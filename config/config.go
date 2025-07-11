@@ -1176,7 +1176,7 @@ type Config struct {
 	//  }
 	// }
 	// ```
-	OverrideMessages map[string]TykError `bson:"override_messages" json:"override_messages"`
+	OverrideMessages map[string]apidef.TykError `bson:"override_messages" json:"override_messages"`
 
 	// Cloud flag shows the Gateway runs in Tyk Cloud.
 	Cloud bool `json:"cloud"`
@@ -1233,11 +1233,6 @@ type ResourceSyncConfig struct {
 
 	// Interval configures the interval in seconds between each retry on a resource sync error.
 	Interval int `json:"interval"`
-}
-
-type TykError struct {
-	Message string `json:"message"`
-	Code    int    `json:"code"`
 }
 
 // VaultConfig is used to configure the creation of a client

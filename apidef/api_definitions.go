@@ -165,6 +165,17 @@ type MockResponseMeta struct {
 	Headers    map[string]string `bson:"headers" json:"headers"`
 }
 
+type TykError struct {
+	Message string `json:"message"`
+	Code    int    `json:"code"`
+}
+
+type ErrorOverrideMeta struct {
+	Path   string              `bson:"path" json:"path"`
+	Method string              `bson:"method" json:"method"`
+	Errors map[string]TykError `bson:"errors" json:"errors"`
+}
+
 type EndPointMeta struct {
 	Disabled   bool   `bson:"disabled" json:"disabled"`
 	Path       string `bson:"path" json:"path"`
@@ -414,6 +425,7 @@ type ExtendedPathsSet struct {
 	GoPlugin                []GoPluginMeta        `bson:"go_plugin" json:"go_plugin,omitempty"`
 	PersistGraphQL          []PersistGraphQLMeta  `bson:"persist_graphql" json:"persist_graphql"`
 	RateLimit               []RateLimitMeta       `bson:"rate_limit" json:"rate_limit"`
+	ErrorOverrides          []ErrorOverrideMeta   `bson:"error_messages" json:"error_messages"`
 }
 
 // Clear omits values that have OAS API definition conversions in place.
@@ -772,6 +784,8 @@ type APIDefinition struct {
 
 	// UpstreamAuth stores information about authenticating against upstream.
 	UpstreamAuth UpstreamAuth `bson:"upstream_auth" json:"upstream_auth"`
+
+	CustomErrorResponses map[string]TykError `bson:"custom_error_responses,omitempty" json:"custom_error_responses,omitempty"`
 }
 
 type JWK struct {

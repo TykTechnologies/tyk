@@ -738,6 +738,19 @@ func handleResponseChain(chain []TykResponseHandler, rw http.ResponseWriter, res
 	traceIsEnabled := trace.IsEnabled()
 	for _, rh := range chain {
 		if err := handleResponse(rh, rw, res, req, ses, traceIsEnabled); err != nil {
+			// Store error in context
+			//ctx.SetErrorInfo(req, "", err)
+
+			// Apply error overrides if the spec is available
+			if spec := rh.Base().Spec; spec != nil {
+				errorOverrideMw := &ErrorOverrideMiddleware{BaseMiddleware: &BaseMiddleware{Spec: spec}}
+				errMsg, _ := errorOverrideMw.ApplyErrorOverride(req, err.Error(), 0)
+
+				if errMsg != err.Error() {
+					err = errors.New(errMsg)
+				}
+			}
+
 			// Abort the request if this handler is a response middleware hook:
 			if rh.Name() == "CustomMiddlewareResponseHook" {
 				rh.HandleError(rw, req)
