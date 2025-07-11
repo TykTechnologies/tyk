@@ -1,6 +1,8 @@
-name: Ask questions about the code
+name: Dependency Impact Review
 
 on:
+  pull_request:
+    types: [opened, synchronize]
   issue_comment:
     types: [created]
 
@@ -14,7 +16,8 @@ jobs:
   dependency_review:
     uses: buger/probe/.github/workflows/probe.yml@main
     with:
-      command_prefix: "/probe"
+      command_prefix: "/dependency"
+      prompt: ".probe/dependency-impact-reviewer.md"
     secrets:
       ANTHROPIC_API_KEY: ${{ secrets.PROBE_ANTHROPIC_API_KEY }}
       ANTHROPIC_API_URL: ${{ secrets.PROBE_ANTHROPIC_URL }}
