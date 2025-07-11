@@ -169,7 +169,7 @@ func TestDNSThrottlingMechanism(t *testing.T) {
 	updateResolvedIPs("test.host", mockResolver)
 	mockResolver.clearCallLog()
 
-	_, _ := checkAndHandleDNSChange("test.host:8080", true)
+	_, _ = checkAndHandleDNSChange("test.host:8080", true)
 
 	assert.True(t, values.GetDNSCheckedAfterError(), "DNS checked flag should be set after first check")
 	callLog := mockResolver.getCallLog()
@@ -178,7 +178,7 @@ func TestDNSThrottlingMechanism(t *testing.T) {
 	// Test 2: Subsequent DNS checks should be throttled
 	mockResolver.clearCallLog()
 	reconnectCalled = false
-	_, _ = checkAndHandleDNSChange("test.host:8080", true)
+	_, shouldRetry := checkAndHandleDNSChange("test.host:8080", true)
 
 	// Note: dnsChanged is not used since we only care about shouldRetry in throttling test
 	// assert.False(t, dnsChanged, "Subsequent check should be throttled")
@@ -378,7 +378,7 @@ func TestDNSChangeWithEmergencyMode(t *testing.T) {
 	updateResolvedIPs("emergency.test", mockResolver)
 	mockResolver.clearCallLog()
 
-	_, _ := checkAndHandleDNSChange("emergency.test:8080", true)
+	_, _ = checkAndHandleDNSChange("emergency.test:8080", true)
 	callLog := mockResolver.getCallLog()
 	assert.Len(t, callLog, 1, "Should make DNS call in normal mode")
 
@@ -387,7 +387,7 @@ func TestDNSChangeWithEmergencyMode(t *testing.T) {
 	values.SetEmergencyMode(true)
 	values.SetDNSCheckedAfterError(false) // Reset flag
 
-	_, shouldRetry = checkAndHandleDNSChange("emergency.test:8080", true)
+	_, shouldRetry := checkAndHandleDNSChange("emergency.test:8080", true)
 	assert.False(t, shouldRetry, "Should not retry in emergency mode")
 	assert.False(t, shouldRetry, "Should not retry in emergency mode")
 
