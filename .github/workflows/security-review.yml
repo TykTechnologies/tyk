@@ -18,7 +18,7 @@ jobs:
     with:
       command_prefix: "/security"
       prompt: ".probe/security-reviewer.md"
-      update_existing_comment: "true"
+      update_existing_comment: true
       update_comment_marker: "Security Impact Reviewer Prompt"
     secrets:
       ANTHROPIC_API_KEY: ${{ secrets.PROBE_ANTHROPIC_API_KEY }}
