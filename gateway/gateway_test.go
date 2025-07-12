@@ -1807,8 +1807,24 @@ func TestBrokenClients(t *testing.T) {
 		time.Sleep(recordsBufferFlushInterval + 50*time.Millisecond)
 		results := ts.Gw.Analytics.Store.GetAndDeleteSet(analyticsKeyName)
 
+		if len(results) == 0 {
+			t.Fatal("No analytics records found, expected exactly one record with ResponseCode 499")
+		}
+
+		if len(results) > 1 {
+			t.Fatalf("Expected exactly one analytics record, but found %d records", len(results))
+		}
+
+		resultStr, ok := results[0].(string)
+		if !ok {
+			t.Fatalf("Analytics record has unexpected type %T, expected string", results[0])
+		}
+
 		var record analytics.AnalyticsRecord
-		msgpack.Unmarshal([]byte(results[0].(string)), &record)
+		if err := msgpack.Unmarshal([]byte(resultStr), &record); err != nil {
+			t.Fatal("Failed to unmarshal analytics record:", err)
+		}
+
 		if record.ResponseCode != 499 {
 			t.Fatal("Analytics record do not match:", record)
 		}
