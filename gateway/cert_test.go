@@ -1224,7 +1224,11 @@ func TestKeyWithCertificateTLS(t *testing.T) {
 		)[0]
 
 		client := GetTLSClient(&clientCert, nil)
-		client.Transport = test.NewTransport(test.WithLocalDialer())
+		// Preserve the original TLS configuration when creating new transport with local dialer
+		originalTransport := client.Transport.(*http.Transport)
+		transport := test.NewTransport(test.WithLocalDialer())
+		transport.TLSClientConfig = originalTransport.TLSClientConfig
+		client.Transport = transport
 
 		_, _ = ts.Run(t, []test.TestCase{
 			{Code: http.StatusNotFound, Path: "/test1", Client: client},
