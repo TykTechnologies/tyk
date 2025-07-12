@@ -45,6 +45,10 @@ func (gw *Gateway) LoadDefinitionsFromRPCBackup() ([]*APISpec, error) {
 		return nil, errors.New("[RPC] --> Failed to get node backup (" + checkKey + "): " + err.Error())
 	}
 
+	if cryptoText == "" {
+		return nil, errors.New("[RPC] --> Empty backup data for key: " + checkKey)
+	}
+
 	apiListAsString := crypto.Decrypt([]byte(secret), cryptoText)
 
 	a := APIDefinitionLoader{Gw: gw}
@@ -95,6 +99,14 @@ func (gw *Gateway) LoadPoliciesFromRPCBackup() (map[string]user.Policy, error) {
 
 	secret := crypto.GetPaddedString(gw.GetConfig().Secret)
 	cryptoText, err := store.GetKey(checkKey)
+	if err != nil {
+		return nil, errors.New("[RPC] --> Failed to get policy backup (" + checkKey + "): " + err.Error())
+	}
+
+	if cryptoText == "" {
+		return nil, errors.New("[RPC] --> Empty policy backup data for key: " + checkKey)
+	}
+
 	listAsString := crypto.Decrypt([]byte(secret), cryptoText)
 
 	if err != nil {

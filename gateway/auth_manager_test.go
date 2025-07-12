@@ -184,34 +184,38 @@ func TestHashKeyFunctionChanged(t *testing.T) {
 	}
 
 	t.Run("custom key", func(t *testing.T) {
-
+		// Test with custom authentication key
 		const customKey = "custom-key"
 
 		session := CreateStandardSession()
-		session.AccessRights = map[string]user.AccessDefinition{"test": {
-			APIID: "test", Versions: []string{"v1"},
+		session.AccessRights = map[string]user.AccessDefinition{api.APIID: {
+			APIID: api.APIID, Versions: []string{"v1"},
 		}}
 
+		// Create the session with the custom key
 		_, _ = ts.Run(t, test.TestCase{AdminAuth: true, Method: http.MethodPost, Path: "/tyk/keys/" + customKey,
 			Data: session, Client: client, Code: http.StatusOK})
 
+		// Test that changing hash function breaks then fixes authentication
 		testChangeHashFunc(t, map[string]string{header.Authorization: customKey}, client, http.StatusForbidden)
 	})
 
 	t.Run("basic auth key", func(t *testing.T) {
+		// Test with basic authentication using username/password
 		api.UseBasicAuth = true
 		api.AuthConfigs = map[string]apidef.AuthConfig{
-			apidef.AuthTokenType: {UseCertificate: true},
+			apidef.AuthTokenType: {UseCertificate: false},
 		}
 		ts.Gw.LoadAPI(api)
 		globalConf = ts.Gw.GetConfig()
 
 		session := CreateStandardSession()
 		session.BasicAuthData.Password = "password"
-		session.AccessRights = map[string]user.AccessDefinition{"test": {
-			APIID: "test", Versions: []string{"v1"},
+		session.AccessRights = map[string]user.AccessDefinition{api.APIID: {
+			APIID: api.APIID, Versions: []string{"v1"},
 		}}
 
+		// Create the session with username "user" and password "password"
 		_, _ = ts.Run(t, test.TestCase{
 			AdminAuth: true,
 			Method:    http.MethodPost,
@@ -223,30 +227,37 @@ func TestHashKeyFunctionChanged(t *testing.T) {
 
 		authHeader := map[string]string{"Authorization": genAuthHeader("user", "password")}
 
+		// Test that changing hash function breaks then fixes authentication
 		testChangeHashFunc(t, authHeader, client, http.StatusUnauthorized)
 
+		// Reset API configuration
 		api.UseBasicAuth = false
 		ts.Gw.LoadAPI(api)
 		globalConf = ts.Gw.GetConfig()
 	})
 
 	t.Run("client certificate", func(t *testing.T) {
+		// Test with client certificate authentication
 		api.UseBasicAuth = false
 		api.AuthConfigs = map[string]apidef.AuthConfig{
 			apidef.AuthTokenType: {UseCertificate: true},
 		}
 		ts.Gw.LoadAPI(api)
+		
 		session := CreateStandardSession()
 		session.Certificate = clientCertID
 		session.BasicAuthData.Password = "password"
-		session.AccessRights = map[string]user.AccessDefinition{"test": {
-			APIID: "test", Versions: []string{"v1"},
+		session.AccessRights = map[string]user.AccessDefinition{api.APIID: {
+			APIID: api.APIID, Versions: []string{"v1"},
 		}}
 
+		// Create the session with client certificate authentication
 		_, _ = ts.Run(t, test.TestCase{AdminAuth: true, Method: http.MethodPost, Path: "/tyk/keys/create",
 			Data: session, Client: client, Code: http.StatusOK})
 
+		// Use TLS client with certificate for authentication
 		client = GetTLSClient(&clientCert, nil)
+		// Test that changing hash function breaks then fixes authentication
 		testChangeHashFunc(t, nil, client, http.StatusForbidden)
 	})
 

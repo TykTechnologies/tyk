@@ -445,6 +445,10 @@ func TestAnalytics_Write(t *testing.T) {
 				results := ts.Gw.Analytics.Store.GetAndDeleteSet(redisAnalyticsKeyName)
 				assert.Len(t, results, 1)
 
+				if len(results) == 0 {
+					t.Fatal("No analytics records found")
+				}
+
 				var record analytics.AnalyticsRecord
 				err = ts.Gw.Analytics.analyticsSerializer.Decode([]byte(results[0].(string)), &record)
 				assert.Nil(t, err)
