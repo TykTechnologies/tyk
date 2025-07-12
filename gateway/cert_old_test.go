@@ -219,14 +219,14 @@ func TestPublicKeyPinning(t *testing.T) {
 
 		// start proxy
 		_, _, _, proxyCert := certs.GenCertificate(&x509.Certificate{
-			Subject: pkix.Name{CommonName: "local1.host"},
+			Subject: pkix.Name{CommonName: "localhost"},
 		}, false)
 		proxyPubID, err := ts.Gw.uploadCertPublicKey(proxyCert)
 		if err != nil {
 			t.Error(err)
 		}
 
-		proxy := initProxy("http", &tls.Config{
+		proxy := initProxy("https", &tls.Config{
 			Certificates: []tls.Certificate{proxyCert},
 			MaxVersion:   tls.VersionTLS12,
 		})
@@ -240,7 +240,7 @@ func TestPublicKeyPinning(t *testing.T) {
 
 		pubKeys := fmt.Sprintf("%s,%s", serverPubID, proxyPubID)
 		upstream.URL = strings.Replace(upstream.URL, "127.0.0.1", "localhost", 1)
-		proxy.URL = strings.Replace(proxy.URL, "127.0.0.1", "local1.host", 1)
+		proxy.URL = strings.Replace(proxy.URL, "127.0.0.1", "localhost", 1)
 
 		ts.Gw.BuildAndLoadAPI([]func(spec *APISpec){func(spec *APISpec) {
 			spec.Proxy.ListenPath = "/valid"
