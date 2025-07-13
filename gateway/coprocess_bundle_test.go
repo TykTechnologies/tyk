@@ -356,20 +356,20 @@ func isPythonCoprocessAvailable() bool {
 	dispatcherPath := filepath.Join(workDir, "coprocess", "python")
 	tykPath := filepath.Join(dispatcherPath, "tyk")
 	protoPath := filepath.Join(dispatcherPath, "proto")
-	
+
 	// Check if required Python coprocess directories exist
 	for _, path := range []string{dispatcherPath, tykPath, protoPath} {
 		if _, err := os.Stat(path); os.IsNotExist(err) {
 			return false
 		}
 	}
-	
+
 	// Check if dispatcher.py exists
 	dispatcherFile := filepath.Join(dispatcherPath, "dispatcher.py")
 	if _, err := os.Stat(dispatcherFile); os.IsNotExist(err) {
 		return false
 	}
-	
+
 	// Try to initialize a Python dispatcher to check if the environment is properly set up
 	pythonVersion := test.GetPythonVersion()
 	conf := config.Config{
@@ -379,7 +379,7 @@ func isPythonCoprocessAvailable() bool {
 			PythonVersion:    pythonVersion,
 		},
 	}
-	
+
 	// Attempt to create a Python dispatcher - if this fails, the environment isn't ready
 	_, err := NewPythonDispatcher(conf)
 	return err == nil

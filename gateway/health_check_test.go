@@ -1062,7 +1062,7 @@ func TestRealisticEmergencyModeRecovery(t *testing.T) {
 
 	// Verify health checks show RPC as healthy again
 	time.Sleep(200 * time.Millisecond) // Allow health checks to run
-	ts.Gw.gatherHealthChecks() // Force health check update
+	ts.Gw.gatherHealthChecks()         // Force health check update
 	healthInfo = ts.Gw.getHealthCheckInfo()
 	if rpcCheck, exists := healthInfo["rpc"]; exists {
 		assert.Equal(t, apidef.Pass, rpcCheck.Status, "RPC should be healthy after recovery")
@@ -3684,11 +3684,11 @@ func testDashboardFailureImpact(t *testing.T) {
 		mockDashboard := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			switch r.URL.Path {
 			case "/register/node":
-				w.Write([]byte(`{"Status": "OK", "Message": {"NodeID": "test-node-123"}, "Nonce": "test-nonce"}`))  
+				w.Write([]byte(`{"Status": "OK", "Message": {"NodeID": "test-node-123"}, "Nonce": "test-nonce"}`))
 			case "/register/ping":
-				w.Write([]byte(`{"Status": "OK", "Nonce": "test-nonce"}`))  
+				w.Write([]byte(`{"Status": "OK", "Nonce": "test-nonce"}`))
 			case "/system/node":
-				w.Write([]byte(`{"Status": "OK"}`))  
+				w.Write([]byte(`{"Status": "OK"}`))
 			default:
 				w.WriteHeader(http.StatusNotFound)
 			}

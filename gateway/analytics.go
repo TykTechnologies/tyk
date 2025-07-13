@@ -113,7 +113,7 @@ func (r *RedisAnalyticsHandler) Flush() {
 	// This prevents race conditions where records generated during request processing
 	// are lost when the analytics system is stopped too quickly
 	time.Sleep(5 * time.Millisecond)
-	
+
 	r.Stop()
 
 	r.Start()

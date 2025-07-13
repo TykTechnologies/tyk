@@ -1038,7 +1038,7 @@ func TestSSLForceCommonName(t *testing.T) {
 		ts.Gw.SetConfig(globalConf)
 
 		targetURL := strings.Replace(upstream.URL, "127.0.0.1", "localhost", 1)
-		
+
 		api := BuildAPI(func(spec *APISpec) {
 			spec.Proxy.ListenPath = "/"
 			spec.Proxy.TargetURL = targetURL

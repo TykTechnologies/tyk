@@ -243,7 +243,7 @@ func TestHashKeyFunctionChanged(t *testing.T) {
 			apidef.AuthTokenType: {UseCertificate: true},
 		}
 		ts.Gw.LoadAPI(api)
-		
+
 		session := CreateStandardSession()
 		session.Certificate = clientCertID
 		session.BasicAuthData.Password = "password"
