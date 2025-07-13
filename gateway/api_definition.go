@@ -206,7 +206,7 @@ func (s *APISpec) Unload() {
 // Validate returns nil if s is a valid spec and an error stating why the spec is not valid.
 func (s *APISpec) Validate(oasConfig config.OASConfig) error {
 	if s.IsOAS {
-		err := s.OAS.Validate(context.Background(), oas.GetValidationOptionsFromConfig(oasConfig)...)
+		err := s.OAS.Validate(context.Background(), oas.WithOpenApiOpts(oas.GetValidationOptionsFromConfig(oasConfig)...))
 		if err != nil {
 			return err
 		}

@@ -4,6 +4,8 @@ import (
 	"embed"
 	"errors"
 	"fmt"
+	"github.com/TykTechnologies/tyk/common/option"
+	"github.com/getkin/kin-openapi/openapi3"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -232,4 +234,22 @@ func getMinorVersion(version string) (string, error) {
 
 	segments := v.Segments()
 	return fmt.Sprintf("%d.%d", segments[0], segments[1]), nil
+}
+
+type validatorCnf struct {
+	opts         []openapi3.ValidationOption
+	allowClassic bool
+}
+
+func WithOpenApiOpts(opts ...openapi3.ValidationOption) option.Option[validatorCnf] {
+	return func(v *validatorCnf) {
+		v.opts = opts
+	}
+}
+
+// WithAllowClassic allows using classic urls
+func WithAllowClassic() option.Option[validatorCnf] {
+	return func(v *validatorCnf) {
+		v.allowClassic = true
+	}
 }
