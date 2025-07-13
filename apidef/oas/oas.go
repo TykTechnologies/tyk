@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/TykTechnologies/tyk/common/option"
+	"github.com/TykTechnologies/tyk/internal/pathutil"
 	"github.com/samber/lo"
 	"strings"
 
@@ -463,11 +465,23 @@ func (s *OAS) ReplaceServers(apiURLs, oldAPIURLs []string) {
 
 // Validate validates OAS document by calling openapi3.T.Validate() function. In addition, it validates Security
 // Requirement section and it's requirements by calling OAS.validateSecurity() function.
-func (s *OAS) Validate(ctx context.Context, opts ...openapi3.ValidationOption) error {
-	validationErr := s.T.Validate(ctx, opts...)
-	securityErr := s.validateSecurity()
+func (s *OAS) Validate(ctx context.Context, opts ...option.Option[validatorCnf]) error {
+	cnf := option.New(opts).Build(validatorCnf{
+		allowClassic: false,
+	})
 
-	return errors.Join(validationErr, securityErr)
+	if err := errors.Join(
+		s.T.Validate(ctx, cnf.opts...),
+		s.validateSecurity(),
+	); err != nil {
+		return err
+	}
+
+	if cnf.allowClassic {
+		return nil
+	}
+
+	return s.validatePath()
 }
 
 // validateSecurity verifies that existing Security Requirement Objects has Security Schemes declared in the Security
@@ -489,6 +503,28 @@ func (s *OAS) validateSecurity() error {
 					key)
 				return errors.New(errorMsg)
 			}
+		}
+	}
+
+	return nil
+}
+
+// validatePath validate paths to contain only non-classic based path
+func (s *OAS) validatePath() error {
+	if s.Paths == nil {
+		return nil
+	}
+
+	for path := range s.Paths.Map() {
+		parsed, err := pathutil.ParsePath(path)
+
+		if err != nil {
+			log.WithError(err).Warnf("Failed to parse path '%s'", path)
+			return fmt.Errorf("Failed to parse path '%s'", path)
+		}
+
+		if parsed.HasReParams() {
+			return fmt.Errorf("OAS does not support classic-based path like this: '%s'", path)
 		}
 	}
 
@@ -544,8 +580,11 @@ func FillOASFromClassicAPIDefinition(api *apidef.APIDefinition, oas *OAS) (*OAS,
 
 	if err := oas.Validate(
 		context.Background(),
-		openapi3.DisableExamplesValidation(),
-		openapi3.DisableSchemaDefaultsValidation(),
+		WithAllowClassic(),
+		WithOpenApiOpts(
+			openapi3.DisableExamplesValidation(),
+			openapi3.DisableSchemaDefaultsValidation(),
+		),
 	); err != nil {
 		return nil, err
 	}
