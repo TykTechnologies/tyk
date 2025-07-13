@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/TykTechnologies/tyk/common/option"
+	"github.com/TykTechnologies/tyk/internal/pathutil"
 	"strings"
 
 	"github.com/samber/lo"
@@ -538,12 +540,24 @@ func (s *OAS) ReplaceServers(apiURLs, oldAPIURLs []string) {
 
 // Validate validates OAS document by calling openapi3.T.Validate() function. In addition, it validates Security
 // Requirement section and it's requirements by calling OAS.validateSecurity() function.
-func (s *OAS) Validate(ctx context.Context, opts ...openapi3.ValidationOption) error {
-	validationErr := s.T.Validate(ctx, opts...)
-	securityErr := s.validateSecurity()
-	compliantModeErr := s.validateCompliantModeAuthentication()
+func (s *OAS) Validate(ctx context.Context, opts ...option.Option[validatorCnf]) error {
+	cnf := option.New(opts).Build(validatorCnf{
+		allowClassic: false,
+	})
 
-	return errors.Join(validationErr, securityErr, compliantModeErr)
+	if err := errors.Join(
+		s.T.Validate(ctx, cnf.opts...),
+		s.validateSecurity(),
+		s.validateCompliantModeAuthentication(),
+	); err != nil {
+		return err
+	}
+
+	if cnf.allowClassic {
+		return nil
+	}
+
+	return s.validatePath()
 }
 
 // Normalize converts the OAS api to a normalized state.
@@ -706,6 +720,28 @@ func (s *OAS) validateCompliantModeAuthentication() error {
 	return nil
 }
 
+// validatePath validate paths to contain only non-classic based path
+func (s *OAS) validatePath() error {
+	if s.Paths == nil {
+		return nil
+	}
+
+	for path := range s.Paths.Map() {
+		parsed, err := pathutil.ParsePath(path)
+
+		if err != nil {
+			log.WithError(err).Warnf("Failed to parse path '%s'", path)
+			return fmt.Errorf("Failed to parse path '%s'", path)
+		}
+
+		if parsed.HasReParams() {
+			return fmt.Errorf("OAS does not support classic-based path like this: '%s'", path)
+		}
+	}
+
+	return nil
+}
+
 // APIDef holds both OAS and Classic forms of an API definition.
 type APIDef struct {
 	// OAS contains the OAS API definition.
@@ -755,8 +791,11 @@ func FillOASFromClassicAPIDefinition(api *apidef.APIDefinition, oas *OAS) (*OAS,
 
 	if err := oas.Validate(
 		context.Background(),
-		openapi3.DisableExamplesValidation(),
-		openapi3.DisableSchemaDefaultsValidation(),
+		WithAllowClassic(),
+		WithOpenApiOpts(
+			openapi3.DisableExamplesValidation(),
+			openapi3.DisableSchemaDefaultsValidation(),
+		),
 	); err != nil {
 		return nil, err
 	}
