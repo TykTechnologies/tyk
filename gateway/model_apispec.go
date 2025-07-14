@@ -181,7 +181,6 @@ func (a *APISpec) findOperation(r *http.Request) *Operation {
 	}
 }
 
-// sendRateLimitHeaders
 func (a *APISpec) sendRateLimitHeaders(session *user.SessionState, dest *http.Response) {
 	quotaMax, quotaRemaining, quotaRenews := int64(0), int64(0), int64(0)
 
