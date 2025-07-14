@@ -69,6 +69,7 @@ import (
 	"github.com/TykTechnologies/tyk/user"
 
 	gql "github.com/TykTechnologies/graphql-go-tools/pkg/graphql"
+	lib "github.com/TykTechnologies/tyk/lib/apidef"
 )
 
 const (
@@ -1049,13 +1050,29 @@ func (gw *Gateway) handleGetAPIOAS(apiID string, modePublic bool) (interface{}, 
 
 func (gw *Gateway) handleAddApi(r *http.Request, fs afero.Fs, oasEndpoint bool) (interface{}, int) {
 	var (
-		newDef             apidef.APIDefinition
-		oasObj             oas.OAS
-		baseAPIID          = r.FormValue("base_api_id")
-		baseAPIVersionName = r.FormValue("base_api_version_name")
-		newVersionName     = r.FormValue("new_version_name")
-		setDefault         = r.FormValue("set_default") == "true"
+		newDef  apidef.APIDefinition
+		oasObj  oas.OAS
+		baseApi *APISpec
 	)
+	//baseAPIID          = r.FormValue("base_api_id")
+	//baseAPIVersionName = r.FormValue("base_api_version_name")
+	//newVersionName     = r.FormValue("new_version_name")
+	//setDefault         = r.FormValue("set_default") == "true"
+
+	versionParams := lib.NewVersionQueryParameters(r)
+	err := versionParams.Validate(func() (bool, string) {
+		baseApiID := versionParams.Get(lib.BaseAPIID)
+		baseApi = gw.getApiSpec(baseApiID)
+		if baseApi != nil {
+			return true, baseApi.VersionDefinition.Name
+		}
+
+		return false, ""
+	})
+
+	if err != nil {
+		return apiError(err.Error()), http.StatusBadRequest
+	}
 
 	if oasEndpoint {
 		if err := json.NewDecoder(r.Body).Decode(&oasObj); err != nil {
@@ -1099,60 +1116,58 @@ func (gw *Gateway) handleAddApi(r *http.Request, fs afero.Fs, oasEndpoint bool) 
 		}
 	}
 
-	if baseAPIID != "" {
-		if baseAPIPtr := gw.getApiSpec(baseAPIID); baseAPIPtr == nil {
-			log.Errorf("Couldn't find a base API to bind with the given API id: %s", baseAPIID)
+	if !versionParams.IsEmpty(lib.BaseAPIID) && baseApi != nil {
+		apiInBytes, err := json.Marshal(baseApi)
+		if err != nil {
+			log.WithError(err).Error("Couldn't marshal API spec")
+		}
+
+		var baseAPI APISpec
+		err = json.Unmarshal(apiInBytes, &baseAPI)
+		if err != nil {
+			log.WithError(err).Error("Couldn't unmarshal API spec")
+		}
+
+		lib.ConfigureVersionDefinition()
+
+		//baseAPI.VersionDefinition.Enabled = true
+		if baseAPIVersionName != "" {
+			baseAPI.VersionDefinition.Name = baseAPIVersionName
+			baseAPI.VersionDefinition.Default = baseAPIVersionName
+		}
+
+		if baseAPI.VersionDefinition.Key == "" {
+			baseAPI.VersionDefinition.Key = apidef.DefaultAPIVersionKey
+		}
+
+		if baseAPI.VersionDefinition.Location == "" {
+			baseAPI.VersionDefinition.Location = apidef.HeaderLocation
+		}
+
+		if baseAPI.VersionDefinition.Default == "" {
+			baseAPI.VersionDefinition.Default = apidef.Self
+		}
+
+		if baseAPI.VersionDefinition.Versions == nil {
+			baseAPI.VersionDefinition.Versions = make(map[string]string)
+		}
+
+		baseAPI.VersionDefinition.Versions[newVersionName] = newDef.APIID
+
+		if setDefault {
+			baseAPI.VersionDefinition.Default = newVersionName
+		}
+
+		if baseAPI.IsOAS {
+			baseAPI.OAS.Fill(*baseAPI.APIDefinition)
+			err, _ := gw.writeOASAndAPIDefToFile(fs, baseAPI.APIDefinition, &baseAPI.OAS)
+			if err != nil {
+				log.WithError(err).Errorf("Error occurred while updating base OAS API with id: %s", baseAPI.APIID)
+			}
 		} else {
-			apiInBytes, err := json.Marshal(baseAPIPtr)
+			err, _ := gw.writeToFile(fs, baseAPI.APIDefinition, baseAPI.APIID)
 			if err != nil {
-				log.WithError(err).Error("Couldn't marshal API spec")
-			}
-
-			var baseAPI APISpec
-			err = json.Unmarshal(apiInBytes, &baseAPI)
-			if err != nil {
-				log.WithError(err).Error("Couldn't unmarshal API spec")
-			}
-
-			baseAPI.VersionDefinition.Enabled = true
-			if baseAPIVersionName != "" {
-				baseAPI.VersionDefinition.Name = baseAPIVersionName
-				baseAPI.VersionDefinition.Default = baseAPIVersionName
-			}
-
-			if baseAPI.VersionDefinition.Key == "" {
-				baseAPI.VersionDefinition.Key = apidef.DefaultAPIVersionKey
-			}
-
-			if baseAPI.VersionDefinition.Location == "" {
-				baseAPI.VersionDefinition.Location = apidef.HeaderLocation
-			}
-
-			if baseAPI.VersionDefinition.Default == "" {
-				baseAPI.VersionDefinition.Default = apidef.Self
-			}
-
-			if baseAPI.VersionDefinition.Versions == nil {
-				baseAPI.VersionDefinition.Versions = make(map[string]string)
-			}
-
-			baseAPI.VersionDefinition.Versions[newVersionName] = newDef.APIID
-
-			if setDefault {
-				baseAPI.VersionDefinition.Default = newVersionName
-			}
-
-			if baseAPI.IsOAS {
-				baseAPI.OAS.Fill(*baseAPI.APIDefinition)
-				err, _ := gw.writeOASAndAPIDefToFile(fs, baseAPI.APIDefinition, &baseAPI.OAS)
-				if err != nil {
-					log.WithError(err).Errorf("Error occurred while updating base OAS API with id: %s", baseAPI.APIID)
-				}
-			} else {
-				err, _ := gw.writeToFile(fs, baseAPI.APIDefinition, baseAPI.APIID)
-				if err != nil {
-					log.WithError(err).Errorf("Error occurred while updating base API with id: %s", baseAPI.APIID)
-				}
+				log.WithError(err).Errorf("Error occurred while updating base API with id: %s", baseAPI.APIID)
 			}
 		}
 	}
