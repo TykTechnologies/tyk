@@ -5,11 +5,14 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/samber/lo"
 	"strings"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/internal/oasutil"
 	"github.com/TykTechnologies/tyk/internal/reflect"
+
 	"github.com/getkin/kin-openapi/openapi3"
 )
 
@@ -340,28 +343,69 @@ func (s *OAS) getTykOperations() (operations Operations) {
 	return
 }
 
+func (s *OAS) ClearCustomDomainServers(old *OAS) error {
+	if old == nil {
+		return nil
+	}
+
+	extension := old.GetTykExtension()
+	if extension == nil {
+		return nil
+	}
+
+	if extension.Server.CustomDomain == nil {
+		return nil
+	}
+
+	return s.RemoveServer(extension.Server.CustomDomain.Name)
+}
+
+func (s *OAS) RemoveServer(serverUrl string) error {
+	if len(serverUrl) == 0 {
+		return nil
+	}
+
+	parsed, err := oasutil.ParseServerUrl(serverUrl)
+
+	if err != nil {
+		return err
+	}
+
+	s.Servers = lo.Filter(s.Servers, func(item *openapi3.Server, _ int) bool {
+		// todo: fix cause can produce errors (add api slug to parsed it check if is a prefix)
+		return !strings.Contains(item.URL, parsed.UrlNormalized)
+	})
+
+	return nil
+}
+
 // AddServers adds a server into the servers definition if not already present.
-func (s *OAS) AddServers(apiURLs ...string) {
+func (s *OAS) AddServers(apiURLs ...string) error {
 	apiURLSet := make(map[string]struct{})
-	newServers := openapi3.Servers{}
+	var newServers openapi3.Servers
+
 	for _, apiURL := range apiURLs {
-		if strings.Contains(apiURL, "{") && strings.Contains(apiURL, "}") {
-			continue
+		serverUrl, err := oasutil.ParseServerUrl(apiURL)
+
+		if err != nil {
+			return err
 		}
 
 		newServers = append(newServers, &openapi3.Server{
-			URL: apiURL,
+			URL:       serverUrl.UrlNormalized,
+			Variables: serverUrl.Variables,
 		})
+
 		apiURLSet[apiURL] = struct{}{}
 	}
 
 	if len(newServers) == 0 {
-		return
+		return nil
 	}
 
 	if len(s.Servers) == 0 {
 		s.Servers = newServers
-		return
+		return nil
 	}
 
 	// check if apiURL already exists in servers object
@@ -374,6 +418,7 @@ func (s *OAS) AddServers(apiURLs ...string) {
 	}
 
 	s.Servers = newServers
+	return nil
 }
 
 // UpdateServers sets or updates the first servers URL if it matches oldAPIURL.
