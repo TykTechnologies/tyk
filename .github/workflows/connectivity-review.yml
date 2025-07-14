@@ -18,6 +18,8 @@ jobs:
     with:
       command_prefix: "/connectivity"
       prompt: ".probe/connectivity-reviewer.md"
+      update_existing_comment: true
+      update_comment_marker: "Connectivity Issues Reviewer Prompt for Tyk Gateway"
     secrets:
       ANTHROPIC_API_KEY: ${{ secrets.PROBE_ANTHROPIC_API_KEY }}
       ANTHROPIC_API_URL: ${{ secrets.PROBE_ANTHROPIC_URL }}
