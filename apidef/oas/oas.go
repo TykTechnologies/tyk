@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/samber/lo"
 	"strings"
 
 	"github.com/TykTechnologies/tyk/apidef"
@@ -340,6 +341,42 @@ func (s *OAS) getTykOperations() (operations Operations) {
 	}
 
 	return
+}
+
+func (s *OAS) ClearCustomDomainServers(old *OAS) error {
+	if old == nil {
+		return nil
+	}
+
+	extension := old.GetTykExtension()
+	if extension == nil {
+		return nil
+	}
+
+	if extension.Server.CustomDomain == nil {
+		return nil
+	}
+
+	return s.RemoveServer(extension.Server.CustomDomain.Name)
+}
+
+func (s *OAS) RemoveServer(serverUrl string) error {
+	if len(serverUrl) == 0 {
+		return nil
+	}
+
+	parsed, err := oasutil.ParseServerUrl(serverUrl)
+
+	if err != nil {
+		return err
+	}
+
+	s.Servers = lo.Filter(s.Servers, func(item *openapi3.Server, _ int) bool {
+		// todo: fix cause can produce errors (add api slug to parsed it check if is a prefix)
+		return !strings.Contains(item.URL, parsed.UrlNormalized)
+	})
+
+	return nil
 }
 
 // AddServers adds a server into the servers definition if not already present.

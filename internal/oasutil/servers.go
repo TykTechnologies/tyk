@@ -114,7 +114,7 @@ func (p *serverUrlParser) extractValueBetweenBraces() (serverVariable, error) {
 		ch := p.url[p.pos]
 
 		switch {
-		case ch == closeCurlyBrace && p.pos == start+1:
+		case ch == closeCurlyBrace && p.pos == start:
 			return serverVariable{}, ErrEmptyVariableName
 		case ch == closeCurlyBrace:
 			p.pos++

@@ -45,6 +45,20 @@ func TestParseServerUrl(t *testing.T) {
 					},
 				},
 			}},
+			{"one letter variable", "https://example.com/{v}/", &oasutil.ServerUrl{
+				Url:           "https://example.com/{v}/",
+				UrlNormalized: "https://example.com/{v}/",
+				Variables: map[string]*openapi3.ServerVariable{
+					"v": {
+						Default: oasutil.DefaultServerUrlPrefix + "1",
+					},
+				},
+			}},
+			{"parses empty line", "", &oasutil.ServerUrl{
+				Url:           "",
+				UrlNormalized: "",
+				Variables:     nil,
+			}},
 		} {
 			t.Run(tCase.name, func(t *testing.T) {
 				res, err := oasutil.ParseServerUrl(tCase.input)
