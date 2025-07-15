@@ -15,12 +15,18 @@ const (
 	paramCount
 )
 
+// VersionParameter represents the type of parameter used in API version configuration.
+// It defines the possible parameters that can be used when working with API versions.
 type VersionParameter int
 
+// String returns the string representation of a VersionParameter.
+// It converts the numeric parameter value to its corresponding string identifier.
 func (v VersionParameter) String() string {
 	return []string{"base_api_id", "base_api_version_name", "new_version_name", "setDefault"}[v]
 }
 
+// AllVersionParameters returns a slice containing all available version parameters.
+// This is useful for iterating through all possible version parameters.
 func AllVersionParameters() []VersionParameter {
 	params := make([]VersionParameter, paramCount)
 	for i := range params {
@@ -30,10 +36,15 @@ func AllVersionParameters() []VersionParameter {
 	return params
 }
 
+// VersionQueryParameters holds the version-related parameters extracted from HTTP requests.
+// It provides methods to access and validate these parameters.
 type VersionQueryParameters struct {
 	versionParams map[string]string
 }
 
+// Validate checks if the version parameters are valid.
+// It takes a function that checks if the base API exists and returns an error if validation fails.
+// The doesBaseApiExists function should return whether the base API exists and its name.
 func (v *VersionQueryParameters) Validate(doesBaseApiExists func() (bool, string)) error {
 	baseID := v.versionParams[BaseAPIID.String()]
 	if baseID == "" {
@@ -52,14 +63,20 @@ func (v *VersionQueryParameters) Validate(doesBaseApiExists func() (bool, string
 	return nil
 }
 
+// IsEmpty checks if a specific version parameter is empty or not set.
+// Returns true if the parameter is empty, false otherwise.
 func (v *VersionQueryParameters) IsEmpty(param VersionParameter) bool {
 	return v.versionParams[param.String()] == ""
 }
 
+// Get retrieves the value of a specific version parameter.
+// Returns the string value of the parameter.
 func (v *VersionQueryParameters) Get(param VersionParameter) string {
 	return v.versionParams[param.String()]
 }
 
+// NewVersionQueryParameters creates a new VersionQueryParameters instance from an HTTP request.
+// It extracts all version-related parameters from the request's URL query.
 func NewVersionQueryParameters(req *http.Request) *VersionQueryParameters {
 	versionParams := &VersionQueryParameters{
 		versionParams: make(map[string]string, paramCount),
