@@ -16,7 +16,26 @@ func TestCORSMiddleware_ProcessRequest_PreflightRequest(t *testing.T) {
 	m := createCORSMiddleware(corsConf)
 	m.Init()
 
-	origin := "http://example.com"
+	t.Run("preflight request - successful", func(t *testing.T) {
+		origin := "http://example.com"
+		resp := executePreFlightRequest(t, m, origin)
+
+		assert.Equal(t, origin, resp.Header.Get("Access-Control-Allow-Origin"))
+		assert.Equal(t, "true", resp.Header.Get("Access-Control-Allow-Credentials"))
+		assert.Contains(t, resp.Header.Get("Access-Control-Allow-Methods"), http.MethodPost)
+	})
+
+	t.Run("preflight request - different origin", func(t *testing.T) {
+		origin := "http://wrong-origin.com"
+		resp := executePreFlightRequest(t, m, origin)
+
+		assert.Empty(t, resp.Header.Get("Access-Control-Allow-Origin"))
+		assert.Empty(t, resp.Header.Get("Access-Control-Allow-Credentials"))
+		assert.Empty(t, resp.Header.Get("Access-Control-Allow-Methods"))
+	})
+}
+
+func executePreFlightRequest(t *testing.T, mw *CORSMiddleware, origin string) *http.Response {
 	req := httptest.NewRequest(http.MethodOptions, "/test", nil)
 	req.Header.Set("Origin", origin)
 	req.Header.Set("Access-Control-Request-Method", http.MethodPost)
@@ -24,14 +43,11 @@ func TestCORSMiddleware_ProcessRequest_PreflightRequest(t *testing.T) {
 
 	w := httptest.NewRecorder()
 
-	err, code := m.ProcessRequest(w, req, nil)
+	err, code := mw.ProcessRequest(w, req, nil)
 	assert.Nil(t, err)
 	assert.Equal(t, middleware.StatusRespond, code, "Should respond immediately for preflight requests")
 
-	resp := w.Result()
-	assert.Equal(t, origin, resp.Header.Get("Access-Control-Allow-Origin"))
-	assert.Equal(t, "true", resp.Header.Get("Access-Control-Allow-Credentials"))
-	assert.Contains(t, resp.Header.Get("Access-Control-Allow-Methods"), http.MethodPost)
+	return w.Result()
 }
 
 func TestCORSMiddleware_ProcessRequest_RegularRequest(t *testing.T) {
@@ -39,21 +55,37 @@ func TestCORSMiddleware_ProcessRequest_RegularRequest(t *testing.T) {
 	m := createCORSMiddleware(corsConf)
 	m.Init()
 
-	origin := "http://example.com"
+	t.Run("regular request - successful", func(t *testing.T) {
+		origin := "http://example.com"
+		resp := executeRegularRequest(t, m, origin)
+
+		assert.Equal(t, origin, resp.Header.Get("Access-Control-Allow-Origin"))
+		assert.Equal(t, "true", resp.Header.Get("Access-Control-Allow-Credentials"))
+		assert.Contains(t, resp.Header.Get("Access-Control-Expose-Headers"), "X-Rate-Limit")
+	})
+
+	t.Run("regular request - different origin", func(t *testing.T) {
+		origin := "http://wrong-origin.com"
+		resp := executeRegularRequest(t, m, origin)
+
+		assert.Empty(t, resp.Header.Get("Access-Control-Allow-Origin"))
+		assert.Empty(t, resp.Header.Get("Access-Control-Allow-Credentials"))
+		assert.Empty(t, resp.Header.Get("Access-Control-Expose-Headers"))
+	})
+}
+
+func executeRegularRequest(t *testing.T, mw *CORSMiddleware, origin string) *http.Response {
 	req := httptest.NewRequest(http.MethodGet, "/test", nil)
 	req.Header.Set("Origin", origin)
 	req.Header.Set("Content-Type", "application/json")
 
 	w := httptest.NewRecorder()
 
-	err, code := m.ProcessRequest(w, req, nil)
+	err, code := mw.ProcessRequest(w, req, nil)
 	assert.Nil(t, err)
 	assert.Equal(t, http.StatusOK, code, "Should continue middleware chain for regular requests")
 
-	resp := w.Result()
-	assert.Equal(t, origin, resp.Header.Get("Access-Control-Allow-Origin"))
-	assert.Equal(t, "true", resp.Header.Get("Access-Control-Allow-Credentials"))
-	assert.Contains(t, resp.Header.Get("Access-Control-Expose-Headers"), "X-Rate-Limit")
+	return w.Result()
 }
 
 func TestCORSMiddleware_testApi(t *testing.T) {
