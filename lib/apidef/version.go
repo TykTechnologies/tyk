@@ -90,28 +90,32 @@ func NewVersionQueryParameters(req *http.Request) *VersionQueryParameters {
 	return versionParams
 }
 
-// WithVersionName sets the version name
+// WithVersionName creates an option that sets the version name in a VersionDefinition.
 func WithVersionName(name string) option.Option[apidef.VersionDefinition] {
 	return func(version *apidef.VersionDefinition) {
 		version.Name = name
 	}
 }
 
-// AddVersion adds a version mapping
+// AddVersion creates an option that adds a version mapping to a VersionDefinition.
+// It associates a version name with an API ID in the Versions map.
 func AddVersion(versionName, apiID string) option.Option[apidef.VersionDefinition] {
 	return func(vd *apidef.VersionDefinition) {
 		vd.Versions[versionName] = apiID
 	}
 }
 
-// SetAsDefault marks a version as the default
+// SetAsDefault creates an option that marks a specific version as the default.
+// This sets the Default field in the VersionDefinition to the specified version name.
 func SetAsDefault(versionName string) option.Option[apidef.VersionDefinition] {
 	return func(vd *apidef.VersionDefinition) {
 		vd.Default = versionName
 	}
 }
 
-// ConfigureVersionDefinition sets up the version definition with default values if not already set
+// ConfigureVersionDefinition sets up the version definition with default values if not already set.
+// It applies the provided parameters to configure the version definition and ensures
+// that required fields have appropriate values.
 func ConfigureVersionDefinition(def apidef.VersionDefinition, params *VersionQueryParameters, apiID string) *apidef.VersionDefinition {
 	opts := make([]option.Option[apidef.VersionDefinition], 0)
 
