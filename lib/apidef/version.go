@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/common/option"
-	"net/http"
+	"net/url"
 )
 
 const (
@@ -22,7 +22,7 @@ type VersionParameter int
 // String returns the string representation of a VersionParameter.
 // It converts the numeric parameter value to its corresponding string identifier.
 func (v VersionParameter) String() string {
-	return []string{"base_api_id", "base_api_version_name", "new_version_name", "setDefault"}[v]
+	return []string{"base_api_id", "base_api_version_name", "new_version_name", "set_default"}[v]
 }
 
 // AllVersionParameters returns a slice containing all available version parameters.
@@ -77,14 +77,14 @@ func (v *VersionQueryParameters) Get(param VersionParameter) string {
 
 // NewVersionQueryParameters creates a new VersionQueryParameters instance from an HTTP request.
 // It extracts all version-related parameters from the request's URL query.
-func NewVersionQueryParameters(req *http.Request) *VersionQueryParameters {
+func NewVersionQueryParameters(query url.Values) *VersionQueryParameters {
 	versionParams := &VersionQueryParameters{
 		versionParams: make(map[string]string, paramCount),
 	}
 
 	for _, param := range AllVersionParameters() {
 		paramName := param.String()
-		versionParams.versionParams[paramName] = req.URL.Query().Get(paramName)
+		versionParams.versionParams[paramName] = query.Get(paramName)
 	}
 
 	return versionParams
@@ -94,6 +94,13 @@ func NewVersionQueryParameters(req *http.Request) *VersionQueryParameters {
 func WithVersionName(name string) option.Option[apidef.VersionDefinition] {
 	return func(version *apidef.VersionDefinition) {
 		version.Name = name
+	}
+}
+
+// WithBaseID creates an option that sets the version baseID in a VersionDefinition.
+func WithBaseID(id string) option.Option[apidef.VersionDefinition] {
+	return func(version *apidef.VersionDefinition) {
+		version.BaseID = id
 	}
 }
 
@@ -116,23 +123,34 @@ func SetAsDefault(versionName string) option.Option[apidef.VersionDefinition] {
 // ConfigureVersionDefinition sets up the version definition with default values if not already set.
 // It applies the provided parameters to configure the version definition and ensures
 // that required fields have appropriate values.
-func ConfigureVersionDefinition(def apidef.VersionDefinition, params *VersionQueryParameters, apiID string) *apidef.VersionDefinition {
+func ConfigureVersionDefinition(def apidef.VersionDefinition, params *VersionQueryParameters, newApiID string) apidef.VersionDefinition {
 	opts := make([]option.Option[apidef.VersionDefinition], 0)
 
-	def.Enabled = true
+	if !params.IsEmpty(BaseAPIID) {
+		def.Enabled = true
 
-	if !params.IsEmpty(BaseAPIVersionName) {
-		opts = append(opts, WithVersionName(params.versionParams[BaseAPIVersionName.String()]))
-	}
-
-	if !params.IsEmpty(SetDefault) {
-		setDefault := params.versionParams[SetDefault.String()]
-		if setDefault == "true" {
-			opts = append(opts, SetAsDefault(params.versionParams[NewVersionName.String()]))
+		if !params.IsEmpty(BaseAPIVersionName) {
+			opts = append(opts, WithVersionName(params.versionParams[BaseAPIVersionName.String()]))
 		}
+
+		if !params.IsEmpty(SetDefault) {
+			setDefault := params.versionParams[SetDefault.String()]
+			if setDefault == "true" {
+				opts = append(opts, SetAsDefault(params.versionParams[NewVersionName.String()]))
+			}
+		}
+
+		if !params.IsEmpty(BaseAPIID) {
+			opts = append(opts, WithBaseID(params.versionParams[BaseAPIID.String()]))
+		}
+
+		opts = append(opts, AddVersion(params.versionParams[NewVersionName.String()], newApiID))
 	}
 
-	opts = append(opts, AddVersion(params.versionParams[NewVersionName.String()], apiID))
+	// When baseAPIID is missing in the request params, and it's versioning is enabled then set versioning ID as APIID
+	if params.IsEmpty(BaseAPIID) && def.BaseID == "" {
+		def.BaseID = newApiID
+	}
 
 	if def.Key == "" {
 		def.Key = apidef.DefaultAPIVersionKey
@@ -150,5 +168,5 @@ func ConfigureVersionDefinition(def apidef.VersionDefinition, params *VersionQue
 		def.Versions = make(map[string]string)
 	}
 
-	return option.New(opts).Build(def)
+	return *option.New(opts).Build(def)
 }

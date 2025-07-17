@@ -1054,12 +1054,8 @@ func (gw *Gateway) handleAddApi(r *http.Request, fs afero.Fs, oasEndpoint bool) 
 		oasObj  oas.OAS
 		baseApi *APISpec
 	)
-	//baseAPIID          = r.FormValue("base_api_id")
-	//baseAPIVersionName = r.FormValue("base_api_version_name")
-	//newVersionName     = r.FormValue("new_version_name")
-	//setDefault         = r.FormValue("set_default") == "true"
 
-	versionParams := lib.NewVersionQueryParameters(r)
+	versionParams := lib.NewVersionQueryParameters(r.URL.Query())
 	err := versionParams.Validate(func() (bool, string) {
 		baseApiID := versionParams.Get(lib.BaseAPIID)
 		baseApi = gw.getApiSpec(baseApiID)
@@ -1128,35 +1124,7 @@ func (gw *Gateway) handleAddApi(r *http.Request, fs afero.Fs, oasEndpoint bool) 
 			log.WithError(err).Error("Couldn't unmarshal API spec")
 		}
 
-		lib.ConfigureVersionDefinition()
-
-		//baseAPI.VersionDefinition.Enabled = true
-		if baseAPIVersionName != "" {
-			baseAPI.VersionDefinition.Name = baseAPIVersionName
-			baseAPI.VersionDefinition.Default = baseAPIVersionName
-		}
-
-		if baseAPI.VersionDefinition.Key == "" {
-			baseAPI.VersionDefinition.Key = apidef.DefaultAPIVersionKey
-		}
-
-		if baseAPI.VersionDefinition.Location == "" {
-			baseAPI.VersionDefinition.Location = apidef.HeaderLocation
-		}
-
-		if baseAPI.VersionDefinition.Default == "" {
-			baseAPI.VersionDefinition.Default = apidef.Self
-		}
-
-		if baseAPI.VersionDefinition.Versions == nil {
-			baseAPI.VersionDefinition.Versions = make(map[string]string)
-		}
-
-		baseAPI.VersionDefinition.Versions[newVersionName] = newDef.APIID
-
-		if setDefault {
-			baseAPI.VersionDefinition.Default = newVersionName
-		}
+		lib.ConfigureVersionDefinition(baseAPI.VersionDefinition, versionParams, newDef.APIID)
 
 		if baseAPI.IsOAS {
 			baseAPI.OAS.Fill(*baseAPI.APIDefinition)

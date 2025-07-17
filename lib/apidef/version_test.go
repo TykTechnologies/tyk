@@ -132,7 +132,7 @@ func TestNewVersionQueryParameters(t *testing.T) {
 		URL: u,
 	}
 
-	queryParams := NewVersionQueryParameters(req)
+	queryParams := NewVersionQueryParameters(req.URL.Query())
 
 	assert.Equal(t, baseAPIID, queryParams.Get(BaseAPIID))
 	assert.Equal(t, baseVersion, queryParams.Get(BaseAPIVersionName))
