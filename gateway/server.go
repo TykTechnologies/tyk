@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/rs/cors"
 	htmltemplate "html/template"
 	"io/ioutil"
 	stdlog "log"
@@ -828,11 +829,13 @@ func (gw *Gateway) addOAuthHandlers(spec *APISpec, muxer *mux.Router) *OAuthMana
 	oauthManager := OAuthManager{spec, osinServer, gw}
 	oauthHandlers := OAuthHandlers{oauthManager}
 
+	wrapWithCORS := createCORSWrapper(spec)
+
 	muxer.Handle(apiAuthorizePath, gw.checkIsAPIOwner(allowMethods(oauthHandlers.HandleGenerateAuthCodeData, "POST")))
-	muxer.HandleFunc(clientAuthPath, allowMethods(oauthHandlers.HandleAuthorizePassthrough, "GET", "POST"))
-	muxer.HandleFunc(clientAccessPath, addSecureAndCacheHeaders(allowMethods(oauthHandlers.HandleAccessRequest, "GET", "POST")))
-	muxer.HandleFunc(revokeToken, oauthHandlers.HandleRevokeToken)
-	muxer.HandleFunc(revokeAllTokens, oauthHandlers.HandleRevokeAllTokens)
+	muxer.HandleFunc(clientAuthPath, wrapWithCORS(allowMethods(oauthHandlers.HandleAuthorizePassthrough, "GET", "POST")))
+	muxer.HandleFunc(clientAccessPath, wrapWithCORS(addSecureAndCacheHeaders(allowMethods(oauthHandlers.HandleAccessRequest, "GET", "POST"))))
+	muxer.HandleFunc(revokeToken, wrapWithCORS(oauthHandlers.HandleRevokeToken))
+	muxer.HandleFunc(revokeAllTokens, wrapWithCORS(oauthHandlers.HandleRevokeAllTokens))
 	return &oauthManager
 }
 
@@ -1080,6 +1083,33 @@ func (gw *Gateway) DoReload() {
 
 	gw.performedSuccessfulReload = true
 	mainLog.Info("API reload complete")
+}
+
+func createCORSWrapper(spec *APISpec) func(handler http.HandlerFunc) http.HandlerFunc {
+	var corsHandler func(http.Handler) http.Handler
+
+	if spec.CORS.Enable {
+		corsHandler = cors.New(cors.Options{
+			AllowedOrigins:     spec.CORS.AllowedOrigins,
+			AllowedMethods:     spec.CORS.AllowedMethods,
+			AllowedHeaders:     spec.CORS.AllowedHeaders,
+			ExposedHeaders:     spec.CORS.ExposedHeaders,
+			AllowCredentials:   spec.CORS.AllowCredentials,
+			MaxAge:             spec.CORS.MaxAge,
+			OptionsPassthrough: spec.CORS.OptionsPassthrough,
+			Debug:              spec.CORS.Debug,
+		}).Handler
+	}
+
+	return func(handler http.HandlerFunc) http.HandlerFunc {
+		if corsHandler == nil {
+			return handler
+		}
+
+		return func(w http.ResponseWriter, r *http.Request) {
+			corsHandler(handler).ServeHTTP(w, r)
+		}
+	}
 }
 
 func syncResourcesWithReload(resource string, conf config.Config, syncFunc func() (int, error)) (int, error) {
