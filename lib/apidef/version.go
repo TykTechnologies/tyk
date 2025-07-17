@@ -46,9 +46,13 @@ type VersionQueryParameters struct {
 // It takes a function that checks if the base API exists and returns an error if validation fails.
 // The doesBaseApiExists function should return whether the base API exists and its name.
 func (v *VersionQueryParameters) Validate(doesBaseApiExists func() (bool, string)) error {
-	baseID := v.versionParams[BaseAPIID.String()]
-	if baseID == "" {
+	if v.IsEmpty(BaseAPIID) {
 		return nil
+	}
+	baseID := v.Get(BaseAPIID)
+
+	if v.IsEmpty(NewVersionName) {
+		return fmt.Errorf("the new version name is required")
 	}
 
 	exists, baseName := doesBaseApiExists()
@@ -56,7 +60,7 @@ func (v *VersionQueryParameters) Validate(doesBaseApiExists func() (bool, string
 		return fmt.Errorf("%s is not a valid Base API version", baseID)
 	}
 
-	if v.versionParams[BaseAPIVersionName.String()] == "" && baseName == "" {
+	if v.IsEmpty(BaseAPIVersionName) && baseName == "" {
 		return fmt.Errorf("you need to provide a version name for the new Base API: %s", baseID)
 	}
 
