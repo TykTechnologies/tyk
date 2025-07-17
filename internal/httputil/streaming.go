@@ -16,9 +16,11 @@ func IsGrpcStreaming(r *http.Request) bool {
 	return r.ContentLength == -1 && r.Header.Get(headerContentType) == "application/grpc"
 }
 
-// IsSseStreamingResponse returns true if the response designates SSE streaming.
+// IsSseStreamingResponse returns true if the response designates SSE streaming. 
+// Content-Type text/event-stream headers with charset declaration ("text/event-stream; charset=utf-8") are evaluated to true
 func IsSseStreamingResponse(r *http.Response) bool {
-	return r.Header.Get(headerContentType) == "text/event-stream"
+	contentType := r.Header.Get(headerContentType)
+	return strings.HasPrefix(contentType, "text/event-stream")
 }
 
 // IsUpgrade checks if the request is an upgrade request and returns the upgrade type.
