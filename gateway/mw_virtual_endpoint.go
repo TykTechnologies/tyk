@@ -12,7 +12,6 @@ import (
 	"net/url"
 	"os"
 	"reflect"
-	"strconv"
 	"strings"
 	"time"
 
@@ -21,7 +20,6 @@ import (
 
 	"github.com/TykTechnologies/tyk-pump/analytics"
 	"github.com/TykTechnologies/tyk/apidef"
-	"github.com/TykTechnologies/tyk/header"
 	"github.com/TykTechnologies/tyk/internal/middleware"
 	"github.com/TykTechnologies/tyk/user"
 	"github.com/sirupsen/logrus"
@@ -333,14 +331,7 @@ func (gw *Gateway) handleForcedResponse(rw http.ResponseWriter, res *http.Respon
 		res.Header.Set("Connection", "close")
 	}
 
-	// Add resource headers
-	if ses != nil {
-		// We have found a session, lets report back
-		quotaMax, quotaRemaining, _, quotaRenews := ses.GetQuotaLimitByAPIID(spec.APIID)
-		res.Header.Set(header.XRateLimitLimit, strconv.Itoa(int(quotaMax)))
-		res.Header.Set(header.XRateLimitRemaining, strconv.Itoa(int(quotaRemaining)))
-		res.Header.Set(header.XRateLimitReset, strconv.Itoa(int(quotaRenews)))
-	}
+	spec.sendRateLimitHeaders(ses, res)
 
 	copyHeader(rw.Header(), res.Header, gw.GetConfig().IgnoreCanonicalMIMEHeaderKey)
 

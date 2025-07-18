@@ -133,6 +133,8 @@ func (m *mockResponseMiddleware) mockResponse(r *http.Request) (*http.Response, 
 
 	res.Body = io.NopCloser(bytes.NewBuffer(body))
 
+	m.Spec.sendRateLimitHeaders(ctxGetSession(r), res)
+
 	return res, nil
 }
 

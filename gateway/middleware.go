@@ -746,6 +746,7 @@ func handleResponseChain(chain []TykResponseHandler, rw http.ResponseWriter, res
 			return false, err
 		}
 	}
+
 	return false, nil
 }
 
