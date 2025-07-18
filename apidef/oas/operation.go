@@ -669,21 +669,11 @@ func (s *OAS) getOperationID(inPath, method string) string {
 			}
 
 			if part.isRegex {
-				schema := &openapi3.SchemaRef{
-					Value: &openapi3.Schema{
-						Type:    &openapi3.Types{openapi3.TypeString},
-						Pattern: part.value,
-					},
-				}
-				param := &openapi3.ParameterRef{
-					Value: &openapi3.Parameter{
-						Name:     part.name,
-						In:       "path",
-						Required: true,
-						Schema:   schema,
-					},
-				}
-				p.Parameters = append(p.Parameters, param)
+				p.Parameters = append(p.Parameters, &openapi3.ParameterRef{
+					Value: openapi3.
+						NewPathParameter(part.name).
+						WithSchema(openapi3.NewStringSchema().WithPattern(part.value)),
+				})
 			}
 		}
 	} else {
@@ -995,36 +985,6 @@ func (s *OAS) fillCircuitBreaker(metas []apidef.CircuitBreakerMeta) {
 			operation.CircuitBreaker = nil
 		}
 	}
-}
-
-// detectMockResponseContentType determines the Content-Type of the mock response.
-// It first checks the headers for an explicit Content-Type, then attempts to detect
-// the type from the body content. Returns "text/plain" if no specific type can be determined.
-func detectMockResponseContentType(mock apidef.MockResponseMeta) string {
-	const headerContentType = "Content-Type"
-
-	for name, value := range mock.Headers {
-		if http.CanonicalHeaderKey(name) == headerContentType {
-			return value
-		}
-	}
-
-	if mock.Body == "" {
-		return "text/plain"
-	}
-
-	// We attempt to guess the content type by checking if the body is a valid JSON.
-	var arrayValue = []json.RawMessage{}
-	if err := json.Unmarshal([]byte(mock.Body), &arrayValue); err == nil {
-		return "application/json"
-	}
-
-	var objectValue = map[string]json.RawMessage{}
-	if err := json.Unmarshal([]byte(mock.Body), &objectValue); err == nil {
-		return "application/json"
-	}
-
-	return "text/plain"
 }
 
 // sortMockResponseAllowList sorts the mock response paths by path, method, and response code.
