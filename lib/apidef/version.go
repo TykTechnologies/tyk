@@ -1,6 +1,7 @@
 package apidef
 
 import (
+	"errors"
 	"fmt"
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/common/option"
@@ -13,6 +14,10 @@ const (
 	NewVersionName
 	SetDefault
 	paramCount
+)
+
+var (
+	ErrNewVersionRequired = errors.New("The new version name is required")
 )
 
 // VersionParameter represents the type of parameter used in API version configuration.
@@ -52,7 +57,7 @@ func (v *VersionQueryParameters) Validate(doesBaseApiExists func() (bool, string
 	baseID := v.Get(BaseAPIID)
 
 	if v.IsEmpty(NewVersionName) {
-		return fmt.Errorf("the new version name is required")
+		return ErrNewVersionRequired
 	}
 
 	exists, baseName := doesBaseApiExists()

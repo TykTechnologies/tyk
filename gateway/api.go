@@ -1067,6 +1067,13 @@ func (gw *Gateway) handleAddApi(r *http.Request, fs afero.Fs, oasEndpoint bool) 
 	})
 
 	if err != nil {
+		// https://tyktech.atlassian.net/browse/TT-7523?focusedCommentId=100547
+		// Sadly we are averse to changing (incorrect) HTTP error codes, because these could be considered breaking changes by some of our clients.
+		// Please return HTTP 422 here, because currently the request doesn’t generate an error.
+		if errors.Is(err, lib.ErrNewVersionRequired) {
+			return apiError(err.Error()), http.StatusUnprocessableEntity
+		}
+
 		return apiError(err.Error()), http.StatusBadRequest
 	}
 
