@@ -13,7 +13,7 @@ func TestVersionParameter_String(t *testing.T) {
 	assert.Equal(t, "base_api_id", BaseAPIID.String())
 	assert.Equal(t, "base_api_version_name", BaseAPIVersionName.String())
 	assert.Equal(t, "new_version_name", NewVersionName.String())
-	assert.Equal(t, "setDefault", SetDefault.String())
+	assert.Equal(t, "set_default", SetDefault.String())
 }
 
 func TestVersionQueryParameters_Validate(t *testing.T) {
@@ -39,7 +39,8 @@ func TestVersionQueryParameters_Validate(t *testing.T) {
 	t.Run("Non-existent base API", func(t *testing.T) {
 		queryParams := &VersionQueryParameters{
 			versionParams: map[string]string{
-				BaseAPIID.String(): nonExistentApiName,
+				BaseAPIID.String():      nonExistentApiName,
+				NewVersionName.String(): "v1",
 			},
 		}
 		err := queryParams.Validate(baseApiExists(false, nonExistentApiName))
@@ -51,6 +52,7 @@ func TestVersionQueryParameters_Validate(t *testing.T) {
 		queryParams := &VersionQueryParameters{
 			versionParams: map[string]string{
 				BaseAPIID.String():          existentApiName,
+				NewVersionName.String():     "v1",
 				BaseAPIVersionName.String(): "",
 			},
 		}
@@ -63,6 +65,7 @@ func TestVersionQueryParameters_Validate(t *testing.T) {
 		queryParams := &VersionQueryParameters{
 			versionParams: map[string]string{
 				BaseAPIID.String():          existentApiName,
+				NewVersionName.String():     "v1",
 				BaseAPIVersionName.String(): "",
 			},
 		}
@@ -74,6 +77,7 @@ func TestVersionQueryParameters_Validate(t *testing.T) {
 		queryParams := &VersionQueryParameters{
 			versionParams: map[string]string{
 				BaseAPIID.String():          existentApiName,
+				NewVersionName.String():     "v2",
 				BaseAPIVersionName.String(): "v1",
 			},
 		}
@@ -127,7 +131,7 @@ func TestNewVersionQueryParameters(t *testing.T) {
 	newVersion := "v2"
 	setDefault := "true"
 
-	u, _ := url.Parse(fmt.Sprintf("http://example.com/api?base_api_id=%s&base_api_version_name=%s&new_version_name=%s&setDefault=%s", baseAPIID, baseVersion, newVersion, setDefault))
+	u, _ := url.Parse(fmt.Sprintf("http://example.com/api?base_api_id=%s&base_api_version_name=%s&new_version_name=%s&set_default=%s", baseAPIID, baseVersion, newVersion, setDefault))
 	req := &http.Request{
 		URL: u,
 	}
@@ -149,6 +153,7 @@ func TestConfigureVersionDefinition(t *testing.T) {
 		baseDefinition := apidef.VersionDefinition{}
 		versionParams := &VersionQueryParameters{
 			versionParams: map[string]string{
+				BaseAPIID.String():          apiID,
 				BaseAPIVersionName.String(): baseName,
 				NewVersionName.String():     versionName,
 			},
@@ -157,6 +162,7 @@ func TestConfigureVersionDefinition(t *testing.T) {
 		result := ConfigureVersionDefinition(baseDefinition, versionParams, apiID)
 
 		assert.True(t, result.Enabled)
+		assert.Equal(t, apiID, result.BaseID)
 		assert.Equal(t, baseName, result.Name)
 		assert.Equal(t, apidef.DefaultAPIVersionKey, result.Key)
 		assert.Equal(t, apidef.HeaderLocation, result.Location)
@@ -168,6 +174,7 @@ func TestConfigureVersionDefinition(t *testing.T) {
 		baseDefinition := apidef.VersionDefinition{}
 		versionParams := &VersionQueryParameters{
 			versionParams: map[string]string{
+				BaseAPIID.String():      apiID,
 				NewVersionName.String(): versionName,
 				SetDefault.String():     "true",
 			},
