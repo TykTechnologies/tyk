@@ -50,7 +50,7 @@ func (s *Stream) Start(config map[string]interface{}, mux service.HTTPMultiplexe
 
 	s.logger.Debugf("Building new stream")
 	builder := service.NewStreamBuilder()
-	handler := slog.NewJSONHandler(&bentoLogAdapter{logger: s.logger}, nil)
+	handler := slog.NewJSONHandler(newBentoLogAdapter(s.logger), nil)
 	builder.SetLogger(slog.New(handler))
 
 	err = builder.SetYAML(string(configPayload))
