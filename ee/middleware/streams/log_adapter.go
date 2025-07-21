@@ -29,7 +29,7 @@ func (w *bentoLogAdapter) Write(p []byte) (n int, err error) {
 	line := bentoLogLine{
 		fields: make(map[string]interface{}),
 	}
-	err = jsonparser.ObjectEach(p, func(key []byte, value []byte, dataType jsonparser.ValueType, offset int) error {
+	err = jsonparser.ObjectEach(p, func(key []byte, value []byte, dataType jsonparser.ValueType, _ int) error {
 		if string(key) == "time" {
 			// discard time, the own logger of Tyk has this field
 			return nil
@@ -55,6 +55,6 @@ func (w *bentoLogAdapter) Write(p []byte) (n int, err error) {
 	for k, v := range line.fields {
 		logger = logger.WithField(k, v)
 	}
-	logger.Logf(line.level, line.msg)
+	logger.Logln(line.level, line.msg)
 	return n, err
 }

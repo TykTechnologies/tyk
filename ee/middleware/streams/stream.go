@@ -20,8 +20,8 @@ import (
 type Stream struct {
 	allowedUnsafe []string
 	streamConfig  string
-	stream *service.Stream
-	logger *logrus.Entry
+	stream        *service.Stream
+	logger        *logrus.Entry
 }
 
 // NewStream creates a new stream without initializing it
