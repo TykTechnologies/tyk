@@ -209,6 +209,9 @@ func (s *APISpec) Validate(oasConfig config.OASConfig) error {
 		if err != nil {
 			return err
 		}
+		if s.GetTykExtension() == nil {
+			return errors.New("invalid OAS api")
+		}
 	}
 
 	// For tcp services we need to make sure we can bind to the port.

@@ -88,6 +88,17 @@ func (a *APISpec) CheckSpecMatchesStatus(r *http.Request, rxPaths []URLSpec, mod
 	return false, nil
 }
 
+func (a *APISpec) GetTykExtension() *oas.XTykAPIGateway {
+	if !a.IsOAS {
+		return nil
+	}
+	res := a.OAS.GetTykExtension()
+	if res == nil {
+		log.Warn("APISpec is an invalid OAS API")
+	}
+	return a.OAS.GetTykExtension()
+}
+
 // FindSpecMatchesStatus checks if a URL spec has a specific status and returns the URLSpec for it.
 func (a *APISpec) FindSpecMatchesStatus(r *http.Request, rxPaths []URLSpec, mode URLStatus) (*URLSpec, bool) {
 	matchPath, method := a.getMatchPathAndMethod(r, mode)
