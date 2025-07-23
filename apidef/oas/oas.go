@@ -371,9 +371,8 @@ func (s *OAS) RemoveServer(serverUrl string) error {
 		return err
 	}
 
-	s.Servers = lo.Filter(s.Servers, func(item *openapi3.Server, _ int) bool {
-		// todo: fix cause can produce errors (add api slug to parsed it check if is a prefix)
-		return !strings.Contains(item.URL, parsed.UrlNormalized)
+	s.Servers = lo.Filter(s.Servers, func(server *openapi3.Server, _ int) bool {
+		return server.URL != parsed.UrlNormalized
 	})
 
 	return nil
