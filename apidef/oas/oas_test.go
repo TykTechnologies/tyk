@@ -1524,3 +1524,42 @@ func TestYaml(t *testing.T) {
 	oasDoc.SetTykExtension(nil)
 	assert.Equal(t, oasDoc, yamlOASDoc)
 }
+
+func Test_RemoveServer(t *testing.T) {
+	createOas := func() *OAS {
+		var spec openapi3.T
+
+		spec.OpenAPI = "3.0.3"
+		spec.Info = &openapi3.Info{
+			Title:   "Test API",
+			Version: "1.0.0",
+		}
+
+		spec.Servers = append(spec.Servers, &openapi3.Server{
+			URL: "https://{sub}.example.com/{version}",
+			Variables: map[string]*openapi3.ServerVariable{
+				"version": {
+					Default: "v1",
+				},
+				"sub": {
+					Default: "default",
+				},
+			},
+		})
+
+		return &OAS{spec}
+	}
+
+	t.Run("removes without fail", func(t *testing.T) {
+		spec := createOas()
+		err := spec.RemoveServer("https://{sub:[a-z]+}.example.com/{version:[0-9]+}")
+		assert.NoError(t, err)
+		assert.Len(t, spec.Servers, 0)
+	})
+
+	t.Run("fails if invalid regex was provided", func(t *testing.T) {
+		spec := createOas()
+		err := spec.RemoveServer("https://{sub:[a-z]+}.example.com/{version:[0-9]+}}")
+		assert.Error(t, err)
+	})
+}

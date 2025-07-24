@@ -343,23 +343,6 @@ func (s *OAS) getTykOperations() (operations Operations) {
 	return
 }
 
-func (s *OAS) ClearCustomDomainServers(old *OAS) error {
-	if old == nil {
-		return nil
-	}
-
-	extension := old.GetTykExtension()
-	if extension == nil {
-		return nil
-	}
-
-	if extension.Server.CustomDomain == nil {
-		return nil
-	}
-
-	return s.RemoveServer(extension.Server.CustomDomain.Name)
-}
-
 func (s *OAS) RemoveServer(serverUrl string) error {
 	if len(serverUrl) == 0 {
 		return nil
