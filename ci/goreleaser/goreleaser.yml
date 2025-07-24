@@ -6,81 +6,11 @@
 # - amd64
 version: 2
 builds:
-  - id: ee-amd64
+  - id: std
     flags:
-      - -tags=goplugin,ee
+      - -tags=ignore
       - -trimpath
-    env:
-      - NOP=nop # ignore this, it is jsut to avoid a complex conditional in the templates
-      - CC=gcc
-    ldflags:
-      - -X github.com/TykTechnologies/tyk/internal/build.Version={{.Version}}
-      - -X github.com/TykTechnologies/tyk/internal/build.Commit={{.FullCommit}}
-      - -X github.com/TykTechnologies/tyk/internal/build.BuildDate={{.Date}}
-      - -X github.com/TykTechnologies/tyk/internal/build.BuiltBy=goreleaser
-    goos:
-      - linux
-    goarch:
-      - amd64
-    binary: tyk
-  - id: ee-arm64
-    flags:
-      - -tags=goplugin,ee
-      - -trimpath
-    env:
-      - NOP=nop # ignore this, it is jsut to avoid a complex conditional in the templates
-      - CC=aarch64-linux-gnu-gcc
-    ldflags:
-      - -X github.com/TykTechnologies/tyk/internal/build.Version={{.Version}}
-      - -X github.com/TykTechnologies/tyk/internal/build.Commit={{.FullCommit}}
-      - -X github.com/TykTechnologies/tyk/internal/build.BuildDate={{.Date}}
-      - -X github.com/TykTechnologies/tyk/internal/build.BuiltBy=goreleaser
-    goos:
-      - linux
-    goarch:
-      - arm64
-    binary: tyk
-  - id: ee-s390x
-    flags:
-      - -tags=goplugin,ee
-      - -trimpath
-    env:
-      - NOP=nop # ignore this, it is jsut to avoid a complex conditional in the templates
-      - CC=s390x-linux-gnu-gcc
-    ldflags:
-      - -X github.com/TykTechnologies/tyk/internal/build.Version={{.Version}}
-      - -X github.com/TykTechnologies/tyk/internal/build.Commit={{.FullCommit}}
-      - -X github.com/TykTechnologies/tyk/internal/build.BuildDate={{.Date}}
-      - -X github.com/TykTechnologies/tyk/internal/build.BuiltBy=goreleaser
-    goos:
-      - linux
-    goarch:
-      - s390x
-    binary: tyk
-  - id: fips-amd64
-    flags:
-      - -tags=goplugin,fips,boringcrypto
-    env:
-      - NOP=nop # ignore this, it is jsut to avoid a complex conditional in the templates
-      - CC=gcc
-      - GOEXPERIMENT=boringcrypto
-    ldflags:
-      - -X github.com/TykTechnologies/tyk/internal/build.Version={{.Version}}
-      - -X github.com/TykTechnologies/tyk/internal/build.Commit={{.FullCommit}}
-      - -X github.com/TykTechnologies/tyk/internal/build.BuildDate={{.Date}}
-      - -X github.com/TykTechnologies/tyk/internal/build.BuiltBy=goreleaser
-    goos:
-      - linux
-    goarch:
-      - amd64
-    binary: tyk
-  - id: std-amd64
-    flags:
       - -tags=goplugin
-      - -trimpath
-    env:
-      - NOP=nop # ignore this, it is jsut to avoid a complex conditional in the templates
-      - CC=gcc
     ldflags:
       - -X github.com/TykTechnologies/tyk/internal/build.Version={{.Version}}
       - -X github.com/TykTechnologies/tyk/internal/build.Commit={{.FullCommit}}
@@ -93,16 +23,16 @@ builds:
     binary: tyk
   - id: std-arm64
     flags:
-      - -tags=goplugin
+      - -tags=ignore
       - -trimpath
-    env:
-      - NOP=nop # ignore this, it is jsut to avoid a complex conditional in the templates
-      - CC=aarch64-linux-gnu-gcc
+      - -tags=goplugin
     ldflags:
       - -X github.com/TykTechnologies/tyk/internal/build.Version={{.Version}}
       - -X github.com/TykTechnologies/tyk/internal/build.Commit={{.FullCommit}}
       - -X github.com/TykTechnologies/tyk/internal/build.BuildDate={{.Date}}
       - -X github.com/TykTechnologies/tyk/internal/build.BuiltBy=goreleaser
+    env:
+      - CC=aarch64-linux-gnu-gcc
     goos:
       - linux
     goarch:
@@ -110,11 +40,28 @@ builds:
     binary: tyk
   - id: std-s390x
     flags:
-      - -tags=goplugin
+      - -tags=ignore
       - -trimpath
+      - -tags=goplugin
+    ldflags:
+      - -X github.com/TykTechnologies/tyk/internal/build.Version={{.Version}}
+      - -X github.com/TykTechnologies/tyk/internal/build.Commit={{.FullCommit}}
+      - -X github.com/TykTechnologies/tyk/internal/build.BuildDate={{.Date}}
+      - -X github.com/TykTechnologies/tyk/internal/build.BuiltBy=goreleaser
     env:
-      - NOP=nop # ignore this, it is jsut to avoid a complex conditional in the templates
       - CC=s390x-linux-gnu-gcc
+    goos:
+      - linux
+    goarch:
+      - s390x
+    binary: tyk
+  - id: fips
+    flags:
+      - -tags=ignore
+      - -trimpath
+      - -tags=goplugin,fips,boringcrypto,ee
+    env:
+      - GOEXPERIMENT=boringcrypto
     ldflags:
       - -X github.com/TykTechnologies/tyk/internal/build.Version={{.Version}}
       - -X github.com/TykTechnologies/tyk/internal/build.Commit={{.FullCommit}}
@@ -123,20 +70,69 @@ builds:
     goos:
       - linux
     goarch:
+      - amd64
+    binary: tyk
+  - id: ee
+    flags:
+      - -tags=ignore
+      - -trimpath
+      - -tags=goplugin,ee
+    ldflags:
+      - -X github.com/TykTechnologies/tyk/internal/build.Version={{.Version}}
+      - -X github.com/TykTechnologies/tyk/internal/build.Commit={{.FullCommit}}
+      - -X github.com/TykTechnologies/tyk/internal/build.BuildDate={{.Date}}
+      - -X github.com/TykTechnologies/tyk/internal/build.BuiltBy=goreleaser
+    goos:
+      - linux
+    goarch:
+      - amd64
+    binary: tyk
+  - id: ee-arm64
+    flags:
+      - -tags=ignore
+      - -trimpath
+      - -tags=goplugin,ee
+    ldflags:
+      - -X github.com/TykTechnologies/tyk/internal/build.Version={{.Version}}
+      - -X github.com/TykTechnologies/tyk/internal/build.Commit={{.FullCommit}}
+      - -X github.com/TykTechnologies/tyk/internal/build.BuildDate={{.Date}}
+      - -X github.com/TykTechnologies/tyk/internal/build.BuiltBy=goreleaser
+    env:
+      - CC=aarch64-linux-gnu-gcc
+    goos:
+      - linux
+    goarch:
+      - arm64
+    binary: tyk
+  - id: ee-s390x
+    flags:
+      - -tags=ignore
+      - -trimpath
+      - -tags=goplugin,ee
+    ldflags:
+      - -X github.com/TykTechnologies/tyk/internal/build.Version={{.Version}}
+      - -X github.com/TykTechnologies/tyk/internal/build.Commit={{.FullCommit}}
+      - -X github.com/TykTechnologies/tyk/internal/build.BuildDate={{.Date}}
+      - -X github.com/TykTechnologies/tyk/internal/build.BuiltBy=goreleaser
+    env:
+      - CC=s390x-linux-gnu-gcc
+    goos:
+      - linux
+    goarch:
       - s390x
     binary: tyk
 nfpms:
-  - id: ee
+  - id: std
     vendor: "Tyk Technologies Ltd"
     homepage: "https://tyk.io"
     maintainer: "Tyk <info@tyk.io>"
-    description: Tyk API Gateway Enterprise Edition written in Go, supporting REST, GraphQL, TCP and gRPC protocols
-    package_name: tyk-gateway-ee
+    description: Tyk Open Source API Gateway written in Go, supporting REST, GraphQL, TCP and gRPC protocols
+    package_name: tyk-gateway
     file_name_template: "{{ .ConventionalFileName }}"
-    ids:
-      - ee-amd64
-      - ee-arm64
-      - ee-s390x
+    builds:
+      - std
+      - std-arm64
+      - std-s390x
     formats:
       - deb
       - rpm
@@ -189,11 +185,11 @@ nfpms:
     vendor: "Tyk Technologies Ltd"
     homepage: "https://tyk.io"
     maintainer: "Tyk <info@tyk.io>"
-    description: Tyk Open Source API Gateway written in Go, supporting REST, GraphQL, TCP and gRPC protocols Built with boringssl
+    description: Tyk Open Source API Gateway written in Go, supporting REST, GraphQL, TCP and gRPC protocols
     package_name: tyk-gateway-fips
     file_name_template: "{{ .ConventionalFileName }}"
-    ids:
-      - fips-amd64
+    builds:
+      - fips
     formats:
       - deb
       - rpm
@@ -242,17 +238,17 @@ nfpms:
       signature:
         key_file: tyk.io.signing.key
         type: origin
-  - id: std
+  - id: ee
     vendor: "Tyk Technologies Ltd"
     homepage: "https://tyk.io"
     maintainer: "Tyk <info@tyk.io>"
     description: Tyk Open Source API Gateway written in Go, supporting REST, GraphQL, TCP and gRPC protocols
-    package_name: tyk-gateway
+    package_name: tyk-gateway-ee
     file_name_template: "{{ .ConventionalFileName }}"
-    ids:
-      - std-amd64
-      - std-arm64
-      - std-s390x
+    builds:
+      - ee
+      - ee-arm64
+      - ee-s390x
     formats:
       - deb
       - rpm
@@ -302,21 +298,7 @@ nfpms:
         key_file: tyk.io.signing.key
         type: origin
 publishers:
-  - name: ee
-    ids:
-      - ee
-    env:
-      - PACKAGECLOUD_TOKEN={{ .Env.PACKAGECLOUD_TOKEN }}
-    cmd: packagecloud publish --debvers "{{ .Env.DEBVERS }}" --rpmvers "{{ .Env.RPMVERS }}" tyk/tyk-ee-unstable {{ .ArtifactPath }}
-  - name: fips
-    ids:
-      - fips
-    env:
-      - PACKAGECLOUD_TOKEN={{ .Env.PACKAGECLOUD_TOKEN }}
-    cmd: packagecloud publish --debvers "{{ .Env.DEBVERS }}" --rpmvers "{{ .Env.RPMVERS }}" tyk/tyk-ee-unstable {{ .ArtifactPath }}
-  - name: std
-    ids:
-      - std
+  - name: tyk-gateway-unstable
     env:
       - PACKAGECLOUD_TOKEN={{ .Env.PACKAGECLOUD_TOKEN }}
     cmd: packagecloud publish --debvers "{{ .Env.DEBVERS }}" --rpmvers "{{ .Env.RPMVERS }}" tyk/tyk-gateway-unstable {{ .ArtifactPath }}
@@ -569,7 +551,7 @@ docker_manifests:
       - tykio/tyk-gateway:{{ .Tag }}-std-s390x
 # This disables archives
 archives:
-  - formats: ['binary']
+  - format: binary
     allow_different_binary_count: true
 checksum:
   disable: true
