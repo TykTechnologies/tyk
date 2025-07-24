@@ -168,10 +168,7 @@ jobs:
         uses: docker/metadata-action@v5
         with:
           images: |
-            docker.tyk.io/tyk-gateway/tyk-gateway
-
-            tykio/tyk-gateway
-
+            docker.tyk.io/tyk-gateway/tyk-gateway-ee
             tykio/tyk-gateway-ee
           flavor: |
             latest=false
@@ -238,10 +235,7 @@ jobs:
         with:
           images: |
             docker.tyk.io/tyk-gateway/tyk-gateway
-
             tykio/tyk-gateway
-
-            tykio/tyk-gateway-ee
           flavor: |
             latest=false
             prefix=v
