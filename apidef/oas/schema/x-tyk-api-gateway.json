@@ -528,6 +528,9 @@
     "X-Tyk-Global": {
       "type": "object",
       "properties": {
+        "customErrorResponses": {
+          "$ref": "#/definitions/X-Tyk-ErrorMessage"
+        },
         "pluginConfig": {
           "$ref": "#/definitions/X-Tyk-PluginConfig"
         },
@@ -1056,6 +1059,9 @@
         },
         "rateLimit": {
           "$ref": "#/definitions/X-Tyk-RateLimit"
+        },
+        "customErrorResponses": {
+          "$ref": "#/definitions/X-Tyk-ErrorMessage"
         }
       }
     },
@@ -2613,6 +2619,27 @@
         "url",
         "weight"
       ]
+    },
+    "X-Tyk-Error": {
+      "type": "object",
+      "properties": {
+        "code": {
+          "type": "integer",
+          "description": "HTTP status code to return"
+        },
+        "message": {
+          "type": "string",
+          "description": "Error message to return"
+        }
+      }
+    },
+    "X-Tyk-ErrorMessage": {
+      "type": "object",
+      "properties": {
+          "additionalProperties": {
+            "$ref": "#/definitions/X-Tyk-Error"
+          }
+      }
     }
   }
 }

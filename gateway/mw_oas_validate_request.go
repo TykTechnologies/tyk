@@ -2,8 +2,11 @@ package gateway
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"github.com/TykTechnologies/tyk/ctx"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/getkin/kin-openapi/openapi3"
@@ -96,9 +99,80 @@ func (k *ValidateRequest) ProcessRequest(w http.ResponseWriter, r *http.Request,
 
 	err := openapi3filter.ValidateRequest(r.Context(), requestValidationInput)
 	if err != nil {
+		details := validationErrorDetails(ErrNotValidSchema, err)
+		ctx.SetErrorInfo(r, ErrNotValidSchema, err, details)
+
 		return fmt.Errorf("request validation error: %w", err), errResponseCode
 	}
 
 	// Handle Success
 	return nil, http.StatusOK
+}
+
+// FieldError represents a validation error for a specific field,
+// containing the field's JSON pointer path and the reason for the error.
+type FieldError struct {
+	Field  string `json:"field"`
+	Reason string `json:"reason"`
+}
+
+// Converts []FieldError to flat map[string]interface{}: field -> reason
+func validationErrorDetails(errorId string, err error) ctx.ErrorContextData {
+	fieldErrors := structureError(err)
+	errorsAsMap := make(map[string]interface{}, len(fieldErrors))
+	for _, fe := range fieldErrors {
+		if fe.Field != "" {
+			errorsAsMap[fe.Field] = fe.Reason
+		}
+	}
+	return ctx.BuildTemplateContext(errorsAsMap, errorId, err)
+}
+
+// structureError parses an error from openapi3filter.ValidateRequest,
+// extracting validation issues as a slice of FieldError with JSON pointer paths and reasons.
+// Returns one generic error if no detailed validation errors found.
+func structureError(err error) []FieldError {
+	var fieldErrors []FieldError
+
+	var reqErr *openapi3filter.RequestError
+	if errors.As(err, &reqErr) {
+		switch e := reqErr.Err.(type) {
+		case openapi3.MultiError:
+			for _, subErr := range e {
+				if schemaErr, ok := subErr.(*openapi3.SchemaError); ok {
+					fieldErrors = append(fieldErrors, FieldError{
+						Field:  jsonPointerToString(schemaErr.JSONPointer()),
+						Reason: schemaErr.Reason,
+					})
+				}
+			}
+		case *openapi3.SchemaError:
+			fieldErrors = append(fieldErrors, FieldError{
+				Field:  jsonPointerToString(e.JSONPointer()),
+				Reason: e.Reason,
+			})
+		default:
+			fieldErrors = append(fieldErrors, FieldError{
+				Field:  "",
+				Reason: reqErr.Err.Error(),
+			})
+		}
+	} else {
+		fieldErrors = append(fieldErrors, FieldError{
+			Field:  "",
+			Reason: err.Error(),
+		})
+	}
+
+	return fieldErrors
+}
+
+// jsonPointerToString converts a JSON pointer represented as a slice of strings
+// into a slash-separated string path (e.g., ["user", "email"] -> "user/email").
+// Returns an empty string if the input slice is empty.
+func jsonPointerToString(pointer []string) string {
+	if len(pointer) == 0 {
+		return ""
+	}
+	return strings.Join(pointer, "/")
 }

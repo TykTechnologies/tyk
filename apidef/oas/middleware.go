@@ -120,6 +120,9 @@ type Global struct {
 	// SkipQuotaReset indicates if quota limits should not be reset when creating or updating quotas for the API.
 	// Tyk classic API definition: `dont_set_quota_on_create`.
 	SkipQuotaReset bool `bson:"skipQuotaReset,omitempty" json:"skipQuotaReset,omitempty"`
+
+	// ErrorMessages defines the API-level error message configurations.
+	CustomErrorResponses map[string]apidef.TykError `bson:"customErrorResponses,omitempty" json:"customErrorResponses,omitempty"`
 }
 
 // MarshalJSON is a custom JSON marshaller for the Global struct. It is implemented
@@ -252,6 +255,22 @@ func (g *Global) Fill(api apidef.APIDefinition) {
 	g.fillRequestSizeLimit(api)
 
 	g.fillSkips(api)
+
+	g.fillErrorMessages(api)
+}
+
+func (g *Global) fillErrorMessages(api apidef.APIDefinition) {
+	// Fill error messages
+	if g.CustomErrorResponses == nil {
+		g.CustomErrorResponses = make(map[string]apidef.TykError)
+	}
+	for k, v := range api.CustomErrorResponses {
+		g.CustomErrorResponses[k] = v
+	}
+
+	if ShouldOmit(g.CustomErrorResponses) {
+		g.CustomErrorResponses = nil
+	}
 }
 
 func (g *Global) fillTrafficLogs(api apidef.APIDefinition) {
@@ -336,6 +355,8 @@ func (g *Global) ExtractTo(api *apidef.APIDefinition) {
 
 	g.extractTrafficLogsTo(api)
 
+	g.extractErrorMessages(api)
+
 	if g.TransformRequestHeaders == nil {
 		g.TransformRequestHeaders = &TransformHeaders{}
 		defer func() {
@@ -370,6 +391,14 @@ func (g *Global) ExtractTo(api *apidef.APIDefinition) {
 	g.extractRequestSizeLimitTo(api)
 
 	g.extractSkipsTo(api)
+
+}
+
+func (g *Global) extractErrorMessages(api *apidef.APIDefinition) {
+	if g.CustomErrorResponses == nil {
+		return
+	}
+	api.CustomErrorResponses = g.CustomErrorResponses
 }
 
 func (g *Global) extractTrafficLogsTo(api *apidef.APIDefinition) {

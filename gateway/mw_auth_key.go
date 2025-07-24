@@ -2,12 +2,12 @@ package gateway
 
 import (
 	"errors"
+	"github.com/TykTechnologies/tyk/ctx"
 	"net/http"
 	"strings"
 	"time"
 
 	"github.com/TykTechnologies/tyk/apidef"
-	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/internal/crypto"
 	"github.com/TykTechnologies/tyk/internal/httpctx"
 	"github.com/TykTechnologies/tyk/internal/otel"
@@ -29,33 +29,35 @@ const (
 	ErrAuthCertExpired               = "auth.cert_expired"
 	ErrAuthKeyIsInvalid              = "auth.key_is_invalid"
 
+	ErrNotValidSchema = "oas.schema_invalid"
+
 	MsgNonExistentKey  = "Attempted access with non-existent key."
 	MsgNonExistentCert = "Attempted access with non-existent cert."
 	MsgInvalidKey      = "Attempted access with invalid key."
 )
 
 func initAuthKeyErrors() {
-	TykErrors[ErrAuthAuthorizationFieldMissing] = config.TykError{
+	TykErrors[ErrAuthAuthorizationFieldMissing] = apidef.TykError{
 		Message: MsgAuthFieldMissing,
 		Code:    http.StatusUnauthorized,
 	}
 
-	TykErrors[ErrAuthKeyNotFound] = config.TykError{
+	TykErrors[ErrAuthKeyNotFound] = apidef.TykError{
 		Message: MsgApiAccessDisallowed,
 		Code:    http.StatusForbidden,
 	}
 
-	TykErrors[ErrAuthCertNotFound] = config.TykError{
+	TykErrors[ErrAuthCertNotFound] = apidef.TykError{
 		Message: MsgApiAccessDisallowed,
 		Code:    http.StatusForbidden,
 	}
 
-	TykErrors[ErrAuthKeyIsInvalid] = config.TykError{
+	TykErrors[ErrAuthKeyIsInvalid] = apidef.TykError{
 		Message: MsgApiAccessDisallowed,
 		Code:    http.StatusForbidden,
 	}
 
-	TykErrors[ErrAuthCertExpired] = config.TykError{
+	TykErrors[ErrAuthCertExpired] = apidef.TykError{
 		Message: MsgCertificateExpired,
 		Code:    http.StatusForbidden,
 	}
@@ -116,6 +118,7 @@ func (k *AuthKey) ProcessRequest(_ http.ResponseWriter, r *http.Request, _ inter
 		key = k.Gw.generateToken(k.Spec.OrgID, certHash)
 	} else {
 		k.Logger().Info("Attempted access with malformed header, no auth header found.")
+		ctx.SetErrorInfo(r, ErrAuthAuthorizationFieldMissing, nil, nil)
 		return errorAndStatusCode(ErrAuthAuthorizationFieldMissing)
 	}
 
@@ -125,6 +128,7 @@ func (k *AuthKey) ProcessRequest(_ http.ResponseWriter, r *http.Request, _ inter
 		// fallback to search by cert
 		session, keyExists = k.CheckSessionAndIdentityForValidKey(certHash, r)
 		if !keyExists {
+			ctx.SetErrorInfo(r, ErrAuthKeyNotFound, nil, nil)
 			return k.reportInvalidKey(key, r, MsgNonExistentKey, ErrAuthKeyNotFound)
 		}
 	}
