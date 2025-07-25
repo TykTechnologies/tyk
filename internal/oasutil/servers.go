@@ -34,6 +34,13 @@ type ServerUrl struct {
 	Variables map[string]*openapi3.ServerVariable
 }
 
+func newServerUrl(originUrl string) ServerUrl {
+	return ServerUrl{
+		Url:       originUrl,
+		Variables: make(map[string]*openapi3.ServerVariable),
+	}
+}
+
 // ParseServerUrl
 // Url template e.g. "{subdomain:[a-z]+}.example.com" or "api.example.com"
 func ParseServerUrl(url string) (*ServerUrl, error) {
@@ -54,9 +61,7 @@ type serverVariable struct {
 func (p *serverUrlParser) parse(url string) (*ServerUrl, error) {
 	p.url = url
 
-	result := new(ServerUrl)
-	result.Url = url
-	result.UrlNormalized = ""
+	result := newServerUrl(url)
 
 	var buf []byte
 
@@ -77,10 +82,6 @@ func (p *serverUrlParser) parse(url string) (*ServerUrl, error) {
 				return nil, err
 			}
 
-			if result.Variables == nil {
-				result.Variables = map[string]*openapi3.ServerVariable{}
-			}
-
 			if _, ok := result.Variables[variable.name]; ok {
 				return nil, ErrVariableCollision
 			}
@@ -99,7 +100,7 @@ func (p *serverUrlParser) parse(url string) (*ServerUrl, error) {
 
 	result.UrlNormalized += string(buf)
 
-	return result, nil
+	return &result, nil
 }
 
 func (p *serverUrlParser) extractValueBetweenBraces() (serverVariable, error) {

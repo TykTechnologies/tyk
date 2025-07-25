@@ -1557,6 +1557,20 @@ func Test_RemoveServer(t *testing.T) {
 		assert.Len(t, spec.Servers, 0)
 	})
 
+	t.Run("does no remove no one server if server url is empty", func(t *testing.T) {
+		spec := createOas()
+		err := spec.RemoveServer("")
+		assert.NoError(t, err)
+		assert.Len(t, spec.Servers, 1)
+	})
+
+	t.Run("does not fail if given server does not exist", func(t *testing.T) {
+		spec := createOas()
+		err := spec.RemoveServer("https://example.com")
+		assert.NoError(t, err)
+		assert.Len(t, spec.Servers, 1)
+	})
+
 	t.Run("fails if invalid regex was provided", func(t *testing.T) {
 		spec := createOas()
 		err := spec.RemoveServer("https://{sub:[a-z]+}.example.com/{version:[0-9]+}}")

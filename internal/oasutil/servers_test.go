@@ -8,7 +8,6 @@ import (
 )
 
 func TestParseServerUrl(t *testing.T) {
-
 	t.Run("positive test cases", func(t *testing.T) {
 		type testCase struct {
 			name     string
