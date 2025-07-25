@@ -89,8 +89,8 @@ func (v *VersionCheck) ProcessRequest(w http.ResponseWriter, r *http.Request, _ 
 			}
 		}
 
-		v.Spec.SanitizeProxyPaths(r)
-
+		new_listen_path := v.Spec.Proxy.ListenPath[:len(v.Spec.Proxy.ListenPath)-1] + "-" + targetVersion
+		r.URL.Path = new_listen_path + v.Spec.StripListenPath(r.URL.Path)
 		handler.ServeHTTP(w, r)
 		return nil, middleware.StatusRespond
 	}
