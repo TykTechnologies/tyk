@@ -36,9 +36,24 @@ type ServerUrl struct {
 
 func newServerUrl(originUrl string) ServerUrl {
 	return ServerUrl{
-		Url:       originUrl,
-		Variables: make(map[string]*openapi3.ServerVariable),
+		Url: originUrl,
 	}
+}
+
+func (u *ServerUrl) addVariable(name, defaultValue string) error {
+	if u.Variables == nil {
+		u.Variables = make(map[string]*openapi3.ServerVariable)
+	}
+
+	if _, ok := u.Variables[name]; ok {
+		return ErrVariableCollision
+	}
+
+	u.Variables[name] = &openapi3.ServerVariable{
+		Default: defaultValue,
+	}
+
+	return nil
 }
 
 // ParseServerUrl
@@ -82,12 +97,8 @@ func (p *serverUrlParser) parse(url string) (*ServerUrl, error) {
 				return nil, err
 			}
 
-			if _, ok := result.Variables[variable.name]; ok {
-				return nil, ErrVariableCollision
-			}
-
-			result.Variables[variable.name] = &openapi3.ServerVariable{
-				Default: p.nextParamName(),
+			if err = result.addVariable(variable.name, p.nextParamName()); err != nil {
+				return nil, err
 			}
 
 			result.UrlNormalized += string(openCurlyBrace) + variable.name + string(closeCurlyBrace)
