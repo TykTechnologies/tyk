@@ -96,7 +96,7 @@ func (a *APISpec) GetTykExtension() *oas.XTykAPIGateway {
 	if res == nil {
 		log.Warn("APISpec is an invalid OAS API")
 	}
-	return a.OAS.GetTykExtension()
+	return res
 }
 
 // FindSpecMatchesStatus checks if a URL spec has a specific status and returns the URLSpec for it.
