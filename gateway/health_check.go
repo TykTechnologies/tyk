@@ -301,8 +301,8 @@ func (gw *Gateway) isCriticalFailure(component string) bool {
 		return true
 	}
 
-	// Consider RPC critical only if using RPC
-	if component == "rpc" && gw.GetConfig().Policies.PolicySource == "rpc" {
+	// Consider RPC critical only if using RPC and gw not in emergency mode
+	if component == "rpc" && gw.GetConfig().Policies.PolicySource == "rpc" && !rpc.IsEmergencyMode() {
 		return true
 	}
 

@@ -12,6 +12,7 @@ import (
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/rpc"
 	"github.com/TykTechnologies/tyk/storage"
 )
 
@@ -354,6 +355,7 @@ func TestGateway_isCriticalFailure(t *testing.T) {
 		component      string
 		check          HealthCheckItem
 		setupConfig    func(*config.Config)
+		setupFunc      func(*testing.T)
 		expectedResult bool
 	}{
 		{
@@ -456,6 +458,36 @@ func TestGateway_isCriticalFailure(t *testing.T) {
 			},
 			expectedResult: true, // Critical based on component and config, not status
 		},
+		{
+			name:      "rpc component is NOT critical when PolicySource is rpc but in emergency mode",
+			component: "rpc",
+			check: HealthCheckItem{
+				Status:        Fail,
+				ComponentType: System,
+			},
+			setupConfig: func(conf *config.Config) {
+				conf.Policies.PolicySource = "rpc"
+			},
+			setupFunc: func(t *testing.T) {
+				rpc.SetEmergencyMode(t, true)
+			},
+			expectedResult: false,
+		},
+		{
+			name:      "rpc component is critical when PolicySource is rpc and NOT in emergency mode",
+			component: "rpc",
+			check: HealthCheckItem{
+				Status:        Fail,
+				ComponentType: System,
+			},
+			setupConfig: func(conf *config.Config) {
+				conf.Policies.PolicySource = "rpc"
+			},
+			setupFunc: func(t *testing.T) {
+				rpc.SetEmergencyMode(t, false)
+			},
+			expectedResult: true,
+		},
 	}
 
 	for _, tt := range tests {
@@ -463,6 +495,12 @@ func TestGateway_isCriticalFailure(t *testing.T) {
 			// Create a new gateway instance for each test
 			conf := config.Config{}
 			tt.setupConfig(&conf)
+
+			// Setup emergency mode if needed
+			if tt.setupFunc != nil {
+				tt.setupFunc(t)
+			}
+
 			gw := NewGateway(conf, nil)
 
 			// Call the function under test

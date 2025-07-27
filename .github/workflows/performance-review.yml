@@ -1,0 +1,25 @@
+name: Performance Review
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+  issue_comment:
+    types: [created]
+
+# Define permissions needed for the workflow
+permissions:
+  issues: write
+  pull-requests: write
+  contents: read
+
+jobs:
+  performance_review:
+    uses: buger/probe/.github/workflows/probe.yml@main
+    with:
+      command_prefix: "/performance"
+      prompt: ".probe/performance-reviewer.md"
+      update_existing_comment: true
+      update_comment_marker: "Performance Impact Reviewer Prompt"
+    secrets:
+      ANTHROPIC_API_KEY: ${{ secrets.PROBE_ANTHROPIC_API_KEY }}
+      ANTHROPIC_API_URL: ${{ secrets.PROBE_ANTHROPIC_URL }}
