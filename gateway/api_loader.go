@@ -3,7 +3,6 @@ package gateway
 import (
 	"crypto/tls"
 	"fmt"
-	"github.com/TykTechnologies/tyk/common/option"
 	"io/ioutil"
 	"net/http"
 	"net/url"
@@ -15,6 +14,8 @@ import (
 	"strings"
 	"sync"
 	texttemplate "text/template"
+
+	"github.com/TykTechnologies/tyk/common/option"
 
 	"github.com/gorilla/mux"
 	"github.com/justinas/alice"
@@ -346,29 +347,39 @@ func (gw *Gateway) processSpec(
 	gw.mwAppendEnabled(&chainArray, &TrackEndpointMiddleware{baseMid.Copy()})
 
 	if !spec.UseKeylessAccess {
-		// Select the keying method to use for setting session states
-		if gw.mwAppendEnabled(&authArray, &Oauth2KeyExists{baseMid.Copy()}) {
-			logger.Info("Checking security policy: OAuth")
-		}
+		// Check if this is an OAS API with multiple security requirements (OR conditions)
+		if spec.IsOAS && gw.hasMultipleSecurityRequirements(spec) {
+			logger.Info("Checking security policy: Multi-Auth (OR conditions)")
+			multiAuthMW := &MultiAuthMiddleware{BaseMiddleware: *baseMid}
+			multiAuthMW.BuildAuthRequirements(gw, spec, baseMid)
+			if gw.mwAppendEnabled(&authArray, multiAuthMW) {
+				logger.Infof("Enabled multi-auth with %d security requirements", len(multiAuthMW.authRequirements))
+			}
+		} else {
+			// Select the keying method to use for setting session states (existing behavior)
+			if gw.mwAppendEnabled(&authArray, &Oauth2KeyExists{baseMid.Copy()}) {
+				logger.Info("Checking security policy: OAuth")
+			}
 
-		if gw.mwAppendEnabled(&authArray, &ExternalOAuthMiddleware{baseMid.Copy()}) {
-			logger.Info("Checking security policy: External OAuth")
-		}
+			if gw.mwAppendEnabled(&authArray, &ExternalOAuthMiddleware{baseMid.Copy()}) {
+				logger.Info("Checking security policy: External OAuth")
+			}
 
-		if gw.mwAppendEnabled(&authArray, &BasicAuthKeyIsValid{baseMid.Copy(), nil, nil}) {
-			logger.Info("Checking security policy: Basic")
-		}
+			if gw.mwAppendEnabled(&authArray, &BasicAuthKeyIsValid{baseMid.Copy(), nil, nil}) {
+				logger.Info("Checking security policy: Basic")
+			}
 
-		if gw.mwAppendEnabled(&authArray, &HTTPSignatureValidationMiddleware{BaseMiddleware: baseMid.Copy()}) {
-			logger.Info("Checking security policy: HMAC")
-		}
+			if gw.mwAppendEnabled(&authArray, &HTTPSignatureValidationMiddleware{BaseMiddleware: baseMid.Copy()}) {
+				logger.Info("Checking security policy: HMAC")
+			}
 
-		if gw.mwAppendEnabled(&authArray, &JWTMiddleware{baseMid.Copy()}) {
-			logger.Info("Checking security policy: JWT")
-		}
+			if gw.mwAppendEnabled(&authArray, &JWTMiddleware{baseMid.Copy()}) {
+				logger.Info("Checking security policy: JWT")
+			}
 
-		if gw.mwAppendEnabled(&authArray, &OpenIDMW{BaseMiddleware: baseMid.Copy()}) {
-			logger.Info("Checking security policy: OpenID")
+			if gw.mwAppendEnabled(&authArray, &OpenIDMW{BaseMiddleware: baseMid.Copy()}) {
+				logger.Info("Checking security policy: OpenID")
+			}
 		}
 
 		customPluginAuthEnabled := spec.CustomPluginAuthEnabled || spec.UseGoPluginAuth || spec.EnableCoProcessAuth
@@ -1158,4 +1169,14 @@ func WithQuotaKey(key string) option.Option[ProcessSpecOptions] {
 	return func(p *ProcessSpecOptions) {
 		p.quotaKey = key
 	}
+}
+
+// hasMultipleSecurityRequirements checks if an OAS API has multiple security requirements (OR conditions)
+func (gw *Gateway) hasMultipleSecurityRequirements(spec *APISpec) bool {
+	if !spec.IsOAS {
+		return false
+	}
+
+	auth := spec.OAS.GetTykExtension().Server.Authentication
+	return auth != nil && auth.MultiAuth != nil && auth.MultiAuth.Enabled
 }
