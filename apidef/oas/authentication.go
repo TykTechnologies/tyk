@@ -59,6 +59,10 @@ type Authentication struct {
 	// SecuritySchemes contains security schemes definitions.
 	SecuritySchemes SecuritySchemes `bson:"securitySchemes,omitempty" json:"securitySchemes,omitempty"`
 
+	// MultiAuth contains configuration for multiple authentication requirements (OR conditions).
+	// When enabled, this allows processing multiple security requirements as alternatives.
+	MultiAuth *MultiAuthConfig `bson:"multiAuth,omitempty" json:"multiAuth,omitempty"`
+
 	// CustomKeyLifetime contains configuration for the maximum retention period for access tokens.
 	CustomKeyLifetime *CustomKeyLifetime `bson:"customKeyLifetime,omitempty" json:"customKeyLifetime,omitempty"`
 }
@@ -982,4 +986,41 @@ func (id *IDExtractor) ExtractTo(api *apidef.APIDefinition) {
 	}
 
 	id.Config.ExtractTo(api)
+}
+
+// SecurityRequirement represents one security checkpoint with its required authentication schemes
+// and the middleware chain to process them. For example, "API key + OAuth" would be one
+// SecurityRequirement with two schemes.
+type SecurityRequirement struct {
+	// Schemes maps scheme names to their required scopes
+	Schemes map[string][]string `json:"schemes"`
+	// Chain contains the middleware constructors for this requirement
+	// This field is populated during middleware chain construction
+	Chain []interface{} `json:"-"` // interface{} to avoid import cycles
+}
+
+// MultiAuthConfig contains all available security checkpoints for an API.
+// The BaseIdentityProvider is determined dynamically based on whichever
+// authentication method succeeds first.
+type MultiAuthConfig struct {
+	// Requirements contains all available security requirements (OR conditions)
+	Requirements []SecurityRequirement `json:"requirements"`
+	// BaseIdentityProvider is determined at runtime based on successful auth method
+	BaseIdentityProvider apidef.AuthTypeEnum `json:"baseIdentityProvider,omitempty"`
+	// Enabled indicates if multi-auth processing is active
+	Enabled bool `json:"enabled"`
+}
+
+// AuthenticationResult stores the outcome of authentication processing.
+// Tracks which specific auth method worked, the resulting user session,
+// and which security requirement was successfully passed.
+type AuthenticationResult struct {
+	// Method indicates which auth method succeeded (jwt, apiKey, basic, etc.)
+	Method string `json:"method"`
+	// Session contains the user session from successful authentication
+	Session interface{} `json:"-"` // interface{} to avoid import cycles
+	// Requirement indicates which security requirement succeeded (0, 1, 2, etc.)
+	Requirement int `json:"requirement"`
+	// Error contains aggregated errors if all methods failed
+	Error error `json:"-"`
 }
