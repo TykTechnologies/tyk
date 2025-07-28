@@ -343,6 +343,8 @@ func (s *OAS) getTykOperations() (operations Operations) {
 	return
 }
 
+// RemoveServer removes the server from the server list if it's already present.
+// It accepts regex-based server URLs, such as https://{subdomain:[a-z]+}.example.com/{version}
 func (s *OAS) RemoveServer(serverUrl string) error {
 	if len(serverUrl) == 0 {
 		return nil
