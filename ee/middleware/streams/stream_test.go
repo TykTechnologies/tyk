@@ -4,12 +4,13 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v2"
 )
 
 func TestStreamStart(t *testing.T) {
-	str := NewStream(nil)
+	str := NewStream(nil, testLogger())
 	require.NotNil(t, str)
 
 	t.Run("success", func(t *testing.T) {
@@ -46,6 +47,7 @@ func TestStreamStart(t *testing.T) {
 }
 
 func TestStreamStop(t *testing.T) {
+	logger := testLogger()
 	validConfig := map[string]interface{}{
 		"input": map[string]interface{}{
 			"http_server": map[string]interface{}{
@@ -59,7 +61,7 @@ func TestStreamStop(t *testing.T) {
 		},
 	}
 	t.Run("successfully stop", func(t *testing.T) {
-		str := NewStream(nil)
+		str := NewStream(nil, logger)
 		require.NotNil(t, str)
 
 		err := str.Start(validConfig, nil)
@@ -70,7 +72,7 @@ func TestStreamStop(t *testing.T) {
 	})
 
 	t.Run("no error stopping cause no stream", func(t *testing.T) {
-		str := NewStream(nil)
+		str := NewStream(nil, logger)
 		require.NotNil(t, str)
 
 		err := str.Start(validConfig, nil)
@@ -82,8 +84,9 @@ func TestStreamStop(t *testing.T) {
 }
 
 func TestRemoveAndWhitelistUnsafeComponents(t *testing.T) {
+	logger := logrus.NewEntry(logrus.New())
 	t.Run("Remove Unsafe Components", func(t *testing.T) {
-		stream := NewStream(nil)
+		stream := NewStream(nil, logger)
 		unsafeConfig := map[string]interface{}{
 			"input": map[string]interface{}{
 				"type": "file",
@@ -112,7 +115,7 @@ func TestRemoveAndWhitelistUnsafeComponents(t *testing.T) {
 	})
 
 	t.Run("Whitelist Components", func(t *testing.T) {
-		stream := NewStream([]string{"file", "socket"})
+		stream := NewStream([]string{"file", "socket"}, logger)
 
 		unsafeConfig := map[string]interface{}{
 			"input": map[string]interface{}{
@@ -149,4 +152,8 @@ func containsUnsafeComponent(configPayload []byte) bool {
 		}
 	}
 	return false
+}
+
+func testLogger() *logrus.Entry {
+	return logrus.NewEntry(logrus.New())
 }
