@@ -13,7 +13,7 @@ func TestReadableDuration_MarshalJSON(t *testing.T) {
 
 	t.Run("valid", func(t *testing.T) {
 		duration := ReadableDuration(time.Minute * 5)
-		expectedJSON := []byte(`"5m0s"`)
+		expectedJSON := []byte(`"5m"`)
 		resultJSON, err := json.Marshal(&duration)
 		assert.NoError(t, err)
 		assert.Equal(t, string(expectedJSON), string(resultJSON))
@@ -30,6 +30,14 @@ func TestReadableDuration_MarshalJSON(t *testing.T) {
 	t.Run("50 milliseconds", func(t *testing.T) {
 		duration := ReadableDuration(time.Millisecond * 50)
 		expectedJSON := []byte(`"50ms"`)
+		resultJSON, err := json.Marshal(&duration)
+		assert.NoError(t, err)
+		assert.Equal(t, string(expectedJSON), string(resultJSON))
+	})
+
+	t.Run("90 seconds", func(t *testing.T) {
+		duration := ReadableDuration(time.Second * 90)
+		expectedJSON := []byte(`"1m30s"`)
 		resultJSON, err := json.Marshal(&duration)
 		assert.NoError(t, err)
 		assert.Equal(t, string(expectedJSON), string(resultJSON))
