@@ -1050,15 +1050,14 @@ func (gw *Gateway) handleGetAPIOAS(apiID string, modePublic bool) (interface{}, 
 
 func (gw *Gateway) handleAddApi(r *http.Request, fs afero.Fs, oasEndpoint bool) (interface{}, int) {
 	var (
-		newDef  apidef.APIDefinition
-		oasObj  oas.OAS
-		baseApi *APISpec
+		newDef apidef.APIDefinition
+		oasObj oas.OAS
 	)
 
 	versionParams := lib.NewVersionQueryParameters(r.URL.Query())
 	err := versionParams.Validate(func() (bool, string) {
 		baseApiID := versionParams.Get(lib.BaseAPIID)
-		baseApi = gw.getApiSpec(baseApiID)
+		baseApi := gw.getApiSpec(baseApiID)
 		if baseApi != nil {
 			return true, baseApi.VersionDefinition.Name
 		}
@@ -1119,19 +1118,9 @@ func (gw *Gateway) handleAddApi(r *http.Request, fs afero.Fs, oasEndpoint bool) 
 		}
 	}
 
-	if !versionParams.IsEmpty(lib.BaseAPIID) && baseApi != nil {
-		apiInBytes, err := json.Marshal(baseApi)
-		if err != nil {
-			log.WithError(err).Error("Couldn't marshal API spec")
-		}
-
-		var baseAPI APISpec
-		err = json.Unmarshal(apiInBytes, &baseAPI)
-		if err != nil {
-			log.WithError(err).Error("Couldn't unmarshal API spec")
-		}
-
-		lib.ConfigureVersionDefinition(baseAPI.VersionDefinition, versionParams, newDef.APIID)
+	if !versionParams.IsEmpty(lib.BaseAPIID) {
+		baseAPI := gw.getApiSpec(versionParams.Get(lib.BaseAPIID))
+		baseAPI.VersionDefinition = lib.ConfigureVersionDefinition(baseAPI.VersionDefinition, versionParams, newDef.APIID)
 
 		if baseAPI.IsOAS {
 			baseAPI.OAS.Fill(*baseAPI.APIDefinition)

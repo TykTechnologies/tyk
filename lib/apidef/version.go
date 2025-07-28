@@ -139,21 +139,21 @@ func ConfigureVersionDefinition(def apidef.VersionDefinition, params *VersionQue
 		def.Enabled = true
 
 		if !params.IsEmpty(BaseAPIVersionName) {
-			opts = append(opts, WithVersionName(params.versionParams[BaseAPIVersionName.String()]))
+			opts = append(opts, WithVersionName(params.Get(BaseAPIVersionName)))
 		}
 
 		if !params.IsEmpty(SetDefault) {
-			setDefault := params.versionParams[SetDefault.String()]
+			setDefault := params.Get(SetDefault)
 			if setDefault == "true" {
-				opts = append(opts, SetAsDefault(params.versionParams[NewVersionName.String()]))
+				opts = append(opts, SetAsDefault(params.Get(NewVersionName)))
 			}
 		}
 
 		if !params.IsEmpty(BaseAPIID) {
-			opts = append(opts, WithBaseID(params.versionParams[BaseAPIID.String()]))
+			opts = append(opts, WithBaseID(params.Get(BaseAPIID)))
 		}
 
-		opts = append(opts, AddVersion(params.versionParams[NewVersionName.String()], newApiID))
+		opts = append(opts, AddVersion(params.Get(NewVersionName), newApiID))
 	}
 
 	// When baseAPIID is missing in the request params, and it's versioning is enabled then set versioning ID as APIID
