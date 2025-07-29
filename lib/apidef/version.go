@@ -9,14 +9,31 @@ import (
 )
 
 const (
+	// BaseAPIID represents the parameter for the base API identifier.
+	// This is used to identify the original API that a version is based on.
 	BaseAPIID VersionParameter = iota
+
+	// BaseAPIVersionName represents the parameter for the base API version name.
+	// This is used to specify the name of the version in the base API.
 	BaseAPIVersionName
+
+	// NewVersionName represents the parameter for the new version name.
+	// This is used when creating a new version of an API.
 	NewVersionName
+
+	// SetDefault represents the parameter that determines if a version should be set as default.
+	// When true, the new version will be marked as the default version for the API.
 	SetDefault
+
+	// paramCount is used internally to track the number of version parameters.
 	paramCount
 )
 
+const TrueString = "true"
+
 var (
+	// ErrNewVersionRequired is returned when a new version name is required but not provided.
+	// This error occurs during validation when attempting to create a new API version.
 	ErrNewVersionRequired = errors.New("The new version name is required")
 )
 
@@ -144,7 +161,7 @@ func ConfigureVersionDefinition(def apidef.VersionDefinition, params *VersionQue
 
 		if !params.IsEmpty(SetDefault) {
 			setDefault := params.Get(SetDefault)
-			if setDefault == "true" {
+			if setDefault == TrueString {
 				opts = append(opts, SetAsDefault(params.Get(NewVersionName)))
 			}
 		}
