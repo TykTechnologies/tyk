@@ -2189,7 +2189,8 @@ func TestHandleAddApi_AddVersionAtomically(t *testing.T) {
 		{AdminAuth: true, Method: http.MethodPost, Data: v2,
 			Path: fmt.Sprintf("/tyk/apis?base_api_id=%s&new_version_name=%s&set_default=true&base_api_version_name=%s", baseAPI.APIID, v2VersionName, baseVersionName),
 			BodyMatchFunc: func(i []byte) bool {
-				assert.Len(t, baseAPI.VersionDefinition.Versions, 0)
+				// Gateway addApi function modifies baseAPI in it's internal storage - gw.apisByID
+				assert.Len(t, baseAPI.VersionDefinition.Versions, 1)
 				ts.Gw.DoReload()
 				return true
 			},
@@ -2267,7 +2268,8 @@ func TestHandleAddOASApi_AddVersionAtomically(t *testing.T) {
 		{AdminAuth: true, Method: http.MethodPost, Data: &v2.OAS,
 			Path: fmt.Sprintf("/tyk/apis/oas?base_api_id=%s&new_version_name=%s&set_default=true&base_api_version_name=%s", baseAPI.APIID, v2VersionName, baseVersionName),
 			BodyMatchFunc: func(i []byte) bool {
-				assert.Len(t, baseAPI.VersionDefinition.Versions, 0)
+				// Gateway addApi function modifies baseAPI in it's internal storage - gw.apisByID
+				assert.Len(t, baseAPI.VersionDefinition.Versions, 1)
 				ts.Gw.DoReload()
 				return true
 			},
