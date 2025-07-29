@@ -5,12 +5,14 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/samber/lo"
 	"strings"
 
 	"github.com/TykTechnologies/kin-openapi/openapi3"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/internal/oasutil"
 	"github.com/TykTechnologies/tyk/internal/reflect"
 )
 
@@ -341,28 +343,53 @@ func (s *OAS) getTykOperations() (operations Operations) {
 	return
 }
 
+// RemoveServer removes the server from the server list if it's already present.
+// It accepts regex-based server URLs, such as https://{subdomain:[a-z]+}.example.com/{version}
+func (s *OAS) RemoveServer(serverUrl string) error {
+	if len(serverUrl) == 0 {
+		return nil
+	}
+
+	parsed, err := oasutil.ParseServerUrl(serverUrl)
+
+	if err != nil {
+		return err
+	}
+
+	s.Servers = lo.Filter(s.Servers, func(server *openapi3.Server, _ int) bool {
+		return server.URL != parsed.UrlNormalized
+	})
+
+	return nil
+}
+
 // AddServers adds a server into the servers definition if not already present.
-func (s *OAS) AddServers(apiURLs ...string) {
+func (s *OAS) AddServers(apiURLs ...string) error {
 	apiURLSet := make(map[string]struct{})
-	newServers := openapi3.Servers{}
+	var newServers openapi3.Servers
+
 	for _, apiURL := range apiURLs {
-		if strings.Contains(apiURL, "{") && strings.Contains(apiURL, "}") {
-			continue
+		serverUrl, err := oasutil.ParseServerUrl(apiURL)
+
+		if err != nil {
+			return err
 		}
 
 		newServers = append(newServers, &openapi3.Server{
-			URL: apiURL,
+			URL:       serverUrl.UrlNormalized,
+			Variables: serverUrl.Variables,
 		})
+
 		apiURLSet[apiURL] = struct{}{}
 	}
 
 	if len(newServers) == 0 {
-		return
+		return nil
 	}
 
 	if len(s.Servers) == 0 {
 		s.Servers = newServers
-		return
+		return nil
 	}
 
 	// check if apiURL already exists in servers object
@@ -375,6 +402,7 @@ func (s *OAS) AddServers(apiURLs ...string) {
 	}
 
 	s.Servers = newServers
+	return nil
 }
 
 // UpdateServers sets or updates the first servers URL if it matches oldAPIURL.
