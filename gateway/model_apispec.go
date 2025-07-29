@@ -1,9 +1,12 @@
 package gateway
 
 import (
+	"github.com/TykTechnologies/tyk/header"
 	"github.com/TykTechnologies/tyk/internal/errors"
+	"github.com/TykTechnologies/tyk/user"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -83,6 +86,17 @@ func (a *APISpec) CheckSpecMatchesStatus(r *http.Request, rxPaths []URLSpec, mod
 		}
 	}
 	return false, nil
+}
+
+func (a *APISpec) GetTykExtension() *oas.XTykAPIGateway {
+	if !a.IsOAS {
+		return nil
+	}
+	res := a.OAS.GetTykExtension()
+	if res == nil {
+		log.Warn("APISpec is an invalid OAS API")
+	}
+	return res
 }
 
 // FindSpecMatchesStatus checks if a URL spec has a specific status and returns the URLSpec for it.
@@ -176,4 +190,22 @@ func (a *APISpec) findOperation(r *http.Request) *Operation {
 		route:      route,
 		pathParams: pathParams,
 	}
+}
+
+func (a *APISpec) sendRateLimitHeaders(session *user.SessionState, dest *http.Response) {
+	quotaMax, quotaRemaining, quotaRenews := int64(0), int64(0), int64(0)
+
+	if session != nil {
+		quotaMax, quotaRemaining, _, quotaRenews = session.GetQuotaLimitByAPIID(a.APIID)
+	} else {
+		log.Warningf("session not found. sending inappropriate rate-limit headers")
+	}
+
+	if dest.Header == nil {
+		dest.Header = http.Header{}
+	}
+
+	dest.Header.Set(header.XRateLimitLimit, strconv.Itoa(int(quotaMax)))
+	dest.Header.Set(header.XRateLimitRemaining, strconv.Itoa(int(quotaRemaining)))
+	dest.Header.Set(header.XRateLimitReset, strconv.Itoa(int(quotaRenews)))
 }
