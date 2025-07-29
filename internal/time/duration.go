@@ -102,6 +102,11 @@ func (d ReadableDuration) format() string {
 	var sb strings.Builder
 	var rest = int64(d)
 
+	if rest < 0 {
+		rest *= -1
+		sb.WriteByte('-')
+	}
+
 	for _, conv := range convertCases {
 		if rest == 0 {
 			break
