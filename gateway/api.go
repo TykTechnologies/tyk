@@ -1101,7 +1101,10 @@ func (gw *Gateway) handleAddApi(r *http.Request, fs afero.Fs, oasEndpoint bool) 
 
 	if oasEndpoint {
 		newAPIURL := getAPIURL(newDef, gw.GetConfig())
-		oasObj.AddServers(newAPIURL)
+
+		if err := oasObj.AddServers(newAPIURL); err != nil {
+			return apiError(err.Error()), http.StatusBadRequest
+		}
 
 		newDef.IsOAS = true
 		oasObj.GetTykExtension().Info.ID = newDef.APIID
