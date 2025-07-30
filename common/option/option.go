@@ -19,3 +19,7 @@ func (o Options[O]) Build(baseVal O) *O {
 
 	return &baseVal
 }
+
+func (o Options[O]) BuildValue(baseVal O) O {
+	return *o.Build(baseVal)
+}

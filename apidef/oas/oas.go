@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/TykTechnologies/tyk/common/option"
 	"github.com/samber/lo"
 	"strings"
 
@@ -69,7 +70,11 @@ func (s *OAS) MarshalJSON() ([]byte, error) {
 }
 
 // Fill fills *OAS definition from apidef.APIDefinition.
-func (s *OAS) Fill(api apidef.APIDefinition) {
+func (s *OAS) Fill(api apidef.APIDefinition, opts ...FillOption) {
+	opt := option.New(opts).Build(fillOptions{
+		strategy: regexTransform, // transform regex by default
+	})
+
 	xTykAPIGateway := s.GetTykExtension()
 	if xTykAPIGateway == nil {
 		xTykAPIGateway = &XTykAPIGateway{}
@@ -77,7 +82,7 @@ func (s *OAS) Fill(api apidef.APIDefinition) {
 	}
 
 	xTykAPIGateway.Fill(api)
-	s.fillPathsAndOperations(api.VersionData.Versions[Main].ExtendedPaths)
+	s.fillPathsAndOperations(api.VersionData.Versions[Main].ExtendedPaths, *opt)
 	s.fillSecurity(api)
 
 	if ShouldOmit(xTykAPIGateway) {
@@ -594,4 +599,33 @@ func GetValidationOptionsFromConfig(oasConfig config.OASConfig) []openapi3.Valid
 	}
 
 	return opts
+}
+
+// classicToOasStrategy transform strategy
+type classicToOasStrategy int
+
+const (
+	unknownTransform classicToOasStrategy = iota
+	regexTransform
+	regexIgnoreTransform
+)
+
+type fillOptions struct {
+	strategy classicToOasStrategy
+}
+
+// FillOption optional parameter for Fill method.
+type FillOption = option.Option[fillOptions]
+
+func defaultFillOptions() fillOptions {
+	return fillOptions{
+		strategy: regexTransform,
+	}
+}
+
+// WithOmitTranslate omits regex-based endpoints translation during classic to oas translation.
+func WithOmitTranslate() option.Option[fillOptions] {
+	return func(o *fillOptions) {
+		o.strategy = regexIgnoreTransform
+	}
 }
