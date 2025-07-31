@@ -2,10 +2,10 @@ package gateway
 
 import (
 	"errors"
-	"net/http"
-	"time"
-
 	"github.com/getkin/kin-openapi/routers"
+	"net/http"
+	"net/url"
+	"time"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/apidef/oas"
@@ -89,7 +89,18 @@ func (v *VersionCheck) ProcessRequest(w http.ResponseWriter, r *http.Request, _ 
 			}
 		}
 
-		v.Spec.SanitizeProxyPaths(r)
+		if v.Spec.IsOAS {
+			target_api := v.Gw.apisByID[subVersionID]
+			stripped_path := v.Spec.StripListenPath(r.URL.Path)
+			new_path, err := url.JoinPath(target_api.Proxy.ListenPath, stripped_path)
+			if err != nil {
+				log.Errorf("Url Join Error, err: %s", err)
+				return errors.New(http.StatusText(http.StatusInternalServerError)), http.StatusInternalServerError
+			}
+			r.URL.Path = new_path
+		} else {
+			v.Spec.SanitizeProxyPaths(r)
+		}
 
 		handler.ServeHTTP(w, r)
 		return nil, middleware.StatusRespond
