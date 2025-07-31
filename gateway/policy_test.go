@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"reflect"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -718,4 +719,139 @@ func TestParsePoliciesFromRPC(t *testing.T) {
 		})
 	}
 
+}
+
+// TestLoadPoliciesFromDashboardAutoRecovery tests that nonce desynchronization
+// automatically recovers without manual intervention
+func TestLoadPoliciesFromDashboardAutoRecovery(t *testing.T) {
+	requestCount := 0
+	registrationCount := 0
+
+	// Mock dashboard server
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Handle registration requests
+		if strings.Contains(r.URL.Path, "/register/node") {
+			registrationCount++
+			w.Header().Set("Content-Type", "application/json")
+			response := NodeResponseOK{
+				Status:  "ok",
+				Message: map[string]string{"NodeID": "test-node-id"},
+				Nonce:   fmt.Sprintf("nonce-%d", registrationCount),
+			}
+			json.NewEncoder(w).Encode(response)
+			return
+		}
+
+		// Handle policy requests
+		requestCount++
+		
+		// First request: return 403 to simulate nonce mismatch
+		if requestCount == 1 {
+			w.WriteHeader(http.StatusForbidden)
+			w.Write([]byte("Nonce failed"))
+			return
+		}
+
+		// Subsequent requests: success
+		w.Header().Set("Content-Type", "application/json")
+		list := struct {
+			Message []DBPolicy `json:"message"`
+			Nonce   string     `json:"nonce"`
+		}{
+			Message: []DBPolicy{},
+			Nonce:   "success-nonce",
+		}
+		json.NewEncoder(w).Encode(list)
+	}))
+	defer ts.Close()
+
+	// Set up test environment
+	conf := func(globalConf *config.Config) {
+		globalConf.UseDBAppConfigs = true
+		globalConf.DBAppConfOptions.ConnectionString = ts.URL
+	}
+	g := StartTest(conf)
+	defer g.Close()
+
+	// Set up dashboard service
+	g.Gw.DashService = &HTTPDashboardHandler{Gw: g.Gw}
+	g.Gw.DashService.Init()
+
+	// Test: Load policies should auto-recover from nonce failure
+	allowExplicitPolicyID := g.Gw.GetConfig().Policies.AllowExplicitPolicyID
+	policyMap, err := g.Gw.LoadPoliciesFromDashboard(ts.URL, "", allowExplicitPolicyID)
+
+	// Should succeed due to auto-recovery
+	assert.NoError(t, err, "Auto-recovery should allow successful policy loading")
+	assert.NotNil(t, policyMap, "Policy map should be returned after auto-recovery")
+	
+	// Verify the auto-recovery process
+	assert.Equal(t, 2, requestCount, "Should have made 2 requests (first failed, second succeeded)")
+	assert.Equal(t, 1, registrationCount, "Should have made 1 registration request for recovery")
+}
+
+// TestLoadPoliciesFromDashboardNonceEmptyAfterFailedRecovery tests the scenario
+// where the gateway tries to recover from nonce error but creates a "Nonce empty" error
+func TestLoadPoliciesFromDashboardNonceEmptyAfterFailedRecovery(t *testing.T) {
+	var requestCount int
+
+	// Mock dashboard that simulates the problematic behavior described in the plan
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requestCount++
+		
+		nonce := r.Header.Get("x-tyk-nonce")
+		
+		// First request: Nonce mismatch 
+		if requestCount == 1 {
+			w.WriteHeader(http.StatusForbidden)
+			w.Write([]byte("Nonce failed"))
+			return
+		}
+		
+		// Second request: After gateway clears nonce (simulating current broken recovery)
+		if requestCount == 2 && nonce == "" {
+			w.WriteHeader(http.StatusForbidden)
+			w.Write([]byte("Authorization failed (Nonce empty)"))
+			return
+		}
+
+		// Should not reach here in the broken scenario
+		w.Header().Set("Content-Type", "application/json")
+		list := struct {
+			Message []DBPolicy `json:"message"`
+			Nonce   string     `json:"nonce"`
+		}{
+			Message: []DBPolicy{},
+			Nonce:   "recovery-nonce",
+		}
+		json.NewEncoder(w).Encode(list)
+	}))
+	defer ts.Close()
+
+	conf := func(globalConf *config.Config) {
+		globalConf.UseDBAppConfigs = true
+	}
+	g := StartTest(conf)
+	defer g.Close()
+
+	// Set initial nonce to simulate established session
+	g.Gw.ServiceNonce = "old-nonce"
+	
+	allowExplicitPolicyID := g.Gw.GetConfig().Policies.AllowExplicitPolicyID
+
+	// First call - should get "Nonce failed"
+	policyMap, err := g.Gw.LoadPoliciesFromDashboard(ts.URL, "", allowExplicitPolicyID)
+	assert.Error(t, err)
+	assert.Empty(t, policyMap)
+
+	// Simulate the current broken recovery logic: clear the nonce
+	g.Gw.ServiceNonce = ""
+
+	// Second call - should get "Authorization failed (Nonce empty)" 
+	policyMap, err = g.Gw.LoadPoliciesFromDashboard(ts.URL, "", allowExplicitPolicyID)
+	assert.Error(t, err)
+	assert.Empty(t, policyMap)
+	
+	// This demonstrates the current broken state that leads to crash loops
+	assert.Equal(t, 2, requestCount, "Should have made exactly 2 requests showing the failure loop")
 }
