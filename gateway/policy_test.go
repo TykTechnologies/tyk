@@ -855,3 +855,163 @@ func TestLoadPoliciesFromDashboardNonceEmptyAfterFailedRecovery(t *testing.T) {
 	// This demonstrates the current broken state that leads to crash loops
 	assert.Equal(t, 2, requestCount, "Should have made exactly 2 requests showing the failure loop")
 }
+
+// TestLoadPoliciesFromDashboardInvalidSecret tests Case 2.1 - Invalid Dashboard Secret
+func TestLoadPoliciesFromDashboardInvalidSecret(t *testing.T) {
+	var requestCount int
+
+	// Mock dashboard that returns "Secret incorrect" error
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requestCount++
+		w.WriteHeader(http.StatusForbidden)
+		w.Write([]byte("Authorization failed (Secret incorrect)"))
+	}))
+	defer ts.Close()
+
+	conf := func(globalConf *config.Config) {
+		globalConf.UseDBAppConfigs = true
+	}
+	g := StartTest(conf)
+	defer g.Close()
+
+	// Set up dashboard service with invalid secret
+	g.Gw.DashService = &HTTPDashboardHandler{Gw: g.Gw}
+	g.Gw.DashService.Init()
+
+	allowExplicitPolicyID := g.Gw.GetConfig().Policies.AllowExplicitPolicyID
+	policyMap, err := g.Gw.LoadPoliciesFromDashboard(ts.URL, "invalid-secret", allowExplicitPolicyID)
+
+	// Should fail with the standard error, NOT trigger nonce recovery
+	assert.Error(t, err)
+	assert.Equal(t, ErrPoliciesFetchFailed, err)
+	assert.Empty(t, policyMap)
+	assert.Equal(t, 1, requestCount, "Should make only one request, no retry for invalid secret")
+}
+
+// TestLoadPoliciesFromDashboardServerError tests Case 2.3 - Server Error (Redis unavailable simulation)
+func TestLoadPoliciesFromDashboardServerError(t *testing.T) {
+	var requestCount int
+
+	// Mock dashboard that returns 500 Internal Server Error
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requestCount++
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte("Internal Server Error: Cannot connect to Redis"))
+	}))
+	defer ts.Close()
+
+	conf := func(globalConf *config.Config) {
+		globalConf.UseDBAppConfigs = true
+	}
+	g := StartTest(conf)
+	defer g.Close()
+
+	// Set up dashboard service
+	g.Gw.DashService = &HTTPDashboardHandler{Gw: g.Gw}
+	g.Gw.DashService.Init()
+
+	allowExplicitPolicyID := g.Gw.GetConfig().Policies.AllowExplicitPolicyID
+	policyMap, err := g.Gw.LoadPoliciesFromDashboard(ts.URL, "", allowExplicitPolicyID)
+
+	// Should fail with standard error, NOT trigger nonce recovery
+	assert.Error(t, err)
+	assert.Equal(t, ErrPoliciesFetchFailed, err)
+	assert.Empty(t, policyMap)
+	assert.Equal(t, 1, requestCount, "Should make only one request, no retry for server errors")
+}
+
+// TestLoadPoliciesFromDashboardTimeoutSimulation tests timeout scenario (Case 1.1 simulation)
+func TestLoadPoliciesFromDashboardTimeoutSimulation(t *testing.T) {
+	var requestCount int
+	var registrationCount int
+
+	// Mock dashboard that simulates: request reaches dashboard, response is lost,
+	// gateway retries with stale nonce
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Handle registration requests
+		if strings.Contains(r.URL.Path, "/register/node") {
+			registrationCount++
+			w.Header().Set("Content-Type", "application/json")
+			response := NodeResponseOK{
+				Status:  "ok",
+				Message: map[string]string{"NodeID": "test-node-id"},
+				Nonce:   fmt.Sprintf("nonce-%d", registrationCount),
+			}
+			json.NewEncoder(w).Encode(response)
+			return
+		}
+
+		// Handle policy requests
+		requestCount++
+		
+		// First request: simulate timeout by returning nonce failure (gateway retries with stale nonce)
+		if requestCount == 1 {
+			w.WriteHeader(http.StatusForbidden)
+			w.Write([]byte("Nonce failed"))
+			return
+		}
+
+		// Subsequent requests: success after auto-recovery
+		w.Header().Set("Content-Type", "application/json")
+		list := struct {
+			Message []DBPolicy `json:"message"`
+			Nonce   string     `json:"nonce"`
+		}{
+			Message: []DBPolicy{},
+			Nonce:   "recovery-success-nonce",
+		}
+		json.NewEncoder(w).Encode(list)
+	}))
+	defer ts.Close()
+
+	conf := func(globalConf *config.Config) {
+		globalConf.UseDBAppConfigs = true
+	}
+	g := StartTest(conf)
+	defer g.Close()
+
+	// Set up dashboard service
+	g.Gw.DashService = &HTTPDashboardHandler{Gw: g.Gw}
+	g.Gw.DashService.Init()
+
+	// Set initial nonce to simulate established session before timeout
+	g.Gw.ServiceNonce = "pre-timeout-nonce"
+
+	allowExplicitPolicyID := g.Gw.GetConfig().Policies.AllowExplicitPolicyID
+	policyMap, err := g.Gw.LoadPoliciesFromDashboard(ts.URL, "", allowExplicitPolicyID)
+
+	// Should succeed due to auto-recovery
+	assert.NoError(t, err, "Auto-recovery should handle timeout-induced nonce failure")
+	assert.NotNil(t, policyMap, "Policy map should be returned after auto-recovery")
+	
+	// Verify the auto-recovery process for timeout scenario
+	assert.Equal(t, 2, requestCount, "Should make 2 requests (failed retry + recovery)")
+	assert.Equal(t, 1, registrationCount, "Should re-register once for recovery")
+}
+
+// TestLoadPoliciesFromDashboardNoDashServiceFallback tests graceful fallback when DashService unavailable
+func TestLoadPoliciesFromDashboardNoDashServiceFallback(t *testing.T) {
+	// Mock dashboard that returns nonce error
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusForbidden)
+		w.Write([]byte("Nonce failed"))
+	}))
+	defer ts.Close()
+
+	conf := func(globalConf *config.Config) {
+		globalConf.UseDBAppConfigs = true
+	}
+	g := StartTest(conf)
+	defer g.Close()
+
+	// DO NOT set up DashService - simulating environment where it's not available
+	g.Gw.DashService = nil
+
+	allowExplicitPolicyID := g.Gw.GetConfig().Policies.AllowExplicitPolicyID
+	policyMap, err := g.Gw.LoadPoliciesFromDashboard(ts.URL, "", allowExplicitPolicyID)
+
+	// Should fail gracefully without causing panic
+	assert.Error(t, err)
+	assert.Equal(t, ErrPoliciesFetchFailed, err)
+	assert.Empty(t, policyMap)
+}

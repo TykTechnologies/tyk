@@ -1,6 +1,7 @@
 package gateway
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"github.com/TykTechnologies/tyk/header"
@@ -165,7 +166,7 @@ func (gw *Gateway) LoadPoliciesFromDashboard(endpoint, secret string, allowExpli
 				return nil, ErrPoliciesFetchFailed
 			}
 			
-			if err := gw.DashService.Register(); err != nil {
+			if err := gw.DashService.Register(context.Background()); err != nil {
 				log.Error("Failed to re-register node during policy recovery: ", err)
 				return nil, ErrPoliciesFetchFailed
 			}

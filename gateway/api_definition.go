@@ -428,7 +428,7 @@ func (a APIDefinitionLoader) FromDashboardService(endpoint string) ([]*APISpec, 
 			return nil, fmt.Errorf("login failure, Response was: %v", errorMessage)
 		}
 		
-		if err := a.Gw.DashService.Register(); err != nil {
+		if err := a.Gw.DashService.Register(context.Background()); err != nil {
 			log.Error("Failed to re-register node during API definitions recovery: ", err)
 			return nil, fmt.Errorf("login failure, Response was: %v", errorMessage)
 		}

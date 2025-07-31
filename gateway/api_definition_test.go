@@ -10,6 +10,7 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"sync"
 	"testing"
 	texttemplate "text/template"
@@ -1647,4 +1648,165 @@ func TestInternalEndpointMW_TT_11126(t *testing.T) {
 	_, _ = ts.Run(t, []test.TestCase{
 		{Path: "/headers", Code: http.StatusForbidden},
 	}...)
+}
+
+// TestFromDashboardServiceAutoRecovery tests nonce desynchronization auto-recovery for API definitions
+func TestFromDashboardServiceAutoRecovery(t *testing.T) {
+	requestCount := 0
+	registrationCount := 0
+
+	// Mock dashboard server
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Handle registration requests
+		if strings.Contains(r.URL.Path, "/register/node") {
+			registrationCount++
+			w.Header().Set("Content-Type", "application/json")
+			response := NodeResponseOK{
+				Status:  "ok",
+				Message: map[string]string{"NodeID": "test-node-id"},
+				Nonce:   fmt.Sprintf("nonce-%d", registrationCount),
+			}
+			json.NewEncoder(w).Encode(response)
+			return
+		}
+
+		// Handle API definition requests
+		requestCount++
+		
+		// First request: return 403 to simulate nonce mismatch
+		if requestCount == 1 {
+			w.WriteHeader(http.StatusForbidden)
+			w.Write([]byte("Nonce failed"))
+			return
+		}
+
+		// Subsequent requests: success after auto-recovery
+		w.Header().Set("Content-Type", "application/json")
+		list := model.NewMergedAPIList()
+		list.Nonce = "success-nonce"
+		json.NewEncoder(w).Encode(list)
+	}))
+	defer ts.Close()
+
+	conf := func(globalConf *config.Config) {
+		globalConf.UseDBAppConfigs = true
+		globalConf.DBAppConfOptions.ConnectionString = ts.URL
+	}
+	g := StartTest(conf)
+	defer g.Close()
+
+	// Set up dashboard service
+	g.Gw.DashService = &HTTPDashboardHandler{Gw: g.Gw}
+	g.Gw.DashService.Init()
+
+	// Create API definition loader
+	loader := APIDefinitionLoader{Gw: g.Gw}
+
+	// Test: Load API definitions should auto-recover from nonce failure
+	specs, err := loader.FromDashboardService(ts.URL)
+
+	// Should succeed due to auto-recovery
+	assert.NoError(t, err, "Auto-recovery should allow successful API definitions loading")
+	assert.NotNil(t, specs, "API specs should be returned after auto-recovery")
+	
+	// Verify the auto-recovery process
+	assert.Equal(t, 2, requestCount, "Should have made 2 requests (first failed, second succeeded)")
+	assert.Equal(t, 1, registrationCount, "Should have made 1 registration request for recovery")
+}
+
+// TestFromDashboardServiceInvalidSecret tests invalid secret handling for API definitions
+func TestFromDashboardServiceInvalidSecret(t *testing.T) {
+	var requestCount int
+
+	// Mock dashboard that returns "Secret incorrect" error
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requestCount++
+		w.WriteHeader(http.StatusForbidden)
+		w.Write([]byte("Authorization failed (Secret incorrect)"))
+	}))
+	defer ts.Close()
+
+	conf := func(globalConf *config.Config) {
+		globalConf.UseDBAppConfigs = true
+	}
+	g := StartTest(conf)
+	defer g.Close()
+
+	// Set up dashboard service
+	g.Gw.DashService = &HTTPDashboardHandler{Gw: g.Gw}
+	g.Gw.DashService.Init()
+
+	// Create API definition loader
+	loader := APIDefinitionLoader{Gw: g.Gw}
+
+	specs, err := loader.FromDashboardService(ts.URL)
+
+	// Should fail with standard error, NOT trigger nonce recovery
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "login failure")
+	assert.Nil(t, specs)
+	assert.Equal(t, 1, requestCount, "Should make only one request, no retry for invalid secret")
+}
+
+// TestFromDashboardServiceServerError tests server error handling for API definitions
+func TestFromDashboardServiceServerError(t *testing.T) {
+	var requestCount int
+
+	// Mock dashboard that returns 500 Internal Server Error
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requestCount++
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte("Internal Server Error: Cannot connect to Redis"))
+	}))
+	defer ts.Close()
+
+	conf := func(globalConf *config.Config) {
+		globalConf.UseDBAppConfigs = true
+	}
+	g := StartTest(conf)
+	defer g.Close()
+
+	// Set up dashboard service
+	g.Gw.DashService = &HTTPDashboardHandler{Gw: g.Gw}
+	g.Gw.DashService.Init()
+
+	// Create API definition loader
+	loader := APIDefinitionLoader{Gw: g.Gw}
+
+	specs, err := loader.FromDashboardService(ts.URL)
+
+	// Should fail with standard error, NOT trigger nonce recovery
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "dashboard API error")
+	assert.Nil(t, specs)
+	assert.Equal(t, 1, requestCount, "Should make only one request, no retry for server errors")
+}
+
+// TestFromDashboardServiceNoDashServiceFallback tests graceful fallback for API definitions
+func TestFromDashboardServiceNoDashServiceFallback(t *testing.T) {
+	// Mock dashboard that returns nonce error
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusForbidden)
+		w.Write([]byte("Nonce failed"))
+	}))
+	defer ts.Close()
+
+	conf := func(globalConf *config.Config) {
+		globalConf.UseDBAppConfigs = true
+	}
+	g := StartTest(conf)
+	defer g.Close()
+
+	// DO NOT set up DashService - simulating environment where it's not available
+	g.Gw.DashService = nil
+
+	// Create API definition loader
+	loader := APIDefinitionLoader{Gw: g.Gw}
+
+	specs, err := loader.FromDashboardService(ts.URL)
+
+	// Should fail gracefully without causing panic
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "login failure")
+	assert.Nil(t, specs)
 }
