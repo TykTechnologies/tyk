@@ -36,6 +36,9 @@ func TestLoadPoliciesFromDashboardReLogin(t *testing.T) {
 	g := StartTest(conf)
 	defer g.Close()
 
+	// Reset the global dashboard client to ensure test isolation
+	g.Gw.resetDashboardClient()
+
 	allowExplicitPolicyID := g.Gw.GetConfig().Policies.AllowExplicitPolicyID
 	policyMap, err := g.Gw.LoadPoliciesFromDashboard(ts.URL, "", allowExplicitPolicyID)
 
@@ -724,11 +727,6 @@ func TestParsePoliciesFromRPC(t *testing.T) {
 // TestLoadPoliciesFromDashboardAutoRecovery tests that nonce desynchronization
 // automatically recovers without manual intervention
 func TestLoadPoliciesFromDashboardAutoRecovery(t *testing.T) {
-	// Skip this test if it's causing timeouts in CI
-	if testing.Short() {
-		t.Skip("Skipping in short mode")
-	}
-
 	requestCount := 0
 	registrationCount := 0
 
@@ -770,21 +768,28 @@ func TestLoadPoliciesFromDashboardAutoRecovery(t *testing.T) {
 	}))
 	defer ts.Close()
 
-	// Set up test environment
+	// Use simplified config to avoid gateway initialization timeouts
 	conf := func(globalConf *config.Config) {
-		globalConf.UseDBAppConfigs = true
-		globalConf.DBAppConfOptions.ConnectionString = ts.URL
+		globalConf.UseDBAppConfigs = false // Simplified setup
+		globalConf.NodeSecret = "test-secret"
+		globalConf.DBAppConfOptions.ConnectionTimeout = 2
+		globalConf.DisableDashboardZeroConf = true
 	}
 	g := StartTest(conf)
 	defer g.Close()
 
-	// Set up dashboard service
-	g.Gw.DashService = &HTTPDashboardHandler{Gw: g.Gw}
-	g.Gw.DashService.Init()
+	// Reset the global dashboard client to ensure test isolation
+	g.Gw.resetDashboardClient()
+
+	// Set up simplified dashboard service
+	g.Gw.DashService = &HTTPDashboardHandler{
+		Gw: g.Gw,
+		Secret: "test-secret",
+		RegistrationEndpoint: ts.URL + "/register/node",
+	}
 
 	// Test: Load policies should auto-recover from nonce failure
-	allowExplicitPolicyID := g.Gw.GetConfig().Policies.AllowExplicitPolicyID
-	policyMap, err := g.Gw.LoadPoliciesFromDashboard(ts.URL, "", allowExplicitPolicyID)
+	policyMap, err := g.Gw.LoadPoliciesFromDashboard(ts.URL, "", false)
 
 	// Should succeed due to auto-recovery
 	assert.NoError(t, err, "Auto-recovery should allow successful policy loading")
@@ -833,18 +838,25 @@ func TestLoadPoliciesFromDashboardNonceEmptyAfterFailedRecovery(t *testing.T) {
 	defer ts.Close()
 
 	conf := func(globalConf *config.Config) {
-		globalConf.UseDBAppConfigs = true
+		globalConf.UseDBAppConfigs = false // Simplified setup
+		// Set short timeout for tests to prevent hanging
+		globalConf.DBAppConfOptions.ConnectionTimeout = 2
+		// Disable zeroconf to prevent blocking
+		globalConf.DisableDashboardZeroConf = true
+		// Set NodeSecret to prevent Fatal error in Init
+		globalConf.NodeSecret = "test-secret"
 	}
 	g := StartTest(conf)
 	defer g.Close()
 
+	// Reset the global dashboard client to ensure test isolation
+	g.Gw.resetDashboardClient()
+
 	// Set initial nonce to simulate established session
 	g.Gw.ServiceNonce = "old-nonce"
-	
-	allowExplicitPolicyID := g.Gw.GetConfig().Policies.AllowExplicitPolicyID
 
 	// First call - should get "Nonce failed"
-	policyMap, err := g.Gw.LoadPoliciesFromDashboard(ts.URL, "", allowExplicitPolicyID)
+	policyMap, err := g.Gw.LoadPoliciesFromDashboard(ts.URL, "", false)
 	assert.Error(t, err)
 	assert.Empty(t, policyMap)
 
@@ -852,7 +864,7 @@ func TestLoadPoliciesFromDashboardNonceEmptyAfterFailedRecovery(t *testing.T) {
 	g.Gw.ServiceNonce = ""
 
 	// Second call - should get "Authorization failed (Nonce empty)" 
-	policyMap, err = g.Gw.LoadPoliciesFromDashboard(ts.URL, "", allowExplicitPolicyID)
+	policyMap, err = g.Gw.LoadPoliciesFromDashboard(ts.URL, "", false)
 	assert.Error(t, err)
 	assert.Empty(t, policyMap)
 	
@@ -862,7 +874,6 @@ func TestLoadPoliciesFromDashboardNonceEmptyAfterFailedRecovery(t *testing.T) {
 
 // TestLoadPoliciesFromDashboardInvalidSecret tests Case 2.1 - Invalid Dashboard Secret
 func TestLoadPoliciesFromDashboardInvalidSecret(t *testing.T) {
-	t.Skip("Test disabled due to timeout issues - functionality verified through manual testing")
 	var requestCount int
 
 	// Mock dashboard that returns "Secret incorrect" error
@@ -874,14 +885,10 @@ func TestLoadPoliciesFromDashboardInvalidSecret(t *testing.T) {
 	defer ts.Close()
 
 	conf := func(globalConf *config.Config) {
-		globalConf.UseDBAppConfigs = true
+		globalConf.UseDBAppConfigs = false  // Disable dashboard integration for simpler test
 	}
 	g := StartTest(conf)
 	defer g.Close()
-
-	// Set up dashboard service with invalid secret
-	g.Gw.DashService = &HTTPDashboardHandler{Gw: g.Gw}
-	g.Gw.DashService.Init()
 
 	allowExplicitPolicyID := g.Gw.GetConfig().Policies.AllowExplicitPolicyID
 	policyMap, err := g.Gw.LoadPoliciesFromDashboard(ts.URL, "invalid-secret", allowExplicitPolicyID)
@@ -895,7 +902,6 @@ func TestLoadPoliciesFromDashboardInvalidSecret(t *testing.T) {
 
 // TestLoadPoliciesFromDashboardServerError tests Case 2.3 - Server Error (Redis unavailable simulation)
 func TestLoadPoliciesFromDashboardServerError(t *testing.T) {
-	t.Skip("Test disabled due to timeout issues - functionality verified through manual testing")
 	var requestCount int
 
 	// Mock dashboard that returns 500 Internal Server Error
@@ -907,14 +913,10 @@ func TestLoadPoliciesFromDashboardServerError(t *testing.T) {
 	defer ts.Close()
 
 	conf := func(globalConf *config.Config) {
-		globalConf.UseDBAppConfigs = true
+		globalConf.UseDBAppConfigs = false  // Disable dashboard integration for simpler test
 	}
 	g := StartTest(conf)
 	defer g.Close()
-
-	// Set up dashboard service
-	g.Gw.DashService = &HTTPDashboardHandler{Gw: g.Gw}
-	g.Gw.DashService.Init()
 
 	allowExplicitPolicyID := g.Gw.GetConfig().Policies.AllowExplicitPolicyID
 	policyMap, err := g.Gw.LoadPoliciesFromDashboard(ts.URL, "", allowExplicitPolicyID)
@@ -928,7 +930,6 @@ func TestLoadPoliciesFromDashboardServerError(t *testing.T) {
 
 // TestLoadPoliciesFromDashboardTimeoutSimulation tests timeout scenario (Case 1.1 simulation)
 func TestLoadPoliciesFromDashboardTimeoutSimulation(t *testing.T) {
-	t.Skip("Test disabled due to timeout issues - functionality verified through manual testing")
 	var requestCount int
 	var registrationCount int
 
@@ -972,20 +973,31 @@ func TestLoadPoliciesFromDashboardTimeoutSimulation(t *testing.T) {
 	defer ts.Close()
 
 	conf := func(globalConf *config.Config) {
-		globalConf.UseDBAppConfigs = true
+		globalConf.UseDBAppConfigs = false // Simplified setup
+		// Set short timeout for tests to prevent hanging
+		globalConf.DBAppConfOptions.ConnectionTimeout = 2
+		// Disable zeroconf to prevent blocking
+		globalConf.DisableDashboardZeroConf = true
+		// Set NodeSecret to prevent Fatal error in Init
+		globalConf.NodeSecret = "test-secret"
 	}
 	g := StartTest(conf)
 	defer g.Close()
 
-	// Set up dashboard service
-	g.Gw.DashService = &HTTPDashboardHandler{Gw: g.Gw}
-	g.Gw.DashService.Init()
+	// Reset the global dashboard client to ensure test isolation
+	g.Gw.resetDashboardClient()
+
+	// Set up simplified dashboard service
+	g.Gw.DashService = &HTTPDashboardHandler{
+		Gw: g.Gw,
+		Secret: "test-secret",
+		RegistrationEndpoint: ts.URL + "/register/node",
+	}
 
 	// Set initial nonce to simulate established session before timeout
 	g.Gw.ServiceNonce = "pre-timeout-nonce"
 
-	allowExplicitPolicyID := g.Gw.GetConfig().Policies.AllowExplicitPolicyID
-	policyMap, err := g.Gw.LoadPoliciesFromDashboard(ts.URL, "", allowExplicitPolicyID)
+	policyMap, err := g.Gw.LoadPoliciesFromDashboard(ts.URL, "", false)
 
 	// Should succeed due to auto-recovery
 	assert.NoError(t, err, "Auto-recovery should handle timeout-induced nonce failure")
@@ -998,7 +1010,6 @@ func TestLoadPoliciesFromDashboardTimeoutSimulation(t *testing.T) {
 
 // TestLoadPoliciesFromDashboardNoDashServiceFallback tests graceful fallback when DashService unavailable
 func TestLoadPoliciesFromDashboardNoDashServiceFallback(t *testing.T) {
-	t.Skip("Test disabled due to timeout issues - functionality verified through manual testing")
 	// Mock dashboard that returns nonce error
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusForbidden)
@@ -1007,7 +1018,7 @@ func TestLoadPoliciesFromDashboardNoDashServiceFallback(t *testing.T) {
 	defer ts.Close()
 
 	conf := func(globalConf *config.Config) {
-		globalConf.UseDBAppConfigs = true
+		globalConf.UseDBAppConfigs = false  // Disable dashboard integration for simpler test
 	}
 	g := StartTest(conf)
 	defer g.Close()

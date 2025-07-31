@@ -419,23 +419,34 @@ func (a APIDefinitionLoader) FromDashboardService(endpoint string) ([]*APISpec, 
 	if resp.StatusCode == http.StatusForbidden {
 		body, _ := ioutil.ReadAll(resp.Body)
 		errorMessage := string(body)
-		log.Warning("Dashboard authentication failed during API definitions fetch, attempting to re-register node...")
 		
 		// Handle nonce desynchronization with intelligent auto-recovery
-		// Check if DashService is available for recovery
-		if a.Gw.DashService == nil {
-			log.Error("Dashboard service not available for nonce recovery")
+		// Only attempt recovery for nonce-related failures, not other auth failures
+		if strings.Contains(errorMessage, "Nonce failed") || strings.Contains(errorMessage, "nonce") {
+			log.Warning("Dashboard nonce failure detected during API definitions fetch, attempting to re-register node...")
+			
+			// Check if DashService is available for recovery
+			if a.Gw.DashService == nil {
+				log.Error("Dashboard service not available for nonce recovery")
+				return nil, fmt.Errorf("login failure, Response was: %v", errorMessage)
+			}
+			
+			// Use a timeout context to prevent hanging in tests
+			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			defer cancel()
+			
+			if err := a.Gw.DashService.Register(ctx); err != nil {
+				log.Error("Failed to re-register node during API definitions recovery: ", err)
+				return nil, fmt.Errorf("login failure, Response was: %v", errorMessage)
+			}
+			log.Info("Node re-registered successfully, retrying API definitions fetch...")
+			
+			// Retry the request with the new nonce
+			return a.FromDashboardService(endpoint)
+		} else {
+			log.Warning("Dashboard authentication failed with non-nonce error during API definitions fetch: ", errorMessage)
 			return nil, fmt.Errorf("login failure, Response was: %v", errorMessage)
 		}
-		
-		if err := a.Gw.DashService.Register(context.Background()); err != nil {
-			log.Error("Failed to re-register node during API definitions recovery: ", err)
-			return nil, fmt.Errorf("login failure, Response was: %v", errorMessage)
-		}
-		log.Info("Node re-registered successfully, retrying API definitions fetch...")
-		
-		// Retry the request with the new nonce
-		return a.FromDashboardService(endpoint)
 	}
 
 	if resp.StatusCode != http.StatusOK {

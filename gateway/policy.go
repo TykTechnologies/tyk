@@ -9,6 +9,8 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
+	"time"
 
 	"github.com/TykTechnologies/graphql-go-tools/pkg/graphql"
 
@@ -158,22 +160,31 @@ func (gw *Gateway) LoadPoliciesFromDashboard(endpoint, secret string, allowExpli
 
 		// Handle nonce desynchronization with intelligent auto-recovery
 		if resp.StatusCode == http.StatusForbidden {
-			log.Warning("Dashboard authentication failed, attempting to re-register node...")
-			
-			// Check if DashService is available for recovery
-			if gw.DashService == nil {
-				log.Error("Dashboard service not available for nonce recovery")
-				return nil, ErrPoliciesFetchFailed
+			// Only attempt recovery for nonce-related failures, not other auth failures
+			if strings.Contains(errorMessage, "Nonce failed") || strings.Contains(errorMessage, "nonce") {
+				log.Warning("Dashboard nonce failure detected, attempting to re-register node...")
+				
+				// Check if DashService is available for recovery
+				if gw.DashService == nil {
+					log.Error("Dashboard service not available for nonce recovery")
+					return nil, ErrPoliciesFetchFailed
+				}
+				
+				// Use a timeout context to prevent hanging in tests
+				ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+				defer cancel()
+				
+				if err := gw.DashService.Register(ctx); err != nil {
+					log.Error("Failed to re-register node during policy recovery: ", err)
+					return nil, ErrPoliciesFetchFailed
+				}
+				log.Info("Node re-registered successfully, retrying policy fetch...")
+				
+				// Retry the request with the new nonce
+				return gw.LoadPoliciesFromDashboard(endpoint, secret, allowExplicit)
+			} else {
+				log.Warning("Dashboard authentication failed with non-nonce error: ", errorMessage)
 			}
-			
-			if err := gw.DashService.Register(context.Background()); err != nil {
-				log.Error("Failed to re-register node during policy recovery: ", err)
-				return nil, ErrPoliciesFetchFailed
-			}
-			log.Info("Node re-registered successfully, retrying policy fetch...")
-			
-			// Retry the request with the new nonce
-			return gw.LoadPoliciesFromDashboard(endpoint, secret, allowExplicit)
 		}
 
 		return nil, ErrPoliciesFetchFailed
