@@ -152,7 +152,29 @@ func (gw *Gateway) LoadPoliciesFromDashboard(endpoint, secret string, allowExpli
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := ioutil.ReadAll(resp.Body)
-		log.Error("Policy request login failure, Response was: ", string(body))
+		errorMessage := string(body)
+		log.Error("Policy request login failure, Response was: ", errorMessage)
+
+		// Handle nonce desynchronization with intelligent auto-recovery
+		if resp.StatusCode == http.StatusForbidden {
+			log.Warning("Dashboard authentication failed, attempting to re-register node...")
+			
+			// Check if DashService is available for recovery
+			if gw.DashService == nil {
+				log.Error("Dashboard service not available for nonce recovery")
+				return nil, ErrPoliciesFetchFailed
+			}
+			
+			if err := gw.DashService.Register(); err != nil {
+				log.Error("Failed to re-register node during policy recovery: ", err)
+				return nil, ErrPoliciesFetchFailed
+			}
+			log.Info("Node re-registered successfully, retrying policy fetch...")
+			
+			// Retry the request with the new nonce
+			return gw.LoadPoliciesFromDashboard(endpoint, secret, allowExplicit)
+		}
+
 		return nil, ErrPoliciesFetchFailed
 	}
 
