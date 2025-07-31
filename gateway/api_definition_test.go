@@ -1920,7 +1920,7 @@ func TestFromDashboardServiceNetworkErrors(t *testing.T) {
 			name: "Connection Refused",
 			serverFunc: func() *httptest.Server {
 				// Create and immediately close server to simulate connection refused
-				ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
+				ts := httptest.NewServer(http.HandlerFunc(func(_ http.ResponseWriter, _ *http.Request) {}))
 				ts.Close()
 				return ts
 			},
@@ -1930,7 +1930,7 @@ func TestFromDashboardServiceNetworkErrors(t *testing.T) {
 		{
 			name: "Network Timeout",
 			serverFunc: func() *httptest.Server {
-				return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				return httptest.NewServer(http.HandlerFunc(func(_ http.ResponseWriter, _ *http.Request) {
 					// Simulate timeout by sleeping longer than client timeout
 					// Gateway timeout is set to 2 seconds in test config
 					time.Sleep(3 * time.Second)
@@ -1963,7 +1963,7 @@ func TestFromDashboardServiceNetworkErrors(t *testing.T) {
 		{
 			name: "Malformed JSON Response",
 			serverFunc: func() *httptest.Server {
-				return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 					// Return 200 OK but with malformed JSON
 					w.Header().Set("Content-Type", "application/json")
 					w.WriteHeader(http.StatusOK)

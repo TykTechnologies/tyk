@@ -216,7 +216,7 @@ func (gw *Gateway) LoadPoliciesFromDashboard(endpoint, secret string, allowExpli
 		log.Error("Failed to decode policy body: ", err)
 		// Check if this is a network error (EOF, unexpected EOF) that might benefit from re-registration
 		// This can happen when load balancer drains connection during response body read
-		if (err == io.EOF || err == io.ErrUnexpectedEOF || strings.Contains(err.Error(), "EOF")) && gw.DashService != nil {
+		if (errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) || strings.Contains(err.Error(), "EOF")) && gw.DashService != nil {
 			log.Warning("Network error detected while reading policy response, attempting to re-register node...")
 			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 			defer cancel()

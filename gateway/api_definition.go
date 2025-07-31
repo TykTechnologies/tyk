@@ -476,7 +476,7 @@ func (a APIDefinitionLoader) FromDashboardService(endpoint string) ([]*APISpec, 
 	if err != nil {
 		log.Error("Couldn't read api definition list")
 		// Check if this is a network error that might benefit from re-registration
-		if (err == io.EOF || err == io.ErrUnexpectedEOF || strings.Contains(err.Error(), "EOF")) && a.Gw.DashService != nil {
+		if (errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) || strings.Contains(err.Error(), "EOF")) && a.Gw.DashService != nil {
 			log.Warning("Network error detected while reading API definition response, attempting to re-register node...")
 			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 			defer cancel()
