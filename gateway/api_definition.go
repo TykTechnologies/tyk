@@ -412,6 +412,22 @@ func (a APIDefinitionLoader) FromDashboardService(endpoint string) ([]*APISpec, 
 	c := a.Gw.initialiseClient()
 	resp, err := c.Do(newRequest)
 	if err != nil {
+		// Check if this might be a transient network error that could benefit from re-registration
+		// This handles load balancer draining scenarios where connections are dropped
+		if a.Gw.DashService != nil {
+			log.Warning("Network error detected during API definitions fetch, attempting to re-register node...")
+			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			defer cancel()
+			
+			if regErr := a.Gw.DashService.Register(ctx); regErr != nil {
+				log.Error("Failed to re-register node after network error: ", regErr)
+				return nil, err // Return original error
+			}
+			log.Info("Node re-registered successfully after network error, retrying API definitions fetch...")
+			
+			// Retry the request with fresh registration
+			return a.FromDashboardService(endpoint)
+		}
 		return nil, err
 	}
 	defer resp.Body.Close()
@@ -459,6 +475,21 @@ func (a APIDefinitionLoader) FromDashboardService(endpoint string) ([]*APISpec, 
 	inBytes, err := io.ReadAll(resp.Body)
 	if err != nil {
 		log.Error("Couldn't read api definition list")
+		// Check if this is a network error that might benefit from re-registration
+		if (err == io.EOF || err == io.ErrUnexpectedEOF || strings.Contains(err.Error(), "EOF")) && a.Gw.DashService != nil {
+			log.Warning("Network error detected while reading API definition response, attempting to re-register node...")
+			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			defer cancel()
+			
+			if regErr := a.Gw.DashService.Register(ctx); regErr != nil {
+				log.Error("Failed to re-register node after read error: ", regErr)
+				return nil, err // Return original error
+			}
+			log.Info("Node re-registered successfully after read error, retrying API definitions fetch...")
+			
+			// Retry the request with fresh registration
+			return a.FromDashboardService(endpoint)
+		}
 		return nil, err
 	}
 
@@ -467,6 +498,7 @@ func (a APIDefinitionLoader) FromDashboardService(endpoint string) ([]*APISpec, 
 	err = json.Unmarshal(inBytes, &list)
 	if err != nil {
 		log.Error("Couldn't unmarshal api definition list")
+		// JSON unmarshal errors are not network errors, so don't retry
 		return nil, err
 	}
 

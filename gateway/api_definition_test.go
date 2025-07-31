@@ -1724,7 +1724,7 @@ func TestFromDashboardServiceInvalidSecret(t *testing.T) {
 	var requestCount int
 
 	// Mock dashboard that returns "Secret incorrect" error
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		requestCount++
 		w.WriteHeader(http.StatusForbidden)
 		w.Write([]byte("Authorization failed (Secret incorrect)"))
@@ -1766,7 +1766,7 @@ func TestFromDashboardServiceServerError(t *testing.T) {
 	var requestCount int
 
 	// Mock dashboard that returns 500 Internal Server Error
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		requestCount++
 		w.WriteHeader(http.StatusInternalServerError)
 		w.Write([]byte("Internal Server Error: Cannot connect to Redis"))
@@ -1806,7 +1806,7 @@ func TestFromDashboardServiceServerError(t *testing.T) {
 // TestFromDashboardServiceNoDashServiceFallback tests graceful fallback for API definitions
 func TestFromDashboardServiceNoDashServiceFallback(t *testing.T) {
 	// Mock dashboard that returns nonce error
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusForbidden)
 		w.Write([]byte("Nonce failed"))
 	}))
@@ -1906,4 +1906,177 @@ func TestFromDashboardServiceNoNodeIDFound(t *testing.T) {
 	// Verify the auto-recovery process happened
 	assert.GreaterOrEqual(t, requestCount, 2, "Should have made at least 2 API definition requests")
 	assert.GreaterOrEqual(t, registrationCount, 1, "Should have re-registered at least once")
+}
+
+// TestFromDashboardServiceNetworkErrors tests various network error scenarios for API definitions
+func TestFromDashboardServiceNetworkErrors(t *testing.T) {
+	testCases := []struct {
+		name          string
+		serverFunc    func() *httptest.Server
+		expectedError string
+		description   string
+	}{
+		{
+			name: "Connection Refused",
+			serverFunc: func() *httptest.Server {
+				// Create and immediately close server to simulate connection refused
+				ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
+				ts.Close()
+				return ts
+			},
+			expectedError: "connection refused",
+			description:   "Dashboard is completely down",
+		},
+		{
+			name: "Network Timeout",
+			serverFunc: func() *httptest.Server {
+				return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					// Simulate timeout by sleeping longer than client timeout
+					// Gateway timeout is set to 2 seconds in test config
+					time.Sleep(3 * time.Second)
+				}))
+			},
+			expectedError: "context deadline exceeded",
+			description:   "Request times out before response",
+		},
+		{
+			name: "Connection Dropped Mid-Response",
+			serverFunc: func() *httptest.Server {
+				return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					// Start writing response then close connection
+					w.Header().Set("Content-Type", "application/json")
+					w.WriteHeader(http.StatusOK)
+					// Force flush to send headers
+					if f, ok := w.(http.Flusher); ok {
+						f.Flush()
+					}
+					// Simulate connection drop by hijacking and closing
+					if hj, ok := w.(http.Hijacker); ok {
+						conn, _, _ := hj.Hijack()
+						conn.Close()
+					}
+				}))
+			},
+			expectedError: "unexpected EOF",
+			description:   "Connection drops while reading response",
+		},
+		{
+			name: "Malformed JSON Response",
+			serverFunc: func() *httptest.Server {
+				return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					// Return 200 OK but with malformed JSON
+					w.Header().Set("Content-Type", "application/json")
+					w.WriteHeader(http.StatusOK)
+					w.Write([]byte("{invalid json"))
+				}))
+			},
+			expectedError: "invalid character",
+			description:   "Server returns malformed JSON",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			ts := tc.serverFunc()
+			if ts != nil {
+				defer ts.Close()
+			}
+
+			conf := func(globalConf *config.Config) {
+				globalConf.UseDBAppConfigs = false
+				// Set a short timeout to make tests run faster
+				globalConf.DBAppConfOptions.ConnectionTimeout = 2
+			}
+			g := StartTest(conf)
+			defer g.Close()
+
+			// Create API definition loader
+			loader := APIDefinitionLoader{Gw: g.Gw}
+
+			// Test: Load API definitions should fail with network error
+			specs, err := loader.FromDashboardService(ts.URL)
+
+			// Should fail with appropriate error
+			assert.Error(t, err, tc.description)
+			assert.Nil(t, specs)
+			
+			// For now, network errors are not auto-recovered
+			// This is a potential enhancement for the future
+			if tc.expectedError != "" && err != nil {
+				assert.Contains(t, err.Error(), tc.expectedError, "Error should indicate network issue")
+			}
+		})
+	}
+}
+
+// TestFromDashboardServiceNetworkErrorRecovery tests auto-recovery from network errors for API definitions
+func TestFromDashboardServiceNetworkErrorRecovery(t *testing.T) {
+	requestCount := 0
+	registrationCount := 0
+
+	// Mock dashboard server that simulates network error then recovery
+	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Handle registration requests
+		if strings.Contains(r.URL.Path, "/register/node") {
+			registrationCount++
+			w.Header().Set("Content-Type", "application/json")
+			response := NodeResponseOK{
+				Status:  "ok",
+				Message: map[string]string{"NodeID": "test-node-id"},
+				Nonce:   fmt.Sprintf("nonce-%d", registrationCount),
+			}
+			json.NewEncoder(w).Encode(response)
+			return
+		}
+
+		// Handle API definition requests
+		requestCount++
+		
+		// First request: simulate connection drop
+		if requestCount == 1 {
+			// Simulate load balancer draining connection mid-flight
+			if hj, ok := w.(http.Hijacker); ok {
+				conn, _, _ := hj.Hijack()
+				conn.Close()
+			}
+			return
+		}
+
+		// Subsequent requests: success after re-registration
+		w.Header().Set("Content-Type", "application/json")
+		list := model.NewMergedAPIList()
+		list.Nonce = "success-nonce"
+		json.NewEncoder(w).Encode(list)
+	}))
+	defer mockServer.Close()
+
+	conf := func(globalConf *config.Config) {
+		globalConf.UseDBAppConfigs = false
+		globalConf.NodeSecret = "test-secret"
+		globalConf.DBAppConfOptions.ConnectionTimeout = 2
+		globalConf.DisableDashboardZeroConf = true
+	}
+	g := StartTest(conf)
+	defer g.Close()
+
+	// Set up dashboard service
+	g.Gw.DashService = &HTTPDashboardHandler{
+		Gw: g.Gw,
+		Secret: "test-secret",
+		RegistrationEndpoint: mockServer.URL + "/register/node",
+	}
+
+	// Create API definition loader
+	loader := APIDefinitionLoader{Gw: g.Gw}
+
+	// Test: Load API definitions should auto-recover from network error
+	endpoint := mockServer.URL + "/system/apis"
+	_, err := loader.FromDashboardService(endpoint)
+
+	// Should succeed due to auto-recovery from network error
+	assert.NoError(t, err, "Auto-recovery should handle network errors for API definitions")
+	
+	// Verify the auto-recovery process happened
+	assert.Equal(t, 2, requestCount, "Should have made 2 API requests (failed + retry)")
+	assert.GreaterOrEqual(t, registrationCount, 1, "Should have re-registered after network error")
 }
