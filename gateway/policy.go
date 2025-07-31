@@ -161,7 +161,7 @@ func (gw *Gateway) LoadPoliciesFromDashboard(endpoint, secret string, allowExpli
 		// Handle nonce desynchronization with intelligent auto-recovery
 		if resp.StatusCode == http.StatusForbidden {
 			// Only attempt recovery for nonce-related failures, not other auth failures
-			if strings.Contains(errorMessage, "Nonce failed") || strings.Contains(errorMessage, "nonce") {
+			if strings.Contains(errorMessage, "Nonce failed") || strings.Contains(errorMessage, "nonce") || strings.Contains(errorMessage, "No node ID Found") {
 				log.Warning("Dashboard nonce failure detected, attempting to re-register node...")
 				
 				// Check if DashService is available for recovery

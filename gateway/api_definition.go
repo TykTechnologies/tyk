@@ -422,7 +422,7 @@ func (a APIDefinitionLoader) FromDashboardService(endpoint string) ([]*APISpec, 
 		
 		// Handle nonce desynchronization with intelligent auto-recovery
 		// Only attempt recovery for nonce-related failures, not other auth failures
-		if strings.Contains(errorMessage, "Nonce failed") || strings.Contains(errorMessage, "nonce") {
+		if strings.Contains(errorMessage, "Nonce failed") || strings.Contains(errorMessage, "nonce") || strings.Contains(errorMessage, "No node ID Found") {
 			log.Warning("Dashboard nonce failure detected during API definitions fetch, attempting to re-register node...")
 			
 			// Check if DashService is available for recovery

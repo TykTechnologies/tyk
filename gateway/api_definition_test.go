@@ -1837,3 +1837,73 @@ func TestFromDashboardServiceNoDashServiceFallback(t *testing.T) {
 	assert.Contains(t, err.Error(), "login failure")
 	assert.Nil(t, specs)
 }
+
+// TestFromDashboardServiceNoNodeIDFound tests that missing node ID error triggers auto-recovery for API definitions
+func TestFromDashboardServiceNoNodeIDFound(t *testing.T) {
+	requestCount := 0
+	registrationCount := 0
+
+	// Mock dashboard server
+	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Handle registration requests
+		if strings.Contains(r.URL.Path, "/register/node") {
+			registrationCount++
+			w.Header().Set("Content-Type", "application/json")
+			response := NodeResponseOK{
+				Status:  "ok",
+				Message: map[string]string{"NodeID": "test-node-id"},
+				Nonce:   fmt.Sprintf("nonce-%d", registrationCount),
+			}
+			json.NewEncoder(w).Encode(response)
+			return
+		}
+
+		// Handle API definition requests
+		requestCount++
+		
+		// First request: return 403 with "No node ID Found" error
+		if requestCount == 1 {
+			w.WriteHeader(http.StatusForbidden)
+			w.Write([]byte("Authorization failed (No node ID Found)"))
+			return
+		}
+
+		// Subsequent requests: success after auto-recovery
+		w.Header().Set("Content-Type", "application/json")
+		list := model.NewMergedAPIList()
+		list.Nonce = "success-nonce"
+		json.NewEncoder(w).Encode(list)
+	}))
+	defer mockServer.Close()
+
+	conf := func(globalConf *config.Config) {
+		globalConf.UseDBAppConfigs = false // Simplified setup
+		globalConf.NodeSecret = "test-secret"
+		globalConf.DBAppConfOptions.ConnectionTimeout = 2
+		globalConf.DisableDashboardZeroConf = true
+	}
+	g := StartTest(conf)
+	defer g.Close()
+
+	// Set up simplified dashboard service
+	g.Gw.DashService = &HTTPDashboardHandler{
+		Gw: g.Gw,
+		Secret: "test-secret",
+		RegistrationEndpoint: mockServer.URL + "/register/node",
+	}
+
+	// Create API definition loader
+	loader := APIDefinitionLoader{Gw: g.Gw}
+
+	// Test: Load API definitions should auto-recover from missing node ID
+	endpoint := mockServer.URL + "/system/apis"
+	
+	_, err := loader.FromDashboardService(endpoint)
+
+	// Should succeed due to auto-recovery
+	assert.NoError(t, err, "Auto-recovery should allow successful API definitions loading after node ID error")
+	
+	// Verify the auto-recovery process happened
+	assert.GreaterOrEqual(t, requestCount, 2, "Should have made at least 2 API definition requests")
+	assert.GreaterOrEqual(t, registrationCount, 1, "Should have re-registered at least once")
+}
