@@ -8,8 +8,8 @@ type (
 
 const (
 	Pass HealthCheckStatus = "pass"
-	Fail                   = "fail"
-	Warn                   = "warn"
+	Fail HealthCheckStatus = "fail"
+	Warn HealthCheckStatus = "warn"
 
 	Component HealthCheckComponentType = "component"
 	Datastore                          = "datastore"
