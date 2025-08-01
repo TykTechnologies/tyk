@@ -135,7 +135,7 @@ func TcpMock(useSSL bool, cb func(in []byte, err error) (out []byte)) net.Listen
 // Generate cert
 func Cert(domain string) tls.Certificate {
 	// crypto/rsa: 512-bit keys are insecure (see https://go.dev/pkg/crypto/rsa#hdr-Minimum_key_size)
-	private, _ := rsa.GenerateKey(rand.Reader, 1024)
+	private, _ := rsa.GenerateKey(rand.Reader, 2048)
 	template := &x509.Certificate{
 		SerialNumber: big.NewInt(1),
 		Subject: pkix.Name{

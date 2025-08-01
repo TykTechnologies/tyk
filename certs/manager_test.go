@@ -69,7 +69,7 @@ func TestAddCertificate(t *testing.T) {
 	combinedPemWrongPrivate := append(cert2Pem, keyPem...)
 
 	// crypto/rsa: 512-bit keys are insecure (see https://go.dev/pkg/crypto/rsa#hdr-Minimum_key_size)
-	priv, _ := rsa.GenerateKey(rand.Reader, 1024)
+	priv, _ := rsa.GenerateKey(rand.Reader, 2048)
 	privDer, _ := x509.MarshalPKIXPublicKey(&priv.PublicKey)
 	pubPem := pem.EncodeToMemory(&pem.Block{Type: "PUBLIC KEY", Bytes: privDer})
 	pubID := tykcrypto.HexSHA256(privDer)
