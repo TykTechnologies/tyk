@@ -36,6 +36,9 @@ const (
 	HMACSign  = "hmac"
 	RSASign   = "rsa"
 	ECDSASign = "ecdsa"
+	ISS       = "iss"
+	AUD       = "aud"
+	JTI       = "jti"
 )
 
 const UnexpectedSigningMethod = "Unexpected signing method"
@@ -859,8 +862,8 @@ func (k *JWTMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, _
 	})
 
 	if err == nil && token.Valid {
-		if jwtErr := k.timeValidateJWTClaims(token.Claims.(jwt.MapClaims)); jwtErr != nil {
-			return errors.New("Key not authorized: " + jwtErr.Error()), http.StatusUnauthorized
+		if err := k.validateClaims(token); err != nil {
+			return errors.New("Key not authorized: " + err.Error()), http.StatusUnauthorized
 		}
 
 		// Token is valid - let's move on
@@ -912,6 +915,147 @@ func ParseRSAPublicKey(data []byte) (interface{}, error) {
 func (k *JWTMiddleware) timeValidateJWTClaims(c jwt.MapClaims) *jwt.ValidationError {
 	return timeValidateJWTClaims(c, k.Spec.JWTExpiresAtValidationSkew, k.Spec.JWTIssuedAtValidationSkew,
 		k.Spec.JWTNotBeforeValidationSkew)
+}
+
+func (k *JWTMiddleware) validateClaims(token *jwt.Token) error {
+	if err := k.timeValidateJWTClaims(token.Claims.(jwt.MapClaims)); err != nil {
+		return err
+	}
+
+	// Extra OAS-specific validations
+	if err := k.validateExtraClaims(token.Claims, token); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func validateIssuer(claims jwt.Claims, allowedIssuers []string) error {
+	if claims, ok := claims.(jwt.MapClaims); ok {
+		iss, exists := claims[ISS]
+		if !exists {
+			return errors.New("issuer claim is required but not present in token")
+		}
+
+		issuer, ok := iss.(string)
+		if !ok {
+			return errors.New("issuer claim must be a string")
+		}
+
+		for _, allowed := range allowedIssuers {
+			if issuer == allowed {
+				return nil
+			}
+		}
+
+		return fmt.Errorf("invalid issuer claim: %s", issuer)
+	}
+	return errors.New("invalid claims type")
+}
+
+func validateAudience(claims jwt.Claims, allowedAudiences []string) error {
+	if claims, ok := claims.(jwt.MapClaims); ok {
+		aud, exists := claims[AUD]
+		if !exists {
+			return errors.New("audience claim is required but not present in token")
+		}
+
+		var audiences []string
+		switch v := aud.(type) {
+		case string:
+			audiences = []string{v}
+		case []interface{}:
+			for _, a := range v {
+				if s, ok := a.(string); ok {
+					audiences = append(audiences, s)
+				}
+			}
+		default:
+			return errors.New("invalid audience claim format")
+		}
+
+		for _, tokenAud := range audiences {
+			for _, allowedAud := range allowedAudiences {
+				if tokenAud == allowedAud {
+					return nil
+				}
+			}
+		}
+
+		return fmt.Errorf("no matching audience found in token: %v", audiences)
+	}
+	return errors.New("invalid claims type")
+}
+
+func validateJTI(claims jwt.Claims) error {
+	if claims, ok := claims.(jwt.MapClaims); ok {
+		if _, exists := claims[JTI]; !exists {
+			return errors.New("JWT ID (jti) claim is required but not present in token")
+		}
+		return nil
+	}
+	return errors.New("invalid claims type")
+}
+
+func validateSubjectValue(subject string, allowedSubjects []string) error {
+	for _, allowed := range allowedSubjects {
+		if subject == allowed {
+			return nil
+		}
+	}
+	return fmt.Errorf("invalid subject value: %s", subject)
+}
+
+func (k *JWTMiddleware) validateExtraClaims(claims jwt.Claims, token *jwt.Token) error {
+	if !k.Spec.IsOAS {
+		return nil // Skip extra validations for non-OAS APIs
+	}
+
+	tykExt := k.Spec.GetTykExtension()
+
+	jwtConfig := k.Spec.OAS.Security.JWT
+
+	// Issuer validation
+	if len(jwtConfig.AllowedIssuers) > 0 {
+		if err := validateIssuer(claims, jwtConfig.AllowedIssuers); err != nil {
+			k.Logger().WithError(err).Error("JWT issuer validation failed")
+			return err
+		}
+	}
+
+	// Audience validation
+	if len(jwtConfig.AllowedAudiences) > 0 {
+		if err := validateAudience(claims, jwtConfig.AllowedAudiences); err != nil {
+			k.Logger().WithError(err).Error("JWT audience validation failed")
+			return err
+		}
+	}
+
+	// JWT ID validation
+	if jwtConfig.RequireJTI {
+		if err := validateJTI(claims); err != nil {
+			k.Logger().WithError(err).Error("JWT ID validation failed")
+			return err
+		}
+	}
+
+	// Subject validation
+	if len(jwtConfig.AllowedSubjects) > 0 {
+		// For subject validation we need to use the middleware's getIdentityFromToken
+		// as it handles the priority of kid header, identity base field, and sub claim
+		subject, err := k.getIdentityFromToken(token)
+		if err != nil {
+			k.Logger().WithError(err).Error("Failed to get identity from token")
+			return err
+		}
+
+		if err := validateSubjectValue(subject, jwtConfig.AllowedSubjects); err != nil {
+			k.Logger().WithError(err).Error("JWT subject validation failed")
+			return err
+		}
+	}
+
+	return nil
 }
 
 func ctxSetJWTContextVars(s *APISpec, r *http.Request, token *jwt.Token) {

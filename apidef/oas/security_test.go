@@ -10,6 +10,52 @@ import (
 	"github.com/TykTechnologies/tyk/apidef"
 )
 
+func TestGetJWTConfiguration(t *testing.T) {
+	t.Run("should retrieve successfully", func(t *testing.T) {
+		var api apidef.APIDefinition
+		api.EnableJWT = true
+		api.AuthConfigs = map[string]apidef.AuthConfig{
+			apidef.JWTType: {
+				Name:           "jwtAuth",
+				AuthHeaderName: "Authorization",
+			},
+		}
+		api.JWTIdentityBaseField = "new_sub"
+
+		var oas OAS
+		oas.SetTykExtension(&XTykAPIGateway{})
+		oas.fillSecurity(api)
+
+		j := oas.GetTykExtension().Server.Authentication.SecuritySchemes["jwtAuth"].(*JWT)
+		j.AllowedIssuers = []string{"issuer_one", "issuer_two"}
+		j.AllowedAudiences = []string{"audience_one", "audience_two"}
+
+		oas.GetTykExtension().Server.Authentication.SecuritySchemes["jwtAuth"] = j
+		gotten := oas.GetJWTConfiguration()
+
+		assert.Equal(t, j.AllowedIssuers, gotten.AllowedIssuers)
+		assert.Equal(t, "new_sub", gotten.IdentityBaseField)
+		assert.Equal(t, j.AllowedAudiences, gotten.AllowedAudiences)
+	})
+
+	t.Run("should return nil", func(t *testing.T) {
+		var auth apidef.AuthConfig
+		Fill(t, &auth, 0)
+		auth.DisableHeader = false
+
+		var api apidef.APIDefinition
+		api.AuthConfigs = map[string]apidef.AuthConfig{
+			apidef.AuthTokenType: auth,
+		}
+
+		var oas OAS
+		oas.SetTykExtension(&XTykAPIGateway{})
+		oas.fillSecurity(api)
+
+		assert.Nil(t, oas.GetJWTConfiguration())
+	})
+}
+
 func TestOAS_Security(t *testing.T) {
 	var auth apidef.AuthConfig
 	Fill(t, &auth, 0)
