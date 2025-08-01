@@ -144,7 +144,14 @@ func (gw *Gateway) handleRedisEvent(v interface{}, handled func(NotificationComm
 			return
 		}
 		gw.onServerStatusReceivedHandler(notif.Payload)
-	case NoticeApiUpdated, NoticeApiRemoved, NoticeApiAdded, NoticePolicyChanged, NoticeGroupReload:
+	case NoticeApiUpdated:
+		pubSubLog.Infof("Reloading API %s", notif.Payload)
+		if notif.Payload != "" {
+			gw.reloadSingleAPI(notif.Payload)
+		} else {
+			gw.reloadURLStructure(reloaded)
+		}
+	case NoticeApiRemoved, NoticeApiAdded, NoticePolicyChanged, NoticeGroupReload:
 		pubSubLog.Info("Reloading endpoints")
 		gw.reloadURLStructure(reloaded)
 	case KeySpaceUpdateNotification:
