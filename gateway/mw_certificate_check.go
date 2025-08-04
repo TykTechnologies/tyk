@@ -1,7 +1,7 @@
 package gateway
 
 import (
-	"crypto/sha256"
+	"crypto/sha1"
 	"crypto/tls"
 	"encoding/hex"
 	"fmt"
