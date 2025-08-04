@@ -120,7 +120,7 @@ type JWT struct {
 	// The identity fields that are checked in order are: `kid`, IdentityBaseField, `sub`.
 	//
 	// Tyk classic API definition: `jwt_identity_base_field`
-	IdentityBaseField string `bson:"identityBaseField,omitempty" json:"identityBaseField,omitempty"`
+	IdentityBaseField []string `bson:"identityBaseField,omitempty" json:"identityBaseField,omitempty"`
 
 	// SkipKid controls skipping using the `kid` claim from a JWT (default behaviour).
 	// When this is true, the field configured in IdentityBaseField is checked first.
@@ -227,7 +227,9 @@ func (s *OAS) fillJWT(api apidef.APIDefinition) {
 	jwt.Source = api.JWTSource
 	jwt.JwksURIs = api.JWTJwksURIs
 	jwt.SigningMethod = api.JWTSigningMethod
-	jwt.IdentityBaseField = api.JWTIdentityBaseField
+	if api.JWTIdentityBaseField != "" {
+		jwt.IdentityBaseField = []string{api.JWTIdentityBaseField}
+	}
 	jwt.SkipKid = api.JWTSkipKid
 	jwt.PolicyFieldName = api.JWTPolicyFieldName
 	jwt.ClientBaseField = api.JWTClientIDBaseField
@@ -263,7 +265,9 @@ func (s *OAS) extractJWTTo(api *apidef.APIDefinition, name string) {
 	api.JWTSource = jwt.Source
 	api.JWTJwksURIs = jwt.JwksURIs
 	api.JWTSigningMethod = jwt.SigningMethod
-	api.JWTIdentityBaseField = jwt.IdentityBaseField
+	if len(jwt.IdentityBaseField) > 0 {
+		api.JWTIdentityBaseField = jwt.IdentityBaseField[0]
+	}
 	api.JWTSkipKid = jwt.SkipKid
 	api.JWTPolicyFieldName = jwt.PolicyFieldName
 	api.JWTClientIDBaseField = jwt.ClientBaseField

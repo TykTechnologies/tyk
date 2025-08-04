@@ -34,7 +34,7 @@ func TestGetJWTConfiguration(t *testing.T) {
 		gotten := oas.GetJWTConfiguration()
 
 		assert.Equal(t, j.AllowedIssuers, gotten.AllowedIssuers)
-		assert.Equal(t, "new_sub", gotten.IdentityBaseField)
+		assert.Equal(t, []string{"new_sub"}, gotten.IdentityBaseField)
 		assert.Equal(t, j.AllowedAudiences, gotten.AllowedAudiences)
 	})
 

@@ -1090,7 +1090,7 @@ func TestJWTExtraClaimsValidation(t *testing.T) {
 			name: "valid identity base field",
 			oasConfig: &oas.JWT{
 				AllowedSubjects:   []string{"user1", "user2"},
-				IdentityBaseField: "user_id",
+				IdentityBaseField: []string{"user_id"},
 			},
 			claims: jwt.MapClaims{
 				"user_id": "user1",
