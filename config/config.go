@@ -60,6 +60,14 @@ var (
 			AllowUnsafe: []string{},
 		},
 		PIDFileLocation: "/var/run/tyk/tyk-gateway.pid",
+		Security: SecurityConfig{
+			CertificateExpiryMonitor: CertificateExpiryMonitorConfig{
+				WarningThresholdDays: 30,
+				CheckCooldownSeconds: 3600,
+				EventCooldownSeconds: 86400,
+				MaxConcurrentChecks:  20,
+			},
+		},
 	}
 )
 
@@ -611,6 +619,25 @@ type CertificatesConfig struct {
 	MDCB []string `json:"mdcb_api"`
 }
 
+// CertificateExpiryMonitorConfig configures the certificate expiration notification feature
+type CertificateExpiryMonitorConfig struct {
+	// WarningThresholdDays specifies the number of days before certificate expiration to start sending notifications
+	// Default: 30 days
+	WarningThresholdDays int `json:"warning_threshold_days"`
+
+	// CheckCooldownSeconds specifies the minimum time in seconds between certificate expiration checks
+	// Default: 3600 seconds (1 hour)
+	CheckCooldownSeconds int `json:"check_cooldown_seconds"`
+
+	// EventCooldownSeconds specifies the minimum time in seconds between firing the same certificate expiration event
+	// Default: 86400 seconds (24 hours)
+	EventCooldownSeconds int `json:"event_cooldown_seconds"`
+
+	// MaxConcurrentChecks specifies the maximum number of concurrent certificate checks
+	// Default: 20 (0 means use certificate count, negative means use 1 worker)
+	MaxConcurrentChecks int `json:"max_concurrent_checks"`
+}
+
 type SecurityConfig struct {
 	// Set the AES256 secret which is used to encode certificate private keys when they uploaded via certificate storage
 	PrivateCertificateEncodingSecret string `json:"private_certificate_encoding_secret"`
@@ -622,6 +649,9 @@ type SecurityConfig struct {
 	PinnedPublicKeys map[string]string `json:"pinned_public_keys"`
 
 	Certificates CertificatesConfig `json:"certificates"`
+
+	// CertificateExpiryMonitor configures the certificate expiration notification feature
+	CertificateExpiryMonitor CertificateExpiryMonitorConfig `json:"certificate_expiry_monitor"`
 }
 
 type NewRelicConfig struct {
