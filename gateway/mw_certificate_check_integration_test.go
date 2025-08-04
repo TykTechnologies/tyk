@@ -1,9 +1,11 @@
 package gateway
 
 import (
+	"context"
 	"crypto/tls"
 	"crypto/x509"
 	"crypto/x509/pkix"
+	"fmt"
 	"testing"
 	"time"
 
@@ -11,6 +13,7 @@ import (
 	"github.com/TykTechnologies/tyk/certs/mock"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/internal/cache"
+	"github.com/TykTechnologies/tyk/storage"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
 )
@@ -30,32 +33,154 @@ func setupIntegrationMW(t *testing.T, useMutualTLS bool, certs []*tls.Certificat
 	// Create a cache for testing
 	mockCache := cache.New(3600, 600)
 
-	return &CertificateCheckMW{
-		BaseMiddleware: &BaseMiddleware{
-			Spec: &APISpec{
-				APIDefinition: &apidef.APIDefinition{
-					UseMutualTLSAuth:   useMutualTLS,
-					ClientCertificates: []string{"cert1"},
-				},
-				GlobalConfig: config.Config{
-					Security: config.SecurityConfig{
-						Certificates: config.CertificatesConfig{
-							API: []string{"cert2"},
-						},
-						CertificateExpiryMonitor: config.CertificateExpiryMonitorConfig{
-							WarningThresholdDays: 30,
-							CheckCooldownSeconds: 3600,
-							EventCooldownSeconds: 86400,
-						},
-					},
-				},
+	// Generate unique test prefix for Redis keys to avoid clashes
+	testPrefix := fmt.Sprintf("test-%d-", time.Now().UnixNano())
+
+	gw := &Gateway{
+		CertificateManager: mockCertManager,
+		UtilCache:          mockCache,
+	}
+
+	// Initialize storage connection handler
+	gw.StorageConnectionHandler = storage.NewConnectionHandler(context.Background())
+
+	// Set the configuration properly with Redis storage
+	gwConfig := config.Config{
+		Storage: config.StorageOptionsConf{
+			Type:    "redis",
+			Host:    "localhost",
+			Port:    6379,
+			MaxIdle: 100,
+		},
+		Security: config.SecurityConfig{
+			Certificates: config.CertificatesConfig{
+				API: []string{"cert2"},
 			},
-			Gw: &Gateway{
-				CertificateManager: mockCertManager,
-				UtilCache:          mockCache,
+			CertificateExpiryMonitor: config.CertificateExpiryMonitorConfig{
+				WarningThresholdDays: 60, // Custom threshold
+				CheckCooldownSeconds: 3600,
+				EventCooldownSeconds: 86400,
 			},
 		},
 	}
+	gw.SetConfig(gwConfig)
+
+	// Connect to Redis
+	ctx := context.Background()
+	gw.StorageConnectionHandler.Connect(ctx, func() {
+		// Connection callback - do nothing for tests
+	}, &gwConfig)
+
+	// Wait for connection to be established
+	timeout, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	connected := gw.StorageConnectionHandler.WaitConnect(timeout)
+	if !connected {
+		t.Fatalf("Redis connection was not established in test setup")
+	}
+
+	mw := &CertificateCheckMW{
+		BaseMiddleware: &BaseMiddleware{
+			Spec: &APISpec{
+				APIDefinition: &apidef.APIDefinition{
+					UseMutualTLSAuth:   true,
+					ClientCertificates: []string{"cert1"},
+					APIID:              "integration-test-api-id",
+					OrgID:              "integration-test-org-id",
+				},
+				GlobalConfig: gw.GetConfig(),
+			},
+			Gw: gw,
+		},
+	}
+
+	// Initialize Redis store with randomized prefix
+	mw.store = &storage.RedisCluster{
+		KeyPrefix:         fmt.Sprintf("cert-cooldown:%s", testPrefix),
+		ConnectionHandler: gw.StorageConnectionHandler,
+	}
+	mw.store.Connect()
+
+	return mw
+}
+
+// setupIntegrationMWWithPrefix creates a middleware instance for integration testing with a specific test prefix
+func setupIntegrationMWWithPrefix(t *testing.T, _ bool, certs []*tls.Certificate, testPrefix string) *CertificateCheckMW {
+	ctrl := gomock.NewController(t)
+	mockCertManager := mock.NewMockCertificateManager(ctrl)
+
+	if certs != nil {
+		mockCertManager.EXPECT().
+			List(gomock.Any(), gomock.Any()).
+			Return(certs).
+			AnyTimes()
+	}
+
+	gw := &Gateway{
+		CertificateManager: mockCertManager,
+	}
+
+	// Initialize storage connection handler
+	gw.StorageConnectionHandler = storage.NewConnectionHandler(context.Background())
+
+	// Set the configuration properly with Redis storage
+	gwConfig := config.Config{
+		Storage: config.StorageOptionsConf{
+			Type:    "redis",
+			Host:    "localhost",
+			Port:    6379,
+			MaxIdle: 100,
+		},
+		Security: config.SecurityConfig{
+			Certificates: config.CertificatesConfig{
+				API: []string{"cert2"},
+			},
+			CertificateExpiryMonitor: config.CertificateExpiryMonitorConfig{
+				WarningThresholdDays: 60, // Custom threshold
+				CheckCooldownSeconds: 3600,
+				EventCooldownSeconds: 86400,
+			},
+		},
+	}
+	gw.SetConfig(gwConfig)
+
+	// Connect to Redis
+	ctx := context.Background()
+	gw.StorageConnectionHandler.Connect(ctx, func() {
+		// Connection callback - do nothing for tests
+	}, &gwConfig)
+
+	// Wait for connection to be established
+	timeout, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	connected := gw.StorageConnectionHandler.WaitConnect(timeout)
+	if !connected {
+		t.Fatalf("Redis connection was not established in test setup")
+	}
+
+	mw := &CertificateCheckMW{
+		BaseMiddleware: &BaseMiddleware{
+			Spec: &APISpec{
+				APIDefinition: &apidef.APIDefinition{
+					UseMutualTLSAuth:   true,
+					ClientCertificates: []string{"cert1"},
+					APIID:              "integration-test-api-id",
+					OrgID:              "integration-test-org-id",
+				},
+				GlobalConfig: gw.GetConfig(),
+			},
+			Gw: gw,
+		},
+	}
+
+	// Initialize Redis store with the provided prefix
+	mw.store = &storage.RedisCluster{
+		KeyPrefix:         fmt.Sprintf("cert-cooldown:%s", testPrefix),
+		ConnectionHandler: gw.StorageConnectionHandler,
+	}
+	mw.store.Connect()
+
+	return mw
 }
 
 // createIntegrationTestCertificate creates a simple test certificate for integration tests
@@ -150,6 +275,25 @@ func TestCertificateCheckMW_Integration_Configuration(t *testing.T) {
 
 		mockCache := cache.New(3600, 600)
 
+		gw := &Gateway{
+			CertificateManager: mockCertManager,
+			UtilCache:          mockCache,
+		}
+
+		// Set the configuration properly
+		gw.SetConfig(config.Config{
+			Security: config.SecurityConfig{
+				Certificates: config.CertificatesConfig{
+					API: []string{"cert2"},
+				},
+				CertificateExpiryMonitor: config.CertificateExpiryMonitorConfig{
+					WarningThresholdDays: 60, // Custom threshold
+					CheckCooldownSeconds: 3600,
+					EventCooldownSeconds: 86400,
+				},
+			},
+		})
+
 		mw := &CertificateCheckMW{
 			BaseMiddleware: &BaseMiddleware{
 				Spec: &APISpec{
@@ -157,23 +301,9 @@ func TestCertificateCheckMW_Integration_Configuration(t *testing.T) {
 						UseMutualTLSAuth:   true,
 						ClientCertificates: []string{"cert1"},
 					},
-					GlobalConfig: config.Config{
-						Security: config.SecurityConfig{
-							Certificates: config.CertificatesConfig{
-								API: []string{"cert2"},
-							},
-							CertificateExpiryMonitor: config.CertificateExpiryMonitorConfig{
-								WarningThresholdDays: 60, // Custom threshold
-								CheckCooldownSeconds: 3600,
-								EventCooldownSeconds: 86400,
-							},
-						},
-					},
+					GlobalConfig: gw.GetConfig(),
 				},
-				Gw: &Gateway{
-					CertificateManager: mockCertManager,
-					UtilCache:          mockCache,
-				},
+				Gw: gw,
 			},
 		}
 
@@ -195,6 +325,25 @@ func TestCertificateCheckMW_Integration_Configuration(t *testing.T) {
 
 		mockCache := cache.New(3600, 600)
 
+		gw := &Gateway{
+			CertificateManager: mockCertManager,
+			UtilCache:          mockCache,
+		}
+
+		// Set the configuration properly
+		gw.SetConfig(config.Config{
+			Security: config.SecurityConfig{
+				Certificates: config.CertificatesConfig{
+					API: []string{"cert2"},
+				},
+				CertificateExpiryMonitor: config.CertificateExpiryMonitorConfig{
+					WarningThresholdDays: 30,
+					CheckCooldownSeconds: 3600,
+					EventCooldownSeconds: 1, // Very short cooldown for testing
+				},
+			},
+		})
+
 		mw := &CertificateCheckMW{
 			BaseMiddleware: &BaseMiddleware{
 				Spec: &APISpec{
@@ -202,23 +351,9 @@ func TestCertificateCheckMW_Integration_Configuration(t *testing.T) {
 						UseMutualTLSAuth:   true,
 						ClientCertificates: []string{"cert1"},
 					},
-					GlobalConfig: config.Config{
-						Security: config.SecurityConfig{
-							Certificates: config.CertificatesConfig{
-								API: []string{"cert2"},
-							},
-							CertificateExpiryMonitor: config.CertificateExpiryMonitorConfig{
-								WarningThresholdDays: 30,
-								CheckCooldownSeconds: 3600,
-								EventCooldownSeconds: 1, // Very short cooldown for testing
-							},
-						},
-					},
+					GlobalConfig: gw.GetConfig(),
 				},
-				Gw: &Gateway{
-					CertificateManager: mockCertManager,
-					UtilCache:          mockCache,
-				},
+				Gw: gw,
 			},
 		}
 
@@ -315,7 +450,7 @@ func TestCertificateCheckMW_Integration_HelperMethods(t *testing.T) {
 	cert := createIntegrationTestCertificate(30, "helper-test.example.com")
 	certID := mw.generateCertificateID(cert)
 	assert.NotEmpty(t, certID)
-	assert.Len(t, certID, 64) // SHA256 hash length
+	assert.Len(t, certID, 40) // SHA1 hash length
 
 	// Test with nil certificate
 	nilCertID := mw.generateCertificateID(nil)
@@ -487,16 +622,14 @@ func TestCertificateCheckMW_Integration_CooldownIntegration(t *testing.T) {
 func TestCertificateCheckMW_Integration_CooldownPersistence(t *testing.T) {
 	t.Parallel()
 
-	// Create a shared cache that both middleware instances will use
-	sharedCache := cache.New(3600, 600)
+	// Generate a shared test prefix for both middleware instances
+	sharedTestPrefix := fmt.Sprintf("test-%d-", time.Now().UnixNano())
 
 	// Create first middleware instance
-	mw1 := setupIntegrationMW(t, true, nil)
-	mw1.Gw.UtilCache = sharedCache
+	mw1 := setupIntegrationMWWithPrefix(t, true, nil, sharedTestPrefix)
 
-	// Create second middleware instance with same cache
-	mw2 := setupIntegrationMW(t, true, nil)
-	mw2.Gw.UtilCache = sharedCache
+	// Create second middleware instance with same prefix
+	mw2 := setupIntegrationMWWithPrefix(t, true, nil, sharedTestPrefix)
 
 	// Create a test certificate
 	cert := createIntegrationTestCertificate(15, "persistence-integration-test.example.com")

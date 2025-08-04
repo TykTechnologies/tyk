@@ -13,13 +13,15 @@ import (
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/internal/crypto"
 	"github.com/TykTechnologies/tyk/internal/event"
+	"github.com/TykTechnologies/tyk/storage"
 )
 
 // CertificateCheckMW is used if domain was not detected or multiple APIs bind on the same domain. In this case authentification check happens not on TLS side but on HTTP level using this middleware
 type CertificateCheckMW struct {
 	*BaseMiddleware
-	certIDCache sync.Map // Cache for certificate IDs to avoid repeated hashing
-	certLocks   sync.Map // Map of mutexes per certificate ID for thread-safe cooldown operations
+	certIDCache sync.Map        // Cache for certificate IDs to avoid repeated hashing
+	certLocks   sync.Map        // Map of mutexes per certificate ID for thread-safe cooldown operations
+	store       storage.Handler // Redis storage for cooldowns
 }
 
 func (m *CertificateCheckMW) Name() string {
@@ -49,6 +51,16 @@ func (m *CertificateCheckMW) ProcessRequest(w http.ResponseWriter, r *http.Reque
 
 		// Log certificate check initiation
 		log.Debug("Starting certificate expiration check for API: ", m.Spec.APIID, " with ", len(apiCerts), " certificates")
+
+		// Initialize Redis store for cooldowns if not already done
+		if m.store == nil {
+			m.store = &storage.RedisCluster{
+				KeyPrefix:         "cert-cooldown:",
+				ConnectionHandler: m.Gw.StorageConnectionHandler,
+			}
+
+			m.store.Connect()
+		}
 
 		// TODO: Consider running certificate checks in the background to avoid blocking requests.
 		// This would require:
@@ -140,7 +152,11 @@ func (m *CertificateCheckMW) checkCertificate(cert *tls.Certificate, monitorConf
 	// Check if we should skip this certificate based on check cooldown
 	// This prevents checking the same certificate too frequently
 	if m.shouldSkipCertificate(certID, monitorConfig) {
-		log.Debugf("Certificate expiry monitor: Skipping check for certificate '%s' due to cooldown (ID: %s...)", cert.Leaf.Subject.CommonName, certID[:8])
+		if certID != "" {
+			log.Debugf("Certificate expiry monitor: Skipping check for certificate '%s' due to cooldown (ID: %s...)", cert.Leaf.Subject.CommonName, certID[:8])
+		} else {
+			log.Debugf("Certificate expiry monitor: Skipping check for certificate '%s' due to cooldown (ID: empty)", cert.Leaf.Subject.CommonName)
+		}
 		return
 	}
 
@@ -155,7 +171,11 @@ func (m *CertificateCheckMW) checkCertificate(cert *tls.Certificate, monitorConf
 	switch {
 	case hoursUntilExpiry < 0:
 		// Certificate has already expired (negative hours means past expiry date)
-		log.Warningf("Certificate expiry monitor: CRITICAL - Certificate '%s' has EXPIRED (ID: %s...)", commonName, certID[:8])
+		if certID != "" {
+			log.Warningf("Certificate expiry monitor: CRITICAL - Certificate '%s' has EXPIRED (ID: %s...)", commonName, certID[:8])
+		} else {
+			log.Warningf("Certificate expiry monitor: CRITICAL - Certificate '%s' has EXPIRED (ID: empty)", commonName)
+		}
 
 	case hoursUntilExpiry <= monitorConfig.WarningThresholdDays*24:
 		// Certificate is expiring soon (within the configured warning threshold)
@@ -164,14 +184,26 @@ func (m *CertificateCheckMW) checkCertificate(cert *tls.Certificate, monitorConf
 		// Check if we should fire the expiring soon event based on event cooldown
 		if m.shouldFireExpiryEvent(certID, monitorConfig) {
 			m.fireCertificateExpiringSoonEvent(cert, hoursUntilExpiry)
-			log.Infof("Certificate expiry monitor: EXPIRY EVENT FIRED for certificate '%s' - expires in %d hours (ID: %s...)", commonName, hoursUntilExpiry, certID[:8])
+			if certID != "" {
+				log.Infof("Certificate expiry monitor: EXPIRY EVENT FIRED for certificate '%s' - expires in %d hours (ID: %s...)", commonName, hoursUntilExpiry, certID[:8])
+			} else {
+				log.Infof("Certificate expiry monitor: EXPIRY EVENT FIRED for certificate '%s' - expires in %d hours (ID: empty)", commonName, hoursUntilExpiry)
+			}
 		} else {
-			log.Debugf("Certificate expiry monitor: Event suppressed for certificate '%s' due to cooldown (ID: %s...)", commonName, certID[:8])
+			if certID != "" {
+				log.Debugf("Certificate expiry monitor: Event suppressed for certificate '%s' due to cooldown (ID: %s...)", commonName, certID[:8])
+			} else {
+				log.Debugf("Certificate expiry monitor: Event suppressed for certificate '%s' due to cooldown (ID: empty)", commonName)
+			}
 		}
 
 	default:
 		// Certificate is healthy (expires beyond the warning threshold)
-		log.Debugf("Certificate expiry monitor: Certificate '%s' is healthy - expires in %d hours (ID: %s...)", commonName, hoursUntilExpiry, certID[:8])
+		if certID != "" {
+			log.Debugf("Certificate expiry monitor: Certificate '%s' is healthy - expires in %d hours (ID: %s...)", commonName, hoursUntilExpiry, certID[:8])
+		} else {
+			log.Debugf("Certificate expiry monitor: Certificate '%s' is healthy - expires in %d hours (ID: empty)", commonName, hoursUntilExpiry)
+		}
 	}
 }
 
@@ -228,7 +260,11 @@ func (m *CertificateCheckMW) shouldSkipCertificate(certID string, monitorConfig 
 	// Get certificate-specific lock to prevent race conditions
 	lock := m.acquireLock(certID)
 	if lock == nil {
-		log.Warningf("Certificate expiry monitor: Cannot get lock for certificate ID: %s", certID[:8])
+		if certID != "" {
+			log.Warningf("Certificate expiry monitor: Cannot get lock for certificate ID: %s", certID[:8])
+		} else {
+			log.Warningf("Certificate expiry monitor: Cannot get lock for certificate ID: empty")
+		}
 		return true // Skip check if we can't get a lock
 	}
 
@@ -242,15 +278,25 @@ func (m *CertificateCheckMW) shouldSkipCertificate(certID string, monitorConfig 
 	}
 
 	checkCooldownKey := fmt.Sprintf("cert_check_cooldown:%s", certID)
-	_, exists := m.Gw.UtilCache.Get(checkCooldownKey)
-	if exists {
+
+	// Use Redis for cooldowns
+	if m.store == nil {
+		// Store not initialized, skip cooldown check
+		return false
+	}
+	_, err := m.store.GetKey(checkCooldownKey)
+	if err == nil {
 		log.Debugf("Certificate expiry monitor: Check cooldown active for certificate ID: %s... (cooldown: %ds)", certID[:8], monitorConfig.CheckCooldownSeconds)
 		return true // Skip check due to cooldown
 	}
-
 	// Set check cooldown atomically (protected by lock)
-	m.Gw.UtilCache.Set(checkCooldownKey, "1", int64(monitorConfig.CheckCooldownSeconds))
-	log.Debugf("Certificate expiry monitor: Check cooldown set for certificate ID: %s... (cooldown: %ds)", certID[:8], monitorConfig.CheckCooldownSeconds)
+	m.store.SetKey(checkCooldownKey, "1", int64(monitorConfig.CheckCooldownSeconds))
+	if certID != "" {
+		log.Debugf("Certificate expiry monitor: Check cooldown set for certificate ID: %s... (cooldown: %ds)", certID[:8], monitorConfig.CheckCooldownSeconds)
+	} else {
+		log.Debugf("Certificate expiry monitor: Check cooldown set for certificate ID: empty (cooldown: %ds)", monitorConfig.CheckCooldownSeconds)
+	}
+
 	return false // Don't skip check
 }
 
@@ -264,7 +310,11 @@ func (m *CertificateCheckMW) shouldFireExpiryEvent(certID string, monitorConfig 
 	// Get certificate-specific lock to prevent race conditions
 	lock := m.acquireLock(certID)
 	if lock == nil {
-		log.Warningf("Certificate expiry monitor: Cannot get lock for certificate ID: %s", certID[:8])
+		if certID != "" {
+			log.Warningf("Certificate expiry monitor: Cannot get lock for certificate ID: %s", certID[:8])
+		} else {
+			log.Warningf("Certificate expiry monitor: Cannot get lock for certificate ID: empty")
+		}
 		return false // Don't fire event if we can't get a lock
 	}
 
@@ -278,15 +328,25 @@ func (m *CertificateCheckMW) shouldFireExpiryEvent(certID string, monitorConfig 
 	}
 
 	cooldownKey := fmt.Sprintf("cert_expiry_cooldown:%s", certID)
-	_, exists := m.Gw.UtilCache.Get(cooldownKey)
-	if exists {
+
+	// Use Redis for cooldowns
+	if m.store == nil {
+		// Store not initialized, allow event to fire
+		return true
+	}
+	_, err := m.store.GetKey(cooldownKey)
+	if err == nil {
 		log.Debugf("Certificate expiry monitor: Event cooldown active for certificate ID: %s... (cooldown: %ds)", certID[:8], monitorConfig.EventCooldownSeconds)
 		return false
 	}
-
 	// Set cooldown atomically (protected by lock)
-	m.Gw.UtilCache.Set(cooldownKey, "1", int64(monitorConfig.EventCooldownSeconds))
-	log.Debugf("Certificate expiry monitor: Event cooldown set for certificate ID: %s... (cooldown: %ds)", certID[:8], monitorConfig.EventCooldownSeconds)
+	m.store.SetKey(cooldownKey, "1", int64(monitorConfig.EventCooldownSeconds))
+	if certID != "" {
+		log.Debugf("Certificate expiry monitor: Event cooldown set for certificate ID: %s... (cooldown: %ds)", certID[:8], monitorConfig.EventCooldownSeconds)
+	} else {
+		log.Debugf("Certificate expiry monitor: Event cooldown set for certificate ID: empty (cooldown: %ds)", monitorConfig.EventCooldownSeconds)
+	}
+
 	return true
 }
 
@@ -327,7 +387,11 @@ func (m *CertificateCheckMW) fireCertificateExpiringSoonEvent(cert *tls.Certific
 		OrgID:           m.Spec.OrgID,
 	}
 
-	log.Debugf("Certificate expiry monitor: Firing expiry event for certificate '%s' - expires in %dd %dh (ID: %s...)", cert.Leaf.Subject.CommonName, daysUntilExpiry, remainingHours, certID[:8])
+	if certID != "" {
+		log.Debugf("Certificate expiry monitor: Firing expiry event for certificate '%s' - expires in %dd %dh (ID: %s...)", cert.Leaf.Subject.CommonName, daysUntilExpiry, remainingHours, certID[:8])
+	} else {
+		log.Debugf("Certificate expiry monitor: Firing expiry event for certificate '%s' - expires in %dd %dh (ID: empty)", cert.Leaf.Subject.CommonName, daysUntilExpiry, remainingHours)
+	}
 
 	m.Spec.FireEvent(event.CertificateExpiringSoon, eventMeta)
 }

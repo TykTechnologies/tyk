@@ -1,9 +1,11 @@
 package gateway
 
 import (
+	"context"
 	"crypto/tls"
 	"crypto/x509"
 	"crypto/x509/pkix"
+	"fmt"
 	"net/http"
 	"testing"
 	"time"
@@ -12,6 +14,7 @@ import (
 	"github.com/TykTechnologies/tyk/certs/mock"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/internal/cache"
+	"github.com/TykTechnologies/tyk/storage"
 	"go.uber.org/mock/gomock"
 )
 
@@ -30,32 +33,75 @@ func newBenchmarkCertificateCheckMW(b *testing.B, useMutualTLS bool, certs []*tl
 	// Create a cache for testing
 	mockCache := cache.New(3600, 600)
 
-	return &CertificateCheckMW{
+	// Generate unique test prefix for Redis keys to avoid clashes
+	testPrefix := fmt.Sprintf("benchmark-%d-", time.Now().UnixNano())
+
+	gw := &Gateway{
+		CertificateManager: mockCertManager,
+		UtilCache:          mockCache,
+	}
+
+	// Initialize storage connection handler
+	gw.StorageConnectionHandler = storage.NewConnectionHandler(context.Background())
+
+	// Set the configuration properly with Redis storage
+	gwConfig := config.Config{
+		Storage: config.StorageOptionsConf{
+			Type:    "redis",
+			Host:    "localhost",
+			Port:    6379,
+			MaxIdle: 100,
+		},
+		Security: config.SecurityConfig{
+			Certificates: config.CertificatesConfig{
+				API: []string{"cert2"},
+			},
+			CertificateExpiryMonitor: config.CertificateExpiryMonitorConfig{
+				WarningThresholdDays: 30,
+				CheckCooldownSeconds: 3600,
+				EventCooldownSeconds: 86400,
+			},
+		},
+	}
+	gw.SetConfig(gwConfig)
+
+	// Connect to Redis
+	ctx := context.Background()
+	gw.StorageConnectionHandler.Connect(ctx, func() {
+		// Connection callback - do nothing for benchmarks
+	}, &gwConfig)
+
+	// Wait for connection to be established
+	timeout, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	connected := gw.StorageConnectionHandler.WaitConnect(timeout)
+	if !connected {
+		b.Fatalf("Redis connection was not established in benchmark setup")
+	}
+
+	mw := &CertificateCheckMW{
 		BaseMiddleware: &BaseMiddleware{
 			Spec: &APISpec{
 				APIDefinition: &apidef.APIDefinition{
 					UseMutualTLSAuth:   useMutualTLS,
 					ClientCertificates: []string{"cert1"},
+					APIID:              "benchmark-test-api-id",
+					OrgID:              "benchmark-test-org-id",
 				},
-				GlobalConfig: config.Config{
-					Security: config.SecurityConfig{
-						Certificates: config.CertificatesConfig{
-							API: []string{"cert2"},
-						},
-						CertificateExpiryMonitor: config.CertificateExpiryMonitorConfig{
-							WarningThresholdDays: 30,
-							CheckCooldownSeconds: 3600,
-							EventCooldownSeconds: 86400,
-						},
-					},
-				},
+				GlobalConfig: gw.GetConfig(),
 			},
-			Gw: &Gateway{
-				CertificateManager: mockCertManager,
-				UtilCache:          mockCache,
-			},
+			Gw: gw,
 		},
 	}
+
+	// Initialize Redis store with randomized prefix
+	mw.store = &storage.RedisCluster{
+		KeyPrefix:         fmt.Sprintf("cert-cooldown:%s", testPrefix),
+		ConnectionHandler: gw.StorageConnectionHandler,
+	}
+	mw.store.Connect()
+
+	return mw
 }
 
 // createTestCertificate creates a test certificate with specified expiration
