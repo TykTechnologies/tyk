@@ -1,8 +1,0 @@
-{
-    "security": {
-        "certificate_expiry_monitor": {
-            "warning_threshold_days": 14,
-            "check_cooldown_seconds": 1200
-        }
-    }
-} 

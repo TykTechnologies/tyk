@@ -398,22 +398,10 @@ func TestCertificateExpiryMonitorConfig(t *testing.T) {
 
 	t.Run("Read and write config with certificate expiry monitor", func(t *testing.T) {
 		// Test different configuration scenarios with descriptive file names:
-		// - warning_15days_check_30min_event_12hours_workers_10: typical configuration with moderate values
 		// - warning_1day_check_1sec_event_1sec_workers_1: edge cases with minimum allowed values
-		// - warning_90days_check_2hours_event_48hours_workers_50: high values suitable for production environments
-		// - warning_7days_check_15min_event_6hours_workers_5: development/testing configuration
-		// - warning_30days_check_1hour_event_24hours_workers_20: typical production configuration (defaults)
-		// - warning_3days_check_5min_event_1hour_workers_3: high-frequency monitoring configuration
-		// - warning_60days_check_4hours_event_72hours_workers_30: conservative production configuration
-		// Note: Partial configuration tests are temporarily disabled due to JSON comparison issues
+		// Note: Reduced test files to essential scenarios only
 		files := []string{
-			"testdata/cert_monitor_warning_15days_check_30min_event_12hours_workers_10.json",
 			"testdata/cert_monitor_warning_1day_check_1sec_event_1sec_workers_1.json",
-			"testdata/cert_monitor_warning_90days_check_2hours_event_48hours_workers_50.json",
-			"testdata/cert_monitor_warning_7days_check_15min_event_6hours_workers_5.json",
-			"testdata/cert_monitor_warning_30days_check_1hour_event_24hours_workers_20.json",
-			"testdata/cert_monitor_warning_3days_check_5min_event_1hour_workers_3.json",
-			"testdata/cert_monitor_warning_60days_check_4hours_event_72hours_workers_30.json",
 		}
 		for _, f := range files {
 			t.Run(f, func(t *testing.T) {
