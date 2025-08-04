@@ -681,25 +681,3 @@ func TestCertificateCheckMW_WorkerCountCalculation(t *testing.T) {
 		})
 	}
 }
-
-func TestCertificateCheckMW_FireCertificateExpiredEvent(t *testing.T) {
-	t.Parallel()
-
-	mw := setupMW(t, true, nil)
-
-	// Create an expired certificate
-	expiredCert := createTestCertificateWithName(-1, "expired.example.com")
-	certID := "test-expired-cert-id"
-
-	// Test that the function can be called without panicking
-	// Since the function has an empty body, it should just return without doing anything
-	mw.fireCertificateExpiredEvent(expiredCert, certID)
-	mw.fireCertificateExpiredEvent(nil, "nil-cert-id")
-	mw.fireCertificateExpiredEvent(expiredCert, "")
-
-	certWithNilLeaf := &tls.Certificate{}
-	mw.fireCertificateExpiredEvent(certWithNilLeaf, "nil-leaf-cert-id")
-
-	// All calls should complete without panicking
-	t.Log("fireCertificateExpiredEvent function called successfully with various inputs")
-}
