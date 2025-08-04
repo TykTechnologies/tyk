@@ -290,7 +290,9 @@ func (m *CertificateCheckMW) shouldSkipCertificate(certID string, monitorConfig 
 		return true // Skip check due to cooldown
 	}
 	// Set check cooldown atomically (protected by lock)
-	m.store.SetKey(checkCooldownKey, "1", int64(monitorConfig.CheckCooldownSeconds))
+	if err := m.store.SetKey(checkCooldownKey, "1", int64(monitorConfig.CheckCooldownSeconds)); err != nil {
+		log.Warningf("Certificate expiry monitor: Failed to set check cooldown for certificate ID: %s... - %v", certID[:8], err)
+	}
 	if certID != "" {
 		log.Debugf("Certificate expiry monitor: Check cooldown set for certificate ID: %s... (cooldown: %ds)", certID[:8], monitorConfig.CheckCooldownSeconds)
 	} else {
@@ -340,7 +342,9 @@ func (m *CertificateCheckMW) shouldFireExpiryEvent(certID string, monitorConfig 
 		return false
 	}
 	// Set cooldown atomically (protected by lock)
-	m.store.SetKey(cooldownKey, "1", int64(monitorConfig.EventCooldownSeconds))
+	if err := m.store.SetKey(cooldownKey, "1", int64(monitorConfig.EventCooldownSeconds)); err != nil {
+		log.Warningf("Certificate expiry monitor: Failed to set event cooldown for certificate ID: %s... - %v", certID[:8], err)
+	}
 	if certID != "" {
 		log.Debugf("Certificate expiry monitor: Event cooldown set for certificate ID: %s... (cooldown: %ds)", certID[:8], monitorConfig.EventCooldownSeconds)
 	} else {

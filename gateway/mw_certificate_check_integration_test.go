@@ -19,7 +19,7 @@ import (
 )
 
 // setupIntegrationMW creates a middleware instance for integration testing
-func setupIntegrationMW(t *testing.T, useMutualTLS bool, certs []*tls.Certificate) *CertificateCheckMW {
+func setupIntegrationMW(t *testing.T, _ bool, certs []*tls.Certificate) *CertificateCheckMW {
 	ctrl := gomock.NewController(t)
 	mockCertManager := mock.NewMockCertificateManager(ctrl)
 
