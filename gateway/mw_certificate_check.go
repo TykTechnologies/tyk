@@ -16,26 +16,6 @@ import (
 )
 
 // CertificateCheckMW is used if domain was not detected or multiple APIs bind on the same domain. In this case authentification check happens not on TLS side but on HTTP level using this middleware
-//
-// Certificate Expiry Monitor Features:
-// - Monitors certificate expiration dates and fires events when certificates are expiring soon
-// - Supports configurable warning thresholds, check cooldowns, and event cooldowns
-// - Implements parallel processing with configurable worker limits
-// - Uses caching to avoid repeated certificate ID generation
-// - Provides comprehensive logging for monitoring and debugging
-// - Implements thread-safe cooldown operations to prevent race conditions
-//
-// Current Implementation Status:
-// - CertificateExpiringSoon events: Fully implemented and functional
-// - CertificateExpired events: Logged but not fired (TODO for separate task/PR)
-// - All configuration options: Fully functional with sensible defaults
-// - Cooldown mechanisms: Fully implemented for both checks and events with thread-safety
-// - Parallel processing: Fully implemented with configurable limits and concurrency safety
-//
-// Future Enhancements:
-// - CertificateExpired event firing will be implemented in a separate task/PR
-// - Additional event types may be added for different certificate states
-// - Enhanced metadata and event payloads for better integration
 type CertificateCheckMW struct {
 	*BaseMiddleware
 	certIDCache sync.Map // Cache for certificate IDs to avoid repeated hashing
@@ -70,6 +50,13 @@ func (m *CertificateCheckMW) ProcessRequest(w http.ResponseWriter, r *http.Reque
 		// Log certificate check initiation
 		log.Debug("Starting certificate expiration check for API: ", m.Spec.APIID, " with ", len(apiCerts), " certificates")
 
+		// TODO: Consider running certificate checks in the background to avoid blocking requests.
+		// This would require:
+		// 1. A background worker pool to process checks asynchronously
+		// 2. A mechanism to track and limit concurrent background checks
+		// 3. Error handling for background task failures
+		// 4. Careful consideration of race conditions and state management
+		// Currently this is a blocking call and will block the request until complete
 		m.checkCertificateExpiration(apiCerts)
 	}
 
@@ -93,7 +80,12 @@ func (m *CertificateCheckMW) checkCertificateExpiration(certs []*tls.Certificate
 	// Limit concurrency to avoid overwhelming the system
 	maxConcurrent := config.MaxConcurrentChecks
 
-	// Calculate optimal worker count
+	// Calculate optimal worker count based on the following rules:
+	// - For 2 or fewer certificates, use a single worker since parallelization overhead isn't worth it
+	// - If maxConcurrent is 0, use one worker per certificate for maximum parallelization
+	// - If maxConcurrent is negative, use a single worker as a safe fallback
+	// - If we have fewer certificates than maxConcurrent, match workers to certificates to avoid idle workers
+	// - Otherwise use maxConcurrent workers to respect the configured limit and prevent system overload
 	var maxWorkers int
 	if len(certs) <= 2 {
 		maxWorkers = 1
@@ -198,7 +190,7 @@ func (m *CertificateCheckMW) generateCertificateID(cert *tls.Certificate) string
 	}
 
 	// Generate new hash if not cached
-	hash := sha256.Sum256(cert.Leaf.Raw)
+	hash := sha1.Sum(cert.Leaf.Raw)
 	certID := hex.EncodeToString(hash[:])
 
 	// Cache the result
