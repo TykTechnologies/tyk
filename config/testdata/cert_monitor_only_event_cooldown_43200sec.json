@@ -1,7 +1,0 @@
-{
-    "security": {
-        "certificate_expiry_monitor": {
-            "event_cooldown_seconds": 43200
-        }
-    }
-} 
