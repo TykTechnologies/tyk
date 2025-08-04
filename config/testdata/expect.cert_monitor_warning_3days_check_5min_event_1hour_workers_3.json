@@ -1,0 +1,6 @@
+{
+    "warning_threshold_days": 3,
+    "check_cooldown_seconds": 300,
+    "event_cooldown_seconds": 3600,
+    "max_concurrent_checks": 3
+} 

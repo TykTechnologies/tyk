@@ -1,0 +1,7 @@
+{
+    "security": {
+        "certificate_expiry_monitor": {
+            "warning_threshold_days": 45
+        }
+    }
+} 

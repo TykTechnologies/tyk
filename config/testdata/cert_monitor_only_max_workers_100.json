@@ -1,0 +1,7 @@
+{
+    "security": {
+        "certificate_expiry_monitor": {
+            "max_concurrent_checks": 100
+        }
+    }
+} 
