@@ -507,7 +507,7 @@ func TestCertificateCheckMW_Parallelization(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
+		t.Run(tc.name, func(_ *testing.T) {
 			// Update the middleware's configuration for this test case
 			mw.Spec.GlobalConfig.Security.CertificateExpiryMonitor.MaxConcurrentChecks = tc.maxConcurrent
 
