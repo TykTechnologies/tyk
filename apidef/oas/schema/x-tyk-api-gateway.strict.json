@@ -2215,7 +2215,8 @@
         "HostUp",
         "TokenCreated",
         "TokenUpdated",
-        "TokenDeleted"
+        "TokenDeleted",
+        "CertificateExpiringSoon"
       ],
       "additionalProperties": false
     },
