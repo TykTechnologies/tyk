@@ -18,6 +18,7 @@ import (
 // CertificateCheckMW is used if domain was not detected or multiple APIs bind on the same domain. In this case authentification check happens not on TLS side but on HTTP level using this middleware
 type CertificateCheckMW struct {
 	*BaseMiddleware
+	certIDCache sync.Map // Cache for certificate IDs to avoid repeated hashing
 }
 
 func (m *CertificateCheckMW) Name() string {
@@ -170,15 +171,28 @@ func (m *CertificateCheckMW) checkCertificate(cert *tls.Certificate, config conf
 	}
 }
 
-// generateCertificateID generates a unique ID for the certificate
+// generateCertificateID generates a unique ID for the certificate with caching to avoid repeated hashing
 func (m *CertificateCheckMW) generateCertificateID(cert *tls.Certificate) string {
 	if cert == nil || cert.Leaf == nil || len(cert.Leaf.Raw) == 0 {
 		return ""
 	}
 
-	hash := sha256.Sum256(cert.Leaf.Raw)
+	// Create a cache key from the certificate's raw data
+	cacheKey := string(cert.Leaf.Raw)
 
-	return hex.EncodeToString(hash[:])
+	// Check if we already have this certificate ID cached
+	if cachedID, ok := m.certIDCache.Load(cacheKey); ok {
+		return cachedID.(string)
+	}
+
+	// Generate new hash if not cached
+	hash := sha256.Sum256(cert.Leaf.Raw)
+	certID := hex.EncodeToString(hash[:])
+
+	// Cache the result
+	m.certIDCache.Store(cacheKey, certID)
+
+	return certID
 }
 
 // shouldSkipCertificate checks if a certificate check should be skipped based on check cooldown
