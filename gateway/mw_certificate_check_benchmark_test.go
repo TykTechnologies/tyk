@@ -228,7 +228,7 @@ func BenchmarkCertificateCheckMW_CheckCertificateExpiration(b *testing.B) {
 // BenchmarkCertificateCheckMW_CacheOperations benchmarks Redis cache operations
 func BenchmarkCertificateCheckMW_CacheOperations(b *testing.B) {
 	mw := newBenchmarkCertificateCheckMW(b, true, nil)
-	config := mw.Spec.GlobalConfig.Security.CertificateExpiryMonitor
+	monitorConfig := mw.Spec.GlobalConfig.Security.CertificateExpiryMonitor
 
 	b.Run("CacheGet", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
@@ -245,7 +245,7 @@ func BenchmarkCertificateCheckMW_CacheOperations(b *testing.B) {
 	b.Run("ShouldFireEventWithCache", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
 			certID := "benchmark-cert-id"
-			_ = mw.shouldFireExpiryEvent(certID, config)
+			_ = mw.shouldFireExpiryEvent(certID, monitorConfig)
 		}
 	})
 }

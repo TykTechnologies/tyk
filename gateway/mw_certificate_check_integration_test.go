@@ -504,7 +504,7 @@ func TestCertificateCheckMW_Integration_CooldownPersistence(t *testing.T) {
 	assert.NotEmpty(t, certID)
 
 	// Configure short cooldowns for testing
-	config := config.CertificateExpiryMonitorConfig{
+	monitorConfig := config.CertificateExpiryMonitorConfig{
 		WarningThresholdDays: 30,
 		CheckCooldownSeconds: 60,  // 1 minute
 		EventCooldownSeconds: 120, // 2 minutes
@@ -513,20 +513,20 @@ func TestCertificateCheckMW_Integration_CooldownPersistence(t *testing.T) {
 	t.Run("Cooldowns persist across instances", func(t *testing.T) {
 		// Test check cooldown persistence
 		// First check should succeed
-		shouldSkip1 := mw1.shouldSkipCertificate(certID, config)
+		shouldSkip1 := mw1.shouldSkipCertificate(certID, monitorConfig)
 		assert.False(t, shouldSkip1, "First check should be allowed")
 
 		// Check with different instance should fail (cooldown persists)
-		shouldSkip2 := mw2.shouldSkipCertificate(certID, config)
+		shouldSkip2 := mw2.shouldSkipCertificate(certID, monitorConfig)
 		assert.True(t, shouldSkip2, "Check cooldown should persist across instances")
 
 		// Test event cooldown persistence
 		// First event should succeed
-		shouldFire1 := mw1.shouldFireExpiryEvent(certID, config)
+		shouldFire1 := mw1.shouldFireExpiryEvent(certID, monitorConfig)
 		assert.True(t, shouldFire1, "First event should be allowed")
 
 		// Event with different instance should fail (cooldown persists)
-		shouldFire2 := mw2.shouldFireExpiryEvent(certID, config)
+		shouldFire2 := mw2.shouldFireExpiryEvent(certID, monitorConfig)
 		assert.False(t, shouldFire2, "Event cooldown should persist across instances")
 	})
 }
