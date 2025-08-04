@@ -22,9 +22,9 @@ func (i *TrackEndpoint) ExtractTo(meta *apidef.TrackEndpointMeta) {
 	meta.Disabled = !i.Enabled
 }
 
-func (s *OAS) fillTrackEndpoint(metas []apidef.TrackEndpointMeta) {
+func (s *OAS) fillTrackEndpoint(metas []apidef.TrackEndpointMeta, opt fillOptions) {
 	for _, meta := range metas {
-		operationID := s.getOperationID(meta.Path, meta.Method)
+		operationID := s.ensureOperationId(meta.Path, meta.Method, opt)
 		operation := s.GetTykExtension().getOperation(operationID)
 
 		if operation.TrackEndpoint == nil {
@@ -38,9 +38,10 @@ func (s *OAS) fillTrackEndpoint(metas []apidef.TrackEndpointMeta) {
 	}
 }
 
-func (s *OAS) fillDoNotTrackEndpoint(metas []apidef.TrackEndpointMeta) {
+func (s *OAS) fillDoNotTrackEndpoint(metas []apidef.TrackEndpointMeta, opt fillOptions) {
 	for _, meta := range metas {
-		operationID := s.getOperationID(meta.Path, meta.Method)
+		operationID := s.ensureOperationId(meta.Path, meta.Method, opt)
+
 		operation := s.GetTykExtension().getOperation(operationID)
 
 		if operation.DoNotTrackEndpoint == nil {
