@@ -1011,9 +1011,7 @@ func (k *JWTMiddleware) validateExtraClaims(claims jwt.Claims, token *jwt.Token)
 		return nil // Skip extra validations for non-OAS APIs
 	}
 
-	tykExt := k.Spec.GetTykExtension()
-
-	jwtConfig := k.Spec.OAS.Security.JWT
+	jwtConfig := k.Spec.OAS.GetJWTConfiguration()
 
 	// Issuer validation
 	if len(jwtConfig.AllowedIssuers) > 0 {
@@ -1041,8 +1039,6 @@ func (k *JWTMiddleware) validateExtraClaims(claims jwt.Claims, token *jwt.Token)
 
 	// Subject validation
 	if len(jwtConfig.AllowedSubjects) > 0 {
-		// For subject validation we need to use the middleware's getIdentityFromToken
-		// as it handles the priority of kid header, identity base field, and sub claim
 		subject, err := k.getIdentityFromToken(token)
 		if err != nil {
 			k.Logger().WithError(err).Error("Failed to get identity from token")

@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/TykTechnologies/tyk/apidef/oas"
 	"net/http"
 	"reflect"
 	"sort"
@@ -983,6 +984,172 @@ func TestJWTExistingSessionRSAWithRawSourceInvalidPolicyID(t *testing.T) {
 	})
 }
 
+func TestJWTExtraClaimsValidation(t *testing.T) {
+	secret := "12345"
+
+	cases := []struct {
+		name          string
+		oasConfig     *oas.JWT
+		claims        jwt.MapClaims
+		expectError   bool
+		errorContains string
+	}{
+		{
+			name: "valid issuer",
+			oasConfig: &oas.JWT{
+				AllowedIssuers: []string{"issuer1", "issuer2"},
+			},
+			claims: jwt.MapClaims{
+				"iss": "issuer1",
+			},
+			expectError: false,
+		},
+		{
+			name: "invalid issuer",
+			oasConfig: &oas.JWT{
+				AllowedIssuers: []string{"issuer1", "issuer2"},
+			},
+			claims: jwt.MapClaims{
+				"iss": "issuer3",
+			},
+			expectError:   true,
+			errorContains: "invalid issuer claim",
+		},
+		{
+			name: "valid audience string",
+			oasConfig: &oas.JWT{
+				AllowedAudiences: []string{"aud1", "aud2"},
+			},
+			claims: jwt.MapClaims{
+				"aud": "aud1",
+			},
+			expectError: false,
+		},
+		{
+			name: "valid audience array",
+			oasConfig: &oas.JWT{
+				AllowedAudiences: []string{"aud1", "aud2"},
+			},
+			claims: jwt.MapClaims{
+				"aud": []interface{}{"aud3", "aud2"},
+			},
+			expectError: false,
+		},
+		{
+			name: "invalid audience",
+			oasConfig: &oas.JWT{
+				AllowedAudiences: []string{"aud1", "aud2"},
+			},
+			claims: jwt.MapClaims{
+				"aud": "aud3",
+			},
+			expectError:   true,
+			errorContains: "no matching audience found",
+		},
+		{
+			name: "valid jti when required",
+			oasConfig: &oas.JWT{
+				RequireJTI: true,
+			},
+			claims: jwt.MapClaims{
+				"jti": "123",
+			},
+			expectError: false,
+		},
+		{
+			name: "missing jti when required",
+			oasConfig: &oas.JWT{
+				RequireJTI: true,
+			},
+			claims:        jwt.MapClaims{},
+			expectError:   true,
+			errorContains: "JWT ID (jti) claim is required",
+		},
+		{
+			name: "valid subject",
+			oasConfig: &oas.JWT{
+				AllowedSubjects: []string{"sub1", "sub2"},
+			},
+			claims: jwt.MapClaims{
+				"sub": "sub1",
+			},
+			expectError: false,
+		},
+		{
+			name: "invalid subject",
+			oasConfig: &oas.JWT{
+				AllowedSubjects: []string{"sub1", "sub2"},
+			},
+			claims: jwt.MapClaims{
+				"sub": "sub3",
+			},
+			expectError:   true,
+			errorContains: "invalid subject value",
+		},
+		{
+			name: "valid identity base field",
+			oasConfig: &oas.JWT{
+				AllowedSubjects:   []string{"user1", "user2"},
+				IdentityBaseField: "user_id",
+			},
+			claims: jwt.MapClaims{
+				"user_id": "user1",
+			},
+			expectError: false,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			var api apidef.APIDefinition
+			api.EnableJWT = true
+			api.AuthConfigs = map[string]apidef.AuthConfig{
+				apidef.JWTType: {
+					Name:           "jwtAuth",
+					AuthHeaderName: "Authorization",
+				},
+			}
+			api.IsOAS = true
+
+			var o oas.OAS
+			o.SetTykExtension(&oas.XTykAPIGateway{})
+			o.Fill(api)
+
+			o.GetTykExtension().Server.Authentication.SecuritySchemes["jwtAuth"] = tc.oasConfig
+			o.ExtractTo(&api)
+
+			spec := &APISpec{
+				APIDefinition: &api,
+				OAS:           o,
+			}
+
+			// Create and sign token
+			token := jwt.New(jwt.SigningMethodHS256)
+			token.Claims = tc.claims
+			signedToken, err := token.SignedString([]byte(secret))
+			assert.NoError(t, err)
+
+			// Create middleware, parse token and call function
+			jwtMiddleware := &JWTMiddleware{BaseMiddleware: &BaseMiddleware{
+				Spec: spec,
+			}}
+			parser := jwt.NewParser(jwt.WithoutClaimsValidation())
+			parsedToken, err := parser.Parse(signedToken, func(token *jwt.Token) (interface{}, error) {
+				return []byte(secret), nil
+			})
+			assert.NoError(t, err)
+			err = jwtMiddleware.validateExtraClaims(parsedToken.Claims, parsedToken)
+
+			if tc.expectError {
+				assert.Error(t, err)
+				assert.Contains(t, err.Error(), tc.errorContains)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
 func TestJWTScopeToPolicyMapping(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
@@ -1070,165 +1237,6 @@ func TestJWTScopeToPolicyMapping(t *testing.T) {
 				},
 			},
 		}
-
-		//func TestJWTExtraClaimsValidation(t *testing.T) {
-		//	ts := newJWTAuthMiddlewareGenericSession(t)
-		//	defer ts.Close()
-		//
-		//	secret := "12345"
-		//
-		//	cases := []struct {
-		//		name          string
-		//		oasConfig     *oas.JWT
-		//		claims        jwt.MapClaims
-		//		expectError   bool
-		//		errorContains string
-		//	}{
-		//		{
-		//			name: "valid issuer",
-		//			oasConfig: &oas.JWT{
-		//				AllowedIssuers: []string{"issuer1", "issuer2"},
-		//			},
-		//			claims: jwt.MapClaims{
-		//				"iss": "issuer1",
-		//			},
-		//			expectError: false,
-		//		},
-		//		{
-		//			name: "invalid issuer",
-		//			oasConfig: &oas.JWT{
-		//				AllowedIssuers: []string{"issuer1", "issuer2"},
-		//			},
-		//			claims: jwt.MapClaims{
-		//				"iss": "issuer3",
-		//			},
-		//			expectError:   true,
-		//			errorContains: "invalid issuer claim",
-		//		},
-		//		{
-		//			name: "valid audience string",
-		//			oasConfig: &oas.JWT{
-		//				AllowedAudiences: []string{"aud1", "aud2"},
-		//			},
-		//			claims: jwt.MapClaims{
-		//				"aud": "aud1",
-		//			},
-		//			expectError: false,
-		//		},
-		//		{
-		//			name: "valid audience array",
-		//			oasConfig: &oas.JWT{
-		//				AllowedAudiences: []string{"aud1", "aud2"},
-		//			},
-		//			claims: jwt.MapClaims{
-		//				"aud": []interface{}{"aud3", "aud2"},
-		//			},
-		//			expectError: false,
-		//		},
-		//		{
-		//			name: "invalid audience",
-		//			oasConfig: &oas.JWT{
-		//				AllowedAudiences: []string{"aud1", "aud2"},
-		//			},
-		//			claims: jwt.MapClaims{
-		//				"aud": "aud3",
-		//			},
-		//			expectError:   true,
-		//			errorContains: "no matching audience found",
-		//		},
-		//		{
-		//			name: "valid jti when required",
-		//			oasConfig: &oas.JWT{
-		//				RequireJTI: true,
-		//			},
-		//			claims: jwt.MapClaims{
-		//				"jti": "123",
-		//			},
-		//			expectError: false,
-		//		},
-		//		{
-		//			name: "missing jti when required",
-		//			oasConfig: &oas.JWT{
-		//				RequireJTI: true,
-		//			},
-		//			claims:        jwt.MapClaims{},
-		//			expectError:   true,
-		//			errorContains: "JWT ID (jti) claim is required",
-		//		},
-		//		{
-		//			name: "valid subject",
-		//			oasConfig: &oas.JWT{
-		//				AllowedSubjects: []string{"sub1", "sub2"},
-		//			},
-		//			claims: jwt.MapClaims{
-		//				"sub": "sub1",
-		//			},
-		//			expectError: false,
-		//		},
-		//		{
-		//			name: "invalid subject",
-		//			oasConfig: &oas.JWT{
-		//				AllowedSubjects: []string{"sub1", "sub2"},
-		//			},
-		//			claims: jwt.MapClaims{
-		//				"sub": "sub3",
-		//			},
-		//			expectError:   true,
-		//			errorContains: "invalid subject value",
-		//		},
-		//		{
-		//			name: "valid identity base field",
-		//			oasConfig: &oas.JWT{
-		//				AllowedSubjects:   []string{"user1", "user2"},
-		//				IdentityBaseField: "user_id",
-		//			},
-		//			claims: jwt.MapClaims{
-		//				"user_id": "user1",
-		//			},
-		//			expectError: false,
-		//		},
-		//	}
-		//
-		//	for _, tc := range cases {
-		//		t.Run(tc.name, func(t *testing.T) {
-		//			spec := &APISpec{
-		//				APIDefinition: &apidef.APIDefinition{},
-		//				OAS:          &oas.OAS{},
-		//			}
-		//			spec.OAS.Security = &oas.Security{
-		//				JWT: tc.oasConfig,
-		//			}
-		//
-		//			// Create and sign token
-		//			token := jwt.New(jwt.SigningMethodHS256)
-		//			token.Claims = tc.claims
-		//			signedToken, err := token.SignedString([]byte(secret))
-		//			assert.NoError(t, err)
-		//
-		//			// Create middleware
-		//			jwtMiddleware := &JWTMiddleware{BaseMiddleware: BaseMiddleware{
-		//				Spec: spec,
-		//			}}
-		//
-		//			// Parse token
-		//			parser := jwt.NewParser(jwt.WithoutClaimsValidation())
-		//			parsedToken, err := parser.Parse(signedToken, func(token *jwt.Token) (interface{}, error) {
-		//				return []byte(secret), nil
-		//			})
-		//			assert.NoError(t, err)
-		//
-		//			// Validate claims
-		//			err = jwtMiddleware.validateExtraClaims(parsedToken.Claims, parsedToken)
-		//
-		//			if tc.expectError {
-		//				assert.Error(t, err)
-		//				assert.Contains(t, err.Error(), tc.errorContains)
-		//			} else {
-		//				assert.NoError(t, err)
-		//			}
-		//		})
-		//	}
-		//}
 		spec.OrgID = "default"
 	})[0]
 
