@@ -2,6 +2,7 @@ package gateway
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"strings"
@@ -211,7 +212,7 @@ func (m *MultiAuthMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 	}
 
 	// Fallback error if no auth errors were captured
-	return fmt.Errorf(MsgApiAccessDisallowed), http.StatusUnauthorized
+	return errors.New(MsgApiAccessDisallowed), http.StatusUnauthorized
 }
 
 // setBaseIdentityProvider sets the BaseIdentityProvider in the request context.

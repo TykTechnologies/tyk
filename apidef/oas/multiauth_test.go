@@ -196,7 +196,7 @@ func TestOAS_importMultiAuthentication_MultiAuth(t *testing.T) {
 						},
 						"basicAuth": {
 							Value: &openapi3.SecurityScheme{
-								Type:   "http",  
+								Type:   "http",
 								Scheme: "basic",
 							},
 						},

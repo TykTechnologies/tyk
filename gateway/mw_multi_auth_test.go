@@ -28,7 +28,7 @@ func createMultiAuthOASSpec() string {
 			{
 				"url": "` + TestHttpAny + `"
 			}
-		],
+	],
 		"paths": {
 			"/test": {
 				"get": {
@@ -36,10 +36,10 @@ func createMultiAuthOASSpec() string {
 						"200": {
 							"description": "Success"
 						}
-					}
 				}
 			}
-		},
+		}
+	},
 		"components": {
 			"securitySchemes": {
 				"apiKey": {
@@ -56,8 +56,8 @@ func createMultiAuthOASSpec() string {
 					"scheme": "bearer",
 					"bearerFormat": "JWT"
 				}
-			}
-		},
+		}
+	},
 		"security": [
 			{"apiKey": []},
 			{"basicAuth": []},
@@ -76,9 +76,9 @@ func createMultiAuthOASSpec() string {
 					"value": "/multi-auth-test/",
 					"strip": true
 				}
-			}
 		}
-	}`
+	}
+}`
 }
 
 // createAPIKeySession creates a session for API key authentication
@@ -119,19 +119,19 @@ func createOASFromJSON(jsonSpec string) oas.OAS {
 	if err != nil {
 		panic("Failed to load OAS spec: " + err.Error())
 	}
-	
+
 	err = doc.Validate(context.Background())
 	if err != nil {
 		panic("Failed to validate OAS spec: " + err.Error())
 	}
-	
+
 	oasAPI := oas.OAS{T: *doc}
 	
 	// Set default Tyk extension if not present
 	if oasAPI.GetTykExtension() == nil {
 		oasAPI.SetTykExtension(&oas.XTykAPIGateway{})
 	}
-	
+
 	return oasAPI
 }
 
@@ -144,11 +144,11 @@ func TestMultiAuthMiddleware_OR_ApiKey_Success(t *testing.T) {
 		spec.IsOAS = true
 		spec.OAS = createOASFromJSON(createMultiAuthOASSpec())
 		
-		// Configure MultiAuth to be enabled
+// Configure MultiAuth to be enabled
 		if spec.OAS.GetTykExtension().Server.Authentication == nil {
 			spec.OAS.GetTykExtension().Server.Authentication = &oas.Authentication{}
 		}
-		auth := spec.OAS.GetTykExtension().Server.Authentication
+	auth := spec.OAS.GetTykExtension().Server.Authentication
 		auth.Enabled = true
 		auth.MultiAuth = &oas.MultiAuth{
 			Enabled: true,
@@ -157,7 +157,7 @@ func TestMultiAuthMiddleware_OR_ApiKey_Success(t *testing.T) {
 				{Name: "basic_auth", Schemes: map[string][]string{"basicAuth": {}}},
 			},
 		}
-	})
+})
 
 	// Create API key session
 	apiKey := "test-api-key-12345"
@@ -187,11 +187,11 @@ func TestMultiAuthMiddleware_OR_BasicAuth_Success(t *testing.T) {
 		spec.IsOAS = true
 		spec.OAS = createOASFromJSON(createMultiAuthOASSpec())
 		
-		// Configure MultiAuth to be enabled
+// Configure MultiAuth to be enabled
 		if spec.OAS.GetTykExtension().Server.Authentication == nil {
 			spec.OAS.GetTykExtension().Server.Authentication = &oas.Authentication{}
 		}
-		auth := spec.OAS.GetTykExtension().Server.Authentication
+	auth := spec.OAS.GetTykExtension().Server.Authentication
 		auth.Enabled = true
 		auth.MultiAuth = &oas.MultiAuth{
 			Enabled: true,
@@ -200,7 +200,7 @@ func TestMultiAuthMiddleware_OR_BasicAuth_Success(t *testing.T) {
 				{Name: "basic_auth", Schemes: map[string][]string{"basicAuth": {}}},
 			},
 		}
-	})
+})
 
 	// Create basic auth session
 	username := "testuser"
@@ -236,11 +236,11 @@ func TestMultiAuthMiddleware_OR_Fallback_Success(t *testing.T) {
 		spec.IsOAS = true
 		spec.OAS = createOASFromJSON(createMultiAuthOASSpec())
 		
-		// Configure MultiAuth to be enabled
+// Configure MultiAuth to be enabled
 		if spec.OAS.GetTykExtension().Server.Authentication == nil {
 			spec.OAS.GetTykExtension().Server.Authentication = &oas.Authentication{}
 		}
-		auth := spec.OAS.GetTykExtension().Server.Authentication
+	auth := spec.OAS.GetTykExtension().Server.Authentication
 		auth.Enabled = true
 		auth.MultiAuth = &oas.MultiAuth{
 			Enabled: true,
@@ -249,7 +249,7 @@ func TestMultiAuthMiddleware_OR_Fallback_Success(t *testing.T) {
 				{Name: "basic_auth", Schemes: map[string][]string{"basicAuth": {}}},
 			},
 		}
-	})
+})
 
 	// Create only basic auth session (no API key session)
 	username := "testuser"
@@ -288,11 +288,11 @@ func TestMultiAuthMiddleware_OR_AllFailed(t *testing.T) {
 		spec.IsOAS = true
 		spec.OAS = createOASFromJSON(createMultiAuthOASSpec())
 		
-		// Configure MultiAuth to be enabled
+// Configure MultiAuth to be enabled
 		if spec.OAS.GetTykExtension().Server.Authentication == nil {
 			spec.OAS.GetTykExtension().Server.Authentication = &oas.Authentication{}
 		}
-		auth := spec.OAS.GetTykExtension().Server.Authentication
+	auth := spec.OAS.GetTykExtension().Server.Authentication
 		auth.Enabled = true
 		auth.MultiAuth = &oas.MultiAuth{
 			Enabled: true,
@@ -301,7 +301,7 @@ func TestMultiAuthMiddleware_OR_AllFailed(t *testing.T) {
 				{Name: "basic_auth", Schemes: map[string][]string{"basicAuth": {}}},
 			},
 		}
-	})
+})
 
 	// Test request with no authentication headers (should fail)
 	ts.Run(t, []test.TestCase{
@@ -327,7 +327,7 @@ func TestMultiAuthMiddleware_BackwardCompatibility_SingleAuth(t *testing.T) {
 			{
 				"url": "` + TestHttpAny + `"
 			}
-		],
+	],
 		"paths": {
 			"/test": {
 				"get": {
@@ -335,10 +335,10 @@ func TestMultiAuthMiddleware_BackwardCompatibility_SingleAuth(t *testing.T) {
 						"200": {
 							"description": "Success"
 						}
-					}
 				}
 			}
-		},
+		}
+	},
 		"components": {
 			"securitySchemes": {
 				"apiKey": {
@@ -346,8 +346,8 @@ func TestMultiAuthMiddleware_BackwardCompatibility_SingleAuth(t *testing.T) {
 					"in": "header",
 					"name": "Authorization"
 				}
-			}
-		},
+		}
+	},
 		"security": [
 			{"apiKey": []}
 		],
@@ -364,9 +364,9 @@ func TestMultiAuthMiddleware_BackwardCompatibility_SingleAuth(t *testing.T) {
 					"value": "/single-auth-test/",
 					"strip": true
 				}
-			}
 		}
-	}`
+	}
+}`
 
 	// Load OAS API with single auth (should use existing behavior)
 	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {

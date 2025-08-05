@@ -874,11 +874,11 @@ func (s *OAS) isAuthenticationEmpty() bool {
 	}
 	
 	// Check if any authentication method is configured
-	return auth.MultiAuth == nil && 
-		   len(auth.SecuritySchemes) == 0 &&
-		   auth.HMAC == nil &&
-		   auth.OIDC == nil &&
-		   auth.Custom == nil
+	return auth.MultiAuth == nil &&
+		len(auth.SecuritySchemes) == 0 &&
+		auth.HMAC == nil &&
+		auth.OIDC == nil &&
+		auth.Custom == nil
 }
 
 func resetSecuritySchemes(api *apidef.APIDefinition) {

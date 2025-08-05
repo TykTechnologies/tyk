@@ -28,7 +28,7 @@ func createUserOASSpec() string {
 			{
 				"url": "http://localhost:8181/myoas/"
 			}
-		],
+	],
 		"security": [
 			{
 				"basicAuth": [],
@@ -37,7 +37,7 @@ func createUserOASSpec() string {
 			{
 				"basicAuth": []
 			}
-		],
+	],
 		"paths": {
 			"/get": {
 				"get": {
@@ -45,10 +45,10 @@ func createUserOASSpec() string {
 						"200": {
 							"description": "Success"
 						}
-					}
 				}
 			}
-		},
+		}
+	},
 		"components": {
 			"securitySchemes": {
 				"basicAuth": {
@@ -60,8 +60,8 @@ func createUserOASSpec() string {
 					"in": "header",
 					"name": "Authorization"
 				}
-			}
-		},
+		}
+	},
 		"x-tyk-api-gateway": {
 			"info": {
 				"name": "MyOAS",
@@ -72,7 +72,7 @@ func createUserOASSpec() string {
 					"active": true,
 					"internal": false
 				}
-			},
+		},
 			"upstream": {
 				"url": "` + TestHttpAny + `"
 			},
@@ -93,10 +93,10 @@ func createUserOASSpec() string {
 								"enabled": true,
 								"name": "Authorization"
 							}
-						}
 					}
 				}
-			},
+			}
+		},
 			"middleware": {
 				"global": {
 					"contextVariables": {
@@ -105,10 +105,10 @@ func createUserOASSpec() string {
 					"trafficLogs": {
 						"enabled": true
 					}
-				}
 			}
 		}
-	}`
+	}
+}`
 }
 
 func createUserBasicAuthSession() *user.SessionState {
@@ -136,7 +136,7 @@ func TestUserScenario_BasicAuth_Only_Success(t *testing.T) {
 	if err != nil {
 		t.Fatal("Failed to load OAS spec:", err)
 	}
-	
+
 	oasAPI := oas.OAS{T: *doc}
 	oasAPI.SetTykExtension(oasAPI.GetTykExtension())
 	
@@ -195,7 +195,7 @@ func TestUserScenario_Debug_SecurityRequirements(t *testing.T) {
 	if err != nil {
 		t.Fatal("Failed to load OAS spec:", err)
 	}
-	
+
 	oasAPI := oas.OAS{T: *doc}
 	
 	// Set the Tyk extension properly
@@ -211,11 +211,11 @@ func TestUserScenario_Debug_SecurityRequirements(t *testing.T) {
 		s.OAS = oasAPI
 		spec = s
 		
-		t.Logf("Number of security requirements: %d", len(s.OAS.Security))
+t.Logf("Number of security requirements: %d", len(s.OAS.Security))
 		for i, req := range s.OAS.Security {
 			t.Logf("Security requirement %d: %+v", i, req)
 		}
-		
+
 		// Check if MultiAuth is enabled
 		if auth := s.OAS.GetTykExtension().Server.Authentication; auth != nil {
 			if auth.MultiAuth != nil {
@@ -224,10 +224,10 @@ func TestUserScenario_Debug_SecurityRequirements(t *testing.T) {
 			} else {
 				t.Log("MultiAuth is nil")
 			}
-		} else {
+	} else {
 			t.Log("Authentication is nil")
 		}
-	})
+})
 	
 	// Test the isMultiAuthEnabled function
 	if ts.Gw.isMultiAuthEnabled(spec) {
