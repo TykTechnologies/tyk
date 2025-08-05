@@ -150,6 +150,11 @@ func (m *CertificateCheckMW) extractCertInfo(cert *tls.Certificate) *certInfo {
 	}
 
 	certID := m.computeCertID(cert)
+	if certID == "" {
+		log.Warning("Certificate expiry monitor: Skipping certificate with empty ID (no raw data)")
+		return nil
+	}
+
 	commonName := cert.Leaf.Subject.CommonName
 	hoursUntilExpiry := int(time.Until(cert.Leaf.NotAfter).Hours())
 

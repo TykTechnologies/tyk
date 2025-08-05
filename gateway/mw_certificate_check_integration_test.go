@@ -378,14 +378,11 @@ func TestCertificateCheckMW_Integration_CooldownMechanisms(t *testing.T) {
 		typeName     string // "check" or "event"
 		cooldown     int
 		zeroCooldown bool
-		emptyID      bool
 	}{
-		{"Check Cooldown Respects Configuration", "check", 60, false, false},
-		{"Check Cooldown with Zero Value", "check", 0, true, false},
-		{"Check Cooldown with Empty Certificate ID", "check", 60, false, true},
-		{"Event Cooldown Respects Configuration", "event", 120, false, false},
-		{"Event Cooldown with Zero Value", "event", 0, true, false},
-		{"Event Cooldown with Empty Certificate ID", "event", 120, false, true},
+		{"Check Cooldown Respects Configuration", "check", 60, false},
+		{"Check Cooldown with Zero Value", "check", 0, true},
+		{"Event Cooldown Respects Configuration", "event", 120, false},
+		{"Event Cooldown with Zero Value", "event", 0, true},
 	}
 
 	for _, tc := range tests {
@@ -397,13 +394,8 @@ func TestCertificateCheckMW_Integration_CooldownMechanisms(t *testing.T) {
 				mw.Spec.GlobalConfig.Security.CertificateExpiryMonitor.EventCooldownSeconds = tc.cooldown
 			}
 
-			var certID string
-			if tc.emptyID {
-				certID = ""
-			} else {
-				cert := createIntegrationTestCertificate(15, tc.name+".example.com")
-				certID = mw.computeCertID(cert)
-			}
+			cert := createIntegrationTestCertificate(15, tc.name+".example.com")
+			certID := mw.computeCertID(cert)
 
 			if tc.typeName == "check" {
 				if tc.zeroCooldown {
@@ -411,9 +403,6 @@ func TestCertificateCheckMW_Integration_CooldownMechanisms(t *testing.T) {
 						shouldSkip := mw.shouldCooldown(mw.Spec.GlobalConfig.Security.CertificateExpiryMonitor, certID)
 						assert.False(t, shouldSkip, "Check should always be allowed with zero cooldown")
 					}
-				} else if tc.emptyID {
-					shouldSkip := mw.shouldCooldown(mw.Spec.GlobalConfig.Security.CertificateExpiryMonitor, certID)
-					assert.True(t, shouldSkip, "Empty certID should not be allowed")
 				} else {
 					shouldSkip := mw.shouldCooldown(mw.Spec.GlobalConfig.Security.CertificateExpiryMonitor, certID)
 					assert.False(t, shouldSkip, "First check should be allowed")
@@ -431,9 +420,6 @@ func TestCertificateCheckMW_Integration_CooldownMechanisms(t *testing.T) {
 						shouldFire := mw.shouldFireExpiryEvent(certID, mw.Spec.GlobalConfig.Security.CertificateExpiryMonitor)
 						assert.True(t, shouldFire, "Event should always be allowed with zero cooldown")
 					}
-				} else if tc.emptyID {
-					shouldFire := mw.shouldFireExpiryEvent(certID, mw.Spec.GlobalConfig.Security.CertificateExpiryMonitor)
-					assert.False(t, shouldFire, "Empty certID should not be allowed")
 				} else {
 					shouldFire := mw.shouldFireExpiryEvent(certID, mw.Spec.GlobalConfig.Security.CertificateExpiryMonitor)
 					assert.True(t, shouldFire, "First event should be allowed")
