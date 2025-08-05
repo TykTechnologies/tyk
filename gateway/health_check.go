@@ -172,6 +172,60 @@ func (gw *Gateway) gatherHealthChecks() {
 	allInfos.mux.Unlock()
 }
 
+// helloHandler returns detailed health check information but always with 200 OK status
+// This is the old implementation behavior - detailed response but always 200
+func (gw *Gateway) helloHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		doJSONWrite(w, http.StatusMethodNotAllowed, apiError(http.StatusText(http.StatusMethodNotAllowed)))
+		return
+	}
+
+	checks := gw.getHealthCheckInfo()
+
+	res := HealthCheckResponse{
+		Status:      Pass,
+		Version:     VERSION,
+		Description: "Tyk GW",
+		Details:     checks,
+	}
+
+	var failCount int
+
+	for _, v := range checks {
+		if v.Status == Fail {
+			failCount++
+		}
+	}
+
+	var status HealthCheckStatus
+
+	switch failCount {
+	case 0:
+		status = Pass
+
+	case len(checks):
+		status = Fail
+
+	default:
+		status = Warn
+	}
+
+	res.Status = status
+
+	w.Header().Set("Content-Type", header.ApplicationJSON)
+
+	// If this option is not set, or is explicitly set to false, add the mascot headers
+	if !gw.GetConfig().HideGeneratorHeader {
+		addMascotHeaders(w)
+	}
+
+	w.WriteHeader(http.StatusOK)
+	err := json.NewEncoder(w).Encode(res)
+	if err != nil {
+		mainLog.Warning(fmt.Sprintf("[Hello] Could not encode response, error: %s", err.Error()))
+	}
+}
+
 func (gw *Gateway) liveCheckHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		doJSONWrite(w, http.StatusMethodNotAllowed, apiError(http.StatusText(http.StatusMethodNotAllowed)))
@@ -187,9 +241,26 @@ func (gw *Gateway) liveCheckHandler(w http.ResponseWriter, r *http.Request) {
 		Details:     checks,
 	}
 
-	failCount, criticalFailure := gw.evaluateHealthChecks(checks)
+	var failCount int
 
-	status, httpStatus := gw.determineHealthStatus(failCount, criticalFailure, len(checks))
+	for _, v := range checks {
+		if v.Status == Fail {
+			failCount++
+		}
+	}
+
+	var status HealthCheckStatus
+
+	switch failCount {
+	case 0:
+		status = Pass
+
+	case len(checks):
+		status = Fail
+
+	default:
+		status = Warn
+	}
 
 	res.Status = status
 
@@ -200,11 +271,8 @@ func (gw *Gateway) liveCheckHandler(w http.ResponseWriter, r *http.Request) {
 		addMascotHeaders(w)
 	}
 
-	w.WriteHeader(httpStatus)
-	err := json.NewEncoder(w).Encode(res)
-	if err != nil {
-		mainLog.Warning(fmt.Sprintf("[Liveness] Could not encode response, error: %s", err.Error()))
-	}
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(res)
 }
 
 // readinessHandler is a dedicated endpoint for readiness probes
