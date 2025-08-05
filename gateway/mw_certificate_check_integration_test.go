@@ -12,14 +12,13 @@ import (
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/certs/mock"
 	"github.com/TykTechnologies/tyk/config"
-	"github.com/TykTechnologies/tyk/internal/cache"
 	"github.com/TykTechnologies/tyk/storage"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
 )
 
-// setupIntegrationMW creates a middleware instance for integration testing
-func setupIntegrationMW(t *testing.T, _ bool, certs []*tls.Certificate) *CertificateCheckMW {
+// setupCertificateCheckMWIntegration creates a middleware instance for integration testing
+func setupCertificateCheckMWIntegration(t *testing.T, _ bool, certs []*tls.Certificate) *CertificateCheckMW {
 	ctrl := gomock.NewController(t)
 	mockCertManager := mock.NewMockCertificateManager(ctrl)
 
@@ -30,15 +29,11 @@ func setupIntegrationMW(t *testing.T, _ bool, certs []*tls.Certificate) *Certifi
 			AnyTimes()
 	}
 
-	// Create a cache for testing
-	mockCache := cache.New(3600, 600)
-
 	// Generate unique test prefix for Redis keys to avoid clashes
 	testPrefix := fmt.Sprintf("test-%d-", time.Now().UnixNano())
 
 	gw := &Gateway{
 		CertificateManager: mockCertManager,
-		UtilCache:          mockCache,
 	}
 
 	// Initialize storage connection handler
@@ -208,10 +203,10 @@ func TestCertificateCheckMW_Integration_CoreFunctionality(t *testing.T) {
 		// Create a certificate that expires in 60 days (outside warning threshold)
 		cert := createIntegrationTestCertificate(60, "valid.example.com")
 
-		mw := setupIntegrationMW(t, true, []*tls.Certificate{cert})
+		mw := setupCertificateCheckMWIntegration(t, true, []*tls.Certificate{cert})
 
 		// Test the core expiration checking logic directly
-		mw.checkCertificateExpiration([]*tls.Certificate{cert})
+		mw.checkCertificatesExpiration([]*tls.Certificate{cert})
 
 		// Verify no event was fired (certificate is not expiring soon)
 		// This is tested by ensuring the function completes without error
@@ -221,24 +216,24 @@ func TestCertificateCheckMW_Integration_CoreFunctionality(t *testing.T) {
 		// Create a certificate that expires in 15 days (within warning threshold)
 		cert := createIntegrationTestCertificate(15, "expiring.example.com")
 
-		mw := setupIntegrationMW(t, true, []*tls.Certificate{cert})
+		mw := setupCertificateCheckMWIntegration(t, true, []*tls.Certificate{cert})
 
 		// Test the core expiration checking logic directly
-		mw.checkCertificateExpiration([]*tls.Certificate{cert})
+		mw.checkCertificatesExpiration([]*tls.Certificate{cert})
 
 		// The event firing is tested indirectly through the cooldown mechanism
 		// A second call should not fire the event due to cooldown
-		mw.checkCertificateExpiration([]*tls.Certificate{cert})
+		mw.checkCertificatesExpiration([]*tls.Certificate{cert})
 	})
 
 	t.Run("Critical Certificate - Event Should Be Fired", func(t *testing.T) {
 		// Create a certificate that expires in 5 days (critical)
 		cert := createIntegrationTestCertificate(5, "critical.example.com")
 
-		mw := setupIntegrationMW(t, true, []*tls.Certificate{cert})
+		mw := setupCertificateCheckMWIntegration(t, true, []*tls.Certificate{cert})
 
 		// Test the core expiration checking logic directly
-		mw.checkCertificateExpiration([]*tls.Certificate{cert})
+		mw.checkCertificatesExpiration([]*tls.Certificate{cert})
 	})
 
 	t.Run("Multiple Certificates - Mixed Expiration", func(t *testing.T) {
@@ -250,313 +245,208 @@ func TestCertificateCheckMW_Integration_CoreFunctionality(t *testing.T) {
 		// Create TLS certificates
 		tlsCerts := []*tls.Certificate{validCert, expiringCert, criticalCert}
 
-		mw := setupIntegrationMW(t, true, tlsCerts)
+		mw := setupCertificateCheckMWIntegration(t, true, tlsCerts)
 
 		// Test the core expiration checking logic directly
-		mw.checkCertificateExpiration(tlsCerts)
+		mw.checkCertificatesExpiration(tlsCerts)
 	})
 }
 
-// TestCertificateCheckMW_Integration_Configuration tests different configuration scenarios
+// Consolidated configuration scenarios
 func TestCertificateCheckMW_Integration_Configuration(t *testing.T) {
 	t.Parallel()
 
-	t.Run("Custom Warning Threshold", func(t *testing.T) {
-		// Create a certificate that expires in 45 days
-		cert := createIntegrationTestCertificate(45, "custom.example.com")
+	tests := []struct {
+		name          string
+		certDays      int
+		certName      string
+		warningDays   int
+		checkCooldown int
+		eventCooldown int
+		sleep         time.Duration
+	}{
+		{
+			name:          "Custom Warning Threshold",
+			certDays:      45,
+			certName:      "custom.example.com",
+			warningDays:   60,
+			checkCooldown: 3600,
+			eventCooldown: 86400,
+		},
+		{
+			name:          "Short Cooldown Period",
+			certDays:      15,
+			certName:      "shortcooldown.example.com",
+			warningDays:   30,
+			checkCooldown: 3600,
+			eventCooldown: 1,
+			sleep:         2 * time.Second,
+		},
+	}
 
-		// Create middleware with custom warning threshold
-		ctrl := gomock.NewController(t)
-		mockCertManager := mock.NewMockCertificateManager(ctrl)
-		mockCertManager.EXPECT().
-			List(gomock.Any(), gomock.Any()).
-			Return([]*tls.Certificate{cert}).
-			AnyTimes()
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			cert := createIntegrationTestCertificate(tc.certDays, tc.certName)
+			ctrl := gomock.NewController(t)
+			mockCertManager := mock.NewMockCertificateManager(ctrl)
+			mockCertManager.EXPECT().
+				List(gomock.Any(), gomock.Any()).
+				Return([]*tls.Certificate{cert}).
+				AnyTimes()
 
-		mockCache := cache.New(3600, 600)
-
-		gw := &Gateway{
-			CertificateManager: mockCertManager,
-			UtilCache:          mockCache,
-		}
-
-		// Set the configuration properly
-		gw.SetConfig(config.Config{
-			Security: config.SecurityConfig{
-				Certificates: config.CertificatesConfig{
-					API: []string{"cert2"},
-				},
-				CertificateExpiryMonitor: config.CertificateExpiryMonitorConfig{
-					WarningThresholdDays: 60, // Custom threshold
-					CheckCooldownSeconds: 3600,
-					EventCooldownSeconds: 86400,
-				},
-			},
-		})
-
-		mw := &CertificateCheckMW{
-			BaseMiddleware: &BaseMiddleware{
-				Spec: &APISpec{
-					APIDefinition: &apidef.APIDefinition{
-						UseMutualTLSAuth:   true,
-						ClientCertificates: []string{"cert1"},
+			gw := &Gateway{
+				CertificateManager: mockCertManager,
+			}
+			gw.SetConfig(config.Config{
+				Security: config.SecurityConfig{
+					Certificates: config.CertificatesConfig{
+						API: []string{"cert2"},
 					},
-					GlobalConfig: gw.GetConfig(),
-				},
-				Gw: gw,
-			},
-		}
-
-		// Test the core expiration checking logic directly
-		mw.checkCertificateExpiration([]*tls.Certificate{cert})
-	})
-
-	t.Run("Short Cooldown Period", func(t *testing.T) {
-		// Create a certificate that expires in 15 days
-		cert := createIntegrationTestCertificate(15, "shortcooldown.example.com")
-
-		// Create middleware with short cooldown
-		ctrl := gomock.NewController(t)
-		mockCertManager := mock.NewMockCertificateManager(ctrl)
-		mockCertManager.EXPECT().
-			List(gomock.Any(), gomock.Any()).
-			Return([]*tls.Certificate{cert}).
-			AnyTimes()
-
-		mockCache := cache.New(3600, 600)
-
-		gw := &Gateway{
-			CertificateManager: mockCertManager,
-			UtilCache:          mockCache,
-		}
-
-		// Set the configuration properly
-		gw.SetConfig(config.Config{
-			Security: config.SecurityConfig{
-				Certificates: config.CertificatesConfig{
-					API: []string{"cert2"},
-				},
-				CertificateExpiryMonitor: config.CertificateExpiryMonitorConfig{
-					WarningThresholdDays: 30,
-					CheckCooldownSeconds: 3600,
-					EventCooldownSeconds: 1, // Very short cooldown for testing
-				},
-			},
-		})
-
-		mw := &CertificateCheckMW{
-			BaseMiddleware: &BaseMiddleware{
-				Spec: &APISpec{
-					APIDefinition: &apidef.APIDefinition{
-						UseMutualTLSAuth:   true,
-						ClientCertificates: []string{"cert1"},
+					CertificateExpiryMonitor: config.CertificateExpiryMonitorConfig{
+						WarningThresholdDays: tc.warningDays,
+						CheckCooldownSeconds: tc.checkCooldown,
+						EventCooldownSeconds: tc.eventCooldown,
 					},
-					GlobalConfig: gw.GetConfig(),
 				},
-				Gw: gw,
-			},
-		}
+			})
 
-		// First call
-		mw.checkCertificateExpiration([]*tls.Certificate{cert})
+			mw := &CertificateCheckMW{
+				BaseMiddleware: &BaseMiddleware{
+					Spec: &APISpec{
+						APIDefinition: &apidef.APIDefinition{
+							UseMutualTLSAuth:   true,
+							ClientCertificates: []string{"cert1"},
+						},
+						GlobalConfig: gw.GetConfig(),
+					},
+					Gw: gw,
+				},
+			}
 
-		// Wait for cooldown to expire
-		time.Sleep(2 * time.Second)
-
-		// Second call - should fire event again due to short cooldown
-		mw.checkCertificateExpiration([]*tls.Certificate{cert})
-	})
+			mw.checkCertificatesExpiration([]*tls.Certificate{cert})
+			if tc.sleep > 0 {
+				time.Sleep(tc.sleep)
+				mw.checkCertificatesExpiration([]*tls.Certificate{cert})
+			}
+		})
+	}
 }
 
-// TestCertificateCheckMW_Integration_ErrorScenarios tests error scenarios
+// Consolidated error scenarios
 func TestCertificateCheckMW_Integration_ErrorScenarios(t *testing.T) {
 	t.Parallel()
 
-	t.Run("Expired Certificate", func(t *testing.T) {
-		// Create a certificate that has already expired
-		cert := createIntegrationTestCertificate(-1, "expired.example.com")
+	tests := []struct {
+		name     string
+		cert     *tls.Certificate
+		certList []*tls.Certificate
+	}{
+		{
+			name: "Expired Certificate",
+			cert: createIntegrationTestCertificate(-1, "expired.example.com"),
+		},
+		{
+			name:     "Nil Certificate",
+			certList: []*tls.Certificate{nil},
+		},
+		{
+			name: "Certificate with Nil Leaf",
+			cert: &tls.Certificate{Leaf: nil},
+		},
+	}
 
-		mw := setupIntegrationMW(t, true, []*tls.Certificate{cert})
-
-		// Test the core expiration checking logic directly
-		mw.checkCertificateExpiration([]*tls.Certificate{cert})
-	})
-
-	t.Run("Nil Certificate", func(t *testing.T) {
-		mw := setupIntegrationMW(t, true, nil)
-
-		// Test with nil certificate
-		mw.checkCertificateExpiration([]*tls.Certificate{nil})
-	})
-
-	t.Run("Certificate with Nil Leaf", func(t *testing.T) {
-		cert := &tls.Certificate{
-			Leaf: nil, // Nil leaf
-		}
-
-		mw := setupIntegrationMW(t, true, []*tls.Certificate{cert})
-
-		// Test with certificate that has nil leaf
-		mw.checkCertificateExpiration([]*tls.Certificate{cert})
-	})
-}
-
-// TestCertificateCheckMW_Integration_Performance tests performance characteristics
-func TestCertificateCheckMW_Integration_Performance(t *testing.T) {
-	t.Parallel()
-
-	t.Run("Multiple Certificates Processing", func(t *testing.T) {
-		// Create multiple certificates
-		certs := []*tls.Certificate{
-			createIntegrationTestCertificate(60, "cert1.example.com"),
-			createIntegrationTestCertificate(15, "cert2.example.com"),
-			createIntegrationTestCertificate(5, "cert3.example.com"),
-			createIntegrationTestCertificate(90, "cert4.example.com"),
-			createIntegrationTestCertificate(30, "cert5.example.com"),
-		}
-
-		mw := setupIntegrationMW(t, true, certs)
-
-		// Process multiple certificates
-		for i := 0; i < 10; i++ {
-			mw.checkCertificateExpiration(certs)
-		}
-	})
-
-	t.Run("Large Certificate Processing", func(t *testing.T) {
-		// Create a certificate with large extensions
-		cert := createIntegrationTestCertificate(30, "large.example.com")
-
-		// Add large extensions to simulate complex certificates
-		cert.Leaf.Extensions = append(cert.Leaf.Extensions, pkix.Extension{
-			Id:    []int{1, 2, 3, 4, 5},
-			Value: make([]byte, 1000), // Large extension
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			var certs []*tls.Certificate
+			if tc.certList != nil {
+				certs = tc.certList
+			} else {
+				certs = []*tls.Certificate{tc.cert}
+			}
+			mw := setupCertificateCheckMWIntegration(t, true, certs)
+			mw.checkCertificatesExpiration(certs)
 		})
-
-		mw := setupIntegrationMW(t, true, []*tls.Certificate{cert})
-
-		// Process large certificate
-		mw.checkCertificateExpiration([]*tls.Certificate{cert})
-	})
+	}
 }
 
-// TestCertificateCheckMW_Integration_HelperMethods tests the helper methods in integration context
-func TestCertificateCheckMW_Integration_HelperMethods(t *testing.T) {
+// Consolidated cooldown mechanism tests
+func TestCertificateCheckMW_Integration_CooldownMechanisms(t *testing.T) {
 	t.Parallel()
 
-	mw := setupIntegrationMW(t, true, nil)
+	tests := []struct {
+		name         string
+		typeName     string // "check" or "event"
+		cooldown     int
+		zeroCooldown bool
+		emptyID      bool
+	}{
+		{"Check Cooldown Respects Configuration", "check", 60, false, false},
+		{"Check Cooldown with Zero Value", "check", 0, true, false},
+		{"Check Cooldown with Empty Certificate ID", "check", 60, false, true},
+		{"Event Cooldown Respects Configuration", "event", 120, false, false},
+		{"Event Cooldown with Zero Value", "event", 0, true, false},
+		{"Event Cooldown with Empty Certificate ID", "event", 120, false, true},
+	}
 
-	// Test certificate ID generation
-	cert := createIntegrationTestCertificate(30, "helper-test.example.com")
-	certID := mw.generateCertificateID(cert)
-	assert.NotEmpty(t, certID)
-	assert.Len(t, certID, 64) // SHA256 hash length
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			mw := setupCertificateCheckMWIntegration(t, true, nil)
+			if tc.typeName == "check" {
+				mw.Spec.GlobalConfig.Security.CertificateExpiryMonitor.CheckCooldownSeconds = tc.cooldown
+			} else {
+				mw.Spec.GlobalConfig.Security.CertificateExpiryMonitor.EventCooldownSeconds = tc.cooldown
+			}
 
-	// Test with nil certificate
-	nilCertID := mw.generateCertificateID(nil)
-	assert.Empty(t, nilCertID)
+			var certID string
+			if tc.emptyID {
+				certID = ""
+			} else {
+				cert := createIntegrationTestCertificate(15, tc.name+".example.com")
+				certID = mw.generateCertificateID(cert)
+			}
 
-	// Test with certificate that has nil Leaf
-	certWithNilLeaf := &tls.Certificate{}
-	nilLeafCertID := mw.generateCertificateID(certWithNilLeaf)
-	assert.Empty(t, nilLeafCertID)
-}
-
-// TestCertificateCheckMW_Integration_CheckCooldown tests the check cooldown mechanism in integration context
-func TestCertificateCheckMW_Integration_CheckCooldown(t *testing.T) {
-	t.Parallel()
-
-	t.Run("Check Cooldown Respects Configuration", func(t *testing.T) {
-		// Create middleware with short check cooldown for testing
-		mw := setupIntegrationMW(t, true, nil)
-		mw.Spec.GlobalConfig.Security.CertificateExpiryMonitor.CheckCooldownSeconds = 60 // 1 minute
-
-		cert := createIntegrationTestCertificate(15, "cooldown-test.example.com")
-		certID := mw.generateCertificateID(cert)
-
-		// First check should be allowed
-		shouldSkip := mw.shouldSkipCertificate(certID, mw.Spec.GlobalConfig.Security.CertificateExpiryMonitor)
-		assert.False(t, shouldSkip, "First check should be allowed")
-
-		// Second check should be blocked by cooldown
-		shouldSkip = mw.shouldSkipCertificate(certID, mw.Spec.GlobalConfig.Security.CertificateExpiryMonitor)
-		assert.True(t, shouldSkip, "Second check should be blocked by cooldown")
-
-		// Different certificate should still be allowed
-		differentCert := createIntegrationTestCertificate(15, "different-cooldown-test.example.com")
-		differentCertID := mw.generateCertificateID(differentCert)
-		shouldSkip = mw.shouldSkipCertificate(differentCertID, mw.Spec.GlobalConfig.Security.CertificateExpiryMonitor)
-		assert.False(t, shouldSkip, "Different certificate should be allowed")
-	})
-
-	t.Run("Check Cooldown with Zero Value", func(t *testing.T) {
-		mw := setupIntegrationMW(t, true, nil)
-		mw.Spec.GlobalConfig.Security.CertificateExpiryMonitor.CheckCooldownSeconds = 0 // No cooldown
-
-		cert := createIntegrationTestCertificate(15, "zero-cooldown-test.example.com")
-		certID := mw.generateCertificateID(cert)
-
-		// Multiple checks should always be allowed with zero cooldown
-		for i := 0; i < 5; i++ {
-			shouldSkip := mw.shouldSkipCertificate(certID, mw.Spec.GlobalConfig.Security.CertificateExpiryMonitor)
-			assert.False(t, shouldSkip, "Check should always be allowed with zero cooldown")
-		}
-	})
-
-	t.Run("Check Cooldown with Empty Certificate ID", func(t *testing.T) {
-		mw := setupIntegrationMW(t, true, nil)
-
-		// Empty certID should not be allowed
-		shouldSkip := mw.shouldSkipCertificate("", mw.Spec.GlobalConfig.Security.CertificateExpiryMonitor)
-		assert.True(t, shouldSkip, "Empty certID should not be allowed")
-	})
-}
-
-// TestCertificateCheckMW_Integration_EventCooldown tests the event cooldown mechanism in integration context
-func TestCertificateCheckMW_Integration_EventCooldown(t *testing.T) {
-	t.Parallel()
-
-	t.Run("Event Cooldown Respects Configuration", func(t *testing.T) {
-		// Create middleware with short event cooldown for testing
-		mw := setupIntegrationMW(t, true, nil)
-		mw.Spec.GlobalConfig.Security.CertificateExpiryMonitor.EventCooldownSeconds = 120 // 2 minutes
-
-		certID := "event-cooldown-test-cert-id"
-
-		// First event should be allowed
-		shouldFire := mw.shouldFireExpiryEvent(certID, mw.Spec.GlobalConfig.Security.CertificateExpiryMonitor)
-		assert.True(t, shouldFire, "First event should be allowed")
-
-		// Second event should be blocked by cooldown
-		shouldFire = mw.shouldFireExpiryEvent(certID, mw.Spec.GlobalConfig.Security.CertificateExpiryMonitor)
-		assert.False(t, shouldFire, "Second event should be blocked by cooldown")
-
-		// Different certificate should still be allowed
-		differentCertID := "different-event-cooldown-test-cert-id"
-		shouldFire = mw.shouldFireExpiryEvent(differentCertID, mw.Spec.GlobalConfig.Security.CertificateExpiryMonitor)
-		assert.True(t, shouldFire, "Different certificate should be allowed")
-	})
-
-	t.Run("Event Cooldown with Zero Value", func(t *testing.T) {
-		mw := setupIntegrationMW(t, true, nil)
-		mw.Spec.GlobalConfig.Security.CertificateExpiryMonitor.EventCooldownSeconds = 0 // No cooldown
-
-		certID := "zero-event-cooldown-test-cert-id"
-
-		// Multiple events should always be allowed with zero cooldown
-		for i := 0; i < 5; i++ {
-			shouldFire := mw.shouldFireExpiryEvent(certID, mw.Spec.GlobalConfig.Security.CertificateExpiryMonitor)
-			assert.True(t, shouldFire, "Event should always be allowed with zero cooldown")
-		}
-	})
-
-	t.Run("Event Cooldown with Empty Certificate ID", func(t *testing.T) {
-		mw := setupIntegrationMW(t, true, nil)
-
-		// Empty certID should not be allowed
-		shouldFire := mw.shouldFireExpiryEvent("", mw.Spec.GlobalConfig.Security.CertificateExpiryMonitor)
-		assert.False(t, shouldFire, "Empty certID should not be allowed")
-	})
+			if tc.typeName == "check" {
+				if tc.zeroCooldown {
+					for i := 0; i < 5; i++ {
+						shouldSkip := mw.shouldSkipCertificate(certID, mw.Spec.GlobalConfig.Security.CertificateExpiryMonitor)
+						assert.False(t, shouldSkip, "Check should always be allowed with zero cooldown")
+					}
+				} else if tc.emptyID {
+					shouldSkip := mw.shouldSkipCertificate(certID, mw.Spec.GlobalConfig.Security.CertificateExpiryMonitor)
+					assert.True(t, shouldSkip, "Empty certID should not be allowed")
+				} else {
+					shouldSkip := mw.shouldSkipCertificate(certID, mw.Spec.GlobalConfig.Security.CertificateExpiryMonitor)
+					assert.False(t, shouldSkip, "First check should be allowed")
+					shouldSkip = mw.shouldSkipCertificate(certID, mw.Spec.GlobalConfig.Security.CertificateExpiryMonitor)
+					assert.True(t, shouldSkip, "Second check should be blocked by cooldown")
+					// Different certificate
+					differentCert := createIntegrationTestCertificate(15, "different-"+tc.name+".example.com")
+					differentCertID := mw.generateCertificateID(differentCert)
+					shouldSkip = mw.shouldSkipCertificate(differentCertID, mw.Spec.GlobalConfig.Security.CertificateExpiryMonitor)
+					assert.False(t, shouldSkip, "Different certificate should be allowed")
+				}
+			} else {
+				if tc.zeroCooldown {
+					for i := 0; i < 5; i++ {
+						shouldFire := mw.shouldFireExpiryEvent(certID, mw.Spec.GlobalConfig.Security.CertificateExpiryMonitor)
+						assert.True(t, shouldFire, "Event should always be allowed with zero cooldown")
+					}
+				} else if tc.emptyID {
+					shouldFire := mw.shouldFireExpiryEvent(certID, mw.Spec.GlobalConfig.Security.CertificateExpiryMonitor)
+					assert.False(t, shouldFire, "Empty certID should not be allowed")
+				} else {
+					shouldFire := mw.shouldFireExpiryEvent(certID, mw.Spec.GlobalConfig.Security.CertificateExpiryMonitor)
+					assert.True(t, shouldFire, "First event should be allowed")
+					shouldFire = mw.shouldFireExpiryEvent(certID, mw.Spec.GlobalConfig.Security.CertificateExpiryMonitor)
+					assert.False(t, shouldFire, "Second event should be blocked by cooldown")
+					// Different certificate
+					differentCertID := "different-" + tc.name + "-id"
+					shouldFire = mw.shouldFireExpiryEvent(differentCertID, mw.Spec.GlobalConfig.Security.CertificateExpiryMonitor)
+					assert.True(t, shouldFire, "Different certificate should be allowed")
+				}
+			}
+		})
+	}
 }
 
 // TestCertificateCheckMW_Integration_CooldownIntegration tests both cooldown mechanisms working together
@@ -564,7 +454,7 @@ func TestCertificateCheckMW_Integration_CooldownIntegration(t *testing.T) {
 	t.Parallel()
 
 	t.Run("Both Cooldowns Work Together", func(t *testing.T) {
-		mw := setupIntegrationMW(t, true, nil)
+		mw := setupCertificateCheckMWIntegration(t, true, nil)
 		// Set short cooldowns for testing
 		mw.Spec.GlobalConfig.Security.CertificateExpiryMonitor.CheckCooldownSeconds = 60  // 1 minute
 		mw.Spec.GlobalConfig.Security.CertificateExpiryMonitor.EventCooldownSeconds = 120 // 2 minutes
@@ -596,7 +486,7 @@ func TestCertificateCheckMW_Integration_CooldownIntegration(t *testing.T) {
 	})
 
 	t.Run("Different Certificates Are Independent", func(t *testing.T) {
-		mw := setupIntegrationMW(t, true, nil)
+		mw := setupCertificateCheckMWIntegration(t, true, nil)
 		mw.Spec.GlobalConfig.Security.CertificateExpiryMonitor.CheckCooldownSeconds = 60
 		mw.Spec.GlobalConfig.Security.CertificateExpiryMonitor.EventCooldownSeconds = 120
 
@@ -670,7 +560,7 @@ func TestCertificateCheckMW_Integration_EndToEndCooldown(t *testing.T) {
 
 	t.Run("End-to-End Cooldown Behavior", func(t *testing.T) {
 		// Create middleware with short cooldowns for testing
-		mw := setupIntegrationMW(t, true, nil)
+		mw := setupCertificateCheckMWIntegration(t, true, nil)
 		mw.Spec.GlobalConfig.Security.CertificateExpiryMonitor.CheckCooldownSeconds = 60
 		mw.Spec.GlobalConfig.Security.CertificateExpiryMonitor.EventCooldownSeconds = 120
 		mw.Spec.GlobalConfig.Security.CertificateExpiryMonitor.WarningThresholdDays = 30
@@ -680,20 +570,20 @@ func TestCertificateCheckMW_Integration_EndToEndCooldown(t *testing.T) {
 
 		// First call to checkCertificateExpiration should process the certificate
 		// and potentially fire an event
-		mw.checkCertificateExpiration([]*tls.Certificate{cert})
+		mw.checkCertificatesExpiration([]*tls.Certificate{cert})
 
 		// Second call should skip the certificate due to check cooldown
-		mw.checkCertificateExpiration([]*tls.Certificate{cert})
+		mw.checkCertificatesExpiration([]*tls.Certificate{cert})
 
 		// Third call should also skip due to check cooldown
-		mw.checkCertificateExpiration([]*tls.Certificate{cert})
+		mw.checkCertificatesExpiration([]*tls.Certificate{cert})
 
 		// The function should complete without errors even when cooldowns are active
 		// This tests that the cooldown logic doesn't break the main flow
 	})
 
 	t.Run("End-to-End with Multiple Certificates", func(t *testing.T) {
-		mw := setupIntegrationMW(t, true, nil)
+		mw := setupCertificateCheckMWIntegration(t, true, nil)
 		mw.Spec.GlobalConfig.Security.CertificateExpiryMonitor.CheckCooldownSeconds = 60
 		mw.Spec.GlobalConfig.Security.CertificateExpiryMonitor.EventCooldownSeconds = 120
 		mw.Spec.GlobalConfig.Security.CertificateExpiryMonitor.WarningThresholdDays = 30
@@ -706,12 +596,73 @@ func TestCertificateCheckMW_Integration_EndToEndCooldown(t *testing.T) {
 		certs := []*tls.Certificate{cert1, cert2, cert3}
 
 		// First call should process all certificates
-		mw.checkCertificateExpiration(certs)
+		mw.checkCertificatesExpiration(certs)
 
 		// Second call should skip cert1 and cert2 due to check cooldown
 		// but cert3 should still be processed (though it won't trigger events)
-		mw.checkCertificateExpiration(certs)
+		mw.checkCertificatesExpiration(certs)
 
 		// The function should complete without errors
 	})
+}
+
+// TestCertificateCheckMW_Integration_Performance tests performance characteristics
+func TestCertificateCheckMW_Integration_Performance(t *testing.T) {
+	t.Parallel()
+
+	t.Run("Multiple Certificates Processing", func(t *testing.T) {
+		// Create multiple certificates
+		certs := []*tls.Certificate{
+			createIntegrationTestCertificate(60, "cert1.example.com"),
+			createIntegrationTestCertificate(15, "cert2.example.com"),
+			createIntegrationTestCertificate(5, "cert3.example.com"),
+			createIntegrationTestCertificate(90, "cert4.example.com"),
+			createIntegrationTestCertificate(30, "cert5.example.com"),
+		}
+
+		mw := setupCertificateCheckMWIntegration(t, true, certs)
+
+		// Process multiple certificates
+		for i := 0; i < 10; i++ {
+			mw.checkCertificatesExpiration(certs)
+		}
+	})
+
+	t.Run("Large Certificate Processing", func(t *testing.T) {
+		// Create a certificate with large extensions
+		cert := createIntegrationTestCertificate(30, "large.example.com")
+
+		// Add large extensions to simulate complex certificates
+		cert.Leaf.Extensions = append(cert.Leaf.Extensions, pkix.Extension{
+			Id:    []int{1, 2, 3, 4, 5},
+			Value: make([]byte, 1000), // Large extension
+		})
+
+		mw := setupCertificateCheckMWIntegration(t, true, []*tls.Certificate{cert})
+
+		// Process large certificate
+		mw.checkCertificatesExpiration([]*tls.Certificate{cert})
+	})
+}
+
+// TestCertificateCheckMW_Integration_HelperMethods tests the helper methods in integration context
+func TestCertificateCheckMW_Integration_HelperMethods(t *testing.T) {
+	t.Parallel()
+
+	mw := setupCertificateCheckMWIntegration(t, true, nil)
+
+	// Test certificate ID generation
+	cert := createIntegrationTestCertificate(30, "helper-test.example.com")
+	certID := mw.generateCertificateID(cert)
+	assert.NotEmpty(t, certID)
+	assert.Len(t, certID, 64) // SHA256 hash length
+
+	// Test with nil certificate
+	nilCertID := mw.generateCertificateID(nil)
+	assert.Empty(t, nilCertID)
+
+	// Test with certificate that has nil Leaf
+	certWithNilLeaf := &tls.Certificate{}
+	nilLeafCertID := mw.generateCertificateID(certWithNilLeaf)
+	assert.Empty(t, nilLeafCertID)
 }
