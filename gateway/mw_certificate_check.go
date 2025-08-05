@@ -59,6 +59,7 @@ func (m *CertificateCheckMW) ProcessRequest(w http.ResponseWriter, r *http.Reque
 				KeyPrefix:         "cert-cooldown:",
 				ConnectionHandler: m.Gw.StorageConnectionHandler,
 			}
+
 			m.store.Connect()
 		}
 
@@ -116,12 +117,12 @@ func (m *CertificateCheckMW) checkCertificate(cert *tls.Certificate, monitorConf
 
 	// Check if we should skip this certificate based on check cooldown
 	if m.shouldSkipCertificate(certInfo.ID, monitorConfig) {
-		m.logSkipDueToCooldown(certInfo)
+		log.Debugf("Certificate expiry monitor: Skipping check for certificate '%s' due to cooldown (ID: %s...)", certInfo.CommonName, certInfo.ID[:8])
 		return
 	}
 
 	// Log the certificate being checked for debugging purposes
-	m.logCertificateCheck(certInfo)
+	log.Debugf("Certificate expiry monitor: Checking certificate '%s' - Hours until expiry: %d", certInfo.CommonName, certInfo.HoursUntilExpiry)
 
 	// Process certificate based on its expiry status
 	m.processCertificateByStatus(certInfo, monitorConfig)
@@ -154,22 +155,14 @@ func (m *CertificateCheckMW) extractCertInfo(cert *tls.Certificate) *certInfo {
 		CommonName:       commonName,
 		HoursUntilExpiry: hoursUntilExpiry,
 		IsExpired:        hoursUntilExpiry < 0,
-		IsExpiringSoon:   hoursUntilExpiry >= 0 && hoursUntilExpiry <= m.Gw.GetConfig().Security.CertificateExpiryMonitor.WarningThresholdDays*24,
+		IsExpiringSoon:   m.isCertificateExpiringSoon(hoursUntilExpiry),
 	}
 }
 
-// logSkipDueToCooldown logs when a certificate check is skipped due to cooldown
-func (m *CertificateCheckMW) logSkipDueToCooldown(certInfo *certInfo) {
-	if certInfo.ID != "" {
-		log.Debugf("Certificate expiry monitor: Skipping check for certificate '%s' due to cooldown (ID: %s...)", certInfo.CommonName, certInfo.ID[:8])
-	} else {
-		log.Debugf("Certificate expiry monitor: Skipping check for certificate '%s' due to cooldown (ID: empty)", certInfo.CommonName)
-	}
-}
-
-// logCertificateCheck logs the certificate being checked
-func (m *CertificateCheckMW) logCertificateCheck(certInfo *certInfo) {
-	log.Debugf("Certificate expiry monitor: Checking certificate '%s' - Hours until expiry: %d", certInfo.CommonName, certInfo.HoursUntilExpiry)
+// isCertificateExpiringSoon checks if a certificate is expiring within the configured warning threshold
+func (m *CertificateCheckMW) isCertificateExpiringSoon(hoursUntilExpiry int) bool {
+	warningThresholdHours := m.Gw.GetConfig().Security.CertificateExpiryMonitor.WarningThresholdDays * 24
+	return hoursUntilExpiry >= 0 && hoursUntilExpiry <= warningThresholdHours
 }
 
 // processCertificateByStatus processes the certificate based on its expiry status
@@ -186,50 +179,25 @@ func (m *CertificateCheckMW) processCertificateByStatus(certInfo *certInfo, moni
 
 // handleExpiredCertificate handles certificates that have already expired
 func (m *CertificateCheckMW) handleExpiredCertificate(certInfo *certInfo) {
-	if certInfo.ID != "" {
-		log.Warningf("Certificate expiry monitor: CRITICAL - Certificate '%s' has EXPIRED (ID: %s...)", certInfo.CommonName, certInfo.ID[:8])
-	} else {
-		log.Warningf("Certificate expiry monitor: CRITICAL - Certificate '%s' has EXPIRED (ID: empty)", certInfo.CommonName)
-	}
+	log.Warningf("Certificate expiry monitor: CRITICAL - Certificate '%s' has EXPIRED (ID: %s...)", certInfo.CommonName, certInfo.ID[:8])
 }
 
 // handleExpiringSoonCertificate handles certificates that are expiring soon
 func (m *CertificateCheckMW) handleExpiringSoonCertificate(certInfo *certInfo, monitorConfig config.CertificateExpiryMonitorConfig) {
 	log.Infof("Certificate expiry monitor: Certificate '%s' is expiring soon (%d hours remaining) - checking event cooldown", certInfo.CommonName, certInfo.HoursUntilExpiry)
 
-	if m.shouldFireExpiryEvent(certInfo.ID, monitorConfig) {
-		m.fireCertificateExpiringSoonEvent(certInfo.Certificate, certInfo.HoursUntilExpiry)
-		m.logExpiryEventFired(certInfo)
-	} else {
-		m.logExpiryEventSuppressed(certInfo)
+	if !m.shouldFireExpiryEvent(certInfo.ID, monitorConfig) {
+		log.Debugf("Certificate expiry monitor: Event suppressed for certificate '%s' due to cooldown (ID: %s...)", certInfo.CommonName, certInfo.ID[:8])
+		return
 	}
+
+	m.fireCertificateExpiringSoonEvent(certInfo.Certificate, certInfo.HoursUntilExpiry)
+	log.Infof("Certificate expiry monitor: EXPIRY EVENT FIRED for certificate '%s' - expires in %d hours (ID: %s...)", certInfo.CommonName, certInfo.HoursUntilExpiry, certInfo.ID[:8])
 }
 
 // handleHealthyCertificate handles certificates that are healthy
 func (m *CertificateCheckMW) handleHealthyCertificate(certInfo *certInfo) {
-	if certInfo.ID != "" {
-		log.Debugf("Certificate expiry monitor: Certificate '%s' is healthy - expires in %d hours (ID: %s...)", certInfo.CommonName, certInfo.HoursUntilExpiry, certInfo.ID[:8])
-	} else {
-		log.Debugf("Certificate expiry monitor: Certificate '%s' is healthy - expires in %d hours (ID: empty)", certInfo.CommonName, certInfo.HoursUntilExpiry)
-	}
-}
-
-// logExpiryEventFired logs when an expiry event is fired
-func (m *CertificateCheckMW) logExpiryEventFired(certInfo *certInfo) {
-	if certInfo.ID != "" {
-		log.Infof("Certificate expiry monitor: EXPIRY EVENT FIRED for certificate '%s' - expires in %d hours (ID: %s...)", certInfo.CommonName, certInfo.HoursUntilExpiry, certInfo.ID[:8])
-	} else {
-		log.Infof("Certificate expiry monitor: EXPIRY EVENT FIRED for certificate '%s' - expires in %d hours (ID: empty)", certInfo.CommonName, certInfo.HoursUntilExpiry)
-	}
-}
-
-// logExpiryEventSuppressed logs when an expiry event is suppressed due to cooldown
-func (m *CertificateCheckMW) logExpiryEventSuppressed(certInfo *certInfo) {
-	if certInfo.ID != "" {
-		log.Debugf("Certificate expiry monitor: Event suppressed for certificate '%s' due to cooldown (ID: %s...)", certInfo.CommonName, certInfo.ID[:8])
-	} else {
-		log.Debugf("Certificate expiry monitor: Event suppressed for certificate '%s' due to cooldown (ID: empty)", certInfo.CommonName)
-	}
+	log.Debugf("Certificate expiry monitor: Certificate '%s' is healthy - expires in %d hours (ID: %s...)", certInfo.CommonName, certInfo.HoursUntilExpiry, certInfo.ID[:8])
 }
 
 // generateCertificateID generates a unique ID for the certificate with caching to avoid repeated hashing
