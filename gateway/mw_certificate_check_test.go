@@ -304,7 +304,7 @@ func TestCertificateCheckMW_HelperMethods(t *testing.T) {
 	}
 	certID = mw.generateCertificateID(validCert)
 	assert.NotEmpty(t, certID)
-	assert.Len(t, certID, 40) // SHA1 hash is 20 bytes = 40 hex chars
+	assert.Len(t, certID, 64) // SHA256 hash is 32 bytes = 64 hex chars
 
 	// Test shouldFireEvent with empty certID
 	monitorConfig := config.CertificateExpiryMonitorConfig{
