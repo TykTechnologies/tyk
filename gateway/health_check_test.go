@@ -512,6 +512,105 @@ func TestGateway_isCriticalFailure(t *testing.T) {
 	}
 }
 
+func TestGateway_isCriticalFailureForLiveness(t *testing.T) {
+	tests := []struct {
+		name           string
+		component      string
+		check          HealthCheckItem
+		setupConfig    func(*config.Config)
+		setupFunc      func(*testing.T)
+		expectedResult bool
+	}{
+		{
+			name:      "redis component is NOT critical for liveness",
+			component: "redis",
+			check: HealthCheckItem{
+				Status:        Fail,
+				ComponentType: Datastore,
+			},
+			setupConfig:    func(_ *config.Config) {},
+			expectedResult: false,
+		},
+		{
+			name:      "dashboard component is critical for liveness when UseDBAppConfigs is enabled",
+			component: "dashboard",
+			check: HealthCheckItem{
+				Status:        Fail,
+				ComponentType: System,
+			},
+			setupConfig: func(conf *config.Config) {
+				conf.UseDBAppConfigs = true
+			},
+			expectedResult: true,
+		},
+		{
+			name:      "dashboard component is not critical for liveness when UseDBAppConfigs is disabled",
+			component: "dashboard",
+			check: HealthCheckItem{
+				Status:        Fail,
+				ComponentType: System,
+			},
+			setupConfig: func(conf *config.Config) {
+				conf.UseDBAppConfigs = false
+			},
+			expectedResult: false,
+		},
+		{
+			name:      "rpc component is critical for liveness when PolicySource is rpc",
+			component: "rpc",
+			check: HealthCheckItem{
+				Status:        Fail,
+				ComponentType: System,
+			},
+			setupConfig: func(conf *config.Config) {
+				conf.Policies.PolicySource = "rpc"
+			},
+			expectedResult: true,
+		},
+		{
+			name:      "rpc component is not critical for liveness when PolicySource is file",
+			component: "rpc",
+			check: HealthCheckItem{
+				Status:        Fail,
+				ComponentType: System,
+			},
+			setupConfig: func(conf *config.Config) {
+				conf.Policies.PolicySource = "file"
+			},
+			expectedResult: false,
+		},
+		{
+			name:      "unknown component is not critical for liveness",
+			component: "custom",
+			check: HealthCheckItem{
+				Status:        Fail,
+				ComponentType: System,
+			},
+			setupConfig:    func(_ *config.Config) {},
+			expectedResult: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			conf := config.Config{}
+			tt.setupConfig(&conf)
+
+			if tt.setupFunc != nil {
+				tt.setupFunc(t)
+			}
+
+			gw := NewGateway(conf, nil)
+
+			// Call the function under test
+			result := gw.isCriticalFailureForLiveness(tt.component)
+
+			// Assert the result
+			assert.Equal(t, tt.expectedResult, result)
+		})
+	}
+}
+
 func TestGateway_evaluateHealthChecks(t *testing.T) {
 	tests := []struct {
 		name                    string
@@ -702,6 +801,144 @@ func TestGateway_evaluateHealthChecks(t *testing.T) {
 
 			// Call the function under test
 			failCount, criticalFailure := gw.evaluateHealthChecks(tt.checks)
+
+			// Assert the results
+			assert.Equal(t, tt.expectedFailCount, failCount)
+			assert.Equal(t, tt.expectedCriticalFailure, criticalFailure)
+		})
+	}
+}
+
+func TestGateway_evaluateHealthChecksForLiveness(t *testing.T) {
+	tests := []struct {
+		name                    string
+		checks                  map[string]HealthCheckItem
+		setupConfig             func(*config.Config)
+		expectedFailCount       int
+		expectedCriticalFailure bool
+	}{
+		{
+			name:                    "no health checks",
+			checks:                  map[string]HealthCheckItem{},
+			setupConfig:             func(_ *config.Config) {},
+			expectedFailCount:       0,
+			expectedCriticalFailure: false,
+		},
+		{
+			name: "all checks passing",
+			checks: map[string]HealthCheckItem{
+				"redis": {
+					Status:        Pass,
+					ComponentType: Datastore,
+				},
+				"dashboard": {
+					Status:        Pass,
+					ComponentType: System,
+				},
+			},
+			setupConfig:             func(_ *config.Config) {},
+			expectedFailCount:       0,
+			expectedCriticalFailure: false,
+		},
+		{
+			name: "redis failing - NOT critical for liveness",
+			checks: map[string]HealthCheckItem{
+				"redis": {
+					Status:        Fail,
+					ComponentType: Datastore,
+				},
+				"dashboard": {
+					Status:        Pass,
+					ComponentType: System,
+				},
+			},
+			setupConfig:             func(_ *config.Config) {},
+			expectedFailCount:       1,
+			expectedCriticalFailure: false,
+		},
+		{
+			name: "dashboard failing with UseDBAppConfigs enabled - critical for liveness",
+			checks: map[string]HealthCheckItem{
+				"redis": {
+					Status:        Pass,
+					ComponentType: Datastore,
+				},
+				"dashboard": {
+					Status:        Fail,
+					ComponentType: System,
+				},
+			},
+			setupConfig: func(conf *config.Config) {
+				conf.UseDBAppConfigs = true
+			},
+			expectedFailCount:       1,
+			expectedCriticalFailure: true,
+		},
+		{
+			name: "dashboard failing with UseDBAppConfigs disabled - non-critical for liveness",
+			checks: map[string]HealthCheckItem{
+				"redis": {
+					Status:        Pass,
+					ComponentType: Datastore,
+				},
+				"dashboard": {
+					Status:        Fail,
+					ComponentType: System,
+				},
+			},
+			setupConfig: func(conf *config.Config) {
+				conf.UseDBAppConfigs = false
+			},
+			expectedFailCount:       1,
+			expectedCriticalFailure: false,
+		},
+		{
+			name: "redis and dashboard both failing - only dashboard critical for liveness when enabled",
+			checks: map[string]HealthCheckItem{
+				"redis": {
+					Status:        Fail,
+					ComponentType: Datastore,
+				},
+				"dashboard": {
+					Status:        Fail,
+					ComponentType: System,
+				},
+			},
+			setupConfig: func(conf *config.Config) {
+				conf.UseDBAppConfigs = true
+			},
+			expectedFailCount:       2,
+			expectedCriticalFailure: true,
+		},
+		{
+			name: "redis and dashboard both failing - neither critical for liveness when dashboard disabled",
+			checks: map[string]HealthCheckItem{
+				"redis": {
+					Status:        Fail,
+					ComponentType: Datastore,
+				},
+				"dashboard": {
+					Status:        Fail,
+					ComponentType: System,
+				},
+			},
+			setupConfig: func(conf *config.Config) {
+				conf.UseDBAppConfigs = false
+			},
+			expectedFailCount:       2,
+			expectedCriticalFailure: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			conf := config.Config{}
+			tt.setupConfig(&conf)
+
+			gw := NewGateway(conf, nil)
+
+			// Call the function under test
+			failCount, criticalFailure := gw.evaluateHealthChecksForLiveness(tt.checks)
 
 			// Assert the results
 			assert.Equal(t, tt.expectedFailCount, failCount)
@@ -1000,13 +1237,63 @@ func TestGateway_liveCheckHandler(t *testing.T) {
 			expectedResponseStatus: Warn,
 		},
 		{
-			name:   "all checks failing - returns 200 with fail status",
+			name:   "redis failure only - returns 200 with fail status",
 			method: http.MethodGet,
 			setupGateway: func(_ *Gateway) {
 				// No special setup needed
 			},
 			setupHealthCheck: func(gw *Gateway) {
-				// Set up health check with all failing
+				// Set up health check with Redis failing (non-critical for liveness)
+				healthInfo := map[string]HealthCheckItem{
+					"redis": {
+						Status:        Fail,
+						ComponentType: Datastore,
+						Output:        "Redis connection failed",
+					},
+				}
+				gw.setCurrentHealthCheckInfo(healthInfo)
+			},
+			expectedStatus:         http.StatusOK,
+			expectedResponseStatus: Fail,
+		},
+		{
+			name:   "dashboard failure with UseDBAppConfigs enabled - returns 503",
+			method: http.MethodGet,
+			setupGateway: func(gw *Gateway) {
+				// Enable UseDBAppConfigs to make dashboard critical
+				conf := gw.GetConfig()
+				conf.UseDBAppConfigs = true
+				gw.SetConfig(conf)
+			},
+			setupHealthCheck: func(gw *Gateway) {
+				// Set up health check with dashboard failing (critical for liveness)
+				healthInfo := map[string]HealthCheckItem{
+					"redis": {
+						Status:        Pass,
+						ComponentType: Datastore,
+					},
+					"dashboard": {
+						Status:        Fail,
+						ComponentType: System,
+						Output:        "Dashboard service unavailable",
+					},
+				}
+				gw.setCurrentHealthCheckInfo(healthInfo)
+			},
+			expectedStatus:         http.StatusServiceUnavailable,
+			expectedResponseStatus: Warn,
+		},
+		{
+			name:   "mixed failures with redis and non-critical dashboard - returns 200",
+			method: http.MethodGet,
+			setupGateway: func(gw *Gateway) {
+				// Disable UseDBAppConfigs to make dashboard non-critical
+				conf := gw.GetConfig()
+				conf.UseDBAppConfigs = false
+				gw.SetConfig(conf)
+			},
+			setupHealthCheck: func(gw *Gateway) {
+				// Set up health check with all failing but only non-critical for liveness
 				healthInfo := map[string]HealthCheckItem{
 					"redis": {
 						Status:        Fail,

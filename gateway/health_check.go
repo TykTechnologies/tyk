@@ -241,13 +241,8 @@ func (gw *Gateway) liveCheckHandler(w http.ResponseWriter, r *http.Request) {
 		Details:     checks,
 	}
 
-	var failCount int
-
-	for _, v := range checks {
-		if v.Status == Fail {
-			failCount++
-		}
-	}
+	// Evaluate health checks but treat Redis as non-critical for liveness
+	failCount, criticalFailure := gw.evaluateHealthChecksForLiveness(checks)
 
 	var status HealthCheckStatus
 
@@ -271,7 +266,13 @@ func (gw *Gateway) liveCheckHandler(w http.ResponseWriter, r *http.Request) {
 		addMascotHeaders(w)
 	}
 
-	w.WriteHeader(http.StatusOK)
+	// Return 503 only for critical failures (not including Redis)
+	httpStatus := http.StatusOK
+	if criticalFailure {
+		httpStatus = http.StatusServiceUnavailable
+	}
+
+	w.WriteHeader(httpStatus)
 	json.NewEncoder(w).Encode(res)
 }
 
@@ -358,10 +359,44 @@ func (gw *Gateway) evaluateHealthChecks(checks map[string]HealthCheckItem) (fail
 	return failCount, criticalFailure
 }
 
+func (gw *Gateway) evaluateHealthChecksForLiveness(checks map[string]HealthCheckItem) (failCount int, criticalFailure bool) {
+	// Check for critical failures but treat Redis as non-critical for liveness
+	for component, check := range checks {
+		if check.Status == Fail {
+			failCount++
+
+			if gw.isCriticalFailureForLiveness(component) {
+				criticalFailure = true
+			}
+		}
+	}
+	return failCount, criticalFailure
+}
+
 func (gw *Gateway) isCriticalFailure(component string) bool {
 	// Redis is always considered critical
 	if component == "redis" {
 		return true
+	}
+
+	// Consider dashboard critical only if UseDBAppConfigs is enabled
+	if component == "dashboard" && gw.GetConfig().UseDBAppConfigs {
+		return true
+	}
+
+	// Consider RPC critical only if using RPC and gw not in emergency mode
+	if component == "rpc" && gw.GetConfig().Policies.PolicySource == "rpc" && !rpc.IsEmergencyMode() {
+		return true
+	}
+
+	return false
+}
+
+func (gw *Gateway) isCriticalFailureForLiveness(component string) bool {
+	// Redis is NOT considered critical for liveness checks
+	// The gateway can still serve requests if APIs/policies are already loaded
+	if component == "redis" {
+		return false
 	}
 
 	// Consider dashboard critical only if UseDBAppConfigs is enabled
