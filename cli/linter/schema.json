@@ -1131,11 +1131,6 @@
               "type": "integer",
               "minimum": 1,
               "default": 86400
-            },
-            "max_concurrent_checks": {
-              "type": "integer",
-              "minimum": 1,
-              "default": 20
             }
           }
         }
