@@ -56,12 +56,12 @@ func TestDefaultValueAndWriteDefaultConf(t *testing.T) {
 		{
 			"CertificateExpiryMonitorWarningThresholdDays", "TYK_GW_SECURITY_CERTIFICATEEXPIRYMONITOR_WARNINGTHRESHOLDDAYS",
 			func(c *Config) interface{} { return c.Security.CertificateExpiryMonitor.WarningThresholdDays },
-			int64(30), int64(15),
+			int(30), int(15),
 		},
 		{
 			"CertificateExpiryMonitorCheckCooldownSeconds", "TYK_GW_SECURITY_CERTIFICATEEXPIRYMONITOR_CHECKCOOLDOWNSECONDS",
 			func(c *Config) interface{} { return c.Security.CertificateExpiryMonitor.CheckCooldownSeconds },
-			int64(3600), int64(1800),
+			int(3600), int(1800),
 		},
 		{
 			"CertificateExpiryMonitorEventCooldownSeconds", "TYK_GW_SECURITY_CERTIFICATEEXPIRYMONITOR_EVENTCOOLDOWNSECONDS",
