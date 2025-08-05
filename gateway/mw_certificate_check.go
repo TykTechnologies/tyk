@@ -62,7 +62,7 @@ func (m *CertificateCheckMW) ProcessRequest(w http.ResponseWriter, r *http.Reque
 			m.store.Connect()
 		}
 
-		// TODO: Consider running certificate checks in the background to avoid blocking requests.
+		// NOTE: Consider running certificate checks in the background to avoid blocking requests.
 		// This would require:
 		// 1. A background worker pool to process checks asynchronously
 		// 2. A mechanism to track and limit concurrent background checks
