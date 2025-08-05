@@ -526,8 +526,12 @@ func TestCertificateCheckMW_Concurrency(t *testing.T) {
 
 		// Test that the lock works
 		lock1.Lock()
+		// Simulate some work in critical section
+		_ = "work"
 		lock1.Unlock()
 		lock2.Lock()
+		// Simulate some work in critical section
+		_ = "work"
 		lock2.Unlock()
 
 		// Test different certificates get different locks
@@ -544,7 +548,11 @@ func TestCertificateCheckMW_Concurrency(t *testing.T) {
 
 		// Both locks should work independently
 		lock1.Lock()
+		// Simulate some work in critical section
+		_ = "work"
 		lock2.Lock()
+		// Simulate some work in critical section
+		_ = "work"
 		lock1.Unlock()
 		lock2.Unlock()
 	})

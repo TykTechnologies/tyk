@@ -110,7 +110,7 @@ func (m *CertificateCheckMW) checkCertificatesExpiration(certificates []*tls.Cer
 
 // checkCertificate checks a single certificate for expiration and fires appropriate events
 // based on the certificate's expiry status and configured cooldown periods.
-func (m *CertificateCheckMW) checkCertificate(cert *tls.Certificate, monitorConfig config.CertificateExpiryMonitorConfig, now time.Time) {
+func (m *CertificateCheckMW) checkCertificate(cert *tls.Certificate, monitorConfig config.CertificateExpiryMonitorConfig, _ time.Time) {
 	// Validate certificate and get certificate info
 	certInfo := m.extractCertInfo(cert)
 	if certInfo == nil {
