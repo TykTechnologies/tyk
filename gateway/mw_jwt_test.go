@@ -2795,52 +2795,91 @@ func TestTimeValidateClaims(t *testing.T) {
 
 func TestGetUserIDFromClaim(t *testing.T) {
 	userID := "123"
-	userIDKey := "user_id"
-	t.Run("identity base field exists", func(t *testing.T) {
-		jwtClaims := jwt.MapClaims{
-			userIDKey: userID,
-			"iss":     "example.com",
+	t.Run("is classic", func(t *testing.T) {
+		userIDKey := "user_id"
+		var api apidef.APIDefinition
+		api.EnableJWT = true
+		api.AuthConfigs = map[string]apidef.AuthConfig{
+			apidef.JWTType: {
+				Name:           "jwtAuth",
+				AuthHeaderName: "Authorization",
+			},
 		}
-		identity, err := getUserIDFromClaim(jwtClaims, "user_id")
-		assert.NoError(t, err)
-		assert.Equal(t, identity, userID)
+		api.JWTIdentityBaseField = userIDKey
+
+		var o oas.OAS
+		o.Fill(api)
+		middleware := JWTMiddleware{&BaseMiddleware{Spec: &APISpec{
+			OAS:           o,
+			APIDefinition: &api,
+		}}}
+
+		t.Run("identity base field exists", func(t *testing.T) {
+			jwtClaims := jwt.MapClaims{
+				userIDKey: userID,
+				"iss":     "example.com",
+			}
+			identity, err := middleware.getUserIdFromClaim(jwtClaims)
+			assert.NoError(t, err)
+			assert.Equal(t, identity, userID)
+		})
+
+		t.Run("identity base field doesn't exist, fallback to sub", func(t *testing.T) {
+			jwtClaims := jwt.MapClaims{
+				"iss": "example.com",
+				"sub": userID,
+			}
+			identity, err := middleware.getUserIdFromClaim(jwtClaims)
+			assert.NoError(t, err)
+			assert.Equal(t, identity, userID)
+		})
+
+		t.Run("identity base field and sub doesn't exist", func(t *testing.T) {
+			jwtClaims := jwt.MapClaims{
+				"iss": "example.com",
+			}
+			_, err := middleware.getUserIdFromClaim(jwtClaims)
+			assert.ErrorIs(t, err, ErrNoSuitableUserIDClaimFound)
+		})
+
+		t.Run("identity base field doesn't exist, empty sub", func(t *testing.T) {
+			jwtClaims := jwt.MapClaims{
+				"iss": "example.com",
+				"sub": "",
+			}
+			_, err := middleware.getUserIdFromClaim(jwtClaims)
+			assert.ErrorIs(t, err, ErrEmptyUserIDInSubClaim)
+		})
+
+		t.Run("empty identity base field", func(t *testing.T) {
+			jwtClaims := jwt.MapClaims{
+				"iss":     "example.com",
+				userIDKey: "",
+			}
+			_, err := middleware.getUserIdFromClaim(jwtClaims)
+			assert.ErrorIs(t, err, ErrEmptyUserIDInClaim)
+		})
 	})
 
-	t.Run("identity base field doesn't exist, fallback to sub", func(t *testing.T) {
-		jwtClaims := jwt.MapClaims{
-			"iss": "example.com",
-			"sub": userID,
+	t.Run("is OAS", func(t *testing.T) {
+		var api apidef.APIDefinition
+		api.EnableJWT = true
+		api.AuthConfigs = map[string]apidef.AuthConfig{
+			apidef.JWTType: {
+				Name:           "jwtAuth",
+				AuthHeaderName: "Authorization",
+			},
 		}
-		identity, err := getUserIDFromClaim(jwtClaims, userIDKey)
-		assert.NoError(t, err)
-		assert.Equal(t, identity, userID)
+
+		var o oas.OAS
+		o.Fill(api)
+		o.GetJWTConfiguration().IdentityBaseField = []string{"user_id", "backup_user_id"}
+		middleware := JWTMiddleware{&BaseMiddleware{Spec: &APISpec{
+			OAS:           o,
+			APIDefinition: &api,
+		}}}
 	})
 
-	t.Run("identity base field and sub doesn't exist", func(t *testing.T) {
-		jwtClaims := jwt.MapClaims{
-			"iss": "example.com",
-		}
-		_, err := getUserIDFromClaim(jwtClaims, userIDKey)
-		assert.ErrorIs(t, err, ErrNoSuitableUserIDClaimFound)
-	})
-
-	t.Run("identity base field doesn't exist, empty sub", func(t *testing.T) {
-		jwtClaims := jwt.MapClaims{
-			"iss": "example.com",
-			"sub": "",
-		}
-		_, err := getUserIDFromClaim(jwtClaims, userIDKey)
-		assert.ErrorIs(t, err, ErrEmptyUserIDInSubClaim)
-	})
-
-	t.Run("empty identity base field", func(t *testing.T) {
-		jwtClaims := jwt.MapClaims{
-			"iss":     "example.com",
-			userIDKey: "",
-		}
-		_, err := getUserIDFromClaim(jwtClaims, userIDKey)
-		assert.Equal(t, fmt.Sprintf("found an empty user ID in predefined base field claim %s", userIDKey), err.Error())
-	})
 }
 
 func TestJWTMiddleware_getSecretToVerifySignature_JWKNoKID(t *testing.T) {

@@ -54,6 +54,7 @@ var (
 
 	ErrNoSuitableUserIDClaimFound = errors.New("no suitable claims for user ID were found")
 	ErrEmptyUserIDInSubClaim      = errors.New("found an empty user ID in sub claim")
+	ErrEmptyUserIDInClaim         = errors.New("found an empty user ID in claim")
 )
 
 func (k *JWTMiddleware) Name() string {
@@ -441,7 +442,33 @@ func (k *JWTMiddleware) getBasePolicyID(r *http.Request, claims jwt.MapClaims) (
 }
 
 func (k *JWTMiddleware) getUserIdFromClaim(claims jwt.MapClaims) (string, error) {
-	return getUserIDFromClaim(claims, k.Spec.JWTIdentityBaseField)
+	if k.Spec.IsOAS {
+		return k.getUserIDFromClaimOAS(claims)
+	} else {
+		return getUserIDFromClaim(claims, k.Spec.JWTIdentityBaseField, true)
+	}
+}
+
+func (k *JWTMiddleware) getUserIDFromClaimOAS(claims jwt.MapClaims) (string, error) {
+	identityBaseFields := k.Spec.OAS.GetJWTConfiguration().IdentityBaseField
+	checkedSub := false
+	for i, identityBaseField := range identityBaseFields {
+		if identityBaseField == SUB {
+			checkedSub = true
+		}
+
+		// fallBack to Sub if it is the last item and SUB has not been checked yet
+		shouldFallBack := i == len(identityBaseFields)-1 && !checkedSub
+		id, err := getUserIDFromClaim(claims, identityBaseField, shouldFallBack)
+		if err != nil {
+			if errors.Is(ErrNoSuitableUserIDClaimFound, err) {
+				continue
+			}
+			return "", err
+		}
+		return id, nil
+	}
+	return "", ErrEmptyUserIDInClaim
 }
 
 func toScopeStringsSlice(v interface{}, scopeSlice *[]string, nested bool) []string {
@@ -1258,7 +1285,7 @@ func timeValidateJWTClaims(c jwt.MapClaims, expiresAt, issuedAt, notBefore uint6
 }
 
 // getUserIDFromClaim parses jwt claims and get the userID from provided identityBaseField.
-func getUserIDFromClaim(claims jwt.MapClaims, identityBaseField string) (string, error) {
+func getUserIDFromClaim(claims jwt.MapClaims, identityBaseField string, shouldFallback bool) (string, error) {
 	var (
 		userID string
 		found  bool
@@ -1271,9 +1298,9 @@ func getUserIDFromClaim(claims jwt.MapClaims, identityBaseField string) (string,
 				return userID, nil
 			}
 
-			message := "found an empty user ID in predefined base field claim " + identityBaseField
-			log.Error(message)
-			return "", errors.New(message)
+			err := fmt.Errorf("%w, claim: %s", ErrEmptyUserIDInClaim, identityBaseField)
+			log.Error(err)
+			return "", err
 		}
 
 		if !found {
@@ -1281,7 +1308,7 @@ func getUserIDFromClaim(claims jwt.MapClaims, identityBaseField string) (string,
 		}
 	}
 
-	if userID, found = claims[SUB].(string); found {
+	if userID, found = claims[SUB].(string); shouldFallback && found {
 		if len(userID) > 0 {
 			log.WithField("userId", userID).Debug("Found User Id in 'sub' claim")
 			return userID, nil

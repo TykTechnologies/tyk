@@ -149,7 +149,7 @@ func (k *ExternalOAuthMiddleware) jwt(accessToken string) (bool, string, error) 
 	}
 
 	var userID string
-	userID, err = getUserIDFromClaim(token.Claims.(jwt.MapClaims), jwtValidation.IdentityBaseField)
+	userID, err = getUserIDFromClaim(token.Claims.(jwt.MapClaims), jwtValidation.IdentityBaseField, true)
 	if err != nil {
 		return false, "", err
 	}
@@ -259,7 +259,7 @@ func (k *ExternalOAuthMiddleware) introspection(accessToken string) (bool, strin
 		return false, "", nil
 	}
 
-	userID, err := getUserIDFromClaim(claims, opts.IdentityBaseField)
+	userID, err := getUserIDFromClaim(claims, opts.IdentityBaseField, true)
 	if err != nil {
 		return false, "", err
 	}
