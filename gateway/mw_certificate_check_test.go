@@ -47,7 +47,6 @@ func setupMW(t *testing.T, useMutualTLS bool, setupMock func(*mock.MockCertifica
 				WarningThresholdDays: 30,
 				CheckCooldownSeconds: 3600,
 				EventCooldownSeconds: 86400,
-				MaxConcurrentChecks:  10,
 			},
 		},
 	}
@@ -525,90 +524,6 @@ func createTestCertificateWithName(daysUntilExpiry int, commonName string) *tls.
 	}
 }
 
-// TestCertificateCheckMW_Parallelization tests the parallelization logic
-func TestCertificateCheckMW_Parallelization(t *testing.T) {
-	t.Parallel()
-
-	mw := setupMW(t, true, nil)
-
-	// Test with different numbers of certificates
-	testCases := []struct {
-		name            string
-		certCount       int
-		maxConcurrent   int
-		expectedWorkers int
-	}{
-		{"Single certificate", 1, 5, 1},
-		{"Two certificates", 2, 5, 1},
-		{"Three certificates", 3, 5, 3},
-		{"Five certificates", 5, 3, 3},
-		{"Ten certificates", 10, 5, 5},
-		{"Zero max concurrent", 5, 0, 5},
-		{"Negative max concurrent", 5, -1, 1},
-	}
-
-	for _, tc := range testCases {
-		t.Run(tc.name, func(_ *testing.T) {
-			// Update the middleware's configuration for this test case
-			mw.Spec.GlobalConfig.Security.CertificateExpiryMonitor.MaxConcurrentChecks = tc.maxConcurrent
-
-			// Create test certificates
-			certs := make([]*tls.Certificate, tc.certCount)
-			for i := 0; i < tc.certCount; i++ {
-				certs[i] = createTestCertificateWithName(30, fmt.Sprintf("test-%d.example.com", i))
-			}
-
-			// Call checkCertificateExpiration and verify it completes without error
-			// We can't easily test the exact number of workers, but we can verify
-			// that the function completes successfully
-			mw.checkCertificateExpiration(certs)
-
-			// The test passes if no panic or error occurs
-		})
-	}
-}
-
-// TestCertificateCheckMW_WorkerCountCalculation tests the worker count calculation logic
-func TestCertificateCheckMW_WorkerCountCalculation(t *testing.T) {
-	t.Parallel()
-
-	mw := setupMW(t, true, nil)
-
-	// Test various scenarios for worker count calculation
-	testCases := []struct {
-		name            string
-		certCount       int
-		maxConcurrent   int
-		expectedWorkers int
-	}{
-		{"Single certificate", 1, 5, 1},
-		{"Two certificates", 2, 5, 1},
-		{"Three certificates", 3, 5, 3},
-		{"Five certificates", 5, 3, 3},
-		{"Ten certificates", 10, 5, 5},
-		{"Zero max concurrent", 5, 0, 5},
-		{"Negative max concurrent", 5, -1, 1},
-	}
-
-	for _, tc := range testCases {
-		t.Run(tc.name, func(_ *testing.T) {
-			// Update the middleware's configuration for this test case
-			mw.Spec.GlobalConfig.Security.CertificateExpiryMonitor.MaxConcurrentChecks = tc.maxConcurrent
-
-			// Create test certificates
-			certs := make([]*tls.Certificate, tc.certCount)
-			for i := 0; i < tc.certCount; i++ {
-				certs[i] = createTestCertificateWithName(30, fmt.Sprintf("test-%d.example.com", i))
-			}
-
-			// Call checkCertificateExpiration and verify it completes without error
-			mw.checkCertificateExpiration(certs)
-
-			// The test passes if no panic or error occurs
-		})
-	}
-}
-
 // TestCertificateCheckMW_ConcurrencySafety tests that the certificate check middleware
 // is thread-safe under high concurrency scenarios
 func TestCertificateCheckMW_ConcurrencySafety(t *testing.T) {
@@ -968,7 +883,6 @@ func BenchmarkCertificateCheckMW_ConcurrentChecks(b *testing.B) {
 							WarningThresholdDays: 30,
 							CheckCooldownSeconds: 1,
 							EventCooldownSeconds: 1,
-							MaxConcurrentChecks:  10,
 						},
 					},
 				},
@@ -1013,7 +927,6 @@ func BenchmarkCertificateCheckMW_ConcurrentEvents(b *testing.B) {
 							WarningThresholdDays: 30,
 							CheckCooldownSeconds: 1,
 							EventCooldownSeconds: 1,
-							MaxConcurrentChecks:  10,
 						},
 					},
 				},

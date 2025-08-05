@@ -68,11 +68,6 @@ func TestDefaultValueAndWriteDefaultConf(t *testing.T) {
 			func(c *Config) interface{} { return c.Security.CertificateExpiryMonitor.EventCooldownSeconds },
 			86400, 43200,
 		},
-		{
-			"MaxConcurrentChecks", "TYK_GW_SECURITY_CERTIFICATEEXPIRYMONITOR_MAXCONCURRENTCHECKS",
-			func(c *Config) interface{} { return c.Security.CertificateExpiryMonitor.MaxConcurrentChecks },
-			20, 10,
-		},
 	}
 
 	for _, tc := range cases {
@@ -446,12 +441,12 @@ func TestCertificateExpiryMonitorConfig(t *testing.T) {
 				os.Setenv("TYK_GW_SECURITY_CERTIFICATEEXPIRYMONITOR_WARNINGTHRESHOLDDAYS", "7")
 				os.Setenv("TYK_GW_SECURITY_CERTIFICATEEXPIRYMONITOR_CHECKCOOLDOWNSECONDS", "900")
 				os.Setenv("TYK_GW_SECURITY_CERTIFICATEEXPIRYMONITOR_EVENTCOOLDOWNSECONDS", "21600")
-				os.Setenv("TYK_GW_SECURITY_CERTIFICATEEXPIRYMONITOR_MAXCONCURRENTCHECKS", "5")
+
 				defer func() {
 					os.Unsetenv("TYK_GW_SECURITY_CERTIFICATEEXPIRYMONITOR_WARNINGTHRESHOLDDAYS")
 					os.Unsetenv("TYK_GW_SECURITY_CERTIFICATEEXPIRYMONITOR_CHECKCOOLDOWNSECONDS")
 					os.Unsetenv("TYK_GW_SECURITY_CERTIFICATEEXPIRYMONITOR_EVENTCOOLDOWNSECONDS")
-					os.Unsetenv("TYK_GW_SECURITY_CERTIFICATEEXPIRYMONITOR_MAXCONCURRENTCHECKS")
+
 				}()
 
 				var c Config
@@ -501,7 +496,6 @@ func TestCertificateExpiryMonitorConfig(t *testing.T) {
 			WarningThresholdDays: 30,
 			CheckCooldownSeconds: 3600,
 			EventCooldownSeconds: 86400,
-			MaxConcurrentChecks:  20,
 		}
 
 		if c.Security.CertificateExpiryMonitor.WarningThresholdDays != expected.WarningThresholdDays {
@@ -517,11 +511,6 @@ func TestCertificateExpiryMonitorConfig(t *testing.T) {
 		if c.Security.CertificateExpiryMonitor.EventCooldownSeconds != expected.EventCooldownSeconds {
 			t.Errorf("Expected EventCooldownSeconds to be %d, got %d",
 				expected.EventCooldownSeconds, c.Security.CertificateExpiryMonitor.EventCooldownSeconds)
-		}
-
-		if c.Security.CertificateExpiryMonitor.MaxConcurrentChecks != expected.MaxConcurrentChecks {
-			t.Errorf("Expected MaxConcurrentChecks to be %d, got %d",
-				expected.MaxConcurrentChecks, c.Security.CertificateExpiryMonitor.MaxConcurrentChecks)
 		}
 	})
 }

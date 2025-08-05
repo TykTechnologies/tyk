@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"net/http"
+	"runtime"
 	"sync"
 	"time"
 
@@ -89,26 +90,17 @@ func (m *CertificateCheckMW) checkCertificateExpiration(certificates []*tls.Cert
 	log.Debug("Certificate expiry monitor: Starting check for ", len(certificates), " certificates with warning threshold of ", monitorConfig.WarningThresholdDays, " days")
 
 	// Use a worker pool to process certificates in parallel
-	// Limit concurrency to avoid overwhelming the system
-	maxConcurrent := monitorConfig.MaxConcurrentChecks
-
 	// Calculate optimal worker count based on the following rules:
 	// - For 2 or fewer certificates, use a single worker since parallelization overhead isn't worth it
-	// - If maxConcurrent is 0, use one worker per certificate for maximum parallelization
-	// - If maxConcurrent is negative, use a single worker as a safe fallback
-	// - If we have fewer certificates than maxConcurrent, match workers to certificates to avoid idle workers
-	// - Otherwise use maxConcurrent workers to respect the configured limit and prevent system overload
+	// - For 3-10 certificates, use 3 workers for good balance of parallelism and overhead
+	// - For more than 10 certificates, use number of CPU cores to prevent system overload
 	var maxWorkers int
 	if len(certificates) <= 2 {
 		maxWorkers = 1
-	} else if maxConcurrent == 0 {
-		maxWorkers = len(certificates)
-	} else if maxConcurrent < 0 {
-		maxWorkers = 1
-	} else if len(certificates) <= maxConcurrent {
-		maxWorkers = len(certificates)
+	} else if len(certificates) <= 10 {
+		maxWorkers = 3
 	} else {
-		maxWorkers = maxConcurrent
+		maxWorkers = runtime.NumCPU()
 	}
 
 	// Create a channel to send certificates to workers

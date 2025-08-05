@@ -65,7 +65,6 @@ var (
 				WarningThresholdDays: 30,
 				CheckCooldownSeconds: 3600,
 				EventCooldownSeconds: 86400,
-				MaxConcurrentChecks:  20,
 			},
 		},
 	}
@@ -632,10 +631,6 @@ type CertificateExpiryMonitorConfig struct {
 	// EventCooldownSeconds specifies the minimum time in seconds between firing the same certificate expiration event
 	// Default: 86400 seconds (24 hours)
 	EventCooldownSeconds int `json:"event_cooldown_seconds"`
-
-	// MaxConcurrentChecks specifies the maximum number of concurrent certificate checks
-	// Default: 20 (0 means use certificate count, negative means use 1 worker)
-	MaxConcurrentChecks int `json:"max_concurrent_checks"`
 }
 
 type SecurityConfig struct {
