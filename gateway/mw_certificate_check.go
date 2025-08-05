@@ -122,6 +122,7 @@ func (m *CertificateCheckMW) checkCertificate(cert *tls.Certificate, monitorConf
 	// Check if we should skip this certificate based on check cooldown
 	if m.shouldCooldown(monitorConfig, certInfo.ID) {
 		log.Debugf("Certificate expiry monitor: Skipping check for certificate '%s' due to cooldown (ID: %s...)", certInfo.CommonName, certInfo.ID[:8])
+
 		return
 	}
 
@@ -129,7 +130,14 @@ func (m *CertificateCheckMW) checkCertificate(cert *tls.Certificate, monitorConf
 	log.Debugf("Certificate expiry monitor: Checking certificate '%s' - Hours until expiry: %d", certInfo.CommonName, certInfo.HoursUntilExpiry)
 
 	// Process certificate based on its expiry status
-	m.processCertificateByStatus(certInfo, monitorConfig)
+	switch {
+	case certInfo.IsExpired:
+		m.handleExpiredCertificate(certInfo)
+	case certInfo.IsExpiringSoon:
+		m.handleExpiringSoonCertificate(certInfo, monitorConfig)
+	default:
+		m.handleHealthyCertificate(certInfo)
+	}
 }
 
 // certInfo holds certificate information for processing
@@ -172,18 +180,6 @@ func (m *CertificateCheckMW) extractCertInfo(cert *tls.Certificate) *certInfo {
 func (m *CertificateCheckMW) isCertificateExpiringSoon(hoursUntilExpiry int) bool {
 	warningThresholdHours := m.Gw.GetConfig().Security.CertificateExpiryMonitor.WarningThresholdDays * 24
 	return hoursUntilExpiry >= 0 && hoursUntilExpiry <= warningThresholdHours
-}
-
-// processCertificateByStatus processes the certificate based on its expiry status
-func (m *CertificateCheckMW) processCertificateByStatus(certInfo *certInfo, monitorConfig config.CertificateExpiryMonitorConfig) {
-	switch {
-	case certInfo.IsExpired:
-		m.handleExpiredCertificate(certInfo)
-	case certInfo.IsExpiringSoon:
-		m.handleExpiringSoonCertificate(certInfo, monitorConfig)
-	default:
-		m.handleHealthyCertificate(certInfo)
-	}
 }
 
 // handleExpiredCertificate handles certificates that have already expired
