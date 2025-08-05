@@ -3,6 +3,7 @@ package oas
 import (
 	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/lonelycode/osin"
+	"github.com/sirupsen/logrus"
 
 	"github.com/TykTechnologies/tyk/apidef"
 )
@@ -793,16 +794,27 @@ func (s *OAS) fillSecurity(api apidef.APIDefinition) {
 }
 
 func (s *OAS) extractSecurityTo(api *apidef.APIDefinition) {
-	if s.getTykAuthentication() == nil {
+	wasAuthNil := s.getTykAuthentication() == nil
+	if wasAuthNil {
 		s.GetTykExtension().Server.Authentication = &Authentication{}
-		defer func() {
-			s.GetTykExtension().Server.Authentication = nil
-		}()
 	}
 
 	resetSecuritySchemes(api)
 
+	if len(s.Security) > 0 {
+		err := s.importAuthentication(true)
+		if err != nil {
+			logrus.WithError(err).Error("Error importing authentication from OAS security requirements")
+		}
+	}
+
 	s.getTykAuthentication().ExtractTo(api)
+	
+	isEmpty := s.isAuthenticationEmpty()
+	
+	if wasAuthNil && isEmpty {
+		s.GetTykExtension().Server.Authentication = nil
+	}
 
 	if api.AuthConfigs == nil {
 		api.AuthConfigs = make(map[string]apidef.AuthConfig)
@@ -812,37 +824,61 @@ func (s *OAS) extractSecurityTo(api *apidef.APIDefinition) {
 		return
 	}
 
-	for schemeName := range s.getTykSecuritySchemes() {
-		if _, ok := s.Security[0][schemeName]; ok {
-			v := s.Components.SecuritySchemes[schemeName].Value
-			switch {
-			case v.Type == typeAPIKey:
-				s.extractTokenTo(api, schemeName)
-			case v.Type == typeHTTP && v.Scheme == schemeBearer && v.BearerFormat == bearerFormatJWT:
-				s.extractJWTTo(api, schemeName)
-			case v.Type == typeHTTP && v.Scheme == schemeBasic:
-				s.extractBasicTo(api, schemeName)
-			case v.Type == typeOAuth2:
-				securityScheme := s.getTykSecurityScheme(schemeName)
-				if securityScheme == nil {
-					return
-				}
+	// Process all unique security schemes from all security requirements
+	processedSchemes := make(map[string]bool)
+	for _, securityReq := range s.Security {
+		for schemeName := range securityReq {
+			if !processedSchemes[schemeName] {
+				processedSchemes[schemeName] = true
+				
+				// Check if this scheme is configured in Tyk extension
+				if _, exists := s.getTykSecuritySchemes()[schemeName]; exists {
+					v := s.Components.SecuritySchemes[schemeName].Value
+					switch {
+					case v.Type == typeAPIKey:
+						s.extractTokenTo(api, schemeName)
+					case v.Type == typeHTTP && v.Scheme == schemeBearer && v.BearerFormat == bearerFormatJWT:
+						s.extractJWTTo(api, schemeName)
+					case v.Type == typeHTTP && v.Scheme == schemeBasic:
+						s.extractBasicTo(api, schemeName)
+					case v.Type == typeOAuth2:
+						securityScheme := s.getTykSecurityScheme(schemeName)
+						if securityScheme == nil {
+							continue
+						}
 
-				externalOAuth := &ExternalOAuth{}
-				if oauthVal, ok := securityScheme.(*ExternalOAuth); ok {
-					externalOAuth = oauthVal
-				} else {
-					toStructIfMap(securityScheme, externalOAuth)
-				}
+						externalOAuth := &ExternalOAuth{}
+						if oauthVal, ok := securityScheme.(*ExternalOAuth); ok {
+							externalOAuth = oauthVal
+						} else {
+							toStructIfMap(securityScheme, externalOAuth)
+						}
 
-				if len(externalOAuth.Providers) > 0 {
-					s.extractExternalOAuthTo(api, schemeName)
-				} else {
-					s.extractOAuthTo(api, schemeName)
+						if len(externalOAuth.Providers) > 0 {
+							s.extractExternalOAuthTo(api, schemeName)
+						} else {
+							s.extractOAuthTo(api, schemeName)
+						}
+					}
 				}
 			}
 		}
 	}
+}
+
+// isAuthenticationEmpty checks if the authentication object has no configured authentication methods
+func (s *OAS) isAuthenticationEmpty() bool {
+	auth := s.getTykAuthentication()
+	if auth == nil {
+		return true
+	}
+	
+	// Check if any authentication method is configured
+	return auth.MultiAuth == nil && 
+		   len(auth.SecuritySchemes) == 0 &&
+		   auth.HMAC == nil &&
+		   auth.OIDC == nil &&
+		   auth.Custom == nil
 }
 
 func resetSecuritySchemes(api *apidef.APIDefinition) {

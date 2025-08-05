@@ -92,6 +92,26 @@ func (gw *Gateway) skipSpecBecauseInvalid(spec *APISpec, logger *logrus.Entry) b
 	return false
 }
 
+// isMultiAuthEnabled checks if MultiAuth (OR authentication) is enabled for an OAS API spec.
+func (gw *Gateway) isMultiAuthEnabled(spec *APISpec) bool {
+	if !spec.IsOAS {
+		return false
+	}
+	
+	tykExt := spec.OAS.GetTykExtension()
+	if tykExt == nil {
+		return false
+	}
+	
+	if auth := tykExt.Server.Authentication; auth != nil {
+		if auth.MultiAuth != nil {
+			return auth.MultiAuth.Enabled
+		}
+	}
+	
+	return false
+}
+
 func generateDomainPath(hostname, listenPath string) string {
 	return hostname + listenPath
 }
@@ -331,29 +351,46 @@ func (gw *Gateway) processSpec(
 	gw.mwAppendEnabled(&chainArray, &TrackEndpointMiddleware{baseMid.Copy()})
 
 	if !spec.UseKeylessAccess {
-		// Select the keying method to use for setting session states
-		if gw.mwAppendEnabled(&authArray, &Oauth2KeyExists{baseMid.Copy()}) {
-			logger.Info("Checking security policy: OAuth")
-		}
+		// Debug: Log the state of the spec
+		logger.WithFields(logrus.Fields{
+			"api_name": spec.Name,
+			"is_oas": spec.IsOAS,
+			"has_oas_extension": spec.OAS.GetTykExtension() != nil,
+		}).Info("Checking authentication setup for API")
+		
+		// Check if MultiAuth (OR authentication) is enabled for OAS APIs
+		if spec.IsOAS && gw.isMultiAuthEnabled(spec) {
+			multiAuthMW := &MultiAuthMiddleware{BaseMiddleware: baseMid.Copy()}
+			multiAuthMW.Init()
+			if multiAuthMW.EnabledForSpec() {
+				authArray = append(authArray, gw.createMiddleware(multiAuthMW))
+			}
+		} else {
+			// Standard authentication (AND logic) - existing behavior
+			// Select the keying method to use for setting session states
+			if gw.mwAppendEnabled(&authArray, &Oauth2KeyExists{baseMid.Copy()}) {
+				logger.Info("Checking security policy: OAuth")
+			}
 
-		if gw.mwAppendEnabled(&authArray, &ExternalOAuthMiddleware{baseMid.Copy()}) {
-			logger.Info("Checking security policy: External OAuth")
-		}
+			if gw.mwAppendEnabled(&authArray, &ExternalOAuthMiddleware{baseMid.Copy()}) {
+				logger.Info("Checking security policy: External OAuth")
+			}
 
-		if gw.mwAppendEnabled(&authArray, &BasicAuthKeyIsValid{baseMid.Copy(), nil, nil}) {
-			logger.Info("Checking security policy: Basic")
-		}
+			if gw.mwAppendEnabled(&authArray, &BasicAuthKeyIsValid{baseMid.Copy(), nil, nil}) {
+				logger.Info("Checking security policy: Basic")
+			}
 
-		if gw.mwAppendEnabled(&authArray, &HTTPSignatureValidationMiddleware{BaseMiddleware: baseMid.Copy()}) {
-			logger.Info("Checking security policy: HMAC")
-		}
+			if gw.mwAppendEnabled(&authArray, &HTTPSignatureValidationMiddleware{BaseMiddleware: baseMid.Copy()}) {
+				logger.Info("Checking security policy: HMAC")
+			}
 
-		if gw.mwAppendEnabled(&authArray, &JWTMiddleware{baseMid.Copy()}) {
-			logger.Info("Checking security policy: JWT")
-		}
+			if gw.mwAppendEnabled(&authArray, &JWTMiddleware{baseMid.Copy()}) {
+				logger.Info("Checking security policy: JWT")
+			}
 
-		if gw.mwAppendEnabled(&authArray, &OpenIDMW{BaseMiddleware: baseMid.Copy()}) {
-			logger.Info("Checking security policy: OpenID")
+			if gw.mwAppendEnabled(&authArray, &OpenIDMW{BaseMiddleware: baseMid.Copy()}) {
+				logger.Info("Checking security policy: OpenID")
+			}
 		}
 
 		customPluginAuthEnabled := spec.CustomPluginAuthEnabled || spec.UseGoPluginAuth || spec.EnableCoProcessAuth
@@ -386,7 +423,16 @@ func (gw *Gateway) processSpec(
 			}
 		}
 
-		if spec.UseStandardAuth || len(authArray) == 0 {
+		// Only add standard AuthKey middleware if MultiAuth is not enabled
+		// and either UseStandardAuth is true or no auth middleware has been added yet
+		multiAuthEnabled := gw.isMultiAuthEnabled(spec)
+		logger.WithFields(logrus.Fields{
+			"multiauth_enabled": multiAuthEnabled,
+			"use_standard_auth": spec.UseStandardAuth,
+			"auth_array_len": len(authArray),
+		}).Info("Evaluating AuthKey middleware addition")
+		
+		if !multiAuthEnabled && (spec.UseStandardAuth || len(authArray) == 0) {
 			logger.Info("Checking security policy: Token")
 			authArray = append(authArray, gw.createMiddleware(&AuthKey{baseMid.Copy()}))
 		}
