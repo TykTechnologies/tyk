@@ -252,7 +252,7 @@ func TestCertificateCheckMW_HelperMethods(t *testing.T) {
 	mw := setupCertificateCheckMW(t, true, nil)
 
 	// Test generateCertificateID with nil certificate
-	certID := mw.generateCertificateID(nil)
+	certID := mw.computeCertID(nil)
 	assert.Equal(t, "", certID)
 
 	// Test generateCertificateID with valid certificate
@@ -261,7 +261,7 @@ func TestCertificateCheckMW_HelperMethods(t *testing.T) {
 			Raw: []byte("test-certificate-data"),
 		},
 	}
-	certID = mw.generateCertificateID(validCert)
+	certID = mw.computeCertID(validCert)
 	assert.NotEmpty(t, certID)
 	assert.Len(t, certID, 64) // SHA256 hash is 32 bytes = 64 hex chars
 
@@ -297,24 +297,24 @@ func TestCertificateCheckMW_CooldownMechanisms(t *testing.T) {
 		}
 
 		// Test shouldSkipCertificate with empty certID
-		shouldSkip := mw.shouldSkipCertificate("", monitorConfig)
+		shouldSkip := mw.shouldCooldown(monitorConfig, "")
 		assert.True(t, shouldSkip, "Should skip check with empty certID")
 
 		// Test shouldSkipCertificate with valid certID (should not skip on first call)
-		shouldSkip = mw.shouldSkipCertificate("check-cooldown-test-id", monitorConfig)
+		shouldSkip = mw.shouldCooldown(monitorConfig, "check-cooldown-test-id")
 		assert.False(t, shouldSkip, "Should not skip check on first call")
 
 		// Test shouldSkipCertificate with same certID (should skip due to cooldown)
-		shouldSkip = mw.shouldSkipCertificate("check-cooldown-test-id", monitorConfig)
+		shouldSkip = mw.shouldCooldown(monitorConfig, "check-cooldown-test-id")
 		assert.True(t, shouldSkip, "Should skip check due to cooldown")
 
 		// Test shouldSkipCertificate with different certID (should not skip)
-		shouldSkip = mw.shouldSkipCertificate("check-cooldown-different-id", monitorConfig)
+		shouldSkip = mw.shouldCooldown(monitorConfig, "check-cooldown-different-id")
 		assert.False(t, shouldSkip, "Should not skip check for different certID")
 
 		// Test shouldSkipCertificate with zero cooldown (should never skip)
 		monitorConfig.CheckCooldownSeconds = 0
-		shouldSkip = mw.shouldSkipCertificate("check-cooldown-zero-id", monitorConfig)
+		shouldSkip = mw.shouldCooldown(monitorConfig, "check-cooldown-zero-id")
 		assert.False(t, shouldSkip, "Should not skip check with zero cooldown")
 	})
 
@@ -352,11 +352,11 @@ func TestCertificateCheckMW_CooldownMechanisms(t *testing.T) {
 		certID := "integration-test-cert"
 
 		// First check should succeed
-		shouldSkip := mw.shouldSkipCertificate(certID, monitorConfig)
+		shouldSkip := mw.shouldCooldown(monitorConfig, certID)
 		assert.False(t, shouldSkip, "First check should succeed")
 
 		// Second check should fail due to check cooldown
-		shouldSkip = mw.shouldSkipCertificate(certID, monitorConfig)
+		shouldSkip = mw.shouldCooldown(monitorConfig, certID)
 		assert.True(t, shouldSkip, "Second check should fail due to cooldown")
 
 		// First event should succeed
@@ -380,10 +380,10 @@ func TestCertificateCheckMW_CooldownMechanisms(t *testing.T) {
 		certID := "zero-cooldown-test"
 
 		// With zero check cooldown, should never skip
-		shouldSkip := mw.shouldSkipCertificate(certID, monitorConfig)
+		shouldSkip := mw.shouldCooldown(monitorConfig, certID)
 		assert.False(t, shouldSkip, "Should not skip with zero check cooldown")
 
-		shouldSkip = mw.shouldSkipCertificate(certID, monitorConfig)
+		shouldSkip = mw.shouldCooldown(monitorConfig, certID)
 		assert.False(t, shouldSkip, "Should still not skip with zero check cooldown")
 
 		// With zero event cooldown, should always fire
@@ -404,11 +404,11 @@ func TestCertificateCheckMW_CooldownMechanisms(t *testing.T) {
 		certID := "persistence-test-cert"
 
 		// Set up cooldowns
-		mw.shouldSkipCertificate(certID, monitorConfig) // This sets the check cooldown
+		mw.shouldCooldown(monitorConfig, certID)        // This sets the check cooldown
 		mw.shouldFireExpiryEvent(certID, monitorConfig) // This sets the event cooldown
 
 		// Test that cooldowns persist
-		shouldSkip := mw.shouldSkipCertificate(certID, monitorConfig)
+		shouldSkip := mw.shouldCooldown(monitorConfig, certID)
 		assert.True(t, shouldSkip, "Check cooldown should persist")
 
 		shouldFire := mw.shouldFireExpiryEvent(certID, monitorConfig)
@@ -417,7 +417,7 @@ func TestCertificateCheckMW_CooldownMechanisms(t *testing.T) {
 		// Test that different certIDs are not affected
 		differentCertID := "different-persistence-test-cert"
 
-		shouldSkip = mw.shouldSkipCertificate(differentCertID, monitorConfig)
+		shouldSkip = mw.shouldCooldown(monitorConfig, differentCertID)
 		assert.False(t, shouldSkip, "Different certID should not be affected by cooldown")
 
 		shouldFire = mw.shouldFireExpiryEvent(differentCertID, monitorConfig)
@@ -447,7 +447,7 @@ func TestCertificateCheckMW_Concurrency(t *testing.T) {
 				defer wg.Done()
 
 				for j := 0; j < checksPerGoroutine; j++ {
-					shouldSkip := mw.shouldSkipCertificate(certID, mw.Spec.GlobalConfig.Security.CertificateExpiryMonitor)
+					shouldSkip := mw.shouldCooldown(mw.Spec.GlobalConfig.Security.CertificateExpiryMonitor, certID)
 					results <- shouldSkip
 					time.Sleep(time.Microsecond)
 				}
@@ -488,7 +488,7 @@ func TestCertificateCheckMW_Concurrency(t *testing.T) {
 			wg.Add(1)
 			go func() {
 				defer wg.Done()
-				certID := mw.generateCertificateID(cert)
+				certID := mw.computeCertID(cert)
 				results <- certID
 			}()
 		}
@@ -647,7 +647,7 @@ func BenchmarkCertificateCheckMW_ConcurrentChecks(b *testing.B) {
 	b.ResetTimer()
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
-			mw.shouldSkipCertificate(certID, mw.Spec.GlobalConfig.Security.CertificateExpiryMonitor)
+			mw.shouldCooldown(mw.Spec.GlobalConfig.Security.CertificateExpiryMonitor, certID)
 		}
 	})
 }

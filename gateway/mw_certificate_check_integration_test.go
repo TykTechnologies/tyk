@@ -402,27 +402,27 @@ func TestCertificateCheckMW_Integration_CooldownMechanisms(t *testing.T) {
 				certID = ""
 			} else {
 				cert := createIntegrationTestCertificate(15, tc.name+".example.com")
-				certID = mw.generateCertificateID(cert)
+				certID = mw.computeCertID(cert)
 			}
 
 			if tc.typeName == "check" {
 				if tc.zeroCooldown {
 					for i := 0; i < 5; i++ {
-						shouldSkip := mw.shouldSkipCertificate(certID, mw.Spec.GlobalConfig.Security.CertificateExpiryMonitor)
+						shouldSkip := mw.shouldCooldown(mw.Spec.GlobalConfig.Security.CertificateExpiryMonitor, certID)
 						assert.False(t, shouldSkip, "Check should always be allowed with zero cooldown")
 					}
 				} else if tc.emptyID {
-					shouldSkip := mw.shouldSkipCertificate(certID, mw.Spec.GlobalConfig.Security.CertificateExpiryMonitor)
+					shouldSkip := mw.shouldCooldown(mw.Spec.GlobalConfig.Security.CertificateExpiryMonitor, certID)
 					assert.True(t, shouldSkip, "Empty certID should not be allowed")
 				} else {
-					shouldSkip := mw.shouldSkipCertificate(certID, mw.Spec.GlobalConfig.Security.CertificateExpiryMonitor)
+					shouldSkip := mw.shouldCooldown(mw.Spec.GlobalConfig.Security.CertificateExpiryMonitor, certID)
 					assert.False(t, shouldSkip, "First check should be allowed")
-					shouldSkip = mw.shouldSkipCertificate(certID, mw.Spec.GlobalConfig.Security.CertificateExpiryMonitor)
+					shouldSkip = mw.shouldCooldown(mw.Spec.GlobalConfig.Security.CertificateExpiryMonitor, certID)
 					assert.True(t, shouldSkip, "Second check should be blocked by cooldown")
 					// Different certificate
 					differentCert := createIntegrationTestCertificate(15, "different-"+tc.name+".example.com")
-					differentCertID := mw.generateCertificateID(differentCert)
-					shouldSkip = mw.shouldSkipCertificate(differentCertID, mw.Spec.GlobalConfig.Security.CertificateExpiryMonitor)
+					differentCertID := mw.computeCertID(differentCert)
+					shouldSkip = mw.shouldCooldown(mw.Spec.GlobalConfig.Security.CertificateExpiryMonitor, differentCertID)
 					assert.False(t, shouldSkip, "Different certificate should be allowed")
 				}
 			} else {
@@ -460,17 +460,17 @@ func TestCertificateCheckMW_Integration_CooldownIntegration(t *testing.T) {
 		mw.Spec.GlobalConfig.Security.CertificateExpiryMonitor.EventCooldownSeconds = 120 // 2 minutes
 
 		cert := createIntegrationTestCertificate(15, "integration-test.example.com")
-		certID := mw.generateCertificateID(cert)
+		certID := mw.computeCertID(cert)
 
 		// First call: should allow both check and event
-		shouldSkip := mw.shouldSkipCertificate(certID, mw.Spec.GlobalConfig.Security.CertificateExpiryMonitor)
+		shouldSkip := mw.shouldCooldown(mw.Spec.GlobalConfig.Security.CertificateExpiryMonitor, certID)
 		assert.False(t, shouldSkip, "First check should be allowed")
 
 		shouldFire := mw.shouldFireExpiryEvent(certID, mw.Spec.GlobalConfig.Security.CertificateExpiryMonitor)
 		assert.True(t, shouldFire, "First event should be allowed")
 
 		// Second call: should block both check and event due to cooldown
-		shouldSkip = mw.shouldSkipCertificate(certID, mw.Spec.GlobalConfig.Security.CertificateExpiryMonitor)
+		shouldSkip = mw.shouldCooldown(mw.Spec.GlobalConfig.Security.CertificateExpiryMonitor, certID)
 		assert.True(t, shouldSkip, "Second check should be blocked by cooldown")
 
 		shouldFire = mw.shouldFireExpiryEvent(certID, mw.Spec.GlobalConfig.Security.CertificateExpiryMonitor)
@@ -478,7 +478,7 @@ func TestCertificateCheckMW_Integration_CooldownIntegration(t *testing.T) {
 
 		// Different certID should still work
 		differentCertID := "different-integration-cert-id"
-		shouldSkip = mw.shouldSkipCertificate(differentCertID, mw.Spec.GlobalConfig.Security.CertificateExpiryMonitor)
+		shouldSkip = mw.shouldCooldown(mw.Spec.GlobalConfig.Security.CertificateExpiryMonitor, differentCertID)
 		assert.False(t, shouldSkip, "Different certID check should be allowed")
 
 		shouldFire = mw.shouldFireExpiryEvent(differentCertID, mw.Spec.GlobalConfig.Security.CertificateExpiryMonitor)
@@ -492,15 +492,15 @@ func TestCertificateCheckMW_Integration_CooldownIntegration(t *testing.T) {
 
 		cert1 := createIntegrationTestCertificate(15, "integration-test-1.example.com")
 		cert2 := createIntegrationTestCertificate(15, "integration-test-2.example.com")
-		certID1 := mw.generateCertificateID(cert1)
-		certID2 := mw.generateCertificateID(cert2)
+		certID1 := mw.computeCertID(cert1)
+		certID2 := mw.computeCertID(cert2)
 
 		// Set cooldowns for first certificate
-		mw.shouldSkipCertificate(certID1, mw.Spec.GlobalConfig.Security.CertificateExpiryMonitor)
+		mw.shouldCooldown(mw.Spec.GlobalConfig.Security.CertificateExpiryMonitor, certID1)
 		mw.shouldFireExpiryEvent(certID1, mw.Spec.GlobalConfig.Security.CertificateExpiryMonitor)
 
 		// Second certificate should still be allowed
-		shouldSkip := mw.shouldSkipCertificate(certID2, mw.Spec.GlobalConfig.Security.CertificateExpiryMonitor)
+		shouldSkip := mw.shouldCooldown(mw.Spec.GlobalConfig.Security.CertificateExpiryMonitor, certID2)
 		assert.False(t, shouldSkip, "Second certificate check should be allowed")
 
 		shouldFire := mw.shouldFireExpiryEvent(certID2, mw.Spec.GlobalConfig.Security.CertificateExpiryMonitor)
@@ -523,7 +523,7 @@ func TestCertificateCheckMW_Integration_CooldownPersistence(t *testing.T) {
 
 	// Create a test certificate
 	cert := createIntegrationTestCertificate(15, "persistence-integration-test.example.com")
-	certID := mw1.generateCertificateID(cert)
+	certID := mw1.computeCertID(cert)
 	assert.NotEmpty(t, certID)
 
 	// Configure short cooldowns for testing
@@ -536,11 +536,11 @@ func TestCertificateCheckMW_Integration_CooldownPersistence(t *testing.T) {
 	t.Run("Cooldowns persist across instances", func(t *testing.T) {
 		// Test check cooldown persistence
 		// First check should succeed
-		shouldSkip1 := mw1.shouldSkipCertificate(certID, monitorConfig)
+		shouldSkip1 := mw1.shouldCooldown(monitorConfig, certID)
 		assert.False(t, shouldSkip1, "First check should be allowed")
 
 		// Check with different instance should fail (cooldown persists)
-		shouldSkip2 := mw2.shouldSkipCertificate(certID, monitorConfig)
+		shouldSkip2 := mw2.shouldCooldown(monitorConfig, certID)
 		assert.True(t, shouldSkip2, "Check cooldown should persist across instances")
 
 		// Test event cooldown persistence
@@ -653,16 +653,16 @@ func TestCertificateCheckMW_Integration_HelperMethods(t *testing.T) {
 
 	// Test certificate ID generation
 	cert := createIntegrationTestCertificate(30, "helper-test.example.com")
-	certID := mw.generateCertificateID(cert)
+	certID := mw.computeCertID(cert)
 	assert.NotEmpty(t, certID)
 	assert.Len(t, certID, 64) // SHA256 hash length
 
 	// Test with nil certificate
-	nilCertID := mw.generateCertificateID(nil)
+	nilCertID := mw.computeCertID(nil)
 	assert.Empty(t, nilCertID)
 
 	// Test with certificate that has nil Leaf
 	certWithNilLeaf := &tls.Certificate{}
-	nilLeafCertID := mw.generateCertificateID(certWithNilLeaf)
+	nilLeafCertID := mw.computeCertID(certWithNilLeaf)
 	assert.Empty(t, nilLeafCertID)
 }

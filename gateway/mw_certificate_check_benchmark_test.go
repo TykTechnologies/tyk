@@ -179,7 +179,7 @@ func BenchmarkCertificateCheckMW_HelperMethods(b *testing.B) {
 
 	b.Run("GenerateCertificateID", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
-			_ = mw.generateCertificateID(cert)
+			_ = mw.computeCertID(cert)
 		}
 	})
 
@@ -243,7 +243,7 @@ func BenchmarkCertificateCheckMW_MemoryUsage(b *testing.B) {
 	b.Run("CertificateIDGeneration", func(b *testing.B) {
 		b.ReportAllocs()
 		for i := 0; i < b.N; i++ {
-			_ = mw.generateCertificateID(cert)
+			_ = mw.computeCertID(cert)
 		}
 	})
 
