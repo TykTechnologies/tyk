@@ -140,70 +140,127 @@ func (m *CertificateCheckMW) checkCertificateExpiration(certificates []*tls.Cert
 // checkCertificate checks a single certificate for expiration and fires appropriate events
 // based on the certificate's expiry status and configured cooldown periods.
 func (m *CertificateCheckMW) checkCertificate(cert *tls.Certificate, monitorConfig config.CertificateExpiryMonitorConfig, now time.Time) {
-	// Validate certificate is not nil and has a valid Leaf (parsed certificate)
-	if cert == nil || cert.Leaf == nil {
-		log.Warning("Certificate expiry monitor: Skipping nil certificate or certificate with nil Leaf")
+	// Validate certificate and get certificate info
+	certInfo := m.validateAndExtractCertInfo(cert)
+	if certInfo == nil {
 		return
 	}
-
-	// Generate unique certificate ID for tracking and cooldown management
-	certID := m.generateCertificateID(cert)
 
 	// Check if we should skip this certificate based on check cooldown
-	// This prevents checking the same certificate too frequently
-	if m.shouldSkipCertificate(certID, monitorConfig) {
-		if certID != "" {
-			log.Debugf("Certificate expiry monitor: Skipping check for certificate '%s' due to cooldown (ID: %s...)", cert.Leaf.Subject.CommonName, certID[:8])
-		} else {
-			log.Debugf("Certificate expiry monitor: Skipping check for certificate '%s' due to cooldown (ID: empty)", cert.Leaf.Subject.CommonName)
-		}
+	if m.shouldSkipCertificate(certInfo.ID, monitorConfig) {
+		m.logSkipDueToCooldown(certInfo)
 		return
 	}
 
-	// Extract basic certificate information for logging and processing
-	commonName := cert.Leaf.Subject.CommonName
-	hoursUntilExpiry := int(cert.Leaf.NotAfter.Sub(now).Hours())
-
 	// Log the certificate being checked for debugging purposes
-	log.Debugf("Certificate expiry monitor: Checking certificate '%s' - Hours until expiry: %d", commonName, hoursUntilExpiry)
+	m.logCertificateCheck(certInfo)
 
-	// Determine certificate status and handle accordingly
+	// Process certificate based on its expiry status
+	m.processCertificateByStatus(certInfo, monitorConfig)
+}
+
+// certInfo holds certificate information for processing
+type certInfo struct {
+	Certificate      *tls.Certificate
+	ID               string
+	CommonName       string
+	HoursUntilExpiry int
+	IsExpired        bool
+	IsExpiringSoon   bool
+}
+
+// validateAndExtractCertInfo validates the certificate and extracts basic information
+func (m *CertificateCheckMW) validateAndExtractCertInfo(cert *tls.Certificate) *certInfo {
+	if cert == nil || cert.Leaf == nil {
+		log.Warning("Certificate expiry monitor: Skipping nil certificate or certificate with nil Leaf")
+		return nil
+	}
+
+	certID := m.generateCertificateID(cert)
+	commonName := cert.Leaf.Subject.CommonName
+	hoursUntilExpiry := int(cert.Leaf.NotAfter.Sub(time.Now()).Hours())
+
+	return &certInfo{
+		Certificate:      cert,
+		ID:               certID,
+		CommonName:       commonName,
+		HoursUntilExpiry: hoursUntilExpiry,
+		IsExpired:        hoursUntilExpiry < 0,
+		IsExpiringSoon:   hoursUntilExpiry >= 0 && hoursUntilExpiry <= m.Gw.GetConfig().Security.CertificateExpiryMonitor.WarningThresholdDays*24,
+	}
+}
+
+// logSkipDueToCooldown logs when a certificate check is skipped due to cooldown
+func (m *CertificateCheckMW) logSkipDueToCooldown(certInfo *certInfo) {
+	if certInfo.ID != "" {
+		log.Debugf("Certificate expiry monitor: Skipping check for certificate '%s' due to cooldown (ID: %s...)", certInfo.CommonName, certInfo.ID[:8])
+	} else {
+		log.Debugf("Certificate expiry monitor: Skipping check for certificate '%s' due to cooldown (ID: empty)", certInfo.CommonName)
+	}
+}
+
+// logCertificateCheck logs the certificate being checked
+func (m *CertificateCheckMW) logCertificateCheck(certInfo *certInfo) {
+	log.Debugf("Certificate expiry monitor: Checking certificate '%s' - Hours until expiry: %d", certInfo.CommonName, certInfo.HoursUntilExpiry)
+}
+
+// processCertificateByStatus processes the certificate based on its expiry status
+func (m *CertificateCheckMW) processCertificateByStatus(certInfo *certInfo, monitorConfig config.CertificateExpiryMonitorConfig) {
 	switch {
-	case hoursUntilExpiry < 0:
-		// Certificate has already expired (negative hours means past expiry date)
-		if certID != "" {
-			log.Warningf("Certificate expiry monitor: CRITICAL - Certificate '%s' has EXPIRED (ID: %s...)", commonName, certID[:8])
-		} else {
-			log.Warningf("Certificate expiry monitor: CRITICAL - Certificate '%s' has EXPIRED (ID: empty)", commonName)
-		}
-
-	case hoursUntilExpiry <= monitorConfig.WarningThresholdDays*24:
-		// Certificate is expiring soon (within the configured warning threshold)
-		log.Infof("Certificate expiry monitor: Certificate '%s' is expiring soon (%d hours remaining) - checking event cooldown", commonName, hoursUntilExpiry)
-
-		// Check if we should fire the expiring soon event based on event cooldown
-		if m.shouldFireExpiryEvent(certID, monitorConfig) {
-			m.fireCertificateExpiringSoonEvent(cert, hoursUntilExpiry)
-			if certID != "" {
-				log.Infof("Certificate expiry monitor: EXPIRY EVENT FIRED for certificate '%s' - expires in %d hours (ID: %s...)", commonName, hoursUntilExpiry, certID[:8])
-			} else {
-				log.Infof("Certificate expiry monitor: EXPIRY EVENT FIRED for certificate '%s' - expires in %d hours (ID: empty)", commonName, hoursUntilExpiry)
-			}
-		} else {
-			if certID != "" {
-				log.Debugf("Certificate expiry monitor: Event suppressed for certificate '%s' due to cooldown (ID: %s...)", commonName, certID[:8])
-			} else {
-				log.Debugf("Certificate expiry monitor: Event suppressed for certificate '%s' due to cooldown (ID: empty)", commonName)
-			}
-		}
-
+	case certInfo.IsExpired:
+		m.handleExpiredCertificate(certInfo)
+	case certInfo.IsExpiringSoon:
+		m.handleExpiringSoonCertificate(certInfo, monitorConfig)
 	default:
-		// Certificate is healthy (expires beyond the warning threshold)
-		if certID != "" {
-			log.Debugf("Certificate expiry monitor: Certificate '%s' is healthy - expires in %d hours (ID: %s...)", commonName, hoursUntilExpiry, certID[:8])
-		} else {
-			log.Debugf("Certificate expiry monitor: Certificate '%s' is healthy - expires in %d hours (ID: empty)", commonName, hoursUntilExpiry)
-		}
+		m.handleHealthyCertificate(certInfo)
+	}
+}
+
+// handleExpiredCertificate handles certificates that have already expired
+func (m *CertificateCheckMW) handleExpiredCertificate(certInfo *certInfo) {
+	if certInfo.ID != "" {
+		log.Warningf("Certificate expiry monitor: CRITICAL - Certificate '%s' has EXPIRED (ID: %s...)", certInfo.CommonName, certInfo.ID[:8])
+	} else {
+		log.Warningf("Certificate expiry monitor: CRITICAL - Certificate '%s' has EXPIRED (ID: empty)", certInfo.CommonName)
+	}
+}
+
+// handleExpiringSoonCertificate handles certificates that are expiring soon
+func (m *CertificateCheckMW) handleExpiringSoonCertificate(certInfo *certInfo, monitorConfig config.CertificateExpiryMonitorConfig) {
+	log.Infof("Certificate expiry monitor: Certificate '%s' is expiring soon (%d hours remaining) - checking event cooldown", certInfo.CommonName, certInfo.HoursUntilExpiry)
+
+	if m.shouldFireExpiryEvent(certInfo.ID, monitorConfig) {
+		m.fireCertificateExpiringSoonEvent(certInfo.Certificate, certInfo.HoursUntilExpiry)
+		m.logExpiryEventFired(certInfo)
+	} else {
+		m.logExpiryEventSuppressed(certInfo)
+	}
+}
+
+// handleHealthyCertificate handles certificates that are healthy
+func (m *CertificateCheckMW) handleHealthyCertificate(certInfo *certInfo) {
+	if certInfo.ID != "" {
+		log.Debugf("Certificate expiry monitor: Certificate '%s' is healthy - expires in %d hours (ID: %s...)", certInfo.CommonName, certInfo.HoursUntilExpiry, certInfo.ID[:8])
+	} else {
+		log.Debugf("Certificate expiry monitor: Certificate '%s' is healthy - expires in %d hours (ID: empty)", certInfo.CommonName, certInfo.HoursUntilExpiry)
+	}
+}
+
+// logExpiryEventFired logs when an expiry event is fired
+func (m *CertificateCheckMW) logExpiryEventFired(certInfo *certInfo) {
+	if certInfo.ID != "" {
+		log.Infof("Certificate expiry monitor: EXPIRY EVENT FIRED for certificate '%s' - expires in %d hours (ID: %s...)", certInfo.CommonName, certInfo.HoursUntilExpiry, certInfo.ID[:8])
+	} else {
+		log.Infof("Certificate expiry monitor: EXPIRY EVENT FIRED for certificate '%s' - expires in %d hours (ID: empty)", certInfo.CommonName, certInfo.HoursUntilExpiry)
+	}
+}
+
+// logExpiryEventSuppressed logs when an expiry event is suppressed due to cooldown
+func (m *CertificateCheckMW) logExpiryEventSuppressed(certInfo *certInfo) {
+	if certInfo.ID != "" {
+		log.Debugf("Certificate expiry monitor: Event suppressed for certificate '%s' due to cooldown (ID: %s...)", certInfo.CommonName, certInfo.ID[:8])
+	} else {
+		log.Debugf("Certificate expiry monitor: Event suppressed for certificate '%s' due to cooldown (ID: empty)", certInfo.CommonName)
 	}
 }
 
