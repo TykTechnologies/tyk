@@ -393,10 +393,10 @@ func TestCertificateExpiryMonitorConfig(t *testing.T) {
 
 	t.Run("Read and write config with certificate expiry monitor", func(t *testing.T) {
 		// Test different configuration scenarios with descriptive file names:
-		// - warning_1day_check_1sec_event_1sec_workers_1: edge cases with minimum allowed values
+		// - warning_1day_check_1sec_event_1sec_minimal: edge cases with minimum allowed values
 		// Note: Reduced test files to essential scenarios only
 		files := []string{
-			"testdata/cert_monitor_warning_1day_check_1sec_event_1sec_workers_1.json",
+			"testdata/cert_monitor_warning_1day_check_1sec_event_1sec_minimal.json",
 		}
 		for _, f := range files {
 			t.Run(f, func(t *testing.T) {
