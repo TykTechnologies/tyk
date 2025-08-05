@@ -45,7 +45,7 @@ func (m *CertificateCheckMW) ProcessRequest(w http.ResponseWriter, r *http.Reque
 		certIDs := append(m.Spec.ClientCertificates, m.Spec.GlobalConfig.Security.Certificates.API...)
 		apiCerts := m.Gw.CertificateManager.List(certIDs, certs.CertificatePublic)
 		if err := crypto.ValidateRequestCerts(r, apiCerts); err != nil {
-			log.Warning("Certificate validation failed: ", err)
+			log.Warning("[CertificateCheckMW] Certificate validation failed: ", err)
 			return err, http.StatusForbidden
 		}
 
@@ -54,21 +54,14 @@ func (m *CertificateCheckMW) ProcessRequest(w http.ResponseWriter, r *http.Reque
 
 		// Initialize Redis store for cooldowns if not already done
 		if m.store == nil {
+			log.Debug("[CertificateCheckMW] Initializing Redis store for cooldowns.")
 			m.store = &storage.RedisCluster{
 				KeyPrefix:         "cert-cooldown:",
 				ConnectionHandler: m.Gw.StorageConnectionHandler,
 			}
-
 			m.store.Connect()
 		}
 
-		// NOTE: Consider running certificate checks in the background to avoid blocking requests.
-		// This would require:
-		// 1. A background worker pool to process checks asynchronously
-		// 2. A mechanism to track and limit concurrent background checks
-		// 3. Error handling for background task failures
-		// 4. Careful consideration of race conditions and state management
-		// Currently this is a blocking call and will block the request until complete
 		m.checkCertificatesExpiration(apiCerts)
 	}
 
@@ -86,7 +79,7 @@ func (m *CertificateCheckMW) checkCertificatesExpiration(certificates []*tls.Cer
 	monitorConfig := m.Gw.GetConfig().Security.CertificateExpiryMonitor
 	now := time.Now()
 
-	log.Debug("Certificate expiry monitor: Starting check for ", len(certificates), " certificates with warning threshold of ", monitorConfig.WarningThresholdDays, " days")
+	log.Debug("[CertificateCheckMW] Starting expiration check for ", len(certificates), " certificates with warning threshold of ", monitorConfig.WarningThresholdDays, " days")
 
 	// NOTE: In the future, consider using a worker pool pattern instead of spawning a goroutine per certificate.
 	// This would help limit resource usage with large numbers of certificates by:
@@ -96,12 +89,15 @@ func (m *CertificateCheckMW) checkCertificatesExpiration(certificates []*tls.Cer
 	// 4. Allowing for more controlled error handling and retries
 	var wg sync.WaitGroup
 
-	for _, cert := range certificates {
+	for i, cert := range certificates {
+		if cert == nil {
+			continue
+		}
 		wg.Add(1)
-		go func(cert *tls.Certificate) {
+		go func(cert *tls.Certificate, idx int) {
 			defer wg.Done()
 			m.checkCertificate(cert, monitorConfig, now)
-		}(cert)
+		}(cert, i)
 	}
 
 	// Wait for all goroutines to complete
@@ -149,7 +145,7 @@ func (m *CertificateCheckMW) extractCertInfo(cert *tls.Certificate) *certInfo {
 
 	certID := m.generateCertificateID(cert)
 	commonName := cert.Leaf.Subject.CommonName
-	hoursUntilExpiry := int(cert.Leaf.NotAfter.Sub(time.Now()).Hours())
+	hoursUntilExpiry := int(time.Until(cert.Leaf.NotAfter).Hours())
 
 	return &certInfo{
 		Certificate:      cert,
