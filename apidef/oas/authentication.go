@@ -482,7 +482,7 @@ type Scopes struct {
 	// Tyk classic API definition:
 	// - For OIDC: `scopes.oidc.scope_claim_name`
 	// - For JWT: `scopes.jwt.scope_claim_name`
-	ClaimName string `bson:"claimName,omitempty" json:"claimName,omitempty"`
+	ClaimName []string `bson:"claimName,omitempty" json:"claimName,omitempty"`
 
 	// ScopeToPolicyMapping contains the mappings of scopes to policy IDs.
 	//
@@ -494,7 +494,9 @@ type Scopes struct {
 
 // Fill fills *Scopes from *apidef.ScopeClaim.
 func (s *Scopes) Fill(scopeClaim *apidef.ScopeClaim) {
-	s.ClaimName = scopeClaim.ScopeClaimName
+	if scopeClaim.ScopeClaimName != "" {
+		s.ClaimName = []string{scopeClaim.ScopeClaimName}
+	}
 
 	s.ScopeToPolicyMapping = []ScopeToPolicy{}
 
@@ -513,7 +515,9 @@ func (s *Scopes) Fill(scopeClaim *apidef.ScopeClaim) {
 
 // ExtractTo extracts *Scopes to *apidef.ScopeClaim.
 func (s *Scopes) ExtractTo(scopeClaim *apidef.ScopeClaim) {
-	scopeClaim.ScopeClaimName = s.ClaimName
+	if len(s.ClaimName) > 0 {
+		scopeClaim.ScopeClaimName = s.ClaimName[0]
+	}
 
 	scopeClaim.ScopeToPolicy = map[string]string{}
 	for _, v := range s.ScopeToPolicyMapping {

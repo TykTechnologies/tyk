@@ -22,15 +22,40 @@ func TestAuthentication(t *testing.T) {
 }
 
 func TestScopes(t *testing.T) {
-	var emptyScopes Scopes
+	t.Run("default", func(t *testing.T) {
+		var emptyScopes Scopes
 
-	scopeClaim := apidef.ScopeClaim{}
-	emptyScopes.ExtractTo(&scopeClaim)
+		scopeClaim := apidef.ScopeClaim{}
+		emptyScopes.ExtractTo(&scopeClaim)
 
-	var resultScopes Scopes
-	resultScopes.Fill(&scopeClaim)
+		var resultScopes Scopes
+		resultScopes.Fill(&scopeClaim)
 
-	assert.Equal(t, emptyScopes, resultScopes)
+		assert.Equal(t, emptyScopes, resultScopes)
+	})
+	t.Run("fill scope claim", func(t *testing.T) {
+		var emptyScopes Scopes
+
+		scopeClaim := apidef.ScopeClaim{
+			ScopeClaimName: "test",
+		}
+
+		emptyScopes.Fill(&scopeClaim)
+
+		assert.Equal(t, emptyScopes.ClaimName, []string{scopeClaim.ScopeClaimName})
+	})
+
+	t.Run("extract scope claim", func(t *testing.T) {
+		var emptydefScopeClaim apidef.ScopeClaim
+
+		scope := Scopes{
+			ClaimName: []string{"test", "second"},
+		}
+
+		scope.ExtractTo(&emptydefScopeClaim)
+		assert.Equal(t, emptydefScopeClaim.ScopeClaimName, "test")
+	})
+
 }
 
 func TestAuthSources(t *testing.T) {

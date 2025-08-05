@@ -6,6 +6,7 @@ import (
 	"encoding/xml"
 	"errors"
 	"fmt"
+	"github.com/golang-jwt/jwt/v4"
 	"net/http"
 	"text/template"
 	"time"
@@ -1571,7 +1572,7 @@ func DummyAPI() APIDefinition {
 	}
 }
 
-func (a *APIDefinition) GetScopeClaimName() string {
+func (a *APIDefinition) GetScopeClaimName(claims jwt.MapClaims) string {
 	if reflect.IsEmpty(a.Scopes) {
 		return a.JWTScopeClaimName
 	}

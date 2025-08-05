@@ -711,7 +711,7 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 
 	// apply policies from scope if scope-to-policy mapping is specified for this API
 	if len(k.Spec.GetScopeToPolicyMapping()) != 0 {
-		scopeClaimName := k.Spec.GetScopeClaimName()
+		scopeClaimName := k.Spec.GetScopeClaimName(claims)
 		if scopeClaimName == "" {
 			scopeClaimName = "scope"
 		}
