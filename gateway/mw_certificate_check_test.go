@@ -265,15 +265,11 @@ func TestCertificateCheckMW_HelperMethods(t *testing.T) {
 	assert.NotEmpty(t, certID)
 	assert.Len(t, certID, 64) // SHA256 hash is 32 bytes = 64 hex chars
 
-	// Test shouldFireEvent with empty certID
+	// Test shouldFireEvent with valid certID
 	monitorConfig := config.CertificateExpiryMonitorConfig{
 		EventCooldownSeconds: 3600,
 	}
-	shouldFire := mw.shouldFireExpiryEvent("", monitorConfig)
-	assert.False(t, shouldFire)
-
-	// Test shouldFireEvent with valid certID (should fire on first call)
-	shouldFire = mw.shouldFireExpiryEvent("helper-test-cert-id", monitorConfig)
+	shouldFire := mw.shouldFireExpiryEvent("helper-test-cert-id", monitorConfig)
 	assert.True(t, shouldFire)
 
 	// Test shouldFireEvent with same certID (should not fire due to cooldown)
@@ -296,13 +292,13 @@ func TestCertificateCheckMW_CooldownMechanisms(t *testing.T) {
 			CheckCooldownSeconds: 3600, // 1 hour
 		}
 
-		// Test shouldSkipCertificate with empty certID
-		shouldSkip := mw.shouldCooldown(monitorConfig, "")
-		assert.True(t, shouldSkip, "Should skip check with empty certID")
-
 		// Test shouldSkipCertificate with valid certID (should not skip on first call)
-		shouldSkip = mw.shouldCooldown(monitorConfig, "check-cooldown-test-id")
+		shouldSkip := mw.shouldCooldown(monitorConfig, "check-cooldown-test-id")
 		assert.False(t, shouldSkip, "Should not skip check on first call")
+
+		// Test shouldSkipCertificate with same certID (should skip due to cooldown)
+		shouldSkip = mw.shouldCooldown(monitorConfig, "check-cooldown-test-id")
+		assert.True(t, shouldSkip, "Should skip check due to cooldown")
 
 		// Test shouldSkipCertificate with same certID (should skip due to cooldown)
 		shouldSkip = mw.shouldCooldown(monitorConfig, "check-cooldown-test-id")
@@ -324,12 +320,8 @@ func TestCertificateCheckMW_CooldownMechanisms(t *testing.T) {
 			EventCooldownSeconds: 86400, // 24 hours
 		}
 
-		// Test shouldFireExpiryEvent with empty certID
-		shouldFire := mw.shouldFireExpiryEvent("", monitorConfig)
-		assert.False(t, shouldFire)
-
 		// Test shouldFireExpiryEvent with valid certID (should fire on first call)
-		shouldFire = mw.shouldFireExpiryEvent("event-cooldown-test-id", monitorConfig)
+		shouldFire := mw.shouldFireExpiryEvent("event-cooldown-test-id", monitorConfig)
 		assert.True(t, shouldFire)
 
 		// Test shouldFireExpiryEvent with same certID (should not fire due to cooldown)
