@@ -133,7 +133,7 @@ func (m *CertificateCheckMW) checkCertificateExpiration(certificates []*tls.Cert
 // based on the certificate's expiry status and configured cooldown periods.
 func (m *CertificateCheckMW) checkCertificate(cert *tls.Certificate, monitorConfig config.CertificateExpiryMonitorConfig, now time.Time) {
 	// Validate certificate and get certificate info
-	certInfo := m.validateAndExtractCertInfo(cert)
+	certInfo := m.extractCertInfo(cert)
 	if certInfo == nil {
 		return
 	}
@@ -161,8 +161,8 @@ type certInfo struct {
 	IsExpiringSoon   bool
 }
 
-// validateAndExtractCertInfo validates the certificate and extracts basic information
-func (m *CertificateCheckMW) validateAndExtractCertInfo(cert *tls.Certificate) *certInfo {
+// extractCertInfo validates the certificate and extracts basic information
+func (m *CertificateCheckMW) extractCertInfo(cert *tls.Certificate) *certInfo {
 	if cert == nil || cert.Leaf == nil {
 		log.Warning("Certificate expiry monitor: Skipping nil certificate or certificate with nil Leaf")
 		return nil
