@@ -450,7 +450,7 @@ func TestCertificateCheckMW_Integration_HelperMethods(t *testing.T) {
 	cert := createIntegrationTestCertificate(30, "helper-test.example.com")
 	certID := mw.generateCertificateID(cert)
 	assert.NotEmpty(t, certID)
-	assert.Len(t, certID, 40) // SHA1 hash length
+	assert.Len(t, certID, 64) // SHA256 hash length
 
 	// Test with nil certificate
 	nilCertID := mw.generateCertificateID(nil)
