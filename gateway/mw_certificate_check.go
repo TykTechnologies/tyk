@@ -96,6 +96,7 @@ func (m *CertificateCheckMW) checkCertificatesExpiration(certificates []*tls.Cer
 		wg.Add(1)
 		go func(cert *tls.Certificate, idx int) {
 			defer wg.Done()
+			log.Debugf("[CertificateCheckMW] Checking certificate %d/%d", idx+1, len(certificates))
 			m.checkCertificate(cert, monitorConfig, now)
 		}(cert, i)
 	}
