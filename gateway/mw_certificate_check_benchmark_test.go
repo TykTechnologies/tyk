@@ -13,13 +13,12 @@ import (
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/certs/mock"
 	"github.com/TykTechnologies/tyk/config"
-	"github.com/TykTechnologies/tyk/internal/cache"
 	"github.com/TykTechnologies/tyk/storage"
 	"go.uber.org/mock/gomock"
 )
 
-// newBenchmarkCertificateCheckMW creates a middleware instance for benchmarking
-func newBenchmarkCertificateCheckMW(b *testing.B, useMutualTLS bool, certs []*tls.Certificate) *CertificateCheckMW {
+// setupCertificateCheckMWBenchmark creates a middleware instance for benchmarking
+func setupCertificateCheckMWBenchmark(b *testing.B, useMutualTLS bool, certs []*tls.Certificate) *CertificateCheckMW {
 	ctrl := gomock.NewController(b)
 	mockCertManager := mock.NewMockCertificateManager(ctrl)
 
@@ -30,15 +29,11 @@ func newBenchmarkCertificateCheckMW(b *testing.B, useMutualTLS bool, certs []*tl
 			AnyTimes()
 	}
 
-	// Create a cache for testing
-	mockCache := cache.New(3600, 600)
-
 	// Generate unique test prefix for Redis keys to avoid clashes
 	testPrefix := fmt.Sprintf("benchmark-%d-", time.Now().UnixNano())
 
 	gw := &Gateway{
 		CertificateManager: mockCertManager,
-		UtilCache:          mockCache,
 	}
 
 	// Initialize storage connection handler
@@ -132,79 +127,54 @@ func createTestRequest(withTLS bool, peerCerts []*x509.Certificate) *http.Reques
 	return req
 }
 
-// BenchmarkCertificateCheckMW_NoMutualTLS benchmarks the middleware when mutual TLS is disabled
-func BenchmarkCertificateCheckMW_NoMutualTLS(b *testing.B) {
-	mw := newBenchmarkCertificateCheckMW(b, false, nil)
-	req := createTestRequest(false, nil)
-
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		_, _ = mw.ProcessRequest(nil, req, nil)
+// BenchmarkCertificateCheckMW_ProcessRequest benchmarks the main ProcessRequest method
+func BenchmarkCertificateCheckMW_ProcessRequest(b *testing.B) {
+	tests := []struct {
+		name         string
+		useMutualTLS bool
+		certs        []*tls.Certificate
+		withTLS      bool
+		peerCerts    []*x509.Certificate
+	}{
+		{"NoMutualTLS", false, nil, false, nil},
+		{"ValidCertificate", true, []*tls.Certificate{createTestCertificate(60)}, true, []*x509.Certificate{{
+			Raw:        []byte("abc"),
+			NotAfter:   time.Now().Add(time.Hour),
+			Extensions: []pkix.Extension{{Value: []byte("dummy")}},
+		}}},
+		{"ExpiringCertificate", true, []*tls.Certificate{createTestCertificate(15)}, true, []*x509.Certificate{{
+			Raw:        []byte("abc"),
+			NotAfter:   time.Now().Add(time.Hour),
+			Extensions: []pkix.Extension{{Value: []byte("dummy")}},
+		}}},
+		{"MultipleCertificates", true, []*tls.Certificate{
+			createTestCertificate(60),
+			createTestCertificate(15),
+			createTestCertificate(5),
+			createTestCertificate(90),
+		}, true, []*x509.Certificate{{
+			Raw:        []byte("abc"),
+			NotAfter:   time.Now().Add(time.Hour),
+			Extensions: []pkix.Extension{{Value: []byte("dummy")}},
+		}}},
 	}
-}
 
-// BenchmarkCertificateCheckMW_ValidCertificate benchmarks the middleware with valid certificates
-func BenchmarkCertificateCheckMW_ValidCertificate(b *testing.B) {
-	validCert := createTestCertificate(60) // 60 days until expiry
-	mw := newBenchmarkCertificateCheckMW(b, true, []*tls.Certificate{validCert})
+	for _, tc := range tests {
+		b.Run(tc.name, func(b *testing.B) {
+			mw := setupCertificateCheckMWBenchmark(b, tc.useMutualTLS, tc.certs)
+			req := createTestRequest(tc.withTLS, tc.peerCerts)
 
-	peerCert := &x509.Certificate{
-		Raw:        []byte("abc"),
-		NotAfter:   time.Now().Add(time.Hour),
-		Extensions: []pkix.Extension{{Value: []byte("dummy")}},
-	}
-	req := createTestRequest(true, []*x509.Certificate{peerCert})
-
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		_, _ = mw.ProcessRequest(nil, req, nil)
-	}
-}
-
-// BenchmarkCertificateCheckMW_ExpiringCertificate benchmarks the middleware with expiring certificates
-func BenchmarkCertificateCheckMW_ExpiringCertificate(b *testing.B) {
-	expiringCert := createTestCertificate(15) // 15 days until expiry (within threshold)
-	mw := newBenchmarkCertificateCheckMW(b, true, []*tls.Certificate{expiringCert})
-
-	peerCert := &x509.Certificate{
-		Raw:        []byte("abc"),
-		NotAfter:   time.Now().Add(time.Hour),
-		Extensions: []pkix.Extension{{Value: []byte("dummy")}},
-	}
-	req := createTestRequest(true, []*x509.Certificate{peerCert})
-
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		_, _ = mw.ProcessRequest(nil, req, nil)
-	}
-}
-
-// BenchmarkCertificateCheckMW_MultipleCertificates benchmarks the middleware with multiple certificates
-func BenchmarkCertificateCheckMW_MultipleCertificates(b *testing.B) {
-	certs := []*tls.Certificate{
-		createTestCertificate(60), // Valid
-		createTestCertificate(15), // Expiring
-		createTestCertificate(5),  // Critical
-		createTestCertificate(90), // Valid
-	}
-	mw := newBenchmarkCertificateCheckMW(b, true, certs)
-
-	peerCert := &x509.Certificate{
-		Raw:        []byte("abc"),
-		NotAfter:   time.Now().Add(time.Hour),
-		Extensions: []pkix.Extension{{Value: []byte("dummy")}},
-	}
-	req := createTestRequest(true, []*x509.Certificate{peerCert})
-
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		_, _ = mw.ProcessRequest(nil, req, nil)
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				_, _ = mw.ProcessRequest(nil, req, nil)
+			}
+		})
 	}
 }
 
 // BenchmarkCertificateCheckMW_HelperMethods benchmarks the helper methods
 func BenchmarkCertificateCheckMW_HelperMethods(b *testing.B) {
-	mw := newBenchmarkCertificateCheckMW(b, true, nil)
+	mw := setupCertificateCheckMWBenchmark(b, true, nil)
 	cert := createTestCertificate(30)
 
 	b.Run("GenerateCertificateID", func(b *testing.B) {
@@ -229,95 +199,45 @@ func BenchmarkCertificateCheckMW_HelperMethods(b *testing.B) {
 
 // BenchmarkCertificateCheckMW_CheckCertificateExpiration benchmarks the certificate expiration checking logic
 func BenchmarkCertificateCheckMW_CheckCertificateExpiration(b *testing.B) {
-	mw := newBenchmarkCertificateCheckMW(b, true, nil)
+	mw := setupCertificateCheckMWBenchmark(b, true, nil)
 
-	b.Run("NoExpiringCertificates", func(b *testing.B) {
-		certs := []*tls.Certificate{
+	tests := []struct {
+		name  string
+		certs []*tls.Certificate
+	}{
+		{"NoExpiringCertificates", []*tls.Certificate{
 			createTestCertificate(60),
 			createTestCertificate(90),
 			createTestCertificate(120),
-		}
-		b.ResetTimer()
-		for i := 0; i < b.N; i++ {
-			mw.checkCertificateExpiration(certs)
-		}
-	})
-
-	b.Run("WithExpiringCertificates", func(b *testing.B) {
-		certs := []*tls.Certificate{
+		}},
+		{"WithExpiringCertificates", []*tls.Certificate{
 			createTestCertificate(60),
-			createTestCertificate(15), // Expiring
-			createTestCertificate(5),  // Critical
+			createTestCertificate(15),
+			createTestCertificate(5),
 			createTestCertificate(90),
-		}
-		b.ResetTimer()
-		for i := 0; i < b.N; i++ {
-			mw.checkCertificateExpiration(certs)
-		}
-	})
-
-	b.Run("MixedCertificates", func(b *testing.B) {
-		certs := []*tls.Certificate{
+		}},
+		{"MixedCertificates", []*tls.Certificate{
 			createTestCertificate(60),
-			createTestCertificate(15), // Expiring
+			createTestCertificate(15),
 			createTestCertificate(90),
-			createTestCertificate(3), // Critical
+			createTestCertificate(3),
 			createTestCertificate(45),
-		}
-		b.ResetTimer()
-		for i := 0; i < b.N; i++ {
-			mw.checkCertificateExpiration(certs)
-		}
-	})
-}
+		}},
+	}
 
-// BenchmarkCertificateCheckMW_CacheOperations benchmarks Redis cache operations
-func BenchmarkCertificateCheckMW_CacheOperations(b *testing.B) {
-	mw := newBenchmarkCertificateCheckMW(b, true, nil)
-	monitorConfig := mw.Spec.GlobalConfig.Security.CertificateExpiryMonitor
-
-	b.Run("CacheGet", func(b *testing.B) {
-		for i := 0; i < b.N; i++ {
-			_, _ = mw.Gw.UtilCache.Get("test-key")
-		}
-	})
-
-	b.Run("CacheSet", func(b *testing.B) {
-		for i := 0; i < b.N; i++ {
-			mw.Gw.UtilCache.Set("test-key", "test-value", 3600)
-		}
-	})
-
-	b.Run("ShouldFireEventWithCache", func(b *testing.B) {
-		for i := 0; i < b.N; i++ {
-			certID := "benchmark-cert-id"
-			_ = mw.shouldFireExpiryEvent(certID, monitorConfig)
-		}
-	})
-}
-
-// BenchmarkCertificateCheckMW_EventFiring benchmarks event firing performance
-func BenchmarkCertificateCheckMW_EventFiring(b *testing.B) {
-	mw := newBenchmarkCertificateCheckMW(b, true, nil)
-	cert := createTestCertificate(15)
-
-	b.Run("EventFiringOnly", func(b *testing.B) {
-		for i := 0; i < b.N; i++ {
-			mw.fireCertificateExpiringSoonEvent(cert, 15)
-		}
-	})
-
-	b.Run("FullExpirationCheck", func(b *testing.B) {
-		certs := []*tls.Certificate{cert}
-		for i := 0; i < b.N; i++ {
-			mw.checkCertificateExpiration(certs)
-		}
-	})
+	for _, tc := range tests {
+		b.Run(tc.name, func(b *testing.B) {
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				mw.checkCertificatesExpiration(tc.certs)
+			}
+		})
+	}
 }
 
 // BenchmarkCertificateCheckMW_MemoryUsage benchmarks memory usage patterns
 func BenchmarkCertificateCheckMW_MemoryUsage(b *testing.B) {
-	mw := newBenchmarkCertificateCheckMW(b, true, nil)
+	mw := setupCertificateCheckMWBenchmark(b, true, nil)
 	cert := createTestCertificate(15)
 
 	b.Run("CertificateIDGeneration", func(b *testing.B) {

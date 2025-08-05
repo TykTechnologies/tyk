@@ -6,7 +6,6 @@ import (
 	"encoding/hex"
 	"fmt"
 	"net/http"
-	"runtime"
 	"sync"
 	"time"
 
@@ -70,14 +69,14 @@ func (m *CertificateCheckMW) ProcessRequest(w http.ResponseWriter, r *http.Reque
 		// 3. Error handling for background task failures
 		// 4. Careful consideration of race conditions and state management
 		// Currently this is a blocking call and will block the request until complete
-		m.checkCertificateExpiration(apiCerts)
+		m.checkCertificatesExpiration(apiCerts)
 	}
 
 	return nil, http.StatusOK
 }
 
-// checkCertificateExpiration checks if certificates are expiring soon and fires events
-func (m *CertificateCheckMW) checkCertificateExpiration(certificates []*tls.Certificate) {
+// checkCertificatesExpiration checks if certificates are expiring soon and fires events
+func (m *CertificateCheckMW) checkCertificatesExpiration(certificates []*tls.Certificate) {
 	// Safety check for tests where gateway might not be fully initialized
 	if m.Gw == nil {
 		log.Warning("Certificate expiry monitor: Gateway not initialized, skipping certificate checks")
@@ -89,43 +88,23 @@ func (m *CertificateCheckMW) checkCertificateExpiration(certificates []*tls.Cert
 
 	log.Debug("Certificate expiry monitor: Starting check for ", len(certificates), " certificates with warning threshold of ", monitorConfig.WarningThresholdDays, " days")
 
-	// Use a worker pool to process certificates in parallel
-	// Calculate optimal worker count based on the following rules:
-	// - For 2 or fewer certificates, use a single worker since parallelization overhead isn't worth it
-	// - For 3-10 certificates, use 3 workers for good balance of parallelism and overhead
-	// - For more than 10 certificates, use number of CPU cores to prevent system overload
-	var maxWorkers int
-	if len(certificates) <= 2 {
-		maxWorkers = 1
-	} else if len(certificates) <= 10 {
-		maxWorkers = 3
-	} else {
-		maxWorkers = runtime.NumCPU()
-	}
-
-	// Create a channel to send certificates to workers
-	certChan := make(chan *tls.Certificate, len(certificates))
+	// NOTE: In the future, consider using a worker pool pattern instead of spawning a goroutine per certificate.
+	// This would help limit resource usage with large numbers of certificates by:
+	// 1. Using a fixed number of worker goroutines
+	// 2. Processing certificates through a buffered channel
+	// 3. Providing better backpressure handling
+	// 4. Allowing for more controlled error handling and retries
 	var wg sync.WaitGroup
 
-	// Start workers
-	for i := 0; i < maxWorkers; i++ {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			for cert := range certChan {
-				m.checkCertificate(cert, monitorConfig, now)
-			}
-		}()
-	}
-
-	// Send certificates to workers
 	for _, cert := range certificates {
-		certChan <- cert
+		wg.Add(1)
+		go func(cert *tls.Certificate) {
+			defer wg.Done()
+			m.checkCertificate(cert, monitorConfig, now)
+		}(cert)
 	}
 
-	close(certChan)
-
-	// Wait for all workers to complete
+	// Wait for all goroutines to complete
 	wg.Wait()
 }
 
