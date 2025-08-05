@@ -1049,7 +1049,9 @@ func TestJWTExtraClaimsValidation(t *testing.T) {
 		{
 			name: "valid jti when required",
 			oasConfig: &oas.JWT{
-				RequireJTI: true,
+				JTIValidation: oas.JTIValidation{
+					Enabled: true,
+				},
 			},
 			claims: jwt.MapClaims{
 				"jti": "123",
@@ -1059,7 +1061,9 @@ func TestJWTExtraClaimsValidation(t *testing.T) {
 		{
 			name: "missing jti when required",
 			oasConfig: &oas.JWT{
-				RequireJTI: true,
+				JTIValidation: oas.JTIValidation{
+					Enabled: true,
+				},
 			},
 			claims:        jwt.MapClaims{},
 			expectError:   true,
@@ -3373,6 +3377,99 @@ func Test_getOAuthClientIDFromClaim(t *testing.T) {
 			oauthClientID := j.getOAuthClientIDFromClaim(tc.claims)
 
 			assert.Equal(t, tc.expectedClientID, oauthClientID)
+		})
+	}
+}
+
+// TestJWTMiddleware_getScopeClaimNameOAS tests the getScopeClaimNameOAS function with various scenarios
+func TestJWTMiddleware_getScopeClaimNameOAS(t *testing.T) {
+	tests := []struct {
+		name       string
+		claimNames []string
+		claims     jwt.MapClaims
+		want       string
+	}{
+		{
+			name:       "empty claims and empty claim names",
+			claimNames: []string{},
+			claims:     jwt.MapClaims{},
+			want:       "",
+		},
+		{
+			name:       "claim exists - single claim name",
+			claimNames: []string{"scope"},
+			claims: jwt.MapClaims{
+				"scope": "read write",
+			},
+			want: "scope",
+		},
+		{
+			name:       "claim exists - multiple claim names, first match",
+			claimNames: []string{"scp", "scope", "permissions"},
+			claims: jwt.MapClaims{
+				"scope": "read write",
+				"scp":   "admin",
+			},
+			want: "scp",
+		},
+		{
+			name:       "claim exists - multiple claim names, last match",
+			claimNames: []string{"scp", "scope", "permissions"},
+			claims: jwt.MapClaims{
+				"permissions": "read write",
+			},
+			want: "permissions",
+		},
+		{
+			name:       "no matching claims",
+			claimNames: []string{"scope", "scp"},
+			claims: jwt.MapClaims{
+				"roles": "admin",
+				"sub":   "1234",
+			},
+			want: "",
+		},
+		{
+			name:       "case sensitive match",
+			claimNames: []string{"Scope", "scope"},
+			claims: jwt.MapClaims{
+				"Scope": "read write",
+				"scope": "admin",
+			},
+			want: "Scope",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var api apidef.APIDefinition
+			api.EnableJWT = true
+			api.AuthConfigs = map[string]apidef.AuthConfig{
+				apidef.JWTType: {
+					Name:           "jwtAuth",
+					AuthHeaderName: "Authorization",
+				},
+			}
+			api.IsOAS = true
+
+			var o oas.OAS
+			o.SetTykExtension(&oas.XTykAPIGateway{})
+			o.Fill(api)
+			o.GetJWTConfiguration().Scopes = &oas.Scopes{
+				ClaimName: tt.claimNames,
+			}
+			mw := JWTMiddleware{
+				BaseMiddleware: &BaseMiddleware{
+					Spec: &APISpec{
+						OAS:           o,
+						APIDefinition: &api,
+					},
+				},
+			}
+			got := mw.getScopeClaimNameOAS(tt.claims)
+			if got != tt.want {
+				t.Errorf("getScopeClaimNameOAS() = %v, want %v", got, tt.want)
+			}
 		})
 	}
 }

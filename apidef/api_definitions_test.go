@@ -229,7 +229,7 @@ func TestAPIDefinition_GetScopeClaimName(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			apiDef := getAPIDef(tc.deprecatedScopeName, tc.jwtScopeName, tc.oidcScopeName, tc.useOIDC)
-			assert.Equal(t, tc.expectedScopeName, apiDef.GetScopeClaimName(nil))
+			assert.Equal(t, tc.expectedScopeName, apiDef.GetScopeClaimName())
 		})
 	}
 }

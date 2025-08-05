@@ -186,7 +186,7 @@ func (k *OpenIDMW) ProcessRequest(w http.ResponseWriter, r *http.Request, _ inte
 	if !useScope {
 		policiesToApply = append(policiesToApply, policyID)
 	} else {
-		scopeClaimName := k.Spec.GetScopeClaimName(nil)
+		scopeClaimName := k.Spec.GetScopeClaimName()
 		if scopeClaimName == "" {
 			scopeClaimName = "scope"
 		}

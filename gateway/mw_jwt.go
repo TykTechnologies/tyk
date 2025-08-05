@@ -711,7 +711,10 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 
 	// apply policies from scope if scope-to-policy mapping is specified for this API
 	if len(k.Spec.GetScopeToPolicyMapping()) != 0 {
-		scopeClaimName := k.Spec.GetScopeClaimName(claims)
+		scopeClaimName := k.Spec.GetScopeClaimName()
+		if k.Spec.IsOAS {
+			scopeClaimName = k.getScopeClaimNameOAS(claims)
+		}
 		if scopeClaimName == "" {
 			scopeClaimName = "scope"
 		}
@@ -823,6 +826,18 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 	ctxSetJWTContextVars(k.Spec, r, token)
 
 	return nil, http.StatusOK
+}
+
+func (k *JWTMiddleware) getScopeClaimNameOAS(claims jwt.MapClaims) string {
+	claimNames := k.Spec.OAS.GetJWTConfiguration().Scopes.ClaimName
+	for _, claimName := range claimNames {
+		for k, _ := range claims {
+			if k == claimName {
+				return claimName
+			}
+		}
+	}
+	return ""
 }
 
 func (k *JWTMiddleware) reportLoginFailure(tykId string, r *http.Request) {
@@ -1074,7 +1089,7 @@ func (k *JWTMiddleware) validateExtraClaims(claims jwt.Claims, token *jwt.Token)
 	}
 
 	// JWT ID validation
-	if jwtConfig.RequireJTI {
+	if jwtConfig.JTIValidation.Enabled {
 		if err := validateJTI(claims); err != nil {
 			k.Logger().WithError(err).Error("JWT ID validation failed")
 			return err

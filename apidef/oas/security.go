@@ -172,9 +172,8 @@ type JWT struct {
 	// When configured, the JWT's audience claim must match one of these values.
 	AllowedAudiences []string `bson:"allowedAudiences,omitempty" json:"allowedAudiences,omitempty"`
 
-	// RequireJTI indicates whether JWT ID claim is required.
-	// When true, tokens must include a 'jti' claim.
-	RequireJTI bool `bson:"requireJTI,omitempty" json:"requireJTI,omitempty"`
+	// JTIValidation contains the configuration for the validation of the JWT ID.
+	JTIValidation JTIValidation `bson:"jtiValidation,omitempty" json:"jtiValidation,omitempty"`
 
 	// AllowedSubjects contains a list of accepted subjects for JWT validation.
 	// When configured, the subject from kid/identityBaseField/sub must match one of these values.
@@ -186,6 +185,12 @@ type JWT struct {
 	//
 	// Tyk classic API definition: `idp_client_id_mapping_disabled`.
 	IDPClientIDMappingDisabled bool `bson:"idpClientIdMappingDisabled,omitempty" json:"idpClientIdMappingDisabled,omitempty"`
+}
+
+type JTIValidation struct {
+	// Enabled indicates whether JWT ID claim is required.
+	// When true, tokens must include a 'jti' claim.
+	Enabled bool `bson:"enabled" json:"enabled"`
 }
 
 // Import populates *JWT based on arguments.
