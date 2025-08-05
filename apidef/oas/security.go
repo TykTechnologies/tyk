@@ -132,7 +132,7 @@ type JWT struct {
 	// The policy is applied to the session as a base policy.
 	//
 	// Tyk classic API definition: `jwt_policy_field_name`
-	PolicyFieldName string `bson:"policyFieldName,omitempty" json:"policyFieldName,omitempty"`
+	PolicyFieldName []string `bson:"policyFieldName,omitempty" json:"policyFieldName,omitempty"`
 
 	// ClientBaseField is used when PolicyFieldName is not provided. It will get
 	// a session key and use the policies from that. The field ensures that requests
@@ -231,7 +231,9 @@ func (s *OAS) fillJWT(api apidef.APIDefinition) {
 		jwt.IdentityBaseField = []string{api.JWTIdentityBaseField}
 	}
 	jwt.SkipKid = api.JWTSkipKid
-	jwt.PolicyFieldName = api.JWTPolicyFieldName
+	if api.JWTPolicyFieldName != "" {
+		jwt.PolicyFieldName = []string{api.JWTPolicyFieldName}
+	}
 	jwt.ClientBaseField = api.JWTClientIDBaseField
 
 	if jwt.Scopes == nil {
@@ -269,7 +271,9 @@ func (s *OAS) extractJWTTo(api *apidef.APIDefinition, name string) {
 		api.JWTIdentityBaseField = jwt.IdentityBaseField[0]
 	}
 	api.JWTSkipKid = jwt.SkipKid
-	api.JWTPolicyFieldName = jwt.PolicyFieldName
+	if len(jwt.PolicyFieldName) > 0 {
+		api.JWTPolicyFieldName = jwt.PolicyFieldName[0]
+	}
 	api.JWTClientIDBaseField = jwt.ClientBaseField
 
 	if jwt.Scopes != nil {

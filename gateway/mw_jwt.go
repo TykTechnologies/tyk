@@ -379,18 +379,35 @@ func jwkURLsChanged(a, b []apidef.JWK) bool {
 }
 
 func (k *JWTMiddleware) getPolicyIDFromToken(claims jwt.MapClaims) (string, bool) {
-	policyID, foundPolicy := claims[k.Spec.JWTPolicyFieldName].(string)
-	if !foundPolicy {
-		k.Logger().Debugf("Could not identify a policy to apply to this token from field: %s", k.Spec.JWTPolicyFieldName)
-		return "", false
-	}
+	if k.Spec.IsOAS {
+		policyID := ""
+		found := false
+		fieldNames := k.Spec.OAS.GetJWTConfiguration().PolicyFieldName
+		for _, c := range fieldNames {
+			policyID, found = claims[c].(string)
+			if found {
+				break
+			}
+		}
 
-	if policyID == "" {
-		k.Logger().Errorf("Policy field %s has empty value", k.Spec.JWTPolicyFieldName)
-		return "", false
-	}
+		if !found || policyID == "" {
+			k.Logger().Debugf("Could not identify a policy to apply to this token from fields: %v", fieldNames)
+			return "", false
+		}
+		return policyID, true
+	} else {
+		policyID, foundPolicy := claims[k.Spec.JWTPolicyFieldName].(string)
+		if !foundPolicy {
+			k.Logger().Debugf("Could not identify a policy to apply to this token from field: %s", k.Spec.JWTPolicyFieldName)
+			return "", false
+		}
 
-	return policyID, true
+		if policyID == "" {
+			k.Logger().Errorf("Policy field %s has empty value", k.Spec.JWTPolicyFieldName)
+			return "", false
+		}
+		return policyID, true
+	}
 }
 
 func (k *JWTMiddleware) getBasePolicyID(r *http.Request, claims jwt.MapClaims) (policyID string, found bool) {

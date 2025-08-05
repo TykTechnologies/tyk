@@ -1150,6 +1150,134 @@ func TestJWTExtraClaimsValidation(t *testing.T) {
 	}
 }
 
+func TestGetPolicyIDFromToken(t *testing.T) {
+	testCases := []struct {
+		name         string
+		claims       jwt.MapClaims
+		expected     string
+		expectedBool bool
+		modifySpec   func(spec *APISpec)
+	}{
+		{
+			name: "default case",
+			claims: jwt.MapClaims{
+				"policy": "mainpolicy",
+			},
+			expectedBool: true,
+			expected:     "mainpolicy",
+			modifySpec: func(spec *APISpec) {
+				spec.IsOAS = false
+				spec.JWTPolicyFieldName = "policy"
+			},
+		},
+		{
+			name: "is classic missing",
+			claims: jwt.MapClaims{
+				"random": "test",
+			},
+			expectedBool: false,
+			expected:     "",
+			modifySpec: func(spec *APISpec) {
+				spec.IsOAS = false
+				spec.JWTPolicyFieldName = "policy"
+			},
+		},
+		{
+			name: "is classic empty",
+			claims: jwt.MapClaims{
+				"policy": "",
+			},
+			expectedBool: false,
+			expected:     "",
+			modifySpec: func(spec *APISpec) {
+				spec.IsOAS = false
+				spec.JWTPolicyFieldName = "policy"
+			},
+		},
+		{
+			name: "is oas",
+			claims: jwt.MapClaims{
+				"policy": "mainpolicy",
+			},
+			expectedBool: true,
+			expected:     "mainpolicy",
+			modifySpec: func(spec *APISpec) {
+				spec.IsOAS = true
+				spec.OAS.GetJWTConfiguration().PolicyFieldName = []string{"policy", "backuppolicy"}
+				spec.OAS.ExtractTo(spec.APIDefinition)
+			},
+		},
+		{
+			name: "is oas second",
+			claims: jwt.MapClaims{
+				"backuppolicy": "mainpolicy",
+			},
+			expectedBool: true,
+			expected:     "mainpolicy",
+			modifySpec: func(spec *APISpec) {
+				spec.IsOAS = true
+				spec.OAS.GetJWTConfiguration().PolicyFieldName = []string{"policy", "backuppolicy"}
+				spec.OAS.ExtractTo(spec.APIDefinition)
+			},
+		},
+		{
+			name: "is oas missing",
+			claims: jwt.MapClaims{
+				"random": "mainpolicy",
+			},
+			expectedBool: false,
+			expected:     "",
+			modifySpec: func(spec *APISpec) {
+				spec.IsOAS = true
+				spec.OAS.GetJWTConfiguration().PolicyFieldName = []string{"policy", "backuppolicy"}
+				spec.OAS.ExtractTo(spec.APIDefinition)
+			},
+		},
+		{
+			name: "empty value",
+			claims: jwt.MapClaims{
+				"policy": "",
+			},
+			expectedBool: false,
+			expected:     "",
+			modifySpec: func(spec *APISpec) {
+				spec.IsOAS = true
+				spec.OAS.GetJWTConfiguration().PolicyFieldName = []string{"policy", "backuppolicy"}
+				spec.OAS.ExtractTo(spec.APIDefinition)
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			var api apidef.APIDefinition
+			api.EnableJWT = true
+			api.AuthConfigs = map[string]apidef.AuthConfig{
+				apidef.JWTType: {
+					Name:           "jwtAuth",
+					AuthHeaderName: "Authorization",
+				},
+			}
+
+			var o oas.OAS
+			o.SetTykExtension(&oas.XTykAPIGateway{})
+			o.Fill(api)
+
+			spec := &APISpec{
+				APIDefinition: &api,
+				OAS:           o,
+			}
+
+			tc.modifySpec(spec)
+
+			k := JWTMiddleware{&BaseMiddleware{Spec: spec}}
+			gotten, gottenBool := k.getPolicyIDFromToken(tc.claims)
+			assert.Equal(t, tc.expected, gotten)
+			assert.Equal(t, tc.expectedBool, gottenBool)
+		})
+	}
+}
+
 func TestJWTScopeToPolicyMapping(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()

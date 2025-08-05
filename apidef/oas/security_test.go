@@ -38,6 +38,34 @@ func TestGetJWTConfiguration(t *testing.T) {
 		assert.Equal(t, j.AllowedAudiences, gotten.AllowedAudiences)
 	})
 
+	t.Run("should successfully convert identity and policy and return", func(t *testing.T) {
+		var api apidef.APIDefinition
+		api.EnableJWT = true
+		api.AuthConfigs = map[string]apidef.AuthConfig{
+			apidef.JWTType: {
+				Name:           "jwtAuth",
+				AuthHeaderName: "Authorization",
+			},
+		}
+		api.JWTIdentityBaseField = "new_sub"
+		api.JWTPolicyFieldName = "policy"
+
+		var oas OAS
+		oas.Fill(api)
+
+		j := oas.GetJWTConfiguration()
+		assert.Equal(t, j.IdentityBaseField[0], "new_sub")
+		assert.Equal(t, j.PolicyFieldName[0], "policy")
+
+		var newAPIDef apidef.APIDefinition
+		oas.GetJWTConfiguration().PolicyFieldName = []string{"policy", "backup_policy"}
+		oas.GetJWTConfiguration().IdentityBaseField = []string{"new_sub", "second_sub"}
+		oas.ExtractTo(&newAPIDef)
+
+		assert.Equal(t, "policy", newAPIDef.JWTPolicyFieldName)
+		assert.Equal(t, "new_sub", newAPIDef.JWTIdentityBaseField)
+	})
+
 	t.Run("should return nil", func(t *testing.T) {
 		var auth apidef.AuthConfig
 		Fill(t, &auth, 0)
