@@ -62,12 +62,24 @@ var (
 		PIDFileLocation: "/var/run/tyk/tyk-gateway.pid",
 		Security: SecurityConfig{
 			CertificateExpiryMonitor: CertificateExpiryMonitorConfig{
-				WarningThresholdDays: 30,
-				CheckCooldownSeconds: 3600,
-				EventCooldownSeconds: 86400,
+				WarningThresholdDays: DefaultWarningThresholdDays,
+				CheckCooldownSeconds: DefaultCheckCooldownSeconds,
+				EventCooldownSeconds: DefaultEventCooldownSeconds,
 			},
 		},
 	}
+)
+
+// Certificate monitor constants
+const (
+	// DefaultWarningThresholdDays is the default number of days before certificate expiration to start sending notifications
+	DefaultWarningThresholdDays = 30
+
+	// DefaultCheckCooldownSeconds is the default minimum time in seconds between certificate expiration checks
+	DefaultCheckCooldownSeconds = 3600 // 1 hour
+
+	// DefaultEventCooldownSeconds is the default minimum time in seconds between firing the same certificate expiration event
+	DefaultEventCooldownSeconds = 86400 // 24 hours
 )
 
 const (
@@ -621,15 +633,15 @@ type CertificatesConfig struct {
 // CertificateExpiryMonitorConfig configures the certificate expiration notification feature
 type CertificateExpiryMonitorConfig struct {
 	// WarningThresholdDays specifies the number of days before certificate expiration to start sending notifications
-	// Default: 30 days
+	// Default: DefaultWarningThresholdDays (30 days)
 	WarningThresholdDays int `json:"warning_threshold_days"`
 
 	// CheckCooldownSeconds specifies the minimum time in seconds between certificate expiration checks
-	// Default: 3600 seconds (1 hour)
+	// Default: DefaultCheckCooldownSeconds (3600 seconds = 1 hour)
 	CheckCooldownSeconds int `json:"check_cooldown_seconds"`
 
 	// EventCooldownSeconds specifies the minimum time in seconds between firing the same certificate expiration event
-	// Default: 86400 seconds (24 hours)
+	// Default: DefaultEventCooldownSeconds (86400 seconds = 24 hours)
 	EventCooldownSeconds int `json:"event_cooldown_seconds"`
 }
 

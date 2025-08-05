@@ -399,10 +399,12 @@ func TestCertificateCheckMW_Integration_CooldownMechanisms(t *testing.T) {
 
 			if tc.typeName == "check" {
 				if tc.zeroCooldown {
-					for i := 0; i < 5; i++ {
-						shouldSkip := mw.shouldCooldown(mw.Spec.GlobalConfig.Security.CertificateExpiryMonitor, certID)
-						assert.False(t, shouldSkip, "Check should always be allowed with zero cooldown")
-					}
+					// First check should be allowed (uses default cooldown)
+					shouldSkip := mw.shouldCooldown(mw.Spec.GlobalConfig.Security.CertificateExpiryMonitor, certID)
+					assert.False(t, shouldSkip, "First check should be allowed with zero cooldown (uses default)")
+					// Second check should be blocked (uses default cooldown)
+					shouldSkip = mw.shouldCooldown(mw.Spec.GlobalConfig.Security.CertificateExpiryMonitor, certID)
+					assert.True(t, shouldSkip, "Second check should be blocked with zero cooldown (uses default)")
 				} else {
 					shouldSkip := mw.shouldCooldown(mw.Spec.GlobalConfig.Security.CertificateExpiryMonitor, certID)
 					assert.False(t, shouldSkip, "First check should be allowed")
@@ -416,10 +418,12 @@ func TestCertificateCheckMW_Integration_CooldownMechanisms(t *testing.T) {
 				}
 			} else {
 				if tc.zeroCooldown {
-					for i := 0; i < 5; i++ {
-						shouldFire := mw.shouldFireExpiryEvent(certID, mw.Spec.GlobalConfig.Security.CertificateExpiryMonitor)
-						assert.True(t, shouldFire, "Event should always be allowed with zero cooldown")
-					}
+					// First event should be allowed (uses default cooldown)
+					shouldFire := mw.shouldFireExpiryEvent(certID, mw.Spec.GlobalConfig.Security.CertificateExpiryMonitor)
+					assert.True(t, shouldFire, "First event should be allowed with zero cooldown (uses default)")
+					// Second event should be blocked (uses default cooldown)
+					shouldFire = mw.shouldFireExpiryEvent(certID, mw.Spec.GlobalConfig.Security.CertificateExpiryMonitor)
+					assert.False(t, shouldFire, "Second event should be blocked with zero cooldown (uses default)")
 				} else {
 					shouldFire := mw.shouldFireExpiryEvent(certID, mw.Spec.GlobalConfig.Security.CertificateExpiryMonitor)
 					assert.True(t, shouldFire, "First event should be allowed")
