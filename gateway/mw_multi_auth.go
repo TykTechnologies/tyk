@@ -23,10 +23,10 @@ type MultiAuthMiddleware struct {
 
 // AuthRequirement represents one authentication requirement with its middleware chain.
 type AuthRequirement struct {
-	Name         string
-	Schemes      map[string][]string
-	Middlewares  []TykMiddleware
-	AuthType     apidef.AuthTypeEnum
+	Name        string
+	Schemes     map[string][]string
+	Middlewares []TykMiddleware
+	AuthType    apidef.AuthTypeEnum
 }
 
 // Name returns the middleware name.
@@ -53,7 +53,7 @@ func (m *MultiAuthMiddleware) Init() {
 	// Initialize authentication requirements from OAS configuration
 	if auth := m.Spec.OAS.GetTykExtension().Server.Authentication; auth != nil && auth.MultiAuth != nil {
 		m.authRequirements = make([]AuthRequirement, 0, len(auth.MultiAuth.Requirements))
-		
+
 		for _, req := range auth.MultiAuth.Requirements {
 			authReq := AuthRequirement{
 				Name:        req.Name,
@@ -63,7 +63,7 @@ func (m *MultiAuthMiddleware) Init() {
 
 			// Build middleware chain for this requirement
 			authReq.AuthType = m.buildMiddlewareChain(&authReq)
-			
+
 			m.authRequirements = append(m.authRequirements, authReq)
 		}
 	}
@@ -72,7 +72,7 @@ func (m *MultiAuthMiddleware) Init() {
 // buildMiddlewareChain creates middleware instances for a specific auth requirement.
 func (m *MultiAuthMiddleware) buildMiddlewareChain(authReq *AuthRequirement) apidef.AuthTypeEnum {
 	var primaryAuthType apidef.AuthTypeEnum = apidef.AuthTypeNone
-	
+
 	for schemeName := range authReq.Schemes {
 		if m.Spec.IsOAS {
 			if securityScheme := m.Spec.OAS.Components.SecuritySchemes[schemeName]; securityScheme != nil {
@@ -106,7 +106,7 @@ func (m *MultiAuthMiddleware) buildMiddlewareChain(authReq *AuthRequirement) api
 						} else {
 							// Create default basic auth config
 							defaultConfig := apidef.AuthConfig{
-								Name:         schemeName,
+								Name:          schemeName,
 								DisableHeader: false,
 							}
 							middleware.Spec.AuthConfigs = map[string]apidef.AuthConfig{
@@ -144,7 +144,7 @@ func (m *MultiAuthMiddleware) buildMiddlewareChain(authReq *AuthRequirement) api
 			}
 		}
 	}
-	
+
 	return primaryAuthType
 }
 
@@ -209,17 +209,15 @@ func (m *MultiAuthMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 		}
 		return fmt.Errorf("%v", lastError), http.StatusUnauthorized
 	}
-	
+
 	// Fallback error if no auth errors were captured
 	return fmt.Errorf(MsgApiAccessDisallowed), http.StatusUnauthorized
 }
 
 // setBaseIdentityProvider sets the BaseIdentityProvider in the request context.
 func (m *MultiAuthMiddleware) setBaseIdentityProvider(r *http.Request, authType apidef.AuthTypeEnum) {
-	// Store the successful auth type in request context for later use
 	ctx := context.WithValue(r.Context(), "multiauth_successful_type", authType)
 	*r = *r.WithContext(ctx)
-	
 }
 
 // Config returns the middleware configuration.
@@ -229,7 +227,6 @@ func (m *MultiAuthMiddleware) Config() (any, error) {
 
 // Unload performs cleanup when the middleware is unloaded.
 func (m *MultiAuthMiddleware) Unload() {
-	// Cleanup middleware instances
 	for _, requirement := range m.authRequirements {
 		for _, middleware := range requirement.Middlewares {
 			middleware.Unload()
