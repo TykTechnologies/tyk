@@ -363,7 +363,7 @@ func TestCertificateCheckMW_CooldownMechanisms(t *testing.T) {
 	t.Run("Cooldown Configuration", func(t *testing.T) {
 		mw := setupCertificateCheckMW(t, true, nil)
 
-		// Test zero cooldown values (should disable cooldowns)
+		// Test zero cooldown values (should use defaults)
 		monitorConfig := config.CertificateExpiryMonitorConfig{
 			CheckCooldownSeconds: 0,
 			EventCooldownSeconds: 0,
@@ -371,19 +371,19 @@ func TestCertificateCheckMW_CooldownMechanisms(t *testing.T) {
 
 		certID := "zero-cooldown-test"
 
-		// With zero check cooldown, should never skip
+		// With zero check cooldown, should use default (3600 seconds)
 		shouldSkip := mw.shouldCooldown(monitorConfig, certID)
-		assert.False(t, shouldSkip, "Should not skip with zero check cooldown")
+		assert.False(t, shouldSkip, "Should not skip on first check with zero cooldown (uses default)")
 
 		shouldSkip = mw.shouldCooldown(monitorConfig, certID)
-		assert.False(t, shouldSkip, "Should still not skip with zero check cooldown")
+		assert.True(t, shouldSkip, "Should skip on second check with zero cooldown (uses default)")
 
-		// With zero event cooldown, should always fire
+		// With zero event cooldown, should use default (86400 seconds)
 		shouldFire := mw.shouldFireExpiryEvent(certID, monitorConfig)
-		assert.True(t, shouldFire, "Should fire with zero event cooldown")
+		assert.True(t, shouldFire, "Should fire on first event with zero cooldown (uses default)")
 
 		shouldFire = mw.shouldFireExpiryEvent(certID, monitorConfig)
-		assert.True(t, shouldFire, "Should still fire with zero event cooldown")
+		assert.False(t, shouldFire, "Should not fire on second event with zero cooldown (uses default)")
 	})
 
 	t.Run("Cooldown Persistence", func(t *testing.T) {

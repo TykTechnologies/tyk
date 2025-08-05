@@ -178,7 +178,14 @@ func (m *CertificateCheckMW) extractCertInfo(cert *tls.Certificate) *certInfo {
 
 // isCertificateExpiringSoon checks if a certificate is expiring within the configured warning threshold
 func (m *CertificateCheckMW) isCertificateExpiringSoon(hoursUntilExpiry int) bool {
-	warningThresholdHours := m.Gw.GetConfig().Security.CertificateExpiryMonitor.WarningThresholdDays * 24
+	warningThresholdDays := m.Gw.GetConfig().Security.CertificateExpiryMonitor.WarningThresholdDays
+
+	if warningThresholdDays == 0 {
+		warningThresholdDays = config.DefaultWarningThresholdDays
+	}
+
+	warningThresholdHours := warningThresholdDays * 24
+
 	return hoursUntilExpiry >= 0 && hoursUntilExpiry <= warningThresholdHours
 }
 
@@ -197,6 +204,7 @@ func (m *CertificateCheckMW) handleExpiringSoonCertificate(certInfo *certInfo, m
 	}
 
 	m.fireCertificateExpiringSoonEvent(certInfo.Certificate, certInfo.HoursUntilExpiry)
+
 	log.Infof("Certificate expiry monitor: EXPIRY EVENT FIRED for certificate '%s' - expires in %d hours (ID: %s...)", certInfo.CommonName, certInfo.HoursUntilExpiry, certInfo.ID[:8])
 }
 
@@ -256,10 +264,10 @@ func (m *CertificateCheckMW) shouldCooldown(monitorConfig config.CertificateExpi
 	lock.Lock()
 	defer lock.Unlock()
 
-	// If check cooldown is 0, never skip checks
-	if monitorConfig.CheckCooldownSeconds <= 0 {
-		log.Debugf("Certificate expiry monitor: Check cooldown disabled (0 seconds) - allowing check for certificate ID: %s...", certID[:8])
-		return false
+	checkCooldownSeconds := monitorConfig.CheckCooldownSeconds
+
+	if checkCooldownSeconds == 0 {
+		checkCooldownSeconds = config.DefaultCheckCooldownSeconds
 	}
 
 	checkCooldownKey := fmt.Sprintf("cert_check_cooldown:%s", certID)
@@ -272,15 +280,15 @@ func (m *CertificateCheckMW) shouldCooldown(monitorConfig config.CertificateExpi
 
 	_, err := m.store.GetKey(checkCooldownKey)
 	if err == nil {
-		log.Debugf("Certificate expiry monitor: Check cooldown active for certificate ID: %s... (cooldown: %ds)", certID[:8], monitorConfig.CheckCooldownSeconds)
+		log.Debugf("Certificate expiry monitor: Check cooldown active for certificate ID: %s... (cooldown: %ds)", certID[:8], checkCooldownSeconds)
 		return true // Skip check due to cooldown
 	}
 	// Set check cooldown atomically (protected by lock)
-	if err := m.store.SetKey(checkCooldownKey, "1", int64(monitorConfig.CheckCooldownSeconds)); err != nil {
+	if err := m.store.SetKey(checkCooldownKey, "1", int64(checkCooldownSeconds)); err != nil {
 		log.Warningf("Certificate expiry monitor: Failed to set check cooldown for certificate ID: %s... - %v", certID[:8], err)
 	}
 
-	log.Debugf("Certificate expiry monitor: Check cooldown set for certificate ID: %s... (cooldown: %ds)", certID[:8], monitorConfig.CheckCooldownSeconds)
+	log.Debugf("Certificate expiry monitor: Check cooldown set for certificate ID: %s... (cooldown: %ds)", certID[:8], checkCooldownSeconds)
 
 	return false // Don't skip check
 }
@@ -298,10 +306,10 @@ func (m *CertificateCheckMW) shouldFireExpiryEvent(certID string, monitorConfig 
 	lock.Lock()
 	defer lock.Unlock()
 
-	// If event cooldown is 0, always allow events
-	if monitorConfig.EventCooldownSeconds <= 0 {
-		log.Debugf("Certificate expiry monitor: Event cooldown disabled (0 seconds) - allowing event for certificate ID: %s...", certID[:8])
-		return true
+	eventCooldownSeconds := monitorConfig.EventCooldownSeconds
+
+	if eventCooldownSeconds == 0 {
+		eventCooldownSeconds = config.DefaultEventCooldownSeconds
 	}
 
 	// Use Redis for cooldowns
@@ -314,16 +322,16 @@ func (m *CertificateCheckMW) shouldFireExpiryEvent(certID string, monitorConfig 
 
 	_, err := m.store.GetKey(cooldownKey)
 	if err == nil {
-		log.Debugf("Certificate expiry monitor: Event cooldown active for certificate ID: %s... (cooldown: %ds)", certID[:8], monitorConfig.EventCooldownSeconds)
+		log.Debugf("Certificate expiry monitor: Event cooldown active for certificate ID: %s... (cooldown: %ds)", certID[:8], eventCooldownSeconds)
 		return false
 	}
 
 	// Set cooldown atomically (protected by lock)
-	if err := m.store.SetKey(cooldownKey, "1", int64(monitorConfig.EventCooldownSeconds)); err != nil {
+	if err := m.store.SetKey(cooldownKey, "1", int64(eventCooldownSeconds)); err != nil {
 		log.Warningf("Certificate expiry monitor: Failed to set event cooldown for certificate ID: %s... - %v", certID[:8], err)
 	}
 
-	log.Debugf("Certificate expiry monitor: Event cooldown set for certificate ID: %s... (cooldown: %ds)", certID[:8], monitorConfig.EventCooldownSeconds)
+	log.Debugf("Certificate expiry monitor: Event cooldown set for certificate ID: %s... (cooldown: %ds)", certID[:8], eventCooldownSeconds)
 
 	return true
 }
