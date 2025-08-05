@@ -6,13 +6,13 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/TykTechnologies/tyk/apidef/oas"
 	"net/http"
 	"reflect"
 	"sort"
 	"testing"
 	"time"
 
+	"github.com/TykTechnologies/tyk/apidef/oas"
 	"github.com/go-jose/go-jose/v3"
 	"github.com/golang-jwt/jwt/v4"
 	"github.com/stretchr/testify/assert"
@@ -2870,6 +2870,7 @@ func TestGetUserIDFromClaim(t *testing.T) {
 				AuthHeaderName: "Authorization",
 			},
 		}
+		api.IsOAS = true
 
 		var o oas.OAS
 		o.Fill(api)
@@ -2878,6 +2879,66 @@ func TestGetUserIDFromClaim(t *testing.T) {
 			OAS:           o,
 			APIDefinition: &api,
 		}}}
+
+		t.Run("first identity base field exists", func(t *testing.T) {
+			jwtClaims := jwt.MapClaims{
+				"user_id": userID,
+				"iss":     "example.com",
+			}
+			identity, err := middleware.getUserIdFromClaim(jwtClaims)
+			assert.NoError(t, err)
+			assert.Equal(t, identity, userID)
+		})
+
+		t.Run("second identity base field exists", func(t *testing.T) {
+			jwtClaims := jwt.MapClaims{
+				"backup_user_id": userID,
+				"iss":            "example.com",
+			}
+			identity, err := middleware.getUserIdFromClaim(jwtClaims)
+			assert.NoError(t, err)
+			assert.Equal(t, identity, userID)
+		})
+
+		t.Run("no identity base fields exist, fallback to sub", func(t *testing.T) {
+			o.GetJWTConfiguration().IdentityBaseField = []string{"missing_field", "another_missing"}
+			jwtClaims := jwt.MapClaims{
+				"iss": "example.com",
+				"sub": userID,
+			}
+			identity, err := middleware.getUserIdFromClaim(jwtClaims)
+			assert.NoError(t, err)
+			assert.Equal(t, identity, userID)
+		})
+
+		t.Run("sub in identity base fields", func(t *testing.T) {
+			o.GetJWTConfiguration().IdentityBaseField = []string{"missing_field", "sub"}
+			jwtClaims := jwt.MapClaims{
+				"iss": "example.com",
+				"sub": userID,
+			}
+			identity, err := middleware.getUserIdFromClaim(jwtClaims)
+			assert.NoError(t, err)
+			assert.Equal(t, identity, userID)
+		})
+
+		t.Run("no identity base fields and no sub", func(t *testing.T) {
+			o.GetJWTConfiguration().IdentityBaseField = []string{"missing_field", "another_missing"}
+			jwtClaims := jwt.MapClaims{
+				"iss": "example.com",
+			}
+			_, err := middleware.getUserIdFromClaim(jwtClaims)
+			assert.ErrorIs(t, err, ErrEmptyUserIDInClaim)
+		})
+
+		t.Run("empty identity base field value", func(t *testing.T) {
+			jwtClaims := jwt.MapClaims{
+				"user_id": "",
+				"iss":     "example.com",
+			}
+			_, err := middleware.getUserIdFromClaim(jwtClaims)
+			assert.ErrorIs(t, err, ErrEmptyUserIDInClaim)
+		})
 	})
 
 }
