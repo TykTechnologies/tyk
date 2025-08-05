@@ -1,7 +1,7 @@
 package gateway
 
 import (
-	"crypto/sha1"
+	"crypto/sha256"
 	"crypto/tls"
 	"encoding/hex"
 	"fmt"
@@ -213,8 +213,9 @@ func (m *CertificateCheckMW) generateCertificateID(cert *tls.Certificate) string
 		return ""
 	}
 
-	// Create a cache key from the certificate's raw data
-	cacheKey := string(cert.Leaf.Raw)
+	// Use SHA-256 hash of the raw bytes as the cache key to ensure uniqueness and avoid encoding issues
+	hash := sha256.Sum256(cert.Leaf.Raw)
+	cacheKey := hex.EncodeToString(hash[:])
 
 	// Check if we already have this certificate ID cached
 	if cachedID, ok := m.certIDCache.Load(cacheKey); ok {
@@ -224,9 +225,8 @@ func (m *CertificateCheckMW) generateCertificateID(cert *tls.Certificate) string
 		// If type assertion fails, fall through to regenerate
 	}
 
-	// Generate new hash if not cached
-	hash := sha1.Sum(cert.Leaf.Raw)
-	certID := hex.EncodeToString(hash[:])
+	// Use the hash as the certificate ID (it's already unique)
+	certID := cacheKey
 
 	// Cache the result
 	m.certIDCache.Store(cacheKey, certID)
