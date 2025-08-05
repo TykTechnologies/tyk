@@ -345,20 +345,6 @@ func (gw *Gateway) determineHealthStatus(failCount int, criticalFailure bool, to
 	}
 }
 
-func (gw *Gateway) evaluateHealthChecks(checks map[string]HealthCheckItem) (failCount int, criticalFailure bool) {
-	// Check for critical failures
-	for component, check := range checks {
-		if check.Status == Fail {
-			failCount++
-
-			if gw.isCriticalFailure(component) {
-				criticalFailure = true
-			}
-		}
-	}
-	return failCount, criticalFailure
-}
-
 func (gw *Gateway) evaluateHealthChecksForLiveness(checks map[string]HealthCheckItem) (failCount int, criticalFailure bool) {
 	// Check for critical failures but treat Redis as non-critical for liveness
 	for component, check := range checks {
@@ -371,25 +357,6 @@ func (gw *Gateway) evaluateHealthChecksForLiveness(checks map[string]HealthCheck
 		}
 	}
 	return failCount, criticalFailure
-}
-
-func (gw *Gateway) isCriticalFailure(component string) bool {
-	// Redis is always considered critical
-	if component == "redis" {
-		return true
-	}
-
-	// Consider dashboard critical only if UseDBAppConfigs is enabled
-	if component == "dashboard" && gw.GetConfig().UseDBAppConfigs {
-		return true
-	}
-
-	// Consider RPC critical only if using RPC and gw not in emergency mode
-	if component == "rpc" && gw.GetConfig().Policies.PolicySource == "rpc" && !rpc.IsEmergencyMode() {
-		return true
-	}
-
-	return false
 }
 
 func (gw *Gateway) isCriticalFailureForLiveness(component string) bool {
