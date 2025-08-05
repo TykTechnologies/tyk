@@ -1238,6 +1238,9 @@
             }
           }
         },
+        "multiAuth": {
+          "$ref": "#/definitions/X-Tyk-MultiAuth"
+        },
         "customKeyLifetime": {
           "type": "object",
           "properties": {
@@ -2612,6 +2615,46 @@
       "required": [
         "url",
         "weight"
+      ]
+    },
+    "X-Tyk-MultiAuth": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "requirements": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/X-Tyk-AuthRequirement"
+          }
+        }
+      },
+      "required": [
+        "enabled"
+      ]
+    },
+    "X-Tyk-AuthRequirement": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "schemes": {
+          "type": "object",
+          "patternProperties": {
+            "^[a-zA-Z0-9\\.\\-_]+$": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      },
+      "required": [
+        "name",
+        "schemes"
       ]
     }
   }
