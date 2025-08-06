@@ -306,7 +306,7 @@ func TestCertificateCheckMW_Integration_CoreFunctionality(t *testing.T) {
 		if len(events) > 0 {
 			eventMeta, ok := events[0].Meta.(EventCertificateExpiringSoonMeta)
 			assert.True(t, ok, "Event metadata should be EventCertificateExpiringSoonMeta")
-			assert.Equal(t, "expiring.example.com", eventMeta.CertificateName, "Certificate name should match")
+			assert.Equal(t, "expiring.example.com", eventMeta.CertName, "Certificate name should match")
 			assert.Equal(t, "integration-test-api-id", eventMeta.APIID, "API ID should match")
 			assert.Equal(t, "integration-test-org-id", eventMeta.OrgID, "Org ID should match")
 		}
@@ -344,7 +344,7 @@ func TestCertificateCheckMW_Integration_CoreFunctionality(t *testing.T) {
 		if len(events) > 0 {
 			eventMeta, ok := events[0].Meta.(EventCertificateExpiringSoonMeta)
 			assert.True(t, ok, "Event metadata should be EventCertificateExpiringSoonMeta")
-			assert.Equal(t, "critical.example.com", eventMeta.CertificateName, "Certificate name should match")
+			assert.Equal(t, "critical.example.com", eventMeta.CertName, "Certificate name should match")
 		}
 	})
 
@@ -378,7 +378,7 @@ func TestCertificateCheckMW_Integration_CoreFunctionality(t *testing.T) {
 		for _, e := range events {
 			eventMeta, ok := e.Meta.(EventCertificateExpiringSoonMeta)
 			assert.True(t, ok, "Event metadata should be EventCertificateExpiringSoonMeta")
-			certNames[eventMeta.CertificateName] = true
+			certNames[eventMeta.CertName] = true
 		}
 
 		// Should have events for expiring and critical certificates, but not valid

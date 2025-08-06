@@ -118,12 +118,12 @@ type EventTokenMeta struct {
 // EventCertificateExpiringSoonMeta is the metadata structure for certificate expiration events
 type EventCertificateExpiringSoonMeta struct {
 	EventMetaDefault
-	CertificateID   string    `json:"certificate_id"`
-	CertificateName string    `json:"certificate_name"`
-	ExpirationDate  time.Time `json:"expiration_date"`
-	DaysUntilExpiry int       `json:"days_until_expiry"`
-	APIID           string    `json:"api_id"`
-	OrgID           string    `json:"org_id"`
+	CertID        string    `json:"cert_id"`
+	CertName      string    `json:"cert_name"`
+	ExpiresAt     time.Time `json:"expires_at"`
+	DaysRemaining int       `json:"days_remaining"`
+	APIID         string    `json:"api_id"`
+	OrgID         string    `json:"org_id"`
 }
 
 // EventHandlerByName is a convenience function to get event handler instances from an API Definition
