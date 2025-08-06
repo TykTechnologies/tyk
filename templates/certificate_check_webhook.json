@@ -1,13 +1,11 @@
 {
     "event": "{{.Type}}",
     "message": "{{.Meta.Message}}",
-    "certificate_id": "{{.Meta.CertificateID}}",
-    "certificate_name": "{{.Meta.CertificateName}}",
-    "expiration_date": "{{.Meta.ExpirationDate}}",
-    "days_until_expiry": "{{.Meta.DaysUntilExpiry}}",
+    "cert_id": "{{.Meta.CertID}}",
+    "cert_name": "{{.Meta.CertName}}",
+    "expires_at": "{{.Meta.ExpiresAt}}",
+    "days_remaining": "{{.Meta.DaysRemaining}}",
     "api_id": "{{.Meta.APIID}}",
     "org_id": "{{.Meta.OrgID}}",
-    "timestamp": "{{.TimeStamp}}",
-    "gateway_id": "{{.Meta.GatewayID}}",
-    "severity": "{{.Meta.Severity}}"
+    "timestamp": "{{.TimeStamp}}"
 } 
