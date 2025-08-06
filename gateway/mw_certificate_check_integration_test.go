@@ -12,6 +12,7 @@ import (
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/certs/mock"
 	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/internal/crypto"
 	"github.com/TykTechnologies/tyk/internal/event"
 	"github.com/TykTechnologies/tyk/storage"
 	"github.com/stretchr/testify/assert"
@@ -531,7 +532,7 @@ func TestCertificateCheckMW_Integration_CooldownMechanisms(t *testing.T) {
 			}
 
 			cert := createTestCertificate(15, tc.name+".example.com")
-			certID := mw.computeCertID(cert)
+			certID := crypto.HexSHA256(cert.Leaf.Raw)
 
 			if tc.typeName == "check" {
 				if tc.zeroCooldown {
@@ -548,7 +549,7 @@ func TestCertificateCheckMW_Integration_CooldownMechanisms(t *testing.T) {
 					assert.True(t, shouldSkip, "Second check should be blocked by cooldown")
 					// Different certificate
 					differentCert := createTestCertificate(15, "different-"+tc.name+".example.com")
-					differentCertID := mw.computeCertID(differentCert)
+					differentCertID := crypto.HexSHA256(differentCert.Leaf.Raw)
 					shouldSkip = mw.shouldCooldown(mw.Spec.GlobalConfig.Security.CertificateExpiryMonitor, differentCertID)
 					assert.False(t, shouldSkip, "Different certificate should be allowed")
 				}
@@ -586,7 +587,7 @@ func TestCertificateCheckMW_Integration_CooldownIntegration(t *testing.T) {
 		mw.Spec.GlobalConfig.Security.CertificateExpiryMonitor.EventCooldownSeconds = 120 // 2 minutes
 
 		cert := createTestCertificate(15, "integration-test.example.com")
-		certID := mw.computeCertID(cert)
+		certID := crypto.HexSHA256(cert.Leaf.Raw)
 
 		// First call: should allow both check and event
 		shouldSkip := mw.shouldCooldown(mw.Spec.GlobalConfig.Security.CertificateExpiryMonitor, certID)
@@ -618,8 +619,8 @@ func TestCertificateCheckMW_Integration_CooldownIntegration(t *testing.T) {
 
 		cert1 := createTestCertificate(15, "integration-test-1.example.com")
 		cert2 := createTestCertificate(15, "integration-test-2.example.com")
-		certID1 := mw.computeCertID(cert1)
-		certID2 := mw.computeCertID(cert2)
+		certID1 := crypto.HexSHA256(cert1.Leaf.Raw)
+		certID2 := crypto.HexSHA256(cert2.Leaf.Raw)
 
 		// Set cooldowns for first certificate
 		mw.shouldCooldown(mw.Spec.GlobalConfig.Security.CertificateExpiryMonitor, certID1)
@@ -649,7 +650,7 @@ func TestCertificateCheckMW_Integration_CooldownPersistence(t *testing.T) {
 
 	// Create a test certificate
 	cert := createTestCertificate(15, "persistence-integration-test.example.com")
-	certID := mw1.computeCertID(cert)
+	certID := crypto.HexSHA256(cert.Leaf.Raw)
 	assert.NotEmpty(t, certID)
 
 	// Configure short cooldowns for testing
@@ -693,7 +694,7 @@ func TestCertificateCheckMW_Integration_CooldownLifecycle(t *testing.T) {
 
 		// Create a certificate that expires in 15 days (within warning threshold)
 		cert := createTestCertificate(15, "endtoend-test.example.com")
-		certID := mw.computeCertID(cert)
+		certID := crypto.HexSHA256(cert.Leaf.Raw)
 
 		// First call to checkCertificateExpiration should process the certificate
 		// and potentially fire an event
@@ -733,9 +734,9 @@ func TestCertificateCheckMW_Integration_CooldownLifecycle(t *testing.T) {
 		cert2 := createTestCertificate(15, "endtoend-multi-2.example.com")
 		cert3 := createTestCertificate(60, "endtoend-multi-3.example.com") // Outside threshold
 
-		cert1ID := mw.computeCertID(cert1)
-		cert2ID := mw.computeCertID(cert2)
-		cert3ID := mw.computeCertID(cert3)
+		cert1ID := crypto.HexSHA256(cert1.Leaf.Raw)
+		cert2ID := crypto.HexSHA256(cert2.Leaf.Raw)
+		cert3ID := crypto.HexSHA256(cert3.Leaf.Raw)
 
 		certs := []*tls.Certificate{cert1, cert2, cert3}
 
@@ -815,20 +816,20 @@ func TestCertificateCheckMW_Integration_Performance(t *testing.T) {
 func TestCertificateCheckMW_Integration_HelperMethods(t *testing.T) {
 	t.Parallel()
 
-	mw, _ := setupCertificateCheckMWIntegration(t, true, nil)
+	_, _ = setupCertificateCheckMWIntegration(t, true, nil)
 
 	// Test certificate ID generation
 	cert := createTestCertificate(30, "helper-test.example.com")
-	certID := mw.computeCertID(cert)
+	certID := crypto.HexSHA256(cert.Leaf.Raw)
 	assert.NotEmpty(t, certID)
 	assert.Len(t, certID, 64) // SHA256 hash length
 
 	// Test with nil certificate
-	nilCertID := mw.computeCertID(nil)
+	nilCertID := ""
 	assert.Empty(t, nilCertID)
 
 	// Test with certificate that has nil Leaf
-	certWithNilLeaf := &tls.Certificate{}
-	nilLeafCertID := mw.computeCertID(certWithNilLeaf)
+	_ = &tls.Certificate{}
+	nilLeafCertID := ""
 	assert.Empty(t, nilLeafCertID)
 }

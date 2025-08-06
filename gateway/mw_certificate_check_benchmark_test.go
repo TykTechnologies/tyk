@@ -14,6 +14,7 @@ import (
 	"github.com/TykTechnologies/tyk/certs/mock"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/internal/cache"
+	"github.com/TykTechnologies/tyk/internal/crypto"
 	"github.com/TykTechnologies/tyk/storage"
 	"go.uber.org/mock/gomock"
 )
@@ -163,7 +164,7 @@ func BenchmarkCertificateCheckMW_HelperMethods(b *testing.B) {
 
 	b.Run("GenerateCertificateID", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
-			_ = mw.computeCertID(cert)
+			_ = crypto.HexSHA256(cert.Leaf.Raw)
 		}
 	})
 
@@ -176,7 +177,8 @@ func BenchmarkCertificateCheckMW_HelperMethods(b *testing.B) {
 
 	b.Run("FireCertificateExpiringSoonEvent", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
-			mw.fireCertificateExpiringSoonEvent(cert, 30)
+			certID := crypto.HexSHA256(cert.Leaf.Raw)
+			mw.fireCertificateExpiringSoonEvent(cert, certID, 30)
 		}
 	})
 }
@@ -227,14 +229,15 @@ func BenchmarkCertificateCheckMW_MemoryUsage(b *testing.B) {
 	b.Run("CertificateIDGeneration", func(b *testing.B) {
 		b.ReportAllocs()
 		for i := 0; i < b.N; i++ {
-			_ = mw.computeCertID(cert)
+			_ = crypto.HexSHA256(cert.Leaf.Raw)
 		}
 	})
 
 	b.Run("EventMetadataCreation", func(b *testing.B) {
 		b.ReportAllocs()
 		for i := 0; i < b.N; i++ {
-			mw.fireCertificateExpiringSoonEvent(cert, 15)
+			certID := crypto.HexSHA256(cert.Leaf.Raw)
+			mw.fireCertificateExpiringSoonEvent(cert, certID, 15)
 		}
 	})
 

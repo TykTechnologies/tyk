@@ -1,9 +1,7 @@
 package gateway
 
 import (
-	"crypto/sha256"
 	"crypto/tls"
-	"encoding/hex"
 	"fmt"
 	"net/http"
 	"sync"
@@ -164,7 +162,7 @@ func (m *CertificateCheckMW) extractCertInfo(cert *tls.Certificate) *certInfo {
 		return nil
 	}
 
-	certID := m.computeCertID(cert)
+	certID := crypto.HexSHA256(cert.Leaf.Raw)
 	if certID == "" {
 		log.Warning("Certificate expiry monitor: Skipping certificate with empty ID (no raw data)")
 		return nil
@@ -215,7 +213,7 @@ func (m *CertificateCheckMW) handleExpiringSoonCertificate(certInfo *certInfo, m
 		return
 	}
 
-	m.fireCertificateExpiringSoonEvent(certInfo.Certificate, certInfo.HoursUntilExpiry)
+	m.fireCertificateExpiringSoonEvent(certInfo.Certificate, certInfo.ID, certInfo.HoursUntilExpiry)
 
 	log.Infof("Certificate expiry monitor: EXPIRY EVENT FIRED for certificate '%s' - expires in %d hours (ID: %s...)", certInfo.CommonName, certInfo.HoursUntilExpiry, certInfo.ID[:8])
 }
@@ -223,22 +221,6 @@ func (m *CertificateCheckMW) handleExpiringSoonCertificate(certInfo *certInfo, m
 // handleHealthyCertificate handles certificates that are healthy
 func (m *CertificateCheckMW) handleHealthyCertificate(certInfo *certInfo) {
 	log.Debugf("Certificate expiry monitor: Certificate '%s' is healthy - expires in %d hours (ID: %s...)", certInfo.CommonName, certInfo.HoursUntilExpiry, certInfo.ID[:8])
-}
-
-// computeCertID generates a unique ID for the certificate with caching to avoid repeated hashing
-func (m *CertificateCheckMW) computeCertID(cert *tls.Certificate) string {
-	if cert == nil || cert.Leaf == nil || len(cert.Leaf.Raw) == 0 {
-		return ""
-	}
-
-	// NOTE: Consider implementing certificate ID caching if performance becomes a concern,
-	// especially when dealing with large numbers of certificates or frequent certificate checks.
-	// The cache could help avoid repeated SHA-256 hashing of the same certificate data.
-
-	// Use SHA-256 hash of the raw bytes as the certificate ID to ensure uniqueness and avoid encoding issues
-	hash := sha256.Sum256(cert.Leaf.Raw)
-
-	return hex.EncodeToString(hash[:])
 }
 
 // shouldCooldown checks if a certificate check should be skipped based on check cooldown
@@ -316,13 +298,11 @@ func (m *CertificateCheckMW) shouldFireExpiryEvent(certID string, monitorConfig 
 }
 
 // fireCertificateExpiringSoonEvent fires the certificate expiring soon event
-func (m *CertificateCheckMW) fireCertificateExpiringSoonEvent(cert *tls.Certificate, hoursUntilExpiry int) {
+func (m *CertificateCheckMW) fireCertificateExpiringSoonEvent(cert *tls.Certificate, certID string, hoursUntilExpiry int) {
 	if cert == nil || cert.Leaf == nil {
 		log.Warningf("Certificate expiry monitor: Cannot fire event - nil certificate or certificate with nil Leaf")
 		return
 	}
-
-	certID := m.computeCertID(cert)
 
 	// Convert hours to days and remaining hours for display
 	daysUntilExpiry := hoursUntilExpiry / 24
