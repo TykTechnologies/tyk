@@ -257,7 +257,7 @@ func (m *CertificateCheckMW) shouldCooldown(monitorConfig config.CertificateExpi
 
 	log.Debugf("Certificate expiry monitor: Check cooldown set for certificate ID: %s... (cooldown: %ds)", certID[:8], checkCooldownSeconds)
 
-	return false // Don't skip check
+	return false
 }
 
 // shouldFireExpiryEvent checks if an event should be fired based on cooldown
