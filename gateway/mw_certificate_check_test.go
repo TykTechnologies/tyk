@@ -14,6 +14,7 @@ import (
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/certs/mock"
 	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/internal/crypto"
 	"github.com/TykTechnologies/tyk/storage"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
@@ -267,17 +268,13 @@ func TestCertificateCheckMW_HelperMethods(t *testing.T) {
 
 	mw := setupCertificateCheckMW(t, true, nil)
 
-	// Test generateCertificateID with nil certificate
-	certID := mw.computeCertID(nil)
-	assert.Equal(t, "", certID)
-
 	// Test generateCertificateID with valid certificate
 	validCert := &tls.Certificate{
 		Leaf: &x509.Certificate{
 			Raw: []byte("test-certificate-data"),
 		},
 	}
-	certID = mw.computeCertID(validCert)
+	certID := crypto.HexSHA256(validCert.Leaf.Raw)
 	assert.NotEmpty(t, certID)
 	assert.Len(t, certID, 64) // SHA256 hash is 32 bytes = 64 hex chars
 
@@ -295,7 +292,8 @@ func TestCertificateCheckMW_HelperMethods(t *testing.T) {
 	// Test fireCertificateExpiringSoonEvent with valid certificate
 	validCert.Leaf.Subject.CommonName = "test.example.com"
 	validCert.Leaf.NotAfter = time.Now().Add(30 * 24 * time.Hour)
-	mw.fireCertificateExpiringSoonEvent(validCert, 30)
+	certID = crypto.HexSHA256(validCert.Leaf.Raw)
+	mw.fireCertificateExpiringSoonEvent(validCert, certID, 30)
 }
 
 // Comprehensive test for all cooldown mechanisms
@@ -482,8 +480,6 @@ func TestCertificateCheckMW_Concurrency(t *testing.T) {
 	})
 
 	t.Run("Cache Consistency", func(t *testing.T) {
-		mw := setupCertificateCheckMW(t, true, nil)
-
 		// Test certificate ID generation consistency
 		cert := createTestCertificate(30, "test-cache-consistency-cert")
 
@@ -496,7 +492,7 @@ func TestCertificateCheckMW_Concurrency(t *testing.T) {
 			wg.Add(1)
 			go func() {
 				defer wg.Done()
-				certID := mw.computeCertID(cert)
+				certID := crypto.HexSHA256(cert.Leaf.Raw)
 				results <- certID
 			}()
 		}
@@ -575,7 +571,7 @@ func TestCertificateCheckMW_Concurrency(t *testing.T) {
 
 		// Test that certificate ID computation still works correctly after concurrent processing
 		testCert := createTestCertificate(30, "post-concurrency-test")
-		certID := mw.computeCertID(testCert)
+		certID := crypto.HexSHA256(testCert.Leaf.Raw)
 		assert.NotEmpty(t, certID, "Certificate ID computation should still work after concurrent processing")
 
 		// Test that cooldown mechanism still works correctly after concurrent processing
