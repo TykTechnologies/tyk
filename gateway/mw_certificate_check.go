@@ -185,6 +185,11 @@ func (m *CertificateCheckMW) extractCertInfo(cert *tls.Certificate) *certInfo {
 
 // isCertificateExpiringSoon checks if a certificate is expiring within the configured warning threshold
 func (m *CertificateCheckMW) isCertificateExpiringSoon(hoursUntilExpiry int) bool {
+	// NOTE: Configuration is retrieved fresh on each call, which allows hot reload to take effect.
+	// However, existing cooldowns in Redis are not invalidated when configuration changes.
+	// This means that if WarningThresholdDays is updated via hot reload, certificates with active
+	// cooldowns will continue to use the old threshold until their cooldown expires.
+	// Consider implementing cooldown invalidation when configuration changes to ensure consistent behavior.
 	warningThresholdDays := m.Gw.GetConfig().Security.CertificateExpiryMonitor.WarningThresholdDays
 
 	if warningThresholdDays == 0 {
