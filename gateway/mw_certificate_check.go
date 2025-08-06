@@ -344,12 +344,12 @@ func (m *CertificateCheckMW) fireCertificateExpiringSoonEvent(cert *tls.Certific
 		EventMetaDefault: EventMetaDefault{
 			Message: message,
 		},
-		CertificateID:   certID,
-		CertificateName: cert.Leaf.Subject.CommonName,
-		ExpirationDate:  cert.Leaf.NotAfter,
-		DaysUntilExpiry: daysUntilExpiry,
-		APIID:           m.Spec.APIID,
-		OrgID:           m.Spec.OrgID,
+		CertID:        certID,
+		CertName:      cert.Leaf.Subject.CommonName,
+		ExpiresAt:     cert.Leaf.NotAfter,
+		DaysRemaining: daysUntilExpiry,
+		APIID:         m.Spec.APIID,
+		OrgID:         m.Spec.OrgID,
 	}
 
 	log.Debugf("Certificate expiry monitor: Firing expiry event for certificate '%s' - expires in %dd %dh (ID: %s...)", cert.Leaf.Subject.CommonName, daysUntilExpiry, remainingHours, certID[:8])
