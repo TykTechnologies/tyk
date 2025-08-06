@@ -210,8 +210,8 @@ func TestUserScenario_Debug_SecurityRequirements(t *testing.T) {
 		s.IsOAS = true
 		s.OAS = oasAPI
 		spec = s
-		
-t.Logf("Number of security requirements: %d", len(s.OAS.Security))
+
+		t.Logf("Number of security requirements: %d", len(s.OAS.Security))
 		for i, req := range s.OAS.Security {
 			t.Logf("Security requirement %d: %+v", i, req)
 		}
@@ -224,11 +224,11 @@ t.Logf("Number of security requirements: %d", len(s.OAS.Security))
 			} else {
 				t.Log("MultiAuth is nil")
 			}
-	} else {
+		} else {
 			t.Log("Authentication is nil")
 		}
-})
-	
+	})
+
 	// Test the isMultiAuthEnabled function
 	if ts.Gw.isMultiAuthEnabled(spec) {
 		t.Log("isMultiAuthEnabled returned true")
