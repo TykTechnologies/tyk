@@ -59,8 +59,53 @@ type Authentication struct {
 	// SecuritySchemes contains security schemes definitions.
 	SecuritySchemes SecuritySchemes `bson:"securitySchemes,omitempty" json:"securitySchemes,omitempty"`
 
+	// MultiAuth contains configuration for multi-authentication with OR logic.
+	MultiAuth *MultiAuth `bson:"multiAuth,omitempty" json:"multiAuth,omitempty"`
+
 	// CustomKeyLifetime contains configuration for the maximum retention period for access tokens.
 	CustomKeyLifetime *CustomKeyLifetime `bson:"customKeyLifetime,omitempty" json:"customKeyLifetime,omitempty"`
+}
+
+// MultiAuth contains configuration for multi-authentication with OR logic.
+type MultiAuth struct {
+	// Enabled activates multi-authentication with OR logic where any one security requirement can satisfy authentication.
+	Enabled bool `bson:"enabled" json:"enabled"`
+
+	// Requirements contains the authentication requirements that can be used as alternatives (OR logic).
+	Requirements []AuthRequirement `bson:"requirements,omitempty" json:"requirements,omitempty"`
+}
+
+// AuthRequirement represents a single authentication requirement containing multiple schemes that must all be satisfied (AND logic).
+type AuthRequirement struct {
+	// Name is the name/identifier for this authentication requirement.
+	Name string `bson:"name" json:"name"`
+
+	// Schemes contains the security schemes that must all be satisfied for this requirement (AND logic).
+	Schemes map[string][]string `bson:"schemes" json:"schemes"`
+}
+
+// Fill fills *MultiAuth from OAS security requirements.
+func (m *MultiAuth) Fill(security openapi3.SecurityRequirements) {
+	if len(security) <= 1 {
+		m.Enabled = false
+		return
+	}
+
+	m.Enabled = true
+	m.Requirements = make([]AuthRequirement, 0, len(security))
+
+	for i, securityReq := range security {
+		requirement := AuthRequirement{
+			Name:    fmt.Sprintf("requirement_%d", i),
+			Schemes: make(map[string][]string),
+		}
+
+		for schemeName, scopes := range securityReq {
+			requirement.Schemes[schemeName] = scopes
+		}
+
+		m.Requirements = append(m.Requirements, requirement)
+	}
 }
 
 // CustomKeyLifetime contains configuration for custom key retention.

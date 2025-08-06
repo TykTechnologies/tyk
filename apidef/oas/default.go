@@ -169,8 +169,6 @@ func (s *OAS) importAuthentication(enable bool) error {
 		return errEmptySecurityObject
 	}
 
-	securityReq := s.Security[0]
-
 	xTykAPIGateway := s.GetTykExtension()
 	authentication := xTykAPIGateway.Server.Authentication
 	if authentication == nil {
@@ -179,6 +177,19 @@ func (s *OAS) importAuthentication(enable bool) error {
 	}
 
 	authentication.Enabled = enable
+
+	// Check if we have multiple security requirements (OR conditions)
+	if len(s.Security) > 1 {
+		return s.importMultiAuthentication(authentication, enable)
+	}
+
+	// Backward compatibility: single security requirement (existing behavior)
+	return s.importSingleAuthentication(authentication, enable)
+}
+
+// importSingleAuthentication handles the current behavior for single security requirements.
+func (s *OAS) importSingleAuthentication(authentication *Authentication, enable bool) error {
+	securityReq := s.Security[0]
 
 	tykSecuritySchemes := authentication.SecuritySchemes
 	if tykSecuritySchemes == nil {
@@ -194,6 +205,43 @@ func (s *OAS) importAuthentication(enable bool) error {
 		}
 	}
 
+	authentication.BaseIdentityProvider = tykSecuritySchemes.GetBaseIdentityProvider()
+
+	return nil
+}
+
+// importMultiAuthentication handles multiple security requirements (OR conditions).
+func (s *OAS) importMultiAuthentication(authentication *Authentication, enable bool) error {
+	// Initialize MultiAuth configuration
+	if authentication.MultiAuth == nil {
+		authentication.MultiAuth = &MultiAuth{}
+	}
+
+	authentication.MultiAuth.Fill(s.Security)
+
+	// Also process all security schemes for the SecuritySchemes map
+	tykSecuritySchemes := authentication.SecuritySchemes
+	if tykSecuritySchemes == nil {
+		tykSecuritySchemes = make(SecuritySchemes)
+		authentication.SecuritySchemes = tykSecuritySchemes
+	}
+
+	// Import all unique security schemes from all requirements
+	uniqueSchemes := make(map[string]bool)
+	for _, securityReq := range s.Security {
+		for name := range securityReq {
+			if !uniqueSchemes[name] {
+				uniqueSchemes[name] = true
+				securityScheme := s.Components.SecuritySchemes[name]
+				err := tykSecuritySchemes.Import(name, securityScheme.Value, enable)
+				if err != nil {
+					log.WithError(err).Errorf("Error while importing security scheme: %s", name)
+				}
+			}
+		}
+	}
+
+	// Set BaseIdentityProvider using precedence rules
 	authentication.BaseIdentityProvider = tykSecuritySchemes.GetBaseIdentityProvider()
 
 	return nil

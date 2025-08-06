@@ -698,6 +698,8 @@ func (a APIDefinitionLoader) loadDefFromFilePath(filePath string) (*APISpec, err
 		oasDoc, err := loader.LoadFromFile(a.GetOASFilepath(filePath))
 		if err == nil {
 			nestDef.OAS = &oas.OAS{T: *oasDoc}
+			// IMPORTANT: Extract security requirements and other OAS configurations to API definition
+			nestDef.OAS.ExtractTo(&def)
 		}
 	}
 
