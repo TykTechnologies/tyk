@@ -172,6 +172,60 @@ func (gw *Gateway) gatherHealthChecks() {
 	allInfos.mux.Unlock()
 }
 
+// helloHandler returns detailed health check information but always with 200 OK status
+// This is the old implementation behavior - detailed response but always 200
+func (gw *Gateway) helloHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		doJSONWrite(w, http.StatusMethodNotAllowed, apiError(http.StatusText(http.StatusMethodNotAllowed)))
+		return
+	}
+
+	checks := gw.getHealthCheckInfo()
+
+	res := HealthCheckResponse{
+		Status:      Pass,
+		Version:     VERSION,
+		Description: "Tyk GW",
+		Details:     checks,
+	}
+
+	var failCount int
+
+	for _, v := range checks {
+		if v.Status == Fail {
+			failCount++
+		}
+	}
+
+	var status HealthCheckStatus
+
+	switch failCount {
+	case 0:
+		status = Pass
+
+	case len(checks):
+		status = Fail
+
+	default:
+		status = Warn
+	}
+
+	res.Status = status
+
+	w.Header().Set("Content-Type", header.ApplicationJSON)
+
+	// If this option is not set, or is explicitly set to false, add the mascot headers
+	if !gw.GetConfig().HideGeneratorHeader {
+		addMascotHeaders(w)
+	}
+
+	w.WriteHeader(http.StatusOK)
+	err := json.NewEncoder(w).Encode(res)
+	if err != nil {
+		mainLog.Warning(fmt.Sprintf("[Hello] Could not encode response, error: %s", err.Error()))
+	}
+}
+
 func (gw *Gateway) liveCheckHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		doJSONWrite(w, http.StatusMethodNotAllowed, apiError(http.StatusText(http.StatusMethodNotAllowed)))
@@ -187,9 +241,21 @@ func (gw *Gateway) liveCheckHandler(w http.ResponseWriter, r *http.Request) {
 		Details:     checks,
 	}
 
-	failCount, criticalFailure := gw.evaluateHealthChecks(checks)
+	// Evaluate health checks but treat Redis as non-critical for liveness
+	failCount, criticalFailure := gw.evaluateHealthChecksForLiveness(checks)
 
-	status, httpStatus := gw.determineHealthStatus(failCount, criticalFailure, len(checks))
+	var status HealthCheckStatus
+
+	switch failCount {
+	case 0:
+		status = Pass
+
+	case len(checks):
+		status = Fail
+
+	default:
+		status = Warn
+	}
 
 	res.Status = status
 
@@ -200,11 +266,14 @@ func (gw *Gateway) liveCheckHandler(w http.ResponseWriter, r *http.Request) {
 		addMascotHeaders(w)
 	}
 
-	w.WriteHeader(httpStatus)
-	err := json.NewEncoder(w).Encode(res)
-	if err != nil {
-		mainLog.Warning(fmt.Sprintf("[Liveness] Could not encode response, error: %s", err.Error()))
+	// Return 503 only for critical failures (not including Redis)
+	httpStatus := http.StatusOK
+	if criticalFailure {
+		httpStatus = http.StatusServiceUnavailable
 	}
+
+	w.WriteHeader(httpStatus)
+	json.NewEncoder(w).Encode(res)
 }
 
 // readinessHandler is a dedicated endpoint for readiness probes
@@ -276,13 +345,13 @@ func (gw *Gateway) determineHealthStatus(failCount int, criticalFailure bool, to
 	}
 }
 
-func (gw *Gateway) evaluateHealthChecks(checks map[string]HealthCheckItem) (failCount int, criticalFailure bool) {
-	// Check for critical failures
+func (gw *Gateway) evaluateHealthChecksForLiveness(checks map[string]HealthCheckItem) (failCount int, criticalFailure bool) {
+	// Check for critical failures but treat Redis as non-critical for liveness
 	for component, check := range checks {
 		if check.Status == Fail {
 			failCount++
 
-			if gw.isCriticalFailure(component) {
+			if gw.isCriticalFailureForLiveness(component) {
 				criticalFailure = true
 			}
 		}
@@ -290,10 +359,11 @@ func (gw *Gateway) evaluateHealthChecks(checks map[string]HealthCheckItem) (fail
 	return failCount, criticalFailure
 }
 
-func (gw *Gateway) isCriticalFailure(component string) bool {
-	// Redis is always considered critical
+func (gw *Gateway) isCriticalFailureForLiveness(component string) bool {
+	// Redis is NOT considered critical for liveness checks
+	// The gateway can still serve requests if APIs/policies are already loaded
 	if component == "redis" {
-		return true
+		return false
 	}
 
 	// Consider dashboard critical only if UseDBAppConfigs is enabled

@@ -683,8 +683,9 @@ func (gw *Gateway) loadControlAPIEndpoints(muxer *mux.Router) {
 		}
 	}
 
-	muxer.HandleFunc("/"+gw.GetConfig().HealthCheckEndpointName, gw.liveCheckHandler)
+	muxer.HandleFunc("/"+gw.GetConfig().HealthCheckEndpointName, gw.helloHandler)
 	muxer.HandleFunc("/"+gw.GetConfig().ReadinessCheckEndpointName, gw.readinessHandler)
+	muxer.HandleFunc("/"+gw.GetConfig().LivenessCheckEndpointName, gw.liveCheckHandler)
 
 	r := mux.NewRouter()
 	muxer.PathPrefix("/tyk/").Handler(http.StripPrefix("/tyk",
@@ -1560,6 +1561,10 @@ func (gw *Gateway) afterConfSetup() {
 
 	if conf.ReadinessCheckEndpointName == "" {
 		conf.ReadinessCheckEndpointName = "ready"
+	}
+
+	if conf.LivenessCheckEndpointName == "" {
+		conf.LivenessCheckEndpointName = "live"
 	}
 
 	var err error

@@ -48,6 +48,7 @@ var (
 		},
 		HealthCheckEndpointName:    "hello",
 		ReadinessCheckEndpointName: "ready",
+		LivenessCheckEndpointName:  "live",
 		CoProcessOptions: CoProcessConfig{
 			EnableCoProcess: false,
 		},
@@ -940,6 +941,10 @@ type Config struct {
 	// ReadinessCheckEndpointName Enables you to change the readiness endpoint
 	// Default is "/ready"
 	ReadinessCheckEndpointName string `json:"readiness_check_endpoint_name"`
+
+	// LivenessCheckEndpointName Enables you to change the liveness endpoint
+	// Default is "/live"
+	LivenessCheckEndpointName string `json:"liveness_check_endpoint_name"`
 
 	// GracefulShutdownTimeoutDuration sets how many seconds the gateway should wait for an existing connection
 	//to finish before shutting down the server. Defaults to 30 seconds.
