@@ -187,6 +187,7 @@ type JWT struct {
 	IDPClientIDMappingDisabled bool `bson:"idpClientIdMappingDisabled,omitempty" json:"idpClientIdMappingDisabled,omitempty"`
 }
 
+// JTIValidation contains the configuration for the validation of the JWT ID.
 type JTIValidation struct {
 	// Enabled indicates whether JWT ID claim is required.
 	// When true, tokens must include a 'jti' claim.

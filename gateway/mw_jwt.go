@@ -452,14 +452,13 @@ func (k *JWTMiddleware) getUserIdFromClaim(claims jwt.MapClaims) (string, error)
 func (k *JWTMiddleware) getUserIDFromClaimOAS(claims jwt.MapClaims) (string, error) {
 	identityBaseFields := k.Spec.OAS.GetJWTConfiguration().IdentityBaseField
 	checkedSub := false
-	for i, identityBaseField := range identityBaseFields {
+	for _, identityBaseField := range identityBaseFields {
 		if identityBaseField == SUB {
 			checkedSub = true
 		}
 
 		// fallBack to Sub if it is the last item and SUB has not been checked yet
-		shouldFallBack := i == len(identityBaseFields)-1 && !checkedSub
-		id, err := getUserIDFromClaim(claims, identityBaseField, shouldFallBack)
+		id, err := getUserIDFromClaim(claims, identityBaseField, false)
 		if err != nil {
 			if errors.Is(ErrNoSuitableUserIDClaimFound, err) {
 				continue
@@ -468,7 +467,10 @@ func (k *JWTMiddleware) getUserIDFromClaimOAS(claims jwt.MapClaims) (string, err
 		}
 		return id, nil
 	}
-	return "", ErrEmptyUserIDInClaim
+	if !checkedSub {
+		return getUserIDFromClaim(claims, SUB, false)
+	}
+	return "", ErrNoSuitableUserIDClaimFound
 }
 
 func toScopeStringsSlice(v interface{}, scopeSlice *[]string, nested bool) []string {
@@ -831,7 +833,7 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 func (k *JWTMiddleware) getScopeClaimNameOAS(claims jwt.MapClaims) string {
 	claimNames := k.Spec.OAS.GetJWTConfiguration().Scopes.ClaimName
 	for _, claimName := range claimNames {
-		for k, _ := range claims {
+		for k := range claims {
 			if k == claimName {
 				return claimName
 			}
@@ -977,83 +979,78 @@ func (k *JWTMiddleware) timeValidateJWTClaims(c jwt.MapClaims) *jwt.ValidationEr
 }
 
 func (k *JWTMiddleware) validateClaims(token *jwt.Token) error {
-	if err := k.timeValidateJWTClaims(token.Claims.(jwt.MapClaims)); err != nil {
+	claims, ok := token.Claims.(jwt.MapClaims)
+	if !ok {
+		return errors.New("invalid claims format")
+	}
+	if err := k.timeValidateJWTClaims(claims); err != nil {
 		return err
 	}
 
 	// Extra OAS-specific validations
-	if err := k.validateExtraClaims(token.Claims, token); err != nil {
+	if err := k.validateExtraClaims(claims, token); err != nil {
 		return err
 	}
 
 	return nil
 }
 
-func validateIssuer(claims jwt.Claims, allowedIssuers []string) error {
-	if claims, ok := claims.(jwt.MapClaims); ok {
-		iss, exists := claims[ISS]
-		if !exists {
-			return errors.New("issuer claim is required but not present in token")
-		}
+func validateIssuer(claims jwt.MapClaims, allowedIssuers []string) error {
+	iss, exists := claims[ISS]
+	if !exists {
+		return errors.New("issuer claim is required but not present in token")
+	}
 
-		issuer, ok := iss.(string)
-		if !ok {
-			return errors.New("issuer claim must be a string")
-		}
+	issuer, ok := iss.(string)
+	if !ok {
+		return errors.New("issuer claim must be a string")
+	}
 
-		for _, allowed := range allowedIssuers {
-			if issuer == allowed {
+	for _, allowed := range allowedIssuers {
+		if issuer == allowed {
+			return nil
+		}
+	}
+
+	return fmt.Errorf("invalid issuer claim: %s", issuer)
+}
+
+func validateAudience(claims jwt.MapClaims, allowedAudiences []string) error {
+	aud, exists := claims[AUD]
+	if !exists {
+		return errors.New("audience claim is required but not present in token")
+	}
+
+	var audiences []string
+	switch v := aud.(type) {
+	case string:
+		audiences = []string{v}
+	case []interface{}:
+		for _, a := range v {
+			if s, ok := a.(string); ok {
+				audiences = append(audiences, s)
+			}
+		}
+	default:
+		return errors.New("invalid audience claim format")
+	}
+
+	for _, tokenAud := range audiences {
+		for _, allowedAud := range allowedAudiences {
+			if tokenAud == allowedAud {
 				return nil
 			}
 		}
-
-		return fmt.Errorf("invalid issuer claim: %s", issuer)
 	}
-	return errors.New("invalid claims type")
+
+	return fmt.Errorf("no matching audience found in token: %v", audiences)
 }
 
-func validateAudience(claims jwt.Claims, allowedAudiences []string) error {
-	if claims, ok := claims.(jwt.MapClaims); ok {
-		aud, exists := claims[AUD]
-		if !exists {
-			return errors.New("audience claim is required but not present in token")
-		}
-
-		var audiences []string
-		switch v := aud.(type) {
-		case string:
-			audiences = []string{v}
-		case []interface{}:
-			for _, a := range v {
-				if s, ok := a.(string); ok {
-					audiences = append(audiences, s)
-				}
-			}
-		default:
-			return errors.New("invalid audience claim format")
-		}
-
-		for _, tokenAud := range audiences {
-			for _, allowedAud := range allowedAudiences {
-				if tokenAud == allowedAud {
-					return nil
-				}
-			}
-		}
-
-		return fmt.Errorf("no matching audience found in token: %v", audiences)
+func validateJTI(claims jwt.MapClaims) error {
+	if _, exists := claims[JTI]; !exists {
+		return errors.New("JWT ID (jti) claim is required but not present in token")
 	}
-	return errors.New("invalid claims type")
-}
-
-func validateJTI(claims jwt.Claims) error {
-	if claims, ok := claims.(jwt.MapClaims); ok {
-		if _, exists := claims[JTI]; !exists {
-			return errors.New("JWT ID (jti) claim is required but not present in token")
-		}
-		return nil
-	}
-	return errors.New("invalid claims type")
+	return nil
 }
 
 func validateSubjectValue(subject string, allowedSubjects []string) error {
@@ -1065,7 +1062,7 @@ func validateSubjectValue(subject string, allowedSubjects []string) error {
 	return fmt.Errorf("invalid subject value: %s", subject)
 }
 
-func (k *JWTMiddleware) validateExtraClaims(claims jwt.Claims, token *jwt.Token) error {
+func (k *JWTMiddleware) validateExtraClaims(claims jwt.MapClaims, token *jwt.Token) error {
 	if !k.Spec.IsOAS {
 		return nil // Skip extra validations for non-OAS APIs
 	}

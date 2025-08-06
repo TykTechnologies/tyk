@@ -134,22 +134,25 @@ func (k *ExternalOAuthMiddleware) jwt(accessToken string) (bool, string, error) 
 
 		return parseJWTKey(jwtValidation.SigningMethod, val)
 	})
-
 	if err != nil {
 		return false, "", fmt.Errorf("token verification failed: %w", err)
 	}
-
-	if token != nil && !token.Valid {
+	if token == nil || !token.Valid {
 		return false, "", errors.New("invalid token")
 	}
 
-	if err := timeValidateJWTClaims(token.Claims.(jwt.MapClaims), jwtValidation.ExpiresAtValidationSkew,
+	claims, ok := token.Claims.(jwt.MapClaims)
+	if !ok {
+		return false, "", errors.New("invalid token")
+	}
+
+	if err := timeValidateJWTClaims(claims, jwtValidation.ExpiresAtValidationSkew,
 		jwtValidation.IssuedAtValidationSkew, jwtValidation.NotBeforeValidationSkew); err != nil {
 		return false, "", fmt.Errorf("key not authorized: %w", err)
 	}
 
 	var userID string
-	userID, err = getUserIDFromClaim(token.Claims.(jwt.MapClaims), jwtValidation.IdentityBaseField, true)
+	userID, err = getUserIDFromClaim(claims, jwtValidation.IdentityBaseField, true)
 	if err != nil {
 		return false, "", err
 	}

@@ -227,7 +227,17 @@
       "type": "object",
       "properties": {
         "claimName": {
-          "type": "string"
+          "oneOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          ]
         },
         "scopeToPolicyMapping": {
           "type": "array",

@@ -1138,11 +1138,11 @@ func TestJWTExtraClaimsValidation(t *testing.T) {
 				Spec: spec,
 			}}
 			parser := jwt.NewParser(jwt.WithoutClaimsValidation())
-			parsedToken, err := parser.Parse(signedToken, func(token *jwt.Token) (interface{}, error) {
+			parsedToken, err := parser.Parse(signedToken, func(_ *jwt.Token) (interface{}, error) {
 				return []byte(secret), nil
 			})
 			assert.NoError(t, err)
-			err = jwtMiddleware.validateExtraClaims(parsedToken.Claims, parsedToken)
+			err = jwtMiddleware.validateExtraClaims(parsedToken.Claims.(jwt.MapClaims), parsedToken)
 
 			if tc.expectError {
 				assert.Error(t, err)
@@ -2866,83 +2866,114 @@ func TestGetUserIDFromClaim(t *testing.T) {
 	})
 
 	t.Run("is OAS", func(t *testing.T) {
-		var api apidef.APIDefinition
-		api.EnableJWT = true
-		api.AuthConfigs = map[string]apidef.AuthConfig{
-			apidef.JWTType: {
-				Name:           "jwtAuth",
-				AuthHeaderName: "Authorization",
+		testCases := []struct {
+			name               string
+			expectedErr        error
+			expected           string
+			claims             jwt.MapClaims
+			identityBaseFields []string
+		}{
+			{
+				name: "identity base field exists",
+				claims: jwt.MapClaims{
+					"user_id": userID,
+					"iss":     "example.com",
+				},
+				identityBaseFields: []string{"user_id"},
+				expected:           userID,
+			},
+			{
+				name: "second identity base field exists",
+				claims: jwt.MapClaims{
+					"backup_user_id": userID,
+					"iss":            "example.com",
+				},
+				identityBaseFields: []string{"user_id", "backup_user_id"},
+				expected:           userID,
+			},
+			{
+				name: "no identity base field exists, fallback to sub",
+				claims: jwt.MapClaims{
+					"iss": "example.com",
+					"sub": userID,
+				},
+				identityBaseFields: []string{"user_id", "backup_user_id"},
+				expected:           userID,
+			},
+			{
+				name:               "sub in identity base fields",
+				identityBaseFields: []string{"user_id", "sub"},
+				expected:           userID,
+				claims: jwt.MapClaims{
+					"iss": "example.com",
+					"sub": userID,
+				},
+			},
+			{
+				name:               "sub in identity base fields, but not in claims",
+				identityBaseFields: []string{"user_id", "sub"},
+				claims:             jwt.MapClaims{},
+				expectedErr:        ErrNoSuitableUserIDClaimFound,
+			},
+			{
+				name:               "no identity base fields and no sub",
+				identityBaseFields: []string{"user_id", "backup_user_id"},
+				expectedErr:        ErrNoSuitableUserIDClaimFound,
+				claims: jwt.MapClaims{
+					"iss": "example.com",
+				},
+			},
+			{
+				name: "no configured base fields and sub",
+				claims: jwt.MapClaims{
+					"sub": userID,
+				},
+				expected: userID,
+			},
+			{
+				name:               "empty identity base field",
+				identityBaseFields: []string{"user_id", "backup_user_id"},
+				claims: jwt.MapClaims{
+					"iss":     "example.com",
+					"user_id": "",
+				},
+				expectedErr: ErrEmptyUserIDInClaim,
+			},
+			{
+				name:        "no configured base field and no sub",
+				claims:      jwt.MapClaims{},
+				expectedErr: ErrNoSuitableUserIDClaimFound,
 			},
 		}
-		api.IsOAS = true
+		for _, tc := range testCases {
+			t.Run(tc.name, func(t *testing.T) {
+				var api apidef.APIDefinition
+				api.EnableJWT = true
+				api.AuthConfigs = map[string]apidef.AuthConfig{
+					apidef.JWTType: {
+						Name:           "jwtAuth",
+						AuthHeaderName: "Authorization",
+					},
+				}
+				api.IsOAS = true
 
-		var o oas.OAS
-		o.Fill(api)
-		o.GetJWTConfiguration().IdentityBaseField = []string{"user_id", "backup_user_id"}
-		middleware := JWTMiddleware{&BaseMiddleware{Spec: &APISpec{
-			OAS:           o,
-			APIDefinition: &api,
-		}}}
+				var o oas.OAS
+				o.Fill(api)
+				o.GetJWTConfiguration().IdentityBaseField = tc.identityBaseFields
+				middleware := JWTMiddleware{&BaseMiddleware{Spec: &APISpec{
+					OAS:           o,
+					APIDefinition: &api,
+				}}}
 
-		t.Run("first identity base field exists", func(t *testing.T) {
-			jwtClaims := jwt.MapClaims{
-				"user_id": userID,
-				"iss":     "example.com",
-			}
-			identity, err := middleware.getUserIdFromClaim(jwtClaims)
-			assert.NoError(t, err)
-			assert.Equal(t, identity, userID)
-		})
-
-		t.Run("second identity base field exists", func(t *testing.T) {
-			jwtClaims := jwt.MapClaims{
-				"backup_user_id": userID,
-				"iss":            "example.com",
-			}
-			identity, err := middleware.getUserIdFromClaim(jwtClaims)
-			assert.NoError(t, err)
-			assert.Equal(t, identity, userID)
-		})
-
-		t.Run("no identity base fields exist, fallback to sub", func(t *testing.T) {
-			o.GetJWTConfiguration().IdentityBaseField = []string{"missing_field", "another_missing"}
-			jwtClaims := jwt.MapClaims{
-				"iss": "example.com",
-				"sub": userID,
-			}
-			identity, err := middleware.getUserIdFromClaim(jwtClaims)
-			assert.NoError(t, err)
-			assert.Equal(t, identity, userID)
-		})
-
-		t.Run("sub in identity base fields", func(t *testing.T) {
-			o.GetJWTConfiguration().IdentityBaseField = []string{"missing_field", "sub"}
-			jwtClaims := jwt.MapClaims{
-				"iss": "example.com",
-				"sub": userID,
-			}
-			identity, err := middleware.getUserIdFromClaim(jwtClaims)
-			assert.NoError(t, err)
-			assert.Equal(t, identity, userID)
-		})
-
-		t.Run("no identity base fields and no sub", func(t *testing.T) {
-			o.GetJWTConfiguration().IdentityBaseField = []string{"missing_field", "another_missing"}
-			jwtClaims := jwt.MapClaims{
-				"iss": "example.com",
-			}
-			_, err := middleware.getUserIdFromClaim(jwtClaims)
-			assert.ErrorIs(t, err, ErrEmptyUserIDInClaim)
-		})
-
-		t.Run("empty identity base field value", func(t *testing.T) {
-			jwtClaims := jwt.MapClaims{
-				"user_id": "",
-				"iss":     "example.com",
-			}
-			_, err := middleware.getUserIdFromClaim(jwtClaims)
-			assert.ErrorIs(t, err, ErrEmptyUserIDInClaim)
-		})
+				identity, err := middleware.getUserIdFromClaim(tc.claims)
+				if tc.expectedErr != nil {
+					assert.ErrorIs(t, err, tc.expectedErr)
+				} else {
+					assert.NoError(t, err)
+					assert.Equal(t, identity, tc.expected)
+				}
+			})
+		}
 	})
 
 }
