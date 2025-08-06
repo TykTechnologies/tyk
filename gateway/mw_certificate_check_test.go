@@ -14,11 +14,27 @@ import (
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/certs/mock"
 	"github.com/TykTechnologies/tyk/config"
-	"github.com/TykTechnologies/tyk/internal/cache"
 	"github.com/TykTechnologies/tyk/storage"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
 )
+
+// createTestCertificate creates a test certificate with specified expiration and common name
+func createTestCertificate(daysUntilExpiry int, commonName string) *tls.Certificate {
+	expirationDate := time.Now().Add(time.Duration(daysUntilExpiry) * 24 * time.Hour)
+	return &tls.Certificate{
+		Leaf: &x509.Certificate{
+			Subject: pkix.Name{
+				CommonName: commonName,
+			},
+			NotAfter: expirationDate,
+			Raw:      []byte("test-certificate-data-" + commonName),
+			Extensions: []pkix.Extension{
+				{Value: []byte("ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad")},
+			},
+		},
+	}
+}
 
 // setupCertificateCheckMW returns a CertificateCheckMW with a configurable CertificateManager.
 func setupCertificateCheckMW(t *testing.T, useMutualTLS bool, setupMock func(*mock.MockCertificateManager)) *CertificateCheckMW {
@@ -469,7 +485,7 @@ func TestCertificateCheckMW_Concurrency(t *testing.T) {
 		mw := setupCertificateCheckMW(t, true, nil)
 
 		// Test certificate ID generation consistency
-		cert := createTestCertificateWithName(30, "test-cache-consistency-cert")
+		cert := createTestCertificate(30, "test-cache-consistency-cert")
 
 		const numGoroutines = 10
 		var wg sync.WaitGroup
@@ -508,7 +524,7 @@ func TestCertificateCheckMW_Concurrency(t *testing.T) {
 		// Create multiple test certificates
 		certs := make([]*tls.Certificate, 10)
 		for i := range certs {
-			certs[i] = createTestCertificateWithName(15+i, fmt.Sprintf("test-%d.example.com", i))
+			certs[i] = createTestCertificate(15+i, fmt.Sprintf("test-%d.example.com", i))
 		}
 
 		mw := setupCertificateCheckMW(t, true, nil)
@@ -523,121 +539,51 @@ func TestCertificateCheckMW_Concurrency(t *testing.T) {
 		const numGoroutines = 2
 		var wg sync.WaitGroup
 
+		errorChan := make(chan error, numGoroutines)
+
 		for i := 0; i < numGoroutines; i++ {
 			wg.Add(1)
 			go func() {
 				defer wg.Done()
 				for j := 0; j < 2; j++ {
-					mw.checkCertificatesExpiration(certs)
+					// Capture any panics and convert to errors
+					func() {
+						defer func() {
+							if r := recover(); r != nil {
+								errorChan <- fmt.Errorf("panic in goroutine: %v", r)
+							}
+						}()
+						mw.checkCertificatesExpiration(certs)
+					}()
 					time.Sleep(time.Millisecond)
 				}
 			}()
 		}
 
 		wg.Wait()
-	})
-}
+		close(errorChan)
 
-// createTestCertificateWithName creates a test certificate with specified expiration and common name
-func createTestCertificateWithName(daysUntilExpiry int, commonName string) *tls.Certificate {
-	expirationDate := time.Now().Add(time.Duration(daysUntilExpiry) * 24 * time.Hour)
-	return &tls.Certificate{
-		Leaf: &x509.Certificate{
-			Subject: pkix.Name{
-				CommonName: commonName,
-			},
-			NotAfter: expirationDate,
-			Raw:      []byte("test-certificate-data"),
-			Extensions: []pkix.Extension{
-				{Value: []byte("ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad")},
-			},
-		},
-	}
-}
-
-// Benchmark tests for concurrency performance
-func BenchmarkCertificateCheckMW_ConcurrentChecks(b *testing.B) {
-	mw := &CertificateCheckMW{
-		BaseMiddleware: &BaseMiddleware{
-			Spec: &APISpec{
-				APIDefinition: &apidef.APIDefinition{
-					APIID: "test-api-id",
-					OrgID: "test-org-id",
-				},
-				GlobalConfig: config.Config{
-					Security: config.SecurityConfig{
-						CertificateExpiryMonitor: config.CertificateExpiryMonitorConfig{
-							WarningThresholdDays: 30,
-							CheckCooldownSeconds: 1,
-							EventCooldownSeconds: 1,
-						},
-					},
-				},
-			},
-		},
-	}
-
-	// Mock gateway
-	mw.Gw = &Gateway{}
-	mw.Gw.UtilCache = cache.New(3600, 10*60)
-
-	// Initialize Redis store with a unique prefix for benchmarks
-	mw.Gw.StorageConnectionHandler = storage.NewConnectionHandler(context.Background())
-	mw.store = &storage.RedisCluster{
-		KeyPrefix:         fmt.Sprintf("cert-cooldown:benchmark-%d-", time.Now().UnixNano()),
-		ConnectionHandler: mw.Gw.StorageConnectionHandler,
-	}
-	mw.store.Connect()
-
-	certID := "benchmark-cert-id"
-
-	b.ResetTimer()
-	b.RunParallel(func(pb *testing.PB) {
-		for pb.Next() {
-			mw.shouldCooldown(mw.Spec.GlobalConfig.Security.CertificateExpiryMonitor, certID)
+		// Verify no errors occurred during concurrent processing
+		for err := range errorChan {
+			t.Errorf("Error during concurrent processing: %v", err)
 		}
-	})
-}
 
-func BenchmarkCertificateCheckMW_ConcurrentEvents(b *testing.B) {
-	mw := &CertificateCheckMW{
-		BaseMiddleware: &BaseMiddleware{
-			Spec: &APISpec{
-				APIDefinition: &apidef.APIDefinition{
-					APIID: "test-api-id",
-					OrgID: "test-org-id",
-				},
-				GlobalConfig: config.Config{
-					Security: config.SecurityConfig{
-						CertificateExpiryMonitor: config.CertificateExpiryMonitorConfig{
-							WarningThresholdDays: 30,
-							CheckCooldownSeconds: 1,
-							EventCooldownSeconds: 1,
-						},
-					},
-				},
-			},
-		},
-	}
+		// Verify that the middleware is still in a valid state after concurrent processing
+		assert.NotNil(t, mw.store, "Store should remain initialized after concurrent processing")
+		assert.NotNil(t, mw.Spec, "Spec should remain initialized after concurrent processing")
+		assert.NotNil(t, mw.Gw, "Gateway should remain initialized after concurrent processing")
 
-	// Mock gateway
-	mw.Gw = &Gateway{}
-	mw.Gw.UtilCache = cache.New(3600, 10*60)
+		// Test that certificate ID computation still works correctly after concurrent processing
+		testCert := createTestCertificate(30, "post-concurrency-test")
+		certID := mw.computeCertID(testCert)
+		assert.NotEmpty(t, certID, "Certificate ID computation should still work after concurrent processing")
 
-	// Initialize Redis store with a unique prefix for benchmarks
-	mw.Gw.StorageConnectionHandler = storage.NewConnectionHandler(context.Background())
-	mw.store = &storage.RedisCluster{
-		KeyPrefix:         fmt.Sprintf("cert-cooldown:benchmark-%d-", time.Now().UnixNano()),
-		ConnectionHandler: mw.Gw.StorageConnectionHandler,
-	}
-	mw.store.Connect()
+		// Test that cooldown mechanism still works correctly after concurrent processing
+		shouldSkip := mw.shouldCooldown(mw.Spec.GlobalConfig.Security.CertificateExpiryMonitor, certID)
+		assert.False(t, shouldSkip, "First check should be allowed after concurrent processing")
 
-	certID := "benchmark-cert-id"
-
-	b.ResetTimer()
-	b.RunParallel(func(pb *testing.PB) {
-		for pb.Next() {
-			mw.shouldFireExpiryEvent(certID, mw.Spec.GlobalConfig.Security.CertificateExpiryMonitor)
-		}
+		// Second check should be blocked by cooldown
+		shouldSkip = mw.shouldCooldown(mw.Spec.GlobalConfig.Security.CertificateExpiryMonitor, certID)
+		assert.True(t, shouldSkip, "Second check should be blocked by cooldown after concurrent processing")
 	})
 }
