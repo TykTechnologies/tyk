@@ -30,7 +30,7 @@ type eventInfo struct {
 	Timestamp time.Time
 }
 
-func (m *MockEventTracker) Init(conf interface{}) error {
+func (m *MockEventTracker) Init(_ interface{}) error {
 	// No initialization needed for mock
 	return nil
 }
