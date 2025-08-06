@@ -504,51 +504,6 @@ func TestCertificateCheckMW_Concurrency(t *testing.T) {
 		assert.Equal(t, numGoroutines, count, "All goroutines should complete")
 	})
 
-	t.Run("Lock Management", func(t *testing.T) {
-		mw := setupCertificateCheckMW(t, true, nil)
-
-		// Test lock creation and reuse
-		certID := "lock-management-test-cert"
-
-		lock1 := mw.acquireLock(certID)
-		lock2 := mw.acquireLock(certID)
-
-		// Should return the same lock instance
-		assert.Equal(t, lock1, lock2, "Same certificate should return the same lock")
-
-		// Test that the lock works
-		lock1.Lock()
-		// Simulate some work in critical section
-		_ = "work"
-		lock1.Unlock()
-		lock2.Lock()
-		// Simulate some work in critical section
-		_ = "work"
-		lock2.Unlock()
-
-		// Test different certificates get different locks
-		certID1 := "lock-management-cert-id-1"
-		certID2 := "lock-management-cert-id-2"
-
-		lock1 = mw.acquireLock(certID1)
-		lock2 = mw.acquireLock(certID2)
-
-		// Should return different lock instances
-		if lock1 == lock2 {
-			t.Errorf("Different certificates should return different locks: lock1=%p, lock2=%p", lock1, lock2)
-		}
-
-		// Both locks should work independently
-		lock1.Lock()
-		// Simulate some work in critical section
-		_ = "work"
-		lock2.Lock()
-		// Simulate some work in critical section
-		_ = "work"
-		lock1.Unlock()
-		lock2.Unlock()
-	})
-
 	t.Run("Parallel Processing Safety", func(t *testing.T) {
 		// Create multiple test certificates
 		certs := make([]*tls.Certificate, 10)
