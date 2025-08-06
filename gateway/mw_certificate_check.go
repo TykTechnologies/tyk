@@ -16,12 +16,17 @@ import (
 	"github.com/TykTechnologies/tyk/storage"
 )
 
+const (
+	// Certificate check cooldown key prefix for Redis
+	certCheckCooldownPrefix = "cert_check_cooldown:"
+	// Certificate expiry event cooldown key prefix for Redis
+	certExpiryCooldownPrefix = "cert_expiry_cooldown:"
+)
+
 // CertificateCheckMW is used if domain was not detected or multiple APIs bind on the same domain. In this case authentification check happens not on TLS side but on HTTP level using this middleware
 type CertificateCheckMW struct {
 	*BaseMiddleware
-	certIDCache sync.Map        // Cache for certificate IDs to avoid repeated hashing
-	certLocks   sync.Map        // Map of mutexes per certificate ID for thread-safe cooldown operations
-	store       storage.Handler // Redis storage for cooldowns
+	store storage.Handler // Redis storage for cooldowns
 }
 
 func (m *CertificateCheckMW) Name() string {
@@ -65,6 +70,9 @@ func (m *CertificateCheckMW) ProcessRequest(w http.ResponseWriter, r *http.Reque
 			m.store.Connect()
 		}
 
+		// NOTE: Certificate expiration checking is currently performed synchronously, which may block the request.
+		// Consider making this asynchronous in the future to improve request response times, especially when
+		// processing large numbers of certificates or when Redis operations are slow.
 		m.checkCertificatesExpiration(apiCerts)
 	}
 
@@ -73,7 +81,6 @@ func (m *CertificateCheckMW) ProcessRequest(w http.ResponseWriter, r *http.Reque
 
 // checkCertificatesExpiration checks if certificates are expiring soon and fires events
 func (m *CertificateCheckMW) checkCertificatesExpiration(certificates []*tls.Certificate) {
-	// Safety check for tests where gateway might not be fully initialized
 	if m.Gw == nil {
 		log.Warning("Certificate expiry monitor: Gateway not initialized, skipping certificate checks")
 		return
@@ -219,50 +226,23 @@ func (m *CertificateCheckMW) computeCertID(cert *tls.Certificate) string {
 		return ""
 	}
 
-	// Use SHA-256 hash of the raw bytes as the cache key to ensure uniqueness and avoid encoding issues
+	// NOTE: Consider implementing certificate ID caching if performance becomes a concern,
+	// especially when dealing with large numbers of certificates or frequent certificate checks.
+	// The cache could help avoid repeated SHA-256 hashing of the same certificate data.
+
+	// Use SHA-256 hash of the raw bytes as the certificate ID to ensure uniqueness and avoid encoding issues
 	hash := sha256.Sum256(cert.Leaf.Raw)
-	cacheKey := hex.EncodeToString(hash[:])
 
-	// Check if we already have this certificate ID cached
-	if id, ok := m.certIDCache.Load(cacheKey); ok {
-		if cachedID, ok := id.(string); ok {
-			return cachedID
-		}
-		// If type assertion fails, fall through to regenerate
-	}
-
-	// Use the hash as the certificate ID (it's already unique)
-	certID := cacheKey
-
-	// Cache the result
-	m.certIDCache.Store(cacheKey, certID)
-
-	return certID
-}
-
-// acquireLock returns a mutex for the given certificate ID to ensure thread-safe operations
-// This prevents race conditions when multiple goroutines check the same certificate simultaneously
-func (m *CertificateCheckMW) acquireLock(certID string) *sync.Mutex {
-	// Get or create a mutex for this certificate ID
-	lock, _ := m.certLocks.LoadOrStore(certID, &sync.Mutex{})
-	if mutex, ok := lock.(*sync.Mutex); ok {
-		return mutex
-	}
-	// If type assertion fails, return nil as fallback
-	return nil
+	return hex.EncodeToString(hash[:])
 }
 
 // shouldCooldown checks if a certificate check should be skipped based on check cooldown
 func (m *CertificateCheckMW) shouldCooldown(monitorConfig config.CertificateExpiryMonitorConfig, certID string) bool {
-	// Get certificate-specific lock to prevent race conditions
-	lock := m.acquireLock(certID)
-	if lock == nil {
-		log.Warningf("Certificate expiry monitor: Cannot get lock for certificate ID: %s", certID[:8])
-		return true // Skip check if we can't get a lock
-	}
-
-	lock.Lock()
-	defer lock.Unlock()
+	// NOTE: This method currently has a race condition where multiple goroutines checking the same certificate
+	// could both proceed with their operations. The current storage.Handler interface doesn't provide atomic
+	// operations, so we use a check-then-set pattern. In the future, consider extending the Handler interface
+	// to support atomic operations (e.g., SET key value NX EX seconds) to eliminate the race condition and
+	// improve performance. This would replace the current check-then-set pattern with a single atomic operation.
 
 	checkCooldownSeconds := monitorConfig.CheckCooldownSeconds
 
@@ -270,7 +250,7 @@ func (m *CertificateCheckMW) shouldCooldown(monitorConfig config.CertificateExpi
 		checkCooldownSeconds = config.DefaultCheckCooldownSeconds
 	}
 
-	checkCooldownKey := fmt.Sprintf("cert_check_cooldown:%s", certID)
+	checkCooldownKey := fmt.Sprintf("%s%s", certCheckCooldownPrefix, certID)
 
 	// Use Redis for cooldowns
 	if m.store == nil {
@@ -295,16 +275,10 @@ func (m *CertificateCheckMW) shouldCooldown(monitorConfig config.CertificateExpi
 
 // shouldFireExpiryEvent checks if an event should be fired based on cooldown
 func (m *CertificateCheckMW) shouldFireExpiryEvent(certID string, monitorConfig config.CertificateExpiryMonitorConfig) bool {
-	// Get certificate-specific lock to prevent race conditions
-	lock := m.acquireLock(certID)
-	if lock == nil {
-		log.Warningf("Certificate expiry monitor: Cannot get lock for certificate ID: %s", certID[:8])
-
-		return false // Don't fire event if we can't get a lock
-	}
-
-	lock.Lock()
-	defer lock.Unlock()
+	// NOTE: This method currently has a race condition where multiple goroutines could both fire events
+	// for the same certificate. In the future, consider using Redis atomic operations
+	// (e.g., SET key value NX EX seconds) to eliminate the race condition and prevent duplicate events.
+	// This would replace the current check-then-set pattern with a single atomic operation.
 
 	eventCooldownSeconds := monitorConfig.EventCooldownSeconds
 
@@ -318,7 +292,7 @@ func (m *CertificateCheckMW) shouldFireExpiryEvent(certID string, monitorConfig 
 		return true
 	}
 
-	cooldownKey := fmt.Sprintf("cert_expiry_cooldown:%s", certID)
+	cooldownKey := fmt.Sprintf("%s%s", certExpiryCooldownPrefix, certID)
 
 	_, err := m.store.GetKey(cooldownKey)
 	if err == nil {
