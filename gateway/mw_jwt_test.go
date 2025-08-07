@@ -3487,7 +3487,7 @@ func TestJWTMiddleware_getScopeClaimNameOAS(t *testing.T) {
 			o.SetTykExtension(&oas.XTykAPIGateway{})
 			o.Fill(api)
 			o.GetJWTConfiguration().Scopes = &oas.Scopes{
-				ClaimName: tt.claimNames,
+				Claims: tt.claimNames,
 			}
 			mw := JWTMiddleware{
 				BaseMiddleware: &BaseMiddleware{

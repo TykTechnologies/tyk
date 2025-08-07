@@ -831,7 +831,7 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 }
 
 func (k *JWTMiddleware) getScopeClaimNameOAS(claims jwt.MapClaims) string {
-	claimNames := k.Spec.OAS.GetJWTConfiguration().Scopes.ClaimName
+	claimNames := k.Spec.OAS.GetJWTConfiguration().Scopes.Claims
 	for _, claimName := range claimNames {
 		for k := range claims {
 			if k == claimName {

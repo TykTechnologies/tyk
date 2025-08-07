@@ -42,14 +42,15 @@ func TestScopes(t *testing.T) {
 
 		emptyScopes.Fill(&scopeClaim)
 
-		assert.Equal(t, emptyScopes.ClaimName, []string{scopeClaim.ScopeClaimName})
+		assert.Equal(t, emptyScopes.Claims, []string{scopeClaim.ScopeClaimName})
 	})
 
 	t.Run("extract scope claim", func(t *testing.T) {
 		var emptydefScopeClaim apidef.ScopeClaim
 
 		scope := Scopes{
-			ClaimName: []string{"test", "second"},
+			Claims:    []string{"test", "second"},
+			ClaimName: "test",
 		}
 
 		scope.ExtractTo(&emptydefScopeClaim)
