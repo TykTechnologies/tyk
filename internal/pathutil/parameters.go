@@ -79,17 +79,7 @@ func isDefinedSchemaValue(ref *openapi3.ParameterRef) bool {
 }
 
 func isTypeOf(ref *openapi3.ParameterRef, expectedType string) bool {
-	if !isDefinedSchemaValue(ref) {
-		return false
-	}
-
-	for _, typ := range *(ref.Value.Schema.Value.Type) {
-		if typ == expectedType {
-			return true
-		}
-	}
-
-	return false
+	return isDefinedSchemaValue(ref) && ref.Value.Schema.Value.Type.Includes(expectedType)
 }
 
 func isPatternDefined(ref *openapi3.ParameterRef) bool {

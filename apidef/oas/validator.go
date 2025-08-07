@@ -237,19 +237,11 @@ func getMinorVersion(version string) (string, error) {
 }
 
 type validatorCnf struct {
-	opts         []openapi3.ValidationOption
-	allowClassic bool
+	opts []openapi3.ValidationOption
 }
 
 func WithOpenApiOpts(opts ...openapi3.ValidationOption) option.Option[validatorCnf] {
 	return func(v *validatorCnf) {
 		v.opts = opts
-	}
-}
-
-// WithAllowClassic allows using classic urls
-func WithAllowClassic() option.Option[validatorCnf] {
-	return func(v *validatorCnf) {
-		v.allowClassic = true
 	}
 }

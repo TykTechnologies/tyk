@@ -407,6 +407,22 @@ func (r *pathPart) normalize() string {
 	}
 }
 
+func (r *pathPart) isRegExp() bool {
+	return r.typ == pathPartRe
+}
+
+func (r *pathPart) isParameter() bool {
+	return r.typ == pathPartParameter
+}
+
+func (r *pathPart) isPartRaw() bool {
+	return r.typ == pathPartRaw
+}
+
+func (r *pathPart) isSplitter() bool {
+	return r.typ == pathPartSplitter
+}
+
 func isIdentifierSymbol(s byte) bool {
 	return isLowerLetter(s) || isUpperLetter(s) || isDigit(s) || isUnderscoreOrMinusOrDot(s)
 }

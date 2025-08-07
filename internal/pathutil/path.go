@@ -17,6 +17,11 @@ type Path struct {
 	parts      []pathPart
 }
 
+// parsePath responsible for parsing single path
+func parsePath(in string) (*Path, error) {
+	return NewParser().Parse(in)
+}
+
 func newNormalizedPath(parts []pathPart) *Path {
 	var sb strings.Builder
 	var np Path
@@ -62,7 +67,7 @@ func (o Path) RawOpIdPrefix() string {
 	return strings.TrimPrefix(o.path, string(slash))
 }
 
-// PropagateTo takes existent parameters and propagates them to destination if those do not exi
+// PropagateTo takes existent parameters and propagates them to destination if those do not exist.
 func (o Path) PropagateTo(dest openapi3.Parameters) {
 	if !o.HasParams() {
 		return
