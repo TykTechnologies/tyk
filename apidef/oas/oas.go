@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/TykTechnologies/tyk/common/option"
+	"github.com/TykTechnologies/tyk/internal/pathutil"
 	"github.com/samber/lo"
 	"strings"
 
@@ -471,6 +472,16 @@ func (s *OAS) Validate(ctx context.Context, opts ...option.Option[validatorCnf])
 		s.T.Validate(ctx, cnf.opts...),
 		s.validateSecurity(),
 	)
+}
+
+// Normalize regex based endpoints to norma ones
+func (s *OAS) Normalize() error {
+	if newPath, err := pathutil.Normalize(s.Paths); err != nil {
+		return err
+	} else {
+		s.Paths = newPath
+		return nil
+	}
 }
 
 // validateSecurity verifies that existing Security Requirement Objects has Security Schemes declared in the Security
