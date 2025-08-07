@@ -218,7 +218,7 @@
         "claimName": {
           "type": "string"
         },
-        "subjectClaims": {
+        "claims": {
           "type": "array",
           "items": {"type": "string"}
         },
@@ -1616,11 +1616,35 @@
         "identityBaseField": {
           "type": "string"
         },
+        "subjectClaims": {
+          "type": "array",
+          "items": {"type": "string"}
+        },
         "skipKid": {
           "type": "boolean"
         },
         "policyFieldName": {
           "type": "string"
+        },
+        "basePolicyClaims": {
+          "type": "array",
+          "items": {"type": "string"}
+        },
+        "allowedIssuers": {
+          "type": "array",
+          "items": {"type": "string"}
+        },
+        "allowedAudiences": {
+          "type": "array",
+          "items": {"type": "string"}
+        },
+        "jtiValidation": {
+          "type": "array",
+          "items": {"type": "string"}
+        },
+        "allowedSubjects": {
+          "type": "array",
+          "items": {"type": "string"}
         },
         "clientBaseField": {
           "type": "string"
