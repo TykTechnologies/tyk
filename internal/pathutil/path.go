@@ -68,16 +68,12 @@ func (o Path) RawOpIdPrefix() string {
 }
 
 // PropagateTo takes existent parameters and propagates them to destination if those do not exist.
-func (o Path) PropagateTo(dest openapi3.Parameters) {
+func (o Path) PropagateTo(dest *openapi3.Parameters) {
 	if !o.HasParams() {
 		return
 	}
 
-	if dest == nil {
-		dest = openapi3.Parameters{}
-	}
-
-	wrapParameters(&dest).extendBy(o.parameterRefs())
+	wrapParameters(dest).extendBy(o.parameterRefs())
 }
 
 // parameterRefs slices of path-based params.

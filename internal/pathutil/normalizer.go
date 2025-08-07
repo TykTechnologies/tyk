@@ -100,7 +100,11 @@ func (n *normalizer) normalize() (*openapi3.Paths, error) {
 			return nil, err
 		} else {
 			clonedPathItems := reflect.Clone(pathItem)
-			parsedPath.PropagateTo(clonedPathItems.Parameters)
+			parsedPath.PropagateTo(&clonedPathItems.Parameters)
+
+			for _, op := range clonedPathItems.Operations() {
+				parsedPath.PropagateTo(&op.Parameters)
+			}
 
 			normalized.Set(
 				parsedPath.path,
