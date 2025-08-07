@@ -122,8 +122,8 @@ type JWT struct {
 	// Tyk classic API definition: `jwt_identity_base_field`
 	IdentityBaseField string `bson:"identityBaseField,omitempty" json:"identityBaseField,omitempty"`
 
-	// SubjectClaims specifies a list of claims that can be used to identity the subject of the JWT
-	// The field is an OAS only field and is only used in OAS APIs
+	// SubjectClaims specifies a list of claims that can be used to identity the subject of the JWT.
+	// The field is an OAS only field and is only used in OAS APIs.
 	SubjectClaims []string `bson:"subjectClaims,omitempty" json:"subjectClaims,omitempty"`
 
 	// SkipKid controls skipping using the `kid` claim from a JWT (default behaviour).
@@ -140,7 +140,7 @@ type JWT struct {
 
 	// BasePolicyClaims specifies a list of claims from which the base PolicyID is extracted.
 	// The policy is applied to the session as a base policy.
-	// The field is an OAS only field and is only used in OAS APIs
+	// The field is an OAS only field and is only used in OAS APIs.
 	BasePolicyClaims []string `bson:"basePolicyClaims,omitempty" json:"basePolicyClaims,omitempty"`
 
 	// ClientBaseField is used when PolicyFieldName is not provided. It will get
