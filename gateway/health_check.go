@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"sync"
 	"time"
@@ -217,7 +218,10 @@ func (gw *Gateway) liveCheckHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(res)
+	err := json.NewEncoder(w).Encode(res)
+	if err != nil {
+		mainLog.Warning(fmt.Sprintf("[Liveness] Could not encode response, error: %s", err.Error()))
+	}
 }
 
 // readinessHandler is a dedicated endpoint for readiness probes
@@ -272,7 +276,10 @@ func (gw *Gateway) readinessHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(res)
+	err := json.NewEncoder(w).Encode(res)
+	if err != nil {
+		mainLog.Warning(fmt.Sprintf("[Readiness] Could not encode response, error: %s", err.Error()))
+	}
 }
 
 func (gw *Gateway) determineHealthStatus(failCount int, criticalFailure bool, totalChecks int) (HealthCheckStatus, int) {
