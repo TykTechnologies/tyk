@@ -1250,6 +1250,19 @@ func TestGetPolicyIDFromToken(t *testing.T) {
 				spec.OAS.ExtractTo(spec.APIDefinition)
 			},
 		},
+		{
+			name: "is classic converted to oas without filling BasePolicyClaims",
+			claims: jwt.MapClaims{
+				"policy": "mainpolicy",
+			},
+			expectedBool: true,
+			expected:     "mainpolicy",
+			modifySpec: func(spec *APISpec) {
+				spec.APIDefinition.JWTPolicyFieldName = "policy"
+				spec.OAS.Fill(*spec.APIDefinition)
+				spec.IsOAS = true
+			},
+		},
 	}
 
 	for _, tc := range testCases {
@@ -2863,6 +2876,35 @@ func TestGetUserIDFromClaim(t *testing.T) {
 			_, err := middleware.getUserIdFromClaim(jwtClaims)
 			assert.ErrorIs(t, err, ErrEmptyUserIDInClaim)
 		})
+	})
+
+	t.Run("is classic and converted to oas", func(t *testing.T) {
+		userIDKey := "user_id"
+		var api apidef.APIDefinition
+		api.EnableJWT = true
+		api.AuthConfigs = map[string]apidef.AuthConfig{
+			apidef.JWTType: {
+				Name:           "jwtAuth",
+				AuthHeaderName: "Authorization",
+			},
+		}
+		api.JWTIdentityBaseField = userIDKey
+
+		var o oas.OAS
+		o.Fill(api)
+		api.IsOAS = true
+		middleware := JWTMiddleware{&BaseMiddleware{Spec: &APISpec{
+			OAS:           o,
+			APIDefinition: &api,
+		}}}
+
+		jwtClaims := jwt.MapClaims{
+			userIDKey: userID,
+			"iss":     "example.com",
+		}
+		identity, err := middleware.getUserIdFromClaim(jwtClaims)
+		assert.NoError(t, err)
+		assert.Equal(t, identity, userID)
 	})
 
 	t.Run("is OAS", func(t *testing.T) {
