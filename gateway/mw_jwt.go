@@ -457,7 +457,6 @@ func (k *JWTMiddleware) getUserIDFromClaimOAS(claims jwt.MapClaims) (string, err
 			checkedSub = true
 		}
 
-		// fallBack to Sub if it is the last item and SUB has not been checked yet
 		id, err := getUserIDFromClaim(claims, identityBaseField, false)
 		if err != nil {
 			if errors.Is(ErrNoSuitableUserIDClaimFound, err) {
@@ -467,6 +466,7 @@ func (k *JWTMiddleware) getUserIDFromClaimOAS(claims jwt.MapClaims) (string, err
 		}
 		return id, nil
 	}
+	// fallBack to Sub if SUB has not been checked yet
 	if !checkedSub {
 		return getUserIDFromClaim(claims, SUB, false)
 	}
