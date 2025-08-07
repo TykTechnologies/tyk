@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"net/http"
 	"sync"
 	"time"
@@ -187,9 +186,26 @@ func (gw *Gateway) liveCheckHandler(w http.ResponseWriter, r *http.Request) {
 		Details:     checks,
 	}
 
-	failCount, criticalFailure := gw.evaluateHealthChecks(checks)
+	var failCount int
 
-	status, httpStatus := gw.determineHealthStatus(failCount, criticalFailure, len(checks))
+	for _, v := range checks {
+		if v.Status == Fail {
+			failCount++
+		}
+	}
+
+	var status HealthCheckStatus
+
+	switch failCount {
+	case 0:
+		status = Pass
+
+	case len(checks):
+		status = Fail
+
+	default:
+		status = Warn
+	}
 
 	res.Status = status
 
@@ -200,11 +216,8 @@ func (gw *Gateway) liveCheckHandler(w http.ResponseWriter, r *http.Request) {
 		addMascotHeaders(w)
 	}
 
-	w.WriteHeader(httpStatus)
-	err := json.NewEncoder(w).Encode(res)
-	if err != nil {
-		mainLog.Warning(fmt.Sprintf("[Liveness] Could not encode response, error: %s", err.Error()))
-	}
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(res)
 }
 
 // readinessHandler is a dedicated endpoint for readiness probes
