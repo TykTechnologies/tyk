@@ -474,7 +474,7 @@ func (s *OAS) Validate(ctx context.Context, opts ...option.Option[validatorCnf])
 	)
 }
 
-// Normalize regex based endpoints to norma ones
+// Normalize regex based endpoints to norma ones.
 func (s *OAS) Normalize() error {
 	if newPath, err := pathutil.Normalize(s.Paths); err != nil {
 		return err
