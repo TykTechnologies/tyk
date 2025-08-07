@@ -136,7 +136,12 @@ type JWT struct {
 	// The policy is applied to the session as a base policy.
 	//
 	// Tyk classic API definition: `jwt_policy_field_name`
-	PolicyFieldName []string `bson:"policyFieldName,omitempty" json:"policyFieldName,omitempty"`
+	PolicyFieldName string `bson:"policyFieldName,omitempty" json:"policyFieldName,omitempty"`
+
+	// BasePolicyClaims specifies a list of claims from which the base PolicyID is extracted.
+	// The policy is applied to the session as a base policy.
+	// The field is an OAS only field and is only used in OAS APIs
+	BasePolicyClaims []string `bson:"basePolicyClaims,omitempty" json:"basePolicyClaims,omitempty"`
 
 	// ClientBaseField is used when PolicyFieldName is not provided. It will get
 	// a session key and use the policies from that. The field ensures that requests
@@ -242,8 +247,9 @@ func (s *OAS) fillJWT(api apidef.APIDefinition) {
 		jwt.SubjectClaims = []string{jwt.IdentityBaseField}
 	}
 	jwt.SkipKid = api.JWTSkipKid
-	if api.JWTPolicyFieldName != "" {
-		jwt.PolicyFieldName = []string{api.JWTPolicyFieldName}
+	jwt.PolicyFieldName = api.JWTPolicyFieldName
+	if jwt.PolicyFieldName != "" {
+		jwt.BasePolicyClaims = []string{api.JWTPolicyFieldName}
 	}
 	jwt.ClientBaseField = api.JWTClientIDBaseField
 
@@ -280,9 +286,7 @@ func (s *OAS) extractJWTTo(api *apidef.APIDefinition, name string) {
 	api.JWTSigningMethod = jwt.SigningMethod
 	api.JWTIdentityBaseField = jwt.IdentityBaseField
 	api.JWTSkipKid = jwt.SkipKid
-	if len(jwt.PolicyFieldName) > 0 {
-		api.JWTPolicyFieldName = jwt.PolicyFieldName[0]
-	}
+	api.JWTPolicyFieldName = jwt.PolicyFieldName
 	api.JWTClientIDBaseField = jwt.ClientBaseField
 
 	if jwt.Scopes != nil {

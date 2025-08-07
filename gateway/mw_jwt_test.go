@@ -1207,7 +1207,7 @@ func TestGetPolicyIDFromToken(t *testing.T) {
 			expected:     "mainpolicy",
 			modifySpec: func(spec *APISpec) {
 				spec.IsOAS = true
-				spec.OAS.GetJWTConfiguration().PolicyFieldName = []string{"policy", "backuppolicy"}
+				spec.OAS.GetJWTConfiguration().BasePolicyClaims = []string{"policy", "backuppolicy"}
 				spec.OAS.ExtractTo(spec.APIDefinition)
 			},
 		},
@@ -1220,7 +1220,7 @@ func TestGetPolicyIDFromToken(t *testing.T) {
 			expected:     "mainpolicy",
 			modifySpec: func(spec *APISpec) {
 				spec.IsOAS = true
-				spec.OAS.GetJWTConfiguration().PolicyFieldName = []string{"policy", "backuppolicy"}
+				spec.OAS.GetJWTConfiguration().BasePolicyClaims = []string{"policy", "backuppolicy"}
 				spec.OAS.ExtractTo(spec.APIDefinition)
 			},
 		},
@@ -1233,7 +1233,7 @@ func TestGetPolicyIDFromToken(t *testing.T) {
 			expected:     "",
 			modifySpec: func(spec *APISpec) {
 				spec.IsOAS = true
-				spec.OAS.GetJWTConfiguration().PolicyFieldName = []string{"policy", "backuppolicy"}
+				spec.OAS.GetJWTConfiguration().BasePolicyClaims = []string{"policy", "backuppolicy"}
 				spec.OAS.ExtractTo(spec.APIDefinition)
 			},
 		},
@@ -1246,7 +1246,7 @@ func TestGetPolicyIDFromToken(t *testing.T) {
 			expected:     "",
 			modifySpec: func(spec *APISpec) {
 				spec.IsOAS = true
-				spec.OAS.GetJWTConfiguration().PolicyFieldName = []string{"policy", "backuppolicy"}
+				spec.OAS.GetJWTConfiguration().BasePolicyClaims = []string{"policy", "backuppolicy"}
 				spec.OAS.ExtractTo(spec.APIDefinition)
 			},
 		},

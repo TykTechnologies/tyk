@@ -20,7 +20,6 @@ func TestGetJWTConfiguration(t *testing.T) {
 				AuthHeaderName: "Authorization",
 			},
 		}
-		api.JWTIdentityBaseField = "new_sub"
 
 		var oas OAS
 		oas.SetTykExtension(&XTykAPIGateway{})
@@ -29,12 +28,15 @@ func TestGetJWTConfiguration(t *testing.T) {
 		j := oas.GetTykExtension().Server.Authentication.SecuritySchemes["jwtAuth"].(*JWT)
 		j.AllowedIssuers = []string{"issuer_one", "issuer_two"}
 		j.AllowedAudiences = []string{"audience_one", "audience_two"}
+		j.BasePolicyClaims = []string{"policy"}
+		j.SubjectClaims = []string{"new_sub"}
 
 		oas.GetTykExtension().Server.Authentication.SecuritySchemes["jwtAuth"] = j
 		gotten := oas.GetJWTConfiguration()
 
 		assert.Equal(t, j.AllowedIssuers, gotten.AllowedIssuers)
-		assert.Equal(t, []string{"new_sub"}, gotten.IdentityBaseField)
+		assert.Equal(t, []string{"new_sub"}, gotten.SubjectClaims)
+		assert.Equal(t, []string{"policy"}, gotten.BasePolicyClaims)
 		assert.Equal(t, j.AllowedAudiences, gotten.AllowedAudiences)
 	})
 
@@ -56,10 +58,11 @@ func TestGetJWTConfiguration(t *testing.T) {
 		j := oas.GetJWTConfiguration()
 		assert.Equal(t, j.IdentityBaseField, "new_sub")
 		assert.Equal(t, []string{"new_sub"}, j.SubjectClaims)
-		assert.Equal(t, j.PolicyFieldName[0], "policy")
+		assert.Equal(t, j.PolicyFieldName, "policy")
+		assert.Equal(t, []string{"policy"}, j.BasePolicyClaims)
 
 		var newAPIDef apidef.APIDefinition
-		oas.GetJWTConfiguration().PolicyFieldName = []string{"policy", "backup_policy"}
+		oas.GetJWTConfiguration().PolicyFieldName = "policy"
 		oas.GetJWTConfiguration().IdentityBaseField = "subject"
 		oas.ExtractTo(&newAPIDef)
 
@@ -418,7 +421,6 @@ func TestOAS_JWT(t *testing.T) {
 	convertedOAS.fillJWT(api)
 
 	// trim oas JWT config slices before comparing after converting back, because only the first item is taken
-	oas.GetJWTConfiguration().PolicyFieldName = oas.GetJWTConfiguration().PolicyFieldName[:1]
 	oas.GetJWTConfiguration().Scopes.ClaimName = oas.GetJWTConfiguration().Scopes.ClaimName[:1]
 
 	// set OAS only fields since they will not be converted
@@ -426,6 +428,7 @@ func TestOAS_JWT(t *testing.T) {
 	convertedOAS.GetJWTConfiguration().AllowedIssuers = oas.GetJWTConfiguration().AllowedIssuers
 	convertedOAS.GetJWTConfiguration().AllowedSubjects = oas.GetJWTConfiguration().AllowedSubjects
 	convertedOAS.GetJWTConfiguration().SubjectClaims = oas.GetJWTConfiguration().SubjectClaims
+	convertedOAS.GetJWTConfiguration().BasePolicyClaims = oas.GetJWTConfiguration().BasePolicyClaims
 	convertedOAS.GetJWTConfiguration().JTIValidation.Enabled = true
 	assert.Equal(t, oas, convertedOAS)
 }

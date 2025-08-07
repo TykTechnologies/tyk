@@ -383,7 +383,7 @@ func (k *JWTMiddleware) getPolicyIDFromToken(claims jwt.MapClaims) (string, bool
 	if k.Spec.IsOAS {
 		policyID := ""
 		found := false
-		fieldNames := k.Spec.OAS.GetJWTConfiguration().PolicyFieldName
+		fieldNames := k.Spec.OAS.GetJWTConfiguration().BasePolicyClaims
 		for _, c := range fieldNames {
 			policyID, found = claims[c].(string)
 			if found {
