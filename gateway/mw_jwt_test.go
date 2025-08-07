@@ -1093,8 +1093,8 @@ func TestJWTExtraClaimsValidation(t *testing.T) {
 		{
 			name: "valid identity base field",
 			oasConfig: &oas.JWT{
-				AllowedSubjects:   []string{"user1", "user2"},
-				IdentityBaseField: []string{"user_id"},
+				AllowedSubjects: []string{"user1", "user2"},
+				SubjectClaims:   []string{"user_id"},
 			},
 			claims: jwt.MapClaims{
 				"user_id": "user1",
@@ -2867,11 +2867,11 @@ func TestGetUserIDFromClaim(t *testing.T) {
 
 	t.Run("is OAS", func(t *testing.T) {
 		testCases := []struct {
-			name               string
-			expectedErr        error
-			expected           string
-			claims             jwt.MapClaims
-			identityBaseFields []string
+			name          string
+			expectedErr   error
+			expected      string
+			claims        jwt.MapClaims
+			subjectClaims []string
 		}{
 			{
 				name: "identity base field exists",
@@ -2879,8 +2879,8 @@ func TestGetUserIDFromClaim(t *testing.T) {
 					"user_id": userID,
 					"iss":     "example.com",
 				},
-				identityBaseFields: []string{"user_id"},
-				expected:           userID,
+				subjectClaims: []string{"user_id"},
+				expected:      userID,
 			},
 			{
 				name: "second identity base field exists",
@@ -2888,8 +2888,8 @@ func TestGetUserIDFromClaim(t *testing.T) {
 					"backup_user_id": userID,
 					"iss":            "example.com",
 				},
-				identityBaseFields: []string{"user_id", "backup_user_id"},
-				expected:           userID,
+				subjectClaims: []string{"user_id", "backup_user_id"},
+				expected:      userID,
 			},
 			{
 				name: "no identity base field exists, fallback to sub",
@@ -2897,28 +2897,28 @@ func TestGetUserIDFromClaim(t *testing.T) {
 					"iss": "example.com",
 					"sub": userID,
 				},
-				identityBaseFields: []string{"user_id", "backup_user_id"},
-				expected:           userID,
+				subjectClaims: []string{"user_id", "backup_user_id"},
+				expected:      userID,
 			},
 			{
-				name:               "sub in identity base fields",
-				identityBaseFields: []string{"user_id", "sub"},
-				expected:           userID,
+				name:          "sub in identity base fields",
+				subjectClaims: []string{"user_id", "sub"},
+				expected:      userID,
 				claims: jwt.MapClaims{
 					"iss": "example.com",
 					"sub": userID,
 				},
 			},
 			{
-				name:               "sub in identity base fields, but not in claims",
-				identityBaseFields: []string{"user_id", "sub"},
-				claims:             jwt.MapClaims{},
-				expectedErr:        ErrNoSuitableUserIDClaimFound,
+				name:          "sub in identity base fields, but not in claims",
+				subjectClaims: []string{"user_id", "sub"},
+				claims:        jwt.MapClaims{},
+				expectedErr:   ErrNoSuitableUserIDClaimFound,
 			},
 			{
-				name:               "no identity base fields and no sub",
-				identityBaseFields: []string{"user_id", "backup_user_id"},
-				expectedErr:        ErrNoSuitableUserIDClaimFound,
+				name:          "no identity base fields and no sub",
+				subjectClaims: []string{"user_id", "backup_user_id"},
+				expectedErr:   ErrNoSuitableUserIDClaimFound,
 				claims: jwt.MapClaims{
 					"iss": "example.com",
 				},
@@ -2931,8 +2931,8 @@ func TestGetUserIDFromClaim(t *testing.T) {
 				expected: userID,
 			},
 			{
-				name:               "empty identity base field",
-				identityBaseFields: []string{"user_id", "backup_user_id"},
+				name:          "empty identity base field",
+				subjectClaims: []string{"user_id", "backup_user_id"},
 				claims: jwt.MapClaims{
 					"iss":     "example.com",
 					"user_id": "",
@@ -2959,7 +2959,7 @@ func TestGetUserIDFromClaim(t *testing.T) {
 
 				var o oas.OAS
 				o.Fill(api)
-				o.GetJWTConfiguration().IdentityBaseField = tc.identityBaseFields
+				o.GetJWTConfiguration().SubjectClaims = tc.subjectClaims
 				middleware := JWTMiddleware{&BaseMiddleware{Spec: &APISpec{
 					OAS:           o,
 					APIDefinition: &api,

@@ -120,7 +120,11 @@ type JWT struct {
 	// The identity fields that are checked in order are: `kid`, IdentityBaseField, `sub`.
 	//
 	// Tyk classic API definition: `jwt_identity_base_field`
-	IdentityBaseField []string `bson:"identityBaseField,omitempty" json:"identityBaseField,omitempty"`
+	IdentityBaseField string `bson:"identityBaseField,omitempty" json:"identityBaseField,omitempty"`
+
+	// SubjectClaims specifies a list of claims that can be used to identity the subject of the JWT
+	// The field is an OAS only field and is only used in OAS APIs
+	SubjectClaims []string `bson:"subjectClaims,omitempty" json:"subjectClaims,omitempty"`
 
 	// SkipKid controls skipping using the `kid` claim from a JWT (default behaviour).
 	// When this is true, the field configured in IdentityBaseField is checked first.
@@ -233,8 +237,9 @@ func (s *OAS) fillJWT(api apidef.APIDefinition) {
 	jwt.Source = api.JWTSource
 	jwt.JwksURIs = api.JWTJwksURIs
 	jwt.SigningMethod = api.JWTSigningMethod
-	if api.JWTIdentityBaseField != "" {
-		jwt.IdentityBaseField = []string{api.JWTIdentityBaseField}
+	jwt.IdentityBaseField = api.JWTIdentityBaseField
+	if jwt.IdentityBaseField != "" {
+		jwt.SubjectClaims = []string{jwt.IdentityBaseField}
 	}
 	jwt.SkipKid = api.JWTSkipKid
 	if api.JWTPolicyFieldName != "" {
@@ -273,9 +278,7 @@ func (s *OAS) extractJWTTo(api *apidef.APIDefinition, name string) {
 	api.JWTSource = jwt.Source
 	api.JWTJwksURIs = jwt.JwksURIs
 	api.JWTSigningMethod = jwt.SigningMethod
-	if len(jwt.IdentityBaseField) > 0 {
-		api.JWTIdentityBaseField = jwt.IdentityBaseField[0]
-	}
+	api.JWTIdentityBaseField = jwt.IdentityBaseField
 	api.JWTSkipKid = jwt.SkipKid
 	if len(jwt.PolicyFieldName) > 0 {
 		api.JWTPolicyFieldName = jwt.PolicyFieldName[0]

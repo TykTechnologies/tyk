@@ -227,17 +227,13 @@
       "type": "object",
       "properties": {
         "claimName": {
-          "oneOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "array",
-              "items": {
-                "type": "string"
-              }
-            }
-          ]
+          "type": "string"
+        },
+        "subjectClaims": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
         },
         "scopeToPolicyMapping": {
           "type": "array",

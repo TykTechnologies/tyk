@@ -54,16 +54,17 @@ func TestGetJWTConfiguration(t *testing.T) {
 		oas.Fill(api)
 
 		j := oas.GetJWTConfiguration()
-		assert.Equal(t, j.IdentityBaseField[0], "new_sub")
+		assert.Equal(t, j.IdentityBaseField, "new_sub")
+		assert.Equal(t, []string{"new_sub"}, j.SubjectClaims)
 		assert.Equal(t, j.PolicyFieldName[0], "policy")
 
 		var newAPIDef apidef.APIDefinition
 		oas.GetJWTConfiguration().PolicyFieldName = []string{"policy", "backup_policy"}
-		oas.GetJWTConfiguration().IdentityBaseField = []string{"new_sub", "second_sub"}
+		oas.GetJWTConfiguration().IdentityBaseField = "subject"
 		oas.ExtractTo(&newAPIDef)
 
 		assert.Equal(t, "policy", newAPIDef.JWTPolicyFieldName)
-		assert.Equal(t, "new_sub", newAPIDef.JWTIdentityBaseField)
+		assert.Equal(t, "subject", newAPIDef.JWTIdentityBaseField)
 	})
 
 	t.Run("should return nil", func(t *testing.T) {
@@ -417,7 +418,6 @@ func TestOAS_JWT(t *testing.T) {
 	convertedOAS.fillJWT(api)
 
 	// trim oas JWT config slices before comparing after converting back, because only the first item is taken
-	oas.GetJWTConfiguration().IdentityBaseField = oas.GetJWTConfiguration().IdentityBaseField[:1]
 	oas.GetJWTConfiguration().PolicyFieldName = oas.GetJWTConfiguration().PolicyFieldName[:1]
 	oas.GetJWTConfiguration().Scopes.ClaimName = oas.GetJWTConfiguration().Scopes.ClaimName[:1]
 
@@ -425,6 +425,7 @@ func TestOAS_JWT(t *testing.T) {
 	convertedOAS.GetJWTConfiguration().AllowedAudiences = oas.GetJWTConfiguration().AllowedAudiences
 	convertedOAS.GetJWTConfiguration().AllowedIssuers = oas.GetJWTConfiguration().AllowedIssuers
 	convertedOAS.GetJWTConfiguration().AllowedSubjects = oas.GetJWTConfiguration().AllowedSubjects
+	convertedOAS.GetJWTConfiguration().SubjectClaims = oas.GetJWTConfiguration().SubjectClaims
 	convertedOAS.GetJWTConfiguration().JTIValidation.Enabled = true
 	assert.Equal(t, oas, convertedOAS)
 }

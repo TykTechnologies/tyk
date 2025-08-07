@@ -450,7 +450,7 @@ func (k *JWTMiddleware) getUserIdFromClaim(claims jwt.MapClaims) (string, error)
 }
 
 func (k *JWTMiddleware) getUserIDFromClaimOAS(claims jwt.MapClaims) (string, error) {
-	identityBaseFields := k.Spec.OAS.GetJWTConfiguration().IdentityBaseField
+	identityBaseFields := k.Spec.OAS.GetJWTConfiguration().SubjectClaims
 	checkedSub := false
 	for _, identityBaseField := range identityBaseFields {
 		if identityBaseField == SUB {
