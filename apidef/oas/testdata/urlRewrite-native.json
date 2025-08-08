@@ -12,6 +12,10 @@
           "header_name": {
             "match_rx": "header_pattern",
             "reverse": true
+          },
+          "content-type": {
+            "match_rx": "header_pattern_without_negate",
+            "reverse": false
           }
         },
         "query_val_matches": {
