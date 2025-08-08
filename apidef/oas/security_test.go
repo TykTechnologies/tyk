@@ -1,6 +1,7 @@
 package oas
 
 import (
+	"encoding/json"
 	"sort"
 	"testing"
 
@@ -198,6 +199,20 @@ func TestOAS_Token(t *testing.T) {
 	convertedOAS.fillToken(api)
 
 	assert.Equal(t, oas, convertedOAS)
+
+	// Make sure AuthSources are not serialized into json.
+	token.Query = &AuthSource{Enabled: true}
+	token.Header = &AuthSource{Enabled: true}
+	token.Cookie = &AuthSource{Enabled: true}
+	bytes, err := json.Marshal(token)
+	assert.NoError(t, err)
+
+	var unmarshalledToken Token
+	err = json.Unmarshal(bytes, &unmarshalledToken)
+	assert.NoError(t, err)
+	assert.Nil(t, unmarshalledToken.Query)
+	assert.Nil(t, unmarshalledToken.Header)
+	assert.Nil(t, unmarshalledToken.Cookie)
 }
 
 func TestOAS_Token_MultipleSecuritySchemes(t *testing.T) {
