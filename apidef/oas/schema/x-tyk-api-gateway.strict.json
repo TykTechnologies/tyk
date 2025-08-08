@@ -959,8 +959,7 @@
       },
       "required": [
         "in",
-        "pattern",
-        "negate"
+        "pattern"
       ],
       "additionalProperties": false
     },
@@ -989,8 +988,7 @@
       "required": [
         "in",
         "name",
-        "pattern",
-        "negate"
+        "pattern"
       ],
       "additionalProperties": false
     },

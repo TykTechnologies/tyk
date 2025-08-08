@@ -920,8 +920,7 @@
       },
       "required": [
         "in",
-        "pattern",
-        "negate"
+        "pattern"
       ]
     },
     "X-Tyk-URLRewriteRule": {
@@ -949,8 +948,7 @@
       "required": [
         "in",
         "name",
-        "pattern",
-        "negate"
+        "pattern"
       ]
     },
     "X-Tyk-EndpointPostPlugin": {
