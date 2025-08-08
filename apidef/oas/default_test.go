@@ -563,6 +563,34 @@ func TestOAS_BuildDefaultTykExtension(t *testing.T) {
 			return operations
 		}
 
+		t.Run("operations not present in new oas paths definition should be removed", func(t *testing.T) {
+			fakeOperationName := "fakeOperation"
+			fakeOperation := &Operation{
+				MockResponse: &MockResponse{
+					Enabled: true,
+				},
+			}
+			oasDef := getOASDef(true, true)
+
+			tykExtensionConfigParams := TykExtensionConfigParams{
+				MockResponse: &trueVal,
+			}
+
+			extension := &XTykAPIGateway{
+				Middleware: &Middleware{
+					Operations: map[string]*Operation{fakeOperationName: fakeOperation},
+				},
+			}
+			oasDef.SetTykExtension(extension)
+			assert.Greater(t, len(oasDef.getTykOperations()), 0)
+
+			expectedOperations := getExpectedOperations(true, true, middlewareMockResponse)
+			err := oasDef.BuildDefaultTykExtension(tykExtensionConfigParams, true)
+
+			assert.NoError(t, err)
+			assert.Equal(t, expectedOperations, oasDef.getTykOperations())
+		})
+
 		t.Run("allowList", func(t *testing.T) {
 			t.Run("enable allowList for all paths when no configured operationID in OAS", func(t *testing.T) {
 				oasDef := getOASDef(false, false)
