@@ -2186,7 +2186,7 @@ func TestJWTRSAIdInClaimsWithBaseField(t *testing.T) {
 		ts.Run(t, test.TestCase{
 			Headers:   authHeaders,
 			Code:      http.StatusForbidden,
-			BodyMatch: "found an empty user ID in predefined base field claim user_id",
+			BodyMatch: "found an empty user ID in predefined base claim, claim: user_id",
 		})
 	})
 

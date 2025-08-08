@@ -420,15 +420,13 @@ func TestOAS_JWT(t *testing.T) {
 	convertedOAS.SetTykExtension(&XTykAPIGateway{Server: Server{Authentication: &Authentication{SecuritySchemes: SecuritySchemes{}}}})
 	convertedOAS.fillJWT(api)
 
-	// trim oas JWT config slices before comparing after converting back, because only the first item is taken
-	oas.GetJWTConfiguration().Scopes.ClaimName = oas.GetJWTConfiguration().Scopes.ClaimName[:1]
-
 	// set OAS only fields since they will not be converted
 	convertedOAS.GetJWTConfiguration().AllowedAudiences = oas.GetJWTConfiguration().AllowedAudiences
 	convertedOAS.GetJWTConfiguration().AllowedIssuers = oas.GetJWTConfiguration().AllowedIssuers
 	convertedOAS.GetJWTConfiguration().AllowedSubjects = oas.GetJWTConfiguration().AllowedSubjects
 	convertedOAS.GetJWTConfiguration().SubjectClaims = oas.GetJWTConfiguration().SubjectClaims
 	convertedOAS.GetJWTConfiguration().BasePolicyClaims = oas.GetJWTConfiguration().BasePolicyClaims
+	convertedOAS.GetJWTConfiguration().Scopes.Claims = oas.GetJWTConfiguration().Scopes.Claims
 	convertedOAS.GetJWTConfiguration().JTIValidation.Enabled = true
 	assert.Equal(t, oas, convertedOAS)
 }
@@ -656,8 +654,8 @@ func TestOAS_OIDC(t *testing.T) {
 	convertedOAS.SetTykExtension(&XTykAPIGateway{Server: Server{Authentication: &Authentication{}}})
 	convertedOAS.getTykAuthentication().Fill(api)
 
-	// set claim name to first item in string because it sliced during conversion
-	oas.Extensions[ExtensionTykAPIGateway].(*XTykAPIGateway).Server.Authentication.OIDC.Scopes.ClaimName = oidc.Scopes.ClaimName[:1]
+	// set scope claims cause it is OAS only
+	convertedOAS.Extensions[ExtensionTykAPIGateway].(*XTykAPIGateway).Server.Authentication.OIDC.Scopes.Claims = oidc.Scopes.Claims
 	assert.Equal(t, oas, convertedOAS)
 }
 

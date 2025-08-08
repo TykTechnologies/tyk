@@ -54,7 +54,7 @@ var (
 
 	ErrNoSuitableUserIDClaimFound = errors.New("no suitable claims for user ID were found")
 	ErrEmptyUserIDInSubClaim      = errors.New("found an empty user ID in sub claim")
-	ErrEmptyUserIDInClaim         = errors.New("found an empty user ID in claim")
+	ErrEmptyUserIDInClaim         = errors.New("found an empty user ID in predefined base claim")
 )
 
 func (k *JWTMiddleware) Name() string {
