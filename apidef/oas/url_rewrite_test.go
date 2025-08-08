@@ -46,7 +46,6 @@ func TestURLRewrite_ExtractTo(t *testing.T) {
 	assert.Equal(t, native, extracted)
 }
 
-
 func decode(tb testing.TB, fs embed.FS, dest any, filename string) {
 	tb.Helper()
 
