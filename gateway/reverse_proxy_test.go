@@ -443,6 +443,130 @@ func TestCircuitBreaker5xxs(t *testing.T) {
 	})
 }
 
+func TestTimeoutBehavior(t *testing.T) {
+
+	test.Flaky(t) // Because involves timing tests
+
+
+    tests := []struct {
+        name               string
+		expectedDelay     time.Duration
+        proxyTimeout      float64
+        enforcedTimeout   float64
+
+    }{
+        {
+            name:              "TEST 1: Enforced timeout is set, so used instead of default proxy timeout, enforced timeout is lesser than proxy timeout",
+            proxyTimeout:      3, 
+            enforcedTimeout:   1,
+			expectedDelay:     1 * time.Second,
+
+        },
+        {
+            name:              "TEST 2: Enforced timeout is set, so used instead of default proxy timeout, enforced timeout is greater than proxy timeout",
+            proxyTimeout:      1,
+            enforcedTimeout:   3,
+			expectedDelay:     3 * time.Second,
+
+        },
+        {
+            name:              "TEST 3: Enforced timeout not set, so default proxy timeout is used",
+            proxyTimeout:      2,
+            enforcedTimeout:   0,
+			expectedDelay:     2 * time.Second,
+        },
+    }
+
+	for _, tc := range tests {
+        t.Run(tc.name, func(t *testing.T) {
+            // Create upstream server that delays
+            upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				// Keep upstream alive for a bit longer than the enforced timeout
+                time.Sleep(tc.expectedDelay + 5 * time.Second)
+                w.WriteHeader(http.StatusOK)
+            }))
+            defer upstream.Close()
+
+            // Start test gateway with timeout config
+            ts := StartTest(func(globalConf *config.Config) {
+                globalConf.ProxyDefaultTimeout = tc.proxyTimeout
+            })
+            defer ts.Close()
+
+            ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+                spec.Name = "Timeout Test API"
+                spec.APIID = "timeout_test_api"
+                spec.Proxy.ListenPath = "/timeout-test"  
+                spec.Proxy.StripListenPath = true
+                spec.Proxy.TargetURL = upstream.URL
+
+				// Only set the enforced timeout if it's greater than 0
+				if tc.enforcedTimeout > 0 {
+
+					spec.EnforcedTimeoutEnabled	 = true
+					 // Configure version with timeout
+					 spec.VersionData = apidef.VersionData{
+						NotVersioned: true,
+						DefaultVersion: "Default",
+						Versions: map[string]apidef.VersionInfo{
+							"Default": {
+								UseExtendedPaths: true,
+								Name: "Default",
+								ExtendedPaths: apidef.ExtendedPathsSet{
+									HardTimeouts: []apidef.HardTimeoutMeta{
+										{
+											Path:    "/",
+											Method:  "GET",
+											TimeOut: int(tc.enforcedTimeout),
+										},
+									},
+								},
+							},
+						},
+					}
+
+					
+				}
+            })
+
+			 // // Add small delay for API registration
+            time.Sleep(100 * time.Millisecond)
+
+            // // Make request and measure time
+            start := time.Now()
+        
+ 			_, err := ts.Run(t, []test.TestCase{
+                {
+                    Data: nil, 
+                    Path: "/timeout-test",
+                    Code: http.StatusGatewayTimeout,
+                    BodyMatch: `"error": "Upstream service reached hard timeout."`,
+                    Method: http.MethodGet,
+                },
+            }...)
+
+			if err != nil {
+				t.Fatalf("error: %v", err)
+			}
+
+			// Add a small buffer (e.g. 100ms) to account for processing overhead
+			duration := time.Since(start)
+			const timeoutBuffer = 100 * time.Millisecond
+			maxAllowedDuration := tc.expectedDelay + timeoutBuffer
+
+			if duration > maxAllowedDuration {
+				t.Fatalf("duration: %v exceeded maximum allowed duration: %v (expected: %v + %v buffer)", 
+					duration, maxAllowedDuration, tc.expectedDelay, timeoutBuffer)
+			} else {
+				t.Logf("duration: %v was as expected: %v", duration, maxAllowedDuration)
+			}
+
+			t.Logf("proxy timeout: %v", tc.proxyTimeout)
+			t.Logf("enforced timeout: %v", tc.enforcedTimeout)
+        })
+    }
+}
+
 func TestCircuitBreakerEvents(t *testing.T) {
 	// Use this channel to capture webhook events:
 	triggeredEvent := make(chan apidef.TykEvent)

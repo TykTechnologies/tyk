@@ -543,7 +543,14 @@ func (p *ReverseProxy) ServeHTTPForCache(rw http.ResponseWriter, req *http.Reque
 
 const defaultProxyTimeout float64 = 30
 
-func proxyTimeout(spec *APISpec) float64 {
+// ProxyTimeout checks if there is a path-specific enforced timeout, otherwise it checks the global timeout
+// The path-specific timeout overrides the global timeout.
+// The path-specific timeout is enforced by the API spec version, while the global timeout is enforced by the global config.
+// TT-12343
+func proxyTimeout(spec *APISpec, enforcedTimeout float64) float64 {
+	if enforcedTimeout > 0 {
+		return enforcedTimeout
+	}
 	if spec.GlobalConfig.ProxyDefaultTimeout > 0 {
 		return spec.GlobalConfig.ProxyDefaultTimeout
 	}
@@ -1203,7 +1210,7 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 			oldTransport.DisableKeepAlives = true
 		}
 
-		timeout := proxyTimeout(p.TykAPISpec)
+		timeout := proxyTimeout(p.TykAPISpec, enforcedTimeout)
 
 		// If an enforced timeout is configured for this API endpoint, use it instead
 		// of the global default timeout, as it should take precedence
