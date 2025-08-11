@@ -248,6 +248,7 @@ func TestGateway_readinessHandler(t *testing.T) {
 	}
 
 	for _, tt := range tests {
+		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			// Create a new gateway instance for each test
 			gw := NewGateway(config.Config{}, nil)
@@ -491,6 +492,7 @@ func TestGateway_isCriticalFailure(t *testing.T) {
 	}
 
 	for _, tt := range tests {
+		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			// Create a new gateway instance for each test
 			conf := config.Config{}
@@ -694,6 +696,7 @@ func TestGateway_evaluateHealthChecks(t *testing.T) {
 	}
 
 	for _, tt := range tests {
+		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			// Create a new gateway instance for each test
 			conf := config.Config{}
@@ -859,6 +862,7 @@ func TestGateway_liveCheckHandler(t *testing.T) {
 	}
 
 	for _, tt := range tests {
+		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			gw := NewGateway(config.Config{}, nil)
 
@@ -1015,6 +1019,7 @@ func TestGateway_liveCheckHandler_vs_readinessHandler(t *testing.T) {
 	}
 
 	for _, tt := range tests {
+		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			gw := NewGateway(config.Config{}, nil)
 			tt.setupHealthCheck(gw)
@@ -1237,6 +1242,7 @@ func TestGateway_liveCheckHandler_EdgeCases(t *testing.T) {
 	}
 
 	for _, tt := range tests {
+		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			gw := NewGateway(config.Config{}, nil)
 
@@ -1354,6 +1360,7 @@ func TestGateway_determineHealthStatus(t *testing.T) {
 	}
 
 	for _, tt := range tests {
+		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			// Create a gateway instance (config doesn't matter for this function)
 			gw := NewGateway(config.Config{}, nil)
