@@ -180,7 +180,9 @@ func LoadCount() int {
 }
 
 func Reset() {
-	clientSingleton.Stop()
+	if clientSingleton != nil {
+		clientSingleton.Stop()
+	}
 	clientSingleton = nil
 	funcClientSingleton = nil
 	values.Reset()

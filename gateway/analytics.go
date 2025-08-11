@@ -109,6 +109,11 @@ func (r *RedisAnalyticsHandler) Stop() {
 
 // Flush will stop the analytics processing and empty the analytics buffer and then re-init the workers again
 func (r *RedisAnalyticsHandler) Flush() {
+	// Add a small delay to allow any pending analytics records to be processed
+	// This prevents race conditions where records generated during request processing
+	// are lost when the analytics system is stopped too quickly
+	time.Sleep(5 * time.Millisecond)
+
 	r.Stop()
 
 	r.Start()
