@@ -1,6 +1,7 @@
 package oas
 
 import (
+	"encoding/json"
 	"sort"
 	"testing"
 
@@ -9,6 +10,84 @@ import (
 
 	"github.com/TykTechnologies/tyk/apidef"
 )
+
+func TestGetJWTConfiguration(t *testing.T) {
+	t.Run("should retrieve successfully", func(t *testing.T) {
+		var api apidef.APIDefinition
+		api.EnableJWT = true
+		api.AuthConfigs = map[string]apidef.AuthConfig{
+			apidef.JWTType: {
+				Name:           "jwtAuth",
+				AuthHeaderName: "Authorization",
+			},
+		}
+
+		var oas OAS
+		oas.SetTykExtension(&XTykAPIGateway{})
+		oas.fillSecurity(api)
+
+		j := oas.GetTykExtension().Server.Authentication.SecuritySchemes["jwtAuth"].(*JWT)
+		j.AllowedIssuers = []string{"issuer_one", "issuer_two"}
+		j.AllowedAudiences = []string{"audience_one", "audience_two"}
+		j.BasePolicyClaims = []string{"policy"}
+		j.SubjectClaims = []string{"new_sub"}
+
+		oas.GetTykExtension().Server.Authentication.SecuritySchemes["jwtAuth"] = j
+		gotten := oas.GetJWTConfiguration()
+
+		assert.Equal(t, j.AllowedIssuers, gotten.AllowedIssuers)
+		assert.Equal(t, []string{"new_sub"}, gotten.SubjectClaims)
+		assert.Equal(t, []string{"policy"}, gotten.BasePolicyClaims)
+		assert.Equal(t, j.AllowedAudiences, gotten.AllowedAudiences)
+	})
+
+	t.Run("should successfully convert identity and policy and return", func(t *testing.T) {
+		var api apidef.APIDefinition
+		api.EnableJWT = true
+		api.AuthConfigs = map[string]apidef.AuthConfig{
+			apidef.JWTType: {
+				Name:           "jwtAuth",
+				AuthHeaderName: "Authorization",
+			},
+		}
+		api.JWTIdentityBaseField = "new_sub"
+		api.JWTPolicyFieldName = "policy"
+
+		var oas OAS
+		oas.Fill(api)
+
+		j := oas.GetJWTConfiguration()
+		assert.Equal(t, j.IdentityBaseField, "new_sub")
+		assert.Equal(t, []string{"new_sub"}, j.SubjectClaims)
+		assert.Equal(t, j.PolicyFieldName, "policy")
+		assert.Equal(t, []string{"policy"}, j.BasePolicyClaims)
+
+		var newAPIDef apidef.APIDefinition
+		oas.GetJWTConfiguration().PolicyFieldName = "policy"
+		oas.GetJWTConfiguration().IdentityBaseField = "subject"
+		oas.ExtractTo(&newAPIDef)
+
+		assert.Equal(t, "policy", newAPIDef.JWTPolicyFieldName)
+		assert.Equal(t, "subject", newAPIDef.JWTIdentityBaseField)
+	})
+
+	t.Run("should return nil", func(t *testing.T) {
+		var auth apidef.AuthConfig
+		Fill(t, &auth, 0)
+		auth.DisableHeader = false
+
+		var api apidef.APIDefinition
+		api.AuthConfigs = map[string]apidef.AuthConfig{
+			apidef.AuthTokenType: auth,
+		}
+
+		var oas OAS
+		oas.SetTykExtension(&XTykAPIGateway{})
+		oas.fillSecurity(api)
+
+		assert.Nil(t, oas.GetJWTConfiguration())
+	})
+}
 
 func TestOAS_Security(t *testing.T) {
 	var auth apidef.AuthConfig
@@ -198,6 +277,20 @@ func TestOAS_Token(t *testing.T) {
 	convertedOAS.fillToken(api)
 
 	assert.Equal(t, oas, convertedOAS)
+
+	// Make sure AuthSources are not serialized into json.
+	token.Query = &AuthSource{Enabled: true}
+	token.Header = &AuthSource{Enabled: true}
+	token.Cookie = &AuthSource{Enabled: true}
+	bytes, err := json.Marshal(token)
+	assert.NoError(t, err)
+
+	var unmarshalledToken Token
+	err = json.Unmarshal(bytes, &unmarshalledToken)
+	assert.NoError(t, err)
+	assert.Nil(t, unmarshalledToken.Query)
+	assert.Nil(t, unmarshalledToken.Header)
+	assert.Nil(t, unmarshalledToken.Cookie)
 }
 
 func TestOAS_Token_MultipleSecuritySchemes(t *testing.T) {
@@ -342,6 +435,14 @@ func TestOAS_JWT(t *testing.T) {
 	convertedOAS.SetTykExtension(&XTykAPIGateway{Server: Server{Authentication: &Authentication{SecuritySchemes: SecuritySchemes{}}}})
 	convertedOAS.fillJWT(api)
 
+	// set OAS only fields since they will not be converted
+	convertedOAS.GetJWTConfiguration().AllowedAudiences = oas.GetJWTConfiguration().AllowedAudiences
+	convertedOAS.GetJWTConfiguration().AllowedIssuers = oas.GetJWTConfiguration().AllowedIssuers
+	convertedOAS.GetJWTConfiguration().AllowedSubjects = oas.GetJWTConfiguration().AllowedSubjects
+	convertedOAS.GetJWTConfiguration().SubjectClaims = oas.GetJWTConfiguration().SubjectClaims
+	convertedOAS.GetJWTConfiguration().BasePolicyClaims = oas.GetJWTConfiguration().BasePolicyClaims
+	convertedOAS.GetJWTConfiguration().Scopes.Claims = oas.GetJWTConfiguration().Scopes.Claims
+	convertedOAS.GetJWTConfiguration().JTIValidation.Enabled = true
 	assert.Equal(t, oas, convertedOAS)
 }
 
@@ -568,6 +669,8 @@ func TestOAS_OIDC(t *testing.T) {
 	convertedOAS.SetTykExtension(&XTykAPIGateway{Server: Server{Authentication: &Authentication{}}})
 	convertedOAS.getTykAuthentication().Fill(api)
 
+	// set scope claims cause it is OAS only
+	convertedOAS.Extensions[ExtensionTykAPIGateway].(*XTykAPIGateway).Server.Authentication.OIDC.Scopes.Claims = oidc.Scopes.Claims
 	assert.Equal(t, oas, convertedOAS)
 }
 

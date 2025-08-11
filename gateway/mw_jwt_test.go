@@ -12,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/TykTechnologies/tyk/apidef/oas"
 	"github.com/go-jose/go-jose/v3"
 	"github.com/golang-jwt/jwt/v4"
 	"github.com/stretchr/testify/assert"
@@ -983,6 +984,317 @@ func TestJWTExistingSessionRSAWithRawSourceInvalidPolicyID(t *testing.T) {
 	})
 }
 
+func TestJWTExtraClaimsValidation(t *testing.T) {
+	secret := "12345"
+
+	cases := []struct {
+		name          string
+		oasConfig     *oas.JWT
+		claims        jwt.MapClaims
+		expectError   bool
+		errorContains string
+	}{
+		{
+			name: "valid issuer",
+			oasConfig: &oas.JWT{
+				AllowedIssuers: []string{"issuer1", "issuer2"},
+			},
+			claims: jwt.MapClaims{
+				"iss": "issuer1",
+			},
+			expectError: false,
+		},
+		{
+			name: "invalid issuer",
+			oasConfig: &oas.JWT{
+				AllowedIssuers: []string{"issuer1", "issuer2"},
+			},
+			claims: jwt.MapClaims{
+				"iss": "issuer3",
+			},
+			expectError:   true,
+			errorContains: "invalid issuer claim",
+		},
+		{
+			name: "valid audience string",
+			oasConfig: &oas.JWT{
+				AllowedAudiences: []string{"aud1", "aud2"},
+			},
+			claims: jwt.MapClaims{
+				"aud": "aud1",
+			},
+			expectError: false,
+		},
+		{
+			name: "valid audience array",
+			oasConfig: &oas.JWT{
+				AllowedAudiences: []string{"aud1", "aud2"},
+			},
+			claims: jwt.MapClaims{
+				"aud": []interface{}{"aud3", "aud2"},
+			},
+			expectError: false,
+		},
+		{
+			name: "invalid audience",
+			oasConfig: &oas.JWT{
+				AllowedAudiences: []string{"aud1", "aud2"},
+			},
+			claims: jwt.MapClaims{
+				"aud": "aud3",
+			},
+			expectError:   true,
+			errorContains: "no matching audience found",
+		},
+		{
+			name: "valid jti when required",
+			oasConfig: &oas.JWT{
+				JTIValidation: oas.JTIValidation{
+					Enabled: true,
+				},
+			},
+			claims: jwt.MapClaims{
+				"jti": "123",
+			},
+			expectError: false,
+		},
+		{
+			name: "missing jti when required",
+			oasConfig: &oas.JWT{
+				JTIValidation: oas.JTIValidation{
+					Enabled: true,
+				},
+			},
+			claims:        jwt.MapClaims{},
+			expectError:   true,
+			errorContains: "JWT ID (jti) claim is required",
+		},
+		{
+			name: "valid subject",
+			oasConfig: &oas.JWT{
+				AllowedSubjects: []string{"sub1", "sub2"},
+			},
+			claims: jwt.MapClaims{
+				"sub": "sub1",
+			},
+			expectError: false,
+		},
+		{
+			name: "invalid subject",
+			oasConfig: &oas.JWT{
+				AllowedSubjects: []string{"sub1", "sub2"},
+			},
+			claims: jwt.MapClaims{
+				"sub": "sub3",
+			},
+			expectError:   true,
+			errorContains: "invalid subject value",
+		},
+		{
+			name: "valid identity base field",
+			oasConfig: &oas.JWT{
+				AllowedSubjects: []string{"user1", "user2"},
+				SubjectClaims:   []string{"user_id"},
+			},
+			claims: jwt.MapClaims{
+				"user_id": "user1",
+			},
+			expectError: false,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			var api apidef.APIDefinition
+			api.EnableJWT = true
+			api.AuthConfigs = map[string]apidef.AuthConfig{
+				apidef.JWTType: {
+					Name:           "jwtAuth",
+					AuthHeaderName: "Authorization",
+				},
+			}
+			api.IsOAS = true
+
+			var o oas.OAS
+			o.SetTykExtension(&oas.XTykAPIGateway{})
+			o.Fill(api)
+
+			o.GetTykExtension().Server.Authentication.SecuritySchemes["jwtAuth"] = tc.oasConfig
+			o.ExtractTo(&api)
+
+			spec := &APISpec{
+				APIDefinition: &api,
+				OAS:           o,
+			}
+
+			// Create and sign token
+			token := jwt.New(jwt.SigningMethodHS256)
+			token.Claims = tc.claims
+			signedToken, err := token.SignedString([]byte(secret))
+			assert.NoError(t, err)
+
+			// Create middleware, parse token and call function
+			jwtMiddleware := &JWTMiddleware{BaseMiddleware: &BaseMiddleware{
+				Spec: spec,
+			}}
+			parser := jwt.NewParser(jwt.WithoutClaimsValidation())
+			parsedToken, err := parser.Parse(signedToken, func(_ *jwt.Token) (interface{}, error) {
+				return []byte(secret), nil
+			})
+			assert.NoError(t, err)
+			err = jwtMiddleware.validateExtraClaims(parsedToken.Claims.(jwt.MapClaims), parsedToken)
+
+			if tc.expectError {
+				assert.Error(t, err)
+				assert.Contains(t, err.Error(), tc.errorContains)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
+func TestGetPolicyIDFromToken(t *testing.T) {
+	testCases := []struct {
+		name         string
+		claims       jwt.MapClaims
+		expected     string
+		expectedBool bool
+		modifySpec   func(spec *APISpec)
+	}{
+		{
+			name: "default case",
+			claims: jwt.MapClaims{
+				"policy": "mainpolicy",
+			},
+			expectedBool: true,
+			expected:     "mainpolicy",
+			modifySpec: func(spec *APISpec) {
+				spec.IsOAS = false
+				spec.JWTPolicyFieldName = "policy"
+			},
+		},
+		{
+			name: "is classic missing",
+			claims: jwt.MapClaims{
+				"random": "test",
+			},
+			expectedBool: false,
+			expected:     "",
+			modifySpec: func(spec *APISpec) {
+				spec.IsOAS = false
+				spec.JWTPolicyFieldName = "policy"
+			},
+		},
+		{
+			name: "is classic empty",
+			claims: jwt.MapClaims{
+				"policy": "",
+			},
+			expectedBool: false,
+			expected:     "",
+			modifySpec: func(spec *APISpec) {
+				spec.IsOAS = false
+				spec.JWTPolicyFieldName = "policy"
+			},
+		},
+		{
+			name: "is oas",
+			claims: jwt.MapClaims{
+				"policy": "mainpolicy",
+			},
+			expectedBool: true,
+			expected:     "mainpolicy",
+			modifySpec: func(spec *APISpec) {
+				spec.IsOAS = true
+				spec.OAS.GetJWTConfiguration().BasePolicyClaims = []string{"policy", "backuppolicy"}
+				spec.OAS.ExtractTo(spec.APIDefinition)
+			},
+		},
+		{
+			name: "is oas second",
+			claims: jwt.MapClaims{
+				"backuppolicy": "mainpolicy",
+			},
+			expectedBool: true,
+			expected:     "mainpolicy",
+			modifySpec: func(spec *APISpec) {
+				spec.IsOAS = true
+				spec.OAS.GetJWTConfiguration().BasePolicyClaims = []string{"policy", "backuppolicy"}
+				spec.OAS.ExtractTo(spec.APIDefinition)
+			},
+		},
+		{
+			name: "is oas missing",
+			claims: jwt.MapClaims{
+				"random": "mainpolicy",
+			},
+			expectedBool: false,
+			expected:     "",
+			modifySpec: func(spec *APISpec) {
+				spec.IsOAS = true
+				spec.OAS.GetJWTConfiguration().BasePolicyClaims = []string{"policy", "backuppolicy"}
+				spec.OAS.ExtractTo(spec.APIDefinition)
+			},
+		},
+		{
+			name: "empty value",
+			claims: jwt.MapClaims{
+				"policy": "",
+			},
+			expectedBool: false,
+			expected:     "",
+			modifySpec: func(spec *APISpec) {
+				spec.IsOAS = true
+				spec.OAS.GetJWTConfiguration().BasePolicyClaims = []string{"policy", "backuppolicy"}
+				spec.OAS.ExtractTo(spec.APIDefinition)
+			},
+		},
+		{
+			name: "is classic converted to oas without filling BasePolicyClaims",
+			claims: jwt.MapClaims{
+				"policy": "mainpolicy",
+			},
+			expectedBool: true,
+			expected:     "mainpolicy",
+			modifySpec: func(spec *APISpec) {
+				spec.APIDefinition.JWTPolicyFieldName = "policy"
+				spec.OAS.Fill(*spec.APIDefinition)
+				spec.IsOAS = true
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			var api apidef.APIDefinition
+			api.EnableJWT = true
+			api.AuthConfigs = map[string]apidef.AuthConfig{
+				apidef.JWTType: {
+					Name:           "jwtAuth",
+					AuthHeaderName: "Authorization",
+				},
+			}
+
+			var o oas.OAS
+			o.SetTykExtension(&oas.XTykAPIGateway{})
+			o.Fill(api)
+
+			spec := &APISpec{
+				APIDefinition: &api,
+				OAS:           o,
+			}
+
+			tc.modifySpec(spec)
+
+			k := JWTMiddleware{&BaseMiddleware{Spec: spec}}
+			gotten, gottenBool := k.getPolicyIDFromToken(tc.claims)
+			assert.Equal(t, tc.expected, gotten)
+			assert.Equal(t, tc.expectedBool, gottenBool)
+		})
+	}
+}
+
 func TestJWTScopeToPolicyMapping(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
@@ -1874,7 +2186,7 @@ func TestJWTRSAIdInClaimsWithBaseField(t *testing.T) {
 		ts.Run(t, test.TestCase{
 			Headers:   authHeaders,
 			Code:      http.StatusForbidden,
-			BodyMatch: "found an empty user ID in predefined base field claim user_id",
+			BodyMatch: "found an empty user ID in predefined base claim, claim: user_id",
 		})
 	})
 
@@ -2500,52 +2812,212 @@ func TestTimeValidateClaims(t *testing.T) {
 
 func TestGetUserIDFromClaim(t *testing.T) {
 	userID := "123"
-	userIDKey := "user_id"
-	t.Run("identity base field exists", func(t *testing.T) {
+	t.Run("is classic", func(t *testing.T) {
+		userIDKey := "user_id"
+		var api apidef.APIDefinition
+		api.EnableJWT = true
+		api.AuthConfigs = map[string]apidef.AuthConfig{
+			apidef.JWTType: {
+				Name:           "jwtAuth",
+				AuthHeaderName: "Authorization",
+			},
+		}
+		api.JWTIdentityBaseField = userIDKey
+
+		var o oas.OAS
+		o.Fill(api)
+		middleware := JWTMiddleware{&BaseMiddleware{Spec: &APISpec{
+			OAS:           o,
+			APIDefinition: &api,
+		}}}
+
+		t.Run("identity base field exists", func(t *testing.T) {
+			jwtClaims := jwt.MapClaims{
+				userIDKey: userID,
+				"iss":     "example.com",
+			}
+			identity, err := middleware.getUserIdFromClaim(jwtClaims)
+			assert.NoError(t, err)
+			assert.Equal(t, identity, userID)
+		})
+
+		t.Run("identity base field doesn't exist, fallback to sub", func(t *testing.T) {
+			jwtClaims := jwt.MapClaims{
+				"iss": "example.com",
+				"sub": userID,
+			}
+			identity, err := middleware.getUserIdFromClaim(jwtClaims)
+			assert.NoError(t, err)
+			assert.Equal(t, identity, userID)
+		})
+
+		t.Run("identity base field and sub doesn't exist", func(t *testing.T) {
+			jwtClaims := jwt.MapClaims{
+				"iss": "example.com",
+			}
+			_, err := middleware.getUserIdFromClaim(jwtClaims)
+			assert.ErrorIs(t, err, ErrNoSuitableUserIDClaimFound)
+		})
+
+		t.Run("identity base field doesn't exist, empty sub", func(t *testing.T) {
+			jwtClaims := jwt.MapClaims{
+				"iss": "example.com",
+				"sub": "",
+			}
+			_, err := middleware.getUserIdFromClaim(jwtClaims)
+			assert.ErrorIs(t, err, ErrEmptyUserIDInSubClaim)
+		})
+
+		t.Run("empty identity base field", func(t *testing.T) {
+			jwtClaims := jwt.MapClaims{
+				"iss":     "example.com",
+				userIDKey: "",
+			}
+			_, err := middleware.getUserIdFromClaim(jwtClaims)
+			assert.ErrorIs(t, err, ErrEmptyUserIDInClaim)
+		})
+	})
+
+	t.Run("is classic and converted to oas", func(t *testing.T) {
+		userIDKey := "user_id"
+		var api apidef.APIDefinition
+		api.EnableJWT = true
+		api.AuthConfigs = map[string]apidef.AuthConfig{
+			apidef.JWTType: {
+				Name:           "jwtAuth",
+				AuthHeaderName: "Authorization",
+			},
+		}
+		api.JWTIdentityBaseField = userIDKey
+
+		var o oas.OAS
+		o.Fill(api)
+		api.IsOAS = true
+		middleware := JWTMiddleware{&BaseMiddleware{Spec: &APISpec{
+			OAS:           o,
+			APIDefinition: &api,
+		}}}
+
 		jwtClaims := jwt.MapClaims{
 			userIDKey: userID,
 			"iss":     "example.com",
 		}
-		identity, err := getUserIDFromClaim(jwtClaims, "user_id")
+		identity, err := middleware.getUserIdFromClaim(jwtClaims)
 		assert.NoError(t, err)
 		assert.Equal(t, identity, userID)
 	})
 
-	t.Run("identity base field doesn't exist, fallback to sub", func(t *testing.T) {
-		jwtClaims := jwt.MapClaims{
-			"iss": "example.com",
-			"sub": userID,
+	t.Run("is OAS", func(t *testing.T) {
+		testCases := []struct {
+			name          string
+			expectedErr   error
+			expected      string
+			claims        jwt.MapClaims
+			subjectClaims []string
+		}{
+			{
+				name: "identity base field exists",
+				claims: jwt.MapClaims{
+					"user_id": userID,
+					"iss":     "example.com",
+				},
+				subjectClaims: []string{"user_id"},
+				expected:      userID,
+			},
+			{
+				name: "second identity base field exists",
+				claims: jwt.MapClaims{
+					"backup_user_id": userID,
+					"iss":            "example.com",
+				},
+				subjectClaims: []string{"user_id", "backup_user_id"},
+				expected:      userID,
+			},
+			{
+				name: "no identity base field exists, fallback to sub",
+				claims: jwt.MapClaims{
+					"iss": "example.com",
+					"sub": userID,
+				},
+				subjectClaims: []string{"user_id", "backup_user_id"},
+				expected:      userID,
+			},
+			{
+				name:          "sub in identity base fields",
+				subjectClaims: []string{"user_id", "sub"},
+				expected:      userID,
+				claims: jwt.MapClaims{
+					"iss": "example.com",
+					"sub": userID,
+				},
+			},
+			{
+				name:          "sub in identity base fields, but not in claims",
+				subjectClaims: []string{"user_id", "sub"},
+				claims:        jwt.MapClaims{},
+				expectedErr:   ErrNoSuitableUserIDClaimFound,
+			},
+			{
+				name:          "no identity base fields and no sub",
+				subjectClaims: []string{"user_id", "backup_user_id"},
+				expectedErr:   ErrNoSuitableUserIDClaimFound,
+				claims: jwt.MapClaims{
+					"iss": "example.com",
+				},
+			},
+			{
+				name: "no configured base fields and sub",
+				claims: jwt.MapClaims{
+					"sub": userID,
+				},
+				expected: userID,
+			},
+			{
+				name:          "empty identity base field",
+				subjectClaims: []string{"user_id", "backup_user_id"},
+				claims: jwt.MapClaims{
+					"iss":     "example.com",
+					"user_id": "",
+				},
+				expectedErr: ErrEmptyUserIDInClaim,
+			},
+			{
+				name:        "no configured base field and no sub",
+				claims:      jwt.MapClaims{},
+				expectedErr: ErrNoSuitableUserIDClaimFound,
+			},
 		}
-		identity, err := getUserIDFromClaim(jwtClaims, userIDKey)
-		assert.NoError(t, err)
-		assert.Equal(t, identity, userID)
+		for _, tc := range testCases {
+			t.Run(tc.name, func(t *testing.T) {
+				var api apidef.APIDefinition
+				api.EnableJWT = true
+				api.AuthConfigs = map[string]apidef.AuthConfig{
+					apidef.JWTType: {
+						Name:           "jwtAuth",
+						AuthHeaderName: "Authorization",
+					},
+				}
+				api.IsOAS = true
+
+				var o oas.OAS
+				o.Fill(api)
+				o.GetJWTConfiguration().SubjectClaims = tc.subjectClaims
+				middleware := JWTMiddleware{&BaseMiddleware{Spec: &APISpec{
+					OAS:           o,
+					APIDefinition: &api,
+				}}}
+
+				identity, err := middleware.getUserIdFromClaim(tc.claims)
+				if tc.expectedErr != nil {
+					assert.ErrorIs(t, err, tc.expectedErr)
+				} else {
+					assert.NoError(t, err)
+					assert.Equal(t, identity, tc.expected)
+				}
+			})
+		}
 	})
 
-	t.Run("identity base field and sub doesn't exist", func(t *testing.T) {
-		jwtClaims := jwt.MapClaims{
-			"iss": "example.com",
-		}
-		_, err := getUserIDFromClaim(jwtClaims, userIDKey)
-		assert.ErrorIs(t, err, ErrNoSuitableUserIDClaimFound)
-	})
-
-	t.Run("identity base field doesn't exist, empty sub", func(t *testing.T) {
-		jwtClaims := jwt.MapClaims{
-			"iss": "example.com",
-			"sub": "",
-		}
-		_, err := getUserIDFromClaim(jwtClaims, userIDKey)
-		assert.ErrorIs(t, err, ErrEmptyUserIDInSubClaim)
-	})
-
-	t.Run("empty identity base field", func(t *testing.T) {
-		jwtClaims := jwt.MapClaims{
-			"iss":     "example.com",
-			userIDKey: "",
-		}
-		_, err := getUserIDFromClaim(jwtClaims, userIDKey)
-		assert.Equal(t, fmt.Sprintf("found an empty user ID in predefined base field claim %s", userIDKey), err.Error())
-	})
 }
 
 func TestJWTMiddleware_getSecretToVerifySignature_JWKNoKID(t *testing.T) {
@@ -2978,6 +3450,99 @@ func Test_getOAuthClientIDFromClaim(t *testing.T) {
 			oauthClientID := j.getOAuthClientIDFromClaim(tc.claims)
 
 			assert.Equal(t, tc.expectedClientID, oauthClientID)
+		})
+	}
+}
+
+// TestJWTMiddleware_getScopeClaimNameOAS tests the getScopeClaimNameOAS function with various scenarios
+func TestJWTMiddleware_getScopeClaimNameOAS(t *testing.T) {
+	tests := []struct {
+		name       string
+		claimNames []string
+		claims     jwt.MapClaims
+		want       string
+	}{
+		{
+			name:       "empty claims and empty claim names",
+			claimNames: []string{},
+			claims:     jwt.MapClaims{},
+			want:       "",
+		},
+		{
+			name:       "claim exists - single claim name",
+			claimNames: []string{"scope"},
+			claims: jwt.MapClaims{
+				"scope": "read write",
+			},
+			want: "scope",
+		},
+		{
+			name:       "claim exists - multiple claim names, first match",
+			claimNames: []string{"scp", "scope", "permissions"},
+			claims: jwt.MapClaims{
+				"scope": "read write",
+				"scp":   "admin",
+			},
+			want: "scp",
+		},
+		{
+			name:       "claim exists - multiple claim names, last match",
+			claimNames: []string{"scp", "scope", "permissions"},
+			claims: jwt.MapClaims{
+				"permissions": "read write",
+			},
+			want: "permissions",
+		},
+		{
+			name:       "no matching claims",
+			claimNames: []string{"scope", "scp"},
+			claims: jwt.MapClaims{
+				"roles": "admin",
+				"sub":   "1234",
+			},
+			want: "",
+		},
+		{
+			name:       "case sensitive match",
+			claimNames: []string{"Scope", "scope"},
+			claims: jwt.MapClaims{
+				"Scope": "read write",
+				"scope": "admin",
+			},
+			want: "Scope",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var api apidef.APIDefinition
+			api.EnableJWT = true
+			api.AuthConfigs = map[string]apidef.AuthConfig{
+				apidef.JWTType: {
+					Name:           "jwtAuth",
+					AuthHeaderName: "Authorization",
+				},
+			}
+			api.IsOAS = true
+
+			var o oas.OAS
+			o.SetTykExtension(&oas.XTykAPIGateway{})
+			o.Fill(api)
+			o.GetJWTConfiguration().Scopes = &oas.Scopes{
+				Claims: tt.claimNames,
+			}
+			mw := JWTMiddleware{
+				BaseMiddleware: &BaseMiddleware{
+					Spec: &APISpec{
+						OAS:           o,
+						APIDefinition: &api,
+					},
+				},
+			}
+			got := mw.getScopeClaimNameOAS(tt.claims)
+			if got != tt.want {
+				t.Errorf("getScopeClaimNameOAS() = %v, want %v", got, tt.want)
+			}
 		})
 	}
 }

@@ -40,6 +40,11 @@
           "pattern": "request_context_pattern",
           "name": "request_context_name",
           "negate": false
+        },
+        {
+          "in": "header",
+          "pattern": "header_pattern_without_negate",
+          "name": "content-type"
         }
       ],
       "rewriteTo": "http://example.com/rewritten-one"
