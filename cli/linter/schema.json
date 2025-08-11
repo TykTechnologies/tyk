@@ -1109,6 +1109,9 @@
     "readiness_check_endpoint_name": {
       "type": "string"
     },
+    "liveness_check_endpoint_name": {
+      "type": "string"
+    },
     "graceful_shutdown_timeout_duration": {
       "type": "integer"
     },
