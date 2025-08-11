@@ -122,6 +122,10 @@ type JWT struct {
 	// Tyk classic API definition: `jwt_identity_base_field`
 	IdentityBaseField string `bson:"identityBaseField,omitempty" json:"identityBaseField,omitempty"`
 
+	// SubjectClaims specifies a list of claims that can be used to identity the subject of the JWT.
+	// The field is an OAS only field and is only used in OAS APIs.
+	SubjectClaims []string `bson:"subjectClaims,omitempty" json:"subjectClaims,omitempty"`
+
 	// SkipKid controls skipping using the `kid` claim from a JWT (default behaviour).
 	// When this is true, the field configured in IdentityBaseField is checked first.
 	//
@@ -133,6 +137,11 @@ type JWT struct {
 	//
 	// Tyk classic API definition: `jwt_policy_field_name`
 	PolicyFieldName string `bson:"policyFieldName,omitempty" json:"policyFieldName,omitempty"`
+
+	// BasePolicyClaims specifies a list of claims from which the base PolicyID is extracted.
+	// The policy is applied to the session as a base policy.
+	// The field is an OAS only field and is only used in OAS APIs.
+	BasePolicyClaims []string `bson:"basePolicyClaims,omitempty" json:"basePolicyClaims,omitempty"`
 
 	// ClientBaseField is used when PolicyFieldName is not provided. It will get
 	// a session key and use the policies from that. The field ensures that requests
@@ -164,12 +173,34 @@ type JWT struct {
 	// Tyk classic API definition: `jwt_expires_at_validation_skew`.
 	ExpiresAtValidationSkew uint64 `bson:"expiresAtValidationSkew,omitempty" json:"expiresAtValidationSkew,omitempty"`
 
+	// AllowedIssuers contains a list of accepted issuers for JWT validation.
+	// When configured, the JWT's issuer claim must match one of these values.
+	AllowedIssuers []string `bson:"allowedIssuers,omitempty" json:"allowedIssuers,omitempty"`
+
+	// AllowedAudiences contains a list of accepted audiences for JWT validation.
+	// When configured, the JWT's audience claim must match one of these values.
+	AllowedAudiences []string `bson:"allowedAudiences,omitempty" json:"allowedAudiences,omitempty"`
+
+	// JTIValidation contains the configuration for the validation of the JWT ID.
+	JTIValidation JTIValidation `bson:"jtiValidation,omitempty" json:"jtiValidation,omitempty"`
+
+	// AllowedSubjects contains a list of accepted subjects for JWT validation.
+	// When configured, the subject from kid/identityBaseField/sub must match one of these values.
+	AllowedSubjects []string `bson:"allowedSubjects,omitempty" json:"allowedSubjects,omitempty"`
+
 	// IDPClientIDMappingDisabled prevents Tyk from automatically detecting the use of certain IDPs based on standard claims
 	// that they include in the JWT: `client_id`, `cid`, `clientId`. Setting this flag to `true` disables the mapping and avoids
 	// accidentally misidentifying the use of one of these IDPs if one of their standard values is configured in your JWT.
 	//
 	// Tyk classic API definition: `idp_client_id_mapping_disabled`.
 	IDPClientIDMappingDisabled bool `bson:"idpClientIdMappingDisabled,omitempty" json:"idpClientIdMappingDisabled,omitempty"`
+}
+
+// JTIValidation contains the configuration for the validation of the JWT ID.
+type JTIValidation struct {
+	// Enabled indicates whether JWT ID claim is required.
+	// When true, tokens must include a 'jti' claim.
+	Enabled bool `bson:"enabled" json:"enabled"`
 }
 
 // Import populates *JWT based on arguments.
@@ -212,8 +243,14 @@ func (s *OAS) fillJWT(api apidef.APIDefinition) {
 	jwt.JwksURIs = api.JWTJwksURIs
 	jwt.SigningMethod = api.JWTSigningMethod
 	jwt.IdentityBaseField = api.JWTIdentityBaseField
+	if jwt.IdentityBaseField != "" {
+		jwt.SubjectClaims = []string{jwt.IdentityBaseField}
+	}
 	jwt.SkipKid = api.JWTSkipKid
 	jwt.PolicyFieldName = api.JWTPolicyFieldName
+	if jwt.PolicyFieldName != "" {
+		jwt.BasePolicyClaims = []string{api.JWTPolicyFieldName}
+	}
 	jwt.ClientBaseField = api.JWTClientIDBaseField
 
 	if jwt.Scopes == nil {
@@ -843,6 +880,18 @@ func (s *OAS) extractSecurityTo(api *apidef.APIDefinition) {
 			}
 		}
 	}
+}
+
+func (s *OAS) GetJWTConfiguration() *JWT {
+	for keyName := range s.getTykSecuritySchemes() {
+		if _, ok := s.Security[0][keyName]; ok {
+			v := s.Components.SecuritySchemes[keyName].Value
+			if v.Type == typeHTTP && v.Scheme == schemeBearer && v.BearerFormat == bearerFormatJWT {
+				return s.getTykJWTAuth(keyName)
+			}
+		}
+	}
+	return nil
 }
 
 func resetSecuritySchemes(api *apidef.APIDefinition) {
