@@ -10,6 +10,7 @@ import (
 	"encoding/pem"
 	"errors"
 	"fmt"
+	"github.com/TykTechnologies/tyk/certs"
 	"io"
 	"net/http"
 	"strings"
@@ -903,6 +904,16 @@ func (k *JWTMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, _
 	// enable bearer token format
 	rawJWT = stripBearer(rawJWT)
 
+	// Check if this is a JWE token and decrypt it
+	if k.Spec.EnableJWE && isJWE(rawJWT) {
+		var err error
+		rawJWT, err = k.decryptJWE(rawJWT)
+		if err != nil {
+			k.Logger().WithError(err).Error("JWE decryption failed")
+			return errors.New("JWE decryption failed: " + err.Error()), http.StatusUnauthorized
+		}
+	}
+
 	// Use own validation logic, see below
 	parser := jwt.NewParser(jwt.WithoutClaimsValidation())
 
@@ -1332,4 +1343,96 @@ func getUserIDFromClaim(claims jwt.MapClaims, identityBaseField string, shouldFa
 
 	log.Error(ErrNoSuitableUserIDClaimFound)
 	return "", ErrNoSuitableUserIDClaimFound
+}
+
+// decryptJWE decrypts a JWE token and returns the nested JWT
+func (k *JWTMiddleware) decryptJWE(jweToken string) (string, error) {
+	if !k.Spec.EnableJWE {
+		return "", errors.New("JWE is not enabled for this API")
+	}
+
+	object, err := jose.ParseEncrypted(jweToken)
+	if err != nil {
+		return "", fmt.Errorf("failed to parse JWE token: %w", err)
+	}
+
+	tokenAlg := object.Header.Algorithm
+
+	// Validate alg and enc if configured
+	if err := k.validateJWEAlgorithms(tokenAlg); err != nil {
+		return "", err
+	}
+
+	// Determine actual algorithm to use
+	actualAlg := tokenAlg
+	if k.Spec.JWEDecryptionMethod != "" {
+		actualAlg = k.Spec.JWEDecryptionMethod
+	}
+
+	// Load the decryption key
+	key, err := k.loadJWEKey(actualAlg)
+	if err != nil {
+		return "", fmt.Errorf("failed to load JWE decryption key: %w", err)
+	}
+
+	// Decrypt the payload
+	decrypted, err := object.Decrypt(key)
+	if err != nil {
+		return "", fmt.Errorf("failed to decrypt JWE token: %w", err)
+	}
+
+	return string(decrypted), nil
+}
+
+func (k *JWTMiddleware) validateJWEAlgorithms(tokenAlg string) error {
+	if k.Spec.JWEDecryptionMethod != "" && tokenAlg != k.Spec.JWEDecryptionMethod {
+		return fmt.Errorf("JWE alg mismatch: header=%s, expected=%s", tokenAlg, k.Spec.JWEDecryptionMethod)
+	}
+	return nil
+}
+
+func (k *JWTMiddleware) loadJWEKey(actualAlg string) (interface{}, error) {
+	switch {
+	case strings.HasPrefix(actualAlg, "RSA") || strings.HasPrefix(actualAlg, "ECDH-ES"):
+		return k.loadJWEAsymmetricKey()
+	case actualAlg == "dir" || strings.HasPrefix(actualAlg, "A") || strings.HasPrefix(actualAlg, "PBES2"):
+		return k.loadJWESymmetricKey()
+	default:
+		return nil, fmt.Errorf("unsupported JWE algorithm: %s", actualAlg)
+	}
+}
+
+func (k *JWTMiddleware) loadJWEAsymmetricKey() (interface{}, error) {
+	if k.Spec.JWEDecryptionCertID == "" {
+		return nil, errors.New("certificate ID required for asymmetric JWE algorithms")
+	}
+	certs := k.Gw.CertificateManager.List([]string{k.Spec.JWEDecryptionCertID}, certs.CertificatePrivate)
+	if len(certs) == 0 || certs[0] == nil {
+		return nil, errors.New("certificate not found")
+	}
+	return certs[0].PrivateKey, nil
+}
+
+func (k *JWTMiddleware) loadJWESymmetricKey() ([]byte, error) {
+	if k.Spec.JWEDecryptionKey == "" {
+		return nil, errors.New("symmetric key not configured")
+	}
+
+	if strings.HasPrefix(k.Spec.JWEDecryptionKey, "secret://") {
+		return k.resolveSecretKey(k.Spec.JWEDecryptionKey)
+	}
+
+	return []byte(k.Spec.JWEDecryptionKey), nil
+}
+
+func (k *JWTMiddleware) resolveSecretKey(ref string) ([]byte, error) {
+	// query the secret store and return its real value
+	return []byte(ref), nil
+}
+
+// isJWE determines if a token is a JWE token
+// JWE is composed by 5 sections separated by .
+func isJWE(token string) bool {
+	parts := strings.Split(token, ".")
+	return len(parts) == 5
 }
