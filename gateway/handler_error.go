@@ -15,8 +15,6 @@ import (
 	"github.com/TykTechnologies/tyk/apidef"
 
 	"github.com/TykTechnologies/tyk-pump/analytics"
-	"github.com/TykTechnologies/tyk/config"
-
 	"github.com/TykTechnologies/tyk/header"
 	"github.com/TykTechnologies/tyk/request"
 )
@@ -37,7 +35,7 @@ const (
 
 var errCustomBodyResponse = errors.New("errCustomBodyResponse")
 
-var TykErrors = make(map[string]config.TykError)
+var TykErrors = make(map[string]apidef.TykError)
 
 func errorAndStatusCode(errType string) (error, int) {
 	err := TykErrors[errType]
@@ -45,7 +43,7 @@ func errorAndStatusCode(errType string) (error, int) {
 }
 
 func defaultTykErrors() {
-	TykErrors = make(map[string]config.TykError)
+	TykErrors = make(map[string]apidef.TykError)
 
 	initAuthKeyErrors()
 	initOauth2KeyExistsErrors()
@@ -89,6 +87,10 @@ type TemplateExecutor interface {
 
 // HandleError is the actual error handler and will store the error details in analytics if analytics processing is enabled.
 func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMsg string, errCode int, writeResponse bool) {
+	// Apply error overrides
+	errorOverrideMw := &ErrorOverrideMiddleware{BaseMiddleware: e.BaseMiddleware}
+	errMsg, errCode = errorOverrideMw.ApplyErrorOverride(r, errMsg, errCode)
+
 	defer e.Base().UpdateRequestSession(r)
 	response := &http.Response{}
 

@@ -84,6 +84,17 @@ type Operation struct {
 
 	// RateLimit contains endpoint level rate limit configuration.
 	RateLimit *RateLimitEndpoint `bson:"rateLimit,omitempty" json:"rateLimit,omitempty"`
+
+	// ErrorMessage defines the error message configuration for this operation.
+	ErrorOverrideMessage map[string]apidef.TykError `bson:"customErrorResponses,omitempty" json:"customErrorResponses,omitempty"`
+}
+
+type ErrorMessage map[string]apidef.TykError
+
+func (m *ErrorMessage) Fill(meta apidef.ErrorOverrideMeta) {
+	for k, v := range meta.Errors {
+		(*m)[k] = v
+	}
 }
 
 // AllowanceType holds the valid allowance types values.
@@ -167,6 +178,7 @@ func (s *OAS) fillPathsAndOperations(ep apidef.ExtendedPathsSet) {
 	s.fillRequestSizeLimit(ep.SizeLimit)
 	s.fillRateLimitEndpoints(ep.RateLimit)
 	s.fillMockResponsePaths(s.Paths, ep)
+	s.fillErrorsOverrides(ep.ErrorOverrides)
 }
 
 // fillMockResponsePaths converts classic API mock responses to OAS format.
@@ -268,6 +280,7 @@ func (s *OAS) extractPathsAndOperations(ep *apidef.ExtendedPathsSet) {
 					tykOp.extractDoNotTrackEndpointTo(ep, path, method)
 					tykOp.extractRequestSizeLimitTo(ep, path, method)
 					tykOp.extractRateLimitEndpointTo(ep, path, method)
+					tykOp.extractErrorsOverrideTo(ep, path, method)
 					break
 				}
 			}
@@ -972,6 +985,15 @@ func (o *Operation) extractEndpointPostPluginTo(ep *apidef.ExtendedPathsSet, pat
 	ep.GoPlugin = append(ep.GoPlugin, meta)
 }
 
+func (o *Operation) extractErrorsOverrideTo(ep *apidef.ExtendedPathsSet, path string, method string) {
+	if o.ErrorOverrideMessage == nil {
+		return
+	}
+	meta := apidef.ErrorOverrideMeta{Path: path, Method: method}
+	meta.Errors = o.ErrorOverrideMessage
+	ep.ErrorOverrides = append(ep.ErrorOverrides, meta)
+}
+
 func (o *Operation) extractCircuitBreakerTo(ep *apidef.ExtendedPathsSet, path string, method string) {
 	if o.CircuitBreaker == nil {
 		return
@@ -980,6 +1002,23 @@ func (o *Operation) extractCircuitBreakerTo(ep *apidef.ExtendedPathsSet, path st
 	meta := apidef.CircuitBreakerMeta{Path: path, Method: method}
 	o.CircuitBreaker.ExtractTo(&meta)
 	ep.CircuitBreaker = append(ep.CircuitBreaker, meta)
+}
+
+func (s *OAS) fillErrorsOverrides(metas []apidef.ErrorOverrideMeta) {
+	for _, meta := range metas {
+		operationID := s.getOperationID(meta.Path, meta.Method)
+		operation := s.GetTykExtension().getOperation(operationID)
+		if operation.ErrorOverrideMessage == nil {
+			operation.ErrorOverrideMessage = make(map[string]apidef.TykError)
+		}
+
+		for k, v := range meta.Errors {
+			operation.ErrorOverrideMessage[k] = v
+		}
+		if ShouldOmit(operation.ErrorOverrideMessage) {
+			operation.ErrorOverrideMessage = nil
+		}
+	}
 }
 
 func (s *OAS) fillCircuitBreaker(metas []apidef.CircuitBreakerMeta) {

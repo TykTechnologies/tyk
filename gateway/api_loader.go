@@ -479,6 +479,9 @@ func (gw *Gateway) processSpec(
 			chainArray = append(chainArray, gw.createDynamicMiddleware(obj.Name, false, obj.RequireSession, baseMid.Copy()))
 		}
 	}
+	// Add the error override middleware as the final middleware in the request chain
+	gw.mwAppendEnabled(&chainArray, &ErrorOverrideMiddleware{BaseMiddleware: baseMid.Copy()})
+
 	chain = alice.New(chainArray...).Then(&DummyProxyHandler{SH: SuccessHandler{baseMid.Copy()}, Gw: gw})
 
 	if !spec.UseKeylessAccess {

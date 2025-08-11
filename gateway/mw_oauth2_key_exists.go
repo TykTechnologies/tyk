@@ -4,7 +4,6 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/internal/otel"
 
 	"github.com/TykTechnologies/tyk/apidef"
@@ -23,22 +22,22 @@ const (
 )
 
 func initOauth2KeyExistsErrors() {
-	TykErrors[ErrOAuthAuthorizationFieldMissing] = config.TykError{
+	TykErrors[ErrOAuthAuthorizationFieldMissing] = apidef.TykError{
 		Message: MsgAuthFieldMissing,
 		Code:    http.StatusBadRequest,
 	}
 
-	TykErrors[ErrOAuthAuthorizationFieldMalformed] = config.TykError{
+	TykErrors[ErrOAuthAuthorizationFieldMalformed] = apidef.TykError{
 		Message: MsgBearerMailformed,
 		Code:    http.StatusBadRequest,
 	}
 
-	TykErrors[ErrOAuthKeyNotFound] = config.TykError{
+	TykErrors[ErrOAuthKeyNotFound] = apidef.TykError{
 		Message: MsgKeyNotAuthorized,
 		Code:    http.StatusForbidden,
 	}
 
-	TykErrors[ErrOAuthClientDeleted] = config.TykError{
+	TykErrors[ErrOAuthClientDeleted] = apidef.TykError{
 		Message: MsgOauthClientRevoked,
 		Code:    http.StatusForbidden,
 	}

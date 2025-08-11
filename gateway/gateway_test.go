@@ -1879,7 +1879,7 @@ func TestOverrideErrors(t *testing.T) {
 
 	testConf := ts.Gw.GetConfig()
 
-	testConf.OverrideMessages = map[string]config.TykError{
+	testConf.OverrideMessages = map[string]apidef.TykError{
 		ErrOAuthAuthorizationFieldMissing: {
 			Message: message1,
 			Code:    code1,
@@ -1928,7 +1928,7 @@ func TestOverrideErrors(t *testing.T) {
 	assert(message6, code6, e, i)
 
 	t.Run("Partial override", func(t *testing.T) {
-		testConf.OverrideMessages = map[string]config.TykError{
+		testConf.OverrideMessages = map[string]apidef.TykError{
 			ErrOAuthAuthorizationFieldMissing: {
 				Code: code4,
 			},
