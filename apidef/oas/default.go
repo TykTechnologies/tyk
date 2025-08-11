@@ -221,13 +221,9 @@ func (s *OAS) importMiddlewares(overRideValues TykExtensionConfigParams) {
 		xTykAPIGateway.Middleware = &Middleware{}
 	}
 
-<<<<<<< HEAD
-	for path, pathItem := range s.Paths {
-=======
 	currentOperations := make([]string, 0)
 
-	for path, pathItem := range s.Paths.Map() {
->>>>>>> dbabb5f84... [TT-7524] [OAS] Gateway CE behaves differently from Dashboard for middleware and PATCH (#7261)
+	for path, pathItem := range s.Paths {
 		overRideValues.pathItemHasParameters = len(pathItem.Parameters) > 0
 		for _, method := range allowedMethods {
 			if operation := pathItem.GetOperation(method); operation != nil {
