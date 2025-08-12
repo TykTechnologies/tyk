@@ -30,7 +30,7 @@ type Token struct {
 	Enabled bool `bson:"enabled" json:"enabled"` // required
 
 	// AuthSources contains the configuration for authentication sources.
-	AuthSources `bson:",inline" json:"-"`
+	AuthSources `bson:",inline" json:",inline"`
 
 	// EnableClientCertificate allows to create dynamic keys based on certificates.
 	//
