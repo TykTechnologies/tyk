@@ -155,6 +155,32 @@ func TestCreateTLSConfig(t *testing.T) {
 		assert.Equal(t, uint16(tls.VersionTLS12), tlsConfig.MinVersion)
 		assert.Equal(t, uint16(tls.VersionTLS13), tlsConfig.MaxVersion)
 	})
+
+	t.Run("SSL with partial failures still applies other settings", func(t *testing.T) {
+		// Test that even if CA loading fails, other TLS settings are still applied
+		tempDir := t.TempDir()
+		certFile := filepath.Join(tempDir, "client.crt")
+		keyFile := filepath.Join(tempDir, "client.key")
+		createTestCertAndKey(t, certFile, keyFile)
+
+		cfg := &config.StorageOptionsConf{
+			UseSSL:                true,
+			SSLInsecureSkipVerify: true,
+			CAFile:                "/nonexistent/ca.crt", // This will fail to load
+			CertFile:              certFile,               // But this should still work
+			KeyFile:               keyFile,
+			TLSMinVersion:         "1.2",
+			TLSMaxVersion:         "1.3",
+		}
+
+		tlsConfig := createTLSConfig(cfg)
+		assert.NotNil(t, tlsConfig)
+		assert.True(t, tlsConfig.InsecureSkipVerify)
+		assert.Nil(t, tlsConfig.RootCAs)                                 // CA loading failed
+		assert.Len(t, tlsConfig.Certificates, 1)                        // But client cert still loaded
+		assert.Equal(t, uint16(tls.VersionTLS12), tlsConfig.MinVersion) // And TLS versions still set
+		assert.Equal(t, uint16(tls.VersionTLS13), tlsConfig.MaxVersion)
+	})
 }
 
 func TestGetTLSVersion(t *testing.T) {

@@ -80,15 +80,14 @@ func createTLSConfig(cfg *config.StorageOptionsConf) *tls.Config {
 		caCert, err := os.ReadFile(cfg.CAFile)
 		if err != nil {
 			logrus.WithError(err).Error("Failed to load CA certificate for rate limiter Redis")
-			return tlsConfig
+		} else {
+			caCertPool := x509.NewCertPool()
+			if !caCertPool.AppendCertsFromPEM(caCert) {
+				logrus.Error("Failed to parse CA certificate for rate limiter Redis")
+			} else {
+				tlsConfig.RootCAs = caCertPool
+			}
 		}
-
-		caCertPool := x509.NewCertPool()
-		if !caCertPool.AppendCertsFromPEM(caCert) {
-			logrus.Error("Failed to parse CA certificate for rate limiter Redis")
-			return tlsConfig
-		}
-		tlsConfig.RootCAs = caCertPool
 	}
 
 	// Load client certificate and key for mutual TLS
@@ -96,9 +95,9 @@ func createTLSConfig(cfg *config.StorageOptionsConf) *tls.Config {
 		cert, err := tls.LoadX509KeyPair(cfg.CertFile, cfg.KeyFile)
 		if err != nil {
 			logrus.WithError(err).Error("Failed to load client certificate and key for rate limiter Redis")
-			return tlsConfig
+		} else {
+			tlsConfig.Certificates = []tls.Certificate{cert}
 		}
-		tlsConfig.Certificates = []tls.Certificate{cert}
 	}
 
 	return tlsConfig
