@@ -36,6 +36,9 @@ const (
 	HMACSign  = "hmac"
 	RSASign   = "rsa"
 	ECDSASign = "ecdsa"
+	ISS       = "iss"
+	AUD       = "aud"
+	JTI       = "jti"
 )
 
 const UnexpectedSigningMethod = "Unexpected signing method"
@@ -51,6 +54,7 @@ var (
 
 	ErrNoSuitableUserIDClaimFound = errors.New("no suitable claims for user ID were found")
 	ErrEmptyUserIDInSubClaim      = errors.New("found an empty user ID in sub claim")
+	ErrEmptyUserIDInClaim         = errors.New("found an empty user ID in predefined base claim")
 )
 
 func (k *JWTMiddleware) Name() string {
@@ -376,18 +380,38 @@ func jwkURLsChanged(a, b []apidef.JWK) bool {
 }
 
 func (k *JWTMiddleware) getPolicyIDFromToken(claims jwt.MapClaims) (string, bool) {
-	policyID, foundPolicy := claims[k.Spec.JWTPolicyFieldName].(string)
-	if !foundPolicy {
-		k.Logger().Debugf("Could not identify a policy to apply to this token from field: %s", k.Spec.JWTPolicyFieldName)
-		return "", false
-	}
+	if k.Spec.IsOAS {
+		policyID := ""
+		found := false
+		fieldNames := k.Spec.OAS.GetJWTConfiguration().BasePolicyClaims
+		if len(fieldNames) == 0 && k.Spec.OAS.GetJWTConfiguration().PolicyFieldName != "" {
+			fieldNames = append(fieldNames, k.Spec.OAS.GetJWTConfiguration().PolicyFieldName)
+		}
+		for _, c := range fieldNames {
+			policyID, found = claims[c].(string)
+			if found {
+				break
+			}
+		}
 
-	if policyID == "" {
-		k.Logger().Errorf("Policy field %s has empty value", k.Spec.JWTPolicyFieldName)
-		return "", false
-	}
+		if !found || policyID == "" {
+			k.Logger().Debugf("Could not identify a policy to apply to this token from fields: %v", fieldNames)
+			return "", false
+		}
+		return policyID, true
+	} else {
+		policyID, foundPolicy := claims[k.Spec.JWTPolicyFieldName].(string)
+		if !foundPolicy {
+			k.Logger().Debugf("Could not identify a policy to apply to this token from field: %s", k.Spec.JWTPolicyFieldName)
+			return "", false
+		}
 
-	return policyID, true
+		if policyID == "" {
+			k.Logger().Errorf("Policy field %s has empty value", k.Spec.JWTPolicyFieldName)
+			return "", false
+		}
+		return policyID, true
+	}
 }
 
 func (k *JWTMiddleware) getBasePolicyID(r *http.Request, claims jwt.MapClaims) (policyID string, found bool) {
@@ -421,7 +445,38 @@ func (k *JWTMiddleware) getBasePolicyID(r *http.Request, claims jwt.MapClaims) (
 }
 
 func (k *JWTMiddleware) getUserIdFromClaim(claims jwt.MapClaims) (string, error) {
-	return getUserIDFromClaim(claims, k.Spec.JWTIdentityBaseField)
+	if k.Spec.IsOAS {
+		return k.getUserIDFromClaimOAS(claims)
+	} else {
+		return getUserIDFromClaim(claims, k.Spec.JWTIdentityBaseField, true)
+	}
+}
+
+func (k *JWTMiddleware) getUserIDFromClaimOAS(claims jwt.MapClaims) (string, error) {
+	identityBaseFields := k.Spec.OAS.GetJWTConfiguration().SubjectClaims
+	if len(identityBaseFields) == 0 && k.Spec.OAS.GetJWTConfiguration().IdentityBaseField != "" {
+		identityBaseFields = append(identityBaseFields, k.Spec.OAS.GetJWTConfiguration().IdentityBaseField)
+	}
+	checkedSub := false
+	for _, identityBaseField := range identityBaseFields {
+		if identityBaseField == SUB {
+			checkedSub = true
+		}
+
+		id, err := getUserIDFromClaim(claims, identityBaseField, false)
+		if err != nil {
+			if errors.Is(ErrNoSuitableUserIDClaimFound, err) {
+				continue
+			}
+			return "", err
+		}
+		return id, nil
+	}
+	// fallBack to Sub if SUB has not been checked yet
+	if !checkedSub {
+		return getUserIDFromClaim(claims, SUB, false)
+	}
+	return "", ErrNoSuitableUserIDClaimFound
 }
 
 func toScopeStringsSlice(v interface{}, scopeSlice *[]string, nested bool) []string {
@@ -665,6 +720,9 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 	// apply policies from scope if scope-to-policy mapping is specified for this API
 	if len(k.Spec.GetScopeToPolicyMapping()) != 0 {
 		scopeClaimName := k.Spec.GetScopeClaimName()
+		if k.Spec.IsOAS {
+			scopeClaimName = k.getScopeClaimNameOAS(claims)
+		}
 		if scopeClaimName == "" {
 			scopeClaimName = "scope"
 		}
@@ -778,6 +836,21 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 	return nil, http.StatusOK
 }
 
+func (k *JWTMiddleware) getScopeClaimNameOAS(claims jwt.MapClaims) string {
+	claimNames := k.Spec.OAS.GetJWTConfiguration().Scopes.Claims
+	if len(claimNames) == 0 && k.Spec.OAS.GetJWTConfiguration().Scopes.ClaimName != "" {
+		claimNames = []string{k.Spec.OAS.GetJWTConfiguration().Scopes.ClaimName}
+	}
+	for _, claimName := range claimNames {
+		for k := range claims {
+			if k == claimName {
+				return claimName
+			}
+		}
+	}
+	return ""
+}
+
 func (k *JWTMiddleware) reportLoginFailure(tykId string, r *http.Request) {
 	// Fire Authfailed Event
 	AuthFailed(k, r, tykId)
@@ -859,8 +932,8 @@ func (k *JWTMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, _
 	})
 
 	if err == nil && token.Valid {
-		if jwtErr := k.timeValidateJWTClaims(token.Claims.(jwt.MapClaims)); jwtErr != nil {
-			return errors.New("Key not authorized: " + jwtErr.Error()), http.StatusUnauthorized
+		if err := k.validateClaims(token); err != nil {
+			return errors.New("Key not authorized: " + err.Error()), http.StatusUnauthorized
 		}
 
 		// Token is valid - let's move on
@@ -912,6 +985,138 @@ func ParseRSAPublicKey(data []byte) (interface{}, error) {
 func (k *JWTMiddleware) timeValidateJWTClaims(c jwt.MapClaims) *jwt.ValidationError {
 	return timeValidateJWTClaims(c, k.Spec.JWTExpiresAtValidationSkew, k.Spec.JWTIssuedAtValidationSkew,
 		k.Spec.JWTNotBeforeValidationSkew)
+}
+
+func (k *JWTMiddleware) validateClaims(token *jwt.Token) error {
+	claims, ok := token.Claims.(jwt.MapClaims)
+	if !ok {
+		return errors.New("invalid claims format")
+	}
+	if err := k.timeValidateJWTClaims(claims); err != nil {
+		return err
+	}
+
+	// Extra OAS-specific validations
+	if err := k.validateExtraClaims(claims, token); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func validateIssuer(claims jwt.MapClaims, allowedIssuers []string) error {
+	iss, exists := claims[ISS]
+	if !exists {
+		return errors.New("issuer claim is required but not present in token")
+	}
+
+	issuer, ok := iss.(string)
+	if !ok {
+		return errors.New("issuer claim must be a string")
+	}
+
+	for _, allowed := range allowedIssuers {
+		if issuer == allowed {
+			return nil
+		}
+	}
+
+	return fmt.Errorf("invalid issuer claim: %s", issuer)
+}
+
+func validateAudience(claims jwt.MapClaims, allowedAudiences []string) error {
+	aud, exists := claims[AUD]
+	if !exists {
+		return errors.New("audience claim is required but not present in token")
+	}
+
+	var audiences []string
+	switch v := aud.(type) {
+	case string:
+		audiences = []string{v}
+	case []interface{}:
+		for _, a := range v {
+			if s, ok := a.(string); ok {
+				audiences = append(audiences, s)
+			}
+		}
+	default:
+		return errors.New("invalid audience claim format")
+	}
+
+	for _, tokenAud := range audiences {
+		for _, allowedAud := range allowedAudiences {
+			if tokenAud == allowedAud {
+				return nil
+			}
+		}
+	}
+
+	return fmt.Errorf("no matching audience found in token: %v", audiences)
+}
+
+func validateJTI(claims jwt.MapClaims) error {
+	if _, exists := claims[JTI]; !exists {
+		return errors.New("JWT ID (jti) claim is required but not present in token")
+	}
+	return nil
+}
+
+func validateSubjectValue(subject string, allowedSubjects []string) error {
+	for _, allowed := range allowedSubjects {
+		if subject == allowed {
+			return nil
+		}
+	}
+	return fmt.Errorf("invalid subject value: %s", subject)
+}
+
+func (k *JWTMiddleware) validateExtraClaims(claims jwt.MapClaims, token *jwt.Token) error {
+	if !k.Spec.IsOAS {
+		return nil // Skip extra validations for non-OAS APIs
+	}
+
+	jwtConfig := k.Spec.OAS.GetJWTConfiguration()
+
+	// Issuer validation
+	if len(jwtConfig.AllowedIssuers) > 0 {
+		if err := validateIssuer(claims, jwtConfig.AllowedIssuers); err != nil {
+			k.Logger().WithError(err).Error("JWT issuer validation failed")
+			return err
+		}
+	}
+
+	// Audience validation
+	if len(jwtConfig.AllowedAudiences) > 0 {
+		if err := validateAudience(claims, jwtConfig.AllowedAudiences); err != nil {
+			k.Logger().WithError(err).Error("JWT audience validation failed")
+			return err
+		}
+	}
+
+	// JWT ID validation
+	if jwtConfig.JTIValidation.Enabled {
+		if err := validateJTI(claims); err != nil {
+			k.Logger().WithError(err).Error("JWT ID validation failed")
+			return err
+		}
+	}
+
+	// Subject validation
+	if len(jwtConfig.AllowedSubjects) > 0 {
+		subject, err := k.getIdentityFromToken(token)
+		if err != nil {
+			k.Logger().WithError(err).Error("Failed to get identity from token")
+			return err
+		}
+
+		if err := validateSubjectValue(subject, jwtConfig.AllowedSubjects); err != nil {
+			k.Logger().WithError(err).Error("JWT subject validation failed")
+			return err
+		}
+	}
+
+	return nil
 }
 
 func ctxSetJWTContextVars(s *APISpec, r *http.Request, token *jwt.Token) {
@@ -1101,7 +1306,7 @@ func timeValidateJWTClaims(c jwt.MapClaims, expiresAt, issuedAt, notBefore uint6
 }
 
 // getUserIDFromClaim parses jwt claims and get the userID from provided identityBaseField.
-func getUserIDFromClaim(claims jwt.MapClaims, identityBaseField string) (string, error) {
+func getUserIDFromClaim(claims jwt.MapClaims, identityBaseField string, shouldFallback bool) (string, error) {
 	var (
 		userID string
 		found  bool
@@ -1114,9 +1319,9 @@ func getUserIDFromClaim(claims jwt.MapClaims, identityBaseField string) (string,
 				return userID, nil
 			}
 
-			message := "found an empty user ID in predefined base field claim " + identityBaseField
-			log.Error(message)
-			return "", errors.New(message)
+			err := fmt.Errorf("%w, claim: %s", ErrEmptyUserIDInClaim, identityBaseField)
+			log.Error(err)
+			return "", err
 		}
 
 		if !found {
@@ -1124,7 +1329,7 @@ func getUserIDFromClaim(claims jwt.MapClaims, identityBaseField string) (string,
 		}
 	}
 
-	if userID, found = claims[SUB].(string); found {
+	if userID, found = claims[SUB].(string); shouldFallback && found {
 		if len(userID) > 0 {
 			log.WithField("userId", userID).Debug("Found User Id in 'sub' claim")
 			return userID, nil
