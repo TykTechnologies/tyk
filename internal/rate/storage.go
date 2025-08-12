@@ -2,8 +2,11 @@ package rate
 
 import (
 	"crypto/tls"
+	"crypto/x509"
+	"os"
 	"time"
 
+	"github.com/sirupsen/logrus"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/internal/redis"
 )
@@ -25,9 +28,7 @@ func NewStorage(cfg *config.StorageOptionsConf) redis.UniversalClient {
 	var tlsConfig *tls.Config
 
 	if cfg.UseSSL {
-		tlsConfig = &tls.Config{
-			InsecureSkipVerify: cfg.SSLInsecureSkipVerify,
-		}
+		tlsConfig = createTLSConfig(cfg)
 	}
 
 	opts := &redis.UniversalOptions{
@@ -54,4 +55,68 @@ func NewStorage(cfg *config.StorageOptionsConf) redis.UniversalClient {
 	}
 
 	return redis.NewClient(opts.Simple())
+}
+
+// createTLSConfig creates a TLS configuration with proper mTLS support
+func createTLSConfig(cfg *config.StorageOptionsConf) *tls.Config {
+	tlsConfig := &tls.Config{
+		InsecureSkipVerify: cfg.SSLInsecureSkipVerify,
+	}
+
+	// Set TLS versions if configured
+	if cfg.TLSMinVersion != "" {
+		if version, ok := getTLSVersion(cfg.TLSMinVersion); ok {
+			tlsConfig.MinVersion = version
+		}
+	}
+	if cfg.TLSMaxVersion != "" {
+		if version, ok := getTLSVersion(cfg.TLSMaxVersion); ok {
+			tlsConfig.MaxVersion = version
+		}
+	}
+
+	// Load CA certificate if provided
+	if cfg.CAFile != "" {
+		caCert, err := os.ReadFile(cfg.CAFile)
+		if err != nil {
+			logrus.WithError(err).Error("Failed to load CA certificate for rate limiter Redis")
+			return tlsConfig
+		}
+
+		caCertPool := x509.NewCertPool()
+		if !caCertPool.AppendCertsFromPEM(caCert) {
+			logrus.Error("Failed to parse CA certificate for rate limiter Redis")
+			return tlsConfig
+		}
+		tlsConfig.RootCAs = caCertPool
+	}
+
+	// Load client certificate and key for mutual TLS
+	if cfg.CertFile != "" && cfg.KeyFile != "" {
+		cert, err := tls.LoadX509KeyPair(cfg.CertFile, cfg.KeyFile)
+		if err != nil {
+			logrus.WithError(err).Error("Failed to load client certificate and key for rate limiter Redis")
+			return tlsConfig
+		}
+		tlsConfig.Certificates = []tls.Certificate{cert}
+	}
+
+	return tlsConfig
+}
+
+// getTLSVersion converts a string TLS version to the corresponding tls constant
+func getTLSVersion(version string) (uint16, bool) {
+	switch version {
+	case "1.0":
+		return tls.VersionTLS10, true
+	case "1.1":
+		return tls.VersionTLS11, true
+	case "1.2":
+		return tls.VersionTLS12, true
+	case "1.3":
+		return tls.VersionTLS13, true
+	default:
+		logrus.Warnf("Unknown TLS version: %s", version)
+		return 0, false
+	}
 }
