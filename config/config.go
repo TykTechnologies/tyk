@@ -60,7 +60,26 @@ var (
 			AllowUnsafe: []string{},
 		},
 		PIDFileLocation: "/var/run/tyk/tyk-gateway.pid",
+		Security: SecurityConfig{
+			CertificateExpiryMonitor: CertificateExpiryMonitorConfig{
+				WarningThresholdDays: DefaultWarningThresholdDays,
+				CheckCooldownSeconds: DefaultCheckCooldownSeconds,
+				EventCooldownSeconds: DefaultEventCooldownSeconds,
+			},
+		},
 	}
+)
+
+// Certificate monitor constants
+const (
+	// DefaultWarningThresholdDays is the default number of days before certificate expiration to start sending notifications
+	DefaultWarningThresholdDays = 30
+
+	// DefaultCheckCooldownSeconds is the default minimum time in seconds between certificate expiration checks
+	DefaultCheckCooldownSeconds = 3600 // 1 hour
+
+	// DefaultEventCooldownSeconds is the default minimum time in seconds between firing the same certificate expiration event
+	DefaultEventCooldownSeconds = 86400 // 24 hours
 )
 
 const (
@@ -611,6 +630,21 @@ type CertificatesConfig struct {
 	MDCB []string `json:"mdcb_api"`
 }
 
+// CertificateExpiryMonitorConfig configures the certificate expiration notification feature
+type CertificateExpiryMonitorConfig struct {
+	// WarningThresholdDays specifies the number of days before certificate expiration to start sending notifications
+	// Default: DefaultWarningThresholdDays (30 days)
+	WarningThresholdDays int `json:"warning_threshold_days"`
+
+	// CheckCooldownSeconds specifies the minimum time in seconds between certificate expiration checks
+	// Default: DefaultCheckCooldownSeconds (3600 seconds = 1 hour)
+	CheckCooldownSeconds int `json:"check_cooldown_seconds"`
+
+	// EventCooldownSeconds specifies the minimum time in seconds between firing the same certificate expiration event
+	// Default: DefaultEventCooldownSeconds (86400 seconds = 24 hours)
+	EventCooldownSeconds int `json:"event_cooldown_seconds"`
+}
+
 type SecurityConfig struct {
 	// Set the AES256 secret which is used to encode certificate private keys when they uploaded via certificate storage
 	PrivateCertificateEncodingSecret string `json:"private_certificate_encoding_secret"`
@@ -622,6 +656,9 @@ type SecurityConfig struct {
 	PinnedPublicKeys map[string]string `json:"pinned_public_keys"`
 
 	Certificates CertificatesConfig `json:"certificates"`
+
+	// CertificateExpiryMonitor configures the certificate expiration notification feature
+	CertificateExpiryMonitor CertificateExpiryMonitorConfig `json:"certificate_expiry_monitor"`
 }
 
 type NewRelicConfig struct {
