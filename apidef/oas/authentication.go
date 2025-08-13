@@ -226,7 +226,7 @@ func (ss SecuritySchemes) Import(name string, nativeSS *openapi3.SecurityScheme,
 			}
 		}
 
-		token.Import(nativeSS, enable)
+		token.Enabled = enable
 	case nativeSS.Type == typeHTTP && nativeSS.Scheme == schemeBearer && nativeSS.BearerFormat == bearerFormatJWT:
 		jwt := &JWT{}
 		if ss[name] == nil {
