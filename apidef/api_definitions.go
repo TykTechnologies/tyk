@@ -772,6 +772,10 @@ type APIDefinition struct {
 
 	// UpstreamAuth stores information about authenticating against upstream.
 	UpstreamAuth UpstreamAuth `bson:"upstream_auth" json:"upstream_auth"`
+
+	// SecurityRequirements stores all OAS security requirements (auto-populated from OAS import)
+	// When len(SecurityRequirements) > 1, OR logic is automatically applied
+	SecurityRequirements [][]string `json:"security_requirements,omitempty" bson:"security_requirements,omitempty"`
 }
 
 type JWK struct {

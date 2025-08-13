@@ -391,7 +391,37 @@ func (gw *Gateway) processSpec(
 			authArray = append(authArray, gw.createMiddleware(&AuthKey{baseMid.Copy()}))
 		}
 
-		chainArray = append(chainArray, authArray...)
+		// Check if we need to use OR logic for multiple security requirements
+		if len(spec.SecurityRequirements) > 1 && len(authArray) > 0 {
+			logger.Info("Multiple security requirements detected - using OR authentication logic")
+			
+			// Create middleware instances for the OR wrapper
+			authMiddlewares := make([]TykMiddleware, 0, len(authArray))
+			
+			// Build each auth middleware
+			for _, constructor := range authArray {
+				// Use a dummy handler to build the middleware
+				dummyHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {})
+				handler := constructor(dummyHandler)
+				
+				// Extract the TykMiddleware from the handler
+				if mw, ok := handler.(TykMiddleware); ok {
+					authMiddlewares = append(authMiddlewares, mw)
+				}
+			}
+			
+			// Create and configure the OR wrapper
+			orWrapper := &AuthORWrapper{
+				BaseMiddleware: *baseMid.Copy(),
+			}
+			orWrapper.SetAuthMiddlewares(authMiddlewares)
+			
+			// Add the OR wrapper to the chain instead of individual auth middlewares
+			chainArray = append(chainArray, gw.createMiddleware(orWrapper))
+		} else {
+			// Single requirement or empty = AND logic (default behavior)
+			chainArray = append(chainArray, authArray...)
+		}
 
 		// if gw is edge, then prefetch any existent org session expiry
 		if gw.GetConfig().SlaveOptions.UseRPC {

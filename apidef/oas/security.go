@@ -849,6 +849,17 @@ func (s *OAS) extractSecurityTo(api *apidef.APIDefinition) {
 		return
 	}
 
+	// Extract ALL security requirements for OR logic support
+	api.SecurityRequirements = make([][]string, 0, len(s.Security))
+	for _, requirement := range s.Security {
+		schemes := make([]string, 0, len(requirement))
+		for schemeName := range requirement {
+			schemes = append(schemes, schemeName)
+		}
+		api.SecurityRequirements = append(api.SecurityRequirements, schemes)
+	}
+
+	// Process first security requirement for backward compatibility
 	for schemeName := range s.getTykSecuritySchemes() {
 		if _, ok := s.Security[0][schemeName]; ok {
 			v := s.Components.SecuritySchemes[schemeName].Value
