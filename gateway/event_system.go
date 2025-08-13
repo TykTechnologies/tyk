@@ -60,6 +60,8 @@ const (
 	EventTokenDeleted = event.TokenDeleted
 	// EventCertificateExpiringSoon is an alias maintained for backwards compatibility.
 	EventCertificateExpiringSoon = event.CertificateExpiringSoon
+	// EventCertificateExpired is an alias maintained for backwards compatibility.
+	EventCertificateExpired = event.CertificateExpired
 )
 
 type EventHostStatusMeta struct {
