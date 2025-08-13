@@ -1527,6 +1527,8 @@ func (gw *Gateway) apiOASPatchHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
+	// Update middlewares even when no query params are provided.
+	oasObjToPatch.ImportMiddlewares(oas.TykExtensionConfigParams{})
 
 	oasAPIInBytes, err := oasObjToPatch.MarshalJSON()
 	if err != nil {
