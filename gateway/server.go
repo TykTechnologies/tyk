@@ -2021,8 +2021,13 @@ func (gw *Gateway) startDRL() {
 
 	gw.drlOnce.Do(func() {
 		drlManager := &drl.DRL{}
-		gw.SessionLimiter = NewSessionLimiter(gw.ctx, &gwConfig, drlManager)
+		sessionLimiter, err := NewSessionLimiter(gw.ctx, &gwConfig, drlManager)
+		if err != nil {
+			mainLog.WithError(err).Error("Could not initialise session limiter")
+			return
+		}
 
+		gw.SessionLimiter = sessionLimiter
 		gw.DRLManager = drlManager
 
 		if disabled {
