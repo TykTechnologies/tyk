@@ -49,6 +49,15 @@ func TestReadableDuration_MarshalJSON(t *testing.T) {
 
 		duration = ReadableDuration(1*time.Hour + (2+60)*time.Minute + 3*time.Second + 4*time.Millisecond + 5*time.Microsecond + 6*time.Nanosecond)
 		assert.Equal(t, "2h2m3s4ms5µs6ns", duration.format())
+
+		duration = ReadableDuration(71*time.Second + 10*time.Millisecond)
+		assert.Equal(t, "1m11s10ms", duration.format())
+
+		duration = ReadableDuration(1*time.Millisecond + 1*time.Nanosecond)
+		assert.Equal(t, "1ms1ns", duration.format())
+
+		duration = ReadableDuration(1*time.Second + 1*time.Nanosecond)
+		assert.Equal(t, "1s1ns", duration.format())
 	})
 
 	t.Run("negative duration", func(t *testing.T) {
