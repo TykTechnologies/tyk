@@ -15,7 +15,6 @@ import (
 )
 
 func TestNewStorage(t *testing.T) {
-	var err error
 	conf, err := config.NewDefaultWithEnv()
 	assert.NoError(t, err)
 
@@ -35,6 +34,80 @@ func TestNewStorage(t *testing.T) {
 	conf.Storage.MasterName = "redis"
 	client, err = NewStorage(&conf.Storage)
 	assert.NotNil(t, client)
+}
+
+func TestNewStorageWithTLS(t *testing.T) {
+	baseConfig, err := config.NewDefaultWithEnv()
+	assert.NoError(t, err)
+
+	tests := []struct {
+		name           string
+		configModifier func(*config.StorageOptionsConf) // Function to modify the base config
+		expectError    bool
+		errorSubstring string
+	}{
+		{
+			name: "Valid TLS versions",
+			configModifier: func(cfg *config.StorageOptionsConf) {
+				cfg.UseSSL = true
+				cfg.TLSMinVersion = "1.2"
+				cfg.TLSMaxVersion = "1.3"
+			},
+			expectError: false,
+		},
+		{
+			name: "Min version higher than max version",
+			configModifier: func(cfg *config.StorageOptionsConf) {
+				cfg.UseSSL = true
+				cfg.TLSMinVersion = "1.3"
+				cfg.TLSMaxVersion = "1.2"
+			},
+			expectError:    true,
+			errorSubstring: "MinVersion is higher than MaxVersion",
+		},
+		{
+			name: "Invalid min version",
+			configModifier: func(cfg *config.StorageOptionsConf) {
+				cfg.UseSSL = true
+				cfg.TLSMinVersion = "invalid"
+			},
+			expectError:    true,
+			errorSubstring: InvalidTLSMinVersion.Error(),
+		},
+		{
+			name: "Invalid max version",
+			configModifier: func(cfg *config.StorageOptionsConf) {
+				cfg.UseSSL = true
+				cfg.TLSMaxVersion = "invalid"
+			},
+			expectError:    true,
+			errorSubstring: InvalidTLSMaxVersion.Error(),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Start with a fresh copy of the base configuration
+			testConfig := baseConfig
+
+			// Apply the test-specific modifications
+			if tt.configModifier != nil {
+				tt.configModifier(&testConfig.Storage)
+			}
+
+			client, err := NewStorage(&testConfig.Storage)
+			if tt.expectError {
+				assert.Error(t, err)
+				if tt.errorSubstring != "" {
+					assert.Contains(t, err.Error(), tt.errorSubstring)
+				}
+				assert.Nil(t, client, "Client should be nil when there's an error")
+			} else {
+				assert.NoError(t, err)
+				assert.NotNil(t, client, "Client should not be nil when there's no error")
+			}
+		})
+	}
 }
 
 func TestHandleTLSVersion(t *testing.T) {
