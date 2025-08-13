@@ -384,6 +384,9 @@ func (k *JWTMiddleware) getPolicyIDFromToken(claims jwt.MapClaims) (string, bool
 		policyID := ""
 		found := false
 		fieldNames := k.Spec.OAS.GetJWTConfiguration().BasePolicyClaims
+		if len(fieldNames) == 0 && k.Spec.OAS.GetJWTConfiguration().PolicyFieldName != "" {
+			fieldNames = append(fieldNames, k.Spec.OAS.GetJWTConfiguration().PolicyFieldName)
+		}
 		for _, c := range fieldNames {
 			policyID, found = claims[c].(string)
 			if found {
@@ -451,6 +454,9 @@ func (k *JWTMiddleware) getUserIdFromClaim(claims jwt.MapClaims) (string, error)
 
 func (k *JWTMiddleware) getUserIDFromClaimOAS(claims jwt.MapClaims) (string, error) {
 	identityBaseFields := k.Spec.OAS.GetJWTConfiguration().SubjectClaims
+	if len(identityBaseFields) == 0 && k.Spec.OAS.GetJWTConfiguration().IdentityBaseField != "" {
+		identityBaseFields = append(identityBaseFields, k.Spec.OAS.GetJWTConfiguration().IdentityBaseField)
+	}
 	checkedSub := false
 	for _, identityBaseField := range identityBaseFields {
 		if identityBaseField == SUB {
@@ -832,6 +838,9 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 
 func (k *JWTMiddleware) getScopeClaimNameOAS(claims jwt.MapClaims) string {
 	claimNames := k.Spec.OAS.GetJWTConfiguration().Scopes.Claims
+	if len(claimNames) == 0 && k.Spec.OAS.GetJWTConfiguration().Scopes.ClaimName != "" {
+		claimNames = []string{k.Spec.OAS.GetJWTConfiguration().Scopes.ClaimName}
+	}
 	for _, claimName := range claimNames {
 		for k := range claims {
 			if k == claimName {
