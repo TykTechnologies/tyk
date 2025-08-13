@@ -1,0 +1,817 @@
+package gateway
+
+import (
+	"encoding/base64"
+	"net/http"
+	"testing"
+	"time"
+
+	"github.com/golang-jwt/jwt/v4"
+
+	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/test"
+	"github.com/TykTechnologies/tyk/user"
+)
+
+// TestMultiAuthMiddleware_OR_JWT_And_ApiKey_Combination tests the OR logic with JWT and API key
+func TestMultiAuthMiddleware_OR_JWT_And_ApiKey_Combination(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	// Create a policy for JWT
+	pID := ts.CreatePolicy(func(p *user.Policy) {
+		p.AccessRights = map[string]user.AccessDefinition{
+			"test-or-jwt-apikey": {
+				APIName:  "Test OR JWT API Key",
+				APIID:    "test-or-jwt-apikey",
+				Versions: []string{"default"},
+			},
+		}
+	})
+
+	// Create API key session
+	apiKeySession := CreateStandardSession()
+	apiKeySession.AccessRights = map[string]user.AccessDefinition{
+		"test-or-jwt-apikey": {
+			APIName:  "Test OR JWT API Key",
+			APIID:    "test-or-jwt-apikey",
+			Versions: []string{"default"},
+		},
+	}
+	apiKey := CreateSession(ts.Gw, func(s *user.SessionState) {
+		*s = *apiKeySession
+	})
+
+	// Configure API with JWT and API key, OR logic via SecurityRequirements
+	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		spec.APIID = "test-or-jwt-apikey"
+		spec.Name = "Test OR JWT API Key"
+		spec.Proxy.ListenPath = "/test-or-jwt-apikey/"
+		spec.UseKeylessAccess = false
+
+		// Enable both JWT and API key
+		spec.UseStandardAuth = true
+		spec.EnableJWT = true
+
+		// Configure JWT
+		spec.JWTSigningMethod = RSASign
+		spec.JWTSource = base64.StdEncoding.EncodeToString([]byte(jwtRSAPubKey))
+		spec.JWTIdentityBaseField = "user_id"
+		spec.JWTPolicyFieldName = "policy_id"
+		spec.JWTDefaultPolicies = []string{pID}
+
+		// Configure auth headers
+		spec.AuthConfigs = map[string]apidef.AuthConfig{
+			"authToken": {
+				AuthHeaderName: "X-API-Key",
+			},
+			"jwt": {
+				AuthHeaderName: "Authorization",
+			},
+		}
+
+		// Simulate OAS import with multiple security requirements (OR logic)
+		spec.SecurityRequirements = [][]string{
+			{"jwt"},      // Option 1: JWT only
+			{"apikey"},   // Option 2: API key only
+		}
+
+		// BaseIdentity will be set dynamically
+		spec.BaseIdentityProvidedBy = apidef.UnsetAuth
+	})
+
+	// Create JWT token
+	jwtToken := CreateJWKToken(func(t *jwt.Token) {
+		t.Claims.(jwt.MapClaims)["user_id"] = "jwt-user"
+		t.Claims.(jwt.MapClaims)["policy_id"] = pID
+		t.Claims.(jwt.MapClaims)["exp"] = time.Now().Add(time.Hour).Unix()
+	})
+
+	// Test cases for OR logic
+	testCases := []test.TestCase{
+		// Test 1: Valid JWT only - should succeed
+		{
+			Method: "GET",
+			Path:   "/test-or-jwt-apikey/",
+			Headers: map[string]string{
+				"Authorization": "Bearer " + jwtToken,
+			},
+			Code: http.StatusOK,
+		},
+		// Test 2: Valid API key only - should succeed
+		{
+			Method: "GET",
+			Path:   "/test-or-jwt-apikey/",
+			Headers: map[string]string{
+				"X-API-Key": apiKey,
+			},
+			Code: http.StatusOK,
+		},
+		// Test 3: Valid JWT + Invalid API key - should succeed (OR logic)
+		{
+			Method: "GET",
+			Path:   "/test-or-jwt-apikey/",
+			Headers: map[string]string{
+				"Authorization": "Bearer " + jwtToken,
+				"X-API-Key":     "invalid-key",
+			},
+			Code: http.StatusOK,
+		},
+		// Test 4: Invalid JWT + Valid API key - should succeed (OR logic)
+		{
+			Method: "GET",
+			Path:   "/test-or-jwt-apikey/",
+			Headers: map[string]string{
+				"Authorization": "Bearer invalid-jwt",
+				"X-API-Key":     apiKey,
+			},
+			Code: http.StatusOK,
+		},
+		// Test 5: Both valid - should succeed
+		{
+			Method: "GET",
+			Path:   "/test-or-jwt-apikey/",
+			Headers: map[string]string{
+				"Authorization": "Bearer " + jwtToken,
+				"X-API-Key":     apiKey,
+			},
+			Code: http.StatusOK,
+		},
+		// Test 6: Both invalid - should fail with last error
+		{
+			Method: "GET",
+			Path:   "/test-or-jwt-apikey/",
+			Headers: map[string]string{
+				"Authorization": "Bearer invalid-jwt",
+				"X-API-Key":     "invalid-key",
+			},
+			Code:      http.StatusForbidden,
+		},
+		// Test 7: No auth headers - should fail
+		{
+			Method:    "GET",
+			Path:      "/test-or-jwt-apikey/",
+			Headers:   map[string]string{},
+			Code:      http.StatusUnauthorized,
+		},
+	}
+
+	ts.Run(t, testCases...)
+}
+
+// TestMultiAuthMiddleware_OR_BasicAuth_And_ApiKey tests OR logic with Basic Auth and API key  
+func TestMultiAuthMiddleware_OR_BasicAuth_And_ApiKey(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	// Create API key session
+	apiKeySession := CreateStandardSession()
+	apiKeySession.AccessRights = map[string]user.AccessDefinition{
+		"test-or-basic-apikey": {
+			APIName:  "Test OR Basic API Key",
+			APIID:    "test-or-basic-apikey",
+			Versions: []string{"default"},
+		},
+	}
+	apiKey := CreateSession(ts.Gw, func(s *user.SessionState) {
+		*s = *apiKeySession
+	})
+
+	// Create Basic Auth session
+	basicUsername := "testuser"
+	basicPassword := "testpass"
+	basicSession := CreateStandardSession()
+	basicSession.BasicAuthData.Password = basicPassword
+	basicSession.AccessRights = map[string]user.AccessDefinition{
+		"test-or-basic-apikey": {
+			APIName:  "Test OR Basic API Key",
+			APIID:    "test-or-basic-apikey",
+			Versions: []string{"default"},
+		},
+	}
+
+	// Store basic auth session with org-id prefix
+	basicKeyName := ts.Gw.generateToken("default", basicUsername)
+	err := ts.Gw.GlobalSessionManager.UpdateSession(basicKeyName, basicSession, 60, false)
+	if err != nil {
+		t.Fatal("Failed to create basic auth session:", err)
+	}
+
+	// Configure API with Basic Auth and API key
+	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		spec.APIID = "test-or-basic-apikey"
+		spec.Name = "Test OR Basic API Key"
+		spec.OrgID = "default"
+		spec.Proxy.ListenPath = "/test-or-basic-apikey/"
+		spec.UseKeylessAccess = false
+
+		// Enable both Basic Auth and API key
+		spec.UseBasicAuth = true
+		spec.UseStandardAuth = true
+
+		// Configure auth headers
+		spec.AuthConfigs = map[string]apidef.AuthConfig{
+			"basic": {
+				AuthHeaderName: "Authorization",
+			},
+			"authToken": {
+				AuthHeaderName: "X-API-Key",
+			},
+		}
+
+		// Simulate OAS import with multiple security requirements (OR logic)
+		spec.SecurityRequirements = [][]string{
+			{"basic"},    // Option 1: Basic auth only
+			{"apikey"},   // Option 2: API key only
+		}
+
+		spec.BaseIdentityProvidedBy = apidef.UnsetAuth
+	})
+
+	// Encode basic auth credentials
+	basicAuthHeader := "Basic " + base64.StdEncoding.EncodeToString([]byte(basicUsername+":"+basicPassword))
+	invalidBasicAuthHeader := "Basic " + base64.StdEncoding.EncodeToString([]byte(basicUsername+":wrongpass"))
+
+	// Test cases for OR logic with Basic Auth and API Key
+	testCases := []test.TestCase{
+		// Test 1: Valid Basic Auth only - should succeed
+		{
+			Method: "GET",
+			Path:   "/test-or-basic-apikey/",
+			Headers: map[string]string{
+				"Authorization": basicAuthHeader,
+			},
+			Code: http.StatusOK,
+		},
+		// Test 2: Valid API key only - should succeed
+		{
+			Method: "GET",
+			Path:   "/test-or-basic-apikey/",
+			Headers: map[string]string{
+				"X-API-Key": apiKey,
+			},
+			Code:      http.StatusOK,
+		},
+		// Test 3: Valid Basic Auth + Invalid API key - should succeed (OR logic)
+		{
+			Method: "GET",
+			Path:   "/test-or-basic-apikey/",
+			Headers: map[string]string{
+				"Authorization": basicAuthHeader,
+				"X-API-Key":     "invalid-key",
+			},
+			Code:      http.StatusOK,
+		},
+		// Test 4: Invalid Basic Auth + Valid API key - should succeed (OR logic)
+		{
+			Method: "GET",
+			Path:   "/test-or-basic-apikey/",
+			Headers: map[string]string{
+				"Authorization": invalidBasicAuthHeader,
+				"X-API-Key":     apiKey,
+			},
+			Code:      http.StatusOK,
+		},
+		// Test 5: Both valid - should succeed
+		{
+			Method: "GET",
+			Path:   "/test-or-basic-apikey/",
+			Headers: map[string]string{
+				"Authorization": basicAuthHeader,
+				"X-API-Key":     apiKey,
+			},
+			Code:      http.StatusOK,
+		},
+		// Test 6: Both invalid - should fail
+		{
+			Method: "GET",
+			Path:   "/test-or-basic-apikey/",
+			Headers: map[string]string{
+				"Authorization": invalidBasicAuthHeader,
+				"X-API-Key":     "invalid-key",
+			},
+			Code: http.StatusForbidden,
+		},
+		// Test 7: No auth headers - should fail
+		{
+			Method:  "GET",
+			Path:    "/test-or-basic-apikey/",
+			Headers: map[string]string{},
+			Code:    http.StatusUnauthorized,
+		},
+	}
+
+	ts.Run(t, testCases...)
+}
+
+// TestMultiAuthMiddleware_OR_AllMethodsFail tests error aggregation when all methods fail
+func TestMultiAuthMiddleware_OR_AllMethodsFail(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	// Configure API with JWT and API key, OR logic
+	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		spec.APIID = "test-or-all-fail"
+		spec.Name = "Test OR All Fail"
+		spec.Proxy.ListenPath = "/test-or-all-fail/"
+		spec.UseKeylessAccess = false
+
+		// Enable both JWT and API key
+		spec.UseStandardAuth = true
+		spec.EnableJWT = true
+
+		// Configure JWT
+		spec.JWTSigningMethod = RSASign
+		spec.JWTSource = base64.StdEncoding.EncodeToString([]byte(jwtRSAPubKey))
+		spec.JWTIdentityBaseField = "user_id"
+
+		// Configure auth headers
+		spec.AuthConfigs = map[string]apidef.AuthConfig{
+			"authToken": {
+				AuthHeaderName: "X-API-Key",
+			},
+			"jwt": {
+				AuthHeaderName: "Authorization",
+			},
+		}
+
+		// Multiple security requirements trigger OR logic
+		spec.SecurityRequirements = [][]string{
+			{"jwt"},      // Option 1: JWT only
+			{"apikey"},   // Option 2: API key only
+		}
+
+		spec.BaseIdentityProvidedBy = apidef.UnsetAuth
+	})
+
+	// Test cases - all auth methods should fail
+	testCases := []test.TestCase{
+		// Test 1: Invalid JWT and invalid API key - should return last error
+		{
+			Method: "GET",
+			Path:   "/test-or-all-fail/",
+			Headers: map[string]string{
+				"Authorization": "Bearer invalid-jwt-token",
+				"X-API-Key":     "invalid-api-key",
+			},
+			Code:      http.StatusForbidden,
+		},
+		// Test 2: Only invalid JWT - should fail
+		{
+			Method: "GET",
+			Path:   "/test-or-all-fail/",
+			Headers: map[string]string{
+				"Authorization": "Bearer invalid-jwt",
+			},
+			Code: http.StatusUnauthorized, // No API key provided
+		},
+		// Test 3: Only invalid API key - should fail
+		{
+			Method: "GET",
+			Path:   "/test-or-all-fail/",
+			Headers: map[string]string{
+				"X-API-Key": "invalid-key",
+			},
+			Code: http.StatusForbidden, // API key invalid
+		},
+	}
+
+	ts.Run(t, testCases...)
+}
+
+// TestMultiAuthMiddleware_BackwardCompatibility_AND_Logic tests that AND logic is preserved when SecurityRequirements <= 1
+func TestMultiAuthMiddleware_BackwardCompatibility_AND_Logic(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	// Create a policy for JWT
+	pID := ts.CreatePolicy(func(p *user.Policy) {
+		p.AccessRights = map[string]user.AccessDefinition{
+			"test-and-logic": {
+				APIName:  "Test AND Logic",
+				APIID:    "test-and-logic",
+				Versions: []string{"default"},
+			},
+		}
+	})
+
+	// Create API key session
+	apiKeySession := CreateStandardSession()
+	apiKeySession.AccessRights = map[string]user.AccessDefinition{
+		"test-and-logic": {
+			APIName:  "Test AND Logic",
+			APIID:    "test-and-logic",
+			Versions: []string{"default"},
+		},
+	}
+	apiKey := CreateSession(ts.Gw, func(s *user.SessionState) {
+		*s = *apiKeySession
+	})
+
+	// Configure API with JWT and API key, but with single/no SecurityRequirements (AND logic)
+	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		spec.APIID = "test-and-logic"
+		spec.Name = "Test AND Logic"
+		spec.Proxy.ListenPath = "/test-and-logic/"
+		spec.UseKeylessAccess = false
+
+		// Enable both JWT and API key
+		spec.UseStandardAuth = true
+		spec.EnableJWT = true
+
+		// Configure JWT
+		spec.JWTSigningMethod = RSASign
+		spec.JWTSource = base64.StdEncoding.EncodeToString([]byte(jwtRSAPubKey))
+		spec.JWTIdentityBaseField = "user_id"
+		spec.JWTPolicyFieldName = "policy_id"
+		spec.JWTDefaultPolicies = []string{pID}
+
+		// Configure auth headers
+		spec.AuthConfigs = map[string]apidef.AuthConfig{
+			"authToken": {
+				AuthHeaderName: "X-API-Key",
+			},
+			"jwt": {
+				AuthHeaderName: "Authorization",
+			},
+		}
+
+		// Single security requirement or empty = AND logic (backward compatibility)
+		spec.SecurityRequirements = [][]string{
+			{"jwt", "apikey"}, // Single requirement with both methods = AND logic
+		}
+
+		spec.BaseIdentityProvidedBy = apidef.AuthToken // API key provides base identity
+	})
+
+	// Create JWT token
+	jwtToken := CreateJWKToken(func(t *jwt.Token) {
+		t.Claims.(jwt.MapClaims)["user_id"] = "jwt-user"
+		t.Claims.(jwt.MapClaims)["policy_id"] = pID
+		t.Claims.(jwt.MapClaims)["exp"] = time.Now().Add(time.Hour).Unix()
+	})
+
+	// Test cases for AND logic (backward compatibility)
+	testCases := []test.TestCase{
+		// Test 1: Both valid JWT and API key - should succeed (AND logic requires both)
+		{
+			Method: "GET",
+			Path:   "/test-and-logic/",
+			Headers: map[string]string{
+				"Authorization": "Bearer " + jwtToken,
+				"X-API-Key":     apiKey,
+			},
+			Code:      http.StatusOK,
+		},
+		// Test 2: Valid JWT only - should fail (AND logic requires both)
+		{
+			Method: "GET",
+			Path:   "/test-and-logic/",
+			Headers: map[string]string{
+				"Authorization": "Bearer " + jwtToken,
+			},
+			Code:      http.StatusUnauthorized,
+			BodyMatch: "Authorization field missing",
+		},
+		// Test 3: Valid API key only - should fail (AND logic requires both)
+		{
+			Method: "GET",
+			Path:   "/test-and-logic/",
+			Headers: map[string]string{
+				"X-API-Key": apiKey,
+			},
+			Code:      http.StatusBadRequest,
+			BodyMatch: "Authorization field missing",
+		},
+		// Test 4: Invalid JWT + Valid API key - should fail
+		{
+			Method: "GET",
+			Path:   "/test-and-logic/",
+			Headers: map[string]string{
+				"Authorization": "Bearer invalid-jwt",
+				"X-API-Key":     apiKey,
+			},
+			Code:      http.StatusForbidden,
+			BodyMatch: "Key not authorized",
+		},
+		// Test 5: Valid JWT + Invalid API key - should fail
+		{
+			Method: "GET",
+			Path:   "/test-and-logic/",
+			Headers: map[string]string{
+				"Authorization": "Bearer " + jwtToken,
+				"X-API-Key":     "invalid-key",
+			},
+			Code:      http.StatusForbidden,
+		},
+	}
+
+	ts.Run(t, testCases...)
+}
+
+// TestMultiAuthMiddleware_OR_MixedValidInvalid tests mixed valid/invalid credentials
+func TestMultiAuthMiddleware_OR_MixedValidInvalid(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	// Create multiple API keys with different permissions
+	apiKey1Session := CreateStandardSession()
+	apiKey1Session.AccessRights = map[string]user.AccessDefinition{
+		"test-or-mixed": {
+			APIName:  "Test OR Mixed",
+			APIID:    "test-or-mixed",
+			Versions: []string{"default"},
+		},
+	}
+	apiKey1 := CreateSession(ts.Gw, func(s *user.SessionState) {
+		*s = *apiKey1Session
+	})
+
+	// Create Basic Auth session
+	basicUsername := "mixeduser"
+	basicPassword := "mixedpass"
+	basicSession := CreateStandardSession()
+	basicSession.BasicAuthData.Password = basicPassword
+	basicSession.AccessRights = map[string]user.AccessDefinition{
+		"test-or-mixed": {
+			APIName:  "Test OR Mixed",
+			APIID:    "test-or-mixed",
+			Versions: []string{"default"},
+		},
+	}
+
+	// Store basic auth session
+	basicKeyName := ts.Gw.generateToken("default", basicUsername)
+	err := ts.Gw.GlobalSessionManager.UpdateSession(basicKeyName, basicSession, 60, false)
+	if err != nil {
+		t.Fatal("Failed to create basic auth session:", err)
+	}
+
+	// Configure API with multiple auth methods
+	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		spec.APIID = "test-or-mixed"
+		spec.Name = "Test OR Mixed"
+		spec.OrgID = "default"
+		spec.Proxy.ListenPath = "/test-or-mixed/"
+		spec.UseKeylessAccess = false
+
+		// Enable Basic Auth and API key
+		spec.UseBasicAuth = true
+		spec.UseStandardAuth = true
+
+		// Configure auth headers
+		spec.AuthConfigs = map[string]apidef.AuthConfig{
+			"basic": {
+				AuthHeaderName: "Authorization",
+			},
+			"authToken": {
+				AuthHeaderName: "X-API-Key",
+			},
+		}
+
+		// Multiple security requirements for OR logic
+		spec.SecurityRequirements = [][]string{
+			{"basic"},    // Option 1: Basic auth
+			{"apikey"},   // Option 2: API key
+		}
+
+		spec.BaseIdentityProvidedBy = apidef.UnsetAuth
+	})
+
+	// Prepare auth headers
+	validBasicAuth := "Basic " + base64.StdEncoding.EncodeToString([]byte(basicUsername+":"+basicPassword))
+	invalidBasicAuth := "Basic " + base64.StdEncoding.EncodeToString([]byte("wronguser:wrongpass"))
+
+	// Test mixed valid/invalid scenarios
+	testCases := []test.TestCase{
+		// Test 1: First method invalid, second valid - should succeed
+		{
+			Method: "GET",
+			Path:   "/test-or-mixed/",
+			Headers: map[string]string{
+				"Authorization": invalidBasicAuth,
+				"X-API-Key":     apiKey1,
+			},
+			Code:      http.StatusOK,
+		},
+		// Test 2: First method valid, second invalid - should succeed
+		{
+			Method: "GET",
+			Path:   "/test-or-mixed/",
+			Headers: map[string]string{
+				"Authorization": validBasicAuth,
+				"X-API-Key":     "totally-wrong-key",
+			},
+			Code:      http.StatusOK,
+		},
+		// Test 3: Empty first method, valid second - should succeed
+		{
+			Method: "GET",
+			Path:   "/test-or-mixed/",
+			Headers: map[string]string{
+				"X-API-Key": apiKey1,
+			},
+			Code:      http.StatusOK,
+		},
+		// Test 4: Valid first method, empty second - should succeed
+		{
+			Method: "GET",
+			Path:   "/test-or-mixed/",
+			Headers: map[string]string{
+				"Authorization": validBasicAuth,
+			},
+			Code:      http.StatusOK,
+		},
+		// Test 5: Malformed Basic Auth + valid API key - should succeed
+		{
+			Method: "GET",
+			Path:   "/test-or-mixed/",
+			Headers: map[string]string{
+				"Authorization": "Basic malformed",
+				"X-API-Key":     apiKey1,
+			},
+			Code:      http.StatusOK,
+		},
+		// Test 6: Valid Basic Auth + malformed API key - should succeed
+		{
+			Method: "GET",
+			Path:   "/test-or-mixed/",
+			Headers: map[string]string{
+				"Authorization": validBasicAuth,
+				"X-API-Key":     "",
+			},
+			Code:      http.StatusOK,
+		},
+	}
+
+	ts.Run(t, testCases...)
+}
+
+// TestMultiAuthMiddleware_OR_ThreeAuthMethods tests OR logic with three auth methods
+func TestMultiAuthMiddleware_OR_ThreeAuthMethods(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	// Create a policy for JWT
+	pID := ts.CreatePolicy(func(p *user.Policy) {
+		p.AccessRights = map[string]user.AccessDefinition{
+			"test-or-three": {
+				APIName:  "Test OR Three",
+				APIID:    "test-or-three",
+				Versions: []string{"default"},
+			},
+		}
+	})
+
+	// Create API key session
+	apiKeySession := CreateStandardSession()
+	apiKeySession.AccessRights = map[string]user.AccessDefinition{
+		"test-or-three": {
+			APIName:  "Test OR Three",
+			APIID:    "test-or-three",
+			Versions: []string{"default"},
+		},
+	}
+	apiKey := CreateSession(ts.Gw, func(s *user.SessionState) {
+		*s = *apiKeySession
+	})
+
+	// Create Basic Auth session
+	basicUsername := "threeuser"
+	basicPassword := "threepass"
+	basicSession := CreateStandardSession()
+	basicSession.BasicAuthData.Password = basicPassword
+	basicSession.AccessRights = map[string]user.AccessDefinition{
+		"test-or-three": {
+			APIName:  "Test OR Three",
+			APIID:    "test-or-three",
+			Versions: []string{"default"},
+		},
+	}
+
+	// Store basic auth session
+	basicKeyName := ts.Gw.generateToken("default", basicUsername)
+	err := ts.Gw.GlobalSessionManager.UpdateSession(basicKeyName, basicSession, 60, false)
+	if err != nil {
+		t.Fatal("Failed to create basic auth session:", err)
+	}
+
+	// Configure API with three auth methods
+	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		spec.APIID = "test-or-three"
+		spec.Name = "Test OR Three"
+		spec.OrgID = "default"
+		spec.Proxy.ListenPath = "/test-or-three/"
+		spec.UseKeylessAccess = false
+
+		// Enable all three auth methods
+		spec.UseBasicAuth = true
+		spec.UseStandardAuth = true
+		spec.EnableJWT = true
+
+		// Configure JWT
+		spec.JWTSigningMethod = RSASign
+		spec.JWTSource = base64.StdEncoding.EncodeToString([]byte(jwtRSAPubKey))
+		spec.JWTIdentityBaseField = "user_id"
+		spec.JWTPolicyFieldName = "policy_id"
+		spec.JWTDefaultPolicies = []string{pID}
+
+		// Configure auth headers - use different headers to avoid conflicts
+		spec.AuthConfigs = map[string]apidef.AuthConfig{
+			"basic": {
+				AuthHeaderName: "Authorization",
+			},
+			"authToken": {
+				AuthHeaderName: "X-API-Key",
+			},
+			"jwt": {
+				AuthHeaderName: "X-JWT-Token",
+			},
+		}
+
+		// Three security requirements for OR logic
+		spec.SecurityRequirements = [][]string{
+			{"basic"},    // Option 1: Basic auth
+			{"apikey"},   // Option 2: API key
+			{"jwt"},      // Option 3: JWT
+		}
+
+		spec.BaseIdentityProvidedBy = apidef.UnsetAuth
+	})
+
+	// Create JWT token
+	jwtToken := CreateJWKToken(func(t *jwt.Token) {
+		t.Claims.(jwt.MapClaims)["user_id"] = "jwt-user-three"
+		t.Claims.(jwt.MapClaims)["policy_id"] = pID
+		t.Claims.(jwt.MapClaims)["exp"] = time.Now().Add(time.Hour).Unix()
+	})
+
+	// Prepare auth headers
+	validBasicAuth := "Basic " + base64.StdEncoding.EncodeToString([]byte(basicUsername+":"+basicPassword))
+
+	// Test three auth methods with OR logic
+	testCases := []test.TestCase{
+		// Test 1: Only first method (Basic) valid - should succeed
+		{
+			Method: "GET",
+			Path:   "/test-or-three/",
+			Headers: map[string]string{
+				"Authorization": validBasicAuth,
+			},
+			Code:      http.StatusOK,
+		},
+		// Test 2: Only second method (API Key) valid - should succeed
+		{
+			Method: "GET",
+			Path:   "/test-or-three/",
+			Headers: map[string]string{
+				"X-API-Key": apiKey,
+			},
+			Code:      http.StatusOK,
+		},
+		// Test 3: Only third method (JWT) valid - should succeed
+		{
+			Method: "GET",
+			Path:   "/test-or-three/",
+			Headers: map[string]string{
+				"X-JWT-Token": "Bearer " + jwtToken,
+			},
+			Code:      http.StatusOK,
+		},
+		// Test 4: First two invalid, third valid - should succeed
+		{
+			Method: "GET",
+			Path:   "/test-or-three/",
+			Headers: map[string]string{
+				"Authorization": "Basic invalid",
+				"X-API-Key":     "invalid-key",
+				"X-JWT-Token":   "Bearer " + jwtToken,
+			},
+			Code:      http.StatusOK,
+		},
+		// Test 5: All three valid - should succeed (first one wins)
+		{
+			Method: "GET",
+			Path:   "/test-or-three/",
+			Headers: map[string]string{
+				"Authorization": validBasicAuth,
+				"X-API-Key":     apiKey,
+				"X-JWT-Token":   "Bearer " + jwtToken,
+			},
+			Code:      http.StatusOK,
+		},
+		// Test 6: All three invalid - should fail
+		{
+			Method: "GET",
+			Path:   "/test-or-three/",
+			Headers: map[string]string{
+				"Authorization": "Basic wrong",
+				"X-API-Key":     "wrong-key",
+				"X-JWT-Token":   "Bearer wrong-jwt",
+			},
+			Code: http.StatusForbidden,
+		},
+	}
+
+	ts.Run(t, testCases...)
+}

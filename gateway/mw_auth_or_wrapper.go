@@ -14,9 +14,14 @@ type AuthORWrapper struct {
 
 // ProcessRequest handles the OR logic for authentication
 func (a *AuthORWrapper) ProcessRequest(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
+	logger := a.Logger()
+	logger.Debugf("OR wrapper processing with %d middlewares, %d security requirements", 
+		len(a.authMiddlewares), len(a.Spec.SecurityRequirements))
+	
 	// Auto-detect OR logic from security requirements
 	if len(a.Spec.SecurityRequirements) <= 1 {
 		// Single requirement or empty = AND logic (default behavior)
+		logger.Debug("Using AND logic (single or no security requirement)")
 		for _, mw := range a.authMiddlewares {
 			if err, code := mw.ProcessRequest(w, r, nil); err != nil {
 				return err, code
@@ -26,20 +31,28 @@ func (a *AuthORWrapper) ProcessRequest(w http.ResponseWriter, r *http.Request, _
 	}
 
 	// Multiple requirements = OR Logic: Try each requirement until one succeeds
+	logger.Debugf("Using OR logic with %d auth middlewares", len(a.authMiddlewares))
+	
 	var lastError error
 	var lastCode int
 
-	for _, mw := range a.authMiddlewares {
-		// Clone the request to avoid side effects between attempts
-		rClone := r.Clone(r.Context())
-
-		err, code := mw.ProcessRequest(w, rClone, nil)
+	for i, mw := range a.authMiddlewares {
+		// Use the original request for all middlewares
+		// Each auth middleware should handle its own session logic
+		logger.Debugf("Trying auth middleware %d: %T", i, mw)
+		err, code := mw.ProcessRequest(w, r, nil)
 		if err == nil {
-			// Success! Copy any modifications back to original request
-			*r = *rClone
+			logger.Debugf("Auth middleware %d succeeded", i)
+			// Success! Authentication passed
+			// The session should already be set by the successful auth middleware
+			// But we need to ensure it's in the original request context
+			if session := ctxGetSession(r); session != nil {
+				ctxSetSession(r, session, false, a.Gw.GetConfig().HashKeys)
+			}
 			return nil, http.StatusOK
 		}
 
+		logger.Debugf("Auth middleware %d failed: %v (code: %d)", i, err, code)
 		// Keep track of last error and code
 		lastError = err
 		lastCode = code
@@ -63,10 +76,58 @@ func (a *AuthORWrapper) EnabledForSpec() bool {
 
 // Init initializes the AuthORWrapper middleware
 func (a *AuthORWrapper) Init() {
+	logger := a.Logger()
+	spec := a.Spec
+	
+	// Initialize auth middlewares based on what's enabled in the spec
 	a.authMiddlewares = []TykMiddleware{}
-}
-
-// SetAuthMiddlewares sets the authentication middlewares to be used with OR logic
-func (a *AuthORWrapper) SetAuthMiddlewares(middlewares []TykMiddleware) {
-	a.authMiddlewares = middlewares
+	
+	// Build each auth middleware based on what's enabled
+	if spec.EnableJWT {
+		logger.Debug("Adding JWT middleware to OR wrapper")
+		jwtMw := &JWTMiddleware{BaseMiddleware: a.BaseMiddleware.Copy()}
+		jwtMw.Spec = spec
+		jwtMw.Gw = a.Gw
+		jwtMw.Init()
+		a.authMiddlewares = append(a.authMiddlewares, jwtMw)
+	}
+	
+	if spec.UseBasicAuth {
+		logger.Debug("Adding Basic Auth middleware to OR wrapper") 
+		basicMw := &BasicAuthKeyIsValid{BaseMiddleware: a.BaseMiddleware.Copy()}
+		basicMw.Spec = spec
+		basicMw.Gw = a.Gw
+		basicMw.Init()
+		a.authMiddlewares = append(a.authMiddlewares, basicMw)
+	}
+	
+	if spec.EnableSignatureChecking {
+		logger.Debug("Adding HMAC middleware to OR wrapper")
+		hmacMw := &HTTPSignatureValidationMiddleware{BaseMiddleware: a.BaseMiddleware.Copy()}
+		hmacMw.Spec = spec
+		hmacMw.Gw = a.Gw
+		hmacMw.Init()
+		a.authMiddlewares = append(a.authMiddlewares, hmacMw)
+	}
+	
+	if spec.UseOauth2 {
+		logger.Debug("Adding OAuth middleware to OR wrapper")
+		oauthMw := &Oauth2KeyExists{BaseMiddleware: a.BaseMiddleware.Copy()}
+		oauthMw.Spec = spec
+		oauthMw.Gw = a.Gw
+		oauthMw.Init()
+		a.authMiddlewares = append(a.authMiddlewares, oauthMw)
+	}
+	
+	// Always add standard auth (API key) if enabled or as fallback
+	if spec.UseStandardAuth || len(a.authMiddlewares) == 0 {
+		logger.Debug("Adding API Key middleware to OR wrapper")
+		authKeyMw := &AuthKey{BaseMiddleware: a.BaseMiddleware.Copy()}
+		authKeyMw.Spec = spec
+		authKeyMw.Gw = a.Gw
+		authKeyMw.Init()
+		a.authMiddlewares = append(a.authMiddlewares, authKeyMw)
+	}
+	
+	logger.Debugf("AuthORWrapper.Init completed with %d middlewares", len(a.authMiddlewares))
 }
