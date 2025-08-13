@@ -19,6 +19,9 @@ const (
 	certCheckCooldownPrefix = "cert_check_cooldown:"
 	// Certificate expiry event cooldown key prefix for Redis
 	certExpiryCooldownPrefix = "cert_expiry_cooldown:"
+	// Certificate expiry monitor enabled - meant for development/benchmarking purposes only.
+	// This should be removed or replaced with proper configuration for production use.
+	certExpiryMonitorEnabled = true
 )
 
 // CertificateCheckMW is used if domain was not detected or multiple APIs bind on the same domain. In this case authentification check happens not on TLS side but on HTTP level using this middleware
@@ -53,25 +56,27 @@ func (m *CertificateCheckMW) ProcessRequest(w http.ResponseWriter, r *http.Reque
 			return err, http.StatusForbidden
 		}
 
-		// Log certificate check initiation
-		log.Debug("Starting certificate expiration check for API: ", m.Spec.APIID, " with ", len(apiCerts), " certificates")
+		if certExpiryMonitorEnabled {
+			// Log certificate check initiation
+			log.Debug("Starting certificate expiration check for API: ", m.Spec.APIID, " with ", len(apiCerts), " certificates")
 
-		// Initialize Redis store for cooldowns if not already done
-		if m.store == nil {
-			log.Debug("[CertificateCheckMW] Initializing Redis store for cooldowns.")
+			// Initialize Redis store for cooldowns if not already done
+			if m.store == nil {
+				log.Debug("[CertificateCheckMW] Initializing Redis store for cooldowns.")
 
-			m.store = &storage.RedisCluster{
-				KeyPrefix:         "cert-cooldown:",
-				ConnectionHandler: m.Gw.StorageConnectionHandler,
+				m.store = &storage.RedisCluster{
+					KeyPrefix:         "cert-cooldown:",
+					ConnectionHandler: m.Gw.StorageConnectionHandler,
+				}
+
+				m.store.Connect()
 			}
 
-			m.store.Connect()
+			// NOTE: Certificate expiration checking is currently performed synchronously, which may block the request.
+			// Consider making this asynchronous in the future to improve request response times, especially when
+			// processing large numbers of certificates or when Redis operations are slow.
+			m.checkCertificatesExpiration(apiCerts)
 		}
-
-		// NOTE: Certificate expiration checking is currently performed synchronously, which may block the request.
-		// Consider making this asynchronous in the future to improve request response times, especially when
-		// processing large numbers of certificates or when Redis operations are slow.
-		m.checkCertificatesExpiration(apiCerts)
 	}
 
 	return nil, http.StatusOK
