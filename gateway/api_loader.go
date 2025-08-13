@@ -394,12 +394,12 @@ func (gw *Gateway) processSpec(
 		// Check if we need to use OR logic for multiple security requirements
 		if len(spec.SecurityRequirements) > 1 && len(authArray) > 0 {
 			logger.Info("Multiple security requirements detected - using OR authentication logic")
-			
+
 			// Create the OR wrapper - it will initialize its own auth middlewares in Init()
 			orWrapper := &AuthORWrapper{
 				BaseMiddleware: *baseMid.Copy(),
 			}
-			
+
 			// Add the OR wrapper to the chain instead of individual auth middlewares
 			chainArray = append(chainArray, gw.createMiddleware(orWrapper))
 		} else {

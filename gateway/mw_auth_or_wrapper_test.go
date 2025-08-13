@@ -72,8 +72,8 @@ func TestMultiAuthMiddleware_OR_JWT_And_ApiKey_Combination(t *testing.T) {
 
 		// Simulate OAS import with multiple security requirements (OR logic)
 		spec.SecurityRequirements = [][]string{
-			{"jwt"},      // Option 1: JWT only
-			{"apikey"},   // Option 2: API key only
+			{"jwt"},    // Option 1: JWT only
+			{"apikey"}, // Option 2: API key only
 		}
 
 		// BaseIdentity will be set dynamically
@@ -145,21 +145,21 @@ func TestMultiAuthMiddleware_OR_JWT_And_ApiKey_Combination(t *testing.T) {
 				"Authorization": "Bearer invalid-jwt",
 				"X-API-Key":     "invalid-key",
 			},
-			Code:      http.StatusForbidden,
+			Code: http.StatusForbidden,
 		},
 		// Test 7: No auth headers - should fail
 		{
-			Method:    "GET",
-			Path:      "/test-or-jwt-apikey/",
-			Headers:   map[string]string{},
-			Code:      http.StatusUnauthorized,
+			Method:  "GET",
+			Path:    "/test-or-jwt-apikey/",
+			Headers: map[string]string{},
+			Code:    http.StatusUnauthorized,
 		},
 	}
 
 	ts.Run(t, testCases...)
 }
 
-// TestMultiAuthMiddleware_OR_BasicAuth_And_ApiKey tests OR logic with Basic Auth and API key  
+// TestMultiAuthMiddleware_OR_BasicAuth_And_ApiKey tests OR logic with Basic Auth and API key
 func TestMultiAuthMiddleware_OR_BasicAuth_And_ApiKey(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
@@ -221,8 +221,8 @@ func TestMultiAuthMiddleware_OR_BasicAuth_And_ApiKey(t *testing.T) {
 
 		// Simulate OAS import with multiple security requirements (OR logic)
 		spec.SecurityRequirements = [][]string{
-			{"basic"},    // Option 1: Basic auth only
-			{"apikey"},   // Option 2: API key only
+			{"basic"},  // Option 1: Basic auth only
+			{"apikey"}, // Option 2: API key only
 		}
 
 		spec.BaseIdentityProvidedBy = apidef.UnsetAuth
@@ -250,7 +250,7 @@ func TestMultiAuthMiddleware_OR_BasicAuth_And_ApiKey(t *testing.T) {
 			Headers: map[string]string{
 				"X-API-Key": apiKey,
 			},
-			Code:      http.StatusOK,
+			Code: http.StatusOK,
 		},
 		// Test 3: Valid Basic Auth + Invalid API key - should succeed (OR logic)
 		{
@@ -260,7 +260,7 @@ func TestMultiAuthMiddleware_OR_BasicAuth_And_ApiKey(t *testing.T) {
 				"Authorization": basicAuthHeader,
 				"X-API-Key":     "invalid-key",
 			},
-			Code:      http.StatusOK,
+			Code: http.StatusOK,
 		},
 		// Test 4: Invalid Basic Auth + Valid API key - should succeed (OR logic)
 		{
@@ -270,7 +270,7 @@ func TestMultiAuthMiddleware_OR_BasicAuth_And_ApiKey(t *testing.T) {
 				"Authorization": invalidBasicAuthHeader,
 				"X-API-Key":     apiKey,
 			},
-			Code:      http.StatusOK,
+			Code: http.StatusOK,
 		},
 		// Test 5: Both valid - should succeed
 		{
@@ -280,7 +280,7 @@ func TestMultiAuthMiddleware_OR_BasicAuth_And_ApiKey(t *testing.T) {
 				"Authorization": basicAuthHeader,
 				"X-API-Key":     apiKey,
 			},
-			Code:      http.StatusOK,
+			Code: http.StatusOK,
 		},
 		// Test 6: Both invalid - should fail
 		{
@@ -337,8 +337,8 @@ func TestMultiAuthMiddleware_OR_AllMethodsFail(t *testing.T) {
 
 		// Multiple security requirements trigger OR logic
 		spec.SecurityRequirements = [][]string{
-			{"jwt"},      // Option 1: JWT only
-			{"apikey"},   // Option 2: API key only
+			{"jwt"},    // Option 1: JWT only
+			{"apikey"}, // Option 2: API key only
 		}
 
 		spec.BaseIdentityProvidedBy = apidef.UnsetAuth
@@ -354,7 +354,7 @@ func TestMultiAuthMiddleware_OR_AllMethodsFail(t *testing.T) {
 				"Authorization": "Bearer invalid-jwt-token",
 				"X-API-Key":     "invalid-api-key",
 			},
-			Code:      http.StatusForbidden,
+			Code: http.StatusForbidden,
 		},
 		// Test 2: Only invalid JWT - should fail
 		{
@@ -461,7 +461,7 @@ func TestMultiAuthMiddleware_BackwardCompatibility_AND_Logic(t *testing.T) {
 				"Authorization": "Bearer " + jwtToken,
 				"X-API-Key":     apiKey,
 			},
-			Code:      http.StatusOK,
+			Code: http.StatusOK,
 		},
 		// Test 2: Valid JWT only - should fail (AND logic requires both)
 		{
@@ -502,7 +502,7 @@ func TestMultiAuthMiddleware_BackwardCompatibility_AND_Logic(t *testing.T) {
 				"Authorization": "Bearer " + jwtToken,
 				"X-API-Key":     "invalid-key",
 			},
-			Code:      http.StatusForbidden,
+			Code: http.StatusForbidden,
 		},
 	}
 
@@ -571,8 +571,8 @@ func TestMultiAuthMiddleware_OR_MixedValidInvalid(t *testing.T) {
 
 		// Multiple security requirements for OR logic
 		spec.SecurityRequirements = [][]string{
-			{"basic"},    // Option 1: Basic auth
-			{"apikey"},   // Option 2: API key
+			{"basic"},  // Option 1: Basic auth
+			{"apikey"}, // Option 2: API key
 		}
 
 		spec.BaseIdentityProvidedBy = apidef.UnsetAuth
@@ -592,7 +592,7 @@ func TestMultiAuthMiddleware_OR_MixedValidInvalid(t *testing.T) {
 				"Authorization": invalidBasicAuth,
 				"X-API-Key":     apiKey1,
 			},
-			Code:      http.StatusOK,
+			Code: http.StatusOK,
 		},
 		// Test 2: First method valid, second invalid - should succeed
 		{
@@ -602,7 +602,7 @@ func TestMultiAuthMiddleware_OR_MixedValidInvalid(t *testing.T) {
 				"Authorization": validBasicAuth,
 				"X-API-Key":     "totally-wrong-key",
 			},
-			Code:      http.StatusOK,
+			Code: http.StatusOK,
 		},
 		// Test 3: Empty first method, valid second - should succeed
 		{
@@ -611,7 +611,7 @@ func TestMultiAuthMiddleware_OR_MixedValidInvalid(t *testing.T) {
 			Headers: map[string]string{
 				"X-API-Key": apiKey1,
 			},
-			Code:      http.StatusOK,
+			Code: http.StatusOK,
 		},
 		// Test 4: Valid first method, empty second - should succeed
 		{
@@ -620,7 +620,7 @@ func TestMultiAuthMiddleware_OR_MixedValidInvalid(t *testing.T) {
 			Headers: map[string]string{
 				"Authorization": validBasicAuth,
 			},
-			Code:      http.StatusOK,
+			Code: http.StatusOK,
 		},
 		// Test 5: Malformed Basic Auth + valid API key - should succeed
 		{
@@ -630,7 +630,7 @@ func TestMultiAuthMiddleware_OR_MixedValidInvalid(t *testing.T) {
 				"Authorization": "Basic malformed",
 				"X-API-Key":     apiKey1,
 			},
-			Code:      http.StatusOK,
+			Code: http.StatusOK,
 		},
 		// Test 6: Valid Basic Auth + malformed API key - should succeed
 		{
@@ -640,7 +640,7 @@ func TestMultiAuthMiddleware_OR_MixedValidInvalid(t *testing.T) {
 				"Authorization": validBasicAuth,
 				"X-API-Key":     "",
 			},
-			Code:      http.StatusOK,
+			Code: http.StatusOK,
 		},
 	}
 
@@ -731,9 +731,9 @@ func TestMultiAuthMiddleware_OR_ThreeAuthMethods(t *testing.T) {
 
 		// Three security requirements for OR logic
 		spec.SecurityRequirements = [][]string{
-			{"basic"},    // Option 1: Basic auth
-			{"apikey"},   // Option 2: API key
-			{"jwt"},      // Option 3: JWT
+			{"basic"},  // Option 1: Basic auth
+			{"apikey"}, // Option 2: API key
+			{"jwt"},    // Option 3: JWT
 		}
 
 		spec.BaseIdentityProvidedBy = apidef.UnsetAuth
@@ -758,7 +758,7 @@ func TestMultiAuthMiddleware_OR_ThreeAuthMethods(t *testing.T) {
 			Headers: map[string]string{
 				"Authorization": validBasicAuth,
 			},
-			Code:      http.StatusOK,
+			Code: http.StatusOK,
 		},
 		// Test 2: Only second method (API Key) valid - should succeed
 		{
@@ -767,7 +767,7 @@ func TestMultiAuthMiddleware_OR_ThreeAuthMethods(t *testing.T) {
 			Headers: map[string]string{
 				"X-API-Key": apiKey,
 			},
-			Code:      http.StatusOK,
+			Code: http.StatusOK,
 		},
 		// Test 3: Only third method (JWT) valid - should succeed
 		{
@@ -776,7 +776,7 @@ func TestMultiAuthMiddleware_OR_ThreeAuthMethods(t *testing.T) {
 			Headers: map[string]string{
 				"X-JWT-Token": "Bearer " + jwtToken,
 			},
-			Code:      http.StatusOK,
+			Code: http.StatusOK,
 		},
 		// Test 4: First two invalid, third valid - should succeed
 		{
@@ -787,7 +787,7 @@ func TestMultiAuthMiddleware_OR_ThreeAuthMethods(t *testing.T) {
 				"X-API-Key":     "invalid-key",
 				"X-JWT-Token":   "Bearer " + jwtToken,
 			},
-			Code:      http.StatusOK,
+			Code: http.StatusOK,
 		},
 		// Test 5: All three valid - should succeed (first one wins)
 		{
@@ -798,7 +798,7 @@ func TestMultiAuthMiddleware_OR_ThreeAuthMethods(t *testing.T) {
 				"X-API-Key":     apiKey,
 				"X-JWT-Token":   "Bearer " + jwtToken,
 			},
-			Code:      http.StatusOK,
+			Code: http.StatusOK,
 		},
 		// Test 6: All three invalid - should fail
 		{

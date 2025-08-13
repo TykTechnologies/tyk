@@ -3,7 +3,7 @@ package gateway
 import (
 	"net/http"
 	"testing"
-	
+
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/test"
 	"github.com/TykTechnologies/tyk/user"
@@ -17,12 +17,12 @@ func TestORAuthSimple(t *testing.T) {
 	session1 := CreateStandardSession()
 	session1.AccessRights = map[string]user.AccessDefinition{
 		"test-or": {
-			APIName:  "Test OR API", 
+			APIName:  "Test OR API",
 			APIID:    "test-or",
 			Versions: []string{"default"},
 		},
 	}
-	
+
 	apiKey1 := CreateSession(ts.Gw, func(s *user.SessionState) {
 		*s = *session1
 	})
@@ -30,12 +30,12 @@ func TestORAuthSimple(t *testing.T) {
 	session2 := CreateStandardSession()
 	session2.AccessRights = map[string]user.AccessDefinition{
 		"test-or": {
-			APIName:  "Test OR API", 
+			APIName:  "Test OR API",
 			APIID:    "test-or",
 			Versions: []string{"default"},
 		},
 	}
-	
+
 	apiKey2 := CreateSession(ts.Gw, func(s *user.SessionState) {
 		*s = *session2
 	})
@@ -46,7 +46,7 @@ func TestORAuthSimple(t *testing.T) {
 		spec.Name = "Test OR API"
 		spec.Proxy.ListenPath = "/test-or/"
 		spec.UseKeylessAccess = false
-		
+
 		// Enable standard auth (API key)
 		spec.UseStandardAuth = true
 		spec.AuthConfigs = map[string]apidef.AuthConfig{
@@ -54,7 +54,7 @@ func TestORAuthSimple(t *testing.T) {
 				AuthHeaderName: "X-API-Key",
 			},
 		}
-		
+
 		// This should still work with single auth method
 		spec.BaseIdentityProvidedBy = apidef.AuthToken
 	})
@@ -92,7 +92,7 @@ func TestORAuthSimple(t *testing.T) {
 		{
 			Method: "GET",
 			Path:   "/test-or/",
-			Code: http.StatusUnauthorized,
+			Code:   http.StatusUnauthorized,
 		},
 	}
 

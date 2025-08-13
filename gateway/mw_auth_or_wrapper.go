@@ -15,9 +15,9 @@ type AuthORWrapper struct {
 // ProcessRequest handles the OR logic for authentication
 func (a *AuthORWrapper) ProcessRequest(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
 	logger := a.Logger()
-	logger.Debugf("OR wrapper processing with %d middlewares, %d security requirements", 
+	logger.Debugf("OR wrapper processing with %d middlewares, %d security requirements",
 		len(a.authMiddlewares), len(a.Spec.SecurityRequirements))
-	
+
 	// Auto-detect OR logic from security requirements
 	if len(a.Spec.SecurityRequirements) <= 1 {
 		// Single requirement or empty = AND logic (default behavior)
@@ -32,7 +32,7 @@ func (a *AuthORWrapper) ProcessRequest(w http.ResponseWriter, r *http.Request, _
 
 	// Multiple requirements = OR Logic: Try each requirement until one succeeds
 	logger.Debugf("Using OR logic with %d auth middlewares", len(a.authMiddlewares))
-	
+
 	var lastError error
 	var lastCode int
 
@@ -78,10 +78,10 @@ func (a *AuthORWrapper) EnabledForSpec() bool {
 func (a *AuthORWrapper) Init() {
 	logger := a.Logger()
 	spec := a.Spec
-	
+
 	// Initialize auth middlewares based on what's enabled in the spec
 	a.authMiddlewares = []TykMiddleware{}
-	
+
 	// Build each auth middleware based on what's enabled
 	if spec.EnableJWT {
 		logger.Debug("Adding JWT middleware to OR wrapper")
@@ -91,16 +91,16 @@ func (a *AuthORWrapper) Init() {
 		jwtMw.Init()
 		a.authMiddlewares = append(a.authMiddlewares, jwtMw)
 	}
-	
+
 	if spec.UseBasicAuth {
-		logger.Debug("Adding Basic Auth middleware to OR wrapper") 
+		logger.Debug("Adding Basic Auth middleware to OR wrapper")
 		basicMw := &BasicAuthKeyIsValid{BaseMiddleware: a.BaseMiddleware.Copy()}
 		basicMw.Spec = spec
 		basicMw.Gw = a.Gw
 		basicMw.Init()
 		a.authMiddlewares = append(a.authMiddlewares, basicMw)
 	}
-	
+
 	if spec.EnableSignatureChecking {
 		logger.Debug("Adding HMAC middleware to OR wrapper")
 		hmacMw := &HTTPSignatureValidationMiddleware{BaseMiddleware: a.BaseMiddleware.Copy()}
@@ -109,7 +109,7 @@ func (a *AuthORWrapper) Init() {
 		hmacMw.Init()
 		a.authMiddlewares = append(a.authMiddlewares, hmacMw)
 	}
-	
+
 	if spec.UseOauth2 {
 		logger.Debug("Adding OAuth middleware to OR wrapper")
 		oauthMw := &Oauth2KeyExists{BaseMiddleware: a.BaseMiddleware.Copy()}
@@ -118,7 +118,7 @@ func (a *AuthORWrapper) Init() {
 		oauthMw.Init()
 		a.authMiddlewares = append(a.authMiddlewares, oauthMw)
 	}
-	
+
 	// Always add standard auth (API key) if enabled or as fallback
 	if spec.UseStandardAuth || len(a.authMiddlewares) == 0 {
 		logger.Debug("Adding API Key middleware to OR wrapper")
@@ -128,6 +128,6 @@ func (a *AuthORWrapper) Init() {
 		authKeyMw.Init()
 		a.authMiddlewares = append(a.authMiddlewares, authKeyMw)
 	}
-	
+
 	logger.Debugf("AuthORWrapper.Init completed with %d middlewares", len(a.authMiddlewares))
 }
