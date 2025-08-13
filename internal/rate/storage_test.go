@@ -25,15 +25,18 @@ func TestNewStorage(t *testing.T) {
 
 	client, err := NewStorage(&conf.Storage)
 	assert.NotNil(t, client)
+	assert.NoError(t, err)
 
 	conf.Storage.EnableCluster = true
 	client, err = NewStorage(&conf.Storage)
 	assert.NotNil(t, client)
+	assert.NoError(t, err)
 
 	conf.Storage.EnableCluster = false
 	conf.Storage.MasterName = "redis"
 	client, err = NewStorage(&conf.Storage)
 	assert.NotNil(t, client)
+	assert.NoError(t, err)
 }
 
 func TestNewStorageWithTLS(t *testing.T) {
