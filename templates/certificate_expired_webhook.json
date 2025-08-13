@@ -1,0 +1,11 @@
+{
+    "event": "{{.Type}}",
+    "message": "{{.Meta.Message}}",
+    "cert_id": "{{.Meta.CertID}}",
+    "cert_name": "{{.Meta.CertName}}",
+    "expires_at": "{{.Meta.ExpiresAt}}",
+    "expired_for": "{{.Meta.ExpiredFor}}",
+    "api_id": "{{.Meta.APIID}}",
+    "org_id": "{{.Meta.OrgID}}",
+    "timestamp": "{{.TimeStamp}}"
+}

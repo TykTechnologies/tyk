@@ -46,6 +46,8 @@ const (
 	TokenDeleted Event = "TokenDeleted"
 	// CertificateExpiringSoon is the event triggered when a certificate is approaching expiration.
 	CertificateExpiringSoon Event = "CertificateExpiringSoon"
+	// CertificateExpired is the event triggered when a certificate has expired.
+	CertificateExpired Event = "CertificateExpired"
 )
 
 // Rate limiter events

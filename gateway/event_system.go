@@ -126,6 +126,17 @@ type EventCertificateExpiringSoonMeta struct {
 	OrgID         string    `json:"org_id"`
 }
 
+// EventCertificateExpiredMeta is the metadata structure for expired certificate events
+type EventCertificateExpiredMeta struct {
+	EventMetaDefault
+	CertID     string    `json:"cert_id"`
+	CertName   string    `json:"cert_name"`
+	ExpiresAt  time.Time `json:"expires_at"`
+	ExpiredFor int       `json:"expired_for"` // days since expiration
+	APIID      string    `json:"api_id"`
+	OrgID      string    `json:"org_id"`
+}
+
 // EventHandlerByName is a convenience function to get event handler instances from an API Definition
 func (gw *Gateway) EventHandlerByName(handlerConf apidef.EventHandlerTriggerConfig, spec *APISpec) (config.TykEventHandler, error) {
 

@@ -137,7 +137,7 @@ func (m *CertificateCheckMW) checkCertificate(cert *tls.Certificate, monitorConf
 	// Process certificate based on its expiry status
 	switch {
 	case certInfo.IsExpired:
-		m.handleExpiredCertificate(certInfo)
+		m.handleExpiredCertificate(certInfo, monitorConfig)
 	case certInfo.IsExpiringSoon:
 		m.handleExpiringSoonCertificate(certInfo, monitorConfig)
 	default:
@@ -200,8 +200,19 @@ func (m *CertificateCheckMW) isCertificateExpiringSoon(hoursUntilExpiry int) boo
 }
 
 // handleExpiredCertificate handles certificates that have already expired
-func (m *CertificateCheckMW) handleExpiredCertificate(certInfo *certInfo) {
+func (m *CertificateCheckMW) handleExpiredCertificate(certInfo *certInfo, monitorConfig config.CertificateExpiryMonitorConfig) {
 	log.Warningf("Certificate expiry monitor: CRITICAL - Certificate '%s' has EXPIRED (ID: %s...)", certInfo.CommonName, certInfo.ID[:8])
+
+	// Check if we should fire the expired event based on cooldown
+	if !m.shouldFireExpiryEvent(certInfo.ID, monitorConfig) {
+		log.Debugf("Certificate expiry monitor: Event suppressed for expired certificate '%s' due to cooldown (ID: %s...)", certInfo.CommonName, certInfo.ID[:8])
+		return
+	}
+
+	// Fire CertificateExpired event
+	m.fireCertificateExpiredEvent(certInfo.Certificate, certInfo.ID)
+
+	log.Infof("Certificate expiry monitor: EXPIRED EVENT FIRED for certificate '%s' - expired %d days ago (ID: %s...)", certInfo.CommonName, int(time.Since(certInfo.Certificate.Leaf.NotAfter).Hours()/24), certInfo.ID[:8])
 }
 
 // handleExpiringSoonCertificate handles certificates that are expiring soon
@@ -335,4 +346,36 @@ func (m *CertificateCheckMW) fireCertificateExpiringSoonEvent(cert *tls.Certific
 	log.Debugf("Certificate expiry monitor: Firing expiry event for certificate '%s' - expires in %dd %dh (ID: %s...)", cert.Leaf.Subject.CommonName, daysUntilExpiry, remainingHours, certID[:8])
 
 	m.Spec.FireEvent(event.CertificateExpiringSoon, eventMeta)
+}
+
+// fireCertificateExpiredEvent fires the certificate expired event
+func (m *CertificateCheckMW) fireCertificateExpiredEvent(cert *tls.Certificate, certID string) {
+	if cert == nil || cert.Leaf == nil {
+		log.Warningf("Certificate expiry monitor: Cannot fire expired event - nil certificate or certificate with nil Leaf")
+		return
+	}
+
+	// Calculate days since expiration
+	daysSinceExpiry := int(time.Since(cert.Leaf.NotAfter).Hours() / 24)
+	if daysSinceExpiry < 0 {
+		daysSinceExpiry = 0 // Should not happen for expired certificates, but safety check
+	}
+
+	message := fmt.Sprintf("Certificate %s has expired %d days ago", cert.Leaf.Subject.CommonName, daysSinceExpiry)
+
+	eventMeta := EventCertificateExpiredMeta{
+		EventMetaDefault: EventMetaDefault{
+			Message: message,
+		},
+		CertID:     certID,
+		CertName:   cert.Leaf.Subject.CommonName,
+		ExpiresAt:  cert.Leaf.NotAfter,
+		ExpiredFor: daysSinceExpiry,
+		APIID:      m.Spec.APIID,
+		OrgID:      m.Spec.OrgID,
+	}
+
+	log.Debugf("Certificate expiry monitor: Firing expired event for certificate '%s' - expired %d days ago (ID: %s...)", cert.Leaf.Subject.CommonName, daysSinceExpiry, certID[:8])
+
+	m.Spec.FireEvent(event.CertificateExpired, eventMeta)
 }

@@ -2216,7 +2216,8 @@
         "TokenCreated",
         "TokenUpdated",
         "TokenDeleted",
-        "CertificateExpiringSoon"
+        "CertificateExpiringSoon",
+        "CertificateExpired"
       ],
       "additionalProperties": false
     },
