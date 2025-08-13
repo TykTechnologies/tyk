@@ -846,9 +846,9 @@ func (s *OAS) extractSecurityTo(api *apidef.APIDefinition) {
 	}
 
 	s.getTykAuthentication().ExtractTo(api)
-	
+
 	isEmpty := s.isAuthenticationEmpty()
-	
+
 	if wasAuthNil && isEmpty {
 		s.GetTykExtension().Server.Authentication = nil
 	}
@@ -867,7 +867,7 @@ func (s *OAS) extractSecurityTo(api *apidef.APIDefinition) {
 		for schemeName := range securityReq {
 			if !processedSchemes[schemeName] {
 				processedSchemes[schemeName] = true
-				
+
 				// Check if this scheme is configured in Tyk extension
 				if _, exists := s.getTykSecuritySchemes()[schemeName]; exists {
 					v := s.Components.SecuritySchemes[schemeName].Value
@@ -909,13 +909,14 @@ func (s *OAS) isAuthenticationEmpty() bool {
 	if auth == nil {
 		return true
 	}
-	
+
 	// Check if any authentication method is configured
 	return auth.MultiAuth == nil &&
 		len(auth.SecuritySchemes) == 0 &&
 		auth.HMAC == nil &&
 		auth.OIDC == nil &&
 		auth.Custom == nil
+}
 
 func (s *OAS) GetJWTConfiguration() *JWT {
 	for keyName := range s.getTykSecuritySchemes() {
