@@ -814,18 +814,11 @@ func (s *OAS) fillSecurity(api apidef.APIDefinition) {
 		s.Components = &openapi3.Components{}
 	}
 
-	// Clear Security requirements before filling - we'll manage them here
-	s.Security = nil
-
 	s.fillToken(api)
 	s.fillJWT(api)
 	s.fillBasic(api)
 	s.fillOAuth(api)
 	s.fillExternalOAuth(api)
-
-	// Clear any Security requirements that individual fill methods might have created
-	// We'll manage them centrally here
-	s.Security = nil
 
 	if len(api.SecurityRequirements) > 0 {
 		s.Security = make(openapi3.SecurityRequirements, 0, len(api.SecurityRequirements))
