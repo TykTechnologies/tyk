@@ -828,7 +828,7 @@ func TestAuthORWrapper_EnabledForSpec(t *testing.T) {
 				SecurityRequirements: [][]string{{"jwt"}},
 			},
 		}
-		
+
 		wrapper := &AuthORWrapper{
 			BaseMiddleware: BaseMiddleware{
 				Spec: spec,
@@ -836,7 +836,7 @@ func TestAuthORWrapper_EnabledForSpec(t *testing.T) {
 			},
 			authMiddlewares: []TykMiddleware{&AuthKey{}},
 		}
-		
+
 		if wrapper.EnabledForSpec() {
 			t.Error("Expected EnabledForSpec to return false for single security requirement")
 		}
@@ -848,7 +848,7 @@ func TestAuthORWrapper_EnabledForSpec(t *testing.T) {
 				SecurityRequirements: [][]string{{"jwt"}, {"apikey"}},
 			},
 		}
-		
+
 		wrapper := &AuthORWrapper{
 			BaseMiddleware: BaseMiddleware{
 				Spec: spec,
@@ -856,7 +856,7 @@ func TestAuthORWrapper_EnabledForSpec(t *testing.T) {
 			},
 			authMiddlewares: []TykMiddleware{},
 		}
-		
+
 		if wrapper.EnabledForSpec() {
 			t.Error("Expected EnabledForSpec to return false when no auth middlewares")
 		}
@@ -868,7 +868,7 @@ func TestAuthORWrapper_EnabledForSpec(t *testing.T) {
 				SecurityRequirements: [][]string{{"jwt"}, {"apikey"}},
 			},
 		}
-		
+
 		wrapper := &AuthORWrapper{
 			BaseMiddleware: BaseMiddleware{
 				Spec: spec,
@@ -876,7 +876,7 @@ func TestAuthORWrapper_EnabledForSpec(t *testing.T) {
 			},
 			authMiddlewares: []TykMiddleware{&AuthKey{}, &JWTMiddleware{}},
 		}
-		
+
 		if !wrapper.EnabledForSpec() {
 			t.Error("Expected EnabledForSpec to return true for multiple requirements and middlewares")
 		}
@@ -912,8 +912,8 @@ func TestAuthORWrapper_Init_AllAuthTypes(t *testing.T) {
 	}
 
 	expectedTypes := map[string]bool{
-		"*gateway.JWTMiddleware":                    false,
-		"*gateway.BasicAuthKeyIsValid":              false,
+		"*gateway.JWTMiddleware":                     false,
+		"*gateway.BasicAuthKeyIsValid":               false,
 		"*gateway.HTTPSignatureValidationMiddleware": false,
 		"*gateway.Oauth2KeyExists":                   false,
 	}
