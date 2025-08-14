@@ -1732,7 +1732,7 @@ func TestOAS_importAuthentication(t *testing.T) {
 					AuthSources: AuthSources{
 						Header: &AuthSource{
 							Enabled: true,
-							Name: "Authorization",
+							Name:    "Authorization",
 						},
 					},
 				},
