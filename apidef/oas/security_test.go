@@ -974,7 +974,7 @@ func TestOAS_GetJWTConfiguration_EmptySecurity(t *testing.T) {
 				},
 			},
 		}
-		
+
 		oas.SetTykExtension(&XTykAPIGateway{
 			Server: Server{
 				Authentication: &Authentication{
@@ -987,11 +987,11 @@ func TestOAS_GetJWTConfiguration_EmptySecurity(t *testing.T) {
 				},
 			},
 		})
-		
+
 		oas.Security = openapi3.SecurityRequirements{
 			{"jwt-auth": []string{}},
 		}
-		
+
 		jwt := oas.GetJWTConfiguration()
 		assert.NotNil(t, jwt)
 		assert.Equal(t, "header", jwt.Source)
