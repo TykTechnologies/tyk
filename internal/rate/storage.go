@@ -6,9 +6,9 @@ import (
 	"os"
 	"time"
 
-	"github.com/sirupsen/logrus"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/internal/redis"
+	"github.com/sirupsen/logrus"
 )
 
 // NewStorage provides a redis v9 client for rate limiter use.

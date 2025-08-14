@@ -167,7 +167,7 @@ func TestCreateTLSConfig(t *testing.T) {
 			UseSSL:                true,
 			SSLInsecureSkipVerify: true,
 			CAFile:                "/nonexistent/ca.crt", // This will fail to load
-			CertFile:              certFile,               // But this should still work
+			CertFile:              certFile,              // But this should still work
 			KeyFile:               keyFile,
 			TLSMinVersion:         "1.2",
 			TLSMaxVersion:         "1.3",
@@ -176,7 +176,7 @@ func TestCreateTLSConfig(t *testing.T) {
 		tlsConfig := createTLSConfig(cfg)
 		assert.NotNil(t, tlsConfig)
 		assert.True(t, tlsConfig.InsecureSkipVerify)
-		assert.Nil(t, tlsConfig.RootCAs)                                 // CA loading failed
+		assert.Nil(t, tlsConfig.RootCAs)                                // CA loading failed
 		assert.Len(t, tlsConfig.Certificates, 1)                        // But client cert still loaded
 		assert.Equal(t, uint16(tls.VersionTLS12), tlsConfig.MinVersion) // And TLS versions still set
 		assert.Equal(t, uint16(tls.VersionTLS13), tlsConfig.MaxVersion)
@@ -246,10 +246,10 @@ func createTestCertAndKey(t *testing.T, certFile, keyFile string) {
 		Subject: pkix.Name{
 			Organization: []string{"Test Client"},
 		},
-		NotBefore:    time.Now(),
-		NotAfter:     time.Now().Add(365 * 24 * time.Hour),
-		KeyUsage:     x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature,
-		ExtKeyUsage:  []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth},
+		NotBefore:   time.Now(),
+		NotAfter:    time.Now().Add(365 * 24 * time.Hour),
+		KeyUsage:    x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature,
+		ExtKeyUsage: []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth},
 	}
 
 	certDER, err := x509.CreateCertificate(rand.Reader, &template, &template, &priv.PublicKey, priv)
