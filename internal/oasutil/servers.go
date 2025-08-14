@@ -3,7 +3,9 @@ package oasutil
 import (
 	"errors"
 	"fmt"
+	"github.com/TykTechnologies/tyk/pkg/errpack"
 	"github.com/getkin/kin-openapi/openapi3"
+	"regexp"
 	"strings"
 )
 
@@ -12,6 +14,8 @@ var (
 	ErrEmptyVariableName    = errors.New("empty variable name")
 	ErrVariableCollision    = errors.New("variable collision")
 	ErrUnexpectedCurlyBrace = errors.New("unexpected closing curly brace")
+	ErrInvalidVariableName  = errors.New("invalid variable name")
+	ErrInvalidPattern       = errors.New("invalid pattern")
 	errUnreachable          = errors.New("unreachable")
 )
 
@@ -144,6 +148,14 @@ func (p *serverUrlParser) extractValueBetweenBraces() (serverVariable, error) {
 				return serverVariable{}, ErrEmptyVariableName
 			}
 
+			if !isValidName(name) {
+				return serverVariable{}, ErrInvalidVariableName
+			}
+
+			if _, err := regexp.Compile(pattern); err != nil {
+				return serverVariable{}, errpack.Wrap(ErrInvalidPattern, "failed to compile pattern")
+			}
+
 			return serverVariable{
 				name:    name,
 				pattern: pattern,
@@ -160,3 +172,9 @@ func (p *serverUrlParser) nextParamName() string {
 	p.counter++
 	return fmt.Sprintf("%s%d", DefaultServerUrlPrefix, p.counter)
 }
+
+func isValidName(name string) bool {
+	return nameRe.MatchString(name)
+}
+
+var nameRe = regexp.MustCompile("^[a-zA-Z][a-zA-Z0-9_]*$")
