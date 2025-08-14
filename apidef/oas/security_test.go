@@ -714,7 +714,7 @@ func TestOAS_fillSecurity_CentralizedManagement(t *testing.T) {
 	t.Run("should manage Security requirements centrally", func(t *testing.T) {
 		var api apidef.APIDefinition
 		api.UseKeylessAccess = false
-		
+
 		api.AuthConfigs = map[string]apidef.AuthConfig{
 			apidef.AuthTokenType: {
 				Name:           "token-auth",
@@ -734,12 +734,12 @@ func TestOAS_fillSecurity_CentralizedManagement(t *testing.T) {
 	t.Run("should use explicit SecurityRequirements for OR logic", func(t *testing.T) {
 		var api apidef.APIDefinition
 		api.UseKeylessAccess = false
-		
+
 		api.SecurityRequirements = [][]string{
 			{"token-auth"},
 			{"jwt-auth"},
 		}
-		
+
 		api.AuthConfigs = map[string]apidef.AuthConfig{
 			apidef.AuthTokenType: {
 				Name:           "token-auth",
@@ -758,10 +758,10 @@ func TestOAS_fillSecurity_CentralizedManagement(t *testing.T) {
 
 		assert.NotNil(t, oas.Security)
 		assert.Len(t, oas.Security, 2, "Should have 2 requirements for OR logic")
-		
+
 		assert.Len(t, oas.Security[0], 1)
 		assert.Contains(t, oas.Security[0], "token-auth")
-		
+
 		assert.Len(t, oas.Security[1], 1)
 		assert.Contains(t, oas.Security[1], "jwt-auth")
 	})
@@ -785,7 +785,7 @@ func TestOAS_extractSecurityTo_ORLogic(t *testing.T) {
 			{"token-auth": []string{}},
 			{"jwt-auth": []string{}},
 		}
-		
+
 		oas.Components = &openapi3.Components{
 			SecuritySchemes: openapi3.SecuritySchemes{
 				"token-auth": &openapi3.SecuritySchemeRef{
@@ -804,7 +804,7 @@ func TestOAS_extractSecurityTo_ORLogic(t *testing.T) {
 				},
 			},
 		}
-		
+
 		oas.SetTykExtension(&XTykAPIGateway{
 			Server: Server{
 				Authentication: &Authentication{
@@ -832,7 +832,7 @@ func TestOAS_extractSecurityTo_ORLogic(t *testing.T) {
 				"jwt-auth":   []string{},
 			},
 		}
-		
+
 		oas.Components = &openapi3.Components{
 			SecuritySchemes: openapi3.SecuritySchemes{
 				"token-auth": &openapi3.SecuritySchemeRef{
@@ -851,7 +851,7 @@ func TestOAS_extractSecurityTo_ORLogic(t *testing.T) {
 				},
 			},
 		}
-		
+
 		oas.SetTykExtension(&XTykAPIGateway{
 			Server: Server{
 				Authentication: &Authentication{
@@ -872,7 +872,7 @@ func TestOAS_extractSecurityTo_ORLogic(t *testing.T) {
 	t.Run("should handle empty Security", func(t *testing.T) {
 		var oas OAS
 		oas.SetTykExtension(&XTykAPIGateway{})
-		
+
 		var api apidef.APIDefinition
 		oas.extractSecurityTo(&api)
 
@@ -881,7 +881,7 @@ func TestOAS_extractSecurityTo_ORLogic(t *testing.T) {
 }
 
 func TestOAS_GetJWTConfiguration_EmptySecurity(t *testing.T) {
-	t.Run("should handle nil Security array", func(t *testing.T) {
+	t.Run("should return nil when Security array is nil", func(t *testing.T) {
 		var oas OAS
 		oas.Components = &openapi3.Components{
 			SecuritySchemes: openapi3.SecuritySchemes{
@@ -894,7 +894,7 @@ func TestOAS_GetJWTConfiguration_EmptySecurity(t *testing.T) {
 				},
 			},
 		}
-		
+
 		oas.SetTykExtension(&XTykAPIGateway{
 			Server: Server{
 				Authentication: &Authentication{
@@ -907,15 +907,14 @@ func TestOAS_GetJWTConfiguration_EmptySecurity(t *testing.T) {
 				},
 			},
 		})
-		
+
 		oas.Security = nil
-		
+
 		jwt := oas.GetJWTConfiguration()
-		assert.NotNil(t, jwt)
-		assert.Equal(t, "header", jwt.Source)
+		assert.Nil(t, jwt)
 	})
 
-	t.Run("should handle empty Security array", func(t *testing.T) {
+	t.Run("should return nil when Security array is empty", func(t *testing.T) {
 		var oas OAS
 		oas.Components = &openapi3.Components{
 			SecuritySchemes: openapi3.SecuritySchemes{
@@ -928,7 +927,7 @@ func TestOAS_GetJWTConfiguration_EmptySecurity(t *testing.T) {
 				},
 			},
 		}
-		
+
 		oas.SetTykExtension(&XTykAPIGateway{
 			Server: Server{
 				Authentication: &Authentication{
@@ -941,12 +940,11 @@ func TestOAS_GetJWTConfiguration_EmptySecurity(t *testing.T) {
 				},
 			},
 		})
-		
+
 		oas.Security = openapi3.SecurityRequirements{}
-		
+
 		jwt := oas.GetJWTConfiguration()
-		assert.NotNil(t, jwt)
-		assert.Equal(t, "header", jwt.Source)
+		assert.Nil(t, jwt)
 	})
 
 	t.Run("should return nil when no JWT configuration exists", func(t *testing.T) {
@@ -958,9 +956,45 @@ func TestOAS_GetJWTConfiguration_EmptySecurity(t *testing.T) {
 				},
 			},
 		})
-		
+
 		jwt := oas.GetJWTConfiguration()
 		assert.Nil(t, jwt)
+	})
+
+	t.Run("should return JWT when Security contains JWT reference", func(t *testing.T) {
+		var oas OAS
+		oas.Components = &openapi3.Components{
+			SecuritySchemes: openapi3.SecuritySchemes{
+				"jwt-auth": &openapi3.SecuritySchemeRef{
+					Value: &openapi3.SecurityScheme{
+						Type:         typeHTTP,
+						Scheme:       schemeBearer,
+						BearerFormat: bearerFormatJWT,
+					},
+				},
+			},
+		}
+		
+		oas.SetTykExtension(&XTykAPIGateway{
+			Server: Server{
+				Authentication: &Authentication{
+					SecuritySchemes: SecuritySchemes{
+						"jwt-auth": &JWT{
+							Enabled: true,
+							Source:  "header",
+						},
+					},
+				},
+			},
+		})
+		
+		oas.Security = openapi3.SecurityRequirements{
+			{"jwt-auth": []string{}},
+		}
+		
+		jwt := oas.GetJWTConfiguration()
+		assert.NotNil(t, jwt)
+		assert.Equal(t, "header", jwt.Source)
 	})
 }
 
@@ -1033,14 +1067,14 @@ func TestOAS_fillSecurity_BackwardCompatibility(t *testing.T) {
 		var oas OAS
 		oas.Components = &openapi3.Components{}
 		oas.SetTykExtension(&XTykAPIGateway{})
-		
+
 		ac := api.AuthConfigs[apidef.AuthTokenType]
 		oas.fillAPIKeyScheme(&ac)
-		
+
 		assert.NotNil(t, oas.Security)
 		assert.Len(t, oas.Security, 1)
 		assert.Contains(t, oas.Security[0], "token-auth")
-		
+
 		assert.NotNil(t, oas.Components.SecuritySchemes)
 		assert.Contains(t, oas.Components.SecuritySchemes, "token-auth")
 	})

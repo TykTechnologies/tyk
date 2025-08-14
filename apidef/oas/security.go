@@ -916,19 +916,7 @@ func (s *OAS) extractSecurityTo(api *apidef.APIDefinition) {
 }
 
 func (s *OAS) GetJWTConfiguration() *JWT {
-	// Handle case where Security requirements haven't been populated
 	if len(s.Security) == 0 {
-		// Check all security schemes for JWT
-		for keyName := range s.getTykSecuritySchemes() {
-			if s.Components != nil && s.Components.SecuritySchemes != nil {
-				if scheme, ok := s.Components.SecuritySchemes[keyName]; ok && scheme.Value != nil {
-					v := scheme.Value
-					if v.Type == typeHTTP && v.Scheme == schemeBearer && v.BearerFormat == bearerFormatJWT {
-						return s.getTykJWTAuth(keyName)
-					}
-				}
-			}
-		}
 		return nil
 	}
 
