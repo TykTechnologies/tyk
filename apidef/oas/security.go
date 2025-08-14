@@ -233,7 +233,7 @@ func (s *OAS) fillJWT(api apidef.APIDefinition) {
 	}
 
 	ref.Value.WithType(typeHTTP).WithScheme(schemeBearer).WithBearerFormat(bearerFormatJWT)
-	
+
 	// Append to Security requirements (will be cleared and rebuilt in fillSecurity)
 	s.appendSecurity(ac.Name)
 
@@ -351,7 +351,7 @@ func (s *OAS) fillBasic(api apidef.APIDefinition) {
 	}
 
 	ref.Value.WithType(typeHTTP).WithScheme(schemeBasic)
-	
+
 	// Append to Security requirements (will be cleared and rebuilt in fillSecurity)
 	s.appendSecurity(ac.Name)
 
@@ -818,7 +818,7 @@ func (s *OAS) fillSecurity(api apidef.APIDefinition) {
 
 	// Clear Security requirements before filling - we'll manage them here
 	s.Security = nil
-	
+
 	s.fillToken(api)
 	s.fillJWT(api)
 	s.fillBasic(api)
@@ -947,7 +947,7 @@ func (s *OAS) GetJWTConfiguration() *JWT {
 		}
 		return nil
 	}
-	
+
 	// Original logic when Security requirements exist
 	for keyName := range s.getTykSecuritySchemes() {
 		if _, ok := s.Security[0][keyName]; ok {
@@ -1059,7 +1059,7 @@ func (s *OAS) fillAPIKeySchemeWithOpts(ac *apidef.AuthConfig, addSecurity bool) 
 	}
 
 	ref.Value.WithName(key).WithIn(loc).WithType(typeAPIKey)
-	
+
 	// Only append to Security if called directly (not from fillSecurity)
 	if addSecurity {
 		s.appendSecurity(ac.Name)
@@ -1138,7 +1138,7 @@ func (s *OAS) fillOAuthScheme(accessTypes []osin.AccessRequestType, name string)
 	}
 
 	ref.Value.WithType(typeOAuth2).Flows = flows
-	
+
 	// Append to Security requirements (will be cleared and rebuilt in fillSecurity)
 	s.appendSecurity(name)
 }
@@ -1172,7 +1172,7 @@ func (s *OAS) fillOAuthSchemeForExternal(name string) {
 	setScopesIfEmpty(flows.AuthorizationCode)
 
 	ref.Value.WithType(typeOAuth2).Flows = flows
-	
+
 	// Append to Security requirements (will be cleared and rebuilt in fillSecurity)
 	s.appendSecurity(name)
 }
