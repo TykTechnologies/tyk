@@ -3,7 +3,6 @@ package gateway
 import (
 	"crypto/tls"
 	"fmt"
-	"github.com/TykTechnologies/tyk/common/option"
 	"io/ioutil"
 	"net/http"
 	"net/url"
@@ -15,6 +14,8 @@ import (
 	"strings"
 	"sync"
 	texttemplate "text/template"
+
+	"github.com/TykTechnologies/tyk/common/option"
 
 	"github.com/gorilla/mux"
 	"github.com/justinas/alice"
@@ -391,11 +392,9 @@ func (gw *Gateway) processSpec(
 			authArray = append(authArray, gw.createMiddleware(&AuthKey{baseMid.Copy()}))
 		}
 
-		// Check if we need to use OR logic for multiple security requirements
 		if len(spec.SecurityRequirements) > 1 && len(authArray) > 0 {
 			logger.Info("Multiple security requirements detected - using OR authentication logic")
 
-			// Create the OR wrapper - it will initialize its own auth middlewares in Init()
 			orWrapper := &AuthORWrapper{
 				BaseMiddleware: *baseMid.Copy(),
 			}
@@ -403,7 +402,6 @@ func (gw *Gateway) processSpec(
 			// Add the OR wrapper to the chain instead of individual auth middlewares
 			chainArray = append(chainArray, gw.createMiddleware(orWrapper))
 		} else {
-			// Single requirement or empty = AND logic (default behavior)
 			chainArray = append(chainArray, authArray...)
 		}
 

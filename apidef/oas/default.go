@@ -185,12 +185,9 @@ func (s *OAS) importAuthentication(enable bool) error {
 		authentication.SecuritySchemes = tykSecuritySchemes
 	}
 
-	// Import ALL security requirements, not just the first one
-	// This enables OR logic when multiple requirements exist
 	processedSchemes := make(map[string]bool)
 	for _, securityReq := range s.Security {
 		for name := range securityReq {
-			// Only process each scheme once
 			if !processedSchemes[name] {
 				securityScheme := s.Components.SecuritySchemes[name]
 				err := tykSecuritySchemes.Import(name, securityScheme.Value, enable)
@@ -202,10 +199,7 @@ func (s *OAS) importAuthentication(enable bool) error {
 		}
 	}
 
-	// Set base identity provider from first security requirement for backward compatibility
-	if len(s.Security) > 0 {
-		authentication.BaseIdentityProvider = tykSecuritySchemes.GetBaseIdentityProvider()
-	}
+	authentication.BaseIdentityProvider = tykSecuritySchemes.GetBaseIdentityProvider()
 
 	return nil
 }
