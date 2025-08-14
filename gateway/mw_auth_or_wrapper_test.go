@@ -2,6 +2,7 @@ package gateway
 
 import (
 	"encoding/base64"
+	"fmt"
 	"net/http"
 	"testing"
 	"time"
@@ -814,4 +815,193 @@ func TestMultiAuthMiddleware_OR_ThreeAuthMethods(t *testing.T) {
 	}
 
 	ts.Run(t, testCases...)
+}
+
+// TestAuthORWrapper_EnabledForSpec tests the EnabledForSpec method
+func TestAuthORWrapper_EnabledForSpec(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	t.Run("should return false when SecurityRequirements <= 1", func(t *testing.T) {
+		spec := &APISpec{
+			APIDefinition: &apidef.APIDefinition{
+				SecurityRequirements: [][]string{{"jwt"}},
+			},
+		}
+		
+		wrapper := &AuthORWrapper{
+			BaseMiddleware: BaseMiddleware{
+				Spec: spec,
+				Gw:   ts.Gw,
+			},
+			authMiddlewares: []TykMiddleware{&AuthKey{}},
+		}
+		
+		if wrapper.EnabledForSpec() {
+			t.Error("Expected EnabledForSpec to return false for single security requirement")
+		}
+	})
+
+	t.Run("should return false when authMiddlewares <= 1", func(t *testing.T) {
+		spec := &APISpec{
+			APIDefinition: &apidef.APIDefinition{
+				SecurityRequirements: [][]string{{"jwt"}, {"apikey"}},
+			},
+		}
+		
+		wrapper := &AuthORWrapper{
+			BaseMiddleware: BaseMiddleware{
+				Spec: spec,
+				Gw:   ts.Gw,
+			},
+			authMiddlewares: []TykMiddleware{},
+		}
+		
+		if wrapper.EnabledForSpec() {
+			t.Error("Expected EnabledForSpec to return false when no auth middlewares")
+		}
+	})
+
+	t.Run("should return true when SecurityRequirements > 1 and authMiddlewares > 1", func(t *testing.T) {
+		spec := &APISpec{
+			APIDefinition: &apidef.APIDefinition{
+				SecurityRequirements: [][]string{{"jwt"}, {"apikey"}},
+			},
+		}
+		
+		wrapper := &AuthORWrapper{
+			BaseMiddleware: BaseMiddleware{
+				Spec: spec,
+				Gw:   ts.Gw,
+			},
+			authMiddlewares: []TykMiddleware{&AuthKey{}, &JWTMiddleware{}},
+		}
+		
+		if !wrapper.EnabledForSpec() {
+			t.Error("Expected EnabledForSpec to return true for multiple requirements and middlewares")
+		}
+	})
+}
+
+// TestAuthORWrapper_Init_AllAuthTypes tests Init with all authentication types
+func TestAuthORWrapper_Init_AllAuthTypes(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	spec := &APISpec{
+		APIDefinition: &apidef.APIDefinition{
+			EnableJWT:               true,
+			UseBasicAuth:            true,
+			EnableSignatureChecking: true,
+			UseOauth2:               true,
+			UseStandardAuth:         false,
+		},
+	}
+
+	wrapper := &AuthORWrapper{
+		BaseMiddleware: BaseMiddleware{
+			Spec: spec,
+			Gw:   ts.Gw,
+		},
+	}
+
+	wrapper.Init()
+
+	if len(wrapper.authMiddlewares) != 4 {
+		t.Errorf("Expected 4 auth middlewares, got %d", len(wrapper.authMiddlewares))
+	}
+
+	expectedTypes := map[string]bool{
+		"*gateway.JWTMiddleware":                    false,
+		"*gateway.BasicAuthKeyIsValid":              false,
+		"*gateway.HTTPSignatureValidationMiddleware": false,
+		"*gateway.Oauth2KeyExists":                   false,
+	}
+
+	for _, mw := range wrapper.authMiddlewares {
+		typeName := fmt.Sprintf("%T", mw)
+		if _, exists := expectedTypes[typeName]; exists {
+			expectedTypes[typeName] = true
+		}
+	}
+
+	for typeName, found := range expectedTypes {
+		if !found {
+			t.Errorf("Expected middleware type %s not found", typeName)
+		}
+	}
+}
+
+// TestAuthORWrapper_Init_NoAuthConfigured tests Init when no auth is configured
+func TestAuthORWrapper_Init_NoAuthConfigured(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	spec := &APISpec{
+		APIDefinition: &apidef.APIDefinition{
+			EnableJWT:               false,
+			UseBasicAuth:            false,
+			EnableSignatureChecking: false,
+			UseOauth2:               false,
+			UseStandardAuth:         false,
+		},
+	}
+
+	wrapper := &AuthORWrapper{
+		BaseMiddleware: BaseMiddleware{
+			Spec: spec,
+			Gw:   ts.Gw,
+		},
+	}
+
+	wrapper.Init()
+
+	if len(wrapper.authMiddlewares) != 1 {
+		t.Errorf("Expected 1 auth middleware (fallback), got %d", len(wrapper.authMiddlewares))
+	}
+
+	if _, ok := wrapper.authMiddlewares[0].(*AuthKey); !ok {
+		t.Errorf("Expected AuthKey middleware as fallback, got %T", wrapper.authMiddlewares[0])
+	}
+}
+
+// TestAuthORWrapper_Init_WithStandardAuth tests Init when UseStandardAuth is true
+func TestAuthORWrapper_Init_WithStandardAuth(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	spec := &APISpec{
+		APIDefinition: &apidef.APIDefinition{
+			EnableJWT:               false,
+			UseBasicAuth:            false,
+			EnableSignatureChecking: false,
+			UseOauth2:               false,
+			UseStandardAuth:         true,
+		},
+	}
+
+	wrapper := &AuthORWrapper{
+		BaseMiddleware: BaseMiddleware{
+			Spec: spec,
+			Gw:   ts.Gw,
+		},
+	}
+
+	wrapper.Init()
+
+	if len(wrapper.authMiddlewares) != 1 {
+		t.Errorf("Expected 1 auth middleware, got %d", len(wrapper.authMiddlewares))
+	}
+
+	if _, ok := wrapper.authMiddlewares[0].(*AuthKey); !ok {
+		t.Errorf("Expected AuthKey middleware, got %T", wrapper.authMiddlewares[0])
+	}
+}
+
+// TestAuthORWrapper_Name tests the Name method
+func TestAuthORWrapper_Name(t *testing.T) {
+	wrapper := &AuthORWrapper{}
+	if wrapper.Name() != "AuthORWrapper" {
+		t.Errorf("Expected name 'AuthORWrapper', got '%s'", wrapper.Name())
+	}
 }
