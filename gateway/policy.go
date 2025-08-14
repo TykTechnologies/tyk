@@ -1,13 +1,17 @@
 package gateway
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"github.com/TykTechnologies/tyk/header"
+	"io"
 	"io/ioutil"
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
+	"time"
 
 	"github.com/TykTechnologies/graphql-go-tools/pkg/graphql"
 
@@ -146,13 +150,60 @@ func (gw *Gateway) LoadPoliciesFromDashboard(endpoint, secret string, allowExpli
 	resp, err := c.Do(newRequest)
 	if err != nil {
 		log.Error("Policy request failed: ", err)
+		// Check if this might be a transient network error that could benefit from re-registration
+		// This handles load balancer draining scenarios where connections are dropped
+		if gw.DashService != nil {
+			log.Warning("Network error detected during policy fetch, attempting to re-register node...")
+			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			defer cancel()
+			
+			if regErr := gw.DashService.Register(ctx); regErr != nil {
+				log.Error("Failed to re-register node after network error: ", regErr)
+				return nil, err // Return original error
+			}
+			log.Info("Node re-registered successfully after network error, retrying policy fetch...")
+			
+			// Retry the request with fresh registration
+			return gw.LoadPoliciesFromDashboard(endpoint, secret, allowExplicit)
+		}
 		return nil, err
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := ioutil.ReadAll(resp.Body)
-		log.Error("Policy request login failure, Response was: ", string(body))
+		errorMessage := string(body)
+		log.Error("Policy request login failure, Response was: ", errorMessage)
+
+		// Handle nonce desynchronization with intelligent auto-recovery
+		if resp.StatusCode == http.StatusForbidden {
+			// Only attempt recovery for nonce-related failures, not other auth failures
+			if strings.Contains(errorMessage, "Nonce failed") || strings.Contains(errorMessage, "nonce") || strings.Contains(errorMessage, "No node ID Found") {
+				log.Warning("Dashboard nonce failure detected, attempting to re-register node...")
+				
+				// Check if DashService is available for recovery
+				if gw.DashService == nil {
+					log.Error("Dashboard service not available for nonce recovery")
+					return nil, ErrPoliciesFetchFailed
+				}
+				
+				// Use a timeout context to prevent hanging in tests
+				ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+				defer cancel()
+				
+				if err := gw.DashService.Register(ctx); err != nil {
+					log.Error("Failed to re-register node during policy recovery: ", err)
+					return nil, ErrPoliciesFetchFailed
+				}
+				log.Info("Node re-registered successfully, retrying policy fetch...")
+				
+				// Retry the request with the new nonce
+				return gw.LoadPoliciesFromDashboard(endpoint, secret, allowExplicit)
+			} else {
+				log.Warning("Dashboard authentication failed with non-nonce error: ", errorMessage)
+			}
+		}
+
 		return nil, ErrPoliciesFetchFailed
 	}
 
@@ -163,6 +214,22 @@ func (gw *Gateway) LoadPoliciesFromDashboard(endpoint, secret string, allowExpli
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&list); err != nil {
 		log.Error("Failed to decode policy body: ", err)
+		// Check if this is a network error (EOF, unexpected EOF) that might benefit from re-registration
+		// This can happen when load balancer drains connection during response body read
+		if (errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) || strings.Contains(err.Error(), "EOF")) && gw.DashService != nil {
+			log.Warning("Network error detected while reading policy response, attempting to re-register node...")
+			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			defer cancel()
+			
+			if regErr := gw.DashService.Register(ctx); regErr != nil {
+				log.Error("Failed to re-register node after decode error: ", regErr)
+				return nil, err // Return original error
+			}
+			log.Info("Node re-registered successfully after decode error, retrying policy fetch...")
+			
+			// Retry the request with fresh registration
+			return gw.LoadPoliciesFromDashboard(endpoint, secret, allowExplicit)
+		}
 		return nil, err
 	}
 
