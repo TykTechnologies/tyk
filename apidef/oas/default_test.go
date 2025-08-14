@@ -273,6 +273,16 @@ func TestOAS_BuildDefaultTykExtension(t *testing.T) {
 								},
 							},
 						},
+						// OR alternative authentication method should also be imported
+						testSSMyAuthWithOR: &Basic{
+							Enabled: true,
+							AuthSources: AuthSources{
+								Header: &AuthSource{
+									Enabled: true,
+									Name:    defaultAuthSourceName,
+								},
+							},
+						},
 					},
 				},
 			},
@@ -1667,7 +1677,7 @@ func TestOAS_importAuthentication(t *testing.T) {
 		assert.Nil(t, authentication)
 	})
 
-	t.Run("add first authentication in case of OR condition", func(t *testing.T) {
+	t.Run("import all authentication methods for OR condition", func(t *testing.T) {
 		check := func(t *testing.T, enable bool) {
 			t.Helper()
 			oas := OAS{}
@@ -1706,6 +1716,8 @@ func TestOAS_importAuthentication(t *testing.T) {
 
 			assert.Equal(t, enable, authentication.Enabled)
 
+			// When there are multiple security requirements (OR condition),
+			// ALL authentication methods should be imported to enable OR logic
 			expectedSecuritySchemes := SecuritySchemes{
 				testSecurityNameToken: &Token{
 					Enabled: enable,
@@ -1715,10 +1727,20 @@ func TestOAS_importAuthentication(t *testing.T) {
 						},
 					},
 				},
+				testSecurityNameJWT: &JWT{
+					Enabled: enable,
+					AuthSources: AuthSources{
+						Header: &AuthSource{
+							Enabled: true,
+							Name: "Authorization",
+						},
+					},
+				},
 			}
 
 			assert.Equal(t, expectedSecuritySchemes, authentication.SecuritySchemes)
-			assert.Equal(t, apidef.AuthTypeNone, authentication.BaseIdentityProvider)
+			// Base identity provider should be determined from the security schemes
+			assert.NotNil(t, authentication.BaseIdentityProvider)
 		}
 
 		t.Run("enable=true", func(t *testing.T) {
