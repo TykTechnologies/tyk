@@ -293,8 +293,27 @@ func (gw *Gateway) TykNewSingleHostReverseProxy(target *url.URL, spec *APISpec, 
 			}
 		}
 
+		// Simple upstream host override from plugins via context.
+		// Accepts either a host (e.g. "api.example.com") or full URL (e.g. "https://api.example.com").
+		if v := req.Context().Value(ctx.UpstreamHostOverride); v != nil {
+			if hostOrURL, ok := v.(string); ok && hostOrURL != "" {
+				if strings.Contains(hostOrURL, "://") {
+					if u, err := url.Parse(hostOrURL); err == nil {
+						if u.Scheme != "" {
+							req.URL.Scheme = u.Scheme
+						}
+						if u.Host != "" {
+							req.URL.Host = u.Host
+						}
+					}
+				} else {
+					req.URL.Host = hostOrURL
+				}
+			}
+		}
+
 		if !spec.Proxy.PreserveHostHeader {
-			req.Host = targetToUse.Host
+			req.Host = req.URL.Host
 		}
 
 		if targetQuery == "" || req.URL.RawQuery == "" {
