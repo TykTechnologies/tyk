@@ -3,7 +3,13 @@ package oasutil
 import (
 	"errors"
 	"fmt"
+<<<<<<< HEAD
 	"github.com/TykTechnologies/kin-openapi/openapi3"
+=======
+	"github.com/TykTechnologies/tyk/pkg/errpack"
+	"github.com/getkin/kin-openapi/openapi3"
+	"regexp"
+>>>>>>> 9ae9ac231... Custom domain regex causing problems with servers (bugfix) (#7310)
 	"strings"
 )
 
@@ -12,7 +18,13 @@ var (
 	ErrEmptyVariableName    = errors.New("empty variable name")
 	ErrVariableCollision    = errors.New("variable collision")
 	ErrUnexpectedCurlyBrace = errors.New("unexpected closing curly brace")
+	ErrInvalidVariableName  = errors.New("invalid variable name")
+	ErrInvalidPattern       = errors.New("invalid pattern")
 	errUnreachable          = errors.New("unreachable")
+)
+
+var (
+	identifierRe = regexp.MustCompile("^[a-zA-Z][a-zA-Z0-9_]*$")
 )
 
 const (
@@ -144,6 +156,14 @@ func (p *serverUrlParser) extractValueBetweenBraces() (serverVariable, error) {
 				return serverVariable{}, ErrEmptyVariableName
 			}
 
+			if !isValidIdentifier(name) {
+				return serverVariable{}, ErrInvalidVariableName
+			}
+
+			if _, err := regexp.Compile(pattern); err != nil {
+				return serverVariable{}, errpack.Wrap(ErrInvalidPattern, "failed to compile pattern")
+			}
+
 			return serverVariable{
 				name:    name,
 				pattern: pattern,
@@ -159,4 +179,8 @@ func (p *serverUrlParser) extractValueBetweenBraces() (serverVariable, error) {
 func (p *serverUrlParser) nextParamName() string {
 	p.counter++
 	return fmt.Sprintf("%s%d", DefaultServerUrlPrefix, p.counter)
+}
+
+func isValidIdentifier(name string) bool {
+	return identifierRe.MatchString(name)
 }

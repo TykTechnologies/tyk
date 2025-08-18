@@ -81,9 +81,12 @@ func TestParseServerUrl(t *testing.T) {
 			{"empty variable name 2", "example{:[a-z]+}.com", oasutil.ErrEmptyVariableName},
 			{"no closed brace", "{example.com", oasutil.ErrParse},
 			{"server variable collision", "{version:[a-z]+}.example.com/{version:[0-9]+}", oasutil.ErrVariableCollision},
+			{"double open", "{{subdomain}.example.com", oasutil.ErrInvalidVariableName},
+			{"invalid pattern", "{subdomain:[a-z]++}.example.com", oasutil.ErrInvalidPattern},
 		} {
 			t.Run(tCase.name, func(t *testing.T) {
 				_, err := oasutil.ParseServerUrl(tCase.input)
+				assert.NotNil(t, err)
 				assert.ErrorContains(t, err, tCase.expectedErr.Error())
 			})
 		}
