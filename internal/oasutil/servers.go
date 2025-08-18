@@ -19,6 +19,10 @@ var (
 	errUnreachable          = errors.New("unreachable")
 )
 
+var (
+	identifierRe = regexp.MustCompile("^[a-zA-Z][a-zA-Z0-9_]*$")
+)
+
 const (
 	DefaultServerUrlPrefix = "pathParam"
 	openCurlyBrace         = '{'
@@ -148,7 +152,7 @@ func (p *serverUrlParser) extractValueBetweenBraces() (serverVariable, error) {
 				return serverVariable{}, ErrEmptyVariableName
 			}
 
-			if !isValidName(name) {
+			if !isValidIdentifier(name) {
 				return serverVariable{}, ErrInvalidVariableName
 			}
 
@@ -173,8 +177,6 @@ func (p *serverUrlParser) nextParamName() string {
 	return fmt.Sprintf("%s%d", DefaultServerUrlPrefix, p.counter)
 }
 
-func isValidName(name string) bool {
-	return nameRe.MatchString(name)
+func isValidIdentifier(name string) bool {
+	return identifierRe.MatchString(name)
 }
-
-var nameRe = regexp.MustCompile("^[a-zA-Z][a-zA-Z0-9_]*$")
