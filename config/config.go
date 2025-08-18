@@ -745,6 +745,9 @@ type Config struct {
 	// Global Certificate configuration
 	Security SecurityConfig `json:"security"`
 
+	// External service configuration for proxy and mTLS support
+	ExternalServices ExternalServiceConfig `json:"external_services"`
+
 	// Gateway HTTP server configuration
 	HttpServerOptions HttpServerOptionsConfig `json:"http_server_options"`
 
