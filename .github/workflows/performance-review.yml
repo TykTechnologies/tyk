@@ -14,7 +14,7 @@ permissions:
 
 jobs:
   performance_review:
-    uses: buger/probe/.github/workflows/probe.yml@main
+    uses: probelabs/probe/.github/workflows/probe.yml@main
     with:
       command_prefix: "/performance"
       prompt: ".probe/performance-reviewer.md"
