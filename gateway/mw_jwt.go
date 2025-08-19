@@ -11,6 +11,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/google/go-cmp/cmp"
+	"github.com/ohler55/ojg/jp"
 	"github.com/tidwall/gjson"
 	"io"
 	"net/http"
@@ -1097,26 +1098,38 @@ func (k *JWTMiddleware) validateCustomClaimsNew(claims jwt.MapClaims) error {
 	if err != nil {
 		return fmt.Errorf("error parsing claims: %w", err)
 	}
-	for claimName, validation := range validationRules {
-		result := gjson.Get(string(claimsJson), claimName)
+	for claimsPath, validation := range validationRules {
+		// validate json path
+		_, err = jp.Parse(claimsJson)
+		if err != nil {
+			return fmt.Errorf("invalid claim path: %s", claimsPath)
+		}
+
+		result := gjson.Get(string(claimsJson), claimsPath)
 		if !result.Exists() {
 			if validation.NonBlocking {
-				k.Logger().Warningf("Claim %s value does not match any expected values", claimName)
+				k.Logger().Warningf("Claim %s value does not match any expected values", claimsPath)
 			} else {
-				return fmt.Errorf("custom claim %s is required but not present in token", claimName)
+				return fmt.Errorf("custom claim %s is required but not present in token", claimsPath)
 			}
 		}
 		switch validation.Type {
 		case oas.ClaimValidationTypeRequired:
-			continue
+			if result.Type == gjson.Null {
+				if validation.NonBlocking {
+					k.Logger().Warningf("Claim %s expects a non nil value", claimsPath)
+				} else {
+					return fmt.Errorf("custom claim %s expects a non nil value", claimsPath)
+				}
+			}
 		case oas.ClaimValidationTypeContains:
 			matched := customClaimsContainsMatch(validation.AllowedValues, result.Value())
 			if !matched {
 				if validation.NonBlocking {
-					k.Logger().Warningf("Claim %s value does not contain any expected values", claimName)
+					k.Logger().Warningf("Claim %s value does not contain any expected values", claimsPath)
 					continue
 				}
-				return fmt.Errorf("claim %s value does not contain any expected values", claimName)
+				return fmt.Errorf("claim %s value does not contain any expected values", claimsPath)
 			}
 		case oas.ClaimValidationTypeExactMatch:
 			matched := false
@@ -1128,10 +1141,10 @@ func (k *JWTMiddleware) validateCustomClaimsNew(claims jwt.MapClaims) error {
 			}
 			if !matched {
 				if validation.NonBlocking {
-					k.Logger().Warningf("Claim %s value does not match any expected values", claimName)
+					k.Logger().Warningf("Claim %s value does not match any expected values", claimsPath)
 					continue
 				}
-				return fmt.Errorf("claim %s value does not match any expected values", claimName)
+				return fmt.Errorf("claim %s value does not match any expected values", claimsPath)
 			}
 		}
 	}

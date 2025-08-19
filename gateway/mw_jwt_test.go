@@ -996,6 +996,32 @@ func TestJWTCustomClaimsValidation(t *testing.T) {
 	}{
 		// Required validation tests
 		{
+			name: "required claim with null value fails",
+			validation: map[string]oas.CustomClaimValidationConfig{
+				"myclaim": {
+					Type: oas.ClaimValidationTypeRequired,
+				},
+			},
+			claims: jwt.MapClaims{
+				"myclaim": nil,
+			},
+			expectError:   true,
+			errorContains: "custom claim myclaim expects a non nil value",
+		},
+		{
+			name: "multiple required claims all must be present",
+			validation: map[string]oas.CustomClaimValidationConfig{
+				"claim1": {Type: oas.ClaimValidationTypeRequired},
+				"claim2": {Type: oas.ClaimValidationTypeRequired},
+			},
+			claims: jwt.MapClaims{
+				"claim1": "value1",
+				// claim2 missing
+			},
+			expectError:   true,
+			errorContains: "custom claim claim2 is required but not present in token",
+		},
+		{
 			name: "required claim exists",
 			validation: map[string]oas.CustomClaimValidationConfig{
 				"myclaim": {
@@ -1006,6 +1032,37 @@ func TestJWTCustomClaimsValidation(t *testing.T) {
 				"myclaim": "any-value",
 			},
 			expectError: false,
+		},
+		{
+			name: "required nested claim exists",
+			validation: map[string]oas.CustomClaimValidationConfig{
+				"user.profile.role": {
+					Type: oas.ClaimValidationTypeRequired,
+				},
+			},
+			claims: jwt.MapClaims{
+				"user": map[string]interface{}{
+					"profile": map[string]interface{}{
+						"role": "admin",
+					},
+				},
+			},
+			expectError: false,
+		},
+		{
+			name: "required nested claim missing",
+			validation: map[string]oas.CustomClaimValidationConfig{
+				"user.profile.role": {
+					Type: oas.ClaimValidationTypeRequired,
+				},
+			},
+			claims: jwt.MapClaims{
+				"user": map[string]interface{}{
+					"profile": map[string]interface{}{},
+				},
+			},
+			expectError:   true,
+			errorContains: "custom claim user.profile.role is required but not present in token",
 		},
 		{
 			name: "required claim missing",
@@ -1032,6 +1089,33 @@ func TestJWTCustomClaimsValidation(t *testing.T) {
 
 		// Exact match tests
 		{
+			name: "exact match - multiple allowed values passes if any match",
+			validation: map[string]oas.CustomClaimValidationConfig{
+				"role": {
+					Type:          oas.ClaimValidationTypeExactMatch,
+					AllowedValues: []interface{}{"admin", "editor", "viewer"},
+				},
+			},
+			claims: jwt.MapClaims{
+				"role": "editor",
+			},
+			expectError: false,
+		},
+		{
+			name: "case sensitive string matching",
+			validation: map[string]oas.CustomClaimValidationConfig{
+				"role": {
+					Type:          oas.ClaimValidationTypeExactMatch,
+					AllowedValues: []interface{}{"Admin"},
+				},
+			},
+			claims: jwt.MapClaims{
+				"role": "admin",
+			},
+			expectError:   true,
+			errorContains: "does not match any expected values",
+		},
+		{
 			name: "exact match string success",
 			validation: map[string]oas.CustomClaimValidationConfig{
 				"role": {
@@ -1043,6 +1127,41 @@ func TestJWTCustomClaimsValidation(t *testing.T) {
 				"role": "admin",
 			},
 			expectError: false,
+		},
+		{
+			name: "exact match nested string success",
+			validation: map[string]oas.CustomClaimValidationConfig{
+				"user.metadata.level": {
+					Type:          oas.ClaimValidationTypeExactMatch,
+					AllowedValues: []interface{}{"gold", "silver"},
+				},
+			},
+			claims: jwt.MapClaims{
+				"user": map[string]interface{}{
+					"metadata": map[string]interface{}{
+						"level": "gold",
+					},
+				},
+			},
+			expectError: false,
+		},
+		{
+			name: "exact match nested string failure",
+			validation: map[string]oas.CustomClaimValidationConfig{
+				"user.metadata.level": {
+					Type:          oas.ClaimValidationTypeExactMatch,
+					AllowedValues: []interface{}{"gold", "silver"},
+				},
+			},
+			claims: jwt.MapClaims{
+				"user": map[string]interface{}{
+					"metadata": map[string]interface{}{
+						"level": "bronze",
+					},
+				},
+			},
+			expectError:   true,
+			errorContains: "does not match any expected values",
 		},
 		{
 			name: "exact match number success",
@@ -1098,6 +1217,105 @@ func TestJWTCustomClaimsValidation(t *testing.T) {
 				"scope": "read:users write:users",
 			},
 			expectError: false,
+		},
+		{
+			name: "invalid dot notation path",
+			validation: map[string]oas.CustomClaimValidationConfig{
+				"user\\..role": {
+					Type: oas.ClaimValidationTypeRequired,
+				},
+			},
+			claims: jwt.MapClaims{
+				"user": map[string]interface{}{
+					"role": "admin",
+				},
+			},
+			expectError:   true,
+			errorContains: "invalid claim path",
+		},
+		{
+			name: "mixed blocking/non-blocking rules",
+			validation: map[string]oas.CustomClaimValidationConfig{
+				"claim1": {
+					Type:        oas.ClaimValidationTypeRequired,
+					NonBlocking: true,
+				},
+				"claim2": {
+					Type:          oas.ClaimValidationTypeExactMatch,
+					AllowedValues: []interface{}{"value2"},
+					NonBlocking:   false,
+				},
+			},
+			claims: jwt.MapClaims{
+				"claim2": "wrong",
+			},
+			expectError:   true,
+			errorContains: "does not match any expected values",
+		},
+		{
+			name: "mixed data types in array",
+			validation: map[string]oas.CustomClaimValidationConfig{
+				"values": {
+					Type:          oas.ClaimValidationTypeContains,
+					AllowedValues: []interface{}{"string", 42, true},
+				},
+			},
+			claims: jwt.MapClaims{
+				"values": []interface{}{"other", 42, false, "string"},
+			},
+			expectError: false,
+		},
+		{
+			name: "contains nested array success",
+			validation: map[string]oas.CustomClaimValidationConfig{
+				"user.permissions.roles": {
+					Type:          oas.ClaimValidationTypeContains,
+					AllowedValues: []interface{}{"admin", "editor"},
+				},
+			},
+			claims: jwt.MapClaims{
+				"user": map[string]interface{}{
+					"permissions": map[string]interface{}{
+						"roles": []interface{}{"user", "admin", "viewer"},
+					},
+				},
+			},
+			expectError: false,
+		},
+		{
+			name: "contains nested string success",
+			validation: map[string]oas.CustomClaimValidationConfig{
+				"user.permissions.scope": {
+					Type:          oas.ClaimValidationTypeContains,
+					AllowedValues: []interface{}{"read"},
+				},
+			},
+			claims: jwt.MapClaims{
+				"user": map[string]interface{}{
+					"permissions": map[string]interface{}{
+						"scope": "read:users write:users",
+					},
+				},
+			},
+			expectError: false,
+		},
+		{
+			name: "contains nested string failure",
+			validation: map[string]oas.CustomClaimValidationConfig{
+				"user.permissions.scope": {
+					Type:          oas.ClaimValidationTypeContains,
+					AllowedValues: []interface{}{"admin"},
+				},
+			},
+			claims: jwt.MapClaims{
+				"user": map[string]interface{}{
+					"permissions": map[string]interface{}{
+						"scope": "read:users write:users",
+					},
+				},
+			},
+			expectError:   true,
+			errorContains: "does not contain any expected values",
 		},
 		{
 			name: "contains array success",
