@@ -221,7 +221,9 @@ type CustomClaimValidationConfig struct {
 
 	// AllowedValues contains the values to validate against for "exact_match" and "contains" validation types.
 	// Not used for "required" validation type.
-	AllowedValues []string `bson:"allowedValues,omitempty" json:"allowedValues,omitempty"`
+	AllowedValues []interface{} `bson:"allowedValues,omitempty" json:"allowedValues,omitempty"`
+
+	NonBlocking bool `bson:"nonBlocking,omitempty" json:"nonBlocking,omitempty"`
 }
 
 // CustomClaimValidationType represents the type of validation to perform on a JWT claim
