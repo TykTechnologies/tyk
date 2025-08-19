@@ -137,7 +137,7 @@ func (s *OAS) BuildDefaultTykExtension(overRideValues TykExtensionConfigParams, 
 		}
 	}
 
-	s.importMiddlewares(overRideValues)
+	s.ImportMiddlewares(overRideValues)
 
 	return nil
 }
@@ -214,7 +214,7 @@ func (as *AuthSources) Import(in string) {
 	}
 }
 
-func (s *OAS) importMiddlewares(overRideValues TykExtensionConfigParams) {
+func (s *OAS) ImportMiddlewares(overRideValues TykExtensionConfigParams) {
 	xTykAPIGateway := s.GetTykExtension()
 
 	if xTykAPIGateway.Middleware == nil {
