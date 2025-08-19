@@ -54,7 +54,7 @@ jobs:
       commit_author: ${{ steps.set_outputs.outputs.commit_author}}
     steps:
       - name: Checkout of tyk
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           fetch-depth: 1
       - name: Set some outputs for later
@@ -406,7 +406,7 @@ jobs:
           - arm64
         distro: ${{ fromJson(needs.test-controller-distros.outputs.deb) }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           fetch-depth: 1
           sparse-checkout: ci
@@ -463,7 +463,7 @@ jobs:
           - arm64
         distro: ${{ fromJson(needs.test-controller-distros.outputs.rpm) }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           fetch-depth: 1
           sparse-checkout: ci
