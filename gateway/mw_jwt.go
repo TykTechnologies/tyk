@@ -11,6 +11,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/google/go-cmp/cmp"
+	"github.com/tidwall/gjson"
 	"io"
 	"net/http"
 	"strings"
@@ -1090,26 +1091,37 @@ func customClaimsContainsMatch(expectedValues []interface{}, claimValue interfac
 }
 
 // validateCustomClaims performs validation of custom claims according to the configuration
-func (k *JWTMiddleware) validateCustomClaims(claims jwt.MapClaims) error {
+func (k *JWTMiddleware) validateCustomClaimsNew(claims jwt.MapClaims) error {
 	validationRules := k.Spec.OAS.GetJWTConfiguration().CustomClaimValidation
+	claimsJson, err := json.Marshal(claims)
+	if err != nil {
+		return fmt.Errorf("error parsing claims: %w", err)
+	}
 	for claimName, validation := range validationRules {
-		claimValue, exists := claims[claimName]
-		if !exists && !validation.NonBlocking {
-			return fmt.Errorf("custom claim %s is required but not present in token", claimName)
+		result := gjson.Get(string(claimsJson), claimName)
+		if !result.Exists() {
+			if validation.NonBlocking {
+				k.Logger().Warningf("Claim %s value does not match any expected values", claimName)
+			} else {
+				return fmt.Errorf("custom claim %s is required but not present in token", claimName)
+			}
 		}
-		if !exists && validation.NonBlocking {
-			k.Logger().Warningf("Claim %s value does not match any expected values", claimName)
-		}
-
 		switch validation.Type {
 		case oas.ClaimValidationTypeRequired:
-			// Already handled by existence check above
 			continue
-
+		case oas.ClaimValidationTypeContains:
+			matched := customClaimsContainsMatch(validation.AllowedValues, result.Value())
+			if !matched {
+				if validation.NonBlocking {
+					k.Logger().Warningf("Claim %s value does not contain any expected values", claimName)
+					continue
+				}
+				return fmt.Errorf("claim %s value does not contain any expected values", claimName)
+			}
 		case oas.ClaimValidationTypeExactMatch:
 			matched := false
 			for _, expectedValue := range validation.AllowedValues {
-				if cmp.Equal(claimValue, expectedValue) {
+				if cmp.Equal(result.Value(), expectedValue) {
 					matched = true
 					break
 				}
@@ -1120,16 +1132,6 @@ func (k *JWTMiddleware) validateCustomClaims(claims jwt.MapClaims) error {
 					continue
 				}
 				return fmt.Errorf("claim %s value does not match any expected values", claimName)
-			}
-
-		case oas.ClaimValidationTypeContains:
-			matched := customClaimsContainsMatch(validation.AllowedValues, claimValue)
-			if !matched {
-				if validation.NonBlocking {
-					k.Logger().Warningf("Claim %s value does not contain any expected values", claimName)
-					continue
-				}
-				return fmt.Errorf("claim %s value does not contain any expected values", claimName)
 			}
 		}
 	}
@@ -1192,7 +1194,7 @@ func (k *JWTMiddleware) validateExtraClaims(claims jwt.MapClaims, token *jwt.Tok
 
 	// Custom claims validation
 	if len(jwtConfig.CustomClaimValidation) > 0 {
-		if err := k.validateCustomClaims(claims); err != nil {
+		if err := k.validateCustomClaimsNew(claims); err != nil {
 			k.Logger().WithError(err).Error("JWT custom claims validation failed")
 			return err
 		}
