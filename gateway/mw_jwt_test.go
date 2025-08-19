@@ -984,6 +984,204 @@ func TestJWTExistingSessionRSAWithRawSourceInvalidPolicyID(t *testing.T) {
 	})
 }
 
+func TestJWTCustomClaimsValidation(t *testing.T) {
+	secret := "12345"
+
+	cases := []struct {
+		name          string
+		validation    map[string]oas.CustomClaimValidationConfig
+		claims        jwt.MapClaims
+		expectError   bool
+		errorContains string
+	}{
+		// Required validation tests
+		{
+			name: "required claim exists",
+			validation: map[string]oas.CustomClaimValidationConfig{
+				"myclaim": {
+					Type: oas.ClaimValidationTypeRequired,
+				},
+			},
+			claims: jwt.MapClaims{
+				"myclaim": "any-value",
+			},
+			expectError: false,
+		},
+		{
+			name: "required claim missing",
+			validation: map[string]oas.CustomClaimValidationConfig{
+				"myclaim": {
+					Type: oas.ClaimValidationTypeRequired,
+				},
+			},
+			claims:        jwt.MapClaims{},
+			expectError:   true,
+			errorContains: "required claim myclaim not found",
+		},
+		{
+			name: "required claim missing but non-blocking",
+			validation: map[string]oas.CustomClaimValidationConfig{
+				"myclaim": {
+					Type:        oas.ClaimValidationTypeRequired,
+					NonBlocking: true,
+				},
+			},
+			claims:      jwt.MapClaims{},
+			expectError: false,
+		},
+
+		// Exact match tests
+		{
+			name: "exact match string success",
+			validation: map[string]oas.CustomClaimValidationConfig{
+				"role": {
+					Type:          oas.ClaimValidationTypeExactMatch,
+					AllowedValues: []interface{}{"admin", "user"},
+				},
+			},
+			claims: jwt.MapClaims{
+				"role": "admin",
+			},
+			expectError: false,
+		},
+		{
+			name: "exact match number success",
+			validation: map[string]oas.CustomClaimValidationConfig{
+				"level": {
+					Type:          oas.ClaimValidationTypeExactMatch,
+					AllowedValues: []interface{}{float64(1), float64(2), float64(3)},
+				},
+			},
+			claims: jwt.MapClaims{
+				"level": float64(2),
+			},
+			expectError: false,
+		},
+		{
+			name: "exact match boolean success",
+			validation: map[string]oas.CustomClaimValidationConfig{
+				"active": {
+					Type:          oas.ClaimValidationTypeExactMatch,
+					AllowedValues: []interface{}{true},
+				},
+			},
+			claims: jwt.MapClaims{
+				"active": true,
+			},
+			expectError: false,
+		},
+		{
+			name: "exact match failure",
+			validation: map[string]oas.CustomClaimValidationConfig{
+				"role": {
+					Type:          oas.ClaimValidationTypeExactMatch,
+					AllowedValues: []interface{}{"admin", "user"},
+				},
+			},
+			claims: jwt.MapClaims{
+				"role": "guest",
+			},
+			expectError:   true,
+			errorContains: "does not match any expected values",
+		},
+
+		// Contains tests
+		{
+			name: "contains string success",
+			validation: map[string]oas.CustomClaimValidationConfig{
+				"scope": {
+					Type:          oas.ClaimValidationTypeContains,
+					AllowedValues: []interface{}{"read", "write"},
+				},
+			},
+			claims: jwt.MapClaims{
+				"scope": "read:users write:users",
+			},
+			expectError: false,
+		},
+		{
+			name: "contains array success",
+			validation: map[string]oas.CustomClaimValidationConfig{
+				"permissions": {
+					Type:          oas.ClaimValidationTypeContains,
+					AllowedValues: []interface{}{"read", "write"},
+				},
+			},
+			claims: jwt.MapClaims{
+				"permissions": []interface{}{"delete", "read", "execute"},
+			},
+			expectError: false,
+		},
+		{
+			name: "contains failure",
+			validation: map[string]oas.CustomClaimValidationConfig{
+				"scope": {
+					Type:          oas.ClaimValidationTypeContains,
+					AllowedValues: []interface{}{"admin"},
+				},
+			},
+			claims: jwt.MapClaims{
+				"scope": "read:users write:users",
+			},
+			expectError:   true,
+			errorContains: "does not contain any expected values",
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			var api apidef.APIDefinition
+			api.EnableJWT = true
+			api.AuthConfigs = map[string]apidef.AuthConfig{
+				apidef.JWTType: {
+					Name:           "jwtAuth",
+					AuthHeaderName: "Authorization",
+				},
+			}
+			api.IsOAS = true
+
+			var o oas.OAS
+			o.SetTykExtension(&oas.XTykAPIGateway{})
+			o.Fill(api)
+
+			jwtConfig := &oas.JWT{
+				CustomClaimValidation: tc.validation,
+			}
+			o.GetTykExtension().Server.Authentication.SecuritySchemes["jwtAuth"] = jwtConfig
+			o.ExtractTo(&api)
+
+			spec := &APISpec{
+				APIDefinition: &api,
+				OAS:           o,
+			}
+
+			// Create and sign token
+			token := jwt.New(jwt.SigningMethodHS256)
+			token.Claims = tc.claims
+			signedToken, err := token.SignedString([]byte(secret))
+			assert.NoError(t, err)
+
+			// Create middleware, parse token and call function
+			jwtMiddleware := &JWTMiddleware{BaseMiddleware: &BaseMiddleware{
+				Spec: spec,
+			}}
+			parser := jwt.NewParser(jwt.WithoutClaimsValidation())
+			parsedToken, err := parser.Parse(signedToken, func(_ *jwt.Token) (interface{}, error) {
+				return []byte(secret), nil
+			})
+			assert.NoError(t, err)
+			err = jwtMiddleware.validateExtraClaims(parsedToken.Claims.(jwt.MapClaims), parsedToken)
+
+			if tc.expectError {
+				assert.Error(t, err)
+				assert.Contains(t, err.Error(), tc.errorContains)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
 func TestJWTExtraClaimsValidation(t *testing.T) {
 	secret := "12345"
 
