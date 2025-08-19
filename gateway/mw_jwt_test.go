@@ -1016,7 +1016,7 @@ func TestJWTCustomClaimsValidation(t *testing.T) {
 			},
 			claims:        jwt.MapClaims{},
 			expectError:   true,
-			errorContains: "required claim myclaim not found",
+			errorContains: "custom claim myclaim is required but not present in token",
 		},
 		{
 			name: "required claim missing but non-blocking",
