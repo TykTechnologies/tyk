@@ -198,7 +198,45 @@ type JWT struct {
 	//
 	// Tyk classic API definition: `idp_client_id_mapping_disabled`.
 	IDPClientIDMappingDisabled bool `bson:"idpClientIdMappingDisabled,omitempty" json:"idpClientIdMappingDisabled,omitempty"`
+
+	// CustomClaimValidation contains custom validation rules for JWT claims.
+	// It maps a claim name to its validation configuration.
+	//
+	// The validation can be one of three types:
+	// - "required": claim must exist in the token
+	// - "exact_match": claim must equal one of the specified values
+	// - "contains": claim must contain one of the specified values
+	//
+	// Example: {"role": {"type": "exact_match", "allowedValues": ["admin", "user"]}}
+	//
+	// Tyk classic API definition: N/A (OAS only)
+	CustomClaimValidation map[string]CustomClaimValidationConfig `bson:"customClaimValidation,omitempty" json:"customClaimValidation,omitempty"`
 }
+
+// CustomClaimValidationConfig defines the validation configuration for a JWT claim.
+type CustomClaimValidationConfig struct {
+	// Type specifies the type of validation to perform on the claim.
+	// Valid values are: "required", "exact_match", "contains"
+	Type CustomClaimValidationType `bson:"type" json:"type"`
+
+	// AllowedValues contains the values to validate against for "exact_match" and "contains" validation types.
+	// Not used for "required" validation type.
+	AllowedValues []string `bson:"allowedValues,omitempty" json:"allowedValues,omitempty"`
+}
+
+// CustomClaimValidationType represents the type of validation to perform on a JWT claim
+type CustomClaimValidationType string
+
+const (
+	// ClaimValidationTypeRequired indicates the claim must exist in the token
+	ClaimValidationTypeRequired CustomClaimValidationType = "required"
+
+	// ClaimValidationTypeExactMatch indicates the claim must equal one of the specified values
+	ClaimValidationTypeExactMatch CustomClaimValidationType = "exact_match"
+
+	// ClaimValidationTypeContains indicates the claim must contain one of the specified values
+	ClaimValidationTypeContains CustomClaimValidationType = "contains"
+)
 
 // JTIValidation contains the configuration for the validation of the JWT ID.
 type JTIValidation struct {
