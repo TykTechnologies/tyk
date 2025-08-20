@@ -1049,7 +1049,7 @@ func TestMultiAuthMiddleware_OR_OAuth2_And_ApiKey(t *testing.T) {
 		// Enable both OAuth2 and API key
 		spec.UseOauth2 = true
 		spec.UseStandardAuth = true
-		
+
 		// Configure OAuth2
 		spec.Oauth2Meta.AllowedAccessTypes = []osin.AccessRequestType{
 			"authorization_code",
@@ -1089,7 +1089,7 @@ func TestMultiAuthMiddleware_OR_OAuth2_And_ApiKey(t *testing.T) {
 		ClientRedirectURI: "http://redirect.example.com",
 		PolicyID:          pID,
 	}
-	
+
 	// Store OAuth client using the spec's OAuth manager
 	spec.OAuthManager.Storage().SetClient(clientID, spec.OrgID, &oauthClient, false)
 
@@ -1175,10 +1175,10 @@ func TestMultiAuthMiddleware_OR_OAuth2_And_ApiKey(t *testing.T) {
 		},
 		// Test 6: No auth headers - should fail
 		{
-			Method: "GET",
-			Path:   "/test-or-oauth-apikey/",
+			Method:  "GET",
+			Path:    "/test-or-oauth-apikey/",
 			Headers: map[string]string{},
-			Code: http.StatusUnauthorized,
+			Code:    http.StatusUnauthorized,
 		},
 	}
 
@@ -1315,8 +1315,8 @@ func TestMultiAuthMiddleware_OR_RateLimiting(t *testing.T) {
 
 	// Create API key session with low rate limit
 	apiKeySession := CreateStandardSession()
-	apiKeySession.Rate = 2        // 2 requests
-	apiKeySession.Per = 60        // per minute
+	apiKeySession.Rate = 2 // 2 requests
+	apiKeySession.Per = 60 // per minute
 	apiKeySession.AccessRights = map[string]user.AccessDefinition{
 		"test-or-ratelimit": {
 			APIName:  "Test OR Rate Limit",
@@ -1333,8 +1333,8 @@ func TestMultiAuthMiddleware_OR_RateLimiting(t *testing.T) {
 	basicPassword := "ratelimitpass"
 	basicSession := CreateStandardSession()
 	basicSession.BasicAuthData.Password = basicPassword
-	basicSession.Rate = 10       // 10 requests
-	basicSession.Per = 60        // per minute
+	basicSession.Rate = 10 // 10 requests
+	basicSession.Per = 60  // per minute
 	basicSession.AccessRights = map[string]user.AccessDefinition{
 		"test-or-ratelimit": {
 			APIName:  "Test OR Rate Limit",
@@ -1578,7 +1578,7 @@ func TestMultiAuthMiddleware_OR_PerformanceWithManyMethods(t *testing.T) {
 
 	// Measure time for successful auth with last method
 	start := time.Now()
-	
+
 	// API key is the last method but should still succeed quickly
 	ts.Run(t, test.TestCase{
 		Method: "GET",
@@ -1588,17 +1588,17 @@ func TestMultiAuthMiddleware_OR_PerformanceWithManyMethods(t *testing.T) {
 		},
 		Code: http.StatusOK,
 	})
-	
+
 	duration := time.Since(start)
-	
+
 	// Even with multiple auth methods, it should complete quickly (< 100ms)
 	if duration > 100*time.Millisecond {
 		t.Logf("Warning: OR auth with multiple methods took %v", duration)
 	}
-	
+
 	// Test with invalid credentials for all methods - should try all and fail
 	start = time.Now()
-	
+
 	ts.Run(t, test.TestCase{
 		Method: "GET",
 		Path:   "/test-or-performance/",
@@ -1608,9 +1608,9 @@ func TestMultiAuthMiddleware_OR_PerformanceWithManyMethods(t *testing.T) {
 		},
 		Code: http.StatusForbidden,
 	})
-	
+
 	duration = time.Since(start)
-	
+
 	// Should still complete reasonably quickly even when trying all methods
 	if duration > 200*time.Millisecond {
 		t.Logf("Warning: OR auth failure with multiple methods took %v", duration)
