@@ -13,7 +13,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/TykTechnologies/tyk/apidef"
-	"github.com/TykTechnologies/tyk/pkg/utils"
 	"github.com/TykTechnologies/tyk/test"
 )
 
@@ -304,7 +303,8 @@ func TestResponseTransformMiddleware(t *testing.T) {
 
 		testServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 			w.Header().Set("Content-Type", "application/json")
-			_, _ = w.Write([]byte(`{"name":"world"}`))
+			_, err := w.Write([]byte(`{"name":"world"}`))
+			assert.NoError(t, err)
 			w.WriteHeader(http.StatusOK)
 		}))
 
@@ -354,13 +354,16 @@ func TestResponseTransformMiddleware(t *testing.T) {
 			testServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				w.Header().Set("Content-Type", "application/json")
 
-				body := utils.Must(json.Marshal(struct {
+				body, err := json.Marshal(struct {
 					Path string `json:"Path"`
 				}{
 					Path: r.URL.Path,
-				}))
+				})
+				require.NoError(t, err)
 
-				_ = utils.Must(w.Write(body))
+				_, err = w.Write(body)
+				require.NoError(t, err)
+
 				w.WriteHeader(http.StatusOK)
 			}))
 
