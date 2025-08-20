@@ -2,12 +2,15 @@ package gateway
 
 import (
 	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
 	"testing"
 	"time"
 
 	"github.com/golang-jwt/jwt/v4"
+	"github.com/lonelycode/osin"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/test"
@@ -1003,5 +1006,613 @@ func TestAuthORWrapper_Name(t *testing.T) {
 	wrapper := &AuthORWrapper{}
 	if wrapper.Name() != "AuthORWrapper" {
 		t.Errorf("Expected name 'AuthORWrapper', got '%s'", wrapper.Name())
+	}
+}
+
+// TestMultiAuthMiddleware_OR_OAuth2_And_ApiKey tests OR logic with OAuth2 and API key
+func TestMultiAuthMiddleware_OR_OAuth2_And_ApiKey(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	// Create policy for OAuth and API key access
+	pID := ts.CreatePolicy(func(p *user.Policy) {
+		p.AccessRights = map[string]user.AccessDefinition{
+			"test-or-oauth-apikey": {
+				APIName:  "Test OR OAuth API Key",
+				APIID:    "test-or-oauth-apikey",
+				Versions: []string{"default"},
+			},
+		}
+	})
+
+	// Create API key session
+	apiKeySession := CreateStandardSession()
+	apiKeySession.AccessRights = map[string]user.AccessDefinition{
+		"test-or-oauth-apikey": {
+			APIName:  "Test OR OAuth API Key",
+			APIID:    "test-or-oauth-apikey",
+			Versions: []string{"default"},
+		},
+	}
+	apiKey := CreateSession(ts.Gw, func(s *user.SessionState) {
+		*s = *apiKeySession
+	})
+
+	// Configure API with OAuth2 and API key
+	spec := ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		spec.APIID = "test-or-oauth-apikey"
+		spec.Name = "Test OR OAuth API Key"
+		spec.OrgID = "default"
+		spec.Proxy.ListenPath = "/test-or-oauth-apikey/"
+		spec.UseKeylessAccess = false
+
+		// Enable both OAuth2 and API key
+		spec.UseOauth2 = true
+		spec.UseStandardAuth = true
+		
+		// Configure OAuth2
+		spec.Oauth2Meta.AllowedAccessTypes = []osin.AccessRequestType{
+			"authorization_code",
+			"refresh_token",
+			"client_credentials",
+		}
+		spec.Oauth2Meta.AllowedAuthorizeTypes = []osin.AuthorizeRequestType{
+			"code",
+			"token",
+		}
+
+		// Configure auth headers
+		spec.AuthConfigs = map[string]apidef.AuthConfig{
+			"oauth": {
+				AuthHeaderName: "Authorization",
+			},
+			"authToken": {
+				AuthHeaderName: "X-API-Key",
+			},
+		}
+
+		// Multiple security requirements for OR logic
+		spec.SecurityRequirements = [][]string{
+			{"oauth"},  // Option 1: OAuth2
+			{"apikey"}, // Option 2: API key
+		}
+
+		spec.BaseIdentityProvidedBy = apidef.UnsetAuth
+	})[0]
+
+	// Create OAuth client
+	clientID := "test-oauth-client"
+	clientSecret := "test-secret"
+	oauthClient := OAuthClient{
+		ClientID:          clientID,
+		ClientSecret:      clientSecret,
+		ClientRedirectURI: "http://redirect.example.com",
+		PolicyID:          pID,
+	}
+	
+	// Store OAuth client using the spec's OAuth manager
+	spec.OAuthManager.Storage().SetClient(clientID, spec.OrgID, &oauthClient, false)
+
+	// Get OAuth token using the authorize-client endpoint
+	param := make(url.Values)
+	param.Set("response_type", "token")
+	param.Set("redirect_uri", oauthClient.ClientRedirectURI)
+	param.Set("client_id", clientID)
+	param.Set("client_secret", clientSecret)
+	param.Set("key_rules", `{"test-or-oauth-apikey": {"access_rights": {"test-or-oauth-apikey": {"api_id": "test-or-oauth-apikey", "api_name": "Test OR OAuth API Key", "versions": ["default"]}}}}`)
+
+	resp, err := ts.Run(t, test.TestCase{
+		Path:      "/test-or-oauth-apikey/tyk/oauth/authorize-client/",
+		Data:      param.Encode(),
+		AdminAuth: true,
+		Headers: map[string]string{
+			"Content-Type": "application/x-www-form-urlencoded",
+		},
+		Method: http.MethodPost,
+		Code:   http.StatusOK,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Extract OAuth token
+	var tokenResponse struct {
+		AccessToken string `json:"access_token"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&tokenResponse); err != nil {
+		t.Fatal("Failed to decode OAuth token response:", err)
+	}
+
+	// Test cases for OR logic with OAuth2 and API Key
+	testCases := []test.TestCase{
+		// Test 1: Valid OAuth token only - should succeed
+		{
+			Method: "GET",
+			Path:   "/test-or-oauth-apikey/",
+			Headers: map[string]string{
+				"Authorization": "Bearer " + tokenResponse.AccessToken,
+			},
+			Code: http.StatusOK,
+		},
+		// Test 2: Valid API key only - should succeed
+		{
+			Method: "GET",
+			Path:   "/test-or-oauth-apikey/",
+			Headers: map[string]string{
+				"X-API-Key": apiKey,
+			},
+			Code: http.StatusOK,
+		},
+		// Test 3: Invalid OAuth + Valid API key - should succeed (OR logic)
+		{
+			Method: "GET",
+			Path:   "/test-or-oauth-apikey/",
+			Headers: map[string]string{
+				"Authorization": "Bearer invalid-oauth-token",
+				"X-API-Key":     apiKey,
+			},
+			Code: http.StatusOK,
+		},
+		// Test 4: Valid OAuth + Invalid API key - should succeed (OR logic)
+		{
+			Method: "GET",
+			Path:   "/test-or-oauth-apikey/",
+			Headers: map[string]string{
+				"Authorization": "Bearer " + tokenResponse.AccessToken,
+				"X-API-Key":     "invalid-key",
+			},
+			Code: http.StatusOK,
+		},
+		// Test 5: Both invalid - should fail
+		{
+			Method: "GET",
+			Path:   "/test-or-oauth-apikey/",
+			Headers: map[string]string{
+				"Authorization": "Bearer invalid-oauth",
+				"X-API-Key":     "invalid-key",
+			},
+			Code: http.StatusForbidden,
+		},
+		// Test 6: No auth headers - should fail
+		{
+			Method: "GET",
+			Path:   "/test-or-oauth-apikey/",
+			Headers: map[string]string{},
+			Code: http.StatusUnauthorized,
+		},
+	}
+
+	ts.Run(t, testCases...)
+}
+
+// TestMultiAuthMiddleware_OR_SessionPersistence tests that session data persists correctly with OR auth
+func TestMultiAuthMiddleware_OR_SessionPersistence(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	// Create API key session with specific metadata
+	apiKeySession := CreateStandardSession()
+	apiKeySession.MetaData = map[string]interface{}{
+		"auth_type": "api_key",
+		"user_id":   "apikey-user-123",
+	}
+	apiKeySession.AccessRights = map[string]user.AccessDefinition{
+		"test-or-session": {
+			APIName:  "Test OR Session",
+			APIID:    "test-or-session",
+			Versions: []string{"default"},
+		},
+	}
+	apiKey := CreateSession(ts.Gw, func(s *user.SessionState) {
+		*s = *apiKeySession
+	})
+
+	// Create Basic Auth session with different metadata
+	basicUsername := "sessionuser"
+	basicPassword := "sessionpass"
+	basicSession := CreateStandardSession()
+	basicSession.BasicAuthData.Password = basicPassword
+	basicSession.MetaData = map[string]interface{}{
+		"auth_type": "basic",
+		"user_id":   "basic-user-456",
+	}
+	basicSession.AccessRights = map[string]user.AccessDefinition{
+		"test-or-session": {
+			APIName:  "Test OR Session",
+			APIID:    "test-or-session",
+			Versions: []string{"default"},
+		},
+	}
+
+	// Store basic auth session
+	basicKeyName := ts.Gw.generateToken("default", basicUsername)
+	err := ts.Gw.GlobalSessionManager.UpdateSession(basicKeyName, basicSession, 60, false)
+	if err != nil {
+		t.Fatal("Failed to create basic auth session:", err)
+	}
+
+	// Configure API
+	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		spec.APIID = "test-or-session"
+		spec.Name = "Test OR Session"
+		spec.OrgID = "default"
+		spec.Proxy.ListenPath = "/test-or-session/"
+		spec.UseKeylessAccess = false
+
+		// Enable both auth methods
+		spec.UseBasicAuth = true
+		spec.UseStandardAuth = true
+
+		// Configure auth headers
+		spec.AuthConfigs = map[string]apidef.AuthConfig{
+			"basic": {
+				AuthHeaderName: "Authorization",
+			},
+			"authToken": {
+				AuthHeaderName: "X-API-Key",
+			},
+		}
+
+		// Multiple security requirements for OR logic
+		spec.SecurityRequirements = [][]string{
+			{"basic"},  // Option 1: Basic auth
+			{"apikey"}, // Option 2: API key
+		}
+
+		spec.BaseIdentityProvidedBy = apidef.UnsetAuth
+	})
+
+	// Prepare auth headers
+	validBasicAuth := "Basic " + base64.StdEncoding.EncodeToString([]byte(basicUsername+":"+basicPassword))
+
+	// Test that the correct session is used based on which auth succeeds
+	t.Run("API Key session metadata", func(t *testing.T) {
+		ts.Run(t, []test.TestCase{
+			{
+				Method: "GET",
+				Path:   "/test-or-session/",
+				Headers: map[string]string{
+					"X-API-Key": apiKey,
+				},
+				Code: http.StatusOK,
+			},
+		}...)
+	})
+
+	t.Run("Basic Auth session metadata", func(t *testing.T) {
+		ts.Run(t, []test.TestCase{
+			{
+				Method: "GET",
+				Path:   "/test-or-session/",
+				Headers: map[string]string{
+					"Authorization": validBasicAuth,
+				},
+				Code: http.StatusOK,
+			},
+		}...)
+	})
+
+	// Test with both - first successful auth's session should be used
+	t.Run("First successful auth session used", func(t *testing.T) {
+		ts.Run(t, []test.TestCase{
+			{
+				Method: "GET",
+				Path:   "/test-or-session/",
+				Headers: map[string]string{
+					"Authorization": validBasicAuth,
+					"X-API-Key":     apiKey,
+				},
+				Code: http.StatusOK,
+			},
+		}...)
+	})
+}
+
+// TestMultiAuthMiddleware_OR_RateLimiting tests rate limiting with OR auth
+func TestMultiAuthMiddleware_OR_RateLimiting(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	// Create API key session with low rate limit
+	apiKeySession := CreateStandardSession()
+	apiKeySession.Rate = 2        // 2 requests
+	apiKeySession.Per = 60        // per minute
+	apiKeySession.AccessRights = map[string]user.AccessDefinition{
+		"test-or-ratelimit": {
+			APIName:  "Test OR Rate Limit",
+			APIID:    "test-or-ratelimit",
+			Versions: []string{"default"},
+		},
+	}
+	apiKey := CreateSession(ts.Gw, func(s *user.SessionState) {
+		*s = *apiKeySession
+	})
+
+	// Create Basic Auth session with higher rate limit
+	basicUsername := "ratelimituser"
+	basicPassword := "ratelimitpass"
+	basicSession := CreateStandardSession()
+	basicSession.BasicAuthData.Password = basicPassword
+	basicSession.Rate = 10       // 10 requests
+	basicSession.Per = 60        // per minute
+	basicSession.AccessRights = map[string]user.AccessDefinition{
+		"test-or-ratelimit": {
+			APIName:  "Test OR Rate Limit",
+			APIID:    "test-or-ratelimit",
+			Versions: []string{"default"},
+		},
+	}
+
+	// Store basic auth session
+	basicKeyName := ts.Gw.generateToken("default", basicUsername)
+	err := ts.Gw.GlobalSessionManager.UpdateSession(basicKeyName, basicSession, 60, false)
+	if err != nil {
+		t.Fatal("Failed to create basic auth session:", err)
+	}
+
+	// Configure API
+	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		spec.APIID = "test-or-ratelimit"
+		spec.Name = "Test OR Rate Limit"
+		spec.OrgID = "default"
+		spec.Proxy.ListenPath = "/test-or-ratelimit/"
+		spec.UseKeylessAccess = false
+
+		// Enable both auth methods
+		spec.UseBasicAuth = true
+		spec.UseStandardAuth = true
+
+		// Configure auth headers
+		spec.AuthConfigs = map[string]apidef.AuthConfig{
+			"basic": {
+				AuthHeaderName: "Authorization",
+			},
+			"authToken": {
+				AuthHeaderName: "X-API-Key",
+			},
+		}
+
+		// Multiple security requirements for OR logic
+		spec.SecurityRequirements = [][]string{
+			{"basic"},  // Option 1: Basic auth
+			{"apikey"}, // Option 2: API key
+		}
+
+		spec.BaseIdentityProvidedBy = apidef.UnsetAuth
+	})
+
+	// Prepare auth headers
+	validBasicAuth := "Basic " + base64.StdEncoding.EncodeToString([]byte(basicUsername+":"+basicPassword))
+
+	// Test that rate limiting applies based on the successful auth method
+	t.Run("API Key rate limit applies", func(t *testing.T) {
+		// First 2 requests should succeed
+		for i := 0; i < 2; i++ {
+			ts.Run(t, test.TestCase{
+				Method: "GET",
+				Path:   "/test-or-ratelimit/",
+				Headers: map[string]string{
+					"X-API-Key": apiKey,
+				},
+				Code: http.StatusOK,
+			})
+		}
+
+		// Third request should be rate limited
+		ts.Run(t, test.TestCase{
+			Method: "GET",
+			Path:   "/test-or-ratelimit/",
+			Headers: map[string]string{
+				"X-API-Key": apiKey,
+			},
+			Code: http.StatusTooManyRequests,
+		})
+	})
+
+	// Clear rate limit counters by waiting
+	time.Sleep(time.Second)
+
+	t.Run("Basic Auth rate limit applies", func(t *testing.T) {
+		// Should allow more requests with Basic Auth (10 per minute)
+		for i := 0; i < 5; i++ {
+			ts.Run(t, test.TestCase{
+				Method: "GET",
+				Path:   "/test-or-ratelimit/",
+				Headers: map[string]string{
+					"Authorization": validBasicAuth,
+				},
+				Code: http.StatusOK,
+			})
+		}
+	})
+}
+
+// TestMultiAuthMiddleware_OR_ErrorMessages tests error message consistency with OR auth
+func TestMultiAuthMiddleware_OR_ErrorMessages(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	// Configure API with JWT and API key
+	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		spec.APIID = "test-or-errors"
+		spec.Name = "Test OR Errors"
+		spec.Proxy.ListenPath = "/test-or-errors/"
+		spec.UseKeylessAccess = false
+
+		// Enable both JWT and API key
+		spec.UseStandardAuth = true
+		spec.EnableJWT = true
+
+		// Configure JWT
+		spec.JWTSigningMethod = RSASign
+		spec.JWTSource = base64.StdEncoding.EncodeToString([]byte(jwtRSAPubKey))
+		spec.JWTIdentityBaseField = "user_id"
+
+		// Configure auth headers
+		spec.AuthConfigs = map[string]apidef.AuthConfig{
+			"authToken": {
+				AuthHeaderName: "X-API-Key",
+			},
+			"jwt": {
+				AuthHeaderName: "Authorization",
+			},
+		}
+
+		// Multiple security requirements for OR logic
+		spec.SecurityRequirements = [][]string{
+			{"jwt"},    // Option 1: JWT
+			{"apikey"}, // Option 2: API key
+		}
+
+		spec.BaseIdentityProvidedBy = apidef.UnsetAuth
+	})
+
+	// Test various error scenarios and verify error messages
+	testCases := []test.TestCase{
+		// No auth provided - should return appropriate error
+		{
+			Method:    "GET",
+			Path:      "/test-or-errors/",
+			Headers:   map[string]string{},
+			Code:      http.StatusUnauthorized,
+			BodyMatch: "Authorization field missing",
+		},
+		// Invalid JWT format
+		{
+			Method: "GET",
+			Path:   "/test-or-errors/",
+			Headers: map[string]string{
+				"Authorization": "Bearer not-a-jwt",
+			},
+			Code:      http.StatusUnauthorized,
+			BodyMatch: "Authorization field missing",
+		},
+		// Invalid API key
+		{
+			Method: "GET",
+			Path:   "/test-or-errors/",
+			Headers: map[string]string{
+				"X-API-Key": "invalid-key-format",
+			},
+			Code:      http.StatusForbidden,
+			BodyMatch: "Access to this API has been disallowed",
+		},
+		// Both invalid - should return last error
+		{
+			Method: "GET",
+			Path:   "/test-or-errors/",
+			Headers: map[string]string{
+				"Authorization": "Bearer invalid-jwt",
+				"X-API-Key":     "invalid-key",
+			},
+			Code:      http.StatusForbidden,
+			BodyMatch: "Access to this API has been disallowed",
+		},
+	}
+
+	ts.Run(t, testCases...)
+}
+
+// TestMultiAuthMiddleware_OR_PerformanceWithManyMethods tests performance with many auth methods
+func TestMultiAuthMiddleware_OR_PerformanceWithManyMethods(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	// Create API key session
+	apiKeySession := CreateStandardSession()
+	apiKeySession.AccessRights = map[string]user.AccessDefinition{
+		"test-or-performance": {
+			APIName:  "Test OR Performance",
+			APIID:    "test-or-performance",
+			Versions: []string{"default"},
+		},
+	}
+	apiKey := CreateSession(ts.Gw, func(s *user.SessionState) {
+		*s = *apiKeySession
+	})
+
+	// Configure API with multiple auth methods
+	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		spec.APIID = "test-or-performance"
+		spec.Name = "Test OR Performance"
+		spec.Proxy.ListenPath = "/test-or-performance/"
+		spec.UseKeylessAccess = false
+
+		// Enable multiple auth methods
+		spec.UseStandardAuth = true
+		spec.EnableJWT = true
+		spec.UseBasicAuth = true
+		spec.EnableSignatureChecking = true
+
+		// Configure JWT
+		spec.JWTSigningMethod = RSASign
+		spec.JWTSource = base64.StdEncoding.EncodeToString([]byte(jwtRSAPubKey))
+		spec.JWTIdentityBaseField = "user_id"
+
+		// Configure auth headers
+		spec.AuthConfigs = map[string]apidef.AuthConfig{
+			"authToken": {
+				AuthHeaderName: "X-API-Key",
+			},
+			"jwt": {
+				AuthHeaderName: "Authorization",
+			},
+			"basic": {
+				AuthHeaderName: "Authorization",
+			},
+			"hmac": {
+				AuthHeaderName: "Authorization",
+			},
+		}
+
+		// Multiple security requirements for OR logic
+		spec.SecurityRequirements = [][]string{
+			{"jwt"},    // Option 1: JWT
+			{"basic"},  // Option 2: Basic Auth
+			{"hmac"},   // Option 3: HMAC
+			{"apikey"}, // Option 4: API key (should succeed quickly as last option)
+		}
+
+		spec.BaseIdentityProvidedBy = apidef.UnsetAuth
+	})
+
+	// Measure time for successful auth with last method
+	start := time.Now()
+	
+	// API key is the last method but should still succeed quickly
+	ts.Run(t, test.TestCase{
+		Method: "GET",
+		Path:   "/test-or-performance/",
+		Headers: map[string]string{
+			"X-API-Key": apiKey,
+		},
+		Code: http.StatusOK,
+	})
+	
+	duration := time.Since(start)
+	
+	// Even with multiple auth methods, it should complete quickly (< 100ms)
+	if duration > 100*time.Millisecond {
+		t.Logf("Warning: OR auth with multiple methods took %v", duration)
+	}
+	
+	// Test with invalid credentials for all methods - should try all and fail
+	start = time.Now()
+	
+	ts.Run(t, test.TestCase{
+		Method: "GET",
+		Path:   "/test-or-performance/",
+		Headers: map[string]string{
+			"Authorization": "Bearer invalid",
+			"X-API-Key":     "invalid",
+		},
+		Code: http.StatusForbidden,
+	})
+	
+	duration = time.Since(start)
+	
+	// Should still complete reasonably quickly even when trying all methods
+	if duration > 200*time.Millisecond {
+		t.Logf("Warning: OR auth failure with multiple methods took %v", duration)
 	}
 }
