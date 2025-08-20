@@ -1100,7 +1100,7 @@ func (k *JWTMiddleware) validateCustomClaimsNew(claims jwt.MapClaims) error {
 	}
 	for claimsPath, validation := range validationRules {
 		// validate json path
-		_, err = jp.Parse(claimsJson)
+		_, err = jp.Parse([]byte(fmt.Sprintf("$.%s", claimsPath)))
 		if err != nil {
 			return fmt.Errorf("invalid claim path: %s", claimsPath)
 		}
