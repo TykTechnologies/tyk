@@ -1,0 +1,9 @@
+{
+    "security": {
+        "certificate_expiry_monitor": {
+            "warning_threshold_days": 1,
+            "check_cooldown_seconds": 1,
+            "event_cooldown_seconds": 1
+        }
+    }
+} 
