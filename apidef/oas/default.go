@@ -170,8 +170,6 @@ func (s *OAS) importAuthentication(enable bool) error {
 		return errEmptySecurityObject
 	}
 
-	securityReq := s.Security[0]
-
 	xTykAPIGateway := s.GetTykExtension()
 	authentication := xTykAPIGateway.Server.Authentication
 	if authentication == nil {
@@ -180,6 +178,19 @@ func (s *OAS) importAuthentication(enable bool) error {
 	}
 
 	authentication.Enabled = enable
+
+	// Check if we have multiple security requirements (OR conditions)
+	if len(s.Security) > 1 {
+		return s.importMultiAuthentication(authentication, enable)
+	}
+
+	// Backward compatibility: single security requirement (existing behavior)
+	return s.importSingleAuthentication(authentication, enable)
+}
+
+// importSingleAuthentication handles the current behavior for single security requirements
+func (s *OAS) importSingleAuthentication(authentication *Authentication, enable bool) error {
+	securityReq := s.Security[0]
 
 	tykSecuritySchemes := authentication.SecuritySchemes
 	if tykSecuritySchemes == nil {
@@ -196,7 +207,53 @@ func (s *OAS) importAuthentication(enable bool) error {
 	}
 
 	authentication.BaseIdentityProvider = tykSecuritySchemes.GetBaseIdentityProvider()
+	return nil
+}
 
+// importMultiAuthentication handles multiple security requirements (OR conditions)
+func (s *OAS) importMultiAuthentication(authentication *Authentication, enable bool) error {
+	log.Info("Processing multiple security requirements (OR conditions)")
+
+	// Initialize multi-auth config
+	multiAuth := &MultiAuthConfig{
+		Enabled:      true,
+		Requirements: make([]SecurityRequirement, 0, len(s.Security)),
+	}
+
+	// Initialize security schemes for compatibility
+	if authentication.SecuritySchemes == nil {
+		authentication.SecuritySchemes = make(SecuritySchemes)
+	}
+
+	// Process each security requirement as an alternative
+	for i, securityReq := range s.Security {
+		log.Debugf("Processing security requirement %d with %d schemes", i, len(securityReq))
+
+		requirement := SecurityRequirement{
+			Schemes: make(map[string][]string),
+		}
+
+		// Import schemes for this requirement
+		for schemeName, scopes := range securityReq {
+			requirement.Schemes[schemeName] = scopes
+
+			// Also add to global security schemes for backward compatibility
+			if securityScheme := s.Components.SecuritySchemes[schemeName]; securityScheme != nil {
+				err := authentication.SecuritySchemes.Import(schemeName, securityScheme.Value, enable)
+				if err != nil {
+					log.WithError(err).Errorf("Error while importing security scheme: %s", schemeName)
+				}
+			}
+		}
+
+		multiAuth.Requirements = append(multiAuth.Requirements, requirement)
+	}
+
+	// BaseIdentityProvider will be determined at runtime
+	multiAuth.BaseIdentityProvider = ""
+	authentication.MultiAuth = multiAuth
+
+	log.Infof("Successfully configured %d security requirements for OR authentication", len(multiAuth.Requirements))
 	return nil
 }
 
