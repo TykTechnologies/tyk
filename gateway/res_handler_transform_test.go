@@ -396,7 +396,7 @@ func TestResponseTransformMiddleware(t *testing.T) {
 		})
 
 		res, _ := ts.Run(t, test.TestCase{
-			Path:   "/combined/anything/777",
+			Path:   "/combined/anything/7777",
 			Method: http.MethodGet,
 			Code:   http.StatusOK,
 		})
@@ -408,7 +408,7 @@ func TestResponseTransformMiddleware(t *testing.T) {
 		assert.NoError(t, json.Unmarshal(rawBody, &body))
 		assert.Equal(t, transformedResponse{
 			Transformed: true,
-			Path:        "/anything/transformed/777",
+			Path:        "/anything/transformed/7777",
 		}, body)
 	})
 }
