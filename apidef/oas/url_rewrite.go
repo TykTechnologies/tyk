@@ -158,6 +158,12 @@ func (v *URLRewrite) Sort() {
 		rules := t.Rules
 
 		sort.Slice(rules, func(i, j int) bool {
+			// if the cardinal index is equal, the sorting will fall back
+			// to the Name, otherwise it will be non-deterministic.
+			if rules[i].In.Index() == rules[j].In.Index() {
+				return rules[i].Name < rules[j].Name
+			}
+
 			return rules[i].In.Index() < rules[j].In.Index()
 		})
 	}
