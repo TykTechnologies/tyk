@@ -3,14 +3,11 @@ package oasutil
 import (
 	"errors"
 	"fmt"
-<<<<<<< HEAD
-	"github.com/TykTechnologies/kin-openapi/openapi3"
-=======
+	"regexp"
+	"strings"
+
 	"github.com/TykTechnologies/tyk/pkg/errpack"
 	"github.com/getkin/kin-openapi/openapi3"
-	"regexp"
->>>>>>> 9ae9ac231... Custom domain regex causing problems with servers (bugfix) (#7310)
-	"strings"
 )
 
 var (
