@@ -35,13 +35,22 @@ func (a *AuthORWrapper) ProcessRequest(w http.ResponseWriter, r *http.Request, _
 
 	for i, mw := range a.authMiddlewares {
 		logger.Debugf("Trying auth middleware %d: %T", i, mw)
-		err, code := mw.ProcessRequest(w, r, nil)
+
+		// Clone the request to avoid side effects from failed auth attempts
+		// Each middleware gets a clean request without modifications from previous attempts
+		rClone := r.Clone(r.Context())
+
+		err, code := mw.ProcessRequest(w, rClone, nil)
 		if err == nil {
 			logger.Debugf("Auth middleware %d succeeded", i)
 
-			if session := ctxGetSession(r); session != nil {
+			if session := ctxGetSession(rClone); session != nil {
 				ctxSetSession(r, session, false, a.Gw.GetConfig().HashKeys)
 			}
+
+			// Copy any other important context values from the successful attempt back to the original request
+			*r = *rClone
+
 			return nil, http.StatusOK
 		}
 

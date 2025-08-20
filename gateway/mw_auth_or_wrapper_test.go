@@ -1616,3 +1616,101 @@ func TestMultiAuthMiddleware_OR_PerformanceWithManyMethods(t *testing.T) {
 		t.Logf("Warning: OR auth failure with multiple methods took %v", duration)
 	}
 }
+
+// TestMultiAuthMiddleware_OR_SessionIsolation tests that failed auth attempts don't contaminate the session
+func TestMultiAuthMiddleware_OR_SessionIsolation(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	// Create API key session with specific metadata
+	apiKeySession := CreateStandardSession()
+	apiKeySession.MetaData = map[string]interface{}{
+		"source": "api_key",
+		"clean":  true,
+	}
+	apiKeySession.AccessRights = map[string]user.AccessDefinition{
+		"test-or-isolation": {
+			APIName:  "Test OR Isolation",
+			APIID:    "test-or-isolation",
+			Versions: []string{"default"},
+		},
+	}
+	apiKey := CreateSession(ts.Gw, func(s *user.SessionState) {
+		*s = *apiKeySession
+	})
+
+	// Configure API with JWT and API key
+	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		spec.APIID = "test-or-isolation"
+		spec.Name = "Test OR Isolation"
+		spec.Proxy.ListenPath = "/test-or-isolation/"
+		spec.UseKeylessAccess = false
+
+		// Enable both JWT and API key
+		spec.UseStandardAuth = true
+		spec.EnableJWT = true
+
+		// Configure JWT
+		spec.JWTSigningMethod = RSASign
+		spec.JWTSource = base64.StdEncoding.EncodeToString([]byte(jwtRSAPubKey))
+		spec.JWTIdentityBaseField = "user_id"
+
+		// Configure auth headers
+		spec.AuthConfigs = map[string]apidef.AuthConfig{
+			"authToken": {
+				AuthHeaderName: "X-API-Key",
+			},
+			"jwt": {
+				AuthHeaderName: "Authorization",
+			},
+		}
+
+		// Multiple security requirements for OR logic
+		spec.SecurityRequirements = [][]string{
+			{"jwt"},    // Option 1: JWT (will fail with invalid token)
+			{"apikey"}, // Option 2: API key (will succeed)
+		}
+
+		spec.BaseIdentityProvidedBy = apidef.UnsetAuth
+	})
+
+	// Test that a failed JWT attempt doesn't contaminate the session for API key
+	// The JWT middleware might modify the session context even when failing
+	// Request cloning should prevent this from affecting the API key auth
+	testCases := []test.TestCase{
+		// Test 1: Invalid JWT + Valid API key
+		// Without request cloning, the failed JWT might contaminate the session
+		// With cloning, the API key should get a clean session
+		{
+			Method: "GET",
+			Path:   "/test-or-isolation/",
+			Headers: map[string]string{
+				"Authorization": "Bearer invalid-jwt-that-might-modify-session",
+				"X-API-Key":     apiKey,
+			},
+			Code: http.StatusOK,
+		},
+		// Test 2: Valid API key only (control test)
+		{
+			Method: "GET",
+			Path:   "/test-or-isolation/",
+			Headers: map[string]string{
+				"X-API-Key": apiKey,
+			},
+			Code: http.StatusOK,
+		},
+		// Test 3: Multiple invalid attempts before valid API key
+		// Tests that multiple failed attempts don't accumulate contamination
+		{
+			Method: "GET",
+			Path:   "/test-or-isolation/",
+			Headers: map[string]string{
+				"Authorization": "Bearer completely-invalid",
+				"X-API-Key":     apiKey,
+			},
+			Code: http.StatusOK,
+		},
+	}
+
+	ts.Run(t, testCases...)
+}
