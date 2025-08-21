@@ -630,6 +630,15 @@ func TestOAS_GetSecuritySchemes(t *testing.T) {
 
 	jwt := JWT{}
 	Fill(t, &jwt, 0)
+	// set the customClaims value to float if it is an int, it is reconverted to float on unmarshal since the field is an interface{}
+	for _, conf := range jwt.CustomClaimValidation {
+		for i, v := range conf.AllowedValues {
+			iv, ok := v.(int)
+			if ok {
+				conf.AllowedValues[i] = float64(iv)
+			}
+		}
+	}
 
 	oauth := OAuth{}
 	Fill(t, &oauth, 0)
