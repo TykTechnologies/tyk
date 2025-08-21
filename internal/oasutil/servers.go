@@ -16,6 +16,7 @@ var (
 	ErrUnexpectedCurlyBrace = errors.New("unexpected closing curly brace")
 	ErrInvalidVariableName  = errors.New("invalid variable name")
 	ErrInvalidPattern       = errors.New("invalid pattern")
+	ErrNoCaptureGroup       = errors.New("capture groups are prohibited")
 	errUnreachable          = errors.New("unreachable")
 )
 
@@ -156,8 +157,10 @@ func (p *serverUrlParser) extractValueBetweenBraces() (serverVariable, error) {
 				return serverVariable{}, ErrInvalidVariableName
 			}
 
-			if _, err := regexp.Compile(pattern); err != nil {
+			if re, err := regexp.Compile(pattern); err != nil {
 				return serverVariable{}, errpack.Wrap(ErrInvalidPattern, "failed to compile pattern")
+			} else if hasCaptureGroups(re) {
+				return serverVariable{}, errpack.Wrap(ErrNoCaptureGroup, "using capture group is not allowed in server patterns")
 			}
 
 			return serverVariable{
@@ -179,4 +182,8 @@ func (p *serverUrlParser) nextParamName() string {
 
 func isValidIdentifier(name string) bool {
 	return identifierRe.MatchString(name)
+}
+
+func hasCaptureGroups(re *regexp.Regexp) bool {
+	return re.NumSubexp() > 0
 }
