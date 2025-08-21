@@ -219,7 +219,7 @@ func (gw *Gateway) TykNewSingleHostReverseProxy(target *url.URL, spec *APISpec, 
 			Handler:        http.HandlerFunc(handler),
 			ReadTimeout:    1 * time.Second,
 			WriteTimeout:   1 * time.Second,
-			MaxHeaderBytes: 1 << 20,
+			MaxHeaderBytes: spec.GlobalConfig.HttpServerOptions.MaxHeaderBytes,
 		}
 		allHostsDownURL = "http://" + listener.Addr().String()
 		go func() {
