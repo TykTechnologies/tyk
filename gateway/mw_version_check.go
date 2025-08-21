@@ -3,6 +3,7 @@ package gateway
 import (
 	"errors"
 	"net/http"
+	"net/url"
 	"time"
 
 	"github.com/getkin/kin-openapi/routers"
@@ -89,7 +90,22 @@ func (v *VersionCheck) ProcessRequest(w http.ResponseWriter, r *http.Request, _ 
 			}
 		}
 
-		v.Spec.SanitizeProxyPaths(r)
+		if v.Spec.IsOAS {
+			targetApi, ok := v.Gw.apisByID[subVersionID]
+
+			if !ok {
+				return errors.New(string(VersionDoesNotExist)), http.StatusNotFound
+			}
+
+			strippedPath := v.Spec.StripListenPath(r.URL.Path)
+			newPath, err := url.JoinPath(targetApi.Proxy.ListenPath, strippedPath)
+			if err != nil {
+				return err, http.StatusInternalServerError
+			}
+			r.URL.Path = newPath
+		} else {
+			v.Spec.SanitizeProxyPaths(r)
+		}
 
 		handler.ServeHTTP(w, r)
 		return nil, middleware.StatusRespond
