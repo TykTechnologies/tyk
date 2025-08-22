@@ -1,7 +1,6 @@
 package certcheck
 
 import (
-	"crypto/tls"
 	"time"
 
 	"github.com/TykTechnologies/tyk/apidef"
@@ -11,9 +10,9 @@ import (
 type FireEventFunc func(name apidef.TykEvent, meta interface{})
 
 type CertInfo struct {
-	Certificate      *tls.Certificate
 	ID               string
 	CommonName       string
+	NotAfter         time.Time
 	HoursUntilExpiry int
 }
 
@@ -24,4 +23,12 @@ type EventCertificateExpiringSoonMeta struct {
 	CertName      string    `json:"cert_name"`
 	ExpiresAt     time.Time `json:"expires_at"`
 	DaysRemaining int       `json:"days_remaining"`
+}
+
+type EventCertificateExpiredMeta struct {
+	model.EventMetaDefault
+	CertID          string    `json:"cert_id"`
+	CertName        string    `json:"cert_name"`
+	ExpiredAt       time.Time `json:"expired_at"`
+	DaysSinceExpiry int       `json:"days_since_expiry"`
 }

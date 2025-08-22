@@ -1,9 +1,10 @@
 package certcheck
 
-//go:generate mockgen -destination=./mock/batcher.go -package mock . Batcher, BackgroundBatcher
+//go:generate mockgen -destination=./batcher_mock_test.go -package certcheck . Batcher,BackgroundBatcher
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sync"
 	"time"
@@ -14,6 +15,10 @@ import (
 	"github.com/TykTechnologies/tyk/internal/event"
 	"github.com/TykTechnologies/tyk/internal/model"
 	"github.com/TykTechnologies/tyk/storage"
+)
+
+var (
+	ErrFallbackCooldownCheckFailed = errors.New("failed to check cooldown in fallback cache")
 )
 
 type Batch struct {
@@ -74,34 +79,34 @@ type BackgroundBatcher interface {
 }
 
 type CertificateExpiryCheckBatcher struct {
-	logger             *logrus.Entry
-	config             config.CertificateExpiryMonitorConfig
-	batch              *Batch
-	localCooldownCache CooldownCache
-	redisCooldownCache CooldownCache
-	flushTicker        *time.Ticker
-	fireEvent          FireEventFunc
+	logger                *logrus.Entry
+	config                config.CertificateExpiryMonitorConfig
+	batch                 *Batch
+	localCooldownCache    CooldownCache
+	fallbackCooldownCache CooldownCache
+	flushTicker           *time.Ticker
+	fireEvent             FireEventFunc
 }
 
-func NewCertificateExpiryCheckBatcher(logger *logrus.Entry, cfg config.CertificateExpiryMonitorConfig, redisStorage storage.Handler, eventFunc FireEventFunc) (*CertificateExpiryCheckBatcher, error) {
+func NewCertificateExpiryCheckBatcher(logger *logrus.Entry, cfg config.CertificateExpiryMonitorConfig, fallbackStorage storage.Handler, eventFunc FireEventFunc) (*CertificateExpiryCheckBatcher, error) {
 	localCache, err := NewLocalCooldownCache(128)
 	if err != nil {
 		return nil, err
 	}
 
-	redisCache, err := NewRedisCooldownCache(redisStorage)
+	fallbackCache, err := NewRedisCooldownCache(fallbackStorage)
 	if err != nil {
 		return nil, err
 	}
 
 	return &CertificateExpiryCheckBatcher{
-		logger:             logger,
-		config:             cfg,
-		batch:              NewBatch(),
-		localCooldownCache: localCache,
-		redisCooldownCache: redisCache,
-		flushTicker:        time.NewTicker(30 * time.Second),
-		fireEvent:          eventFunc,
+		logger:                logger,
+		config:                cfg,
+		batch:                 NewBatch(),
+		localCooldownCache:    localCache,
+		fallbackCooldownCache: fallbackCache,
+		flushTicker:           time.NewTicker(30 * time.Second),
+		fireEvent:             eventFunc,
 	}, nil
 }
 
@@ -114,8 +119,16 @@ func (c *CertificateExpiryCheckBatcher) RunInBackground(ctx context.Context) {
 	for {
 		batchCopy := c.batch.CopyAndClear()
 		for _, certInfo := range batchCopy {
-			exists, redisFallback := c.checkCooldownExistsInLocalCache(certInfo)
-			checkCooldownIsActive := c.isCheckCooldownActive(certInfo, exists, redisFallback)
+			existsInLocalCache := c.checkCooldownExistsInLocalCache(certInfo)
+			checkCooldownIsActive, err := c.isCheckCooldownActive(certInfo, existsInLocalCache)
+			if err != nil {
+				c.logger.
+					WithField("certID", certInfo.ID[:8]).
+					WithError(err).
+					Error("failed to check cooldown - skipping certificate")
+				continue
+			}
+
 			if checkCooldownIsActive {
 				continue
 			}
@@ -138,41 +151,45 @@ func (c *CertificateExpiryCheckBatcher) RunInBackground(ctx context.Context) {
 	}
 }
 
-func (c *CertificateExpiryCheckBatcher) checkCooldownExistsInLocalCache(certInfo CertInfo) (exists bool, fallbackToRedis bool) {
+func (c *CertificateExpiryCheckBatcher) checkCooldownExistsInLocalCache(certInfo CertInfo) (exists bool) {
 	var err error
 	exists, err = c.localCooldownCache.HasCheckCooldown(certInfo.ID)
 	if err != nil {
 		c.logger.WithError(err).
 			WithField("certID", certInfo.ID[:8]).
 			Error("failed to check if check cooldown exists in local cache")
-
-		fallbackToRedis = true
 	}
-	return exists, fallbackToRedis
+	return exists
 }
 
-func (c *CertificateExpiryCheckBatcher) isCheckCooldownActive(certInfo CertInfo, foundInLocalCache bool, fallbackToRedis bool) bool {
+func (c *CertificateExpiryCheckBatcher) isCheckCooldownActive(certInfo CertInfo, foundInLocalCache bool) (bool, error) {
 	checkCooldownActive := false
-	if foundInLocalCache && !fallbackToRedis {
+	fallback := false
+	if foundInLocalCache {
 		var err error
 		checkCooldownActive, err = c.localCooldownCache.IsCheckCooldownActive(certInfo.ID)
 		if err != nil {
+			fallback = true
 			c.logger.
 				WithError(err).
 				WithField("certID", certInfo.ID[:8]).
 				Error("failed to check if check cooldown is active in local cache")
 		}
-	} else {
+	}
+
+	if !foundInLocalCache || fallback {
 		var err error
-		checkCooldownActive, err = c.redisCooldownCache.IsCheckCooldownActive(certInfo.ID)
+		checkCooldownActive, err = c.fallbackCooldownCache.IsCheckCooldownActive(certInfo.ID)
 		if err != nil {
 			c.logger.
 				WithError(err).
 				WithField("certID", certInfo.ID[:8]).
-				Error("failed to check if check cooldown is active in redis")
+				Error("failed to check if check cooldown is active in fallback cache")
+			return false, ErrFallbackCooldownCheckFailed
 		}
 	}
-	return checkCooldownActive
+
+	return checkCooldownActive, nil
 }
 
 func (c *CertificateExpiryCheckBatcher) setCheckCooldown(certInfo CertInfo) {
@@ -182,11 +199,11 @@ func (c *CertificateExpiryCheckBatcher) setCheckCooldown(certInfo CertInfo) {
 			WithField("certID", certInfo.ID[:8]).
 			Error("failed to set check cooldown for certificate in local cache")
 	}
-	err = c.redisCooldownCache.SetCheckCooldown(certInfo.ID, int64(c.config.CheckCooldownSeconds))
+	err = c.fallbackCooldownCache.SetCheckCooldown(certInfo.ID, int64(c.config.CheckCooldownSeconds))
 	if err != nil {
 		c.logger.WithError(err).
 			WithField("certID", certInfo.ID[:8]).
-			Error("failed to set check cooldown for certificate in redis")
+			Error("failed to set check cooldown for certificate in fallback cache")
 	}
 }
 
@@ -207,8 +224,16 @@ func (c *CertificateExpiryCheckBatcher) isCertificateExpiringSoon(certInfo CertI
 }
 
 func (c *CertificateExpiryCheckBatcher) handleEventForCertificate(certInfo CertInfo, isExpired bool) {
-	exists, redisFallback := c.fireEventCooldownExistsInLocalCache(certInfo)
-	isFireEventCooldownActive := c.isFireEventCooldownActive(certInfo, exists, redisFallback)
+	exists := c.fireEventCooldownExistsInLocalCache(certInfo)
+	isFireEventCooldownActive, err := c.isFireEventCooldownActive(certInfo, exists)
+	if err != nil {
+		c.logger.
+			WithField("certID", certInfo.ID[:8]).
+			WithError(err).
+			Error("failed to check cooldown - skipping certificate")
+		return
+	}
+
 	if isFireEventCooldownActive {
 		return
 	}
@@ -223,38 +248,34 @@ func (c *CertificateExpiryCheckBatcher) handleEventForCertificate(certInfo CertI
 }
 
 func (c *CertificateExpiryCheckBatcher) handleEventForExpiredCertificate(certInfo CertInfo) {
-	// Implementation will happen in another ticket
+	daysSinceExpiry := (certInfo.HoursUntilExpiry / 24) * -1
+	hoursSinceExpiry := (certInfo.HoursUntilExpiry % -24) * -1
+
+	eventMeta := EventCertificateExpiredMeta{
+		EventMetaDefault: model.EventMetaDefault{
+			Message: c.composeExpiredMessage(certInfo, daysSinceExpiry, hoursSinceExpiry),
+		},
+		CertID:          certInfo.ID,
+		CertName:        certInfo.CommonName,
+		ExpiredAt:       certInfo.NotAfter,
+		DaysSinceExpiry: daysSinceExpiry,
+	}
+
+	c.fireEvent(event.CertificateExpired, eventMeta)
+	c.logger.Debugf("Certificate expiry monitor: EXPIRY EVENT FIRED for certificate '%s' - expired since %d hours (ID: %s...)", certInfo.CommonName, certInfo.HoursUntilExpiry, certInfo.ID[:8])
 }
 
 func (c *CertificateExpiryCheckBatcher) handleEventForSoonToExpireCertificate(certInfo CertInfo) {
-	if certInfo.Certificate == nil || certInfo.Certificate.Leaf == nil {
-		c.logger.Warningf("Certificate expiry monitor: Cannot fire event - nil certificate or certificate with nil Leaf")
-		return
-	}
-
-	// Convert hours to days and remaining hours for display
 	daysUntilExpiry := certInfo.HoursUntilExpiry / 24
 	remainingHours := certInfo.HoursUntilExpiry % 24
 
-	var message string
-
-	if daysUntilExpiry > 0 {
-		if remainingHours > 0 {
-			message = fmt.Sprintf("Certificate %s is expiring in %d days and %d hours", certInfo.Certificate.Leaf.Subject.CommonName, daysUntilExpiry, remainingHours)
-		} else {
-			message = fmt.Sprintf("Certificate %s is expiring in %d days", certInfo.Certificate.Leaf.Subject.CommonName, daysUntilExpiry)
-		}
-	} else {
-		message = fmt.Sprintf("Certificate %s is expiring in %d hours", certInfo.Certificate.Leaf.Subject.CommonName, remainingHours)
-	}
-
 	eventMeta := EventCertificateExpiringSoonMeta{
 		EventMetaDefault: model.EventMetaDefault{
-			Message: message,
+			Message: c.composeSoonToExpire(certInfo, daysUntilExpiry, remainingHours),
 		},
 		CertID:        certInfo.ID,
-		CertName:      certInfo.Certificate.Leaf.Subject.CommonName,
-		ExpiresAt:     certInfo.Certificate.Leaf.NotAfter,
+		CertName:      certInfo.CommonName,
+		ExpiresAt:     certInfo.NotAfter,
 		DaysRemaining: daysUntilExpiry,
 	}
 
@@ -262,22 +283,22 @@ func (c *CertificateExpiryCheckBatcher) handleEventForSoonToExpireCertificate(ce
 	c.logger.Debugf("Certificate expiry monitor: EXPIRY EVENT FIRED for certificate '%s' - expires in %d hours (ID: %s...)", certInfo.CommonName, certInfo.HoursUntilExpiry, certInfo.ID[:8])
 }
 
-func (c *CertificateExpiryCheckBatcher) fireEventCooldownExistsInLocalCache(certInfo CertInfo) (exists bool, fallbackToRedis bool) {
+func (c *CertificateExpiryCheckBatcher) fireEventCooldownExistsInLocalCache(certInfo CertInfo) (exists bool) {
 	var err error
 	exists, err = c.localCooldownCache.HasFireEventCooldown(certInfo.ID)
 	if err != nil {
 		c.logger.WithError(err).
 			WithField("certID", certInfo.ID[:8]).
 			Error("failed to check if fire event cooldown exists in local cache")
-
-		fallbackToRedis = true
 	}
-	return exists, fallbackToRedis
+	return exists
 }
 
-func (c *CertificateExpiryCheckBatcher) isFireEventCooldownActive(certInfo CertInfo, foundInLocalCache bool, fallbackToRedis bool) bool {
+func (c *CertificateExpiryCheckBatcher) isFireEventCooldownActive(certInfo CertInfo, foundInLocalCache bool) (bool, error) {
 	fireEventCooldownActive := false
-	if foundInLocalCache && !fallbackToRedis {
+	useFallback := false
+
+	if foundInLocalCache {
 		var err error
 		fireEventCooldownActive, err = c.localCooldownCache.IsFireEventCooldownActive(certInfo.ID)
 		if err != nil {
@@ -285,18 +306,23 @@ func (c *CertificateExpiryCheckBatcher) isFireEventCooldownActive(certInfo CertI
 				WithError(err).
 				WithField("certID", certInfo.ID[:8]).
 				Error("failed to check if fire event cooldown is active in local cache")
+			useFallback = true
 		}
-	} else {
+	}
+
+	if !foundInLocalCache || useFallback {
 		var err error
-		fireEventCooldownActive, err = c.redisCooldownCache.IsFireEventCooldownActive(certInfo.ID)
+		fireEventCooldownActive, err = c.fallbackCooldownCache.IsFireEventCooldownActive(certInfo.ID)
 		if err != nil {
 			c.logger.
 				WithError(err).
 				WithField("certID", certInfo.ID[:8]).
-				Error("failed to check if fire event cooldown is active in redis")
+				Error("failed to check if fire event cooldown is active in fallback cache")
+
+			return false, ErrFallbackCooldownCheckFailed
 		}
 	}
-	return fireEventCooldownActive
+	return fireEventCooldownActive, nil
 }
 
 func (c *CertificateExpiryCheckBatcher) setFireEventCooldown(certInfo CertInfo) {
@@ -306,12 +332,34 @@ func (c *CertificateExpiryCheckBatcher) setFireEventCooldown(certInfo CertInfo) 
 			WithField("certID", certInfo.ID[:8]).
 			Error("failed to set fire event cooldown for certificate in local cache")
 	}
-	err = c.redisCooldownCache.SetFireEventCooldown(certInfo.ID, int64(c.config.EventCooldownSeconds))
+	err = c.fallbackCooldownCache.SetFireEventCooldown(certInfo.ID, int64(c.config.EventCooldownSeconds))
 	if err != nil {
 		c.logger.WithError(err).
 			WithField("certID", certInfo.ID[:8]).
-			Error("failed to set fire event cooldown for certificate in redis")
+			Error("failed to set fire event cooldown for certificate in fallback cache")
 	}
+}
+
+func (c *CertificateExpiryCheckBatcher) composeSoonToExpire(certInfo CertInfo, daysUntilExpiry int, remainingHours int) string {
+	if daysUntilExpiry > 0 {
+		if remainingHours > 0 {
+			return fmt.Sprintf("Certificate %s is expiring in %d days and %d hours", certInfo.CommonName, daysUntilExpiry, remainingHours)
+		} else {
+			return fmt.Sprintf("Certificate %s is expiring in %d days", certInfo.CommonName, daysUntilExpiry)
+		}
+	}
+	return fmt.Sprintf("Certificate %s is expiring in %d hours", certInfo.CommonName, remainingHours)
+}
+
+func (c *CertificateExpiryCheckBatcher) composeExpiredMessage(certInfo CertInfo, daysSinceExpiry int, hoursSinceExpiry int) string {
+	if daysSinceExpiry > 0 {
+		if hoursSinceExpiry > 0 {
+			return fmt.Sprintf("Certificate %s is expired since %d days and %d hours", certInfo.CommonName, daysSinceExpiry, hoursSinceExpiry)
+		} else {
+			return fmt.Sprintf("Certificate %s is expired since %d days", certInfo.CommonName, daysSinceExpiry)
+		}
+	}
+	return fmt.Sprintf("Certificate %s is expired since %d hours", certInfo.CommonName, hoursSinceExpiry)
 }
 
 // Interface Guards
