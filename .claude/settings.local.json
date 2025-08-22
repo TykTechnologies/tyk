@@ -32,6 +32,10 @@
       "Bash(gh run view:*)",
       "Bash(gh run view:*)",
       "Bash(golangci-lint run:*)",
+      "Bash(git commit:*)",
+      "Bash(sed:*)",
+      "Bash(golangci-lint run:*)",
+      "Bash(go run:*)",
       "Bash(git commit:*)"
     ],
     "deny": []
