@@ -747,7 +747,7 @@ func TestLoadPoliciesFromDashboardAutoRecovery(t *testing.T) {
 
 		// Handle policy requests
 		requestCount++
-		
+
 		// First request: return 403 to simulate nonce mismatch
 		if requestCount == 1 {
 			w.WriteHeader(http.StatusForbidden)
@@ -794,7 +794,7 @@ func TestLoadPoliciesFromDashboardAutoRecovery(t *testing.T) {
 	// Should succeed due to auto-recovery
 	assert.NoError(t, err, "Auto-recovery should allow successful policy loading")
 	assert.NotNil(t, policyMap, "Policy map should be returned after auto-recovery")
-	
+
 	// Verify the auto-recovery process happened
 	assert.GreaterOrEqual(t, requestCount, 1, "Should have made at least 1 policy request")
 }
@@ -807,16 +807,16 @@ func TestLoadPoliciesFromDashboardNonceEmptyAfterFailedRecovery(t *testing.T) {
 	// Mock dashboard that simulates the problematic behavior described in the plan
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		requestCount++
-		
+
 		nonce := r.Header.Get("x-tyk-nonce")
-		
-		// First request: Nonce mismatch 
+
+		// First request: Nonce mismatch
 		if requestCount == 1 {
 			w.WriteHeader(http.StatusForbidden)
 			w.Write([]byte("Nonce failed"))
 			return
 		}
-		
+
 		// Second request: After gateway clears nonce (simulating current broken recovery)
 		if requestCount == 2 && nonce == "" {
 			w.WriteHeader(http.StatusForbidden)
@@ -863,11 +863,11 @@ func TestLoadPoliciesFromDashboardNonceEmptyAfterFailedRecovery(t *testing.T) {
 	// Simulate the current broken recovery logic: clear the nonce
 	g.Gw.ServiceNonce = ""
 
-	// Second call - should get "Authorization failed (Nonce empty)" 
+	// Second call - should get "Authorization failed (Nonce empty)"
 	policyMap, err = g.Gw.LoadPoliciesFromDashboard(ts.URL, "", false)
 	assert.Error(t, err)
 	assert.Empty(t, policyMap)
-	
+
 	// This demonstrates the current broken state that leads to crash loops
 	assert.Equal(t, 2, requestCount, "Should have made exactly 2 requests showing the failure loop")
 }
@@ -951,7 +951,7 @@ func TestLoadPoliciesFromDashboardTimeoutSimulation(t *testing.T) {
 
 		// Handle policy requests
 		requestCount++
-		
+
 		// First request: simulate timeout by returning nonce failure (gateway retries with stale nonce)
 		if requestCount == 1 {
 			w.WriteHeader(http.StatusForbidden)
@@ -1002,7 +1002,7 @@ func TestLoadPoliciesFromDashboardTimeoutSimulation(t *testing.T) {
 	// Should succeed due to auto-recovery
 	assert.NoError(t, err, "Auto-recovery should handle timeout-induced nonce failure")
 	assert.NotNil(t, policyMap, "Policy map should be returned after auto-recovery")
-	
+
 	// Verify the auto-recovery process for timeout scenario
 	assert.Equal(t, 2, requestCount, "Should make 2 requests (failed retry + recovery)")
 	assert.Equal(t, 1, registrationCount, "Should re-register once for recovery")
@@ -1057,7 +1057,7 @@ func TestLoadPoliciesFromDashboardNoNodeIDFound(t *testing.T) {
 
 		// Handle policy requests
 		requestCount++
-		
+
 		// First request: return 403 with "No node ID Found" error
 		if requestCount == 1 {
 			w.WriteHeader(http.StatusForbidden)
@@ -1104,7 +1104,7 @@ func TestLoadPoliciesFromDashboardNoNodeIDFound(t *testing.T) {
 	// Should succeed due to auto-recovery
 	assert.NoError(t, err, "Auto-recovery should allow successful policy loading after node ID error")
 	assert.NotNil(t, policyMap, "Policy map should be returned after auto-recovery")
-	
+
 	// Verify the auto-recovery process happened
 	assert.GreaterOrEqual(t, requestCount, 2, "Should have made at least 2 policy requests")
 	assert.GreaterOrEqual(t, registrationCount, 1, "Should have re-registered at least once")
@@ -1196,7 +1196,7 @@ func TestLoadPoliciesFromDashboardNetworkErrors(t *testing.T) {
 			// Should fail with appropriate error
 			assert.Error(t, err, tc.description)
 			assert.Nil(t, policyMap)
-			
+
 			// For now, network errors are not auto-recovered
 			// This is a potential enhancement for the future
 			if tc.expectedError != "" && err != nil {
@@ -1228,7 +1228,7 @@ func TestLoadPoliciesFromDashboardNetworkErrorRecovery(t *testing.T) {
 
 		// Handle policy requests
 		requestCount++
-		
+
 		// First request: simulate connection drop (hijack and close)
 		if requestCount == 1 {
 			// Simulate load balancer draining connection mid-flight
@@ -1277,7 +1277,7 @@ func TestLoadPoliciesFromDashboardNetworkErrorRecovery(t *testing.T) {
 	// Should succeed due to auto-recovery from network error
 	assert.NoError(t, err, "Auto-recovery should handle network errors")
 	assert.NotNil(t, policyMap, "Policy map should be returned after network error recovery")
-	
+
 	// Verify the auto-recovery process happened
 	assert.Equal(t, 2, requestCount, "Should have made 2 policy requests (failed + retry)")
 	assert.GreaterOrEqual(t, registrationCount, 1, "Should have re-registered after network error")
@@ -1357,10 +1357,10 @@ func TestLoadPoliciesFromDashboardLoadBalancerDrain(t *testing.T) {
 
 				// Handle policy requests
 				requestCount++
-				
+
 				// Apply drain scenario
 				tc.drainFunc(w, requestCount)
-				
+
 				// If we didn't drain, return success
 				if requestCount > 1 {
 					w.Header().Set("Content-Type", "application/json")

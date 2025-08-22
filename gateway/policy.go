@@ -156,13 +156,13 @@ func (gw *Gateway) LoadPoliciesFromDashboard(endpoint, secret string, allowExpli
 			log.Warning("Network error detected during policy fetch, attempting to re-register node...")
 			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 			defer cancel()
-			
+
 			if regErr := gw.DashService.Register(ctx); regErr != nil {
 				log.Error("Failed to re-register node after network error: ", regErr)
 				return nil, err // Return original error
 			}
 			log.Info("Node re-registered successfully after network error, retrying policy fetch...")
-			
+
 			// Retry the request with fresh registration
 			return gw.LoadPoliciesFromDashboard(endpoint, secret, allowExplicit)
 		}
@@ -180,23 +180,23 @@ func (gw *Gateway) LoadPoliciesFromDashboard(endpoint, secret string, allowExpli
 			// Only attempt recovery for nonce-related failures, not other auth failures
 			if strings.Contains(errorMessage, "Nonce failed") || strings.Contains(errorMessage, "nonce") || strings.Contains(errorMessage, "No node ID Found") {
 				log.Warning("Dashboard nonce failure detected, attempting to re-register node...")
-				
+
 				// Check if DashService is available for recovery
 				if gw.DashService == nil {
 					log.Error("Dashboard service not available for nonce recovery")
 					return nil, ErrPoliciesFetchFailed
 				}
-				
+
 				// Use a timeout context to prevent hanging in tests
 				ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 				defer cancel()
-				
+
 				if err := gw.DashService.Register(ctx); err != nil {
 					log.Error("Failed to re-register node during policy recovery: ", err)
 					return nil, ErrPoliciesFetchFailed
 				}
 				log.Info("Node re-registered successfully, retrying policy fetch...")
-				
+
 				// Retry the request with the new nonce
 				return gw.LoadPoliciesFromDashboard(endpoint, secret, allowExplicit)
 			} else {
@@ -220,13 +220,13 @@ func (gw *Gateway) LoadPoliciesFromDashboard(endpoint, secret string, allowExpli
 			log.Warning("Network error detected while reading policy response, attempting to re-register node...")
 			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 			defer cancel()
-			
+
 			if regErr := gw.DashService.Register(ctx); regErr != nil {
 				log.Error("Failed to re-register node after decode error: ", regErr)
 				return nil, err // Return original error
 			}
 			log.Info("Node re-registered successfully after decode error, retrying policy fetch...")
-			
+
 			// Retry the request with fresh registration
 			return gw.LoadPoliciesFromDashboard(endpoint, secret, allowExplicit)
 		}

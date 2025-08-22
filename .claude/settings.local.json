@@ -36,7 +36,9 @@
       "Bash(sed:*)",
       "Bash(golangci-lint run:*)",
       "Bash(go run:*)",
-      "Bash(git commit:*)"
+      "Bash(git commit:*)",
+      "Bash(git pull:*)",
+      "Bash(git rebase:*)"
     ],
     "deny": []
   },

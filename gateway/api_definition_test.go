@@ -1672,7 +1672,7 @@ func TestFromDashboardServiceAutoRecovery(t *testing.T) {
 
 		// Handle API definition requests
 		requestCount++
-		
+
 		// First request: return 403 to simulate nonce mismatch
 		if requestCount == 1 {
 			w.WriteHeader(http.StatusForbidden)
@@ -1709,12 +1709,12 @@ func TestFromDashboardServiceAutoRecovery(t *testing.T) {
 
 	// Test: Load API definitions should auto-recover from nonce failure
 	endpoint := mockServer.URL + "/system/apis"
-	
+
 	_, err := loader.FromDashboardService(endpoint)
 
 	// Should succeed due to auto-recovery (specs can be empty but shouldn't error)
 	assert.NoError(t, err, "Auto-recovery should allow successful API definitions loading")
-	
+
 	// Verify the auto-recovery process happened
 	assert.GreaterOrEqual(t, requestCount, 1, "Should have made at least 1 API definition request")
 }
@@ -1860,7 +1860,7 @@ func TestFromDashboardServiceNoNodeIDFound(t *testing.T) {
 
 		// Handle API definition requests
 		requestCount++
-		
+
 		// First request: return 403 with "No node ID Found" error
 		if requestCount == 1 {
 			w.WriteHeader(http.StatusForbidden)
@@ -1897,12 +1897,12 @@ func TestFromDashboardServiceNoNodeIDFound(t *testing.T) {
 
 	// Test: Load API definitions should auto-recover from missing node ID
 	endpoint := mockServer.URL + "/system/apis"
-	
+
 	_, err := loader.FromDashboardService(endpoint)
 
 	// Should succeed due to auto-recovery
 	assert.NoError(t, err, "Auto-recovery should allow successful API definitions loading after node ID error")
-	
+
 	// Verify the auto-recovery process happened
 	assert.GreaterOrEqual(t, requestCount, 2, "Should have made at least 2 API definition requests")
 	assert.GreaterOrEqual(t, registrationCount, 1, "Should have re-registered at least once")
@@ -1999,7 +1999,7 @@ func TestFromDashboardServiceNetworkErrors(t *testing.T) {
 			// Should fail with appropriate error
 			assert.Error(t, err, tc.description)
 			assert.Nil(t, specs)
-			
+
 			// For now, network errors are not auto-recovered
 			// This is a potential enhancement for the future
 			if tc.expectedError != "" && err != nil {
@@ -2031,7 +2031,7 @@ func TestFromDashboardServiceNetworkErrorRecovery(t *testing.T) {
 
 		// Handle API definition requests
 		requestCount++
-		
+
 		// First request: simulate connection drop
 		if requestCount == 1 {
 			// Simulate load balancer draining connection mid-flight
@@ -2075,7 +2075,7 @@ func TestFromDashboardServiceNetworkErrorRecovery(t *testing.T) {
 
 	// Should succeed due to auto-recovery from network error
 	assert.NoError(t, err, "Auto-recovery should handle network errors for API definitions")
-	
+
 	// Verify the auto-recovery process happened
 	assert.Equal(t, 2, requestCount, "Should have made 2 API requests (failed + retry)")
 	assert.GreaterOrEqual(t, registrationCount, 1, "Should have re-registered after network error")
