@@ -38,7 +38,8 @@
       "Bash(go run:*)",
       "Bash(git commit:*)",
       "Bash(git pull:*)",
-      "Bash(git rebase:*)"
+      "Bash(git rebase:*)",
+      "Bash(gofmt:*)"
     ],
     "deny": []
   },

@@ -783,8 +783,8 @@ func TestLoadPoliciesFromDashboardAutoRecovery(t *testing.T) {
 
 	// Set up simplified dashboard service
 	g.Gw.DashService = &HTTPDashboardHandler{
-		Gw: g.Gw,
-		Secret: "test-secret",
+		Gw:                   g.Gw,
+		Secret:               "test-secret",
 		RegistrationEndpoint: ts.URL + "/register/node",
 	}
 
@@ -885,7 +885,7 @@ func TestLoadPoliciesFromDashboardInvalidSecret(t *testing.T) {
 	defer ts.Close()
 
 	conf := func(globalConf *config.Config) {
-		globalConf.UseDBAppConfigs = false  // Disable dashboard integration for simpler test
+		globalConf.UseDBAppConfigs = false // Disable dashboard integration for simpler test
 	}
 	g := StartTest(conf)
 	defer g.Close()
@@ -913,7 +913,7 @@ func TestLoadPoliciesFromDashboardServerError(t *testing.T) {
 	defer ts.Close()
 
 	conf := func(globalConf *config.Config) {
-		globalConf.UseDBAppConfigs = false  // Disable dashboard integration for simpler test
+		globalConf.UseDBAppConfigs = false // Disable dashboard integration for simpler test
 	}
 	g := StartTest(conf)
 	defer g.Close()
@@ -989,8 +989,8 @@ func TestLoadPoliciesFromDashboardTimeoutSimulation(t *testing.T) {
 
 	// Set up simplified dashboard service
 	g.Gw.DashService = &HTTPDashboardHandler{
-		Gw: g.Gw,
-		Secret: "test-secret",
+		Gw:                   g.Gw,
+		Secret:               "test-secret",
 		RegistrationEndpoint: ts.URL + "/register/node",
 	}
 
@@ -1018,7 +1018,7 @@ func TestLoadPoliciesFromDashboardNoDashServiceFallback(t *testing.T) {
 	defer ts.Close()
 
 	conf := func(globalConf *config.Config) {
-		globalConf.UseDBAppConfigs = false  // Disable dashboard integration for simpler test
+		globalConf.UseDBAppConfigs = false // Disable dashboard integration for simpler test
 	}
 	g := StartTest(conf)
 	defer g.Close()
@@ -1093,8 +1093,8 @@ func TestLoadPoliciesFromDashboardNoNodeIDFound(t *testing.T) {
 
 	// Set up simplified dashboard service
 	g.Gw.DashService = &HTTPDashboardHandler{
-		Gw: g.Gw,
-		Secret: "test-secret",
+		Gw:                   g.Gw,
+		Secret:               "test-secret",
 		RegistrationEndpoint: ts.URL + "/register/node",
 	}
 
@@ -1266,8 +1266,8 @@ func TestLoadPoliciesFromDashboardNetworkErrorRecovery(t *testing.T) {
 
 	// Set up dashboard service
 	g.Gw.DashService = &HTTPDashboardHandler{
-		Gw: g.Gw,
-		Secret: "test-secret",
+		Gw:                   g.Gw,
+		Secret:               "test-secret",
 		RegistrationEndpoint: ts.URL + "/register/node",
 	}
 
@@ -1386,8 +1386,8 @@ func TestLoadPoliciesFromDashboardLoadBalancerDrain(t *testing.T) {
 
 			// Set up dashboard service
 			g.Gw.DashService = &HTTPDashboardHandler{
-				Gw: g.Gw,
-				Secret: "test-secret",
+				Gw:                   g.Gw,
+				Secret:               "test-secret",
 				RegistrationEndpoint: ts.URL + "/register/node",
 			}
 

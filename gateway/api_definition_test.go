@@ -1699,8 +1699,8 @@ func TestFromDashboardServiceAutoRecovery(t *testing.T) {
 
 	// Set up simplified dashboard service
 	g.Gw.DashService = &HTTPDashboardHandler{
-		Gw: g.Gw,
-		Secret: "test-secret",
+		Gw:                   g.Gw,
+		Secret:               "test-secret",
 		RegistrationEndpoint: mockServer.URL + "/register/node",
 	}
 
@@ -1732,7 +1732,7 @@ func TestFromDashboardServiceInvalidSecret(t *testing.T) {
 	defer ts.Close()
 
 	conf := func(globalConf *config.Config) {
-		globalConf.UseDBAppConfigs = false  // Disable to prevent registration during startup
+		globalConf.UseDBAppConfigs = false // Disable to prevent registration during startup
 		// Set short timeout for tests to prevent hanging
 		globalConf.DBAppConfOptions.ConnectionTimeout = 2
 		// Disable zeroconf to prevent blocking
@@ -1745,7 +1745,7 @@ func TestFromDashboardServiceInvalidSecret(t *testing.T) {
 
 	// Set up simplified dashboard service
 	g.Gw.DashService = &HTTPDashboardHandler{
-		Gw: g.Gw,
+		Gw:     g.Gw,
 		Secret: "test-secret",
 	}
 
@@ -1774,7 +1774,7 @@ func TestFromDashboardServiceServerError(t *testing.T) {
 	defer ts.Close()
 
 	conf := func(globalConf *config.Config) {
-		globalConf.UseDBAppConfigs = false  // Disable to prevent registration during startup
+		globalConf.UseDBAppConfigs = false // Disable to prevent registration during startup
 		// Set short timeout for tests to prevent hanging
 		globalConf.DBAppConfOptions.ConnectionTimeout = 2
 		// Disable zeroconf to prevent blocking
@@ -1787,7 +1787,7 @@ func TestFromDashboardServiceServerError(t *testing.T) {
 
 	// Set up simplified dashboard service
 	g.Gw.DashService = &HTTPDashboardHandler{
-		Gw: g.Gw,
+		Gw:     g.Gw,
 		Secret: "test-secret",
 	}
 
@@ -1813,7 +1813,7 @@ func TestFromDashboardServiceNoDashServiceFallback(t *testing.T) {
 	defer ts.Close()
 
 	conf := func(globalConf *config.Config) {
-		globalConf.UseDBAppConfigs = false  // Disable to prevent registration during startup
+		globalConf.UseDBAppConfigs = false // Disable to prevent registration during startup
 		// Set short timeout for tests to prevent hanging
 		globalConf.DBAppConfOptions.ConnectionTimeout = 2
 		// Disable zeroconf to prevent blocking
@@ -1887,8 +1887,8 @@ func TestFromDashboardServiceNoNodeIDFound(t *testing.T) {
 
 	// Set up simplified dashboard service
 	g.Gw.DashService = &HTTPDashboardHandler{
-		Gw: g.Gw,
-		Secret: "test-secret",
+		Gw:                   g.Gw,
+		Secret:               "test-secret",
 		RegistrationEndpoint: mockServer.URL + "/register/node",
 	}
 
@@ -2061,8 +2061,8 @@ func TestFromDashboardServiceNetworkErrorRecovery(t *testing.T) {
 
 	// Set up dashboard service
 	g.Gw.DashService = &HTTPDashboardHandler{
-		Gw: g.Gw,
-		Secret: "test-secret",
+		Gw:                   g.Gw,
+		Secret:               "test-secret",
 		RegistrationEndpoint: mockServer.URL + "/register/node",
 	}
 
