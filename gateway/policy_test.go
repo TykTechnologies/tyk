@@ -1144,7 +1144,7 @@ func TestLoadPoliciesFromDashboardNetworkErrors(t *testing.T) {
 		{
 			name: "Connection Dropped Mid-Response",
 			serverFunc: func() *httptest.Server {
-				return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 					// Start writing response then close connection
 					w.Header().Set("Content-Type", "application/json")
 					w.WriteHeader(http.StatusOK)

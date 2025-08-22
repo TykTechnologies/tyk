@@ -23,12 +23,21 @@
       "Bash(go test:*)",
       "Bash(git checkout:*)",
       "Bash(git add:*)",
-      "Bash(git push:*)"
+      "Bash(git push:*)",
+      "Bash(gh pr checks:*)",
+      "Bash(gh run list:*)",
+      "WebFetch(domain:github.com)",
+      "Bash(git fetch:*)",
+      "Bash(gh api:*)",
+      "Bash(gh run view:*)",
+      "Bash(gh run view:*)",
+      "Bash(golangci-lint run:*)",
+      "Bash(git commit:*)"
     ],
     "deny": []
   },
+  "enableAllProjectMcpServers": true,
   "enabledMcpjsonServers": [
     "big-brain"
-  ],
-  "enableAllProjectMcpServers": true
+  ]
 }
