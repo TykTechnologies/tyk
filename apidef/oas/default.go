@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/url"
 	"reflect"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -136,7 +137,7 @@ func (s *OAS) BuildDefaultTykExtension(overRideValues TykExtensionConfigParams, 
 		}
 	}
 
-	s.importMiddlewares(overRideValues)
+	s.ImportMiddlewares(overRideValues)
 
 	return nil
 }
@@ -213,12 +214,14 @@ func (as *AuthSources) Import(in string) {
 	}
 }
 
-func (s *OAS) importMiddlewares(overRideValues TykExtensionConfigParams) {
+func (s *OAS) ImportMiddlewares(overRideValues TykExtensionConfigParams) {
 	xTykAPIGateway := s.GetTykExtension()
 
 	if xTykAPIGateway.Middleware == nil {
 		xTykAPIGateway.Middleware = &Middleware{}
 	}
+
+	currentOperations := make([]string, 0)
 
 	for path, pathItem := range s.Paths.Map() {
 		overRideValues.pathItemHasParameters = len(pathItem.Parameters) > 0
@@ -226,13 +229,31 @@ func (s *OAS) importMiddlewares(overRideValues TykExtensionConfigParams) {
 			if operation := pathItem.GetOperation(method); operation != nil {
 				tykOperation := s.getTykOperation(method, path)
 				tykOperation.Import(operation, overRideValues)
+				currentOperations = append(currentOperations, s.getOperationID(path, method))
 				s.deleteTykOperationIfEmpty(tykOperation, method, path)
 			}
 		}
 	}
 
+	s.removeObsoleteOperations(currentOperations)
+
 	if ShouldOmit(xTykAPIGateway.Middleware) {
 		xTykAPIGateway.Middleware = nil
+	}
+}
+
+func (s *OAS) removeObsoleteOperations(currentOperations []string) {
+	tykOperations := s.getTykOperations()
+	obsoleteOperations := make([]string, 0)
+
+	for id := range tykOperations {
+		if !slices.Contains(currentOperations, id) {
+			obsoleteOperations = append(obsoleteOperations, id)
+		}
+	}
+
+	for _, operationID := range obsoleteOperations {
+		delete(tykOperations, operationID)
 	}
 }
 

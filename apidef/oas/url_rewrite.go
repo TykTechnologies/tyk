@@ -116,7 +116,7 @@ type URLRewriteRule struct {
 
 	// Negate is a boolean negation operator. Setting it to true inverts the matching behaviour
 	// such that the rewrite will be triggered if the value does not match the `pattern` for this rule.
-	Negate bool `bson:"negate" json:"negate"`
+	Negate bool `bson:"negate,omitempty" json:"negate,omitempty"`
 }
 
 // Fill fills *URLRewrite receiver from apidef.URLRewriteMeta.
@@ -158,6 +158,12 @@ func (v *URLRewrite) Sort() {
 		rules := t.Rules
 
 		sort.Slice(rules, func(i, j int) bool {
+			// if the cardinal index is equal, the sorting will fall back
+			// to the Name, otherwise it will be non-deterministic.
+			if rules[i].In.Index() == rules[j].In.Index() {
+				return rules[i].Name < rules[j].Name
+			}
+
 			return rules[i].In.Index() < rules[j].In.Index()
 		})
 	}

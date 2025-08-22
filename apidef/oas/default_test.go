@@ -258,11 +258,6 @@ func TestOAS_BuildDefaultTykExtension(t *testing.T) {
 					SecuritySchemes: SecuritySchemes{
 						testSSMyAuth: &Token{
 							Enabled: true,
-							AuthSources: AuthSources{
-								Header: &AuthSource{
-									Enabled: true,
-								},
-							},
 						},
 						testSSMyAuthWithAnd: &OAuth{
 							Enabled: true,
@@ -562,6 +557,34 @@ func TestOAS_BuildDefaultTykExtension(t *testing.T) {
 
 			return operations
 		}
+
+		t.Run("operations not present in new oas paths definition should be removed", func(t *testing.T) {
+			fakeOperationName := "fakeOperation"
+			fakeOperation := &Operation{
+				MockResponse: &MockResponse{
+					Enabled: true,
+				},
+			}
+			oasDef := getOASDef(true, true)
+
+			tykExtensionConfigParams := TykExtensionConfigParams{
+				MockResponse: &trueVal,
+			}
+
+			extension := &XTykAPIGateway{
+				Middleware: &Middleware{
+					Operations: map[string]*Operation{fakeOperationName: fakeOperation},
+				},
+			}
+			oasDef.SetTykExtension(extension)
+			assert.Greater(t, len(oasDef.getTykOperations()), 0)
+
+			expectedOperations := getExpectedOperations(true, true, middlewareMockResponse)
+			err := oasDef.BuildDefaultTykExtension(tykExtensionConfigParams, true)
+
+			assert.NoError(t, err)
+			assert.Equal(t, expectedOperations, oasDef.getTykOperations())
+		})
 
 		t.Run("allowList", func(t *testing.T) {
 			t.Run("enable allowList for all paths when no configured operationID in OAS", func(t *testing.T) {
@@ -1681,11 +1704,6 @@ func TestOAS_importAuthentication(t *testing.T) {
 			expectedSecuritySchemes := SecuritySchemes{
 				testSecurityNameToken: &Token{
 					Enabled: enable,
-					AuthSources: AuthSources{
-						Cookie: &AuthSource{
-							Enabled: true,
-						},
-					},
 				},
 			}
 
@@ -1727,12 +1745,6 @@ func TestOAS_importAuthentication(t *testing.T) {
 					SecuritySchemes: SecuritySchemes{
 						testSecurityNameToken: &Token{
 							Enabled: false,
-							AuthSources: AuthSources{
-								Header: &AuthSource{
-									Enabled: true,
-									Name:    testHeaderName,
-								},
-							},
 						},
 					},
 				},
@@ -1751,15 +1763,6 @@ func TestOAS_importAuthentication(t *testing.T) {
 		expectedSecuritySchemes := SecuritySchemes{
 			testSecurityNameToken: &Token{
 				Enabled: true,
-				AuthSources: AuthSources{
-					Header: &AuthSource{
-						Enabled: true,
-						Name:    testHeaderName,
-					},
-					Cookie: &AuthSource{
-						Enabled: true,
-					},
-				},
 			},
 		}
 
@@ -1807,11 +1810,6 @@ func TestOAS_importAuthentication(t *testing.T) {
 			expectedSecuritySchemes := SecuritySchemes{
 				testSecurityNameToken: &Token{
 					Enabled: enable,
-					AuthSources: AuthSources{
-						Cookie: &AuthSource{
-							Enabled: true,
-						},
-					},
 				},
 				testSecurityNameJWT: &JWT{
 					Enabled: enable,
@@ -1864,11 +1862,6 @@ func TestSecuritySchemes_Import(t *testing.T) {
 
 			expectedToken := &Token{
 				Enabled: enable,
-				AuthSources: AuthSources{
-					Header: &AuthSource{
-						Enabled: true,
-					},
-				},
 			}
 
 			assert.Equal(t, expectedToken, securitySchemes[testSecurityNameToken])
@@ -1963,14 +1956,7 @@ func TestSecuritySchemes_Import(t *testing.T) {
 	})
 
 	t.Run("update existing one", func(t *testing.T) {
-		existingToken := &Token{
-			AuthSources: AuthSources{
-				Cookie: &AuthSource{
-					Enabled: true,
-					Name:    testCookieName,
-				},
-			},
-		}
+		existingToken := &Token{}
 		securitySchemes := SecuritySchemes{
 			testSecurityNameToken: existingToken,
 		}
@@ -1986,15 +1972,6 @@ func TestSecuritySchemes_Import(t *testing.T) {
 
 		expectedToken := &Token{
 			Enabled: true,
-			AuthSources: AuthSources{
-				Header: &AuthSource{
-					Enabled: true,
-				},
-				Cookie: &AuthSource{
-					Enabled: true,
-					Name:    testCookieName,
-				},
-			},
 		}
 
 		assert.Equal(t, expectedToken, securitySchemes[testSecurityNameToken])

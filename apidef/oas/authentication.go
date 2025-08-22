@@ -226,7 +226,7 @@ func (ss SecuritySchemes) Import(name string, nativeSS *openapi3.SecurityScheme,
 			}
 		}
 
-		token.Import(nativeSS, enable)
+		token.Enabled = enable
 	case nativeSS.Type == typeHTTP && nativeSS.Scheme == schemeBearer && nativeSS.BearerFormat == bearerFormatJWT:
 		jwt := &JWT{}
 		if ss[name] == nil {
@@ -484,6 +484,11 @@ type Scopes struct {
 	// - For JWT: `scopes.jwt.scope_claim_name`
 	ClaimName string `bson:"claimName,omitempty" json:"claimName,omitempty"`
 
+	// Claims contains a list of claims that contains the claim name.
+	// The first match from the list of claims in the token is used.
+	// OAS only field applied to OAS apis.
+	Claims []string `bson:"claims,omitempty" json:"claims,omitempty"`
+
 	// ScopeToPolicyMapping contains the mappings of scopes to policy IDs.
 	//
 	// Tyk classic API definition:
@@ -495,6 +500,9 @@ type Scopes struct {
 // Fill fills *Scopes from *apidef.ScopeClaim.
 func (s *Scopes) Fill(scopeClaim *apidef.ScopeClaim) {
 	s.ClaimName = scopeClaim.ScopeClaimName
+	if s.ClaimName != "" {
+		s.Claims = []string{scopeClaim.ScopeClaimName}
+	}
 
 	s.ScopeToPolicyMapping = []ScopeToPolicy{}
 
