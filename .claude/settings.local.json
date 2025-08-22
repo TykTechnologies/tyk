@@ -1,0 +1,34 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(gh pr view:*)",
+      "Bash(chmod:*)",
+      "Bash(redis-cli:*)",
+      "Bash(./monitor-recovery-logs.sh:*)",
+      "Bash(timeout:*)",
+      "Bash(bash:*)",
+      "Bash(./continuous-load-test.sh:*)",
+      "Bash(curl:*)",
+      "Bash(pkill:*)",
+      "Bash(./run-all-tests.sh:*)",
+      "Bash(./test-network-failures.sh:*)",
+      "Bash(./test-nonce-recovery.sh:*)",
+      "Bash(rm:*)",
+      "Bash(brew list:*)",
+      "Bash(brew install:*)",
+      "Bash(go build:*)",
+      "Bash(./test-nonce-issue-demo.sh:*)",
+      "Bash(grep:*)",
+      "Bash(find:*)",
+      "Bash(go test:*)",
+      "Bash(git checkout:*)",
+      "Bash(git add:*)",
+      "Bash(git push:*)"
+    ],
+    "deny": []
+  },
+  "enabledMcpjsonServers": [
+    "big-brain"
+  ],
+  "enableAllProjectMcpServers": true
+}
