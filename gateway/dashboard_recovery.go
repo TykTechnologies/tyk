@@ -54,7 +54,10 @@ func (gw *Gateway) executeDashboardRequestWithRecovery(buildReq func() (*http.Re
 
 		// Handle forbidden responses (potential nonce issues)
 		if resp.StatusCode == http.StatusForbidden {
-			body, _ := io.ReadAll(resp.Body)
+			body, err := io.ReadAll(resp.Body)
+			if err != nil {
+				body = []byte("failed to read response body")
+			}
 			resp.Body.Close()
 			errorMessage := string(body)
 

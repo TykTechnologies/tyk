@@ -423,12 +423,18 @@ func (a APIDefinitionLoader) FromDashboardService(endpoint string) ([]*APISpec, 
 
 	// Handle 403 responses (auth errors already logged by helper)
 	if resp.StatusCode == http.StatusForbidden {
-		body, _ := io.ReadAll(resp.Body)
+		body, err := io.ReadAll(resp.Body)
+		if err != nil {
+			body = []byte("failed to read response body")
+		}
 		return nil, fmt.Errorf("login failure, Response was: %v", string(body))
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
+		body, err := io.ReadAll(resp.Body)
+		if err != nil {
+			body = []byte("failed to read response body")
+		}
 		return nil, fmt.Errorf("dashboard API error, response was: %v", string(body))
 	}
 
