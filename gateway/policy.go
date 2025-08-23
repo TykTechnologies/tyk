@@ -1,17 +1,13 @@
 package gateway
 
 import (
-	"context"
 	"encoding/json"
 	"errors"
 	"github.com/TykTechnologies/tyk/header"
-	"io"
 	"io/ioutil"
 	"net/http"
 	"os"
 	"path/filepath"
-	"strings"
-	"time"
 
 	"github.com/TykTechnologies/graphql-go-tools/pkg/graphql"
 
@@ -123,87 +119,40 @@ func LoadPoliciesFromDir(dir string) (map[string]user.Policy, error) {
 
 // LoadPoliciesFromDashboard will connect and download Policies from a Tyk Dashboard instance.
 func (gw *Gateway) LoadPoliciesFromDashboard(endpoint, secret string, allowExplicit bool) (map[string]user.Policy, error) {
+	// Build request function for recovery mechanism
+	buildReq := func() (*http.Request, error) {
+		req, err := http.NewRequest("GET", endpoint, nil)
+		if err != nil {
+			return nil, err
+		}
 
-	// Get the definitions
-	newRequest, err := http.NewRequest("GET", endpoint, nil)
-	if err != nil {
-		log.Error("Failed to create request: ", err)
-		return nil, err
+		req.Header.Set("authorization", secret)
+		req.Header.Set(header.XTykNodeID, gw.GetNodeID())
+		req.Header.Set(header.XTykSessionID, gw.SessionID)
+
+		gw.ServiceNonceMutex.RLock()
+		req.Header.Set(header.XTykNonce, gw.ServiceNonce)
+		gw.ServiceNonceMutex.RUnlock()
+
+		return req, nil
 	}
-
-	newRequest.Header.Set("authorization", secret)
-	newRequest.Header.Set(header.XTykNodeID, gw.GetNodeID())
-	newRequest.Header.Set(header.XTykSessionID, gw.SessionID)
-
-	gw.ServiceNonceMutex.RLock()
-	newRequest.Header.Set("x-tyk-nonce", gw.ServiceNonce)
-	gw.ServiceNonceMutex.RUnlock()
-
-	log.WithFields(logrus.Fields{
-		"prefix": "policy",
-	}).Info("Mutex lock acquired... calling")
-	c := gw.initialiseClient()
 
 	log.WithFields(logrus.Fields{
 		"prefix": "policy",
 	}).Info("Calling dashboard service for policy list")
-	resp, err := c.Do(newRequest)
+
+	// Execute request with automatic recovery
+	resp, err := gw.executeDashboardRequestWithRecovery(buildReq, "policy fetch")
 	if err != nil {
 		log.Error("Policy request failed: ", err)
-		// Check if this might be a transient network error that could benefit from re-registration
-		// This handles load balancer draining scenarios where connections are dropped
-		if gw.DashService != nil {
-			log.Warning("Network error detected during policy fetch, attempting to re-register node...")
-			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-			defer cancel()
-
-			if regErr := gw.DashService.Register(ctx); regErr != nil {
-				log.Error("Failed to re-register node after network error: ", regErr)
-				return nil, err // Return original error
-			}
-			log.Info("Node re-registered successfully after network error, retrying policy fetch...")
-
-			// Retry the request with fresh registration
-			return gw.LoadPoliciesFromDashboard(endpoint, secret, allowExplicit)
-		}
 		return nil, err
 	}
 	defer resp.Body.Close()
 
+	// Check response status
 	if resp.StatusCode != http.StatusOK {
 		body, _ := ioutil.ReadAll(resp.Body)
-		errorMessage := string(body)
-		log.Error("Policy request login failure, Response was: ", errorMessage)
-
-		// Handle nonce desynchronization with intelligent auto-recovery
-		if resp.StatusCode == http.StatusForbidden {
-			// Only attempt recovery for nonce-related failures, not other auth failures
-			if strings.Contains(errorMessage, "Nonce failed") || strings.Contains(errorMessage, "nonce") || strings.Contains(errorMessage, "No node ID Found") {
-				log.Warning("Dashboard nonce failure detected, attempting to re-register node...")
-
-				// Check if DashService is available for recovery
-				if gw.DashService == nil {
-					log.Error("Dashboard service not available for nonce recovery")
-					return nil, ErrPoliciesFetchFailed
-				}
-
-				// Use a timeout context to prevent hanging in tests
-				ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-				defer cancel()
-
-				if err := gw.DashService.Register(ctx); err != nil {
-					log.Error("Failed to re-register node during policy recovery: ", err)
-					return nil, ErrPoliciesFetchFailed
-				}
-				log.Info("Node re-registered successfully, retrying policy fetch...")
-
-				// Retry the request with the new nonce
-				return gw.LoadPoliciesFromDashboard(endpoint, secret, allowExplicit)
-			} else {
-				log.Warning("Dashboard authentication failed with non-nonce error: ", errorMessage)
-			}
-		}
-
+		log.Error("Policy request login failure, Response was: ", string(body))
 		return nil, ErrPoliciesFetchFailed
 	}
 
@@ -214,20 +163,9 @@ func (gw *Gateway) LoadPoliciesFromDashboard(endpoint, secret string, allowExpli
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&list); err != nil {
 		log.Error("Failed to decode policy body: ", err)
-		// Check if this is a network error (EOF, unexpected EOF) that might benefit from re-registration
-		// This can happen when load balancer drains connection during response body read
-		if (errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) || strings.Contains(err.Error(), "EOF")) && gw.DashService != nil {
-			log.Warning("Network error detected while reading policy response, attempting to re-register node...")
-			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-			defer cancel()
-
-			if regErr := gw.DashService.Register(ctx); regErr != nil {
-				log.Error("Failed to re-register node after decode error: ", regErr)
-				return nil, err // Return original error
-			}
-			log.Info("Node re-registered successfully after decode error, retrying policy fetch...")
-
-			// Retry the request with fresh registration
+		// Check if we should retry after a network error during read
+		if gw.HandleDashboardResponseReadError(err, "policy fetch") {
+			// Retry the entire operation
 			return gw.LoadPoliciesFromDashboard(endpoint, secret, allowExplicit)
 		}
 		return nil, err

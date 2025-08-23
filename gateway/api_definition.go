@@ -8,7 +8,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"net/url"
 	"os"
@@ -392,81 +391,44 @@ func (a APIDefinitionLoader) MakeSpec(def *model.MergedAPI, logger *logrus.Entry
 func (a APIDefinitionLoader) FromDashboardService(endpoint string) ([]*APISpec, error) {
 	// Get the definitions
 	log.Debug("Calling: ", endpoint)
-	newRequest, err := http.NewRequest("GET", endpoint, nil)
-	if err != nil {
-		log.Error("Failed to create request: ", err)
+
+	// Build request function for recovery helper
+	buildReq := func() (*http.Request, error) {
+		newRequest, err := http.NewRequest("GET", endpoint, nil)
+		if err != nil {
+			log.Error("Failed to create request: ", err)
+			return nil, err
+		}
+
+		gwConfig := a.Gw.GetConfig()
+		newRequest.Header.Set("authorization", gwConfig.NodeSecret)
+		log.Debug("Using: NodeID: ", a.Gw.GetNodeID())
+		newRequest.Header.Set(header.XTykNodeID, a.Gw.GetNodeID())
+
+		a.Gw.ServiceNonceMutex.RLock()
+		newRequest.Header.Set(header.XTykNonce, a.Gw.ServiceNonce)
+		a.Gw.ServiceNonceMutex.RUnlock()
+
+		newRequest.Header.Set(header.XTykSessionID, a.Gw.SessionID)
+
+		return newRequest, nil
 	}
 
-	gwConfig := a.Gw.GetConfig()
-
-	newRequest.Header.Set("authorization", gwConfig.NodeSecret)
-	log.Debug("Using: NodeID: ", a.Gw.GetNodeID())
-	newRequest.Header.Set(header.XTykNodeID, a.Gw.GetNodeID())
-
-	a.Gw.ServiceNonceMutex.RLock()
-	newRequest.Header.Set(header.XTykNonce, a.Gw.ServiceNonce)
-	a.Gw.ServiceNonceMutex.RUnlock()
-
-	newRequest.Header.Set(header.XTykSessionID, a.Gw.SessionID)
-
-	c := a.Gw.initialiseClient()
-	resp, err := c.Do(newRequest)
+	// Execute request with automatic recovery
+	resp, err := a.Gw.executeDashboardRequestWithRecovery(buildReq, "API definitions fetch")
 	if err != nil {
-		// Check if this might be a transient network error that could benefit from re-registration
-		// This handles load balancer draining scenarios where connections are dropped
-		if a.Gw.DashService != nil {
-			log.Warning("Network error detected during API definitions fetch, attempting to re-register node...")
-			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-			defer cancel()
-
-			if regErr := a.Gw.DashService.Register(ctx); regErr != nil {
-				log.Error("Failed to re-register node after network error: ", regErr)
-				return nil, err // Return original error
-			}
-			log.Info("Node re-registered successfully after network error, retrying API definitions fetch...")
-
-			// Retry the request with fresh registration
-			return a.FromDashboardService(endpoint)
-		}
 		return nil, err
 	}
 	defer resp.Body.Close()
 
+	// Handle 403 responses (auth errors already logged by helper)
 	if resp.StatusCode == http.StatusForbidden {
-		body, _ := ioutil.ReadAll(resp.Body)
-		errorMessage := string(body)
-
-		// Handle nonce desynchronization with intelligent auto-recovery
-		// Only attempt recovery for nonce-related failures, not other auth failures
-		if strings.Contains(errorMessage, "Nonce failed") || strings.Contains(errorMessage, "nonce") || strings.Contains(errorMessage, "No node ID Found") {
-			log.Warning("Dashboard nonce failure detected during API definitions fetch, attempting to re-register node...")
-
-			// Check if DashService is available for recovery
-			if a.Gw.DashService == nil {
-				log.Error("Dashboard service not available for nonce recovery")
-				return nil, fmt.Errorf("login failure, Response was: %v", errorMessage)
-			}
-
-			// Use a timeout context to prevent hanging in tests
-			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-			defer cancel()
-
-			if err := a.Gw.DashService.Register(ctx); err != nil {
-				log.Error("Failed to re-register node during API definitions recovery: ", err)
-				return nil, fmt.Errorf("login failure, Response was: %v", errorMessage)
-			}
-			log.Info("Node re-registered successfully, retrying API definitions fetch...")
-
-			// Retry the request with the new nonce
-			return a.FromDashboardService(endpoint)
-		} else {
-			log.Warning("Dashboard authentication failed with non-nonce error during API definitions fetch: ", errorMessage)
-			return nil, fmt.Errorf("login failure, Response was: %v", errorMessage)
-		}
+		body, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("login failure, Response was: %v", string(body))
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		body, _ := ioutil.ReadAll(resp.Body)
+		body, _ := io.ReadAll(resp.Body)
 		return nil, fmt.Errorf("dashboard API error, response was: %v", string(body))
 	}
 
@@ -475,19 +437,8 @@ func (a APIDefinitionLoader) FromDashboardService(endpoint string) ([]*APISpec, 
 	inBytes, err := io.ReadAll(resp.Body)
 	if err != nil {
 		log.Error("Couldn't read api definition list")
-		// Check if this is a network error that might benefit from re-registration
-		if (errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) || strings.Contains(err.Error(), "EOF")) && a.Gw.DashService != nil {
-			log.Warning("Network error detected while reading API definition response, attempting to re-register node...")
-			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-			defer cancel()
-
-			if regErr := a.Gw.DashService.Register(ctx); regErr != nil {
-				log.Error("Failed to re-register node after read error: ", regErr)
-				return nil, err // Return original error
-			}
-			log.Info("Node re-registered successfully after read error, retrying API definitions fetch...")
-
-			// Retry the request with fresh registration
+		// Check if this is a recoverable read error and retry if needed
+		if a.Gw.HandleDashboardResponseReadError(err, "API definitions read") {
 			return a.FromDashboardService(endpoint)
 		}
 		return nil, err
@@ -503,6 +454,7 @@ func (a APIDefinitionLoader) FromDashboardService(endpoint string) ([]*APISpec, 
 	}
 
 	// Extract tagged entries only
+	gwConfig := a.Gw.GetConfig()
 	apiDefs := list.Filter(gwConfig.DBAppConfOptions.NodeIsSegmented, gwConfig.DBAppConfOptions.Tags...)
 
 	// Process
