@@ -1210,9 +1210,9 @@ func TestLoadPoliciesFromDashboardNetworkErrors(t *testing.T) {
 				// Could be "context deadline exceeded", "unexpected end of JSON input", or "Client.Timeout"
 				assert.True(t,
 					strings.Contains(err.Error(), "context deadline exceeded") ||
-					strings.Contains(err.Error(), "unexpected end of JSON input") ||
-					strings.Contains(err.Error(), "Client.Timeout") ||
-					strings.Contains(err.Error(), "timeout"),
+						strings.Contains(err.Error(), "unexpected end of JSON input") ||
+						strings.Contains(err.Error(), "Client.Timeout") ||
+						strings.Contains(err.Error(), "timeout"),
 					fmt.Sprintf("Expected timeout-related error, got: %v", err))
 			} else if tc.expectedError != "" && err != nil {
 				assert.Contains(t, err.Error(), tc.expectedError, "Error should indicate network issue")
