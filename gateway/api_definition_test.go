@@ -10,6 +10,7 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"sync"
 	"testing"
 	texttemplate "text/template"
@@ -1375,7 +1376,7 @@ func TestEnforcedTimeout(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
 
-	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(_ http.ResponseWriter, _ *http.Request) {
 		time.Sleep(2 * time.Second)
 	}))
 
@@ -1647,4 +1648,450 @@ func TestInternalEndpointMW_TT_11126(t *testing.T) {
 	_, _ = ts.Run(t, []test.TestCase{
 		{Path: "/headers", Code: http.StatusForbidden},
 	}...)
+}
+
+// TestFromDashboardServiceAutoRecovery tests nonce desynchronization auto-recovery for API definitions
+func TestFromDashboardServiceAutoRecovery(t *testing.T) {
+	requestCount := 0
+	registrationCount := 0
+
+	// Mock dashboard server
+	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Handle registration requests
+		if strings.Contains(r.URL.Path, "/register/node") {
+			registrationCount++
+			w.Header().Set("Content-Type", "application/json")
+			response := NodeResponseOK{
+				Status:  "ok",
+				Message: map[string]string{"NodeID": "test-node-id"},
+				Nonce:   fmt.Sprintf("nonce-%d", registrationCount),
+			}
+			json.NewEncoder(w).Encode(response)
+			return
+		}
+
+		// Handle API definition requests
+		requestCount++
+
+		// First request: return 403 to simulate nonce mismatch
+		if requestCount == 1 {
+			w.WriteHeader(http.StatusForbidden)
+			w.Write([]byte("Nonce failed"))
+			return
+		}
+
+		// Subsequent requests: success after auto-recovery
+		w.Header().Set("Content-Type", "application/json")
+		list := model.NewMergedAPIList()
+		list.Nonce = "success-nonce"
+		json.NewEncoder(w).Encode(list)
+	}))
+	defer mockServer.Close()
+
+	conf := func(globalConf *config.Config) {
+		globalConf.UseDBAppConfigs = false // Simplified setup
+		globalConf.NodeSecret = "test-secret"
+		globalConf.DBAppConfOptions.ConnectionTimeout = 2
+		globalConf.DisableDashboardZeroConf = true
+	}
+	g := StartTest(conf)
+	defer g.Close()
+
+	// Set up simplified dashboard service
+	g.Gw.DashService = &HTTPDashboardHandler{
+		Gw:                   g.Gw,
+		Secret:               "test-secret",
+		RegistrationEndpoint: mockServer.URL + "/register/node",
+	}
+
+	// Create API definition loader
+	loader := APIDefinitionLoader{Gw: g.Gw}
+
+	// Test: Load API definitions should auto-recover from nonce failure
+	endpoint := mockServer.URL + "/system/apis"
+
+	_, err := loader.FromDashboardService(endpoint)
+
+	// Should succeed due to auto-recovery (specs can be empty but shouldn't error)
+	assert.NoError(t, err, "Auto-recovery should allow successful API definitions loading")
+
+	// Verify the auto-recovery process happened
+	assert.GreaterOrEqual(t, requestCount, 1, "Should have made at least 1 API definition request")
+}
+
+// TestFromDashboardServiceInvalidSecret tests invalid secret handling for API definitions
+func TestFromDashboardServiceInvalidSecret(t *testing.T) {
+	var requestCount int
+
+	// Mock dashboard that returns "Secret incorrect" error
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		requestCount++
+		w.WriteHeader(http.StatusForbidden)
+		w.Write([]byte("Authorization failed (Secret incorrect)"))
+	}))
+	defer ts.Close()
+
+	conf := func(globalConf *config.Config) {
+		globalConf.UseDBAppConfigs = false // Disable to prevent registration during startup
+		// Set short timeout for tests to prevent hanging
+		globalConf.DBAppConfOptions.ConnectionTimeout = 2
+		// Disable zeroconf to prevent blocking
+		globalConf.DisableDashboardZeroConf = true
+		// Set NodeSecret to prevent Fatal error in Init
+		globalConf.NodeSecret = "test-secret"
+	}
+	g := StartTest(conf)
+	defer g.Close()
+
+	// Set up simplified dashboard service
+	g.Gw.DashService = &HTTPDashboardHandler{
+		Gw:     g.Gw,
+		Secret: "test-secret",
+	}
+
+	// Create API definition loader
+	loader := APIDefinitionLoader{Gw: g.Gw}
+
+	specs, err := loader.FromDashboardService(ts.URL)
+
+	// Should fail with standard error, NOT trigger nonce recovery
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "login failure")
+	assert.Nil(t, specs)
+	assert.Equal(t, 1, requestCount, "Should make only one request, no retry for invalid secret")
+}
+
+// TestFromDashboardServiceServerError tests server error handling for API definitions
+func TestFromDashboardServiceServerError(t *testing.T) {
+	var requestCount int
+
+	// Mock dashboard that returns 500 Internal Server Error
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		requestCount++
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte("Internal Server Error: Cannot connect to Redis"))
+	}))
+	defer ts.Close()
+
+	conf := func(globalConf *config.Config) {
+		globalConf.UseDBAppConfigs = false // Disable to prevent registration during startup
+		// Set short timeout for tests to prevent hanging
+		globalConf.DBAppConfOptions.ConnectionTimeout = 2
+		// Disable zeroconf to prevent blocking
+		globalConf.DisableDashboardZeroConf = true
+		// Set NodeSecret to prevent Fatal error in Init
+		globalConf.NodeSecret = "test-secret"
+	}
+	g := StartTest(conf)
+	defer g.Close()
+
+	// Set up simplified dashboard service
+	g.Gw.DashService = &HTTPDashboardHandler{
+		Gw:     g.Gw,
+		Secret: "test-secret",
+	}
+
+	// Create API definition loader
+	loader := APIDefinitionLoader{Gw: g.Gw}
+
+	specs, err := loader.FromDashboardService(ts.URL)
+
+	// Should fail with standard error, NOT trigger nonce recovery
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "dashboard API error")
+	assert.Nil(t, specs)
+	assert.Equal(t, 1, requestCount, "Should make only one request, no retry for server errors")
+}
+
+// TestFromDashboardServiceNoDashServiceFallback tests graceful fallback for API definitions
+func TestFromDashboardServiceNoDashServiceFallback(t *testing.T) {
+	// Mock dashboard that returns nonce error
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusForbidden)
+		w.Write([]byte("Nonce failed"))
+	}))
+	defer ts.Close()
+
+	conf := func(globalConf *config.Config) {
+		globalConf.UseDBAppConfigs = false // Disable to prevent registration during startup
+		// Set short timeout for tests to prevent hanging
+		globalConf.DBAppConfOptions.ConnectionTimeout = 2
+		// Disable zeroconf to prevent blocking
+		globalConf.DisableDashboardZeroConf = true
+		// Set NodeSecret to prevent Fatal error in Init
+		globalConf.NodeSecret = "test-secret"
+	}
+	g := StartTest(conf)
+	defer g.Close()
+
+	// DO NOT set up DashService - simulating environment where it's not available
+	g.Gw.DashService = nil
+
+	// Create API definition loader
+	loader := APIDefinitionLoader{Gw: g.Gw}
+
+	specs, err := loader.FromDashboardService(ts.URL)
+
+	// Should fail gracefully without causing panic
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "login failure")
+	assert.Nil(t, specs)
+}
+
+// TestFromDashboardServiceNoNodeIDFound tests that missing node ID error triggers auto-recovery for API definitions
+func TestFromDashboardServiceNoNodeIDFound(t *testing.T) {
+	requestCount := 0
+	registrationCount := 0
+
+	// Mock dashboard server
+	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Handle registration requests
+		if strings.Contains(r.URL.Path, "/register/node") {
+			registrationCount++
+			w.Header().Set("Content-Type", "application/json")
+			response := NodeResponseOK{
+				Status:  "ok",
+				Message: map[string]string{"NodeID": "test-node-id"},
+				Nonce:   fmt.Sprintf("nonce-%d", registrationCount),
+			}
+			json.NewEncoder(w).Encode(response)
+			return
+		}
+
+		// Handle API definition requests
+		requestCount++
+
+		// First request: return 403 with "No node ID Found" error
+		if requestCount == 1 {
+			w.WriteHeader(http.StatusForbidden)
+			w.Write([]byte("Authorization failed (No node ID Found)"))
+			return
+		}
+
+		// Subsequent requests: success after auto-recovery
+		w.Header().Set("Content-Type", "application/json")
+		list := model.NewMergedAPIList()
+		list.Nonce = "success-nonce"
+		json.NewEncoder(w).Encode(list)
+	}))
+	defer mockServer.Close()
+
+	conf := func(globalConf *config.Config) {
+		globalConf.UseDBAppConfigs = false // Simplified setup
+		globalConf.NodeSecret = "test-secret"
+		globalConf.DBAppConfOptions.ConnectionTimeout = 2
+		globalConf.DisableDashboardZeroConf = true
+	}
+	g := StartTest(conf)
+	defer g.Close()
+
+	// Set up simplified dashboard service
+	g.Gw.DashService = &HTTPDashboardHandler{
+		Gw:                   g.Gw,
+		Secret:               "test-secret",
+		RegistrationEndpoint: mockServer.URL + "/register/node",
+	}
+
+	// Create API definition loader
+	loader := APIDefinitionLoader{Gw: g.Gw}
+
+	// Test: Load API definitions should auto-recover from missing node ID
+	endpoint := mockServer.URL + "/system/apis"
+
+	_, err := loader.FromDashboardService(endpoint)
+
+	// Should succeed due to auto-recovery
+	assert.NoError(t, err, "Auto-recovery should allow successful API definitions loading after node ID error")
+
+	// Verify the auto-recovery process happened
+	assert.GreaterOrEqual(t, requestCount, 2, "Should have made at least 2 API definition requests")
+	assert.GreaterOrEqual(t, registrationCount, 1, "Should have re-registered at least once")
+}
+
+// TestFromDashboardServiceNetworkErrors tests various network error scenarios for API definitions
+func TestFromDashboardServiceNetworkErrors(t *testing.T) {
+	testCases := []struct {
+		name          string
+		serverFunc    func() *httptest.Server
+		expectedError string
+		description   string
+	}{
+		{
+			name: "Connection Refused",
+			serverFunc: func() *httptest.Server {
+				// Create and immediately close server to simulate connection refused
+				ts := httptest.NewServer(http.HandlerFunc(func(_ http.ResponseWriter, _ *http.Request) {}))
+				ts.Close()
+				return ts
+			},
+			expectedError: "connection refused",
+			description:   "Dashboard is completely down",
+		},
+		{
+			name: "Network Timeout",
+			serverFunc: func() *httptest.Server {
+				return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+					// Simulate timeout by not responding at all
+					// This ensures a predictable timeout error
+					select {
+					case <-time.After(5 * time.Second):
+						// This will never be reached due to client timeout
+					case <-w.(http.CloseNotifier).CloseNotify():
+						// Client disconnected due to timeout
+						return
+					}
+				}))
+			},
+			expectedError: "",
+			description:   "Request times out before response",
+		},
+		{
+			name: "Connection Dropped Mid-Response",
+			serverFunc: func() *httptest.Server {
+				return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+					// Start writing response then close connection
+					w.Header().Set("Content-Type", "application/json")
+					w.WriteHeader(http.StatusOK)
+					// Force flush to send headers
+					if f, ok := w.(http.Flusher); ok {
+						f.Flush()
+					}
+					// Simulate connection drop by hijacking and closing
+					if hj, ok := w.(http.Hijacker); ok {
+						conn, _, _ := hj.Hijack()
+						conn.Close()
+					}
+				}))
+			},
+			expectedError: "unexpected EOF",
+			description:   "Connection drops while reading response",
+		},
+		{
+			name: "Malformed JSON Response",
+			serverFunc: func() *httptest.Server {
+				return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+					// Return 200 OK but with malformed JSON
+					w.Header().Set("Content-Type", "application/json")
+					w.WriteHeader(http.StatusOK)
+					w.Write([]byte("{invalid json"))
+				}))
+			},
+			expectedError: "invalid character",
+			description:   "Server returns malformed JSON",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			ts := tc.serverFunc()
+			if ts != nil {
+				defer ts.Close()
+			}
+
+			conf := func(globalConf *config.Config) {
+				globalConf.UseDBAppConfigs = false
+				// Set a short timeout to make tests run faster
+				globalConf.DBAppConfOptions.ConnectionTimeout = 2
+			}
+			g := StartTest(conf)
+			defer g.Close()
+
+			// Create API definition loader
+			loader := APIDefinitionLoader{Gw: g.Gw}
+
+			// Test: Load API definitions should fail with network error
+			specs, err := loader.FromDashboardService(ts.URL)
+
+			// Should fail with appropriate error
+			assert.Error(t, err, tc.description)
+			assert.Nil(t, specs)
+
+			// For now, network errors are not auto-recovered
+			// This is a potential enhancement for the future
+			if tc.name == "Network Timeout" && err != nil {
+				// Timeout errors can vary based on where the timeout occurs
+				// Could be "context deadline exceeded", "unexpected end of JSON input", or "Client.Timeout"
+				assert.True(t,
+					strings.Contains(err.Error(), "context deadline exceeded") ||
+						strings.Contains(err.Error(), "unexpected end of JSON input") ||
+						strings.Contains(err.Error(), "Client.Timeout") ||
+						strings.Contains(err.Error(), "timeout"),
+					fmt.Sprintf("Expected timeout-related error, got: %v", err))
+			} else if tc.expectedError != "" && err != nil {
+				assert.Contains(t, err.Error(), tc.expectedError, "Error should indicate network issue")
+			}
+		})
+	}
+}
+
+// TestFromDashboardServiceNetworkErrorRecovery tests auto-recovery from network errors for API definitions
+func TestFromDashboardServiceNetworkErrorRecovery(t *testing.T) {
+	requestCount := 0
+	registrationCount := 0
+
+	// Mock dashboard server that simulates network error then recovery
+	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Handle registration requests
+		if strings.Contains(r.URL.Path, "/register/node") {
+			registrationCount++
+			w.Header().Set("Content-Type", "application/json")
+			response := NodeResponseOK{
+				Status:  "ok",
+				Message: map[string]string{"NodeID": "test-node-id"},
+				Nonce:   fmt.Sprintf("nonce-%d", registrationCount),
+			}
+			json.NewEncoder(w).Encode(response)
+			return
+		}
+
+		// Handle API definition requests
+		requestCount++
+
+		// First request: simulate connection drop
+		if requestCount == 1 {
+			// Simulate load balancer draining connection mid-flight
+			if hj, ok := w.(http.Hijacker); ok {
+				conn, _, _ := hj.Hijack()
+				conn.Close()
+			}
+			return
+		}
+
+		// Subsequent requests: success after re-registration
+		w.Header().Set("Content-Type", "application/json")
+		list := model.NewMergedAPIList()
+		list.Nonce = "success-nonce"
+		json.NewEncoder(w).Encode(list)
+	}))
+	defer mockServer.Close()
+
+	conf := func(globalConf *config.Config) {
+		globalConf.UseDBAppConfigs = false
+		globalConf.NodeSecret = "test-secret"
+		globalConf.DBAppConfOptions.ConnectionTimeout = 2
+		globalConf.DisableDashboardZeroConf = true
+	}
+	g := StartTest(conf)
+	defer g.Close()
+
+	// Set up dashboard service
+	g.Gw.DashService = &HTTPDashboardHandler{
+		Gw:                   g.Gw,
+		Secret:               "test-secret",
+		RegistrationEndpoint: mockServer.URL + "/register/node",
+	}
+
+	// Create API definition loader
+	loader := APIDefinitionLoader{Gw: g.Gw}
+
+	// Test: Load API definitions should auto-recover from network error
+	endpoint := mockServer.URL + "/system/apis"
+	_, err := loader.FromDashboardService(endpoint)
+
+	// Should succeed due to auto-recovery from network error
+	assert.NoError(t, err, "Auto-recovery should handle network errors for API definitions")
+
+	// Verify the auto-recovery process happened
+	assert.Equal(t, 2, requestCount, "Should have made 2 API requests (failed + retry)")
+	assert.GreaterOrEqual(t, registrationCount, 1, "Should have re-registered after network error")
 }
