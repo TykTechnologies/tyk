@@ -63,6 +63,9 @@ func TestTraceHttpRequest(t *testing.T) {
 		assert.Equal(t, "", request.URL.Path)
 		assert.Equal(t, headers, request.Header)
 		assert.Equal(t, string(bodyInBytes), body)
+
+		session := ctxGetSession(request)
+		assert.NotNil(t, session, "initializes default fake session")
 	})
 
 	t.Run("api-scoped rate limit works as expected", func(t *testing.T) {
@@ -277,10 +280,6 @@ func TestTraceHttpRequest(t *testing.T) {
 
 		type UuidDto struct {
 			Uuid string `json:"uuid"`
-		}
-
-		type WrappedUuidDto struct {
-			Data UuidDto `json:"data"`
 		}
 
 		var hdr = HeaderCnf{Name: "Content-Type", Value: "application/json"}

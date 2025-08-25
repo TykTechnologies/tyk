@@ -20,6 +20,7 @@ import (
 	"github.com/TykTechnologies/tyk/apidef/oas"
 	"github.com/TykTechnologies/tyk/internal/httputil"
 	"github.com/TykTechnologies/tyk/internal/model"
+	"github.com/TykTechnologies/tyk/user"
 )
 
 const (
@@ -128,6 +129,9 @@ func (tr *traceRequest) toRequest(
 	for key, values := range tr.Request.Headers {
 		addCustomHeader(r.Header, key, values, ignoreCanonicalMIMEHeaderKey)
 	}
+
+	// inject fake session
+	ctxSetSession(r, &user.SessionState{}, false, false)
 
 	return r, nil
 }
