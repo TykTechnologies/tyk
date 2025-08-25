@@ -563,12 +563,8 @@ func (a APIDefinitionLoader) FromDashboardService(endpoint string) ([]*APISpec, 
 	}
 
 	// Extract tagged entries only
-<<<<<<< HEAD
-	apiDefs := list.filter(gwConfig.DBAppConfOptions.NodeIsSegmented, gwConfig.DBAppConfOptions.Tags...)
-=======
 	gwConfig := a.Gw.GetConfig()
-	apiDefs := list.Filter(gwConfig.DBAppConfOptions.NodeIsSegmented, gwConfig.DBAppConfOptions.Tags...)
->>>>>>> 48e93c638... [TT-15190] feat: Gateway Resilience Enhancement - Intelligent Auto-Recovery for Nonce Desynchronization (#7267)
+	apiDefs := list.filter(gwConfig.DBAppConfOptions.NodeIsSegmented, gwConfig.DBAppConfOptions.Tags...)
 
 	// Process
 	specs := a.prepareSpecs(apiDefs, gwConfig, false)

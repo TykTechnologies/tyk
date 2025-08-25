@@ -2,6 +2,7 @@ package gateway
 
 import (
 	"bytes"
+	"context"
 	"crypto/tls"
 	"encoding/json"
 	"errors"
@@ -23,9 +24,9 @@ type NodeResponseOK struct {
 
 type DashboardServiceSender interface {
 	Init() error
-	Register() error
+	Register(ctx context.Context) error
 	DeRegister() error
-	StartBeating() error
+	StartBeating(ctx context.Context) error
 	StopBeating()
 	Ping() error
 	NotifyDashboardOfEvent(interface{}) error
@@ -106,11 +107,11 @@ func (gw *Gateway) reLogin() {
 
 	time.Sleep(5 * time.Second)
 
-	if err := gw.DashService.Register(); err != nil {
+	if err := gw.DashService.Register(context.Background()); err != nil {
 		dashLog.Error("Could not register: ", err)
 	} else {
 		go func() {
-			beatErr := gw.DashService.StartBeating()
+			beatErr := gw.DashService.StartBeating(context.Background())
 			if beatErr != nil {
 				dashLog.Error("Could not start beating. ", beatErr.Error())
 			}
@@ -188,7 +189,7 @@ func (h *HTTPDashboardHandler) NotifyDashboardOfEvent(event interface{}) error {
 	return nil
 }
 
-func (h *HTTPDashboardHandler) Register() error {
+func (h *HTTPDashboardHandler) Register(ctx context.Context) error {
 	dashLog.Info("Registering gateway node with Dashboard")
 	req := h.newRequest(http.MethodGet, h.RegistrationEndpoint)
 	req.Header.Set(header.XTykSessionID, h.Gw.SessionID)
@@ -200,14 +201,14 @@ func (h *HTTPDashboardHandler) Register() error {
 	if err != nil {
 		dashLog.Errorf("Request failed with error %v; retrying in 5s", err)
 		time.Sleep(time.Second * 5)
-		return h.Register()
+		return h.Register(ctx)
 	} else if resp.StatusCode == http.StatusConflict {
 		dashLog.Debug("Node is already registered")
 		return nil
 	} else if resp != nil && resp.StatusCode != 200 {
 		dashLog.Errorf("Response failed with code %d; retrying in 5s", resp.StatusCode)
 		time.Sleep(time.Second * 5)
-		return h.Register()
+		return h.Register(ctx)
 	}
 
 	defer resp.Body.Close()
@@ -223,7 +224,7 @@ func (h *HTTPDashboardHandler) Register() error {
 	if !found {
 		dashLog.Error("Failed to register node, retrying in 5s")
 		time.Sleep(time.Second * 5)
-		return h.Register()
+		return h.Register(ctx)
 	}
 
 	dashLog.WithField("id", h.Gw.GetNodeID()).Info("Node Registered")
@@ -241,14 +242,15 @@ func (h *HTTPDashboardHandler) Register() error {
 func (h *HTTPDashboardHandler) Ping() error {
 	return h.sendHeartBeat(
 		h.newRequest(http.MethodGet, h.HeartBeatEndpoint),
-		h.Gw.initialiseClient())
+		h.Gw.initialiseClient(),
+		context.Background())
 }
 
 func (h *HTTPDashboardHandler) isHeartBeatStopped() bool {
 	return atomic.LoadInt32(&h.heartBeatStopSentinel) == HeartBeatStopped
 }
 
-func (h *HTTPDashboardHandler) StartBeating() error {
+func (h *HTTPDashboardHandler) StartBeating(ctx context.Context) error {
 	atomic.SwapInt32(&h.heartBeatStopSentinel, HeartBeatStarted)
 
 	req := h.newRequest(http.MethodGet, h.HeartBeatEndpoint)
@@ -256,7 +258,7 @@ func (h *HTTPDashboardHandler) StartBeating() error {
 	client := h.Gw.initialiseClient()
 
 	for !h.isHeartBeatStopped() {
-		if err := h.sendHeartBeat(req, client); err != nil {
+		if err := h.sendHeartBeat(req, client, ctx); err != nil {
 			dashLog.Warning(err)
 		}
 		time.Sleep(time.Second * 2)
@@ -281,7 +283,7 @@ func (h *HTTPDashboardHandler) newRequest(method, endpoint string) *http.Request
 	return req
 }
 
-func (h *HTTPDashboardHandler) sendHeartBeat(req *http.Request, client *http.Client) error {
+func (h *HTTPDashboardHandler) sendHeartBeat(req *http.Request, client *http.Client, ctx context.Context) error {
 	req.Header.Set(header.XTykNodeID, h.Gw.GetNodeID())
 	h.Gw.ServiceNonceMutex.RLock()
 	req.Header.Set(header.XTykNonce, h.Gw.ServiceNonce)
@@ -295,7 +297,7 @@ func (h *HTTPDashboardHandler) sendHeartBeat(req *http.Request, client *http.Cli
 	defer resp.Body.Close()
 
 	if resp.StatusCode == http.StatusForbidden {
-		return h.Gw.DashService.Register()
+		return h.Gw.DashService.Register(ctx)
 	}
 
 	if resp.StatusCode != http.StatusOK {
