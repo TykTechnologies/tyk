@@ -9,6 +9,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -2311,10 +2312,13 @@ func TestLoadPoliciesFromDashboardLoadBalancerDrain(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
+			mtx := sync.Mutex{}
 			requestCount := 0
 			registrationCount := 0
 
 			ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				mtx.Lock()
+				defer mtx.Unlock()
 				// Handle registration requests
 				if strings.Contains(r.URL.Path, "/register/node") {
 					registrationCount++
