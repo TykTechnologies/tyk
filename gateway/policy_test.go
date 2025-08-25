@@ -486,204 +486,204 @@ func (s *Test) TestPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesD
 		{
 			"TagMerge", []string{"tags1", "tags2"},
 			"", func(t *testing.T, s *user.SessionState) {
-			want := []string{"key-tag", "tagA", "tagX", "tagY"}
-			sort.Strings(s.Tags)
+				want := []string{"key-tag", "tagA", "tagX", "tagY"}
+				sort.Strings(s.Tags)
 
-			assert.Equal(t, want, s.Tags)
-		}, &user.SessionState{
-			Tags: []string{"key-tag"},
-		},
+				assert.Equal(t, want, s.Tags)
+			}, &user.SessionState{
+				Tags: []string{"key-tag"},
+			},
 		},
 		{
 			"InactiveMergeOne", []string{"tags1", "inactive1"},
 			"", func(t *testing.T, s *user.SessionState) {
-			if !s.IsInactive {
-				t.Fatalf("want IsInactive to be true")
-			}
-		}, nil,
+				if !s.IsInactive {
+					t.Fatalf("want IsInactive to be true")
+				}
+			}, nil,
 		},
 		{
 			"InactiveMergeAll", []string{"inactive1", "inactive2"},
 			"", func(t *testing.T, s *user.SessionState) {
-			if !s.IsInactive {
-				t.Fatalf("want IsInactive to be true")
-			}
-		}, nil,
+				if !s.IsInactive {
+					t.Fatalf("want IsInactive to be true")
+				}
+			}, nil,
 		},
 		{
 			"InactiveWithSession", []string{"tags1", "tags2"},
 			"", func(t *testing.T, s *user.SessionState) {
-			if !s.IsInactive {
-				t.Fatalf("want IsInactive to be true")
-			}
-		}, &user.SessionState{
-			IsInactive: true,
-		},
+				if !s.IsInactive {
+					t.Fatalf("want IsInactive to be true")
+				}
+			}, &user.SessionState{
+				IsInactive: true,
+			},
 		},
 		{
 			"QuotaPart with unlimited", []string{"unlimited-quota"},
 			"", func(t *testing.T, s *user.SessionState) {
-			if s.QuotaMax != -1 {
-				t.Fatalf("want unlimited quota to be -1")
-			}
-		}, nil,
+				if s.QuotaMax != -1 {
+					t.Fatalf("want unlimited quota to be -1")
+				}
+			}, nil,
 		},
 		{
 			"QuotaPart", []string{"quota1"},
 			"", func(t *testing.T, s *user.SessionState) {
-			if s.QuotaMax != 2 {
-				t.Fatalf("want QuotaMax to be 2")
-			}
-		}, nil,
+				if s.QuotaMax != 2 {
+					t.Fatalf("want QuotaMax to be 2")
+				}
+			}, nil,
 		},
 		{
 			"QuotaParts", []string{"quota1", "quota2"},
 			"", func(t *testing.T, s *user.SessionState) {
-			if s.QuotaMax != 3 {
-				t.Fatalf("Should pick bigger value")
-			}
-		}, nil,
+				if s.QuotaMax != 3 {
+					t.Fatalf("Should pick bigger value")
+				}
+			}, nil,
 		},
 		{
 			"QuotaParts with acl", []string{"quota5", "quota4"},
 			"", func(t *testing.T, s *user.SessionState) {
-			assert.Equal(t, int64(4), s.QuotaMax)
-		}, nil,
+				assert.Equal(t, int64(4), s.QuotaMax)
+			}, nil,
 		},
 		{
 			"QuotaPart with access rights", []string{"quota3"},
 			"", func(t *testing.T, s *user.SessionState) {
-			if s.QuotaMax != 3 {
-				t.Fatalf("quota should be the same as policy quota")
-			}
-		}, nil,
+				if s.QuotaMax != 3 {
+					t.Fatalf("quota should be the same as policy quota")
+				}
+			}, nil,
 		},
 		{
 			"QuotaPart with access rights in multi-policy", []string{"quota4", "nonpart1"},
 			"", func(t *testing.T, s *user.SessionState) {
-			if s.QuotaMax != 3 {
-				t.Fatalf("quota should be the same as policy quota")
-			}
+				if s.QuotaMax != 3 {
+					t.Fatalf("quota should be the same as policy quota")
+				}
 
-			// Don't apply api 'b' coming from quota4 policy
-			want := map[string]user.AccessDefinition{"a": {Limit: user.APILimit{}}}
-			assert.Equal(t, want, s.AccessRights)
-		}, nil,
+				// Don't apply api 'b' coming from quota4 policy
+				want := map[string]user.AccessDefinition{"a": {Limit: user.APILimit{}}}
+				assert.Equal(t, want, s.AccessRights)
+			}, nil,
 		},
 		{
 			"RatePart with unlimited", []string{"unlimited-rate"},
 			"", func(t *testing.T, s *user.SessionState) {
-			if s.Rate != -1 {
-				t.Fatalf("want unlimited rate to be -1")
-			}
-		}, nil,
+				if s.Rate != -1 {
+					t.Fatalf("want unlimited rate to be -1")
+				}
+			}, nil,
 		},
 		{
 			"RatePart", []string{"rate1"},
 			"", func(t *testing.T, s *user.SessionState) {
-			if s.Rate != 3 {
-				t.Fatalf("want Rate to be 3")
-			}
-		}, nil,
+				if s.Rate != 3 {
+					t.Fatalf("want Rate to be 3")
+				}
+			}, nil,
 		},
 		{
 			"RateParts", []string{"rate1", "rate2"},
 			"", func(t *testing.T, s *user.SessionState) {
-			if s.Rate != 4 {
-				t.Fatalf("Should pick bigger value")
-			}
-		}, nil,
+				if s.Rate != 4 {
+					t.Fatalf("Should pick bigger value")
+				}
+			}, nil,
 		},
 		{
 			"RateParts with acl", []string{"rate5", "rate4"},
 			"", func(t *testing.T, s *user.SessionState) {
-			assert.Equal(t, float64(10), s.Rate)
-		}, nil,
+				assert.Equal(t, float64(10), s.Rate)
+			}, nil,
 		},
 		{
 			"RateParts with acl respected by session", []string{"rate4", "rate5"},
 			"", func(t *testing.T, s *user.SessionState) {
-			assert.Equal(t, float64(10), s.Rate)
-		}, &user.SessionState{Rate: 20},
+				assert.Equal(t, float64(10), s.Rate)
+			}, &user.SessionState{Rate: 20},
 		},
 		{
 			"Rate with no partition respected by session", []string{"rate-no-partition"},
 			"", func(t *testing.T, s *user.SessionState) {
-			assert.Equal(t, float64(12), s.Rate)
-		}, &user.SessionState{Rate: 20},
+				assert.Equal(t, float64(12), s.Rate)
+			}, &user.SessionState{Rate: 20},
 		},
 		{
 			"ComplexityPart with unlimited", []string{"unlimitedComplexity"},
 			"", func(t *testing.T, s *user.SessionState) {
-			if s.MaxQueryDepth != -1 {
-				t.Fatalf("unlimitied query depth should be -1")
-			}
-		}, nil,
+				if s.MaxQueryDepth != -1 {
+					t.Fatalf("unlimitied query depth should be -1")
+				}
+			}, nil,
 		},
 		{
 			"ComplexityPart", []string{"complexity1"},
 			"", func(t *testing.T, s *user.SessionState) {
-			if s.MaxQueryDepth != 2 {
-				t.Fatalf("want MaxQueryDepth to be 2")
-			}
-		}, nil,
+				if s.MaxQueryDepth != 2 {
+					t.Fatalf("want MaxQueryDepth to be 2")
+				}
+			}, nil,
 		},
 		{
 			"ComplexityParts", []string{"complexity1", "complexity2"},
 			"", func(t *testing.T, s *user.SessionState) {
-			if s.MaxQueryDepth != 3 {
-				t.Fatalf("Should pick bigger value")
-			}
-		}, nil,
+				if s.MaxQueryDepth != 3 {
+					t.Fatalf("Should pick bigger value")
+				}
+			}, nil,
 		},
 		{
 			"AclPart", []string{"acl1"},
 			"", func(t *testing.T, s *user.SessionState) {
-			want := map[string]user.AccessDefinition{"a": {Limit: user.APILimit{}}}
+				want := map[string]user.AccessDefinition{"a": {Limit: user.APILimit{}}}
 
-			assert.Equal(t, want, s.AccessRights)
-		}, nil,
+				assert.Equal(t, want, s.AccessRights)
+			}, nil,
 		},
 		{
 			"AclPart", []string{"acl1", "acl2"},
 			"", func(t *testing.T, s *user.SessionState) {
-			want := map[string]user.AccessDefinition{"a": {Limit: user.APILimit{}}, "b": {Limit: user.APILimit{}}}
-			assert.Equal(t, want, s.AccessRights)
-		}, nil,
+				want := map[string]user.AccessDefinition{"a": {Limit: user.APILimit{}}, "b": {Limit: user.APILimit{}}}
+				assert.Equal(t, want, s.AccessRights)
+			}, nil,
 		},
 		{
 			"Acl for a and rate for a,b", []string{"acl1", "rate-for-a-b"},
 			"", func(t *testing.T, s *user.SessionState) {
-			want := map[string]user.AccessDefinition{"a": {Limit: user.APILimit{Rate: 4}}, "b": {Limit: user.APILimit{Rate: 4}}}
-			assert.Equal(t, want, s.AccessRights)
-		}, nil,
+				want := map[string]user.AccessDefinition{"a": {Limit: user.APILimit{Rate: 4}}, "b": {Limit: user.APILimit{Rate: 4}}}
+				assert.Equal(t, want, s.AccessRights)
+			}, nil,
 		},
 		{
 			"Acl for a,b and individual rate for a,b", []string{"acl-for-a-b", "rate-for-a", "rate-for-b"},
 			"", func(t *testing.T, s *user.SessionState) {
-			want := map[string]user.AccessDefinition{
-				"a": {Limit: user.APILimit{Rate: 4}},
-				"b": {Limit: user.APILimit{Rate: 2}},
-			}
-			assert.Equal(t, want, s.AccessRights)
-		}, nil,
+				want := map[string]user.AccessDefinition{
+					"a": {Limit: user.APILimit{Rate: 4}},
+					"b": {Limit: user.APILimit{Rate: 2}},
+				}
+				assert.Equal(t, want, s.AccessRights)
+			}, nil,
 		},
 		{
 			"RightsUpdate", []string{"acl3"},
 			"", func(t *testing.T, ses *user.SessionState) {
-			newPolicy := user.Policy{
-				AccessRights: map[string]user.AccessDefinition{"a": {Limit: user.APILimit{}}, "b": {Limit: user.APILimit{}}, "c": {Limit: user.APILimit{}}},
-			}
+				newPolicy := user.Policy{
+					AccessRights: map[string]user.AccessDefinition{"a": {Limit: user.APILimit{}}, "b": {Limit: user.APILimit{}}, "c": {Limit: user.APILimit{}}},
+				}
 
-			s.Gw.policiesMu.Lock()
-			s.Gw.policiesByID["acl3"] = newPolicy
-			s.Gw.policiesMu.Unlock()
-			err := bmid.ApplyPolicies(ses)
-			if err != nil {
-				t.Fatalf("couldn't apply policy: %s", err.Error())
-			}
-			assert.Equal(t, newPolicy.AccessRights, ses.AccessRights)
-		}, nil,
+				s.Gw.policiesMu.Lock()
+				s.Gw.policiesByID["acl3"] = newPolicy
+				s.Gw.policiesMu.Unlock()
+				err := bmid.ApplyPolicies(ses)
+				if err != nil {
+					t.Fatalf("couldn't apply policy: %s", err.Error())
+				}
+				assert.Equal(t, newPolicy.AccessRights, ses.AccessRights)
+			}, nil,
 		},
 		{
 			name:     "Per API is set with other partitions to true",
@@ -861,10 +861,10 @@ func (s *Test) TestPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesD
 		{
 			"Throttle interval from policy", []string{"throttle1"},
 			"", func(t *testing.T, s *user.SessionState) {
-			if s.ThrottleInterval != 9 {
-				t.Fatalf("Throttle interval should be 9 inherited from policy")
-			}
-		}, nil,
+				if s.ThrottleInterval != 9 {
+					t.Fatalf("Throttle interval should be 9 inherited from policy")
+				}
+			}, nil,
 		},
 		{
 			name:     "Throttle retry limit from policy",
