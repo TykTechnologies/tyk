@@ -8,7 +8,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"net/url"
 	"os"
@@ -495,37 +494,50 @@ func (f *nestedApiDefinitionList) filter(enabled bool, tags ...string) []nestedA
 func (a APIDefinitionLoader) FromDashboardService(endpoint string) ([]*APISpec, error) {
 	// Get the definitions
 	log.Debug("Calling: ", endpoint)
-	newRequest, err := http.NewRequest("GET", endpoint, nil)
-	if err != nil {
-		log.Error("Failed to create request: ", err)
+
+	// Build request function for recovery helper
+	buildReq := func() (*http.Request, error) {
+		newRequest, err := http.NewRequest("GET", endpoint, nil)
+		if err != nil {
+			log.Error("Failed to create request: ", err)
+			return nil, err
+		}
+
+		gwConfig := a.Gw.GetConfig()
+		newRequest.Header.Set("authorization", gwConfig.NodeSecret)
+		log.Debug("Using: NodeID: ", a.Gw.GetNodeID())
+		newRequest.Header.Set(header.XTykNodeID, a.Gw.GetNodeID())
+
+		a.Gw.ServiceNonceMutex.RLock()
+		newRequest.Header.Set(header.XTykNonce, a.Gw.ServiceNonce)
+		a.Gw.ServiceNonceMutex.RUnlock()
+
+		newRequest.Header.Set(header.XTykSessionID, a.Gw.SessionID)
+
+		return newRequest, nil
 	}
 
-	gwConfig := a.Gw.GetConfig()
-
-	newRequest.Header.Set("authorization", gwConfig.NodeSecret)
-	log.Debug("Using: NodeID: ", a.Gw.GetNodeID())
-	newRequest.Header.Set(header.XTykNodeID, a.Gw.GetNodeID())
-
-	a.Gw.ServiceNonceMutex.RLock()
-	newRequest.Header.Set(header.XTykNonce, a.Gw.ServiceNonce)
-	a.Gw.ServiceNonceMutex.RUnlock()
-
-	newRequest.Header.Set(header.XTykSessionID, a.Gw.SessionID)
-
-	c := a.Gw.initialiseClient()
-	resp, err := c.Do(newRequest)
+	// Execute request with automatic recovery
+	resp, err := a.Gw.executeDashboardRequestWithRecovery(buildReq, "API definitions fetch")
 	if err != nil {
 		return nil, err
 	}
 	defer resp.Body.Close()
 
+	// Handle 403 responses (auth errors already logged by helper)
 	if resp.StatusCode == http.StatusForbidden {
-		body, _ := ioutil.ReadAll(resp.Body)
+		body, err := io.ReadAll(resp.Body)
+		if err != nil {
+			body = []byte("failed to read response body")
+		}
 		return nil, fmt.Errorf("login failure, Response was: %v", string(body))
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		body, _ := ioutil.ReadAll(resp.Body)
+		body, err := io.ReadAll(resp.Body)
+		if err != nil {
+			body = []byte("failed to read response body")
+		}
 		return nil, fmt.Errorf("dashboard API error, response was: %v", string(body))
 	}
 
@@ -534,6 +546,10 @@ func (a APIDefinitionLoader) FromDashboardService(endpoint string) ([]*APISpec, 
 	inBytes, err := io.ReadAll(resp.Body)
 	if err != nil {
 		log.Error("Couldn't read api definition list")
+		// Check if this is a recoverable read error and retry if needed
+		if a.Gw.HandleDashboardResponseReadError(err, "API definitions read") {
+			return a.FromDashboardService(endpoint)
+		}
 		return nil, err
 	}
 
@@ -542,11 +558,17 @@ func (a APIDefinitionLoader) FromDashboardService(endpoint string) ([]*APISpec, 
 	err = json.Unmarshal(inBytes, &list)
 	if err != nil {
 		log.Error("Couldn't unmarshal api definition list")
+		// JSON unmarshal errors are not network errors, so don't retry
 		return nil, err
 	}
 
 	// Extract tagged entries only
+<<<<<<< HEAD
 	apiDefs := list.filter(gwConfig.DBAppConfOptions.NodeIsSegmented, gwConfig.DBAppConfOptions.Tags...)
+=======
+	gwConfig := a.Gw.GetConfig()
+	apiDefs := list.Filter(gwConfig.DBAppConfOptions.NodeIsSegmented, gwConfig.DBAppConfOptions.Tags...)
+>>>>>>> 48e93c638... [TT-15190] feat: Gateway Resilience Enhancement - Intelligent Auto-Recovery for Nonce Desynchronization (#7267)
 
 	// Process
 	specs := a.prepareSpecs(apiDefs, gwConfig, false)
