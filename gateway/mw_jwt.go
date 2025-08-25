@@ -10,18 +10,21 @@ import (
 	"encoding/pem"
 	"errors"
 	"fmt"
+	"github.com/google/go-cmp/cmp"
+	"github.com/ohler55/ojg/jp"
+	"github.com/tidwall/gjson"
 	"io"
 	"net/http"
 	"strings"
 	"time"
 
+	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/apidef/oas"
+	"github.com/TykTechnologies/tyk/storage"
+	"github.com/TykTechnologies/tyk/user"
 	"github.com/go-jose/go-jose/v3"
 	"github.com/golang-jwt/jwt/v4"
 	"github.com/lonelycode/osin"
-
-	"github.com/TykTechnologies/tyk/apidef"
-	"github.com/TykTechnologies/tyk/storage"
-	"github.com/TykTechnologies/tyk/user"
 
 	"github.com/TykTechnologies/tyk/internal/cache"
 )
@@ -1062,6 +1065,92 @@ func validateJTI(claims jwt.MapClaims) error {
 	return nil
 }
 
+func customClaimsContainsMatch(expectedValues []interface{}, claimValue interface{}) bool {
+	matched := false
+	for _, expectedValue := range expectedValues {
+		switch cv := claimValue.(type) {
+		case string:
+			if expectedStr, ok := expectedValue.(string); ok {
+				if strings.Contains(cv, expectedStr) {
+					matched = true
+					break
+				}
+			}
+		case []interface{}:
+			for _, item := range cv {
+				if cmp.Equal(expectedValue, item) {
+					matched = true
+					break
+				}
+			}
+		default:
+			matched = cmp.Equal(expectedValue, cv)
+		}
+	}
+
+	return matched
+}
+
+// validateCustomClaims performs validation of custom claims according to the configuration
+func (k *JWTMiddleware) validateCustomClaimsNew(claims jwt.MapClaims) error {
+	validationRules := k.Spec.OAS.GetJWTConfiguration().CustomClaimValidation
+	claimsJson, err := json.Marshal(claims)
+	if err != nil {
+		return fmt.Errorf("error parsing claims: %w", err)
+	}
+	for claimsPath, validation := range validationRules {
+		// validate json path
+		_, err = jp.Parse([]byte(fmt.Sprintf("$.%s", claimsPath)))
+		if err != nil {
+			return fmt.Errorf("invalid claim path: %s", claimsPath)
+		}
+
+		result := gjson.Get(string(claimsJson), claimsPath)
+		if !result.Exists() {
+			if validation.NonBlocking {
+				k.Logger().Warningf("Claim %s value does not match any expected values", claimsPath)
+			} else {
+				return fmt.Errorf("custom claim %s is required but not present in token", claimsPath)
+			}
+		}
+		switch validation.Type {
+		case oas.ClaimValidationTypeRequired:
+			if result.Type == gjson.Null {
+				if validation.NonBlocking {
+					k.Logger().Warningf("Claim %s expects a non nil value", claimsPath)
+				} else {
+					return fmt.Errorf("custom claim %s expects a non nil value", claimsPath)
+				}
+			}
+		case oas.ClaimValidationTypeContains:
+			matched := customClaimsContainsMatch(validation.AllowedValues, result.Value())
+			if !matched {
+				if validation.NonBlocking {
+					k.Logger().Warningf("Claim %s value does not contain any expected values", claimsPath)
+					continue
+				}
+				return fmt.Errorf("claim %s value does not contain any expected values", claimsPath)
+			}
+		case oas.ClaimValidationTypeExactMatch:
+			matched := false
+			for _, expectedValue := range validation.AllowedValues {
+				if cmp.Equal(result.Value(), expectedValue) {
+					matched = true
+					break
+				}
+			}
+			if !matched {
+				if validation.NonBlocking {
+					k.Logger().Warningf("Claim %s value does not match any expected values", claimsPath)
+					continue
+				}
+				return fmt.Errorf("claim %s value does not match any expected values", claimsPath)
+			}
+		}
+	}
+	return nil
+}
+
 func validateSubjectValue(subject string, allowedSubjects []string) error {
 	for _, allowed := range allowedSubjects {
 		if subject == allowed {
@@ -1112,6 +1201,14 @@ func (k *JWTMiddleware) validateExtraClaims(claims jwt.MapClaims, token *jwt.Tok
 
 		if err := validateSubjectValue(subject, jwtConfig.AllowedSubjects); err != nil {
 			k.Logger().WithError(err).Error("JWT subject validation failed")
+			return err
+		}
+	}
+
+	// Custom claims validation
+	if len(jwtConfig.CustomClaimValidation) > 0 {
+		if err := k.validateCustomClaimsNew(claims); err != nil {
+			k.Logger().WithError(err).Error("JWT custom claims validation failed")
 			return err
 		}
 	}
