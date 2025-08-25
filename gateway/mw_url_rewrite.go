@@ -203,7 +203,7 @@ func (gw *Gateway) urlRewrite(meta *apidef.URLRewriteMeta, r *http.Request) (str
 		log.Debug("URL Re-written to: ", newpath)
 
 		// put url_rewrite path to context to be used in ResponseTransformMiddleware
-		ctxSetUrlRewritePath(r, meta.Path)
+		ctxSetUrlRewritePath(r, r.URL.Path)
 	}
 
 	newpath = gw.ReplaceTykVariables(r, newpath, true)
