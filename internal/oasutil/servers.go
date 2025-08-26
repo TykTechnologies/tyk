@@ -157,7 +157,7 @@ func (p *serverUrlParser) extractValueBetweenBraces() (serverVariable, error) {
 			}
 
 			if _, err := regexp.Compile(pattern); err != nil {
-				return serverVariable{}, errpack.Wrap(ErrInvalidPattern, "failed to compile pattern")
+				return serverVariable{}, errpack.Domain("failed to compile pattern").Chain(ErrInvalidPattern)
 			}
 
 			return serverVariable{

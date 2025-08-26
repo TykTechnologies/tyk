@@ -417,12 +417,22 @@ func (a APIDefinitionLoader) FromDashboardService(endpoint string) ([]*APISpec, 
 	defer resp.Body.Close()
 
 	if resp.StatusCode == http.StatusForbidden {
-		body, _ := ioutil.ReadAll(resp.Body)
+		body, err := ioutil.ReadAll(resp.Body)
+
+		if err != nil {
+			log.WithError(err).Error("Failed to read response body")
+		}
+
 		return nil, fmt.Errorf("login failure, Response was: %v", string(body))
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		body, _ := ioutil.ReadAll(resp.Body)
+		body, err := ioutil.ReadAll(resp.Body)
+
+		if err != nil {
+			log.WithError(err).Error("Failed to read response body")
+		}
+
 		return nil, fmt.Errorf("dashboard API error, response was: %v", string(body))
 	}
 

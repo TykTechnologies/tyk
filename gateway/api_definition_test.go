@@ -1375,7 +1375,7 @@ func TestEnforcedTimeout(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
 
-	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(_ http.ResponseWriter, _ *http.Request) {
 		time.Sleep(2 * time.Second)
 	}))
 

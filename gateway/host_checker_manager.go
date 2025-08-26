@@ -5,7 +5,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
-	"fmt"
+	"github.com/TykTechnologies/tyk/pkg/errpack"
 	"net/http"
 	"net/url"
 	"sync"
@@ -498,7 +498,7 @@ func (hc *HostCheckerManager) RecordUptimeAnalytics(report HostHealthReport) err
 	spec := hc.Gw.getApiSpec(apiID)
 
 	if spec == nil {
-		return fmt.Errorf("API not found in register: %v", apiID)
+		return errpack.NotFoundWithId(apiID)
 	}
 
 	orgID := spec.OrgID
