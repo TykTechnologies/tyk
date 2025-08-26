@@ -20,7 +20,6 @@ import (
 	"strconv"
 	"strings"
 	"sync"
-
 	"sync/atomic"
 	texttemplate "text/template"
 	"time"
@@ -1880,12 +1879,12 @@ func handleDashboardRegistration(gw *Gateway) {
 	dashboardServiceInit(gw)
 
 	// connStr := buildDashboardConnStr("/register/node")
-	if err := gw.DashService.Register(); err != nil {
+	if err := gw.DashService.Register(gw.ctx); err != nil {
 		dashLog.Fatal("Registration failed: ", err)
 	}
 
 	go func() {
-		beatErr := gw.DashService.StartBeating()
+		beatErr := gw.DashService.StartBeating(gw.ctx)
 		if beatErr != nil {
 			dashLog.Error("Could not start beating. ", beatErr.Error())
 		}
