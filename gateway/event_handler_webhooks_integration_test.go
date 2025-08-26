@@ -18,7 +18,7 @@ func TestWebHookHandler_ProxyIntegration(t *testing.T) {
 	defer ts.Close()
 
 	// Create a test webhook target server
-	webhookServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	webhookServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte("OK"))
 	}))
@@ -99,7 +99,7 @@ func TestWebHookHandler_mTLSIntegration(t *testing.T) {
 	defer ts.Close()
 
 	// Create a test HTTPS webhook server
-	webhookServer := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	webhookServer := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte("OK"))
 	}))
@@ -180,7 +180,7 @@ func TestWebHookHandler_FallbackBehavior(t *testing.T) {
 	ts.Gw.SetConfig(gwConf)
 
 	// Create a test webhook target server
-	webhookServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	webhookServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte("OK"))
 	}))

@@ -251,9 +251,9 @@ func (f *ExternalHTTPClientFactory) CreateHealthCheckClient() (*http.Client, err
 }
 
 // getJWKWithClient fetches JWK using the provided HTTP client for proxy and mTLS support
-func getJWKWithClient(url string, client *http.Client) (*jose.JSONWebKeySet, error) {
+func getJWKWithClient(jwlUrl string, client *http.Client) (*jose.JSONWebKeySet, error) {
 	log.Debug("Pulling JWK with configured client")
-	resp, err := client.Get(url)
+	resp, err := client.Get(jwlUrl)
 	if err != nil {
 		log.WithError(err).Error("Failed to get resource URL")
 		return nil, err

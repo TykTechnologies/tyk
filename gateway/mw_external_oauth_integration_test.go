@@ -21,7 +21,7 @@ func TestExternalOAuthMiddleware_JWKWithProxy(t *testing.T) {
 	defer ts.Close()
 
 	// Create a test JWK server
-	jwkServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	jwkServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		jwkResponse := map[string]interface{}{
 			"keys": []map[string]interface{}{
 				{
@@ -39,7 +39,7 @@ func TestExternalOAuthMiddleware_JWKWithProxy(t *testing.T) {
 
 	// Create a test proxy server that tracks requests
 	var proxyRequests int
-	proxyServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	proxyServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		proxyRequests++
 		// Forward the request to the actual JWK server
 		resp, err := http.Get(jwkServer.URL)
@@ -109,7 +109,7 @@ func TestExternalOAuthMiddleware_IntrospectionWithProxy(t *testing.T) {
 	defer ts.Close()
 
 	// Create a test introspection server
-	introspectionServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	introspectionServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		response := map[string]interface{}{
 			"active": true,
 			"sub":    "test-user",
@@ -242,7 +242,7 @@ func TestJWTMiddleware_JWKWithProxyAndMTLS(t *testing.T) {
 	defer ts.Close()
 
 	// Create a test JWK server
-	jwkServer := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	jwkServer := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		jwkResponse := map[string]interface{}{
 			"keys": []map[string]interface{}{
 				{

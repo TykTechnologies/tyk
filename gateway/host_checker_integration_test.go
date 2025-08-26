@@ -18,7 +18,7 @@ func TestHostChecker_ProxyIntegration(t *testing.T) {
 
 	// Create a test health endpoint server
 	var healthCheckCalled bool
-	healthServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	healthServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		healthCheckCalled = true
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte("OK"))
@@ -87,7 +87,7 @@ func TestHostChecker_mTLSIntegration(t *testing.T) {
 	defer ts.Close()
 
 	// Create a test HTTPS health endpoint server
-	healthServer := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	healthServer := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte("OK"))
 	}))
@@ -159,7 +159,7 @@ func TestHostChecker_FallbackBehavior(t *testing.T) {
 
 	// Create a test health endpoint server
 	var healthCheckCalled bool
-	healthServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	healthServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		healthCheckCalled = true
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte("OK"))
@@ -198,7 +198,7 @@ func TestHostChecker_TimeoutOverride(t *testing.T) {
 	}
 
 	// Create a slow server to test timeout behavior
-	slowServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	slowServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		time.Sleep(2 * time.Second) // Longer than our test timeout
 		w.WriteHeader(http.StatusOK)
 	}))

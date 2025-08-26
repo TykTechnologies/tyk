@@ -24,7 +24,7 @@ func TestExternalServices_ProxyIntegration(t *testing.T) {
 	var discoveryProxyRequests int
 
 	// Create different target servers
-	oauthServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	oauthServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		response := map[string]interface{}{
 			"active": true,
 			"sub":    "test-user",
@@ -33,19 +33,19 @@ func TestExternalServices_ProxyIntegration(t *testing.T) {
 	}))
 	defer oauthServer.Close()
 
-	webhookServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	webhookServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte("webhook ok"))
 	}))
 	defer webhookServer.Close()
 
-	healthServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	healthServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte("healthy"))
 	}))
 	defer healthServer.Close()
 
-	discoveryServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	discoveryServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		response := []map[string]interface{}{
 			{"host": "service1.example.com", "port": 8080},
 			{"host": "service2.example.com", "port": 8080},
@@ -55,10 +55,11 @@ func TestExternalServices_ProxyIntegration(t *testing.T) {
 	defer discoveryServer.Close()
 
 	// Create service-specific proxy servers
-	oauthProxyServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	oauthProxyServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		oauthProxyRequests++
 		// Forward to OAuth server
-		resp, _ := http.Get(oauthServer.URL)
+		resp, err := http.Get(oauthServer.URL)
+		assert.Nil(t, err)
 		defer resp.Body.Close()
 		w.Header().Set("Content-Type", "application/json")
 		response := map[string]interface{}{
@@ -69,21 +70,21 @@ func TestExternalServices_ProxyIntegration(t *testing.T) {
 	}))
 	defer oauthProxyServer.Close()
 
-	webhookProxyServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	webhookProxyServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		webhookProxyRequests++
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte("webhook ok"))
 	}))
 	defer webhookProxyServer.Close()
 
-	healthProxyServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	healthProxyServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		healthProxyRequests++
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte("healthy"))
 	}))
 	defer healthProxyServer.Close()
 
-	discoveryProxyServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	discoveryProxyServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		discoveryProxyRequests++
 		response := []map[string]interface{}{
 			{"host": "service1.example.com", "port": 8080},
@@ -160,7 +161,7 @@ func TestExternalServices_mTLSIntegration(t *testing.T) {
 	defer ts.Close()
 
 	// Create HTTPS servers for different services
-	oauthServer := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	oauthServer := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		response := map[string]interface{}{
 			"active": true,
 			"sub":    "test-user",
@@ -169,7 +170,7 @@ func TestExternalServices_mTLSIntegration(t *testing.T) {
 	}))
 	defer oauthServer.Close()
 
-	webhookServer := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	webhookServer := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte("webhook ok"))
 	}))

@@ -210,7 +210,7 @@ func TestE2E_WebhookDeliveryWithProxyRetry(t *testing.T) {
 	var proxyAttempts int
 
 	// Create webhook target that fails first time
-	webhookServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	webhookServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		webhookAttempts++
 		if webhookAttempts == 1 {
 			// Fail first attempt
@@ -303,7 +303,7 @@ func TestE2E_HealthCheckWithServiceDiscovery(t *testing.T) {
 	var healthCheckRequests int
 
 	// Create service discovery server
-	discoveryServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	discoveryServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		discoveryRequests++
 		services := []map[string]interface{}{
 			{"host": "service1.example.com", "port": 8080},
@@ -314,7 +314,7 @@ func TestE2E_HealthCheckWithServiceDiscovery(t *testing.T) {
 	defer discoveryServer.Close()
 
 	// Create health check endpoints
-	healthServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	healthServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		healthCheckRequests++
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte("healthy"))
