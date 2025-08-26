@@ -67,7 +67,7 @@ func urlFromService(spec *APISpec, gw *Gateway) (*apidef.HostList, error) {
 		spec.ServiceRefreshInProgress = true
 		defer func() { spec.ServiceRefreshInProgress = false }()
 		sd := ServiceDiscovery{}
-		sd.Init(&spec.Proxy.ServiceDiscovery)
+		sd.Init(&spec.Proxy.ServiceDiscovery, gw)
 		data, err := sd.Target(spec.Proxy.ServiceDiscovery.QueryEndpoint)
 		if err != nil {
 			return nil, err

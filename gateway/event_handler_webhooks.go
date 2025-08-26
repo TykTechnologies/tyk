@@ -243,7 +243,13 @@ func (w *WebHookHandler) HandleEvent(em config.EventMessage) {
 		return
 	}
 
-	cli := &http.Client{Timeout: 30 * time.Second}
+	// Create HTTP client using factory for webhook service
+	clientFactory := NewExternalHTTPClientFactory(w.Gw)
+	cli, err := clientFactory.CreateWebhookClient()
+	if err != nil {
+		log.WithError(err).Error("Failed to create webhook HTTP client, falling back to default")
+		cli = &http.Client{Timeout: 30 * time.Second}
+	}
 
 	resp, err := cli.Do(req)
 	if err != nil {

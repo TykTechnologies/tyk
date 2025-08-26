@@ -4,6 +4,7 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"net/http"
 	"net/url"
@@ -11,6 +12,7 @@ import (
 	"time"
 
 	"github.com/TykTechnologies/tyk/config"
+	"github.com/go-jose/go-jose/v3"
 )
 
 // ExternalHTTPClientFactory creates HTTP clients for external service interactions
@@ -38,12 +40,7 @@ func NewExternalHTTPClientFactory(gw *Gateway) *ExternalHTTPClientFactory {
 func (f *ExternalHTTPClientFactory) CreateClient(serviceType string) (*http.Client, error) {
 	serviceConfig := f.getServiceConfig(serviceType)
 
-	transport := &http.Transport{
-		// Set reasonable defaults
-		MaxIdleConns:        100,
-		MaxIdleConnsPerHost: 10,
-		IdleConnTimeout:     30 * time.Second,
-	}
+	transport := f.getServiceTransport(serviceType)
 
 	// Configure proxy
 	proxyFunc, err := f.getProxyFunction(serviceConfig)
@@ -59,9 +56,12 @@ func (f *ExternalHTTPClientFactory) CreateClient(serviceType string) (*http.Clie
 	}
 	transport.TLSClientConfig = tlsConfig
 
+	// Apply service-specific timeout configuration
+	timeout := f.getServiceTimeout(serviceType)
+
 	return &http.Client{
 		Transport: transport,
-		Timeout:   30 * time.Second,
+		Timeout:   timeout,
 	}, nil
 }
 
@@ -243,4 +243,132 @@ func (f *ExternalHTTPClientFactory) CreateWebhookClient() (*http.Client, error) 
 // CreateAnalyticsClient creates an HTTP client for analytics requests.
 func (f *ExternalHTTPClientFactory) CreateAnalyticsClient() (*http.Client, error) {
 	return f.CreateClient(config.ServiceTypeAnalytics)
+}
+
+// CreateHealthCheckClient creates an HTTP client for health check requests.
+func (f *ExternalHTTPClientFactory) CreateHealthCheckClient() (*http.Client, error) {
+	return f.CreateClient(config.ServiceTypeHealth)
+}
+
+// getJWKWithClient fetches JWK using the provided HTTP client for proxy and mTLS support
+func getJWKWithClient(url string, client *http.Client) (*jose.JSONWebKeySet, error) {
+	log.Debug("Pulling JWK with configured client")
+	resp, err := client.Get(url)
+	if err != nil {
+		log.WithError(err).Error("Failed to get resource URL")
+		return nil, err
+	}
+
+	defer func() {
+		_ = resp.Body.Close()
+	}()
+
+	buf, err := io.ReadAll(resp.Body)
+	if err != nil {
+		log.WithError(err).Error("Failed to get read response body")
+		return nil, err
+	}
+
+	jwkSet, err := parseJWK(buf)
+	if err != nil {
+		return nil, err
+	}
+
+	return jwkSet, nil
+}
+
+// getServiceTimeout returns the appropriate timeout for different service types
+func (f *ExternalHTTPClientFactory) getServiceTimeout(serviceType string) time.Duration {
+	switch serviceType {
+	case config.ServiceTypeOAuth:
+		// OAuth/JWT flows should have reasonable timeouts for authentication
+		return 15 * time.Second
+	case config.ServiceTypeAnalytics:
+		// Analytics calls can be more generous as they're often batched
+		return 30 * time.Second
+	case config.ServiceTypeWebhook:
+		// Webhooks need reliable delivery with reasonable timeout
+		return 30 * time.Second
+	case config.ServiceTypeHealth:
+		// Health checks need quick responses
+		return 10 * time.Second
+	case config.ServiceTypeDiscovery:
+		// Service discovery needs quick responses for load balancing
+		return 10 * time.Second
+	case config.ServiceTypeStorage:
+		// Storage operations might need more time
+		return 20 * time.Second
+	default:
+		// Default conservative timeout
+		return 30 * time.Second
+	}
+}
+
+// getServiceTransport returns service-specific HTTP transport configuration
+func (f *ExternalHTTPClientFactory) getServiceTransport(serviceType string) *http.Transport {
+	switch serviceType {
+	case config.ServiceTypeOAuth:
+		// OAuth/JWT needs reliable connections for authentication
+		return &http.Transport{
+			MaxIdleConns:          50,
+			MaxIdleConnsPerHost:   10,
+			IdleConnTimeout:       30 * time.Second,
+			TLSHandshakeTimeout:   10 * time.Second,
+			ExpectContinueTimeout: 1 * time.Second,
+		}
+	case config.ServiceTypeAnalytics:
+		// Analytics may have higher throughput needs
+		return &http.Transport{
+			MaxIdleConns:          100,
+			MaxIdleConnsPerHost:   20,
+			IdleConnTimeout:       60 * time.Second,
+			TLSHandshakeTimeout:   10 * time.Second,
+			ExpectContinueTimeout: 1 * time.Second,
+		}
+	case config.ServiceTypeWebhook:
+		// Webhooks need reliable delivery
+		return &http.Transport{
+			MaxIdleConns:          50,
+			MaxIdleConnsPerHost:   10,
+			IdleConnTimeout:       30 * time.Second,
+			TLSHandshakeTimeout:   10 * time.Second,
+			ExpectContinueTimeout: 1 * time.Second,
+		}
+	case config.ServiceTypeHealth:
+		// Health checks need quick, frequent connections
+		return &http.Transport{
+			MaxIdleConns:          20,
+			MaxIdleConnsPerHost:   5,
+			IdleConnTimeout:       15 * time.Second,
+			TLSHandshakeTimeout:   5 * time.Second,
+			ExpectContinueTimeout: 1 * time.Second,
+		}
+	case config.ServiceTypeDiscovery:
+		// Service discovery needs quick responses
+		return &http.Transport{
+			MaxIdleConns:          30,
+			MaxIdleConnsPerHost:   5,
+			IdleConnTimeout:       20 * time.Second,
+			TLSHandshakeTimeout:   5 * time.Second,
+			ExpectContinueTimeout: 1 * time.Second,
+		}
+	case config.ServiceTypeStorage:
+		// Storage may need longer-lived connections
+		return &http.Transport{
+			MaxIdleConns:          50,
+			MaxIdleConnsPerHost:   15,
+			IdleConnTimeout:       90 * time.Second,
+			TLSHandshakeTimeout:   15 * time.Second,
+			ExpectContinueTimeout: 1 * time.Second,
+		}
+	default:
+		// Default transport configuration
+		return &http.Transport{
+			MaxIdleConns:          100,
+			MaxIdleConnsPerHost:   10,
+			IdleConnTimeout:       30 * time.Second,
+			TLSHandshakeTimeout:   10 * time.Second,
+			ExpectContinueTimeout: 1 * time.Second,
+		}
+	}
 }

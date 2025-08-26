@@ -23,10 +23,12 @@ type ServiceDiscovery struct {
 	parentPath          string
 	portPath            string
 	targetPath          string
+	gw                  *Gateway // Added for HTTP client factory access
 }
 
-func (s *ServiceDiscovery) Init(spec *apidef.ServiceDiscoveryConfiguration) {
+func (s *ServiceDiscovery) Init(spec *apidef.ServiceDiscoveryConfiguration, gw *Gateway) {
 	s.spec = spec
+	s.gw = gw
 	s.isNested = spec.UseNestedQuery
 	s.isTargetList = spec.UseTargetList
 	s.endpointReturnsList = spec.EndpointReturnsList
@@ -46,7 +48,24 @@ func (s *ServiceDiscovery) Init(spec *apidef.ServiceDiscoveryConfiguration) {
 
 func (s *ServiceDiscovery) getServiceData(name string) (string, error) {
 	log.Debug("Getting ", name)
-	resp, err := http.Get(name)
+
+	// Try to use HTTP client factory for discovery service
+	var resp *http.Response
+	var err error
+
+	if s.gw != nil {
+		clientFactory := NewExternalHTTPClientFactory(s.gw)
+		if client, clientErr := clientFactory.CreateClient("discovery"); clientErr == nil {
+			resp, err = client.Get(name)
+		} else {
+			log.WithError(clientErr).Debug("Failed to create discovery HTTP client, falling back to default")
+			resp, err = http.Get(name)
+		}
+	} else {
+		// Fallback to default client if gateway not set
+		resp, err = http.Get(name)
+	}
+
 	if err != nil {
 		return "", err
 	}
