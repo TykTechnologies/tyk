@@ -100,8 +100,14 @@ func TestExternalHTTPClientFactory_CreateClient(t *testing.T) {
 			require.NoError(t, err)
 			require.NotNil(t, client)
 
-			// Check client configuration
-			assert.Equal(t, 30*time.Second, client.Timeout)
+			// Check client configuration - timeout should match service type
+			expectedTimeout := 30 * time.Second // Default for most services
+			if tt.serviceType == config.ServiceTypeOAuth {
+				expectedTimeout = 15 * time.Second
+			} else if tt.serviceType == config.ServiceTypeHealth || tt.serviceType == config.ServiceTypeDiscovery {
+				expectedTimeout = 10 * time.Second
+			}
+			assert.Equal(t, expectedTimeout, client.Timeout)
 
 			transport := client.Transport.(*http.Transport)
 			assert.NotNil(t, transport)
