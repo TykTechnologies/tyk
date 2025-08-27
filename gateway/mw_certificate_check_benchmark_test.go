@@ -1,6 +1,27 @@
 package gateway
 
-/*
+import (
+	"context"
+	"crypto/tls"
+	"crypto/x509"
+	"crypto/x509/pkix"
+	"fmt"
+	"io"
+	"net/http"
+	"testing"
+	"time"
+
+	"github.com/sirupsen/logrus"
+	"go.uber.org/mock/gomock"
+
+	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/certs/mock"
+	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/internal/certcheck"
+	"github.com/TykTechnologies/tyk/internal/crypto"
+	"github.com/TykTechnologies/tyk/storage"
+)
+
 // setupCertificateCheckMWBenchmark creates a middleware instance for benchmarking
 func setupCertificateCheckMWBenchmark(b *testing.B, useMutualTLS bool, certs []*tls.Certificate) *CertificateCheckMW {
 	ctrl := gomock.NewController(b)
@@ -80,6 +101,17 @@ func setupCertificateCheckMWBenchmark(b *testing.B, useMutualTLS bool, certs []*
 	}
 	mw.store.Connect()
 
+	discardLogger := logrus.New()
+	discardLogger.SetOutput(io.Discard)
+
+	mw.expiryCheckBatcher, _ = certcheck.NewCertificateExpiryCheckBatcher(
+		logrus.NewEntry(discardLogger),
+		mw.Gw.GetConfig().Security.CertificateExpiryMonitor,
+		mw.store,
+		mw.Spec.FireEvent)
+
+	mw.expiryCheckBatcher.SetFlushInterval(10 * time.Millisecond)
+
 	return mw
 }
 
@@ -126,9 +158,13 @@ func BenchmarkCertificateCheckMW_ProcessRequest(b *testing.B) {
 		}}},
 	}
 
+	ctx, cancelFunc := context.WithCancel(context.Background())
+	defer cancelFunc()
+
 	for _, tc := range tests {
 		b.Run(tc.name, func(b *testing.B) {
 			mw := setupCertificateCheckMWBenchmark(b, tc.useMutualTLS, tc.certs)
+			go mw.expiryCheckBatcher.RunInBackground(ctx)
 			req := createTestRequest(tc.withTLS, tc.peerCerts)
 
 			b.ResetTimer()
@@ -139,35 +175,12 @@ func BenchmarkCertificateCheckMW_ProcessRequest(b *testing.B) {
 	}
 }
 
-// BenchmarkCertificateCheckMW_HelperMethods benchmarks the helper methods
-func BenchmarkCertificateCheckMW_HelperMethods(b *testing.B) {
-	mw := setupCertificateCheckMWBenchmark(b, true, nil)
-	cert := createTestCertificate(30, "benchmark-cert")
-
-	b.Run("GenerateCertificateID", func(b *testing.B) {
-		for i := 0; i < b.N; i++ {
-			_ = crypto.HexSHA256(cert.Leaf.Raw)
-		}
-	})
-
-	b.Run("ShouldFireEvent", func(b *testing.B) {
-		config := mw.Spec.GlobalConfig.Security.CertificateExpiryMonitor
-		for i := 0; i < b.N; i++ {
-			_ = mw.shouldFireExpiryEvent("test-cert-id", config)
-		}
-	})
-
-	b.Run("FireCertificateExpiringSoonEvent", func(b *testing.B) {
-		for i := 0; i < b.N; i++ {
-			certID := crypto.HexSHA256(cert.Leaf.Raw)
-			mw.fireCertificateExpiringSoonEvent(cert, certID, 30)
-		}
-	})
-}
-
 // BenchmarkCertificateCheckMW_CheckCertificateExpiration benchmarks the certificate expiration checking logic
 func BenchmarkCertificateCheckMW_CheckCertificateExpiration(b *testing.B) {
 	mw := setupCertificateCheckMWBenchmark(b, true, nil)
+	ctx, cancelFunc := context.WithCancel(context.Background())
+	defer cancelFunc()
+	go mw.expiryCheckBatcher.RunInBackground(ctx)
 
 	tests := []struct {
 		name  string
@@ -206,20 +219,15 @@ func BenchmarkCertificateCheckMW_CheckCertificateExpiration(b *testing.B) {
 // BenchmarkCertificateCheckMW_MemoryUsage benchmarks memory usage patterns
 func BenchmarkCertificateCheckMW_MemoryUsage(b *testing.B) {
 	mw := setupCertificateCheckMWBenchmark(b, true, nil)
+	ctx, cancelFunc := context.WithCancel(context.Background())
+	defer cancelFunc()
+	go mw.expiryCheckBatcher.RunInBackground(ctx)
 	cert := createTestCertificate(15, "benchmark-cert")
 
 	b.Run("CertificateIDGeneration", func(b *testing.B) {
 		b.ReportAllocs()
 		for i := 0; i < b.N; i++ {
 			_ = crypto.HexSHA256(cert.Leaf.Raw)
-		}
-	})
-
-	b.Run("EventMetadataCreation", func(b *testing.B) {
-		b.ReportAllocs()
-		for i := 0; i < b.N; i++ {
-			certID := crypto.HexSHA256(cert.Leaf.Raw)
-			mw.fireCertificateExpiringSoonEvent(cert, certID, 15)
 		}
 	})
 
@@ -245,91 +253,3 @@ func BenchmarkCertificateCheckMW_MemoryUsage(b *testing.B) {
 		}
 	})
 }
-
-// Benchmark tests for concurrency performance
-func BenchmarkCertificateCheckMW_ConcurrentChecks(b *testing.B) {
-	mw := &CertificateCheckMW{
-		BaseMiddleware: &BaseMiddleware{
-			Spec: &APISpec{
-				APIDefinition: &apidef.APIDefinition{
-					APIID: "test-api-id",
-					OrgID: "test-org-id",
-				},
-				GlobalConfig: config.Config{
-					Security: config.SecurityConfig{
-						CertificateExpiryMonitor: config.CertificateExpiryMonitorConfig{
-							WarningThresholdDays: 30,
-							CheckCooldownSeconds: 1,
-							EventCooldownSeconds: 1,
-						},
-					},
-				},
-			},
-		},
-	}
-
-	// Mock gateway
-	mw.Gw = &Gateway{}
-	mw.Gw.UtilCache = cache.New(3600, 10*60)
-
-	// Initialize Redis store with a unique prefix for benchmarks
-	mw.Gw.StorageConnectionHandler = storage.NewConnectionHandler(context.Background())
-	mw.store = &storage.RedisCluster{
-		KeyPrefix:         fmt.Sprintf("cert-cooldown:benchmark-%d-", time.Now().UnixNano()),
-		ConnectionHandler: mw.Gw.StorageConnectionHandler,
-	}
-	mw.store.Connect()
-
-	certID := "benchmark-cert-id"
-
-	b.ResetTimer()
-	b.RunParallel(func(pb *testing.PB) {
-		for pb.Next() {
-			mw.shouldCooldown(mw.Spec.GlobalConfig.Security.CertificateExpiryMonitor, certID)
-		}
-	})
-}
-
-func BenchmarkCertificateCheckMW_ConcurrentEvents(b *testing.B) {
-	mw := &CertificateCheckMW{
-		BaseMiddleware: &BaseMiddleware{
-			Spec: &APISpec{
-				APIDefinition: &apidef.APIDefinition{
-					APIID: "test-api-id",
-					OrgID: "test-org-id",
-				},
-				GlobalConfig: config.Config{
-					Security: config.SecurityConfig{
-						CertificateExpiryMonitor: config.CertificateExpiryMonitorConfig{
-							WarningThresholdDays: 30,
-							CheckCooldownSeconds: 1,
-							EventCooldownSeconds: 1,
-						},
-					},
-				},
-			},
-		},
-	}
-
-	// Mock gateway
-	mw.Gw = &Gateway{}
-	mw.Gw.UtilCache = cache.New(3600, 10*60)
-
-	// Initialize Redis store with a unique prefix for benchmarks
-	mw.Gw.StorageConnectionHandler = storage.NewConnectionHandler(context.Background())
-	mw.store = &storage.RedisCluster{
-		KeyPrefix:         fmt.Sprintf("cert-cooldown:benchmark-%d-", time.Now().UnixNano()),
-		ConnectionHandler: mw.Gw.StorageConnectionHandler,
-	}
-	mw.store.Connect()
-
-	certID := "benchmark-cert-id"
-
-	b.ResetTimer()
-	b.RunParallel(func(pb *testing.PB) {
-		for pb.Next() {
-			mw.shouldFireExpiryEvent(certID, mw.Spec.GlobalConfig.Security.CertificateExpiryMonitor)
-		}
-	})
-}
-*/
