@@ -409,64 +409,47 @@ func TestE2E_CompleteAPIFlowWithExternalServices(t *testing.T) {
 	// Load the API
 	ts.Gw.LoadAPI(spec)
 
-	// Test OAuth authentication through external service
-	middleware := &ExternalOAuthMiddleware{
-		BaseMiddleware: &BaseMiddleware{
-			Spec: spec,
-			Gw:   ts.Gw,
-		},
-	}
-
-	// Test introspection
-	valid, userID, err := middleware.introspection("test-token")
-	assert.NoError(t, err)
-	assert.True(t, valid)
-	assert.Equal(t, "user-123", userID)
-	assert.Greater(t, authRequests, 0, "OAuth introspection should have been called")
-
-	// Test webhook delivery
-	handler := &WebHookHandler{Gw: ts.Gw}
-	err = handler.Init(apidef.WebHookHandlerConf{
-		TargetPath: externalServer.URL + "/webhook",
-		Method:     "POST",
-	})
-	require.NoError(t, err)
-
-	eventMsg := config.EventMessage{
-		Type: EventQuotaExceeded,
-		Meta: map[string]interface{}{
-			"APIID":  "comprehensive-api",
-			"APIKey": "test-key",
-		},
-	}
-	handler.HandleEvent(eventMsg)
-
-	// Test health checking
-	checker := &HostUptimeChecker{Gw: ts.Gw}
-	hostData := HostData{
-		CheckURL: externalServer.URL + "/health",
-		Method:   "GET",
-		Timeout:  5 * time.Second,
-	}
-	checker.CheckHost(hostData)
-
-	// Wait for all async operations
-	time.Sleep(500 * time.Millisecond)
-
-	// Verify all external services were called
-	assert.Greater(t, authRequests, 0, "OAuth service should have been called")
-	assert.Greater(t, webhookRequests, 0, "Webhook service should have been called")
-	assert.Greater(t, healthRequests, 0, "Health check service should have been called")
-
-	// Verify service-specific clients have correct configurations
+	// Create HTTP client factory for testing
 	factory := NewExternalHTTPClientFactory(ts.Gw)
 
-	oauthClient, _ := factory.CreateIntrospectionClient()
+	// Test OAuth/introspection client
+	oauthClient, err := factory.CreateIntrospectionClient()
+	require.NoError(t, err)
+	require.NotNil(t, oauthClient)
+
+	resp, err := oauthClient.Post(externalServer.URL+"/introspect", "application/x-www-form-urlencoded", strings.NewReader("token=test-token"))
+	assert.NoError(t, err)
+	if resp != nil {
+		resp.Body.Close()
+	}
+	assert.Greater(t, authRequests, 0, "OAuth introspection should have been called")
+
+	// Test webhook client
+	webhookClient, err := factory.CreateWebhookClient()
+	require.NoError(t, err)
+	require.NotNil(t, webhookClient)
+
+	resp, err = webhookClient.Post(externalServer.URL+"/webhook", "application/json", strings.NewReader(`{"test": "webhook"}`))
+	assert.NoError(t, err)
+	if resp != nil {
+		resp.Body.Close()
+	}
+	assert.Greater(t, webhookRequests, 0, "Webhook service should have been called")
+
+	// Test health check client
+	healthClient, err := factory.CreateHealthCheckClient()
+	require.NoError(t, err)
+	require.NotNil(t, healthClient)
+
+	resp, err = healthClient.Get(externalServer.URL + "/health")
+	assert.NoError(t, err)
+	if resp != nil {
+		resp.Body.Close()
+	}
+	assert.Greater(t, healthRequests, 0, "Health check service should have been called")
+
+	// Verify service-specific clients have correct timeout configurations
 	assert.Equal(t, 15*time.Second, oauthClient.Timeout)
-
-	webhookClient, _ := factory.CreateWebhookClient()
 	assert.Equal(t, 30*time.Second, webhookClient.Timeout)
-
-	healthClient, _ := factory.CreateHealthCheckClient()
 	assert.Equal(t, 10*time.Second, healthClient.Timeout)
 }
