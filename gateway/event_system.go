@@ -8,6 +8,7 @@ import (
 	"github.com/TykTechnologies/tyk/internal/event"
 
 	circuit "github.com/TykTechnologies/circuitbreaker"
+
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
 )
@@ -60,6 +61,8 @@ const (
 	EventTokenDeleted = event.TokenDeleted
 	// EventCertificateExpiringSoon is an alias maintained for backwards compatibility.
 	EventCertificateExpiringSoon = event.CertificateExpiringSoon
+	// EventCertificateExpired is an alias maintained for backwards compatibility.
+	EventCertificateExpired = event.CertificateExpired
 )
 
 type EventHostStatusMeta struct {

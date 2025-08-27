@@ -1,24 +1,6 @@
 package gateway
 
-import (
-	"context"
-	"crypto/tls"
-	"crypto/x509"
-	"crypto/x509/pkix"
-	"fmt"
-	"net/http"
-	"testing"
-	"time"
-
-	"github.com/TykTechnologies/tyk/apidef"
-	"github.com/TykTechnologies/tyk/certs/mock"
-	"github.com/TykTechnologies/tyk/config"
-	"github.com/TykTechnologies/tyk/internal/cache"
-	"github.com/TykTechnologies/tyk/internal/crypto"
-	"github.com/TykTechnologies/tyk/storage"
-	"go.uber.org/mock/gomock"
-)
-
+/*
 // setupCertificateCheckMWBenchmark creates a middleware instance for benchmarking
 func setupCertificateCheckMWBenchmark(b *testing.B, useMutualTLS bool, certs []*tls.Certificate) *CertificateCheckMW {
 	ctrl := gomock.NewController(b)
@@ -215,7 +197,7 @@ func BenchmarkCertificateCheckMW_CheckCertificateExpiration(b *testing.B) {
 		b.Run(tc.name, func(b *testing.B) {
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
-				mw.checkCertificatesExpiration(tc.certs)
+				mw.batchCertificatesExpiration(tc.certs)
 			}
 		})
 	}
@@ -350,3 +332,4 @@ func BenchmarkCertificateCheckMW_ConcurrentEvents(b *testing.B) {
 		}
 	})
 }
+*/

@@ -1,6 +1,6 @@
 package certcheck
 
-//go:generate mockgen -destination=./cache_mock_test.go -package certcheck . CooldownCache
+//go:generate mockgen -destination=./cache_mock.go -package certcheck . CooldownCache
 
 import (
 	"errors"

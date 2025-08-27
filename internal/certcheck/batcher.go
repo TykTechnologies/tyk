@@ -1,6 +1,6 @@
 package certcheck
 
-//go:generate mockgen -destination=./batcher_mock_test.go -package certcheck . Batcher,BackgroundBatcher
+//go:generate mockgen -destination=./batcher_mock.go -package certcheck . Batcher,BackgroundBatcher
 
 import (
 	"context"
@@ -76,6 +76,7 @@ type Batcher interface {
 type BackgroundBatcher interface {
 	Batcher
 	RunInBackground(ctx context.Context)
+	SetFlushInterval(time.Duration)
 }
 
 type CertificateExpiryCheckBatcher struct {
@@ -149,6 +150,10 @@ func (c *CertificateExpiryCheckBatcher) RunInBackground(ctx context.Context) {
 			continue
 		}
 	}
+}
+
+func (c *CertificateExpiryCheckBatcher) SetFlushInterval(interval time.Duration) {
+	c.flushTicker.Reset(interval)
 }
 
 func (c *CertificateExpiryCheckBatcher) checkCooldownExistsInLocalCache(certInfo CertInfo) (exists bool) {
