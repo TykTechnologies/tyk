@@ -58,6 +58,8 @@ const (
 	EventTokenUpdated = event.TokenUpdated
 	// EventTokenDeleted is an alias maintained for backwards compatibility.
 	EventTokenDeleted = event.TokenDeleted
+	// EventCertificateExpiringSoon is an alias maintained for backwards compatibility.
+	EventCertificateExpiringSoon = event.CertificateExpiringSoon
 )
 
 type EventHostStatusMeta struct {
@@ -111,6 +113,17 @@ type EventTokenMeta struct {
 	EventMetaDefault
 	Org string
 	Key string
+}
+
+// EventCertificateExpiringSoonMeta is the metadata structure for certificate expiration events
+type EventCertificateExpiringSoonMeta struct {
+	EventMetaDefault
+	CertID        string    `json:"cert_id"`
+	CertName      string    `json:"cert_name"`
+	ExpiresAt     time.Time `json:"expires_at"`
+	DaysRemaining int       `json:"days_remaining"`
+	APIID         string    `json:"api_id"`
+	OrgID         string    `json:"org_id"`
 }
 
 // EventHandlerByName is a convenience function to get event handler instances from an API Definition
