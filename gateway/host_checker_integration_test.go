@@ -59,10 +59,11 @@ func TestHostChecker_ProxyIntegration(t *testing.T) {
 	}
 	ts.Gw.SetConfig(gwConf)
 
-	// Create host checker
+	// Create host checker and initialize it with buffered channels
 	checker := &HostUptimeChecker{
 		Gw: ts.Gw,
 	}
+	checker.Init(1, 3, 5, make(map[string]HostData), HostCheckCallBacks{})
 
 	// Create test host data
 	hostData := HostData{
@@ -71,10 +72,29 @@ func TestHostChecker_ProxyIntegration(t *testing.T) {
 		Timeout:  5 * time.Second,
 	}
 
-	// Perform health check
-	checker.CheckHost(hostData)
+	// Create a channel to signal completion
+	done := make(chan bool, 1)
 
-	// Give some time for the health check to be processed
+	// Consume from the channels to prevent blocking
+	go func() {
+		select {
+		case <-checker.okChan:
+			done <- true
+		case <-checker.errorChan:
+			done <- false
+		case <-time.After(10 * time.Second):
+			done <- false // timeout
+		}
+	}()
+
+	// Perform health check in a goroutine to avoid blocking
+	go checker.CheckHost(hostData)
+
+	// Wait for completion or timeout
+	success := <-done
+	assert.True(t, success, "Health check should succeed")
+
+	// Give some time for any remaining processing
 	time.Sleep(100 * time.Millisecond)
 
 	// Verify health check was performed through proxy
@@ -166,10 +186,11 @@ func TestHostChecker_FallbackBehavior(t *testing.T) {
 	}))
 	defer healthServer.Close()
 
-	// Create host checker
+	// Create host checker and initialize it with buffered channels
 	checker := &HostUptimeChecker{
 		Gw: ts.Gw,
 	}
+	checker.Init(1, 3, 5, make(map[string]HostData), HostCheckCallBacks{})
 
 	// Create test host data
 	hostData := HostData{
@@ -192,10 +213,11 @@ func TestHostChecker_TimeoutOverride(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
 
-	// Create host checker
+	// Create host checker and initialize it with buffered channels
 	checker := &HostUptimeChecker{
 		Gw: ts.Gw,
 	}
+	checker.Init(1, 3, 5, make(map[string]HostData), HostCheckCallBacks{})
 
 	// Create a slow server to test timeout behavior
 	slowServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
@@ -238,10 +260,11 @@ func TestHostChecker_CustomHeaders(t *testing.T) {
 	}))
 	defer healthServer.Close()
 
-	// Create host checker
+	// Create host checker and initialize it with buffered channels
 	checker := &HostUptimeChecker{
 		Gw: ts.Gw,
 	}
+	checker.Init(1, 3, 5, make(map[string]HostData), HostCheckCallBacks{})
 
 	// Create test host data with custom headers
 	hostData := HostData{
