@@ -28,15 +28,12 @@ func TestExternalServiceConfig_JSON(t *testing.T) {
 				CAFile:   "/path/to/ca.pem",
 			},
 		},
-		Analytics: ServiceConfig{
-			Proxy: ProxyConfig{
-				HTTPSProxy: "https://analytics-proxy:8080",
-			},
-		},
 		Storage: ServiceConfig{
 			MTLS: MTLSConfig{
 				Enabled:            true,
 				InsecureSkipVerify: true,
+				TLSMinVersion:      "1.2",
+				TLSMaxVersion:      "1.3",
 			},
 		},
 		Webhooks: ServiceConfig{
@@ -81,7 +78,6 @@ func TestExternalServiceConfig_JSON(t *testing.T) {
 	assert.Equal(t, config.OAuth.MTLS.KeyFile, unmarshaled.OAuth.MTLS.KeyFile)
 	assert.Equal(t, config.OAuth.MTLS.CAFile, unmarshaled.OAuth.MTLS.CAFile)
 
-	assert.Equal(t, config.Analytics.Proxy.HTTPSProxy, unmarshaled.Analytics.Proxy.HTTPSProxy)
 	assert.Equal(t, config.Storage.MTLS.Enabled, unmarshaled.Storage.MTLS.Enabled)
 	assert.Equal(t, config.Storage.MTLS.InsecureSkipVerify, unmarshaled.Storage.MTLS.InsecureSkipVerify)
 	assert.Equal(t, config.Webhooks.Proxy.UseEnvironment, unmarshaled.Webhooks.Proxy.UseEnvironment)
@@ -192,7 +188,6 @@ func TestServiceTypeConstants(t *testing.T) {
 	// Test that all service type constants are defined correctly
 	expectedTypes := map[string]string{
 		ServiceTypeOAuth:     "oauth",
-		ServiceTypeAnalytics: "analytics",
 		ServiceTypeStorage:   "storage",
 		ServiceTypeWebhook:   "webhook",
 		ServiceTypeHealth:    "health",
@@ -236,11 +231,6 @@ func TestExternalServiceConfig_PartialConfiguration(t *testing.T) {
 				Proxy: ProxyConfig{
 					UseEnvironment: true,
 				},
-				Analytics: ServiceConfig{
-					Proxy: ProxyConfig{
-						HTTPProxy: "http://analytics-proxy:8080",
-					},
-				},
 				Webhooks: ServiceConfig{
 					MTLS: MTLSConfig{
 						Enabled:            true,
@@ -270,9 +260,6 @@ func TestExternalServiceConfig_PartialConfiguration(t *testing.T) {
 			}
 			if tt.config.OAuth.MTLS.Enabled {
 				assert.Equal(t, tt.config.OAuth.MTLS.Enabled, unmarshaled.OAuth.MTLS.Enabled)
-			}
-			if tt.config.Analytics.Proxy.HTTPProxy != "" {
-				assert.Equal(t, tt.config.Analytics.Proxy.HTTPProxy, unmarshaled.Analytics.Proxy.HTTPProxy)
 			}
 			if tt.config.Webhooks.MTLS.Enabled {
 				assert.Equal(t, tt.config.Webhooks.MTLS.Enabled, unmarshaled.Webhooks.MTLS.Enabled)

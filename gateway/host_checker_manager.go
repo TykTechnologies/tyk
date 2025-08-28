@@ -438,7 +438,7 @@ func (hc *HostCheckerManager) ListFromService(apiID string) ([]HostData, error) 
 		return nil, errors.New("API ID not found in register")
 	}
 	sd := ServiceDiscovery{}
-	sd.Init(&spec.UptimeTests.Config.ServiceDiscovery)
+	sd.Init(&spec.UptimeTests.Config.ServiceDiscovery, hc.Gw)
 	data, err := sd.Target(spec.UptimeTests.Config.ServiceDiscovery.QueryEndpoint)
 
 	if err != nil {

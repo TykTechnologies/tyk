@@ -7,7 +7,6 @@ type ExternalServiceConfig struct {
 	Proxy ProxyConfig `json:"proxy"`
 	// Service-specific configurations that can override global settings
 	OAuth     ServiceConfig `json:"oauth"`
-	Analytics ServiceConfig `json:"analytics"`
 	Storage   ServiceConfig `json:"storage"`
 	Webhooks  ServiceConfig `json:"webhooks"`
 	Health    ServiceConfig `json:"health"`
@@ -47,12 +46,15 @@ type MTLSConfig struct {
 	CAFile string `json:"ca_file"`
 	// InsecureSkipVerify disables server certificate verification (not recommended for production)
 	InsecureSkipVerify bool `json:"insecure_skip_verify"`
+	// TLSMinVersion sets the minimum TLS version (e.g., "1.2", "1.3")
+	TLSMinVersion string `json:"tls_min_version"`
+	// TLSMaxVersion sets the maximum TLS version (e.g., "1.2", "1.3")
+	TLSMaxVersion string `json:"tls_max_version"`
 }
 
 // Service type constants for identifying different external service types
 const (
 	ServiceTypeOAuth     = "oauth"
-	ServiceTypeAnalytics = "analytics"
 	ServiceTypeStorage   = "storage"
 	ServiceTypeWebhook   = "webhook"
 	ServiceTypeHealth    = "health"

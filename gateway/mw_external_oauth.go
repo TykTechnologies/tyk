@@ -174,8 +174,21 @@ func (k *ExternalOAuthMiddleware) getSecretFromJWKURL(url string, kid interface{
 
 	cachedJWK, found := externalOAuthJWKCache.Get(k.Spec.APIID)
 	if !found {
-		if jwkSet, err = getJWK(url, k.Gw.GetConfig().JWTSSLInsecureSkipVerify); err != nil {
-			return nil, err
+		// Create HTTP client using factory for OAuth service
+		clientFactory := NewExternalHTTPClientFactory(k.Gw)
+		client, clientErr := clientFactory.CreateJWKClient(k.Gw.GetConfig().JWTSSLInsecureSkipVerify)
+		if clientErr != nil {
+			k.Logger().WithError(clientErr).Error("Failed to create JWK HTTP client")
+			// Fallback to original method if client factory fails
+			k.Logger().Debug("[ExternalServices] Falling back to legacy JWK client due to factory error")
+			if jwkSet, err = getJWK(url, k.Gw.GetConfig().JWTSSLInsecureSkipVerify); err != nil {
+				return nil, err
+			}
+		} else {
+			k.Logger().Debugf("[ExternalServices] Using external services JWK client to fetch: %s", url)
+			if jwkSet, err = getJWKWithClient(url, client); err != nil {
+				return nil, err
+			}
 		}
 
 		k.Logger().Debug("Caching JWK")
@@ -234,7 +247,7 @@ func (k *ExternalOAuthMiddleware) introspection(accessToken string) (bool, strin
 
 	if !cached {
 		log.WithError(err).Debug("Doing OAuth introspection call")
-		claims, err = introspect(opts, accessToken)
+		claims, err = k.introspectWithClient(opts, accessToken)
 		if err != nil {
 			return false, "", fmt.Errorf("introspection err: %w", err)
 		}
@@ -340,6 +353,57 @@ func introspect(opts apidef.Introspection, accessToken string) (jwt.MapClaims, e
 	body.Set("client_secret", opts.ClientSecret)
 
 	res, err := http.Post(opts.URL, "application/x-www-form-urlencoded", strings.NewReader(body.Encode()))
+	if err != nil {
+		return nil, fmt.Errorf("error happened during the introspection call: %w", err)
+	}
+
+	defer res.Body.Close()
+
+	bodyInBytes, err := io.ReadAll(res.Body)
+	if err != nil {
+		return nil, fmt.Errorf("couldn't read the introspection call response: %w", err)
+	}
+
+	var claims jwt.MapClaims
+	err = json.Unmarshal(bodyInBytes, &claims)
+	if err != nil {
+		return nil, fmt.Errorf("couldn't unmarshal the introspection call response: %w", err)
+	}
+
+	if res.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("status does not indicate success: code: %d, body: %v", res.StatusCode, res.Body)
+	}
+
+	return claims, nil
+}
+
+// introspectWithClient makes an introspection request using the HTTP client factory for proxy and mTLS support
+func (k *ExternalOAuthMiddleware) introspectWithClient(opts apidef.Introspection, accessToken string) (jwt.MapClaims, error) {
+	body := url.Values{}
+	body.Set("token", accessToken)
+	body.Set("client_id", opts.ClientID)
+	body.Set("client_secret", opts.ClientSecret)
+
+	// Create HTTP client using factory for OAuth introspection
+	clientFactory := NewExternalHTTPClientFactory(k.Gw)
+	client, err := clientFactory.CreateIntrospectionClient()
+	if err != nil {
+		k.Logger().WithError(err).Error("Failed to create introspection HTTP client, falling back to default")
+		// Fallback to original introspect function
+		k.Logger().Debug("[ExternalServices] Falling back to legacy introspection client due to factory error")
+		return introspect(opts, accessToken)
+	}
+
+	k.Logger().Debugf("[ExternalServices] Using external services introspection client for URL: %s", opts.URL)
+
+	req, err := http.NewRequest("POST", opts.URL, strings.NewReader(body.Encode()))
+	if err != nil {
+		return nil, fmt.Errorf("failed to create introspection request: %w", err)
+	}
+
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+
+	res, err := client.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("error happened during the introspection call: %w", err)
 	}
