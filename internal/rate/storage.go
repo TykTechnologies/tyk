@@ -12,7 +12,7 @@ import (
 )
 
 // NewStorage provides a redis v9 client for rate limiter use.
-func NewStorage(cfg *config.StorageOptionsConf) redis.UniversalClient {
+func NewStorage(cfg *config.StorageOptionsConf, externalServicesConfig *config.ExternalServiceConfig) redis.UniversalClient {
 	// poolSize applies per cluster node and not for the whole cluster.
 	poolSize := 500
 	if cfg.MaxActive > 0 {
@@ -28,7 +28,7 @@ func NewStorage(cfg *config.StorageOptionsConf) redis.UniversalClient {
 	var tlsConfig *tls.Config
 
 	if cfg.UseSSL {
-		tlsConfig = createTLSConfig(cfg)
+		tlsConfig = createTLSConfig(cfg, externalServicesConfig)
 	}
 
 	opts := &redis.UniversalOptions{
@@ -58,34 +58,75 @@ func NewStorage(cfg *config.StorageOptionsConf) redis.UniversalClient {
 }
 
 // createTLSConfig creates a TLS configuration with proper mTLS support
-func createTLSConfig(cfg *config.StorageOptionsConf) *tls.Config {
+// It prioritizes external services storage configuration over legacy storage config
+func createTLSConfig(cfg *config.StorageOptionsConf, externalServicesConfig *config.ExternalServiceConfig) *tls.Config {
+	// Start with legacy configuration as base
 	tlsConfig := &tls.Config{
 		InsecureSkipVerify: cfg.SSLInsecureSkipVerify,
 	}
 
-	// Set TLS versions if configured
-	if cfg.TLSMinVersion != "" {
-		if version, ok := getTLSVersion(cfg.TLSMinVersion); ok {
-			tlsConfig.MinVersion = version
+	// Override with external services storage configuration if available and enabled
+	if externalServicesConfig != nil && externalServicesConfig.Storage.MTLS.Enabled {
+		storageConfig := externalServicesConfig.Storage.MTLS
+		tlsConfig.InsecureSkipVerify = storageConfig.InsecureSkipVerify
+
+		// Load client certificate from external services config
+		if storageConfig.CertFile != "" && storageConfig.KeyFile != "" {
+			cert, err := tls.LoadX509KeyPair(storageConfig.CertFile, storageConfig.KeyFile)
+			if err != nil {
+				logrus.WithError(err).Error("Failed to load external services storage client certificate for Redis")
+			} else {
+				tlsConfig.Certificates = []tls.Certificate{cert}
+				logrus.Debug("Loaded Redis client certificate from external services storage configuration")
+			}
 		}
-	}
-	if cfg.TLSMaxVersion != "" {
-		if version, ok := getTLSVersion(cfg.TLSMaxVersion); ok {
-			tlsConfig.MaxVersion = version
+
+		// Load CA certificate from external services config
+		if storageConfig.CAFile != "" {
+			caCert, err := os.ReadFile(storageConfig.CAFile)
+			if err != nil {
+				logrus.WithError(err).Error("Failed to load external services storage CA certificate for Redis")
+			} else {
+				caCertPool := x509.NewCertPool()
+				if !caCertPool.AppendCertsFromPEM(caCert) {
+					logrus.Error("Failed to parse external services storage CA certificate for Redis")
+				} else {
+					tlsConfig.RootCAs = caCertPool
+					logrus.Debug("Loaded Redis CA certificate from external services storage configuration")
+				}
+			}
 		}
+
+		// Set TLS versions from external services config if configured
+		if storageConfig.TLSMinVersion != "" {
+			if version, ok := getTLSVersion(storageConfig.TLSMinVersion); ok {
+				tlsConfig.MinVersion = version
+			}
+		}
+		if storageConfig.TLSMaxVersion != "" {
+			if version, ok := getTLSVersion(storageConfig.TLSMaxVersion); ok {
+				tlsConfig.MaxVersion = version
+			}
+		}
+
+		// External services config takes priority, skip legacy configuration
+		return tlsConfig
 	}
+
+	// Legacy certificate loading (only if external services config not used)
 
 	// Load CA certificate if provided
 	if cfg.CAFile != "" {
 		caCert, err := os.ReadFile(cfg.CAFile)
 		if err != nil {
-			logrus.WithError(err).Error("Failed to load CA certificate for rate limiter Redis")
+			logrus.WithError(err).Error("Failed to load legacy CA certificate for rate limiter Redis")
 		} else {
 			caCertPool := x509.NewCertPool()
 			if !caCertPool.AppendCertsFromPEM(caCert) {
-				logrus.Error("Failed to parse CA certificate for rate limiter Redis")
+				logrus.Error("Failed to parse legacy CA certificate for rate limiter Redis")
 			} else {
 				tlsConfig.RootCAs = caCertPool
+				logrus.Debug("Loaded Redis CA certificate from legacy storage configuration")
 			}
 		}
 	}
@@ -94,9 +135,22 @@ func createTLSConfig(cfg *config.StorageOptionsConf) *tls.Config {
 	if cfg.CertFile != "" && cfg.KeyFile != "" {
 		cert, err := tls.LoadX509KeyPair(cfg.CertFile, cfg.KeyFile)
 		if err != nil {
-			logrus.WithError(err).Error("Failed to load client certificate and key for rate limiter Redis")
+			logrus.WithError(err).Error("Failed to load legacy client certificate and key for rate limiter Redis")
 		} else {
 			tlsConfig.Certificates = []tls.Certificate{cert}
+			logrus.Debug("Loaded Redis client certificate from legacy storage configuration")
+		}
+	}
+
+	// Set TLS versions from legacy config if configured
+	if cfg.TLSMinVersion != "" {
+		if version, ok := getTLSVersion(cfg.TLSMinVersion); ok {
+			tlsConfig.MinVersion = version
+		}
+	}
+	if cfg.TLSMaxVersion != "" {
+		if version, ok := getTLSVersion(cfg.TLSMaxVersion); ok {
+			tlsConfig.MaxVersion = version
 		}
 	}
 

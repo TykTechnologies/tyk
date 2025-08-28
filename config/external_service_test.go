@@ -32,6 +32,8 @@ func TestExternalServiceConfig_JSON(t *testing.T) {
 			MTLS: MTLSConfig{
 				Enabled:            true,
 				InsecureSkipVerify: true,
+				TLSMinVersion:      "1.2",
+				TLSMaxVersion:      "1.3",
 			},
 		},
 		Webhooks: ServiceConfig{

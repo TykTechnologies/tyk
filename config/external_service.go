@@ -46,6 +46,10 @@ type MTLSConfig struct {
 	CAFile string `json:"ca_file"`
 	// InsecureSkipVerify disables server certificate verification (not recommended for production)
 	InsecureSkipVerify bool `json:"insecure_skip_verify"`
+	// TLSMinVersion sets the minimum TLS version (e.g., "1.2", "1.3")
+	TLSMinVersion string `json:"tls_min_version"`
+	// TLSMaxVersion sets the maximum TLS version (e.g., "1.2", "1.3")
+	TLSMaxVersion string `json:"tls_max_version"`
 }
 
 // Service type constants for identifying different external service types
