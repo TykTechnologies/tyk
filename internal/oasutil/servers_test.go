@@ -58,6 +58,18 @@ func TestParseServerUrl(t *testing.T) {
 				UrlNormalized: "",
 				Variables:     nil,
 			}},
+			{"doesnt fail with non capture group", "https://{subdomain:(?:hello|world)}.example.com/{version:(?:v[0-9]+)}", &oasutil.ServerUrl{
+				Url:           "https://{subdomain:(?:hello|world)}.example.com/{version:(?:v[0-9]+)}",
+				UrlNormalized: "https://{subdomain}.example.com/{version}",
+				Variables: map[string]*openapi3.ServerVariable{
+					"subdomain": {
+						Default: oasutil.DefaultServerUrlPrefix + "1",
+					},
+					"version": {
+						Default: oasutil.DefaultServerUrlPrefix + "2",
+					},
+				},
+			}},
 		} {
 			t.Run(tCase.name, func(t *testing.T) {
 				res, err := oasutil.ParseServerUrl(tCase.input)
@@ -81,9 +93,14 @@ func TestParseServerUrl(t *testing.T) {
 			{"empty variable name 2", "example{:[a-z]+}.com", oasutil.ErrEmptyVariableName},
 			{"no closed brace", "{example.com", oasutil.ErrParse},
 			{"server variable collision", "{version:[a-z]+}.example.com/{version:[0-9]+}", oasutil.ErrVariableCollision},
+			{"double open", "{{subdomain}.example.com", oasutil.ErrInvalidVariableName},
+			{"invalid pattern", "{subdomain:[a-z]++}.example.com", oasutil.ErrInvalidPattern},
+			// using capture groups provide to fail gateway https://tyktech.atlassian.net/browse/TT-11244?focusedCommentId=101878
+			{"does not allow capture group", "{subdomain:([a-z]+)}.example.com", oasutil.ErrNoCaptureGroup},
 		} {
 			t.Run(tCase.name, func(t *testing.T) {
 				_, err := oasutil.ParseServerUrl(tCase.input)
+				assert.NotNil(t, err)
 				assert.ErrorContains(t, err, tCase.expectedErr.Error())
 			})
 		}

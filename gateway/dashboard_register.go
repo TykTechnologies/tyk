@@ -59,6 +59,11 @@ type HTTPDashboardHandler struct {
 
 var dashClient *http.Client
 
+// resetDashboardClient resets the global dashboard client for tests
+func (gw *Gateway) resetDashboardClient() {
+	dashClient = nil
+}
+
 func (gw *Gateway) initialiseClient() *http.Client {
 	if dashClient == nil {
 		conf := gw.GetConfig()

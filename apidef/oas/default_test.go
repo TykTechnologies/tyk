@@ -258,11 +258,6 @@ func TestOAS_BuildDefaultTykExtension(t *testing.T) {
 					SecuritySchemes: SecuritySchemes{
 						testSSMyAuth: &Token{
 							Enabled: true,
-							AuthSources: AuthSources{
-								Header: &AuthSource{
-									Enabled: true,
-								},
-							},
 						},
 						testSSMyAuthWithAnd: &OAuth{
 							Enabled: true,
@@ -1709,11 +1704,6 @@ func TestOAS_importAuthentication(t *testing.T) {
 			expectedSecuritySchemes := SecuritySchemes{
 				testSecurityNameToken: &Token{
 					Enabled: enable,
-					AuthSources: AuthSources{
-						Cookie: &AuthSource{
-							Enabled: true,
-						},
-					},
 				},
 			}
 
@@ -1755,12 +1745,6 @@ func TestOAS_importAuthentication(t *testing.T) {
 					SecuritySchemes: SecuritySchemes{
 						testSecurityNameToken: &Token{
 							Enabled: false,
-							AuthSources: AuthSources{
-								Header: &AuthSource{
-									Enabled: true,
-									Name:    testHeaderName,
-								},
-							},
 						},
 					},
 				},
@@ -1779,15 +1763,6 @@ func TestOAS_importAuthentication(t *testing.T) {
 		expectedSecuritySchemes := SecuritySchemes{
 			testSecurityNameToken: &Token{
 				Enabled: true,
-				AuthSources: AuthSources{
-					Header: &AuthSource{
-						Enabled: true,
-						Name:    testHeaderName,
-					},
-					Cookie: &AuthSource{
-						Enabled: true,
-					},
-				},
 			},
 		}
 
@@ -1835,11 +1810,6 @@ func TestOAS_importAuthentication(t *testing.T) {
 			expectedSecuritySchemes := SecuritySchemes{
 				testSecurityNameToken: &Token{
 					Enabled: enable,
-					AuthSources: AuthSources{
-						Cookie: &AuthSource{
-							Enabled: true,
-						},
-					},
 				},
 				testSecurityNameJWT: &JWT{
 					Enabled: enable,
@@ -1892,11 +1862,6 @@ func TestSecuritySchemes_Import(t *testing.T) {
 
 			expectedToken := &Token{
 				Enabled: enable,
-				AuthSources: AuthSources{
-					Header: &AuthSource{
-						Enabled: true,
-					},
-				},
 			}
 
 			assert.Equal(t, expectedToken, securitySchemes[testSecurityNameToken])
@@ -1991,14 +1956,7 @@ func TestSecuritySchemes_Import(t *testing.T) {
 	})
 
 	t.Run("update existing one", func(t *testing.T) {
-		existingToken := &Token{
-			AuthSources: AuthSources{
-				Cookie: &AuthSource{
-					Enabled: true,
-					Name:    testCookieName,
-				},
-			},
-		}
+		existingToken := &Token{}
 		securitySchemes := SecuritySchemes{
 			testSecurityNameToken: existingToken,
 		}
@@ -2014,15 +1972,6 @@ func TestSecuritySchemes_Import(t *testing.T) {
 
 		expectedToken := &Token{
 			Enabled: true,
-			AuthSources: AuthSources{
-				Header: &AuthSource{
-					Enabled: true,
-				},
-				Cookie: &AuthSource{
-					Enabled: true,
-					Name:    testCookieName,
-				},
-			},
 		}
 
 		assert.Equal(t, expectedToken, securitySchemes[testSecurityNameToken])

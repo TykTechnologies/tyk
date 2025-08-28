@@ -226,7 +226,7 @@ func (ss SecuritySchemes) Import(name string, nativeSS *openapi3.SecurityScheme,
 			}
 		}
 
-		token.Import(nativeSS, enable)
+		token.Enabled = enable
 	case nativeSS.Type == typeHTTP && nativeSS.Scheme == schemeBearer && nativeSS.BearerFormat == bearerFormatJWT:
 		jwt := &JWT{}
 		if ss[name] == nil {
@@ -484,9 +484,9 @@ type Scopes struct {
 	// - For JWT: `scopes.jwt.scope_claim_name`
 	ClaimName string `bson:"claimName,omitempty" json:"claimName,omitempty"`
 
-	// Claims contains a list of claims that contains the claim name.
-	// The first match from the list of claims in the token is used.
-	// OAS only field applied to OAS apis.
+	// Claims specifies a list of claims that can be used to provide the scope-to-policy mapping.
+	// The first match from the list found in the token will be interrogated to retrieve the scopes that are then checked against the scopeToPolicyMapping.
+	// This field is a Tyk OAS only field and is only used in Tyk OAS APIs.
 	Claims []string `bson:"claims,omitempty" json:"claims,omitempty"`
 
 	// ScopeToPolicyMapping contains the mappings of scopes to policy IDs.
