@@ -1,6 +1,7 @@
 package gateway
 
 import (
+	"crypto/tls"
 	"io/ioutil"
 	"net/http"
 	"os"
@@ -538,4 +539,215 @@ func TestExternalHTTPClientFactory_createCustomProxyFunc(t *testing.T) {
 		require.NoError(t, err)
 		assert.Nil(t, proxyURL)
 	})
+}
+
+func TestExternalHTTPClientFactory_getServiceTransport(t *testing.T) {
+	factory := &ExternalHTTPClientFactory{}
+
+	tests := []struct {
+		name                        string
+		serviceType                 string
+		expectedMaxIdleConns        int
+		expectedMaxIdleConnsPerHost int
+		expectedIdleConnTimeout     time.Duration
+	}{
+		{
+			name:                        "OAuth service",
+			serviceType:                 config.ServiceTypeOAuth,
+			expectedMaxIdleConns:        50,
+			expectedMaxIdleConnsPerHost: 10,
+			expectedIdleConnTimeout:     30 * time.Second,
+		},
+		{
+			name:                        "Analytics service",
+			serviceType:                 config.ServiceTypeAnalytics,
+			expectedMaxIdleConns:        100,
+			expectedMaxIdleConnsPerHost: 20,
+			expectedIdleConnTimeout:     60 * time.Second,
+		},
+		{
+			name:                        "Webhook service",
+			serviceType:                 config.ServiceTypeWebhook,
+			expectedMaxIdleConns:        50,
+			expectedMaxIdleConnsPerHost: 10,
+			expectedIdleConnTimeout:     30 * time.Second,
+		},
+		{
+			name:                        "Health service",
+			serviceType:                 config.ServiceTypeHealth,
+			expectedMaxIdleConns:        20,
+			expectedMaxIdleConnsPerHost: 5,
+			expectedIdleConnTimeout:     15 * time.Second,
+		},
+		{
+			name:                        "Discovery service",
+			serviceType:                 config.ServiceTypeDiscovery,
+			expectedMaxIdleConns:        30,
+			expectedMaxIdleConnsPerHost: 5,
+			expectedIdleConnTimeout:     20 * time.Second,
+		},
+		{
+			name:                        "Storage service",
+			serviceType:                 config.ServiceTypeStorage,
+			expectedMaxIdleConns:        50,
+			expectedMaxIdleConnsPerHost: 15,
+			expectedIdleConnTimeout:     90 * time.Second,
+		},
+		{
+			name:                        "Unknown service (default)",
+			serviceType:                 "unknown",
+			expectedMaxIdleConns:        100,
+			expectedMaxIdleConnsPerHost: 10,
+			expectedIdleConnTimeout:     30 * time.Second,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			transport := factory.getServiceTransport(tt.serviceType)
+			assert.NotNil(t, transport)
+			assert.Equal(t, tt.expectedMaxIdleConns, transport.MaxIdleConns)
+			assert.Equal(t, tt.expectedMaxIdleConnsPerHost, transport.MaxIdleConnsPerHost)
+			assert.Equal(t, tt.expectedIdleConnTimeout, transport.IdleConnTimeout)
+		})
+	}
+}
+
+func TestExternalHTTPClientFactory_getTLSConfig(t *testing.T) {
+	factory := &ExternalHTTPClientFactory{}
+
+	invalidCertData := "invalid certificate data"
+
+	tests := []struct {
+		name          string
+		serviceConfig config.ServiceConfig
+		setupFiles    func(t *testing.T) (certFile, keyFile, caFile string)
+		expectError   bool
+		errorContains string
+		validateTLS   func(t *testing.T, tlsConfig *tls.Config)
+	}{
+		{
+			name: "basic TLS config with InsecureSkipVerify false",
+			serviceConfig: config.ServiceConfig{
+				MTLS: config.MTLSConfig{
+					Enabled:            false,
+					InsecureSkipVerify: false,
+				},
+			},
+			expectError: false,
+			validateTLS: func(t *testing.T, tlsConfig *tls.Config) {
+				assert.False(t, tlsConfig.InsecureSkipVerify)
+				assert.Nil(t, tlsConfig.Certificates)
+				assert.Nil(t, tlsConfig.RootCAs)
+			},
+		},
+		{
+			name: "basic TLS config with InsecureSkipVerify true",
+			serviceConfig: config.ServiceConfig{
+				MTLS: config.MTLSConfig{
+					Enabled:            false,
+					InsecureSkipVerify: true,
+				},
+			},
+			expectError: false,
+			validateTLS: func(t *testing.T, tlsConfig *tls.Config) {
+				assert.True(t, tlsConfig.InsecureSkipVerify)
+				assert.Nil(t, tlsConfig.Certificates)
+				assert.Nil(t, tlsConfig.RootCAs)
+			},
+		},
+		{
+			name: "mTLS enabled but no cert/key files",
+			serviceConfig: config.ServiceConfig{
+				MTLS: config.MTLSConfig{
+					Enabled:  true,
+					CertFile: "",
+					KeyFile:  "",
+					CAFile:   "",
+				},
+			},
+			expectError: false,
+			validateTLS: func(t *testing.T, tlsConfig *tls.Config) {
+				assert.Nil(t, tlsConfig.Certificates)
+				assert.Nil(t, tlsConfig.RootCAs)
+			},
+		},
+		{
+			name: "mTLS enabled with invalid cert file",
+			serviceConfig: config.ServiceConfig{
+				MTLS: config.MTLSConfig{
+					Enabled:  true,
+					CertFile: "/nonexistent/cert.pem",
+					KeyFile:  "/nonexistent/key.pem",
+				},
+			},
+			expectError:   true,
+			errorContains: "failed to load client certificate",
+		},
+		{
+			name: "mTLS enabled with invalid CA file path",
+			serviceConfig: config.ServiceConfig{
+				MTLS: config.MTLSConfig{
+					Enabled: true,
+					CAFile:  "/nonexistent/ca.pem",
+				},
+			},
+			expectError:   true,
+			errorContains: "failed to read CA certificate",
+		},
+		{
+			name: "mTLS enabled with invalid CA content",
+			serviceConfig: config.ServiceConfig{
+				MTLS: config.MTLSConfig{
+					Enabled: true,
+				},
+			},
+			setupFiles: func(t *testing.T) (certFile, keyFile, caFile string) {
+				caFileHandle, err := ioutil.TempFile("", "invalid_ca_*.pem")
+				require.NoError(t, err)
+				_, err = caFileHandle.WriteString(invalidCertData)
+				require.NoError(t, err)
+				caFileHandle.Close()
+				return "", "", caFileHandle.Name()
+			},
+			expectError:   true,
+			errorContains: "failed to parse CA certificate",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var certFile, keyFile, caFile string
+
+			if tt.setupFiles != nil {
+				certFile, keyFile, caFile = tt.setupFiles(t)
+				if certFile != "" {
+					defer os.Remove(certFile)
+					tt.serviceConfig.MTLS.CertFile = certFile
+				}
+				if keyFile != "" {
+					defer os.Remove(keyFile)
+					tt.serviceConfig.MTLS.KeyFile = keyFile
+				}
+				if caFile != "" {
+					defer os.Remove(caFile)
+					tt.serviceConfig.MTLS.CAFile = caFile
+				}
+			}
+
+			tlsConfig, err := factory.getTLSConfig(tt.serviceConfig)
+
+			if tt.expectError {
+				assert.Error(t, err)
+				assert.Contains(t, err.Error(), tt.errorContains)
+				assert.Nil(t, tlsConfig)
+			} else {
+				assert.NoError(t, err)
+				assert.NotNil(t, tlsConfig)
+				if tt.validateTLS != nil {
+					tt.validateTLS(t, tlsConfig)
+				}
+			}
+		})
+	}
 }
