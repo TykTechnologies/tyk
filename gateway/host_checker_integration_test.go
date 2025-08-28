@@ -171,7 +171,7 @@ func TestHostChecker_FallbackBehavior(t *testing.T) {
 	gwConf.ExternalServices = config.ExternalServiceConfig{
 		Health: config.ServiceConfig{
 			Proxy: config.ProxyConfig{
-				HTTPProxy: "invalid://proxy:8080",
+				HTTPProxy: "://invalid-proxy", // Malformed URL that will cause url.Parse to fail
 			},
 		},
 	}
@@ -199,10 +199,40 @@ func TestHostChecker_FallbackBehavior(t *testing.T) {
 		Timeout:  5 * time.Second,
 	}
 
-	// Perform health check - should work despite invalid proxy (fallback)
-	checker.CheckHost(hostData)
+	// Create a channel to signal completion
+	done := make(chan bool, 1)
 
-	// Give some time for the health check to be processed
+	// Consume from the channels to prevent blocking
+	go func() {
+		select {
+		case report := <-checker.okChan:
+			t.Logf("Received OK report: %+v", report)
+			done <- true
+		case report := <-checker.errorChan:
+			t.Logf("Received ERROR report: %+v", report)
+			done <- false
+		case <-time.After(10 * time.Second):
+			t.Logf("Timed out waiting for health check result")
+			done <- false // timeout
+		}
+	}()
+
+	// Add debugging for the client creation
+	factory := NewExternalHTTPClientFactory(ts.Gw)
+	client, clientErr := factory.CreateHealthCheckClient()
+	t.Logf("Client creation error: %v", clientErr)
+	if clientErr == nil {
+		t.Logf("Client created successfully, timeout: %v", client.Timeout)
+	}
+
+	// Perform health check in a goroutine to avoid blocking
+	go checker.CheckHost(hostData)
+
+	// Wait for completion or timeout
+	success := <-done
+	assert.True(t, success, "Health check should succeed")
+
+	// Give some time for any remaining processing
 	time.Sleep(100 * time.Millisecond)
 
 	// The health check should still be performed using fallback client
