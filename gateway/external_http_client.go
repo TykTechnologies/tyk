@@ -104,6 +104,17 @@ func (f *ExternalHTTPClientFactory) getProxyFunction(serviceConfig config.Servic
 
 	// Check service-specific proxy configuration
 	if serviceConfig.Proxy.HTTPProxy != "" || serviceConfig.Proxy.HTTPSProxy != "" {
+		// Validate proxy URLs during client creation to fail fast
+		if serviceConfig.Proxy.HTTPProxy != "" {
+			if _, err := url.Parse(serviceConfig.Proxy.HTTPProxy); err != nil {
+				return nil, fmt.Errorf("invalid HTTP proxy URL: %w", err)
+			}
+		}
+		if serviceConfig.Proxy.HTTPSProxy != "" {
+			if _, err := url.Parse(serviceConfig.Proxy.HTTPSProxy); err != nil {
+				return nil, fmt.Errorf("invalid HTTPS proxy URL: %w", err)
+			}
+		}
 		return f.createCustomProxyFunc(serviceConfig.Proxy), nil
 	}
 
