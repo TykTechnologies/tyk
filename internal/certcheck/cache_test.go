@@ -43,6 +43,8 @@ func TestInMemoryCooldownCache_SetCheckCooldown(t *testing.T) {
 	require.NoError(t, err)
 
 	err = cache.SetCheckCooldown("added-later", 10)
+	require.NoError(t, err)
+
 	exists, err = cache.HasCheckCooldown("added-later")
 	assert.True(t, exists)
 	assert.NoError(t, err)

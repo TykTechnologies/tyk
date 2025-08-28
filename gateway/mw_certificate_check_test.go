@@ -257,7 +257,7 @@ func TestCertificateCheckMW_ProcessRequest(t *testing.T) {
 						AnyTimes()
 				}
 			} else {
-				setupMock = func(m *mock.MockCertificateManager, bg *certcheck.MockBackgroundBatcher) {
+				setupMock = func(_ *mock.MockCertificateManager, bg *certcheck.MockBackgroundBatcher) {
 					bg.EXPECT().Add(gomock.AssignableToTypeOf(certcheck.CertInfo{})).
 						AnyTimes()
 				}

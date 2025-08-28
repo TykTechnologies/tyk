@@ -65,9 +65,7 @@ func (b *Batch) CopyAndClear() []CertInfo {
 	defer b.mutex.Unlock()
 
 	batchCopy := make([]CertInfo, len(b.batchQueue))
-	for i, certInfo := range b.batchQueue {
-		batchCopy[i] = certInfo
-	}
+	copy(batchCopy, b.batchQueue)
 
 	b.lookupTable = make(map[string]any)
 	b.batchQueue = b.batchQueue[:0]
