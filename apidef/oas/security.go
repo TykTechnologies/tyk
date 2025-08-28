@@ -123,7 +123,7 @@ type JWT struct {
 	IdentityBaseField string `bson:"identityBaseField,omitempty" json:"identityBaseField,omitempty"`
 
 	// SubjectClaims specifies a list of claims that can be used to identity the subject of the JWT.
-	// The field is a Tyk OAS only field and is only used in Tyk OAS APIs.
+	// This field is a Tyk OAS only field and is only used in Tyk OAS APIs.
 	SubjectClaims []string `bson:"subjectClaims,omitempty" json:"subjectClaims,omitempty"`
 
 	// SkipKid controls skipping using the `kid` claim from a JWT (default behaviour).
@@ -140,7 +140,7 @@ type JWT struct {
 
 	// BasePolicyClaims specifies a list of claims from which the base PolicyID is extracted.
 	// The policy is applied to the session as a base policy.
-	// The field is a Tyk OAS only field and is only used in Tyk OAS APIs.
+	// This field is a Tyk OAS only field and is only used in Tyk OAS APIs.
 	BasePolicyClaims []string `bson:"basePolicyClaims,omitempty" json:"basePolicyClaims,omitempty"`
 
 	// ClientBaseField is used when PolicyFieldName is not provided. It will get
@@ -175,21 +175,21 @@ type JWT struct {
 
 	// AllowedIssuers contains a list of accepted issuers for JWT validation.
 	// When configured, the JWT's issuer claim must match one of these values.
-	// The field is a Tyk OAS only field and is only used in Tyk OAS APIs.
+	// This field is a Tyk OAS only field and is only used in Tyk OAS APIs.
 	AllowedIssuers []string `bson:"allowedIssuers,omitempty" json:"allowedIssuers,omitempty"`
 
 	// AllowedAudiences contains a list of accepted audiences for JWT validation.
 	// When configured, the JWT's audience claim must match one of these values.
-	// The field is a Tyk OAS only field and is only used in Tyk OAS APIs.
+	// This field is a Tyk OAS only field and is only used in Tyk OAS APIs.
 	AllowedAudiences []string `bson:"allowedAudiences,omitempty" json:"allowedAudiences,omitempty"`
 
 	// JTIValidation contains the configuration for the validation of the JWT ID.
-	// The field is a Tyk OAS only field and is only used in Tyk OAS APIs.
+	// This field is a Tyk OAS only field and is only used in Tyk OAS APIs.
 	JTIValidation JTIValidation `bson:"jtiValidation,omitempty" json:"jtiValidation,omitempty"`
 
 	// AllowedSubjects contains a list of accepted subjects for JWT validation.
 	// When configured, the subject from kid/identityBaseField/sub must match one of these values.
-	// The field is a Tyk OAS only field and is only used in Tyk OAS APIs.
+	// This field is a Tyk OAS only field and is only used in Tyk OAS APIs.
 	AllowedSubjects []string `bson:"allowedSubjects,omitempty" json:"allowedSubjects,omitempty"`
 
 	// IDPClientIDMappingDisabled prevents Tyk from automatically detecting the use of certain IDPs based on standard claims

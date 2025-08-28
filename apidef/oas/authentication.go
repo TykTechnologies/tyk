@@ -486,7 +486,7 @@ type Scopes struct {
 
 	// Claims specifies a list of claims that can be used to provide the scope-to-policy mapping.
 	// The first match from the list found in the token will be interrogated to retrieve the scopes that are then checked against the scopeToPolicyMapping.
-	// The field is a Tyk OAS only field and is only used in Tyk OAS APIs.
+	// This field is a Tyk OAS only field and is only used in Tyk OAS APIs.
 	Claims []string `bson:"claims,omitempty" json:"claims,omitempty"`
 
 	// ScopeToPolicyMapping contains the mappings of scopes to policy IDs.
