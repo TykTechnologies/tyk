@@ -263,13 +263,32 @@ func TestHostChecker_TimeoutOverride(t *testing.T) {
 		Timeout:  100 * time.Millisecond, // Very short timeout
 	}
 
+	// Create a channel to signal completion
+	done := make(chan bool, 1)
+
+	// Consume from the channels to prevent blocking
+	go func() {
+		select {
+		case <-checker.okChan:
+			done <- false // Should not succeed due to timeout
+		case <-checker.errorChan:
+			done <- true // Expected timeout error
+		case <-time.After(5 * time.Second):
+			done <- false // Test timeout
+		}
+	}()
+
 	// Perform health check - should timeout quickly
 	start := time.Now()
-	checker.CheckHost(hostData)
+	go checker.CheckHost(hostData)
+
+	// Wait for completion or timeout
+	timeoutOccurred := <-done
 	duration := time.Since(start)
 
 	// Should timeout quickly, not wait for the full server delay
 	assert.Less(t, duration, 1*time.Second, "Health check should timeout quickly")
+	assert.True(t, timeoutOccurred, "Health check should timeout and report error")
 }
 
 func TestHostChecker_CustomHeaders(t *testing.T) {
@@ -308,10 +327,29 @@ func TestHostChecker_CustomHeaders(t *testing.T) {
 		Timeout: 5 * time.Second,
 	}
 
-	// Perform health check
-	checker.CheckHost(hostData)
+	// Create a channel to signal completion
+	done := make(chan bool, 1)
 
-	// Give some time for the health check to be processed
+	// Consume from the channels to prevent blocking
+	go func() {
+		select {
+		case <-checker.okChan:
+			done <- true
+		case <-checker.errorChan:
+			done <- false
+		case <-time.After(10 * time.Second):
+			done <- false // timeout
+		}
+	}()
+
+	// Perform health check in a goroutine to avoid blocking
+	go checker.CheckHost(hostData)
+
+	// Wait for completion or timeout
+	success := <-done
+	assert.True(t, success, "Health check should succeed")
+
+	// Give some time for any remaining processing
 	time.Sleep(100 * time.Millisecond)
 
 	// Verify custom headers were sent
