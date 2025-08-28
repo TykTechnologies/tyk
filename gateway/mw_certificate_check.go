@@ -15,8 +15,10 @@ import (
 // CertificateCheckMW is used if domain was not detected or multiple APIs bind on the same domain. In this case authentification check happens not on TLS side but on HTTP level using this middleware
 type CertificateCheckMW struct {
 	*BaseMiddleware
-	store              storage.Handler // Redis storage for cooldowns
-	expiryCheckBatcher certcheck.BackgroundBatcher
+	store                 storage.Handler // Redis storage for cooldowns
+	expiryCheckContext    context.Context
+	expiryCheckCancelFunc context.CancelFunc
+	expiryCheckBatcher    certcheck.BackgroundBatcher
 }
 
 func (m *CertificateCheckMW) Name() string {
@@ -46,17 +48,25 @@ func (m *CertificateCheckMW) Init() {
 
 		var err error
 		m.expiryCheckBatcher, err = certcheck.NewCertificateExpiryCheckBatcher(
-			log.WithField("", ""),
+			m.logger,
 			m.Gw.GetConfig().Security.CertificateExpiryMonitor,
 			m.store,
-			m.Spec.FireEvent)
+			m.Spec.FireEvent,
+		)
 
 		if err != nil {
 			log.Fatal("[CertificateCheckMW] Failed to initialize certificate expiry check batcher.")
 			return
 		}
+	}
 
-		go m.expiryCheckBatcher.RunInBackground(context.Background())
+	m.expiryCheckContext, m.expiryCheckCancelFunc = context.WithCancel(context.Background())
+	go m.expiryCheckBatcher.RunInBackground(m.expiryCheckContext)
+}
+
+func (m *CertificateCheckMW) Unload() {
+	if m.expiryCheckCancelFunc != nil {
+		m.expiryCheckCancelFunc()
 	}
 }
 

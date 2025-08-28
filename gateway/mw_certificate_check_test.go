@@ -10,6 +10,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/sirupsen/logrus"
+	logrustest "github.com/sirupsen/logrus/hooks/test"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
 
@@ -18,6 +20,7 @@ import (
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/internal/certcheck"
 	"github.com/TykTechnologies/tyk/storage"
+	mockstorage "github.com/TykTechnologies/tyk/storage/mock"
 )
 
 // createTestCertificate creates a test certificate with specified expiration and common name
@@ -271,4 +274,36 @@ func TestCertificateCheckMW_ProcessRequest(t *testing.T) {
 			assert.Equal(t, tc.expectCode, code)
 		})
 	}
+}
+
+func TestCertificateCheckMiddleware_InitAndUnload(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	t.Cleanup(ctrl.Finish)
+
+	redisMock := mockstorage.NewMockHandler(ctrl)
+	logger, _ := logrustest.NewNullLogger()
+
+	gw := &Gateway{}
+	gwConfig := config.Config{
+		Security: config.SecurityConfig{
+			CertificateExpiryMonitor: config.CertificateExpiryMonitorConfig{},
+		},
+	}
+	gw.SetConfig(gwConfig)
+
+	mw := CertificateCheckMW{
+		BaseMiddleware: &BaseMiddleware{
+			Gw:     gw,
+			logger: logrus.NewEntry(logger),
+		},
+		store: redisMock, // redis will be tested in integration tests
+	}
+
+	mw.Init()
+	mw.Unload()
+
+	assert.Eventuallyf(t, func() bool {
+		<-mw.expiryCheckContext.Done()
+		return true
+	}, 10*time.Millisecond, 5*time.Millisecond, "Unload did not stop cert check batcher")
 }
