@@ -7,8 +7,10 @@ import (
 	"github.com/TykTechnologies/tyk/internal/model"
 )
 
+// FireEventFunc is a function that fires an event.
 type FireEventFunc func(name apidef.TykEvent, meta interface{})
 
+// CertInfo is a structure that holds information about a certificate.
 type CertInfo struct {
 	ID               string
 	CommonName       string
@@ -16,7 +18,7 @@ type CertInfo struct {
 	HoursUntilExpiry int
 }
 
-// EventCertificateExpiringSoonMeta is the metadata structure for certificate expiration events
+// EventCertificateExpiringSoonMeta is the metadata structure for certificate expiration events.
 type EventCertificateExpiringSoonMeta struct {
 	model.EventMetaDefault
 	CertID        string    `json:"cert_id"`
@@ -25,6 +27,7 @@ type EventCertificateExpiringSoonMeta struct {
 	DaysRemaining int       `json:"days_remaining"`
 }
 
+// EventCertificateExpiredMeta is the metadata structure for certificate expiration events.
 type EventCertificateExpiredMeta struct {
 	model.EventMetaDefault
 	CertID          string    `json:"cert_id"`

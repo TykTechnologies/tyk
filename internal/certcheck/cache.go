@@ -20,15 +20,20 @@ const (
 )
 
 var (
-	ErrCheckCooldownDoesNotExist     = errors.New("check cooldown does not exist")
+
+	// ErrCheckCooldownDoesNotExist indicates that no check cooldown exists for the specified identifier in the cache.
+	ErrCheckCooldownDoesNotExist = errors.New("check cooldown does not exist")
+	// ErrFireEventCooldownDoesNotExist indicates that no fire event cooldown exists for the specified identifier in the cache.
 	ErrFireEventCooldownDoesNotExist = errors.New("fire event cooldown does not exist")
 )
 
+// Cooldowns is a struct that holds the cooldowns for a certificate.
 type Cooldowns struct {
 	CheckCooldown     time.Time
 	FireEventCooldown time.Time
 }
 
+// CooldownCache is an interface for a cache that stores cooldowns for certificates.
 type CooldownCache interface {
 	HasCheckCooldown(certID string) (exists bool, err error)
 	IsCheckCooldownActive(certID string) (active bool, err error)
@@ -38,28 +43,32 @@ type CooldownCache interface {
 	SetFireEventCooldown(certID string, fireEventCooldownInSeconds int64) error
 }
 
-type LocalCooldownCache struct {
+// InMemoryCooldownCache is a cache that stores cooldowns for certificates in memory.
+type InMemoryCooldownCache struct {
 	lruCache *lru.Cache[string, Cooldowns]
 }
 
-func NewLocalCooldownCache(size int) (*LocalCooldownCache, error) {
+// NewInMemoryCooldownCache creates a new InMemoryCooldownCache.
+func NewInMemoryCooldownCache(size int) (*InMemoryCooldownCache, error) {
 	lruCache, err := lru.New[string, Cooldowns](size)
 	if err != nil {
 		return nil, err
 	}
 
-	return &LocalCooldownCache{
+	return &InMemoryCooldownCache{
 		lruCache: lruCache,
 	}, nil
 }
 
-func (l *LocalCooldownCache) HasCheckCooldown(certID string) (exists bool, err error) {
-	return l.lruCache.Contains(certID), nil
+// HasCheckCooldown checks if a check cooldown exists for the specified identifier.
+func (mem *InMemoryCooldownCache) HasCheckCooldown(certID string) (exists bool, err error) {
+	return mem.lruCache.Contains(certID), nil
 }
 
-func (l *LocalCooldownCache) IsCheckCooldownActive(certID string) (active bool, err error) {
+// IsCheckCooldownActive checks if a check cooldown is active for the specified identifier.
+func (mem *InMemoryCooldownCache) IsCheckCooldownActive(certID string) (active bool, err error) {
 	now := time.Now()
-	cooldowns, ok := l.lruCache.Get(certID)
+	cooldowns, ok := mem.lruCache.Get(certID)
 	if !ok {
 		return false, ErrCheckCooldownDoesNotExist
 	}
@@ -71,31 +80,34 @@ func (l *LocalCooldownCache) IsCheckCooldownActive(certID string) (active bool, 
 	return false, nil
 }
 
-func (l *LocalCooldownCache) SetCheckCooldown(certID string, checkCooldownInSeconds int64) error {
+// SetCheckCooldown sets a check cooldown for the specified identifier.
+func (mem *InMemoryCooldownCache) SetCheckCooldown(certID string, checkCooldownInSeconds int64) error {
 	now := time.Now()
 	cooldownEndTime := now.Add(time.Duration(checkCooldownInSeconds) * time.Second)
 
-	cooldowns, ok := l.lruCache.Get(certID)
+	cooldowns, ok := mem.lruCache.Get(certID)
 	if ok {
 		cooldowns.CheckCooldown = cooldownEndTime
-		l.lruCache.Add(certID, cooldowns)
+		mem.lruCache.Add(certID, cooldowns)
 	}
 
 	newCooldowns := Cooldowns{
 		CheckCooldown:     cooldownEndTime,
 		FireEventCooldown: now,
 	}
-	l.lruCache.Add(certID, newCooldowns)
+	mem.lruCache.Add(certID, newCooldowns)
 	return nil
 }
 
-func (l *LocalCooldownCache) HasFireEventCooldown(certID string) (exists bool, err error) {
-	return l.lruCache.Contains(certID), nil
+// HasFireEventCooldown checks if a fire event cooldown exists for the specified identifier.
+func (mem *InMemoryCooldownCache) HasFireEventCooldown(certID string) (exists bool, err error) {
+	return mem.lruCache.Contains(certID), nil
 }
 
-func (l *LocalCooldownCache) IsFireEventCooldownActive(certID string) (active bool, err error) {
+// IsFireEventCooldownActive checks if a fire event cooldown is active for the specified identifier.
+func (mem *InMemoryCooldownCache) IsFireEventCooldownActive(certID string) (active bool, err error) {
 	now := time.Now()
-	cooldowns, ok := l.lruCache.Get(certID)
+	cooldowns, ok := mem.lruCache.Get(certID)
 	if !ok {
 		return false, ErrFireEventCooldownDoesNotExist
 	}
@@ -107,38 +119,43 @@ func (l *LocalCooldownCache) IsFireEventCooldownActive(certID string) (active bo
 	return false, nil
 }
 
-func (l *LocalCooldownCache) SetFireEventCooldown(certID string, fireEventCooldownInSeconds int64) error {
+// SetFireEventCooldown sets a fire event cooldown for the specified identifier.
+func (mem *InMemoryCooldownCache) SetFireEventCooldown(certID string, fireEventCooldownInSeconds int64) error {
 	now := time.Now()
 	cooldownEndTime := now.Add(time.Duration(fireEventCooldownInSeconds) * time.Second)
 
-	cooldowns, ok := l.lruCache.Get(certID)
+	cooldowns, ok := mem.lruCache.Get(certID)
 	if ok {
 		cooldowns.FireEventCooldown = cooldownEndTime
-		l.lruCache.Add(certID, cooldowns)
+		mem.lruCache.Add(certID, cooldowns)
 	}
 
 	newCooldowns := Cooldowns{
 		CheckCooldown:     now,
 		FireEventCooldown: cooldownEndTime,
 	}
-	l.lruCache.Add(certID, newCooldowns)
+	mem.lruCache.Add(certID, newCooldowns)
 	return nil
 }
 
+// RedisCooldownCache is a cache that stores cooldowns for certificates in Redis.
 type RedisCooldownCache struct {
 	redisStorage storage.Handler
 }
 
+// NewRedisCooldownCache creates a new RedisCooldownCache.
 func NewRedisCooldownCache(redisStorage storage.Handler) (*RedisCooldownCache, error) {
 	return &RedisCooldownCache{
 		redisStorage: redisStorage,
 	}, nil
 }
 
+// HasCheckCooldown checks if a check cooldown exists for the specified identifier.
 func (r *RedisCooldownCache) HasCheckCooldown(certID string) (exists bool, err error) {
 	return r.redisStorage.Exists(r.checkKey(certID))
 }
 
+// IsCheckCooldownActive checks if a check cooldown is active for the specified identifier.
 func (r *RedisCooldownCache) IsCheckCooldownActive(certID string) (active bool, err error) {
 	_, err = r.redisStorage.GetKey(r.checkKey(certID))
 	if errors.Is(err, storage.ErrKeyNotFound) {
@@ -149,14 +166,17 @@ func (r *RedisCooldownCache) IsCheckCooldownActive(certID string) (active bool, 
 	return true, nil
 }
 
+// SetCheckCooldown sets a check cooldown for the specified identifier.
 func (r *RedisCooldownCache) SetCheckCooldown(certID string, checkCooldownInSeconds int64) error {
 	return r.redisStorage.SetKey(r.checkKey(certID), "1", checkCooldownInSeconds)
 }
 
+// HasFireEventCooldown checks if a fire event cooldown exists for the specified identifier.
 func (r *RedisCooldownCache) HasFireEventCooldown(certID string) (exists bool, err error) {
 	return r.redisStorage.Exists(r.fireEventKey(certID))
 }
 
+// IsFireEventCooldownActive checks if a fire event cooldown is active for the specified identifier.
 func (r *RedisCooldownCache) IsFireEventCooldownActive(certID string) (active bool, err error) {
 	_, err = r.redisStorage.GetKey(r.fireEventKey(certID))
 	if errors.Is(err, storage.ErrKeyNotFound) {
@@ -167,6 +187,7 @@ func (r *RedisCooldownCache) IsFireEventCooldownActive(certID string) (active bo
 	return true, nil
 }
 
+// SetFireEventCooldown sets a fire event cooldown for the specified identifier.
 func (r *RedisCooldownCache) SetFireEventCooldown(certID string, fireEventCooldownInSeconds int64) error {
 	return r.redisStorage.SetKey(r.fireEventKey(certID), "1", fireEventCooldownInSeconds)
 }
@@ -180,5 +201,5 @@ func (r *RedisCooldownCache) fireEventKey(certID string) string {
 }
 
 // Interface Guards
-var _ CooldownCache = (*LocalCooldownCache)(nil)
+var _ CooldownCache = (*InMemoryCooldownCache)(nil)
 var _ CooldownCache = (*RedisCooldownCache)(nil)

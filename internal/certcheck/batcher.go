@@ -92,7 +92,7 @@ type CertificateExpiryCheckBatcher struct {
 	logger                *logrus.Entry
 	config                config.CertificateExpiryMonitorConfig
 	batch                 *Batch
-	localCooldownCache    CooldownCache
+	inMemoryCooldownCache CooldownCache
 	fallbackCooldownCache CooldownCache
 	flushTicker           *time.Ticker
 	fireEvent             FireEventFunc
@@ -100,7 +100,7 @@ type CertificateExpiryCheckBatcher struct {
 
 // NewCertificateExpiryCheckBatcher creates a new CertificateExpiryCheckBatcher.
 func NewCertificateExpiryCheckBatcher(logger *logrus.Entry, cfg config.CertificateExpiryMonitorConfig, fallbackStorage storage.Handler, eventFunc FireEventFunc) (*CertificateExpiryCheckBatcher, error) {
-	localCache, err := NewLocalCooldownCache(128)
+	inMemoryCache, err := NewInMemoryCooldownCache(128)
 	if err != nil {
 		return nil, err
 	}
@@ -114,7 +114,7 @@ func NewCertificateExpiryCheckBatcher(logger *logrus.Entry, cfg config.Certifica
 		logger:                logger,
 		config:                cfg,
 		batch:                 NewBatch(),
-		localCooldownCache:    localCache,
+		inMemoryCooldownCache: inMemoryCache,
 		fallbackCooldownCache: fallbackCache,
 		flushTicker:           time.NewTicker(30 * time.Second),
 		fireEvent:             eventFunc,
@@ -172,12 +172,12 @@ func (c *CertificateExpiryCheckBatcher) SetFlushInterval(interval time.Duration)
 
 func (c *CertificateExpiryCheckBatcher) checkCooldownExistsInLocalCache(certInfo CertInfo) (exists bool) {
 	var err error
-	exists, err = c.localCooldownCache.HasCheckCooldown(certInfo.ID)
+	exists, err = c.inMemoryCooldownCache.HasCheckCooldown(certInfo.ID)
 	if err != nil {
 		c.logger.WithError(err).
 			WithField("certID", certInfo.ID[:8]).
 			WithField("cooldown", "check").
-			Error("Failed to check if check cooldown exists in local cache")
+			Error("Failed to check if check cooldown exists in in-memory cache")
 	}
 	return exists
 }
@@ -187,14 +187,14 @@ func (c *CertificateExpiryCheckBatcher) isCheckCooldownActive(certInfo CertInfo,
 	fallback := false
 	if foundInLocalCache {
 		var err error
-		checkCooldownActive, err = c.localCooldownCache.IsCheckCooldownActive(certInfo.ID)
+		checkCooldownActive, err = c.inMemoryCooldownCache.IsCheckCooldownActive(certInfo.ID)
 		if err != nil {
 			fallback = true
 			c.logger.
 				WithError(err).
 				WithField("certID", certInfo.ID[:8]).
 				WithField("cooldown", "check").
-				Error("Failed to check if check cooldown is active in local cache")
+				Error("Failed to check if check cooldown is active in in-memory cache")
 		}
 	}
 
@@ -215,12 +215,12 @@ func (c *CertificateExpiryCheckBatcher) isCheckCooldownActive(certInfo CertInfo,
 }
 
 func (c *CertificateExpiryCheckBatcher) setCheckCooldown(certInfo CertInfo) {
-	err := c.localCooldownCache.SetCheckCooldown(certInfo.ID, int64(c.config.CheckCooldownSeconds))
+	err := c.inMemoryCooldownCache.SetCheckCooldown(certInfo.ID, int64(c.config.CheckCooldownSeconds))
 	if err != nil {
 		c.logger.WithError(err).
 			WithField("certID", certInfo.ID[:8]).
 			WithField("cooldown", "check").
-			Error("Failed to set check cooldown for certificate in local cache")
+			Error("Failed to set check cooldown for certificate in in-memory cache")
 	}
 	err = c.fallbackCooldownCache.SetCheckCooldown(certInfo.ID, int64(c.config.CheckCooldownSeconds))
 	if err != nil {
@@ -310,12 +310,12 @@ func (c *CertificateExpiryCheckBatcher) handleEventForSoonToExpireCertificate(ce
 
 func (c *CertificateExpiryCheckBatcher) fireEventCooldownExistsInLocalCache(certInfo CertInfo) (exists bool) {
 	var err error
-	exists, err = c.localCooldownCache.HasFireEventCooldown(certInfo.ID)
+	exists, err = c.inMemoryCooldownCache.HasFireEventCooldown(certInfo.ID)
 	if err != nil {
 		c.logger.WithError(err).
 			WithField("certID", certInfo.ID[:8]).
 			WithField("cooldown", "fireEvent").
-			Error("failed to check if fire event cooldown exists in local cache")
+			Error("failed to check if fire event cooldown exists in in-memory cache")
 	}
 	return exists
 }
@@ -326,13 +326,13 @@ func (c *CertificateExpiryCheckBatcher) isFireEventCooldownActive(certInfo CertI
 
 	if foundInLocalCache {
 		var err error
-		fireEventCooldownActive, err = c.localCooldownCache.IsFireEventCooldownActive(certInfo.ID)
+		fireEventCooldownActive, err = c.inMemoryCooldownCache.IsFireEventCooldownActive(certInfo.ID)
 		if err != nil {
 			c.logger.
 				WithError(err).
 				WithField("certID", certInfo.ID[:8]).
 				WithField("cooldown", "fireEvent").
-				Error("Failed to check if fire event cooldown is active in local cache")
+				Error("Failed to check if fire event cooldown is active in in-memory cache")
 			useFallback = true
 		}
 	}
@@ -354,12 +354,12 @@ func (c *CertificateExpiryCheckBatcher) isFireEventCooldownActive(certInfo CertI
 }
 
 func (c *CertificateExpiryCheckBatcher) setFireEventCooldown(certInfo CertInfo) {
-	err := c.localCooldownCache.SetFireEventCooldown(certInfo.ID, int64(c.config.EventCooldownSeconds))
+	err := c.inMemoryCooldownCache.SetFireEventCooldown(certInfo.ID, int64(c.config.EventCooldownSeconds))
 	if err != nil {
 		c.logger.WithError(err).
 			WithField("certID", certInfo.ID[:8]).
 			WithField("cooldown", "fireEvent").
-			Error("Failed to set fire event cooldown for certificate in local cache")
+			Error("Failed to set fire event cooldown for certificate in in-memory cache")
 	}
 	err = c.fallbackCooldownCache.SetFireEventCooldown(certInfo.ID, int64(c.config.EventCooldownSeconds))
 	if err != nil {
