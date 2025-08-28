@@ -136,11 +136,6 @@ func TestExternalHTTPClientFactory_getServiceConfig(t *testing.T) {
 					HTTPProxy: "http://oauth-proxy:8080",
 				},
 			},
-			Analytics: config.ServiceConfig{
-				Proxy: config.ProxyConfig{
-					HTTPSProxy: "https://analytics-proxy:8080",
-				},
-			},
 		},
 	}
 

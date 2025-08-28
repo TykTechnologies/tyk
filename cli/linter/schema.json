@@ -215,6 +215,12 @@
             },
             "insecure_skip_verify": {
               "type": "boolean"
+            },
+            "tls_max_version": {
+              "type": "string"
+            },
+            "tls_min_version": {
+              "type": "string"
             }
           }
         }

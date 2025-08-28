@@ -314,7 +314,7 @@ func (h *HostUptimeChecker) CheckHost(toCheck HostData) {
 			}
 			client = h.Gw.HostCheckerClient
 		} else {
-			log.Debugf("[ExternalServices] Using external services health check client for URL: %s", name)
+			log.Debugf("[ExternalServices] Using external services health check client for URL: %s", toCheck.CheckURL)
 			// Set the timeout for the factory-created client if specified
 			if toCheck.Timeout != 0 {
 				client.Timeout = toCheck.Timeout

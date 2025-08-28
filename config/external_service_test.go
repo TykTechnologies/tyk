@@ -78,7 +78,6 @@ func TestExternalServiceConfig_JSON(t *testing.T) {
 	assert.Equal(t, config.OAuth.MTLS.KeyFile, unmarshaled.OAuth.MTLS.KeyFile)
 	assert.Equal(t, config.OAuth.MTLS.CAFile, unmarshaled.OAuth.MTLS.CAFile)
 
-	assert.Equal(t, config.Analytics.Proxy.HTTPSProxy, unmarshaled.Analytics.Proxy.HTTPSProxy)
 	assert.Equal(t, config.Storage.MTLS.Enabled, unmarshaled.Storage.MTLS.Enabled)
 	assert.Equal(t, config.Storage.MTLS.InsecureSkipVerify, unmarshaled.Storage.MTLS.InsecureSkipVerify)
 	assert.Equal(t, config.Webhooks.Proxy.UseEnvironment, unmarshaled.Webhooks.Proxy.UseEnvironment)
@@ -261,9 +260,6 @@ func TestExternalServiceConfig_PartialConfiguration(t *testing.T) {
 			}
 			if tt.config.OAuth.MTLS.Enabled {
 				assert.Equal(t, tt.config.OAuth.MTLS.Enabled, unmarshaled.OAuth.MTLS.Enabled)
-			}
-			if tt.config.Analytics.Proxy.HTTPProxy != "" {
-				assert.Equal(t, tt.config.Analytics.Proxy.HTTPProxy, unmarshaled.Analytics.Proxy.HTTPProxy)
 			}
 			if tt.config.Webhooks.MTLS.Enabled {
 				assert.Equal(t, tt.config.Webhooks.MTLS.Enabled, unmarshaled.Webhooks.MTLS.Enabled)
