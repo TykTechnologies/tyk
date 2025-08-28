@@ -2157,7 +2157,8 @@
         "TokenCreated",
         "TokenUpdated",
         "TokenDeleted",
-        "CertificateExpiringSoon"
+        "CertificateExpiringSoon",
+        "CertificateExpired"
       ]
     },
     "X-Tyk-ContextVariables": {
