@@ -56,13 +56,16 @@ func (s *ServiceDiscovery) getServiceData(name string) (string, error) {
 	if s.gw != nil {
 		clientFactory := NewExternalHTTPClientFactory(s.gw)
 		if client, clientErr := clientFactory.CreateClient("discovery"); clientErr == nil {
+			log.Debugf("[ExternalServices] Using external services discovery client for URL: %s", name)
 			resp, err = client.Get(name)
 		} else {
 			log.WithError(clientErr).Debug("Failed to create discovery HTTP client, falling back to default")
+			log.Debug("[ExternalServices] Falling back to legacy discovery client due to factory error")
 			resp, err = http.Get(name)
 		}
 	} else {
 		// Fallback to default client if gateway not set
+		log.Debug("[ExternalServices] Using default HTTP client for discovery (no gateway context)")
 		resp, err = http.Get(name)
 	}
 

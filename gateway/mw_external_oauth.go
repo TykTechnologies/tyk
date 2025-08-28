@@ -180,10 +180,12 @@ func (k *ExternalOAuthMiddleware) getSecretFromJWKURL(url string, kid interface{
 		if clientErr != nil {
 			k.Logger().WithError(clientErr).Error("Failed to create JWK HTTP client")
 			// Fallback to original method if client factory fails
+			k.Logger().Debug("[ExternalServices] Falling back to legacy JWK client due to factory error")
 			if jwkSet, err = getJWK(url, k.Gw.GetConfig().JWTSSLInsecureSkipVerify); err != nil {
 				return nil, err
 			}
 		} else {
+			k.Logger().Debugf("[ExternalServices] Using external services JWK client to fetch: %s", url)
 			if jwkSet, err = getJWKWithClient(url, client); err != nil {
 				return nil, err
 			}
@@ -388,8 +390,11 @@ func (k *ExternalOAuthMiddleware) introspectWithClient(opts apidef.Introspection
 	if err != nil {
 		k.Logger().WithError(err).Error("Failed to create introspection HTTP client, falling back to default")
 		// Fallback to original introspect function
+		k.Logger().Debug("[ExternalServices] Falling back to legacy introspection client due to factory error")
 		return introspect(opts, accessToken)
 	}
+
+	k.Logger().Debugf("[ExternalServices] Using external services introspection client for URL: %s", opts.URL)
 
 	req, err := http.NewRequest("POST", opts.URL, strings.NewReader(body.Encode()))
 	if err != nil {

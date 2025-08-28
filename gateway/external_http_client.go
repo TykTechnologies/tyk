@@ -38,6 +38,8 @@ func NewExternalHTTPClientFactory(gw *Gateway) *ExternalHTTPClientFactory {
 // 3. Environment variables (for proxy)
 // 4. Default settings
 func (f *ExternalHTTPClientFactory) CreateClient(serviceType string) (*http.Client, error) {
+	log.Debugf("[ExternalServices] Creating HTTP client for service type: %s", serviceType)
+
 	serviceConfig := f.getServiceConfig(serviceType)
 
 	transport := f.getServiceTransport(serviceType)
@@ -49,6 +51,10 @@ func (f *ExternalHTTPClientFactory) CreateClient(serviceType string) (*http.Clie
 	}
 	transport.Proxy = proxyFunc
 
+	if proxyFunc != nil {
+		log.Debugf("[ExternalServices] HTTP client for %s configured with proxy support", serviceType)
+	}
+
 	// Configure TLS
 	tlsConfig, err := f.getTLSConfig(serviceConfig)
 	if err != nil {
@@ -56,8 +62,14 @@ func (f *ExternalHTTPClientFactory) CreateClient(serviceType string) (*http.Clie
 	}
 	transport.TLSClientConfig = tlsConfig
 
+	if tlsConfig != nil && len(tlsConfig.Certificates) > 0 {
+		log.Debugf("[ExternalServices] HTTP client for %s configured with mTLS certificates", serviceType)
+	}
+
 	// Apply service-specific timeout configuration
 	timeout := f.getServiceTimeout(serviceType)
+
+	log.Debugf("[ExternalServices] HTTP client for %s created with timeout: %v", serviceType, timeout)
 
 	return &http.Client{
 		Transport: transport,
@@ -223,6 +235,8 @@ func (f *ExternalHTTPClientFactory) getTLSConfig(serviceConfig config.ServiceCon
 // CreateJWKClient creates an HTTP client specifically configured for JWK endpoint requests.
 // This method preserves existing SSL skip verify behavior while adding proxy support.
 func (f *ExternalHTTPClientFactory) CreateJWKClient(insecureSkipVerify bool) (*http.Client, error) {
+	log.Debugf("[ExternalServices] Creating JWK HTTP client with insecureSkipVerify: %t", insecureSkipVerify)
+
 	client, err := f.CreateClient(config.ServiceTypeOAuth)
 	if err != nil {
 		return nil, err
@@ -234,6 +248,7 @@ func (f *ExternalHTTPClientFactory) CreateJWKClient(insecureSkipVerify bool) (*h
 			transport.TLSClientConfig = &tls.Config{}
 		}
 		transport.TLSClientConfig.InsecureSkipVerify = insecureSkipVerify
+		log.Debugf("[ExternalServices] JWK client configured with insecureSkipVerify: %t", insecureSkipVerify)
 	}
 
 	return client, nil
@@ -241,16 +256,19 @@ func (f *ExternalHTTPClientFactory) CreateJWKClient(insecureSkipVerify bool) (*h
 
 // CreateIntrospectionClient creates an HTTP client for OAuth introspection requests.
 func (f *ExternalHTTPClientFactory) CreateIntrospectionClient() (*http.Client, error) {
+	log.Debug("[ExternalServices] Creating OAuth introspection HTTP client")
 	return f.CreateClient(config.ServiceTypeOAuth)
 }
 
 // CreateWebhookClient creates an HTTP client for webhook requests.
 func (f *ExternalHTTPClientFactory) CreateWebhookClient() (*http.Client, error) {
+	log.Debug("[ExternalServices] Creating webhook HTTP client")
 	return f.CreateClient(config.ServiceTypeWebhook)
 }
 
 // CreateHealthCheckClient creates an HTTP client for health check requests.
 func (f *ExternalHTTPClientFactory) CreateHealthCheckClient() (*http.Client, error) {
+	log.Debug("[ExternalServices] Creating health check HTTP client")
 	return f.CreateClient(config.ServiceTypeHealth)
 }
 

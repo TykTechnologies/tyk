@@ -301,6 +301,7 @@ func (h *HostUptimeChecker) CheckHost(toCheck HostData) {
 		client, clientErr := clientFactory.CreateHealthCheckClient()
 		if clientErr != nil {
 			log.WithError(clientErr).Debug("Failed to create health check HTTP client, falling back to default")
+			log.Debug("[ExternalServices] Falling back to legacy host checker client due to factory error")
 			// Fallback to original HostCheckerClient
 			h.Gw.HostCheckerClient.Transport = &http.Transport{
 				TLSClientConfig: &tls.Config{
@@ -313,6 +314,7 @@ func (h *HostUptimeChecker) CheckHost(toCheck HostData) {
 			}
 			client = h.Gw.HostCheckerClient
 		} else {
+			log.Debugf("[ExternalServices] Using external services health check client for URL: %s", name)
 			// Set the timeout for the factory-created client if specified
 			if toCheck.Timeout != 0 {
 				client.Timeout = toCheck.Timeout
