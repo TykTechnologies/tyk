@@ -6,12 +6,12 @@ import (
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"fmt"
-	"io"
 	"net/http"
 	"testing"
 	"time"
 
 	"github.com/sirupsen/logrus"
+	logrustest "github.com/sirupsen/logrus/hooks/test"
 	"go.uber.org/mock/gomock"
 
 	"github.com/TykTechnologies/tyk/apidef"
@@ -101,11 +101,9 @@ func setupCertificateCheckMWBenchmark(b *testing.B, useMutualTLS bool, certs []*
 	}
 	mw.store.Connect()
 
-	discardLogger := logrus.New()
-	discardLogger.SetOutput(io.Discard)
-
+	logger, _ := logrustest.NewNullLogger()
 	mw.expiryCheckBatcher, _ = certcheck.NewCertificateExpiryCheckBatcher(
-		logrus.NewEntry(discardLogger),
+		logrus.NewEntry(logger),
 		mw.Gw.GetConfig().Security.CertificateExpiryMonitor,
 		mw.store,
 		mw.Spec.FireEvent)

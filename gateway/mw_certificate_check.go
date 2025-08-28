@@ -88,14 +88,14 @@ func (m *CertificateCheckMW) ProcessRequest(w http.ResponseWriter, r *http.Reque
 			return err, http.StatusForbidden
 		}
 
-		log.Debug("Starting certificate expiration check for API: ", m.Spec.APIID, " with ", len(apiCerts), " certificates")
+		log.Debug("[CertificateCheckMW] Starting certificate expiration check for API: ", m.Spec.APIID, " with ", len(apiCerts), " certificates")
 		m.batchCertificatesExpiration(apiCerts)
 	}
 
 	return nil, http.StatusOK
 }
 
-// batchCertificatesExpiration checks if certificates are expiring soon and fires events
+// batchCertificatesExpiration batches certificates for expiry checking using the configured BackgroundBatcher.
 func (m *CertificateCheckMW) batchCertificatesExpiration(certificates []*tls.Certificate) {
 	for _, cert := range certificates {
 		certInfo, ok := m.extractCertInfo(cert)
@@ -110,7 +110,7 @@ func (m *CertificateCheckMW) batchCertificatesExpiration(certificates []*tls.Cer
 	}
 }
 
-// extractCertInfo validates the certificate and extracts basic information
+// extractCertInfo validates the certificate and extracts basic information.
 func (m *CertificateCheckMW) extractCertInfo(cert *tls.Certificate) (certInfo certcheck.CertInfo, ok bool) {
 	if cert == nil || cert.Leaf == nil {
 		log.Warning("[CertificateCheckMW] Skipping invalid certificate")

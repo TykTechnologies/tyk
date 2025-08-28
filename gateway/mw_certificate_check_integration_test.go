@@ -4,12 +4,12 @@ import (
 	"context"
 	"crypto/tls"
 	"fmt"
-	"io"
 	"sync"
 	"testing"
 	"time"
 
 	"github.com/sirupsen/logrus"
+	logrustest "github.com/sirupsen/logrus/hooks/test"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
@@ -188,12 +188,11 @@ func setupCertificateCheckMWIntegrationWithEvents(t *testing.T, _ bool, certs []
 	}
 	mw.store.Connect()
 
-	discardLogger := logrus.New()
-	discardLogger.SetOutput(io.Discard)
+	logger, _ := logrustest.NewNullLogger()
 
 	var err error
 	mw.expiryCheckBatcher, err = certcheck.NewCertificateExpiryCheckBatcher(
-		logrus.NewEntry(discardLogger),
+		logrus.NewEntry(logger),
 		mw.Gw.GetConfig().Security.CertificateExpiryMonitor,
 		mw.store,
 		mw.Spec.FireEvent)
