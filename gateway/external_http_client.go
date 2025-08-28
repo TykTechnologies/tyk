@@ -73,8 +73,6 @@ func (f *ExternalHTTPClientFactory) getServiceConfig(serviceType string) config.
 	switch serviceType {
 	case config.ServiceTypeOAuth:
 		serviceConfig = f.config.OAuth
-	case config.ServiceTypeAnalytics:
-		serviceConfig = f.config.Analytics
 	case config.ServiceTypeStorage:
 		serviceConfig = f.config.Storage
 	case config.ServiceTypeWebhook:
@@ -251,11 +249,6 @@ func (f *ExternalHTTPClientFactory) CreateWebhookClient() (*http.Client, error) 
 	return f.CreateClient(config.ServiceTypeWebhook)
 }
 
-// CreateAnalyticsClient creates an HTTP client for analytics requests.
-func (f *ExternalHTTPClientFactory) CreateAnalyticsClient() (*http.Client, error) {
-	return f.CreateClient(config.ServiceTypeAnalytics)
-}
-
 // CreateHealthCheckClient creates an HTTP client for health check requests.
 func (f *ExternalHTTPClientFactory) CreateHealthCheckClient() (*http.Client, error) {
 	return f.CreateClient(config.ServiceTypeHealth)
@@ -294,9 +287,6 @@ func (f *ExternalHTTPClientFactory) getServiceTimeout(serviceType string) time.D
 	case config.ServiceTypeOAuth:
 		// OAuth/JWT flows should have reasonable timeouts for authentication
 		return 15 * time.Second
-	case config.ServiceTypeAnalytics:
-		// Analytics calls can be more generous as they're often batched
-		return 30 * time.Second
 	case config.ServiceTypeWebhook:
 		// Webhooks need reliable delivery with reasonable timeout
 		return 30 * time.Second
@@ -324,15 +314,6 @@ func (f *ExternalHTTPClientFactory) getServiceTransport(serviceType string) *htt
 			MaxIdleConns:          50,
 			MaxIdleConnsPerHost:   10,
 			IdleConnTimeout:       30 * time.Second,
-			TLSHandshakeTimeout:   10 * time.Second,
-			ExpectContinueTimeout: 1 * time.Second,
-		}
-	case config.ServiceTypeAnalytics:
-		// Analytics may have higher throughput needs
-		return &http.Transport{
-			MaxIdleConns:          100,
-			MaxIdleConnsPerHost:   20,
-			IdleConnTimeout:       60 * time.Second,
 			TLSHandshakeTimeout:   10 * time.Second,
 			ExpectContinueTimeout: 1 * time.Second,
 		}

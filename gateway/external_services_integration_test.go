@@ -252,10 +252,6 @@ func TestExternalServices_ServiceSpecificTimeouts(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, 10*time.Second, discoveryClient.Timeout)
 
-	// Test Analytics timeout (30 seconds)
-	analyticsClient, err := factory.CreateAnalyticsClient()
-	require.NoError(t, err)
-	assert.Equal(t, 30*time.Second, analyticsClient.Timeout)
 }
 
 func TestExternalServices_TransportConfiguration(t *testing.T) {
@@ -281,13 +277,6 @@ func TestExternalServices_TransportConfiguration(t *testing.T) {
 	assert.Equal(t, 15*time.Second, transport.IdleConnTimeout)
 	assert.Equal(t, 5*time.Second, transport.TLSHandshakeTimeout)
 
-	// Test Analytics transport configuration (higher throughput)
-	analyticsClient, err := factory.CreateAnalyticsClient()
-	require.NoError(t, err)
-	transport = analyticsClient.Transport.(*http.Transport)
-	assert.Equal(t, 100, transport.MaxIdleConns)
-	assert.Equal(t, 20, transport.MaxIdleConnsPerHost)
-	assert.Equal(t, 60*time.Second, transport.IdleConnTimeout)
 }
 
 func TestExternalServices_ConfigurationHierarchy(t *testing.T) {

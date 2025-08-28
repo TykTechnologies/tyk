@@ -28,11 +28,6 @@ func TestExternalServiceConfig_JSON(t *testing.T) {
 				CAFile:   "/path/to/ca.pem",
 			},
 		},
-		Analytics: ServiceConfig{
-			Proxy: ProxyConfig{
-				HTTPSProxy: "https://analytics-proxy:8080",
-			},
-		},
 		Storage: ServiceConfig{
 			MTLS: MTLSConfig{
 				Enabled:            true,
@@ -192,7 +187,6 @@ func TestServiceTypeConstants(t *testing.T) {
 	// Test that all service type constants are defined correctly
 	expectedTypes := map[string]string{
 		ServiceTypeOAuth:     "oauth",
-		ServiceTypeAnalytics: "analytics",
 		ServiceTypeStorage:   "storage",
 		ServiceTypeWebhook:   "webhook",
 		ServiceTypeHealth:    "health",
@@ -235,11 +229,6 @@ func TestExternalServiceConfig_PartialConfiguration(t *testing.T) {
 			config: ExternalServiceConfig{
 				Proxy: ProxyConfig{
 					UseEnvironment: true,
-				},
-				Analytics: ServiceConfig{
-					Proxy: ProxyConfig{
-						HTTPProxy: "http://analytics-proxy:8080",
-					},
 				},
 				Webhooks: ServiceConfig{
 					MTLS: MTLSConfig{

@@ -155,11 +155,6 @@ func TestExternalHTTPClientFactory_getServiceConfig(t *testing.T) {
 			wantProxy:   "http://oauth-proxy:8080",
 		},
 		{
-			name:        "Analytics service gets specific config",
-			serviceType: config.ServiceTypeAnalytics,
-			wantProxy:   "https://analytics-proxy:8080",
-		},
-		{
 			name:        "Unknown service gets global config",
 			serviceType: "unknown",
 			wantProxy:   "http://global-proxy:8080",
@@ -421,14 +416,6 @@ func TestExternalHTTPClientFactory_SpecializedClients(t *testing.T) {
 		assert.NotNil(t, transport.Proxy)
 	})
 
-	t.Run("CreateAnalyticsClient", func(t *testing.T) {
-		client, err := factory.CreateAnalyticsClient()
-		require.NoError(t, err)
-		require.NotNil(t, client)
-
-		transport := client.Transport.(*http.Transport)
-		assert.NotNil(t, transport.Proxy)
-	})
 }
 
 // Test mTLS configuration with temporary certificates
@@ -557,13 +544,6 @@ func TestExternalHTTPClientFactory_getServiceTransport(t *testing.T) {
 			expectedMaxIdleConns:        50,
 			expectedMaxIdleConnsPerHost: 10,
 			expectedIdleConnTimeout:     30 * time.Second,
-		},
-		{
-			name:                        "Analytics service",
-			serviceType:                 config.ServiceTypeAnalytics,
-			expectedMaxIdleConns:        100,
-			expectedMaxIdleConnsPerHost: 20,
-			expectedIdleConnTimeout:     60 * time.Second,
 		},
 		{
 			name:                        "Webhook service",

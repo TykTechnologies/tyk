@@ -7,7 +7,6 @@ type ExternalServiceConfig struct {
 	Proxy ProxyConfig `json:"proxy"`
 	// Service-specific configurations that can override global settings
 	OAuth     ServiceConfig `json:"oauth"`
-	Analytics ServiceConfig `json:"analytics"`
 	Storage   ServiceConfig `json:"storage"`
 	Webhooks  ServiceConfig `json:"webhooks"`
 	Health    ServiceConfig `json:"health"`
@@ -52,7 +51,6 @@ type MTLSConfig struct {
 // Service type constants for identifying different external service types
 const (
 	ServiceTypeOAuth     = "oauth"
-	ServiceTypeAnalytics = "analytics"
 	ServiceTypeStorage   = "storage"
 	ServiceTypeWebhook   = "webhook"
 	ServiceTypeHealth    = "health"
