@@ -1204,14 +1204,21 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 		}
 
 		timeout := proxyTimeout(p.TykAPISpec)
+		transportTimeout := timeout
 
-		// If an enforced timeout is configured for this API endpoint, use it instead
-		// of the global default timeout, as it should take precedence
+		// If an enforced timeout is configured for this API endpoint, we use context timeout instead of transport timeout
+		// to avoid conflicts between ResponseHeaderTimeout and context timeout
 		if isTimeoutEnforced {
-			timeout = enforcedTimeout
+			// Don't pass the enforced timeout to transport - let context timeout handle it
+			// Use the default proxy timeout for transport instead
+			transportTimeout = proxyTimeout(p.TykAPISpec)
+			p.logger.Debug("Using context timeout for hard timeout, transport timeout: ", transportTimeout)
+		} else {
+			// For non-enforced timeouts, we can use the global timeout on transport
+			p.logger.Debug("Using transport timeout: ", timeout)
 		}
 
-		p.TykAPISpec.HTTPTransport = p.httpTransport(timeout, rw, req, outreq)
+		p.TykAPISpec.HTTPTransport = p.httpTransport(transportTimeout, rw, req, outreq)
 		p.TykAPISpec.HTTPTransportCreated = time.Now()
 
 		if oldTransport != nil {
