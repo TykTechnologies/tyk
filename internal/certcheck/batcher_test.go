@@ -3,11 +3,11 @@ package certcheck
 import (
 	"context"
 	"errors"
-	"io"
 	"testing"
 	"time"
 
 	"github.com/sirupsen/logrus"
+	logrustest "github.com/sirupsen/logrus/hooks/test"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
@@ -705,21 +705,21 @@ func TestCertificateExpiryCheckBatcher(t *testing.T) {
 func TestCertificateExpiryCheckBatcher_composeSoonToExpire(t *testing.T) {
 	t.Run("Should compose expiry message with days and hours", func(t *testing.T) {
 		batcher := CertificateExpiryCheckBatcher{}
-		actualMessage := batcher.composeSoonToExpire(CertInfo{CommonName: "test-cert"}, 5, 10)
+		actualMessage := batcher.composeSoonToExpireMessage(CertInfo{CommonName: "test-cert"}, 5, 10)
 		expectedMessage := "Certificate test-cert is expiring in 5 days and 10 hours"
 		assert.Equal(t, expectedMessage, actualMessage)
 	})
 
 	t.Run("Should compose expiry message with days only", func(t *testing.T) {
 		batcher := CertificateExpiryCheckBatcher{}
-		actualMessage := batcher.composeSoonToExpire(CertInfo{CommonName: "test-cert"}, 5, 0)
+		actualMessage := batcher.composeSoonToExpireMessage(CertInfo{CommonName: "test-cert"}, 5, 0)
 		expectedMessage := "Certificate test-cert is expiring in 5 days"
 		assert.Equal(t, expectedMessage, actualMessage)
 	})
 
 	t.Run("Should compose expiry message with hours only", func(t *testing.T) {
 		batcher := CertificateExpiryCheckBatcher{}
-		actualMessage := batcher.composeSoonToExpire(CertInfo{CommonName: "test-cert"}, 0, 2)
+		actualMessage := batcher.composeSoonToExpireMessage(CertInfo{CommonName: "test-cert"}, 0, 2)
 		expectedMessage := "Certificate test-cert is expiring in 2 hours"
 		assert.Equal(t, expectedMessage, actualMessage)
 	})
@@ -750,8 +750,7 @@ func TestCertificateExpiryCheckBatcher_composeExpiredMessage(t *testing.T) {
 
 func createBatcherMocks(t *testing.T) (ctrl *gomock.Controller, batcherMocks *BatcherMocks) {
 	ctrl = gomock.NewController(t)
-	logger := logrus.New()
-	logger.SetOutput(io.Discard)
+	logger, _ := logrustest.NewNullLogger()
 
 	return ctrl, &BatcherMocks{
 		ctrl:              ctrl,

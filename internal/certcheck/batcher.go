@@ -18,15 +18,18 @@ import (
 )
 
 var (
+	// ErrFallbackCooldownCheckFailed is returned when the fallback cache is used, and the check cooldown cannot be checked.
 	ErrFallbackCooldownCheckFailed = errors.New("failed to check cooldown in fallback cache")
 )
 
+// Batch is a queue of certificates that are ready to be checked.
 type Batch struct {
 	lookupTable map[string]any
 	batchQueue  []CertInfo
 	mutex       sync.Mutex
 }
 
+// NewBatch creates a new Batch.
 func NewBatch() *Batch {
 	return &Batch{
 		lookupTable: make(map[string]any),
@@ -35,6 +38,7 @@ func NewBatch() *Batch {
 	}
 }
 
+// Append adds a certificate to the batch.
 func (b *Batch) Append(certInfo CertInfo) {
 	b.mutex.Lock()
 	defer b.mutex.Unlock()
@@ -48,12 +52,14 @@ func (b *Batch) Append(certInfo CertInfo) {
 	b.batchQueue = append(b.batchQueue, certInfo)
 }
 
+// Size returns the number of certificates in the batch.
 func (b *Batch) Size() int {
 	b.mutex.Lock()
 	defer b.mutex.Unlock()
 	return len(b.batchQueue)
 }
 
+// CopyAndClear returns a copy of the batch and clears the batch.
 func (b *Batch) CopyAndClear() []CertInfo {
 	b.mutex.Lock()
 	defer b.mutex.Unlock()
@@ -69,16 +75,19 @@ func (b *Batch) CopyAndClear() []CertInfo {
 	return batchCopy
 }
 
+// Batcher processes and manages the addition of CertInfo objects, ensuring they are handled in a batch-like manner.
 type Batcher interface {
 	Add(cert CertInfo) error
 }
 
+// BackgroundBatcher is a Batcher that can be run in the background.
 type BackgroundBatcher interface {
 	Batcher
 	RunInBackground(ctx context.Context)
 	SetFlushInterval(time.Duration)
 }
 
+// CertificateExpiryCheckBatcher is a Batcher that checks certificates for expiry.
 type CertificateExpiryCheckBatcher struct {
 	logger                *logrus.Entry
 	config                config.CertificateExpiryMonitorConfig
@@ -89,6 +98,7 @@ type CertificateExpiryCheckBatcher struct {
 	fireEvent             FireEventFunc
 }
 
+// NewCertificateExpiryCheckBatcher creates a new CertificateExpiryCheckBatcher.
 func NewCertificateExpiryCheckBatcher(logger *logrus.Entry, cfg config.CertificateExpiryMonitorConfig, fallbackStorage storage.Handler, eventFunc FireEventFunc) (*CertificateExpiryCheckBatcher, error) {
 	localCache, err := NewLocalCooldownCache(128)
 	if err != nil {
@@ -111,11 +121,13 @@ func NewCertificateExpiryCheckBatcher(logger *logrus.Entry, cfg config.Certifica
 	}, nil
 }
 
+// Add adds a certificate to the batch.
 func (c *CertificateExpiryCheckBatcher) Add(cert CertInfo) error {
 	c.batch.Append(cert)
 	return nil
 }
 
+// RunInBackground runs the batcher in the background.
 func (c *CertificateExpiryCheckBatcher) RunInBackground(ctx context.Context) {
 	for {
 		batchCopy := c.batch.CopyAndClear()
@@ -125,8 +137,9 @@ func (c *CertificateExpiryCheckBatcher) RunInBackground(ctx context.Context) {
 			if err != nil {
 				c.logger.
 					WithField("certID", certInfo.ID[:8]).
+					WithField("cooldown", "check").
 					WithError(err).
-					Error("failed to check cooldown - skipping certificate")
+					Error("Failed to check cooldown - skipping certificate")
 				continue
 			}
 
@@ -152,6 +165,7 @@ func (c *CertificateExpiryCheckBatcher) RunInBackground(ctx context.Context) {
 	}
 }
 
+// SetFlushInterval sets the interval at which the batcher will flush the batch.
 func (c *CertificateExpiryCheckBatcher) SetFlushInterval(interval time.Duration) {
 	c.flushTicker.Reset(interval)
 }
@@ -162,7 +176,8 @@ func (c *CertificateExpiryCheckBatcher) checkCooldownExistsInLocalCache(certInfo
 	if err != nil {
 		c.logger.WithError(err).
 			WithField("certID", certInfo.ID[:8]).
-			Error("failed to check if check cooldown exists in local cache")
+			WithField("cooldown", "check").
+			Error("Failed to check if check cooldown exists in local cache")
 	}
 	return exists
 }
@@ -178,7 +193,8 @@ func (c *CertificateExpiryCheckBatcher) isCheckCooldownActive(certInfo CertInfo,
 			c.logger.
 				WithError(err).
 				WithField("certID", certInfo.ID[:8]).
-				Error("failed to check if check cooldown is active in local cache")
+				WithField("cooldown", "check").
+				Error("Failed to check if check cooldown is active in local cache")
 		}
 	}
 
@@ -189,7 +205,8 @@ func (c *CertificateExpiryCheckBatcher) isCheckCooldownActive(certInfo CertInfo,
 			c.logger.
 				WithError(err).
 				WithField("certID", certInfo.ID[:8]).
-				Error("failed to check if check cooldown is active in fallback cache")
+				WithField("cooldown", "check").
+				Error("Failed to check if check cooldown is active in fallback cache")
 			return false, ErrFallbackCooldownCheckFailed
 		}
 	}
@@ -202,13 +219,15 @@ func (c *CertificateExpiryCheckBatcher) setCheckCooldown(certInfo CertInfo) {
 	if err != nil {
 		c.logger.WithError(err).
 			WithField("certID", certInfo.ID[:8]).
-			Error("failed to set check cooldown for certificate in local cache")
+			WithField("cooldown", "check").
+			Error("Failed to set check cooldown for certificate in local cache")
 	}
 	err = c.fallbackCooldownCache.SetCheckCooldown(certInfo.ID, int64(c.config.CheckCooldownSeconds))
 	if err != nil {
 		c.logger.WithError(err).
 			WithField("certID", certInfo.ID[:8]).
-			Error("failed to set check cooldown for certificate in fallback cache")
+			WithField("cooldown", "check").
+			Error("Failed to set check cooldown for certificate in fallback cache")
 	}
 }
 
@@ -234,8 +253,9 @@ func (c *CertificateExpiryCheckBatcher) handleEventForCertificate(certInfo CertI
 	if err != nil {
 		c.logger.
 			WithField("certID", certInfo.ID[:8]).
+			WithField("cooldown", "fireEvent").
 			WithError(err).
-			Error("failed to check cooldown - skipping certificate")
+			Error("Failed to check cooldown - skipping certificate")
 		return
 	}
 
@@ -276,7 +296,7 @@ func (c *CertificateExpiryCheckBatcher) handleEventForSoonToExpireCertificate(ce
 
 	eventMeta := EventCertificateExpiringSoonMeta{
 		EventMetaDefault: model.EventMetaDefault{
-			Message: c.composeSoonToExpire(certInfo, daysUntilExpiry, remainingHours),
+			Message: c.composeSoonToExpireMessage(certInfo, daysUntilExpiry, remainingHours),
 		},
 		CertID:        certInfo.ID,
 		CertName:      certInfo.CommonName,
@@ -294,6 +314,7 @@ func (c *CertificateExpiryCheckBatcher) fireEventCooldownExistsInLocalCache(cert
 	if err != nil {
 		c.logger.WithError(err).
 			WithField("certID", certInfo.ID[:8]).
+			WithField("cooldown", "fireEvent").
 			Error("failed to check if fire event cooldown exists in local cache")
 	}
 	return exists
@@ -310,7 +331,8 @@ func (c *CertificateExpiryCheckBatcher) isFireEventCooldownActive(certInfo CertI
 			c.logger.
 				WithError(err).
 				WithField("certID", certInfo.ID[:8]).
-				Error("failed to check if fire event cooldown is active in local cache")
+				WithField("cooldown", "fireEvent").
+				Error("Failed to check if fire event cooldown is active in local cache")
 			useFallback = true
 		}
 	}
@@ -322,7 +344,8 @@ func (c *CertificateExpiryCheckBatcher) isFireEventCooldownActive(certInfo CertI
 			c.logger.
 				WithError(err).
 				WithField("certID", certInfo.ID[:8]).
-				Error("failed to check if fire event cooldown is active in fallback cache")
+				WithField("cooldown", "fireEvent").
+				Error("Failed to check if fire event cooldown is active in fallback cache")
 
 			return false, ErrFallbackCooldownCheckFailed
 		}
@@ -335,17 +358,19 @@ func (c *CertificateExpiryCheckBatcher) setFireEventCooldown(certInfo CertInfo) 
 	if err != nil {
 		c.logger.WithError(err).
 			WithField("certID", certInfo.ID[:8]).
-			Error("failed to set fire event cooldown for certificate in local cache")
+			WithField("cooldown", "fireEvent").
+			Error("Failed to set fire event cooldown for certificate in local cache")
 	}
 	err = c.fallbackCooldownCache.SetFireEventCooldown(certInfo.ID, int64(c.config.EventCooldownSeconds))
 	if err != nil {
 		c.logger.WithError(err).
 			WithField("certID", certInfo.ID[:8]).
-			Error("failed to set fire event cooldown for certificate in fallback cache")
+			WithField("cooldown", "fireEvent").
+			Error("Failed to set fire event cooldown for certificate in fallback cache")
 	}
 }
 
-func (c *CertificateExpiryCheckBatcher) composeSoonToExpire(certInfo CertInfo, daysUntilExpiry int, remainingHours int) string {
+func (c *CertificateExpiryCheckBatcher) composeSoonToExpireMessage(certInfo CertInfo, daysUntilExpiry int, remainingHours int) string {
 	if daysUntilExpiry > 0 {
 		if remainingHours > 0 {
 			return fmt.Sprintf("Certificate %s is expiring in %d days and %d hours", certInfo.CommonName, daysUntilExpiry, remainingHours)
