@@ -158,9 +158,9 @@ func (p *serverUrlParser) extractValueBetweenBraces() (serverVariable, error) {
 			}
 
 			if re, err := regexp.Compile(pattern); err != nil {
-				return serverVariable{}, errpack.Wrap(ErrInvalidPattern, "failed to compile pattern")
+				return serverVariable{}, errpack.Domain("failed to compile pattern").Chain(ErrInvalidPattern)
 			} else if hasCaptureGroups(re) {
-				return serverVariable{}, errpack.Wrap(ErrNoCaptureGroup, "using capture group is not allowed in server patterns")
+				return serverVariable{}, errpack.Domain("using capture group is not allowed in server patterns").Chain(ErrNoCaptureGroup)
 			}
 
 			return serverVariable{
