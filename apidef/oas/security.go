@@ -254,7 +254,7 @@ const (
 	// The match is case-sensitive and type-aware (string/number/boolean/array).
 	ClaimValidationTypeExactMatch CustomClaimValidationType = "exact_match"
 
-	// ClaimValidationTypeContains indicates the claim must contain one of the specified values.
+	// ClaimValidationTypeContains indicates that the claim must contain one of the specified values.
 	// For strings: checks if the claim contains any allowed value as a substring
 	// For arrays: checks if the claim contains any allowed value as an element
 	ClaimValidationTypeContains CustomClaimValidationType = "contains"
