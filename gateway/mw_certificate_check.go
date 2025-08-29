@@ -32,7 +32,11 @@ func (m *CertificateCheckMW) EnabledForSpec() bool {
 func (m *CertificateCheckMW) Init() {
 	// Initialize Redis store for cooldowns if not already done
 	if m.store == nil {
-		log.Debug("[CertificateCheckMW] Initializing Redis store for cooldowns.")
+		log.
+			WithField("api_id", m.Spec.APIID).
+			WithField("api_name", m.Spec.Name).
+			WithField("mw", m.Name()).
+			Debug("Initializing Redis store for cooldowns.")
 
 		m.store = &storage.RedisCluster{
 			KeyPrefix:         "cert-cooldown:",
@@ -44,18 +48,32 @@ func (m *CertificateCheckMW) Init() {
 
 	// Initialize expiry check batcher
 	if m.expiryCheckBatcher == nil {
-		log.Debug("[CertificateCheckMW] Initializing certificate expiry check batcher.")
+		log.
+			WithField("api_id", m.Spec.APIID).
+			WithField("api_name", m.Spec.Name).
+			WithField("mw", m.Name()).
+			Debug("Initializing certificate expiry check batcher.")
+
+		apiData := certcheck.APIMetaData{
+			APIID:   m.Spec.APIID,
+			APIName: m.Spec.Name,
+		}
 
 		var err error
 		m.expiryCheckBatcher, err = certcheck.NewCertificateExpiryCheckBatcher(
 			m.logger,
+			apiData,
 			m.Gw.GetConfig().Security.CertificateExpiryMonitor,
 			m.store,
 			m.Spec.FireEvent,
 		)
 
 		if err != nil {
-			log.Fatal("[CertificateCheckMW] Failed to initialize certificate expiry check batcher.")
+			log.
+				WithField("api_id", m.Spec.APIID).
+				WithField("api_name", m.Spec.Name).
+				WithField("mw", m.Name()).
+				Error("Failed to initialize certificate expiry check batcher.")
 			return
 		}
 	}
@@ -66,6 +84,12 @@ func (m *CertificateCheckMW) Init() {
 
 func (m *CertificateCheckMW) Unload() {
 	if m.expiryCheckCancelFunc != nil {
+		log.
+			WithField("api_id", m.Spec.APIID).
+			WithField("api_name", m.Spec.Name).
+			WithField("mw", m.Name()).
+			Debug("Stopping certificate expiry check batcher.")
+
 		m.expiryCheckCancelFunc()
 	}
 }
@@ -83,20 +107,29 @@ func (m *CertificateCheckMW) ProcessRequest(w http.ResponseWriter, r *http.Reque
 		certIDs := append(m.Spec.ClientCertificates, m.Spec.GlobalConfig.Security.Certificates.API...)
 		apiCerts := m.Gw.CertificateManager.List(certIDs, certs.CertificatePublic)
 		if err := crypto.ValidateRequestCerts(r, apiCerts); err != nil {
-			log.Warning("[CertificateCheckMW] Certificate validation failed: ", err)
-
+			log.
+				WithField("api_id", m.Spec.APIID).
+				WithField("api_name", m.Spec.Name).
+				WithField("mw", m.Name()).
+				Warning("Certificate validation failed: ", err)
+			m.batchCertificatesExpirationCheck(apiCerts)
 			return err, http.StatusForbidden
 		}
 
-		log.Debug("[CertificateCheckMW] Starting certificate expiration check for API: ", m.Spec.APIID, " with ", len(apiCerts), " certificates")
-		m.batchCertificatesExpiration(apiCerts)
+		m.batchCertificatesExpirationCheck(apiCerts)
 	}
 
 	return nil, http.StatusOK
 }
 
-// batchCertificatesExpiration batches certificates for expiry checking using the configured BackgroundBatcher.
-func (m *CertificateCheckMW) batchCertificatesExpiration(certificates []*tls.Certificate) {
+// batchCertificatesExpirationCheck batches certificates for expiry checking using the configured BackgroundBatcher.
+func (m *CertificateCheckMW) batchCertificatesExpirationCheck(certificates []*tls.Certificate) {
+	log.
+		WithField("api_id", m.Spec.APIID).
+		WithField("api_name", m.Spec.Name).
+		WithField("mw", m.Name()).
+		Debugf("Batch certificates for expiration check with %d certificates", len(certificates))
+
 	for _, cert := range certificates {
 		certInfo, ok := m.extractCertInfo(cert)
 		if !ok {
@@ -105,7 +138,11 @@ func (m *CertificateCheckMW) batchCertificatesExpiration(certificates []*tls.Cer
 
 		err := m.expiryCheckBatcher.Add(certInfo)
 		if err != nil {
-			log.Error("[CertificateCheckMW] Failed to batch certificate expiry check: ", err)
+			log.
+				WithField("api_id", m.Spec.APIID).
+				WithField("api_name", m.Spec.Name).
+				WithField("mw", m.Name()).
+				Error("[CertificateCheckMW] Failed to batch certificate expiry check: ", err)
 		}
 	}
 }
@@ -113,13 +150,21 @@ func (m *CertificateCheckMW) batchCertificatesExpiration(certificates []*tls.Cer
 // extractCertInfo validates the certificate and extracts basic information.
 func (m *CertificateCheckMW) extractCertInfo(cert *tls.Certificate) (certInfo certcheck.CertInfo, ok bool) {
 	if cert == nil || cert.Leaf == nil {
-		log.Warning("[CertificateCheckMW] Skipping invalid certificate")
+		log.
+			WithField("api_id", m.Spec.APIID).
+			WithField("api_name", m.Spec.Name).
+			WithField("mw", m.Name()).
+			Warning("Extract Cert Info: Skipping invalid certificate")
 		return certcheck.CertInfo{}, false
 	}
 
 	certID := crypto.HexSHA256(cert.Leaf.Raw)
 	if certID == "" {
-		log.Warning("[CertificateCheckMW] Skipping certificate with empty ID (no raw data)")
+		log.
+			WithField("api_id", m.Spec.APIID).
+			WithField("api_name", m.Spec.Name).
+			WithField("mw", m.Name()).
+			Warning("Extract Cert Info: Skipping certificate with empty ID (no raw data)")
 		return certcheck.CertInfo{}, false
 	}
 

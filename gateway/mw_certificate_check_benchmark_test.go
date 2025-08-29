@@ -104,6 +104,10 @@ func setupCertificateCheckMWBenchmark(b *testing.B, useMutualTLS bool, certs []*
 	logger, _ := logrustest.NewNullLogger()
 	mw.expiryCheckBatcher, _ = certcheck.NewCertificateExpiryCheckBatcher(
 		logrus.NewEntry(logger),
+		certcheck.APIMetaData{
+			APIID:   mw.Spec.APIID,
+			APIName: mw.Spec.Name,
+		},
 		mw.Gw.GetConfig().Security.CertificateExpiryMonitor,
 		mw.store,
 		mw.Spec.FireEvent)
@@ -208,7 +212,7 @@ func BenchmarkCertificateCheckMW_CheckCertificateExpiration(b *testing.B) {
 		b.Run(tc.name, func(b *testing.B) {
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
-				mw.batchCertificatesExpiration(tc.certs)
+				mw.batchCertificatesExpirationCheck(tc.certs)
 			}
 		})
 	}

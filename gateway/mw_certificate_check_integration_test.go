@@ -193,6 +193,10 @@ func setupCertificateCheckMWIntegrationWithEvents(t *testing.T, _ bool, certs []
 	var err error
 	mw.expiryCheckBatcher, err = certcheck.NewCertificateExpiryCheckBatcher(
 		logrus.NewEntry(logger),
+		certcheck.APIMetaData{
+			APIID:   mw.Spec.APIID,
+			APIName: mw.Spec.Name,
+		},
 		mw.Gw.GetConfig().Security.CertificateExpiryMonitor,
 		mw.store,
 		mw.Spec.FireEvent)
@@ -214,7 +218,7 @@ func TestCertificateCheckMW_Integration_CoreFunctionality(t *testing.T) {
 		mw, eventTracker := setupCertificateCheckMWIntegration(t, true, []*tls.Certificate{cert})
 
 		// Test the core expiration checking logic directly
-		mw.batchCertificatesExpiration([]*tls.Certificate{cert})
+		mw.batchCertificatesExpirationCheck([]*tls.Certificate{cert})
 
 		// Verify no events were fired for valid certificate
 		assert.Equal(t, 0, eventTracker.GetEventCount(), "No events should be fired for valid certificate")
@@ -227,7 +231,7 @@ func TestCertificateCheckMW_Integration_CoreFunctionality(t *testing.T) {
 		mw, eventTracker := setupCertificateCheckMWIntegration(t, true, []*tls.Certificate{cert})
 
 		// Test the core expiration checking logic directly
-		mw.batchCertificatesExpiration([]*tls.Certificate{cert})
+		mw.batchCertificatesExpirationCheck([]*tls.Certificate{cert})
 
 		// Setup and start the background batcher
 		ctx, cancelFunc := context.WithTimeout(context.Background(), time.Duration(20)*time.Millisecond)
@@ -255,7 +259,7 @@ func TestCertificateCheckMW_Integration_CoreFunctionality(t *testing.T) {
 		eventTracker.ClearEvents()
 
 		// A second call should not fire the event due to cooldown
-		mw.batchCertificatesExpiration([]*tls.Certificate{cert})
+		mw.batchCertificatesExpirationCheck([]*tls.Certificate{cert})
 
 		// Verify no additional events were fired due to cooldown
 		assert.Equal(t, 0, eventTracker.GetEventCount(), "No additional events should be fired due to cooldown")
@@ -268,7 +272,7 @@ func TestCertificateCheckMW_Integration_CoreFunctionality(t *testing.T) {
 		mw, eventTracker := setupCertificateCheckMWIntegration(t, true, []*tls.Certificate{cert})
 
 		// Test the core expiration checking logic directly
-		mw.batchCertificatesExpiration([]*tls.Certificate{cert})
+		mw.batchCertificatesExpirationCheck([]*tls.Certificate{cert})
 
 		// Setup and start the background batcher
 		ctx, cancelFunc := context.WithTimeout(context.Background(), time.Duration(20)*time.Millisecond)
@@ -300,7 +304,7 @@ func TestCertificateCheckMW_Integration_CoreFunctionality(t *testing.T) {
 		mw, eventTracker := setupCertificateCheckMWIntegration(t, true, []*tls.Certificate{cert})
 
 		// Test the core expiration checking logic directly
-		mw.batchCertificatesExpiration([]*tls.Certificate{cert})
+		mw.batchCertificatesExpirationCheck([]*tls.Certificate{cert})
 
 		// Setup and start the background batcher
 		ctx, cancelFunc := context.WithTimeout(context.Background(), time.Duration(20)*time.Millisecond)
@@ -328,7 +332,7 @@ func TestCertificateCheckMW_Integration_CoreFunctionality(t *testing.T) {
 		eventTracker.ClearEvents()
 
 		// A second call should not fire the event due to cooldown
-		mw.batchCertificatesExpiration([]*tls.Certificate{cert})
+		mw.batchCertificatesExpirationCheck([]*tls.Certificate{cert})
 
 		// Verify no additional events were fired due to cooldown
 		assert.Equal(t, 0, eventTracker.GetEventCount(), "No additional events should be fired due to cooldown")
@@ -347,7 +351,7 @@ func TestCertificateCheckMW_Integration_CoreFunctionality(t *testing.T) {
 		mw, eventTracker := setupCertificateCheckMWIntegration(t, true, tlsCerts)
 
 		// Test the core expiration checking logic directly
-		mw.batchCertificatesExpiration(tlsCerts)
+		mw.batchCertificatesExpirationCheck(tlsCerts)
 
 		// Setup and start the background batcher
 		ctx, cancelFunc := context.WithTimeout(context.Background(), time.Duration(20)*time.Millisecond)
@@ -436,7 +440,7 @@ func TestCertificateCheckMW_Integration_ErrorScenarios(t *testing.T) {
 			mw, _ := setupCertificateCheckMWIntegration(t, true, certs)
 			ctx, cancelFunc := context.WithTimeout(context.Background(), time.Duration(20)*time.Millisecond)
 			mw.expiryCheckBatcher.RunInBackground(ctx)
-			mw.batchCertificatesExpiration(certs)
+			mw.batchCertificatesExpirationCheck(certs)
 			cancelFunc()
 		})
 	}

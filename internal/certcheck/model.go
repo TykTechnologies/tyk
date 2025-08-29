@@ -10,6 +10,12 @@ import (
 // FireEventFunc is a function that fires an event.
 type FireEventFunc func(name apidef.TykEvent, meta interface{})
 
+// APIMetaData is a structure that holds information about an API.
+type APIMetaData struct {
+	APIID   string
+	APIName string
+}
+
 // CertInfo is a structure that holds information about a certificate.
 type CertInfo struct {
 	ID               string

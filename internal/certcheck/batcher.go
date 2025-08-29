@@ -88,6 +88,7 @@ type BackgroundBatcher interface {
 // CertificateExpiryCheckBatcher is a Batcher that checks certificates for expiry.
 type CertificateExpiryCheckBatcher struct {
 	logger                *logrus.Entry
+	apiMetaData           APIMetaData
 	config                config.CertificateExpiryMonitorConfig
 	batch                 *Batch
 	inMemoryCooldownCache CooldownCache
@@ -97,7 +98,7 @@ type CertificateExpiryCheckBatcher struct {
 }
 
 // NewCertificateExpiryCheckBatcher creates a new CertificateExpiryCheckBatcher.
-func NewCertificateExpiryCheckBatcher(logger *logrus.Entry, cfg config.CertificateExpiryMonitorConfig, fallbackStorage storage.Handler, eventFunc FireEventFunc) (*CertificateExpiryCheckBatcher, error) {
+func NewCertificateExpiryCheckBatcher(logger *logrus.Entry, apiMetaData APIMetaData, cfg config.CertificateExpiryMonitorConfig, fallbackStorage storage.Handler, eventFunc FireEventFunc) (*CertificateExpiryCheckBatcher, error) {
 	inMemoryCache, err := NewInMemoryCooldownCache(128)
 	if err != nil {
 		return nil, err
@@ -108,8 +109,13 @@ func NewCertificateExpiryCheckBatcher(logger *logrus.Entry, cfg config.Certifica
 		return nil, err
 	}
 
+	logger = logger.WithField("api_id", apiMetaData.APIID).
+		WithField("api_name", apiMetaData.APIName).
+		WithField("task", "CertificateExpiryMonitorTask")
+
 	return &CertificateExpiryCheckBatcher{
 		logger:                logger,
+		apiMetaData:           apiMetaData,
 		config:                cfg,
 		batch:                 NewBatch(),
 		inMemoryCooldownCache: inMemoryCache,
@@ -128,6 +134,10 @@ func (c *CertificateExpiryCheckBatcher) Add(cert CertInfo) error {
 // RunInBackground runs the batcher in the background.
 func (c *CertificateExpiryCheckBatcher) RunInBackground(ctx context.Context) {
 	for {
+		c.logger.
+			WithField("batch_size", c.batch.Size()).
+			Debug("Flush certificate expiry monitor batch")
+
 		batchCopy := c.batch.CopyAndClear()
 		for _, certInfo := range batchCopy {
 			existsInLocalCache := c.checkCooldownExistsInLocalCache(certInfo)
@@ -285,7 +295,10 @@ func (c *CertificateExpiryCheckBatcher) handleEventForExpiredCertificate(certInf
 	}
 
 	c.fireEvent(event.CertificateExpired, eventMeta)
-	c.logger.Debugf("Certificate expiry monitor: EXPIRY EVENT FIRED for certificate '%s' - expired since %d hours (ID: %s...)", certInfo.CommonName, certInfo.HoursUntilExpiry, certInfo.ID[:8])
+	c.logger.
+		WithField("cert_id", certInfo.ID[:8]).
+		WithField("event_type", string(event.CertificateExpired)).
+		Debugf("EXPIRY EVENT FIRED for certificate '%s' - expired since %d hours", certInfo.CommonName, certInfo.HoursUntilExpiry)
 }
 
 func (c *CertificateExpiryCheckBatcher) handleEventForSoonToExpireCertificate(certInfo CertInfo) {
@@ -303,7 +316,10 @@ func (c *CertificateExpiryCheckBatcher) handleEventForSoonToExpireCertificate(ce
 	}
 
 	c.fireEvent(event.CertificateExpiringSoon, eventMeta)
-	c.logger.Debugf("Certificate expiry monitor: EXPIRY EVENT FIRED for certificate '%s' - expires in %d hours (ID: %s...)", certInfo.CommonName, certInfo.HoursUntilExpiry, certInfo.ID[:8])
+	c.logger.
+		WithField("cert_id", certInfo.ID[:8]).
+		WithField("event_type", string(event.CertificateExpiringSoon)).
+		Debugf("EXPIRY EVENT FIRED for certificate '%s' - expires in %d hours", certInfo.CommonName, certInfo.HoursUntilExpiry)
 }
 
 func (c *CertificateExpiryCheckBatcher) fireEventCooldownExistsInLocalCache(certInfo CertInfo) (exists bool) {

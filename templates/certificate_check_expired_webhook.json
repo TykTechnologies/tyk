@@ -1,9 +1,0 @@
-{
-    "event": "{{.Type}}",
-    "message": "{{.Meta.Message}}",
-    "cert_id": "{{.Meta.CertID}}",
-    "cert_name": "{{.Meta.CertName}}",
-    "expired_at": "{{.Meta.ExpiredAt}}",
-    "days_since_expiry": "{{.Meta.DaysSinceExpiry}}",
-    "timestamp": "{{.TimeStamp}}"
-} 
