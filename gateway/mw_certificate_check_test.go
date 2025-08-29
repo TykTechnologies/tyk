@@ -293,6 +293,12 @@ func TestCertificateCheckMiddleware_InitAndUnload(t *testing.T) {
 
 	mw := CertificateCheckMW{
 		BaseMiddleware: &BaseMiddleware{
+			Spec: &APISpec{
+				APIDefinition: &apidef.APIDefinition{
+					APIID: "test-api-id",
+					Name:  "test-api",
+				},
+			},
 			Gw:     gw,
 			logger: logrus.NewEntry(logger),
 		},
