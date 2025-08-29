@@ -5,6 +5,7 @@ import (
 	"crypto/md5"
 	"encoding/hex"
 	"errors"
+	"fmt"
 	htmltemplate "html/template"
 	"io/ioutil"
 	"net/http"
@@ -18,6 +19,7 @@ import (
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/header"
+	"github.com/TykTechnologies/tyk/internal/certcheck"
 	"github.com/TykTechnologies/tyk/storage"
 )
 
@@ -173,11 +175,25 @@ func (w *WebHookHandler) checkURL(r string) bool {
 	return true
 }
 
-func (w *WebHookHandler) Checksum(reqBody string) (string, error) {
-	// We do this twice because fuck it.
-	localRequest, _ := http.NewRequest(string(w.getRequestMethod(w.conf.Method)), w.conf.TargetPath, strings.NewReader(reqBody))
+func (w *WebHookHandler) Checksum(em config.EventMessage, reqBody string) (string, error) {
 	h := md5.New()
-	localRequest.Write(h)
+
+	// EventCertificateExpiringSoon and EventCertificateExpired do have dynamic bodies.
+	// Checksum will always be different, so a different strategy is needed in those cases.
+	switch em.Type {
+	case EventCertificateExpiringSoon:
+		meta := em.Meta.(certcheck.EventCertificateExpiringSoonMeta)
+		hashBody := fmt.Sprintf("%s%s%s%s", em.Type, meta.CertID, meta.CertName, meta.ExpiresAt.String())
+		h.Write([]byte(hashBody))
+	case EventCertificateExpired:
+		meta := em.Meta.(certcheck.EventCertificateExpiredMeta)
+		hashBody := fmt.Sprintf("%s%s%s%s", em.Type, meta.CertID, meta.CertName, meta.ExpiredAt.String())
+		h.Write([]byte(hashBody))
+	default:
+		localRequest, _ := http.NewRequest(string(w.getRequestMethod(w.conf.Method)), w.conf.TargetPath, strings.NewReader(reqBody))
+		localRequest.Write(h)
+	}
+
 	return hex.EncodeToString(h.Sum(nil)), nil
 }
 
@@ -236,7 +252,7 @@ func (w *WebHookHandler) HandleEvent(em config.EventMessage) {
 	}
 
 	// Generate signature for request
-	reqChecksum, _ := w.Checksum(reqBody)
+	reqChecksum, _ := w.Checksum(em, reqBody)
 
 	// Check request velocity for this hook (wasHookFired())
 	if w.WasHookFired(reqChecksum) {
