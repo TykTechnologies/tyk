@@ -5,11 +5,14 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/header"
+	"github.com/TykTechnologies/tyk/internal/certcheck"
+	"github.com/TykTechnologies/tyk/internal/model"
 )
 
 func (ts *Test) createWebHookHandler(t *testing.T) *WebHookHandler {
@@ -74,10 +77,11 @@ func TestNewInvalid(t *testing.T) {
 }
 
 func TestChecksum(t *testing.T) {
-	ts := StartTest(nil)
-	defer ts.Close()
+	t.Run("default case", func(t *testing.T) {
+		ts := StartTest(nil)
+		t.Cleanup(ts.Close)
 
-	rBody := `{
+		rBody := `{
 		"event": "QuotaExceeded",
 		"message": "Key Quota Limit Exceeded",
 		"path": "/about-lonelycoder/",
@@ -86,17 +90,110 @@ func TestChecksum(t *testing.T) {
 		"timestamp": 2014-11-27 12:52:05.944549825 &#43;0000 GMT
 	}`
 
-	hook := ts.createWebHookHandler(t)
-	checksum, err := hook.Checksum(rBody)
+		hook := ts.createWebHookHandler(t)
+		checksum, err := hook.Checksum(config.EventMessage{Type: EventQuotaExceeded}, rBody)
 
-	if err != nil {
-		t.Error("Checksum should not have failed with good objet and body")
-	}
+		if err != nil {
+			t.Error("Checksum should not have failed with good objet and body")
+		}
 
-	if checksum != "62a6b4fa9b45cd372b871764296fb3a5" {
-		t.Error("Checksum is incorrect")
-		t.Error(checksum)
-	}
+		if checksum != "62a6b4fa9b45cd372b871764296fb3a5" {
+			t.Error("Checksum is incorrect")
+			t.Error(checksum)
+		}
+	})
+
+	t.Run("certificate events", func(t *testing.T) {
+		t.Run("should produce the same checksum for EventCertificateExpiringSoon", func(t *testing.T) {
+			ts := StartTest(nil)
+			t.Cleanup(ts.Close)
+
+			em := config.EventMessage{
+				Type: EventCertificateExpiringSoon,
+				Meta: certcheck.EventCertificateExpiringSoonMeta{
+					EventMetaDefault: model.EventMetaDefault{},
+					CertID:           "123abc",
+					CertName:         "Cert Soon To Expire",
+					ExpiresAt:        time.Now().Add(time.Hour * 24),
+					DaysRemaining:    1,
+				},
+				TimeStamp: "now",
+			}
+
+			hook := ts.createWebHookHandler(t)
+			firstChecksum, err := hook.Checksum(em, "dynamic 1")
+			assert.NoError(t, err)
+
+			secondChecksum, err := hook.Checksum(em, "dynamic 2")
+			assert.NoError(t, err)
+			assert.Equal(t, firstChecksum, secondChecksum)
+		})
+
+		t.Run("should produce the same checksum for EventCertificateExpired", func(t *testing.T) {
+			ts := StartTest(nil)
+			t.Cleanup(ts.Close)
+
+			em := config.EventMessage{
+				Type: EventCertificateExpired,
+				Meta: certcheck.EventCertificateExpiredMeta{
+					EventMetaDefault: model.EventMetaDefault{},
+					CertID:           "123abc",
+					CertName:         "Cert Expired",
+					ExpiredAt:        time.Now().Add(time.Hour * -24),
+					DaysSinceExpiry:  1,
+				},
+				TimeStamp: "now",
+			}
+
+			hook := ts.createWebHookHandler(t)
+			firstChecksum, err := hook.Checksum(em, "dynamic 1")
+			assert.NoError(t, err)
+
+			secondChecksum, err := hook.Checksum(em, "dynamic 2")
+			assert.NoError(t, err)
+			assert.Equal(t, firstChecksum, secondChecksum)
+		})
+
+		t.Run("should produce different checksums for EventCertificateExpired and EventCertificateExpiringSoon", func(t *testing.T) {
+			ts := StartTest(nil)
+			t.Cleanup(ts.Close)
+
+			certID := "123abc"
+			certName := "Cert With Same Name"
+
+			emSoonToExpire := config.EventMessage{
+				Type: EventCertificateExpiringSoon,
+				Meta: certcheck.EventCertificateExpiringSoonMeta{
+					EventMetaDefault: model.EventMetaDefault{},
+					CertID:           certID,
+					CertName:         certName,
+					ExpiresAt:        time.Now().Add(time.Hour * 24),
+					DaysRemaining:    1,
+				},
+				TimeStamp: "now",
+			}
+
+			emExpired := config.EventMessage{
+				Type: EventCertificateExpired,
+				Meta: certcheck.EventCertificateExpiredMeta{
+					EventMetaDefault: model.EventMetaDefault{},
+					CertID:           certID,
+					CertName:         certName,
+					ExpiredAt:        time.Now().Add(time.Hour * -24),
+					DaysSinceExpiry:  1,
+				},
+				TimeStamp: "now",
+			}
+
+			hook := ts.createWebHookHandler(t)
+			soonToExpireChecksum, err := hook.Checksum(emSoonToExpire, "dynamic soon to expire")
+			assert.NoError(t, err)
+
+			expiredChecksum, err := hook.Checksum(emExpired, "dynamic expired")
+			assert.NoError(t, err)
+			assert.NotEqual(t, soonToExpireChecksum, expiredChecksum)
+		})
+	})
 }
 
 func TestBuildRequest(t *testing.T) {
@@ -198,7 +295,7 @@ func TestGet(t *testing.T) {
 	body, err := eventHandler.CreateBody(eventMessage)
 	assert.NoError(t, err)
 
-	checksum, _ := eventHandler.Checksum(body)
+	checksum, _ := eventHandler.Checksum(config.EventMessage{Type: EventKeyExpired}, body)
 	eventHandler.HandleEvent(eventMessage)
 
 	if wasFired := eventHandler.WasHookFired(checksum); !wasFired {
@@ -236,7 +333,7 @@ func TestPost(t *testing.T) {
 
 	body, _ := eventHandler.CreateBody(eventMessage)
 
-	checksum, _ := eventHandler.Checksum(body)
+	checksum, _ := eventHandler.Checksum(config.EventMessage{Type: EventKeyExpired}, body)
 	eventHandler.HandleEvent(eventMessage)
 
 	if wasFired := eventHandler.WasHookFired(checksum); !wasFired {

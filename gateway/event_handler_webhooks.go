@@ -5,6 +5,7 @@ import (
 	"crypto/md5"
 	"encoding/hex"
 	"errors"
+	"fmt"
 	htmltemplate "html/template"
 	"io/ioutil"
 	"net/http"
@@ -18,6 +19,7 @@ import (
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/header"
+	"github.com/TykTechnologies/tyk/internal/certcheck"
 	"github.com/TykTechnologies/tyk/storage"
 )
 
@@ -34,6 +36,9 @@ const (
 var (
 	// ErrEventHandlerDisabled is returned when the event handler is disabled.
 	ErrEventHandlerDisabled = errors.New("event handler disabled")
+
+	// ErrCouldNotCastMetaData is returned when metadata cannot be cast to the expected type.
+	ErrCouldNotCastMetaData = errors.New("could not cast meta data")
 )
 
 // WebHookHandler is an event handler that triggers web hooks
@@ -173,11 +178,37 @@ func (w *WebHookHandler) checkURL(r string) bool {
 	return true
 }
 
-func (w *WebHookHandler) Checksum(reqBody string) (string, error) {
-	// We do this twice because fuck it.
-	localRequest, _ := http.NewRequest(string(w.getRequestMethod(w.conf.Method)), w.conf.TargetPath, strings.NewReader(reqBody))
+func (w *WebHookHandler) Checksum(em config.EventMessage, reqBody string) (string, error) {
 	h := md5.New()
-	localRequest.Write(h)
+
+	// EventCertificateExpiringSoon and EventCertificateExpired do have dynamic bodies.
+	// Checksum will always be different, so a different strategy is needed in those cases.
+	switch em.Type {
+	case EventCertificateExpiringSoon:
+		meta, ok := em.Meta.(certcheck.EventCertificateExpiringSoonMeta)
+		if !ok {
+			return "", ErrCouldNotCastMetaData
+		}
+		hashBody := fmt.Sprintf("%s%s%s%s", em.Type, meta.CertID, meta.CertName, meta.ExpiresAt.String())
+		h.Write([]byte(hashBody))
+	case EventCertificateExpired:
+		meta, ok := em.Meta.(certcheck.EventCertificateExpiredMeta)
+		if !ok {
+			return "", ErrCouldNotCastMetaData
+		}
+		hashBody := fmt.Sprintf("%s%s%s%s", em.Type, meta.CertID, meta.CertName, meta.ExpiredAt.String())
+		h.Write([]byte(hashBody))
+	default:
+		localRequest, err := http.NewRequest(string(w.getRequestMethod(w.conf.Method)), w.conf.TargetPath, strings.NewReader(reqBody))
+		if err != nil {
+			return "", err
+		}
+		err = localRequest.Write(h)
+		if err != nil {
+			return "", err
+		}
+	}
+
 	return hex.EncodeToString(h.Sum(nil)), nil
 }
 
@@ -236,7 +267,13 @@ func (w *WebHookHandler) HandleEvent(em config.EventMessage) {
 	}
 
 	// Generate signature for request
-	reqChecksum, _ := w.Checksum(reqBody)
+	reqChecksum, err := w.Checksum(em, reqBody)
+	if err != nil {
+		log.WithError(err).WithFields(logrus.Fields{
+			"prefix": "webhooks",
+		}).Error("Webhook checksum error")
+		return
+	}
 
 	// Check request velocity for this hook (wasHookFired())
 	if w.WasHookFired(reqChecksum) {
