@@ -36,6 +36,9 @@ const (
 var (
 	// ErrEventHandlerDisabled is returned when the event handler is disabled.
 	ErrEventHandlerDisabled = errors.New("event handler disabled")
+
+	// ErrCouldNotCastMetaData is returned when metadata cannot be cast to the expected type.
+	ErrCouldNotCastMetaData = errors.New("could not cast meta data")
 )
 
 // WebHookHandler is an event handler that triggers web hooks
@@ -182,16 +185,28 @@ func (w *WebHookHandler) Checksum(em config.EventMessage, reqBody string) (strin
 	// Checksum will always be different, so a different strategy is needed in those cases.
 	switch em.Type {
 	case EventCertificateExpiringSoon:
-		meta := em.Meta.(certcheck.EventCertificateExpiringSoonMeta)
+		meta, ok := em.Meta.(certcheck.EventCertificateExpiringSoonMeta)
+		if !ok {
+			return "", ErrCouldNotCastMetaData
+		}
 		hashBody := fmt.Sprintf("%s%s%s%s", em.Type, meta.CertID, meta.CertName, meta.ExpiresAt.String())
 		h.Write([]byte(hashBody))
 	case EventCertificateExpired:
-		meta := em.Meta.(certcheck.EventCertificateExpiredMeta)
+		meta, ok := em.Meta.(certcheck.EventCertificateExpiredMeta)
+		if !ok {
+			return "", ErrCouldNotCastMetaData
+		}
 		hashBody := fmt.Sprintf("%s%s%s%s", em.Type, meta.CertID, meta.CertName, meta.ExpiredAt.String())
 		h.Write([]byte(hashBody))
 	default:
-		localRequest, _ := http.NewRequest(string(w.getRequestMethod(w.conf.Method)), w.conf.TargetPath, strings.NewReader(reqBody))
-		localRequest.Write(h)
+		localRequest, err := http.NewRequest(string(w.getRequestMethod(w.conf.Method)), w.conf.TargetPath, strings.NewReader(reqBody))
+		if err != nil {
+			return "", err
+		}
+		err = localRequest.Write(h)
+		if err != nil {
+			return "", err
+		}
 	}
 
 	return hex.EncodeToString(h.Sum(nil)), nil
@@ -252,7 +267,13 @@ func (w *WebHookHandler) HandleEvent(em config.EventMessage) {
 	}
 
 	// Generate signature for request
-	reqChecksum, _ := w.Checksum(em, reqBody)
+	reqChecksum, err := w.Checksum(em, reqBody)
+	if err != nil {
+		log.WithError(err).WithFields(logrus.Fields{
+			"prefix": "webhooks",
+		}).Error("Webhook checksum error")
+		return
+	}
 
 	// Check request velocity for this hook (wasHookFired())
 	if w.WasHookFired(reqChecksum) {
