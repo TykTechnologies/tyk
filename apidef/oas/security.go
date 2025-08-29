@@ -250,7 +250,7 @@ const (
 	// No value validation is performed - only existence is checked.
 	ClaimValidationTypeRequired CustomClaimValidationType = "required"
 
-	// ClaimValidationTypeExactMatch indicates the claim must exactly equal one of the specified values.
+	// ClaimValidationTypeExactMatch indicates that the claim must exactly equal one of the specified values.
 	// The match is case-sensitive and type-aware (string/number/boolean/array).
 	ClaimValidationTypeExactMatch CustomClaimValidationType = "exact_match"
 
