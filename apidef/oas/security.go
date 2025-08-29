@@ -27,7 +27,7 @@ type Token struct {
 	// Enabled activates the token based authentication mode.
 	//
 	// Tyk classic API definition: `auth_configs["authToken"].use_standard_auth`
-	Enabled bool `bson:"enabled" json:"enabled"` // required
+	Enabled *bool `bson:"enabled" json:"enabled"` // required
 
 	// AuthSources contains the configuration for authentication sources.
 	AuthSources `bson:",inline" json:",inline"`
@@ -45,7 +45,7 @@ type Token struct {
 
 // Import populates *Token from argument values.
 func (t *Token) Import(nativeSS *openapi3.SecurityScheme, enable bool) {
-	t.Enabled = enable
+	t.Enabled = &enable
 	t.AuthSources.Import(nativeSS.In)
 }
 
@@ -58,7 +58,7 @@ func (s *OAS) fillToken(api apidef.APIDefinition) {
 	s.fillAPIKeyScheme(&authConfig)
 
 	token := &Token{}
-	token.Enabled = api.UseStandardAuth
+	token.Enabled = &api.UseStandardAuth
 	token.AuthSources.Fill(authConfig)
 	token.EnableClientCertificate = authConfig.UseCertificate
 	if token.Signature == nil {
@@ -81,7 +81,11 @@ func (s *OAS) extractTokenTo(api *apidef.APIDefinition, name string) {
 	authConfig := apidef.AuthConfig{DisableHeader: true}
 
 	token := s.getTykTokenAuth(name)
-	api.UseStandardAuth = token.Enabled
+	var enabled bool
+	if token.Enabled != nil {
+		enabled = *token.Enabled
+	}
+	api.UseStandardAuth = enabled
 	authConfig.UseCertificate = token.EnableClientCertificate
 	token.AuthSources.ExtractTo(&authConfig)
 	if token.Signature != nil {
