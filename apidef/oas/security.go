@@ -225,7 +225,7 @@ type CustomClaimValidationConfig struct {
 	// Supported types:
 	// - required: validates that the claim exists and is non-null.
 	// - exact_match: validates claim equals one of the allowed values (case-sensitive).
-	// - contains: for strings, checks substring; for arrays, checks element existence.
+	// - contains: validates that the claim in the JWT contains one of the allowed values.
 	Type CustomClaimValidationType `bson:"type" json:"type"`
 
 	// AllowedValues contains the values to validate against for "exact_match" and "contains" validation types.
