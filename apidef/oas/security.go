@@ -246,7 +246,7 @@ type CustomClaimValidationConfig struct {
 type CustomClaimValidationType string
 
 const (
-	// ClaimValidationTypeRequired indicates the claim must exist in the token and be non-null.
+	// ClaimValidationTypeRequired indicates that the claim must exist in the token and be non-null.
 	// No value validation is performed - only existence is checked.
 	ClaimValidationTypeRequired CustomClaimValidationType = "required"
 
