@@ -228,7 +228,7 @@ type CustomClaimValidationConfig struct {
 	// - contains: validates that the claim in the JWT contains one of the allowed values.
 	Type CustomClaimValidationType `bson:"type" json:"type"`
 
-	// AllowedValues contains the values to validate against for "exact_match" and "contains" validation types.
+	// AllowedValues contains the values that Tyk will use to validate the claim for "exact_match" and "contains" validation types.
 	// Not used for "required" validation type.
 	// Supports string, number, boolean, and array values.
 	// For arrays, validation succeeds if any array element matches any allowed value.
