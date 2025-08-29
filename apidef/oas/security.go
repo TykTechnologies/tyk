@@ -219,7 +219,7 @@ type JWT struct {
 	CustomClaimValidation map[string]CustomClaimValidationConfig `bson:"customClaimValidation,omitempty" json:"customClaimValidation,omitempty"`
 }
 
-// CustomClaimValidationConfig defines the validation configuration for a JWT claim.
+// CustomClaimValidationConfig defines the validation configuration for a custom JWT claim.
 type CustomClaimValidationConfig struct {
 	// Type specifies the type of validation to perform on the claim.
 	// Supported types:
