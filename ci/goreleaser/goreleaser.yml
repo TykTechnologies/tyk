@@ -4,13 +4,15 @@
 # This project needs CGO_ENABLED=1 and the cross-compiler toolchains for
 # - arm64
 # - amd64
-
+version: 2
 builds:
-  - id: std
+  - id: fips-amd64
     flags:
-      - -tags=ignore
-      - -trimpath
-      - -tags=goplugin
+      - -tags=goplugin,fips,boringcrypto
+    env:
+      - NOP=nop # ignore this, it is jsut to avoid a complex conditional in the templates
+      - CC=gcc
+      - $env
     ldflags:
       - -X github.com/TykTechnologies/tyk/internal/build.Version={{.Version}}
       - -X github.com/TykTechnologies/tyk/internal/build.Commit={{.FullCommit}}
@@ -21,14 +23,13 @@ builds:
     goarch:
       - amd64
     binary: tyk
-  - id: fips
+  - id: std-amd64
     flags:
-      - -tags=ignore
-      - -trimpath
       - -tags=goplugin
-      - -tags=fips,boringcrypto
+      - -trimpath
     env:
-      - GOEXPERIMENT=boringcrypto
+      - NOP=nop # ignore this, it is jsut to avoid a complex conditional in the templates
+      - CC=gcc
     ldflags:
       - -X github.com/TykTechnologies/tyk/internal/build.Version={{.Version}}
       - -X github.com/TykTechnologies/tyk/internal/build.Commit={{.FullCommit}}
@@ -41,32 +42,48 @@ builds:
     binary: tyk
   - id: std-arm64
     flags:
-      - -tags=ignore
-      - -trimpath
       - -tags=goplugin
+      - -trimpath
+    env:
+      - NOP=nop # ignore this, it is jsut to avoid a complex conditional in the templates
+      - CC=aarch64-linux-gnu-gcc
     ldflags:
       - -X github.com/TykTechnologies/tyk/internal/build.Version={{.Version}}
       - -X github.com/TykTechnologies/tyk/internal/build.Commit={{.FullCommit}}
       - -X github.com/TykTechnologies/tyk/internal/build.BuildDate={{.Date}}
       - -X github.com/TykTechnologies/tyk/internal/build.BuiltBy=goreleaser
-    env:
-      - CC=aarch64-linux-gnu-gcc
     goos:
       - linux
     goarch:
       - arm64
     binary: tyk
+  - id: std-s390x
+    flags:
+      - -tags=goplugin
+      - -trimpath
+    env:
+      - NOP=nop # ignore this, it is jsut to avoid a complex conditional in the templates
+      - CC=s390x-linux-gnu-gcc
+    ldflags:
+      - -X github.com/TykTechnologies/tyk/internal/build.Version={{.Version}}
+      - -X github.com/TykTechnologies/tyk/internal/build.Commit={{.FullCommit}}
+      - -X github.com/TykTechnologies/tyk/internal/build.BuildDate={{.Date}}
+      - -X github.com/TykTechnologies/tyk/internal/build.BuiltBy=goreleaser
+    goos:
+      - linux
+    goarch:
+      - s390x
+    binary: tyk
 nfpms:
-  - id: std
+  - id: fips
     vendor: "Tyk Technologies Ltd"
     homepage: "https://tyk.io"
     maintainer: "Tyk <info@tyk.io>"
-    description: Tyk Open Source API Gateway written in Go, supporting REST, GraphQL, TCP and gRPC protocols
-    package_name: tyk-gateway
+    description: Tyk Open Source API Gateway written in Go, supporting REST, GraphQL, TCP and gRPC protocols Built with boringssl
+    package_name: tyk-gateway-fips
     file_name_template: "{{ .ConventionalFileName }}"
-    builds:
-      - std
-      - std-arm64
+    ids:
+      - fips-amd64
     formats:
       - deb
       - rpm
@@ -115,15 +132,17 @@ nfpms:
       signature:
         key_file: tyk.io.signing.key
         type: origin
-  - id: fips
+  - id: std
     vendor: "Tyk Technologies Ltd"
     homepage: "https://tyk.io"
     maintainer: "Tyk <info@tyk.io>"
     description: Tyk Open Source API Gateway written in Go, supporting REST, GraphQL, TCP and gRPC protocols
-    package_name: tyk-gateway-fips
+    package_name: tyk-gateway
     file_name_template: "{{ .ConventionalFileName }}"
-    builds:
-      - fips
+    ids:
+      - std-amd64
+      - std-arm64
+      - std-s390x
     formats:
       - deb
       - rpm
@@ -173,13 +192,21 @@ nfpms:
         key_file: tyk.io.signing.key
         type: origin
 publishers:
-  - name: tyk-gateway-unstable
+  - name: fips
+    ids:
+      - fips
+    env:
+      - PACKAGECLOUD_TOKEN={{ .Env.PACKAGECLOUD_TOKEN }}
+    cmd: packagecloud publish --debvers "{{ .Env.DEBVERS }}" --rpmvers "{{ .Env.RPMVERS }}" tyk/tyk-ee-unstable {{ .ArtifactPath }}
+  - name: std
+    ids:
+      - std
     env:
       - PACKAGECLOUD_TOKEN={{ .Env.PACKAGECLOUD_TOKEN }}
     cmd: packagecloud publish --debvers "{{ .Env.DEBVERS }}" --rpmvers "{{ .Env.RPMVERS }}" tyk/tyk-gateway-unstable {{ .ArtifactPath }}
 # This disables archives
 archives:
-  - format: binary
+  - formats: ['binary']
     allow_different_binary_count: true
 checksum:
   disable: true
