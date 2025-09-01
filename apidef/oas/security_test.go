@@ -151,53 +151,76 @@ func TestOAS_ApiKeyScheme(t *testing.T) {
 func TestOAS_Token(t *testing.T) {
 	const securityName = "custom"
 
-	var oas OAS
-	oas.Security = openapi3.SecurityRequirements{
-		{
-			securityName: []string{},
-		},
-	}
-
-	oas.Components = &openapi3.Components{
-		SecuritySchemes: openapi3.SecuritySchemes{
-			securityName: {
-				Value: &openapi3.SecurityScheme{
-					Type: typeAPIKey,
-					Name: "x-query",
-					In:   query,
-				},
-			},
-		},
-	}
-
-	var token Token
-	Fill(t, &token, 0)
-	token.Query = nil
-	oas.Extensions = map[string]interface{}{
-		ExtensionTykAPIGateway: &XTykAPIGateway{
-			Server: Server{
-				Authentication: &Authentication{
-					SecuritySchemes: SecuritySchemes{
-						securityName: &token,
+	oas := OAS{T: openapi3.T{
+		Components: &openapi3.Components{
+			SecuritySchemes: openapi3.SecuritySchemes{
+				securityName: {
+					Value: &openapi3.SecurityScheme{
+						Type: typeAPIKey,
+						Name: "x-query",
+						In:   query,
 					},
 				},
 			},
 		},
+		Security: openapi3.SecurityRequirements{
+			{
+				securityName: []string{},
+			},
+		},
+	}}
+
+	setToken := func(token Token) {
+		oas.Extensions = map[string]interface{}{
+			ExtensionTykAPIGateway: &XTykAPIGateway{
+				Server: Server{
+					Authentication: &Authentication{
+						SecuritySchemes: SecuritySchemes{
+							securityName: &token,
+						},
+					},
+				},
+			},
+		}
 	}
 
-	var api apidef.APIDefinition
-	api.AuthConfigs = make(map[string]apidef.AuthConfig)
-	oas.extractTokenTo(&api, securityName)
+	convertAPI := func() OAS {
+		var api apidef.APIDefinition
+		api.AuthConfigs = make(map[string]apidef.AuthConfig)
+		oas.extractTokenTo(&api, securityName)
 
-	var convertedOAS OAS
-	convertedOAS.Components = &openapi3.Components{
-		SecuritySchemes: oas.Components.SecuritySchemes,
+		var convertedOAS OAS
+		convertedOAS.Components = &openapi3.Components{
+			SecuritySchemes: oas.Components.SecuritySchemes,
+		}
+
+		convertedOAS.SetTykExtension(&XTykAPIGateway{Server: Server{Authentication: &Authentication{SecuritySchemes: SecuritySchemes{}}}})
+		convertedOAS.fillToken(api)
+
+		return convertedOAS
 	}
 
-	convertedOAS.SetTykExtension(&XTykAPIGateway{Server: Server{Authentication: &Authentication{SecuritySchemes: SecuritySchemes{}}}})
-	convertedOAS.fillToken(api)
+	t.Run("enabled", func(t *testing.T) {
+		var token Token
+		Fill(t, &token, 0)
+		token.Query = nil
 
-	assert.Equal(t, oas, convertedOAS)
+		setToken(token)
+		convertedOAS := convertAPI()
+
+		assert.Equal(t, oas, convertedOAS)
+	})
+
+	t.Run("disabled", func(t *testing.T) {
+		var token Token
+		token.Enabled = getBoolPointer(false)
+
+		setToken(token)
+		convertedOAS := convertAPI()
+
+		assert.NotNil(t, convertedOAS.getTykSecuritySchemes()[securityName])
+	})
+
 }
 
 func TestOAS_Token_MultipleSecuritySchemes(t *testing.T) {
@@ -237,7 +260,7 @@ func TestOAS_Token_MultipleSecuritySchemes(t *testing.T) {
 				Enabled: true,
 				SecuritySchemes: SecuritySchemes{
 					securityName: &Token{
-						Enabled: true,
+						Enabled: getBoolPointer(true),
 					},
 				},
 			},
