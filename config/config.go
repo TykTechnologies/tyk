@@ -72,13 +72,13 @@ var (
 
 // Certificate monitor constants
 const (
-	// DefaultWarningThresholdDays is the default number of days before certificate expiration to start sending notifications
+	// DefaultWarningThresholdDays is the number of days before certificate expiration that the Gateway will start sending CertificateExpiringSoon notifications
 	DefaultWarningThresholdDays = 30
 
-	// DefaultCheckCooldownSeconds is the default minimum time in seconds between certificate expiration checks
+	// DefaultCheckCooldownSeconds is the minimum time in seconds that the Gateway will leave between checking for the expiry of a certificate when it is used in an API request
 	DefaultCheckCooldownSeconds = 3600 // 1 hour
 
-	// DefaultEventCooldownSeconds is the default minimum time in seconds between firing the same certificate expiration event
+	// DefaultEventCooldownSeconds is the minimum time in seconds that the Gateway will leave between firing an event for an expiring or expired certificate; this default will be applied as a floor value to protect the system from misconfiguration, but can be overridden by setting a longer cooldown in the CertificateExpiryMonitorConfig
 	DefaultEventCooldownSeconds = 86400 // 24 hours
 )
 
@@ -632,15 +632,15 @@ type CertificatesConfig struct {
 
 // CertificateExpiryMonitorConfig configures the certificate expiration notification feature
 type CertificateExpiryMonitorConfig struct {
-	// WarningThresholdDays specifies the number of days before certificate expiration to start sending notifications
+	// WarningThresholdDays specifies the number of days before certificate expiration that the Gateway will start sending CertificateExpiringSoon notifications
 	// Default: DefaultWarningThresholdDays (30 days)
 	WarningThresholdDays int `json:"warning_threshold_days"`
 
-	// CheckCooldownSeconds specifies the minimum time in seconds between certificate expiration checks
+	// CheckCooldownSeconds specifies the minimum time in seconds that the Gateway will leave between checking for the expiry of a certificate when it is used in an API request - if a certificate is used repeatedly this prevents unnecessary expiry checks
 	// Default: DefaultCheckCooldownSeconds (3600 seconds = 1 hour)
 	CheckCooldownSeconds int `json:"check_cooldown_seconds"`
 
-	// EventCooldownSeconds specifies the minimum time in seconds between firing the same certificate expiration event
+	// EventCooldownSeconds specifies the minimum time in seconds between firing the same certificate expiry event - this prevents unnecessary events from being generated for an expiring or expired certificate being used repeatedly; note that the higher of the value configured here or the default (DefaultEventCooldownSeconds) will be applied
 	// Default: DefaultEventCooldownSeconds (86400 seconds = 24 hours)
 	EventCooldownSeconds int `json:"event_cooldown_seconds"`
 }
@@ -657,7 +657,7 @@ type SecurityConfig struct {
 
 	Certificates CertificatesConfig `json:"certificates"`
 
-	// CertificateExpiryMonitor configures the certificate expiration notification feature
+	// CertificateExpiryMonitor configures the certificate expiry monitoring and notification feature
 	CertificateExpiryMonitor CertificateExpiryMonitorConfig `json:"certificate_expiry_monitor"`
 }
 
