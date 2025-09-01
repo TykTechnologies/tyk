@@ -2174,7 +2174,9 @@
         "HostUp",
         "TokenCreated",
         "TokenUpdated",
-        "TokenDeleted"
+        "TokenDeleted",
+        "CertificateExpiringSoon",
+        "CertificateExpired"
       ]
     },
     "X-Tyk-ContextVariables": {

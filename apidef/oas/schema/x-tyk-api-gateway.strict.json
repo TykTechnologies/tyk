@@ -2279,7 +2279,9 @@
         "HostUp",
         "TokenCreated",
         "TokenUpdated",
-        "TokenDeleted"
+        "TokenDeleted",
+        "CertificateExpiringSoon",
+        "CertificateExpired"
       ],
       "additionalProperties": false
     },
