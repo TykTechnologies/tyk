@@ -1757,6 +1757,30 @@
         },
         "idpClientIdMappingDisabled": {
           "type": "boolean"
+        },
+        "customClaimValidation": {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "enum": [
+                "required",
+                "exact_match",
+                "contains"
+              ]
+            },
+            "allowedValues": {
+              "type": "array",
+              "items": {}
+            },
+            "nonBlocking": {
+              "type": "boolean",
+              "default": false
+            }
+          },
+          "required": [
+            "type"
+          ]
         }
       },
       "required": [

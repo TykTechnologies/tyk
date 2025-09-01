@@ -202,7 +202,67 @@ type JWT struct {
 	//
 	// Tyk classic API definition: `idp_client_id_mapping_disabled`.
 	IDPClientIDMappingDisabled bool `bson:"idpClientIdMappingDisabled,omitempty" json:"idpClientIdMappingDisabled,omitempty"`
+
+	// CustomClaimValidation contains custom validation rules for JWT claims.
+	// It maps a claim name (including nested claims using dot notation) to its validation configuration.
+	//
+	// The validation can be one of three types:
+	// - "required": claim must exist in the token (null/empty values are considered invalid)
+	// - "exact_match": claim must exactly equal one of the specified values (case-sensitive)
+	// - "contains": for strings, must contain one of the values as substring; for arrays, must contain one of the values as element
+	//
+	// Examples:
+	// Basic validation: {"role": {"type": "exact_match", "allowedValues": ["admin", "user"]}}
+	// Nested claim: {"user.metadata.level": {"type": "contains", "allowedValues": ["gold", "silver"]}}
+	// Multiple rules: {"permissions": {"type": "contains", "allowedValues": ["read", "write"], "nonBlocking": true}}
+	//
+	// Claims can be of type string, number, boolean, or array. For arrays, the contains validation
+	// checks if any of the array elements exactly match any of the allowed values.
+	//
+	// Tyk classic API definition: N/A (OAS only).
+	CustomClaimValidation map[string]CustomClaimValidationConfig `bson:"customClaimValidation,omitempty" json:"customClaimValidation,omitempty"`
 }
+
+// CustomClaimValidationConfig defines the validation configuration for a custom JWT claim.
+type CustomClaimValidationConfig struct {
+	// Type specifies the type of validation to perform on the claim.
+	// Supported types:
+	// - required: validates that the claim exists and is non-null.
+	// - exact_match: validates that the claim in the JWT equals one of the allowed values (case-sensitive).
+	// - contains: validates that the claim in the JWT contains one of the allowed values.
+	Type CustomClaimValidationType `bson:"type" json:"type"`
+
+	// AllowedValues contains the values that Tyk will use to validate the claim for "exact_match" and "contains" validation types.
+	// Not used for "required" validation type.
+	// Supports string, number, boolean, and array values.
+	// For arrays, validation succeeds if any array element matches any allowed value.
+	AllowedValues []interface{} `bson:"allowedValues,omitempty" json:"allowedValues,omitempty"`
+
+	// NonBlocking determines if validation failure should log a warning (true) or reject the request (false).
+	// This enables gradual rollout of validation rules by monitoring before enforcing.
+	// Multiple rules can be mixed, some blocking and others non-blocking.
+	NonBlocking bool `bson:"nonBlocking,omitempty" json:"nonBlocking,omitempty"`
+}
+
+// CustomClaimValidationType represents how a JWT claim should be validated.
+// This determines the validation logic used to check the claim value.
+// The validation behavior varies based on both the type selected and the claim's data type.
+type CustomClaimValidationType string
+
+const (
+	// ClaimValidationTypeRequired indicates that the claim must exist in the token and be non-null.
+	// No value validation is performed - only existence is checked.
+	ClaimValidationTypeRequired CustomClaimValidationType = "required"
+
+	// ClaimValidationTypeExactMatch indicates that the claim must exactly equal one of the specified values.
+	// The match is case-sensitive and type-aware (string/number/boolean/array).
+	ClaimValidationTypeExactMatch CustomClaimValidationType = "exact_match"
+
+	// ClaimValidationTypeContains indicates that the claim must contain one of the specified values.
+	// For strings: checks if the claim contains any allowed value as a substring
+	// For arrays: checks if the claim contains any allowed value as an element
+	ClaimValidationTypeContains CustomClaimValidationType = "contains"
+)
 
 // JTIValidation contains the configuration for the validation of the JWT ID.
 type JTIValidation struct {

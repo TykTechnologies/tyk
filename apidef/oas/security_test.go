@@ -451,6 +451,7 @@ func TestOAS_JWT(t *testing.T) {
 	convertedOAS.GetJWTConfiguration().BasePolicyClaims = oas.GetJWTConfiguration().BasePolicyClaims
 	convertedOAS.GetJWTConfiguration().Scopes.Claims = oas.GetJWTConfiguration().Scopes.Claims
 	convertedOAS.GetJWTConfiguration().JTIValidation.Enabled = true
+	convertedOAS.GetJWTConfiguration().CustomClaimValidation = oas.GetJWTConfiguration().CustomClaimValidation
 	assert.Equal(t, oas, convertedOAS)
 }
 
