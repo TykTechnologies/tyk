@@ -829,11 +829,12 @@ func TestOAS_extractSecurityTo_ORLogic(t *testing.T) {
 			},
 		}
 
+		trueVal := true
 		oas.SetTykExtension(&XTykAPIGateway{
 			Server: Server{
 				Authentication: &Authentication{
 					SecuritySchemes: SecuritySchemes{
-						"token-auth": &Token{Enabled: true},
+						"token-auth": &Token{Enabled: &trueVal},
 						"jwt-auth":   &JWT{Enabled: true},
 					},
 				},
@@ -876,11 +877,12 @@ func TestOAS_extractSecurityTo_ORLogic(t *testing.T) {
 			},
 		}
 
+		trueVal := true
 		oas.SetTykExtension(&XTykAPIGateway{
 			Server: Server{
 				Authentication: &Authentication{
 					SecuritySchemes: SecuritySchemes{
-						"token-auth": &Token{Enabled: true},
+						"token-auth": &Token{Enabled: &trueVal},
 						"jwt-auth":   &JWT{Enabled: true},
 					},
 				},
