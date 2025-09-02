@@ -13,7 +13,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/ohler55/ojg/jp"
 	"github.com/tidwall/gjson"
-	"io"
+
 	"net/http"
 	"strings"
 	"time"
