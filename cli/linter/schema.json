@@ -213,6 +213,15 @@
             "ca_file": {
               "type": "string"
             },
+            "cert_id": {
+              "type": "string"
+            },
+            "ca_cert_ids": {
+              "type": ["array", "null"],
+              "items": {
+                "type": "string"
+              }
+            },
             "insecure_skip_verify": {
               "type": "boolean"
             },
