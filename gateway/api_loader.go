@@ -3,7 +3,6 @@ package gateway
 import (
 	"crypto/tls"
 	"fmt"
-	"github.com/TykTechnologies/tyk/common/option"
 	"io/ioutil"
 	"net/http"
 	"net/url"
@@ -15,6 +14,8 @@ import (
 	"strings"
 	"sync"
 	texttemplate "text/template"
+
+	"github.com/TykTechnologies/tyk/common/option"
 
 	"github.com/gorilla/mux"
 	"github.com/justinas/alice"
