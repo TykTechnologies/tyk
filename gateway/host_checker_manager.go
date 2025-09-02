@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"github.com/TykTechnologies/tyk/pkg/errpack"
 	"net/http"
 	"net/url"
 	"sync"
@@ -233,7 +234,11 @@ func (hc *HostCheckerManager) getHostKey(report HostHealthReport) string {
 
 func (hc *HostCheckerManager) OnHostReport(ctx context.Context, report HostHealthReport) {
 	if hc.Gw.GetConfig().UptimeTests.Config.EnableUptimeAnalytics {
-		go hc.RecordUptimeAnalytics(report)
+		go func() {
+			if err := hc.RecordUptimeAnalytics(report); err != nil {
+				log.WithError(err).Error("failed to record uptime metrics")
+			}
+		}()
 	}
 }
 
@@ -489,12 +494,14 @@ func (hc *HostCheckerManager) DoServiceDiscoveryListUpdateForID(apiID string) {
 func (hc *HostCheckerManager) RecordUptimeAnalytics(report HostHealthReport) error {
 	// If we are obfuscating API Keys, store the hashed representation (config check handled in hashing function)
 
-	spec := hc.Gw.getApiSpec(report.MetaData[UnHealthyHostMetaDataAPIKey])
-	orgID := ""
-	if spec != nil {
-		orgID = spec.OrgID
+	apiID := report.MetaData[UnHealthyHostMetaDataAPIKey]
+	spec := hc.Gw.getApiSpec(apiID)
+
+	if spec == nil {
+		return errpack.NotFoundWithId(apiID)
 	}
 
+	orgID := spec.OrgID
 	t := time.Now()
 
 	var serverError bool

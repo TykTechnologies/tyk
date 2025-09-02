@@ -27,7 +27,7 @@ type Token struct {
 	// Enabled activates the token based authentication mode.
 	//
 	// Tyk classic API definition: `auth_configs["authToken"].use_standard_auth`
-	Enabled bool `bson:"enabled" json:"enabled"` // required
+	Enabled *bool `bson:"enabled" json:"enabled"` // required
 
 	// AuthSources contains the configuration for authentication sources.
 	AuthSources `bson:",inline" json:",inline"`
@@ -45,7 +45,7 @@ type Token struct {
 
 // Import populates *Token from argument values.
 func (t *Token) Import(nativeSS *openapi3.SecurityScheme, enable bool) {
-	t.Enabled = enable
+	t.Enabled = &enable
 	t.AuthSources.Import(nativeSS.In)
 }
 
@@ -58,7 +58,7 @@ func (s *OAS) fillToken(api apidef.APIDefinition) {
 	s.fillAPIKeyScheme(&authConfig)
 
 	token := &Token{}
-	token.Enabled = api.UseStandardAuth
+	token.Enabled = &api.UseStandardAuth
 	token.AuthSources.Fill(authConfig)
 	token.EnableClientCertificate = authConfig.UseCertificate
 	if token.Signature == nil {
@@ -81,7 +81,11 @@ func (s *OAS) extractTokenTo(api *apidef.APIDefinition, name string) {
 	authConfig := apidef.AuthConfig{DisableHeader: true}
 
 	token := s.getTykTokenAuth(name)
-	api.UseStandardAuth = token.Enabled
+	var enabled bool
+	if token.Enabled != nil {
+		enabled = *token.Enabled
+	}
+	api.UseStandardAuth = enabled
 	authConfig.UseCertificate = token.EnableClientCertificate
 	token.AuthSources.ExtractTo(&authConfig)
 	if token.Signature != nil {
@@ -123,7 +127,7 @@ type JWT struct {
 	IdentityBaseField string `bson:"identityBaseField,omitempty" json:"identityBaseField,omitempty"`
 
 	// SubjectClaims specifies a list of claims that can be used to identity the subject of the JWT.
-	// The field is an OAS only field and is only used in OAS APIs.
+	// This field is a Tyk OAS only field and is only used in Tyk OAS APIs.
 	SubjectClaims []string `bson:"subjectClaims,omitempty" json:"subjectClaims,omitempty"`
 
 	// SkipKid controls skipping using the `kid` claim from a JWT (default behaviour).
@@ -140,7 +144,7 @@ type JWT struct {
 
 	// BasePolicyClaims specifies a list of claims from which the base PolicyID is extracted.
 	// The policy is applied to the session as a base policy.
-	// The field is an OAS only field and is only used in OAS APIs.
+	// This field is a Tyk OAS only field and is only used in Tyk OAS APIs.
 	BasePolicyClaims []string `bson:"basePolicyClaims,omitempty" json:"basePolicyClaims,omitempty"`
 
 	// ClientBaseField is used when PolicyFieldName is not provided. It will get
@@ -175,17 +179,21 @@ type JWT struct {
 
 	// AllowedIssuers contains a list of accepted issuers for JWT validation.
 	// When configured, the JWT's issuer claim must match one of these values.
+	// This field is a Tyk OAS only field and is only used in Tyk OAS APIs.
 	AllowedIssuers []string `bson:"allowedIssuers,omitempty" json:"allowedIssuers,omitempty"`
 
 	// AllowedAudiences contains a list of accepted audiences for JWT validation.
 	// When configured, the JWT's audience claim must match one of these values.
+	// This field is a Tyk OAS only field and is only used in Tyk OAS APIs.
 	AllowedAudiences []string `bson:"allowedAudiences,omitempty" json:"allowedAudiences,omitempty"`
 
 	// JTIValidation contains the configuration for the validation of the JWT ID.
+	// This field is a Tyk OAS only field and is only used in Tyk OAS APIs.
 	JTIValidation JTIValidation `bson:"jtiValidation,omitempty" json:"jtiValidation,omitempty"`
 
 	// AllowedSubjects contains a list of accepted subjects for JWT validation.
 	// When configured, the subject from kid/identityBaseField/sub must match one of these values.
+	// This field is a Tyk OAS only field and is only used in Tyk OAS APIs.
 	AllowedSubjects []string `bson:"allowedSubjects,omitempty" json:"allowedSubjects,omitempty"`
 
 	// IDPClientIDMappingDisabled prevents Tyk from automatically detecting the use of certain IDPs based on standard claims
@@ -194,7 +202,67 @@ type JWT struct {
 	//
 	// Tyk classic API definition: `idp_client_id_mapping_disabled`.
 	IDPClientIDMappingDisabled bool `bson:"idpClientIdMappingDisabled,omitempty" json:"idpClientIdMappingDisabled,omitempty"`
+
+	// CustomClaimValidation contains custom validation rules for JWT claims.
+	// It maps a claim name (including nested claims using dot notation) to its validation configuration.
+	//
+	// The validation can be one of three types:
+	// - "required": claim must exist in the token (null/empty values are considered invalid)
+	// - "exact_match": claim must exactly equal one of the specified values (case-sensitive)
+	// - "contains": for strings, must contain one of the values as substring; for arrays, must contain one of the values as element
+	//
+	// Examples:
+	// Basic validation: {"role": {"type": "exact_match", "allowedValues": ["admin", "user"]}}
+	// Nested claim: {"user.metadata.level": {"type": "contains", "allowedValues": ["gold", "silver"]}}
+	// Multiple rules: {"permissions": {"type": "contains", "allowedValues": ["read", "write"], "nonBlocking": true}}
+	//
+	// Claims can be of type string, number, boolean, or array. For arrays, the contains validation
+	// checks if any of the array elements exactly match any of the allowed values.
+	//
+	// Tyk classic API definition: N/A (OAS only).
+	CustomClaimValidation map[string]CustomClaimValidationConfig `bson:"customClaimValidation,omitempty" json:"customClaimValidation,omitempty"`
 }
+
+// CustomClaimValidationConfig defines the validation configuration for a custom JWT claim.
+type CustomClaimValidationConfig struct {
+	// Type specifies the type of validation to perform on the claim.
+	// Supported types:
+	// - required: validates that the claim exists and is non-null.
+	// - exact_match: validates that the claim in the JWT equals one of the allowed values (case-sensitive).
+	// - contains: validates that the claim in the JWT contains one of the allowed values.
+	Type CustomClaimValidationType `bson:"type" json:"type"`
+
+	// AllowedValues contains the values that Tyk will use to validate the claim for "exact_match" and "contains" validation types.
+	// Not used for "required" validation type.
+	// Supports string, number, boolean, and array values.
+	// For arrays, validation succeeds if any array element matches any allowed value.
+	AllowedValues []interface{} `bson:"allowedValues,omitempty" json:"allowedValues,omitempty"`
+
+	// NonBlocking determines if validation failure should log a warning (true) or reject the request (false).
+	// This enables gradual rollout of validation rules by monitoring before enforcing.
+	// Multiple rules can be mixed, some blocking and others non-blocking.
+	NonBlocking bool `bson:"nonBlocking,omitempty" json:"nonBlocking,omitempty"`
+}
+
+// CustomClaimValidationType represents how a JWT claim should be validated.
+// This determines the validation logic used to check the claim value.
+// The validation behavior varies based on both the type selected and the claim's data type.
+type CustomClaimValidationType string
+
+const (
+	// ClaimValidationTypeRequired indicates that the claim must exist in the token and be non-null.
+	// No value validation is performed - only existence is checked.
+	ClaimValidationTypeRequired CustomClaimValidationType = "required"
+
+	// ClaimValidationTypeExactMatch indicates that the claim must exactly equal one of the specified values.
+	// The match is case-sensitive and type-aware (string/number/boolean/array).
+	ClaimValidationTypeExactMatch CustomClaimValidationType = "exact_match"
+
+	// ClaimValidationTypeContains indicates that the claim must contain one of the specified values.
+	// For strings: checks if the claim contains any allowed value as a substring
+	// For arrays: checks if the claim contains any allowed value as an element
+	ClaimValidationTypeContains CustomClaimValidationType = "contains"
+)
 
 // JTIValidation contains the configuration for the validation of the JWT ID.
 type JTIValidation struct {

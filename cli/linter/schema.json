@@ -1118,6 +1118,27 @@
               }
             }
           }
+        },
+        "certificate_expiry_monitor": {
+          "type": ["object", "null"],
+          "additionalProperties": false,
+          "properties": {
+            "warning_threshold_days": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 30
+            },
+            "check_cooldown_seconds": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 3600
+            },
+            "event_cooldown_seconds": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 86400
+            }
+          }
         }
       }
     },

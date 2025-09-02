@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/rs/cors"
+	"github.com/samber/lo"
 	htmltemplate "html/template"
 	"io/ioutil"
 	stdlog "log"
@@ -279,6 +280,32 @@ func (gw *Gateway) cacheClose() {
 	gw.UtilCache.Close()
 	gw.RPCGlobalCache.Close()
 	gw.RPCCertCache.Close()
+}
+
+func (gw *Gateway) saveApi(spec *APISpec) {
+	gw.apisMu.Lock()
+	defer gw.apisMu.Unlock()
+
+	if gw.apisByID == nil {
+		gw.apisByID = map[string]*APISpec{}
+	}
+
+	gw.apisByID[spec.APIID] = spec
+	gw.apiSpecs = append(gw.apiSpecs, spec)
+}
+
+func (gw *Gateway) deleteApi(spec *APISpec) {
+	gw.apisMu.Lock()
+	defer gw.apisMu.Unlock()
+
+	if gw.apisByID == nil {
+		gw.apisByID = map[string]*APISpec{}
+	}
+
+	delete(gw.apisByID, spec.APIID)
+	gw.apiSpecs = lo.Filter(gw.apiSpecs, func(item *APISpec, _ int) bool {
+		return item.APIID != spec.APIID
+	})
 }
 
 // SetupNewRelic creates new newrelic.Application instance.

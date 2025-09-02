@@ -104,12 +104,14 @@ require (
 	github.com/goccy/go-json v0.10.4
 	github.com/goccy/go-yaml v1.15.23
 	github.com/google/go-cmp v0.7.0
+	github.com/hashicorp/golang-lru/v2 v2.0.7
 	github.com/huandu/go-clone/generic v1.7.2
 	github.com/mccutchen/go-httpbin/v2 v2.18.2
 	github.com/nats-io/nats.go v1.38.0
 	github.com/newrelic/go-agent/v3 v3.35.1
 	github.com/newrelic/go-agent/v3/integrations/nrgorilla v1.2.2
 	github.com/oasdiff/yaml v0.0.0-20250309154309-f31be36b4037
+	github.com/ohler55/ojg v1.26.9
 	github.com/rabbitmq/amqp091-go v1.9.0
 	github.com/samber/lo v1.50.0
 	github.com/shirou/gopsutil v3.21.11+incompatible
@@ -117,6 +119,7 @@ require (
 	github.com/testcontainers/testcontainers-go/modules/kafka v0.37.0
 	github.com/testcontainers/testcontainers-go/modules/nats v0.37.0
 	github.com/testcontainers/testcontainers-go/modules/rabbitmq v0.36.0
+	github.com/tidwall/gjson v1.17.1
 	github.com/warpstreamlabs/bento v1.7.1
 	go.opentelemetry.io/otel v1.36.0
 	go.opentelemetry.io/otel/trace v1.36.0
@@ -347,7 +350,6 @@ require (
 	github.com/hashicorp/go-uuid v1.0.3 // indirect
 	github.com/hashicorp/golang-lru v0.5.4 // indirect
 	github.com/hashicorp/golang-lru/arc/v2 v2.0.7 // indirect
-	github.com/hashicorp/golang-lru/v2 v2.0.7 // indirect
 	github.com/hashicorp/hcl v1.0.0 // indirect
 	github.com/hashicorp/raft v1.7.1 // indirect
 	github.com/hashicorp/serf v0.10.1 // indirect
@@ -483,7 +485,6 @@ require (
 	github.com/stretchr/objx v0.5.2 // indirect
 	github.com/tetratelabs/wazero v1.6.0 // indirect
 	github.com/tidwall/btree v1.7.0 // indirect
-	github.com/tidwall/gjson v1.17.1 // indirect
 	github.com/tidwall/match v1.1.1 // indirect
 	github.com/tidwall/pretty v1.2.1 // indirect
 	github.com/tidwall/sjson v1.2.5 // indirect
