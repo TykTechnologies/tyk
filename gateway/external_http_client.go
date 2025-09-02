@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/TykTechnologies/tyk/certs"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/go-jose/go-jose/v3"
 )
@@ -198,15 +199,28 @@ func splitNoProxy(noProxy string) []string {
 }
 
 // getTLSConfig creates TLS configuration based on mTLS settings.
+// It supports both file-based and certificate store configurations.
 func (f *ExternalHTTPClientFactory) getTLSConfig(serviceConfig config.ServiceConfig) (*tls.Config, error) {
 	tlsConfig := &tls.Config{
 		InsecureSkipVerify: serviceConfig.MTLS.InsecureSkipVerify,
 	}
 
+	// Validate mTLS configuration
+	if err := serviceConfig.MTLS.Validate(); err != nil {
+		return nil, fmt.Errorf("invalid mTLS configuration: %w", err)
+	}
+
 	// Configure mTLS if enabled
 	if serviceConfig.MTLS.Enabled {
-		// Load client certificate
-		if serviceConfig.MTLS.CertFile != "" && serviceConfig.MTLS.KeyFile != "" {
+		// Priority 1: Certificate store (if CertID is provided)
+		if serviceConfig.MTLS.IsCertificateStoreConfig() {
+			cert, err := f.loadCertificateFromStore(serviceConfig.MTLS.CertID)
+			if err != nil {
+				return nil, fmt.Errorf("failed to load certificate from store: %w", err)
+			}
+			tlsConfig.Certificates = []tls.Certificate{*cert}
+		} else if serviceConfig.MTLS.IsFileBasedConfig() {
+			// Priority 2: File-based certificates (existing behavior)
 			cert, err := tls.LoadX509KeyPair(serviceConfig.MTLS.CertFile, serviceConfig.MTLS.KeyFile)
 			if err != nil {
 				return nil, fmt.Errorf("failed to load client certificate: %w", err)
@@ -214,8 +228,14 @@ func (f *ExternalHTTPClientFactory) getTLSConfig(serviceConfig config.ServiceCon
 			tlsConfig.Certificates = []tls.Certificate{cert}
 		}
 
-		// Load CA certificate
-		if serviceConfig.MTLS.CAFile != "" {
+		// Load CA certificates from store or file
+		if len(serviceConfig.MTLS.CACertIDs) > 0 {
+			caCertPool := f.loadCACertPoolFromStore(serviceConfig.MTLS.CACertIDs)
+			if caCertPool != nil {
+				tlsConfig.RootCAs = caCertPool
+			}
+		} else if serviceConfig.MTLS.CAFile != "" {
+			// Existing file-based CA loading logic
 			caCert, err := ioutil.ReadFile(serviceConfig.MTLS.CAFile)
 			if err != nil {
 				return nil, fmt.Errorf("failed to read CA certificate: %w", err)
@@ -297,6 +317,42 @@ func getJWKWithClient(jwlUrl string, client *http.Client) (*jose.JSONWebKeySet, 
 	}
 
 	return jwkSet, nil
+}
+
+// loadCertificateFromStore retrieves a certificate from the Tyk certificate store.
+func (f *ExternalHTTPClientFactory) loadCertificateFromStore(certID string) (*tls.Certificate, error) {
+	if f.gw.CertificateManager == nil {
+		return nil, fmt.Errorf("certificate manager not available")
+	}
+
+	log.Debugf("[ExternalServices] Loading certificate from store: %s", certID)
+
+	certs := f.gw.CertificateManager.List([]string{certID}, certs.CertificatePrivate)
+	if len(certs) == 0 || certs[0] == nil {
+		return nil, fmt.Errorf("certificate not found in store: %s", certID)
+	}
+
+	log.Debugf("[ExternalServices] Successfully loaded certificate from store: %s", certID)
+	return certs[0], nil
+}
+
+// loadCACertPoolFromStore creates a CA certificate pool from store certificate IDs.
+func (f *ExternalHTTPClientFactory) loadCACertPoolFromStore(certIDs []string) *x509.CertPool {
+	if f.gw.CertificateManager == nil {
+		log.Error("[ExternalServices] Certificate manager not available for CA certificate loading")
+		return nil
+	}
+
+	log.Debugf("[ExternalServices] Loading CA certificates from store: %v", certIDs)
+
+	certPool := f.gw.CertificateManager.CertPool(certIDs)
+	if certPool != nil {
+		log.Debugf("[ExternalServices] Successfully loaded %d CA certificates from store", len(certIDs))
+	} else {
+		log.Warn("[ExternalServices] Failed to create CA certificate pool from store")
+	}
+
+	return certPool
 }
 
 // getServiceTimeout returns the appropriate timeout for different service types

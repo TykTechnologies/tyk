@@ -2,6 +2,7 @@ package gateway
 
 import (
 	"crypto/tls"
+	"crypto/x509"
 	"io/ioutil"
 	"net/http"
 	"os"
@@ -12,6 +13,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/TykTechnologies/tyk/certs"
 	"github.com/TykTechnologies/tyk/config"
 )
 
@@ -74,6 +76,7 @@ func TestExternalHTTPClientFactory_CreateClient(t *testing.T) {
 				OAuth: config.ServiceConfig{
 					MTLS: config.MTLSConfig{
 						Enabled:            true,
+						CertID:             "test-cert-123",
 						InsecureSkipVerify: true,
 					},
 				},
@@ -94,6 +97,16 @@ func TestExternalHTTPClientFactory_CreateClient(t *testing.T) {
 			// Create a mock gateway
 			gw := &Gateway{}
 			gw.SetConfig(gwConfig)
+
+			// Add certificate manager if mTLS is enabled with certificate store
+			if tt.wantMTLS && tt.config.OAuth.MTLS.CertID != "" {
+				mockCertManager := &mockCertificateManager{
+					certificates: map[string]*tls.Certificate{
+						"test-cert-123": createMockCertificate(),
+					},
+				}
+				gw.CertificateManager = mockCertManager
+			}
 
 			factory := NewExternalHTTPClientFactory(gw)
 			client, err := factory.CreateClient(tt.serviceType)
@@ -641,11 +654,8 @@ func TestExternalHTTPClientFactory_getTLSConfig(t *testing.T) {
 					CAFile:   "",
 				},
 			},
-			expectError: false,
-			validateTLS: func(t *testing.T, tlsConfig *tls.Config) {
-				assert.Nil(t, tlsConfig.Certificates)
-				assert.Nil(t, tlsConfig.RootCAs)
-			},
+			expectError:   true,
+			errorContains: "mTLS enabled but no certificate configuration provided",
 		},
 		{
 			name: "mTLS enabled with invalid cert file",
@@ -722,6 +732,484 @@ func TestExternalHTTPClientFactory_getTLSConfig(t *testing.T) {
 				if tt.validateTLS != nil {
 					tt.validateTLS(t, tlsConfig)
 				}
+			}
+		})
+	}
+}
+
+// Mock certificate manager for testing
+type mockCertificateManager struct {
+	certificates   map[string]*tls.Certificate
+	caCertificates []string
+}
+
+func (m *mockCertificateManager) List(certIDs []string, mode certs.CertificateType) (out []*tls.Certificate) {
+	for _, id := range certIDs {
+		if cert, exists := m.certificates[id]; exists {
+			out = append(out, cert)
+		} else {
+			out = append(out, nil)
+		}
+	}
+	return out
+}
+
+func (m *mockCertificateManager) ListPublicKeys(keyIDs []string) (out []string) {
+	return []string{}
+}
+
+func (m *mockCertificateManager) ListRawPublicKey(keyID string) interface{} {
+	return nil
+}
+
+func (m *mockCertificateManager) ListAllIds(prefix string) []string {
+	var ids []string
+	for id := range m.certificates {
+		ids = append(ids, id)
+	}
+	return ids
+}
+
+func (m *mockCertificateManager) GetRaw(certID string) (string, error) {
+	return "", nil
+}
+
+func (m *mockCertificateManager) Add(certData []byte, orgID string) (string, error) {
+	return "", nil
+}
+
+func (m *mockCertificateManager) Delete(certID string, orgID string) {}
+
+func (m *mockCertificateManager) CertPool(certIDs []string) *x509.CertPool {
+	if len(certIDs) == 0 {
+		return nil
+	}
+
+	// Check if we have CA certificates configured for this mock
+	if len(m.caCertificates) > 0 {
+		pool := x509.NewCertPool()
+		// In a real implementation, we'd add actual certificates
+		// For testing purposes, just return a non-nil pool
+		return pool
+	}
+
+	return nil
+}
+
+func (m *mockCertificateManager) FlushCache() {}
+
+// Helper function to create a mock certificate for testing
+func createMockCertificate() *tls.Certificate {
+	// Create a minimal certificate for testing
+	// In practice, you'd use real certificate data
+	return &tls.Certificate{
+		Certificate: [][]byte{[]byte("mock cert data")},
+	}
+}
+
+func TestExternalHTTPClientFactory_getTLSConfig_CertificateStore(t *testing.T) {
+	tests := []struct {
+		name              string
+		serviceConfig     config.ServiceConfig
+		setupMocks        func(*Gateway)
+		expectError       bool
+		errorContains     string
+		validateTLSConfig func(t *testing.T, tlsConfig *tls.Config)
+	}{
+		{
+			name: "certificate store - successful certificate load",
+			serviceConfig: config.ServiceConfig{
+				MTLS: config.MTLSConfig{
+					Enabled: true,
+					CertID:  "cert123",
+				},
+			},
+			setupMocks: func(gw *Gateway) {
+				mockCertManager := &mockCertificateManager{
+					certificates: map[string]*tls.Certificate{
+						"cert123": createMockCertificate(),
+					},
+				}
+				gw.CertificateManager = mockCertManager
+			},
+			expectError: false,
+			validateTLSConfig: func(t *testing.T, tlsConfig *tls.Config) {
+				assert.Len(t, tlsConfig.Certificates, 1)
+				assert.False(t, tlsConfig.InsecureSkipVerify)
+			},
+		},
+		{
+			name: "certificate store - certificate not found",
+			serviceConfig: config.ServiceConfig{
+				MTLS: config.MTLSConfig{
+					Enabled: true,
+					CertID:  "nonexistent",
+				},
+			},
+			setupMocks: func(gw *Gateway) {
+				mockCertManager := &mockCertificateManager{
+					certificates: map[string]*tls.Certificate{},
+				}
+				gw.CertificateManager = mockCertManager
+			},
+			expectError:   true,
+			errorContains: "certificate not found in store",
+		},
+		{
+			name: "certificate store - no certificate manager",
+			serviceConfig: config.ServiceConfig{
+				MTLS: config.MTLSConfig{
+					Enabled: true,
+					CertID:  "cert123",
+				},
+			},
+			setupMocks: func(gw *Gateway) {
+				gw.CertificateManager = nil
+			},
+			expectError:   true,
+			errorContains: "certificate manager not available",
+		},
+		{
+			name: "certificate store with CA certificates",
+			serviceConfig: config.ServiceConfig{
+				MTLS: config.MTLSConfig{
+					Enabled:   true,
+					CertID:    "cert123",
+					CACertIDs: []string{"ca123", "ca456"},
+				},
+			},
+			setupMocks: func(gw *Gateway) {
+				mockCertManager := &mockCertificateManager{
+					certificates: map[string]*tls.Certificate{
+						"cert123": createMockCertificate(),
+					},
+					caCertificates: []string{"ca123", "ca456"},
+				}
+				gw.CertificateManager = mockCertManager
+			},
+			expectError: false,
+			validateTLSConfig: func(t *testing.T, tlsConfig *tls.Config) {
+				assert.Len(t, tlsConfig.Certificates, 1)
+				assert.NotNil(t, tlsConfig.RootCAs)
+			},
+		},
+		{
+			name: "certificate store - invalid configuration mixed with files",
+			serviceConfig: config.ServiceConfig{
+				MTLS: config.MTLSConfig{
+					Enabled:  true,
+					CertID:   "cert123",
+					CertFile: "/path/to/cert.pem",
+					KeyFile:  "/path/to/key.pem",
+				},
+			},
+			setupMocks:    func(gw *Gateway) {},
+			expectError:   true,
+			errorContains: "cannot specify both file-based and certificate store configuration",
+		},
+		{
+			name: "certificate store - insecure skip verify",
+			serviceConfig: config.ServiceConfig{
+				MTLS: config.MTLSConfig{
+					Enabled:            true,
+					CertID:             "cert123",
+					InsecureSkipVerify: true,
+				},
+			},
+			setupMocks: func(gw *Gateway) {
+				mockCertManager := &mockCertificateManager{
+					certificates: map[string]*tls.Certificate{
+						"cert123": createMockCertificate(),
+					},
+				}
+				gw.CertificateManager = mockCertManager
+			},
+			expectError: false,
+			validateTLSConfig: func(t *testing.T, tlsConfig *tls.Config) {
+				assert.Len(t, tlsConfig.Certificates, 1)
+				assert.True(t, tlsConfig.InsecureSkipVerify)
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Create test gateway
+			gw := &Gateway{}
+			tt.setupMocks(gw)
+
+			factory := &ExternalHTTPClientFactory{gw: gw}
+
+			tlsConfig, err := factory.getTLSConfig(tt.serviceConfig)
+
+			if tt.expectError {
+				assert.Error(t, err)
+				assert.Contains(t, err.Error(), tt.errorContains)
+			} else {
+				assert.NoError(t, err)
+				assert.NotNil(t, tlsConfig)
+				if tt.validateTLSConfig != nil {
+					tt.validateTLSConfig(t, tlsConfig)
+				}
+			}
+		})
+	}
+}
+
+func TestExternalHTTPClientFactory_loadCertificateFromStore(t *testing.T) {
+	tests := []struct {
+		name          string
+		certID        string
+		setupMocks    func(*Gateway)
+		expectError   bool
+		errorContains string
+	}{
+		{
+			name:   "successful certificate load",
+			certID: "cert123",
+			setupMocks: func(gw *Gateway) {
+				mockCertManager := &mockCertificateManager{
+					certificates: map[string]*tls.Certificate{
+						"cert123": createMockCertificate(),
+					},
+				}
+				gw.CertificateManager = mockCertManager
+			},
+			expectError: false,
+		},
+		{
+			name:   "certificate not found",
+			certID: "nonexistent",
+			setupMocks: func(gw *Gateway) {
+				mockCertManager := &mockCertificateManager{
+					certificates: map[string]*tls.Certificate{},
+				}
+				gw.CertificateManager = mockCertManager
+			},
+			expectError:   true,
+			errorContains: "certificate not found in store",
+		},
+		{
+			name:   "certificate manager not available",
+			certID: "cert123",
+			setupMocks: func(gw *Gateway) {
+				gw.CertificateManager = nil
+			},
+			expectError:   true,
+			errorContains: "certificate manager not available",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gw := &Gateway{}
+			tt.setupMocks(gw)
+
+			factory := &ExternalHTTPClientFactory{gw: gw}
+			cert, err := factory.loadCertificateFromStore(tt.certID)
+
+			if tt.expectError {
+				assert.Error(t, err)
+				assert.Contains(t, err.Error(), tt.errorContains)
+				assert.Nil(t, cert)
+			} else {
+				assert.NoError(t, err)
+				assert.NotNil(t, cert)
+			}
+		})
+	}
+}
+
+func TestExternalHTTPClientFactory_loadCACertPoolFromStore(t *testing.T) {
+	tests := []struct {
+		name       string
+		certIDs    []string
+		setupMocks func(*Gateway)
+		expectNil  bool
+	}{
+		{
+			name:    "successful CA cert pool creation",
+			certIDs: []string{"ca123", "ca456"},
+			setupMocks: func(gw *Gateway) {
+				mockCertManager := &mockCertificateManager{
+					caCertificates: []string{"ca123", "ca456"},
+				}
+				gw.CertificateManager = mockCertManager
+			},
+			expectNil: false,
+		},
+		{
+			name:    "empty cert IDs",
+			certIDs: []string{},
+			setupMocks: func(gw *Gateway) {
+				mockCertManager := &mockCertificateManager{}
+				gw.CertificateManager = mockCertManager
+			},
+			expectNil: true,
+		},
+		{
+			name:    "certificate manager not available",
+			certIDs: []string{"ca123"},
+			setupMocks: func(gw *Gateway) {
+				gw.CertificateManager = nil
+			},
+			expectNil: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gw := &Gateway{}
+			tt.setupMocks(gw)
+
+			factory := &ExternalHTTPClientFactory{gw: gw}
+			certPool := factory.loadCACertPoolFromStore(tt.certIDs)
+
+			if tt.expectNil {
+				assert.Nil(t, certPool)
+			} else {
+				assert.NotNil(t, certPool)
+			}
+		})
+	}
+}
+
+func TestExternalHTTPClientFactory_BackwardCompatibility(t *testing.T) {
+	// Ensure that existing file-based configurations continue to work
+	tests := []struct {
+		name          string
+		serviceConfig config.ServiceConfig
+		expectError   bool
+		description   string
+	}{
+		{
+			name: "file-based configuration still works",
+			serviceConfig: config.ServiceConfig{
+				MTLS: config.MTLSConfig{
+					Enabled:  false, // Disabled should not cause issues
+					CertFile: "/path/to/cert.pem",
+					KeyFile:  "/path/to/key.pem",
+				},
+			},
+			expectError: false,
+			description: "Disabled mTLS with file paths should work",
+		},
+		{
+			name: "empty certificate store fields do not interfere",
+			serviceConfig: config.ServiceConfig{
+				MTLS: config.MTLSConfig{
+					Enabled:   false,
+					CertID:    "", // Empty cert ID should not interfere
+					CACertIDs: nil,
+				},
+			},
+			expectError: false,
+			description: "Empty certificate store fields should not cause issues when mTLS is disabled",
+		},
+		{
+			name: "mixed configuration validation works correctly",
+			serviceConfig: config.ServiceConfig{
+				MTLS: config.MTLSConfig{
+					Enabled:  true,
+					CertFile: "/path/to/cert.pem",
+					KeyFile:  "/path/to/key.pem",
+					CertID:   "cert123", // This should trigger validation error
+				},
+			},
+			expectError: true,
+			description: "Mixed configuration should be properly rejected",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			factory := &ExternalHTTPClientFactory{}
+			_, err := factory.getTLSConfig(tt.serviceConfig)
+
+			if tt.expectError {
+				assert.Error(t, err, tt.description)
+			} else {
+				assert.NoError(t, err, tt.description)
+			}
+		})
+	}
+}
+
+func TestExternalHTTPClientFactory_CertificateStoreIntegration(t *testing.T) {
+	// Integration test to verify the complete flow works
+
+	// Create a mock gateway with certificate manager
+	gw := &Gateway{}
+	mockCertManager := &mockCertificateManager{
+		certificates: map[string]*tls.Certificate{
+			"client-cert-123": createMockCertificate(),
+		},
+		caCertificates: []string{"ca-cert-456", "ca-cert-789"},
+	}
+	gw.CertificateManager = mockCertManager
+
+	// Create the factory
+	factory := &ExternalHTTPClientFactory{gw: gw}
+
+	// Test various service configurations
+	testConfigs := []struct {
+		name        string
+		serviceType string
+		mtlsConfig  config.MTLSConfig
+		expectError bool
+	}{
+		{
+			name:        "OAuth with certificate store",
+			serviceType: "oauth",
+			mtlsConfig: config.MTLSConfig{
+				Enabled:   true,
+				CertID:    "client-cert-123",
+				CACertIDs: []string{"ca-cert-456", "ca-cert-789"},
+			},
+			expectError: false,
+		},
+		{
+			name:        "Storage with file-based (backward compatibility)",
+			serviceType: "storage",
+			mtlsConfig: config.MTLSConfig{
+				Enabled: false, // Disabled to avoid file system dependency
+			},
+			expectError: false,
+		},
+		{
+			name:        "Webhook with certificate store - certificate not found",
+			serviceType: "webhook",
+			mtlsConfig: config.MTLSConfig{
+				Enabled: true,
+				CertID:  "nonexistent-cert",
+			},
+			expectError: true,
+		},
+	}
+
+	for _, tc := range testConfigs {
+		t.Run(tc.name, func(t *testing.T) {
+			serviceConfig := config.ServiceConfig{
+				MTLS: tc.mtlsConfig,
+			}
+
+			tlsConfig, err := factory.getTLSConfig(serviceConfig)
+
+			if tc.expectError {
+				assert.Error(t, err)
+				assert.Nil(t, tlsConfig)
+			} else {
+				assert.NoError(t, err)
+				assert.NotNil(t, tlsConfig)
+
+				// Verify TLS configuration properties
+				if tc.mtlsConfig.Enabled && tc.mtlsConfig.CertID != "" {
+					assert.Len(t, tlsConfig.Certificates, 1, "Should have one client certificate")
+				}
+				if len(tc.mtlsConfig.CACertIDs) > 0 {
+					assert.NotNil(t, tlsConfig.RootCAs, "Should have CA certificate pool")
+				}
+				assert.Equal(t, tc.mtlsConfig.InsecureSkipVerify, tlsConfig.InsecureSkipVerify)
 			}
 		})
 	}
