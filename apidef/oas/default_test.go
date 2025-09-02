@@ -257,7 +257,7 @@ func TestOAS_BuildDefaultTykExtension(t *testing.T) {
 					BaseIdentityProvider: apidef.AuthToken,
 					SecuritySchemes: SecuritySchemes{
 						testSSMyAuth: &Token{
-							Enabled: true,
+							Enabled: getBoolPointer(true),
 						},
 						testSSMyAuthWithAnd: &OAuth{
 							Enabled: true,
@@ -1715,7 +1715,7 @@ func TestOAS_importAuthentication(t *testing.T) {
 			// ALL authentication methods should be imported to enable OR logic
 			expectedSecuritySchemes := SecuritySchemes{
 				testSecurityNameToken: &Token{
-					Enabled: enable,
+					Enabled: &enable,
 				},
 				testSecurityNameJWT: &JWT{
 					Enabled: enable,
@@ -1766,7 +1766,7 @@ func TestOAS_importAuthentication(t *testing.T) {
 				Authentication: &Authentication{
 					SecuritySchemes: SecuritySchemes{
 						testSecurityNameToken: &Token{
-							Enabled: false,
+							Enabled: getBoolPointer(false),
 						},
 					},
 				},
@@ -1784,7 +1784,7 @@ func TestOAS_importAuthentication(t *testing.T) {
 
 		expectedSecuritySchemes := SecuritySchemes{
 			testSecurityNameToken: &Token{
-				Enabled: true,
+				Enabled: getBoolPointer(true),
 			},
 		}
 
@@ -1831,7 +1831,7 @@ func TestOAS_importAuthentication(t *testing.T) {
 
 			expectedSecuritySchemes := SecuritySchemes{
 				testSecurityNameToken: &Token{
-					Enabled: enable,
+					Enabled: &enable,
 				},
 				testSecurityNameJWT: &JWT{
 					Enabled: enable,
@@ -1883,7 +1883,7 @@ func TestSecuritySchemes_Import(t *testing.T) {
 			assert.NoError(t, err)
 
 			expectedToken := &Token{
-				Enabled: enable,
+				Enabled: &enable,
 			}
 
 			assert.Equal(t, expectedToken, securitySchemes[testSecurityNameToken])
@@ -1993,7 +1993,7 @@ func TestSecuritySchemes_Import(t *testing.T) {
 		assert.NoError(t, err)
 
 		expectedToken := &Token{
-			Enabled: true,
+			Enabled: getBoolPointer(true),
 		}
 
 		assert.Equal(t, expectedToken, securitySchemes[testSecurityNameToken])
@@ -2059,7 +2059,7 @@ func TestToken_Import(t *testing.T) {
 	token.Import(nativeSecurityScheme, true)
 
 	expectedToken := &Token{
-		Enabled: true,
+		Enabled: getBoolPointer(true),
 		AuthSources: AuthSources{
 			Header: &AuthSource{
 				Enabled: true,
