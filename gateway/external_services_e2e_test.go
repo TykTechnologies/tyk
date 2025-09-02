@@ -1,6 +1,8 @@
 package gateway
 
 import (
+	"crypto/tls"
+	"crypto/x509"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -13,8 +15,70 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/certs"
 	"github.com/TykTechnologies/tyk/config"
 )
+
+// Mock certificate manager for E2E testing
+type mockE2ECertificateManager struct {
+	certificates   map[string]*tls.Certificate
+	caCertificates []string
+}
+
+func (m *mockE2ECertificateManager) List(certIDs []string, _ certs.CertificateType) (out []*tls.Certificate) {
+	for _, id := range certIDs {
+		if cert, exists := m.certificates[id]; exists {
+			out = append(out, cert)
+		} else {
+			out = append(out, nil)
+		}
+	}
+	return out
+}
+
+func (m *mockE2ECertificateManager) ListPublicKeys(_ []string) (out []string) {
+	return []string{}
+}
+
+func (m *mockE2ECertificateManager) ListRawPublicKey(_ string) interface{} {
+	return nil
+}
+
+func (m *mockE2ECertificateManager) ListAllIds(_ string) []string {
+	var ids []string
+	for id := range m.certificates {
+		ids = append(ids, id)
+	}
+	return ids
+}
+
+func (m *mockE2ECertificateManager) GetRaw(_ string) (string, error) {
+	return "", nil
+}
+
+func (m *mockE2ECertificateManager) Add(_ []byte, _ string) (string, error) {
+	return "", nil
+}
+
+func (m *mockE2ECertificateManager) Delete(_ string, _ string) {}
+
+func (m *mockE2ECertificateManager) CertPool(certIDs []string) *x509.CertPool {
+	if len(certIDs) == 0 {
+		return nil
+	}
+
+	// Check if we have CA certificates configured for this mock
+	if len(m.caCertificates) > 0 {
+		pool := x509.NewCertPool()
+		// In a real implementation, we'd add actual certificates
+		// For testing purposes, just return a non-nil pool
+		return pool
+	}
+
+	return nil
+}
+
+func (m *mockE2ECertificateManager) FlushCache() {}
 
 func TestE2E_OAuthFlowWithProxyAndmTLS(t *testing.T) {
 	ts := StartTest(nil)
@@ -86,11 +150,19 @@ func TestE2E_OAuthFlowWithProxyAndmTLS(t *testing.T) {
 			},
 			MTLS: config.MTLSConfig{
 				Enabled:            true,
-				InsecureSkipVerify: true, // For test server
+				CACertIDs:          []string{"test-ca-cert"},
+				InsecureSkipVerify: true,
 			},
 		},
 	}
 	ts.Gw.SetConfig(gwConf)
+
+	// Add mock certificate manager for CA certificate
+	mockCertManager := &mockE2ECertificateManager{
+		certificates:   map[string]*tls.Certificate{},
+		caCertificates: []string{"test-ca-cert"},
+	}
+	ts.Gw.CertificateManager = mockCertManager
 
 	// Create API with External OAuth
 	spec := &APISpec{
@@ -358,23 +430,33 @@ func TestE2E_CompleteAPIFlowWithExternalServices(t *testing.T) {
 		OAuth: config.ServiceConfig{
 			MTLS: config.MTLSConfig{
 				Enabled:            true,
+				CACertIDs:          []string{"test-ca-cert"},
 				InsecureSkipVerify: true,
 			},
 		},
 		Webhooks: config.ServiceConfig{
 			MTLS: config.MTLSConfig{
 				Enabled:            true,
+				CACertIDs:          []string{"test-ca-cert"},
 				InsecureSkipVerify: true,
 			},
 		},
 		Health: config.ServiceConfig{
 			MTLS: config.MTLSConfig{
 				Enabled:            true,
+				CACertIDs:          []string{"test-ca-cert"},
 				InsecureSkipVerify: true,
 			},
 		},
 	}
 	ts.Gw.SetConfig(gwConf)
+
+	// Add mock certificate manager for CA certificates
+	mockCertManager := &mockE2ECertificateManager{
+		certificates:   map[string]*tls.Certificate{},
+		caCertificates: []string{"test-ca-cert"},
+	}
+	ts.Gw.CertificateManager = mockCertManager
 
 	// Create API with all external service integrations
 	spec := &APISpec{

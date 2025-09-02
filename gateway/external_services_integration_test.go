@@ -1,6 +1,8 @@
 package gateway
 
 import (
+	"crypto/tls"
+	"crypto/x509"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -10,8 +12,70 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/TykTechnologies/tyk/certs"
 	"github.com/TykTechnologies/tyk/config"
 )
+
+// Mock certificate manager for integration testing
+type mockIntegrationCertificateManager struct {
+	certificates   map[string]*tls.Certificate
+	caCertificates []string
+}
+
+func (m *mockIntegrationCertificateManager) List(certIDs []string, _ certs.CertificateType) (out []*tls.Certificate) {
+	for _, id := range certIDs {
+		if cert, exists := m.certificates[id]; exists {
+			out = append(out, cert)
+		} else {
+			out = append(out, nil)
+		}
+	}
+	return out
+}
+
+func (m *mockIntegrationCertificateManager) ListPublicKeys(_ []string) (out []string) {
+	return []string{}
+}
+
+func (m *mockIntegrationCertificateManager) ListRawPublicKey(_ string) interface{} {
+	return nil
+}
+
+func (m *mockIntegrationCertificateManager) ListAllIds(_ string) []string {
+	var ids []string
+	for id := range m.certificates {
+		ids = append(ids, id)
+	}
+	return ids
+}
+
+func (m *mockIntegrationCertificateManager) GetRaw(_ string) (string, error) {
+	return "", nil
+}
+
+func (m *mockIntegrationCertificateManager) Add(_ []byte, _ string) (string, error) {
+	return "", nil
+}
+
+func (m *mockIntegrationCertificateManager) Delete(_ string, _ string) {}
+
+func (m *mockIntegrationCertificateManager) CertPool(certIDs []string) *x509.CertPool {
+	if len(certIDs) == 0 {
+		return nil
+	}
+
+	// Check if we have CA certificates configured for this mock
+	if len(m.caCertificates) > 0 {
+		pool := x509.NewCertPool()
+		// In a real implementation, we'd add actual certificates
+		// For testing purposes, just return a non-nil pool
+		return pool
+	}
+
+	return nil
+}
+
+func (m *mockIntegrationCertificateManager) FlushCache() {}
 
 func TestExternalServices_ProxyIntegration(t *testing.T) {
 	ts := StartTest(nil)
@@ -182,23 +246,33 @@ func TestExternalServices_mTLSIntegration(t *testing.T) {
 		OAuth: config.ServiceConfig{
 			MTLS: config.MTLSConfig{
 				Enabled:            true,
-				InsecureSkipVerify: true, // For test servers
+				CACertIDs:          []string{"test-ca-cert"},
+				InsecureSkipVerify: true,
 			},
 		},
 		Webhooks: config.ServiceConfig{
 			MTLS: config.MTLSConfig{
 				Enabled:            true,
-				InsecureSkipVerify: true, // For test servers
+				CACertIDs:          []string{"test-ca-cert"},
+				InsecureSkipVerify: true,
 			},
 		},
 		Health: config.ServiceConfig{
 			MTLS: config.MTLSConfig{
 				Enabled:            true,
-				InsecureSkipVerify: true, // For test servers
+				CACertIDs:          []string{"test-ca-cert"},
+				InsecureSkipVerify: true,
 			},
 		},
 	}
 	ts.Gw.SetConfig(gwConf)
+
+	// Add mock certificate manager for CA certificates
+	mockCertManager := &mockIntegrationCertificateManager{
+		certificates:   map[string]*tls.Certificate{},
+		caCertificates: []string{"test-ca-cert"},
+	}
+	ts.Gw.CertificateManager = mockCertManager
 
 	// Test OAuth client with mTLS
 	factory := NewExternalHTTPClientFactory(ts.Gw)

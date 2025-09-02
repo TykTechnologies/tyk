@@ -1,6 +1,8 @@
 package gateway
 
 import (
+	"crypto/tls"
+	"crypto/x509"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -9,8 +11,70 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/TykTechnologies/tyk/certs"
 	"github.com/TykTechnologies/tyk/config"
 )
+
+// Mock certificate manager for host checker integration testing
+type mockHostCheckerCertificateManager struct {
+	certificates   map[string]*tls.Certificate
+	caCertificates []string
+}
+
+func (m *mockHostCheckerCertificateManager) List(certIDs []string, _ certs.CertificateType) (out []*tls.Certificate) {
+	for _, id := range certIDs {
+		if cert, exists := m.certificates[id]; exists {
+			out = append(out, cert)
+		} else {
+			out = append(out, nil)
+		}
+	}
+	return out
+}
+
+func (m *mockHostCheckerCertificateManager) ListPublicKeys(_ []string) (out []string) {
+	return []string{}
+}
+
+func (m *mockHostCheckerCertificateManager) ListRawPublicKey(_ string) interface{} {
+	return nil
+}
+
+func (m *mockHostCheckerCertificateManager) ListAllIds(_ string) []string {
+	var ids []string
+	for id := range m.certificates {
+		ids = append(ids, id)
+	}
+	return ids
+}
+
+func (m *mockHostCheckerCertificateManager) GetRaw(_ string) (string, error) {
+	return "", nil
+}
+
+func (m *mockHostCheckerCertificateManager) Add(_ []byte, _ string) (string, error) {
+	return "", nil
+}
+
+func (m *mockHostCheckerCertificateManager) Delete(_ string, _ string) {}
+
+func (m *mockHostCheckerCertificateManager) CertPool(certIDs []string) *x509.CertPool {
+	if len(certIDs) == 0 {
+		return nil
+	}
+
+	// Check if we have CA certificates configured for this mock
+	if len(m.caCertificates) > 0 {
+		pool := x509.NewCertPool()
+		// In a real implementation, we'd add actual certificates
+		// For testing purposes, just return a non-nil pool
+		return pool
+	}
+
+	return nil
+}
+
+func (m *mockHostCheckerCertificateManager) FlushCache() {}
 
 func TestHostChecker_ProxyIntegration(t *testing.T) {
 	ts := StartTest(nil)
@@ -119,11 +183,19 @@ func TestHostChecker_mTLSIntegration(t *testing.T) {
 		Health: config.ServiceConfig{
 			MTLS: config.MTLSConfig{
 				Enabled:            true,
-				InsecureSkipVerify: true, // For test server
+				CACertIDs:          []string{"test-ca-cert"},
+				InsecureSkipVerify: true,
 			},
 		},
 	}
 	ts.Gw.SetConfig(gwConf)
+
+	// Add mock certificate manager for CA certificate
+	mockCertManager := &mockHostCheckerCertificateManager{
+		certificates:   map[string]*tls.Certificate{},
+		caCertificates: []string{"test-ca-cert"},
+	}
+	ts.Gw.CertificateManager = mockCertManager
 
 	// Test that HTTP client factory creates client with mTLS configuration
 	factory := NewExternalHTTPClientFactory(ts.Gw)

@@ -100,7 +100,7 @@ func TestExternalHTTPClientFactory_CreateClient(t *testing.T) {
 
 			// Add certificate manager if mTLS is enabled with certificate store
 			if tt.wantMTLS && tt.config.OAuth.MTLS.CertID != "" {
-				mockCertManager := &mockCertificateManager{
+				mockCertManager := &mockExternalHTTPClientCertificateManager{
 					certificates: map[string]*tls.Certificate{
 						"test-cert-123": createMockCertificate(),
 					},
@@ -738,12 +738,12 @@ func TestExternalHTTPClientFactory_getTLSConfig(t *testing.T) {
 }
 
 // Mock certificate manager for testing
-type mockCertificateManager struct {
+type mockExternalHTTPClientCertificateManager struct {
 	certificates   map[string]*tls.Certificate
 	caCertificates []string
 }
 
-func (m *mockCertificateManager) List(certIDs []string, _ certs.CertificateType) (out []*tls.Certificate) {
+func (m *mockExternalHTTPClientCertificateManager) List(certIDs []string, _ certs.CertificateType) (out []*tls.Certificate) {
 	for _, id := range certIDs {
 		if cert, exists := m.certificates[id]; exists {
 			out = append(out, cert)
@@ -754,15 +754,15 @@ func (m *mockCertificateManager) List(certIDs []string, _ certs.CertificateType)
 	return out
 }
 
-func (m *mockCertificateManager) ListPublicKeys(_ []string) (out []string) {
+func (m *mockExternalHTTPClientCertificateManager) ListPublicKeys(_ []string) (out []string) {
 	return []string{}
 }
 
-func (m *mockCertificateManager) ListRawPublicKey(_ string) interface{} {
+func (m *mockExternalHTTPClientCertificateManager) ListRawPublicKey(_ string) interface{} {
 	return nil
 }
 
-func (m *mockCertificateManager) ListAllIds(_ string) []string {
+func (m *mockExternalHTTPClientCertificateManager) ListAllIds(_ string) []string {
 	var ids []string
 	for id := range m.certificates {
 		ids = append(ids, id)
@@ -770,17 +770,17 @@ func (m *mockCertificateManager) ListAllIds(_ string) []string {
 	return ids
 }
 
-func (m *mockCertificateManager) GetRaw(_ string) (string, error) {
+func (m *mockExternalHTTPClientCertificateManager) GetRaw(_ string) (string, error) {
 	return "", nil
 }
 
-func (m *mockCertificateManager) Add(_ []byte, _ string) (string, error) {
+func (m *mockExternalHTTPClientCertificateManager) Add(_ []byte, _ string) (string, error) {
 	return "", nil
 }
 
-func (m *mockCertificateManager) Delete(_ string, _ string) {}
+func (m *mockExternalHTTPClientCertificateManager) Delete(_ string, _ string) {}
 
-func (m *mockCertificateManager) CertPool(certIDs []string) *x509.CertPool {
+func (m *mockExternalHTTPClientCertificateManager) CertPool(certIDs []string) *x509.CertPool {
 	if len(certIDs) == 0 {
 		return nil
 	}
@@ -796,7 +796,7 @@ func (m *mockCertificateManager) CertPool(certIDs []string) *x509.CertPool {
 	return nil
 }
 
-func (m *mockCertificateManager) FlushCache() {}
+func (m *mockExternalHTTPClientCertificateManager) FlushCache() {}
 
 // Helper function to create a mock certificate for testing
 func createMockCertificate() *tls.Certificate {
@@ -825,7 +825,7 @@ func TestExternalHTTPClientFactory_getTLSConfig_CertificateStore(t *testing.T) {
 				},
 			},
 			setupMocks: func(gw *Gateway) {
-				mockCertManager := &mockCertificateManager{
+				mockCertManager := &mockExternalHTTPClientCertificateManager{
 					certificates: map[string]*tls.Certificate{
 						"cert123": createMockCertificate(),
 					},
@@ -847,7 +847,7 @@ func TestExternalHTTPClientFactory_getTLSConfig_CertificateStore(t *testing.T) {
 				},
 			},
 			setupMocks: func(gw *Gateway) {
-				mockCertManager := &mockCertificateManager{
+				mockCertManager := &mockExternalHTTPClientCertificateManager{
 					certificates: map[string]*tls.Certificate{},
 				}
 				gw.CertificateManager = mockCertManager
@@ -879,7 +879,7 @@ func TestExternalHTTPClientFactory_getTLSConfig_CertificateStore(t *testing.T) {
 				},
 			},
 			setupMocks: func(gw *Gateway) {
-				mockCertManager := &mockCertificateManager{
+				mockCertManager := &mockExternalHTTPClientCertificateManager{
 					certificates: map[string]*tls.Certificate{
 						"cert123": createMockCertificate(),
 					},
@@ -917,7 +917,7 @@ func TestExternalHTTPClientFactory_getTLSConfig_CertificateStore(t *testing.T) {
 				},
 			},
 			setupMocks: func(gw *Gateway) {
-				mockCertManager := &mockCertificateManager{
+				mockCertManager := &mockExternalHTTPClientCertificateManager{
 					certificates: map[string]*tls.Certificate{
 						"cert123": createMockCertificate(),
 					},
@@ -968,7 +968,7 @@ func TestExternalHTTPClientFactory_loadCertificateFromStore(t *testing.T) {
 			name:   "successful certificate load",
 			certID: "cert123",
 			setupMocks: func(gw *Gateway) {
-				mockCertManager := &mockCertificateManager{
+				mockCertManager := &mockExternalHTTPClientCertificateManager{
 					certificates: map[string]*tls.Certificate{
 						"cert123": createMockCertificate(),
 					},
@@ -981,7 +981,7 @@ func TestExternalHTTPClientFactory_loadCertificateFromStore(t *testing.T) {
 			name:   "certificate not found",
 			certID: "nonexistent",
 			setupMocks: func(gw *Gateway) {
-				mockCertManager := &mockCertificateManager{
+				mockCertManager := &mockExternalHTTPClientCertificateManager{
 					certificates: map[string]*tls.Certificate{},
 				}
 				gw.CertificateManager = mockCertManager
@@ -1031,7 +1031,7 @@ func TestExternalHTTPClientFactory_loadCACertPoolFromStore(t *testing.T) {
 			name:    "successful CA cert pool creation",
 			certIDs: []string{"ca123", "ca456"},
 			setupMocks: func(gw *Gateway) {
-				mockCertManager := &mockCertificateManager{
+				mockCertManager := &mockExternalHTTPClientCertificateManager{
 					caCertificates: []string{"ca123", "ca456"},
 				}
 				gw.CertificateManager = mockCertManager
@@ -1042,7 +1042,7 @@ func TestExternalHTTPClientFactory_loadCACertPoolFromStore(t *testing.T) {
 			name:    "empty cert IDs",
 			certIDs: []string{},
 			setupMocks: func(gw *Gateway) {
-				mockCertManager := &mockCertificateManager{}
+				mockCertManager := &mockExternalHTTPClientCertificateManager{}
 				gw.CertificateManager = mockCertManager
 			},
 			expectNil: true,
@@ -1140,7 +1140,7 @@ func TestExternalHTTPClientFactory_CertificateStoreIntegration(t *testing.T) {
 
 	// Create a mock gateway with certificate manager
 	gw := &Gateway{}
-	mockCertManager := &mockCertificateManager{
+	mockCertManager := &mockExternalHTTPClientCertificateManager{
 		certificates: map[string]*tls.Certificate{
 			"client-cert-123": createMockCertificate(),
 		},

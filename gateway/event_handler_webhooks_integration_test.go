@@ -1,6 +1,8 @@
 package gateway
 
 import (
+	"crypto/tls"
+	"crypto/x509"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -10,8 +12,70 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/certs"
 	"github.com/TykTechnologies/tyk/config"
 )
+
+// Mock certificate manager for testing
+type mockWebhookCertificateManager struct {
+	certificates   map[string]*tls.Certificate
+	caCertificates []string
+}
+
+func (m *mockWebhookCertificateManager) List(certIDs []string, _ certs.CertificateType) (out []*tls.Certificate) {
+	for _, id := range certIDs {
+		if cert, exists := m.certificates[id]; exists {
+			out = append(out, cert)
+		} else {
+			out = append(out, nil)
+		}
+	}
+	return out
+}
+
+func (m *mockWebhookCertificateManager) ListPublicKeys(_ []string) (out []string) {
+	return []string{}
+}
+
+func (m *mockWebhookCertificateManager) ListRawPublicKey(_ string) interface{} {
+	return nil
+}
+
+func (m *mockWebhookCertificateManager) ListAllIds(_ string) []string {
+	var ids []string
+	for id := range m.certificates {
+		ids = append(ids, id)
+	}
+	return ids
+}
+
+func (m *mockWebhookCertificateManager) GetRaw(_ string) (string, error) {
+	return "", nil
+}
+
+func (m *mockWebhookCertificateManager) Add(_ []byte, _ string) (string, error) {
+	return "", nil
+}
+
+func (m *mockWebhookCertificateManager) Delete(_ string, _ string) {}
+
+func (m *mockWebhookCertificateManager) CertPool(certIDs []string) *x509.CertPool {
+	if len(certIDs) == 0 {
+		return nil
+	}
+
+	// Check if we have CA certificates configured for this mock
+	if len(m.caCertificates) > 0 {
+		pool := x509.NewCertPool()
+		// In a real implementation, we'd add actual certificates
+		// For testing purposes, just return a non-nil pool
+		return pool
+	}
+
+	return nil
+}
+
+func (m *mockWebhookCertificateManager) FlushCache() {}
 
 func TestWebHookHandler_ProxyIntegration(t *testing.T) {
 	ts := StartTest(nil)
@@ -111,11 +175,19 @@ func TestWebHookHandler_mTLSIntegration(t *testing.T) {
 		Webhooks: config.ServiceConfig{
 			MTLS: config.MTLSConfig{
 				Enabled:            true,
-				InsecureSkipVerify: true, // For test server
+				CACertIDs:          []string{"test-ca-cert"}, // Dummy CA cert for validation
+				InsecureSkipVerify: true,                     // For test server
 			},
 		},
 	}
 	ts.Gw.SetConfig(gwConf)
+
+	// Add mock certificate manager for CA certificate
+	mockCertManager := &mockWebhookCertificateManager{
+		certificates:   map[string]*tls.Certificate{},
+		caCertificates: []string{"test-ca-cert"},
+	}
+	ts.Gw.CertificateManager = mockCertManager
 
 	// Create webhook handler
 	handler := &WebHookHandler{
