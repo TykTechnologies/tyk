@@ -743,7 +743,7 @@ type mockCertificateManager struct {
 	caCertificates []string
 }
 
-func (m *mockCertificateManager) List(certIDs []string, mode certs.CertificateType) (out []*tls.Certificate) {
+func (m *mockCertificateManager) List(certIDs []string, _ certs.CertificateType) (out []*tls.Certificate) {
 	for _, id := range certIDs {
 		if cert, exists := m.certificates[id]; exists {
 			out = append(out, cert)
@@ -754,15 +754,15 @@ func (m *mockCertificateManager) List(certIDs []string, mode certs.CertificateTy
 	return out
 }
 
-func (m *mockCertificateManager) ListPublicKeys(keyIDs []string) (out []string) {
+func (m *mockCertificateManager) ListPublicKeys(_ []string) (out []string) {
 	return []string{}
 }
 
-func (m *mockCertificateManager) ListRawPublicKey(keyID string) interface{} {
+func (m *mockCertificateManager) ListRawPublicKey(_ string) interface{} {
 	return nil
 }
 
-func (m *mockCertificateManager) ListAllIds(prefix string) []string {
+func (m *mockCertificateManager) ListAllIds(_ string) []string {
 	var ids []string
 	for id := range m.certificates {
 		ids = append(ids, id)
@@ -770,15 +770,15 @@ func (m *mockCertificateManager) ListAllIds(prefix string) []string {
 	return ids
 }
 
-func (m *mockCertificateManager) GetRaw(certID string) (string, error) {
+func (m *mockCertificateManager) GetRaw(_ string) (string, error) {
 	return "", nil
 }
 
-func (m *mockCertificateManager) Add(certData []byte, orgID string) (string, error) {
+func (m *mockCertificateManager) Add(_ []byte, _ string) (string, error) {
 	return "", nil
 }
 
-func (m *mockCertificateManager) Delete(certID string, orgID string) {}
+func (m *mockCertificateManager) Delete(_ string, _ string) {}
 
 func (m *mockCertificateManager) CertPool(certIDs []string) *x509.CertPool {
 	if len(certIDs) == 0 {
@@ -903,7 +903,7 @@ func TestExternalHTTPClientFactory_getTLSConfig_CertificateStore(t *testing.T) {
 					KeyFile:  "/path/to/key.pem",
 				},
 			},
-			setupMocks:    func(gw *Gateway) {},
+			setupMocks:    func(_ *Gateway) {},
 			expectError:   true,
 			errorContains: "cannot specify both file-based and certificate store configuration",
 		},

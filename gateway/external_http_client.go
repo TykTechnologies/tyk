@@ -327,13 +327,13 @@ func (f *ExternalHTTPClientFactory) loadCertificateFromStore(certID string) (*tl
 
 	log.Debugf("[ExternalServices] Loading certificate from store: %s", certID)
 
-	certs := f.gw.CertificateManager.List([]string{certID}, certs.CertificatePrivate)
-	if len(certs) == 0 || certs[0] == nil {
+	certsList := f.gw.CertificateManager.List([]string{certID}, certs.CertificatePrivate)
+	if len(certsList) == 0 || certsList[0] == nil {
 		return nil, fmt.Errorf("certificate not found in store: %s", certID)
 	}
 
 	log.Debugf("[ExternalServices] Successfully loaded certificate from store: %s", certID)
-	return certs[0], nil
+	return certsList[0], nil
 }
 
 // loadCACertPoolFromStore creates a CA certificate pool from store certificate IDs.
