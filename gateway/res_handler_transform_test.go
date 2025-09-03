@@ -299,7 +299,6 @@ func TestHeaderTransformBase(t *testing.T) {
 func TestResponseTransformMiddleware(t *testing.T) {
 	t.Run("Response transform alone", func(t *testing.T) {
 		ts := StartTest(nil)
-		defer ts.Close()
 
 		testServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 			w.Header().Set("Content-Type", "application/json")
@@ -308,7 +307,8 @@ func TestResponseTransformMiddleware(t *testing.T) {
 			w.WriteHeader(http.StatusOK)
 		}))
 
-		defer testServer.Close()
+		t.Cleanup(testServer.Close)
+		t.Cleanup(ts.Close)
 
 		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 			spec.Proxy.ListenPath = "/test"
@@ -343,32 +343,33 @@ func TestResponseTransformMiddleware(t *testing.T) {
 
 	t.Run("Response transform with URL rewrite", func(t *testing.T) {
 		ts := StartTest(nil)
-		defer ts.Close()
 
 		type transformedResponse struct {
 			Transformed bool   `json:"transformed"`
 			Path        string `json:"path"`
 		}
 
+		testServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+
+			body, err := json.Marshal(struct {
+				Path string `json:"Path"`
+			}{
+				Path: r.URL.Path,
+			})
+			require.NoError(t, err)
+
+			_, err = w.Write(body)
+			require.NoError(t, err)
+
+			w.WriteHeader(http.StatusOK)
+		}))
+
+		t.Cleanup(testServer.Close)
+		t.Cleanup(ts.Close)
+
 		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
-			testServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				w.Header().Set("Content-Type", "application/json")
-
-				body, err := json.Marshal(struct {
-					Path string `json:"Path"`
-				}{
-					Path: r.URL.Path,
-				})
-				require.NoError(t, err)
-
-				_, err = w.Write(body)
-				require.NoError(t, err)
-
-				w.WriteHeader(http.StatusOK)
-			}))
-
-			defer testServer.Close()
-
+			spec.Proxy.TargetURL = testServer.URL
 			spec.Proxy.ListenPath = "/combined/"
 			v := spec.VersionData.Versions["Default"]
 
@@ -398,11 +399,13 @@ func TestResponseTransformMiddleware(t *testing.T) {
 			spec.VersionData.Versions["Default"] = v
 		})
 
-		res, _ := ts.Run(t, test.TestCase{
+		res, err := ts.Run(t, test.TestCase{
 			Path:   "/combined/anything/7777",
 			Method: http.MethodGet,
 			Code:   http.StatusOK,
 		})
+		require.NoError(t, err)
+		require.Equal(t, http.StatusOK, res.StatusCode)
 
 		rawBody, err := io.ReadAll(res.Body)
 		require.NoError(t, err)
