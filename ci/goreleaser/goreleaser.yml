@@ -320,6 +320,229 @@ publishers:
     env:
       - PACKAGECLOUD_TOKEN={{ .Env.PACKAGECLOUD_TOKEN }}
     cmd: packagecloud publish --debvers "{{ .Env.DEBVERS }}" --rpmvers "{{ .Env.RPMVERS }}" tyk/tyk-gateway-unstable {{ .ArtifactPath }}
+dockers:
+  # Build tykio/tyk-gateway-ee, docker.tyk.io/tyk-gateway/tyk-gateway-ee ee (amd64)
+  - ids:
+      - ee-amd64
+    image_templates:
+      - "tykio/tyk-gateway-ee:{{.Tag}}-ee-amd64"
+      - "docker.tyk.io/tyk-gateway/tyk-gateway-ee:{{.Tag}}-ee-amd64"
+    build_flag_templates:
+      - "--build-arg=PORTS=8080"
+      - "--platform=linux/amd64"
+      - "--label=org.opencontainers.image.created={{.Date}}"
+      - "--label=org.opencontainers.image.title={{.ProjectName}} EE"
+      - "--label=org.opencontainers.image.revision={{.FullCommit}}"
+      - "--label=org.opencontainers.image.version={{.Version}}"
+    use: buildx
+    goarch: amd64
+    goos: linux
+    dockerfile: ci/Dockerfile.std
+    extra_files:
+      - "ci/install/"
+      - "README.md"
+      - "LICENSE.md"
+      - "apps/app_sample.json"
+      - "templates"
+      - "middleware"
+      - "event_handlers/sample"
+      - "policies"
+      - "coprocess"
+      - "tyk.conf.example"
+  # Build tykio/tyk-gateway-ee, docker.tyk.io/tyk-gateway/tyk-gateway-ee ee (arm64)
+  - ids:
+      - ee-arm64
+    image_templates:
+      - "tykio/tyk-gateway-ee:{{.Tag}}-ee-arm64"
+      - "docker.tyk.io/tyk-gateway/tyk-gateway-ee:{{.Tag}}-ee-arm64"
+    build_flag_templates:
+      - "--build-arg=PORTS=8080"
+      - "--platform=linux/arm64"
+      - "--label=org.opencontainers.image.created={{.Date}}"
+      - "--label=org.opencontainers.image.title={{.ProjectName}} EE"
+      - "--label=org.opencontainers.image.revision={{.FullCommit}}"
+      - "--label=org.opencontainers.image.version={{.Version}}"
+    use: buildx
+    goarch: arm64
+    goos: linux
+    dockerfile: ci/Dockerfile.std
+    extra_files:
+      - "ci/install/"
+      - "README.md"
+      - "LICENSE.md"
+      - "apps/app_sample.json"
+      - "templates"
+      - "middleware"
+      - "event_handlers/sample"
+      - "policies"
+      - "coprocess"
+      - "tyk.conf.example"
+  # Build tykio/tyk-gateway-fips fips (amd64)
+  - ids:
+      - fips-amd64
+    image_templates:
+      - "tykio/tyk-gateway-fips:{{.Tag}}-fips-amd64"
+    build_flag_templates:
+      - "--build-arg=PORTS=8080"
+      - "--platform=linux/amd64"
+      - "--label=org.opencontainers.image.created={{.Date}}"
+      - "--label=org.opencontainers.image.title={{.ProjectName}} FIPS"
+      - "--label=org.opencontainers.image.revision={{.FullCommit}}"
+      - "--label=org.opencontainers.image.version={{.Version}}"
+    use: buildx
+    goarch: amd64
+    goos: linux
+    dockerfile: ci/Dockerfile.std
+    extra_files:
+      - "ci/install/"
+      - "README.md"
+      - "LICENSE.md"
+      - "apps/app_sample.json"
+      - "templates"
+      - "middleware"
+      - "event_handlers/sample"
+      - "policies"
+      - "coprocess"
+      - "tyk.conf.example"
+  # Build tykio/tyk-gateway, docker.tyk.io/tyk-gateway/tyk-gateway std (amd64)
+  - ids:
+      - std-amd64
+    image_templates:
+      - "tykio/tyk-gateway:{{.Tag}}-amd64"
+      - "docker.tyk.io/tyk-gateway/tyk-gateway:{{.Tag}}-amd64"
+    build_flag_templates:
+      - "--build-arg=PORTS=8080"
+      - "--platform=linux/amd64"
+      - "--label=org.opencontainers.image.created={{.Date}}"
+      - "--label=org.opencontainers.image.title={{.ProjectName}}"
+      - "--label=org.opencontainers.image.revision={{.FullCommit}}"
+      - "--label=org.opencontainers.image.version={{.Version}}"
+    use: buildx
+    goarch: amd64
+    goos: linux
+    dockerfile: ci/Dockerfile.std
+    extra_files:
+      - "ci/install/"
+      - "README.md"
+      - "LICENSE.md"
+      - "apps/app_sample.json"
+      - "templates"
+      - "middleware"
+      - "event_handlers/sample"
+      - "policies"
+      - "coprocess"
+      - "tyk.conf.example"
+  # Build tykio/tyk-gateway, docker.tyk.io/tyk-gateway/tyk-gateway std (arm64)
+  - ids:
+      - std-arm64
+    image_templates:
+      - "tykio/tyk-gateway:{{.Tag}}-arm64"
+      - "docker.tyk.io/tyk-gateway/tyk-gateway:{{.Tag}}-arm64"
+    build_flag_templates:
+      - "--build-arg=PORTS=8080"
+      - "--platform=linux/arm64"
+      - "--label=org.opencontainers.image.created={{.Date}}"
+      - "--label=org.opencontainers.image.title={{.ProjectName}}"
+      - "--label=org.opencontainers.image.revision={{.FullCommit}}"
+      - "--label=org.opencontainers.image.version={{.Version}}"
+    use: buildx
+    goarch: arm64
+    goos: linux
+    dockerfile: ci/Dockerfile.std
+    extra_files:
+      - "ci/install/"
+      - "README.md"
+      - "LICENSE.md"
+      - "apps/app_sample.json"
+      - "templates"
+      - "middleware"
+      - "event_handlers/sample"
+      - "policies"
+      - "coprocess"
+      - "tyk.conf.example"
+  # Build gateway hybrid container (amd64)
+  - ids:
+      - std-amd64
+    image_templates:
+      - "tykio/tyk-hybrid-docker:{{.Tag}}-amd64"
+    build_flag_templates:
+      - "--platform=linux/amd64"
+      - "--label=org.opencontainers.image.created={{.Date}}"
+      - "--label=org.opencontainers.image.title={{.ProjectName}}-hybrid"
+      - "--label=org.opencontainers.image.revision={{.FullCommit}}"
+      - "--label=org.opencontainers.image.version={{.Version}}"
+    use: buildx
+    goarch: amd64
+    goos: linux
+    dockerfile: ci/images/hybrid/Dockerfile
+    extra_files:
+      - "ci/images/hybrid/"
+  # Build gateway hybrid container (arm64)
+  - ids:
+      - std-arm64
+    image_templates:
+      - "tykio/tyk-hybrid-docker:{{.Tag}}-arm64"
+    build_flag_templates:
+      - "--platform=linux/arm64"
+      - "--label=org.opencontainers.image.created={{.Date}}"
+      - "--label=org.opencontainers.image.title={{.ProjectName}}-hybrid"
+      - "--label=org.opencontainers.image.revision={{.FullCommit}}"
+      - "--label=org.opencontainers.image.version={{.Version}}"
+    use: buildx
+    goarch: arm64
+    goos: linux
+    dockerfile: ci/images/hybrid/Dockerfile
+    extra_files:
+      - "ci/images/hybrid/"
+# The plugin compiler image is built outside of goreleaser in a
+# plugin-compiler-build workflow.
+
+docker_manifests:
+  - name_template: tykio/tyk-gateway-ee:{{ .Tag }}-ee
+    image_templates:
+      - tykio/tyk-gateway-ee:{{ .Tag }}-ee-amd64
+      - tykio/tyk-gateway-ee:{{ .Tag }}-ee-arm64
+  - name_template: tykio/tyk-gateway-ee:v{{ .Major }}.{{ .Minor }}{{.Prerelease}}-ee
+    image_templates:
+      - tykio/tyk-gateway-ee:{{ .Tag }}-ee-amd64
+      - tykio/tyk-gateway-ee:{{ .Tag }}-ee-arm64
+  - name_template: tykio/tyk-gateway-ee:v{{ .Major }}{{.Prerelease}}-ee
+    image_templates:
+      - tykio/tyk-gateway-ee:{{ .Tag }}-ee-amd64
+      - tykio/tyk-gateway-ee:{{ .Tag }}-ee-arm64
+  - name_template: docker.tyk.io/tyk-gateway/tyk-gateway-ee:{{ .Tag }}-ee
+    image_templates:
+      - docker.tyk.io/tyk-gateway/tyk-gateway-ee:{{ .Tag }}-ee-amd64
+      - docker.tyk.io/tyk-gateway/tyk-gateway-ee:{{ .Tag }}-ee-arm64
+  - name_template: tykio/tyk-gateway-fips:{{ .Tag }}-fips
+    image_templates:
+      - tykio/tyk-gateway-fips:{{ .Tag }}-fips-amd64
+  - name_template: tykio/tyk-gateway-fips:v{{ .Major }}.{{ .Minor }}{{.Prerelease}}-fips
+    image_templates:
+      - tykio/tyk-gateway-fips:{{ .Tag }}-fips-amd64
+  - name_template: tykio/tyk-gateway-fips:v{{ .Major }}{{.Prerelease}}-fips
+    image_templates:
+      - tykio/tyk-gateway-fips:{{ .Tag }}-fips-amd64
+  - name_template: tykio/tyk-gateway:{{ .Tag }}
+    image_templates:
+      - tykio/tyk-gateway:{{ .Tag }}-amd64
+      - tykio/tyk-gateway:{{ .Tag }}-arm64
+  - name_template: tykio/tyk-gateway:v{{ .Major }}.{{ .Minor }}{{.Prerelease}}
+    image_templates:
+      - tykio/tyk-gateway:{{ .Tag }}-amd64
+      - tykio/tyk-gateway:{{ .Tag }}-arm64
+  - name_template: tykio/tyk-gateway:v{{ .Major }}{{.Prerelease}}
+    image_templates:
+      - tykio/tyk-gateway:{{ .Tag }}-amd64
+      - tykio/tyk-gateway:{{ .Tag }}-arm64
+  - name_template: docker.tyk.io/tyk-gateway/tyk-gateway:{{ .Tag }}
+    image_templates:
+      - docker.tyk.io/tyk-gateway/tyk-gateway:{{ .Tag }}-amd64
+      - docker.tyk.io/tyk-gateway/tyk-gateway:{{ .Tag }}-arm64
+  - name_template: tykio/tyk-hybrid-docker:{{ .Tag }}
+    image_templates:
+      - tykio/tyk-hybrid-docker:{{ .Tag }}-amd64
+      - tykio/tyk-hybrid-docker:{{ .Tag }}-arm64
 # This disables archives
 archives:
   - formats: ['binary']
