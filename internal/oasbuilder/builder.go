@@ -1,6 +1,7 @@
 package oasbuilder
 
 import (
+	"bytes"
 	"encoding/base64"
 	"errors"
 	"fmt"
@@ -255,11 +256,24 @@ func (eb *EndpointBuilder) TransformResponseBody(factory func(*oas.TransformBody
 
 // TransformResponseBodyJson defines json template
 func (eb *EndpointBuilder) TransformResponseBodyJson(tpl string) *EndpointBuilder {
-	return eb.TransformResponseBody(func(body *oas.TransformBody) {
-		body.Format = apidef.RequestJSON
-		body.Enabled = true
-		body.Body = base64.StdEncoding.EncodeToString([]byte(tpl))
-	})
+	return eb.TransformResponseBody(eb.makeBodyTpl(tpl))
+}
+
+func (eb *EndpointBuilder) TransformRequestBody(factory func(*oas.TransformBody)) *EndpointBuilder {
+	op := eb.operation().TransformRequestBody
+
+	if op == nil {
+		op = &oas.TransformBody{Enabled: true}
+		eb.operation().TransformRequestBody = op
+	}
+
+	factory(op)
+
+	return eb
+}
+
+func (eb *EndpointBuilder) TransformRequestBodyJson(tpl string) *EndpointBuilder {
+	return eb.TransformRequestBody(eb.makeBodyTpl(tpl))
 }
 
 func (eb *EndpointBuilder) MockDefault() *EndpointBuilder {
@@ -289,6 +303,20 @@ func (eb *EndpointBuilder) operation() *oas.Operation {
 	}
 
 	return eb.op
+}
+
+func (eb *EndpointBuilder) makeBodyTpl(tpl string) func(body *oas.TransformBody) {
+	return func(body *oas.TransformBody) {
+		if b64, err := base64Encode(tpl); err != nil {
+			eb.errors = append(eb.errors, err)
+			return
+		} else {
+			body.Body = string(b64)
+		}
+
+		body.Format = apidef.RequestJSON
+		body.Enabled = true
+	}
 }
 
 func (eb *EndpointBuilder) build(builder *Builder) {
@@ -333,4 +361,15 @@ func (eb *EndpointBuilder) build(builder *Builder) {
 	})
 
 	builder.oas.Paths.Set(eb.path, currentPath)
+}
+
+func base64Encode(str string) ([]byte, error) {
+	var buf bytes.Buffer
+	encoder := base64.NewEncoder(base64.StdEncoding, &buf)
+
+	if _, err := encoder.Write([]byte(str)); err != nil {
+		return nil, err
+	}
+
+	return buf.Bytes(), nil
 }

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -377,7 +378,8 @@ func TestTraceHttpRequest(t *testing.T) {
 					TransformRequestHeaders(func(headers *oas.TransformHeaders) {
 						headers.Remove = append(headers.Remove, requestRemove)
 						headers.Add.Add(requestAddKey, requestAddValue)
-					})
+					}).
+					TransformRequestBodyJson(`{"data": {{ .input }}}`)
 			}),
 		)
 
@@ -423,14 +425,14 @@ func TestTraceHttpRequest(t *testing.T) {
 		logs, err := traceResp.logs()
 		require.NoError(t, err)
 
-		assert.Equal(t, 1, lo.CountBy(logs, byMsgContains(msgBodyTransformedResponseTransformMiddleware)), "contains message msgBodyTransformedResponseTransformMiddleware")
+		assert.Equal(t, 1, lo.CountBy(logs, and(byMsgContains(msgBodyTransformed), byType(traceLogRequest))), "contains message %q", msgBodyTransformed)
+		assert.Equal(t, 1, lo.CountBy(logs, and(byMsgContains(msgBodyTransformed), byType(traceLogResponse))), "contains message %q", msgBodyTransformed)
+
 		assert.Equal(t, 1, lo.CountBy(logs, byMsgContains(responseRemove)), "contains message %q", responseRemove)
-		assert.Equal(t, 1, lo.CountBy(logs, byMsgContains(responseAddKey)), "contains message %q", responseAddKey)
-		assert.Equal(t, 1, lo.CountBy(logs, byMsgContains(responseAddValue)), "contains message %q", responseAddValue)
+		assert.Equal(t, 1, lo.CountBy(logs, byMsgContains(fmt.Sprintf("%s: %s", responseAddKey, responseAddValue))), "contains message %s: %s", responseAddKey, responseAddValue)
 
 		assert.Equal(t, 1, lo.CountBy(logs, byMsgContains(requestRemove)), "contains message %q", requestRemove)
-		assert.Equal(t, 1, lo.CountBy(logs, byMsgContains(requestAddKey)), "contains message %q", requestAddKey)
-		assert.Equal(t, 1, lo.CountBy(logs, byMsgContains(requestAddValue)), "contains message %q", requestAddValue)
+		assert.Equal(t, 1, lo.CountBy(logs, byMsgContains(fmt.Sprintf("%s: %s", requestAddKey, requestAddValue))), "contains message %s: %s", requestAddKey, requestAddValue)
 
 		assert.Equal(t, 0, lo.CountBy(logs, byMsgContains(dummyUnexistentValue)), "does not contain message %q", dummyUnexistentValue)
 	})
@@ -453,5 +455,17 @@ func byMiddleware(mwName string) cntPredicate[traceLogEntry] {
 func byMsgContains(msg string) cntPredicate[traceLogEntry] {
 	return func(entry traceLogEntry) bool {
 		return strings.Contains(entry.Msg, msg)
+	}
+}
+
+func and[T any](predicates ...cntPredicate[T]) cntPredicate[T] {
+	return func(entry T) bool {
+		for _, pred := range predicates {
+			if !pred(entry) {
+				return false
+			}
+		}
+
+		return true
 	}
 }
