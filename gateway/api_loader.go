@@ -349,7 +349,7 @@ func (gw *Gateway) processSpec(
 			logger.Info("Checking security policy: HMAC")
 		}
 
-		if gw.mwAppendEnabled(&authArray, &JWTMiddleware{baseMid.Copy()}) {
+		if gw.mwAppendEnabled(&authArray, &JWTMiddleware{BaseMiddleware: baseMid.Copy()}) {
 			logger.Info("Checking security policy: JWT")
 		}
 

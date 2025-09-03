@@ -1716,7 +1716,7 @@ func TestGetPolicyIDFromToken(t *testing.T) {
 
 			tc.modifySpec(spec)
 
-			k := JWTMiddleware{&BaseMiddleware{Spec: spec}}
+			k := JWTMiddleware{BaseMiddleware: &BaseMiddleware{Spec: spec}}
 			gotten, gottenBool := k.getPolicyIDFromToken(tc.claims)
 			assert.Equal(t, tc.expected, gotten)
 			assert.Equal(t, tc.expectedBool, gottenBool)
@@ -2326,6 +2326,15 @@ func BenchmarkJWTSessionRSAWithJWK(b *testing.B) {
 func (ts *Test) prepareJWTSessionRSAWithEncodedJWK() (*APISpec, string) {
 
 	const testAPIID = "test-api-id"
+	return ts.prepareJWTSessionRSAWithEncodedJWKCommon(testAPIID)
+}
+
+func (ts *Test) prepareJWTSessionRSAWithEncodedJWKWithAPIID(testAPIID string) (*APISpec, string) {
+	return ts.prepareJWTSessionRSAWithEncodedJWKCommon(testAPIID)
+}
+
+func (ts *Test) prepareJWTSessionRSAWithEncodedJWKCommon(testAPIID string) (*APISpec, string) {
+
 	spec := BuildAPI(func(spec *APISpec) {
 		spec.UseKeylessAccess = false
 		spec.APIID = testAPIID
@@ -2358,6 +2367,64 @@ func (ts *Test) prepareJWTSessionRSAWithEncodedJWK() (*APISpec, string) {
 	return spec, jwtToken
 }
 
+func TestJWKSCache_InvalidateCacheForAPI(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	spec, jwtToken := ts.prepareJWTSessionRSAWithEncodedJWKWithAPIID(uuid.NewHex())
+
+	authHeaders := map[string]string{"authorization": jwtToken}
+
+	spec.JWTSource = testHttpJWK
+	ts.Gw.LoadAPI(spec)
+	ts.Run(t, test.TestCase{
+		Headers: authHeaders, Code: http.StatusOK,
+	})
+
+	// The previous request fills the cache with some entries
+	jwkCache := loadOrCreateJWKCacheByApiID(spec.APIID)
+	assert.True(t, jwkCache.Count() > 0)
+
+	ts.Run(t, test.TestCase{
+		Method:    http.MethodDelete,
+		Path:      "/tyk/cache/jwks/" + spec.APIID,
+		AdminAuth: true,
+		Code:      http.StatusOK,
+	})
+
+	jwkCache = loadOrCreateJWKCacheByApiID(spec.APIID)
+	assert.Equal(t, 0, jwkCache.Count())
+}
+
+func TestJWKSCache_InvalidateJWKSCache(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	spec, jwtToken := ts.prepareJWTSessionRSAWithEncodedJWKWithAPIID(uuid.NewHex())
+
+	authHeaders := map[string]string{"authorization": jwtToken}
+
+	spec.JWTSource = testHttpJWK
+	ts.Gw.LoadAPI(spec)
+	ts.Run(t, test.TestCase{
+		Headers: authHeaders, Code: http.StatusOK,
+	})
+
+	// The previous request populates the cache with some entries
+	jwkCache := loadOrCreateJWKCacheByApiID(spec.APIID)
+	assert.True(t, jwkCache.Count() > 0)
+
+	ts.Run(t, test.TestCase{
+		Method:    http.MethodDelete,
+		Path:      "/tyk/cache/jwks",
+		AdminAuth: true,
+		Code:      http.StatusOK,
+	})
+
+	jwkCache = loadOrCreateJWKCacheByApiID(spec.APIID)
+	assert.Equal(t, 0, jwkCache.Count())
+}
+
 func TestJWTSessionRSAWithEncodedJWK(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
@@ -2366,9 +2433,7 @@ func TestJWTSessionRSAWithEncodedJWK(t *testing.T) {
 
 	authHeaders := map[string]string{"authorization": jwtToken}
 	flush := func() {
-		if JWKCache != nil {
-			JWKCache.Flush()
-		}
+		JWKCaches.Delete(spec.APIID)
 	}
 	t.Run("Direct JWK URL", func(t *testing.T) {
 		spec.JWTSource = testHttpJWK
@@ -3255,7 +3320,7 @@ func TestGetUserIDFromClaim(t *testing.T) {
 
 		var o oas.OAS
 		o.Fill(api)
-		middleware := JWTMiddleware{&BaseMiddleware{Spec: &APISpec{
+		middleware := JWTMiddleware{BaseMiddleware: &BaseMiddleware{Spec: &APISpec{
 			OAS:           o,
 			APIDefinition: &api,
 		}}}
@@ -3322,7 +3387,7 @@ func TestGetUserIDFromClaim(t *testing.T) {
 		var o oas.OAS
 		o.Fill(api)
 		api.IsOAS = true
-		middleware := JWTMiddleware{&BaseMiddleware{Spec: &APISpec{
+		middleware := JWTMiddleware{BaseMiddleware: &BaseMiddleware{Spec: &APISpec{
 			OAS:           o,
 			APIDefinition: &api,
 		}}}
@@ -3446,7 +3511,7 @@ func TestGetUserIDFromClaimOAS(t *testing.T) {
 			o.Fill(api)
 			o.GetJWTConfiguration().SubjectClaims = tc.subjectClaims
 			o.GetJWTConfiguration().IdentityBaseField = tc.identityBaseField
-			middleware := JWTMiddleware{&BaseMiddleware{Spec: &APISpec{
+			middleware := JWTMiddleware{BaseMiddleware: &BaseMiddleware{Spec: &APISpec{
 				OAS:           o,
 				APIDefinition: &api,
 			}}}
@@ -3500,6 +3565,48 @@ func TestJWTMiddleware_getSecretToVerifySignature_JWKNoKID(t *testing.T) {
 		_, err := m.getSecretToVerifySignature(nil, token)
 		assert.Error(t, err)
 	})
+}
+
+func TestJWTMiddleware_PrefetchJWKs(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	gw := &Gateway{}
+	gw.SetConfig(config.Config{
+		JWTSSLInsecureSkipVerify: true,
+	})
+
+	m := JWTMiddleware{
+		BaseMiddleware: &BaseMiddleware{
+			Gw: gw,
+		},
+	}
+
+	api := &apidef.APIDefinition{
+		APIID: uuid.NewHex(),
+		OrgID: "org-id",
+	}
+
+	api.JWTJwksURIs = []apidef.JWK{
+		{
+			URL: testHttpJWK,
+		},
+	}
+
+	m.Spec = &APISpec{
+		APIDefinition: api,
+	}
+	m.Init()
+	var numberOfCachedJWKItems = 0
+	for i := 0; i < 10; i++ {
+		jwkCache := loadOrCreateJWKCacheByApiID(api.APIID)
+		numberOfCachedJWKItems = jwkCache.Count()
+		if numberOfCachedJWKItems == 1 {
+			break
+		}
+		time.Sleep(200 * time.Millisecond)
+	}
+	assert.Equal(t, 1, numberOfCachedJWKItems)
 }
 
 func TestGetSecretFromMultipleJWKURIs(t *testing.T) {
@@ -3596,12 +3703,13 @@ func TestGetSecretFromMultipleJWKURIs(t *testing.T) {
 					}, nil
 				}
 
-				JWKCache.Set(cacheKey, &apidef.APIDefinition{
+				jwkCache := loadOrCreateJWKCacheByApiID(api.APIID)
+				jwkCache.Set(cacheKey, &apidef.APIDefinition{
 					APIID:       testAPIID,
 					JWTJwksURIs: []apidef.JWK{{URL: testJWKURL}},
 				}, cache.DefaultExpiration)
 
-				JWKCache.Set(testAPIID, &jose.JSONWebKeySet{
+				jwkCache.Set(testAPIID, &jose.JSONWebKeySet{
 					Keys: []jose.JSONWebKey{
 						{KeyID: "cached-kid", Key: "cached-key"},
 					},
@@ -3625,8 +3733,10 @@ func TestGetSecretFromMultipleJWKURIs(t *testing.T) {
 						},
 					}, nil
 				}
-				JWKCache.Set(testAPIID, "invalid-format", cache.DefaultExpiration)
-				JWKCache.Set(cacheKey, &apidef.APIDefinition{
+
+				jwkCache := loadOrCreateJWKCacheByApiID(api.APIID)
+				jwkCache.Set(testAPIID, "invalid-format", cache.DefaultExpiration)
+				jwkCache.Set(cacheKey, &apidef.APIDefinition{
 					APIID:       testAPIID,
 					JWTJwksURIs: []apidef.JWK{{URL: testJWKURL}},
 				}, cache.DefaultExpiration)
@@ -3650,14 +3760,15 @@ func TestGetSecretFromMultipleJWKURIs(t *testing.T) {
 					}, nil
 				}
 
-				JWKCache.Set(cacheKey, &apidef.APIDefinition{
+				jwkCache := loadOrCreateJWKCacheByApiID(api.APIID)
+				jwkCache.Set(cacheKey, &apidef.APIDefinition{
 					APIID: testAPIID,
 					JWTJwksURIs: []apidef.JWK{
 						{URL: "http://localhost:8080/old-url"},
 					},
 				}, cache.DefaultExpiration)
 
-				JWKCache.Set(testAPIID, &jose.JSONWebKeySet{
+				jwkCache.Set(testAPIID, &jose.JSONWebKeySet{
 					Keys: []jose.JSONWebKey{
 						{KeyID: "old-kid", Key: "old-key"},
 					},
@@ -3693,14 +3804,15 @@ func TestGetSecretFromMultipleJWKURIs(t *testing.T) {
 					return nil, errors.New("failed to fetch JWK")
 				}
 
-				JWKCache.Set(cacheKey, &apidef.APIDefinition{
+				jwkCache := loadOrCreateJWKCacheByApiID(api.APIID)
+				jwkCache.Set(cacheKey, &apidef.APIDefinition{
 					APIID: testAPIID,
 					JWTJwksURIs: []apidef.JWK{
 						{URL: testJWKURL},
 					},
 				}, cache.DefaultExpiration)
 
-				JWKCache.Set(api.APIID, map[string]string{"jwk": "something-random"}, cache.DefaultExpiration)
+				jwkCache.Set(api.APIID, map[string]string{"jwk": "something-random"}, cache.DefaultExpiration)
 			},
 			jwkURIs:     []apidef.JWK{{URL: testJWKURL}},
 			kid:         "new-kid",
@@ -3717,12 +3829,13 @@ func TestGetSecretFromMultipleJWKURIs(t *testing.T) {
 					return nil, errors.New("failed to fetch JWK")
 				}
 
-				JWKCache.Set(cacheKey, &apidef.APIDefinition{
+				jwkCache := loadOrCreateJWKCacheByApiID(api.APIID)
+				jwkCache.Set(cacheKey, &apidef.APIDefinition{
 					APIID:     testAPIID,
 					JWTSource: encodedTestJWKURL,
 				}, cache.DefaultExpiration)
 
-				JWKCache.Set(api.APIID, map[string]string{"jwk": "something-random"}, cache.DefaultExpiration)
+				jwkCache.Set(api.APIID, map[string]string{"jwk": "something-random"}, cache.DefaultExpiration)
 			},
 			jwkURI:              apidef.JWK{URL: testJWKURL},
 			kid:                 "new-kid",
@@ -3743,8 +3856,9 @@ func TestGetSecretFromMultipleJWKURIs(t *testing.T) {
 						},
 					}, nil
 				}
-				JWKCache.Set(testAPIID, "invalid-format", cache.DefaultExpiration)
-				JWKCache.Set(cacheKey, &apidef.APIDefinition{
+				jwkCache := loadOrCreateJWKCacheByApiID(api.APIID)
+				jwkCache.Set(testAPIID, "invalid-format", cache.DefaultExpiration)
+				jwkCache.Set(cacheKey, &apidef.APIDefinition{
 					APIID:       testAPIID,
 					JWTJwksURIs: []apidef.JWK{{URL: testJWKURL}},
 				}, cache.DefaultExpiration)
@@ -3759,7 +3873,7 @@ func TestGetSecretFromMultipleJWKURIs(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			JWKCache.Flush()
+			m.loadOrCreateJWKCache().Flush()
 
 			if tt.setup != nil {
 				tt.setup(tt.isOas)
