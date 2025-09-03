@@ -888,6 +888,25 @@ func (s *OAS) fillSecurity(api apidef.APIDefinition) {
 	s.fillOAuth(api)
 	s.fillExternalOAuth(api)
 
+	if len(api.SecurityRequirements) > 0 {
+		s.Security = make(openapi3.SecurityRequirements, 0, len(api.SecurityRequirements))
+		for _, requirement := range api.SecurityRequirements {
+			secReq := openapi3.NewSecurityRequirement()
+			for _, schemeName := range requirement {
+				secReq[schemeName] = []string{}
+			}
+			s.Security = append(s.Security, secReq)
+		}
+	} else if len(tykAuthentication.SecuritySchemes) > 0 {
+		secReq := openapi3.NewSecurityRequirement()
+		for name := range tykAuthentication.SecuritySchemes {
+			secReq[name] = []string{}
+		}
+		if len(secReq) > 0 {
+			s.Security = openapi3.SecurityRequirements{secReq}
+		}
+	}
+
 	if len(tykAuthentication.SecuritySchemes) == 0 {
 		tykAuthentication.SecuritySchemes = nil
 	}
@@ -917,6 +936,20 @@ func (s *OAS) extractSecurityTo(api *apidef.APIDefinition) {
 		return
 	}
 
+	// Only extract security requirements if there are multiple requirements (OR logic)
+	// A single requirement is the default behavior and doesn't need explicit SecurityRequirements
+	if len(s.Security) > 1 {
+		api.SecurityRequirements = make([][]string, 0, len(s.Security))
+		for _, requirement := range s.Security {
+			schemes := make([]string, 0, len(requirement))
+			for schemeName := range requirement {
+				schemes = append(schemes, schemeName)
+			}
+			api.SecurityRequirements = append(api.SecurityRequirements, schemes)
+		}
+	}
+
+	// Process first security requirement for backward compatibility
 	for schemeName := range s.getTykSecuritySchemes() {
 		if _, ok := s.Security[0][schemeName]; ok {
 			v := s.Components.SecuritySchemes[schemeName].Value
@@ -951,6 +984,10 @@ func (s *OAS) extractSecurityTo(api *apidef.APIDefinition) {
 }
 
 func (s *OAS) GetJWTConfiguration() *JWT {
+	if len(s.Security) == 0 {
+		return nil
+	}
+
 	for keyName := range s.getTykSecuritySchemes() {
 		if _, ok := s.Security[0][keyName]; ok {
 			v := s.Components.SecuritySchemes[keyName].Value

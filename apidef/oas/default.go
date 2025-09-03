@@ -170,8 +170,6 @@ func (s *OAS) importAuthentication(enable bool) error {
 		return errEmptySecurityObject
 	}
 
-	securityReq := s.Security[0]
-
 	xTykAPIGateway := s.GetTykExtension()
 	authentication := xTykAPIGateway.Server.Authentication
 	if authentication == nil {
@@ -187,11 +185,17 @@ func (s *OAS) importAuthentication(enable bool) error {
 		authentication.SecuritySchemes = tykSecuritySchemes
 	}
 
-	for name := range securityReq {
-		securityScheme := s.Components.SecuritySchemes[name]
-		err := tykSecuritySchemes.Import(name, securityScheme.Value, enable)
-		if err != nil {
-			log.WithError(err).Errorf("Error while importing security scheme: %s", name)
+	processedSchemes := make(map[string]bool)
+	for _, securityReq := range s.Security {
+		for name := range securityReq {
+			if !processedSchemes[name] {
+				securityScheme := s.Components.SecuritySchemes[name]
+				err := tykSecuritySchemes.Import(name, securityScheme.Value, enable)
+				if err != nil {
+					log.WithError(err).Errorf("Error while importing security scheme: %s", name)
+				}
+				processedSchemes[name] = true
+			}
 		}
 	}
 
