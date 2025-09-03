@@ -45,9 +45,13 @@ func (t *TransformMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 		return nil, http.StatusOK
 	}
 	err := transformBody(r, meta.(*TransformSpec), t)
+
 	if err != nil {
 		t.Logger().WithError(err).Error("Body transform failure")
+	} else {
+		t.Logger().Error("Body transformed")
 	}
+
 	return nil, http.StatusOK
 }
 

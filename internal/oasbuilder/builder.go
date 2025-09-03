@@ -1,8 +1,10 @@
 package oasbuilder
 
 import (
+	"encoding/base64"
 	"errors"
 	"fmt"
+	"github.com/TykTechnologies/tyk/apidef"
 	"net/http"
 	"net/url"
 	"strings"
@@ -225,6 +227,19 @@ func (eb *EndpointBuilder) TransformResponseHeaders(factory func(*oas.TransformH
 	return eb
 }
 
+func (eb *EndpointBuilder) TransformRequestHeaders(factory func(*oas.TransformHeaders)) *EndpointBuilder {
+	op := eb.operation().TransformRequestHeaders
+
+	if op == nil {
+		op = &oas.TransformHeaders{Enabled: true}
+		eb.operation().TransformRequestHeaders = op
+	}
+
+	factory(op)
+
+	return eb
+}
+
 func (eb *EndpointBuilder) TransformResponseBody(factory func(*oas.TransformBody)) *EndpointBuilder {
 	op := eb.operation().TransformResponseBody
 
@@ -236,6 +251,15 @@ func (eb *EndpointBuilder) TransformResponseBody(factory func(*oas.TransformBody
 	factory(op)
 
 	return eb
+}
+
+// TransformResponseBodyJson defines json template
+func (eb *EndpointBuilder) TransformResponseBodyJson(tpl string) *EndpointBuilder {
+	return eb.TransformResponseBody(func(body *oas.TransformBody) {
+		body.Format = apidef.RequestJSON
+		body.Enabled = true
+		body.Body = base64.StdEncoding.EncodeToString([]byte(tpl))
+	})
 }
 
 func (eb *EndpointBuilder) MockDefault() *EndpointBuilder {

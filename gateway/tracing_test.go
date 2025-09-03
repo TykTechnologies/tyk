@@ -3,9 +3,7 @@ package gateway
 import (
 	"bytes"
 	"context"
-	"encoding/base64"
 	"encoding/json"
-	"github.com/TykTechnologies/tyk/internal/oasbuilder"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -15,6 +13,7 @@ import (
 
 	"github.com/TykTechnologies/tyk/header"
 	"github.com/TykTechnologies/tyk/internal/middleware"
+	"github.com/TykTechnologies/tyk/internal/oasbuilder"
 	"github.com/google/uuid"
 	"github.com/mccutchen/go-httpbin/v2/httpbin"
 	"github.com/samber/lo"
@@ -291,11 +290,7 @@ func TestTraceHttpRequest(t *testing.T) {
 					TransformResponseHeaders(func(headers *oas.TransformHeaders) {
 						headers.AppendAddOp(hdr.Name, hdr.Value)
 					}).
-					TransformResponseBody(func(tb *oas.TransformBody) {
-						tb.Enabled = true
-						tb.Format = apidef.RequestJSON
-						tb.Body = base64.StdEncoding.EncodeToString([]byte(`{"data": {{ . | toJSON }}}`))
-					})
+					TransformResponseBodyJson(`{"data": {{ . | toJSON }}}`)
 			}),
 		)
 
@@ -353,6 +348,92 @@ func TestTraceHttpRequest(t *testing.T) {
 		require.True(t, lo.CountBy(logs, byMiddleware(new(ResponseTransformMiddleware).Name())) > 0)
 		require.NoError(t, uuid.Validate(uuidDto.Uuid))
 	})
+
+	t.Run("transform body request writes logs", func(t *testing.T) {
+		type typedResponse struct {
+			Id string `json:"id"`
+		}
+
+		const (
+			responseRemove       = "response-remove"
+			responseAddKey       = "response-add-key"
+			responseAddValue     = "response-add-value"
+			requestRemove        = "request-remove"
+			requestAddKey        = "request-add-key"
+			requestAddValue      = "request-add-value"
+			dummyUnexistentValue = "dummy-unexistent-value"
+		)
+
+		oasDef, err := oasbuilder.Build(
+			oasbuilder.WithTestListenPathAndUpstream("/test", testServer.URL),
+			oasbuilder.WithGlobalRateLimit(1, 60*time.Second),
+			oasbuilder.WithGet("/uuid", func(b *oasbuilder.EndpointBuilder) {
+				b.
+					TransformResponseBodyJson(`{"id":"{{.uuid}}"}`).
+					TransformResponseHeaders(func(headers *oas.TransformHeaders) {
+						headers.Remove = append(headers.Remove, responseRemove)
+						headers.Add.Add(responseAddKey, responseAddValue)
+					}).
+					TransformRequestHeaders(func(headers *oas.TransformHeaders) {
+						headers.Remove = append(headers.Remove, requestRemove)
+						headers.Add.Add(requestAddKey, requestAddValue)
+					})
+			}),
+		)
+
+		require.NoError(t, err)
+		require.NotNil(t, oasDef)
+
+		traceReq := traceRequest{
+			Request: &traceHttpRequest{
+				Method: http.MethodGet,
+				Path:   "/uuid",
+			},
+			OAS: oasDef,
+		}
+
+		reqBody, err := json.Marshal(traceReq)
+		require.NoError(t, err)
+		require.NotNil(t, reqBody)
+
+		req := httptest.NewRequest(http.MethodPost, "/debug/trace", bytes.NewReader(reqBody))
+		req.Header.Set("Content-Type", "application/json")
+
+		res := httptest.NewRecorder()
+		ts.Gw.traceHandler(res, req)
+		require.Equal(t, http.StatusOK, res.Code)
+
+		var traceResp traceResponse
+
+		err = json.NewDecoder(res.Body).Decode(&traceResp)
+		assert.NoError(t, err)
+
+		request, response, err := traceResp.parseTrace()
+		require.NoError(t, err)
+		require.NotNil(t, request)
+		require.NotNil(t, response)
+
+		var mockedResponse typedResponse
+		require.Equal(t, http.StatusOK, response.StatusCode)
+		err = json.NewDecoder(response.Body).Decode(&mockedResponse)
+		defer response.Body.Close()
+		require.NoError(t, err)
+		require.NoError(t, uuid.Validate(mockedResponse.Id))
+
+		logs, err := traceResp.logs()
+		require.NoError(t, err)
+
+		assert.Equal(t, 1, lo.CountBy(logs, byMsgContains(msgBodyTransformedResponseTransformMiddleware)), "contains message msgBodyTransformedResponseTransformMiddleware")
+		assert.Equal(t, 1, lo.CountBy(logs, byMsgContains(responseRemove)), "contains message %q", responseRemove)
+		assert.Equal(t, 1, lo.CountBy(logs, byMsgContains(responseAddKey)), "contains message %q", responseAddKey)
+		assert.Equal(t, 1, lo.CountBy(logs, byMsgContains(responseAddValue)), "contains message %q", responseAddValue)
+
+		assert.Equal(t, 1, lo.CountBy(logs, byMsgContains(requestRemove)), "contains message %q", requestRemove)
+		assert.Equal(t, 1, lo.CountBy(logs, byMsgContains(requestAddKey)), "contains message %q", requestAddKey)
+		assert.Equal(t, 1, lo.CountBy(logs, byMsgContains(requestAddValue)), "contains message %q", requestAddValue)
+
+		assert.Equal(t, 0, lo.CountBy(logs, byMsgContains(dummyUnexistentValue)), "does not contain message %q", dummyUnexistentValue)
+	})
 }
 
 type cntPredicate[T any] func(T) bool
@@ -366,5 +447,11 @@ func byType(typ traceLogType) cntPredicate[traceLogEntry] {
 func byMiddleware(mwName string) cntPredicate[traceLogEntry] {
 	return func(entry traceLogEntry) bool {
 		return entry.Mw == mwName
+	}
+}
+
+func byMsgContains(msg string) cntPredicate[traceLogEntry] {
+	return func(entry traceLogEntry) bool {
+		return strings.Contains(entry.Msg, msg)
 	}
 }
