@@ -392,7 +392,18 @@ func (gw *Gateway) processSpec(
 			authArray = append(authArray, gw.createMiddleware(&AuthKey{baseMid.Copy()}))
 		}
 
-		chainArray = append(chainArray, authArray...)
+		if len(spec.SecurityRequirements) > 1 && len(authArray) > 0 {
+			logger.Info("Multiple security requirements detected - using OR authentication logic")
+
+			orWrapper := &AuthORWrapper{
+				BaseMiddleware: *baseMid.Copy(),
+			}
+
+			// Add the OR wrapper to the chain instead of individual auth middlewares
+			chainArray = append(chainArray, gw.createMiddleware(orWrapper))
+		} else {
+			chainArray = append(chainArray, authArray...)
+		}
 
 		// if gw is edge, then prefetch any existent org session expiry
 		if gw.GetConfig().SlaveOptions.UseRPC {
