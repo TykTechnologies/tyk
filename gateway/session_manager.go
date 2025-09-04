@@ -65,7 +65,7 @@ type SessionLimiter struct {
 // configured, then redis will be used. If local storage is configured, then
 // in-memory counters will be used. If no storage is configured, it falls
 // back onto the default gateway storage configuration.
-func NewSessionLimiter(ctx context.Context, conf *config.Config, drlManager *drl.DRL) SessionLimiter {
+func NewSessionLimiter(ctx context.Context, conf *config.Config, drlManager *drl.DRL, externalServicesConfig *config.ExternalServiceConfig) SessionLimiter {
 	sessionLimiter := SessionLimiter{
 		ctx:         ctx,
 		drlManager:  drlManager,
@@ -79,7 +79,7 @@ func NewSessionLimiter(ctx context.Context, conf *config.Config, drlManager *drl
 
 	switch storageConf.Type {
 	case "redis":
-		sessionLimiter.limiterStorage = rate.NewStorage(storageConf)
+		sessionLimiter.limiterStorage = rate.NewStorage(storageConf, externalServicesConfig)
 	}
 
 	sessionLimiter.smoothing = rate.NewSmoothing(sessionLimiter.limiterStorage)

@@ -23,7 +23,7 @@ func TestCreateTLSConfig(t *testing.T) {
 		cfg := &config.StorageOptionsConf{
 			UseSSL: false,
 		}
-		tlsConfig := createTLSConfig(cfg)
+		tlsConfig := createTLSConfig(cfg, nil)
 		assert.NotNil(t, tlsConfig)
 		assert.False(t, tlsConfig.InsecureSkipVerify)
 	})
@@ -33,7 +33,7 @@ func TestCreateTLSConfig(t *testing.T) {
 			UseSSL:                true,
 			SSLInsecureSkipVerify: true,
 		}
-		tlsConfig := createTLSConfig(cfg)
+		tlsConfig := createTLSConfig(cfg, nil)
 		assert.NotNil(t, tlsConfig)
 		assert.True(t, tlsConfig.InsecureSkipVerify)
 	})
@@ -44,7 +44,7 @@ func TestCreateTLSConfig(t *testing.T) {
 			TLSMinVersion: "1.2",
 			TLSMaxVersion: "1.3",
 		}
-		tlsConfig := createTLSConfig(cfg)
+		tlsConfig := createTLSConfig(cfg, nil)
 		assert.NotNil(t, tlsConfig)
 		assert.Equal(t, uint16(tls.VersionTLS12), tlsConfig.MinVersion)
 		assert.Equal(t, uint16(tls.VersionTLS13), tlsConfig.MaxVersion)
@@ -55,7 +55,7 @@ func TestCreateTLSConfig(t *testing.T) {
 			UseSSL:        true,
 			TLSMinVersion: "invalid",
 		}
-		tlsConfig := createTLSConfig(cfg)
+		tlsConfig := createTLSConfig(cfg, nil)
 		assert.NotNil(t, tlsConfig)
 		assert.Equal(t, uint16(0), tlsConfig.MinVersion) // Should be zero for invalid version
 	})
@@ -70,7 +70,7 @@ func TestCreateTLSConfig(t *testing.T) {
 			UseSSL: true,
 			CAFile: caFile,
 		}
-		tlsConfig := createTLSConfig(cfg)
+		tlsConfig := createTLSConfig(cfg, nil)
 		assert.NotNil(t, tlsConfig)
 		assert.NotNil(t, tlsConfig.RootCAs)
 	})
@@ -80,7 +80,7 @@ func TestCreateTLSConfig(t *testing.T) {
 			UseSSL: true,
 			CAFile: "/nonexistent/ca.crt",
 		}
-		tlsConfig := createTLSConfig(cfg)
+		tlsConfig := createTLSConfig(cfg, nil)
 		assert.NotNil(t, tlsConfig)
 		assert.Nil(t, tlsConfig.RootCAs) // Should be nil when CA loading fails
 	})
@@ -97,7 +97,7 @@ func TestCreateTLSConfig(t *testing.T) {
 			CertFile: certFile,
 			KeyFile:  keyFile,
 		}
-		tlsConfig := createTLSConfig(cfg)
+		tlsConfig := createTLSConfig(cfg, nil)
 		assert.NotNil(t, tlsConfig)
 		assert.Len(t, tlsConfig.Certificates, 1)
 	})
@@ -111,7 +111,7 @@ func TestCreateTLSConfig(t *testing.T) {
 			UseSSL:   true,
 			CertFile: certFile,
 		}
-		tlsConfig := createTLSConfig(cfg)
+		tlsConfig := createTLSConfig(cfg, nil)
 		assert.NotNil(t, tlsConfig)
 		assert.Len(t, tlsConfig.Certificates, 0) // Should be empty when key is missing
 	})
@@ -122,7 +122,7 @@ func TestCreateTLSConfig(t *testing.T) {
 			CertFile: "/nonexistent/client.crt",
 			KeyFile:  "/nonexistent/client.key",
 		}
-		tlsConfig := createTLSConfig(cfg)
+		tlsConfig := createTLSConfig(cfg, nil)
 		assert.NotNil(t, tlsConfig)
 		assert.Len(t, tlsConfig.Certificates, 0) // Should be empty when loading fails
 	})
@@ -147,7 +147,7 @@ func TestCreateTLSConfig(t *testing.T) {
 			TLSMaxVersion:         "1.3",
 		}
 
-		tlsConfig := createTLSConfig(cfg)
+		tlsConfig := createTLSConfig(cfg, nil)
 		assert.NotNil(t, tlsConfig)
 		assert.False(t, tlsConfig.InsecureSkipVerify)
 		assert.NotNil(t, tlsConfig.RootCAs)
@@ -173,7 +173,7 @@ func TestCreateTLSConfig(t *testing.T) {
 			TLSMaxVersion:         "1.3",
 		}
 
-		tlsConfig := createTLSConfig(cfg)
+		tlsConfig := createTLSConfig(cfg, nil)
 		assert.NotNil(t, tlsConfig)
 		assert.True(t, tlsConfig.InsecureSkipVerify)
 		assert.Nil(t, tlsConfig.RootCAs)                                // CA loading failed
