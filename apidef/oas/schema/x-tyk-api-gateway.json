@@ -1620,6 +1620,26 @@
           "type": "array",
           "items": {"type": "string"}
         },
+        "jwksURIs": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "object",
+            "properties": {
+              "url": {
+                "type": "string",
+                "format": "uri"
+              },
+              "cache_timeout": {
+                "type": "number",
+                "minimum": 0
+              }
+            },
+            "required": ["url"]
+          }
+        },
         "skipKid": {
           "type": "boolean"
         },
