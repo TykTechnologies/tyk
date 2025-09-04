@@ -79,20 +79,20 @@ func (cfg *MTLSConfig) Validate() error {
 		return nil
 	}
 
-	hasFileConfig := cfg.CertFile != "" || cfg.KeyFile != ""
+	isFileConfig := cfg.CertFile != "" || cfg.KeyFile != ""
 	hasStoreConfig := cfg.CertID != ""
 	hasCAConfig := cfg.CAFile != "" || len(cfg.CACertIDs) > 0
 
-	if hasFileConfig && hasStoreConfig {
+	if isFileConfig && hasStoreConfig {
 		return fmt.Errorf("cannot specify both file-based and certificate store configuration")
 	}
 
 	// Allow CA-only configurations (for server certificate verification)
-	if !hasFileConfig && !hasStoreConfig && !hasCAConfig {
+	if !isFileConfig && !hasStoreConfig && !hasCAConfig {
 		return fmt.Errorf("mTLS enabled but no certificate configuration provided")
 	}
 
-	if hasFileConfig && (cfg.CertFile == "" || cfg.KeyFile == "") {
+	if isFileConfig && (cfg.CertFile == "" || cfg.KeyFile == "") {
 		return fmt.Errorf("both cert_file and key_file must be specified for file-based configuration")
 	}
 
