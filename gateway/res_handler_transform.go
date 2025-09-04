@@ -179,7 +179,7 @@ func (r *ResponseTransformMiddleware) HandleResponse(rw http.ResponseWriter, res
 	if err := tmeta.Template.Execute(&bodyBuffer, bodyData); err != nil {
 		logger.WithError(err).Error("Failed to apply template to request")
 	} else {
-		logger.Infof("%s", msgBodyTransformed)
+		logger.Debugf("%s", msgBodyTransformed)
 	}
 
 	// Re-compress if original upstream response was compressed
