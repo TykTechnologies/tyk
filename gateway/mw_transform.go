@@ -24,7 +24,7 @@ type TransformMiddleware struct {
 }
 
 func (t *TransformMiddleware) Name() string {
-	return "TransformMiddleware"
+	return "RequestTransformMiddleware"
 }
 
 func (t *TransformMiddleware) EnabledForSpec() bool {
