@@ -14,7 +14,6 @@ import (
 	"net/http"
 	"strings"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	"github.com/google/go-cmp/cmp"
@@ -35,8 +34,6 @@ import (
 
 type JWTMiddleware struct {
 	*BaseMiddleware
-
-	UnloadFlag atomic.Bool
 }
 
 var JWKCaches = sync.Map{}
@@ -79,11 +76,10 @@ func (k *JWTMiddleware) Init() {
 		// asynchronous fetches to not block API loading
 		go func() {
 			k.Logger().Debug("Pre-fetching JWKs asynchronously")
+			// Drop the previous cache for the API ID
+			JWKCaches.Delete(k.Spec.APIID)
 			jwkCache := loadOrCreateJWKCacheByApiID(k.Spec.APIID)
 			for _, jwk := range config.JWTJwksURIs {
-				if k.UnloadFlag.Load() {
-					break
-				}
 				jwkSet, err := GetJWK(jwk.URL, k.Gw.GetConfig().JWTSSLInsecureSkipVerify)
 				if err != nil {
 					k.Logger().WithError(err).Infof("Failed to fetch or decode JWKs from %s", jwk.URL)
@@ -101,8 +97,15 @@ func (k *JWTMiddleware) Init() {
 }
 
 func (k *JWTMiddleware) Unload() {
-	k.UnloadFlag.Store(true)
-	JWKCaches.Delete(k.Spec.APIID)
+	// Unload method has been called asynchronously after Init is called
+	// when a user changes the API configuration. Because of that behavior,
+	// we only clean the cache if there is no spec found with the ID.
+	// Init tries to clean the cache for the API ID when it starts
+	spec := k.Gw.getApiSpec(k.Spec.APIID)
+	if spec == nil {
+		// Drop the cache for API ID if it's removed from Tyk
+		JWKCaches.Delete(k.Spec.APIID)
+	}
 }
 
 func (k *JWTMiddleware) EnabledForSpec() bool {

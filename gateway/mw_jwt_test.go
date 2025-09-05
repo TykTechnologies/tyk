@@ -2334,7 +2334,6 @@ func (ts *Test) prepareJWTSessionRSAWithEncodedJWKWithAPIID(testAPIID string) (*
 }
 
 func (ts *Test) prepareJWTSessionRSAWithEncodedJWKCommon(testAPIID string) (*APISpec, string) {
-
 	spec := BuildAPI(func(spec *APISpec) {
 		spec.UseKeylessAccess = false
 		spec.APIID = testAPIID
