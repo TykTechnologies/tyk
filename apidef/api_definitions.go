@@ -779,8 +779,10 @@ type APIDefinition struct {
 }
 
 type JWK struct {
-	// url is the jwk endpoint
+	// URL is the jwk endpoint
 	URL string `json:"url"`
+	// CacheTimeout defines how long the JWKS is kept in the cache before forcing a refresh.
+	CacheTimeout int64 `bson:"cache_timeout" json:"cache_timeout"`
 }
 
 // UpstreamAuth holds the configurations related to upstream API authentication.
