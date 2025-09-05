@@ -1515,10 +1515,8 @@
         }
       },
       "required": [
-        "enabled",
         "location",
-        "key",
-        "versions"
+        "key"
       ],
       "additionalProperties": false
     },
