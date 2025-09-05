@@ -5,11 +5,11 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/apidef/oas"
+	"github.com/TykTechnologies/tyk/internal/oasutil"
 	"github.com/TykTechnologies/tyk/test"
 )
 
@@ -101,7 +101,7 @@ func TestValidateRequest(t *testing.T) {
 
 	const operationID = "postpost"
 
-	oasDoc, err := openapi3.NewLoader().LoadFromData([]byte(testOASForValidateRequest))
+	oasDoc, err := oasutil.LoadFromData([]byte(testOASForValidateRequest))
 	assert.NoError(t, err)
 
 	xTykAPIGateway := &oas.XTykAPIGateway{

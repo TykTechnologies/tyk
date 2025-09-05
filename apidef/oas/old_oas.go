@@ -2,6 +2,7 @@ package oas
 
 import (
 	"github.com/getkin/kin-openapi/openapi3"
+	"github.com/TykTechnologies/tyk/internal/oasutil"
 )
 
 // OldOAS serves for data model migration/conversion purposes (gorm).
@@ -16,7 +17,7 @@ func (o *OldOAS) ConvertToNewerOAS() (*OAS, error) {
 		return nil, err
 	}
 
-	loader := openapi3.NewLoader()
+	loader := oasutil.NewLoader()
 	t, err := loader.LoadFromData(outBytes)
 	if err != nil {
 		return nil, err

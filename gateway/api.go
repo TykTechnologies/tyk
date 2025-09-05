@@ -43,7 +43,7 @@ import (
 	"time"
 
 	"github.com/TykTechnologies/tyk/internal/httpctx"
-	"github.com/getkin/kin-openapi/openapi3"
+	"github.com/TykTechnologies/tyk/internal/oasutil"
 
 	gqlv2 "github.com/TykTechnologies/graphql-go-tools/v2/pkg/graphql"
 
@@ -3409,7 +3409,7 @@ func extractOASObjFromReq(reqBody io.Reader) ([]byte, *oas.OAS, error) {
 		return nil, nil, ErrRequestMalformed
 	}
 
-	loader := openapi3.NewLoader()
+	loader := oasutil.NewLoader()
 	t, err := loader.LoadFromData(reqBodyInBytes)
 	if err != nil {
 		return nil, nil, ErrRequestMalformed
