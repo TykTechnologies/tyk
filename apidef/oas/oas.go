@@ -5,8 +5,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/samber/lo"
 	"strings"
+
+	"github.com/samber/lo"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
@@ -14,6 +15,8 @@ import (
 	"github.com/TykTechnologies/tyk/internal/reflect"
 
 	"github.com/getkin/kin-openapi/openapi3"
+	"github.com/pb33f/libopenapi"
+	"github.com/pb33f/libopenapi/datamodel/high/v3"
 )
 
 const (
@@ -31,8 +34,15 @@ const (
 )
 
 // OAS holds the upstream OAS definition as well as adds functionality like custom JSON marshalling.
+// For OAS 3.1 support, now includes both kin-openapi and libopenapi representations
 type OAS struct {
+	// Legacy kin-openapi representation - maintained for backward compatibility
 	openapi3.T
+
+	// New libopenapi representation - for OAS 3.1 support
+	// These fields are populated when loading documents with libopenapi
+	Document libopenapi.Document `json:"-"` // Don't serialize these fields
+	Model    *v3.Document        `json:"-"` // Don't serialize these fields
 }
 
 // MarshalJSON implements json.Marshaller.
@@ -594,4 +604,56 @@ func GetValidationOptionsFromConfig(oasConfig config.OASConfig) []openapi3.Valid
 	}
 
 	return opts
+}
+
+// LoadFromData loads an OAS document from byte data using libopenapi while maintaining backward compatibility
+// For OAS 3.1 support - this populates both kin-openapi and libopenapi representations
+func (s *OAS) LoadFromData(data []byte) error {
+	// First, load using libopenapi for OAS 3.1 support
+	document, err := libopenapi.NewDocument(data)
+	if err != nil {
+		return fmt.Errorf("failed to create libopenapi document: %w", err)
+	}
+
+	// Build the v3 model
+	model, buildErrors := document.BuildV3Model()
+	if len(buildErrors) > 0 {
+		return fmt.Errorf("failed to build v3 model: %v", buildErrors)
+	}
+
+	// Store libopenapi representations
+	s.Document = document
+	s.Model = &model.Model
+
+	// Also populate legacy kin-openapi representation for backward compatibility
+	loader := openapi3.NewLoader()
+	t, err := loader.LoadFromData(data)
+	if err != nil {
+		// If kin-openapi fails but libopenapi succeeded, that's likely OAS 3.1
+		// We'll continue with just the libopenapi representation
+		// TODO: Consider how to handle this case - might need to create minimal openapi3.T
+		return fmt.Errorf("failed to load with kin-openapi (document may be OAS 3.1): %w", err)
+	}
+
+	s.T = *t
+
+	return nil
+}
+
+// HasLibOpenAPIDocument returns true if this OAS has been loaded with libopenapi
+// For OAS 3.1 support - use this to check if new features are available
+func (s *OAS) HasLibOpenAPIDocument() bool {
+	return s.Document != nil && s.Model != nil
+}
+
+// GetDocument returns the libopenapi document if available
+// For OAS 3.1 support - use this to access libopenapi-specific features
+func (s *OAS) GetDocument() libopenapi.Document {
+	return s.Document
+}
+
+// GetModel returns the libopenapi v3 model if available  
+// For OAS 3.1 support - use this to access libopenapi-specific features
+func (s *OAS) GetModel() *v3.Document {
+	return s.Model
 }

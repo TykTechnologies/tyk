@@ -26,7 +26,7 @@ func getBoolPointer(b bool) *bool {
 func TestValidateOASObject(t *testing.T) {
 	t.Parallel()
 	validOASObject := OAS{
-		openapi3.T{
+		T: openapi3.T{
 			OpenAPI: "3.0.3",
 			Info:    &openapi3.Info{},
 			Paths: func() *openapi3.Paths {

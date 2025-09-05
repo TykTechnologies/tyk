@@ -2,8 +2,6 @@ package oas
 
 import (
 	"fmt"
-
-	"github.com/pb33f/libopenapi"
 )
 
 // OldOAS serves for data model migration/conversion purposes (gorm).
@@ -15,26 +13,18 @@ type OldOAS struct {
 
 // ConvertToNewerOAS converts a deprecated OldOAS object to the newer OAS representation.
 func (o *OldOAS) ConvertToNewerOAS() (*OAS, error) {
-	// TODO: For OAS 3.1 support - implement proper conversion using libopenapi
 	if len(o.Data) == 0 {
 		return nil, fmt.Errorf("no OAS data available for conversion")
 	}
 
-	// Create libopenapi document from raw data
-	document, err := libopenapi.NewDocument(o.Data)
+	// Create new OAS and load data using the new LoadFromData method
+	oas := &OAS{}
+	err := oas.LoadFromData(o.Data)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create libopenapi document: %w", err)
+		return nil, fmt.Errorf("failed to load OAS data: %w", err)
 	}
 
-	// Build the v3 model
-	_, buildErrors := document.BuildV3Model()
-	if len(buildErrors) > 0 {
-		return nil, fmt.Errorf("failed to build v3 model: %v", buildErrors)
-	}
-
-	// TODO: For OAS 3.1 support - implement proper OAS creation from libopenapi document
-	// For now, return an error since the OAS struct needs to be updated first
-	return nil, fmt.Errorf("OAS creation from libopenapi document not yet implemented - requires OAS struct migration")
+	return oas, nil
 }
 
 // MarshalJSON marshals the OldOAS data

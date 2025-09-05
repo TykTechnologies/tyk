@@ -43,7 +43,6 @@ import (
 	"time"
 
 	"github.com/TykTechnologies/tyk/internal/httpctx"
-	"github.com/getkin/kin-openapi/openapi3"
 
 	gqlv2 "github.com/TykTechnologies/graphql-go-tools/v2/pkg/graphql"
 
@@ -3407,13 +3406,11 @@ func extractOASObjFromReq(reqBody io.Reader) ([]byte, *oas.OAS, error) {
 		return nil, nil, ErrRequestMalformed
 	}
 
-	loader := openapi3.NewLoader()
-	t, err := loader.LoadFromData(reqBodyInBytes)
+	// Use the new LoadFromData method that supports both kin-openapi and libopenapi
+	err = oasObj.LoadFromData(reqBodyInBytes)
 	if err != nil {
 		return nil, nil, ErrRequestMalformed
 	}
-
-	oasObj.T = *t
 
 	return reqBodyInBytes, &oasObj, nil
 }

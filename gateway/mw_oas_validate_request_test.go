@@ -5,7 +5,6 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/TykTechnologies/tyk/apidef"
@@ -101,7 +100,9 @@ func TestValidateRequest(t *testing.T) {
 
 	const operationID = "postpost"
 
-	oasDoc, err := openapi3.NewLoader().LoadFromData([]byte(testOASForValidateRequest))
+	// Load using new LoadFromData method that supports both kin-openapi and libopenapi
+	var oasAPI oas.OAS
+	err := oasAPI.LoadFromData([]byte(testOASForValidateRequest))
 	assert.NoError(t, err)
 
 	xTykAPIGateway := &oas.XTykAPIGateway{
@@ -116,7 +117,6 @@ func TestValidateRequest(t *testing.T) {
 		},
 	}
 
-	oasAPI := oas.OAS{T: *oasDoc}
 	oasAPI.SetTykExtension(xTykAPIGateway)
 
 	var def apidef.APIDefinition

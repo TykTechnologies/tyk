@@ -706,7 +706,7 @@ func TestOAS_MarshalJSON(t *testing.T) {
 
 	t.Run("should not base64 encode extension values when it's slice of bytes", func(t *testing.T) {
 		s := OAS{
-			openapi3.T{
+			T: openapi3.T{
 				Info: &openapi3.Info{
 					Title: "OAS Doc",
 				},
@@ -1547,7 +1547,7 @@ func Test_RemoveServer(t *testing.T) {
 			},
 		})
 
-		return &OAS{spec}
+		return &OAS{T: spec}
 	}
 
 	t.Run("removes without fail", func(t *testing.T) {
