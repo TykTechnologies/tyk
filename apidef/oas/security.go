@@ -97,6 +97,13 @@ func (s *OAS) extractTokenTo(api *apidef.APIDefinition, name string) {
 	api.AuthConfigs[apidef.AuthTokenType] = authConfig
 }
 
+type JWK struct {
+	// URL is the jwk endpoint
+	URL string `json:"url"`
+	// CacheTimeout defines how long the JWKS is kept in the cache before forcing a refresh.
+	CacheTimeout int64 `bson:"cacheTimeout" json:"cacheTimeout"`
+}
+
 // JWT holds the configuration for the JWT middleware.
 type JWT struct {
 	// Enabled activates the basic authentication mode.
@@ -113,7 +120,7 @@ type JWT struct {
 	Source string `bson:"source,omitempty" json:"source,omitempty"`
 
 	// JwksURIs contains a list of JSON Web Key Sets (JWKS) endpoints from which Tyk will retrieve JWKS to validate JSON Web Tokens (JWTs).
-	JwksURIs []apidef.JWK `bson:"jwksURIs,omitempty" json:"jwksURIs,omitempty"`
+	JwksURIs []JWK `bson:"jwksURIs,omitempty" json:"jwksURIs,omitempty"`
 
 	// SigningMethod contains the signing method to use for the JWT.
 	//
@@ -308,7 +315,17 @@ func (s *OAS) fillJWT(api apidef.APIDefinition) {
 	jwt.Enabled = api.EnableJWT
 	jwt.AuthSources.Fill(ac)
 	jwt.Source = api.JWTSource
-	jwt.JwksURIs = api.JWTJwksURIs
+
+	var jwksURIs []JWK
+	for _, jwksUri := range api.JWTJwksURIs {
+		convertedJwksUri := JWK{
+			URL:          jwksUri.URL,
+			CacheTimeout: jwksUri.CacheTimeout,
+		}
+		jwksURIs = append(jwksURIs, convertedJwksUri)
+	}
+	jwt.JwksURIs = jwksURIs
+
 	jwt.SigningMethod = api.JWTSigningMethod
 	jwt.IdentityBaseField = api.JWTIdentityBaseField
 	if jwt.IdentityBaseField != "" {
@@ -350,7 +367,17 @@ func (s *OAS) extractJWTTo(api *apidef.APIDefinition, name string) {
 	api.EnableJWT = jwt.Enabled
 	jwt.AuthSources.ExtractTo(&ac)
 	api.JWTSource = jwt.Source
-	api.JWTJwksURIs = jwt.JwksURIs
+
+	var jwksURIs []apidef.JWK
+	for _, jwksUri := range jwt.JwksURIs {
+		convertedJwksUri := apidef.JWK{
+			URL:          jwksUri.URL,
+			CacheTimeout: jwksUri.CacheTimeout,
+		}
+		jwksURIs = append(jwksURIs, convertedJwksUri)
+	}
+	api.JWTJwksURIs = jwksURIs
+
 	api.JWTSigningMethod = jwt.SigningMethod
 	api.JWTIdentityBaseField = jwt.IdentityBaseField
 	api.JWTSkipKid = jwt.SkipKid

@@ -3566,7 +3566,7 @@ func TestJWTMiddleware_getSecretToVerifySignature_JWKNoKID(t *testing.T) {
 	})
 }
 
-func TestJWTMiddleware_PrefetchJWKs(t *testing.T) {
+func TestJWTMiddleware_InitThenUnload(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
 
@@ -3606,6 +3606,17 @@ func TestJWTMiddleware_PrefetchJWKs(t *testing.T) {
 		time.Sleep(200 * time.Millisecond)
 	}
 	assert.Equal(t, 1, numberOfCachedJWKItems)
+
+	// A child test for checking Unload behavior
+	// Unload method flushes the cache for the API Id, if it cannot be found in
+	// gw.apisByID map. In our root test, we do not register the API to the global
+	// map. So we can directly observe the Unload's behavior. Normally, it only flushes
+	// the cache when an API is removed.
+	t.Run("Unload", func(t *testing.T) {
+		m.Unload()
+		jwkCache := loadOrCreateJWKCacheByApiID(api.APIID)
+		assert.Equal(t, 0, jwkCache.Count())
+	})
 }
 
 func TestGetSecretFromMultipleJWKURIs(t *testing.T) {

@@ -1630,7 +1630,7 @@
                 "type": "string",
                 "format": "uri"
               },
-              "cache_timeout": {
+              "cacheTimeout": {
                 "type": "number",
                 "minimum": 0
               }
