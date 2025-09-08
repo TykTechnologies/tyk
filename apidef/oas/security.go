@@ -97,8 +97,9 @@ func (s *OAS) extractTokenTo(api *apidef.APIDefinition, name string) {
 	api.AuthConfigs[apidef.AuthTokenType] = authConfig
 }
 
+// JWK represents a JSON Web Key containing configuration for JWKS endpoint and its cache timeout.
 type JWK struct {
-	// URL is the jwk endpoint
+	// URL is the jwk endpoint.
 	URL string `json:"url"`
 	// CacheTimeout defines how long the JWKS is kept in the cache before forcing a refresh.
 	CacheTimeout int64 `bson:"cacheTimeout" json:"cacheTimeout"`
