@@ -297,7 +297,8 @@ func TestWebHookHandler_ConfigurationHierarchy(t *testing.T) {
 	// Configure global and service-specific proxy
 	gwConf := ts.Gw.GetConfig()
 	gwConf.ExternalServices = config.ExternalServiceConfig{
-		Proxy: config.ProxyConfig{
+		Global: config.GlobalProxyConfig{
+			Enabled:   true,
 			HTTPProxy: "http://global-proxy:8080",
 		},
 		Webhooks: config.ServiceConfig{

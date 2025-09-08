@@ -99,10 +99,14 @@ func (f *ExternalHTTPClientFactory) getServiceConfig(serviceType string) config.
 		serviceConfig = config.ServiceConfig{}
 	}
 
-	// Merge with global proxy configuration if service-specific is not set
-	if serviceConfig.Proxy.HTTPProxy == "" && serviceConfig.Proxy.HTTPSProxy == "" && !serviceConfig.Proxy.UseEnvironment {
-		if f.config.Proxy.HTTPProxy != "" || f.config.Proxy.HTTPSProxy != "" || f.config.Proxy.UseEnvironment {
-			serviceConfig.Proxy = f.config.Proxy
+	// Merge with global proxy configuration if service-specific is not set and global is enabled
+	if serviceConfig.Proxy.HTTPProxy == "" && serviceConfig.Proxy.HTTPSProxy == "" && !serviceConfig.Proxy.Enabled {
+		if f.config.Global.Enabled {
+			// Map global config to service config structure
+			serviceConfig.Proxy.Enabled = f.config.Global.Enabled
+			serviceConfig.Proxy.HTTPProxy = f.config.Global.HTTPProxy
+			serviceConfig.Proxy.HTTPSProxy = f.config.Global.HTTPSProxy
+			serviceConfig.Proxy.BypassProxy = f.config.Global.BypassProxy
 		}
 	}
 
@@ -129,9 +133,12 @@ func (f *ExternalHTTPClientFactory) getProxyFunction(serviceConfig config.Servic
 		return f.createCustomProxyFunc(serviceConfig.Proxy), nil
 	}
 
-	// Check if environment variables should be used
-	if serviceConfig.Proxy.UseEnvironment {
-		return http.ProxyFromEnvironment, nil
+	// Check if proxy is enabled and should use environment variables
+	if serviceConfig.Proxy.Enabled {
+		// If no specific proxy URLs are set but proxy is enabled, use environment variables
+		if serviceConfig.Proxy.HTTPProxy == "" && serviceConfig.Proxy.HTTPSProxy == "" {
+			return http.ProxyFromEnvironment, nil
+		}
 	}
 
 	// No proxy configuration
@@ -157,8 +164,8 @@ func (f *ExternalHTTPClientFactory) createCustomProxyFunc(proxyConfig config.Pro
 			return nil, nil // No proxy
 		}
 
-		// Check NO_PROXY list
-		if f.shouldBypassProxy(req.URL.Host, proxyConfig.NoProxy) {
+		// Check bypass proxy list
+		if f.shouldBypassProxy(req.URL.Host, proxyConfig.BypassProxy) {
 			return nil, nil
 		}
 
@@ -166,15 +173,15 @@ func (f *ExternalHTTPClientFactory) createCustomProxyFunc(proxyConfig config.Pro
 	}
 }
 
-// shouldBypassProxy checks if a host should bypass the proxy based on NO_PROXY configuration.
-func (f *ExternalHTTPClientFactory) shouldBypassProxy(host, noProxy string) bool {
-	if noProxy == "" {
+// shouldBypassProxy checks if a host should bypass the proxy based on bypass proxy configuration.
+func (f *ExternalHTTPClientFactory) shouldBypassProxy(host, bypassProxy string) bool {
+	if bypassProxy == "" {
 		return false
 	}
 
 	// Parse comma-separated list of hosts to bypass
-	for _, noProxyHost := range splitNoProxy(noProxy) {
-		if host == noProxyHost || (noProxyHost == "localhost" && (host == "localhost" || host == "127.0.0.1")) {
+	for _, bypassHost := range splitBypassProxy(bypassProxy) {
+		if host == bypassHost || (bypassHost == "localhost" && (host == "localhost" || host == "127.0.0.1")) {
 			return true
 		}
 	}
@@ -182,14 +189,14 @@ func (f *ExternalHTTPClientFactory) shouldBypassProxy(host, noProxy string) bool
 	return false
 }
 
-// splitNoProxy splits a NO_PROXY string into individual hosts.
-func splitNoProxy(noProxy string) []string {
-	if noProxy == "" {
+// splitBypassProxy splits a bypass proxy string into individual hosts.
+func splitBypassProxy(bypassProxy string) []string {
+	if bypassProxy == "" {
 		return nil
 	}
 
 	var hosts []string
-	for _, host := range strings.Split(noProxy, ",") {
+	for _, host := range strings.Split(bypassProxy, ",") {
 		host = strings.TrimSpace(host)
 		if host != "" {
 			hosts = append(hosts, host)

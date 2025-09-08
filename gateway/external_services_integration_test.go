@@ -360,12 +360,14 @@ func TestExternalServices_ConfigurationHierarchy(t *testing.T) {
 	// Configure global proxy and service-specific overrides
 	gwConf := ts.Gw.GetConfig()
 	gwConf.ExternalServices = config.ExternalServiceConfig{
-		Proxy: config.ProxyConfig{
-			HTTPProxy: "http://global-proxy:8080",
-			NoProxy:   "localhost,127.0.0.1",
+		Global: config.GlobalProxyConfig{
+			Enabled:     true,
+			HTTPProxy:   "http://global-proxy:8080",
+			BypassProxy: "localhost,127.0.0.1",
 		},
 		OAuth: config.ServiceConfig{
 			Proxy: config.ProxyConfig{
+				Enabled:   true,
 				HTTPProxy: "http://oauth-specific-proxy:8080",
 			},
 		},
@@ -384,19 +386,20 @@ func TestExternalServices_ConfigurationHierarchy(t *testing.T) {
 	// Test Webhook inherits global configuration
 	webhookConfig := factory.getServiceConfig(config.ServiceTypeWebhook)
 	assert.Equal(t, "http://global-proxy:8080", webhookConfig.Proxy.HTTPProxy)
-	assert.Equal(t, "localhost,127.0.0.1", webhookConfig.Proxy.NoProxy)
+	assert.Equal(t, "localhost,127.0.0.1", webhookConfig.Proxy.BypassProxy)
 }
 
-func TestExternalServices_NoProxyConfiguration(t *testing.T) {
+func TestExternalServices_BypassProxyConfiguration(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
 
 	// Configure proxy with NO_PROXY list
 	gwConf := ts.Gw.GetConfig()
 	gwConf.ExternalServices = config.ExternalServiceConfig{
-		Proxy: config.ProxyConfig{
-			HTTPProxy: "http://proxy:8080",
-			NoProxy:   "localhost,127.0.0.1,*.internal",
+		Global: config.GlobalProxyConfig{
+			Enabled:     true,
+			HTTPProxy:   "http://proxy:8080",
+			BypassProxy: "localhost,127.0.0.1,*.internal",
 		},
 	}
 	ts.Gw.SetConfig(gwConf)
@@ -407,9 +410,9 @@ func TestExternalServices_NoProxyConfiguration(t *testing.T) {
 	serviceConfig := factory.getServiceConfig(config.ServiceTypeOAuth)
 
 	// Test shouldBypassProxy method
-	assert.True(t, factory.shouldBypassProxy("localhost", serviceConfig.Proxy.NoProxy))
-	assert.True(t, factory.shouldBypassProxy("127.0.0.1", serviceConfig.Proxy.NoProxy))
-	assert.False(t, factory.shouldBypassProxy("example.com", serviceConfig.Proxy.NoProxy))
+	assert.True(t, factory.shouldBypassProxy("localhost", serviceConfig.Proxy.BypassProxy))
+	assert.True(t, factory.shouldBypassProxy("127.0.0.1", serviceConfig.Proxy.BypassProxy))
+	assert.False(t, factory.shouldBypassProxy("example.com", serviceConfig.Proxy.BypassProxy))
 }
 
 func TestExternalServices_EnvironmentProxyConfiguration(t *testing.T) {
@@ -421,7 +424,7 @@ func TestExternalServices_EnvironmentProxyConfiguration(t *testing.T) {
 	gwConf.ExternalServices = config.ExternalServiceConfig{
 		OAuth: config.ServiceConfig{
 			Proxy: config.ProxyConfig{
-				UseEnvironment: true,
+				Enabled: true,
 			},
 		},
 	}

@@ -11,14 +11,15 @@ import (
 func TestExternalServiceConfig_JSON(t *testing.T) {
 	// Test serialization and deserialization of the configuration
 	config := ExternalServiceConfig{
-		Proxy: ProxyConfig{
-			UseEnvironment: true,
-			HTTPProxy:      "http://proxy:8080",
-			HTTPSProxy:     "https://proxy:8080",
-			NoProxy:        "localhost,127.0.0.1",
+		Global: GlobalProxyConfig{
+			Enabled:     true,
+			HTTPProxy:   "http://proxy:8080",
+			HTTPSProxy:  "https://proxy:8080",
+			BypassProxy: "localhost,127.0.0.1",
 		},
 		OAuth: ServiceConfig{
 			Proxy: ProxyConfig{
+				Enabled:   true,
 				HTTPProxy: "http://oauth-proxy:8080",
 			},
 			MTLS: MTLSConfig{
@@ -38,11 +39,12 @@ func TestExternalServiceConfig_JSON(t *testing.T) {
 		},
 		Webhooks: ServiceConfig{
 			Proxy: ProxyConfig{
-				UseEnvironment: true,
+				Enabled: true,
 			},
 		},
 		Health: ServiceConfig{
 			Proxy: ProxyConfig{
+				Enabled:   true,
 				HTTPProxy: "http://health-proxy:8080",
 			},
 		},
@@ -67,10 +69,10 @@ func TestExternalServiceConfig_JSON(t *testing.T) {
 	require.NoError(t, err)
 
 	// Verify all fields are correctly unmarshaled
-	assert.Equal(t, config.Proxy.UseEnvironment, unmarshaled.Proxy.UseEnvironment)
-	assert.Equal(t, config.Proxy.HTTPProxy, unmarshaled.Proxy.HTTPProxy)
-	assert.Equal(t, config.Proxy.HTTPSProxy, unmarshaled.Proxy.HTTPSProxy)
-	assert.Equal(t, config.Proxy.NoProxy, unmarshaled.Proxy.NoProxy)
+	assert.Equal(t, config.Global.Enabled, unmarshaled.Global.Enabled)
+	assert.Equal(t, config.Global.HTTPProxy, unmarshaled.Global.HTTPProxy)
+	assert.Equal(t, config.Global.HTTPSProxy, unmarshaled.Global.HTTPSProxy)
+	assert.Equal(t, config.Global.BypassProxy, unmarshaled.Global.BypassProxy)
 
 	assert.Equal(t, config.OAuth.Proxy.HTTPProxy, unmarshaled.OAuth.Proxy.HTTPProxy)
 	assert.Equal(t, config.OAuth.MTLS.Enabled, unmarshaled.OAuth.MTLS.Enabled)
@@ -80,7 +82,7 @@ func TestExternalServiceConfig_JSON(t *testing.T) {
 
 	assert.Equal(t, config.Storage.MTLS.Enabled, unmarshaled.Storage.MTLS.Enabled)
 	assert.Equal(t, config.Storage.MTLS.InsecureSkipVerify, unmarshaled.Storage.MTLS.InsecureSkipVerify)
-	assert.Equal(t, config.Webhooks.Proxy.UseEnvironment, unmarshaled.Webhooks.Proxy.UseEnvironment)
+	assert.Equal(t, config.Webhooks.Proxy.Enabled, unmarshaled.Webhooks.Proxy.Enabled)
 	assert.Equal(t, config.Health.Proxy.HTTPProxy, unmarshaled.Health.Proxy.HTTPProxy)
 	assert.Equal(t, config.Discovery.MTLS.Enabled, unmarshaled.Discovery.MTLS.Enabled)
 	assert.Equal(t, config.Discovery.MTLS.CertFile, unmarshaled.Discovery.MTLS.CertFile)
@@ -98,10 +100,10 @@ func TestProxyConfig_Empty(t *testing.T) {
 	err = json.Unmarshal(jsonData, &unmarshaled)
 	require.NoError(t, err)
 
-	assert.False(t, unmarshaled.UseEnvironment)
+	assert.False(t, unmarshaled.Enabled)
 	assert.Empty(t, unmarshaled.HTTPProxy)
 	assert.Empty(t, unmarshaled.HTTPSProxy)
-	assert.Empty(t, unmarshaled.NoProxy)
+	assert.Empty(t, unmarshaled.BypassProxy)
 }
 
 func TestServiceConfig_Empty(t *testing.T) {
@@ -115,7 +117,7 @@ func TestServiceConfig_Empty(t *testing.T) {
 	err = json.Unmarshal(jsonData, &unmarshaled)
 	require.NoError(t, err)
 
-	assert.False(t, unmarshaled.Proxy.UseEnvironment)
+	assert.False(t, unmarshaled.Proxy.Enabled)
 	assert.Empty(t, unmarshaled.Proxy.HTTPProxy)
 	assert.False(t, unmarshaled.MTLS.Enabled)
 	assert.Empty(t, unmarshaled.MTLS.CertFile)
@@ -208,7 +210,8 @@ func TestExternalServiceConfig_PartialConfiguration(t *testing.T) {
 		{
 			name: "only global proxy",
 			config: ExternalServiceConfig{
-				Proxy: ProxyConfig{
+				Global: GlobalProxyConfig{
+					Enabled:   true,
 					HTTPProxy: "http://proxy:8080",
 				},
 			},
@@ -228,8 +231,8 @@ func TestExternalServiceConfig_PartialConfiguration(t *testing.T) {
 		{
 			name: "mixed configuration",
 			config: ExternalServiceConfig{
-				Proxy: ProxyConfig{
-					UseEnvironment: true,
+				Global: GlobalProxyConfig{
+					Enabled: true,
 				},
 				Webhooks: ServiceConfig{
 					MTLS: MTLSConfig{
@@ -252,11 +255,11 @@ func TestExternalServiceConfig_PartialConfiguration(t *testing.T) {
 			require.NoError(t, err)
 
 			// Verify specific fields that were set
-			if tt.config.Proxy.HTTPProxy != "" {
-				assert.Equal(t, tt.config.Proxy.HTTPProxy, unmarshaled.Proxy.HTTPProxy)
+			if tt.config.Global.HTTPProxy != "" {
+				assert.Equal(t, tt.config.Global.HTTPProxy, unmarshaled.Global.HTTPProxy)
 			}
-			if tt.config.Proxy.UseEnvironment {
-				assert.Equal(t, tt.config.Proxy.UseEnvironment, unmarshaled.Proxy.UseEnvironment)
+			if tt.config.Global.Enabled {
+				assert.Equal(t, tt.config.Global.Enabled, unmarshaled.Global.Enabled)
 			}
 			if tt.config.OAuth.MTLS.Enabled {
 				assert.Equal(t, tt.config.OAuth.MTLS.Enabled, unmarshaled.OAuth.MTLS.Enabled)
@@ -271,8 +274,8 @@ func TestExternalServiceConfig_PartialConfiguration(t *testing.T) {
 func TestExternalServiceConfig_JSONTags(t *testing.T) {
 	// Test that JSON tags are working correctly by creating a minimal JSON and unmarshaling
 	jsonStr := `{
-		"proxy": {
-			"use_environment": true,
+		"global": {
+			"enabled": true,
 			"http_proxy": "http://proxy:8080"
 		},
 		"oauth": {
@@ -287,8 +290,8 @@ func TestExternalServiceConfig_JSONTags(t *testing.T) {
 	err := json.Unmarshal([]byte(jsonStr), &config)
 	require.NoError(t, err)
 
-	assert.True(t, config.Proxy.UseEnvironment)
-	assert.Equal(t, "http://proxy:8080", config.Proxy.HTTPProxy)
+	assert.True(t, config.Global.Enabled)
+	assert.Equal(t, "http://proxy:8080", config.Global.HTTPProxy)
 	assert.True(t, config.OAuth.MTLS.Enabled)
 	assert.Equal(t, "/cert.pem", config.OAuth.MTLS.CertFile)
 }
@@ -351,10 +354,10 @@ func TestExternalServiceConfig_ZeroValues(t *testing.T) {
 	require.NoError(t, err)
 
 	// All fields should be zero values
-	assert.False(t, unmarshaled.Proxy.UseEnvironment)
-	assert.Empty(t, unmarshaled.Proxy.HTTPProxy)
-	assert.Empty(t, unmarshaled.Proxy.HTTPSProxy)
-	assert.Empty(t, unmarshaled.Proxy.NoProxy)
+	assert.False(t, unmarshaled.Global.Enabled)
+	assert.Empty(t, unmarshaled.Global.HTTPProxy)
+	assert.Empty(t, unmarshaled.Global.HTTPSProxy)
+	assert.Empty(t, unmarshaled.Global.BypassProxy)
 
 	assert.False(t, unmarshaled.OAuth.MTLS.Enabled)
 	assert.Empty(t, unmarshaled.OAuth.MTLS.CertFile)

@@ -424,8 +424,8 @@ func TestE2E_CompleteAPIFlowWithExternalServices(t *testing.T) {
 	// Configure comprehensive external services
 	gwConf := ts.Gw.GetConfig()
 	gwConf.ExternalServices = config.ExternalServiceConfig{
-		Proxy: config.ProxyConfig{
-			UseEnvironment: false, // Use specific configuration
+		Global: config.GlobalProxyConfig{
+			Enabled: false, // Use specific configuration
 		},
 		OAuth: config.ServiceConfig{
 			MTLS: config.MTLSConfig{

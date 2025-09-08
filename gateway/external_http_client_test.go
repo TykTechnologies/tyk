@@ -35,7 +35,8 @@ func TestExternalHTTPClientFactory_CreateClient(t *testing.T) {
 		{
 			name: "global proxy configuration",
 			config: config.ExternalServiceConfig{
-				Proxy: config.ProxyConfig{
+				Global: config.GlobalProxyConfig{
+					Enabled:   true,
 					HTTPProxy: "http://proxy:8080",
 				},
 			},
@@ -46,11 +47,13 @@ func TestExternalHTTPClientFactory_CreateClient(t *testing.T) {
 		{
 			name: "service-specific proxy overrides global",
 			config: config.ExternalServiceConfig{
-				Proxy: config.ProxyConfig{
+				Global: config.GlobalProxyConfig{
+					Enabled:   true,
 					HTTPProxy: "http://global-proxy:8080",
 				},
 				OAuth: config.ServiceConfig{
 					Proxy: config.ProxyConfig{
+						Enabled:   true,
 						HTTPProxy: "http://oauth-proxy:8080",
 					},
 				},
@@ -62,8 +65,8 @@ func TestExternalHTTPClientFactory_CreateClient(t *testing.T) {
 		{
 			name: "environment proxy configuration",
 			config: config.ExternalServiceConfig{
-				Proxy: config.ProxyConfig{
-					UseEnvironment: true,
+				Global: config.GlobalProxyConfig{
+					Enabled: true,
 				},
 			},
 			serviceType: config.ServiceTypeOAuth,
@@ -141,11 +144,13 @@ func TestExternalHTTPClientFactory_CreateClient(t *testing.T) {
 func TestExternalHTTPClientFactory_getServiceConfig(t *testing.T) {
 	factory := &ExternalHTTPClientFactory{
 		config: &config.ExternalServiceConfig{
-			Proxy: config.ProxyConfig{
+			Global: config.GlobalProxyConfig{
+				Enabled:   true,
 				HTTPProxy: "http://global-proxy:8080",
 			},
 			OAuth: config.ServiceConfig{
 				Proxy: config.ProxyConfig{
+					Enabled:   true,
 					HTTPProxy: "http://oauth-proxy:8080",
 				},
 			},
@@ -208,6 +213,7 @@ func TestExternalHTTPClientFactory_getProxyFunction(t *testing.T) {
 			name: "HTTP proxy configured",
 			serviceConfig: config.ServiceConfig{
 				Proxy: config.ProxyConfig{
+					Enabled:   true,
 					HTTPProxy: "http://proxy:8080",
 				},
 			},
@@ -218,7 +224,7 @@ func TestExternalHTTPClientFactory_getProxyFunction(t *testing.T) {
 			name: "environment proxy",
 			serviceConfig: config.ServiceConfig{
 				Proxy: config.ProxyConfig{
-					UseEnvironment: true,
+					Enabled: true,
 				},
 			},
 			wantProxy: true,
@@ -255,7 +261,7 @@ func TestExternalHTTPClientFactory_getProxyFunction(t *testing.T) {
 	}
 }
 
-func TestSplitNoProxy(t *testing.T) {
+func TestSplitBypassProxy(t *testing.T) {
 	tests := []struct {
 		name    string
 		noProxy string
@@ -290,7 +296,7 @@ func TestSplitNoProxy(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := splitNoProxy(tt.noProxy)
+			got := splitBypassProxy(tt.noProxy)
 			assert.Equal(t, tt.want, got)
 		})
 	}
@@ -360,7 +366,8 @@ func TestExternalHTTPClientFactory_shouldBypassProxy(t *testing.T) {
 func TestExternalHTTPClientFactory_CreateJWKClient(t *testing.T) {
 	gwConfig := config.Config{
 		ExternalServices: config.ExternalServiceConfig{
-			Proxy: config.ProxyConfig{
+			Global: config.GlobalProxyConfig{
+				Enabled:   true,
 				HTTPProxy: "http://proxy:8080",
 			},
 		},
@@ -395,7 +402,8 @@ func TestExternalHTTPClientFactory_CreateJWKClient(t *testing.T) {
 func TestExternalHTTPClientFactory_SpecializedClients(t *testing.T) {
 	gwConfig := config.Config{
 		ExternalServices: config.ExternalServiceConfig{
-			Proxy: config.ProxyConfig{
+			Global: config.GlobalProxyConfig{
+				Enabled:   true,
 				HTTPProxy: "http://proxy:8080",
 			},
 		},
@@ -498,9 +506,9 @@ func TestExternalHTTPClientFactory_createCustomProxyFunc(t *testing.T) {
 	factory := &ExternalHTTPClientFactory{}
 
 	proxyConfig := config.ProxyConfig{
-		HTTPProxy:  "http://http-proxy:8080",
-		HTTPSProxy: "https://https-proxy:8080",
-		NoProxy:    "localhost,127.0.0.1",
+		HTTPProxy:   "http://http-proxy:8080",
+		HTTPSProxy:  "https://https-proxy:8080",
+		BypassProxy: "localhost,127.0.0.1",
 	}
 
 	proxyFunc := factory.createCustomProxyFunc(proxyConfig)
