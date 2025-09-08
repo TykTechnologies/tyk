@@ -183,7 +183,7 @@
           "type": ["object", "null"],
           "additionalProperties": false,
           "properties": {
-            "use_environment": {
+            "enabled": {
               "type": "boolean"
             },
             "http_proxy": {
@@ -192,7 +192,7 @@
             "https_proxy": {
               "type": "string"
             },
-            "no_proxy": {
+            "bypass_proxy": {
               "type": "string"
             }
           }
@@ -1155,11 +1155,11 @@
       "type": ["object", "null"],
       "additionalProperties": false,
       "properties": {
-        "proxy": {
+        "global": {
           "type": ["object", "null"],
           "additionalProperties": false,
           "properties": {
-            "use_environment": {
+            "enabled": {
               "type": "boolean"
             },
             "http_proxy": {
@@ -1168,7 +1168,7 @@
             "https_proxy": {
               "type": "string"
             },
-            "no_proxy": {
+            "bypass_proxy": {
               "type": "string"
             }
           }
