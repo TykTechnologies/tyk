@@ -470,6 +470,25 @@ func (s *OAS) Validate(ctx context.Context, opts ...openapi3.ValidationOption) e
 	return errors.Join(validationErr, securityErr)
 }
 
+// Normalize converts the OAS api to a normalized state.
+// it does this by fixing backwards compatibility issues
+// and copying fields values necessary to work
+// any logic to ensure the Tyk oas API is backwards compatible with previous versions of the gateway
+// should be placed in here.
+func (s *OAS) Normalize() {
+	// copy the values of the new JWT validation
+	jwtConfiguration := s.GetJWTConfiguration()
+	if len(jwtConfiguration.BasePolicyClaims) > 0 {
+		jwtConfiguration.PolicyFieldName = jwtConfiguration.BasePolicyClaims[0]
+	}
+	if len(jwtConfiguration.SubjectClaims) > 0 {
+		jwtConfiguration.IdentityBaseField = jwtConfiguration.SubjectClaims[0]
+	}
+	if len(jwtConfiguration.Scopes.Claims) > 0 {
+		jwtConfiguration.Scopes.ClaimName = jwtConfiguration.Scopes.Claims[0]
+	}
+}
+
 // validateSecurity verifies that existing Security Requirement Objects has Security Schemes declared in the Security
 // Schemes under the Components Object. This function closes gap in validation provided by OAS.Validate func.
 func (s *OAS) validateSecurity() error {
