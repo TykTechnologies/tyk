@@ -1634,15 +1634,6 @@ paths:
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
           description: Forbidden
-        "404":
-          content:
-            application/json:
-              example:
-                message: no cache found for the given api id
-                status: error
-              schema:
-                $ref: '#/components/schemas/ApiStatusMessage'
-          description: No cache found for the given API ID.
       summary: Invalidate cache for given API ID.
       tags:
         - JWK cache invalidation

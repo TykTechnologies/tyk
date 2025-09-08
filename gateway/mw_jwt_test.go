@@ -2395,23 +2395,6 @@ func TestJWKSCache_InvalidateCacheForAPI(t *testing.T) {
 	assert.Equal(t, 0, jwkCache.Count())
 }
 
-func TestJWKSCache_InvalidateCacheForAPIWithInvalidAPIId(t *testing.T) {
-	ts := StartTest(nil)
-	defer ts.Close()
-
-	spec, _ := ts.prepareJWTSessionRSAWithEncodedJWKWithAPIID(uuid.NewHex())
-
-	ts.Gw.LoadAPI(spec)
-
-	ts.Run(t, test.TestCase{
-		Method:    http.MethodDelete,
-		Path:      "/tyk/cache/jwks/invalid-api-id",
-		AdminAuth: true,
-		Code:      http.StatusNotFound,
-		BodyMatch: "no cache found for the given api id",
-	})
-}
-
 func TestJWKSCache_InvalidateJWKSCache(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()

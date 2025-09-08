@@ -1530,10 +1530,10 @@ func (gw *Gateway) invalidateJWKSCacheForAPIID(w http.ResponseWriter, r *http.Re
 			panic("JWKCache must implement cache.Repository")
 		}
 		jwkCache.Flush()
-		doJSONWrite(w, http.StatusOK, apiOk("cache invalidated"))
-	} else {
-		doJSONWrite(w, http.StatusNotFound, apiError("no cache found for the given api id"))
 	}
+	// Cache invalidation is idempotent: calling it ensures the key is absent,
+	// regardless of whether it was cached before or not.
+	doJSONWrite(w, http.StatusOK, apiOk("cache invalidated"))
 }
 
 func (gw *Gateway) invalidateJWKSCacheForAllAPIs(w http.ResponseWriter, _ *http.Request) {
