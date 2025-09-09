@@ -436,7 +436,7 @@ func (k *JWTMiddleware) getSecretFromMultipleJWKURIs(jwkURIs []apidef.JWK, kidVa
 		jwkSets = nil
 		jwkCache := k.loadOrCreateJWKCache()
 		jwkCache.Flush()
-    
+
 		// Create client factory for JWK fetching
 		clientFactory := NewExternalHTTPClientFactory(k.Gw)
 		client, clientErr := clientFactory.CreateJWKClient(k.Gw.GetConfig().JWTSSLInsecureSkipVerify)
