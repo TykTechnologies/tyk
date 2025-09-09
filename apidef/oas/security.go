@@ -345,12 +345,12 @@ func (s *OAS) fillJWT(api apidef.APIDefinition) {
 
 	jwt.SigningMethod = api.JWTSigningMethod
 	jwt.IdentityBaseField = api.JWTIdentityBaseField
-	if jwt.IdentityBaseField != "" {
+	if jwt.IdentityBaseField != "" && len(jwt.SubjectClaims) == 0 {
 		jwt.SubjectClaims = []string{jwt.IdentityBaseField}
 	}
 	jwt.SkipKid = api.JWTSkipKid
 	jwt.PolicyFieldName = api.JWTPolicyFieldName
-	if jwt.PolicyFieldName != "" {
+	if jwt.PolicyFieldName != "" && len(jwt.BasePolicyClaims) == 0 {
 		jwt.BasePolicyClaims = []string{api.JWTPolicyFieldName}
 	}
 	jwt.ClientBaseField = api.JWTClientIDBaseField
@@ -370,6 +370,9 @@ func (s *OAS) fillJWT(api apidef.APIDefinition) {
 
 		if existing.Scopes != nil {
 			jwt.Scopes.Claims = existing.Scopes.Claims
+		}
+		if existing.CustomClaimValidation != nil {
+			jwt.CustomClaimValidation = existing.CustomClaimValidation
 		}
 	}
 
