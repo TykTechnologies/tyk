@@ -343,6 +343,20 @@ func (s *OAS) fillJWT(api apidef.APIDefinition) {
 		jwt.Scopes = &Scopes{}
 	}
 
+	existing := s.GetJWTConfiguration()
+	if existing != nil {
+		jwt.BasePolicyClaims = existing.BasePolicyClaims
+		jwt.SubjectClaims = existing.SubjectClaims
+		jwt.AllowedIssuers = existing.AllowedIssuers
+		jwt.AllowedAudiences = existing.AllowedAudiences
+		jwt.AllowedSubjects = existing.AllowedSubjects
+		jwt.JTIValidation.Enabled = existing.JTIValidation.Enabled
+
+		if existing.Scopes != nil {
+			jwt.Scopes.Claims = existing.Scopes.Claims
+		}
+	}
+
 	jwt.Scopes.Fill(&api.Scopes.JWT)
 	if ShouldOmit(jwt.Scopes) {
 		jwt.Scopes = nil
