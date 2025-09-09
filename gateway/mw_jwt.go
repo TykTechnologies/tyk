@@ -10,7 +10,6 @@ import (
 	"encoding/pem"
 	"errors"
 	"fmt"
-	"io"
 	"net/http"
 	"strings"
 	"sync"
@@ -79,8 +78,24 @@ func (k *JWTMiddleware) Init() {
 			// Drop the previous cache for the API ID
 			JWKCaches.Delete(k.Spec.APIID)
 			jwkCache := loadOrCreateJWKCacheByApiID(k.Spec.APIID)
+
+			// Create client factory for JWK fetching
+			clientFactory := NewExternalHTTPClientFactory(k.Gw)
+			client, clientErr := clientFactory.CreateJWKClient(k.Gw.GetConfig().JWTSSLInsecureSkipVerify)
+
 			for _, jwk := range config.JWTJwksURIs {
-				jwkSet, err := GetJWK(jwk.URL, k.Gw.GetConfig().JWTSSLInsecureSkipVerify)
+				var jwkSet *jose.JSONWebKeySet
+				var err error
+
+				if clientErr == nil {
+					jwkSet, err = getJWKWithClient(jwk.URL, client)
+				}
+
+				// Fallback to original method if factory fails
+				if clientErr != nil || err != nil {
+					jwkSet, err = GetJWK(jwk.URL, k.Gw.GetConfig().JWTSSLInsecureSkipVerify)
+				}
+
 				if err != nil {
 					k.Logger().WithError(err).Infof("Failed to fetch or decode JWKs from %s", jwk.URL)
 					continue
