@@ -478,17 +478,8 @@ func (s *OAS) Validate(ctx context.Context, opts ...openapi3.ValidationOption) e
 func (s *OAS) Normalize() {
 	// copy the values of the new JWT validation
 	jwtConfiguration := s.GetJWTConfiguration()
-	if jwtConfiguration == nil {
-		return
-	}
-	if len(jwtConfiguration.BasePolicyClaims) > 0 {
-		jwtConfiguration.PolicyFieldName = jwtConfiguration.BasePolicyClaims[0]
-	}
-	if len(jwtConfiguration.SubjectClaims) > 0 {
-		jwtConfiguration.IdentityBaseField = jwtConfiguration.SubjectClaims[0]
-	}
-	if jwtConfiguration.Scopes != nil && len(jwtConfiguration.Scopes.Claims) > 0 {
-		jwtConfiguration.Scopes.ClaimName = jwtConfiguration.Scopes.Claims[0]
+	if jwtConfiguration != nil {
+		jwtConfiguration.Normalize()
 	}
 }
 

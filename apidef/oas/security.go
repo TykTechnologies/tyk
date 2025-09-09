@@ -288,6 +288,22 @@ func (j *JWT) Import(enable bool) {
 	}
 }
 
+func (j *JWT) Normalize() {
+	// copy the values of the new JWT validation
+	if j == nil {
+		return
+	}
+	if len(j.BasePolicyClaims) > 0 {
+		j.PolicyFieldName = j.BasePolicyClaims[0]
+	}
+	if len(j.SubjectClaims) > 0 {
+		j.IdentityBaseField = j.SubjectClaims[0]
+	}
+	if j.Scopes != nil && len(j.Scopes.Claims) > 0 {
+		j.Scopes.ClaimName = j.Scopes.Claims[0]
+	}
+}
+
 func (s *OAS) fillJWT(api apidef.APIDefinition) {
 	ac, ok := api.AuthConfigs[apidef.JWTType]
 	if !ok || ac.Name == "" {
