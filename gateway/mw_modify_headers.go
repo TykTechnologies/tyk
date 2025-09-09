@@ -12,7 +12,7 @@ type TransformHeaders struct {
 }
 
 func (t *TransformHeaders) Name() string {
-	return "HeaderInjector"
+	return "RequestHeaderInjector"
 }
 
 func (t *TransformHeaders) EnabledForSpec() bool {
