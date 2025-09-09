@@ -6,8 +6,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/rs/cors"
-	"github.com/samber/lo"
 	htmltemplate "html/template"
 	"io/ioutil"
 	stdlog "log"
@@ -23,6 +21,9 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+
+	"github.com/rs/cors"
+	"github.com/samber/lo"
 
 	"github.com/TykTechnologies/tyk/tcp"
 	"github.com/TykTechnologies/tyk/trace"
@@ -775,6 +776,8 @@ func (gw *Gateway) loadControlAPIEndpoints(muxer *mux.Router) {
 	}
 
 	r.HandleFunc("/debug", gw.traceHandler).Methods("POST")
+	r.HandleFunc("/cache/jwks/{apiID}", gw.invalidateJWKSCacheForAPIID).Methods("DELETE")
+	r.HandleFunc("/cache/jwks", gw.invalidateJWKSCacheForAllAPIs).Methods("DELETE")
 	r.HandleFunc("/cache/{apiID}", gw.invalidateCacheHandler).Methods("DELETE")
 	r.HandleFunc("/keys", gw.keyHandler).Methods("POST", "PUT", "GET", "DELETE")
 	r.HandleFunc("/keys/preview", gw.previewKeyHandler).Methods("POST")
