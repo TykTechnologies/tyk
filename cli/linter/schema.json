@@ -183,7 +183,7 @@
           "type": ["object", "null"],
           "additionalProperties": false,
           "properties": {
-            "use_environment": {
+            "enabled": {
               "type": "boolean"
             },
             "http_proxy": {
@@ -192,7 +192,7 @@
             "https_proxy": {
               "type": "string"
             },
-            "no_proxy": {
+            "bypass_proxy": {
               "type": "string"
             }
           }
@@ -213,8 +213,23 @@
             "ca_file": {
               "type": "string"
             },
+            "cert_id": {
+              "type": "string"
+            },
+            "ca_cert_ids": {
+              "type": ["array", "null"],
+              "items": {
+                "type": "string"
+              }
+            },
             "insecure_skip_verify": {
               "type": "boolean"
+            },
+            "tls_max_version": {
+              "type": "string"
+            },
+            "tls_min_version": {
+              "type": "string"
             }
           }
         }
@@ -1140,11 +1155,11 @@
       "type": ["object", "null"],
       "additionalProperties": false,
       "properties": {
-        "proxy": {
+        "global": {
           "type": ["object", "null"],
           "additionalProperties": false,
           "properties": {
-            "use_environment": {
+            "enabled": {
               "type": "boolean"
             },
             "http_proxy": {
@@ -1153,7 +1168,7 @@
             "https_proxy": {
               "type": "string"
             },
-            "no_proxy": {
+            "bypass_proxy": {
               "type": "string"
             }
           }

@@ -151,9 +151,16 @@ func parseJWK(buf []byte) (*jose.JSONWebKeySet, error) {
 }
 
 func (k *JWTMiddleware) legacyGetSecretFromURL(url, kid, keyType string) (interface{}, error) {
-	var client http.Client
-	client.Transport = &http.Transport{
-		TLSClientConfig: &tls.Config{InsecureSkipVerify: k.Gw.GetConfig().JWTSSLInsecureSkipVerify},
+	// Try to use HTTP client factory first
+	clientFactory := NewExternalHTTPClientFactory(k.Gw)
+	client, err := clientFactory.CreateJWKClient(k.Gw.GetConfig().JWTSSLInsecureSkipVerify)
+	if err != nil {
+		// Fallback to original client
+		client = &http.Client{
+			Transport: &http.Transport{
+				TLSClientConfig: &tls.Config{InsecureSkipVerify: k.Gw.GetConfig().JWTSSLInsecureSkipVerify},
+			},
+		}
 	}
 
 	var jwkSet JWKs
@@ -246,15 +253,27 @@ func (k *JWTMiddleware) getSecretFromURL(url string, kidVal interface{}, keyType
 	}
 
 	if !found || cacheOutdated {
-		if jwkSet, err = GetJWK(url, k.Gw.GetConfig().JWTSSLInsecureSkipVerify); err != nil {
-			k.Logger().WithError(err).Info("Failed to decode JWKs body. Trying x5c PEM fallback.")
-
-			key, legacyError := k.legacyGetSecretFromURL(url, kid, keyType)
-			if legacyError == nil {
-				return key, nil
+		// Try to use HTTP client factory first
+		clientFactory := NewExternalHTTPClientFactory(k.Gw)
+		client, clientErr := clientFactory.CreateJWKClient(k.Gw.GetConfig().JWTSSLInsecureSkipVerify)
+		if clientErr == nil {
+			if jwkSet, err = getJWKWithClient(url, client); err != nil {
+				k.Logger().WithError(err).Info("Failed to decode JWKs body with factory client. Trying x5c PEM fallback.")
 			}
+		}
 
-			return nil, err
+		// Fallback to original method if factory fails or JWK fetch fails
+		if clientErr != nil || err != nil {
+			if jwkSet, err = GetJWK(url, k.Gw.GetConfig().JWTSSLInsecureSkipVerify); err != nil {
+				k.Logger().WithError(err).Info("Failed to decode JWKs body. Trying x5c PEM fallback.")
+
+				key, legacyError := k.legacyGetSecretFromURL(url, kid, keyType)
+				if legacyError == nil {
+					return key, nil
+				}
+
+				return nil, err
+			}
 		}
 
 		// Cache it
@@ -402,8 +421,25 @@ func (k *JWTMiddleware) getSecretFromMultipleJWKURIs(jwkURIs []apidef.JWK, kidVa
 		jwkSets = nil
 		jwkCache := k.loadOrCreateJWKCache()
 		jwkCache.Flush()
+    
+		// Create client factory for JWK fetching
+		clientFactory := NewExternalHTTPClientFactory(k.Gw)
+		client, clientErr := clientFactory.CreateJWKClient(k.Gw.GetConfig().JWTSSLInsecureSkipVerify)
+
 		for _, jwk := range jwkURIs {
-			jwkSet, err := GetJWK(jwk.URL, k.Gw.GetConfig().JWTSSLInsecureSkipVerify)
+			var jwkSet *jose.JSONWebKeySet
+			var err error
+
+			// Try with factory client first
+			if clientErr == nil {
+				jwkSet, err = getJWKWithClient(jwk.URL, client)
+			}
+
+			// Fallback to original method if factory fails
+			if clientErr != nil || err != nil {
+				jwkSet, err = GetJWK(jwk.URL, k.Gw.GetConfig().JWTSSLInsecureSkipVerify)
+			}
+
 			if err != nil {
 				k.Logger().WithError(err).Infof("Failed to fetch or decode JWKs from %s", jwk.URL)
 				fallbackJWKURIs = append(fallbackJWKURIs, jwk)
@@ -1429,30 +1465,7 @@ func getJWK(url string, jwtSSLInsecureSkipVerify bool) (*jose.JSONWebKeySet, err
 		},
 	}
 
-	// Get the JWK
-	log.Debug("Pulling JWK")
-	resp, err := client.Get(url)
-	if err != nil {
-		log.WithError(err).Error("Failed to get resource URL")
-		return nil, err
-	}
-
-	defer func() {
-		_ = resp.Body.Close()
-	}()
-
-	buf, err := io.ReadAll(resp.Body)
-	if err != nil {
-		log.WithError(err).Error("Failed to get read response body")
-		return nil, err
-	}
-
-	jwkSet, err := parseJWK(buf)
-	if err != nil {
-		return nil, err
-	}
-
-	return jwkSet, nil
+	return getJWKWithClient(url, &client)
 }
 
 // timeValidateJWTClaims validates JWT with provided clock skew, to overcome skew occurred with distributed systems.

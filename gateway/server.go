@@ -2051,7 +2051,7 @@ func (gw *Gateway) startDRL() {
 
 	gw.drlOnce.Do(func() {
 		drlManager := &drl.DRL{}
-		gw.SessionLimiter = NewSessionLimiter(gw.ctx, &gwConfig, drlManager)
+		gw.SessionLimiter = NewSessionLimiter(gw.ctx, &gwConfig, drlManager, &gwConfig.ExternalServices)
 
 		gw.DRLManager = drlManager
 
