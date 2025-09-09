@@ -1603,6 +1603,66 @@ paths:
       summary: Invalidate cache.
       tags:
       - Cache Invalidation
+  /tyk/cache/jwks/{apiID}:
+    delete:
+      description: Invalidate JWK cache for the given API.
+      operationId: invalidateJWKCache
+      parameters:
+        - description: The API ID.
+          example: ae67bb862a3241a49117508e0f9ee839
+          in: path
+          name: apiID
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              example:
+                message: cache invalidated
+                status: ok
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Cache invalidated.
+        "403":
+          content:
+            application/json:
+              example:
+                message: Attempted administrative access with invalid or missing key!
+                status: error
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Forbidden
+      summary: Invalidate cache for given API ID.
+      tags:
+        - JWK cache invalidation
+  /tyk/cache/jwks:
+    delete:
+      description: Invalidate JWK cache for all APIs.
+      operationId: invalidateJWKCacheForAllAPIs
+      responses:
+        "200":
+          content:
+            application/json:
+              example:
+                message: cache invalidated
+                status: ok
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Cache invalidated.
+        "403":
+          content:
+            application/json:
+              example:
+                message: Attempted administrative access with invalid or missing key!
+                status: error
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Forbidden
+      summary: Invalidate JWK cache for all APIs
+      tags:
+        - JWK cache invalidation
   /tyk/certs:
     get:
       description: List all certificates in the Tyk Gateway.
