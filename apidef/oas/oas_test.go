@@ -1322,6 +1322,123 @@ func TestAPIContext_getValidationOptionsFromConfig(t *testing.T) {
 	})
 }
 
+func TestOAS_Normalize(t *testing.T) {
+	t.Run("should copy JWT validation fields correctly", func(t *testing.T) {
+		oas := &OAS{
+			T: openapi3.T{
+				Security: openapi3.SecurityRequirements{
+					{
+						"jwt1": []string{},
+					},
+				},
+				Components: &openapi3.Components{
+					SecuritySchemes: openapi3.SecuritySchemes{
+						"jwt1": &openapi3.SecuritySchemeRef{
+							Value: &openapi3.SecurityScheme{
+								Type:         typeHTTP,
+								Scheme:       schemeBearer,
+								BearerFormat: bearerFormatJWT,
+							},
+						},
+					},
+				},
+			},
+		}
+
+		// Setup initial JWT configuration with new fields
+		jwt := &JWT{
+			BasePolicyClaims: []string{"policy_claim"},
+			SubjectClaims:    []string{"subject_claim"},
+			Scopes: &Scopes{
+				Claims: []string{"scope_claim"},
+			},
+		}
+
+		oas.SetTykExtension(&XTykAPIGateway{
+			Server: Server{
+				Authentication: &Authentication{
+					SecuritySchemes: SecuritySchemes{
+						"jwt1": jwt,
+					},
+				},
+			},
+		})
+
+		// Call Normalize to copy values to old fields
+		oas.Normalize()
+
+		// Verify that old fields were populated from new fields
+		jwtConfig := oas.GetJWTConfiguration()
+		assert.Equal(t, "policy_claim", jwtConfig.PolicyFieldName)
+		assert.Equal(t, "subject_claim", jwtConfig.IdentityBaseField)
+		assert.Equal(t, "scope_claim", jwtConfig.Scopes.ClaimName)
+
+		// Verify that new fields remain unchanged
+		assert.Equal(t, []string{"policy_claim"}, jwtConfig.BasePolicyClaims)
+		assert.Equal(t, []string{"subject_claim"}, jwtConfig.SubjectClaims)
+		assert.Equal(t, []string{"scope_claim"}, jwtConfig.Scopes.Claims)
+
+		t.Run("scopes nil", func(t *testing.T) {
+			oas.GetJWTConfiguration().Scopes = nil
+
+			oas.Normalize()
+
+			assert.Equal(t, "policy_claim", jwtConfig.PolicyFieldName)
+			assert.Equal(t, "subject_claim", jwtConfig.IdentityBaseField)
+		})
+	})
+	t.Run("should be nil-safe", func(t *testing.T) {
+		oas := &OAS{
+			T: openapi3.T{
+				Security: openapi3.SecurityRequirements{
+					{
+						"jwt1": []string{},
+					},
+				},
+				Components: &openapi3.Components{
+					SecuritySchemes: openapi3.SecuritySchemes{
+						"jwt1": &openapi3.SecuritySchemeRef{
+							Value: &openapi3.SecurityScheme{
+								Type:         typeHTTP,
+								Scheme:       schemeBearer,
+								BearerFormat: bearerFormatJWT,
+							},
+						},
+					},
+				},
+			},
+		}
+
+		// Setup initial JWT configuration with new fields
+		jwt := &JWT{
+			BasePolicyClaims: []string{"policy_claim"},
+			SubjectClaims:    []string{"subject_claim"},
+			Scopes: &Scopes{
+				Claims: []string{"scope_claim"},
+			},
+		}
+
+		// use wrong id to trigger null jwt
+		oas.SetTykExtension(&XTykAPIGateway{
+			Server: Server{
+				Authentication: &Authentication{
+					SecuritySchemes: SecuritySchemes{
+						"jwt2": jwt,
+					},
+				},
+			},
+		})
+
+		// Call Normalize to copy values to old fields
+		oas.Normalize()
+
+		// Verify that old fields were populated from new fields
+		jwtConfig := oas.GetJWTConfiguration()
+		assert.Nil(t, jwtConfig)
+	})
+
+}
+
 func TestOAS_ValidateSecurity(t *testing.T) {
 	apiKey := "api_key"
 	oauth2 := "oauth2"

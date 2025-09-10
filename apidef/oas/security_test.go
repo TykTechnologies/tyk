@@ -441,17 +441,53 @@ func TestOAS_JWT(t *testing.T) {
 	var convertedOAS OAS
 	convertedOAS.Components = &openapi3.Components{}
 	convertedOAS.SetTykExtension(&XTykAPIGateway{Server: Server{Authentication: &Authentication{SecuritySchemes: SecuritySchemes{}}}})
+
+	// pre-populate oas only field before testing and make sure it is not modified
+	convertedOAS.Security = openapi3.SecurityRequirements{
+		{
+			securityName: []string{},
+		},
+	}
+
+	convertedOAS.Components = &openapi3.Components{
+		SecuritySchemes: openapi3.SecuritySchemes{
+			securityName: {
+				Value: &openapi3.SecurityScheme{
+					Type:         typeHTTP,
+					Scheme:       schemeBearer,
+					BearerFormat: bearerFormatJWT,
+				},
+			},
+		},
+	}
+
+	convertedOAS.Extensions = map[string]interface{}{
+		ExtensionTykAPIGateway: &XTykAPIGateway{
+			Server: Server{
+				Authentication: &Authentication{
+					SecuritySchemes: SecuritySchemes{
+						securityName: &JWT{
+							CustomClaimValidation: oas.GetJWTConfiguration().CustomClaimValidation,
+							JTIValidation: JTIValidation{
+								Enabled: oas.GetJWTConfiguration().JTIValidation.Enabled,
+							},
+							AllowedIssuers:   oas.GetJWTConfiguration().AllowedIssuers,
+							AllowedAudiences: oas.GetJWTConfiguration().AllowedAudiences,
+							AllowedSubjects:  oas.GetJWTConfiguration().AllowedSubjects,
+							SubjectClaims:    oas.GetJWTConfiguration().SubjectClaims,
+							BasePolicyClaims: oas.GetJWTConfiguration().BasePolicyClaims,
+							Scopes: &Scopes{
+								Claims: oas.GetJWTConfiguration().Scopes.Claims,
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
 	convertedOAS.fillJWT(api)
 
-	// set OAS only fields since they will not be converted
-	convertedOAS.GetJWTConfiguration().AllowedAudiences = oas.GetJWTConfiguration().AllowedAudiences
-	convertedOAS.GetJWTConfiguration().AllowedIssuers = oas.GetJWTConfiguration().AllowedIssuers
-	convertedOAS.GetJWTConfiguration().AllowedSubjects = oas.GetJWTConfiguration().AllowedSubjects
-	convertedOAS.GetJWTConfiguration().SubjectClaims = oas.GetJWTConfiguration().SubjectClaims
-	convertedOAS.GetJWTConfiguration().BasePolicyClaims = oas.GetJWTConfiguration().BasePolicyClaims
-	convertedOAS.GetJWTConfiguration().Scopes.Claims = oas.GetJWTConfiguration().Scopes.Claims
-	convertedOAS.GetJWTConfiguration().JTIValidation.Enabled = true
-	convertedOAS.GetJWTConfiguration().CustomClaimValidation = oas.GetJWTConfiguration().CustomClaimValidation
 	assert.Equal(t, oas, convertedOAS)
 }
 
