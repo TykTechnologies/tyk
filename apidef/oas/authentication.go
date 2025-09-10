@@ -138,7 +138,7 @@ func (a *Authentication) Fill(api apidef.APIDefinition) {
 	a.Enabled = !api.UseKeylessAccess
 	a.StripAuthorizationData = api.StripAuthData
 	a.BaseIdentityProvider = api.BaseIdentityProvidedBy
-	
+
 	// Fill SecurityProcessingMode with default if empty
 	if api.SecurityProcessingMode == "" {
 		a.SecurityProcessingMode = "legacy"
@@ -200,7 +200,7 @@ func (a *Authentication) ExtractTo(api *apidef.APIDefinition) {
 	api.UseKeylessAccess = !a.Enabled
 	api.StripAuthData = a.StripAuthorizationData
 	api.BaseIdentityProvidedBy = a.BaseIdentityProvider
-	
+
 	// Extract SecurityProcessingMode with validation and default
 	if a.SecurityProcessingMode == "" {
 		api.SecurityProcessingMode = "legacy"
