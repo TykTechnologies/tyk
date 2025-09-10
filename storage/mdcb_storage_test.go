@@ -64,7 +64,7 @@ func TestGetResourceType(t *testing.T) {
 		expected string
 	}{
 		{"oauth-clientid.client-id", resourceOauthClient},
-		{"cert.something", resourceCertificate},
+		{"raw-something", resourceCertificate},
 		{"apikey.something", resourceApiKey},
 		{"unmatched-key", resourceKey},
 	}
@@ -194,7 +194,7 @@ func TestGetFromRPCAndCache(t *testing.T) {
 	}
 	m.OnRPCCertPull = mockSaveCert
 
-	certKey := "cert-my-cert-id"
+	certKey := "raw-my-cert-id"
 	rpcHandler.EXPECT().GetKey(certKey).Return("value", nil)
 	rpcVal, err = m.getFromRPCAndCache(certKey)
 	assert.Equal(t, "value", rpcVal)
@@ -234,7 +234,7 @@ func TestProcessResourceByType(t *testing.T) {
 		},
 		{
 			name: "Successful Certificate caching",
-			key:  "cert:cert1",
+			key:  "raw-cert1",
 			val:  "certdata1",
 			setupMocks: func(_ *mock.MockHandler) {
 				// Setup expectations for certificate caching if needed
@@ -243,7 +243,7 @@ func TestProcessResourceByType(t *testing.T) {
 		},
 		{
 			name: "Failed Certificate caching",
-			key:  "cert:failCert",
+			key:  "raw-failCert",
 			val:  "certdata2",
 			setupMocks: func(_ *mock.MockHandler) {
 				// Setup expectations for failed certificate caching if needed
@@ -268,9 +268,9 @@ func TestProcessResourceByType(t *testing.T) {
 			tc.setupMocks(setup.Local)
 
 			// If testing certificate caching, setup the callback
-			if strings.HasPrefix(tc.key, "cert:") {
+			if strings.HasPrefix(tc.key, "raw-") {
 				m.OnRPCCertPull = func(key, _ string) error {
-					if key == "cert:failCert" {
+					if key == "raw-failCert" {
 						return errCachingFailed
 					}
 					return nil
