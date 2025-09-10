@@ -146,12 +146,6 @@ func (mem *InMemoryCooldownCache) SetFireEventCooldown(certID string, fireEventC
 	now := time.Now()
 	cooldownEndTime := now.Add(time.Duration(fireEventCooldownInSeconds) * time.Second)
 
-	cooldowns, ok := cooldownLRUCache.Get(certID)
-	if ok {
-		cooldowns.FireEventCooldown = cooldownEndTime
-		cooldownLRUCache.Add(certID, cooldowns)
-	}
-
 	newCooldowns := Cooldowns{
 		CheckCooldown:     now,
 		FireEventCooldown: cooldownEndTime,
