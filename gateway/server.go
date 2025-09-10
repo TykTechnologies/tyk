@@ -29,7 +29,6 @@ import (
 	"github.com/rs/cors"
 	"github.com/samber/lo"
 
-	"github.com/TykTechnologies/tyk/internal/certcheck"
 	"github.com/TykTechnologies/tyk/tcp"
 	"github.com/TykTechnologies/tyk/trace"
 
@@ -272,8 +271,6 @@ func (gw *Gateway) cacheCreate() {
 
 	gw.RPCGlobalCache = cache.New(int64(conf.SlaveOptions.RPCGlobalCacheExpiration), 15)
 	gw.RPCCertCache = cache.New(int64(conf.SlaveOptions.RPCCertCacheExpiration), 15)
-
-	certcheck.InitInMemoryCooldownCache()
 }
 
 // cacheClose will close the caches in *Gateway, cleaning up the goroutines.

@@ -2,7 +2,6 @@ package certcheck
 
 import (
 	"errors"
-	"os"
 	"testing"
 	"time"
 
@@ -14,15 +13,9 @@ import (
 	storagemock "github.com/TykTechnologies/tyk/storage/mock"
 )
 
-func TestMain(m *testing.M) {
-	InitInMemoryCooldownCache()
-	returnCode := m.Run()
-	os.Exit(returnCode)
-}
-
 func TestInMemoryCooldownCache_HasCheckCooldown(t *testing.T) {
 	t.Run("should return false when there is no entry in cache", func(t *testing.T) {
-		t.Cleanup(cooldownLRUCache.Purge)
+		t.Cleanup(GetCooldownLRUCache().Purge)
 
 		cache, err := NewInMemoryCooldownCache()
 		require.NoError(t, err)
@@ -33,10 +26,10 @@ func TestInMemoryCooldownCache_HasCheckCooldown(t *testing.T) {
 	})
 
 	t.Run("should return true when there is something in cache", func(t *testing.T) {
-		t.Cleanup(cooldownLRUCache.Purge)
+		t.Cleanup(GetCooldownLRUCache().Purge)
 
 		cache, err := NewInMemoryCooldownCache()
-		cooldownLRUCache.Add("does-exist", Cooldowns{})
+		GetCooldownLRUCache().Add("does-exist", Cooldowns{})
 
 		require.NoError(t, err)
 
@@ -48,7 +41,7 @@ func TestInMemoryCooldownCache_HasCheckCooldown(t *testing.T) {
 
 func TestInMemoryCooldownCache_SetCheckCooldown(t *testing.T) {
 	t.Run("should set cooldowns when there is no entry in cache", func(t *testing.T) {
-		t.Cleanup(cooldownLRUCache.Purge)
+		t.Cleanup(GetCooldownLRUCache().Purge)
 
 		cache, err := NewInMemoryCooldownCache()
 		require.NoError(t, err)
@@ -66,13 +59,13 @@ func TestInMemoryCooldownCache_SetCheckCooldown(t *testing.T) {
 	})
 
 	t.Run("should preserve fire event cooldown when already exists", func(t *testing.T) {
-		t.Cleanup(cooldownLRUCache.Purge)
+		t.Cleanup(GetCooldownLRUCache().Purge)
 
 		cache, err := NewInMemoryCooldownCache()
 		require.NoError(t, err)
 
 		specificFireEventCooldown := time.Now().Add(time.Minute * 10)
-		cooldownLRUCache.Add("does-exist", Cooldowns{
+		GetCooldownLRUCache().Add("does-exist", Cooldowns{
 			FireEventCooldown: specificFireEventCooldown,
 		})
 
@@ -87,7 +80,7 @@ func TestInMemoryCooldownCache_SetCheckCooldown(t *testing.T) {
 		assert.True(t, exists)
 		assert.NoError(t, err)
 
-		cachedCooldowns, ok := cooldownLRUCache.Get("does-exist")
+		cachedCooldowns, ok := GetCooldownLRUCache().Get("does-exist")
 		assert.True(t, ok)
 		assert.Equal(t, specificFireEventCooldown, cachedCooldowns.FireEventCooldown)
 	})
@@ -95,7 +88,7 @@ func TestInMemoryCooldownCache_SetCheckCooldown(t *testing.T) {
 
 func TestInMemoryCooldownCache_IsCheckCooldownActive(t *testing.T) {
 	t.Run("should return ErrCheckCooldownDoesNotExist when there is no entry in cache", func(t *testing.T) {
-		t.Cleanup(cooldownLRUCache.Purge)
+		t.Cleanup(GetCooldownLRUCache().Purge)
 
 		cache, err := NewInMemoryCooldownCache()
 		require.NoError(t, err)
@@ -105,7 +98,7 @@ func TestInMemoryCooldownCache_IsCheckCooldownActive(t *testing.T) {
 	})
 
 	t.Run("should return active = false when there is something in cache but cooldown is not active", func(t *testing.T) {
-		t.Cleanup(cooldownLRUCache.Purge)
+		t.Cleanup(GetCooldownLRUCache().Purge)
 
 		cache, err := NewInMemoryCooldownCache()
 		require.NoError(t, err)
@@ -119,7 +112,7 @@ func TestInMemoryCooldownCache_IsCheckCooldownActive(t *testing.T) {
 	})
 
 	t.Run("should return active = true when there is something in cache but cooldown is not active", func(t *testing.T) {
-		t.Cleanup(cooldownLRUCache.Purge)
+		t.Cleanup(GetCooldownLRUCache().Purge)
 
 		cache, err := NewInMemoryCooldownCache()
 		require.NoError(t, err)
@@ -135,7 +128,7 @@ func TestInMemoryCooldownCache_IsCheckCooldownActive(t *testing.T) {
 
 func TestInMemoryCooldownCache_HasFireEventCooldown(t *testing.T) {
 	t.Run("should return false when there is no entry in cache", func(t *testing.T) {
-		t.Cleanup(cooldownLRUCache.Purge)
+		t.Cleanup(GetCooldownLRUCache().Purge)
 
 		cache, err := NewInMemoryCooldownCache()
 		require.NoError(t, err)
@@ -146,12 +139,12 @@ func TestInMemoryCooldownCache_HasFireEventCooldown(t *testing.T) {
 	})
 
 	t.Run("should return true when there is something in cache", func(t *testing.T) {
-		t.Cleanup(cooldownLRUCache.Purge)
+		t.Cleanup(GetCooldownLRUCache().Purge)
 
 		cache, err := NewInMemoryCooldownCache()
 		require.NoError(t, err)
 
-		cooldownLRUCache.Add("does-exist", Cooldowns{})
+		GetCooldownLRUCache().Add("does-exist", Cooldowns{})
 
 		exists, err := cache.HasFireEventCooldown("does-exist")
 		assert.True(t, exists)
@@ -160,7 +153,7 @@ func TestInMemoryCooldownCache_HasFireEventCooldown(t *testing.T) {
 }
 
 func TestInMemoryCooldownCache_SetFireEventCooldown(t *testing.T) {
-	t.Cleanup(cooldownLRUCache.Purge)
+	t.Cleanup(GetCooldownLRUCache().Purge)
 
 	cache, err := NewInMemoryCooldownCache()
 	require.NoError(t, err)
@@ -179,7 +172,7 @@ func TestInMemoryCooldownCache_SetFireEventCooldown(t *testing.T) {
 
 func TestInMemoryCooldownCache_IsFireEventCooldownActive(t *testing.T) {
 	t.Run("should return ErrFireEventCooldownDoesNotExist when there is no entry in cache", func(t *testing.T) {
-		t.Cleanup(cooldownLRUCache.Purge)
+		t.Cleanup(GetCooldownLRUCache().Purge)
 
 		cache, err := NewInMemoryCooldownCache()
 		require.NoError(t, err)
@@ -189,7 +182,7 @@ func TestInMemoryCooldownCache_IsFireEventCooldownActive(t *testing.T) {
 	})
 
 	t.Run("should return active = false when there is something in cache but cooldown is not active", func(t *testing.T) {
-		t.Cleanup(cooldownLRUCache.Purge)
+		t.Cleanup(GetCooldownLRUCache().Purge)
 
 		cache, err := NewInMemoryCooldownCache()
 		require.NoError(t, err)
@@ -203,7 +196,7 @@ func TestInMemoryCooldownCache_IsFireEventCooldownActive(t *testing.T) {
 	})
 
 	t.Run("should return active = true when there is something in cache but cooldown is not active", func(t *testing.T) {
-		t.Cleanup(cooldownLRUCache.Purge)
+		t.Cleanup(GetCooldownLRUCache().Purge)
 
 		cache, err := NewInMemoryCooldownCache()
 		require.NoError(t, err)
