@@ -13,12 +13,12 @@ import (
 	"github.com/TykTechnologies/tyk/apidef"
 )
 
-// ValidateSecurityProcessingMode validates the security processing mode value
+// ValidateSecurityProcessingMode validates the security processing mode value.
 func ValidateSecurityProcessingMode(mode string) bool {
 	return mode == "" || mode == "legacy" || mode == "compliant"
 }
 
-// GetDefaultSecurityProcessingMode returns the default security processing mode
+// GetDefaultSecurityProcessingMode returns the default security processing mode.
 func GetDefaultSecurityProcessingMode() string {
 	return "legacy"
 }
@@ -78,8 +78,8 @@ type Authentication struct {
 	// Tyk classic API definition: `security_processing_mode`
 	SecurityProcessingMode string `bson:"securityProcessingMode,omitempty" json:"securityProcessingMode,omitempty"`
 
-	// Security contains Tyk vendor extension security requirements for proprietary auth methods
-	// This is concatenated with OpenAPI security requirements when SecurityProcessingMode is "compliant"
+	// Security contains Tyk vendor extension security requirements for proprietary auth methods.
+	// This is concatenated with OpenAPI security requirements when SecurityProcessingMode is "compliant".
 	Security [][]string `bson:"security,omitempty" json:"security,omitempty"`
 }
 
