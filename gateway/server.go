@@ -21,23 +21,18 @@ import (
 	"strconv"
 	"strings"
 	"sync"
-
-	"github.com/rs/cors"
-	"github.com/samber/lo"
-
-	"github.com/TykTechnologies/tyk/tcp"
-	"github.com/TykTechnologies/tyk/trace"
-
 	"sync/atomic"
 	"syscall"
 	texttemplate "text/template"
 	"time"
 
-	"github.com/TykTechnologies/tyk/internal/crypto"
-	"github.com/TykTechnologies/tyk/internal/httputil"
-	"github.com/TykTechnologies/tyk/internal/otel"
-	"github.com/TykTechnologies/tyk/internal/scheduler"
-	"github.com/TykTechnologies/tyk/test"
+	"github.com/rs/cors"
+	"github.com/samber/lo"
+
+	"github.com/TykTechnologies/tyk/internal/certcheck"
+	"github.com/TykTechnologies/tyk/tcp"
+	"github.com/TykTechnologies/tyk/trace"
+
 	logstashhook "github.com/bshuster-repo/logrus-logstash-hook"
 	logrussentry "github.com/evalphobia/logrus_sentry"
 	grayloghook "github.com/gemnasium/logrus-graylog-hook"
@@ -45,6 +40,12 @@ import (
 	"github.com/lonelycode/osin"
 	"github.com/sirupsen/logrus"
 	logrussyslog "github.com/sirupsen/logrus/hooks/syslog"
+
+	"github.com/TykTechnologies/tyk/internal/crypto"
+	"github.com/TykTechnologies/tyk/internal/httputil"
+	"github.com/TykTechnologies/tyk/internal/otel"
+	"github.com/TykTechnologies/tyk/internal/scheduler"
+	"github.com/TykTechnologies/tyk/test"
 
 	"github.com/TykTechnologies/tyk/internal/uuid"
 
@@ -271,6 +272,8 @@ func (gw *Gateway) cacheCreate() {
 
 	gw.RPCGlobalCache = cache.New(int64(conf.SlaveOptions.RPCGlobalCacheExpiration), 15)
 	gw.RPCCertCache = cache.New(int64(conf.SlaveOptions.RPCCertCacheExpiration), 15)
+
+	certcheck.InitInMemoryCooldownCache()
 }
 
 // cacheClose will close the caches in *Gateway, cleaning up the goroutines.

@@ -2,6 +2,7 @@ package certcheck
 
 import (
 	"errors"
+	"os"
 	"testing"
 	"time"
 
@@ -12,6 +13,12 @@ import (
 	"github.com/TykTechnologies/tyk/storage"
 	storagemock "github.com/TykTechnologies/tyk/storage/mock"
 )
+
+func TestMain(m *testing.M) {
+	InitInMemoryCooldownCache()
+	returnCode := m.Run()
+	os.Exit(returnCode)
+}
 
 func TestInMemoryCooldownCache_HasCheckCooldown(t *testing.T) {
 	t.Run("should return false when there is no entry in cache", func(t *testing.T) {

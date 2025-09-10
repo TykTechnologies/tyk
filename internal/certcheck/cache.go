@@ -47,7 +47,7 @@ type CooldownCache interface {
 var cooldownLRUCache *lru.Cache[string, Cooldowns]
 var cooldownLRUCacheMutex = &sync.RWMutex{}
 
-func init() {
+func InitInMemoryCooldownCache() {
 	var err error
 	cooldownLRUCache, err = lru.New[string, Cooldowns](512)
 	if err != nil {
