@@ -22,7 +22,7 @@ RUN rm -rf /root/.cache \
 
 # Comment this to test in dev
 COPY ${BUILD_PACKAGE_NAME}_*${TARGETARCH}.deb /
-RUN dpkg -i /${BUILD_PACKAGE_NAME}*${TARGETARCH}.deb && rm /*.deb
+RUN find / -maxdepth 1 -name "${BUILD_PACKAGE_NAME}_*${TARGETARCH}.deb" -exec dpkg -i {} \; && find / -maxdepth 1 -name "*.deb" -delete
 
 ARG PORTS
 
