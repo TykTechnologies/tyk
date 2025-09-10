@@ -13,6 +13,16 @@ import (
 	"github.com/TykTechnologies/tyk/apidef"
 )
 
+// ValidateSecurityProcessingMode validates the security processing mode value
+func ValidateSecurityProcessingMode(mode string) bool {
+	return mode == "" || mode == "legacy" || mode == "compliant"
+}
+
+// GetDefaultSecurityProcessingMode returns the default security processing mode
+func GetDefaultSecurityProcessingMode() string {
+	return "legacy"
+}
+
 // Authentication contains configuration about the authentication methods and security policies applied to requests.
 type Authentication struct {
 	// Enabled makes the API protected when one of the authentication modes is enabled.
@@ -61,6 +71,16 @@ type Authentication struct {
 
 	// CustomKeyLifetime contains configuration for the maximum retention period for access tokens.
 	CustomKeyLifetime *CustomKeyLifetime `bson:"customKeyLifetime,omitempty" json:"customKeyLifetime,omitempty"`
+
+	// SecurityProcessingMode controls how multiple security requirements are processed.
+	// - "legacy" (default): Only first security requirement processed, uses BaseIdentityProvider
+	// - "compliant": All security requirements processed with OR logic, dynamic identity provider
+	// Tyk classic API definition: `security_processing_mode`
+	SecurityProcessingMode string `bson:"securityProcessingMode,omitempty" json:"securityProcessingMode,omitempty"`
+
+	// Security contains Tyk vendor extension security requirements for proprietary auth methods
+	// This is concatenated with OpenAPI security requirements when SecurityProcessingMode is "compliant"
+	Security [][]string `bson:"security,omitempty" json:"security,omitempty"`
 }
 
 // CustomKeyLifetime contains configuration for custom key retention.
@@ -118,6 +138,13 @@ func (a *Authentication) Fill(api apidef.APIDefinition) {
 	a.Enabled = !api.UseKeylessAccess
 	a.StripAuthorizationData = api.StripAuthData
 	a.BaseIdentityProvider = api.BaseIdentityProvidedBy
+	
+	// Fill SecurityProcessingMode with default if empty
+	if api.SecurityProcessingMode == "" {
+		a.SecurityProcessingMode = "legacy"
+	} else {
+		a.SecurityProcessingMode = api.SecurityProcessingMode
+	}
 
 	if a.Custom == nil {
 		a.Custom = &CustomPluginAuthentication{}
@@ -173,6 +200,16 @@ func (a *Authentication) ExtractTo(api *apidef.APIDefinition) {
 	api.UseKeylessAccess = !a.Enabled
 	api.StripAuthData = a.StripAuthorizationData
 	api.BaseIdentityProvidedBy = a.BaseIdentityProvider
+	
+	// Extract SecurityProcessingMode with validation and default
+	if a.SecurityProcessingMode == "" {
+		api.SecurityProcessingMode = "legacy"
+	} else if a.SecurityProcessingMode == "legacy" || a.SecurityProcessingMode == "compliant" {
+		api.SecurityProcessingMode = a.SecurityProcessingMode
+	} else {
+		// Invalid value, default to legacy
+		api.SecurityProcessingMode = "legacy"
+	}
 
 	if a.HMAC != nil {
 		a.HMAC.ExtractTo(api)

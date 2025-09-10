@@ -18,6 +18,9 @@ func TestAuthentication(t *testing.T) {
 	var resultAuthentication Authentication
 	resultAuthentication.Fill(convertedAPI)
 
+	// Set expected default for SecurityProcessingMode
+	emptyAuthentication.SecurityProcessingMode = "legacy"
+	
 	assert.Equal(t, emptyAuthentication, resultAuthentication)
 }
 
@@ -333,5 +336,138 @@ func TestIDExtractor(t *testing.T) {
 		actualIDExtractor.Fill(convertedAPI)
 
 		assert.Equal(t, expectedIDExtractor, actualIDExtractor)
+	})
+}
+
+func TestSecurityProcessingMode(t *testing.T) {
+	t.Run("DefaultValues", func(t *testing.T) {
+		testCases := []struct {
+			name     string
+			input    *Authentication
+			expected string
+		}{
+			{
+				name:     "nil field defaults to legacy",
+				input:    &Authentication{},
+				expected: "legacy",
+			},
+			{
+				name: "empty string defaults to legacy",
+				input: &Authentication{
+					SecurityProcessingMode: "",
+				},
+				expected: "legacy",
+			},
+			{
+				name: "explicit legacy",
+				input: &Authentication{
+					SecurityProcessingMode: "legacy",
+				},
+				expected: "legacy",
+			},
+			{
+				name: "explicit compliant",
+				input: &Authentication{
+					SecurityProcessingMode: "compliant",
+				},
+				expected: "compliant",
+			},
+		}
+		
+		for _, tc := range testCases {
+			t.Run(tc.name, func(t *testing.T) {
+				var api apidef.APIDefinition
+				tc.input.ExtractTo(&api)
+				assert.Equal(t, tc.expected, api.SecurityProcessingMode)
+			})
+		}
+	})
+	
+	t.Run("Validation", func(t *testing.T) {
+		testCases := []struct {
+			name        string
+			mode        string
+			shouldBeValid bool
+		}{
+			{"valid legacy", "legacy", true},
+			{"valid compliant", "compliant", true},
+			{"empty string", "", true},
+			{"invalid mode", "invalid", false},
+			{"numeric value", "123", false},
+			{"mixed case", "Legacy", false},
+			{"with spaces", "legacy ", false},
+		}
+		
+		for _, tc := range testCases {
+			t.Run(tc.name, func(t *testing.T) {
+				isValid := ValidateSecurityProcessingMode(tc.mode)
+				assert.Equal(t, tc.shouldBeValid, isValid)
+			})
+		}
+	})
+	
+	t.Run("ExtractToWithValidation", func(t *testing.T) {
+		testCases := []struct {
+			name     string
+			input    string
+			expected string
+		}{
+			{"empty defaults to legacy", "", "legacy"},
+			{"legacy stays legacy", "legacy", "legacy"},
+			{"compliant stays compliant", "compliant", "compliant"},
+			{"invalid defaults to legacy", "invalid", "legacy"},
+		}
+		
+		for _, tc := range testCases {
+			t.Run(tc.name, func(t *testing.T) {
+				auth := &Authentication{
+					SecurityProcessingMode: tc.input,
+				}
+				var api apidef.APIDefinition
+				auth.ExtractTo(&api)
+				assert.Equal(t, tc.expected, api.SecurityProcessingMode)
+			})
+		}
+	})
+	
+	t.Run("FillWithDefault", func(t *testing.T) {
+		// Test that Fill properly sets default when API has empty mode
+		api := apidef.APIDefinition{
+			SecurityProcessingMode: "",
+		}
+		
+		auth := &Authentication{}
+		auth.Fill(api)
+		
+		assert.Equal(t, "legacy", auth.SecurityProcessingMode)
+	})
+	
+	t.Run("GetDefaultSecurityProcessingMode", func(t *testing.T) {
+		assert.Equal(t, "legacy", GetDefaultSecurityProcessingMode())
+	})
+}
+
+func TestVendorExtensionSecurity(t *testing.T) {
+	t.Run("Security array field", func(t *testing.T) {
+		auth := &Authentication{
+			Security: [][]string{
+				{"hmac"},
+				{"custom"},
+				{"hmac", "jwt"},
+			},
+		}
+		
+		var api apidef.APIDefinition
+		auth.ExtractTo(&api)
+		
+		// The Security field should not be extracted to APIDefinition
+		// It's only stored in the OAS extension
+		
+		auth2 := &Authentication{}
+		auth2.Fill(api)
+		
+		// Security field is not filled from APIDefinition
+		// It only exists in OAS vendor extension
+		assert.Nil(t, auth2.Security)
 	})
 }

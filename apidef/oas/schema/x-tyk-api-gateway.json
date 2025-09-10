@@ -1260,6 +1260,22 @@
           "required": [
             "enabled"
           ]
+        },
+        "securityProcessingMode": {
+          "type": "string",
+          "enum": ["legacy", "compliant"],
+          "default": "legacy",
+          "description": "Controls how multiple security requirements are processed"
+        },
+        "security": {
+          "type": "array",
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "description": "Vendor extension security requirements for proprietary auth methods"
         }
       },
       "required": [
