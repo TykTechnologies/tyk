@@ -62,6 +62,7 @@
   "cert_name": "{{.Meta.CertName}}",
   "expires_at": "{{.Meta.ExpiresAt}}",
   "days_remaining": "{{.Meta.DaysRemaining}}",
+  "api_id": "{{.Meta.APIID}}",
   "timestamp": "{{.TimeStamp}}"
 }
 {{ else if eq .Type "CertificateExpired"}}
@@ -72,6 +73,7 @@
   "cert_name": "{{.Meta.CertName}}",
   "expired_at": "{{.Meta.ExpiredAt}}",
   "days_since_expiry": "{{.Meta.DaysSinceExpiry}}",
+  "api_id": "{{.Meta.APIID}}",
   "timestamp": "{{.TimeStamp}}"
 }
 {{ else}}

@@ -292,6 +292,7 @@ func (c *CertificateExpiryCheckBatcher) handleEventForExpiredCertificate(certInf
 		CertName:        certInfo.CommonName,
 		ExpiredAt:       certInfo.NotAfter,
 		DaysSinceExpiry: daysSinceExpiry,
+		APIID:           c.apiMetaData.APIID,
 	}
 
 	c.fireEvent(event.CertificateExpired, eventMeta)
@@ -313,6 +314,7 @@ func (c *CertificateExpiryCheckBatcher) handleEventForSoonToExpireCertificate(ce
 		CertName:      certInfo.CommonName,
 		ExpiresAt:     certInfo.NotAfter,
 		DaysRemaining: daysUntilExpiry,
+		APIID:         c.apiMetaData.APIID,
 	}
 
 	c.fireEvent(event.CertificateExpiringSoon, eventMeta)
