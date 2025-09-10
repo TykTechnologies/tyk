@@ -3,6 +3,7 @@ package certcheck
 import (
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -14,7 +15,9 @@ import (
 
 func TestInMemoryCooldownCache_HasCheckCooldown(t *testing.T) {
 	t.Run("should return false when there is no entry in cache", func(t *testing.T) {
-		cache, err := NewInMemoryCooldownCache(2)
+		t.Cleanup(cooldownLRUCache.Purge)
+
+		cache, err := NewInMemoryCooldownCache()
 		require.NoError(t, err)
 
 		exists, err := cache.HasCheckCooldown("unknown")
@@ -23,8 +26,10 @@ func TestInMemoryCooldownCache_HasCheckCooldown(t *testing.T) {
 	})
 
 	t.Run("should return true when there is something in cache", func(t *testing.T) {
-		cache, err := NewInMemoryCooldownCache(2)
-		cache.lruCache.Add("does-exist", Cooldowns{})
+		t.Cleanup(cooldownLRUCache.Purge)
+
+		cache, err := NewInMemoryCooldownCache()
+		cooldownLRUCache.Add("does-exist", Cooldowns{})
 
 		require.NoError(t, err)
 
@@ -35,24 +40,57 @@ func TestInMemoryCooldownCache_HasCheckCooldown(t *testing.T) {
 }
 
 func TestInMemoryCooldownCache_SetCheckCooldown(t *testing.T) {
-	cache, err := NewInMemoryCooldownCache(2)
-	require.NoError(t, err)
+	t.Run("should set cooldowns when there is no entry in cache", func(t *testing.T) {
+		t.Cleanup(cooldownLRUCache.Purge)
 
-	exists, err := cache.HasCheckCooldown("added-later")
-	require.False(t, exists)
-	require.NoError(t, err)
+		cache, err := NewInMemoryCooldownCache()
+		require.NoError(t, err)
 
-	err = cache.SetCheckCooldown("added-later", 10)
-	require.NoError(t, err)
+		exists, err := cache.HasCheckCooldown("added-later")
+		require.False(t, exists)
+		require.NoError(t, err)
 
-	exists, err = cache.HasCheckCooldown("added-later")
-	assert.True(t, exists)
-	assert.NoError(t, err)
+		err = cache.SetCheckCooldown("added-later", 10)
+		require.NoError(t, err)
+
+		exists, err = cache.HasCheckCooldown("added-later")
+		assert.True(t, exists)
+		assert.NoError(t, err)
+	})
+
+	t.Run("should preserve fire event cooldown when already exists", func(t *testing.T) {
+		t.Cleanup(cooldownLRUCache.Purge)
+
+		cache, err := NewInMemoryCooldownCache()
+		require.NoError(t, err)
+
+		specificFireEventCooldown := time.Now().Add(time.Minute * 10)
+		cooldownLRUCache.Add("does-exist", Cooldowns{
+			FireEventCooldown: specificFireEventCooldown,
+		})
+
+		exists, err := cache.HasCheckCooldown("does-exist")
+		require.True(t, exists)
+		require.NoError(t, err)
+
+		err = cache.SetCheckCooldown("does-exist", 10)
+		require.NoError(t, err)
+
+		exists, err = cache.HasCheckCooldown("does-exist")
+		assert.True(t, exists)
+		assert.NoError(t, err)
+
+		cachedCooldowns, ok := cooldownLRUCache.Get("does-exist")
+		assert.True(t, ok)
+		assert.Equal(t, specificFireEventCooldown, cachedCooldowns.FireEventCooldown)
+	})
 }
 
 func TestInMemoryCooldownCache_IsCheckCooldownActive(t *testing.T) {
 	t.Run("should return ErrCheckCooldownDoesNotExist when there is no entry in cache", func(t *testing.T) {
-		cache, err := NewInMemoryCooldownCache(2)
+		t.Cleanup(cooldownLRUCache.Purge)
+
+		cache, err := NewInMemoryCooldownCache()
 		require.NoError(t, err)
 		active, err := cache.IsCheckCooldownActive("added-later")
 		assert.False(t, active)
@@ -60,7 +98,9 @@ func TestInMemoryCooldownCache_IsCheckCooldownActive(t *testing.T) {
 	})
 
 	t.Run("should return active = false when there is something in cache but cooldown is not active", func(t *testing.T) {
-		cache, err := NewInMemoryCooldownCache(2)
+		t.Cleanup(cooldownLRUCache.Purge)
+
+		cache, err := NewInMemoryCooldownCache()
 		require.NoError(t, err)
 
 		err = cache.SetCheckCooldown("cooldown-not-active", -120)
@@ -72,7 +112,9 @@ func TestInMemoryCooldownCache_IsCheckCooldownActive(t *testing.T) {
 	})
 
 	t.Run("should return active = true when there is something in cache but cooldown is not active", func(t *testing.T) {
-		cache, err := NewInMemoryCooldownCache(2)
+		t.Cleanup(cooldownLRUCache.Purge)
+
+		cache, err := NewInMemoryCooldownCache()
 		require.NoError(t, err)
 
 		err = cache.SetCheckCooldown("cooldown-not-active", 60)
@@ -86,7 +128,9 @@ func TestInMemoryCooldownCache_IsCheckCooldownActive(t *testing.T) {
 
 func TestInMemoryCooldownCache_HasFireEventCooldown(t *testing.T) {
 	t.Run("should return false when there is no entry in cache", func(t *testing.T) {
-		cache, err := NewInMemoryCooldownCache(2)
+		t.Cleanup(cooldownLRUCache.Purge)
+
+		cache, err := NewInMemoryCooldownCache()
 		require.NoError(t, err)
 
 		exists, err := cache.HasFireEventCooldown("unknown")
@@ -95,10 +139,12 @@ func TestInMemoryCooldownCache_HasFireEventCooldown(t *testing.T) {
 	})
 
 	t.Run("should return true when there is something in cache", func(t *testing.T) {
-		cache, err := NewInMemoryCooldownCache(2)
+		t.Cleanup(cooldownLRUCache.Purge)
+
+		cache, err := NewInMemoryCooldownCache()
 		require.NoError(t, err)
 
-		cache.lruCache.Add("does-exist", Cooldowns{})
+		cooldownLRUCache.Add("does-exist", Cooldowns{})
 
 		exists, err := cache.HasFireEventCooldown("does-exist")
 		assert.True(t, exists)
@@ -107,7 +153,9 @@ func TestInMemoryCooldownCache_HasFireEventCooldown(t *testing.T) {
 }
 
 func TestInMemoryCooldownCache_SetFireEventCooldown(t *testing.T) {
-	cache, err := NewInMemoryCooldownCache(2)
+	t.Cleanup(cooldownLRUCache.Purge)
+
+	cache, err := NewInMemoryCooldownCache()
 	require.NoError(t, err)
 
 	exists, err := cache.HasFireEventCooldown("added-later")
@@ -124,7 +172,9 @@ func TestInMemoryCooldownCache_SetFireEventCooldown(t *testing.T) {
 
 func TestInMemoryCooldownCache_IsFireEventCooldownActive(t *testing.T) {
 	t.Run("should return ErrFireEventCooldownDoesNotExist when there is no entry in cache", func(t *testing.T) {
-		cache, err := NewInMemoryCooldownCache(2)
+		t.Cleanup(cooldownLRUCache.Purge)
+
+		cache, err := NewInMemoryCooldownCache()
 		require.NoError(t, err)
 		active, err := cache.IsFireEventCooldownActive("added-later")
 		assert.False(t, active)
@@ -132,7 +182,9 @@ func TestInMemoryCooldownCache_IsFireEventCooldownActive(t *testing.T) {
 	})
 
 	t.Run("should return active = false when there is something in cache but cooldown is not active", func(t *testing.T) {
-		cache, err := NewInMemoryCooldownCache(2)
+		t.Cleanup(cooldownLRUCache.Purge)
+
+		cache, err := NewInMemoryCooldownCache()
 		require.NoError(t, err)
 
 		err = cache.SetFireEventCooldown("cooldown-not-active", -120)
@@ -144,7 +196,9 @@ func TestInMemoryCooldownCache_IsFireEventCooldownActive(t *testing.T) {
 	})
 
 	t.Run("should return active = true when there is something in cache but cooldown is not active", func(t *testing.T) {
-		cache, err := NewInMemoryCooldownCache(2)
+		t.Cleanup(cooldownLRUCache.Purge)
+
+		cache, err := NewInMemoryCooldownCache()
 		require.NoError(t, err)
 
 		err = cache.SetFireEventCooldown("cooldown-not-active", 60)
