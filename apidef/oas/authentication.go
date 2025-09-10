@@ -500,7 +500,7 @@ type Scopes struct {
 // Fill fills *Scopes from *apidef.ScopeClaim.
 func (s *Scopes) Fill(scopeClaim *apidef.ScopeClaim) {
 	s.ClaimName = scopeClaim.ScopeClaimName
-	if s.ClaimName != "" {
+	if s.ClaimName != "" && len(s.Claims) < 1 {
 		s.Claims = []string{scopeClaim.ScopeClaimName}
 	}
 

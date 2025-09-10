@@ -97,6 +97,14 @@ func (s *OAS) extractTokenTo(api *apidef.APIDefinition, name string) {
 	api.AuthConfigs[apidef.AuthTokenType] = authConfig
 }
 
+// JWK represents a JSON Web Key containing configuration for JWKS endpoint and its cache timeout.
+type JWK struct {
+	// URL is the jwk endpoint.
+	URL string `json:"url"`
+	// CacheTimeout defines how long the JWKS is kept in the cache before forcing a refresh.
+	CacheTimeout int64 `bson:"cacheTimeout" json:"cacheTimeout"`
+}
+
 // JWT holds the configuration for the JWT middleware.
 type JWT struct {
 	// Enabled activates the basic authentication mode.
@@ -113,7 +121,7 @@ type JWT struct {
 	Source string `bson:"source,omitempty" json:"source,omitempty"`
 
 	// JwksURIs contains a list of JSON Web Key Sets (JWKS) endpoints from which Tyk will retrieve JWKS to validate JSON Web Tokens (JWTs).
-	JwksURIs []apidef.JWK `bson:"jwksURIs,omitempty" json:"jwksURIs,omitempty"`
+	JwksURIs []JWK `bson:"jwksURIs,omitempty" json:"jwksURIs,omitempty"`
 
 	// SigningMethod contains the signing method to use for the JWT.
 	//
@@ -280,6 +288,22 @@ func (j *JWT) Import(enable bool) {
 	}
 }
 
+func (j *JWT) Normalize() {
+	// copy the values of the new JWT validation
+	if j == nil {
+		return
+	}
+	if len(j.BasePolicyClaims) > 0 {
+		j.PolicyFieldName = j.BasePolicyClaims[0]
+	}
+	if len(j.SubjectClaims) > 0 {
+		j.IdentityBaseField = j.SubjectClaims[0]
+	}
+	if j.Scopes != nil && len(j.Scopes.Claims) > 0 {
+		j.Scopes.ClaimName = j.Scopes.Claims[0]
+	}
+}
+
 func (s *OAS) fillJWT(api apidef.APIDefinition) {
 	ac, ok := api.AuthConfigs[apidef.JWTType]
 	if !ok || ac.Name == "" {
@@ -308,21 +332,48 @@ func (s *OAS) fillJWT(api apidef.APIDefinition) {
 	jwt.Enabled = api.EnableJWT
 	jwt.AuthSources.Fill(ac)
 	jwt.Source = api.JWTSource
-	jwt.JwksURIs = api.JWTJwksURIs
+
+	var jwksURIs []JWK
+	for _, jwksUri := range api.JWTJwksURIs {
+		convertedJwksUri := JWK{
+			URL:          jwksUri.URL,
+			CacheTimeout: jwksUri.CacheTimeout,
+		}
+		jwksURIs = append(jwksURIs, convertedJwksUri)
+	}
+	jwt.JwksURIs = jwksURIs
+
 	jwt.SigningMethod = api.JWTSigningMethod
 	jwt.IdentityBaseField = api.JWTIdentityBaseField
-	if jwt.IdentityBaseField != "" {
+	if jwt.IdentityBaseField != "" && len(jwt.SubjectClaims) == 0 {
 		jwt.SubjectClaims = []string{jwt.IdentityBaseField}
 	}
 	jwt.SkipKid = api.JWTSkipKid
 	jwt.PolicyFieldName = api.JWTPolicyFieldName
-	if jwt.PolicyFieldName != "" {
+	if jwt.PolicyFieldName != "" && len(jwt.BasePolicyClaims) == 0 {
 		jwt.BasePolicyClaims = []string{api.JWTPolicyFieldName}
 	}
 	jwt.ClientBaseField = api.JWTClientIDBaseField
 
 	if jwt.Scopes == nil {
 		jwt.Scopes = &Scopes{}
+	}
+
+	existing := s.GetJWTConfiguration()
+	if existing != nil {
+		jwt.BasePolicyClaims = existing.BasePolicyClaims
+		jwt.SubjectClaims = existing.SubjectClaims
+		jwt.AllowedIssuers = existing.AllowedIssuers
+		jwt.AllowedAudiences = existing.AllowedAudiences
+		jwt.AllowedSubjects = existing.AllowedSubjects
+		jwt.JTIValidation.Enabled = existing.JTIValidation.Enabled
+
+		if existing.Scopes != nil {
+			jwt.Scopes.Claims = existing.Scopes.Claims
+		}
+		if existing.CustomClaimValidation != nil {
+			jwt.CustomClaimValidation = existing.CustomClaimValidation
+		}
 	}
 
 	jwt.Scopes.Fill(&api.Scopes.JWT)
@@ -350,7 +401,17 @@ func (s *OAS) extractJWTTo(api *apidef.APIDefinition, name string) {
 	api.EnableJWT = jwt.Enabled
 	jwt.AuthSources.ExtractTo(&ac)
 	api.JWTSource = jwt.Source
-	api.JWTJwksURIs = jwt.JwksURIs
+
+	var jwksURIs []apidef.JWK
+	for _, jwksUri := range jwt.JwksURIs {
+		convertedJwksUri := apidef.JWK{
+			URL:          jwksUri.URL,
+			CacheTimeout: jwksUri.CacheTimeout,
+		}
+		jwksURIs = append(jwksURIs, convertedJwksUri)
+	}
+	api.JWTJwksURIs = jwksURIs
+
 	api.JWTSigningMethod = jwt.SigningMethod
 	api.JWTIdentityBaseField = jwt.IdentityBaseField
 	api.JWTSkipKid = jwt.SkipKid
