@@ -357,6 +357,8 @@ func TestE2E_HealthCheckWithServiceDiscovery(t *testing.T) {
 		Discovery: config.ServiceConfig{},
 		Health:    config.ServiceConfig{},
 	}
+	// Enable external services for discovery testing
+	gwConf.ExternalServices.Global.Enabled = true
 	ts.Gw.SetConfig(gwConf)
 
 	// Test service discovery directly without complex initialization

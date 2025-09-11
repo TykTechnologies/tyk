@@ -81,7 +81,7 @@ func (k *JWTMiddleware) Init() {
 
 			// Create client factory for JWK fetching
 			clientFactory := NewExternalHTTPClientFactory(k.Gw)
-			client, clientErr := clientFactory.CreateJWKClient(k.Gw.GetConfig().JWTSSLInsecureSkipVerify)
+			client, clientErr := clientFactory.CreateJWKClient()
 
 			for _, jwk := range config.JWTJwksURIs {
 				var jwkSet *jose.JSONWebKeySet
@@ -168,7 +168,7 @@ func parseJWK(buf []byte) (*jose.JSONWebKeySet, error) {
 func (k *JWTMiddleware) legacyGetSecretFromURL(url, kid, keyType string) (interface{}, error) {
 	// Try to use HTTP client factory first
 	clientFactory := NewExternalHTTPClientFactory(k.Gw)
-	client, err := clientFactory.CreateJWKClient(k.Gw.GetConfig().JWTSSLInsecureSkipVerify)
+	client, err := clientFactory.CreateJWKClient()
 	if err != nil {
 		// Fallback to original client
 		client = &http.Client{
@@ -270,7 +270,7 @@ func (k *JWTMiddleware) getSecretFromURL(url string, kidVal interface{}, keyType
 	if !found || cacheOutdated {
 		// Try to use HTTP client factory first
 		clientFactory := NewExternalHTTPClientFactory(k.Gw)
-		client, clientErr := clientFactory.CreateJWKClient(k.Gw.GetConfig().JWTSSLInsecureSkipVerify)
+		client, clientErr := clientFactory.CreateJWKClient()
 		if clientErr == nil {
 			if jwkSet, err = getJWKWithClient(url, client); err != nil {
 				k.Logger().WithError(err).Info("Failed to decode JWKs body with factory client. Trying x5c PEM fallback.")
@@ -439,7 +439,7 @@ func (k *JWTMiddleware) getSecretFromMultipleJWKURIs(jwkURIs []apidef.JWK, kidVa
 
 		// Create client factory for JWK fetching
 		clientFactory := NewExternalHTTPClientFactory(k.Gw)
-		client, clientErr := clientFactory.CreateJWKClient(k.Gw.GetConfig().JWTSSLInsecureSkipVerify)
+		client, clientErr := clientFactory.CreateJWKClient()
 
 		for _, jwk := range jwkURIs {
 			var jwkSet *jose.JSONWebKeySet
