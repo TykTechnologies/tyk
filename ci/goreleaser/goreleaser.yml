@@ -328,6 +328,7 @@ dockers:
       - "tykio/tyk-gateway-ee:{{.Tag}}-ee-amd64"
     build_flag_templates:
       - "--build-arg=PORTS=8080"
+      - "--build-arg=BUILD_PACKAGE_NAME=tyk-gateway-ee"
       - "--platform=linux/amd64"
       - "--label=org.opencontainers.image.created={{.Date}}"
       - "--label=org.opencontainers.image.title={{.ProjectName}} Enterprise Edition"
@@ -340,6 +341,7 @@ dockers:
     extra_files:
       - "ci/install/"
       - "README.md"
+      - "dist/"
       - "LICENSE.md"
       - "apps/app_sample.json"
       - "templates"
@@ -355,6 +357,7 @@ dockers:
       - "tykio/tyk-gateway-ee:{{.Tag}}-ee-arm64"
     build_flag_templates:
       - "--build-arg=PORTS=8080"
+      - "--build-arg=BUILD_PACKAGE_NAME=tyk-gateway-ee"
       - "--platform=linux/arm64"
       - "--label=org.opencontainers.image.created={{.Date}}"
       - "--label=org.opencontainers.image.title={{.ProjectName}} Enterprise Edition"
@@ -367,6 +370,7 @@ dockers:
     extra_files:
       - "ci/install/"
       - "README.md"
+      - "dist/"
       - "LICENSE.md"
       - "apps/app_sample.json"
       - "templates"
@@ -382,6 +386,7 @@ dockers:
       - "tykio/tyk-gateway-fips:{{.Tag}}-fips-amd64"
     build_flag_templates:
       - "--build-arg=PORTS=8080"
+      - "--build-arg=BUILD_PACKAGE_NAME=tyk-gateway-fips"
       - "--platform=linux/amd64"
       - "--label=org.opencontainers.image.created={{.Date}}"
       - "--label=org.opencontainers.image.title={{.ProjectName}} FIPS"
@@ -394,6 +399,7 @@ dockers:
     extra_files:
       - "ci/install/"
       - "README.md"
+      - "dist/"
       - "LICENSE.md"
       - "apps/app_sample.json"
       - "templates"
@@ -409,6 +415,7 @@ dockers:
       - "tykio/tyk-gateway:{{.Tag}}-std-amd64"
     build_flag_templates:
       - "--build-arg=PORTS=8080"
+      - "--build-arg=BUILD_PACKAGE_NAME=tyk-gateway"
       - "--platform=linux/amd64"
       - "--label=org.opencontainers.image.created={{.Date}}"
       - "--label=org.opencontainers.image.title={{.ProjectName}}"
@@ -421,6 +428,7 @@ dockers:
     extra_files:
       - "ci/install/"
       - "README.md"
+      - "dist/"
       - "LICENSE.md"
       - "apps/app_sample.json"
       - "templates"
@@ -436,6 +444,7 @@ dockers:
       - "tykio/tyk-gateway:{{.Tag}}-std-arm64"
     build_flag_templates:
       - "--build-arg=PORTS=8080"
+      - "--build-arg=BUILD_PACKAGE_NAME=tyk-gateway"
       - "--platform=linux/arm64"
       - "--label=org.opencontainers.image.created={{.Date}}"
       - "--label=org.opencontainers.image.title={{.ProjectName}}"
@@ -448,6 +457,7 @@ dockers:
     extra_files:
       - "ci/install/"
       - "README.md"
+      - "dist/"
       - "LICENSE.md"
       - "apps/app_sample.json"
       - "templates"
