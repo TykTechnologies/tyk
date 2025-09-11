@@ -303,9 +303,9 @@ func (f *ExternalHTTPClientFactory) getTLSConfig(serviceConfig config.ServiceCon
 }
 
 // CreateJWKClient creates an HTTP client specifically configured for JWK endpoint requests.
-// This method implements proper backward compatibility: uses external services OAuth mTLS configuration
-// if explicitly set, otherwise falls back to legacy jwt_ssl_insecure_skip_verify setting.
-func (f *ExternalHTTPClientFactory) CreateJWKClient(legacyInsecureSkipVerify bool) (*http.Client, error) {
+// This method requires external services OAuth configuration to be set up and will fail if not configured.
+// Callers should fall back to getJWK() function if this method returns an error.
+func (f *ExternalHTTPClientFactory) CreateJWKClient() (*http.Client, error) {
 	log.Debug("[ExternalServices] Creating JWK HTTP client")
 
 	client, err := f.CreateClient(config.ServiceTypeOAuth)
@@ -313,26 +313,7 @@ func (f *ExternalHTTPClientFactory) CreateJWKClient(legacyInsecureSkipVerify boo
 		return nil, err
 	}
 
-	// Check if external services OAuth mTLS has been explicitly configured
-	serviceConfig := f.getServiceConfig(config.ServiceTypeOAuth)
-
-	if transport, ok := client.Transport.(*http.Transport); ok {
-		if transport.TLSClientConfig == nil {
-			transport.TLSClientConfig = &tls.Config{}
-		}
-
-		// Only use legacy setting if external services OAuth mTLS is not explicitly configured
-		if !serviceConfig.MTLS.IsExplicitlyConfigured() {
-			// Fall back to legacy setting when external services is not configured
-			transport.TLSClientConfig.InsecureSkipVerify = legacyInsecureSkipVerify
-			log.Debugf("[ExternalServices] JWK client using legacy JWT SSL skip verify setting: %t", legacyInsecureSkipVerify)
-		} else {
-			// External services OAuth mTLS configuration takes precedence
-			log.Debugf("[ExternalServices] JWK client using external services OAuth mTLS configuration: insecureSkipVerify=%t",
-				transport.TLSClientConfig.InsecureSkipVerify)
-		}
-	}
-
+	log.Debug("[ExternalServices] JWK client using external services OAuth configuration")
 	return client, nil
 }
 
