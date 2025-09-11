@@ -465,6 +465,7 @@ func (m *proxyMux) serve(gw *Gateway) {
 				ReadTimeout:  readTimeout,
 				WriteTimeout: writeTimeout,
 				Handler:      handler,
+				MaxHeaderBytes: conf.HttpServerOptions.MaxHeaderBytes,
 			}
 			if gw.ConnectionWatcher != nil {
 				p.httpServer.ConnState = gw.ConnectionWatcher.OnStateChange
