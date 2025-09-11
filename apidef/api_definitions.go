@@ -411,6 +411,7 @@ type ExtendedPathsSet struct {
 	ValidateJSON            []ValidatePathMeta    `bson:"validate_json" json:"validate_json,omitempty"`
 	ValidateRequest         []ValidateRequestMeta `bson:"validate_request" json:"validate_request,omitempty"`
 	Internal                []InternalMeta        `bson:"internal" json:"internal,omitempty"`
+	TrafficMirror           []TrafficMirrorMeta   `bson:"traffic_mirror" json:"traffic_mirror,omitempty"`
 	GoPlugin                []GoPluginMeta        `bson:"go_plugin" json:"go_plugin,omitempty"`
 	PersistGraphQL          []PersistGraphQLMeta  `bson:"persist_graphql" json:"persist_graphql"`
 	RateLimit               []RateLimitMeta       `bson:"rate_limit" json:"rate_limit"`
@@ -1662,6 +1663,24 @@ type Introspection struct {
 type IntrospectionCache struct {
 	Enabled bool  `bson:"enabled" json:"enabled"`
 	Timeout int64 `bson:"timeout" json:"timeout"`
+}
+
+type TrafficMirrorMeta struct {
+	Disabled     bool                        `bson:"disabled" json:"disabled"`
+	Path         string                      `bson:"path" json:"path"`
+	Method       string                      `bson:"method" json:"method"`
+	IgnoreCase   bool                        `bson:"ignore_case" json:"ignore_case"`
+	Destinations []TrafficMirrorDestination  `bson:"destinations" json:"destinations"`
+	SampleRate   float64                     `bson:"sample_rate,omitempty" json:"sample_rate,omitempty"`
+	Async        bool                        `bson:"async" json:"async"`
+	Headers      map[string]string           `bson:"headers,omitempty" json:"headers,omitempty"`
+}
+
+type TrafficMirrorDestination struct {
+	URL        string            `bson:"url" json:"url"`
+	Headers    map[string]string `bson:"headers,omitempty" json:"headers,omitempty"`
+	Timeout    int               `bson:"timeout,omitempty" json:"timeout,omitempty"` // seconds
+	SampleRate float64           `bson:"sample_rate,omitempty" json:"sample_rate,omitempty"`
 }
 
 // WebHookHandlerConf holds configuration related to webhook event handler.

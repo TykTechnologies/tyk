@@ -465,6 +465,7 @@ func (gw *Gateway) processSpec(
 	gw.mwAppendEnabled(&chainArray, &TransformHeaders{BaseMiddleware: baseMid.Copy()})
 	gw.mwAppendEnabled(&chainArray, &URLRewriteMiddleware{BaseMiddleware: baseMid.Copy()})
 	gw.mwAppendEnabled(&chainArray, &TransformMethod{BaseMiddleware: baseMid.Copy()})
+	gw.mwAppendEnabled(&chainArray, &TrafficMirrorMiddleware{BaseMiddleware: baseMid.Copy()})
 
 	// Earliest we can respond with cache get 200 ok
 	gw.mwAppendEnabled(&chainArray, newMockResponseMiddleware(baseMid.Copy()))
