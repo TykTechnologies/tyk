@@ -1315,7 +1315,10 @@
         },
         "securityProcessingMode": {
           "type": "string",
-          "enum": ["legacy", "compliant"],
+          "enum": [
+            "legacy",
+            "compliant"
+          ],
           "description": "Controls how multiple security requirements are processed"
         },
         "security": {
