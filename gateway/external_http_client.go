@@ -41,6 +41,11 @@ func NewExternalHTTPClientFactory(gw *Gateway) *ExternalHTTPClientFactory {
 func (f *ExternalHTTPClientFactory) CreateClient(serviceType string) (*http.Client, error) {
 	log.Debugf("[ExternalServices] Creating HTTP client for service type: %s", serviceType)
 
+	// Check if external services are configured for this service type
+	if !f.isServiceConfigured(serviceType) {
+		return nil, fmt.Errorf("external services not configured for service type: %s", serviceType)
+	}
+
 	serviceConfig := f.getServiceConfig(serviceType)
 
 	transport := f.getServiceTransport(serviceType)
@@ -111,6 +116,44 @@ func (f *ExternalHTTPClientFactory) getServiceConfig(serviceType string) config.
 	}
 
 	return serviceConfig
+}
+
+// isServiceConfigured checks if external services configuration is enabled for the given service type.
+func (f *ExternalHTTPClientFactory) isServiceConfigured(serviceType string) bool {
+	// First check if global configuration is enabled - this applies to all services
+	if f.config.Global.Enabled {
+		return true
+	}
+
+	// Get service-specific configuration (without global merge for more precise checking)
+	var serviceConfig config.ServiceConfig
+	switch serviceType {
+	case config.ServiceTypeOAuth:
+		serviceConfig = f.config.OAuth
+	case config.ServiceTypeStorage:
+		serviceConfig = f.config.Storage
+	case config.ServiceTypeWebhook:
+		serviceConfig = f.config.Webhooks
+	case config.ServiceTypeHealth:
+		serviceConfig = f.config.Health
+	case config.ServiceTypeDiscovery:
+		serviceConfig = f.config.Discovery
+	default:
+		// Unknown service type - no service-specific config available
+		return false
+	}
+
+	// Check if service-specific proxy configuration is enabled
+	if serviceConfig.Proxy.Enabled || serviceConfig.Proxy.HTTPProxy != "" || serviceConfig.Proxy.HTTPSProxy != "" {
+		return true
+	}
+
+	// Check if service-specific mTLS is enabled
+	if serviceConfig.MTLS.Enabled {
+		return true
+	}
+
+	return false
 }
 
 // getProxyFunction returns the appropriate proxy function based on configuration.
