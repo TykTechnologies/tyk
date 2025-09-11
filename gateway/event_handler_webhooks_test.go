@@ -116,6 +116,7 @@ func TestChecksum(t *testing.T) {
 					CertName:         "Cert Soon To Expire",
 					ExpiresAt:        time.Now().Add(time.Hour * 24),
 					DaysRemaining:    1,
+					APIID:            "123abc",
 				},
 				TimeStamp: "now",
 			}
@@ -141,6 +142,7 @@ func TestChecksum(t *testing.T) {
 					CertName:         "Cert Expired",
 					ExpiredAt:        time.Now().Add(time.Hour * -24),
 					DaysSinceExpiry:  1,
+					APIID:            "123abc",
 				},
 				TimeStamp: "now",
 			}

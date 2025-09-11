@@ -21,6 +21,10 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
+	"syscall"
+	texttemplate "text/template"
+	"time"
 
 	"github.com/rs/cors"
 	"github.com/samber/lo"
@@ -28,16 +32,6 @@ import (
 	"github.com/TykTechnologies/tyk/tcp"
 	"github.com/TykTechnologies/tyk/trace"
 
-	"sync/atomic"
-	"syscall"
-	texttemplate "text/template"
-	"time"
-
-	"github.com/TykTechnologies/tyk/internal/crypto"
-	"github.com/TykTechnologies/tyk/internal/httputil"
-	"github.com/TykTechnologies/tyk/internal/otel"
-	"github.com/TykTechnologies/tyk/internal/scheduler"
-	"github.com/TykTechnologies/tyk/test"
 	logstashhook "github.com/bshuster-repo/logrus-logstash-hook"
 	logrussentry "github.com/evalphobia/logrus_sentry"
 	grayloghook "github.com/gemnasium/logrus-graylog-hook"
@@ -45,6 +39,12 @@ import (
 	"github.com/lonelycode/osin"
 	"github.com/sirupsen/logrus"
 	logrussyslog "github.com/sirupsen/logrus/hooks/syslog"
+
+	"github.com/TykTechnologies/tyk/internal/crypto"
+	"github.com/TykTechnologies/tyk/internal/httputil"
+	"github.com/TykTechnologies/tyk/internal/otel"
+	"github.com/TykTechnologies/tyk/internal/scheduler"
+	"github.com/TykTechnologies/tyk/test"
 
 	"github.com/TykTechnologies/tyk/internal/uuid"
 
