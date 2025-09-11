@@ -99,7 +99,7 @@ type CertificateExpiryCheckBatcher struct {
 
 // NewCertificateExpiryCheckBatcher creates a new CertificateExpiryCheckBatcher.
 func NewCertificateExpiryCheckBatcher(logger *logrus.Entry, apiMetaData APIMetaData, cfg config.CertificateExpiryMonitorConfig, fallbackStorage storage.Handler, eventFunc FireEventFunc) (*CertificateExpiryCheckBatcher, error) {
-	inMemoryCache, err := NewInMemoryCooldownCache(128)
+	inMemoryCache, err := NewInMemoryCooldownCache()
 	if err != nil {
 		return nil, err
 	}
@@ -292,6 +292,7 @@ func (c *CertificateExpiryCheckBatcher) handleEventForExpiredCertificate(certInf
 		CertName:        certInfo.CommonName,
 		ExpiredAt:       certInfo.NotAfter,
 		DaysSinceExpiry: daysSinceExpiry,
+		APIID:           c.apiMetaData.APIID,
 	}
 
 	c.fireEvent(event.CertificateExpired, eventMeta)
@@ -313,6 +314,7 @@ func (c *CertificateExpiryCheckBatcher) handleEventForSoonToExpireCertificate(ce
 		CertName:      certInfo.CommonName,
 		ExpiresAt:     certInfo.NotAfter,
 		DaysRemaining: daysUntilExpiry,
+		APIID:         c.apiMetaData.APIID,
 	}
 
 	c.fireEvent(event.CertificateExpiringSoon, eventMeta)
