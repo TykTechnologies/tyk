@@ -27,6 +27,8 @@ const (
 	Main = ""
 
 	// DefaultOpenAPI is the default open API version which is set to migrated APIs.
+	// Remains 3.0.6 for backward compatibility. OAS 3.1 support is available
+	// through pb33f/libopenapi migration when explicitly specified in documents.
 	DefaultOpenAPI = "3.0.6"
 )
 

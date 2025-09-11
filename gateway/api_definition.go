@@ -27,6 +27,7 @@ import (
 	"github.com/getkin/kin-openapi/openapi3"
 
 	"github.com/TykTechnologies/tyk/apidef/oas"
+	"github.com/TykTechnologies/tyk/internal/oasutil"
 
 	"github.com/cenk/backoff"
 
@@ -361,7 +362,7 @@ func (a APIDefinitionLoader) MakeSpec(def *model.MergedAPI, logger *logrus.Entry
 	}
 
 	if spec.IsOAS && def.OAS != nil {
-		loader := openapi3.NewLoader()
+		loader := oasutil.NewLoader()
 		if err := loader.ResolveRefsIn(&def.OAS.T, nil); err != nil {
 			logger.WithError(err).Errorf("Dashboard loaded API's OAS reference resolve failed: %s", def.APIID)
 		}
@@ -710,9 +711,10 @@ func (a APIDefinitionLoader) loadDefFromFilePath(filePath string) (*APISpec, err
 
 	nestDef := model.MergedAPI{APIDefinition: &def}
 	if def.IsOAS {
-		loader := openapi3.NewLoader()
+		loader := oasutil.NewLoader()
 		// use openapi3.ReadFromFile as ReadFromURIFunc since the default implementation cache spec based on file path.
-		loader.ReadFromURIFunc = openapi3.ReadFromFile
+		// TODO: Update this when full pb33f/libopenapi migration is complete
+		loader.OpenAPI3Loader.ReadFromURIFunc = openapi3.ReadFromFile
 		oasDoc, err := loader.LoadFromFile(a.GetOASFilepath(filePath))
 		if err == nil {
 			nestDef.OAS = &oas.OAS{T: *oasDoc}
