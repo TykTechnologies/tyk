@@ -13,16 +13,16 @@ RUN apt-get update \
 RUN dpkg --purge --force-remove-essential curl ncurses-base || true
 RUN rm -fv /usr/bin/passwd /usr/sbin/adduser || true
 
+# Comment this to test in dev
+COPY dist/${BUILD_PACKAGE_NAME}_*_${TARGETARCH}.deb /
+RUN dpkg -i /${BUILD_PACKAGE_NAME}_*_${TARGETARCH}.deb && find / -maxdepth 1 -name "*.deb" -delete
+
 # Clean up caches, unwanted .a and .o files
 RUN rm -rf /root/.cache \
     && apt-get -y autoremove \
     && apt-get clean \
-    && rm -rf /usr/include/* /var/cache/apt/archives /var/lib/{apt,dpkg,cache,log} \
+    && rm -rf /usr/include/* /var/cache/apt/archives /var/lib/apt /var/lib/cache /var/log/* \
     && find /usr/lib -type f -name '*.a' -o -name '*.o' -delete
-
-# Comment this to test in dev
-COPY ${BUILD_PACKAGE_NAME}_*${TARGETARCH}.deb /
-RUN dpkg -i /${BUILD_PACKAGE_NAME}*${TARGETARCH}.deb && rm /*.deb
 
 ARG PORTS
 
