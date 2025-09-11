@@ -86,6 +86,7 @@ const (
 	GoPlugin
 	PersistGraphQL
 	RateLimit
+	TrafficMirrored
 )
 
 // RequestStatus is a custom type to avoid collisions
@@ -123,6 +124,7 @@ const (
 	StatusGoPlugin                 RequestStatus = "Go plugin"
 	StatusPersistGraphQL           RequestStatus = "Persist GraphQL"
 	StatusRateLimit                RequestStatus = "Rate Limited"
+	StatusTrafficMirrored          RequestStatus = "Traffic Mirrored"
 )
 
 type EndPointCacheMeta struct {
@@ -1294,6 +1296,24 @@ func (a APIDefinitionLoader) compileRateLimitPathsSpec(paths []apidef.RateLimitM
 	return urlSpec
 }
 
+func (a APIDefinitionLoader) compileTrafficMirrorPathsSpec(paths []apidef.TrafficMirrorMeta, stat URLStatus, conf config.Config) []URLSpec {
+	urlSpec := []URLSpec{}
+
+	for _, stringSpec := range paths {
+		if stringSpec.Disabled {
+			continue
+		}
+
+		newSpec := URLSpec{}
+		a.generateRegex(stringSpec.Path, &newSpec, stat, conf)
+		// Extend with method actions
+		newSpec.TrafficMirror = stringSpec
+		urlSpec = append(urlSpec, newSpec)
+	}
+
+	return urlSpec
+}
+
 func (a APIDefinitionLoader) getExtendedPathSpecs(apiVersionDef apidef.VersionInfo, apiSpec *APISpec, conf config.Config) ([]URLSpec, bool) {
 	// TODO: New compiler here, needs to put data into a different structure
 
@@ -1321,6 +1341,7 @@ func (a APIDefinitionLoader) getExtendedPathSpecs(apiVersionDef apidef.VersionIn
 	goPlugins := a.compileGopluginPathsSpec(apiVersionDef.ExtendedPaths.GoPlugin, GoPlugin, apiSpec, conf)
 	persistGraphQL := a.compilePersistGraphQLPathSpec(apiVersionDef.ExtendedPaths.PersistGraphQL, PersistGraphQL, apiSpec, conf)
 	rateLimitPaths := a.compileRateLimitPathsSpec(apiVersionDef.ExtendedPaths.RateLimit, RateLimit, conf)
+	trafficMirrorPaths := a.compileTrafficMirrorPathsSpec(apiVersionDef.ExtendedPaths.TrafficMirror, TrafficMirrored, conf)
 
 	combinedPath := []URLSpec{}
 	combinedPath = append(combinedPath, mockResponsePaths...)
@@ -1347,6 +1368,7 @@ func (a APIDefinitionLoader) getExtendedPathSpecs(apiVersionDef apidef.VersionIn
 	combinedPath = append(combinedPath, validateJSON...)
 	combinedPath = append(combinedPath, internalPaths...)
 	combinedPath = append(combinedPath, rateLimitPaths...)
+	combinedPath = append(combinedPath, trafficMirrorPaths...)
 
 	return combinedPath, len(whiteListPaths) > 0
 }
@@ -1409,6 +1431,8 @@ func (a *APISpec) getURLStatus(stat URLStatus) RequestStatus {
 		return StatusPersistGraphQL
 	case RateLimit:
 		return StatusRateLimit
+	case TrafficMirrored:
+		return StatusTrafficMirrored
 	default:
 		log.Error("URL Status was not one of Ignored, Blacklist or WhiteList! Blocking.")
 		return EndPointNotAllowed

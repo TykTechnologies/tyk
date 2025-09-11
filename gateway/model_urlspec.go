@@ -37,6 +37,7 @@ type URLSpec struct {
 	GoPluginMeta              GoPluginMiddleware
 	PersistGraphQL            apidef.PersistGraphQLMeta
 	RateLimit                 apidef.RateLimitMeta
+	TrafficMirror             apidef.TrafficMirrorMeta
 
 	IgnoreCase bool
 }
@@ -85,6 +86,10 @@ func (u *URLSpec) modeSpecificSpec(mode URLStatus) (interface{}, bool) {
 		return &u.GoPluginMeta, true
 	case PersistGraphQL:
 		return &u.PersistGraphQL, true
+	case RateLimit:
+		return &u.RateLimit, true
+	case TrafficMirrored:
+		return &u.TrafficMirror, true
 	default:
 		return nil, false
 	}
@@ -135,6 +140,8 @@ func (u *URLSpec) matchesMethod(method string) bool {
 		return method == u.PersistGraphQL.Method
 	case RateLimit:
 		return method == u.RateLimit.Method
+	case TrafficMirrored:
+		return method == u.TrafficMirror.Method
 	default:
 		return false
 	}
