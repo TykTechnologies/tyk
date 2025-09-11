@@ -542,6 +542,7 @@ func TestCertificateExpiryCheckBatcher(t *testing.T) {
 					CertName:        "test-cert",
 					ExpiredAt:       expiredSince,
 					DaysSinceExpiry: 2,
+					APIID:           "123abc",
 				}, actualEventMeta)
 			})
 
@@ -621,6 +622,7 @@ func TestCertificateExpiryCheckBatcher(t *testing.T) {
 					CertName:      "test-cert",
 					ExpiresAt:     expiry,
 					DaysRemaining: 2,
+					APIID:         "123abc",
 				}, actualEventMeta)
 			})
 
@@ -700,6 +702,7 @@ func TestCertificateExpiryCheckBatcher(t *testing.T) {
 					CertName:      "test-cert",
 					ExpiresAt:     expiry,
 					DaysRemaining: 2,
+					APIID:         "123abc",
 				}, actualEventMeta)
 			})
 		})
