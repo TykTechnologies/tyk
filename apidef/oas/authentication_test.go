@@ -18,9 +18,6 @@ func TestAuthentication(t *testing.T) {
 	var resultAuthentication Authentication
 	resultAuthentication.Fill(convertedAPI)
 
-	// Set expected default for SecurityProcessingMode
-	emptyAuthentication.SecurityProcessingMode = "legacy"
-
 	assert.Equal(t, emptyAuthentication, resultAuthentication)
 }
 
@@ -347,16 +344,16 @@ func TestSecurityProcessingMode(t *testing.T) {
 			expected string
 		}{
 			{
-				name:     "nil field defaults to legacy",
+				name:     "empty field stays empty",
 				input:    &Authentication{},
-				expected: "legacy",
+				expected: "",
 			},
 			{
-				name: "empty string defaults to legacy",
+				name: "empty string stays empty",
 				input: &Authentication{
 					SecurityProcessingMode: "",
 				},
-				expected: "legacy",
+				expected: "",
 			},
 			{
 				name: "explicit legacy",
@@ -412,7 +409,7 @@ func TestSecurityProcessingMode(t *testing.T) {
 			input    string
 			expected string
 		}{
-			{"empty defaults to legacy", "", "legacy"},
+			{"empty stays empty", "", ""},
 			{"legacy stays legacy", "legacy", "legacy"},
 			{"compliant stays compliant", "compliant", "compliant"},
 			{"invalid defaults to legacy", "invalid", "legacy"},
@@ -430,16 +427,40 @@ func TestSecurityProcessingMode(t *testing.T) {
 		}
 	})
 
-	t.Run("FillWithDefault", func(t *testing.T) {
-		// Test that Fill properly sets default when API has empty mode
-		api := apidef.APIDefinition{
-			SecurityProcessingMode: "",
-		}
+	t.Run("FillFromAPIDefinition", func(t *testing.T) {
+		// Test that Fill copies the value as-is from APIDefinition
+		t.Run("empty string", func(t *testing.T) {
+			api := apidef.APIDefinition{
+				SecurityProcessingMode: "",
+			}
 
-		auth := &Authentication{}
-		auth.Fill(api)
+			auth := &Authentication{}
+			auth.Fill(api)
 
-		assert.Equal(t, "legacy", auth.SecurityProcessingMode)
+			assert.Equal(t, "", auth.SecurityProcessingMode)
+		})
+
+		t.Run("legacy value", func(t *testing.T) {
+			api := apidef.APIDefinition{
+				SecurityProcessingMode: "legacy",
+			}
+
+			auth := &Authentication{}
+			auth.Fill(api)
+
+			assert.Equal(t, "legacy", auth.SecurityProcessingMode)
+		})
+
+		t.Run("compliant value", func(t *testing.T) {
+			api := apidef.APIDefinition{
+				SecurityProcessingMode: "compliant",
+			}
+
+			auth := &Authentication{}
+			auth.Fill(api)
+
+			assert.Equal(t, "compliant", auth.SecurityProcessingMode)
+		})
 	})
 
 	t.Run("GetDefaultSecurityProcessingMode", func(t *testing.T) {

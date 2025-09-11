@@ -139,12 +139,8 @@ func (a *Authentication) Fill(api apidef.APIDefinition) {
 	a.StripAuthorizationData = api.StripAuthData
 	a.BaseIdentityProvider = api.BaseIdentityProvidedBy
 
-	// Fill SecurityProcessingMode with default if empty
-	if api.SecurityProcessingMode == "" {
-		a.SecurityProcessingMode = "legacy"
-	} else {
-		a.SecurityProcessingMode = api.SecurityProcessingMode
-	}
+	// Copy SecurityProcessingMode as-is from APIDefinition
+	a.SecurityProcessingMode = api.SecurityProcessingMode
 
 	if a.Custom == nil {
 		a.Custom = &CustomPluginAuthentication{}
@@ -201,9 +197,10 @@ func (a *Authentication) ExtractTo(api *apidef.APIDefinition) {
 	api.StripAuthData = a.StripAuthorizationData
 	api.BaseIdentityProvidedBy = a.BaseIdentityProvider
 
-	// Extract SecurityProcessingMode with validation and default
+	// Extract SecurityProcessingMode with validation
 	if a.SecurityProcessingMode == "" {
-		api.SecurityProcessingMode = "legacy"
+		// Keep empty as empty for roundtrip consistency
+		api.SecurityProcessingMode = ""
 	} else if a.SecurityProcessingMode == "legacy" || a.SecurityProcessingMode == "compliant" {
 		api.SecurityProcessingMode = a.SecurityProcessingMode
 	} else {
