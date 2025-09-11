@@ -364,38 +364,81 @@ func TestExternalHTTPClientFactory_shouldBypassProxy(t *testing.T) {
 }
 
 func TestExternalHTTPClientFactory_CreateJWKClient(t *testing.T) {
-	gwConfig := config.Config{
-		ExternalServices: config.ExternalServiceConfig{
-			Global: config.GlobalProxyConfig{
-				Enabled:   true,
-				HTTPProxy: "http://proxy:8080",
+	t.Run("legacy behavior when external services not configured", func(t *testing.T) {
+		gwConfig := config.Config{
+			ExternalServices: config.ExternalServiceConfig{
+				Global: config.GlobalProxyConfig{
+					Enabled:   true,
+					HTTPProxy: "http://proxy:8080",
+				},
 			},
-		},
-	}
+		}
 
-	gw := &Gateway{}
-	gw.SetConfig(gwConfig)
+		gw := &Gateway{}
+		gw.SetConfig(gwConfig)
+		factory := NewExternalHTTPClientFactory(gw)
 
-	factory := NewExternalHTTPClientFactory(gw)
-
-	t.Run("with insecure skip verify true", func(t *testing.T) {
+		// Legacy setting should be used when external services OAuth mTLS is not configured
 		client, err := factory.CreateJWKClient(true)
 		require.NoError(t, err)
 		require.NotNil(t, client)
 
 		transport := client.Transport.(*http.Transport)
-		assert.True(t, transport.TLSClientConfig.InsecureSkipVerify)
-		assert.NotNil(t, transport.Proxy) // Should have proxy from config
+		assert.True(t, transport.TLSClientConfig.InsecureSkipVerify) // Should use legacy setting
+		assert.NotNil(t, transport.Proxy)                            // Should have proxy from config
 	})
 
-	t.Run("with insecure skip verify false", func(t *testing.T) {
-		client, err := factory.CreateJWKClient(false)
+	t.Run("external services takes precedence when configured", func(t *testing.T) {
+		gwConfig := config.Config{
+			ExternalServices: config.ExternalServiceConfig{
+				Global: config.GlobalProxyConfig{
+					Enabled:   true,
+					HTTPProxy: "http://proxy:8080",
+				},
+				OAuth: config.ServiceConfig{
+					MTLS: config.MTLSConfig{
+						InsecureSkipVerify: false, // External services says false
+					},
+				},
+			},
+		}
+
+		gw := &Gateway{}
+		gw.SetConfig(gwConfig)
+		factory := NewExternalHTTPClientFactory(gw)
+
+		// External services setting should override legacy setting
+		client, err := factory.CreateJWKClient(true) // Legacy says true
 		require.NoError(t, err)
 		require.NotNil(t, client)
 
 		transport := client.Transport.(*http.Transport)
-		assert.False(t, transport.TLSClientConfig.InsecureSkipVerify)
-		assert.NotNil(t, transport.Proxy) // Should have proxy from config
+		assert.False(t, transport.TLSClientConfig.InsecureSkipVerify) // Should use external services setting (false)
+		assert.NotNil(t, transport.Proxy)                             // Should have proxy from config
+	})
+
+	t.Run("legacy fallback when only enabled=true but no other mTLS config", func(t *testing.T) {
+		gwConfig := config.Config{
+			ExternalServices: config.ExternalServiceConfig{
+				OAuth: config.ServiceConfig{
+					MTLS: config.MTLSConfig{
+						Enabled: true, // Only enabled is set, no other mTLS configuration
+					},
+				},
+			},
+		}
+
+		gw := &Gateway{}
+		gw.SetConfig(gwConfig)
+		factory := NewExternalHTTPClientFactory(gw)
+
+		// Should use legacy since enabled=true alone is not considered explicit configuration
+		client, err := factory.CreateJWKClient(true) // Legacy says true
+		require.NoError(t, err)
+		require.NotNil(t, client)
+
+		transport := client.Transport.(*http.Transport)
+		assert.True(t, transport.TLSClientConfig.InsecureSkipVerify) // Should use legacy setting (true)
 	})
 }
 

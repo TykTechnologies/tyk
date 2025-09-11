@@ -260,22 +260,34 @@ func (f *ExternalHTTPClientFactory) getTLSConfig(serviceConfig config.ServiceCon
 }
 
 // CreateJWKClient creates an HTTP client specifically configured for JWK endpoint requests.
-// This method preserves existing SSL skip verify behavior while adding proxy support.
-func (f *ExternalHTTPClientFactory) CreateJWKClient(insecureSkipVerify bool) (*http.Client, error) {
-	log.Debugf("[ExternalServices] Creating JWK HTTP client with insecureSkipVerify: %t", insecureSkipVerify)
+// This method implements proper backward compatibility: uses external services OAuth mTLS configuration
+// if explicitly set, otherwise falls back to legacy jwt_ssl_insecure_skip_verify setting.
+func (f *ExternalHTTPClientFactory) CreateJWKClient(legacyInsecureSkipVerify bool) (*http.Client, error) {
+	log.Debug("[ExternalServices] Creating JWK HTTP client")
 
 	client, err := f.CreateClient(config.ServiceTypeOAuth)
 	if err != nil {
 		return nil, err
 	}
 
-	// Override TLS configuration to preserve existing JWK behavior
+	// Check if external services OAuth mTLS has been explicitly configured
+	serviceConfig := f.getServiceConfig(config.ServiceTypeOAuth)
+
 	if transport, ok := client.Transport.(*http.Transport); ok {
 		if transport.TLSClientConfig == nil {
 			transport.TLSClientConfig = &tls.Config{}
 		}
-		transport.TLSClientConfig.InsecureSkipVerify = insecureSkipVerify
-		log.Debugf("[ExternalServices] JWK client configured with insecureSkipVerify: %t", insecureSkipVerify)
+
+		// Only use legacy setting if external services OAuth mTLS is not explicitly configured
+		if !serviceConfig.MTLS.IsExplicitlyConfigured() {
+			// Fall back to legacy setting when external services is not configured
+			transport.TLSClientConfig.InsecureSkipVerify = legacyInsecureSkipVerify
+			log.Debugf("[ExternalServices] JWK client using legacy JWT SSL skip verify setting: %t", legacyInsecureSkipVerify)
+		} else {
+			// External services OAuth mTLS configuration takes precedence
+			log.Debugf("[ExternalServices] JWK client using external services OAuth mTLS configuration: insecureSkipVerify=%t",
+				transport.TLSClientConfig.InsecureSkipVerify)
+		}
 	}
 
 	return client, nil

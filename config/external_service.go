@@ -134,3 +134,13 @@ func (cfg *MTLSConfig) IsFileBasedConfig() bool {
 func (cfg *MTLSConfig) IsCertificateStoreConfig() bool {
 	return cfg.CertID != ""
 }
+
+// IsExplicitlyConfigured returns true if mTLS has been explicitly configured in external services.
+// This is used to determine whether to fall back to legacy settings or use external services configuration.
+// Note: enabled=true alone is not considered explicit configuration since it requires additional
+// certificate/key configuration to be functional.
+func (cfg *MTLSConfig) IsExplicitlyConfigured() bool {
+	return cfg.CertFile != "" || cfg.KeyFile != "" || cfg.CAFile != "" ||
+		cfg.CertID != "" || len(cfg.CACertIDs) > 0 || cfg.TLSMinVersion != "" ||
+		cfg.TLSMaxVersion != ""
+}
