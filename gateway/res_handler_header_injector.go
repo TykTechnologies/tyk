@@ -24,7 +24,7 @@ func (h *HeaderInjector) Base() *BaseTykResponseHandler {
 }
 
 func (*HeaderInjector) Name() string {
-	return "HeaderInjector"
+	return "ResponseHeaderInjector"
 }
 
 func (h *HeaderInjector) Enabled() bool {

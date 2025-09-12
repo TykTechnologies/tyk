@@ -18,6 +18,10 @@ import (
 	"github.com/TykTechnologies/tyk/user"
 )
 
+const (
+	msgBodyTransformed = "Body transformed"
+)
+
 type ResponseTransformMiddleware struct {
 	BaseTykResponseHandler
 }
@@ -174,6 +178,8 @@ func (r *ResponseTransformMiddleware) HandleResponse(rw http.ResponseWriter, res
 	var bodyBuffer bytes.Buffer
 	if err := tmeta.Template.Execute(&bodyBuffer, bodyData); err != nil {
 		logger.WithError(err).Error("Failed to apply template to request")
+	} else {
+		logger.Debugf("%s", msgBodyTransformed)
 	}
 
 	// Re-compress if original upstream response was compressed
