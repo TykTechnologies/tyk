@@ -218,7 +218,10 @@ func TestWebHookHandler_mTLSIntegration(t *testing.T) {
 }
 
 func TestWebHookHandler_ServiceTimeouts(t *testing.T) {
-	ts := StartTest(nil)
+	ts := StartTest(func(globalConf *config.Config) {
+		// Enable external services for webhook testing
+		globalConf.ExternalServices.Global.Enabled = true
+	})
 	defer ts.Close()
 
 	// Test that webhook service gets appropriate timeout

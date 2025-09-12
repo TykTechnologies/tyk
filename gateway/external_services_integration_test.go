@@ -301,7 +301,10 @@ func TestExternalServices_mTLSIntegration(t *testing.T) {
 }
 
 func TestExternalServices_ServiceSpecificTimeouts(t *testing.T) {
-	ts := StartTest(nil)
+	ts := StartTest(func(globalConf *config.Config) {
+		// Enable external services for timeout testing
+		globalConf.ExternalServices.Global.Enabled = true
+	})
 	defer ts.Close()
 
 	factory := NewExternalHTTPClientFactory(ts.Gw)
@@ -329,7 +332,10 @@ func TestExternalServices_ServiceSpecificTimeouts(t *testing.T) {
 }
 
 func TestExternalServices_TransportConfiguration(t *testing.T) {
-	ts := StartTest(nil)
+	ts := StartTest(func(globalConf *config.Config) {
+		// Enable external services for transport testing
+		globalConf.ExternalServices.Global.Enabled = true
+	})
 	defer ts.Close()
 
 	factory := NewExternalHTTPClientFactory(ts.Gw)
