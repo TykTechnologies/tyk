@@ -37,6 +37,7 @@ type URLSpec struct {
 	GoPluginMeta              GoPluginMiddleware
 	PersistGraphQL            apidef.PersistGraphQLMeta
 	RateLimit                 apidef.RateLimitMeta
+	AWSLambda                 apidef.AWSLambdaMeta
 
 	IgnoreCase bool
 }
@@ -44,7 +45,7 @@ type URLSpec struct {
 // modeSpecificSpec returns the respective field of URLSpec if it matches the given mode.
 // Deprecated: Usage should not increase.
 func (u *URLSpec) modeSpecificSpec(mode URLStatus) (interface{}, bool) {
-	switch mode {
+    switch mode {
 	case Ignored, BlackList, WhiteList:
 		return nil, true
 	case Cached:
@@ -83,16 +84,18 @@ func (u *URLSpec) modeSpecificSpec(mode URLStatus) (interface{}, bool) {
 		return &u.Internal, true
 	case GoPlugin:
 		return &u.GoPluginMeta, true
-	case PersistGraphQL:
-		return &u.PersistGraphQL, true
-	default:
-		return nil, false
-	}
+    case PersistGraphQL:
+        return &u.PersistGraphQL, true
+    case AWSLambda:
+        return &u.AWSLambda, true
+    default:
+        return nil, false
+    }
 }
 
 // matchesMethod checks if the given method matches the method required by the URLSpec for the current status.
 func (u *URLSpec) matchesMethod(method string) bool {
-	switch u.Status {
+    switch u.Status {
 	case Ignored, BlackList, WhiteList:
 		return true
 	case Cached:
@@ -131,13 +134,15 @@ func (u *URLSpec) matchesMethod(method string) bool {
 		return method == u.Internal.Method
 	case GoPlugin:
 		return method == u.GoPluginMeta.Meta.Method
-	case PersistGraphQL:
-		return method == u.PersistGraphQL.Method
-	case RateLimit:
-		return method == u.RateLimit.Method
-	default:
-		return false
-	}
+    case PersistGraphQL:
+        return method == u.PersistGraphQL.Method
+    case RateLimit:
+        return method == u.RateLimit.Method
+    case AWSLambda:
+        return method == u.AWSLambda.Method
+    default:
+        return false
+    }
 }
 
 // matchesPath takes the input string and matches it against an internal regex.
