@@ -1,0 +1,127 @@
+{
+  "listen_port": 8080,
+  "secret": "my-tyk-secret",
+  "template_path": "./templates",
+  "tyk_js_path": "./js/tyk.js",
+  "middleware_path": "./middleware",
+  "use_db_app_configs": false,
+  "app_path": "./apps/",
+  "storage": {
+    "type": "redis",
+    "host": "localhost",
+    "port": 6379,
+    "username": "",
+    "password": "",
+    "database": 0,
+    "optimisation_max_idle": 2000
+  },
+  "enable_analytics": false,
+  "analytics_config": {
+    "type": "",
+    "csv_dir": "/tmp"
+  },
+  "health_check": {
+    "enable_health_checks": true,
+    "health_check_value_timeouts": 60
+  },
+  "optimisations_use_async_session_write": true,
+  "allow_master_keys": false,
+  "policies": {},
+  "hash_keys": true,
+  "close_connections": false,
+  "http_server_options": {
+    "enable_websockets": true
+  },
+  "allow_insecure_configs": true,
+  "coprocess_options": {
+    "enable_coprocess": false
+  },
+  "enable_bundle_downloader": false,
+  "bundle_base_url": "",
+  "global_session_lifetime": 100,
+  "force_global_session_lifetime": false,
+  "max_idle_connections_per_host": 500,
+  "enable_custom_domains": true,
+  
+  "global_middleware": {
+    "pre": [
+      {
+        "name": "traffic_mirror",
+        "enabled": true,
+        "priority": 10,
+        "include_apis": [],
+        "exclude_apis": ["internal-api", "health-check"],
+        "config": {
+          "sample_rate": 0.1,
+          "async": true,
+          "timeout": 5,
+          "headers": {
+            "X-Tyk-Mirror-Version": "v1.0",
+            "X-Tyk-Mirror-Environment": "production"
+          },
+          "destinations": [
+            {
+              "url": "https://mirror1.example.com/webhook",
+              "timeout": 10,
+              "headers": {
+                "Authorization": "Bearer mirror-token-1",
+                "Content-Type": "application/json"
+              }
+            },
+            {
+              "url": "https://analytics.example.com/traffic",
+              "timeout": 5,
+              "headers": {
+                "X-Analytics-Key": "analytics-key-123"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "name": "global_headers",
+        "enabled": true,
+        "priority": 5,
+        "include_apis": [],
+        "exclude_apis": [],
+        "config": {
+          "request_headers": {
+            "X-Tyk-Gateway-Version": "5.0",
+            "X-Request-ID": "auto-generated",
+            "X-Forwarded-Proto": "https"
+          },
+          "response_headers": {
+            "X-Powered-By": "Tyk API Gateway",
+            "X-Rate-Limit-By": "Tyk",
+            "Strict-Transport-Security": "max-age=31536000; includeSubDomains"
+          },
+          "remove_request_headers": [
+            "X-Internal-Token",
+            "X-Debug-Info"
+          ],
+          "remove_response_headers": [
+            "Server",
+            "X-Powered-By-Backend"
+          ]
+        }
+      }
+    ],
+    "post": [
+      {
+        "name": "global_headers",
+        "enabled": true,
+        "priority": 10,
+        "include_apis": ["public-api"],
+        "exclude_apis": [],
+        "config": {
+          "response_headers": {
+            "X-Response-Time": "auto-calculated",
+            "Cache-Control": "no-cache, no-store, must-revalidate",
+            "X-Content-Type-Options": "nosniff",
+            "X-Frame-Options": "DENY"
+          }
+        }
+      }
+    ]
+  }
+}

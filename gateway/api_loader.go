@@ -300,6 +300,9 @@ func (gw *Gateway) processSpec(
 		logger.Info("Checking security policy: Open")
 	}
 
+	// Add global pre-middleware (runs before all API-specific middleware)
+	gw.appendGlobalMiddleware(&chainArray, baseMid, "pre", spec.APIID)
+
 	gw.mwAppendEnabled(&chainArray, &VersionCheck{BaseMiddleware: baseMid.Copy()})
 	gw.mwAppendEnabled(&chainArray, &CORSMiddleware{BaseMiddleware: baseMid.Copy()})
 
@@ -492,6 +495,10 @@ func (gw *Gateway) processSpec(
 			chainArray = append(chainArray, gw.createDynamicMiddleware(obj.Name, false, obj.RequireSession, baseMid.Copy()))
 		}
 	}
+
+	// Add global post-middleware (runs after all API-specific middleware)
+	gw.appendGlobalMiddleware(&chainArray, baseMid, "post", spec.APIID)
+
 	chain = alice.New(chainArray...).Then(&DummyProxyHandler{SH: SuccessHandler{baseMid.Copy()}, Gw: gw})
 
 	if !spec.UseKeylessAccess {

@@ -1240,10 +1240,37 @@ type Config struct {
 	Streaming StreamingConfig `json:"streaming"`
 
 	Labs LabsConfig `json:"labs"`
+
+	// GlobalMiddleware configuration allows applying middleware to all APIs
+	GlobalMiddleware GlobalMiddlewareConfig `json:"global_middleware"`
 }
 
 // LabsConfig include config for streaming
 type LabsConfig map[string]interface{}
+
+// GlobalMiddlewareConfig defines global middleware that applies to all APIs
+type GlobalMiddlewareConfig struct {
+	// Pre-request global middleware (executed before API-specific middleware)
+	Pre []GlobalPluginConfig `json:"pre"`
+	// Post-request global middleware (executed after API-specific middleware) 
+	Post []GlobalPluginConfig `json:"post"`
+}
+
+// GlobalPluginConfig defines a single global middleware plugin
+type GlobalPluginConfig struct {
+	// Name of the middleware (e.g., "traffic_mirror", "global_rate_limit")
+	Name string `json:"name"`
+	// Whether this global middleware is enabled
+	Enabled bool `json:"enabled"`
+	// Priority for ordering (lower numbers execute first)
+	Priority int `json:"priority"`
+	// API IDs to exclude from this global middleware
+	ExcludeAPIs []string `json:"exclude_apis"`
+	// API IDs to include for this global middleware (if empty, applies to all)
+	IncludeAPIs []string `json:"include_apis"`
+	// Configuration object passed to the middleware
+	Config map[string]interface{} `json:"config"`
+}
 
 // Decode unmarshals json config into the Labs config
 func (lc *LabsConfig) Decode(value string) error {
