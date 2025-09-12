@@ -65,6 +65,7 @@ func TestXTykGateway_Lint(t *testing.T) {
 			}
 		}
 		settings.Server.Authentication.BaseIdentityProvider = ""
+		settings.Server.Authentication.SecurityProcessingMode = "legacy"
 		settings.Server.Authentication.Custom.Config.IDExtractor.Source = "body"
 		settings.Server.Authentication.Custom.Config.IDExtractor.With = "regex"
 		settings.Server.Authentication.SecuritySchemes = map[string]interface{}{
