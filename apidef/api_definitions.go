@@ -404,6 +404,7 @@ type ExtendedPathsSet struct {
 	CircuitBreaker          []CircuitBreakerMeta  `bson:"circuit_breakers" json:"circuit_breakers,omitempty"`
 	URLRewrite              []URLRewriteMeta      `bson:"url_rewrites" json:"url_rewrites,omitempty"`
 	Virtual                 []VirtualMeta         `bson:"virtual" json:"virtual,omitempty"`
+	AWSLambda               []AWSLambdaMeta       `bson:"aws_lambda" json:"aws_lambda,omitempty"`
 	SizeLimit               []RequestSizeMeta     `bson:"size_limits" json:"size_limits,omitempty"`
 	MethodTransforms        []MethodTransformMeta `bson:"method_transforms" json:"method_transforms,omitempty"`
 	TrackEndpoints          []TrackEndpointMeta   `bson:"track_endpoints" json:"track_endpoints,omitempty"`
@@ -425,6 +426,56 @@ func (e *ExtendedPathsSet) Clear() {
 		TransformJQResponse: e.TransformJQResponse,
 		PersistGraphQL:      e.PersistGraphQL,
 	}
+}
+
+// AWSLambdaMeta defines per-path AWS Lambda invocation configuration.
+type AWSLambdaMeta struct {
+    Disabled        bool   `bson:"disabled" json:"disabled"`
+    Path            string `bson:"path" json:"path"`
+    Method          string `bson:"method" json:"method"`
+    FunctionName    string `bson:"function_name" json:"function_name"`
+    Qualifier       string `bson:"qualifier" json:"qualifier,omitempty"`
+    Region          string `bson:"region" json:"region"`
+    InvocationType  string `bson:"invocation_type" json:"invocation_type"`
+    TimeoutMs       int    `bson:"timeout_ms" json:"timeout_ms"`
+
+    Credentials     AWSCredentialsConfig        `bson:"credentials" json:"credentials"`
+    RequestMapping  AWSLambdaRequestMapping     `bson:"request_mapping" json:"request_mapping"`
+    ResponseMapping AWSLambdaResponseMapping    `bson:"response_mapping" json:"response_mapping"`
+}
+
+// AWSCredentialsConfig configures how credentials are resolved for Lambda invocation.
+type AWSCredentialsConfig struct {
+    UseSDKDefaultChain bool   `bson:"use_sdk_default_chain" json:"use_sdk_default_chain"`
+    AccessKeyID        string `bson:"access_key_id" json:"access_key_id,omitempty"`
+    SecretAccessKey    string `bson:"secret_access_key" json:"secret_access_key,omitempty"`
+    SessionToken       string `bson:"session_token" json:"session_token,omitempty"`
+    AssumeRoleARN      string `bson:"assume_role_arn" json:"assume_role_arn,omitempty"`
+    ExternalID         string `bson:"external_id" json:"external_id,omitempty"`
+    EndpointOverride   string `bson:"endpoint_override" json:"endpoint_override,omitempty"`
+}
+
+// AWSLambdaRequestMapping controls how HTTP requests are converted into Lambda payloads.
+type AWSLambdaRequestMapping struct {
+    Mode               string   `bson:"mode" json:"mode"`
+    ForwardBody        bool     `bson:"forward_body" json:"forward_body"`
+    ForwardHeaders     bool     `bson:"forward_headers" json:"forward_headers"`
+    ForwardQuerystring bool     `bson:"forward_querystrings" json:"forward_querystrings"`
+    ForwardPath        bool     `bson:"forward_path" json:"forward_path"`
+    PayloadVersion     string   `bson:"payload_version" json:"payload_version"`
+    Base64EncodeBody   bool     `bson:"base64_encode_body" json:"base64_encode_body"`
+    HeaderAllowList    []string `bson:"header_allow_list" json:"header_allow_list,omitempty"`
+    QueryAllowList     []string `bson:"query_allow_list" json:"query_allow_list,omitempty"`
+}
+
+// AWSLambdaResponseMapping controls how Lambda responses are mapped to HTTP responses.
+type AWSLambdaResponseMapping struct {
+    Mode               string `bson:"mode" json:"mode"`
+    DefaultStatus      int    `bson:"default_status" json:"default_status"`
+    ErrorStatus        int    `bson:"error_status" json:"error_status"`
+    DecodeBase64Body   bool   `bson:"decode_base64_body" json:"decode_base64_body"`
+    UnhandledStatus    int    `bson:"unhandled_status" json:"unhandled_status"`
+    HeaderPassthrough  bool   `bson:"header_passthrough" json:"header_passthrough"`
 }
 
 // VersionDefinition is a struct that holds the versioning information for an API.

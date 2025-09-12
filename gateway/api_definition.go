@@ -83,9 +83,10 @@ const (
 	RequestNotTracked
 	ValidateJSONRequest
 	Internal
-	GoPlugin
-	PersistGraphQL
-	RateLimit
+    GoPlugin
+    PersistGraphQL
+    RateLimit
+    AWSLambda
 )
 
 // RequestStatus is a custom type to avoid collisions
@@ -121,8 +122,9 @@ const (
 	StatusValidateRequest          RequestStatus = "Validate Request"
 	StatusInternal                 RequestStatus = "Internal path"
 	StatusGoPlugin                 RequestStatus = "Go plugin"
-	StatusPersistGraphQL           RequestStatus = "Persist GraphQL"
-	StatusRateLimit                RequestStatus = "Rate Limited"
+    StatusPersistGraphQL           RequestStatus = "Persist GraphQL"
+    StatusRateLimit                RequestStatus = "Rate Limited"
+    StatusAWSLambda                RequestStatus = "AWS Lambda"
 )
 
 type EndPointCacheMeta struct {
@@ -1147,6 +1149,25 @@ func (a APIDefinitionLoader) compileVirtualPathsSpec(paths []apidef.VirtualMeta,
 	return urlSpec
 }
 
+func (a APIDefinitionLoader) compileAWSLambdaPathSpec(paths []apidef.AWSLambdaMeta, stat URLStatus, _ *APISpec, conf config.Config) []URLSpec {
+    // transform an extended configuration URL into an array of URLSpecs
+    // This way we can iterate the whole array once, on match we break with status
+    urlSpec := []URLSpec{}
+    for _, stringSpec := range paths {
+        if stringSpec.Disabled {
+            continue
+        }
+
+        newSpec := URLSpec{}
+        a.generateRegex(stringSpec.Path, &newSpec, stat, conf)
+        newSpec.AWSLambda = stringSpec
+
+        urlSpec = append(urlSpec, newSpec)
+    }
+
+    return urlSpec
+}
+
 func (a APIDefinitionLoader) compileGopluginPathsSpec(paths []apidef.GoPluginMeta, stat URLStatus, _ *APISpec, conf config.Config) []URLSpec {
 
 	// transform an extended configuration URL into an array of URLSpecs
@@ -1318,7 +1339,8 @@ func (a APIDefinitionLoader) getExtendedPathSpecs(apiVersionDef apidef.VersionIn
 	unTrackedPaths := a.compileUnTrackedEndpointPathsSpec(apiVersionDef.ExtendedPaths.DoNotTrackEndpoints, RequestNotTracked, conf)
 	validateJSON := a.compileValidateJSONPathsSpec(apiVersionDef.ExtendedPaths.ValidateJSON, ValidateJSONRequest, conf)
 	internalPaths := a.compileInternalPathsSpec(apiVersionDef.ExtendedPaths.Internal, Internal, conf)
-	goPlugins := a.compileGopluginPathsSpec(apiVersionDef.ExtendedPaths.GoPlugin, GoPlugin, apiSpec, conf)
+    goPlugins := a.compileGopluginPathsSpec(apiVersionDef.ExtendedPaths.GoPlugin, GoPlugin, apiSpec, conf)
+    lambdaPaths := a.compileAWSLambdaPathSpec(apiVersionDef.ExtendedPaths.AWSLambda, AWSLambda, apiSpec, conf)
 	persistGraphQL := a.compilePersistGraphQLPathSpec(apiVersionDef.ExtendedPaths.PersistGraphQL, PersistGraphQL, apiSpec, conf)
 	rateLimitPaths := a.compileRateLimitPathsSpec(apiVersionDef.ExtendedPaths.RateLimit, RateLimit, conf)
 
@@ -1338,7 +1360,8 @@ func (a APIDefinitionLoader) getExtendedPathSpecs(apiVersionDef apidef.VersionIn
 	combinedPath = append(combinedPath, circuitBreakers...)
 	combinedPath = append(combinedPath, urlRewrites...)
 	combinedPath = append(combinedPath, requestSizes...)
-	combinedPath = append(combinedPath, goPlugins...)
+    combinedPath = append(combinedPath, goPlugins...)
+    combinedPath = append(combinedPath, lambdaPaths...)
 	combinedPath = append(combinedPath, persistGraphQL...)
 	combinedPath = append(combinedPath, virtualPaths...)
 	combinedPath = append(combinedPath, methodTransforms...)
@@ -1362,7 +1385,7 @@ func (a *APISpec) StopSessionManagerPool() {
 }
 
 func (a *APISpec) getURLStatus(stat URLStatus) RequestStatus {
-	switch stat {
+    switch stat {
 	case Ignored:
 		return StatusOkAndIgnore
 	case BlackList:
@@ -1407,12 +1430,14 @@ func (a *APISpec) getURLStatus(stat URLStatus) RequestStatus {
 		return StatusGoPlugin
 	case PersistGraphQL:
 		return StatusPersistGraphQL
-	case RateLimit:
-		return StatusRateLimit
-	default:
-		log.Error("URL Status was not one of Ignored, Blacklist or WhiteList! Blocking.")
-		return EndPointNotAllowed
-	}
+    case RateLimit:
+        return StatusRateLimit
+    case AWSLambda:
+        return StatusAWSLambda
+    default:
+        log.Error("URL Status was not one of Ignored, Blacklist or WhiteList! Blocking.")
+        return EndPointNotAllowed
+    }
 }
 
 // URLAllowedAndIgnored checks if a url is allowed and ignored.
