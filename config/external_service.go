@@ -30,7 +30,7 @@ type GlobalProxyConfig struct {
 	// HTTPProxy is the HTTP proxy URL for HTTP requests to external services (e.g., http://localhost:3128).
 	// This setting applies globally unless overridden by service-specific configuration.
 	HTTPProxy string `json:"http_proxy"`
-	// HTTPSProxy is the HTTPS proxy URL for HTTPS requests to external services (e.g., http://localhost:3128).
+	// HTTPSProxy is the HTTPS proxy URL for HTTPS requests to external services (e.g., https://localhost:3128).
 	// This setting applies globally unless overridden by service-specific configuration.
 	HTTPSProxy string `json:"https_proxy"`
 	// BypassProxy is a comma-separated list of hosts to bypass proxy. Supports exact hostnames, IP addresses,
@@ -44,7 +44,7 @@ type ProxyConfig struct {
 	Enabled bool `json:"enabled"`
 	// HTTPProxy is the HTTP proxy URL for HTTP requests (e.g., http://localhost:3128).
 	HTTPProxy string `json:"http_proxy"`
-	// HTTPSProxy is the HTTPS proxy URL for HTTPS requests (e.g., http://localhost:3128).
+	// HTTPSProxy is the HTTPS proxy URL for HTTPS requests (e.g., https://localhost:3128).
 	HTTPSProxy string `json:"https_proxy"`
 	// BypassProxy is a comma-separated list of hosts to bypass proxy.
 	BypassProxy string `json:"bypass_proxy"`
@@ -62,13 +62,13 @@ type ServiceConfig struct {
 
 // MTLSConfig defines mutual TLS client certificate configuration.
 type MTLSConfig struct {
-	// Enabled controls whether mTLS is enabled for service requests. When enabled, cert_file and key_file are required.
+	// Enabled controls whether mTLS is enabled for service requests. When enabled, either file-based configuration (cert_file, key_file) or certificate store configuration (cert_id) must be provided.
 	Enabled bool `json:"enabled"`
 
 	// File-based certificate configuration
-	// CertFile is the path to the client certificate file for mTLS authentication. Required when enabled: true.
+	// CertFile is the path to the client certificate file for mTLS authentication. Required when using file-based configuration.
 	CertFile string `json:"cert_file"`
-	// KeyFile is the path to the client private key file for mTLS authentication. Required when enabled: true.
+	// KeyFile is the path to the client private key file for mTLS authentication. Required when using file-based configuration.
 	KeyFile string `json:"key_file"`
 	// CAFile is the path to the CA certificate file for server verification. Optional but recommended for production environments.
 	CAFile string `json:"ca_file"`

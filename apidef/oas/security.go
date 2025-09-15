@@ -288,6 +288,22 @@ func (j *JWT) Import(enable bool) {
 	}
 }
 
+func (j *JWT) Normalize() {
+	// copy the values of the new JWT validation
+	if j == nil {
+		return
+	}
+	if len(j.BasePolicyClaims) > 0 {
+		j.PolicyFieldName = j.BasePolicyClaims[0]
+	}
+	if len(j.SubjectClaims) > 0 {
+		j.IdentityBaseField = j.SubjectClaims[0]
+	}
+	if j.Scopes != nil && len(j.Scopes.Claims) > 0 {
+		j.Scopes.ClaimName = j.Scopes.Claims[0]
+	}
+}
+
 func (s *OAS) fillJWT(api apidef.APIDefinition) {
 	ac, ok := api.AuthConfigs[apidef.JWTType]
 	if !ok || ac.Name == "" {
@@ -329,18 +345,35 @@ func (s *OAS) fillJWT(api apidef.APIDefinition) {
 
 	jwt.SigningMethod = api.JWTSigningMethod
 	jwt.IdentityBaseField = api.JWTIdentityBaseField
-	if jwt.IdentityBaseField != "" {
+	if jwt.IdentityBaseField != "" && len(jwt.SubjectClaims) == 0 {
 		jwt.SubjectClaims = []string{jwt.IdentityBaseField}
 	}
 	jwt.SkipKid = api.JWTSkipKid
 	jwt.PolicyFieldName = api.JWTPolicyFieldName
-	if jwt.PolicyFieldName != "" {
+	if jwt.PolicyFieldName != "" && len(jwt.BasePolicyClaims) == 0 {
 		jwt.BasePolicyClaims = []string{api.JWTPolicyFieldName}
 	}
 	jwt.ClientBaseField = api.JWTClientIDBaseField
 
 	if jwt.Scopes == nil {
 		jwt.Scopes = &Scopes{}
+	}
+
+	existing := s.GetJWTConfiguration()
+	if existing != nil {
+		jwt.BasePolicyClaims = existing.BasePolicyClaims
+		jwt.SubjectClaims = existing.SubjectClaims
+		jwt.AllowedIssuers = existing.AllowedIssuers
+		jwt.AllowedAudiences = existing.AllowedAudiences
+		jwt.AllowedSubjects = existing.AllowedSubjects
+		jwt.JTIValidation.Enabled = existing.JTIValidation.Enabled
+
+		if existing.Scopes != nil {
+			jwt.Scopes.Claims = existing.Scopes.Claims
+		}
+		if existing.CustomClaimValidation != nil {
+			jwt.CustomClaimValidation = existing.CustomClaimValidation
+		}
 	}
 
 	jwt.Scopes.Fill(&api.Scopes.JWT)
