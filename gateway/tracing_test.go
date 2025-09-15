@@ -374,6 +374,9 @@ func TestTraceHttpRequest(t *testing.T) {
 	})
 
 	t.Run("transform body request writes logs", func(t *testing.T) {
+		ts := StartTest(nil)
+		defer ts.Close()
+
 		type typedResponse struct {
 			Id string `json:"id"`
 		}
