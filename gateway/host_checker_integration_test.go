@@ -215,7 +215,10 @@ func TestHostChecker_mTLSIntegration(t *testing.T) {
 }
 
 func TestHostChecker_ServiceTimeouts(t *testing.T) {
-	ts := StartTest(nil)
+	ts := StartTest(func(globalConf *config.Config) {
+		// Enable external services for health check testing
+		globalConf.ExternalServices.Global.Enabled = true
+	})
 	defer ts.Close()
 
 	// Test that health check service gets appropriate timeout
