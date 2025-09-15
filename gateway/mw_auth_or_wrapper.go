@@ -20,18 +20,23 @@ func (a *AuthORWrapper) ProcessRequest(w http.ResponseWriter, r *http.Request, _
 
 	// Determine processing mode
 	processingMode := a.Spec.SecurityProcessingMode
-	if processingMode == "" {
-		processingMode = "legacy"
-	}
-
-	// Legacy mode: Always use AND logic regardless of SecurityRequirements
-	// This maintains backward compatibility
-	if processingMode == "legacy" || len(a.Spec.SecurityRequirements) <= 1 {
-		if processingMode == "legacy" {
-			logger.Debug("Using AND logic (legacy mode)")
-		} else {
-			logger.Debug("Using AND logic (single or no security requirement)")
+	
+	// Single or no requirements: always use AND logic
+	if len(a.Spec.SecurityRequirements) <= 1 {
+		logger.Debug("Using AND logic (single or no security requirement)")
+		
+		for _, mw := range a.authMiddlewares {
+			if err, code := mw.ProcessRequest(w, r, nil); err != nil {
+				return err, code
+			}
 		}
+		return nil, http.StatusOK
+	}
+	
+	// Multiple requirements - check processing mode
+	// Default to legacy mode for backward compatibility (pre-TT-2378 behavior)
+	if processingMode == "" || processingMode == "legacy" {
+		logger.Debug("Using AND logic (legacy mode - backward compatibility)")
 		
 		for _, mw := range a.authMiddlewares {
 			if err, code := mw.ProcessRequest(w, r, nil); err != nil {
@@ -42,7 +47,7 @@ func (a *AuthORWrapper) ProcessRequest(w http.ResponseWriter, r *http.Request, _
 	}
 
 	// Compliant mode with multiple requirements: Use OR logic
-	logger.Debugf("Using OR logic (compliant mode) with %d auth middlewares", len(a.authMiddlewares))
+	logger.Debugf("Using OR logic (compliant mode explicitly set) with %d auth middlewares", len(a.authMiddlewares))
 
 	var lastError error
 	var lastCode int
