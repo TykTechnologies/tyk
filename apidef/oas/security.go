@@ -310,10 +310,10 @@ func (s *OAS) fillJWT(api apidef.APIDefinition) {
 		return
 	}
 
-	ss := s.Components.SecuritySchemes
+	ss := s.T.Components.SecuritySchemes
 	if ss == nil {
 		ss = make(map[string]*openapi3.SecuritySchemeRef)
-		s.Components.SecuritySchemes = ss
+		s.T.Components.SecuritySchemes = ss
 	}
 
 	ref, ok := ss[ac.Name]
@@ -464,10 +464,10 @@ func (s *OAS) fillBasic(api apidef.APIDefinition) {
 		return
 	}
 
-	ss := s.Components.SecuritySchemes
+	ss := s.T.Components.SecuritySchemes
 	if ss == nil {
 		ss = make(map[string]*openapi3.SecuritySchemeRef)
-		s.Components.SecuritySchemes = ss
+		s.T.Components.SecuritySchemes = ss
 	}
 
 	ref, ok := ss[ac.Name]
@@ -926,6 +926,17 @@ func (n *Notifications) ExtractTo(nm *apidef.NotificationsManager) {
 	nm.OAuthKeyChangeURL = n.OnKeyChangeURL
 }
 
+// isProprietaryAuth checks if an auth method is Tyk proprietary (not standard OpenAPI)
+func isProprietaryAuth(authMethod string) bool {
+	proprietary := []string{"hmac", "custom", "mtls", "coprocess"}
+	for _, p := range proprietary {
+		if authMethod == p {
+			return true
+		}
+	}
+	return false
+}
+
 func (s *OAS) fillSecurity(api apidef.APIDefinition) {
 	tykAuthentication := s.GetTykExtension().Server.Authentication
 	if tykAuthentication == nil {
@@ -939,8 +950,8 @@ func (s *OAS) fillSecurity(api apidef.APIDefinition) {
 
 	tykAuthentication.Fill(api)
 
-	if s.Components == nil {
-		s.Components = &openapi3.Components{}
+	if s.T.Components == nil {
+		s.T.Components = &openapi3.Components{}
 	}
 
 	s.fillToken(api)
@@ -949,22 +960,75 @@ func (s *OAS) fillSecurity(api apidef.APIDefinition) {
 	s.fillOAuth(api)
 	s.fillExternalOAuth(api)
 
-	if len(api.SecurityRequirements) > 0 {
-		s.Security = make(openapi3.SecurityRequirements, 0, len(api.SecurityRequirements))
-		for _, requirement := range api.SecurityRequirements {
-			secReq := openapi3.NewSecurityRequirement()
-			for _, schemeName := range requirement {
-				secReq[schemeName] = []string{}
+	// Handle security requirements based on processing mode
+	processingMode := api.SecurityProcessingMode
+	if processingMode == "" {
+		processingMode = "legacy"
+	}
+
+	if processingMode == "compliant" {
+		// Compliant mode: separate OAS and vendor security
+		oasSecurity := make(openapi3.SecurityRequirements, 0)
+		vendorSecurity := [][]string{}
+
+		if len(api.SecurityRequirements) > 0 {
+			for _, requirement := range api.SecurityRequirements {
+				isVendorOnly := true
+				oasReq := openapi3.NewSecurityRequirement()
+				vendorReq := []string{}
+				
+				for _, schemeName := range requirement {
+					if isProprietaryAuth(schemeName) {
+						vendorReq = append(vendorReq, schemeName)
+					} else {
+						oasReq[schemeName] = []string{}
+						isVendorOnly = false
+					}
+				}
+				
+				if isVendorOnly && len(vendorReq) > 0 {
+					vendorSecurity = append(vendorSecurity, vendorReq)
+				} else if len(oasReq) > 0 {
+					oasSecurity = append(oasSecurity, oasReq)
+				}
 			}
-			s.Security = append(s.Security, secReq)
+		} else if len(tykAuthentication.SecuritySchemes) > 0 {
+			// No explicit requirements, create from schemes
+			secReq := openapi3.NewSecurityRequirement()
+			for name := range tykAuthentication.SecuritySchemes {
+				if !isProprietaryAuth(name) {
+					secReq[name] = []string{}
+				}
+			}
+			if len(secReq) > 0 {
+				oasSecurity = append(oasSecurity, secReq)
+			}
 		}
-	} else if len(tykAuthentication.SecuritySchemes) > 0 {
-		secReq := openapi3.NewSecurityRequirement()
-		for name := range tykAuthentication.SecuritySchemes {
-			secReq[name] = []string{}
+
+		s.T.Security = oasSecurity
+		if len(vendorSecurity) > 0 {
+			tykAuthentication.Security = vendorSecurity
 		}
-		if len(secReq) > 0 {
-			s.Security = openapi3.SecurityRequirements{secReq}
+	} else {
+		// Legacy mode: keep traditional behavior
+		if len(api.SecurityRequirements) > 0 {
+			s.T.Security = make(openapi3.SecurityRequirements, 0, len(api.SecurityRequirements))
+			for _, requirement := range api.SecurityRequirements {
+				secReq := openapi3.NewSecurityRequirement()
+				for _, schemeName := range requirement {
+					// In legacy mode, don't separate vendor extensions
+					secReq[schemeName] = []string{}
+				}
+				s.T.Security = append(s.T.Security, secReq)
+			}
+		} else if len(tykAuthentication.SecuritySchemes) > 0 {
+			secReq := openapi3.NewSecurityRequirement()
+			for name := range tykAuthentication.SecuritySchemes {
+				secReq[name] = []string{}
+			}
+			if len(secReq) > 0 {
+				s.T.Security = openapi3.SecurityRequirements{secReq}
+			}
 		}
 	}
 
@@ -993,15 +1057,41 @@ func (s *OAS) extractSecurityTo(api *apidef.APIDefinition) {
 		api.AuthConfigs = make(map[string]apidef.AuthConfig)
 	}
 
-	if len(s.Security) == 0 || s.Components == nil || len(s.Components.SecuritySchemes) == 0 {
+	if len(s.T.Security) == 0 || s.T.Components == nil || len(s.T.Components.SecuritySchemes) == 0 {
 		return
 	}
 
-	// Only extract security requirements if there are multiple requirements (OR logic)
-	// A single requirement is the default behavior and doesn't need explicit SecurityRequirements
-	if len(s.Security) > 1 {
-		api.SecurityRequirements = make([][]string, 0, len(s.Security))
-		for _, requirement := range s.Security {
+	// Extract security requirements based on processing mode
+	processingMode := api.SecurityProcessingMode
+	if processingMode == "" {
+		processingMode = "legacy"
+	}
+
+	// In compliant mode, extract all security requirements including vendor extension
+	// In legacy mode, still extract but gateway will only use first
+	if processingMode == "compliant" {
+		// Concatenate OAS security with vendor extension security
+		api.SecurityRequirements = make([][]string, 0)
+		
+		// Add OAS security requirements
+		for _, requirement := range s.T.Security {
+			schemes := make([]string, 0, len(requirement))
+			for schemeName := range requirement {
+				schemes = append(schemes, schemeName)
+			}
+			api.SecurityRequirements = append(api.SecurityRequirements, schemes)
+		}
+		
+		// Add vendor extension security requirements
+		if s.getTykAuthentication() != nil && len(s.getTykAuthentication().Security) > 0 {
+			for _, vendorReq := range s.getTykAuthentication().Security {
+				api.SecurityRequirements = append(api.SecurityRequirements, vendorReq)
+			}
+		}
+	} else if len(s.T.Security) > 1 {
+		// Legacy mode with multiple requirements - extract all but gateway will only use first
+		api.SecurityRequirements = make([][]string, 0, len(s.T.Security))
+		for _, requirement := range s.T.Security {
 			schemes := make([]string, 0, len(requirement))
 			for schemeName := range requirement {
 				schemes = append(schemes, schemeName)
@@ -1012,8 +1102,8 @@ func (s *OAS) extractSecurityTo(api *apidef.APIDefinition) {
 
 	// Process first security requirement for backward compatibility
 	for schemeName := range s.getTykSecuritySchemes() {
-		if _, ok := s.Security[0][schemeName]; ok {
-			v := s.Components.SecuritySchemes[schemeName].Value
+		if _, ok := s.T.Security[0][schemeName]; ok {
+			v := s.T.Components.SecuritySchemes[schemeName].Value
 			switch {
 			case v.Type == typeAPIKey:
 				s.extractTokenTo(api, schemeName)
@@ -1045,13 +1135,13 @@ func (s *OAS) extractSecurityTo(api *apidef.APIDefinition) {
 }
 
 func (s *OAS) GetJWTConfiguration() *JWT {
-	if len(s.Security) == 0 {
+	if len(s.T.Security) == 0 {
 		return nil
 	}
 
 	for keyName := range s.getTykSecuritySchemes() {
-		if _, ok := s.Security[0][keyName]; ok {
-			v := s.Components.SecuritySchemes[keyName].Value
+		if _, ok := s.T.Security[0][keyName]; ok {
+			v := s.T.Components.SecuritySchemes[keyName].Value
 			if v.Type == typeHTTP && v.Scheme == schemeBearer && v.BearerFormat == bearerFormatJWT {
 				return s.getTykJWTAuth(keyName)
 			}
@@ -1120,10 +1210,10 @@ func resetSecuritySchemes(api *apidef.APIDefinition) {
 }
 
 func (s *OAS) fillAPIKeyScheme(ac *apidef.AuthConfig) {
-	ss := s.Components.SecuritySchemes
+	ss := s.T.Components.SecuritySchemes
 	if ss == nil {
 		ss = make(map[string]*openapi3.SecuritySchemeRef)
-		s.Components.SecuritySchemes = ss
+		s.T.Components.SecuritySchemes = ss
 	}
 
 	ref, ok := ss[ac.Name]
@@ -1160,7 +1250,7 @@ func (s *OAS) fillAPIKeyScheme(ac *apidef.AuthConfig) {
 }
 
 func (s *OAS) extractAPIKeySchemeTo(ac *apidef.AuthConfig, name string) {
-	ref := s.Components.SecuritySchemes[name]
+	ref := s.T.Components.SecuritySchemes[name]
 	ac.Name = name
 
 	switch ref.Value.In {
@@ -1177,10 +1267,10 @@ func (s *OAS) extractAPIKeySchemeTo(ac *apidef.AuthConfig, name string) {
 }
 
 func (s *OAS) fillOAuthScheme(accessTypes []osin.AccessRequestType, name string) {
-	ss := s.Components.SecuritySchemes
+	ss := s.T.Components.SecuritySchemes
 	if ss == nil {
 		ss = make(map[string]*openapi3.SecuritySchemeRef)
-		s.Components.SecuritySchemes = ss
+		s.T.Components.SecuritySchemes = ss
 	}
 
 	ref, ok := ss[name]
@@ -1236,10 +1326,10 @@ func (s *OAS) fillOAuthScheme(accessTypes []osin.AccessRequestType, name string)
 }
 
 func (s *OAS) fillOAuthSchemeForExternal(name string) {
-	ss := s.Components.SecuritySchemes
+	ss := s.T.Components.SecuritySchemes
 	if ss == nil {
 		ss = make(map[string]*openapi3.SecuritySchemeRef)
-		s.Components.SecuritySchemes = ss
+		s.T.Components.SecuritySchemes = ss
 	}
 
 	ref, ok := ss[name]
@@ -1269,7 +1359,7 @@ func (s *OAS) fillOAuthSchemeForExternal(name string) {
 }
 
 func (s *OAS) extractOAuthSchemeTo(api *apidef.APIDefinition, name string) {
-	ref := s.Components.SecuritySchemes[name]
+	ref := s.T.Components.SecuritySchemes[name]
 
 	flows := ref.Value.Flows
 	if flows == nil {
@@ -1294,12 +1384,12 @@ func (s *OAS) extractOAuthSchemeTo(api *apidef.APIDefinition, name string) {
 }
 
 func (s *OAS) appendSecurity(name string) {
-	if len(s.Security) == 0 {
-		s.Security.With(openapi3.NewSecurityRequirement())
+	if len(s.T.Security) == 0 {
+		s.T.Security.With(openapi3.NewSecurityRequirement())
 	}
 
-	if _, found := s.Security[0][name]; !found {
-		s.Security[0][name] = []string{}
+	if _, found := s.T.Security[0][name]; !found {
+		s.T.Security[0][name] = []string{}
 	}
 }
 

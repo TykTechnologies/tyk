@@ -15,11 +15,24 @@ type AuthORWrapper struct {
 // ProcessRequest handles the OR logic for authentication
 func (a *AuthORWrapper) ProcessRequest(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
 	logger := a.Logger()
-	logger.Debugf("OR wrapper processing with %d middlewares, %d security requirements",
-		len(a.authMiddlewares), len(a.Spec.SecurityRequirements))
+	logger.Debugf("OR wrapper processing with %d middlewares, %d security requirements, mode: %s",
+		len(a.authMiddlewares), len(a.Spec.SecurityRequirements), a.Spec.SecurityProcessingMode)
 
-	if len(a.Spec.SecurityRequirements) <= 1 {
-		logger.Debug("Using AND logic (single or no security requirement)")
+	// Determine processing mode
+	processingMode := a.Spec.SecurityProcessingMode
+	if processingMode == "" {
+		processingMode = "legacy"
+	}
+
+	// Legacy mode: Always use AND logic regardless of SecurityRequirements
+	// This maintains backward compatibility
+	if processingMode == "legacy" || len(a.Spec.SecurityRequirements) <= 1 {
+		if processingMode == "legacy" {
+			logger.Debug("Using AND logic (legacy mode)")
+		} else {
+			logger.Debug("Using AND logic (single or no security requirement)")
+		}
+		
 		for _, mw := range a.authMiddlewares {
 			if err, code := mw.ProcessRequest(w, r, nil); err != nil {
 				return err, code
@@ -28,7 +41,8 @@ func (a *AuthORWrapper) ProcessRequest(w http.ResponseWriter, r *http.Request, _
 		return nil, http.StatusOK
 	}
 
-	logger.Debugf("Using OR logic with %d auth middlewares", len(a.authMiddlewares))
+	// Compliant mode with multiple requirements: Use OR logic
+	logger.Debugf("Using OR logic (compliant mode) with %d auth middlewares", len(a.authMiddlewares))
 
 	var lastError error
 	var lastCode int
@@ -70,6 +84,9 @@ func (a *AuthORWrapper) Name() string {
 
 // EnabledForSpec checks if the middleware is enabled for the API spec
 func (a *AuthORWrapper) EnabledForSpec() bool {
+	// AuthORWrapper is only used when there are multiple security requirements
+	// or when we need special processing. With a single requirement,
+	// the auth middlewares are added directly to the chain.
 	return len(a.Spec.SecurityRequirements) > 1 && len(a.authMiddlewares) > 1
 }
 

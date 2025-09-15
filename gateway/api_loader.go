@@ -392,6 +392,15 @@ func (gw *Gateway) processSpec(
 			authArray = append(authArray, gw.createMiddleware(&AuthKey{baseMid.Copy()}))
 		}
 
+		// Check security processing mode
+		processingMode := spec.SecurityProcessingMode
+		if processingMode == "legacy" && len(spec.SecurityRequirements) > 1 {
+			// Legacy mode: only use first security requirement
+			logger.Info("Legacy mode: Only processing first security requirement, ignoring others")
+			spec.SecurityRequirements = spec.SecurityRequirements[:1]
+		}
+
+		// Use AuthORWrapper when we have multiple security requirements
 		if len(spec.SecurityRequirements) > 1 && len(authArray) > 0 {
 			logger.Info("Multiple security requirements detected - using OR authentication logic")
 
@@ -402,6 +411,7 @@ func (gw *Gateway) processSpec(
 			// Add the OR wrapper to the chain instead of individual auth middlewares
 			chainArray = append(chainArray, gw.createMiddleware(orWrapper))
 		} else {
+			// Single requirement or no requirements - use direct middleware chain
 			chainArray = append(chainArray, authArray...)
 		}
 
