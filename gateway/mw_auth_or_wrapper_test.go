@@ -80,6 +80,9 @@ func TestMultiAuthMiddleware_OR_JWT_And_ApiKey_Combination(t *testing.T) {
 			{"apikey"}, // Option 2: API key only
 		}
 
+		// Enable compliant mode for OR logic
+		spec.SecurityProcessingMode = "compliant"
+
 		// BaseIdentity will be set dynamically
 		spec.BaseIdentityProvidedBy = apidef.UnsetAuth
 	})
@@ -229,6 +232,9 @@ func TestMultiAuthMiddleware_OR_BasicAuth_And_ApiKey(t *testing.T) {
 			{"apikey"}, // Option 2: API key only
 		}
 
+		// Enable compliant mode for OR logic
+		spec.SecurityProcessingMode = "compliant"
+
 		spec.BaseIdentityProvidedBy = apidef.UnsetAuth
 	})
 
@@ -345,6 +351,9 @@ func TestMultiAuthMiddleware_OR_AllMethodsFail(t *testing.T) {
 			{"apikey"}, // Option 2: API key only
 		}
 
+		// Enable compliant mode for OR logic
+		spec.SecurityProcessingMode = "compliant"
+
 		spec.BaseIdentityProvidedBy = apidef.UnsetAuth
 	})
 
@@ -446,6 +455,9 @@ func TestMultiAuthMiddleware_BackwardCompatibility_AND_Logic(t *testing.T) {
 		}
 
 		spec.BaseIdentityProvidedBy = apidef.AuthToken // API key provides base identity
+
+		// Enable compliant mode for OR logic
+		spec.SecurityProcessingMode = "compliant"
 	})
 
 	// Create JWT token
@@ -578,6 +590,10 @@ func TestMultiAuthMiddleware_OR_MixedValidInvalid(t *testing.T) {
 			{"basic"},  // Option 1: Basic auth
 			{"apikey"}, // Option 2: API key
 		}
+
+
+		// Enable compliant mode for OR logic
+		spec.SecurityProcessingMode = "compliant"
 
 		spec.BaseIdentityProvidedBy = apidef.UnsetAuth
 	})
@@ -740,6 +756,8 @@ func TestMultiAuthMiddleware_OR_ThreeAuthMethods(t *testing.T) {
 			{"jwt"},    // Option 3: JWT
 		}
 
+		// Enable compliant mode for OR logic
+		spec.SecurityProcessingMode = "compliant"
 		spec.BaseIdentityProvidedBy = apidef.UnsetAuth
 	})
 
@@ -1077,6 +1095,10 @@ func TestMultiAuthMiddleware_OR_OAuth2_And_ApiKey(t *testing.T) {
 			{"apikey"}, // Option 2: API key
 		}
 
+
+		// Enable compliant mode for OR logic
+		spec.SecurityProcessingMode = "compliant"
+
 		spec.BaseIdentityProvidedBy = apidef.UnsetAuth
 	})[0]
 
@@ -1259,6 +1281,10 @@ func TestMultiAuthMiddleware_OR_SessionPersistence(t *testing.T) {
 			{"apikey"}, // Option 2: API key
 		}
 
+
+		// Enable compliant mode for OR logic
+		spec.SecurityProcessingMode = "compliant"
+
 		spec.BaseIdentityProvidedBy = apidef.UnsetAuth
 	})
 
@@ -1378,6 +1404,10 @@ func TestMultiAuthMiddleware_OR_RateLimiting(t *testing.T) {
 			{"apikey"}, // Option 2: API key
 		}
 
+
+		// Enable compliant mode for OR logic
+		spec.SecurityProcessingMode = "compliant"
+
 		spec.BaseIdentityProvidedBy = apidef.UnsetAuth
 	})
 
@@ -1463,6 +1493,10 @@ func TestMultiAuthMiddleware_OR_ErrorMessages(t *testing.T) {
 			{"jwt"},    // Option 1: JWT
 			{"apikey"}, // Option 2: API key
 		}
+
+
+		// Enable compliant mode for OR logic
+		spec.SecurityProcessingMode = "compliant"
 
 		spec.BaseIdentityProvidedBy = apidef.UnsetAuth
 	})
@@ -1573,6 +1607,9 @@ func TestMultiAuthMiddleware_OR_PerformanceWithManyMethods(t *testing.T) {
 			{"apikey"}, // Option 4: API key (should succeed quickly as last option)
 		}
 
+		// Enable compliant mode for OR logic
+		spec.SecurityProcessingMode = "compliant"
+
 		spec.BaseIdentityProvidedBy = apidef.UnsetAuth
 	})
 
@@ -1670,6 +1707,10 @@ func TestMultiAuthMiddleware_OR_SessionIsolation(t *testing.T) {
 			{"jwt"},    // Option 1: JWT (will fail with invalid token)
 			{"apikey"}, // Option 2: API key (will succeed)
 		}
+
+
+		// Enable compliant mode for OR logic
+		spec.SecurityProcessingMode = "compliant"
 
 		spec.BaseIdentityProvidedBy = apidef.UnsetAuth
 	})
