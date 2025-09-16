@@ -105,8 +105,6 @@ func TestOAS_Security(t *testing.T) {
 	var convertedAPI apidef.APIDefinition // bundle enabled
 	oas.extractSecurityTo(&convertedAPI)
 
-	// After fix: SecurityRequirements are now extracted even for single schemes
-	// Clear it before comparison since original API doesn't have it
 	convertedAPI.SecurityRequirements = nil
 	assert.Equal(t, api, convertedAPI)
 }
@@ -931,7 +929,6 @@ func TestOAS_extractSecurityTo_ORLogic(t *testing.T) {
 		var api apidef.APIDefinition
 		oas.extractSecurityTo(&api)
 
-		// After fix: single requirements are now extracted to preserve structure
 		assert.Len(t, api.SecurityRequirements, 1)
 		assert.Contains(t, api.SecurityRequirements[0], "token-auth")
 		assert.Contains(t, api.SecurityRequirements[0], "jwt-auth")
@@ -1118,7 +1115,6 @@ func TestOAS_SecurityRequirements_RoundTrip(t *testing.T) {
 		var extractedAPI apidef.APIDefinition
 		oas.extractSecurityTo(&extractedAPI)
 
-		// After fix: AND logic requirements are now extracted to preserve structure
 		assert.Len(t, extractedAPI.SecurityRequirements, 1)
 		assert.Len(t, extractedAPI.SecurityRequirements[0], 2)
 		assert.Contains(t, extractedAPI.SecurityRequirements[0], "token-auth")

@@ -398,7 +398,7 @@ func (s *OAS) extractJWTTo(api *apidef.APIDefinition, name string) {
 	ac := apidef.AuthConfig{Name: name, DisableHeader: true}
 
 	jwt := s.getTykJWTAuth(name)
-	
+
 	// Handle both standard OpenAPI JWT schemes and Tyk-extended JWT schemes.
 	// Standard OpenAPI schemes (without Tyk extension) are enabled by default.
 	// Tyk-extended schemes use the enabled value from the extension
@@ -422,7 +422,7 @@ func (s *OAS) extractJWTTo(api *apidef.APIDefinition, name string) {
 		// No OpenAPI components, but has Tyk extension
 		api.EnableJWT = jwt.Enabled
 	}
-	
+
 	if jwt != nil {
 		jwt.AuthSources.ExtractTo(&ac)
 		api.JWTSource = jwt.Source
@@ -535,7 +535,7 @@ func (s *OAS) extractBasicTo(api *apidef.APIDefinition, name string) {
 	ac := apidef.AuthConfig{Name: name, DisableHeader: true}
 
 	basic := s.getTykBasicAuth(name)
-	
+
 	// Handle both standard OpenAPI basic auth schemes and Tyk-extended basic auth schemes.
 	// Standard OpenAPI schemes (without Tyk extension) are enabled by default.
 	// Tyk-extended schemes use the enabled value from the extension
@@ -559,7 +559,7 @@ func (s *OAS) extractBasicTo(api *apidef.APIDefinition, name string) {
 		// No OpenAPI components, but has Tyk extension
 		api.UseBasicAuth = basic.Enabled
 	}
-	
+
 	if basic != nil {
 		basic.AuthSources.ExtractTo(&ac)
 		api.BasicAuth.DisableCaching = basic.DisableCaching

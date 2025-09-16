@@ -80,9 +80,6 @@ func TestMultiAuthMiddleware_OR_JWT_And_ApiKey_Combination(t *testing.T) {
 			{"apikey"}, // Option 2: API key only
 		}
 
-		// Classic APIs always use legacy mode (only first requirement)
-		// Note: True OR logic is OAS-only, these tests verify AND behavior
-
 		// BaseIdentity will be set dynamically
 		spec.BaseIdentityProvidedBy = apidef.UnsetAuth
 	})
@@ -232,9 +229,6 @@ func TestMultiAuthMiddleware_OR_BasicAuth_And_ApiKey(t *testing.T) {
 			{"apikey"}, // Option 2: API key only
 		}
 
-		// Classic APIs always use legacy mode (only first requirement)
-		// Note: True OR logic is OAS-only, these tests verify AND behavior
-
 		spec.BaseIdentityProvidedBy = apidef.UnsetAuth
 	})
 
@@ -351,9 +345,6 @@ func TestMultiAuthMiddleware_OR_AllMethodsFail(t *testing.T) {
 			{"apikey"}, // Option 2: API key only
 		}
 
-		// Classic APIs always use legacy mode (only first requirement)
-		// Note: True OR logic is OAS-only, these tests verify AND behavior
-
 		spec.BaseIdentityProvidedBy = apidef.UnsetAuth
 	})
 
@@ -456,8 +447,6 @@ func TestMultiAuthMiddleware_BackwardCompatibility_AND_Logic(t *testing.T) {
 
 		spec.BaseIdentityProvidedBy = apidef.AuthToken // API key provides base identity
 
-		// Classic APIs always use legacy mode (only first requirement)
-		// Note: True OR logic is OAS-only, these tests verify AND behavior
 	})
 
 	// Create JWT token
@@ -590,9 +579,6 @@ func TestMultiAuthMiddleware_OR_MixedValidInvalid(t *testing.T) {
 			{"basic"},  // Option 1: Basic auth
 			{"apikey"}, // Option 2: API key
 		}
-
-		// Classic APIs always use legacy mode (only first requirement)
-		// Note: True OR logic is OAS-only, these tests verify AND behavior
 
 		spec.BaseIdentityProvidedBy = apidef.UnsetAuth
 	})
@@ -755,8 +741,6 @@ func TestMultiAuthMiddleware_OR_ThreeAuthMethods(t *testing.T) {
 			{"jwt"},    // Option 3: JWT
 		}
 
-		// Classic APIs always use legacy mode (only first requirement)
-		// Note: True OR logic is OAS-only, these tests verify AND behavior
 		spec.BaseIdentityProvidedBy = apidef.UnsetAuth
 	})
 
@@ -1094,9 +1078,6 @@ func TestMultiAuthMiddleware_OR_OAuth2_And_ApiKey(t *testing.T) {
 			{"apikey"}, // Option 2: API key
 		}
 
-		// Classic APIs always use legacy mode (only first requirement)
-		// Note: True OR logic is OAS-only, these tests verify AND behavior
-
 		spec.BaseIdentityProvidedBy = apidef.UnsetAuth
 	})[0]
 
@@ -1279,9 +1260,6 @@ func TestMultiAuthMiddleware_OR_SessionPersistence(t *testing.T) {
 			{"apikey"}, // Option 2: API key
 		}
 
-		// Classic APIs always use legacy mode (only first requirement)
-		// Note: True OR logic is OAS-only, these tests verify AND behavior
-
 		spec.BaseIdentityProvidedBy = apidef.UnsetAuth
 	})
 
@@ -1401,9 +1379,6 @@ func TestMultiAuthMiddleware_OR_RateLimiting(t *testing.T) {
 			{"apikey"}, // Option 2: API key
 		}
 
-		// Classic APIs always use legacy mode (only first requirement)
-		// Note: True OR logic is OAS-only, these tests verify AND behavior
-
 		spec.BaseIdentityProvidedBy = apidef.UnsetAuth
 	})
 
@@ -1489,9 +1464,6 @@ func TestMultiAuthMiddleware_OR_ErrorMessages(t *testing.T) {
 			{"jwt"},    // Option 1: JWT
 			{"apikey"}, // Option 2: API key
 		}
-
-		// Classic APIs always use legacy mode (only first requirement)
-		// Note: True OR logic is OAS-only, these tests verify AND behavior
 
 		spec.BaseIdentityProvidedBy = apidef.UnsetAuth
 	})
@@ -1602,9 +1574,6 @@ func TestMultiAuthMiddleware_OR_PerformanceWithManyMethods(t *testing.T) {
 			{"apikey"}, // Option 4: API key (should succeed quickly as last option)
 		}
 
-		// Classic APIs always use legacy mode (only first requirement)
-		// Note: True OR logic is OAS-only, these tests verify AND behavior
-
 		spec.BaseIdentityProvidedBy = apidef.UnsetAuth
 	})
 
@@ -1702,9 +1671,6 @@ func TestMultiAuthMiddleware_OR_SessionIsolation(t *testing.T) {
 			{"jwt"},    // Option 1: JWT (will fail with invalid token)
 			{"apikey"}, // Option 2: API key (will succeed)
 		}
-
-		// Classic APIs always use legacy mode (only first requirement)
-		// Note: True OR logic is OAS-only, these tests verify AND behavior
 
 		spec.BaseIdentityProvidedBy = apidef.UnsetAuth
 	})

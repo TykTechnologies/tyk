@@ -139,8 +139,6 @@ func (a *Authentication) Fill(api apidef.APIDefinition) {
 	a.StripAuthorizationData = api.StripAuthData
 	a.BaseIdentityProvider = api.BaseIdentityProvidedBy
 
-	// SecurityProcessingMode is OAS-only - not filled from APIDefinition
-
 	if a.Custom == nil {
 		a.Custom = &CustomPluginAuthentication{}
 	}
@@ -195,8 +193,6 @@ func (a *Authentication) ExtractTo(api *apidef.APIDefinition) {
 	api.UseKeylessAccess = !a.Enabled
 	api.StripAuthData = a.StripAuthorizationData
 	api.BaseIdentityProvidedBy = a.BaseIdentityProvider
-
-	// SecurityProcessingMode is OAS-only - not extracted to APIDefinition
 
 	if a.HMAC != nil {
 		a.HMAC.ExtractTo(api)

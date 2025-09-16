@@ -5,8 +5,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/samber/lo"
 	"strings"
+
+	"github.com/samber/lo"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
@@ -266,7 +267,6 @@ func (s *OAS) getTykBasicAuth(name string) (basic *Basic) {
 
 	basic = &Basic{}
 	if basicVal, ok := securityScheme.(*Basic); ok {
-		// Already a typed Basic struct
 		basic = basicVal
 	} else {
 		// Security scheme is stored as map[string]interface{}, convert it to Basic struct

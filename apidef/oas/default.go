@@ -318,7 +318,6 @@ func GetTykExtensionConfigParams(r *http.Request) *TykExtensionConfigParams {
 	if processingMode != "" {
 		overRideValues.SecurityProcessingMode = processingMode
 	} else {
-		// Backward compatibility: check authentication param for "compliant" value
 		authParam := strings.TrimSpace(queries.Get("authentication"))
 		if authParam == "compliant" {
 			overRideValues.SecurityProcessingMode = "compliant"

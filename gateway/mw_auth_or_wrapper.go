@@ -15,7 +15,7 @@ type AuthORWrapper struct {
 // ProcessRequest handles the OR logic for authentication
 func (a *AuthORWrapper) ProcessRequest(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
 	logger := a.Logger()
-	
+
 	// Determine processing mode (OAS-only feature)
 	processingMode := "legacy" // default
 	if a.Spec.IsOAS && a.Spec.OAS.GetTykExtension() != nil {
@@ -23,7 +23,7 @@ func (a *AuthORWrapper) ProcessRequest(w http.ResponseWriter, r *http.Request, _
 			processingMode = auth.SecurityProcessingMode
 		}
 	}
-	
+
 	logger.Debugf("OR wrapper processing with %d middlewares, %d security requirements, mode: %s",
 		len(a.authMiddlewares), len(a.Spec.SecurityRequirements), processingMode)
 
@@ -39,8 +39,6 @@ func (a *AuthORWrapper) ProcessRequest(w http.ResponseWriter, r *http.Request, _
 		return nil, http.StatusOK
 	}
 
-	// Multiple requirements - check processing mode
-	// Default to legacy mode for backward compatibility (pre-TT-2378 behavior)
 	if processingMode == "" || processingMode == "legacy" {
 		logger.Debug("Using AND logic (legacy mode - backward compatibility)")
 

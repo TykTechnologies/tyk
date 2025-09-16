@@ -375,8 +375,6 @@ func TestSecurityProcessingMode(t *testing.T) {
 			t.Run(tc.name, func(t *testing.T) {
 				var api apidef.APIDefinition
 				tc.input.ExtractTo(&api)
-				// SecurityProcessingMode is OAS-only, not extracted to APIDefinition
-				// Just verify that ExtractTo doesn't panic and the field stays in OAS
 				assert.Equal(t, tc.expected, tc.input.SecurityProcessingMode)
 			})
 		}
@@ -424,8 +422,6 @@ func TestSecurityProcessingMode(t *testing.T) {
 				}
 				var api apidef.APIDefinition
 				auth.ExtractTo(&api)
-				// SecurityProcessingMode is OAS-only, not extracted to APIDefinition
-				// The field should remain in the OAS Authentication struct
 				assert.Equal(t, tc.input, auth.SecurityProcessingMode)
 			})
 		}
@@ -486,14 +482,9 @@ func TestVendorExtensionSecurity(t *testing.T) {
 		var api apidef.APIDefinition
 		auth.ExtractTo(&api)
 
-		// The Security field should not be extracted to APIDefinition
-		// It's only stored in the OAS extension
-
 		auth2 := &Authentication{}
 		auth2.Fill(api)
 
-		// Security field is not filled from APIDefinition
-		// It only exists in OAS vendor extension
 		assert.Nil(t, auth2.Security)
 	})
 }
