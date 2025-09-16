@@ -9,13 +9,80 @@ import (
 	"testing"
 	"time"
 
+	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/golang-jwt/jwt/v4"
 	"github.com/lonelycode/osin"
 
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/apidef/oas"
 	"github.com/TykTechnologies/tyk/test"
 	"github.com/TykTechnologies/tyk/user"
 )
+
+// createOASAPIWithORAuth creates a proper OAS API with OR authentication from the start
+func createOASAPIWithORAuth(spec *APISpec, authConfigs map[string]apidef.AuthConfig, securityRequirements [][]string) {
+	// Mark as OAS API
+	spec.IsOAS = true
+
+	// Set the security requirements
+	spec.SecurityRequirements = securityRequirements
+
+	// Create OpenAPI 3.0 document
+	oasDoc := openapi3.T{
+		OpenAPI: "3.0.3",
+		Info: &openapi3.Info{
+			Title:   spec.Name,
+			Version: "1.0.0",
+		},
+		Paths: openapi3.NewPaths(),
+	}
+
+	// Add a wildcard path to handle all requests
+	pathItem := &openapi3.PathItem{
+		Get:     &openapi3.Operation{Responses: openapi3.NewResponses()},
+		Post:    &openapi3.Operation{Responses: openapi3.NewResponses()},
+		Put:     &openapi3.Operation{Responses: openapi3.NewResponses()},
+		Delete:  &openapi3.Operation{Responses: openapi3.NewResponses()},
+		Options: &openapi3.Operation{Responses: openapi3.NewResponses()},
+		Head:    &openapi3.Operation{Responses: openapi3.NewResponses()},
+		Patch:   &openapi3.Operation{Responses: openapi3.NewResponses()},
+	}
+	oasDoc.Paths.Set("/*", pathItem)
+
+	// Create OAS wrapper
+	o := oas.OAS{T: oasDoc}
+
+	// Set Tyk extension with compliant mode BEFORE filling
+	o.SetTykExtension(&oas.XTykAPIGateway{
+		Server: oas.Server{
+			Authentication: &oas.Authentication{
+				Enabled:                true,
+				SecurityProcessingMode: "compliant", // Enable OR logic
+			},
+		},
+	})
+
+	// Fill from the API definition - this will populate all necessary fields
+	o.Fill(*spec.APIDefinition)
+
+	// Ensure compliant mode is preserved after Fill
+	if tykExt := o.GetTykExtension(); tykExt != nil {
+		if tykExt.Server.Authentication == nil {
+			tykExt.Server.Authentication = &oas.Authentication{}
+		}
+		tykExt.Server.Authentication.SecurityProcessingMode = "compliant"
+	}
+
+	// Extract back to populate all fields
+	o.ExtractTo(spec.APIDefinition)
+
+	// Ensure the API is active and has proper configuration
+	spec.APIDefinition.Active = true
+	spec.APIDefinition.IsOAS = true
+
+	// Set the OAS object on the spec
+	spec.OAS = o
+}
 
 // TestMultiAuthMiddleware_OR_JWT_And_ApiKey_Combination tests the OR logic with JWT and API key
 func TestMultiAuthMiddleware_OR_JWT_And_ApiKey_Combination(t *testing.T) {
@@ -46,12 +113,14 @@ func TestMultiAuthMiddleware_OR_JWT_And_ApiKey_Combination(t *testing.T) {
 		*s = *apiKeySession
 	})
 
-	// Configure API with JWT and API key, OR logic via SecurityRequirements
+	// Configure OAS API with JWT and API key, OR logic via SecurityRequirements
 	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 		spec.APIID = "test-or-jwt-apikey"
 		spec.Name = "Test OR JWT API Key"
 		spec.Proxy.ListenPath = "/test-or-jwt-apikey/"
+		spec.Proxy.TargetURL = "http://httpbin.org/"
 		spec.UseKeylessAccess = false
+		spec.Active = true
 
 		// Enable both JWT and API key
 		spec.UseStandardAuth = true
@@ -65,7 +134,7 @@ func TestMultiAuthMiddleware_OR_JWT_And_ApiKey_Combination(t *testing.T) {
 		spec.JWTDefaultPolicies = []string{pID}
 
 		// Configure auth headers
-		spec.AuthConfigs = map[string]apidef.AuthConfig{
+		authConfigs := map[string]apidef.AuthConfig{
 			"authToken": {
 				AuthHeaderName: "X-API-Key",
 			},
@@ -73,15 +142,19 @@ func TestMultiAuthMiddleware_OR_JWT_And_ApiKey_Combination(t *testing.T) {
 				AuthHeaderName: "Authorization",
 			},
 		}
+		spec.AuthConfigs = authConfigs
 
-		// Simulate OAS import with multiple security requirements (OR logic)
-		spec.SecurityRequirements = [][]string{
+		// Security requirements for OR logic
+		securityRequirements := [][]string{
 			{"jwt"},    // Option 1: JWT only
 			{"apikey"}, // Option 2: API key only
 		}
 
 		// BaseIdentity will be set dynamically
 		spec.BaseIdentityProvidedBy = apidef.UnsetAuth
+
+		// Create proper OAS API with compliant mode for OR logic
+		createOASAPIWithORAuth(spec, authConfigs, securityRequirements)
 	})
 
 	// Create JWT token
@@ -211,10 +284,13 @@ func TestMultiAuthMiddleware_OR_BasicAuth_And_ApiKey(t *testing.T) {
 
 		// Enable both Basic Auth and API key
 		spec.UseBasicAuth = true
+		// spec.EnableBasicAuth = true // This field doesn't exist, UseBasicAuth is sufficient
 		spec.UseStandardAuth = true
+		spec.Proxy.TargetURL = "http://httpbin.org/"
+		spec.Active = true
 
 		// Configure auth headers
-		spec.AuthConfigs = map[string]apidef.AuthConfig{
+		authConfigs := map[string]apidef.AuthConfig{
 			"basic": {
 				AuthHeaderName: "Authorization",
 			},
@@ -222,14 +298,18 @@ func TestMultiAuthMiddleware_OR_BasicAuth_And_ApiKey(t *testing.T) {
 				AuthHeaderName: "X-API-Key",
 			},
 		}
+		spec.AuthConfigs = authConfigs
 
-		// Simulate OAS import with multiple security requirements (OR logic)
-		spec.SecurityRequirements = [][]string{
+		// Security requirements for OR logic
+		securityRequirements := [][]string{
 			{"basic"},  // Option 1: Basic auth only
 			{"apikey"}, // Option 2: API key only
 		}
 
 		spec.BaseIdentityProvidedBy = apidef.UnsetAuth
+
+		// Create proper OAS API with compliant mode for OR logic
+		createOASAPIWithORAuth(spec, authConfigs, securityRequirements)
 	})
 
 	// Encode basic auth credentials
@@ -318,7 +398,9 @@ func TestMultiAuthMiddleware_OR_AllMethodsFail(t *testing.T) {
 		spec.APIID = "test-or-all-fail"
 		spec.Name = "Test OR All Fail"
 		spec.Proxy.ListenPath = "/test-or-all-fail/"
+		spec.Proxy.TargetURL = "http://httpbin.org/"
 		spec.UseKeylessAccess = false
+		spec.Active = true
 
 		// Enable both JWT and API key
 		spec.UseStandardAuth = true
@@ -346,6 +428,9 @@ func TestMultiAuthMiddleware_OR_AllMethodsFail(t *testing.T) {
 		}
 
 		spec.BaseIdentityProvidedBy = apidef.UnsetAuth
+
+		// Mark as OAS API with compliant mode for OR logic
+		createOASAPIWithORAuth(spec, spec.AuthConfigs, spec.SecurityRequirements)
 	})
 
 	// Test cases - all auth methods should fail
@@ -417,7 +502,9 @@ func TestMultiAuthMiddleware_BackwardCompatibility_AND_Logic(t *testing.T) {
 		spec.APIID = "test-and-logic"
 		spec.Name = "Test AND Logic"
 		spec.Proxy.ListenPath = "/test-and-logic/"
+		spec.Proxy.TargetURL = "http://httpbin.org/"
 		spec.UseKeylessAccess = false
+		spec.Active = true
 
 		// Enable both JWT and API key
 		spec.UseStandardAuth = true
@@ -558,7 +645,9 @@ func TestMultiAuthMiddleware_OR_MixedValidInvalid(t *testing.T) {
 		spec.Name = "Test OR Mixed"
 		spec.OrgID = "default"
 		spec.Proxy.ListenPath = "/test-or-mixed/"
+		spec.Proxy.TargetURL = "http://httpbin.org/"
 		spec.UseKeylessAccess = false
+		spec.Active = true
 
 		// Enable Basic Auth and API key
 		spec.UseBasicAuth = true
@@ -581,6 +670,9 @@ func TestMultiAuthMiddleware_OR_MixedValidInvalid(t *testing.T) {
 		}
 
 		spec.BaseIdentityProvidedBy = apidef.UnsetAuth
+
+		// Mark as OAS API with compliant mode for OR logic
+		createOASAPIWithORAuth(spec, spec.AuthConfigs, spec.SecurityRequirements)
 	})
 
 	// Prepare auth headers
@@ -707,7 +799,9 @@ func TestMultiAuthMiddleware_OR_ThreeAuthMethods(t *testing.T) {
 		spec.Name = "Test OR Three"
 		spec.OrgID = "default"
 		spec.Proxy.ListenPath = "/test-or-three/"
+		spec.Proxy.TargetURL = "http://httpbin.org/"
 		spec.UseKeylessAccess = false
+		spec.Active = true
 
 		// Enable all three auth methods
 		spec.UseBasicAuth = true
@@ -742,6 +836,9 @@ func TestMultiAuthMiddleware_OR_ThreeAuthMethods(t *testing.T) {
 		}
 
 		spec.BaseIdentityProvidedBy = apidef.UnsetAuth
+
+		// Mark as OAS API with compliant mode for OR logic
+		createOASAPIWithORAuth(spec, spec.AuthConfigs, spec.SecurityRequirements)
 	})
 
 	// Create JWT token
@@ -1045,7 +1142,9 @@ func TestMultiAuthMiddleware_OR_OAuth2_And_ApiKey(t *testing.T) {
 		spec.Name = "Test OR OAuth API Key"
 		spec.OrgID = "default"
 		spec.Proxy.ListenPath = "/test-or-oauth-apikey/"
+		spec.Proxy.TargetURL = "http://httpbin.org/"
 		spec.UseKeylessAccess = false
+		spec.Active = true
 
 		// Enable both OAuth2 and API key
 		spec.UseOauth2 = true
@@ -1079,6 +1178,9 @@ func TestMultiAuthMiddleware_OR_OAuth2_And_ApiKey(t *testing.T) {
 		}
 
 		spec.BaseIdentityProvidedBy = apidef.UnsetAuth
+
+		// Mark as OAS API with compliant mode for OR logic
+		createOASAPIWithORAuth(spec, spec.AuthConfigs, spec.SecurityRequirements)
 	})[0]
 
 	// Create OAuth client
@@ -1238,7 +1340,9 @@ func TestMultiAuthMiddleware_OR_SessionPersistence(t *testing.T) {
 		spec.Name = "Test OR Session"
 		spec.OrgID = "default"
 		spec.Proxy.ListenPath = "/test-or-session/"
+		spec.Proxy.TargetURL = "http://httpbin.org/"
 		spec.UseKeylessAccess = false
+		spec.Active = true
 
 		// Enable both auth methods
 		spec.UseBasicAuth = true
@@ -1261,6 +1365,9 @@ func TestMultiAuthMiddleware_OR_SessionPersistence(t *testing.T) {
 		}
 
 		spec.BaseIdentityProvidedBy = apidef.UnsetAuth
+
+		// Mark as OAS API with compliant mode for OR logic
+		createOASAPIWithORAuth(spec, spec.AuthConfigs, spec.SecurityRequirements)
 	})
 
 	// Prepare auth headers
@@ -1357,7 +1464,9 @@ func TestMultiAuthMiddleware_OR_RateLimiting(t *testing.T) {
 		spec.Name = "Test OR Rate Limit"
 		spec.OrgID = "default"
 		spec.Proxy.ListenPath = "/test-or-ratelimit/"
+		spec.Proxy.TargetURL = "http://httpbin.org/"
 		spec.UseKeylessAccess = false
+		spec.Active = true
 
 		// Enable both auth methods
 		spec.UseBasicAuth = true
@@ -1380,6 +1489,9 @@ func TestMultiAuthMiddleware_OR_RateLimiting(t *testing.T) {
 		}
 
 		spec.BaseIdentityProvidedBy = apidef.UnsetAuth
+
+		// Mark as OAS API with compliant mode for OR logic
+		createOASAPIWithORAuth(spec, spec.AuthConfigs, spec.SecurityRequirements)
 	})
 
 	// Prepare auth headers
@@ -1438,7 +1550,9 @@ func TestMultiAuthMiddleware_OR_ErrorMessages(t *testing.T) {
 		spec.APIID = "test-or-errors"
 		spec.Name = "Test OR Errors"
 		spec.Proxy.ListenPath = "/test-or-errors/"
+		spec.Proxy.TargetURL = "http://httpbin.org/"
 		spec.UseKeylessAccess = false
+		spec.Active = true
 
 		// Enable both JWT and API key
 		spec.UseStandardAuth = true
@@ -1466,6 +1580,9 @@ func TestMultiAuthMiddleware_OR_ErrorMessages(t *testing.T) {
 		}
 
 		spec.BaseIdentityProvidedBy = apidef.UnsetAuth
+
+		// Mark as OAS API with compliant mode for OR logic
+		createOASAPIWithORAuth(spec, spec.AuthConfigs, spec.SecurityRequirements)
 	})
 
 	// Test various error scenarios and verify error messages
@@ -1537,7 +1654,9 @@ func TestMultiAuthMiddleware_OR_PerformanceWithManyMethods(t *testing.T) {
 		spec.APIID = "test-or-performance"
 		spec.Name = "Test OR Performance"
 		spec.Proxy.ListenPath = "/test-or-performance/"
+		spec.Proxy.TargetURL = "http://httpbin.org/"
 		spec.UseKeylessAccess = false
+		spec.Active = true
 
 		// Enable multiple auth methods
 		spec.UseStandardAuth = true
@@ -1575,6 +1694,9 @@ func TestMultiAuthMiddleware_OR_PerformanceWithManyMethods(t *testing.T) {
 		}
 
 		spec.BaseIdentityProvidedBy = apidef.UnsetAuth
+
+		// Mark as OAS API with compliant mode for OR logic
+		createOASAPIWithORAuth(spec, spec.AuthConfigs, spec.SecurityRequirements)
 	})
 
 	// Measure time for successful auth with last method
@@ -1645,7 +1767,9 @@ func TestMultiAuthMiddleware_OR_SessionIsolation(t *testing.T) {
 		spec.APIID = "test-or-isolation"
 		spec.Name = "Test OR Isolation"
 		spec.Proxy.ListenPath = "/test-or-isolation/"
+		spec.Proxy.TargetURL = "http://httpbin.org/"
 		spec.UseKeylessAccess = false
+		spec.Active = true
 
 		// Enable both JWT and API key
 		spec.UseStandardAuth = true
@@ -1673,6 +1797,9 @@ func TestMultiAuthMiddleware_OR_SessionIsolation(t *testing.T) {
 		}
 
 		spec.BaseIdentityProvidedBy = apidef.UnsetAuth
+
+		// Mark as OAS API with compliant mode for OR logic
+		createOASAPIWithORAuth(spec, spec.AuthConfigs, spec.SecurityRequirements)
 	})
 
 	// Test that a failed JWT attempt doesn't contaminate the session for API key
@@ -1759,7 +1886,9 @@ func TestSecurityProcessingMode_LegacyMode(t *testing.T) {
 		spec.APIID = "test-legacy-mode"
 		spec.Name = "Test Legacy Mode"
 		spec.Proxy.ListenPath = "/test-legacy-mode/"
+		spec.Proxy.TargetURL = "http://httpbin.org/"
 		spec.UseKeylessAccess = false
+		spec.Active = true
 		spec.UseStandardAuth = true
 		spec.UseBasicAuth = false // Don't enable basic auth in legacy mode test
 
@@ -1852,12 +1981,13 @@ func TestSecurityProcessingMode_CompliantMode(t *testing.T) {
 		spec.APIID = "test-compliant-mode"
 		spec.Name = "Test Compliant Mode"
 		spec.Proxy.ListenPath = "/test-compliant-mode/"
+		spec.Proxy.TargetURL = "http://httpbin.org/"
 		spec.UseKeylessAccess = false
+		spec.Active = true
 		spec.UseStandardAuth = true
 		spec.UseBasicAuth = true
 
-		// Classic APIs cannot use compliant mode (OAS-only feature)
-		// This test will verify legacy behavior (only first requirement used)
+		// Configure OR logic through multiple security requirements
 		spec.SecurityRequirements = [][]string{
 			{"apikey"}, // Option 1: API key
 			{"basic"},  // Option 2: Basic auth
@@ -1871,6 +2001,9 @@ func TestSecurityProcessingMode_CompliantMode(t *testing.T) {
 				AuthHeaderName: "Authorization",
 			},
 		}
+
+		// Mark as OAS API with compliant mode for OR logic
+		createOASAPIWithORAuth(spec, spec.AuthConfigs, spec.SecurityRequirements)
 	})
 
 	testCases := []test.TestCase{
@@ -1944,7 +2077,9 @@ func TestSecurityProcessingMode_DefaultBehavior(t *testing.T) {
 		spec.APIID = "test-default-mode"
 		spec.Name = "Test Default Mode"
 		spec.Proxy.ListenPath = "/test-default-mode/"
+		spec.Proxy.TargetURL = "http://httpbin.org/"
 		spec.UseKeylessAccess = false
+		spec.Active = true
 		spec.UseStandardAuth = true
 		spec.UseBasicAuth = false // Only enable API key for legacy default
 

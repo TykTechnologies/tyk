@@ -86,7 +86,7 @@ func (s *OAS) BuildDefaultTykExtension(overRideValues TykExtensionConfigParams, 
 	}
 
 	if xTykAPIGateway.Info.Name == "" {
-		xTykAPIGateway.Info.Name = s.T.Info.Title
+		xTykAPIGateway.Info.Name = s.Info.Title
 	}
 
 	if overRideValues.ApiID != "" {
@@ -111,11 +111,11 @@ func (s *OAS) BuildDefaultTykExtension(overRideValues TykExtensionConfigParams, 
 	if overRideValues.UpstreamURL != "" {
 		upstreamURL = overRideValues.UpstreamURL
 	} else if xTykAPIGateway.Upstream.URL == "" {
-		if len(s.T.Servers) == 0 {
+		if len(s.Servers) == 0 {
 			return errEmptyServersObject
 		}
 
-		upstreamURL = s.T.Servers[0].URL
+		upstreamURL = s.Servers[0].URL
 		if isURLParametrized(upstreamURL) {
 			var err error
 			upstreamURL, err = generateUrlUsingDefaultVariableValues(s, upstreamURL)
@@ -154,7 +154,7 @@ func (s *OAS) BuildDefaultTykExtension(overRideValues TykExtensionConfigParams, 
 }
 
 func generateUrlUsingDefaultVariableValues(s *OAS, upstreamURL string) (string, error) {
-	for name, variable := range s.T.Servers[0].Variables {
+	for name, variable := range s.Servers[0].Variables {
 		if strings.Contains(upstreamURL, "{"+name+"}") {
 			if variable.Default == "" {
 				return "", fmt.Errorf("server variable %s does not have a default value", name)
@@ -177,7 +177,7 @@ func replaceParameterWithValue(url string, name string, value string) string {
 }
 
 func (s *OAS) importAuthentication(enable bool) error {
-	if len(s.T.Security) == 0 {
+	if len(s.Security) == 0 {
 		return errEmptySecurityObject
 	}
 
@@ -197,10 +197,10 @@ func (s *OAS) importAuthentication(enable bool) error {
 	}
 
 	processedSchemes := make(map[string]bool)
-	for _, securityReq := range s.T.Security {
+	for _, securityReq := range s.Security {
 		for name := range securityReq {
 			if !processedSchemes[name] {
-				securityScheme := s.T.Components.SecuritySchemes[name]
+				securityScheme := s.Components.SecuritySchemes[name]
 				err := tykSecuritySchemes.Import(name, securityScheme.Value, enable)
 				if err != nil {
 					log.WithError(err).Errorf("Error while importing security scheme: %s", name)
@@ -238,7 +238,7 @@ func (s *OAS) ImportMiddlewares(overRideValues TykExtensionConfigParams) {
 
 	currentOperations := make([]string, 0)
 
-	for path, pathItem := range s.T.Paths.Map() {
+	for path, pathItem := range s.Paths.Map() {
 		overRideValues.pathItemHasParameters = len(pathItem.Parameters) > 0
 		for _, method := range allowedMethods {
 			if operation := pathItem.GetOperation(method); operation != nil {
