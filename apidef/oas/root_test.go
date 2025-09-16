@@ -7,8 +7,8 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/TykTechnologies/tyk/internal/service/gojsonschema"
 	"github.com/getkin/kin-openapi/openapi3"
-	"github.com/TykTechnologies/internal/service/gojsonschema"
 
 	"github.com/stretchr/testify/assert"
 
