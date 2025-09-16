@@ -1136,9 +1136,7 @@ func (s *OAS) extractSecurityTo(api *apidef.APIDefinition) {
 
 		// Add vendor extension security requirements
 		if s.getTykAuthentication() != nil && len(s.getTykAuthentication().Security) > 0 {
-			for _, vendorReq := range s.getTykAuthentication().Security {
-				api.SecurityRequirements = append(api.SecurityRequirements, vendorReq)
-			}
+			api.SecurityRequirements = append(api.SecurityRequirements, s.getTykAuthentication().Security...)
 		}
 	} else if len(s.T.Security) > 0 {
 		// Legacy mode - extract all security requirements (even single ones)
