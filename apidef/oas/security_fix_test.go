@@ -2,18 +2,18 @@ package oas
 
 import (
 	"fmt"
-	"testing"
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/stretchr/testify/assert"
+	"testing"
 )
 
 func TestSecurityRequirementsPreservation(t *testing.T) {
 	testCases := []struct {
-		name               string
-		inputSecurity     openapi3.SecurityRequirements
-		mode              string
-		expectPreserved   bool
+		name            string
+		inputSecurity   openapi3.SecurityRequirements
+		mode            string
+		expectPreserved bool
 	}{
 		{
 			name: "Two separate OR requirements (user's bug case)",
@@ -21,7 +21,7 @@ func TestSecurityRequirementsPreservation(t *testing.T) {
 				{"authToken": []string{}},
 				{"basicAuth": []string{}},
 			},
-			mode: "legacy",
+			mode:            "legacy",
 			expectPreserved: true,
 		},
 		{
@@ -29,7 +29,7 @@ func TestSecurityRequirementsPreservation(t *testing.T) {
 			inputSecurity: openapi3.SecurityRequirements{
 				{"authToken": []string{}},
 			},
-			mode: "legacy",
+			mode:            "legacy",
 			expectPreserved: true,
 		},
 		{
@@ -37,7 +37,7 @@ func TestSecurityRequirementsPreservation(t *testing.T) {
 			inputSecurity: openapi3.SecurityRequirements{
 				{"authToken": []string{}, "basicAuth": []string{}},
 			},
-			mode: "legacy",
+			mode:            "legacy",
 			expectPreserved: true,
 		},
 		{
@@ -47,7 +47,7 @@ func TestSecurityRequirementsPreservation(t *testing.T) {
 				{"oauth2": []string{"read", "write"}},
 				{"jwt": []string{}},
 			},
-			mode: "compliant",
+			mode:            "compliant",
 			expectPreserved: true,
 		},
 		{
@@ -56,7 +56,7 @@ func TestSecurityRequirementsPreservation(t *testing.T) {
 				{"apiKey": []string{}},
 				{"oauth2": []string{"read"}, "jwt": []string{}},
 			},
-			mode: "legacy",
+			mode:            "legacy",
 			expectPreserved: true,
 		},
 	}
@@ -64,7 +64,7 @@ func TestSecurityRequirementsPreservation(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			fmt.Printf("\n=== Testing: %s ===\n", tc.name)
-			
+
 			// Create OAS with the given security requirements
 			oasDoc := &openapi3.T{
 				OpenAPI: "3.0.3",
@@ -81,46 +81,46 @@ func TestSecurityRequirementsPreservation(t *testing.T) {
 					SecuritySchemes: createTestSecuritySchemes(),
 				},
 			}
-			
+
 			oasWrapper := &OAS{T: *oasDoc}
 			tykExt := createTestTykExtension()
 			oasWrapper.SetTykExtension(tykExt)
-			
+
 			fmt.Println("Input Security:")
 			for i, req := range tc.inputSecurity {
 				fmt.Printf("  [%d]: %v\n", i, req)
 			}
-			
+
 			// Extract to APIDefinition
 			apiDef := &apidef.APIDefinition{}
 			apiDef.SecurityProcessingMode = tc.mode
 			oasWrapper.ExtractTo(apiDef)
-			
+
 			fmt.Printf("Extracted SecurityRequirements: %v\n", apiDef.SecurityRequirements)
-			
+
 			// Fill back to new OAS
 			resultOAS := &OAS{}
 			resultOAS.Fill(*apiDef)
-			
+
 			fmt.Println("Result Security:")
 			for i, req := range resultOAS.T.Security {
 				fmt.Printf("  [%d]: %v\n", i, req)
 			}
-			
+
 			// Verify preservation
 			if tc.expectPreserved {
-				assert.Equal(t, len(tc.inputSecurity), len(resultOAS.T.Security), 
+				assert.Equal(t, len(tc.inputSecurity), len(resultOAS.T.Security),
 					"Number of security requirements should be preserved")
-				
+
 				// Check that structure is preserved
 				for i, inputReq := range tc.inputSecurity {
 					if i < len(resultOAS.T.Security) {
 						resultReq := resultOAS.T.Security[i]
-						assert.Equal(t, len(inputReq), len(resultReq), 
+						assert.Equal(t, len(inputReq), len(resultReq),
 							"Number of schemes in requirement %d should be preserved", i)
-						
+
 						for scheme := range inputReq {
-							assert.Contains(t, resultReq, scheme, 
+							assert.Contains(t, resultReq, scheme,
 								"Scheme %s should be in requirement %d", scheme, i)
 						}
 					}
@@ -158,7 +158,7 @@ func createTestSecuritySchemes() openapi3.SecuritySchemes {
 				Flows: &openapi3.OAuthFlows{
 					AuthorizationCode: &openapi3.OAuthFlow{
 						AuthorizationURL: "https://example.com/oauth/authorize",
-						TokenURL:        "https://example.com/oauth/token",
+						TokenURL:         "https://example.com/oauth/token",
 						Scopes: map[string]string{
 							"read":  "Read access",
 							"write": "Write access",

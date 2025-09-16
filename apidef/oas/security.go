@@ -1,8 +1,6 @@
 package oas
 
 import (
-	"fmt"
-	
 	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/lonelycode/osin"
 
@@ -940,11 +938,6 @@ func isProprietaryAuth(authMethod string) bool {
 }
 
 func (s *OAS) fillSecurity(api apidef.APIDefinition) {
-	fmt.Println("\n=== DEBUG fillSecurity START ===")
-	fmt.Printf("API Name: %s\n", api.Name)
-	fmt.Printf("SecurityProcessingMode: %s\n", api.SecurityProcessingMode)
-	fmt.Printf("Input SecurityRequirements: %v\n", api.SecurityRequirements)
-	
 	tykAuthentication := s.GetTykExtension().Server.Authentication
 	if tykAuthentication == nil {
 		tykAuthentication = &Authentication{}
@@ -983,7 +976,7 @@ func (s *OAS) fillSecurity(api apidef.APIDefinition) {
 				isVendorOnly := true
 				oasReq := openapi3.NewSecurityRequirement()
 				vendorReq := []string{}
-				
+
 				for _, schemeName := range requirement {
 					if isProprietaryAuth(schemeName) {
 						vendorReq = append(vendorReq, schemeName)
@@ -992,7 +985,7 @@ func (s *OAS) fillSecurity(api apidef.APIDefinition) {
 						isVendorOnly = false
 					}
 				}
-				
+
 				if isVendorOnly && len(vendorReq) > 0 {
 					vendorSecurity = append(vendorSecurity, vendorReq)
 				} else if len(oasReq) > 0 {
@@ -1013,10 +1006,6 @@ func (s *OAS) fillSecurity(api apidef.APIDefinition) {
 		}
 
 		s.T.Security = oasSecurity
-		fmt.Println("COMPLIANT mode - OAS Security set to:")
-		for i, req := range s.T.Security {
-			fmt.Printf("  [%d]: %v\n", i, req)
-		}
 		if len(vendorSecurity) > 0 {
 			tykAuthentication.Security = vendorSecurity
 		}
@@ -1039,18 +1028,9 @@ func (s *OAS) fillSecurity(api apidef.APIDefinition) {
 			}
 			if len(secReq) > 0 {
 				s.T.Security = openapi3.SecurityRequirements{secReq}
-				fmt.Println("LEGACY mode - Created MERGED requirement from schemes:")
-				for i, req := range s.T.Security {
-					fmt.Printf("  [%d]: %v\n", i, req)
-				}
 			}
 		}
-		fmt.Println("LEGACY mode - Final OAS Security:")
-		for i, req := range s.T.Security {
-			fmt.Printf("  [%d]: %v\n", i, req)
-		}
 	}
-	fmt.Println("=== DEBUG fillSecurity END ===\n")
 
 	if len(tykAuthentication.SecuritySchemes) == 0 {
 		tykAuthentication.SecuritySchemes = nil
@@ -1062,13 +1042,6 @@ func (s *OAS) fillSecurity(api apidef.APIDefinition) {
 }
 
 func (s *OAS) extractSecurityTo(api *apidef.APIDefinition) {
-	fmt.Println("\n=== DEBUG extractSecurityTo START ===")
-	fmt.Printf("API Name: %s\n", api.Name)
-	fmt.Printf("OAS Security Requirements:\n")
-	for i, req := range s.T.Security {
-		fmt.Printf("  [%d]: %v\n", i, req)
-	}
-	
 	if s.getTykAuthentication() == nil {
 		s.GetTykExtension().Server.Authentication = &Authentication{}
 		defer func() {
@@ -1099,7 +1072,7 @@ func (s *OAS) extractSecurityTo(api *apidef.APIDefinition) {
 	if processingMode == "compliant" {
 		// Concatenate OAS security with vendor extension security
 		api.SecurityRequirements = make([][]string, 0)
-		
+
 		// Add OAS security requirements
 		for _, requirement := range s.T.Security {
 			schemes := make([]string, 0, len(requirement))
@@ -1108,7 +1081,7 @@ func (s *OAS) extractSecurityTo(api *apidef.APIDefinition) {
 			}
 			api.SecurityRequirements = append(api.SecurityRequirements, schemes)
 		}
-		
+
 		// Add vendor extension security requirements
 		if s.getTykAuthentication() != nil && len(s.getTykAuthentication().Security) > 0 {
 			for _, vendorReq := range s.getTykAuthentication().Security {
@@ -1126,9 +1099,7 @@ func (s *OAS) extractSecurityTo(api *apidef.APIDefinition) {
 			}
 			api.SecurityRequirements = append(api.SecurityRequirements, schemes)
 		}
-		fmt.Printf("LEGACY mode - Extracted SecurityRequirements: %v\n", api.SecurityRequirements)
 	}
-	fmt.Println("=== DEBUG extractSecurityTo END ===\n")
 
 	// Process first security requirement for backward compatibility
 	for schemeName := range s.getTykSecuritySchemes() {

@@ -139,7 +139,7 @@ func (s *OAS) BuildDefaultTykExtension(overRideValues TykExtensionConfigParams, 
 			return err
 		}
 	}
-	
+
 	// Set SecurityProcessingMode if provided
 	if overRideValues.SecurityProcessingMode != "" {
 		if xTykAPIGateway.Server.Authentication == nil {
@@ -312,7 +312,7 @@ func GetTykExtensionConfigParams(r *http.Request) *TykExtensionConfigParams {
 	overRideValues.ValidateRequest = getQueryValPtr(strings.TrimSpace(queries.Get("validateRequest")))
 	overRideValues.AllowList = getQueryValPtr(strings.TrimSpace(queries.Get("allowList")))
 	overRideValues.MockResponse = getQueryValPtr(strings.TrimSpace(queries.Get("mockResponse")))
-	
+
 	// Extract security processing mode from query params
 	processingMode := strings.TrimSpace(queries.Get("securityProcessingMode"))
 	if processingMode != "" {

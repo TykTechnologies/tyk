@@ -20,11 +20,11 @@ func (a *AuthORWrapper) ProcessRequest(w http.ResponseWriter, r *http.Request, _
 
 	// Determine processing mode
 	processingMode := a.Spec.SecurityProcessingMode
-	
+
 	// Single or no requirements: always use AND logic
 	if len(a.Spec.SecurityRequirements) <= 1 {
 		logger.Debug("Using AND logic (single or no security requirement)")
-		
+
 		for _, mw := range a.authMiddlewares {
 			if err, code := mw.ProcessRequest(w, r, nil); err != nil {
 				return err, code
@@ -32,12 +32,12 @@ func (a *AuthORWrapper) ProcessRequest(w http.ResponseWriter, r *http.Request, _
 		}
 		return nil, http.StatusOK
 	}
-	
+
 	// Multiple requirements - check processing mode
 	// Default to legacy mode for backward compatibility (pre-TT-2378 behavior)
 	if processingMode == "" || processingMode == "legacy" {
 		logger.Debug("Using AND logic (legacy mode - backward compatibility)")
-		
+
 		for _, mw := range a.authMiddlewares {
 			if err, code := mw.ProcessRequest(w, r, nil); err != nil {
 				return err, code
