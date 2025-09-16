@@ -392,8 +392,13 @@ func (gw *Gateway) processSpec(
 			authArray = append(authArray, gw.createMiddleware(&AuthKey{baseMid.Copy()}))
 		}
 
-		// Check security processing mode
-		processingMode := spec.SecurityProcessingMode
+		// Check security processing mode (OAS-only feature)
+		processingMode := "legacy" // default
+		if spec.IsOAS && spec.OAS.GetTykExtension() != nil {
+			if auth := spec.OAS.GetTykExtension().Server.Authentication; auth != nil && auth.SecurityProcessingMode != "" {
+				processingMode = auth.SecurityProcessingMode
+			}
+		}
 		if processingMode == "legacy" && len(spec.SecurityRequirements) > 1 {
 			// Legacy mode: only use first security requirement
 			logger.Info("Legacy mode: Only processing first security requirement, ignoring others")

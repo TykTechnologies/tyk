@@ -1226,11 +1226,14 @@ func TestSecurityRequirementsPreservation(t *testing.T) {
 
 			oasWrapper := &OAS{T: *oasDoc}
 			tykExt := createTestTykExtension()
+			// Set the processing mode in OAS (OAS-only feature)
+			if tykExt.Server.Authentication != nil {
+				tykExt.Server.Authentication.SecurityProcessingMode = tc.mode
+			}
 			oasWrapper.SetTykExtension(tykExt)
 
 			// Extract to APIDefinition
 			apiDef := &apidef.APIDefinition{}
-			apiDef.SecurityProcessingMode = tc.mode
 			oasWrapper.ExtractTo(apiDef)
 
 			// Fill back to new OAS

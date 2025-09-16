@@ -15,11 +15,17 @@ type AuthORWrapper struct {
 // ProcessRequest handles the OR logic for authentication
 func (a *AuthORWrapper) ProcessRequest(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
 	logger := a.Logger()
+	
+	// Determine processing mode (OAS-only feature)
+	processingMode := "legacy" // default
+	if a.Spec.IsOAS && a.Spec.OAS.GetTykExtension() != nil {
+		if auth := a.Spec.OAS.GetTykExtension().Server.Authentication; auth != nil && auth.SecurityProcessingMode != "" {
+			processingMode = auth.SecurityProcessingMode
+		}
+	}
+	
 	logger.Debugf("OR wrapper processing with %d middlewares, %d security requirements, mode: %s",
-		len(a.authMiddlewares), len(a.Spec.SecurityRequirements), a.Spec.SecurityProcessingMode)
-
-	// Determine processing mode
-	processingMode := a.Spec.SecurityProcessingMode
+		len(a.authMiddlewares), len(a.Spec.SecurityRequirements), processingMode)
 
 	// Single or no requirements: always use AND logic
 	if len(a.Spec.SecurityRequirements) <= 1 {

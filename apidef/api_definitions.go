@@ -776,9 +776,6 @@ type APIDefinition struct {
 	// SecurityRequirements stores all OAS security requirements (auto-populated from OpenAPI description import)
 	// When len(SecurityRequirements) > 1, OR logic is automatically applied
 	SecurityRequirements [][]string `json:"security_requirements,omitempty" bson:"security_requirements,omitempty"`
-
-	// SecurityProcessingMode controls authentication processing logic
-	SecurityProcessingMode string `json:"security_processing_mode,omitempty" bson:"security_processing_mode,omitempty"`
 }
 
 type JWK struct {

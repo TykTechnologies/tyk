@@ -375,7 +375,9 @@ func TestSecurityProcessingMode(t *testing.T) {
 			t.Run(tc.name, func(t *testing.T) {
 				var api apidef.APIDefinition
 				tc.input.ExtractTo(&api)
-				assert.Equal(t, tc.expected, api.SecurityProcessingMode)
+				// SecurityProcessingMode is OAS-only, not extracted to APIDefinition
+				// Just verify that ExtractTo doesn't panic and the field stays in OAS
+				assert.Equal(t, tc.expected, tc.input.SecurityProcessingMode)
 			})
 		}
 	})
@@ -422,44 +424,47 @@ func TestSecurityProcessingMode(t *testing.T) {
 				}
 				var api apidef.APIDefinition
 				auth.ExtractTo(&api)
-				assert.Equal(t, tc.expected, api.SecurityProcessingMode)
+				// SecurityProcessingMode is OAS-only, not extracted to APIDefinition
+				// The field should remain in the OAS Authentication struct
+				assert.Equal(t, tc.input, auth.SecurityProcessingMode)
 			})
 		}
 	})
 
 	t.Run("FillFromAPIDefinition", func(t *testing.T) {
-		// Test that Fill copies the value as-is from APIDefinition
-		t.Run("empty string", func(t *testing.T) {
-			api := apidef.APIDefinition{
-				SecurityProcessingMode: "",
+		// Test that SecurityProcessingMode is OAS-only and NOT filled from APIDefinition
+		t.Run("preserves existing OAS value", func(t *testing.T) {
+			api := apidef.APIDefinition{}
+
+			auth := &Authentication{
+				SecurityProcessingMode: "compliant", // Pre-existing OAS value
 			}
+			auth.Fill(api)
+
+			// Should preserve the OAS value, not overwrite from APIDefinition
+			assert.Equal(t, "compliant", auth.SecurityProcessingMode)
+		})
+
+		t.Run("empty stays empty if not set", func(t *testing.T) {
+			api := apidef.APIDefinition{}
 
 			auth := &Authentication{}
 			auth.Fill(api)
 
+			// Should remain empty since it's not filled from APIDefinition
 			assert.Equal(t, "", auth.SecurityProcessingMode)
 		})
 
-		t.Run("legacy value", func(t *testing.T) {
-			api := apidef.APIDefinition{
-				SecurityProcessingMode: "legacy",
-			}
+		t.Run("legacy value preserved", func(t *testing.T) {
+			api := apidef.APIDefinition{}
 
-			auth := &Authentication{}
+			auth := &Authentication{
+				SecurityProcessingMode: "legacy", // Pre-existing OAS value
+			}
 			auth.Fill(api)
 
+			// Should preserve the OAS value
 			assert.Equal(t, "legacy", auth.SecurityProcessingMode)
-		})
-
-		t.Run("compliant value", func(t *testing.T) {
-			api := apidef.APIDefinition{
-				SecurityProcessingMode: "compliant",
-			}
-
-			auth := &Authentication{}
-			auth.Fill(api)
-
-			assert.Equal(t, "compliant", auth.SecurityProcessingMode)
 		})
 	})
 

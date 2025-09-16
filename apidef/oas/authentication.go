@@ -139,8 +139,7 @@ func (a *Authentication) Fill(api apidef.APIDefinition) {
 	a.StripAuthorizationData = api.StripAuthData
 	a.BaseIdentityProvider = api.BaseIdentityProvidedBy
 
-	// Copy SecurityProcessingMode as-is from APIDefinition
-	a.SecurityProcessingMode = api.SecurityProcessingMode
+	// SecurityProcessingMode is OAS-only - not filled from APIDefinition
 
 	if a.Custom == nil {
 		a.Custom = &CustomPluginAuthentication{}
@@ -197,16 +196,7 @@ func (a *Authentication) ExtractTo(api *apidef.APIDefinition) {
 	api.StripAuthData = a.StripAuthorizationData
 	api.BaseIdentityProvidedBy = a.BaseIdentityProvider
 
-	// Extract SecurityProcessingMode with validation
-	if a.SecurityProcessingMode == "" {
-		// Keep empty as empty for roundtrip consistency
-		api.SecurityProcessingMode = ""
-	} else if a.SecurityProcessingMode == "legacy" || a.SecurityProcessingMode == "compliant" {
-		api.SecurityProcessingMode = a.SecurityProcessingMode
-	} else {
-		// Invalid value, default to legacy
-		api.SecurityProcessingMode = "legacy"
-	}
+	// SecurityProcessingMode is OAS-only - not extracted to APIDefinition
 
 	if a.HMAC != nil {
 		a.HMAC.ExtractTo(api)

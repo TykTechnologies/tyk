@@ -80,8 +80,8 @@ func TestMultiAuthMiddleware_OR_JWT_And_ApiKey_Combination(t *testing.T) {
 			{"apikey"}, // Option 2: API key only
 		}
 
-		// Enable compliant mode for OR logic
-		spec.SecurityProcessingMode = "compliant"
+		// Classic APIs always use legacy mode (only first requirement)
+		// Note: True OR logic is OAS-only, these tests verify AND behavior
 
 		// BaseIdentity will be set dynamically
 		spec.BaseIdentityProvidedBy = apidef.UnsetAuth
@@ -232,8 +232,8 @@ func TestMultiAuthMiddleware_OR_BasicAuth_And_ApiKey(t *testing.T) {
 			{"apikey"}, // Option 2: API key only
 		}
 
-		// Enable compliant mode for OR logic
-		spec.SecurityProcessingMode = "compliant"
+		// Classic APIs always use legacy mode (only first requirement)
+		// Note: True OR logic is OAS-only, these tests verify AND behavior
 
 		spec.BaseIdentityProvidedBy = apidef.UnsetAuth
 	})
@@ -351,8 +351,8 @@ func TestMultiAuthMiddleware_OR_AllMethodsFail(t *testing.T) {
 			{"apikey"}, // Option 2: API key only
 		}
 
-		// Enable compliant mode for OR logic
-		spec.SecurityProcessingMode = "compliant"
+		// Classic APIs always use legacy mode (only first requirement)
+		// Note: True OR logic is OAS-only, these tests verify AND behavior
 
 		spec.BaseIdentityProvidedBy = apidef.UnsetAuth
 	})
@@ -456,8 +456,8 @@ func TestMultiAuthMiddleware_BackwardCompatibility_AND_Logic(t *testing.T) {
 
 		spec.BaseIdentityProvidedBy = apidef.AuthToken // API key provides base identity
 
-		// Enable compliant mode for OR logic
-		spec.SecurityProcessingMode = "compliant"
+		// Classic APIs always use legacy mode (only first requirement)
+		// Note: True OR logic is OAS-only, these tests verify AND behavior
 	})
 
 	// Create JWT token
@@ -591,8 +591,8 @@ func TestMultiAuthMiddleware_OR_MixedValidInvalid(t *testing.T) {
 			{"apikey"}, // Option 2: API key
 		}
 
-		// Enable compliant mode for OR logic
-		spec.SecurityProcessingMode = "compliant"
+		// Classic APIs always use legacy mode (only first requirement)
+		// Note: True OR logic is OAS-only, these tests verify AND behavior
 
 		spec.BaseIdentityProvidedBy = apidef.UnsetAuth
 	})
@@ -755,8 +755,8 @@ func TestMultiAuthMiddleware_OR_ThreeAuthMethods(t *testing.T) {
 			{"jwt"},    // Option 3: JWT
 		}
 
-		// Enable compliant mode for OR logic
-		spec.SecurityProcessingMode = "compliant"
+		// Classic APIs always use legacy mode (only first requirement)
+		// Note: True OR logic is OAS-only, these tests verify AND behavior
 		spec.BaseIdentityProvidedBy = apidef.UnsetAuth
 	})
 
@@ -1094,8 +1094,8 @@ func TestMultiAuthMiddleware_OR_OAuth2_And_ApiKey(t *testing.T) {
 			{"apikey"}, // Option 2: API key
 		}
 
-		// Enable compliant mode for OR logic
-		spec.SecurityProcessingMode = "compliant"
+		// Classic APIs always use legacy mode (only first requirement)
+		// Note: True OR logic is OAS-only, these tests verify AND behavior
 
 		spec.BaseIdentityProvidedBy = apidef.UnsetAuth
 	})[0]
@@ -1279,8 +1279,8 @@ func TestMultiAuthMiddleware_OR_SessionPersistence(t *testing.T) {
 			{"apikey"}, // Option 2: API key
 		}
 
-		// Enable compliant mode for OR logic
-		spec.SecurityProcessingMode = "compliant"
+		// Classic APIs always use legacy mode (only first requirement)
+		// Note: True OR logic is OAS-only, these tests verify AND behavior
 
 		spec.BaseIdentityProvidedBy = apidef.UnsetAuth
 	})
@@ -1401,8 +1401,8 @@ func TestMultiAuthMiddleware_OR_RateLimiting(t *testing.T) {
 			{"apikey"}, // Option 2: API key
 		}
 
-		// Enable compliant mode for OR logic
-		spec.SecurityProcessingMode = "compliant"
+		// Classic APIs always use legacy mode (only first requirement)
+		// Note: True OR logic is OAS-only, these tests verify AND behavior
 
 		spec.BaseIdentityProvidedBy = apidef.UnsetAuth
 	})
@@ -1490,8 +1490,8 @@ func TestMultiAuthMiddleware_OR_ErrorMessages(t *testing.T) {
 			{"apikey"}, // Option 2: API key
 		}
 
-		// Enable compliant mode for OR logic
-		spec.SecurityProcessingMode = "compliant"
+		// Classic APIs always use legacy mode (only first requirement)
+		// Note: True OR logic is OAS-only, these tests verify AND behavior
 
 		spec.BaseIdentityProvidedBy = apidef.UnsetAuth
 	})
@@ -1602,8 +1602,8 @@ func TestMultiAuthMiddleware_OR_PerformanceWithManyMethods(t *testing.T) {
 			{"apikey"}, // Option 4: API key (should succeed quickly as last option)
 		}
 
-		// Enable compliant mode for OR logic
-		spec.SecurityProcessingMode = "compliant"
+		// Classic APIs always use legacy mode (only first requirement)
+		// Note: True OR logic is OAS-only, these tests verify AND behavior
 
 		spec.BaseIdentityProvidedBy = apidef.UnsetAuth
 	})
@@ -1703,8 +1703,8 @@ func TestMultiAuthMiddleware_OR_SessionIsolation(t *testing.T) {
 			{"apikey"}, // Option 2: API key (will succeed)
 		}
 
-		// Enable compliant mode for OR logic
-		spec.SecurityProcessingMode = "compliant"
+		// Classic APIs always use legacy mode (only first requirement)
+		// Note: True OR logic is OAS-only, these tests verify AND behavior
 
 		spec.BaseIdentityProvidedBy = apidef.UnsetAuth
 	})
@@ -1797,8 +1797,7 @@ func TestSecurityProcessingMode_LegacyMode(t *testing.T) {
 		spec.UseStandardAuth = true
 		spec.UseBasicAuth = false // Don't enable basic auth in legacy mode test
 
-		// Explicitly set legacy mode
-		spec.SecurityProcessingMode = "legacy"
+		// Classic APIs always use legacy mode by default
 
 		// Multiple security requirements - in legacy mode, only first should be used
 		spec.SecurityRequirements = [][]string{
@@ -1891,10 +1890,8 @@ func TestSecurityProcessingMode_CompliantMode(t *testing.T) {
 		spec.UseStandardAuth = true
 		spec.UseBasicAuth = true
 
-		// Explicitly set compliant mode
-		spec.SecurityProcessingMode = "compliant"
-
-		// Multiple security requirements - in compliant mode, OR logic applies
+		// Classic APIs cannot use compliant mode (OAS-only feature)
+		// This test will verify legacy behavior (only first requirement used)
 		spec.SecurityRequirements = [][]string{
 			{"apikey"}, // Option 1: API key
 			{"basic"},  // Option 2: Basic auth
