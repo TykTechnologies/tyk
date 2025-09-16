@@ -24,7 +24,7 @@ type TransformMiddleware struct {
 }
 
 func (t *TransformMiddleware) Name() string {
-	return "TransformMiddleware"
+	return "RequestTransformMiddleware"
 }
 
 func (t *TransformMiddleware) EnabledForSpec() bool {
@@ -45,9 +45,13 @@ func (t *TransformMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 		return nil, http.StatusOK
 	}
 	err := transformBody(r, meta.(*TransformSpec), t)
+
 	if err != nil {
 		t.Logger().WithError(err).Error("Body transform failure")
+	} else {
+		t.Logger().Debugf("%s", msgBodyTransformed)
 	}
+
 	return nil, http.StatusOK
 }
 
