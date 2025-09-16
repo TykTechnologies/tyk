@@ -1418,17 +1418,16 @@ func (gw *Gateway) apiHandler(w http.ResponseWriter, r *http.Request) {
 
 func (gw *Gateway) apiOASGetHandler(w http.ResponseWriter, r *http.Request) {
 	var (
-		apiID       = mux.Vars(r)["apiID"]
-		scopePublic = r.URL.Query().Get("mode") == "public"
-		obj         interface{}
-		code        int
+		apiID = mux.Vars(r)["apiID"]
+		obj   interface{}
+		code  int
 	)
 	if apiID != "" {
 		log.Debugf("Requesting API definition for %q", apiID)
-		obj, code = gw.handleGetAPIOAS(apiID, scopePublic)
+		obj, code = gw.handleGetAPIOAS(apiID, false)
 	} else {
 		log.Debug("Requesting API list")
-		obj, code = gw.handleGetAPIListOAS(scopePublic)
+		obj, code = gw.handleGetAPIListOAS(false)
 	}
 
 	if oasAPI, ok := obj.(*oas.OAS); ok {
