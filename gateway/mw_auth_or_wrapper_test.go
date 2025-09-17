@@ -16,14 +16,11 @@ import (
 	"github.com/getkin/kin-openapi/openapi3"
 	jwt "github.com/golang-jwt/jwt/v4"
 
+	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/apidef/oas"
 	"github.com/TykTechnologies/tyk/test"
 	"github.com/TykTechnologies/tyk/user"
 )
-
-// ==========================================================================================
-// Helper Functions
-// ==========================================================================================
 
 // generateHMACSignature generates a proper HMAC signature for HTTP Signature validation
 func generateHMACSignature(method, path string, headers map[string]string, secret string, algorithm string) string {
@@ -58,10 +55,6 @@ func generateHMACSignature(method, path string, headers map[string]string, secre
 	sigString := base64.StdEncoding.EncodeToString(h.Sum(nil))
 	return url.QueryEscape(sigString)
 }
-
-// ==========================================================================================
-// Legacy Mode OR Logic Tests - These were already in the original file
-// ==========================================================================================
 
 // TestLegacyMode_BackwardCompatibility tests that legacy mode is the default
 func TestLegacyMode_BackwardCompatibility(t *testing.T) {
@@ -629,10 +622,6 @@ func TestLegacyMode_ANDLogicWithinSingleRequirement(t *testing.T) {
 
 	ts.Run(t, testCases...)
 }
-
-// ==========================================================================================
-// Compliant Mode OR Logic Tests
-// ==========================================================================================
 
 // TestCompliantMode_JWTOrAPIKeyOrHMAC tests OR logic with JWT, API Key, and HMAC
 func TestCompliantMode_JWTOrAPIKeyOrHMAC(t *testing.T) {
@@ -1213,10 +1202,6 @@ func TestCompliantMode_ThreeAuthMethods(t *testing.T) {
 	ts.Run(t, testCases...)
 }
 
-// ==========================================================================================
-// HMAC Signature Validation Tests
-// ==========================================================================================
-
 // TestHMACSignatureValidation tests proper HMAC signature validation
 func TestHMACSignatureValidation(t *testing.T) {
 	ts := StartTest(nil)
@@ -1680,10 +1665,6 @@ func TestHMACInORAuthentication(t *testing.T) {
 	})
 }
 
-// ==========================================================================================
-// Existing tests from the original file that should be preserved
-// ==========================================================================================
-
 // TestMultiAuthMiddleware_OR_JWT_And_ApiKey_Combination tests OR logic with JWT and API key
 func TestMultiAuthMiddleware_OR_JWT_And_ApiKey_Combination(t *testing.T) {
 	ts := StartTest(nil)
@@ -1995,10 +1976,6 @@ func TestMultiAuthMiddleware_OR_AllMethodsFail(t *testing.T) {
 	ts.Run(t, testCases...)
 }
 
-// ==========================================================================================
-// Helper function that was referenced in compliant tests
-// ==========================================================================================
-
 func createOASAPIWithBasicAndAPIKey(spec *APISpec) {
 	oasDoc := oas.OAS{}
 	oasDoc.T = openapi3.T{
@@ -2077,4 +2054,480 @@ func createOASAPIWithBasicAndAPIKey(spec *APISpec) {
 	oasDoc.ExtractTo(spec.APIDefinition)
 	spec.IsOAS = true
 	spec.OAS = oasDoc
+}
+
+// TestStandardOpenAPIBearerWithoutTykExtension tests standard OpenAPI bearer auth without Tyk extension
+func TestStandardOpenAPIBearerWithoutTykExtension(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	// This test simulates the behavior when standard OpenAPI bearer auth is processed
+	// without Tyk extension - it should enable JWT by default
+	
+	// Create JWT policy
+	pID := ts.CreatePolicy(func(p *user.Policy) {
+		p.OrgID = ""
+		p.AccessRights = map[string]user.AccessDefinition{
+			"test-standard-bearer": {
+				APIName:  "Test Standard Bearer",
+				APIID:    "test-standard-bearer",
+				Versions: []string{"default"},
+			},
+		}
+	})
+
+	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		spec.APIID = "test-standard-bearer"
+		spec.Name = "Test Standard Bearer"
+		spec.OrgID = ""
+		spec.Proxy.ListenPath = "/test-standard-bearer/"
+		spec.Proxy.TargetURL = TestHttpAny
+		spec.UseKeylessAccess = false
+
+		// Simulate standard OpenAPI bearer configuration
+		// In real OAS extraction, bearer auth without Tyk extension enables JWT
+		spec.EnableJWT = true
+		spec.JWTSigningMethod = "rsa"
+		spec.JWTSource = base64.StdEncoding.EncodeToString([]byte(jwtRSAPubKey))
+		spec.JWTIdentityBaseField = "user_id"
+		spec.JWTPolicyFieldName = "policy_id"
+		spec.JWTDefaultPolicies = []string{pID}
+		
+		// Set up auth config as it would be by OAS extraction
+		spec.AuthConfigs = map[string]apidef.AuthConfig{
+			"bearerAuth": {
+				Name:           "bearerAuth",
+				DisableHeader:  false,
+				AuthHeaderName: "Authorization",
+			},
+		}
+		
+		// Single security requirement
+		spec.SecurityRequirements = [][]string{
+			{"bearerAuth"},
+		}
+	})
+
+	// Create JWT token
+	jwtToken := CreateJWKToken(func(t *jwt.Token) {
+		t.Claims.(jwt.MapClaims)["user_id"] = "standard-bearer-user"
+		t.Claims.(jwt.MapClaims)["policy_id"] = pID
+		t.Claims.(jwt.MapClaims)["exp"] = time.Now().Add(time.Hour).Unix()
+	})
+
+	// Test cases
+	testCases := []test.TestCase{
+		// Valid JWT should succeed
+		{
+			Method: "GET",
+			Path:   "/test-standard-bearer/",
+			Headers: map[string]string{
+				"Authorization": "Bearer " + jwtToken,
+			},
+			Code: http.StatusOK,
+		},
+		// No auth should fail
+		{
+			Method:  "GET",
+			Path:    "/test-standard-bearer/",
+			Headers: map[string]string{},
+			Code:    http.StatusBadRequest, // JWT returns 400 for missing Authorization header
+		},
+	}
+
+	ts.Run(t, testCases...)
+}
+
+// TestSingleSecurityRequirementANDLogic tests single requirement with multiple auth methods (AND logic)
+func TestSingleSecurityRequirementANDLogic(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	// This test ensures the OR wrapper properly handles single requirements with AND logic
+	// The code path: if len(a.Spec.SecurityRequirements) <= 1
+	
+	// Create policy for JWT
+	pID := ts.CreatePolicy(func(p *user.Policy) {
+		p.OrgID = ""
+		p.AccessRights = map[string]user.AccessDefinition{
+			"test-single-and": {
+				APIName:  "Test Single AND",
+				APIID:    "test-single-and",
+				Versions: []string{"default"},
+			},
+		}
+	})
+
+	// Create API key
+	apiKey := CreateSession(ts.Gw, func(s *user.SessionState) {
+		s.OrgID = ""
+		s.AccessRights = map[string]user.AccessDefinition{
+			"test-single-and": {
+				APIName:  "Test Single AND",
+				APIID:    "test-single-and",
+				Versions: []string{"default"},
+			},
+		}
+	})
+
+	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		spec.APIID = "test-single-and"
+		spec.Name = "Test Single AND"
+		spec.OrgID = ""
+		spec.Proxy.ListenPath = "/test-single-and/"
+		spec.UseKeylessAccess = false
+
+		// Create OAS with single requirement containing multiple auth methods
+		oasDoc := oas.OAS{}
+		oasDoc.T = openapi3.T{
+			OpenAPI: "3.0.3",
+			Info: &openapi3.Info{
+				Title:   spec.Name,
+				Version: "1.0.0",
+			},
+			Paths: openapi3.NewPaths(),
+			Components: &openapi3.Components{
+				SecuritySchemes: openapi3.SecuritySchemes{
+					"jwt": &openapi3.SecuritySchemeRef{
+						Value: &openapi3.SecurityScheme{
+							Type:         "http",
+							Scheme:       "bearer",
+							BearerFormat: "JWT",
+						},
+					},
+					"apikey": &openapi3.SecuritySchemeRef{
+						Value: &openapi3.SecurityScheme{
+							Type: "apiKey",
+							In:   "header",
+							Name: "X-API-Key",
+						},
+					},
+				},
+			},
+			// Single requirement with both JWT AND API key
+			Security: openapi3.SecurityRequirements{
+				openapi3.SecurityRequirement{
+					"jwt":    []string{},
+					"apikey": []string{},
+				},
+			},
+		}
+
+		tykExtension := &oas.XTykAPIGateway{
+			Info: oas.Info{
+				ID:   spec.APIID,
+				Name: spec.Name,
+				State: oas.State{
+					Active: true,
+				},
+			},
+			Server: oas.Server{
+				ListenPath: oas.ListenPath{
+					Value: spec.Proxy.ListenPath,
+					Strip: true,
+				},
+				Authentication: &oas.Authentication{
+					Enabled:                true,
+					SecurityProcessingMode: "compliant", // Even in compliant mode, single requirement = AND
+					SecuritySchemes: oas.SecuritySchemes{
+						"jwt": &oas.JWT{
+							Enabled:           true,
+							Source:            base64.StdEncoding.EncodeToString([]byte(jwtRSAPubKey)),
+							SigningMethod:     "rsa",
+							IdentityBaseField: "user_id",
+							PolicyFieldName:   "policy_id",
+							DefaultPolicies:   []string{pID},
+							AuthSources: oas.AuthSources{
+								Header: &oas.AuthSource{
+									Enabled: true,
+									Name:    "Authorization",
+								},
+							},
+						},
+						"apikey": &oas.Token{
+							Enabled: func() *bool { b := true; return &b }(),
+							AuthSources: oas.AuthSources{
+								Header: &oas.AuthSource{
+									Enabled: true,
+									Name:    "X-API-Key",
+								},
+							},
+						},
+					},
+				},
+			},
+			Upstream: oas.Upstream{
+				URL: TestHttpAny,
+			},
+		}
+
+		oasDoc.SetTykExtension(tykExtension)
+		oasDoc.ExtractTo(spec.APIDefinition)
+		spec.IsOAS = true
+		spec.OAS = oasDoc
+	})
+
+	// Create JWT token
+	jwtToken := CreateJWKToken(func(t *jwt.Token) {
+		t.Claims.(jwt.MapClaims)["user_id"] = "single-and-user"
+		t.Claims.(jwt.MapClaims)["policy_id"] = pID
+		t.Claims.(jwt.MapClaims)["exp"] = time.Now().Add(time.Hour).Unix()
+	})
+
+	// Test cases - single requirement means AND logic
+	testCases := []test.TestCase{
+		// Both JWT and API key = success
+		{
+			Method: "GET",
+			Path:   "/test-single-and/",
+			Headers: map[string]string{
+				"Authorization": "Bearer " + jwtToken,
+				"X-API-Key":     apiKey,
+			},
+			Code: http.StatusOK,
+		},
+		// Only JWT = fail (need both)
+		{
+			Method: "GET",
+			Path:   "/test-single-and/",
+			Headers: map[string]string{
+				"Authorization": "Bearer " + jwtToken,
+			},
+			Code: http.StatusUnauthorized,
+		},
+		// Only API key = fail (need both)
+		{
+			Method: "GET",
+			Path:   "/test-single-and/",
+			Headers: map[string]string{
+				"X-API-Key": apiKey,
+			},
+			Code: http.StatusBadRequest, // JWT middleware returns 400 when header missing
+		},
+		// Neither = fail
+		{
+			Method:  "GET",
+			Path:    "/test-single-and/",
+			Headers: map[string]string{},
+			Code:    http.StatusBadRequest,
+		},
+	}
+
+	ts.Run(t, testCases...)
+}
+
+// TestOAuth2InORWrapper tests OAuth2 authentication configuration that would be used in OR wrapper
+func TestOAuth2InORWrapper(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	// This test verifies OAuth2 can be configured alongside other auth methods
+	// The actual OR logic testing is done in other tests
+	
+	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		spec.APIID = "test-oauth2-or"
+		spec.Name = "Test OAuth2 OR"
+		spec.OrgID = ""
+		spec.Proxy.ListenPath = "/test-oauth2-or/"
+		spec.Proxy.TargetURL = TestHttpAny
+		spec.UseKeylessAccess = false
+		
+		// Just test that OAuth2 can be enabled with correct configuration
+		// In real OR wrapper scenario, both would be enabled
+		spec.UseOauth2 = true
+		
+		// Configure auth configs as they would be in OR scenario
+		spec.AuthConfigs = map[string]apidef.AuthConfig{
+			"oauth2": {
+				Name:           "oauth2",
+				DisableHeader:  false,
+				AuthHeaderName: "Authorization",
+			},
+		}
+		
+		// Single requirement to test OAuth2 configuration
+		spec.SecurityRequirements = [][]string{
+			{"oauth2"},
+		}
+	})
+
+	// Test that OAuth2 is properly configured
+	// Just verify the configuration doesn't cause errors
+	testCases := []test.TestCase{
+		// No auth returns expected error
+		{
+			Method:  "GET",
+			Path:    "/test-oauth2-or/",
+			Headers: map[string]string{},
+			Code:    http.StatusBadRequest, // OAuth2 returns 400 for missing Authorization header
+		},
+		// Invalid OAuth2 token fails as expected
+		{
+			Method: "GET",
+			Path:   "/test-oauth2-or/",
+			Headers: map[string]string{
+				"Authorization": "Bearer invalid-oauth-token",
+			},
+			Code: http.StatusForbidden, // Invalid OAuth token
+		},
+	}
+
+	ts.Run(t, testCases...)
+}
+
+// TestAuthORWrapperEnabledForSpec tests the EnabledForSpec conditions
+func TestAuthORWrapperEnabledForSpec(t *testing.T) {
+	t.Run("Single requirement should not use OR wrapper", func(t *testing.T) {
+		spec := &APISpec{
+			APIDefinition: &apidef.APIDefinition{
+				UseStandardAuth: true,
+				SecurityRequirements: [][]string{
+					{"apikey"},
+				},
+			},
+		}
+		
+		wrapper := &AuthORWrapper{
+			BaseMiddleware: BaseMiddleware{
+				Spec: spec,
+				Gw:   &Gateway{},
+				logger: log.WithField("mw", "AuthORWrapper"),
+			},
+		}
+		wrapper.Init()
+		
+		if wrapper.EnabledForSpec() {
+			t.Error("OR wrapper should not be enabled for single security requirement")
+		}
+	})
+
+	t.Run("Multiple requirements should use OR wrapper", func(t *testing.T) {
+		spec := &APISpec{
+			APIDefinition: &apidef.APIDefinition{
+				UseStandardAuth: true,
+				EnableJWT:       true,
+				SecurityRequirements: [][]string{
+					{"apikey"},
+					{"jwt"},
+				},
+			},
+		}
+		
+		wrapper := &AuthORWrapper{
+			BaseMiddleware: BaseMiddleware{
+				Spec: spec,
+				Gw:   &Gateway{},
+				logger: log.WithField("mw", "AuthORWrapper"),
+			},
+		}
+		wrapper.Init()
+		
+		if !wrapper.EnabledForSpec() {
+			t.Error("OR wrapper should be enabled for multiple security requirements")
+		}
+	})
+
+	t.Run("No auth middlewares should not enable OR wrapper", func(t *testing.T) {
+		spec := &APISpec{
+			APIDefinition: &apidef.APIDefinition{
+				SecurityRequirements: [][]string{
+					{"custom1"},
+					{"custom2"},
+				},
+			},
+		}
+		
+		wrapper := &AuthORWrapper{
+			BaseMiddleware: BaseMiddleware{
+				Spec: spec,
+				Gw:   &Gateway{},
+				logger: log.WithField("mw", "AuthORWrapper"),
+			},
+		}
+		// Init but no auth methods will be added
+		wrapper.Init()
+		
+		if wrapper.EnabledForSpec() {
+			t.Error("OR wrapper should not be enabled when no auth middlewares are configured")
+		}
+	})
+}
+
+// TestJWTWithTykExtensionButNoComponents tests JWT configured in Tyk extension but no OpenAPI components
+func TestJWTWithTykExtensionButNoComponents(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	// Create JWT policy
+	pID := ts.CreatePolicy(func(p *user.Policy) {
+		p.OrgID = ""
+		p.AccessRights = map[string]user.AccessDefinition{
+			"test-jwt-extension-only": {
+				APIName:  "Test JWT Extension Only",
+				APIID:    "test-jwt-extension-only",
+				Versions: []string{"default"},
+			},
+		}
+	})
+
+	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		spec.APIID = "test-jwt-extension-only"
+		spec.Name = "Test JWT Extension Only"
+		spec.OrgID = ""
+		spec.Proxy.ListenPath = "/test-jwt-extension-only/"
+		spec.Proxy.TargetURL = TestHttpAny
+		spec.UseKeylessAccess = false
+		
+		// Simulate JWT configured in Tyk extension but no OpenAPI components
+		// This would be extracted from Tyk extension's SecuritySchemes
+		spec.EnableJWT = true
+		spec.JWTSigningMethod = "rsa"
+		spec.JWTSource = base64.StdEncoding.EncodeToString([]byte(jwtRSAPubKey))
+		spec.JWTIdentityBaseField = "user_id"
+		spec.JWTPolicyFieldName = "policy_id"
+		spec.JWTDefaultPolicies = []string{pID}
+		
+		// Set auth config
+		spec.AuthConfigs = map[string]apidef.AuthConfig{
+			"jwt": {
+				Name:           "jwt",
+				DisableHeader:  false,
+				AuthHeaderName: "Authorization",
+			},
+		}
+		
+		// Security requirement
+		spec.SecurityRequirements = [][]string{
+			{"jwt"},
+		}
+	})
+
+	// Create JWT token
+	jwtToken := CreateJWKToken(func(t *jwt.Token) {
+		t.Claims.(jwt.MapClaims)["user_id"] = "extension-only-user"
+		t.Claims.(jwt.MapClaims)["policy_id"] = pID
+		t.Claims.(jwt.MapClaims)["exp"] = time.Now().Add(time.Hour).Unix()
+	})
+
+	// Test cases
+	testCases := []test.TestCase{
+		// Valid JWT should succeed
+		{
+			Method: "GET",
+			Path:   "/test-jwt-extension-only/",
+			Headers: map[string]string{
+				"Authorization": "Bearer " + jwtToken,
+			},
+			Code: http.StatusOK,
+		},
+		// No auth should fail
+		{
+			Method:  "GET",
+			Path:    "/test-jwt-extension-only/",
+			Headers: map[string]string{},
+			Code:    http.StatusBadRequest, // JWT returns 400 for missing Authorization header
+		},
+	}
+
+	ts.Run(t, testCases...)
 }
