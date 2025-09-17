@@ -1343,3 +1343,255 @@ func createTestTykExtension() *XTykAPIGateway {
 		},
 	}
 }
+
+func TestIsProprietaryAuth(t *testing.T) {
+	tests := []struct {
+		name       string
+		authMethod string
+		want       bool
+	}{
+		{
+			name:       "HMAC is proprietary",
+			authMethod: "hmac",
+			want:       true,
+		},
+		{
+			name:       "Custom is proprietary",
+			authMethod: "custom",
+			want:       true,
+		},
+		{
+			name:       "mTLS is proprietary",
+			authMethod: "mtls",
+			want:       true,
+		},
+		{
+			name:       "Coprocess is proprietary",
+			authMethod: "coprocess",
+			want:       true,
+		},
+		{
+			name:       "JWT is not proprietary",
+			authMethod: "jwt",
+			want:       false,
+		},
+		{
+			name:       "OAuth2 is not proprietary",
+			authMethod: "oauth2",
+			want:       false,
+		},
+		{
+			name:       "API Key is not proprietary",
+			authMethod: "apikey",
+			want:       false,
+		},
+		{
+			name:       "Basic auth is not proprietary",
+			authMethod: "basic",
+			want:       false,
+		},
+		{
+			name:       "Bearer is not proprietary",
+			authMethod: "bearer",
+			want:       false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := isProprietaryAuth(tt.authMethod)
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
+func TestCompliantModeSecuritySeparation(t *testing.T) {
+	t.Run("compliant mode separates OAS and vendor security", func(t *testing.T) {
+		// Create API with mixed security requirements
+		api := apidef.APIDefinition{
+			SecurityRequirements: [][]string{
+				{"jwt"},           // Standard OAS
+				{"hmac"},          // Proprietary
+				{"jwt", "apikey"}, // Mixed
+			},
+			UseStandardAuth:         true,
+			EnableJWT:               true,
+			EnableSignatureChecking: true,
+			AuthConfigs: map[string]apidef.AuthConfig{
+				"jwt": {
+					Name:           "jwt",
+					AuthHeaderName: "Authorization",
+				},
+				"apikey": {
+					Name:           "apikey",
+					AuthHeaderName: "X-API-Key",
+				},
+			},
+		}
+
+		oas := OAS{}
+		oas.SetTykExtension(&XTykAPIGateway{
+			Server: Server{
+				Authentication: &Authentication{
+					Enabled:                true,
+					SecurityProcessingMode: "compliant",
+					SecuritySchemes: SecuritySchemes{
+						"jwt": &JWT{
+							Enabled: true,
+						},
+						"apikey": &Token{
+							Enabled: func() *bool { b := true; return &b }(),
+						},
+						"hmac": &HMAC{
+							Enabled: true,
+						},
+					},
+				},
+			},
+		})
+
+		// Fill security with compliant mode
+		oas.fillSecurity(api)
+
+		// Check OAS Security (should only have non-proprietary)
+		assert.Len(t, oas.T.Security, 2) // JWT and JWT+apikey requirements
+
+		// First requirement should be jwt only
+		assert.Contains(t, oas.T.Security[0], "jwt")
+		assert.NotContains(t, oas.T.Security[0], "hmac")
+
+		// Second requirement should have jwt and apikey
+		assert.Contains(t, oas.T.Security[1], "jwt")
+		assert.Contains(t, oas.T.Security[1], "apikey")
+
+		// Check Vendor Security (should only have proprietary)
+		tykAuth := oas.GetTykExtension().Server.Authentication
+		assert.NotNil(t, tykAuth.Security)
+		assert.Len(t, tykAuth.Security, 1) // hmac requirement only
+
+		// First vendor requirement should be hmac only
+		assert.Contains(t, tykAuth.Security[0], "hmac")
+	})
+
+	t.Run("compliant mode creates security from schemes when no requirements", func(t *testing.T) {
+		api := apidef.APIDefinition{
+			// No SecurityRequirements
+			UseStandardAuth: true,
+			EnableJWT:       true,
+		}
+
+		oas := OAS{}
+		oas.SetTykExtension(&XTykAPIGateway{
+			Server: Server{
+				Authentication: &Authentication{
+					Enabled:                true,
+					SecurityProcessingMode: "compliant",
+					SecuritySchemes: SecuritySchemes{
+						"jwt": &JWT{
+							Enabled: true,
+						},
+						"apikey": &Token{
+							Enabled: func() *bool { b := true; return &b }(),
+						},
+						"hmac": &HMAC{
+							Enabled: true,
+						},
+					},
+				},
+			},
+		})
+
+		// Fill security with compliant mode
+		oas.fillSecurity(api)
+
+		// Should create OAS Security from non-proprietary schemes
+		assert.Len(t, oas.T.Security, 1)
+		secReq := oas.T.Security[0]
+		assert.Contains(t, secReq, "jwt")
+		assert.Contains(t, secReq, "apikey")
+		assert.NotContains(t, secReq, "hmac")
+
+		// Vendor security should be empty since no explicit requirements
+		tykAuth := oas.GetTykExtension().Server.Authentication
+		assert.Nil(t, tykAuth.Security)
+	})
+
+	t.Run("legacy mode keeps traditional behavior", func(t *testing.T) {
+		api := apidef.APIDefinition{
+			SecurityRequirements: [][]string{
+				{"jwt"},
+				{"hmac"},
+				{"apikey"},
+			},
+			UseStandardAuth:         true,
+			EnableJWT:               true,
+			EnableSignatureChecking: true,
+		}
+
+		oas := OAS{}
+		oas.SetTykExtension(&XTykAPIGateway{
+			Server: Server{
+				Authentication: &Authentication{
+					Enabled:                true,
+					SecurityProcessingMode: "legacy", // Explicitly set to legacy
+				},
+			},
+		})
+
+		// Fill security with legacy mode
+		oas.fillSecurity(api)
+
+		// In legacy mode, all requirements go to OAS Security
+		assert.Len(t, oas.T.Security, 3)
+
+		// Check that all requirements are in OAS Security
+		var foundJwt, foundHmac, foundApikey bool
+		for _, req := range oas.T.Security {
+			if _, ok := req["jwt"]; ok {
+				foundJwt = true
+			}
+			if _, ok := req["hmac"]; ok {
+				foundHmac = true
+			}
+			if _, ok := req["apikey"]; ok {
+				foundApikey = true
+			}
+		}
+		assert.True(t, foundJwt)
+		assert.True(t, foundHmac)
+		assert.True(t, foundApikey)
+
+		// Vendor security should not be set in legacy mode
+		tykAuth := oas.GetTykExtension().Server.Authentication
+		assert.Nil(t, tykAuth.Security)
+	})
+
+	t.Run("compliant mode with getTykAuthentication returns processing mode", func(t *testing.T) {
+		api := apidef.APIDefinition{}
+
+		oas := OAS{}
+		// Test when authentication is nil
+		oas.SetTykExtension(&XTykAPIGateway{
+			Server: Server{},
+		})
+
+		oas.fillSecurity(api)
+		// Should default to legacy when nil
+		assert.Len(t, oas.T.Security, 0)
+
+		// Test when authentication exists with compliant mode
+		oas.SetTykExtension(&XTykAPIGateway{
+			Server: Server{
+				Authentication: &Authentication{
+					Enabled:                true,
+					SecurityProcessingMode: "compliant",
+				},
+			},
+		})
+
+		// Verify getTykAuthentication returns the authentication object
+		auth := oas.getTykAuthentication()
+		assert.NotNil(t, auth)
+		assert.Equal(t, "compliant", auth.SecurityProcessingMode)
+	})
+}
