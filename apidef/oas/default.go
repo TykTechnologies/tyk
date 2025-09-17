@@ -313,7 +313,6 @@ func GetTykExtensionConfigParams(r *http.Request) *TykExtensionConfigParams {
 	overRideValues.AllowList = getQueryValPtr(strings.TrimSpace(queries.Get("allowList")))
 	overRideValues.MockResponse = getQueryValPtr(strings.TrimSpace(queries.Get("mockResponse")))
 
-	// Extract security processing mode from query params
 	processingMode := strings.TrimSpace(queries.Get("securityProcessingMode"))
 	if processingMode != "" {
 		overRideValues.SecurityProcessingMode = processingMode

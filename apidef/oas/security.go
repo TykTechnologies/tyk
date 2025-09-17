@@ -1015,7 +1015,7 @@ func (s *OAS) fillSecurity(api apidef.APIDefinition) {
 	s.fillExternalOAuth(api)
 
 	// Handle security requirements based on processing mode (OAS-only feature)
-	processingMode := "legacy" // default
+	processingMode := "legacy"
 	if s.getTykAuthentication() != nil && s.getTykAuthentication().SecurityProcessingMode != "" {
 		processingMode = s.getTykAuthentication().SecurityProcessingMode
 	}
@@ -1116,7 +1116,7 @@ func (s *OAS) extractSecurityTo(api *apidef.APIDefinition) {
 	}
 
 	// Extract security requirements based on processing mode (OAS-only feature)
-	processingMode := "legacy" // default
+	processingMode := "legacy"
 	if s.getTykAuthentication() != nil && s.getTykAuthentication().SecurityProcessingMode != "" {
 		processingMode = s.getTykAuthentication().SecurityProcessingMode
 	}

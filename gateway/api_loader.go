@@ -414,7 +414,7 @@ func (gw *Gateway) processSpec(
 			authMiddlewares = append(authMiddlewares, authKeyMW)
 		}
 
-		processingMode := "legacy" // default
+		processingMode := "legacy"
 		if spec.IsOAS && spec.OAS.GetTykExtension() != nil {
 			if auth := spec.OAS.GetTykExtension().Server.Authentication; auth != nil && auth.SecurityProcessingMode != "" {
 				processingMode = auth.SecurityProcessingMode

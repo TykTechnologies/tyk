@@ -14,9 +14,8 @@ type AuthORWrapper struct {
 
 // ProcessRequest handles the OR logic for authentication
 func (a *AuthORWrapper) ProcessRequest(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
-
 	// Determine processing mode (OAS-only feature)
-	processingMode := "legacy" // default
+	processingMode := "legacy"
 	if a.Spec.IsOAS && a.Spec.OAS.GetTykExtension() != nil {
 		if auth := a.Spec.OAS.GetTykExtension().Server.Authentication; auth != nil && auth.SecurityProcessingMode != "" {
 			processingMode = auth.SecurityProcessingMode
