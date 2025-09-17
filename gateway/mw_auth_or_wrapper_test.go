@@ -27,12 +27,12 @@ func createOASAPIWithORAuth(spec *APISpec, jwtConfig *oas.JWT, apiKeyConfig bool
 		},
 		Paths: openapi3.NewPaths(),
 	}
-	
+
 	// Add components for security schemes
 	oasDoc.T.Components = &openapi3.Components{
 		SecuritySchemes: openapi3.SecuritySchemes{},
 	}
-	
+
 	// Add JWT security scheme if JWT config provided
 	if jwtConfig != nil {
 		oasDoc.T.Components.SecuritySchemes["jwt"] = &openapi3.SecuritySchemeRef{
@@ -43,7 +43,7 @@ func createOASAPIWithORAuth(spec *APISpec, jwtConfig *oas.JWT, apiKeyConfig bool
 			},
 		}
 	}
-	
+
 	// Add API key security scheme if enabled
 	if apiKeyConfig {
 		oasDoc.T.Components.SecuritySchemes["apikey"] = &openapi3.SecuritySchemeRef{
@@ -54,7 +54,7 @@ func createOASAPIWithORAuth(spec *APISpec, jwtConfig *oas.JWT, apiKeyConfig bool
 			},
 		}
 	}
-	
+
 	// Build security requirements based on what's enabled
 	var secReqs openapi3.SecurityRequirements
 	if jwtConfig != nil {
@@ -63,7 +63,7 @@ func createOASAPIWithORAuth(spec *APISpec, jwtConfig *oas.JWT, apiKeyConfig bool
 	if apiKeyConfig {
 		secReqs = append(secReqs, openapi3.SecurityRequirement{"apikey": []string{}})
 	}
-	
+
 	// Add paths with security requirements
 	pathItem := &openapi3.PathItem{
 		Get: &openapi3.Operation{
@@ -75,13 +75,13 @@ func createOASAPIWithORAuth(spec *APISpec, jwtConfig *oas.JWT, apiKeyConfig bool
 			Security:  &secReqs,
 		},
 	}
-	
+
 	// Add root path only (wildcard causes 404 issues with auth)
 	oasDoc.T.Paths.Set("/", pathItem)
-	
+
 	// Set global security requirements
 	oasDoc.T.Security = secReqs
-	
+
 	// Create Tyk extension with auth configuration
 	tykExtension := &oas.XTykAPIGateway{
 		Info: oas.Info{
@@ -99,14 +99,14 @@ func createOASAPIWithORAuth(spec *APISpec, jwtConfig *oas.JWT, apiKeyConfig bool
 			Authentication: &oas.Authentication{
 				Enabled:                true,
 				SecurityProcessingMode: "compliant", // Enable OR logic
-				SecuritySchemes: oas.SecuritySchemes{},
+				SecuritySchemes:        oas.SecuritySchemes{},
 			},
 		},
 		Upstream: oas.Upstream{
 			URL: TestHttpAny,
 		},
 	}
-	
+
 	// Configure JWT authentication if provided
 	if jwtConfig != nil {
 		// JWT is stored directly as a JWT type in SecuritySchemes
@@ -118,7 +118,7 @@ func createOASAPIWithORAuth(spec *APISpec, jwtConfig *oas.JWT, apiKeyConfig bool
 		// Store as pointer to JWT since it will be type-checked later
 		tykExtension.Server.Authentication.SecuritySchemes["jwt"] = &jwtWithAuth
 	}
-	
+
 	// Configure API key authentication if enabled
 	if apiKeyConfig {
 		enabled := true
@@ -133,13 +133,13 @@ func createOASAPIWithORAuth(spec *APISpec, jwtConfig *oas.JWT, apiKeyConfig bool
 			},
 		}
 	}
-	
+
 	// Set the Tyk extension
 	oasDoc.SetTykExtension(tykExtension)
-	
+
 	// Extract to populate the APIDefinition
 	oasDoc.ExtractTo(spec.APIDefinition)
-	
+
 	// Set spec fields
 	spec.IsOAS = true
 	spec.OAS = oasDoc
@@ -157,7 +157,7 @@ func createOASAPIWithBasicAndAPIKey(spec *APISpec) {
 		},
 		Paths: openapi3.NewPaths(),
 	}
-	
+
 	// Add components for security schemes
 	oasDoc.T.Components = &openapi3.Components{
 		SecuritySchemes: openapi3.SecuritySchemes{
@@ -176,13 +176,13 @@ func createOASAPIWithBasicAndAPIKey(spec *APISpec) {
 			},
 		},
 	}
-	
+
 	// Build security requirements for OR logic
 	secReqs := openapi3.SecurityRequirements{
 		openapi3.SecurityRequirement{"basic": []string{}},
 		openapi3.SecurityRequirement{"apikey": []string{}},
 	}
-	
+
 	// Add paths with security requirements
 	oasDoc.T.Paths.Set("/", &openapi3.PathItem{
 		Get: &openapi3.Operation{
@@ -191,10 +191,10 @@ func createOASAPIWithBasicAndAPIKey(spec *APISpec) {
 			Responses:   openapi3.NewResponses(),
 		},
 	})
-	
+
 	// Set default security
 	oasDoc.T.Security = secReqs
-	
+
 	// Configure Tyk extensions for compliant mode
 	oasDoc.SetTykExtension(&oas.XTykAPIGateway{
 		Info: oas.Info{
@@ -214,31 +214,31 @@ func createOASAPIWithBasicAndAPIKey(spec *APISpec) {
 			},
 		},
 	})
-	
+
 	spec.OAS = oasDoc
 	spec.IsOAS = true
-	
+
 	// Enable auth methods on spec
 	spec.UseBasicAuth = true
 	spec.UseStandardAuth = true
-	
+
 	// Set auth config for proper header lookup
 	spec.Auth = apidef.AuthConfig{
 		AuthHeaderName: "X-API-Key",
-		UseParam: false,
-		DisableHeader: false,
+		UseParam:       false,
+		DisableHeader:  false,
 	}
-	
+
 	spec.AuthConfigs = map[string]apidef.AuthConfig{
 		"basic": {
 			AuthHeaderName: "Authorization",
 		},
 		"authToken": {
 			AuthHeaderName: "X-API-Key",
-			DisableHeader: false,
+			DisableHeader:  false,
 		},
 	}
-	
+
 	// Set security requirements for OR logic
 	spec.SecurityRequirements = [][]string{
 		{"basic"},  // Option 1: Basic auth
@@ -258,7 +258,7 @@ func createOASAPIWithThreeAuthMethods(spec *APISpec, jwtConfig *oas.JWT) {
 		},
 		Paths: openapi3.NewPaths(),
 	}
-	
+
 	// Add components for security schemes
 	oasDoc.T.Components = &openapi3.Components{
 		SecuritySchemes: openapi3.SecuritySchemes{
@@ -284,14 +284,14 @@ func createOASAPIWithThreeAuthMethods(spec *APISpec, jwtConfig *oas.JWT) {
 			},
 		},
 	}
-	
+
 	// Build security requirements for OR logic - three options
 	secReqs := openapi3.SecurityRequirements{
 		openapi3.SecurityRequirement{"jwt": []string{}},
 		openapi3.SecurityRequirement{"basic": []string{}},
 		openapi3.SecurityRequirement{"apikey": []string{}},
 	}
-	
+
 	// Add paths with security requirements
 	oasDoc.T.Paths.Set("/", &openapi3.PathItem{
 		Get: &openapi3.Operation{
@@ -300,10 +300,10 @@ func createOASAPIWithThreeAuthMethods(spec *APISpec, jwtConfig *oas.JWT) {
 			Responses:   openapi3.NewResponses(),
 		},
 	})
-	
+
 	// Set default security
 	oasDoc.T.Security = secReqs
-	
+
 	// Configure Tyk extensions for compliant mode
 	oasDoc.SetTykExtension(&oas.XTykAPIGateway{
 		Info: oas.Info{
@@ -323,43 +323,43 @@ func createOASAPIWithThreeAuthMethods(spec *APISpec, jwtConfig *oas.JWT) {
 			},
 		},
 	})
-	
+
 	spec.OAS = oasDoc
 	spec.IsOAS = true
-	
+
 	// Enable auth methods on spec
 	spec.EnableJWT = true
 	spec.UseBasicAuth = true
 	spec.UseStandardAuth = true
-	
+
 	// Set auth configurations
 	spec.Auth = apidef.AuthConfig{
 		AuthHeaderName: "X-API-Key",
-		UseParam: false,
-		DisableHeader: false,
+		UseParam:       false,
+		DisableHeader:  false,
 	}
-	
+
 	spec.AuthConfigs = map[string]apidef.AuthConfig{
 		"jwt": {
 			AuthHeaderName: "Authorization",
-			DisableHeader: false,
+			DisableHeader:  false,
 		},
 		"basic": {
 			AuthHeaderName: "Authorization",
 		},
 		"authToken": {
 			AuthHeaderName: "X-API-Key",
-			DisableHeader: false,
+			DisableHeader:  false,
 		},
 	}
-	
+
 	// Set security requirements for OR logic
 	spec.SecurityRequirements = [][]string{
 		{"jwt"},    // Option 1: JWT
 		{"basic"},  // Option 2: Basic auth
 		{"apikey"}, // Option 3: API key
 	}
-	
+
 	// Set JWT configuration
 	if jwtConfig != nil {
 		spec.JWTSigningMethod = jwtConfig.SigningMethod
@@ -380,7 +380,7 @@ func TestOASAPIRouting(t *testing.T) {
 		spec.APIID = "test-oas-routing"
 		spec.Name = "Test OAS Routing"
 		spec.Proxy.ListenPath = "/test-oas-routing/"
-		
+
 		// Create minimal OAS document
 		oasDoc := oas.OAS{}
 		oasDoc.T = openapi3.T{
@@ -391,7 +391,7 @@ func TestOASAPIRouting(t *testing.T) {
 			},
 			Paths: openapi3.NewPaths(),
 		}
-		
+
 		// Add a simple path
 		pathItem := &openapi3.PathItem{
 			Get: &openapi3.Operation{
@@ -399,7 +399,7 @@ func TestOASAPIRouting(t *testing.T) {
 			},
 		}
 		oasDoc.T.Paths.Set("/", pathItem)
-		
+
 		// Create minimal Tyk extension
 		tykExtension := &oas.XTykAPIGateway{
 			Info: oas.Info{
@@ -419,13 +419,13 @@ func TestOASAPIRouting(t *testing.T) {
 				URL: TestHttpAny,
 			},
 		}
-		
+
 		// Set the Tyk extension
 		oasDoc.SetTykExtension(tykExtension)
-		
+
 		// Extract to populate the APIDefinition
 		oasDoc.ExtractTo(spec.APIDefinition)
-		
+
 		// Set spec fields
 		spec.IsOAS = true
 		spec.OAS = oasDoc
@@ -438,13 +438,13 @@ func TestOASAPIRouting(t *testing.T) {
 		Path:   "/test-oas-routing/",
 		Code:   http.StatusOK,
 	})
-	
+
 	// Now test with auth enabled
 	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 		spec.APIID = "test-oas-auth-routing"
 		spec.Name = "Test OAS Auth Routing"
 		spec.Proxy.ListenPath = "/test-oas-auth-routing/"
-		
+
 		// Create OAS document
 		oasDoc := oas.OAS{}
 		oasDoc.T = openapi3.T{
@@ -455,7 +455,7 @@ func TestOASAPIRouting(t *testing.T) {
 			},
 			Paths: openapi3.NewPaths(),
 		}
-		
+
 		// Add components for security schemes
 		oasDoc.T.Components = &openapi3.Components{
 			SecuritySchemes: openapi3.SecuritySchemes{
@@ -468,7 +468,7 @@ func TestOASAPIRouting(t *testing.T) {
 				},
 			},
 		}
-		
+
 		// Add paths with security requirement
 		pathItem := &openapi3.PathItem{
 			Get: &openapi3.Operation{
@@ -509,12 +509,12 @@ func TestOASAPIRouting(t *testing.T) {
 			},
 		}
 		oasDoc.T.Paths.Set("/{path+}", pathWithParam) // Use {path+} for catch-all
-		
+
 		// Set global security requirements
 		oasDoc.T.Security = openapi3.SecurityRequirements{
 			openapi3.SecurityRequirement{"apikey": []string{}},
 		}
-		
+
 		// Create Tyk extension with auth
 		enabled := true
 		tykExtension := &oas.XTykAPIGateway{
@@ -544,20 +544,20 @@ func TestOASAPIRouting(t *testing.T) {
 				URL: TestHttpAny,
 			},
 		}
-		
+
 		// Set the Tyk extension
 		oasDoc.SetTykExtension(tykExtension)
-		
+
 		// Extract to populate the APIDefinition
 		oasDoc.ExtractTo(spec.APIDefinition)
-		
+
 		// Set spec fields
 		spec.IsOAS = true
 		spec.OAS = oasDoc
 		spec.Active = true  // Make sure API is active
-		
+
 	})
-	
+
 	// Create API key
 	apiKey := CreateSession(ts.Gw, func(s *user.SessionState) {
 		s.AccessRights = map[string]user.AccessDefinition{
@@ -568,7 +568,7 @@ func TestOASAPIRouting(t *testing.T) {
 			},
 		}
 	})
-	
+
 	// Test with valid API key
 	ts.Run(t, test.TestCase{
 		Method: "GET",
@@ -616,20 +616,20 @@ func TestMultiAuthMiddleware_OR_JWT_And_ApiKey_Combination(t *testing.T) {
 		spec.APIID = "test-or-jwt-apikey"
 		spec.Name = "Test OR JWT API Key"
 		spec.Proxy.ListenPath = "/test-or-jwt-apikey/"
-		
+
 		// Create JWT config for OAS
 		jwtConfig := &oas.JWT{
-			Enabled:              true,
-			Source:               base64.StdEncoding.EncodeToString([]byte(jwtRSAPubKey)),
-			SigningMethod:        "rsa",
-			IdentityBaseField:    "user_id",
-			PolicyFieldName:      "policy_id",
-			DefaultPolicies:      []string{pID},
+			Enabled:           true,
+			Source:            base64.StdEncoding.EncodeToString([]byte(jwtRSAPubKey)),
+			SigningMethod:     "rsa",
+			IdentityBaseField: "user_id",
+			PolicyFieldName:   "policy_id",
+			DefaultPolicies:   []string{pID},
 		}
-		
+
 		// Use the helper to create a proper OAS API
 		createOASAPIWithORAuth(spec, jwtConfig, true)
-		
+
 		if spec.OAS.GetTykExtension() != nil && spec.OAS.GetTykExtension().Server.Authentication != nil {
 			_ = spec.OAS.GetTykExtension().Server.Authentication.SecurityProcessingMode
 		}
@@ -641,8 +641,7 @@ func TestMultiAuthMiddleware_OR_JWT_And_ApiKey_Combination(t *testing.T) {
 		t.Claims.(jwt.MapClaims)["policy_id"] = pID
 		t.Claims.(jwt.MapClaims)["exp"] = time.Now().Add(time.Hour).Unix()
 	})
-	
-	
+
 	// Test cases for OR logic
 	testCases := []test.TestCase{
 		// Test 1: Valid API key only - should succeed
@@ -769,7 +768,7 @@ func TestMultiAuthMiddleware_OR_BasicAuth_And_ApiKey(t *testing.T) {
 
 		// Create proper OAS API with Basic Auth and API Key support
 		createOASAPIWithBasicAndAPIKey(spec)
-		
+
 	})
 
 	// Encode basic auth credentials
@@ -873,8 +872,8 @@ func TestMultiAuthMiddleware_OR_AllMethodsFail(t *testing.T) {
 					Name:    "Authorization",
 				},
 			},
-			SigningMethod: "rsa",
-			Source:        base64.StdEncoding.EncodeToString([]byte(jwtRSAPubKey)),
+			SigningMethod:     "rsa",
+			Source:            base64.StdEncoding.EncodeToString([]byte(jwtRSAPubKey)),
 			IdentityBaseField: "user_id",
 		}
 
@@ -916,7 +915,8 @@ func TestMultiAuthMiddleware_OR_AllMethodsFail(t *testing.T) {
 
 	ts.Run(t, testCases...)
 }
-// 
+
+//
 // TestMultiAuthMiddleware_BackwardCompatibility_AND_Logic tests that AND logic is preserved when SecurityRequirements <= 1
 /*
 func TestMultiAuthMiddleware_BackwardCompatibility_AND_Logic(t *testing.T) {

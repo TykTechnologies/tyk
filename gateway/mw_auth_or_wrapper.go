@@ -23,7 +23,6 @@ func (a *AuthORWrapper) ProcessRequest(w http.ResponseWriter, r *http.Request, _
 		}
 	}
 
-
 	// Single or no requirements: always use AND logic
 	if len(a.Spec.SecurityRequirements) <= 1 {
 
@@ -68,7 +67,6 @@ func (a *AuthORWrapper) ProcessRequest(w http.ResponseWriter, r *http.Request, _
 
 			return nil, http.StatusOK
 		}
-
 
 		lastError = err
 		lastCode = code
