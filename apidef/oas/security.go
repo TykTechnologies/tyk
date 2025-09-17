@@ -397,7 +397,7 @@ func (s *OAS) fillJWT(api apidef.APIDefinition) {
 }
 
 func (s *OAS) extractJWTTo(api *apidef.APIDefinition, name string) {
-	ac := apidef.AuthConfig{Name: name, DisableHeader: false}
+	ac := apidef.AuthConfig{Name: name, DisableHeader: true}
 
 	jwt := s.getTykJWTAuth(name)
 
@@ -454,6 +454,11 @@ func (s *OAS) extractJWTTo(api *apidef.APIDefinition, name string) {
 		api.JWTNotBeforeValidationSkew = jwt.NotBeforeValidationSkew
 		api.JWTExpiresAtValidationSkew = jwt.ExpiresAtValidationSkew
 		api.IDPClientIDMappingDisabled = jwt.IDPClientIDMappingDisabled
+	} else {
+		// Standard OpenAPI JWT/Bearer auth without Tyk extension
+		// Set default to read from Authorization header
+		ac.DisableHeader = false
+		ac.AuthHeaderName = "Authorization"
 	}
 
 	api.AuthConfigs[apidef.JWTType] = ac
@@ -570,6 +575,11 @@ func (s *OAS) extractBasicTo(api *apidef.APIDefinition, name string) {
 		if basic.ExtractCredentialsFromBody != nil {
 			basic.ExtractCredentialsFromBody.ExtractTo(api)
 		}
+	} else {
+		// Standard OpenAPI basic auth without Tyk extension
+		// Set default to read from Authorization header
+		ac.DisableHeader = false
+		ac.AuthHeaderName = "Authorization"
 	}
 
 	api.AuthConfigs[apidef.BasicType] = ac

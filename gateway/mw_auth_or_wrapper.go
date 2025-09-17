@@ -48,7 +48,8 @@ func (a *AuthORWrapper) ProcessRequest(w http.ResponseWriter, r *http.Request, _
 	var lastError error
 	var lastCode int
 
-	for _, mw := range a.authMiddlewares {
+	for i, mw := range a.authMiddlewares {
+		a.Logger().Debugf("OR wrapper: trying auth method %d/%d: %s", i+1, len(a.authMiddlewares), mw.Name())
 
 		// Clone the request to avoid side effects from failed auth attempts
 		// Each middleware gets a clean request without modifications from previous attempts
@@ -56,17 +57,18 @@ func (a *AuthORWrapper) ProcessRequest(w http.ResponseWriter, r *http.Request, _
 
 		err, code := mw.ProcessRequest(w, rClone, nil)
 		if err == nil {
+			a.Logger().Debugf("OR wrapper: auth method %s succeeded", mw.Name())
 
 			if session := ctxGetSession(rClone); session != nil {
 				ctxSetSession(r, session, false, a.Gw.GetConfig().HashKeys)
 			}
 
-			// Copy any other important context values from the successful attempt back to the original request
 			*r = *rClone
 
 			return nil, http.StatusOK
 		}
 
+		a.Logger().Debugf("OR wrapper: auth method %s failed with error: %v (code: %d)", mw.Name(), err, code)
 		lastError = err
 		lastCode = code
 	}

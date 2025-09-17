@@ -420,13 +420,13 @@ func (gw *Gateway) processSpec(
 				processingMode = auth.SecurityProcessingMode
 			}
 		}
-		if processingMode == "legacy" && len(spec.SecurityRequirements) > 1 {
-			logger.Info("Legacy mode: Only processing first security requirement, ignoring others")
-			spec.SecurityRequirements = spec.SecurityRequirements[:1]
-		}
 
-		if len(spec.SecurityRequirements) > 1 && len(authMiddlewares) > 0 {
-			logger.Info("Multiple security requirements detected - using OR authentication logic")
+		// In compliant mode with multiple requirements, use OR wrapper
+		// Note: Vendor extension security is already included in spec.SecurityRequirements after extraction
+		if processingMode == "compliant" && len(spec.SecurityRequirements) > 1 && len(authMiddlewares) > 0 {
+			logger.WithFields(logrus.Fields{
+				"totalRequirements": len(spec.SecurityRequirements),
+			}).Info("Compliant mode: Multiple security requirements detected - using OR authentication logic")
 
 			orWrapper := &AuthORWrapper{
 				BaseMiddleware:  *baseMid.Copy(),
@@ -435,6 +435,10 @@ func (gw *Gateway) processSpec(
 
 			chainArray = append(chainArray, gw.createMiddleware(orWrapper))
 		} else {
+			// Legacy mode or single requirement - use standard auth chain
+			if processingMode == "legacy" && len(spec.SecurityRequirements) > 1 {
+				logger.Info("Legacy mode: Processing first security requirement only, ignoring others")
+			}
 			chainArray = append(chainArray, authArray...)
 		}
 
