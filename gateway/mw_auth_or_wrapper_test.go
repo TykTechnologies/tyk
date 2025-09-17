@@ -2063,7 +2063,7 @@ func TestStandardOpenAPIBearerWithoutTykExtension(t *testing.T) {
 
 	// This test simulates the behavior when standard OpenAPI bearer auth is processed
 	// without Tyk extension - it should enable JWT by default
-	
+
 	// Create JWT policy
 	pID := ts.CreatePolicy(func(p *user.Policy) {
 		p.OrgID = ""
@@ -2092,7 +2092,7 @@ func TestStandardOpenAPIBearerWithoutTykExtension(t *testing.T) {
 		spec.JWTIdentityBaseField = "user_id"
 		spec.JWTPolicyFieldName = "policy_id"
 		spec.JWTDefaultPolicies = []string{pID}
-		
+
 		// Set up auth config as it would be by OAS extraction
 		spec.AuthConfigs = map[string]apidef.AuthConfig{
 			"bearerAuth": {
@@ -2101,7 +2101,7 @@ func TestStandardOpenAPIBearerWithoutTykExtension(t *testing.T) {
 				AuthHeaderName: "Authorization",
 			},
 		}
-		
+
 		// Single security requirement
 		spec.SecurityRequirements = [][]string{
 			{"bearerAuth"},
@@ -2145,7 +2145,7 @@ func TestSingleSecurityRequirementANDLogic(t *testing.T) {
 
 	// This test ensures the OR wrapper properly handles single requirements with AND logic
 	// The code path: if len(a.Spec.SecurityRequirements) <= 1
-	
+
 	// Create policy for JWT
 	pID := ts.CreatePolicy(func(p *user.Policy) {
 		p.OrgID = ""
@@ -2323,7 +2323,7 @@ func TestOAuth2InORWrapper(t *testing.T) {
 
 	// This test verifies OAuth2 can be configured alongside other auth methods
 	// The actual OR logic testing is done in other tests
-	
+
 	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 		spec.APIID = "test-oauth2-or"
 		spec.Name = "Test OAuth2 OR"
@@ -2331,11 +2331,11 @@ func TestOAuth2InORWrapper(t *testing.T) {
 		spec.Proxy.ListenPath = "/test-oauth2-or/"
 		spec.Proxy.TargetURL = TestHttpAny
 		spec.UseKeylessAccess = false
-		
+
 		// Just test that OAuth2 can be enabled with correct configuration
 		// In real OR wrapper scenario, both would be enabled
 		spec.UseOauth2 = true
-		
+
 		// Configure auth configs as they would be in OR scenario
 		spec.AuthConfigs = map[string]apidef.AuthConfig{
 			"oauth2": {
@@ -2344,7 +2344,7 @@ func TestOAuth2InORWrapper(t *testing.T) {
 				AuthHeaderName: "Authorization",
 			},
 		}
-		
+
 		// Single requirement to test OAuth2 configuration
 		spec.SecurityRequirements = [][]string{
 			{"oauth2"},
@@ -2386,16 +2386,16 @@ func TestAuthORWrapperEnabledForSpec(t *testing.T) {
 				},
 			},
 		}
-		
+
 		wrapper := &AuthORWrapper{
 			BaseMiddleware: BaseMiddleware{
-				Spec: spec,
-				Gw:   &Gateway{},
+				Spec:   spec,
+				Gw:     &Gateway{},
 				logger: log.WithField("mw", "AuthORWrapper"),
 			},
 		}
 		wrapper.Init()
-		
+
 		if wrapper.EnabledForSpec() {
 			t.Error("OR wrapper should not be enabled for single security requirement")
 		}
@@ -2412,16 +2412,16 @@ func TestAuthORWrapperEnabledForSpec(t *testing.T) {
 				},
 			},
 		}
-		
+
 		wrapper := &AuthORWrapper{
 			BaseMiddleware: BaseMiddleware{
-				Spec: spec,
-				Gw:   &Gateway{},
+				Spec:   spec,
+				Gw:     &Gateway{},
 				logger: log.WithField("mw", "AuthORWrapper"),
 			},
 		}
 		wrapper.Init()
-		
+
 		if !wrapper.EnabledForSpec() {
 			t.Error("OR wrapper should be enabled for multiple security requirements")
 		}
@@ -2436,17 +2436,17 @@ func TestAuthORWrapperEnabledForSpec(t *testing.T) {
 				},
 			},
 		}
-		
+
 		wrapper := &AuthORWrapper{
 			BaseMiddleware: BaseMiddleware{
-				Spec: spec,
-				Gw:   &Gateway{},
+				Spec:   spec,
+				Gw:     &Gateway{},
 				logger: log.WithField("mw", "AuthORWrapper"),
 			},
 		}
 		// Init but no auth methods will be added
 		wrapper.Init()
-		
+
 		if wrapper.EnabledForSpec() {
 			t.Error("OR wrapper should not be enabled when no auth middlewares are configured")
 		}
@@ -2477,7 +2477,7 @@ func TestJWTWithTykExtensionButNoComponents(t *testing.T) {
 		spec.Proxy.ListenPath = "/test-jwt-extension-only/"
 		spec.Proxy.TargetURL = TestHttpAny
 		spec.UseKeylessAccess = false
-		
+
 		// Simulate JWT configured in Tyk extension but no OpenAPI components
 		// This would be extracted from Tyk extension's SecuritySchemes
 		spec.EnableJWT = true
@@ -2486,7 +2486,7 @@ func TestJWTWithTykExtensionButNoComponents(t *testing.T) {
 		spec.JWTIdentityBaseField = "user_id"
 		spec.JWTPolicyFieldName = "policy_id"
 		spec.JWTDefaultPolicies = []string{pID}
-		
+
 		// Set auth config
 		spec.AuthConfigs = map[string]apidef.AuthConfig{
 			"jwt": {
@@ -2495,7 +2495,7 @@ func TestJWTWithTykExtensionButNoComponents(t *testing.T) {
 				AuthHeaderName: "Authorization",
 			},
 		}
-		
+
 		// Security requirement
 		spec.SecurityRequirements = [][]string{
 			{"jwt"},
