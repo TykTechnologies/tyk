@@ -408,7 +408,7 @@ func TestVersioning(t *testing.T) {
 }
 
 func TestVersioningSchemaValidation(t *testing.T) {
-	schemaLoader := gojsonschema.NewStringLoader(string(schemaContent))
+	schemaLoader := gojsonschema.NewBytesLoader(schemaContent)
 
 	createBaseAPIGateway := func() XTykAPIGateway {
 		return XTykAPIGateway{
