@@ -1,7 +1,6 @@
 package oas
 
 import (
-	_ "embed"
 	"encoding/json"
 	"fmt"
 	"reflect"
