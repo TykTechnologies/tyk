@@ -14,9 +14,6 @@ import (
 	"github.com/TykTechnologies/tyk/apidef"
 )
 
-//go:embed schema/x-tyk-api-gateway.json
-var schemaContent []byte
-
 func TestXTykAPIGateway(t *testing.T) {
 	t.Run("empty", func(t *testing.T) {
 		var emptyXTykAPIGateway XTykAPIGateway

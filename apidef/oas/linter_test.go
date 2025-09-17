@@ -170,7 +170,6 @@ func TestXTykGateway_Lint(t *testing.T) {
 }
 
 func TestVersioningSchemaValidation(t *testing.T) {
-	// Load schema
 	schema, err := schemaDir.ReadFile("schema/x-tyk-api-gateway.strict.json")
 	require.NoError(t, err)
 	schemaLoader := gojsonschema.NewBytesLoader(schema)
