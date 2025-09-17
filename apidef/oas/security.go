@@ -397,7 +397,7 @@ func (s *OAS) fillJWT(api apidef.APIDefinition) {
 }
 
 func (s *OAS) extractJWTTo(api *apidef.APIDefinition, name string) {
-	ac := apidef.AuthConfig{Name: name, DisableHeader: true}
+	ac := apidef.AuthConfig{Name: name, DisableHeader: false}
 
 	jwt := s.getTykJWTAuth(name)
 
