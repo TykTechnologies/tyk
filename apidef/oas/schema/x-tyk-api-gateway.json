@@ -1454,8 +1454,20 @@
         }
       },
       "required": [
-        "location",
-        "key"
+        "location"
+      ],
+      "anyOf": [
+        {
+          "properties": {
+            "location": { "enum": ["header", "url-param"] }
+          },
+          "required": ["key"]
+        },
+        {
+          "properties": {
+            "location": { "enum": ["url"] }
+          }
+        }
       ]
     },
     "X-Tyk-VersionToID": {
