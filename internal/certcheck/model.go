@@ -42,6 +42,12 @@ func (c CertInfo) SecondsUntilExpiry() int {
 	return int(c.UntilExpiry.Seconds())
 }
 
+// DaysUntilExpiry returns the number of days until the certificate expires.
+// This is calculated from the UntilExpiry field for convenience.
+func (c CertInfo) DaysUntilExpiry() int {
+	return c.HoursUntilExpiry() / 24
+}
+
 // EventCertificateExpiringSoonMeta is the metadata structure for certificate expiration events.
 type EventCertificateExpiringSoonMeta struct {
 	model.EventMetaDefault

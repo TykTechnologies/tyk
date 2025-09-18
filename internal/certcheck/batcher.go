@@ -283,11 +283,8 @@ func (c *CertificateExpiryCheckBatcher) handleEventForCertificate(certInfo CertI
 
 func (c *CertificateExpiryCheckBatcher) handleEventForExpiredCertificate(certInfo CertInfo) {
 	// Calculate days and hours since expiry (negative duration)
-	daysSinceExpiry := int(certInfo.UntilExpiry.Hours()/24) * -1
-	hoursSinceExpiry := int(certInfo.UntilExpiry.Hours()) % 24
-	if hoursSinceExpiry != 0 {
-		hoursSinceExpiry *= -1
-	}
+	daysSinceExpiry := certInfo.DaysUntilExpiry() * -1
+	hoursSinceExpiry := (certInfo.HoursUntilExpiry() % -24) * -1
 
 	eventMeta := EventCertificateExpiredMeta{
 		EventMetaDefault: model.EventMetaDefault{
@@ -304,12 +301,12 @@ func (c *CertificateExpiryCheckBatcher) handleEventForExpiredCertificate(certInf
 	c.logger.
 		WithField("cert_id", certInfo.ID[:8]).
 		WithField("event_type", string(event.CertificateExpired)).
-		Debugf("EXPIRY EVENT FIRED for certificate '%s' - expired since %v", certInfo.CommonName, certInfo.UntilExpiry)
+		Debugf("EXPIRY EVENT FIRED for certificate '%s' - expired since %d hours", certInfo.CommonName, certInfo.HoursUntilExpiry())
 }
 
 func (c *CertificateExpiryCheckBatcher) handleEventForSoonToExpireCertificate(certInfo CertInfo) {
-	daysUntilExpiry := int(certInfo.UntilExpiry.Hours() / 24)
-	remainingHours := int(certInfo.UntilExpiry.Hours()) % 24
+	daysUntilExpiry := certInfo.DaysUntilExpiry()
+	remainingHours := int(certInfo.HoursUntilExpiry()) % 24
 
 	eventMeta := EventCertificateExpiringSoonMeta{
 		EventMetaDefault: model.EventMetaDefault{
@@ -326,7 +323,7 @@ func (c *CertificateExpiryCheckBatcher) handleEventForSoonToExpireCertificate(ce
 	c.logger.
 		WithField("cert_id", certInfo.ID[:8]).
 		WithField("event_type", string(event.CertificateExpiringSoon)).
-		Debugf("EXPIRY EVENT FIRED for certificate '%s' - expires in %v", certInfo.CommonName, certInfo.UntilExpiry)
+		Debugf("EXPIRY EVENT FIRED for certificate '%s' - expires in %d hours", certInfo.CommonName, certInfo.HoursUntilExpiry())
 }
 
 func (c *CertificateExpiryCheckBatcher) fireEventCooldownExistsInLocalCache(certInfo CertInfo) (exists bool) {

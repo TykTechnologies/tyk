@@ -1357,3 +1357,141 @@ func createBatcherMocks(t *testing.T) (ctrl *gomock.Controller, batcherMocks *Ba
 		fallbackCacheMock: NewMockCooldownCache(ctrl),
 	}
 }
+
+func TestCertInfo_DaysUntilExpiry(t *testing.T) {
+	tests := map[string]struct {
+		daysUntilExpiry int
+		expectedDays    int
+		description     string
+	}{
+		"positive_days": {
+			daysUntilExpiry: 30, // 30 days
+			expectedDays:    30,
+			description:     "Should return 30 days for 30 days",
+		},
+		"zero_days": {
+			daysUntilExpiry: 0,
+			expectedDays:    0,
+			description:     "Should return 0 days for 0 days",
+		},
+		"negative_days": {
+			daysUntilExpiry: -7, // -7 days (expired)
+			expectedDays:    -7,
+			description:     "Should return -7 days for -7 days",
+		},
+		"large_positive": {
+			daysUntilExpiry: 365, // 1 year
+			expectedDays:    365,
+			description:     "Should return 365 days for 365 days",
+		},
+		"large_negative": {
+			daysUntilExpiry: -365, // -1 year
+			expectedDays:    -365,
+			description:     "Should return -365 days for -365 days",
+		},
+		"fractional_days_truncated": {
+			daysUntilExpiry: 30, // 30.5 days should truncate to 30
+			expectedDays:    30,
+			description:     "Should return 30 days for 30.5 days (truncated)",
+		},
+		"one_day": {
+			daysUntilExpiry: 1,
+			expectedDays:    1,
+			description:     "Should return 1 day for 1 day",
+		},
+		"fractional_day_less_than_one": {
+			daysUntilExpiry: 0, // 0.5 days should truncate to 0
+			expectedDays:    0,
+			description:     "Should return 0 days for 0.5 days (truncated)",
+		},
+		"half_day": {
+			daysUntilExpiry: 0, // 12 hours = 0.5 days, should truncate to 0
+			expectedDays:    0,
+			description:     "Should return 0 days for 12 hours (0.5 days truncated)",
+		},
+		"one_and_half_days": {
+			daysUntilExpiry: 1, // 36 hours = 1.5 days, should truncate to 1
+			expectedDays:    1,
+			description:     "Should return 1 day for 36 hours (1.5 days truncated)",
+		},
+		"two_days": {
+			daysUntilExpiry: 2,
+			expectedDays:    2,
+			description:     "Should return 2 days for 2 days",
+		},
+		"seven_days": {
+			daysUntilExpiry: 7, // 1 week
+			expectedDays:    7,
+			description:     "Should return 7 days for 1 week",
+		},
+		"thirty_days": {
+			daysUntilExpiry: 30, // 1 month
+			expectedDays:    30,
+			description:     "Should return 30 days for 1 month",
+		},
+		"sixty_days": {
+			daysUntilExpiry: 60, // 2 months
+			expectedDays:    60,
+			description:     "Should return 60 days for 2 months",
+		},
+		"ninety_days": {
+			daysUntilExpiry: 90, // 3 months
+			expectedDays:    90,
+			description:     "Should return 90 days for 3 months",
+		},
+		"one_hundred_eighty_days": {
+			daysUntilExpiry: 180, // 6 months
+			expectedDays:    180,
+			description:     "Should return 180 days for 6 months",
+		},
+		"three_hundred_sixty_five_days": {
+			daysUntilExpiry: 365, // 1 year
+			expectedDays:    365,
+			description:     "Should return 365 days for 1 year",
+		},
+		"seven_hundred_thirty_days": {
+			daysUntilExpiry: 730, // 2 years
+			expectedDays:    730,
+			description:     "Should return 730 days for 2 years",
+		},
+		"negative_one_day": {
+			daysUntilExpiry: -1,
+			expectedDays:    -1,
+			description:     "Should return -1 day for -1 day",
+		},
+		"negative_seven_days": {
+			daysUntilExpiry: -7, // -1 week
+			expectedDays:    -7,
+			description:     "Should return -7 days for -1 week",
+		},
+		"negative_thirty_days": {
+			daysUntilExpiry: -30, // -1 month
+			expectedDays:    -30,
+			description:     "Should return -30 days for -1 month",
+		},
+		"negative_ninety_days": {
+			daysUntilExpiry: -90, // -3 months
+			expectedDays:    -90,
+			description:     "Should return -90 days for -3 months",
+		},
+		"negative_three_hundred_sixty_five_days": {
+			daysUntilExpiry: -365, // -1 year
+			expectedDays:    -365,
+			description:     "Should return -365 days for -1 year",
+		},
+	}
+
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			certInfo := CertInfo{
+				ID:          "test-cert",
+				CommonName:  "test.example.com",
+				NotAfter:    time.Now().Add(time.Duration(tt.daysUntilExpiry) * 24 * time.Hour),
+				UntilExpiry: time.Duration(tt.daysUntilExpiry) * 24 * time.Hour,
+			}
+
+			result := certInfo.DaysUntilExpiry()
+			assert.Equal(t, tt.expectedDays, result, tt.description)
+		})
+	}
+}
