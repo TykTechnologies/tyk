@@ -1137,6 +1137,18 @@
           }
         }
       }
+    },
+    "security_requirements": {
+      "type": [
+        "array",
+        "null"
+      ],
+      "items": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      }
     }
   },
   "required": [
