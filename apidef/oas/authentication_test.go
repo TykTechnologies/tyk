@@ -358,14 +358,14 @@ func TestSecurityProcessingMode(t *testing.T) {
 			{
 				name: "explicit legacy",
 				input: &Authentication{
-					SecurityProcessingMode: "legacy",
+					SecurityProcessingMode: SecurityProcessingModeLegacy,
 				},
 				expected: "legacy",
 			},
 			{
 				name: "explicit compliant",
 				input: &Authentication{
-					SecurityProcessingMode: "compliant",
+					SecurityProcessingMode: SecurityProcessingModeCompliant,
 				},
 				expected: "compliant",
 			},
@@ -433,12 +433,12 @@ func TestSecurityProcessingMode(t *testing.T) {
 			api := apidef.APIDefinition{}
 
 			auth := &Authentication{
-				SecurityProcessingMode: "compliant", // Pre-existing OAS value
+				SecurityProcessingMode: SecurityProcessingModeCompliant, // Pre-existing OAS value
 			}
 			auth.Fill(api)
 
 			// Should preserve the OAS value, not overwrite from APIDefinition
-			assert.Equal(t, "compliant", auth.SecurityProcessingMode)
+			assert.Equal(t, SecurityProcessingModeCompliant, auth.SecurityProcessingMode)
 		})
 
 		t.Run("empty stays empty if not set", func(t *testing.T) {
@@ -455,17 +455,17 @@ func TestSecurityProcessingMode(t *testing.T) {
 			api := apidef.APIDefinition{}
 
 			auth := &Authentication{
-				SecurityProcessingMode: "legacy", // Pre-existing OAS value
+				SecurityProcessingMode: SecurityProcessingModeLegacy, // Pre-existing OAS value
 			}
 			auth.Fill(api)
 
 			// Should preserve the OAS value
-			assert.Equal(t, "legacy", auth.SecurityProcessingMode)
+			assert.Equal(t, SecurityProcessingModeLegacy, auth.SecurityProcessingMode)
 		})
 	})
 
 	t.Run("GetDefaultSecurityProcessingMode", func(t *testing.T) {
-		assert.Equal(t, "legacy", GetDefaultSecurityProcessingMode())
+		assert.Equal(t, SecurityProcessingModeLegacy, GetDefaultSecurityProcessingMode())
 	})
 }
 

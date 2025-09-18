@@ -2,6 +2,8 @@ package gateway
 
 import (
 	"net/http"
+
+	"github.com/TykTechnologies/tyk/apidef/oas"
 )
 
 // AuthORWrapper is a middleware that handles OR logic for multiple authentication methods.
@@ -15,7 +17,7 @@ type AuthORWrapper struct {
 // ProcessRequest handles the OR logic for authentication
 func (a *AuthORWrapper) ProcessRequest(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
 	// Determine processing mode (OAS-only feature)
-	processingMode := "legacy"
+	processingMode := oas.SecurityProcessingModeLegacy
 	if a.Spec.IsOAS && a.Spec.OAS.GetTykExtension() != nil {
 		if auth := a.Spec.OAS.GetTykExtension().Server.Authentication; auth != nil && auth.SecurityProcessingMode != "" {
 			processingMode = auth.SecurityProcessingMode
@@ -33,7 +35,7 @@ func (a *AuthORWrapper) ProcessRequest(w http.ResponseWriter, r *http.Request, _
 		return nil, http.StatusOK
 	}
 
-	if processingMode == "" || processingMode == "legacy" {
+	if processingMode == "" || processingMode == oas.SecurityProcessingModeLegacy {
 
 		for _, mw := range a.authMiddlewares {
 			if err, code := mw.ProcessRequest(w, r, nil); err != nil {

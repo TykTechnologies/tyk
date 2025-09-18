@@ -247,7 +247,7 @@ func TestLegacyMode_BackwardCompatibility(t *testing.T) {
 					},
 					Authentication: &oas.Authentication{
 						Enabled:                true,
-						SecurityProcessingMode: "legacy", // Explicit legacy mode
+						SecurityProcessingMode: oas.SecurityProcessingModeLegacy, // Explicit legacy mode
 						SecuritySchemes: oas.SecuritySchemes{
 							"apikey": &oas.Token{
 								Enabled: func() *bool { b := true; return &b }(),
@@ -380,7 +380,7 @@ func TestLegacyMode_OnlyFirstRequirementProcessed(t *testing.T) {
 				},
 				Authentication: &oas.Authentication{
 					Enabled:                true,
-					SecurityProcessingMode: "legacy",
+					SecurityProcessingMode: oas.SecurityProcessingModeLegacy,
 					SecuritySchemes: oas.SecuritySchemes{
 						"basic": &oas.Basic{
 							Enabled: true,
@@ -533,7 +533,7 @@ func TestLegacyMode_ANDLogicWithinSingleRequirement(t *testing.T) {
 				},
 				Authentication: &oas.Authentication{
 					Enabled:                true,
-					SecurityProcessingMode: "legacy", // Legacy mode with AND logic
+					SecurityProcessingMode: oas.SecurityProcessingModeLegacy, // Legacy mode with AND logic
 				},
 			},
 			Upstream: oas.Upstream{
@@ -729,7 +729,7 @@ func TestCompliantMode_JWTOrAPIKeyOrHMAC(t *testing.T) {
 				},
 				Authentication: &oas.Authentication{
 					Enabled:                true,
-					SecurityProcessingMode: "compliant", // Compliant mode for OR logic
+					SecurityProcessingMode: oas.SecurityProcessingModeCompliant, // Compliant mode for OR logic
 					// Vendor extension security for HMAC (proprietary)
 					Security: [][]string{
 						{"hmac"}, // HMAC as additional OR option
@@ -896,7 +896,7 @@ func TestCompliantMode_SessionIsolation(t *testing.T) {
 
 		// Ensure compliant mode is set
 		if spec.OAS.GetTykExtension() != nil && spec.OAS.GetTykExtension().Server.Authentication != nil {
-			spec.OAS.GetTykExtension().Server.Authentication.SecurityProcessingMode = "compliant"
+			spec.OAS.GetTykExtension().Server.Authentication.SecurityProcessingMode = oas.SecurityProcessingModeCompliant
 		}
 
 		// Re-extract to apply changes
@@ -1065,7 +1065,7 @@ func TestCompliantMode_ThreeAuthMethods(t *testing.T) {
 				},
 				Authentication: &oas.Authentication{
 					Enabled:                true,
-					SecurityProcessingMode: "compliant",
+					SecurityProcessingMode: oas.SecurityProcessingModeCompliant,
 					SecuritySchemes: oas.SecuritySchemes{
 						"jwt": &oas.JWT{
 							Enabled:           true,
@@ -1259,7 +1259,7 @@ func TestHMACSignatureValidation(t *testing.T) {
 				},
 				Authentication: &oas.Authentication{
 					Enabled:                true,
-					SecurityProcessingMode: "compliant",
+					SecurityProcessingMode: oas.SecurityProcessingModeCompliant,
 					Security: [][]string{
 						{"hmac"}, // HMAC only
 					},
@@ -1524,7 +1524,7 @@ func TestHMACInORAuthentication(t *testing.T) {
 				},
 				Authentication: &oas.Authentication{
 					Enabled:                true,
-					SecurityProcessingMode: "compliant",
+					SecurityProcessingMode: oas.SecurityProcessingModeCompliant,
 					// Add HMAC as vendor extension
 					Security: [][]string{
 						{"hmac"}, // HMAC as vendor extension option
@@ -1749,7 +1749,7 @@ func TestMultiAuthMiddleware_OR_JWT_And_ApiKey_Combination(t *testing.T) {
 				},
 				Authentication: &oas.Authentication{
 					Enabled:                true,
-					SecurityProcessingMode: "compliant",
+					SecurityProcessingMode: oas.SecurityProcessingModeCompliant,
 					SecuritySchemes: oas.SecuritySchemes{
 						"jwt": &oas.JWT{
 							Enabled:           true,
@@ -1896,7 +1896,7 @@ func TestMultiAuthMiddleware_OR_AllMethodsFail(t *testing.T) {
 				},
 				Authentication: &oas.Authentication{
 					Enabled:                true,
-					SecurityProcessingMode: "compliant",
+					SecurityProcessingMode: oas.SecurityProcessingModeCompliant,
 					SecuritySchemes: oas.SecuritySchemes{
 						"jwt": &oas.JWT{
 							Enabled:           true,
@@ -2228,7 +2228,7 @@ func TestSingleSecurityRequirementANDLogic(t *testing.T) {
 				},
 				Authentication: &oas.Authentication{
 					Enabled:                true,
-					SecurityProcessingMode: "compliant", // Even in compliant mode, single requirement = AND
+					SecurityProcessingMode: oas.SecurityProcessingModeCompliant, // Even in compliant mode, single requirement = AND
 					SecuritySchemes: oas.SecuritySchemes{
 						"jwt": &oas.JWT{
 							Enabled:           true,

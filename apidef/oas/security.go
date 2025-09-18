@@ -1025,12 +1025,12 @@ func (s *OAS) fillSecurity(api apidef.APIDefinition) {
 	s.fillExternalOAuth(api)
 
 	// Handle security requirements based on processing mode (OAS-only feature)
-	processingMode := "legacy"
+	processingMode := SecurityProcessingModeLegacy
 	if s.getTykAuthentication() != nil && s.getTykAuthentication().SecurityProcessingMode != "" {
 		processingMode = s.getTykAuthentication().SecurityProcessingMode
 	}
 
-	if processingMode == "compliant" {
+	if processingMode == SecurityProcessingModeCompliant {
 		// Compliant mode: separate OAS and vendor security
 		oasSecurity := make(openapi3.SecurityRequirements, 0)
 		vendorSecurity := [][]string{}
@@ -1126,14 +1126,14 @@ func (s *OAS) extractSecurityTo(api *apidef.APIDefinition) {
 	}
 
 	// Extract security requirements based on processing mode (OAS-only feature)
-	processingMode := "legacy"
+	processingMode := SecurityProcessingModeLegacy
 	if s.getTykAuthentication() != nil && s.getTykAuthentication().SecurityProcessingMode != "" {
 		processingMode = s.getTykAuthentication().SecurityProcessingMode
 	}
 
 	// In compliant mode, extract all security requirements including vendor extension
 	// In legacy mode, still extract but gateway will only use first
-	if processingMode == "compliant" {
+	if processingMode == SecurityProcessingModeCompliant {
 		// Concatenate OAS security with vendor extension security
 		api.SecurityRequirements = make([][]string, 0)
 
@@ -1167,7 +1167,7 @@ func (s *OAS) extractSecurityTo(api *apidef.APIDefinition) {
 	// - Compliant mode: Process ALL security requirements to enable multiple auth methods with OR logic
 	// - Legacy mode: Process only the first requirement for backward compatibility
 	requirementsToProcess := []openapi3.SecurityRequirement{}
-	if processingMode == "compliant" && len(s.Security) > 0 {
+	if processingMode == SecurityProcessingModeCompliant && len(s.Security) > 0 {
 		// Process all requirements in compliant mode
 		requirementsToProcess = s.Security
 	} else if len(s.Security) > 0 {

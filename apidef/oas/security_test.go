@@ -1161,7 +1161,7 @@ func TestSecurityRequirementsPreservation(t *testing.T) {
 				{"authToken": []string{}},
 				{"basicAuth": []string{}},
 			},
-			mode:            "legacy",
+			mode:            SecurityProcessingModeLegacy,
 			expectPreserved: true,
 		},
 		{
@@ -1169,7 +1169,7 @@ func TestSecurityRequirementsPreservation(t *testing.T) {
 			inputSecurity: openapi3.SecurityRequirements{
 				{"authToken": []string{}},
 			},
-			mode:            "legacy",
+			mode:            SecurityProcessingModeLegacy,
 			expectPreserved: true,
 		},
 		{
@@ -1177,7 +1177,7 @@ func TestSecurityRequirementsPreservation(t *testing.T) {
 			inputSecurity: openapi3.SecurityRequirements{
 				{"authToken": []string{}, "basicAuth": []string{}},
 			},
-			mode:            "legacy",
+			mode:            SecurityProcessingModeLegacy,
 			expectPreserved: true,
 		},
 		{
@@ -1187,7 +1187,7 @@ func TestSecurityRequirementsPreservation(t *testing.T) {
 				{"oauth2": []string{"read", "write"}},
 				{"jwt": []string{}},
 			},
-			mode:            "compliant",
+			mode:            SecurityProcessingModeCompliant,
 			expectPreserved: true,
 		},
 		{
@@ -1196,7 +1196,7 @@ func TestSecurityRequirementsPreservation(t *testing.T) {
 				{"apiKey": []string{}},
 				{"oauth2": []string{"read"}, "jwt": []string{}},
 			},
-			mode:            "legacy",
+			mode:            SecurityProcessingModeLegacy,
 			expectPreserved: true,
 		},
 	}
@@ -1434,7 +1434,7 @@ func TestCompliantModeSecuritySeparation(t *testing.T) {
 			Server: Server{
 				Authentication: &Authentication{
 					Enabled:                true,
-					SecurityProcessingMode: "compliant",
+					SecurityProcessingMode: SecurityProcessingModeCompliant,
 					SecuritySchemes: SecuritySchemes{
 						"jwt": &JWT{
 							Enabled: true,
@@ -1485,7 +1485,7 @@ func TestCompliantModeSecuritySeparation(t *testing.T) {
 			Server: Server{
 				Authentication: &Authentication{
 					Enabled:                true,
-					SecurityProcessingMode: "compliant",
+					SecurityProcessingMode: SecurityProcessingModeCompliant,
 					SecuritySchemes: SecuritySchemes{
 						"jwt": &JWT{
 							Enabled: true,
@@ -1533,7 +1533,7 @@ func TestCompliantModeSecuritySeparation(t *testing.T) {
 			Server: Server{
 				Authentication: &Authentication{
 					Enabled:                true,
-					SecurityProcessingMode: "legacy", // Explicitly set to legacy
+					SecurityProcessingMode: SecurityProcessingModeLegacy, // Explicitly set to legacy
 				},
 			},
 		})
@@ -1584,7 +1584,7 @@ func TestCompliantModeSecuritySeparation(t *testing.T) {
 			Server: Server{
 				Authentication: &Authentication{
 					Enabled:                true,
-					SecurityProcessingMode: "compliant",
+					SecurityProcessingMode: SecurityProcessingModeCompliant,
 				},
 			},
 		})
@@ -1592,6 +1592,6 @@ func TestCompliantModeSecuritySeparation(t *testing.T) {
 		// Verify getTykAuthentication returns the authentication object
 		auth := oas.getTykAuthentication()
 		assert.NotNil(t, auth)
-		assert.Equal(t, "compliant", auth.SecurityProcessingMode)
+		assert.Equal(t, SecurityProcessingModeCompliant, auth.SecurityProcessingMode)
 	})
 }

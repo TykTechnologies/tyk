@@ -1571,13 +1571,13 @@ func TestOAS_BuildDefaultTykExtension(t *testing.T) {
 		}
 
 		err := oasDef.BuildDefaultTykExtension(TykExtensionConfigParams{
-			SecurityProcessingMode: "compliant",
+			SecurityProcessingMode: SecurityProcessingModeCompliant,
 		}, true)
 		assert.NoError(t, err)
 
 		tykExt := oasDef.GetTykExtension()
 		assert.NotNil(t, tykExt.Server.Authentication)
-		assert.Equal(t, "compliant", tykExt.Server.Authentication.SecurityProcessingMode)
+		assert.Equal(t, SecurityProcessingModeCompliant, tykExt.Server.Authentication.SecurityProcessingMode)
 
 		// Test case 2: SecurityProcessingMode when Authentication already exists
 		oasDef2 := OAS{
@@ -1612,13 +1612,13 @@ func TestOAS_BuildDefaultTykExtension(t *testing.T) {
 		})
 
 		err = oasDef2.BuildDefaultTykExtension(TykExtensionConfigParams{
-			SecurityProcessingMode: "legacy",
+			SecurityProcessingMode: SecurityProcessingModeLegacy,
 		}, true)
 		assert.NoError(t, err)
 
 		tykExt2 := oasDef2.GetTykExtension()
 		assert.NotNil(t, tykExt2.Server.Authentication)
-		assert.Equal(t, "legacy", tykExt2.Server.Authentication.SecurityProcessingMode)
+		assert.Equal(t, SecurityProcessingModeLegacy, tykExt2.Server.Authentication.SecurityProcessingMode)
 		assert.True(t, tykExt2.Server.Authentication.Enabled)
 	})
 }

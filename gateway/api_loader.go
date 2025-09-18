@@ -22,6 +22,7 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/apidef/oas"
 	"github.com/TykTechnologies/tyk/coprocess"
 	"github.com/TykTechnologies/tyk/rpc"
 	"github.com/TykTechnologies/tyk/storage"
@@ -414,7 +415,7 @@ func (gw *Gateway) processSpec(
 			authMiddlewares = append(authMiddlewares, authKeyMW)
 		}
 
-		processingMode := "legacy"
+		processingMode := oas.SecurityProcessingModeLegacy
 		if spec.IsOAS && spec.OAS.GetTykExtension() != nil {
 			if auth := spec.OAS.GetTykExtension().Server.Authentication; auth != nil && auth.SecurityProcessingMode != "" {
 				processingMode = auth.SecurityProcessingMode
@@ -423,7 +424,7 @@ func (gw *Gateway) processSpec(
 
 		// In compliant mode with multiple requirements, use OR wrapper
 		// Note: Vendor extension security is already included in spec.SecurityRequirements after extraction
-		if processingMode == "compliant" && len(spec.SecurityRequirements) > 1 && len(authMiddlewares) > 0 {
+		if processingMode == oas.SecurityProcessingModeCompliant && len(spec.SecurityRequirements) > 1 && len(authMiddlewares) > 0 {
 			logger.WithFields(logrus.Fields{
 				"totalRequirements": len(spec.SecurityRequirements),
 			}).Info("Compliant mode: Multiple security requirements detected - using OR authentication logic")
@@ -436,7 +437,7 @@ func (gw *Gateway) processSpec(
 			chainArray = append(chainArray, gw.createMiddleware(orWrapper))
 		} else {
 			// Legacy mode or single requirement - use standard auth chain
-			if processingMode == "legacy" && len(spec.SecurityRequirements) > 1 {
+			if processingMode == oas.SecurityProcessingModeLegacy && len(spec.SecurityRequirements) > 1 {
 				logger.Info("Legacy mode: Processing first security requirement only, ignoring others")
 			}
 			chainArray = append(chainArray, authArray...)

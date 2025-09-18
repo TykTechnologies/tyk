@@ -13,14 +13,23 @@ import (
 	"github.com/TykTechnologies/tyk/apidef"
 )
 
+// SecurityProcessingMode constants define how multiple security requirements are processed
+const (
+	// SecurityProcessingModeLegacy processes only the first security requirement and uses BaseIdentityProvider
+	SecurityProcessingModeLegacy = "legacy"
+	
+	// SecurityProcessingModeCompliant processes all security requirements with OR logic and uses dynamic identity provider
+	SecurityProcessingModeCompliant = "compliant"
+)
+
 // ValidateSecurityProcessingMode validates the security processing mode value.
 func ValidateSecurityProcessingMode(mode string) bool {
-	return mode == "" || mode == "legacy" || mode == "compliant"
+	return mode == "" || mode == SecurityProcessingModeLegacy || mode == SecurityProcessingModeCompliant
 }
 
 // GetDefaultSecurityProcessingMode returns the default security processing mode.
 func GetDefaultSecurityProcessingMode() string {
-	return "legacy"
+	return SecurityProcessingModeLegacy
 }
 
 // Authentication contains configuration about the authentication methods and security policies applied to requests.
