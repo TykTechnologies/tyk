@@ -189,14 +189,26 @@ func (w *WebHookHandler) Checksum(em config.EventMessage, reqBody string) (strin
 		if !ok {
 			return "", ErrCouldNotCastMetaData
 		}
-		hashBody := fmt.Sprintf("%s%s%s%s", em.Type, meta.CertID, meta.CertName, meta.ExpiresAt.String())
+		hashBody := fmt.Sprintf("%s%s%s%s%s",
+			em.Type,
+			meta.CertID,
+			meta.CertName,
+			meta.ExpiresAt.String(),
+			meta.APIID,
+		)
 		h.Write([]byte(hashBody))
 	case EventCertificateExpired:
 		meta, ok := em.Meta.(certcheck.EventCertificateExpiredMeta)
 		if !ok {
 			return "", ErrCouldNotCastMetaData
 		}
-		hashBody := fmt.Sprintf("%s%s%s%s", em.Type, meta.CertID, meta.CertName, meta.ExpiredAt.String())
+		hashBody := fmt.Sprintf("%s%s%s%s%s",
+			em.Type,
+			meta.CertID,
+			meta.CertName,
+			meta.ExpiredAt.String(),
+			meta.APIID,
+		)
 		h.Write([]byte(hashBody))
 	default:
 		localRequest, err := http.NewRequest(string(w.getRequestMethod(w.conf.Method)), w.conf.TargetPath, strings.NewReader(reqBody))
@@ -280,7 +292,16 @@ func (w *WebHookHandler) HandleEvent(em config.EventMessage) {
 		return
 	}
 
-	cli := &http.Client{Timeout: 30 * time.Second}
+	// Create HTTP client using factory for webhook service
+	clientFactory := NewExternalHTTPClientFactory(w.Gw)
+	cli, err := clientFactory.CreateWebhookClient()
+	if err != nil {
+		log.WithError(err).Error("Failed to create webhook HTTP client, falling back to default")
+		log.Debug("[ExternalServices] Falling back to legacy webhook client due to factory error")
+		cli = &http.Client{Timeout: 30 * time.Second}
+	} else {
+		log.Debugf("[ExternalServices] Using external services webhook client for URL: %s", req.URL.String())
+	}
 
 	resp, err := cli.Do(req)
 	if err != nil {

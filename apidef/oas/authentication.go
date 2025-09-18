@@ -13,6 +13,25 @@ import (
 	"github.com/TykTechnologies/tyk/apidef"
 )
 
+// SecurityProcessingMode constants define how multiple security requirements are processed
+const (
+	// SecurityProcessingModeLegacy processes only the first security requirement and uses BaseIdentityProvider
+	SecurityProcessingModeLegacy = "legacy"
+
+	// SecurityProcessingModeCompliant processes all security requirements with OR logic and uses dynamic identity provider
+	SecurityProcessingModeCompliant = "compliant"
+)
+
+// ValidateSecurityProcessingMode validates the security processing mode value.
+func ValidateSecurityProcessingMode(mode string) bool {
+	return mode == "" || mode == SecurityProcessingModeLegacy || mode == SecurityProcessingModeCompliant
+}
+
+// GetDefaultSecurityProcessingMode returns the default security processing mode.
+func GetDefaultSecurityProcessingMode() string {
+	return SecurityProcessingModeLegacy
+}
+
 // Authentication contains configuration about the authentication methods and security policies applied to requests.
 type Authentication struct {
 	// Enabled makes the API protected when one of the authentication modes is enabled.
@@ -61,6 +80,16 @@ type Authentication struct {
 
 	// CustomKeyLifetime contains configuration for the maximum retention period for access tokens.
 	CustomKeyLifetime *CustomKeyLifetime `bson:"customKeyLifetime,omitempty" json:"customKeyLifetime,omitempty"`
+
+	// SecurityProcessingMode controls how multiple security requirements are processed.
+	// - "legacy" (default): Only first security requirement processed, uses BaseIdentityProvider
+	// - "compliant": All security requirements processed with OR logic, dynamic identity provider
+	// Tyk classic API definition: `security_processing_mode`
+	SecurityProcessingMode string `bson:"securityProcessingMode,omitempty" json:"securityProcessingMode,omitempty"`
+
+	// Security contains Tyk vendor extension security requirements for proprietary auth methods.
+	// This is concatenated with OpenAPI security requirements when SecurityProcessingMode is "compliant".
+	Security [][]string `bson:"security,omitempty" json:"security,omitempty"`
 }
 
 // CustomKeyLifetime contains configuration for custom key retention.
@@ -500,7 +529,7 @@ type Scopes struct {
 // Fill fills *Scopes from *apidef.ScopeClaim.
 func (s *Scopes) Fill(scopeClaim *apidef.ScopeClaim) {
 	s.ClaimName = scopeClaim.ScopeClaimName
-	if s.ClaimName != "" {
+	if s.ClaimName != "" && len(s.Claims) < 1 {
 		s.Claims = []string{scopeClaim.ScopeClaimName}
 	}
 

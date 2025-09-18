@@ -5,8 +5,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/samber/lo"
 	"strings"
+
+	"github.com/samber/lo"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
@@ -255,6 +256,9 @@ func (s *OAS) getTykJWTAuth(name string) (jwt *JWT) {
 	return
 }
 
+// getTykBasicAuth retrieves the Basic auth configuration from Tyk extension.
+// It handles both typed (*Basic) and untyped (map[string]interface{}) security schemes.
+// When an untyped scheme is found, it converts it to *Basic and caches the result.
 func (s *OAS) getTykBasicAuth(name string) (basic *Basic) {
 	securityScheme := s.getTykSecurityScheme(name)
 	if securityScheme == nil {
@@ -265,10 +269,12 @@ func (s *OAS) getTykBasicAuth(name string) (basic *Basic) {
 	if basicVal, ok := securityScheme.(*Basic); ok {
 		basic = basicVal
 	} else {
-		toStructIfMap(securityScheme, basic)
+		// Security scheme is stored as map[string]interface{}, convert it to Basic struct
+		if toStructIfMap(securityScheme, basic) {
+			// Cache the converted struct for future use
+			s.getTykSecuritySchemes()[name] = basic
+		}
 	}
-
-	s.getTykSecuritySchemes()[name] = basic
 
 	return
 }
@@ -468,6 +474,19 @@ func (s *OAS) Validate(ctx context.Context, opts ...openapi3.ValidationOption) e
 	securityErr := s.validateSecurity()
 
 	return errors.Join(validationErr, securityErr)
+}
+
+// Normalize converts the OAS api to a normalized state.
+// it does this by fixing backwards compatibility issues
+// and copying fields values necessary to work
+// any logic to ensure the Tyk oas API is backwards compatible with previous versions of the gateway
+// should be placed in here.
+func (s *OAS) Normalize() {
+	// copy the values of the new JWT validation
+	jwtConfiguration := s.GetJWTConfiguration()
+	if jwtConfiguration != nil {
+		jwtConfiguration.Normalize()
+	}
 }
 
 // validateSecurity verifies that existing Security Requirement Objects has Security Schemes declared in the Security

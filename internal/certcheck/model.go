@@ -31,6 +31,7 @@ type EventCertificateExpiringSoonMeta struct {
 	CertName      string    `json:"cert_name"`
 	ExpiresAt     time.Time `json:"expires_at"`
 	DaysRemaining int       `json:"days_remaining"`
+	APIID         string    `json:"api_id"`
 }
 
 // EventCertificateExpiredMeta is the metadata structure for certificate expiration events.
@@ -40,4 +41,5 @@ type EventCertificateExpiredMeta struct {
 	CertName        string    `json:"cert_name"`
 	ExpiredAt       time.Time `json:"expired_at"`
 	DaysSinceExpiry int       `json:"days_since_expiry"`
+	APIID           string    `json:"api_id"`
 }

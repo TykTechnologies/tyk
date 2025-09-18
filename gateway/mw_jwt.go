@@ -10,13 +10,15 @@ import (
 	"encoding/pem"
 	"errors"
 	"fmt"
-	"github.com/google/go-cmp/cmp"
-	"github.com/ohler55/ojg/jp"
-	"github.com/tidwall/gjson"
-	"io"
 	"net/http"
 	"strings"
+	"sync"
 	"time"
+
+	"github.com/google/go-cmp/cmp"
+	"github.com/gorilla/mux"
+	"github.com/ohler55/ojg/jp"
+	"github.com/tidwall/gjson"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/apidef/oas"
@@ -32,6 +34,8 @@ import (
 type JWTMiddleware struct {
 	*BaseMiddleware
 }
+
+var JWKCaches = sync.Map{}
 
 const (
 	KID       = "kid"
@@ -64,11 +68,78 @@ func (k *JWTMiddleware) Name() string {
 	return "JWTMiddleware"
 }
 
+func (k *JWTMiddleware) Init() {
+	config := k.Spec.APIDefinition
+
+	if len(config.JWTJwksURIs) > 0 {
+		// asynchronous fetches to not block API loading
+		go func() {
+			k.Logger().Debug("Pre-fetching JWKs asynchronously")
+			// Drop the previous cache for the API ID
+			JWKCaches.Delete(k.Spec.APIID)
+			jwkCache := loadOrCreateJWKCacheByApiID(k.Spec.APIID)
+
+			// Create client factory for JWK fetching
+			clientFactory := NewExternalHTTPClientFactory(k.Gw)
+			client, clientErr := clientFactory.CreateJWKClient()
+
+			for _, jwk := range config.JWTJwksURIs {
+				var jwkSet *jose.JSONWebKeySet
+				var err error
+
+				if clientErr == nil {
+					jwkSet, err = getJWKWithClient(jwk.URL, client)
+				}
+
+				// Fallback to original method if factory fails
+				if clientErr != nil || err != nil {
+					jwkSet, err = GetJWK(jwk.URL, k.Gw.GetConfig().JWTSSLInsecureSkipVerify)
+				}
+
+				if err != nil {
+					k.Logger().WithError(err).Infof("Failed to fetch or decode JWKs from %s", jwk.URL)
+					continue
+				}
+
+				cacheTimeout := int64(cache.DefaultExpiration)
+				if jwk.CacheTimeout >= 0 {
+					cacheTimeout = jwk.CacheTimeout
+				}
+				jwkCache.Set(jwk.URL, jwkSet, cacheTimeout)
+			}
+		}()
+	}
+}
+
+func (k *JWTMiddleware) Unload() {
+	// Unload method has been called asynchronously after Init is called
+	// when a user changes the API configuration. Because of that behavior,
+	// we only clean the cache if there is no spec found with the ID.
+	// Init tries to clean the cache for the API ID when it starts
+	spec := k.Gw.getApiSpec(k.Spec.APIID)
+	if spec == nil {
+		// Drop the cache for API ID if it's removed from Tyk
+		JWKCaches.Delete(k.Spec.APIID)
+	}
+}
+
 func (k *JWTMiddleware) EnabledForSpec() bool {
 	return k.Spec.EnableJWT
 }
 
-var JWKCache cache.Repository = cache.New(240, 30)
+func (k *JWTMiddleware) loadOrCreateJWKCache() cache.Repository {
+	return loadOrCreateJWKCacheByApiID(k.Spec.APIID)
+}
+
+func loadOrCreateJWKCacheByApiID(apiID string) cache.Repository {
+	raw, _ := JWKCaches.LoadOrStore(apiID, cache.New(240, 30))
+	jwkCache, ok := raw.(cache.Repository)
+	if !ok {
+		// This should not be possible
+		panic("JWKCache instance must implement cache.Repository")
+	}
+	return jwkCache
+}
 
 type JWK struct {
 	Alg string   `json:"alg"`
@@ -95,13 +166,21 @@ func parseJWK(buf []byte) (*jose.JSONWebKeySet, error) {
 }
 
 func (k *JWTMiddleware) legacyGetSecretFromURL(url, kid, keyType string) (interface{}, error) {
-	var client http.Client
-	client.Transport = &http.Transport{
-		TLSClientConfig: &tls.Config{InsecureSkipVerify: k.Gw.GetConfig().JWTSSLInsecureSkipVerify},
+	// Try to use HTTP client factory first
+	clientFactory := NewExternalHTTPClientFactory(k.Gw)
+	client, err := clientFactory.CreateJWKClient()
+	if err != nil {
+		// Fallback to original client
+		client = &http.Client{
+			Transport: &http.Transport{
+				TLSClientConfig: &tls.Config{InsecureSkipVerify: k.Gw.GetConfig().JWTSSLInsecureSkipVerify},
+			},
+		}
 	}
 
 	var jwkSet JWKs
-	cachedJWK, found := JWKCache.Get("legacy-" + k.Spec.APIID)
+	jwkCache := k.loadOrCreateJWKCache()
+	cachedJWK, found := jwkCache.Get("legacy-" + url)
 	if !found {
 		resp, err := client.Get(url)
 		if err != nil {
@@ -116,7 +195,7 @@ func (k *JWTMiddleware) legacyGetSecretFromURL(url, kid, keyType string) (interf
 			return nil, err
 		}
 
-		JWKCache.Set("legacy-"+k.Spec.APIID, jwkSet, cache.DefaultExpiration)
+		jwkCache.Set("legacy-"+url, jwkSet, cache.DefaultExpiration)
 	} else {
 		jwkSet = cachedJWK.(JWKs)
 	}
@@ -154,10 +233,11 @@ func (k *JWTMiddleware) getSecretFromURL(url string, kidVal interface{}, keyType
 		found  bool
 	)
 
+	jwkCache := k.loadOrCreateJWKCache()
 	cacheAPIDef := k.specCacheKey(k.Spec, JWKsAPIDef)
 	cacheOutdated := false
 
-	cachedAPIDefRaw, foundDef := JWKCache.Get(cacheAPIDef)
+	cachedAPIDefRaw, foundDef := jwkCache.Get(cacheAPIDef)
 	if foundDef {
 		cachedAPIDef, ok := cachedAPIDefRaw.(*apidef.APIDefinition)
 		if !ok {
@@ -172,7 +252,7 @@ func (k *JWTMiddleware) getSecretFromURL(url string, kidVal interface{}, keyType
 		if string(decodedURL) != url {
 			cacheOutdated = true
 		} else {
-			cachedJWK, ok := JWKCache.Get(k.Spec.APIID)
+			cachedJWK, ok := jwkCache.Get(url)
 			if ok {
 				found = true
 				var okType bool
@@ -188,21 +268,33 @@ func (k *JWTMiddleware) getSecretFromURL(url string, kidVal interface{}, keyType
 	}
 
 	if !found || cacheOutdated {
-		if jwkSet, err = GetJWK(url, k.Gw.GetConfig().JWTSSLInsecureSkipVerify); err != nil {
-			k.Logger().WithError(err).Info("Failed to decode JWKs body. Trying x5c PEM fallback.")
-
-			key, legacyError := k.legacyGetSecretFromURL(url, kid, keyType)
-			if legacyError == nil {
-				return key, nil
+		// Try to use HTTP client factory first
+		clientFactory := NewExternalHTTPClientFactory(k.Gw)
+		client, clientErr := clientFactory.CreateJWKClient()
+		if clientErr == nil {
+			if jwkSet, err = getJWKWithClient(url, client); err != nil {
+				k.Logger().WithError(err).Info("Failed to decode JWKs body with factory client. Trying x5c PEM fallback.")
 			}
+		}
 
-			return nil, err
+		// Fallback to original method if factory fails or JWK fetch fails
+		if clientErr != nil || err != nil {
+			if jwkSet, err = GetJWK(url, k.Gw.GetConfig().JWTSSLInsecureSkipVerify); err != nil {
+				k.Logger().WithError(err).Info("Failed to decode JWKs body. Trying x5c PEM fallback.")
+
+				key, legacyError := k.legacyGetSecretFromURL(url, kid, keyType)
+				if legacyError == nil {
+					return key, nil
+				}
+
+				return nil, err
+			}
 		}
 
 		// Cache it
 		k.Logger().Debug("Caching JWK")
-		JWKCache.Set(k.Spec.APIID, jwkSet, cache.DefaultExpiration)
-		JWKCache.Set(cacheAPIDef, k.Spec.APIDefinition, cache.DefaultExpiration)
+		jwkCache.Set(url, jwkSet, k.findCacheTimeoutByURL(url))
+		jwkCache.Set(cacheAPIDef, k.Spec.APIDefinition, cache.DefaultExpiration)
 	}
 
 	k.Logger().Debug("Checking JWKs...")
@@ -210,6 +302,15 @@ func (k *JWTMiddleware) getSecretFromURL(url string, kidVal interface{}, keyType
 		return keys[0].Key, nil
 	}
 	return nil, errors.New("No matching KID could be found")
+}
+
+func (k *JWTMiddleware) findCacheTimeoutByURL(url string) int64 {
+	for _, uri := range k.Spec.JWTJwksURIs {
+		if uri.URL == url {
+			return uri.CacheTimeout
+		}
+	}
+	return cache.DefaultExpiration
 }
 
 func (k *JWTMiddleware) getIdentityFromToken(token *jwt.Token) (string, error) {
@@ -279,6 +380,22 @@ func (k *JWTMiddleware) specCacheKey(spec *APISpec, prefix string) string {
 	return prefix + spec.APIID + spec.OrgID
 }
 
+func (k *JWTMiddleware) collectCachedJWKsFromCache(jwkURIs []apidef.JWK) (jwkSets []*jose.JSONWebKeySet) {
+	jwkCache := k.loadOrCreateJWKCache()
+	for _, jwkURI := range jwkURIs {
+		cachedItem, ok := jwkCache.Get(jwkURI.URL)
+		if !ok {
+			continue
+		}
+		jwkSet, ok := cachedItem.(*jose.JSONWebKeySet)
+		if !ok {
+			k.Logger().Warnf("Invalid JWK cache format for APIID %s, URL %s — ignoring", k.Spec.APIID, jwkURI.URL)
+		}
+		jwkSets = append(jwkSets, jwkSet)
+	}
+	return jwkSets
+}
+
 func (k *JWTMiddleware) getSecretFromMultipleJWKURIs(jwkURIs []apidef.JWK, kidVal interface{}, keyType string) (interface{}, error) {
 	if !k.Spec.APIDefinition.IsOAS {
 		err := errors.New("this feature is only available when using OAS API")
@@ -300,7 +417,7 @@ func (k *JWTMiddleware) getSecretFromMultipleJWKURIs(jwkURIs []apidef.JWK, kidVa
 	cacheAPIDef := k.specCacheKey(k.Spec, JWKsAPIDef)
 	cacheOutdated := false
 
-	cachedAPIDefRaw, foundDef := JWKCache.Get(cacheAPIDef)
+	cachedAPIDefRaw, foundDef := k.loadOrCreateJWKCache().Get(cacheAPIDef)
 	if foundDef {
 		cachedAPIDef, ok := cachedAPIDefRaw.(*apidef.APIDefinition)
 		if !ok {
@@ -311,35 +428,50 @@ func (k *JWTMiddleware) getSecretFromMultipleJWKURIs(jwkURIs []apidef.JWK, kidVa
 			k.Logger().Infof("Detected change in JWK URLs — refreshing cache for APIID %s", k.Spec.APIID)
 			cacheOutdated = true
 		} else {
-			cachedJWKs, foundJWKs := JWKCache.Get(k.Spec.APIID)
-			if foundJWKs {
-				jwkSets, ok = cachedJWKs.([]*jose.JSONWebKeySet)
-				if !ok {
-					k.Logger().Warnf("Invalid JWK cache format for APIID %s — ignoring", k.Spec.APIID)
-
-					jwkSets = nil
-				}
-			}
+			jwkSets = k.collectCachedJWKsFromCache(jwkURIs)
 		}
 	}
 
 	if !foundDef || cacheOutdated || len(jwkSets) == 0 {
 		jwkSets = nil
+		jwkCache := k.loadOrCreateJWKCache()
+		jwkCache.Flush()
+
+		// Create client factory for JWK fetching
+		clientFactory := NewExternalHTTPClientFactory(k.Gw)
+		client, clientErr := clientFactory.CreateJWKClient()
+
 		for _, jwk := range jwkURIs {
-			jwkSet, err := GetJWK(jwk.URL, k.Gw.GetConfig().JWTSSLInsecureSkipVerify)
+			var jwkSet *jose.JSONWebKeySet
+			var err error
+
+			// Try with factory client first
+			if clientErr == nil {
+				jwkSet, err = getJWKWithClient(jwk.URL, client)
+			}
+
+			// Fallback to original method if factory fails
+			if clientErr != nil || err != nil {
+				jwkSet, err = GetJWK(jwk.URL, k.Gw.GetConfig().JWTSSLInsecureSkipVerify)
+			}
+
 			if err != nil {
 				k.Logger().WithError(err).Infof("Failed to fetch or decode JWKs from %s", jwk.URL)
 				fallbackJWKURIs = append(fallbackJWKURIs, jwk)
 				continue
 			}
 
+			cacheTimeout := int64(cache.DefaultExpiration)
+			if jwk.CacheTimeout >= 0 {
+				cacheTimeout = jwk.CacheTimeout
+			}
+			jwkCache.Set(jwk.URL, jwkSet, cacheTimeout)
 			jwkSets = append(jwkSets, jwkSet)
 		}
 
 		if len(jwkSets) > 0 {
 			k.Logger().Debugf("Caching %d JWK sets for APIID %s", len(jwkSets), k.Spec.APIID)
-			JWKCache.Set(k.Spec.APIID, jwkSets, cache.DefaultExpiration)
-			JWKCache.Set(cacheAPIDef, k.Spec.APIDefinition, cache.DefaultExpiration)
+			k.loadOrCreateJWKCache().Set(cacheAPIDef, k.Spec.APIDefinition, cache.DefaultExpiration)
 		}
 	}
 
@@ -1348,30 +1480,7 @@ func getJWK(url string, jwtSSLInsecureSkipVerify bool) (*jose.JSONWebKeySet, err
 		},
 	}
 
-	// Get the JWK
-	log.Debug("Pulling JWK")
-	resp, err := client.Get(url)
-	if err != nil {
-		log.WithError(err).Error("Failed to get resource URL")
-		return nil, err
-	}
-
-	defer func() {
-		_ = resp.Body.Close()
-	}()
-
-	buf, err := io.ReadAll(resp.Body)
-	if err != nil {
-		log.WithError(err).Error("Failed to get read response body")
-		return nil, err
-	}
-
-	jwkSet, err := parseJWK(buf)
-	if err != nil {
-		return nil, err
-	}
-
-	return jwkSet, nil
+	return getJWKWithClient(url, &client)
 }
 
 // timeValidateJWTClaims validates JWT with provided clock skew, to overcome skew occurred with distributed systems.
@@ -1438,4 +1547,25 @@ func getUserIDFromClaim(claims jwt.MapClaims, identityBaseField string, shouldFa
 
 	log.Error(ErrNoSuitableUserIDClaimFound)
 	return "", ErrNoSuitableUserIDClaimFound
+}
+
+func (gw *Gateway) invalidateJWKSCacheForAPIID(w http.ResponseWriter, r *http.Request) {
+	apiID := mux.Vars(r)["apiID"]
+	raw, ok := JWKCaches.Load(apiID)
+	if ok {
+		jwkCache, interfaceOK := raw.(cache.Repository)
+		if !interfaceOK {
+			panic("JWKCache must implement cache.Repository")
+		}
+		jwkCache.Flush()
+	}
+	// Cache invalidation is idempotent: calling it ensures the key is absent,
+	// regardless of whether it was cached before or not.
+	doJSONWrite(w, http.StatusOK, apiOk("cache invalidated"))
+}
+
+func (gw *Gateway) invalidateJWKSCacheForAllAPIs(w http.ResponseWriter, _ *http.Request) {
+	JWKCaches.Clear()
+
+	doJSONWrite(w, http.StatusOK, apiOk("cache invalidated"))
 }
