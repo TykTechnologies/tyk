@@ -17,7 +17,7 @@ import (
 const (
 	// SecurityProcessingModeLegacy processes only the first security requirement and uses BaseIdentityProvider
 	SecurityProcessingModeLegacy = "legacy"
-	
+
 	// SecurityProcessingModeCompliant processes all security requirements with OR logic and uses dynamic identity provider
 	SecurityProcessingModeCompliant = "compliant"
 )
