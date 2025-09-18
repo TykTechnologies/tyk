@@ -1003,6 +1003,20 @@ func isProprietaryAuth(authMethod string) bool {
 
 func (s *OAS) fillSecurity(api apidef.APIDefinition) {
 	tykAuthentication := s.GetTykExtension().Server.Authentication
+
+	// For OAS import: don't create authentication if none exists and the API is keyless
+	// This preserves the import behavior where authentication is only added when explicitly requested
+	if tykAuthentication == nil && api.UseKeylessAccess {
+		// If there are no auth configs or security requirements, skip creating authentication
+		// This handles the case where an OAS is imported without the authentication query parameter
+		if len(api.AuthConfigs) == 0 && len(api.SecurityRequirements) == 0 {
+			if s.T.Components == nil {
+				s.T.Components = &openapi3.Components{}
+			}
+			return
+		}
+	}
+
 	if tykAuthentication == nil {
 		tykAuthentication = &Authentication{}
 		s.GetTykExtension().Server.Authentication = tykAuthentication
@@ -1014,8 +1028,8 @@ func (s *OAS) fillSecurity(api apidef.APIDefinition) {
 
 	tykAuthentication.Fill(api)
 
-	if s.Components == nil {
-		s.Components = &openapi3.Components{}
+	if s.T.Components == nil {
+		s.T.Components = &openapi3.Components{}
 	}
 
 	s.fillToken(api)
