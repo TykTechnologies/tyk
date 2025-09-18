@@ -5,8 +5,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/samber/lo"
 	"strings"
+
+	"github.com/samber/lo"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
@@ -255,6 +256,9 @@ func (s *OAS) getTykJWTAuth(name string) (jwt *JWT) {
 	return
 }
 
+// getTykBasicAuth retrieves the Basic auth configuration from Tyk extension.
+// It handles both typed (*Basic) and untyped (map[string]interface{}) security schemes.
+// When an untyped scheme is found, it converts it to *Basic and caches the result.
 func (s *OAS) getTykBasicAuth(name string) (basic *Basic) {
 	securityScheme := s.getTykSecurityScheme(name)
 	if securityScheme == nil {
@@ -265,10 +269,12 @@ func (s *OAS) getTykBasicAuth(name string) (basic *Basic) {
 	if basicVal, ok := securityScheme.(*Basic); ok {
 		basic = basicVal
 	} else {
-		toStructIfMap(securityScheme, basic)
+		// Security scheme is stored as map[string]interface{}, convert it to Basic struct
+		if toStructIfMap(securityScheme, basic) {
+			// Cache the converted struct for future use
+			s.getTykSecuritySchemes()[name] = basic
+		}
 	}
-
-	s.getTykSecuritySchemes()[name] = basic
 
 	return
 }

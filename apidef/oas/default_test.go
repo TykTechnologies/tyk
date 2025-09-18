@@ -1554,6 +1554,73 @@ func TestOAS_BuildDefaultTykExtension(t *testing.T) {
 		assert.NotNil(t, err)
 		assert.Contains(t, err.Error(), "server URL contains undefined variables")
 	})
+
+	t.Run("build tyk extension with SecurityProcessingMode override", func(t *testing.T) {
+		// Test case 1: SecurityProcessingMode when Authentication is nil
+		oasDef := OAS{
+			T: openapi3.T{
+				Info: &openapi3.Info{
+					Title: "OAS API with Security",
+				},
+				Servers: openapi3.Servers{
+					{
+						URL: "https://example-org.com/api",
+					},
+				},
+			},
+		}
+
+		err := oasDef.BuildDefaultTykExtension(TykExtensionConfigParams{
+			SecurityProcessingMode: SecurityProcessingModeCompliant,
+		}, true)
+		assert.NoError(t, err)
+
+		tykExt := oasDef.GetTykExtension()
+		assert.NotNil(t, tykExt.Server.Authentication)
+		assert.Equal(t, SecurityProcessingModeCompliant, tykExt.Server.Authentication.SecurityProcessingMode)
+
+		// Test case 2: SecurityProcessingMode when Authentication already exists
+		oasDef2 := OAS{
+			T: openapi3.T{
+				Info: &openapi3.Info{
+					Title: "OAS API with Existing Auth",
+				},
+				Servers: openapi3.Servers{
+					{
+						URL: "https://example-org.com/api",
+					},
+				},
+			},
+		}
+
+		// Set up existing authentication
+		oasDef2.SetTykExtension(&XTykAPIGateway{
+			Server: Server{
+				Authentication: &Authentication{
+					Enabled: true,
+				},
+			},
+			Upstream: Upstream{
+				URL: "https://example-org.com/api",
+			},
+			Info: Info{
+				Name: "OAS API with Existing Auth",
+				State: State{
+					Active: true,
+				},
+			},
+		})
+
+		err = oasDef2.BuildDefaultTykExtension(TykExtensionConfigParams{
+			SecurityProcessingMode: SecurityProcessingModeLegacy,
+		}, true)
+		assert.NoError(t, err)
+
+		tykExt2 := oasDef2.GetTykExtension()
+		assert.NotNil(t, tykExt2.Server.Authentication)
+		assert.Equal(t, SecurityProcessingModeLegacy, tykExt2.Server.Authentication.SecurityProcessingMode)
+		assert.True(t, tykExt2.Server.Authentication.Enabled)
+	})
 }
 
 func TestGetTykExtensionConfigParams(t *testing.T) {

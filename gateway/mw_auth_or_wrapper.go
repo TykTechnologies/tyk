@@ -2,6 +2,8 @@ package gateway
 
 import (
 	"net/http"
+
+	"github.com/TykTechnologies/tyk/apidef/oas"
 )
 
 // AuthORWrapper is a middleware that handles OR logic for multiple authentication methods.
@@ -14,12 +16,17 @@ type AuthORWrapper struct {
 
 // ProcessRequest handles the OR logic for authentication
 func (a *AuthORWrapper) ProcessRequest(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
-	logger := a.Logger()
-	logger.Debugf("OR wrapper processing with %d middlewares, %d security requirements",
-		len(a.authMiddlewares), len(a.Spec.SecurityRequirements))
+	// Determine processing mode (OAS-only feature)
+	processingMode := oas.SecurityProcessingModeLegacy
+	if a.Spec.IsOAS && a.Spec.OAS.GetTykExtension() != nil {
+		if auth := a.Spec.OAS.GetTykExtension().Server.Authentication; auth != nil && auth.SecurityProcessingMode != "" {
+			processingMode = auth.SecurityProcessingMode
+		}
+	}
 
+	// Single or no requirements: always use AND logic
 	if len(a.Spec.SecurityRequirements) <= 1 {
-		logger.Debug("Using AND logic (single or no security requirement)")
+
 		for _, mw := range a.authMiddlewares {
 			if err, code := mw.ProcessRequest(w, r, nil); err != nil {
 				return err, code
@@ -28,13 +35,23 @@ func (a *AuthORWrapper) ProcessRequest(w http.ResponseWriter, r *http.Request, _
 		return nil, http.StatusOK
 	}
 
-	logger.Debugf("Using OR logic with %d auth middlewares", len(a.authMiddlewares))
+	if processingMode == "" || processingMode == oas.SecurityProcessingModeLegacy {
+
+		for _, mw := range a.authMiddlewares {
+			if err, code := mw.ProcessRequest(w, r, nil); err != nil {
+				return err, code
+			}
+		}
+		return nil, http.StatusOK
+	}
+
+	// Compliant mode with multiple requirements: Use OR logic
 
 	var lastError error
 	var lastCode int
 
 	for i, mw := range a.authMiddlewares {
-		logger.Debugf("Trying auth middleware %d: %T", i, mw)
+		a.Logger().Debugf("OR wrapper: trying auth method %d/%d: %s", i+1, len(a.authMiddlewares), mw.Name())
 
 		// Clone the request to avoid side effects from failed auth attempts
 		// Each middleware gets a clean request without modifications from previous attempts
@@ -42,20 +59,18 @@ func (a *AuthORWrapper) ProcessRequest(w http.ResponseWriter, r *http.Request, _
 
 		err, code := mw.ProcessRequest(w, rClone, nil)
 		if err == nil {
-			logger.Debugf("Auth middleware %d succeeded", i)
+			a.Logger().Debugf("OR wrapper: auth method %s succeeded", mw.Name())
 
 			if session := ctxGetSession(rClone); session != nil {
 				ctxSetSession(r, session, false, a.Gw.GetConfig().HashKeys)
 			}
 
-			// Copy any other important context values from the successful attempt back to the original request
 			*r = *rClone
 
 			return nil, http.StatusOK
 		}
 
-		logger.Debugf("Auth middleware %d failed: %v (code: %d)", i, err, code)
-
+		a.Logger().Debugf("OR wrapper: auth method %s failed with error: %v (code: %d)", mw.Name(), err, code)
 		lastError = err
 		lastCode = code
 	}
@@ -70,18 +85,19 @@ func (a *AuthORWrapper) Name() string {
 
 // EnabledForSpec checks if the middleware is enabled for the API spec
 func (a *AuthORWrapper) EnabledForSpec() bool {
+	// AuthORWrapper is only used when there are multiple security requirements
+	// or when we need special processing. With a single requirement,
+	// the auth middlewares are added directly to the chain.
 	return len(a.Spec.SecurityRequirements) > 1 && len(a.authMiddlewares) > 1
 }
 
 // Init initializes the AuthORWrapper middleware
 func (a *AuthORWrapper) Init() {
-	logger := a.Logger()
 	spec := a.Spec
 
 	a.authMiddlewares = []TykMiddleware{}
 
 	if spec.EnableJWT {
-		logger.Debug("Adding JWT middleware to OR wrapper")
 		jwtMw := &JWTMiddleware{BaseMiddleware: a.BaseMiddleware.Copy()}
 		jwtMw.Spec = spec
 		jwtMw.Gw = a.Gw
@@ -90,7 +106,6 @@ func (a *AuthORWrapper) Init() {
 	}
 
 	if spec.UseBasicAuth {
-		logger.Debug("Adding Basic Auth middleware to OR wrapper")
 		basicMw := &BasicAuthKeyIsValid{BaseMiddleware: a.BaseMiddleware.Copy()}
 		basicMw.Spec = spec
 		basicMw.Gw = a.Gw
@@ -99,7 +114,6 @@ func (a *AuthORWrapper) Init() {
 	}
 
 	if spec.EnableSignatureChecking {
-		logger.Debug("Adding HMAC middleware to OR wrapper")
 		hmacMw := &HTTPSignatureValidationMiddleware{BaseMiddleware: a.BaseMiddleware.Copy()}
 		hmacMw.Spec = spec
 		hmacMw.Gw = a.Gw
@@ -108,7 +122,6 @@ func (a *AuthORWrapper) Init() {
 	}
 
 	if spec.UseOauth2 {
-		logger.Debug("Adding OAuth middleware to OR wrapper")
 		oauthMw := &Oauth2KeyExists{BaseMiddleware: a.BaseMiddleware.Copy()}
 		oauthMw.Spec = spec
 		oauthMw.Gw = a.Gw
@@ -118,7 +131,6 @@ func (a *AuthORWrapper) Init() {
 
 	// Always add standard auth (API key) if enabled or as fallback
 	if spec.UseStandardAuth || len(a.authMiddlewares) == 0 {
-		logger.Debug("Adding API Key middleware to OR wrapper")
 		authKeyMw := &AuthKey{BaseMiddleware: a.BaseMiddleware.Copy()}
 		authKeyMw.Spec = spec
 		authKeyMw.Gw = a.Gw
@@ -126,5 +138,4 @@ func (a *AuthORWrapper) Init() {
 		a.authMiddlewares = append(a.authMiddlewares, authKeyMw)
 	}
 
-	logger.Debugf("AuthORWrapper.Init completed with %d middlewares", len(a.authMiddlewares))
 }
