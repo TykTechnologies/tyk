@@ -139,11 +139,11 @@ func (s *OAS) BuildDefaultTykExtension(overRideValues TykExtensionConfigParams, 
 			return err
 		}
 	}
-	
+
 	if overRideValues.SecurityProcessingMode != "" {
 		authExists := xTykAPIGateway.Server.Authentication != nil
 		authEnabled := overRideValues.Authentication != nil && *overRideValues.Authentication
-		
+
 		if authEnabled || (!isImport && authExists) || (isImport && authExists) {
 			if xTykAPIGateway.Server.Authentication == nil {
 				xTykAPIGateway.Server.Authentication = &Authentication{}

@@ -1138,7 +1138,7 @@ func (s *OAS) extractSecurityTo(api *apidef.APIDefinition) {
 	if s.getTykAuthentication() != nil && s.getTykAuthentication().SecurityProcessingMode != "" {
 		processingMode = s.getTykAuthentication().SecurityProcessingMode
 	}
-	
+
 	if !wasNil {
 		if processingMode == SecurityProcessingModeCompliant {
 			api.SecurityRequirements = make([][]string, 0)
