@@ -379,11 +379,11 @@ dockers:
       - "policies"
       - "coprocess"
       - "tyk.conf.example"
-  # Build tykio/tyk-gateway-fips fips (amd64)
+  # Build tykio/tyk-gateway fips (amd64)
   - ids:
       - fips-amd64
     image_templates:
-      - "tykio/tyk-gateway-fips:{{.Tag}}-fips-amd64"
+      - "tykio/tyk-gateway:{{.Tag}}-fips-amd64"
     build_flag_templates:
       - "--build-arg=PORTS=8080"
       - "--build-arg=BUILD_PACKAGE_NAME=tyk-gateway-fips"
@@ -480,16 +480,16 @@ docker_manifests:
     image_templates:
       - tykio/tyk-gateway-ee:{{`{{ .Tag }}`}}-ee-amd64
       - tykio/tyk-gateway-ee:{{`{{ .Tag }}`}}-ee-arm64
-  # Single-arch manifest for tykio/tyk-gateway-fips fips
-  - name_template: tykio/tyk-gateway-fips:{{ .Tag }}-fips
+  # Single-arch manifest for tykio/tyk-gateway fips
+  - name_template: tykio/tyk-gateway:{{ .Tag }}-fips
     image_templates:
-      - tykio/tyk-gateway-fips:{{`{{ .Tag }}`}}-fips-amd64
-  - name_template: tykio/tyk-gateway-fips:v{{ .Major }}.{{ .Minor }}{{.Prerelease}}-fips
+      - tykio/tyk-gateway:{{`{{ .Tag }}`}}-fips-amd64
+  - name_template: tykio/tyk-gateway:v{{ .Major }}.{{ .Minor }}{{.Prerelease}}-fips
     image_templates:
-      - tykio/tyk-gateway-fips:{{`{{ .Tag }}`}}-fips-amd64
-  - name_template: tykio/tyk-gateway-fips:v{{ .Major }}{{.Prerelease}}-fips
+      - tykio/tyk-gateway:{{`{{ .Tag }}`}}-fips-amd64
+  - name_template: tykio/tyk-gateway:v{{ .Major }}{{.Prerelease}}-fips
     image_templates:
-      - tykio/tyk-gateway-fips:{{`{{ .Tag }}`}}-fips-amd64
+      - tykio/tyk-gateway:{{`{{ .Tag }}`}}-fips-amd64
   # Multi-arch manifest for tykio/tyk-gateway std
   - name_template: tykio/tyk-gateway:{{ .Tag }}
     image_templates:
