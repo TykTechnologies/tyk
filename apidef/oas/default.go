@@ -133,10 +133,15 @@ func (s *OAS) BuildDefaultTykExtension(overRideValues TykExtensionConfigParams, 
 		xTykAPIGateway.Upstream.URL = upstreamURL
 	}
 
-	if overRideValues.Authentication != nil {
+	if overRideValues.Authentication != nil && *overRideValues.Authentication {
 		err := s.importAuthentication(*overRideValues.Authentication)
 		if err != nil {
 			return err
+		}
+	} else {
+		s.Security = nil
+		if s.Components != nil {
+			s.Components.SecuritySchemes = nil
 		}
 	}
 
