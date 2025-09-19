@@ -200,11 +200,11 @@ jobs:
             BUILD_PACKAGE_NAME=tyk-gateway-ee
       - name: Docker metadata for fips CI
         id: ci_metadata_fips
-        if: ${{ matrix.golang_cross == '1.23-bullseye' }}
+        if: ${{ matrix.golang_cross == '1.24-bullseye' }}
         uses: docker/metadata-action@v5
         with:
           images: |
-            ${{ steps.ecr.outputs.registry }}/tyk-fips
+            ${{ steps.ecr.outputs.registry }}/tyk
           flavor: |
             latest=false
           tags: |
@@ -215,11 +215,11 @@ jobs:
             type=semver,pattern={{major}}.{{minor}},prefix=v
             type=semver,pattern={{version}},prefix=v
       - name: push fips image to CI
-        if: ${{ matrix.golang_cross == '1.23-bullseye' }}
+        if: ${{ matrix.golang_cross == '1.24-bullseye' }}
         uses: docker/build-push-action@v6
         with:
           context: "dist"
-          platforms: linux/amd64,linux/arm64
+          platforms: linux/amd64
           file: ci/Dockerfile.distroless
           provenance: mode=max
           sbom: true
@@ -235,7 +235,7 @@ jobs:
         uses: docker/metadata-action@v5
         with:
           images: |
-            tykio/tyk-gateway-fips
+            tykio/tyk-gateway
           flavor: |
             latest=false
             prefix=v
@@ -248,11 +248,11 @@ jobs:
             org.opencontainers.image.vendor=tyk.io
             org.opencontainers.image.version=${{ github.ref_name }}
       - name: push fips image to prod
-        if: ${{ matrix.golang_cross == '1.23-bullseye' }}
+        if: ${{ matrix.golang_cross == '1.24-bullseye' }}
         uses: docker/build-push-action@v6
         with:
           context: "dist"
-          platforms: linux/amd64,linux/arm64
+          platforms: linux/amd64
           file: ci/Dockerfile.distroless
           provenance: mode=max
           sbom: true
