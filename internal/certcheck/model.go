@@ -18,10 +18,10 @@ type APIMetaData struct {
 
 // CertInfo is a structure that holds information about a certificate.
 type CertInfo struct {
-	ID               string
-	CommonName       string
-	NotAfter         time.Time
-	HoursUntilExpiry int
+	ID              string
+	CommonName      string
+	NotAfter        time.Time
+	TimeUntilExpiry time.Duration
 }
 
 // EventCertificateExpiringSoonMeta is the metadata structure for certificate expiration events.

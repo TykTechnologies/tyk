@@ -437,10 +437,10 @@ func TestCertificateExpiryCheckBatcher(t *testing.T) {
 				now := time.Now()
 				expiry := now.Add(48 * time.Hour)
 				err = batcher.Add(CertInfo{
-					ID:               "test-cert-id",
-					HoursUntilExpiry: 48,
-					NotAfter:         expiry,
-					CommonName:       "test-cert",
+					ID:              "test-cert-id",
+					TimeUntilExpiry: 48 * time.Hour,
+					NotAfter:        expiry,
+					CommonName:      "test-cert",
 				})
 				require.NoError(t, err)
 
@@ -493,10 +493,10 @@ func TestCertificateExpiryCheckBatcher(t *testing.T) {
 				now := time.Now()
 				expiredSince := now.Add(-50 * time.Hour)
 				err = batcher.Add(CertInfo{
-					ID:               "test-cert-id",
-					HoursUntilExpiry: -50,
-					NotAfter:         expiredSince,
-					CommonName:       "test-cert",
+					ID:              "test-cert-id",
+					TimeUntilExpiry: -50 * time.Hour,
+					NotAfter:        expiredSince,
+					CommonName:      "test-cert",
 				})
 				require.NoError(t, err)
 
@@ -573,10 +573,10 @@ func TestCertificateExpiryCheckBatcher(t *testing.T) {
 				now := time.Now()
 				expiry := now.Add(48 * time.Hour)
 				err = batcher.Add(CertInfo{
-					ID:               "test-cert-id",
-					HoursUntilExpiry: 48,
-					NotAfter:         expiry,
-					CommonName:       "test-cert",
+					ID:              "test-cert-id",
+					TimeUntilExpiry: 48 * time.Hour,
+					NotAfter:        expiry,
+					CommonName:      "test-cert",
 				})
 				require.NoError(t, err)
 
@@ -653,10 +653,10 @@ func TestCertificateExpiryCheckBatcher(t *testing.T) {
 				now := time.Now()
 				expiry := now.Add(48 * time.Hour)
 				err = batcher.Add(CertInfo{
-					ID:               "test-cert-id",
-					HoursUntilExpiry: 48,
-					NotAfter:         expiry,
-					CommonName:       "test-cert",
+					ID:              "test-cert-id",
+					TimeUntilExpiry: 48 * time.Hour,
+					NotAfter:        expiry,
+					CommonName:      "test-cert",
 				})
 				require.NoError(t, err)
 
