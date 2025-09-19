@@ -1595,3 +1595,113 @@ func TestCompliantModeSecuritySeparation(t *testing.T) {
 		assert.Equal(t, SecurityProcessingModeCompliant, auth.SecurityProcessingMode)
 	})
 }
+
+func TestOAS_fillSecurity_KeylessAPIConditionalAuth(t *testing.T) {
+	t.Run("should skip authentication creation for keyless API with no auth configs or security requirements", func(t *testing.T) {
+		var api apidef.APIDefinition
+		api.UseKeylessAccess = true
+
+		var oas OAS
+		oas.SetTykExtension(&XTykAPIGateway{})
+		oas.fillSecurity(api)
+
+		assert.Nil(t, oas.GetTykExtension().Server.Authentication)
+		assert.NotNil(t, oas.T.Components)
+	})
+
+	t.Run("should create authentication for keyless API with auth configs", func(t *testing.T) {
+		var api apidef.APIDefinition
+		api.UseKeylessAccess = true
+		api.AuthConfigs = map[string]apidef.AuthConfig{
+			apidef.AuthTokenType: {
+				Name:           "token-auth",
+				AuthHeaderName: "X-API-Key",
+			},
+		}
+
+		var oas OAS
+		oas.SetTykExtension(&XTykAPIGateway{})
+		oas.fillSecurity(api)
+
+		assert.NotNil(t, oas.GetTykExtension().Server.Authentication)
+		assert.NotNil(t, oas.GetTykExtension().Server.Authentication.SecuritySchemes)
+	})
+
+	t.Run("should create authentication for keyless API with security requirements", func(t *testing.T) {
+		var api apidef.APIDefinition
+		api.UseKeylessAccess = true
+		api.SecurityRequirements = [][]string{
+			{"token-auth"},
+		}
+
+		var oas OAS
+		oas.SetTykExtension(&XTykAPIGateway{})
+		oas.fillSecurity(api)
+
+		assert.NotNil(t, oas.GetTykExtension().Server.Authentication)
+	})
+
+	t.Run("should create authentication for non-keyless API even without configs", func(t *testing.T) {
+		var api apidef.APIDefinition
+		api.UseKeylessAccess = false
+
+		var oas OAS
+		oas.SetTykExtension(&XTykAPIGateway{})
+		oas.fillSecurity(api)
+
+		assert.NotNil(t, oas.GetTykExtension().Server.Authentication)
+	})
+}
+
+func TestOAS_FillSecurityKeylessAPI(t *testing.T) {
+	t.Run("keyless API without auth configs should not create authentication", func(t *testing.T) {
+		api := apidef.APIDefinition{
+			UseKeylessAccess:     true,
+			AuthConfigs:          map[string]apidef.AuthConfig{},
+			SecurityRequirements: [][]string{},
+		}
+
+		oas := OAS{}
+		oas.SetTykExtension(&XTykAPIGateway{})
+
+		oas.fillSecurity(api)
+		tykExt := oas.GetTykExtension()
+		assert.Nil(t, tykExt.Server.Authentication,
+			"fillSecurity should not create authentication for keyless API without auth configs")
+	})
+
+	t.Run("keyless API with auth configs should create authentication", func(t *testing.T) {
+		api := apidef.APIDefinition{
+			UseKeylessAccess: true,
+			AuthConfigs: map[string]apidef.AuthConfig{
+				"test": {Name: "test"},
+			},
+			SecurityRequirements: [][]string{},
+		}
+
+		oas := OAS{}
+		oas.SetTykExtension(&XTykAPIGateway{})
+
+		oas.fillSecurity(api)
+		tykExt := oas.GetTykExtension()
+		assert.NotNil(t, tykExt.Server.Authentication,
+			"fillSecurity should create authentication for keyless API with auth configs")
+	})
+
+	t.Run("non-keyless API should create authentication", func(t *testing.T) {
+		api := apidef.APIDefinition{
+			UseKeylessAccess:     false,
+			UseBasicAuth:         true,
+			AuthConfigs:          map[string]apidef.AuthConfig{},
+			SecurityRequirements: [][]string{},
+		}
+
+		oas := OAS{}
+		oas.SetTykExtension(&XTykAPIGateway{})
+
+		oas.fillSecurity(api)
+		tykExt := oas.GetTykExtension()
+		assert.NotNil(t, tykExt.Server.Authentication,
+			"fillSecurity should create authentication for non-keyless API")
+	})
+}

@@ -1556,7 +1556,7 @@ func TestOAS_BuildDefaultTykExtension(t *testing.T) {
 	})
 
 	t.Run("build tyk extension with SecurityProcessingMode override", func(t *testing.T) {
-		// Test case 1: SecurityProcessingMode when Authentication is nil
+		authEnabled := true
 		oasDef := OAS{
 			T: openapi3.T{
 				Info: &openapi3.Info{
@@ -1567,10 +1567,26 @@ func TestOAS_BuildDefaultTykExtension(t *testing.T) {
 						URL: "https://example-org.com/api",
 					},
 				},
+				Security: openapi3.SecurityRequirements{
+					{
+						"apiKey": []string{},
+					},
+				},
+				Components: &openapi3.Components{
+					SecuritySchemes: openapi3.SecuritySchemes{
+						"apiKey": &openapi3.SecuritySchemeRef{
+							Value: &openapi3.SecurityScheme{
+								Type:   "http",
+								Scheme: "basic",
+							},
+						},
+					},
+				},
 			},
 		}
 
 		err := oasDef.BuildDefaultTykExtension(TykExtensionConfigParams{
+			Authentication:         &authEnabled,
 			SecurityProcessingMode: SecurityProcessingModeCompliant,
 		}, true)
 		assert.NoError(t, err)
@@ -1579,7 +1595,27 @@ func TestOAS_BuildDefaultTykExtension(t *testing.T) {
 		assert.NotNil(t, tykExt.Server.Authentication)
 		assert.Equal(t, SecurityProcessingModeCompliant, tykExt.Server.Authentication.SecurityProcessingMode)
 
-		// Test case 2: SecurityProcessingMode when Authentication already exists
+		oasDefNoAuth := OAS{
+			T: openapi3.T{
+				Info: &openapi3.Info{
+					Title: "OAS API without Auth",
+				},
+				Servers: openapi3.Servers{
+					{
+						URL: "https://example-org.com/api",
+					},
+				},
+			},
+		}
+
+		err = oasDefNoAuth.BuildDefaultTykExtension(TykExtensionConfigParams{
+			SecurityProcessingMode: SecurityProcessingModeCompliant,
+		}, true)
+		assert.NoError(t, err)
+
+		tykExtNoAuth := oasDefNoAuth.GetTykExtension()
+		assert.Nil(t, tykExtNoAuth.Server.Authentication, "Authentication should not be created when auth is not explicitly enabled during import")
+
 		oasDef2 := OAS{
 			T: openapi3.T{
 				Info: &openapi3.Info{
@@ -1593,7 +1629,6 @@ func TestOAS_BuildDefaultTykExtension(t *testing.T) {
 			},
 		}
 
-		// Set up existing authentication
 		oasDef2.SetTykExtension(&XTykAPIGateway{
 			Server: Server{
 				Authentication: &Authentication{
@@ -2323,5 +2358,209 @@ func TestRetainOldServerURL(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			assert.EqualValues(t, tt.want, RetainOldServerURL(tt.args.oldServers, tt.args.newServers))
 		})
+	}
+}
+
+func TestOAS_ImportWithoutAuthenticationParameter(t *testing.T) {
+	t.Run("OAS with security but no auth parameter should not create authentication", func(t *testing.T) {
+		oas := createOASWithSecurityForImport()
+
+		params := TykExtensionConfigParams{
+			ListenPath: "/test",
+			AllowList:  boolPtr(false),
+		}
+
+		err := oas.BuildDefaultTykExtension(params, true)
+		assert.NoError(t, err)
+
+		assert.NotNil(t, oas.Security, "Security should be preserved in OAS document")
+		assert.NotNil(t, oas.Components.SecuritySchemes, "SecuritySchemes should be preserved in OAS document")
+
+		var api apidef.APIDefinition
+		oas.ExtractTo(&api)
+
+		assert.True(t, api.UseKeylessAccess, "API should be keyless when authentication is not enabled")
+		assert.False(t, api.UseBasicAuth, "Basic auth should not be enabled")
+		assert.False(t, api.EnableJWT, "JWT should not be enabled")
+		assert.False(t, api.UseStandardAuth, "Standard auth should not be enabled")
+		assert.Empty(t, api.SecurityRequirements, "Security requirements should be empty")
+
+		oasResult := OAS{}
+		oasResult.Fill(api)
+
+		tykExt := oasResult.GetTykExtension()
+		assert.NotNil(t, tykExt, "Tyk extension should exist")
+		assert.Nil(t, tykExt.Server.Authentication,
+			"Authentication should NOT be created when API is keyless - this was the regression bug")
+	})
+
+	t.Run("OAS with security and auth=true should create authentication", func(t *testing.T) {
+		oas := createOASWithSecurityForImport()
+
+		params := TykExtensionConfigParams{
+			ListenPath:     "/test",
+			Authentication: boolPtr(true),
+		}
+
+		err := oas.BuildDefaultTykExtension(params, true)
+		assert.NoError(t, err)
+		assert.NotNil(t, oas.Security, "Security should be preserved when authentication=true")
+		assert.NotNil(t, oas.Components.SecuritySchemes, "SecuritySchemes should be preserved")
+
+		var api apidef.APIDefinition
+		oas.ExtractTo(&api)
+		assert.False(t, api.UseKeylessAccess, "API should not be keyless")
+		assert.True(t, api.UseBasicAuth, "Basic auth should be enabled")
+		assert.NotEmpty(t, api.SecurityRequirements, "Security requirements should exist")
+
+		oasResult := OAS{}
+		oasResult.Fill(api)
+		tykExt := oasResult.GetTykExtension()
+		assert.NotNil(t, tykExt, "Tyk extension should exist")
+		assert.NotNil(t, tykExt.Server.Authentication, "Authentication should be created")
+		assert.NotNil(t, tykExt.Server.Authentication.SecuritySchemes, "SecuritySchemes should exist")
+	})
+
+	t.Run("OAS with security and auth=false should not create authentication", func(t *testing.T) {
+		oas := createOASWithSecurityForImport()
+
+		params := TykExtensionConfigParams{
+			ListenPath:     "/test",
+			Authentication: boolPtr(false),
+		}
+
+		err := oas.BuildDefaultTykExtension(params, true)
+		assert.NoError(t, err)
+		assert.NotNil(t, oas.Security, "Security should be preserved in OAS document")
+		assert.NotNil(t, oas.Components.SecuritySchemes, "SecuritySchemes should be preserved in OAS document")
+
+		var api apidef.APIDefinition
+		oas.ExtractTo(&api)
+		assert.True(t, api.UseKeylessAccess, "API should be keyless")
+		assert.False(t, api.UseBasicAuth, "Basic auth should not be enabled")
+
+		oasResult := OAS{}
+		oasResult.Fill(api)
+		tykExt := oasResult.GetTykExtension()
+		assert.NotNil(t, tykExt, "Tyk extension should exist")
+		assert.Nil(t, tykExt.Server.Authentication, "Authentication should NOT be created")
+	})
+
+	t.Run("OAS without security and no auth parameter should not create authentication", func(t *testing.T) {
+		oas := OAS{
+			T: openapi3.T{
+				OpenAPI: "3.0.1",
+				Info: &openapi3.Info{
+					Title:   "test-api",
+					Version: "v1",
+				},
+				Servers: openapi3.Servers{
+					{URL: "http://example.com"},
+				},
+			},
+		}
+
+		params := TykExtensionConfigParams{
+			ListenPath: "/test",
+		}
+
+		err := oas.BuildDefaultTykExtension(params, true)
+		assert.NoError(t, err)
+
+		var api apidef.APIDefinition
+		oas.ExtractTo(&api)
+
+		oasResult := OAS{}
+		oasResult.Fill(api)
+		tykExt := oasResult.GetTykExtension()
+		assert.NotNil(t, tykExt, "Tyk extension should exist")
+		assert.Nil(t, tykExt.Server.Authentication, "Authentication should NOT be created")
+	})
+}
+
+func TestOAS_SecurityClearingBehavior(t *testing.T) {
+	testCases := []struct {
+		name              string
+		authParam         *bool
+		expectAuthCreated bool
+	}{
+		{
+			name:              "auth=nil does not create authentication",
+			authParam:         nil,
+			expectAuthCreated: false,
+		},
+		{
+			name:              "auth=false does not create authentication",
+			authParam:         boolPtr(false),
+			expectAuthCreated: false,
+		},
+		{
+			name:              "auth=true creates authentication",
+			authParam:         boolPtr(true),
+			expectAuthCreated: true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			oas := createOASWithSecurityForImport()
+
+			params := TykExtensionConfigParams{
+				ListenPath:     "/test",
+				Authentication: tc.authParam,
+			}
+
+			err := oas.BuildDefaultTykExtension(params, true)
+			assert.NoError(t, err)
+			// OAS document structure should always be preserved
+			assert.NotNil(t, oas.Security, "Security should be preserved in OAS for %s", tc.name)
+			assert.NotNil(t, oas.Components.SecuritySchemes, "SecuritySchemes should be preserved in OAS for %s", tc.name)
+
+			var api apidef.APIDefinition
+			oas.ExtractTo(&api)
+
+			oasResult := OAS{}
+			oasResult.Fill(api)
+
+			tykExt := oasResult.GetTykExtension()
+			assert.NotNil(t, tykExt)
+
+			if tc.expectAuthCreated {
+				assert.NotNil(t, tykExt.Server.Authentication,
+					"Authentication should be created for %s", tc.name)
+			} else {
+				assert.Nil(t, tykExt.Server.Authentication,
+					"Authentication should NOT be created for %s", tc.name)
+			}
+		})
+	}
+}
+
+func createOASWithSecurityForImport() *OAS {
+	return &OAS{
+		T: openapi3.T{
+			OpenAPI: "3.0.1",
+			Info: &openapi3.Info{
+				Title:   "oas-traffic-logs",
+				Version: "v1",
+			},
+			Servers: openapi3.Servers{
+				{URL: "http://httpbin.org"},
+			},
+			Security: openapi3.SecurityRequirements{
+				{"apiKey": []string{}},
+			},
+			Components: &openapi3.Components{
+				SecuritySchemes: map[string]*openapi3.SecuritySchemeRef{
+					"apiKey": {
+						Value: &openapi3.SecurityScheme{
+							Type:   "http",
+							Scheme: "basic",
+						},
+					},
+				},
+			},
+			Paths: openapi3.NewPaths(),
+		},
 	}
 }
