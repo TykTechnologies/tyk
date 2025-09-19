@@ -240,7 +240,7 @@ func (c *CertificateExpiryCheckBatcher) setCheckCooldown(certInfo CertInfo) {
 }
 
 func (c *CertificateExpiryCheckBatcher) isCertificateExpired(certInfo CertInfo) bool {
-	return certInfo.HoursUntilExpiry < 0
+	return certInfo.UntilExpiry <= 0
 }
 
 func (c *CertificateExpiryCheckBatcher) isCertificateExpiringSoon(certInfo CertInfo) bool {
@@ -250,9 +250,10 @@ func (c *CertificateExpiryCheckBatcher) isCertificateExpiringSoon(certInfo CertI
 		warningThresholdDays = config.DefaultWarningThresholdDays
 	}
 
-	warningThresholdHours := warningThresholdDays * 24
+	warningThresholdDuration := time.Duration(warningThresholdDays) * 24 * time.Hour // Convert days to duration
 
-	return certInfo.HoursUntilExpiry >= 0 && certInfo.HoursUntilExpiry <= warningThresholdHours
+	// Certificate is expiring soon if it hasn't expired yet and is within the warning threshold
+	return certInfo.UntilExpiry > 0 && certInfo.UntilExpiry <= warningThresholdDuration
 }
 
 func (c *CertificateExpiryCheckBatcher) handleEventForCertificate(certInfo CertInfo, isExpired bool) {
@@ -281,8 +282,9 @@ func (c *CertificateExpiryCheckBatcher) handleEventForCertificate(certInfo CertI
 }
 
 func (c *CertificateExpiryCheckBatcher) handleEventForExpiredCertificate(certInfo CertInfo) {
-	daysSinceExpiry := (certInfo.HoursUntilExpiry / 24) * -1
-	hoursSinceExpiry := (certInfo.HoursUntilExpiry % -24) * -1
+	// Calculate days and hours since expiry (negative duration)
+	daysSinceExpiry := certInfo.DaysUntilExpiry() * -1
+	hoursSinceExpiry := (certInfo.HoursUntilExpiry() % -24) * -1
 
 	eventMeta := EventCertificateExpiredMeta{
 		EventMetaDefault: model.EventMetaDefault{
@@ -299,12 +301,12 @@ func (c *CertificateExpiryCheckBatcher) handleEventForExpiredCertificate(certInf
 	c.logger.
 		WithField("cert_id", certInfo.ID[:8]).
 		WithField("event_type", string(event.CertificateExpired)).
-		Debugf("EXPIRY EVENT FIRED for certificate '%s' - expired since %d hours", certInfo.CommonName, certInfo.HoursUntilExpiry)
+		Debugf("EXPIRY EVENT FIRED for certificate '%s' - expired since %d hours", certInfo.CommonName, certInfo.HoursUntilExpiry())
 }
 
 func (c *CertificateExpiryCheckBatcher) handleEventForSoonToExpireCertificate(certInfo CertInfo) {
-	daysUntilExpiry := certInfo.HoursUntilExpiry / 24
-	remainingHours := certInfo.HoursUntilExpiry % 24
+	daysUntilExpiry := certInfo.DaysUntilExpiry()
+	remainingHours := int(certInfo.HoursUntilExpiry()) % 24
 
 	eventMeta := EventCertificateExpiringSoonMeta{
 		EventMetaDefault: model.EventMetaDefault{
@@ -321,7 +323,7 @@ func (c *CertificateExpiryCheckBatcher) handleEventForSoonToExpireCertificate(ce
 	c.logger.
 		WithField("cert_id", certInfo.ID[:8]).
 		WithField("event_type", string(event.CertificateExpiringSoon)).
-		Debugf("EXPIRY EVENT FIRED for certificate '%s' - expires in %d hours", certInfo.CommonName, certInfo.HoursUntilExpiry)
+		Debugf("EXPIRY EVENT FIRED for certificate '%s' - expires in %d hours", certInfo.CommonName, certInfo.HoursUntilExpiry())
 }
 
 func (c *CertificateExpiryCheckBatcher) fireEventCooldownExistsInLocalCache(certInfo CertInfo) (exists bool) {

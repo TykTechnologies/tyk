@@ -18,10 +18,34 @@ type APIMetaData struct {
 
 // CertInfo is a structure that holds information about a certificate.
 type CertInfo struct {
-	ID               string
-	CommonName       string
-	NotAfter         time.Time
-	HoursUntilExpiry int
+	ID          string
+	CommonName  string
+	NotAfter    time.Time
+	UntilExpiry time.Duration
+}
+
+// HoursUntilExpiry returns the number of hours until the certificate expires.
+// This is calculated from the UntilExpiry field for convenience.
+func (c CertInfo) HoursUntilExpiry() int {
+	return int(c.UntilExpiry.Hours())
+}
+
+// MinutesUntilExpiry returns the number of minutes until the certificate expires.
+// This is calculated from the UntilExpiry field for convenience.
+func (c CertInfo) MinutesUntilExpiry() int {
+	return int(c.UntilExpiry.Minutes())
+}
+
+// SecondsUntilExpiry returns the number of seconds until the certificate expires.
+// This is calculated from the UntilExpiry field for convenience.
+func (c CertInfo) SecondsUntilExpiry() int {
+	return int(c.UntilExpiry.Seconds())
+}
+
+// DaysUntilExpiry returns the number of days until the certificate expires.
+// This is calculated from the UntilExpiry field for convenience.
+func (c CertInfo) DaysUntilExpiry() int {
+	return c.HoursUntilExpiry() / 24
 }
 
 // EventCertificateExpiringSoonMeta is the metadata structure for certificate expiration events.
