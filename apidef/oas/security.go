@@ -400,7 +400,7 @@ func (s *OAS) extractJWTTo(api *apidef.APIDefinition, name string) {
 	ac := apidef.AuthConfig{Name: name, DisableHeader: true}
 
 	jwt := s.getTykJWTAuth(name)
-	
+
 	// Only enable JWT if there's an explicit Tyk extension configuration
 	if jwt != nil {
 		api.EnableJWT = jwt.Enabled
@@ -515,7 +515,7 @@ func (s *OAS) extractBasicTo(api *apidef.APIDefinition, name string) {
 	ac := apidef.AuthConfig{Name: name, DisableHeader: true}
 
 	basic := s.getTykBasicAuth(name)
-	
+
 	// Only enable basic auth if there's an explicit Tyk extension configuration
 	if basic != nil {
 		api.UseBasicAuth = basic.Enabled
