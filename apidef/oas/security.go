@@ -1004,7 +1004,8 @@ func isProprietaryAuth(authMethod string) bool {
 func (s *OAS) fillSecurity(api apidef.APIDefinition) {
 	tykAuthentication := s.GetTykExtension().Server.Authentication
 
-	if tykAuthentication == nil && api.UseKeylessAccess {
+	if tykAuthentication == nil && api.UseKeylessAccess && 
+		len(api.AuthConfigs) == 0 && len(api.SecurityRequirements) == 0 {
 		if s.T.Components == nil {
 			s.T.Components = &openapi3.Components{}
 		}
