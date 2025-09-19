@@ -1004,17 +1004,11 @@ func isProprietaryAuth(authMethod string) bool {
 func (s *OAS) fillSecurity(api apidef.APIDefinition) {
 	tykAuthentication := s.GetTykExtension().Server.Authentication
 
-	// For OAS import: don't create authentication if none exists and the API is keyless
-	// This preserves the import behavior where authentication is only added when explicitly requested
 	if tykAuthentication == nil && api.UseKeylessAccess {
-		// If there are no auth configs or security requirements, skip creating authentication
-		// This handles the case where an OAS is imported without the authentication query parameter
-		if len(api.AuthConfigs) == 0 && len(api.SecurityRequirements) == 0 {
-			if s.T.Components == nil {
-				s.T.Components = &openapi3.Components{}
-			}
-			return
+		if s.T.Components == nil {
+			s.T.Components = &openapi3.Components{}
 		}
+		return
 	}
 
 	if tykAuthentication == nil {
@@ -1038,7 +1032,6 @@ func (s *OAS) fillSecurity(api apidef.APIDefinition) {
 	s.fillOAuth(api)
 	s.fillExternalOAuth(api)
 
-	// Handle security requirements based on processing mode (OAS-only feature)
 	processingMode := SecurityProcessingModeLegacy
 	if s.getTykAuthentication() != nil && s.getTykAuthentication().SecurityProcessingMode != "" {
 		processingMode = s.getTykAuthentication().SecurityProcessingMode
@@ -1120,7 +1113,8 @@ func (s *OAS) fillSecurity(api apidef.APIDefinition) {
 }
 
 func (s *OAS) extractSecurityTo(api *apidef.APIDefinition) {
-	if s.getTykAuthentication() == nil {
+	wasNil := s.getTykAuthentication() == nil
+	if wasNil {
 		s.GetTykExtension().Server.Authentication = &Authentication{}
 		defer func() {
 			s.GetTykExtension().Server.Authentication = nil
@@ -1144,55 +1138,44 @@ func (s *OAS) extractSecurityTo(api *apidef.APIDefinition) {
 	if s.getTykAuthentication() != nil && s.getTykAuthentication().SecurityProcessingMode != "" {
 		processingMode = s.getTykAuthentication().SecurityProcessingMode
 	}
+	
+	if !wasNil {
+		if processingMode == SecurityProcessingModeCompliant {
+			api.SecurityRequirements = make([][]string, 0)
 
-	// In compliant mode, extract all security requirements including vendor extension
-	// In legacy mode, still extract but gateway will only use first
-	if processingMode == SecurityProcessingModeCompliant {
-		// Concatenate OAS security with vendor extension security
-		api.SecurityRequirements = make([][]string, 0)
-
-		// Add OAS security requirements
-		for _, requirement := range s.Security {
-			schemes := make([]string, 0, len(requirement))
-			for schemeName := range requirement {
-				schemes = append(schemes, schemeName)
+			for _, requirement := range s.Security {
+				schemes := make([]string, 0, len(requirement))
+				for schemeName := range requirement {
+					schemes = append(schemes, schemeName)
+				}
+				api.SecurityRequirements = append(api.SecurityRequirements, schemes)
 			}
-			api.SecurityRequirements = append(api.SecurityRequirements, schemes)
-		}
 
-		// Add vendor extension security requirements
-		if s.getTykAuthentication() != nil && len(s.getTykAuthentication().Security) > 0 {
-			api.SecurityRequirements = append(api.SecurityRequirements, s.getTykAuthentication().Security...)
-		}
-	} else if len(s.Security) > 0 {
-		// Legacy mode - extract all security requirements (even single ones)
-		// This ensures they are preserved during the Fill/Extract cycle
-		api.SecurityRequirements = make([][]string, 0, len(s.Security))
-		for _, requirement := range s.Security {
-			schemes := make([]string, 0, len(requirement))
-			for schemeName := range requirement {
-				schemes = append(schemes, schemeName)
+			if s.getTykAuthentication() != nil && len(s.getTykAuthentication().Security) > 0 {
+				api.SecurityRequirements = append(api.SecurityRequirements, s.getTykAuthentication().Security...)
 			}
-			api.SecurityRequirements = append(api.SecurityRequirements, schemes)
+		} else if len(s.Security) > 0 {
+			api.SecurityRequirements = make([][]string, 0, len(s.Security))
+			for _, requirement := range s.Security {
+				schemes := make([]string, 0, len(requirement))
+				for schemeName := range requirement {
+					schemes = append(schemes, schemeName)
+				}
+				api.SecurityRequirements = append(api.SecurityRequirements, schemes)
+			}
 		}
 	}
 
-	// Process security requirements based on processing mode:
-	// - Compliant mode: Process ALL security requirements to enable multiple auth methods with OR logic
-	// - Legacy mode: Process only the first requirement for backward compatibility
 	requirementsToProcess := []openapi3.SecurityRequirement{}
-	if processingMode == SecurityProcessingModeCompliant && len(s.Security) > 0 {
-		// Process all requirements in compliant mode
-		requirementsToProcess = s.Security
-	} else if len(s.Security) > 0 {
-		// Legacy mode - only process first requirement
-		requirementsToProcess = s.Security[:1]
+	if !wasNil {
+		if processingMode == SecurityProcessingModeCompliant && len(s.Security) > 0 {
+			requirementsToProcess = s.Security
+		} else if len(s.Security) > 0 {
+			requirementsToProcess = s.Security[:1]
+		}
 	}
 
-	// Extract authentication configurations for each security scheme.
-	// This processes both standard OpenAPI schemes and Tyk-extended schemes.
 	for _, requirement := range requirementsToProcess {
-		// For token auth, we need to prioritize enabled schemes since only one can be active
 		var tokenSchemes []string
 		for schemeName := range requirement {
 			if scheme, ok := s.Components.SecuritySchemes[schemeName]; ok && scheme.Value.Type == typeAPIKey {
@@ -1200,28 +1183,24 @@ func (s *OAS) extractSecurityTo(api *apidef.APIDefinition) {
 			}
 		}
 
-		// If we have multiple token schemes, extract the enabled one first
 		if len(tokenSchemes) > 1 {
 			for _, schemeName := range tokenSchemes {
 				token := s.getTykTokenAuth(schemeName)
 				if token != nil && token.Enabled != nil && *token.Enabled {
 					s.extractTokenTo(api, schemeName)
-					break // Only one token auth can be active
+					break
 				}
 			}
-			// If none are explicitly enabled, fall back to extracting the first one
 			if api.AuthConfigs[apidef.AuthTokenType].Name == "" && len(tokenSchemes) > 0 {
 				s.extractTokenTo(api, tokenSchemes[0])
 			}
 		}
 
 		for schemeName := range requirement {
-			// Process the security scheme if it exists in the OpenAPI components
 			if scheme, ok := s.Components.SecuritySchemes[schemeName]; ok {
 				v := scheme.Value
 				switch {
 				case v.Type == typeAPIKey:
-					// Already handled above for multiple token schemes
 					if len(tokenSchemes) <= 1 {
 						s.extractTokenTo(api, schemeName)
 					}

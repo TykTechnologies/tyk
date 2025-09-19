@@ -138,19 +138,18 @@ func (s *OAS) BuildDefaultTykExtension(overRideValues TykExtensionConfigParams, 
 		if err != nil {
 			return err
 		}
-	} else {
-		s.Security = nil
-		if s.Components != nil {
-			s.Components.SecuritySchemes = nil
-		}
 	}
-
-	// Set SecurityProcessingMode if provided
+	
 	if overRideValues.SecurityProcessingMode != "" {
-		if xTykAPIGateway.Server.Authentication == nil {
-			xTykAPIGateway.Server.Authentication = &Authentication{}
+		authExists := xTykAPIGateway.Server.Authentication != nil
+		authEnabled := overRideValues.Authentication != nil && *overRideValues.Authentication
+		
+		if authEnabled || (!isImport && authExists) || (isImport && authExists) {
+			if xTykAPIGateway.Server.Authentication == nil {
+				xTykAPIGateway.Server.Authentication = &Authentication{}
+			}
+			xTykAPIGateway.Server.Authentication.SecurityProcessingMode = overRideValues.SecurityProcessingMode
 		}
-		xTykAPIGateway.Server.Authentication.SecurityProcessingMode = overRideValues.SecurityProcessingMode
 	}
 
 	s.ImportMiddlewares(overRideValues)

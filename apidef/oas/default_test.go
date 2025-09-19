@@ -1556,7 +1556,7 @@ func TestOAS_BuildDefaultTykExtension(t *testing.T) {
 	})
 
 	t.Run("build tyk extension with SecurityProcessingMode override", func(t *testing.T) {
-		// Test case 1: SecurityProcessingMode when Authentication is nil
+		authEnabled := true
 		oasDef := OAS{
 			T: openapi3.T{
 				Info: &openapi3.Info{
@@ -1567,10 +1567,26 @@ func TestOAS_BuildDefaultTykExtension(t *testing.T) {
 						URL: "https://example-org.com/api",
 					},
 				},
+				Security: openapi3.SecurityRequirements{
+					{
+						"apiKey": []string{},
+					},
+				},
+				Components: &openapi3.Components{
+					SecuritySchemes: openapi3.SecuritySchemes{
+						"apiKey": &openapi3.SecuritySchemeRef{
+							Value: &openapi3.SecurityScheme{
+								Type:   "http",
+								Scheme: "basic",
+							},
+						},
+					},
+				},
 			},
 		}
 
 		err := oasDef.BuildDefaultTykExtension(TykExtensionConfigParams{
+			Authentication:         &authEnabled,
 			SecurityProcessingMode: SecurityProcessingModeCompliant,
 		}, true)
 		assert.NoError(t, err)
@@ -1579,7 +1595,27 @@ func TestOAS_BuildDefaultTykExtension(t *testing.T) {
 		assert.NotNil(t, tykExt.Server.Authentication)
 		assert.Equal(t, SecurityProcessingModeCompliant, tykExt.Server.Authentication.SecurityProcessingMode)
 
-		// Test case 2: SecurityProcessingMode when Authentication already exists
+		oasDefNoAuth := OAS{
+			T: openapi3.T{
+				Info: &openapi3.Info{
+					Title: "OAS API without Auth",
+				},
+				Servers: openapi3.Servers{
+					{
+						URL: "https://example-org.com/api",
+					},
+				},
+			},
+		}
+
+		err = oasDefNoAuth.BuildDefaultTykExtension(TykExtensionConfigParams{
+			SecurityProcessingMode: SecurityProcessingModeCompliant,
+		}, true)
+		assert.NoError(t, err)
+
+		tykExtNoAuth := oasDefNoAuth.GetTykExtension()
+		assert.Nil(t, tykExtNoAuth.Server.Authentication, "Authentication should not be created when auth is not explicitly enabled during import")
+
 		oasDef2 := OAS{
 			T: openapi3.T{
 				Info: &openapi3.Info{
@@ -1593,7 +1629,6 @@ func TestOAS_BuildDefaultTykExtension(t *testing.T) {
 			},
 		}
 
-		// Set up existing authentication
 		oasDef2.SetTykExtension(&XTykAPIGateway{
 			Server: Server{
 				Authentication: &Authentication{
@@ -2338,8 +2373,8 @@ func TestOAS_ImportWithoutAuthenticationParameter(t *testing.T) {
 		err := oas.BuildDefaultTykExtension(params, true)
 		assert.NoError(t, err)
 
-		assert.Nil(t, oas.Security, "Security should be cleared when authentication is not provided")
-		assert.Nil(t, oas.Components.SecuritySchemes, "SecuritySchemes should be cleared when authentication is not provided")
+		assert.NotNil(t, oas.Security, "Security should be preserved in OAS document")
+		assert.NotNil(t, oas.Components.SecuritySchemes, "SecuritySchemes should be preserved in OAS document")
 
 		var api apidef.APIDefinition
 		oas.ExtractTo(&api)
@@ -2396,8 +2431,8 @@ func TestOAS_ImportWithoutAuthenticationParameter(t *testing.T) {
 
 		err := oas.BuildDefaultTykExtension(params, true)
 		assert.NoError(t, err)
-		assert.Nil(t, oas.Security, "Security should be cleared when authentication=false")
-		assert.Nil(t, oas.Components.SecuritySchemes, "SecuritySchemes should be cleared")
+		assert.NotNil(t, oas.Security, "Security should be preserved in OAS document")
+		assert.NotNil(t, oas.Components.SecuritySchemes, "SecuritySchemes should be preserved in OAS document")
 
 		var api apidef.APIDefinition
 		oas.ExtractTo(&api)
@@ -2445,28 +2480,24 @@ func TestOAS_ImportWithoutAuthenticationParameter(t *testing.T) {
 
 func TestOAS_SecurityClearingBehavior(t *testing.T) {
 	testCases := []struct {
-		name                  string
-		authParam             *bool
-		expectSecurityCleared bool
-		expectAuthCreated     bool
+		name              string
+		authParam         *bool
+		expectAuthCreated bool
 	}{
 		{
-			name:                  "auth=nil clears security",
-			authParam:             nil,
-			expectSecurityCleared: true,
-			expectAuthCreated:     false,
+			name:              "auth=nil does not create authentication",
+			authParam:         nil,
+			expectAuthCreated: false,
 		},
 		{
-			name:                  "auth=false clears security",
-			authParam:             boolPtr(false),
-			expectSecurityCleared: true,
-			expectAuthCreated:     false,
+			name:              "auth=false does not create authentication",
+			authParam:         boolPtr(false),
+			expectAuthCreated: false,
 		},
 		{
-			name:                  "auth=true preserves security",
-			authParam:             boolPtr(true),
-			expectSecurityCleared: false,
-			expectAuthCreated:     true,
+			name:              "auth=true creates authentication",
+			authParam:         boolPtr(true),
+			expectAuthCreated: true,
 		},
 	}
 
@@ -2481,13 +2512,9 @@ func TestOAS_SecurityClearingBehavior(t *testing.T) {
 
 			err := oas.BuildDefaultTykExtension(params, true)
 			assert.NoError(t, err)
-			if tc.expectSecurityCleared {
-				assert.Nil(t, oas.Security, "Security should be cleared for %s", tc.name)
-				assert.Nil(t, oas.Components.SecuritySchemes, "SecuritySchemes should be cleared for %s", tc.name)
-			} else {
-				assert.NotNil(t, oas.Security, "Security should be preserved for %s", tc.name)
-				assert.NotNil(t, oas.Components.SecuritySchemes, "SecuritySchemes should be preserved for %s", tc.name)
-			}
+			// OAS document structure should always be preserved
+			assert.NotNil(t, oas.Security, "Security should be preserved in OAS for %s", tc.name)
+			assert.NotNil(t, oas.Components.SecuritySchemes, "SecuritySchemes should be preserved in OAS for %s", tc.name)
 
 			var api apidef.APIDefinition
 			oas.ExtractTo(&api)
