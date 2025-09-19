@@ -169,9 +169,9 @@ func (m *CertificateCheckMW) extractCertInfo(cert *tls.Certificate) (certInfo ce
 	}
 
 	return certcheck.CertInfo{
-		ID:               certID,
-		CommonName:       cert.Leaf.Subject.CommonName,
-		NotAfter:         cert.Leaf.NotAfter,
-		HoursUntilExpiry: int(time.Until(cert.Leaf.NotAfter).Hours()),
+		ID:              certID,
+		CommonName:      cert.Leaf.Subject.CommonName,
+		NotAfter:        cert.Leaf.NotAfter,
+		TimeUntilExpiry: time.Until(cert.Leaf.NotAfter),
 	}, true
 }
