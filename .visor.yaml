@@ -105,6 +105,7 @@ checks:
 
   dependency:
     type: ai
+    schema: code-review
     depends_on: [quality]
     reuse_ai_session: true
     on: [pr_opened, pr_updated]
@@ -148,6 +149,7 @@ checks:
 
   connectivity:
     type: ai
+    schema: code-review
     depends_on: [dependency]
     reuse_ai_session: true
     on: [pr_opened, pr_updated]
