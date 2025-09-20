@@ -27,3 +27,4 @@ jobs:
           installation-id: ${{ secrets.PROBE_APP_INSTALLATION_ID }}
         env:
           GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
+          
