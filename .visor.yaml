@@ -104,6 +104,7 @@ checks:
          * Identify areas where additional caching, pooling, or lazy loading could help.
 
   dependency:
+    type: ai
     depends_on: [quality]
     reuse_ai_session: true
     on: [pr_opened, pr_updated]
@@ -146,6 +147,7 @@ checks:
       6. **Security & RBAC** – cert loading, ownership/RBAC handlers
 
   connectivity:
+    type: ai
     depends_on: [dependency]
     reuse_ai_session: true
     on: [pr_opened, pr_updated]
