@@ -1096,9 +1096,7 @@ func (s *OAS) extractSecurityTo(api *apidef.APIDefinition) {
 		if s.getTykAuthentication() != nil && len(s.getTykAuthentication().Security) > 0 {
 			api.SecurityRequirements = append(api.SecurityRequirements, s.getTykAuthentication().Security...)
 		}
-	} else if len(s.Security) > 0 {
-		// Legacy mode - extract all security requirements (even single ones)
-		// This ensures they are preserved during the Fill/Extract cycle
+	} else if len(s.Security) > 1 {
 		api.SecurityRequirements = make([][]string, 0, len(s.Security))
 		for _, requirement := range s.Security {
 			schemes := make([]string, 0, len(requirement))
@@ -1112,12 +1110,20 @@ func (s *OAS) extractSecurityTo(api *apidef.APIDefinition) {
 	// Process security requirements based on processing mode:
 	// - Compliant mode: Process ALL security requirements to enable multiple auth methods with OR logic
 	// - Legacy mode: Process only the first requirement for backward compatibility
+	// BUT only if Tyk authentication is configured (don't auto-extract from bare OAS)
 	requirementsToProcess := []openapi3.SecurityRequirement{}
+	tykAuth := s.getTykAuthentication()
+	hasEnabledSchemes := false
+	if tykAuth != nil && tykAuth.SecuritySchemes != nil {
+		// Check if any security scheme is defined in Tyk extension
+		hasEnabledSchemes = len(tykAuth.SecuritySchemes) > 0
+	}
+
 	if processingMode == SecurityProcessingModeCompliant && len(s.Security) > 0 {
 		// Process all requirements in compliant mode
 		requirementsToProcess = s.Security
-	} else if len(s.Security) > 0 {
-		// Legacy mode - only process first requirement
+	} else if len(s.Security) > 0 && tykAuth != nil && (tykAuth.Enabled || hasEnabledSchemes) {
+		// Legacy mode - process first requirement if Tyk authentication is enabled OR has security schemes defined
 		requirementsToProcess = s.Security[:1]
 	}
 
