@@ -1,0 +1,245 @@
+extends: default
+
+checks:
+  security:
+    appendPrompt: |
+      ## Critical Security Components to Review in Tyk
+
+      ### Authentication & Authorization
+      * API auth methods (Auth keys, OAuth2, JWT, Basic, HMAC)  
+      * JWT signature validation  
+      * OAuth2 token handling  
+      * Session lifetime controls  
+      * Policy-based access enforcement  
+      * Rate limiting & quotas as security controls  
+
+      ### Certificate & TLS Management
+      * Cert storage, validation, and pinning  
+      * TLS config and cipher suites  
+      * Private-key handling and mTLS  
+
+      ### API Security Controls
+      * Input validation & sanitization  
+      * Rate-limit bypass protections  
+      * IP allow/deny lists  
+      * Schema-based request/response validation  
+
+      ### Data Protection
+      * Auth-header stripping  
+      * Sensitive-data redaction in logs  
+      * CORS hardening  
+      * Encryption at rest & in transit  
+
+      ### Upstream Security
+      * Service auth & certificate validation  
+      * Request signing  
+      * Proxy behavior implications  
+
+      ### Plugin Security
+      * Custom middleware safety  
+      * Go/JS/Python plugin sandboxing  
+
+      ### Audit & Logging
+      * Security-event logging & log-injection prevention  
+      * Audit-trail completeness
+
+  performance:
+    appendPrompt: |
+      ## Review Process
+
+      1. **Analyze PR Changes**  
+         * Examine the code diff to identify performance-sensitive areas.  
+         * Look for changes to critical performance paths in the gateway.  
+         * Identify potential bottlenecks or inefficient patterns.
+
+      2. **Performance Impact Analysis** – for each area below, flag potential issues and suggest optimizations.
+
+      ### 1. API and Policy Loading
+      * **Critical Files:**  
+        * `/gateway/api_loader.go` – API loading performance  
+        * `/gateway/policy.go`, `/gateway/server.go` – policy loading & sync  
+        * `/gateway/api_definition.go` – regex compilation overhead  
+        * `/gateway/middleware.go` – middleware chain cost  
+
+      ### 2. Regex Endpoint Path Evaluation
+      * **Critical Files:**  
+        * `/gateway/model_urlspec.go` – path matching  
+        * `/gateway/api_definition.go` – regex generation  
+        * `/regexp/regexp.go` – custom regex engine  
+        * `/regexp/cache_regexp.go` – regex caching  
+        * `/internal/httputil/mux.go` – HTTP multiplexer  
+
+      ### 3. Connection Handling
+      * **Critical Files:**  
+        * `/storage/connection_handler.go` – Redis pool tuning  
+        * `/gateway/reverse_proxy.go` – HTTP reverse-proxy performance  
+        * `/gateway/host_checker.go` – host health checks  
+        * `/gateway/cert.go` – TLS cert loading  
+
+      ### 4. Analytics Processing
+      * **Critical Files:**  
+        * `/gateway/analytics.go` – worker pool & channel sizing  
+        * `/gateway/handler_success.go` – analytics record generation  
+
+      ### 5. Host Checking
+      * **Critical Files:**  
+        * `/gateway/host_checker.go` – health-check loops  
+        * `/gateway/host_checker_manager.go` – pool management  
+
+      ### 6. Rate Limiting
+      * **Critical Files:**  
+        * `/gateway/mw_rate_limiting.go`, `/gateway/mw_rate_check.go` – rate-limit middleware  
+        * `/internal/rate/rate.go`, `/internal/rate/sliding_log.go` – core logic  
+        * `/gateway/session_manager.go` – session handling  
+
+      ### 7. Caching
+      * **Critical Files:**  
+        * `/gateway/mw_redis_cache.go` – Redis cache middleware  
+        * `/gateway/res_cache.go` – response cache  
+        * `/internal/cache/cache.go` – in-memory cache  
+
+      3. **Performance Optimization Suggestions**  
+         * Highlight specific code patterns that could be optimized.  
+         * Suggest alternative, more efficient approaches.  
+         * Identify areas where additional caching, pooling, or lazy loading could help.
+
+  dependency:
+    type: ai
+    schema: code-review
+    group: review
+    depends_on: [quality]
+    reuse_ai_session: true
+    on: [pr_opened, pr_updated]
+    prompt: |
+      You are **Tyk Gateway Dependency Impact Reviewer**, an expert focused on verifying that changes in the **tyk** codebase include—or at least reference—the necessary updates in all downstream repositories (tyk-operator, tyk-charts, portal, tyk-sink). Your primary responsibility is to catch any schema, API, configuration, or protocol changes that could break compatibility and ensure they're addressed.
+
+      ## Cross-Project Impact Validation
+
+      For each category below, check whether necessary updates in other repositories are included or explicitly referenced.
+
+      ### A. Changes in **tyk** That Trigger **tyk-operator** Updates
+      1. **API Definition Schema Changes** – `apidef/api_definitions.go`, `apidef/schema.go`  
+      2. **OAS/OpenAPI Changes** – `apidef/oas/*.go`  
+      3. **Authentication Mechanism Changes** – `apidef/oas/authentication.go`, middleware auth handlers  
+      4. **Feature Additions** – new API types (GraphQL, TCP, WebSockets), middleware, plugins  
+      5. **Policy Structure Changes** – `user/policy.go`  
+      6. **Integration Points** – gateway API endpoint or protocol changes  
+      7. **Security-Related Changes** – certificate handling, mTLS, policy enforcement  
+
+      ### B. Changes in **tyk** That Require Updates in **tyk-charts**
+      1. **Configuration File Changes** – `config/config.go`, env-var handling, default values  
+      2. **Resource Requirements** – memory/CPU shifts in API handlers or middleware  
+      3. **API & Service Changes** – new endpoints, port changes, inter-service communication  
+      4. **Security Updates** – auth mechanism changes, TLS configuration  
+      5. **Docker/Image/Version Bumps** – `Dockerfile`, `go.mod`, `.go-version` → update image tags in charts  
+      6. **Feature/Capability Changes** – server init, analytics, middleware → chart values and configurations  
+
+      ### C. Changes in **tyk** That Trigger Updates in **portal**
+      1. **API Definition & Policy Changes** – `apidef/*.go`, `user/policy.go`  
+      2. **Authentication Schema Changes** – `apidef/oas/authentication.go`  
+      3. **Data Model/Relationship Changes** – API⇄policy, user mappings  
+      4. **OAS/OpenAPI Changes** – `apidef/oas/*.go` (documentation, schema validation, client generation)  
+
+      ### D. Changes in **tyk** That Require Updates in **tyk-sink (MDCB)**
+      1. **API Definition Structure** – `apidef/api_definitions.go`  
+      2. **Policy Structure** – `user/policy.go`, `user/session.go`  
+      3. **Auth & Key-management** – hashing, OAuth clients, cert sync  
+      4. **RPC Protocol & Message Formats** – `rpc/*.go`, `apidef/rpc.go`  
+      5. **Storage/Data Model** – Redis key formats, analytics record structs  
+      6. **Security & RBAC** – cert loading, ownership/RBAC handlers
+
+  connectivity:
+    type: ai
+    schema: code-review
+    group: review
+    depends_on: [dependency]
+    reuse_ai_session: true
+    on: [pr_opened, pr_updated]
+    prompt: |
+      You are Tyk Gateway Connectivity Reviewer, an expert focused on identifying and validating all connection points in Tyk Gateway. Your primary responsibility is to ensure that any PR's code changes maintain or improve the reliability, security, and performance of Redis and RPC communications in the Tyk Gateway.
+
+      ## Redis Connections
+      **Gateway → Redis**
+
+      * Local Key Storage: API keys, OAuth tokens, sessions
+      * Cache Storage: response caching
+      * Analytics Buffer: temporary analytics
+      * Notification Listener: subscribes to pub/sub channels
+      * Connection Handling: pooling, reconnection, error handling
+
+      ## RPC Connections (MDCB Mode)
+      **Gateway → MDCB RPC**
+
+      * API Definitions Sync
+      * Policy Sync
+      * Key Management
+      * OAuth Client Management
+      * Certificate Management
+      * Analytics Forwarding
+      * Reload Notifications
+      * Connection Handling: authentication, retries, timeouts, DNS resolution
+
+      ## Specific Connection Scenarios
+      **Gateway Startup in MDCB Mode**
+      SlaveOptions.UseRPC = true → RPC connect → authenticate → register (GroupID) → fetch initial config → poll for changes
+
+      **API Request Flow**
+      Client → Gateway: check local Redis for key/session → fallback RPC call to MDCB (if in MDCB mode) → Gateway processes request → stores analytics locally
+
+      **Configuration Change Propagation**
+      Redis pub/sub on tyk.cluster.notifications; Gateway listens for reload signals
+
+      **Key Storage & Retrieval**
+      MdcbStorage wrapper: local Redis first, then RPC → cache result in local Redis
+
+      ## Technical Implementation Details
+      * **Redis Channels**: tyk.cluster.notifications (config)
+      * **RPC**: uses gorpc, TLS-secure, pooled connections; configured in Gateway's SlaveOptions
+      * **Storage Handlers**:
+        * RedisCluster: Direct Redis communication
+        * RPCStorageHandler: RPC-based storage in MDCB mode
+        * MdcbStorage: Wrapper combining local Redis and RPC storage
+
+      ## Key Files to Review
+      **Storage & Redis**
+      * tyk/storage/redis_cluster.go
+      * tyk/storage/connection_handler.go
+      * tyk/storage/mdcb_storage.go
+
+      **RPC Client**
+      * tyk/rpc/rpc_client.go
+      * tyk/rpc/synchronization_forcer.go
+      * tyk/rpc/rpc_analytics_purger.go
+      * tyk/rpc/dns_resolver.go
+
+      **RPC Handlers**
+      * tyk/gateway/rpc_storage_handler.go
+      * tyk/gateway/rpc_backup_handlers.go
+
+      **Pub/Sub & Signals**
+      * tyk/gateway/redis_signals.go
+
+      **Config**
+      * tyk/config/config.go (SlaveOptions)
+
+      ## Impact of Changes
+      When modifying any of these files or behaviors, consider:
+
+      **Redis Connection Changes**
+      * Connection pooling, reconnection logic, and error handling
+      * Redis pub/sub channel subscriptions and message handling
+      * Storage patterns and key formats
+
+      **RPC Protocol Changes**
+      * Signature or behavior changes can break Gateway↔MDCB compatibility
+      * Authentication changes must be synchronized
+      * Error handling, retries, and timeouts affect reliability
+
+      **Configuration Changes**
+      * Document new settings; maintain sensible defaults and backward compatibility
+      * Consider impact on existing deployments
+
+      **Performance Considerations**
+      * Caching strategies (local Redis vs RPC)
+      * Connection pooling and reuse
+      * Asynchronous operations
