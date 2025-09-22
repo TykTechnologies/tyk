@@ -929,9 +929,7 @@ func TestOAS_extractSecurityTo_ORLogic(t *testing.T) {
 		var api apidef.APIDefinition
 		oas.extractSecurityTo(&api)
 
-		assert.Len(t, api.SecurityRequirements, 1)
-		assert.Contains(t, api.SecurityRequirements[0], "token-auth")
-		assert.Contains(t, api.SecurityRequirements[0], "jwt-auth")
+		assert.Nil(t, api.SecurityRequirements)
 	})
 
 	t.Run("should handle empty Security", func(t *testing.T) {
@@ -1115,10 +1113,8 @@ func TestOAS_SecurityRequirements_RoundTrip(t *testing.T) {
 		var extractedAPI apidef.APIDefinition
 		oas.extractSecurityTo(&extractedAPI)
 
-		assert.Len(t, extractedAPI.SecurityRequirements, 1)
-		assert.Len(t, extractedAPI.SecurityRequirements[0], 2)
-		assert.Contains(t, extractedAPI.SecurityRequirements[0], "token-auth")
-		assert.Contains(t, extractedAPI.SecurityRequirements[0], "jwt-auth")
+		// Single requirement (AND logic) doesn't need explicit SecurityRequirements
+		assert.Nil(t, extractedAPI.SecurityRequirements)
 	})
 }
 
