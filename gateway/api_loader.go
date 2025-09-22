@@ -22,6 +22,7 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/apidef/oas"
 	"github.com/TykTechnologies/tyk/coprocess"
 	"github.com/TykTechnologies/tyk/rpc"
 	"github.com/TykTechnologies/tyk/storage"
@@ -331,30 +332,45 @@ func (gw *Gateway) processSpec(
 	gw.mwAppendEnabled(&chainArray, &MiddlewareContextVars{BaseMiddleware: baseMid.Copy()})
 	gw.mwAppendEnabled(&chainArray, &TrackEndpointMiddleware{baseMid.Copy()})
 
+	// Track auth middlewares for OR wrapper
+	var authMiddlewares []TykMiddleware
+
 	if !spec.UseKeylessAccess {
 		// Select the keying method to use for setting session states
-		if gw.mwAppendEnabled(&authArray, &Oauth2KeyExists{baseMid.Copy()}) {
+		oauth2MW := &Oauth2KeyExists{baseMid.Copy()}
+		if gw.mwAppendEnabled(&authArray, oauth2MW) {
 			logger.Info("Checking security policy: OAuth")
+			authMiddlewares = append(authMiddlewares, oauth2MW)
 		}
 
-		if gw.mwAppendEnabled(&authArray, &ExternalOAuthMiddleware{baseMid.Copy()}) {
+		extOAuthMW := &ExternalOAuthMiddleware{baseMid.Copy()}
+		if gw.mwAppendEnabled(&authArray, extOAuthMW) {
 			logger.Info("Checking security policy: External OAuth")
+			authMiddlewares = append(authMiddlewares, extOAuthMW)
 		}
 
-		if gw.mwAppendEnabled(&authArray, &BasicAuthKeyIsValid{baseMid.Copy(), nil, nil}) {
+		basicAuthMW := &BasicAuthKeyIsValid{baseMid.Copy(), nil, nil}
+		if gw.mwAppendEnabled(&authArray, basicAuthMW) {
 			logger.Info("Checking security policy: Basic")
+			authMiddlewares = append(authMiddlewares, basicAuthMW)
 		}
 
-		if gw.mwAppendEnabled(&authArray, &HTTPSignatureValidationMiddleware{BaseMiddleware: baseMid.Copy()}) {
+		hmacMW := &HTTPSignatureValidationMiddleware{BaseMiddleware: baseMid.Copy()}
+		if gw.mwAppendEnabled(&authArray, hmacMW) {
 			logger.Info("Checking security policy: HMAC")
+			authMiddlewares = append(authMiddlewares, hmacMW)
 		}
 
-		if gw.mwAppendEnabled(&authArray, &JWTMiddleware{baseMid.Copy()}) {
+		jwtMW := &JWTMiddleware{BaseMiddleware: baseMid.Copy()}
+		if gw.mwAppendEnabled(&authArray, jwtMW) {
 			logger.Info("Checking security policy: JWT")
+			authMiddlewares = append(authMiddlewares, jwtMW)
 		}
 
-		if gw.mwAppendEnabled(&authArray, &OpenIDMW{BaseMiddleware: baseMid.Copy()}) {
+		openIDMW := &OpenIDMW{BaseMiddleware: baseMid.Copy()}
+		if gw.mwAppendEnabled(&authArray, openIDMW) {
 			logger.Info("Checking security policy: OpenID")
+			authMiddlewares = append(authMiddlewares, openIDMW)
 		}
 
 		if spec.CustomPluginAuthEnabled && !mwAuthCheckFunc.Disabled {
@@ -362,49 +378,71 @@ func (gw *Gateway) processSpec(
 				logger.Warn("No plugin driver found")
 				gw.mwAppendEnabled(&authArray, &PluginAuthGatekeeperMiddleware{BaseMiddleware: baseMid.Copy()})
 			} else {
-				switch spec.CustomMiddleware.Driver {
-				case apidef.OttoDriver:
-					logger.Info("----> Checking security policy: JS Plugin")
-					authArray = append(authArray, gw.createMiddleware(&DynamicMiddleware{
-						BaseMiddleware:      baseMid.Copy(),
-						MiddlewareClassName: mwAuthCheckFunc.Name,
-						Pre:                 true,
-						Auth:                true,
-					}))
-				case apidef.GoPluginDriver:
-					gw.mwAppendEnabled(
-						&authArray,
-						&GoPluginMiddleware{
-							BaseMiddleware: baseMid.Copy(),
-							Path:           mwAuthCheckFunc.Path,
-							SymbolName:     mwAuthCheckFunc.Name,
-							APILevel:       true,
-						},
-					)
-				default:
-					coprocessLog.Debug("Registering coprocess middleware, hook name: ", mwAuthCheckFunc.Name, "hook type: CustomKeyCheck", ", driver: ", mwDriver)
-
-					newExtractor(spec, baseMid.Copy())
-					gw.mwAppendEnabled(&authArray, &CoProcessMiddleware{baseMid.Copy(), coprocess.HookType_CustomKeyCheck, mwAuthCheckFunc.Name, mwDriver, mwAuthCheckFunc.RawBodyOnly, nil})
+			switch spec.CustomMiddleware.Driver {
+			case apidef.OttoDriver:
+				logger.Info("----> Checking security policy: JS Plugin")
+				dynamicMW := &DynamicMiddleware{
+					BaseMiddleware:      baseMid.Copy(),
+					MiddlewareClassName: mwAuthCheckFunc.Name,
+					Pre:                 true,
+					Auth:                true,
 				}
+				authArray = append(authArray, gw.createMiddleware(dynamicMW))
+				authMiddlewares = append(authMiddlewares, dynamicMW)
+			case apidef.GoPluginDriver:
+				goPluginMW := &GoPluginMiddleware{
+					BaseMiddleware: baseMid.Copy(),
+					Path:           mwAuthCheckFunc.Path,
+					SymbolName:     mwAuthCheckFunc.Name,
+					APILevel:       true,
+				}
+				if gw.mwAppendEnabled(&authArray, goPluginMW) {
+					authMiddlewares = append(authMiddlewares, goPluginMW)
+				}
+			default:
+				coprocessLog.Debug("Registering coprocess middleware, hook name: ", mwAuthCheckFunc.Name, "hook type: CustomKeyCheck", ", driver: ", mwDriver)
+
+				newExtractor(spec, baseMid.Copy())
+				coProcessMW := &CoProcessMiddleware{baseMid.Copy(), coprocess.HookType_CustomKeyCheck, mwAuthCheckFunc.Name, mwDriver, mwAuthCheckFunc.RawBodyOnly, nil}
+				if gw.mwAppendEnabled(&authArray, coProcessMW) {
+					authMiddlewares = append(authMiddlewares, coProcessMW)
+				}
+			}
 			}
 		}
 
 		if spec.UseStandardAuth || len(authArray) == 0 {
 			logger.Info("Checking security policy: Token")
-			authArray = append(authArray, gw.createMiddleware(&AuthKey{baseMid.Copy()}))
+			authKeyMW := &AuthKey{baseMid.Copy()}
+			authArray = append(authArray, gw.createMiddleware(authKeyMW))
+			authMiddlewares = append(authMiddlewares, authKeyMW)
 		}
 
-		if len(spec.SecurityRequirements) > 1 && len(authArray) > 0 {
-			logger.Info("Multiple security requirements detected - using OR authentication logic")
+		processingMode := oas.SecurityProcessingModeLegacy
+		if spec.IsOAS && spec.OAS.GetTykExtension() != nil {
+			if auth := spec.OAS.GetTykExtension().Server.Authentication; auth != nil && auth.SecurityProcessingMode != "" {
+				processingMode = auth.SecurityProcessingMode
+			}
+		}
+
+		// In compliant mode with multiple requirements, use OR wrapper
+		// Note: Vendor extension security is already included in spec.SecurityRequirements after extraction
+		if processingMode == oas.SecurityProcessingModeCompliant && len(spec.SecurityRequirements) > 1 && len(authMiddlewares) > 0 {
+			logger.WithFields(logrus.Fields{
+				"totalRequirements": len(spec.SecurityRequirements),
+			}).Info("Compliant mode: Multiple security requirements detected - using OR authentication logic")
 
 			orWrapper := &AuthORWrapper{
-				BaseMiddleware: *baseMid.Copy(),
+				BaseMiddleware:  *baseMid.Copy(),
+				authMiddlewares: authMiddlewares,
 			}
 
-			// Add the OR wrapper to the chain instead of individual auth middlewares
 			chainArray = append(chainArray, gw.createMiddleware(orWrapper))
 		} else {
+			// Legacy mode or single requirement - use standard auth chain
+			if processingMode == oas.SecurityProcessingModeLegacy && len(spec.SecurityRequirements) > 1 {
+				logger.Info("Legacy mode: Processing first security requirement only, ignoring others")
+			}
 			chainArray = append(chainArray, authArray...)
 		}
 

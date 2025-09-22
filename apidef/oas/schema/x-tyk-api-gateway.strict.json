@@ -1312,6 +1312,24 @@
           "required": [
             "enabled"
           ]
+        },
+        "securityProcessingMode": {
+          "type": "string",
+          "enum": [
+            "legacy",
+            "compliant"
+          ],
+          "description": "Controls how multiple security requirements are processed"
+        },
+        "security": {
+          "type": "array",
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "description": "Vendor extension security requirements for proprietary auth methods"
         }
       },
       "required": [
@@ -1515,8 +1533,31 @@
         }
       },
       "required": [
-        "location",
-        "key"
+        "location"
+      ],
+      "anyOf": [
+        {
+          "properties": {
+            "location": {
+              "enum": [
+                "header",
+                "url-param"
+              ]
+            }
+          },
+          "required": [
+            "key"
+          ]
+        },
+        {
+          "properties": {
+            "location": {
+              "enum": [
+                "url"
+              ]
+            }
+          }
+        }
       ],
       "additionalProperties": false
     },
@@ -1686,6 +1727,28 @@
           "type": "array",
           "items": {
             "type": "string"
+          }
+        },
+        "jwksURIs": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "object",
+            "properties": {
+              "url": {
+                "type": "string",
+                "format": "uri"
+              },
+              "cacheTimeout": {
+                "type": "number",
+                "minimum": 0
+              }
+            },
+            "required": [
+              "url"
+            ]
           }
         },
         "skipKid": {

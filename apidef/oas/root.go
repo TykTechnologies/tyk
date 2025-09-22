@@ -165,7 +165,7 @@ type Versioning struct {
 	// - `url`.
 	Location string `bson:"location" json:"location"` // required
 	// Key contains the name of the key to check for versioning information.
-	Key string `bson:"key" json:"key"` // required
+	Key string `bson:"key" json:"key,omitempty"` // required conditionally
 	// Versions contains a list of versions that map to individual API IDs.
 	Versions []VersionToID `bson:"versions" json:"versions"` // required
 	// StripVersioningData is a boolean flag, if set to `true`, the API responses will be stripped of versioning data.

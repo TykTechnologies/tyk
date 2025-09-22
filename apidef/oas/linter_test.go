@@ -65,6 +65,7 @@ func TestXTykGateway_Lint(t *testing.T) {
 			}
 		}
 		settings.Server.Authentication.BaseIdentityProvider = ""
+		settings.Server.Authentication.SecurityProcessingMode = SecurityProcessingModeLegacy
 		settings.Server.Authentication.Custom.Config.IDExtractor.Source = "body"
 		settings.Server.Authentication.Custom.Config.IDExtractor.With = "regex"
 		settings.Server.Authentication.SecuritySchemes = map[string]interface{}{
@@ -124,6 +125,14 @@ func TestXTykGateway_Lint(t *testing.T) {
 		settings.Upstream.TLSTransport.MinVersion = "1.2"
 		settings.Upstream.TLSTransport.MaxVersion = "1.2"
 		settings.Upstream.TLSTransport.Ciphers = []string{"TLS_RSA_WITH_RC4_128_SHA"}
+
+		if settings.Info.Versioning != nil {
+			switch settings.Info.Versioning.Location {
+			case "header", "url-param", "url":
+			default:
+				settings.Info.Versioning.Location = "header"
+			}
+		}
 	}
 
 	// Encode data to json
@@ -158,5 +167,98 @@ func TestXTykGateway_Lint(t *testing.T) {
 			t.Logf("%s\n", err)
 		}
 		t.Fail()
+	}
+}
+
+func TestVersioningSchemaValidation(t *testing.T) {
+	schema, err := schemaDir.ReadFile("schema/x-tyk-api-gateway.strict.json")
+	require.NoError(t, err)
+	schemaLoader := gojsonschema.NewBytesLoader(schema)
+
+	createBaseAPIGateway := func() XTykAPIGateway {
+		return XTykAPIGateway{
+			Info: Info{
+				Name: "Test API",
+				State: State{
+					Active: true,
+				},
+			},
+			Upstream: Upstream{
+				URL: "http://example.com",
+			},
+			Server: Server{
+				ListenPath: ListenPath{
+					Value: "/test",
+				},
+			},
+		}
+	}
+
+	tests := []struct {
+		name            string
+		setupVersioning func() *Versioning
+		shouldBeValid   bool
+	}{
+		{
+			name: "valid with header location and key",
+			setupVersioning: func() *Versioning {
+				return &Versioning{
+					Enabled:  true,
+					Location: "header",
+					Key:      "x-api-version",
+					Versions: []VersionToID{
+						{Name: "v1", ID: "version-1"},
+					},
+				}
+			},
+			shouldBeValid: true,
+		},
+		{
+			name: "valid with url location without key",
+			setupVersioning: func() *Versioning {
+				return &Versioning{
+					Enabled:  true,
+					Location: "url",
+					Versions: []VersionToID{
+						{Name: "v1", ID: "version-1"},
+					},
+				}
+			},
+			shouldBeValid: true,
+		},
+		{
+			name: "invalid with header location without key",
+			setupVersioning: func() *Versioning {
+				return &Versioning{
+					Enabled:  true,
+					Location: "header",
+					Versions: []VersionToID{
+						{Name: "v1", ID: "version-1"},
+					},
+				}
+			},
+			shouldBeValid: false,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			apiGateway := createBaseAPIGateway()
+			apiGateway.Info.Versioning = tc.setupVersioning()
+
+			docLoader := gojsonschema.NewGoLoader(apiGateway)
+			result, err := gojsonschema.Validate(schemaLoader, docLoader)
+			assert.NoError(t, err)
+
+			if tc.shouldBeValid {
+				if !result.Valid() {
+					t.Errorf("Expected schema to be valid but got errors: %v", result.Errors())
+				}
+			} else {
+				if result.Valid() {
+					t.Errorf("Expected schema to be invalid but it was valid")
+				}
+			}
+		})
 	}
 }

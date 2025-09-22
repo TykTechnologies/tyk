@@ -5,6 +5,7 @@ package certcheck
 import (
 	"errors"
 	"fmt"
+	"sync"
 	"time"
 
 	lru "github.com/hashicorp/golang-lru/v2"
@@ -43,32 +44,46 @@ type CooldownCache interface {
 	SetFireEventCooldown(certID string, fireEventCooldownInSeconds int64) error
 }
 
+var cooldownLRUCache *lru.Cache[string, Cooldowns]
+var cooldownLRUCacheMutex = &sync.RWMutex{}
+
+// GetCooldownLRUCache returns the LRU cache for cooldowns. It is initialized if it does not exist yet.
+// Using the singleton pattern here to ensure that the cache is always initialized.
+func GetCooldownLRUCache() *lru.Cache[string, Cooldowns] {
+	if cooldownLRUCache == nil {
+		var err error
+		cooldownLRUCache, err = lru.New[string, Cooldowns](512)
+		if err != nil {
+			// This should actually never happen. But it helps us to ensure that the cache is always initialized.
+			panic(err)
+		}
+	}
+	return cooldownLRUCache
+}
+
 // InMemoryCooldownCache is a cache that stores cooldowns for certificates in memory.
 type InMemoryCooldownCache struct {
-	lruCache *lru.Cache[string, Cooldowns]
 }
 
 // NewInMemoryCooldownCache creates a new InMemoryCooldownCache.
-func NewInMemoryCooldownCache(size int) (*InMemoryCooldownCache, error) {
-	lruCache, err := lru.New[string, Cooldowns](size)
-	if err != nil {
-		return nil, err
-	}
-
-	return &InMemoryCooldownCache{
-		lruCache: lruCache,
-	}, nil
+func NewInMemoryCooldownCache() (*InMemoryCooldownCache, error) {
+	return &InMemoryCooldownCache{}, nil
 }
 
 // HasCheckCooldown checks if a check cooldown exists for the specified identifier.
 func (mem *InMemoryCooldownCache) HasCheckCooldown(certID string) (exists bool, err error) {
-	return mem.lruCache.Contains(certID), nil
+	cooldownLRUCacheMutex.RLock()
+	defer cooldownLRUCacheMutex.RUnlock()
+	return GetCooldownLRUCache().Contains(certID), nil
 }
 
 // IsCheckCooldownActive checks if a check cooldown is active for the specified identifier.
 func (mem *InMemoryCooldownCache) IsCheckCooldownActive(certID string) (active bool, err error) {
+	cooldownLRUCacheMutex.RLock()
+	defer cooldownLRUCacheMutex.RUnlock()
+
 	now := time.Now()
-	cooldowns, ok := mem.lruCache.Get(certID)
+	cooldowns, ok := GetCooldownLRUCache().Get(certID)
 	if !ok {
 		return false, ErrCheckCooldownDoesNotExist
 	}
@@ -82,32 +97,41 @@ func (mem *InMemoryCooldownCache) IsCheckCooldownActive(certID string) (active b
 
 // SetCheckCooldown sets a check cooldown for the specified identifier.
 func (mem *InMemoryCooldownCache) SetCheckCooldown(certID string, checkCooldownInSeconds int64) error {
+	cooldownLRUCacheMutex.Lock()
+	defer cooldownLRUCacheMutex.Unlock()
+
 	now := time.Now()
 	cooldownEndTime := now.Add(time.Duration(checkCooldownInSeconds) * time.Second)
 
-	cooldowns, ok := mem.lruCache.Get(certID)
+	cooldowns, ok := GetCooldownLRUCache().Get(certID)
 	if ok {
 		cooldowns.CheckCooldown = cooldownEndTime
-		mem.lruCache.Add(certID, cooldowns)
+		GetCooldownLRUCache().Add(certID, cooldowns)
+		return nil
 	}
 
 	newCooldowns := Cooldowns{
 		CheckCooldown:     cooldownEndTime,
 		FireEventCooldown: now,
 	}
-	mem.lruCache.Add(certID, newCooldowns)
+	GetCooldownLRUCache().Add(certID, newCooldowns)
 	return nil
 }
 
 // HasFireEventCooldown checks if a fire event cooldown exists for the specified identifier.
 func (mem *InMemoryCooldownCache) HasFireEventCooldown(certID string) (exists bool, err error) {
-	return mem.lruCache.Contains(certID), nil
+	cooldownLRUCacheMutex.RLock()
+	defer cooldownLRUCacheMutex.RUnlock()
+	return GetCooldownLRUCache().Contains(certID), nil
 }
 
 // IsFireEventCooldownActive checks if a fire event cooldown is active for the specified identifier.
 func (mem *InMemoryCooldownCache) IsFireEventCooldownActive(certID string) (active bool, err error) {
+	cooldownLRUCacheMutex.RLock()
+	defer cooldownLRUCacheMutex.RUnlock()
+
 	now := time.Now()
-	cooldowns, ok := mem.lruCache.Get(certID)
+	cooldowns, ok := GetCooldownLRUCache().Get(certID)
 	if !ok {
 		return false, ErrFireEventCooldownDoesNotExist
 	}
@@ -121,20 +145,17 @@ func (mem *InMemoryCooldownCache) IsFireEventCooldownActive(certID string) (acti
 
 // SetFireEventCooldown sets a fire event cooldown for the specified identifier.
 func (mem *InMemoryCooldownCache) SetFireEventCooldown(certID string, fireEventCooldownInSeconds int64) error {
+	cooldownLRUCacheMutex.Lock()
+	defer cooldownLRUCacheMutex.Unlock()
+
 	now := time.Now()
 	cooldownEndTime := now.Add(time.Duration(fireEventCooldownInSeconds) * time.Second)
-
-	cooldowns, ok := mem.lruCache.Get(certID)
-	if ok {
-		cooldowns.FireEventCooldown = cooldownEndTime
-		mem.lruCache.Add(certID, cooldowns)
-	}
 
 	newCooldowns := Cooldowns{
 		CheckCooldown:     now,
 		FireEventCooldown: cooldownEndTime,
 	}
-	mem.lruCache.Add(certID, newCooldowns)
+	GetCooldownLRUCache().Add(certID, newCooldowns)
 	return nil
 }
 

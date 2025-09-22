@@ -176,7 +176,7 @@ func (k *ExternalOAuthMiddleware) getSecretFromJWKURL(url string, kid interface{
 	if !found {
 		// Create HTTP client using factory for OAuth service
 		clientFactory := NewExternalHTTPClientFactory(k.Gw)
-		client, clientErr := clientFactory.CreateJWKClient(k.Gw.GetConfig().JWTSSLInsecureSkipVerify)
+		client, clientErr := clientFactory.CreateJWKClient()
 		if clientErr != nil {
 			k.Logger().WithError(clientErr).Error("Failed to create JWK HTTP client")
 			// Fallback to original method if client factory fails

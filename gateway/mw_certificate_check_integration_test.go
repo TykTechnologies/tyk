@@ -209,9 +209,9 @@ func setupCertificateCheckMWIntegrationWithEvents(t *testing.T, _ bool, certs []
 
 // TestCertificateCheckMW_Integration_CoreFunctionality tests the core certificate expiration logic
 func TestCertificateCheckMW_Integration_CoreFunctionality(t *testing.T) {
-	t.Parallel()
-
 	t.Run("Valid Certificate - No Event Fired", func(t *testing.T) {
+		t.Cleanup(certcheck.GetCooldownLRUCache().Purge)
+
 		// Create a certificate that expires in 90 days (outside warning threshold of 60 days)
 		cert := createTestCertificate(90, "valid.example.com")
 
@@ -225,6 +225,8 @@ func TestCertificateCheckMW_Integration_CoreFunctionality(t *testing.T) {
 	})
 
 	t.Run("Expiring Certificate - Event Should Be Fired", func(t *testing.T) {
+		t.Cleanup(certcheck.GetCooldownLRUCache().Purge)
+
 		// Create a certificate that expires in 15 days (within warning threshold)
 		cert := createTestCertificate(15, "expiring.example.com")
 
@@ -266,6 +268,8 @@ func TestCertificateCheckMW_Integration_CoreFunctionality(t *testing.T) {
 	})
 
 	t.Run("Critical Certificate - Event Should Be Fired", func(t *testing.T) {
+		t.Cleanup(certcheck.GetCooldownLRUCache().Purge)
+
 		// Create a certificate that expires in 5 days (critical)
 		cert := createTestCertificate(5, "critical.example.com")
 
@@ -298,6 +302,8 @@ func TestCertificateCheckMW_Integration_CoreFunctionality(t *testing.T) {
 	})
 
 	t.Run("Expired Certificate - Event Should Be Fired", func(t *testing.T) {
+		t.Cleanup(certcheck.GetCooldownLRUCache().Purge)
+
 		// Create a certificate that expires in 5 days (critical)
 		cert := createTestCertificate(-15, "expired.example.com")
 
@@ -339,6 +345,8 @@ func TestCertificateCheckMW_Integration_CoreFunctionality(t *testing.T) {
 	})
 
 	t.Run("Multiple Certificates - Mixed Expiration", func(t *testing.T) {
+		t.Cleanup(certcheck.GetCooldownLRUCache().Purge)
+
 		// Create certificates with different expiration dates
 		validCert := createTestCertificate(90, "valid.example.com") // Outside 60-day threshold
 		expiringCert := createTestCertificate(15, "expiring.example.com")

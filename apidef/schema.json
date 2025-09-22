@@ -126,6 +126,10 @@
           "url": {
             "type": "string",
             "format": "uri"
+          },
+          "cache_timeout": {
+            "type": "number",
+            "minimum": 0
           }
         },
         "required": ["url"]
@@ -1131,6 +1135,18 @@
               }
             }
           }
+        }
+      }
+    },
+    "security_requirements": {
+      "type": [
+        "array",
+        "null"
+      ],
+      "items": {
+        "type": "array",
+        "items": {
+          "type": "string"
         }
       }
     }

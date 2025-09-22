@@ -6,8 +6,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/rs/cors"
-	"github.com/samber/lo"
 	htmltemplate "html/template"
 	"io/ioutil"
 	stdlog "log"
@@ -23,20 +21,17 @@ import (
 	"strconv"
 	"strings"
 	"sync"
-
-	"github.com/TykTechnologies/tyk/tcp"
-	"github.com/TykTechnologies/tyk/trace"
-
 	"sync/atomic"
 	"syscall"
 	texttemplate "text/template"
 	"time"
 
-	"github.com/TykTechnologies/tyk/internal/crypto"
-	"github.com/TykTechnologies/tyk/internal/httputil"
-	"github.com/TykTechnologies/tyk/internal/otel"
-	"github.com/TykTechnologies/tyk/internal/scheduler"
-	"github.com/TykTechnologies/tyk/test"
+	"github.com/rs/cors"
+	"github.com/samber/lo"
+
+	"github.com/TykTechnologies/tyk/tcp"
+	"github.com/TykTechnologies/tyk/trace"
+
 	logstashhook "github.com/bshuster-repo/logrus-logstash-hook"
 	logrussentry "github.com/evalphobia/logrus_sentry"
 	grayloghook "github.com/gemnasium/logrus-graylog-hook"
@@ -44,6 +39,12 @@ import (
 	"github.com/lonelycode/osin"
 	"github.com/sirupsen/logrus"
 	logrussyslog "github.com/sirupsen/logrus/hooks/syslog"
+
+	"github.com/TykTechnologies/tyk/internal/crypto"
+	"github.com/TykTechnologies/tyk/internal/httputil"
+	"github.com/TykTechnologies/tyk/internal/otel"
+	"github.com/TykTechnologies/tyk/internal/scheduler"
+	"github.com/TykTechnologies/tyk/test"
 
 	"github.com/TykTechnologies/tyk/internal/uuid"
 
@@ -775,6 +776,8 @@ func (gw *Gateway) loadControlAPIEndpoints(muxer *mux.Router) {
 	}
 
 	r.HandleFunc("/debug", gw.traceHandler).Methods("POST")
+	r.HandleFunc("/cache/jwks/{apiID}", gw.invalidateJWKSCacheForAPIID).Methods("DELETE")
+	r.HandleFunc("/cache/jwks", gw.invalidateJWKSCacheForAllAPIs).Methods("DELETE")
 	r.HandleFunc("/cache/{apiID}", gw.invalidateCacheHandler).Methods("DELETE")
 	r.HandleFunc("/keys", gw.keyHandler).Methods("POST", "PUT", "GET", "DELETE")
 	r.HandleFunc("/keys/preview", gw.previewKeyHandler).Methods("POST")

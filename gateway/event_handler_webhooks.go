@@ -189,14 +189,26 @@ func (w *WebHookHandler) Checksum(em config.EventMessage, reqBody string) (strin
 		if !ok {
 			return "", ErrCouldNotCastMetaData
 		}
-		hashBody := fmt.Sprintf("%s%s%s%s", em.Type, meta.CertID, meta.CertName, meta.ExpiresAt.String())
+		hashBody := fmt.Sprintf("%s%s%s%s%s",
+			em.Type,
+			meta.CertID,
+			meta.CertName,
+			meta.ExpiresAt.String(),
+			meta.APIID,
+		)
 		h.Write([]byte(hashBody))
 	case EventCertificateExpired:
 		meta, ok := em.Meta.(certcheck.EventCertificateExpiredMeta)
 		if !ok {
 			return "", ErrCouldNotCastMetaData
 		}
-		hashBody := fmt.Sprintf("%s%s%s%s", em.Type, meta.CertID, meta.CertName, meta.ExpiredAt.String())
+		hashBody := fmt.Sprintf("%s%s%s%s%s",
+			em.Type,
+			meta.CertID,
+			meta.CertName,
+			meta.ExpiredAt.String(),
+			meta.APIID,
+		)
 		h.Write([]byte(hashBody))
 	default:
 		localRequest, err := http.NewRequest(string(w.getRequestMethod(w.conf.Method)), w.conf.TargetPath, strings.NewReader(reqBody))
