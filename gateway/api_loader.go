@@ -357,33 +357,36 @@ func (gw *Gateway) processSpec(
 			logger.Info("Checking security policy: OpenID")
 		}
 
-		customPluginAuthEnabled := spec.CustomPluginAuthEnabled || spec.UseGoPluginAuth || spec.EnableCoProcessAuth
+		if spec.CustomPluginAuthEnabled && !mwAuthCheckFunc.Disabled {
+			if spec.CustomMiddleware.Driver == "" || mwAuthCheckFunc.Path == "" {
+				logger.Warn("No plugin driver found")
+				gw.mwAppendEnabled(&authArray, &PluginAuthGatekeeperMiddleware{BaseMiddleware: baseMid.Copy()})
+			} else {
+				switch spec.CustomMiddleware.Driver {
+				case apidef.OttoDriver:
+					logger.Info("----> Checking security policy: JS Plugin")
+					authArray = append(authArray, gw.createMiddleware(&DynamicMiddleware{
+						BaseMiddleware:      baseMid.Copy(),
+						MiddlewareClassName: mwAuthCheckFunc.Name,
+						Pre:                 true,
+						Auth:                true,
+					}))
+				case apidef.GoPluginDriver:
+					gw.mwAppendEnabled(
+						&authArray,
+						&GoPluginMiddleware{
+							BaseMiddleware: baseMid.Copy(),
+							Path:           mwAuthCheckFunc.Path,
+							SymbolName:     mwAuthCheckFunc.Name,
+							APILevel:       true,
+						},
+					)
+				default:
+					coprocessLog.Debug("Registering coprocess middleware, hook name: ", mwAuthCheckFunc.Name, "hook type: CustomKeyCheck", ", driver: ", mwDriver)
 
-		if customPluginAuthEnabled && !mwAuthCheckFunc.Disabled {
-			switch spec.CustomMiddleware.Driver {
-			case apidef.OttoDriver:
-				logger.Info("----> Checking security policy: JS Plugin")
-				authArray = append(authArray, gw.createMiddleware(&DynamicMiddleware{
-					BaseMiddleware:      baseMid.Copy(),
-					MiddlewareClassName: mwAuthCheckFunc.Name,
-					Pre:                 true,
-					Auth:                true,
-				}))
-			case apidef.GoPluginDriver:
-				gw.mwAppendEnabled(
-					&authArray,
-					&GoPluginMiddleware{
-						BaseMiddleware: baseMid.Copy(),
-						Path:           mwAuthCheckFunc.Path,
-						SymbolName:     mwAuthCheckFunc.Name,
-						APILevel:       true,
-					},
-				)
-			default:
-				coprocessLog.Debug("Registering coprocess middleware, hook name: ", mwAuthCheckFunc.Name, "hook type: CustomKeyCheck", ", driver: ", mwDriver)
-
-				newExtractor(spec, baseMid.Copy())
-				gw.mwAppendEnabled(&authArray, &CoProcessMiddleware{baseMid.Copy(), coprocess.HookType_CustomKeyCheck, mwAuthCheckFunc.Name, mwDriver, mwAuthCheckFunc.RawBodyOnly, nil})
+					newExtractor(spec, baseMid.Copy())
+					gw.mwAppendEnabled(&authArray, &CoProcessMiddleware{baseMid.Copy(), coprocess.HookType_CustomKeyCheck, mwAuthCheckFunc.Name, mwDriver, mwAuthCheckFunc.RawBodyOnly, nil})
+				}
 			}
 		}
 
