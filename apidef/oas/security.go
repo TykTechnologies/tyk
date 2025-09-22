@@ -401,31 +401,9 @@ func (s *OAS) extractJWTTo(api *apidef.APIDefinition, name string) {
 
 	jwt := s.getTykJWTAuth(name)
 
-	// Handle both standard OpenAPI JWT schemes and Tyk-extended JWT schemes.
-	// Standard OpenAPI schemes (without Tyk extension) are enabled by default.
-	// Tyk-extended schemes use the enabled value from the extension
-	if s.Components != nil && s.Components.SecuritySchemes != nil {
-		if scheme, exists := s.Components.SecuritySchemes[name]; exists {
-			schemeValue := scheme.Value
-			if schemeValue != nil && schemeValue.Type == typeHTTP && schemeValue.Scheme == schemeBearer {
-				// This is a standard OpenAPI bearer/JWT auth scheme
-				// Check if there's a Tyk extension for it
-				_, hasTykExtension := s.getTykSecuritySchemes()[name]
-				if !hasTykExtension {
-					// Standard OpenAPI bearer auth without Tyk extension - enable by default
-					api.EnableJWT = true
-				} else if jwt != nil {
-					// Has Tyk extension - use its enabled value
-					api.EnableJWT = jwt.Enabled
-				}
-			}
-		}
-	} else if jwt != nil {
-		// No OpenAPI components, but has Tyk extension
-		api.EnableJWT = jwt.Enabled
-	}
-
+	// Only enable JWT if there's an explicit Tyk extension configuration
 	if jwt != nil {
+		api.EnableJWT = jwt.Enabled
 		jwt.AuthSources.ExtractTo(&ac)
 		api.JWTSource = jwt.Source
 
@@ -454,11 +432,6 @@ func (s *OAS) extractJWTTo(api *apidef.APIDefinition, name string) {
 		api.JWTNotBeforeValidationSkew = jwt.NotBeforeValidationSkew
 		api.JWTExpiresAtValidationSkew = jwt.ExpiresAtValidationSkew
 		api.IDPClientIDMappingDisabled = jwt.IDPClientIDMappingDisabled
-	} else {
-		// Standard OpenAPI JWT/Bearer auth without Tyk extension
-		// Set default to read from Authorization header
-		ac.DisableHeader = false
-		ac.AuthHeaderName = "Authorization"
 	}
 
 	api.AuthConfigs[apidef.JWTType] = ac
@@ -543,31 +516,9 @@ func (s *OAS) extractBasicTo(api *apidef.APIDefinition, name string) {
 
 	basic := s.getTykBasicAuth(name)
 
-	// Handle both standard OpenAPI basic auth schemes and Tyk-extended basic auth schemes.
-	// Standard OpenAPI schemes (without Tyk extension) are enabled by default.
-	// Tyk-extended schemes use the enabled value from the extension
-	if s.Components != nil && s.Components.SecuritySchemes != nil {
-		if scheme, exists := s.Components.SecuritySchemes[name]; exists {
-			schemeValue := scheme.Value
-			if schemeValue != nil && schemeValue.Type == typeHTTP && schemeValue.Scheme == schemeBasic {
-				// This is a standard OpenAPI basic auth scheme
-				// Check if there's a Tyk extension for it
-				_, hasTykExtension := s.getTykSecuritySchemes()[name]
-				if !hasTykExtension {
-					// Standard OpenAPI basic auth without Tyk extension - enable by default
-					api.UseBasicAuth = true
-				} else if basic != nil {
-					// Has Tyk extension - use its enabled value
-					api.UseBasicAuth = basic.Enabled
-				}
-			}
-		}
-	} else if basic != nil {
-		// No OpenAPI components, but has Tyk extension
-		api.UseBasicAuth = basic.Enabled
-	}
-
+	// Only enable basic auth if there's an explicit Tyk extension configuration
 	if basic != nil {
+		api.UseBasicAuth = basic.Enabled
 		basic.AuthSources.ExtractTo(&ac)
 		api.BasicAuth.DisableCaching = basic.DisableCaching
 		api.BasicAuth.CacheTTL = basic.CacheTTL
@@ -575,11 +526,6 @@ func (s *OAS) extractBasicTo(api *apidef.APIDefinition, name string) {
 		if basic.ExtractCredentialsFromBody != nil {
 			basic.ExtractCredentialsFromBody.ExtractTo(api)
 		}
-	} else {
-		// Standard OpenAPI basic auth without Tyk extension
-		// Set default to read from Authorization header
-		ac.DisableHeader = false
-		ac.AuthHeaderName = "Authorization"
 	}
 
 	api.AuthConfigs[apidef.BasicType] = ac
@@ -1150,9 +1096,7 @@ func (s *OAS) extractSecurityTo(api *apidef.APIDefinition) {
 		if s.getTykAuthentication() != nil && len(s.getTykAuthentication().Security) > 0 {
 			api.SecurityRequirements = append(api.SecurityRequirements, s.getTykAuthentication().Security...)
 		}
-	} else if len(s.Security) > 0 {
-		// Legacy mode - extract all security requirements (even single ones)
-		// This ensures they are preserved during the Fill/Extract cycle
+	} else if len(s.Security) > 1 {
 		api.SecurityRequirements = make([][]string, 0, len(s.Security))
 		for _, requirement := range s.Security {
 			schemes := make([]string, 0, len(requirement))
@@ -1166,12 +1110,20 @@ func (s *OAS) extractSecurityTo(api *apidef.APIDefinition) {
 	// Process security requirements based on processing mode:
 	// - Compliant mode: Process ALL security requirements to enable multiple auth methods with OR logic
 	// - Legacy mode: Process only the first requirement for backward compatibility
+	// BUT only if Tyk authentication is configured (don't auto-extract from bare OAS)
 	requirementsToProcess := []openapi3.SecurityRequirement{}
+	tykAuth := s.getTykAuthentication()
+	hasEnabledSchemes := false
+	if tykAuth != nil && tykAuth.SecuritySchemes != nil {
+		// Check if any security scheme is defined in Tyk extension
+		hasEnabledSchemes = len(tykAuth.SecuritySchemes) > 0
+	}
+
 	if processingMode == SecurityProcessingModeCompliant && len(s.Security) > 0 {
 		// Process all requirements in compliant mode
 		requirementsToProcess = s.Security
-	} else if len(s.Security) > 0 {
-		// Legacy mode - only process first requirement
+	} else if len(s.Security) > 0 && tykAuth != nil && (tykAuth.Enabled || hasEnabledSchemes) {
+		// Legacy mode - process first requirement if Tyk authentication is enabled OR has security schemes defined
 		requirementsToProcess = s.Security[:1]
 	}
 
