@@ -60,6 +60,9 @@ type TykExtensionConfigParams struct {
 	ValidateRequest *bool
 	// MockResponse is true if a mocked response is configured.
 	MockResponse *bool
+	// SecurityProcessingMode controls how multiple security requirements are processed.
+	// Can be "legacy" or "compliant".
+	SecurityProcessingMode string
 
 	// pathItemHasParameters is set to true when parameters are defined the same level as of operations within path.
 	pathItemHasParameters bool
@@ -135,6 +138,14 @@ func (s *OAS) BuildDefaultTykExtension(overRideValues TykExtensionConfigParams, 
 		if err != nil {
 			return err
 		}
+	}
+
+	// Set SecurityProcessingMode if provided
+	if overRideValues.SecurityProcessingMode != "" {
+		if xTykAPIGateway.Server.Authentication == nil {
+			xTykAPIGateway.Server.Authentication = &Authentication{}
+		}
+		xTykAPIGateway.Server.Authentication.SecurityProcessingMode = overRideValues.SecurityProcessingMode
 	}
 
 	s.ImportMiddlewares(overRideValues)
@@ -301,6 +312,16 @@ func GetTykExtensionConfigParams(r *http.Request) *TykExtensionConfigParams {
 	overRideValues.ValidateRequest = getQueryValPtr(strings.TrimSpace(queries.Get("validateRequest")))
 	overRideValues.AllowList = getQueryValPtr(strings.TrimSpace(queries.Get("allowList")))
 	overRideValues.MockResponse = getQueryValPtr(strings.TrimSpace(queries.Get("mockResponse")))
+
+	processingMode := strings.TrimSpace(queries.Get("securityProcessingMode"))
+	if processingMode != "" {
+		overRideValues.SecurityProcessingMode = processingMode
+	} else {
+		authParam := strings.TrimSpace(queries.Get("authentication"))
+		if authParam == "compliant" {
+			overRideValues.SecurityProcessingMode = SecurityProcessingModeCompliant
+		}
+	}
 
 	if ShouldOmit(overRideValues) {
 		return nil
