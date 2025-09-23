@@ -289,8 +289,9 @@ type schemaModifier struct {
 }
 
 func (c *schemaModifier) cacheKey() string {
-	allowedFields := slices.SortedFunc(slices.Values(c.allowedFields), strings.Compare)
-	return fmt.Sprintf("%s:%#v", c.version, allowedFields)
+	allowedFields := slices.Clone(c.allowedFields)
+	slices.SortFunc(allowedFields, strings.Compare)
+	return c.version + ":" + strings.Join(allowedFields, ":")
 }
 
 func (c *schemaModifier) getSchema() ([]byte, error) {
