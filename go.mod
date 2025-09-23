@@ -105,6 +105,7 @@ require (
 	github.com/goccy/go-json v0.10.4
 	github.com/goccy/go-yaml v1.15.23
 	github.com/google/go-cmp v0.7.0
+	github.com/hashicorp/golang-lru v0.5.4
 	github.com/hashicorp/golang-lru/v2 v2.0.7
 	github.com/huandu/go-clone/generic v1.7.2
 	github.com/mccutchen/go-httpbin/v2 v2.18.2
@@ -349,7 +350,6 @@ require (
 	github.com/hashicorp/go-secure-stdlib/strutil v0.1.2 // indirect
 	github.com/hashicorp/go-sockaddr v1.0.2 // indirect
 	github.com/hashicorp/go-uuid v1.0.3 // indirect
-	github.com/hashicorp/golang-lru v0.5.4 // indirect
 	github.com/hashicorp/golang-lru/arc/v2 v2.0.7 // indirect
 	github.com/hashicorp/hcl v1.0.0 // indirect
 	github.com/hashicorp/raft v1.7.1 // indirect

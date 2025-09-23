@@ -4,7 +4,9 @@ import (
 	"embed"
 	"errors"
 	"fmt"
+	"github.com/TykTechnologies/tyk/pkg/utils"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 	"sync"
@@ -12,6 +14,7 @@ import (
 	"github.com/buger/jsonparser"
 	"github.com/hashicorp/go-multierror"
 	pkgver "github.com/hashicorp/go-version"
+	lru "github.com/hashicorp/golang-lru"
 
 	"github.com/TykTechnologies/tyk/common/option"
 	tykerrors "github.com/TykTechnologies/tyk/internal/errors"
@@ -28,6 +31,12 @@ const (
 	keyRequired                 = "required"
 	keyAnyOf                    = "anyOf"
 	oasSchemaVersionNotFoundFmt = "Schema not found for version %q"
+
+	defaultLruCacheSize = 1 << 10
+)
+
+var (
+	errUnexpected = errors.New("unexpected: invariant broken")
 )
 
 var (
@@ -38,6 +47,8 @@ var (
 	oasJSONSchemas map[string][]byte
 
 	defaultVersion string
+
+	defaultSchemaCache = utils.Must(NewLruSchemaCache(defaultLruCacheSize))
 )
 
 func loadOASSchema() error {
@@ -127,16 +138,9 @@ func validateJSON(schema, document []byte) error {
 
 }
 
-type jsonSchema []byte
-
 // ValidateOASObject validates an OAS document against a particular OAS version.
-func ValidateOASObject(documentBody []byte, oasVersion string, opts ...option.FailableOption[jsonSchema]) error {
+func ValidateOASObject(documentBody []byte, oasVersion string) error {
 	oasSchema, err := GetOASSchema(oasVersion)
-	if err != nil {
-		return err
-	}
-
-	oasSchema, err = applyOptions(oasSchema, opts)
 	if err != nil {
 		return err
 	}
@@ -144,23 +148,25 @@ func ValidateOASObject(documentBody []byte, oasVersion string, opts ...option.Fa
 	return validateJSON(oasSchema, documentBody)
 }
 
-func applyOptions(schema []byte, opts []option.FailableOption[jsonSchema]) ([]byte, error) {
-	if len(opts) == 0 {
-		return schema, nil
-	}
-
-	// Should be copied because schema is allocated on heap.
-	// Coping prevents mutation schema.
-	var copiedSchema = make([]byte, len(schema))
-	copy(copiedSchema, schema)
-
-	modifiedSchema, err := option.NewFailable(opts).Build(copiedSchema)
-
+// ValidateOASObjectWithOptions validates an OAS documents due to schema with additional options.
+func ValidateOASObjectWithOptions(documentBody []byte, oasVersion string, opts ...option.Option[schemaModifier]) error {
+	oasSchema, err := GetOASSchema(oasVersion)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	return *modifiedSchema, nil
+	modifier := option.New(opts).Build(schemaModifier{
+		cache:   defaultSchemaCache,
+		version: oasVersion,
+		schema:  oasSchema,
+	})
+
+	oasSchema, err = modifier.getSchema()
+	if err != nil {
+		return err
+	}
+
+	return validateJSON(oasSchema, documentBody)
 }
 
 // ValidateOASTemplate checks a Tyk OAS API template for necessary fields,
@@ -230,24 +236,16 @@ func GetOASSchema(version string) ([]byte, error) {
 }
 
 // AllowRootFields extends list of allowed fields on fly if field is not described
-func AllowRootFields(fields ...string) option.FailableOption[jsonSchema] {
-	return func(s *jsonSchema) error {
-		var schema = *s
+func AllowRootFields(fields ...string) option.Option[schemaModifier] {
+	return func(s *schemaModifier) {
+		s.allowedFields = fields
+	}
+}
 
-		for _, field := range fields {
-			_, typ, _, err := jsonparser.Get(schema, keyProperties, field)
-
-			if typ == jsonparser.NotExist && errors.Is(err, jsonparser.KeyPathNotFoundError) {
-				if schema, err = jsonparser.Set(schema, []byte(`{}`), keyProperties, field); err != nil {
-					return err
-				}
-			} else if err != nil {
-				return err
-			}
-		}
-
-		*s = schema
-		return nil
+// WithCache allows pass optional cache
+func WithCache(cache SchemaCache) option.Option[schemaModifier] {
+	return func(s *schemaModifier) {
+		s.cache = cache
 	}
 }
 
@@ -281,4 +279,115 @@ func getMinorVersion(version string) (string, error) {
 
 	segments := v.Segments()
 	return fmt.Sprintf("%d.%d", segments[0], segments[1]), nil
+}
+
+type schemaModifier struct {
+	version       string
+	schema        []byte
+	allowedFields []string
+	cache         SchemaCache
+}
+
+func (c *schemaModifier) cacheKey() string {
+	allowedFields := slices.SortedFunc(slices.Values(c.allowedFields), strings.Compare)
+	return fmt.Sprintf("%s:%#v", c.version, allowedFields)
+}
+
+func (c *schemaModifier) getSchema() ([]byte, error) {
+	if len(c.allowedFields) == 0 {
+		return c.schema, nil
+	}
+
+	key := c.cacheKey()
+
+	if schema, err := c.cache.Get(key, func() ([]byte, error) {
+		var schema = copyBytes(c.schema)
+
+		for _, field := range c.allowedFields {
+			_, _, _, err := jsonparser.Get(schema, keyProperties, field)
+
+			if errors.Is(err, jsonparser.KeyPathNotFoundError) {
+				if schema, err = jsonparser.Set(schema, []byte(`{}`), keyProperties, field); err != nil {
+					return nil, err
+				}
+			} else if err != nil {
+				return nil, err
+			}
+		}
+
+		return schema, nil
+	}); err != nil {
+		return nil, err
+	} else {
+		return schema, nil
+	}
+}
+
+// SchemaCache json schema cache.
+type SchemaCache interface {
+	Get(key string, create func() ([]byte, error)) ([]byte, error)
+}
+
+// interface created for acceptance tests purposes
+type extendedSchemaCache interface {
+	SchemaCache
+	Purge()
+	Len() int
+}
+
+var _ SchemaCache = (*LruSchemaCache)(nil)
+
+// LruSchemaCache schema caching object which implements LRU algorithm under the hood.
+type LruSchemaCache struct {
+	capacity int
+	cache    *lru.Cache
+}
+
+// NewLruSchemaCache create new cache instance.
+func NewLruSchemaCache(capacity int) (*LruSchemaCache, error) {
+	lruCache, err := lru.New(capacity)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &LruSchemaCache{
+		capacity: capacity,
+		cache:    lruCache,
+	}, nil
+}
+
+func (l *LruSchemaCache) Get(key string, create func() ([]byte, error)) ([]byte, error) {
+	if res, ok := l.cache.Get(key); ok {
+		bRes, okCast := res.([]byte)
+
+		if !okCast {
+			return nil, errUnexpected
+		}
+
+		return bRes, nil
+	}
+
+	newEntry, err := create()
+	if err != nil {
+		return nil, err
+	}
+
+	_ = l.cache.Add(key, newEntry)
+
+	return newEntry, nil
+}
+
+func (l *LruSchemaCache) Purge() {
+	l.cache.Purge()
+}
+
+func (l *LruSchemaCache) Len() int {
+	return l.cache.Len()
+}
+
+func copyBytes(in []byte) []byte {
+	out := make([]byte, len(in))
+	copy(out, in)
+	return out
 }

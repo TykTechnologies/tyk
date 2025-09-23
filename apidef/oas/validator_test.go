@@ -295,25 +295,45 @@ func TestGetOASSchema(t *testing.T) {
 	})
 }
 
-func TestAllowRootFields(t *testing.T) {
+func TestValidateOASObjectWithLruCache(t *testing.T) {
+	schemaCache, err := NewLruSchemaCache(10)
+	require.NoError(t, err)
+	acceptanceTestsValidateOASObjectWithOptions(t, schemaCache)
+}
+
+// acceptanceTestsValidateOASObjectWithCache acceptance tests validator + cache
+func acceptanceTestsValidateOASObjectWithOptions(t *testing.T, cache extendedSchemaCache) {
+	t.Helper()
+
 	const oasVersion = "3.0.3"
 
-	t.Run("fails if addition filed exist but not allowed", func(t *testing.T) {
+	cache.Purge()
+	assert.Equal(t, 0, cache.Len())
+
+	t.Run("fails if additional field exists but not allowed", func(t *testing.T) {
 		spec := extendDefaultValidOas(t, `{"additional": true}`)
-		err := ValidateOASObject(spec, oasVersion)
-		require.Error(t, err)
+		err := ValidateOASObjectWithOptions(spec, oasVersion, WithCache(cache))
+		assert.Error(t, err)
+		assert.Equal(t, 0, cache.Len())
 	})
 
-	t.Run("does not fail if addition filed is allowed", func(t *testing.T) {
+	t.Run("does not fail if additional field is allowed", func(t *testing.T) {
 		spec := extendDefaultValidOas(t, `{"additional": true}`)
-		err := ValidateOASObject(spec, oasVersion, AllowRootFields("additional"))
-		require.NoError(t, err)
+		err := ValidateOASObjectWithOptions(spec, oasVersion, AllowRootFields("additional"), WithCache(cache))
+		assert.NoError(t, err)
+		assert.Equal(t, 1, cache.Len(), "puts one entry into cache")
+
+		spec2 := extendDefaultValidOas(t, `{"additional": true}`)
+		err2 := ValidateOASObjectWithOptions(spec2, oasVersion, AllowRootFields("additional"), WithCache(cache))
+		assert.NoError(t, err2)
+		assert.Equal(t, 1, cache.Len(), "does not extend cache")
 	})
 
 	t.Run("does not allow to override default validation rules", func(t *testing.T) {
 		spec := extendDefaultValidOas(t, `{"paths": true}`)
-		err := ValidateOASObject(spec, oasVersion, AllowRootFields("paths"))
-		require.Error(t, err)
+		err := ValidateOASObjectWithOptions(spec, oasVersion, AllowRootFields("paths"), WithCache(cache))
+		assert.Error(t, err)
+		assert.Equal(t, 2, cache.Len(), "extends cache once more")
 	})
 }
 
