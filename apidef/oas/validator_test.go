@@ -2,7 +2,9 @@ package oas
 
 import (
 	"embed"
+	"encoding/json"
 	"fmt"
+	jsonpatch "github.com/evanphx/json-patch"
 	"strings"
 	"testing"
 
@@ -291,4 +293,43 @@ func TestGetOASSchema(t *testing.T) {
 		expectedErr := fmt.Errorf("Malformed version: %s", reqOASVersion)
 		assert.Equal(t, expectedErr, err)
 	})
+}
+
+func TestAllowRootFields(t *testing.T) {
+	const oasVersion = "3.0.3"
+
+	t.Run("fails if addition filed exist but not allowed", func(t *testing.T) {
+		spec := extendDefaultValidOas(t, `{"additional": true}`)
+		err := ValidateOASObject(spec, oasVersion)
+		require.Error(t, err)
+	})
+
+	t.Run("does not fail if addition filed is allowed", func(t *testing.T) {
+		spec := extendDefaultValidOas(t, `{"additional": true}`)
+		err := ValidateOASObject(spec, oasVersion, AllowRootFields("additional"))
+		require.NoError(t, err)
+	})
+
+	t.Run("does not allow to override default validation rules", func(t *testing.T) {
+		spec := extendDefaultValidOas(t, `{"paths": true}`)
+		err := ValidateOASObject(spec, oasVersion, AllowRootFields("paths"))
+		require.Error(t, err)
+	})
+}
+
+func extendDefaultValidOas(t testing.TB, patch string) []byte {
+	t.Helper()
+
+	var spec openapi3.T
+	spec.OpenAPI = "3.0.3"
+	spec.Paths = openapi3.NewPaths()
+	spec.Info = &openapi3.Info{}
+
+	data, err := json.Marshal(spec)
+	require.NoError(t, err)
+
+	data, err = jsonpatch.MergePatch(data, []byte(patch))
+	require.NoError(t, err)
+
+	return data
 }

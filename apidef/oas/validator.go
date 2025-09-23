@@ -13,6 +13,7 @@ import (
 	"github.com/hashicorp/go-multierror"
 	pkgver "github.com/hashicorp/go-version"
 
+	"github.com/TykTechnologies/tyk/common/option"
 	tykerrors "github.com/TykTechnologies/tyk/internal/errors"
 	"github.com/TykTechnologies/tyk/internal/service/gojsonschema"
 	logger "github.com/TykTechnologies/tyk/log"
@@ -126,14 +127,40 @@ func validateJSON(schema, document []byte) error {
 
 }
 
+type jsonSchema []byte
+
 // ValidateOASObject validates an OAS document against a particular OAS version.
-func ValidateOASObject(documentBody []byte, oasVersion string) error {
+func ValidateOASObject(documentBody []byte, oasVersion string, opts ...option.FailableOption[jsonSchema]) error {
 	oasSchema, err := GetOASSchema(oasVersion)
 	if err != nil {
 		return err
 	}
 
+	oasSchema, err = applyOptions(oasSchema, opts)
+	if err != nil {
+		return err
+	}
+
 	return validateJSON(oasSchema, documentBody)
+}
+
+func applyOptions(schema []byte, opts []option.FailableOption[jsonSchema]) ([]byte, error) {
+	if len(opts) == 0 {
+		return schema, nil
+	}
+
+	// Should be copied because schema is allocated on heap.
+	// Coping prevents mutation schema.
+	var copiedSchema = make([]byte, len(schema))
+	copy(copiedSchema, schema)
+
+	modifiedSchema, err := option.NewFailable(opts).Build(copiedSchema)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return *modifiedSchema, nil
 }
 
 // ValidateOASTemplate checks a Tyk OAS API template for necessary fields,
@@ -200,6 +227,28 @@ func GetOASSchema(version string) ([]byte, error) {
 	}
 
 	return oasSchema, nil
+}
+
+// AllowRootFields extends list of allowed fields on fly if field is not described
+func AllowRootFields(fields ...string) option.FailableOption[jsonSchema] {
+	return func(s *jsonSchema) error {
+		var schema = *s
+
+		for _, field := range fields {
+			_, typ, _, err := jsonparser.Get(schema, keyProperties, field)
+
+			if typ == jsonparser.NotExist && errors.Is(err, jsonparser.KeyPathNotFoundError) {
+				if schema, err = jsonparser.Set(schema, []byte(`{}`), keyProperties, field); err != nil {
+					return err
+				}
+			} else if err != nil {
+				return err
+			}
+		}
+
+		*s = schema
+		return nil
+	}
 }
 
 func findDefaultVersion(rawVersions []string) string {

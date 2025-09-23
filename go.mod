@@ -99,6 +99,7 @@ require (
 	github.com/TykTechnologies/opentelemetry v0.0.22
 	github.com/alecthomas/kingpin/v2 v2.4.0
 	github.com/eclipse/paho.mqtt.golang v1.4.3
+	github.com/evanphx/json-patch v4.12.0+incompatible
 	github.com/getkin/kin-openapi v0.132.0
 	github.com/go-redis/redismock/v9 v9.2.0
 	github.com/goccy/go-json v0.10.4
