@@ -337,8 +337,8 @@ func acceptanceTestsValidateOASObjectWithOptions(t *testing.T, cache extendedSch
 	})
 }
 
-func extendDefaultValidOas(t testing.TB, patch string) []byte {
-	t.Helper()
+func extendDefaultValidOas(tb testing.TB, patch string) []byte {
+	tb.Helper()
 
 	var spec openapi3.T
 	spec.OpenAPI = "3.0.3"
@@ -346,10 +346,10 @@ func extendDefaultValidOas(t testing.TB, patch string) []byte {
 	spec.Info = &openapi3.Info{}
 
 	data, err := json.Marshal(spec)
-	require.NoError(t, err)
+	require.NoError(tb, err)
 
 	data, err = jsonpatch.MergePatch(data, []byte(patch))
-	require.NoError(t, err)
+	require.NoError(tb, err)
 
 	return data
 }
