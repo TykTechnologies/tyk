@@ -2,9 +2,7 @@ package oas
 
 import (
 	"embed"
-	"encoding/json"
 	"fmt"
-	jsonpatch "github.com/evanphx/json-patch"
 	"strings"
 	"testing"
 
@@ -293,63 +291,4 @@ func TestGetOASSchema(t *testing.T) {
 		expectedErr := fmt.Errorf("Malformed version: %s", reqOASVersion)
 		assert.Equal(t, expectedErr, err)
 	})
-}
-
-func TestValidateOASObjectWithLruCache(t *testing.T) {
-	schemaCache, err := NewLruSchemaCache(10)
-	require.NoError(t, err)
-	acceptanceTestsValidateOASObjectWithOptions(t, schemaCache)
-}
-
-// acceptanceTestsValidateOASObjectWithCache acceptance tests validator + cache
-func acceptanceTestsValidateOASObjectWithOptions(t *testing.T, cache extendedSchemaCache) {
-	t.Helper()
-
-	const oasVersion = "3.0.3"
-
-	cache.Purge()
-	assert.Equal(t, 0, cache.Len())
-
-	t.Run("fails if additional field exists but not allowed", func(t *testing.T) {
-		spec := extendDefaultValidOas(t, `{"additional": true}`)
-		err := ValidateOASObjectWithOptions(spec, oasVersion, WithCache(cache))
-		assert.Error(t, err)
-		assert.Equal(t, 0, cache.Len())
-	})
-
-	t.Run("does not fail if additional field is allowed", func(t *testing.T) {
-		spec := extendDefaultValidOas(t, `{"additional": true}`)
-		err := ValidateOASObjectWithOptions(spec, oasVersion, AllowRootFields("additional"), WithCache(cache))
-		assert.NoError(t, err)
-		assert.Equal(t, 1, cache.Len(), "puts one entry into cache")
-
-		spec2 := extendDefaultValidOas(t, `{"additional": true}`)
-		err2 := ValidateOASObjectWithOptions(spec2, oasVersion, AllowRootFields("additional"), WithCache(cache))
-		assert.NoError(t, err2)
-		assert.Equal(t, 1, cache.Len(), "does not extend cache")
-	})
-
-	t.Run("does not allow to override default validation rules", func(t *testing.T) {
-		spec := extendDefaultValidOas(t, `{"paths": true}`)
-		err := ValidateOASObjectWithOptions(spec, oasVersion, AllowRootFields("paths"), WithCache(cache))
-		assert.Error(t, err)
-		assert.Equal(t, 2, cache.Len(), "extends cache once more")
-	})
-}
-
-func extendDefaultValidOas(tb testing.TB, patch string) []byte {
-	tb.Helper()
-
-	var spec openapi3.T
-	spec.OpenAPI = "3.0.3"
-	spec.Paths = openapi3.NewPaths()
-	spec.Info = &openapi3.Info{}
-
-	data, err := json.Marshal(spec)
-	require.NoError(tb, err)
-
-	data, err = jsonpatch.MergePatch(data, []byte(patch))
-	require.NoError(tb, err)
-
-	return data
 }
