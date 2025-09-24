@@ -373,7 +373,9 @@ func (gw *Gateway) processSpec(
 			authMiddlewares = append(authMiddlewares, openIDMW)
 		}
 
-		if spec.CustomPluginAuthEnabled && !mwAuthCheckFunc.Disabled {
+		customPluginAuthEnabled := spec.CustomPluginAuthEnabled || spec.UseGoPluginAuth || spec.EnableCoProcessAuth
+
+		if customPluginAuthEnabled && !mwAuthCheckFunc.Disabled {
 			if spec.CustomMiddleware.Driver == "" || mwAuthCheckFunc.Path == "" {
 				logger.Warn("No plugin driver found")
 				gateKeeperMW := &PluginAuthGatekeeperMiddleware{BaseMiddleware: baseMid.Copy()}
