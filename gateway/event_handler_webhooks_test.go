@@ -1,6 +1,7 @@
 package gateway
 
 import (
+	"encoding/json"
 	"net/http"
 	"path/filepath"
 	"strings"
@@ -8,6 +9,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/header"
@@ -341,6 +343,112 @@ func TestPost(t *testing.T) {
 	if wasFired := eventHandler.WasHookFired(checksum); !wasFired {
 		t.Error("Checksum should have matched, event did not fire!")
 	}
+}
+
+func TestTemplates(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	conf := map[string]interface{}{
+		"disabled":      false,
+		"method":        "POST",
+		"target_path":   testHttpPost,
+		"template_path": "../templates/default_webhook.json",
+		"header_map":    nil,
+		"event_timeout": 10,
+	}
+
+	webhookHandler := ts.createWebHookHandler(t)
+	err := webhookHandler.Init(conf)
+	require.NoError(t, err)
+
+	t.Run("CertificateExpiringSoon", func(t *testing.T) {
+		type ActualExpiringSoon struct {
+			Event         string `json:"event"`
+			Message       string `json:"message"`
+			CertID        string `json:"cert_id"`
+			CertName      string `json:"cert_name"`
+			ExpiresAt     string `json:"expires_at"`
+			DaysRemaining int    `json:"days_remaining"`
+			APIID         string `json:"api_id"`
+			Timestamp     string `json:"timestamp"`
+		}
+
+		meta := certcheck.EventCertificateExpiringSoonMeta{
+			EventMetaDefault: model.EventMetaDefault{
+				Message: "Certificate will expire in 1 day",
+			},
+			CertID:        "123abc",
+			CertName:      "Cert Soon To Expire",
+			ExpiresAt:     time.Now().Add(time.Hour * 24),
+			DaysRemaining: 1,
+			APIID:         "123abc",
+		}
+
+		eventMessage := config.EventMessage{
+			Type: EventCertificateExpiringSoon,
+			Meta: meta,
+		}
+
+		stringMessage, err := webhookHandler.CreateBody(eventMessage)
+		assert.NoError(t, err)
+
+		var actualExpiringSoon ActualExpiringSoon
+		err = json.Unmarshal([]byte(stringMessage), &actualExpiringSoon)
+		assert.NoError(t, err)
+
+		assert.Equal(t, string(EventCertificateExpiringSoon), actualExpiringSoon.Event)
+		assert.Equal(t, meta.EventMetaDefault.Message, actualExpiringSoon.Message)
+		assert.Equal(t, meta.CertID, actualExpiringSoon.CertID)
+		assert.Equal(t, meta.CertName, actualExpiringSoon.CertName)
+		assert.NotEmpty(t, actualExpiringSoon.ExpiresAt)
+		assert.Equal(t, 1, actualExpiringSoon.DaysRemaining)
+		assert.Equal(t, meta.APIID, actualExpiringSoon.APIID)
+	})
+
+	t.Run("CertificateExpired", func(t *testing.T) {
+		type ActualExpired struct {
+			Event           string `json:"event"`
+			Message         string `json:"message"`
+			CertID          string `json:"cert_id"`
+			CertName        string `json:"cert_name"`
+			ExpiredAt       string `json:"expired_at"`
+			DaysSinceExpiry int    `json:"days_since_expiry"`
+			APIID           string `json:"api_id"`
+			Timestamp       string `json:"timestamp"`
+		}
+
+		meta := certcheck.EventCertificateExpiredMeta{
+			EventMetaDefault: model.EventMetaDefault{
+				Message: "Certificate expired since 1 day",
+			},
+			CertID:          "123abc",
+			CertName:        "Cert Expired",
+			ExpiredAt:       time.Now().Add(time.Hour * -24),
+			DaysSinceExpiry: 1,
+			APIID:           "123abc",
+		}
+
+		eventMessage := config.EventMessage{
+			Type: EventCertificateExpired,
+			Meta: meta,
+		}
+
+		stringMessage, err := webhookHandler.CreateBody(eventMessage)
+		assert.NoError(t, err)
+
+		var actualExpired ActualExpired
+		err = json.Unmarshal([]byte(stringMessage), &actualExpired)
+		assert.NoError(t, err)
+
+		assert.Equal(t, string(EventCertificateExpired), actualExpired.Event)
+		assert.Equal(t, meta.EventMetaDefault.Message, actualExpired.Message)
+		assert.Equal(t, meta.CertID, actualExpired.CertID)
+		assert.Equal(t, meta.CertName, actualExpired.CertName)
+		assert.NotEmpty(t, actualExpired.ExpiredAt)
+		assert.Equal(t, 1, actualExpired.DaysSinceExpiry)
+		assert.Equal(t, meta.APIID, actualExpired.APIID)
+	})
 }
 
 func TestNewCustomTemplate(t *testing.T) {
