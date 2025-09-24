@@ -437,17 +437,17 @@ func TestTemplates(t *testing.T) {
 		stringMessage, err := webhookHandler.CreateBody(eventMessage)
 		assert.NoError(t, err)
 
-		var actualExpiringSoon ActualExpired
-		err = json.Unmarshal([]byte(stringMessage), &actualExpiringSoon)
+		var actualExpired ActualExpired
+		err = json.Unmarshal([]byte(stringMessage), &actualExpired)
 		assert.NoError(t, err)
 
-		assert.Equal(t, string(EventCertificateExpired), actualExpiringSoon.Event)
-		assert.Equal(t, meta.EventMetaDefault.Message, actualExpiringSoon.Message)
-		assert.Equal(t, meta.CertID, actualExpiringSoon.CertID)
-		assert.Equal(t, meta.CertName, actualExpiringSoon.CertName)
-		assert.NotEmpty(t, actualExpiringSoon.ExpiredAt)
-		assert.Equal(t, 1, actualExpiringSoon.DaysSinceExpiry)
-		assert.Equal(t, meta.APIID, actualExpiringSoon.APIID)
+		assert.Equal(t, string(EventCertificateExpired), actualExpired.Event)
+		assert.Equal(t, meta.EventMetaDefault.Message, actualExpired.Message)
+		assert.Equal(t, meta.CertID, actualExpired.CertID)
+		assert.Equal(t, meta.CertName, actualExpired.CertName)
+		assert.NotEmpty(t, actualExpired.ExpiredAt)
+		assert.Equal(t, 1, actualExpired.DaysSinceExpiry)
+		assert.Equal(t, meta.APIID, actualExpired.APIID)
 	})
 }
 
