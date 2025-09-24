@@ -148,7 +148,7 @@ func loadTestGRPCAPIs(s *gateway.Test) {
 			AuthHeaderName: "authorization",
 		}
 		spec.UseKeylessAccess = false
-		spec.CustomPluginAuthEnabled = true
+		spec.EnableCoProcessAuth = true
 		spec.VersionData = struct {
 			NotVersioned   bool                          `bson:"not_versioned" json:"not_versioned"`
 			DefaultVersion string                        `bson:"default_version" json:"default_version"`
@@ -568,7 +568,7 @@ func TestGRPC_MultiAuthentication(t *testing.T) {
 		spec.APIID = apiID
 		spec.Proxy.ListenPath = "/"
 		spec.UseKeylessAccess = false
-		spec.CustomPluginAuthEnabled = true
+		spec.EnableCoProcessAuth = true
 		spec.AuthConfigs = map[string]apidef.AuthConfig{
 			apidef.AuthTokenType: {
 				AuthHeaderName: "AuthToken",
