@@ -148,7 +148,7 @@ func loadTestGRPCAPIs(s *gateway.Test) {
 			AuthHeaderName: "authorization",
 		}
 		spec.UseKeylessAccess = false
-		spec.EnableCoProcessAuth = true
+		spec.CustomPluginAuthEnabled = true
 		spec.VersionData = struct {
 			NotVersioned   bool                          `bson:"not_versioned" json:"not_versioned"`
 			DefaultVersion string                        `bson:"default_version" json:"default_version"`
@@ -180,6 +180,10 @@ func loadTestGRPCAPIs(s *gateway.Test) {
 		spec.Proxy.StripListenPath = true
 		spec.CustomMiddleware = apidef.MiddlewareSection{
 			Driver: apidef.GrpcDriver,
+			AuthCheck: apidef.MiddlewareDefinition{
+				Name: "ignorePlugin",
+				Path: "testPath",
+			},
 			IdExtractor: apidef.MiddlewareIdExtractor{
 				ExtractFrom: apidef.HeaderSource,
 				ExtractWith: apidef.ValueExtractor,
@@ -214,6 +218,7 @@ func loadTestGRPCAPIs(s *gateway.Test) {
 			Driver: apidef.GrpcDriver,
 			AuthCheck: apidef.MiddlewareDefinition{
 				Name: "testAuthHook1",
+				Path: "testAuthHook1Path",
 			},
 			IdExtractor: apidef.MiddlewareIdExtractor{
 				Disabled:        false,
@@ -248,6 +253,7 @@ func loadTestGRPCAPIs(s *gateway.Test) {
 			Driver: apidef.GrpcDriver,
 			AuthCheck: apidef.MiddlewareDefinition{
 				Name: "testAuthHook1",
+				Path: "testAuthHook1Path",
 			},
 			IdExtractor: apidef.MiddlewareIdExtractor{
 				Disabled:        true,
@@ -562,7 +568,7 @@ func TestGRPC_MultiAuthentication(t *testing.T) {
 		spec.APIID = apiID
 		spec.Proxy.ListenPath = "/"
 		spec.UseKeylessAccess = false
-		spec.EnableCoProcessAuth = true
+		spec.CustomPluginAuthEnabled = true
 		spec.AuthConfigs = map[string]apidef.AuthConfig{
 			apidef.AuthTokenType: {
 				AuthHeaderName: "AuthToken",
@@ -577,6 +583,7 @@ func TestGRPC_MultiAuthentication(t *testing.T) {
 		}
 		spec.CustomMiddleware.Driver = apidef.GrpcDriver
 		spec.CustomMiddleware.AuthCheck.Name = "testAuthHook1"
+		spec.CustomMiddleware.AuthCheck.Path = "testAuthHook1Path"
 		spec.CustomMiddleware.IdExtractor.Extractor = nil
 	})[0]
 
