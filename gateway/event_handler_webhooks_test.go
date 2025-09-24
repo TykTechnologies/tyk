@@ -420,10 +420,10 @@ func TestTemplates(t *testing.T) {
 
 		meta := certcheck.EventCertificateExpiredMeta{
 			EventMetaDefault: model.EventMetaDefault{
-				Message: "Certificate will expire in 1 day",
+				Message: "Certificate expired since 1 day",
 			},
 			CertID:          "123abc",
-			CertName:        "Cert Soon To Expire",
+			CertName:        "Cert Expired",
 			ExpiredAt:       time.Now().Add(time.Hour * -24),
 			DaysSinceExpiry: 1,
 			APIID:           "123abc",
