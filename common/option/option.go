@@ -4,8 +4,6 @@ type (
 	Option[O any] func(*O)
 
 	Options[O any] []Option[O]
-
-	FailableOption[O any] func(*O) error
 )
 
 func New[O any](opts []Option[O]) Options[O] {
