@@ -2,7 +2,9 @@ package gateway
 
 import (
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/test"
 	"github.com/stretchr/testify/assert"
+	"net/http"
 	"testing"
 )
 
@@ -88,4 +90,21 @@ func TestPluginAuthGatekeeperMiddleware_EnabledForSpec(t *testing.T) {
 			assert.Equal(t, tt.expected, mw.EnabledForSpec())
 		})
 	}
+}
+
+func TestPluginAuthGatekeeperMiddleware_ProcessRequest(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		spec.APIID = "GatekeeperAPI"
+		spec.Proxy.ListenPath = "/test"
+		spec.UseKeylessAccess = false
+		spec.CustomPluginAuthEnabled = true
+		spec.CustomMiddleware.Driver = ""
+	})
+
+	_, _ = ts.Run(t, test.TestCase{
+		Path: "/test", Code: http.StatusForbidden, BodyMatch: disallowedAccessErrorMsg,
+	})
 }
