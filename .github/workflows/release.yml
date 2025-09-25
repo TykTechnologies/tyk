@@ -41,9 +41,9 @@ jobs:
       fail-fast: false
       matrix:
         golang_cross:
-          - 1.23-bullseye
+          - 1.24-bullseye
         include:
-          - golang_cross: 1.23-bullseye
+          - golang_cross: 1.24-bullseye
             goreleaser: 'ci/goreleaser/goreleaser.yml'
             cgo: 1
             rpmvers: 'el/7 el/8 el/9 amazon/2 amazon/2023'
@@ -129,12 +129,12 @@ jobs:
           mask-aws-account-id: false
       - uses: aws-actions/amazon-ecr-login@v2
         id: ecr
-        if: ${{ matrix.golang_cross == '1.23-bullseye' }}
+        if: ${{ matrix.golang_cross == '1.24-bullseye' }}
         with:
           mask-password: 'true'
       - name: Docker metadata for ee CI
         id: ci_metadata_ee
-        if: ${{ matrix.golang_cross == '1.23-bullseye' }}
+        if: ${{ matrix.golang_cross == '1.24-bullseye' }}
         uses: docker/metadata-action@v5
         with:
           images: |
@@ -149,7 +149,7 @@ jobs:
             type=semver,pattern={{major}}.{{minor}},prefix=v
             type=semver,pattern={{version}},prefix=v
       - name: push ee image to CI
-        if: ${{ matrix.golang_cross == '1.23-bullseye' }}
+        if: ${{ matrix.golang_cross == '1.24-bullseye' }}
         uses: docker/build-push-action@v6
         with:
           context: "dist"
@@ -183,7 +183,7 @@ jobs:
             org.opencontainers.image.vendor=tyk.io
             org.opencontainers.image.version=${{ github.ref_name }}
       - name: push ee image to prod
-        if: ${{ matrix.golang_cross == '1.23-bullseye' }}
+        if: ${{ matrix.golang_cross == '1.24-bullseye' }}
         uses: docker/build-push-action@v6
         with:
           context: "dist"
@@ -265,7 +265,7 @@ jobs:
             BUILD_PACKAGE_NAME=tyk-gateway-fips
       - name: Docker metadata for std CI
         id: ci_metadata_std
-        if: ${{ matrix.golang_cross == '1.23-bullseye' }}
+        if: ${{ matrix.golang_cross == '1.24-bullseye' }}
         uses: docker/metadata-action@v5
         with:
           images: |
@@ -280,7 +280,7 @@ jobs:
             type=semver,pattern={{major}}.{{minor}},prefix=v
             type=semver,pattern={{version}},prefix=v
       - name: push std image to CI
-        if: ${{ matrix.golang_cross == '1.23-bullseye' }}
+        if: ${{ matrix.golang_cross == '1.24-bullseye' }}
         uses: docker/build-push-action@v6
         with:
           context: "dist"
@@ -314,7 +314,7 @@ jobs:
             org.opencontainers.image.vendor=tyk.io
             org.opencontainers.image.version=${{ github.ref_name }}
       - name: push std image to prod
-        if: ${{ matrix.golang_cross == '1.23-bullseye' }}
+        if: ${{ matrix.golang_cross == '1.24-bullseye' }}
         uses: docker/build-push-action@v6
         with:
           context: "dist"
@@ -331,7 +331,7 @@ jobs:
             BUILD_PACKAGE_NAME=tyk-gateway
       - name: save deb
         uses: actions/upload-artifact@v4
-        if: ${{ matrix.golang_cross == '1.23-bullseye' }}
+        if: ${{ matrix.golang_cross == '1.24-bullseye' }}
         with:
           name: deb
           retention-days: 1
@@ -341,7 +341,7 @@ jobs:
             !dist/*fips*.deb
       - name: save rpm
         uses: actions/upload-artifact@v4
-        if: ${{ matrix.golang_cross == '1.23-bullseye' }}
+        if: ${{ matrix.golang_cross == '1.24-bullseye' }}
         with:
           name: rpm
           retention-days: 1
