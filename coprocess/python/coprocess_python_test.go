@@ -61,7 +61,8 @@ def MyAuthHook(request, session, metadata, spec):
 		    "custom_middleware": {
 		        "driver": "python",
 		        "auth_check": {
-		            "name": "MyAuthHook"
+		            "name": "MyAuthHook",
+					"path": "middleware.py",
 		        }
 		    },
 		    "checksum": "%s"
