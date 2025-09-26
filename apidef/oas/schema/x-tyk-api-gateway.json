@@ -1687,8 +1687,15 @@
           "items": {"type": "string"}
         },
         "jtiValidation": {
-          "type": "array",
-          "items": {"type": "string"}
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "enabled"
+          ]
         },
         "allowedSubjects": {
           "type": "array",
