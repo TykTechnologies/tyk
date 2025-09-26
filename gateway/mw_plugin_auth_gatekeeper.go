@@ -18,7 +18,9 @@ func (p *PluginAuthGatekeeperMiddleware) Name() string {
 }
 
 func (p *PluginAuthGatekeeperMiddleware) EnabledForSpec() bool {
-	return p.Spec.CustomPluginAuthEnabled && (p.Spec.CustomMiddleware.Driver == "" || p.Spec.CustomMiddleware.AuthCheck.Path == "")
+	customPluginAuthEnabled := p.Spec.CustomPluginAuthEnabled || p.Spec.UseGoPluginAuth || p.Spec.EnableCoProcessAuth
+
+	return customPluginAuthEnabled && (p.Spec.CustomMiddleware.Driver == "" || p.Spec.CustomMiddleware.AuthCheck.Path == "")
 }
 
 // ProcessRequest will run any checks on the request on the way through the system, return an error to have the chain fail
