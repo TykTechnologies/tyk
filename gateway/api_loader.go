@@ -507,6 +507,7 @@ func (gw *Gateway) processSpec(
 	// Earliest we can respond with cache get 200 ok
 	gw.mwAppendEnabled(&chainArray, newMockResponseMiddleware(baseMid.Copy()))
 	gw.mwAppendEnabled(&chainArray, &RedisCacheMiddleware{BaseMiddleware: baseMid.Copy(), store: &cacheStore})
+	gw.mwAppendEnabled(&chainArray, &AWSLambdaMiddleware{BaseMiddleware: baseMid.Copy()})
 	gw.mwAppendEnabled(&chainArray, &VirtualEndpoint{BaseMiddleware: baseMid.Copy()})
 	gw.mwAppendEnabled(&chainArray, &RequestSigning{BaseMiddleware: baseMid.Copy()})
 	gw.mwAppendEnabled(&chainArray, &GoPluginMiddleware{BaseMiddleware: baseMid.Copy()})
