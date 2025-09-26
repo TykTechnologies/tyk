@@ -25,7 +25,7 @@ require (
 	github.com/TykTechnologies/goautosocket v0.0.0-20190430121222-97bfa5e7e481
 	github.com/TykTechnologies/gorpc v0.0.0-20250214161245-e9f3f088e8c6
 	github.com/TykTechnologies/goverify v0.0.0-20220808203004-1486f89e7708
-	github.com/TykTechnologies/graphql-go-tools v1.6.2-0.20250606091303-a8e1ade2da8e
+	github.com/TykTechnologies/graphql-go-tools v1.6.2-0.20250926102005-c54e73aae17d
 	github.com/TykTechnologies/graphql-translator v0.0.0-20250602105400-41c2e7514a36
 	github.com/TykTechnologies/murmur3 v0.0.0-20230310161213-aad17efd5632
 	github.com/TykTechnologies/openid2go v0.1.2
@@ -95,7 +95,7 @@ require (
 	github.com/Azure/go-amqp v1.0.5
 	github.com/IBM/sarama v1.43.3
 	github.com/Jeffail/gabs/v2 v2.7.0
-	github.com/TykTechnologies/graphql-go-tools/v2 v2.0.0-20250527121326-5f5c91189896
+	github.com/TykTechnologies/graphql-go-tools/v2 v2.0.0-20250926102005-c54e73aae17d
 	github.com/TykTechnologies/opentelemetry v0.0.22
 	github.com/alecthomas/kingpin/v2 v2.4.0
 	github.com/eclipse/paho.mqtt.golang v1.4.3
@@ -146,7 +146,7 @@ require (
 	cloud.google.com/go/trace v1.11.2 // indirect
 	connectrpc.com/connect v1.18.1 // indirect
 	cuelang.org/go v0.7.1 // indirect
-	dario.cat/mergo v1.0.1 // indirect
+	dario.cat/mergo v1.0.2 // indirect
 	github.com/99designs/go-keychain v0.0.0-20191008050251-8e49817e8af4 // indirect
 	github.com/99designs/keyring v1.2.2 // indirect
 	github.com/AthenZ/athenz v1.10.62 // indirect
@@ -273,8 +273,8 @@ require (
 	github.com/dgryski/go-rendezvous v0.0.0-20200823014737-9f7001d12a5f // indirect
 	github.com/distribution/reference v0.6.0 // indirect
 	github.com/dlclark/regexp2 v1.11.4 // indirect
-	github.com/docker/cli v25.0.3+incompatible // indirect
-	github.com/docker/docker v28.2.2+incompatible // indirect
+	github.com/docker/cli v28.4.0+incompatible // indirect
+	github.com/docker/docker v28.4.0+incompatible // indirect
 	github.com/docker/go-connections v0.5.0 // indirect
 	github.com/docker/go-units v0.5.0 // indirect
 	github.com/dop251/goja v0.0.0-20241024094426-79f3a7efcdbd // indirect
@@ -307,6 +307,7 @@ require (
 	github.com/go-openapi/swag v0.23.0 // indirect
 	github.com/go-sourcemap/sourcemap v2.1.4+incompatible // indirect
 	github.com/go-sql-driver/mysql v1.7.1 // indirect
+	github.com/go-viper/mapstructure/v2 v2.4.0 // indirect
 	github.com/go-zeromq/goczmq/v4 v4.2.2 // indirect
 	github.com/go-zeromq/zmq4 v0.17.0 // indirect
 	github.com/gobwas/httphead v0.1.0 // indirect
