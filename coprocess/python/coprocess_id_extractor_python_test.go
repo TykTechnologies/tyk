@@ -47,7 +47,8 @@ def MyAuthHook(request, session, metadata, spec):
 		    "custom_middleware": {
 		        "driver": "python",
 		        "auth_check": {
-		            "name": "MyAuthHook"
+		            "name": "MyAuthHook",
+					"path": "middleware.py"
 		        },
 		        "id_extractor": {
 		        	"extract_from": "header",
@@ -98,7 +99,8 @@ def MyAuthHook(request, session, metadata, spec):
 		    "custom_middleware": {
 		        "driver": "python",
 		        "auth_check": {
-		            "name": "MyAuthHook"
+		            "name": "MyAuthHook",
+					"path": "middleware.py"
 		        },
 		        "id_extractor": {
 		        	"extract_from": "form",
@@ -149,7 +151,8 @@ def MyAuthHook(request, session, metadata, spec):
 		    "custom_middleware": {
 		        "driver": "python",
 		        "auth_check": {
-		            "name": "MyAuthHook"
+		            "name": "MyAuthHook",
+					"path": "middleware.py"
 		        },
 		        "id_extractor": {
 		        	"extract_from": "header",
