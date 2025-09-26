@@ -42,7 +42,7 @@ jobs:
           git rev-parse origin/${{ env.BRANCH_NAME }}
 
       - name: Setup Golang
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v6
         with:
           go-version-file: go.mod
           cache-dependency-path: go.sum
@@ -136,7 +136,7 @@ jobs:
           destination: /usr/local/bin
 
       - name: Setup Golang
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v6
         with:
           go-version-file: go.mod
           cache-dependency-path: go.sum
