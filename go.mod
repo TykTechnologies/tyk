@@ -69,7 +69,7 @@ require (
 	github.com/rs/cors v1.11.1
 	github.com/sirupsen/logrus v1.9.3
 	github.com/spf13/afero v1.11.0
-	github.com/stretchr/testify v1.10.0 // test
+	github.com/stretchr/testify v1.11.0 // test
 	github.com/uber/jaeger-client-go v2.30.1-0.20220110192849-8d8e8fcfd04d+incompatible
 	github.com/valyala/fasthttp v1.58.0 // test
 	github.com/vmihailenco/msgpack v4.0.4+incompatible
@@ -112,6 +112,7 @@ require (
 	github.com/newrelic/go-agent/v3/integrations/nrgorilla v1.2.2
 	github.com/oasdiff/yaml v0.0.0-20250309154309-f31be36b4037
 	github.com/ohler55/ojg v1.26.9
+	github.com/pb33f/libopenapi v0.25.9
 	github.com/rabbitmq/amqp091-go v1.9.0
 	github.com/samber/lo v1.50.0
 	github.com/shirou/gopsutil v3.21.11+incompatible
@@ -229,6 +230,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/sts v1.32.2 // indirect
 	github.com/aws/smithy-go v1.22.2 // indirect
 	github.com/aymerick/douceur v0.2.0 // indirect
+	github.com/bahlo/generic-list-go v0.2.0 // indirect
 	github.com/beanstalkd/go-beanstalk v0.2.0 // indirect
 	github.com/benhoyt/goawk v1.25.0 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
@@ -441,6 +443,7 @@ require (
 	github.com/oschwald/geoip2-golang v1.9.0 // indirect
 	github.com/parquet-go/parquet-go v0.23.0 // indirect
 	github.com/paulmach/orb v0.11.1 // indirect
+	github.com/pb33f/ordered-map/v2 v2.2.0 // indirect
 	github.com/pebbe/zmq4 v1.2.11 // indirect
 	github.com/perimeterx/marshmallow v1.1.5 // indirect
 	github.com/peterbourgon/g2s v0.0.0-20170223122336-d4e7ad98afea // indirect
@@ -481,6 +484,7 @@ require (
 	github.com/snowflakedb/gosnowflake v1.14.0 // indirect
 	github.com/sourcegraph/conc v0.3.0 // indirect
 	github.com/spaolacci/murmur3 v1.1.0 // indirect
+	github.com/speakeasy-api/jsonpath v0.6.2 // indirect
 	github.com/spf13/cast v1.7.0 // indirect
 	github.com/stretchr/objx v0.5.2 // indirect
 	github.com/tetratelabs/wazero v1.6.0 // indirect
