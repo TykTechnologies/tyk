@@ -2095,3 +2095,320 @@ func TestFromDashboardServiceNetworkErrorRecovery(t *testing.T) {
 	assert.Equal(t, 2, requestCount, "Should have made 2 API requests (failed + retry)")
 	assert.GreaterOrEqual(t, registrationCount, 1, "Should have re-registered after network error")
 }
+
+func TestAPISpec_GetSingleOrDefaultVersion(t *testing.T) {
+	type testCase struct {
+		name            string
+		spec            *APISpec
+		expectedVersion apidef.VersionInfo
+		expectedOk      bool
+	}
+
+	testCases := []testCase{
+		{
+			name: "should get the single existing version",
+			spec: &APISpec{
+				APIDefinition: &apidef.APIDefinition{
+					VersionData: apidef.VersionData{
+						NotVersioned: true,
+						Versions: map[string]apidef.VersionInfo{
+							"v1": {Name: "v1"},
+						},
+					},
+				},
+			},
+			expectedVersion: apidef.VersionInfo{Name: "v1"},
+			expectedOk:      true,
+		},
+		{
+			name: "should get the defined default version when not_versioned is false",
+			spec: &APISpec{
+				APIDefinition: &apidef.APIDefinition{
+					VersionData: apidef.VersionData{
+						NotVersioned:   false,
+						DefaultVersion: "v1",
+						Versions: map[string]apidef.VersionInfo{
+							"Default": {Name: "Default"},
+							"v1":      {Name: "v1"},
+							"v2":      {Name: "v2"},
+						},
+					},
+				},
+			},
+			expectedVersion: apidef.VersionInfo{Name: "v1"},
+			expectedOk:      true,
+		},
+		{
+			name: "should get the default version when not_versioned is true",
+			spec: &APISpec{
+				APIDefinition: &apidef.APIDefinition{
+					VersionData: apidef.VersionData{
+						NotVersioned:   true,
+						DefaultVersion: "v1",
+						Versions: map[string]apidef.VersionInfo{
+							"Default": {Name: "Default"},
+							"v1":      {Name: "v1"},
+							"v2":      {Name: "v2"},
+						},
+					},
+				},
+			},
+			expectedVersion: apidef.VersionInfo{Name: "Default"},
+			expectedOk:      true,
+		},
+		{
+			name: "should get the default version when no default version is set and the default version is stored as Default (upper-case)",
+			spec: &APISpec{
+				APIDefinition: &apidef.APIDefinition{
+					VersionData: apidef.VersionData{
+						NotVersioned:   true,
+						DefaultVersion: "",
+						Versions: map[string]apidef.VersionInfo{
+							"Default": {Name: "Default"},
+							"v1":      {Name: "v1"},
+							"v2":      {Name: "v2"},
+						},
+					},
+				},
+			},
+			expectedVersion: apidef.VersionInfo{Name: "Default"},
+			expectedOk:      true,
+		},
+		{
+			name: "should get the default version when no default version is set and the default version is stored as default (lower-case)",
+			spec: &APISpec{
+				APIDefinition: &apidef.APIDefinition{
+					VersionData: apidef.VersionData{
+						NotVersioned:   true,
+						DefaultVersion: "",
+						Versions: map[string]apidef.VersionInfo{
+							"default": {Name: "default"},
+							"v1":      {Name: "v1"},
+							"v2":      {Name: "v2"},
+						},
+					},
+				},
+			},
+			expectedVersion: apidef.VersionInfo{Name: "default"},
+			expectedOk:      true,
+		},
+		{
+			name: "should get the default version when no default version is set and the default version is stored as empty string",
+			spec: &APISpec{
+				APIDefinition: &apidef.APIDefinition{
+					VersionData: apidef.VersionData{
+						NotVersioned:   true,
+						DefaultVersion: "",
+						Versions: map[string]apidef.VersionInfo{
+							"":   {Name: "empty-string"},
+							"v1": {Name: "v1"},
+							"v2": {Name: "v2"},
+						},
+					},
+				},
+			},
+			expectedVersion: apidef.VersionInfo{Name: "empty-string"},
+			expectedOk:      true,
+		},
+		{
+			name: "should return false for ok, if all checks failed",
+			spec: &APISpec{
+				APIDefinition: &apidef.APIDefinition{
+					VersionData: apidef.VersionData{
+						NotVersioned:   true,
+						DefaultVersion: "",
+						Versions: map[string]apidef.VersionInfo{
+							"v1": {Name: "v1"},
+							"v2": {Name: "v2"},
+						},
+					},
+				},
+			},
+			expectedVersion: apidef.VersionInfo{},
+			expectedOk:      false,
+		},
+	}
+
+	for _, tc := range testCases {
+		tc := tc
+
+		t.Run(tc.name, func(t *testing.T) {
+			version, ok := tc.spec.GetSingleOrDefaultVersion()
+			assert.Equal(t, tc.expectedVersion, version)
+			assert.Equal(t, tc.expectedOk, ok)
+		})
+	}
+}
+
+func TestAPISpec_CheckForAmbiguousDefaultVersions(t *testing.T) {
+	type testCase struct {
+		name              string
+		spec              *APISpec
+		expectedAmbiguous bool
+	}
+
+	testCases := []testCase{
+		{
+			name: "should return false if no default version is found",
+			spec: &APISpec{
+				APIDefinition: &apidef.APIDefinition{
+					VersionData: apidef.VersionData{
+						NotVersioned:   true,
+						DefaultVersion: "",
+						Versions: map[string]apidef.VersionInfo{
+							"v1": {Name: "v1"},
+						},
+					},
+				},
+			},
+			expectedAmbiguous: false,
+		},
+		{
+			name: "should return true if Default and default versions are found",
+			spec: &APISpec{
+				APIDefinition: &apidef.APIDefinition{
+					VersionData: apidef.VersionData{
+						NotVersioned:   true,
+						DefaultVersion: "",
+						Versions: map[string]apidef.VersionInfo{
+							"Default": {Name: "Default"},
+							"default": {Name: "default"},
+						},
+					},
+				},
+			},
+			expectedAmbiguous: true,
+		},
+		{
+			name: "should return true if Default and '' versions are found",
+			spec: &APISpec{
+				APIDefinition: &apidef.APIDefinition{
+					VersionData: apidef.VersionData{
+						NotVersioned:   true,
+						DefaultVersion: "",
+						Versions: map[string]apidef.VersionInfo{
+							"":        {Name: "empty"},
+							"Default": {Name: "Default"},
+						},
+					},
+				},
+			},
+			expectedAmbiguous: true,
+		},
+		{
+			name: "should return true if default and '' versions are found",
+			spec: &APISpec{
+				APIDefinition: &apidef.APIDefinition{
+					VersionData: apidef.VersionData{
+						NotVersioned:   true,
+						DefaultVersion: "",
+						Versions: map[string]apidef.VersionInfo{
+							"":        {Name: "empty"},
+							"default": {Name: "default"},
+						},
+					},
+				},
+			},
+			expectedAmbiguous: true,
+		},
+		{
+			name: "should return true if all default versions are found",
+			spec: &APISpec{
+				APIDefinition: &apidef.APIDefinition{
+					VersionData: apidef.VersionData{
+						NotVersioned:   true,
+						DefaultVersion: "",
+						Versions: map[string]apidef.VersionInfo{
+							"":        {Name: "empty"},
+							"Default": {Name: "Default"},
+							"default": {Name: "default"},
+						},
+					},
+				},
+			},
+			expectedAmbiguous: true,
+		},
+	}
+
+	for _, tc := range testCases {
+		tc := tc
+
+		t.Run(tc.name, func(t *testing.T) {
+			assert.Equal(t, tc.expectedAmbiguous, tc.spec.CheckForAmbiguousDefaultVersions())
+		})
+	}
+}
+
+func TestAPISpec_Version(t *testing.T) {
+	t.Run("for not_versioned set to true", func(t *testing.T) {
+		type testCase struct {
+			name                  string
+			spec                  *APISpec
+			expectedVersion       *apidef.VersionInfo
+			expectedRequestStatus RequestStatus
+		}
+
+		testCases := []testCase{
+			{
+				name: "should return the single or default version of the API",
+				spec: &APISpec{
+					APIDefinition: &apidef.APIDefinition{
+						VersionData: apidef.VersionData{
+							NotVersioned: true,
+							Versions: map[string]apidef.VersionInfo{
+								"v1":      {Name: "v1"},
+								"Default": {Name: "Default"},
+							},
+						},
+					},
+				},
+				expectedVersion:       &apidef.VersionInfo{Name: "Default"},
+				expectedRequestStatus: StatusOk,
+			},
+			{
+				name: "should return RequestStatus VersionDefaultForNotVersionedNotFound if no default version can be found",
+				spec: &APISpec{
+					APIDefinition: &apidef.APIDefinition{
+						VersionData: apidef.VersionData{
+							NotVersioned: true,
+							Versions: map[string]apidef.VersionInfo{
+								"v1": {Name: "v1"},
+								"v2": {Name: "v2"},
+							},
+						},
+					},
+				},
+				expectedVersion:       nil,
+				expectedRequestStatus: VersionDefaultForNotVersionedNotFound,
+			},
+			{
+				name: "should return RequestStatus VersionAmbiguousDefault if multiple default version can be found",
+				spec: &APISpec{
+					APIDefinition: &apidef.APIDefinition{
+						VersionData: apidef.VersionData{
+							NotVersioned: true,
+							Versions: map[string]apidef.VersionInfo{
+								"default": {Name: "default"},
+								"Default": {Name: "Default"},
+							},
+						},
+					},
+				},
+				expectedVersion:       nil,
+				expectedRequestStatus: VersionAmbiguousDefault,
+			},
+		}
+
+		for _, tc := range testCases {
+			tc := tc
+
+			t.Run(tc.name, func(t *testing.T) {
+				r := &http.Request{}
+				versionInfo, requestStatus := tc.spec.Version(r)
+				assert.Equal(t, tc.expectedVersion, versionInfo)
+				assert.Equal(t, tc.expectedRequestStatus, requestStatus)
+			})
+		}
+	})
+
+}
