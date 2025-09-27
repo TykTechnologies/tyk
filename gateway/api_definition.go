@@ -1720,7 +1720,7 @@ func (a *APISpec) GetSingleOrDefaultVersion() (versionInfo apidef.VersionInfo, o
 
 	// Now we check if a default version is defined and will look for it, when NotVersioned is set to false.
 	// Otherwise, we skip this check.
-	if a.VersionData.NotVersioned == false && a.VersionData.DefaultVersion != "" {
+	if !a.VersionData.NotVersioned && a.VersionData.DefaultVersion != "" {
 		versionInfo, ok = a.VersionData.Versions[a.VersionData.DefaultVersion]
 		return versionInfo, ok
 	}
