@@ -1663,14 +1663,14 @@ func TestGetJWTConfiguration_ORAuthentication(t *testing.T) {
 
 	t.Run("Legacy mode - should NOT find JWT when it's not first", func(t *testing.T) {
 		oas := createTestOAS(SecurityProcessingModeLegacy)
-		
+
 		jwtConfig := oas.GetJWTConfiguration()
 		assert.Nil(t, jwtConfig, "In legacy mode, JWT should NOT be found when it's not the first security requirement")
 	})
 
 	t.Run("Compliant mode - should find JWT even when it's not first", func(t *testing.T) {
 		oas := createTestOAS(SecurityProcessingModeCompliant)
-		
+
 		jwtConfig := oas.GetJWTConfiguration()
 		assert.NotNil(t, jwtConfig, "In compliant mode, JWT should be found even when it's not the first security requirement")
 		assert.Equal(t, "hmac", jwtConfig.SigningMethod)
@@ -1682,7 +1682,7 @@ func TestGetJWTConfiguration_ORAuthentication(t *testing.T) {
 
 	t.Run("Default (empty) mode - should use legacy behavior", func(t *testing.T) {
 		oas := createTestOAS("")
-		
+
 		jwtConfig := oas.GetJWTConfiguration()
 		assert.Nil(t, jwtConfig, "With empty/default mode, should behave like legacy mode")
 	})
@@ -1731,7 +1731,7 @@ func TestGetJWTConfiguration_ORAuthentication(t *testing.T) {
 			},
 		}
 		oas.SetTykExtension(tykExtension)
-		
+
 		jwtConfig := oas.GetJWTConfiguration()
 		assert.NotNil(t, jwtConfig, "Legacy mode should find JWT when it's the first security requirement")
 		assert.Equal(t, "rsa", jwtConfig.SigningMethod)
@@ -1788,7 +1788,7 @@ func TestGetJWTConfiguration_ORAuthentication(t *testing.T) {
 			},
 		}
 		oas.SetTykExtension(tykExtension)
-		
+
 		jwtConfig := oas.GetJWTConfiguration()
 		assert.NotNil(t, jwtConfig, "Compliant mode should find JWT regardless of its position")
 		assert.Equal(t, "ecdsa", jwtConfig.SigningMethod)
@@ -1836,7 +1836,7 @@ func TestGetJWTConfiguration_ORAuthentication(t *testing.T) {
 					},
 				}
 				oas.SetTykExtension(tykExtension)
-				
+
 				jwtConfig := oas.GetJWTConfiguration()
 				assert.Nil(t, jwtConfig, "Should return nil when no JWT security scheme exists")
 			})
@@ -1875,7 +1875,7 @@ func TestGetJWTConfiguration_ORAuthentication(t *testing.T) {
 			},
 		}
 		oas.SetTykExtension(tykExtension)
-		
+
 		jwtConfig := oas.GetJWTConfiguration()
 		assert.Nil(t, jwtConfig, "Should return nil when security scheme is not properly typed as JWT")
 	})
@@ -1913,7 +1913,7 @@ func TestGetJWTConfiguration_ORAuthentication(t *testing.T) {
 					},
 				}
 				oas.SetTykExtension(tykExtension)
-				
+
 				jwtConfig := oas.GetJWTConfiguration()
 				assert.Nil(t, jwtConfig, "Should return nil when Security array is empty")
 			})
