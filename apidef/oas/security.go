@@ -1196,11 +1196,31 @@ func (s *OAS) GetJWTConfiguration() *JWT {
 		return nil
 	}
 
-	for keyName := range s.getTykSecuritySchemes() {
-		if _, ok := s.Security[0][keyName]; ok {
-			v := s.Components.SecuritySchemes[keyName].Value
-			if v.Type == typeHTTP && v.Scheme == schemeBearer && v.BearerFormat == bearerFormatJWT {
-				return s.getTykJWTAuth(keyName)
+	processingMode := SecurityProcessingModeLegacy
+	if s.getTykAuthentication() != nil && s.getTykAuthentication().SecurityProcessingMode != "" {
+		processingMode = s.getTykAuthentication().SecurityProcessingMode
+	}
+
+	if processingMode == SecurityProcessingModeLegacy {
+		// Legacy mode: only check the first security requirement
+		for keyName := range s.getTykSecuritySchemes() {
+			if _, ok := s.Security[0][keyName]; ok {
+				v := s.Components.SecuritySchemes[keyName].Value
+				if v.Type == typeHTTP && v.Scheme == schemeBearer && v.BearerFormat == bearerFormatJWT {
+					return s.getTykJWTAuth(keyName)
+				}
+			}
+		}
+	} else {
+		// Compliant mode: check ALL security requirements for OR authentication support
+		for _, securityRequirement := range s.Security {
+			for keyName := range s.getTykSecuritySchemes() {
+				if _, ok := securityRequirement[keyName]; ok {
+					v := s.Components.SecuritySchemes[keyName].Value
+					if v.Type == typeHTTP && v.Scheme == schemeBearer && v.BearerFormat == bearerFormatJWT {
+						return s.getTykJWTAuth(keyName)
+					}
+				}
 			}
 		}
 	}
