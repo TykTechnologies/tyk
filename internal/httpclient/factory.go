@@ -27,9 +27,9 @@ type ExternalHTTPClientFactory struct {
 }
 
 // NewExternalHTTPClientFactory creates a new HTTP client factory.
-func NewExternalHTTPClientFactory(config *config.ExternalServiceConfig, certManager CertificateManager) *ExternalHTTPClientFactory {
+func NewExternalHTTPClientFactory(serviceConfig *config.ExternalServiceConfig, certManager CertificateManager) *ExternalHTTPClientFactory {
 	return &ExternalHTTPClientFactory{
-		config:      config,
+		config:      serviceConfig,
 		certManager: certManager,
 	}
 }

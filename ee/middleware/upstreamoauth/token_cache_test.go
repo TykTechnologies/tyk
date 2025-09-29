@@ -44,7 +44,7 @@ func TestGetToken_CacheHit(t *testing.T) {
 	req, _ := http.NewRequest("GET", "http://example.com", nil)
 
 	// Mock obtain token function (should not be called)
-	obtainTokenFunc := func(ctx context.Context) (*oauth2.Token, error) {
+	obtainTokenFunc := func(_ context.Context) (*oauth2.Token, error) {
 		t.Fatal("obtainTokenFunc should not be called for cache hit")
 		return nil, nil
 	}
@@ -85,7 +85,7 @@ func TestGetToken_CacheMiss(t *testing.T) {
 		"scope": "read write admin",
 	})
 
-	obtainTokenFunc := func(ctx context.Context) (*oauth2.Token, error) {
+	obtainTokenFunc := func(_ context.Context) (*oauth2.Token, error) {
 		return newToken, nil
 	}
 
@@ -116,7 +116,7 @@ func TestGetToken_ObtainTokenError(t *testing.T) {
 	req, _ := http.NewRequest("GET", "http://example.com", nil)
 
 	// Mock obtain token function that fails
-	obtainTokenFunc := func(ctx context.Context) (*oauth2.Token, error) {
+	obtainTokenFunc := func(_ context.Context) (*oauth2.Token, error) {
 		return nil, fmt.Errorf("OAuth server error")
 	}
 

@@ -150,7 +150,7 @@ func TestMiddleware_EnabledForSpec(t *testing.T) {
 
 func TestMiddleware_ProcessRequest_ClientCredentials(t *testing.T) {
 	// Setup OAuth server
-	oauthServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	oauthServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		response := map[string]interface{}{
 			"access_token": "test-access-token",
@@ -219,7 +219,7 @@ func TestMiddleware_ProcessRequest_ClientCredentials(t *testing.T) {
 
 func TestMiddleware_ProcessRequest_PasswordAuth(t *testing.T) {
 	// Setup OAuth server
-	oauthServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	oauthServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		response := map[string]interface{}{
 			"access_token": "test-access-token",

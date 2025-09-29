@@ -20,7 +20,7 @@ func TestOAuth2HTTPClientContext_ClientCredentials(t *testing.T) {
 	var requestsReceived int
 
 	// Create a test server that records request details
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		requestsReceived++
 
 		w.Header().Set("Content-Type", "application/json")
@@ -130,7 +130,7 @@ func TestOAuth2HTTPClientContext_PasswordAuth(t *testing.T) {
 	var requestsReceived int
 
 	// Create a test server
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		requestsReceived++
 
 		w.Header().Set("Content-Type", "application/json")

@@ -138,13 +138,13 @@ func TestExternalHTTPClientFactory_CreateClient(t *testing.T) {
 }
 
 func TestExternalHTTPClientFactory_CreateOAuthClient(t *testing.T) {
-	config := &config.ExternalServiceConfig{
+	serviceConfig := &config.ExternalServiceConfig{
 		Global: config.GlobalProxyConfig{
 			Enabled: true,
 		},
 	}
 
-	factory := NewExternalHTTPClientFactory(config, nil)
+	factory := NewExternalHTTPClientFactory(serviceConfig, nil)
 	client, err := factory.CreateOAuthClient()
 
 	require.NoError(t, err)
@@ -297,14 +297,14 @@ func TestExternalHTTPClientFactory_getProxyFunction(t *testing.T) {
 
 func TestGetJWKWithClient(t *testing.T) {
 	// Mock parser function
-	parseJWK := func(data []byte) (*jose.JSONWebKeySet, error) {
+	parseJWK := func(_ []byte) (*jose.JSONWebKeySet, error) {
 		// Simplified mock implementation
 		return &jose.JSONWebKeySet{}, nil
 	}
 
 	t.Run("successful request", func(t *testing.T) {
 		// Create a test server
-		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 			w.WriteHeader(http.StatusOK)
 			w.Write([]byte(`{"keys": []}`))
 		}))
