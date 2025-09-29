@@ -2531,3 +2531,194 @@ func TestJWTWithTykExtensionButNoComponents(t *testing.T) {
 
 	ts.Run(t, testCases...)
 }
+
+func TestMultiAuthMiddleware_OR_CompliantMode_JWT_Second(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	jwtPolicyID := ts.CreatePolicy(func(p *user.Policy) {
+		p.OrgID = "default"
+		p.AccessRights = map[string]user.AccessDefinition{
+			"jwt-second-api": {
+				APIName:  "JWT Second API",
+				APIID:    "jwt-second-api",
+				Versions: []string{"default"},
+			},
+		}
+	})
+
+	apiKey := CreateSession(ts.Gw, func(s *user.SessionState) {
+		s.OrgID = "default"
+		s.AccessRights = map[string]user.AccessDefinition{
+			"jwt-second-api": {
+				APIName:  "JWT Second API",
+				APIID:    "jwt-second-api",
+				Versions: []string{"default"},
+			},
+		}
+	})
+
+	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		spec.APIID = "jwt-second-api"
+		spec.Name = "JWT Second API"
+		spec.OrgID = "default"
+		spec.Proxy.ListenPath = "/jwt-second/"
+		spec.UseKeylessAccess = false
+
+		oasDoc := oas.OAS{}
+		oasDoc.T = openapi3.T{
+			OpenAPI: "3.0.3",
+			Info: &openapi3.Info{
+				Title:   spec.Name,
+				Version: "1.0.0",
+			},
+			Paths: openapi3.NewPaths(),
+			Components: &openapi3.Components{
+				SecuritySchemes: openapi3.SecuritySchemes{
+					"apiKeyAuth": &openapi3.SecuritySchemeRef{
+						Value: &openapi3.SecurityScheme{
+							Type: "apiKey",
+							In:   "header",
+							Name: "X-API-Key",
+						},
+					},
+					"jwtAuth": &openapi3.SecuritySchemeRef{
+						Value: &openapi3.SecurityScheme{
+							Type:         "http",
+							Scheme:       "bearer",
+							BearerFormat: "JWT",
+						},
+					},
+				},
+			},
+			Security: openapi3.SecurityRequirements{
+				openapi3.SecurityRequirement{"apiKeyAuth": []string{}},
+				openapi3.SecurityRequirement{"jwtAuth": []string{}},
+			},
+		}
+
+		tykExtension := &oas.XTykAPIGateway{
+			Info: oas.Info{
+				ID:    spec.APIID,
+				Name:  spec.Name,
+				OrgID: "default",
+				State: oas.State{
+					Active: true,
+				},
+			},
+			Server: oas.Server{
+				ListenPath: oas.ListenPath{
+					Value: spec.Proxy.ListenPath,
+					Strip: true,
+				},
+				Authentication: &oas.Authentication{
+					Enabled: true,
+					SecurityProcessingMode: oas.SecurityProcessingModeCompliant,
+					SecuritySchemes: oas.SecuritySchemes{
+						"apiKeyAuth": &oas.Token{
+							Enabled: func() *bool { b := true; return &b }(),
+							AuthSources: oas.AuthSources{
+								Header: &oas.AuthSource{
+									Enabled: true,
+									Name:    "X-API-Key",
+								},
+							},
+						},
+						"jwtAuth": &oas.JWT{
+							Enabled:           true,
+							Source:            base64.StdEncoding.EncodeToString([]byte(jwtRSAPubKey)),
+							SigningMethod:     "rsa",
+							IdentityBaseField: "user_id",
+							PolicyFieldName:   "policy_id",
+							DefaultPolicies:   []string{jwtPolicyID},
+							AuthSources: oas.AuthSources{
+								Header: &oas.AuthSource{
+									Enabled: true,
+									Name:    "Authorization",
+								},
+							},
+						},
+					},
+				},
+			},
+			Upstream: oas.Upstream{
+				URL: TestHttpAny,
+			},
+		}
+
+		oasDoc.SetTykExtension(tykExtension)
+		oasDoc.ExtractTo(spec.APIDefinition)
+		spec.IsOAS = true
+		spec.OAS = oasDoc
+		
+		spec.SecurityRequirements = [][]string{
+			{"apiKeyAuth"},
+			{"jwtAuth"},
+		}
+		
+		spec.UseStandardAuth = true
+		spec.EnableJWT = true
+		spec.JWTSigningMethod = "rsa"
+		spec.JWTSource = base64.StdEncoding.EncodeToString([]byte(jwtRSAPubKey))
+		spec.JWTIdentityBaseField = "user_id"
+		spec.JWTPolicyFieldName = "policy_id"
+	})
+
+	jwtToken := CreateJWKToken(func(t *jwt.Token) {
+		t.Claims.(jwt.MapClaims)["user_id"] = "jwt-user"
+		t.Claims.(jwt.MapClaims)["policy_id"] = jwtPolicyID
+		t.Claims.(jwt.MapClaims)["exp"] = time.Now().Add(time.Hour).Unix()
+	})
+
+	testCases := []test.TestCase{
+		{
+			Method: "GET",
+			Path:   "/jwt-second/get",
+			Headers: map[string]string{
+				"Authorization": "Bearer " + jwtToken,
+			},
+			Code: http.StatusOK,
+		},
+		{
+			Method: "GET",
+			Path:   "/jwt-second/get",
+			Headers: map[string]string{
+				"X-API-Key": apiKey,
+			},
+			Code: http.StatusOK,
+		},
+		{
+			Method: "GET",
+			Path:   "/jwt-second/get",
+			Headers: map[string]string{
+				"Authorization": "Bearer " + jwtToken,
+				"X-API-Key":     apiKey,
+			},
+			Code: http.StatusOK,
+		},
+		{
+			Method: "GET",
+			Path:   "/jwt-second/get",
+			Headers: map[string]string{
+				"Authorization": "Bearer invalid-jwt-token",
+			},
+			Code: http.StatusUnauthorized,
+		},
+		{
+			Method: "GET",
+			Path:   "/jwt-second/get",
+			Headers: map[string]string{},
+			Code:    http.StatusUnauthorized,
+		},
+		{
+			Method: "GET",
+			Path:   "/jwt-second/get",
+			Headers: map[string]string{
+				"X-API-Key": "wrong-key",
+			},
+			Code: http.StatusForbidden,
+		},
+	}
+
+	ts.Run(t, testCases...)
+}
