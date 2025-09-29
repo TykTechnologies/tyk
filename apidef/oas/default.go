@@ -60,7 +60,7 @@ type TykExtensionConfigParams struct {
 	ValidateRequest *bool
 	// MockResponse is true if a mocked response is configured.
 	MockResponse *bool
-	// SecurityProcessingMode controls how multiple security requirements are processed.
+	// SecurityProcessingMode controls how Tyk will process the OpenAPI `security` field if multiple security requirement objects are declared.
 	// Can be "legacy" or "compliant".
 	SecurityProcessingMode string
 
