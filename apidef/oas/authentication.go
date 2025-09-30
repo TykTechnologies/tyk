@@ -81,14 +81,13 @@ type Authentication struct {
 	// CustomKeyLifetime contains configuration for the maximum retention period for access tokens.
 	CustomKeyLifetime *CustomKeyLifetime `bson:"customKeyLifetime,omitempty" json:"customKeyLifetime,omitempty"`
 
-	// SecurityProcessingMode controls how multiple security requirements are processed.
-	// - "legacy" (default): Only first security requirement processed, uses BaseIdentityProvider
-	// - "compliant": All security requirements processed with OR logic, dynamic identity provider
-	// Tyk classic API definition: `security_processing_mode`
+	// SecurityProcessingMode controls how Tyk will process the OpenAPI `security` field if multiple security requirement objects are declared.
+	// - "legacy" (default): Only the first security requirement object will be processed; uses BaseIdentityProvider to create the session object.
+	// - "compliant": All security requirement objects will be processed, request will be authorized if any of these are validated; the origin for the session object will be determined dynamically based on the validated security requirement.
 	SecurityProcessingMode string `bson:"securityProcessingMode,omitempty" json:"securityProcessingMode,omitempty"`
 
-	// Security contains Tyk vendor extension security requirements for proprietary auth methods.
-	// This is concatenated with OpenAPI security requirements when SecurityProcessingMode is "compliant".
+	// Security is an extension to the OpenAPI security field and is used when securityProcessingMode is set to "compliant".
+	// This can be used to combine any declared securitySchemes including Tyk proprietary auth methods.
 	Security [][]string `bson:"security,omitempty" json:"security,omitempty"`
 }
 
@@ -515,7 +514,6 @@ type Scopes struct {
 
 	// Claims specifies a list of claims that can be used to provide the scope-to-policy mapping.
 	// The first match from the list found in the token will be interrogated to retrieve the scopes that are then checked against the scopeToPolicyMapping.
-	// This field is a Tyk OAS only field and is only used in Tyk OAS APIs.
 	Claims []string `bson:"claims,omitempty" json:"claims,omitempty"`
 
 	// ScopeToPolicyMapping contains the mappings of scopes to policy IDs.
