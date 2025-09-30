@@ -116,7 +116,7 @@ func NewCertificateExpiryCheckBatcher(logger *logrus.Entry, apiMetaData APIMetaD
 	return &CertificateExpiryCheckBatcher{
 		logger:                logger,
 		apiMetaData:           apiMetaData,
-		config:                cfg,
+		config:                applyConfigDefaults(cfg),
 		batch:                 NewBatch(),
 		inMemoryCooldownCache: inMemoryCache,
 		fallbackCooldownCache: fallbackCache,
@@ -408,6 +408,22 @@ func (c *CertificateExpiryCheckBatcher) composeExpiredMessage(certInfo CertInfo,
 		}
 	}
 	return fmt.Sprintf("Certificate %s is expired since %d hours", certInfo.CommonName, hoursSinceExpiry)
+}
+
+func applyConfigDefaults(cfg config.CertificateExpiryMonitorConfig) config.CertificateExpiryMonitorConfig {
+	if cfg.WarningThresholdDays == 0 {
+		cfg.WarningThresholdDays = config.DefaultWarningThresholdDays
+	}
+
+	if cfg.CheckCooldownSeconds == 0 {
+		cfg.CheckCooldownSeconds = config.DefaultCheckCooldownSeconds
+	}
+
+	if cfg.EventCooldownSeconds == 0 {
+		cfg.EventCooldownSeconds = config.DefaultEventCooldownSeconds
+	}
+
+	return cfg
 }
 
 // Interface Guards
