@@ -632,7 +632,7 @@ type CertificatesConfig struct {
 
 // CertificateExpiryMonitorConfig configures the certificate expiration notification feature
 type CertificateExpiryMonitorConfig struct {
-	// WarningThresholdDays specifies the number of days before certificate expiration that the Gateway will start sending CertificateExpiringSoon notifications
+	// WarningThresholdDays specifies the number of days before certificate expiry that the Gateway will start generating CertificateExpiringSoon events when the certificate is used
 	// Default: DefaultWarningThresholdDays (30 days)
 	WarningThresholdDays int `json:"warning_threshold_days"`
 
