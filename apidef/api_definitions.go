@@ -781,7 +781,7 @@ type APIDefinition struct {
 type JWK struct {
 	// URL is the jwk endpoint
 	URL string `json:"url"`
-	// CacheTimeout defines how long the JWKS is kept in the cache before forcing a refresh.
+	// CacheTimeout defines how long the JWKS will be kept in the cache before forcing a refresh from the JWKS endpoint.
 	CacheTimeout int64 `bson:"cache_timeout" json:"cache_timeout"`
 }
 
