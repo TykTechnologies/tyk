@@ -297,13 +297,6 @@ func (m *CoProcessMiddleware) EnabledForSpec() bool {
 		return false
 	}
 
-	if d, _ := loadedDrivers[m.Spec.CustomMiddleware.Driver]; d == nil {
-		log.WithFields(logrus.Fields{
-			"prefix": "coprocess",
-		}).Errorf("Driver '%s' isn't loaded", m.Spec.CustomMiddleware.Driver)
-		return false
-	}
-
 	log.WithFields(logrus.Fields{
 		"prefix": "coprocess",
 	}).Debug("Enabling CP middleware.")
@@ -313,6 +306,15 @@ func (m *CoProcessMiddleware) EnabledForSpec() bool {
 
 // ProcessRequest will run any checks on the request on the way through the system, return an error to have the chain fail
 func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
+	if d, _ := loadedDrivers[m.Spec.CustomMiddleware.Driver]; d == nil {
+		log.WithFields(logrus.Fields{
+			"prefix": "coprocess",
+		}).Errorf("Driver '%s' isn't loaded", m.Spec.CustomMiddleware.Driver)
+		respCode := http.StatusInternalServerError
+
+		return errors.New(http.StatusText(respCode)), respCode
+	}
+
 	if m.HookType == coprocess.HookType_CustomKeyCheck {
 		if ctxGetRequestStatus(r) == StatusOkAndIgnore {
 			return nil, http.StatusOK
