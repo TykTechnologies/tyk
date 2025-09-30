@@ -306,7 +306,7 @@ func (m *CoProcessMiddleware) EnabledForSpec() bool {
 
 // ProcessRequest will run any checks on the request on the way through the system, return an error to have the chain fail
 func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
-	if d, _ := loadedDrivers[m.Spec.CustomMiddleware.Driver]; d == nil {
+	if d := loadedDrivers[m.Spec.CustomMiddleware.Driver]; d == nil {
 		log.WithFields(logrus.Fields{
 			"prefix": "coprocess",
 		}).Errorf("Driver '%s' isn't loaded", m.Spec.CustomMiddleware.Driver)
