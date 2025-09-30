@@ -95,7 +95,6 @@ builds:
     flags:
       - -tags=goplugin
       - -trimpath
-      - -trimpath
     env:
       - NOP=nop # ignore this, it is jsut to avoid a complex conditional in the templates
       - CC=gcc
@@ -113,7 +112,6 @@ builds:
     flags:
       - -tags=goplugin
       - -trimpath
-      - -trimpath
     env:
       - NOP=nop # ignore this, it is jsut to avoid a complex conditional in the templates
       - CC=aarch64-linux-gnu-gcc
@@ -130,7 +128,6 @@ builds:
   - id: std-s390x
     flags:
       - -tags=goplugin
-      - -trimpath
       - -trimpath
     env:
       - NOP=nop # ignore this, it is jsut to avoid a complex conditional in the templates
