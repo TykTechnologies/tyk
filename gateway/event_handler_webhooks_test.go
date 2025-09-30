@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	logrus "github.com/sirupsen/logrus/hooks/test"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/TykTechnologies/tyk/config"
@@ -333,4 +334,31 @@ func TestWebhookContentTypeHeader(t *testing.T) {
 		})
 	}
 
+}
+
+func TestWebhookTemplateFuncs(t *testing.T) {
+	t.Run("as_RFC3339", func(t *testing.T) {
+		asRFC3339Func := templateFuncAsRFC3339()
+		inputTime := time.Date(2025, 1, 2, 3, 4, 5, 6, time.UTC)
+		expected := "2025-01-02T03:04:05Z"
+		actual := asRFC3339Func(inputTime)
+		assert.Equal(t, expected, actual)
+	})
+
+	t.Run("as_RFC3339_from_string", func(t *testing.T) {
+		noopLogger, _ := logrus.NewNullLogger()
+		asRFC3339FromStringFunc := templateFuncAsRFC3339FromString(noopLogger)
+
+		t.Run("invalid time", func(t *testing.T) {
+			input := "2025/01/02 03:04:05"
+			expected := "2025/01/02 03:04:05"
+			assert.Equal(t, expected, asRFC3339FromStringFunc(input))
+		})
+
+		t.Run("valid time", func(t *testing.T) {
+			input := "2025-01-02 03:04:05.999999 +0200 CEST"
+			expected := "2025-01-02T03:04:05+02:00"
+			assert.Equal(t, expected, asRFC3339FromStringFunc(input))
+		})
+	})
 }

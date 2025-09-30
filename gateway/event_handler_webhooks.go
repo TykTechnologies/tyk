@@ -90,7 +90,11 @@ func (w *WebHookHandler) Init(handlerConf interface{}) error {
 			"target": w.conf.TargetPath,
 		}).Info("Loading default template.")
 		defaultPath := filepath.Join(w.Gw.GetConfig().TemplatePath, "default_webhook.json")
-		w.template, err = htmltemplate.ParseFiles(defaultPath)
+		w.template = htmltemplate.New("default_webhook.json").Funcs(htmltemplate.FuncMap{
+			"as_rfc3339":             templateFuncAsRFC3339(),
+			"as_rfc3339_from_string": templateFuncAsRFC3339FromString(log),
+		})
+		w.template, err = w.template.ParseFiles(defaultPath)
 		if err != nil {
 			log.WithFields(logrus.Fields{
 				"prefix": "webhooks",
@@ -278,4 +282,29 @@ func (w *WebHookHandler) HandleEvent(em config.EventMessage) {
 	}
 
 	w.setHookFired(reqChecksum)
+}
+
+func templateFuncAsRFC3339() func(time.Time) string {
+	return func(t time.Time) string {
+		return t.Format(time.RFC3339)
+	}
+}
+
+func templateFuncAsRFC3339FromString(log *logrus.Logger) func(string) string {
+	return func(s string) string {
+		t, err := time.Parse("2006-01-02 15:04:05.999999 -0700 MST", s)
+		if err == nil {
+			return t.Format(time.RFC3339)
+		}
+
+		log.WithFields(logrus.Fields{
+			"prefix":   "webhooks",
+			"datetime": s,
+			"error":    err.Error(),
+		}).
+			Debug("Could not parse time to RFC3339 from string.")
+
+		// Fallback to the original string
+		return s
+	}
 }
