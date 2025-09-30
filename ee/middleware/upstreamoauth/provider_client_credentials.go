@@ -9,11 +9,11 @@ import (
 	"github.com/TykTechnologies/tyk/internal/httpclient"
 )
 
-func (cache *ClientCredentialsClient) ObtainToken(ctx context.Context) (*oauth2.Token, error) {
-	cfg := newOAuth2ClientCredentialsConfig(cache.mw)
+func (client *ClientCredentialsClient) ObtainToken(ctx context.Context) (*oauth2.Token, error) {
+	cfg := newOAuth2ClientCredentialsConfig(client.mw)
 
 	// Use external services HTTP client if configured
-	if httpClient := cache.getHTTPClient(); httpClient != nil {
+	if httpClient := client.getHTTPClient(); httpClient != nil {
 		ctx = context.WithValue(ctx, oauth2.HTTPClient, httpClient)
 	}
 
@@ -21,32 +21,42 @@ func (cache *ClientCredentialsClient) ObtainToken(ctx context.Context) (*oauth2.
 	return tokenSource.Token()
 }
 
-func (cache *ClientCredentialsClient) GetToken(r *http.Request) (string, error) {
-	cacheKey := generateClientCredentialsCacheKey(cache.mw.Spec.UpstreamAuth.OAuth, cache.mw.Spec.APIID)
-	secret := cache.mw.Gw.GetConfig().Secret
-	extraMetadata := cache.mw.Spec.UpstreamAuth.OAuth.ClientCredentials.ExtraMetadata
+func (client *ClientCredentialsClient) GetToken(r *http.Request) (string, error) {
+	cacheKey := generateClientCredentialsCacheKey(client.mw.Spec.UpstreamAuth.OAuth, client.mw.Spec.APIID)
+	secret := client.mw.Gw.GetConfig().Secret
+	extraMetadata := client.mw.Spec.UpstreamAuth.OAuth.ClientCredentials.ExtraMetadata
 
 	obtainTokenFunc := func(ctx context.Context) (*oauth2.Token, error) {
-		return cache.ObtainToken(ctx)
+		return client.ObtainToken(ctx)
 	}
 
-	return getToken(r, cacheKey, obtainTokenFunc, secret, extraMetadata, cache.mw.clientCredentialsStorageHandler)
+	return getToken(r, cacheKey, obtainTokenFunc, secret, extraMetadata, client.mw.clientCredentialsStorageHandler)
 }
 
 // getHTTPClient creates an HTTP client with external services configuration if available
-func (cache *ClientCredentialsClient) getHTTPClient() *http.Client {
-	gwConfig := cache.mw.Gw.GetConfig()
+func (client *ClientCredentialsClient) getHTTPClient() *http.Client {
+	gwConfig := client.mw.Gw.GetConfig()
 	if gwConfig.ExternalServices.OAuth.MTLS.Enabled ||
 		gwConfig.ExternalServices.OAuth.Proxy.Enabled ||
 		gwConfig.ExternalServices.Global.Enabled {
 
-		// Create HTTP client factory
-		factory := httpclient.NewExternalHTTPClientFactory(&gwConfig.ExternalServices, cache.mw.Gw.GetCertificateManager())
+		// Create HTTP httpClient factory
+		factory := httpclient.NewExternalHTTPClientFactory(&gwConfig.ExternalServices, client.mw.Gw.GetCertificateManager())
 
-		// Try to create OAuth client
-		if client, err := factory.CreateOAuthClient(); err == nil {
-			return client
+		// Try to create OAuth httpClient with proper error handling
+		httpClient, err := factory.CreateOAuthClient()
+		if err != nil {
+			// Log the configuration error but continue with default httpClient
+			if client.mw != nil && client.mw.Base != nil {
+				client.mw.Logger().WithError(err).Warn("Failed to create custom HTTP httpClient for upstream OAuth, falling back to default httpClient. Check external services configuration.")
+			}
+			return nil
 		}
+
+		if client.mw != nil && client.mw.Base != nil {
+			client.mw.Logger().Debug("Successfully created custom HTTP httpClient for upstream OAuth with external services configuration")
+		}
+		return httpClient
 	}
 
 	// Return nil to use default HTTP client

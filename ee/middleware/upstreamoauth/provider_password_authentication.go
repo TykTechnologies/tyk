@@ -9,43 +9,53 @@ import (
 	"github.com/TykTechnologies/tyk/internal/httpclient"
 )
 
-func (cache *PasswordClient) ObtainToken(ctx context.Context) (*oauth2.Token, error) {
-	cfg := newOAuth2PasswordConfig(cache.mw)
+func (client *PasswordClient) ObtainToken(ctx context.Context) (*oauth2.Token, error) {
+	cfg := newOAuth2PasswordConfig(client.mw)
 
 	// Use external services HTTP client if configured
-	if httpClient := cache.getHTTPClient(); httpClient != nil {
+	if httpClient := client.getHTTPClient(); httpClient != nil {
 		ctx = context.WithValue(ctx, oauth2.HTTPClient, httpClient)
 	}
 
-	return cfg.PasswordCredentialsToken(ctx, cache.mw.Spec.UpstreamAuth.OAuth.PasswordAuthentication.Username, cache.mw.Spec.UpstreamAuth.OAuth.PasswordAuthentication.Password)
+	return cfg.PasswordCredentialsToken(ctx, client.mw.Spec.UpstreamAuth.OAuth.PasswordAuthentication.Username, client.mw.Spec.UpstreamAuth.OAuth.PasswordAuthentication.Password)
 }
 
-func (cache *PasswordClient) GetToken(r *http.Request) (string, error) {
-	cacheKey := generatePasswordOAuthCacheKey(cache.mw.Spec.UpstreamAuth.OAuth, cache.mw.Spec.APIID)
-	secret := cache.mw.Gw.GetConfig().Secret
-	extraMetadata := cache.mw.Spec.UpstreamAuth.OAuth.PasswordAuthentication.ExtraMetadata
+func (client *PasswordClient) GetToken(r *http.Request) (string, error) {
+	cacheKey := generatePasswordOAuthCacheKey(client.mw.Spec.UpstreamAuth.OAuth, client.mw.Spec.APIID)
+	secret := client.mw.Gw.GetConfig().Secret
+	extraMetadata := client.mw.Spec.UpstreamAuth.OAuth.PasswordAuthentication.ExtraMetadata
 
 	obtainTokenFunc := func(ctx context.Context) (*oauth2.Token, error) {
-		return cache.ObtainToken(ctx)
+		return client.ObtainToken(ctx)
 	}
 
-	return getToken(r, cacheKey, obtainTokenFunc, secret, extraMetadata, cache.mw.passwordStorageHandler)
+	return getToken(r, cacheKey, obtainTokenFunc, secret, extraMetadata, client.mw.passwordStorageHandler)
 }
 
 // getHTTPClient creates an HTTP client with external services configuration if available
-func (cache *PasswordClient) getHTTPClient() *http.Client {
-	gwConfig := cache.mw.Gw.GetConfig()
+func (client *PasswordClient) getHTTPClient() *http.Client {
+	gwConfig := client.mw.Gw.GetConfig()
 	if gwConfig.ExternalServices.OAuth.MTLS.Enabled ||
 		gwConfig.ExternalServices.OAuth.Proxy.Enabled ||
 		gwConfig.ExternalServices.Global.Enabled {
 
-		// Create HTTP client factory
-		factory := httpclient.NewExternalHTTPClientFactory(&gwConfig.ExternalServices, cache.mw.Gw.GetCertificateManager())
+		// Create HTTP httpClient factory
+		factory := httpclient.NewExternalHTTPClientFactory(&gwConfig.ExternalServices, client.mw.Gw.GetCertificateManager())
 
-		// Try to create OAuth client
-		if client, err := factory.CreateOAuthClient(); err == nil {
-			return client
+		// Try to create OAuth httpClient with proper error handling
+		httpClient, err := factory.CreateOAuthClient()
+		if err != nil {
+			// Log the configuration error but continue with default httpClient
+			if client.mw != nil && client.mw.Base != nil {
+				client.mw.Logger().WithError(err).Warn("Failed to create custom HTTP httpClient for upstream OAuth, falling back to default httpClient. Check external services configuration.")
+			}
+			return nil
 		}
+
+		if client.mw != nil && client.mw.Base != nil {
+			client.mw.Logger().Debug("Successfully created custom HTTP httpClient for upstream OAuth with external services configuration")
+		}
+		return httpClient
 	}
 
 	// Return nil to use default HTTP client
