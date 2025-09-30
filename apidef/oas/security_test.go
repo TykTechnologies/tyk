@@ -1591,3 +1591,365 @@ func TestCompliantModeSecuritySeparation(t *testing.T) {
 		assert.Equal(t, SecurityProcessingModeCompliant, auth.SecurityProcessingMode)
 	})
 }
+
+// TestGetJWTConfiguration_ORAuthentication tests GetJWTConfiguration with OR authentication scenarios
+// This test ensures that the JWT configuration is correctly retrieved based on the security processing mode
+// and prevents regression of the panic issue when JWT is not the first security requirement.
+func TestGetJWTConfiguration_ORAuthentication(t *testing.T) {
+	// Helper function to create test OAS with JWT as second security requirement
+	createTestOAS := func(processingMode string) *OAS {
+		oas := &OAS{}
+		oas.T = openapi3.T{
+			OpenAPI: "3.0.3",
+			Components: &openapi3.Components{
+				SecuritySchemes: openapi3.SecuritySchemes{
+					"apiKeyAuth": &openapi3.SecuritySchemeRef{
+						Value: &openapi3.SecurityScheme{
+							Type: "apiKey",
+							In:   "header",
+							Name: "X-API-Key",
+						},
+					},
+					"jwtAuth": &openapi3.SecuritySchemeRef{
+						Value: &openapi3.SecurityScheme{
+							Type:         typeHTTP,
+							Scheme:       schemeBearer,
+							BearerFormat: bearerFormatJWT,
+						},
+					},
+					"basicAuth": &openapi3.SecuritySchemeRef{
+						Value: &openapi3.SecurityScheme{
+							Type:   typeHTTP,
+							Scheme: "basic",
+						},
+					},
+				},
+			},
+			// IMPORTANT: JWT is second in the security requirements (API key is first)
+			Security: openapi3.SecurityRequirements{
+				openapi3.SecurityRequirement{"apiKeyAuth": []string{}},
+				openapi3.SecurityRequirement{"jwtAuth": []string{}},
+			},
+		}
+
+		// Set up Tyk extension with JWT configuration
+		tykExtension := &XTykAPIGateway{
+			Server: Server{
+				Authentication: &Authentication{
+					SecurityProcessingMode: processingMode,
+					SecuritySchemes: SecuritySchemes{
+						"apiKeyAuth": &Token{
+							Enabled: func() *bool { b := true; return &b }(),
+						},
+						"jwtAuth": &JWT{
+							Enabled:           true,
+							SigningMethod:     "hmac",
+							Source:            "YS1zdHJpbmctc2VjcmV0LWF0LWxlYXN0LTI1Ni1iaXRzLWxvbmc=",
+							IdentityBaseField: "sub",
+							PolicyFieldName:   "policy",
+							AllowedIssuers:    []string{"test-issuer"},
+							AllowedAudiences:  []string{"test-audience"},
+							JTIValidation: JTIValidation{
+								Enabled: false,
+							},
+						},
+					},
+				},
+			},
+		}
+		oas.SetTykExtension(tykExtension)
+		return oas
+	}
+
+	t.Run("Legacy mode - should NOT find JWT when it's not first", func(t *testing.T) {
+		oas := createTestOAS(SecurityProcessingModeLegacy)
+
+		jwtConfig := oas.GetJWTConfiguration()
+		assert.Nil(t, jwtConfig, "In legacy mode, JWT should NOT be found when it's not the first security requirement")
+	})
+
+	t.Run("Compliant mode - should find JWT even when it's not first", func(t *testing.T) {
+		oas := createTestOAS(SecurityProcessingModeCompliant)
+
+		jwtConfig := oas.GetJWTConfiguration()
+		assert.NotNil(t, jwtConfig, "In compliant mode, JWT should be found even when it's not the first security requirement")
+		assert.Equal(t, "hmac", jwtConfig.SigningMethod)
+		assert.Equal(t, "sub", jwtConfig.IdentityBaseField)
+		assert.Equal(t, "policy", jwtConfig.PolicyFieldName)
+		assert.Equal(t, []string{"test-issuer"}, jwtConfig.AllowedIssuers)
+		assert.Equal(t, []string{"test-audience"}, jwtConfig.AllowedAudiences)
+	})
+
+	t.Run("Default (empty) mode - should use legacy behavior", func(t *testing.T) {
+		oas := createTestOAS("")
+
+		jwtConfig := oas.GetJWTConfiguration()
+		assert.Nil(t, jwtConfig, "With empty/default mode, should behave like legacy mode")
+	})
+
+	t.Run("Legacy mode - should find JWT when it's first", func(t *testing.T) {
+		oas := &OAS{}
+		oas.T = openapi3.T{
+			OpenAPI: "3.0.3",
+			Components: &openapi3.Components{
+				SecuritySchemes: openapi3.SecuritySchemes{
+					"jwtAuth": &openapi3.SecuritySchemeRef{
+						Value: &openapi3.SecurityScheme{
+							Type:         typeHTTP,
+							Scheme:       schemeBearer,
+							BearerFormat: bearerFormatJWT,
+						},
+					},
+					"apiKeyAuth": &openapi3.SecuritySchemeRef{
+						Value: &openapi3.SecurityScheme{
+							Type: "apiKey",
+							In:   "header",
+							Name: "X-API-Key",
+						},
+					},
+				},
+			},
+			// JWT is first this time
+			Security: openapi3.SecurityRequirements{
+				openapi3.SecurityRequirement{"jwtAuth": []string{}},
+				openapi3.SecurityRequirement{"apiKeyAuth": []string{}},
+			},
+		}
+
+		tykExtension := &XTykAPIGateway{
+			Server: Server{
+				Authentication: &Authentication{
+					SecurityProcessingMode: SecurityProcessingModeLegacy,
+					SecuritySchemes: SecuritySchemes{
+						"jwtAuth": &JWT{
+							Enabled:       true,
+							SigningMethod: "rsa",
+							Source:        "cHVibGljLWtleQ==",
+						},
+					},
+				},
+			},
+		}
+		oas.SetTykExtension(tykExtension)
+
+		jwtConfig := oas.GetJWTConfiguration()
+		assert.NotNil(t, jwtConfig, "Legacy mode should find JWT when it's the first security requirement")
+		assert.Equal(t, "rsa", jwtConfig.SigningMethod)
+	})
+
+	t.Run("Compliant mode - JWT as third requirement", func(t *testing.T) {
+		oas := &OAS{}
+		oas.T = openapi3.T{
+			OpenAPI: "3.0.3",
+			Components: &openapi3.Components{
+				SecuritySchemes: openapi3.SecuritySchemes{
+					"basicAuth": &openapi3.SecuritySchemeRef{
+						Value: &openapi3.SecurityScheme{
+							Type:   typeHTTP,
+							Scheme: "basic",
+						},
+					},
+					"apiKeyAuth": &openapi3.SecuritySchemeRef{
+						Value: &openapi3.SecurityScheme{
+							Type: "apiKey",
+							In:   "header",
+							Name: "X-API-Key",
+						},
+					},
+					"jwtAuth": &openapi3.SecuritySchemeRef{
+						Value: &openapi3.SecurityScheme{
+							Type:         typeHTTP,
+							Scheme:       schemeBearer,
+							BearerFormat: bearerFormatJWT,
+						},
+					},
+				},
+			},
+			// JWT is third in the list
+			Security: openapi3.SecurityRequirements{
+				openapi3.SecurityRequirement{"basicAuth": []string{}},
+				openapi3.SecurityRequirement{"apiKeyAuth": []string{}},
+				openapi3.SecurityRequirement{"jwtAuth": []string{}},
+			},
+		}
+
+		tykExtension := &XTykAPIGateway{
+			Server: Server{
+				Authentication: &Authentication{
+					SecurityProcessingMode: SecurityProcessingModeCompliant,
+					SecuritySchemes: SecuritySchemes{
+						"jwtAuth": &JWT{
+							Enabled:       true,
+							SigningMethod: "ecdsa",
+							Source:        "ZWNkc2Eta2V5",
+						},
+					},
+				},
+			},
+		}
+		oas.SetTykExtension(tykExtension)
+
+		jwtConfig := oas.GetJWTConfiguration()
+		assert.NotNil(t, jwtConfig, "Compliant mode should find JWT regardless of its position")
+		assert.Equal(t, "ecdsa", jwtConfig.SigningMethod)
+	})
+
+	t.Run("No JWT in security requirements - both modes return nil", func(t *testing.T) {
+		for _, mode := range []string{SecurityProcessingModeLegacy, SecurityProcessingModeCompliant} {
+			t.Run(mode, func(t *testing.T) {
+				oas := &OAS{}
+				oas.T = openapi3.T{
+					OpenAPI: "3.0.3",
+					Components: &openapi3.Components{
+						SecuritySchemes: openapi3.SecuritySchemes{
+							"apiKeyAuth": &openapi3.SecuritySchemeRef{
+								Value: &openapi3.SecurityScheme{
+									Type: "apiKey",
+									In:   "header",
+									Name: "X-API-Key",
+								},
+							},
+							"basicAuth": &openapi3.SecuritySchemeRef{
+								Value: &openapi3.SecurityScheme{
+									Type:   typeHTTP,
+									Scheme: "basic",
+								},
+							},
+						},
+					},
+					Security: openapi3.SecurityRequirements{
+						openapi3.SecurityRequirement{"apiKeyAuth": []string{}},
+						openapi3.SecurityRequirement{"basicAuth": []string{}},
+					},
+				}
+
+				tykExtension := &XTykAPIGateway{
+					Server: Server{
+						Authentication: &Authentication{
+							SecurityProcessingMode: mode,
+							SecuritySchemes: SecuritySchemes{
+								"apiKeyAuth": &Token{
+									Enabled: func() *bool { b := true; return &b }(),
+								},
+							},
+						},
+					},
+				}
+				oas.SetTykExtension(tykExtension)
+
+				jwtConfig := oas.GetJWTConfiguration()
+				assert.Nil(t, jwtConfig, "Should return nil when no JWT security scheme exists")
+			})
+		}
+	})
+
+	t.Run("JWT with wrong type - both modes return nil", func(t *testing.T) {
+		oas := &OAS{}
+		oas.T = openapi3.T{
+			OpenAPI: "3.0.3",
+			Components: &openapi3.Components{
+				SecuritySchemes: openapi3.SecuritySchemes{
+					"wrongJWT": &openapi3.SecuritySchemeRef{
+						Value: &openapi3.SecurityScheme{
+							Type:   typeHTTP,
+							Scheme: "bearer", // Missing BearerFormat: "JWT"
+						},
+					},
+				},
+			},
+			Security: openapi3.SecurityRequirements{
+				openapi3.SecurityRequirement{"wrongJWT": []string{}},
+			},
+		}
+
+		tykExtension := &XTykAPIGateway{
+			Server: Server{
+				Authentication: &Authentication{
+					SecurityProcessingMode: SecurityProcessingModeCompliant,
+					SecuritySchemes: SecuritySchemes{
+						"wrongJWT": &JWT{
+							Enabled: true,
+						},
+					},
+				},
+			},
+		}
+		oas.SetTykExtension(tykExtension)
+
+		jwtConfig := oas.GetJWTConfiguration()
+		assert.Nil(t, jwtConfig, "Should return nil when security scheme is not properly typed as JWT")
+	})
+
+	t.Run("Empty Security array - both modes return nil", func(t *testing.T) {
+		for _, mode := range []string{SecurityProcessingModeLegacy, SecurityProcessingModeCompliant} {
+			t.Run(mode, func(t *testing.T) {
+				oas := &OAS{}
+				oas.T = openapi3.T{
+					OpenAPI: "3.0.3",
+					Components: &openapi3.Components{
+						SecuritySchemes: openapi3.SecuritySchemes{
+							"jwtAuth": &openapi3.SecuritySchemeRef{
+								Value: &openapi3.SecurityScheme{
+									Type:         typeHTTP,
+									Scheme:       schemeBearer,
+									BearerFormat: bearerFormatJWT,
+								},
+							},
+						},
+					},
+					Security: openapi3.SecurityRequirements{}, // Empty security requirements
+				}
+
+				tykExtension := &XTykAPIGateway{
+					Server: Server{
+						Authentication: &Authentication{
+							SecurityProcessingMode: mode,
+							SecuritySchemes: SecuritySchemes{
+								"jwtAuth": &JWT{
+									Enabled: true,
+								},
+							},
+						},
+					},
+				}
+				oas.SetTykExtension(tykExtension)
+
+				jwtConfig := oas.GetJWTConfiguration()
+				assert.Nil(t, jwtConfig, "Should return nil when Security array is empty")
+			})
+		}
+	})
+
+	t.Run("Nil getTykAuthentication - defaults to legacy mode", func(t *testing.T) {
+		oas := &OAS{}
+		oas.T = openapi3.T{
+			OpenAPI: "3.0.3",
+			Components: &openapi3.Components{
+				SecuritySchemes: openapi3.SecuritySchemes{
+					"apiKeyAuth": &openapi3.SecuritySchemeRef{
+						Value: &openapi3.SecurityScheme{
+							Type: "apiKey",
+							In:   "header",
+							Name: "X-API-Key",
+						},
+					},
+					"jwtAuth": &openapi3.SecuritySchemeRef{
+						Value: &openapi3.SecurityScheme{
+							Type:         typeHTTP,
+							Scheme:       schemeBearer,
+							BearerFormat: bearerFormatJWT,
+						},
+					},
+				},
+			},
+			Security: openapi3.SecurityRequirements{
+				openapi3.SecurityRequirement{"apiKeyAuth": []string{}},
+				openapi3.SecurityRequirement{"jwtAuth": []string{}}, // JWT is second
+			},
+		}
+
+		// No Tyk extension set - should default to legacy mode
+		jwtConfig := oas.GetJWTConfiguration()
+		assert.Nil(t, jwtConfig, "Should behave as legacy mode when getTykAuthentication is nil")
+	})
+}

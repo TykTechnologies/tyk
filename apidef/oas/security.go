@@ -99,11 +99,11 @@ func (s *OAS) extractTokenTo(api *apidef.APIDefinition, name string) {
 	api.AuthConfigs[apidef.AuthTokenType] = authConfig
 }
 
-// JWK represents a JSON Web Key containing configuration for JWKS endpoint and its cache timeout.
+// JWK represents a JSON Web Key Set containing configuration for the JWKS endpoint and its cache timeout.
 type JWK struct {
-	// URL is the jwk endpoint.
+	// URL is the JWKS endpoint.
 	URL string `json:"url"`
-	// CacheTimeout defines how long the JWKS is kept in the cache before forcing a refresh.
+	// CacheTimeout defines how long the JWKS will be kept in the cache before forcing a refresh from the JWKS endpoint.
 	CacheTimeout int64 `bson:"cacheTimeout" json:"cacheTimeout"`
 }
 
@@ -137,7 +137,6 @@ type JWT struct {
 	IdentityBaseField string `bson:"identityBaseField,omitempty" json:"identityBaseField,omitempty"`
 
 	// SubjectClaims specifies a list of claims that can be used to identity the subject of the JWT.
-	// This field is a Tyk OAS only field and is only used in Tyk OAS APIs.
 	SubjectClaims []string `bson:"subjectClaims,omitempty" json:"subjectClaims,omitempty"`
 
 	// SkipKid controls skipping using the `kid` claim from a JWT (default behaviour).
@@ -154,7 +153,6 @@ type JWT struct {
 
 	// BasePolicyClaims specifies a list of claims from which the base PolicyID is extracted.
 	// The policy is applied to the session as a base policy.
-	// This field is a Tyk OAS only field and is only used in Tyk OAS APIs.
 	BasePolicyClaims []string `bson:"basePolicyClaims,omitempty" json:"basePolicyClaims,omitempty"`
 
 	// ClientBaseField is used when PolicyFieldName is not provided. It will get
@@ -189,21 +187,17 @@ type JWT struct {
 
 	// AllowedIssuers contains a list of accepted issuers for JWT validation.
 	// When configured, the JWT's issuer claim must match one of these values.
-	// This field is a Tyk OAS only field and is only used in Tyk OAS APIs.
 	AllowedIssuers []string `bson:"allowedIssuers,omitempty" json:"allowedIssuers,omitempty"`
 
 	// AllowedAudiences contains a list of accepted audiences for JWT validation.
 	// When configured, the JWT's audience claim must match one of these values.
-	// This field is a Tyk OAS only field and is only used in Tyk OAS APIs.
 	AllowedAudiences []string `bson:"allowedAudiences,omitempty" json:"allowedAudiences,omitempty"`
 
 	// JTIValidation contains the configuration for the validation of the JWT ID.
-	// This field is a Tyk OAS only field and is only used in Tyk OAS APIs.
 	JTIValidation JTIValidation `bson:"jtiValidation,omitempty" json:"jtiValidation,omitempty"`
 
 	// AllowedSubjects contains a list of accepted subjects for JWT validation.
 	// When configured, the subject from kid/identityBaseField/sub must match one of these values.
-	// This field is a Tyk OAS only field and is only used in Tyk OAS APIs.
 	AllowedSubjects []string `bson:"allowedSubjects,omitempty" json:"allowedSubjects,omitempty"`
 
 	// IDPClientIDMappingDisabled prevents Tyk from automatically detecting the use of certain IDPs based on standard claims
@@ -229,7 +223,6 @@ type JWT struct {
 	// Claims can be of type string, number, boolean, or array. For arrays, the contains validation
 	// checks if any of the array elements exactly match any of the allowed values.
 	//
-	// Tyk classic API definition: N/A (OAS only).
 	CustomClaimValidation map[string]CustomClaimValidationConfig `bson:"customClaimValidation,omitempty" json:"customClaimValidation,omitempty"`
 }
 
@@ -1196,11 +1189,31 @@ func (s *OAS) GetJWTConfiguration() *JWT {
 		return nil
 	}
 
-	for keyName := range s.getTykSecuritySchemes() {
-		if _, ok := s.Security[0][keyName]; ok {
-			v := s.Components.SecuritySchemes[keyName].Value
-			if v.Type == typeHTTP && v.Scheme == schemeBearer && v.BearerFormat == bearerFormatJWT {
-				return s.getTykJWTAuth(keyName)
+	processingMode := SecurityProcessingModeLegacy
+	if s.getTykAuthentication() != nil && s.getTykAuthentication().SecurityProcessingMode != "" {
+		processingMode = s.getTykAuthentication().SecurityProcessingMode
+	}
+
+	if processingMode == SecurityProcessingModeLegacy {
+		// Legacy mode: only check the first security requirement
+		for keyName := range s.getTykSecuritySchemes() {
+			if _, ok := s.Security[0][keyName]; ok {
+				v := s.Components.SecuritySchemes[keyName].Value
+				if v.Type == typeHTTP && v.Scheme == schemeBearer && v.BearerFormat == bearerFormatJWT {
+					return s.getTykJWTAuth(keyName)
+				}
+			}
+		}
+	} else {
+		// Compliant mode: check ALL security requirements for OR authentication support
+		for _, securityRequirement := range s.Security {
+			for keyName := range s.getTykSecuritySchemes() {
+				if _, ok := securityRequirement[keyName]; ok {
+					v := s.Components.SecuritySchemes[keyName].Value
+					if v.Type == typeHTTP && v.Scheme == schemeBearer && v.BearerFormat == bearerFormatJWT {
+						return s.getTykJWTAuth(keyName)
+					}
+				}
 			}
 		}
 	}
