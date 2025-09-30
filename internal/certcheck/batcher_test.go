@@ -768,3 +768,25 @@ func createBatcherMocks(t *testing.T) (ctrl *gomock.Controller, batcherMocks *Ba
 		fallbackCacheMock: NewMockCooldownCache(ctrl),
 	}
 }
+
+func TestApplyConfigDefaults(t *testing.T) {
+	t.Run("without provided values", func(t *testing.T) {
+		providedCfg := config.CertificateExpiryMonitorConfig{}
+		actualCfg := applyConfigDefaults(providedCfg)
+		assert.Equal(t, config.DefaultWarningThresholdDays, actualCfg.WarningThresholdDays)
+		assert.Equal(t, config.DefaultCheckCooldownSeconds, actualCfg.CheckCooldownSeconds)
+		assert.Equal(t, config.DefaultEventCooldownSeconds, actualCfg.EventCooldownSeconds)
+	})
+
+	t.Run("with provided values", func(t *testing.T) {
+		providedCfg := config.CertificateExpiryMonitorConfig{
+			WarningThresholdDays: 10,
+			CheckCooldownSeconds: 100,
+			EventCooldownSeconds: 1000,
+		}
+		actualCfg := applyConfigDefaults(providedCfg)
+		assert.Equal(t, 10, actualCfg.WarningThresholdDays)
+		assert.Equal(t, 100, actualCfg.CheckCooldownSeconds)
+		assert.Equal(t, 1000, actualCfg.EventCooldownSeconds)
+	})
+}
