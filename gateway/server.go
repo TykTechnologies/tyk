@@ -2132,6 +2132,10 @@ func (gw *Gateway) GetConfig() config.Config {
 	return gw.config.Load().(config.Config)
 }
 
+func (gw *Gateway) GetCertificateManager() certs.CertificateManager {
+	return gw.CertificateManager
+}
+
 func (gw *Gateway) SetConfig(conf config.Config, skipReload ...bool) {
 	gw.configMu.Lock()
 	gw.config.Store(conf)
