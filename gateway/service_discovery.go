@@ -59,9 +59,18 @@ func (s *ServiceDiscovery) getServiceData(name string) (string, error) {
 			log.Debugf("[ExternalServices] Using external services discovery client for URL: %s", name)
 			resp, err = client.Get(name)
 		} else {
-			log.WithError(clientErr).Debug("Failed to create discovery HTTP client, falling back to default")
-			log.Debug("[ExternalServices] Falling back to legacy discovery client due to factory error")
-			resp, err = http.Get(name)
+			// Check if mTLS is explicitly enabled and error is certificate-related - if so, don't fallback as it would bypass security
+			gwConfig := s.gw.GetConfig()
+			if gwConfig.ExternalServices.Discovery.MTLS.Enabled && isMTLSError(clientErr) {
+				log.WithError(clientErr).Error("mTLS configuration failed for service discovery. Discovery request will fail to maintain security.")
+				// Return the TLS configuration error directly
+				return "", clientErr
+			} else {
+				// For other errors (not configured, proxy config), fallback to default client
+				log.WithError(clientErr).Debug("Failed to create discovery HTTP client, falling back to default")
+				log.Debug("[ExternalServices] Falling back to legacy discovery client due to factory error")
+				resp, err = http.Get(name)
+			}
 		}
 	} else {
 		// Fallback to default client if gateway not set

@@ -2,12 +2,20 @@ package upstreamoauth
 
 import (
 	"context"
+	"errors"
 	"net/http"
 
 	"golang.org/x/oauth2"
 
 	"github.com/TykTechnologies/tyk/internal/httpclient"
 )
+
+// isMTLSError checks if the error is related to mTLS certificate loading
+func isMTLSError(err error) bool {
+	return errors.Is(err, httpclient.ErrMTLSCertificateLoad) ||
+		errors.Is(err, httpclient.ErrMTLSCertificateStore) ||
+		errors.Is(err, httpclient.ErrMTLSCALoad)
+}
 
 func (client *PasswordClient) ObtainToken(ctx context.Context) (*oauth2.Token, error) {
 	cfg := newOAuth2PasswordConfig(client.mw)
@@ -45,7 +53,16 @@ func (client *PasswordClient) getHTTPClient() *http.Client {
 		// Try to create OAuth httpClient with proper error handling
 		httpClient, err := factory.CreateOAuthClient()
 		if err != nil {
-			// Log the configuration error but continue with default httpClient
+			// If mTLS is explicitly enabled and the error is related to certificate loading,
+			// we should not fallback to default client as this would bypass required mutual TLS authentication
+			if gwConfig.ExternalServices.OAuth.MTLS.Enabled && isMTLSError(err) {
+				if client.mw != nil && client.mw.Base != nil {
+					client.mw.Logger().WithError(err).Error("mTLS configuration failed for upstream OAuth. This is a security-critical error - requests cannot proceed without proper mutual TLS authentication.")
+				}
+				// Don't return a client at all - let the OAuth flow fail properly
+				return nil
+			}
+			// For other errors (e.g., not configured, proxy config), log warning and fallback
 			if client.mw != nil && client.mw.Base != nil {
 				client.mw.Logger().WithError(err).Warn("Failed to create custom HTTP httpClient for upstream OAuth, falling back to default httpClient. Check external services configuration.")
 			}
