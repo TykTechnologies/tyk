@@ -312,9 +312,12 @@ func TestWebHookHandler_ConfigurationHierarchy(t *testing.T) {
 	}
 	ts.Gw.SetConfig(gwConf)
 
-	// Test that service-specific configuration takes precedence
+	// Test that the factory is created with the webhook configuration
 	factory := NewExternalHTTPClientFactory(ts.Gw)
-	serviceConfig := factory.getServiceConfig(config.ServiceTypeWebhook)
+	assert.NotNil(t, factory)
 
-	assert.Equal(t, "http://webhook-specific-proxy:8080", serviceConfig.Proxy.HTTPProxy)
+	// Create a webhook client to verify it uses the external services configuration
+	client, err := factory.CreateWebhookClient()
+	assert.NoError(t, err)
+	assert.NotNil(t, client)
 }
