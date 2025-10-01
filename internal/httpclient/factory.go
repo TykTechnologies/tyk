@@ -316,14 +316,14 @@ func (f *ExternalHTTPClientFactory) getTLSConfig(serviceConfig config.ServiceCon
 		if serviceConfig.MTLS.IsCertificateStoreConfig() {
 			cert, err := f.loadCertificateFromStore(serviceConfig.MTLS.CertID)
 			if err != nil {
-				return nil, fmt.Errorf("%w: %v", ErrMTLSCertificateStore, err)
+				return nil, fmt.Errorf("%w: %w", ErrMTLSCertificateStore, err)
 			}
 			tlsConfig.Certificates = []tls.Certificate{*cert}
 		} else if serviceConfig.MTLS.IsFileBasedConfig() {
 			// Priority 2: File-based certificates (existing behavior)
 			cert, err := tls.LoadX509KeyPair(serviceConfig.MTLS.CertFile, serviceConfig.MTLS.KeyFile)
 			if err != nil {
-				return nil, fmt.Errorf("%w: %v", ErrMTLSCertificateLoad, err)
+				return nil, fmt.Errorf("%w: %w", ErrMTLSCertificateLoad, err)
 			}
 			tlsConfig.Certificates = []tls.Certificate{cert}
 		}
@@ -338,7 +338,7 @@ func (f *ExternalHTTPClientFactory) getTLSConfig(serviceConfig config.ServiceCon
 			// Existing file-based CA loading logic
 			caCert, err := ioutil.ReadFile(serviceConfig.MTLS.CAFile)
 			if err != nil {
-				return nil, fmt.Errorf("%w: %v", ErrMTLSCALoad, err)
+				return nil, fmt.Errorf("%w: %w", ErrMTLSCALoad, err)
 			}
 
 			caCertPool := x509.NewCertPool()
