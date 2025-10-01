@@ -93,36 +93,38 @@ type RequestStatus string
 
 // Statuses of the request, all are false-y except StatusOk and StatusOkAndIgnore
 const (
-	VersionNotFound                RequestStatus = "Version information not found"
-	VersionDoesNotExist            RequestStatus = "This API version does not seem to exist"
-	VersionWhiteListStatusNotFound RequestStatus = "WhiteListStatus for path not found"
-	VersionExpired                 RequestStatus = "Api Version has expired, please check documentation or contact administrator"
-	APIExpired                     RequestStatus = "API has expired, please check documentation or contact administrator"
-	EndPointNotAllowed             RequestStatus = "Requested endpoint is forbidden"
-	StatusOkAndIgnore              RequestStatus = "Everything OK, passing and not filtering"
-	StatusOk                       RequestStatus = "Everything OK, passing"
-	StatusCached                   RequestStatus = "Cached path"
-	StatusTransform                RequestStatus = "Transformed path"
-	StatusTransformResponse        RequestStatus = "Transformed response"
-	StatusTransformJQ              RequestStatus = "Transformed path with JQ"
-	StatusTransformJQResponse      RequestStatus = "Transformed response with JQ"
-	StatusHeaderInjected           RequestStatus = "Header injected"
-	StatusMethodTransformed        RequestStatus = "Method Transformed"
-	StatusHeaderInjectedResponse   RequestStatus = "Header injected on response"
-	StatusRedirectFlowByReply      RequestStatus = "Exceptional action requested, redirecting flow!"
-	StatusHardTimeout              RequestStatus = "Hard Timeout enforced on path"
-	StatusCircuitBreaker           RequestStatus = "Circuit breaker enforced"
-	StatusURLRewrite               RequestStatus = "URL Rewritten"
-	StatusVirtualPath              RequestStatus = "Virtual Endpoint"
-	StatusRequestSizeControlled    RequestStatus = "Request Size Limited"
-	StatusRequestTracked           RequestStatus = "Request Tracked"
-	StatusRequestNotTracked        RequestStatus = "Request Not Tracked"
-	StatusValidateJSON             RequestStatus = "Validate JSON"
-	StatusValidateRequest          RequestStatus = "Validate Request"
-	StatusInternal                 RequestStatus = "Internal path"
-	StatusGoPlugin                 RequestStatus = "Go plugin"
-	StatusPersistGraphQL           RequestStatus = "Persist GraphQL"
-	StatusRateLimit                RequestStatus = "Rate Limited"
+	VersionNotFound                       RequestStatus = "Version information not found"
+	VersionDoesNotExist                   RequestStatus = "This API version does not seem to exist"
+	VersionWhiteListStatusNotFound        RequestStatus = "WhiteListStatus for path not found"
+	VersionExpired                        RequestStatus = "Api Version has expired, please check documentation or contact administrator"
+	VersionDefaultForNotVersionedNotFound RequestStatus = "No default API version for this non-versioned API found"
+	VersionAmbiguousDefault               RequestStatus = "Ambiguous default API version for this non-versioned API"
+	APIExpired                            RequestStatus = "API has expired, please check documentation or contact administrator"
+	EndPointNotAllowed                    RequestStatus = "Requested endpoint is forbidden"
+	StatusOkAndIgnore                     RequestStatus = "Everything OK, passing and not filtering"
+	StatusOk                              RequestStatus = "Everything OK, passing"
+	StatusCached                          RequestStatus = "Cached path"
+	StatusTransform                       RequestStatus = "Transformed path"
+	StatusTransformResponse               RequestStatus = "Transformed response"
+	StatusTransformJQ                     RequestStatus = "Transformed path with JQ"
+	StatusTransformJQResponse             RequestStatus = "Transformed response with JQ"
+	StatusHeaderInjected                  RequestStatus = "Header injected"
+	StatusMethodTransformed               RequestStatus = "Method Transformed"
+	StatusHeaderInjectedResponse          RequestStatus = "Header injected on response"
+	StatusRedirectFlowByReply             RequestStatus = "Exceptional action requested, redirecting flow!"
+	StatusHardTimeout                     RequestStatus = "Hard Timeout enforced on path"
+	StatusCircuitBreaker                  RequestStatus = "Circuit breaker enforced"
+	StatusURLRewrite                      RequestStatus = "URL Rewritten"
+	StatusVirtualPath                     RequestStatus = "Virtual Endpoint"
+	StatusRequestSizeControlled           RequestStatus = "Request Size Limited"
+	StatusRequestTracked                  RequestStatus = "Request Tracked"
+	StatusRequestNotTracked               RequestStatus = "Request Not Tracked"
+	StatusValidateJSON                    RequestStatus = "Validate JSON"
+	StatusValidateRequest                 RequestStatus = "Validate Request"
+	StatusInternal                        RequestStatus = "Internal path"
+	StatusGoPlugin                        RequestStatus = "Go plugin"
+	StatusPersistGraphQL                  RequestStatus = "Persist GraphQL"
+	StatusRateLimit                       RequestStatus = "Rate Limited"
 )
 
 type EndPointCacheMeta struct {
@@ -1664,10 +1666,15 @@ func (a *APISpec) Version(r *http.Request) (*apidef.VersionInfo, RequestStatus) 
 	} else {
 		// Are we versioned?
 		if a.VersionData.NotVersioned {
-			// Get the first one in the list
-			for _, v := range a.VersionData.Versions {
-				version = v
-				break
+			ambiguous := a.CheckForAmbiguousDefaultVersions()
+			if ambiguous {
+				return nil, VersionAmbiguousDefault
+			}
+
+			ok := false
+			version, ok = a.GetSingleOrDefaultVersion()
+			if !ok {
+				return nil, VersionDefaultForNotVersionedNotFound
 			}
 		} else {
 			// Extract Version Info
@@ -1699,6 +1706,57 @@ func (a *APISpec) Version(r *http.Request) (*apidef.VersionInfo, RequestStatus) 
 	}
 
 	return &version, StatusOk
+}
+
+// GetSingleOrDefaultVersion determines and returns a single version or the default version if only one or a default exists.
+// Returns versionInfo and a boolean indicating success or failure.
+func (a *APISpec) GetSingleOrDefaultVersion() (versionInfo apidef.VersionInfo, ok bool) {
+	// If only one version exists, we can safely return this one
+	if len(a.VersionData.Versions) == 1 {
+		for _, v := range a.VersionData.Versions {
+			return v, true
+		}
+	}
+
+	// Now we check if a default version is defined and will look for it, when NotVersioned is set to false.
+	// Otherwise, we skip this check.
+	if !a.VersionData.NotVersioned && a.VersionData.DefaultVersion != "" {
+		versionInfo, ok = a.VersionData.Versions[a.VersionData.DefaultVersion]
+		return versionInfo, ok
+	}
+
+	// If no default version is defined, we try to find one named "Default", "default" or ""
+	if versionInfo, ok = a.VersionData.Versions["Default"]; ok {
+		return versionInfo, ok
+	}
+
+	if versionInfo, ok = a.VersionData.Versions["default"]; ok {
+		return versionInfo, ok
+	}
+
+	if versionInfo, ok = a.VersionData.Versions[""]; ok {
+		return versionInfo, ok
+	}
+
+	// If we reach this point, we tried everything to find a default version and failed
+	return apidef.VersionInfo{}, false
+}
+
+// CheckForAmbiguousDefaultVersions checks if there are multiple ambiguous default versions in the version data.
+func (a *APISpec) CheckForAmbiguousDefaultVersions() bool {
+	foundDefaultVersions := 0
+	for key := range a.VersionData.Versions {
+		switch key {
+		case "Default":
+			fallthrough
+		case "default":
+			fallthrough
+		case "":
+			foundDefaultVersions++
+		}
+	}
+
+	return foundDefaultVersions > 1
 }
 
 // StripListenPath will strip the listen path from the URL, keeping version in tact.
