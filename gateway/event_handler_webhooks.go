@@ -300,7 +300,7 @@ func (w *WebHookHandler) HandleEvent(em config.EventMessage) {
 	clientFactory := NewExternalHTTPClientFactory(w.Gw)
 	cli, err := clientFactory.CreateWebhookClient()
 	if err != nil {
-		log.WithError(err).Error("Failed to create webhook HTTP client, falling back to default")
+		log.WithError(err).Debug("Failed to create webhook HTTP client, falling back to default")
 		log.Debug("[ExternalServices] Falling back to legacy webhook client due to factory error")
 		cli = &http.Client{Timeout: 30 * time.Second}
 	} else {
