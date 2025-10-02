@@ -832,7 +832,7 @@ func TestCompliantMode_JWTOrAPIKeyOrHMAC(t *testing.T) {
 			},
 			Code: http.StatusOK,
 		},
-		// All invalid - should fail
+		// All invalid - should fail with error from last security group
 		{
 			Method: "GET",
 			Path:   "/test-compliant-or/",
@@ -840,7 +840,7 @@ func TestCompliantMode_JWTOrAPIKeyOrHMAC(t *testing.T) {
 				"Authorization": "Bearer invalid",
 				"X-API-Key":     "invalid",
 			},
-			Code: http.StatusForbidden,
+			Code: http.StatusBadRequest,
 		},
 	}
 
@@ -1647,7 +1647,7 @@ func TestHMACInORAuthentication(t *testing.T) {
 				"X-API-Key":     "invalid-key",
 				"Authorization": `Signature keyId="wrong",algorithm="hmac-sha1",signature="invalid"`,
 			},
-			Code: http.StatusForbidden,
+			Code: http.StatusBadRequest,
 		}
 
 		ts.Run(t, testCase)
@@ -1658,7 +1658,7 @@ func TestHMACInORAuthentication(t *testing.T) {
 			Method:  "GET",
 			Path:    "/test-hmac-or/",
 			Headers: map[string]string{},
-			Code:    http.StatusUnauthorized,
+			Code:    http.StatusBadRequest,
 		}
 
 		ts.Run(t, testCase)
