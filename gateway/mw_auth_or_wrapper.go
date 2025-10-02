@@ -3,6 +3,7 @@ package gateway
 import (
 	"fmt"
 	"net/http"
+	"net/http/httptest"
 
 	"github.com/TykTechnologies/tyk/apidef/oas"
 )
@@ -57,15 +58,17 @@ func (a *AuthORWrapper) ProcessRequest(w http.ResponseWriter, r *http.Request, _
 		for _, schemeName := range requirement {
 			mw := a.getMiddlewareForScheme(schemeName)
 			if mw == nil {
-				a.Logger().Debugf("OR wrapper: no middleware found for scheme %s, skipping group", schemeName)
+				a.Logger().Warnf("OR wrapper: no middleware found for scheme %s (server misconfiguration), skipping group", schemeName)
 				groupSuccess = false
-				groupError = lastError
-				groupCode = lastCode
+				groupError = fmt.Errorf("security scheme %s is not configured", schemeName)
+				groupCode = http.StatusInternalServerError
 				break
 			}
 
 			a.Logger().Debugf("OR wrapper: executing auth method %s in group %d", mw.Name(), groupIdx+1)
-			err, code := mw.ProcessRequest(w, rClone, nil)
+			// Use a response recorder to prevent failed auth attempts from writing to the actual response
+			recorder := httptest.NewRecorder()
+			err, code := mw.ProcessRequest(recorder, rClone, nil)
 			if err != nil {
 				a.Logger().Debugf("OR wrapper: auth method %s failed with error: %v (code: %d)", mw.Name(), err, code)
 				groupSuccess = false
