@@ -3932,7 +3932,6 @@ func TestMultiAuthMiddleware_AND_Within_OR_Groups(t *testing.T) {
 	ts.Run(t, testCases...)
 }
 
-
 // TestAuthORWrapper_OAuth2_Internal tests OAuth2 scheme detection for internal OAuth
 func TestAuthORWrapper_OAuth2_Internal(t *testing.T) {
 	ts := StartTest(nil)
