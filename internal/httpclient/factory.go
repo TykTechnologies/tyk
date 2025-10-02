@@ -3,6 +3,7 @@ package httpclient
 import (
 	"crypto/tls"
 	"crypto/x509"
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -15,6 +16,23 @@ import (
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/go-jose/go-jose/v3"
 )
+
+// Error types for proper error handling with errors.Is()
+var (
+	// ErrMTLSCertificateLoad indicates a failure to load mTLS certificates
+	ErrMTLSCertificateLoad = errors.New("mTLS certificate loading failed")
+	// ErrMTLSCertificateStore indicates a failure to load certificates from the certificate store
+	ErrMTLSCertificateStore = errors.New("mTLS certificate store access failed")
+	// ErrMTLSCALoad indicates a failure to load CA certificates
+	ErrMTLSCALoad = errors.New("mTLS CA certificate loading failed")
+)
+
+// IsMTLSError checks if the error is related to mTLS certificate loading
+func IsMTLSError(err error) bool {
+	return errors.Is(err, ErrMTLSCertificateLoad) ||
+		errors.Is(err, ErrMTLSCertificateStore) ||
+		errors.Is(err, ErrMTLSCALoad)
+}
 
 // CertificateManager is an alias for the actual certificate manager interface.
 type CertificateManager = certs.CertificateManager
@@ -305,14 +323,14 @@ func (f *ExternalHTTPClientFactory) getTLSConfig(serviceConfig config.ServiceCon
 		if serviceConfig.MTLS.IsCertificateStoreConfig() {
 			cert, err := f.loadCertificateFromStore(serviceConfig.MTLS.CertID)
 			if err != nil {
-				return nil, fmt.Errorf("failed to load certificate from store: %w", err)
+				return nil, fmt.Errorf("%w: %w", ErrMTLSCertificateStore, err)
 			}
 			tlsConfig.Certificates = []tls.Certificate{*cert}
 		} else if serviceConfig.MTLS.IsFileBasedConfig() {
 			// Priority 2: File-based certificates (existing behavior)
 			cert, err := tls.LoadX509KeyPair(serviceConfig.MTLS.CertFile, serviceConfig.MTLS.KeyFile)
 			if err != nil {
-				return nil, fmt.Errorf("failed to load client certificate: %w", err)
+				return nil, fmt.Errorf("%w: %w", ErrMTLSCertificateLoad, err)
 			}
 			tlsConfig.Certificates = []tls.Certificate{cert}
 		}
@@ -327,12 +345,12 @@ func (f *ExternalHTTPClientFactory) getTLSConfig(serviceConfig config.ServiceCon
 			// Existing file-based CA loading logic
 			caCert, err := ioutil.ReadFile(serviceConfig.MTLS.CAFile)
 			if err != nil {
-				return nil, fmt.Errorf("failed to read CA certificate: %w", err)
+				return nil, fmt.Errorf("%w: %w", ErrMTLSCALoad, err)
 			}
 
 			caCertPool := x509.NewCertPool()
 			if !caCertPool.AppendCertsFromPEM(caCert) {
-				return nil, fmt.Errorf("failed to parse CA certificate")
+				return nil, fmt.Errorf("%w: failed to parse CA certificate", ErrMTLSCALoad)
 			}
 			tlsConfig.RootCAs = caCertPool
 		}
