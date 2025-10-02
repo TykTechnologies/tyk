@@ -77,7 +77,7 @@ func (tr TraceMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request,
 	if baseMw := tr.Base(); baseMw != nil {
 		cfg := baseMw.Gw.GetConfig()
 		if cfg.OpenTelemetry.Enabled {
-			otel.AddTraceID(r.Context(), w)
+			otel.AddTraceID(r.Context(), w, r)
 			var span otel.Span
 			if baseMw.Spec.DetailedTracing {
 				var ctx context.Context
