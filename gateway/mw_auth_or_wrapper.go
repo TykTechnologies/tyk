@@ -7,12 +7,17 @@ import (
 	"github.com/TykTechnologies/tyk/apidef/oas"
 )
 
+// AuthORWrapper is a middleware that handles OR logic for multiple authentication methods.
+// When multiple security requirements are defined (len(SecurityRequirements) > 1),
+// it tries each auth method until one succeeds.
 type AuthORWrapper struct {
 	BaseMiddleware
 	authMiddlewares []TykMiddleware
 }
 
+// ProcessRequest handles the OR logic for authentication
 func (a *AuthORWrapper) ProcessRequest(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
+	// Determine processing mode (OAS-only feature)
 	processingMode := oas.SecurityProcessingModeLegacy
 	if a.Spec.IsOAS && a.Spec.OAS.GetTykExtension() != nil {
 		if auth := a.Spec.OAS.GetTykExtension().Server.Authentication; auth != nil && auth.SecurityProcessingMode != "" {
@@ -161,10 +166,15 @@ func (a *AuthORWrapper) Name() string {
 	return "AuthORWrapper"
 }
 
+// EnabledForSpec checks if the middleware is enabled for the API spec
 func (a *AuthORWrapper) EnabledForSpec() bool {
+	// AuthORWrapper is only used when there are multiple security requirements
+	// or when we need special processing. With a single requirement,
+	// the auth middlewares are added directly to the chain.
 	return len(a.Spec.SecurityRequirements) > 1 && len(a.authMiddlewares) > 1
 }
 
+// Init initializes the AuthORWrapper middleware
 func (a *AuthORWrapper) Init() {
 	spec := a.Spec
 
