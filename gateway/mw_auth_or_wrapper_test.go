@@ -3931,3 +3931,123 @@ func TestMultiAuthMiddleware_AND_Within_OR_Groups(t *testing.T) {
 
 	ts.Run(t, testCases...)
 }
+
+
+// TestAuthORWrapper_OAuth2_Internal tests OAuth2 scheme detection for internal OAuth
+func TestAuthORWrapper_OAuth2_Internal(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	apiKey := CreateSession(ts.Gw, func(s *user.SessionState) {
+		s.AccessRights = map[string]user.AccessDefinition{
+			"test-oauth2-internal": {
+				APIName:  "Test OAuth2 Internal",
+				APIID:    "test-oauth2-internal",
+				Versions: []string{"default"},
+			},
+		}
+	})
+
+	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		spec.APIID = "test-oauth2-internal"
+		spec.Name = "Test OAuth2 Internal"
+		spec.Proxy.ListenPath = "/test-oauth2-internal/"
+		spec.UseKeylessAccess = false
+
+		oasDoc := oas.OAS{}
+		oasDoc.T = openapi3.T{
+			OpenAPI: "3.0.3",
+			Info: &openapi3.Info{
+				Title:   spec.Name,
+				Version: "1.0.0",
+			},
+			Paths: openapi3.NewPaths(),
+			Components: &openapi3.Components{
+				SecuritySchemes: openapi3.SecuritySchemes{
+					"oauth2": &openapi3.SecuritySchemeRef{
+						Value: &openapi3.SecurityScheme{
+							Type: "oauth2",
+							Flows: &openapi3.OAuthFlows{
+								ClientCredentials: &openapi3.OAuthFlow{
+									TokenURL: "https://example.com/token",
+								},
+							},
+						},
+					},
+					"apiKeyAuth": &openapi3.SecuritySchemeRef{
+						Value: &openapi3.SecurityScheme{
+							Type: "apiKey",
+							In:   "header",
+							Name: "X-API-Key",
+						},
+					},
+				},
+			},
+			Security: openapi3.SecurityRequirements{
+				openapi3.SecurityRequirement{"oauth2": []string{}},
+				openapi3.SecurityRequirement{"apiKeyAuth": []string{}},
+			},
+		}
+
+		tykExtension := &oas.XTykAPIGateway{
+			Info: oas.Info{
+				ID:   spec.APIID,
+				Name: spec.Name,
+				State: oas.State{
+					Active: true,
+				},
+			},
+			Server: oas.Server{
+				ListenPath: oas.ListenPath{
+					Value: spec.Proxy.ListenPath,
+					Strip: true,
+				},
+				Authentication: &oas.Authentication{
+					Enabled:                true,
+					SecurityProcessingMode: oas.SecurityProcessingModeCompliant,
+					SecuritySchemes: oas.SecuritySchemes{
+						"oauth2": &oas.OAuth{
+							Enabled: true,
+							AuthSources: oas.AuthSources{
+								Header: &oas.AuthSource{
+									Enabled: true,
+									Name:    "Authorization",
+								},
+							},
+						},
+						"apiKeyAuth": &oas.Token{
+							Enabled: func() *bool { b := true; return &b }(),
+							AuthSources: oas.AuthSources{
+								Header: &oas.AuthSource{
+									Enabled: true,
+									Name:    "X-API-Key",
+								},
+							},
+						},
+					},
+				},
+			},
+			Upstream: oas.Upstream{
+				URL: TestHttpAny,
+			},
+		}
+
+		oasDoc.SetTykExtension(tykExtension)
+		oasDoc.ExtractTo(spec.APIDefinition)
+		spec.IsOAS = true
+		spec.OAS = oasDoc
+	})
+
+	testCases := []test.TestCase{
+		{
+			Method: "GET",
+			Path:   "/test-oauth2-internal/",
+			Headers: map[string]string{
+				"X-API-Key": apiKey,
+			},
+			Code: http.StatusOK,
+		},
+	}
+
+	ts.Run(t, testCases...)
+}
