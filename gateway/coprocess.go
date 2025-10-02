@@ -275,25 +275,10 @@ func (gw *Gateway) CoProcessInit() {
 
 // EnabledForSpec checks if this middleware should be enabled for a given API.
 func (m *CoProcessMiddleware) EnabledForSpec() bool {
-
 	if !m.Gw.GetConfig().CoProcessOptions.EnableCoProcess {
 		log.WithFields(logrus.Fields{
 			"prefix": "coprocess",
 		}).Error("Your API specifies a CP custom middleware, either Tyk wasn't build with CP support or CP is not enabled in your Tyk configuration file!")
-		return false
-	}
-
-	var supported bool
-	for _, driver := range supportedDrivers {
-		if m.Spec.CustomMiddleware.Driver == driver {
-			supported = true
-		}
-	}
-
-	if !supported {
-		log.WithFields(logrus.Fields{
-			"prefix": "coprocess",
-		}).Errorf("Unsupported driver '%s'", m.Spec.CustomMiddleware.Driver)
 		return false
 	}
 
@@ -306,13 +291,9 @@ func (m *CoProcessMiddleware) EnabledForSpec() bool {
 
 // ProcessRequest will run any checks on the request on the way through the system, return an error to have the chain fail
 func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
-	if d := loadedDrivers[m.Spec.CustomMiddleware.Driver]; d == nil {
-		log.WithFields(logrus.Fields{
-			"prefix": "coprocess",
-		}).Errorf("Driver '%s' isn't loaded", m.Spec.CustomMiddleware.Driver)
-		respCode := http.StatusInternalServerError
-
-		return errors.New(http.StatusText(respCode)), respCode
+	errorCode, err := m.validateDriver()
+	if err != nil {
+		return err, errorCode
 	}
 
 	if m.HookType == coprocess.HookType_CustomKeyCheck {
@@ -511,6 +492,38 @@ func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 	}
 
 	return nil, http.StatusOK
+}
+
+func (m *CoProcessMiddleware) validateDriver() (int, error) {
+	if !m.isDriverSupported() {
+		log.WithFields(logrus.Fields{
+			"prefix": "coprocess",
+		}).Errorf("Unsupported driver '%s'", m.Spec.CustomMiddleware.Driver)
+		respCode := http.StatusInternalServerError
+
+		return respCode, errors.New(http.StatusText(respCode))
+	}
+
+	if d := loadedDrivers[m.Spec.CustomMiddleware.Driver]; d == nil {
+		log.WithFields(logrus.Fields{
+			"prefix": "coprocess",
+		}).Errorf("Driver '%s' isn't loaded", m.Spec.CustomMiddleware.Driver)
+		respCode := http.StatusInternalServerError
+
+		return respCode, errors.New(http.StatusText(respCode))
+	}
+
+	return http.StatusOK, nil
+}
+
+func (m *CoProcessMiddleware) isDriverSupported() bool {
+	for _, driver := range supportedDrivers {
+		if m.Spec.CustomMiddleware.Driver == driver {
+			return true
+		}
+	}
+
+	return false
 }
 
 type CustomMiddlewareResponseHook struct {
