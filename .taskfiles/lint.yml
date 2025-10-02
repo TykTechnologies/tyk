@@ -43,6 +43,13 @@ tasks:
     desc: "Print changes from dev -> CI"
     cmds:
       - dyff between -i .golangci.dev.yml .golangci.yml
+      
+  run-no-fix:
+    desc: "Run linters without auto-fixing"
+    cmds:
+      - task: fmt
+      - task: vet
+      - task: check
 
   build:
     desc: "Run go build for sanity check"
