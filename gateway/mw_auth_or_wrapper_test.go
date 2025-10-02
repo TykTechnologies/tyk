@@ -2702,13 +2702,13 @@ func TestMultiAuthMiddleware_OR_CompliantMode_JWT_Second(t *testing.T) {
 			Headers: map[string]string{
 				"Authorization": "Bearer invalid-jwt-token",
 			},
-			Code: http.StatusUnauthorized,
+			Code: http.StatusForbidden, // Last error: JWT validation fails with 403
 		},
 		{
 			Method:  "GET",
 			Path:    "/jwt-second/get",
 			Headers: map[string]string{},
-			Code:    http.StatusUnauthorized,
+			Code:    http.StatusBadRequest, // Last error: JWT missing Authorization header (400)
 		},
 		{
 			Method: "GET",
@@ -2716,7 +2716,7 @@ func TestMultiAuthMiddleware_OR_CompliantMode_JWT_Second(t *testing.T) {
 			Headers: map[string]string{
 				"X-API-Key": "wrong-key",
 			},
-			Code: http.StatusForbidden,
+			Code: http.StatusBadRequest, // Last error: JWT missing Authorization header (400)
 		},
 	}
 
@@ -3728,6 +3728,206 @@ func TestVendorExtension_EmptyOAS_CompliantMode(t *testing.T) {
 
 		ts.Run(t, testCase)
 	})
+
+	ts.Run(t, testCases...)
+}
+
+func TestMultiAuthMiddleware_AND_Within_OR_Groups(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	// Create JWT policy
+	pID := ts.CreatePolicy(func(p *user.Policy) {
+		p.OrgID = ""
+		p.AccessRights = map[string]user.AccessDefinition{
+			"test-and-within-or": {
+				APIName:  "Test AND Within OR",
+				APIID:    "test-and-within-or",
+				Versions: []string{"default"},
+			},
+		}
+	})
+
+	// Create API key session
+	apiKey := CreateSession(ts.Gw, func(s *user.SessionState) {
+		s.OrgID = ""
+		s.AccessRights = map[string]user.AccessDefinition{
+			"test-and-within-or": {
+				APIName:  "Test AND Within OR",
+				APIID:    "test-and-within-or",
+				Versions: []string{"default"},
+			},
+		}
+	})
+
+	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		spec.APIID = "test-and-within-or"
+		spec.Name = "Test AND Within OR"
+		spec.OrgID = ""
+		spec.Proxy.ListenPath = "/test-and-within-or/"
+		spec.UseKeylessAccess = false
+
+		// Create OAS with JWT and authToken
+		oasDoc := oas.OAS{}
+		oasDoc.T = openapi3.T{
+			OpenAPI: "3.0.3",
+			Info: &openapi3.Info{
+				Title:   spec.Name,
+				Version: "1.0.0",
+			},
+			Paths: openapi3.NewPaths(),
+			Components: &openapi3.Components{
+				SecuritySchemes: openapi3.SecuritySchemes{
+					"jwtAuth": &openapi3.SecuritySchemeRef{
+						Value: &openapi3.SecurityScheme{
+							Type:         "http",
+							Scheme:       "bearer",
+							BearerFormat: "JWT",
+						},
+					},
+					"authToken": &openapi3.SecuritySchemeRef{
+						Value: &openapi3.SecurityScheme{
+							Type: "apiKey",
+							In:   "header",
+							Name: "Authorization1",
+						},
+					},
+				},
+			},
+			// CRITICAL: Security requirements define (JWT AND authToken) OR (JWT only)
+			Security: openapi3.SecurityRequirements{
+				openapi3.SecurityRequirement{
+					"jwtAuth":   []string{}, // Group 1: JWT AND authToken
+					"authToken": []string{},
+				},
+				openapi3.SecurityRequirement{
+					"jwtAuth": []string{}, // Group 2: JWT only
+				},
+			},
+		}
+
+		tykExtension := &oas.XTykAPIGateway{
+			Info: oas.Info{
+				ID:   spec.APIID,
+				Name: spec.Name,
+				State: oas.State{
+					Active: true,
+				},
+			},
+			Server: oas.Server{
+				ListenPath: oas.ListenPath{
+					Value: spec.Proxy.ListenPath,
+					Strip: true,
+				},
+				Authentication: &oas.Authentication{
+					Enabled:                true,
+					SecurityProcessingMode: oas.SecurityProcessingModeCompliant,
+					SecuritySchemes: oas.SecuritySchemes{
+						"jwtAuth": &oas.JWT{
+							Enabled:           true,
+							Source:            base64.StdEncoding.EncodeToString([]byte(jwtRSAPubKey)),
+							SigningMethod:     "rsa",
+							IdentityBaseField: "user_id",
+							DefaultPolicies:   []string{pID},
+							AuthSources: oas.AuthSources{
+								Header: &oas.AuthSource{
+									Enabled: true,
+									Name:    "Authorization",
+								},
+							},
+						},
+						"authToken": &oas.Token{
+							Enabled: func() *bool { b := true; return &b }(),
+							AuthSources: oas.AuthSources{
+								Header: &oas.AuthSource{
+									Enabled: true,
+									Name:    "Authorization1",
+								},
+							},
+						},
+					},
+				},
+			},
+			Upstream: oas.Upstream{
+				URL: TestHttpAny,
+			},
+		}
+
+		oasDoc.SetTykExtension(tykExtension)
+		oasDoc.ExtractTo(spec.APIDefinition)
+		spec.IsOAS = true
+		spec.OAS = oasDoc
+	})
+
+	// Create JWT token
+	jwtToken := CreateJWKToken(func(t *jwt.Token) {
+		t.Claims.(jwt.MapClaims)["user_id"] = "test-user"
+		t.Claims.(jwt.MapClaims)["exp"] = time.Now().Add(time.Hour).Unix()
+	})
+
+	// Test cases - THIS IS THE CRITICAL TEST
+	testCases := []test.TestCase{
+		// Test 1: JWT + authToken should succeed (satisfies Group 1: JWT AND authToken)
+		{
+			Method: "GET",
+			Path:   "/test-and-within-or/",
+			Headers: map[string]string{
+				"Authorization":  "Bearer " + jwtToken,
+				"Authorization1": apiKey,
+			},
+			Code: http.StatusOK,
+		},
+		// Test 2: JWT only should succeed (satisfies Group 2: JWT only)
+		{
+			Method: "GET",
+			Path:   "/test-and-within-or/",
+			Headers: map[string]string{
+				"Authorization": "Bearer " + jwtToken,
+			},
+			Code: http.StatusOK,
+		},
+		// Test 3: CRITICAL - authToken only should FAIL (doesn't satisfy either group)
+		// Group 1 fails because JWT is missing
+		// Group 2 fails because JWT is missing
+		{
+			Method: "GET",
+			Path:   "/test-and-within-or/",
+			Headers: map[string]string{
+				"Authorization1": apiKey,
+			},
+			Code:      http.StatusBadRequest,
+			BodyMatch: "Authorization field missing",
+		},
+		// Test 4: No credentials should fail
+		{
+			Method:    "GET",
+			Path:      "/test-and-within-or/",
+			Headers:   map[string]string{},
+			Code:      http.StatusBadRequest,
+			BodyMatch: "Authorization field missing",
+		},
+		// Test 5: Invalid JWT + valid authToken should fail (Group 1 fails on JWT validation)
+		{
+			Method: "GET",
+			Path:   "/test-and-within-or/",
+			Headers: map[string]string{
+				"Authorization":  "Bearer invalid-token",
+				"Authorization1": apiKey,
+			},
+			Code: http.StatusForbidden,
+		},
+		// Test 6: Valid JWT + invalid authToken should succeed (Group 2: JWT only)
+		// This tests that when Group 1 fails on authToken, it tries Group 2
+		{
+			Method: "GET",
+			Path:   "/test-and-within-or/",
+			Headers: map[string]string{
+				"Authorization":  "Bearer " + jwtToken,
+				"Authorization1": "invalid-key",
+			},
+			Code: http.StatusOK,
+		},
+	}
 
 	ts.Run(t, testCases...)
 }

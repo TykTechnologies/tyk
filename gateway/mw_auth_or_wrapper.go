@@ -1,22 +1,18 @@
 package gateway
 
 import (
+	"fmt"
 	"net/http"
 
 	"github.com/TykTechnologies/tyk/apidef/oas"
 )
 
-// AuthORWrapper is a middleware that handles OR logic for multiple authentication methods.
-// When multiple security requirements are defined (len(SecurityRequirements) > 1),
-// it tries each auth method until one succeeds.
 type AuthORWrapper struct {
 	BaseMiddleware
 	authMiddlewares []TykMiddleware
 }
 
-// ProcessRequest handles the OR logic for authentication
 func (a *AuthORWrapper) ProcessRequest(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
-	// Determine processing mode (OAS-only feature)
 	processingMode := oas.SecurityProcessingModeLegacy
 	if a.Spec.IsOAS && a.Spec.OAS.GetTykExtension() != nil {
 		if auth := a.Spec.OAS.GetTykExtension().Server.Authentication; auth != nil && auth.SecurityProcessingMode != "" {
@@ -24,9 +20,7 @@ func (a *AuthORWrapper) ProcessRequest(w http.ResponseWriter, r *http.Request, _
 		}
 	}
 
-	// Single or no requirements: always use AND logic
 	if len(a.Spec.SecurityRequirements) <= 1 {
-
 		for _, mw := range a.authMiddlewares {
 			if err, code := mw.ProcessRequest(w, r, nil); err != nil {
 				return err, code
@@ -36,7 +30,6 @@ func (a *AuthORWrapper) ProcessRequest(w http.ResponseWriter, r *http.Request, _
 	}
 
 	if processingMode == "" || processingMode == oas.SecurityProcessingModeLegacy {
-
 		for _, mw := range a.authMiddlewares {
 			if err, code := mw.ProcessRequest(w, r, nil); err != nil {
 				return err, code
@@ -45,21 +38,41 @@ func (a *AuthORWrapper) ProcessRequest(w http.ResponseWriter, r *http.Request, _
 		return nil, http.StatusOK
 	}
 
-	// Compliant mode with multiple requirements: Use OR logic
-
 	var lastError error
 	var lastCode int
 
-	for i, mw := range a.authMiddlewares {
-		a.Logger().Debugf("OR wrapper: trying auth method %d/%d: %s", i+1, len(a.authMiddlewares), mw.Name())
+	for groupIdx, requirement := range a.Spec.SecurityRequirements {
+		a.Logger().Debugf("OR wrapper: trying security requirement group %d/%d: %v", groupIdx+1, len(a.Spec.SecurityRequirements), requirement)
 
-		// Clone the request to avoid side effects from failed auth attempts
-		// Each middleware gets a clean request without modifications from previous attempts
 		rClone := r.Clone(r.Context())
+		groupSuccess := true
+		var groupError error
+		var groupCode int
 
-		err, code := mw.ProcessRequest(w, rClone, nil)
-		if err == nil {
+		for _, schemeName := range requirement {
+			mw := a.getMiddlewareForScheme(schemeName)
+			if mw == nil {
+				a.Logger().Debugf("OR wrapper: no middleware found for scheme %s, skipping group", schemeName)
+				groupSuccess = false
+				groupError = lastError
+				groupCode = lastCode
+				break
+			}
+
+			a.Logger().Debugf("OR wrapper: executing auth method %s in group %d", mw.Name(), groupIdx+1)
+			err, code := mw.ProcessRequest(w, rClone, nil)
+			if err != nil {
+				a.Logger().Debugf("OR wrapper: auth method %s failed with error: %v (code: %d)", mw.Name(), err, code)
+				groupSuccess = false
+				groupError = err
+				groupCode = code
+				break
+			}
 			a.Logger().Debugf("OR wrapper: auth method %s succeeded", mw.Name())
+		}
+
+		if groupSuccess {
+			a.Logger().Debugf("OR wrapper: security requirement group %d succeeded", groupIdx+1)
 
 			if session := ctxGetSession(rClone); session != nil {
 				ctxSetSession(r, session, false, a.Gw.GetConfig().HashKeys)
@@ -70,28 +83,88 @@ func (a *AuthORWrapper) ProcessRequest(w http.ResponseWriter, r *http.Request, _
 			return nil, http.StatusOK
 		}
 
-		a.Logger().Debugf("OR wrapper: auth method %s failed with error: %v (code: %d)", mw.Name(), err, code)
-		lastError = err
-		lastCode = code
+		lastError = groupError
+		lastCode = groupCode
 	}
 
 	return lastError, lastCode
 }
 
-// Name returns the name of the middleware
+func (a *AuthORWrapper) getMiddlewareForScheme(schemeName string) TykMiddleware {
+	if !a.Spec.IsOAS {
+		return nil
+	}
+
+	if a.Spec.OAS.T.Components != nil && a.Spec.OAS.T.Components.SecuritySchemes != nil {
+		schemeRef := a.Spec.OAS.T.Components.SecuritySchemes[schemeName]
+		if schemeRef != nil && schemeRef.Value != nil {
+			scheme := schemeRef.Value
+
+			switch {
+			case scheme.Type == "http" && scheme.Scheme == "bearer" && scheme.BearerFormat == "JWT":
+				return a.findMiddlewareByType(&JWTMiddleware{})
+			case scheme.Type == "apiKey":
+				return a.findMiddlewareByType(&AuthKey{})
+			case scheme.Type == "http" && scheme.Scheme == "basic":
+				return a.findMiddlewareByType(&BasicAuthKeyIsValid{})
+			case scheme.Type == "oauth2":
+				if a.Spec.ExternalOAuth.Enabled {
+					return a.findMiddlewareByType(&ExternalOAuthMiddleware{})
+				}
+				return a.findMiddlewareByType(&Oauth2KeyExists{})
+			}
+		}
+	}
+
+	if tykExt := a.Spec.OAS.GetTykExtension(); tykExt != nil {
+		if auth := tykExt.Server.Authentication; auth != nil && auth.SecuritySchemes != nil {
+			if tykScheme := auth.SecuritySchemes[schemeName]; tykScheme != nil {
+				if a.Spec.EnableSignatureChecking {
+					return a.findMiddlewareByType(&HTTPSignatureValidationMiddleware{})
+				}
+
+				if a.Spec.UseOpenID {
+					return a.findMiddlewareByType(&OpenIDMW{})
+				}
+
+				customPluginAuthEnabled := a.Spec.CustomPluginAuthEnabled || a.Spec.UseGoPluginAuth || a.Spec.EnableCoProcessAuth
+				if customPluginAuthEnabled {
+					if mw := a.findMiddlewareByType(&GoPluginMiddleware{}); mw != nil {
+						return mw
+					}
+					if mw := a.findMiddlewareByType(&CoProcessMiddleware{}); mw != nil {
+						return mw
+					}
+					if mw := a.findMiddlewareByType(&DynamicMiddleware{}); mw != nil {
+						return mw
+					}
+				}
+			}
+		}
+	}
+
+	return nil
+}
+
+func (a *AuthORWrapper) findMiddlewareByType(example TykMiddleware) TykMiddleware {
+	exampleType := fmt.Sprintf("%T", example)
+
+	for _, mw := range a.authMiddlewares {
+		if fmt.Sprintf("%T", mw) == exampleType {
+			return mw
+		}
+	}
+	return nil
+}
+
 func (a *AuthORWrapper) Name() string {
 	return "AuthORWrapper"
 }
 
-// EnabledForSpec checks if the middleware is enabled for the API spec
 func (a *AuthORWrapper) EnabledForSpec() bool {
-	// AuthORWrapper is only used when there are multiple security requirements
-	// or when we need special processing. With a single requirement,
-	// the auth middlewares are added directly to the chain.
 	return len(a.Spec.SecurityRequirements) > 1 && len(a.authMiddlewares) > 1
 }
 
-// Init initializes the AuthORWrapper middleware
 func (a *AuthORWrapper) Init() {
 	spec := a.Spec
 
@@ -129,7 +202,22 @@ func (a *AuthORWrapper) Init() {
 		a.authMiddlewares = append(a.authMiddlewares, oauthMw)
 	}
 
-	// Always add standard auth (API key) if enabled or as fallback
+	if spec.ExternalOAuth.Enabled {
+		extOAuthMw := &ExternalOAuthMiddleware{BaseMiddleware: a.BaseMiddleware.Copy()}
+		extOAuthMw.Spec = spec
+		extOAuthMw.Gw = a.Gw
+		extOAuthMw.Init()
+		a.authMiddlewares = append(a.authMiddlewares, extOAuthMw)
+	}
+
+	if spec.UseOpenID {
+		openIDMw := &OpenIDMW{BaseMiddleware: a.BaseMiddleware.Copy()}
+		openIDMw.Spec = spec
+		openIDMw.Gw = a.Gw
+		openIDMw.Init()
+		a.authMiddlewares = append(a.authMiddlewares, openIDMw)
+	}
+
 	if spec.UseStandardAuth || len(a.authMiddlewares) == 0 {
 		authKeyMw := &AuthKey{BaseMiddleware: a.BaseMiddleware.Copy()}
 		authKeyMw.Spec = spec
