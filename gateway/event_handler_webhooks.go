@@ -20,6 +20,7 @@ import (
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/header"
 	"github.com/TykTechnologies/tyk/internal/certcheck"
+	"github.com/TykTechnologies/tyk/internal/httpclient"
 	"github.com/TykTechnologies/tyk/storage"
 )
 
@@ -302,7 +303,7 @@ func (w *WebHookHandler) HandleEvent(em config.EventMessage) {
 	if err != nil {
 		// Check if mTLS is explicitly enabled and error is certificate-related - if so, don't fallback as it would bypass security
 		gwConfig := w.Gw.GetConfig()
-		if gwConfig.ExternalServices.Webhooks.MTLS.Enabled && isMTLSError(err) {
+		if gwConfig.ExternalServices.Webhooks.MTLS.Enabled && httpclient.IsMTLSError(err) {
 			log.WithError(err).Error("mTLS configuration failed for webhooks. Webhook delivery will be skipped to maintain security.")
 			// Skip webhook delivery entirely when mTLS is misconfigured
 			return

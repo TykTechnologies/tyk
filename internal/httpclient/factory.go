@@ -27,6 +27,13 @@ var (
 	ErrMTLSCALoad = errors.New("mTLS CA certificate loading failed")
 )
 
+// IsMTLSError checks if the error is related to mTLS certificate loading
+func IsMTLSError(err error) bool {
+	return errors.Is(err, ErrMTLSCertificateLoad) ||
+		errors.Is(err, ErrMTLSCertificateStore) ||
+		errors.Is(err, ErrMTLSCALoad)
+}
+
 // CertificateManager is an alias for the actual certificate manager interface.
 type CertificateManager = certs.CertificateManager
 

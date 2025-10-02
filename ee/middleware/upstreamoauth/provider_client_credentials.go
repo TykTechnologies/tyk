@@ -48,7 +48,7 @@ func (client *ClientCredentialsClient) getHTTPClient() *http.Client {
 		if err != nil {
 			// If mTLS is explicitly enabled and the error is related to certificate loading,
 			// we should not fallback to default client as this would bypass required mutual TLS authentication
-			if gwConfig.ExternalServices.OAuth.MTLS.Enabled && isMTLSError(err) {
+			if gwConfig.ExternalServices.OAuth.MTLS.Enabled && httpclient.IsMTLSError(err) {
 				if client.mw != nil && client.mw.Base != nil {
 					client.mw.Logger().WithError(err).Error("mTLS configuration failed for upstream OAuth. This is a security-critical error - requests cannot proceed without proper mutual TLS authentication.")
 				}

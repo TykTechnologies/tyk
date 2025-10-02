@@ -1,7 +1,7 @@
 package httpclient
 
 import (
-	"errors"
+	"fmt"
 	"net/http"
 	"testing"
 
@@ -84,9 +84,9 @@ func TestExternalHTTPClientFactory_MTLSSecurityValidation(t *testing.T) {
 				assert.Contains(t, err.Error(), tt.errorContains)
 				assert.Nil(t, client)
 
-				// Also verify we can use errors.Is() for mTLS-related errors
+				// Also verify we can use IsMTLSError() for mTLS-related errors
 				if tt.name != "mTLS enabled with certificate store ID but no cert manager should fail" {
-					assert.True(t, errors.Is(err, ErrMTLSCertificateLoad) || errors.Is(err, ErrMTLSCALoad) || errors.Is(err, ErrMTLSCertificateStore))
+					assert.True(t, IsMTLSError(err))
 				}
 			} else {
 				assert.NoError(t, err)
@@ -121,8 +121,8 @@ func TestExternalHTTPClientFactory_MTLSFallbackSecurity(t *testing.T) {
 	assert.Nil(t, client)
 	assert.Contains(t, err.Error(), "failed to configure TLS")
 
-	// Verify we can use errors.Is() to check for mTLS certificate loading errors
-	assert.True(t, errors.Is(err, ErrMTLSCertificateLoad))
+	// Verify we can use IsMTLSError() to check for mTLS certificate loading errors
+	assert.True(t, IsMTLSError(err))
 }
 
 // TestExternalHTTPClientFactory_ProxyOnlyConfiguration tests that proxy-only
@@ -147,4 +147,228 @@ func TestExternalHTTPClientFactory_ProxyOnlyConfiguration(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, client)
 	assert.IsType(t, &http.Client{}, client)
+}
+
+// TestExternalHTTPClientFactory_CreateWebhookClient tests webhook client creation
+func TestExternalHTTPClientFactory_CreateWebhookClient(t *testing.T) {
+	tests := []struct {
+		name          string
+		serviceConfig config.ServiceConfig
+		expectError   bool
+		errorContains string
+	}{
+		{
+			name: "webhook client with proxy configuration should succeed",
+			serviceConfig: config.ServiceConfig{
+				Proxy: config.ProxyConfig{
+					Enabled: true, // Enable proxy to make service configured
+				},
+				MTLS: config.MTLSConfig{
+					Enabled: false, // Disabled to avoid certificate errors in test
+				},
+			},
+			expectError: false,
+		},
+		{
+			name: "webhook client with invalid mTLS should fail",
+			serviceConfig: config.ServiceConfig{
+				MTLS: config.MTLSConfig{
+					Enabled:  true,
+					CertFile: "/nonexistent/cert.pem",
+					KeyFile:  "/nonexistent/key.pem",
+				},
+			},
+			expectError:   true,
+			errorContains: "failed to configure TLS",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			factory := &ExternalHTTPClientFactory{
+				config: &config.ExternalServiceConfig{
+					Webhooks: tt.serviceConfig,
+				},
+				certManager: nil,
+			}
+
+			client, err := factory.CreateWebhookClient()
+
+			if tt.expectError {
+				assert.Error(t, err)
+				assert.Contains(t, err.Error(), tt.errorContains)
+				assert.Nil(t, client)
+				assert.True(t, IsMTLSError(err))
+			} else {
+				assert.NoError(t, err)
+				assert.NotNil(t, client)
+				assert.IsType(t, &http.Client{}, client)
+			}
+		})
+	}
+}
+
+// TestExternalHTTPClientFactory_CreateHealthCheckClient tests health check client creation
+func TestExternalHTTPClientFactory_CreateHealthCheckClient(t *testing.T) {
+	tests := []struct {
+		name          string
+		serviceConfig config.ServiceConfig
+		expectError   bool
+		errorContains string
+	}{
+		{
+			name: "health check client with proxy config should succeed",
+			serviceConfig: config.ServiceConfig{
+				Proxy: config.ProxyConfig{
+					Enabled: true, // Enable proxy to make service configured
+				},
+				MTLS: config.MTLSConfig{
+					Enabled: false, // Disabled to avoid certificate errors in test
+				},
+			},
+			expectError: false,
+		},
+		{
+			name: "health check client with invalid mTLS should fail",
+			serviceConfig: config.ServiceConfig{
+				MTLS: config.MTLSConfig{
+					Enabled:  true,
+					CertFile: "/nonexistent/cert.pem",
+					KeyFile:  "/nonexistent/key.pem",
+				},
+			},
+			expectError:   true,
+			errorContains: "failed to configure TLS",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			factory := &ExternalHTTPClientFactory{
+				config: &config.ExternalServiceConfig{
+					Health: tt.serviceConfig,
+				},
+				certManager: nil,
+			}
+
+			client, err := factory.CreateHealthCheckClient()
+
+			if tt.expectError {
+				assert.Error(t, err)
+				assert.Contains(t, err.Error(), tt.errorContains)
+				assert.Nil(t, client)
+				assert.True(t, IsMTLSError(err))
+			} else {
+				assert.NoError(t, err)
+				assert.NotNil(t, client)
+				assert.IsType(t, &http.Client{}, client)
+			}
+		})
+	}
+}
+
+// TestExternalHTTPClientFactory_CreateIntrospectionClient tests introspection client creation
+func TestExternalHTTPClientFactory_CreateIntrospectionClient(t *testing.T) {
+	tests := []struct {
+		name          string
+		serviceConfig config.ServiceConfig
+		expectError   bool
+		errorContains string
+	}{
+		{
+			name: "introspection client with proxy config should succeed",
+			serviceConfig: config.ServiceConfig{
+				Proxy: config.ProxyConfig{
+					Enabled: true, // Enable proxy to make service configured
+				},
+				MTLS: config.MTLSConfig{
+					Enabled: false, // Disabled to avoid certificate errors in test
+				},
+			},
+			expectError: false,
+		},
+		{
+			name: "introspection client with invalid mTLS should fail",
+			serviceConfig: config.ServiceConfig{
+				MTLS: config.MTLSConfig{
+					Enabled:  true,
+					CertFile: "/nonexistent/cert.pem",
+					KeyFile:  "/nonexistent/key.pem",
+				},
+			},
+			expectError:   true,
+			errorContains: "failed to configure TLS",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			factory := &ExternalHTTPClientFactory{
+				config: &config.ExternalServiceConfig{
+					OAuth: tt.serviceConfig, // Introspection uses OAuth config
+				},
+				certManager: nil,
+			}
+
+			client, err := factory.CreateIntrospectionClient()
+
+			if tt.expectError {
+				assert.Error(t, err)
+				assert.Contains(t, err.Error(), tt.errorContains)
+				assert.Nil(t, client)
+				assert.True(t, IsMTLSError(err))
+			} else {
+				assert.NoError(t, err)
+				assert.NotNil(t, client)
+				assert.IsType(t, &http.Client{}, client)
+			}
+		})
+	}
+}
+
+// TestIsMTLSError tests the IsMTLSError function
+func TestIsMTLSError(t *testing.T) {
+	tests := []struct {
+		name     string
+		err      error
+		expected bool
+	}{
+		{
+			name:     "ErrMTLSCertificateLoad should return true",
+			err:      ErrMTLSCertificateLoad,
+			expected: true,
+		},
+		{
+			name:     "ErrMTLSCertificateStore should return true",
+			err:      ErrMTLSCertificateStore,
+			expected: true,
+		},
+		{
+			name:     "ErrMTLSCALoad should return true",
+			err:      ErrMTLSCALoad,
+			expected: true,
+		},
+		{
+			name:     "wrapped ErrMTLSCertificateLoad should return true",
+			err:      fmt.Errorf("wrapped error: %w", ErrMTLSCertificateLoad),
+			expected: true,
+		},
+		{
+			name:     "other error should return false",
+			err:      fmt.Errorf("some other error"),
+			expected: false,
+		},
+		{
+			name:     "nil error should return false",
+			err:      nil,
+			expected: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := IsMTLSError(tt.err)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
 }

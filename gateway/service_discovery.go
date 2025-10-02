@@ -9,6 +9,7 @@ import (
 	"github.com/Jeffail/gabs/v2"
 
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/internal/httpclient"
 )
 
 const arrayName = "tyk_array"
@@ -61,7 +62,7 @@ func (s *ServiceDiscovery) getServiceData(name string) (string, error) {
 		} else {
 			// Check if mTLS is explicitly enabled and error is certificate-related - if so, don't fallback as it would bypass security
 			gwConfig := s.gw.GetConfig()
-			if gwConfig.ExternalServices.Discovery.MTLS.Enabled && isMTLSError(clientErr) {
+			if gwConfig.ExternalServices.Discovery.MTLS.Enabled && httpclient.IsMTLSError(clientErr) {
 				log.WithError(clientErr).Error("mTLS configuration failed for service discovery. Discovery request will fail to maintain security.")
 				// Return the TLS configuration error directly
 				return "", clientErr

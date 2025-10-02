@@ -21,13 +21,6 @@ import (
 	"github.com/TykTechnologies/tyk/internal/httpclient"
 )
 
-// isMTLSError checks if the error is related to mTLS certificate loading
-func isMTLSError(err error) bool {
-	return errors.Is(err, httpclient.ErrMTLSCertificateLoad) ||
-		errors.Is(err, httpclient.ErrMTLSCertificateStore) ||
-		errors.Is(err, httpclient.ErrMTLSCALoad)
-}
-
 const (
 	defaultTimeout             = 10
 	defaultSampletTriggerLimit = 3
@@ -310,7 +303,7 @@ func (h *HostUptimeChecker) CheckHost(toCheck HostData) {
 		if clientErr != nil {
 			// Check if mTLS is explicitly enabled and error is certificate-related - if so, don't fallback as it would bypass security
 			gwConfig := h.Gw.GetConfig()
-			if gwConfig.ExternalServices.Health.MTLS.Enabled && isMTLSError(clientErr) {
+			if gwConfig.ExternalServices.Health.MTLS.Enabled && httpclient.IsMTLSError(clientErr) {
 				log.WithError(clientErr).Error("mTLS configuration failed for health checks. Health check will be marked as failed to maintain security.")
 				// Mark health check as failed when mTLS is misconfigured
 				report.IsTCPError = true
