@@ -5,6 +5,7 @@ import (
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/ctx"
+	"github.com/TykTechnologies/tyk/internal/httpclient"
 	"github.com/TykTechnologies/tyk/internal/httpctx"
 	"github.com/TykTechnologies/tyk/internal/model"
 )
@@ -25,6 +26,7 @@ type BaseMiddleware interface {
 // Gateway is the subset of Gateway APIs that the middleware uses.
 type Gateway interface {
 	model.ConfigProvider
+	GetCertificateManager() httpclient.CertificateManager
 }
 
 // Type Storage is a subset of storage.RedisCluster
