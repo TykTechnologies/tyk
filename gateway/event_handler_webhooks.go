@@ -20,6 +20,7 @@ import (
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/header"
 	"github.com/TykTechnologies/tyk/internal/certcheck"
+	"github.com/TykTechnologies/tyk/internal/httpclient"
 	"github.com/TykTechnologies/tyk/storage"
 )
 
@@ -300,9 +301,18 @@ func (w *WebHookHandler) HandleEvent(em config.EventMessage) {
 	clientFactory := NewExternalHTTPClientFactory(w.Gw)
 	cli, err := clientFactory.CreateWebhookClient()
 	if err != nil {
-		log.WithError(err).Error("Failed to create webhook HTTP client, falling back to default")
-		log.Debug("[ExternalServices] Falling back to legacy webhook client due to factory error")
-		cli = &http.Client{Timeout: 30 * time.Second}
+		// Check if mTLS is explicitly enabled and error is certificate-related - if so, don't fallback as it would bypass security
+		gwConfig := w.Gw.GetConfig()
+		if gwConfig.ExternalServices.Webhooks.MTLS.Enabled && httpclient.IsMTLSError(err) {
+			log.WithError(err).Error("mTLS configuration failed for webhooks. Webhook delivery will be skipped to maintain security.")
+			// Skip webhook delivery entirely when mTLS is misconfigured
+			return
+		} else {
+			// For other errors (not configured, proxy config), fallback to default client
+			log.WithError(err).Debug("Failed to create webhook HTTP client, falling back to default")
+			log.Debug("[ExternalServices] Falling back to legacy webhook client due to factory error")
+			cli = &http.Client{Timeout: 30 * time.Second}
+		}
 	} else {
 		log.Debugf("[ExternalServices] Using external services webhook client for URL: %s", req.URL.String())
 	}
