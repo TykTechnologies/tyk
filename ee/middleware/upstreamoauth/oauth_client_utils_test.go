@@ -103,7 +103,7 @@ func TestCreateOAuthHTTPClient(t *testing.T) {
 // where mTLS errors should not fallback to insecure clients
 func TestCreateOAuthHTTPClient_MTLSErrorSecurity(t *testing.T) {
 	// Test with mTLS enabled but misconfigured (no certificates provided)
-	config := config.Config{
+	cfg := config.Config{
 		ExternalServices: config.ExternalServiceConfig{
 			OAuth: config.ServiceConfig{
 				MTLS:  config.MTLSConfig{Enabled: true},
@@ -115,7 +115,7 @@ func TestCreateOAuthHTTPClient_MTLSErrorSecurity(t *testing.T) {
 
 	mw := &Middleware{
 		Gw: &mockGateway{
-			config:      config,
+			config:      cfg,
 			certManager: nil, // Use nil for simplicity
 		},
 		Base: &mockBaseMiddleware{},
