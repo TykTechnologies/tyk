@@ -186,8 +186,6 @@ func (a *APISpec) sendRateLimitHeaders(session *user.SessionState, dest *http.Re
 
 	if session != nil {
 		quotaMax, quotaRemaining, _, quotaRenews = session.GetQuotaLimitByAPIID(a.APIID)
-	} else {
-		log.Warningf("session not found. sending inappropriate rate-limit headers")
 	}
 
 	if dest.Header == nil {
