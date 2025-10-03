@@ -8,6 +8,18 @@ import (
 	"github.com/TykTechnologies/tyk/apidef/oas"
 )
 
+// OpenAPI security scheme constants
+const (
+	securitySchemeTypeHTTP   = "http"
+	securitySchemeTypeAPIKey = "apiKey"
+	securitySchemeTypeOAuth2 = "oauth2"
+
+	securitySchemeHTTPBearer = "bearer"
+	securitySchemeHTTPBasic  = "basic"
+
+	securitySchemeBearerFormatJWT = "JWT"
+)
+
 // AuthORWrapper is a middleware that handles OR logic for multiple authentication methods.
 // When multiple security requirements are defined (len(SecurityRequirements) > 1),
 // it tries each auth method until one succeeds.
@@ -112,13 +124,13 @@ func (a *AuthORWrapper) getMiddlewareForScheme(schemeName string) TykMiddleware 
 			scheme := schemeRef.Value
 
 			switch {
-			case scheme.Type == "http" && scheme.Scheme == "bearer" && scheme.BearerFormat == "JWT":
+			case scheme.Type == securitySchemeTypeHTTP && scheme.Scheme == securitySchemeHTTPBearer && scheme.BearerFormat == securitySchemeBearerFormatJWT:
 				return a.findMiddlewareByType(&JWTMiddleware{})
-			case scheme.Type == "apiKey":
+			case scheme.Type == securitySchemeTypeAPIKey:
 				return a.findMiddlewareByType(&AuthKey{})
-			case scheme.Type == "http" && scheme.Scheme == "basic":
+			case scheme.Type == securitySchemeTypeHTTP && scheme.Scheme == securitySchemeHTTPBasic:
 				return a.findMiddlewareByType(&BasicAuthKeyIsValid{})
-			case scheme.Type == "oauth2":
+			case scheme.Type == securitySchemeTypeOAuth2:
 				if a.Spec.ExternalOAuth.Enabled {
 					return a.findMiddlewareByType(&ExternalOAuthMiddleware{})
 				}
