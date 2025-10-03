@@ -60,7 +60,7 @@ jobs:
         uses: shrink/actions-docker-extract@v3
         with:
           image: tykio/ci-tools:latest
-          path: /usr/local/bin/golangci-lint
+          path: /usr/local/bin/.
           destination: /usr/local/bin
 
       - run: golangci-lint version && golangci-lint cache status
