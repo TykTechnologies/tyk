@@ -507,3 +507,52 @@ func TestBundle_Verify(t *testing.T) {
 		})
 	}
 }
+
+func TestValidateZipPath(t *testing.T) {
+	bundlePath := "/tmp/bundles/test-bundle"
+
+	spec := &APISpec{
+		APIDefinition: &apidef.APIDefinition{
+			APIID: "test-api",
+			OrgID: "test-org",
+			Name:  "test",
+		},
+	}
+
+	tests := []struct {
+		name        string
+		filePath    string
+		bundlePath  string
+		wantErr     bool
+		errContains string
+	}{
+		{
+			name:       "valid path",
+			filePath:   "middleware.js",
+			bundlePath: bundlePath,
+			wantErr:    false,
+		},
+		{
+			name:        "invalid path",
+			filePath:    "../../../invalid/path",
+			bundlePath:  bundlePath,
+			wantErr:     true,
+			errContains: "Invalid file path",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := validateZipPath(tt.filePath, tt.bundlePath, spec)
+
+			if tt.wantErr {
+				assert.Error(t, err)
+				if tt.errContains != "" {
+					assert.Contains(t, err.Error(), tt.errContains)
+				}
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}

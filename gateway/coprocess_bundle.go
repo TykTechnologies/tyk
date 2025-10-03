@@ -187,6 +187,10 @@ func (ZipBundleSaver) Save(bundle *Bundle, bundlePath string, spec *APISpec) err
 	}
 
 	for _, f := range reader.File {
+		if err := validateZipPath(f.Name, bundlePath, spec); err != nil {
+			return err
+		}
+
 		destPath := filepath.Join(bundlePath, f.Name)
 
 		if f.FileHeader.Mode().IsDir() {
@@ -211,6 +215,27 @@ func (ZipBundleSaver) Save(bundle *Bundle, bundlePath string, spec *APISpec) err
 			return err
 		}
 	}
+	return nil
+}
+
+// validateZipPath ensures that a file path from a zip archive is valid and within the expected directory.
+func validateZipPath(filePath string, bundlePath string, spec *APISpec) error {
+	cleanPath := filepath.Clean(filePath)
+
+	if filepath.IsAbs(cleanPath) {
+		return bundleError(spec, nil, fmt.Sprintf("Invalid file path in bundle: %s", filePath))
+	}
+
+	destPath := filepath.Join(bundlePath, cleanPath)
+	relPath, err := filepath.Rel(bundlePath, destPath)
+	if err != nil {
+		return bundleError(spec, err, fmt.Sprintf("Failed to resolve bundle path: %s", filePath))
+	}
+
+	if strings.HasPrefix(relPath, "..") {
+		return bundleError(spec, nil, fmt.Sprintf("Invalid file path in bundle: %s", filePath))
+	}
+
 	return nil
 }
 
@@ -300,9 +325,8 @@ func saveBundle(bundle *Bundle, destPath string, spec *APISpec) error {
 	case "zip":
 		bundleSaver = ZipBundleSaver{}
 	}
-	bundleSaver.Save(bundle, destPath, spec)
 
-	return nil
+	return bundleSaver.Save(bundle, destPath, spec)
 }
 
 // loadBundleManifest will parse the manifest file and return the bundle parameters.
