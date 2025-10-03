@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"go.opentelemetry.io/otel/trace"
 
 	"github.com/TykTechnologies/graphql-go-tools/pkg/engine/datasource/httpclient"
 	"github.com/TykTechnologies/graphql-go-tools/pkg/graphql"
@@ -355,4 +356,272 @@ func TestAnalyticsIgnoreSubgraph(t *testing.T) {
 		},
 	)
 	assert.NoError(t, err)
+}
+
+func TestSuccessHandler_RecordHit_TraceID(t *testing.T) {
+	testCases := []struct {
+		name                 string
+		openTelemetryEnabled bool
+		setupContext         func(context.Context) context.Context
+		expectedTraceID      string
+		description          string
+	}{
+		{
+			name:                 "should populate TraceID when OpenTelemetry is enabled and valid trace exists",
+			openTelemetryEnabled: true,
+			setupContext: func(ctx context.Context) context.Context {
+				traceID, _ := trace.TraceIDFromHex("4bf92f3577b34da6a3ce929d0e0e4736")
+				spanID, _ := trace.SpanIDFromHex("00f067aa0ba902b7")
+				spanCtx := trace.NewSpanContext(trace.SpanContextConfig{
+					TraceID:    traceID,
+					SpanID:     spanID,
+					TraceFlags: trace.FlagsSampled,
+				})
+				return trace.ContextWithSpanContext(ctx, spanCtx)
+			},
+			expectedTraceID: "4bf92f3577b34da6a3ce929d0e0e4736",
+		},
+		{
+			name:                 "should not populate TraceID when OpenTelemetry is disabled",
+			openTelemetryEnabled: false,
+			setupContext: func(ctx context.Context) context.Context {
+				traceID, _ := trace.TraceIDFromHex("4bf92f3577b34da6a3ce929d0e0e4736")
+				spanID, _ := trace.SpanIDFromHex("00f067aa0ba902b7")
+				spanCtx := trace.NewSpanContext(trace.SpanContextConfig{
+					TraceID:    traceID,
+					SpanID:     spanID,
+					TraceFlags: trace.FlagsSampled,
+				})
+				return trace.ContextWithSpanContext(ctx, spanCtx)
+			},
+			expectedTraceID: "",
+		},
+		{
+			name:                 "should not populate TraceID when no valid span context exists",
+			openTelemetryEnabled: true,
+			setupContext: func(ctx context.Context) context.Context {
+				return ctx
+			},
+			expectedTraceID: "",
+		},
+		{
+			name:                 "should not populate TraceID when span context is invalid",
+			openTelemetryEnabled: true,
+			setupContext: func(ctx context.Context) context.Context {
+				spanCtx := trace.SpanContext{}
+				return trace.ContextWithSpanContext(ctx, spanCtx)
+			},
+			expectedTraceID: "",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			ts := StartTest(nil)
+			defer ts.Close()
+
+			globalConf := ts.Gw.GetConfig()
+			globalConf.OpenTelemetry.Enabled = tc.openTelemetryEnabled
+			globalConf.EnableAnalytics = true
+
+			spec := BuildAPI(func(spec *APISpec) {
+				spec.Name = "test-api"
+				spec.APIID = "test-api-id"
+				spec.Proxy.ListenPath = "/test"
+				spec.GlobalConfig.OpenTelemetry.Enabled = tc.openTelemetryEnabled
+				spec.GlobalConfig.EnableAnalytics = true
+				spec.DoNotTrack = false
+			})[0]
+
+			ts.Gw.LoadAPI(spec)
+
+			var capturedRecord *analytics.AnalyticsRecord
+			ts.Gw.Analytics.mockEnabled = true
+			ts.Gw.Analytics.mockRecordHit = func(record *analytics.AnalyticsRecord) {
+				capturedRecord = record
+			}
+
+			req, _ := http.NewRequest("GET", "/test", nil)
+			ctx := req.Context()
+			if tc.setupContext != nil {
+				ctx = tc.setupContext(ctx)
+			}
+			req = req.WithContext(ctx)
+
+			successHandler := &SuccessHandler{
+				BaseMiddleware: &BaseMiddleware{
+					Spec: spec,
+					Gw:   ts.Gw,
+				},
+			}
+
+			// Create a mock response to avoid nil pointer dereference
+			mockResponse := &http.Response{
+				StatusCode: 200,
+				Header:     make(http.Header),
+				Body:       http.NoBody,
+			}
+
+			successHandler.RecordHit(req, analytics.Latency{Total: 100}, 200, mockResponse, false)
+
+			if capturedRecord == nil {
+				t.Fatal("Analytics record should be captured but was nil")
+			}
+
+			assert.Equal(t, tc.expectedTraceID, capturedRecord.TraceID, tc.description)
+
+			assert.Equal(t, "GET", capturedRecord.Method, "Method should be captured correctly")
+			assert.Equal(t, "/test", capturedRecord.Path, "Path should be captured correctly")
+			assert.Equal(t, 200, capturedRecord.ResponseCode, "Response code should be captured correctly")
+		})
+	}
+}
+
+func TestSuccessHandler_TraceIDResponseHeader(t *testing.T) {
+	testCases := []struct {
+		name                 string
+		openTelemetryEnabled bool
+		detailedRecording    bool
+		setupContext         func(context.Context) context.Context
+		expectedTraceID      string
+		expectHeader         bool
+		description          string
+	}{
+		{
+			name:                 "should add X-Tyk-Trace-Id header when OpenTelemetry is enabled and valid trace exists",
+			openTelemetryEnabled: true,
+			detailedRecording:    true,
+			setupContext: func(ctx context.Context) context.Context {
+				traceID, _ := trace.TraceIDFromHex("4bf92f3577b34da6a3ce929d0e0e4736")
+				spanID, _ := trace.SpanIDFromHex("00f067aa0ba902b7")
+				spanCtx := trace.NewSpanContext(trace.SpanContextConfig{
+					TraceID:    traceID,
+					SpanID:     spanID,
+					TraceFlags: trace.FlagsSampled,
+				})
+				return trace.ContextWithSpanContext(ctx, spanCtx)
+			},
+			expectedTraceID: "4bf92f3577b34da6a3ce929d0e0e4736",
+			expectHeader:    true,
+			description:     "Valid trace ID should be added as response header",
+		},
+		{
+			name:                 "should not add X-Tyk-Trace-Id header when OpenTelemetry is disabled",
+			openTelemetryEnabled: false,
+			detailedRecording:    true,
+			setupContext: func(ctx context.Context) context.Context {
+				traceID, _ := trace.TraceIDFromHex("4bf92f3577b34da6a3ce929d0e0e4736")
+				spanID, _ := trace.SpanIDFromHex("00f067aa0ba902b7")
+				spanCtx := trace.NewSpanContext(trace.SpanContextConfig{
+					TraceID:    traceID,
+					SpanID:     spanID,
+					TraceFlags: trace.FlagsSampled,
+				})
+				return trace.ContextWithSpanContext(ctx, spanCtx)
+			},
+			expectedTraceID: "",
+			expectHeader:    false,
+		},
+		{
+			name:                 "should not add X-Tyk-Trace-Id header when no valid span context exists",
+			openTelemetryEnabled: true,
+			detailedRecording:    true,
+			setupContext: func(ctx context.Context) context.Context {
+				return ctx
+			},
+			expectedTraceID: "",
+			expectHeader:    false,
+			description:     "Header should not be added when no valid span context exists",
+		},
+		{
+			name:                 "should not add X-Tyk-Trace-Id header when span context is invalid",
+			openTelemetryEnabled: true,
+			detailedRecording:    true,
+			setupContext: func(ctx context.Context) context.Context {
+				spanCtx := trace.SpanContext{}
+				return trace.ContextWithSpanContext(ctx, spanCtx)
+			},
+			expectedTraceID: "",
+			expectHeader:    false,
+		},
+		{
+			name:                 "should not add X-Tyk-Trace-Id header when detailed recording is disabled",
+			openTelemetryEnabled: true,
+			detailedRecording:    false,
+			setupContext: func(ctx context.Context) context.Context {
+				traceID, _ := trace.TraceIDFromHex("4bf92f3577b34da6a3ce929d0e0e4736")
+				spanID, _ := trace.SpanIDFromHex("00f067aa0ba902b7")
+				spanCtx := trace.NewSpanContext(trace.SpanContextConfig{
+					TraceID:    traceID,
+					SpanID:     spanID,
+					TraceFlags: trace.FlagsSampled,
+				})
+				return trace.ContextWithSpanContext(ctx, spanCtx)
+			},
+			expectedTraceID: "",
+			expectHeader:    false,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			ts := StartTest(nil)
+			defer ts.Close()
+
+			globalConf := ts.Gw.GetConfig()
+			globalConf.OpenTelemetry.Enabled = tc.openTelemetryEnabled
+			globalConf.EnableAnalytics = true
+
+			// Create API spec
+			spec := BuildAPI(func(spec *APISpec) {
+				spec.Name = "test-api"
+				spec.APIID = "test-api-id"
+				spec.Proxy.ListenPath = "/test"
+				spec.GlobalConfig.OpenTelemetry.Enabled = tc.openTelemetryEnabled
+				spec.GlobalConfig.EnableAnalytics = true
+				spec.DoNotTrack = false
+				spec.EnableDetailedRecording = tc.detailedRecording // Use test case setting for detailed recording
+			})[0]
+
+			ts.Gw.LoadAPI(spec)
+
+			var capturedResponse *http.Response
+			ts.Gw.Analytics.mockEnabled = true
+			ts.Gw.Analytics.mockRecordHit = func(record *analytics.AnalyticsRecord) {}
+
+			req, _ := http.NewRequest("GET", "/test", nil)
+			ctx := req.Context()
+			if tc.setupContext != nil {
+				ctx = tc.setupContext(ctx)
+			}
+			req = req.WithContext(ctx)
+
+			mockResponse := &http.Response{
+				StatusCode: 200,
+				Header:     make(http.Header),
+				Body:       http.NoBody,
+			}
+
+			successHandler := &SuccessHandler{
+				BaseMiddleware: &BaseMiddleware{
+					Spec: spec,
+					Gw:   ts.Gw,
+				},
+			}
+
+			successHandler.RecordHit(req, analytics.Latency{Total: 100}, 200, mockResponse, false)
+			capturedResponse = mockResponse
+
+			if tc.expectHeader {
+				headerValue := capturedResponse.Header.Get("X-Tyk-Trace-Id")
+				assert.NotEmpty(t, headerValue, "X-Tyk-Trace-Id header should be present")
+				assert.Equal(t, tc.expectedTraceID, headerValue, tc.description)
+			} else {
+				headerValue := capturedResponse.Header.Get("X-Tyk-Trace-Id")
+				assert.Empty(t, headerValue, "X-Tyk-Trace-Id header should not be present")
+			}
+
+			assert.Equal(t, 200, capturedResponse.StatusCode, "Response code should be preserved")
+		})
+	}
 }

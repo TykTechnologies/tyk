@@ -15,11 +15,11 @@ import (
 	"github.com/TykTechnologies/tyk-pump/analytics"
 
 	"github.com/TykTechnologies/tyk/apidef"
-	"github.com/TykTechnologies/tyk/internal/httputil"
-
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/ctx"
 	"github.com/TykTechnologies/tyk/header"
+	"github.com/TykTechnologies/tyk/internal/httputil"
+	"github.com/TykTechnologies/tyk/internal/otel"
 	"github.com/TykTechnologies/tyk/request"
 	"github.com/TykTechnologies/tyk/user"
 )
@@ -213,6 +213,8 @@ func (s *SuccessHandler) RecordHit(r *http.Request, timing analytics.Latency, co
 		rawRequest := ""
 		rawResponse := ""
 
+		traceID := otel.ExtractTraceID(r.Context(), s.Spec.GlobalConfig.OpenTelemetry.Enabled)
+
 		if recordDetail(r, s.Spec) {
 			// Get the wire format representation
 			var wireFormatReq bytes.Buffer
@@ -228,6 +230,8 @@ func (s *SuccessHandler) RecordHit(r *http.Request, timing analytics.Latency, co
 			if responseCopy != nil && responseCopy.Body != nil {
 				// we need to delete the chunked transfer encoding header to avoid malformed body in our rawResponse
 				httputil.RemoveResponseTransferEncoding(responseCopy, "chunked")
+
+				otel.InjectTraceIDHTTPResponse(responseCopy, traceID)
 
 				responseContent, err := io.ReadAll(responseCopy.Body)
 				if err != nil {
@@ -286,6 +290,7 @@ func (s *SuccessHandler) RecordHit(r *http.Request, timing analytics.Latency, co
 			Alias:         alias,
 			TrackPath:     trackEP,
 			ExpireAt:      t,
+			TraceID:       traceID,
 		}
 
 		if s.Spec.GlobalConfig.AnalyticsConfig.EnableGeoIP {

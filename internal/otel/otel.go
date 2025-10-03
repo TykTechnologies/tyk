@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"github.com/sirupsen/logrus"
+	oteltrace "go.opentelemetry.io/otel/trace"
 
 	otelconfig "github.com/TykTechnologies/opentelemetry/config"
 	semconv "github.com/TykTechnologies/opentelemetry/semconv/v1.0.0"
@@ -138,8 +139,41 @@ func SpanFromContext(ctx context.Context) tyktrace.Span {
 }
 
 func AddTraceID(ctx context.Context, w http.ResponseWriter) {
-	span := SpanFromContext(ctx)
-	if span.SpanContext().HasTraceID() {
-		w.Header().Set("X-Tyk-Trace-Id", span.SpanContext().TraceID().String())
+	traceID := ExtractTraceID(ctx, true)
+	InjectTraceIDResponseHeader(w, traceID)
+}
+
+// ExtractTraceID extracts the trace ID from the given context if OpenTelemetry is enabled
+// and a valid trace context exists. Returns an empty string if no valid trace ID is found.
+func ExtractTraceID(ctx context.Context, enabled bool) string {
+	if !enabled {
+		return ""
+	}
+
+	spanCtx := oteltrace.SpanContextFromContext(ctx)
+	if spanCtx.IsValid() && spanCtx.HasTraceID() {
+		return spanCtx.TraceID().String()
+	}
+
+	return ""
+}
+
+// InjectTraceIDHeader sets the trace ID in the provided http.Header
+// if the trace ID is not empty.
+func InjectTraceIDHeader(h http.Header, traceID string) {
+	if h != nil && traceID != "" {
+		h.Set("X-Tyk-Trace-Id", traceID)
+	}
+}
+
+func InjectTraceIDHTTPResponse(resp *http.Response, traceID string) {
+	if resp != nil {
+		InjectTraceIDHeader(resp.Header, traceID)
+	}
+}
+
+func InjectTraceIDResponseHeader(w http.ResponseWriter, traceID string) {
+	if w != nil {
+		InjectTraceIDHeader(w.Header(), traceID)
 	}
 }
