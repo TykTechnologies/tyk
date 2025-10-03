@@ -27,7 +27,7 @@ env:
   BRANCH_NAME: ${{ github.base_ref || github.ref_name }} # base_ref for PRs is 'master', but merges read in ref_name
 
 jobs:
-  golangci-lint:
+  lint:
     runs-on: ubuntu-latest
     if: ${{ !github.event.pull_request.draft }}
     steps:
