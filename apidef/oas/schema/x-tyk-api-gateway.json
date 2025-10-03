@@ -1661,8 +1661,7 @@
                 "format": "uri"
               },
               "cacheTimeout": {
-                "type": "number",
-                "minimum": 0
+                "$ref": "#/definitions/X-Tyk-ReadableDuration"
               }
             },
             "required": ["url"]

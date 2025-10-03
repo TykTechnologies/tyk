@@ -5,6 +5,7 @@ import (
 	"github.com/lonelycode/osin"
 
 	"github.com/TykTechnologies/tyk/apidef"
+	tyktime "github.com/TykTechnologies/tyk/internal/time"
 )
 
 const (
@@ -104,7 +105,7 @@ type JWK struct {
 	// URL is the JWKS endpoint.
 	URL string `json:"url"`
 	// CacheTimeout defines how long the JWKS will be kept in the cache before forcing a refresh from the JWKS endpoint.
-	CacheTimeout int64 `bson:"cacheTimeout" json:"cacheTimeout"`
+	CacheTimeout tyktime.ReadableDuration `bson:"cacheTimeout" json:"cacheTimeout"`
 }
 
 // JWT holds the configuration for the JWT middleware.
