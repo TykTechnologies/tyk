@@ -98,7 +98,7 @@ jobs:
   test:
     name: Go ${{ matrix.go-version }} Redis ${{ matrix.redis-version }}
     if: ${{ !github.event.pull_request.draft }}
-    needs: golangci-lint
+    needs: lint
     # Runs on is pinned to a version that provides python 3.10.
     # See: https://github.com/actions/runner-images?tab=readme-ov-file#available-images
     # Avoid using ubuntu-latest as it would upgrade python unattended.
@@ -189,7 +189,7 @@ jobs:
   sonar-cloud-analysis:
     runs-on: ubuntu-latest
     if: ${{ !github.event.pull_request.draft }}
-    needs: [test, golangci-lint]
+    needs: [test, lint]
     steps:
       - name: "Checkout repository"
         uses: TykTechnologies/github-actions/.github/actions/checkout-pr@main
