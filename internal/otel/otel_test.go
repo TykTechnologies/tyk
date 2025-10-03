@@ -300,12 +300,78 @@ func TestAddTraceID(t *testing.T) {
 				req = req.WithContext(ctx)
 			}
 
-			AddTraceID(req.Context(), w)
+			AddTraceID(req.Context(), w, req)
 
-			if tt.wantHeader && w.Header().Get("X-Tyk-Trace-Id") == "" {
-				t.Errorf("expected header to be set, but it wasn't")
-			} else if !tt.wantHeader && w.Header().Get("X-Tyk-Trace-Id") != "" {
-				t.Errorf("expected header not to be set, but it was")
+			responseTraceID := w.Header().Get("X-Tyk-Trace-Id")
+			if tt.wantHeader && responseTraceID == "" {
+				t.Errorf("expected response header to be set, but it wasn't")
+			} else if !tt.wantHeader && responseTraceID != "" {
+				t.Errorf("expected response header not to be set, but it was")
+			}
+
+			requestTraceID := req.Header.Get("X-Tyk-Trace-Id")
+			if tt.wantHeader && requestTraceID == "" {
+				t.Errorf("expected request header to be set, but it wasn't")
+			} else if !tt.wantHeader && requestTraceID != "" {
+				t.Errorf("expected request header not to be set, but it was")
+			}
+
+			if tt.wantHeader && responseTraceID != requestTraceID {
+				t.Errorf("response and request trace IDs should match, got response: %s, request: %s", responseTraceID, requestTraceID)
+			}
+		})
+	}
+}
+
+func TestAddTraceID_TraceIDFormat(t *testing.T) {
+	tests := []struct {
+		name        string
+		setupSpan   bool
+		expectValid bool
+	}{
+		{
+			name:        "valid trace ID from active span",
+			setupSpan:   true,
+			expectValid: true,
+		},
+		{
+			name:        "no span context - no headers set",
+			setupSpan:   false,
+			expectValid: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodGet, "/test", nil)
+			w := httptest.NewRecorder()
+
+			if tt.setupSpan {
+				otelConfig := OpenTelemetry{
+					Enabled:  true,
+					Exporter: "http",
+					Endpoint: "http://localhost:4317",
+				}
+				provider := InitOpenTelemetry(context.Background(), logrus.New(), &otelConfig, "test", "test", false, "test", false, []string{})
+				ctx, span := provider.Tracer().Start(context.Background(), "test-operation")
+				req = req.WithContext(ctx)
+
+				assert.True(t, span.SpanContext().HasTraceID(), "span should have a trace ID")
+			}
+
+			AddTraceID(req.Context(), w, req)
+
+			responseTraceID := w.Header().Get("X-Tyk-Trace-Id")
+			requestTraceID := req.Header.Get("X-Tyk-Trace-Id")
+
+			if tt.expectValid {
+				assert.NotEmpty(t, responseTraceID, "response trace ID header should be set")
+				assert.NotEmpty(t, requestTraceID, "request trace ID header should be set")
+
+				assert.Equal(t, responseTraceID, requestTraceID, "response and request trace IDs should match")
+			} else {
+				assert.Empty(t, responseTraceID, "response trace ID header should not be set")
+				assert.Empty(t, requestTraceID, "request trace ID header should not be set")
 			}
 		})
 	}
