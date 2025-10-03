@@ -4050,3 +4050,287 @@ func TestAuthORWrapper_OAuth2_Internal(t *testing.T) {
 
 	ts.Run(t, testCases...)
 }
+
+// TestAuthORWrapper_findMiddlewareByType tests the findMiddlewareByType helper function
+func TestAuthORWrapper_findMiddlewareByType(t *testing.T) {
+	wrapper := &AuthORWrapper{
+		authMiddlewares: []TykMiddleware{
+			&JWTMiddleware{},
+			&AuthKey{},
+			&BasicAuthKeyIsValid{},
+			&Oauth2KeyExists{},
+		},
+	}
+
+	tests := []struct {
+		name     string
+		example  TykMiddleware
+		expected bool
+	}{
+		{
+			name:     "Find JWT middleware",
+			example:  &JWTMiddleware{},
+			expected: true,
+		},
+		{
+			name:     "Find AuthKey middleware",
+			example:  &AuthKey{},
+			expected: true,
+		},
+		{
+			name:     "Find BasicAuth middleware",
+			example:  &BasicAuthKeyIsValid{},
+			expected: true,
+		},
+		{
+			name:     "Find OAuth2 middleware",
+			example:  &Oauth2KeyExists{},
+			expected: true,
+		},
+		{
+			name:     "Middleware not in list",
+			example:  &HTTPSignatureValidationMiddleware{},
+			expected: false,
+		},
+		{
+			name:     "External OAuth not in list",
+			example:  &ExternalOAuthMiddleware{},
+			expected: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := wrapper.findMiddlewareByType(tt.example)
+			if tt.expected && result == nil {
+				t.Errorf("Expected to find middleware %T, but got nil", tt.example)
+			}
+			if !tt.expected && result != nil {
+				t.Errorf("Expected nil for middleware %T, but found %T", tt.example, result)
+			}
+		})
+	}
+}
+
+// TestAuthORWrapper_getMiddlewareForScheme tests the getMiddlewareForScheme function
+func TestAuthORWrapper_getMiddlewareForScheme(t *testing.T) {
+	tests := []struct {
+		name         string
+		setupSpec    func(*APISpec)
+		schemeName   string
+		expectFound  bool
+		expectType   string
+	}{
+		{
+			name: "JWT scheme - standard OAS",
+			setupSpec: func(spec *APISpec) {
+				spec.EnableJWT = true
+				spec.IsOAS = true
+				spec.OAS.T.Components = &openapi3.Components{
+					SecuritySchemes: openapi3.SecuritySchemes{
+						"jwtAuth": &openapi3.SecuritySchemeRef{
+							Value: &openapi3.SecurityScheme{
+								Type:         "http",
+								Scheme:       "bearer",
+								BearerFormat: "JWT",
+							},
+						},
+					},
+				}
+			},
+			schemeName:  "jwtAuth",
+			expectFound: true,
+			expectType:  "*gateway.JWTMiddleware",
+		},
+		{
+			name: "API Key scheme - standard OAS",
+			setupSpec: func(spec *APISpec) {
+				spec.UseStandardAuth = true
+				spec.IsOAS = true
+				spec.OAS.T.Components = &openapi3.Components{
+					SecuritySchemes: openapi3.SecuritySchemes{
+						"apiKeyAuth": &openapi3.SecuritySchemeRef{
+							Value: &openapi3.SecurityScheme{
+								Type: "apiKey",
+								In:   "header",
+								Name: "X-API-Key",
+							},
+						},
+					},
+				}
+			},
+			schemeName:  "apiKeyAuth",
+			expectFound: true,
+			expectType:  "*gateway.AuthKey",
+		},
+		{
+			name: "Basic Auth scheme - standard OAS",
+			setupSpec: func(spec *APISpec) {
+				spec.UseBasicAuth = true
+				spec.IsOAS = true
+				spec.OAS.T.Components = &openapi3.Components{
+					SecuritySchemes: openapi3.SecuritySchemes{
+						"basicAuth": &openapi3.SecuritySchemeRef{
+							Value: &openapi3.SecurityScheme{
+								Type:   "http",
+								Scheme: "basic",
+							},
+						},
+					},
+				}
+			},
+			schemeName:  "basicAuth",
+			expectFound: true,
+			expectType:  "*gateway.BasicAuthKeyIsValid",
+		},
+		{
+			name: "OAuth2 internal scheme - standard OAS",
+			setupSpec: func(spec *APISpec) {
+				spec.UseOauth2 = true
+				spec.IsOAS = true
+				spec.OAS.T.Components = &openapi3.Components{
+					SecuritySchemes: openapi3.SecuritySchemes{
+						"oauth2": &openapi3.SecuritySchemeRef{
+							Value: &openapi3.SecurityScheme{
+								Type: "oauth2",
+							},
+						},
+					},
+				}
+			},
+			schemeName:  "oauth2",
+			expectFound: true,
+			expectType:  "*gateway.Oauth2KeyExists",
+		},
+		{
+			name: "OAuth2 external scheme - standard OAS",
+			setupSpec: func(spec *APISpec) {
+				spec.ExternalOAuth.Enabled = true
+				spec.IsOAS = true
+				spec.OAS.T.Components = &openapi3.Components{
+					SecuritySchemes: openapi3.SecuritySchemes{
+						"oauth2": &openapi3.SecuritySchemeRef{
+							Value: &openapi3.SecurityScheme{
+								Type: "oauth2",
+							},
+						},
+					},
+				}
+			},
+			schemeName:  "oauth2",
+			expectFound: true,
+			expectType:  "*gateway.ExternalOAuthMiddleware",
+		},
+		{
+			name: "HMAC scheme - Tyk vendor extension",
+			setupSpec: func(spec *APISpec) {
+				spec.EnableSignatureChecking = true
+				spec.IsOAS = true
+
+				tykExt := &oas.XTykAPIGateway{
+					Server: oas.Server{
+						Authentication: &oas.Authentication{
+							SecuritySchemes: oas.SecuritySchemes{
+								"hmacAuth": &oas.HMAC{
+									Enabled: true,
+								},
+							},
+						},
+					},
+				}
+				spec.OAS.SetTykExtension(tykExt)
+			},
+			schemeName:  "hmacAuth",
+			expectFound: true,
+			expectType:  "*gateway.HTTPSignatureValidationMiddleware",
+		},
+		{
+			name: "OpenID scheme - Tyk vendor extension",
+			setupSpec: func(spec *APISpec) {
+				spec.UseOpenID = true
+				spec.IsOAS = true
+
+				tykExt := &oas.XTykAPIGateway{
+					Server: oas.Server{
+						Authentication: &oas.Authentication{
+							SecuritySchemes: oas.SecuritySchemes{
+								"oidcAuth": &oas.OIDC{
+									Enabled: true,
+								},
+							},
+						},
+					},
+				}
+				spec.OAS.SetTykExtension(tykExt)
+			},
+			schemeName:  "oidcAuth",
+			expectFound: true,
+			expectType:  "*gateway.OpenIDMW",
+		},
+		{
+			name: "Non-OAS spec returns nil",
+			setupSpec: func(spec *APISpec) {
+				spec.IsOAS = false
+			},
+			schemeName:  "anyScheme",
+			expectFound: false,
+		},
+		{
+			name: "Scheme not found in OAS",
+			setupSpec: func(spec *APISpec) {
+				spec.IsOAS = true
+				spec.OAS.T.Components = &openapi3.Components{
+					SecuritySchemes: openapi3.SecuritySchemes{},
+				}
+			},
+			schemeName:  "nonExistentScheme",
+			expectFound: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ts := StartTest(nil)
+			defer ts.Close()
+
+			// Create spec
+			spec := &APISpec{
+				APIDefinition: &apidef.APIDefinition{},
+				OAS:           oas.OAS{T: openapi3.T{}},
+			}
+
+			// Setup spec
+			tt.setupSpec(spec)
+
+			// Create wrapper with properly initialized base middleware
+			wrapper := &AuthORWrapper{
+				BaseMiddleware: BaseMiddleware{
+					Spec:   spec,
+					Gw:     ts.Gw,
+					logger: log.WithField("mw", "AuthORWrapper"),
+				},
+			}
+
+			// Initialize middlewares based on spec settings
+			wrapper.Init()
+
+			// Test getMiddlewareForScheme
+			result := wrapper.getMiddlewareForScheme(tt.schemeName)
+
+			if tt.expectFound {
+				if result == nil {
+					t.Errorf("Expected to find middleware for scheme %s, but got nil", tt.schemeName)
+				} else {
+					actualType := fmt.Sprintf("%T", result)
+					if actualType != tt.expectType {
+						t.Errorf("Expected middleware type %s for scheme %s, but got %s", tt.expectType, tt.schemeName, actualType)
+					}
+				}
+			} else {
+				if result != nil {
+					t.Errorf("Expected nil for scheme %s, but got %T", tt.schemeName, result)
+				}
+			}
+		})
+	}
+}

@@ -50,10 +50,10 @@ func (a *AuthORWrapper) ProcessRequest(w http.ResponseWriter, r *http.Request, _
 	for groupIdx, requirement := range a.Spec.SecurityRequirements {
 		a.Logger().Debugf("OR wrapper: trying security requirement group %d/%d: %v", groupIdx+1, len(a.Spec.SecurityRequirements), requirement)
 
-		rClone := r.Clone(r.Context())
 		groupSuccess := true
 		var groupError error
 		var groupCode int
+		var lastSuccessfulClone *http.Request
 
 		for _, schemeName := range requirement {
 			mw := a.getMiddlewareForScheme(schemeName)
@@ -66,6 +66,8 @@ func (a *AuthORWrapper) ProcessRequest(w http.ResponseWriter, r *http.Request, _
 			}
 
 			a.Logger().Debugf("OR wrapper: executing auth method %s in group %d", mw.Name(), groupIdx+1)
+			// Clone request per middleware to prevent mutations from affecting subsequent auth methods in the AND group
+			rClone := r.Clone(r.Context())
 			// Use a response recorder to prevent failed auth attempts from writing to the actual response
 			recorder := httptest.NewRecorder()
 			err, code := mw.ProcessRequest(recorder, rClone, nil)
@@ -77,16 +79,17 @@ func (a *AuthORWrapper) ProcessRequest(w http.ResponseWriter, r *http.Request, _
 				break
 			}
 			a.Logger().Debugf("OR wrapper: auth method %s succeeded", mw.Name())
+			lastSuccessfulClone = rClone
 		}
 
 		if groupSuccess {
 			a.Logger().Debugf("OR wrapper: security requirement group %d succeeded", groupIdx+1)
 
-			if session := ctxGetSession(rClone); session != nil {
+			if session := ctxGetSession(lastSuccessfulClone); session != nil {
 				ctxSetSession(r, session, false, a.Gw.GetConfig().HashKeys)
 			}
 
-			*r = *rClone
+			*r = *lastSuccessfulClone
 
 			return nil, http.StatusOK
 		}
