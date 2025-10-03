@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	tyktime "github.com/TykTechnologies/tyk/internal/time"
 	"net/http"
 	"reflect"
 	"sort"
@@ -14,6 +13,7 @@ import (
 	"time"
 
 	"github.com/TykTechnologies/tyk/apidef/oas"
+	tyktime "github.com/TykTechnologies/tyk/internal/time"
 	"github.com/go-jose/go-jose/v3"
 	"github.com/golang-jwt/jwt/v4"
 	"github.com/stretchr/testify/assert"

@@ -786,6 +786,14 @@ type JWK struct {
 	CacheTimeout tyktime.ReadableDuration `bson:"cache_timeout" json:"cache_timeout"`
 }
 
+// GetCacheTimeoutSeconds returns the cache timeout in seconds, using the default expiration if CacheTimeout is zero or negative.
+func (jwk *JWK) GetCacheTimeoutSeconds(defaultExpiration int64) int64 {
+	if jwk.CacheTimeout > 0 {
+		return int64(jwk.CacheTimeout.Seconds())
+	}
+	return defaultExpiration
+}
+
 // UpstreamAuth holds the configurations related to upstream API authentication.
 type UpstreamAuth struct {
 	// Enabled enables upstream API authentication.

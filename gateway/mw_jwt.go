@@ -101,11 +101,7 @@ func (k *JWTMiddleware) Init() {
 					continue
 				}
 
-				cacheTimeout := int64(cache.DefaultExpiration)
-				if jwk.CacheTimeout > 0 {
-					cacheTimeout = int64(jwk.CacheTimeout.Seconds())
-				}
-				jwkCache.Set(jwk.URL, jwkSet, cacheTimeout)
+				jwkCache.Set(jwk.URL, jwkSet, jwk.GetCacheTimeoutSeconds(cache.DefaultExpiration))
 			}
 		}()
 	}
@@ -307,9 +303,7 @@ func (k *JWTMiddleware) getSecretFromURL(url string, kidVal interface{}, keyType
 func (k *JWTMiddleware) findCacheTimeoutByURL(url string) int64 {
 	for _, uri := range k.Spec.JWTJwksURIs {
 		if uri.URL == url {
-			if uri.CacheTimeout > 0 {
-				return int64(uri.CacheTimeout.Seconds())
-			}
+			return uri.GetCacheTimeoutSeconds(cache.DefaultExpiration)
 		}
 	}
 	return cache.DefaultExpiration
@@ -463,11 +457,7 @@ func (k *JWTMiddleware) getSecretFromMultipleJWKURIs(jwkURIs []apidef.JWK, kidVa
 				continue
 			}
 
-			cacheTimeout := int64(cache.DefaultExpiration)
-			if jwk.CacheTimeout > 0 {
-				cacheTimeout = int64(jwk.CacheTimeout.Seconds())
-			}
-			jwkCache.Set(jwk.URL, jwkSet, cacheTimeout)
+			jwkCache.Set(jwk.URL, jwkSet, jwk.GetCacheTimeoutSeconds(cache.DefaultExpiration))
 			jwkSets = append(jwkSets, jwkSet)
 		}
 
