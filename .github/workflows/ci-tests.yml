@@ -213,20 +213,38 @@ jobs:
           files: 'gateway-all.cov, golangci-lint-report.json'
           fail: true
 
+      - name: Set SonarCloud parameters
+        id: sonar_params
+        run: |
+          # Common parameters for both PR and push
+          SONAR_ARGS="-Dsonar.organization=tyktechnologies \
+          -Dsonar.projectKey=TykTechnologies_tyk \
+          -Dsonar.sources=. \
+          -Dsonar.exclusions=**/testdata/*,test/**,tests/**,coprocess/**/*,ci/**,templates/**,**/*.pb.go,internal/graphengine/gomock_reflect_3503306920/* \
+          -Dsonar.coverage.exclusions=**/*_test.go,**/mock/*,tests/**,swagger*.yml,**/*.pb.go,internal/graphengine/gomock_reflect_3503306920/* \
+          -Dsonar.test.inclusions=**/*_test.go,tests/** \
+          -Dsonar.tests=. \
+          -Dsonar.go.coverage.reportPaths=gateway-all.cov \
+          -Dsonar.go.golangci-lint.reportPaths=golangci-lint-report.json"
+          
+          # Add PR-specific parameters if this is a pull request
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            SONAR_ARGS="$SONAR_ARGS \
+            -Dsonar.pullrequest.key=${{ github.event.pull_request.number }} \
+            -Dsonar.pullrequest.branch=${{ github.head_ref }} \
+            -Dsonar.pullrequest.base=${{ github.base_ref }}"
+            echo "Running SonarCloud in pull request mode"
+          else
+            echo "Running SonarCloud in full analysis mode"
+          fi
+          
+          echo "sonar_args=$SONAR_ARGS" >> $GITHUB_OUTPUT
+
       - name: Scan
         if: always()
         uses: sonarsource/sonarqube-scan-action@master
         with:
-          args: >
-            -Dsonar.organization=tyktechnologies
-            -Dsonar.projectKey=TykTechnologies_tyk
-            -Dsonar.sources=.
-            -Dsonar.exclusions=**/testdata/*,test/**,tests/**,coprocess/**/*,ci/**,templates/**,**/*.pb.go,internal/graphengine/gomock_reflect_3503306920/*
-            -Dsonar.coverage.exclusions=**/*_test.go,**/mock/*,tests/**,swagger*.yml,**/*.pb.go,internal/graphengine/gomock_reflect_3503306920/*
-            -Dsonar.test.inclusions=**/*_test.go,tests/**
-            -Dsonar.tests=.
-            -Dsonar.go.coverage.reportPaths=gateway-all.cov
-            -Dsonar.go.golangci-lint.reportPaths=golangci-lint-report.json
+          args: ${{ steps.sonar_params.outputs.sonar_args }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
