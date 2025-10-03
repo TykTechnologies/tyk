@@ -67,11 +67,23 @@ jobs:
 
       - name: golangci-lint
         if: ${{ github.event_name == 'pull_request' }}
-        # This is a pull request, but exiting here skips CI tests (`needs: golangci-lint`). Exit code 0 to always run tests.
-        # PR uses the "prod" config and must pass.
         run: |
           # Run linting without auto-fixing
-          task lint-no-fix
+          task lint-no-golangci
+          
+          git add --all
+          git diff HEAD > git-state.log
+          git_state_count=$(wc -l < git-state.log)
+          if [[ $git_state_count -ne 0 ]]
+          then
+            echo "git-state<<EOF" >> $GITHUB_OUTPUT
+            cat git-state.log >> $GITHUB_OUTPUT
+            echo "EOF" >> $GITHUB_OUTPUT
+            echo "task lint made git state dirty, please run task lint locally and update PR"
+            echo
+            cat git-state.log
+            exit 1
+          fi
           
           # Generate report for SonarCloud
           golangci-lint run --out-format colored-line-number,checkstyle:golangci-lint-report.json \
@@ -82,7 +94,7 @@ jobs:
         # Using the default config, reports stats to sonarcloud. No requirements on passing other than KPIs tracked in dev.
         run: |
           # Run linting without auto-fixing
-          task lint-no-fix
+          task lint-no-golangci
           
           # Generate report for SonarCloud
           golangci-lint run --out-format checkstyle:golangci-lint-report.json -v ./...

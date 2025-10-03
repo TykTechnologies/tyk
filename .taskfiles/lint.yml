@@ -15,8 +15,8 @@ tasks:
       - task: check
       - golangci-lint run --new-from-rev=origin/{{ .branch_name }} --issues-exit-code=1 --fix ./...
 
-  run-no-fix:
-    desc: "Run linters without auto-fixing"
+  run-no-golangci:
+    desc: "Run linters without golangci-lint auto-fix"
     cmds:
       - task: fmt
       - task: vet

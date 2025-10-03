@@ -79,11 +79,11 @@ tasks:
       - task: lint:run
       - task: lint:extras
       
-  lint-no-fix:
+  lint-no-golangci:
     desc: "Tidy the codebase without auto-fixing"
     cmds:
       - task: codegen
-      - task: lint:run-no-fix
+      - task: lint:run-no-golangci
       - task: lint:extras
 
   lint:extras:
