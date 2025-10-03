@@ -4115,11 +4115,11 @@ func TestAuthORWrapper_findMiddlewareByType(t *testing.T) {
 // TestAuthORWrapper_getMiddlewareForScheme tests the getMiddlewareForScheme function
 func TestAuthORWrapper_getMiddlewareForScheme(t *testing.T) {
 	tests := []struct {
-		name         string
-		setupSpec    func(*APISpec)
-		schemeName   string
-		expectFound  bool
-		expectType   string
+		name        string
+		setupSpec   func(*APISpec)
+		schemeName  string
+		expectFound bool
+		expectType  string
 	}{
 		{
 			name: "JWT scheme - standard OAS",
