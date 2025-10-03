@@ -832,7 +832,7 @@ func TestCompliantMode_JWTOrAPIKeyOrHMAC(t *testing.T) {
 			},
 			Code: http.StatusOK,
 		},
-		// All invalid - should fail
+		// All invalid - should fail with error from last security group
 		{
 			Method: "GET",
 			Path:   "/test-compliant-or/",
@@ -840,7 +840,7 @@ func TestCompliantMode_JWTOrAPIKeyOrHMAC(t *testing.T) {
 				"Authorization": "Bearer invalid",
 				"X-API-Key":     "invalid",
 			},
-			Code: http.StatusForbidden,
+			Code: http.StatusBadRequest,
 		},
 	}
 
@@ -1647,7 +1647,7 @@ func TestHMACInORAuthentication(t *testing.T) {
 				"X-API-Key":     "invalid-key",
 				"Authorization": `Signature keyId="wrong",algorithm="hmac-sha1",signature="invalid"`,
 			},
-			Code: http.StatusForbidden,
+			Code: http.StatusBadRequest,
 		}
 
 		ts.Run(t, testCase)
@@ -1658,7 +1658,7 @@ func TestHMACInORAuthentication(t *testing.T) {
 			Method:  "GET",
 			Path:    "/test-hmac-or/",
 			Headers: map[string]string{},
-			Code:    http.StatusUnauthorized,
+			Code:    http.StatusBadRequest,
 		}
 
 		ts.Run(t, testCase)
@@ -2530,4 +2530,1807 @@ func TestJWTWithTykExtensionButNoComponents(t *testing.T) {
 	}
 
 	ts.Run(t, testCases...)
+}
+
+func TestMultiAuthMiddleware_OR_CompliantMode_JWT_Second(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	jwtPolicyID := ts.CreatePolicy(func(p *user.Policy) {
+		p.OrgID = "default"
+		p.AccessRights = map[string]user.AccessDefinition{
+			"jwt-second-api": {
+				APIName:  "JWT Second API",
+				APIID:    "jwt-second-api",
+				Versions: []string{"default"},
+			},
+		}
+	})
+
+	apiKey := CreateSession(ts.Gw, func(s *user.SessionState) {
+		s.OrgID = "default"
+		s.AccessRights = map[string]user.AccessDefinition{
+			"jwt-second-api": {
+				APIName:  "JWT Second API",
+				APIID:    "jwt-second-api",
+				Versions: []string{"default"},
+			},
+		}
+	})
+
+	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		spec.APIID = "jwt-second-api"
+		spec.Name = "JWT Second API"
+		spec.OrgID = "default"
+		spec.Proxy.ListenPath = "/jwt-second/"
+		spec.UseKeylessAccess = false
+
+		oasDoc := oas.OAS{}
+		oasDoc.T = openapi3.T{
+			OpenAPI: "3.0.3",
+			Info: &openapi3.Info{
+				Title:   spec.Name,
+				Version: "1.0.0",
+			},
+			Paths: openapi3.NewPaths(),
+			Components: &openapi3.Components{
+				SecuritySchemes: openapi3.SecuritySchemes{
+					"apiKeyAuth": &openapi3.SecuritySchemeRef{
+						Value: &openapi3.SecurityScheme{
+							Type: "apiKey",
+							In:   "header",
+							Name: "X-API-Key",
+						},
+					},
+					"jwtAuth": &openapi3.SecuritySchemeRef{
+						Value: &openapi3.SecurityScheme{
+							Type:         "http",
+							Scheme:       "bearer",
+							BearerFormat: "JWT",
+						},
+					},
+				},
+			},
+			Security: openapi3.SecurityRequirements{
+				openapi3.SecurityRequirement{"apiKeyAuth": []string{}},
+				openapi3.SecurityRequirement{"jwtAuth": []string{}},
+			},
+		}
+
+		tykExtension := &oas.XTykAPIGateway{
+			Info: oas.Info{
+				ID:    spec.APIID,
+				Name:  spec.Name,
+				OrgID: "default",
+				State: oas.State{
+					Active: true,
+				},
+			},
+			Server: oas.Server{
+				ListenPath: oas.ListenPath{
+					Value: spec.Proxy.ListenPath,
+					Strip: true,
+				},
+				Authentication: &oas.Authentication{
+					Enabled:                true,
+					SecurityProcessingMode: oas.SecurityProcessingModeCompliant,
+					SecuritySchemes: oas.SecuritySchemes{
+						"apiKeyAuth": &oas.Token{
+							Enabled: func() *bool { b := true; return &b }(),
+							AuthSources: oas.AuthSources{
+								Header: &oas.AuthSource{
+									Enabled: true,
+									Name:    "X-API-Key",
+								},
+							},
+						},
+						"jwtAuth": &oas.JWT{
+							Enabled:           true,
+							Source:            base64.StdEncoding.EncodeToString([]byte(jwtRSAPubKey)),
+							SigningMethod:     "rsa",
+							IdentityBaseField: "user_id",
+							PolicyFieldName:   "policy_id",
+							DefaultPolicies:   []string{jwtPolicyID},
+							AuthSources: oas.AuthSources{
+								Header: &oas.AuthSource{
+									Enabled: true,
+									Name:    "Authorization",
+								},
+							},
+						},
+					},
+				},
+			},
+			Upstream: oas.Upstream{
+				URL: TestHttpAny,
+			},
+		}
+
+		oasDoc.SetTykExtension(tykExtension)
+		oasDoc.ExtractTo(spec.APIDefinition)
+		spec.IsOAS = true
+		spec.OAS = oasDoc
+
+		spec.SecurityRequirements = [][]string{
+			{"apiKeyAuth"},
+			{"jwtAuth"},
+		}
+
+		spec.UseStandardAuth = true
+		spec.EnableJWT = true
+		spec.JWTSigningMethod = "rsa"
+		spec.JWTSource = base64.StdEncoding.EncodeToString([]byte(jwtRSAPubKey))
+		spec.JWTIdentityBaseField = "user_id"
+		spec.JWTPolicyFieldName = "policy_id"
+	})
+
+	jwtToken := CreateJWKToken(func(t *jwt.Token) {
+		t.Claims.(jwt.MapClaims)["user_id"] = "jwt-user"
+		t.Claims.(jwt.MapClaims)["policy_id"] = jwtPolicyID
+		t.Claims.(jwt.MapClaims)["exp"] = time.Now().Add(time.Hour).Unix()
+	})
+
+	testCases := []test.TestCase{
+		{
+			Method: "GET",
+			Path:   "/jwt-second/get",
+			Headers: map[string]string{
+				"Authorization": "Bearer " + jwtToken,
+			},
+			Code: http.StatusOK,
+		},
+		{
+			Method: "GET",
+			Path:   "/jwt-second/get",
+			Headers: map[string]string{
+				"X-API-Key": apiKey,
+			},
+			Code: http.StatusOK,
+		},
+		{
+			Method: "GET",
+			Path:   "/jwt-second/get",
+			Headers: map[string]string{
+				"Authorization": "Bearer " + jwtToken,
+				"X-API-Key":     apiKey,
+			},
+			Code: http.StatusOK,
+		},
+		{
+			Method: "GET",
+			Path:   "/jwt-second/get",
+			Headers: map[string]string{
+				"Authorization": "Bearer invalid-jwt-token",
+			},
+			Code: http.StatusForbidden, // Last error: JWT validation fails with 403
+		},
+		{
+			Method:  "GET",
+			Path:    "/jwt-second/get",
+			Headers: map[string]string{},
+			Code:    http.StatusBadRequest, // Last error: JWT missing Authorization header (400)
+		},
+		{
+			Method: "GET",
+			Path:   "/jwt-second/get",
+			Headers: map[string]string{
+				"X-API-Key": "wrong-key",
+			},
+			Code: http.StatusBadRequest, // Last error: JWT missing Authorization header (400)
+		},
+	}
+
+	ts.Run(t, testCases...)
+}
+
+func TestVendorExtension_MixedANDOR_LegacyMode(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	pID := ts.CreatePolicy(func(p *user.Policy) {
+		p.OrgID = ""
+		p.AccessRights = map[string]user.AccessDefinition{
+			"test-mixed-andor-legacy": {
+				APIName:  "Test Mixed ANDOR Legacy",
+				APIID:    "test-mixed-andor-legacy",
+				Versions: []string{"default"},
+			},
+		}
+	})
+
+	apiKey := CreateSession(ts.Gw, func(s *user.SessionState) {
+		s.OrgID = ""
+		s.AccessRights = map[string]user.AccessDefinition{
+			"test-mixed-andor-legacy": {
+				APIName:  "Test Mixed ANDOR Legacy",
+				APIID:    "test-mixed-andor-legacy",
+				Versions: []string{"default"},
+			},
+		}
+	})
+
+	hmacKey := "mixed-hmac-key"
+	hmacSecret := "mixed-hmac-secret"
+	hmacSession := CreateStandardSession()
+	hmacSession.OrgID = ""
+	hmacSession.HMACEnabled = true
+	hmacSession.HmacSecret = hmacSecret
+	hmacSession.AccessRights = map[string]user.AccessDefinition{
+		"test-mixed-andor-legacy": {
+			APIName:  "Test Mixed ANDOR Legacy",
+			APIID:    "test-mixed-andor-legacy",
+			Versions: []string{"default"},
+		},
+	}
+	_ = ts.Gw.GlobalSessionManager.UpdateSession(hmacKey, hmacSession, 60, false)
+
+	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		spec.APIID = "test-mixed-andor-legacy"
+		spec.Name = "Test Mixed ANDOR Legacy"
+		spec.OrgID = ""
+		spec.Proxy.ListenPath = "/test-mixed-andor-legacy/"
+		spec.UseKeylessAccess = false
+
+		oasDoc := oas.OAS{}
+		oasDoc.T = openapi3.T{
+			OpenAPI: "3.0.3",
+			Info: &openapi3.Info{
+				Title:   spec.Name,
+				Version: "1.0.0",
+			},
+			Paths: openapi3.NewPaths(),
+			Components: &openapi3.Components{
+				SecuritySchemes: openapi3.SecuritySchemes{
+					"jwt": &openapi3.SecuritySchemeRef{
+						Value: &openapi3.SecurityScheme{
+							Type:         "http",
+							Scheme:       "bearer",
+							BearerFormat: "JWT",
+						},
+					},
+					"apikey": &openapi3.SecuritySchemeRef{
+						Value: &openapi3.SecurityScheme{
+							Type: "apiKey",
+							In:   "header",
+							Name: "X-API-Key",
+						},
+					},
+				},
+			},
+
+			Security: openapi3.SecurityRequirements{
+				openapi3.SecurityRequirement{"jwt": []string{}},
+				openapi3.SecurityRequirement{"apikey": []string{}},
+			},
+		}
+
+		tykExtension := &oas.XTykAPIGateway{
+			Info: oas.Info{
+				ID:   spec.APIID,
+				Name: spec.Name,
+				State: oas.State{
+					Active: true,
+				},
+			},
+			Server: oas.Server{
+				ListenPath: oas.ListenPath{
+					Value: spec.Proxy.ListenPath,
+					Strip: true,
+				},
+				Authentication: &oas.Authentication{
+					Enabled:                true,
+					SecurityProcessingMode: oas.SecurityProcessingModeLegacy,
+
+					Security: [][]string{
+						{"jwt", "hmac"},
+						{"apikey"},
+					},
+					SecuritySchemes: oas.SecuritySchemes{
+						"jwt": &oas.JWT{
+							Enabled:           true,
+							Source:            base64.StdEncoding.EncodeToString([]byte(jwtRSAPubKey)),
+							SigningMethod:     "rsa",
+							IdentityBaseField: "user_id",
+							PolicyFieldName:   "policy_id",
+							DefaultPolicies:   []string{pID},
+							AuthSources: oas.AuthSources{
+								Header: &oas.AuthSource{
+									Enabled: true,
+									Name:    "Authorization",
+								},
+							},
+						},
+						"apikey": &oas.Token{
+							Enabled: func() *bool { b := true; return &b }(),
+							AuthSources: oas.AuthSources{
+								Header: &oas.AuthSource{
+									Enabled: true,
+									Name:    "X-API-Key",
+								},
+							},
+						},
+						"hmac": &oas.HMAC{
+							Enabled: true,
+							AuthSources: oas.AuthSources{
+								Header: &oas.AuthSource{
+									Enabled: true,
+									Name:    "Authorization",
+								},
+							},
+						},
+					},
+				},
+			},
+			Upstream: oas.Upstream{
+				URL: TestHttpAny,
+			},
+		}
+
+		oasDoc.SetTykExtension(tykExtension)
+		oasDoc.ExtractTo(spec.APIDefinition)
+		spec.IsOAS = true
+		spec.OAS = oasDoc
+
+		spec.EnableSignatureChecking = true
+		spec.HmacAllowedAlgorithms = []string{"hmac-sha1", "hmac-sha256"}
+	})
+
+	jwtToken := CreateJWKToken(func(t *jwt.Token) {
+		t.Claims.(jwt.MapClaims)["user_id"] = "mixed-legacy-user"
+		t.Claims.(jwt.MapClaims)["policy_id"] = pID
+		t.Claims.(jwt.MapClaims)["exp"] = time.Now().Add(time.Hour).Unix()
+	})
+
+	testCases := []test.TestCase{
+
+		{
+			Method: "GET",
+			Path:   "/test-mixed-andor-legacy/",
+			Headers: map[string]string{
+				"Authorization": "Bearer " + jwtToken,
+			},
+			Code: http.StatusBadRequest,
+		},
+
+		{
+			Method: "GET",
+			Path:   "/test-mixed-andor-legacy/",
+			Headers: map[string]string{
+				"X-API-Key": apiKey,
+			},
+			Code: http.StatusBadRequest,
+		},
+
+		{
+			Method: "GET",
+			Path:   "/test-mixed-andor-legacy/",
+			Headers: map[string]string{
+				"Authorization": "Bearer " + jwtToken,
+			},
+			Code: http.StatusBadRequest,
+		},
+
+		{
+			Method:  "GET",
+			Path:    "/test-mixed-andor-legacy/",
+			Headers: map[string]string{},
+			Code:    http.StatusBadRequest,
+		},
+	}
+
+	t.Run("JWT and HMAC together in legacy mode", func(t *testing.T) {
+		date := time.Now().Format("Mon, 02 Jan 2006 15:04:05 MST")
+		headers := map[string]string{
+			"Date": date,
+		}
+
+		signature := generateHMACSignature("GET", "/test-mixed-andor-legacy/", headers, hmacSecret, "hmac-sha1")
+		_ = signature
+
+		testCase := test.TestCase{
+			Method: "GET",
+			Path:   "/test-mixed-andor-legacy/",
+			Headers: map[string]string{
+				"Authorization": "Bearer " + jwtToken,
+				"Date":          date,
+			},
+			Code: http.StatusBadRequest,
+		}
+
+		ts.Run(t, testCase)
+	})
+
+	ts.Run(t, testCases...)
+}
+
+func TestVendorExtension_MixedANDOR_CompliantMode(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	pID := ts.CreatePolicy(func(p *user.Policy) {
+		p.OrgID = ""
+		p.AccessRights = map[string]user.AccessDefinition{
+			"test-mixed-andor-compliant": {
+				APIName:  "Test Mixed ANDOR Compliant",
+				APIID:    "test-mixed-andor-compliant",
+				Versions: []string{"default"},
+			},
+		}
+	})
+
+	apiKey := CreateSession(ts.Gw, func(s *user.SessionState) {
+		s.OrgID = ""
+		s.AccessRights = map[string]user.AccessDefinition{
+			"test-mixed-andor-compliant": {
+				APIName:  "Test Mixed ANDOR Compliant",
+				APIID:    "test-mixed-andor-compliant",
+				Versions: []string{"default"},
+			},
+		}
+	})
+
+	hmacKey := "mixed-hmac-key-compliant"
+	hmacSecret := "mixed-hmac-secret-compliant"
+	hmacSession := CreateStandardSession()
+	hmacSession.OrgID = ""
+	hmacSession.HMACEnabled = true
+	hmacSession.HmacSecret = hmacSecret
+	hmacSession.AccessRights = map[string]user.AccessDefinition{
+		"test-mixed-andor-compliant": {
+			APIName:  "Test Mixed ANDOR Compliant",
+			APIID:    "test-mixed-andor-compliant",
+			Versions: []string{"default"},
+		},
+	}
+	_ = ts.Gw.GlobalSessionManager.UpdateSession(hmacKey, hmacSession, 60, false)
+
+	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		spec.APIID = "test-mixed-andor-compliant"
+		spec.Name = "Test Mixed ANDOR Compliant"
+		spec.OrgID = ""
+		spec.Proxy.ListenPath = "/test-mixed-andor-compliant/"
+		spec.UseKeylessAccess = false
+
+		oasDoc := oas.OAS{}
+		oasDoc.T = openapi3.T{
+			OpenAPI: "3.0.3",
+			Info: &openapi3.Info{
+				Title:   spec.Name,
+				Version: "1.0.0",
+			},
+			Paths: openapi3.NewPaths(),
+			Components: &openapi3.Components{
+				SecuritySchemes: openapi3.SecuritySchemes{
+					"apikey": &openapi3.SecuritySchemeRef{
+						Value: &openapi3.SecurityScheme{
+							Type: "apiKey",
+							In:   "header",
+							Name: "X-API-Key",
+						},
+					},
+				},
+			},
+
+			Security: openapi3.SecurityRequirements{
+				openapi3.SecurityRequirement{"apikey": []string{}},
+			},
+		}
+
+		tykExtension := &oas.XTykAPIGateway{
+			Info: oas.Info{
+				ID:   spec.APIID,
+				Name: spec.Name,
+				State: oas.State{
+					Active: true,
+				},
+			},
+			Server: oas.Server{
+				ListenPath: oas.ListenPath{
+					Value: spec.Proxy.ListenPath,
+					Strip: true,
+				},
+				Authentication: &oas.Authentication{
+					Enabled:                true,
+					SecurityProcessingMode: oas.SecurityProcessingModeCompliant,
+
+					Security: [][]string{
+						{"jwt", "hmac"},
+						{"apikey"},
+					},
+					SecuritySchemes: oas.SecuritySchemes{
+						"jwt": &oas.JWT{
+							Enabled:           true,
+							Source:            base64.StdEncoding.EncodeToString([]byte(jwtRSAPubKey)),
+							SigningMethod:     "rsa",
+							IdentityBaseField: "user_id",
+							PolicyFieldName:   "policy_id",
+							DefaultPolicies:   []string{pID},
+							AuthSources: oas.AuthSources{
+								Header: &oas.AuthSource{
+									Enabled: true,
+									Name:    "Authorization",
+								},
+							},
+						},
+						"apikey": &oas.Token{
+							Enabled: func() *bool { b := true; return &b }(),
+							AuthSources: oas.AuthSources{
+								Header: &oas.AuthSource{
+									Enabled: true,
+									Name:    "X-API-Key",
+								},
+							},
+						},
+						"hmac": &oas.HMAC{
+							Enabled: true,
+							AuthSources: oas.AuthSources{
+								Header: &oas.AuthSource{
+									Enabled: true,
+									Name:    "X-HMAC-Signature",
+								},
+							},
+						},
+					},
+				},
+			},
+			Upstream: oas.Upstream{
+				URL: TestHttpAny,
+			},
+		}
+
+		oasDoc.SetTykExtension(tykExtension)
+		oasDoc.ExtractTo(spec.APIDefinition)
+		spec.IsOAS = true
+		spec.OAS = oasDoc
+
+		spec.EnableSignatureChecking = true
+		spec.HmacAllowedAlgorithms = []string{"hmac-sha1", "hmac-sha256"}
+	})
+
+	jwtToken := CreateJWKToken(func(t *jwt.Token) {
+		t.Claims.(jwt.MapClaims)["user_id"] = "mixed-compliant-user"
+		t.Claims.(jwt.MapClaims)["policy_id"] = pID
+		t.Claims.(jwt.MapClaims)["exp"] = time.Now().Add(time.Hour).Unix()
+	})
+
+	testCases := []test.TestCase{
+
+		{
+			Method: "GET",
+			Path:   "/test-mixed-andor-compliant/",
+			Headers: map[string]string{
+				"X-API-Key": apiKey,
+			},
+			Code: http.StatusOK,
+		},
+
+		{
+			Method: "GET",
+			Path:   "/test-mixed-andor-compliant/",
+			Headers: map[string]string{
+				"Authorization": "Bearer " + jwtToken,
+			},
+			Code: http.StatusUnauthorized,
+		},
+
+		{
+			Method: "GET",
+			Path:   "/test-mixed-andor-compliant/",
+			Headers: map[string]string{
+				"X-API-Key":     "invalid",
+				"Authorization": "Bearer " + jwtToken,
+			},
+			Code: http.StatusForbidden,
+		},
+
+		{
+			Method:  "GET",
+			Path:    "/test-mixed-andor-compliant/",
+			Headers: map[string]string{},
+			Code:    http.StatusUnauthorized,
+		},
+	}
+
+	ts.Run(t, testCases...)
+}
+
+func TestVendorExtension_ComplexCombination_LegacyMode(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		spec.APIID = "test-complex-legacy"
+		spec.Name = "Test Complex Legacy"
+		spec.OrgID = ""
+		spec.Proxy.ListenPath = "/test-complex-legacy/"
+		spec.UseKeylessAccess = false
+
+		oasDoc := oas.OAS{}
+		oasDoc.T = openapi3.T{
+			OpenAPI: "3.0.3",
+			Info: &openapi3.Info{
+				Title:   spec.Name,
+				Version: "1.0.0",
+			},
+			Paths: openapi3.NewPaths(),
+			Components: &openapi3.Components{
+				SecuritySchemes: openapi3.SecuritySchemes{
+					"oauth2": &openapi3.SecuritySchemeRef{
+						Value: &openapi3.SecurityScheme{
+							Type: "oauth2",
+							Flows: &openapi3.OAuthFlows{
+								ClientCredentials: &openapi3.OAuthFlow{
+									TokenURL: "https://example.com/oauth/token",
+									Scopes:   map[string]string{"read": "Read access"},
+								},
+							},
+						},
+					},
+				},
+			},
+			Security: openapi3.SecurityRequirements{
+				openapi3.SecurityRequirement{"oauth2": []string{"read"}},
+			},
+		}
+
+		tykExtension := &oas.XTykAPIGateway{
+			Info: oas.Info{
+				ID:   spec.APIID,
+				Name: spec.Name,
+				State: oas.State{
+					Active: true,
+				},
+			},
+			Server: oas.Server{
+				ListenPath: oas.ListenPath{
+					Value: spec.Proxy.ListenPath,
+					Strip: true,
+				},
+				Authentication: &oas.Authentication{
+					Enabled:                true,
+					SecurityProcessingMode: oas.SecurityProcessingModeLegacy,
+
+					Security: [][]string{
+						{"oauth2"},
+						{"hmac", "custom"},
+					},
+					SecuritySchemes: oas.SecuritySchemes{
+						"oauth2": &oas.OAuth{
+							Enabled: true,
+							AuthSources: oas.AuthSources{
+								Header: &oas.AuthSource{
+									Enabled: true,
+									Name:    "Authorization",
+								},
+							},
+						},
+						"hmac": &oas.HMAC{
+							Enabled: true,
+							AuthSources: oas.AuthSources{
+								Header: &oas.AuthSource{
+									Enabled: true,
+									Name:    "X-HMAC-Signature",
+								},
+							},
+						},
+						"custom": &oas.CustomPluginAuthentication{
+							Enabled: true,
+							AuthSources: oas.AuthSources{
+								Header: &oas.AuthSource{
+									Enabled: true,
+									Name:    "X-Custom-Auth",
+								},
+							},
+						},
+					},
+				},
+			},
+			Upstream: oas.Upstream{
+				URL: TestHttpAny,
+			},
+		}
+
+		oasDoc.SetTykExtension(tykExtension)
+		oasDoc.ExtractTo(spec.APIDefinition)
+		spec.IsOAS = true
+		spec.OAS = oasDoc
+
+		spec.UseOauth2 = true
+	})
+
+	testCases := []test.TestCase{
+
+		{
+			Method:  "GET",
+			Path:    "/test-complex-legacy/",
+			Headers: map[string]string{},
+			Code:    http.StatusBadRequest,
+		},
+
+		{
+			Method: "GET",
+			Path:   "/test-complex-legacy/",
+			Headers: map[string]string{
+				"Authorization": "Bearer invalid-oauth-token",
+			},
+			Code: http.StatusForbidden,
+		},
+
+		{
+			Method: "GET",
+			Path:   "/test-complex-legacy/",
+			Headers: map[string]string{
+				"X-HMAC-Signature": "some-signature",
+				"X-Custom-Auth":    "custom-token",
+			},
+			Code: http.StatusBadRequest,
+		},
+	}
+
+	ts.Run(t, testCases...)
+}
+
+func TestVendorExtension_ComplexCombination_CompliantMode(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	hmacKey := "complex-hmac-key"
+	hmacSecret := "complex-hmac-secret"
+	hmacSession := CreateStandardSession()
+	hmacSession.OrgID = ""
+	hmacSession.HMACEnabled = true
+	hmacSession.HmacSecret = hmacSecret
+	hmacSession.AccessRights = map[string]user.AccessDefinition{
+		"test-complex-compliant": {
+			APIName:  "Test Complex Compliant",
+			APIID:    "test-complex-compliant",
+			Versions: []string{"default"},
+		},
+	}
+	_ = ts.Gw.GlobalSessionManager.UpdateSession(hmacKey, hmacSession, 60, false)
+
+	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		spec.APIID = "test-complex-compliant"
+		spec.Name = "Test Complex Compliant"
+		spec.OrgID = ""
+		spec.Proxy.ListenPath = "/test-complex-compliant/"
+		spec.UseKeylessAccess = false
+
+		oasDoc := oas.OAS{}
+		oasDoc.T = openapi3.T{
+			OpenAPI: "3.0.3",
+			Info: &openapi3.Info{
+				Title:   spec.Name,
+				Version: "1.0.0",
+			},
+			Paths: openapi3.NewPaths(),
+		}
+
+		tykExtension := &oas.XTykAPIGateway{
+			Info: oas.Info{
+				ID:   spec.APIID,
+				Name: spec.Name,
+				State: oas.State{
+					Active: true,
+				},
+			},
+			Server: oas.Server{
+				ListenPath: oas.ListenPath{
+					Value: spec.Proxy.ListenPath,
+					Strip: true,
+				},
+				Authentication: &oas.Authentication{
+					Enabled:                true,
+					SecurityProcessingMode: oas.SecurityProcessingModeCompliant,
+					Security: [][]string{
+						{"oauth2"},
+						{"hmac", "custom"},
+					},
+					SecuritySchemes: oas.SecuritySchemes{
+						"oauth2": &oas.OAuth{
+							Enabled: true,
+							AuthSources: oas.AuthSources{
+								Header: &oas.AuthSource{
+									Enabled: true,
+									Name:    "Authorization",
+								},
+							},
+						},
+						"hmac": &oas.HMAC{
+							Enabled: true,
+							AuthSources: oas.AuthSources{
+								Header: &oas.AuthSource{
+									Enabled: true,
+									Name:    "Authorization",
+								},
+							},
+						},
+						"custom": &oas.CustomPluginAuthentication{
+							Enabled: true,
+							AuthSources: oas.AuthSources{
+								Header: &oas.AuthSource{
+									Enabled: true,
+									Name:    "X-Custom-Auth",
+								},
+							},
+						},
+					},
+				},
+			},
+			Upstream: oas.Upstream{
+				URL: TestHttpAny,
+			},
+		}
+
+		oasDoc.SetTykExtension(tykExtension)
+		oasDoc.ExtractTo(spec.APIDefinition)
+		spec.IsOAS = true
+		spec.OAS = oasDoc
+
+		spec.UseOauth2 = true
+		spec.EnableSignatureChecking = true
+		spec.HmacAllowedAlgorithms = []string{"hmac-sha1", "hmac-sha256"}
+		spec.CustomPluginAuthEnabled = true
+	})
+
+	testCases := []test.TestCase{
+
+		{
+			Method: "GET",
+			Path:   "/test-complex-compliant/",
+			Headers: map[string]string{
+				"Authorization": "Bearer invalid-oauth",
+			},
+			Code: http.StatusForbidden,
+		},
+
+		{
+			Method: "GET",
+			Path:   "/test-complex-compliant/",
+			Headers: map[string]string{
+				"Authorization": "HMAC some-signature",
+			},
+			Code: http.StatusBadRequest,
+		},
+
+		{
+			Method: "GET",
+			Path:   "/test-complex-compliant/",
+			Headers: map[string]string{
+				"X-Custom-Auth": "custom-token",
+			},
+			Code: http.StatusBadRequest,
+		},
+
+		{
+			Method:  "GET",
+			Path:    "/test-complex-compliant/",
+			Headers: map[string]string{},
+			Code:    http.StatusBadRequest,
+		},
+	}
+
+	ts.Run(t, testCases...)
+}
+
+func TestVendorExtension_EmptyOAS_LegacyMode(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	hmacKey := "empty-oas-hmac-key"
+	hmacSecret := "empty-oas-hmac-secret"
+	hmacSession := CreateStandardSession()
+	hmacSession.OrgID = ""
+	hmacSession.HMACEnabled = true
+	hmacSession.HmacSecret = hmacSecret
+	hmacSession.AccessRights = map[string]user.AccessDefinition{
+		"test-empty-oas-legacy": {
+			APIName:  "Test Empty OAS Legacy",
+			APIID:    "test-empty-oas-legacy",
+			Versions: []string{"default"},
+		},
+	}
+	_ = ts.Gw.GlobalSessionManager.UpdateSession(hmacKey, hmacSession, 60, false)
+
+	apiKey := CreateSession(ts.Gw, func(s *user.SessionState) {
+		s.OrgID = ""
+		s.AccessRights = map[string]user.AccessDefinition{
+			"test-empty-oas-legacy": {
+				APIName:  "Test Empty OAS Legacy",
+				APIID:    "test-empty-oas-legacy",
+				Versions: []string{"default"},
+			},
+		}
+	})
+
+	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		spec.APIID = "test-empty-oas-legacy"
+		spec.Name = "Test Empty OAS Legacy"
+		spec.OrgID = ""
+		spec.Proxy.ListenPath = "/test-empty-oas-legacy/"
+		spec.UseKeylessAccess = false
+
+		oasDoc := oas.OAS{}
+		oasDoc.T = openapi3.T{
+			OpenAPI: "3.0.3",
+			Info: &openapi3.Info{
+				Title:   spec.Name,
+				Version: "1.0.0",
+			},
+			Paths: openapi3.NewPaths(),
+		}
+
+		tykExtension := &oas.XTykAPIGateway{
+			Info: oas.Info{
+				ID:   spec.APIID,
+				Name: spec.Name,
+				State: oas.State{
+					Active: true,
+				},
+			},
+			Server: oas.Server{
+				ListenPath: oas.ListenPath{
+					Value: spec.Proxy.ListenPath,
+					Strip: true,
+				},
+				Authentication: &oas.Authentication{
+					Enabled:                true,
+					SecurityProcessingMode: oas.SecurityProcessingModeLegacy,
+
+					Security: [][]string{
+						{"hmac"},
+						{"apikey"}, // Ignored in legacy
+					},
+					SecuritySchemes: oas.SecuritySchemes{
+						"hmac": &oas.HMAC{
+							Enabled: true,
+							AuthSources: oas.AuthSources{
+								Header: &oas.AuthSource{
+									Enabled: true,
+									Name:    "Authorization",
+								},
+							},
+						},
+						"apikey": &oas.Token{
+							Enabled: func() *bool { b := true; return &b }(),
+							AuthSources: oas.AuthSources{
+								Header: &oas.AuthSource{
+									Enabled: true,
+									Name:    "X-API-Key",
+								},
+							},
+						},
+					},
+				},
+			},
+			Upstream: oas.Upstream{
+				URL: TestHttpGet,
+			},
+		}
+
+		oasDoc.SetTykExtension(tykExtension)
+		oasDoc.ExtractTo(spec.APIDefinition)
+		spec.IsOAS = true
+		spec.OAS = oasDoc
+
+		spec.EnableSignatureChecking = true
+		spec.HmacAllowedAlgorithms = []string{"hmac-sha1", "hmac-sha256"}
+	})
+
+	testCases := []test.TestCase{
+
+		{
+			Method: "GET",
+			Path:   "/test-empty-oas-legacy/",
+			Headers: map[string]string{
+				"X-API-Key": apiKey,
+			},
+			Code: http.StatusBadRequest,
+		},
+
+		{
+			Method:  "GET",
+			Path:    "/test-empty-oas-legacy/",
+			Headers: map[string]string{},
+			Code:    http.StatusBadRequest,
+		},
+	}
+
+	t.Run("Valid HMAC in legacy mode with empty OAS", func(t *testing.T) {
+		date := time.Now().Format("Mon, 02 Jan 2006 15:04:05 MST")
+		headers := map[string]string{
+			"Date": date,
+		}
+
+		signature := generateHMACSignature("GET", "/test-empty-oas-legacy/", headers, hmacSecret, "hmac-sha1")
+		authHeader := fmt.Sprintf(`Signature keyId="%s",algorithm="hmac-sha1",headers="(request-target) date",signature="%s"`, hmacKey, signature)
+
+		testCase := test.TestCase{
+			Method: "GET",
+			Path:   "/test-empty-oas-legacy/",
+			Headers: map[string]string{
+				"Date":          date,
+				"Authorization": authHeader,
+			},
+			Code: http.StatusOK,
+		}
+
+		ts.Run(t, testCase)
+	})
+
+	ts.Run(t, testCases...)
+}
+
+func TestVendorExtension_EmptyOAS_CompliantMode(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	hmacKey := "empty-oas-hmac-compliant"
+	hmacSecret := "empty-oas-secret-compliant"
+	hmacSession := CreateStandardSession()
+	hmacSession.OrgID = ""
+	hmacSession.HMACEnabled = true
+	hmacSession.HmacSecret = hmacSecret
+	hmacSession.AccessRights = map[string]user.AccessDefinition{
+		"test-empty-oas-compliant": {
+			APIName:  "Test Empty OAS Compliant",
+			APIID:    "test-empty-oas-compliant",
+			Versions: []string{"default"},
+		},
+	}
+	_ = ts.Gw.GlobalSessionManager.UpdateSession(hmacKey, hmacSession, 60, false)
+
+	apiKey := CreateSession(ts.Gw, func(s *user.SessionState) {
+		s.OrgID = ""
+		s.AccessRights = map[string]user.AccessDefinition{
+			"test-empty-oas-compliant": {
+				APIName:  "Test Empty OAS Compliant",
+				APIID:    "test-empty-oas-compliant",
+				Versions: []string{"default"},
+			},
+		}
+	})
+
+	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		spec.APIID = "test-empty-oas-compliant"
+		spec.Name = "Test Empty OAS Compliant"
+		spec.OrgID = ""
+		spec.Proxy.ListenPath = "/test-empty-oas-compliant/"
+		spec.UseKeylessAccess = false
+
+		oasDoc := oas.OAS{}
+		oasDoc.T = openapi3.T{
+			OpenAPI: "3.0.3",
+			Info: &openapi3.Info{
+				Title:   spec.Name,
+				Version: "1.0.0",
+			},
+			Paths: openapi3.NewPaths(),
+		}
+
+		tykExtension := &oas.XTykAPIGateway{
+			Info: oas.Info{
+				ID:   spec.APIID,
+				Name: spec.Name,
+				State: oas.State{
+					Active: true,
+				},
+			},
+			Server: oas.Server{
+				ListenPath: oas.ListenPath{
+					Value: spec.Proxy.ListenPath,
+					Strip: true,
+				},
+				Authentication: &oas.Authentication{
+					Enabled:                true,
+					SecurityProcessingMode: oas.SecurityProcessingModeCompliant,
+
+					Security: [][]string{
+						{"hmac"},
+						{"apikey"},
+					},
+					SecuritySchemes: oas.SecuritySchemes{
+						"hmac": &oas.HMAC{
+							Enabled: true,
+							AuthSources: oas.AuthSources{
+								Header: &oas.AuthSource{
+									Enabled: true,
+									Name:    "Authorization",
+								},
+							},
+						},
+						"apikey": &oas.Token{
+							Enabled: func() *bool { b := true; return &b }(),
+							AuthSources: oas.AuthSources{
+								Header: &oas.AuthSource{
+									Enabled: true,
+									Name:    "X-API-Key",
+								},
+							},
+						},
+					},
+				},
+			},
+			Upstream: oas.Upstream{
+				URL: TestHttpGet,
+			},
+		}
+
+		oasDoc.SetTykExtension(tykExtension)
+		oasDoc.ExtractTo(spec.APIDefinition)
+		spec.IsOAS = true
+		spec.OAS = oasDoc
+
+		spec.EnableSignatureChecking = true
+		spec.HmacAllowedAlgorithms = []string{"hmac-sha1", "hmac-sha256"}
+	})
+
+	testCases := []test.TestCase{
+
+		{
+			Method: "GET",
+			Path:   "/test-empty-oas-compliant/",
+			Headers: map[string]string{
+				"X-API-Key": apiKey,
+			},
+			Code: http.StatusBadRequest,
+		},
+
+		{
+			Method: "GET",
+			Path:   "/test-empty-oas-compliant/",
+			Headers: map[string]string{
+				"X-API-Key": "invalid",
+			},
+			Code: http.StatusBadRequest,
+		},
+
+		{
+			Method:  "GET",
+			Path:    "/test-empty-oas-compliant/",
+			Headers: map[string]string{},
+			Code:    http.StatusBadRequest,
+		},
+	}
+
+	t.Run("Valid HMAC in compliant mode with empty OAS", func(t *testing.T) {
+		date := time.Now().Format("Mon, 02 Jan 2006 15:04:05 MST")
+		headers := map[string]string{
+			"Date": date,
+		}
+
+		signature := generateHMACSignature("GET", "/test-empty-oas-compliant/", headers, hmacSecret, "hmac-sha1")
+		authHeader := fmt.Sprintf(`Signature keyId="%s",algorithm="hmac-sha1",headers="(request-target) date",signature="%s"`, hmacKey, signature)
+
+		testCase := test.TestCase{
+			Method: "GET",
+			Path:   "/test-empty-oas-compliant/",
+			Headers: map[string]string{
+				"Date":          date,
+				"Authorization": authHeader,
+			},
+			Code: http.StatusOK,
+		}
+
+		ts.Run(t, testCase)
+	})
+
+	t.Run("Invalid HMAC but valid API key in compliant mode", func(t *testing.T) {
+		testCase := test.TestCase{
+			Method: "GET",
+			Path:   "/test-empty-oas-compliant/",
+			Headers: map[string]string{
+				"Authorization": `Signature keyId="wrong",algorithm="hmac-sha1",signature="invalid"`,
+				"X-API-Key":     apiKey,
+			},
+			Code: http.StatusBadRequest,
+		}
+
+		ts.Run(t, testCase)
+	})
+
+	ts.Run(t, testCases...)
+}
+
+func TestMultiAuthMiddleware_AND_Within_OR_Groups(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	// Create JWT policy
+	pID := ts.CreatePolicy(func(p *user.Policy) {
+		p.OrgID = ""
+		p.AccessRights = map[string]user.AccessDefinition{
+			"test-and-within-or": {
+				APIName:  "Test AND Within OR",
+				APIID:    "test-and-within-or",
+				Versions: []string{"default"},
+			},
+		}
+	})
+
+	// Create API key session
+	apiKey := CreateSession(ts.Gw, func(s *user.SessionState) {
+		s.OrgID = ""
+		s.AccessRights = map[string]user.AccessDefinition{
+			"test-and-within-or": {
+				APIName:  "Test AND Within OR",
+				APIID:    "test-and-within-or",
+				Versions: []string{"default"},
+			},
+		}
+	})
+
+	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		spec.APIID = "test-and-within-or"
+		spec.Name = "Test AND Within OR"
+		spec.OrgID = ""
+		spec.Proxy.ListenPath = "/test-and-within-or/"
+		spec.UseKeylessAccess = false
+
+		// Create OAS with JWT and authToken
+		oasDoc := oas.OAS{}
+		oasDoc.T = openapi3.T{
+			OpenAPI: "3.0.3",
+			Info: &openapi3.Info{
+				Title:   spec.Name,
+				Version: "1.0.0",
+			},
+			Paths: openapi3.NewPaths(),
+			Components: &openapi3.Components{
+				SecuritySchemes: openapi3.SecuritySchemes{
+					"jwtAuth": &openapi3.SecuritySchemeRef{
+						Value: &openapi3.SecurityScheme{
+							Type:         "http",
+							Scheme:       "bearer",
+							BearerFormat: "JWT",
+						},
+					},
+					"authToken": &openapi3.SecuritySchemeRef{
+						Value: &openapi3.SecurityScheme{
+							Type: "apiKey",
+							In:   "header",
+							Name: "Authorization1",
+						},
+					},
+				},
+			},
+			// CRITICAL: Security requirements define (JWT AND authToken) OR (JWT only)
+			Security: openapi3.SecurityRequirements{
+				openapi3.SecurityRequirement{
+					"jwtAuth":   []string{}, // Group 1: JWT AND authToken
+					"authToken": []string{},
+				},
+				openapi3.SecurityRequirement{
+					"jwtAuth": []string{}, // Group 2: JWT only
+				},
+			},
+		}
+
+		tykExtension := &oas.XTykAPIGateway{
+			Info: oas.Info{
+				ID:   spec.APIID,
+				Name: spec.Name,
+				State: oas.State{
+					Active: true,
+				},
+			},
+			Server: oas.Server{
+				ListenPath: oas.ListenPath{
+					Value: spec.Proxy.ListenPath,
+					Strip: true,
+				},
+				Authentication: &oas.Authentication{
+					Enabled:                true,
+					SecurityProcessingMode: oas.SecurityProcessingModeCompliant,
+					SecuritySchemes: oas.SecuritySchemes{
+						"jwtAuth": &oas.JWT{
+							Enabled:           true,
+							Source:            base64.StdEncoding.EncodeToString([]byte(jwtRSAPubKey)),
+							SigningMethod:     "rsa",
+							IdentityBaseField: "user_id",
+							DefaultPolicies:   []string{pID},
+							AuthSources: oas.AuthSources{
+								Header: &oas.AuthSource{
+									Enabled: true,
+									Name:    "Authorization",
+								},
+							},
+						},
+						"authToken": &oas.Token{
+							Enabled: func() *bool { b := true; return &b }(),
+							AuthSources: oas.AuthSources{
+								Header: &oas.AuthSource{
+									Enabled: true,
+									Name:    "Authorization1",
+								},
+							},
+						},
+					},
+				},
+			},
+			Upstream: oas.Upstream{
+				URL: TestHttpAny,
+			},
+		}
+
+		oasDoc.SetTykExtension(tykExtension)
+		oasDoc.ExtractTo(spec.APIDefinition)
+		spec.IsOAS = true
+		spec.OAS = oasDoc
+	})
+
+	// Create JWT token
+	jwtToken := CreateJWKToken(func(t *jwt.Token) {
+		t.Claims.(jwt.MapClaims)["user_id"] = "test-user"
+		t.Claims.(jwt.MapClaims)["exp"] = time.Now().Add(time.Hour).Unix()
+	})
+
+	// Test cases - THIS IS THE CRITICAL TEST
+	testCases := []test.TestCase{
+		// Test 1: JWT + authToken should succeed (satisfies Group 1: JWT AND authToken)
+		{
+			Method: "GET",
+			Path:   "/test-and-within-or/",
+			Headers: map[string]string{
+				"Authorization":  "Bearer " + jwtToken,
+				"Authorization1": apiKey,
+			},
+			Code: http.StatusOK,
+		},
+		// Test 2: JWT only should succeed (satisfies Group 2: JWT only)
+		{
+			Method: "GET",
+			Path:   "/test-and-within-or/",
+			Headers: map[string]string{
+				"Authorization": "Bearer " + jwtToken,
+			},
+			Code: http.StatusOK,
+		},
+		// Test 3: CRITICAL - authToken only should FAIL (doesn't satisfy either group)
+		// Group 1 fails because JWT is missing
+		// Group 2 fails because JWT is missing
+		{
+			Method: "GET",
+			Path:   "/test-and-within-or/",
+			Headers: map[string]string{
+				"Authorization1": apiKey,
+			},
+			Code:      http.StatusBadRequest,
+			BodyMatch: "Authorization field missing",
+		},
+		// Test 4: No credentials should fail
+		{
+			Method:    "GET",
+			Path:      "/test-and-within-or/",
+			Headers:   map[string]string{},
+			Code:      http.StatusBadRequest,
+			BodyMatch: "Authorization field missing",
+		},
+		// Test 5: Invalid JWT + valid authToken should fail (Group 1 fails on JWT validation)
+		{
+			Method: "GET",
+			Path:   "/test-and-within-or/",
+			Headers: map[string]string{
+				"Authorization":  "Bearer invalid-token",
+				"Authorization1": apiKey,
+			},
+			Code: http.StatusForbidden,
+		},
+		// Test 6: Valid JWT + invalid authToken should succeed (Group 2: JWT only)
+		// This tests that when Group 1 fails on authToken, it tries Group 2
+		{
+			Method: "GET",
+			Path:   "/test-and-within-or/",
+			Headers: map[string]string{
+				"Authorization":  "Bearer " + jwtToken,
+				"Authorization1": "invalid-key",
+			},
+			Code: http.StatusOK,
+		},
+	}
+
+	ts.Run(t, testCases...)
+}
+
+// TestAuthORWrapper_OAuth2_Internal tests OAuth2 scheme detection for internal OAuth
+func TestAuthORWrapper_OAuth2_Internal(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	apiKey := CreateSession(ts.Gw, func(s *user.SessionState) {
+		s.AccessRights = map[string]user.AccessDefinition{
+			"test-oauth2-internal": {
+				APIName:  "Test OAuth2 Internal",
+				APIID:    "test-oauth2-internal",
+				Versions: []string{"default"},
+			},
+		}
+	})
+
+	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		spec.APIID = "test-oauth2-internal"
+		spec.Name = "Test OAuth2 Internal"
+		spec.Proxy.ListenPath = "/test-oauth2-internal/"
+		spec.UseKeylessAccess = false
+
+		oasDoc := oas.OAS{}
+		oasDoc.T = openapi3.T{
+			OpenAPI: "3.0.3",
+			Info: &openapi3.Info{
+				Title:   spec.Name,
+				Version: "1.0.0",
+			},
+			Paths: openapi3.NewPaths(),
+			Components: &openapi3.Components{
+				SecuritySchemes: openapi3.SecuritySchemes{
+					"oauth2": &openapi3.SecuritySchemeRef{
+						Value: &openapi3.SecurityScheme{
+							Type: "oauth2",
+							Flows: &openapi3.OAuthFlows{
+								ClientCredentials: &openapi3.OAuthFlow{
+									TokenURL: "https://example.com/token",
+								},
+							},
+						},
+					},
+					"apiKeyAuth": &openapi3.SecuritySchemeRef{
+						Value: &openapi3.SecurityScheme{
+							Type: "apiKey",
+							In:   "header",
+							Name: "X-API-Key",
+						},
+					},
+				},
+			},
+			Security: openapi3.SecurityRequirements{
+				openapi3.SecurityRequirement{"oauth2": []string{}},
+				openapi3.SecurityRequirement{"apiKeyAuth": []string{}},
+			},
+		}
+
+		tykExtension := &oas.XTykAPIGateway{
+			Info: oas.Info{
+				ID:   spec.APIID,
+				Name: spec.Name,
+				State: oas.State{
+					Active: true,
+				},
+			},
+			Server: oas.Server{
+				ListenPath: oas.ListenPath{
+					Value: spec.Proxy.ListenPath,
+					Strip: true,
+				},
+				Authentication: &oas.Authentication{
+					Enabled:                true,
+					SecurityProcessingMode: oas.SecurityProcessingModeCompliant,
+					SecuritySchemes: oas.SecuritySchemes{
+						"oauth2": &oas.OAuth{
+							Enabled: true,
+							AuthSources: oas.AuthSources{
+								Header: &oas.AuthSource{
+									Enabled: true,
+									Name:    "Authorization",
+								},
+							},
+						},
+						"apiKeyAuth": &oas.Token{
+							Enabled: func() *bool { b := true; return &b }(),
+							AuthSources: oas.AuthSources{
+								Header: &oas.AuthSource{
+									Enabled: true,
+									Name:    "X-API-Key",
+								},
+							},
+						},
+					},
+				},
+			},
+			Upstream: oas.Upstream{
+				URL: TestHttpAny,
+			},
+		}
+
+		oasDoc.SetTykExtension(tykExtension)
+		oasDoc.ExtractTo(spec.APIDefinition)
+		spec.IsOAS = true
+		spec.OAS = oasDoc
+	})
+
+	testCases := []test.TestCase{
+		{
+			Method: "GET",
+			Path:   "/test-oauth2-internal/",
+			Headers: map[string]string{
+				"X-API-Key": apiKey,
+			},
+			Code: http.StatusOK,
+		},
+	}
+
+	ts.Run(t, testCases...)
+}
+
+// TestAuthORWrapper_findMiddlewareByType tests the findMiddlewareByType helper function
+func TestAuthORWrapper_findMiddlewareByType(t *testing.T) {
+	wrapper := &AuthORWrapper{
+		authMiddlewares: []TykMiddleware{
+			&JWTMiddleware{},
+			&AuthKey{},
+			&BasicAuthKeyIsValid{},
+			&Oauth2KeyExists{},
+		},
+	}
+
+	tests := []struct {
+		name     string
+		example  TykMiddleware
+		expected bool
+	}{
+		{
+			name:     "Find JWT middleware",
+			example:  &JWTMiddleware{},
+			expected: true,
+		},
+		{
+			name:     "Find AuthKey middleware",
+			example:  &AuthKey{},
+			expected: true,
+		},
+		{
+			name:     "Find BasicAuth middleware",
+			example:  &BasicAuthKeyIsValid{},
+			expected: true,
+		},
+		{
+			name:     "Find OAuth2 middleware",
+			example:  &Oauth2KeyExists{},
+			expected: true,
+		},
+		{
+			name:     "Middleware not in list",
+			example:  &HTTPSignatureValidationMiddleware{},
+			expected: false,
+		},
+		{
+			name:     "External OAuth not in list",
+			example:  &ExternalOAuthMiddleware{},
+			expected: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := wrapper.findMiddlewareByType(tt.example)
+			if tt.expected && result == nil {
+				t.Errorf("Expected to find middleware %T, but got nil", tt.example)
+			}
+			if !tt.expected && result != nil {
+				t.Errorf("Expected nil for middleware %T, but found %T", tt.example, result)
+			}
+		})
+	}
+}
+
+// TestAuthORWrapper_getMiddlewareForScheme tests the getMiddlewareForScheme function
+func TestAuthORWrapper_getMiddlewareForScheme(t *testing.T) {
+	tests := []struct {
+		name        string
+		setupSpec   func(*APISpec)
+		schemeName  string
+		expectFound bool
+		expectType  string
+	}{
+		{
+			name: "JWT scheme - standard OAS",
+			setupSpec: func(spec *APISpec) {
+				spec.EnableJWT = true
+				spec.IsOAS = true
+				spec.OAS.T.Components = &openapi3.Components{
+					SecuritySchemes: openapi3.SecuritySchemes{
+						"jwtAuth": &openapi3.SecuritySchemeRef{
+							Value: &openapi3.SecurityScheme{
+								Type:         "http",
+								Scheme:       "bearer",
+								BearerFormat: "JWT",
+							},
+						},
+					},
+				}
+			},
+			schemeName:  "jwtAuth",
+			expectFound: true,
+			expectType:  "*gateway.JWTMiddleware",
+		},
+		{
+			name: "API Key scheme - standard OAS",
+			setupSpec: func(spec *APISpec) {
+				spec.UseStandardAuth = true
+				spec.IsOAS = true
+				spec.OAS.T.Components = &openapi3.Components{
+					SecuritySchemes: openapi3.SecuritySchemes{
+						"apiKeyAuth": &openapi3.SecuritySchemeRef{
+							Value: &openapi3.SecurityScheme{
+								Type: "apiKey",
+								In:   "header",
+								Name: "X-API-Key",
+							},
+						},
+					},
+				}
+			},
+			schemeName:  "apiKeyAuth",
+			expectFound: true,
+			expectType:  "*gateway.AuthKey",
+		},
+		{
+			name: "Basic Auth scheme - standard OAS",
+			setupSpec: func(spec *APISpec) {
+				spec.UseBasicAuth = true
+				spec.IsOAS = true
+				spec.OAS.T.Components = &openapi3.Components{
+					SecuritySchemes: openapi3.SecuritySchemes{
+						"basicAuth": &openapi3.SecuritySchemeRef{
+							Value: &openapi3.SecurityScheme{
+								Type:   "http",
+								Scheme: "basic",
+							},
+						},
+					},
+				}
+			},
+			schemeName:  "basicAuth",
+			expectFound: true,
+			expectType:  "*gateway.BasicAuthKeyIsValid",
+		},
+		{
+			name: "OAuth2 internal scheme - standard OAS",
+			setupSpec: func(spec *APISpec) {
+				spec.UseOauth2 = true
+				spec.IsOAS = true
+				spec.OAS.T.Components = &openapi3.Components{
+					SecuritySchemes: openapi3.SecuritySchemes{
+						"oauth2": &openapi3.SecuritySchemeRef{
+							Value: &openapi3.SecurityScheme{
+								Type: "oauth2",
+							},
+						},
+					},
+				}
+			},
+			schemeName:  "oauth2",
+			expectFound: true,
+			expectType:  "*gateway.Oauth2KeyExists",
+		},
+		{
+			name: "OAuth2 external scheme - standard OAS",
+			setupSpec: func(spec *APISpec) {
+				spec.ExternalOAuth.Enabled = true
+				spec.IsOAS = true
+				spec.OAS.T.Components = &openapi3.Components{
+					SecuritySchemes: openapi3.SecuritySchemes{
+						"oauth2": &openapi3.SecuritySchemeRef{
+							Value: &openapi3.SecurityScheme{
+								Type: "oauth2",
+							},
+						},
+					},
+				}
+			},
+			schemeName:  "oauth2",
+			expectFound: true,
+			expectType:  "*gateway.ExternalOAuthMiddleware",
+		},
+		{
+			name: "HMAC scheme - Tyk vendor extension",
+			setupSpec: func(spec *APISpec) {
+				spec.EnableSignatureChecking = true
+				spec.IsOAS = true
+
+				tykExt := &oas.XTykAPIGateway{
+					Server: oas.Server{
+						Authentication: &oas.Authentication{
+							SecuritySchemes: oas.SecuritySchemes{
+								"hmacAuth": &oas.HMAC{
+									Enabled: true,
+								},
+							},
+						},
+					},
+				}
+				spec.OAS.SetTykExtension(tykExt)
+			},
+			schemeName:  "hmacAuth",
+			expectFound: true,
+			expectType:  "*gateway.HTTPSignatureValidationMiddleware",
+		},
+		{
+			name: "OpenID scheme - Tyk vendor extension",
+			setupSpec: func(spec *APISpec) {
+				spec.UseOpenID = true
+				spec.IsOAS = true
+
+				tykExt := &oas.XTykAPIGateway{
+					Server: oas.Server{
+						Authentication: &oas.Authentication{
+							SecuritySchemes: oas.SecuritySchemes{
+								"oidcAuth": &oas.OIDC{
+									Enabled: true,
+								},
+							},
+						},
+					},
+				}
+				spec.OAS.SetTykExtension(tykExt)
+			},
+			schemeName:  "oidcAuth",
+			expectFound: true,
+			expectType:  "*gateway.OpenIDMW",
+		},
+		{
+			name: "Non-OAS spec returns nil",
+			setupSpec: func(spec *APISpec) {
+				spec.IsOAS = false
+			},
+			schemeName:  "anyScheme",
+			expectFound: false,
+		},
+		{
+			name: "Scheme not found in OAS",
+			setupSpec: func(spec *APISpec) {
+				spec.IsOAS = true
+				spec.OAS.T.Components = &openapi3.Components{
+					SecuritySchemes: openapi3.SecuritySchemes{},
+				}
+			},
+			schemeName:  "nonExistentScheme",
+			expectFound: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ts := StartTest(nil)
+			defer ts.Close()
+
+			// Create spec
+			spec := &APISpec{
+				APIDefinition: &apidef.APIDefinition{},
+				OAS:           oas.OAS{T: openapi3.T{}},
+			}
+
+			// Setup spec
+			tt.setupSpec(spec)
+
+			// Create wrapper with properly initialized base middleware
+			wrapper := &AuthORWrapper{
+				BaseMiddleware: BaseMiddleware{
+					Spec:   spec,
+					Gw:     ts.Gw,
+					logger: log.WithField("mw", "AuthORWrapper"),
+				},
+			}
+
+			// Initialize middlewares based on spec settings
+			wrapper.Init()
+
+			// Test getMiddlewareForScheme
+			result := wrapper.getMiddlewareForScheme(tt.schemeName)
+
+			if tt.expectFound {
+				if result == nil {
+					t.Errorf("Expected to find middleware for scheme %s, but got nil", tt.schemeName)
+				} else {
+					actualType := fmt.Sprintf("%T", result)
+					if actualType != tt.expectType {
+						t.Errorf("Expected middleware type %s for scheme %s, but got %s", tt.expectType, tt.schemeName, actualType)
+					}
+				}
+			} else {
+				if result != nil {
+					t.Errorf("Expected nil for scheme %s, but got %T", tt.schemeName, result)
+				}
+			}
+		})
+	}
 }
