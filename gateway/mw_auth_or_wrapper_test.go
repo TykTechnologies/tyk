@@ -2531,8 +2531,6 @@ func TestJWTWithTykExtensionButNoComponents(t *testing.T) {
 
 	ts.Run(t, testCases...)
 }
-<<<<<<< HEAD
-=======
 
 func TestMultiAuthMiddleware_OR_CompliantMode_JWT_Second(t *testing.T) {
 	ts := StartTest(nil)
@@ -4336,4 +4334,3 @@ func TestAuthORWrapper_getMiddlewareForScheme(t *testing.T) {
 		})
 	}
 }
->>>>>>> 8721d7764... [TT-15901] Adding AND support for auth method groups (#7399)
