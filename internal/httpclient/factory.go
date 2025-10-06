@@ -15,6 +15,7 @@ import (
 	"github.com/TykTechnologies/tyk/certs"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/go-jose/go-jose/v3"
+	"github.com/sirupsen/logrus"
 )
 
 // Error types for proper error handling with errors.Is()
@@ -253,28 +254,42 @@ func (f *ExternalHTTPClientFactory) getProxyFunction(serviceConfig config.Servic
 // createCustomProxyFunc creates a custom proxy function based on the proxy configuration.
 func (f *ExternalHTTPClientFactory) createCustomProxyFunc(proxyConfig config.ProxyConfig) func(*http.Request) (*url.URL, error) {
 	return func(req *http.Request) (*url.URL, error) {
+		logrus.Debugf("[ExternalServices] Proxy function called for request: %s %s", req.Method, req.URL.String())
+
 		var proxyURL string
 
 		// Choose proxy based on scheme
 		if req.URL.Scheme == "https" && proxyConfig.HTTPSProxy != "" {
 			proxyURL = proxyConfig.HTTPSProxy
+			logrus.Debugf("[ExternalServices] Using HTTPS proxy: %s", proxyURL)
 		} else if req.URL.Scheme == "http" && proxyConfig.HTTPProxy != "" {
 			proxyURL = proxyConfig.HTTPProxy
+			logrus.Debugf("[ExternalServices] Using HTTP proxy: %s", proxyURL)
 		} else if proxyConfig.HTTPProxy != "" {
 			// Fallback to HTTP proxy
 			proxyURL = proxyConfig.HTTPProxy
+			logrus.Debugf("[ExternalServices] Using fallback HTTP proxy: %s", proxyURL)
 		}
 
 		if proxyURL == "" {
+			logrus.Debug("[ExternalServices] No proxy URL configured, returning nil")
 			return nil, nil // No proxy
 		}
 
 		// Check bypass proxy list
 		if f.shouldBypassProxy(req.URL.Host, proxyConfig.BypassProxy) {
+			logrus.Debugf("[ExternalServices] Host %s is in bypass list, skipping proxy", req.URL.Host)
 			return nil, nil
 		}
 
-		return url.Parse(proxyURL)
+		parsedURL, err := url.Parse(proxyURL)
+		if err != nil {
+			logrus.Errorf("[ExternalServices] Failed to parse proxy URL %s: %v", proxyURL, err)
+			return nil, err
+		}
+
+		logrus.Debugf("[ExternalServices] Returning proxy URL: %s", parsedURL.String())
+		return parsedURL, nil
 	}
 }
 
