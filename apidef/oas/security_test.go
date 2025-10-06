@@ -943,6 +943,116 @@ func TestOAS_extractSecurityTo_ORLogic(t *testing.T) {
 	})
 }
 
+func TestOAS_extractSecurityTo_VendorExtensionSecurity(t *testing.T) {
+	t.Run("should extract JWT from vendor extension security in compliant mode", func(t *testing.T) {
+		var oas OAS
+
+		// OAS-level security has authToken and jwtAuth as separate OR requirements
+		oas.Security = openapi3.SecurityRequirements{
+			{"authToken": []string{}},
+			{"jwtAuth": []string{}},
+		}
+
+		oas.Components = &openapi3.Components{
+			SecuritySchemes: openapi3.SecuritySchemes{
+				"authToken": &openapi3.SecuritySchemeRef{
+					Value: &openapi3.SecurityScheme{
+						Type: typeAPIKey,
+						In:   header,
+						Name: "AuthToken",
+					},
+				},
+				"jwtAuth": &openapi3.SecuritySchemeRef{
+					Value: &openapi3.SecurityScheme{
+						Type:         typeHTTP,
+						Scheme:       schemeBearer,
+						BearerFormat: bearerFormatJWT,
+					},
+				},
+			},
+		}
+
+		trueVal := true
+		oas.SetTykExtension(&XTykAPIGateway{
+			Server: Server{
+				Authentication: &Authentication{
+					Enabled:                true,
+					SecurityProcessingMode: SecurityProcessingModeCompliant,
+					SecuritySchemes: SecuritySchemes{
+						"authToken": &Token{Enabled: &trueVal},
+						"jwtAuth": &JWT{
+							Enabled:           true,
+							SigningMethod:     "hmac",
+							Source:            "c29tZXRoaW5n",
+							IdentityBaseField: "sub",
+							SubjectClaims:     []string{"sub"},
+							DefaultPolicies:   []string{},
+							BasePolicyClaims:  []string{},
+							AuthSources: AuthSources{
+								Header: &AuthSource{
+									Enabled: true,
+									Name:    "JWT",
+								},
+							},
+						},
+					},
+					HMAC: &HMAC{
+						Enabled:           true,
+						AllowedAlgorithms: []string{"hmac-sha256"},
+						AllowedClockSkew:  -1,
+						AuthSources: AuthSources{
+							Header: &AuthSource{
+								Enabled: true,
+								Name:    "HMAC",
+							},
+						},
+					},
+					// Vendor extension security: [hmac, jwtAuth] as AND requirement
+					Security: [][]string{
+						{"hmac", "jwtAuth"},
+					},
+				},
+			},
+		})
+
+		var api apidef.APIDefinition
+		oas.extractSecurityTo(&api)
+
+		// Verify JWT is enabled
+		assert.True(t, api.EnableJWT, "JWT should be enabled")
+
+		// Verify JWT auth config is created
+		jwtConfig, ok := api.AuthConfigs[apidef.JWTType]
+		assert.True(t, ok, "JWT auth config should exist in auth_configs")
+		assert.Equal(t, "jwtAuth", jwtConfig.Name)
+
+		// Verify JWT settings are extracted
+		assert.Equal(t, "hmac", api.JWTSigningMethod)
+		assert.Equal(t, "c29tZXRoaW5n", api.JWTSource)
+		assert.Equal(t, "sub", api.JWTIdentityBaseField)
+
+		// Verify HMAC is also enabled
+		assert.True(t, api.EnableSignatureChecking, "HMAC should be enabled")
+		hmacConfig, ok := api.AuthConfigs[apidef.HMACType]
+		assert.True(t, ok, "HMAC auth config should exist in auth_configs")
+		assert.Equal(t, "HMAC", hmacConfig.AuthHeaderName)
+		assert.Equal(t, []string{"hmac-sha256"}, api.HmacAllowedAlgorithms)
+		assert.Equal(t, float64(-1), api.HmacAllowedClockSkew)
+
+		// Verify authToken is also configured
+		tokenConfig, ok := api.AuthConfigs[apidef.AuthTokenType]
+		assert.True(t, ok, "Token auth config should exist in auth_configs")
+		assert.Equal(t, "authToken", tokenConfig.Name)
+		assert.True(t, api.UseStandardAuth, "Standard auth should be enabled")
+
+		// Verify security requirements include both OAS and vendor security
+		assert.Len(t, api.SecurityRequirements, 3, "Should have 3 security requirements")
+		assert.Contains(t, api.SecurityRequirements, []string{"authToken"})
+		assert.Contains(t, api.SecurityRequirements, []string{"jwtAuth"})
+		assert.Contains(t, api.SecurityRequirements, []string{"hmac", "jwtAuth"})
+	})
+}
+
 func TestOAS_GetJWTConfiguration_EmptySecurity(t *testing.T) {
 	t.Run("should return nil when Security array is nil", func(t *testing.T) {
 		var oas OAS

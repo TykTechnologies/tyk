@@ -1116,6 +1116,17 @@ func (s *OAS) extractSecurityTo(api *apidef.APIDefinition) {
 	if processingMode == SecurityProcessingModeCompliant && len(s.Security) > 0 {
 		// Process all requirements in compliant mode
 		requirementsToProcess = s.Security
+
+		// Also process vendor extension security requirements
+		if tykAuth != nil && len(tykAuth.Security) > 0 {
+			for _, vendorReq := range tykAuth.Security {
+				secReq := openapi3.NewSecurityRequirement()
+				for _, schemeName := range vendorReq {
+					secReq[schemeName] = []string{}
+				}
+				requirementsToProcess = append(requirementsToProcess, secReq)
+			}
+		}
 	} else if len(s.Security) > 0 && tykAuth != nil && (tykAuth.Enabled || hasEnabledSchemes) {
 		// Legacy mode - process first requirement if Tyk authentication is enabled OR has security schemes defined
 		requirementsToProcess = s.Security[:1]
