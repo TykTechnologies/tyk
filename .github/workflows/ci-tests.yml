@@ -70,20 +70,7 @@ jobs:
         run: |
           # Run linting without auto-fixing
           task lint-no-golangci
-          
-          git add --all
-          git diff HEAD > git-state.log
-          git_state_count=$(wc -l < git-state.log)
-          if [[ $git_state_count -ne 0 ]]
-          then
-            echo "git-state<<EOF" >> $GITHUB_OUTPUT
-            cat git-state.log >> $GITHUB_OUTPUT
-            echo "EOF" >> $GITHUB_OUTPUT
-            echo "task lint made git state dirty, please run task lint locally and update PR"
-            echo
-            cat git-state.log
-            exit 1
-          fi
+          task --exit-code lint:check-git-state MESSAGE="task lint made git state dirty, please run task lint locally and update PR"
           
           # Generate report for SonarCloud
           golangci-lint run --out-format colored-line-number,checkstyle:golangci-lint-report.json \
@@ -91,11 +78,12 @@ jobs:
 
       - name: golangci-lint-on-push
         if: ${{ github.event_name == 'push' }}
-        # Using the default config, reports stats to sonarcloud. No requirements on passing other than KPIs tracked in dev.
+        # Using the default config, reports stats to sonarcloud.
         run: |
           # Run linting without auto-fixing
           task lint-no-golangci
-          
+          task --exit-code lint:check-git-state MESSAGE="task lint made git state dirty, please run task lint locally and update PR"
+
           # Generate report for SonarCloud
           golangci-lint run --out-format checkstyle:golangci-lint-report.json -v ./...
 
