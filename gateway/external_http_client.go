@@ -65,10 +65,13 @@ func (f *ExternalHTTPClientFactory) CreateWebhookClient() (*http.Client, error) 
 		config.Webhooks.Proxy.HTTPProxy,
 		config.Webhooks.Proxy.HTTPSProxy)
 
+	log.Debug("[ExternalServices] About to call f.factory.CreateWebhookClient()")
 	client, err := f.factory.CreateWebhookClient()
 	if err != nil {
+		log.Errorf("[ExternalServices] f.factory.CreateWebhookClient() returned error: %v", err)
 		return nil, err
 	}
+	log.Debug("[ExternalServices] f.factory.CreateWebhookClient() succeeded")
 
 	// Debug: Log proxy configuration
 	if transport, ok := client.Transport.(*http.Transport); ok {
@@ -77,6 +80,8 @@ func (f *ExternalHTTPClientFactory) CreateWebhookClient() (*http.Client, error) 
 		} else {
 			log.Debug("[ExternalServices] Webhook client has NO proxy configured")
 		}
+	} else {
+		log.Debugf("[ExternalServices] Transport is not *http.Transport, it's %T", client.Transport)
 	}
 
 	return client, nil
