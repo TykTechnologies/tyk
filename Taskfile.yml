@@ -79,7 +79,7 @@ tasks:
       - task: lint:run
       - task: lint:extras
       
-  lint-no-golangci:
+  tidy:
     desc: "Tidy the codebase without auto-fixing"
     cmds:
       - task: codegen

@@ -63,15 +63,16 @@ jobs:
           path: /usr/local/bin/.
           destination: /usr/local/bin
 
+      - run: |
+          # Run linting without auto-fixing
+          task tidy
+          task --exit-code lint:check-git-state MESSAGE="task tidy made git state dirty, please run task lint locally and update PR"
+
       - run: golangci-lint version && golangci-lint cache status
 
       - name: golangci-lint
         if: ${{ github.event_name == 'pull_request' }}
-        run: |
-          # Run linting without auto-fixing
-          task lint-no-golangci
-          task --exit-code lint:check-git-state MESSAGE="task lint made git state dirty, please run task lint locally and update PR"
-          
+        run: |  
           # Generate report for SonarCloud
           golangci-lint run --out-format colored-line-number,checkstyle:golangci-lint-report.json \
                             --new-from-rev=origin/${{ env.BRANCH_NAME }} -v ./...
@@ -80,10 +81,6 @@ jobs:
         if: ${{ github.event_name == 'push' }}
         # Using the default config, reports stats to sonarcloud.
         run: |
-          # Run linting without auto-fixing
-          task lint-no-golangci
-          task --exit-code lint:check-git-state MESSAGE="task lint made git state dirty, please run task lint locally and update PR"
-
           # Generate report for SonarCloud
           golangci-lint run --out-format checkstyle:golangci-lint-report.json -v ./...
 
