@@ -150,24 +150,38 @@ func (a *AuthORWrapper) getMiddlewareForScheme(schemeName string) TykMiddleware 
 			// First check if the scheme is defined in SecuritySchemes
 			if auth.SecuritySchemes != nil {
 				if tykScheme := auth.SecuritySchemes[schemeName]; tykScheme != nil {
-					if a.Spec.EnableSignatureChecking {
-						return a.findMiddlewareByType(&HTTPSignatureValidationMiddleware{})
-					}
-
-					if a.Spec.UseOpenID {
-						return a.findMiddlewareByType(&OpenIDMW{})
-					}
-
-					customPluginAuthEnabled := a.Spec.CustomPluginAuthEnabled || a.Spec.UseGoPluginAuth || a.Spec.EnableCoProcessAuth
-					if customPluginAuthEnabled {
-						if mw := a.findMiddlewareByType(&GoPluginMiddleware{}); mw != nil {
-							return mw
+					switch tykScheme.(type) {
+					case *oas.JWT:
+						return a.findMiddlewareByType(&JWTMiddleware{})
+					case *oas.Token:
+						return a.findMiddlewareByType(&AuthKey{})
+					case *oas.Basic:
+						return a.findMiddlewareByType(&BasicAuthKeyIsValid{})
+					case *oas.OAuth:
+						if a.Spec.ExternalOAuth.Enabled {
+							return a.findMiddlewareByType(&ExternalOAuthMiddleware{})
 						}
-						if mw := a.findMiddlewareByType(&CoProcessMiddleware{}); mw != nil {
-							return mw
+						return a.findMiddlewareByType(&Oauth2KeyExists{})
+					case *oas.HMAC:
+						if a.Spec.EnableSignatureChecking {
+							return a.findMiddlewareByType(&HTTPSignatureValidationMiddleware{})
 						}
-						if mw := a.findMiddlewareByType(&DynamicMiddleware{}); mw != nil {
-							return mw
+					case *oas.OIDC:
+						if a.Spec.UseOpenID {
+							return a.findMiddlewareByType(&OpenIDMW{})
+						}
+					case *oas.CustomPluginAuthentication:
+						customPluginAuthEnabled := a.Spec.CustomPluginAuthEnabled || a.Spec.UseGoPluginAuth || a.Spec.EnableCoProcessAuth
+						if customPluginAuthEnabled {
+							if mw := a.findMiddlewareByType(&GoPluginMiddleware{}); mw != nil {
+								return mw
+							}
+							if mw := a.findMiddlewareByType(&CoProcessMiddleware{}); mw != nil {
+								return mw
+							}
+							if mw := a.findMiddlewareByType(&DynamicMiddleware{}); mw != nil {
+								return mw
+							}
 						}
 					}
 				}

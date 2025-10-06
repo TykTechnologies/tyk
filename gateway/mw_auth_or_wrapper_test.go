@@ -4222,6 +4222,29 @@ func TestAuthORWrapper_getMiddlewareForScheme(t *testing.T) {
 			expectType:  "*gateway.ExternalOAuthMiddleware",
 		},
 		{
+			name: "JWT scheme - Tyk vendor extension",
+			setupSpec: func(spec *APISpec) {
+				spec.EnableJWT = true
+				spec.IsOAS = true
+
+				tykExt := &oas.XTykAPIGateway{
+					Server: oas.Server{
+						Authentication: &oas.Authentication{
+							SecuritySchemes: oas.SecuritySchemes{
+								"jwtAuth": &oas.JWT{
+									Enabled: true,
+								},
+							},
+						},
+					},
+				}
+				spec.OAS.SetTykExtension(tykExt)
+			},
+			schemeName:  "jwtAuth",
+			expectFound: true,
+			expectType:  "*gateway.JWTMiddleware",
+		},
+		{
 			name: "HMAC scheme - Tyk vendor extension",
 			setupSpec: func(spec *APISpec) {
 				spec.EnableSignatureChecking = true
