@@ -52,6 +52,11 @@ func NewExternalHTTPClientFactory(serviceConfig *config.ExternalServiceConfig, c
 	}
 }
 
+// GetConfig returns the external service configuration.
+func (f *ExternalHTTPClientFactory) GetConfig() *config.ExternalServiceConfig {
+	return f.config
+}
+
 // CreateClient creates an HTTP client configured for the specified service type.
 // It applies proxy settings and mTLS configuration based on the service configuration hierarchy:
 // 1. Service-specific configuration

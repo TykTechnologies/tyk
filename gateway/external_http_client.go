@@ -57,7 +57,29 @@ func (f *ExternalHTTPClientFactory) CreateIntrospectionClient() (*http.Client, e
 // CreateWebhookClient creates an HTTP client for webhook requests.
 func (f *ExternalHTTPClientFactory) CreateWebhookClient() (*http.Client, error) {
 	log.Debug("[ExternalServices] Creating webhook HTTP client")
-	return f.factory.CreateWebhookClient()
+
+	// Debug: Log the webhook proxy configuration before creating client
+	config := f.factory.GetConfig()
+	log.Debugf("[ExternalServices] Webhook proxy config - Enabled: %v, HTTP: %s, HTTPS: %s",
+		config.Webhooks.Proxy.Enabled,
+		config.Webhooks.Proxy.HTTPProxy,
+		config.Webhooks.Proxy.HTTPSProxy)
+
+	client, err := f.factory.CreateWebhookClient()
+	if err != nil {
+		return nil, err
+	}
+
+	// Debug: Log proxy configuration
+	if transport, ok := client.Transport.(*http.Transport); ok {
+		if transport.Proxy != nil {
+			log.Debug("[ExternalServices] Webhook client configured with proxy function")
+		} else {
+			log.Debug("[ExternalServices] Webhook client has NO proxy configured")
+		}
+	}
+
+	return client, nil
 }
 
 // CreateHealthCheckClient creates an HTTP client for health check requests.
