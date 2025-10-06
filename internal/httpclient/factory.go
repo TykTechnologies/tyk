@@ -14,8 +14,12 @@ import (
 
 	"github.com/TykTechnologies/tyk/certs"
 	"github.com/TykTechnologies/tyk/config"
+	logger "github.com/TykTechnologies/tyk/log"
 	"github.com/go-jose/go-jose/v3"
-	"github.com/sirupsen/logrus"
+)
+
+var (
+	log = logger.Get()
 )
 
 // Error types for proper error handling with errors.Is()
@@ -65,7 +69,7 @@ func (f *ExternalHTTPClientFactory) GetConfig() *config.ExternalServiceConfig {
 // 3. Environment variables (for proxy)
 // 4. Default settings
 func (f *ExternalHTTPClientFactory) CreateClient(serviceType string) (*http.Client, error) {
-	logrus.Debugf("[ExternalServices] CreateClient called for service type: %s", serviceType)
+	log.Debugf("[ExternalServices] CreateClient called for service type: %s", serviceType)
 
 	// Check if external services are configured for this service type
 	if !f.isServiceConfigured(serviceType) {
@@ -73,7 +77,7 @@ func (f *ExternalHTTPClientFactory) CreateClient(serviceType string) (*http.Clie
 	}
 
 	serviceConfig := f.getServiceConfig(serviceType)
-	logrus.Debugf("[ExternalServices] Service config - HTTP proxy: %s, HTTPS proxy: %s",
+	log.Debugf("[ExternalServices] Service config - HTTP proxy: %s, HTTPS proxy: %s",
 		serviceConfig.Proxy.HTTPProxy, serviceConfig.Proxy.HTTPSProxy)
 
 	transport := f.getServiceTransport(serviceType)
@@ -83,7 +87,7 @@ func (f *ExternalHTTPClientFactory) CreateClient(serviceType string) (*http.Clie
 	if err != nil {
 		return nil, fmt.Errorf("failed to configure proxy: %w", err)
 	}
-	logrus.Debugf("[ExternalServices] Setting proxy function on transport (nil=%v)", proxyFunc == nil)
+	log.Debugf("[ExternalServices] Setting proxy function on transport (nil=%v)", proxyFunc == nil)
 	transport.Proxy = proxyFunc
 
 	// Configure TLS
@@ -101,7 +105,7 @@ func (f *ExternalHTTPClientFactory) CreateClient(serviceType string) (*http.Clie
 		Timeout:   timeout,
 	}
 
-	logrus.Debugf("[ExternalServices] Created client - Transport type: %T, Proxy func nil: %v",
+	log.Debugf("[ExternalServices] Created client - Transport type: %T, Proxy func nil: %v",
 		client.Transport, transport.Proxy == nil)
 
 	return client, nil
@@ -124,7 +128,14 @@ func (f *ExternalHTTPClientFactory) CreateIntrospectionClient() (*http.Client, e
 
 // CreateWebhookClient creates an HTTP client for webhook requests.
 func (f *ExternalHTTPClientFactory) CreateWebhookClient() (*http.Client, error) {
-	return f.CreateClient(config.ServiceTypeWebhook)
+	log.Debug("[ExternalServices][Internal] CreateWebhookClient called in internal factory")
+	client, err := f.CreateClient(config.ServiceTypeWebhook)
+	if err != nil {
+		log.Errorf("[ExternalServices][Internal] CreateClient returned error: %v", err)
+	} else {
+		log.Debug("[ExternalServices][Internal] CreateClient succeeded")
+	}
+	return client, err
 }
 
 // CreateHealthCheckClient creates an HTTP client for health check requests.
@@ -264,41 +275,41 @@ func (f *ExternalHTTPClientFactory) getProxyFunction(serviceConfig config.Servic
 // createCustomProxyFunc creates a custom proxy function based on the proxy configuration.
 func (f *ExternalHTTPClientFactory) createCustomProxyFunc(proxyConfig config.ProxyConfig) func(*http.Request) (*url.URL, error) {
 	return func(req *http.Request) (*url.URL, error) {
-		logrus.Debugf("[ExternalServices] Proxy function called for request: %s %s", req.Method, req.URL.String())
+		log.Debugf("[ExternalServices] Proxy function called for request: %s %s", req.Method, req.URL.String())
 
 		var proxyURL string
 
 		// Choose proxy based on scheme
 		if req.URL.Scheme == "https" && proxyConfig.HTTPSProxy != "" {
 			proxyURL = proxyConfig.HTTPSProxy
-			logrus.Debugf("[ExternalServices] Using HTTPS proxy: %s", proxyURL)
+			log.Debugf("[ExternalServices] Using HTTPS proxy: %s", proxyURL)
 		} else if req.URL.Scheme == "http" && proxyConfig.HTTPProxy != "" {
 			proxyURL = proxyConfig.HTTPProxy
-			logrus.Debugf("[ExternalServices] Using HTTP proxy: %s", proxyURL)
+			log.Debugf("[ExternalServices] Using HTTP proxy: %s", proxyURL)
 		} else if proxyConfig.HTTPProxy != "" {
 			// Fallback to HTTP proxy
 			proxyURL = proxyConfig.HTTPProxy
-			logrus.Debugf("[ExternalServices] Using fallback HTTP proxy: %s", proxyURL)
+			log.Debugf("[ExternalServices] Using fallback HTTP proxy: %s", proxyURL)
 		}
 
 		if proxyURL == "" {
-			logrus.Debug("[ExternalServices] No proxy URL configured, returning nil")
+			log.Debug("[ExternalServices] No proxy URL configured, returning nil")
 			return nil, nil // No proxy
 		}
 
 		// Check bypass proxy list
 		if f.shouldBypassProxy(req.URL.Host, proxyConfig.BypassProxy) {
-			logrus.Debugf("[ExternalServices] Host %s is in bypass list, skipping proxy", req.URL.Host)
+			log.Debugf("[ExternalServices] Host %s is in bypass list, skipping proxy", req.URL.Host)
 			return nil, nil
 		}
 
 		parsedURL, err := url.Parse(proxyURL)
 		if err != nil {
-			logrus.Errorf("[ExternalServices] Failed to parse proxy URL %s: %v", proxyURL, err)
+			log.Errorf("[ExternalServices] Failed to parse proxy URL %s: %v", proxyURL, err)
 			return nil, err
 		}
 
-		logrus.Debugf("[ExternalServices] Returning proxy URL: %s", parsedURL.String())
+		log.Debugf("[ExternalServices] Returning proxy URL: %s", parsedURL.String())
 		return parsedURL, nil
 	}
 }
