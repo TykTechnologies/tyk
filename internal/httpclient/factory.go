@@ -65,12 +65,16 @@ func (f *ExternalHTTPClientFactory) GetConfig() *config.ExternalServiceConfig {
 // 3. Environment variables (for proxy)
 // 4. Default settings
 func (f *ExternalHTTPClientFactory) CreateClient(serviceType string) (*http.Client, error) {
+	logrus.Debugf("[ExternalServices] CreateClient called for service type: %s", serviceType)
+
 	// Check if external services are configured for this service type
 	if !f.isServiceConfigured(serviceType) {
 		return nil, fmt.Errorf("external services not configured for service type: %s", serviceType)
 	}
 
 	serviceConfig := f.getServiceConfig(serviceType)
+	logrus.Debugf("[ExternalServices] Service config - HTTP proxy: %s, HTTPS proxy: %s",
+		serviceConfig.Proxy.HTTPProxy, serviceConfig.Proxy.HTTPSProxy)
 
 	transport := f.getServiceTransport(serviceType)
 
@@ -79,6 +83,7 @@ func (f *ExternalHTTPClientFactory) CreateClient(serviceType string) (*http.Clie
 	if err != nil {
 		return nil, fmt.Errorf("failed to configure proxy: %w", err)
 	}
+	logrus.Debugf("[ExternalServices] Setting proxy function on transport (nil=%v)", proxyFunc == nil)
 	transport.Proxy = proxyFunc
 
 	// Configure TLS
@@ -91,10 +96,15 @@ func (f *ExternalHTTPClientFactory) CreateClient(serviceType string) (*http.Clie
 	// Apply service-specific timeout configuration
 	timeout := f.getServiceTimeout(serviceType)
 
-	return &http.Client{
+	client := &http.Client{
 		Transport: transport,
 		Timeout:   timeout,
-	}, nil
+	}
+
+	logrus.Debugf("[ExternalServices] Created client - Transport type: %T, Proxy func nil: %v",
+		client.Transport, transport.Proxy == nil)
+
+	return client, nil
 }
 
 // CreateOAuthClient creates an HTTP client for OAuth requests (including upstream OAuth).
