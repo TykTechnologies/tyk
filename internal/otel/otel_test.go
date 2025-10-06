@@ -267,7 +267,7 @@ func TestContextWithSpan(t *testing.T) {
 
 func makeHTTPCollector(t *testing.T) (endpoint string, cleanup func()) {
 	t.Helper()
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	}))
 	return srv.URL, srv.Close
