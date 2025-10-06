@@ -1046,10 +1046,93 @@ func TestOAS_extractSecurityTo_VendorExtensionSecurity(t *testing.T) {
 		assert.True(t, api.UseStandardAuth, "Standard auth should be enabled")
 
 		// Verify security requirements include both OAS and vendor security
-		assert.Len(t, api.SecurityRequirements, 3, "Should have 3 security requirements")
+		assert.Len(t, api.SecurityRequirements, 2, "Should have 2 security requirements")
 		assert.Contains(t, api.SecurityRequirements, []string{"authToken"})
-		assert.Contains(t, api.SecurityRequirements, []string{"jwtAuth"})
 		assert.Contains(t, api.SecurityRequirements, []string{"hmac", "jwtAuth"})
+	})
+
+	t.Run("should keep mixed auth requirement in vendor security when filling OAS", func(t *testing.T) {
+		var api apidef.APIDefinition
+		api.SecurityRequirements = [][]string{
+			{"authToken"},          // Pure OAS auth
+			{"hmac", "jwtAuth"},    // Mixed: proprietary + standard
+		}
+
+		var oas OAS
+		oas.SetTykExtension(&XTykAPIGateway{
+			Server: Server{
+				Authentication: &Authentication{
+					SecurityProcessingMode: SecurityProcessingModeCompliant,
+				},
+			},
+		})
+
+		oas.fillSecurity(api)
+
+		// Verify OAS security only has pure standard auth
+		assert.Len(t, oas.Security, 1, "OAS security should only have standard auth requirements")
+		assert.Contains(t, oas.Security[0], "authToken")
+		assert.NotContains(t, oas.Security[0], "jwtAuth", "jwtAuth should NOT be in OAS security when part of mixed requirement")
+
+		// Verify vendor security has the mixed requirement
+		tykAuth := oas.getTykAuthentication()
+		assert.NotNil(t, tykAuth)
+		assert.Len(t, tykAuth.Security, 1, "Vendor security should have the mixed requirement")
+		assert.Equal(t, []string{"hmac", "jwtAuth"}, tykAuth.Security[0])
+	})
+}
+
+func TestOAS_GetJWTConfiguration_VendorSecurity(t *testing.T) {
+	t.Run("should return JWT config from vendor security in compliant mode", func(t *testing.T) {
+		var oas OAS
+
+		// OAS security only has authToken, JWT is in vendor security
+		oas.Security = openapi3.SecurityRequirements{
+			{"authToken": []string{}},
+		}
+
+		oas.Components = &openapi3.Components{
+			SecuritySchemes: openapi3.SecuritySchemes{
+				"authToken": &openapi3.SecuritySchemeRef{
+					Value: &openapi3.SecurityScheme{
+						Type: typeAPIKey,
+						In:   header,
+						Name: "AuthToken",
+					},
+				},
+				"jwtAuth": &openapi3.SecuritySchemeRef{
+					Value: &openapi3.SecurityScheme{
+						Type:         typeHTTP,
+						Scheme:       schemeBearer,
+						BearerFormat: bearerFormatJWT,
+					},
+				},
+			},
+		}
+
+		expectedJWT := &JWT{
+			Enabled:       true,
+			Source:        "test-source",
+			SigningMethod: "hmac",
+		}
+
+		oas.SetTykExtension(&XTykAPIGateway{
+			Server: Server{
+				Authentication: &Authentication{
+					SecurityProcessingMode: SecurityProcessingModeCompliant,
+					SecuritySchemes: SecuritySchemes{
+						"jwtAuth": expectedJWT,
+					},
+					Security: [][]string{
+						{"hmac", "jwtAuth"}, // JWT is in vendor security with HMAC
+					},
+				},
+			},
+		})
+
+		jwt := oas.GetJWTConfiguration()
+		assert.NotNil(t, jwt, "Should find JWT config in vendor security")
+		assert.Equal(t, expectedJWT, jwt)
 	})
 }
 

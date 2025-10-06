@@ -977,22 +977,31 @@ func (s *OAS) fillSecurity(api apidef.APIDefinition) {
 
 		if len(api.SecurityRequirements) > 0 {
 			for _, requirement := range api.SecurityRequirements {
-				isVendorOnly := true
+				hasProprietaryAuth := false
+				hasStandardAuth := false
 				oasReq := openapi3.NewSecurityRequirement()
 				vendorReq := []string{}
 
+				// First pass: check what types of auth we have
 				for _, schemeName := range requirement {
 					if isProprietaryAuth(schemeName) {
+						hasProprietaryAuth = true
 						vendorReq = append(vendorReq, schemeName)
 					} else {
+						hasStandardAuth = true
 						oasReq[schemeName] = []string{}
-						isVendorOnly = false
 					}
 				}
 
-				if isVendorOnly && len(vendorReq) > 0 {
+				// If requirement has BOTH proprietary and standard auth (mixed AND requirement),
+				// the entire requirement goes to vendor security
+				if hasProprietaryAuth && hasStandardAuth {
+					vendorSecurity = append(vendorSecurity, requirement)
+				} else if hasProprietaryAuth {
+					// Only proprietary auth - goes to vendor security
 					vendorSecurity = append(vendorSecurity, vendorReq)
-				} else if len(oasReq) > 0 {
+				} else if hasStandardAuth {
+					// Only standard auth - goes to OAS security
 					oasSecurity = append(oasSecurity, oasReq)
 				}
 			}
@@ -1077,13 +1086,47 @@ func (s *OAS) extractSecurityTo(api *apidef.APIDefinition) {
 		// Concatenate OAS security with vendor extension security
 		api.SecurityRequirements = make([][]string, 0)
 
-		// Add OAS security requirements
+		// First, collect all auth schemes that appear in vendor security mixed requirements
+		// (requirements that have both proprietary and standard auth)
+		schemesInMixedVendorReqs := make(map[string]bool)
+		if s.getTykAuthentication() != nil && len(s.getTykAuthentication().Security) > 0 {
+			for _, vendorReq := range s.getTykAuthentication().Security {
+				hasProprietary := false
+				hasStandard := false
+				for _, schemeName := range vendorReq {
+					if isProprietaryAuth(schemeName) {
+						hasProprietary = true
+					} else {
+						hasStandard = true
+					}
+				}
+				// If mixed requirement, mark all standard schemes as being in mixed vendor
+				if hasProprietary && hasStandard {
+					for _, schemeName := range vendorReq {
+						if !isProprietaryAuth(schemeName) {
+							schemesInMixedVendorReqs[schemeName] = true
+						}
+					}
+				}
+			}
+		}
+
+		// Add OAS security requirements, but skip any that would be duplicates
+		// of schemes in mixed vendor requirements
 		for _, requirement := range s.Security {
 			schemes := make([]string, 0, len(requirement))
+			skip := false
 			for schemeName := range requirement {
 				schemes = append(schemes, schemeName)
+				// If this is a single-scheme requirement and it's in a mixed vendor req, skip it
+				if len(requirement) == 1 && schemesInMixedVendorReqs[schemeName] {
+					skip = true
+					break
+				}
 			}
-			api.SecurityRequirements = append(api.SecurityRequirements, schemes)
+			if !skip {
+				api.SecurityRequirements = append(api.SecurityRequirements, schemes)
+			}
 		}
 
 		// Add vendor extension security requirements
@@ -1197,33 +1240,55 @@ func (s *OAS) extractSecurityTo(api *apidef.APIDefinition) {
 }
 
 func (s *OAS) GetJWTConfiguration() *JWT {
-	if len(s.Security) == 0 {
-		return nil
-	}
-
 	processingMode := SecurityProcessingModeLegacy
 	if s.getTykAuthentication() != nil && s.getTykAuthentication().SecurityProcessingMode != "" {
 		processingMode = s.getTykAuthentication().SecurityProcessingMode
 	}
 
+	// Helper function to check if a scheme is JWT
+	isJWTScheme := func(schemeName string) bool {
+		if s.Components == nil || s.Components.SecuritySchemes == nil {
+			return false
+		}
+		scheme, ok := s.Components.SecuritySchemes[schemeName]
+		if !ok {
+			return false
+		}
+		v := scheme.Value
+		return v.Type == typeHTTP && v.Scheme == schemeBearer && v.BearerFormat == bearerFormatJWT
+	}
+
 	if processingMode == SecurityProcessingModeLegacy {
-		// Legacy mode: only check the first security requirement
-		for keyName := range s.getTykSecuritySchemes() {
-			if _, ok := s.Security[0][keyName]; ok {
-				v := s.Components.SecuritySchemes[keyName].Value
-				if v.Type == typeHTTP && v.Scheme == schemeBearer && v.BearerFormat == bearerFormatJWT {
+		// Legacy mode: only check the first security requirement in OAS security
+		if len(s.Security) > 0 {
+			for keyName := range s.getTykSecuritySchemes() {
+				if _, ok := s.Security[0][keyName]; ok && isJWTScheme(keyName) {
 					return s.getTykJWTAuth(keyName)
 				}
 			}
 		}
 	} else {
-		// Compliant mode: check ALL security requirements for OR authentication support
+		// Compliant mode: check ALL security requirements (OAS + vendor) for OR authentication support
+
+		// First check OAS security requirements
 		for _, securityRequirement := range s.Security {
 			for keyName := range s.getTykSecuritySchemes() {
-				if _, ok := securityRequirement[keyName]; ok {
-					v := s.Components.SecuritySchemes[keyName].Value
-					if v.Type == typeHTTP && v.Scheme == schemeBearer && v.BearerFormat == bearerFormatJWT {
-						return s.getTykJWTAuth(keyName)
+				if _, ok := securityRequirement[keyName]; ok && isJWTScheme(keyName) {
+					return s.getTykJWTAuth(keyName)
+				}
+			}
+		}
+
+		// Also check vendor extension security requirements
+		if s.getTykAuthentication() != nil && len(s.getTykAuthentication().Security) > 0 {
+			for _, vendorReq := range s.getTykAuthentication().Security {
+				for _, schemeName := range vendorReq {
+					// Check if this scheme is JWT and has Tyk config
+					if isJWTScheme(schemeName) {
+						jwt := s.getTykJWTAuth(schemeName)
+						if jwt != nil {
+							return jwt
+						}
 					}
 				}
 			}
