@@ -79,10 +79,9 @@ jobs:
 
       - name: golangci-lint-on-push
         if: ${{ github.event_name == 'push' }}
-        # Using the default config, reports stats to sonarcloud.
+        # Using the default config, reports stats to sonarcloud. No requirements on passing other than KPIs tracked in dev.
         run: |
-          # Generate report for SonarCloud
-          golangci-lint run --out-format checkstyle:golangci-lint-report.json -v ./...
+          golangci-lint run --out-format checkstyle:golangci-lint-report.json --issues-exit-code=0 -v ./...
 
       - uses: actions/upload-artifact@v4
         if: ${{ always() }}
