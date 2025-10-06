@@ -5,7 +5,9 @@ import (
 	"net/http"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/assert"
+	"go.opentelemetry.io/otel/trace"
 
 	"github.com/TykTechnologies/graphql-go-tools/pkg/engine/datasource/httpclient"
 	"github.com/TykTechnologies/graphql-go-tools/pkg/graphql"
@@ -355,4 +357,75 @@ func TestAnalyticsIgnoreSubgraph(t *testing.T) {
 		},
 	)
 	assert.NoError(t, err)
+}
+
+func TestSuccessHandler_addTraceIDTag(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	s := &SuccessHandler{
+		BaseMiddleware: &BaseMiddleware{Gw: ts.Gw},
+	}
+
+	makeCtxWithTrace := func(hex string) context.Context {
+		tid, err := trace.TraceIDFromHex(hex)
+		if err != nil {
+			t.Fatalf("invalid trace id: %v", err)
+		}
+		sc := trace.NewSpanContext(trace.SpanContextConfig{
+			TraceID:    tid,
+			TraceFlags: trace.FlagsSampled,
+		})
+		return trace.ContextWithSpanContext(context.Background(), sc)
+	}
+
+	tests := map[string]struct {
+		enableOTel bool
+		ctx        context.Context
+		in         []string
+		want       []string
+	}{
+		"enabled_with_trace_appends": {
+			enableOTel: true,
+			ctx:        makeCtxWithTrace("0123456789abcdef0123456789abcdef"),
+			in:         []string{"a", "b"},
+			want:       []string{"a", "b", traceTagPrefix + "0123456789abcdef0123456789abcdef"},
+		},
+		"enabled_without_trace_noop": {
+			enableOTel: true,
+			ctx:        context.Background(),
+			in:         []string{"x"},
+			want:       []string{"x"},
+		},
+		"disabled_with_trace_noop": {
+			enableOTel: false,
+			ctx:        makeCtxWithTrace("ffffffffffffffffffffffffffffffff"),
+			in:         []string{},
+			want:       []string{},
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			cfg := ts.Gw.GetConfig()
+			cfg.OpenTelemetry.Enabled = tc.enableOTel
+			ts.Gw.SetConfig(cfg)
+
+			tags := make([]string, 0, len(tc.in))
+			tags = append(tags, tc.in...)
+
+			s.addTraceIDTag(tc.ctx, &tags)
+
+			want := tc.want
+			if want == nil {
+				want = []string{}
+			}
+
+			if diff := cmp.Diff(tags, want); diff != "" {
+				t.Fatalf("tags mismatch (-got +want):\n%s", diff)
+			}
+
+			s.addTraceIDTag(tc.ctx, nil)
+		})
+	}
 }

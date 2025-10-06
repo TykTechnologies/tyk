@@ -265,114 +265,80 @@ func TestContextWithSpan(t *testing.T) {
 	}
 }
 
-func TestAddTraceID(t *testing.T) {
-	tests := []struct {
-		name       string
-		hasTraceID bool
-		wantHeader bool
-	}{
-		{
-			name:       "otel enabled with trace id",
-			hasTraceID: true,
-			wantHeader: true,
-		},
-		{
-			name:       "otel enabled without trace id",
-			hasTraceID: false,
-			wantHeader: false,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			req := httptest.NewRequest(http.MethodGet, "/", nil)
-			w := httptest.NewRecorder()
-
-			otelConfig := OpenTelemetry{
-				Enabled:  true,
-				Exporter: "http",
-				Endpoint: "http://localhost:4317",
-			}
-
-			if tt.hasTraceID {
-				ot := InitOpenTelemetry(context.Background(), logrus.New(), &otelConfig, "test", "test", false, "test", false, []string{})
-				ctx, _ := ot.Tracer().Start(context.Background(), "testing")
-				req = req.WithContext(ctx)
-			}
-
-			AddTraceID(req.Context(), w, req)
-
-			responseTraceID := w.Header().Get("X-Tyk-Trace-Id")
-			if tt.wantHeader && responseTraceID == "" {
-				t.Errorf("expected response header to be set, but it wasn't")
-			} else if !tt.wantHeader && responseTraceID != "" {
-				t.Errorf("expected response header not to be set, but it was")
-			}
-
-			requestTraceID := req.Header.Get("X-Tyk-Trace-Id")
-			if tt.wantHeader && requestTraceID == "" {
-				t.Errorf("expected request header to be set, but it wasn't")
-			} else if !tt.wantHeader && requestTraceID != "" {
-				t.Errorf("expected request header not to be set, but it was")
-			}
-
-			if tt.wantHeader && responseTraceID != requestTraceID {
-				t.Errorf("response and request trace IDs should match, got response: %s, request: %s", responseTraceID, requestTraceID)
-			}
-		})
-	}
+func makeHTTPCollector(t *testing.T) (endpoint string, cleanup func()) {
+	t.Helper()
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+	return srv.URL, srv.Close
 }
 
-func TestAddTraceID_TraceIDFormat(t *testing.T) {
-	tests := []struct {
-		name        string
-		setupSpan   bool
-		expectValid bool
-	}{
-		{
-			name:        "valid trace ID from active span",
-			setupSpan:   true,
-			expectValid: true,
-		},
-		{
-			name:        "no span context - no headers set",
-			setupSpan:   false,
-			expectValid: false,
-		},
+func makeProviderHTTP(t *testing.T) tyktrace.Provider {
+	t.Helper()
+	endpoint, cleanup := makeHTTPCollector(t)
+	t.Cleanup(cleanup)
+
+	cfg := &OpenTelemetry{
+		Enabled:  true,
+		Exporter: "http",
+		Endpoint: endpoint,
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			req := httptest.NewRequest(http.MethodGet, "/test", nil)
-			w := httptest.NewRecorder()
+	provider := InitOpenTelemetry(context.Background(), logrus.New(), cfg,
+		"gw-id-1", "v1.2.3", false, "", false, nil)
 
-			if tt.setupSpan {
-				otelConfig := OpenTelemetry{
-					Enabled:  true,
-					Exporter: "http",
-					Endpoint: "http://localhost:4317",
-				}
-				provider := InitOpenTelemetry(context.Background(), logrus.New(), &otelConfig, "test", "test", false, "test", false, []string{})
-				ctx, span := provider.Tracer().Start(context.Background(), "test-operation")
-				req = req.WithContext(ctx)
+	assert.NotNil(t, provider)
+	assert.Equal(t, tyktrace.OTEL_PROVIDER, provider.Type())
 
-				assert.True(t, span.SpanContext().HasTraceID(), "span should have a trace ID")
-			}
+	return provider
+}
 
-			AddTraceID(req.Context(), w, req)
+func TestExtractTraceID(t *testing.T) {
+	t.Run("returns empty when no span in context", func(t *testing.T) {
+		got := ExtractTraceID(context.Background())
+		assert.Equal(t, "", got)
+	})
 
-			responseTraceID := w.Header().Get("X-Tyk-Trace-Id")
-			requestTraceID := req.Header.Get("X-Tyk-Trace-Id")
+	t.Run("returns non-empty trace id when span is present", func(t *testing.T) {
+		provider := makeProviderHTTP(t)
 
-			if tt.expectValid {
-				assert.NotEmpty(t, responseTraceID, "response trace ID header should be set")
-				assert.NotEmpty(t, requestTraceID, "request trace ID header should be set")
+		ctx := context.Background()
+		_, span := provider.Tracer().Start(ctx, "extract-traceid-test")
+		defer span.End()
 
-				assert.Equal(t, responseTraceID, requestTraceID, "response and request trace IDs should match")
-			} else {
-				assert.Empty(t, responseTraceID, "response trace ID header should not be set")
-				assert.Empty(t, requestTraceID, "request trace ID header should not be set")
-			}
-		})
-	}
+		ctx = ContextWithSpan(ctx, span)
+
+		got := ExtractTraceID(ctx)
+		assert.NotEmpty(t, got, "expected non-empty trace id")
+		assert.Equal(t, span.SpanContext().TraceID().String(), got)
+	})
+}
+
+func TestAddTraceID(t *testing.T) {
+	t.Run("does not set header when no span", func(t *testing.T) {
+		rr := httptest.NewRecorder()
+
+		AddTraceID(context.Background(), rr)
+
+		assert.Empty(t, rr.Header().Get(TykTraceIDHeader))
+	})
+
+	t.Run("sets header when span has trace id", func(t *testing.T) {
+		provider := makeProviderHTTP(t)
+
+		req := httptest.NewRequest(http.MethodGet, "http://example.com/", nil)
+		ctx := req.Context()
+
+		_, span := provider.Tracer().Start(ctx, "add-traceid-test")
+		defer span.End()
+
+		ctx = ContextWithSpan(ctx, span)
+
+		rr := httptest.NewRecorder()
+		AddTraceID(ctx, rr)
+
+		h := rr.Header().Get(TykTraceIDHeader)
+		assert.NotEmpty(t, h, "expected X-Tyk-Trace-Id header to be set")
+		assert.Equal(t, span.SpanContext().TraceID().String(), h)
+	})
 }

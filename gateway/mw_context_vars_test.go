@@ -1,6 +1,7 @@
 package gateway
 
 import (
+	"context"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -10,6 +11,7 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+	"go.opentelemetry.io/otel/trace"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/test"
@@ -253,6 +255,67 @@ func BenchmarkContextVarsMiddlewareProcessRequest(b *testing.B) {
 					b.Errorf("Wrong response code: %d Eexpected 200.", code)
 				}
 			}
+		})
+	}
+}
+
+func TestAddTraceIDToContextVars(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	mw := &MiddlewareContextVars{
+		BaseMiddleware: &BaseMiddleware{Gw: ts.Gw},
+	}
+
+	makeCtxWithTrace := func(tidHex string) context.Context {
+		tid, err := trace.TraceIDFromHex(tidHex)
+		if err != nil {
+			t.Fatalf("invalid trace id hex: %v", err)
+		}
+		sc := trace.NewSpanContext(trace.SpanContextConfig{
+			TraceID:    tid,
+			TraceFlags: trace.FlagsSampled,
+			Remote:     false,
+		})
+		return trace.ContextWithSpanContext(context.Background(), sc)
+	}
+
+	tests := map[string]struct {
+		enabled bool
+		ctx     context.Context
+		want    map[string]interface{}
+	}{
+		"enabled_with_trace": {
+			enabled: true,
+			ctx:     makeCtxWithTrace("0123456789abcdef0123456789abcdef"),
+			want:    map[string]interface{}{"tyk_trace_id": "0123456789abcdef0123456789abcdef"},
+		},
+		"enabled_without_trace": {
+			enabled: true,
+			ctx:     context.Background(),
+			want:    map[string]interface{}{},
+		},
+		"disabled_with_trace": {
+			enabled: false,
+			ctx:     makeCtxWithTrace("ffffffffffffffffffffffffffffffff"),
+			want:    map[string]interface{}{},
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			cfg := ts.Gw.GetConfig()
+			cfg.OpenTelemetry.Enabled = tc.enabled
+			ts.Gw.SetConfig(cfg)
+
+			vars := map[string]interface{}{}
+			mw.addTraceIDToContextVars(tc.ctx, vars)
+
+			if diff := cmp.Diff(vars, tc.want); diff != "" {
+				t.Fatalf("vars mismatch (-got +want):\n%s", diff)
+			}
+
+			mw.addTraceIDToContextVars(tc.ctx, nil)
 		})
 	}
 }
