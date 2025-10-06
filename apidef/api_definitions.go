@@ -18,6 +18,7 @@ import (
 	"github.com/TykTechnologies/tyk/internal/event"
 
 	"github.com/TykTechnologies/tyk/internal/reflect"
+	tyktime "github.com/TykTechnologies/tyk/internal/time"
 
 	"golang.org/x/oauth2"
 
@@ -782,7 +783,15 @@ type JWK struct {
 	// URL is the jwk endpoint
 	URL string `json:"url"`
 	// CacheTimeout defines how long the JWKS will be kept in the cache before forcing a refresh from the JWKS endpoint.
-	CacheTimeout int64 `bson:"cache_timeout" json:"cache_timeout"`
+	CacheTimeout tyktime.ReadableDuration `bson:"cache_timeout" json:"cache_timeout"`
+}
+
+// GetCacheTimeoutSeconds returns the cache timeout in seconds, using the default expiration if CacheTimeout is zero or negative.
+func (jwk *JWK) GetCacheTimeoutSeconds(defaultExpiration int64) int64 {
+	if jwk.CacheTimeout > 0 {
+		return int64(jwk.CacheTimeout.Seconds())
+	}
+	return defaultExpiration
 }
 
 // UpstreamAuth holds the configurations related to upstream API authentication.
