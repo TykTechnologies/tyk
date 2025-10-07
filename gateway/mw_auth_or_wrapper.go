@@ -18,6 +18,11 @@ const (
 	securitySchemeHTTPBasic  = "basic"
 
 	securitySchemeBearerFormatJWT = "JWT"
+
+	// Tyk vendor extension security scheme names
+	securitySchemeNameHMAC   = "hmac"
+	securitySchemeNameOIDC   = "oidc"
+	securitySchemeNameCustom = "custom"
 )
 
 // AuthORWrapper is a middleware that handles OR logic for multiple authentication methods.
@@ -139,27 +144,77 @@ func (a *AuthORWrapper) getMiddlewareForScheme(schemeName string) TykMiddleware 
 		}
 	}
 
+	// Check Tyk vendor extension authentication methods
 	if tykExt := a.Spec.OAS.GetTykExtension(); tykExt != nil {
-		if auth := tykExt.Server.Authentication; auth != nil && auth.SecuritySchemes != nil {
-			if tykScheme := auth.SecuritySchemes[schemeName]; tykScheme != nil {
-				if a.Spec.EnableSignatureChecking {
+		if auth := tykExt.Server.Authentication; auth != nil {
+			// First check if the scheme is defined in SecuritySchemes
+			if auth.SecuritySchemes != nil {
+				if tykScheme := auth.SecuritySchemes[schemeName]; tykScheme != nil {
+					// Use type switch for standard auth types (JWT, Token, Basic, OAuth)
+					// These can be reliably determined by their OAS type
+					switch tykScheme.(type) {
+					case *oas.JWT:
+						return a.findMiddlewareByType(&JWTMiddleware{})
+					case *oas.Token:
+						return a.findMiddlewareByType(&AuthKey{})
+					case *oas.Basic:
+						return a.findMiddlewareByType(&BasicAuthKeyIsValid{})
+					case *oas.OAuth:
+						if a.Spec.ExternalOAuth.Enabled {
+							return a.findMiddlewareByType(&ExternalOAuthMiddleware{})
+						}
+						return a.findMiddlewareByType(&Oauth2KeyExists{})
+					}
+
+					// For HMAC, OIDC, and Custom plugins, use legacy flag checks
+					// This maintains backward compatibility with existing tests and configurations
+					if a.Spec.EnableSignatureChecking {
+						return a.findMiddlewareByType(&HTTPSignatureValidationMiddleware{})
+					}
+
+					if a.Spec.UseOpenID {
+						return a.findMiddlewareByType(&OpenIDMW{})
+					}
+
+					customPluginAuthEnabled := a.Spec.CustomPluginAuthEnabled || a.Spec.UseGoPluginAuth || a.Spec.EnableCoProcessAuth
+					if customPluginAuthEnabled {
+						if mw := a.findMiddlewareByType(&GoPluginMiddleware{}); mw != nil {
+							return mw
+						}
+						if mw := a.findMiddlewareByType(&CoProcessMiddleware{}); mw != nil {
+							return mw
+						}
+						if mw := a.findMiddlewareByType(&DynamicMiddleware{}); mw != nil {
+							return mw
+						}
+					}
+				}
+			}
+
+			// Fallback: check by scheme name even if not in SecuritySchemes
+			// This handles cases where auth is enabled via direct fields (e.g., hmac.enabled: true)
+			switch schemeName {
+			case securitySchemeNameHMAC:
+				if auth.HMAC != nil && auth.HMAC.Enabled && a.Spec.EnableSignatureChecking {
 					return a.findMiddlewareByType(&HTTPSignatureValidationMiddleware{})
 				}
-
-				if a.Spec.UseOpenID {
+			case securitySchemeNameOIDC:
+				if auth.OIDC != nil && auth.OIDC.Enabled && a.Spec.UseOpenID {
 					return a.findMiddlewareByType(&OpenIDMW{})
 				}
-
-				customPluginAuthEnabled := a.Spec.CustomPluginAuthEnabled || a.Spec.UseGoPluginAuth || a.Spec.EnableCoProcessAuth
-				if customPluginAuthEnabled {
-					if mw := a.findMiddlewareByType(&GoPluginMiddleware{}); mw != nil {
-						return mw
-					}
-					if mw := a.findMiddlewareByType(&CoProcessMiddleware{}); mw != nil {
-						return mw
-					}
-					if mw := a.findMiddlewareByType(&DynamicMiddleware{}); mw != nil {
-						return mw
+			case securitySchemeNameCustom:
+				if auth.Custom != nil && auth.Custom.Enabled {
+					customPluginAuthEnabled := a.Spec.CustomPluginAuthEnabled || a.Spec.UseGoPluginAuth || a.Spec.EnableCoProcessAuth
+					if customPluginAuthEnabled {
+						if mw := a.findMiddlewareByType(&GoPluginMiddleware{}); mw != nil {
+							return mw
+						}
+						if mw := a.findMiddlewareByType(&CoProcessMiddleware{}); mw != nil {
+							return mw
+						}
+						if mw := a.findMiddlewareByType(&DynamicMiddleware{}); mw != nil {
+							return mw
+						}
 					}
 				}
 			}
@@ -244,6 +299,31 @@ func (a *AuthORWrapper) Init() {
 		openIDMw.Gw = a.Gw
 		openIDMw.Init()
 		a.authMiddlewares = append(a.authMiddlewares, openIDMw)
+	}
+
+	// Custom plugin middlewares
+	if spec.UseGoPluginAuth {
+		goPluginMw := &GoPluginMiddleware{BaseMiddleware: a.BaseMiddleware.Copy()}
+		goPluginMw.Spec = spec
+		goPluginMw.Gw = a.Gw
+		goPluginMw.Init()
+		a.authMiddlewares = append(a.authMiddlewares, goPluginMw)
+	}
+
+	if spec.EnableCoProcessAuth {
+		coProcessMw := &CoProcessMiddleware{BaseMiddleware: a.BaseMiddleware.Copy()}
+		coProcessMw.Spec = spec
+		coProcessMw.Gw = a.Gw
+		coProcessMw.Init()
+		a.authMiddlewares = append(a.authMiddlewares, coProcessMw)
+	}
+
+	if spec.CustomPluginAuthEnabled {
+		dynamicMw := &DynamicMiddleware{BaseMiddleware: a.BaseMiddleware.Copy()}
+		dynamicMw.Spec = spec
+		dynamicMw.Gw = a.Gw
+		dynamicMw.Init()
+		a.authMiddlewares = append(a.authMiddlewares, dynamicMw)
 	}
 
 	if spec.UseStandardAuth || len(a.authMiddlewares) == 0 {
