@@ -520,21 +520,24 @@ func TestValidateZipPath(t *testing.T) {
 	}
 
 	tests := []struct {
-		name        string
 		filePath    string
 		bundlePath  string
 		wantErr     bool
 		errContains string
 	}{
 		{
-			name:       "valid path",
 			filePath:   "middleware.js",
 			bundlePath: bundlePath,
 			wantErr:    false,
 		},
 		{
-			name:        "invalid path",
 			filePath:    "../../../invalid/path",
+			bundlePath:  bundlePath,
+			wantErr:     true,
+			errContains: "Invalid file path",
+		},
+		{
+			filePath:    "/absolute/path",
 			bundlePath:  bundlePath,
 			wantErr:     true,
 			errContains: "Invalid file path",
@@ -542,7 +545,7 @@ func TestValidateZipPath(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
+		t.Run(tt.filePath, func(t *testing.T) {
 			err := validateZipPath(tt.filePath, tt.bundlePath, spec)
 
 			if tt.wantErr {
