@@ -353,8 +353,12 @@ func (f *ExternalHTTPClientFactory) getTLSConfig(serviceConfig config.ServiceCon
 		InsecureSkipVerify: serviceConfig.MTLS.InsecureSkipVerify,
 	}
 
+	log.Debugf("[ExternalServices] getTLSConfig - MTLS.Enabled=%v, CertFile=%s, KeyFile=%s",
+		serviceConfig.MTLS.Enabled, serviceConfig.MTLS.CertFile, serviceConfig.MTLS.KeyFile)
+
 	// Validate mTLS configuration
 	if err := serviceConfig.MTLS.Validate(); err != nil {
+		log.WithError(err).Error("[ExternalServices] MTLS validation failed")
 		return nil, fmt.Errorf("invalid mTLS configuration: %w", err)
 	}
 
@@ -362,18 +366,27 @@ func (f *ExternalHTTPClientFactory) getTLSConfig(serviceConfig config.ServiceCon
 	if serviceConfig.MTLS.Enabled {
 		// Priority 1: Certificate store (if CertID is provided)
 		if serviceConfig.MTLS.IsCertificateStoreConfig() {
+			log.Debugf("[ExternalServices] Loading certificate from store: %s", serviceConfig.MTLS.CertID)
 			cert, err := f.loadCertificateFromStore(serviceConfig.MTLS.CertID)
 			if err != nil {
+				log.WithError(err).Error("[ExternalServices] Failed to load certificate from store")
 				return nil, fmt.Errorf("%w: %w", ErrMTLSCertificateStore, err)
 			}
 			tlsConfig.Certificates = []tls.Certificate{*cert}
+			log.Debug("[ExternalServices] Successfully loaded certificate from store")
 		} else if serviceConfig.MTLS.IsFileBasedConfig() {
 			// Priority 2: File-based certificates (existing behavior)
+			log.Debugf("[ExternalServices] Loading certificate from files: cert=%s, key=%s",
+				serviceConfig.MTLS.CertFile, serviceConfig.MTLS.KeyFile)
 			cert, err := tls.LoadX509KeyPair(serviceConfig.MTLS.CertFile, serviceConfig.MTLS.KeyFile)
 			if err != nil {
+				log.WithError(err).Error("[ExternalServices] Failed to load certificate from files")
 				return nil, fmt.Errorf("%w: %w", ErrMTLSCertificateLoad, err)
 			}
 			tlsConfig.Certificates = []tls.Certificate{cert}
+			log.Debugf("[ExternalServices] Successfully loaded certificate from files (cert count: %d)", len(tlsConfig.Certificates))
+		} else {
+			log.Warn("[ExternalServices] MTLS enabled but no certificate configuration provided")
 		}
 
 		// Load CA certificates from store or file
@@ -396,6 +409,9 @@ func (f *ExternalHTTPClientFactory) getTLSConfig(serviceConfig config.ServiceCon
 			tlsConfig.RootCAs = caCertPool
 		}
 	}
+
+	log.Debugf("[ExternalServices] getTLSConfig complete - InsecureSkipVerify=%v, Certificates loaded: %d",
+		tlsConfig.InsecureSkipVerify, len(tlsConfig.Certificates))
 
 	return tlsConfig, nil
 }
