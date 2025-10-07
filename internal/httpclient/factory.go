@@ -351,13 +351,6 @@ func splitBypassProxy(bypassProxy string) []string {
 func (f *ExternalHTTPClientFactory) getTLSConfig(serviceConfig config.ServiceConfig) (*tls.Config, error) {
 	tlsConfig := &tls.Config{
 		InsecureSkipVerify: serviceConfig.MTLS.InsecureSkipVerify,
-		// Force GetClientCertificate to always provide our certificate
-		GetClientCertificate: func(cri *tls.CertificateRequestInfo) (*tls.Certificate, error) {
-			log.Debugf("[ExternalServices] GetClientCertificate called - Server requested client cert")
-			log.Debugf("[ExternalServices] Server AcceptableCAs: %d", len(cri.AcceptableCAs))
-			log.Debugf("[ExternalServices] Server SignatureSchemes: %v", cri.SignatureSchemes)
-			return nil, nil // Return nil to use Certificates field instead
-		},
 	}
 
 	log.Debugf("[ExternalServices] getTLSConfig - MTLS.Enabled=%v, CertFile=%s, KeyFile=%s",
@@ -371,6 +364,9 @@ func (f *ExternalHTTPClientFactory) getTLSConfig(serviceConfig config.ServiceCon
 
 	// Configure mTLS if enabled
 	if serviceConfig.MTLS.Enabled {
+		var clientCert tls.Certificate
+		var certLoaded bool
+
 		// Priority 1: Certificate store (if CertID is provided)
 		if serviceConfig.MTLS.IsCertificateStoreConfig() {
 			log.Debugf("[ExternalServices] Loading certificate from store: %s", serviceConfig.MTLS.CertID)
@@ -379,7 +375,8 @@ func (f *ExternalHTTPClientFactory) getTLSConfig(serviceConfig config.ServiceCon
 				log.WithError(err).Error("[ExternalServices] Failed to load certificate from store")
 				return nil, fmt.Errorf("%w: %w", ErrMTLSCertificateStore, err)
 			}
-			tlsConfig.Certificates = []tls.Certificate{*cert}
+			clientCert = *cert
+			certLoaded = true
 			log.Debug("[ExternalServices] Successfully loaded certificate from store")
 		} else if serviceConfig.MTLS.IsFileBasedConfig() {
 			// Priority 2: File-based certificates (existing behavior)
@@ -390,10 +387,22 @@ func (f *ExternalHTTPClientFactory) getTLSConfig(serviceConfig config.ServiceCon
 				log.WithError(err).Error("[ExternalServices] Failed to load certificate from files")
 				return nil, fmt.Errorf("%w: %w", ErrMTLSCertificateLoad, err)
 			}
-			tlsConfig.Certificates = []tls.Certificate{cert}
-			log.Debugf("[ExternalServices] Successfully loaded certificate from files (cert count: %d)", len(tlsConfig.Certificates))
+			clientCert = cert
+			certLoaded = true
+			log.Debugf("[ExternalServices] Successfully loaded certificate from files")
 		} else {
 			log.Warn("[ExternalServices] MTLS enabled but no certificate configuration provided")
+		}
+
+		// Set up GetClientCertificate callback to provide our certificate
+		if certLoaded {
+			tlsConfig.GetClientCertificate = func(cri *tls.CertificateRequestInfo) (*tls.Certificate, error) {
+				log.Debugf("[ExternalServices] GetClientCertificate called - Server requested client cert")
+				log.Debugf("[ExternalServices] Server AcceptableCAs: %d", len(cri.AcceptableCAs))
+				log.Debugf("[ExternalServices] Server SignatureSchemes: %v", cri.SignatureSchemes)
+				log.Debug("[ExternalServices] Returning client certificate")
+				return &clientCert, nil
+			}
 		}
 
 		// Load CA certificates from store or file
