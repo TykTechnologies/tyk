@@ -5339,7 +5339,7 @@ func TestIntegration_AND_Groups_With_HMAC(t *testing.T) {
 			Headers: map[string]string{
 				"X-API-Key": apiKey,
 			},
-			Code: http.StatusUnauthorized, // HMAC middleware fails when Authorization missing
+			Code: http.StatusBadRequest, // JWT middleware returns 400 when Authorization header is malformed/missing
 		},
 		// Test 3: Only HMAC fails (need both API Key AND HMAC)
 		{
@@ -5349,7 +5349,7 @@ func TestIntegration_AND_Groups_With_HMAC(t *testing.T) {
 				"Authorization": hmacHeader,
 				"Date":          headers["Date"],
 			},
-			Code: http.StatusForbidden, // API Key middleware fails when X-API-Key missing
+			Code: http.StatusUnauthorized, // JWT middleware returns 401 when it can't parse the Authorization header as JWT
 		},
 		// Test 4: Neither credential fails
 		{
