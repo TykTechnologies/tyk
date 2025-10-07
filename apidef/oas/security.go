@@ -1202,17 +1202,6 @@ func (s *OAS) extractSecurityTo(api *apidef.APIDefinition) {
 }
 
 func (s *OAS) GetJWTConfiguration() *JWT {
-<<<<<<< HEAD
-	if len(s.Security) == 0 {
-		return nil
-	}
-
-	for keyName := range s.getTykSecuritySchemes() {
-		if _, ok := s.Security[0][keyName]; ok {
-			v := s.Components.SecuritySchemes[keyName].Value
-			if v.Type == typeHTTP && v.Scheme == schemeBearer && v.BearerFormat == bearerFormatJWT {
-				return s.getTykJWTAuth(keyName)
-=======
 	processingMode := SecurityProcessingModeLegacy
 	if s.getTykAuthentication() != nil && s.getTykAuthentication().SecurityProcessingMode != "" {
 		processingMode = s.getTykAuthentication().SecurityProcessingMode
@@ -1264,7 +1253,6 @@ func (s *OAS) GetJWTConfiguration() *JWT {
 						}
 					}
 				}
->>>>>>> 5667cd4d5... [TT-15901] Enhance AuthORWrapper to support authentication methods without SecuritySchemes (#7411)
 			}
 		}
 	}
