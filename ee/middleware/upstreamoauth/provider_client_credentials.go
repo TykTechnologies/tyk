@@ -1,7 +1,9 @@
 package upstreamoauth
 
 import (
+	"bytes"
 	"context"
+	"io"
 	"net/http"
 
 	"golang.org/x/oauth2"
@@ -15,7 +17,27 @@ type loggingRoundTripper struct {
 
 func (l *loggingRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 	// Log the request
-	l.logger("[UpstreamOAuth] Making request to: %s", req.URL.String())
+	l.logger("[UpstreamOAuth] Making request to: %s %s", req.Method, req.URL.String())
+
+	// Log request headers
+	l.logger("[UpstreamOAuth] Request headers:")
+	for name, values := range req.Header {
+		for _, value := range values {
+			// Mask sensitive values
+			displayValue := value
+			if name == "Authorization" && len(value) > 20 {
+				displayValue = value[:20] + "..."
+			}
+			l.logger("[UpstreamOAuth]   %s: %s", name, displayValue)
+		}
+	}
+
+	// Log request body for POST requests
+	if req.Method == "POST" && req.Body != nil {
+		bodyBytes, _ := io.ReadAll(req.Body)
+		req.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
+		l.logger("[UpstreamOAuth] Request body: %s", string(bodyBytes))
+	}
 
 	// Check if we have TLS config
 	if transport, ok := l.base.(*http.Transport); ok {
@@ -38,6 +60,13 @@ func (l *loggingRoundTripper) RoundTrip(req *http.Request) (*http.Response, erro
 		l.logger("[UpstreamOAuth] Request failed: %v", err)
 	} else {
 		l.logger("[UpstreamOAuth] Request succeeded: %d", resp.StatusCode)
+
+		// Log response body for errors
+		if resp.StatusCode >= 400 {
+			bodyBytes, _ := io.ReadAll(resp.Body)
+			resp.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
+			l.logger("[UpstreamOAuth] Response body: %s", string(bodyBytes))
+		}
 	}
 
 	return resp, err
