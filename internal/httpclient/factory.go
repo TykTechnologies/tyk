@@ -351,6 +351,13 @@ func splitBypassProxy(bypassProxy string) []string {
 func (f *ExternalHTTPClientFactory) getTLSConfig(serviceConfig config.ServiceConfig) (*tls.Config, error) {
 	tlsConfig := &tls.Config{
 		InsecureSkipVerify: serviceConfig.MTLS.InsecureSkipVerify,
+		// Force GetClientCertificate to always provide our certificate
+		GetClientCertificate: func(cri *tls.CertificateRequestInfo) (*tls.Certificate, error) {
+			log.Debugf("[ExternalServices] GetClientCertificate called - Server requested client cert")
+			log.Debugf("[ExternalServices] Server AcceptableCAs: %d", len(cri.AcceptableCAs))
+			log.Debugf("[ExternalServices] Server SignatureSchemes: %v", cri.SignatureSchemes)
+			return nil, nil // Return nil to use Certificates field instead
+		},
 	}
 
 	log.Debugf("[ExternalServices] getTLSConfig - MTLS.Enabled=%v, CertFile=%s, KeyFile=%s",
