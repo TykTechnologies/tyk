@@ -171,11 +171,11 @@ func recordGraphDetails(rec *analytics.AnalyticsRecord, r *http.Request, resp *h
 
 const traceTagPrefix = "tyk-trace-"
 
-func (s *SuccessHandler) addTraceIDTag(ctx context.Context, tags []string) []string {
+func (s *SuccessHandler) addTraceIDTag(reqCtx context.Context, tags []string) []string {
 	if !s.Gw.GetConfig().OpenTelemetry.Enabled {
 		return tags
 	}
-	if id := otel.ExtractTraceID(ctx); id != "" {
+	if id := otel.ExtractTraceID(reqCtx); id != "" {
 		tags = append(tags, traceTagPrefix+id)
 	}
 	return tags

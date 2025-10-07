@@ -324,8 +324,6 @@ func TestAddTraceIDToContextVars(t *testing.T) {
 			if diff := cmp.Diff(vars, tc.want); diff != "" {
 				t.Fatalf("vars mismatch (-got +want):\n%s", diff)
 			}
-
-			vars = mw.addTraceIDToContextVars(tc.ctx, nil)
 		})
 	}
 }
