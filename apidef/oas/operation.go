@@ -15,7 +15,7 @@ import (
 	"github.com/TykTechnologies/tyk/regexp"
 )
 
-// Operations holds Operation definitions. The string key in this object is the `operationID`, which is a unique identifier for each API operation. 
+// Operations holds Operation definitions. The string key in this object is the `operationID`, which is a unique identifier for each API operation.
 type Operations map[string]*Operation
 
 // Operation holds a request operation configuration, allowances, tranformations, caching, timeouts and validation.
