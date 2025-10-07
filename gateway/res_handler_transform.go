@@ -5,6 +5,7 @@ import (
 	"compress/flate"
 	"compress/gzip"
 	"encoding/json"
+	"errors"
 	"io"
 	"io/ioutil"
 	"net/http"
@@ -119,8 +120,30 @@ func (r *ResponseTransformMiddleware) HandleResponse(rw http.ResponseWriter, res
 	tmeta := meta.(*TransformSpec)
 
 	respBody := respBodyReader(req, res)
-	body, _ := ioutil.ReadAll(respBody)
 	defer respBody.Close()
+
+	var reader io.Reader = respBody
+	maxSize := r.Gw.GetConfig().HttpServerOptions.MaxResponseBodySize
+	if maxSize > 0 {
+		reader = io.LimitReader(respBody, maxSize+1)
+	}
+
+	body, err := ioutil.ReadAll(reader)
+	if err != nil {
+		logger.WithError(err).Error("Error reading response body")
+		return err
+	}
+
+	if maxSize > 0 && int64(len(body)) > maxSize {
+		logger.WithFields(logrus.Fields{
+			"max_size": maxSize,
+		}).Error("Response body exceeded maximum size limit")
+
+		handler := ErrorHandler{&BaseMiddleware{Spec: r.Spec, Gw: r.Gw}}
+		handler.HandleError(rw, req, "Response body too large", http.StatusInternalServerError, true)
+
+		return errors.New("response body size exceeded the allowed limit")
+	}
 
 	// Put into an interface:
 	bodyData := make(map[string]interface{})
