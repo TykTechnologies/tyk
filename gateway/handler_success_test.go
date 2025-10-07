@@ -414,7 +414,7 @@ func TestSuccessHandler_addTraceIDTag(t *testing.T) {
 			tags := make([]string, 0, len(tc.in))
 			tags = append(tags, tc.in...)
 
-			s.addTraceIDTag(tc.ctx, &tags)
+			tags = s.addTraceIDTag(tc.ctx, tags)
 
 			want := tc.want
 			if want == nil {
@@ -424,8 +424,6 @@ func TestSuccessHandler_addTraceIDTag(t *testing.T) {
 			if diff := cmp.Diff(tags, want); diff != "" {
 				t.Fatalf("tags mismatch (-got +want):\n%s", diff)
 			}
-
-			s.addTraceIDTag(tc.ctx, nil)
 		})
 	}
 }

@@ -319,13 +319,13 @@ func TestAddTraceIDToContextVars(t *testing.T) {
 			ts.Gw.SetConfig(cfg)
 
 			vars := map[string]interface{}{}
-			mw.addTraceIDToContextVars(tc.ctx, vars)
+			vars = mw.addTraceIDToContextVars(tc.ctx, vars)
 
 			if diff := cmp.Diff(vars, tc.want); diff != "" {
 				t.Fatalf("vars mismatch (-got +want):\n%s", diff)
 			}
 
-			mw.addTraceIDToContextVars(tc.ctx, nil)
+			vars = mw.addTraceIDToContextVars(tc.ctx, nil)
 		})
 	}
 }
