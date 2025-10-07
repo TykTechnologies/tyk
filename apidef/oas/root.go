@@ -131,7 +131,7 @@ type State struct {
 	// Active enables the API so that Tyk will listen for and process requests made to the listenPath.
 	// Tyk classic API definition: `active`
 	Active bool `bson:"active" json:"active"` // required
-	// This field controls the exposure of the API on the Gateway.
+	// Internal controls the exposure of the API on the Gateway.
 	// When set to `true`, the API will not be made available for external access and will not be included in API listings returned by the Gateway's management APIs;
 	// it will be accessible only via [internal looping]({{< ref "advanced-configuration/transform-traffic/looping" >}}) or as a [child API version]({{< ref "api-management/api-versioning#base-and-child-apis" >}}).
 	// 
