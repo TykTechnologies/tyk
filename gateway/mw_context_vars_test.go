@@ -194,7 +194,12 @@ func testPrepareTestContextVarsMiddleware() map[string]testContextVarsData {
 }
 
 func TestContextVarsMiddlewareProcessRequest(t *testing.T) {
-	mw := &MiddlewareContextVars{}
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	mw := &MiddlewareContextVars{
+		BaseMiddleware: &BaseMiddleware{Gw: ts.Gw},
+	}
 
 	tests := testPrepareTestContextVarsMiddleware()
 
@@ -233,7 +238,12 @@ func TestContextVarsMiddlewareProcessRequest(t *testing.T) {
 }
 
 func BenchmarkContextVarsMiddlewareProcessRequest(b *testing.B) {
-	mw := &MiddlewareContextVars{}
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	mw := &MiddlewareContextVars{
+		BaseMiddleware: &BaseMiddleware{Gw: ts.Gw},
+	}
 	tests := testPrepareTestContextVarsMiddleware()
 	var err error
 	var code int
