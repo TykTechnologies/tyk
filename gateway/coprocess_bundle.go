@@ -222,8 +222,10 @@ func (ZipBundleSaver) Save(bundle *Bundle, bundlePath string, spec *APISpec) err
 func validateZipPath(filePath string, bundlePath string, spec *APISpec) error {
 	cleanPath := filepath.Clean(filePath)
 
-	if filepath.IsAbs(cleanPath) {
-		return bundleError(spec, nil, fmt.Sprintf("Invalid file path in bundle: %s", filePath))
+	invalidPathErr := bundleError(spec, nil, fmt.Sprintf("Invalid file path in bundle: %s", filePath))
+
+	if filepath.IsAbs(cleanPath) || filepath.VolumeName(cleanPath) != "" {
+		return invalidPathErr
 	}
 
 	destPath := filepath.Join(bundlePath, cleanPath)
@@ -233,7 +235,7 @@ func validateZipPath(filePath string, bundlePath string, spec *APISpec) error {
 	}
 
 	if strings.HasPrefix(relPath, "..") {
-		return bundleError(spec, nil, fmt.Sprintf("Invalid file path in bundle: %s", filePath))
+		return invalidPathErr
 	}
 
 	return nil
