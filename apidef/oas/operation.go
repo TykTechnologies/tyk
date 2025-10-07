@@ -27,7 +27,6 @@ type Operation struct {
 	Block *Allowance `bson:"block,omitempty" json:"block,omitempty"`
 
 	// IgnoreAuthentication ignores authentication on request by allowance.
-	// 
 	// Tyk classic API definition: version_data.versions..extended_paths.ignored[].
 	IgnoreAuthentication *Allowance `bson:"ignoreAuthentication,omitempty" json:"ignoreAuthentication,omitempty"`
 
