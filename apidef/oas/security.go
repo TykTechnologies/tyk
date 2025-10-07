@@ -977,22 +977,31 @@ func (s *OAS) fillSecurity(api apidef.APIDefinition) {
 
 		if len(api.SecurityRequirements) > 0 {
 			for _, requirement := range api.SecurityRequirements {
-				isVendorOnly := true
+				hasProprietaryAuth := false
+				hasStandardAuth := false
 				oasReq := openapi3.NewSecurityRequirement()
 				vendorReq := []string{}
 
+				// First pass: check what types of auth we have
 				for _, schemeName := range requirement {
 					if isProprietaryAuth(schemeName) {
+						hasProprietaryAuth = true
 						vendorReq = append(vendorReq, schemeName)
 					} else {
+						hasStandardAuth = true
 						oasReq[schemeName] = []string{}
-						isVendorOnly = false
 					}
 				}
 
-				if isVendorOnly && len(vendorReq) > 0 {
+				// If requirement has BOTH proprietary and standard auth (mixed AND requirement),
+				// the entire requirement goes to vendor security
+				if hasProprietaryAuth && hasStandardAuth {
+					vendorSecurity = append(vendorSecurity, requirement)
+				} else if hasProprietaryAuth {
+					// Only proprietary auth - goes to vendor security
 					vendorSecurity = append(vendorSecurity, vendorReq)
-				} else if len(oasReq) > 0 {
+				} else if hasStandardAuth {
+					// Only standard auth - goes to OAS security
 					oasSecurity = append(oasSecurity, oasReq)
 				}
 			}
@@ -1077,19 +1086,15 @@ func (s *OAS) extractSecurityTo(api *apidef.APIDefinition) {
 		// Concatenate OAS security with vendor extension security
 		api.SecurityRequirements = make([][]string, 0)
 
-		// Add OAS security requirements
-		for _, requirement := range s.Security {
-			schemes := make([]string, 0, len(requirement))
-			for schemeName := range requirement {
-				schemes = append(schemes, schemeName)
-			}
-			api.SecurityRequirements = append(api.SecurityRequirements, schemes)
-		}
+		// Identify standard auth schemes that appear in mixed vendor requirements
+		// to avoid duplicating them in OAS security
+		mixedVendorSchemes := s.identifyMixedVendorAuthSchemes()
+
+		// Add OAS security requirements, filtering out duplicates
+		s.appendFilteredOASSecurityRequirements(&api.SecurityRequirements, mixedVendorSchemes)
 
 		// Add vendor extension security requirements
-		if s.getTykAuthentication() != nil && len(s.getTykAuthentication().Security) > 0 {
-			api.SecurityRequirements = append(api.SecurityRequirements, s.getTykAuthentication().Security...)
-		}
+		s.appendVendorSecurityRequirements(&api.SecurityRequirements)
 	} else if len(s.Security) > 1 {
 		api.SecurityRequirements = make([][]string, 0, len(s.Security))
 		for _, requirement := range s.Security {
@@ -1116,6 +1121,17 @@ func (s *OAS) extractSecurityTo(api *apidef.APIDefinition) {
 	if processingMode == SecurityProcessingModeCompliant && len(s.Security) > 0 {
 		// Process all requirements in compliant mode
 		requirementsToProcess = s.Security
+
+		// Also process vendor extension security requirements
+		if tykAuth != nil && len(tykAuth.Security) > 0 {
+			for _, vendorReq := range tykAuth.Security {
+				secReq := openapi3.NewSecurityRequirement()
+				for _, schemeName := range vendorReq {
+					secReq[schemeName] = []string{}
+				}
+				requirementsToProcess = append(requirementsToProcess, secReq)
+			}
+		}
 	} else if len(s.Security) > 0 && tykAuth != nil && (tykAuth.Enabled || hasEnabledSchemes) {
 		// Legacy mode - process first requirement if Tyk authentication is enabled OR has security schemes defined
 		requirementsToProcess = s.Security[:1]
@@ -1186,15 +1202,57 @@ func (s *OAS) extractSecurityTo(api *apidef.APIDefinition) {
 }
 
 func (s *OAS) GetJWTConfiguration() *JWT {
-	if len(s.Security) == 0 {
-		return nil
+	processingMode := SecurityProcessingModeLegacy
+	if s.getTykAuthentication() != nil && s.getTykAuthentication().SecurityProcessingMode != "" {
+		processingMode = s.getTykAuthentication().SecurityProcessingMode
 	}
 
-	for keyName := range s.getTykSecuritySchemes() {
-		if _, ok := s.Security[0][keyName]; ok {
-			v := s.Components.SecuritySchemes[keyName].Value
-			if v.Type == typeHTTP && v.Scheme == schemeBearer && v.BearerFormat == bearerFormatJWT {
-				return s.getTykJWTAuth(keyName)
+	// Helper function to check if a scheme is JWT
+	isJWTScheme := func(schemeName string) bool {
+		if s.Components == nil || s.Components.SecuritySchemes == nil {
+			return false
+		}
+		scheme, ok := s.Components.SecuritySchemes[schemeName]
+		if !ok {
+			return false
+		}
+		v := scheme.Value
+		return v.Type == typeHTTP && v.Scheme == schemeBearer && v.BearerFormat == bearerFormatJWT
+	}
+
+	if processingMode == SecurityProcessingModeLegacy {
+		// Legacy mode: only check the first security requirement in OAS security
+		if len(s.Security) > 0 {
+			for keyName := range s.getTykSecuritySchemes() {
+				if _, ok := s.Security[0][keyName]; ok && isJWTScheme(keyName) {
+					return s.getTykJWTAuth(keyName)
+				}
+			}
+		}
+	} else {
+		// Compliant mode: check ALL security requirements (OAS + vendor) for OR authentication support
+
+		// First check OAS security requirements
+		for _, securityRequirement := range s.Security {
+			for keyName := range s.getTykSecuritySchemes() {
+				if _, ok := securityRequirement[keyName]; ok && isJWTScheme(keyName) {
+					return s.getTykJWTAuth(keyName)
+				}
+			}
+		}
+
+		// Also check vendor extension security requirements
+		if s.getTykAuthentication() != nil && len(s.getTykAuthentication().Security) > 0 {
+			for _, vendorReq := range s.getTykAuthentication().Security {
+				for _, schemeName := range vendorReq {
+					// Check if this scheme is JWT and has Tyk config
+					if isJWTScheme(schemeName) {
+						jwt := s.getTykJWTAuth(schemeName)
+						if jwt != nil {
+							return jwt
+						}
+					}
+				}
 			}
 		}
 	}
@@ -1459,5 +1517,78 @@ func setTokenURLIfEmpty(flow *openapi3.OAuthFlow) {
 func setScopesIfEmpty(flow *openapi3.OAuthFlow) {
 	if flow.Scopes == nil {
 		flow.Scopes = make(map[string]string)
+	}
+}
+
+// identifyMixedVendorAuthSchemes collects all standard (non-proprietary) auth schemes
+// that appear in vendor security requirements alongside proprietary auth schemes.
+// These are "mixed" requirements like [hmac, jwtAuth] where both proprietary and
+// standard auth are required together (AND logic).
+//
+// Returns a map of scheme names that should not be duplicated in OAS security.
+func (s *OAS) identifyMixedVendorAuthSchemes() map[string]bool {
+	mixedSchemes := make(map[string]bool)
+
+	tykAuth := s.getTykAuthentication()
+	if tykAuth == nil || len(tykAuth.Security) == 0 {
+		return mixedSchemes
+	}
+
+	for _, vendorReq := range tykAuth.Security {
+		hasProprietary := false
+		hasStandard := false
+
+		// First pass: determine if this requirement has both types
+		for _, schemeName := range vendorReq {
+			if isProprietaryAuth(schemeName) {
+				hasProprietary = true
+			} else {
+				hasStandard = true
+			}
+		}
+
+		// If mixed requirement, mark all standard schemes
+		if hasProprietary && hasStandard {
+			for _, schemeName := range vendorReq {
+				if !isProprietaryAuth(schemeName) {
+					mixedSchemes[schemeName] = true
+				}
+			}
+		}
+	}
+
+	return mixedSchemes
+}
+
+// appendFilteredOASSecurityRequirements adds OAS security requirements to the API definition,
+// skipping any single-scheme requirements that are already part of mixed vendor requirements.
+// This prevents duplication when a scheme like "jwtAuth" appears both in OAS security
+// as a single requirement and in vendor security as part of a mixed requirement.
+func (s *OAS) appendFilteredOASSecurityRequirements(apiSecurityReqs *[][]string, mixedVendorSchemes map[string]bool) {
+	for _, requirement := range s.Security {
+		schemes := make([]string, 0, len(requirement))
+		skip := false
+
+		for schemeName := range requirement {
+			schemes = append(schemes, schemeName)
+			// Skip single-scheme requirements that are in mixed vendor requirements
+			if len(requirement) == 1 && mixedVendorSchemes[schemeName] {
+				skip = true
+				break
+			}
+		}
+
+		if !skip {
+			*apiSecurityReqs = append(*apiSecurityReqs, schemes)
+		}
+	}
+}
+
+// appendVendorSecurityRequirements adds vendor extension security requirements
+// to the API definition if they exist.
+func (s *OAS) appendVendorSecurityRequirements(apiSecurityReqs *[][]string) {
+	tykAuth := s.getTykAuthentication()
+	if tykAuth != nil && len(tykAuth.Security) > 0 {
+		*apiSecurityReqs = append(*apiSecurityReqs, tykAuth.Security...)
 	}
 }
