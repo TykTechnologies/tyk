@@ -169,7 +169,7 @@ func recordGraphDetails(rec *analytics.AnalyticsRecord, r *http.Request, resp *h
 	rec.GraphQLStats = stats
 }
 
-const traceTagPrefix = "tyk-trace-"
+const traceTagPrefix = "trace-id-"
 
 func (s *SuccessHandler) addTraceIDTag(reqCtx context.Context, tags []string) []string {
 	if !s.Gw.GetConfig().OpenTelemetry.Enabled {
