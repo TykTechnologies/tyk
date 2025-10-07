@@ -741,7 +741,8 @@ func (c *Cache) ExtractTo(cache *apidef.CacheOptions) {
 	cache.CacheControlTTLHeader = c.ControlTTLHeaderName
 }
 
-// Paths is a mapping of API endpoints to Path plugin configurations.
+// Paths is a mapping of API endpoints to Path plugin configurations. This field is part of the [Middleware](#middleware) structure.
+// The string keys in this object represent URL path patterns (e.g. `/users`, `/users/{id}`, `/api/*`) that match API endpoints.
 type Paths map[string]*Path
 
 // Fill fills *Paths (map) from apidef.ExtendedPathSet.
@@ -994,6 +995,8 @@ type Plugins struct {
 	Block *Allowance `bson:"block,omitempty" json:"block,omitempty"`
 
 	// IgnoreAuthentication ignores authentication on request by allowance.
+	//
+	// Tyk classic API definition: version_data.versions..extended_paths.ignored[].
 	IgnoreAuthentication *Allowance `bson:"ignoreAuthentication,omitempty" json:"ignoreAuthentication,omitempty"`
 
 	// TransformRequestMethod allows you to transform the method of a request.
