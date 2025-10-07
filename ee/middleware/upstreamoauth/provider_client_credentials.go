@@ -48,6 +48,18 @@ func (l *loggingRoundTripper) RoundTrip(req *http.Request) (*http.Response, erro
 			// Log certificate details
 			for i, cert := range transport.TLSClientConfig.Certificates {
 				l.logger("[UpstreamOAuth] Certificate[%d]: has %d certs in chain", i, len(cert.Certificate))
+
+				// Verify private key is present
+				if cert.PrivateKey != nil {
+					l.logger("[UpstreamOAuth] Certificate[%d]: PrivateKey present (type: %T)", i, cert.PrivateKey)
+				} else {
+					l.logger("[UpstreamOAuth] Certificate[%d]: WARNING - NO PrivateKey!", i)
+				}
+
+				// Check if Leaf certificate is parsed
+				if cert.Leaf != nil {
+					l.logger("[UpstreamOAuth] Certificate[%d]: Leaf cert subject: %s", i, cert.Leaf.Subject.String())
+				}
 			}
 		} else {
 			l.logger("[UpstreamOAuth] RoundTrip - NO TLS config!")
