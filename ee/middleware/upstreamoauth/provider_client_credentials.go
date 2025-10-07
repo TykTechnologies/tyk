@@ -12,7 +12,18 @@ func (client *ClientCredentialsClient) ObtainToken(ctx context.Context) (*oauth2
 
 	// Use external services HTTP client if configured
 	if httpClient := client.getHTTPClient(); httpClient != nil {
+		client.mw.Logger().Debugf("[UpstreamOAuth] Setting custom HTTP client in context - Transport type: %T", httpClient.Transport)
+		if transport, ok := httpClient.Transport.(*http.Transport); ok {
+			if transport.TLSClientConfig != nil {
+				client.mw.Logger().Debugf("[UpstreamOAuth] TLS config present - Certificates: %d, InsecureSkipVerify: %v",
+					len(transport.TLSClientConfig.Certificates), transport.TLSClientConfig.InsecureSkipVerify)
+			} else {
+				client.mw.Logger().Warn("[UpstreamOAuth] TLS config is nil!")
+			}
+		}
 		ctx = context.WithValue(ctx, oauth2.HTTPClient, httpClient)
+	} else {
+		client.mw.Logger().Warn("[UpstreamOAuth] No custom HTTP client configured, oauth2 will use default client")
 	}
 
 	tokenSource := cfg.TokenSource(ctx)
