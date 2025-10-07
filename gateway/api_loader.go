@@ -338,36 +338,54 @@ func (gw *Gateway) processSpec(
 	if !spec.UseKeylessAccess {
 		// Select the keying method to use for setting session states
 		oauth2MW := &Oauth2KeyExists{baseMid.Copy()}
+		oauth2MW.Spec = spec
+		oauth2MW.Gw = gw
+		oauth2MW.Init()
 		if gw.mwAppendEnabled(&authArray, oauth2MW) {
 			logger.Info("Checking security policy: OAuth")
 			authMiddlewares = append(authMiddlewares, oauth2MW)
 		}
 
 		extOAuthMW := &ExternalOAuthMiddleware{baseMid.Copy()}
+		extOAuthMW.Spec = spec
+		extOAuthMW.Gw = gw
+		extOAuthMW.Init()
 		if gw.mwAppendEnabled(&authArray, extOAuthMW) {
 			logger.Info("Checking security policy: External OAuth")
 			authMiddlewares = append(authMiddlewares, extOAuthMW)
 		}
 
 		basicAuthMW := &BasicAuthKeyIsValid{baseMid.Copy(), nil, nil}
+		basicAuthMW.Spec = spec
+		basicAuthMW.Gw = gw
+		basicAuthMW.Init()
 		if gw.mwAppendEnabled(&authArray, basicAuthMW) {
 			logger.Info("Checking security policy: Basic")
 			authMiddlewares = append(authMiddlewares, basicAuthMW)
 		}
 
 		hmacMW := &HTTPSignatureValidationMiddleware{BaseMiddleware: baseMid.Copy()}
+		hmacMW.Spec = spec
+		hmacMW.Gw = gw
+		hmacMW.Init()
 		if gw.mwAppendEnabled(&authArray, hmacMW) {
 			logger.Info("Checking security policy: HMAC")
 			authMiddlewares = append(authMiddlewares, hmacMW)
 		}
 
 		jwtMW := &JWTMiddleware{BaseMiddleware: baseMid.Copy()}
+		jwtMW.Spec = spec
+		jwtMW.Gw = gw
+		jwtMW.Init()
 		if gw.mwAppendEnabled(&authArray, jwtMW) {
 			logger.Info("Checking security policy: JWT")
 			authMiddlewares = append(authMiddlewares, jwtMW)
 		}
 
 		openIDMW := &OpenIDMW{BaseMiddleware: baseMid.Copy()}
+		openIDMW.Spec = spec
+		openIDMW.Gw = gw
+		openIDMW.Init()
 		if gw.mwAppendEnabled(&authArray, openIDMW) {
 			logger.Info("Checking security policy: OpenID")
 			authMiddlewares = append(authMiddlewares, openIDMW)
