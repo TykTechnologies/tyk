@@ -1054,8 +1054,8 @@ func TestOAS_extractSecurityTo_VendorExtensionSecurity(t *testing.T) {
 	t.Run("should keep mixed auth requirement in vendor security when filling OAS", func(t *testing.T) {
 		var api apidef.APIDefinition
 		api.SecurityRequirements = [][]string{
-			{"authToken"},          // Pure OAS auth
-			{"hmac", "jwtAuth"},    // Mixed: proprietary + standard
+			{"authToken"},       // Pure OAS auth
+			{"hmac", "jwtAuth"}, // Mixed: proprietary + standard
 		}
 
 		var oas OAS

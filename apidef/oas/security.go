@@ -1086,53 +1086,15 @@ func (s *OAS) extractSecurityTo(api *apidef.APIDefinition) {
 		// Concatenate OAS security with vendor extension security
 		api.SecurityRequirements = make([][]string, 0)
 
-		// First, collect all auth schemes that appear in vendor security mixed requirements
-		// (requirements that have both proprietary and standard auth)
-		schemesInMixedVendorReqs := make(map[string]bool)
-		if s.getTykAuthentication() != nil && len(s.getTykAuthentication().Security) > 0 {
-			for _, vendorReq := range s.getTykAuthentication().Security {
-				hasProprietary := false
-				hasStandard := false
-				for _, schemeName := range vendorReq {
-					if isProprietaryAuth(schemeName) {
-						hasProprietary = true
-					} else {
-						hasStandard = true
-					}
-				}
-				// If mixed requirement, mark all standard schemes as being in mixed vendor
-				if hasProprietary && hasStandard {
-					for _, schemeName := range vendorReq {
-						if !isProprietaryAuth(schemeName) {
-							schemesInMixedVendorReqs[schemeName] = true
-						}
-					}
-				}
-			}
-		}
+		// Identify standard auth schemes that appear in mixed vendor requirements
+		// to avoid duplicating them in OAS security
+		mixedVendorSchemes := s.identifyMixedVendorAuthSchemes()
 
-		// Add OAS security requirements, but skip any that would be duplicates
-		// of schemes in mixed vendor requirements
-		for _, requirement := range s.Security {
-			schemes := make([]string, 0, len(requirement))
-			skip := false
-			for schemeName := range requirement {
-				schemes = append(schemes, schemeName)
-				// If this is a single-scheme requirement and it's in a mixed vendor req, skip it
-				if len(requirement) == 1 && schemesInMixedVendorReqs[schemeName] {
-					skip = true
-					break
-				}
-			}
-			if !skip {
-				api.SecurityRequirements = append(api.SecurityRequirements, schemes)
-			}
-		}
+		// Add OAS security requirements, filtering out duplicates
+		s.appendFilteredOASSecurityRequirements(&api.SecurityRequirements, mixedVendorSchemes)
 
 		// Add vendor extension security requirements
-		if s.getTykAuthentication() != nil && len(s.getTykAuthentication().Security) > 0 {
-			api.SecurityRequirements = append(api.SecurityRequirements, s.getTykAuthentication().Security...)
-		}
+		s.appendVendorSecurityRequirements(&api.SecurityRequirements)
 	} else if len(s.Security) > 1 {
 		api.SecurityRequirements = make([][]string, 0, len(s.Security))
 		for _, requirement := range s.Security {
@@ -1555,5 +1517,78 @@ func setTokenURLIfEmpty(flow *openapi3.OAuthFlow) {
 func setScopesIfEmpty(flow *openapi3.OAuthFlow) {
 	if flow.Scopes == nil {
 		flow.Scopes = make(map[string]string)
+	}
+}
+
+// identifyMixedVendorAuthSchemes collects all standard (non-proprietary) auth schemes
+// that appear in vendor security requirements alongside proprietary auth schemes.
+// These are "mixed" requirements like [hmac, jwtAuth] where both proprietary and
+// standard auth are required together (AND logic).
+//
+// Returns a map of scheme names that should not be duplicated in OAS security.
+func (s *OAS) identifyMixedVendorAuthSchemes() map[string]bool {
+	mixedSchemes := make(map[string]bool)
+
+	tykAuth := s.getTykAuthentication()
+	if tykAuth == nil || len(tykAuth.Security) == 0 {
+		return mixedSchemes
+	}
+
+	for _, vendorReq := range tykAuth.Security {
+		hasProprietary := false
+		hasStandard := false
+
+		// First pass: determine if this requirement has both types
+		for _, schemeName := range vendorReq {
+			if isProprietaryAuth(schemeName) {
+				hasProprietary = true
+			} else {
+				hasStandard = true
+			}
+		}
+
+		// If mixed requirement, mark all standard schemes
+		if hasProprietary && hasStandard {
+			for _, schemeName := range vendorReq {
+				if !isProprietaryAuth(schemeName) {
+					mixedSchemes[schemeName] = true
+				}
+			}
+		}
+	}
+
+	return mixedSchemes
+}
+
+// appendFilteredOASSecurityRequirements adds OAS security requirements to the API definition,
+// skipping any single-scheme requirements that are already part of mixed vendor requirements.
+// This prevents duplication when a scheme like "jwtAuth" appears both in OAS security
+// as a single requirement and in vendor security as part of a mixed requirement.
+func (s *OAS) appendFilteredOASSecurityRequirements(apiSecurityReqs *[][]string, mixedVendorSchemes map[string]bool) {
+	for _, requirement := range s.Security {
+		schemes := make([]string, 0, len(requirement))
+		skip := false
+
+		for schemeName := range requirement {
+			schemes = append(schemes, schemeName)
+			// Skip single-scheme requirements that are in mixed vendor requirements
+			if len(requirement) == 1 && mixedVendorSchemes[schemeName] {
+				skip = true
+				break
+			}
+		}
+
+		if !skip {
+			*apiSecurityReqs = append(*apiSecurityReqs, schemes)
+		}
+	}
+}
+
+// appendVendorSecurityRequirements adds vendor extension security requirements
+// to the API definition if they exist.
+func (s *OAS) appendVendorSecurityRequirements(apiSecurityReqs *[][]string) {
+	tykAuth := s.getTykAuthentication()
+	if tykAuth != nil && len(tykAuth.Security) > 0 {
+		*apiSecurityReqs = append(*apiSecurityReqs, tykAuth.Security...)
 	}
 }
