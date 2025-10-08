@@ -1075,7 +1075,7 @@ func (s *OAS) fillSecurity(api apidef.APIDefinition) {
 
 				// First pass: check what types of auth we have
 				for _, schemeName := range requirement {
-					if s.isProprietaryAuthScheme(schemeName) {
+					if isProprietaryAuth(schemeName) {
 						hasProprietaryAuth = true
 						vendorReq = append(vendorReq, schemeName)
 					} else {
@@ -1215,14 +1215,9 @@ func (s *OAS) extractSecurityTo(api *apidef.APIDefinition) {
 
 	if processingMode == SecurityProcessingModeCompliant {
 		// Process all requirements in compliant mode
-		requirementsToProcess = make([]openapi3.SecurityRequirement, 0)
+		requirementsToProcess = s.Security
 
-		// Add OAS security requirements if present
-		if len(s.Security) > 0 {
-			requirementsToProcess = append(requirementsToProcess, s.Security...)
-		}
-
-		// Add vendor extension security requirements if present (independent of OAS security)
+		// Also process vendor extension security requirements
 		if tykAuth != nil && len(tykAuth.Security) > 0 {
 			for _, vendorReq := range tykAuth.Security {
 				secReq := openapi3.NewSecurityRequirement()
