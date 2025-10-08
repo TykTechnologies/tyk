@@ -1,6 +1,8 @@
 package oas
 
 import (
+	"fmt"
+
 	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/lonelycode/osin"
 
@@ -1033,6 +1035,8 @@ func (s *OAS) isProprietarySchemeType(scheme interface{}) bool {
 }
 
 func (s *OAS) fillSecurity(api apidef.APIDefinition) {
+	fmt.Println("🔧 DEBUG: Using PR version with isProprietaryAuthScheme fix")
+
 	tykAuthentication := s.GetTykExtension().Server.Authentication
 	if tykAuthentication == nil {
 		tykAuthentication = &Authentication{}
@@ -1075,7 +1079,9 @@ func (s *OAS) fillSecurity(api apidef.APIDefinition) {
 
 				// First pass: check what types of auth we have
 				for _, schemeName := range requirement {
-					if isProprietaryAuth(schemeName) {
+					isProprietary := s.isProprietaryAuthScheme(schemeName)
+
+					if isProprietary {
 						hasProprietaryAuth = true
 						vendorReq = append(vendorReq, schemeName)
 					} else {
