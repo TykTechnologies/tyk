@@ -941,6 +941,97 @@ func isProprietaryAuth(authMethod string) bool {
 	return false
 }
 
+// isProprietaryAuthScheme checks if a security scheme name refers to Tyk proprietary auth.
+// It identifies proprietary schemes by checking:
+// 1. Known proprietary type names (hmac, custom, mtls, coprocess)
+// 2. Presence in vendor extension security without corresponding OAS Component
+// 3. Type inspection of SecuritySchemes entries
+func (s *OAS) isProprietaryAuthScheme(schemeName string) bool {
+	// Check known proprietary auth type names
+	if isProprietaryAuth(schemeName) {
+		return true
+	}
+
+	tykAuth := s.getTykAuthentication()
+	if tykAuth == nil {
+		return false
+	}
+
+	// Priority check: schemes in vendor extension security
+	if s.isInVendorSecurity(schemeName, tykAuth) {
+		return s.isProprietaryInVendor(schemeName, tykAuth)
+	}
+
+	// Fallback: check SecuritySchemes type
+	return s.isProprietaryInSecuritySchemes(schemeName, tykAuth)
+}
+
+// isInVendorSecurity checks if a scheme name appears in vendor extension security requirements
+func (s *OAS) isInVendorSecurity(schemeName string, tykAuth *Authentication) bool {
+	for _, vendorReq := range tykAuth.Security {
+		for _, vendorSchemeName := range vendorReq {
+			if vendorSchemeName == schemeName {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// isProprietaryInVendor determines if a scheme in vendor security is proprietary
+func (s *OAS) isProprietaryInVendor(schemeName string, tykAuth *Authentication) bool {
+	// If not in OAS Components, it's proprietary
+	if !s.isInOASComponents(schemeName) {
+		return true
+	}
+
+	// If in both vendor and OAS, check SecuritySchemes type
+	if tykAuth.SecuritySchemes != nil {
+		if scheme, exists := tykAuth.SecuritySchemes[schemeName]; exists {
+			return s.isProprietarySchemeType(scheme)
+		}
+	}
+
+	// In both but can't determine type, assume standard
+	return false
+}
+
+// isProprietaryInSecuritySchemes checks if a scheme in SecuritySchemes is proprietary
+func (s *OAS) isProprietaryInSecuritySchemes(schemeName string, tykAuth *Authentication) bool {
+	if tykAuth.SecuritySchemes == nil {
+		return false
+	}
+
+	scheme, exists := tykAuth.SecuritySchemes[schemeName]
+	if !exists {
+		return false
+	}
+
+	// Determine by type - standard types are not proprietary even if not in OAS Components yet
+	return s.isProprietarySchemeType(scheme)
+}
+
+// isInOASComponents checks if a scheme exists in OpenAPI Components
+func (s *OAS) isInOASComponents(schemeName string) bool {
+	if s.Components == nil || s.Components.SecuritySchemes == nil {
+		return false
+	}
+	_, exists := s.Components.SecuritySchemes[schemeName]
+	return exists
+}
+
+// isProprietarySchemeType checks if a SecurityScheme type is proprietary
+func (s *OAS) isProprietarySchemeType(scheme interface{}) bool {
+	switch scheme.(type) {
+	case *JWT, *Token, *Basic, *ExternalOAuth:
+		return false // Standard OAS types
+	case *CustomPluginAuthentication:
+		return true // Proprietary
+	default:
+		return true // Unknown types treated as proprietary
+	}
+}
+
 func (s *OAS) fillSecurity(api apidef.APIDefinition) {
 	tykAuthentication := s.GetTykExtension().Server.Authentication
 	if tykAuthentication == nil {
@@ -984,7 +1075,7 @@ func (s *OAS) fillSecurity(api apidef.APIDefinition) {
 
 				// First pass: check what types of auth we have
 				for _, schemeName := range requirement {
-					if isProprietaryAuth(schemeName) {
+					if s.isProprietaryAuthScheme(schemeName) {
 						hasProprietaryAuth = true
 						vendorReq = append(vendorReq, schemeName)
 					} else {
@@ -1009,7 +1100,7 @@ func (s *OAS) fillSecurity(api apidef.APIDefinition) {
 			// No explicit requirements, create from schemes
 			secReq := openapi3.NewSecurityRequirement()
 			for name := range tykAuthentication.SecuritySchemes {
-				if !isProprietaryAuth(name) {
+				if !s.isProprietaryAuthScheme(name) {
 					secReq[name] = []string{}
 				}
 			}
@@ -1070,14 +1161,19 @@ func (s *OAS) extractSecurityTo(api *apidef.APIDefinition) {
 		api.AuthConfigs = make(map[string]apidef.AuthConfig)
 	}
 
-	if len(s.Security) == 0 || s.Components == nil || len(s.Components.SecuritySchemes) == 0 {
-		return
-	}
-
 	// Extract security requirements based on processing mode (OAS-only feature)
 	processingMode := SecurityProcessingModeLegacy
-	if s.getTykAuthentication() != nil && s.getTykAuthentication().SecurityProcessingMode != "" {
-		processingMode = s.getTykAuthentication().SecurityProcessingMode
+	tykAuth := s.getTykAuthentication()
+	if tykAuth != nil && tykAuth.SecurityProcessingMode != "" {
+		processingMode = tykAuth.SecurityProcessingMode
+	}
+
+	// Check if we have any security to process (OAS or vendor extension)
+	hasOASSecurity := len(s.Security) > 0 && s.Components != nil && len(s.Components.SecuritySchemes) > 0
+	hasVendorSecurity := processingMode == SecurityProcessingModeCompliant && tykAuth != nil && len(tykAuth.Security) > 0
+
+	if !hasOASSecurity && !hasVendorSecurity {
+		return
 	}
 
 	// In compliant mode, extract all security requirements including vendor extension
@@ -1111,18 +1207,22 @@ func (s *OAS) extractSecurityTo(api *apidef.APIDefinition) {
 	// - Legacy mode: Process only the first requirement for backward compatibility
 	// BUT only if Tyk authentication is configured (don't auto-extract from bare OAS)
 	requirementsToProcess := []openapi3.SecurityRequirement{}
-	tykAuth := s.getTykAuthentication()
 	hasEnabledSchemes := false
 	if tykAuth != nil && tykAuth.SecuritySchemes != nil {
 		// Check if any security scheme is defined in Tyk extension
 		hasEnabledSchemes = len(tykAuth.SecuritySchemes) > 0
 	}
 
-	if processingMode == SecurityProcessingModeCompliant && len(s.Security) > 0 {
+	if processingMode == SecurityProcessingModeCompliant {
 		// Process all requirements in compliant mode
-		requirementsToProcess = s.Security
+		requirementsToProcess = make([]openapi3.SecurityRequirement, 0)
 
-		// Also process vendor extension security requirements
+		// Add OAS security requirements if present
+		if len(s.Security) > 0 {
+			requirementsToProcess = append(requirementsToProcess, s.Security...)
+		}
+
+		// Add vendor extension security requirements if present (independent of OAS security)
 		if tykAuth != nil && len(tykAuth.Security) > 0 {
 			for _, vendorReq := range tykAuth.Security {
 				secReq := openapi3.NewSecurityRequirement()
