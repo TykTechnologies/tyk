@@ -11,6 +11,12 @@ jobs:
     container:
       image: pingsafe/s1-shift-left-cli:0.5.3
       options: --entrypoint ""
+    permissions:
+      contents: read
+    env:
+        REPO_FULL_NAME: ${{ github.repository }}
+        REPO_URL: ${{ github.server_url }}
+
 
     steps:
       - uses: actions/checkout@v4
@@ -31,16 +37,12 @@ jobs:
         env:
           DEST: ${{ github.event.pull_request.base.sha }}
           SRC: ${{ github.event.pull_request.head.ref }}
-          REPO_FULL_NAME: ${{ github.repository }}
-          REPO_URL: ${{ github.server_url }}
 
       - name: Run IaC Scanner
         run:  s1-cns-cli scan iac -d $PWD --publish-result --repo-full-name $REPO_FULL_NAME  --repo-url $REPO_URL/$REPO_FULL_NAME --branch $BRANCH --provider GITHUB
         id: iac-scanner
         continue-on-error: true
         env:
-          REPO_FULL_NAME: ${{ github.repository }}
-          REPO_URL: ${{ github.server_url }}
           BRANCH: ${{ github.event.pull_request.head.ref }}
 
       - name: Run Vulnerability Scanner
