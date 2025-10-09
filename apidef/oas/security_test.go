@@ -1705,7 +1705,7 @@ func TestCompliantModeSecuritySeparation(t *testing.T) {
 		assert.Nil(t, tykAuth.Security)
 	})
 
-	t.Run("legacy mode keeps traditional behavior", func(t *testing.T) {
+	t.Run("legacy mode filters proprietary auth", func(t *testing.T) {
 		api := apidef.APIDefinition{
 			SecurityRequirements: [][]string{
 				{"jwt"},
@@ -1722,7 +1722,7 @@ func TestCompliantModeSecuritySeparation(t *testing.T) {
 			Server: Server{
 				Authentication: &Authentication{
 					Enabled:                true,
-					SecurityProcessingMode: SecurityProcessingModeLegacy, // Explicitly set to legacy
+					SecurityProcessingMode: SecurityProcessingModeLegacy,
 				},
 			},
 		})
@@ -1730,10 +1730,11 @@ func TestCompliantModeSecuritySeparation(t *testing.T) {
 		// Fill security with legacy mode
 		oas.fillSecurity(api)
 
-		// In legacy mode, all requirements go to OAS Security
-		assert.Len(t, oas.T.Security, 3)
+		// In legacy mode, only NON-PROPRIETARY auth goes to OAS Security
+		// Proprietary auth (hmac) should go to vendor security even in legacy mode
+		assert.Len(t, oas.T.Security, 2) // jwt and apikey only
 
-		// Check that all requirements are in OAS Security
+		// Check that non-proprietary requirements are in OAS Security
 		var foundJwt, foundHmac, foundApikey bool
 		for _, req := range oas.T.Security {
 			if _, ok := req["jwt"]; ok {
@@ -1746,13 +1747,15 @@ func TestCompliantModeSecuritySeparation(t *testing.T) {
 				foundApikey = true
 			}
 		}
-		assert.True(t, foundJwt)
-		assert.True(t, foundHmac)
-		assert.True(t, foundApikey)
+		assert.True(t, foundJwt, "jwt should be in OAS security")
+		assert.False(t, foundHmac, "hmac should NOT be in OAS security")
+		assert.True(t, foundApikey, "apikey should be in OAS security")
 
-		// Vendor security should not be set in legacy mode
+		// Proprietary auth (hmac) should be in vendor security
 		tykAuth := oas.GetTykExtension().Server.Authentication
-		assert.Nil(t, tykAuth.Security)
+		assert.NotNil(t, tykAuth.Security, "vendor security should contain proprietary auth")
+		assert.Len(t, tykAuth.Security, 1, "should have 1 proprietary requirement")
+		assert.Contains(t, tykAuth.Security[0], "hmac", "hmac should be in vendor security")
 	})
 
 	t.Run("compliant mode with getTykAuthentication returns processing mode", func(t *testing.T) {
@@ -2535,5 +2538,349 @@ func TestIsProprietarySchemeType(t *testing.T) {
 		var scheme interface{} = nil
 
 		assert.True(t, oas.isProprietarySchemeType(scheme), "nil should be treated as proprietary")
+	})
+}
+
+func TestModeSwitching(t *testing.T) {
+	t.Run("legacy to compliant with mixed auth", func(t *testing.T) {
+		// Setup: Legacy mode with mixed auth (both standard and proprietary in OAS security)
+		api := apidef.APIDefinition{
+			SecurityRequirements: [][]string{
+				{"jwtAuth"},
+				{"customAuth"},
+			},
+			EnableJWT:              true,
+			CustomPluginAuthEnabled: true,
+			AuthConfigs: map[string]apidef.AuthConfig{
+				apidef.JWTType: {
+					Name:           "jwtAuth",
+					AuthHeaderName: "Authorization",
+				},
+				apidef.CoprocessType: {
+					Name:           "customAuth",
+					AuthHeaderName: "X-Custom-Auth",
+				},
+			},
+		}
+
+		oas := OAS{}
+		oas.SetTykExtension(&XTykAPIGateway{
+			Server: Server{
+				Authentication: &Authentication{
+					Enabled:                true,
+					SecurityProcessingMode: SecurityProcessingModeCompliant, // Switch to compliant
+					SecuritySchemes: SecuritySchemes{
+						"jwtAuth": &JWT{
+							Enabled: true,
+						},
+						"customAuth": &CustomPluginAuthentication{
+							Enabled: true,
+						},
+					},
+				},
+			},
+		})
+
+		// Action: Fill with compliant mode
+		oas.fillSecurity(api)
+
+		// Expected: jwtAuth in OAS security, customAuth in vendor security
+		assert.Len(t, oas.T.Security, 1, "should have 1 OAS requirement")
+		assert.Contains(t, oas.T.Security[0], "jwtAuth", "jwtAuth should be in OAS security")
+		assert.NotContains(t, oas.T.Security[0], "customAuth", "customAuth should NOT be in OAS security")
+
+		tykAuth := oas.GetTykExtension().Server.Authentication
+		assert.NotNil(t, tykAuth.Security, "vendor security should be populated")
+		assert.Len(t, tykAuth.Security, 1, "should have 1 vendor requirement")
+		assert.Contains(t, tykAuth.Security[0], "customAuth", "customAuth should be in vendor security")
+	})
+
+	t.Run("compliant to legacy preserves separation", func(t *testing.T) {
+		// Setup: Compliant mode with properly separated auth
+		api := apidef.APIDefinition{
+			SecurityRequirements: [][]string{
+				{"jwtAuth"},
+				{"customAuth"},
+			},
+			EnableJWT:              true,
+			CustomPluginAuthEnabled: true,
+			AuthConfigs: map[string]apidef.AuthConfig{
+				apidef.JWTType: {
+					Name:           "jwtAuth",
+					AuthHeaderName: "Authorization",
+				},
+				apidef.CoprocessType: {
+					Name:           "customAuth",
+					AuthHeaderName: "X-Custom-Auth",
+				},
+			},
+		}
+
+		oas := OAS{}
+		oas.SetTykExtension(&XTykAPIGateway{
+			Server: Server{
+				Authentication: &Authentication{
+					Enabled:                true,
+					SecurityProcessingMode: SecurityProcessingModeLegacy, // Switch to legacy
+					SecuritySchemes: SecuritySchemes{
+						"jwtAuth": &JWT{
+							Enabled: true,
+						},
+						"customAuth": &CustomPluginAuthentication{
+							Enabled: true,
+						},
+					},
+				},
+			},
+		})
+
+		// Action: Fill with legacy mode
+		oas.fillSecurity(api)
+
+		// Expected: Separation maintained even in legacy mode
+		assert.Len(t, oas.T.Security, 1, "should have 1 OAS requirement")
+		assert.Contains(t, oas.T.Security[0], "jwtAuth", "jwtAuth should be in OAS security")
+		assert.NotContains(t, oas.T.Security[0], "customAuth", "customAuth should NOT be in OAS security")
+
+		tykAuth := oas.GetTykExtension().Server.Authentication
+		assert.NotNil(t, tykAuth.Security, "vendor security should be populated")
+		assert.Len(t, tykAuth.Security, 1, "should have 1 vendor requirement")
+		assert.Contains(t, tykAuth.Security[0], "customAuth", "customAuth should be in vendor security")
+	})
+
+	t.Run("add standard auth in compliant mode", func(t *testing.T) {
+		// Setup: Compliant mode with existing auth
+		api := apidef.APIDefinition{
+			SecurityRequirements: [][]string{
+				{"jwtAuth"},
+				{"basicAuth"}, // Adding new standard auth
+			},
+			EnableJWT:    true,
+			UseBasicAuth: true,
+			AuthConfigs: map[string]apidef.AuthConfig{
+				apidef.JWTType: {
+					Name:           "jwtAuth",
+					AuthHeaderName: "Authorization",
+				},
+				apidef.BasicType: {
+					Name:           "basicAuth",
+					AuthHeaderName: "Authorization",
+				},
+			},
+		}
+
+		oas := OAS{}
+		oas.SetTykExtension(&XTykAPIGateway{
+			Server: Server{
+				Authentication: &Authentication{
+					Enabled:                true,
+					SecurityProcessingMode: SecurityProcessingModeCompliant,
+					SecuritySchemes: SecuritySchemes{
+						"jwtAuth": &JWT{
+							Enabled: true,
+						},
+						"basicAuth": &Basic{
+							Enabled: true,
+						},
+					},
+				},
+			},
+		})
+
+		// Action: Fill security
+		oas.fillSecurity(api)
+
+		// Expected: Both in OAS security
+		assert.Len(t, oas.T.Security, 2, "should have 2 OAS requirements")
+
+		var foundJwt, foundBasic bool
+		for _, req := range oas.T.Security {
+			if _, ok := req["jwtAuth"]; ok {
+				foundJwt = true
+			}
+			if _, ok := req["basicAuth"]; ok {
+				foundBasic = true
+			}
+		}
+		assert.True(t, foundJwt, "jwtAuth should be in OAS security")
+		assert.True(t, foundBasic, "basicAuth should be in OAS security")
+	})
+
+	t.Run("add proprietary auth in legacy mode", func(t *testing.T) {
+		// Setup: Legacy mode with existing standard auth
+		api := apidef.APIDefinition{
+			SecurityRequirements: [][]string{
+				{"jwtAuth"},
+				{"hmac"}, // Adding proprietary auth
+			},
+			EnableJWT:               true,
+			EnableSignatureChecking: true,
+			AuthConfigs: map[string]apidef.AuthConfig{
+				apidef.JWTType: {
+					Name:           "jwtAuth",
+					AuthHeaderName: "Authorization",
+				},
+				apidef.HMACType: {
+					Name:           "hmac",
+					AuthHeaderName: "Authorization",
+				},
+			},
+		}
+
+		oas := OAS{}
+		oas.SetTykExtension(&XTykAPIGateway{
+			Server: Server{
+				Authentication: &Authentication{
+					Enabled:                true,
+					SecurityProcessingMode: SecurityProcessingModeLegacy,
+					SecuritySchemes: SecuritySchemes{
+						"jwtAuth": &JWT{
+							Enabled: true,
+						},
+						"hmac": &HMAC{
+							Enabled: true,
+						},
+					},
+				},
+			},
+		})
+
+		// Action: Fill security
+		oas.fillSecurity(api)
+
+		// Expected: jwt in OAS, hmac in vendor
+		assert.Len(t, oas.T.Security, 1, "should have 1 OAS requirement")
+		assert.Contains(t, oas.T.Security[0], "jwtAuth", "jwtAuth should be in OAS security")
+		assert.NotContains(t, oas.T.Security[0], "hmac", "hmac should NOT be in OAS security")
+
+		tykAuth := oas.GetTykExtension().Server.Authentication
+		assert.NotNil(t, tykAuth.Security, "vendor security should be populated")
+		assert.Len(t, tykAuth.Security, 1, "should have 1 vendor requirement")
+		assert.Contains(t, tykAuth.Security[0], "hmac", "hmac should be in vendor security")
+	})
+
+	t.Run("round-trip preserves mode switching behavior", func(t *testing.T) {
+		// Setup: Start with mixed auth
+		originalAPI := apidef.APIDefinition{
+			SecurityRequirements: [][]string{
+				{"jwtAuth"},
+				{"customAuth"},
+			},
+			EnableJWT:              true,
+			CustomPluginAuthEnabled: true,
+			AuthConfigs: map[string]apidef.AuthConfig{
+				apidef.JWTType: {
+					Name:           "jwtAuth",
+					AuthHeaderName: "Authorization",
+				},
+				apidef.CoprocessType: {
+					Name:           "customAuth",
+					AuthHeaderName: "X-Custom-Auth",
+				},
+			},
+		}
+
+		// First fill with compliant mode
+		oas := OAS{}
+		oas.SetTykExtension(&XTykAPIGateway{
+			Server: Server{
+				Authentication: &Authentication{
+					Enabled:                true,
+					SecurityProcessingMode: SecurityProcessingModeCompliant,
+					SecuritySchemes: SecuritySchemes{
+						"jwtAuth": &JWT{
+							Enabled: true,
+						},
+						"customAuth": &CustomPluginAuthentication{
+							Enabled: true,
+						},
+					},
+				},
+			},
+		})
+		oas.fillSecurity(originalAPI)
+
+		// Extract back to API
+		var extractedAPI apidef.APIDefinition
+		oas.extractSecurityTo(&extractedAPI)
+
+		// Fill again with same mode
+		oas2 := OAS{}
+		oas2.SetTykExtension(&XTykAPIGateway{
+			Server: Server{
+				Authentication: &Authentication{
+					Enabled:                true,
+					SecurityProcessingMode: SecurityProcessingModeCompliant,
+					SecuritySchemes: SecuritySchemes{
+						"jwtAuth": &JWT{
+							Enabled: true,
+						},
+						"customAuth": &CustomPluginAuthentication{
+							Enabled: true,
+						},
+					},
+				},
+			},
+		})
+		oas2.fillSecurity(extractedAPI)
+
+		// Expected: Same separation maintained
+		assert.Equal(t, oas.T.Security, oas2.T.Security, "OAS security should be preserved")
+
+		tykAuth1 := oas.GetTykExtension().Server.Authentication
+		tykAuth2 := oas2.GetTykExtension().Server.Authentication
+		assert.Equal(t, tykAuth1.Security, tykAuth2.Security, "Vendor security should be preserved")
+	})
+
+	t.Run("mixed AND requirement in compliant mode", func(t *testing.T) {
+		// Setup: Mixed requirement with both standard and proprietary (AND logic)
+		api := apidef.APIDefinition{
+			SecurityRequirements: [][]string{
+				{"jwtAuth", "customAuth"}, // Mixed AND requirement
+			},
+			EnableJWT:              true,
+			CustomPluginAuthEnabled: true,
+			AuthConfigs: map[string]apidef.AuthConfig{
+				apidef.JWTType: {
+					Name:           "jwtAuth",
+					AuthHeaderName: "Authorization",
+				},
+				apidef.CoprocessType: {
+					Name:           "customAuth",
+					AuthHeaderName: "X-Custom-Auth",
+				},
+			},
+		}
+
+		oas := OAS{}
+		oas.SetTykExtension(&XTykAPIGateway{
+			Server: Server{
+				Authentication: &Authentication{
+					Enabled:                true,
+					SecurityProcessingMode: SecurityProcessingModeCompliant,
+					SecuritySchemes: SecuritySchemes{
+						"jwtAuth": &JWT{
+							Enabled: true,
+						},
+						"customAuth": &CustomPluginAuthentication{
+							Enabled: true,
+						},
+					},
+				},
+			},
+		})
+
+		// Action: Fill security
+		oas.fillSecurity(api)
+
+		// Expected: Entire mixed requirement goes to vendor security
+		assert.Len(t, oas.T.Security, 0, "OAS security should be empty for mixed requirements")
+
+		tykAuth := oas.GetTykExtension().Server.Authentication
+		assert.NotNil(t, tykAuth.Security, "vendor security should be populated")
+		assert.Len(t, tykAuth.Security, 1, "should have 1 vendor requirement")
+		assert.Len(t, tykAuth.Security[0], 2, "vendor requirement should have 2 schemes")
+		assert.Contains(t, tykAuth.Security[0], "jwtAuth", "jwtAuth should be in vendor security")
+		assert.Contains(t, tykAuth.Security[0], "customAuth", "customAuth should be in vendor security")
 	})
 }

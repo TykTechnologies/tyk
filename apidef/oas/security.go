@@ -1023,7 +1023,7 @@ func (s *OAS) isInOASComponents(schemeName string) bool {
 // isProprietarySchemeType checks if a SecurityScheme type is proprietary
 func (s *OAS) isProprietarySchemeType(scheme interface{}) bool {
 	switch scheme.(type) {
-	case *JWT, *Token, *Basic, *ExternalOAuth:
+	case *JWT, *Token, *Basic, *OAuth, *ExternalOAuth:
 		return false // Standard OAS types
 	case *CustomPluginAuthentication:
 		return true // Proprietary
@@ -1116,21 +1116,44 @@ func (s *OAS) fillSecurity(api apidef.APIDefinition) {
 			tykAuthentication.Security = vendorSecurity
 		}
 	} else {
-		// Legacy mode: keep traditional behavior
+		// Legacy mode: filter proprietary auth even in legacy mode
+		// Legacy mode only affects PROCESSING (use first requirement), not STORAGE location
+		// Proprietary auth must never be in OAS security field
 		if len(api.SecurityRequirements) > 0 {
 			s.Security = make(openapi3.SecurityRequirements, 0, len(api.SecurityRequirements))
+			vendorSecurity := [][]string{}
+
 			for _, requirement := range api.SecurityRequirements {
 				secReq := openapi3.NewSecurityRequirement()
+				vendorReq := []string{}
+
 				for _, schemeName := range requirement {
-					// In legacy mode, don't separate vendor extensions
-					secReq[schemeName] = []string{}
+					if s.isProprietaryAuthScheme(schemeName) {
+						vendorReq = append(vendorReq, schemeName)
+					} else {
+						secReq[schemeName] = []string{}
+					}
 				}
-				s.Security = append(s.Security, secReq)
+
+				if len(secReq) > 0 {
+					s.Security = append(s.Security, secReq)
+				}
+				if len(vendorReq) > 0 {
+					vendorSecurity = append(vendorSecurity, vendorReq)
+				}
+			}
+
+			if len(vendorSecurity) > 0 {
+				tykAuthentication.Security = vendorSecurity
 			}
 		} else if len(tykAuthentication.SecuritySchemes) > 0 {
+			// When no explicit requirements, create from schemes
+			// Only add non-proprietary schemes to OAS security
 			secReq := openapi3.NewSecurityRequirement()
 			for name := range tykAuthentication.SecuritySchemes {
-				secReq[name] = []string{}
+				if !s.isProprietaryAuthScheme(name) {
+					secReq[name] = []string{}
+				}
 			}
 			if len(secReq) > 0 {
 				s.Security = openapi3.SecurityRequirements{secReq}
