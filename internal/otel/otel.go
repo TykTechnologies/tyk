@@ -133,13 +133,31 @@ var APIKeyAliasAttribute = semconv.TykAPIKeyAlias
 
 var OAuthClientIDAttribute = semconv.TykOauthID
 
+const (
+	TykTraceIDHeader = "X-Tyk-Trace-Id"
+)
+
 func SpanFromContext(ctx context.Context) tyktrace.Span {
 	return tyktrace.SpanFromContext(ctx)
 }
 
-func AddTraceID(ctx context.Context, w http.ResponseWriter) {
+func ExtractTraceID(ctx context.Context) string {
 	span := SpanFromContext(ctx)
 	if span.SpanContext().HasTraceID() {
-		w.Header().Set("X-Tyk-Trace-Id", span.SpanContext().TraceID().String())
+		return span.SpanContext().TraceID().String()
 	}
+	return ""
+}
+
+func addTraceIDToResponseHeader(w http.ResponseWriter, traceID string) {
+	w.Header().Set(TykTraceIDHeader, traceID)
+}
+
+func AddTraceID(ctx context.Context, w http.ResponseWriter) {
+	traceID := ExtractTraceID(ctx)
+	if traceID == "" {
+		return
+	}
+
+	addTraceIDToResponseHeader(w, traceID)
 }

@@ -2,6 +2,7 @@ package gateway
 
 import (
 	"bytes"
+	"context"
 	"encoding/base64"
 	"io"
 	"io/ioutil"
@@ -20,6 +21,7 @@ import (
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/ctx"
 	"github.com/TykTechnologies/tyk/header"
+	"github.com/TykTechnologies/tyk/internal/otel"
 	"github.com/TykTechnologies/tyk/request"
 	"github.com/TykTechnologies/tyk/user"
 )
@@ -167,6 +169,18 @@ func recordGraphDetails(rec *analytics.AnalyticsRecord, r *http.Request, resp *h
 	rec.GraphQLStats = stats
 }
 
+const traceTagPrefix = "trace-id-"
+
+func (s *SuccessHandler) addTraceIDTag(reqCtx context.Context, tags []string) []string {
+	if !s.Gw.GetConfig().OpenTelemetry.Enabled {
+		return tags
+	}
+	if id := otel.ExtractTraceID(reqCtx); id != "" {
+		tags = append(tags, traceTagPrefix+id)
+	}
+	return tags
+}
+
 func (s *SuccessHandler) RecordHit(r *http.Request, timing analytics.Latency, code int, responseCopy *http.Response, cached bool) {
 
 	if s.Spec.DoNotTrack || ctxGetDoNotTrack(r) {
@@ -209,6 +223,8 @@ func (s *SuccessHandler) RecordHit(r *http.Request, timing analytics.Latency, co
 		if cached {
 			tags = append(tags, "cached-response")
 		}
+
+		tags = s.addTraceIDTag(r.Context(), tags)
 
 		rawRequest := ""
 		rawResponse := ""
