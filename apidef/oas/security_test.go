@@ -2549,7 +2549,7 @@ func TestModeSwitching(t *testing.T) {
 				{"jwtAuth"},
 				{"customAuth"},
 			},
-			EnableJWT:              true,
+			EnableJWT:               true,
 			CustomPluginAuthEnabled: true,
 			AuthConfigs: map[string]apidef.AuthConfig{
 				apidef.JWTType: {
@@ -2602,7 +2602,7 @@ func TestModeSwitching(t *testing.T) {
 				{"jwtAuth"},
 				{"customAuth"},
 			},
-			EnableJWT:              true,
+			EnableJWT:               true,
 			CustomPluginAuthEnabled: true,
 			AuthConfigs: map[string]apidef.AuthConfig{
 				apidef.JWTType: {
@@ -2766,7 +2766,7 @@ func TestModeSwitching(t *testing.T) {
 				{"jwtAuth"},
 				{"customAuth"},
 			},
-			EnableJWT:              true,
+			EnableJWT:               true,
 			CustomPluginAuthEnabled: true,
 			AuthConfigs: map[string]apidef.AuthConfig{
 				apidef.JWTType: {
@@ -2838,7 +2838,7 @@ func TestModeSwitching(t *testing.T) {
 			SecurityRequirements: [][]string{
 				{"jwtAuth", "customAuth"}, // Mixed AND requirement
 			},
-			EnableJWT:              true,
+			EnableJWT:               true,
 			CustomPluginAuthEnabled: true,
 			AuthConfigs: map[string]apidef.AuthConfig{
 				apidef.JWTType: {
