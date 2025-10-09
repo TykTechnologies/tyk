@@ -613,10 +613,13 @@ func (gw *Gateway) configureAuthAndOrgStores(gs *generalStores, spec *APISpec) (
 	case RPCStorageEngine:
 		authStore = gs.rpcAuthStore
 		orgStore = gs.rpcOrgStore
-		spec.GlobalConfig.EnforceOrgDataAge = true
-		globalConf := gw.GetConfig()
-		globalConf.EnforceOrgDataAge = true
-		gw.SetConfig(globalConf)
+		// Only enforce org data age if org quotas are enabled
+		if gw.GetConfig().EnforceOrgQuotas {
+			spec.GlobalConfig.EnforceOrgDataAge = true
+			globalConf := gw.GetConfig()
+			globalConf.EnforceOrgDataAge = true
+			gw.SetConfig(globalConf)
+		}
 	}
 
 	sessionStore := gs.redisStore
@@ -923,10 +926,13 @@ func (gw *Gateway) loadTCPService(spec *APISpec, gs *generalStores, muxer *proxy
 	case RPCStorageEngine:
 		authStore = gs.rpcAuthStore
 		orgStore = gs.rpcOrgStore
-		spec.GlobalConfig.EnforceOrgDataAge = true
-		gwConfig := gw.GetConfig()
-		gwConfig.EnforceOrgDataAge = true
-		gw.SetConfig(gwConfig)
+		// Only enforce org data age if org quotas are enabled
+		if gw.GetConfig().EnforceOrgQuotas {
+			spec.GlobalConfig.EnforceOrgDataAge = true
+			gwConfig := gw.GetConfig()
+			gwConfig.EnforceOrgDataAge = true
+			gw.SetConfig(gwConfig)
+		}
 	}
 
 	sessionStore := gs.redisStore
