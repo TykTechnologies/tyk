@@ -563,7 +563,7 @@ type HttpServerOptionsConfig struct {
 	// Tyk Gateway will evaluate the response body size during transformation. If the body exceeds this limit,
 	// the Gateway will return an HTTP 500 error and the transformation will not be performed.
 	//
-	// The response body is read in chunks to compare total size against `MaxResponseBodySize`.
+	// The response body is read into memory (up to MaxResponseBodySize+1 bytes) using io.LimitReader.
 	//
 	// A value of zero (default) means that no maximum is set and response bodies will not be limited.
 	MaxResponseBodySize int64 `json:"max_response_body_size"`
