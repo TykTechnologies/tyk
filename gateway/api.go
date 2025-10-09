@@ -31,6 +31,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/TykTechnologies/tyk/internal/osutil"
 	"io"
 	"io/ioutil"
 	"net/http"
@@ -916,6 +917,16 @@ func (gw *Gateway) handleGetPolicyList() (interface{}, int) {
 	return polIDList, http.StatusOK
 }
 
+func (gw *Gateway) newPolicyPathRoot() (*osutil.Root, error) {
+	policyPath := gw.GetConfig().Policies.PolicyPath
+
+	if policyPath == "" {
+		policyPath = "."
+	}
+
+	return osutil.NewRoot(policyPath)
+}
+
 func (gw *Gateway) handleAddOrUpdatePolicy(polID string, r *http.Request) (interface{}, int) {
 	if gw.GetConfig().Policies.PolicySource == "service" {
 		log.Error("Rejected new policy due to PolicySource = service")
@@ -933,8 +944,16 @@ func (gw *Gateway) handleAddOrUpdatePolicy(polID string, r *http.Request) (inter
 		return apiError("Request ID does not match that in policy! For Update operations these must match."), http.StatusBadRequest
 	}
 
-	// Create a filename
-	polFilePath := filepath.Join(gw.GetConfig().Policies.PolicyPath, newPol.ID+".json")
+	if !ensurePolicyId(newPol) {
+		log.Error("Failed to save policy, because of empty id")
+		return apiError("Failed to save policy"), http.StatusInternalServerError
+	}
+
+	root, err := gw.newPolicyPathRoot()
+	if err != nil {
+		log.WithError(err).Error("Unable to crate policy root.")
+		return apiError("Unable to get policy root."), http.StatusInternalServerError
+	}
 
 	asByte, err := json.MarshalIndent(newPol, "", "  ")
 	if err != nil {
@@ -942,7 +961,7 @@ func (gw *Gateway) handleAddOrUpdatePolicy(polID string, r *http.Request) (inter
 		return apiError("Marshalling failed"), http.StatusInternalServerError
 	}
 
-	if err := ioutil.WriteFile(polFilePath, asByte, 0644); err != nil {
+	if err := root.WriteFile(newPol.ID+".json", asByte, 0644); err != nil {
 		log.Error("Failed to create file! - ", err)
 		return apiError("Failed to create file!"), http.StatusInternalServerError
 	}
@@ -962,16 +981,22 @@ func (gw *Gateway) handleAddOrUpdatePolicy(polID string, r *http.Request) (inter
 }
 
 func (gw *Gateway) handleDeletePolicy(polID string) (interface{}, int) {
-	// Generate a filename
-	defFilePath := filepath.Join(gw.GetConfig().Policies.PolicyPath, polID+".json")
+	root, err := gw.newPolicyPathRoot()
+
+	if err != nil {
+		log.WithError(err).Error("Unable to create policy root.")
+		return apiError("Delete failed"), http.StatusInternalServerError
+	}
+
+	defFilePath := polID + ".json"
 
 	// If it exists, delete it
-	if _, err := os.Stat(defFilePath); err != nil {
+	if _, err := root.Stat(defFilePath); err != nil {
 		log.Warningf("Error describing named file: %v ", err)
 		return apiError("Delete failed"), http.StatusInternalServerError
 	}
 
-	if err := os.Remove(defFilePath); err != nil {
+	if err := root.Remove(defFilePath); err != nil {
 		log.Warningf("Delete failed: %v", err)
 		return apiError("Delete failed"), http.StatusInternalServerError
 	}
