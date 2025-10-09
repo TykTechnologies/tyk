@@ -128,7 +128,7 @@ func (r *ResponseTransformMiddleware) HandleResponse(rw http.ResponseWriter, res
 		reader = io.LimitReader(respBody, maxSize+1)
 	}
 
-	body, err := ioutil.ReadAll(reader)
+	body, err := io.ReadAll(reader)
 	if err != nil {
 		logger.WithError(err).Error("Error reading response body")
 		return err

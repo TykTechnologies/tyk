@@ -504,15 +504,14 @@ func TestResponseTransformMiddleware(t *testing.T) {
 				require.NoError(t, err)
 				assert.Equal(t, tc.expectedCode, res.StatusCode)
 
+				body, err := io.ReadAll(res.Body)
+				require.NoError(t, err)
+
 				if tc.expectTransform {
-					body, err := io.ReadAll(res.Body)
-					require.NoError(t, err)
 					assert.JSONEq(t, tc.expectedResponse, string(body))
 				}
 
 				if tc.expectedError != "" {
-					body, err := io.ReadAll(res.Body)
-					require.NoError(t, err)
 					assert.Contains(t, string(body), tc.expectedError)
 				}
 			})
