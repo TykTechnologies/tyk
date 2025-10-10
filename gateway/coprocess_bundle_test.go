@@ -165,35 +165,14 @@ func TestBundleLoader(t *testing.T) {
 	})
 
 	t.Run("Load bundle fails if public key path is set but signature verification fails", func(t *testing.T) {
-		privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
-		if err != nil {
-			t.Fatalf("rsa.GenerateKey() failed: %v", err)
-		}
-		publicKey := &privateKey.PublicKey
-
-		publicKeyDER, err := x509.MarshalPKIXPublicKey(publicKey)
-		if err != nil {
-			t.Fatalf("x509.MarshalPKIXPublicKey() failed: %v", err)
-		}
-
-		pemBlock := &pem.Block{
-			Type:  "PUBLIC KEY",
-			Bytes: publicKeyDER,
-		}
-
-		tmpfile, err := os.CreateTemp("", "example")
-		if err != nil {
-			t.Fatalf("os.CreateTemp() failed: %v", err)
-		}
-		defer tmpfile.Close()
-		defer os.Remove(tmpfile.Name())
-
-		if err := pem.Encode(tmpfile, pemBlock); err != nil {
-			t.Fatalf("pem.Encode() failed: %v", err)
-		}
+		pemfile := createPEMFile(t)
+		t.Cleanup(func() {
+			_ = pemfile.Close()
+			_ = os.Remove(pemfile.Name())
+		})
 
 		cfg := ts.Gw.GetConfig()
-		cfg.PublicKeyPath = tmpfile.Name()
+		cfg.PublicKeyPath = pemfile.Name()
 		ts.Gw.SetConfig(cfg)
 
 		spec := &APISpec{
@@ -201,7 +180,7 @@ func TestBundleLoader(t *testing.T) {
 				CustomMiddlewareBundle: badSignatureBundleID,
 			},
 		}
-		err = ts.Gw.loadBundle(spec)
+		err := ts.Gw.loadBundle(spec)
 
 		assert.ErrorContains(t, err, "crypto/rsa: verification error")
 	})

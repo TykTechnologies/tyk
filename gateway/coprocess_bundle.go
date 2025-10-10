@@ -375,9 +375,9 @@ func (gw *Gateway) loadBundle(spec *APISpec) error {
 // The method handles bundle fetching, saving, and manifest validation.
 // Returns an error if the bundle cannot be fetched, saved, or its manifest cannot be verified successfully.
 func (gw *Gateway) loadBundleWithFs(spec *APISpec, bundleFs afero.Fs) error {
-	/*if gw.GetConfig().ManagementNode {
+	if gw.GetConfig().ManagementNode {
 		return nil
-	}*/
+	}
 
 	// Skip if no custom middleware bundle name is set.
 	if spec.CustomMiddlewareBundleDisabled || spec.CustomMiddlewareBundle == "" {
