@@ -26,6 +26,7 @@ import (
 
 	"github.com/TykTechnologies/goverify"
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/internal/sanitize"
 )
 
 var (
@@ -187,7 +188,7 @@ func (ZipBundleSaver) Save(bundle *Bundle, bundlePath string, spec *APISpec) err
 	}
 
 	for _, f := range reader.File {
-		if err := validateZipPath(f.Name, bundlePath, spec); err != nil {
+		if err := sanitize.ZipFilePath(f.Name, bundlePath); err != nil {
 			return err
 		}
 
@@ -215,29 +216,6 @@ func (ZipBundleSaver) Save(bundle *Bundle, bundlePath string, spec *APISpec) err
 			return err
 		}
 	}
-	return nil
-}
-
-// validateZipPath ensures that a file path from a zip archive is valid and within the expected directory.
-func validateZipPath(filePath string, bundlePath string, spec *APISpec) error {
-	cleanPath := filepath.Clean(filePath)
-
-	invalidPathErr := bundleError(spec, nil, fmt.Sprintf("Invalid file path in bundle: %s", filePath))
-
-	if filepath.IsAbs(cleanPath) || filepath.VolumeName(cleanPath) != "" {
-		return invalidPathErr
-	}
-
-	destPath := filepath.Join(bundlePath, cleanPath)
-	relPath, err := filepath.Rel(bundlePath, destPath)
-	if err != nil {
-		return bundleError(spec, err, fmt.Sprintf("Failed to resolve bundle path: %s", filePath))
-	}
-
-	if strings.HasPrefix(relPath, "..") {
-		return invalidPathErr
-	}
-
 	return nil
 }
 
