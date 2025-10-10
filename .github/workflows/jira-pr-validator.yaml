@@ -1,0 +1,16 @@
+name: Validate PR against Jira
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, edited]
+
+jobs:
+  validate:
+    if: ${{ !github.event.pull_request.draft }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate Jira ticket
+        uses: TykTechnologies/jira-linter@main
+        with:
+          jira-base-url: 'https://tyktech.atlassian.net'
+          jira-api-token: ${{ secrets.JIRA_TOKEN }}
