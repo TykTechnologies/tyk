@@ -183,7 +183,7 @@ type ZipBundleSaver struct {
 }
 
 // Save implements the main method of the BundleSaver interface. It makes use of archive/zip.
-func (z *ZipBundleSaver) Save(bundle *Bundle, bundlePath string, spec *APISpec) error {
+func (z *ZipBundleSaver) Save(bundle *Bundle, bundlePath string, _ *APISpec) error {
 	buf := bytes.NewReader(bundle.Data)
 	reader, err := zip.NewReader(buf, int64(len(bundle.Data)))
 	if err != nil {

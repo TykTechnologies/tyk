@@ -223,6 +223,7 @@ func TestBundleLoader(t *testing.T) {
 			"checksum": "d41d8cd98f00b204e9800998ecf8427e",
 			"signature": "dGVzdC1wdWJsaWMta2V5"
 		}`)
+		require.NoError(t, err)
 
 		_, err = memFs.Create(filepath.Join(bundlePath, "plugin.py"))
 		require.NoError(t, err)
