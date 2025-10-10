@@ -587,7 +587,7 @@ func (s *OAS) validateCompliantModeAuthentication() error {
 	}
 
 	// Check auth methods in SecuritySchemes
-	if tykAuth.SecuritySchemes != nil && len(tykAuth.SecuritySchemes) > 0 {
+	if len(tykAuth.SecuritySchemes) > 0 {
 		for schemeName, scheme := range tykAuth.SecuritySchemes {
 			// Check if this auth method is enabled
 			enabled := false

@@ -1614,7 +1614,7 @@ func TestOAS_ValidateCompliantModeAuthentication(t *testing.T) {
 	}{
 		{
 			name: "no authentication - should pass",
-			setupOAS: func(oas *OAS) {
+			setupOAS: func(_ *OAS) {
 				// No authentication configured
 			},
 			expectedError: "",

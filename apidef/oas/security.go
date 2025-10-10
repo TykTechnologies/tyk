@@ -1063,6 +1063,10 @@ func (s *OAS) fillSecurity(api apidef.APIDefinition) {
 
 	if processingMode == SecurityProcessingModeCompliant {
 		// Compliant mode: separate OAS and vendor security
+		// Clear any auto-added security from individual fill methods (fillJWT, fillToken, etc.)
+		// as we'll rebuild it properly from SecurityRequirements
+		s.T.Security = nil
+
 		oasSecurity := make(openapi3.SecurityRequirements, 0)
 		vendorSecurity := [][]string{}
 

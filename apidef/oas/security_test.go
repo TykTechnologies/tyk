@@ -2883,4 +2883,256 @@ func TestModeSwitching(t *testing.T) {
 		assert.Contains(t, tykAuth.Security[0], "jwtAuth", "jwtAuth should be in vendor security")
 		assert.Contains(t, tykAuth.Security[0], "customAuth", "customAuth should be in vendor security")
 	})
+
+	t.Run("mixed requirement with hmac, custom, and jwt - bug fix verification", func(t *testing.T) {
+		// Regression test for bug where jwtAuth was being moved from vendor security to OAS security
+		// when part of a mixed requirement like [hmac, custom, jwtAuth]
+		api := apidef.APIDefinition{
+			SecurityRequirements: [][]string{
+				{"hmac", "custom", "jwtAuth"}, // Three-way mixed AND requirement
+			},
+			EnableJWT:               true,
+			EnableSignatureChecking: true,
+			CustomPluginAuthEnabled: true,
+			AuthConfigs: map[string]apidef.AuthConfig{
+				apidef.HMACType: {
+					Name:           "hmac",
+					AuthHeaderName: "Authorization",
+				},
+				apidef.CoprocessType: {
+					Name:           "custom",
+					AuthHeaderName: "X-Custom-Auth",
+				},
+				apidef.JWTType: {
+					Name:           "jwtAuth",
+					AuthHeaderName: "Authorization",
+				},
+			},
+		}
+
+		oas := OAS{}
+		oas.SetTykExtension(&XTykAPIGateway{
+			Server: Server{
+				Authentication: &Authentication{
+					Enabled:                true,
+					SecurityProcessingMode: SecurityProcessingModeCompliant,
+					SecuritySchemes: SecuritySchemes{
+						"hmac": &HMAC{
+							Enabled: true,
+						},
+						"custom": &CustomPluginAuthentication{
+							Enabled: true,
+						},
+						"jwtAuth": &JWT{
+							Enabled: true,
+						},
+					},
+				},
+			},
+		})
+
+		// Action: Fill security
+		oas.fillSecurity(api)
+
+		// Expected: ALL auth methods in vendor security, NONE in OAS security
+		assert.Len(t, oas.T.Security, 0, "OAS security should be empty - jwtAuth should NOT be moved here")
+
+		tykAuth := oas.GetTykExtension().Server.Authentication
+		assert.NotNil(t, tykAuth.Security, "vendor security should be populated")
+		assert.Len(t, tykAuth.Security, 1, "should have exactly 1 vendor requirement")
+		assert.Len(t, tykAuth.Security[0], 3, "vendor requirement should have all 3 schemes")
+		assert.Contains(t, tykAuth.Security[0], "hmac", "hmac should be in vendor security")
+		assert.Contains(t, tykAuth.Security[0], "custom", "custom should be in vendor security")
+		assert.Contains(t, tykAuth.Security[0], "jwtAuth", "jwtAuth should stay in vendor security (not moved to OAS)")
+	})
+
+	t.Run("jwt not duplicated in both locations for mixed requirement", func(t *testing.T) {
+		// Verify that JWT appears only in vendor security, not in both OAS and vendor
+		api := apidef.APIDefinition{
+			SecurityRequirements: [][]string{
+				{"hmac", "jwtAuth"}, // Mixed requirement
+			},
+			EnableJWT:               true,
+			EnableSignatureChecking: true,
+			AuthConfigs: map[string]apidef.AuthConfig{
+				apidef.HMACType: {
+					Name:           "hmac",
+					AuthHeaderName: "Authorization",
+				},
+				apidef.JWTType: {
+					Name:           "jwtAuth",
+					AuthHeaderName: "Authorization",
+				},
+			},
+		}
+
+		oas := OAS{}
+		oas.SetTykExtension(&XTykAPIGateway{
+			Server: Server{
+				Authentication: &Authentication{
+					Enabled:                true,
+					SecurityProcessingMode: SecurityProcessingModeCompliant,
+					SecuritySchemes: SecuritySchemes{
+						"hmac": &HMAC{
+							Enabled: true,
+						},
+						"jwtAuth": &JWT{
+							Enabled: true,
+						},
+					},
+				},
+			},
+		})
+
+		// Action: Fill security
+		oas.fillSecurity(api)
+
+		// Expected: JWT only in vendor security, not duplicated in OAS security
+		assert.Empty(t, oas.T.Security, "OAS security must be empty - JWT should not be duplicated here")
+
+		tykAuth := oas.GetTykExtension().Server.Authentication
+		assert.Len(t, tykAuth.Security, 1, "should have 1 vendor requirement")
+		assert.Contains(t, tykAuth.Security[0], "jwtAuth", "jwtAuth should be in vendor security")
+		assert.Contains(t, tykAuth.Security[0], "hmac", "hmac should be in vendor security")
+
+		// Double-check JWT is not in OAS security
+		for _, req := range oas.T.Security {
+			assert.NotContains(t, req, "jwtAuth", "jwtAuth must NOT appear in OAS security when part of mixed requirement")
+		}
+	})
+
+	t.Run("mixed requirement round-trip preserves location", func(t *testing.T) {
+		// Test that mixed requirements survive round-trip without JWT being moved to OAS security
+		originalAPI := apidef.APIDefinition{
+			SecurityRequirements: [][]string{
+				{"hmac", "custom", "jwtAuth"},
+			},
+			EnableJWT:               true,
+			EnableSignatureChecking: true,
+			CustomPluginAuthEnabled: true,
+			AuthConfigs: map[string]apidef.AuthConfig{
+				apidef.HMACType: {
+					Name:           "hmac",
+					AuthHeaderName: "Authorization",
+				},
+				apidef.CoprocessType: {
+					Name:           "custom",
+					AuthHeaderName: "X-Custom-Auth",
+				},
+				apidef.JWTType: {
+					Name:           "jwtAuth",
+					AuthHeaderName: "Authorization",
+				},
+			},
+		}
+
+		// First fill
+		oas1 := OAS{}
+		oas1.SetTykExtension(&XTykAPIGateway{
+			Server: Server{
+				Authentication: &Authentication{
+					Enabled:                true,
+					SecurityProcessingMode: SecurityProcessingModeCompliant,
+					SecuritySchemes: SecuritySchemes{
+						"hmac": &HMAC{Enabled: true},
+						"custom": &CustomPluginAuthentication{Enabled: true},
+						"jwtAuth": &JWT{Enabled: true},
+					},
+				},
+			},
+		})
+		oas1.fillSecurity(originalAPI)
+
+		// Extract
+		var extractedAPI apidef.APIDefinition
+		oas1.extractSecurityTo(&extractedAPI)
+
+		// Second fill (round-trip)
+		oas2 := OAS{}
+		oas2.SetTykExtension(&XTykAPIGateway{
+			Server: Server{
+				Authentication: &Authentication{
+					Enabled:                true,
+					SecurityProcessingMode: SecurityProcessingModeCompliant,
+					SecuritySchemes: SecuritySchemes{
+						"hmac": &HMAC{Enabled: true},
+						"custom": &CustomPluginAuthentication{Enabled: true},
+						"jwtAuth": &JWT{Enabled: true},
+					},
+				},
+			},
+		})
+		oas2.fillSecurity(extractedAPI)
+
+		// Expected: Both iterations have same structure
+		assert.Equal(t, oas1.T.Security, oas2.T.Security, "OAS security should be identical after round-trip")
+		assert.Empty(t, oas2.T.Security, "OAS security should remain empty after round-trip")
+
+		tykAuth1 := oas1.GetTykExtension().Server.Authentication
+		tykAuth2 := oas2.GetTykExtension().Server.Authentication
+		assert.Equal(t, tykAuth1.Security, tykAuth2.Security, "vendor security should be identical after round-trip")
+		assert.Len(t, tykAuth2.Security, 1, "should still have 1 vendor requirement")
+		assert.Contains(t, tykAuth2.Security[0], "jwtAuth", "jwtAuth should remain in vendor security")
+	})
+
+	t.Run("multiple mixed requirements stay in vendor security", func(t *testing.T) {
+		// Test multiple mixed requirements (OR logic between them, AND within each)
+		api := apidef.APIDefinition{
+			SecurityRequirements: [][]string{
+				{"hmac", "jwtAuth"},    // First mixed AND requirement
+				{"custom", "jwtAuth"},  // Second mixed AND requirement
+			},
+			EnableJWT:               true,
+			EnableSignatureChecking: true,
+			CustomPluginAuthEnabled: true,
+			AuthConfigs: map[string]apidef.AuthConfig{
+				apidef.HMACType: {
+					Name:           "hmac",
+					AuthHeaderName: "Authorization",
+				},
+				apidef.CoprocessType: {
+					Name:           "custom",
+					AuthHeaderName: "X-Custom-Auth",
+				},
+				apidef.JWTType: {
+					Name:           "jwtAuth",
+					AuthHeaderName: "Authorization",
+				},
+			},
+		}
+
+		oas := OAS{}
+		oas.SetTykExtension(&XTykAPIGateway{
+			Server: Server{
+				Authentication: &Authentication{
+					Enabled:                true,
+					SecurityProcessingMode: SecurityProcessingModeCompliant,
+					SecuritySchemes: SecuritySchemes{
+						"hmac": &HMAC{Enabled: true},
+						"custom": &CustomPluginAuthentication{Enabled: true},
+						"jwtAuth": &JWT{Enabled: true},
+					},
+				},
+			},
+		})
+
+		// Action: Fill security
+		oas.fillSecurity(api)
+
+		// Expected: All requirements in vendor security, none in OAS
+		assert.Empty(t, oas.T.Security, "OAS security should be empty for mixed requirements")
+
+		tykAuth := oas.GetTykExtension().Server.Authentication
+		assert.Len(t, tykAuth.Security, 2, "should have 2 vendor requirements")
+
+		// First requirement: [hmac, jwtAuth]
+		assert.Len(t, tykAuth.Security[0], 2, "first requirement should have 2 schemes")
+		assert.Contains(t, tykAuth.Security[0], "hmac", "first requirement should contain hmac")
+		assert.Contains(t, tykAuth.Security[0], "jwtAuth", "first requirement should contain jwtAuth")
+
+		// Second requirement: [custom, jwtAuth]
+		assert.Len(t, tykAuth.Security[1], 2, "second requirement should have 2 schemes")
+		assert.Contains(t, tykAuth.Security[1], "custom", "second requirement should contain custom")
+		assert.Contains(t, tykAuth.Security[1], "jwtAuth", "second requirement should contain jwtAuth")
+	})
 }
