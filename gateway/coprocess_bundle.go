@@ -1,14 +1,6 @@
 package gateway
 
 import (
-	"path"
-	"strings"
-	"time"
-
-	"github.com/cenk/backoff"
-
-	"github.com/sirupsen/logrus"
-
 	"archive/zip"
 	"bytes"
 	"crypto/md5"
@@ -21,10 +13,18 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/url"
-	"os"
+	"path"
 	"path/filepath"
+	"strings"
+	"time"
+
+	"github.com/cenk/backoff"
+	"github.com/spf13/afero"
+
+	"github.com/sirupsen/logrus"
 
 	"github.com/TykTechnologies/goverify"
+
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/internal/sanitize"
 )
@@ -44,8 +44,8 @@ type Bundle struct {
 	Gw       *Gateway `json:"-"`
 }
 
-// Verify performs a signature verification on the bundle file.
-func (b *Bundle) Verify() error {
+// Verify performs signature verification on the bundle file.
+func (b *Bundle) Verify(bundleFs afero.Fs) error {
 	log.WithFields(logrus.Fields{
 		"prefix": "main",
 	}).Info("----> Verifying bundle: ", b.Spec.CustomMiddlewareBundle)
@@ -74,7 +74,7 @@ func (b *Bundle) Verify() error {
 	for _, f := range b.Manifest.FileList {
 		extractedPath := filepath.Join(b.Path, f)
 
-		f, err := os.Open(extractedPath)
+		f, err := bundleFs.Open(extractedPath)
 		if err != nil {
 			return err
 		}
@@ -137,6 +137,7 @@ type HTTPBundleGetter struct {
 
 // FileBundleGetter is a BundleGetter for testing.
 type FileBundleGetter struct {
+	Fs                 afero.Fs
 	URL                string
 	InsecureSkipVerify bool
 }
@@ -168,7 +169,7 @@ func (g *HTTPBundleGetter) Get() ([]byte, error) {
 
 // Get mocks an HTTP(S) GET request.
 func (g *FileBundleGetter) Get() ([]byte, error) {
-	return os.ReadFile(strings.TrimPrefix(g.URL, "file://"))
+	return afero.ReadFile(g.Fs, strings.TrimPrefix(g.URL, "file://"))
 }
 
 // BundleSaver is an interface used by bundle saver structures.
@@ -177,10 +178,12 @@ type BundleSaver interface {
 }
 
 // ZipBundleSaver is a BundleSaver for ZIP files.
-type ZipBundleSaver struct{}
+type ZipBundleSaver struct {
+	Fs afero.Fs
+}
 
 // Save implements the main method of the BundleSaver interface. It makes use of archive/zip.
-func (ZipBundleSaver) Save(bundle *Bundle, bundlePath string, spec *APISpec) error {
+func (z *ZipBundleSaver) Save(bundle *Bundle, bundlePath string, spec *APISpec) error {
 	buf := bytes.NewReader(bundle.Data)
 	reader, err := zip.NewReader(buf, int64(len(bundle.Data)))
 	if err != nil {
@@ -195,7 +198,7 @@ func (ZipBundleSaver) Save(bundle *Bundle, bundlePath string, spec *APISpec) err
 		destPath := filepath.Join(bundlePath, f.Name)
 
 		if f.FileHeader.Mode().IsDir() {
-			if err := os.Mkdir(destPath, 0700); err != nil {
+			if err := z.Fs.Mkdir(destPath, 0700); err != nil {
 				return err
 			}
 			continue
@@ -204,7 +207,7 @@ func (ZipBundleSaver) Save(bundle *Bundle, bundlePath string, spec *APISpec) err
 		if err != nil {
 			return err
 		}
-		newFile, err := os.Create(destPath)
+		newFile, err := z.Fs.Create(destPath)
 		if err != nil {
 			return err
 		}
@@ -220,7 +223,7 @@ func (ZipBundleSaver) Save(bundle *Bundle, bundlePath string, spec *APISpec) err
 }
 
 // FetchBundle will fetch a given bundle, using the right BundleGetter. The first argument is the bundle name, the base bundle URL will be used as prefix.
-func (gw *Gateway) FetchBundle(spec *APISpec) (Bundle, error) {
+func (gw *Gateway) FetchBundle(bundleFs afero.Fs, spec *APISpec) (Bundle, error) {
 	bundle := Bundle{Gw: gw}
 	var err error
 
@@ -256,6 +259,7 @@ func (gw *Gateway) FetchBundle(spec *APISpec) (Bundle, error) {
 		}
 	case "file":
 		getter = &FileBundleGetter{
+			Fs:                 bundleFs,
 			URL:                bundleURL,
 			InsecureSkipVerify: gw.GetConfig().BundleInsecureSkipVerify,
 		}
@@ -295,7 +299,7 @@ func pullBundle(getter BundleGetter, backoffMultiplier float64) ([]byte, error) 
 }
 
 // saveBundle will save a bundle to the disk, see ZipBundleSaver methods for reference.
-func saveBundle(bundle *Bundle, destPath string, spec *APISpec) error {
+func saveBundle(bundleFs afero.Fs, bundle *Bundle, destPath string, spec *APISpec) error {
 	bundleFormat := "zip"
 
 	var bundleSaver BundleSaver
@@ -303,20 +307,22 @@ func saveBundle(bundle *Bundle, destPath string, spec *APISpec) error {
 	// TODO: use enums?
 	switch bundleFormat {
 	case "zip":
-		bundleSaver = ZipBundleSaver{}
+		bundleSaver = &ZipBundleSaver{
+			Fs: bundleFs,
+		}
 	}
 
 	return bundleSaver.Save(bundle, destPath, spec)
 }
 
 // loadBundleManifest will parse the manifest file and return the bundle parameters.
-func loadBundleManifest(bundle *Bundle, spec *APISpec, skipVerification bool) error {
+func loadBundleManifest(bundleFs afero.Fs, bundle *Bundle, spec *APISpec, skipVerification bool) error {
 	log.WithFields(logrus.Fields{
 		"prefix": "main",
 	}).Info("----> Loading bundle: ", spec.CustomMiddlewareBundle)
 
 	manifestPath := filepath.Join(bundle.Path, "manifest.json")
-	f, err := os.Open(manifestPath)
+	f, err := bundleFs.Open(manifestPath)
 	if err != nil {
 		return err
 	}
@@ -333,7 +339,7 @@ func loadBundleManifest(bundle *Bundle, spec *APISpec, skipVerification bool) er
 		return nil
 	}
 
-	if err := bundle.Verify(); err != nil {
+	if err := bundle.Verify(bundleFs); err != nil {
 		log.WithFields(logrus.Fields{
 			"prefix": "main",
 		}).Info("----> Bundle verification failed: ", spec.CustomMiddlewareBundle)
@@ -357,11 +363,21 @@ func (gw *Gateway) getHashedBundleName(bundleName string) (string, error) {
 	return fmt.Sprintf("%x", bundleNameHash.Sum(nil)), nil
 }
 
-// loadBundle wraps the load and save steps, it will return if an error occurs at any point.
+// loadBundle configures the gateway to load a custom middleware bundle based on the provided API specification.
+// It verifies the existence, integrity, and configuration of the bundle, applying it to the spec if validation succeeds.
+// Returns an error if the bundle cannot be loaded, validated, or is disabled in the spec.
 func (gw *Gateway) loadBundle(spec *APISpec) error {
-	if gw.GetConfig().ManagementNode {
+	return gw.loadBundleWithFs(spec, afero.NewOsFs())
+}
+
+// loadBundleWithFs loads and validates a middleware bundle for the given API specification using the provided filesystem.
+// It operates only if required settings like CustomMiddlewareBundle and BundleBaseURL are configured in the API spec.
+// The method handles bundle fetching, saving, and manifest validation.
+// Returns an error if the bundle cannot be fetched, saved, or its manifest cannot be verified successfully.
+func (gw *Gateway) loadBundleWithFs(spec *APISpec, bundleFs afero.Fs) error {
+	/*if gw.GetConfig().ManagementNode {
 		return nil
-	}
+	}*/
 
 	// Skip if no custom middleware bundle name is set.
 	if spec.CustomMiddlewareBundleDisabled || spec.CustomMiddlewareBundle == "" {
@@ -378,7 +394,7 @@ func (gw *Gateway) loadBundle(spec *APISpec) error {
 
 	// Skip if the bundle destination path already exists.
 	// The bundle exists, load and return:
-	if _, err := os.Stat(destPath); err == nil {
+	if _, err := bundleFs.Stat(destPath); err == nil {
 		log.WithFields(logrus.Fields{
 			"prefix": "main",
 		}).Info("Loading existing bundle: ", spec.CustomMiddlewareBundle)
@@ -390,11 +406,12 @@ func (gw *Gateway) loadBundle(spec *APISpec) error {
 			Gw:   gw,
 		}
 
-		err = loadBundleManifest(&bundle, spec, true)
+		err = loadBundleManifest(bundleFs, &bundle, spec, false)
 		if err != nil {
 			log.WithFields(logrus.Fields{
 				"prefix": "main",
 			}).Info("----> Couldn't load bundle: ", spec.CustomMiddlewareBundle, " ", err)
+			return err
 		}
 
 		log.WithFields(logrus.Fields{
@@ -410,16 +427,16 @@ func (gw *Gateway) loadBundle(spec *APISpec) error {
 		"prefix": "main",
 	}).Info("----> Fetching Bundle: ", spec.CustomMiddlewareBundle)
 
-	bundle, err := gw.FetchBundle(spec)
+	bundle, err := gw.FetchBundle(bundleFs, spec)
 	if err != nil {
 		return bundleError(spec, err, "Couldn't fetch bundle")
 	}
 
-	if err := os.MkdirAll(destPath, 0700); err != nil {
+	if err := bundleFs.MkdirAll(destPath, 0700); err != nil {
 		return bundleError(spec, err, "Couldn't create bundle directory")
 	}
 
-	if err := saveBundle(&bundle, destPath, spec); err != nil {
+	if err := saveBundle(bundleFs, &bundle, destPath, spec); err != nil {
 		return bundleError(spec, err, "Couldn't save bundle")
 	}
 
@@ -430,10 +447,10 @@ func (gw *Gateway) loadBundle(spec *APISpec) error {
 	// Set the destination path:
 	bundle.Path = destPath
 
-	if err := loadBundleManifest(&bundle, spec, false); err != nil {
+	if err := loadBundleManifest(bundleFs, &bundle, spec, false); err != nil {
 		bundleError(spec, err, "Couldn't load bundle")
 
-		if removeErr := os.RemoveAll(bundle.Path); removeErr != nil {
+		if removeErr := bundleFs.RemoveAll(bundle.Path); removeErr != nil {
 			bundleError(spec, removeErr, "Couldn't remove bundle")
 		}
 		return err
