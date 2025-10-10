@@ -3034,8 +3034,8 @@ func TestModeSwitching(t *testing.T) {
 					Enabled:                true,
 					SecurityProcessingMode: SecurityProcessingModeCompliant,
 					SecuritySchemes: SecuritySchemes{
-						"hmac": &HMAC{Enabled: true},
-						"custom": &CustomPluginAuthentication{Enabled: true},
+						"hmac":    &HMAC{Enabled: true},
+						"custom":  &CustomPluginAuthentication{Enabled: true},
 						"jwtAuth": &JWT{Enabled: true},
 					},
 				},
@@ -3055,8 +3055,8 @@ func TestModeSwitching(t *testing.T) {
 					Enabled:                true,
 					SecurityProcessingMode: SecurityProcessingModeCompliant,
 					SecuritySchemes: SecuritySchemes{
-						"hmac": &HMAC{Enabled: true},
-						"custom": &CustomPluginAuthentication{Enabled: true},
+						"hmac":    &HMAC{Enabled: true},
+						"custom":  &CustomPluginAuthentication{Enabled: true},
 						"jwtAuth": &JWT{Enabled: true},
 					},
 				},
@@ -3079,8 +3079,8 @@ func TestModeSwitching(t *testing.T) {
 		// Test multiple mixed requirements (OR logic between them, AND within each)
 		api := apidef.APIDefinition{
 			SecurityRequirements: [][]string{
-				{"hmac", "jwtAuth"},    // First mixed AND requirement
-				{"custom", "jwtAuth"},  // Second mixed AND requirement
+				{"hmac", "jwtAuth"},   // First mixed AND requirement
+				{"custom", "jwtAuth"}, // Second mixed AND requirement
 			},
 			EnableJWT:               true,
 			EnableSignatureChecking: true,
@@ -3108,8 +3108,8 @@ func TestModeSwitching(t *testing.T) {
 					Enabled:                true,
 					SecurityProcessingMode: SecurityProcessingModeCompliant,
 					SecuritySchemes: SecuritySchemes{
-						"hmac": &HMAC{Enabled: true},
-						"custom": &CustomPluginAuthentication{Enabled: true},
+						"hmac":    &HMAC{Enabled: true},
+						"custom":  &CustomPluginAuthentication{Enabled: true},
 						"jwtAuth": &JWT{Enabled: true},
 					},
 				},
