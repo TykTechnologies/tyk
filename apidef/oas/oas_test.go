@@ -1602,6 +1602,383 @@ func TestOAS_ValidateSecurity(t *testing.T) {
 	}
 }
 
+func TestOAS_ValidateCompliantModeAuthentication(t *testing.T) {
+	t.Parallel()
+
+	enabledTrue := true
+
+	tests := []struct {
+		name          string
+		setupOAS      func(oas *OAS)
+		expectedError string
+	}{
+		{
+			name: "no authentication - should pass",
+			setupOAS: func(oas *OAS) {
+				// No authentication configured
+			},
+			expectedError: "",
+		},
+		{
+			name: "legacy mode with enabled auth not in security - should pass",
+			setupOAS: func(oas *OAS) {
+				xTykExt := &XTykAPIGateway{
+					Server: Server{
+						Authentication: &Authentication{
+							SecurityProcessingMode: SecurityProcessingModeLegacy,
+							SecuritySchemes: SecuritySchemes{
+								"jwt": &JWT{Enabled: true},
+							},
+						},
+					},
+				}
+				oas.SetTykExtension(xTykExt)
+			},
+			expectedError: "",
+		},
+		{
+			name: "compliant mode with enabled JWT in OAS security - should pass",
+			setupOAS: func(oas *OAS) {
+				xTykExt := &XTykAPIGateway{
+					Server: Server{
+						Authentication: &Authentication{
+							SecurityProcessingMode: SecurityProcessingModeCompliant,
+							SecuritySchemes: SecuritySchemes{
+								"jwt": &JWT{Enabled: true},
+							},
+						},
+					},
+				}
+				oas.SetTykExtension(xTykExt)
+
+				// Add JWT to OAS security and components
+				oas.T.Components = &openapi3.Components{
+					SecuritySchemes: openapi3.SecuritySchemes{
+						"jwt": &openapi3.SecuritySchemeRef{
+							Value: openapi3.NewJWTSecurityScheme(),
+						},
+					},
+				}
+				secReq := openapi3.NewSecurityRequirement()
+				secReq["jwt"] = []string{}
+				oas.T.Security = openapi3.SecurityRequirements{secReq}
+			},
+			expectedError: "",
+		},
+		{
+			name: "compliant mode with enabled HMAC in vendor security - should pass",
+			setupOAS: func(oas *OAS) {
+				xTykExt := &XTykAPIGateway{
+					Server: Server{
+						Authentication: &Authentication{
+							SecurityProcessingMode: SecurityProcessingModeCompliant,
+							SecuritySchemes: SecuritySchemes{
+								"hmac": &HMAC{Enabled: true},
+							},
+							Security: [][]string{{"hmac"}},
+						},
+					},
+				}
+				oas.SetTykExtension(xTykExt)
+			},
+			expectedError: "",
+		},
+		{
+			name: "compliant mode with top-level HMAC enabled in vendor security - should pass",
+			setupOAS: func(oas *OAS) {
+				xTykExt := &XTykAPIGateway{
+					Server: Server{
+						Authentication: &Authentication{
+							SecurityProcessingMode: SecurityProcessingModeCompliant,
+							HMAC:                   &HMAC{Enabled: true},
+							Security:               [][]string{{"hmac"}},
+						},
+					},
+				}
+				oas.SetTykExtension(xTykExt)
+			},
+			expectedError: "",
+		},
+		{
+			name: "compliant mode with top-level Custom enabled in vendor security - should pass",
+			setupOAS: func(oas *OAS) {
+				xTykExt := &XTykAPIGateway{
+					Server: Server{
+						Authentication: &Authentication{
+							SecurityProcessingMode: SecurityProcessingModeCompliant,
+							Custom:                 &CustomPluginAuthentication{Enabled: true},
+							Security:               [][]string{{"custom"}},
+						},
+					},
+				}
+				oas.SetTykExtension(xTykExt)
+			},
+			expectedError: "",
+		},
+		{
+			name: "compliant mode with top-level OIDC enabled in vendor security - should pass",
+			setupOAS: func(oas *OAS) {
+				xTykExt := &XTykAPIGateway{
+					Server: Server{
+						Authentication: &Authentication{
+							SecurityProcessingMode: SecurityProcessingModeCompliant,
+							OIDC:                   &OIDC{Enabled: true},
+							Security:               [][]string{{"oidc"}},
+						},
+					},
+				}
+				oas.SetTykExtension(xTykExt)
+			},
+			expectedError: "",
+		},
+		{
+			name: "compliant mode with enabled custom auth in vendor security - should pass",
+			setupOAS: func(oas *OAS) {
+				xTykExt := &XTykAPIGateway{
+					Server: Server{
+						Authentication: &Authentication{
+							SecurityProcessingMode: SecurityProcessingModeCompliant,
+							SecuritySchemes: SecuritySchemes{
+								"customAuth": &CustomPluginAuthentication{Enabled: true},
+							},
+							Security: [][]string{{"customAuth"}},
+						},
+					},
+				}
+				oas.SetTykExtension(xTykExt)
+			},
+			expectedError: "",
+		},
+		{
+			name: "compliant mode with enabled Token in vendor security - should pass",
+			setupOAS: func(oas *OAS) {
+				xTykExt := &XTykAPIGateway{
+					Server: Server{
+						Authentication: &Authentication{
+							SecurityProcessingMode: SecurityProcessingModeCompliant,
+							SecuritySchemes: SecuritySchemes{
+								"authToken": &Token{Enabled: &enabledTrue},
+							},
+							Security: [][]string{{"authToken"}},
+						},
+					},
+				}
+				oas.SetTykExtension(xTykExt)
+			},
+			expectedError: "",
+		},
+		{
+			name: "compliant mode with multiple enabled auth in security - should pass",
+			setupOAS: func(oas *OAS) {
+				xTykExt := &XTykAPIGateway{
+					Server: Server{
+						Authentication: &Authentication{
+							SecurityProcessingMode: SecurityProcessingModeCompliant,
+							SecuritySchemes: SecuritySchemes{
+								"jwt":    &JWT{Enabled: true},
+								"hmac":   &HMAC{Enabled: true},
+								"custom": &CustomPluginAuthentication{Enabled: true},
+							},
+							Security: [][]string{{"hmac"}, {"custom"}},
+						},
+					},
+				}
+				oas.SetTykExtension(xTykExt)
+
+				// Add JWT to OAS security and components
+				oas.T.Components = &openapi3.Components{
+					SecuritySchemes: openapi3.SecuritySchemes{
+						"jwt": &openapi3.SecuritySchemeRef{
+							Value: openapi3.NewJWTSecurityScheme(),
+						},
+					},
+				}
+				secReq := openapi3.NewSecurityRequirement()
+				secReq["jwt"] = []string{}
+				oas.T.Security = openapi3.SecurityRequirements{secReq}
+			},
+			expectedError: "",
+		},
+		{
+			name: "compliant mode with enabled JWT not in any security - should fail",
+			setupOAS: func(oas *OAS) {
+				xTykExt := &XTykAPIGateway{
+					Server: Server{
+						Authentication: &Authentication{
+							SecurityProcessingMode: SecurityProcessingModeCompliant,
+							SecuritySchemes: SecuritySchemes{
+								"jwt": &JWT{Enabled: true},
+							},
+						},
+					},
+				}
+				oas.SetTykExtension(xTykExt)
+			},
+			expectedError: "Invalid multi-auth configuration: jwt auth enabled but not configured in a security requirement",
+		},
+		{
+			name: "compliant mode with enabled HMAC not in vendor security - should fail",
+			setupOAS: func(oas *OAS) {
+				xTykExt := &XTykAPIGateway{
+					Server: Server{
+						Authentication: &Authentication{
+							SecurityProcessingMode: SecurityProcessingModeCompliant,
+							SecuritySchemes: SecuritySchemes{
+								"hmac": &HMAC{Enabled: true},
+							},
+						},
+					},
+				}
+				oas.SetTykExtension(xTykExt)
+			},
+			expectedError: "Invalid multi-auth configuration: hmac auth enabled but not configured in a security requirement",
+		},
+		{
+			name: "compliant mode with top-level HMAC enabled not in vendor security - should fail",
+			setupOAS: func(oas *OAS) {
+				xTykExt := &XTykAPIGateway{
+					Server: Server{
+						Authentication: &Authentication{
+							SecurityProcessingMode: SecurityProcessingModeCompliant,
+							HMAC:                   &HMAC{Enabled: true},
+						},
+					},
+				}
+				oas.SetTykExtension(xTykExt)
+			},
+			expectedError: "Invalid multi-auth configuration: hmac auth enabled but not configured in a security requirement",
+		},
+		{
+			name: "compliant mode with top-level Custom enabled not in vendor security - should fail",
+			setupOAS: func(oas *OAS) {
+				xTykExt := &XTykAPIGateway{
+					Server: Server{
+						Authentication: &Authentication{
+							SecurityProcessingMode: SecurityProcessingModeCompliant,
+							Custom:                 &CustomPluginAuthentication{Enabled: true},
+						},
+					},
+				}
+				oas.SetTykExtension(xTykExt)
+			},
+			expectedError: "Invalid multi-auth configuration: custom auth enabled but not configured in a security requirement",
+		},
+		{
+			name: "compliant mode with top-level OIDC enabled not in vendor security - should fail",
+			setupOAS: func(oas *OAS) {
+				xTykExt := &XTykAPIGateway{
+					Server: Server{
+						Authentication: &Authentication{
+							SecurityProcessingMode: SecurityProcessingModeCompliant,
+							OIDC:                   &OIDC{Enabled: true},
+						},
+					},
+				}
+				oas.SetTykExtension(xTykExt)
+			},
+			expectedError: "Invalid multi-auth configuration: oidc auth enabled but not configured in a security requirement",
+		},
+		{
+			name: "compliant mode with enabled custom auth not in vendor security - should fail",
+			setupOAS: func(oas *OAS) {
+				xTykExt := &XTykAPIGateway{
+					Server: Server{
+						Authentication: &Authentication{
+							SecurityProcessingMode: SecurityProcessingModeCompliant,
+							SecuritySchemes: SecuritySchemes{
+								"customAuth": &CustomPluginAuthentication{Enabled: true},
+							},
+						},
+					},
+				}
+				oas.SetTykExtension(xTykExt)
+			},
+			expectedError: "Invalid multi-auth configuration: customAuth auth enabled but not configured in a security requirement",
+		},
+		{
+			name: "compliant mode with multiple enabled auth not configured - should fail with both",
+			setupOAS: func(oas *OAS) {
+				xTykExt := &XTykAPIGateway{
+					Server: Server{
+						Authentication: &Authentication{
+							SecurityProcessingMode: SecurityProcessingModeCompliant,
+							SecuritySchemes: SecuritySchemes{
+								"hmac":   &HMAC{Enabled: true},
+								"custom": &CustomPluginAuthentication{Enabled: true},
+							},
+						},
+					},
+				}
+				oas.SetTykExtension(xTykExt)
+			},
+			expectedError: "auth methods enabled but not configured in a security requirement",
+		},
+		{
+			name: "compliant mode with disabled auth not in security - should pass",
+			setupOAS: func(oas *OAS) {
+				enabledFalse := false
+				xTykExt := &XTykAPIGateway{
+					Server: Server{
+						Authentication: &Authentication{
+							SecurityProcessingMode: SecurityProcessingModeCompliant,
+							SecuritySchemes: SecuritySchemes{
+								"jwt":   &JWT{Enabled: false},
+								"token": &Token{Enabled: &enabledFalse},
+							},
+						},
+					},
+				}
+				oas.SetTykExtension(xTykExt)
+			},
+			expectedError: "",
+		},
+		{
+			name: "compliant mode with mixed enabled and disabled auth - should fail for enabled only",
+			setupOAS: func(oas *OAS) {
+				enabledFalse := false
+				xTykExt := &XTykAPIGateway{
+					Server: Server{
+						Authentication: &Authentication{
+							SecurityProcessingMode: SecurityProcessingModeCompliant,
+							SecuritySchemes: SecuritySchemes{
+								"jwt":   &JWT{Enabled: true},
+								"token": &Token{Enabled: &enabledFalse},
+							},
+						},
+					},
+				}
+				oas.SetTykExtension(xTykExt)
+			},
+			expectedError: "Invalid multi-auth configuration: jwt auth enabled but not configured in a security requirement",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			oas := &OAS{
+				T: openapi3.T{
+					OpenAPI: "3.0.3",
+					Info: &openapi3.Info{
+						Title:   "Test API",
+						Version: "1.0.0",
+					},
+					Paths: openapi3.NewPaths(),
+				},
+			}
+
+			tt.setupOAS(oas)
+
+			err := oas.Validate(context.Background())
+			if tt.expectedError == "" {
+				assert.NoError(t, err)
+			} else {
+				assert.Error(t, err)
+				assert.Contains(t, err.Error(), tt.expectedError)
+			}
+		})
+	}
+}
+
 func TestYaml(t *testing.T) {
 	oasDoc := OAS{}
 	Fill(t, &oasDoc, 0)
