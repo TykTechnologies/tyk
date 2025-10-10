@@ -191,35 +191,47 @@ func (z *ZipBundleSaver) Save(bundle *Bundle, bundlePath string, _ *APISpec) err
 	}
 
 	for _, f := range reader.File {
-		if err := sanitize.ZipFilePath(f.Name, bundlePath); err != nil {
-			return err
-		}
-
-		destPath := filepath.Join(bundlePath, f.Name)
-
-		if f.FileHeader.Mode().IsDir() {
-			if err := z.Fs.Mkdir(destPath, 0700); err != nil {
-				return err
-			}
-			continue
-		}
-		rc, err := f.Open()
-		if err != nil {
-			return err
-		}
-		newFile, err := z.Fs.Create(destPath)
-		if err != nil {
-			return err
-		}
-		if _, err = io.Copy(newFile, rc); err != nil {
-			return err
-		}
-		rc.Close()
-		if err := newFile.Close(); err != nil {
+		if err := z.extractFile(f, bundlePath); err != nil {
 			return err
 		}
 	}
+	
 	return nil
+}
+
+func (z *ZipBundleSaver) extractFile(f *zip.File, bundlePath string) error {
+	if err := sanitize.ZipFilePath(f.Name, bundlePath); err != nil {
+		return err
+	}
+
+	destPath := filepath.Join(bundlePath, f.Name)
+
+	if f.FileHeader.Mode().IsDir() {
+		return z.Fs.Mkdir(destPath, 0700)
+	}
+
+	rc, err := f.Open()
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if err := rc.Close(); err != nil {
+			log.WithFields(logrus.Fields{
+				"prefix": "main",
+			}).WithError(err).Error("Couldn't close file")
+		}
+	}()
+
+	newFile, err := z.Fs.Create(destPath)
+	if err != nil {
+		return err
+	}
+
+	if _, err = io.Copy(newFile, rc); err != nil {
+		return err
+	}
+
+	return newFile.Close()
 }
 
 // FetchBundle will fetch a given bundle, using the right BundleGetter. The first argument is the bundle name, the base bundle URL will be used as prefix.
