@@ -558,12 +558,11 @@ type HttpServerOptionsConfig struct {
 	// https://tyk.io/docs/api-management/traffic-transformation/#request-size-limits
 	MaxRequestBodySize int64 `json:"max_request_body_size"`
 
-	// MaxResponseBodySize configures a maximum size limit for response body size (in bytes) when response transformation is enabled.
+	// MaxResponseBodySize configures an upper limit for the size of the response body (payload) in bytes.
 	//
-	// Tyk Gateway will evaluate the response body size during transformation. If the body exceeds this limit,
-	// the Gateway will return an HTTP 500 error and the transformation will not be performed.
+	// This limit is currently applied only if the Response Body Transform middleware is enabled.
 	//
-	// The response body is read into memory (up to MaxResponseBodySize+1 bytes) using io.LimitReader.
+	// The Gateway will return `HTTP 500 Response Body Too Large` if the response payload exceeds MaxResponseBodySize+1 bytes.
 	//
 	// A value of zero (default) means that no maximum is set and response bodies will not be limited.
 	MaxResponseBodySize int64 `json:"max_response_body_size"`
