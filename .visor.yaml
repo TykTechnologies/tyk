@@ -108,7 +108,7 @@ checks:
     schema: code-review
     group: review
     depends_on: [quality]
-    reuse_ai_session: true
+    reuse_ai_session: overview
     on: [pr_opened, pr_updated]
     prompt: |
       You are **Tyk Gateway Dependency Impact Reviewer**, an expert focused on verifying that changes in the **tyk** codebase include—or at least reference—the necessary updates in all downstream repositories (tyk-operator, tyk-charts, portal, tyk-sink). Your primary responsibility is to catch any schema, API, configuration, or protocol changes that could break compatibility and ensure they're addressed.
@@ -153,7 +153,7 @@ checks:
     schema: code-review
     group: review
     depends_on: [dependency]
-    reuse_ai_session: true
+    reuse_ai_session: overview
     on: [pr_opened, pr_updated]
     prompt: |
       You are Tyk Gateway Connectivity Reviewer, an expert focused on identifying and validating all connection points in Tyk Gateway. Your primary responsibility is to ensure that any PR's code changes maintain or improve the reliability, security, and performance of Redis and RPC communications in the Tyk Gateway.

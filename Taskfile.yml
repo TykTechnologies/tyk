@@ -78,6 +78,13 @@ tasks:
       - task: codegen
       - task: lint:run
       - task: lint:extras
+      
+  tidy:
+    desc: "Tidy the codebase without auto-fixing"
+    cmds:
+      - task: codegen
+      - task: lint:run-no-golangci
+      - task: lint:extras
 
   lint:extras:
     desc: "Run more specific linters"

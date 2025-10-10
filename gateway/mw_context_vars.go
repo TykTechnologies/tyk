@@ -1,11 +1,13 @@
 package gateway
 
 import (
+	"context"
 	"net/http"
 	"strings"
 
 	"github.com/TykTechnologies/tyk/internal/uuid"
 
+	"github.com/TykTechnologies/tyk/internal/otel"
 	"github.com/TykTechnologies/tyk/request"
 )
 
@@ -19,6 +21,28 @@ func (m *MiddlewareContextVars) Name() string {
 
 func (m *MiddlewareContextVars) EnabledForSpec() bool {
 	return m.Spec.EnableContextVars
+}
+
+const traceIDVarKey = "tyk_trace_id"
+
+func (m *MiddlewareContextVars) addTraceIDToContextVars(
+	ctx context.Context,
+	vars map[string]interface{},
+) map[string]interface{} {
+	if !m.Gw.GetConfig().OpenTelemetry.Enabled {
+		return vars
+	}
+
+	id := otel.ExtractTraceID(ctx)
+	if id == "" {
+		return vars
+	}
+
+	if vars == nil {
+		vars = make(map[string]interface{}, 1)
+	}
+	vars[traceIDVarKey] = id
+	return vars
 }
 
 // ProcessRequest will run any checks on the request on the way through the system, return an error to have the chain fail
@@ -35,6 +59,8 @@ func (m *MiddlewareContextVars) ProcessRequest(w http.ResponseWriter, r *http.Re
 		"remote_addr":  request.RealIP(r),              // IP
 		"request_id":   uuid.New(),                     //Correlation ID
 	}
+
+	contextDataObject = m.addTraceIDToContextVars(r.Context(), contextDataObject)
 
 	for hname, vals := range r.Header {
 		n := "headers_" + strings.Replace(hname, "-", "_", -1)

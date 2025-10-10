@@ -15,6 +15,13 @@ tasks:
       - task: check
       - golangci-lint run --new-from-rev=origin/{{ .branch_name }} --issues-exit-code=1 --fix ./...
 
+  run-no-golangci:
+    desc: "Run linters without golangci-lint auto-fix"
+    cmds:
+      - task: fmt
+      - task: vet
+      - task: check
+
   fmt:
     desc: "Run typical code cleanup steps"
     cmds:
@@ -81,3 +88,23 @@ tasks:
     dir: '{{.root}}'
     cmds:
       - go test -count 1 -run=TestXTykGateway_Lint ./apidef/oas/
+
+  check-git-state:
+    desc: "Check if git state is dirty"
+    dir: '{{.root}}'
+    vars:
+      message: '{{.MESSAGE | default "task made git state dirty, please run task locally and update PR"}}'
+    set: [errexit]
+    cmds:
+      - |
+        git add --all
+        git diff HEAD > git-state.log
+        git_state_count=$(wc -l < git-state.log)
+        if [[ $git_state_count -ne 0 ]]
+        then
+          echo "{{.message}}"
+          echo
+          cat git-state.log
+          exit 1
+        fi
+
