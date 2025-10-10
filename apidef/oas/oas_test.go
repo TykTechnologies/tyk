@@ -1814,7 +1814,7 @@ func TestOAS_ValidateCompliantModeAuthentication(t *testing.T) {
 				}
 				oas.SetTykExtension(xTykExt)
 			},
-			expectedError: "Invalid multi-auth configuration: jwt auth enabled but not configured in a security requirement",
+			expectedError: "invalid multi-auth configuration: jwt auth enabled but not configured in a security requirement",
 		},
 		{
 			name: "compliant mode with enabled HMAC not in vendor security - should fail",
@@ -1831,7 +1831,7 @@ func TestOAS_ValidateCompliantModeAuthentication(t *testing.T) {
 				}
 				oas.SetTykExtension(xTykExt)
 			},
-			expectedError: "Invalid multi-auth configuration: hmac auth enabled but not configured in a security requirement",
+			expectedError: "invalid multi-auth configuration: hmac auth enabled but not configured in a security requirement",
 		},
 		{
 			name: "compliant mode with top-level HMAC enabled not in vendor security - should fail",
@@ -1846,7 +1846,7 @@ func TestOAS_ValidateCompliantModeAuthentication(t *testing.T) {
 				}
 				oas.SetTykExtension(xTykExt)
 			},
-			expectedError: "Invalid multi-auth configuration: hmac auth enabled but not configured in a security requirement",
+			expectedError: "invalid multi-auth configuration: hmac auth enabled but not configured in a security requirement",
 		},
 		{
 			name: "compliant mode with top-level Custom enabled not in vendor security - should fail",
@@ -1861,7 +1861,7 @@ func TestOAS_ValidateCompliantModeAuthentication(t *testing.T) {
 				}
 				oas.SetTykExtension(xTykExt)
 			},
-			expectedError: "Invalid multi-auth configuration: custom auth enabled but not configured in a security requirement",
+			expectedError: "invalid multi-auth configuration: custom auth enabled but not configured in a security requirement",
 		},
 		{
 			name: "compliant mode with top-level OIDC enabled not in vendor security - should fail",
@@ -1876,7 +1876,7 @@ func TestOAS_ValidateCompliantModeAuthentication(t *testing.T) {
 				}
 				oas.SetTykExtension(xTykExt)
 			},
-			expectedError: "Invalid multi-auth configuration: oidc auth enabled but not configured in a security requirement",
+			expectedError: "invalid multi-auth configuration: oidc auth enabled but not configured in a security requirement",
 		},
 		{
 			name: "compliant mode with enabled custom auth not in vendor security - should fail",
@@ -1893,7 +1893,7 @@ func TestOAS_ValidateCompliantModeAuthentication(t *testing.T) {
 				}
 				oas.SetTykExtension(xTykExt)
 			},
-			expectedError: "Invalid multi-auth configuration: customAuth auth enabled but not configured in a security requirement",
+			expectedError: "invalid multi-auth configuration: customAuth auth enabled but not configured in a security requirement",
 		},
 		{
 			name: "compliant mode with multiple enabled auth not configured - should fail with both",
@@ -1949,7 +1949,7 @@ func TestOAS_ValidateCompliantModeAuthentication(t *testing.T) {
 				}
 				oas.SetTykExtension(xTykExt)
 			},
-			expectedError: "Invalid multi-auth configuration: jwt auth enabled but not configured in a security requirement",
+			expectedError: "invalid multi-auth configuration: jwt auth enabled but not configured in a security requirement",
 		},
 	}
 

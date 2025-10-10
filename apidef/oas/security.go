@@ -1079,9 +1079,7 @@ func (s *OAS) fillSecurity(api apidef.APIDefinition) {
 
 				// First pass: check what types of auth we have
 				for _, schemeName := range requirement {
-					isProprietary := s.isProprietaryAuthScheme(schemeName)
-
-					if isProprietary {
+					if s.isProprietaryAuthScheme(schemeName) {
 						hasProprietaryAuth = true
 						vendorReq = append(vendorReq, schemeName)
 					} else {
@@ -1267,8 +1265,10 @@ func (s *OAS) extractSecurityTo(api *apidef.APIDefinition) {
 		// For token auth, we need to prioritize enabled schemes since only one can be active
 		var tokenSchemes []string
 		for schemeName := range requirement {
-			if scheme, ok := s.Components.SecuritySchemes[schemeName]; ok && scheme.Value.Type == typeAPIKey {
-				tokenSchemes = append(tokenSchemes, schemeName)
+			if s.T.Components != nil && s.T.Components.SecuritySchemes != nil {
+				if scheme, ok := s.T.Components.SecuritySchemes[schemeName]; ok && scheme.Value.Type == typeAPIKey {
+					tokenSchemes = append(tokenSchemes, schemeName)
+				}
 			}
 		}
 
@@ -1289,35 +1289,37 @@ func (s *OAS) extractSecurityTo(api *apidef.APIDefinition) {
 
 		for schemeName := range requirement {
 			// Process the security scheme if it exists in the OpenAPI components
-			if scheme, ok := s.Components.SecuritySchemes[schemeName]; ok {
-				v := scheme.Value
-				switch {
-				case v.Type == typeAPIKey:
-					// Already handled above for multiple token schemes
-					if len(tokenSchemes) <= 1 {
-						s.extractTokenTo(api, schemeName)
-					}
-				case v.Type == typeHTTP && v.Scheme == schemeBearer && v.BearerFormat == bearerFormatJWT:
-					s.extractJWTTo(api, schemeName)
-				case v.Type == typeHTTP && v.Scheme == schemeBasic:
-					s.extractBasicTo(api, schemeName)
-				case v.Type == typeOAuth2:
-					securityScheme := s.getTykSecurityScheme(schemeName)
-					if securityScheme == nil {
-						continue
-					}
+			if s.T.Components != nil && s.T.Components.SecuritySchemes != nil {
+				if scheme, ok := s.T.Components.SecuritySchemes[schemeName]; ok {
+					v := scheme.Value
+					switch {
+					case v.Type == typeAPIKey:
+						// Already handled above for multiple token schemes
+						if len(tokenSchemes) <= 1 {
+							s.extractTokenTo(api, schemeName)
+						}
+					case v.Type == typeHTTP && v.Scheme == schemeBearer && v.BearerFormat == bearerFormatJWT:
+						s.extractJWTTo(api, schemeName)
+					case v.Type == typeHTTP && v.Scheme == schemeBasic:
+						s.extractBasicTo(api, schemeName)
+					case v.Type == typeOAuth2:
+						securityScheme := s.getTykSecurityScheme(schemeName)
+						if securityScheme == nil {
+							continue
+						}
 
-					externalOAuth := &ExternalOAuth{}
-					if oauthVal, ok := securityScheme.(*ExternalOAuth); ok {
-						externalOAuth = oauthVal
-					} else {
-						toStructIfMap(securityScheme, externalOAuth)
-					}
+						externalOAuth := &ExternalOAuth{}
+						if oauthVal, ok := securityScheme.(*ExternalOAuth); ok {
+							externalOAuth = oauthVal
+						} else {
+							toStructIfMap(securityScheme, externalOAuth)
+						}
 
-					if len(externalOAuth.Providers) > 0 {
-						s.extractExternalOAuthTo(api, schemeName)
-					} else {
-						s.extractOAuthTo(api, schemeName)
+						if len(externalOAuth.Providers) > 0 {
+							s.extractExternalOAuthTo(api, schemeName)
+						} else {
+							s.extractOAuthTo(api, schemeName)
+						}
 					}
 				}
 			}

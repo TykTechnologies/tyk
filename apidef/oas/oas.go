@@ -498,13 +498,13 @@ func (s *OAS) validateSecurity() error {
 	}
 
 	if s.Components == nil || s.Components.SecuritySchemes == nil || len(s.Components.SecuritySchemes) == 0 {
-		return errors.New("No components or security schemes present in OAS")
+		return errors.New("no components or security schemes present in OAS")
 	}
 
 	for _, requirement := range s.Security {
 		for key := range requirement {
 			if _, ok := s.Components.SecuritySchemes[key]; !ok {
-				errorMsg := fmt.Sprintf("Missing required Security Scheme '%s' in Components.SecuritySchemes. "+
+				errorMsg := fmt.Sprintf("missing required Security Scheme '%s' in Components.SecuritySchemes. "+
 					"For more information please visit https://swagger.io/specification/#security-requirement-object",
 					key)
 				return errors.New(errorMsg)
@@ -513,22 +513,6 @@ func (s *OAS) validateSecurity() error {
 	}
 
 	return nil
-}
-
-// isStandardOASAuth checks if an auth method is a standard OpenAPI auth type
-// (can appear in OAS security field). Returns false for Tyk proprietary auth methods.
-func isStandardOASAuth(authMethod string) bool {
-	// Standard OpenAPI auth methods that can be in OAS security field
-	standardMethods := []string{"jwt", "oauth", "oauth2", "basic", "token", "apiKey"}
-
-	authMethodLower := strings.ToLower(authMethod)
-	for _, method := range standardMethods {
-		if authMethodLower == method {
-			return true
-		}
-	}
-
-	return false
 }
 
 // validateCompliantModeAuthentication validates that all enabled auth methods in compliant mode
@@ -647,7 +631,7 @@ func (s *OAS) validateCompliantModeAuthentication() error {
 		} else {
 			authWord = "auth methods"
 		}
-		return fmt.Errorf("Invalid multi-auth configuration: %s %s enabled but not configured in a security requirement", methodList, authWord)
+		return fmt.Errorf("invalid multi-auth configuration: %s %s enabled but not configured in a security requirement", methodList, authWord)
 	}
 
 	return nil
