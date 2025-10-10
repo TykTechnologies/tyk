@@ -195,7 +195,7 @@ func (z *ZipBundleSaver) Save(bundle *Bundle, bundlePath string, _ *APISpec) err
 			return err
 		}
 	}
-	
+
 	return nil
 }
 
@@ -227,11 +227,19 @@ func (z *ZipBundleSaver) extractFile(f *zip.File, bundlePath string) error {
 		return err
 	}
 
+	defer func() {
+		if err := newFile.Close(); err != nil {
+			log.WithFields(logrus.Fields{
+				"prefix": "main",
+			}).WithError(err).Error("Couldn't close file")
+		}
+	}()
+
 	if _, err = io.Copy(newFile, rc); err != nil {
 		return err
 	}
 
-	return newFile.Close()
+	return nil
 }
 
 // FetchBundle will fetch a given bundle, using the right BundleGetter. The first argument is the bundle name, the base bundle URL will be used as prefix.
