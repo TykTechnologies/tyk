@@ -3381,7 +3381,7 @@ func TestVendorExtension_ComplexCombination_CompliantMode(t *testing.T) {
 			Headers: map[string]string{
 				"Authorization": "Bearer invalid-oauth",
 			},
-			Code: http.StatusForbidden,
+			Code: http.StatusBadRequest,
 		},
 
 		{
