@@ -1787,8 +1787,6 @@ func TestCompliantModeSecuritySeparation(t *testing.T) {
 		assert.Equal(t, SecurityProcessingModeCompliant, auth.SecurityProcessingMode)
 	})
 }
-<<<<<<< HEAD
-=======
 
 // TestGetJWTConfiguration_ORAuthentication tests GetJWTConfiguration with OR authentication scenarios
 // This test ensures that the JWT configuration is correctly retrieved based on the security processing mode
@@ -3138,4 +3136,3 @@ func TestModeSwitching(t *testing.T) {
 		assert.Contains(t, tykAuth.Security[1], "jwtAuth", "second requirement should contain jwtAuth")
 	})
 }
->>>>>>> 13aeda22f... [TT-15956] Proprietary auth methods are auto populated to OAS Security when changing to compliant mode (#7425)
