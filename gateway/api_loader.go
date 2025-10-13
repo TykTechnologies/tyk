@@ -1204,12 +1204,12 @@ func (gw *Gateway) allApisAreMTLS() bool {
 
 // enforceOrgDataAgeIfQuotasEnabled updates the configuration to enforce organization data age if quotas are enabled.
 func (gw *Gateway) enforceOrgDataAgeIfQuotasEnabled(spec *APISpec) {
-	if !gw.GetConfig().EnforceOrgQuotas {
+	globalConf := gw.GetConfig()
+	if !globalConf.EnforceOrgQuotas {
 		return
 	}
 
 	spec.GlobalConfig.EnforceOrgDataAge = true
-	globalConf := gw.GetConfig()
 	globalConf.EnforceOrgDataAge = true
 	gw.SetConfig(globalConf)
 }
