@@ -498,13 +498,13 @@ func (s *OAS) validateSecurity() error {
 	}
 
 	if s.Components == nil || s.Components.SecuritySchemes == nil || len(s.Components.SecuritySchemes) == 0 {
-		return errors.New("no components or security schemes present in OAS")
+		return errors.New("No components or security schemes present in OAS")
 	}
 
 	for _, requirement := range s.Security {
 		for key := range requirement {
 			if _, ok := s.Components.SecuritySchemes[key]; !ok {
-				errorMsg := fmt.Sprintf("missing required Security Scheme '%s' in Components.SecuritySchemes. "+
+				errorMsg := fmt.Sprintf("Missing required Security Scheme '%s' in Components.SecuritySchemes. "+
 					"For more information please visit https://swagger.io/specification/#security-requirement-object",
 					key)
 				return errors.New(errorMsg)
