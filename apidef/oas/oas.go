@@ -472,8 +472,9 @@ func (s *OAS) ReplaceServers(apiURLs, oldAPIURLs []string) {
 func (s *OAS) Validate(ctx context.Context, opts ...openapi3.ValidationOption) error {
 	validationErr := s.T.Validate(ctx, opts...)
 	securityErr := s.validateSecurity()
+	compliantModeErr := s.validateCompliantModeAuthentication()
 
-	return errors.Join(validationErr, securityErr)
+	return errors.Join(validationErr, securityErr, compliantModeErr)
 }
 
 // Normalize converts the OAS api to a normalized state.
@@ -497,18 +498,140 @@ func (s *OAS) validateSecurity() error {
 	}
 
 	if s.Components == nil || s.Components.SecuritySchemes == nil || len(s.Components.SecuritySchemes) == 0 {
-		return errors.New("No components or security schemes present in OAS")
+		return errors.New("no components or security schemes present in OAS")
 	}
 
 	for _, requirement := range s.Security {
 		for key := range requirement {
 			if _, ok := s.Components.SecuritySchemes[key]; !ok {
-				errorMsg := fmt.Sprintf("Missing required Security Scheme '%s' in Components.SecuritySchemes. "+
+				errorMsg := fmt.Sprintf("missing required Security Scheme '%s' in Components.SecuritySchemes. "+
 					"For more information please visit https://swagger.io/specification/#security-requirement-object",
 					key)
 				return errors.New(errorMsg)
 			}
 		}
+	}
+
+	return nil
+}
+
+// validateCompliantModeAuthentication validates that all enabled auth methods in compliant mode
+// are properly configured in security requirements (either OAS security or vendor extension security).
+// This validation only runs when securityProcessingMode is set to "compliant".
+func (s *OAS) validateCompliantModeAuthentication() error {
+	tykAuth := s.getTykAuthentication()
+	if tykAuth == nil {
+		return nil
+	}
+
+	// Only validate in compliant mode
+	if tykAuth.SecurityProcessingMode != SecurityProcessingModeCompliant {
+		return nil
+	}
+
+	// Collect all security requirement names from both OAS and vendor extension
+	configuredAuthMethods := make(map[string]bool)
+
+	// Add OAS security requirements
+	for _, requirement := range s.T.Security {
+		for schemeName := range requirement {
+			configuredAuthMethods[schemeName] = true
+		}
+	}
+
+	// Add vendor extension security requirements
+	if tykAuth.Security != nil {
+		for _, requirement := range tykAuth.Security {
+			for _, schemeName := range requirement {
+				configuredAuthMethods[schemeName] = true
+			}
+		}
+	}
+
+	// Check each enabled auth method
+	var misconfiguredMethods []string
+
+	// Check top-level auth method fields (HMAC, OIDC, Custom)
+	if tykAuth.HMAC != nil && tykAuth.HMAC.Enabled {
+		if !configuredAuthMethods["hmac"] {
+			misconfiguredMethods = append(misconfiguredMethods, "hmac")
+		}
+	}
+
+	if tykAuth.OIDC != nil && tykAuth.OIDC.Enabled {
+		if !configuredAuthMethods["oidc"] {
+			misconfiguredMethods = append(misconfiguredMethods, "oidc")
+		}
+	}
+
+	if tykAuth.Custom != nil && tykAuth.Custom.Enabled {
+		if !configuredAuthMethods["custom"] {
+			misconfiguredMethods = append(misconfiguredMethods, "custom")
+		}
+	}
+
+	// Check auth methods in SecuritySchemes
+	if len(tykAuth.SecuritySchemes) > 0 {
+		for schemeName, scheme := range tykAuth.SecuritySchemes {
+			// Check if this auth method is enabled
+			enabled := false
+
+			// Type-specific enabled checks
+			switch v := scheme.(type) {
+			case *Token:
+				if v.Enabled != nil && *v.Enabled {
+					enabled = true
+				}
+			case *JWT:
+				if v.Enabled {
+					enabled = true
+				}
+			case *Basic:
+				if v.Enabled {
+					enabled = true
+				}
+			case *OAuth:
+				if v.Enabled {
+					enabled = true
+				}
+			case *HMAC:
+				if v.Enabled {
+					enabled = true
+				}
+			case *OIDC:
+				if v.Enabled {
+					enabled = true
+				}
+			case *CustomPluginAuthentication:
+				if v.Enabled {
+					enabled = true
+				}
+			case map[string]interface{}:
+				// Handle untyped schemes
+				if enabledVal, ok := v["enabled"]; ok {
+					if enabledBool, ok := enabledVal.(bool); ok && enabledBool {
+						enabled = true
+					}
+				}
+			}
+
+			// If enabled but not in any security requirement, add to misconfigured list
+			if enabled && !configuredAuthMethods[schemeName] {
+				misconfiguredMethods = append(misconfiguredMethods, schemeName)
+			}
+		}
+	}
+
+	// Return error if any misconfigured methods found
+	if len(misconfiguredMethods) > 0 {
+		methodList := strings.Join(misconfiguredMethods, " and ")
+		var authWord string
+		if len(misconfiguredMethods) == 1 {
+			authWord = "auth"
+		} else {
+			authWord = "auth methods"
+		}
+		return fmt.Errorf("invalid multi-auth configuration: %s %s enabled but not configured in a security requirement", methodList, authWord)
 	}
 
 	return nil
