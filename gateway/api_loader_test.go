@@ -17,6 +17,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	persistentmodel "github.com/TykTechnologies/storage/persistent/model"
+
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/apidef/oas"
 	"github.com/TykTechnologies/tyk/config"
@@ -9584,6 +9585,64 @@ func TestRecoverFromLoadApiPanic(t *testing.T) {
 			if !strings.Contains(err.Error(), tt.expected) {
 				t.Errorf("expected error to contain %q, got %q", tt.expected, err.Error())
 			}
+		})
+	}
+}
+
+func TestEnforceOrgDataAgeIfQuotasEnabled(t *testing.T) {
+	type testCase struct {
+		name                      string
+		enforceOrgQuotas          bool
+		enforceOrgDataAge         bool
+		expectedEnforceOrgDataAge bool
+	}
+
+	tests := []testCase{
+		{
+			name:                      "should not set org data age if quotas are disabled",
+			enforceOrgQuotas:          false,
+			enforceOrgDataAge:         false,
+			expectedEnforceOrgDataAge: false,
+		},
+		{
+			name:                      "should keep org data age if quotas are disabled",
+			enforceOrgQuotas:          false,
+			enforceOrgDataAge:         true,
+			expectedEnforceOrgDataAge: true,
+		},
+		{
+			name:                      "should enforce org data age if quotas are enabled",
+			enforceOrgQuotas:          true,
+			enforceOrgDataAge:         false,
+			expectedEnforceOrgDataAge: true,
+		},
+		{
+			name:                      "should keep org data age enabled if quotas are enabled",
+			enforceOrgQuotas:          true,
+			enforceOrgDataAge:         true,
+			expectedEnforceOrgDataAge: true,
+		},
+	}
+
+	for _, tc := range tests {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			ts := StartTest(func(globalConf *config.Config) {
+				globalConf.EnforceOrgQuotas = tc.enforceOrgQuotas
+				globalConf.EnforceOrgDataAge = tc.enforceOrgDataAge
+			})
+			t.Cleanup(ts.Close)
+
+			spec := &APISpec{
+				GlobalConfig: config.Config{
+					EnforceOrgDataAge: tc.enforceOrgDataAge,
+				},
+			}
+			ts.Gw.enforceOrgDataAgeIfQuotasEnabled(spec)
+
+			gwConf := ts.Gw.GetConfig()
+			assert.Equal(t, tc.expectedEnforceOrgDataAge, gwConf.EnforceOrgDataAge)
+			assert.Equal(t, tc.expectedEnforceOrgDataAge, spec.GlobalConfig.EnforceOrgDataAge)
 		})
 	}
 }
