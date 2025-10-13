@@ -132,6 +132,7 @@ func (r *ResponseTransformMiddleware) HandleResponse(rw http.ResponseWriter, res
 			handler := ErrorHandler{&BaseMiddleware{Spec: r.Spec, Gw: r.Gw}}
 			handler.HandleError(rw, req, "Response body too large", http.StatusInternalServerError, true)
 		}
+
 		return err
 	}
 
@@ -209,7 +210,7 @@ func (r *ResponseTransformMiddleware) HandleResponse(rw http.ResponseWriter, res
 // GetResponseBody reads the response body with size limit enforcement
 // and returns an error if the body exceeds the configured maximum size.
 func (r *ResponseTransformMiddleware) GetResponseBody(respBody io.Reader, logger *logrus.Entry) ([]byte, error) {
-	var reader io.Reader = respBody
+	var reader = respBody
 	maxSize := r.Gw.GetConfig().HttpServerOptions.MaxResponseBodySize
 	if maxSize > 0 {
 		reader = io.LimitReader(respBody, maxSize+1)
@@ -218,6 +219,7 @@ func (r *ResponseTransformMiddleware) GetResponseBody(respBody io.Reader, logger
 	body, err := io.ReadAll(reader)
 	if err != nil {
 		logger.WithError(err).Error("Error reading response body")
+
 		return nil, err
 	}
 
@@ -225,6 +227,7 @@ func (r *ResponseTransformMiddleware) GetResponseBody(respBody io.Reader, logger
 		logger.WithFields(logrus.Fields{
 			"max_size": maxSize,
 		}).Error("Response body exceeded maximum size limit")
+
 		return nil, ErrResponseSizeLimitExceeded
 	}
 
