@@ -49,6 +49,12 @@ func TestZipFilePath(t *testing.T) {
 			errContains: ErrInvalidFilePath,
 		},
 		{
+			filePath:    "./../test",
+			targetDir:   targetDir,
+			wantErr:     true,
+			errContains: ErrInvalidFilePath,
+		},
+		{
 			filePath:  "./middleware.js",
 			targetDir: targetDir,
 			wantErr:   false,
