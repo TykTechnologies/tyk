@@ -243,8 +243,6 @@ func (t *Service) Apply(session *user.SessionState) error {
 		return errors.New("key has no valid policies to be applied")
 	}
 
-	session.Touch()
-
 	return nil
 }
 
