@@ -557,6 +557,15 @@ type HttpServerOptionsConfig struct {
 	// See more information about setting request size limits here:
 	// https://tyk.io/docs/api-management/traffic-transformation/#request-size-limits
 	MaxRequestBodySize int64 `json:"max_request_body_size"`
+
+	// MaxResponseBodySize configures an upper limit for the size of the response body (payload) in bytes.
+	//
+	// This limit is currently applied only if the Response Body Transform middleware is enabled.
+	//
+	// The Gateway will return `HTTP 500 Response Body Too Large` if the response payload exceeds MaxResponseBodySize+1 bytes.
+	//
+	// A value of zero (default) means that no maximum is set and response bodies will not be limited.
+	MaxResponseBodySize int64 `json:"max_response_body_size"`
 }
 
 type AuthOverrideConf struct {
