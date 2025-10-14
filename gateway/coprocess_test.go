@@ -1,6 +1,8 @@
 package gateway
 
 import (
+	"errors"
+	"net/http"
 	"reflect"
 	"testing"
 
@@ -301,4 +303,69 @@ func TestCoProcessMiddlewareName(t *testing.T) {
 	m := &CoProcessMiddleware{}
 
 	require.Equal(t, "CoProcessMiddleware", m.Name(), "Name method did not return the expected value")
+}
+
+func TestValidateDriver(t *testing.T) {
+	testSupportedDrivers := []apidef.MiddlewareDriver{apidef.PythonDriver, apidef.LuaDriver, apidef.GrpcDriver}
+	testLoadedDrivers := map[apidef.MiddlewareDriver]coprocess.Dispatcher{apidef.GrpcDriver: &GRPCDispatcher{}}
+
+	tests := []struct {
+		name           string
+		driver         apidef.MiddlewareDriver
+		expectedStatus int
+		expectedErr    error
+	}{
+		{
+			name:           "Valid driver - supported and loaded",
+			driver:         apidef.GrpcDriver,
+			expectedStatus: http.StatusOK,
+			expectedErr:    nil,
+		},
+		{
+			name:           "Invalid driver - not supported",
+			driver:         "unsupportedDriver",
+			expectedStatus: http.StatusInternalServerError,
+			expectedErr:    errors.New(http.StatusText(http.StatusInternalServerError)),
+		},
+		{
+			name:           "Invalid driver - supported but not loaded",
+			driver:         apidef.PythonDriver,
+			expectedStatus: http.StatusInternalServerError,
+			expectedErr:    errors.New(http.StatusText(http.StatusInternalServerError)),
+		},
+	}
+
+	originalSupportedDrivers := supportedDrivers
+	originalLoadedDrivers := loadedDrivers
+
+	supportedDrivers = testSupportedDrivers
+	loadedDrivers = testLoadedDrivers
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mw := &CoProcessMiddleware{
+				BaseMiddleware: &BaseMiddleware{
+					Spec: &APISpec{
+						APIDefinition: &apidef.APIDefinition{
+							CustomMiddleware: apidef.MiddlewareSection{
+								Driver: tt.driver,
+							},
+						},
+					},
+				},
+			}
+
+			status, err := mw.validateDriver()
+
+			assert.Equal(t, tt.expectedStatus, status)
+			if tt.expectedErr == nil {
+				assert.Nil(t, err)
+			} else {
+				assert.Equal(t, tt.expectedErr.Error(), err.Error())
+			}
+		})
+	}
+
+	supportedDrivers = originalSupportedDrivers
+	loadedDrivers = originalLoadedDrivers
 }
