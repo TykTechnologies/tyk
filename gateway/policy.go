@@ -255,6 +255,10 @@ func (gw *Gateway) LoadPoliciesFromRPC(store RPCDataLoader, orgId string) (map[s
 // ensurePolicyId ensures ID field exists
 // should be removed after migrate
 func ensurePolicyId(policy *user.Policy) bool {
+	if policy == nil {
+		return false
+	}
+
 	if policy.ID != "" {
 		return true
 	}
