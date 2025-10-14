@@ -13,6 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/test"
 )
 
@@ -416,5 +417,104 @@ func TestResponseTransformMiddleware(t *testing.T) {
 			Transformed: true,
 			Path:        "/anything/transformed/7777",
 		}, body)
+	})
+
+	t.Run("with body size constraints", func(t *testing.T) {
+		testCases := []struct {
+			name             string
+			maxBodySize      int64
+			responseBody     string
+			expectTransform  bool
+			expectedResponse string
+			expectedCode     int
+			expectedError    string
+		}{
+			{
+				name:             "Response body within limit",
+				maxBodySize:      100,
+				responseBody:     `{"name":"test"}`,
+				expectTransform:  true,
+				expectedResponse: `{"result": "test"}`,
+				expectedCode:     http.StatusOK,
+			},
+			{
+				name:          "Response body exceeds limit",
+				maxBodySize:   10,
+				responseBody:  `{"name":"this is a long response that exceeds the limit"}`,
+				expectedCode:  http.StatusInternalServerError,
+				expectedError: "Response body too large",
+			},
+			{
+				name:             "Constraint disabled (zero value)",
+				maxBodySize:      0,
+				responseBody:     `{"name":"test"}`,
+				expectTransform:  true,
+				expectedResponse: `{"result": "test"}`,
+				expectedCode:     http.StatusOK,
+			},
+			{
+				name:             "Exact limit boundary",
+				maxBodySize:      15,
+				responseBody:     `{"name":"test"}`,
+				expectTransform:  true,
+				expectedResponse: `{"result": "test"}`,
+				expectedCode:     http.StatusOK,
+			},
+		}
+
+		for _, tc := range testCases {
+			t.Run(tc.name, func(t *testing.T) {
+				ts := StartTest(func(globalConf *config.Config) {
+					globalConf.HttpServerOptions.MaxResponseBodySize = tc.maxBodySize
+				})
+				defer ts.Close()
+
+				testServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+					w.Header().Set("Content-Type", "application/json")
+					_, err := w.Write([]byte(tc.responseBody))
+					assert.NoError(t, err)
+				}))
+				defer testServer.Close()
+
+				ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+					spec.Proxy.ListenPath = "/test"
+					spec.Proxy.TargetURL = testServer.URL
+
+					UpdateAPIVersion(spec, "v1", func(v *apidef.VersionInfo) {
+						v.ExtendedPaths.TransformResponse = []apidef.TemplateMeta{
+							{
+								Path:   "/transform",
+								Method: http.MethodGet,
+								TemplateData: apidef.TemplateData{
+									Mode:           apidef.UseBlob,
+									TemplateSource: base64.StdEncoding.EncodeToString([]byte(`{"result": "{{.name}}"}`)),
+									Input:          apidef.RequestJSON,
+								},
+							},
+						}
+					})
+				})
+
+				res, err := ts.Run(t, test.TestCase{
+					Path:   "/test/transform",
+					Method: http.MethodGet,
+					Code:   tc.expectedCode,
+				})
+
+				require.NoError(t, err)
+				assert.Equal(t, tc.expectedCode, res.StatusCode)
+
+				body, err := io.ReadAll(res.Body)
+				require.NoError(t, err)
+
+				if tc.expectTransform {
+					assert.JSONEq(t, tc.expectedResponse, string(body))
+				}
+
+				if tc.expectedError != "" {
+					assert.Contains(t, string(body), tc.expectedError)
+				}
+			})
+		}
 	})
 }

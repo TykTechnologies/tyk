@@ -629,6 +629,9 @@
         },
         "max_request_body_size": {
           "type": "integer"
+        },
+        "max_response_body_size": {
+          "type": "integer"
         }
       }
     },
