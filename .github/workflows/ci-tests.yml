@@ -244,3 +244,17 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+  report_logs:
+    runs-on: ubuntu-latest
+    needs: [test]
+    if: ${{ !github.event.pull_request.draft && always() }}
+    name: Report GH Logs on Failure
+    permissions:
+      actions: read
+      contents: read
+    steps:
+      - name: Upload failed job logs
+        uses: TykTechnologies/github-actions/.github/actions/gh-logs-analyser@main
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          gh_logs_analyser_token: ${{ secrets.GH_LOGS_ANALYSER }}
