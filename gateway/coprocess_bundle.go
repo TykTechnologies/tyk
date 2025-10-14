@@ -200,9 +200,9 @@ func (z *ZipBundleSaver) Save(bundle *Bundle, bundlePath string, _ *APISpec) err
 }
 
 func (z *ZipBundleSaver) extractFile(f *zip.File, bundlePath string) error {
-	if err := sanitize.ZipFilePath(f.Name, bundlePath); err != nil {
+	/*if err := sanitize.ZipFilePath(f.Name, bundlePath); err != nil {
 		return err
-	}
+	}*/
 
 	destPath := filepath.Join(bundlePath, f.Name)
 
