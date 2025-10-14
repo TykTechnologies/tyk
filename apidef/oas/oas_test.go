@@ -11,6 +11,7 @@ import (
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/internal/event"
+	"github.com/TykTechnologies/tyk/internal/oasutil"
 
 	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/oasdiff/yaml"
@@ -2014,7 +2015,7 @@ func TestYaml(t *testing.T) {
 	yamlBody, err := yaml.JSONToYAML(jsonBody)
 	assert.NoError(t, err)
 
-	yamlOAS, err := openapi3.NewLoader().LoadFromData(yamlBody)
+	yamlOAS, err := oasutil.LoadFromData(yamlBody)
 	assert.NoError(t, err)
 
 	yamlOASDoc := OAS{
