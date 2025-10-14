@@ -613,10 +613,8 @@ func (gw *Gateway) configureAuthAndOrgStores(gs *generalStores, spec *APISpec) (
 	case RPCStorageEngine:
 		authStore = gs.rpcAuthStore
 		orgStore = gs.rpcOrgStore
-		spec.GlobalConfig.EnforceOrgDataAge = true
-		globalConf := gw.GetConfig()
-		globalConf.EnforceOrgDataAge = true
-		gw.SetConfig(globalConf)
+		// Only enforce org data age if org quotas are enabled
+		gw.enforceOrgDataAgeIfQuotasEnabled(spec)
 	}
 
 	sessionStore := gs.redisStore
@@ -923,10 +921,8 @@ func (gw *Gateway) loadTCPService(spec *APISpec, gs *generalStores, muxer *proxy
 	case RPCStorageEngine:
 		authStore = gs.rpcAuthStore
 		orgStore = gs.rpcOrgStore
-		spec.GlobalConfig.EnforceOrgDataAge = true
-		gwConfig := gw.GetConfig()
-		gwConfig.EnforceOrgDataAge = true
-		gw.SetConfig(gwConfig)
+		// Only enforce org data age if org quotas are enabled
+		gw.enforceOrgDataAgeIfQuotasEnabled(spec)
 	}
 
 	sessionStore := gs.redisStore
@@ -1204,6 +1200,18 @@ func (gw *Gateway) allApisAreMTLS() bool {
 	}
 
 	return true
+}
+
+// enforceOrgDataAgeIfQuotasEnabled updates the configuration to enforce organization data age if quotas are enabled.
+func (gw *Gateway) enforceOrgDataAgeIfQuotasEnabled(spec *APISpec) {
+	globalConf := gw.GetConfig()
+	if !globalConf.EnforceOrgQuotas {
+		return
+	}
+
+	spec.GlobalConfig.EnforceOrgDataAge = true
+	globalConf.EnforceOrgDataAge = true
+	gw.SetConfig(globalConf)
 }
 
 // WithQuotaKey overrides quota key manually
