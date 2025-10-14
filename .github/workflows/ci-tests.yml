@@ -244,3 +244,24 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+
+  aggregator-ci-test:
+    name: Aggregated CI Status
+    runs-on: ubuntu-latest
+    if: ${{ always() && github.event_name == 'pull_request' }}
+    needs: [ sonar-cloud-analysis, test,  ]
+    steps:
+      - name: Aggregate results
+        run: |
+          failed=()
+          for job in golangci-lint test build; do
+            result=$(eval echo '${{ needs.'$job'.result }}')
+            if [ "$result" != "success" ]; then
+              failed+=("$job")
+            fi
+          done
+          if [ ${#failed[@]} -ne 0 ]; then
+            echo "❌ Failed jobs: ${failed[*]}"
+            exit 1
+          fi
+          echo "✅ All required jobs succeeded"
