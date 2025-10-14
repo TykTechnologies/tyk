@@ -26,6 +26,7 @@ import (
 
 	"github.com/TykTechnologies/goverify"
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/internal/sanitize"
 )
 
 var (
@@ -187,6 +188,10 @@ func (ZipBundleSaver) Save(bundle *Bundle, bundlePath string, spec *APISpec) err
 	}
 
 	for _, f := range reader.File {
+		if err := sanitize.ZipFilePath(f.Name, bundlePath); err != nil {
+			return err
+		}
+
 		destPath := filepath.Join(bundlePath, f.Name)
 
 		if f.FileHeader.Mode().IsDir() {
@@ -300,9 +305,8 @@ func saveBundle(bundle *Bundle, destPath string, spec *APISpec) error {
 	case "zip":
 		bundleSaver = ZipBundleSaver{}
 	}
-	bundleSaver.Save(bundle, destPath, spec)
 
-	return nil
+	return bundleSaver.Save(bundle, destPath, spec)
 }
 
 // loadBundleManifest will parse the manifest file and return the bundle parameters.
