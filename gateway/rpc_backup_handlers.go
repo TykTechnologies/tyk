@@ -95,7 +95,7 @@ func (gw *Gateway) LoadPoliciesFromRPCBackup() (map[string]user.Policy, error) {
 
 	secret := crypto.GetPaddedString(gw.GetConfig().Secret)
 	cryptoText, err := store.GetKey(checkKey)
-	listAsString := crypto.Decrypt(secret, cryptoText)
+	listAsString := crypto.Decrypt([]byte(secret), cryptoText)
 
 	if err != nil {
 		return nil, errors.New("[RPC] --> Failed to get node policy backup (" + checkKey + "): " + err.Error())
