@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
+	"time"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/apidef/oas"
@@ -48,6 +49,7 @@ const (
 	RequestStatus
 	GraphQLRequest
 	GraphQLIsWebSocketUpgrade
+	RequestReceivedTime
 
 	// CacheOptions holds cache options required for cache writer middleware.
 	CacheOptions
@@ -149,4 +151,22 @@ func GetOASDefinition(r *http.Request) *oas.OAS {
 	}
 
 	return nil
+}
+
+// GetRequestReceivedTime will return the time the request was received by the gateway.
+func GetRequestReceivedTime(r *http.Request) time.Time {
+	if v := r.Context().Value(RequestReceivedTime); v != nil {
+		if val, ok := v.(time.Time); ok {
+			return val
+		}
+	}
+	// Fallback to current time if not set, though it should always be set.
+	return time.Now()
+}
+
+// SetRequestReceivedTime sets the time the request was received by the gateway.
+func SetRequestReceivedTime(r *http.Request, t time.Time) {
+	ctx := r.Context()
+	ctx = context.WithValue(ctx, RequestReceivedTime, t)
+	core.SetContext(r, ctx)
 }
