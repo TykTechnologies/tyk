@@ -53,6 +53,8 @@ const (
 	CacheOptions
 	OASDefinition
 	SelfLooping
+	// Used by plugins to override the upstream host
+	UpstreamHostOverride
 )
 
 func ctxSetSession(r *http.Request, s *user.SessionState, scheduleUpdate bool, hashKey bool) {
