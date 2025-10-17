@@ -1602,12 +1602,15 @@ func (gw *Gateway) keyHandler(w http.ResponseWriter, r *http.Request) {
 			obj, code = gw.handleAddOrUpdate(origKeyName, r, isHashed)
 		}
 	case http.MethodGet:
-		if keyName != "" {
-			// Return single key detail
-			obj, code = gw.handleGetDetail(keyName, apiID, orgID, isHashed)
-			if code != http.StatusOK && hashKeyFunction != "" {
-				// try to use legacy key format
-				obj, code = gw.handleGetDetail(origKeyName, apiID, orgID, isHashed)
+		if origKeyName != "" {
+		keyTries:
+			for _, key := range []string{
+				gw.generateToken(orgID, origKeyName),
+				origKeyName,
+			} {
+				if obj, code = gw.handleGetDetail(key, apiID, orgID, isHashed); code == http.StatusOK {
+					break keyTries
+				}
 			}
 		} else {
 			// Return list of keys
