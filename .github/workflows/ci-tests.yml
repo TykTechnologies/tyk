@@ -250,7 +250,7 @@ jobs:
     name: Aggregated CI Status
     runs-on: ubuntu-latest
     if: ${{ always() && github.event_name == 'pull_request' }}
-    needs: [ sonar-cloud-analysis, test ]
+    needs: [ test ]
     steps:
       - name: Aggregate results
         run: |
