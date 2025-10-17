@@ -18,6 +18,7 @@ func TestRecord(t *testing.T) {
 	latency := analytics.Latency{
 		Total:    99,
 		Upstream: 101,
+		Gateway:  -2,
 	}
 
 	req := httptest.NewRequest(http.MethodGet, "http://example.com/path?userid=1", nil)
