@@ -4,6 +4,10 @@ on:
   pull_request:
     types: [opened, synchronize, reopened, edited]
 
+concurrency:
+  group: jira-validator-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
 jobs:
   validate:
     if: ${{ !github.event.pull_request.draft }}
