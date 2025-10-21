@@ -523,11 +523,10 @@ func FuncClientSingleton(funcName string, request interface{}) (result interface
 		// If there's an error, handle it with our dedicated error handler
 		if err != nil {
 			if handleRPCError(err, values.Config().ConnectionString) {
-				// Error was handled and we should retry
-				return nil
+				// DNS changed, reconnected - return error to trigger retry
+				return err
 			}
-			// Error wasn't handled or we shouldn't retry
-			// Use backoff.Permanent to prevent retries when DNS hasn't changed
+			// DNS unchanged or not a network error - use backoff.Permanent to prevent retries
 			return backoff.Permanent(err)
 		}
 
