@@ -21,7 +21,8 @@ func equalStringSlices(a, b []string) bool {
 	return true
 }
 
-func isNetworkError(err error) bool {
+// isDNSError checks if an error is a DNS-related error that might be resolved by DNS change
+func isDNSError(err error) bool {
 	if err == nil {
 		return false
 	}

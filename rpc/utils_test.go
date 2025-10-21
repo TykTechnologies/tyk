@@ -103,8 +103,8 @@ func TestEqualStringSlices(t *testing.T) {
 	}
 }
 
-// TestIsNetworkError tests the isNetworkError function
-func TestIsNetworkError(t *testing.T) {
+// TestIsDNSError tests the isDNSError function
+func TestIsDNSError(t *testing.T) {
 	tests := []struct {
 		name     string
 		err      error
@@ -116,7 +116,7 @@ func TestIsNetworkError(t *testing.T) {
 			expected: false,
 		},
 		{
-			name:     "non-network error",
+			name:     "non-DNS error",
 			err:      errors.New("some random error"),
 			expected: false,
 		},
@@ -166,9 +166,9 @@ func TestIsNetworkError(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := isNetworkError(tt.err)
+			result := isDNSError(tt.err)
 			if result != tt.expected {
-				t.Errorf("isNetworkError(%v) = %v, expected %v", tt.err, result, tt.expected)
+				t.Errorf("isDNSError(%v) = %v, expected %v", tt.err, result, tt.expected)
 			}
 		})
 	}
