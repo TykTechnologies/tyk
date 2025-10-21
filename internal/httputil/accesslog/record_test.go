@@ -16,9 +16,9 @@ import (
 
 func TestRecord(t *testing.T) {
 	latency := analytics.Latency{
-		Total:    99,
-		Upstream: 101,
-		Gateway:  -2,
+		Total:    150,
+		Upstream: 120,
+		Gateway:  30,
 	}
 
 	req := httptest.NewRequest(http.MethodGet, "http://example.com/path?userid=1", nil)
@@ -40,13 +40,14 @@ func TestRecord(t *testing.T) {
 		"client_ip":        request.RealIP(req),
 		"remote_addr":      "0.0.0.0",
 		"host":             "example.com",
-		"latency_total":    int64(99),
+		"latency_gateway":  int64(30),
+		"latency_total":    int64(150),
 		"method":           http.MethodGet,
 		"path":             "/path",
 		"protocol":         "HTTP/1.1",
 		"status":           http.StatusOK,
 		"upstream_addr":    "http://example.com/path",
-		"upstream_latency": int64(101),
+		"upstream_latency": int64(120),
 		"user_agent":       "user-agent",
 	}
 
