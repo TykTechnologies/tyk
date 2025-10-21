@@ -95,7 +95,6 @@ builds:
     flags:
       - -tags=goplugin
       - -trimpath
-      - -trimpath
     env:
       - NOP=nop # ignore this, it is jsut to avoid a complex conditional in the templates
       - CC=gcc
@@ -113,7 +112,6 @@ builds:
     flags:
       - -tags=goplugin
       - -trimpath
-      - -trimpath
     env:
       - NOP=nop # ignore this, it is jsut to avoid a complex conditional in the templates
       - CC=aarch64-linux-gnu-gcc
@@ -130,7 +128,6 @@ builds:
   - id: std-s390x
     flags:
       - -tags=goplugin
-      - -trimpath
       - -trimpath
     env:
       - NOP=nop # ignore this, it is jsut to avoid a complex conditional in the templates
@@ -400,6 +397,35 @@ dockers:
       - "policies"
       - "coprocess"
       - "tyk.conf.example"
+  # Build tykio/tyk-gateway-ee ee (s390x)
+  - ids:
+      - ee-s390x
+    image_templates:
+      - "tykio/tyk-gateway-ee:{{.Tag}}-ee-s390x"
+    build_flag_templates:
+      - "--build-arg=PORTS=8080"
+      - "--build-arg=BUILD_PACKAGE_NAME=tyk-gateway-ee"
+      - "--platform=linux/s390x"
+      - "--label=org.opencontainers.image.created={{.Date}}"
+      - "--label=org.opencontainers.image.title={{.ProjectName}} Enterprise Edition"
+      - "--label=org.opencontainers.image.revision={{.FullCommit}}"
+      - "--label=org.opencontainers.image.version={{.Version}}"
+    use: buildx
+    goarch: s390x
+    goos: linux
+    dockerfile: ci/Dockerfile.std
+    extra_files:
+      - "ci/install/"
+      - "README.md"
+      - "dist/"
+      - "LICENSE.md"
+      - "apps/app_sample.json"
+      - "templates"
+      - "middleware"
+      - "event_handlers/sample"
+      - "policies"
+      - "coprocess"
+      - "tyk.conf.example"
   # Build tykio/tyk-gateway fips (amd64)
   - ids:
       - fips-amd64
@@ -516,46 +542,81 @@ dockers:
       - "policies"
       - "coprocess"
       - "tyk.conf.example"
+  # Build tykio/tyk-gateway std (s390x)
+  - ids:
+      - std-s390x
+    image_templates:
+      - "tykio/tyk-gateway:{{.Tag}}-std-s390x"
+    build_flag_templates:
+      - "--build-arg=PORTS=8080"
+      - "--build-arg=BUILD_PACKAGE_NAME=tyk-gateway"
+      - "--platform=linux/s390x"
+      - "--label=org.opencontainers.image.created={{.Date}}"
+      - "--label=org.opencontainers.image.title={{.ProjectName}}"
+      - "--label=org.opencontainers.image.revision={{.FullCommit}}"
+      - "--label=org.opencontainers.image.version={{.Version}}"
+    use: buildx
+    goarch: s390x
+    goos: linux
+    dockerfile: ci/Dockerfile.std
+    extra_files:
+      - "ci/install/"
+      - "README.md"
+      - "dist/"
+      - "LICENSE.md"
+      - "apps/app_sample.json"
+      - "templates"
+      - "middleware"
+      - "event_handlers/sample"
+      - "policies"
+      - "coprocess"
+      - "tyk.conf.example"
 docker_manifests:
   # Multi-arch manifest for tykio/tyk-gateway-ee ee
   - name_template: tykio/tyk-gateway-ee:{{ .Tag }}-ee
     image_templates:
-      - tykio/tyk-gateway-ee:{{`{{ .Tag }}`}}-ee-amd64
-      - tykio/tyk-gateway-ee:{{`{{ .Tag }}`}}-ee-arm64
+      - tykio/tyk-gateway-ee:{{ .Tag }}-ee-amd64
+      - tykio/tyk-gateway-ee:{{ .Tag }}-ee-arm64
+      - tykio/tyk-gateway-ee:{{ .Tag }}-ee-s390x
   - name_template: tykio/tyk-gateway-ee:v{{ .Major }}.{{ .Minor }}{{.Prerelease}}-ee
     image_templates:
-      - tykio/tyk-gateway-ee:{{`{{ .Tag }}`}}-ee-amd64
-      - tykio/tyk-gateway-ee:{{`{{ .Tag }}`}}-ee-arm64
+      - tykio/tyk-gateway-ee:{{ .Tag }}-ee-amd64
+      - tykio/tyk-gateway-ee:{{ .Tag }}-ee-arm64
+      - tykio/tyk-gateway-ee:{{ .Tag }}-ee-s390x
   - name_template: tykio/tyk-gateway-ee:v{{ .Major }}{{.Prerelease}}-ee
     image_templates:
-      - tykio/tyk-gateway-ee:{{`{{ .Tag }}`}}-ee-amd64
-      - tykio/tyk-gateway-ee:{{`{{ .Tag }}`}}-ee-arm64
+      - tykio/tyk-gateway-ee:{{ .Tag }}-ee-amd64
+      - tykio/tyk-gateway-ee:{{ .Tag }}-ee-arm64
+      - tykio/tyk-gateway-ee:{{ .Tag }}-ee-s390x
   # Multi-arch manifest for tykio/tyk-gateway fips
   - name_template: tykio/tyk-gateway:{{ .Tag }}-fips
     image_templates:
-      - tykio/tyk-gateway:{{`{{ .Tag }}`}}-fips-amd64
-      - tykio/tyk-gateway:{{`{{ .Tag }}`}}-fips-arm64
+      - tykio/tyk-gateway:{{ .Tag }}-fips-amd64
+      - tykio/tyk-gateway:{{ .Tag }}-fips-arm64
   - name_template: tykio/tyk-gateway:v{{ .Major }}.{{ .Minor }}{{.Prerelease}}-fips
     image_templates:
-      - tykio/tyk-gateway:{{`{{ .Tag }}`}}-fips-amd64
-      - tykio/tyk-gateway:{{`{{ .Tag }}`}}-fips-arm64
+      - tykio/tyk-gateway:{{ .Tag }}-fips-amd64
+      - tykio/tyk-gateway:{{ .Tag }}-fips-arm64
   - name_template: tykio/tyk-gateway:v{{ .Major }}{{.Prerelease}}-fips
     image_templates:
-      - tykio/tyk-gateway:{{`{{ .Tag }}`}}-fips-amd64
-      - tykio/tyk-gateway:{{`{{ .Tag }}`}}-fips-arm64
+      - tykio/tyk-gateway:{{ .Tag }}-fips-amd64
+      - tykio/tyk-gateway:{{ .Tag }}-fips-arm64
   # Multi-arch manifest for tykio/tyk-gateway std
   - name_template: tykio/tyk-gateway:{{ .Tag }}
     image_templates:
-      - tykio/tyk-gateway:{{`{{ .Tag }}`}}-std-amd64
-      - tykio/tyk-gateway:{{`{{ .Tag }}`}}-std-arm64
+      - tykio/tyk-gateway:{{ .Tag }}-std-amd64
+      - tykio/tyk-gateway:{{ .Tag }}-std-arm64
+      - tykio/tyk-gateway:{{ .Tag }}-std-s390x
   - name_template: tykio/tyk-gateway:v{{ .Major }}.{{ .Minor }}{{.Prerelease}}
     image_templates:
-      - tykio/tyk-gateway:{{`{{ .Tag }}`}}-std-amd64
-      - tykio/tyk-gateway:{{`{{ .Tag }}`}}-std-arm64
+      - tykio/tyk-gateway:{{ .Tag }}-std-amd64
+      - tykio/tyk-gateway:{{ .Tag }}-std-arm64
+      - tykio/tyk-gateway:{{ .Tag }}-std-s390x
   - name_template: tykio/tyk-gateway:v{{ .Major }}{{.Prerelease}}
     image_templates:
-      - tykio/tyk-gateway:{{`{{ .Tag }}`}}-std-amd64
-      - tykio/tyk-gateway:{{`{{ .Tag }}`}}-std-arm64
+      - tykio/tyk-gateway:{{ .Tag }}-std-amd64
+      - tykio/tyk-gateway:{{ .Tag }}-std-arm64
+      - tykio/tyk-gateway:{{ .Tag }}-std-s390x
 # This disables archives
 archives:
   - formats: ['binary']
