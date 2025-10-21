@@ -527,7 +527,8 @@ func FuncClientSingleton(funcName string, request interface{}) (result interface
 				return nil
 			}
 			// Error wasn't handled or we shouldn't retry
-			return err
+			// Use backoff.Permanent to prevent retries when DNS hasn't changed
+			return backoff.Permanent(err)
 		}
 
 		return nil

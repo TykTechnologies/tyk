@@ -1,6 +1,10 @@
 package rpc
 
-import "testing"
+import (
+	"errors"
+	"net"
+	"testing"
+)
 
 func TestRecoveryFromEmergencyMode(t *testing.T) {
 	if IsEmergencyMode() {
@@ -73,5 +77,116 @@ func TestClientIsConnected(t *testing.T) {
 				t.Errorf("ClientIsConnected() = %v, want %v", got, tt.expected)
 			}
 		})
+	}
+}
+
+// TestHandleRPCError_DNSUnchanged_NoRetry verifies that handleRPCError returns false
+// when DNS hasn't changed, which should prevent retries when wrapped with backoff.Permanent
+func TestHandleRPCError_DNSUnchanged_NoRetry(t *testing.T) {
+	// Save original values
+	originalResolver := dnsResolver
+	originalIPs := lastResolvedIPs
+	originalSafeReconnect := safeReconnectRPCClient
+	originalDNSChecked := values.GetDNSCheckedAfterError()
+	originalEmergencyMode := values.GetEmergencyMode()
+
+	defer func() {
+		dnsResolver = originalResolver
+		lastResolvedIPs = originalIPs
+		safeReconnectRPCClient = originalSafeReconnect
+		values.SetDNSCheckedAfterError(originalDNSChecked)
+		values.SetEmergencyMode(originalEmergencyMode)
+	}()
+
+	// Setup: simulate initial DNS resolution
+	lastResolvedIPs = []string{"192.168.1.1"}
+	values.SetDNSCheckedAfterError(false)
+	values.SetEmergencyMode(false)
+
+	// Mock DNS resolver that returns same IPs (DNS unchanged)
+	mockResolver := &MockDNSResolver{
+		LookupIPFunc: func(host string) ([]net.IP, error) {
+			return makeIPs("192.168.1.1"), nil
+		},
+	}
+	dnsResolver = mockResolver
+
+	reconnectCalled := false
+	safeReconnectRPCClient = func(suppressRegister bool) {
+		reconnectCalled = true
+	}
+
+	// Test 1: Generic RPC timeout error (not DNS-related)
+	err := errors.New("Cannot obtain response during timeout")
+	shouldRetry := handleRPCError(err, "example.com:8080")
+
+	if shouldRetry {
+		t.Error("handleRPCError should return false for non-DNS errors")
+	}
+	if reconnectCalled {
+		t.Error("Should not attempt reconnect for non-DNS errors")
+	}
+
+	// Reset for next test
+	values.SetDNSCheckedAfterError(false)
+	reconnectCalled = false
+
+	// Test 2: DNS error but DNS unchanged
+	err = errors.New("dial tcp: lookup mdcb.example.com: no such host")
+	shouldRetry = handleRPCError(err, "example.com:8080")
+
+	if shouldRetry {
+		t.Error("handleRPCError should return false when DNS hasn't changed")
+	}
+	if reconnectCalled {
+		t.Error("Should not reconnect when DNS hasn't changed")
+	}
+}
+
+// TestHandleRPCError_DNSChanged_Retry verifies that handleRPCError returns true
+// when DNS has actually changed, allowing retries
+func TestHandleRPCError_DNSChanged_Retry(t *testing.T) {
+	// Save original values
+	originalResolver := dnsResolver
+	originalIPs := lastResolvedIPs
+	originalSafeReconnect := safeReconnectRPCClient
+	originalDNSChecked := values.GetDNSCheckedAfterError()
+	originalEmergencyMode := values.GetEmergencyMode()
+
+	defer func() {
+		dnsResolver = originalResolver
+		lastResolvedIPs = originalIPs
+		safeReconnectRPCClient = originalSafeReconnect
+		values.SetDNSCheckedAfterError(originalDNSChecked)
+		values.SetEmergencyMode(originalEmergencyMode)
+	}()
+
+	// Setup: simulate initial DNS resolution
+	lastResolvedIPs = []string{"192.168.1.1"}
+	values.SetDNSCheckedAfterError(false)
+	values.SetEmergencyMode(false)
+
+	// Mock DNS resolver that returns different IPs (DNS changed)
+	mockResolver := &MockDNSResolver{
+		LookupIPFunc: func(host string) ([]net.IP, error) {
+			return makeIPs("192.168.1.2"), nil
+		},
+	}
+	dnsResolver = mockResolver
+
+	reconnectCalled := false
+	safeReconnectRPCClient = func(suppressRegister bool) {
+		reconnectCalled = true
+	}
+
+	// Test: DNS error with DNS changed
+	err := errors.New("dial tcp: lookup mdcb.example.com: no such host")
+	shouldRetry := handleRPCError(err, "example.com:8080")
+
+	if !shouldRetry {
+		t.Error("handleRPCError should return true when DNS has changed")
+	}
+	if !reconnectCalled {
+		t.Error("Should attempt reconnect when DNS has changed")
 	}
 }
