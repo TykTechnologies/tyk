@@ -966,6 +966,10 @@ func (gw *Gateway) handleAddOrUpdatePolicy(polID string, r *http.Request) (inter
 		return apiError("Failed to create file!"), http.StatusInternalServerError
 	}
 
+	gw.policiesMu.Lock()
+	defer gw.policiesMu.Unlock()
+	gw.policiesByID[newPol.ID] = *newPol
+
 	action := "modified"
 	if r.Method == http.MethodPost {
 		action = "added"
