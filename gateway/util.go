@@ -216,3 +216,39 @@ func containsEscapedChars(str string) bool {
 
 	return str != unescaped
 }
+
+// DataProcessor is an interface for processing data
+type DataProcessor interface {
+	Process(data []byte) ([]byte, error)
+	Close() error
+}
+
+// SimpleDataProcessor is a concrete implementation
+type SimpleDataProcessor struct {
+	prefix string
+}
+
+// Process adds a prefix to the data
+func (s *SimpleDataProcessor) Process(data []byte) ([]byte, error) {
+	result := append([]byte(s.prefix), data...)
+	return result, nil
+}
+
+// Close cleans up resources
+func (s *SimpleDataProcessor) Close() error {
+	return nil
+}
+
+// BAD: Returns interface instead of concrete type - violates "accept interfaces, return concrete types"
+// This makes it harder for callers to access concrete methods and exposes implementation details
+func NewDataProcessor(prefix string) DataProcessor {
+	return &SimpleDataProcessor{
+		prefix: prefix,
+	}
+}
+
+// BAD: Accepts concrete type instead of interface - limits flexibility
+// This function could work with any io.Reader, but only accepts *SimpleDataProcessor
+func ProcessWithSimpleProcessor(processor *SimpleDataProcessor, data []byte) ([]byte, error) {
+	return processor.Process(data)
+}
