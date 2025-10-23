@@ -5,6 +5,7 @@ package gateway
 
 import (
 	"C"
+	"context"
 	"io/ioutil"
 	"path/filepath"
 	"runtime"
@@ -40,6 +41,11 @@ type PythonDispatcher struct {
 
 // Dispatch takes a CoProcessMessage and sends it to the CP.
 func (d *PythonDispatcher) Dispatch(object *coprocess.Object) (*coprocess.Object, error) {
+	return d.DispatchWithContext(context.Background(), object)
+}
+
+// DispatchWithContext takes a context and CoProcessMessage and sends it to the CP.
+func (d *PythonDispatcher) DispatchWithContext(ctx context.Context, object *coprocess.Object) (*coprocess.Object, error) {
 	// Prepare the PB object:
 	objectMsg, err := proto.Marshal(object)
 	if err != nil {
