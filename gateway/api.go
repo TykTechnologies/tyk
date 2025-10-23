@@ -1005,6 +1005,10 @@ func (gw *Gateway) handleDeletePolicy(polID string) (interface{}, int) {
 		return apiError("Delete failed"), http.StatusInternalServerError
 	}
 
+	gw.policiesMu.Lock()
+	defer gw.policiesMu.Unlock()
+	delete(gw.policiesByID, polID)
+
 	response := apiModifyKeySuccess{
 		Key:    polID,
 		Status: "ok",
