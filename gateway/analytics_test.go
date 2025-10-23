@@ -348,6 +348,9 @@ func TestAnalytics_Write(t *testing.T) {
 				if record.Latency.Total != record.RequestTime {
 					t.Errorf("expected %d got %d", record.RequestTime, record.Latency.Total)
 				}
+				if record.Latency.Gateway != record.Latency.Total-record.Latency.Upstream {
+					t.Errorf("expected gateway latency %d got %d", record.Latency.Total-record.Latency.Upstream, record.Latency.Gateway)
+				}
 			})
 
 			t.Run("Detailed analytics with cache", func(t *testing.T) {

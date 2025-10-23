@@ -399,9 +399,11 @@ func (s *SuccessHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) *http
 	log.Debug("Upstream request took (ms): ", millisec)
 
 	if resp.Response != nil {
+		upstreamMs := int64(DurationToMillisecond(resp.UpstreamLatency))
 		latency := analytics.Latency{
 			Total:    int64(millisec),
-			Upstream: int64(DurationToMillisecond(resp.UpstreamLatency)),
+			Upstream: upstreamMs,
+			Gateway:  int64(millisec) - upstreamMs,
 		}
 		s.RecordHit(r, latency, resp.Response.StatusCode, resp.Response, false)
 		s.RecordAccessLog(r, resp.Response, latency)
@@ -428,9 +430,11 @@ func (s *SuccessHandler) ServeHTTPWithCache(w http.ResponseWriter, r *http.Reque
 	log.Debug("Upstream request took (ms): ", millisec)
 
 	if inRes.Response != nil {
+		upstreamMs := int64(DurationToMillisecond(inRes.UpstreamLatency))
 		latency := analytics.Latency{
 			Total:    int64(millisec),
-			Upstream: int64(DurationToMillisecond(inRes.UpstreamLatency)),
+			Upstream: upstreamMs,
+			Gateway:  int64(millisec) - upstreamMs,
 		}
 		s.RecordHit(r, latency, inRes.Response.StatusCode, inRes.Response, false)
 	}
