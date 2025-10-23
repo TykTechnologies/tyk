@@ -108,14 +108,14 @@ func TestHandleRPCError_DNSUnchanged_NoRetry(t *testing.T) {
 
 	// Mock DNS resolver that returns same IPs (DNS unchanged)
 	mockResolver := &MockDNSResolver{
-		LookupIPFunc: func(host string) ([]net.IP, error) {
+		LookupIPFunc: func(_ string) ([]net.IP, error) {
 			return makeIPs("192.168.1.1"), nil
 		},
 	}
 	dnsResolver = mockResolver
 
 	reconnectCalled := false
-	safeReconnectRPCClient = func(suppressRegister bool) {
+	safeReconnectRPCClient = func(_ bool) {
 		reconnectCalled = true
 	}
 
@@ -171,14 +171,14 @@ func TestHandleRPCError_DNSChanged_Retry(t *testing.T) {
 
 	// Mock DNS resolver that returns different IPs (DNS changed)
 	mockResolver := &MockDNSResolver{
-		LookupIPFunc: func(host string) ([]net.IP, error) {
+		LookupIPFunc: func(_ string) ([]net.IP, error) {
 			return makeIPs("192.168.1.2"), nil
 		},
 	}
 	dnsResolver = mockResolver
 
 	reconnectCalled := false
-	safeReconnectRPCClient = func(suppressRegister bool) {
+	safeReconnectRPCClient = func(_ bool) {
 		reconnectCalled = true
 	}
 
@@ -311,7 +311,7 @@ func TestRPCErrorRetryBehavior_Integration(t *testing.T) {
 		lastResolvedIPs = []string{"192.168.1.1"}
 
 		reconnectCalled := false
-		safeReconnectRPCClient = func(suppressRegister bool) {
+		safeReconnectRPCClient = func(_ bool) {
 			reconnectCalled = true
 		}
 
@@ -352,14 +352,14 @@ func TestRPCErrorRetryBehavior_Integration(t *testing.T) {
 
 		// DNS returns same IPs
 		mockResolver := &MockDNSResolver{
-			LookupIPFunc: func(host string) ([]net.IP, error) {
+			LookupIPFunc: func(_ string) ([]net.IP, error) {
 				return makeIPs("192.168.1.1"), nil
 			},
 		}
 		dnsResolver = mockResolver
 
 		reconnectCalled := false
-		safeReconnectRPCClient = func(suppressRegister bool) {
+		safeReconnectRPCClient = func(_ bool) {
 			reconnectCalled = true
 		}
 
@@ -398,14 +398,14 @@ func TestRPCErrorRetryBehavior_Integration(t *testing.T) {
 
 		// DNS returns different IPs
 		mockResolver := &MockDNSResolver{
-			LookupIPFunc: func(host string) ([]net.IP, error) {
+			LookupIPFunc: func(_ string) ([]net.IP, error) {
 				return makeIPs("192.168.1.2"), nil
 			},
 		}
 		dnsResolver = mockResolver
 
 		reconnectCount := 0
-		safeReconnectRPCClient = func(suppressRegister bool) {
+		safeReconnectRPCClient = func(_ bool) {
 			reconnectCount++
 			values.SetDNSCheckedAfterError(false) // Reset after reconnect
 		}
