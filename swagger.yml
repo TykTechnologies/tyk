@@ -33,7 +33,7 @@ info:
     name: Mozilla Public License Version 2.0
     url: https://github.com/TykTechnologies/tyk/blob/master/LICENSE.md
   title: Tyk Gateway API
-  version: 5.9.0
+  version: 5.10.1
 servers:
 - url: https://{tenant}
   variables:
