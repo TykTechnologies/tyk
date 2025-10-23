@@ -68,3 +68,52 @@ func benchmarkFormatter(b *testing.B, formatter logrus.Formatter) {
 		logger.WithError(err).WithField("prefix", "test").Info("This is a typical log message")
 	}
 }
+
+func TestJSONFormatterErrorHandling(t *testing.T) {
+	formatter := &JSONFormatter{
+		TimestampFormat: time.RFC3339,
+	}
+
+	t.Run("error type in error key", func(t *testing.T) {
+		entry := &logrus.Entry{
+			Data: logrus.Fields{
+				logrus.ErrorKey: errors.New("test error"),
+			},
+			Time:    time.Now(),
+			Level:   logrus.InfoLevel,
+			Message: "test message",
+		}
+
+		output, err := formatter.Format(entry)
+		assert.NoError(t, err)
+		assert.Contains(t, string(output), `"logrus_error":"test error"`)
+	})
+
+	t.Run("non-error type in error key", func(t *testing.T) {
+		entry := &logrus.Entry{
+			Data: logrus.Fields{
+				logrus.ErrorKey: "string error",
+			},
+			Time:    time.Now(),
+			Level:   logrus.InfoLevel,
+			Message: "test message",
+		}
+
+		output, err := formatter.Format(entry)
+		assert.NoError(t, err)
+		assert.Contains(t, string(output), `"logrus_error":"string error"`)
+	})
+
+	t.Run("no error key present", func(t *testing.T) {
+		entry := &logrus.Entry{
+			Data:    logrus.Fields{},
+			Time:    time.Now(),
+			Level:   logrus.InfoLevel,
+			Message: "test message",
+		}
+
+		output, err := formatter.Format(entry)
+		assert.NoError(t, err)
+		assert.NotContains(t, string(output), "logrus_error")
+	})
+}
