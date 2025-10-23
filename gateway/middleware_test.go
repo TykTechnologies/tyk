@@ -38,32 +38,124 @@ func TestBaseMiddleware_OrgSessionExpiry(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
 
-	m := &BaseMiddleware{
-		Spec: &APISpec{
-			GlobalConfig: config.Config{
-				EnforceOrgDataAge: true,
+	t.Run("should return cached value when available", func(t *testing.T) {
+		m := &BaseMiddleware{
+			Spec: &APISpec{
+				GlobalConfig: config.Config{
+					EnforceOrgDataAge: true,
+				},
+				OrgSessionManager: mockStore{},
 			},
-			OrgSessionManager: mockStore{},
-		},
-		logger: mainLog,
-		Gw:     ts.Gw,
-	}
-	v := int64(100)
-	ts.Gw.ExpiryCache.Set(sess.OrgID, v, cache.DefaultExpiration)
+			logger: mainLog,
+			Gw:     ts.Gw,
+		}
+		v := int64(100)
+		ts.Gw.ExpiryCache.Set(sess.OrgID, v, cache.DefaultExpiration)
+		defer ts.Gw.ExpiryCache.Delete(sess.OrgID)
 
-	got := m.OrgSessionExpiry(sess.OrgID)
-	assert.Equal(t, v, got)
-	ts.Gw.ExpiryCache.Delete(sess.OrgID)
+		got := m.OrgSessionExpiry(sess.OrgID)
+		assert.Equal(t, v, got)
+	})
 
-	got = m.OrgSessionExpiry(sess.OrgID)
-	assert.Equal(t, sess.DataExpires, got)
-	ts.Gw.ExpiryCache.Delete(sess.OrgID)
+	t.Run("should return default and trigger background refresh on cache miss", func(t *testing.T) {
+		m := &BaseMiddleware{
+			Spec: &APISpec{
+				GlobalConfig: config.Config{
+					EnforceOrgDataAge: true,
+				},
+				OrgSessionManager: mockStore{},
+			},
+			logger: mainLog,
+			Gw:     ts.Gw,
+		}
 
-	m.Spec.OrgSessionManager = mockStore{DetailNotFound: true}
-	noOrgSess := "nonexistent_org"
-	got = m.OrgSessionExpiry(noOrgSess)
-	assert.Equal(t, DEFAULT_ORG_SESSION_EXPIRATION, got)
+		ts.Gw.ExpiryCache.Delete(sess.OrgID)
 
+		got := m.OrgSessionExpiry(sess.OrgID)
+		assert.Equal(t, DEFAULT_ORG_SESSION_EXPIRATION, got, "Should return default immediately on cache miss")
+
+	})
+
+	t.Run("background refresh should populate cache with org data", func(t *testing.T) {
+		m := &BaseMiddleware{
+			Spec: &APISpec{
+				GlobalConfig: config.Config{
+					EnforceOrgDataAge: true,
+				},
+				OrgSessionManager: mockStore{},
+			},
+			logger: mainLog,
+			Gw:     ts.Gw,
+		}
+
+		ts.Gw.ExpiryCache.Delete(sess.OrgID)
+
+		m.refreshOrgSessionExpiry(sess.OrgID)
+
+		cachedVal, found := ts.Gw.ExpiryCache.Get(sess.OrgID)
+		assert.True(t, found, "Cache should be populated after background refresh")
+		assert.Equal(t, sess.DataExpires, cachedVal.(int64), "Cache should contain org's DataExpires value")
+
+		got := m.OrgSessionExpiry(sess.OrgID)
+		assert.Equal(t, sess.DataExpires, got, "Should return cached value from background refresh")
+	})
+
+	t.Run("should return default when org session not found", func(t *testing.T) {
+		m := &BaseMiddleware{
+			Spec: &APISpec{
+				GlobalConfig: config.Config{
+					EnforceOrgDataAge: true,
+				},
+				OrgSessionManager: mockStore{DetailNotFound: true},
+			},
+			logger: mainLog,
+			Gw:     ts.Gw,
+		}
+
+		noOrgSess := "nonexistent_org"
+		ts.Gw.ExpiryCache.Delete(noOrgSess)
+
+		got := m.OrgSessionExpiry(noOrgSess)
+		assert.Equal(t, DEFAULT_ORG_SESSION_EXPIRATION, got)
+	})
+
+	t.Run("should return default immediately in emergency mode", func(t *testing.T) {
+
+		m := &BaseMiddleware{
+			Spec: &APISpec{
+				GlobalConfig: config.Config{
+					EnforceOrgDataAge: true,
+				},
+				OrgSessionManager: mockStore{},
+			},
+			logger: mainLog,
+			Gw:     ts.Gw,
+		}
+
+		ts.Gw.ExpiryCache.Delete(sess.OrgID)
+
+		got := m.OrgSessionExpiry(sess.OrgID)
+
+		assert.Equal(t, DEFAULT_ORG_SESSION_EXPIRATION, got)
+	})
+
+	t.Run("should handle EnforceOrgDataAge disabled", func(t *testing.T) {
+		m := &BaseMiddleware{
+			Spec: &APISpec{
+				GlobalConfig: config.Config{
+					EnforceOrgDataAge: false,
+				},
+				OrgSessionManager: mockStore{},
+			},
+			logger: mainLog,
+			Gw:     ts.Gw,
+		}
+
+		ts.Gw.ExpiryCache.Delete(sess.OrgID)
+
+		got := m.OrgSessionExpiry(sess.OrgID)
+		assert.Equal(t, DEFAULT_ORG_SESSION_EXPIRATION, got)
+	})
 }
 
 func TestBaseMiddleware_getAuthType(t *testing.T) {
