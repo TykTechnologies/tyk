@@ -945,14 +945,14 @@ func (gw *Gateway) handleAddOrUpdatePolicy(polID string, r *http.Request) (inter
 	}
 
 	if !ensurePolicyId(newPol) {
-		log.Error("Failed to save policy, because of empty id")
-		return apiError("Failed to save policy"), http.StatusInternalServerError
+		log.Error("Unable to create policy without id.")
+		return apiError("Unable to create policy without id."), http.StatusBadRequest
 	}
 
 	root, err := gw.newPolicyPathRoot()
 	if err != nil {
-		log.WithError(err).Error("Unable to crate policy root.")
-		return apiError("Unable to get policy root."), http.StatusInternalServerError
+		log.WithError(err).Error("Unable to access the policy storage root path.")
+		return apiError("Unable to access policy storage."), http.StatusInternalServerError
 	}
 
 	asByte, err := json.MarshalIndent(newPol, "", "  ")
