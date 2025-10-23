@@ -2,6 +2,7 @@ package gateway
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -17,6 +18,7 @@ import (
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/coprocess"
 	"github.com/TykTechnologies/tyk/internal/middleware"
+	"github.com/TykTechnologies/tyk/internal/otel"
 	"github.com/TykTechnologies/tyk/user"
 	"github.com/sirupsen/logrus"
 )
@@ -70,6 +72,7 @@ type CoProcessor struct {
 }
 
 // BuildObject constructs a CoProcessObject from a given http.Request.
+// It also extracts and includes trace context if OpenTelemetry is enabled.
 func (c *CoProcessor) BuildObject(req *http.Request, res *http.Response, spec *APISpec) (*coprocess.Object, error) {
 	headers := ProtoMap(req.Header)
 
@@ -117,6 +120,17 @@ func (c *CoProcessor) BuildObject(req *http.Request, res *http.Response, spec *A
 		Request:  miniRequestObject,
 		HookName: c.Middleware.HookName,
 		HookType: c.Middleware.HookType,
+	}
+
+	// Extract trace context from the request context if OpenTelemetry is enabled
+	if req.Context() != nil {
+		fmt.Println("========+ANDREI GOT HERE")
+		traceCtx := otel.ExtractTraceContext(req.Context())
+		if traceCtx.IsValid() {
+			object.TraceId = traceCtx.TraceID
+			object.SpanId = traceCtx.SpanID
+			object.TraceFlags = traceCtx.TraceFlags
+		}
 	}
 
 	object.Spec = make(map[string]string)
@@ -347,7 +361,7 @@ func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 	}
 
 	t1 := time.Now()
-	returnObject, err := coProcessor.Dispatch(object)
+	returnObject, err := coProcessor.Dispatch(r.Context(), object)
 	ms := DurationToMillisecond(time.Since(t1))
 
 	if err != nil {
@@ -582,7 +596,7 @@ func (h *CustomMiddlewareResponseHook) HandleResponse(rw http.ResponseWriter, re
 	}
 	object.Session = ProtoSessionState(ses)
 
-	retObject, err := coProcessor.Dispatch(object)
+	retObject, err := coProcessor.Dispatch(req.Context(), object)
 	if err != nil {
 		h.logger().WithError(err).Debug("Couldn't dispatch request object")
 		return errors.New("Middleware error")
@@ -665,17 +679,20 @@ func syncHeadersAndMultiValueHeaders(headers map[string]string, multiValueHeader
 	return updatedMultiValueHeaders
 }
 
-func (c *CoProcessor) Dispatch(object *coprocess.Object) (*coprocess.Object, error) {
+func (c *CoProcessor) Dispatch(ctx context.Context, object *coprocess.Object) (*coprocess.Object, error) {
 	dispatcher := loadedDrivers[c.Middleware.MiddlewareDriver]
 	if dispatcher == nil {
 		err := fmt.Errorf("Couldn't dispatch request, driver '%s' isn't available", c.Middleware.MiddlewareDriver)
 		return nil, err
 	}
-	newObject, err := dispatcher.Dispatch(object)
-	if err != nil {
-		return nil, err
+
+	// Try to use DispatchWithContext for trace propagation if available
+	if dispatcherWithCtx, ok := dispatcher.(coprocess.DispatcherWithContext); ok {
+		return dispatcherWithCtx.DispatchWithContext(ctx, object)
 	}
-	return newObject, nil
+
+	// Fall back to Dispatch for backward compatibility
+	return dispatcher.Dispatch(object)
 }
 
 func coprocessAuthEnabled(spec *APISpec) bool {

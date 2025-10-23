@@ -3,11 +3,13 @@ package gateway
 import (
 	"context"
 	"errors"
-	"github.com/sirupsen/logrus"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
 	"net/url"
 	"strings"
+
+	"github.com/sirupsen/logrus"
+	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/coprocess"
@@ -47,8 +49,24 @@ func GetCoProcessGrpcServerTargetUrlAsString(targetUrl *url.URL) string {
 }
 
 // Dispatch takes a CoProcessMessage and sends it to the CP.
+// This is the backward-compatible method that uses context.Background().
 func (d *GRPCDispatcher) Dispatch(object *coprocess.Object) (*coprocess.Object, error) {
-	return grpcClient.Dispatch(context.Background(), object)
+	return d.DispatchWithContext(context.Background(), object)
+}
+
+// DispatchWithContext takes a context and a CoProcessMessage and sends it to the CP.
+// The context is used to propagate trace context to the gRPC plugin.
+func (d *GRPCDispatcher) DispatchWithContext(ctx context.Context, object *coprocess.Object) (*coprocess.Object, error) {
+	// Use the provided context instead of context.Background() to propagate trace context
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	return grpcClient.Dispatch(ctx, object)
+}
+
+// DispatchObject is deprecated. Use Dispatch or DispatchWithContext instead.
+func (d *GRPCDispatcher) DispatchObject(object *coprocess.Object) (*coprocess.Object, error) {
+	return d.Dispatch(object)
 }
 
 // DispatchEvent dispatches a Tyk event.
@@ -96,7 +114,14 @@ func (gw *Gateway) NewGRPCDispatcher() (coprocess.Dispatcher, error) {
 		return nil, err
 	}
 
-	dialOptions := []grpc.DialOption{gw.grpcCallOpts(), grpc.WithTransportCredentials(insecure.NewCredentials())}
+	dialOptions := []grpc.DialOption{
+		gw.grpcCallOpts(),
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+		// Add OpenTelemetry gRPC interceptors for automatic trace context propagation
+		grpc.WithUnaryInterceptor(otelgrpc.UnaryClientInterceptor()),
+		grpc.WithStreamInterceptor(otelgrpc.StreamClientInterceptor()),
+	}
+	
 	authority := gw.GetConfig().CoProcessOptions.GRPCAuthority
 	if authority != "" {
 		dialOptions = append(dialOptions, grpc.WithAuthority(authority))

@@ -161,3 +161,34 @@ func AddTraceID(ctx context.Context, w http.ResponseWriter) {
 
 	addTraceIDToResponseHeader(w, traceID)
 }
+
+// TraceContext represents the OpenTelemetry trace context information
+// that can be extracted from a context and passed to plugins.
+type TraceContext struct {
+	TraceID    string
+	SpanID     string
+	TraceFlags uint32
+}
+
+// ExtractTraceContext extracts the trace context from a Go context.
+// It returns a TraceContext struct containing the trace ID, span ID, and trace flags.
+// If no trace context is present, it returns an empty TraceContext.
+func ExtractTraceContext(ctx context.Context) TraceContext {
+	span := SpanFromContext(ctx)
+	spanContext := span.SpanContext()
+	
+	if !spanContext.HasTraceID() {
+		return TraceContext{}
+	}
+
+	return TraceContext{
+		TraceID:    spanContext.TraceID().String(),
+		SpanID:     spanContext.SpanID().String(),
+		TraceFlags: uint32(spanContext.TraceFlags()),
+	}
+}
+
+// IsValid returns true if the TraceContext contains valid trace information.
+func (tc TraceContext) IsValid() bool {
+	return tc.TraceID != "" && tc.SpanID != ""
+}

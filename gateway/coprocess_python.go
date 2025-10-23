@@ -5,6 +5,7 @@ package gateway
 
 import (
 	"C"
+	"context"
 	"io/ioutil"
 	"path/filepath"
 	"runtime"
@@ -39,7 +40,17 @@ type PythonDispatcher struct {
 }
 
 // Dispatch takes a CoProcessMessage and sends it to the CP.
+// This is the backward-compatible method.
 func (d *PythonDispatcher) Dispatch(object *coprocess.Object) (*coprocess.Object, error) {
+	return d.DispatchWithContext(context.Background(), object)
+}
+
+// DispatchWithContext takes a context and a CoProcessMessage and sends it to the CP.
+// The context parameter is currently not used by Python plugins but is kept for interface compatibility.
+func (d *PythonDispatcher) DispatchWithContext(ctx context.Context, object *coprocess.Object) (*coprocess.Object, error) {
+	// Context is currently not used for Python plugins, but the trace context
+	// is already available in the object.TraceId, object.SpanId, and object.TraceFlags fields
+	// for Python plugins to use if they implement OpenTelemetry tracing
 	// Prepare the PB object:
 	objectMsg, err := proto.Marshal(object)
 	if err != nil {
@@ -132,7 +143,11 @@ func (d *PythonDispatcher) Dispatch(object *coprocess.Object) (*coprocess.Object
 		return nil, err
 	}
 	return newObject, nil
+}
 
+// DispatchObject is deprecated. Use Dispatch or DispatchWithContext instead.
+func (d *PythonDispatcher) DispatchObject(object *coprocess.Object) (*coprocess.Object, error) {
+	return d.Dispatch(object)
 }
 
 // DispatchEvent dispatches a Tyk event.

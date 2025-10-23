@@ -67,6 +67,7 @@ static void LuaDispatchEvent(char* event_json) {
 import "C"
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"io/ioutil"
@@ -123,7 +124,18 @@ func (d *LuaDispatcher) NativeDispatch(objectPtr unsafe.Pointer, newObjectPtr un
 	return nil
 }
 
+// Dispatch takes a CoProcessMessage and sends it to the CP.
+// This is the backward-compatible method.
 func (d *LuaDispatcher) Dispatch(object *coprocess.Object) (*coprocess.Object, error) {
+	return d.DispatchWithContext(context.Background(), object)
+}
+
+// DispatchWithContext takes a context and a CoProcessMessage and sends it to the CP.
+// The context parameter is currently not used by Lua plugins but is kept for interface compatibility.
+func (d *LuaDispatcher) DispatchWithContext(ctx context.Context, object *coprocess.Object) (*coprocess.Object, error) {
+	// Context is currently not used for Lua plugins, but the trace context
+	// is already available in the object.TraceId, object.SpanId, and object.TraceFlags fields
+	// for Lua plugins to use if they implement OpenTelemetry tracing
 	objectMsg, err := json.Marshal(object)
 	if err != nil {
 		return nil, err
@@ -155,6 +167,11 @@ func (d *LuaDispatcher) Dispatch(object *coprocess.Object) (*coprocess.Object, e
 	C.free(unsafe.Pointer(newObjectPtr))
 
 	return newObject, nil
+}
+
+// DispatchObject is deprecated. Use Dispatch or DispatchWithContext instead.
+func (d *LuaDispatcher) DispatchObject(object *coprocess.Object) (*coprocess.Object, error) {
+	return d.Dispatch(object)
 }
 
 // Reload will perform a middleware reload when a hot reload is triggered.

@@ -35,6 +35,31 @@ message Object {
   // Response relates to the ResponseObject used by response hooks. The fields are populated with the upstream HTTP
   // response data. All the field contents can be modified.
   ResponseObject response = 7;
+
+  // OpenTelemetry trace context fields for distributed tracing support.
+  // These are dedicated fields rather than being stored in the metadata map for several reasons:
+  // 1. Type safety - trace_flags is uint32, not string
+  // 2. API clarity - self-documenting and discoverable
+  // 3. No collision risk with user-defined metadata keys
+  // 4. Better performance - direct field access vs map lookup
+  // 5. Consistent with OpenTelemetry standards - trace context is infrastructure, not user metadata
+  //
+  // Note: For gRPC plugins, trace context is also automatically propagated through gRPC metadata
+  // via OpenTelemetry interceptors. These fields provide additional access for logging and are
+  // used by non-gRPC plugins (Python, Lua) that cannot use gRPC metadata.
+
+  // TraceID is the OpenTelemetry trace ID in hexadecimal format (32 characters).
+  // Example: "1234567890abcdef1234567890abcdef"
+  string trace_id = 8;
+
+  // SpanID is the OpenTelemetry span ID in hexadecimal format (16 characters).
+  // Example: "1234567890abcdef"
+  string span_id = 9;
+
+  // TraceFlags represents the OpenTelemetry trace flags (8 bits stored as uint32).
+  // Bit 0 (least significant) is the "sampled" flag (1 = sampled, 0 = not sampled).
+  // Example: 1 (sampled), 0 (not sampled)
+  uint32 trace_flags = 10;
 }
 
 // Event is represented as a JSON payload.
