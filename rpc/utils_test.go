@@ -103,8 +103,8 @@ func TestEqualStringSlices(t *testing.T) {
 	}
 }
 
-// TestIsNetworkError tests the isNetworkError function
-func TestIsNetworkError(t *testing.T) {
+// TestIsDNSError tests the isDNSError function
+func TestIsDNSError(t *testing.T) {
 	tests := []struct {
 		name     string
 		err      error
@@ -116,27 +116,59 @@ func TestIsNetworkError(t *testing.T) {
 			expected: false,
 		},
 		{
-			name:     "non-network error",
+			name:     "non-DNS error",
 			err:      errors.New("some random error"),
 			expected: false,
 		},
+		// Generic RPC errors should NOT be treated as DNS errors
 		{
-			name:     "unexpected response type error",
+			name:     "unexpected response type error - not DNS related",
 			err:      errors.New("unexpected response type: <nil>. Expected *dispatcherResponse"),
+			expected: false,
+		},
+		{
+			name:     "timeout error - not DNS related",
+			err:      errors.New("Cannot obtain response during timeout=30s"),
+			expected: false,
+		},
+		{
+			name:     "rpc down error - not DNS related",
+			err:      errors.New("rpc is either down or was not configured"),
+			expected: false,
+		},
+		{
+			name:     "decode error - not DNS related",
+			err:      errors.New("Cannot decode response"),
+			expected: false,
+		},
+		// Actual DNS errors SHOULD be detected
+		{
+			name:     "no such host - DNS error",
+			err:      errors.New("dial tcp: lookup mdcb.example.com: no such host"),
 			expected: true,
 		},
 		{
-			name:     "timeout error",
-			err:      errors.New("Cannot obtain response during timeout=30s"),
+			name:     "DNS lookup timeout",
+			err:      errors.New("dial tcp: lookup mdcb.example.com on 8.8.8.8:53: i/o timeout"),
 			expected: true,
+		},
+		{
+			name:     "lookup without timeout - not a DNS error",
+			err:      errors.New("lookup failed for other reasons"),
+			expected: false,
+		},
+		{
+			name:     "timeout without lookup - not a DNS error",
+			err:      errors.New("connection timeout"),
+			expected: false,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := isNetworkError(tt.err)
+			result := isDNSError(tt.err)
 			if result != tt.expected {
-				t.Errorf("isNetworkError(%v) = %v, expected %v", tt.err, result, tt.expected)
+				t.Errorf("isDNSError(%v) = %v, expected %v", tt.err, result, tt.expected)
 			}
 		})
 	}
