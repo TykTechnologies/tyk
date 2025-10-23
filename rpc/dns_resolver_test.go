@@ -108,7 +108,7 @@ func TestCheckDNSAndReconnect(t *testing.T) {
 			dnsLookupCalled := false
 			mockResolver := &MockDNSResolver{}
 			mockResolver.LookupIPFunc = func(host string) ([]net.IP, error) {
-			_ = host // unused
+				_ = host // unused
 				dnsLookupCalled = true
 				return tt.resolvedIPs, tt.resolveError
 			}
@@ -117,7 +117,7 @@ func TestCheckDNSAndReconnect(t *testing.T) {
 			// Create a mock reconnect function
 			reconnectCalled := false
 			safeReconnectRPCClient = func(suppressRegister bool) {
-			_ = suppressRegister // unused
+				_ = suppressRegister // unused
 				reconnectCalled = true
 			}
 
@@ -242,7 +242,7 @@ func TestUpdateResolvedIPs(t *testing.T) {
 
 			// Configure mock resolver
 			mockResolver.LookupIPFunc = func(host string) ([]net.IP, error) {
-			_ = host // unused
+				_ = host // unused
 				return tt.resolvedIPs, tt.resolveError
 			}
 
@@ -358,7 +358,7 @@ func TestCheckAndHandleDNSChange(t *testing.T) {
 			// Create a mock resolver
 			mockResolver := &MockDNSResolver{}
 			mockResolver.LookupIPFunc = func(host string) ([]net.IP, error) {
-			_ = host // unused
+				_ = host // unused
 				return tt.resolvedIPs, tt.resolveError
 			}
 			dnsResolver = mockResolver
@@ -370,7 +370,7 @@ func TestCheckAndHandleDNSChange(t *testing.T) {
 			// Create a mock reconnect function
 			reconnectCalled := false
 			safeReconnectRPCClient = func(suppressRegister bool) {
-			_ = suppressRegister // unused
+				_ = suppressRegister // unused
 				reconnectCalled = true
 			}
 
