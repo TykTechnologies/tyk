@@ -3381,6 +3381,19 @@ func ctxGetRequestStatus(r *http.Request) (stat RequestStatus) {
 	return
 }
 
+func ctxSetRequestLogger(r *http.Request, logger *logrus.Entry) {
+	setCtxValue(r, ctx.RequestLogger, logger)
+}
+
+func ctxGetRequestLogger(r *http.Request) *logrus.Entry {
+	if v := r.Context().Value(ctx.RequestLogger); v != nil {
+		if logger, ok := v.(*logrus.Entry); ok {
+			return logger
+		}
+	}
+	return nil
+}
+
 var createOauthClientSecret = func() string {
 	secret := uuid.New()
 	return base64.StdEncoding.EncodeToString([]byte(secret))
