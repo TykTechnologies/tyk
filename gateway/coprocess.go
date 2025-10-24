@@ -20,7 +20,6 @@ import (
 	"github.com/TykTechnologies/tyk/internal/middleware"
 	"github.com/TykTechnologies/tyk/user"
 	"github.com/sirupsen/logrus"
-	"go.opentelemetry.io/otel/trace"
 )
 
 var (
