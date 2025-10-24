@@ -2,6 +2,7 @@ package gateway
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -347,7 +348,7 @@ func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 	}
 
 	t1 := time.Now()
-	returnObject, err := coProcessor.Dispatch(object)
+	returnObject, err := coProcessor.Dispatch(r.Context(), object)
 	ms := DurationToMillisecond(time.Since(t1))
 
 	if err != nil {
@@ -582,7 +583,7 @@ func (h *CustomMiddlewareResponseHook) HandleResponse(rw http.ResponseWriter, re
 	}
 	object.Session = ProtoSessionState(ses)
 
-	retObject, err := coProcessor.Dispatch(object)
+	retObject, err := coProcessor.Dispatch(req.Context(), object)
 	if err != nil {
 		h.logger().WithError(err).Debug("Couldn't dispatch request object")
 		return errors.New("Middleware error")
@@ -665,13 +666,13 @@ func syncHeadersAndMultiValueHeaders(headers map[string]string, multiValueHeader
 	return updatedMultiValueHeaders
 }
 
-func (c *CoProcessor) Dispatch(object *coprocess.Object) (*coprocess.Object, error) {
+func (c *CoProcessor) Dispatch(ctx context.Context, object *coprocess.Object) (*coprocess.Object, error) {
 	dispatcher := loadedDrivers[c.Middleware.MiddlewareDriver]
 	if dispatcher == nil {
 		err := fmt.Errorf("Couldn't dispatch request, driver '%s' isn't available", c.Middleware.MiddlewareDriver)
 		return nil, err
 	}
-	newObject, err := dispatcher.Dispatch(object)
+	newObject, err := dispatcher.DispatchWithContext(ctx, object)
 	if err != nil {
 		return nil, err
 	}
