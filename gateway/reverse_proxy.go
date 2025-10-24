@@ -516,12 +516,16 @@ var hopHeaders = []string{
 
 func (p *ReverseProxy) ServeHTTP(rw http.ResponseWriter, req *http.Request) ProxyResponse {
 	startTime := time.Now()
-	p.logger.WithField("ts", startTime.UnixNano()).Debug("Started")
+	if p.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
+		p.logger.WithField("ts", startTime.UnixNano()).Debug("Started")
+	}
 
 	resp := p.WrappedServeHTTP(rw, req, recordDetail(req, p.TykAPISpec))
 
 	finishTime := time.Since(startTime)
-	p.logger.WithField("ns", finishTime.Nanoseconds()).Debug("Finished")
+	if p.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
+		p.logger.WithField("ns", finishTime.Nanoseconds()).Debug("Finished")
+	}
 
 	// make response body to be nopCloser and re-readable before serve it through chain of middlewares
 	nopCloseResponseBody(resp.Response)
@@ -531,12 +535,16 @@ func (p *ReverseProxy) ServeHTTP(rw http.ResponseWriter, req *http.Request) Prox
 
 func (p *ReverseProxy) ServeHTTPForCache(rw http.ResponseWriter, req *http.Request) ProxyResponse {
 	startTime := time.Now()
-	p.logger.WithField("ts", startTime.UnixNano()).Debug("Started")
+	if p.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
+		p.logger.WithField("ts", startTime.UnixNano()).Debug("Started")
+	}
 
 	resp := p.WrappedServeHTTP(rw, req, true)
 	nopCloseResponseBody(resp.Response)
 	finishTime := time.Since(startTime)
-	p.logger.WithField("ns", finishTime.Nanoseconds()).Debug("Finished")
+	if p.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
+		p.logger.WithField("ns", finishTime.Nanoseconds()).Debug("Finished")
+	}
 
 	return resp
 }
@@ -831,7 +839,9 @@ func (rt *TykRoundTripper) RoundTrip(r *http.Request) (*http.Response, error) {
 			return nil, errors.New("handler could")
 		}
 
-		rt.logger.WithField("looping_url", "tyk://"+r.Host).Debug("Executing request on internal route")
+		if rt.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
+			rt.logger.WithField("looping_url", "tyk://"+r.Host).Debug("Executing request on internal route")
+		}
 
 		return handleInMemoryLoop(handler, r)
 	}
