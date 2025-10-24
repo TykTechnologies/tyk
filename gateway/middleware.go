@@ -406,7 +406,12 @@ func (t *BaseMiddleware) refreshOrgSessionExpiry(orgid string) {
 			return s.DataExpires, nil
 		}
 
-		t.Logger().Debug("RPC call failed, setting default expiry for org: ", orgid)
+		if !found {
+			t.Logger().Debug("Org session not found, setting default expiry for org: ", orgid)
+		} else {
+			t.Logger().Debug("EnforceOrgDataAge is disabled, setting default expiry for org: ", orgid)
+		}
+
 		t.SetOrgExpiry(orgid, DEFAULT_ORG_SESSION_EXPIRATION)
 		return DEFAULT_ORG_SESSION_EXPIRATION, nil
 	})
