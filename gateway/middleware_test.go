@@ -13,6 +13,7 @@ import (
 	headers2 "github.com/TykTechnologies/tyk/header"
 	"github.com/TykTechnologies/tyk/internal/cache"
 	"github.com/TykTechnologies/tyk/internal/uuid"
+	"github.com/TykTechnologies/tyk/rpc"
 	"github.com/TykTechnologies/tyk/test"
 
 	"github.com/TykTechnologies/tyk/config"
@@ -57,7 +58,7 @@ func TestBaseMiddleware_OrgSessionExpiry(t *testing.T) {
 		assert.Equal(t, v, got)
 	})
 
-	t.Run("should return default and trigger background refresh on cache miss", func(t *testing.T) {
+	t.Run("should return default immediately on cache miss", func(t *testing.T) {
 		m := &BaseMiddleware{
 			Spec: &APISpec{
 				GlobalConfig: config.Config{
@@ -116,10 +117,18 @@ func TestBaseMiddleware_OrgSessionExpiry(t *testing.T) {
 		ts.Gw.ExpiryCache.Delete(noOrgSess)
 
 		got := m.OrgSessionExpiry(noOrgSess)
-		assert.Equal(t, DEFAULT_ORG_SESSION_EXPIRATION, got)
+		assert.Equal(t, DEFAULT_ORG_SESSION_EXPIRATION, got, "Should return default immediately on cache miss")
+
+		m.refreshOrgSessionExpiry(noOrgSess)
+
+		cachedVal, found := ts.Gw.ExpiryCache.Get(noOrgSess)
+		assert.True(t, found, "Cache should be populated after background refresh")
+		assert.Equal(t, DEFAULT_ORG_SESSION_EXPIRATION, cachedVal.(int64), "Cache should contain default expiration when org not found")
 	})
 
 	t.Run("should return default immediately in emergency mode", func(t *testing.T) {
+		rpc.SetEmergencyMode(t, true)
+		defer rpc.SetEmergencyMode(t, false)
 
 		m := &BaseMiddleware{
 			Spec: &APISpec{
@@ -154,7 +163,13 @@ func TestBaseMiddleware_OrgSessionExpiry(t *testing.T) {
 		ts.Gw.ExpiryCache.Delete(sess.OrgID)
 
 		got := m.OrgSessionExpiry(sess.OrgID)
-		assert.Equal(t, DEFAULT_ORG_SESSION_EXPIRATION, got)
+		assert.Equal(t, DEFAULT_ORG_SESSION_EXPIRATION, got, "Should return default immediately on cache miss")
+
+		m.refreshOrgSessionExpiry(sess.OrgID)
+
+		cachedVal, found := ts.Gw.ExpiryCache.Get(sess.OrgID)
+		assert.True(t, found, "Cache should be populated after background refresh")
+		assert.Equal(t, DEFAULT_ORG_SESSION_EXPIRATION, cachedVal.(int64), "Cache should contain default expiration when EnforceOrgDataAge is disabled")
 	})
 }
 

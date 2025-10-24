@@ -392,7 +392,7 @@ func (t *BaseMiddleware) OrgSessionExpiry(orgid string) int64 {
 func (t *BaseMiddleware) refreshOrgSessionExpiry(orgid string) {
 	t.Logger().Debug("Background refresh started for org: ", orgid)
 
-	_, err, _ := orgSessionExpiryCache.Do(orgid, func() (interface{}, error) {
+	orgSessionExpiryCache.Do(orgid, func() (interface{}, error) {
 		cachedVal, found := t.Gw.ExpiryCache.Get(orgid)
 		if found {
 			t.Logger().Debug("Org expiry already refreshed")
@@ -410,10 +410,6 @@ func (t *BaseMiddleware) refreshOrgSessionExpiry(orgid string) {
 		t.SetOrgExpiry(orgid, DEFAULT_ORG_SESSION_EXPIRATION)
 		return DEFAULT_ORG_SESSION_EXPIRATION, nil
 	})
-
-	if err != nil {
-		t.Logger().WithError(err).Debug("Error during background org expiry refresh")
-	}
 }
 
 func (t *BaseMiddleware) UpdateRequestSession(r *http.Request) bool {
