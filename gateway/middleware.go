@@ -371,27 +371,50 @@ func (t *BaseMiddleware) SetOrgExpiry(orgid string, expiry int64) {
 func (t *BaseMiddleware) OrgSessionExpiry(orgid string) int64 {
 	t.Logger().Debug("Checking: ", orgid)
 
-	// Cache failed attempt
-	id, err, _ := orgSessionExpiryCache.Do(orgid, func() (interface{}, error) {
+	if rpc.IsEmergencyMode() {
+		t.Logger().Debug("Emergency mode active, returning default expiry")
+		return DEFAULT_ORG_SESSION_EXPIRATION
+	}
+
+	cachedVal, found := t.Gw.ExpiryCache.Get(orgid)
+	if found {
+		t.Logger().Debug("Using cached org expiry value")
+		return cachedVal.(int64)
+	}
+
+	t.Logger().Debug("Cache miss, starting background refresh")
+	go t.refreshOrgSessionExpiry(orgid)
+
+	return DEFAULT_ORG_SESSION_EXPIRATION
+}
+
+// refreshOrgSessionExpiry performs the RPC call in the background to refresh org session expiry
+func (t *BaseMiddleware) refreshOrgSessionExpiry(orgid string) {
+	t.Logger().Debug("Background refresh started for org: ", orgid)
+
+	orgSessionExpiryCache.Do(orgid, func() (interface{}, error) {
 		cachedVal, found := t.Gw.ExpiryCache.Get(orgid)
 		if found {
+			t.Logger().Debug("Org expiry already refreshed")
 			return cachedVal, nil
 		}
 
 		s, found := t.OrgSession(orgid)
 		if found && t.Spec.GlobalConfig.EnforceOrgDataAge {
+			t.Logger().Debug("Successfully refreshed org expiry from RPC: ", orgid)
+			t.SetOrgExpiry(orgid, s.DataExpires)
 			return s.DataExpires, nil
 		}
-		return 0, errors.New("missing session")
-	})
 
-	if err != nil {
-		t.Logger().Debug("no cached entry found, returning 7 days")
+		if !found {
+			t.Logger().Debug("Org session not found, setting default expiry for org: ", orgid)
+		} else {
+			t.Logger().Debug("EnforceOrgDataAge is disabled, setting default expiry for org: ", orgid)
+		}
+
 		t.SetOrgExpiry(orgid, DEFAULT_ORG_SESSION_EXPIRATION)
-		return DEFAULT_ORG_SESSION_EXPIRATION
-	}
-
-	return id.(int64)
+		return DEFAULT_ORG_SESSION_EXPIRATION, nil
+	})
 }
 
 func (t *BaseMiddleware) UpdateRequestSession(r *http.Request) bool {
