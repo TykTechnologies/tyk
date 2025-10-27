@@ -378,8 +378,10 @@ func (t *BaseMiddleware) OrgSessionExpiry(orgid string) int64 {
 
 	cachedVal, found := t.Gw.ExpiryCache.Get(orgid)
 	if found {
-		t.Logger().Debug("Using cached org expiry value")
-		return cachedVal.(int64)
+		if expiry, ok := cachedVal.(int64); ok {
+			t.Logger().Debug("Using cached org expiry value")
+			return expiry
+		}
 	}
 
 	t.Logger().Debug("Cache miss, starting background refresh")
