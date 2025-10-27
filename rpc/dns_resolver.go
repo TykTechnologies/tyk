@@ -106,6 +106,9 @@ func checkAndHandleDNSChange(connectionString string, suppressRegister bool) (dn
 }
 
 func defaultSafeReconnectRPCClient(suppressRegister bool) {
+	// Stop DNS monitor before reconnecting
+	StopDNSMonitor()
+
 	// Stop existing client
 	if clientSingleton != nil {
 		oldClient := clientSingleton
@@ -126,5 +129,11 @@ func defaultSafeReconnectRPCClient(suppressRegister bool) {
 	handleLogin()
 	if !suppressRegister {
 		register()
+	}
+
+	// Restart DNS monitor if it was enabled
+	config := values.Config()
+	if !suppressRegister && config.DNSMonitorEnabled {
+		StartDNSMonitor(config.DNSMonitorEnabled, config.DNSMonitorInterval, config.ConnectionString)
 	}
 }
