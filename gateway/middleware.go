@@ -395,12 +395,6 @@ func (t *BaseMiddleware) refreshOrgSessionExpiry(orgid string) {
 	t.Logger().Debug("Background refresh started for org: ", orgid)
 
 	_, err, _ := orgSessionExpiryCache.Do(orgid, func() (interface{}, error) {
-		cachedVal, found := t.Gw.ExpiryCache.Get(orgid)
-		if found {
-			t.Logger().Debug("Org expiry already refreshed")
-			return cachedVal, nil
-		}
-
 		s, found := t.OrgSession(orgid)
 		if found && t.Spec.GlobalConfig.EnforceOrgDataAge {
 			t.Logger().Debug("Successfully refreshed org expiry from RPC: ", orgid)
