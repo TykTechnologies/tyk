@@ -31,7 +31,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/TykTechnologies/tyk/internal/osutil"
 	"io"
 	"io/ioutil"
 	"net/http"
@@ -50,6 +49,7 @@ import (
 
 	"github.com/TykTechnologies/tyk/config"
 
+	"github.com/TykTechnologies/tyk/internal/osutil"
 	"github.com/TykTechnologies/tyk/internal/otel"
 	"github.com/TykTechnologies/tyk/internal/redis"
 	"github.com/TykTechnologies/tyk/internal/uuid"
@@ -966,10 +966,6 @@ func (gw *Gateway) handleAddOrUpdatePolicy(polID string, r *http.Request) (inter
 		return apiError("Failed to create file!"), http.StatusInternalServerError
 	}
 
-	gw.policiesMu.Lock()
-	defer gw.policiesMu.Unlock()
-	gw.policiesByID[newPol.ID] = *newPol
-
 	action := "modified"
 	if r.Method == http.MethodPost {
 		action = "added"
@@ -1004,10 +1000,6 @@ func (gw *Gateway) handleDeletePolicy(polID string) (interface{}, int) {
 		log.Warningf("Delete failed: %v", err)
 		return apiError("Delete failed"), http.StatusInternalServerError
 	}
-
-	gw.policiesMu.Lock()
-	defer gw.policiesMu.Unlock()
-	delete(gw.policiesByID, polID)
 
 	response := apiModifyKeySuccess{
 		Key:    polID,
