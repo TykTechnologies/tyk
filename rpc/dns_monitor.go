@@ -147,10 +147,11 @@ func (m *DNSMonitor) checkDNS() {
 	if changed {
 		Log.Info("DNS monitor: detected DNS change in background, triggering reconnection")
 
-		// Reconnect in background
-		safeReconnectRPCClient(false)
-
-		Log.Info("DNS monitor: reconnection completed")
+		// Reconnect in a separate goroutine to avoid deadlock
+		go func() {
+			safeReconnectRPCClient(false)
+			Log.Info("DNS monitor: reconnection completed")
+		}()
 	} else {
 		Log.Debug("DNS monitor: no DNS changes detected")
 	}
