@@ -118,7 +118,7 @@ type RPCStorageHandler struct {
 	Gw               *Gateway `json:"-"`
 }
 
-//go:generate mockgen -typed -source=$FILE -destination=../internal/policy/store_mock.go -package policy . RPCDataLoader
+//go:generate mockgen -typed -source=$FILE -destination=../internal/policy/store_mock.gen.go -package policy . RPCDataLoader
 type RPCDataLoader interface {
 	Connect() bool
 	GetApiDefinitions(orgId string, tags []string) string
