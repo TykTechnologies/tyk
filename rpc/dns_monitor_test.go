@@ -450,3 +450,74 @@ func TestDNSMonitorInvalidConnectionString(t *testing.T) {
 		t.Errorf("DNS should not be looked up with invalid connection string, but was checked %d times", callCount)
 	}
 }
+
+// TestDNSMonitorRateLimiting tests that reconnections are rate limited to prevent flapping
+func TestDNSMonitorRateLimiting(t *testing.T) {
+	// Save original values and restore after test
+	originalResolver := dnsResolver
+	originalIPs := lastResolvedIPs
+	originalSafeReconnect := safeReconnectRPCClient
+
+	defer func() {
+		dnsResolver = originalResolver
+		lastResolvedIPs = originalIPs
+		safeReconnectRPCClient = originalSafeReconnect
+		StopDNSMonitor()
+		reconnectionInProgress.Store(false)
+	}()
+
+	// Set initial IPs
+	lastResolvedIPs = []string{"192.168.1.1"}
+
+	// Create a mock resolver that always returns different IPs (simulating flapping DNS)
+	mockResolver := &MockDNSResolver{}
+	mockResolver.LookupIPFunc = func(_ string) ([]net.IP, error) {
+		return makeIPs("192.168.1.100"), nil // Always different
+	}
+	dnsResolver = mockResolver
+
+	// Track reconnect calls
+	reconnectCallCount := 0
+	var reconnectMu sync.Mutex
+
+	// Use instant reconnect (no delay) for testing
+	safeReconnectRPCClient = func(_ bool) {
+		reconnectMu.Lock()
+		reconnectCallCount++
+		reconnectMu.Unlock()
+		time.Sleep(100 * time.Millisecond) // Small delay to simulate reconnection
+	}
+
+	// Start monitor with short interval (1 second)
+	StartDNSMonitor(true, 1, "example.com:8080")
+
+	// Wait for first reconnection to complete
+	time.Sleep(1500 * time.Millisecond)
+
+	// Get reconnect count after first cycle
+	reconnectMu.Lock()
+	firstCount := reconnectCallCount
+	reconnectMu.Unlock()
+
+	// First reconnection should have happened
+	if firstCount == 0 {
+		t.Error("Expected at least one reconnection, got none")
+	}
+
+	// Wait for more check cycles (DNS still shows changes but should be rate limited)
+	time.Sleep(3 * time.Second)
+
+	// Stop monitor
+	StopDNSMonitor()
+
+	// Get final reconnect count
+	reconnectMu.Lock()
+	finalCount := reconnectCallCount
+	reconnectMu.Unlock()
+
+	// Should still be 1 due to rate limiting (60 second window)
+	// Even though DNS kept changing, reconnections should be blocked
+	if finalCount > 1 {
+		t.Errorf("Expected reconnection to be rate limited (max 1), but got %d reconnections", finalCount)
+	}
+}

@@ -1,6 +1,7 @@
 package rpc
 
 import (
+	"context"
 	"errors"
 	"net"
 	"testing"
@@ -20,7 +21,7 @@ type MockDNSResolver struct {
 	LookupIPFunc func(host string) ([]net.IP, error)
 }
 
-func (m *MockDNSResolver) LookupIP(host string) ([]net.IP, error) {
+func (m *MockDNSResolver) LookupIP(ctx context.Context, host string) ([]net.IP, error) {
 	return m.LookupIPFunc(host)
 }
 
@@ -247,7 +248,7 @@ func TestUpdateResolvedIPs(t *testing.T) {
 			}
 
 			// Call the function
-			result := updateResolvedIPs("example.com", mockResolver)
+			result := updateResolvedIPs(context.Background(), "example.com", mockResolver)
 
 			// Check result
 			if result != tt.expectedResult {

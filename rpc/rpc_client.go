@@ -1,6 +1,7 @@
 package rpc
 
 import (
+	"context"
 	"crypto/tls"
 	"errors"
 	"net"
@@ -262,7 +263,7 @@ func Connect(
 	// Initial DNS resolution and get first ip
 	host, _, err := net.SplitHostPort(connConfig.ConnectionString)
 	if err == nil {
-		updateResolvedIPs(host, dnsResolver)
+		updateResolvedIPs(context.Background(), host, dnsResolver)
 	}
 
 	// Start background DNS monitor if enabled

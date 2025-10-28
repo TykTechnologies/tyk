@@ -12,12 +12,14 @@ import (
 
 // DNSMonitor handles background DNS monitoring for worker gateways
 type DNSMonitor struct {
-	enabled       bool
-	checkInterval time.Duration
-	connectionStr string
-	ctx           context.Context
-	cancel        context.CancelFunc
-	stopComplete  chan struct{}
+	enabled            bool
+	checkInterval      time.Duration
+	connectionStr      string
+	ctx                context.Context
+	cancel             context.CancelFunc
+	stopComplete       chan struct{}
+	lastReconnectTime  time.Time
+	lastReconnectMutex sync.Mutex
 }
 
 var (
@@ -25,8 +27,8 @@ var (
 	dnsMonitor     *DNSMonitor
 	dnsMonitorLock sync.Mutex
 
-	// Prevent concurrent reconnections
-	reconnectionInProgress atomic.Value // stores bool
+	// Prevent concurrent reconnections - global state independent of monitor lifecycle
+	reconnectionInProgress atomic.Bool
 )
 
 // StartDNSMonitor initializes and starts the background DNS monitor
@@ -38,9 +40,6 @@ func StartDNSMonitor(enabled bool, checkInterval int, connectionString string) {
 	if dnsMonitor != nil {
 		stopDNSMonitorInternal()
 	}
-
-	// Initialize/reset reconnection flag
-	reconnectionInProgress.Store(false)
 
 	// Don't start if disabled
 	if !enabled {
@@ -69,6 +68,8 @@ func StartDNSMonitor(enabled bool, checkInterval int, connectionString string) {
 		ctx:           ctx,
 		cancel:        cancel,
 		stopComplete:  make(chan struct{}),
+		// Initialize to zero time to allow immediate first reconnection
+		lastReconnectTime: time.Time{},
 	}
 
 	Log.WithFields(logrus.Fields{
@@ -148,19 +149,36 @@ func (m *DNSMonitor) checkDNS() {
 
 	Log.WithField("host", host).Debug("DNS monitor: performing background DNS check")
 
-	// Check if DNS has changed
-	changed := updateResolvedIPs(host, dnsResolver)
+	// Check if DNS has changed (pass monitor context for cancellation support)
+	changed := updateResolvedIPs(m.ctx, host, dnsResolver)
 
 	if changed {
 		Log.Info("DNS monitor: detected DNS change in background, triggering reconnection")
 
-		inProgress := reconnectionInProgress.Load()
-		if val, ok := inProgress.(bool); inProgress != nil && ok && val {
+		// Try to atomically set reconnection flag from false to true
+		// If already true, another reconnection is in progress, so skip
+		if !reconnectionInProgress.CompareAndSwap(false, true) {
 			Log.Warning("DNS monitor: reconnection already in progress, skipping duplicate reconnection")
 			return
 		}
 
-		reconnectionInProgress.Store(true)
+		// Check rate limiting - prevent reconnections within 60 seconds
+		m.lastReconnectMutex.Lock()
+		timeSinceLastReconnect := time.Since(m.lastReconnectTime)
+		rateLimitWindow := 60 * time.Second
+
+		if timeSinceLastReconnect < rateLimitWindow && !m.lastReconnectTime.IsZero() {
+			m.lastReconnectMutex.Unlock()
+			reconnectionInProgress.Store(false)
+			Log.WithFields(logrus.Fields{
+				"time_since_last": timeSinceLastReconnect.Seconds(),
+				"rate_limit":      rateLimitWindow.Seconds(),
+			}).Warning("DNS monitor: reconnection rate limited, skipping to prevent flapping")
+			return
+		}
+
+		m.lastReconnectTime = time.Now()
+		m.lastReconnectMutex.Unlock()
 
 		// Reconnect in a separate goroutine to avoid deadlock
 		go func() {

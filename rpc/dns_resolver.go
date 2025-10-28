@@ -1,6 +1,7 @@
 package rpc
 
 import (
+	"context"
 	"net"
 	"sync"
 )
@@ -24,19 +25,20 @@ func init() {
 
 // DNSResolver provides methods for DNS resolution
 type DNSResolver interface {
-	LookupIP(host string) ([]net.IP, error)
+	LookupIP(ctx context.Context, host string) ([]net.IP, error)
 }
 
 // DefaultDNSResolver implements DNSResolver using the standard library
 type DefaultDNSResolver struct{}
 
-func (r *DefaultDNSResolver) LookupIP(host string) ([]net.IP, error) {
-	return net.LookupIP(host)
+func (r *DefaultDNSResolver) LookupIP(ctx context.Context, host string) ([]net.IP, error) {
+	resolver := &net.Resolver{}
+	return resolver.LookupIP(ctx, "ip", host)
 }
 
 // updateResolvedIPs checks if DNS resolution has changed using the provided resolver
-func updateResolvedIPs(host string, resolver DNSResolver) bool {
-	ips, err := resolver.LookupIP(host)
+func updateResolvedIPs(ctx context.Context, host string, resolver DNSResolver) bool {
+	ips, err := resolver.LookupIP(ctx, host)
 	if err != nil {
 		Log.Error("Failed to resolve host during DNS refresh:", err)
 		return false
@@ -71,8 +73,8 @@ func checkDNSAndReconnect(connectionString string, suppressRegister bool) bool {
 		return false
 	}
 
-	// Check if DNS has changed
-	if changed := updateResolvedIPs(host, dnsResolver); changed {
+	// Check if DNS has changed (use background context for reactive DNS checks)
+	if changed := updateResolvedIPs(context.Background(), host, dnsResolver); changed {
 		Log.Info("MDCB DNS resolution changed, reconnecting as self-healing mechanism...")
 		safeReconnectRPCClient(suppressRegister)
 		return true
