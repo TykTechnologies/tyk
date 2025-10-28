@@ -216,7 +216,7 @@ jobs:
           SONAR_ARGS="-Dsonar.organization=tyktechnologies \
           -Dsonar.projectKey=TykTechnologies_tyk \
           -Dsonar.sources=. \
-          -Dsonar.exclusions=**/testdata/*,test/**,tests/**,coprocess/**/*,ci/**,templates/**,**/*.pb.go,internal/graphengine/gomock_reflect_3503306920/* \
+          -Dsonar.exclusions=**/testdata/*,test/**,tests/**,coprocess/**/*,ci/**,templates/**,**/*.pb.go,internal/graphengine/gomock_reflect_3503306920/*,**/*.gen.go \
           -Dsonar.coverage.exclusions=**/*_test.go,**/mock/*,tests/**,swagger*.yml,**/*.pb.go,internal/graphengine/gomock_reflect_3503306920/* \
           -Dsonar.test.inclusions=**/*_test.go,tests/** \
           -Dsonar.tests=. \
