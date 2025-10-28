@@ -345,6 +345,73 @@ func TestDNSMonitorEmergencyMode(t *testing.T) {
 	}
 }
 
+// TestDNSMonitorConcurrentReconnections tests that concurrent reconnections are prevented
+func TestDNSMonitorConcurrentReconnections(t *testing.T) {
+	// Save original values and restore after test
+	originalResolver := dnsResolver
+	originalIPs := lastResolvedIPs
+	originalSafeReconnect := safeReconnectRPCClient
+
+	defer func() {
+		dnsResolver = originalResolver
+		lastResolvedIPs = originalIPs
+		safeReconnectRPCClient = originalSafeReconnect
+		StopDNSMonitor()
+		reconnectionInProgress.Store(false)
+	}()
+
+	// Set initial IPs
+	lastResolvedIPs = []string{"192.168.1.1"}
+
+	// Create a mock resolver that always returns different IPs (DNS always changing)
+	mockResolver := &MockDNSResolver{}
+	mockResolver.LookupIPFunc = func(_ string) ([]net.IP, error) {
+		// Return a different IP each time to simulate rapid DNS changes
+		return makeIPs("192.168.1.100"), nil
+	}
+	dnsResolver = mockResolver
+
+	// Track reconnect calls with a slow reconnect function
+	reconnectCallCount := 0
+	var reconnectMu sync.Mutex
+	reconnectStarted := make(chan struct{})
+
+	safeReconnectRPCClient = func(_ bool) {
+		reconnectMu.Lock()
+		reconnectCallCount++
+		count := reconnectCallCount
+		reconnectMu.Unlock()
+
+		// Signal that first reconnect has started
+		if count == 1 {
+			close(reconnectStarted)
+		}
+
+		// Simulate slow reconnection (longer than check interval)
+		time.Sleep(2 * time.Second)
+	}
+
+	// Start monitor with very short interval (500ms) to trigger multiple checks quickly
+	StartDNSMonitor(true, 1, "example.com:8080")
+
+	// Wait for first reconnection to start
+	<-reconnectStarted
+
+	// Wait a bit more to allow multiple DNS checks to happen while first reconnection is in progress
+	time.Sleep(1500 * time.Millisecond)
+
+	// Stop monitor
+	StopDNSMonitor()
+
+	// Verify only ONE reconnection was triggered despite multiple DNS checks
+	reconnectMu.Lock()
+	defer reconnectMu.Unlock()
+
+	if reconnectCallCount != 1 {
+		t.Errorf("Expected exactly 1 reconnection call (concurrent calls should be blocked), got %d", reconnectCallCount)
+	}
+}
+
 // TestDNSMonitorInvalidConnectionString tests behavior with invalid connection string
 func TestDNSMonitorInvalidConnectionString(t *testing.T) {
 	// Save original values

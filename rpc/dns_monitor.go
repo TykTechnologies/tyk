@@ -4,6 +4,7 @@ import (
 	"context"
 	"net"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/sirupsen/logrus"
@@ -23,6 +24,9 @@ var (
 	// Global DNS monitor instance
 	dnsMonitor     *DNSMonitor
 	dnsMonitorLock sync.Mutex
+
+	// Prevent concurrent reconnections
+	reconnectionInProgress atomic.Value // stores bool
 )
 
 // StartDNSMonitor initializes and starts the background DNS monitor
@@ -34,6 +38,9 @@ func StartDNSMonitor(enabled bool, checkInterval int, connectionString string) {
 	if dnsMonitor != nil {
 		stopDNSMonitorInternal()
 	}
+
+	// Initialize/reset reconnection flag
+	reconnectionInProgress.Store(false)
 
 	// Don't start if disabled
 	if !enabled {
@@ -147,8 +154,20 @@ func (m *DNSMonitor) checkDNS() {
 	if changed {
 		Log.Info("DNS monitor: detected DNS change in background, triggering reconnection")
 
+		inProgress := reconnectionInProgress.Load()
+		if inProgress != nil && inProgress.(bool) {
+			Log.Warning("DNS monitor: reconnection already in progress, skipping duplicate reconnection")
+			return
+		}
+
+		reconnectionInProgress.Store(true)
+
 		// Reconnect in a separate goroutine to avoid deadlock
 		go func() {
+			defer func() {
+				reconnectionInProgress.Store(false)
+			}()
+
 			safeReconnectRPCClient(false)
 			Log.Info("DNS monitor: reconnection completed")
 		}()
