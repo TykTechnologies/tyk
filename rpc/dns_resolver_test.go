@@ -21,7 +21,7 @@ type MockDNSResolver struct {
 	LookupIPFunc func(host string) ([]net.IP, error)
 }
 
-func (m *MockDNSResolver) LookupIP(ctx context.Context, host string) ([]net.IP, error) {
+func (m *MockDNSResolver) LookupIP(_ context.Context, host string) ([]net.IP, error) {
 	return m.LookupIPFunc(host)
 }
 
