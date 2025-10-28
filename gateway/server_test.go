@@ -2,6 +2,7 @@ package gateway
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net"
@@ -13,11 +14,14 @@ import (
 
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
+	"go.uber.org/mock/gomock"
 
 	"github.com/TykTechnologies/again"
+	"github.com/TykTechnologies/storage/persistent/model"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/internal/netutil"
 	"github.com/TykTechnologies/tyk/internal/otel"
+	"github.com/TykTechnologies/tyk/internal/policy"
 	"github.com/TykTechnologies/tyk/rpc"
 	"github.com/TykTechnologies/tyk/tcp"
 	"github.com/TykTechnologies/tyk/test"
@@ -1045,4 +1049,80 @@ func TestGateway_gracefulShutdown_MixedProxyConcurrency(t *testing.T) {
 	if err != nil {
 		t.Errorf("expected no error but got: %v", err)
 	}
+}
+
+func TestLoadPoliciesFromRPC(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	prev := rpc.IsEmergencyMode()
+	rpc.SetEmergencyMode(t, false)
+
+	defer func() {
+		rpc.SetEmergencyMode(t, prev)
+	}()
+
+	controller := gomock.NewController(t)
+
+	t.Run("responds error if failed to connect", func(t *testing.T) {
+		store := policy.NewMockRPCDataLoader(controller)
+		store.EXPECT().Connect().Return(false)
+
+		_, err := ts.Gw.LoadPoliciesFromRPC(store, "")
+
+		assert.ErrorContains(t, err, "Failed connecting to database")
+	})
+
+	t.Run("responds with error if GetPolicies returns empty string", func(t *testing.T) {
+		orgId := "org123"
+
+		store := policy.NewMockRPCDataLoader(controller)
+		store.EXPECT().Connect().Return(true)
+		store.EXPECT().GetPolicies(orgId).Return("")
+
+		_, err := ts.Gw.LoadPoliciesFromRPC(store, orgId)
+
+		assert.ErrorContains(t, err, "failed to fetch policies from RPC store; connection may be down")
+	})
+
+	t.Run("returns policies from rpc", func(t *testing.T) {
+		mid := model.NewObjectID()
+
+		var policies = []user.Policy{
+			{MID: mid},
+		}
+
+		marshaledPolicies, err := json.Marshal(policies)
+		assert.NoError(t, err)
+
+		orgId := "org123"
+
+		store := policy.NewMockRPCDataLoader(controller)
+		store.EXPECT().Connect().Return(true)
+		store.EXPECT().GetPolicies(orgId).Return(string(marshaledPolicies))
+
+		respondedPolicies, err := ts.Gw.LoadPoliciesFromRPC(store, orgId)
+		assert.NoError(t, err)
+
+		assert.Len(t, respondedPolicies, 1, "returns one policy like returned store")
+		assert.Equal(t, mid.Hex(), respondedPolicies[mid.Hex()].ID, "ensures ID from MID ID is empty") // temporary solution can be removed in a while
+	})
+
+	t.Run("returns error if invalid policy received from rpc storage", func(t *testing.T) {
+		var policies = []user.Policy{
+			{MID: "invalid"},
+		}
+
+		marshaledPolicies, err := json.Marshal(policies)
+		assert.NoError(t, err)
+
+		orgId := "org123"
+
+		store := policy.NewMockRPCDataLoader(controller)
+		store.EXPECT().Connect().Return(true)
+		store.EXPECT().GetPolicies(orgId).Return(string(marshaledPolicies))
+
+		_, err = ts.Gw.LoadPoliciesFromRPC(store, orgId)
+		assert.ErrorContains(t, err, "invalid ObjectId in JSON")
+	})
 }

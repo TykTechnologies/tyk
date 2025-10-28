@@ -4,19 +4,17 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/TykTechnologies/tyk/header"
 	"io/ioutil"
 	"net/http"
 	"os"
 	"path/filepath"
 
 	"github.com/TykTechnologies/graphql-go-tools/pkg/graphql"
-
+	"github.com/TykTechnologies/tyk/header"
 	"github.com/TykTechnologies/tyk/rpc"
+	"github.com/TykTechnologies/tyk/user"
 
 	"github.com/sirupsen/logrus"
-
-	"github.com/TykTechnologies/tyk/user"
 )
 
 var (
@@ -214,7 +212,7 @@ func parsePoliciesFromRPC(list string) (map[string]user.Policy, error) {
 
 	for _, p := range dbPolicyList {
 		if !ensurePolicyId(&p) {
-			return nil, fmt.Errorf("invalid policy _id=%q id=%q", p.MID, p.ID)
+			continue
 		}
 		policies[p.ID] = p
 	}
