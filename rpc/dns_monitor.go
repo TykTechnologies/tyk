@@ -12,14 +12,12 @@ import (
 
 // DNSMonitor handles background DNS monitoring for worker gateways
 type DNSMonitor struct {
-	enabled            bool
-	checkInterval      time.Duration
-	connectionStr      string
-	ctx                context.Context
-	cancel             context.CancelFunc
-	stopComplete       chan struct{}
-	lastReconnectTime  time.Time
-	lastReconnectMutex sync.Mutex
+	enabled       bool
+	checkInterval time.Duration
+	connectionStr string
+	ctx           context.Context
+	cancel        context.CancelFunc
+	stopComplete  chan struct{}
 }
 
 var (
@@ -29,6 +27,10 @@ var (
 
 	// Prevent concurrent reconnections - global state independent of monitor lifecycle
 	reconnectionInProgress atomic.Bool
+
+	// Rate limiting state - global to survive monitor restarts during reconnection
+	lastReconnectTime  time.Time
+	lastReconnectMutex sync.Mutex
 )
 
 // StartDNSMonitor initializes and starts the background DNS monitor
@@ -68,8 +70,6 @@ func StartDNSMonitor(enabled bool, checkInterval int, connectionString string) {
 		ctx:           ctx,
 		cancel:        cancel,
 		stopComplete:  make(chan struct{}),
-		// Initialize to zero time to allow immediate first reconnection
-		lastReconnectTime: time.Time{},
 	}
 
 	Log.WithFields(logrus.Fields{
@@ -163,12 +163,13 @@ func (m *DNSMonitor) checkDNS() {
 		}
 
 		// Check rate limiting - prevent reconnections within 60 seconds
-		m.lastReconnectMutex.Lock()
-		timeSinceLastReconnect := time.Since(m.lastReconnectTime)
+		// Use global rate-limiting state that survives monitor restarts
+		lastReconnectMutex.Lock()
+		timeSinceLastReconnect := time.Since(lastReconnectTime)
 		rateLimitWindow := 60 * time.Second
 
-		if timeSinceLastReconnect < rateLimitWindow && !m.lastReconnectTime.IsZero() {
-			m.lastReconnectMutex.Unlock()
+		if timeSinceLastReconnect < rateLimitWindow && !lastReconnectTime.IsZero() {
+			lastReconnectMutex.Unlock()
 			reconnectionInProgress.Store(false)
 			Log.WithFields(logrus.Fields{
 				"time_since_last": timeSinceLastReconnect.Seconds(),
@@ -177,8 +178,8 @@ func (m *DNSMonitor) checkDNS() {
 			return
 		}
 
-		m.lastReconnectTime = time.Now()
-		m.lastReconnectMutex.Unlock()
+		lastReconnectTime = time.Now()
+		lastReconnectMutex.Unlock()
 
 		// Reconnect in a separate goroutine to avoid deadlock
 		go func() {

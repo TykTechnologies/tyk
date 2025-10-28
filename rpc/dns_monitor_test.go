@@ -521,3 +521,76 @@ func TestDNSMonitorRateLimiting(t *testing.T) {
 		t.Errorf("Expected reconnection to be rate limited (max 1), but got %d reconnections", finalCount)
 	}
 }
+
+// TestDNSMonitorRateLimitingSurvivesRestart tests that rate limiting persists across monitor restarts
+func TestDNSMonitorRateLimitingSurvivesRestart(t *testing.T) {
+	// Save original values and restore after test
+	originalResolver := dnsResolver
+	originalIPs := lastResolvedIPs
+	originalSafeReconnect := safeReconnectRPCClient
+	originalLastReconnectTime := lastReconnectTime
+
+	defer func() {
+		dnsResolver = originalResolver
+		lastResolvedIPs = originalIPs
+		safeReconnectRPCClient = originalSafeReconnect
+		lastReconnectTime = originalLastReconnectTime
+		StopDNSMonitor()
+		reconnectionInProgress.Store(false)
+	}()
+
+	// Set initial IPs
+	lastResolvedIPs = []string{"192.168.1.1"}
+
+	// Create a mock resolver that always returns different IPs
+	mockResolver := &MockDNSResolver{}
+	mockResolver.LookupIPFunc = func(_ string) ([]net.IP, error) {
+		return makeIPs("192.168.1.100"), nil // Always different
+	}
+	dnsResolver = mockResolver
+
+	// Track reconnect calls
+	reconnectCallCount := 0
+	var reconnectMu sync.Mutex
+
+	safeReconnectRPCClient = func(_ bool) {
+		reconnectMu.Lock()
+		reconnectCallCount++
+		reconnectMu.Unlock()
+	}
+
+	// Start monitor
+	StartDNSMonitor(true, 1, "example.com:8080")
+
+	// Wait for first reconnection to trigger
+	time.Sleep(1500 * time.Millisecond)
+
+	// Get first count
+	reconnectMu.Lock()
+	firstCount := reconnectCallCount
+	reconnectMu.Unlock()
+
+	if firstCount == 0 {
+		t.Error("Expected at least one reconnection")
+	}
+
+	// Stop and restart monitor (simulating what happens during reconnection)
+	StopDNSMonitor()
+	StartDNSMonitor(true, 1, "example.com:8080")
+
+	// Wait for a few more check cycles
+	time.Sleep(3 * time.Second)
+
+	// Stop monitor
+	StopDNSMonitor()
+
+	// Get final count
+	reconnectMu.Lock()
+	finalCount := reconnectCallCount
+	reconnectMu.Unlock()
+
+	// Should still be 1 because rate limiting state survived the restart
+	if finalCount > 1 {
+		t.Errorf("Expected rate limiting to survive restart (max 1 reconnection), but got %d", finalCount)
+	}
+}
