@@ -1062,10 +1062,8 @@ func TestLoadPoliciesFromRPC(t *testing.T) {
 		rpc.SetEmergencyMode(t, prev)
 	}()
 
-	controller := gomock.NewController(t)
-
 	t.Run("responds error if failed to connect", func(t *testing.T) {
-		store := policy.NewMockRPCDataLoader(controller)
+		store := policy.NewMockRPCDataLoader(gomock.NewController(t))
 		store.EXPECT().Connect().Return(false)
 
 		_, err := ts.Gw.LoadPoliciesFromRPC(store, "")
@@ -1076,7 +1074,7 @@ func TestLoadPoliciesFromRPC(t *testing.T) {
 	t.Run("responds with error if GetPolicies returns empty string", func(t *testing.T) {
 		orgId := "org123"
 
-		store := policy.NewMockRPCDataLoader(controller)
+		store := policy.NewMockRPCDataLoader(gomock.NewController(t))
 		store.EXPECT().Connect().Return(true)
 		store.EXPECT().GetPolicies(orgId).Return("")
 
@@ -1097,7 +1095,7 @@ func TestLoadPoliciesFromRPC(t *testing.T) {
 
 		orgId := "org123"
 
-		store := policy.NewMockRPCDataLoader(controller)
+		store := policy.NewMockRPCDataLoader(gomock.NewController(t))
 		store.EXPECT().Connect().Return(true)
 		store.EXPECT().GetPolicies(orgId).Return(string(marshaledPolicies))
 
@@ -1118,7 +1116,7 @@ func TestLoadPoliciesFromRPC(t *testing.T) {
 
 		orgId := "org123"
 
-		store := policy.NewMockRPCDataLoader(controller)
+		store := policy.NewMockRPCDataLoader(gomock.NewController(t))
 		store.EXPECT().Connect().Return(true)
 		store.EXPECT().GetPolicies(orgId).Return(string(marshaledPolicies))
 
