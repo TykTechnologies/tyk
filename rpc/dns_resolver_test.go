@@ -4,7 +4,9 @@ import (
 	"context"
 	"errors"
 	"net"
+	"sync"
 	"testing"
+	"time"
 )
 
 // Helper function to create IP addresses for testing
@@ -505,5 +507,81 @@ func TestDNSIsOnlyCheckedOncePerConnectionIssue(t *testing.T) {
 	}
 	if !values.GetDNSCheckedAfterError() {
 		t.Error("Third call: DNS checked flag should be set to true again")
+	}
+}
+
+// TestReactiveDNSCheckRespectsReconnectionFlag tests that reactive DNS checks respect the reconnectionInProgress flag
+func TestReactiveDNSCheckRespectsReconnectionFlag(t *testing.T) {
+	// Save original values and restore after test
+	originalResolver := dnsResolver
+	originalIPs := lastResolvedIPs
+	originalSafeReconnect := safeReconnectRPCClient
+
+	defer func() {
+		dnsResolver = originalResolver
+		lastResolvedIPs = originalIPs
+		safeReconnectRPCClient = originalSafeReconnect
+		reconnectionInProgress.Store(false)
+	}()
+
+	// Set initial IPs
+	lastResolvedIPs = []string{"192.168.1.1"}
+
+	// Create a mock resolver that returns different IPs
+	mockResolver := &MockDNSResolver{}
+	mockResolver.LookupIPFunc = func(_ string) ([]net.IP, error) {
+		return makeIPs("192.168.1.2"), nil // Different IP
+	}
+	dnsResolver = mockResolver
+
+	// Track reconnect calls
+	reconnectCallCount := 0
+	var reconnectMu sync.Mutex
+
+	safeReconnectRPCClient = func(_ bool) {
+		reconnectMu.Lock()
+		reconnectCallCount++
+		reconnectMu.Unlock()
+		time.Sleep(100 * time.Millisecond) // Simulate slow reconnection
+	}
+
+	// Simulate proactive monitor starting a reconnection
+	reconnectionInProgress.Store(true)
+
+	// Now try reactive DNS check (should be blocked)
+	result := checkDNSAndReconnect("example.com:8080", false)
+
+	// Should return false because reconnection is already in progress
+	if result {
+		t.Error("Expected checkDNSAndReconnect to return false when reconnection already in progress")
+	}
+
+	// Verify reconnect was NOT called
+	reconnectMu.Lock()
+	count := reconnectCallCount
+	reconnectMu.Unlock()
+
+	if count != 0 {
+		t.Errorf("Expected no reconnection calls, got %d", count)
+	}
+
+	// Reset flag
+	reconnectionInProgress.Store(false)
+
+	// Now try again (should succeed)
+	result = checkDNSAndReconnect("example.com:8080", false)
+
+	// Should return true
+	if !result {
+		t.Error("Expected checkDNSAndReconnect to return true when no reconnection in progress")
+	}
+
+	// Verify reconnect WAS called this time
+	reconnectMu.Lock()
+	count = reconnectCallCount
+	reconnectMu.Unlock()
+
+	if count != 1 {
+		t.Errorf("Expected 1 reconnection call, got %d", count)
 	}
 }

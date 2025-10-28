@@ -76,6 +76,17 @@ func checkDNSAndReconnect(connectionString string, suppressRegister bool) bool {
 	// Check if DNS has changed (use background context for reactive DNS checks)
 	if changed := updateResolvedIPs(context.Background(), host, dnsResolver); changed {
 		Log.Info("MDCB DNS resolution changed, reconnecting as self-healing mechanism...")
+
+		// Check if reconnection is already in progress (from proactive monitor or another reactive check)
+		// Use the same atomic flag as the DNS monitor to prevent concurrent reconnections
+		if !reconnectionInProgress.CompareAndSwap(false, true) {
+			Log.Warning("Reactive DNS check: reconnection already in progress, skipping duplicate reconnection")
+			return false
+		}
+
+		// Perform reconnection synchronously (we're already in error handling path)
+		defer reconnectionInProgress.Store(false)
+
 		safeReconnectRPCClient(suppressRegister)
 		return true
 	}
