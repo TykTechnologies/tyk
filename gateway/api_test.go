@@ -6,6 +6,7 @@ import (
 	"crypto/x509"
 	"encoding/json"
 	"fmt"
+	"github.com/TykTechnologies/storage/persistent/model"
 	"io"
 	"io/ioutil"
 	"net/http"
@@ -79,11 +80,10 @@ const defaultTestPol = `{
 }`
 
 func TestPolicyAPI(t *testing.T) {
-	ts := StartTest(nil)
-	globalConf := ts.Gw.GetConfig()
-	globalConf.Policies.PolicyPath = "."
-	globalConf.Policies.PolicySource = "file"
-	ts.Gw.SetConfig(globalConf)
+	ts := StartTest(func(globalConf *config.Config) {
+		globalConf.Policies.PolicyPath = "."
+		globalConf.Policies.PolicySource = "file"
+	})
 
 	defer ts.Close()
 	ts.Gw.BuildAndLoadAPI()
@@ -126,6 +126,52 @@ func TestPolicyAPI(t *testing.T) {
 	_, _ = ts.Run(t, test.TestCase{
 		Path: "/tyk/policies/not-here", AdminAuth: true, Method: "GET", BodyMatch: `{"status":"error","message":"Policy not found"}`, Code: http.StatusNotFound,
 	})
+
+	t.Run("fails if no MID and no ID is provided", func(t *testing.T) {
+		_, _ = ts.Run(t, test.TestCase{
+			Path:      "/tyk/policies",
+			Method:    http.MethodPost,
+			AdminAuth: true,
+			Data:      serializePolicy(t, user.Policy{}),
+			Code:      http.StatusBadRequest,
+			BodyMatch: `{"status":"error","message":"Unable to create policy without id."}`,
+		})
+	})
+
+	t.Run("fails if invalid MID and no ID is provided", func(t *testing.T) {
+		_, _ = ts.Run(t, test.TestCase{
+			Path:      "/tyk/policies",
+			Method:    http.MethodPost,
+			AdminAuth: true,
+			Data:      serializePolicy(t, user.Policy{MID: "invalid"}),
+			Code:      http.StatusBadRequest,
+			BodyMatch: `{"status":"error","message":"Request malformed"}`,
+		})
+	})
+
+	t.Run("fails if invalid config is provided", func(t *testing.T) {
+		ts.setTestScopeConfig(t, func(cnf *config.Config) {
+			cnf.Policies.PolicyPath = "/etc/hosts"
+		})
+
+		_, _ = ts.Run(t, test.TestCase{
+			Path:      "/tyk/policies",
+			Method:    http.MethodPost,
+			AdminAuth: true,
+			Data:      serializePolicy(t, user.Policy{MID: model.NewObjectID()}),
+			Code:      http.StatusInternalServerError,
+			BodyMatch: `{"status":"error","message":"Unable to access policy storage."}`,
+		})
+	})
+}
+
+func serializePolicy(t *testing.T, pol user.Policy) string {
+	t.Helper()
+
+	data, err := json.Marshal(pol)
+	assert.NoError(t, err)
+
+	return string(data)
 }
 
 func TestHealthCheckEndpoint(t *testing.T) {

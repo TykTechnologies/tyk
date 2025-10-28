@@ -11,6 +11,7 @@ import (
 	"encoding/binary"
 	"encoding/json"
 	"fmt"
+	"github.com/TykTechnologies/tyk/internal/reflect"
 	"io"
 	"io/ioutil"
 	mathrand "math/rand"
@@ -1130,6 +1131,17 @@ func (s *Test) start(genConf func(globalConf *config.Config)) *Gateway {
 func (s *Test) AddDynamicHandler(path string, handlerFunc http.HandlerFunc) {
 	path = strings.Trim(path, "/")
 	s.dynamicHandlers[path] = handlerFunc
+}
+
+// setTestScopeConfig overrides config in scope of test case.
+func (s *Test) setTestScopeConfig(t *testing.T, apply func(cnf *config.Config)) {
+	cnf := s.Gw.GetConfig()
+	newCnf := reflect.Clone(cnf)
+	apply(&newCnf)
+	s.Gw.SetConfig(newCnf)
+	t.Cleanup(func() {
+		s.Gw.SetConfig(cnf)
+	})
 }
 
 func (s *Test) newGateway(genConf func(globalConf *config.Config)) *Gateway {
