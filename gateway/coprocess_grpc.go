@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"github.com/sirupsen/logrus"
+	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	"net/url"
@@ -48,7 +49,12 @@ func GetCoProcessGrpcServerTargetUrlAsString(targetUrl *url.URL) string {
 
 // Dispatch takes a CoProcessMessage and sends it to the CP.
 func (d *GRPCDispatcher) Dispatch(object *coprocess.Object) (*coprocess.Object, error) {
-	return grpcClient.Dispatch(context.Background(), object)
+	return d.DispatchWithContext(context.Background(), object)
+}
+
+// DispatchWithContext takes a context and CoProcessMessage and sends it to the CP with trace propagation.
+func (d *GRPCDispatcher) DispatchWithContext(ctx context.Context, object *coprocess.Object) (*coprocess.Object, error) {
+	return grpcClient.Dispatch(ctx, object)
 }
 
 // DispatchEvent dispatches a Tyk event.
@@ -96,7 +102,11 @@ func (gw *Gateway) NewGRPCDispatcher() (coprocess.Dispatcher, error) {
 		return nil, err
 	}
 
-	dialOptions := []grpc.DialOption{gw.grpcCallOpts(), grpc.WithTransportCredentials(insecure.NewCredentials())}
+	dialOptions := []grpc.DialOption{
+		gw.grpcCallOpts(),
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+		grpc.WithStatsHandler(otelgrpc.NewClientHandler()),
+	}
 	authority := gw.GetConfig().CoProcessOptions.GRPCAuthority
 	if authority != "" {
 		dialOptions = append(dialOptions, grpc.WithAuthority(authority))
