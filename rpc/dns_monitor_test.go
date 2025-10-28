@@ -105,7 +105,7 @@ func TestDNSMonitorProactiveDetection(t *testing.T) {
 	// Create a mock resolver that changes IPs after first call
 	callCount := 0
 	mockResolver := &MockDNSResolver{}
-	mockResolver.LookupIPFunc = func(host string) ([]net.IP, error) {
+	mockResolver.LookupIPFunc = func(_ string) ([]net.IP, error) {
 		callCount++
 		if callCount == 1 {
 			// First call - return original IP
@@ -119,7 +119,7 @@ func TestDNSMonitorProactiveDetection(t *testing.T) {
 	// Track reconnect calls
 	reconnectCallCount := 0
 	var reconnectMu sync.Mutex
-	safeReconnectRPCClient = func(suppressRegister bool) {
+	safeReconnectRPCClient = func(_ bool) {
 		reconnectMu.Lock()
 		defer reconnectMu.Unlock()
 		reconnectCallCount++
@@ -166,7 +166,7 @@ func TestDNSMonitorNoDNSChange(t *testing.T) {
 
 	// Create a mock resolver that always returns the same IP
 	mockResolver := &MockDNSResolver{}
-	mockResolver.LookupIPFunc = func(host string) ([]net.IP, error) {
+	mockResolver.LookupIPFunc = func(_ string) ([]net.IP, error) {
 		return makeIPs("192.168.1.1"), nil
 	}
 	dnsResolver = mockResolver
@@ -174,7 +174,7 @@ func TestDNSMonitorNoDNSChange(t *testing.T) {
 	// Track reconnect calls
 	reconnectCallCount := 0
 	var reconnectMu sync.Mutex
-	safeReconnectRPCClient = func(suppressRegister bool) {
+	safeReconnectRPCClient = func(_ bool) {
 		reconnectMu.Lock()
 		defer reconnectMu.Unlock()
 		reconnectCallCount++
@@ -213,7 +213,7 @@ func TestDNSMonitorGracefulShutdown(t *testing.T) {
 
 	// Create a mock resolver
 	mockResolver := &MockDNSResolver{}
-	mockResolver.LookupIPFunc = func(host string) ([]net.IP, error) {
+	mockResolver.LookupIPFunc = func(_ string) ([]net.IP, error) {
 		return makeIPs("192.168.1.1"), nil
 	}
 	dnsResolver = mockResolver
@@ -324,7 +324,7 @@ func TestDNSMonitorEmergencyMode(t *testing.T) {
 	// Track DNS lookup calls
 	callCount := 0
 	mockResolver := &MockDNSResolver{}
-	mockResolver.LookupIPFunc = func(host string) ([]net.IP, error) {
+	mockResolver.LookupIPFunc = func(_ string) ([]net.IP, error) {
 		callCount++
 		return makeIPs("192.168.1.2"), nil // Different IP
 	}
@@ -363,7 +363,7 @@ func TestDNSMonitorInvalidConnectionString(t *testing.T) {
 	// Create a mock resolver
 	callCount := 0
 	mockResolver := &MockDNSResolver{}
-	mockResolver.LookupIPFunc = func(host string) ([]net.IP, error) {
+	mockResolver.LookupIPFunc = func(_ string) ([]net.IP, error) {
 		callCount++
 		return makeIPs("192.168.1.2"), nil
 	}
