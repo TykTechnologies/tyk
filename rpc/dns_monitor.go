@@ -155,7 +155,7 @@ func (m *DNSMonitor) checkDNS() {
 		Log.Info("DNS monitor: detected DNS change in background, triggering reconnection")
 
 		inProgress := reconnectionInProgress.Load()
-		if inProgress != nil && inProgress.(bool) {
+		if val, ok := inProgress.(bool); inProgress != nil && ok && val {
 			Log.Warning("DNS monitor: reconnection already in progress, skipping duplicate reconnection")
 			return
 		}
