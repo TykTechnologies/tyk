@@ -751,13 +751,10 @@ func (r *RPCStorageHandler) GetApiDefinitions(orgId string, tags []string) strin
 				"tags":  strings.Join(tags, ","),
 			},
 		)
-
-		if r.IsRetriableError(err) {
-			if rpc.Login() {
-				return r.GetApiDefinitions(orgId, tags)
-			}
-		}
-
+		// FuncClientSingleton already tries to call GetApiDefinitions with backoff.
+		// Callers of the "RPCStorageHandler.GetApiDefinitions" method should switch to the fallback
+		// by enabling emergency mode. See syncResourcesWithReload in the server.go file.
+		log.Warningf("RPC Handler: GetApiDefinitions() returned %s, returning empty string", err)
 		return ""
 	}
 	log.Debug("API Definitions retrieved")
