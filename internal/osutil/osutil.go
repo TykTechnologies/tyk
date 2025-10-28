@@ -40,7 +40,12 @@ func NewRoot(path string) (*Root, error) {
 func (r *Root) Ensure(relative string) (string, error) {
 	fullPath := filepath.Join(r.rootPath, relative)
 
-	if !strings.HasPrefix(fullPath, r.rootPath) {
+	rootWithSep := r.rootPath
+	if !strings.HasSuffix(rootWithSep, string(os.PathSeparator)) {
+		rootWithSep += string(os.PathSeparator)
+	}
+
+	if fullPath != r.rootPath && !strings.HasPrefix(fullPath, rootWithSep) {
 		return "", fmt.Errorf("invalid path: '%s' attempts to escape root directory", relative)
 	}
 

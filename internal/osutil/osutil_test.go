@@ -1,6 +1,7 @@
 package osutil_test
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -72,6 +73,15 @@ func TestEnsure(t *testing.T) {
 		assert.Error(t, err)
 		assert.Empty(t, fullPath)
 		assert.Contains(t, err.Error(), "attempts to escape root directory")
+	})
+
+	t.Run("PathTraversalAttack by similar name", func(t *testing.T) {
+		_, file := filepath.Split(tempDir)
+		attackFile := fmt.Sprintf("../%s-wrong", file)
+
+		ensured, err := root.Ensure(attackFile)
+		assert.Error(t, err)
+		assert.Equal(t, "", ensured)
 	})
 }
 
