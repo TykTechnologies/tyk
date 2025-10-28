@@ -3,7 +3,6 @@ package gateway
 import (
 	"encoding/json"
 	"errors"
-	"fmt"
 	"io/ioutil"
 	"net/http"
 	"os"
@@ -183,7 +182,8 @@ func (gw *Gateway) LoadPoliciesFromDashboard(endpoint, secret string) (map[strin
 
 	for _, p := range list.Message {
 		if !ensurePolicyId(&p.Policy) {
-			return nil, fmt.Errorf("invalid policy _id=%q id=%q", p.MID, p.ID)
+			log.Errorf("invalid policy %#v", p)
+			continue
 		}
 
 		if _, ok := policies[p.ID]; ok {
