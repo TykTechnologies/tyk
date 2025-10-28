@@ -2,7 +2,7 @@ package coprocess
 
 import (
 	"context"
-	
+
 	"github.com/TykTechnologies/tyk/apidef"
 )
 

@@ -45,7 +45,7 @@ func (d *PythonDispatcher) Dispatch(object *coprocess.Object) (*coprocess.Object
 }
 
 // DispatchWithContext takes a context and CoProcessMessage and sends it to the CP.
-func (d *PythonDispatcher) DispatchWithContext(ctx context.Context, object *coprocess.Object) (*coprocess.Object, error) {
+func (d *PythonDispatcher) DispatchWithContext(_ context.Context, object *coprocess.Object) (*coprocess.Object, error) {
 	// Prepare the PB object:
 	objectMsg, err := proto.Marshal(object)
 	if err != nil {
