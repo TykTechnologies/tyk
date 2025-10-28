@@ -52,6 +52,7 @@ func (a *Record) WithRequest(req *http.Request, latency analytics.Latency) *Reco
 	a.fields["client_ip"] = request.RealIP(req)
 	a.fields["host"] = req.Host
 	a.fields["latency_total"] = latency.Total
+	a.fields["latency_gateway"] = latency.Gateway
 	a.fields["method"] = req.Method
 	a.fields["path"] = req.URL.Path
 	a.fields["protocol"] = req.Proto

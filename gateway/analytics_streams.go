@@ -152,6 +152,7 @@ func (s *StreamAnalyticsResponseWriter) Write(bytes []byte) (int, error) {
 	latency := analytics.Latency{
 		Total:    int64(totalMillisecond),
 		Upstream: int64(totalMillisecond),
+		Gateway:  0,
 	}
 
 	s.recorder.PrepareRecord(s.r)
