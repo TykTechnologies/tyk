@@ -754,7 +754,7 @@ func (r *RPCStorageHandler) GetApiDefinitions(orgId string, tags []string) strin
 		// FuncClientSingleton already tries to call GetApiDefinitions with backoff.
 		// Callers of the "RPCStorageHandler.GetApiDefinitions" method should switch to the fallback
 		// by enabling emergency mode. See syncResourcesWithReload in the server.go file.
-		log.Warningf("RPC Handler: GetApiDefinitions() returned %s, returning empty string", err)
+		log.Debugf("RPC Handler: GetApiDefinitions() returned %s, returning empty string", err)
 		return ""
 	}
 	log.Debug("API Definitions retrieved")
