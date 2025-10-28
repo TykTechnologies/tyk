@@ -781,6 +781,11 @@ func TestProcessKeySpaceChanges_UserKeyReset(t *testing.T) {
 }
 
 func TestGetApiDefinitions_Fails_With_Timeout(t *testing.T) {
+	wait := make(chan struct{})
+	defer func() {
+		close(wait)
+	}()
+
 	dispatcher := gorpc.NewDispatcher()
 	dispatcher.AddFunc("Login", func(_, _ string) bool {
 		return true
@@ -789,7 +794,7 @@ func TestGetApiDefinitions_Fails_With_Timeout(t *testing.T) {
 		return nil
 	})
 	dispatcher.AddFunc("GetApiDefinitions", func(_ string, _ interface{}) (string, error) {
-		time.Sleep(2 * time.Second) // call_timeout = 1s
+		<-wait // wait until the defer method is called
 		return "sample-response", nil
 	})
 
@@ -840,7 +845,6 @@ func TestGetApiDefinitions(t *testing.T) {
 		return nil
 	})
 	dispatcher.AddFunc("GetApiDefinitions", func(_ string, _ interface{}) (string, error) {
-		time.Sleep(100 * time.Millisecond) // call_timeout = 1s
 		return GetApiDefinitionsResponse, nil
 	})
 
