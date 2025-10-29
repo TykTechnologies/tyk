@@ -753,13 +753,10 @@ func (r *RPCStorageHandler) GetApiDefinitions(orgId string, tags []string) strin
 				"tags":  strings.Join(tags, ","),
 			},
 		)
-
-		if r.IsRetriableError(err) {
-			if rpc.Login() {
-				return r.GetApiDefinitions(orgId, tags)
-			}
-		}
-
+		// FuncClientSingleton already tries to call GetApiDefinitions with backoff.
+		// Callers of the "RPCStorageHandler.GetApiDefinitions" method should switch to the fallback
+		// by enabling emergency mode. See syncResourcesWithReload in the server.go file.
+		log.Debugf("RPC Handler: GetApiDefinitions() returned %s, returning empty string", err)
 		return ""
 	}
 	log.Debug("API Definitions retrieved")
@@ -784,12 +781,10 @@ func (r *RPCStorageHandler) GetPolicies(orgId string) string {
 			},
 		)
 
-		if r.IsRetriableError(err) {
-			if rpc.Login() {
-				return r.GetPolicies(orgId)
-			}
-		}
-
+		// FuncClientSingleton already tries to call GetPolicies with backoff.
+		// Callers of the "RPCStorageHandler.GetPolicies" method should switch to the fallback
+		// by enabling emergency mode. See syncResourcesWithReload in the server.go file.
+		log.Debugf("RPC Handler: GetPolicies() returned %s, returning empty string", err)
 		return ""
 	}
 

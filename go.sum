@@ -828,8 +828,8 @@ github.com/TykTechnologies/opentelemetry v0.0.22 h1:dKYUbUVe6M23grue2kxNMDK7KL5V
 github.com/TykTechnologies/opentelemetry v0.0.22/go.mod h1:O5Fh2KKeno6IEHvIhWlmpf+MHSj5sjSGCpxbo2nqSaU=
 github.com/TykTechnologies/storage v1.2.2 h1:NfBIpnMu9cPMrLxFrKIVzQHtTsvXte7/VdmFC0QrSfw=
 github.com/TykTechnologies/storage v1.2.2/go.mod h1:x4/SA+yiTmYkOyhQy18eNLgGJR4G6/kxX6qXBpzFmtw=
-github.com/TykTechnologies/tyk-pump v1.13.0-rc2.0.20251020155521-533b425aa5e0 h1:7aQ+aY8m+9OTOTwieEVK4s9WSy9SZ/0NRmsccd9Mx8U=
-github.com/TykTechnologies/tyk-pump v1.13.0-rc2.0.20251020155521-533b425aa5e0/go.mod h1:M1tsq49fL5mz3Wpir6fGwVLZ2dP4QFzhIBlFZHACzqw=
+github.com/TykTechnologies/tyk-pump v1.13.0-rc2.0.20251023125113-bc7641d42e63 h1:6n4yFtsBhcQayXzY8AdTKlmaJGw2Z3Uqm6ARIETmiVA=
+github.com/TykTechnologies/tyk-pump v1.13.0-rc2.0.20251023125113-bc7641d42e63/go.mod h1:oTgH2TL6Qjon1Sh3PmcijwOxLetcyu+7DohJr4VwM+c=
 github.com/agnivade/levenshtein v1.1.1 h1:QY8M92nrzkmr798gCo3kmMyqXFzdQVpxLlGPRBij0P8=
 github.com/agnivade/levenshtein v1.1.1/go.mod h1:veldBMzWxcCG2ZvUTKD2kJNRdCk5hVbJomOvKkmgYbo=
 github.com/ajstarks/deck v0.0.0-20200831202436-30c9fc6549a9/go.mod h1:JynElWSGnm/4RlzPXRlREEwqTHAN3T56Bv2ITsFT3gY=
@@ -3331,8 +3331,8 @@ gopkg.in/yaml.v3 v3.0.0-20210107192922-496545a6307b/go.mod h1:K4uyk7z7BCEPqu6E+C
 gopkg.in/yaml.v3 v3.0.0/go.mod h1:K4uyk7z7BCEPqu6E+C64Yfv1cQ7kz7rIZviUmN+EgEM=
 gopkg.in/yaml.v3 v3.0.1 h1:fxVm/GzAzEWqLHuvctI91KS9hhNmmWOoWu0XTYJS7CA=
 gopkg.in/yaml.v3 v3.0.1/go.mod h1:K4uyk7z7BCEPqu6E+C64Yfv1cQ7kz7rIZviUmN+EgEM=
-gorm.io/gorm v1.25.11 h1:/Wfyg1B/je1hnDx3sMkX+gAlxrlZpn6X0BXRlwXlvHg=
-gorm.io/gorm v1.25.11/go.mod h1:xh7N7RHfYlNc5EmcI/El95gXusucDrQnHXe0+CgWcLQ=
+gorm.io/gorm v1.30.0 h1:qbT5aPv1UH8gI99OsRlvDToLxW5zR7FzS9acZDOZcgs=
+gorm.io/gorm v1.30.0/go.mod h1:8Z33v652h4//uMA76KjeDH8mJXPm1QNCYrMeatR0DOE=
 gotest.tools/v3 v3.5.2 h1:7koQfIKdy+I8UTetycgUqXWSDwpgv193Ka+qRsmBY8Q=
 gotest.tools/v3 v3.5.2/go.mod h1:LtdLGcnqToBH83WByAAi/wiwSFCArdFIUV/xxN4pcjA=
 honnef.co/go/tools v0.0.0-20190102054323-c2f93a96b099/go.mod h1:rf3lG4BRIbNafJWhAfAdb/ePZxsR/4RtNHQocxwk9r4=
