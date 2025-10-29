@@ -12,12 +12,15 @@ import (
 
 // DNSMonitor handles background DNS monitoring for worker gateways
 type DNSMonitor struct {
-	enabled       bool
-	checkInterval time.Duration
-	connectionStr string
-	ctx           context.Context
-	cancel        context.CancelFunc
-	stopComplete  chan struct{}
+	enabled           bool
+	baseCheckInterval time.Duration // T0 - minimum interval (e.g., 30s)
+	maxCheckInterval  time.Duration // Tmax - maximum interval (e.g., 10min)
+	currentInterval   time.Duration // Current interval (grows with exponential backoff)
+	connectionStr     string
+	ctx               context.Context
+	cancel            context.CancelFunc
+	stopComplete      chan struct{}
+	intervalMutex     sync.Mutex // Protects currentInterval
 }
 
 var (
@@ -55,21 +58,33 @@ func StartDNSMonitor(enabled bool, checkInterval int, connectionString string) {
 		return
 	}
 
-	// Set default interval if not specified or invalid
+	// Validate and set interval with minimum threshold
+	const minInterval = 10 // Minimum 10 seconds to prevent DNS server overload
 	if checkInterval <= 0 {
 		checkInterval = 30 // Default to 30 seconds
+	} else if checkInterval < minInterval {
+		Log.WithFields(logrus.Fields{
+			"requested_interval": checkInterval,
+			"minimum_interval":   minInterval,
+		}).Warning("DNS monitor: check interval too low, using minimum")
+		checkInterval = minInterval
 	}
 
 	// Create context for lifecycle management
 	ctx, cancel := context.WithCancel(context.Background())
 
+	baseInterval := time.Duration(checkInterval) * time.Second
+	maxInterval := 10 * time.Minute
+
 	dnsMonitor = &DNSMonitor{
-		enabled:       true,
-		checkInterval: time.Duration(checkInterval) * time.Second,
-		connectionStr: connectionString,
-		ctx:           ctx,
-		cancel:        cancel,
-		stopComplete:  make(chan struct{}),
+		enabled:           true,
+		baseCheckInterval: baseInterval,
+		maxCheckInterval:  maxInterval,
+		currentInterval:   baseInterval, // Start with base interval
+		connectionStr:     connectionString,
+		ctx:               ctx,
+		cancel:            cancel,
+		stopComplete:      make(chan struct{}),
 	}
 
 	Log.WithFields(logrus.Fields{
@@ -112,14 +127,19 @@ func stopDNSMonitorInternal() {
 	dnsMonitor = nil
 }
 
-// monitorLoop is the main loop that periodically checks DNS
+// monitorLoop is the main loop that periodically checks DNS with exponential backoff
 func (m *DNSMonitor) monitorLoop() {
 	defer close(m.stopComplete)
 
-	ticker := time.NewTicker(m.checkInterval)
+	// Start with base interval
+	m.intervalMutex.Lock()
+	currentInterval := m.currentInterval
+	m.intervalMutex.Unlock()
+
+	ticker := time.NewTicker(currentInterval)
 	defer ticker.Stop()
 
-	Log.Debug("DNS monitor loop started")
+	Log.WithField("initial_interval", currentInterval).Debug("DNS monitor loop started with exponential backoff")
 
 	for {
 		select {
@@ -127,30 +147,53 @@ func (m *DNSMonitor) monitorLoop() {
 			Log.Debug("DNS monitor loop received shutdown signal")
 			return
 		case <-ticker.C:
-			m.checkDNS()
+			changed := m.checkDNS()
+
+			// Update interval based on whether DNS changed
+			m.intervalMutex.Lock()
+			if changed {
+				// Reset to base interval when change detected
+				m.currentInterval = m.baseCheckInterval
+				Log.WithField("new_interval", m.currentInterval).Info("DNS monitor: DNS changed, reset interval to base")
+			} else {
+				// Double the interval (exponential backoff), but cap at max
+				newInterval := m.currentInterval * 2
+				if newInterval > m.maxCheckInterval {
+					newInterval = m.maxCheckInterval
+				}
+				if newInterval != m.currentInterval {
+					m.currentInterval = newInterval
+					Log.WithField("new_interval", m.currentInterval).Debug("DNS monitor: no change, increased check interval")
+				}
+			}
+			currentInterval = m.currentInterval
+			m.intervalMutex.Unlock()
+
+			// Reset ticker with new interval
+			ticker.Reset(currentInterval)
 		}
 	}
 }
 
 // checkDNS performs the DNS check and reconnects if needed
-func (m *DNSMonitor) checkDNS() {
-	// Don't check if we're in emergency mode
-	if values.GetEmergencyMode() {
-		Log.Debug("DNS monitor: skipping check (emergency mode active)")
-		return
-	}
-
+// Returns true if DNS changed, false otherwise
+func (m *DNSMonitor) checkDNS() bool {
 	// Extract hostname from connection string
 	host, _, err := net.SplitHostPort(m.connectionStr)
 	if err != nil {
 		Log.WithError(err).Error("DNS monitor: failed to parse connection string")
-		return
+		return false
 	}
 
 	Log.WithField("host", host).Debug("DNS monitor: performing background DNS check")
 
 	// Check if DNS has changed (pass monitor context for cancellation support)
 	changed := updateResolvedIPs(m.ctx, host, dnsResolver)
+
+	if !changed {
+		Log.Debug("DNS monitor: no DNS changes detected")
+		return false
+	}
 
 	if changed {
 		Log.Info("DNS monitor: detected DNS change in background, triggering reconnection")
@@ -159,7 +202,7 @@ func (m *DNSMonitor) checkDNS() {
 		// If already true, another reconnection is in progress, so skip
 		if !reconnectionInProgress.CompareAndSwap(false, true) {
 			Log.Warning("DNS monitor: reconnection already in progress, skipping duplicate reconnection")
-			return
+			return true // DNS did change, even though we skipped reconnection
 		}
 
 		// Check rate limiting - prevent reconnections within 60 seconds
@@ -175,7 +218,7 @@ func (m *DNSMonitor) checkDNS() {
 				"time_since_last": timeSinceLastReconnect.Seconds(),
 				"rate_limit":      rateLimitWindow.Seconds(),
 			}).Warning("DNS monitor: reconnection rate limited, skipping to prevent flapping")
-			return
+			return true // DNS did change, even though we skipped reconnection
 		}
 
 		lastReconnectTime = time.Now()
@@ -190,9 +233,11 @@ func (m *DNSMonitor) checkDNS() {
 			safeReconnectRPCClient(false)
 			Log.Info("DNS monitor: reconnection completed")
 		}()
-	} else {
-		Log.Debug("DNS monitor: no DNS changes detected")
+
+		return true // DNS changed and reconnection initiated
 	}
+
+	return false
 }
 
 // IsDNSMonitorRunning returns whether the DNS monitor is currently running

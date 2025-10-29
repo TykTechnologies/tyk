@@ -80,8 +80,36 @@ func TestDNSMonitorDefaultInterval(t *testing.T) {
 	}
 
 	expectedInterval := 30 * time.Second
-	if dnsMonitor.checkInterval != expectedInterval {
-		t.Errorf("DNS monitor interval should be %v, got %v", expectedInterval, dnsMonitor.checkInterval)
+	if dnsMonitor.baseCheckInterval != expectedInterval {
+		t.Errorf("DNS monitor base interval should be %v, got %v", expectedInterval, dnsMonitor.baseCheckInterval)
+	}
+}
+
+// TestDNSMonitorMinimumInterval tests that minimum interval is enforced
+func TestDNSMonitorMinimumInterval(t *testing.T) {
+	// Clean up after test
+	defer StopDNSMonitor()
+
+	// Try to start monitor with too-low interval (1 second)
+	StartDNSMonitor(true, 1, "example.com:8080")
+
+	// Verify monitor is running
+	if !IsDNSMonitorRunning() {
+		t.Error("DNS monitor should be running with minimum interval")
+	}
+
+	// Get the monitor instance to check interval was raised to minimum
+	dnsMonitorLock.Lock()
+	defer dnsMonitorLock.Unlock()
+
+	if dnsMonitor == nil {
+		t.Error("DNS monitor should exist")
+		return
+	}
+
+	minInterval := 10 * time.Second
+	if dnsMonitor.baseCheckInterval != minInterval {
+		t.Errorf("DNS monitor should enforce minimum interval of %v, got %v", minInterval, dnsMonitor.baseCheckInterval)
 	}
 }
 
@@ -296,29 +324,35 @@ func TestDNSMonitorMultipleStarts(t *testing.T) {
 	dnsMonitorLock.Lock()
 	defer dnsMonitorLock.Unlock()
 
-	if dnsMonitor.checkInterval != 3*time.Second {
-		t.Errorf("Expected interval 3s, got %v", dnsMonitor.checkInterval)
+	// Note: 3s is below minimum (10s), so should be raised to 10s
+	expectedInterval := 10 * time.Second
+	if dnsMonitor.baseCheckInterval != expectedInterval {
+		t.Errorf("Expected interval %v (minimum enforced), got %v", expectedInterval, dnsMonitor.baseCheckInterval)
 	}
 }
 
-// TestDNSMonitorEmergencyMode tests that monitor skips checks in emergency mode
+// TestDNSMonitorEmergencyMode tests that monitor continues checking DNS even in emergency mode
+// This allows recovery when DNS change caused the emergency
 func TestDNSMonitorEmergencyMode(t *testing.T) {
 	// Save original values and restore after test
 	originalResolver := dnsResolver
 	originalIPs := lastResolvedIPs
 	originalEmergencyMode := values.GetEmergencyMode()
+	originalSafeReconnect := safeReconnectRPCClient
 
 	defer func() {
 		dnsResolver = originalResolver
 		lastResolvedIPs = originalIPs
 		values.SetEmergencyMode(originalEmergencyMode)
+		safeReconnectRPCClient = originalSafeReconnect
 		StopDNSMonitor()
+		reconnectionInProgress.Store(false)
 	}()
 
 	// Set initial IPs
 	lastResolvedIPs = []string{"192.168.1.1"}
 
-	// Set emergency mode
+	// Set emergency mode to simulate degraded state
 	values.SetEmergencyMode(true)
 
 	// Track DNS lookup calls
@@ -326,9 +360,18 @@ func TestDNSMonitorEmergencyMode(t *testing.T) {
 	mockResolver := &MockDNSResolver{}
 	mockResolver.LookupIPFunc = func(_ string) ([]net.IP, error) {
 		callCount++
-		return makeIPs("192.168.1.2"), nil // Different IP
+		return makeIPs("192.168.1.2"), nil // Different IP - simulates DNS change that could resolve emergency
 	}
 	dnsResolver = mockResolver
+
+	// Track reconnection attempts
+	reconnectCalled := false
+	var reconnectMu sync.Mutex
+	safeReconnectRPCClient = func(_ bool) {
+		reconnectMu.Lock()
+		reconnectCalled = true
+		reconnectMu.Unlock()
+	}
 
 	// Start monitor
 	StartDNSMonitor(true, 1, "example.com:8080")
@@ -339,9 +382,16 @@ func TestDNSMonitorEmergencyMode(t *testing.T) {
 	// Stop monitor
 	StopDNSMonitor()
 
-	// Verify DNS was NOT checked (emergency mode should skip checks)
-	if callCount > 0 {
-		t.Errorf("DNS should not be checked in emergency mode, but was checked %d times", callCount)
+	// Verify DNS WAS checked even in emergency mode
+	if callCount == 0 {
+		t.Error("DNS should be checked even in emergency mode to allow recovery from DNS-change-induced emergencies")
+	}
+
+	// Verify reconnection was triggered (could pull us out of emergency)
+	reconnectMu.Lock()
+	defer reconnectMu.Unlock()
+	if !reconnectCalled {
+		t.Error("Reconnection should be triggered when DNS changes, even in emergency mode")
 	}
 }
 
@@ -593,4 +643,167 @@ func TestDNSMonitorRateLimitingSurvivesRestart(t *testing.T) {
 	if finalCount > 1 {
 		t.Errorf("Expected rate limiting to survive restart (max 1 reconnection), but got %d", finalCount)
 	}
+}
+
+// TestDNSMonitorExponentialBackoff tests that check interval grows exponentially when DNS is stable
+func TestDNSMonitorExponentialBackoff(t *testing.T) {
+	// Save original values and restore after test
+	originalResolver := dnsResolver
+	originalIPs := lastResolvedIPs
+
+	defer func() {
+		dnsResolver = originalResolver
+		lastResolvedIPs = originalIPs
+		StopDNSMonitor()
+	}()
+
+	// Set initial IPs
+	lastResolvedIPs = []string{"192.168.1.1"}
+
+	// Create a mock resolver that returns same IPs (no DNS change)
+	mockResolver := &MockDNSResolver{}
+	mockResolver.LookupIPFunc = func(_ string) ([]net.IP, error) {
+		return makeIPs("192.168.1.1"), nil // Always same
+	}
+	dnsResolver = mockResolver
+
+	// Start monitor with 1 second base interval (for faster testing)
+	StartDNSMonitor(true, 1, "example.com:8080")
+
+	// Get monitor instance to check intervals
+	dnsMonitorLock.Lock()
+	if dnsMonitor == nil {
+		dnsMonitorLock.Unlock()
+		t.Fatal("DNS monitor should be running")
+	}
+
+	// Verify initial interval is base interval
+	dnsMonitor.intervalMutex.Lock()
+	initialInterval := dnsMonitor.currentInterval
+	baseInterval := dnsMonitor.baseCheckInterval
+	maxInterval := dnsMonitor.maxCheckInterval
+	dnsMonitor.intervalMutex.Unlock()
+	dnsMonitorLock.Unlock()
+
+	if initialInterval != baseInterval {
+		t.Errorf("Initial interval should be %v, got %v", baseInterval, initialInterval)
+	}
+
+	if maxInterval != 10*time.Minute {
+		t.Errorf("Max interval should be 10 minutes, got %v", maxInterval)
+	}
+
+	// Wait for a few checks and verify interval grows
+	time.Sleep(1500 * time.Millisecond) // After first check
+
+	dnsMonitorLock.Lock()
+	dnsMonitor.intervalMutex.Lock()
+	intervalAfterFirstCheck := dnsMonitor.currentInterval
+	dnsMonitor.intervalMutex.Unlock()
+	dnsMonitorLock.Unlock()
+
+	// Should have doubled: 1s → 2s
+	expectedAfterFirst := 2 * time.Second
+	if intervalAfterFirstCheck != expectedAfterFirst {
+		t.Errorf("After first check, interval should be %v, got %v", expectedAfterFirst, intervalAfterFirstCheck)
+	}
+
+	// Wait for next check (should happen at 2s interval)
+	time.Sleep(2500 * time.Millisecond)
+
+	dnsMonitorLock.Lock()
+	dnsMonitor.intervalMutex.Lock()
+	intervalAfterSecondCheck := dnsMonitor.currentInterval
+	dnsMonitor.intervalMutex.Unlock()
+	dnsMonitorLock.Unlock()
+
+	// Should have doubled again: 2s → 4s
+	expectedAfterSecond := 4 * time.Second
+	if intervalAfterSecondCheck != expectedAfterSecond {
+		t.Errorf("After second check, interval should be %v, got %v", expectedAfterSecond, intervalAfterSecondCheck)
+	}
+
+	// Stop monitor
+	StopDNSMonitor()
+
+	t.Logf("Exponential backoff verified: %v → %v → %v", baseInterval, intervalAfterFirstCheck, intervalAfterSecondCheck)
+}
+
+// TestDNSMonitorBackoffResetOnChange tests that interval resets to base when DNS changes
+func TestDNSMonitorBackoffResetOnChange(t *testing.T) {
+	// Save original values and restore after test
+	originalResolver := dnsResolver
+	originalIPs := lastResolvedIPs
+	originalSafeReconnect := safeReconnectRPCClient
+
+	defer func() {
+		dnsResolver = originalResolver
+		lastResolvedIPs = originalIPs
+		safeReconnectRPCClient = originalSafeReconnect
+		StopDNSMonitor()
+		reconnectionInProgress.Store(false)
+	}()
+
+	// Set initial IPs
+	lastResolvedIPs = []string{"192.168.1.1"}
+
+	// Create a mock resolver that changes behavior
+	shouldChange := false
+	var changeMu sync.Mutex
+	mockResolver := &MockDNSResolver{}
+	mockResolver.LookupIPFunc = func(_ string) ([]net.IP, error) {
+		changeMu.Lock()
+		defer changeMu.Unlock()
+		if shouldChange {
+			return makeIPs("192.168.1.2"), nil // Changed
+		}
+		return makeIPs("192.168.1.1"), nil // Same
+	}
+	dnsResolver = mockResolver
+
+	// Mock reconnect to avoid actual reconnection
+	safeReconnectRPCClient = func(_ bool) {
+		// Do nothing
+	}
+
+	// Start monitor with 1 second base interval
+	StartDNSMonitor(true, 1, "example.com:8080")
+
+	// Wait for interval to grow (1s → 2s)
+	time.Sleep(1500 * time.Millisecond)
+
+	dnsMonitorLock.Lock()
+	dnsMonitor.intervalMutex.Lock()
+	intervalBeforeChange := dnsMonitor.currentInterval
+	dnsMonitor.intervalMutex.Unlock()
+	dnsMonitorLock.Unlock()
+
+	if intervalBeforeChange != 2*time.Second {
+		t.Logf("Warning: interval before change is %v, expected 2s", intervalBeforeChange)
+	}
+
+	// Now trigger a DNS change
+	changeMu.Lock()
+	shouldChange = true
+	changeMu.Unlock()
+
+	// Wait for next check to detect change and reset interval
+	time.Sleep(2500 * time.Millisecond)
+
+	dnsMonitorLock.Lock()
+	dnsMonitor.intervalMutex.Lock()
+	intervalAfterChange := dnsMonitor.currentInterval
+	baseInterval := dnsMonitor.baseCheckInterval
+	dnsMonitor.intervalMutex.Unlock()
+	dnsMonitorLock.Unlock()
+
+	// Should have reset to base interval
+	if intervalAfterChange != baseInterval {
+		t.Errorf("After DNS change, interval should reset to base (%v), got %v", baseInterval, intervalAfterChange)
+	}
+
+	// Stop monitor
+	StopDNSMonitor()
+
+	t.Logf("Interval reset verified: grew to %v, then reset to %v after DNS change", intervalBeforeChange, intervalAfterChange)
 }
