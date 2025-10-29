@@ -189,57 +189,61 @@ func (m *DNSMonitor) checkDNS() bool {
 
 	Log.WithField("host", host).Debug("DNS monitor: performing background DNS check")
 
-	// Check if DNS has changed (pass monitor context for cancellation support)
-	changed := updateResolvedIPs(m.ctx, host, dnsResolver)
-
-	if !changed {
-		Log.Debug("DNS monitor: no DNS changes detected")
+	// Check if DNS has changed WITHOUT updating cache yet (pass monitor context for cancellation support)
+	// We only update cached IPs after successfully acquiring the reconnection lock
+	changed, newIPs, err := checkDNSChanged(m.ctx, host, dnsResolver)
+	if err != nil || !changed {
+		if !changed {
+			Log.Debug("DNS monitor: no DNS changes detected")
+		}
 		return false
 	}
 
-	if changed {
-		Log.Info("DNS monitor: detected DNS change in background, triggering reconnection")
+	Log.Info("DNS monitor: detected DNS change in background, triggering reconnection")
 
-		// Try to atomically set reconnection flag from false to true
-		// If already true, another reconnection is in progress, so skip
-		if !reconnectionInProgress.CompareAndSwap(false, true) {
-			Log.Warning("DNS monitor: reconnection already in progress, skipping duplicate reconnection")
-			return true // DNS did change, even though we skipped reconnection
-		}
-
-		// Check rate limiting - prevent reconnections within 60 seconds
-		// Use global rate-limiting state that survives monitor restarts
-		lastReconnectMutex.Lock()
-		timeSinceLastReconnect := time.Since(lastReconnectTime)
-		rateLimitWindow := 60 * time.Second
-
-		if timeSinceLastReconnect < rateLimitWindow && !lastReconnectTime.IsZero() {
-			lastReconnectMutex.Unlock()
-			reconnectionInProgress.Store(false)
-			Log.WithFields(logrus.Fields{
-				"time_since_last": timeSinceLastReconnect.Seconds(),
-				"rate_limit":      rateLimitWindow.Seconds(),
-			}).Warning("DNS monitor: reconnection rate limited, skipping to prevent flapping")
-			return true // DNS did change, even though we skipped reconnection
-		}
-
-		lastReconnectTime = time.Now()
-		lastReconnectMutex.Unlock()
-
-		// Reconnect in a separate goroutine to avoid deadlock
-		go func() {
-			defer func() {
-				reconnectionInProgress.Store(false)
-			}()
-
-			safeReconnectRPCClient(false)
-			Log.Info("DNS monitor: reconnection completed")
-		}()
-
-		return true // DNS changed and reconnection initiated
+	// Try to atomically set reconnection flag from false to true
+	// If already true, another reconnection is in progress, so skip
+	// IMPORTANT: Don't update cache if we can't acquire the lock
+	if !reconnectionInProgress.CompareAndSwap(false, true) {
+		Log.Warning("DNS monitor: reconnection already in progress, skipping duplicate reconnection")
+		// Don't update cached IPs since we're not reconnecting
+		return true // DNS did change, even though we skipped reconnection
 	}
 
-	return false
+	// Check rate limiting - prevent reconnections within 60 seconds
+	// Use global rate-limiting state that survives monitor restarts
+	lastReconnectMutex.Lock()
+	timeSinceLastReconnect := time.Since(lastReconnectTime)
+	rateLimitWindow := 60 * time.Second
+
+	if timeSinceLastReconnect < rateLimitWindow && !lastReconnectTime.IsZero() {
+		lastReconnectMutex.Unlock()
+		reconnectionInProgress.Store(false)
+		Log.WithFields(logrus.Fields{
+			"time_since_last": timeSinceLastReconnect.Seconds(),
+			"rate_limit":      rateLimitWindow.Seconds(),
+		}).Warning("DNS monitor: reconnection rate limited, skipping to prevent flapping")
+		// Don't update cached IPs since we're not reconnecting
+		return true // DNS did change, even though we skipped reconnection
+	}
+
+	lastReconnectTime = time.Now()
+	lastReconnectMutex.Unlock()
+
+	// Update cached IPs now that we've acquired the lock and passed rate limiting
+	updateCachedIPs(newIPs)
+
+	// Reconnect in a separate goroutine to avoid deadlock
+	go func() {
+		defer func() {
+			reconnectionInProgress.Store(false)
+		}()
+
+		safeReconnectRPCClient(false)
+		Log.Info("DNS monitor: reconnection completed")
+	}()
+
+	return true // DNS changed and reconnection initiated
 }
 
 // IsDNSMonitorRunning returns whether the DNS monitor is currently running
