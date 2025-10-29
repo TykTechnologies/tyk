@@ -34,6 +34,9 @@ var (
 	// Rate limiting state - global to survive monitor restarts during reconnection
 	lastReconnectTime  time.Time
 	lastReconnectMutex sync.Mutex
+
+	// minCheckInterval is the minimum interval in seconds (can be overridden in tests)
+	minCheckInterval = 10
 )
 
 // StartDNSMonitor initializes and starts the background DNS monitor
@@ -59,15 +62,14 @@ func StartDNSMonitor(enabled bool, checkInterval int, connectionString string) {
 	}
 
 	// Validate and set interval with minimum threshold
-	const minInterval = 10 // Minimum 10 seconds to prevent DNS server overload
 	if checkInterval <= 0 {
 		checkInterval = 30 // Default to 30 seconds
-	} else if checkInterval < minInterval {
+	} else if checkInterval < minCheckInterval {
 		Log.WithFields(logrus.Fields{
 			"requested_interval": checkInterval,
-			"minimum_interval":   minInterval,
+			"minimum_interval":   minCheckInterval,
 		}).Warning("DNS monitor: check interval too low, using minimum")
-		checkInterval = minInterval
+		checkInterval = minCheckInterval
 	}
 
 	// Create context for lifecycle management

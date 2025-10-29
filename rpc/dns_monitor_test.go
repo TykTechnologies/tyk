@@ -119,13 +119,18 @@ func TestDNSMonitorProactiveDetection(t *testing.T) {
 	originalResolver := dnsResolver
 	originalIPs := lastResolvedIPs
 	originalSafeReconnect := safeReconnectRPCClient
+	originalMinInterval := minCheckInterval
 
 	defer func() {
 		dnsResolver = originalResolver
 		lastResolvedIPs = originalIPs
 		safeReconnectRPCClient = originalSafeReconnect
+		minCheckInterval = originalMinInterval
 		StopDNSMonitor()
 	}()
+
+	// Set minimum interval to 1 second for faster testing
+	minCheckInterval = 1
 
 	// Set initial IPs
 	lastResolvedIPs = []string{"192.168.1.1"}
@@ -153,11 +158,12 @@ func TestDNSMonitorProactiveDetection(t *testing.T) {
 		reconnectCallCount++
 	}
 
-	// Start monitor with very short interval for testing
-	StartDNSMonitor(true, 1, "example.com:8080") // 1 second interval
+	// Start monitor with 1 second interval (minimum is now 1s for testing)
+	StartDNSMonitor(true, 1, "example.com:8080")
 
 	// Wait for at least 2 check cycles
-	time.Sleep(2500 * time.Millisecond)
+	// First check at 1s, then interval doubles to 2s, second check at 3s
+	time.Sleep(3500 * time.Millisecond)
 
 	// Stop monitor
 	StopDNSMonitor()
@@ -339,18 +345,28 @@ func TestDNSMonitorEmergencyMode(t *testing.T) {
 	originalIPs := lastResolvedIPs
 	originalEmergencyMode := values.GetEmergencyMode()
 	originalSafeReconnect := safeReconnectRPCClient
+	originalLastReconnectTime := lastReconnectTime
+	originalMinInterval := minCheckInterval
 
 	defer func() {
 		dnsResolver = originalResolver
 		lastResolvedIPs = originalIPs
 		values.SetEmergencyMode(originalEmergencyMode)
 		safeReconnectRPCClient = originalSafeReconnect
+		lastReconnectTime = originalLastReconnectTime
+		minCheckInterval = originalMinInterval
 		StopDNSMonitor()
 		reconnectionInProgress.Store(false)
 	}()
 
-	// Set initial IPs
+	// Set minimum interval to 1 second for faster testing
+	minCheckInterval = 1
+
+	// Set initial IPs and reset rate limiting
 	lastResolvedIPs = []string{"192.168.1.1"}
+	lastReconnectMutex.Lock()
+	lastReconnectTime = time.Time{} // Reset to zero to allow reconnection
+	lastReconnectMutex.Unlock()
 
 	// Set emergency mode to simulate degraded state
 	values.SetEmergencyMode(true)
@@ -373,11 +389,12 @@ func TestDNSMonitorEmergencyMode(t *testing.T) {
 		reconnectMu.Unlock()
 	}
 
-	// Start monitor
+	// Start monitor with 1 second interval
 	StartDNSMonitor(true, 1, "example.com:8080")
 
-	// Wait for a few check cycles
-	time.Sleep(2500 * time.Millisecond)
+	// Wait for at least 2 check cycles
+	// First check at 1s, then interval doubles to 2s, second check at 3s
+	time.Sleep(3500 * time.Millisecond)
 
 	// Stop monitor
 	StopDNSMonitor()
@@ -401,17 +418,27 @@ func TestDNSMonitorConcurrentReconnections(t *testing.T) {
 	originalResolver := dnsResolver
 	originalIPs := lastResolvedIPs
 	originalSafeReconnect := safeReconnectRPCClient
+	originalLastReconnectTime := lastReconnectTime
+	originalMinInterval := minCheckInterval
 
 	defer func() {
 		dnsResolver = originalResolver
 		lastResolvedIPs = originalIPs
 		safeReconnectRPCClient = originalSafeReconnect
+		lastReconnectTime = originalLastReconnectTime
+		minCheckInterval = originalMinInterval
 		StopDNSMonitor()
 		reconnectionInProgress.Store(false)
 	}()
 
-	// Set initial IPs
+	// Set minimum interval to 1 second for faster testing
+	minCheckInterval = 1
+
+	// Set initial IPs and reset rate limiting
 	lastResolvedIPs = []string{"192.168.1.1"}
+	lastReconnectMutex.Lock()
+	lastReconnectTime = time.Time{} // Reset to zero to allow reconnection
+	lastReconnectMutex.Unlock()
 
 	// Create a mock resolver that always returns different IPs (DNS always changing)
 	mockResolver := &MockDNSResolver{}
@@ -441,13 +468,19 @@ func TestDNSMonitorConcurrentReconnections(t *testing.T) {
 		time.Sleep(2 * time.Second)
 	}
 
-	// Start monitor with very short interval (500ms) to trigger multiple checks quickly
+	// Start monitor with 1 second interval
 	StartDNSMonitor(true, 1, "example.com:8080")
 
-	// Wait for first reconnection to start
-	<-reconnectStarted
+	// Wait for first reconnection to start (will happen at T=1s)
+	select {
+	case <-reconnectStarted:
+		// First reconnection started
+	case <-time.After(3 * time.Second):
+		t.Fatal("Timed out waiting for first reconnection to start")
+	}
 
-	// Wait a bit more to allow multiple DNS checks to happen while first reconnection is in progress
+	// Wait a bit to allow another DNS check while first reconnection is still in progress
+	// The reconnection sleeps for 2s, and the next check would be at T=2s (interval doubles to 2s)
 	time.Sleep(1500 * time.Millisecond)
 
 	// Stop monitor
@@ -507,17 +540,27 @@ func TestDNSMonitorRateLimiting(t *testing.T) {
 	originalResolver := dnsResolver
 	originalIPs := lastResolvedIPs
 	originalSafeReconnect := safeReconnectRPCClient
+	originalLastReconnectTime := lastReconnectTime
+	originalMinInterval := minCheckInterval
 
 	defer func() {
 		dnsResolver = originalResolver
 		lastResolvedIPs = originalIPs
 		safeReconnectRPCClient = originalSafeReconnect
+		lastReconnectTime = originalLastReconnectTime
+		minCheckInterval = originalMinInterval
 		StopDNSMonitor()
 		reconnectionInProgress.Store(false)
 	}()
 
-	// Set initial IPs
+	// Set minimum interval to 1 second for faster testing
+	minCheckInterval = 1
+
+	// Set initial IPs and reset rate limiting
 	lastResolvedIPs = []string{"192.168.1.1"}
+	lastReconnectMutex.Lock()
+	lastReconnectTime = time.Time{} // Reset to zero to allow first reconnection
+	lastReconnectMutex.Unlock()
 
 	// Create a mock resolver that always returns different IPs (simulating flapping DNS)
 	mockResolver := &MockDNSResolver{}
@@ -538,10 +581,10 @@ func TestDNSMonitorRateLimiting(t *testing.T) {
 		time.Sleep(100 * time.Millisecond) // Small delay to simulate reconnection
 	}
 
-	// Start monitor with short interval (1 second)
+	// Start monitor with 1 second interval
 	StartDNSMonitor(true, 1, "example.com:8080")
 
-	// Wait for first reconnection to complete
+	// Wait for first reconnection to complete (1s + buffer)
 	time.Sleep(1500 * time.Millisecond)
 
 	// Get reconnect count after first cycle
@@ -555,7 +598,8 @@ func TestDNSMonitorRateLimiting(t *testing.T) {
 	}
 
 	// Wait for more check cycles (DNS still shows changes but should be rate limited)
-	time.Sleep(3 * time.Second)
+	// Next check at 2s (interval doubled), but rate limiting should block reconnection
+	time.Sleep(2 * time.Second)
 
 	// Stop monitor
 	StopDNSMonitor()
@@ -579,18 +623,26 @@ func TestDNSMonitorRateLimitingSurvivesRestart(t *testing.T) {
 	originalIPs := lastResolvedIPs
 	originalSafeReconnect := safeReconnectRPCClient
 	originalLastReconnectTime := lastReconnectTime
+	originalMinInterval := minCheckInterval
 
 	defer func() {
 		dnsResolver = originalResolver
 		lastResolvedIPs = originalIPs
 		safeReconnectRPCClient = originalSafeReconnect
 		lastReconnectTime = originalLastReconnectTime
+		minCheckInterval = originalMinInterval
 		StopDNSMonitor()
 		reconnectionInProgress.Store(false)
 	}()
 
-	// Set initial IPs
+	// Set minimum interval to 1 second for faster testing
+	minCheckInterval = 1
+
+	// Set initial IPs and reset rate limiting
 	lastResolvedIPs = []string{"192.168.1.1"}
+	lastReconnectMutex.Lock()
+	lastReconnectTime = time.Time{} // Reset to zero to allow first reconnection
+	lastReconnectMutex.Unlock()
 
 	// Create a mock resolver that always returns different IPs
 	mockResolver := &MockDNSResolver{}
@@ -609,10 +661,10 @@ func TestDNSMonitorRateLimitingSurvivesRestart(t *testing.T) {
 		reconnectMu.Unlock()
 	}
 
-	// Start monitor
+	// Start monitor with 1 second interval
 	StartDNSMonitor(true, 1, "example.com:8080")
 
-	// Wait for first reconnection to trigger
+	// Wait for first reconnection to trigger (1s + buffer)
 	time.Sleep(1500 * time.Millisecond)
 
 	// Get first count
@@ -628,8 +680,9 @@ func TestDNSMonitorRateLimitingSurvivesRestart(t *testing.T) {
 	StopDNSMonitor()
 	StartDNSMonitor(true, 1, "example.com:8080")
 
-	// Wait for a few more check cycles
-	time.Sleep(3 * time.Second)
+	// Wait for more check cycles
+	// First check at 1s, interval doubles to 2s, second check at 3s
+	time.Sleep(3500 * time.Millisecond)
 
 	// Stop monitor
 	StopDNSMonitor()
@@ -650,12 +703,17 @@ func TestDNSMonitorExponentialBackoff(t *testing.T) {
 	// Save original values and restore after test
 	originalResolver := dnsResolver
 	originalIPs := lastResolvedIPs
+	originalMinInterval := minCheckInterval
 
 	defer func() {
 		dnsResolver = originalResolver
 		lastResolvedIPs = originalIPs
+		minCheckInterval = originalMinInterval
 		StopDNSMonitor()
 	}()
+
+	// Set minimum interval to 1 second for faster testing
+	minCheckInterval = 1
 
 	// Set initial IPs
 	lastResolvedIPs = []string{"192.168.1.1"}
@@ -667,7 +725,7 @@ func TestDNSMonitorExponentialBackoff(t *testing.T) {
 	}
 	dnsResolver = mockResolver
 
-	// Start monitor with 1 second base interval (for faster testing)
+	// Start monitor with 1 second base interval
 	StartDNSMonitor(true, 1, "example.com:8080")
 
 	// Get monitor instance to check intervals
@@ -693,8 +751,8 @@ func TestDNSMonitorExponentialBackoff(t *testing.T) {
 		t.Errorf("Max interval should be 10 minutes, got %v", maxInterval)
 	}
 
-	// Wait for a few checks and verify interval grows
-	time.Sleep(1500 * time.Millisecond) // After first check
+	// Wait for first check to complete and interval to grow (1s + buffer)
+	time.Sleep(1200 * time.Millisecond)
 
 	dnsMonitorLock.Lock()
 	dnsMonitor.intervalMutex.Lock()
@@ -709,7 +767,7 @@ func TestDNSMonitorExponentialBackoff(t *testing.T) {
 	}
 
 	// Wait for next check (should happen at 2s interval)
-	time.Sleep(2500 * time.Millisecond)
+	time.Sleep(2200 * time.Millisecond)
 
 	dnsMonitorLock.Lock()
 	dnsMonitor.intervalMutex.Lock()
