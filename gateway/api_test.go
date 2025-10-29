@@ -80,9 +80,9 @@ const defaultTestPol = `{
 }`
 
 func TestPolicyAPI(t *testing.T) {
-	ts := StartTest(func(globalConf *config.Config) {
-		globalConf.Policies.PolicyPath = "."
-		globalConf.Policies.PolicySource = "file"
+	ts := StartTest(func(cnf *config.Config) {
+		cnf.Policies.PolicyPath = "."
+		cnf.Policies.PolicySource = "file"
 	})
 
 	defer ts.Close()
@@ -161,6 +161,16 @@ func TestPolicyAPI(t *testing.T) {
 			Data:      serializePolicy(t, user.Policy{MID: model.NewObjectID()}),
 			Code:      http.StatusInternalServerError,
 			BodyMatch: `{"status":"error","message":"Unable to access policy storage."}`,
+		})
+	})
+
+	t.Run("post does not fail ID is provided", func(t *testing.T) {
+		_, _ = ts.Run(t, test.TestCase{
+			Path:      "/tyk/policies",
+			Method:    http.MethodPost,
+			AdminAuth: true,
+			Data:      serializePolicy(t, user.Policy{ID: "test"}),
+			Code:      http.StatusOK,
 		})
 	})
 }
