@@ -1,4 +1,4 @@
-name: intelligent branch merge suggestion
+name: intelligent branch merge suggestion.
 on:
   pull_request:
     types:
