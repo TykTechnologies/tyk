@@ -81,17 +81,31 @@ tasks:
       - go generate ./...
 
   codegen:smart:
-    deps: [deps]
+    deps: [deps:mockgen]
     desc: "Run code generation only if files with go:generate changed vs base branch"
+    sources:
+      - '**/*.go'
+    generates:
+      - .task-codegen-cache
     cmds:
       - |
-        changed=$(git diff --name-only origin/{{.BASE_BRANCH}}...HEAD | grep "\.go$" | xargs grep -l "//go:generate" 2>/dev/null || true)
+        # Only check files that changed vs base branch, avoiding grep on unchanged files
+        changed=$(git diff --name-only origin/{{.BASE_BRANCH}}...HEAD -- '*.go' 2>/dev/null || true)
         if [ -z "$changed" ]; then
-          echo "✓ No files with go:generate changed vs origin/{{.BASE_BRANCH}} - skipping codegen"
+          echo "✓ No Go files changed vs origin/{{.BASE_BRANCH}} - skipping codegen"
+          touch .task-codegen-cache
           exit 0
         fi
-        echo "Files with go:generate changed: $(echo $changed | tr '\n' ' ')"
+        # Only grep in changed files for go:generate directive
+        files_with_generate=$(echo "$changed" | xargs grep -l "//go:generate" 2>/dev/null || true)
+        if [ -z "$files_with_generate" ]; then
+          echo "✓ No files with go:generate changed vs origin/{{.BASE_BRANCH}} - skipping codegen"
+          touch .task-codegen-cache
+          exit 0
+        fi
+        echo "Files with go:generate changed: $(echo $files_with_generate | tr '\n' ' ')"
         go generate ./...
+        touch .task-codegen-cache
 
   # Used in CI
   lint:
@@ -110,7 +124,7 @@ tasks:
 
   lint:extras:
     desc: "Run more specific linters"
-    cmds:
+    deps:
       - task: coprocess:lint
       - task: apidef-oas:lint
 
