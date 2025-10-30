@@ -13,7 +13,7 @@ func TestReadableDuration_MarshalJSON(t *testing.T) {
 
 	t.Run("valid", func(t *testing.T) {
 		duration := ReadableDuration(time.Minute * 5)
-		expectedJSON := []byte(`"5m0s"`)
+		expectedJSON := []byte(`"5m"`)
 		resultJSON, err := json.Marshal(&duration)
 		assert.NoError(t, err)
 		assert.Equal(t, string(expectedJSON), string(resultJSON))
@@ -33,6 +33,36 @@ func TestReadableDuration_MarshalJSON(t *testing.T) {
 		resultJSON, err := json.Marshal(&duration)
 		assert.NoError(t, err)
 		assert.Equal(t, string(expectedJSON), string(resultJSON))
+	})
+
+	t.Run("90 seconds", func(t *testing.T) {
+		duration := ReadableDuration(time.Second * 90)
+		expectedJSON := []byte(`"1m30s"`)
+		resultJSON, err := json.Marshal(&duration)
+		assert.NoError(t, err)
+		assert.Equal(t, string(expectedJSON), string(resultJSON))
+	})
+
+	t.Run("complex duration", func(t *testing.T) {
+		duration := ReadableDuration(1*time.Hour + 2*time.Minute + 3*time.Second + 4*time.Millisecond + 5*time.Microsecond + 6*time.Nanosecond)
+		assert.Equal(t, "1h2m3s4ms5µs6ns", duration.format())
+
+		duration = ReadableDuration(1*time.Hour + (2+60)*time.Minute + 3*time.Second + 4*time.Millisecond + 5*time.Microsecond + 6*time.Nanosecond)
+		assert.Equal(t, "2h2m3s4ms5µs6ns", duration.format())
+
+		duration = ReadableDuration(71*time.Second + 10*time.Millisecond)
+		assert.Equal(t, "1m11s10ms", duration.format())
+
+		duration = ReadableDuration(1*time.Millisecond + 1*time.Nanosecond)
+		assert.Equal(t, "1ms1ns", duration.format())
+
+		duration = ReadableDuration(1*time.Second + 1*time.Nanosecond)
+		assert.Equal(t, "1s1ns", duration.format())
+	})
+
+	t.Run("negative duration", func(t *testing.T) {
+		duration := ReadableDuration(-1 * time.Second * 90)
+		assert.Equal(t, "-1m30s", duration.format())
 	})
 }
 

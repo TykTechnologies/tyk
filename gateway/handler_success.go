@@ -2,6 +2,7 @@ package gateway
 
 import (
 	"bytes"
+	"context"
 	"encoding/base64"
 	"io"
 	"io/ioutil"
@@ -20,6 +21,7 @@ import (
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/ctx"
 	"github.com/TykTechnologies/tyk/header"
+	"github.com/TykTechnologies/tyk/internal/otel"
 	"github.com/TykTechnologies/tyk/request"
 	"github.com/TykTechnologies/tyk/user"
 )
@@ -143,10 +145,14 @@ func recordGraphDetails(rec *analytics.AnalyticsRecord, r *http.Request, resp *h
 	)
 	if resp.Body != nil {
 		httputil.RemoveResponseTransferEncoding(resp, "chunked")
+		// respBodyReader tries to decompress the response body if the Accept-Encoding
+		// header is a non-empty string.
+		resp.Body = respBodyReader(r, resp)
 		respBody, err = io.ReadAll(resp.Body)
 		defer func() {
 			_ = resp.Body.Close()
-			resp.Body = respBodyReader(r, resp)
+			// Create a new Reader and assign it to the response body.
+			resp.Body = io.NopCloser(bytes.NewBuffer(respBody))
 		}()
 		if err != nil {
 			logger.WithError(err).Error("error recording graph analytics")
@@ -161,6 +167,18 @@ func recordGraphDetails(rec *analytics.AnalyticsRecord, r *http.Request, resp *h
 		return
 	}
 	rec.GraphQLStats = stats
+}
+
+const traceTagPrefix = "trace-id-"
+
+func (s *SuccessHandler) addTraceIDTag(reqCtx context.Context, tags []string) []string {
+	if !s.Gw.GetConfig().OpenTelemetry.Enabled {
+		return tags
+	}
+	if id := otel.ExtractTraceID(reqCtx); id != "" {
+		tags = append(tags, traceTagPrefix+id)
+	}
+	return tags
 }
 
 func (s *SuccessHandler) RecordHit(r *http.Request, timing analytics.Latency, code int, responseCopy *http.Response, cached bool) {
@@ -205,6 +223,8 @@ func (s *SuccessHandler) RecordHit(r *http.Request, timing analytics.Latency, co
 		if cached {
 			tags = append(tags, "cached-response")
 		}
+
+		tags = s.addTraceIDTag(r.Context(), tags)
 
 		rawRequest := ""
 		rawResponse := ""
@@ -379,9 +399,11 @@ func (s *SuccessHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) *http
 	log.Debug("Upstream request took (ms): ", millisec)
 
 	if resp.Response != nil {
+		upstreamMs := int64(DurationToMillisecond(resp.UpstreamLatency))
 		latency := analytics.Latency{
 			Total:    int64(millisec),
-			Upstream: int64(DurationToMillisecond(resp.UpstreamLatency)),
+			Upstream: upstreamMs,
+			Gateway:  int64(millisec) - upstreamMs,
 		}
 		s.RecordHit(r, latency, resp.Response.StatusCode, resp.Response, false)
 		s.RecordAccessLog(r, resp.Response, latency)
@@ -408,9 +430,11 @@ func (s *SuccessHandler) ServeHTTPWithCache(w http.ResponseWriter, r *http.Reque
 	log.Debug("Upstream request took (ms): ", millisec)
 
 	if inRes.Response != nil {
+		upstreamMs := int64(DurationToMillisecond(inRes.UpstreamLatency))
 		latency := analytics.Latency{
 			Total:    int64(millisec),
-			Upstream: int64(DurationToMillisecond(inRes.UpstreamLatency)),
+			Upstream: upstreamMs,
+			Gateway:  int64(millisec) - upstreamMs,
 		}
 		s.RecordHit(r, latency, inRes.Response.StatusCode, inRes.Response, false)
 	}

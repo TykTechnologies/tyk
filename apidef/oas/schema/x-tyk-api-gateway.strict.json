@@ -229,6 +229,12 @@
         "claimName": {
           "type": "string"
         },
+        "claims": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
         "scopeToPolicyMapping": {
           "type": "array",
           "items": [
@@ -1306,6 +1312,24 @@
           "required": [
             "enabled"
           ]
+        },
+        "securityProcessingMode": {
+          "type": "string",
+          "enum": [
+            "legacy",
+            "compliant"
+          ],
+          "description": "Controls how multiple security requirements are processed"
+        },
+        "security": {
+          "type": "array",
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "description": "Vendor extension security requirements for proprietary auth methods"
         }
       },
       "required": [
@@ -1509,10 +1533,31 @@
         }
       },
       "required": [
-        "enabled",
-        "location",
-        "key",
-        "versions"
+        "location"
+      ],
+      "anyOf": [
+        {
+          "properties": {
+            "location": {
+              "enum": [
+                "header",
+                "url-param"
+              ]
+            }
+          },
+          "required": [
+            "key"
+          ]
+        },
+        {
+          "properties": {
+            "location": {
+              "enum": [
+                "url"
+              ]
+            }
+          }
+        }
       ],
       "additionalProperties": false
     },
@@ -1678,11 +1723,73 @@
         "identityBaseField": {
           "type": "string"
         },
+        "subjectClaims": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "jwksURIs": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "object",
+            "properties": {
+              "url": {
+                "type": "string",
+                "format": "uri"
+              },
+              "cacheTimeout": {
+                "$ref": "#/definitions/X-Tyk-ReadableDuration"
+              }
+            },
+            "required": [
+              "url"
+            ]
+          }
+        },
         "skipKid": {
           "type": "boolean"
         },
         "policyFieldName": {
           "type": "string"
+        },
+        "basePolicyClaims": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "allowedIssuers": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "allowedAudiences": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "jtiValidation": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "enabled"
+          ]
+        },
+        "allowedSubjects": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
         },
         "clientBaseField": {
           "type": "string"
@@ -1715,6 +1822,30 @@
         },
         "idpClientIdMappingDisabled": {
           "type": "boolean"
+        },
+        "customClaimValidation": {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "enum": [
+                "required",
+                "exact_match",
+                "contains"
+              ]
+            },
+            "allowedValues": {
+              "type": "array",
+              "items": {}
+            },
+            "nonBlocking": {
+              "type": "boolean",
+              "default": false
+            }
+          },
+          "required": [
+            "type"
+          ]
         }
       },
       "required": [
@@ -2213,7 +2344,9 @@
         "HostUp",
         "TokenCreated",
         "TokenUpdated",
-        "TokenDeleted"
+        "TokenDeleted",
+        "CertificateExpiringSoon",
+        "CertificateExpired"
       ],
       "additionalProperties": false
     },

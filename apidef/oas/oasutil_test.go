@@ -11,6 +11,7 @@ type testStruct struct {
 	Array     []string
 	Map       map[string]string
 	SubStruct *subStruct
+	BoolPtr   *bool
 }
 
 type subStruct struct {
@@ -24,6 +25,8 @@ func TestShouldOmit(t *testing.T) {
 	v4 := testStruct{Bool: true}
 	v5 := testStruct{Array: []string{"a"}}
 	v6 := testStruct{Map: map[string]string{"a": "b"}}
+	v7 := testStruct{Array: make([]string, 0), Map: make(map[string]string), SubStruct: &subStruct{SubMap: make(map[string]string)}, BoolPtr: boolPtr(false)}
+	v8 := testStruct{Array: make([]string, 0), Map: make(map[string]string), SubStruct: &subStruct{SubMap: make(map[string]string)}, BoolPtr: boolPtr(true)}
 
 	assert.True(t, ShouldOmit(v1))
 	assert.True(t, ShouldOmit(v2))
@@ -31,4 +34,10 @@ func TestShouldOmit(t *testing.T) {
 	assert.False(t, ShouldOmit(v4))
 	assert.False(t, ShouldOmit(v5))
 	assert.False(t, ShouldOmit(v6))
+	assert.False(t, ShouldOmit(v7))
+	assert.False(t, ShouldOmit(v8))
+}
+
+func boolPtr(v bool) *bool {
+	return &v
 }

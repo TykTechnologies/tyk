@@ -26,7 +26,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/TykTechnologies/kin-openapi/openapi3"
+	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/TykTechnologies/tyk/apidef/oas"
@@ -638,13 +638,27 @@ func graphqlProxyUpstreamHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	w.WriteHeader(responseCode)
-	_, _ = w.Write([]byte(`{
+	response := []byte(`{
 		"data": {
 			"hello": "` + name + `",
 			"httpMethod": "` + r.Method + `",
 		}
-	}`))
+	}`)
+
+	// Only supports GZIP for testing purposes
+	acceptEncodingHeader := r.Header.Get("Accept-Encoding")
+	if acceptEncodingHeader != "" && strings.Contains(acceptEncodingHeader, "gzip") {
+		w.Header().Set("Content-Encoding", "gzip")
+		gz := gzip.NewWriter(w)
+		defer func() {
+			_ = gz.Close()
+		}()
+		w.WriteHeader(responseCode)
+		_, _ = gz.Write(response)
+		return
+	}
+	w.WriteHeader(responseCode)
+	_, _ = w.Write(response)
 }
 
 func graphqlDataSourceHandler(w http.ResponseWriter, r *http.Request) {
@@ -1786,7 +1800,7 @@ func getSampleOASAPI() oas.OAS {
 				Title:   "oas doc",
 				Version: "1",
 			},
-			Paths: make(openapi3.Paths),
+			Paths: openapi3.NewPaths(),
 		}}
 
 	oasAPI.SetTykExtension(tykExtension)

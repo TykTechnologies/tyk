@@ -20,7 +20,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/TykTechnologies/kin-openapi/openapi3"
+	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -2189,7 +2189,8 @@ func TestHandleAddApi_AddVersionAtomically(t *testing.T) {
 		{AdminAuth: true, Method: http.MethodPost, Data: v2,
 			Path: fmt.Sprintf("/tyk/apis?base_api_id=%s&new_version_name=%s&set_default=true&base_api_version_name=%s", baseAPI.APIID, v2VersionName, baseVersionName),
 			BodyMatchFunc: func(i []byte) bool {
-				assert.Len(t, baseAPI.VersionDefinition.Versions, 0)
+				// Gateway addApi function modifies baseAPI in it's internal storage - gw.apisByID
+				assert.Len(t, baseAPI.VersionDefinition.Versions, 1)
 				ts.Gw.DoReload()
 				return true
 			},
@@ -2235,7 +2236,7 @@ func TestHandleAddOASApi_AddVersionAtomically(t *testing.T) {
 				Title:   "oas doc",
 				Version: "1",
 			},
-			Paths: make(openapi3.Paths),
+			Paths: openapi3.NewPaths(),
 		},
 	}
 
@@ -2267,7 +2268,8 @@ func TestHandleAddOASApi_AddVersionAtomically(t *testing.T) {
 		{AdminAuth: true, Method: http.MethodPost, Data: &v2.OAS,
 			Path: fmt.Sprintf("/tyk/apis/oas?base_api_id=%s&new_version_name=%s&set_default=true&base_api_version_name=%s", baseAPI.APIID, v2VersionName, baseVersionName),
 			BodyMatchFunc: func(i []byte) bool {
-				assert.Len(t, baseAPI.VersionDefinition.Versions, 0)
+				// Gateway addApi function modifies baseAPI in it's internal storage - gw.apisByID
+				assert.Len(t, baseAPI.VersionDefinition.Versions, 1)
 				ts.Gw.DoReload()
 				return true
 			},
@@ -2375,7 +2377,7 @@ func TestHandleDeleteOASAPI_RemoveVersionAtomically(t *testing.T) {
 				Title:   "oas doc",
 				Version: "1",
 			},
-			Paths: make(openapi3.Paths),
+			Paths: openapi3.NewPaths(),
 		},
 	}
 
@@ -2612,7 +2614,7 @@ func TestOAS(t *testing.T) {
 			Title:   "oas doc",
 			Version: "1",
 		},
-		Paths: make(openapi3.Paths),
+		Paths: openapi3.NewPaths(),
 	}
 
 	oasAPI.Extensions = map[string]interface{}{
@@ -2636,7 +2638,7 @@ func TestOAS(t *testing.T) {
 	assert.NotNil(t, createdOldAPI)
 
 	t.Run("OAS validation - should fail without x-tyk-api-gateway", func(t *testing.T) {
-		oasAPI.Paths = make(openapi3.Paths)
+		oasAPI.Paths = openapi3.NewPaths()
 		delete(oasAPI.Extensions, oas.ExtensionTykAPIGateway)
 		_, _ = ts.Run(t, []test.TestCase{
 			{AdminAuth: true, Method: http.MethodPost, Path: "/tyk/apis/oas/", Data: &oasAPI,
@@ -2659,7 +2661,7 @@ func TestOAS(t *testing.T) {
 		})
 	})
 
-	oasAPI.Paths = make(openapi3.Paths)
+	oasAPI.Paths = openapi3.NewPaths()
 
 	t.Run("get old api in OAS format - should fail", func(t *testing.T) {
 		_, _ = ts.Run(t, test.TestCase{AdminAuth: true, Method: http.MethodGet, Path: oasBasePath + "/" + oldAPIID,
@@ -2729,7 +2731,7 @@ func TestOAS(t *testing.T) {
 				oldAPIInOAS.GetTykExtension().Upstream.MutualTLS = nil
 				oldAPIInOAS.GetTykExtension().Upstream.CertificatePinning = nil
 
-				oldAPIInOAS.Paths = make(openapi3.Paths)
+				oldAPIInOAS.Paths = openapi3.NewPaths()
 				updatePath := "/tyk/apis/oas/" + apiID
 
 				_, _ = ts.Run(t, []test.TestCase{
@@ -2776,7 +2778,7 @@ func TestOAS(t *testing.T) {
 					},
 				}
 
-				oasAPIInOAS.Paths = make(openapi3.Paths)
+				oasAPIInOAS.Paths = openapi3.NewPaths()
 
 				oasAPIInOAS.Info.Title = "oas-updated oas doc"
 				testUpdateAPI(t, ts, &oasAPIInOAS, apiID, true)
@@ -2807,7 +2809,7 @@ func TestOAS(t *testing.T) {
 					},
 				}
 
-				oasAPIInOAS.Paths = make(openapi3.Paths)
+				oasAPIInOAS.Paths = openapi3.NewPaths()
 
 				oasAPIInOAS.Info.Title = "oas-updated oas doc"
 				testUpdateAPI(t, ts, &oasAPIInOAS, apiID, true)
@@ -2919,22 +2921,23 @@ func TestOAS(t *testing.T) {
 		}
 
 		fillPaths := func(oasAPI *oas.OAS) {
-			oasAPI.Paths = openapi3.Paths{
-				"/pets": {
-					Get: &openapi3.Operation{
-						Summary: "get pets",
-						Responses: openapi3.Responses{
-							"200": {
-								Value: &openapi3.Response{
-									Description: getStrPointer("200 response"),
-									Content: openapi3.Content{
-										"application/json": {
-											Schema: &openapi3.SchemaRef{
-												Value: &openapi3.Schema{
-													Properties: openapi3.Schemas{
-														"value": &openapi3.SchemaRef{
-															Value: &openapi3.Schema{Type: openapi3.TypeBoolean},
-														},
+			paths := openapi3.NewPaths()
+
+			paths.Set("/pets", &openapi3.PathItem{
+				Get: &openapi3.Operation{
+					Summary: "get pets",
+					Responses: func() *openapi3.Responses {
+						r := openapi3.NewResponses()
+						r.Set("200", &openapi3.ResponseRef{
+							Value: &openapi3.Response{
+								Description: getStrPointer("200 response"),
+								Content: openapi3.Content{
+									"application/json": {
+										Schema: &openapi3.SchemaRef{
+											Value: &openapi3.Schema{
+												Properties: openapi3.Schemas{
+													"value": &openapi3.SchemaRef{
+														Value: &openapi3.Schema{Type: &openapi3.Types{openapi3.TypeBoolean}},
 													},
 												},
 											},
@@ -2942,32 +2945,38 @@ func TestOAS(t *testing.T) {
 									},
 								},
 							},
-						},
-					},
-					Post: &openapi3.Operation{
-						Responses: openapi3.Responses{
-							"200": {
-								Value: &openapi3.Response{
-									Description: getStrPointer("200 response"),
-									Content: openapi3.Content{
-										"application/json": {
-											Schema: &openapi3.SchemaRef{
-												Value: &openapi3.Schema{
-													Properties: openapi3.Schemas{
-														"added": &openapi3.SchemaRef{
-															Value: &openapi3.Schema{Type: openapi3.TypeBoolean},
-														},
-													},
-												},
-											},
-										},
-									},
-								},
-							},
-						},
-					},
+						})
+						return r
+					}(),
 				},
-			}
+				Post: &openapi3.Operation{
+					Summary: "post pets",
+					Responses: func() *openapi3.Responses {
+						r := openapi3.NewResponses()
+						r.Set("200", &openapi3.ResponseRef{
+							Value: &openapi3.Response{
+								Description: getStrPointer("200 response"),
+								Content: openapi3.Content{
+									"application/json": {
+										Schema: &openapi3.SchemaRef{
+											Value: &openapi3.Schema{
+												Properties: openapi3.Schemas{
+													"added": &openapi3.SchemaRef{
+														Value: &openapi3.Schema{Type: &openapi3.Types{openapi3.TypeBoolean}},
+													},
+												},
+											},
+										},
+									},
+								},
+							},
+						})
+						return r
+					}(),
+				},
+			})
+
+			oasAPI.Paths = paths
 		}
 
 		fillReqBody := func(oasDef *oas.OAS, path, method string) {
@@ -2979,7 +2988,7 @@ func TestOAS(t *testing.T) {
 			valueSchema.Properties = openapi3.Schemas{
 				"value": {
 					Value: &openapi3.Schema{
-						Type: openapi3.TypeBoolean,
+						Type: &openapi3.Types{openapi3.TypeBoolean},
 					},
 				},
 			}
@@ -3222,7 +3231,9 @@ func TestOAS(t *testing.T) {
 
 			_, _ = ts.Run(t, []test.TestCase{
 				{AdminAuth: true, Method: http.MethodPatch, Path: patchPath, Data: &apiInOAS,
-					QueryParams: params, BodyMatch: `"message":"invalid upstream URL"`, Code: http.StatusBadRequest},
+					QueryParams: params,
+					BodyMatch:   `The manually configured upstream URL is not valid. The URL must be absolute and properly formatted \(e.g. https://example.com\). Please check the URL format and try again.`,
+					Code:        http.StatusBadRequest},
 			}...)
 		})
 
@@ -3454,7 +3465,7 @@ func TestOAS(t *testing.T) {
 					Title:   "example oas doc",
 					Version: "1",
 				},
-				Paths: openapi3.Paths{},
+				Paths: openapi3.NewPaths(),
 				Servers: openapi3.Servers{
 					&openapi3.Server{
 						URL:         "http://upstream.example.com",
@@ -3519,7 +3530,8 @@ func TestOAS(t *testing.T) {
 			newParam.UpstreamURL = "upstream.example.com"
 			params := configParams(newParam)
 			_ = testImportOAS(t, ts, test.TestCase{QueryParams: params,
-				Code: http.StatusBadRequest, Data: oasCopy(false, nil), AdminAuth: true, BodyMatch: "invalid upstream URL",
+				Code: http.StatusBadRequest, Data: oasCopy(false, nil), AdminAuth: true,
+				BodyMatch: `The manually configured upstream URL is not valid. The URL must be absolute and properly formatted \(e.g. https://example.com\). Please check the URL format and try again.`,
 			})
 		})
 
@@ -3527,7 +3539,8 @@ func TestOAS(t *testing.T) {
 			oasAPI := oasCopy(false, func(t *openapi3.T) {
 				t.Servers = openapi3.Servers{}
 			})
-			_ = testImportOAS(t, ts, test.TestCase{Code: http.StatusBadRequest, Data: oasAPI, AdminAuth: true, BodyMatch: "servers object is empty in OAS"})
+			_ = testImportOAS(t, ts, test.TestCase{Code: http.StatusBadRequest, Data: oasAPI, AdminAuth: true,
+				BodyMatch: "The ‘servers’ object is empty in your OAS. You can either add a ‘servers’ section to your OpenAPI description or provide a Custom Upstream URL in the manual configuration options below."})
 		})
 
 		t.Run("success without config query params, no tyk ext", func(t *testing.T) {
@@ -3719,7 +3732,7 @@ func TestGetOASAPI_WithVersionBaseID(t *testing.T) {
 				Title:   "oas doc",
 				Version: "1",
 			},
-			Paths: make(openapi3.Paths),
+			Paths: openapi3.NewPaths(),
 		},
 	}
 

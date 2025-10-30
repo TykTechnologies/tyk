@@ -119,37 +119,37 @@ func LoadPoliciesFromDir(dir string) (map[string]user.Policy, error) {
 
 // LoadPoliciesFromDashboard will connect and download Policies from a Tyk Dashboard instance.
 func (gw *Gateway) LoadPoliciesFromDashboard(endpoint, secret string, allowExplicit bool) (map[string]user.Policy, error) {
+	// Build request function for recovery mechanism
+	buildReq := func() (*http.Request, error) {
+		req, err := http.NewRequest("GET", endpoint, nil)
+		if err != nil {
+			return nil, err
+		}
 
-	// Get the definitions
-	newRequest, err := http.NewRequest("GET", endpoint, nil)
-	if err != nil {
-		log.Error("Failed to create request: ", err)
-		return nil, err
+		req.Header.Set("authorization", secret)
+		req.Header.Set(header.XTykNodeID, gw.GetNodeID())
+		req.Header.Set(header.XTykSessionID, gw.SessionID)
+
+		gw.ServiceNonceMutex.RLock()
+		req.Header.Set(header.XTykNonce, gw.ServiceNonce)
+		gw.ServiceNonceMutex.RUnlock()
+
+		return req, nil
 	}
-
-	newRequest.Header.Set("authorization", secret)
-	newRequest.Header.Set(header.XTykNodeID, gw.GetNodeID())
-	newRequest.Header.Set(header.XTykSessionID, gw.SessionID)
-
-	gw.ServiceNonceMutex.RLock()
-	newRequest.Header.Set("x-tyk-nonce", gw.ServiceNonce)
-	gw.ServiceNonceMutex.RUnlock()
-
-	log.WithFields(logrus.Fields{
-		"prefix": "policy",
-	}).Info("Mutex lock acquired... calling")
-	c := gw.initialiseClient()
 
 	log.WithFields(logrus.Fields{
 		"prefix": "policy",
 	}).Info("Calling dashboard service for policy list")
-	resp, err := c.Do(newRequest)
+
+	// Execute request with automatic recovery
+	resp, err := gw.executeDashboardRequestWithRecovery(buildReq, "policy fetch")
 	if err != nil {
 		log.Error("Policy request failed: ", err)
 		return nil, err
 	}
 	defer resp.Body.Close()
 
+	// Check response status
 	if resp.StatusCode != http.StatusOK {
 		body, _ := ioutil.ReadAll(resp.Body)
 		log.Error("Policy request login failure, Response was: ", string(body))
@@ -163,6 +163,11 @@ func (gw *Gateway) LoadPoliciesFromDashboard(endpoint, secret string, allowExpli
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&list); err != nil {
 		log.Error("Failed to decode policy body: ", err)
+		// Check if we should retry after a network error during read
+		if gw.HandleDashboardResponseReadError(err, "policy fetch") {
+			// Retry the entire operation
+			return gw.LoadPoliciesFromDashboard(endpoint, secret, allowExplicit)
+		}
 		return nil, err
 	}
 
@@ -227,6 +232,9 @@ func (gw *Gateway) LoadPoliciesFromRPC(store RPCDataLoader, orgId string, allowE
 	}
 
 	rpcPolicies := store.GetPolicies(orgId)
+	if rpcPolicies == "" {
+		return nil, errors.New("failed to fetch policies from RPC store; connection may be down")
+	}
 
 	policies, err := parsePoliciesFromRPC(rpcPolicies, allowExplicit)
 

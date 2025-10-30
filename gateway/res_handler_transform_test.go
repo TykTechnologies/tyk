@@ -2,15 +2,18 @@ package gateway
 
 import (
 	"encoding/base64"
+	"encoding/json"
+	"io"
 	"net/http"
+	"net/http/httptest"
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/stretchr/testify/assert"
-
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/test"
 )
 
@@ -292,4 +295,226 @@ func TestHeaderTransformBase(t *testing.T) {
 
 	// Check that the returned base is indeed the BaseTykResponseHandler of ht
 	require.Equal(t, &ht.BaseTykResponseHandler, base, "Base method did not return the expected BaseTykResponseHandler")
+}
+
+func TestResponseTransformMiddleware(t *testing.T) {
+	t.Run("Response transform alone", func(t *testing.T) {
+		ts := StartTest(nil)
+
+		testServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			_, err := w.Write([]byte(`{"name":"world"}`))
+			assert.NoError(t, err)
+			w.WriteHeader(http.StatusOK)
+		}))
+
+		t.Cleanup(testServer.Close)
+		t.Cleanup(ts.Close)
+
+		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+			spec.Proxy.ListenPath = "/test"
+			spec.Proxy.TargetURL = testServer.URL
+
+			v := spec.VersionData.Versions["Default"]
+
+			v.UseExtendedPaths = true
+			v.ExtendedPaths.TransformResponse = []apidef.TemplateMeta{
+				{
+					Path:   "/anything/(\\d+)$",
+					Method: http.MethodGet,
+					TemplateData: apidef.TemplateData{
+						Mode:           apidef.UseBlob,
+						TemplateSource: base64.StdEncoding.EncodeToString([]byte(`{"greeting": "hello {{.name}}"}`)),
+						Input:          apidef.RequestJSON,
+						EnableSession:  false,
+					},
+				},
+			}
+
+			spec.VersionData.Versions["Default"] = v
+		})
+
+		_, _ = ts.Run(t, test.TestCase{
+			Path:      "/test/anything/123",
+			Method:    http.MethodGet,
+			Code:      http.StatusOK,
+			BodyMatch: `{"greeting": "hello world"}`,
+		})
+	})
+
+	t.Run("Response transform with URL rewrite", func(t *testing.T) {
+		ts := StartTest(nil)
+
+		type transformedResponse struct {
+			Transformed bool   `json:"transformed"`
+			Path        string `json:"path"`
+		}
+
+		testServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+
+			body, err := json.Marshal(struct {
+				Path string `json:"Path"`
+			}{
+				Path: r.URL.Path,
+			})
+			require.NoError(t, err)
+
+			_, err = w.Write(body)
+			require.NoError(t, err)
+
+			w.WriteHeader(http.StatusOK)
+		}))
+
+		t.Cleanup(testServer.Close)
+		t.Cleanup(ts.Close)
+
+		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+			spec.Proxy.TargetURL = testServer.URL
+			spec.Proxy.ListenPath = "/combined/"
+			v := spec.VersionData.Versions["Default"]
+
+			v.UseExtendedPaths = true
+			v.ExtendedPaths.URLRewrite = []apidef.URLRewriteMeta{
+				{
+					Path:         "/anything/(\\d+)$",
+					Method:       "GET",
+					MatchPattern: "/anything/(\\d+)$",
+					RewriteTo:    "/anything/transformed/$1",
+				},
+			}
+
+			v.ExtendedPaths.TransformResponse = []apidef.TemplateMeta{
+				{
+					Path:   "/anything/(\\d+)$",
+					Method: "GET",
+					TemplateData: apidef.TemplateData{
+						Mode:           apidef.UseBlob,
+						TemplateSource: base64.StdEncoding.EncodeToString([]byte(`{"transformed": true, "path": "{{.Path}}"}`)),
+						Input:          apidef.RequestJSON,
+						EnableSession:  false,
+					},
+				},
+			}
+
+			spec.VersionData.Versions["Default"] = v
+		})
+
+		res, err := ts.Run(t, test.TestCase{
+			Path:   "/combined/anything/7777",
+			Method: http.MethodGet,
+			Code:   http.StatusOK,
+		})
+		require.NoError(t, err)
+		require.Equal(t, http.StatusOK, res.StatusCode)
+
+		rawBody, err := io.ReadAll(res.Body)
+		require.NoError(t, err)
+
+		var body transformedResponse
+		assert.NoError(t, json.Unmarshal(rawBody, &body))
+		assert.Equal(t, transformedResponse{
+			Transformed: true,
+			Path:        "/anything/transformed/7777",
+		}, body)
+	})
+
+	t.Run("with body size constraints", func(t *testing.T) {
+		testCases := []struct {
+			name             string
+			maxBodySize      int64
+			responseBody     string
+			expectTransform  bool
+			expectedResponse string
+			expectedCode     int
+			expectedError    string
+		}{
+			{
+				name:             "Response body within limit",
+				maxBodySize:      100,
+				responseBody:     `{"name":"test"}`,
+				expectTransform:  true,
+				expectedResponse: `{"result": "test"}`,
+				expectedCode:     http.StatusOK,
+			},
+			{
+				name:          "Response body exceeds limit",
+				maxBodySize:   10,
+				responseBody:  `{"name":"this is a long response that exceeds the limit"}`,
+				expectedCode:  http.StatusInternalServerError,
+				expectedError: "Response body too large",
+			},
+			{
+				name:             "Constraint disabled (zero value)",
+				maxBodySize:      0,
+				responseBody:     `{"name":"test"}`,
+				expectTransform:  true,
+				expectedResponse: `{"result": "test"}`,
+				expectedCode:     http.StatusOK,
+			},
+			{
+				name:             "Exact limit boundary",
+				maxBodySize:      15,
+				responseBody:     `{"name":"test"}`,
+				expectTransform:  true,
+				expectedResponse: `{"result": "test"}`,
+				expectedCode:     http.StatusOK,
+			},
+		}
+
+		for _, tc := range testCases {
+			t.Run(tc.name, func(t *testing.T) {
+				ts := StartTest(func(globalConf *config.Config) {
+					globalConf.HttpServerOptions.MaxResponseBodySize = tc.maxBodySize
+				})
+				defer ts.Close()
+
+				testServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+					w.Header().Set("Content-Type", "application/json")
+					_, err := w.Write([]byte(tc.responseBody))
+					assert.NoError(t, err)
+				}))
+				defer testServer.Close()
+
+				ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+					spec.Proxy.ListenPath = "/test"
+					spec.Proxy.TargetURL = testServer.URL
+
+					UpdateAPIVersion(spec, "v1", func(v *apidef.VersionInfo) {
+						v.ExtendedPaths.TransformResponse = []apidef.TemplateMeta{
+							{
+								Path:   "/transform",
+								Method: http.MethodGet,
+								TemplateData: apidef.TemplateData{
+									Mode:           apidef.UseBlob,
+									TemplateSource: base64.StdEncoding.EncodeToString([]byte(`{"result": "{{.name}}"}`)),
+									Input:          apidef.RequestJSON,
+								},
+							},
+						}
+					})
+				})
+
+				res, err := ts.Run(t, test.TestCase{
+					Path:   "/test/transform",
+					Method: http.MethodGet,
+					Code:   tc.expectedCode,
+				})
+
+				require.NoError(t, err)
+				assert.Equal(t, tc.expectedCode, res.StatusCode)
+
+				body, err := io.ReadAll(res.Body)
+				require.NoError(t, err)
+
+				if tc.expectTransform {
+					assert.JSONEq(t, tc.expectedResponse, string(body))
+				}
+
+				if tc.expectedError != "" {
+					assert.Contains(t, string(body), tc.expectedError)
+				}
+			})
+		}
+	})
 }

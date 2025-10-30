@@ -54,6 +54,28 @@
     "message": "{{.Meta.Message}}",
     "api_id": "{{.Meta.APIID}}",
 }
+{{ else if eq .Type "CertificateExpiringSoon"}}
+{
+  "event": "{{.Type}}",
+  "message": "{{.Meta.Message}}",
+  "cert_id": "{{.Meta.CertID}}",
+  "cert_name": "{{.Meta.CertName}}",
+  "expires_at": "{{.Meta.ExpiresAt | as_rfc3339}}",
+  "days_remaining": {{.Meta.DaysRemaining}},
+  "api_id": "{{.Meta.APIID}}",
+  "timestamp": "{{.TimeStamp | as_rfc3339_from_string}}"
+}
+{{ else if eq .Type "CertificateExpired"}}
+{
+  "event": "{{.Type}}",
+  "message": "{{.Meta.Message}}",
+  "cert_id": "{{.Meta.CertID}}",
+  "cert_name": "{{.Meta.CertName}}",
+  "expired_at": "{{.Meta.ExpiredAt | as_rfc3339}}",
+  "days_since_expiry": {{.Meta.DaysSinceExpiry}},
+  "api_id": "{{.Meta.APIID}}",
+  "timestamp": "{{.TimeStamp | as_rfc3339_from_string}}"
+}
 {{ else}}
 {
     "event": "{{.Type}}",

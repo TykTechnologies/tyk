@@ -3,8 +3,10 @@
 .vagrant/
 .venv/
 .vscode/
+.air.toml
 coverage/
 temp/
+/tmp
 /middleware/bundles
 testapps/
 
@@ -21,6 +23,13 @@ testapps/
 /*.conf
 /*.json
 /*.bak
+/.air.toml
+/go.work
+/go.work.sum
+
+/go.work
+/go.work.sum
+
 
 /tyk
 logs/

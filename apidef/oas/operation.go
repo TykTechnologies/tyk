@@ -8,14 +8,14 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/TykTechnologies/kin-openapi/openapi3"
+	"github.com/getkin/kin-openapi/openapi3"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/internal/oasutil"
 	"github.com/TykTechnologies/tyk/regexp"
 )
 
-// Operations holds Operation definitions.
+// Operations holds Operation definitions. The string key in this object is the `operationID`, which is a unique identifier for each API operation.
 type Operations map[string]*Operation
 
 // Operation holds a request operation configuration, allowances, tranformations, caching, timeouts and validation.
@@ -27,6 +27,8 @@ type Operation struct {
 	Block *Allowance `bson:"block,omitempty" json:"block,omitempty"`
 
 	// IgnoreAuthentication ignores authentication on request by allowance.
+	//
+	// Tyk classic API definition: version_data.versions..extended_paths.ignored[].
 	IgnoreAuthentication *Allowance `bson:"ignoreAuthentication,omitempty" json:"ignoreAuthentication,omitempty"`
 
 	// Internal makes the endpoint only respond to internal requests.
@@ -143,7 +145,7 @@ func (s *OAS) fillPathsAndOperations(ep apidef.ExtendedPathsSet) {
 	// Regardless if `ep` is a zero value, we need a non-nil paths
 	// to produce a valid OAS document
 	if s.Paths == nil {
-		s.Paths = make(openapi3.Paths)
+		s.Paths = openapi3.NewPaths()
 	}
 
 	s.fillAllowance(ep.WhiteList, allow)
@@ -183,13 +185,13 @@ func (s *OAS) fillPathsAndOperations(ep apidef.ExtendedPathsSet) {
 // - Checking the Content-Type header if present
 // - Attempting to parse the body as JSON
 // - Defaulting to text/plain if neither above applies
-func (s *OAS) fillMockResponsePaths(paths openapi3.Paths, ep apidef.ExtendedPathsSet) {
+func (s *OAS) fillMockResponsePaths(paths *openapi3.Paths, ep apidef.ExtendedPathsSet) {
 	for _, mock := range ep.MockResponse {
 		operationID := s.getOperationID(mock.Path, mock.Method)
 
 		var operation *openapi3.Operation
 
-		for _, item := range paths {
+		for _, item := range paths.Map() {
 			if op := item.GetOperation(mock.Method); op != nil && op.OperationID == operationID {
 				operation = op
 				break
@@ -208,11 +210,11 @@ func (s *OAS) fillMockResponsePaths(paths openapi3.Paths, ep apidef.ExtendedPath
 			Description: &oasDesc,
 		}
 
-		operation.Responses[strconv.Itoa(mock.Code)] = &openapi3.ResponseRef{
+		operation.Responses.Set(strconv.Itoa(mock.Code), &openapi3.ResponseRef{
 			Value: response,
-		}
+		})
 
-		delete(operation.Responses, "default")
+		operation.Responses.Delete("default")
 
 		tykOperation := s.GetTykExtension().getOperation(operation.OperationID)
 
@@ -244,7 +246,7 @@ func (s *OAS) extractPathsAndOperations(ep *apidef.ExtendedPathsSet) {
 		return
 	}
 
-	for _, pathItem := range oasutil.SortByPathLength(s.Paths) {
+	for _, pathItem := range oasutil.SortByPathLength(*s.Paths) {
 		for id, tykOp := range tykOperations {
 			path := pathItem.Path
 			for method, operation := range pathItem.Operations() {
@@ -619,11 +621,11 @@ func (s *OAS) getOperationID(inPath, method string) string {
 	operationID := strings.TrimPrefix(inPath, "/") + method
 
 	createOrGetPathItem := func(item string) *openapi3.PathItem {
-		if s.Paths[item] == nil {
-			s.Paths[item] = &openapi3.PathItem{}
+		if s.Paths.Value(item) == nil {
+			s.Paths.Set(item, &openapi3.PathItem{})
 		}
 
-		return s.Paths[item]
+		return s.Paths.Value(item)
 	}
 
 	createOrUpdateOperation := func(p *openapi3.PathItem) *openapi3.Operation {
@@ -633,6 +635,7 @@ func (s *OAS) getOperationID(inPath, method string) string {
 			operation = &openapi3.Operation{
 				Responses: openapi3.NewResponses(),
 			}
+
 			p.SetOperation(method, operation)
 		}
 
@@ -670,7 +673,7 @@ func (s *OAS) getOperationID(inPath, method string) string {
 			if part.isRegex {
 				schema := &openapi3.SchemaRef{
 					Value: &openapi3.Schema{
-						Type:    "string",
+						Type:    &openapi3.Types{openapi3.TypeString},
 						Pattern: part.value,
 					},
 				}
@@ -871,7 +874,7 @@ type FromOASExamples struct {
 }
 
 func (*MockResponse) shouldImport(operation *openapi3.Operation) bool {
-	for _, response := range operation.Responses {
+	for _, response := range operation.Responses.Map() {
 		for _, content := range response.Value.Content {
 			if content.Example != nil || content.Schema != nil {
 				return true

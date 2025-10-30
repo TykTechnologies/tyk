@@ -18,6 +18,7 @@ import (
 	"github.com/TykTechnologies/tyk/internal/event"
 
 	"github.com/TykTechnologies/tyk/internal/reflect"
+	tyktime "github.com/TykTechnologies/tyk/internal/time"
 
 	"golang.org/x/oauth2"
 
@@ -118,7 +119,7 @@ const (
 	CoprocessType = "coprocess"
 	OAuthType     = "oauth"
 	// ExternalOAuthType holds configuration for an external OAuth provider.
-	// Deprecated: ExternalOAuth support has been deprecated from 5.7.0.
+	// Deprecated: ExternalOAuth support was deprecated in Tyk 5.7.0.
 	// To avoid any disruptions, we recommend that you use JSON Web Token (JWT) instead,
 	// as explained in https://tyk.io/docs/basic-config-and-security/security/authentication-authorization/ext-oauth-middleware/.
 	ExternalOAuthType = "externalOAuth"
@@ -772,11 +773,25 @@ type APIDefinition struct {
 
 	// UpstreamAuth stores information about authenticating against upstream.
 	UpstreamAuth UpstreamAuth `bson:"upstream_auth" json:"upstream_auth"`
+
+	// SecurityRequirements stores all OAS security requirements (auto-populated from OpenAPI description import)
+	// When len(SecurityRequirements) > 1, OR logic is automatically applied
+	SecurityRequirements [][]string `json:"security_requirements,omitempty" bson:"security_requirements,omitempty"`
 }
 
 type JWK struct {
-	// url is the jwk endpoint
+	// URL is the jwk endpoint
 	URL string `json:"url"`
+	// CacheTimeout defines how long the JWKS will be kept in the cache before forcing a refresh from the JWKS endpoint.
+	CacheTimeout tyktime.ReadableDuration `bson:"cache_timeout" json:"cache_timeout"`
+}
+
+// GetCacheTimeoutSeconds returns the cache timeout in seconds, using the default expiration if CacheTimeout is zero or negative.
+func (jwk *JWK) GetCacheTimeoutSeconds(defaultExpiration int64) int64 {
+	if jwk.CacheTimeout > 0 {
+		return int64(jwk.CacheTimeout.Seconds())
+	}
+	return defaultExpiration
 }
 
 // UpstreamAuth holds the configurations related to upstream API authentication.
@@ -1075,6 +1090,7 @@ type GraphQLProxyConfig struct {
 	Features              GraphQLProxyFeaturesConfig             `bson:"features" json:"features"`
 	AuthHeaders           map[string]string                      `bson:"auth_headers" json:"auth_headers"`
 	SubscriptionType      SubscriptionType                       `bson:"subscription_type" json:"subscription_type,omitempty"`
+	SSEUsePost            bool                                   `bson:"sse_use_post" json:"sse_use_post"`
 	RequestHeaders        map[string]string                      `bson:"request_headers" json:"request_headers"`
 	UseResponseExtensions GraphQLResponseExtensions              `bson:"use_response_extensions" json:"use_response_extensions"`
 	RequestHeadersRewrite map[string]RequestHeadersRewriteConfig `json:"request_headers_rewrite" bson:"request_headers_rewrite"`
@@ -1109,6 +1125,7 @@ type GraphQLSubgraphEntity struct {
 	SDL              string            `bson:"sdl" json:"sdl"`
 	Headers          map[string]string `bson:"headers" json:"headers"`
 	SubscriptionType SubscriptionType  `bson:"subscription_type" json:"subscription_type,omitempty"`
+	SSEUsePost       bool              `bson:"sse_use_post" json:"sse_use_post"`
 }
 
 type GraphQLEngineConfig struct {
@@ -1163,6 +1180,7 @@ type GraphQLEngineDataSourceConfigGraphQL struct {
 	Method           string            `bson:"method" json:"method"`
 	Headers          map[string]string `bson:"headers" json:"headers"`
 	SubscriptionType SubscriptionType  `bson:"subscription_type" json:"subscription_type,omitempty"`
+	SSEUsePost       bool              `bson:"sse_use_post" json:"sse_use_post"`
 	HasOperation     bool              `bson:"has_operation" json:"has_operation"`
 	Operation        string            `bson:"operation" json:"operation"`
 	Variables        json.RawMessage   `bson:"variables" json:"variables"`

@@ -7,11 +7,30 @@ import (
 	"sort"
 	"time"
 
-	"github.com/TykTechnologies/kin-openapi/openapi3"
+	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/mitchellh/mapstructure"
 
 	"github.com/TykTechnologies/tyk/apidef"
 )
+
+// SecurityProcessingMode constants define how multiple security requirements are processed
+const (
+	// SecurityProcessingModeLegacy processes only the first security requirement and uses BaseIdentityProvider
+	SecurityProcessingModeLegacy = "legacy"
+
+	// SecurityProcessingModeCompliant processes all security requirements with OR logic and uses dynamic identity provider
+	SecurityProcessingModeCompliant = "compliant"
+)
+
+// ValidateSecurityProcessingMode validates the security processing mode value.
+func ValidateSecurityProcessingMode(mode string) bool {
+	return mode == "" || mode == SecurityProcessingModeLegacy || mode == SecurityProcessingModeCompliant
+}
+
+// GetDefaultSecurityProcessingMode returns the default security processing mode.
+func GetDefaultSecurityProcessingMode() string {
+	return SecurityProcessingModeLegacy
+}
 
 // Authentication contains configuration about the authentication methods and security policies applied to requests.
 type Authentication struct {
@@ -61,6 +80,15 @@ type Authentication struct {
 
 	// CustomKeyLifetime contains configuration for the maximum retention period for access tokens.
 	CustomKeyLifetime *CustomKeyLifetime `bson:"customKeyLifetime,omitempty" json:"customKeyLifetime,omitempty"`
+
+	// SecurityProcessingMode controls how Tyk will process the OpenAPI `security` field if multiple security requirement objects are declared.
+	// - "legacy" (default): Only the first security requirement object will be processed; uses BaseIdentityProvider to create the session object.
+	// - "compliant": All security requirement objects will be processed, request will be authorized if any of these are validated; the origin for the session object will be determined dynamically based on the validated security requirement.
+	SecurityProcessingMode string `bson:"securityProcessingMode,omitempty" json:"securityProcessingMode,omitempty"`
+
+	// Security is an extension to the OpenAPI security field and is used when securityProcessingMode is set to "compliant".
+	// This can be used to combine any declared securitySchemes including Tyk proprietary auth methods.
+	Security [][]string `bson:"security,omitempty" json:"security,omitempty"`
 }
 
 // CustomKeyLifetime contains configuration for custom key retention.
@@ -226,7 +254,7 @@ func (ss SecuritySchemes) Import(name string, nativeSS *openapi3.SecurityScheme,
 			}
 		}
 
-		token.Import(nativeSS, enable)
+		token.Enabled = &enable
 	case nativeSS.Type == typeHTTP && nativeSS.Scheme == schemeBearer && nativeSS.BearerFormat == bearerFormatJWT:
 		jwt := &JWT{}
 		if ss[name] == nil {
@@ -484,6 +512,10 @@ type Scopes struct {
 	// - For JWT: `scopes.jwt.scope_claim_name`
 	ClaimName string `bson:"claimName,omitempty" json:"claimName,omitempty"`
 
+	// Claims specifies a list of claims that can be used to provide the scope-to-policy mapping.
+	// The first match from the list found in the token will be interrogated to retrieve the scopes that are then checked against the scopeToPolicyMapping.
+	Claims []string `bson:"claims,omitempty" json:"claims,omitempty"`
+
 	// ScopeToPolicyMapping contains the mappings of scopes to policy IDs.
 	//
 	// Tyk classic API definition:
@@ -495,6 +527,9 @@ type Scopes struct {
 // Fill fills *Scopes from *apidef.ScopeClaim.
 func (s *Scopes) Fill(scopeClaim *apidef.ScopeClaim) {
 	s.ClaimName = scopeClaim.ScopeClaimName
+	if s.ClaimName != "" && len(s.Claims) < 1 {
+		s.Claims = []string{scopeClaim.ScopeClaimName}
+	}
 
 	s.ScopeToPolicyMapping = []ScopeToPolicy{}
 

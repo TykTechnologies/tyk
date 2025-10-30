@@ -526,8 +526,8 @@ func testPrepareApplyPolicies(tb testing.TB) (*policy.Service, []testApplyPolici
 			"InactiveWithSession", []string{"tags1", "tags2"},
 			"", func(t *testing.T, s *user.SessionState) {
 				t.Helper()
-				if !s.IsInactive {
-					t.Fatalf("want IsInactive to be true")
+				if s.IsInactive {
+					t.Fatalf("both policies are active so we expect IsInactive to be false")
 				}
 			}, &user.SessionState{
 				IsInactive: true,
@@ -1291,7 +1291,12 @@ func TestService_Apply(t *testing.T) {
 				}
 				sess.SetPolicies(policies...)
 				if err := service.Apply(sess); err != nil {
-					assert.ErrorContains(t, err, tc.errMatch)
+					if tc.errMatch != "" {
+						assert.ErrorContains(t, err, tc.errMatch)
+					} else {
+						t.Fail()
+					}
+
 					return
 				}
 

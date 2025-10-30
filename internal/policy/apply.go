@@ -110,6 +110,9 @@ func (t *Service) Apply(session *user.SessionState) error {
 		policyIDs = storage.PolicyIDs()
 	}
 
+	// Only the status of policies applied to a key should determine the validity of the key.
+	sessionInactiveState := false
+
 	for _, polID := range policyIDs {
 		policy, ok := storage.PolicyByID(polID)
 		if !ok {
@@ -145,7 +148,7 @@ func (t *Service) Apply(session *user.SessionState) error {
 			}
 		}
 
-		session.IsInactive = session.IsInactive || policy.IsInactive
+		sessionInactiveState = sessionInactiveState || policy.IsInactive
 
 		for _, tag := range policy.Tags {
 			tags[tag] = true
@@ -159,6 +162,8 @@ func (t *Service) Apply(session *user.SessionState) error {
 			session.LastUpdated = policy.LastUpdated
 		}
 	}
+
+	session.IsInactive = sessionInactiveState
 
 	for _, tag := range session.Tags {
 		tags[tag] = true

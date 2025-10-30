@@ -15,7 +15,9 @@ import (
 	"runtime"
 	"testing"
 
+	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
@@ -163,35 +165,14 @@ func TestBundleLoader(t *testing.T) {
 	})
 
 	t.Run("Load bundle fails if public key path is set but signature verification fails", func(t *testing.T) {
-		privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
-		if err != nil {
-			t.Fatalf("rsa.GenerateKey() failed: %v", err)
-		}
-		publicKey := &privateKey.PublicKey
-
-		publicKeyDER, err := x509.MarshalPKIXPublicKey(publicKey)
-		if err != nil {
-			t.Fatalf("x509.MarshalPKIXPublicKey() failed: %v", err)
-		}
-
-		pemBlock := &pem.Block{
-			Type:  "PUBLIC KEY",
-			Bytes: publicKeyDER,
-		}
-
-		tmpfile, err := os.CreateTemp("", "example")
-		if err != nil {
-			t.Fatalf("os.CreateTemp() failed: %v", err)
-		}
-		defer tmpfile.Close()
-		defer os.Remove(tmpfile.Name())
-
-		if err := pem.Encode(tmpfile, pemBlock); err != nil {
-			t.Fatalf("pem.Encode() failed: %v", err)
-		}
+		pemfile := createPEMFile(t)
+		t.Cleanup(func() {
+			_ = pemfile.Close()
+			_ = os.Remove(pemfile.Name())
+		})
 
 		cfg := ts.Gw.GetConfig()
-		cfg.PublicKeyPath = tmpfile.Name()
+		cfg.PublicKeyPath = pemfile.Name()
 		ts.Gw.SetConfig(cfg)
 
 		spec := &APISpec{
@@ -199,9 +180,76 @@ func TestBundleLoader(t *testing.T) {
 				CustomMiddlewareBundle: badSignatureBundleID,
 			},
 		}
-		err = ts.Gw.loadBundle(spec)
+		err := ts.Gw.loadBundle(spec)
 
 		assert.ErrorContains(t, err, "crypto/rsa: verification error")
+	})
+
+	t.Run("should always validate manifest.json, even if it already exists on the filesystem", func(t *testing.T) {
+		pemfile := createPEMFile(t)
+		t.Cleanup(func() {
+			_ = pemfile.Close()
+			_ = os.Remove(pemfile.Name())
+		})
+
+		cfg := ts.Gw.GetConfig()
+		cfg.PublicKeyPath = pemfile.Name()
+		ts.Gw.SetConfig(cfg)
+
+		spec := &APISpec{
+			APIDefinition: &apidef.APIDefinition{
+				CustomMiddlewareBundle: "bundle-unverifiable.zip",
+			},
+		}
+
+		bundlePath := ts.Gw.getBundleDestPath(spec)
+
+		memFs := afero.NewMemMapFs()
+		err := memFs.MkdirAll(bundlePath, 0755)
+		require.NoError(t, err)
+
+		manifestFile, err := memFs.Create(filepath.Join(bundlePath, "manifest.json"))
+		require.NoError(t, err)
+		_, err = manifestFile.WriteString(`{
+		    "file_list": [
+				"plugin.py"
+			],
+		    "custom_middleware": {
+		        "driver": "python",
+		        "auth_check": {
+		            "name": "MyAuthHook"
+		        }
+		    },
+			"checksum": "d41d8cd98f00b204e9800998ecf8427e",
+			"signature": "dGVzdC1wdWJsaWMta2V5"
+		}`)
+		require.NoError(t, err)
+
+		_, err = memFs.Create(filepath.Join(bundlePath, "plugin.py"))
+		require.NoError(t, err)
+
+		err = ts.Gw.loadBundleWithFs(spec, memFs)
+		assert.ErrorContains(t, err, "crypto/rsa: verification error")
+	})
+
+	t.Run("load bundle fails if manifest can't be found locally", func(t *testing.T) {
+		spec := &APISpec{
+			APIDefinition: &apidef.APIDefinition{
+				CustomMiddlewareBundle: "bundle.zip",
+			},
+		}
+
+		bundlePath := ts.Gw.getBundleDestPath(spec)
+
+		memFS := afero.NewMemMapFs()
+		err := memFS.MkdirAll(bundlePath, 0755)
+		require.NoError(t, err)
+
+		_, err = memFS.Create(filepath.Join(bundlePath, "plugin.py"))
+		require.NoError(t, err)
+
+		err = ts.Gw.loadBundleWithFs(spec, memFS)
+		assert.ErrorContains(t, err, "manifest.json: file does not exist")
 	})
 }
 
@@ -501,9 +549,37 @@ func TestBundle_Verify(t *testing.T) {
 			globalConf.PublicKeyPath = "test"
 			b.Gw.SetConfig(globalConf)
 
-			if err := b.Verify(); (err != nil) != tt.wantErr {
+			if err := b.Verify(afero.NewOsFs()); (err != nil) != tt.wantErr {
 				t.Errorf("Bundle.Verify() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
 	}
+}
+
+func createPEMFile(t *testing.T) *os.File {
+	t.Helper()
+
+	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		t.Fatalf("rsa.GenerateKey() failed: %v", err)
+	}
+	publicKey := &privateKey.PublicKey
+
+	publicKeyDER, err := x509.MarshalPKIXPublicKey(publicKey)
+	if err != nil {
+		t.Fatalf("x509.MarshalPKIXPublicKey() failed: %v", err)
+	}
+
+	pemBlock := &pem.Block{
+		Type:  "PUBLIC KEY",
+		Bytes: publicKeyDER,
+	}
+
+	tmpfile, err := os.CreateTemp("", "example")
+	require.NoError(t, err)
+
+	err = pem.Encode(tmpfile, pemBlock)
+	require.NoError(t, err)
+
+	return tmpfile
 }

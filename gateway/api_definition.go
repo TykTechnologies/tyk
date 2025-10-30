@@ -8,8 +8,8 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -22,9 +22,9 @@ import (
 
 	"github.com/TykTechnologies/tyk/internal/httputil"
 
-	"github.com/TykTechnologies/kin-openapi/routers/gorillamux"
+	"github.com/getkin/kin-openapi/routers/gorillamux"
 
-	"github.com/TykTechnologies/kin-openapi/openapi3"
+	"github.com/getkin/kin-openapi/openapi3"
 
 	"github.com/TykTechnologies/tyk/apidef/oas"
 
@@ -93,36 +93,38 @@ type RequestStatus string
 
 // Statuses of the request, all are false-y except StatusOk and StatusOkAndIgnore
 const (
-	VersionNotFound                RequestStatus = "Version information not found"
-	VersionDoesNotExist            RequestStatus = "This API version does not seem to exist"
-	VersionWhiteListStatusNotFound RequestStatus = "WhiteListStatus for path not found"
-	VersionExpired                 RequestStatus = "Api Version has expired, please check documentation or contact administrator"
-	APIExpired                     RequestStatus = "API has expired, please check documentation or contact administrator"
-	EndPointNotAllowed             RequestStatus = "Requested endpoint is forbidden"
-	StatusOkAndIgnore              RequestStatus = "Everything OK, passing and not filtering"
-	StatusOk                       RequestStatus = "Everything OK, passing"
-	StatusCached                   RequestStatus = "Cached path"
-	StatusTransform                RequestStatus = "Transformed path"
-	StatusTransformResponse        RequestStatus = "Transformed response"
-	StatusTransformJQ              RequestStatus = "Transformed path with JQ"
-	StatusTransformJQResponse      RequestStatus = "Transformed response with JQ"
-	StatusHeaderInjected           RequestStatus = "Header injected"
-	StatusMethodTransformed        RequestStatus = "Method Transformed"
-	StatusHeaderInjectedResponse   RequestStatus = "Header injected on response"
-	StatusRedirectFlowByReply      RequestStatus = "Exceptional action requested, redirecting flow!"
-	StatusHardTimeout              RequestStatus = "Hard Timeout enforced on path"
-	StatusCircuitBreaker           RequestStatus = "Circuit breaker enforced"
-	StatusURLRewrite               RequestStatus = "URL Rewritten"
-	StatusVirtualPath              RequestStatus = "Virtual Endpoint"
-	StatusRequestSizeControlled    RequestStatus = "Request Size Limited"
-	StatusRequestTracked           RequestStatus = "Request Tracked"
-	StatusRequestNotTracked        RequestStatus = "Request Not Tracked"
-	StatusValidateJSON             RequestStatus = "Validate JSON"
-	StatusValidateRequest          RequestStatus = "Validate Request"
-	StatusInternal                 RequestStatus = "Internal path"
-	StatusGoPlugin                 RequestStatus = "Go plugin"
-	StatusPersistGraphQL           RequestStatus = "Persist GraphQL"
-	StatusRateLimit                RequestStatus = "Rate Limited"
+	VersionNotFound                       RequestStatus = "Version information not found"
+	VersionDoesNotExist                   RequestStatus = "This API version does not seem to exist"
+	VersionWhiteListStatusNotFound        RequestStatus = "WhiteListStatus for path not found"
+	VersionExpired                        RequestStatus = "Api Version has expired, please check documentation or contact administrator"
+	VersionDefaultForNotVersionedNotFound RequestStatus = "No default API version for this non-versioned API found"
+	VersionAmbiguousDefault               RequestStatus = "Ambiguous default API version for this non-versioned API"
+	APIExpired                            RequestStatus = "API has expired, please check documentation or contact administrator"
+	EndPointNotAllowed                    RequestStatus = "Requested endpoint is forbidden"
+	StatusOkAndIgnore                     RequestStatus = "Everything OK, passing and not filtering"
+	StatusOk                              RequestStatus = "Everything OK, passing"
+	StatusCached                          RequestStatus = "Cached path"
+	StatusTransform                       RequestStatus = "Transformed path"
+	StatusTransformResponse               RequestStatus = "Transformed response"
+	StatusTransformJQ                     RequestStatus = "Transformed path with JQ"
+	StatusTransformJQResponse             RequestStatus = "Transformed response with JQ"
+	StatusHeaderInjected                  RequestStatus = "Header injected"
+	StatusMethodTransformed               RequestStatus = "Method Transformed"
+	StatusHeaderInjectedResponse          RequestStatus = "Header injected on response"
+	StatusRedirectFlowByReply             RequestStatus = "Exceptional action requested, redirecting flow!"
+	StatusHardTimeout                     RequestStatus = "Hard Timeout enforced on path"
+	StatusCircuitBreaker                  RequestStatus = "Circuit breaker enforced"
+	StatusURLRewrite                      RequestStatus = "URL Rewritten"
+	StatusVirtualPath                     RequestStatus = "Virtual Endpoint"
+	StatusRequestSizeControlled           RequestStatus = "Request Size Limited"
+	StatusRequestTracked                  RequestStatus = "Request Tracked"
+	StatusRequestNotTracked               RequestStatus = "Request Not Tracked"
+	StatusValidateJSON                    RequestStatus = "Validate JSON"
+	StatusValidateRequest                 RequestStatus = "Validate Request"
+	StatusInternal                        RequestStatus = "Internal path"
+	StatusGoPlugin                        RequestStatus = "Go plugin"
+	StatusPersistGraphQL                  RequestStatus = "Persist GraphQL"
+	StatusRateLimit                       RequestStatus = "Rate Limited"
 )
 
 type EndPointCacheMeta struct {
@@ -379,12 +381,10 @@ func (a APIDefinitionLoader) MakeSpec(def *model.MergedAPI, logger *logrus.Entry
 		{URL: spec.Proxy.ListenPath},
 	}
 
-	spec.OASRouter, err = gorillamux.NewRouter(&oasSpec)
+	spec.oasRouter, err = gorillamux.NewRouter(&oasSpec)
 	if err != nil {
 		logger.WithError(err).Error("Could not create OAS router")
 	}
-
-	spec.setHasMock()
 
 	return spec, nil
 }
@@ -393,37 +393,50 @@ func (a APIDefinitionLoader) MakeSpec(def *model.MergedAPI, logger *logrus.Entry
 func (a APIDefinitionLoader) FromDashboardService(endpoint string) ([]*APISpec, error) {
 	// Get the definitions
 	log.Debug("Calling: ", endpoint)
-	newRequest, err := http.NewRequest("GET", endpoint, nil)
-	if err != nil {
-		log.Error("Failed to create request: ", err)
+
+	// Build request function for recovery helper
+	buildReq := func() (*http.Request, error) {
+		newRequest, err := http.NewRequest("GET", endpoint, nil)
+		if err != nil {
+			log.Error("Failed to create request: ", err)
+			return nil, err
+		}
+
+		gwConfig := a.Gw.GetConfig()
+		newRequest.Header.Set("authorization", gwConfig.NodeSecret)
+		log.Debug("Using: NodeID: ", a.Gw.GetNodeID())
+		newRequest.Header.Set(header.XTykNodeID, a.Gw.GetNodeID())
+
+		a.Gw.ServiceNonceMutex.RLock()
+		newRequest.Header.Set(header.XTykNonce, a.Gw.ServiceNonce)
+		a.Gw.ServiceNonceMutex.RUnlock()
+
+		newRequest.Header.Set(header.XTykSessionID, a.Gw.SessionID)
+
+		return newRequest, nil
 	}
 
-	gwConfig := a.Gw.GetConfig()
-
-	newRequest.Header.Set("authorization", gwConfig.NodeSecret)
-	log.Debug("Using: NodeID: ", a.Gw.GetNodeID())
-	newRequest.Header.Set(header.XTykNodeID, a.Gw.GetNodeID())
-
-	a.Gw.ServiceNonceMutex.RLock()
-	newRequest.Header.Set(header.XTykNonce, a.Gw.ServiceNonce)
-	a.Gw.ServiceNonceMutex.RUnlock()
-
-	newRequest.Header.Set(header.XTykSessionID, a.Gw.SessionID)
-
-	c := a.Gw.initialiseClient()
-	resp, err := c.Do(newRequest)
+	// Execute request with automatic recovery
+	resp, err := a.Gw.executeDashboardRequestWithRecovery(buildReq, "API definitions fetch")
 	if err != nil {
 		return nil, err
 	}
 	defer resp.Body.Close()
 
+	// Handle 403 responses (auth errors already logged by helper)
 	if resp.StatusCode == http.StatusForbidden {
-		body, _ := ioutil.ReadAll(resp.Body)
+		body, err := io.ReadAll(resp.Body)
+		if err != nil {
+			body = []byte("failed to read response body")
+		}
 		return nil, fmt.Errorf("login failure, Response was: %v", string(body))
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		body, _ := ioutil.ReadAll(resp.Body)
+		body, err := io.ReadAll(resp.Body)
+		if err != nil {
+			body = []byte("failed to read response body")
+		}
 		return nil, fmt.Errorf("dashboard API error, response was: %v", string(body))
 	}
 
@@ -432,6 +445,10 @@ func (a APIDefinitionLoader) FromDashboardService(endpoint string) ([]*APISpec, 
 	inBytes, err := io.ReadAll(resp.Body)
 	if err != nil {
 		log.Error("Couldn't read api definition list")
+		// Check if this is a recoverable read error and retry if needed
+		if a.Gw.HandleDashboardResponseReadError(err, "API definitions read") {
+			return a.FromDashboardService(endpoint)
+		}
 		return nil, err
 	}
 
@@ -440,10 +457,12 @@ func (a APIDefinitionLoader) FromDashboardService(endpoint string) ([]*APISpec, 
 	err = json.Unmarshal(inBytes, &list)
 	if err != nil {
 		log.Error("Couldn't unmarshal api definition list")
+		// JSON unmarshal errors are not network errors, so don't retry
 		return nil, err
 	}
 
 	// Extract tagged entries only
+	gwConfig := a.Gw.GetConfig()
 	apiDefs := list.Filter(gwConfig.DBAppConfOptions.NodeIsSegmented, gwConfig.DBAppConfOptions.Tags...)
 
 	// Process
@@ -1647,10 +1666,15 @@ func (a *APISpec) Version(r *http.Request) (*apidef.VersionInfo, RequestStatus) 
 	} else {
 		// Are we versioned?
 		if a.VersionData.NotVersioned {
-			// Get the first one in the list
-			for _, v := range a.VersionData.Versions {
-				version = v
-				break
+			ambiguous := a.CheckForAmbiguousDefaultVersions()
+			if ambiguous {
+				return nil, VersionAmbiguousDefault
+			}
+
+			ok := false
+			version, ok = a.GetSingleOrDefaultVersion()
+			if !ok {
+				return nil, VersionDefaultForNotVersionedNotFound
 			}
 		} else {
 			// Extract Version Info
@@ -1682,6 +1706,57 @@ func (a *APISpec) Version(r *http.Request) (*apidef.VersionInfo, RequestStatus) 
 	}
 
 	return &version, StatusOk
+}
+
+// GetSingleOrDefaultVersion determines and returns a single version or the default version if only one or a default exists.
+// Returns versionInfo and a boolean indicating success or failure.
+func (a *APISpec) GetSingleOrDefaultVersion() (versionInfo apidef.VersionInfo, ok bool) {
+	// If only one version exists, we can safely return this one
+	if len(a.VersionData.Versions) == 1 {
+		for _, v := range a.VersionData.Versions {
+			return v, true
+		}
+	}
+
+	// Now we check if a default version is defined and will look for it, when NotVersioned is set to false.
+	// Otherwise, we skip this check.
+	if !a.VersionData.NotVersioned && a.VersionData.DefaultVersion != "" {
+		versionInfo, ok = a.VersionData.Versions[a.VersionData.DefaultVersion]
+		return versionInfo, ok
+	}
+
+	// If no default version is defined, we try to find one named "Default", "default" or ""
+	if versionInfo, ok = a.VersionData.Versions["Default"]; ok {
+		return versionInfo, ok
+	}
+
+	if versionInfo, ok = a.VersionData.Versions["default"]; ok {
+		return versionInfo, ok
+	}
+
+	if versionInfo, ok = a.VersionData.Versions[""]; ok {
+		return versionInfo, ok
+	}
+
+	// If we reach this point, we tried everything to find a default version and failed
+	return apidef.VersionInfo{}, false
+}
+
+// CheckForAmbiguousDefaultVersions checks if there are multiple ambiguous default versions in the version data.
+func (a *APISpec) CheckForAmbiguousDefaultVersions() bool {
+	foundDefaultVersions := 0
+	for key := range a.VersionData.Versions {
+		switch key {
+		case "Default":
+			fallthrough
+		case "default":
+			fallthrough
+		case "":
+			foundDefaultVersions++
+		}
+	}
+
+	return foundDefaultVersions > 1
 }
 
 // StripListenPath will strip the listen path from the URL, keeping version in tact.
@@ -1727,21 +1802,32 @@ func (a *APISpec) SanitizeProxyPaths(r *http.Request) {
 	log.Debug("Upstream path is: ", r.URL.Path)
 }
 
-func (a *APISpec) setHasMock() {
+func (a *APISpec) getRedirectTargetUrl(inputUrl *url.URL) (*url.URL, error) {
+	if inputUrl == nil {
+		return nil, errors.New("input url is nil")
+	}
+
+	cloneUrl := *inputUrl
+	newPath, err := url.JoinPath("/", a.target.Host, a.StripListenPath(cloneUrl.Path))
+
+	if err != nil {
+		return nil, err
+	}
+
+	cloneUrl.Path = newPath
+	cloneUrl.RawPath = newPath
+	return &cloneUrl, nil
+}
+
+// hasActiveMock checks if specification has at least one active mock.
+func (a *APISpec) hasActiveMock() bool {
 	if !a.IsOAS {
-		a.HasMock = false
-		return
+		return false
 	}
 
 	middleware := a.OAS.GetTykMiddleware()
 	if middleware == nil {
-		a.HasMock = false
-		return
-	}
-
-	if len(middleware.Operations) == 0 {
-		a.HasMock = false
-		return
+		return false
 	}
 
 	for _, operation := range middleware.Operations {
@@ -1750,12 +1836,32 @@ func (a *APISpec) setHasMock() {
 		}
 
 		if operation.MockResponse.Enabled {
-			a.HasMock = true
-			return
+			return true
 		}
 	}
 
-	a.HasMock = false
+	return false
+}
+
+func (a *APISpec) hasVirtualEndpoint() bool {
+	for _, version := range a.VersionData.Versions {
+		for _, virtual := range version.ExtendedPaths.Virtual {
+			if !virtual.Disabled {
+				return true
+			}
+		}
+	}
+
+	return false
+}
+
+// isListeningOnPort checks whether the API listens on the given port.
+func (a *APISpec) isListeningOnPort(port int, gwConfig *config.Config) bool {
+	if a.ListenPort == 0 {
+		return gwConfig.ListenPort == port
+	}
+
+	return a.ListenPort == port
 }
 
 type RoundRobin struct {
@@ -1769,25 +1875,4 @@ func (r *RoundRobin) WithLen(len int) int {
 	// -1 to start at 0, not 1
 	cur := atomic.AddUint32(&r.pos, 1) - 1
 	return int(cur) % len
-}
-
-func (s *APISpec) hasVirtualEndpoint() bool {
-	for _, version := range s.VersionData.Versions {
-		for _, virtual := range version.ExtendedPaths.Virtual {
-			if !virtual.Disabled {
-				return true
-			}
-		}
-	}
-
-	return false
-}
-
-// isListeningOnPort checks whether the API listens on the given port.
-func (s *APISpec) isListeningOnPort(port int, gwConfig *config.Config) bool {
-	if s.ListenPort == 0 {
-		return gwConfig.ListenPort == port
-	}
-
-	return s.ListenPort == port
 }

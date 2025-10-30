@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/TykTechnologies/kin-openapi/openapi3"
+	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/TykTechnologies/tyk/apidef"
@@ -146,7 +146,8 @@ func TestValidateRequest(t *testing.T) {
 			spec.IsOAS = true
 			spec.Proxy.ListenPath = "/product-regexp2/{name:.*}/suffix"
 			spec.UseKeylessAccess = true
-		})
+		},
+	)
 
 	headers := map[string]string{"Content-Type": "application/json"}
 
@@ -234,7 +235,6 @@ func TestValidateRequest_AfterMigration(t *testing.T) {
 					Method: http.MethodPost,
 					Path:   "/post",
 					Schema: map[string]interface{}{
-
 						"required": []string{"name"},
 					},
 					ErrorResponseCode: http.StatusTeapot,

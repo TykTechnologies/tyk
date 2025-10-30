@@ -46,7 +46,7 @@ func getResourceType(key string) string {
 	switch {
 	case strings.Contains(key, "oauth-clientid."):
 		return resourceOauthClient
-	case strings.HasPrefix(key, "cert"):
+	case strings.HasPrefix(key, "raw-"):
 		return resourceCertificate
 	case strings.HasPrefix(key, "apikey"):
 		return resourceApiKey

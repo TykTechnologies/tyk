@@ -24,7 +24,6 @@ import (
 	"net/http"
 	"net/textproto"
 	"net/url"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -68,7 +67,7 @@ func urlFromService(spec *APISpec, gw *Gateway) (*apidef.HostList, error) {
 		spec.ServiceRefreshInProgress = true
 		defer func() { spec.ServiceRefreshInProgress = false }()
 		sd := ServiceDiscovery{}
-		sd.Init(&spec.Proxy.ServiceDiscovery)
+		sd.Init(&spec.Proxy.ServiceDiscovery, gw)
 		data, err := sd.Target(spec.Proxy.ServiceDiscovery.QueryEndpoint)
 		if err != nil {
 			return nil, err
@@ -989,12 +988,6 @@ func (p *ReverseProxy) handleOutboundRequest(roundTripper *TykRoundTripper, outr
 		latency = time.Since(begin)
 	}()
 
-	if p.TykAPISpec.HasMock {
-		if res, err = p.mockResponse(outreq); res != nil {
-			return
-		}
-	}
-
 	if p.TykAPISpec.GraphQL.Enabled {
 		res, hijacked, err = p.handleGraphQL(roundTripper, outreq, w)
 		return
@@ -1211,14 +1204,21 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 		}
 
 		timeout := proxyTimeout(p.TykAPISpec)
+		transportTimeout := timeout
 
-		// If an enforced timeout is configured for this API endpoint, use it instead
-		// of the global default timeout, as it should take precedence
+		// If an enforced timeout is configured for this API endpoint, we use context timeout instead of transport timeout
+		// to avoid conflicts between ResponseHeaderTimeout and context timeout
 		if isTimeoutEnforced {
-			timeout = enforcedTimeout
+			// Don't pass the enforced timeout to transport - let context timeout handle it
+			// Use the default proxy timeout for transport instead
+			transportTimeout = proxyTimeout(p.TykAPISpec)
+			p.logger.Debug("Using context timeout for hard timeout, transport timeout: ", transportTimeout)
+		} else {
+			// For non-enforced timeouts, we can use the global timeout on transport
+			p.logger.Debug("Using transport timeout: ", timeout)
 		}
 
-		p.TykAPISpec.HTTPTransport = p.httpTransport(timeout, rw, req, outreq)
+		p.TykAPISpec.HTTPTransport = p.httpTransport(transportTimeout, rw, req, outreq)
 		p.TykAPISpec.HTTPTransportCreated = time.Now()
 
 		if oldTransport != nil {
@@ -1412,14 +1412,7 @@ func (p *ReverseProxy) HandleResponse(rw http.ResponseWriter, res *http.Response
 		res.Header.Set(header.Connection, "close")
 	}
 
-	// Add resource headers
-	if ses != nil {
-		// We have found a session, lets report back
-		quotaMax, quotaRemaining, _, quotaRenews := ses.GetQuotaLimitByAPIID(p.TykAPISpec.APIID)
-		res.Header.Set(header.XRateLimitLimit, strconv.Itoa(int(quotaMax)))
-		res.Header.Set(header.XRateLimitRemaining, strconv.Itoa(int(quotaRemaining)))
-		res.Header.Set(header.XRateLimitReset, strconv.Itoa(int(quotaRenews)))
-	}
+	p.TykAPISpec.sendRateLimitHeaders(ses, res)
 
 	copyHeader(rw.Header(), res.Header, p.Gw.GetConfig().IgnoreCanonicalMIMEHeaderKey)
 

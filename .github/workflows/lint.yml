@@ -20,10 +20,3 @@ jobs:
       ORG_GH_TOKEN: ${{ secrets.ORG_GH_TOKEN }}
     with:
       go-version: stable
-
-  jira:
-    if: ${{ !github.event.pull_request.draft }}
-    uses: TykTechnologies/github-actions/.github/workflows/jira-lint.yaml@main
-    secrets:
-      JIRA_TOKEN: ${{ secrets.JIRA_TOKEN }}
-      ORG_GH_TOKEN: ${{ secrets.ORG_GH_TOKEN }}

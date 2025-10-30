@@ -5,7 +5,9 @@ import (
 	"net/http"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/assert"
+	"go.opentelemetry.io/otel/trace"
 
 	"github.com/TykTechnologies/graphql-go-tools/pkg/engine/datasource/httpclient"
 	"github.com/TykTechnologies/graphql-go-tools/pkg/graphql"
@@ -122,7 +124,7 @@ func TestRecordDetail(t *testing.T) {
 
 func TestAnalyticRecord_GraphStats(t *testing.T) {
 
-	apiDef := BuildAPI(func(spec *APISpec) {
+	generateApiDefinition := func(spec *APISpec) {
 		spec.Name = "graphql API"
 		spec.APIID = "graphql-api"
 		spec.Proxy.TargetURL = testGraphQLProxyUpstream
@@ -133,7 +135,7 @@ func TestAnalyticRecord_GraphStats(t *testing.T) {
 			Version:       apidef.GraphQLConfigVersion2,
 			Schema:        gqlProxyUpstreamSchema,
 		}
-	})[0]
+	}
 
 	testCases := []struct {
 		name      string
@@ -141,6 +143,7 @@ func TestAnalyticRecord_GraphStats(t *testing.T) {
 		request   graphql.Request
 		checkFunc func(*testing.T, *analytics.AnalyticsRecord)
 		reloadAPI func(*APISpec)
+		headers   map[string]string
 	}{
 		{
 			name: "successfully generate stats",
@@ -221,11 +224,29 @@ func TestAnalyticRecord_GraphStats(t *testing.T) {
 				}, record.GraphQLStats.Errors)
 			},
 		},
+		{
+			name: "successfully generate stats for compressed request body",
+			code: http.StatusOK,
+			request: graphql.Request{
+				Query: `{ hello(name: "World") httpMethod }`,
+			},
+			headers: map[string]string{
+				httpclient.AcceptEncodingHeader: "gzip",
+			},
+			checkFunc: func(t *testing.T, record *analytics.AnalyticsRecord) {
+				t.Helper()
+				assert.True(t, record.GraphQLStats.IsGraphQL)
+				assert.False(t, record.GraphQLStats.HasErrors)
+				assert.ElementsMatch(t, []string{"hello", "httpMethod"}, record.GraphQLStats.RootFields)
+				assert.Equal(t, map[string][]string{}, record.GraphQLStats.Types)
+				assert.Equal(t, analytics.OperationQuery, record.GraphQLStats.OperationType)
+			},
+		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			spec := apiDef
+			spec := BuildAPI(generateApiDefinition)[0]
 			if tc.reloadAPI != nil {
 				tc.reloadAPI(spec)
 			}
@@ -237,13 +258,17 @@ func TestAnalyticRecord_GraphStats(t *testing.T) {
 			ts.Gw.Analytics.mockRecordHit = func(record *analytics.AnalyticsRecord) {
 				tc.checkFunc(t, record)
 			}
+			var headers = map[string]string{
+				httpclient.AcceptEncodingHeader: "",
+			}
+			if tc.headers != nil {
+				headers = tc.headers
+			}
 			_, err := ts.Run(t, test.TestCase{
-				Data:   tc.request,
-				Method: http.MethodPost,
-				Code:   tc.code,
-				Headers: map[string]string{
-					httpclient.AcceptEncodingHeader: "",
-				},
+				Data:    tc.request,
+				Method:  http.MethodPost,
+				Code:    tc.code,
+				Headers: headers,
 			})
 			assert.NoError(t, err)
 		})
@@ -332,4 +357,73 @@ func TestAnalyticsIgnoreSubgraph(t *testing.T) {
 		},
 	)
 	assert.NoError(t, err)
+}
+
+func TestSuccessHandler_addTraceIDTag(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	s := &SuccessHandler{
+		BaseMiddleware: &BaseMiddleware{Gw: ts.Gw},
+	}
+
+	makeCtxWithTrace := func(hex string) context.Context {
+		tid, err := trace.TraceIDFromHex(hex)
+		if err != nil {
+			t.Fatalf("invalid trace id: %v", err)
+		}
+		sc := trace.NewSpanContext(trace.SpanContextConfig{
+			TraceID:    tid,
+			TraceFlags: trace.FlagsSampled,
+		})
+		return trace.ContextWithSpanContext(context.Background(), sc)
+	}
+
+	tests := map[string]struct {
+		enableOTel bool
+		ctx        context.Context
+		in         []string
+		want       []string
+	}{
+		"enabled_with_trace_appends": {
+			enableOTel: true,
+			ctx:        makeCtxWithTrace("0123456789abcdef0123456789abcdef"),
+			in:         []string{"a", "b"},
+			want:       []string{"a", "b", traceTagPrefix + "0123456789abcdef0123456789abcdef"},
+		},
+		"enabled_without_trace_noop": {
+			enableOTel: true,
+			ctx:        context.Background(),
+			in:         []string{"x"},
+			want:       []string{"x"},
+		},
+		"disabled_with_trace_noop": {
+			enableOTel: false,
+			ctx:        makeCtxWithTrace("ffffffffffffffffffffffffffffffff"),
+			in:         []string{},
+			want:       []string{},
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			cfg := ts.Gw.GetConfig()
+			cfg.OpenTelemetry.Enabled = tc.enableOTel
+			ts.Gw.SetConfig(cfg)
+
+			tags := make([]string, 0, len(tc.in))
+			tags = append(tags, tc.in...)
+
+			tags = s.addTraceIDTag(tc.ctx, tags)
+
+			want := tc.want
+			if want == nil {
+				want = []string{}
+			}
+
+			if diff := cmp.Diff(tags, want); diff != "" {
+				t.Fatalf("tags mismatch (-got +want):\n%s", diff)
+			}
+		})
+	}
 }

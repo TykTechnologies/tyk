@@ -43,10 +43,9 @@ import (
 	"time"
 
 	"github.com/TykTechnologies/tyk/internal/httpctx"
+	"github.com/getkin/kin-openapi/openapi3"
 
 	gqlv2 "github.com/TykTechnologies/graphql-go-tools/v2/pkg/graphql"
-
-	"github.com/TykTechnologies/kin-openapi/openapi3"
 
 	"github.com/TykTechnologies/tyk/config"
 
@@ -70,6 +69,7 @@ import (
 	"github.com/TykTechnologies/tyk/user"
 
 	gql "github.com/TykTechnologies/graphql-go-tools/pkg/graphql"
+	lib "github.com/TykTechnologies/tyk/lib/apidef"
 )
 
 const (
@@ -1050,13 +1050,31 @@ func (gw *Gateway) handleGetAPIOAS(apiID string, modePublic bool) (interface{}, 
 
 func (gw *Gateway) handleAddApi(r *http.Request, fs afero.Fs, oasEndpoint bool) (interface{}, int) {
 	var (
-		newDef             apidef.APIDefinition
-		oasObj             oas.OAS
-		baseAPIID          = r.FormValue("base_api_id")
-		baseAPIVersionName = r.FormValue("base_api_version_name")
-		newVersionName     = r.FormValue("new_version_name")
-		setDefault         = r.FormValue("set_default") == "true"
+		newDef apidef.APIDefinition
+		oasObj oas.OAS
 	)
+
+	versionParams := lib.NewVersionQueryParameters(r.URL.Query())
+	err := versionParams.Validate(func() (bool, string) {
+		baseApiID := versionParams.Get(lib.BaseAPIID)
+		baseApi := gw.getApiSpec(baseApiID)
+		if baseApi != nil {
+			return true, baseApi.VersionDefinition.Name
+		}
+
+		return false, ""
+	})
+
+	if err != nil {
+		// https://tyktech.atlassian.net/browse/TT-7523?focusedCommentId=100547
+		// Sadly we are averse to changing (incorrect) HTTP error codes, because these could be considered breaking changes by some of our clients.
+		// Please return HTTP 422 here, because currently the request doesn’t generate an error.
+		if errors.Is(err, lib.ErrNewVersionRequired) {
+			return apiError(err.Error()), http.StatusUnprocessableEntity
+		}
+
+		return apiError(err.Error()), http.StatusBadRequest
+	}
 
 	if oasEndpoint {
 		if err := json.NewDecoder(r.Body).Decode(&oasObj); err != nil {
@@ -1082,7 +1100,10 @@ func (gw *Gateway) handleAddApi(r *http.Request, fs afero.Fs, oasEndpoint bool) 
 
 	if oasEndpoint {
 		newAPIURL := getAPIURL(newDef, gw.GetConfig())
-		oasObj.AddServers(newAPIURL)
+
+		if err := oasObj.AddServers(newAPIURL); err != nil {
+			return apiError(err.Error()), http.StatusBadRequest
+		}
 
 		newDef.IsOAS = true
 		oasObj.GetTykExtension().Info.ID = newDef.APIID
@@ -1100,60 +1121,20 @@ func (gw *Gateway) handleAddApi(r *http.Request, fs afero.Fs, oasEndpoint bool) 
 		}
 	}
 
-	if baseAPIID != "" {
-		if baseAPIPtr := gw.getApiSpec(baseAPIID); baseAPIPtr == nil {
-			log.Errorf("Couldn't find a base API to bind with the given API id: %s", baseAPIID)
+	if !versionParams.IsEmpty(lib.BaseAPIID) {
+		baseAPI := gw.getApiSpec(versionParams.Get(lib.BaseAPIID))
+		baseAPI.VersionDefinition = lib.ConfigureVersionDefinition(baseAPI.VersionDefinition, versionParams, newDef.APIID)
+
+		if baseAPI.IsOAS {
+			baseAPI.OAS.Fill(*baseAPI.APIDefinition)
+			err, _ := gw.writeOASAndAPIDefToFile(fs, baseAPI.APIDefinition, &baseAPI.OAS)
+			if err != nil {
+				log.WithError(err).Errorf("Error occurred while updating base OAS API with id: %s", baseAPI.APIID)
+			}
 		} else {
-			apiInBytes, err := json.Marshal(baseAPIPtr)
+			err, _ := gw.writeToFile(fs, baseAPI.APIDefinition, baseAPI.APIID)
 			if err != nil {
-				log.WithError(err).Error("Couldn't marshal API spec")
-			}
-
-			var baseAPI APISpec
-			err = json.Unmarshal(apiInBytes, &baseAPI)
-			if err != nil {
-				log.WithError(err).Error("Couldn't unmarshal API spec")
-			}
-
-			baseAPI.VersionDefinition.Enabled = true
-			if baseAPIVersionName != "" {
-				baseAPI.VersionDefinition.Name = baseAPIVersionName
-				baseAPI.VersionDefinition.Default = baseAPIVersionName
-			}
-
-			if baseAPI.VersionDefinition.Key == "" {
-				baseAPI.VersionDefinition.Key = apidef.DefaultAPIVersionKey
-			}
-
-			if baseAPI.VersionDefinition.Location == "" {
-				baseAPI.VersionDefinition.Location = apidef.HeaderLocation
-			}
-
-			if baseAPI.VersionDefinition.Default == "" {
-				baseAPI.VersionDefinition.Default = apidef.Self
-			}
-
-			if baseAPI.VersionDefinition.Versions == nil {
-				baseAPI.VersionDefinition.Versions = make(map[string]string)
-			}
-
-			baseAPI.VersionDefinition.Versions[newVersionName] = newDef.APIID
-
-			if setDefault {
-				baseAPI.VersionDefinition.Default = newVersionName
-			}
-
-			if baseAPI.IsOAS {
-				baseAPI.OAS.Fill(*baseAPI.APIDefinition)
-				err, _ := gw.writeOASAndAPIDefToFile(fs, baseAPI.APIDefinition, &baseAPI.OAS)
-				if err != nil {
-					log.WithError(err).Errorf("Error occurred while updating base OAS API with id: %s", baseAPI.APIID)
-				}
-			} else {
-				err, _ := gw.writeToFile(fs, baseAPI.APIDefinition, baseAPI.APIID)
-				if err != nil {
-					log.WithError(err).Errorf("Error occurred while updating base API with id: %s", baseAPI.APIID)
-				}
+				log.WithError(err).Errorf("Error occurred while updating base API with id: %s", baseAPI.APIID)
 			}
 		}
 	}
@@ -1436,17 +1417,16 @@ func (gw *Gateway) apiHandler(w http.ResponseWriter, r *http.Request) {
 
 func (gw *Gateway) apiOASGetHandler(w http.ResponseWriter, r *http.Request) {
 	var (
-		apiID       = mux.Vars(r)["apiID"]
-		scopePublic = r.URL.Query().Get("mode") == "public"
-		obj         interface{}
-		code        int
+		apiID = mux.Vars(r)["apiID"]
+		obj   interface{}
+		code  int
 	)
 	if apiID != "" {
 		log.Debugf("Requesting API definition for %q", apiID)
-		obj, code = gw.handleGetAPIOAS(apiID, scopePublic)
+		obj, code = gw.handleGetAPIOAS(apiID, false)
 	} else {
 		log.Debug("Requesting API list")
-		obj, code = gw.handleGetAPIListOAS(scopePublic)
+		obj, code = gw.handleGetAPIListOAS(false)
 	}
 
 	if oasAPI, ok := obj.(*oas.OAS); ok {
@@ -1546,8 +1526,10 @@ func (gw *Gateway) apiOASPatchHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
+	// Update middlewares even when no query params are provided.
+	oasObjToPatch.ImportMiddlewares(oas.TykExtensionConfigParams{})
 
-	oasAPIInBytes, err := oasObj.MarshalJSON()
+	oasAPIInBytes, err := oasObjToPatch.MarshalJSON()
 	if err != nil {
 		doJSONWrite(w, http.StatusInternalServerError, apiError(err.Error()))
 		return
@@ -3179,6 +3161,25 @@ func ctxGetUrlRewritePath(r *http.Request) string {
 	return ""
 }
 
+func ctxSetInternalRedirectTarget(r *http.Request, u *url.URL) {
+	setCtxValue(r, ctx.InternalRedirectTarget, u)
+}
+
+func ctxGetInternalRedirectTarget(r *http.Request) *url.URL {
+	if v := r.Context().Value(ctx.InternalRedirectTarget); v != nil {
+		if val, ok := v.(*url.URL); ok {
+			return val
+		}
+	}
+
+	if r.URL == nil {
+		return nil
+	}
+
+	clone := *r.URL
+	return &clone
+}
+
 func ctxSetCheckLoopLimits(r *http.Request, b bool) {
 	setCtxValue(r, ctx.CheckLoopLimits, b)
 }
@@ -3352,14 +3353,6 @@ func ctxIncThrottleLevel(r *http.Request, throttleLimit int) {
 	ctxSetThrottleLevel(r, ctxThrottleLevel(r)+1)
 }
 
-func ctxTraceEnabled(r *http.Request) bool {
-	return r.Context().Value(ctx.Trace) != nil
-}
-
-func ctxSetTrace(r *http.Request) {
-	setCtxValue(r, ctx.Trace, true)
-}
-
 func ctxSetSpanAttributes(r *http.Request, mwName string, attrs ...otel.SpanAttribute) {
 	if len(attrs) > 0 {
 		setCtxValue(r, mwName, attrs)
@@ -3383,17 +3376,6 @@ func ctxSetRequestStatus(r *http.Request, stat RequestStatus) {
 func ctxGetRequestStatus(r *http.Request) (stat RequestStatus) {
 	if v := r.Context().Value(ctx.RequestStatus); v != nil {
 		stat = v.(RequestStatus)
-	}
-	return
-}
-
-func ctxSetOperation(r *http.Request, op *Operation) {
-	setCtxValue(r, ctx.OASOperation, op)
-}
-
-func ctxGetOperation(r *http.Request) (op *Operation) {
-	if v := r.Context().Value(ctx.OASOperation); v != nil {
-		op = v.(*Operation)
 	}
 	return
 }

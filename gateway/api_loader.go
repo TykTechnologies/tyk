@@ -15,12 +15,14 @@ import (
 	"sync"
 	texttemplate "text/template"
 
+	"github.com/TykTechnologies/tyk/common/option"
+
 	"github.com/gorilla/mux"
 	"github.com/justinas/alice"
-	"github.com/rs/cors"
 	"github.com/sirupsen/logrus"
 
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/apidef/oas"
 	"github.com/TykTechnologies/tyk/coprocess"
 	"github.com/TykTechnologies/tyk/rpc"
 	"github.com/TykTechnologies/tyk/storage"
@@ -41,6 +43,11 @@ type ChainObject struct {
 	RateLimitChain http.Handler
 	Open           bool
 	Skip           bool
+}
+
+// ProcessSpecOptions represents options for processSpec method
+type ProcessSpecOptions struct {
+	quotaKey string
 }
 
 func (gw *Gateway) prepareStorage() generalStores {
@@ -117,7 +124,7 @@ func fixFuncPath(pathPrefix string, funcs []apidef.MiddlewareDefinition) {
 	}
 }
 
-func (gw *Gateway) generateSubRoutes(spec *APISpec, router *mux.Router, logger *logrus.Entry) {
+func (gw *Gateway) generateSubRoutes(spec *APISpec, router *mux.Router) {
 	if spec.GraphQL.GraphQLPlayground.Enabled {
 		gw.loadGraphQLPlayground(spec, router)
 	}
@@ -130,25 +137,19 @@ func (gw *Gateway) generateSubRoutes(spec *APISpec, router *mux.Router, logger *
 		oauthManager := gw.addOAuthHandlers(spec, router)
 		spec.OAuthManager = oauthManager
 	}
-
-	if spec.CORS.Enable {
-		c := cors.New(cors.Options{
-			AllowedOrigins:     spec.CORS.AllowedOrigins,
-			AllowedMethods:     spec.CORS.AllowedMethods,
-			AllowedHeaders:     spec.CORS.AllowedHeaders,
-			ExposedHeaders:     spec.CORS.ExposedHeaders,
-			AllowCredentials:   spec.CORS.AllowCredentials,
-			MaxAge:             spec.CORS.MaxAge,
-			OptionsPassthrough: spec.CORS.OptionsPassthrough,
-			Debug:              spec.CORS.Debug,
-		})
-
-		router.Use(c.Handler)
-	}
 }
 
-func (gw *Gateway) processSpec(spec *APISpec, apisByListen map[string]int,
-	gs *generalStores, logger *logrus.Entry) *ChainObject {
+func (gw *Gateway) processSpec(
+	spec *APISpec,
+	apisByListen map[string]int,
+	gs *generalStores,
+	logger *logrus.Entry,
+	opts ...option.Option[ProcessSpecOptions],
+) *ChainObject {
+
+	var options = option.New(opts).Build(ProcessSpecOptions{
+		quotaKey: "",
+	})
 
 	var chainDef ChainObject
 
@@ -156,6 +157,7 @@ func (gw *Gateway) processSpec(spec *APISpec, apisByListen map[string]int,
 		"org_id":   spec.OrgID,
 		"api_id":   spec.APIID,
 		"api_name": spec.Name,
+		"type":     traceLogRequest.String(),
 	})
 
 	var coprocessLog = logger.WithFields(logrus.Fields{
@@ -282,7 +284,7 @@ func (gw *Gateway) processSpec(spec *APISpec, apisByListen map[string]int,
 	}
 
 	// Create the response processors, pass all the loaded custom middleware response functions:
-	gw.createResponseMiddlewareChain(spec, mwResponseFuncs)
+	spec.ResponseChain = gw.createResponseMiddlewareChain(spec, mwResponseFuncs, logger)
 
 	baseMid := NewBaseMiddleware(gw, spec, proxy, logger)
 
@@ -300,6 +302,7 @@ func (gw *Gateway) processSpec(spec *APISpec, apisByListen map[string]int,
 	}
 
 	gw.mwAppendEnabled(&chainArray, &VersionCheck{BaseMiddleware: baseMid.Copy()})
+	gw.mwAppendEnabled(&chainArray, &CORSMiddleware{BaseMiddleware: baseMid.Copy()})
 
 	for _, obj := range mwPreFuncs {
 		if mwDriver == apidef.GoPluginDriver {
@@ -329,30 +332,63 @@ func (gw *Gateway) processSpec(spec *APISpec, apisByListen map[string]int,
 	gw.mwAppendEnabled(&chainArray, &MiddlewareContextVars{BaseMiddleware: baseMid.Copy()})
 	gw.mwAppendEnabled(&chainArray, &TrackEndpointMiddleware{baseMid.Copy()})
 
+	// Track auth middlewares for OR wrapper
+	var authMiddlewares []TykMiddleware
+
 	if !spec.UseKeylessAccess {
 		// Select the keying method to use for setting session states
-		if gw.mwAppendEnabled(&authArray, &Oauth2KeyExists{baseMid.Copy()}) {
+		oauth2MW := &Oauth2KeyExists{baseMid.Copy()}
+		oauth2MW.Spec = spec
+		oauth2MW.Gw = gw
+		oauth2MW.Init()
+		if gw.mwAppendEnabled(&authArray, oauth2MW) {
 			logger.Info("Checking security policy: OAuth")
+			authMiddlewares = append(authMiddlewares, oauth2MW)
 		}
 
-		if gw.mwAppendEnabled(&authArray, &ExternalOAuthMiddleware{baseMid.Copy()}) {
+		extOAuthMW := &ExternalOAuthMiddleware{baseMid.Copy()}
+		extOAuthMW.Spec = spec
+		extOAuthMW.Gw = gw
+		extOAuthMW.Init()
+		if gw.mwAppendEnabled(&authArray, extOAuthMW) {
 			logger.Info("Checking security policy: External OAuth")
+			authMiddlewares = append(authMiddlewares, extOAuthMW)
 		}
 
-		if gw.mwAppendEnabled(&authArray, &BasicAuthKeyIsValid{baseMid.Copy(), nil, nil}) {
+		basicAuthMW := &BasicAuthKeyIsValid{baseMid.Copy(), nil, nil}
+		basicAuthMW.Spec = spec
+		basicAuthMW.Gw = gw
+		basicAuthMW.Init()
+		if gw.mwAppendEnabled(&authArray, basicAuthMW) {
 			logger.Info("Checking security policy: Basic")
+			authMiddlewares = append(authMiddlewares, basicAuthMW)
 		}
 
-		if gw.mwAppendEnabled(&authArray, &HTTPSignatureValidationMiddleware{BaseMiddleware: baseMid.Copy()}) {
+		hmacMW := &HTTPSignatureValidationMiddleware{BaseMiddleware: baseMid.Copy()}
+		hmacMW.Spec = spec
+		hmacMW.Gw = gw
+		hmacMW.Init()
+		if gw.mwAppendEnabled(&authArray, hmacMW) {
 			logger.Info("Checking security policy: HMAC")
+			authMiddlewares = append(authMiddlewares, hmacMW)
 		}
 
-		if gw.mwAppendEnabled(&authArray, &JWTMiddleware{baseMid.Copy()}) {
+		jwtMW := &JWTMiddleware{BaseMiddleware: baseMid.Copy()}
+		jwtMW.Spec = spec
+		jwtMW.Gw = gw
+		jwtMW.Init()
+		if gw.mwAppendEnabled(&authArray, jwtMW) {
 			logger.Info("Checking security policy: JWT")
+			authMiddlewares = append(authMiddlewares, jwtMW)
 		}
 
-		if gw.mwAppendEnabled(&authArray, &OpenIDMW{BaseMiddleware: baseMid.Copy()}) {
+		openIDMW := &OpenIDMW{BaseMiddleware: baseMid.Copy()}
+		openIDMW.Spec = spec
+		openIDMW.Gw = gw
+		openIDMW.Init()
+		if gw.mwAppendEnabled(&authArray, openIDMW) {
 			logger.Info("Checking security policy: OpenID")
+			authMiddlewares = append(authMiddlewares, openIDMW)
 		}
 
 		customPluginAuthEnabled := spec.CustomPluginAuthEnabled || spec.UseGoPluginAuth || spec.EnableCoProcessAuth
@@ -361,36 +397,69 @@ func (gw *Gateway) processSpec(spec *APISpec, apisByListen map[string]int,
 			switch spec.CustomMiddleware.Driver {
 			case apidef.OttoDriver:
 				logger.Info("----> Checking security policy: JS Plugin")
-				authArray = append(authArray, gw.createMiddleware(&DynamicMiddleware{
+				dynamicMW := &DynamicMiddleware{
 					BaseMiddleware:      baseMid.Copy(),
 					MiddlewareClassName: mwAuthCheckFunc.Name,
 					Pre:                 true,
 					Auth:                true,
-				}))
+				}
+				authArray = append(authArray, gw.createMiddleware(dynamicMW))
+				authMiddlewares = append(authMiddlewares, dynamicMW)
 			case apidef.GoPluginDriver:
-				gw.mwAppendEnabled(
-					&authArray,
-					&GoPluginMiddleware{
-						BaseMiddleware: baseMid.Copy(),
-						Path:           mwAuthCheckFunc.Path,
-						SymbolName:     mwAuthCheckFunc.Name,
-						APILevel:       true,
-					},
-				)
+				goPluginMW := &GoPluginMiddleware{
+					BaseMiddleware: baseMid.Copy(),
+					Path:           mwAuthCheckFunc.Path,
+					SymbolName:     mwAuthCheckFunc.Name,
+					APILevel:       true,
+				}
+				if gw.mwAppendEnabled(&authArray, goPluginMW) {
+					authMiddlewares = append(authMiddlewares, goPluginMW)
+				}
 			default:
 				coprocessLog.Debug("Registering coprocess middleware, hook name: ", mwAuthCheckFunc.Name, "hook type: CustomKeyCheck", ", driver: ", mwDriver)
 
 				newExtractor(spec, baseMid.Copy())
-				gw.mwAppendEnabled(&authArray, &CoProcessMiddleware{baseMid.Copy(), coprocess.HookType_CustomKeyCheck, mwAuthCheckFunc.Name, mwDriver, mwAuthCheckFunc.RawBodyOnly, nil})
+				coProcessMW := &CoProcessMiddleware{baseMid.Copy(), coprocess.HookType_CustomKeyCheck, mwAuthCheckFunc.Name, mwDriver, mwAuthCheckFunc.RawBodyOnly, nil}
+				if gw.mwAppendEnabled(&authArray, coProcessMW) {
+					authMiddlewares = append(authMiddlewares, coProcessMW)
+				}
 			}
 		}
 
 		if spec.UseStandardAuth || len(authArray) == 0 {
 			logger.Info("Checking security policy: Token")
-			authArray = append(authArray, gw.createMiddleware(&AuthKey{baseMid.Copy()}))
+			authKeyMW := &AuthKey{baseMid.Copy()}
+			authArray = append(authArray, gw.createMiddleware(authKeyMW))
+			authMiddlewares = append(authMiddlewares, authKeyMW)
 		}
 
-		chainArray = append(chainArray, authArray...)
+		processingMode := oas.SecurityProcessingModeLegacy
+		if spec.IsOAS && spec.OAS.GetTykExtension() != nil {
+			if auth := spec.OAS.GetTykExtension().Server.Authentication; auth != nil && auth.SecurityProcessingMode != "" {
+				processingMode = auth.SecurityProcessingMode
+			}
+		}
+
+		// In compliant mode with multiple requirements, use OR wrapper
+		// Note: Vendor extension security is already included in spec.SecurityRequirements after extraction
+		if processingMode == oas.SecurityProcessingModeCompliant && len(spec.SecurityRequirements) > 1 && len(authMiddlewares) > 0 {
+			logger.WithFields(logrus.Fields{
+				"totalRequirements": len(spec.SecurityRequirements),
+			}).Info("Compliant mode: Multiple security requirements detected - using OR authentication logic")
+
+			orWrapper := &AuthORWrapper{
+				BaseMiddleware:  *baseMid.Copy(),
+				authMiddlewares: authMiddlewares,
+			}
+
+			chainArray = append(chainArray, gw.createMiddleware(orWrapper))
+		} else {
+			// Legacy mode or single requirement - use standard auth chain
+			if processingMode == oas.SecurityProcessingModeLegacy && len(spec.SecurityRequirements) > 1 {
+				logger.Info("Legacy mode: Processing first security requirement only, ignoring others")
+			}
+			chainArray = append(chainArray, authArray...)
+		}
 
 		// if gw is edge, then prefetch any existent org session expiry
 		if gw.GetConfig().SlaveOptions.UseRPC {
@@ -424,7 +493,7 @@ func (gw *Gateway) processSpec(spec *APISpec, apisByListen map[string]int,
 		gw.mwAppendEnabled(&chainArray, &RateLimitAndQuotaCheck{baseMid.Copy()})
 	}
 
-	gw.mwAppendEnabled(&chainArray, &RateLimitForAPI{BaseMiddleware: baseMid.Copy()})
+	gw.mwAppendEnabled(&chainArray, &RateLimitForAPI{BaseMiddleware: baseMid.Copy(), quotaKey: options.quotaKey})
 	gw.mwAppendEnabled(&chainArray, &GraphQLMiddleware{BaseMiddleware: baseMid.Copy()})
 
 	if streamMw := getStreamingMiddleware(baseMid); streamMw != nil {
@@ -454,8 +523,8 @@ func (gw *Gateway) processSpec(spec *APISpec, apisByListen map[string]int,
 	gw.mwAppendEnabled(&chainArray, &TransformMethod{BaseMiddleware: baseMid.Copy()})
 
 	// Earliest we can respond with cache get 200 ok
+	gw.mwAppendEnabled(&chainArray, newMockResponseMiddleware(baseMid.Copy()))
 	gw.mwAppendEnabled(&chainArray, &RedisCacheMiddleware{BaseMiddleware: baseMid.Copy(), store: &cacheStore})
-
 	gw.mwAppendEnabled(&chainArray, &VirtualEndpoint{BaseMiddleware: baseMid.Copy()})
 	gw.mwAppendEnabled(&chainArray, &RequestSigning{BaseMiddleware: baseMid.Copy()})
 	gw.mwAppendEnabled(&chainArray, &GoPluginMiddleware{BaseMiddleware: baseMid.Copy()})
@@ -544,10 +613,8 @@ func (gw *Gateway) configureAuthAndOrgStores(gs *generalStores, spec *APISpec) (
 	case RPCStorageEngine:
 		authStore = gs.rpcAuthStore
 		orgStore = gs.rpcOrgStore
-		spec.GlobalConfig.EnforceOrgDataAge = true
-		globalConf := gw.GetConfig()
-		globalConf.EnforceOrgDataAge = true
-		gw.SetConfig(globalConf)
+		// Only enforce org data age if org quotas are enabled
+		gw.enforceOrgDataAgeIfQuotasEnabled(spec)
 	}
 
 	sessionStore := gs.redisStore
@@ -650,13 +717,24 @@ func (d *DummyProxyHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	if d.SH.Spec.target.Scheme == "tyk" {
 		handler, _, found := d.Gw.findInternalHttpHandlerByNameOrID(d.SH.Spec.target.Host)
+
 		if !found {
 			handler := ErrorHandler{d.SH.Base()}
 			handler.HandleError(w, r, "Couldn't detect target", http.StatusInternalServerError, true)
 			return
 		}
 
+		targetUrl, err := d.SH.Spec.getRedirectTargetUrl(ctxGetInternalRedirectTarget(r))
+
+		if err != nil {
+			log.Errorf("failed to create internal redirect url: %s", err)
+			handler := ErrorHandler{d.SH.Base()}
+			handler.HandleError(w, r, "Failed to perform internal redirect", http.StatusInternalServerError, true)
+			return
+		}
+
 		d.SH.Spec.SanitizeProxyPaths(r)
+		ctxSetInternalRedirectTarget(r, targetUrl)
 		ctxSetVersionInfo(r, nil)
 		handler.ServeHTTP(w, r)
 		return
@@ -816,7 +894,7 @@ func (gw *Gateway) loadHTTPService(spec *APISpec, apisByListen map[string]int, g
 	for _, prefix := range prefixes {
 		subrouter := router.PathPrefix(prefix).Subrouter()
 
-		gw.generateSubRoutes(spec, subrouter, logrus.NewEntry(log))
+		gw.generateSubRoutes(spec, subrouter)
 
 		if !chainObj.Open {
 			subrouter.Handle(rateLimitEndpoint, chainObj.RateLimitChain)
@@ -843,10 +921,8 @@ func (gw *Gateway) loadTCPService(spec *APISpec, gs *generalStores, muxer *proxy
 	case RPCStorageEngine:
 		authStore = gs.rpcAuthStore
 		orgStore = gs.rpcOrgStore
-		spec.GlobalConfig.EnforceOrgDataAge = true
-		gwConfig := gw.GetConfig()
-		gwConfig.EnforceOrgDataAge = true
-		gw.SetConfig(gwConfig)
+		// Only enforce org data age if org quotas are enabled
+		gw.enforceOrgDataAgeIfQuotasEnabled(spec)
 	}
 
 	sessionStore := gs.redisStore
@@ -1124,4 +1200,23 @@ func (gw *Gateway) allApisAreMTLS() bool {
 	}
 
 	return true
+}
+
+// enforceOrgDataAgeIfQuotasEnabled updates the configuration to enforce organization data age if quotas are enabled.
+func (gw *Gateway) enforceOrgDataAgeIfQuotasEnabled(spec *APISpec) {
+	globalConf := gw.GetConfig()
+	if !globalConf.EnforceOrgQuotas {
+		return
+	}
+
+	spec.GlobalConfig.EnforceOrgDataAge = true
+	globalConf.EnforceOrgDataAge = true
+	gw.SetConfig(globalConf)
+}
+
+// WithQuotaKey overrides quota key manually
+func WithQuotaKey(key string) option.Option[ProcessSpecOptions] {
+	return func(p *ProcessSpecOptions) {
+		p.quotaKey = key
+	}
 }

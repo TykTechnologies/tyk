@@ -38,7 +38,6 @@ import (
 )
 
 const (
-	mwStatusRespond                = middleware.StatusRespond
 	DEFAULT_ORG_SESSION_EXPIRATION = int64(604800)
 )
 
@@ -136,7 +135,7 @@ func (gw *Gateway) createMiddleware(actualMW TykMiddleware) func(http.Handler) h
 		mw.Logger().Fatal("[Middleware] Configuration load failed")
 	}
 
-	return func(h http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			logger := mw.Base().SetRequestLogger(r)
 
@@ -165,7 +164,7 @@ func (gw *Gateway) createMiddleware(actualMW TykMiddleware) func(http.Handler) h
 			logger.WithField("ts", startTime.UnixNano()).WithField("mw", mw.Name()).Debug("Started")
 
 			if mw.Base().Spec.CORS.OptionsPassthrough && r.Method == "OPTIONS" {
-				h.ServeHTTP(w, r)
+				next.ServeHTTP(w, r)
 				return
 			}
 
@@ -205,10 +204,10 @@ func (gw *Gateway) createMiddleware(actualMW TykMiddleware) func(http.Handler) h
 
 			mw.Base().UpdateRequestSession(r)
 			// Special code, bypasses all other execution
-			if errCode != mwStatusRespond {
+			if errCode != middleware.StatusRespond {
 				// No error, carry on...
 				meta["bypass"] = "1"
-				h.ServeHTTP(w, r)
+				next.ServeHTTP(w, r)
 			}
 		})
 	}
@@ -279,12 +278,12 @@ func NewBaseMiddleware(gw *Gateway, spec *APISpec, proxy ReturningHttpHandler, l
 
 // Copy provides a new BaseMiddleware with it's own logger scope (copy).
 // The Spec, Proxy and Gw values are not copied.
-func (m *BaseMiddleware) Copy() *BaseMiddleware {
+func (t *BaseMiddleware) Copy() *BaseMiddleware {
 	return &BaseMiddleware{
-		logger: m.logger.Dup(),
-		Spec:   m.Spec,
-		Proxy:  m.Proxy,
-		Gw:     m.Gw,
+		logger: t.logger.Dup(),
+		Spec:   t.Spec,
+		Proxy:  t.Proxy,
+		Gw:     t.Gw,
 	}
 }
 
@@ -694,7 +693,13 @@ func (t *BaseMiddleware) generateSessionID(id string) string {
 	return t.Gw.generateToken(t.Spec.OrgID, keyID)
 }
 
+type ResponseMwLogger interface {
+	setLogger(entry *logrus.Entry)
+	logger() *logrus.Entry
+}
+
 type TykResponseHandler interface {
+	ResponseMwLogger
 	Enabled() bool
 	Init(interface{}, *APISpec) error
 	Name() string
@@ -741,6 +746,7 @@ func handleResponseChain(chain []TykResponseHandler, rw http.ResponseWriter, res
 			return false, err
 		}
 	}
+
 	return false, nil
 }
 
@@ -819,6 +825,7 @@ func parseForm(r *http.Request) {
 type BaseTykResponseHandler struct {
 	Spec *APISpec `json:"-"`
 	Gw   *Gateway `json:"-"`
+	log  *logrus.Entry
 }
 
 func (b *BaseTykResponseHandler) Enabled() bool {
@@ -838,3 +845,14 @@ func (b *BaseTykResponseHandler) HandleResponse(rw http.ResponseWriter, res *htt
 }
 
 func (b *BaseTykResponseHandler) HandleError(writer http.ResponseWriter, h *http.Request) {}
+
+func (b *BaseTykResponseHandler) setLogger(logger *logrus.Entry) {
+	b.log = logger
+}
+
+func (b *BaseTykResponseHandler) logger() *logrus.Entry {
+	if b.log == nil {
+		return logrus.NewEntry(log)
+	}
+	return b.log
+}

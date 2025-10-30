@@ -1,13 +1,17 @@
 package gateway
 
 import (
+	"github.com/TykTechnologies/tyk/header"
+	"github.com/TykTechnologies/tyk/internal/errors"
+	"github.com/TykTechnologies/tyk/user"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
 
-	"github.com/TykTechnologies/kin-openapi/routers"
+	"github.com/getkin/kin-openapi/routers"
 
 	"github.com/TykTechnologies/tyk-pump/analytics"
 	"github.com/TykTechnologies/tyk/apidef"
@@ -52,16 +56,13 @@ type APISpec struct {
 	OrgHasNoSession          bool
 	AnalyticsPluginConfig    *GoAnalyticsPlugin
 
-	middlewareChain *ChainObject
-	unloadHooks     []func()
+	unloadHooks []func()
 
 	network analytics.NetworkStats
 
 	GraphEngine graphengine.Engine
 
-	HasMock            bool
-	HasValidateRequest bool
-	OASRouter          routers.Router
+	oasRouter routers.Router
 }
 
 // CheckSpecMatchesStatus checks if a URL spec has a specific status.
@@ -85,6 +86,17 @@ func (a *APISpec) CheckSpecMatchesStatus(r *http.Request, rxPaths []URLSpec, mod
 		}
 	}
 	return false, nil
+}
+
+func (a *APISpec) GetTykExtension() *oas.XTykAPIGateway {
+	if !a.IsOAS {
+		return nil
+	}
+	res := a.OAS.GetTykExtension()
+	if res == nil {
+		log.Warn("APISpec is an invalid OAS API")
+	}
+	return res
 }
 
 // FindSpecMatchesStatus checks if a URL spec has a specific status and returns the URLSpec for it.
@@ -139,4 +151,59 @@ func (a *APISpec) injectIntoReqContext(req *http.Request) {
 	} else {
 		ctx.SetDefinition(req, a.APIDefinition)
 	}
+}
+
+func (a *APISpec) findOperation(r *http.Request) *Operation {
+	middleware := a.OAS.GetTykMiddleware()
+	if middleware == nil {
+		return nil
+	}
+
+	if a.oasRouter == nil {
+		log.Warningf("OAS router not initialized properly. Unable to find route for %s %v", r.Method, r.URL)
+		return nil
+	}
+
+	rClone := *r
+	rClone.URL = ctxGetInternalRedirectTarget(r)
+
+	route, pathParams, err := a.oasRouter.FindRoute(&rClone)
+
+	if errors.Is(err, routers.ErrPathNotFound) {
+		log.Tracef("Unable to find route for %s %v at spec %v", r.Method, r.URL, a.Id)
+		return nil
+	}
+
+	if err != nil {
+		log.Errorf("Error finding route: %v", err)
+		return nil
+	}
+
+	operation, ok := middleware.Operations[route.Operation.OperationID]
+	if !ok {
+		log.Warningf("No operation found for ID: %s", route.Operation.OperationID)
+		return nil
+	}
+
+	return &Operation{
+		Operation:  operation,
+		route:      route,
+		pathParams: pathParams,
+	}
+}
+
+func (a *APISpec) sendRateLimitHeaders(session *user.SessionState, dest *http.Response) {
+	quotaMax, quotaRemaining, quotaRenews := int64(0), int64(0), int64(0)
+
+	if session != nil {
+		quotaMax, quotaRemaining, _, quotaRenews = session.GetQuotaLimitByAPIID(a.APIID)
+	}
+
+	if dest.Header == nil {
+		dest.Header = http.Header{}
+	}
+
+	dest.Header.Set(header.XRateLimitLimit, strconv.Itoa(int(quotaMax)))
+	dest.Header.Set(header.XRateLimitRemaining, strconv.Itoa(int(quotaRemaining)))
+	dest.Header.Set(header.XRateLimitReset, strconv.Itoa(int(quotaRenews)))
 }

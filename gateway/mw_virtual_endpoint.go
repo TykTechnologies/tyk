@@ -12,7 +12,6 @@ import (
 	"net/url"
 	"os"
 	"reflect"
-	"strconv"
 	"strings"
 	"time"
 
@@ -20,11 +19,9 @@ import (
 	_ "github.com/robertkrimen/otto/underscore"
 
 	"github.com/TykTechnologies/tyk-pump/analytics"
-
 	"github.com/TykTechnologies/tyk/apidef"
-	"github.com/TykTechnologies/tyk/header"
+	"github.com/TykTechnologies/tyk/internal/middleware"
 	"github.com/TykTechnologies/tyk/user"
-
 	"github.com/sirupsen/logrus"
 )
 
@@ -48,7 +45,7 @@ type VMResponseObject struct {
 	SessionMeta map[string]interface{}
 }
 
-// DynamicMiddleware is a generic middleware that will execute JS code before continuing
+// VirtualEndpoint is a generic middleware that will execute JS code before continuing
 type VirtualEndpoint struct {
 	*BaseMiddleware
 
@@ -234,7 +231,7 @@ func (d *VirtualEndpoint) ServeHTTPForCache(w http.ResponseWriter, r *http.Reque
 	d.Logger().Debug("JSVM Virtual Endpoint execution took: (ms) ", ms)
 
 	if copiedResponse != nil {
-		d.sh.RecordHit(r, analytics.Latency{Total: int64(ms)}, copiedResponse.StatusCode, copiedResponse, false)
+		d.sh.RecordHit(r, analytics.Latency{Total: int64(ms), Upstream: 0, Gateway: int64(ms)}, copiedResponse.StatusCode, copiedResponse, false)
 	}
 
 	return copiedResponse, nil
@@ -318,7 +315,7 @@ func (d *VirtualEndpoint) ProcessRequest(w http.ResponseWriter, r *http.Request,
 		return errors.New(message), http.StatusInternalServerError
 	}
 
-	return nil, mwStatusRespond
+	return nil, middleware.StatusRespond
 }
 
 func (d *VirtualEndpoint) HandleResponse(rw http.ResponseWriter, res *http.Response, ses *user.SessionState) {
@@ -334,14 +331,7 @@ func (gw *Gateway) handleForcedResponse(rw http.ResponseWriter, res *http.Respon
 		res.Header.Set("Connection", "close")
 	}
 
-	// Add resource headers
-	if ses != nil {
-		// We have found a session, lets report back
-		quotaMax, quotaRemaining, _, quotaRenews := ses.GetQuotaLimitByAPIID(spec.APIID)
-		res.Header.Set(header.XRateLimitLimit, strconv.Itoa(int(quotaMax)))
-		res.Header.Set(header.XRateLimitRemaining, strconv.Itoa(int(quotaRemaining)))
-		res.Header.Set(header.XRateLimitReset, strconv.Itoa(int(quotaRenews)))
-	}
+	spec.sendRateLimitHeaders(ses, res)
 
 	copyHeader(rw.Header(), res.Header, gw.GetConfig().IgnoreCanonicalMIMEHeaderKey)
 

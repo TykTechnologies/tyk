@@ -6,7 +6,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/TykTechnologies/kin-openapi/openapi3"
+	"github.com/getkin/kin-openapi/openapi3"
 
 	"github.com/stretchr/testify/assert"
 
@@ -391,6 +391,7 @@ func FillTestVersionData(t *testing.T, index int) apidef.VersionData {
 
 func TestVersioning(t *testing.T) {
 	var emptyVersioning Versioning
+	emptyVersioning.Versions = []VersionToID{}
 
 	var convertedAPI apidef.APIDefinition
 	emptyVersioning.ExtractTo(&convertedAPI)

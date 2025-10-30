@@ -741,7 +741,8 @@ func (c *Cache) ExtractTo(cache *apidef.CacheOptions) {
 	cache.CacheControlTTLHeader = c.ControlTTLHeaderName
 }
 
-// Paths is a mapping of API endpoints to Path plugin configurations.
+// Paths is a mapping of API endpoints to Path plugin configurations. This field is part of the [Middleware](#middleware) structure.
+// The string keys in this object represent URL path patterns (e.g. `/users`, `/users/{id}`, `/api/*`) that match API endpoints.
 type Paths map[string]*Path
 
 // Fill fills *Paths (map) from apidef.ExtendedPathSet.
@@ -994,6 +995,8 @@ type Plugins struct {
 	Block *Allowance `bson:"block,omitempty" json:"block,omitempty"`
 
 	// IgnoreAuthentication ignores authentication on request by allowance.
+	//
+	// Tyk classic API definition: version_data.versions..extended_paths.ignored[].
 	IgnoreAuthentication *Allowance `bson:"ignoreAuthentication,omitempty" json:"ignoreAuthentication,omitempty"`
 
 	// TransformRequestMethod allows you to transform the method of a request.
@@ -1176,6 +1179,11 @@ type TransformHeaders struct {
 	//
 	// Tyk classic API definition: `version_data.versions..extended_paths.transform_headers[].add_headers`.
 	Add Headers `bson:"add,omitempty" json:"add,omitempty"`
+}
+
+// AppendAddOp appends add operation to TransformHeaders middleware.
+func (th *TransformHeaders) AppendAddOp(name, value string) {
+	th.Add = append(th.Add, Header{Name: name, Value: value})
 }
 
 // Fill fills *TransformHeaders from apidef.HeaderInjectionMeta.
@@ -1806,7 +1814,7 @@ func (g *GlobalRequestSizeLimit) ExtractTo(api *apidef.APIDefinition) {
 
 // ContextVariables holds the configuration related to Tyk context variables.
 type ContextVariables struct {
-	// Enabled enables context variables to be passed to Tyk middlewares.
+	// Enabled provides access to context variables from specific Tyk middleware (URL rewrite, header and body transform).
 	//
 	// Tyk classic API definition: `enable_context_vars`.
 	Enabled bool `json:"enabled" bson:"enabled"`

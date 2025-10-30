@@ -20,6 +20,8 @@ import (
 
 type IPsHandleStrategy string
 
+const GracefulShutdownDefaultDuration = 30
+
 var (
 	log = logger.Get()
 
@@ -44,19 +46,40 @@ var (
 			CheckInterval:             dnsCacheDefaultCheckInterval,
 			MultipleIPsHandleStrategy: NoCacheStrategy,
 		},
-		HealthCheckEndpointName: "hello",
+		HealthCheckEndpointName:    "hello",
+		ReadinessCheckEndpointName: "ready",
 		CoProcessOptions: CoProcessConfig{
 			EnableCoProcess: false,
 		},
 		LivenessCheck: LivenessCheckConfig{
 			CheckDuration: time.Second * 10,
 		},
+		GracefulShutdownTimeoutDuration: GracefulShutdownDefaultDuration,
 		Streaming: StreamingConfig{
 			Enabled:     false,
 			AllowUnsafe: []string{},
 		},
 		PIDFileLocation: "/var/run/tyk/tyk-gateway.pid",
+		Security: SecurityConfig{
+			CertificateExpiryMonitor: CertificateExpiryMonitorConfig{
+				WarningThresholdDays: DefaultWarningThresholdDays,
+				CheckCooldownSeconds: DefaultCheckCooldownSeconds,
+				EventCooldownSeconds: DefaultEventCooldownSeconds,
+			},
+		},
 	}
+)
+
+// Certificate monitor constants
+const (
+	// DefaultWarningThresholdDays is the number of days before certificate expiration that the Gateway will start sending CertificateExpiringSoon notifications
+	DefaultWarningThresholdDays = 30
+
+	// DefaultCheckCooldownSeconds is the minimum time in seconds that the Gateway will leave between checking for the expiry of a certificate when it is used in an API request
+	DefaultCheckCooldownSeconds = 3600 // 1 hour
+
+	// DefaultEventCooldownSeconds is the minimum time in seconds that the Gateway will leave between firing an event for an expiring or expired certificate; this default will be applied as a floor value to protect the system from misconfiguration, but can be overridden by setting a longer cooldown in the CertificateExpiryMonitorConfig
+	DefaultEventCooldownSeconds = 86400 // 24 hours
 )
 
 const (
@@ -190,7 +213,7 @@ type NormalisedURLConfig struct {
 	// Set this to true to have Tyk automatically match for numeric IDs, it will match with a preceding slash so as not to capture actual numbers:
 	NormaliseNumbers bool `json:"normalise_numbers"`
 
-	// This is a list of custom patterns you can add. These must be valid regex strings. Tyk will replace these values with a {var} placeholder.
+	// This is a list of custom patterns you can add. These must be valid regex strings. Tyk will replace these values with a `{var}` placeholder.
 	Custom []string `json:"custom_patterns"`
 
 	CompiledPatternSet NormaliseURLPatterns `json:"-"` // see analytics.go
@@ -536,12 +559,21 @@ type HttpServerOptionsConfig struct {
 	MaxRequestBodySize int64 `json:"max_request_body_size"`
 
 	// XFFDepth controls which position in the X-Forwarded-For chain to use for determining client IP address.
-	// A value of 0 means using the first IP (default). this is way the Gateway has calculated the client IP historically, 
+	// A value of 0 means using the first IP (default). this is way the Gateway has calculated the client IP historically,
 	// the most common case, and will be used when this config is not set.
 	// However, any non-zero value will use that position from the right in the X-Forwarded-For chain.
 	// This is a security feature to prevent against IP spoofing attacks, and is recommended to be set to a non-zero value.
 	// A value of 1 means using the last IP, 2 means second to last, and so on.
 	XFFDepth int `json:"xff_depth"`
+
+	// MaxResponseBodySize configures an upper limit for the size of the response body (payload) in bytes.
+	//
+	// This limit is currently applied only if the Response Body Transform middleware is enabled.
+	//
+	// The Gateway will return `HTTP 500 Response Body Too Large` if the response payload exceeds MaxResponseBodySize+1 bytes.
+	//
+	// A value of zero (default) means that no maximum is set and response bodies will not be limited.
+	MaxResponseBodySize int64 `json:"max_response_body_size"`
 }
 
 type AuthOverrideConf struct {
@@ -590,6 +622,9 @@ type CoProcessConfig struct {
 	// Authority used in GRPC connection
 	GRPCAuthority string `json:"grpc_authority"`
 
+	// GRPCRoundRobinLoadBalancing enables round robin load balancing for gRPC services; you must provide the address of the load balanced service using `dns:///` protocol in `coprocess_grpc_server`.
+	GRPCRoundRobinLoadBalancing bool `json:"grpc_round_robin_load_balancing"`
+
 	// Sets the path to built-in Tyk modules. This will be part of the Python module lookup path. The value used here is the default one for most installations.
 	PythonPathPrefix string `json:"python_path_prefix"`
 
@@ -612,6 +647,21 @@ type CertificatesConfig struct {
 	MDCB []string `json:"mdcb_api"`
 }
 
+// CertificateExpiryMonitorConfig configures the certificate expiration notification feature
+type CertificateExpiryMonitorConfig struct {
+	// WarningThresholdDays specifies the number of days before certificate expiry that the Gateway will start generating CertificateExpiringSoon events when the certificate is used
+	// Default: DefaultWarningThresholdDays (30 days)
+	WarningThresholdDays int `json:"warning_threshold_days"`
+
+	// CheckCooldownSeconds specifies the minimum time in seconds that the Gateway will leave between checking for the expiry of a certificate when it is used in an API request - if a certificate is used repeatedly this prevents unnecessary expiry checks
+	// Default: DefaultCheckCooldownSeconds (3600 seconds = 1 hour)
+	CheckCooldownSeconds int `json:"check_cooldown_seconds"`
+
+	// EventCooldownSeconds specifies the minimum time in seconds between firing the same certificate expiry event - this prevents unnecessary events from being generated for an expiring or expired certificate being used repeatedly; note that the higher of the value configured here or the default (DefaultEventCooldownSeconds) will be applied
+	// Default: DefaultEventCooldownSeconds (86400 seconds = 24 hours)
+	EventCooldownSeconds int `json:"event_cooldown_seconds"`
+}
+
 type SecurityConfig struct {
 	// Set the AES256 secret which is used to encode certificate private keys when they uploaded via certificate storage
 	PrivateCertificateEncodingSecret string `json:"private_certificate_encoding_secret"`
@@ -623,6 +673,9 @@ type SecurityConfig struct {
 	PinnedPublicKeys map[string]string `json:"pinned_public_keys"`
 
 	Certificates CertificatesConfig `json:"certificates"`
+
+	// CertificateExpiryMonitor configures the certificate expiry monitoring and notification feature
+	CertificateExpiryMonitor CertificateExpiryMonitorConfig `json:"certificate_expiry_monitor"`
 }
 
 type NewRelicConfig struct {
@@ -745,6 +798,9 @@ type Config struct {
 
 	// Global Certificate configuration
 	Security SecurityConfig `json:"security"`
+
+	// External service configuration for proxy and mTLS support
+	ExternalServices ExternalServiceConfig `json:"external_services"`
 
 	// Gateway HTTP server configuration
 	HttpServerOptions HttpServerOptionsConfig `json:"http_server_options"`
@@ -934,8 +990,17 @@ type Config struct {
 	// This section enables the configuration of the health-check API endpoint and the size of the sample data cache (in seconds).
 	HealthCheck HealthCheckConfig `json:"health_check"`
 
-	// Enables you to rename the /hello endpoint
+	// HealthCheckEndpointName Enables you to change the liveness endpoint.
+	// Default is "/hello"
 	HealthCheckEndpointName string `json:"health_check_endpoint_name"`
+
+	// ReadinessCheckEndpointName Enables you to change the readiness endpoint
+	// Default is "/ready"
+	ReadinessCheckEndpointName string `json:"readiness_check_endpoint_name"`
+
+	// GracefulShutdownTimeoutDuration sets how many seconds the gateway should wait for an existing connection
+	//to finish before shutting down the server. Defaults to 30 seconds.
+	GracefulShutdownTimeoutDuration int `json:"graceful_shutdown_timeout_duration"`
 
 	// Change the expiry time of a refresh token. By default 14 days (in seconds).
 	OauthRefreshExpire int64 `json:"oauth_refresh_token_expire"`

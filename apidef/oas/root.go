@@ -131,7 +131,10 @@ type State struct {
 	// Active enables the API so that Tyk will listen for and process requests made to the listenPath.
 	// Tyk classic API definition: `active`
 	Active bool `bson:"active" json:"active"` // required
-	// Internal makes the API accessible only internally.
+	// Internal controls the exposure of the API on the Gateway.
+	// When set to `true`, the API will not be made available for external access and will not be included in API listings returned by the Gateway's management APIs;
+	// it will be accessible only via [internal looping]({{< ref "advanced-configuration/transform-traffic/looping" >}}) or as a [child API version]({{< ref "api-management/api-versioning#base-and-child-apis" >}}).
+	//
 	// Tyk classic API definition: `internal`
 	Internal bool `bson:"internal,omitempty" json:"internal,omitempty"`
 }
@@ -165,7 +168,7 @@ type Versioning struct {
 	// - `url`.
 	Location string `bson:"location" json:"location"` // required
 	// Key contains the name of the key to check for versioning information.
-	Key string `bson:"key" json:"key"` // required
+	Key string `bson:"key" json:"key,omitempty"` // required conditionally
 	// Versions contains a list of versions that map to individual API IDs.
 	Versions []VersionToID `bson:"versions" json:"versions"` // required
 	// StripVersioningData is a boolean flag, if set to `true`, the API responses will be stripped of versioning data.
@@ -193,10 +196,6 @@ func (v *Versioning) Fill(api apidef.APIDefinition) {
 	sort.Slice(v.Versions, func(i, j int) bool {
 		return v.Versions[i].Name < v.Versions[j].Name
 	})
-
-	if ShouldOmit(v.Versions) {
-		v.Versions = nil
-	}
 
 	v.StripVersioningData = api.VersionDefinition.StripVersioningData
 	v.FallbackToDefault = api.VersionDefinition.FallbackToDefault
