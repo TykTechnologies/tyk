@@ -99,30 +99,35 @@ const (
 )
 
 type PoliciesConfig struct {
-	// Set this value to `file` to look in the file system for a definition file. Set to `service` to use the Dashboard service.
+	// Sets the location for the definitions of the policies. Optional vaules are `file`, `service` or `rpc`.
+	// `file` - to look in the file system of the gateway for a definition file. Used in OSS deployment only.
+	// `service` - to use Tyk Dashboard to get policy definitions. Used in Pro deployment only.
+	// `rpc` - to use MDCB service to get policy definitions. Used in Pro deployment only.
 	PolicySource string `json:"policy_source"`
 
-	// This option is required if `policies.policy_source` is set to `service`.
+	// Tyk OSS deployment only
+	// Used with OSS when `policies.policy_source` is either set to `file` (or an empty string). 
+	// Tyk will load policies from all the JSON files located in the directory defined by `policies.policy_path`.
+	// With this configuration, policy management through the Gateway API is enabled in the Tyk Gateway.
+	PolicyPath string `json:"policy_path"`
+
+	// Tyk OSS deployment only
+	// Used with OSS when `policies.policy_source` is either set to `file` (or an empty string). 
+	// If `policies.policy_path` is not set, then Tyk will load policies from the JSON file specified by `policy_record_name`.
+	// If `policy_record_name` is not set or is an empty string, the gateway will assume there are no policies to load and continues.
+	PolicyRecordName string `json:"policy_record_name"`
+
+	// Tyk Pro deployment only.
+	// Required when `policies.policy_source` is set to `service`.
 	// Set this to the URL of your Tyk Dashboard installation. The URL needs to be formatted as: http://dashboard_host:port.
 	PolicyConnectionString string `json:"policy_connection_string"`
 
-	// This option only applies in OSS deployment when the `policies.policy_source` is either set
-	// to `file` or an empty string. If `policies.policy_path` is not set, then Tyk will load policies
-	// from the JSON file specified by `policies.policy_record_name`.
-	PolicyRecordName string `json:"policy_record_name"`
-
-	// In a Pro installation, Tyk will load Policy IDs and use the internal object-ID as the ID of the policy.
+	// Tyk Pro deployment only.
+	// Tyk will load Policy IDs and use the internal object-ID as the ID of the policy.
 	// This is not portable in cases where the data needs to be moved from installation to installation.
-	//
-	// If you set this value to `true`, then the id parameter in a stored policy (or imported policy using the Dashboard API), will be used instead of the internal ID.
-	//
-	// This option should only be used when moving an installation to a new database.
+	// If you set this value to `true`, then the id field in a stored policy (or imported policy using the Dashboard API), will be used instead of the internal ID.
+	// This option is useful only when moving an installation to a new database and you want to retain the same IDs.
 	AllowExplicitPolicyID bool `json:"allow_explicit_policy_id"`
-	// This option only applies in OSS deployment when the `policies.policy_source` is either set
-	// to `file` or an empty string. If `policies.policy_path` is set, then Tyk will load policies
-	// from all the JSON files under the directory specified by the `policies.policy_path` option.
-	// In this configuration, Tyk Gateway will allow policy management through the Gateway API.
-	PolicyPath string `json:"policy_path"`
 }
 
 type DBAppConfOptionsConfig struct {
