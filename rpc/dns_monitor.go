@@ -7,6 +7,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/cenkalti/backoff/v4"
 	"github.com/sirupsen/logrus"
 )
 
@@ -15,12 +16,10 @@ type DNSMonitor struct {
 	enabled           bool
 	baseCheckInterval time.Duration // T0 - minimum interval (e.g., 30s)
 	maxCheckInterval  time.Duration // Tmax - maximum interval (e.g., 10min)
-	currentInterval   time.Duration // Current interval (grows with exponential backoff)
 	connectionStr     string
 	ctx               context.Context
 	cancel            context.CancelFunc
 	stopComplete      chan struct{}
-	intervalMutex     sync.Mutex // Protects currentInterval
 }
 
 var (
@@ -62,14 +61,22 @@ func StartDNSMonitor(enabled bool, checkInterval int, connectionString string) {
 	}
 
 	// Validate and set interval with minimum threshold
+	const recommendedMinInterval = 30 // Recommended to avoid DNS server rate limiting
+
 	if checkInterval <= 0 {
-		checkInterval = 30 // Default to 30 seconds
+		checkInterval = recommendedMinInterval // Default to 30 seconds
+		Log.WithField("interval", checkInterval).Debug("DNS monitor: using default check interval")
 	} else if checkInterval < minCheckInterval {
 		Log.WithFields(logrus.Fields{
 			"requested_interval": checkInterval,
 			"minimum_interval":   minCheckInterval,
-		}).Warning("DNS monitor: check interval too low, using minimum")
+		}).Warning("DNS monitor: check interval too low, using minimum to prevent DNS server overload")
 		checkInterval = minCheckInterval
+	} else if checkInterval < recommendedMinInterval {
+		Log.WithFields(logrus.Fields{
+			"current_interval":     checkInterval,
+			"recommended_interval": recommendedMinInterval,
+		}).Warning("DNS monitor: check interval is below recommended minimum. Consider using 30s or higher to avoid DNS server rate limiting")
 	}
 
 	// Create context for lifecycle management
@@ -82,7 +89,6 @@ func StartDNSMonitor(enabled bool, checkInterval int, connectionString string) {
 		enabled:           true,
 		baseCheckInterval: baseInterval,
 		maxCheckInterval:  maxInterval,
-		currentInterval:   baseInterval, // Start with base interval
 		connectionStr:     connectionString,
 		ctx:               ctx,
 		cancel:            cancel,
@@ -133,11 +139,17 @@ func stopDNSMonitorInternal() {
 func (m *DNSMonitor) monitorLoop() {
 	defer close(m.stopComplete)
 
-	// Start with base interval
-	m.intervalMutex.Lock()
-	currentInterval := m.currentInterval
-	m.intervalMutex.Unlock()
+	// Configure exponential backoff
+	b := backoff.NewExponentialBackOff()
+	b.InitialInterval = m.baseCheckInterval   // T0 (e.g., 30s)
+	b.MaxInterval = m.maxCheckInterval        // Tmax (e.g., 10 min)
+	b.MaxElapsedTime = 0                      // Never stop (no total timeout)
+	b.Multiplier = 2.0                        // Simple doubling
+	b.RandomizationFactor = 0                 // No jitter (set to 0.1 if you want some)
+	b.Reset()
 
+	// Get initial interval
+	currentInterval := b.NextBackOff()
 	ticker := time.NewTicker(currentInterval)
 	defer ticker.Stop()
 
@@ -151,25 +163,16 @@ func (m *DNSMonitor) monitorLoop() {
 		case <-ticker.C:
 			changed := m.checkDNS()
 
-			// Update interval based on whether DNS changed
-			m.intervalMutex.Lock()
 			if changed {
 				// Reset to base interval when change detected
-				m.currentInterval = m.baseCheckInterval
-				Log.WithField("new_interval", m.currentInterval).Info("DNS monitor: DNS changed, reset interval to base")
+				b.Reset()
+				currentInterval = b.NextBackOff()
+				Log.WithField("new_interval", currentInterval).Info("DNS monitor: DNS changed, reset interval to base")
 			} else {
-				// Double the interval (exponential backoff), but cap at max
-				newInterval := m.currentInterval * 2
-				if newInterval > m.maxCheckInterval {
-					newInterval = m.maxCheckInterval
-				}
-				if newInterval != m.currentInterval {
-					m.currentInterval = newInterval
-					Log.WithField("new_interval", m.currentInterval).Debug("DNS monitor: no change, increased check interval")
-				}
+				// Get next interval (exponential backoff with cap)
+				currentInterval = b.NextBackOff()
+				Log.WithField("new_interval", currentInterval).Debug("DNS monitor: no change, increased check interval")
 			}
-			currentInterval = m.currentInterval
-			m.intervalMutex.Unlock()
 
 			// Reset ticker with new interval
 			ticker.Reset(currentInterval)
