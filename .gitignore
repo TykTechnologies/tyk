@@ -81,3 +81,11 @@ ci/tests/specs/gateway.collection.postman.json
 ci/tests/specs/.env
 ci/tests/specs/apps
 ci/tests/specs/policies
+
+# Task cache files
+.task-build-cache
+.task-tidy-cache
+.task-check-imports-cache
+.task-check-config-cache
+.task-check-x-tyk-gateway-cache
+.task-codegen-cache

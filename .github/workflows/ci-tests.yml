@@ -47,15 +47,6 @@ jobs:
           go-version-file: go.mod
           cache-dependency-path: go.sum
 
-      - name: Cache
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.cache/golangci-lint
-          key: 'golangci-lint-${{ runner.os }}-${{ hashFiles(''**/go.sum'') }}'
-          restore-keys: |
-            golangci-lint-${{ runner.os }}-
-
       - name: Setup CI Tooling
         uses: shrink/actions-docker-extract@v3
         with:
@@ -63,25 +54,27 @@ jobs:
           path: /usr/local/bin/.
           destination: /usr/local/bin
 
-      - run: |
+      - name: Run codegen and tidy
+        if: github.event_name == 'pull_request'
+        env:
+          BASE_BRANCH: ${{ github.base_ref || 'master' }}
+        run: |
           # Run linting without auto-fixing
           task tidy
+          task codegen:smart
           task --exit-code lint:check-git-state MESSAGE="task tidy made git state dirty, please run task lint locally and update PR"
 
-      - run: golangci-lint version && golangci-lint cache status
-
       - name: golangci-lint
-        if: ${{ github.event_name == 'pull_request' }}
-        run: |  
-          # Generate report for SonarCloud
-          golangci-lint run --out-format colored-line-number,checkstyle:golangci-lint-report.json \
-                            --new-from-rev=origin/${{ env.BRANCH_NAME }} -v ./...
-
-      - name: golangci-lint-on-push
-        if: ${{ github.event_name == 'push' }}
-        # Using the default config, reports stats to sonarcloud. No requirements on passing other than KPIs tracked in dev.
-        run: |
-          golangci-lint run --out-format checkstyle:golangci-lint-report.json --issues-exit-code=0 -v ./...
+        uses: golangci/golangci-lint-action@v8
+        timeout-minutes: 20
+        with:
+          version: v2.5.0
+          only-new-issues: ${{ github.event_name == 'pull_request' }}
+          # Output formats configured in .golangci.yml (v2 approach)
+          # Generates: text to stdout + checkstyle JSON for SonarQube
+          args: --issues-exit-code=0 -v ./...
+          skip-cache: false
+          skip-save-cache: false
 
       - uses: actions/upload-artifact@v4
         if: ${{ always() }}
