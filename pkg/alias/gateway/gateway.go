@@ -8,7 +8,7 @@ import (
 const (
 	EventBreakerTriggered  = event.BreakerTriggered
 	EventRateLimitExceeded = event.RateLimitExceeded
-	EH_WebHook             = event.WebHookHandler
+	EventWebHookHandler    = event.WebHookHandler
 	TestHttpAny            = gateway.TestHttpAny
 )
 
