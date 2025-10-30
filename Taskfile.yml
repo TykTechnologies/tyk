@@ -24,13 +24,22 @@ includes:
 
 vars:
   path: ./...
+  BASE_BRANCH:
+    sh: echo "${BASE_BRANCH:-master}"
 
 tasks:
   build:
     desc: "Build tyk gateway"
+    sources:
+      - '**/*.go'
+      - 'go.mod'
+      - 'go.sum'
+    generates:
+      - '.task-build-cache'
     cmds:
       - go build .
       - cd gateway && go test -c . && cd ..
+      - touch .task-build-cache
 
   docker:
     desc: "build Tyk gateway internal/tyk-gateway"
@@ -71,6 +80,19 @@ tasks:
     cmds:
       - go generate ./...
 
+  codegen:smart:
+    deps: [deps]
+    desc: "Run code generation only if files with go:generate changed vs base branch"
+    cmds:
+      - |
+        changed=$(git diff --name-only origin/{{.BASE_BRANCH}}...HEAD | grep "\.go$" | xargs grep -l "//go:generate" 2>/dev/null || true)
+        if [ -z "$changed" ]; then
+          echo "✓ No files with go:generate changed vs origin/{{.BASE_BRANCH}} - skipping codegen"
+          exit 0
+        fi
+        echo "Files with go:generate changed: $(echo $changed | tr '\n' ' ')"
+        go generate ./...
+
   # Used in CI
   lint:
     desc: "Tidy the codebase"
@@ -83,7 +105,7 @@ tasks:
     desc: "Tidy the codebase without auto-fixing"
     cmds:
       - task: codegen
-      - task: lint:run-no-golangci
+      - task: lint:basic
       - task: lint:extras
 
   lint:extras:

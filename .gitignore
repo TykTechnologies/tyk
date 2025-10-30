@@ -81,3 +81,4 @@ ci/tests/specs/gateway.collection.postman.json
 ci/tests/specs/.env
 ci/tests/specs/apps
 ci/tests/specs/policies
+.task-build-cache
