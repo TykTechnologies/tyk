@@ -7,7 +7,6 @@ tasks:
     deps:
       - mockgen
       - gotestsum
-      - goimports
       - golangci-lint
       - lefthook
     cmds:
@@ -31,15 +30,6 @@ tasks:
       - type gotestsum
     cmds:
       - go install gotest.tools/gotestsum@latest
-
-  goimports:
-    internal: true
-    desc: 'Install x/tools goimports'
-    status:
-      - type goimports
-    cmds:
-      - go install golang.org/x/tools/cmd/goimports@latest
-      - go install github.com/incu6us/goimports-reviser/v3@latest
 
   golangci-lint:
     internal: true

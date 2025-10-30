@@ -98,19 +98,17 @@ tasks:
     cmds:
       - task: lint:fmt
 
-  # This reformats imports with goimports-reviser;
+  # This reformats imports using golangci-lint fmt with gci formatter
   #
   # To limit reformatting scope to packages or files, set `path`:
   #
   # - `task fmt:imports path="./ctx ./rpc"`
   #
-  # Current status: does not run in CI, triggers golangci-lint issues
-  # in the files it fixed. They are preexisting but block golangci-lint
-  # passing in CI.
+  # Uses gci formatter configured in .golangci.yml with Tyk import ordering
   fmt:imports:
-    desc: "Format imports"
+    desc: "Format imports using golangci-lint fmt"
     cmds:
-      - goimports-reviser -imports-order std,general,company,project,blanked,dotted -company-prefixes github.com/TykTechnologies/ {{.path}}
+      - golangci-lint fmt {{.path | default "./..."}}
 
   setup:
     desc: "Setup the project including dependencies and git hooks using lefthooks"
