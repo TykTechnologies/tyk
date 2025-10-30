@@ -54,7 +54,11 @@ jobs:
           path: /usr/local/bin/.
           destination: /usr/local/bin
 
-      - run: |
+      - name: Run codegen and tidy
+        if: github.event_name == 'pull_request'
+        env:
+          BASE_BRANCH: ${{ github.base_ref || 'master' }}
+        run: |
           # Run linting without auto-fixing
           task tidy
           task codegen:smart
