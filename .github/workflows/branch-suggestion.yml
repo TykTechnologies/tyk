@@ -1,0 +1,17 @@
+name: intelligent branch merge suggestion.
+on:
+  pull_request:
+    types:
+      - opened
+      - synchronize
+      - reopened
+
+permissions:
+  pull-requests: write
+  contents: read
+
+jobs:
+  branch-suggestions:
+    uses: TykTechnologies/github-actions/.github/workflows/branch-suggestion.yml@2c8ce806aea008d7079ba2d9d826d87898ba0686
+    secrets:
+      JIRA_TOKEN: ${{ secrets.JIRA_TOKEN }}
