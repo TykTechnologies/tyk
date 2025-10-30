@@ -43,11 +43,11 @@ tasks:
 
   golangci-lint:
     internal: true
-    desc: 'Install golangci-lint'
+    desc: 'Install golangci-lint v2.5.0'
     status:
       - type golangci-lint
     cmds:
-      - go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
+      - go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.5.0
 
   lefthook:
     internal: true

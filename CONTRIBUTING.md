@@ -73,14 +73,15 @@ Currently, in order for tests to pass, a **Redis host is required**. We know, th
 
 #### Using Task Commands
 
-In addition to the standard Go commands, we also provide [Task](https://taskfile.dev/) commands to simplify the setup and local dev process. 
+In addition to the standard Go commands, we also provide [Task](https://taskfile.dev/) commands to simplify the setup and local dev process.
 If you haven't installed Task yet, please follow the [installation instructions](https://taskfile.dev/installation).
 
 Once Task is installed, you can use the following commands:
 
 ```shell
-task setup   # Sets up the project depdendencies, including pre-commit hooks
+task setup   # Sets up the project dependencies, including pre-commit hooks
 task test:integration    # Runs the tests
+task lint    # Runs linting checks
 ```
 
 ### Geo IP features
