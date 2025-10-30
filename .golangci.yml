@@ -166,6 +166,7 @@ issues:
 formatters:
   enable:
     - gci # using for import formatting instead of goimports
+    - gofmt # standard Go formatting
   settings:
     gci:
       sections:

@@ -131,6 +131,18 @@ issues:
   max-issues-per-linter: 0
   max-same-issues: 0
 formatters:
+  enable:
+    - gci # using for import formatting instead of goimports
+    - gofmt # standard Go formatting
+  settings:
+    gci:
+      sections:
+        - standard  # std packages
+        - default   # third-party packages
+        - prefix(github.com/TykTechnologies)  # same org, different repos
+        - prefix(github.com/TykTechnologies/tyk)  # same repo
+        - blank     # blank imports
+        - dot       # dot imports
   exclusions:
     paths:
       - third_party$
