@@ -89,7 +89,6 @@ linters:
         - shadow
       enable-all: true
     revive:
-      ignore-generated-header: true
       severity: error
       enable-all-rules: false
       rules:
@@ -167,8 +166,6 @@ issues:
 formatters:
   enable:
     - gci # using for import formatting instead of goimports
-  disable:
-    - goimports
   settings:
     gci:
       sections:
