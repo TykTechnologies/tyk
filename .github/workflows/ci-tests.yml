@@ -67,7 +67,7 @@ jobs:
           only-new-issues: ${{ github.event_name == 'pull_request' }}
           # Output formats configured in .golangci.yml (v2 approach)
           # Generates: text to stdout + checkstyle JSON for SonarQube
-          args: --out-format checkstyle:golangci-lint-report.json --issues-exit-code=0 -v ./...
+          args: --issues-exit-code=0 -v ./...
           skip-cache: false
           skip-save-cache: false
 

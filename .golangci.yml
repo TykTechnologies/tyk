@@ -19,6 +19,13 @@ run:
   # If false (default) - golangci-lint acquires file lock on start.
   allow-parallel-runners: false
 
+output:
+  formats:
+    text:
+      path: stdout
+    checkstyle:
+      path: golangci-lint-report.json
+
 # This configures the release linters at tyk.
 #
 # The guideline is simple: keep linters you want to track in release
