@@ -21,7 +21,6 @@ import (
 type MockEngine struct {
 	ctrl     *gomock.Controller
 	recorder *MockEngineMockRecorder
-	isgomock struct{}
 }
 
 // MockEngineMockRecorder is the mock recorder for MockEngine.
@@ -54,9 +53,9 @@ func (mr *MockEngineMockRecorder) Cancel() *gomock.Call {
 }
 
 // HandleReverseProxy mocks base method.
-func (m *MockEngine) HandleReverseProxy(params ReverseProxyParams) (*http.Response, bool, error) {
+func (m *MockEngine) HandleReverseProxy(arg0 ReverseProxyParams) (*http.Response, bool, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "HandleReverseProxy", params)
+	ret := m.ctrl.Call(m, "HandleReverseProxy", arg0)
 	ret0, _ := ret[0].(*http.Response)
 	ret1, _ := ret[1].(bool)
 	ret2, _ := ret[2].(error)
@@ -64,9 +63,9 @@ func (m *MockEngine) HandleReverseProxy(params ReverseProxyParams) (*http.Respon
 }
 
 // HandleReverseProxy indicates an expected call of HandleReverseProxy.
-func (mr *MockEngineMockRecorder) HandleReverseProxy(params any) *gomock.Call {
+func (mr *MockEngineMockRecorder) HandleReverseProxy(arg0 any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "HandleReverseProxy", reflect.TypeOf((*MockEngine)(nil).HandleReverseProxy), params)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "HandleReverseProxy", reflect.TypeOf((*MockEngine)(nil).HandleReverseProxy), arg0)
 }
 
 // HasSchema mocks base method.
@@ -84,48 +83,48 @@ func (mr *MockEngineMockRecorder) HasSchema() *gomock.Call {
 }
 
 // ProcessAndStoreGraphQLRequest mocks base method.
-func (m *MockEngine) ProcessAndStoreGraphQLRequest(w http.ResponseWriter, r *http.Request) (error, int) {
+func (m *MockEngine) ProcessAndStoreGraphQLRequest(arg0 http.ResponseWriter, arg1 *http.Request) (error, int) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ProcessAndStoreGraphQLRequest", w, r)
+	ret := m.ctrl.Call(m, "ProcessAndStoreGraphQLRequest", arg0, arg1)
 	ret0, _ := ret[0].(error)
 	ret1, _ := ret[1].(int)
 	return ret0, ret1
 }
 
 // ProcessAndStoreGraphQLRequest indicates an expected call of ProcessAndStoreGraphQLRequest.
-func (mr *MockEngineMockRecorder) ProcessAndStoreGraphQLRequest(w, r any) *gomock.Call {
+func (mr *MockEngineMockRecorder) ProcessAndStoreGraphQLRequest(arg0, arg1 any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ProcessAndStoreGraphQLRequest", reflect.TypeOf((*MockEngine)(nil).ProcessAndStoreGraphQLRequest), w, r)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ProcessAndStoreGraphQLRequest", reflect.TypeOf((*MockEngine)(nil).ProcessAndStoreGraphQLRequest), arg0, arg1)
 }
 
 // ProcessGraphQLComplexity mocks base method.
-func (m *MockEngine) ProcessGraphQLComplexity(r *http.Request, accessDefinition *ComplexityAccessDefinition) (error, int) {
+func (m *MockEngine) ProcessGraphQLComplexity(arg0 *http.Request, arg1 *ComplexityAccessDefinition) (error, int) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ProcessGraphQLComplexity", r, accessDefinition)
+	ret := m.ctrl.Call(m, "ProcessGraphQLComplexity", arg0, arg1)
 	ret0, _ := ret[0].(error)
 	ret1, _ := ret[1].(int)
 	return ret0, ret1
 }
 
 // ProcessGraphQLComplexity indicates an expected call of ProcessGraphQLComplexity.
-func (mr *MockEngineMockRecorder) ProcessGraphQLComplexity(r, accessDefinition any) *gomock.Call {
+func (mr *MockEngineMockRecorder) ProcessGraphQLComplexity(arg0, arg1 any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ProcessGraphQLComplexity", reflect.TypeOf((*MockEngine)(nil).ProcessGraphQLComplexity), r, accessDefinition)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ProcessGraphQLComplexity", reflect.TypeOf((*MockEngine)(nil).ProcessGraphQLComplexity), arg0, arg1)
 }
 
 // ProcessGraphQLGranularAccess mocks base method.
-func (m *MockEngine) ProcessGraphQLGranularAccess(w http.ResponseWriter, r *http.Request, accessDefinition *GranularAccessDefinition) (error, int) {
+func (m *MockEngine) ProcessGraphQLGranularAccess(arg0 http.ResponseWriter, arg1 *http.Request, arg2 *GranularAccessDefinition) (error, int) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ProcessGraphQLGranularAccess", w, r, accessDefinition)
+	ret := m.ctrl.Call(m, "ProcessGraphQLGranularAccess", arg0, arg1, arg2)
 	ret0, _ := ret[0].(error)
 	ret1, _ := ret[1].(int)
 	return ret0, ret1
 }
 
 // ProcessGraphQLGranularAccess indicates an expected call of ProcessGraphQLGranularAccess.
-func (mr *MockEngineMockRecorder) ProcessGraphQLGranularAccess(w, r, accessDefinition any) *gomock.Call {
+func (mr *MockEngineMockRecorder) ProcessGraphQLGranularAccess(arg0, arg1, arg2 any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ProcessGraphQLGranularAccess", reflect.TypeOf((*MockEngine)(nil).ProcessGraphQLGranularAccess), w, r, accessDefinition)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ProcessGraphQLGranularAccess", reflect.TypeOf((*MockEngine)(nil).ProcessGraphQLGranularAccess), arg0, arg1, arg2)
 }
 
 // Version mocks base method.
@@ -146,7 +145,6 @@ func (mr *MockEngineMockRecorder) Version() *gomock.Call {
 type MockComplexityChecker struct {
 	ctrl     *gomock.Controller
 	recorder *MockComplexityCheckerMockRecorder
-	isgomock struct{}
 }
 
 // MockComplexityCheckerMockRecorder is the mock recorder for MockComplexityChecker.
@@ -167,24 +165,23 @@ func (m *MockComplexityChecker) EXPECT() *MockComplexityCheckerMockRecorder {
 }
 
 // DepthLimitExceeded mocks base method.
-func (m *MockComplexityChecker) DepthLimitExceeded(r *http.Request, accessDefinition *ComplexityAccessDefinition) ComplexityFailReason {
+func (m *MockComplexityChecker) DepthLimitExceeded(arg0 *http.Request, arg1 *ComplexityAccessDefinition) ComplexityFailReason {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "DepthLimitExceeded", r, accessDefinition)
+	ret := m.ctrl.Call(m, "DepthLimitExceeded", arg0, arg1)
 	ret0, _ := ret[0].(ComplexityFailReason)
 	return ret0
 }
 
 // DepthLimitExceeded indicates an expected call of DepthLimitExceeded.
-func (mr *MockComplexityCheckerMockRecorder) DepthLimitExceeded(r, accessDefinition any) *gomock.Call {
+func (mr *MockComplexityCheckerMockRecorder) DepthLimitExceeded(arg0, arg1 any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DepthLimitExceeded", reflect.TypeOf((*MockComplexityChecker)(nil).DepthLimitExceeded), r, accessDefinition)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DepthLimitExceeded", reflect.TypeOf((*MockComplexityChecker)(nil).DepthLimitExceeded), arg0, arg1)
 }
 
 // MockGraphQLRequestProcessor is a mock of GraphQLRequestProcessor interface.
 type MockGraphQLRequestProcessor struct {
 	ctrl     *gomock.Controller
 	recorder *MockGraphQLRequestProcessorMockRecorder
-	isgomock struct{}
 }
 
 // MockGraphQLRequestProcessorMockRecorder is the mock recorder for MockGraphQLRequestProcessor.
@@ -205,25 +202,24 @@ func (m *MockGraphQLRequestProcessor) EXPECT() *MockGraphQLRequestProcessorMockR
 }
 
 // ProcessRequest mocks base method.
-func (m *MockGraphQLRequestProcessor) ProcessRequest(ctx context.Context, w http.ResponseWriter, r *http.Request) (error, int) {
+func (m *MockGraphQLRequestProcessor) ProcessRequest(arg0 context.Context, arg1 http.ResponseWriter, arg2 *http.Request) (error, int) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ProcessRequest", ctx, w, r)
+	ret := m.ctrl.Call(m, "ProcessRequest", arg0, arg1, arg2)
 	ret0, _ := ret[0].(error)
 	ret1, _ := ret[1].(int)
 	return ret0, ret1
 }
 
 // ProcessRequest indicates an expected call of ProcessRequest.
-func (mr *MockGraphQLRequestProcessorMockRecorder) ProcessRequest(ctx, w, r any) *gomock.Call {
+func (mr *MockGraphQLRequestProcessorMockRecorder) ProcessRequest(arg0, arg1, arg2 any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ProcessRequest", reflect.TypeOf((*MockGraphQLRequestProcessor)(nil).ProcessRequest), ctx, w, r)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ProcessRequest", reflect.TypeOf((*MockGraphQLRequestProcessor)(nil).ProcessRequest), arg0, arg1, arg2)
 }
 
 // MockGranularAccessChecker is a mock of GranularAccessChecker interface.
 type MockGranularAccessChecker struct {
 	ctrl     *gomock.Controller
 	recorder *MockGranularAccessCheckerMockRecorder
-	isgomock struct{}
 }
 
 // MockGranularAccessCheckerMockRecorder is the mock recorder for MockGranularAccessChecker.
@@ -244,24 +240,23 @@ func (m *MockGranularAccessChecker) EXPECT() *MockGranularAccessCheckerMockRecor
 }
 
 // CheckGraphQLRequestFieldAllowance mocks base method.
-func (m *MockGranularAccessChecker) CheckGraphQLRequestFieldAllowance(w http.ResponseWriter, r *http.Request, accessDefinition *GranularAccessDefinition) GraphQLGranularAccessResult {
+func (m *MockGranularAccessChecker) CheckGraphQLRequestFieldAllowance(arg0 http.ResponseWriter, arg1 *http.Request, arg2 *GranularAccessDefinition) GraphQLGranularAccessResult {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "CheckGraphQLRequestFieldAllowance", w, r, accessDefinition)
+	ret := m.ctrl.Call(m, "CheckGraphQLRequestFieldAllowance", arg0, arg1, arg2)
 	ret0, _ := ret[0].(GraphQLGranularAccessResult)
 	return ret0
 }
 
 // CheckGraphQLRequestFieldAllowance indicates an expected call of CheckGraphQLRequestFieldAllowance.
-func (mr *MockGranularAccessCheckerMockRecorder) CheckGraphQLRequestFieldAllowance(w, r, accessDefinition any) *gomock.Call {
+func (mr *MockGranularAccessCheckerMockRecorder) CheckGraphQLRequestFieldAllowance(arg0, arg1, arg2 any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CheckGraphQLRequestFieldAllowance", reflect.TypeOf((*MockGranularAccessChecker)(nil).CheckGraphQLRequestFieldAllowance), w, r, accessDefinition)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CheckGraphQLRequestFieldAllowance", reflect.TypeOf((*MockGranularAccessChecker)(nil).CheckGraphQLRequestFieldAllowance), arg0, arg1, arg2)
 }
 
 // MockReverseProxyPreHandler is a mock of ReverseProxyPreHandler interface.
 type MockReverseProxyPreHandler struct {
 	ctrl     *gomock.Controller
 	recorder *MockReverseProxyPreHandlerMockRecorder
-	isgomock struct{}
 }
 
 // MockReverseProxyPreHandlerMockRecorder is the mock recorder for MockReverseProxyPreHandler.
@@ -282,16 +277,16 @@ func (m *MockReverseProxyPreHandler) EXPECT() *MockReverseProxyPreHandlerMockRec
 }
 
 // PreHandle mocks base method.
-func (m *MockReverseProxyPreHandler) PreHandle(params ReverseProxyParams) (ReverseProxyType, error) {
+func (m *MockReverseProxyPreHandler) PreHandle(arg0 ReverseProxyParams) (ReverseProxyType, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "PreHandle", params)
+	ret := m.ctrl.Call(m, "PreHandle", arg0)
 	ret0, _ := ret[0].(ReverseProxyType)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // PreHandle indicates an expected call of PreHandle.
-func (mr *MockReverseProxyPreHandlerMockRecorder) PreHandle(params any) *gomock.Call {
+func (mr *MockReverseProxyPreHandlerMockRecorder) PreHandle(arg0 any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PreHandle", reflect.TypeOf((*MockReverseProxyPreHandler)(nil).PreHandle), params)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PreHandle", reflect.TypeOf((*MockReverseProxyPreHandler)(nil).PreHandle), arg0)
 }

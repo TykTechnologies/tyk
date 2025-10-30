@@ -97,14 +97,14 @@ tasks:
   lint:
     desc: "Tidy the codebase"
     cmds:
-      - task: codegen
+      - task: codegen:smart
       - task: lint:run
       - task: lint:extras
-      
+
   tidy:
     desc: "Tidy the codebase without auto-fixing"
     cmds:
-      - task: codegen
+      - task: codegen:smart
       - task: lint:basic
       - task: lint:extras
 

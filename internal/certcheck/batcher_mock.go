@@ -21,7 +21,6 @@ import (
 type MockBatcher struct {
 	ctrl     *gomock.Controller
 	recorder *MockBatcherMockRecorder
-	isgomock struct{}
 }
 
 // MockBatcherMockRecorder is the mock recorder for MockBatcher.
@@ -42,24 +41,23 @@ func (m *MockBatcher) EXPECT() *MockBatcherMockRecorder {
 }
 
 // Add mocks base method.
-func (m *MockBatcher) Add(cert CertInfo) error {
+func (m *MockBatcher) Add(arg0 CertInfo) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Add", cert)
+	ret := m.ctrl.Call(m, "Add", arg0)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // Add indicates an expected call of Add.
-func (mr *MockBatcherMockRecorder) Add(cert any) *gomock.Call {
+func (mr *MockBatcherMockRecorder) Add(arg0 any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Add", reflect.TypeOf((*MockBatcher)(nil).Add), cert)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Add", reflect.TypeOf((*MockBatcher)(nil).Add), arg0)
 }
 
 // MockBackgroundBatcher is a mock of BackgroundBatcher interface.
 type MockBackgroundBatcher struct {
 	ctrl     *gomock.Controller
 	recorder *MockBackgroundBatcherMockRecorder
-	isgomock struct{}
 }
 
 // MockBackgroundBatcherMockRecorder is the mock recorder for MockBackgroundBatcher.
@@ -80,29 +78,29 @@ func (m *MockBackgroundBatcher) EXPECT() *MockBackgroundBatcherMockRecorder {
 }
 
 // Add mocks base method.
-func (m *MockBackgroundBatcher) Add(cert CertInfo) error {
+func (m *MockBackgroundBatcher) Add(arg0 CertInfo) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Add", cert)
+	ret := m.ctrl.Call(m, "Add", arg0)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // Add indicates an expected call of Add.
-func (mr *MockBackgroundBatcherMockRecorder) Add(cert any) *gomock.Call {
+func (mr *MockBackgroundBatcherMockRecorder) Add(arg0 any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Add", reflect.TypeOf((*MockBackgroundBatcher)(nil).Add), cert)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Add", reflect.TypeOf((*MockBackgroundBatcher)(nil).Add), arg0)
 }
 
 // RunInBackground mocks base method.
-func (m *MockBackgroundBatcher) RunInBackground(ctx context.Context) {
+func (m *MockBackgroundBatcher) RunInBackground(arg0 context.Context) {
 	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "RunInBackground", ctx)
+	m.ctrl.Call(m, "RunInBackground", arg0)
 }
 
 // RunInBackground indicates an expected call of RunInBackground.
-func (mr *MockBackgroundBatcherMockRecorder) RunInBackground(ctx any) *gomock.Call {
+func (mr *MockBackgroundBatcherMockRecorder) RunInBackground(arg0 any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RunInBackground", reflect.TypeOf((*MockBackgroundBatcher)(nil).RunInBackground), ctx)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RunInBackground", reflect.TypeOf((*MockBackgroundBatcher)(nil).RunInBackground), arg0)
 }
 
 // SetFlushInterval mocks base method.

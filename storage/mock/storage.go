@@ -19,7 +19,6 @@ import (
 type MockHandler struct {
 	ctrl     *gomock.Controller
 	recorder *MockHandlerMockRecorder
-	isgomock struct{}
 }
 
 // MockHandlerMockRecorder is the mock recorder for MockHandler.
@@ -346,18 +345,18 @@ func (mr *MockHandlerMockRecorder) GetRawKey(arg0 any) *gomock.Call {
 }
 
 // GetRollingWindow mocks base method.
-func (m *MockHandler) GetRollingWindow(key string, per int64, pipeline bool) (int, []any) {
+func (m *MockHandler) GetRollingWindow(arg0 string, arg1 int64, arg2 bool) (int, []any) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetRollingWindow", key, per, pipeline)
+	ret := m.ctrl.Call(m, "GetRollingWindow", arg0, arg1, arg2)
 	ret0, _ := ret[0].(int)
 	ret1, _ := ret[1].([]any)
 	return ret0, ret1
 }
 
 // GetRollingWindow indicates an expected call of GetRollingWindow.
-func (mr *MockHandlerMockRecorder) GetRollingWindow(key, per, pipeline any) *gomock.Call {
+func (mr *MockHandlerMockRecorder) GetRollingWindow(arg0, arg1, arg2 any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetRollingWindow", reflect.TypeOf((*MockHandler)(nil).GetRollingWindow), key, per, pipeline)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetRollingWindow", reflect.TypeOf((*MockHandler)(nil).GetRollingWindow), arg0, arg1, arg2)
 }
 
 // GetSet mocks base method.
@@ -488,16 +487,16 @@ func (mr *MockHandlerMockRecorder) SetRawKey(arg0, arg1, arg2 any) *gomock.Call 
 }
 
 // SetRollingWindow mocks base method.
-func (m *MockHandler) SetRollingWindow(key string, per int64, val string, pipeline bool) (int, []any) {
+func (m *MockHandler) SetRollingWindow(arg0 string, arg1 int64, arg2 string, arg3 bool) (int, []any) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "SetRollingWindow", key, per, val, pipeline)
+	ret := m.ctrl.Call(m, "SetRollingWindow", arg0, arg1, arg2, arg3)
 	ret0, _ := ret[0].(int)
 	ret1, _ := ret[1].([]any)
 	return ret0, ret1
 }
 
 // SetRollingWindow indicates an expected call of SetRollingWindow.
-func (mr *MockHandlerMockRecorder) SetRollingWindow(key, per, val, pipeline any) *gomock.Call {
+func (mr *MockHandlerMockRecorder) SetRollingWindow(arg0, arg1, arg2, arg3 any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetRollingWindow", reflect.TypeOf((*MockHandler)(nil).SetRollingWindow), key, per, val, pipeline)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetRollingWindow", reflect.TypeOf((*MockHandler)(nil).SetRollingWindow), arg0, arg1, arg2, arg3)
 }
