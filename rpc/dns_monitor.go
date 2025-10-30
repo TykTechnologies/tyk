@@ -141,11 +141,11 @@ func (m *DNSMonitor) monitorLoop() {
 
 	// Configure exponential backoff
 	b := backoff.NewExponentialBackOff()
-	b.InitialInterval = m.baseCheckInterval   // T0 (e.g., 30s)
-	b.MaxInterval = m.maxCheckInterval        // Tmax (e.g., 10 min)
-	b.MaxElapsedTime = 0                      // Never stop (no total timeout)
-	b.Multiplier = 2.0                        // Simple doubling
-	b.RandomizationFactor = 0                 // No jitter (set to 0.1 if you want some)
+	b.InitialInterval = m.baseCheckInterval // T0 (e.g., 30s)
+	b.MaxInterval = m.maxCheckInterval      // Tmax (e.g., 10 min)
+	b.MaxElapsedTime = 0                    // Never stop (no total timeout)
+	b.Multiplier = 2.0                      // Simple doubling
+	b.RandomizationFactor = 0               // No jitter (set to 0.1 if you want some)
 	b.Reset()
 
 	// Get initial interval
