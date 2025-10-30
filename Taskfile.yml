@@ -24,13 +24,22 @@ includes:
 
 vars:
   path: ./...
+  BASE_BRANCH:
+    sh: echo "${BASE_BRANCH:-master}"
 
 tasks:
   build:
     desc: "Build tyk gateway"
+    sources:
+      - '**/*.go'
+      - 'go.mod'
+      - 'go.sum'
+    generates:
+      - '.task-build-cache'
     cmds:
       - go build .
       - cd gateway && go test -c . && cd ..
+      - touch .task-build-cache
 
   docker:
     desc: "build Tyk gateway internal/tyk-gateway"
@@ -71,24 +80,51 @@ tasks:
     cmds:
       - go generate ./...
 
+  codegen:smart:
+    deps: [deps:mockgen]
+    desc: "Run code generation only if files with go:generate changed vs base branch"
+    sources:
+      - '**/*.go'
+    generates:
+      - .task-codegen-cache
+    cmds:
+      - |
+        # Only check files that changed vs base branch, avoiding grep on unchanged files
+        changed=$(git diff --name-only origin/{{.BASE_BRANCH}}...HEAD -- '*.go' 2>/dev/null || true)
+        if [ -z "$changed" ]; then
+          echo "✓ No Go files changed vs origin/{{.BASE_BRANCH}} - skipping codegen"
+          touch .task-codegen-cache
+          exit 0
+        fi
+        # Only grep in changed files for go:generate directive
+        files_with_generate=$(echo "$changed" | xargs grep -l "//go:generate" 2>/dev/null || true)
+        if [ -z "$files_with_generate" ]; then
+          echo "✓ No files with go:generate changed vs origin/{{.BASE_BRANCH}} - skipping codegen"
+          touch .task-codegen-cache
+          exit 0
+        fi
+        echo "Files with go:generate changed: $(echo $files_with_generate | tr '\n' ' ')"
+        go generate ./...
+        touch .task-codegen-cache
+
   # Used in CI
   lint:
     desc: "Tidy the codebase"
     cmds:
-      - task: codegen
+      - task: codegen:smart
       - task: lint:run
       - task: lint:extras
-      
+
   tidy:
     desc: "Tidy the codebase without auto-fixing"
     cmds:
-      - task: codegen
-      - task: lint:run-no-golangci
+      - task: codegen:smart
+      - task: lint:basic
       - task: lint:extras
 
   lint:extras:
     desc: "Run more specific linters"
-    cmds:
+    deps:
       - task: coprocess:lint
       - task: apidef-oas:lint
 
@@ -98,19 +134,17 @@ tasks:
     cmds:
       - task: lint:fmt
 
-  # This reformats imports with goimports-reviser;
+  # This reformats imports using golangci-lint fmt with gci formatter
   #
   # To limit reformatting scope to packages or files, set `path`:
   #
   # - `task fmt:imports path="./ctx ./rpc"`
   #
-  # Current status: does not run in CI, triggers golangci-lint issues
-  # in the files it fixed. They are preexisting but block golangci-lint
-  # passing in CI.
+  # Uses gci formatter configured in .golangci.yml with Tyk import ordering
   fmt:imports:
-    desc: "Format imports"
+    desc: "Format imports using golangci-lint fmt"
     cmds:
-      - goimports-reviser -imports-order std,general,company,project,blanked,dotted -company-prefixes github.com/TykTechnologies/ {{.path}}
+      - golangci-lint fmt {{.path | default "./..."}}
 
   setup:
     desc: "Setup the project including dependencies and git hooks using lefthooks"
