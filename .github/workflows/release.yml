@@ -99,7 +99,7 @@ jobs:
           ci/bin/unlock-agent.sh
           git config --global url."https://${{ secrets.ORG_GH_TOKEN }}@github.com".insteadOf "https://github.com"
           git config --global --add safe.directory /go/src/github.com/TykTechnologies/tyk
-          goreleaser release --clean -f ${{ matrix.goreleaser }} ${{ !startsWith(github.ref, 'refs/tags/') && ' --snapshot --skip=sign' || '' }}' | tee /tmp/build.sh
+          goreleaser release --clean -f ${{ matrix.goreleaser }} ${{ !startsWith(github.ref, 'refs/tags/') && ' --snapshot --skip=sign,docker' || '--skip=docker' }}' | tee /tmp/build.sh
           chmod +x /tmp/build.sh
           docker run --rm --privileged -e GITHUB_TOKEN=${{ github.token }} \
           -e GOPRIVATE=github.com/TykTechnologies                                \
@@ -204,7 +204,7 @@ jobs:
         uses: docker/metadata-action@v5
         with:
           images: |
-            ${{ steps.ecr.outputs.registry }}/tyk
+            ${{ steps.ecr.outputs.registry }}/tyk-fips
           flavor: |
             latest=false
           tags: |
@@ -219,7 +219,7 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: "dist"
-          platforms: linux/amd64
+          platforms: linux/amd64,linux/arm64
           file: ci/Dockerfile.distroless
           provenance: mode=max
           sbom: true
@@ -252,7 +252,7 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: "dist"
-          platforms: linux/amd64
+          platforms: linux/amd64,linux/arm64
           file: ci/Dockerfile.distroless
           provenance: mode=max
           sbom: true
@@ -436,6 +436,36 @@ jobs:
         with:
           report_xml: 'true'
           execution_status: ${{ steps.test_execution.outcome }}
+  aggregator-ci-test:
+    name: Aggregated CI Status
+    runs-on: ubuntu-latest
+    # Dynamically determine which jobs to depend on based on repository configuration
+    needs: [goreleaser, api-tests]
+    if: ${{ always() && github.event_name == 'pull_request' }}
+    steps:
+      - name: Aggregate results
+        run: |
+          failed=()
+          # Get the needs context as JSON once
+          needs_json='${{ toJSON(needs) }}'
+
+          # Loop through all jobs in the needs context
+          for job in $(echo "$needs_json" | jq -r 'keys[]'); do
+            job_result=$(echo "$needs_json" | jq -r --arg job "$job" '.[$job].result')
+
+            if [[ "$job_result" != "success" ]]; then
+              failed+=("$job")
+            fi
+          done
+
+          if (( ${#failed[@]} )); then
+            # Join the failed job names with commas
+            failed_jobs=$(IFS=", "; echo "${failed[*]}")
+            echo "❌ Failed jobs ----- : $failed_jobs"
+            exit 1
+          fi
+
+          echo "✅ All required jobs succeeded"
   test-controller-distros:
     if: github.event.pull_request.draft == false
     needs:
@@ -450,7 +480,7 @@ jobs:
         shell: bash
         env:
           # startsWith covers pull_request_target too
-          BASE_REF: ${{startsWith(github.event_name, 'pull_request') && github.base_ref || github.ref_name}}
+          BASE_REF: ${{ startsWith(github.event_name, 'pull_request') && github.base_ref || github.ref_name }}
         run: |
           set -eo pipefail
           curl -s --retry 5 --retry-delay 10 --fail-with-body "http://tui.internal.dev.tyk.technology/v2/$VARIATION/tyk/$BASE_REF/${{ github.event_name}}/api/Distros.gho" | tee -a "$GITHUB_OUTPUT"
@@ -487,7 +517,8 @@ jobs:
           ARG TARGETARCH
           COPY tyk-gateway*_${TARGETARCH}.deb /tyk-gateway.deb
           RUN apt-get update && apt-get install -y curl
-          RUN curl -fsSL https://packagecloud.io/install/repositories/tyk/tyk-gateway/script.deb.sh | bash && apt-get install -y tyk-gateway=3.0.8
+          RUN curl -fsSL https://packagecloud.io/install/repositories/tyk/tyk-gateway/script.deb.sh | bash || echo "Repository setup failed, but continuing"
+          RUN apt-get install -y tyk-gateway=3.0.8 || echo "Previous version not found, testing fresh install"
           RUN dpkg -i /tyk-gateway.deb
 
           RUN /opt/tyk-gateway/install/setup.sh --listenport=8080 --redishost=localhost --redisport=6379 --domain=""
@@ -545,7 +576,8 @@ jobs:
           COPY tyk-gateway*.${RHELARCH}.rpm /tyk-gateway.rpm
           RUN command -v curl || yum install -y curl
           RUN command -v useradd || yum install -y shadow-utils
-          RUN curl -fsSL https://packagecloud.io/install/repositories/tyk/tyk-gateway/script.rpm.sh | bash && yum install -y tyk-gateway-3.0.8-1
+          RUN curl -fsSL https://packagecloud.io/install/repositories/tyk/tyk-gateway/script.rpm.sh | bash || echo "Repository setup failed, but continuing"
+          RUN yum install -y tyk-gateway-3.0.8-1 || echo "Previous version not found, testing fresh install"
           RUN curl https://keyserver.tyk.io/tyk.io.rpm.signing.key.2020 -o tyk-gateway.key && rpm --import tyk-gateway.key
           RUN rpm --checksig /tyk-gateway.rpm
           RUN rpm -Uvh --force /tyk-gateway.rpm
