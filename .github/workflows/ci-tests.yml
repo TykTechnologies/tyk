@@ -51,7 +51,7 @@ jobs:
         uses: shrink/actions-docker-extract@v3
         with:
           image: tykio/ci-tools:latest
-          path: /usr/local/bin/golangci-lint
+          path: /usr/local/bin/task
           destination: /usr/local/bin
 
       - name: Run codegen and tidy
