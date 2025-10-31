@@ -21,16 +21,17 @@ func equalStringSlices(a, b []string) bool {
 	return true
 }
 
-func isNetworkError(err error) bool {
+// isDNSError checks if an error is a DNS-related error that might be resolved by DNS change
+func isDNSError(err error) bool {
 	if err == nil {
 		return false
 	}
 
 	errStr := err.Error()
 
-	// Check for specific network-related error patterns
-	return strings.Contains(errStr, "unexpected response type: <nil>. Expected *dispatcherResponse") ||
-		strings.Contains(errStr, "Cannot obtain response during timeout") ||
-		strings.Contains(errStr, "rpc is either down or was not configured") ||
-		strings.Contains(errStr, "Cannot decode response")
+	// Only check for actual DNS-related errors that might be resolved by DNS change
+	// "no such host" - DNS resolution failed for hostname
+	// "lookup" + "timeout" - DNS lookup timeout
+	return strings.Contains(errStr, "no such host") ||
+		(strings.Contains(errStr, "lookup") && strings.Contains(errStr, "timeout"))
 }
