@@ -84,5 +84,23 @@ task test:integration    # Runs the tests
 task lint    # Runs linting checks
 ```
 
+#### BASE_BRANCH Configuration
+
+The linting and code generation tasks automatically detect the appropriate base branch for comparison:
+
+- **Default behavior**: Compares against `master` branch
+- **Merge/release branches**: If your branch name follows the pattern `merge/release-X.X/*` (e.g., `merge/release-5.8/feature-name`), tasks will automatically compare against `release-X.X`
+- **Manual override**: Set the `BASE_BRANCH` environment variable to specify a custom base branch
+
+```shell
+# Automatic detection (default)
+task lint              # Uses master for regular branches, release-X.X for merge/release-* branches
+
+# Manual override
+BASE_BRANCH=release-5.8 task lint    # Explicitly compare against release-5.8
+```
+
+This automatic base branch detection ensures that linting and code generation only run on files that have changed compared to the appropriate base branch, and git hooks (pre-commit, pre-push) validate changes against the correct baseline.
+
 ### Geo IP features
 This product utilises GeoLite2 data created by MaxMind, available from [http://www.maxmind.com](http://www.maxmind.com).
