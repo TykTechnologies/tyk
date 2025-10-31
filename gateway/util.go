@@ -216,3 +216,35 @@ func containsEscapedChars(str string) bool {
 
 	return str != unescaped
 }
+
+// DataProcessor is an interface for processing data
+type DataProcessor interface {
+	Process(data []byte) ([]byte, error)
+	Close() error
+}
+
+// SimpleDataProcessor is a concrete implementation
+type SimpleDataProcessor struct {
+	prefix string
+}
+
+// Process adds a prefix to the data
+func (s *SimpleDataProcessor) Process(data []byte) ([]byte, error) {
+	result := append([]byte(s.prefix), data...)
+	return result, nil
+}
+
+// Close cleans up resources
+func (s *SimpleDataProcessor) Close() error {
+	return nil
+}
+
+func NewDataProcessor(prefix string) DataProcessor {
+	return &SimpleDataProcessor{
+		prefix: prefix,
+	}
+}
+
+func ProcessWithSimpleProcessor(processor *SimpleDataProcessor, data []byte) ([]byte, error) {
+	return processor.Process(data)
+}
