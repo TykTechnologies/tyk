@@ -11,6 +11,7 @@ import (
 	"strconv"
 
 	"github.com/TykTechnologies/kin-openapi/openapi3"
+
 	"github.com/TykTechnologies/tyk/apidef/oas"
 	"github.com/TykTechnologies/tyk/common/option"
 	"github.com/TykTechnologies/tyk/header"

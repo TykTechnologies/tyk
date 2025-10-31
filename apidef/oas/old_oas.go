@@ -2,7 +2,6 @@ package oas
 
 import (
 	"github.com/TykTechnologies/kin-openapi/openapi3"
-
 	openapifork "github.com/TykTechnologies/kin-openapi/openapi3"
 )
 

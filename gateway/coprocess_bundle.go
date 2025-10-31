@@ -18,10 +18,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/TykTechnologies/goverify"
 	"github.com/cenk/backoff"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/afero"
+
+	"github.com/TykTechnologies/goverify"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/internal/sanitize"

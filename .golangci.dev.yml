@@ -1,12 +1,7 @@
+version: "2"
+
 # Options for analysis running.
 run:
-  timeout: 20m
-  tests: true
-
-  # Be as complete as possible when reporting issues
-  max-issues-per-linter: 0
-  max-same-issues: 0
-
   # If set we pass it to "go list -mod={option}". From "go help modules":
   # If invoked with -mod=readonly, the go command is disallowed from the implicit
   # automatic updating of go.mod described above. Instead, it fails when any changes
@@ -19,119 +14,137 @@ run:
   # Allowed values: readonly|vendor|mod
   # By default, it isn't set.
   modules-download-mode: readonly
-
+  tests: true
   # Allow multiple parallel golangci-lint instances running.
   # If false (default) - golangci-lint acquires file lock on start.
   allow-parallel-runners: false
-
 linters:
-  disable:
-    - varnamelen
-    - tagliatelle
-    - testpackage
-    - paralleltest
-    - ireturn
-    - goimports
   enable:
-    - govet
-    - forbidigo
-    - gochecknoinits
+    - dupl
     - errcheck
     - errorlint
-    - thelper
-    - noctx
-    - dupl
-    - nilerr
+    - forbidigo
+    - gochecknoinits
+    - govet
     - misspell
+    - nilerr
+    - noctx
     - revive
+    - thelper
     - whitespace
-
-linters-settings:
-  misspell:
-    ignore-words:
-      - tempset  # temporary set, not "tempest"
-
-  whitespace:
-    multi-if: true  # Enforces newlines (or comments) after every multi-line if statement
-    multi-func: true  # Enforces newlines (or comments) after every multi-line function signature
-
-  fobidigo:
-    forbid:
-      - p: ^fmt\.Print.*$
-        msg: Do not commit print statements, use t.Log or Logrus.
-      - p: ^net\/http\.(Get|Head|Post|Form).*$
-        msg: Do not use top level http package functions, NewRequestWithContext is encouraged.
-    exclude-godoc-examples: false
-    analyze-types: true
-
-  revive:
-    ignore-generated-header: true
-    severity: error
-    enable-all-rules: false
+  disable:
+    - ireturn
+    - paralleltest
+    - tagliatelle
+    - testpackage
+    - varnamelen
+  settings:
+    errcheck:
+      check-type-assertions: true
+      check-blank: true
+      exclude-functions:
+        - (*github.com/TykTechnologies/tyk/gateway.Test).Run
+        - time.Parse
+        - strconv.ParseBool
+        - strconv.ParseInt
+    forbidigo:
+      forbid:
+        - pattern: ^fmt\.Print.*$
+          msg: Do not commit print statements, use t.Log or Logrus.
+        - pattern: ^net\/http\.(Get|Head|Post|Form).*$
+          msg: Do not use top level http package functions, NewRequestWithContext is encouraged.
+      exclude-godoc-examples: false
+      analyze-types: true
+    govet:
+      disable:
+        - fieldalignment
+        - shadow
+      enable-all: true
+    misspell:
+      ignore-rules:
+        - tempset # temporary set, not "tempest"
+    revive:
+      severity: error
+      enable-all-rules: false
+      rules:
+        - name: unused-parameter
+          arguments:
+            - allowRegex: ^_
+          disabled: false
+        - name: import-shadowing
+          disabled: false
+        - name: exported
+          disabled: false
+    whitespace:
+      multi-if: true # Enforces newlines (or comments) after every multi-line if statement
+      multi-func: true # Enforces newlines (or comments) after every multi-line function signature
+  exclusions:
+    presets:
+      - comments
+      - common-false-positives
+      - legacy
+      - std-error-handling
     rules:
-      - name: unused-parameter
-        disabled: false
-        arguments:
-          - allowRegex: "^_"
-      - name: import-shadowing
-        disabled: false
-      - name: exported
-        disabled: false
-
-  govet:
-    enable-all: true
-    disable:
-      - fieldalignment
-      - shadow
-
-  errcheck:
-    check-type-assertions: true
-    check-blank: true
-    exclude-functions:
-      - (*github.com/TykTechnologies/tyk/gateway.Test).Run
-      - time.Parse
-      - strconv.ParseBool
-      - strconv.ParseInt
-
+      # cli package uses fmt.Print by design
+      - linters:
+          - forbidigo
+        path: ^cli/
+      # we don't want to silence test, but we want to silence
+      # some known issues in them which rank lower than product.
+      # generally no test code impacts the quality of product
+      # code, if the test is deleted. Whatever test metrics we
+      # measure are to our benefit.
+      - linters:
+          - errcheck
+        path: (^test/|^tests/|/testutil.go|_test\.go)
+        text: error return value of `[^`]+` is not checked # unsafe typecasts are common
+      - linters:
+          - errcheck
+        path: (^test/|^tests/|/testutil.go|_test\.go)
+        text: Error return value is not checked
+      - linters:
+          - dupl # many functions looks like dupes
+          - gocyclo # many functions can be very long
+          - funlen # many functions can be very long
+          - gosec # tests don't have CVEs
+        path: _test\.go
+      - path: (.+)\.go$
+        text: G404 # Use of weak random number generator (math/rand instead of crypto/rand)
+      - path: (.+)\.go$
+        text: SA9004 # only the first constant in this group has an explicit type
+      - path: (.+)\.go$
+        text: SA1019 # Warning on deprecated imports (stdlib ioutil, grpc import)
+      - path: (.+)\.go$
+        text: SA1029 # should not use built-in type string as key for value; define your own type to avoid collision
+    paths:
+      - .*\.pb\.go$
+      - .*/mock/.+\.go$
+      - .*/bindata.go$
+      - ci
+      - bin
+      - webclient
+      - portal
+      - third_party$
+      - builtin$
+      - examples$
 issues:
   max-issues-per-linter: 0
   max-same-issues: 0
-  exclude-generated: strict
-  exclude-files:
-    - ".*\\.pb\\.go$"
-    - ".*/mock/.+\\.go$"
-    - ".*/bindata.go$"
-  exclude-dirs:
-    - ci
-    - bin
-    - webclient
-    - portal
-  exclude-rules:
-    # cli package uses fmt.Print by design
-    - path: ^cli/
-      linters:
-        - forbidigo
-    # we don't want to silence test, but we want to silence
-    # some known issues in them which rank lower than product.
-    # generally no test code impacts the quality of product
-    # code, if the test is deleted. Whatever test metrics we
-    # measure are to our benefit.
-    - path: (^test/|^tests/|/testutil.go|_test\.go)
-      linters:
-        - errcheck
-      text: "error return value of `[^`]+` is not checked" # unsafe typecasts are common
-    - path: (^test/|^tests/|/testutil.go|_test\.go)
-      linters:
-        - errcheck
-      text: "Error return value is not checked"
-    - path: _test\.go
-      linters:
-        - dupl # many functions looks like dupes
-        - gocyclo # many functions can be very long
-        - funlen # many functions can be very long
-        - gosec # tests don't have CVEs
-  exclude:
-    - G404    # Use of weak random number generator (math/rand instead of crypto/rand)
-    - SA9004  # only the first constant in this group has an explicit type
-    - SA1019  # Warning on deprecated imports (stdlib ioutil, grpc import)
-    - SA1029  # should not use built-in type string as key for value; define your own type to avoid collision
+formatters:
+  enable:
+    - gci # using for import formatting instead of goimports
+    - gofmt # standard Go formatting
+  settings:
+    gci:
+      sections:
+        - standard  # std packages
+        - default   # third-party packages
+        - prefix(github.com/TykTechnologies)  # same org, different repos
+        - prefix(github.com/TykTechnologies/tyk)  # same repo
+        - blank     # blank imports
+        - dot       # dot imports
+  exclusions:
+    paths:
+      - third_party$
+      - builtin$
+      - examples$
