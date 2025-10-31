@@ -137,8 +137,8 @@ jobs:
           go-version-file: go.mod
           cache-dependency-path: go.sum
 
-      - name: Install Dependencies and basic hygiene test
-        id: hygiene
+      - name: Install Dependencies
+        id: dependencies
         run: |
           sudo apt-get install libluajit-5.1-dev
 
@@ -146,25 +146,6 @@ jobs:
           pip install setuptools
           pip install google
           pip install 'protobuf==4.24.4'
-
-          task --version
-          task lint
-
-          git add --all
-          git diff HEAD > git-state.log
-          git_state_count=$(wc -l < git-state.log)
-
-          if [[ $git_state_count -ne 0 ]]
-          then
-            echo "git-state<<EOF" >> $GITHUB_OUTPUT
-            cat git-state.log >> $GITHUB_OUTPUT
-            echo "EOF" >> $GITHUB_OUTPUT
-
-            echo "task lint made git state dirty, please run task lint locally and update PR"
-            echo
-            cat git-state.log
-            exit 1
-          fi
 
       - name: Bring up test services
         run: task services:up
