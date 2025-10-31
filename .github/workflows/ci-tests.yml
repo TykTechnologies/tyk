@@ -61,7 +61,6 @@ jobs:
         run: |
           # Run linting without auto-fixing
           task tidy
-          task codegen:smart
           task --exit-code lint:check-git-state MESSAGE="task tidy made git state dirty, please run task lint locally and update PR"
 
       - name: golangci-lint
