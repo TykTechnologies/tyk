@@ -1,10 +1,6 @@
 ---
 version: "3"
 
-vars:
-  BASE_BRANCH:
-    sh: echo "${BASE_BRANCH:-master}"
-
 tasks:
   # pre-commit: run formatting linters on each commit
   # golangci-lint with --fix handles: go fmt (via gofmt formatter), go vet (via govet linter)
