@@ -3,19 +3,17 @@ package gateway
 import (
 	"encoding/json"
 	"errors"
-	"github.com/TykTechnologies/tyk/header"
 	"io/ioutil"
 	"net/http"
 	"os"
 	"path/filepath"
 
 	"github.com/TykTechnologies/graphql-go-tools/pkg/graphql"
-
+	"github.com/TykTechnologies/tyk/header"
 	"github.com/TykTechnologies/tyk/rpc"
+	"github.com/TykTechnologies/tyk/user"
 
 	"github.com/sirupsen/logrus"
-
-	"github.com/TykTechnologies/tyk/user"
 )
 
 var (
@@ -118,7 +116,7 @@ func LoadPoliciesFromDir(dir string) (map[string]user.Policy, error) {
 }
 
 // LoadPoliciesFromDashboard will connect and download Policies from a Tyk Dashboard instance.
-func (gw *Gateway) LoadPoliciesFromDashboard(endpoint, secret string, allowExplicit bool) (map[string]user.Policy, error) {
+func (gw *Gateway) LoadPoliciesFromDashboard(endpoint, secret string) (map[string]user.Policy, error) {
 	// Build request function for recovery mechanism
 	buildReq := func() (*http.Request, error) {
 		req, err := http.NewRequest("GET", endpoint, nil)
@@ -161,12 +159,12 @@ func (gw *Gateway) LoadPoliciesFromDashboard(endpoint, secret string, allowExpli
 		Message []DBPolicy
 		Nonce   string
 	}
-	if err := json.NewDecoder(resp.Body).Decode(&list); err != nil {
+	if err = json.NewDecoder(resp.Body).Decode(&list); err != nil {
 		log.Error("Failed to decode policy body: ", err)
 		// Check if we should retry after a network error during read
 		if gw.HandleDashboardResponseReadError(err, "policy fetch") {
 			// Retry the entire operation
-			return gw.LoadPoliciesFromDashboard(endpoint, secret, allowExplicit)
+			return gw.LoadPoliciesFromDashboard(endpoint, secret)
 		}
 		return nil, err
 	}
@@ -181,13 +179,14 @@ func (gw *Gateway) LoadPoliciesFromDashboard(endpoint, secret string, allowExpli
 	log.WithFields(logrus.Fields{
 		"prefix": "policy",
 	}).Info("Processing policy list")
+
 	for _, p := range list.Message {
-		id := p.MID.Hex()
-		if allowExplicit && p.ID != "" {
-			id = p.ID
+		if !ensurePolicyId(&p.Policy) {
+			log.Errorf("invalid policy %#v", p)
+			continue
 		}
-		p.ID = id
-		if _, ok := policies[id]; ok {
+
+		if _, ok := policies[p.ID]; ok {
 			log.WithFields(logrus.Fields{
 				"prefix":   "policy",
 				"policyID": p.ID,
@@ -195,13 +194,14 @@ func (gw *Gateway) LoadPoliciesFromDashboard(endpoint, secret string, allowExpli
 			}).Warning("--> Skipping policy, new item has a duplicate ID!")
 			continue
 		}
-		policies[id] = p.ToRegularPolicy()
+
+		policies[p.ID] = p.ToRegularPolicy()
 	}
 
-	return policies, err
+	return policies, nil
 }
 
-func parsePoliciesFromRPC(list string, allowExplicit bool) (map[string]user.Policy, error) {
+func parsePoliciesFromRPC(list string) (map[string]user.Policy, error) {
 	var dbPolicyList []user.Policy
 
 	if err := json.Unmarshal([]byte(list), &dbPolicyList); err != nil {
@@ -211,18 +211,16 @@ func parsePoliciesFromRPC(list string, allowExplicit bool) (map[string]user.Poli
 	policies := make(map[string]user.Policy, len(dbPolicyList))
 
 	for _, p := range dbPolicyList {
-		id := p.MID.Hex()
-		if allowExplicit && p.ID != "" {
-			id = p.ID
+		if !ensurePolicyId(&p) {
+			continue
 		}
-		p.ID = id
-		policies[id] = p
+		policies[p.ID] = p
 	}
 
 	return policies, nil
 }
 
-func (gw *Gateway) LoadPoliciesFromRPC(store RPCDataLoader, orgId string, allowExplicit bool) (map[string]user.Policy, error) {
+func (gw *Gateway) LoadPoliciesFromRPC(store RPCDataLoader, orgId string) (map[string]user.Policy, error) {
 	if rpc.IsEmergencyMode() {
 		return gw.LoadPoliciesFromRPCBackup()
 	}
@@ -236,7 +234,7 @@ func (gw *Gateway) LoadPoliciesFromRPC(store RPCDataLoader, orgId string, allowE
 		return nil, errors.New("failed to fetch policies from RPC store; connection may be down")
 	}
 
-	policies, err := parsePoliciesFromRPC(rpcPolicies, allowExplicit)
+	policies, err := parsePoliciesFromRPC(rpcPolicies)
 
 	if err != nil {
 		log.WithFields(logrus.Fields{
@@ -250,4 +248,23 @@ func (gw *Gateway) LoadPoliciesFromRPC(store RPCDataLoader, orgId string, allowE
 	}
 
 	return policies, nil
+}
+
+// ensurePolicyId ensures ID field exists
+// should be removed after migrate
+func ensurePolicyId(policy *user.Policy) bool {
+	if policy == nil {
+		return false
+	}
+
+	if policy.ID != "" {
+		return true
+	}
+
+	if !policy.MID.Valid() {
+		return false
+	}
+
+	policy.ID = policy.MID.Hex()
+	return true
 }
