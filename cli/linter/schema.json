@@ -1002,6 +1002,18 @@
         },
         "synchroniser_enabled": {
           "type": "boolean"
+        },
+        "dns_monitor": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "check_interval": {
+              "type": "integer"
+            }
+          }
         }
       }
     },
