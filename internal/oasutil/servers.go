@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/TykTechnologies/kin-openapi/openapi3"
+
 	"github.com/TykTechnologies/tyk/pkg/errpack"
 )
 

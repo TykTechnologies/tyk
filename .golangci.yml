@@ -163,57 +163,6 @@ linters:
 issues:
   max-issues-per-linter: 0
   max-same-issues: 0
-<<<<<<< HEAD
-  exclude-generated: strict
-  exclude-files:
-    - ".*\\.pb\\.go$"
-    - ".*/mock/.+\\.go$"
-    - ".*/bindata.go$"
-  exclude-dirs:
-    - ci
-    - bin
-    - webclient
-    - portal
-  # The `exclude-rules` configuration below configures
-  # more particular exclusion rules, mostly aimed at tests
-  # or some structurally known areas like testutil and test
-  # folders which are not part of product packages.
-  #
-  # Development doesn't carry these exclusions, as we have
-  # testing concerns that are being excluded here.
-  exclude-rules:
-    # cli package uses fmt.Print by design
-    - path: ^cli/
-      linters:
-        - forbidigo
-    # we don't want to silence test, but we want to silence
-    # some known issues in them which rank lower than product.
-    # generally no test code impacts the quality of product
-    # code, if the test is deleted. Whatever test metrics we
-    # measure are to our benefit.
-    - path: (^test/|^tests/|/testutil.go|_test\.go)
-      linters:
-        - errcheck
-      text: "error return value of `[^`]+` is not checked" # unsafe typecasts are common
-    - path: (^test/|^tests/|/testutil.go|_test\.go)
-      linters:
-        - errcheck
-      text: "Error return value is not checked"
-    - path: _test\.go
-      linters:
-        - dupl # many functions looks like dupes
-        - gocyclo # many functions can be very long
-        - funlen # many functions can be very long
-        - gosec # tests don't have CVEs
-    - path: ^internal/service/
-      linters:
-        - gomodguard
-  exclude:
-    - G404    # Use of weak random number generator (math/rand instead of crypto/rand)
-    - SA9004  # only the first constant in this group has an explicit type
-    - SA1019  # Warning on deprecated imports (stdlib ioutil, grpc import)
-    - SA1029  # should not use built-in type string as key for value; define your own type to avoid collision
-=======
 formatters:
   enable:
     - gci # using for import formatting instead of goimports
@@ -232,4 +181,3 @@ formatters:
       - third_party$
       - builtin$
       - examples$
->>>>>>> a87f2af7a... [TT-16055] upgrade golangcilint to v2.5.0 (#7491)

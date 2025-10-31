@@ -9,9 +9,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/TykTechnologies/kin-openapi/openapi3"
 	"github.com/goccy/go-yaml"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/TykTechnologies/kin-openapi/openapi3"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/apidef/oas"

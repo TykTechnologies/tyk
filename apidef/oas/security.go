@@ -1,8 +1,9 @@
 package oas
 
 import (
-	"github.com/TykTechnologies/kin-openapi/openapi3"
 	"github.com/lonelycode/osin"
+
+	"github.com/TykTechnologies/kin-openapi/openapi3"
 
 	"github.com/TykTechnologies/tyk/apidef"
 )
@@ -87,7 +88,7 @@ func (s *OAS) extractTokenTo(api *apidef.APIDefinition, name string) {
 	}
 	api.UseStandardAuth = enabled
 	authConfig.UseCertificate = token.EnableClientCertificate
-	token.AuthSources.ExtractTo(&authConfig)
+	token.ExtractTo(&authConfig)
 	if token.Signature != nil {
 		token.Signature.ExtractTo(&authConfig)
 	}
@@ -243,7 +244,7 @@ func (s *OAS) extractJWTTo(api *apidef.APIDefinition, name string) {
 
 	jwt := s.getTykJWTAuth(name)
 	api.EnableJWT = jwt.Enabled
-	jwt.AuthSources.ExtractTo(&ac)
+	jwt.ExtractTo(&ac)
 	api.JWTSource = jwt.Source
 	api.JWTSigningMethod = jwt.SigningMethod
 	api.JWTIdentityBaseField = jwt.IdentityBaseField
@@ -343,7 +344,7 @@ func (s *OAS) extractBasicTo(api *apidef.APIDefinition, name string) {
 
 	basic := s.getTykBasicAuth(name)
 	api.UseBasicAuth = basic.Enabled
-	basic.AuthSources.ExtractTo(&ac)
+	basic.ExtractTo(&ac)
 	api.BasicAuth.DisableCaching = basic.DisableCaching
 	api.BasicAuth.CacheTTL = basic.CacheTTL
 

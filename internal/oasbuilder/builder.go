@@ -5,13 +5,14 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
-	"github.com/TykTechnologies/tyk/apidef"
 	"net/http"
 	"net/url"
 	"strings"
 	"time"
 
 	"github.com/TykTechnologies/kin-openapi/openapi3"
+
+	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/apidef/oas"
 	"github.com/TykTechnologies/tyk/common/option"
 	tykheaders "github.com/TykTechnologies/tyk/header"

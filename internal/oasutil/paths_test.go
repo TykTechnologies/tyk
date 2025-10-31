@@ -3,8 +3,9 @@ package oasutil
 import (
 	"testing"
 
-	"github.com/TykTechnologies/kin-openapi/openapi3"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/TykTechnologies/kin-openapi/openapi3"
 )
 
 func testOASPaths(paths []string) openapi3.Paths {
