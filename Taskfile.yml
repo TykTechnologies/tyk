@@ -24,6 +24,16 @@ includes:
 
 vars:
   path: ./...
+  # BASE_BRANCH: Determines the base branch for diff-based operations (linting, codegen)
+  # This variable is inherited by all included taskfiles.
+  #
+  # Detection logic:
+  # 1. If BASE_BRANCH env var is set, use it
+  # 2. If current branch follows release bot naming convention (merge/release-X.X/*),
+  #    extract and use the release branch (e.g., merge/release-5.8/foo -> release-5.8)
+  # 3. Otherwise, default to master
+  #
+  # This ensures git hooks and linting compare against the correct baseline branch.
   BASE_BRANCH:
     sh: |
       if [ -n "${BASE_BRANCH}" ]; then
