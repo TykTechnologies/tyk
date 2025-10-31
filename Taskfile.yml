@@ -114,16 +114,12 @@ tasks:
       - task: codegen:smart
       - task: lint:run
       - task: lint:extras
-<<<<<<< HEAD
-=======
-
   tidy:
     desc: "Tidy the codebase without auto-fixing"
     cmds:
       - task: codegen:smart
       - task: lint:basic
       - task: lint:extras
->>>>>>> a87f2af7a... [TT-16055] upgrade golangcilint to v2.5.0 (#7491)
 
   lint:extras:
     desc: "Run more specific linters"

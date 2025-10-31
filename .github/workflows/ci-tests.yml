@@ -54,23 +54,6 @@ jobs:
           path: /usr/local/bin/golangci-lint
           destination: /usr/local/bin
 
-<<<<<<< HEAD
-      - run: golangci-lint version && golangci-lint cache status
-
-      - name: golangci-lint
-        if: ${{ github.event_name == 'pull_request' }}
-        # This is a pull request, but exiting here skips CI tests (`needs: golangci-lint`). Exit code 0 to always run tests.
-        # PR uses the "prod" config and must pass.
-        run: |
-          golangci-lint run --out-format colored-line-number,checkstyle:golangci-lint-report.json \
-                            --issues-exit-code=0 --new-from-rev=origin/${{ env.BRANCH_NAME }} -v ./...
-
-      - name: golangci-lint-on-push
-        if: ${{ github.event_name == 'push' }}
-        # Using the default config, reports stats to sonarcloud. No requirements on passing other than KPIs tracked in dev.
-        run: |
-          golangci-lint run --out-format checkstyle:golangci-lint-report.json --issues-exit-code=0 -v ./...
-=======
       - name: Run codegen and tidy
         if: github.event_name == 'pull_request'
         env:
@@ -92,7 +75,6 @@ jobs:
           args: --issues-exit-code=0 -v ./...
           skip-cache: false
           skip-save-cache: false
->>>>>>> a87f2af7a... [TT-16055] upgrade golangcilint to v2.5.0 (#7491)
 
       - uses: actions/upload-artifact@v4
         if: ${{ always() }}

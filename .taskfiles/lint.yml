@@ -26,15 +26,12 @@ tasks:
       - task: check
       - golangci-lint run --new-from-rev=origin/{{ .BASE_BRANCH }} --issues-exit-code=1 --fix ./...
 
-<<<<<<< HEAD
-=======
   basic:
     desc: "Run basic checks without golangci-lint"
     cmds:
       - task: tidy
       - task: check
 
->>>>>>> a87f2af7a... [TT-16055] upgrade golangcilint to v2.5.0 (#7491)
   fmt:
     desc: "Run typical code cleanup steps"
     cmds:
@@ -124,9 +121,6 @@ tasks:
     generates:
       - .task-check-x-tyk-gateway-cache
     cmds:
-<<<<<<< HEAD
-      - go test -count 1 -run=TestXTykGateway_Lint ./apidef/oas/
-=======
       - |
         changed=$(git diff --name-only origin/{{.BASE_BRANCH}}...HEAD 2>/dev/null | grep -E "^apidef/oas/" || true)
         if [ -z "$changed" ]; then
@@ -152,5 +146,3 @@ tasks:
           git diff
           exit 1
         fi
-
->>>>>>> a87f2af7a... [TT-16055] upgrade golangcilint to v2.5.0 (#7491)
