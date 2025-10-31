@@ -4,8 +4,6 @@ version: "3"
 vars:
   root:
     sh: git rev-parse --show-toplevel
-  BASE_BRANCH:
-    sh: echo "${BASE_BRANCH:-master}"
 
 tasks:
   tidy:
