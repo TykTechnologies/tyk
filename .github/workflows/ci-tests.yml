@@ -51,7 +51,7 @@ jobs:
         uses: shrink/actions-docker-extract@v3
         with:
           image: tykio/ci-tools:latest
-          path: /usr/local/bin/task
+          path: /usr/local/bin/.
           destination: /usr/local/bin
 
       - name: Run codegen and tidy
