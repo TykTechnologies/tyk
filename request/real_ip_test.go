@@ -55,26 +55,26 @@ func TestRealIP(t *testing.T) {
 	if ip != "10.0.0.5" {
 		t.Errorf("\texpected %s got %s", "10.0.0.5", ip)
 	}
-	
+
 	// Test with XFFDepth = 1 (last IP in chain)
 	t.Log("XFFDepth=1 (last IP)")
 	mockConfig.HttpServerOptions.XFFDepth = 1
-	
+
 	r, _ = http.NewRequest(http.MethodGet, "http://abc.com:8080", nil)
 	r.Header.Set("X-Forwarded-For", "10.0.0.3, 10.0.0.2, 10.0.0.1")
-	
+
 	ip = RealIP(r)
 	if ip != "10.0.0.1" {
 		t.Errorf("\texpected %s got %s", "10.0.0.1", ip)
 	}
-	
+
 	// Test with XFFDepth = 2 (second to last IP in chain)
 	t.Log("XFFDepth=2 (second to last IP)")
 	mockConfig.HttpServerOptions.XFFDepth = 2
-	
+
 	r, _ = http.NewRequest(http.MethodGet, "http://abc.com:8080", nil)
 	r.Header.Set("X-Forwarded-For", "10.0.0.3, 10.0.0.2, 10.0.0.1")
-	
+
 	ip = RealIP(r)
 	if ip != "10.0.0.2" {
 		t.Errorf("\texpected %s got %s", "10.0.0.2", ip)
@@ -83,7 +83,7 @@ func TestRealIP(t *testing.T) {
 
 func BenchmarkRealIP_RemoteAddr(b *testing.B) {
 	b.ReportAllocs()
-	
+
 	// Initialize the Global function for benchmark
 	mockConfig := config.Config{}
 	mockConfig.HttpServerOptions.XFFDepth = 0
@@ -104,7 +104,7 @@ func BenchmarkRealIP_RemoteAddr(b *testing.B) {
 
 func BenchmarkRealIP_ForwardedFor(b *testing.B) {
 	b.ReportAllocs()
-	
+
 	// Initialize the Global function for benchmark
 	mockConfig := config.Config{}
 	mockConfig.HttpServerOptions.XFFDepth = 0
@@ -125,7 +125,7 @@ func BenchmarkRealIP_ForwardedFor(b *testing.B) {
 
 func BenchmarkRealIP_RealIP(b *testing.B) {
 	b.ReportAllocs()
-	
+
 	// Initialize the Global function for benchmark
 	mockConfig := config.Config{}
 	mockConfig.HttpServerOptions.XFFDepth = 0
@@ -146,7 +146,7 @@ func BenchmarkRealIP_RealIP(b *testing.B) {
 
 func BenchmarkRealIP_Context(b *testing.B) {
 	b.ReportAllocs()
-	
+
 	// Initialize the Global function for benchmark
 	mockConfig := config.Config{}
 	mockConfig.HttpServerOptions.XFFDepth = 0
@@ -233,7 +233,7 @@ func TestXFFDepth(t *testing.T) {
 
 	// Initialize mock config for tests
 	mockConfig := config.Config{}
-	
+
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			// Set the XFFDepth for this test case
