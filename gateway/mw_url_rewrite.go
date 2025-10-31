@@ -536,7 +536,11 @@ func (m *URLRewriteMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 	}
 
 	if err = m.CheckHostRewrite(oldPath, p, r); err != nil {
-		log.WithError(err).WithField("from", oldPath).WithField("to", p).Error("Checking Host rewrite: error parsing URL")
+		log.WithFields(logrus.Fields{
+			"error": err,
+			"from":  oldPath,
+			"to":    p,
+		}).Error("Checking Host rewrite: error parsing URL")
 	}
 
 	newURL, err := url.Parse(p)

@@ -69,7 +69,11 @@ func (m *GranularAccessMiddleware) ProcessRequest(w http.ResponseWriter, r *http
 			// if loglevel is set to debug verbosity increases and all requests are logged,
 			// regardless if an error occured or not.
 			if gwConfig.LogLevel == "debug" || err != nil {
-				logger = logger.WithError(err).WithField("pattern", pattern).WithField("match", match)
+				logger = logger.WithFields(logrus.Fields{
+				"error":   err,
+				"pattern": pattern,
+				"match":   match,
+			})
 				if err != nil {
 					logger.Error("error matching endpoint")
 				} else {

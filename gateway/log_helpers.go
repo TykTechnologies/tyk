@@ -65,3 +65,18 @@ func (gw *Gateway) getExplicitLogEntryForRequest(logger *logrus.Entry, path stri
 	}
 	return logger.WithFields(fields)
 }
+
+// getOrCreateRequestLogger returns a cached logger from the request context
+// or creates a new one if it doesn't exist. This reduces allocations by
+// ensuring the logger is only created once per request instead of once per middleware.
+func (gw *Gateway) getOrCreateRequestLogger(r *http.Request, key string) *logrus.Entry {
+	// Check if logger already exists in context
+	if logger := ctxGetRequestLogger(r); logger != nil {
+		return logger
+	}
+
+	// Create new logger and cache it in context
+	logger := gw.getLogEntryForRequest(logrus.NewEntry(log), r, key, nil)
+	ctxSetRequestLogger(r, logger)
+	return logger
+}
