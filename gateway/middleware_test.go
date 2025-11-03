@@ -11,9 +11,11 @@ import (
 
 	"github.com/TykTechnologies/tyk/apidef"
 	headers2 "github.com/TykTechnologies/tyk/header"
+	"github.com/TykTechnologies/tyk/internal/cache"
 	"github.com/TykTechnologies/tyk/internal/uuid"
 	"github.com/TykTechnologies/tyk/test"
 
+	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/user"
 )
 
@@ -30,6 +32,38 @@ var sess = user.SessionState{
 
 func (m mockStore) SessionDetail(orgID string, keyName string, hashed bool) (user.SessionState, bool) {
 	return sess.Clone(), !m.DetailNotFound
+}
+
+func TestBaseMiddleware_OrgSessionExpiry(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	m := &BaseMiddleware{
+		Spec: &APISpec{
+			GlobalConfig: config.Config{
+				EnforceOrgDataAge: true,
+			},
+			OrgSessionManager: mockStore{},
+		},
+		logger: mainLog,
+		Gw:     ts.Gw,
+	}
+	v := int64(100)
+	ts.Gw.ExpiryCache.Set(sess.OrgID, v, cache.DefaultExpiration)
+
+	got := m.OrgSessionExpiry(sess.OrgID)
+	assert.Equal(t, v, got)
+	ts.Gw.ExpiryCache.Delete(sess.OrgID)
+
+	got = m.OrgSessionExpiry(sess.OrgID)
+	assert.Equal(t, sess.DataExpires, got)
+	ts.Gw.ExpiryCache.Delete(sess.OrgID)
+
+	m.Spec.OrgSessionManager = mockStore{DetailNotFound: true}
+	noOrgSess := "nonexistent_org"
+	got = m.OrgSessionExpiry(noOrgSess)
+	assert.Equal(t, DEFAULT_ORG_SESSION_EXPIRATION, got)
+
 }
 
 func TestBaseMiddleware_getAuthType(t *testing.T) {

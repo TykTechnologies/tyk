@@ -335,7 +335,12 @@ func (k *OrganizationMonitor) getOrgSessionWithStaleWhileRevalidate() (user.Sess
 	now := time.Now().UnixNano()
 
 	if cached, ok := orgSessionCache.Load(k.Spec.OrgID); ok {
-		entry := cached.(*orgCacheEntry)
+		entry, ok := cached.(*orgCacheEntry)
+		if !ok {
+			k.Logger().Error("Invalid cache entry type")
+			orgSessionCache.Delete(k.Spec.OrgID)
+			return user.SessionState{}, false
+		}
 
 		if now < entry.softExpiry {
 			k.Logger().Debug("Using fresh org session from cache")
