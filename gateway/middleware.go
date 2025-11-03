@@ -39,12 +39,23 @@ import (
 
 const (
 	DEFAULT_ORG_SESSION_EXPIRATION = int64(604800)
+	orgSessionSoftExpiry           = 10 * time.Minute
+	orgSessionHardExpiry           = 1 * time.Hour
+	orgSessionMaxStale             = 24 * time.Hour
+	orgSessionFetchTimeout         = 2 * time.Second
 )
 
 var (
 	GlobalRate            = ratecounter.NewRateCounter(1 * time.Second)
 	orgSessionExpiryCache singleflight.Group
+	orgRefreshInProgress  sync.Map
 )
+
+// orgCacheEntry holds org session with timestamp for stale-while-revalidate
+type orgCacheEntry struct {
+	session  user.SessionState
+	cachedAt int64
+}
 
 type TykMiddleware interface {
 	Base() *BaseMiddleware
@@ -343,25 +354,135 @@ func (t *BaseMiddleware) GetSpec() *APISpec {
 	return t.Spec
 }
 
-func (t *BaseMiddleware) OrgSession(orgID string) (user.SessionState, bool) {
+// fetchOrgSessionWithTimeout fetches org session with a timeout to prevent hanging
+func (t *BaseMiddleware) fetchOrgSessionWithTimeout(orgID string) (user.SessionState, bool) {
+	timeoutCtx, cancel := context.WithTimeout(context.Background(), orgSessionFetchTimeout)
+	defer cancel()
 
+	type result struct {
+		session user.SessionState
+		found   bool
+	}
+	resultChan := make(chan result, 1)
+
+	go func() {
+		session, found := t.Spec.OrgSessionManager.SessionDetail(orgID, orgID, false)
+		if found && t.Spec.GlobalConfig.EnforceOrgDataAge {
+			t.Logger().Debug("Setting data expiry: ", orgID)
+			t.Gw.ExpiryCache.Set(session.OrgID, session.DataExpires, cache.DefaultExpiration)
+		}
+		session.SetKeyHash(storage.HashKey(orgID, t.Gw.GetConfig().HashKeys))
+
+		select {
+		case resultChan <- result{session: session.Clone(), found: found}:
+		case <-timeoutCtx.Done():
+			return
+		}
+	}()
+
+	select {
+	case res := <-resultChan:
+		return res.session, res.found
+	case <-timeoutCtx.Done():
+		t.Logger().Warning("Org session fetch timed out after 2s")
+		return user.SessionState{}, false
+	}
+}
+
+// refreshOrgSession refreshes org session in the background
+func (t *BaseMiddleware) refreshOrgSession(orgID string) {
+	defer orgRefreshInProgress.Delete(orgID)
+
+	t.Logger().Debug("Background refresh started for org session")
+
+	session, found := t.fetchOrgSessionWithTimeout(orgID)
+	if !found {
+		t.Logger().Warning("Background refresh timed out after 2s")
+		return
+	}
+
+	t.cacheOrgSession(orgID, session)
+	t.Logger().Debug("Background refresh completed successfully")
+}
+
+// cacheOrgSession stores org session with timestamp for stale-while-revalidate
+func (t *BaseMiddleware) cacheOrgSession(orgID string, session user.SessionState) {
+	entry := orgCacheEntry{
+		session:  session.Clone(),
+		cachedAt: time.Now().UnixNano(),
+	}
+
+	cacheKey := "org:" + orgID
+	t.Gw.SessionCache.Set(cacheKey, entry, int64(orgSessionMaxStale))
+	t.Logger().Debug("Cached org session")
+}
+
+// OrgSession implements stale-while-revalidate pattern for org sessions:
+// - Soft expiry (10 min): Return stale data, trigger background refresh
+// - Hard expiry (1 hour): Try to fetch fresh data, fall back to serving stale data
+// - Max stale (24 hours): Gateway cache TTL prevents indefinite memory growth
+func (t *BaseMiddleware) OrgSession(orgID string) (user.SessionState, bool) {
 	if rpc.IsEmergencyMode() {
 		return user.SessionState{}, false
 	}
 
-	// Try and get the session from the session store
-	session, found := t.Spec.OrgSessionManager.SessionDetail(orgID, orgID, false)
-	if found && t.Spec.GlobalConfig.EnforceOrgDataAge {
-		// If exists, assume it has been authorized and pass on
-		// We cache org expiry data
-		t.Logger().Debug("Setting data expiry: ", orgID)
+	cacheKey := "org:" + orgID
 
-		t.Gw.ExpiryCache.Set(session.OrgID, session.DataExpires, cache.DefaultExpiration)
+	// Check Gateway cache
+	if cached, found := t.Gw.SessionCache.Get(cacheKey); found {
+		entry, ok := cached.(orgCacheEntry)
+		if !ok {
+			t.Logger().Error("Invalid org cache entry type")
+			t.Gw.SessionCache.Delete(cacheKey)
+			// Fall through to fetch fresh
+		} else {
+			now := time.Now()
+			age := now.Sub(time.Unix(0, entry.cachedAt))
+
+			if age < orgSessionSoftExpiry {
+				// Fresh, return immediately
+				t.Logger().Debug("Using fresh org session from cache")
+				return entry.session.Clone(), true
+			}
+
+			if age < orgSessionHardExpiry {
+				// Stale but within hard expiry, trigger background refresh
+				t.Logger().Debug("Using stale org session, triggering background refresh")
+
+				if _, inProgress := orgRefreshInProgress.LoadOrStore(orgID, true); !inProgress {
+					go t.refreshOrgSession(orgID)
+				}
+
+				return entry.session.Clone(), true
+			}
+
+			// Beyond hard expiry, try to fetch fresh
+			t.Logger().Debug("Org session beyond hard expiry, attempting fresh fetch")
+			session, found := t.fetchOrgSessionWithTimeout(orgID)
+
+			if !found {
+				// Fetch failed, serve stale data to maintain org limits
+				t.Logger().Warning("Org session fetch failed, serving stale data beyond hard expiry to maintain limits")
+				return entry.session.Clone(), true
+			}
+
+			// Fresh fetch succeeded, update cache and return
+			t.cacheOrgSession(orgID, session)
+			return session, true
+		}
 	}
 
-	session.SetKeyHash(storage.HashKey(orgID, t.Gw.GetConfig().HashKeys))
+	// No cache, fetch fresh with timeout
+	t.Logger().Debug("No cached org session, attempting fresh fetch with timeout")
+	session, found := t.fetchOrgSessionWithTimeout(orgID)
 
-	return session.Clone(), found
+	if !found {
+		t.Logger().Warning("Org session fetch timed out after 2s")
+		return user.SessionState{}, false
+	}
+
+	t.cacheOrgSession(orgID, session)
+	return session, true
 }
 
 func (t *BaseMiddleware) SetOrgExpiry(orgid string, expiry int64) {

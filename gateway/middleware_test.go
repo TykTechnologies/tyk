@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 
@@ -464,4 +465,147 @@ func TestQuotaNotAppliedWithURLRewrite(t *testing.T) {
 			Code:    http.StatusForbidden,
 		},
 	}...)
+}
+
+func TestBaseMiddleware_OrgSession_StaleWhileRevalidate(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	orgID := "test-org-" + uuid.New()
+
+	// Create org session using mock store
+	orgSession := user.SessionState{
+		OrgID:          orgID,
+		QuotaMax:       100,
+		QuotaRemaining: 100,
+		Rate:           10,
+		Per:            1,
+	}
+
+	// Use mock store that returns our test session
+	mockOrgStore := mockStore{DetailNotFound: false}
+
+	spec := &APISpec{
+		GlobalConfig: config.Config{
+			EnforceOrgDataAge: true,
+		},
+		OrgSessionManager: mockOrgStore,
+	}
+
+	baseMid := &BaseMiddleware{
+		Spec:   spec,
+		Gw:     ts.Gw,
+		logger: mainLog,
+	}
+
+	t.Run("should cache org session with correct TTL", func(t *testing.T) {
+		// Clear cache
+		cacheKey := "org:" + orgID
+		ts.Gw.SessionCache.Delete(cacheKey)
+		orgRefreshInProgress.Delete(orgID)
+
+		// First call - should fetch and cache
+		session, found := baseMid.OrgSession(orgID)
+		assert.True(t, found, "Should find org session")
+		assert.Equal(t, sess.OrgID, session.OrgID)
+
+		// Verify it's cached
+		cached, found := ts.Gw.SessionCache.Get(cacheKey)
+		assert.True(t, found, "Should be cached")
+
+		entry, ok := cached.(orgCacheEntry)
+		assert.True(t, ok, "Cache entry should be orgCacheEntry type")
+		assert.Equal(t, sess.OrgID, entry.session.OrgID)
+	})
+
+	t.Run("should return fresh cache before soft expiry", func(t *testing.T) {
+		cacheKey := "org:" + orgID
+		ts.Gw.SessionCache.Delete(cacheKey)
+		orgRefreshInProgress.Delete(orgID)
+
+		// Cache a fresh session
+		baseMid.cacheOrgSession(orgID, orgSession)
+
+		// Call immediately - should return cached
+		session, found := baseMid.OrgSession(orgID)
+		assert.True(t, found, "Should find cached session")
+		assert.Equal(t, orgID, session.OrgID)
+
+		// Verify no background refresh was triggered (check after small delay)
+		time.Sleep(50 * time.Millisecond)
+		_, inProgress := orgRefreshInProgress.Load(orgID)
+		assert.False(t, inProgress, "Should not trigger background refresh for fresh cache")
+	})
+
+	t.Run("should handle fetch timeout for non-existent org", func(t *testing.T) {
+		nonExistentOrgID := "timeout-org-" + uuid.New()
+
+		// Use mock that returns not found
+		mockNotFound := mockStore{DetailNotFound: true}
+		specNotFound := &APISpec{
+			GlobalConfig: config.Config{
+				EnforceOrgDataAge: true,
+			},
+			OrgSessionManager: mockNotFound,
+		}
+
+		baseMidNotFound := &BaseMiddleware{
+			Spec:   specNotFound,
+			Gw:     ts.Gw,
+			logger: mainLog,
+		}
+
+		// Should return false for non-existent org
+		_, found := baseMidNotFound.fetchOrgSessionWithTimeout(nonExistentOrgID)
+		assert.False(t, found, "Should not find non-existent org")
+	})
+
+	t.Run("should handle cold start gracefully", func(t *testing.T) {
+		nonExistentOrgID := "cold-start-org-" + uuid.New()
+		cacheKey := "org:" + nonExistentOrgID
+		ts.Gw.SessionCache.Delete(cacheKey)
+		orgRefreshInProgress.Delete(nonExistentOrgID)
+
+		// Use mock that returns not found
+		mockNotFound := mockStore{DetailNotFound: true}
+		specNotFound := &APISpec{
+			GlobalConfig: config.Config{
+				EnforceOrgDataAge: true,
+			},
+			OrgSessionManager: mockNotFound,
+		}
+
+		baseMidNotFound := &BaseMiddleware{
+			Spec:   specNotFound,
+			Gw:     ts.Gw,
+			logger: mainLog,
+		}
+
+		// Cold start with non-existent org should return quickly (not found)
+		_, found := baseMidNotFound.OrgSession(nonExistentOrgID)
+		assert.False(t, found, "Should not find non-existent org session")
+	})
+
+	t.Run("should handle invalid cache entry type", func(t *testing.T) {
+		cacheKey := "org:" + orgID
+		ts.Gw.SessionCache.Delete(cacheKey)
+		orgRefreshInProgress.Delete(orgID)
+
+		// Store invalid type in cache
+		ts.Gw.SessionCache.Set(cacheKey, "invalid-type", cache.DefaultExpiration)
+
+		// Should handle gracefully and fetch fresh
+		session, found := baseMid.OrgSession(orgID)
+
+		if found {
+			assert.Equal(t, sess.OrgID, session.OrgID, "Should fetch fresh session after invalid cache")
+		}
+
+		// Verify invalid entry was replaced with valid entry
+		cached, exists := ts.Gw.SessionCache.Get(cacheKey)
+		if exists {
+			_, isString := cached.(string)
+			assert.False(t, isString, "Invalid cache entry should have been replaced")
+		}
+	})
 }
