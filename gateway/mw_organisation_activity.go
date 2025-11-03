@@ -328,6 +328,34 @@ func (k *OrganizationMonitor) AllowAccessNext(
 	orgChan <- true
 }
 
+// fetchOrgSessionWithTimeout fetches org session with a timeout to prevent hanging
+func (k *OrganizationMonitor) fetchOrgSessionWithTimeout() (user.SessionState, bool) {
+	timeoutCtx, cancel := context.WithTimeout(context.Background(), orgSessionFetchTimeout)
+	defer cancel()
+
+	type result struct {
+		session user.SessionState
+		found   bool
+	}
+	resultChan := make(chan result, 1)
+
+	go func() {
+		session, found := k.OrgSession(k.Spec.OrgID)
+		select {
+		case resultChan <- result{session: session, found: found}:
+		case <-timeoutCtx.Done():
+			return
+		}
+	}()
+
+	select {
+	case res := <-resultChan:
+		return res.session, res.found
+	case <-timeoutCtx.Done():
+		return user.SessionState{}, false
+	}
+}
+
 // getOrgSessionWithStaleWhileRevalidate implements stale-while-revalidate pattern:
 // - Soft expiry (10 min): Return stale data, trigger background refresh
 // - Hard expiry (1 hour): Try to fetch fresh data, fall back to allowing request
@@ -362,35 +390,15 @@ func (k *OrganizationMonitor) getOrgSessionWithStaleWhileRevalidate() (user.Sess
 	}
 
 	k.Logger().Debug("No cached org session, attempting fresh fetch with timeout")
-	timeoutCtx, cancel := context.WithTimeout(context.Background(), orgSessionFetchTimeout)
-	defer cancel()
+	session, found := k.fetchOrgSessionWithTimeout()
 
-	type result struct {
-		session user.SessionState
-		found   bool
-	}
-	resultChan := make(chan result, 1)
-
-	go func() {
-		session, found := k.OrgSession(k.Spec.OrgID)
-		select {
-		case resultChan <- result{session: session, found: found}:
-		case <-timeoutCtx.Done():
-			return
-		}
-	}()
-
-	select {
-	case res := <-resultChan:
-		if res.found {
-			k.cacheOrgSession(res.session)
-			return res.session, true
-		}
-		return user.SessionState{}, false
-	case <-timeoutCtx.Done():
+	if !found {
 		k.Logger().Warning("Org session fetch timed out after 2s")
 		return user.SessionState{}, false
 	}
+
+	k.cacheOrgSession(session)
+	return session, true
 }
 
 // refreshOrgSession refreshes org session in the background
@@ -399,36 +407,15 @@ func (k *OrganizationMonitor) refreshOrgSession() {
 
 	k.Logger().Debug("Background refresh started for org session")
 
-	// Use timeout to prevent hanging indefinitely
-	timeoutCtx, cancel := context.WithTimeout(context.Background(), orgSessionFetchTimeout)
-	defer cancel()
+	session, found := k.fetchOrgSessionWithTimeout()
 
-	type result struct {
-		session user.SessionState
-		found   bool
-	}
-	resultChan := make(chan result, 1)
-
-	go func() {
-		session, found := k.OrgSession(k.Spec.OrgID)
-		select {
-		case resultChan <- result{session: session, found: found}:
-		case <-timeoutCtx.Done():
-			return
-		}
-	}()
-
-	select {
-	case res := <-resultChan:
-		if res.found {
-			k.cacheOrgSession(res.session)
-			k.Logger().Debug("Background refresh completed successfully")
-		} else {
-			k.Logger().Debug("Background refresh failed, org session not found")
-		}
-	case <-timeoutCtx.Done():
+	if !found {
 		k.Logger().Warning("Background refresh timed out after 2s")
+		return
 	}
+
+	k.cacheOrgSession(session)
+	k.Logger().Debug("Background refresh completed successfully")
 }
 
 // cacheOrgSession stores org session with soft and hard expiry
