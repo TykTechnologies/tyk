@@ -394,12 +394,35 @@ func (k *OrganizationMonitor) refreshOrgSession() {
 
 	k.Logger().Debug("Background refresh started for org session")
 
-	session, found := k.OrgSession(k.Spec.OrgID)
-	if found {
-		k.cacheOrgSession(session)
-		k.Logger().Debug("Background refresh completed successfully")
-	} else {
-		k.Logger().Debug("Background refresh failed")
+	// Use timeout to prevent hanging indefinitely
+	timeoutCtx, cancel := context.WithTimeout(context.Background(), orgSessionFetchTimeout)
+	defer cancel()
+
+	type result struct {
+		session user.SessionState
+		found   bool
+	}
+	resultChan := make(chan result, 1)
+
+	go func() {
+		session, found := k.OrgSession(k.Spec.OrgID)
+		select {
+		case resultChan <- result{session: session, found: found}:
+		case <-timeoutCtx.Done():
+			return
+		}
+	}()
+
+	select {
+	case res := <-resultChan:
+		if res.found {
+			k.cacheOrgSession(res.session)
+			k.Logger().Debug("Background refresh completed successfully")
+		} else {
+			k.Logger().Debug("Background refresh failed, org session not found")
+		}
+	case <-timeoutCtx.Done():
+		k.Logger().Warning("Background refresh timed out after 2s")
 	}
 }
 

@@ -539,12 +539,12 @@ func TestOrganizationMonitorStaleWhileRevalidate(t *testing.T) {
 		}
 	})
 
-	t.Run("should respect timeout on cold start", func(t *testing.T) {
+	t.Run("should handle cold start gracefully", func(t *testing.T) {
 		// clear cache to simulate cold start
 		orgSessionCache.Delete(orgID)
 		orgRefreshInProgress.Delete(orgID)
 
-		// use non-existent org to trigger timeout
+		// use non-existent org
 		nonExistentOrgID := "non-existent-org-" + uuid.New()
 
 		spec := ts.Gw.apisByID[ts.Gw.apiSpecs[0].APIID]
@@ -558,7 +558,7 @@ func TestOrganizationMonitorStaleWhileRevalidate(t *testing.T) {
 			},
 		}
 
-		// cold start with non-existent org should time out at 2 seconds
+		// cold start with non-existent org should return quickly (not found)
 		start := time.Now()
 		_, found := monitor.getOrgSessionWithStaleWhileRevalidate()
 		duration := time.Since(start)
@@ -567,11 +567,9 @@ func TestOrganizationMonitorStaleWhileRevalidate(t *testing.T) {
 			t.Error("Should not find non-existent org session")
 		}
 
-		if duration < 1900*time.Millisecond {
-			t.Errorf("Timeout happened too quickly: %v", duration)
-		}
-		if duration > 2500*time.Millisecond {
-			t.Errorf("Timeout took too long: %v", duration)
+		// should return quickly since org doesn't exist (not wait for full timeout)
+		if duration > 500*time.Millisecond {
+			t.Errorf("Should return quickly when org not found, took %v", duration)
 		}
 	})
 }
