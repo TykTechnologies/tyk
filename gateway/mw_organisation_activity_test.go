@@ -5,6 +5,7 @@ package gateway
 
 import (
 	"net/http"
+	"sync"
 	"testing"
 	"time"
 
@@ -460,17 +461,17 @@ func TestOrganizationMonitorStaleWhileRevalidate(t *testing.T) {
 		t.Fatalf("Failed to create org session: %v", err)
 	}
 
+	spec := ts.Gw.apisByID[ts.Gw.apiSpecs[0].APIID]
+	monitor := &OrganizationMonitor{
+		BaseMiddleware: &BaseMiddleware{
+			Spec:   spec,
+			Gw:     ts.Gw,
+			logger: mainLog,
+		},
+	}
+
 	t.Run("should cache org session with correct expiry times", func(t *testing.T) {
 		orgSessionCache.Delete(orgID)
-
-		spec := ts.Gw.apisByID[ts.Gw.apiSpecs[0].APIID]
-		monitor := &OrganizationMonitor{
-			BaseMiddleware: &BaseMiddleware{
-				Spec:   spec,
-				Gw:     ts.Gw,
-				logger: mainLog,
-			},
-		}
 
 		// manually cache the session to test caching logic
 		beforeCache := time.Now()
@@ -487,16 +488,41 @@ func TestOrganizationMonitorStaleWhileRevalidate(t *testing.T) {
 			t.Errorf("Expected org ID %s, got %s", orgID, entry.session.OrgID)
 		}
 
-		// verify soft expiry is around 10 minutes
 		softExpiryTime := time.Unix(0, entry.softExpiry)
 		if !softExpiryTime.After(beforeCache.Add(9*time.Minute)) || !softExpiryTime.Before(afterCache.Add(11*time.Minute)) {
 			t.Errorf("Soft expiry should be around 10 minutes, got %v", softExpiryTime.Sub(beforeCache))
 		}
 
-		// verify hard expiry is around 1 hour
 		hardExpiryTime := time.Unix(0, entry.hardExpiry)
 		if !hardExpiryTime.After(beforeCache.Add(59*time.Minute)) || !hardExpiryTime.Before(afterCache.Add(61*time.Minute)) {
 			t.Errorf("Hard expiry should be around 1 hour, got %v", hardExpiryTime.Sub(beforeCache))
+		}
+	})
+
+	t.Run("should return fresh cache before soft expiry", func(t *testing.T) {
+		orgSessionCache.Delete(orgID)
+		orgRefreshInProgress.Delete(orgID)
+
+		now := time.Now()
+		entry := &orgCacheEntry{
+			session:    orgSession.Clone(),
+			softExpiry: now.Add(5 * time.Minute).UnixNano(),
+			hardExpiry: now.Add(50 * time.Minute).UnixNano(),
+		}
+		orgSessionCache.Store(orgID, entry)
+
+		session, found := monitor.getOrgSessionWithStaleWhileRevalidate()
+		if !found {
+			t.Fatal("Should find cached session")
+		}
+		if session.OrgID != orgID {
+			t.Errorf("Expected org ID %s, got %s", orgID, session.OrgID)
+		}
+
+		time.Sleep(100 * time.Millisecond)
+		_, inProgress := orgRefreshInProgress.Load(orgID)
+		if inProgress {
+			t.Error("Should not trigger background refresh for fresh cache")
 		}
 	})
 
@@ -504,16 +530,6 @@ func TestOrganizationMonitorStaleWhileRevalidate(t *testing.T) {
 		orgSessionCache.Delete(orgID)
 		orgRefreshInProgress.Delete(orgID)
 
-		spec := ts.Gw.apisByID[ts.Gw.apiSpecs[0].APIID]
-		monitor := &OrganizationMonitor{
-			BaseMiddleware: &BaseMiddleware{
-				Spec:   spec,
-				Gw:     ts.Gw,
-				logger: mainLog,
-			},
-		}
-
-		// manually create a cache entry with expired soft expiry but valid hard expiry
 		now := time.Now()
 		entry := &orgCacheEntry{
 			session:    orgSession.Clone(),
@@ -522,7 +538,6 @@ func TestOrganizationMonitorStaleWhileRevalidate(t *testing.T) {
 		}
 		orgSessionCache.Store(orgID, entry)
 
-		// should return stale data immediately
 		start := time.Now()
 		session, found := monitor.getOrgSessionWithStaleWhileRevalidate()
 		duration := time.Since(start)
@@ -537,14 +552,125 @@ func TestOrganizationMonitorStaleWhileRevalidate(t *testing.T) {
 		if duration > 100*time.Millisecond {
 			t.Errorf("Should return stale data instantly, took %v", duration)
 		}
+
+		time.Sleep(200 * time.Millisecond)
+		cached, ok := orgSessionCache.Load(orgID)
+		if !ok {
+			t.Error("Cache should still contain session after background refresh")
+		} else {
+			entry := cached.(*orgCacheEntry)
+			if entry.session.OrgID != orgID {
+				t.Errorf("Expected org ID %s in refreshed cache", orgID)
+			}
+		}
 	})
 
-	t.Run("should handle cold start gracefully", func(t *testing.T) {
-		// clear cache to simulate cold start
+	t.Run("should prevent multiple concurrent refreshes", func(t *testing.T) {
 		orgSessionCache.Delete(orgID)
 		orgRefreshInProgress.Delete(orgID)
 
-		// use non-existent org
+		now := time.Now()
+		entry := &orgCacheEntry{
+			session:    orgSession.Clone(),
+			softExpiry: now.Add(-1 * time.Minute).UnixNano(),
+			hardExpiry: now.Add(50 * time.Minute).UnixNano(),
+		}
+		orgSessionCache.Store(orgID, entry)
+
+		// trigger multiple concurrent calls
+		var wg sync.WaitGroup
+		for i := 0; i < 10; i++ {
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				monitor.getOrgSessionWithStaleWhileRevalidate()
+			}()
+		}
+
+		time.Sleep(50 * time.Millisecond)
+		refreshCount := 0
+		orgRefreshInProgress.Range(func(key, value interface{}) bool {
+			if key == orgID {
+				refreshCount++
+			}
+			return true
+		})
+
+		wg.Wait()
+
+		if refreshCount > 1 {
+			t.Errorf("Expected only 1 refresh in progress, got %d", refreshCount)
+		}
+	})
+
+	t.Run("should delete cache and fetch fresh after hard expiry", func(t *testing.T) {
+		orgSessionCache.Delete(orgID)
+		orgRefreshInProgress.Delete(orgID)
+
+		now := time.Now()
+		entry := &orgCacheEntry{
+			session:    orgSession.Clone(),
+			softExpiry: now.Add(-30 * time.Minute).UnixNano(),
+			hardExpiry: now.Add(-1 * time.Minute).UnixNano(),
+		}
+		orgSessionCache.Store(orgID, entry)
+
+		session, found := monitor.getOrgSessionWithStaleWhileRevalidate()
+
+		if found {
+			if session.OrgID != orgID {
+				t.Errorf("Expected org ID %s, got %s", orgID, session.OrgID)
+			}
+
+			cached, exists := orgSessionCache.Load(orgID)
+			if exists {
+				entry := cached.(*orgCacheEntry)
+				if entry.session.OrgID != orgID {
+					t.Errorf("Expected cached org ID %s, got %s", orgID, entry.session.OrgID)
+				}
+			}
+		}
+
+		if cached, ok := orgSessionCache.Load(orgID); ok {
+			entry := cached.(*orgCacheEntry)
+			if entry.hardExpiry < time.Now().UnixNano() {
+				t.Error("Cached entry should not be expired after hard expiry fetch")
+			}
+		}
+	})
+
+	t.Run("should handle invalid cache entry type", func(t *testing.T) {
+		orgSessionCache.Delete(orgID)
+
+		orgSessionCache.Store(orgID, "invalid-type")
+
+		session, found := monitor.getOrgSessionWithStaleWhileRevalidate()
+
+		if found {
+			if session.OrgID != orgID {
+				t.Errorf("Expected org ID %s, got %s", orgID, session.OrgID)
+			}
+
+			cached, ok := orgSessionCache.Load(orgID)
+			if ok {
+				_, ok = cached.(*orgCacheEntry)
+				if !ok {
+					t.Error("Cached entry should be valid orgCacheEntry type after invalid entry")
+				}
+			}
+		} else {
+			if cached, ok := orgSessionCache.Load(orgID); ok {
+				if _, isString := cached.(string); isString {
+					t.Error("Invalid cache entry should have been deleted")
+				}
+			}
+		}
+	})
+
+	t.Run("should handle cold start gracefully", func(t *testing.T) {
+		orgSessionCache.Delete(orgID)
+		orgRefreshInProgress.Delete(orgID)
+
 		nonExistentOrgID := "non-existent-org-" + uuid.New()
 
 		spec := ts.Gw.apisByID[ts.Gw.apiSpecs[0].APIID]
@@ -567,9 +693,35 @@ func TestOrganizationMonitorStaleWhileRevalidate(t *testing.T) {
 			t.Error("Should not find non-existent org session")
 		}
 
-		// should return quickly since org doesn't exist (not wait for full timeout)
 		if duration > 500*time.Millisecond {
 			t.Errorf("Should return quickly when org not found, took %v", duration)
+		}
+	})
+
+	t.Run("should handle fetch timeout", func(t *testing.T) {
+		orgSessionCache.Delete(orgID)
+
+		nonExistentOrgID := "timeout-org-" + uuid.New()
+		spec.OrgID = nonExistentOrgID
+
+		monitor := &OrganizationMonitor{
+			BaseMiddleware: &BaseMiddleware{
+				Spec:   spec,
+				Gw:     ts.Gw,
+				logger: mainLog,
+			},
+		}
+
+		start := time.Now()
+		_, found := monitor.fetchOrgSessionWithTimeout()
+		duration := time.Since(start)
+
+		if found {
+			t.Error("Should not find non-existent org")
+		}
+
+		if duration > 3*time.Second {
+			t.Errorf("Timeout took too long: %v", duration)
 		}
 	})
 }
