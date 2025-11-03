@@ -1,6 +1,7 @@
 package rpc
 
 import (
+	"context"
 	"crypto/tls"
 	"errors"
 	"net"
@@ -169,6 +170,8 @@ type Config struct {
 	CallTimeout           int    `json:"call_timeout"`
 	PingTimeout           int    `json:"ping_timeout"`
 	RPCPoolSize           int    `json:"rpc_pool_size"`
+	DNSMonitorEnabled     bool   `json:"dns_monitor_enabled"`
+	DNSMonitorInterval    int    `json:"dns_monitor_interval"`
 }
 
 func IsEmergencyMode() bool {
@@ -180,6 +183,7 @@ func LoadCount() int {
 }
 
 func Reset() {
+	StopDNSMonitor()
 	clientSingleton.Stop()
 	clientSingleton = nil
 	funcClientSingleton = nil
@@ -259,7 +263,12 @@ func Connect(
 	// Initial DNS resolution and get first ip
 	host, _, err := net.SplitHostPort(connConfig.ConnectionString)
 	if err == nil {
-		updateResolvedIPs(host, dnsResolver)
+		updateResolvedIPs(context.Background(), host, dnsResolver)
+	}
+
+	// Start background DNS monitor if enabled
+	if !suppressRegister && connConfig.DNSMonitorEnabled {
+		StartDNSMonitor(connConfig.DNSMonitorEnabled, connConfig.DNSMonitorInterval, connConfig.ConnectionString)
 	}
 
 	return true
