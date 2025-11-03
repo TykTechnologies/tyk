@@ -18,9 +18,9 @@ fi
 cleanup() {
     # After installing, remove files that were not needed on this platform / system
     if [ "${use_systemctl}" = "True" ]; then
-        rm -f /lib/systemd/system/tyk-gateway.service
-    else
         rm -f /etc/init.d/tyk-gateway
+    else
+        rm -f /lib/systemd/system/tyk-gateway.service
     fi
 }
 
@@ -39,8 +39,8 @@ restoreServices() {
 setupOwnership() {
     printf "\033[32m Post Install of the install directory ownership and permissions\033[0m\n"
     [ "${change_ownership}" = "True" ] && chown -R tyk:tyk /opt/tyk-gateway
-    # Config file should never be world-readable
-    chmod 660 /opt/tyk-gateway/tyk.conf
+    # Config file should never be world-readable (only if it exists)
+    [ -f /opt/tyk-gateway/tyk.conf ] && chmod 660 /opt/tyk-gateway/tyk.conf
 }
 
 cleanInstall() {
