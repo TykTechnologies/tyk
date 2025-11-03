@@ -362,6 +362,14 @@ type WebHookHandlerConf struct {
 	EventTimeout int64 `bson:"event_timeout" json:"event_timeout"`
 }
 
+// DNSMonitorConfig configures the background DNS monitoring for worker gateways
+type DNSMonitorConfig struct {
+	// Enable background DNS monitoring for proactive detection of MDCB DNS changes
+	Enabled bool `json:"enabled"`
+	// Check interval in seconds for DNS monitoring (default: 30)
+	CheckInterval int `json:"check_interval"`
+}
+
 type SlaveOptionsConfig struct {
 	// Set to `true` to connect a worker Gateway using RPC.
 	UseRPC bool `json:"use_rpc"`
@@ -418,6 +426,9 @@ type SlaveOptionsConfig struct {
 
 	// SynchroniserEnabled enable this config if MDCB has enabled the synchoniser. If disabled then it will ignore signals to synchonise recources
 	SynchroniserEnabled bool `json:"synchroniser_enabled"`
+
+	// DNSMonitor configures background DNS monitoring for proactive detection of MDCB DNS changes
+	DNSMonitor DNSMonitorConfig `json:"dns_monitor"`
 }
 
 type LocalSessionCacheConf struct {
