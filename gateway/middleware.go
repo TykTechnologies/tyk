@@ -371,50 +371,27 @@ func (t *BaseMiddleware) SetOrgExpiry(orgid string, expiry int64) {
 func (t *BaseMiddleware) OrgSessionExpiry(orgid string) int64 {
 	t.Logger().Debug("Checking: ", orgid)
 
-	if rpc.IsEmergencyMode() {
-		t.Logger().Debug("Emergency mode active, returning default expiry")
-		return DEFAULT_ORG_SESSION_EXPIRATION
-	}
-
-	cachedVal, found := t.Gw.ExpiryCache.Get(orgid)
-	if found {
-		if expiry, ok := cachedVal.(int64); ok {
-			t.Logger().Debug("Using cached org expiry value")
-			return expiry
+	// Cache failed attempt
+	id, err, _ := orgSessionExpiryCache.Do(orgid, func() (interface{}, error) {
+		cachedVal, found := t.Gw.ExpiryCache.Get(orgid)
+		if found {
+			return cachedVal, nil
 		}
-	}
 
-	t.Logger().Debug("Cache miss, starting background refresh")
-	go t.refreshOrgSessionExpiry(orgid)
-
-	return DEFAULT_ORG_SESSION_EXPIRATION
-}
-
-// refreshOrgSessionExpiry performs the RPC call in the background to refresh org session expiry
-func (t *BaseMiddleware) refreshOrgSessionExpiry(orgid string) {
-	t.Logger().Debug("Background refresh started for org: ", orgid)
-
-	_, err, _ := orgSessionExpiryCache.Do(orgid, func() (interface{}, error) {
 		s, found := t.OrgSession(orgid)
 		if found && t.Spec.GlobalConfig.EnforceOrgDataAge {
-			t.Logger().Debug("Successfully refreshed org expiry from RPC: ", orgid)
-			t.SetOrgExpiry(orgid, s.DataExpires)
 			return s.DataExpires, nil
 		}
-
-		if !found {
-			t.Logger().Debug("Org session not found, setting default expiry for org: ", orgid)
-		} else {
-			t.Logger().Debug("EnforceOrgDataAge is disabled, setting default expiry for org: ", orgid)
-		}
-
-		t.SetOrgExpiry(orgid, DEFAULT_ORG_SESSION_EXPIRATION)
-		return DEFAULT_ORG_SESSION_EXPIRATION, nil
+		return 0, errors.New("missing session")
 	})
 
 	if err != nil {
-		t.Logger().WithError(err).Debug("Error during background org expiry refresh ", orgid)
+		t.Logger().Debug("no cached entry found, returning 7 days")
+		t.SetOrgExpiry(orgid, DEFAULT_ORG_SESSION_EXPIRATION)
+		return DEFAULT_ORG_SESSION_EXPIRATION
 	}
+
+	return id.(int64)
 }
 
 func (t *BaseMiddleware) UpdateRequestSession(r *http.Request) bool {

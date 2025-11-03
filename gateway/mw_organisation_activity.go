@@ -1,9 +1,11 @@
 package gateway
 
 import (
+	"context"
 	"errors"
 	"net/http"
 	"sync"
+	"time"
 
 	"github.com/TykTechnologies/tyk/ctx"
 	"github.com/TykTechnologies/tyk/request"
@@ -17,6 +19,16 @@ type orgChanMapMu struct {
 
 var orgChanMap = orgChanMapMu{channels: map[string](chan bool){}}
 var orgActiveMap sync.Map
+
+// orgCacheEntry holds org session with soft and hard expiry times
+type orgCacheEntry struct {
+	session    user.SessionState
+	softExpiry int64
+	hardExpiry int64
+}
+
+var orgSessionCache sync.Map
+var orgRefreshInProgress sync.Map // prevents multiple concurrent refreshes
 
 // RateLimitAndQuotaCheck will check the incoming request and key whether it is within it's quota and
 // within it's rate limit, it makes use of the SessionLimiter object to do this
@@ -72,14 +84,10 @@ func (k *OrganizationMonitor) ProcessRequest(w http.ResponseWriter, r *http.Requ
 		}
 	}
 
-	// try to get from Redis
 	if !found {
-		// not found in in-app cache, let's read from Redis
-		orgSession, found = k.OrgSession(k.Spec.OrgID)
+		orgSession, found = k.getOrgSessionWithStaleWhileRevalidate()
 		if !found {
-			// prevent reads from in-app cache and from Redis for next runs
 			k.setOrgHasNoSession(true)
-			// No organisation session has not been created, should not be a pre-requisite in site setups, so we pass the request on
 			return nil, http.StatusOK
 		}
 	}
@@ -311,4 +319,81 @@ func (k *OrganizationMonitor) AllowAccessNext(
 	}
 
 	orgChan <- true
+}
+
+// getOrgSessionWithStaleWhileRevalidate implements stale-while-revalidate pattern:
+// - Soft expiry (10 min): Return stale data, trigger background refresh
+// - Hard expiry (1 hour): Try to fetch fresh data, fall back to allowing request
+func (k *OrganizationMonitor) getOrgSessionWithStaleWhileRevalidate() (user.SessionState, bool) {
+	now := time.Now().UnixNano()
+
+	if cached, ok := orgSessionCache.Load(k.Spec.OrgID); ok {
+		entry := cached.(*orgCacheEntry)
+
+		if now < entry.softExpiry {
+			k.Logger().Debug("Using fresh org session from cache")
+			return entry.session.Clone(), true
+		}
+
+		if now < entry.hardExpiry {
+			k.Logger().Debug("Using stale org session, triggering background refresh")
+
+			if _, inProgress := orgRefreshInProgress.LoadOrStore(k.Spec.OrgID, true); !inProgress {
+				go k.refreshOrgSession()
+			}
+
+			return entry.session.Clone(), true
+		}
+
+		k.Logger().Debug("Org session beyond hard expiry, removing from cache")
+		orgSessionCache.Delete(k.Spec.OrgID)
+	}
+
+	k.Logger().Debug("No cached org session, attempting fresh fetch with timeout")
+	timeoutCtx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	sessionChan := make(chan user.SessionState, 1)
+	go func() {
+		if session, found := k.OrgSession(k.Spec.OrgID); found {
+			sessionChan <- session
+		}
+	}()
+
+	select {
+	case session := <-sessionChan:
+		k.cacheOrgSession(session)
+		return session, true
+	case <-timeoutCtx.Done():
+		k.Logger().Warning("Org session fetch timed out after 2s")
+		return user.SessionState{}, false
+	}
+}
+
+// refreshOrgSession refreshes org session in the background
+func (k *OrganizationMonitor) refreshOrgSession() {
+	defer orgRefreshInProgress.Delete(k.Spec.OrgID)
+
+	k.Logger().Debug("Background refresh started for org session")
+
+	session, found := k.OrgSession(k.Spec.OrgID)
+	if found {
+		k.cacheOrgSession(session)
+		k.Logger().Debug("Background refresh completed successfully")
+	} else {
+		k.Logger().Debug("Background refresh failed")
+	}
+}
+
+// cacheOrgSession stores org session with soft and hard expiry
+func (k *OrganizationMonitor) cacheOrgSession(session user.SessionState) {
+	now := time.Now()
+	entry := &orgCacheEntry{
+		session:    session.Clone(),
+		softExpiry: now.Add(10 * time.Minute).UnixNano(),
+		hardExpiry: now.Add(1 * time.Hour).UnixNano(),
+	}
+
+	orgSessionCache.Store(k.Spec.OrgID, entry)
+	k.Logger().Debug("Cached org session")
 }

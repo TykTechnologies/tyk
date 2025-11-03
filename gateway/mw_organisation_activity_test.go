@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/TykTechnologies/tyk/internal/uuid"
+	"github.com/TykTechnologies/tyk/user"
 
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/test"
@@ -424,4 +425,153 @@ func BenchmarkProcessRequestOffThreadRedisRollingLimiter(b *testing.B) {
 			Code: http.StatusOK,
 		})
 	}
+}
+
+func TestOrganizationMonitorStaleWhileRevalidate(t *testing.T) {
+	test.Flaky(t)
+
+	conf := func(globalConf *config.Config) {
+		globalConf.EnforceOrgQuotas = true
+		globalConf.ExperimentalProcessOrgOffThread = false
+	}
+	ts := StartTest(conf)
+	defer ts.Close()
+
+	orgID := "test-org-" + uuid.New()
+
+	// load API
+	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		spec.UseKeylessAccess = true
+		spec.OrgID = orgID
+		spec.Proxy.ListenPath = "/"
+	})
+
+	// create org session
+	orgSession := user.SessionState{
+		OrgID:          orgID,
+		QuotaMax:       100,
+		QuotaRemaining: 100,
+		Rate:           10,
+		Per:            1,
+	}
+
+	err := ts.Gw.GlobalSessionManager.UpdateSession(orgID, &orgSession, 3600, false)
+	if err != nil {
+		t.Fatalf("Failed to create org session: %v", err)
+	}
+
+	t.Run("should cache org session with correct expiry times", func(t *testing.T) {
+		orgSessionCache.Delete(orgID)
+
+		spec := ts.Gw.apisByID[ts.Gw.apiSpecs[0].APIID]
+		monitor := &OrganizationMonitor{
+			BaseMiddleware: &BaseMiddleware{
+				Spec:   spec,
+				Gw:     ts.Gw,
+				logger: mainLog,
+			},
+		}
+
+		// manually cache the session to test caching logic
+		beforeCache := time.Now()
+		monitor.cacheOrgSession(orgSession)
+		afterCache := time.Now()
+
+		cached, ok := orgSessionCache.Load(orgID)
+		if !ok {
+			t.Fatal("Should be cached")
+		}
+
+		entry := cached.(*orgCacheEntry)
+		if entry.session.OrgID != orgID {
+			t.Errorf("Expected org ID %s, got %s", orgID, entry.session.OrgID)
+		}
+
+		// verify soft expiry is around 10 minutes
+		softExpiryTime := time.Unix(0, entry.softExpiry)
+		if !softExpiryTime.After(beforeCache.Add(9*time.Minute)) || !softExpiryTime.Before(afterCache.Add(11*time.Minute)) {
+			t.Errorf("Soft expiry should be around 10 minutes, got %v", softExpiryTime.Sub(beforeCache))
+		}
+
+		// verify hard expiry is around 1 hour
+		hardExpiryTime := time.Unix(0, entry.hardExpiry)
+		if !hardExpiryTime.After(beforeCache.Add(59*time.Minute)) || !hardExpiryTime.Before(afterCache.Add(61*time.Minute)) {
+			t.Errorf("Hard expiry should be around 1 hour, got %v", hardExpiryTime.Sub(beforeCache))
+		}
+	})
+
+	t.Run("should return stale data immediately after soft expiry", func(t *testing.T) {
+		orgSessionCache.Delete(orgID)
+		orgRefreshInProgress.Delete(orgID)
+
+		spec := ts.Gw.apisByID[ts.Gw.apiSpecs[0].APIID]
+		monitor := &OrganizationMonitor{
+			BaseMiddleware: &BaseMiddleware{
+				Spec:   spec,
+				Gw:     ts.Gw,
+				logger: mainLog,
+			},
+		}
+
+		// manually create a cache entry with expired soft expiry but valid hard expiry
+		now := time.Now()
+		entry := &orgCacheEntry{
+			session:    orgSession.Clone(),
+			softExpiry: now.Add(-1 * time.Minute).UnixNano(), // Expired 1 minute ago
+			hardExpiry: now.Add(50 * time.Minute).UnixNano(), // Still valid for 50 minutes
+		}
+		orgSessionCache.Store(orgID, entry)
+
+		// should return stale data immediately
+		start := time.Now()
+		session, found := monitor.getOrgSessionWithStaleWhileRevalidate()
+		duration := time.Since(start)
+
+		if !found {
+			t.Fatal("Should return stale data")
+		}
+		if session.OrgID != orgID {
+			t.Errorf("Expected org ID %s, got %s", orgID, session.OrgID)
+		}
+
+		if duration > 100*time.Millisecond {
+			t.Errorf("Should return stale data instantly, took %v", duration)
+		}
+	})
+
+	t.Run("should respect timeout on cold start", func(t *testing.T) {
+		// clear cache to simulate cold start
+		orgSessionCache.Delete(orgID)
+		orgRefreshInProgress.Delete(orgID)
+
+		// use non-existent org to trigger timeout
+		nonExistentOrgID := "non-existent-org-" + uuid.New()
+
+		spec := ts.Gw.apisByID[ts.Gw.apiSpecs[0].APIID]
+		spec.OrgID = nonExistentOrgID
+
+		monitor := &OrganizationMonitor{
+			BaseMiddleware: &BaseMiddleware{
+				Spec:   spec,
+				Gw:     ts.Gw,
+				logger: mainLog,
+			},
+		}
+
+		// cold start with non-existent org should time out at 2 seconds
+		start := time.Now()
+		_, found := monitor.getOrgSessionWithStaleWhileRevalidate()
+		duration := time.Since(start)
+
+		if found {
+			t.Error("Should not find non-existent org session")
+		}
+
+		if duration < 1900*time.Millisecond {
+			t.Errorf("Timeout happened too quickly: %v", duration)
+		}
+		if duration > 2500*time.Millisecond {
+			t.Errorf("Timeout took too long: %v", duration)
+		}
+	})
 }
