@@ -30,6 +30,13 @@ type orgCacheEntry struct {
 var orgSessionCache sync.Map
 var orgRefreshInProgress sync.Map // prevents multiple concurrent refreshes
 
+// Cache expiry durations for org sessions
+const (
+	orgSessionSoftExpiry   = 10 * time.Minute
+	orgSessionHardExpiry   = 1 * time.Hour
+	orgSessionFetchTimeout = 2 * time.Second
+)
+
 // RateLimitAndQuotaCheck will check the incoming request and key whether it is within it's quota and
 // within it's rate limit, it makes use of the SessionLimiter object to do this
 type OrganizationMonitor struct {
@@ -350,20 +357,31 @@ func (k *OrganizationMonitor) getOrgSessionWithStaleWhileRevalidate() (user.Sess
 	}
 
 	k.Logger().Debug("No cached org session, attempting fresh fetch with timeout")
-	timeoutCtx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	timeoutCtx, cancel := context.WithTimeout(context.Background(), orgSessionFetchTimeout)
 	defer cancel()
 
-	sessionChan := make(chan user.SessionState, 1)
+	type result struct {
+		session user.SessionState
+		found   bool
+	}
+	resultChan := make(chan result, 1)
+
 	go func() {
-		if session, found := k.OrgSession(k.Spec.OrgID); found {
-			sessionChan <- session
+		session, found := k.OrgSession(k.Spec.OrgID)
+		select {
+		case resultChan <- result{session: session, found: found}:
+		case <-timeoutCtx.Done():
+			return
 		}
 	}()
 
 	select {
-	case session := <-sessionChan:
-		k.cacheOrgSession(session)
-		return session, true
+	case res := <-resultChan:
+		if res.found {
+			k.cacheOrgSession(res.session)
+			return res.session, true
+		}
+		return user.SessionState{}, false
 	case <-timeoutCtx.Done():
 		k.Logger().Warning("Org session fetch timed out after 2s")
 		return user.SessionState{}, false
@@ -390,8 +408,8 @@ func (k *OrganizationMonitor) cacheOrgSession(session user.SessionState) {
 	now := time.Now()
 	entry := &orgCacheEntry{
 		session:    session.Clone(),
-		softExpiry: now.Add(10 * time.Minute).UnixNano(),
-		hardExpiry: now.Add(1 * time.Hour).UnixNano(),
+		softExpiry: now.Add(orgSessionSoftExpiry).UnixNano(),
+		hardExpiry: now.Add(orgSessionHardExpiry).UnixNano(),
 	}
 
 	orgSessionCache.Store(k.Spec.OrgID, entry)
