@@ -395,15 +395,26 @@ func (s *SuccessHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) *http
 	t1 := time.Now()
 	resp := s.Proxy.ServeHTTP(w, r)
 
-	millisec := DurationToMillisecond(time.Since(t1))
+	proxyDuration := time.Since(t1)
+	millisec := DurationToMillisecond(proxyDuration)
 	log.Debug("Upstream request took (ms): ", millisec)
 
 	if resp.Response != nil {
 		upstreamMs := int64(DurationToMillisecond(resp.UpstreamLatency))
+
+		// Calculate total time including all middlewares
+		var totalMs int64
+		if requestStartTime := ctxGetRequestStartTime(r); !requestStartTime.IsZero() {
+			totalMs = int64(DurationToMillisecond(time.Since(requestStartTime)))
+		} else {
+			// Fallback to proxy duration if start time not set
+			totalMs = int64(millisec)
+		}
+
 		latency := analytics.Latency{
-			Total:    int64(millisec),
+			Total:    totalMs,
 			Upstream: upstreamMs,
-			Gateway:  int64(millisec) - upstreamMs,
+			Gateway:  totalMs - upstreamMs,
 		}
 		s.RecordHit(r, latency, resp.Response.StatusCode, resp.Response, false)
 		s.RecordAccessLog(r, resp.Response, latency)
@@ -423,7 +434,8 @@ func (s *SuccessHandler) ServeHTTPWithCache(w http.ResponseWriter, r *http.Reque
 
 	t1 := time.Now()
 	inRes := s.Proxy.ServeHTTPForCache(w, r)
-	millisec := DurationToMillisecond(time.Since(t1))
+	proxyDuration := time.Since(t1)
+	millisec := DurationToMillisecond(proxyDuration)
 
 	addVersionHeader(w, r, s.Spec.GlobalConfig)
 
@@ -431,10 +443,20 @@ func (s *SuccessHandler) ServeHTTPWithCache(w http.ResponseWriter, r *http.Reque
 
 	if inRes.Response != nil {
 		upstreamMs := int64(DurationToMillisecond(inRes.UpstreamLatency))
+
+		// Calculate total time including all middlewares
+		var totalMs int64
+		if requestStartTime := ctxGetRequestStartTime(r); !requestStartTime.IsZero() {
+			totalMs = int64(DurationToMillisecond(time.Since(requestStartTime)))
+		} else {
+			// Fallback to proxy duration if start time not set
+			totalMs = int64(millisec)
+		}
+
 		latency := analytics.Latency{
-			Total:    int64(millisec),
+			Total:    totalMs,
 			Upstream: upstreamMs,
-			Gateway:  int64(millisec) - upstreamMs,
+			Gateway:  totalMs - upstreamMs,
 		}
 		s.RecordHit(r, latency, inRes.Response.StatusCode, inRes.Response, false)
 	}
