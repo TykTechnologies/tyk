@@ -11,7 +11,6 @@ import (
 	"encoding/binary"
 	"encoding/json"
 	"fmt"
-	"github.com/TykTechnologies/tyk/internal/reflect"
 	"io"
 	"io/ioutil"
 	mathrand "math/rand"
@@ -42,6 +41,7 @@ import (
 	"github.com/TykTechnologies/tyk/internal/httputil"
 	"github.com/TykTechnologies/tyk/internal/model"
 	"github.com/TykTechnologies/tyk/internal/otel"
+	"github.com/TykTechnologies/tyk/internal/reflect"
 	"github.com/TykTechnologies/tyk/internal/uuid"
 
 	"github.com/TykTechnologies/graphql-go-tools/pkg/execution/datasource"
@@ -1135,6 +1135,7 @@ func (s *Test) AddDynamicHandler(path string, handlerFunc http.HandlerFunc) {
 
 // setTestScopeConfig overrides config in scope of test case.
 func (s *Test) setTestScopeConfig(t *testing.T, apply func(cnf *config.Config)) {
+	t.Helper()
 	cnf := s.Gw.GetConfig()
 	newCnf := reflect.Clone(cnf)
 	apply(&newCnf)

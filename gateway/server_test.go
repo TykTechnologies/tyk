@@ -18,6 +18,7 @@ import (
 
 	"github.com/TykTechnologies/again"
 	"github.com/TykTechnologies/storage/persistent/model"
+
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/internal/netutil"
 	"github.com/TykTechnologies/tyk/internal/otel"
