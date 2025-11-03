@@ -400,21 +400,9 @@ func (s *SuccessHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) *http
 	log.Debug("Upstream request took (ms): ", millisec)
 
 	if resp.Response != nil {
-		upstreamMs := int64(DurationToMillisecond(resp.UpstreamLatency))
-
-		// Calculate total time including all middlewares
-		var totalMs int64
-		if requestStartTime := ctxGetRequestStartTime(r); !requestStartTime.IsZero() {
-			totalMs = int64(DurationToMillisecond(time.Since(requestStartTime)))
-		} else {
-			// Fallback to proxy duration if start time not set
-			totalMs = int64(millisec)
-		}
-
 		latency := analytics.Latency{
-			Total:    totalMs,
-			Upstream: upstreamMs,
-			Gateway:  totalMs - upstreamMs,
+			Total:    int64(millisec),
+			Upstream: int64(DurationToMillisecond(resp.UpstreamLatency)),
 		}
 		s.RecordHit(r, latency, resp.Response.StatusCode, resp.Response, false)
 		s.RecordAccessLog(r, resp.Response, latency)

@@ -1,6 +1,7 @@
 package rpc
 
 import (
+	"context"
 	"crypto/tls"
 	"errors"
 	"net"
@@ -169,6 +170,8 @@ type Config struct {
 	CallTimeout           int    `json:"call_timeout"`
 	PingTimeout           int    `json:"ping_timeout"`
 	RPCPoolSize           int    `json:"rpc_pool_size"`
+	DNSMonitorEnabled     bool   `json:"dns_monitor_enabled"`
+	DNSMonitorInterval    int    `json:"dns_monitor_interval"`
 }
 
 func IsEmergencyMode() bool {
@@ -180,6 +183,7 @@ func LoadCount() int {
 }
 
 func Reset() {
+	StopDNSMonitor()
 	clientSingleton.Stop()
 	clientSingleton = nil
 	funcClientSingleton = nil
@@ -259,7 +263,12 @@ func Connect(
 	// Initial DNS resolution and get first ip
 	host, _, err := net.SplitHostPort(connConfig.ConnectionString)
 	if err == nil {
-		updateResolvedIPs(host, dnsResolver)
+		updateResolvedIPs(context.Background(), host, dnsResolver)
+	}
+
+	// Start background DNS monitor if enabled
+	if !suppressRegister && connConfig.DNSMonitorEnabled {
+		StartDNSMonitor(connConfig.DNSMonitorEnabled, connConfig.DNSMonitorInterval, connConfig.ConnectionString)
 	}
 
 	return true
@@ -523,11 +532,11 @@ func FuncClientSingleton(funcName string, request interface{}) (result interface
 		// If there's an error, handle it with our dedicated error handler
 		if err != nil {
 			if handleRPCError(err, values.Config().ConnectionString) {
-				// Error was handled and we should retry
-				return nil
+				// DNS changed, reconnected - return error to trigger retry
+				return err
 			}
-			// Error wasn't handled or we shouldn't retry
-			return err
+			// DNS unchanged or not a network error - use backoff.Permanent to prevent retries
+			return backoff.Permanent(err)
 		}
 
 		return nil
@@ -549,14 +558,14 @@ func handleRPCError(err error, connectionString string) bool {
 
 	Log.WithError(err).Debug("[RPC Store] --> Call failed")
 
-	// Check if it's a network-related error that might be resolved by a DNS check
-	if isNetworkError(err) {
-		Log.Debug("[RPC Store] Network error detected, checking DNS...")
+	// Check if it's a DNS-related error that might be resolved by a DNS check
+	if isDNSError(err) {
+		Log.Debug("[RPC Store] DNS error detected, checking DNS...")
 		dnsChanged, shouldRetry := checkAndHandleDNSChange(connectionString, false)
 		return dnsChanged && shouldRetry
 	}
 
-	Log.Debug("[RPC Store] Non-network error, skipping DNS check")
+	Log.Debug("[RPC Store] Non-DNS error, skipping DNS check")
 	return false
 }
 
