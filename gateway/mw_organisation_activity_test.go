@@ -603,39 +603,36 @@ func TestOrganizationMonitorStaleWhileRevalidate(t *testing.T) {
 		}
 	})
 
-	t.Run("should delete cache and fetch fresh after hard expiry", func(t *testing.T) {
+	t.Run("should return stale data when beyond hard expiry (regardless of fetch result)", func(t *testing.T) {
 		orgSessionCache.Delete(orgID)
 		orgRefreshInProgress.Delete(orgID)
 
 		now := time.Now()
-		entry := &orgCacheEntry{
+		staleEntry := &orgCacheEntry{
 			session:    orgSession.Clone(),
 			softExpiry: now.Add(-30 * time.Minute).UnixNano(),
 			hardExpiry: now.Add(-1 * time.Minute).UnixNano(),
 		}
-		orgSessionCache.Store(orgID, entry)
+		orgSessionCache.Store(orgID, staleEntry)
 
 		session, found := monitor.getOrgSessionWithStaleWhileRevalidate()
 
-		if found {
-			if session.OrgID != orgID {
-				t.Errorf("Expected org ID %s, got %s", orgID, session.OrgID)
-			}
-
-			cached, exists := orgSessionCache.Load(orgID)
-			if exists {
-				entry := cached.(*orgCacheEntry)
-				if entry.session.OrgID != orgID {
-					t.Errorf("Expected cached org ID %s, got %s", orgID, entry.session.OrgID)
-				}
-			}
+		if !found {
+			t.Fatal("Should return session (either fresh or stale)")
 		}
 
-		if cached, ok := orgSessionCache.Load(orgID); ok {
-			entry := cached.(*orgCacheEntry)
-			if entry.hardExpiry < time.Now().UnixNano() {
-				t.Error("Cached entry should not be expired after hard expiry fetch")
-			}
+		if session.OrgID != orgID {
+			t.Errorf("Expected org ID %s, got %s", orgID, session.OrgID)
+		}
+
+		// The key behavior: when beyond hard expiry, the function attempts to fetch fresh data
+		// If fetch succeeds: cache is updated with fresh data
+		// If fetch fails: stale data is returned to maintain org limits
+		// Either way, a session is returned and org limits are enforced
+
+		// Verify we got valid session data back
+		if session.QuotaMax != 100 {
+			t.Errorf("Expected quota max 100, got %d", session.QuotaMax)
 		}
 	})
 
@@ -722,6 +719,70 @@ func TestOrganizationMonitorStaleWhileRevalidate(t *testing.T) {
 
 		if duration > 3*time.Second {
 			t.Errorf("Timeout took too long: %v", duration)
+		}
+	})
+
+	t.Run("should serve stale data when fetch fails after hard expiry (fail-safe)", func(t *testing.T) {
+		orgSessionCache.Delete(orgID)
+		orgRefreshInProgress.Delete(orgID)
+
+		nonExistentOrgID := "fail-safe-org-" + uuid.New()
+		spec := ts.Gw.apisByID[ts.Gw.apiSpecs[0].APIID]
+		spec.OrgID = nonExistentOrgID
+
+		monitor := &OrganizationMonitor{
+			BaseMiddleware: &BaseMiddleware{
+				Spec:   spec,
+				Gw:     ts.Gw,
+				logger: mainLog,
+			},
+		}
+
+		// manually cache a session that's beyond hard expiry
+		staleSession := user.SessionState{
+			OrgID:          nonExistentOrgID,
+			QuotaMax:       10,
+			QuotaRemaining: 5,
+			Rate:           100,
+			Per:            1,
+		}
+
+		now := time.Now()
+		entry := &orgCacheEntry{
+			session:    staleSession.Clone(),
+			softExpiry: now.Add(-30 * time.Minute).UnixNano(), // Expired 30 min ago
+			hardExpiry: now.Add(-5 * time.Minute).UnixNano(),  // Expired 5 min ago
+		}
+		orgSessionCache.Store(nonExistentOrgID, entry)
+
+		// fetch will fail, but it should return stale data
+		session, found := monitor.getOrgSessionWithStaleWhileRevalidate()
+
+		if !found {
+			t.Fatal("Should return stale session even when fetch fails after hard expiry")
+		}
+
+		if session.OrgID != nonExistentOrgID {
+			t.Errorf("Expected org ID %s, got %s", nonExistentOrgID, session.OrgID)
+		}
+
+		if session.QuotaMax != 10 {
+			t.Errorf("Expected quota max 10 from stale data, got %d", session.QuotaMax)
+		}
+
+		if session.QuotaRemaining != 5 {
+			t.Errorf("Expected quota remaining 5 from stale data, got %d", session.QuotaRemaining)
+		}
+
+		// verify the stale data is still in cache (not deleted)
+		cached, ok := orgSessionCache.Load(nonExistentOrgID)
+		if !ok {
+			t.Error("Stale cache should still exist after failed fetch")
+		} else {
+			cachedEntry := cached.(*orgCacheEntry)
+			if cachedEntry.session.QuotaMax != 10 {
+				t.Errorf("Cached session should still have quota max 10, got %d", cachedEntry.session.QuotaMax)
+			}
 		}
 	})
 }

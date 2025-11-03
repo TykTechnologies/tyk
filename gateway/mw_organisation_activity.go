@@ -358,7 +358,7 @@ func (k *OrganizationMonitor) fetchOrgSessionWithTimeout() (user.SessionState, b
 
 // getOrgSessionWithStaleWhileRevalidate implements stale-while-revalidate pattern:
 // - Soft expiry (10 min): Return stale data, trigger background refresh
-// - Hard expiry (1 hour): Try to fetch fresh data, fall back to allowing request
+// - Hard expiry (1 hour): Try to fetch fresh data, fall back to serving stale data
 func (k *OrganizationMonitor) getOrgSessionWithStaleWhileRevalidate() (user.SessionState, bool) {
 	now := time.Now().UnixNano()
 
@@ -385,8 +385,16 @@ func (k *OrganizationMonitor) getOrgSessionWithStaleWhileRevalidate() (user.Sess
 			return entry.session.Clone(), true
 		}
 
-		k.Logger().Debug("Org session beyond hard expiry, removing from cache")
-		orgSessionCache.Delete(k.Spec.OrgID)
+		k.Logger().Debug("Org session beyond hard expiry, attempting fresh fetch")
+		session, found := k.fetchOrgSessionWithTimeout()
+
+		if !found {
+			k.Logger().Warning("Org session fetch failed, serving stale data beyond hard expiry to maintain limits")
+			return entry.session.Clone(), true
+		}
+
+		k.cacheOrgSession(session)
+		return session, true
 	}
 
 	k.Logger().Debug("No cached org session, attempting fresh fetch with timeout")
