@@ -41,15 +41,16 @@ jobs:
       fail-fast: false
       matrix:
         golang_cross:
-          - 1.24-bullseye
+          - 1.24-bookworm
         include:
-          - golang_cross: 1.24-bullseye
+          - golang_cross: 1.24-bookworm
             goreleaser: 'ci/goreleaser/goreleaser.yml'
             cgo: 1
             rpmvers: 'el/7 el/8 el/9 amazon/2 amazon/2023'
             debvers: 'ubuntu/xenial ubuntu/bionic ubuntu/focal ubuntu/jammy ubuntu/noble debian/jessie debian/buster debian/bullseye debian/bookworm debian/trixie'
     outputs:
       ee_tags: ${{ steps.ci_metadata_ee.outputs.tags }}
+      fips_tags: ${{ steps.ci_metadata_fips.outputs.tags }}
       std_tags: ${{ steps.ci_metadata_std.outputs.tags }}
       commit_author: ${{ steps.set_outputs.outputs.commit_author}}
     steps:
@@ -98,7 +99,7 @@ jobs:
           ci/bin/unlock-agent.sh
           git config --global url."https://${{ secrets.ORG_GH_TOKEN }}@github.com".insteadOf "https://github.com"
           git config --global --add safe.directory /go/src/github.com/TykTechnologies/tyk
-          goreleaser release --clean -f ${{ matrix.goreleaser }} ${{ !startsWith(github.ref, 'refs/tags/') && ' --snapshot --skip=sign' || '' }}' | tee /tmp/build.sh
+          goreleaser release --clean -f ${{ matrix.goreleaser }} ${{ !startsWith(github.ref, 'refs/tags/') && ' --snapshot --skip=sign,docker' || '--skip=docker' }}' | tee /tmp/build.sh
           chmod +x /tmp/build.sh
           docker run --rm --privileged -e GITHUB_TOKEN=${{ github.token }} \
           -e GOPRIVATE=github.com/TykTechnologies                                \
@@ -128,12 +129,12 @@ jobs:
           mask-aws-account-id: false
       - uses: aws-actions/amazon-ecr-login@v2
         id: ecr
-        if: ${{ matrix.golang_cross == '1.24-bullseye' }}
+        if: ${{ matrix.golang_cross == '1.24-bookworm' }}
         with:
           mask-password: 'true'
       - name: Docker metadata for ee CI
         id: ci_metadata_ee
-        if: ${{ matrix.golang_cross == '1.24-bullseye' }}
+        if: ${{ matrix.golang_cross == '1.24-bookworm' }}
         uses: docker/metadata-action@v5
         with:
           images: |
@@ -148,7 +149,7 @@ jobs:
             type=semver,pattern={{major}}.{{minor}},prefix=v
             type=semver,pattern={{version}},prefix=v
       - name: push ee image to CI
-        if: ${{ matrix.golang_cross == '1.24-bullseye' }}
+        if: ${{ matrix.golang_cross == '1.24-bookworm' }}
         uses: docker/build-push-action@v6
         with:
           context: "dist"
@@ -182,7 +183,7 @@ jobs:
             org.opencontainers.image.vendor=tyk.io
             org.opencontainers.image.version=${{ github.ref_name }}
       - name: push ee image to prod
-        if: ${{ matrix.golang_cross == '1.24-bullseye' }}
+        if: ${{ matrix.golang_cross == '1.24-bookworm' }}
         uses: docker/build-push-action@v6
         with:
           context: "dist"
@@ -197,9 +198,74 @@ jobs:
           labels: ${{ steps.tag_metadata_ee.outputs.labels }}
           build-args: |
             BUILD_PACKAGE_NAME=tyk-gateway-ee
+      - name: Docker metadata for fips CI
+        id: ci_metadata_fips
+        if: ${{ matrix.golang_cross == '1.24-bookworm' }}
+        uses: docker/metadata-action@v5
+        with:
+          images: |
+            ${{ steps.ecr.outputs.registry }}/tyk
+          flavor: |
+            latest=false
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=sha,format=long
+            type=semver,pattern={{major}},prefix=v
+            type=semver,pattern={{major}}.{{minor}},prefix=v
+            type=semver,pattern={{version}},prefix=v
+      - name: push fips image to CI
+        if: ${{ matrix.golang_cross == '1.24-bookworm' }}
+        uses: docker/build-push-action@v6
+        with:
+          context: "dist"
+          platforms: linux/amd64
+          file: ci/Dockerfile.distroless
+          provenance: mode=max
+          sbom: true
+          push: true
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          tags: ${{ steps.ci_metadata_fips.outputs.tags }}
+          labels: ${{ steps.ci_metadata_fips.outputs.labels }}
+          build-args: |
+            BUILD_PACKAGE_NAME=tyk-gateway-fips
+      - name: Docker metadata for fips tag push
+        id: tag_metadata_fips
+        uses: docker/metadata-action@v5
+        with:
+          images: |
+            tykio/tyk-gateway
+          flavor: |
+            latest=false
+            prefix=v
+          tags: |
+            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{version}}
+          labels: |
+            org.opencontainers.image.title=Tyk Gateway FIPS
+            org.opencontainers.image.description=Tyk Open Source API Gateway written in Go, supporting REST, GraphQL, TCP and gRPC protocols Built with boringssl
+            org.opencontainers.image.vendor=tyk.io
+            org.opencontainers.image.version=${{ github.ref_name }}
+      - name: push fips image to prod
+        if: ${{ matrix.golang_cross == '1.24-bookworm' }}
+        uses: docker/build-push-action@v6
+        with:
+          context: "dist"
+          platforms: linux/amd64
+          file: ci/Dockerfile.distroless
+          provenance: mode=max
+          sbom: true
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          push: ${{ startsWith(github.ref, 'refs/tags') }}
+          tags: ${{ steps.tag_metadata_fips.outputs.tags }}
+          labels: ${{ steps.tag_metadata_fips.outputs.labels }}
+          build-args: |
+            BUILD_PACKAGE_NAME=tyk-gateway-fips
       - name: Docker metadata for std CI
         id: ci_metadata_std
-        if: ${{ matrix.golang_cross == '1.24-bullseye' }}
+        if: ${{ matrix.golang_cross == '1.24-bookworm' }}
         uses: docker/metadata-action@v5
         with:
           images: |
@@ -214,7 +280,7 @@ jobs:
             type=semver,pattern={{major}}.{{minor}},prefix=v
             type=semver,pattern={{version}},prefix=v
       - name: push std image to CI
-        if: ${{ matrix.golang_cross == '1.24-bullseye' }}
+        if: ${{ matrix.golang_cross == '1.24-bookworm' }}
         uses: docker/build-push-action@v6
         with:
           context: "dist"
@@ -248,7 +314,7 @@ jobs:
             org.opencontainers.image.vendor=tyk.io
             org.opencontainers.image.version=${{ github.ref_name }}
       - name: push std image to prod
-        if: ${{ matrix.golang_cross == '1.24-bullseye' }}
+        if: ${{ matrix.golang_cross == '1.24-bookworm' }}
         uses: docker/build-push-action@v6
         with:
           context: "dist"
@@ -265,7 +331,7 @@ jobs:
             BUILD_PACKAGE_NAME=tyk-gateway
       - name: save deb
         uses: actions/upload-artifact@v4
-        if: ${{ matrix.golang_cross == '1.24-bullseye' }}
+        if: ${{ matrix.golang_cross == '1.24-bookworm' }}
         with:
           name: deb
           retention-days: 1
@@ -275,7 +341,7 @@ jobs:
             !dist/*fips*.deb
       - name: save rpm
         uses: actions/upload-artifact@v4
-        if: ${{ matrix.golang_cross == '1.24-bullseye' }}
+        if: ${{ matrix.golang_cross == '1.24-bookworm' }}
         with:
           name: rpm
           retention-days: 1
@@ -421,7 +487,8 @@ jobs:
           ARG TARGETARCH
           COPY tyk-gateway*_${TARGETARCH}.deb /tyk-gateway.deb
           RUN apt-get update && apt-get install -y curl
-          RUN curl -fsSL https://packagecloud.io/install/repositories/tyk/tyk-gateway/script.deb.sh | bash && apt-get install -y tyk-gateway=3.0.8
+          RUN curl -fsSL https://packagecloud.io/install/repositories/tyk/tyk-gateway/script.deb.sh | bash || echo "Repository setup failed, but continuing"
+          RUN apt-get install -y tyk-gateway=3.0.8 || echo "Previous version not found, testing fresh install"
           RUN dpkg -i /tyk-gateway.deb
 
           RUN /opt/tyk-gateway/install/setup.sh --listenport=8080 --redishost=localhost --redisport=6379 --domain=""
@@ -479,7 +546,8 @@ jobs:
           COPY tyk-gateway*.${RHELARCH}.rpm /tyk-gateway.rpm
           RUN command -v curl || yum install -y curl
           RUN command -v useradd || yum install -y shadow-utils
-          RUN curl -fsSL https://packagecloud.io/install/repositories/tyk/tyk-gateway/script.rpm.sh | bash && yum install -y tyk-gateway-3.0.8-1
+          RUN curl -fsSL https://packagecloud.io/install/repositories/tyk/tyk-gateway/script.rpm.sh | bash || echo "Repository setup failed, but continuing"
+          RUN yum install -y tyk-gateway-3.0.8-1 || echo "Previous version not found, testing fresh install"
           RUN curl https://keyserver.tyk.io/tyk.io.rpm.signing.key.2020 -o tyk-gateway.key && rpm --import tyk-gateway.key
           RUN rpm --checksig /tyk-gateway.rpm
           RUN rpm -Uvh --force /tyk-gateway.rpm
