@@ -34,7 +34,10 @@ func TestRealIP(t *testing.T) {
 	for _, test := range ipHeaderTests {
 		t.Log(test.comment)
 
-		r, _ := http.NewRequest(http.MethodGet, "http://abc.com:8080", nil)
+		r, err := http.NewRequest(http.MethodGet, "http://abc.com:8080", nil)
+		if err != nil {
+			t.Fatal(err)
+		}
 		r.Header.Set(test.key, test.value)
 		r.RemoteAddr = test.remoteAddr
 
@@ -46,7 +49,10 @@ func TestRealIP(t *testing.T) {
 	}
 
 	t.Log("Context")
-	r, _ := http.NewRequest(http.MethodGet, "http://abc.com:8080", nil)
+	r, err := http.NewRequest(http.MethodGet, "http://abc.com:8080", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	ctx := context.WithValue(r.Context(), "remote_addr", "10.0.0.5")
 	r = r.WithContext(ctx)
@@ -60,7 +66,10 @@ func TestRealIP(t *testing.T) {
 	t.Log("XFFDepth=1 (last IP)")
 	mockConfig.HttpServerOptions.XFFDepth = 1
 
-	r, _ = http.NewRequest(http.MethodGet, "http://abc.com:8080", nil)
+	r, err = http.NewRequest(http.MethodGet, "http://abc.com:8080", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
 	r.Header.Set("X-Forwarded-For", "10.0.0.3, 10.0.0.2, 10.0.0.1")
 
 	ip = RealIP(r)
@@ -72,7 +81,10 @@ func TestRealIP(t *testing.T) {
 	t.Log("XFFDepth=2 (second to last IP)")
 	mockConfig.HttpServerOptions.XFFDepth = 2
 
-	r, _ = http.NewRequest(http.MethodGet, "http://abc.com:8080", nil)
+	r, err = http.NewRequest(http.MethodGet, "http://abc.com:8080", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
 	r.Header.Set("X-Forwarded-For", "10.0.0.3, 10.0.0.2, 10.0.0.1")
 
 	ip = RealIP(r)
@@ -91,7 +103,10 @@ func BenchmarkRealIP_RemoteAddr(b *testing.B) {
 		return mockConfig
 	}
 
-	r, _ := http.NewRequest(http.MethodGet, "http://abc.com:8080", nil)
+	r, err := http.NewRequest(http.MethodGet, "http://abc.com:8080", nil)
+	if err != nil {
+		b.Fatal(err)
+	}
 	r.RemoteAddr = "10.0.1.4:8081"
 
 	for n := 0; n < b.N; n++ {
@@ -112,7 +127,10 @@ func BenchmarkRealIP_ForwardedFor(b *testing.B) {
 		return mockConfig
 	}
 
-	r, _ := http.NewRequest(http.MethodGet, "http://abc.com:8080", nil)
+	r, err := http.NewRequest(http.MethodGet, "http://abc.com:8080", nil)
+	if err != nil {
+		b.Fatal(err)
+	}
 	r.Header.Set("X-Forwarded-For", "10.0.0.3, 10.0.0.2, 10.0.0.1")
 
 	for n := 0; n < b.N; n++ {
@@ -133,7 +151,10 @@ func BenchmarkRealIP_RealIP(b *testing.B) {
 		return mockConfig
 	}
 
-	r, _ := http.NewRequest(http.MethodGet, "http://abc.com:8080", nil)
+	r, err := http.NewRequest(http.MethodGet, "http://abc.com:8080", nil)
+	if err != nil {
+		b.Fatal(err)
+	}
 	r.Header.Set("X-Real-IP", "10.0.0.1")
 
 	for n := 0; n < b.N; n++ {
@@ -154,7 +175,10 @@ func BenchmarkRealIP_Context(b *testing.B) {
 		return mockConfig
 	}
 
-	r, _ := http.NewRequest(http.MethodGet, "http://abc.com:8080", nil)
+	r, err := http.NewRequest(http.MethodGet, "http://abc.com:8080", nil)
+	if err != nil {
+		b.Fatal(err)
+	}
 	r.Header.Set("X-Real-IP", "10.0.0.1")
 	ctx := context.WithValue(r.Context(), "remote_addr", "10.0.0.5")
 	r = r.WithContext(ctx)
@@ -243,7 +267,10 @@ func TestXFFDepth(t *testing.T) {
 			}
 
 			// Create request with X-Forwarded-For header
-			r, _ := http.NewRequest(http.MethodGet, "http://example.com", nil)
+			r, err := http.NewRequest(http.MethodGet, "http://example.com", nil)
+			if err != nil {
+				t.Fatal(err)
+			}
 			r.Header.Set("X-Forwarded-For", tc.xffValue)
 			r.RemoteAddr = "192.168.1.1:8080" // Fallback IP if XFF processing fails
 
