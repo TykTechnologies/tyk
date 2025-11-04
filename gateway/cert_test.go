@@ -1232,6 +1232,18 @@ func TestGetCertificateIDForHost(t *testing.T) {
 		assert.Equal(t, "wildcard-subdomain-cert-id", certID, "Wildcard subdomain should override general wildcard")
 	})
 
+	t.Run("Priority - wildcard subdomain with port overrides wildcard subdomain without port", func(t *testing.T) {
+		certMaps := []map[string]string{
+			{
+				"*.example.com":      "wildcard-no-port-cert-id",
+				"*.example.com:8443": "wildcard-with-port-cert-id",
+			},
+		}
+
+		certID := getCertificateIDForHost("api.example.com:8443", certMaps)
+		assert.Equal(t, "wildcard-with-port-cert-id", certID, "Wildcard subdomain with port should override wildcard subdomain without port (more specific wins)")
+	})
+
 	t.Run("Multiple cert maps - later maps override earlier", func(t *testing.T) {
 		certMaps := []map[string]string{
 			{"example.com": "global-cert-id"},

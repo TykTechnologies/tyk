@@ -103,21 +103,22 @@ func getCertificateIDForHost(host string, certMaps []map[string]string) string {
 		// Try wildcard subdomain pattern matches
 		hostParts := strings.SplitN(hostWithoutPort, ".", 2)
 		if len(hostParts) > 1 {
-			// Try pattern with original host (includes port if present)
+			// Try pattern without port first (less specific)
+			// e.g., "*.example.com" from config matches "api.example.com:8443" request
+			hostPattern := "*." + hostParts[1]
+			if id, ok := m[hostPattern]; ok {
+				certID = id
+			}
+
+			// Try pattern with original host (includes port if present) - higher priority
 			// e.g., "*.example.com:8443" from config matches "api.example.com:8443" request
+			// More specific patterns (with port) override less specific patterns (without port)
 			hostPartsWithPort := strings.SplitN(host, ".", 2)
 			if len(hostPartsWithPort) > 1 {
 				hostPatternWithPort := "*." + hostPartsWithPort[1]
 				if id, ok := m[hostPatternWithPort]; ok {
 					certID = id
 				}
-			}
-
-			// Try pattern without port
-			// e.g., "*.example.com" from config matches "api.example.com:8443" request
-			hostPattern := "*." + hostParts[1]
-			if id, ok := m[hostPattern]; ok {
-				certID = id
 			}
 		}
 
