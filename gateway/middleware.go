@@ -404,8 +404,12 @@ func (t *BaseMiddleware) OrgSession(orgID string) (user.SessionState, bool) {
 	// Check Gateway cache first
 	if !t.Spec.GlobalConfig.LocalSessionCache.DisableCacheSessionState {
 		if cached, found := t.Gw.SessionCache.Get(cacheKey); found {
-			t.Logger().Debug("Using cached org session")
-			return cached.(user.SessionState).Clone(), true
+			if session, ok := cached.(user.SessionState); ok {
+				t.Logger().Debug("Using cached org session")
+				return session.Clone(), true
+			}
+			t.Logger().Warning("Invalid cache entry type for org session, removing from cache")
+			t.Gw.SessionCache.Delete(cacheKey)
 		}
 	}
 
@@ -439,15 +443,17 @@ func (t *BaseMiddleware) OrgSessionExpiry(orgid string) int64 {
 		return val
 	}
 
-	// Cache miss, start async refresh in background, return default immediately
-	go t.refreshOrgSessionExpiry(orgid)
+	// Cache miss
+	go orgSessionExpiryCache.Do(orgid, func() (interface{}, error) {
+		return t.refreshOrgSessionExpiry(orgid)
+	})
 
 	t.Logger().Debug("no cached entry found, returning 7 days (async refresh started)")
 	return DEFAULT_ORG_SESSION_EXPIRATION
 }
 
 // refreshOrgSessionExpiry fetches org session expiry in the background
-func (t *BaseMiddleware) refreshOrgSessionExpiry(orgid string) {
+func (t *BaseMiddleware) refreshOrgSessionExpiry(orgid string) (interface{}, error) {
 	defer func() {
 		if r := recover(); r != nil {
 			t.Logger().Errorf("Panic recovered during org session expiry refresh for org %s: %v", orgid, r)
@@ -458,10 +464,12 @@ func (t *BaseMiddleware) refreshOrgSessionExpiry(orgid string) {
 	if found && t.Spec.GlobalConfig.EnforceOrgDataAge {
 		t.Logger().Debug("Background refresh: setting data expiry for org: ", orgid)
 		t.SetOrgExpiry(orgid, s.DataExpires)
-	} else {
-		t.Logger().Debug("Background refresh: org session not found, setting default expiry")
-		t.SetOrgExpiry(orgid, DEFAULT_ORG_SESSION_EXPIRATION)
+		return s.DataExpires, nil
 	}
+
+	t.Logger().Debug("Background refresh: org session not found, setting default expiry")
+	t.SetOrgExpiry(orgid, DEFAULT_ORG_SESSION_EXPIRATION)
+	return DEFAULT_ORG_SESSION_EXPIRATION, nil
 }
 
 func (t *BaseMiddleware) UpdateRequestSession(r *http.Request) bool {

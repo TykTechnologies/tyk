@@ -24,6 +24,8 @@ type mockStore struct {
 	SessionHandler
 	//DetailNotFound is used to make mocked SessionDetail return (x,false), as if it doesn't find the session in the mocked storage.
 	DetailNotFound bool
+	// Delay simulates a slow RPC call for timeout testing
+	Delay time.Duration
 }
 
 var sess = user.SessionState{
@@ -32,6 +34,9 @@ var sess = user.SessionState{
 }
 
 func (m mockStore) SessionDetail(orgID string, keyName string, hashed bool) (user.SessionState, bool) {
+	if m.Delay > 0 {
+		time.Sleep(m.Delay)
+	}
 	return sess.Clone(), !m.DetailNotFound
 }
 
@@ -641,5 +646,42 @@ func TestBaseMiddleware_OrgSession(t *testing.T) {
 		if found {
 			assert.NotEmpty(t, session.OrgID)
 		}
+	})
+
+	t.Run("should timeout when RPC call takes too long", func(t *testing.T) {
+		timeoutOrgID := "timeout-org-" + uuid.New()
+
+		slowMockStore := mockStore{
+			DetailNotFound: false,
+			Delay:          3 * time.Second,
+		}
+
+		specSlow := &APISpec{
+			GlobalConfig: config.Config{
+				EnforceOrgDataAge: true,
+				LocalSessionCache: config.LocalSessionCacheConf{
+					DisableCacheSessionState: false,
+				},
+			},
+			OrgSessionManager: slowMockStore,
+		}
+
+		baseMidSlow := &BaseMiddleware{
+			Spec:   specSlow,
+			Gw:     ts.Gw,
+			logger: mainLog,
+		}
+
+		start := time.Now()
+		session, found := baseMidSlow.fetchOrgSessionWithTimeout(timeoutOrgID)
+		elapsed := time.Since(start)
+
+		// Should timeout and return false
+		assert.False(t, found, "Should timeout and return false")
+		assert.Empty(t, session.OrgID, "Session should be empty on timeout")
+
+		// Should timeout around 2 seconds, not wait for the full 3 second delay
+		assert.Less(t, elapsed, 3*time.Second, "Should timeout before slow RPC completes")
+		assert.GreaterOrEqual(t, elapsed, 2*time.Second, "Should wait for timeout duration")
 	})
 }
