@@ -72,6 +72,14 @@ var certLog = log.WithField("prefix", "certs")
 func (gw *Gateway) getUpstreamCertificate(host string, spec *APISpec) (cert *tls.Certificate) {
 	var certID string
 
+	// Strip port from host for certificate matching
+	// If host is "example.com:8443", hostWithoutPort becomes "example.com"
+	// If host has no port, hostWithoutPort equals host
+	hostWithoutPort := host
+	if h, _, err := net.SplitHostPort(host); err == nil {
+		hostWithoutPort = h
+	}
+
 	certMaps := []map[string]string{gw.GetConfig().Security.Certificates.Upstream}
 
 	if spec != nil && !spec.UpstreamCertificatesDisabled && spec.UpstreamCertificates != nil {
@@ -83,20 +91,40 @@ func (gw *Gateway) getUpstreamCertificate(host string, spec *APISpec) (cert *tls
 			continue
 		}
 
+		// Try wildcard match for any host
 		if id, ok := m["*"]; ok {
 			certID = id
 		}
 
-		hostParts := strings.SplitN(host, ".", 2)
+		// Try wildcard subdomain pattern matches
+		hostParts := strings.SplitN(hostWithoutPort, ".", 2)
 		if len(hostParts) > 1 {
-			hostPattern := "*." + hostParts[1]
+			// Try pattern with original host (includes port if present)
+			// e.g., "*.example.com:8443" from config matches "api.example.com:8443" request
+			hostPartsWithPort := strings.SplitN(host, ".", 2)
+			if len(hostPartsWithPort) > 1 {
+				hostPatternWithPort := "*." + hostPartsWithPort[1]
+				if id, ok := m[hostPatternWithPort]; ok {
+					certID = id
+				}
+			}
 
+			// Try pattern without port
+			// e.g., "*.example.com" from config matches "api.example.com:8443" request
+			hostPattern := "*." + hostParts[1]
 			if id, ok := m[hostPattern]; ok {
 				certID = id
 			}
 		}
 
+		// Try exact match with original host (for backward compatibility with configs that include port)
 		if id, ok := m[host]; ok {
+			certID = id
+		}
+
+		// Try exact match without port (most common case)
+		// This ensures "example.com" config matches "example.com:8443" request
+		if id, ok := m[hostWithoutPort]; ok {
 			certID = id
 		}
 	}
@@ -420,7 +448,7 @@ func (gw *Gateway) getTLSConfigForClient(baseConfig *tls.Config, listenPort int)
 
 					for _, cert := range gw.CertificateManager.List(certIDs, certs.CertificatePublic) {
 						if cert != nil && !crypto.IsPublicKey(cert) {
-							newConfig.ClientCAs.AddCert(cert.Leaf)
+							crypto.AddCACertificatesFromChainToPool(newConfig.ClientCAs, cert)
 						}
 					}
 				}
