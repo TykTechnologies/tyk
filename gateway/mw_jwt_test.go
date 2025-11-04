@@ -4718,3 +4718,111 @@ func TestJWT_BackwardCompatibility_DefaultPoliciesStillWork(t *testing.T) {
 		assert.Equal(t, []string{defaultPolicyID}, policyIDs, "Expected default policy to be applied")
 	})
 }
+
+// TestJWT_SecurityFix_ExistingSessionNoScopeNoPolicy tests the security fix for
+// existing sessions that should be rejected when presented with a token that has
+// no scopes and no base policy (prevents privilege escalation).
+func TestJWT_SecurityFix_ExistingSessionNoScopeNoPolicy(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	// Create policies for scope mapping
+	premiumPolicyID := ts.CreatePolicy(func(p *user.Policy) {
+		p.ID = "premium-security"
+		p.AccessRights = map[string]user.AccessDefinition{
+			"api1": {
+				Limit: user.APILimit{
+					RateLimit: user.RateLimit{
+						Rate: 1000,
+						Per:  60,
+					},
+					QuotaMax: -1,
+				},
+			},
+		}
+		p.Partitions = user.PolicyPartitions{
+			PerAPI: true,
+		}
+	})
+
+	// Build API with scope mapping but NO default policies
+	spec := BuildAPI(func(spec *APISpec) {
+		spec.APIID = "api1"
+		spec.UseKeylessAccess = false
+		spec.EnableJWT = true
+		spec.JWTSigningMethod = RSASign
+		spec.JWTSource = base64.StdEncoding.EncodeToString([]byte(jwtRSAPubKey))
+		spec.JWTIdentityBaseField = "user_id"
+		spec.JWTDefaultPolicies = []string{} // NO DEFAULT POLICIES
+		spec.Scopes = apidef.Scopes{
+			JWT: apidef.ScopeClaim{
+				ScopeClaimName: "scope",
+				ScopeToPolicy: map[string]string{
+					"user:premium": premiumPolicyID,
+				},
+			},
+		}
+		spec.Proxy.ListenPath = "/api1"
+		spec.OrgID = "default"
+	})[0]
+
+	ts.Gw.LoadAPI(spec)
+
+	userID := "security-test-user-" + uuid.New()
+
+	// Step 1: Create session with valid scope
+	t.Run("Step 1: Create session with premium scope", func(t *testing.T) {
+		jwtToken := CreateJWKToken(func(t *jwt.Token) {
+			t.Claims.(jwt.MapClaims)["user_id"] = userID
+			t.Claims.(jwt.MapClaims)["scope"] = "user:premium"
+			t.Claims.(jwt.MapClaims)["exp"] = time.Now().Add(time.Hour).Unix()
+		})
+
+		authHeaders := map[string]string{"authorization": jwtToken}
+		_, _ = ts.Run(t, test.TestCase{
+			Headers: authHeaders,
+			Path:    "/api1",
+			Code:    http.StatusOK,
+		})
+
+		// Verify session was created with premium policy
+		sessionID := ts.Gw.generateToken(spec.OrgID, fmt.Sprintf("%x", md5.Sum([]byte(userID))))
+		session, _ := ts.Gw.GlobalSessionManager.SessionDetail(spec.OrgID, sessionID, false)
+		policyIDs := session.PolicyIDs()
+		assert.Equal(t, []string{premiumPolicyID}, policyIDs, "Expected premium policy to be applied")
+	})
+
+	// Step 2: SECURITY TEST - Try to access with token that has NO scope and NO base policy
+	// This should be REJECTED to prevent privilege escalation
+	t.Run("Step 2: SECURITY - Reject token with no scope/policy for existing session", func(t *testing.T) {
+		jwtTokenNoScope := CreateJWKToken(func(t *jwt.Token) {
+			t.Claims.(jwt.MapClaims)["user_id"] = userID  // Same user
+			// NO scope claim
+			// NO policy claim
+			t.Claims.(jwt.MapClaims)["exp"] = time.Now().Add(time.Hour).Unix()
+		})
+
+		authHeaders := map[string]string{"authorization": jwtTokenNoScope}
+		_, _ = ts.Run(t, test.TestCase{
+			Headers: authHeaders,
+			Path:    "/api1",
+			Code:    http.StatusForbidden, // Must be rejected!
+		})
+	})
+
+	// Step 3: Verify session can still be accessed with valid token
+	t.Run("Step 3: Valid token still works after rejection", func(t *testing.T) {
+		jwtToken := CreateJWKToken(func(t *jwt.Token) {
+			t.Claims.(jwt.MapClaims)["user_id"] = userID
+			t.Claims.(jwt.MapClaims)["scope"] = "user:premium"
+			t.Claims.(jwt.MapClaims)["exp"] = time.Now().Add(time.Hour).Unix()
+		})
+
+		authHeaders := map[string]string{"authorization": jwtToken}
+		_, _ = ts.Run(t, test.TestCase{
+			Headers: authHeaders,
+			Path:    "/api1",
+			Code:    http.StatusOK,
+		})
+	})
+}

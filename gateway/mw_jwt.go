@@ -750,7 +750,6 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 			}
 		} else {
 			session = user.SessionState{OrgID: k.Spec.OrgID}
-			err = nil
 		}
 
 		//override session expiry with JWT if longer lived
@@ -899,6 +898,12 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 				return errors.New("key not authorized: could not apply several policies"), http.StatusForbidden
 			}
 
+		} else if basePolicyID == "" && exists {
+			// Security: existing session with no scope in token and no base policy
+			// Reject to prevent privilege escalation (token should reset policies)
+			k.reportLoginFailure(baseFieldData, r)
+			k.Logger().Error("Existing session requires scope or base policy when scope mapping is configured")
+			return errors.New("key not authorized: no scope or policy in token"), http.StatusForbidden
 		}
 	}
 
