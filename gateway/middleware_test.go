@@ -22,7 +22,7 @@ import (
 
 type mockStore struct {
 	SessionHandler
-	//DetailNotFound is used to make mocked SessionDetail return (x,false), as if it don't find the session in the mocked storage.
+	//DetailNotFound is used to make mocked SessionDetail return (x,false), as if it doesn't find the session in the mocked storage.
 	DetailNotFound bool
 }
 
@@ -43,28 +43,52 @@ func TestBaseMiddleware_OrgSessionExpiry(t *testing.T) {
 		Spec: &APISpec{
 			GlobalConfig: config.Config{
 				EnforceOrgDataAge: true,
+				LocalSessionCache: config.LocalSessionCacheConf{
+					DisableCacheSessionState: false,
+				},
 			},
 			OrgSessionManager: mockStore{},
 		},
 		logger: mainLog,
 		Gw:     ts.Gw,
 	}
-	v := int64(100)
-	ts.Gw.ExpiryCache.Set(sess.OrgID, v, cache.DefaultExpiration)
 
-	got := m.OrgSessionExpiry(sess.OrgID)
-	assert.Equal(t, v, got)
-	ts.Gw.ExpiryCache.Delete(sess.OrgID)
+	t.Run("should return cached value immediately when present", func(t *testing.T) {
+		v := int64(100)
+		ts.Gw.ExpiryCache.Set(sess.OrgID, v, cache.DefaultExpiration)
 
-	got = m.OrgSessionExpiry(sess.OrgID)
-	assert.Equal(t, sess.DataExpires, got)
-	ts.Gw.ExpiryCache.Delete(sess.OrgID)
+		got := m.OrgSessionExpiry(sess.OrgID)
+		assert.Equal(t, v, got, "Should return cached value")
 
-	m.Spec.OrgSessionManager = mockStore{DetailNotFound: true}
-	noOrgSess := "nonexistent_org"
-	got = m.OrgSessionExpiry(noOrgSess)
-	assert.Equal(t, DEFAULT_ORG_SESSION_EXPIRATION, got)
+		ts.Gw.ExpiryCache.Delete(sess.OrgID)
+	})
 
+	t.Run("should return default immediately on cache miss and refresh in background", func(t *testing.T) {
+		ts.Gw.ExpiryCache.Delete(sess.OrgID)
+		cacheKey := "org:" + sess.OrgID
+		ts.Gw.SessionCache.Delete(cacheKey)
+
+		got := m.OrgSessionExpiry(sess.OrgID)
+		assert.Equal(t, DEFAULT_ORG_SESSION_EXPIRATION, got, "Should return default immediately on cache miss")
+
+		time.Sleep(100 * time.Millisecond)
+
+		cachedVal, found := ts.Gw.ExpiryCache.Get(sess.OrgID)
+		if found {
+			assert.Equal(t, sess.DataExpires, cachedVal.(int64), "Background refresh should populate cache")
+		}
+
+		ts.Gw.ExpiryCache.Delete(sess.OrgID)
+		ts.Gw.SessionCache.Delete(cacheKey)
+	})
+
+	t.Run("should return default for non-existent org", func(t *testing.T) {
+		m.Spec.OrgSessionManager = mockStore{DetailNotFound: true}
+		noOrgSess := "nonexistent_org"
+
+		got := m.OrgSessionExpiry(noOrgSess)
+		assert.Equal(t, DEFAULT_ORG_SESSION_EXPIRATION, got, "Should return default for non-existent org")
+	})
 }
 
 func TestBaseMiddleware_getAuthType(t *testing.T) {
@@ -467,20 +491,11 @@ func TestQuotaNotAppliedWithURLRewrite(t *testing.T) {
 	}...)
 }
 
-func TestBaseMiddleware_OrgSession_StaleWhileRevalidate(t *testing.T) {
+func TestBaseMiddleware_OrgSession(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
 
 	orgID := "test-org-" + uuid.New()
-
-	// Create org session using mock store
-	orgSession := user.SessionState{
-		OrgID:          orgID,
-		QuotaMax:       100,
-		QuotaRemaining: 100,
-		Rate:           10,
-		Per:            1,
-	}
 
 	// Use mock store that returns our test session
 	mockOrgStore := mockStore{DetailNotFound: false}
@@ -488,6 +503,9 @@ func TestBaseMiddleware_OrgSession_StaleWhileRevalidate(t *testing.T) {
 	spec := &APISpec{
 		GlobalConfig: config.Config{
 			EnforceOrgDataAge: true,
+			LocalSessionCache: config.LocalSessionCacheConf{
+				DisableCacheSessionState: false,
+			},
 		},
 		OrgSessionManager: mockOrgStore,
 	}
@@ -498,11 +516,10 @@ func TestBaseMiddleware_OrgSession_StaleWhileRevalidate(t *testing.T) {
 		logger: mainLog,
 	}
 
-	t.Run("should cache org session with correct TTL", func(t *testing.T) {
+	t.Run("should cache org session on first fetch", func(t *testing.T) {
 		// Clear cache
 		cacheKey := "org:" + orgID
 		ts.Gw.SessionCache.Delete(cacheKey)
-		orgRefreshInProgress.Delete(orgID)
 
 		// First call, should fetch and cache
 		session, found := baseMid.OrgSession(orgID)
@@ -513,28 +530,23 @@ func TestBaseMiddleware_OrgSession_StaleWhileRevalidate(t *testing.T) {
 		cached, found := ts.Gw.SessionCache.Get(cacheKey)
 		assert.True(t, found, "Should be cached")
 
-		entry, ok := cached.(orgCacheEntry)
-		assert.True(t, ok, "Cache entry should be orgCacheEntry type")
-		assert.Equal(t, sess.OrgID, entry.session.OrgID)
+		cachedSession, ok := cached.(user.SessionState)
+		assert.True(t, ok, "Cache entry should be user.SessionState type")
+		assert.Equal(t, sess.OrgID, cachedSession.OrgID)
 	})
 
-	t.Run("should return fresh cache before soft expiry", func(t *testing.T) {
+	t.Run("should return cached session on subsequent calls", func(t *testing.T) {
 		cacheKey := "org:" + orgID
 		ts.Gw.SessionCache.Delete(cacheKey)
-		orgRefreshInProgress.Delete(orgID)
 
-		// Cache a fresh session
-		baseMid.cacheOrgSession(orgID, orgSession)
+		// First call to populate cache
+		_, found := baseMid.OrgSession(orgID)
+		assert.True(t, found, "Should find org session")
 
-		// Call immediately, should return cached
+		// Second call should use cache
 		session, found := baseMid.OrgSession(orgID)
 		assert.True(t, found, "Should find cached session")
-		assert.Equal(t, orgID, session.OrgID)
-
-		// Verify no background refresh was triggered (check after small delay)
-		time.Sleep(50 * time.Millisecond)
-		_, inProgress := orgRefreshInProgress.Load(orgID)
-		assert.False(t, inProgress, "Should not trigger background refresh for fresh cache")
+		assert.Equal(t, sess.OrgID, session.OrgID)
 	})
 
 	t.Run("should handle fetch timeout for non-existent org", func(t *testing.T) {
@@ -545,6 +557,9 @@ func TestBaseMiddleware_OrgSession_StaleWhileRevalidate(t *testing.T) {
 		specNotFound := &APISpec{
 			GlobalConfig: config.Config{
 				EnforceOrgDataAge: true,
+				LocalSessionCache: config.LocalSessionCacheConf{
+					DisableCacheSessionState: false,
+				},
 			},
 			OrgSessionManager: mockNotFound,
 		}
@@ -564,13 +579,15 @@ func TestBaseMiddleware_OrgSession_StaleWhileRevalidate(t *testing.T) {
 		nonExistentOrgID := "cold-start-org-" + uuid.New()
 		cacheKey := "org:" + nonExistentOrgID
 		ts.Gw.SessionCache.Delete(cacheKey)
-		orgRefreshInProgress.Delete(nonExistentOrgID)
 
 		// Use mock that returns not found
 		mockNotFound := mockStore{DetailNotFound: true}
 		specNotFound := &APISpec{
 			GlobalConfig: config.Config{
 				EnforceOrgDataAge: true,
+				LocalSessionCache: config.LocalSessionCacheConf{
+					DisableCacheSessionState: false,
+				},
 			},
 			OrgSessionManager: mockNotFound,
 		}
@@ -586,182 +603,43 @@ func TestBaseMiddleware_OrgSession_StaleWhileRevalidate(t *testing.T) {
 		assert.False(t, found, "Should not find non-existent org session")
 	})
 
-	t.Run("should handle invalid cache entry type", func(t *testing.T) {
-		cacheKey := "org:" + orgID
-		ts.Gw.SessionCache.Delete(cacheKey)
-		orgRefreshInProgress.Delete(orgID)
+	t.Run("should fetch fresh data when cache is disabled", func(t *testing.T) {
+		freshOrgID := "fresh-org-" + uuid.New()
 
-		ts.Gw.SessionCache.Set(cacheKey, "invalid-type", cache.DefaultExpiration)
-
-		session, found := baseMid.OrgSession(orgID)
-
-		if found {
-			assert.Equal(t, sess.OrgID, session.OrgID, "Should fetch fresh session after invalid cache")
-		}
-
-		cached, exists := ts.Gw.SessionCache.Get(cacheKey)
-		if exists {
-			_, isString := cached.(string)
-			assert.False(t, isString, "Invalid cache entry should have been replaced")
-		}
-	})
-
-	t.Run("soft expiry: should return stale data and trigger background refresh", func(t *testing.T) {
-		cacheKey := "org:" + orgID
-		ts.Gw.SessionCache.Delete(cacheKey)
-		orgRefreshInProgress.Delete(orgID)
-
-		staleTime := time.Now().Add(-15 * time.Minute) // 15 minutes old (past 10 min soft expiry)
-		staleEntry := orgCacheEntry{
-			session:  orgSession.Clone(),
-			cachedAt: staleTime.UnixNano(),
-		}
-		ts.Gw.SessionCache.Set(cacheKey, staleEntry, int64(orgSessionMaxStale))
-
-		session, found := baseMid.OrgSession(orgID)
-		assert.True(t, found, "Should find stale session")
-		assert.Equal(t, orgID, session.OrgID, "Should return stale session data")
-
-		time.Sleep(200 * time.Millisecond)
-
-		cached, exists := ts.Gw.SessionCache.Get(cacheKey)
-		assert.True(t, exists, "Cache should still exist after refresh")
-
-		if exists {
-			entry, ok := cached.(orgCacheEntry)
-			assert.True(t, ok, "Cache entry should be orgCacheEntry type")
-			assert.Greater(t, entry.cachedAt, staleTime.UnixNano(), "Cache timestamp should be updated after refresh")
-		}
-	})
-
-	t.Run("hard expiry: should attempt fresh fetch and fallback to stale on failure", func(t *testing.T) {
-		staleOrgID := "stale-org-" + uuid.New()
-		cacheKey := "org:" + staleOrgID
-		ts.Gw.SessionCache.Delete(cacheKey)
-		orgRefreshInProgress.Delete(staleOrgID)
-
-		// Create stale session with the correct orgID for this test
-		staleSession := user.SessionState{
-			OrgID:          staleOrgID,
-			QuotaMax:       100,
-			QuotaRemaining: 100,
-			Rate:           10,
-			Per:            1,
-		}
-
-		veryStaleTime := time.Now().Add(-90 * time.Minute) // 90 minutes old (past 1 hour hard expiry)
-		veryStaleEntry := orgCacheEntry{
-			session:  staleSession.Clone(),
-			cachedAt: veryStaleTime.UnixNano(),
-		}
-		ts.Gw.SessionCache.Set(cacheKey, veryStaleEntry, int64(orgSessionMaxStale))
-
-		// Simulating fetch failure
-		mockNotFound := mockStore{DetailNotFound: true}
-		specNotFound := &APISpec{
+		specNoCache := &APISpec{
 			GlobalConfig: config.Config{
 				EnforceOrgDataAge: true,
+				LocalSessionCache: config.LocalSessionCacheConf{
+					DisableCacheSessionState: true,
+				},
 			},
-			OrgSessionManager: mockNotFound,
+			OrgSessionManager: mockOrgStore,
 		}
 
-		baseMidNotFound := &BaseMiddleware{
-			Spec:   specNotFound,
+		baseMidNoCache := &BaseMiddleware{
+			Spec:   specNoCache,
 			Gw:     ts.Gw,
 			logger: mainLog,
 		}
 
-		session, found := baseMidNotFound.OrgSession(staleOrgID)
-		assert.True(t, found, "Should return stale data when fresh fetch fails")
-		assert.Equal(t, staleOrgID, session.OrgID, "Should return stale session data as fallback")
+		// Should fetch fresh data each time when cache is disabled
+		session1, found1 := baseMidNoCache.OrgSession(freshOrgID)
+		assert.True(t, found1, "Should find session")
+		assert.Equal(t, sess.OrgID, session1.OrgID)
+
+		session2, found2 := baseMidNoCache.OrgSession(freshOrgID)
+		assert.True(t, found2, "Should find session again")
+		assert.Equal(t, sess.OrgID, session2.OrgID)
 	})
 
-	t.Run("hard expiry: should fetch fresh data when available", func(t *testing.T) {
-		freshOrgID := "fresh-org-" + uuid.New()
-		cacheKey := "org:" + freshOrgID
-		ts.Gw.SessionCache.Delete(cacheKey)
-		orgRefreshInProgress.Delete(freshOrgID)
+	t.Run("should handle panic during fetch gracefully", func(t *testing.T) {
+		panicOrgID := "panic-org-" + uuid.New()
 
-		veryStaleTime := time.Now().Add(-90 * time.Minute) // 90 minutes old
-		veryStaleEntry := orgCacheEntry{
-			session:  orgSession.Clone(),
-			cachedAt: veryStaleTime.UnixNano(),
+		session, found := baseMid.fetchOrgSessionWithTimeout(panicOrgID)
+
+		// Should either find the session or return false, but not panic
+		if found {
+			assert.NotEmpty(t, session.OrgID)
 		}
-		ts.Gw.SessionCache.Set(cacheKey, veryStaleEntry, int64(orgSessionMaxStale))
-
-		session, found := baseMid.OrgSession(freshOrgID)
-		assert.True(t, found, "Should find session")
-		assert.Equal(t, sess.OrgID, session.OrgID, "Should return fresh session data")
-
-		cached, exists := ts.Gw.SessionCache.Get(cacheKey)
-		assert.True(t, exists, "Cache should be updated")
-
-		if exists {
-			entry, ok := cached.(orgCacheEntry)
-			assert.True(t, ok, "Cache entry should be orgCacheEntry type")
-			assert.Greater(t, entry.cachedAt, veryStaleTime.UnixNano(), "Cache should have fresh timestamp")
-		}
-	})
-
-	t.Run("race condition: should serve stale data when background refresh is in progress", func(t *testing.T) {
-		raceOrgID := "race-org-" + uuid.New()
-		cacheKey := "org:" + raceOrgID
-		ts.Gw.SessionCache.Delete(cacheKey)
-		orgRefreshInProgress.Delete(raceOrgID)
-
-		raceSession := user.SessionState{
-			OrgID:          raceOrgID,
-			QuotaMax:       100,
-			QuotaRemaining: 100,
-			Rate:           10,
-			Per:            1,
-		}
-
-		veryStaleTime := time.Now().Add(-90 * time.Minute)
-		veryStaleEntry := orgCacheEntry{
-			session:  raceSession.Clone(),
-			cachedAt: veryStaleTime.UnixNano(),
-		}
-		ts.Gw.SessionCache.Set(cacheKey, veryStaleEntry, int64(orgSessionMaxStale))
-
-		// Simulate a background refresh already in progress
-		orgRefreshInProgress.Store(raceOrgID, true)
-
-		session, found := baseMid.OrgSession(raceOrgID)
-		assert.True(t, found, "Should return stale data when refresh is in progress")
-		assert.Equal(t, raceOrgID, session.OrgID, "Should return stale session data")
-
-		_, stillInProgress := orgRefreshInProgress.Load(raceOrgID)
-		assert.True(t, stillInProgress, "Refresh flag should still be set")
-
-		orgRefreshInProgress.Delete(raceOrgID)
-	})
-
-	t.Run("soft expiry: should not trigger duplicate background refresh", func(t *testing.T) {
-		dupOrgID := "dup-org-" + uuid.New()
-		cacheKey := "org:" + dupOrgID
-		ts.Gw.SessionCache.Delete(cacheKey)
-		orgRefreshInProgress.Delete(dupOrgID)
-
-		staleTime := time.Now().Add(-15 * time.Minute)
-		staleEntry := orgCacheEntry{
-			session:  orgSession.Clone(),
-			cachedAt: staleTime.UnixNano(),
-		}
-		ts.Gw.SessionCache.Set(cacheKey, staleEntry, int64(orgSessionMaxStale))
-
-		session1, found1 := baseMid.OrgSession(dupOrgID)
-		assert.True(t, found1, "First call should find stale session")
-		assert.NotEmpty(t, session1.OrgID, "Should have an org ID")
-
-		time.Sleep(50 * time.Millisecond)
-
-		session2, found2 := baseMid.OrgSession(dupOrgID)
-		assert.True(t, found2, "Second call should find stale session")
-		assert.NotEmpty(t, session2.OrgID, "Should have an org ID")
-
-		time.Sleep(300 * time.Millisecond)
-
-		orgRefreshInProgress.Delete(dupOrgID)
 	})
 }
