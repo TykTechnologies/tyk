@@ -266,7 +266,10 @@ func (m *proxyMux) handle404(w http.ResponseWriter, r *http.Request) {
 				}
 
 				// Record the hit
-				_ = m.gw.Analytics.RecordHit(&record)
+				err := m.gw.Analytics.RecordHit(&record)
+				if err != nil {
+					mainLog.Errorf("Failed to record 404 analytics for stream on path '%s %s', %v", r.Method, r.URL.Path, err)
+				}
 			}
 		}
 	}
