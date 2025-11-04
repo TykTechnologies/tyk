@@ -640,9 +640,18 @@ func TestBaseMiddleware_OrgSession_StaleWhileRevalidate(t *testing.T) {
 		ts.Gw.SessionCache.Delete(cacheKey)
 		orgRefreshInProgress.Delete(staleOrgID)
 
+		// Create stale session with the correct orgID for this test
+		staleSession := user.SessionState{
+			OrgID:          staleOrgID,
+			QuotaMax:       100,
+			QuotaRemaining: 100,
+			Rate:           10,
+			Per:            1,
+		}
+
 		veryStaleTime := time.Now().Add(-90 * time.Minute) // 90 minutes old (past 1 hour hard expiry)
 		veryStaleEntry := orgCacheEntry{
-			session:  orgSession.Clone(),
+			session:  staleSession.Clone(),
 			cachedAt: veryStaleTime.UnixNano(),
 		}
 		ts.Gw.SessionCache.Set(cacheKey, veryStaleEntry, int64(orgSessionMaxStale))
@@ -664,7 +673,7 @@ func TestBaseMiddleware_OrgSession_StaleWhileRevalidate(t *testing.T) {
 
 		session, found := baseMidNotFound.OrgSession(staleOrgID)
 		assert.True(t, found, "Should return stale data when fresh fetch fails")
-		assert.Equal(t, orgID, session.OrgID, "Should return stale session data as fallback")
+		assert.Equal(t, staleOrgID, session.OrgID, "Should return stale session data as fallback")
 	})
 
 	t.Run("hard expiry: should fetch fresh data when available", func(t *testing.T) {
@@ -700,9 +709,17 @@ func TestBaseMiddleware_OrgSession_StaleWhileRevalidate(t *testing.T) {
 		ts.Gw.SessionCache.Delete(cacheKey)
 		orgRefreshInProgress.Delete(raceOrgID)
 
+		raceSession := user.SessionState{
+			OrgID:          raceOrgID,
+			QuotaMax:       100,
+			QuotaRemaining: 100,
+			Rate:           10,
+			Per:            1,
+		}
+
 		veryStaleTime := time.Now().Add(-90 * time.Minute)
 		veryStaleEntry := orgCacheEntry{
-			session:  orgSession.Clone(),
+			session:  raceSession.Clone(),
 			cachedAt: veryStaleTime.UnixNano(),
 		}
 		ts.Gw.SessionCache.Set(cacheKey, veryStaleEntry, int64(orgSessionMaxStale))
@@ -712,7 +729,7 @@ func TestBaseMiddleware_OrgSession_StaleWhileRevalidate(t *testing.T) {
 
 		session, found := baseMid.OrgSession(raceOrgID)
 		assert.True(t, found, "Should return stale data when refresh is in progress")
-		assert.Equal(t, orgID, session.OrgID, "Should return stale session data")
+		assert.Equal(t, raceOrgID, session.OrgID, "Should return stale session data")
 
 		_, stillInProgress := orgRefreshInProgress.Load(raceOrgID)
 		assert.True(t, stillInProgress, "Refresh flag should still be set")

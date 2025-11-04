@@ -359,13 +359,25 @@ func (t *BaseMiddleware) fetchOrgSessionWithTimeout(orgID string) (user.SessionS
 	timeoutCtx, cancel := context.WithTimeout(context.Background(), orgSessionFetchTimeout)
 	defer cancel()
 
-	type result struct {
+	resultChan := make(chan struct {
 		session user.SessionState
 		found   bool
-	}
-	resultChan := make(chan result, 1)
+	}, 1)
 
 	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				t.Logger().Errorf("Panic recovered during org session fetch for org %s: %v", orgID, r)
+				select {
+				case resultChan <- struct {
+					session user.SessionState
+					found   bool
+				}{session: user.SessionState{}, found: false}:
+				case <-timeoutCtx.Done():
+				}
+			}
+		}()
+
 		session, found := t.Spec.OrgSessionManager.SessionDetail(orgID, orgID, false)
 		if found && t.Spec.GlobalConfig.EnforceOrgDataAge {
 			t.Logger().Debug("Setting data expiry: ", orgID)
@@ -374,7 +386,10 @@ func (t *BaseMiddleware) fetchOrgSessionWithTimeout(orgID string) (user.SessionS
 		session.SetKeyHash(storage.HashKey(orgID, t.Gw.GetConfig().HashKeys))
 
 		select {
-		case resultChan <- result{session: session.Clone(), found: found}:
+		case resultChan <- struct {
+			session user.SessionState
+			found   bool
+		}{session: session.Clone(), found: found}:
 		case <-timeoutCtx.Done():
 			return
 		}
