@@ -1065,6 +1065,7 @@ func (gw *Gateway) loadApps(specs []*APISpec) {
 
 	muxer := &proxyMux{
 		track404Logs: gwConf.Track404Logs,
+		gw:           gw,
 	}
 	router := mux.NewRouter()
 	router.NotFoundHandler = http.HandlerFunc(muxer.handle404)

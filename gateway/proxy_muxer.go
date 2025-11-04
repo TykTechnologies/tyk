@@ -21,6 +21,7 @@ import (
 	"github.com/TykTechnologies/again"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/internal/httputil"
+	"github.com/TykTechnologies/tyk/request"
 	"github.com/TykTechnologies/tyk/tcp"
 
 	"github.com/gorilla/mux"
@@ -131,6 +132,7 @@ type proxyMux struct {
 	proxies      []*proxy
 	again        again.Again
 	track404Logs bool
+	gw           *Gateway
 }
 
 func (m *proxyMux) getProxy(listenPort int, conf config.Config) *proxy {
@@ -205,9 +207,68 @@ func (m *proxyMux) setRouter(port int, protocol string, router *mux.Router, conf
 
 func (m *proxyMux) handle404(w http.ResponseWriter, r *http.Request) {
 	if m.track404Logs {
+		// Existing logging functionality
 		requestMeta := fmt.Sprintf("%s %s %s", r.Method, r.URL.Path, r.Proto)
 		log.WithField("request", requestMeta).WithField("origin", r.RemoteAddr).
 			Error(http.StatusText(http.StatusNotFound))
+
+		// NEW: Also create analytics record if gateway and analytics are available
+		if m.gw != nil && m.gw.Analytics.Store != nil {
+			clientIP := request.RealIP(r)
+
+			// Check if analytics should be recorded (respects enable_analytics and ignored_ips)
+			gwConfig := m.gw.GetConfig()
+			if gwConfig.StoreAnalytics(clientIP) {
+				t := time.Now()
+
+				host := r.URL.Host
+				if host == "" {
+					host = r.Host
+				}
+
+				record := analytics.AnalyticsRecord{
+					Method:        r.Method,
+					Host:          host,
+					Path:          r.URL.Path,
+					RawPath:       r.URL.Path,
+					RawRequest:    r.URL.RawQuery,
+					ContentLength: r.ContentLength,
+					UserAgent:     r.Header.Get("User-Agent"),
+					Day:           t.Day(),
+					Month:         t.Month(),
+					Year:          t.Year(),
+					Hour:          t.Hour(),
+					ResponseCode:  http.StatusNotFound,
+					APIKey:        "",
+					TimeStamp:     t,
+					APIVersion:    "",
+					APIName:       "",
+					APIID:         "",
+					OrgID:         "",
+					OauthID:       "",
+					RequestTime:   0,
+					IPAddress:     clientIP,
+					Geo:           analytics.GeoData{},
+					Network:       analytics.NetworkStats{},
+					Latency: analytics.Latency{
+						Total:    0,
+						Upstream: 0,
+					},
+					Tags:      []string{"404", "path-not-found"},
+					Alias:     "",
+					TrackPath: false,
+					ExpireAt:  t.Add(time.Duration(gwConfig.AnalyticsConfig.StorageExpirationTime) * time.Second),
+				}
+
+				// Enable GeoIP if configured
+				if gwConfig.AnalyticsConfig.EnableGeoIP && m.gw.Analytics.GeoIPDB != nil {
+					record.GetGeo(clientIP, m.gw.Analytics.GeoIPDB)
+				}
+
+				// Record the hit
+				_ = m.gw.Analytics.RecordHit(&record)
+			}
+		}
 	}
 
 	w.WriteHeader(http.StatusNotFound)
