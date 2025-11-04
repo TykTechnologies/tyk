@@ -997,10 +997,6 @@ func TestUpstreamMutualTLS(t *testing.T) {
 }
 
 func TestUpstreamCertificateWithPort(t *testing.T) {
-	// This test validates the fix for handling host:port in getUpstreamCertificate
-	// Previously, certificate matching failed when the host included a port because
-	// pattern matching didn't strip the port before comparison.
-
 	ts := StartTest(nil)
 	defer ts.Close()
 
