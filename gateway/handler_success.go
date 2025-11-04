@@ -395,7 +395,8 @@ func (s *SuccessHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) *http
 	t1 := time.Now()
 	resp := s.Proxy.ServeHTTP(w, r)
 
-	proxyDuration := time.Since(t1)
+	t2 := time.Now()
+	proxyDuration := t2.Sub(t1)
 	millisec := DurationToMillisecond(proxyDuration)
 	log.Debug("Upstream request took (ms): ", millisec)
 
@@ -406,8 +407,8 @@ func (s *SuccessHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) *http
 		var totalMs int64
 		requestStartTime := ctxGetRequestStartTime(r)
 		if !requestStartTime.IsZero() {
-			totalMs = int64(DurationToMillisecond(time.Since(requestStartTime)))
-			log.Debugf("Request start time found: %v, total time: %dms", requestStartTime, totalMs)
+			totalMs = int64(DurationToMillisecond(t2.Sub(requestStartTime)))
+			log.Debugf("Request start time found (UTC): %s, total time: %dms", requestStartTime.UTC().Format(time.RFC3339), totalMs)
 		} else {
 			// Fallback to proxy duration if start time not set
 			totalMs = int64(millisec)
@@ -437,7 +438,8 @@ func (s *SuccessHandler) ServeHTTPWithCache(w http.ResponseWriter, r *http.Reque
 
 	t1 := time.Now()
 	inRes := s.Proxy.ServeHTTPForCache(w, r)
-	proxyDuration := time.Since(t1)
+	t2 := time.Now()
+	proxyDuration := t2.Sub(t1)
 	millisec := DurationToMillisecond(proxyDuration)
 
 	addVersionHeader(w, r, s.Spec.GlobalConfig)
@@ -450,7 +452,7 @@ func (s *SuccessHandler) ServeHTTPWithCache(w http.ResponseWriter, r *http.Reque
 		// Calculate total time including all middlewares
 		var totalMs int64
 		if requestStartTime := ctxGetRequestStartTime(r); !requestStartTime.IsZero() {
-			totalMs = int64(DurationToMillisecond(time.Since(requestStartTime)))
+			totalMs = int64(DurationToMillisecond(t2.Sub(requestStartTime)))
 		} else {
 			// Fallback to proxy duration if start time not set
 			totalMs = int64(millisec)
