@@ -521,36 +521,9 @@ func TestBaseMiddleware_OrgSession(t *testing.T) {
 		logger: mainLog,
 	}
 
-	t.Run("should cache org session on first fetch", func(t *testing.T) {
-		// Clear cache
-		cacheKey := "org:" + orgID
-		ts.Gw.SessionCache.Delete(cacheKey)
-
-		// First call, should fetch and cache
+	t.Run("should fetch org session successfully", func(t *testing.T) {
 		session, found := baseMid.OrgSession(orgID)
 		assert.True(t, found, "Should find org session")
-		assert.Equal(t, sess.OrgID, session.OrgID)
-
-		// Verify it's cached
-		cached, found := ts.Gw.SessionCache.Get(cacheKey)
-		assert.True(t, found, "Should be cached")
-
-		cachedSession, ok := cached.(user.SessionState)
-		assert.True(t, ok, "Cache entry should be user.SessionState type")
-		assert.Equal(t, sess.OrgID, cachedSession.OrgID)
-	})
-
-	t.Run("should return cached session on subsequent calls", func(t *testing.T) {
-		cacheKey := "org:" + orgID
-		ts.Gw.SessionCache.Delete(cacheKey)
-
-		// First call to populate cache
-		_, found := baseMid.OrgSession(orgID)
-		assert.True(t, found, "Should find org session")
-
-		// Second call should use cache
-		session, found := baseMid.OrgSession(orgID)
-		assert.True(t, found, "Should find cached session")
 		assert.Equal(t, sess.OrgID, session.OrgID)
 	})
 

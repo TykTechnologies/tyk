@@ -399,28 +399,9 @@ func (t *BaseMiddleware) OrgSession(orgID string) (user.SessionState, bool) {
 		return user.SessionState{}, false
 	}
 
-	cacheKey := "org:" + orgID
-
-	// Check Gateway cache first
-	if !t.Spec.GlobalConfig.LocalSessionCache.DisableCacheSessionState {
-		if cached, found := t.Gw.SessionCache.Get(cacheKey); found {
-			if session, ok := cached.(user.SessionState); ok {
-				t.Logger().Debug("Using cached org session")
-				return session.Clone(), true
-			}
-			t.Logger().Warning("Invalid cache entry type for org session, removing from cache")
-			t.Gw.SessionCache.Delete(cacheKey)
-		}
-	}
-
-	// Not in cache, fetch with timeout to prevent blocking
+	// Fetch with timeout to prevent blocking
 	t.Logger().Debug("Fetching org session with timeout")
 	session, found := t.fetchOrgSessionWithTimeout(orgID)
-
-	// Cache the result if found
-	if found && !t.Spec.GlobalConfig.LocalSessionCache.DisableCacheSessionState {
-		t.Gw.SessionCache.Set(cacheKey, session.Clone(), cache.DefaultExpiration)
-	}
 
 	return session, found
 }
