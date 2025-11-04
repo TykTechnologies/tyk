@@ -4796,7 +4796,7 @@ func TestJWT_SecurityFix_ExistingSessionNoScopeNoPolicy(t *testing.T) {
 	// This should be REJECTED to prevent privilege escalation
 	t.Run("Step 2: SECURITY - Reject token with no scope/policy for existing session", func(t *testing.T) {
 		jwtTokenNoScope := CreateJWKToken(func(t *jwt.Token) {
-			t.Claims.(jwt.MapClaims)["user_id"] = userID  // Same user
+			t.Claims.(jwt.MapClaims)["user_id"] = userID // Same user
 			// NO scope claim
 			// NO policy claim
 			t.Claims.(jwt.MapClaims)["exp"] = time.Now().Add(time.Hour).Unix()
