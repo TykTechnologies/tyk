@@ -1122,6 +1122,163 @@ func TestUpstreamCertificateWithPort(t *testing.T) {
 	})
 }
 
+func TestGetCertificateIDForHost(t *testing.T) {
+	t.Run("Empty certificate maps", func(t *testing.T) {
+		certID := getCertificateIDForHost("example.com", []map[string]string{})
+		assert.Equal(t, "", certID)
+	})
+
+	t.Run("Wildcard match", func(t *testing.T) {
+		certMaps := []map[string]string{
+			{"*": "wildcard-cert-id"},
+		}
+		certID := getCertificateIDForHost("example.com", certMaps)
+		assert.Equal(t, "wildcard-cert-id", certID)
+
+		certID = getCertificateIDForHost("api.example.com:8443", certMaps)
+		assert.Equal(t, "wildcard-cert-id", certID)
+	})
+
+	t.Run("Exact hostname match without port", func(t *testing.T) {
+		certMaps := []map[string]string{
+			{"example.com": "exact-cert-id"},
+		}
+		certID := getCertificateIDForHost("example.com", certMaps)
+		assert.Equal(t, "exact-cert-id", certID)
+	})
+
+	t.Run("Exact hostname match - config without port, request with port", func(t *testing.T) {
+		certMaps := []map[string]string{
+			{"example.com": "exact-cert-id"},
+		}
+		certID := getCertificateIDForHost("example.com:8443", certMaps)
+		assert.Equal(t, "exact-cert-id", certID, "Should match host without port when request includes port")
+	})
+
+	t.Run("Exact hostname match with port", func(t *testing.T) {
+		certMaps := []map[string]string{
+			{"example.com:8443": "exact-with-port-cert-id"},
+		}
+		certID := getCertificateIDForHost("example.com:8443", certMaps)
+		assert.Equal(t, "exact-with-port-cert-id", certID)
+	})
+
+	t.Run("Wildcard subdomain pattern without port", func(t *testing.T) {
+		certMaps := []map[string]string{
+			{"*.example.com": "wildcard-subdomain-cert-id"},
+		}
+
+		certID := getCertificateIDForHost("api.example.com", certMaps)
+		assert.Equal(t, "wildcard-subdomain-cert-id", certID)
+
+		certID = getCertificateIDForHost("test.example.com", certMaps)
+		assert.Equal(t, "wildcard-subdomain-cert-id", certID)
+	})
+
+	t.Run("Wildcard subdomain pattern - config without port, request with port", func(t *testing.T) {
+		certMaps := []map[string]string{
+			{"*.example.com": "wildcard-subdomain-cert-id"},
+		}
+
+		certID := getCertificateIDForHost("api.example.com:8443", certMaps)
+		assert.Equal(t, "wildcard-subdomain-cert-id", certID, "Should match wildcard pattern even when request includes port")
+
+		certID = getCertificateIDForHost("test.example.com:9000", certMaps)
+		assert.Equal(t, "wildcard-subdomain-cert-id", certID)
+	})
+
+	t.Run("Wildcard subdomain pattern with port", func(t *testing.T) {
+		certMaps := []map[string]string{
+			{"*.example.com:8443": "wildcard-with-port-cert-id"},
+		}
+
+		certID := getCertificateIDForHost("api.example.com:8443", certMaps)
+		assert.Equal(t, "wildcard-with-port-cert-id", certID)
+	})
+
+	t.Run("Priority - exact match overrides wildcard", func(t *testing.T) {
+		certMaps := []map[string]string{
+			{
+				"*":           "wildcard-cert-id",
+				"example.com": "exact-cert-id",
+			},
+		}
+
+		certID := getCertificateIDForHost("example.com", certMaps)
+		assert.Equal(t, "exact-cert-id", certID, "Exact match should override wildcard")
+	})
+
+	t.Run("Priority - exact with port overrides exact without port", func(t *testing.T) {
+		certMaps := []map[string]string{
+			{
+				"example.com":      "exact-no-port-cert-id",
+				"example.com:8443": "exact-with-port-cert-id",
+			},
+		}
+
+		certID := getCertificateIDForHost("example.com:8443", certMaps)
+		assert.Equal(t, "exact-with-port-cert-id", certID, "Exact match with port should override exact without port")
+	})
+
+	t.Run("Priority - wildcard subdomain overrides general wildcard", func(t *testing.T) {
+		certMaps := []map[string]string{
+			{
+				"*":             "wildcard-cert-id",
+				"*.example.com": "wildcard-subdomain-cert-id",
+			},
+		}
+
+		certID := getCertificateIDForHost("api.example.com", certMaps)
+		assert.Equal(t, "wildcard-subdomain-cert-id", certID, "Wildcard subdomain should override general wildcard")
+	})
+
+	t.Run("Multiple cert maps - later maps override earlier", func(t *testing.T) {
+		certMaps := []map[string]string{
+			{"example.com": "global-cert-id"},
+			{"example.com": "spec-cert-id"},
+		}
+
+		certID := getCertificateIDForHost("example.com", certMaps)
+		assert.Equal(t, "spec-cert-id", certID, "Later cert map (spec) should override earlier (global)")
+	})
+
+	t.Run("No match returns empty string", func(t *testing.T) {
+		certMaps := []map[string]string{
+			{"other.com": "other-cert-id"},
+		}
+
+		certID := getCertificateIDForHost("example.com", certMaps)
+		assert.Equal(t, "", certID, "Should return empty string when no match found")
+	})
+
+	t.Run("IPv4 address without port", func(t *testing.T) {
+		certMaps := []map[string]string{
+			{"192.168.1.1": "ip-cert-id"},
+		}
+
+		certID := getCertificateIDForHost("192.168.1.1", certMaps)
+		assert.Equal(t, "ip-cert-id", certID)
+	})
+
+	t.Run("IPv4 address with port", func(t *testing.T) {
+		certMaps := []map[string]string{
+			{"192.168.1.1": "ip-cert-id"},
+		}
+
+		certID := getCertificateIDForHost("192.168.1.1:8443", certMaps)
+		assert.Equal(t, "ip-cert-id", certID, "Should match IP without port when request includes port")
+	})
+
+	t.Run("IPv6 address with port", func(t *testing.T) {
+		certMaps := []map[string]string{
+			{"::1": "ipv6-cert-id"},
+		}
+
+		certID := getCertificateIDForHost("[::1]:8443", certMaps)
+		assert.Equal(t, "ipv6-cert-id", certID, "Should handle IPv6 addresses with brackets and port")
+	})
+}
+
 func TestSSLForceCommonName(t *testing.T) {
 	test.Flaky(t) // TODO TT-5112
 	upstream := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
