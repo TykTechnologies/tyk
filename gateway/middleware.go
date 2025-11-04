@@ -161,7 +161,12 @@ func (gw *Gateway) createMiddleware(actualMW TykMiddleware) func(http.Handler) h
 			}
 
 			startTime := time.Now()
-			logger.WithField("ts", startTime.UnixNano()).WithField("mw", mw.Name()).Debug("Started")
+			if logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
+				logger.WithFields(logrus.Fields{
+					"ts": startTime.UnixNano(),
+					"mw": mw.Name(),
+				}).Debug("Started")
+			}
 
 			if mw.Base().Spec.CORS.OptionsPassthrough && r.Method == "OPTIONS" {
 				next.ServeHTTP(w, r)
@@ -189,7 +194,13 @@ func (gw *Gateway) createMiddleware(actualMW TykMiddleware) func(http.Handler) h
 					job.TimingKv(eventName+".exec_time", finishTime.Nanoseconds(), meta)
 				}
 
-				logger.WithError(err).WithField("code", errCode).WithField("ns", finishTime.Nanoseconds()).Debug("Finished")
+				if logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
+					logger.WithFields(logrus.Fields{
+						"error": err,
+						"code":  errCode,
+						"ns":    finishTime.Nanoseconds(),
+					}).Debug("Finished")
+				}
 				return
 			}
 
@@ -200,7 +211,12 @@ func (gw *Gateway) createMiddleware(actualMW TykMiddleware) func(http.Handler) h
 				job.TimingKv(eventName+".exec_time", finishTime.Nanoseconds(), meta)
 			}
 
-			logger.WithField("code", errCode).WithField("ns", finishTime.Nanoseconds()).Debug("Finished")
+			if logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
+				logger.WithFields(logrus.Fields{
+					"code": errCode,
+					"ns":   finishTime.Nanoseconds(),
+				}).Debug("Finished")
+			}
 
 			mw.Base().UpdateRequestSession(r)
 			// Special code, bypasses all other execution
@@ -315,14 +331,8 @@ func (t *BaseMiddleware) Logger() (logger *logrus.Entry) {
 }
 
 func (t *BaseMiddleware) SetRequestLogger(r *http.Request) *logrus.Entry {
-	t.loggerMu.Lock()
-	defer t.loggerMu.Unlock()
-
-	if t.logger == nil {
-		t.logger = logrus.NewEntry(log)
-	}
-	t.logger = t.Gw.getLogEntryForRequest(t.logger, r, ctxGetAuthToken(r), nil)
-	return t.logger
+	// Use context-based logger to avoid shared state mutation and reduce allocations
+	return t.Gw.getOrCreateRequestLogger(r, ctxGetAuthToken(r))
 }
 
 func (t *BaseMiddleware) Init() {}

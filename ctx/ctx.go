@@ -53,6 +53,7 @@ const (
 	CacheOptions
 	OASDefinition
 	SelfLooping
+	RequestLogger
 )
 
 func ctxSetSession(r *http.Request, s *user.SessionState, scheduleUpdate bool, hashKey bool) {

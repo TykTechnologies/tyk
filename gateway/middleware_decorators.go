@@ -22,7 +22,10 @@ func withLogger(
 ) tykResponseDecorator {
 
 	return func(origin TykResponseHandler) TykResponseHandler {
-		origin.setLogger(logger.WithField("mw", origin.Name()).WithField("type", "response"))
+		origin.setLogger(logger.WithFields(logrus.Fields{
+			"mw":   origin.Name(),
+			"type": "response",
+		}))
 
 		return &logDecorator{
 			TykResponseHandler: origin,
@@ -51,14 +54,19 @@ func (d *logDecorator) HandleResponse(
 ) error {
 
 	start := time.Now()
-	d.logger().WithField("ts", start.UnixNano()).Debug("Started")
+	logger := d.logger()
+	if logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
+		logger.WithField("ts", start.UnixNano()).Debug("Started")
+	}
 
 	if err := d.TykResponseHandler.HandleResponse(writer, response, request, state); err != nil {
 		d.logger().WithField("ns", time.Since(start).Nanoseconds()).WithError(err).Error("Failed to process response")
 		return err
 	}
 
-	d.logger().WithField("ns", time.Since(start).Nanoseconds()).Debug("Finished")
+	if logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
+		logger.WithField("ns", time.Since(start).Nanoseconds()).Debug("Finished")
+	}
 
 	return nil
 }
