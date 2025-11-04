@@ -514,7 +514,7 @@ jobs:
           echo "waiting for Tyk Gateway to initalize..."
           sleep 30
           for i in {1..10}; do
-            if curl -s https://localhost:8080/hello > /dev/null; then
+            if curl -s http://localhost:8080/hello > /dev/null; then
               echo "Gateway is ready!"
               break
             fi
@@ -584,7 +584,7 @@ jobs:
           tags: test-${{ matrix.distro }}-${{ matrix.arch }}
           load: true
       - name: Test the built container image with api functionality test.
-        run: "docker run -d -p8080:8080 --name=test --platform linux/${{ matrix.arch }} --network ${{ job.container.network }} --rm test-${{ matrix.distro }}-${{ matrix.arch }}\necho \"waiting for Tyk Gateway to initalize...\"\nsleep 30\nfor i in {1..10}; do\n  if curl -s https://localhost:8080/hello > /dev/null; then\n    echo \"Gateway is ready!\"\n    break\n  fi\n  echo \"Waiting for gateway to become available... ($i/10)\"\n  sleep 5\n  if [ $i -eq 10 ]; then\n    echo \"Gateway failed to start within timeout\"\n    docker logs test\n    exit 1\n  fi\ndone\n./ci/tests/api-functionality/api_test.sh\nsleep 2\ndocker stop test || true \n"
+        run: "docker run -d -p8080:8080 --name=test --platform linux/${{ matrix.arch }} --network ${{ job.container.network }} --rm test-${{ matrix.distro }}-${{ matrix.arch }}\necho \"waiting for Tyk Gateway to initalize...\"\nsleep 30\nfor i in {1..10}; do\n  if curl -s http://localhost:8080/hello > /dev/null; then\n    echo \"Gateway is ready!\"\n    break\n  fi\n  echo \"Waiting for gateway to become available... ($i/10)\"\n  sleep 5\n  if [ $i -eq 10 ]; then\n    echo \"Gateway failed to start within timeout\"\n    docker logs test\n    exit 1\n  fi\ndone\n./ci/tests/api-functionality/api_test.sh\nsleep 2\ndocker stop test || true \n"
   release-tests:
     needs:
       - goreleaser
