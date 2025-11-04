@@ -508,33 +508,10 @@ jobs:
           push: false
           tags: test-${{ matrix.distro }}-${{ matrix.arch }}
           load: true
-      - name: Test the built container image with api functionality test
+      - name: Test the built container image with api functionality test.
         run: |
           docker run -d -p8080:8080 --name=test --platform linux/${{ matrix.arch }} --network ${{ job.container.network }} --rm test-${{ matrix.distro }}-${{ matrix.arch }}
-          echo "Waiting for Tyk Gateway to initialize..."
-          sleep 15
-          # Add a health check to ensure the gateway is ready
-          for i in {1..10}; do
-            if curl -s http://localhost:8080/hello > /dev/null; then
-              echo "Gateway is ready!"
-              break
-            fi
-            echo "Waiting for gateway to become available... ($i/10)"
-            sleep 5
-            if [ $i -eq 10 ]; then
-              echo "Gateway failed to start within timeout"
-              echo "Checking container status and logs:"
-              docker ps | grep test || true
-              docker logs test
-              exit 1
-            fi
-          done
-          echo "Checking container status and logs:"
-          docker ps | grep test
-          docker logs test
-          echo "Checking if API definitions are loaded:"
-          docker exec test ls -la /opt/tyk-gateway/apps/
-          echo "Running API test:"
+          sleep 2
           ./ci/tests/api-functionality/api_test.sh
           sleep 2
           docker stop test || true
@@ -592,36 +569,8 @@ jobs:
           push: false
           tags: test-${{ matrix.distro }}-${{ matrix.arch }}
           load: true
-      - name: Test the built container image with api functionality test
-        run: |
-          docker run -d -p8080:8080 --name=test --platform linux/${{ matrix.arch }} --network ${{ job.container.network }} --rm test-${{ matrix.distro }}-${{ matrix.arch }}
-          echo "Waiting for Tyk Gateway to initialize..."
-          sleep 15
-          # Add a health check to ensure the gateway is ready
-          for i in {1..10}; do
-            if curl -s http://localhost:8080/hello > /dev/null; then
-              echo "Gateway is ready!"
-              break
-            fi
-            echo "Waiting for gateway to become available... ($i/10)"
-            sleep 5
-            if [ $i -eq 10 ]; then
-              echo "Gateway failed to start within timeout"
-              echo "Checking container status and logs:"
-              docker ps | grep test || true
-              docker logs test
-              exit 1
-            fi
-          done
-          echo "Checking container status and logs:"
-          docker ps | grep test
-          docker logs test
-          echo "Checking if API definitions are loaded:"
-          docker exec test ls -la /opt/tyk-gateway/apps/
-          echo "Running API test:"
-          ./ci/tests/api-functionality/api_test.sh
-          sleep 2
-          docker stop test || true
+      - name: Test the built container image with api functionality test.
+        run: "docker run -d -p8080:8080 --name=test --platform linux/${{ matrix.arch }} --network ${{ job.container.network }} --rm test-${{ matrix.distro }}-${{ matrix.arch }}\nsleep 2\n./ci/tests/api-functionality/api_test.sh\nsleep 2\ndocker stop test || true \n"
   release-tests:
     needs:
       - goreleaser
