@@ -504,7 +504,7 @@ func TestBaseMiddleware_OrgSession_StaleWhileRevalidate(t *testing.T) {
 		ts.Gw.SessionCache.Delete(cacheKey)
 		orgRefreshInProgress.Delete(orgID)
 
-		// First call - should fetch and cache
+		// First call, should fetch and cache
 		session, found := baseMid.OrgSession(orgID)
 		assert.True(t, found, "Should find org session")
 		assert.Equal(t, sess.OrgID, session.OrgID)
@@ -526,7 +526,7 @@ func TestBaseMiddleware_OrgSession_StaleWhileRevalidate(t *testing.T) {
 		// Cache a fresh session
 		baseMid.cacheOrgSession(orgID, orgSession)
 
-		// Call immediately - should return cached
+		// Call immediately, should return cached
 		session, found := baseMid.OrgSession(orgID)
 		assert.True(t, found, "Should find cached session")
 		assert.Equal(t, orgID, session.OrgID)
@@ -591,21 +591,160 @@ func TestBaseMiddleware_OrgSession_StaleWhileRevalidate(t *testing.T) {
 		ts.Gw.SessionCache.Delete(cacheKey)
 		orgRefreshInProgress.Delete(orgID)
 
-		// Store invalid type in cache
 		ts.Gw.SessionCache.Set(cacheKey, "invalid-type", cache.DefaultExpiration)
 
-		// Should handle gracefully and fetch fresh
 		session, found := baseMid.OrgSession(orgID)
 
 		if found {
 			assert.Equal(t, sess.OrgID, session.OrgID, "Should fetch fresh session after invalid cache")
 		}
 
-		// Verify invalid entry was replaced with valid entry
 		cached, exists := ts.Gw.SessionCache.Get(cacheKey)
 		if exists {
 			_, isString := cached.(string)
 			assert.False(t, isString, "Invalid cache entry should have been replaced")
 		}
+	})
+
+	t.Run("soft expiry: should return stale data and trigger background refresh", func(t *testing.T) {
+		cacheKey := "org:" + orgID
+		ts.Gw.SessionCache.Delete(cacheKey)
+		orgRefreshInProgress.Delete(orgID)
+
+		staleTime := time.Now().Add(-15 * time.Minute) // 15 minutes old (past 10 min soft expiry)
+		staleEntry := orgCacheEntry{
+			session:  orgSession.Clone(),
+			cachedAt: staleTime.UnixNano(),
+		}
+		ts.Gw.SessionCache.Set(cacheKey, staleEntry, int64(orgSessionMaxStale))
+
+		session, found := baseMid.OrgSession(orgID)
+		assert.True(t, found, "Should find stale session")
+		assert.Equal(t, orgID, session.OrgID, "Should return stale session data")
+
+		time.Sleep(200 * time.Millisecond)
+
+		cached, exists := ts.Gw.SessionCache.Get(cacheKey)
+		assert.True(t, exists, "Cache should still exist after refresh")
+
+		if exists {
+			entry, ok := cached.(orgCacheEntry)
+			assert.True(t, ok, "Cache entry should be orgCacheEntry type")
+			assert.Greater(t, entry.cachedAt, staleTime.UnixNano(), "Cache timestamp should be updated after refresh")
+		}
+	})
+
+	t.Run("hard expiry: should attempt fresh fetch and fallback to stale on failure", func(t *testing.T) {
+		staleOrgID := "stale-org-" + uuid.New()
+		cacheKey := "org:" + staleOrgID
+		ts.Gw.SessionCache.Delete(cacheKey)
+		orgRefreshInProgress.Delete(staleOrgID)
+
+		veryStaleTime := time.Now().Add(-90 * time.Minute) // 90 minutes old (past 1 hour hard expiry)
+		veryStaleEntry := orgCacheEntry{
+			session:  orgSession.Clone(),
+			cachedAt: veryStaleTime.UnixNano(),
+		}
+		ts.Gw.SessionCache.Set(cacheKey, veryStaleEntry, int64(orgSessionMaxStale))
+
+		// Simulating fetch failure
+		mockNotFound := mockStore{DetailNotFound: true}
+		specNotFound := &APISpec{
+			GlobalConfig: config.Config{
+				EnforceOrgDataAge: true,
+			},
+			OrgSessionManager: mockNotFound,
+		}
+
+		baseMidNotFound := &BaseMiddleware{
+			Spec:   specNotFound,
+			Gw:     ts.Gw,
+			logger: mainLog,
+		}
+
+		session, found := baseMidNotFound.OrgSession(staleOrgID)
+		assert.True(t, found, "Should return stale data when fresh fetch fails")
+		assert.Equal(t, orgID, session.OrgID, "Should return stale session data as fallback")
+	})
+
+	t.Run("hard expiry: should fetch fresh data when available", func(t *testing.T) {
+		freshOrgID := "fresh-org-" + uuid.New()
+		cacheKey := "org:" + freshOrgID
+		ts.Gw.SessionCache.Delete(cacheKey)
+		orgRefreshInProgress.Delete(freshOrgID)
+
+		veryStaleTime := time.Now().Add(-90 * time.Minute) // 90 minutes old
+		veryStaleEntry := orgCacheEntry{
+			session:  orgSession.Clone(),
+			cachedAt: veryStaleTime.UnixNano(),
+		}
+		ts.Gw.SessionCache.Set(cacheKey, veryStaleEntry, int64(orgSessionMaxStale))
+
+		session, found := baseMid.OrgSession(freshOrgID)
+		assert.True(t, found, "Should find session")
+		assert.Equal(t, sess.OrgID, session.OrgID, "Should return fresh session data")
+
+		cached, exists := ts.Gw.SessionCache.Get(cacheKey)
+		assert.True(t, exists, "Cache should be updated")
+
+		if exists {
+			entry, ok := cached.(orgCacheEntry)
+			assert.True(t, ok, "Cache entry should be orgCacheEntry type")
+			assert.Greater(t, entry.cachedAt, veryStaleTime.UnixNano(), "Cache should have fresh timestamp")
+		}
+	})
+
+	t.Run("race condition: should serve stale data when background refresh is in progress", func(t *testing.T) {
+		raceOrgID := "race-org-" + uuid.New()
+		cacheKey := "org:" + raceOrgID
+		ts.Gw.SessionCache.Delete(cacheKey)
+		orgRefreshInProgress.Delete(raceOrgID)
+
+		veryStaleTime := time.Now().Add(-90 * time.Minute)
+		veryStaleEntry := orgCacheEntry{
+			session:  orgSession.Clone(),
+			cachedAt: veryStaleTime.UnixNano(),
+		}
+		ts.Gw.SessionCache.Set(cacheKey, veryStaleEntry, int64(orgSessionMaxStale))
+
+		// Simulate a background refresh already in progress
+		orgRefreshInProgress.Store(raceOrgID, true)
+
+		session, found := baseMid.OrgSession(raceOrgID)
+		assert.True(t, found, "Should return stale data when refresh is in progress")
+		assert.Equal(t, orgID, session.OrgID, "Should return stale session data")
+
+		_, stillInProgress := orgRefreshInProgress.Load(raceOrgID)
+		assert.True(t, stillInProgress, "Refresh flag should still be set")
+
+		orgRefreshInProgress.Delete(raceOrgID)
+	})
+
+	t.Run("soft expiry: should not trigger duplicate background refresh", func(t *testing.T) {
+		dupOrgID := "dup-org-" + uuid.New()
+		cacheKey := "org:" + dupOrgID
+		ts.Gw.SessionCache.Delete(cacheKey)
+		orgRefreshInProgress.Delete(dupOrgID)
+
+		staleTime := time.Now().Add(-15 * time.Minute)
+		staleEntry := orgCacheEntry{
+			session:  orgSession.Clone(),
+			cachedAt: staleTime.UnixNano(),
+		}
+		ts.Gw.SessionCache.Set(cacheKey, staleEntry, int64(orgSessionMaxStale))
+
+		session1, found1 := baseMid.OrgSession(dupOrgID)
+		assert.True(t, found1, "First call should find stale session")
+		assert.NotEmpty(t, session1.OrgID, "Should have an org ID")
+
+		time.Sleep(50 * time.Millisecond)
+
+		session2, found2 := baseMid.OrgSession(dupOrgID)
+		assert.True(t, found2, "Second call should find stale session")
+		assert.NotEmpty(t, session2.OrgID, "Should have an org ID")
+
+		time.Sleep(300 * time.Millisecond)
+
+		orgRefreshInProgress.Delete(dupOrgID)
 	})
 }

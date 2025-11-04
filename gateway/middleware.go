@@ -450,13 +450,27 @@ func (t *BaseMiddleware) OrgSession(orgID string) (user.SessionState, bool) {
 				t.Logger().Debug("Using stale org session, triggering background refresh")
 
 				if _, inProgress := orgRefreshInProgress.LoadOrStore(orgID, true); !inProgress {
-					go t.refreshOrgSession(orgID)
+					go func() {
+						defer func() {
+							if r := recover(); r != nil {
+								t.Logger().Errorf("Panic recovered during org session refresh for org %s: %v", orgID, r)
+							}
+						}()
+						t.refreshOrgSession(orgID)
+					}()
 				}
 
 				return entry.session.Clone(), true
 			}
 
-			// Beyond hard expiry, try to fetch fresh
+			// Beyond hard expiry, check if refresh is already in progress
+			if _, inProgress := orgRefreshInProgress.Load(orgID); inProgress {
+				// Background refresh already running, serve stale data to avoid duplicate fetch
+				t.Logger().Debug("Background refresh in progress, serving stale data beyond hard expiry")
+				return entry.session.Clone(), true
+			}
+
+			// No refresh in progress, try to fetch fresh
 			t.Logger().Debug("Org session beyond hard expiry, attempting fresh fetch")
 			session, found := t.fetchOrgSessionWithTimeout(orgID)
 
