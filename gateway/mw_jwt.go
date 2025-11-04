@@ -907,10 +907,16 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 		}
 	}
 
-	if basePolicyID == "" && len(session.PolicyIDs()) == 0 {
-		k.reportLoginFailure(baseFieldData, r)
-		k.Logger().Error("No policies could be determined from token (no base policy, no valid scopes)")
-		return errors.New("key not authorized: no matching policy found"), http.StatusForbidden
+	if basePolicyID == "" && len(k.Spec.JWTDefaultPolicies) == 0 {
+		if len(session.PolicyIDs()) == 0 {
+			k.reportLoginFailure(baseFieldData, r)
+			k.Logger().Error("No policies could be determined from token (no base policy, no valid scopes)")
+			return errors.New("key not authorized: no matching policy found"), http.StatusForbidden
+		} else if exists && len(k.Spec.GetScopeToPolicyMapping()) == 0 {
+			k.reportLoginFailure(baseFieldData, r)
+			k.Logger().Error("Existing session requires policy in token when no defaults configured")
+			return errors.New("key not authorized: no matching policy found"), http.StatusForbidden
+		}
 	}
 
 	oauthClientID := ""

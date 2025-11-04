@@ -4826,3 +4826,124 @@ func TestJWT_SecurityFix_ExistingSessionNoScopeNoPolicy(t *testing.T) {
 		})
 	})
 }
+
+// TestJWT_TraditionalAuth_ExistingSessionNoPolicyInToken tests the traditional JWT
+// authentication flow (no scope mapping) where existing sessions should be rejected
+// when presented with a token that has no policy claim (prevents privilege escalation).
+// This test replicates the integration test scenario that was failing.
+func TestJWT_TraditionalAuth_ExistingSessionNoPolicyInToken(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	// Create a policy
+	policyID := ts.CreatePolicy(func(p *user.Policy) {
+		p.ID = "active-policy"
+		p.AccessRights = map[string]user.AccessDefinition{
+			"api1": {
+				Limit: user.APILimit{
+					RateLimit: user.RateLimit{
+						Rate: 1000,
+						Per:  60,
+					},
+					QuotaMax: -1,
+				},
+			},
+		}
+		p.Partitions = user.PolicyPartitions{
+			PerAPI: true,
+		}
+	})
+
+	// Build API with traditional JWT auth (NO scope mapping, NO default policies)
+	spec := BuildAPI(func(spec *APISpec) {
+		spec.APIID = "api1"
+		spec.UseKeylessAccess = false
+		spec.EnableJWT = true
+		spec.JWTSigningMethod = RSASign
+		spec.JWTSource = base64.StdEncoding.EncodeToString([]byte(jwtRSAPubKey))
+		spec.JWTIdentityBaseField = "sub"
+		spec.JWTPolicyFieldName = "pol"      // Traditional policy claim field
+		spec.JWTDefaultPolicies = []string{} // NO DEFAULT POLICIES
+		// NO scope mapping configured (traditional JWT)
+		spec.Proxy.ListenPath = "/api1"
+		spec.OrgID = "default"
+	})[0]
+
+	ts.Gw.LoadAPI(spec)
+
+	userID := "test-user-" + uuid.New()
+
+	// Step 1: Create session with valid policy in token
+	t.Run("Step 1: Create session with policy in token", func(t *testing.T) {
+		jwtToken := CreateJWKToken(func(t *jwt.Token) {
+			t.Claims.(jwt.MapClaims)["sub"] = userID
+			t.Claims.(jwt.MapClaims)["pol"] = policyID // Policy in token
+			t.Claims.(jwt.MapClaims)["exp"] = time.Now().Add(time.Hour).Unix()
+		})
+
+		authHeaders := map[string]string{"authorization": jwtToken}
+		_, _ = ts.Run(t, test.TestCase{
+			Headers: authHeaders,
+			Path:    "/api1",
+			Code:    http.StatusOK,
+		})
+
+		// Verify session was created with policy
+		sessionID := ts.Gw.generateToken(spec.OrgID, fmt.Sprintf("%x", md5.Sum([]byte(userID))))
+		session, _ := ts.Gw.GlobalSessionManager.SessionDetail(spec.OrgID, sessionID, false)
+		policyIDs := session.PolicyIDs()
+		assert.Equal(t, []string{policyID}, policyIDs, "Expected policy to be applied")
+	})
+
+	// Step 2: SECURITY TEST - Token without policy claim on existing session should be REJECTED
+	// This is the integration test scenario that was failing
+	t.Run("Step 2: SECURITY - Reject token without policy for existing session", func(t *testing.T) {
+		jwtTokenNoPolicy := CreateJWKToken(func(t *jwt.Token) {
+			t.Claims.(jwt.MapClaims)["sub"] = userID // Same user
+			// NO "pol" claim
+			t.Claims.(jwt.MapClaims)["exp"] = time.Now().Add(time.Hour).Unix()
+		})
+
+		authHeaders := map[string]string{"authorization": jwtTokenNoPolicy}
+		_, _ = ts.Run(t, test.TestCase{
+			Headers:   authHeaders,
+			Path:      "/api1",
+			Code:      http.StatusForbidden, // Must be rejected!
+			BodyMatch: `key not authorized: no matching policy found`,
+		})
+	})
+
+	// Step 3: Verify session can still be accessed with valid token (with policy)
+	t.Run("Step 3: Valid token with policy still works", func(t *testing.T) {
+		jwtToken := CreateJWKToken(func(t *jwt.Token) {
+			t.Claims.(jwt.MapClaims)["sub"] = userID
+			t.Claims.(jwt.MapClaims)["pol"] = policyID // Policy in token
+			t.Claims.(jwt.MapClaims)["exp"] = time.Now().Add(time.Hour).Unix()
+		})
+
+		authHeaders := map[string]string{"authorization": jwtToken}
+		_, _ = ts.Run(t, test.TestCase{
+			Headers: authHeaders,
+			Path:    "/api1",
+			Code:    http.StatusOK,
+		})
+	})
+
+	// Step 4: First-time request with no policy should also be rejected
+	t.Run("Step 4: New user with no policy in token is rejected", func(t *testing.T) {
+		newUserID := "new-user-" + uuid.New()
+		jwtTokenNoPolicy := CreateJWKToken(func(t *jwt.Token) {
+			t.Claims.(jwt.MapClaims)["sub"] = newUserID
+			// NO "pol" claim
+			t.Claims.(jwt.MapClaims)["exp"] = time.Now().Add(time.Hour).Unix()
+		})
+
+		authHeaders := map[string]string{"authorization": jwtTokenNoPolicy}
+		_, _ = ts.Run(t, test.TestCase{
+			Headers:   authHeaders,
+			Path:      "/api1",
+			Code:      http.StatusForbidden,
+			BodyMatch: `key not authorized: no matching policy found`,
+		})
+	})
+}
