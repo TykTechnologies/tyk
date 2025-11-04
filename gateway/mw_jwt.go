@@ -718,36 +718,39 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 		// We need a base policy as a template, either get it from the token itself OR a proxy client ID within Tyk
 		basePolicyID, foundPolicy = k.getBasePolicyID(r, claims)
 		if !foundPolicy {
-			if len(k.Spec.JWTDefaultPolicies) == 0 {
-				k.reportLoginFailure(baseFieldData, r)
-				return errors.New("key not authorized: no matching policy found"), http.StatusForbidden
-			} else {
+			// Only use default policies if configured - scope mapping may provide policies later
+			if len(k.Spec.JWTDefaultPolicies) > 0 {
 				isDefaultPol = true
 				basePolicyID = k.Spec.JWTDefaultPolicies[0]
 			}
 		}
 
-		session, err = k.Gw.generateSessionFromPolicy(basePolicyID,
-			k.Spec.OrgID,
-			true)
+		// Only generate from policy if we have a base policy ID
+		if basePolicyID != "" {
+			session, err = k.Gw.generateSessionFromPolicy(basePolicyID,
+				k.Spec.OrgID,
+				true)
 
-		// If base policy is one of the defaults, apply other ones as well
-		if isDefaultPol {
-			for _, pol := range k.Spec.JWTDefaultPolicies {
-				if !contains(session.ApplyPolicies, pol) {
-					session.ApplyPolicies = append(session.ApplyPolicies, pol)
+			if isDefaultPol {
+				for _, pol := range k.Spec.JWTDefaultPolicies {
+					if !contains(session.ApplyPolicies, pol) {
+						session.ApplyPolicies = append(session.ApplyPolicies, pol)
+					}
 				}
 			}
-		}
 
-		if err := k.ApplyPolicies(&session); err != nil {
-			return errors.New("failed to create key: " + err.Error()), http.StatusInternalServerError
-		}
+			if err := k.ApplyPolicies(&session); err != nil {
+				return errors.New("failed to create key: " + err.Error()), http.StatusInternalServerError
+			}
 
-		if err != nil {
-			k.reportLoginFailure(baseFieldData, r)
-			k.Logger().Error("Could not find a valid policy to apply to this token!")
-			return errors.New("key not authorized: no matching policy"), http.StatusForbidden
+			if err != nil {
+				k.reportLoginFailure(baseFieldData, r)
+				k.Logger().Error("Could not find a valid policy to apply to this token!")
+				return errors.New("key not authorized: no matching policy"), http.StatusForbidden
+			}
+		} else {
+			session = user.SessionState{OrgID: k.Spec.OrgID}
+			err = nil
 		}
 
 		//override session expiry with JWT if longer lived
@@ -767,22 +770,23 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 		// extract policy ID from JWT token
 		basePolicyID, foundPolicy = k.getBasePolicyID(r, claims)
 		if !foundPolicy {
-			if len(k.Spec.JWTDefaultPolicies) == 0 {
-				k.reportLoginFailure(baseFieldData, r)
-				return errors.New("key not authorized: no matching policy found"), http.StatusForbidden
-			} else {
+			if len(k.Spec.JWTDefaultPolicies) > 0 {
 				isDefaultPol = true
 				basePolicyID = k.Spec.JWTDefaultPolicies[0]
 			}
 		}
-		// check if we received a valid policy ID in claim
-		k.Gw.policiesMu.RLock()
-		policy, ok := k.Gw.policiesByID[basePolicyID]
-		k.Gw.policiesMu.RUnlock()
-		if !ok {
-			k.reportLoginFailure(baseFieldData, r)
-			k.Logger().Error("Policy ID found is invalid!")
-			return errors.New("key not authorized: no matching policy"), http.StatusForbidden
+		// check if we received a valid policy ID in claim (skip if no base policy for scope-only auth)
+		var policy user.Policy
+		var ok bool
+		if basePolicyID != "" {
+			k.Gw.policiesMu.RLock()
+			policy, ok = k.Gw.policiesByID[basePolicyID]
+			k.Gw.policiesMu.RUnlock()
+			if !ok {
+				k.reportLoginFailure(baseFieldData, r)
+				k.Logger().Error("Policy ID found is invalid!")
+				return errors.New("key not authorized: no matching policy"), http.StatusForbidden
+			}
 		}
 		// check if token for this session was switched to another valid policy
 		pols := session.PolicyIDs()
@@ -810,7 +814,7 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 			}
 		}
 
-		if !contains(pols, basePolicyID) || defaultPolicyListChanged {
+		if basePolicyID != "" && (!contains(pols, basePolicyID) || defaultPolicyListChanged) {
 			if policy.OrgID != k.Spec.OrgID {
 				k.reportLoginFailure(baseFieldData, r)
 				k.Logger().Error("Policy ID found is invalid (wrong ownership)!")
@@ -855,11 +859,13 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 		}
 
 		if scope := getScopeFromClaim(claims, scopeClaimName); len(scope) > 0 {
-			polIDs := []string{
-				basePolicyID, // add base policy as a first one
+			// Start with base policy if it exists
+			polIDs := []string{}
+			if basePolicyID != "" {
+				polIDs = []string{basePolicyID}
 			}
 
-			// // If specified, scopes should not use default policy
+			// If specified, scopes should not use default policy
 			if isDefaultPol {
 				polIDs = []string{}
 			}
@@ -894,6 +900,12 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 			}
 
 		}
+	}
+
+	if basePolicyID == "" && len(session.PolicyIDs()) == 0 {
+		k.reportLoginFailure(baseFieldData, r)
+		k.Logger().Error("No policies could be determined from token (no base policy, no valid scopes)")
+		return errors.New("key not authorized: no matching policy found"), http.StatusForbidden
 	}
 
 	oauthClientID := ""
