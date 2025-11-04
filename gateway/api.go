@@ -1099,9 +1099,12 @@ func (gw *Gateway) handleAddApi(r *http.Request, fs afero.Fs, oasEndpoint bool) 
 	}
 
 	if oasEndpoint {
-		newAPIURL := getAPIURL(newDef, gw.GetConfig())
+		versioningParams := extractVersioningParams(
+			versionParams.Get(lib.BaseAPIID),
+			versionParams.Get(lib.NewVersionName),
+		)
 
-		if err := oasObj.AddServers(newAPIURL); err != nil {
+		if err := gw.handleOASServersForNewAPI(&newDef, &oasObj, versioningParams); err != nil {
 			return apiError(err.Error()), http.StatusBadRequest
 		}
 
@@ -1192,7 +1195,11 @@ func (gw *Gateway) handleUpdateApi(apiID string, r *http.Request, fs afero.Fs, o
 	}
 
 	if oasEndpoint && spec.IsOAS {
-		updateOASServers(spec, gw.GetConfig(), &newDef, &oasObj)
+		// Handle OAS server regeneration and cascade updates for API update
+		if err := gw.handleOASServersForUpdate(spec, &newDef, &oasObj); err != nil {
+			return apiError(err.Error()), http.StatusBadRequest
+		}
+
 		newDef.IsOAS = true
 
 		err, errCode := gw.writeOASAndAPIDefToFile(fs, &newDef, &oasObj)
@@ -1513,7 +1520,23 @@ func (gw *Gateway) apiOASPatchHandler(w http.ResponseWriter, r *http.Request) {
 		tykExtToPatch = oasObjToPatch.GetTykExtension()
 	}
 
-	oasObj.Servers = oas.RetainOldServerURL(oasObjToPatch.Servers, oasObj.Servers)
+	config := buildServerRegenerationConfig(gw.GetConfig())
+	existingUserServers := oas.ExtractUserServers(
+		oasObjToPatch.Servers,
+		existingAPISpec.APIDefinition,
+		nil,
+		config,
+		"",
+	)
+
+	patchUserServers := oasObj.Servers
+
+	userServersToKeep := patchUserServers
+	if len(patchUserServers) == 0 {
+		userServersToKeep = existingUserServers
+	}
+
+	oasObj.Servers = userServersToKeep
 
 	oasObjToPatch.T = oasObj.T
 
