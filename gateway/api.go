@@ -3124,6 +3124,19 @@ func ctxSetDoNotTrack(r *http.Request, b bool) {
 	setCtxValue(r, ctx.DoNotTrackThisEndpoint, b)
 }
 
+func ctxSetRequestStartTime(r *http.Request, t time.Time) {
+	setCtxValue(r, ctx.RequestStartTime, t)
+}
+
+func ctxGetRequestStartTime(r *http.Request) time.Time {
+	if v := r.Context().Value(ctx.RequestStartTime); v != nil {
+		if t, ok := v.(time.Time); ok {
+			return t
+		}
+	}
+	return time.Time{}
+}
+
 func ctxGetVersionInfo(r *http.Request) *apidef.VersionInfo {
 	if v := r.Context().Value(ctx.VersionData); v != nil {
 		return v.(*apidef.VersionInfo)
