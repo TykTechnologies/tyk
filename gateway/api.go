@@ -1520,12 +1520,12 @@ func (gw *Gateway) apiOASPatchHandler(w http.ResponseWriter, r *http.Request) {
 		tykExtToPatch = oasObjToPatch.GetTykExtension()
 	}
 
-	config := buildServerRegenerationConfig(gw.GetConfig())
+	serverConfig := buildServerRegenerationConfig(gw.GetConfig())
 	existingUserServers := oas.ExtractUserServers(
 		oasObjToPatch.Servers,
 		existingAPISpec.APIDefinition,
 		nil,
-		config,
+		serverConfig,
 		"",
 	)
 

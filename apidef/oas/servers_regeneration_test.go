@@ -1318,7 +1318,8 @@ func TestExtractUserServers(t *testing.T) {
 			if len(tt.expected) > 0 {
 				// Regenerate Tyk servers to verify they're not in the result
 				tempOAS := &OAS{T: openapi3.T{Servers: openapi3.Servers{}}}
-				tempOAS.RegenerateServers(tt.apiDef, nil, tt.baseAPI, nil, tt.config, tt.versionName)
+				err := tempOAS.RegenerateServers(tt.apiDef, nil, tt.baseAPI, nil, tt.config, tt.versionName)
+				require.NoError(t, err)
 
 				for _, tykServer := range tempOAS.Servers {
 					tykNormalized := normalizeServerURL(tykServer.URL)

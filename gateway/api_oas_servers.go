@@ -24,8 +24,8 @@ func buildServerRegenerationConfig(conf config.Config) oas.ServerRegenerationCon
 	}
 
 	// Add port unless it's default (80 for http, 443 for https)
-	if !(protocol == "http://" && conf.ListenPort == 80) &&
-		!(protocol == "https://" && conf.ListenPort == 443) {
+	if (protocol != "http://" || conf.ListenPort != 80) &&
+		(protocol != "https://" || conf.ListenPort != 443) {
 		defaultHost = defaultHost + ":" + strconv.Itoa(conf.ListenPort)
 	}
 
@@ -45,7 +45,7 @@ func (gw *Gateway) regenerateOASServers(
 	baseAPI *APISpec,
 	versionName string,
 ) error {
-	config := buildServerRegenerationConfig(gw.GetConfig())
+	serverConfig := buildServerRegenerationConfig(gw.GetConfig())
 
 	var oldAPIData *apidef.APIDefinition
 	if spec != nil {
@@ -64,7 +64,7 @@ func (gw *Gateway) regenerateOASServers(
 		oldAPIData,
 		baseAPIData,
 		oldBaseAPIData,
-		config,
+		serverConfig,
 		versionName,
 	)
 }
@@ -88,7 +88,7 @@ func (gw *Gateway) updateChildAPIsServersGW(newBaseAPISpec, oldBaseAPISpec *APIS
 	log.Infof("Updating server URLs for %d child APIs of base API %s",
 		len(newBaseAPI.VersionDefinition.Versions), newBaseAPI.APIID)
 
-	config := buildServerRegenerationConfig(gw.GetConfig())
+	serverConfig := buildServerRegenerationConfig(gw.GetConfig())
 
 	for versionName, childAPIID := range newBaseAPI.VersionDefinition.Versions {
 		if childAPIID == newBaseAPI.APIID {
@@ -112,7 +112,7 @@ func (gw *Gateway) updateChildAPIsServersGW(newBaseAPISpec, oldBaseAPISpec *APIS
 			childSpec.APIDefinition,
 			newBaseAPI,
 			oldBaseAPI,
-			config,
+			serverConfig,
 			versionName,
 		)
 		if err != nil {
