@@ -12,6 +12,6 @@ permissions:
 
 jobs:
   branch-suggestions:
-    uses: TykTechnologies/github-actions/.github/workflows/branch-suggestion.yml@main
+    uses: TykTechnologies/github-actions/.github/workflows/branch-suggestion.yml@6569194c3a9748ca564130cad84fe3c0d52250cc
     secrets:
       JIRA_TOKEN: ${{ secrets.JIRA_TOKEN }}
