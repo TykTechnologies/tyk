@@ -19,7 +19,7 @@
   },
   "proxy": {
     "listen_path": "/smoke-test-api/",
-    "target_url": "http://httpbin.org/get",
+    "target_url": "http://httpbin/get",
     "strip_listen_path": true
   },
   "active": true

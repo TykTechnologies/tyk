@@ -1,4 +1,8 @@
 services:
+  httpbin:
+    image: kennethreitz/httpbin
+    platform: linux/amd64
+
   redis:
     image: redis:6.0-alpine
     healthcheck:
