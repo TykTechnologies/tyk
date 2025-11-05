@@ -461,8 +461,12 @@ jobs:
     services:
       httpbin.org:
         image: kennethreitz/httpbin
+        ports:
+          - 9999:80
       redis:
         image: redis:6.0-alpine
+        ports:
+          - 6379:6379
         options: >-
           --health-cmd "redis-cli ping"
           --health-interval 5s
@@ -517,7 +521,7 @@ jobs:
           load: true
       - name: Test the built container image with api functionality test.
         run: |
-          docker run -d -p8080:8080 --name=test --platform linux/${{ matrix.arch }} --network ${{ job.container.network }} --rm test-${{ matrix.distro }}-${{ matrix.arch }}
+          docker run -d -p8080:8080 --name=test --platform linux/${{ matrix.arch }} --network host --rm test-${{ matrix.distro }}-${{ matrix.arch }}
           sleep 2
           ./ci/tests/api-functionality/api_test.sh
           sleep 2
@@ -526,8 +530,12 @@ jobs:
     services:
       httpbin.org:
         image: kennethreitz/httpbin
+        ports:
+          - 9999:80
       redis:
         image: redis:6.0-alpine
+        ports:
+          - 6379:6379
         options: >-
           --health-cmd "redis-cli ping"
           --health-interval 5s
@@ -584,7 +592,7 @@ jobs:
           tags: test-${{ matrix.distro }}-${{ matrix.arch }}
           load: true
       - name: Test the built container image with api functionality test.
-        run: "docker run -d -p8080:8080 --name=test --platform linux/${{ matrix.arch }} --network ${{ job.container.network }} --rm test-${{ matrix.distro }}-${{ matrix.arch }}\nsleep 2\n./ci/tests/api-functionality/api_test.sh\nsleep 2\ndocker stop test || true \n"
+        run: "docker run -d -p8080:8080 --name=test --platform linux/${{ matrix.arch }} --network host --rm test-${{ matrix.distro }}-${{ matrix.arch }}\nsleep 2\n./ci/tests/api-functionality/api_test.sh\nsleep 2\ndocker stop test || true \n"
   release-tests:
     needs:
       - goreleaser
