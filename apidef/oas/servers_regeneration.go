@@ -409,6 +409,43 @@ func ShouldUpdateChildAPIs(newAPI, oldAPI *apidef.APIDefinition) bool {
 	return false
 }
 
+// ShouldUpdateOldDefaultChild determines if the old default child API needs server regeneration
+// when creating a new child version with set_default=true. This is necessary to remove the
+// fallback URL from the old default child since it's no longer the default.
+//
+// Returns true when:
+// - A new version is being set as default (setDefault=true)
+// - There was a previous default version
+// - The default version actually changed
+// - The old default wasn't the base API itself ("Self")
+func ShouldUpdateOldDefaultChild(
+	setDefault bool,
+	oldDefaultVersion string,
+	newDefaultVersion string,
+) bool {
+	// Only update if set_default=true was explicitly passed
+	if !setDefault {
+		return false
+	}
+
+	// Only update if there was a previous default
+	if oldDefaultVersion == "" {
+		return false
+	}
+
+	// Only update if the default actually changed
+	if oldDefaultVersion == newDefaultVersion {
+		return false
+	}
+
+	// Don't try to update if the old default was the base API itself (special case)
+	if oldDefaultVersion == apidef.Self {
+		return false
+	}
+
+	return true
+}
+
 // ExtractUserServers extracts user provided servers from an existing OAS API
 // by regenerating what the Tyk servers should be and filtering them out.
 func ExtractUserServers(

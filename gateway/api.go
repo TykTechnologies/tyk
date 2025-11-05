@@ -1126,6 +1126,10 @@ func (gw *Gateway) handleAddApi(r *http.Request, fs afero.Fs, oasEndpoint bool) 
 
 	if !versionParams.IsEmpty(lib.BaseAPIID) {
 		baseAPI := gw.getApiSpec(versionParams.Get(lib.BaseAPIID))
+
+		// Capture the old default version BEFORE updating the base API
+		oldDefaultVersion := baseAPI.VersionDefinition.Default
+
 		baseAPI.VersionDefinition = lib.ConfigureVersionDefinition(baseAPI.VersionDefinition, versionParams, newDef.APIID)
 
 		if baseAPI.IsOAS {
@@ -1138,6 +1142,15 @@ func (gw *Gateway) handleAddApi(r *http.Request, fs afero.Fs, oasEndpoint bool) 
 			err, _ := gw.writeToFile(fs, baseAPI.APIDefinition, baseAPI.APIID)
 			if err != nil {
 				log.WithError(err).Errorf("Error occurred while updating base API with id: %s", baseAPI.APIID)
+			}
+		}
+
+		// Update old default child's servers if needed (removes fallback URL)
+		setDefault := !versionParams.IsEmpty(lib.SetDefault) && versionParams.Get(lib.SetDefault) == "true"
+		if oas.ShouldUpdateOldDefaultChild(setDefault, oldDefaultVersion, baseAPI.VersionDefinition.Default) {
+			if err := gw.updateOldDefaultChildServersGW(oldDefaultVersion, baseAPI, fs); err != nil {
+				log.WithError(err).Warn("Failed to update old default child API servers")
+				// Don't fail the whole operation if child update fails
 			}
 		}
 	}

@@ -2,7 +2,8 @@ package gateway
 
 import (
 	"strconv"
-	"sync"
+
+	"github.com/spf13/afero"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/apidef/oas"
@@ -91,55 +92,115 @@ func (gw *Gateway) updateChildAPIsServersGW(newBaseAPISpec, oldBaseAPISpec *APIS
 
 	serverConfig := buildServerRegenerationConfig(gw.GetConfig())
 
-	// Use WaitGroup to process child APIs in parallel
-	var wg sync.WaitGroup
-
 	for versionName, childAPIID := range newBaseAPI.VersionDefinition.Versions {
 		if childAPIID == newBaseAPI.APIID {
 			continue
 		}
 
-		// Capture loop variables for goroutine
-		versionName := versionName
-		childAPIID := childAPIID
+		childSpec := gw.getApiSpec(childAPIID)
+		if childSpec == nil {
+			log.Warnf("Child API %s (version %s) not found in loaded APIs", childAPIID, versionName)
+			continue
+		}
 
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		if !childSpec.IsOAS {
+			log.Debugf("Skipping non-OAS child API %s", childAPIID)
+			continue
+		}
 
-			childSpec := gw.getApiSpec(childAPIID)
-			if childSpec == nil {
-				log.Warnf("Child API %s (version %s) not found in loaded APIs", childAPIID, versionName)
-				return
-			}
+		// Regenerate child's servers with new base API configuration
+		err := childSpec.OAS.RegenerateServers(
+			childSpec.APIDefinition,
+			childSpec.APIDefinition,
+			newBaseAPI,
+			oldBaseAPI,
+			serverConfig,
+			versionName,
+		)
+		if err != nil {
+			log.WithError(err).Warnf("Failed to update servers for child API %s", childAPIID)
+			continue
+		}
 
-			if !childSpec.IsOAS {
-				log.Debugf("Skipping non-OAS child API %s", childAPIID)
-				return
-			}
+		childSpec.OAS.Fill(*childSpec.APIDefinition)
 
-			// Regenerate child's servers with new base API configuration
-			err := childSpec.OAS.RegenerateServers(
-				childSpec.APIDefinition,
-				childSpec.APIDefinition,
-				newBaseAPI,
-				oldBaseAPI,
-				serverConfig,
-				versionName,
-			)
-			if err != nil {
-				log.WithError(err).Warnf("Failed to update servers for child API %s", childAPIID)
-				return
-			}
-
-			childSpec.OAS.Fill(*childSpec.APIDefinition)
-
-			log.Debugf("Successfully updated servers for child API %s (version %s)", childAPIID, versionName)
-		}()
+		log.Debugf("Successfully updated servers for child API %s (version %s)", childAPIID, versionName)
 	}
 
-	// Wait for all child API updates to complete
-	wg.Wait()
+	return nil
+}
+
+// updateOldDefaultChildServersGW updates the server URLs for the old default child API
+// when a new version is set as default. This removes the fallback URL from the old default
+// since it's no longer the default version.
+func (gw *Gateway) updateOldDefaultChildServersGW(
+	oldDefaultVersion string,
+	baseAPISpec *APISpec,
+	fs afero.Fs,
+) error {
+	baseAPI := baseAPISpec.APIDefinition
+
+	// Find the old default child's API ID
+	oldDefaultChildID, found := baseAPI.VersionDefinition.Versions[oldDefaultVersion]
+	if !found {
+		log.Warnf("Old default version %s not found in base API %s versions map",
+			oldDefaultVersion, baseAPI.APIID)
+		return nil // Non-fatal: version might have been deleted
+	}
+
+	// Skip if this is the base API itself
+	if oldDefaultChildID == baseAPI.APIID {
+		return nil
+	}
+
+	log.Infof("Updating servers for old default child API %s (version %s) of base API %s",
+		oldDefaultChildID, oldDefaultVersion, baseAPI.APIID)
+
+	// Fetch the old default child API from loaded specs
+	childSpec := gw.getApiSpec(oldDefaultChildID)
+	if childSpec == nil {
+		log.Warnf("Old default child API %s not found in loaded APIs", oldDefaultChildID)
+		return nil // Non-fatal: API might not be loaded yet
+	}
+
+	// Only update if child is an OAS API
+	if !childSpec.IsOAS {
+		log.Debugf("Skipping non-OAS old default child API %s", oldDefaultChildID)
+		return nil
+	}
+
+	serverConfig := buildServerRegenerationConfig(gw.GetConfig())
+
+	// Create a temporary base API with the OLD Default value for correct old URL computation
+	oldBaseAPIState := *baseAPI
+	oldBaseAPIState.VersionDefinition.Default = oldDefaultVersion
+
+	// Regenerate servers with the updated base API state (new Default value)
+	// This will cause shouldAddFallbackURL to return false for the old default
+	err := childSpec.OAS.RegenerateServers(
+		childSpec.APIDefinition,
+		childSpec.APIDefinition,
+		baseAPI,
+		&oldBaseAPIState,
+		serverConfig,
+		oldDefaultVersion,
+	)
+	if err != nil {
+		log.WithError(err).Warnf("Failed to regenerate servers for old default child API %s", oldDefaultChildID)
+		return err
+	}
+
+	childSpec.OAS.Fill(*childSpec.APIDefinition)
+
+	// Write the updated child API to filesystem
+	err, _ = gw.writeToFile(fs, childSpec.APIDefinition, oldDefaultChildID)
+	if err != nil {
+		log.WithError(err).Warnf("Failed to save old default child API %s after updating servers", oldDefaultChildID)
+		return err
+	}
+
+	log.Infof("Successfully updated servers for old default child API %s (version %s)",
+		oldDefaultChildID, oldDefaultVersion)
 
 	return nil
 }
