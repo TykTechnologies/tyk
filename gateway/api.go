@@ -1521,13 +1521,17 @@ func (gw *Gateway) apiOASPatchHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	serverConfig := buildServerRegenerationConfig(gw.GetConfig())
-	existingUserServers := oas.ExtractUserServers(
+	existingUserServers, err := oas.ExtractUserServers(
 		oasObjToPatch.Servers,
 		existingAPISpec.APIDefinition,
 		nil,
 		serverConfig,
 		"",
 	)
+	if err != nil {
+		doJSONWrite(w, http.StatusInternalServerError, apiError(err.Error()))
+		return
+	}
 
 	patchUserServers := oasObj.Servers
 

@@ -2,6 +2,7 @@ package gateway
 
 import (
 	"strconv"
+	"sync"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/apidef/oas"
@@ -90,40 +91,55 @@ func (gw *Gateway) updateChildAPIsServersGW(newBaseAPISpec, oldBaseAPISpec *APIS
 
 	serverConfig := buildServerRegenerationConfig(gw.GetConfig())
 
+	// Use WaitGroup to process child APIs in parallel
+	var wg sync.WaitGroup
+
 	for versionName, childAPIID := range newBaseAPI.VersionDefinition.Versions {
 		if childAPIID == newBaseAPI.APIID {
 			continue
 		}
 
-		childSpec := gw.getApiSpec(childAPIID)
-		if childSpec == nil {
-			log.Warnf("Child API %s (version %s) not found in loaded APIs", childAPIID, versionName)
-			continue
-		}
+		// Capture loop variables for goroutine
+		versionName := versionName
+		childAPIID := childAPIID
 
-		if !childSpec.IsOAS {
-			log.Debugf("Skipping non-OAS child API %s", childAPIID)
-			continue
-		}
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
 
-		// Regenerate child's servers with new base API configuration
-		err := childSpec.OAS.RegenerateServers(
-			childSpec.APIDefinition,
-			childSpec.APIDefinition,
-			newBaseAPI,
-			oldBaseAPI,
-			serverConfig,
-			versionName,
-		)
-		if err != nil {
-			log.WithError(err).Warnf("Failed to update servers for child API %s", childAPIID)
-			continue
-		}
+			childSpec := gw.getApiSpec(childAPIID)
+			if childSpec == nil {
+				log.Warnf("Child API %s (version %s) not found in loaded APIs", childAPIID, versionName)
+				return
+			}
 
-		childSpec.OAS.Fill(*childSpec.APIDefinition)
+			if !childSpec.IsOAS {
+				log.Debugf("Skipping non-OAS child API %s", childAPIID)
+				return
+			}
 
-		log.Debugf("Successfully updated servers for child API %s (version %s)", childAPIID, versionName)
+			// Regenerate child's servers with new base API configuration
+			err := childSpec.OAS.RegenerateServers(
+				childSpec.APIDefinition,
+				childSpec.APIDefinition,
+				newBaseAPI,
+				oldBaseAPI,
+				serverConfig,
+				versionName,
+			)
+			if err != nil {
+				log.WithError(err).Warnf("Failed to update servers for child API %s", childAPIID)
+				return
+			}
+
+			childSpec.OAS.Fill(*childSpec.APIDefinition)
+
+			log.Debugf("Successfully updated servers for child API %s (version %s)", childAPIID, versionName)
+		}()
 	}
+
+	// Wait for all child API updates to complete
+	wg.Wait()
 
 	return nil
 }

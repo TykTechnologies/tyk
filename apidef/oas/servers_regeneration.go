@@ -236,10 +236,15 @@ func determineHosts(apiData *apidef.APIDefinition, config ServerRegenerationConf
 	if len(config.EdgeEndpoints) > 0 && len(apiData.Tags) > 0 {
 		hosts := make([]string, 0, len(config.EdgeEndpoints))
 		for _, endpoint := range config.EdgeEndpoints {
+			endpointTagsMap := make(map[string]bool, len(endpoint.Tags))
+			for _, tag := range endpoint.Tags {
+				endpointTagsMap[tag] = true
+			}
+
 			for _, apiTag := range apiData.Tags {
-				if containsString(endpoint.Tags, apiTag) {
+				if endpointTagsMap[apiTag] {
 					hosts = append(hosts, endpoint.Endpoint)
-					break // Only add each endpoint once
+					break
 				}
 			}
 		}
@@ -412,16 +417,16 @@ func ExtractUserServers(
 	baseAPI *apidef.APIDefinition,
 	config ServerRegenerationConfig,
 	versionName string,
-) openapi3.Servers {
+) (openapi3.Servers, error) {
 	if len(existingServers) == 0 {
-		return openapi3.Servers{}
+		return openapi3.Servers{}, nil
 	}
 
 	tempOAS := &OAS{T: openapi3.T{Servers: openapi3.Servers{}}}
 
 	err := tempOAS.RegenerateServers(apiDef, nil, baseAPI, nil, config, versionName)
 	if err != nil {
-		return existingServers
+		return nil, fmt.Errorf("failed to regenerate servers for user server extraction: %w", err)
 	}
 
 	// Build a map of normalized Tyk URLs for fast lookup
@@ -440,5 +445,5 @@ func ExtractUserServers(
 		}
 	}
 
-	return userServers
+	return userServers, nil
 }
