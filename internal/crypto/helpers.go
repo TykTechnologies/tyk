@@ -172,19 +172,27 @@ func AddCACertificatesFromChainToPool(pool *x509.CertPool, cert *tls.Certificate
 	// For backward compatibility and certificate pinning use cases, we add single certificates
 	// to the pool regardless of IsCA flag.
 	if len(cert.Certificate) == 1 {
-		parsedCert, err := x509.ParseCertificate(cert.Certificate[0])
-		if err != nil {
-			logrus.WithFields(logrus.Fields{
-				"index": 0,
-				"error": err,
-			}).Error("Failed to parse certificate")
-			return
+		var certToAdd *x509.Certificate
+		
+		if cert.Leaf != nil {
+			certToAdd = cert.Leaf
+		} else {
+			// Only re-parse if Leaf is not set
+			parsedCert, err := x509.ParseCertificate(cert.Certificate[0])
+			if err != nil {
+				logrus.WithFields(logrus.Fields{
+					"index": 0,
+					"error": err,
+				}).Error("Failed to parse certificate")
+				return
+			}
+			certToAdd = parsedCert
 		}
 
-		pool.AddCert(parsedCert)
+		pool.AddCert(certToAdd)
 		logrus.WithFields(logrus.Fields{
-			"subject": parsedCert.Subject.CommonName,
-			"isCA":    parsedCert.IsCA,
+			"subject": certToAdd.Subject.CommonName,
+			"isCA":    certToAdd.IsCA,
 		}).Debug("Added certificate to pool")
 		return
 	}
