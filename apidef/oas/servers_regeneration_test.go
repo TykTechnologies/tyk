@@ -1291,13 +1291,14 @@ func TestExtractUserServers(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			result := ExtractUserServers(
+			result, err := ExtractUserServers(
 				tt.existingServers,
 				tt.apiDef,
 				tt.baseAPI,
 				tt.config,
 				tt.versionName,
 			)
+			require.NoError(t, err)
 
 			// Check that we got the expected number of user servers
 			assert.Equal(t, len(tt.expected), len(result), tt.description)
@@ -1359,7 +1360,8 @@ func TestExtractUserServers_EdgeCases(t *testing.T) {
 			DefaultHost: "localhost:8080",
 		}
 
-		result := ExtractUserServers(existingServers, apiDef, nil, config, "")
+		result, err := ExtractUserServers(existingServers, apiDef, nil, config, "")
+		require.NoError(t, err)
 
 		require.Equal(t, 3, len(result))
 		assert.Equal(t, "https://primary.com/api", result[0].URL)
@@ -1387,7 +1389,8 @@ func TestExtractUserServers_EdgeCases(t *testing.T) {
 		}
 
 		// baseAPI is nil - should still work for non-versioned APIs
-		result := ExtractUserServers(existingServers, apiDef, nil, config, "")
+		result, err := ExtractUserServers(existingServers, apiDef, nil, config, "")
+		require.NoError(t, err)
 
 		require.Equal(t, 1, len(result))
 		assert.Equal(t, "https://user.com/api", result[0].URL)
@@ -1413,7 +1416,8 @@ func TestExtractUserServers_EdgeCases(t *testing.T) {
 		}
 
 		// Empty version name for non-versioned API
-		result := ExtractUserServers(existingServers, apiDef, nil, config, "")
+		result, err := ExtractUserServers(existingServers, apiDef, nil, config, "")
+		require.NoError(t, err)
 
 		require.Equal(t, 1, len(result))
 		assert.Equal(t, "https://user.com/api", result[0].URL)
@@ -1439,7 +1443,8 @@ func TestExtractUserServers_EdgeCases(t *testing.T) {
 			DefaultHost: "localhost:8080",
 		}
 
-		result := ExtractUserServers(existingServers, apiDef, nil, config, "")
+		result, err := ExtractUserServers(existingServers, apiDef, nil, config, "")
+		require.NoError(t, err)
 
 		require.Equal(t, 2, len(result))
 
