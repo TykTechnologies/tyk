@@ -1,5 +1,5 @@
 services:
-  httpbin:
+  httpbin.org:
     image: kennethreitz/httpbin
     platform: linux/amd64
 
