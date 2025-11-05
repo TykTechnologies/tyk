@@ -1,10 +1,13 @@
 package oasutil_test
 
 import (
-	"github.com/TykTechnologies/kin-openapi/openapi3"
-	"github.com/TykTechnologies/tyk/internal/oasutil"
-	"github.com/stretchr/testify/assert"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+
+	"github.com/TykTechnologies/kin-openapi/openapi3"
+
+	"github.com/TykTechnologies/tyk/internal/oasutil"
 )
 
 func TestParseServerUrl(t *testing.T) {

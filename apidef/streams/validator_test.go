@@ -7,14 +7,16 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/TykTechnologies/kin-openapi/openapi3"
 	"github.com/buger/jsonparser"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	_ "github.com/warpstreamlabs/bento/public/components/io"
-	_ "github.com/warpstreamlabs/bento/public/components/kafka"
+
+	"github.com/TykTechnologies/kin-openapi/openapi3"
 
 	"github.com/TykTechnologies/tyk/apidef/oas"
+
+	_ "github.com/warpstreamlabs/bento/public/components/io"
+	_ "github.com/warpstreamlabs/bento/public/components/kafka"
 )
 
 //go:embed testdata/*-oas-template.json

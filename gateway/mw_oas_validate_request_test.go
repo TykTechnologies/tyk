@@ -5,8 +5,9 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/TykTechnologies/kin-openapi/openapi3"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/TykTechnologies/kin-openapi/openapi3"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/apidef/oas"
