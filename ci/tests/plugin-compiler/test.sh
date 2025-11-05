@@ -27,4 +27,4 @@ docker run --rm -e GOARCH=arm64 -v $PLUGIN_SOURCE_PATH:/plugin-source $PLUGIN_CO
 
 docker compose up -d --wait --force-recreate || { docker compose logs gw; exit 1; }
 
-curl http://localhost:8080/goplugin/headers | jq -e '.headers.Foo == "Bar"' || { docker compose logs gw; exit 1; }
+curl -s http://localhost:8080/goplugin/headers | jq -e '.headers.Foo == "Bar"' || { docker compose logs gw; exit 1; }
