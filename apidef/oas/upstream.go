@@ -1320,6 +1320,21 @@ func (l *LoadBalancing) Fill(api apidef.APIDefinition) {
 		targetCounter[target].Weight++
 	}
 
+	// Preserve weight=0 targets from existing OAS structure that aren't in active targets
+	if l.Targets != nil {
+		for _, existingTarget := range l.Targets {
+			if existingTarget.Weight == 0 {
+				// Only preserve if it's not already in targetCounter (not an active target)
+				if _, exists := targetCounter[existingTarget.URL]; !exists {
+					targetCounter[existingTarget.URL] = &LoadBalancingTarget{
+						URL:    existingTarget.URL,
+						Weight: 0,
+					}
+				}
+			}
+		}
+	}
+
 	targets := make([]LoadBalancingTarget, len(targetCounter))
 	i := 0
 	for _, target := range targetCounter {

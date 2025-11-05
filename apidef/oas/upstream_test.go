@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"reflect"
+	"sort"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -925,6 +926,339 @@ func TestLoadBalancing(t *testing.T) {
 				assert.Equal(t, tc.expectedTargets, apiDef.Proxy.Targets)
 			})
 		}
+	})
+}
+
+func TestLoadBalancingWeightZeroTargets(t *testing.T) {
+	t.Parallel()
+
+	t.Run("fill preserves weight=0 targets from existing OAS structure", func(t *testing.T) {
+		t.Parallel()
+
+		testcases := []struct {
+			title           string
+			existingTargets []LoadBalancingTarget
+			apiTargets      []string
+			expectedTargets []LoadBalancingTarget
+		}{
+			{
+				title: "preserves single weight=0 target when not in active targets",
+				existingTargets: []LoadBalancingTarget{
+					{URL: "http://upstream-disabled", Weight: 0},
+				},
+				apiTargets: []string{
+					"http://upstream-one",
+					"http://upstream-one",
+				},
+				expectedTargets: []LoadBalancingTarget{
+					{URL: "http://upstream-disabled", Weight: 0},
+					{URL: "http://upstream-one", Weight: 2},
+				},
+			},
+			{
+				title: "preserves multiple weight=0 targets",
+				existingTargets: []LoadBalancingTarget{
+					{URL: "http://upstream-disabled-1", Weight: 0},
+					{URL: "http://upstream-disabled-2", Weight: 0},
+					{URL: "http://upstream-active", Weight: 3},
+				},
+				apiTargets: []string{
+					"http://upstream-active",
+					"http://upstream-active",
+					"http://upstream-new",
+				},
+				expectedTargets: []LoadBalancingTarget{
+					{URL: "http://upstream-active", Weight: 2},
+					{URL: "http://upstream-disabled-1", Weight: 0},
+					{URL: "http://upstream-disabled-2", Weight: 0},
+					{URL: "http://upstream-new", Weight: 1},
+				},
+			},
+			{
+				title: "does not duplicate target if weight=0 in existing but active in api targets",
+				existingTargets: []LoadBalancingTarget{
+					{URL: "http://upstream-one", Weight: 0},
+					{URL: "http://upstream-two", Weight: 5},
+				},
+				apiTargets: []string{
+					"http://upstream-one",
+					"http://upstream-one",
+					"http://upstream-one",
+				},
+				expectedTargets: []LoadBalancingTarget{
+					{URL: "http://upstream-one", Weight: 3},
+				},
+			},
+			{
+				title:           "handles empty existing targets with active api targets",
+				existingTargets: nil,
+				apiTargets: []string{
+					"http://upstream-one",
+					"http://upstream-two",
+					"http://upstream-two",
+				},
+				expectedTargets: []LoadBalancingTarget{
+					{URL: "http://upstream-one", Weight: 1},
+					{URL: "http://upstream-two", Weight: 2},
+				},
+			},
+			{
+				title: "when api targets empty Fill returns early without modifying existing targets",
+				existingTargets: []LoadBalancingTarget{
+					{URL: "http://upstream-disabled", Weight: 0},
+				},
+				apiTargets: []string{},
+				// When api.Proxy.Targets is empty, Fill() returns early without modifying l.Targets
+				// So the existing targets remain unchanged
+				expectedTargets: []LoadBalancingTarget{
+					{URL: "http://upstream-disabled", Weight: 0},
+				},
+			},
+			{
+				title: "preserves weight=0 targets among mixed weights",
+				existingTargets: []LoadBalancingTarget{
+					{URL: "http://upstream-active", Weight: 2},
+					{URL: "http://upstream-disabled-1", Weight: 0},
+					{URL: "http://upstream-active-2", Weight: 3},
+					{URL: "http://upstream-disabled-2", Weight: 0},
+				},
+				apiTargets: []string{
+					"http://upstream-active",
+					"http://upstream-active-2",
+					"http://upstream-active-2",
+					"http://upstream-active-2",
+					"http://upstream-active-2",
+				},
+				expectedTargets: []LoadBalancingTarget{
+					{URL: "http://upstream-active", Weight: 1},
+					{URL: "http://upstream-active-2", Weight: 4},
+					{URL: "http://upstream-disabled-1", Weight: 0},
+					{URL: "http://upstream-disabled-2", Weight: 0},
+				},
+			},
+		}
+
+		for _, tc := range testcases {
+			tc := tc
+			t.Run(tc.title, func(t *testing.T) {
+				t.Parallel()
+
+				// Create LoadBalancing with existing targets
+				lb := &LoadBalancing{
+					Enabled: true,
+					Targets: tc.existingTargets,
+				}
+
+				// Create API definition with active targets
+				apiDef := apidef.APIDefinition{
+					Proxy: apidef.ProxyConfig{
+						EnableLoadBalancing: true,
+						Targets:             tc.apiTargets,
+					},
+				}
+
+				// Fill should preserve weight=0 targets
+				lb.Fill(apiDef)
+
+				// Sort both slices for comparison
+				sort.Slice(lb.Targets, func(i, j int) bool {
+					return lb.Targets[i].URL < lb.Targets[j].URL
+				})
+				expectedSorted := make([]LoadBalancingTarget, len(tc.expectedTargets))
+				copy(expectedSorted, tc.expectedTargets)
+				sort.Slice(expectedSorted, func(i, j int) bool {
+					return expectedSorted[i].URL < expectedSorted[j].URL
+				})
+
+				assert.Equal(t, expectedSorted, lb.Targets)
+			})
+		}
+	})
+
+	t.Run("extractTo excludes weight=0 targets from api.Proxy.Targets", func(t *testing.T) {
+		t.Parallel()
+
+		testcases := []struct {
+			title           string
+			inputTargets    []LoadBalancingTarget
+			expectedTargets []string
+		}{
+			{
+				title: "excludes single weight=0 target",
+				inputTargets: []LoadBalancingTarget{
+					{URL: "http://upstream-one", Weight: 3},
+					{URL: "http://upstream-disabled", Weight: 0},
+					{URL: "http://upstream-two", Weight: 2},
+				},
+				expectedTargets: []string{
+					"http://upstream-one",
+					"http://upstream-one",
+					"http://upstream-one",
+					"http://upstream-two",
+					"http://upstream-two",
+				},
+			},
+			{
+				title: "excludes multiple weight=0 targets",
+				inputTargets: []LoadBalancingTarget{
+					{URL: "http://upstream-active", Weight: 2},
+					{URL: "http://upstream-disabled-1", Weight: 0},
+					{URL: "http://upstream-disabled-2", Weight: 0},
+					{URL: "http://upstream-disabled-3", Weight: 0},
+				},
+				expectedTargets: []string{
+					"http://upstream-active",
+					"http://upstream-active",
+				},
+			},
+			{
+				title: "handles all weight=0 targets",
+				inputTargets: []LoadBalancingTarget{
+					{URL: "http://upstream-disabled-1", Weight: 0},
+					{URL: "http://upstream-disabled-2", Weight: 0},
+				},
+				// ExtractTo creates an empty slice when no active targets
+				expectedTargets: []string{},
+			},
+			{
+				title: "handles no weight=0 targets",
+				inputTargets: []LoadBalancingTarget{
+					{URL: "http://upstream-one", Weight: 1},
+					{URL: "http://upstream-two", Weight: 2},
+					{URL: "http://upstream-three", Weight: 3},
+				},
+				expectedTargets: []string{
+					"http://upstream-one",
+					"http://upstream-two",
+					"http://upstream-two",
+					"http://upstream-three",
+					"http://upstream-three",
+					"http://upstream-three",
+				},
+			},
+			{
+				title:           "handles empty targets list",
+				inputTargets:    []LoadBalancingTarget{},
+				expectedTargets: nil,
+			},
+		}
+
+		for _, tc := range testcases {
+			tc := tc
+			t.Run(tc.title, func(t *testing.T) {
+				t.Parallel()
+
+				lb := &LoadBalancing{
+					Enabled: true,
+					Targets: tc.inputTargets,
+				}
+
+				var apiDef apidef.APIDefinition
+				lb.ExtractTo(&apiDef)
+
+				assert.Equal(t, tc.expectedTargets, apiDef.Proxy.Targets)
+			})
+		}
+	})
+
+	t.Run("round-trip preserves weight=0 targets", func(t *testing.T) {
+		t.Parallel()
+
+		testcases := []struct {
+			title          string
+			initialTargets []LoadBalancingTarget
+		}{
+			{
+				title: "preserves weight=0 through fill->extractTo->fill cycle",
+				initialTargets: []LoadBalancingTarget{
+					{URL: "http://upstream-active", Weight: 3},
+					{URL: "http://upstream-disabled", Weight: 0},
+				},
+			},
+			{
+				title: "preserves multiple weight=0 targets through cycle",
+				initialTargets: []LoadBalancingTarget{
+					{URL: "http://upstream-active-1", Weight: 2},
+					{URL: "http://upstream-disabled-1", Weight: 0},
+					{URL: "http://upstream-active-2", Weight: 1},
+					{URL: "http://upstream-disabled-2", Weight: 0},
+				},
+			},
+		}
+
+		for _, tc := range testcases {
+			tc := tc
+			t.Run(tc.title, func(t *testing.T) {
+				t.Parallel()
+
+				// Step 1: Start with OAS structure
+				initialLB := &LoadBalancing{
+					Enabled: true,
+					Targets: tc.initialTargets,
+				}
+
+				// Step 2: ExtractTo API definition (weight=0 should be excluded from Proxy.Targets)
+				var apiDef apidef.APIDefinition
+				initialLB.ExtractTo(&apiDef)
+
+				// Verify weight=0 targets are NOT in api.Proxy.Targets
+				for _, target := range apiDef.Proxy.Targets {
+					for _, initialTarget := range tc.initialTargets {
+						if initialTarget.Weight == 0 {
+							assert.NotEqual(t, initialTarget.URL, target,
+								"weight=0 target should not appear in api.Proxy.Targets")
+						}
+					}
+				}
+
+				// Step 3: Fill back into OAS (should preserve weight=0 from original)
+				resultLB := &LoadBalancing{
+					Enabled: true,
+					Targets: tc.initialTargets, // Simulating existing OAS state
+				}
+				resultLB.Fill(apiDef)
+
+				// Sort for comparison
+				sort.Slice(initialLB.Targets, func(i, j int) bool {
+					return initialLB.Targets[i].URL < initialLB.Targets[j].URL
+				})
+				sort.Slice(resultLB.Targets, func(i, j int) bool {
+					return resultLB.Targets[i].URL < resultLB.Targets[j].URL
+				})
+
+				// Verify weight=0 targets are preserved
+				assert.Equal(t, initialLB.Targets, resultLB.Targets,
+					"weight=0 targets should be preserved through round-trip")
+			})
+		}
+	})
+
+	t.Run("weight=0 targets receive no traffic", func(t *testing.T) {
+		t.Parallel()
+
+		lb := &LoadBalancing{
+			Enabled: true,
+			Targets: []LoadBalancingTarget{
+				{URL: "http://upstream-active", Weight: 5},
+				{URL: "http://upstream-disabled", Weight: 0},
+			},
+		}
+
+		var apiDef apidef.APIDefinition
+		lb.ExtractTo(&apiDef)
+
+		// Verify that weight=0 target does not appear in the targets list
+		disabledTargetCount := 0
+		for _, target := range apiDef.Proxy.Targets {
+			if target == "http://upstream-disabled" {
+				disabledTargetCount++
+			}
+		}
+
+		assert.Equal(t, 0, disabledTargetCount,
+			"weight=0 target should not appear in api.Proxy.Targets and receive no traffic")
+		assert.Equal(t, 5, len(apiDef.Proxy.Targets),
+			"only active targets should be in api.Proxy.Targets")
 	})
 }
 
