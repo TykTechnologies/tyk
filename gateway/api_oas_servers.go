@@ -262,7 +262,6 @@ func (gw *Gateway) handleOASServersForUpdate(
 
 		if err := gw.updateChildAPIsServersGW(newSpec, oldSpec); err != nil {
 			log.WithError(err).Warn("Failed to update child APIs servers")
-			// Don't fail the whole operation if child updates fail
 		}
 	}
 

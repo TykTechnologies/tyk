@@ -3,6 +3,7 @@ package gateway
 import (
 	"testing"
 
+	"github.com/spf13/afero"
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/apidef/oas"
 	"github.com/TykTechnologies/tyk/config"
@@ -498,5 +499,366 @@ func TestHandleOASServersForUpdate(t *testing.T) {
 
 		require.NoError(t, err)
 		// Should only update this API's servers, no cascade (verified by no panic/error)
+	})
+}
+
+func TestUpdateOldDefaultChildServersGW(t *testing.T) {
+	t.Parallel()
+
+	t.Run("successfully updates old default child API servers", func(t *testing.T) {
+		t.Parallel()
+
+		gw := &Gateway{}
+		gw.SetConfig(config.Config{
+			HttpServerOptions: config.HttpServerOptionsConfig{UseSSL: false},
+			HostName:          "localhost",
+			ListenPort:        8080,
+		})
+
+		// Base API with URL path versioning - v2 is now the new default (changed from v1)
+		baseAPIDef := &apidef.APIDefinition{
+			APIID: "base-api",
+			Proxy: apidef.ProxyConfig{
+				ListenPath: "/products",
+			},
+			VersionDefinition: apidef.VersionDefinition{
+				Enabled:           true,
+				Location:          "url",
+				Default:           "v2", // NEW default (was v1)
+				FallbackToDefault: true, // Enable fallback URL for default version
+				Versions: map[string]string{
+					"v1": "child-v1",
+					"v2": "child-v2",
+				},
+			},
+		}
+		baseAPIDef.IsOAS = true
+
+		baseAPISpec := &APISpec{
+			APIDefinition: baseAPIDef,
+			OAS:           oas.OAS{T: openapi3.T{Servers: openapi3.Servers{}}},
+		}
+
+		// Old default child API (v1) - should have its fallback URL removed
+		oldDefaultChildAPIDef := &apidef.APIDefinition{
+			APIID: "child-v1",
+			Proxy: apidef.ProxyConfig{
+				ListenPath: "/products-v1",
+			},
+			VersionDefinition: apidef.VersionDefinition{
+				BaseID: "base-api",
+			},
+			Internal: true,
+		}
+		oldDefaultChildAPIDef.IsOAS = true
+
+		oldDefaultChildSpec := &APISpec{
+			APIDefinition: oldDefaultChildAPIDef,
+			OAS: oas.OAS{T: openapi3.T{
+				Servers: openapi3.Servers{
+					{URL: "http://localhost:8080/products/v1"},  // Versioned URL
+					{URL: "http://localhost:8080/products"},     // Fallback URL (should be removed)
+				},
+			}},
+		}
+
+		// Store APIs in gateway's API map
+		gw.apisByID = map[string]*APISpec{
+			"base-api": baseAPISpec,
+			"child-v1": oldDefaultChildSpec,
+		}
+
+		// Use in-memory filesystem
+		testFs := afero.NewMemMapFs()
+
+		err := gw.updateOldDefaultChildServersGW("v1", baseAPISpec, testFs)
+
+		require.NoError(t, err)
+
+		// Verify servers were regenerated
+		// After the update, the old default child should have only its versioned URL,
+		// without the fallback URL (since it's no longer the default)
+		require.NotEmpty(t, oldDefaultChildSpec.OAS.Servers)
+
+		// Collect all URLs for verification
+		var urls []string
+		for _, server := range oldDefaultChildSpec.OAS.Servers {
+			urls = append(urls, server.URL)
+		}
+
+		// Should have the versioned URL
+		assert.Contains(t, urls, "http://localhost:8080/products/v1", "Should have versioned URL")
+		// Should NOT have the fallback URL anymore (since it's no longer the default)
+		assert.NotContains(t, urls, "http://localhost:8080/products", "Should NOT have fallback URL")
+
+		// Verify file was written (check it exists in the filesystem)
+		// The exact path depends on writeToFile implementation, but we can verify no error occurred
+	})
+
+	t.Run("old default version not found in versions map", func(t *testing.T) {
+		t.Parallel()
+
+		gw := &Gateway{}
+		gw.SetConfig(config.Config{
+			HttpServerOptions: config.HttpServerOptionsConfig{UseSSL: false},
+			HostName:          "localhost",
+			ListenPort:        8080,
+		})
+
+		baseAPIDef := &apidef.APIDefinition{
+			APIID: "base-api",
+			Proxy: apidef.ProxyConfig{
+				ListenPath: "/products",
+			},
+			VersionDefinition: apidef.VersionDefinition{
+				Enabled:  true,
+				Location: "url",
+				Default:  "v2",
+				Versions: map[string]string{
+					"v2": "child-v2",
+					// v1 not in map anymore (was deleted)
+				},
+			},
+		}
+
+		baseAPISpec := &APISpec{
+			APIDefinition: baseAPIDef,
+		}
+
+		gw.apisByID = map[string]*APISpec{
+			"base-api": baseAPISpec,
+		}
+
+		testFs := afero.NewMemMapFs()
+
+		// Should not error - this is non-fatal
+		err := gw.updateOldDefaultChildServersGW("v1", baseAPISpec, testFs)
+
+		require.NoError(t, err)
+	})
+
+	t.Run("old default is the base API itself - skips update", func(t *testing.T) {
+		t.Parallel()
+
+		gw := &Gateway{}
+		gw.SetConfig(config.Config{
+			HttpServerOptions: config.HttpServerOptionsConfig{UseSSL: false},
+			HostName:          "localhost",
+			ListenPort:        8080,
+		})
+
+		baseAPIDef := &apidef.APIDefinition{
+			APIID: "base-api",
+			Proxy: apidef.ProxyConfig{
+				ListenPath: "/products",
+			},
+			VersionDefinition: apidef.VersionDefinition{
+				Enabled:  true,
+				Location: "url",
+				Default:  "v2",
+				Versions: map[string]string{
+					"v1": "base-api", // Old default points to base API itself
+					"v2": "child-v2",
+				},
+			},
+		}
+
+		baseAPISpec := &APISpec{
+			APIDefinition: baseAPIDef,
+		}
+
+		gw.apisByID = map[string]*APISpec{
+			"base-api": baseAPISpec,
+		}
+
+		testFs := afero.NewMemMapFs()
+
+		err := gw.updateOldDefaultChildServersGW("v1", baseAPISpec, testFs)
+
+		require.NoError(t, err)
+		// Should skip without error
+	})
+
+	t.Run("old default child API not found in loaded APIs", func(t *testing.T) {
+		t.Parallel()
+
+		gw := &Gateway{}
+		gw.SetConfig(config.Config{
+			HttpServerOptions: config.HttpServerOptionsConfig{UseSSL: false},
+			HostName:          "localhost",
+			ListenPort:        8080,
+		})
+
+		baseAPIDef := &apidef.APIDefinition{
+			APIID: "base-api",
+			Proxy: apidef.ProxyConfig{
+				ListenPath: "/products",
+			},
+			VersionDefinition: apidef.VersionDefinition{
+				Enabled:  true,
+				Location: "url",
+				Default:  "v2",
+				Versions: map[string]string{
+					"v1": "child-v1",
+					"v2": "child-v2",
+				},
+			},
+		}
+
+		baseAPISpec := &APISpec{
+			APIDefinition: baseAPIDef,
+		}
+
+		// child-v1 NOT in apisByID map (not loaded)
+		gw.apisByID = map[string]*APISpec{
+			"base-api": baseAPISpec,
+		}
+
+		testFs := afero.NewMemMapFs()
+
+		// Should not error - this is non-fatal
+		err := gw.updateOldDefaultChildServersGW("v1", baseAPISpec, testFs)
+
+		require.NoError(t, err)
+	})
+
+	t.Run("old default child is not OAS - skips update", func(t *testing.T) {
+		t.Parallel()
+
+		gw := &Gateway{}
+		gw.SetConfig(config.Config{
+			HttpServerOptions: config.HttpServerOptionsConfig{UseSSL: false},
+			HostName:          "localhost",
+			ListenPort:        8080,
+		})
+
+		baseAPIDef := &apidef.APIDefinition{
+			APIID: "base-api",
+			Proxy: apidef.ProxyConfig{
+				ListenPath: "/products",
+			},
+			VersionDefinition: apidef.VersionDefinition{
+				Enabled:  true,
+				Location: "url",
+				Default:  "v2",
+				Versions: map[string]string{
+					"v1": "child-v1",
+					"v2": "child-v2",
+				},
+			},
+		}
+
+		baseAPISpec := &APISpec{
+			APIDefinition: baseAPIDef,
+		}
+
+		// Old default child is NOT OAS
+		oldDefaultChildAPIDef := &apidef.APIDefinition{
+			APIID: "child-v1",
+			Proxy: apidef.ProxyConfig{
+				ListenPath: "/products-v1",
+			},
+		}
+		oldDefaultChildAPIDef.IsOAS = false // Not OAS
+
+		oldDefaultChildSpec := &APISpec{
+			APIDefinition: oldDefaultChildAPIDef,
+		}
+
+		gw.apisByID = map[string]*APISpec{
+			"base-api": baseAPISpec,
+			"child-v1": oldDefaultChildSpec,
+		}
+
+		testFs := afero.NewMemMapFs()
+
+		err := gw.updateOldDefaultChildServersGW("v1", baseAPISpec, testFs)
+
+		require.NoError(t, err)
+		// Should skip without error
+	})
+
+	t.Run("handles external child API correctly", func(t *testing.T) {
+		t.Parallel()
+
+		gw := &Gateway{}
+		gw.SetConfig(config.Config{
+			HttpServerOptions: config.HttpServerOptionsConfig{UseSSL: false},
+			HostName:          "localhost",
+			ListenPort:        8080,
+		})
+
+		baseAPIDef := &apidef.APIDefinition{
+			APIID: "base-api",
+			Proxy: apidef.ProxyConfig{
+				ListenPath: "/products",
+			},
+			VersionDefinition: apidef.VersionDefinition{
+				Enabled:           true,
+				Location:          "url",
+				Default:           "v2",
+				FallbackToDefault: true, // Enable fallback URL for default version
+				Versions: map[string]string{
+					"v1": "child-v1",
+					"v2": "child-v2",
+				},
+			},
+		}
+		baseAPIDef.IsOAS = true
+
+		baseAPISpec := &APISpec{
+			APIDefinition: baseAPIDef,
+			OAS:           oas.OAS{T: openapi3.T{Servers: openapi3.Servers{}}},
+		}
+
+		// External child API (Internal: false) - should update both versioned and direct URLs
+		oldDefaultChildAPIDef := &apidef.APIDefinition{
+			APIID: "child-v1",
+			Proxy: apidef.ProxyConfig{
+				ListenPath: "/products-v1",
+			},
+			VersionDefinition: apidef.VersionDefinition{
+				BaseID: "base-api",
+			},
+			Internal: false, // External child
+		}
+		oldDefaultChildAPIDef.IsOAS = true
+
+		oldDefaultChildSpec := &APISpec{
+			APIDefinition: oldDefaultChildAPIDef,
+			OAS: oas.OAS{T: openapi3.T{
+				Servers: openapi3.Servers{
+					{URL: "http://localhost:8080/products/v1"},   // Versioned URL
+					{URL: "http://localhost:8080/products"},      // Fallback URL (should be removed)
+					{URL: "http://localhost:8080/products-v1"},   // Direct URL (should remain)
+				},
+			}},
+		}
+
+		gw.apisByID = map[string]*APISpec{
+			"base-api": baseAPISpec,
+			"child-v1": oldDefaultChildSpec,
+		}
+
+		testFs := afero.NewMemMapFs()
+
+		err := gw.updateOldDefaultChildServersGW("v1", baseAPISpec, testFs)
+
+		require.NoError(t, err)
+
+		// Verify servers were regenerated
+		require.NotEmpty(t, oldDefaultChildSpec.OAS.Servers)
+
+		// Collect all URLs for verification
+		var urls []string
+		for _, server := range oldDefaultChildSpec.OAS.Servers {
+			urls = append(urls, server.URL)
+		}
+
+		// External child should have versioned URL and direct URL
+		assert.Contains(t, urls, "http://localhost:8080/products/v1", "Should have versioned URL")
+		assert.Contains(t, urls, "http://localhost:8080/products-v1", "Should have direct URL")
+		// Should NOT have the fallback URL anymore (since it's no longer the default)
+		assert.NotContains(t, urls, "http://localhost:8080/products", "Should NOT have fallback URL")
 	})
 }
