@@ -502,7 +502,7 @@ jobs:
           RUN apt-get install -y tyk-gateway=3.0.8 || echo "Previous version not found, testing fresh install"
           RUN dpkg -i /tyk-gateway.deb
 
-          RUN /opt/tyk-gateway/install/setup.sh --listenport=8080 --redishost=localhost --redisport=6379 --domain=""
+          RUN /opt/tyk-gateway/install/setup.sh --listenport=8080 --redishost=redis --redisport=6379 --domain=""
           COPY ci/tests/api-functionality/data/api.json /opt/tyk-gateway/apps/
           CMD ["/opt/tyk-gateway/tyk", "--conf", "/opt/tyk-gateway/tyk.conf"]
           ' | tee Dockerfile
@@ -574,7 +574,7 @@ jobs:
           RUN rpm --checksig /tyk-gateway.rpm
           RUN rpm -Uvh --force /tyk-gateway.rpm
 
-          RUN /opt/tyk-gateway/install/setup.sh --listenport=8080 --redishost=localhost --redisport=6379 --domain=""
+          RUN /opt/tyk-gateway/install/setup.sh --listenport=8080 --redishost=redis --redisport=6379 --domain=""
           COPY ci/tests/api-functionality/data/api.json /opt/tyk-gateway/apps/
           CMD ["/opt/tyk-gateway/tyk", "--conf", "/opt/tyk-gateway/tyk.conf"]
           ' | tee Dockerfile
