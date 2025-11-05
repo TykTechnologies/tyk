@@ -110,7 +110,8 @@ func TestCheckDNSAndReconnect(t *testing.T) {
 			// Create a mock resolver
 			dnsLookupCalled := false
 			mockResolver := &MockDNSResolver{}
-			mockResolver.LookupIPFunc = func(_ string) ([]net.IP, error) {
+			mockResolver.LookupIPFunc = func(host string) ([]net.IP, error) {
+				_ = host // unused
 				dnsLookupCalled = true
 				return tt.resolvedIPs, tt.resolveError
 			}
@@ -118,7 +119,8 @@ func TestCheckDNSAndReconnect(t *testing.T) {
 
 			// Create a mock reconnect function
 			reconnectCalled := false
-			safeReconnectRPCClient = func(_ bool) {
+			safeReconnectRPCClient = func(suppressRegister bool) {
+				_ = suppressRegister // unused
 				reconnectCalled = true
 			}
 
@@ -242,7 +244,8 @@ func TestUpdateResolvedIPs(t *testing.T) {
 			lastResolvedIPs = tt.initialIPs
 
 			// Configure mock resolver
-			mockResolver.LookupIPFunc = func(_ string) ([]net.IP, error) {
+			mockResolver.LookupIPFunc = func(host string) ([]net.IP, error) {
+				_ = host // unused
 				return tt.resolvedIPs, tt.resolveError
 			}
 
@@ -357,7 +360,8 @@ func TestCheckAndHandleDNSChange(t *testing.T) {
 
 			// Create a mock resolver
 			mockResolver := &MockDNSResolver{}
-			mockResolver.LookupIPFunc = func(_ string) ([]net.IP, error) {
+			mockResolver.LookupIPFunc = func(host string) ([]net.IP, error) {
+				_ = host // unused
 				return tt.resolvedIPs, tt.resolveError
 			}
 			dnsResolver = mockResolver
@@ -368,7 +372,8 @@ func TestCheckAndHandleDNSChange(t *testing.T) {
 
 			// Create a mock reconnect function
 			reconnectCalled := false
-			safeReconnectRPCClient = func(_ bool) {
+			safeReconnectRPCClient = func(suppressRegister bool) {
+				_ = suppressRegister // unused
 				reconnectCalled = true
 			}
 
@@ -425,7 +430,8 @@ func TestDNSIsOnlyCheckedOncePerConnectionIssue(t *testing.T) {
 	// Create a mock resolver that returns different IPs on each call
 	dnsLookupCount := 0
 	mockResolver := &MockDNSResolver{}
-	mockResolver.LookupIPFunc = func(_ string) ([]net.IP, error) {
+	mockResolver.LookupIPFunc = func(host string) ([]net.IP, error) {
+		_ = host // unused
 		dnsLookupCount++
 		// Return different IPs each time
 		if dnsLookupCount == 1 {
@@ -438,7 +444,8 @@ func TestDNSIsOnlyCheckedOncePerConnectionIssue(t *testing.T) {
 
 	// Create a mock reconnect function that counts calls
 	reconnectCount := 0
-	safeReconnectRPCClient = func(_ bool) {
+	safeReconnectRPCClient = func(suppressRegister bool) {
+		_ = suppressRegister // unused
 		reconnectCount++
 	}
 
