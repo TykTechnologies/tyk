@@ -1604,14 +1604,9 @@ func invalidateJWKSCacheByAPIID(apiID string) {
 	}
 }
 
-func invalidateJWKSCacheForAllAPIs(orgId string) {
-	JWKCaches.Clear()
-}
-
 func (gw *Gateway) invalidateJWKSCacheForAPIID(w http.ResponseWriter, r *http.Request) {
 	apiID := mux.Vars(r)["apiID"]
 	invalidateJWKSCacheByAPIID(apiID)
-
 	// Cache invalidation is idempotent: calling it ensures the key is absent,
 	// regardless of whether it was cached before or not.
 	doJSONWrite(w, http.StatusOK, apiOk("cache invalidated"))

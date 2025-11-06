@@ -41,10 +41,9 @@ const (
 	KeySpaceUpdateNotification   NotificationCommand = "KeySpaceUpdateNotification"
 	OAuthPurgeLapsedTokens       NotificationCommand = "OAuthPurgeLapsedTokens"
 	// NoticeDeleteAPICache is the command with which event is emitted from dashboard to invalidate cache for an API.
-	NoticeDeleteAPICache                NotificationCommand = "DeleteAPICache"
-	NoticeUserKeyReset                  NotificationCommand = "UserKeyReset"
-	NoticeInvalidateJWKSCacheForAPI     NotificationCommand = "InvalidateJWKSCacheForAPI"
-	NoticeInvalidateJWKSCacheForAllAPIs NotificationCommand = "InvalidateJWKSCacheForAllAPIs"
+	NoticeDeleteAPICache            NotificationCommand = "DeleteAPICache"
+	NoticeUserKeyReset              NotificationCommand = "UserKeyReset"
+	NoticeInvalidateJWKSCacheForAPI NotificationCommand = "InvalidateJWKSCacheForAPI"
 )
 
 // Notification is a type that encodes a message published to a pub sub channel (shared between implementations)
@@ -163,8 +162,6 @@ func (gw *Gateway) handleRedisEvent(v interface{}, handled func(NotificationComm
 		}
 	case NoticeInvalidateJWKSCacheForAPI:
 		invalidateJWKSCacheByAPIID(notif.Payload)
-	case NoticeInvalidateJWKSCacheForAllAPIs:
-		invalidateJWKSCacheForAllAPIs(notif.Payload)
 	case NoticeUserKeyReset:
 		gw.handleUserKeyReset(notif.Payload)
 	default:
