@@ -516,6 +516,9 @@ jobs:
           sleep 5
           docker stop test || true
   upgrade-rpm:
+    services:
+      httpbin.org:
+        image: kennethreitz/httpbin
     runs-on: ubuntu-latest
     needs:
       - test-controller-distros
