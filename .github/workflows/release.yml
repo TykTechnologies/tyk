@@ -511,8 +511,8 @@ jobs:
       - name: Test the built container image with api functionality test.
         run: |
           docker run -d -p8080:8080 --name=test --platform linux/${{ matrix.arch }} --network ${{ job.container.network }} test-${{ matrix.distro }}-${{ matrix.arch }}
-          docker logs test
           sleep 2
+          docker logs test
           ./ci/tests/api-functionality/api_test.sh
           sleep 2
           docker stop test || true
