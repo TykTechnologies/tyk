@@ -300,10 +300,264 @@ jobs:
           variation: ${{ env.VARIATION }}
           base_ref: ${{ env.BASE_REF }}
           test_type: api
+  resolve-dashboard-image:
+    if: github.event.pull_request.draft == false
+    needs: goreleaser
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    outputs:
+      dashboard_image: ${{ steps.resolve.outputs.dashboard_image }}
+      needs_build: ${{ steps.resolve.outputs.needs_build }}
+      dashboard_branch: ${{ steps.resolve.outputs.dashboard_branch }}
+      strategy: ${{ steps.resolve.outputs.strategy }}
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::754489498669:role/ecr_rw_tyk
+          role-session-name: cipush
+          aws-region: eu-central-1
+          mask-aws-account-id: false
+
+      - name: Login to Amazon ECR
+        id: ecr
+        uses: aws-actions/amazon-ecr-login@v2
+        with:
+          mask-password: 'true'
+
+      - name: Check if tyk-analytics branch exists
+        id: check_branch
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.ORG_GH_TOKEN }}
+          HEAD_REF: ${{ github.head_ref }}
+        run: |
+          if [ -z "$HEAD_REF" ]; then
+            echo "Not a pull request, skipping branch check"
+            echo "branch_exists=false" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          BRANCH=${HEAD_REF##*/}
+          echo "Checking for branch: $BRANCH in tyk-analytics"
+
+          if git ls-remote --heads https://$GITHUB_TOKEN@github.com/TykTechnologies/tyk-analytics.git refs/heads/$BRANCH | grep -q .; then
+            echo "✓ Branch '$BRANCH' exists in tyk-analytics"
+            echo "branch_exists=true" >> $GITHUB_OUTPUT
+            echo "branch=$BRANCH" >> $GITHUB_OUTPUT
+          else
+            echo "✗ Branch '$BRANCH' not found in tyk-analytics"
+            echo "branch_exists=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Check if ECR image exists with commit SHA
+        id: check_ecr
+        shell: bash
+        env:
+          REGISTRY: ${{ steps.ecr.outputs.registry }}
+          COMMIT_SHA: ${{ github.sha }}
+        run: |
+          IMAGE_TAG="sha-${COMMIT_SHA}"
+          echo "Checking for ECR image: tyk-analytics:${IMAGE_TAG}"
+
+          if aws ecr describe-images \
+            --repository-name tyk-analytics \
+            --image-ids imageTag=${IMAGE_TAG} \
+            --region eu-central-1 2>/dev/null | grep -q imageId; then
+            echo "✓ ECR image exists: ${IMAGE_TAG}"
+            echo "image_exists=true" >> $GITHUB_OUTPUT
+            echo "image_tag=${IMAGE_TAG}" >> $GITHUB_OUTPUT
+          else
+            echo "✗ ECR image not found: ${IMAGE_TAG}"
+            echo "image_exists=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Resolve dashboard image strategy
+        id: resolve
+        shell: bash
+        env:
+          REGISTRY: ${{ steps.ecr.outputs.registry }}
+          BRANCH_EXISTS: ${{ steps.check_branch.outputs.branch_exists }}
+          IMAGE_EXISTS: ${{ steps.check_ecr.outputs.image_exists }}
+          BRANCH: ${{ steps.check_branch.outputs.branch }}
+          IMAGE_TAG: ${{ steps.check_ecr.outputs.image_tag }}
+          BASE_REF: ${{ env.BASE_REF }}
+          COMMIT_SHA: ${{ github.sha }}
+        run: |
+          echo "=================================="
+          echo "📊 Dashboard Image Resolution"
+          echo "=================================="
+          echo "Branch exists: $BRANCH_EXISTS"
+          echo "Image exists: $IMAGE_EXISTS"
+          echo "Branch name: $BRANCH"
+          echo "Image tag: $IMAGE_TAG"
+          echo "Base ref: $BASE_REF"
+          echo "Commit SHA: $COMMIT_SHA"
+          echo "=================================="
+
+          if [ "$BRANCH_EXISTS" = "true" ]; then
+            # Strategy 1: Use gromit policy (matching branch exists)
+            echo "📋 Strategy: Let gromit match branch '$BRANCH'"
+            echo "    → No override needed, gromit will handle it"
+            echo "dashboard_image=" >> $GITHUB_OUTPUT
+            echo "needs_build=false" >> $GITHUB_OUTPUT
+            echo "dashboard_branch=$BRANCH" >> $GITHUB_OUTPUT
+            echo "strategy=gromit-branch" >> $GITHUB_OUTPUT
+
+          elif [ "$IMAGE_EXISTS" = "true" ]; then
+            # Strategy 2: Use existing ECR image
+            echo "🐳 Strategy: Use existing ECR image"
+            echo "    → Image: ${REGISTRY}/tyk-analytics:${IMAGE_TAG}"
+            echo "dashboard_image=${REGISTRY}/tyk-analytics:${IMAGE_TAG}" >> $GITHUB_OUTPUT
+            echo "needs_build=false" >> $GITHUB_OUTPUT
+            echo "dashboard_branch=" >> $GITHUB_OUTPUT
+            echo "strategy=ecr-image" >> $GITHUB_OUTPUT
+
+          else
+            # Strategy 3: Build required
+            echo "🔨 Strategy: Build dashboard from '$BASE_REF' branch"
+            echo "    → Will update gateway ref to $COMMIT_SHA"
+            echo "    → Will push to: ${REGISTRY}/tyk-analytics:sha-${COMMIT_SHA}"
+            echo "dashboard_image=${REGISTRY}/tyk-analytics:sha-${COMMIT_SHA}" >> $GITHUB_OUTPUT
+            echo "needs_build=true" >> $GITHUB_OUTPUT
+            echo "dashboard_branch=$BASE_REF" >> $GITHUB_OUTPUT
+            echo "strategy=build-required" >> $GITHUB_OUTPUT
+          fi
+
+          echo "=================================="
+          echo "✅ Resolution complete"
+          echo "=================================="
+  build-dashboard-image:
+    if: needs.resolve-dashboard-image.outputs.needs_build == 'true'
+    needs: resolve-dashboard-image
+    runs-on: ubuntu-latest-m
+    permissions:
+      id-token: write
+      contents: read
+    outputs:
+      dashboard_image: ${{ steps.output.outputs.image }}
+    steps:
+      - name: Checkout tyk-analytics
+        uses: actions/checkout@v4
+        with:
+          repository: TykTechnologies/tyk-analytics
+          ref: ${{ needs.resolve-dashboard-image.outputs.dashboard_branch }}
+          token: ${{ secrets.ORG_GH_TOKEN }}
+          fetch-depth: 1
+          submodules: true
+
+      - name: Update gateway reference to PR commit
+        shell: bash
+        env:
+          GATEWAY_SHA: ${{ github.sha }}
+        run: |
+          echo "📦 Updating tyk-gateway dependency to: $GATEWAY_SHA"
+
+          # Configure git for go get
+          git config --global url."https://${{ secrets.ORG_GH_TOKEN }}@github.com".insteadOf "https://github.com"
+
+          # Update dependency
+          go get github.com/TykTechnologies/tyk@$GATEWAY_SHA
+          go mod tidy
+
+          echo "✅ Updated go.mod:"
+          grep "github.com/TykTechnologies/tyk" go.mod
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::754489498669:role/ecr_rw_tyk
+          role-session-name: cipush
+          aws-region: eu-central-1
+
+      - name: Login to Amazon ECR
+        id: ecr
+        uses: aws-actions/amazon-ecr-login@v2
+        with:
+          mask-password: 'true'
+
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: ${{ runner.os }}-go-dashboard-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-dashboard-
+
+      - name: Build dashboard binary and docker image
+        shell: bash
+        env:
+          ECR_REGISTRY: ${{ steps.ecr.outputs.registry }}
+          IMAGE_TAG: sha-${{ github.sha }}
+          GOPRIVATE: github.com/TykTechnologies
+        run: |
+          echo "🔨 Building tyk-analytics with goreleaser"
+          echo "   Image: ${ECR_REGISTRY}/tyk-analytics:${IMAGE_TAG}"
+
+          # Build using goreleaser (similar to tyk-analytics release workflow)
+          cat > /tmp/build-dashboard.sh <<'EOF'
+          #!/bin/sh
+          set -eax
+          git config --global url."https://${{ secrets.ORG_GH_TOKEN }}@github.com".insteadOf "https://github.com"
+          git config --global --add safe.directory /go/src/github.com/TykTechnologies/tyk-analytics
+
+          # Build binaries only (skip packaging)
+          goreleaser build --clean -f ci/goreleaser/goreleaser.yml --snapshot --single-target
+          EOF
+
+          chmod +x /tmp/build-dashboard.sh
+
+          # Build in golang-cross container
+          docker run --rm --privileged \
+            -e GOPRIVATE=github.com/TykTechnologies \
+            -e CGO_ENABLED=1 \
+            -v ${{ github.workspace }}:/go/src/github.com/TykTechnologies/tyk-analytics \
+            -v ~/.cache/go-build:/cache/go-build \
+            -v ~/go/pkg/mod:/go/pkg/mod \
+            -e GOCACHE=/cache/go-build \
+            -e GOMODCACHE=/go/pkg/mod \
+            -v /tmp/build-dashboard.sh:/tmp/build-dashboard.sh \
+            -w /go/src/github.com/TykTechnologies/tyk-analytics \
+            tykio/golang-cross:1.24-bullseye /tmp/build-dashboard.sh
+
+          echo "✅ Binary built successfully"
+
+      - name: Build and push dashboard Docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: true
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          tags: ${{ steps.ecr.outputs.registry }}/tyk-analytics:sha-${{ github.sha }}
+          labels: |
+            org.opencontainers.image.title=Tyk Dashboard (Custom Build)
+            org.opencontainers.image.description=Built from ${{ needs.resolve-dashboard-image.outputs.dashboard_branch }} with gateway ${{ github.sha }}
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.source=https://github.com/TykTechnologies/tyk-analytics
+            tyk.gateway.commit=${{ github.sha }}
+            tyk.dashboard.branch=${{ needs.resolve-dashboard-image.outputs.dashboard_branch }}
+
+      - name: Output image reference
+        id: output
+        shell: bash
+        run: |
+          IMAGE="${{ steps.ecr.outputs.registry }}/tyk-analytics:sha-${{ github.sha }}"
+          echo "image=$IMAGE" >> $GITHUB_OUTPUT
+          echo "✅ Dashboard image built and pushed: $IMAGE"
   api-tests:
     needs:
       - test-controller-api
       - goreleaser
+      - resolve-dashboard-image
     runs-on: ubuntu-latest-m-2
     env:
       XUNIT_REPORT_PATH: ${{ github.workspace}}/test-results.xml
@@ -344,12 +598,13 @@ jobs:
         with:
           org_gh_token: ${{ github.token }}
       - name: Set up test environment
-        uses: TykTechnologies/github-actions/.github/actions/tests/env-up@main
+        uses: TykTechnologies/github-actions/.github/actions/tests/env-up@feat/TT-15971/add-dashboard-image-input
         timeout-minutes: 5
         id: env_up
         with:
           base_ref: ${{ env.BASE_REF }}
           tags: ${{ needs.goreleaser.outputs.ee_tags || needs.goreleaser.outputs.std_tags || format('{0}/tyk-ee:master', steps.ecr.outputs.registry) }}
+          dashboard_image: ${{ needs.resolve-dashboard-image.outputs.dashboard_image }}
           github_token: ${{ secrets.ORG_GH_TOKEN }}
           TYK_DB_LICENSEKEY: ${{ secrets.DASH_LICENSE }}
           TYK_MDCB_LICENSE: ${{ secrets.MDCB_LICENSE }}
