@@ -458,6 +458,9 @@ jobs:
             echo "::warning file=.github/workflows/release.yml,line=24,col=1,endColumn=8::Using test variation"
           fi
   upgrade-deb:
+    services:
+      httpbin.org:
+        image: kennethreitz/httpbin
     runs-on: ubuntu-latest
     needs:
       - test-controller-distros
