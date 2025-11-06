@@ -510,7 +510,7 @@ jobs:
           load: true
       - name: Test the built container image with api functionality test.
         run: |
-          docker run -d -p8080:8080 --name=test --platform linux/${{ matrix.arch }} --network ${{ job.container.network }} --rm test-${{ matrix.distro }}-${{ matrix.arch }}
+          docker run -d -p8080:8080 --name=test --platform linux/${{ matrix.arch }} --network ${{ job.container.network }} test-${{ matrix.distro }}-${{ matrix.arch }}
           docker logs test
           sleep 2
           ./ci/tests/api-functionality/api_test.sh
@@ -571,7 +571,7 @@ jobs:
           tags: test-${{ matrix.distro }}-${{ matrix.arch }}
           load: true
       - name: Test the built container image with api functionality test.
-        run: "docker run -d -p8080:8080 --name=test --platform linux/${{ matrix.arch }} --network ${{ job.container.network }} --rm test-${{ matrix.distro }}-${{ matrix.arch }}\nsleep 5\ndocker logs test\n./ci/tests/api-functionality/api_test.sh\nsleep 2\ndocker stop test || true \n"
+        run: "docker run -d -p8080:8080 --name=test --platform linux/${{ matrix.arch }} --network ${{ job.container.network }} test-${{ matrix.distro }}-${{ matrix.arch }}\nsleep 5\ndocker logs test\n./ci/tests/api-functionality/api_test.sh\nsleep 2\ndocker stop test || true \n"
   release-tests:
     needs:
       - goreleaser
