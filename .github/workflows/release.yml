@@ -493,7 +493,7 @@ jobs:
 
           RUN /opt/tyk-gateway/install/setup.sh --listenport=8080 --redishost=localhost --redisport=6379 --domain=""
           COPY ci/tests/api-functionality/data/api.json /opt/tyk-gateway/apps/
-          CMD redis-server --daemonize yes && sleep 2 && /opt/tyk-gateway/tyk --conf /opt/tyk-gateway/tyk.conf
+          CMD mkdir -p /var/lib/redis /var/run/redis && redis-server --daemonize yes --dir /var/lib/redis --logfile "" --bind 127.0.0.1 --port 6379 && redis-cli ping && /opt/tyk-gateway/tyk --conf /opt/tyk-gateway/tyk.conf
           ' | tee Dockerfile
       - name: install on ${{ matrix.distro }}
         uses: docker/build-push-action@v6
@@ -549,7 +549,6 @@ jobs:
           COPY tyk-gateway*.${RHELARCH}.rpm /tyk-gateway.rpm
           RUN command -v curl || yum install -y curl
           RUN command -v useradd || yum install -y shadow-utils
-          RUN yum install -y redis
           RUN curl -fsSL https://packagecloud.io/install/repositories/tyk/tyk-gateway/script.rpm.sh | bash || echo "Repository setup failed, but continuing"
           RUN yum install -y tyk-gateway-3.0.8-1 || echo "Previous version not found, testing fresh install"
           RUN curl https://keyserver.tyk.io/tyk.io.rpm.signing.key.2020 -o tyk-gateway.key && rpm --import tyk-gateway.key
