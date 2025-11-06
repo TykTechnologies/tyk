@@ -4,6 +4,7 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"crypto/x509/pkix"
+	"math/big"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -48,14 +49,18 @@ func TestGenerateRSAPublicKey(t *testing.T) {
 func TestAddCACertificatesFromChainToPool(t *testing.T) {
 	t.Run("nil pool", func(t *testing.T) {
 		// Should not panic with nil pool
-		_, _, _, cert := GenCertificate(&x509.Certificate{}, false)
-		AddCACertificatesFromChainToPool(nil, &cert)
+		assert.NotPanics(t, func() {
+			_, _, _, cert := GenCertificate(&x509.Certificate{}, false)
+			AddCACertificatesFromChainToPool(nil, &cert)
+		})
 	})
 
 	t.Run("nil certificate", func(t *testing.T) {
 		// Should not panic with nil certificate
-		pool := x509.NewCertPool()
-		AddCACertificatesFromChainToPool(pool, nil)
+		assert.NotPanics(t, func() {
+			pool := x509.NewCertPool()
+			AddCACertificatesFromChainToPool(pool, nil)
+		})
 	})
 
 	t.Run("single certificate without chain - not a CA", func(t *testing.T) {
@@ -134,13 +139,19 @@ func TestAddCACertificatesFromChainToPool(t *testing.T) {
 		pool := x509.NewCertPool()
 		AddCACertificatesFromChainToPool(pool, &clientCert)
 
-		// Verify that the pool does not contain the leaf certificate
-		// by checking that the subjects don't match the leaf's subject
+		// Verify that the pool contains exactly 1 certificate (the CA, not the leaf)
 		subjects := pool.Subjects()
-		for _, subject := range subjects {
-			cert := &x509.Certificate{RawSubject: subject}
-			assert.NotEqual(t, leafCert.Subject.String(), cert.Subject.String())
-		}
+		assert.Equal(t, 1, len(subjects), "Pool should contain exactly 1 certificate (the CA)")
+
+		// Parse the CA certificate from the chain and verify it's the one in the pool
+		caCert, err := x509.ParseCertificate(clientCert.Certificate[1])
+		assert.NoError(t, err)
+		assert.True(t, caCert.IsCA, "Certificate at index 1 should be a CA")
+
+		// Verify the CA and leaf have different serial numbers
+		// (CA has serial=1, leaf has serial=3 per testutil.go)
+		assert.Equal(t, big.NewInt(1), caCert.SerialNumber, "CA should have serial number 1")
+		assert.NotEqual(t, leafCert.SerialNumber, caCert.SerialNumber, "Leaf should not have the same serial as CA")
 	})
 
 	t.Run("only CA certificates are added", func(t *testing.T) {

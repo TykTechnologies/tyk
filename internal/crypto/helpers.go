@@ -173,7 +173,6 @@ func AddCACertificatesFromChainToPool(pool *x509.CertPool, cert *tls.Certificate
 	// to the pool regardless of IsCA flag.
 	if len(cert.Certificate) == 1 {
 		var certToAdd *x509.Certificate
-		
 		if cert.Leaf != nil {
 			certToAdd = cert.Leaf
 		} else {

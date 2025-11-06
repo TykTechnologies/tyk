@@ -20,6 +20,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 
 	"github.com/TykTechnologies/tyk/certs/mock"
@@ -1003,11 +1004,14 @@ func TestUpstreamCertificateWithPort(t *testing.T) {
 	ts.Gw.dialCtxFn = test.LocalDialer()
 
 	_, _, combinedClientPEM, clientCert := crypto.GenCertificate(&x509.Certificate{}, false)
-	clientCert.Leaf, _ = x509.ParseCertificate(clientCert.Certificate[0])
+	var err error
+	clientCert.Leaf, err = x509.ParseCertificate(clientCert.Certificate[0])
+	require.NoError(t, err)
 
-	upstream := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	upstream := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(200)
-		_, _ = w.Write([]byte("success"))
+		_, err := w.Write([]byte("success"))
+		require.NoError(t, err)
 	}))
 
 	// Mutual TLS protected upstream
@@ -1023,13 +1027,15 @@ func TestUpstreamCertificateWithPort(t *testing.T) {
 	upstream.StartTLS()
 	defer upstream.Close()
 
-	upstreamURL, _ := url.Parse(upstream.URL)
+	upstreamURL, err := url.Parse(upstream.URL)
+	require.NoError(t, err)
 
 	globalConf := ts.Gw.GetConfig()
 	globalConf.ProxySSLInsecureSkipVerify = true
 	ts.Gw.SetConfig(globalConf)
 
-	clientCertID, _ := ts.Gw.CertificateManager.Add(combinedClientPEM, "")
+	clientCertID, err := ts.Gw.CertificateManager.Add(combinedClientPEM, "")
+	require.NoError(t, err)
 	defer ts.Gw.CertificateManager.Delete(clientCertID, "")
 
 	t.Run("Exact hostname match - config without port, request with port", func(t *testing.T) {
@@ -1512,7 +1518,10 @@ func TestKeyWithCertificateTLS(t *testing.T) {
 		)[0]
 
 		client := GetTLSClient(&clientCert, nil)
-		client.Transport = test.NewTransport(test.WithLocalDialer())
+		// Preserve TLS config while using local dialer
+		if transport, ok := client.Transport.(*http.Transport); ok {
+			transport.DialContext = test.LocalDialer()
+		}
 
 		_, _ = ts.Run(t, []test.TestCase{
 			{Code: http.StatusNotFound, Path: "/test1", Client: client},
