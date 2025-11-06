@@ -514,9 +514,8 @@ jobs:
           sleep 2
           ./ci/tests/api-functionality/api_test.sh
           sleep 2
+          docker logs test
           docker stop test || true
-      - name: Show container logs
-        run: docker logs test
   upgrade-rpm:
     services:
       httpbin.org:
@@ -572,9 +571,7 @@ jobs:
           tags: test-${{ matrix.distro }}-${{ matrix.arch }}
           load: true
       - name: Test the built container image with api functionality test.
-        run: "docker run -d -p8080:8080 --name=test --platform linux/${{ matrix.arch }} --network ${{ job.container.network }} --rm test-${{ matrix.distro }}-${{ matrix.arch }}\nsleep 2\n./ci/tests/api-functionality/api_test.sh\nsleep 2\ndocker stop test || true \n"
-      - name: Show container logs
-        run: docker logs test
+        run: "docker run -d -p8080:8080 --name=test --platform linux/${{ matrix.arch }} --network ${{ job.container.network }} --rm test-${{ matrix.distro }}-${{ matrix.arch }}\nsleep 2\n./ci/tests/api-functionality/api_test.sh\nsleep 2\ndocker logs test\ndocker stop test || true \n"
   release-tests:
     needs:
       - goreleaser
