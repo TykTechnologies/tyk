@@ -1294,14 +1294,13 @@ func TestGetCertificateIDForHost(t *testing.T) {
 }
 
 func TestSSLForceCommonName(t *testing.T) {
-	test.Flaky(t) // TODO TT-5112
 	upstream := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 	}))
 
 	// generate certificate Common Name as valid hostname and SAN as non-empty value
 	_, _, _, cert := crypto.GenCertificate(&x509.Certificate{
 		EmailAddresses: []string{"test@test.com"},
-		Subject:        pkix.Name{CommonName: "host1.local"},
+		Subject:        pkix.Name{CommonName: "localhost"},
 	}, false)
 
 	upstream.TLS = &tls.Config{
@@ -1331,13 +1330,15 @@ func TestSSLForceCommonName(t *testing.T) {
 
 		globalConf := ts.Gw.GetConfig()
 		globalConf.SSLForceCommonNameCheck = true
+		globalConf.ProxySSLInsecureSkipVerify = true
 		ts.Gw.SetConfig(globalConf)
 
-		targetURL := strings.Replace(upstream.URL, "127.0.0.1", "host1.local", 1)
-		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		targetURL := strings.Replace(upstream.URL, "127.0.0.1", "localhost", 1)
+		api := BuildAPI(func(spec *APISpec) {
 			spec.Proxy.ListenPath = "/"
 			spec.Proxy.TargetURL = targetURL
-		})
+		})[0]
+		ts.Gw.LoadAPI(api)
 
 		_, _ = ts.Run(t, test.TestCase{Code: 200, Client: test.NewClientLocal()})
 	})
