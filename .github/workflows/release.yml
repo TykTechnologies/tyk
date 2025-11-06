@@ -458,20 +458,6 @@ jobs:
             echo "::warning file=.github/workflows/release.yml,line=24,col=1,endColumn=8::Using test variation"
           fi
   upgrade-deb:
-    services:
-      httpbin.org:
-        image: kennethreitz/httpbin
-        ports:
-          - 9999:80
-      redis:
-        image: redis:6.0-alpine
-        ports:
-          - 6379:6379
-        options: >-
-          --health-cmd "redis-cli ping"
-          --health-interval 5s
-          --health-timeout 3s
-          --health-retries 5
     runs-on: ubuntu-latest
     needs:
       - test-controller-distros
@@ -497,14 +483,14 @@ jobs:
           echo 'FROM ${{ matrix.distro }}
           ARG TARGETARCH
           COPY tyk-gateway*_${TARGETARCH}.deb /tyk-gateway.deb
-          RUN apt-get update && apt-get install -y curl
+          RUN apt-get update && apt-get install -y curl redis-server
           RUN curl -fsSL https://packagecloud.io/install/repositories/tyk/tyk-gateway/script.deb.sh | bash || echo "Repository setup failed, but continuing"
           RUN apt-get install -y tyk-gateway=3.0.8 || echo "Previous version not found, testing fresh install"
           RUN dpkg -i /tyk-gateway.deb
 
-          RUN /opt/tyk-gateway/install/setup.sh --listenport=8080 --redishost=redis --redisport=6379 --domain=""
+          RUN /opt/tyk-gateway/install/setup.sh --listenport=8080 --redishost=localhost --redisport=6379 --domain=""
           COPY ci/tests/api-functionality/data/api.json /opt/tyk-gateway/apps/
-          CMD ["/opt/tyk-gateway/tyk", "--conf", "/opt/tyk-gateway/tyk.conf"]
+          CMD redis-server --daemonize yes && /opt/tyk-gateway/tyk --conf /opt/tyk-gateway/tyk.conf
           ' | tee Dockerfile
       - name: install on ${{ matrix.distro }}
         uses: docker/build-push-action@v6
@@ -521,26 +507,12 @@ jobs:
           load: true
       - name: Test the built container image with api functionality test.
         run: |
-          docker run -d -p8080:8080 --name=test --platform linux/${{ matrix.arch }} --network host --rm test-${{ matrix.distro }}-${{ matrix.arch }}
+          docker run -d -p8080:8080 --name=test --platform linux/${{ matrix.arch }} --rm test-${{ matrix.distro }}-${{ matrix.arch }}
           sleep 2
           ./ci/tests/api-functionality/api_test.sh
           sleep 2
           docker stop test || true
   upgrade-rpm:
-    services:
-      httpbin.org:
-        image: kennethreitz/httpbin
-        ports:
-          - 9999:80
-      redis:
-        image: redis:6.0-alpine
-        ports:
-          - 6379:6379
-        options: >-
-          --health-cmd "redis-cli ping"
-          --health-interval 5s
-          --health-timeout 3s
-          --health-retries 5
     runs-on: ubuntu-latest
     needs:
       - test-controller-distros
@@ -568,15 +540,16 @@ jobs:
           COPY tyk-gateway*.${RHELARCH}.rpm /tyk-gateway.rpm
           RUN command -v curl || yum install -y curl
           RUN command -v useradd || yum install -y shadow-utils
+          RUN yum install -y redis
           RUN curl -fsSL https://packagecloud.io/install/repositories/tyk/tyk-gateway/script.rpm.sh | bash || echo "Repository setup failed, but continuing"
           RUN yum install -y tyk-gateway-3.0.8-1 || echo "Previous version not found, testing fresh install"
           RUN curl https://keyserver.tyk.io/tyk.io.rpm.signing.key.2020 -o tyk-gateway.key && rpm --import tyk-gateway.key
           RUN rpm --checksig /tyk-gateway.rpm
           RUN rpm -Uvh --force /tyk-gateway.rpm
 
-          RUN /opt/tyk-gateway/install/setup.sh --listenport=8080 --redishost=redis --redisport=6379 --domain=""
+          RUN /opt/tyk-gateway/install/setup.sh --listenport=8080 --redishost=localhost --redisport=6379 --domain=""
           COPY ci/tests/api-functionality/data/api.json /opt/tyk-gateway/apps/
-          CMD ["/opt/tyk-gateway/tyk", "--conf", "/opt/tyk-gateway/tyk.conf"]
+          CMD redis-server --daemonize yes && /opt/tyk-gateway/tyk --conf /opt/tyk-gateway/tyk.conf
           ' | tee Dockerfile
       - name: install on ${{ matrix.distro }}
         uses: docker/build-push-action@v6
@@ -592,7 +565,7 @@ jobs:
           tags: test-${{ matrix.distro }}-${{ matrix.arch }}
           load: true
       - name: Test the built container image with api functionality test.
-        run: "docker run -d -p8080:8080 --name=test --platform linux/${{ matrix.arch }} --network host --rm test-${{ matrix.distro }}-${{ matrix.arch }}\nsleep 2\n./ci/tests/api-functionality/api_test.sh\nsleep 2\ndocker stop test || true \n"
+        run: "docker run -d -p8080:8080 --name=test --platform linux/${{ matrix.arch }} --rm test-${{ matrix.distro }}-${{ matrix.arch }}\nsleep 2\n./ci/tests/api-functionality/api_test.sh\nsleep 2\ndocker stop test || true \n"
   release-tests:
     needs:
       - goreleaser
