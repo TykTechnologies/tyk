@@ -510,10 +510,10 @@ jobs:
           load: true
       - name: Test the built container image with api functionality test.
         run: |
-          docker run -d -p8080:8080 --name=test --platform linux/${{ matrix.arch }} --rm test-${{ matrix.distro }}-${{ matrix.arch }}
-          sleep 5
+          docker run -d -p8080:8080 --name=test --platform linux/${{ matrix.arch }} --network ${{ job.container.network }} --rm test-${{ matrix.distro }}-${{ matrix.arch }}
+          sleep 2
           ./ci/tests/api-functionality/api_test.sh
-          sleep 5
+          sleep 2
           docker stop test || true
   upgrade-rpm:
     services:
@@ -555,7 +555,7 @@ jobs:
 
           RUN /opt/tyk-gateway/install/setup.sh --listenport=8080 --redishost=localhost --redisport=6379 --domain=""
           COPY ci/tests/api-functionality/data/api.json /opt/tyk-gateway/apps/
-          CMD redis-server --daemonize yes && sleep 2 && /opt/tyk-gateway/tyk --conf /opt/tyk-gateway/tyk.conf
+          CMD ["/opt/tyk-gateway/tyk", "--conf", "/opt/tyk-gateway/tyk.conf"]
           ' | tee Dockerfile
       - name: install on ${{ matrix.distro }}
         uses: docker/build-push-action@v6
@@ -571,7 +571,7 @@ jobs:
           tags: test-${{ matrix.distro }}-${{ matrix.arch }}
           load: true
       - name: Test the built container image with api functionality test.
-        run: "docker run -d -p8080:8080 --name=test --platform linux/${{ matrix.arch }} --rm test-${{ matrix.distro }}-${{ matrix.arch }}\nsleep 5\n./ci/tests/api-functionality/api_test.sh\nsleep 5\ndocker stop test || true \n"
+        run: "docker run -d -p8080:8080 --name=test --platform linux/${{ matrix.arch }} --network ${{ job.container.network }} --rm test-${{ matrix.distro }}-${{ matrix.arch }}\nsleep 2\n./ci/tests/api-functionality/api_test.sh\nsleep 2\ndocker stop test || true \n"
   release-tests:
     needs:
       - goreleaser
