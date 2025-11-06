@@ -493,7 +493,7 @@ jobs:
 
           RUN /opt/tyk-gateway/install/setup.sh --listenport=8080 --redishost=localhost --redisport=6379 --domain=""
           COPY ci/tests/api-functionality/data/api.json /opt/tyk-gateway/apps/
-          CMD mkdir -p /var/lib/redis /var/run/redis && redis-server --daemonize yes --dir /var/lib/redis --logfile "" --bind 127.0.0.1 --port 6379 && redis-cli ping && /opt/tyk-gateway/tyk --conf /opt/tyk-gateway/tyk.conf
+          CMD redis-server --daemonize yes && sleep 2 && /opt/tyk-gateway/tyk --conf /opt/tyk-gateway/tyk.conf
           ' | tee Dockerfile
       - name: install on ${{ matrix.distro }}
         uses: docker/build-push-action@v6
@@ -515,9 +515,8 @@ jobs:
           ./ci/tests/api-functionality/api_test.sh
           sleep 2
           docker stop test || true
-      - name: Dump docker logs on failure
-        if: failure()
-        uses: jwalton/gh-docker-logs@v2
+      - name: Show container logs
+        run: docker logs test
   upgrade-rpm:
     services:
       httpbin.org:
@@ -574,9 +573,8 @@ jobs:
           load: true
       - name: Test the built container image with api functionality test.
         run: "docker run -d -p8080:8080 --name=test --platform linux/${{ matrix.arch }} --network ${{ job.container.network }} --rm test-${{ matrix.distro }}-${{ matrix.arch }}\nsleep 2\n./ci/tests/api-functionality/api_test.sh\nsleep 2\ndocker stop test || true \n"
-      - name: Dump docker logs on failure
-        if: failure()
-        uses: jwalton/gh-docker-logs@v2
+      - name: Show container logs
+        run: docker logs test
   release-tests:
     needs:
       - goreleaser
