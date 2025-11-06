@@ -515,6 +515,9 @@ jobs:
           ./ci/tests/api-functionality/api_test.sh
           sleep 2
           docker stop test || true
+      - name: Dump docker logs on failure
+        if: failure()
+        uses: jwalton/gh-docker-logs@v2
   upgrade-rpm:
     services:
       httpbin.org:
@@ -572,6 +575,9 @@ jobs:
           load: true
       - name: Test the built container image with api functionality test.
         run: "docker run -d -p8080:8080 --name=test --platform linux/${{ matrix.arch }} --network ${{ job.container.network }} --rm test-${{ matrix.distro }}-${{ matrix.arch }}\nsleep 2\n./ci/tests/api-functionality/api_test.sh\nsleep 2\ndocker stop test || true \n"
+      - name: Dump docker logs on failure
+        if: failure()
+        uses: jwalton/gh-docker-logs@v2
   release-tests:
     needs:
       - goreleaser
