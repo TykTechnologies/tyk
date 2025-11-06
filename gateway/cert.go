@@ -69,13 +69,25 @@ var cipherSuites = map[string]uint16{
 
 var certLog = log.WithField("prefix", "certs")
 
-func (gw *Gateway) getUpstreamCertificate(host string, spec *APISpec) (cert *tls.Certificate) {
+// getCertificateIDForHost returns the certificate ID that matches the given host from the provided certificate maps.
+// It tries multiple matching patterns to find the best match:
+// 1. Wildcard "*" - matches any host
+// 2. Wildcard subdomain patterns with port - "*.example.com:8443"
+// 3. Wildcard subdomain patterns without port - "*.example.com"
+// 4. Exact hostname match with port - "api.example.com:8443"
+// 5. Exact hostname match without port - "api.example.com"
+//
+// The function automatically handles hosts with ports by using net.SplitHostPort.
+// Certificate maps are checked in order, with later maps taking precedence (allowing spec config to override global config).
+func getCertificateIDForHost(host string, certMaps []map[string]string) string {
 	var certID string
 
-	certMaps := []map[string]string{gw.GetConfig().Security.Certificates.Upstream}
-
-	if spec != nil && !spec.UpstreamCertificatesDisabled && spec.UpstreamCertificates != nil {
-		certMaps = append(certMaps, spec.UpstreamCertificates)
+	// Strip port from host for certificate matching
+	// If host is "example.com:8443", hostWithoutPort becomes "example.com"
+	// If host has no port, hostWithoutPort equals host
+	hostWithoutPort := host
+	if h, _, err := net.SplitHostPort(host); err == nil {
+		hostWithoutPort = h
 	}
 
 	for _, m := range certMaps {
@@ -83,30 +95,62 @@ func (gw *Gateway) getUpstreamCertificate(host string, spec *APISpec) (cert *tls
 			continue
 		}
 
+		// Try wildcard match for any host
 		if id, ok := m["*"]; ok {
 			certID = id
 		}
 
-		hostParts := strings.SplitN(host, ".", 2)
+		// Try wildcard subdomain pattern matches
+		hostParts := strings.SplitN(hostWithoutPort, ".", 2)
 		if len(hostParts) > 1 {
+			// Try pattern without port first (less specific)
+			// e.g., "*.example.com" from config matches "api.example.com:8443" request
 			hostPattern := "*." + hostParts[1]
-
 			if id, ok := m[hostPattern]; ok {
 				certID = id
 			}
+
+			// Try pattern with original host (includes port if present) - higher priority
+			// e.g., "*.example.com:8443" from config matches "api.example.com:8443" request
+			// More specific patterns (with port) override less specific patterns (without port)
+			hostPartsWithPort := strings.SplitN(host, ".", 2)
+			if len(hostPartsWithPort) > 1 {
+				hostPatternWithPort := "*." + hostPartsWithPort[1]
+				if id, ok := m[hostPatternWithPort]; ok {
+					certID = id
+				}
+			}
 		}
 
+		// Try exact match without port first (most common case)
+		// This ensures "example.com" config matches "example.com:8443" request
+		if id, ok := m[hostWithoutPort]; ok {
+			certID = id
+		}
+
+		// Try exact match with original host (higher priority, more specific)
+		// This allows configs that include port to override more general configs
 		if id, ok := m[host]; ok {
 			certID = id
 		}
 	}
 
+	return certID
+}
+
+func (gw *Gateway) getUpstreamCertificate(host string, spec *APISpec) (cert *tls.Certificate) {
+	certMaps := []map[string]string{gw.GetConfig().Security.Certificates.Upstream}
+
+	if spec != nil && !spec.UpstreamCertificatesDisabled && spec.UpstreamCertificates != nil {
+		certMaps = append(certMaps, spec.UpstreamCertificates)
+	}
+
+	certID := getCertificateIDForHost(host, certMaps)
 	if certID == "" {
 		return nil
 	}
 
 	certs := gw.CertificateManager.List([]string{certID}, certs.CertificatePrivate)
-
 	if len(certs) == 0 {
 		return nil
 	}
@@ -420,7 +464,7 @@ func (gw *Gateway) getTLSConfigForClient(baseConfig *tls.Config, listenPort int)
 
 					for _, cert := range gw.CertificateManager.List(certIDs, certs.CertificatePublic) {
 						if cert != nil && !crypto.IsPublicKey(cert) {
-							newConfig.ClientCAs.AddCert(cert.Leaf)
+							crypto.AddCACertificatesFromChainToPool(newConfig.ClientCAs, cert)
 						}
 					}
 				}
