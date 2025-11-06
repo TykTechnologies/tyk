@@ -313,6 +313,54 @@ jobs:
       dashboard_branch: ${{ steps.resolve.outputs.dashboard_branch }}
       strategy: ${{ steps.resolve.outputs.strategy }}
     steps:
+      - name: Checkout tyk repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check for relevant package changes
+        id: check_changes
+        shell: bash
+        env:
+          BASE_REF: ${{ env.BASE_REF }}
+        run: |
+          # Packages that affect dashboard compatibility
+          RELEVANT_PACKAGES="pkg apidef lib common certs log config test user header"
+
+          echo "Checking for changes in packages: $RELEVANT_PACKAGES"
+
+          # Get changed files compared to base branch
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            BASE_SHA="${{ github.event.pull_request.base.sha }}"
+            HEAD_SHA="${{ github.sha }}"
+            echo "Comparing PR: $BASE_SHA...$HEAD_SHA"
+            CHANGED_FILES=$(git diff --name-only $BASE_SHA...$HEAD_SHA || echo "")
+          else
+            # For push events, compare with origin/master
+            echo "Comparing with origin/$BASE_REF"
+            CHANGED_FILES=$(git diff --name-only origin/$BASE_REF...HEAD || echo "")
+          fi
+
+          echo "Changed files:"
+          echo "$CHANGED_FILES"
+
+          # Check if any changed files are in relevant packages
+          HAS_RELEVANT_CHANGES=false
+          for pkg in $RELEVANT_PACKAGES; do
+            if echo "$CHANGED_FILES" | grep -q "^${pkg}/"; then
+              echo "✓ Found changes in package: $pkg"
+              HAS_RELEVANT_CHANGES=true
+            fi
+          done
+
+          if [ "$HAS_RELEVANT_CHANGES" = "true" ]; then
+            echo "has_relevant_changes=true" >> $GITHUB_OUTPUT
+            echo "📦 Relevant package changes detected - custom dashboard build may be needed"
+          else
+            echo "has_relevant_changes=false" >> $GITHUB_OUTPUT
+            echo "ℹ️ No relevant package changes - will use default dashboard"
+          fi
+
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -385,6 +433,7 @@ jobs:
           IMAGE_TAG: ${{ steps.check_ecr.outputs.image_tag }}
           BASE_REF: ${{ env.BASE_REF }}
           COMMIT_SHA: ${{ github.sha }}
+          HAS_RELEVANT_CHANGES: ${{ steps.check_changes.outputs.has_relevant_changes }}
         run: |
           echo "=================================="
           echo "📊 Dashboard Image Resolution"
@@ -395,9 +444,19 @@ jobs:
           echo "Image tag: $IMAGE_TAG"
           echo "Base ref: $BASE_REF"
           echo "Commit SHA: $COMMIT_SHA"
+          echo "Has relevant changes: $HAS_RELEVANT_CHANGES"
           echo "=================================="
 
-          if [ "$BRANCH_EXISTS" = "true" ]; then
+          # If no relevant package changes, always use gromit default
+          if [ "$HAS_RELEVANT_CHANGES" != "true" ]; then
+            echo "ℹ️ Strategy: Use gromit default (no relevant package changes)"
+            echo "    → No custom dashboard needed"
+            echo "dashboard_image=" >> $GITHUB_OUTPUT
+            echo "needs_build=false" >> $GITHUB_OUTPUT
+            echo "dashboard_branch=" >> $GITHUB_OUTPUT
+            echo "strategy=no-relevant-changes" >> $GITHUB_OUTPUT
+
+          elif [ "$BRANCH_EXISTS" = "true" ]; then
             # Strategy 1: Use gromit policy (matching branch exists)
             echo "📋 Strategy: Let gromit match branch '$BRANCH'"
             echo "    → No override needed, gromit will handle it"
