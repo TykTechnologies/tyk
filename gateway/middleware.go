@@ -368,7 +368,7 @@ func (t *BaseMiddleware) fetchOrgSessionWithTimeout(orgID string) (user.SessionS
 			}
 		}()
 
-		session, found := t.Spec.OrgSessionManager.SessionDetail(orgID, orgID, false)
+		session, found := t.Spec.OrgSessionManager.SessionDetailContext(timeoutCtx, orgID, orgID, false)
 		if found && t.Spec.GlobalConfig.EnforceOrgDataAge {
 			t.Logger().Debug("Setting data expiry: ", orgID)
 			t.Gw.ExpiryCache.Set(session.OrgID, session.DataExpires, cache.DefaultExpiration)

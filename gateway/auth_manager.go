@@ -1,6 +1,7 @@
 package gateway
 
 import (
+	"context"
 	"encoding/base64"
 	"encoding/json"
 	"strings"
@@ -21,6 +22,7 @@ type SessionHandler interface {
 	UpdateSession(keyName string, session *user.SessionState, resetTTLTo int64, hashed bool) error
 	RemoveSession(orgID string, keyName string, hashed bool) bool
 	SessionDetail(orgID string, keyName string, hashed bool) (user.SessionState, bool)
+	SessionDetailContext(ctx context.Context, orgID string, keyName string, hashed bool) (user.SessionState, bool)
 	KeyExpired(newSession *user.SessionState) bool
 	Sessions(filter string) []string
 	ResetQuota(string, *user.SessionState, bool)
@@ -159,6 +161,28 @@ func (b *DefaultSessionManager) RemoveSession(orgID string, keyName string, hash
 
 // SessionDetail returns the session detail using the storage engine (either in memory or Redis)
 func (b *DefaultSessionManager) SessionDetail(orgID string, keyName string, hashed bool) (user.SessionState, bool) {
+	return b.fetchSessionDetail(nil, orgID, keyName, hashed)
+}
+
+// SessionDetailContext returns the session detail using the storage engine with context support for cancellation
+func (b *DefaultSessionManager) SessionDetailContext(ctx context.Context, orgID string, keyName string, hashed bool) (user.SessionState, bool) {
+	return b.fetchSessionDetail(ctx, orgID, keyName, hashed)
+}
+
+// fetchSessionDetail is the internal implementation shared by SessionDetail and SessionDetailContext
+func (b *DefaultSessionManager) fetchSessionDetail(ctx context.Context, orgID string, keyName string, hashed bool) (user.SessionState, bool) {
+	if ctx != nil {
+		select {
+		case <-ctx.Done():
+			log.WithFields(logrus.Fields{
+				"prefix":      "auth-mgr",
+				"inbound-key": b.Gw.obfuscateKey(keyName),
+			}).Debug("Context cancelled")
+			return user.SessionState{}, false
+		default:
+		}
+	}
+
 	var jsonKeyVal string
 	var err error
 	keyId := keyName

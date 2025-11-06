@@ -1,6 +1,7 @@
 package gateway
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -36,6 +37,17 @@ var sess = user.SessionState{
 func (m mockStore) SessionDetail(orgID string, keyName string, hashed bool) (user.SessionState, bool) {
 	if m.Delay > 0 {
 		time.Sleep(m.Delay)
+	}
+	return sess.Clone(), !m.DetailNotFound
+}
+
+func (m mockStore) SessionDetailContext(ctx context.Context, orgID string, keyName string, hashed bool) (user.SessionState, bool) {
+	if m.Delay > 0 {
+		select {
+		case <-time.After(m.Delay):
+		case <-ctx.Done():
+			return user.SessionState{}, false
+		}
 	}
 	return sess.Clone(), !m.DetailNotFound
 }
