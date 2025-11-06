@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"context"
 	"errors"
 
 	logger "github.com/TykTechnologies/tyk/log"
@@ -51,6 +52,10 @@ type Handler interface {
 	RemoveFromList(string, string) error
 	AppendToSet(string, string)
 	Exists(string) (bool, error)
+
+	GetKeyContext(ctx context.Context, key string) (string, error)
+	GetRawKeyContext(ctx context.Context, key string) (string, error)
+	GetMultiKeyContext(ctx context.Context, keys []string) ([]string, error)
 }
 
 type AnalyticsHandler interface {

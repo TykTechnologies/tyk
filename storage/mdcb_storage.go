@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"context"
 	"errors"
 	"strings"
 
@@ -288,4 +289,19 @@ func (m MdcbStorage) getFromRPCAndCache(key string) (string, error) {
 // getFromLocal get a key from local storage
 func (m MdcbStorage) getFromLocal(key string) (string, error) {
 	return m.local.GetKey(key)
+}
+
+// GetKeyContext retrieves a key with context support.
+func (m MdcbStorage) GetKeyContext(ctx context.Context, key string) (string, error) {
+	return m.GetKey(key)
+}
+
+// GetRawKeyContext retrieves a raw key with context support.
+func (m MdcbStorage) GetRawKeyContext(ctx context.Context, key string) (string, error) {
+	return m.GetRawKey(key)
+}
+
+// GetMultiKeyContext retrieves multiple keys with context support.
+func (m MdcbStorage) GetMultiKeyContext(ctx context.Context, keys []string) ([]string, error) {
+	return m.GetMultiKey(keys)
 }
