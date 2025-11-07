@@ -364,3 +364,224 @@ func TestLogEventHandlerConf_Scan(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, expected, logEventConf)
 }
+
+func TestAPIDefinition_IsChildAPI(t *testing.T) {
+	tests := []struct {
+		name     string
+		api      APIDefinition
+		expected bool
+	}{
+		{
+			name: "child API - BaseID set and different from APIID",
+			api: APIDefinition{
+				APIID: "child-api-123",
+				VersionDefinition: VersionDefinition{
+					BaseID: "base-api-456",
+				},
+			},
+			expected: true,
+		},
+		{
+			name: "not a child - BaseID empty",
+			api: APIDefinition{
+				APIID: "standalone-api-123",
+				VersionDefinition: VersionDefinition{
+					BaseID: "",
+				},
+			},
+			expected: false,
+		},
+		{
+			name: "not a child - BaseID equals APIID (base API)",
+			api: APIDefinition{
+				APIID: "base-api-123",
+				VersionDefinition: VersionDefinition{
+					BaseID: "base-api-123",
+				},
+			},
+			expected: false,
+		},
+		{
+			name: "not a child - no version definition",
+			api: APIDefinition{
+				APIID:             "api-123",
+				VersionDefinition: VersionDefinition{},
+			},
+			expected: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := tt.api.IsChildAPI()
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+func TestAPIDefinition_IsBaseAPI(t *testing.T) {
+	tests := []struct {
+		name     string
+		api      APIDefinition
+		expected bool
+	}{
+		{
+			name: "base API - has versions and no BaseID",
+			api: APIDefinition{
+				APIID: "base-api-123",
+				VersionDefinition: VersionDefinition{
+					BaseID: "",
+					Versions: map[string]string{
+						"v1": "child-api-1",
+						"v2": "child-api-2",
+					},
+				},
+			},
+			expected: true,
+		},
+		{
+			name: "base API - has versions and BaseID equals APIID",
+			api: APIDefinition{
+				APIID: "base-api-123",
+				VersionDefinition: VersionDefinition{
+					BaseID: "base-api-123",
+					Versions: map[string]string{
+						"v1": "child-api-1",
+						"v2": "child-api-2",
+					},
+				},
+			},
+			expected: true,
+		},
+		{
+			name: "not a base API - no versions",
+			api: APIDefinition{
+				APIID: "api-123",
+				VersionDefinition: VersionDefinition{
+					BaseID:   "",
+					Versions: map[string]string{},
+				},
+			},
+			expected: false,
+		},
+		{
+			name: "not a base API - is a child (BaseID different from APIID)",
+			api: APIDefinition{
+				APIID: "child-api-123",
+				VersionDefinition: VersionDefinition{
+					BaseID: "base-api-456",
+					Versions: map[string]string{
+						"v1": "child-api-123",
+					},
+				},
+			},
+			expected: false,
+		},
+		{
+			name: "not a base API - nil versions",
+			api: APIDefinition{
+				APIID: "api-123",
+				VersionDefinition: VersionDefinition{
+					BaseID:   "",
+					Versions: nil,
+				},
+			},
+			expected: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := tt.api.IsBaseAPI()
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+func TestAPIDefinition_IsBaseAPIWithVersioning(t *testing.T) {
+	tests := []struct {
+		name     string
+		api      APIDefinition
+		expected bool
+	}{
+		{
+			name: "base API with versioning - all conditions met",
+			api: APIDefinition{
+				APIID: "base-api-123",
+				VersionDefinition: VersionDefinition{
+					Enabled: true,
+					Name:    "v1",
+					BaseID:  "",
+				},
+			},
+			expected: true,
+		},
+		{
+			name: "base API with versioning - BaseID equals APIID",
+			api: APIDefinition{
+				APIID: "base-api-123",
+				VersionDefinition: VersionDefinition{
+					Enabled: true,
+					Name:    "v1",
+					BaseID:  "base-api-123",
+				},
+			},
+			expected: true,
+		},
+		{
+			name: "not versioned - Enabled is false",
+			api: APIDefinition{
+				APIID: "api-123",
+				VersionDefinition: VersionDefinition{
+					Enabled: false,
+					Name:    "v1",
+					BaseID:  "",
+				},
+			},
+			expected: false,
+		},
+		{
+			name: "not versioned - Name is empty",
+			api: APIDefinition{
+				APIID: "api-123",
+				VersionDefinition: VersionDefinition{
+					Enabled: true,
+					Name:    "",
+					BaseID:  "",
+				},
+			},
+			expected: false,
+		},
+		{
+			name: "is a child API - BaseID different from APIID",
+			api: APIDefinition{
+				APIID: "child-api-123",
+				VersionDefinition: VersionDefinition{
+					Enabled: true,
+					Name:    "v2",
+					BaseID:  "base-api-456",
+				},
+			},
+			expected: false,
+		},
+		{
+			name: "not versioned - all fields false/empty",
+			api: APIDefinition{
+				APIID: "api-123",
+				VersionDefinition: VersionDefinition{
+					Enabled: false,
+					Name:    "",
+					BaseID:  "",
+				},
+			},
+			expected: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := tt.api.IsBaseAPIWithVersioning()
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
