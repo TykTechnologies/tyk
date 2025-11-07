@@ -625,6 +625,14 @@ jobs:
       - test-controller-api
       - goreleaser
       - resolve-dashboard-image
+      - build-dashboard-image
+    # build-dashboard-image may be skipped, so use if: always() to run regardless
+    if: |
+      always() &&
+      needs.test-controller-api.result == 'success' &&
+      needs.goreleaser.result == 'success' &&
+      needs.resolve-dashboard-image.result == 'success' &&
+      (needs.build-dashboard-image.result == 'success' || needs.build-dashboard-image.result == 'skipped')
     runs-on: ubuntu-latest-m-2
     env:
       XUNIT_REPORT_PATH: ${{ github.workspace}}/test-results.xml
