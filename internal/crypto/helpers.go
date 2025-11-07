@@ -153,6 +153,71 @@ func IsPublicKey(cert *tls.Certificate) bool {
 	return cert.Leaf != nil && strings.HasPrefix(cert.Leaf.Subject.CommonName, "Public Key: ")
 }
 
+// AddCACertificatesFromChainToPool traverses a certificate chain and adds only CA certificates to the provided pool.
+// This is necessary when certificate chains include intermediate CA certificates that need to be added
+// to the client CA pool for mTLS authentication.
+//
+// The function handles two scenarios:
+// 1. Single certificate (len=1): If the certificate has IsCA=true, it is added as a trust anchor
+// 2. Certificate chain (len>1): Skips the leaf certificate (index 0) and adds only CA certificates from the chain
+//
+// In both cases, only certificates with IsCA=true are added to the pool.
+// Parsing errors are logged but do not stop processing of remaining certificates in the chain.
+func AddCACertificatesFromChainToPool(pool *x509.CertPool, cert *tls.Certificate) {
+	if pool == nil || cert == nil {
+		return
+	}
+
+	// Handle single certificate case (e.g., self-signed CA certificate or pinned certificate)
+	// For backward compatibility and certificate pinning use cases, we add single certificates
+	// to the pool regardless of IsCA flag.
+	if len(cert.Certificate) == 1 {
+		var certToAdd *x509.Certificate
+		if cert.Leaf != nil {
+			certToAdd = cert.Leaf
+		} else {
+			// Only re-parse if Leaf is not set
+			parsedCert, err := x509.ParseCertificate(cert.Certificate[0])
+			if err != nil {
+				logrus.WithFields(logrus.Fields{
+					"index": 0,
+					"error": err,
+				}).Error("Failed to parse certificate")
+				return
+			}
+			certToAdd = parsedCert
+		}
+
+		pool.AddCert(certToAdd)
+		logrus.WithFields(logrus.Fields{
+			"subject": certToAdd.Subject.CommonName,
+			"isCA":    certToAdd.IsCA,
+		}).Debug("Added certificate to pool")
+		return
+	}
+
+	// Handle certificate chain: skip index 0 (the leaf certificate), process CA certificates
+	for i := 1; i < len(cert.Certificate); i++ {
+		parsedCert, err := x509.ParseCertificate(cert.Certificate[i])
+		if err != nil {
+			logrus.WithFields(logrus.Fields{
+				"index": i,
+				"error": err,
+			}).Error("Failed to parse certificate in chain")
+			continue
+		}
+
+		// Only add if it's a CA certificate
+		if parsedCert.IsCA {
+			pool.AddCert(parsedCert)
+			logrus.WithFields(logrus.Fields{
+				"subject": parsedCert.Subject.CommonName,
+				"index":   i,
+			}).Debug("Added CA certificate from chain to pool")
+		}
+	}
+}
+
 // PrefixPublicKeyCommonName returns x509.Certificate with prefixed CommonName.
 // This is used in UI/response to hint the type certificate during listing.
 func PrefixPublicKeyCommonName(blockBytes []byte) *x509.Certificate {

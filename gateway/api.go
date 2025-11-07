@@ -1099,9 +1099,12 @@ func (gw *Gateway) handleAddApi(r *http.Request, fs afero.Fs, oasEndpoint bool) 
 	}
 
 	if oasEndpoint {
-		newAPIURL := getAPIURL(newDef, gw.GetConfig())
+		versioningParams := extractVersioningParams(
+			versionParams.Get(lib.BaseAPIID),
+			versionParams.Get(lib.NewVersionName),
+		)
 
-		if err := oasObj.AddServers(newAPIURL); err != nil {
+		if err := gw.handleOASServersForNewAPI(&newDef, &oasObj, versioningParams); err != nil {
 			return apiError(err.Error()), http.StatusBadRequest
 		}
 
@@ -1123,6 +1126,10 @@ func (gw *Gateway) handleAddApi(r *http.Request, fs afero.Fs, oasEndpoint bool) 
 
 	if !versionParams.IsEmpty(lib.BaseAPIID) {
 		baseAPI := gw.getApiSpec(versionParams.Get(lib.BaseAPIID))
+
+		// Capture the old default version BEFORE updating the base API
+		oldDefaultVersion := baseAPI.VersionDefinition.Default
+
 		baseAPI.VersionDefinition = lib.ConfigureVersionDefinition(baseAPI.VersionDefinition, versionParams, newDef.APIID)
 
 		if baseAPI.IsOAS {
@@ -1135,6 +1142,15 @@ func (gw *Gateway) handleAddApi(r *http.Request, fs afero.Fs, oasEndpoint bool) 
 			err, _ := gw.writeToFile(fs, baseAPI.APIDefinition, baseAPI.APIID)
 			if err != nil {
 				log.WithError(err).Errorf("Error occurred while updating base API with id: %s", baseAPI.APIID)
+			}
+		}
+
+		// Update old default child's servers if needed (removes fallback URL)
+		setDefault := !versionParams.IsEmpty(lib.SetDefault) && versionParams.Get(lib.SetDefault) == "true"
+		if oas.ShouldUpdateOldDefaultChild(setDefault, oldDefaultVersion, baseAPI.VersionDefinition.Default) {
+			if err := gw.updateOldDefaultChildServersGW(oldDefaultVersion, baseAPI, fs); err != nil {
+				log.WithError(err).Warn("Failed to update old default child API servers")
+				// Don't fail the whole operation if child update fails
 			}
 		}
 	}
@@ -1192,7 +1208,11 @@ func (gw *Gateway) handleUpdateApi(apiID string, r *http.Request, fs afero.Fs, o
 	}
 
 	if oasEndpoint && spec.IsOAS {
-		updateOASServers(spec, gw.GetConfig(), &newDef, &oasObj)
+		// Handle OAS server regeneration and cascade updates for API update
+		if err := gw.handleOASServersForUpdate(spec, &newDef, &oasObj); err != nil {
+			return apiError(err.Error()), http.StatusBadRequest
+		}
+
 		newDef.IsOAS = true
 
 		err, errCode := gw.writeOASAndAPIDefToFile(fs, &newDef, &oasObj)
@@ -1513,7 +1533,27 @@ func (gw *Gateway) apiOASPatchHandler(w http.ResponseWriter, r *http.Request) {
 		tykExtToPatch = oasObjToPatch.GetTykExtension()
 	}
 
-	oasObj.Servers = oas.RetainOldServerURL(oasObjToPatch.Servers, oasObj.Servers)
+	serverConfig := buildServerRegenerationConfig(gw.GetConfig())
+	existingUserServers, err := oas.ExtractUserServers(
+		oasObjToPatch.Servers,
+		existingAPISpec.APIDefinition,
+		nil,
+		serverConfig,
+		"",
+	)
+	if err != nil {
+		doJSONWrite(w, http.StatusInternalServerError, apiError(err.Error()))
+		return
+	}
+
+	patchUserServers := oasObj.Servers
+
+	userServersToKeep := patchUserServers
+	if len(patchUserServers) == 0 {
+		userServersToKeep = existingUserServers
+	}
+
+	oasObj.Servers = userServersToKeep
 
 	oasObjToPatch.T = oasObj.T
 
