@@ -38,6 +38,10 @@ type URLSpec struct {
 	PersistGraphQL            apidef.PersistGraphQLMeta
 	RateLimit                 apidef.RateLimitMeta
 
+	// oas operation
+	oasMock            oasMockMiddleware
+	oasValidateRequest oasValidateMiddleware
+
 	IgnoreCase bool
 }
 
@@ -85,6 +89,11 @@ func (u *URLSpec) modeSpecificSpec(mode URLStatus) (interface{}, bool) {
 		return &u.GoPluginMeta, true
 	case PersistGraphQL:
 		return &u.PersistGraphQL, true
+	case OasMock:
+		return &u.oasMock, true
+	case OasValidate:
+		return &u.oasValidateRequest, true
+
 	default:
 		return nil, false
 	}
@@ -135,6 +144,10 @@ func (u *URLSpec) matchesMethod(method string) bool {
 		return method == u.PersistGraphQL.Method
 	case RateLimit:
 		return method == u.RateLimit.Method
+	case OasMock:
+		return method == u.oasMock.method
+	case OasValidate:
+		return method == u.oasValidateRequest.method
 	default:
 		return false
 	}

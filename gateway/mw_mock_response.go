@@ -90,14 +90,19 @@ func (m *mockResponseMiddleware) ProcessRequest(rw http.ResponseWriter, r *http.
 }
 
 func (m *mockResponseMiddleware) mockResponse(r *http.Request) (*http.Response, error) {
-	// if response is nil we go further
-	operation := m.Spec.findOperation(r)
+	version, _ := m.Spec.Version(r)
+	versionPaths := m.Spec.RxPaths[version.Name]
+	found, meta := m.Spec.CheckSpecMatchesStatus(r, versionPaths, OasMock)
 
-	if operation == nil {
+	if !found {
 		return nil, nil
 	}
 
-	mockResponse := operation.MockResponse
+	mockResponse, ok := meta.(*oasMockMiddleware)
+	if !ok {
+		return nil, errors.New("unexpected type")
+	}
+
 	if mockResponse == nil || !mockResponse.Enabled {
 		return nil, nil
 	}
@@ -111,14 +116,14 @@ func (m *mockResponseMiddleware) mockResponse(r *http.Request) (*http.Response, 
 	var err error
 
 	if mockResponse.FromOASExamples != nil && mockResponse.FromOASExamples.Enabled {
-		code, contentType, body, headers, err = mockFromOAS(r, operation.route.Operation, mockResponse.FromOASExamples)
+		code, contentType, body, headers, err = mockFromOAS(r, mockResponse.op, mockResponse.FromOASExamples)
 		res.StatusCode = code
 		if err != nil {
 			err = fmt.Errorf("mock: %w", err)
 			return res, err
 		}
 	} else {
-		code, body, headers = mockFromConfig(mockResponse)
+		code, body, headers = mockFromConfig(mockResponse.MockResponse)
 	}
 
 	for _, h := range headers {

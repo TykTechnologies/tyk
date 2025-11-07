@@ -1,15 +1,16 @@
 package gateway
 
 import (
-	"github.com/TykTechnologies/tyk/header"
-	"github.com/TykTechnologies/tyk/internal/errors"
-	"github.com/TykTechnologies/tyk/user"
 	"net/http"
 	"net/url"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/TykTechnologies/tyk/header"
+	"github.com/TykTechnologies/tyk/internal/errors"
+	"github.com/TykTechnologies/tyk/user"
 
 	"github.com/getkin/kin-openapi/routers"
 
@@ -30,7 +31,7 @@ type APISpec struct {
 	sync.RWMutex
 
 	Checksum         string
-	RxPaths          map[string][]URLSpec
+	RxPaths          map[string][]URLSpec // -> is compiled from extended path
 	WhiteListEnabled map[string]bool
 	target           *url.URL
 	AuthManager      SessionHandler
