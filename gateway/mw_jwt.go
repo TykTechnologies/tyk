@@ -385,7 +385,7 @@ func (k *JWTMiddleware) collectCachedJWKsFromCache(jwkURIs []apidef.JWK) (jwkSet
 		}
 		jwkSet, ok := cachedItem.(*jose.JSONWebKeySet)
 		if !ok {
-			k.Logger().Warnf("Invalid JWK cache format for APIID %s, URL %s — ignoring", k.Spec.APIID, jwkURI.URL)
+			k.Logger().Warnf("Invalid JWK cache format for APIID %s, URL %s ? ignoring", k.Spec.APIID, jwkURI.URL)
 		}
 		jwkSets = append(jwkSets, jwkSet)
 	}
@@ -421,7 +421,7 @@ func (k *JWTMiddleware) getSecretFromMultipleJWKURIs(jwkURIs []apidef.JWK, kidVa
 		}
 
 		if jwkURLsChanged(cachedAPIDef.JWTJwksURIs, jwkURIs) {
-			k.Logger().Infof("Detected change in JWK URLs — refreshing cache for APIID %s", k.Spec.APIID)
+			k.Logger().Infof("Detected change in JWK URLs ? refreshing cache for APIID %s", k.Spec.APIID)
 			cacheOutdated = true
 		} else {
 			jwkSets = k.collectCachedJWKsFromCache(jwkURIs)
@@ -515,9 +515,24 @@ func (k *JWTMiddleware) getPolicyIDFromToken(claims jwt.MapClaims) (string, bool
 			fieldNames = append(fieldNames, k.Spec.OAS.GetJWTConfiguration().PolicyFieldName)
 		}
 		for _, c := range fieldNames {
+			// STEP 1: Try literal key first (backward compatibility)
 			policyID, found = claims[c].(string)
-			if found {
+			if found && policyID != "" {
+				k.Logger().Debugf("Found policy in literal claim: %s", c)
 				break
+			}
+
+			// STEP 2: Try nested lookup (new feature)
+			// Only if literal key wasn't found AND the field contains a dot
+			if strings.Contains(c, ".") {
+				value := nestedMapLookup(claims, strings.Split(c, ".")...)
+				if value != nil {
+					policyID, found = value.(string)
+					if found && policyID != "" {
+						k.Logger().Debugf("Found policy in nested claim: %s", c)
+						break
+					}
+				}
 			}
 		}
 
@@ -527,8 +542,31 @@ func (k *JWTMiddleware) getPolicyIDFromToken(claims jwt.MapClaims) (string, bool
 		}
 		return policyID, true
 	} else {
-		policyID, foundPolicy := claims[k.Spec.JWTPolicyFieldName].(string)
-		if !foundPolicy {
+		// Legacy path - also support nested claims
+		policyID := ""
+		found := false
+
+		// STEP 1: Try literal key first (backward compatibility)
+		policyID, found = claims[k.Spec.JWTPolicyFieldName].(string)
+		if found && policyID != "" {
+			k.Logger().Debugf("Found policy in literal claim: %s", k.Spec.JWTPolicyFieldName)
+			return policyID, true
+		}
+
+		// STEP 2: Try nested lookup (new feature)
+		// Only if literal key wasn't found AND the field contains a dot
+		if strings.Contains(k.Spec.JWTPolicyFieldName, ".") {
+			value := nestedMapLookup(claims, strings.Split(k.Spec.JWTPolicyFieldName, ".")...)
+			if value != nil {
+				policyID, found = value.(string)
+				if found && policyID != "" {
+					k.Logger().Debugf("Found policy in nested claim: %s", k.Spec.JWTPolicyFieldName)
+					return policyID, true
+				}
+			}
+		}
+
+		if !found {
 			k.Logger().Debugf("Could not identify a policy to apply to this token from field: %s", k.Spec.JWTPolicyFieldName)
 			return "", false
 		}
@@ -1511,9 +1549,11 @@ func getUserIDFromClaim(claims jwt.MapClaims, identityBaseField string, shouldFa
 	)
 
 	if identityBaseField != "" {
+		// STEP 1: Try literal key first (backward compatibility)
+		// Handles edge case where claim key contains literal dots (e.g., "user.id" as a key)
 		if userID, found = claims[identityBaseField].(string); found {
 			if len(userID) > 0 {
-				log.WithField("userId", userID).Debug("Found User Id in Base Field")
+				log.WithField("userId", userID).Debug("Found User Id in Base Field (literal)")
 				return userID, nil
 			}
 
@@ -1522,6 +1562,25 @@ func getUserIDFromClaim(claims jwt.MapClaims, identityBaseField string, shouldFa
 			return "", err
 		}
 
+		// STEP 2: Try nested lookup (new feature)
+		// Only if literal key wasn't found AND the field contains a dot
+		if strings.Contains(identityBaseField, ".") {
+			value := nestedMapLookup(claims, strings.Split(identityBaseField, ".")...)
+			if value != nil {
+				if userID, found = value.(string); found {
+					if len(userID) > 0 {
+						log.WithField("userId", userID).Debug("Found User Id in Base Field (nested)")
+						return userID, nil
+					}
+
+					err := fmt.Errorf("%w, claim: %s", ErrEmptyUserIDInClaim, identityBaseField)
+					log.Error(err)
+					return "", err
+				}
+			}
+		}
+
+		// Neither literal nor nested found
 		if !found {
 			log.WithField("Base Field", identityBaseField).Warning("Base Field claim not found, trying to find user ID in 'sub' claim.")
 		}
