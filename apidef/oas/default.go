@@ -9,8 +9,6 @@ import (
 	"slices"
 	"strconv"
 	"strings"
-
-	"github.com/getkin/kin-openapi/openapi3"
 )
 
 const (
@@ -337,18 +335,4 @@ func getQueryValPtr(val string) *bool {
 	}
 
 	return &boolVal
-}
-
-// RetainOldServerURL retains the first entry from old servers provided
-// tyk adds a server URL to the start of oas.Servers to add the gw URL
-// RetainOldServerURL can be used when API def is patched.
-func RetainOldServerURL(oldServers, newServers openapi3.Servers) openapi3.Servers {
-	if len(oldServers) > 0 && len(newServers) > 0 {
-		if oldServers[0].URL == newServers[0].URL {
-			return newServers
-		}
-		newServers = append(openapi3.Servers{oldServers[0]}, newServers...)
-	}
-
-	return newServers
 }
