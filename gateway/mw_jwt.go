@@ -1601,6 +1601,7 @@ func invalidateJWKSCacheByAPIID(apiID string) {
 			panic("JWKCache must implement cache.Repository")
 		}
 		jwkCache.Flush()
+		mainLog.Debugf("JWKS cache for API: %s has been flushed", apiID)
 	}
 }
 
