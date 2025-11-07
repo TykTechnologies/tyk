@@ -6,9 +6,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/golang-jwt/jwt/v4"
+
 	"github.com/TykTechnologies/tyk/test"
 	"github.com/TykTechnologies/tyk/user"
-	"github.com/golang-jwt/jwt/v4"
 )
 
 // TestJWTNestedSubjectClaimSingleLevel tests nested subject claim with single level nesting
@@ -394,7 +395,10 @@ func TestJWTNestedClaims_CustomerScenario(t *testing.T) {
 	token.Claims.(jwt.MapClaims)["iss"] = "https://customer-idp.com"
 	token.Claims.(jwt.MapClaims)["exp"] = time.Now().Add(time.Hour * 72).Unix()
 
-	tokenString, _ := token.SignedString([]byte("mysecret"))
+	tokenString, err := token.SignedString([]byte("mysecret"))
+	if err != nil {
+		t.Fatalf("Failed to sign token: %v", err)
+	}
 
 	authHeaders := map[string]string{"authorization": tokenString}
 
