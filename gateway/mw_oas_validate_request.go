@@ -8,8 +8,11 @@ import (
 	"time"
 
 	"github.com/getkin/kin-openapi/openapi3"
-
 	"github.com/getkin/kin-openapi/openapi3filter"
+	"github.com/sirupsen/logrus"
+
+	"github.com/TykTechnologies/tyk/internal/paramextractor"
+	"github.com/TykTechnologies/tyk/internal/reflect"
 )
 
 func init() {
@@ -65,17 +68,16 @@ func (k *ValidateRequest) EnabledForSpec() bool {
 	return false
 }
 
+func (k *ValidateRequest) newParamExtractor() paramextractor.Extractor {
+	opt := k.Gw.GetConfig().HttpServerOptions
+	return paramextractor.NewParamExtractorFromFlags(
+		opt.EnablePathPrefixMatching,
+		opt.EnablePathSuffixMatching,
+	)
+}
+
 // ProcessRequest will run any checks on the request on the way through the system, return an error to have the chain fail
 func (k *ValidateRequest) ProcessRequest(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
-	operation := k.Spec.findOperation(r) // todo: remove it
-	// todo: I need to write params extractor
-	// it should be hidden behind interface with one exposed method Extract(r *http.Request, path string) (map[string]string, error)
-	// prefix, suffix cfg flags suggest that I need to implement 4 (or 3) extractors
-	// 1. strict -> split segments and start iteration all the segments and look for  patterns in segments like {param}
-	// 2. prefix -> technically the same like strict bul does not expect that number of segments in pattern and sample are equal
-	// 3. suffix -> like prefix
-	// 4. glob -> pattern has to be placed in re capture group. capture group should be extracted, after extraction salgorithm from strict matching can be used. to properly detect it we need initial pattern or item path, so Extract() method signature can be changed :p
-
 	version, _ := k.Spec.Version(r)
 	versionPaths := k.Spec.RxPaths[version.Name]
 	found, meta := k.Spec.CheckSpecMatchesStatus(r, versionPaths, OasMock)
@@ -98,11 +100,25 @@ func (k *ValidateRequest) ProcessRequest(w http.ResponseWriter, r *http.Request,
 		errResponseCode = validateRequest.ErrorResponseCode
 	}
 
+	pathParams, err := k.newParamExtractor().Extract(r, validateRequest.path)
+	if err != nil {
+		log.
+			WithError(err).
+			WithFields(logrus.Fields{
+				"path":    r.URL.Path,
+				"pattern": validateRequest.path,
+				"method":  r.Method,
+			}).
+			Error("Parameter extraction failed")
+
+		return fmt.Errorf("param extraction error: %w", err), http.StatusInternalServerError
+	}
+
 	// Validate request
 	requestValidationInput := &openapi3filter.RequestValidationInput{
 		Request:    r,
-		PathParams: operation.pathParams, // todo: remove it
-		Route:      operation.route,      // todo: remove it
+		PathParams: pathParams,
+		Route:      reflect.Clone(validateRequest.route),
 		Options: &openapi3filter.Options{
 			AuthenticationFunc: func(ctx context.Context, input *openapi3filter.AuthenticationInput) error {
 				return nil
@@ -110,7 +126,7 @@ func (k *ValidateRequest) ProcessRequest(w http.ResponseWriter, r *http.Request,
 		},
 	}
 
-	err := openapi3filter.ValidateRequest(r.Context(), requestValidationInput)
+	err = openapi3filter.ValidateRequest(r.Context(), requestValidationInput)
 	if err != nil {
 		return fmt.Errorf("request validation error: %w", err), errResponseCode
 	}

@@ -18,35 +18,28 @@ import (
 	texttemplate "text/template"
 	"time"
 
-	"github.com/TykTechnologies/tyk/ee/middleware/streams"
-	"github.com/TykTechnologies/tyk/internal/oasutil"
-	"github.com/TykTechnologies/tyk/storage/kv"
-
-	"github.com/TykTechnologies/tyk/internal/httputil"
-
-	"github.com/getkin/kin-openapi/routers/gorillamux"
-
-	"github.com/getkin/kin-openapi/openapi3"
-
-	"github.com/TykTechnologies/tyk/apidef/oas"
-
-	"github.com/cenk/backoff"
-
 	"github.com/Masterminds/sprig/v3"
-
+	"github.com/cenk/backoff"
+	"github.com/getkin/kin-openapi/openapi3"
+	"github.com/getkin/kin-openapi/routers"
+	"github.com/getkin/kin-openapi/routers/gorillamux"
 	"github.com/sirupsen/logrus"
 
 	circuit "github.com/TykTechnologies/circuitbreaker"
 
-	"github.com/TykTechnologies/tyk/internal/service/gojsonschema"
-
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/apidef/oas"
 	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/ee/middleware/streams"
 	"github.com/TykTechnologies/tyk/header"
+	"github.com/TykTechnologies/tyk/internal/httputil"
 	"github.com/TykTechnologies/tyk/internal/model"
+	"github.com/TykTechnologies/tyk/internal/oasutil"
+	"github.com/TykTechnologies/tyk/internal/service/gojsonschema"
 	"github.com/TykTechnologies/tyk/regexp"
 	"github.com/TykTechnologies/tyk/rpc"
 	"github.com/TykTechnologies/tyk/storage"
+	"github.com/TykTechnologies/tyk/storage/kv"
 )
 
 // const used by cache middleware
@@ -1306,8 +1299,9 @@ func (a APIDefinitionLoader) compileOasMiddleware(
 	status URLStatus,
 	spec *oas.OAS,
 	cfg config.Config,
-	middlewareFn func(tykOp *oas.Operation, method string, op *openapi3.Operation) interface{},
+	middlewareFn func(tykOp *oas.Operation, method string, op *openapi3.Operation, path string) interface{},
 ) []URLSpec {
+
 	if spec == nil || spec.Paths == nil {
 		return nil
 	}
@@ -1327,7 +1321,7 @@ func (a APIDefinitionLoader) compileOasMiddleware(
 				continue
 			}
 
-			middleware := middlewareFn(tykOp, method, operation)
+			middleware := middlewareFn(tykOp, method, operation, path)
 			if middleware == nil {
 				continue
 			}
@@ -1351,7 +1345,7 @@ func (a APIDefinitionLoader) compileOasMiddleware(
 
 // Compile OAS mock specs
 func (a APIDefinitionLoader) compileOasMock(status URLStatus, oasSpec *oas.OAS, cfg config.Config) []URLSpec {
-	return a.compileOasMiddleware(status, oasSpec, cfg, func(tykOp *oas.Operation, method string, op *openapi3.Operation) interface{} {
+	return a.compileOasMiddleware(status, oasSpec, cfg, func(tykOp *oas.Operation, method string, op *openapi3.Operation, path string) interface{} {
 		if tykOp.MockResponse == nil || !tykOp.MockResponse.Enabled {
 			return nil
 		}
@@ -1360,6 +1354,7 @@ func (a APIDefinitionLoader) compileOasMock(status URLStatus, oasSpec *oas.OAS, 
 			MockResponse: tykOp.MockResponse,
 			endpointMiddleware: endpointMiddleware{
 				method: method,
+				path:   path,
 				op:     op,
 			},
 		}
@@ -1368,17 +1363,26 @@ func (a APIDefinitionLoader) compileOasMock(status URLStatus, oasSpec *oas.OAS, 
 
 // Compile OAS validator specs
 func (a APIDefinitionLoader) compileOasValidator(status URLStatus, oasSpec *oas.OAS, cfg config.Config) []URLSpec {
-	return a.compileOasMiddleware(status, oasSpec, cfg, func(tykOp *oas.Operation, method string, op *openapi3.Operation) interface{} {
+	return a.compileOasMiddleware(status, oasSpec, cfg, func(tykOp *oas.Operation, method string, op *openapi3.Operation, path string) interface{} {
 		if tykOp.ValidateRequest == nil || !tykOp.ValidateRequest.Enabled {
 			return nil
+		}
+
+		route := &routers.Route{
+			Path:      path,
+			Method:    method,
+			Operation: op,
+			Spec:      &oasSpec.T,
 		}
 
 		return oasValidateMiddleware{
 			ValidateRequest: tykOp.ValidateRequest,
 			endpointMiddleware: endpointMiddleware{
 				method: method,
+				path:   path,
 				op:     op,
 			},
+			route: route,
 		}
 	})
 }

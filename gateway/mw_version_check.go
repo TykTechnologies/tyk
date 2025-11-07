@@ -50,6 +50,7 @@ type Operation struct {
 
 type endpointMiddleware struct {
 	method string
+	path   string
 	op     *openapi3.Operation
 }
 
@@ -61,6 +62,7 @@ type oasMockMiddleware struct {
 type oasValidateMiddleware struct {
 	*oas.ValidateRequest
 	endpointMiddleware
+	route *routers.Route
 }
 
 // ProcessRequest will run any checks on the request on the way through the system, return an error to have the chain fail
