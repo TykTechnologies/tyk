@@ -334,11 +334,19 @@ jobs:
             BASE_SHA="${{ github.event.pull_request.base.sha }}"
             HEAD_SHA="${{ github.sha }}"
             echo "Comparing PR: $BASE_SHA...$HEAD_SHA"
-            CHANGED_FILES=$(git diff --name-only $BASE_SHA...$HEAD_SHA || echo "")
+
+            # Ensure we have the base commit
+            git fetch origin $BASE_SHA 2>/dev/null || true
+
+            CHANGED_FILES=$(git diff --name-only $BASE_SHA $HEAD_SHA 2>/dev/null || echo "")
           else
-            # For push events, compare with origin/master
+            # For push events, compare with base ref
             echo "Comparing with origin/$BASE_REF"
-            CHANGED_FILES=$(git diff --name-only origin/$BASE_REF...HEAD || echo "")
+
+            # Fetch the base ref
+            git fetch origin $BASE_REF 2>/dev/null || true
+
+            CHANGED_FILES=$(git diff --name-only origin/$BASE_REF...HEAD 2>/dev/null || echo "")
           fi
 
           echo "Changed files:"
