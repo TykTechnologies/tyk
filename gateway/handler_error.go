@@ -3,6 +3,7 @@ package gateway
 import (
 	"bytes"
 	"encoding/base64"
+	"encoding/json"
 	"errors"
 	htmltemplate "html/template"
 	"io"
@@ -152,7 +153,7 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 			var tmplExecutor TemplateExecutor
 			tmplExecutor = tmpl
 
-			apiError := APIError{htmltemplate.HTML(htmltemplate.JSEscapeString(errMsg))}
+			var apiError APIError
 
 			if contentType == header.ApplicationXML || contentType == header.TextXML {
 				apiError.Message = htmltemplate.HTML(errMsg)
@@ -160,6 +161,9 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 				//we look up in the last defined templateName to obtain the template.
 				rawTmpl := e.Gw.templatesRaw.Lookup(templateName)
 				tmplExecutor = rawTmpl
+			} else {
+				jsonBytes, _ := json.Marshal(errMsg)
+				apiError.Message = htmltemplate.HTML(string(jsonBytes[1 : len(jsonBytes)-1]))
 			}
 
 			var log bytes.Buffer
