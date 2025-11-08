@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/getkin/kin-openapi/openapi3"
@@ -22,6 +23,73 @@ func init() {
 		_, err := time.Parse(time.DateOnly, value)
 		return err
 	})
+}
+
+var specialHeaders = map[string]bool{
+	"Set-Cookie":         true,
+	"Www-Authenticate":   true,
+	"Proxy-Authenticate": true,
+	"Warning":            true,
+	"Content-Length":     true,
+	"Content-Type":       true,
+	"Location":           true,
+	"Etag":               true,
+}
+
+// containsComma checks if any value in the slice contains a comma.
+// This is used to detect cases where combining values would break parsing.
+func containsComma(values []string) bool {
+	for _, v := range values {
+		if strings.Contains(v, ",") {
+			return true
+		}
+	}
+	return false
+}
+
+// normalizeHeaders creates a normalized copy of headers for OpenAPI validation.
+// Multiple headers with the same name are combined into a comma-separated value
+// according to HTTP standards, with exceptions for special headers.
+func normalizeHeaders(headers http.Header) http.Header {
+	normalized := make(http.Header)
+
+	for key, values := range headers {
+		canonicalKey := http.CanonicalHeaderKey(key)
+
+		if len(values) == 0 {
+			continue
+		}
+
+		if len(values) == 1 {
+			normalized.Set(canonicalKey, values[0])
+			continue
+		}
+
+		if specialHeaders[canonicalKey] {
+			normalized.Set(canonicalKey, values[0])
+			continue
+		}
+
+		if containsComma(values) {
+			normalized.Set(canonicalKey, values[0])
+			continue
+		}
+
+		normalized.Set(canonicalKey, strings.Join(values, ","))
+	}
+
+	return normalized
+}
+
+// cloneRequestWithNormalizedHeaders creates a shallow copy of the request
+// with normalized headers for OpenAPI validation.
+// This preserves the original request while allowing header normalization.
+func cloneRequestWithNormalizedHeaders(r *http.Request) *http.Request {
+	clone := r.Clone(r.Context())
+
+	clone.Header = normalizeHeaders(r.Header)
+
+	return clone
 }
 
 type ValidateRequest struct {
@@ -82,9 +150,13 @@ func (k *ValidateRequest) ProcessRequest(w http.ResponseWriter, r *http.Request,
 		errResponseCode = validateRequest.ErrorResponseCode
 	}
 
-	// Validate request
+	// Normalize headers before validation to handle duplicate headers
+	// according to HTTP standards (combine with commas except for special headers)
+	normalizedReq := cloneRequestWithNormalizedHeaders(r)
+
+	// Validate request with normalized headers
 	requestValidationInput := &openapi3filter.RequestValidationInput{
-		Request:    r,
+		Request:    normalizedReq,
 		PathParams: operation.pathParams,
 		Route:      operation.route,
 		Options: &openapi3filter.Options{
