@@ -508,3 +508,78 @@ func TestRuleUpstreamAuth_Validate(t *testing.T) {
 		t.Run(tc.name, runValidationTest(apiDef, ruleSet, tc.result))
 	}
 }
+
+func TestRuleLoadBalancingTargets_Validate(t *testing.T) {
+	ruleSet := ValidationRuleSet{
+		&RuleLoadBalancingTargets{},
+	}
+
+	testCases := []struct {
+		name   string
+		apiDef *APIDefinition
+		result ValidationResult
+	}{
+		{
+			name: "load balancing disabled",
+			apiDef: &APIDefinition{
+				Proxy: ProxyConfig{
+					EnableLoadBalancing: false,
+					Targets:             []string{},
+				},
+			},
+			result: ValidationResult{
+				IsValid: true,
+				Errors:  nil,
+			},
+		},
+		{
+			name: "load balancing enabled with valid targets",
+			apiDef: &APIDefinition{
+				Proxy: ProxyConfig{
+					EnableLoadBalancing: true,
+					Targets: []string{
+						"http://target-1",
+						"http://target-1",
+						"http://target-2",
+					},
+				},
+			},
+			result: ValidationResult{
+				IsValid: true,
+				Errors:  nil,
+			},
+		},
+		{
+			name: "load balancing enabled with all targets weight 0",
+			apiDef: &APIDefinition{
+				Proxy: ProxyConfig{
+					EnableLoadBalancing: true,
+					Targets:             []string{},
+				},
+			},
+			result: ValidationResult{
+				IsValid: false,
+				Errors: []error{
+					ErrAllLoadBalancingTargetsZeroWeight,
+				},
+			},
+		},
+		{
+			name: "load balancing disabled with empty targets",
+			apiDef: &APIDefinition{
+				Proxy: ProxyConfig{
+					EnableLoadBalancing: false,
+					Targets:             []string{},
+				},
+			},
+			result: ValidationResult{
+				IsValid: true,
+				Errors:  nil,
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, runValidationTest(tc.apiDef, ruleSet, tc.result))
+	}
+}
