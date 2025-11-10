@@ -1568,6 +1568,7 @@ func (a *APISpec) URLAllowedAndIgnored(r *http.Request, rxPaths []URLSpec, white
 
 				return StatusOk, rxPaths[i].oasMock
 			}
+		} else {
 
 			// We are using an extended path set, check for the method
 			methodMeta, matchMethodOk := rxPaths[i].MethodActions[r.Method]
