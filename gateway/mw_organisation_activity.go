@@ -4,9 +4,9 @@ import (
 	"errors"
 	"net/http"
 	"sync"
+	"time"
 
 	"github.com/TykTechnologies/tyk/ctx"
-	"github.com/TykTechnologies/tyk/internal/cache"
 	"github.com/TykTechnologies/tyk/request"
 	"github.com/TykTechnologies/tyk/user"
 )
@@ -76,41 +76,38 @@ func (k *OrganizationMonitor) ProcessRequest(w http.ResponseWriter, r *http.Requ
 	// try to get from Redis
 	if !found {
 		// not found in in-app cache, let's read from Redis
-		// In RPC mode, fetch org session asynchronously to avoid blocking requests
+		// RPC mode: start background fetch and allow request to proceed
 		if k.Spec.GlobalConfig.SlaveOptions.UseRPC {
-			// Start background fetch but don't wait for it
-			go func() {
-				orgID := k.Spec.OrgID
-				session, found := k.OrgSession(orgID)
-				if found && !k.Spec.GlobalConfig.LocalSessionCache.DisableCacheSessionState {
-					// Cache the session for future requests
-					k.Gw.SessionCache.Set(orgID, session.Clone(), cache.DefaultExpiration)
-					k.Logger().Debug("Background org session fetch completed for: ", orgID)
-				} else if !found {
-					k.setOrgHasNoSession(true)
-				}
-			}()
+			go k.refreshOrgSession(k.Spec.OrgID)
 
-			// Allow request to proceed immediately without blocking
-			k.Logger().Debug("RPC mode: allowing request without blocking on org session fetch for: ", k.Spec.OrgID)
 			return nil, http.StatusOK
 		}
 
+		// Non-RPC mode: synchronous fetch
 		orgSession, found = k.OrgSession(k.Spec.OrgID)
 		if !found {
 			// prevent reads from in-app cache and from Redis for next runs
 			k.setOrgHasNoSession(true)
-			// No organisation session has not been created, should not be a pre-requisite in site setups, so we pass the request on
 			return nil, http.StatusOK
 		}
 	}
 	clone := orgSession.Clone()
 	if k.Spec.GlobalConfig.ExperimentalProcessOrgOffThread {
-		// Make a copy of request before before sending to goroutine
+		// Make a copy of request before sending to goroutine
 		r2 := r.WithContext(r.Context())
 		return k.ProcessRequestOffThread(r2, &clone)
 	}
 	return k.ProcessRequestLive(r, &clone)
+}
+
+func (k *OrganizationMonitor) refreshOrgSession(orgID string) {
+	session, found := k.OrgSession(orgID)
+	if found && !k.Spec.GlobalConfig.LocalSessionCache.DisableCacheSessionState {
+		k.Gw.SessionCache.Set(orgID, session.Clone(), int64(time.Hour))
+		k.Logger().Debug("Background org session fetch completed for: ", orgID)
+	} else if !found {
+		k.setOrgHasNoSession(true)
+	}
 }
 
 // ProcessRequest will run any checks on the request on the way through the system, return an error to have the chain fail
