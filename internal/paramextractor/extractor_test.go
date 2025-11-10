@@ -1,7 +1,6 @@
 package paramextractor_test
 
 import (
-	"net/http"
 	"net/url"
 	"testing"
 
@@ -11,13 +10,11 @@ import (
 )
 
 // Helper function to create an HTTP request with a specific path
-func createRequest(t *testing.T, path string) *http.Request {
+func createRequest(t *testing.T, path string) string {
 	t.Helper()
 	urlInstance, err := url.Parse("http://example.com" + path)
 	assert.NoError(t, err)
-	return &http.Request{
-		URL: urlInstance,
-	}
+	return urlInstance.Path
 }
 
 // TestStrictExtractor tests the strict path matching extractor

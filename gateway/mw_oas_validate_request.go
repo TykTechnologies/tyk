@@ -82,7 +82,7 @@ func (k *ValidateRequest) newParamExtractor() paramextractor.Extractor {
 func (k *ValidateRequest) ProcessRequest(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
 	version, _ := k.Spec.Version(r)
 	versionPaths := k.Spec.RxPaths[version.Name]
-	found, meta := k.Spec.CheckSpecMatchesStatus(r, versionPaths, OasValidate)
+	found, meta, matchedPath := k.Spec.checkSpecMatchesStatus(r, versionPaths, OasValidate)
 
 	if !found {
 		return nil, http.StatusOK
@@ -102,7 +102,7 @@ func (k *ValidateRequest) ProcessRequest(w http.ResponseWriter, r *http.Request,
 		errResponseCode = validateRequest.ErrorResponseCode
 	}
 
-	pathParams, err := k.newParamExtractor().Extract(r, validateRequest.path)
+	pathParams, err := k.newParamExtractor().Extract(matchedPath, validateRequest.path)
 	if err != nil {
 		log.
 			WithError(err).
@@ -116,11 +116,13 @@ func (k *ValidateRequest) ProcessRequest(w http.ResponseWriter, r *http.Request,
 		return fmt.Errorf("param extraction error: %w", err), http.StatusInternalServerError
 	}
 
+	route := reflect.Clone(validateRequest.route)
+
 	// Validate request
 	requestValidationInput := &openapi3filter.RequestValidationInput{
 		Request:    r,
 		PathParams: pathParams,
-		Route:      reflect.Clone(validateRequest.route),
+		Route:      route,
 		Options: &openapi3filter.Options{
 			AuthenticationFunc: func(ctx context.Context, input *openapi3filter.AuthenticationInput) error {
 				return nil

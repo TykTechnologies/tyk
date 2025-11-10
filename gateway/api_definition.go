@@ -35,6 +35,7 @@ import (
 	"github.com/TykTechnologies/tyk/internal/httputil"
 	"github.com/TykTechnologies/tyk/internal/model"
 	"github.com/TykTechnologies/tyk/internal/oasutil"
+	"github.com/TykTechnologies/tyk/internal/reflect"
 	"github.com/TykTechnologies/tyk/internal/service/gojsonschema"
 	"github.com/TykTechnologies/tyk/regexp"
 	"github.com/TykTechnologies/tyk/rpc"
@@ -1294,13 +1295,20 @@ func (a APIDefinitionLoader) compileRateLimitPathsSpec(paths []apidef.RateLimitM
 	return urlSpec
 }
 
+type middlewareFnCfg struct {
+	method   string
+	path     string
+	pathItem *openapi3.PathItem
+	op       *openapi3.Operation
+	tykOp    *oas.Operation
+}
+
 // compileOasMiddleware helper for compile oas based middlewares to classic RxPaths
 func (a APIDefinitionLoader) compileOasMiddleware(
 	status URLStatus,
 	spec *oas.OAS,
 	cfg config.Config,
-	middlewareFn func(tykOp *oas.Operation, method string, op *openapi3.Operation, path string) urlSpecExtractor,
-
+	middlewareFn func(*middlewareFnCfg) urlSpecExtractor,
 ) []URLSpec {
 
 	if spec == nil || spec.Paths == nil {
@@ -1314,22 +1322,26 @@ func (a APIDefinitionLoader) compileOasMiddleware(
 	}
 
 	for _, pathItem := range oasutil.SortByPathLength(*spec.Paths) {
-		path := pathItem.Path
-
 		for method, operation := range pathItem.Operations() {
 			tykOp := tykExt.Middleware.Operations[operation.OperationID]
 			if tykOp == nil {
 				continue
 			}
 
-			middleware := middlewareFn(tykOp, method, operation, path)
+			middleware := middlewareFn(&middlewareFnCfg{
+				method:   method,
+				path:     pathItem.Path,
+				pathItem: pathItem.PathItem,
+				op:       operation,
+				tykOp:    tykOp,
+			})
 
 			if middleware == nil {
 				continue
 			}
 
 			newSpec := URLSpec{}
-			a.generateRegex(path, &newSpec, status, cfg)
+			a.generateRegex(pathItem.Path, &newSpec, status, cfg)
 
 			middleware.extract(&newSpec)
 
@@ -1342,17 +1354,17 @@ func (a APIDefinitionLoader) compileOasMiddleware(
 
 // Compile OAS mock specs
 func (a APIDefinitionLoader) compileOasMock(status URLStatus, oasSpec *oas.OAS, cfg config.Config) []URLSpec {
-	return a.compileOasMiddleware(status, oasSpec, cfg, func(tykOp *oas.Operation, method string, op *openapi3.Operation, path string) urlSpecExtractor {
-		if tykOp.MockResponse == nil || !tykOp.MockResponse.Enabled {
+	return a.compileOasMiddleware(status, oasSpec, cfg, func(cfg *middlewareFnCfg) urlSpecExtractor {
+		if cfg.tykOp.MockResponse == nil || !cfg.tykOp.MockResponse.Enabled {
 			return nil
 		}
 
 		return oasMockMiddleware{
-			MockResponse: tykOp.MockResponse,
+			MockResponse: cfg.tykOp.MockResponse,
 			endpointMiddleware: endpointMiddleware{
-				method: method,
-				path:   path,
-				op:     op,
+				method: cfg.method,
+				path:   cfg.path,
+				op:     cfg.op,
 			},
 		}
 	})
@@ -1360,24 +1372,25 @@ func (a APIDefinitionLoader) compileOasMock(status URLStatus, oasSpec *oas.OAS, 
 
 // Compile OAS validator specs
 func (a APIDefinitionLoader) compileOasValidator(status URLStatus, oasSpec *oas.OAS, cfg config.Config) []URLSpec {
-	return a.compileOasMiddleware(status, oasSpec, cfg, func(tykOp *oas.Operation, method string, op *openapi3.Operation, path string) urlSpecExtractor {
-		if tykOp.ValidateRequest == nil || !tykOp.ValidateRequest.Enabled {
+	return a.compileOasMiddleware(status, oasSpec, cfg, func(cfg *middlewareFnCfg) urlSpecExtractor {
+		if cfg.tykOp.ValidateRequest == nil || !cfg.tykOp.ValidateRequest.Enabled {
 			return nil
 		}
 
 		route := &routers.Route{
-			Path:      path,
-			Method:    method,
-			Operation: op,
+			Path:      cfg.path,
+			Method:    cfg.method,
+			Operation: cfg.op,
 			Spec:      &oasSpec.T,
+			PathItem:  reflect.Clone(cfg.pathItem),
 		}
 
 		return oasValidateMiddleware{
-			ValidateRequest: tykOp.ValidateRequest,
+			ValidateRequest: cfg.tykOp.ValidateRequest,
 			endpointMiddleware: endpointMiddleware{
-				method: method,
-				path:   path,
-				op:     op,
+				method: cfg.method,
+				path:   cfg.path,
+				op:     cfg.op,
 			},
 			route: route,
 		}
@@ -1514,7 +1527,7 @@ func (a *APISpec) getURLStatus(stat URLStatus) RequestStatus {
 // URLAllowedAndIgnored checks if a url is allowed and ignored.
 func (a *APISpec) URLAllowedAndIgnored(r *http.Request, rxPaths []URLSpec, whiteListStatus bool) (RequestStatus, interface{}) {
 	for i := range rxPaths {
-		if !rxPaths[i].matchesPath(r.URL.Path, a) {
+		if ok, _ := rxPaths[i].matchesPath(r.URL.Path, a); !ok {
 			continue
 		}
 
@@ -1525,7 +1538,7 @@ func (a *APISpec) URLAllowedAndIgnored(r *http.Request, rxPaths []URLSpec, white
 
 	// Check if ignored
 	for i := range rxPaths {
-		if !rxPaths[i].matchesPath(r.URL.Path, a) {
+		if ok, _ := rxPaths[i].matchesPath(r.URL.Path, a); !ok {
 			continue
 		}
 
@@ -1567,9 +1580,14 @@ func (a *APISpec) URLAllowedAndIgnored(r *http.Request, rxPaths []URLSpec, white
 				}
 
 				return StatusOk, rxPaths[i].oasMock
+			case OasValidate:
+				if rxPaths[i].oasMock.method != r.Method {
+					continue
+				}
+
+				return StatusOk, rxPaths[i].oasValidateRequest
 			}
 		} else {
-
 			// We are using an extended path set, check for the method
 			methodMeta, matchMethodOk := rxPaths[i].MethodActions[r.Method]
 			if !matchMethodOk {

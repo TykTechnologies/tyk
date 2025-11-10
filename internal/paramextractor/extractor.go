@@ -2,7 +2,6 @@ package paramextractor
 
 import (
 	"errors"
-	"net/http"
 	"regexp"
 	"strings"
 )
@@ -14,7 +13,7 @@ var (
 
 // Extractor defines the interface for extracting parameters from HTTP requests
 type Extractor interface {
-	Extract(r *http.Request, pattern string) (map[string]string, error)
+	Extract(reqPath string, pattern string) (map[string]string, error)
 }
 
 // Type represents the type of parameter extraction strategy
@@ -128,8 +127,8 @@ type strictExtractor struct {
 	baseExtractor
 }
 
-func (e *strictExtractor) Extract(r *http.Request, pattern string) (map[string]string, error) {
-	path := strings.Trim(r.URL.Path, "/")
+func (e *strictExtractor) Extract(reqPath string, pattern string) (map[string]string, error) {
+	path := strings.Trim(reqPath, "/")
 	pattern = strings.Trim(pattern, "/")
 
 	patternSegments := strings.Split(pattern, "/")
@@ -143,8 +142,8 @@ type prefixExtractor struct {
 	baseExtractor
 }
 
-func (e *prefixExtractor) Extract(r *http.Request, pattern string) (map[string]string, error) {
-	path := strings.Trim(r.URL.Path, "/")
+func (e *prefixExtractor) Extract(reqPath string, pattern string) (map[string]string, error) {
+	path := strings.Trim(reqPath, "/")
 	pattern = strings.Trim(pattern, "/")
 
 	patternSegments := strings.Split(pattern, "/")
@@ -158,8 +157,8 @@ type suffixExtractor struct {
 	baseExtractor
 }
 
-func (e *suffixExtractor) Extract(r *http.Request, pattern string) (map[string]string, error) {
-	path := strings.Trim(r.URL.Path, "/")
+func (e *suffixExtractor) Extract(reqPath string, pattern string) (map[string]string, error) {
+	path := strings.Trim(reqPath, "/")
 	pattern = strings.Trim(pattern, "/")
 
 	patternSegments := strings.Split(pattern, "/")
@@ -182,8 +181,8 @@ type globExtractor struct {
 	baseExtractor
 }
 
-func (e *globExtractor) Extract(r *http.Request, pattern string) (map[string]string, error) {
-	path := r.URL.Path
+func (e *globExtractor) Extract(reqPath string, pattern string) (map[string]string, error) {
+	path := reqPath
 
 	// Convert glob pattern to regex
 	regexPattern := e.globToRegex(pattern)
