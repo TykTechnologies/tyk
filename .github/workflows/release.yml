@@ -435,17 +435,26 @@ jobs:
           echo "📊 Dashboard Image Resolution"
           echo "=================================="
           echo "PR number: $PR_NUMBER"
+          echo "Base ref: $BASE_REF"
           echo "Branch exists: $BRANCH_EXISTS"
           echo "PR image exists: $IMAGE_EXISTS"
           echo "Branch name: $BRANCH"
           echo "PR image tag: $IMAGE_TAG"
-          echo "Base ref: $BASE_REF"
           echo "Commit SHA: $COMMIT_SHA"
           echo "Has relevant changes in latest commit: $HAS_RELEVANT_CHANGES"
           echo "=================================="
 
+          # Only use custom build strategies for PRs targeting master
+          if [ "$BASE_REF" != "master" ]; then
+            echo "ℹ️ Strategy: Use gromit default (base branch is not master)"
+            echo "    → Custom builds only for master branch PRs"
+            echo "dashboard_image=" >> $GITHUB_OUTPUT
+            echo "needs_build=false" >> $GITHUB_OUTPUT
+            echo "dashboard_branch=" >> $GITHUB_OUTPUT
+            echo "strategy=gromit-default" >> $GITHUB_OUTPUT
+
           # Strategy 1: Matching branch exists in tyk-analytics → use gromit
-          if [ "$BRANCH_EXISTS" = "true" ]; then
+          elif [ "$BRANCH_EXISTS" = "true" ]; then
             echo "📋 Strategy: Use matching branch '$BRANCH' via gromit"
             echo "    → No override needed, gromit will handle it"
             echo "dashboard_image=" >> $GITHUB_OUTPUT
