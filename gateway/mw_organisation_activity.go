@@ -6,6 +6,7 @@ import (
 	"sync"
 
 	"github.com/TykTechnologies/tyk/ctx"
+	"github.com/TykTechnologies/tyk/internal/cache"
 	"github.com/TykTechnologies/tyk/request"
 	"github.com/TykTechnologies/tyk/user"
 )
@@ -75,6 +76,26 @@ func (k *OrganizationMonitor) ProcessRequest(w http.ResponseWriter, r *http.Requ
 	// try to get from Redis
 	if !found {
 		// not found in in-app cache, let's read from Redis
+		// In RPC mode, fetch org session asynchronously to avoid blocking requests
+		if k.Spec.GlobalConfig.SlaveOptions.UseRPC {
+			// Start background fetch but don't wait for it
+			go func() {
+				orgID := k.Spec.OrgID
+				session, found := k.OrgSession(orgID)
+				if found && !k.Spec.GlobalConfig.LocalSessionCache.DisableCacheSessionState {
+					// Cache the session for future requests
+					k.Gw.SessionCache.Set(orgID, session.Clone(), cache.DefaultExpiration)
+					k.Logger().Debug("Background org session fetch completed for: ", orgID)
+				} else if !found {
+					k.setOrgHasNoSession(true)
+				}
+			}()
+
+			// Allow request to proceed immediately without blocking
+			k.Logger().Debug("RPC mode: allowing request without blocking on org session fetch for: ", k.Spec.OrgID)
+			return nil, http.StatusOK
+		}
+
 		orgSession, found = k.OrgSession(k.Spec.OrgID)
 		if !found {
 			// prevent reads from in-app cache and from Redis for next runs
