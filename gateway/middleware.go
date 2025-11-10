@@ -15,6 +15,7 @@ import (
 
 	"github.com/TykTechnologies/tyk-pump/analytics"
 	"github.com/TykTechnologies/tyk/internal/httputil/accesslog"
+	"github.com/getkin/kin-openapi/openapi3"
 
 	"github.com/gocraft/health"
 	"github.com/justinas/alice"
@@ -855,4 +856,14 @@ func (b *BaseTykResponseHandler) logger() *logrus.Entry {
 		return logrus.NewEntry(log)
 	}
 	return b.log
+}
+
+type urlSpecExtractor interface {
+	extract(spec *URLSpec)
+}
+
+type endpointMiddleware struct {
+	method string
+	path   string
+	op     *openapi3.Operation
 }

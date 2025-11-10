@@ -260,3 +260,14 @@ func mockFromOAS(r *http.Request, operation *openapi3.Operation, fromOASExamples
 
 	return code, contentType, body, headers, err
 }
+
+var _ urlSpecExtractor = (*oasMockMiddleware)(nil)
+
+type oasMockMiddleware struct {
+	*oas.MockResponse
+	endpointMiddleware
+}
+
+func (o oasMockMiddleware) extract(spec *URLSpec) {
+	spec.oasMock = o
+}

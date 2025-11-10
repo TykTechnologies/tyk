@@ -5,7 +5,6 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/getkin/kin-openapi/routers"
 
 	"github.com/TykTechnologies/tyk/apidef"
@@ -46,23 +45,6 @@ type Operation struct {
 	*oas.Operation
 	route      *routers.Route
 	pathParams map[string]string
-}
-
-type endpointMiddleware struct {
-	method string
-	path   string
-	op     *openapi3.Operation
-}
-
-type oasMockMiddleware struct {
-	*oas.MockResponse
-	endpointMiddleware
-}
-
-type oasValidateMiddleware struct {
-	*oas.ValidateRequest
-	endpointMiddleware
-	route *routers.Route
 }
 
 // ProcessRequest will run any checks on the request on the way through the system, return an error to have the chain fail

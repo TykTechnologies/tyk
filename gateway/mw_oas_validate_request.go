@@ -9,8 +9,10 @@ import (
 
 	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/getkin/kin-openapi/openapi3filter"
+	"github.com/getkin/kin-openapi/routers"
 	"github.com/sirupsen/logrus"
 
+	"github.com/TykTechnologies/tyk/apidef/oas"
 	"github.com/TykTechnologies/tyk/internal/paramextractor"
 	"github.com/TykTechnologies/tyk/internal/reflect"
 )
@@ -80,7 +82,7 @@ func (k *ValidateRequest) newParamExtractor() paramextractor.Extractor {
 func (k *ValidateRequest) ProcessRequest(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
 	version, _ := k.Spec.Version(r)
 	versionPaths := k.Spec.RxPaths[version.Name]
-	found, meta := k.Spec.CheckSpecMatchesStatus(r, versionPaths, OasMock)
+	found, meta := k.Spec.CheckSpecMatchesStatus(r, versionPaths, OasValidate)
 
 	if !found {
 		return nil, http.StatusOK
@@ -133,4 +135,16 @@ func (k *ValidateRequest) ProcessRequest(w http.ResponseWriter, r *http.Request,
 
 	// Handle Success
 	return nil, http.StatusOK
+}
+
+var _ urlSpecExtractor = (*oasValidateMiddleware)(nil)
+
+type oasValidateMiddleware struct {
+	*oas.ValidateRequest
+	endpointMiddleware
+	route *routers.Route
+}
+
+func (o oasValidateMiddleware) extract(spec *URLSpec) {
+	spec.oasValidateRequest = o
 }

@@ -1299,7 +1299,8 @@ func (a APIDefinitionLoader) compileOasMiddleware(
 	status URLStatus,
 	spec *oas.OAS,
 	cfg config.Config,
-	middlewareFn func(tykOp *oas.Operation, method string, op *openapi3.Operation, path string) interface{},
+	middlewareFn func(tykOp *oas.Operation, method string, op *openapi3.Operation, path string) urlSpecExtractor,
+
 ) []URLSpec {
 
 	if spec == nil || spec.Paths == nil {
@@ -1322,6 +1323,7 @@ func (a APIDefinitionLoader) compileOasMiddleware(
 			}
 
 			middleware := middlewareFn(tykOp, method, operation, path)
+
 			if middleware == nil {
 				continue
 			}
@@ -1329,12 +1331,7 @@ func (a APIDefinitionLoader) compileOasMiddleware(
 			newSpec := URLSpec{}
 			a.generateRegex(path, &newSpec, status, cfg)
 
-			switch m := middleware.(type) {
-			case oasMockMiddleware:
-				newSpec.oasMock = m
-			case oasValidateMiddleware:
-				newSpec.oasValidateRequest = m
-			}
+			middleware.extract(&newSpec)
 
 			urlSpecs = append(urlSpecs, newSpec)
 		}
@@ -1345,7 +1342,7 @@ func (a APIDefinitionLoader) compileOasMiddleware(
 
 // Compile OAS mock specs
 func (a APIDefinitionLoader) compileOasMock(status URLStatus, oasSpec *oas.OAS, cfg config.Config) []URLSpec {
-	return a.compileOasMiddleware(status, oasSpec, cfg, func(tykOp *oas.Operation, method string, op *openapi3.Operation, path string) interface{} {
+	return a.compileOasMiddleware(status, oasSpec, cfg, func(tykOp *oas.Operation, method string, op *openapi3.Operation, path string) urlSpecExtractor {
 		if tykOp.MockResponse == nil || !tykOp.MockResponse.Enabled {
 			return nil
 		}
@@ -1363,7 +1360,7 @@ func (a APIDefinitionLoader) compileOasMock(status URLStatus, oasSpec *oas.OAS, 
 
 // Compile OAS validator specs
 func (a APIDefinitionLoader) compileOasValidator(status URLStatus, oasSpec *oas.OAS, cfg config.Config) []URLSpec {
-	return a.compileOasMiddleware(status, oasSpec, cfg, func(tykOp *oas.Operation, method string, op *openapi3.Operation, path string) interface{} {
+	return a.compileOasMiddleware(status, oasSpec, cfg, func(tykOp *oas.Operation, method string, op *openapi3.Operation, path string) urlSpecExtractor {
 		if tykOp.ValidateRequest == nil || !tykOp.ValidateRequest.Enabled {
 			return nil
 		}
@@ -1388,8 +1385,6 @@ func (a APIDefinitionLoader) compileOasValidator(status URLStatus, oasSpec *oas.
 }
 
 func (a APIDefinitionLoader) getExtendedPathSpecs(apiVersionDef apidef.VersionInfo, apiSpec *APISpec, conf config.Config, oasSpec *oas.OAS) ([]URLSpec, bool) {
-	// TODO: New compiler here, needs to put data into a different structure
-
 	mockResponsePaths := a.compileMockResponsePathSpec(apiVersionDef.IgnoreEndpointCase, apiVersionDef.ExtendedPaths.MockResponse, MockResponse, conf)
 	ignoredPaths := a.compileExtendedPathSpec(apiVersionDef.IgnoreEndpointCase, apiVersionDef.ExtendedPaths.Ignored, Ignored, conf)
 	blackListPaths := a.compileExtendedPathSpec(apiVersionDef.IgnoreEndpointCase, apiVersionDef.ExtendedPaths.BlackList, BlackList, conf)

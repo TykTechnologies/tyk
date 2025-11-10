@@ -8,10 +8,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/TykTechnologies/tyk/header"
-	"github.com/TykTechnologies/tyk/internal/errors"
-	"github.com/TykTechnologies/tyk/user"
-
 	"github.com/getkin/kin-openapi/routers"
 
 	"github.com/TykTechnologies/tyk-pump/analytics"
@@ -19,7 +15,10 @@ import (
 	"github.com/TykTechnologies/tyk/apidef/oas"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/ctx"
+	"github.com/TykTechnologies/tyk/header"
+	"github.com/TykTechnologies/tyk/internal/errors"
 	"github.com/TykTechnologies/tyk/internal/graphengine"
+	"github.com/TykTechnologies/tyk/user"
 )
 
 // APISpec represents a path specification for an API, to avoid enumerating multiple nested lists, a single
