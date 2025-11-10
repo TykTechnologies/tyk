@@ -318,38 +318,19 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Check for relevant package changes
+      - name: Check for relevant package changes in latest commit
         id: check_changes
         shell: bash
-        env:
-          BASE_REF: ${{ env.BASE_REF }}
         run: |
           # Packages that affect dashboard compatibility
           RELEVANT_PACKAGES="pkg apidef lib common certs log config test user header"
 
-          echo "Checking for changes in packages: $RELEVANT_PACKAGES"
+          echo "Checking latest commit for changes in packages: $RELEVANT_PACKAGES"
 
-          # Get changed files compared to base branch
-          if [ "${{ github.event_name }}" = "pull_request" ]; then
-            BASE_SHA="${{ github.event.pull_request.base.sha }}"
-            HEAD_SHA="${{ github.sha }}"
-            echo "Comparing PR: $BASE_SHA...$HEAD_SHA"
+          # Check only the latest commit (HEAD^..HEAD)
+          CHANGED_FILES=$(git diff --name-only HEAD^ HEAD 2>/dev/null || echo "")
 
-            # Ensure we have the base commit
-            git fetch origin $BASE_SHA 2>/dev/null || true
-
-            CHANGED_FILES=$(git diff --name-only $BASE_SHA $HEAD_SHA 2>/dev/null || echo "")
-          else
-            # For push events, compare with base ref
-            echo "Comparing with origin/$BASE_REF"
-
-            # Fetch the base ref
-            git fetch origin $BASE_REF 2>/dev/null || true
-
-            CHANGED_FILES=$(git diff --name-only origin/$BASE_REF...HEAD 2>/dev/null || echo "")
-          fi
-
-          echo "Changed files:"
+          echo "Changed files in latest commit:"
           echo "$CHANGED_FILES"
 
           # Check if any changed files are in relevant packages
@@ -363,10 +344,10 @@ jobs:
 
           if [ "$HAS_RELEVANT_CHANGES" = "true" ]; then
             echo "has_relevant_changes=true" >> $GITHUB_OUTPUT
-            echo "📦 Relevant package changes detected - custom dashboard build may be needed"
+            echo "📦 Relevant package changes in latest commit - will build dashboard"
           else
             echo "has_relevant_changes=false" >> $GITHUB_OUTPUT
-            echo "ℹ️ No relevant package changes - will use default dashboard"
+            echo "ℹ️ No relevant package changes in latest commit"
           fi
 
       - name: Configure AWS credentials
@@ -408,14 +389,20 @@ jobs:
             echo "branch_exists=false" >> $GITHUB_OUTPUT
           fi
 
-      - name: Check if ECR image exists with commit SHA
+      - name: Check if ECR image exists for this PR
         id: check_ecr
         shell: bash
         env:
           REGISTRY: ${{ steps.ecr.outputs.registry }}
-          COMMIT_SHA: ${{ github.sha }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
         run: |
-          IMAGE_TAG="sha-${COMMIT_SHA}"
+          if [ -z "$PR_NUMBER" ]; then
+            echo "Not a pull request, skipping ECR check"
+            echo "image_exists=false" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          IMAGE_TAG="tyk-${PR_NUMBER}"
           echo "Checking for ECR image: tyk-analytics:${IMAGE_TAG}"
 
           if aws ecr describe-images \
@@ -441,56 +428,59 @@ jobs:
           IMAGE_TAG: ${{ steps.check_ecr.outputs.image_tag }}
           BASE_REF: ${{ env.BASE_REF }}
           COMMIT_SHA: ${{ github.sha }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
           HAS_RELEVANT_CHANGES: ${{ steps.check_changes.outputs.has_relevant_changes }}
         run: |
           echo "=================================="
           echo "📊 Dashboard Image Resolution"
           echo "=================================="
+          echo "PR number: $PR_NUMBER"
           echo "Branch exists: $BRANCH_EXISTS"
-          echo "Image exists: $IMAGE_EXISTS"
+          echo "PR image exists: $IMAGE_EXISTS"
           echo "Branch name: $BRANCH"
-          echo "Image tag: $IMAGE_TAG"
+          echo "PR image tag: $IMAGE_TAG"
           echo "Base ref: $BASE_REF"
           echo "Commit SHA: $COMMIT_SHA"
-          echo "Has relevant changes: $HAS_RELEVANT_CHANGES"
+          echo "Has relevant changes in latest commit: $HAS_RELEVANT_CHANGES"
           echo "=================================="
 
-          # If no relevant package changes, always use gromit default
-          if [ "$HAS_RELEVANT_CHANGES" != "true" ]; then
-            echo "ℹ️ Strategy: Use gromit default (no relevant package changes)"
-            echo "    → No custom dashboard needed"
-            echo "dashboard_image=" >> $GITHUB_OUTPUT
-            echo "needs_build=false" >> $GITHUB_OUTPUT
-            echo "dashboard_branch=" >> $GITHUB_OUTPUT
-            echo "strategy=no-relevant-changes" >> $GITHUB_OUTPUT
-
-          elif [ "$BRANCH_EXISTS" = "true" ]; then
-            # Strategy 1: Use gromit policy (matching branch exists)
-            echo "📋 Strategy: Let gromit match branch '$BRANCH'"
+          # Strategy 1: Matching branch exists in tyk-analytics → use gromit
+          if [ "$BRANCH_EXISTS" = "true" ]; then
+            echo "📋 Strategy: Use matching branch '$BRANCH' via gromit"
             echo "    → No override needed, gromit will handle it"
             echo "dashboard_image=" >> $GITHUB_OUTPUT
             echo "needs_build=false" >> $GITHUB_OUTPUT
             echo "dashboard_branch=$BRANCH" >> $GITHUB_OUTPUT
             echo "strategy=gromit-branch" >> $GITHUB_OUTPUT
 
+          # Strategy 2a: Latest commit has relevant changes → build new image
+          elif [ "$HAS_RELEVANT_CHANGES" = "true" ]; then
+            PR_IMAGE_TAG="tyk-${PR_NUMBER}"
+            echo "🔨 Strategy: Build dashboard (latest commit has relevant changes)"
+            echo "    → Will update gateway ref to $COMMIT_SHA"
+            echo "    → Will push to: ${REGISTRY}/tyk-analytics:${PR_IMAGE_TAG}"
+            echo "dashboard_image=${REGISTRY}/tyk-analytics:${PR_IMAGE_TAG}" >> $GITHUB_OUTPUT
+            echo "needs_build=true" >> $GITHUB_OUTPUT
+            echo "dashboard_branch=$BASE_REF" >> $GITHUB_OUTPUT
+            echo "strategy=build-required" >> $GITHUB_OUTPUT
+
+          # Strategy 2b: PR image exists and no changes → reuse existing image
           elif [ "$IMAGE_EXISTS" = "true" ]; then
-            # Strategy 2: Use existing ECR image
-            echo "🐳 Strategy: Use existing ECR image"
+            echo "🐳 Strategy: Reuse existing PR image (no changes in latest commit)"
             echo "    → Image: ${REGISTRY}/tyk-analytics:${IMAGE_TAG}"
             echo "dashboard_image=${REGISTRY}/tyk-analytics:${IMAGE_TAG}" >> $GITHUB_OUTPUT
             echo "needs_build=false" >> $GITHUB_OUTPUT
             echo "dashboard_branch=" >> $GITHUB_OUTPUT
-            echo "strategy=ecr-image" >> $GITHUB_OUTPUT
+            echo "strategy=reuse-pr-image" >> $GITHUB_OUTPUT
 
+          # Strategy 3: Fallback to gromit default
           else
-            # Strategy 3: Build required
-            echo "🔨 Strategy: Build dashboard from '$BASE_REF' branch"
-            echo "    → Will update gateway ref to $COMMIT_SHA"
-            echo "    → Will push to: ${REGISTRY}/tyk-analytics:sha-${COMMIT_SHA}"
-            echo "dashboard_image=${REGISTRY}/tyk-analytics:sha-${COMMIT_SHA}" >> $GITHUB_OUTPUT
-            echo "needs_build=true" >> $GITHUB_OUTPUT
-            echo "dashboard_branch=$BASE_REF" >> $GITHUB_OUTPUT
-            echo "strategy=build-required" >> $GITHUB_OUTPUT
+            echo "ℹ️ Strategy: Use gromit default"
+            echo "    → No matching branch, no existing PR image, no relevant changes"
+            echo "dashboard_image=" >> $GITHUB_OUTPUT
+            echo "needs_build=false" >> $GITHUB_OUTPUT
+            echo "dashboard_branch=" >> $GITHUB_OUTPUT
+            echo "strategy=gromit-default" >> $GITHUB_OUTPUT
           fi
 
           echo "=================================="
@@ -515,21 +505,21 @@ jobs:
           fetch-depth: 1
           submodules: true
 
-      - name: Update gateway reference to PR commit
+      - name: Update gateway reference to PR branch
         shell: bash
         env:
-          GATEWAY_SHA: ${{ github.sha }}
+          GATEWAY_BRANCH: ${{ github.head_ref }}
         run: |
-          echo "📦 Updating tyk-gateway dependency to: $GATEWAY_SHA"
+          echo "📦 Updating tyk-gateway dependency to branch: $GATEWAY_BRANCH"
 
           # Configure git for go get
           git config --global url."https://${{ secrets.ORG_GH_TOKEN }}@github.com".insteadOf "https://github.com"
 
-          # Update dependency
-          go get github.com/TykTechnologies/tyk@$GATEWAY_SHA
+          # Update dependency using branch name
+          go get github.com/TykTechnologies/tyk@$GATEWAY_BRANCH
 
           # Update replace directive if present
-          go mod edit -replace github.com/TykTechnologies/tyk=github.com/TykTechnologies/tyk@$GATEWAY_SHA
+          go mod edit -replace github.com/TykTechnologies/tyk=github.com/TykTechnologies/tyk@$GATEWAY_BRANCH
 
           go mod tidy
 
@@ -608,20 +598,21 @@ jobs:
           push: true
           cache-from: type=gha
           cache-to: type=gha,mode=max
-          tags: ${{ steps.ecr.outputs.registry }}/tyk-analytics:sha-${{ github.sha }}
+          tags: ${{ steps.ecr.outputs.registry }}/tyk-analytics:tyk-${{ github.event.pull_request.number }}
           labels: |
-            org.opencontainers.image.title=Tyk Dashboard (Custom Build)
-            org.opencontainers.image.description=Built from ${{ needs.resolve-dashboard-image.outputs.dashboard_branch }} with gateway ${{ github.sha }}
+            org.opencontainers.image.title=Tyk Dashboard (Custom Build for PR)
+            org.opencontainers.image.description=Built from ${{ needs.resolve-dashboard-image.outputs.dashboard_branch }} with gateway branch ${{ github.head_ref }}
             org.opencontainers.image.revision=${{ github.sha }}
             org.opencontainers.image.source=https://github.com/TykTechnologies/tyk-analytics
-            tyk.gateway.commit=${{ github.sha }}
+            tyk.gateway.branch=${{ github.head_ref }}
+            tyk.gateway.pr=${{ github.event.pull_request.number }}
             tyk.dashboard.branch=${{ needs.resolve-dashboard-image.outputs.dashboard_branch }}
 
       - name: Output image reference
         id: output
         shell: bash
         run: |
-          IMAGE="${{ steps.ecr.outputs.registry }}/tyk-analytics:sha-${{ github.sha }}"
+          IMAGE="${{ steps.ecr.outputs.registry }}/tyk-analytics:tyk-${{ github.event.pull_request.number }}"
           echo "image=$IMAGE" >> $GITHUB_OUTPUT
           echo "✅ Dashboard image built and pushed: $IMAGE"
   api-tests:
