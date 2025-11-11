@@ -321,16 +321,19 @@ jobs:
       - name: Check for relevant package changes in latest commit
         id: check_changes
         shell: bash
+        env:
+          GITHUB_SHA: ${{ github.sha }}
         run: |
           # Packages that affect dashboard compatibility
           RELEVANT_PACKAGES="pkg apidef lib common certs log config test user header"
 
-          echo "Checking latest commit for changes in packages: $RELEVANT_PACKAGES"
+          echo "Checking latest commit ($GITHUB_SHA) for changes in packages: $RELEVANT_PACKAGES"
 
-          # Check only the latest commit (HEAD^..HEAD)
-          CHANGED_FILES=$(git diff --name-only HEAD^ HEAD 2>/dev/null || echo "")
+          # For PRs, compare against the parent commit (not merge base)
+          # Use git show to see what THIS commit changed
+          CHANGED_FILES=$(git show --name-only --format= $GITHUB_SHA 2>/dev/null || echo "")
 
-          echo "Changed files in latest commit:"
+          echo "Changed files in commit $GITHUB_SHA:"
           echo "$CHANGED_FILES"
 
           # Check if any changed files are in relevant packages
