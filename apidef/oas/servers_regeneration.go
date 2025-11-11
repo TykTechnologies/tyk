@@ -94,6 +94,29 @@ func (s *OAS) RegenerateServers(
 	return nil
 }
 
+// GenerateTykServers generates and returns only Tyk-managed server URLs for an API.
+// This is a convenience method that generates servers without modifying the OAS spec.
+// Unlike RegenerateServers, this does not include user-defined servers and does not
+// modify the OAS servers array.
+func (s *OAS) GenerateTykServers(
+	apiData *apidef.APIDefinition,
+	baseAPI *apidef.APIDefinition,
+	config ServerRegenerationConfig,
+	versionName string,
+) []*openapi3.Server {
+	serverInfos := generateTykServers(apiData, baseAPI, config, versionName)
+
+	servers := make([]*openapi3.Server, len(serverInfos))
+	for i, info := range serverInfos {
+		servers[i] = &openapi3.Server{
+			URL:         info.url,
+			Description: info.description,
+		}
+	}
+
+	return servers
+}
+
 // generateTykServers generates all Tyk-managed server URLs for an API.
 func generateTykServers(
 	apiData *apidef.APIDefinition,
