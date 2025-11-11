@@ -239,7 +239,7 @@ func TestXFFDepth(t *testing.T) {
 			name:     "Depth -5 (Negative Depth uses same as NO depth)",
 			xffValue: "10.0.0.1,11.0.0.1,12.0.0.1,13.0.0.1",
 			depth:    -5,
-			expected: "10.0.0.1",
+			expected: "",
 		},
 		{
 			name:     "Header with spaces",
@@ -252,6 +252,12 @@ func TestXFFDepth(t *testing.T) {
 			xffValue: "10.0.0.1,11.0.0.1, 12.0.0.1,  13.0.0.1",
 			depth:    3,
 			expected: "11.0.0.1",
+		},
+		{
+			name:     "Empty header",
+			xffValue: "",
+			depth:    0,
+			expected: "192.168.1.1", // Should fall back to RemoteAddr
 		},
 		{
 			name:     "Invalid IP at selected depth",

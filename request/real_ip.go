@@ -27,15 +27,17 @@ func RealIP(r *http.Request) string {
 	if fw := r.Header.Get(header.XForwardFor); fw != "" {
 		xffs := strings.Split(fw, ",")
 
-		// If no IPs, return the first IP in the chain
-		if len(xffs) == 0 {
-			return ""
-		}
-
 		// Get depth from config, default to 0 (first IP in chain)
 		depth := 0
 		if Global != nil {
 			depth = Global().HttpServerOptions.XFFDepth
+		}
+
+		// It's more secure to return empty if depth is invalid.
+		// Returning the first IP in the case of an incorrect depth is a security risk.
+		// and a buried failure.
+		if depth < 0 {
+			return ""
 		}
 
 		// If depth exceeds available IPs, return empty
