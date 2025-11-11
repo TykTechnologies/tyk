@@ -53,6 +53,8 @@ const (
 	CacheOptions
 	OASDefinition
 	SelfLooping
+	// RequestStartTime holds the time when the request entered the middleware chain
+	RequestStartTime
 )
 
 func ctxSetSession(r *http.Request, s *user.SessionState, scheduleUpdate bool, hashKey bool) {
