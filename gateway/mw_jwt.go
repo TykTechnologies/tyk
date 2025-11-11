@@ -385,7 +385,7 @@ func (k *JWTMiddleware) collectCachedJWKsFromCache(jwkURIs []apidef.JWK) (jwkSet
 		}
 		jwkSet, ok := cachedItem.(*jose.JSONWebKeySet)
 		if !ok {
-			k.Logger().Warnf("Invalid JWK cache format for APIID %s, URL %s — ignoring", k.Spec.APIID, jwkURI.URL)
+			k.Logger().Warnf("Invalid JWK cache format for APIID %s, URL %s ? ignoring", k.Spec.APIID, jwkURI.URL)
 		}
 		jwkSets = append(jwkSets, jwkSet)
 	}
@@ -421,7 +421,7 @@ func (k *JWTMiddleware) getSecretFromMultipleJWKURIs(jwkURIs []apidef.JWK, kidVa
 		}
 
 		if jwkURLsChanged(cachedAPIDef.JWTJwksURIs, jwkURIs) {
-			k.Logger().Infof("Detected change in JWK URLs — refreshing cache for APIID %s", k.Spec.APIID)
+			k.Logger().Infof("Detected change in JWK URLs ? refreshing cache for APIID %s", k.Spec.APIID)
 			cacheOutdated = true
 		} else {
 			jwkSets = k.collectCachedJWKsFromCache(jwkURIs)
@@ -508,36 +508,28 @@ func jwkURLsChanged(a, b []apidef.JWK) bool {
 
 func (k *JWTMiddleware) getPolicyIDFromToken(claims jwt.MapClaims) (string, bool) {
 	if k.Spec.IsOAS {
-		policyID := ""
-		found := false
 		fieldNames := k.Spec.OAS.GetJWTConfiguration().BasePolicyClaims
 		if len(fieldNames) == 0 && k.Spec.OAS.GetJWTConfiguration().PolicyFieldName != "" {
 			fieldNames = append(fieldNames, k.Spec.OAS.GetJWTConfiguration().PolicyFieldName)
 		}
-		for _, c := range fieldNames {
-			policyID, found = claims[c].(string)
-			if found {
-				break
+		for _, claimField := range fieldNames {
+			if policyID, found := getClaimValue(claims, claimField); found {
+				k.Logger().Debugf("Found policy in claim: %s", claimField)
+				return policyID, true
 			}
 		}
 
-		if !found || policyID == "" {
-			k.Logger().Debugf("Could not identify a policy to apply to this token from fields: %v", fieldNames)
-			return "", false
-		}
-		return policyID, true
+		k.Logger().Debugf("Could not identify a policy to apply to this token from fields: %v", fieldNames)
+		return "", false
 	} else {
-		policyID, foundPolicy := claims[k.Spec.JWTPolicyFieldName].(string)
-		if !foundPolicy {
-			k.Logger().Debugf("Could not identify a policy to apply to this token from field: %s", k.Spec.JWTPolicyFieldName)
-			return "", false
+		// Legacy path - also support nested claims
+		if policyID, found := getClaimValue(claims, k.Spec.JWTPolicyFieldName); found {
+			k.Logger().Debugf("Found policy in claim: %s", k.Spec.JWTPolicyFieldName)
+			return policyID, true
 		}
 
-		if policyID == "" {
-			k.Logger().Errorf("Policy field %s has empty value", k.Spec.JWTPolicyFieldName)
-			return "", false
-		}
-		return policyID, true
+		k.Logger().Debugf("Could not identify a policy to apply to this token from field: %s", k.Spec.JWTPolicyFieldName)
+		return "", false
 	}
 }
 
@@ -627,6 +619,31 @@ func toScopeStringsSlice(v interface{}, scopeSlice *[]string, nested bool) []str
 	}
 
 	return *scopeSlice
+}
+
+// getClaimValue attempts to retrieve a string value from JWT claims using a two-step lookup:
+// 1. First, it checks for a literal key (backward compatibility for keys with dots in their names)
+// 2. If not found and the field contains a dot, it attempts nested lookup (e.g., "user.id" -> claims["user"]["id"])
+//
+// Returns the claim value and a boolean indicating if it was found.
+func getClaimValue(claims jwt.MapClaims, claimField string) (string, bool) {
+	// STEP 1: Try literal key first (backward compatibility)
+	// Handles edge case where claim key contains literal dots (e.g., "user.id" as a key)
+	if value, found := claims[claimField].(string); found && value != "" {
+		return value, true
+	}
+
+	// STEP 2: Try nested lookup (new feature)
+	// Only if literal key wasn't found AND the field contains a dot
+	if strings.Contains(claimField, ".") {
+		if value := nestedMapLookup(claims, strings.Split(claimField, ".")...); value != nil {
+			if strValue, ok := value.(string); ok && strValue != "" {
+				return strValue, true
+			}
+		}
+	}
+
+	return "", false
 }
 
 func nestedMapLookup(m map[string]interface{}, ks ...string) interface{} {
@@ -1528,36 +1545,45 @@ func timeValidateJWTClaims(c jwt.MapClaims, expiresAt, issuedAt, notBefore uint6
 
 // getUserIDFromClaim parses jwt claims and get the userID from provided identityBaseField.
 func getUserIDFromClaim(claims jwt.MapClaims, identityBaseField string, shouldFallback bool) (string, error) {
-	var (
-		userID string
-		found  bool
-	)
-
 	if identityBaseField != "" {
-		if userID, found = claims[identityBaseField].(string); found {
-			if len(userID) > 0 {
-				log.WithField("userId", userID).Debug("Found User Id in Base Field")
-				return userID, nil
-			}
-
-			err := fmt.Errorf("%w, claim: %s", ErrEmptyUserIDInClaim, identityBaseField)
-			log.Error(err)
-			return "", err
-		}
-
-		if !found {
-			log.WithField("Base Field", identityBaseField).Warning("Base Field claim not found, trying to find user ID in 'sub' claim.")
-		}
-	}
-
-	if userID, found = claims[SUB].(string); shouldFallback && found {
-		if len(userID) > 0 {
-			log.WithField("userId", userID).Debug("Found User Id in 'sub' claim")
+		if userID, found := getClaimValue(claims, identityBaseField); found {
+			log.WithField("userId", userID).Debug("Found User Id in Base Field")
 			return userID, nil
 		}
 
-		log.Error(ErrEmptyUserIDInSubClaim)
-		return "", ErrEmptyUserIDInSubClaim
+		// Check if the field exists but is empty
+		if value, exists := claims[identityBaseField]; exists {
+			if strValue, ok := value.(string); ok && strValue == "" {
+				err := fmt.Errorf("%w, claim: %s", ErrEmptyUserIDInClaim, identityBaseField)
+				log.Error(err)
+				return "", err
+			}
+		}
+
+		// Also check nested path for empty string
+		if strings.Contains(identityBaseField, ".") {
+			if value := nestedMapLookup(claims, strings.Split(identityBaseField, ".")...); value != nil {
+				if strValue, ok := value.(string); ok && strValue == "" {
+					err := fmt.Errorf("%w, claim: %s", ErrEmptyUserIDInClaim, identityBaseField)
+					log.Error(err)
+					return "", err
+				}
+			}
+		}
+
+		log.WithField("Base Field", identityBaseField).Warning("Base Field claim not found, trying to find user ID in 'sub' claim.")
+	}
+
+	if shouldFallback {
+		if userID, found := claims[SUB].(string); found {
+			if len(userID) > 0 {
+				log.WithField("userId", userID).Debug("Found User Id in 'sub' claim")
+				return userID, nil
+			}
+
+			log.Error(ErrEmptyUserIDInSubClaim)
+			return "", ErrEmptyUserIDInSubClaim
+		}
 	}
 
 	log.Error(ErrNoSuitableUserIDClaimFound)
