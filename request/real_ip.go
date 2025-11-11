@@ -28,20 +28,16 @@ func RealIP(r *http.Request) string {
 		xffs := strings.Split(fw, ",")
 
 		// Get depth from config, default to 0 (first IP in chain)
-		depth := 0
+		var depth int
 		if Global != nil {
 			depth = Global().HttpServerOptions.XFFDepth
 		}
 
+		// The following check for invalid depth configs.
 		// It's more secure to return empty if depth is invalid.
-		// Returning the first IP in the case of an incorrect depth is a security risk.
-		// and a buried failure.
-		if depth < 0 {
-			return ""
-		}
-
-		// If depth exceeds available IPs, return empty
-		if depth > len(xffs) {
+		// Defaulting to an IP from the request would be
+		// burying a configuration failure.
+		if depth < 0 || depth > len(xffs) {
 			return ""
 		}
 
@@ -49,7 +45,7 @@ func RealIP(r *http.Request) string {
 		// depth=0 means first IP (leftmost), depth=1 means last IP, depth=2 means second to last, etc.
 		// Negative depth is invalid and treated same as 0/unset.
 		var ip string
-		if depth <= 0 {
+		if depth == 0 {
 			ip = strings.TrimSpace(xffs[0])
 		} else {
 			ip = strings.TrimSpace(xffs[len(xffs)-depth])
