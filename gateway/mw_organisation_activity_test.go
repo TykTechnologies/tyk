@@ -425,3 +425,65 @@ func BenchmarkProcessRequestOffThreadRedisRollingLimiter(b *testing.B) {
 		})
 	}
 }
+
+func TestOrganizationMonitor_RefreshOrgSession(t *testing.T) {
+	conf := func(globalConf *config.Config) {
+		globalConf.EnforceOrgQuotas = true
+		globalConf.LocalSessionCache.DisableCacheSessionState = false
+	}
+
+	ts := StartTest(conf)
+	defer ts.Close()
+
+	orgID := "test-org-refresh-" + uuid.New()
+
+	// Build API
+	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		spec.UseKeylessAccess = true
+		spec.OrgID = orgID
+		spec.Proxy.ListenPath = "/"
+	})
+
+	t.Run("refreshOrgSession populates cache", func(t *testing.T) {
+		// Create org session
+		ts.Run(t, test.TestCase{
+			Path:      "/tyk/org/keys/" + orgID,
+			AdminAuth: true,
+			Method:    http.MethodPost,
+			Code:      http.StatusOK,
+			Data: map[string]interface{}{
+				"quota_max":          10,
+				"quota_remaining":    10,
+				"quota_renewal_rate": 60,
+			},
+		})
+
+		ts.Gw.SessionCache.Flush()
+
+		// Verify cache is empty
+		_, found := ts.Gw.SessionCache.Get(orgID)
+		if found {
+			t.Error("Cache should be empty")
+		}
+
+		spec := ts.Gw.apisByID[ts.Gw.apiSpecs[0].APIID]
+		monitor := &OrganizationMonitor{
+			BaseMiddleware: &BaseMiddleware{
+				Spec: spec,
+				Gw:   ts.Gw,
+			},
+		}
+
+		// Call refreshOrgSession
+		monitor.refreshOrgSession(orgID)
+
+		// Wait a bit for async operation
+		time.Sleep(50 * time.Millisecond)
+
+		// Verify cache is now populated
+		_, found = ts.Gw.SessionCache.Get(orgID)
+		if !found {
+			t.Error("Cache should be populated after refreshOrgSession")
+		}
+	})
+}
