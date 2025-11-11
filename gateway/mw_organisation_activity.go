@@ -4,7 +4,6 @@ import (
 	"errors"
 	"net/http"
 	"sync"
-	"time"
 
 	"golang.org/x/sync/singleflight"
 
@@ -107,7 +106,9 @@ func (k *OrganizationMonitor) refreshOrgSession(orgID string) {
 	orgSessionFetchGroup.Do(orgID, func() (interface{}, error) {
 		session, found := k.OrgSession(orgID)
 		if found && !k.Spec.GlobalConfig.LocalSessionCache.DisableCacheSessionState {
-			k.Gw.SessionCache.Set(orgID, session.Clone(), int64(time.Hour))
+			sessionLifeTime := session.Lifetime(k.Spec.GetSessionLifetimeRespectsKeyExpiration(), k.Spec.SessionLifetime, k.Gw.GetConfig().ForceGlobalSessionLifetime, k.Gw.GetConfig().GlobalSessionLifetime)
+
+			k.Gw.SessionCache.Set(orgID, session.Clone(), sessionLifeTime)
 			k.Logger().Debug("Background org session fetch completed for: ", orgID)
 			return session, nil
 		}
