@@ -236,6 +236,12 @@ func TestXFFDepth(t *testing.T) {
 			expected: "10.0.0.1",
 		},
 		{
+			name:     "Depth -5 (Negative Depth uses same as NO depth)",
+			xffValue: "10.0.0.1,11.0.0.1,12.0.0.1,13.0.0.1",
+			depth:    -5,
+			expected: "10.0.0.1",
+		},
+		{
 			name:     "Header with spaces",
 			xffValue: "10.0.0.1, 11.0.0.1, 12.0.0.1, 13.0.0.1",
 			depth:    2,

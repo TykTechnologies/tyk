@@ -45,8 +45,9 @@ func RealIP(r *http.Request) string {
 
 		// Choose the appropriate IP based on depth
 		// depth=0 means first IP (leftmost), depth=1 means last IP, depth=2 means second to last, etc.
+		// Negative depth is invalid and treated same as 0/unset.
 		var ip string
-		if depth == 0 {
+		if depth <= 0 {
 			ip = strings.TrimSpace(xffs[0])
 		} else {
 			ip = strings.TrimSpace(xffs[len(xffs)-depth])
