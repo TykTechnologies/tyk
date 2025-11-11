@@ -560,33 +560,50 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-go-dashboard-
 
-      - name: Build dashboard packages with goreleaser
+      - name: Build dashboard packages for current architecture
         shell: bash
         env:
           ECR_REGISTRY: ${{ steps.ecr.outputs.registry }}
           IMAGE_TAG: tyk-${{ github.event.pull_request.number }}
           GOPRIVATE: github.com/TykTechnologies
         run: |
-          echo "🔨 Building tyk-analytics packages with goreleaser"
+          # Detect current architecture
+          ARCH=$(uname -m)
+          case $ARCH in
+            x86_64)
+              GOARCH=amd64
+              ;;
+            aarch64)
+              GOARCH=arm64
+              ;;
+            *)
+              echo "Unsupported architecture: $ARCH"
+              exit 1
+              ;;
+          esac
+
+          echo "🔨 Building tyk-analytics packages for linux/$GOARCH"
           echo "   Target image: ${ECR_REGISTRY}/tyk-analytics:${IMAGE_TAG}"
 
-          # Build using goreleaser (matching tyk-analytics release workflow)
+          # Build using goreleaser for current platform only
           cat > /tmp/build-dashboard.sh <<'EOF'
           #!/bin/sh
           set -eax
           git config --global url."https://${{ secrets.ORG_GH_TOKEN }}@github.com".insteadOf "https://github.com"
           git config --global --add safe.directory /go/src/github.com/TykTechnologies/tyk-analytics
 
-          # Build packages (binaries + deb/rpm) but skip signing and docker
-          goreleaser release --clean -f ci/goreleaser/goreleaser.yml --snapshot --skip=sign,docker
+          # Build packages for single target (current platform)
+          goreleaser release --clean -f ci/goreleaser/goreleaser.yml --snapshot --skip=sign,docker --single-target
           EOF
 
           chmod +x /tmp/build-dashboard.sh
 
-          # Build in golang-cross container (same as tyk-analytics release)
+          # Build in golang-cross container
           docker run --rm --privileged \
             -e GOPRIVATE=github.com/TykTechnologies \
             -e CGO_ENABLED=1 \
+            -e GOOS=linux \
+            -e GOARCH=$GOARCH \
             -v ${{ github.workspace }}:/go/src/github.com/TykTechnologies/tyk-analytics \
             -v ~/.cache/go-build:/cache/go-build \
             -v ~/go/pkg/mod:/go/pkg/mod \
@@ -596,14 +613,34 @@ jobs:
             -w /go/src/github.com/TykTechnologies/tyk-analytics \
             tykio/golang-cross:1.24-bookworm /tmp/build-dashboard.sh
 
-          echo "✅ Packages built successfully"
+          echo "✅ Packages built successfully for $GOARCH"
+
+      - name: Detect platform for Docker build
+        id: platform
+        shell: bash
+        run: |
+          ARCH=$(uname -m)
+          case $ARCH in
+            x86_64)
+              PLATFORM=linux/amd64
+              ;;
+            aarch64)
+              PLATFORM=linux/arm64
+              ;;
+            *)
+              echo "Unsupported architecture: $ARCH"
+              exit 1
+              ;;
+          esac
+          echo "platform=$PLATFORM" >> $GITHUB_OUTPUT
+          echo "Building for platform: $PLATFORM"
 
       - name: Build and push dashboard Docker image
         uses: docker/build-push-action@v6
         with:
           context: dist
           file: ci/Dockerfile.distroless
-          platforms: linux/amd64,linux/arm64
+          platforms: ${{ steps.platform.outputs.platform }}
           push: true
           cache-from: type=gha
           cache-to: type=gha,mode=max
