@@ -63,7 +63,7 @@ builds:
     env:
       - NOP=nop # ignore this, it is jsut to avoid a complex conditional in the templates
       - CC=gcc
-      - $env
+      - GOEXPERIMENT=boringcrypto
     ldflags:
       - -X github.com/TykTechnologies/tyk/internal/build.Version={{.Version}}
       - -X github.com/TykTechnologies/tyk/internal/build.Commit={{.FullCommit}}
