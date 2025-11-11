@@ -6,6 +6,8 @@ import (
 	"sync"
 	"time"
 
+	"golang.org/x/sync/singleflight"
+
 	"github.com/TykTechnologies/tyk/ctx"
 	"github.com/TykTechnologies/tyk/request"
 	"github.com/TykTechnologies/tyk/user"
@@ -18,6 +20,7 @@ type orgChanMapMu struct {
 
 var orgChanMap = orgChanMapMu{channels: map[string](chan bool){}}
 var orgActiveMap sync.Map
+var orgSessionFetchGroup singleflight.Group
 
 // RateLimitAndQuotaCheck will check the incoming request and key whether it is within it's quota and
 // within it's rate limit, it makes use of the SessionLimiter object to do this
@@ -101,13 +104,18 @@ func (k *OrganizationMonitor) ProcessRequest(w http.ResponseWriter, r *http.Requ
 }
 
 func (k *OrganizationMonitor) refreshOrgSession(orgID string) {
-	session, found := k.OrgSession(orgID)
-	if found && !k.Spec.GlobalConfig.LocalSessionCache.DisableCacheSessionState {
-		k.Gw.SessionCache.Set(orgID, session.Clone(), int64(time.Hour))
-		k.Logger().Debug("Background org session fetch completed for: ", orgID)
-	} else if !found {
-		k.setOrgHasNoSession(true)
-	}
+	orgSessionFetchGroup.Do(orgID, func() (interface{}, error) {
+		session, found := k.OrgSession(orgID)
+		if found && !k.Spec.GlobalConfig.LocalSessionCache.DisableCacheSessionState {
+			k.Gw.SessionCache.Set(orgID, session.Clone(), int64(time.Hour))
+			k.Logger().Debug("Background org session fetch completed for: ", orgID)
+			return session, nil
+		}
+		if !found {
+			k.setOrgHasNoSession(true)
+		}
+		return nil, nil
+	})
 }
 
 // ProcessRequest will run any checks on the request on the way through the system, return an error to have the chain fail

@@ -371,7 +371,6 @@ func (t *BaseMiddleware) SetOrgExpiry(orgid string, expiry int64) {
 func (t *BaseMiddleware) OrgSessionExpiry(orgid string) int64 {
 	t.Logger().Debug("Checking: ", orgid)
 
-	// Emergency Mode: Return default immediately
 	if rpc.IsEmergencyMode() {
 		return DEFAULT_ORG_SESSION_EXPIRATION
 	}
@@ -382,22 +381,23 @@ func (t *BaseMiddleware) OrgSessionExpiry(orgid string) int64 {
 		return cachedVal.(int64)
 	}
 
-	// Background Refresh: Start async refresh in background
+	// Start async refresh in background
 	go t.refreshOrgSessionExpiry(orgid)
 
-	// Return default immediately
 	return DEFAULT_ORG_SESSION_EXPIRATION
 }
 
 func (t *BaseMiddleware) refreshOrgSessionExpiry(orgid string) {
-	// This RPC call now happens safely in the background
-	s, found := t.OrgSession(orgid)
-	if found && t.Spec.GlobalConfig.EnforceOrgDataAge {
-		t.SetOrgExpiry(orgid, s.DataExpires)
-	} else {
+	orgSessionExpiryCache.Do(orgid, func() (interface{}, error) {
+		s, found := t.OrgSession(orgid)
+		if found && t.Spec.GlobalConfig.EnforceOrgDataAge {
+			t.SetOrgExpiry(orgid, s.DataExpires)
+			return s.DataExpires, nil
+		}
 		// On failure or if not found, cache the default value
 		t.SetOrgExpiry(orgid, DEFAULT_ORG_SESSION_EXPIRATION)
-	}
+		return DEFAULT_ORG_SESSION_EXPIRATION, nil
+	})
 }
 
 func (t *BaseMiddleware) UpdateRequestSession(r *http.Request) bool {
