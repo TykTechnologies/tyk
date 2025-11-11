@@ -444,7 +444,7 @@ func TestOrganizationMonitor_RefreshOrgSession(t *testing.T) {
 		spec.Proxy.ListenPath = "/"
 	})
 
-	t.Run("refreshOrgSession populates cache", func(t *testing.T) {
+	t.Run("refreshOrgSession populates cache when session found", func(t *testing.T) {
 		// Create org session
 		ts.Run(t, test.TestCase{
 			Path:      "/tyk/org/keys/" + orgID,
@@ -484,6 +484,39 @@ func TestOrganizationMonitor_RefreshOrgSession(t *testing.T) {
 		_, found = ts.Gw.SessionCache.Get(orgID)
 		if !found {
 			t.Error("Cache should be populated after refreshOrgSession")
+		}
+	})
+
+	t.Run("refreshOrgSession sets OrgHasNoSession when session not found", func(t *testing.T) {
+		nonExistentOrgID := "test-org-nonexistent-" + uuid.New()
+
+		// Build API with non-existent org
+		spec := ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+			spec.UseKeylessAccess = true
+			spec.OrgID = nonExistentOrgID
+			spec.Proxy.ListenPath = "/nonexistent/"
+		})[0]
+
+		// Verify OrgHasNoSession is initially false
+		if spec.OrgHasNoSession {
+			t.Error("OrgHasNoSession should initially be false")
+		}
+
+		monitor := &OrganizationMonitor{
+			BaseMiddleware: &BaseMiddleware{
+				Spec: spec,
+				Gw:   ts.Gw,
+			},
+		}
+
+		monitor.refreshOrgSession(nonExistentOrgID)
+
+		// Wait for async operation
+		time.Sleep(50 * time.Millisecond)
+
+		// Verify OrgHasNoSession is now true
+		if !monitor.getOrgHasNoSession() {
+			t.Error("OrgHasNoSession should be true after refreshOrgSession for non-existent org")
 		}
 	})
 }
