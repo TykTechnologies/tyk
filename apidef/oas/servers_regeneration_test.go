@@ -757,6 +757,167 @@ func TestGenerateTykServersBaseAPIWithVersioning(t *testing.T) {
 	})
 }
 
+func TestOAS_GenerateTykServers(t *testing.T) {
+	t.Parallel()
+
+	t.Run("standard non-versioned API", func(t *testing.T) {
+		t.Parallel()
+
+		oas := &OAS{}
+		apiDef := &apidef.APIDefinition{
+			APIID: "test-api",
+			Proxy: apidef.ProxyConfig{
+				ListenPath: "/test",
+			},
+		}
+
+		config := ServerRegenerationConfig{
+			Protocol:    "http://",
+			DefaultHost: "localhost:8080",
+		}
+
+		servers := oas.GenerateTykServers(apiDef, nil, config, "")
+
+		require.Len(t, servers, 1)
+		assert.Equal(t, "http://localhost:8080/test", servers[0].URL)
+	})
+
+	t.Run("versioned child API with URL path versioning", func(t *testing.T) {
+		t.Parallel()
+
+		oas := &OAS{}
+		baseAPI := &apidef.APIDefinition{
+			APIID: "base-id",
+			Proxy: apidef.ProxyConfig{
+				ListenPath: "/products",
+			},
+			VersionDefinition: apidef.VersionDefinition{
+				Enabled:  true,
+				Location: "url",
+				Key:      "version",
+				Versions: map[string]string{
+					"v1": "base-id",
+					"v2": "child-id",
+				},
+			},
+		}
+
+		childAPI := &apidef.APIDefinition{
+			APIID: "child-id",
+			Proxy: apidef.ProxyConfig{
+				ListenPath: "/products-v2",
+			},
+			VersionData: apidef.VersionData{
+				NotVersioned: false,
+				Versions: map[string]apidef.VersionInfo{
+					"v2": {},
+				},
+			},
+		}
+
+		config := ServerRegenerationConfig{
+			Protocol:    "https://",
+			DefaultHost: "api.example.com",
+		}
+
+		servers := oas.GenerateTykServers(childAPI, baseAPI, config, "v2")
+
+		// Should have versioned URL
+		require.NotEmpty(t, servers)
+		found := false
+		for _, server := range servers {
+			if server.URL == "https://api.example.com/products/v2" {
+				found = true
+				break
+			}
+		}
+		assert.True(t, found, "Expected to find versioned URL https://api.example.com/products/v2")
+	})
+
+	t.Run("API with custom domain", func(t *testing.T) {
+		t.Parallel()
+
+		oas := &OAS{}
+		apiDef := &apidef.APIDefinition{
+			APIID:  "test-api",
+			Domain: "custom.example.com",
+			Proxy: apidef.ProxyConfig{
+				ListenPath: "/api",
+			},
+		}
+
+		config := ServerRegenerationConfig{
+			Protocol:    "https://",
+			DefaultHost: "localhost:8080",
+		}
+
+		servers := oas.GenerateTykServers(apiDef, nil, config, "")
+
+		require.Len(t, servers, 1)
+		assert.Equal(t, "https://custom.example.com/api", servers[0].URL)
+	})
+
+	t.Run("base API with versioning and fallback", func(t *testing.T) {
+		t.Parallel()
+
+		oas := &OAS{}
+		baseAPI := &apidef.APIDefinition{
+			APIID: "base-id",
+			Proxy: apidef.ProxyConfig{
+				ListenPath: "/products",
+			},
+			VersionDefinition: apidef.VersionDefinition{
+				Enabled:           true,
+				Name:              "v1",
+				Location:          "url",
+				Default:           "v1",
+				FallbackToDefault: true,
+				Versions: map[string]string{
+					"v1": "base-id",
+				},
+			},
+		}
+
+		config := ServerRegenerationConfig{
+			Protocol:    "http://",
+			DefaultHost: "localhost:8080",
+		}
+
+		servers := oas.GenerateTykServers(baseAPI, nil, config, "")
+
+		// Should have both versioned URL and fallback URL
+		require.Len(t, servers, 2)
+		urls := []string{servers[0].URL, servers[1].URL}
+		assert.Contains(t, urls, "http://localhost:8080/products/v1")
+		assert.Contains(t, urls, "http://localhost:8080/products")
+	})
+
+	t.Run("returns openapi3.Server type not serverInfo", func(t *testing.T) {
+		t.Parallel()
+
+		oas := &OAS{}
+		apiDef := &apidef.APIDefinition{
+			APIID: "test-api",
+			Proxy: apidef.ProxyConfig{
+				ListenPath: "/test",
+			},
+		}
+
+		config := ServerRegenerationConfig{
+			Protocol:    "http://",
+			DefaultHost: "localhost:8080",
+		}
+
+		servers := oas.GenerateTykServers(apiDef, nil, config, "")
+
+		// Verify it returns the correct type
+		require.NotNil(t, servers)
+		require.IsType(t, []*openapi3.Server{}, servers)
+		require.Len(t, servers, 1)
+		require.IsType(t, &openapi3.Server{}, servers[0])
+	})
+}
+
 func TestShouldUpdateChildAPIs(t *testing.T) {
 	t.Parallel()
 
