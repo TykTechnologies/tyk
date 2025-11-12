@@ -19,6 +19,7 @@ import (
 type MockRPCDataLoader struct {
 	ctrl     *gomock.Controller
 	recorder *MockRPCDataLoaderMockRecorder
+	isgomock struct{}
 }
 
 // MockRPCDataLoaderMockRecorder is the mock recorder for MockRPCDataLoader.
@@ -77,17 +78,17 @@ func (c *MockRPCDataLoaderConnectCall) DoAndReturn(f func() bool) *MockRPCDataLo
 }
 
 // GetApiDefinitions mocks base method.
-func (m *MockRPCDataLoader) GetApiDefinitions(arg0 string, arg1 []string) string {
+func (m *MockRPCDataLoader) GetApiDefinitions(orgId string, tags []string) string {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetApiDefinitions", arg0, arg1)
+	ret := m.ctrl.Call(m, "GetApiDefinitions", orgId, tags)
 	ret0, _ := ret[0].(string)
 	return ret0
 }
 
 // GetApiDefinitions indicates an expected call of GetApiDefinitions.
-func (mr *MockRPCDataLoaderMockRecorder) GetApiDefinitions(arg0, arg1 any) *MockRPCDataLoaderGetApiDefinitionsCall {
+func (mr *MockRPCDataLoaderMockRecorder) GetApiDefinitions(orgId, tags any) *MockRPCDataLoaderGetApiDefinitionsCall {
 	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetApiDefinitions", reflect.TypeOf((*MockRPCDataLoader)(nil).GetApiDefinitions), arg0, arg1)
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetApiDefinitions", reflect.TypeOf((*MockRPCDataLoader)(nil).GetApiDefinitions), orgId, tags)
 	return &MockRPCDataLoaderGetApiDefinitionsCall{Call: call}
 }
 
@@ -115,17 +116,17 @@ func (c *MockRPCDataLoaderGetApiDefinitionsCall) DoAndReturn(f func(string, []st
 }
 
 // GetPolicies mocks base method.
-func (m *MockRPCDataLoader) GetPolicies(arg0 string) string {
+func (m *MockRPCDataLoader) GetPolicies(orgId string) string {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetPolicies", arg0)
+	ret := m.ctrl.Call(m, "GetPolicies", orgId)
 	ret0, _ := ret[0].(string)
 	return ret0
 }
 
 // GetPolicies indicates an expected call of GetPolicies.
-func (mr *MockRPCDataLoaderMockRecorder) GetPolicies(arg0 any) *MockRPCDataLoaderGetPoliciesCall {
+func (mr *MockRPCDataLoaderMockRecorder) GetPolicies(orgId any) *MockRPCDataLoaderGetPoliciesCall {
 	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetPolicies", reflect.TypeOf((*MockRPCDataLoader)(nil).GetPolicies), arg0)
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetPolicies", reflect.TypeOf((*MockRPCDataLoader)(nil).GetPolicies), orgId)
 	return &MockRPCDataLoaderGetPoliciesCall{Call: call}
 }
 
