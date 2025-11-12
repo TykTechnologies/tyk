@@ -1,0 +1,13 @@
+name: Release bot
+
+on:
+  issue_comment:
+    types: [created]
+
+jobs:
+  release_bot:
+    uses: TykTechnologies/github-actions/.github/workflows/release-bot.yaml@main
+    secrets:
+      APP_ID: ${{ secrets.PROBE_APP_ID }}
+      APP_PRIVATE_KEY: ${{ secrets.PROBE_APP_PRIVATE_KEY }}
+      APP_INSTALLATION_ID: ${{ secrets.PROBE_APP_INSTALLATION_ID }}

@@ -1423,6 +1423,27 @@ func (a *APIDefinition) GetAPIDomain() string {
 	return a.Domain
 }
 
+// IsChildAPI returns true if this API is a child API in a versioning hierarchy.
+// A child API is identified by having a BaseID that differs from its own APIID.
+func (a *APIDefinition) IsChildAPI() bool {
+	return a.VersionDefinition.BaseID != "" && a.VersionDefinition.BaseID != a.APIID
+}
+
+// IsBaseAPI returns true if this API is a base API with child versions.
+// A base API is identified by having versions defined and either no BaseID or BaseID equal to its own APIID.
+func (a *APIDefinition) IsBaseAPI() bool {
+	return len(a.VersionDefinition.Versions) > 0 &&
+		(a.VersionDefinition.BaseID == "" || a.VersionDefinition.BaseID == a.APIID)
+}
+
+// IsBaseAPIWithVersioning returns true if this API is a base API with versioning explicitly enabled.
+// This is similar to IsBaseAPI but additionally requires versioning to be enabled and have a version name.
+func (a *APIDefinition) IsBaseAPIWithVersioning() bool {
+	return a.VersionDefinition.Enabled &&
+		(a.VersionDefinition.BaseID == "" || a.VersionDefinition.BaseID == a.APIID) &&
+		a.VersionDefinition.Name != ""
+}
+
 func DummyAPI() APIDefinition {
 	endpointMeta := EndPointMeta{
 		Path: "abc",

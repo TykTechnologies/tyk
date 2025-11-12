@@ -2183,6 +2183,74 @@ func TestHandleAddApi(t *testing.T) {
 		assert.Equal(t, http.StatusBadRequest, statusCode)
 	})
 
+	t.Run("should return error when load balancing enabled with all targets weight 0", func(t *testing.T) {
+		apiDef := apidef.DummyAPI()
+		apiDef.APIID = "124"
+		apiDef.Proxy.EnableLoadBalancing = true
+		apiDef.Proxy.Targets = []string{} // Empty targets list means all weights are 0
+		apiDefJson, err := json.Marshal(apiDef)
+		require.NoError(t, err)
+
+		req, err := http.NewRequest(http.MethodPost, "http://gateway", bytes.NewBuffer(apiDefJson))
+		require.NoError(t, err)
+
+		response, statusCode := ts.Gw.handleAddApi(req, testFs, false)
+		errorResponse, ok := response.(apiStatusMessage)
+		require.True(t, ok)
+
+		assert.Equal(t, "Validation of API Definition failed. Reason: all load balancing targets have weight 0, at least one target must have weight > 0.", errorResponse.Message)
+		assert.Equal(t, http.StatusBadRequest, statusCode)
+	})
+
+	t.Run("should return error when OAS load balancing enabled with all targets weight 0", func(t *testing.T) {
+		tykExt := oas.XTykAPIGateway{
+			Info: oas.Info{
+				Name: "test api",
+				State: oas.State{
+					Active: true,
+				},
+			},
+			Upstream: oas.Upstream{
+				URL: "http://example.com",
+				LoadBalancing: &oas.LoadBalancing{
+					Enabled: true,
+					Targets: []oas.LoadBalancingTarget{
+						{URL: "http://target-1", Weight: 0},
+						{URL: "http://target-2", Weight: 0},
+					},
+				},
+			},
+			Server: oas.Server{
+				ListenPath: oas.ListenPath{
+					Value: "/test-lb-zero/",
+					Strip: false,
+				},
+			},
+		}
+
+		oasAPI := openapi3.T{
+			OpenAPI: "3.0.3",
+			Info: &openapi3.Info{
+				Title:   "test api",
+				Version: "1",
+			},
+			Paths: openapi3.NewPaths(),
+		}
+
+		oasAPI.Extensions = map[string]interface{}{
+			oas.ExtensionTykAPIGateway: tykExt,
+		}
+
+		_, _ = ts.Run(t, test.TestCase{
+			AdminAuth: true,
+			Method:    http.MethodPost,
+			Path:      "/tyk/apis/oas",
+			Data:      &oasAPI,
+			BodyMatch: `all load balancing targets have weight 0`,
+			Code:      http.StatusBadRequest,
+		})
+	})
+
 	t.Run("should return success when no error occurs", func(t *testing.T) {
 		apiDef := apidef.DummyAPI()
 		apiDef.APIID = "123"

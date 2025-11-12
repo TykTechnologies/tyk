@@ -598,7 +598,7 @@ func (c *certificateManager) CertPool(certIDs []string) *x509.CertPool {
 
 	for _, cert := range c.List(certIDs, CertificatePublic) {
 		if cert != nil && !tykcrypto.IsPublicKey(cert) {
-			pool.AddCert(cert.Leaf)
+			tykcrypto.AddCACertificatesFromChainToPool(pool, cert)
 		}
 	}
 
