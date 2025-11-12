@@ -319,25 +319,33 @@ jobs:
           fetch-depth: 0
           ref: ${{ github.event.pull_request.head.sha }}
 
-      - name: Check for relevant package changes in latest commit
+      - name: Check for relevant package changes in pushed commits
         id: check_changes
         shell: bash
         env:
-          GITHUB_SHA: ${{ github.sha }}
+          BEFORE_SHA: ${{ github.event.before }}
+          AFTER_SHA: ${{ github.sha }}
         run: |
           # Packages that affect dashboard compatibility
           RELEVANT_PACKAGES="pkg apidef lib common certs log config test user header"
 
-          echo "Checking latest commit ($GITHUB_SHA) for changes in packages: $RELEVANT_PACKAGES"
+          echo "Checking commits pushed in this workflow run for changes in packages: $RELEVANT_PACKAGES"
+          echo "Commit range: $BEFORE_SHA..$AFTER_SHA"
 
-          # Verify the commit exists and show git log for debugging
-          git log --oneline -1 $GITHUB_SHA || echo "Commit not found in git log"
+          # Get all changed files in the commits being pushed
+          # When pushing to a new branch, github.event.before is all zeros (null SHA)
+          if [ "$BEFORE_SHA" = "0000000000000000000000000000000000000000" ]; then
+            # First push to branch - compare against base branch
+            git fetch origin ${{ env.BASE_REF }} 2>/dev/null || true
+            CHANGED_FILES=$(git diff --name-only origin/${{ env.BASE_REF }}...HEAD 2>/dev/null || echo "")
+            echo "First push - comparing against base branch"
+          else
+            # Subsequent push - compare against previous commit
+            CHANGED_FILES=$(git diff --name-only $BEFORE_SHA..$AFTER_SHA 2>/dev/null || echo "")
+            echo "Comparing against previous push"
+          fi
 
-          # For PRs, compare against the parent commit (not merge base)
-          # Use git show to see what THIS commit changed
-          CHANGED_FILES=$(git show --name-only --format= $GITHUB_SHA 2>/dev/null || echo "")
-
-          echo "Changed files in commit $GITHUB_SHA:"
+          echo "Changed files in pushed commits:"
           echo "$CHANGED_FILES"
 
           # Check if any changed files are in relevant packages
@@ -351,10 +359,10 @@ jobs:
 
           if [ "$HAS_RELEVANT_CHANGES" = "true" ]; then
             echo "has_relevant_changes=true" >> $GITHUB_OUTPUT
-            echo "📦 Relevant package changes in latest commit - will build dashboard"
+            echo "📦 Relevant package changes in pushed commits - will build dashboard"
           else
             echo "has_relevant_changes=false" >> $GITHUB_OUTPUT
-            echo "ℹ️ No relevant package changes in latest commit"
+            echo "ℹ️ No relevant package changes in pushed commits"
           fi
 
       - name: Configure AWS credentials
