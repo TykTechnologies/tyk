@@ -73,6 +73,7 @@ import (
 	"github.com/TykTechnologies/tyk/internal/model"
 	"github.com/TykTechnologies/tyk/internal/netutil"
 	"github.com/TykTechnologies/tyk/internal/service/newrelic"
+	"github.com/TykTechnologies/tyk/request"
 )
 
 var (
@@ -400,6 +401,10 @@ func (gw *Gateway) setupGlobals() {
 	checkup.Run(&gwConfig)
 
 	gw.SetConfig(gwConfig)
+
+	// Initialize the Global function in the request package to access the gateway config
+	request.Global = gw.GetConfig
+
 	gw.dnsCacheManager = dnscache.NewDnsCacheManager(gwConfig.DnsCache.MultipleIPsHandleStrategy)
 
 	if gwConfig.DnsCache.Enabled {
