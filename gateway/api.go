@@ -49,6 +49,7 @@ import (
 
 	"github.com/TykTechnologies/tyk/config"
 
+	"github.com/TykTechnologies/tyk/internal/osutil"
 	"github.com/TykTechnologies/tyk/internal/otel"
 	"github.com/TykTechnologies/tyk/internal/redis"
 	"github.com/TykTechnologies/tyk/internal/uuid"
@@ -916,6 +917,16 @@ func (gw *Gateway) handleGetPolicyList() (interface{}, int) {
 	return polIDList, http.StatusOK
 }
 
+func (gw *Gateway) newPolicyPathRoot() (*osutil.Root, error) {
+	policyPath := gw.GetConfig().Policies.PolicyPath
+
+	if policyPath == "" {
+		policyPath = "."
+	}
+
+	return osutil.NewRoot(policyPath)
+}
+
 func (gw *Gateway) handleAddOrUpdatePolicy(polID string, r *http.Request) (interface{}, int) {
 	if gw.GetConfig().Policies.PolicySource == "service" {
 		log.Error("Rejected new policy due to PolicySource = service")
@@ -933,8 +944,17 @@ func (gw *Gateway) handleAddOrUpdatePolicy(polID string, r *http.Request) (inter
 		return apiError("Request ID does not match that in policy! For Update operations these must match."), http.StatusBadRequest
 	}
 
-	// Create a filename
-	polFilePath := filepath.Join(gw.GetConfig().Policies.PolicyPath, newPol.ID+".json")
+	if !ensurePolicyId(newPol) {
+		const errMsg = "Unable to create policy without id."
+		log.Error(errMsg)
+		return apiError(errMsg), http.StatusBadRequest
+	}
+
+	root, err := gw.newPolicyPathRoot()
+	if err != nil {
+		log.WithError(err).Error("Unable to access the policy storage root path.")
+		return apiError("Unable to access policy storage."), http.StatusInternalServerError
+	}
 
 	asByte, err := json.MarshalIndent(newPol, "", "  ")
 	if err != nil {
@@ -942,7 +962,7 @@ func (gw *Gateway) handleAddOrUpdatePolicy(polID string, r *http.Request) (inter
 		return apiError("Marshalling failed"), http.StatusInternalServerError
 	}
 
-	if err := ioutil.WriteFile(polFilePath, asByte, 0644); err != nil {
+	if err := root.WriteFile(newPol.ID+".json", asByte, 0644); err != nil {
 		log.Error("Failed to create file! - ", err)
 		return apiError("Failed to create file!"), http.StatusInternalServerError
 	}
@@ -962,16 +982,22 @@ func (gw *Gateway) handleAddOrUpdatePolicy(polID string, r *http.Request) (inter
 }
 
 func (gw *Gateway) handleDeletePolicy(polID string) (interface{}, int) {
-	// Generate a filename
-	defFilePath := filepath.Join(gw.GetConfig().Policies.PolicyPath, polID+".json")
+	root, err := gw.newPolicyPathRoot()
+
+	if err != nil {
+		log.WithError(err).Error("Unable to create policy root.")
+		return apiError("Delete failed"), http.StatusInternalServerError
+	}
+
+	defFilePath := polID + ".json"
 
 	// If it exists, delete it
-	if _, err := os.Stat(defFilePath); err != nil {
+	if _, err := root.Stat(defFilePath); err != nil {
 		log.Warningf("Error describing named file: %v ", err)
 		return apiError("Delete failed"), http.StatusInternalServerError
 	}
 
-	if err := os.Remove(defFilePath); err != nil {
+	if err := root.Remove(defFilePath); err != nil {
 		log.Warningf("Delete failed: %v", err)
 		return apiError("Delete failed"), http.StatusInternalServerError
 	}
@@ -1099,9 +1125,12 @@ func (gw *Gateway) handleAddApi(r *http.Request, fs afero.Fs, oasEndpoint bool) 
 	}
 
 	if oasEndpoint {
-		newAPIURL := getAPIURL(newDef, gw.GetConfig())
+		versioningParams := extractVersioningParams(
+			versionParams.Get(lib.BaseAPIID),
+			versionParams.Get(lib.NewVersionName),
+		)
 
-		if err := oasObj.AddServers(newAPIURL); err != nil {
+		if err := gw.handleOASServersForNewAPI(&newDef, &oasObj, versioningParams); err != nil {
 			return apiError(err.Error()), http.StatusBadRequest
 		}
 
@@ -1123,6 +1152,10 @@ func (gw *Gateway) handleAddApi(r *http.Request, fs afero.Fs, oasEndpoint bool) 
 
 	if !versionParams.IsEmpty(lib.BaseAPIID) {
 		baseAPI := gw.getApiSpec(versionParams.Get(lib.BaseAPIID))
+
+		// Capture the old default version BEFORE updating the base API
+		oldDefaultVersion := baseAPI.VersionDefinition.Default
+
 		baseAPI.VersionDefinition = lib.ConfigureVersionDefinition(baseAPI.VersionDefinition, versionParams, newDef.APIID)
 
 		if baseAPI.IsOAS {
@@ -1135,6 +1168,15 @@ func (gw *Gateway) handleAddApi(r *http.Request, fs afero.Fs, oasEndpoint bool) 
 			err, _ := gw.writeToFile(fs, baseAPI.APIDefinition, baseAPI.APIID)
 			if err != nil {
 				log.WithError(err).Errorf("Error occurred while updating base API with id: %s", baseAPI.APIID)
+			}
+		}
+
+		// Update old default child's servers if needed (removes fallback URL)
+		setDefault := !versionParams.IsEmpty(lib.SetDefault) && versionParams.Get(lib.SetDefault) == "true"
+		if oas.ShouldUpdateOldDefaultChild(setDefault, oldDefaultVersion, baseAPI.VersionDefinition.Default) {
+			if err := gw.updateOldDefaultChildServersGW(oldDefaultVersion, baseAPI, fs); err != nil {
+				log.WithError(err).Warn("Failed to update old default child API servers")
+				// Don't fail the whole operation if child update fails
 			}
 		}
 	}
@@ -1192,7 +1234,11 @@ func (gw *Gateway) handleUpdateApi(apiID string, r *http.Request, fs afero.Fs, o
 	}
 
 	if oasEndpoint && spec.IsOAS {
-		updateOASServers(spec, gw.GetConfig(), &newDef, &oasObj)
+		// Handle OAS server regeneration and cascade updates for API update
+		if err := gw.handleOASServersForUpdate(spec, &newDef, &oasObj); err != nil {
+			return apiError(err.Error()), http.StatusBadRequest
+		}
+
 		newDef.IsOAS = true
 
 		err, errCode := gw.writeOASAndAPIDefToFile(fs, &newDef, &oasObj)
@@ -1513,7 +1559,27 @@ func (gw *Gateway) apiOASPatchHandler(w http.ResponseWriter, r *http.Request) {
 		tykExtToPatch = oasObjToPatch.GetTykExtension()
 	}
 
-	oasObj.Servers = oas.RetainOldServerURL(oasObjToPatch.Servers, oasObj.Servers)
+	serverConfig := buildServerRegenerationConfig(gw.GetConfig())
+	existingUserServers, err := oas.ExtractUserServers(
+		oasObjToPatch.Servers,
+		existingAPISpec.APIDefinition,
+		nil,
+		serverConfig,
+		"",
+	)
+	if err != nil {
+		doJSONWrite(w, http.StatusInternalServerError, apiError(err.Error()))
+		return
+	}
+
+	patchUserServers := oasObj.Servers
+
+	userServersToKeep := patchUserServers
+	if len(patchUserServers) == 0 {
+		userServersToKeep = existingUserServers
+	}
+
+	oasObj.Servers = userServersToKeep
 
 	oasObjToPatch.T = oasObj.T
 
@@ -3095,6 +3161,19 @@ func ctxGetDoNotTrack(r *http.Request) bool {
 
 func ctxSetDoNotTrack(r *http.Request, b bool) {
 	setCtxValue(r, ctx.DoNotTrackThisEndpoint, b)
+}
+
+func ctxSetRequestStartTime(r *http.Request, t time.Time) {
+	setCtxValue(r, ctx.RequestStartTime, t)
+}
+
+func ctxGetRequestStartTime(r *http.Request) time.Time {
+	if v := r.Context().Value(ctx.RequestStartTime); v != nil {
+		if t, ok := v.(time.Time); ok {
+			return t
+		}
+	}
+	return time.Time{}
 }
 
 func ctxGetVersionInfo(r *http.Request) *apidef.VersionInfo {
