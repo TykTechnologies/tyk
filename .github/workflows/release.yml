@@ -521,11 +521,12 @@ jobs:
         shell: bash
         env:
           GATEWAY_BRANCH: ${{ github.head_ref }}
+          ORG_GH_TOKEN: ${{ secrets.ORG_GH_TOKEN }}
         run: |
           echo "📦 Updating tyk-gateway dependency to branch: $GATEWAY_BRANCH"
 
           # Configure git for go get
-          git config --global url."https://${{ secrets.ORG_GH_TOKEN }}@github.com".insteadOf "https://github.com"
+          git config --global url."https://${ORG_GH_TOKEN}@github.com".insteadOf "https://github.com"
 
           # Update dependency using branch name
           go get github.com/TykTechnologies/tyk@$GATEWAY_BRANCH
@@ -569,6 +570,7 @@ jobs:
           ECR_REGISTRY: ${{ steps.ecr.outputs.registry }}
           IMAGE_TAG: tyk-${{ github.event.pull_request.number }}
           GOPRIVATE: github.com/TykTechnologies
+          ORG_GH_TOKEN: ${{ secrets.ORG_GH_TOKEN }}
         run: |
           # Detect current architecture
           ARCH=$(uname -m)
@@ -592,7 +594,7 @@ jobs:
           cat > /tmp/build-dashboard.sh <<'EOF'
           #!/bin/sh
           set -eax
-          git config --global url."https://${{ secrets.ORG_GH_TOKEN }}@github.com".insteadOf "https://github.com"
+          git config --global url."https://${ORG_GH_TOKEN}@github.com".insteadOf "https://github.com"
           git config --global --add safe.directory /go/src/github.com/TykTechnologies/tyk-analytics
 
           # Build packages for single target (current platform)
@@ -602,7 +604,7 @@ jobs:
           chmod +x /tmp/build-dashboard.sh
 
           # Build in golang-cross container
-          docker run --rm --privileged \
+          docker run --rm --privileged -e GITHUB_TOKEN=${ORG_GH_TOKEN} \
             -e GOPRIVATE=github.com/TykTechnologies \
             -e CGO_ENABLED=1 \
             -e GOOS=linux \
