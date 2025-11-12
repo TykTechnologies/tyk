@@ -138,7 +138,7 @@ func TestValidateRequest(t *testing.T) {
 			spec.OAS = oasAPI
 			spec.IsOAS = true
 			// eager listen path pattern replaced with non-eager to pass tests
-			// This is known issue within Tyk classic router; task from August-September 2025 [TT-<I don't remember the number>]
+			// This is known issue within Tyk classic router; task from August-September 2025 [TT-13888]
 			// kin-openapi router had not that issue;
 			// spec.Proxy.ListenPath = "/product-regexp1/{name:.*}"
 			spec.Proxy.ListenPath = "/product-regexp1/{name:[a-z0-9]+}"
