@@ -436,7 +436,7 @@ require (
 	github.com/olivere/elastic/v7 v7.0.32 // indirect
 	github.com/opencontainers/go-digest v1.0.0 // indirect
 	github.com/opencontainers/image-spec v1.1.1 // indirect
-	github.com/opencontainers/runc v1.1.14 // indirect
+	github.com/opencontainers/runc v1.2.8 // indirect
 	github.com/opensearch-project/opensearch-go/v4 v4.3.0 // indirect
 	github.com/orcaman/concurrent-map/v2 v2.0.1 // indirect
 	github.com/ory/dockertest/v3 v3.10.0 // indirect
