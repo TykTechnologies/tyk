@@ -41,6 +41,7 @@ import (
 	"github.com/TykTechnologies/tyk/internal/httputil"
 	"github.com/TykTechnologies/tyk/internal/model"
 	"github.com/TykTechnologies/tyk/internal/otel"
+	"github.com/TykTechnologies/tyk/internal/reflect"
 	"github.com/TykTechnologies/tyk/internal/uuid"
 
 	"github.com/TykTechnologies/graphql-go-tools/pkg/execution/datasource"
@@ -1130,6 +1131,18 @@ func (s *Test) start(genConf func(globalConf *config.Config)) *Gateway {
 func (s *Test) AddDynamicHandler(path string, handlerFunc http.HandlerFunc) {
 	path = strings.Trim(path, "/")
 	s.dynamicHandlers[path] = handlerFunc
+}
+
+// setTestScopeConfig overrides config in scope of test case.
+func (s *Test) setTestScopeConfig(t *testing.T, apply func(cnf *config.Config)) {
+	t.Helper()
+	cnf := s.Gw.GetConfig()
+	newCnf := reflect.Clone(cnf)
+	apply(&newCnf)
+	s.Gw.SetConfig(newCnf)
+	t.Cleanup(func() {
+		s.Gw.SetConfig(cnf)
+	})
 }
 
 func (s *Test) newGateway(genConf func(globalConf *config.Config)) *Gateway {
