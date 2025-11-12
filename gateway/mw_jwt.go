@@ -565,8 +565,10 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 	}
 
 	oauthClientID := ""
-	// Get the OAuth client ID if available:
+	// Get the OAuth client ID if available.
+	// This step is skipped for external IDPs if IDPClientIDMappingDisabled is set to true.
 	if !k.Spec.IDPClientIDMappingDisabled {
+		k.Logger().Debug("IDP client ID mapping enabled, attempting to retrieve OAuth client ID from claims.")
 		oauthClientID = k.getOAuthClientIDFromClaim(claims)
 	}
 
@@ -612,7 +614,8 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 				}
 			}
 		} else {
-			k.Logger().WithError(err).Debug("Couldn't get OAuth client")
+			k.Logger().WithError(err).
+				Warnf("Failed to retrieve OAuth client. For external IDPs, consider disabling IDP client ID mapping for better performance.")
 		}
 	}
 
