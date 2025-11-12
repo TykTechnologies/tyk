@@ -324,7 +324,9 @@ jobs:
         shell: bash
         env:
           BEFORE_SHA: ${{ github.event.before }}
-          AFTER_SHA: ${{ github.sha }}
+          # For pull_request events, github.sha points to a temporary merge commit GitHub creates
+          # We need the actual PR head SHA to compare the commits that were pushed
+          AFTER_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
           # Packages that affect dashboard compatibility
           RELEVANT_PACKAGES="pkg apidef lib common certs log config test user header"
