@@ -871,7 +871,7 @@
         },
         "policy_source": {
           "type": "string",
-          "enum": ["", "service", "rpc"]
+          "enum": ["", "file", "service", "rpc"]
         },
         "policy_path": {
           "type": "string"
