@@ -317,6 +317,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha }}
 
       - name: Check for relevant package changes in latest commit
         id: check_changes
@@ -328,6 +329,9 @@ jobs:
           RELEVANT_PACKAGES="pkg apidef lib common certs log config test user header"
 
           echo "Checking latest commit ($GITHUB_SHA) for changes in packages: $RELEVANT_PACKAGES"
+
+          # Verify the commit exists and show git log for debugging
+          git log --oneline -1 $GITHUB_SHA || echo "Commit not found in git log"
 
           # For PRs, compare against the parent commit (not merge base)
           # Use git show to see what THIS commit changed
