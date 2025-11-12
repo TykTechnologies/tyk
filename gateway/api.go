@@ -945,8 +945,9 @@ func (gw *Gateway) handleAddOrUpdatePolicy(polID string, r *http.Request) (inter
 	}
 
 	if !ensurePolicyId(newPol) {
-		log.Error("Unable to create policy without id.")
-		return apiError("Unable to create policy without id."), http.StatusBadRequest
+		const errMsg = "Unable to create policy without id."
+		log.Error(errMsg)
+		return apiError(errMsg), http.StatusBadRequest
 	}
 
 	root, err := gw.newPolicyPathRoot()
