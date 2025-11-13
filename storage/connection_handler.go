@@ -294,3 +294,35 @@ func getExponentialBackoff() *backoff.ExponentialBackOff {
 
 	return exponentialBackoff
 }
+
+// GetRedisStats returns Redis connection pool statistics for the specified connection type
+func (rc *ConnectionHandler) GetRedisStats(connType string) *RedisPoolStats {
+	rc.connectionsMu.RLock()
+	defer rc.connectionsMu.RUnlock()
+
+	conn, ok := rc.connections[connType]
+	if !ok || conn == nil {
+		return nil
+	}
+
+	// Try to get the connector as a RedisCluster
+	var redisCluster *RedisCluster
+	if ok := conn.As(&redisCluster); ok && redisCluster != nil {
+		if stats := redisCluster.PoolStats(); stats != nil {
+			return &RedisPoolStats{
+				TotalConns: stats.TotalConns,
+				IdleConns:  stats.IdleConns,
+				StaleConns: stats.StaleConns,
+			}
+		}
+	}
+
+	return nil
+}
+
+// RedisPoolStats holds simplified Redis pool statistics for Prometheus metrics
+type RedisPoolStats struct {
+	TotalConns uint32
+	IdleConns  uint32
+	StaleConns uint32
+}
