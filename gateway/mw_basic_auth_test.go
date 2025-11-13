@@ -21,7 +21,6 @@ func genAuthHeader(username, password string) string {
 }
 
 func (ts *Test) testPrepareBasicAuth(cacheDisabled bool) *user.SessionState {
-
 	session := CreateStandardSession()
 	session.BasicAuthData.Password = "password"
 	session.AccessRights = map[string]user.AccessDefinition{"test": {APIID: "test", Versions: []string{"v1"}}}
@@ -33,6 +32,8 @@ func (ts *Test) testPrepareBasicAuth(cacheDisabled bool) *user.SessionState {
 		spec.UseKeylessAccess = false
 		spec.Proxy.ListenPath = "/"
 		spec.OrgID = "default"
+		spec.DisableRateLimit = true
+		spec.DisableQuota = true
 	})
 
 	return session
@@ -169,7 +170,9 @@ func TestBasicAuthHashKeyFunc(t *testing.T) {
 
 			ts.Gw.apisMu.Lock()
 			assert.Len(t, ts.Gw.apiSpecs, 1)
-			k := &BasicAuthKeyIsValid{}
+			k := &BasicAuthKeyIsValid{
+				BaseMiddleware: &BaseMiddleware{},
+			}
 			k.Spec = ts.Gw.apiSpecs[0]
 			ts.Gw.apisMu.Unlock()
 

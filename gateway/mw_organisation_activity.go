@@ -21,7 +21,8 @@ var orgActiveMap sync.Map
 // RateLimitAndQuotaCheck will check the incoming request and key whether it is within it's quota and
 // within it's rate limit, it makes use of the SessionLimiter object to do this
 type OrganizationMonitor struct {
-	BaseMiddleware
+	*BaseMiddleware
+
 	sessionlimiter SessionLimiter
 	mon            Monitor
 }
@@ -106,10 +107,10 @@ func (k *OrganizationMonitor) ProcessRequestLive(r *http.Request, orgSession *us
 		r,
 		orgSession,
 		k.Spec.OrgID,
+		"",
 		k.Spec.OrgSessionManager.Store(),
 		orgSession.Per > 0 && orgSession.Rate > 0,
 		true,
-		&k.Spec.GlobalConfig,
 		k.Spec,
 		false,
 	)
@@ -232,15 +233,18 @@ func (k *OrganizationMonitor) AllowAccessNext(
 		orgChan <- false
 		return
 	}
+
+	customQuotaKey := ""
+
 	// We found a session, apply the quota and rate limiter
 	reason := k.Gw.SessionLimiter.ForwardMessage(
 		r,
 		session,
 		k.Spec.OrgID,
+		customQuotaKey,
 		k.Spec.OrgSessionManager.Store(),
 		session.Per > 0 && session.Rate > 0,
 		true,
-		&k.Spec.GlobalConfig,
 		k.Spec,
 		false,
 	)

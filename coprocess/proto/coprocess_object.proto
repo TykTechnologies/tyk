@@ -9,23 +9,49 @@ package coprocess;
 
 option go_package = "/coprocess";
 
+// Object wraps a MiniRequestObject and contains additional fields that are useful for users that implement
+// their own request dispatchers, like the middleware hook type and name.
 message Object {
+
+  // HookType is an enumeration that identifies the plugin hook type.
   HookType hook_type = 1;
+  
+  // HookName is the plugin name.
   string hook_name = 2;
+
+  // Request relates to the main request data structure used by rich plugins. It’s used for middleware calls 
+  // and contains important fields like headers, parameters, body and URL.
   MiniRequestObject request = 3;
+
+  // Session stores information about the current key/user that’s used for authentication.
   SessionState session = 4;
+  
+  // Metadata is a dynamic filed that contains the metadata.
   map<string, string> metadata = 5;
+
+  // Spec contains information about API definition, including APIID, OrgID and config_data.
   map<string, string> spec = 6;
+
+  // Response relates to the ResponseObject used by response hooks. The fields are populated with the upstream HTTP
+  // response data. All the field contents can be modified.
   ResponseObject response = 7;
 }
 
+// Event is represented as a JSON payload.
 message Event {
+
+  // Payload represents the JSON payload.
   string payload = 1;
 }
 
+// EventReply is the response for event.
 message EventReply {}
 
+// Dispatcher is the service interface that must be implemented by the target language.
 service Dispatcher {
+  // Dispatch is an RPC method that accepts and returns an Object.
   rpc Dispatch (Object) returns (Object) {}
+
+  // DispatchEvent dispatches an event to the target language.
   rpc DispatchEvent (Event) returns (EventReply) {}
 }

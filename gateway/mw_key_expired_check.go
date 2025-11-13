@@ -9,7 +9,7 @@ import (
 
 // KeyExpired middleware will check if the requesting key is expired or not. It makes use of the authManager to do so.
 type KeyExpired struct {
-	BaseMiddleware
+	*BaseMiddleware
 }
 
 func (k *KeyExpired) Name() string {

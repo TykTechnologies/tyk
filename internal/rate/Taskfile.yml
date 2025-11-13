@@ -1,0 +1,50 @@
+---
+version: "3"
+
+includes:
+  services: ../../docker/services/Taskfile.yml
+
+vars:
+  testArgs: -v
+
+tasks:
+  test:
+    desc: "Run tests (requires redis)"
+    deps: [ services:up ]
+    cmds:
+      - defer:
+          task: services:down
+      - task: fmt
+      - go test {{.testArgs}} -count=1 -cover -coverprofile=rate.cov -coverpkg=./... ./...
+
+  bench:
+    desc: "Run benchmarks"
+    cmds:
+      - task: fmt
+      - go test {{.testArgs}} -count=1 -tags integration -bench=. -benchtime=10s -benchmem ./...
+
+  fmt:
+    internal: true
+    desc: "Invoke fmt"
+    cmds:
+      - goimports -w .
+      - go fmt ./...
+
+  cover:
+    desc: "Show source coverage"
+    aliases: [coverage, cov]
+    cmds:
+      - go tool cover -func=rate.cov
+
+  uncover:
+    desc: "Show uncovered source"
+    cmds:
+      - uncover rate.cov
+
+  install:uncover:
+    desc: "Install uncover"
+    internal: true
+    env:
+      GOBIN: /usr/local/bin
+    cmds:
+      - go install github.com/gregoryv/uncover/...@latest

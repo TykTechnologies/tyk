@@ -6,13 +6,19 @@ package gateway
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"net/url"
+	"path"
 	"reflect"
+	"strconv"
 	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
+	"github.com/TykTechnologies/tyk/internal/redis"
 
 	"github.com/TykTechnologies/tyk/config"
 
@@ -42,7 +48,7 @@ const (
 const keyRules = `{
 	"last_check": 1402492859,
 	"org_id": "53ac07777cbb8c2d53000002",
-	"rate": 1,
+	"rate": 3,
 	"per": 1,
 	"quota_max": -1,
 	"quota_renews": 1399567002,
@@ -53,7 +59,7 @@ const keyRules = `{
 const keyRulesWithMetadata = `{
 	"last_check": 1402492859,
 	"org_id": "53ac07777cbb8c2d53000002",
-	"rate": 1,
+	"rate": 3,
 	"per": 1,
 	"quota_max": -1,
 	"quota_renews": 1399567002,
@@ -146,8 +152,43 @@ func (ts *Test) createTestOAuthClient(spec *APISpec, clientID string) OAuthClien
 		PolicyID:          pID,
 		MetaData:          map[string]interface{}{"foo": "bar", "client": "meta"},
 	}
-	spec.OAuthManager.OsinServer.Storage.SetClient(testClient.ClientID, "org-id-1", &testClient, false)
+	spec.OAuthManager.Storage().SetClient(testClient.ClientID, "org-id-1", &testClient, false)
 	return testClient
+}
+
+func (ts *Test) createOAuthClientIDAndTokens(t *testing.T, spec *APISpec, clientID string) {
+	t.Helper()
+	ts.createTestOAuthClient(spec, clientID)
+
+	param := make(url.Values)
+	param.Set("response_type", "token")
+	param.Set("redirect_uri", authRedirectUri)
+	param.Set("client_id", clientID)
+	param.Set("client_secret", authClientSecret)
+	param.Set("key_rules", keyRules)
+
+	headers := map[string]string{
+		"Content-Type": "application/x-www-form-urlencoded",
+	}
+
+	for i := 0; i < 3; i++ {
+		resp, err := ts.Run(t, test.TestCase{
+			Path:      path.Join(spec.Proxy.ListenPath, "/tyk/oauth/authorize-client/"),
+			Data:      param.Encode(),
+			AdminAuth: true,
+			Headers:   headers,
+			Method:    http.MethodPost,
+			Code:      http.StatusOK,
+		})
+		if err != nil {
+			t.Error(err)
+		}
+
+		response := map[string]interface{}{}
+		if err := json.NewDecoder(resp.Body).Decode(&response); err != nil {
+			t.Fatal(err)
+		}
+	}
 }
 
 func TestOauthMultipleAPIs(t *testing.T) {
@@ -191,8 +232,8 @@ func TestOauthMultipleAPIs(t *testing.T) {
 		ClientRedirectURI: authRedirectUri,
 		PolicyID:          pID,
 	}
-	spec.OAuthManager.OsinServer.Storage.SetClient(testClient.ClientID, spec.OrgID, &testClient, false)
-	spec2.OAuthManager.OsinServer.Storage.SetClient(testClient.ClientID, spec2.OrgID, &testClient, false)
+	spec.OAuthManager.Storage().SetClient(testClient.ClientID, spec.OrgID, &testClient, false)
+	spec2.OAuthManager.Storage().SetClient(testClient.ClientID, spec2.OrgID, &testClient, false)
 
 	param := make(url.Values)
 	param.Set("response_type", "token")
@@ -273,7 +314,7 @@ func TestOAuthTokenExpiration(t *testing.T) {
 		ClientRedirectURI: authRedirectUri,
 		PolicyID:          pID,
 	}
-	err := spec.OAuthManager.OsinServer.Storage.SetClient(testClient.ClientID, spec.OrgID, &testClient, false)
+	err := spec.OAuthManager.Storage().SetClient(testClient.ClientID, spec.OrgID, &testClient, false)
 	assert.NoError(t, err)
 
 	param := make(url.Values)
@@ -664,6 +705,7 @@ func TestAPIClientAuthorizeTokenWithPolicy(t *testing.T) {
 }
 
 func getAuthCode(t *testing.T, ts *Test) map[string]string {
+	t.Helper()
 	param := make(url.Values)
 	param.Set("response_type", "code")
 	param.Set("redirect_uri", authRedirectUri)
@@ -816,7 +858,7 @@ func TestGetClientTokens(t *testing.T) {
 
 func testGetClientTokens(t *testing.T, hashed bool) {
 	test.Flaky(t) // TODO: TT-5253
-
+	t.Helper()
 	conf := func(globalConf *config.Config) {
 		// set tokens to be expired after 1 second
 		globalConf.OauthTokenExpire = 1
@@ -935,6 +977,7 @@ type tokenData struct {
 }
 
 func getToken(t *testing.T, ts *Test) tokenData {
+	t.Helper()
 	authData := getAuthCode(t, ts)
 
 	param := make(url.Values)
@@ -1270,4 +1313,188 @@ func TestJSONToFormValues(t *testing.T) {
 			}
 		}
 	})
+}
+
+func assertTokensLen(t *testing.T, storageManager storage.Handler, storageKey string, expectedTokensLen int) {
+	t.Helper()
+	nowTs := time.Now().Unix()
+	startScore := strconv.FormatInt(nowTs, 10)
+	tokens, _, err := storageManager.GetSortedSetRange(storageKey, startScore, "+inf")
+	assert.NoError(t, err)
+	assert.Equal(t, expectedTokensLen, len(tokens))
+}
+
+func TestPurgeOAuthClientTokens(t *testing.T) {
+	t.Run("event", func(t *testing.T) {
+		conf := func(globalConf *config.Config) {
+			// set tokens to be expired after 1 second
+			globalConf.OauthTokenExpire = 1
+			// cleanup tokens older than 1 seconds
+			globalConf.OauthTokenExpiredRetainPeriod = 1
+		}
+
+		ts := StartTest(conf)
+		defer ts.Close()
+
+		spec := ts.LoadTestOAuthSpec()
+
+		clientID1, clientID2 := uuid.New(), uuid.New()
+
+		ts.createOAuthClientIDAndTokens(t, spec, clientID1)
+		ts.createOAuthClientIDAndTokens(t, spec, clientID2)
+		storageKey1, storageKey2 := fmt.Sprintf("%s%s", prefixClientTokens, clientID1),
+			fmt.Sprintf("%s%s", prefixClientTokens, clientID2)
+
+		storageManager := ts.Gw.getGlobalMDCBStorageHandler(generateOAuthPrefix(spec.APIID), false)
+		storageManager.Connect()
+
+		assertTokensLen(t, storageManager, storageKey1, 3)
+		assertTokensLen(t, storageManager, storageKey2, 3)
+
+		time.Sleep(time.Second * 2)
+
+		// emit event
+
+		n := Notification{
+			Command: OAuthPurgeLapsedTokens,
+			Gw:      ts.Gw,
+		}
+		ts.Gw.MainNotifier.Notify(n)
+
+		assertTokensLen(t, storageManager, storageKey1, 0)
+		assertTokensLen(t, storageManager, storageKey2, 0)
+	})
+
+	t.Run("background", func(t *testing.T) {
+
+		conf := func(globalConf *config.Config) {
+			// set tokens to be expired after 1 second
+			globalConf.OauthTokenExpire = 1
+			// cleanup tokens older than 2 seconds
+			globalConf.OauthTokenExpiredRetainPeriod = 1
+		}
+
+		ts := StartTest(conf)
+		defer ts.Close()
+
+		spec := ts.LoadTestOAuthSpec()
+
+		clientID1, clientID2 := uuid.New(), uuid.New()
+
+		ts.createOAuthClientIDAndTokens(t, spec, clientID1)
+		ts.createOAuthClientIDAndTokens(t, spec, clientID2)
+		storageKey1, storageKey2 := fmt.Sprintf("%s%s", prefixClientTokens, clientID1),
+			fmt.Sprintf("%s%s", prefixClientTokens, clientID2)
+
+		storageManager := ts.Gw.getGlobalMDCBStorageHandler(generateOAuthPrefix(spec.APIID), false)
+		storageManager.Connect()
+
+		assertTokensLen(t, storageManager, storageKey1, 3)
+		assertTokensLen(t, storageManager, storageKey2, 3)
+
+		time.Sleep(time.Second * 2)
+
+		assertTokensLen(t, storageManager, storageKey1, 0)
+		assertTokensLen(t, storageManager, storageKey2, 0)
+	})
+
+}
+
+func BenchmarkPurgeLapsedOAuthTokens(b *testing.B) {
+	b.Skip()
+
+	conf := func(globalConf *config.Config) {
+		// set tokens to be expired after 1 second
+		globalConf.OauthTokenExpire = 1
+		// cleanup tokens older than 2 seconds
+		globalConf.OauthTokenExpiredRetainPeriod = 2
+
+		globalConf.Private.OAuthTokensPurgeInterval = 1
+	}
+
+	ts := StartTest(conf)
+	defer ts.Close()
+
+	const (
+		apiCount     = 10
+		clientsCount = 50
+		tokensCount  = 1000
+	)
+
+	gwConf := ts.Gw.GetConfig()
+
+	cfg := gwConf.Storage
+	timeout := 5 * time.Second
+
+	opts := &redis.UniversalOptions{
+		Addrs:        cfg.HostAddrs(),
+		Username:     cfg.Username,
+		Password:     cfg.Password,
+		DB:           cfg.Database,
+		DialTimeout:  timeout,
+		ReadTimeout:  timeout,
+		WriteTimeout: timeout,
+		PoolSize:     500,
+	}
+
+	fillZSet := func(client redis.UniversalClient, key string, count int) {
+		ctx := context.Background()
+		now := time.Now()
+		nowTs := now.Unix()
+		var setMembers []redis.Z
+		for k := 0; k < count; k++ {
+			setMembers = append(setMembers, redis.Z{
+				Score:  float64(nowTs - int64(k)),
+				Member: fmt.Sprintf("dummy-value-%d", k),
+			})
+		}
+
+		// add 10 more tokens to be not expired
+		for k := 0; k < count/10; k++ {
+			setMembers = append(setMembers, redis.Z{
+				Score:  float64(nowTs + int64((k)*1000)),
+				Member: fmt.Sprintf("dummy-value-%d", k),
+			})
+		}
+		client.ZAdd(ctx, key, setMembers...)
+	}
+
+	copyZSet := func(client redis.UniversalClient, src, dst string) {
+		ctx := context.Background()
+		client.ZRangeStore(ctx, dst, redis.ZRangeArgs{
+			Key:   src,
+			Start: "0",
+			Stop:  "+inf",
+		})
+	}
+
+	setup := func(tb testing.TB, client redis.UniversalClient) {
+		tb.Helper()
+		now := time.Now()
+		for i := 0; i < apiCount; i++ {
+			for j := 0; j < clientsCount; j++ {
+				//now := time.Now()
+				dst := fmt.Sprintf("oauth-data.%doauth-client-tokens.%d", i, j)
+				copyZSet(client, "api", dst)
+				//tb.Logf("copy zet elapsed %f", time.Since(now).Seconds())
+			}
+
+		}
+		tb.Logf("setup time elapsed %f", time.Since(now).Seconds())
+	}
+
+	client := redis.NewClient(opts.Simple()) // no S1021
+	now := time.Now()
+	fillZSet(client, "api", tokensCount)
+	b.Logf("fill zet elapsed %f", time.Since(now).Seconds())
+
+	b.ReportAllocs()
+
+	for i := 0; i < b.N; i++ {
+		b.StopTimer()
+		setup(b, client)
+		b.StartTimer()
+		require.NoError(b, ts.Gw.purgeLapsedOAuthTokens())
+		b.StopTimer()
+	}
 }

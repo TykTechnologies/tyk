@@ -1,6 +1,7 @@
 package rpc
 
 import (
+	"context"
 	"crypto/tls"
 	"errors"
 	"net"
@@ -55,7 +56,7 @@ var (
 // ErrRPCIsDown this is returned when we can't reach rpc server.
 var ErrRPCIsDown = errors.New("RPCStorageHandler: rpc is either down or was not configured")
 
-// rpc.Login is callend may places we only need one in flight at a time.
+// rpc.Login is called may places we only need one in flight at a time.
 var loginFlight singleflight.Group
 
 var values rpcOpts
@@ -68,12 +69,31 @@ type rpcOpts struct {
 	emergencyModeLoaded atomic.Value
 	config              atomic.Value
 	clientIsConnected   atomic.Value
+
+	// dnsCheckedAfterError tracks whether DNS has been checked after a connection error.
+	// This ensures DNS is only checked once per disconnection event, rather than
+	// on every failed RPC call. It's reset to false when a successful connection is made.
+	dnsCheckedAfterError atomic.Value
+}
+
+func (r *rpcOpts) SetDNSCheckedAfterError(checked bool) {
+	r.dnsCheckedAfterError.Store(checked)
+}
+
+func (r *rpcOpts) GetDNSCheckedAfterError() bool {
+	if v := r.dnsCheckedAfterError.Load(); v != nil {
+		if b, ok := v.(bool); ok {
+			return b
+		}
+	}
+	return false
 }
 
 func (r rpcOpts) ClientIsConnected() bool {
 	if v := r.clientIsConnected.Load(); v != nil {
 		return v.(bool)
 	}
+
 	return false
 }
 
@@ -89,6 +109,7 @@ func (r *rpcOpts) Reset() {
 	r.emergencyMode.Store(false)
 	r.emergencyModeLoaded.Store(false)
 	r.clientIsConnected.Store(false)
+	r.dnsCheckedAfterError.Store(false)
 }
 
 func (r *rpcOpts) SetLoadCounts(n int) {
@@ -149,6 +170,8 @@ type Config struct {
 	CallTimeout           int    `json:"call_timeout"`
 	PingTimeout           int    `json:"ping_timeout"`
 	RPCPoolSize           int    `json:"rpc_pool_size"`
+	DNSMonitorEnabled     bool   `json:"dns_monitor_enabled"`
+	DNSMonitorInterval    int    `json:"dns_monitor_interval"`
 }
 
 func IsEmergencyMode() bool {
@@ -160,6 +183,7 @@ func LoadCount() int {
 }
 
 func Reset() {
+	StopDNSMonitor()
 	clientSingleton.Stop()
 	clientSingleton = nil
 	funcClientSingleton = nil
@@ -201,18 +225,18 @@ func EmitErrorEventKv(jobName string, funcName string, err error, kv map[string]
 }
 
 // Connect will establish a connection to the RPC server specified in connection options
-func Connect(connConfig Config, suppressRegister bool, dispatcherFuncs map[string]interface{},
+func Connect(
+	connConfig Config,
+	suppressRegister bool,
+	dispatcherFuncs map[string]interface{},
 	getGroupLoginFunc func(string, string) interface{},
 	emergencyModeFunc func(),
-	emergencyModeLoadedFunc func()) bool {
+	emergencyModeLoadedFunc func(),
+) bool {
 	rpcConnectMu.Lock()
 	defer rpcConnectMu.Unlock()
 
-	values.config.Store(connConfig)
-	getGroupLoginCallback = getGroupLoginFunc
-	emergencyModeCallback = emergencyModeFunc
-	emergencyModeLoadedCallback = emergencyModeLoadedFunc
-
+	setupConnectionConfig(connConfig, getGroupLoginFunc, emergencyModeFunc, emergencyModeLoadedFunc)
 	if values.ClientIsConnected() {
 		Log.Debug("Using RPC singleton for connection")
 		return true
@@ -222,9 +246,49 @@ func Connect(connConfig Config, suppressRegister bool, dispatcherFuncs map[strin
 		return !values.GetEmergencyMode()
 	}
 
-	// RPC Client is unset
-	// Set up the cache
 	Log.Info("Setting new RPC connection!")
+	initializeClient()
+	loadDispatcher(dispatcherFuncs)
+
+	if funcClientSingleton == nil {
+		funcClientSingleton = dispatcher.NewFuncClient(clientSingleton)
+	}
+
+	handleLogin()
+	if !suppressRegister {
+		register()
+		go checkDisconnect()
+	}
+
+	// Initial DNS resolution and get first ip
+	host, _, err := net.SplitHostPort(connConfig.ConnectionString)
+	if err == nil {
+		updateResolvedIPs(context.Background(), host, dnsResolver)
+	}
+
+	// Start background DNS monitor if enabled
+	if !suppressRegister && connConfig.DNSMonitorEnabled {
+		StartDNSMonitor(connConfig.DNSMonitorEnabled, connConfig.DNSMonitorInterval, connConfig.ConnectionString)
+	}
+
+	return true
+}
+
+func setupConnectionConfig(
+	connConfig Config,
+	loginFunc func(string, string) interface{},
+	emergencyModeFunc func(),
+	emergencyModeLoadedFunc func(),
+) {
+	values.config.Store(connConfig)
+	getGroupLoginCallback = loginFunc
+	emergencyModeCallback = emergencyModeFunc
+	emergencyModeLoadedCallback = emergencyModeLoadedFunc
+}
+
+func initializeClient() {
+	//by default start in emergency until the rpc connection is stablished
+	values.SetEmergencyMode(true)
 
 	connID := uuid.New()
 
@@ -239,7 +303,6 @@ func Connect(connConfig Config, suppressRegister bool, dispatcherFuncs map[strin
 			MinVersion:         values.Config().SSLMinVersion,
 			MaxVersion:         values.Config().SSLMaxVersion,
 		}
-
 		clientSingleton = gorpc.NewTLSClient(values.Config().ConnectionString, clientCfg)
 	} else {
 		clientSingleton = gorpc.NewTCPClient(values.Config().ConnectionString)
@@ -252,12 +315,16 @@ func Connect(connConfig Config, suppressRegister bool, dispatcherFuncs map[strin
 	clientSingleton.OnConnect = onConnectFunc
 
 	clientSingleton.Conns = values.Config().RPCPoolSize
-	if clientSingleton.Conns == 0 {
+	if clientSingleton.Conns <= 0 {
 		clientSingleton.Conns = 5
 	}
 
-	clientSingleton.Dial = func(addr string) (conn net.Conn, err error) {
+	setupDialFunction(connID)
+	clientSingleton.Start()
+}
 
+func setupDialFunction(connID string) {
+	clientSingleton.Dial = func(addr string) (conn net.Conn, err error) {
 		dialer := &net.Dialer{
 			Timeout:   10 * time.Second,
 			KeepAlive: 30 * time.Second,
@@ -293,22 +360,9 @@ func Connect(connConfig Config, suppressRegister bool, dispatcherFuncs map[strin
 		conn.Write([]byte("proto2"))
 		conn.Write([]byte{byte(len(connID))})
 		conn.Write([]byte(connID))
+
 		return conn, nil
 	}
-	clientSingleton.Start()
-
-	loadDispatcher(dispatcherFuncs)
-
-	if funcClientSingleton == nil {
-		funcClientSingleton = dispatcher.NewFuncClient(clientSingleton)
-	}
-
-	handleLogin()
-	if !suppressRegister {
-		register()
-		go checkDisconnect()
-	}
-	return true
 }
 
 func handleLogin() {
@@ -347,6 +401,11 @@ func loginBase() bool {
 		rpcLoginMu.Unlock()
 		return false
 	}
+
+	// Login was successful, reset the DNS check flag
+	values.SetDNSCheckedAfterError(false)
+	Log.Debug("Reset DNS check flag after successful login")
+
 	return true
 }
 
@@ -469,6 +528,17 @@ func FuncClientSingleton(funcName string, request interface{}) (result interface
 			return ErrRPCIsDown
 		}
 		result, err = funcClientSingleton.CallTimeout(funcName, request, GlobalRPCCallTimeout)
+
+		// If there's an error, handle it with our dedicated error handler
+		if err != nil {
+			if handleRPCError(err, values.Config().ConnectionString) {
+				// DNS changed, reconnected - return error to trigger retry
+				return err
+			}
+			// DNS unchanged or not a network error - use backoff.Permanent to prevent retries
+			return backoff.Permanent(err)
+		}
+
 		return nil
 	}, backoff.WithMaxRetries(
 		backoff.NewConstantBackOff(10*time.Millisecond), 3,
@@ -477,6 +547,26 @@ func FuncClientSingleton(funcName string, request interface{}) (result interface
 		err = be
 	}
 	return
+}
+
+// handleRPCError processes RPC errors and determines if a retry should be attempted
+// Returns true if the error was handled and a retry should be attempted
+func handleRPCError(err error, connectionString string) bool {
+	if err == nil {
+		return false
+	}
+
+	Log.WithError(err).Debug("[RPC Store] --> Call failed")
+
+	// Check if it's a DNS-related error that might be resolved by a DNS check
+	if isDNSError(err) {
+		Log.Debug("[RPC Store] DNS error detected, checking DNS...")
+		dnsChanged, shouldRetry := checkAndHandleDNSChange(connectionString, false)
+		return dnsChanged && shouldRetry
+	}
+
+	Log.Debug("[RPC Store] Non-DNS error, skipping DNS check")
+	return false
 }
 
 var rpcConnectionsPool []net.Conn
@@ -542,4 +632,9 @@ func SetEmergencyMode(t *testing.T, value bool) {
 func SetLoadCounts(t *testing.T, value int) {
 	t.Helper()
 	values.SetLoadCounts(value)
+}
+
+// EnableEmergencyMode sets the emergency mode state for production use
+func EnableEmergencyMode(enabled bool) {
+	values.SetEmergencyMode(enabled)
 }

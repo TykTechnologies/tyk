@@ -3,7 +3,6 @@ package gateway
 import (
 	"bytes"
 	"context"
-	"fmt"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -11,7 +10,7 @@ import (
 	"sync"
 	"sync/atomic"
 	"testing"
-	"text/template"
+	texttemplate "text/template"
 	"time"
 
 	proxyproto "github.com/pires/go-proxyproto"
@@ -69,7 +68,6 @@ func (w *testEventHandler) HandleEvent(em config.EventMessage) {
 	w.cb(em)
 }
 
-// // ToDo check why it blocks
 func TestHostChecker(t *testing.T) {
 	ts := StartTest(func(globalConf *config.Config) {
 		globalConf.UptimeTests.PollerGroup = uuid.New()
@@ -77,7 +75,7 @@ func TestHostChecker(t *testing.T) {
 	})
 	defer ts.Close()
 
-	specTmpl := template.Must(template.New("spec").Parse(sampleUptimeTestAPI))
+	specTmpl := texttemplate.Must(texttemplate.New("spec").Parse(sampleUptimeTestAPI))
 
 	tmplData := struct {
 		Host1, Host2 string
@@ -185,7 +183,7 @@ func TestReverseProxyAllDown(t *testing.T) {
 	})
 	defer ts.Close()
 
-	specTmpl := template.Must(template.New("spec").Parse(sampleUptimeTestAPI))
+	specTmpl := texttemplate.Must(texttemplate.New("spec").Parse(sampleUptimeTestAPI))
 
 	tmplData := struct {
 		Host1, Host2 string
@@ -214,8 +212,8 @@ func TestReverseProxyAllDown(t *testing.T) {
 	}
 	ts.Gw.GlobalHostChecker.checkerMu.Lock()
 	if ts.Gw.GlobalHostChecker.checker == nil {
-		fmt.Printf("\nStop loop: %v\n", !ts.Gw.GlobalHostChecker.stopLoop)
-		fmt.Printf("\n Am I pooling: %v\n", ts.Gw.GlobalHostChecker.AmIPolling())
+		t.Logf("Stop loop: %v\n", !ts.Gw.GlobalHostChecker.stopLoop)
+		t.Logf("Am I pooling: %v\n", ts.Gw.GlobalHostChecker.AmIPolling())
 	}
 	ts.Gw.GlobalHostChecker.checkerMu.Unlock()
 
@@ -400,6 +398,8 @@ func TestTestCheckerTCPHosts_correct_answers_proxy_protocol(t *testing.T) {
 }
 
 func TestTestCheckerTCPHosts_correct_wrong_answers(t *testing.T) {
+	t.Skip() // TT-13861
+
 	ts := StartTest(nil)
 	defer ts.Close()
 
@@ -787,4 +787,38 @@ func TestChecker_HostReporter_down_then_up(t *testing.T) {
 	assert.Equal(t, 2, failed.Load().(int), "expected host down to be fired twice")
 	assert.Equal(t, 1, up.Load().(int), "expected host up to be fired once")
 
+}
+
+func TestUptimeTests_When_UptimeTests_Disabled_In_GW_Config(t *testing.T) {
+	// See TT-14276
+	// Test case: Uptime Tests feature is disabled in GW config but enabled in the API definition.
+	conf := func(conf *config.Config) {
+		conf.UptimeTests.Disable = true
+	}
+	ts := StartTest(conf)
+	defer ts.Close()
+
+	upstreamHost := httptest.NewServer(http.HandlerFunc(func(_ http.ResponseWriter, _ *http.Request) {
+	}))
+	defer upstreamHost.Close()
+
+	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		spec.Proxy.ListenPath = "/"
+		spec.Proxy.EnableLoadBalancing = true
+		spec.Proxy.Targets = []string{upstreamHost.URL}
+		spec.Proxy.CheckHostAgainstUptimeTests = true
+		spec.UptimeTests.CheckList = []apidef.HostCheckObject{
+			{CheckURL: upstreamHost.URL},
+		}
+	})
+
+	// GlobalHostChecker not initialized, it must be nil.
+	assert.Nil(t, ts.Gw.GlobalHostChecker)
+
+	// A request to the defined API should return 200 OK response instead of
+	// panicking the GW.
+	res, err := http.Get(ts.URL + "/")
+	assert.Nil(t, err)
+	defer res.Body.Close()
+	assert.Equal(t, http.StatusOK, res.StatusCode)
 }

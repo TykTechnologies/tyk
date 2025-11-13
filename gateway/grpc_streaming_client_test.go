@@ -24,8 +24,9 @@ package gateway
 
 import (
 	"context"
+	"errors"
 	"io"
-	"math/rand"
+	mathrand "math/rand"
 	"sync"
 	"testing"
 	"time"
@@ -38,6 +39,7 @@ import (
 
 // printFeature gets the feature for the given point.
 func printFeature(t *testing.T, client pb.RouteGuideClient, point *pb.Point) {
+	t.Helper()
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	feature, err := client.GetFeature(ctx, point)
@@ -62,6 +64,7 @@ const expectedFeatures = `[{"name":"Patriots Path, Mendham, NJ 07945, USA","loca
 
 // printFeatures lists all the features within the given bounding Rectangle.
 func printFeatures(t *testing.T, client pb.RouteGuideClient, rect *pb.Rectangle) {
+	t.Helper()
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	stream, err := client.ListFeatures(ctx, rect)
@@ -71,7 +74,7 @@ func printFeatures(t *testing.T, client pb.RouteGuideClient, rect *pb.Rectangle)
 	var features []*pb.Feature
 	for {
 		feature, err := stream.Recv()
-		if err == io.EOF {
+		if errors.Is(err, io.EOF) {
 			b := test.MarshalJSON(t)(features)
 			got := string(b)
 			if got != expectedFeatures {
@@ -88,8 +91,9 @@ func printFeatures(t *testing.T, client pb.RouteGuideClient, rect *pb.Rectangle)
 
 // runRecordRoute sends a sequence of points to server and expects to get a RouteSummary from server.
 func runRecordRoute(t *testing.T, client pb.RouteGuideClient) {
+	t.Helper()
 	// Create a random number of random points
-	r := rand.New(rand.NewSource(time.Now().UnixNano()))
+	r := mathrand.New(mathrand.NewSource(time.Now().UnixNano()))
 	pointCount := int(r.Int31n(100)) + 2 // Traverse at least two points
 	var points []*pb.Point
 	for i := 0; i < pointCount; i++ {
@@ -119,6 +123,7 @@ func runRecordRoute(t *testing.T, client pb.RouteGuideClient) {
 // runRouteChat receives a sequence of route notes, while sending notes for various locations
 // this test bidirectional grpc data streaming
 func runRouteChat(t *testing.T, client pb.RouteGuideClient) {
+	t.Helper()
 	notes := []*pb.RouteNote{
 		{Location: &pb.Point{Latitude: 0, Longitude: 1}, Message: "First message"},
 		{Location: &pb.Point{Latitude: 0, Longitude: 2}, Message: "Second message"},
@@ -178,13 +183,14 @@ func runRouteChat(t *testing.T, client pb.RouteGuideClient) {
 	t.Logf("grpc stream closed")
 }
 
-func randomPoint(r *rand.Rand) *pb.Point {
+func randomPoint(r *mathrand.Rand) *pb.Point {
 	lat := (r.Int31n(180) - 90) * 1e7
 	long := (r.Int31n(360) - 180) * 1e7
 	return &pb.Point{Latitude: lat, Longitude: long}
 }
 
 func testGRPCStreamClient(t *testing.T, addr string, opts ...grpc.DialOption) {
+	t.Helper()
 	opts = append(opts, grpc.WithBlock())
 	conn, err := grpc.Dial(addr, opts...)
 	if err != nil {

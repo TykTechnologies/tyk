@@ -233,6 +233,7 @@
   "enable_signature_checking": false,
   "hmac_allowed_clock_skew": -1,
   "hmac_allowed_algorithms": [],
+  "detailed_tracing": true,
   "request_signing": {
     "is_enabled": false,
     "secret": "",

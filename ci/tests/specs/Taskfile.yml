@@ -1,0 +1,37 @@
+version: "3"
+
+dotenv: ['.env']
+
+tasks:
+  default:
+    desc: "Run the portman tests"
+    cmds:
+      - task: up
+      - task: tests
+
+  tests:
+    desc: "Run the OpenAPI specification tests"
+    cmds:
+      - venom run testdata/populate_gateway_test_data.yaml --var bearerToken=$PORTMAN_API_Key  --stop-on-failure && rm venom*.log
+      - npm install
+      - npm start
+
+  build:
+    desc: "Build docker image"
+    cmds:
+      - docker compose build
+
+  up:
+    desc: "Bring up env"
+    cmds:
+      - docker compose up -d --wait --force-recreate || { docker compose logs gw; exit 1; }
+
+  down:
+    desc: "Shut down env"
+    cmds:
+      - docker compose down --remove-orphans
+
+  logs:
+    desc: "Tail container logs (live)"
+    cmds:
+      - docker compose logs --tail=10 -f

@@ -2,6 +2,7 @@ package user
 
 import (
 	"github.com/TykTechnologies/storage/persistent/model"
+	"github.com/TykTechnologies/tyk/apidef"
 )
 
 type GraphAccessDefinition struct {
@@ -32,6 +33,24 @@ type Policy struct {
 	LastUpdated                   string                           `bson:"last_updated" json:"last_updated"`
 	MetaData                      map[string]interface{}           `bson:"meta_data" json:"meta_data"`
 	GraphQL                       map[string]GraphAccessDefinition `bson:"graphql_access_rights" json:"graphql_access_rights"`
+
+	// Smoothing contains rate limit smoothing settings.
+	Smoothing *apidef.RateLimitSmoothing `json:"smoothing" bson:"smoothing"`
+}
+
+func (p *Policy) APILimit() APILimit {
+	return APILimit{
+		QuotaMax:           p.QuotaMax,
+		QuotaRenewalRate:   p.QuotaRenewalRate,
+		ThrottleInterval:   p.ThrottleInterval,
+		ThrottleRetryLimit: p.ThrottleRetryLimit,
+		MaxQueryDepth:      p.MaxQueryDepth,
+		RateLimit: RateLimit{
+			Rate:      p.Rate,
+			Per:       p.Per,
+			Smoothing: p.Smoothing,
+		},
+	}
 }
 
 type PolicyPartitions struct {
@@ -40,4 +59,9 @@ type PolicyPartitions struct {
 	Complexity bool `bson:"complexity" json:"complexity"`
 	Acl        bool `bson:"acl" json:"acl"`
 	PerAPI     bool `bson:"per_api" json:"per_api"`
+}
+
+// Enabled reports if partitioning is enabled.
+func (p PolicyPartitions) Enabled() bool {
+	return p.Quota || p.RateLimit || p.Acl || p.Complexity
 }

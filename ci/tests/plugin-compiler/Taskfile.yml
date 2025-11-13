@@ -1,0 +1,152 @@
+# yamllint disable rule:line-length
+---
+version: "3"
+
+vars:
+  tag: v0.0.0
+  base: tykio/golang-cross:1.22-bullseye
+  dockerfile: ci/images/plugin-compiler/Dockerfile
+  image: internal/plugin-compiler
+  sha:
+    sh: git rev-parse HEAD
+  root:
+    sh: git rev-parse --show-toplevel
+
+tasks:
+  default:
+    desc: "Build and test plugin compiler"
+    cmds:
+      - task: build
+      - task: test
+
+  build:
+    desc: "Build plugin compiler"
+    dir: '{{.root}}'
+    vars:
+      args: --no-cache --progress=plain --build-arg GITHUB_TAG={{.tag}} --build-arg GITHUB_SHA={{.sha}}
+    cmds:
+      - docker build {{.args}} --build-arg BASE_IMAGE={{.base}} -t {{.image}} -f {{.dockerfile}} .
+
+  test:
+    desc: "Run plugin compiler tests"
+    cmds:
+      - task: test:basic-plugin
+      - task: test:basic-plugin-id
+      - task: test:complex-plugin
+      - task: test:test-plugin
+
+  test:basic-plugin-invalid:
+    desc: "Test plugin compiler (basic-plugin)"
+    deps: [test:basic-plugin-sync]
+    vars:
+      plugin_path: '{{.root}}/ci/tests/plugin-compiler/testdata/basic-plugin-test'
+      symbol: MyPluginPre
+      args: --rm -v {{.plugin_path}}:/plugin-source -w /plugin-source
+    cmds:
+      - rm -f {{.plugin_path}}/*.so
+      - docker run {{.args}} {{.image}} plugin.so 666
+
+  test:basic-plugin-sync:
+    desc: "Prepare complex-plugin-test/"
+    internal: true
+    dir: ./testdata
+    cmds:
+      - rsync -a --del ./basic-plugin/ ./basic-plugin-test/
+      - cd basic-plugin-test && go mod edit -module com
+
+  test:complex-plugin:
+    desc: "Test import replacement + plugin_id"
+    deps: [test:complex-plugin-sync]
+    dir: ./testdata/complex-plugin-test
+    vars:
+      plugin_path: '{{.root}}/ci/tests/plugin-compiler/testdata/complex-plugin-test'
+      symbol: MyPluginPre
+      args: --rm -e DEBUG=1 -v {{.plugin_path}}:/plugin-source -w /plugin-source
+    cmds:
+      - rm -f {{.plugin_path}}/*.so
+      - docker run {{.args}} {{.image}} plugin.so 123
+      - mv -f {{.plugin_path}}/plugin_*.so {{.plugin_path}}/plugin1.so
+      - docker run {{.args}} {{.image}} plugin.so 456
+      - mv -f {{.plugin_path}}/plugin_*.so {{.plugin_path}}/plugin2.so
+      - docker run {{.args}} --entrypoint=/usr/local/bin/tyk {{.image}} plugin load -f plugin1.so,plugin2.so -s {{.symbol}}
+      - strings {{.plugin_path}}/plugin*.so | grep plugin.go
+
+  test:complex-plugin-sync:
+    desc: "Prepare complex-plugin-test/"
+    internal: true
+    dir: ./testdata
+    cmds:
+      - rsync -a --del ./complex-plugin/ ./complex-plugin-test/
+
+  complex-plugin-test:
+    desc: "Prepare a complex plugin test folder"
+    internal: true
+    cmds:
+
+  test:basic-plugin:
+    desc: "Test plugin compiler (basic-plugin)"
+    vars:
+      plugin_path: '{{.root}}/ci/tests/plugin-compiler/testdata/basic-plugin'
+      symbol: MyPluginPre
+      args: --rm -e DEBUG=1 -v {{.plugin_path}}:/plugin-source -w /plugin-source
+    cmds:
+      - rm -f {{.plugin_path}}/*.so
+      - docker run {{.args}} {{.image}} plugin.so
+      - cp -f {{.plugin_path}}/*.so {{.plugin_path}}/plugin.so
+      - docker run {{.args}} --entrypoint=/usr/local/bin/tyk {{.image}} plugin load -f plugin.so -s {{.symbol}}
+      - strings {{.plugin_path}}/plugin.so | grep test_goplugin.go
+
+  test:qa-plugin:
+    desc: "Test plugin compiler (qa-plugin) amd64 e2e + arm64 build"
+    vars:
+      plugin_path: '{{.root}}/ci/tests/plugin-compiler/testdata/qa-plugin'
+      symbol: AuthCheck
+      args: --rm -e DEBUG=1 -v {{.plugin_path}}:/plugin-source -w /plugin-source
+    cmds:
+      - rm -f {{.plugin_path}}/*.so
+      - docker run {{.args}} {{.image}} plugin.so
+      - cp -f {{.plugin_path}}/*.so {{.plugin_path}}/plugin.so
+      - docker run -e GOARCH=arm64 {{.args}} {{.image}} plugin.so
+      - docker run {{.args}} --entrypoint=/usr/local/bin/tyk {{.image}} plugin load -f plugin.so -s {{.symbol}}
+      - strings {{.plugin_path}}/plugin.so | grep test_goplugin.go
+
+  test:basic-plugin-id:
+    desc: "Test plugin compiler (basic-plugin)"
+    vars:
+      plugin_path: '{{.root}}/ci/tests/plugin-compiler/testdata/basic-plugin'
+      symbol: MyPluginPre
+      args: --rm -e DEBUG=1 -v {{.plugin_path}}:/plugin-source -w /plugin-source
+    cmds:
+      - rm -f {{.plugin_path}}/*.so
+      - docker run {{.args}} {{.image}} plugin.so 123
+      - mv -f {{.plugin_path}}/plugin_*.so {{.plugin_path}}/plugin1.so
+      - docker run {{.args}} {{.image}} plugin.so 456
+      - mv -f {{.plugin_path}}/plugin_*.so {{.plugin_path}}/plugin2.so
+      - docker run {{.args}} --entrypoint=/usr/local/bin/tyk {{.image}} plugin load -f plugin1.so,plugin2.so -s {{.symbol}}
+      - strings {{.plugin_path}}/plugin*.so | grep test_goplugin.go
+
+  test:test-plugin:
+    desc: "Test plugin compiler (test-plugin)"
+    vars:
+      plugin_path: '{{.root}}/ci/tests/plugin-compiler/testdata/test-plugin'
+      symbol: AddFooBarHeader
+      args: --rm -e DEBUG=1 -v {{.plugin_path}}:/plugin-source -w /plugin-source
+    cmds:
+      - rm -f {{.plugin_path}}/*.so
+      - docker run {{.args}} {{.image}} plugin.so
+      - cp -f {{.plugin_path}}/*.so {{.plugin_path}}/plugin.so
+      - docker run {{.args}} --entrypoint=/usr/local/bin/tyk {{.image}} plugin load -f plugin.so -s {{.symbol}}
+      - strings {{.plugin_path}}/plugin.so | grep main.go
+
+  test:test-plugin-no-mod:
+    desc: "Test plugin compiler (test-plugin)"
+    vars:
+      plugin_path: '{{.root}}/ci/tests/plugin-compiler/testdata/test-plugin-no-mod'
+      symbol: AddFooBarHeader
+      args: --rm -e DEBUG=1 -v {{.plugin_path}}:/plugin-source -w /plugin-source
+    cmds:
+      - rm -f {{.plugin_path}}/*.so
+      - docker run {{.args}} {{.image}} plugin.so
+      - cp -f {{.plugin_path}}/*.so {{.plugin_path}}/plugin.so
+      - docker run {{.args}} --entrypoint=/usr/local/bin/tyk {{.image}} plugin load -f plugin.so -s {{.symbol}}
+      - strings {{.plugin_path}}/plugin.so | grep main.go

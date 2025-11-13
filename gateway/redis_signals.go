@@ -1,23 +1,29 @@
 package gateway
 
 import (
-	"crypto"
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
+
 	"strconv"
 	"strings"
 	"sync"
 	"time"
 
-	"github.com/go-redis/redis/v8"
+	temporalmodel "github.com/TykTechnologies/storage/temporal/model"
 
-	"github.com/TykTechnologies/goverify"
+	"github.com/TykTechnologies/tyk/internal/crypto"
 	"github.com/TykTechnologies/tyk/storage"
+	"github.com/TykTechnologies/tyk/storage/kv"
 )
 
 type NotificationCommand string
+
+func (n NotificationCommand) String() string {
+	return string(n)
+}
 
 const (
 	RedisPubSubChannel = "tyk.cluster.notifications"
@@ -33,6 +39,10 @@ const (
 	NoticeGatewayConfigResponse  NotificationCommand = "NoticeGatewayConfigResponse"
 	NoticeGatewayDRLNotification NotificationCommand = "NoticeGatewayDRLNotification"
 	KeySpaceUpdateNotification   NotificationCommand = "KeySpaceUpdateNotification"
+	OAuthPurgeLapsedTokens       NotificationCommand = "OAuthPurgeLapsedTokens"
+	// NoticeDeleteAPICache is the command with which event is emitted from dashboard to invalidate cache for an API.
+	NoticeDeleteAPICache NotificationCommand = "DeleteAPICache"
+	NoticeUserKeyReset   NotificationCommand = "UserKeyReset"
 )
 
 // Notification is a type that encodes a message published to a pub sub channel (shared between implementations)
@@ -51,7 +61,7 @@ func (n *Notification) Sign() {
 }
 
 func (gw *Gateway) startPubSubLoop() {
-	cacheStore := storage.RedisCluster{RedisController: gw.RedisController}
+	cacheStore := storage.RedisCluster{ConnectionHandler: gw.StorageConnectionHandler}
 	cacheStore.Connect()
 
 	message := "Connection to Redis failed, reconnect in 10s"
@@ -88,12 +98,23 @@ func (gw *Gateway) logPubSubError(err error, message string) bool {
 }
 
 func (gw *Gateway) handleRedisEvent(v interface{}, handled func(NotificationCommand), reloaded func()) {
-	message, ok := v.(*redis.Message)
+	message, ok := v.(temporalmodel.Message)
 	if !ok {
 		return
 	}
+
+	if message.Type() != temporalmodel.MessageTypeMessage {
+		return
+	}
+
+	payload, err := message.Payload()
+	if err != nil {
+		pubSubLog.Error("Error getting payload from message: ", err)
+		return
+	}
+
 	notif := Notification{Gw: gw}
-	if err := json.Unmarshal([]byte(message.Payload), &notif); err != nil {
+	if err := json.Unmarshal([]byte(payload), &notif); err != nil {
 		pubSubLog.Error("Unmarshalling message body failed, malformed: ", err)
 		return
 	}
@@ -130,6 +151,16 @@ func (gw *Gateway) handleRedisEvent(v interface{}, handled func(NotificationComm
 		gw.reloadURLStructure(reloaded)
 	case KeySpaceUpdateNotification:
 		gw.handleKeySpaceEventCacheFlush(notif.Payload)
+	case OAuthPurgeLapsedTokens:
+		if err := gw.purgeLapsedOAuthTokens(); err != nil {
+			log.WithError(err).Errorf("error while purging tokens for event %s", OAuthPurgeLapsedTokens)
+		}
+	case NoticeDeleteAPICache:
+		if ok := gw.invalidateAPICache(notif.Payload); !ok {
+			log.WithError(err).Errorf("cache invalidation failed for: %s", notif.Payload)
+		}
+	case NoticeUserKeyReset:
+		gw.handleUserKeyReset(notif.Payload)
 	default:
 		pubSubLog.Warnf("Unknown notification command: %q", notif.Command)
 		return
@@ -174,30 +205,21 @@ func isPayloadSignatureValid(notification Notification) bool {
 			return false
 		}
 	default:
-		if notification.Gw.GetConfig().PublicKeyPath != "" && notification.Gw.NotificationVerifier == nil {
-			var err error
-
-			notification.Gw.NotificationVerifier, err = goverify.LoadPublicKeyFromFile(notification.Gw.GetConfig().PublicKeyPath)
-			if err != nil {
-
-				pubSubLog.Error("Notification signer: Failed loading public key from path: ", err)
-				return false
-			}
+		verifier, err := notification.Gw.SignatureVerifier()
+		if err != nil {
+			pubSubLog.Error("Notification signer: Failed loading public key from path: ", err)
+			return false
 		}
 
-		if notification.Gw.NotificationVerifier != nil {
-
+		if verifier != nil {
 			signed, err := base64.StdEncoding.DecodeString(notification.Signature)
 			if err != nil {
-
 				pubSubLog.Error("Failed to decode signature: ", err)
 				return false
 			}
 
-			if err := notification.Gw.NotificationVerifier.Verify([]byte(notification.Payload), signed); err != nil {
-
+			if err := verifier.Verify([]byte(notification.Payload), signed); err != nil {
 				pubSubLog.Error("Could not verify notification: ", err, ": ", notification)
-
 				return false
 			}
 
@@ -233,7 +255,7 @@ func (r *RedisNotifier) Notify(notif interface{}) bool {
 	// pubSubLog.Debug("Sending notification", notif)
 
 	if err := r.store.Publish(r.channel, string(toSend)); err != nil {
-		if err != storage.ErrRedisIsDown {
+		if !errors.Is(err, storage.ErrRedisIsDown) {
 			pubSubLog.Error("Could not send notification: ", err)
 		}
 		return false
@@ -302,5 +324,75 @@ func (gw *Gateway) handleDashboardZeroConfMessage(payload string) {
 	if setHostname {
 		gw.SetConfig(globalConf)
 		pubSubLog.Info("Hostname set with dashboard zeroconf signal")
+	}
+}
+
+// updateKeyInStore updates the API key in the specified KV store
+func (gw *Gateway) updateKeyInStore(keyPath, newKey string) {
+	if keyPath == "" {
+		return
+	}
+
+	var store kv.Store
+	var storeType string
+	actualPath := ""
+
+	switch {
+	case strings.HasPrefix(keyPath, "vault://"):
+		store = gw.vaultKVStore
+		storeType = "Vault"
+		actualPath = strings.TrimPrefix(keyPath, "vault://")
+	case strings.HasPrefix(keyPath, "consul://"):
+		store = gw.consulKVStore
+		storeType = "Consul"
+		actualPath = strings.TrimPrefix(keyPath, "consul://")
+	default:
+		return
+	}
+
+	if store == nil {
+		return
+	}
+
+	if err := store.Put(actualPath, newKey); err != nil {
+		log.WithError(err).Errorf("Failed to update API key in %s", storeType)
+		return
+	}
+	log.Infof("Successfully updated API key in %s", storeType)
+}
+
+// handleUserKeyReset processes a user key reset notification
+func (gw *Gateway) handleUserKeyReset(payload string) {
+	keys := strings.Split(payload, ":")
+	if len(keys) != 2 {
+		log.Error("Invalid user key reset payload")
+		return
+	}
+
+	keys = strings.Split(keys[0], ".")
+	if len(keys) != 2 {
+		log.Error("Invalid user key reset payload")
+		return
+	}
+
+	oldKey := keys[0]
+	newKey := keys[1]
+
+	config := gw.GetConfig()
+
+	if oldKey == config.SlaveOptions.APIKey {
+		config.SlaveOptions.APIKey = newKey
+		gw.SetConfig(config)
+
+		// If we're using a KV store, update the API key there as well
+		gw.updateKeyInStore(config.Private.EdgeOriginalAPIKeyPath, newKey)
+
+		if gw.isRPCMode() {
+			ok := gw.RPCListener.Connect()
+			if !ok {
+				log.Error("Failed to establish RPC connection")
+			}
+
+		}
 	}
 }

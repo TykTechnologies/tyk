@@ -1,0 +1,36 @@
+---
+version: "3"
+
+includes:
+  services:
+    taskfile: ../docker/services/Taskfile.yml
+    dir: ../docker/services
+
+tasks:
+  default:
+    desc: "Run everything"
+    cmds:
+      - task: test
+      - task: lint
+
+  test:
+    desc: "Run tests"
+    deps: [ services:up ]
+    env:
+      GOTESTSUM_FORMAT: testname
+    cmds:
+      - defer: { task: services:down }
+      - go fmt ./...
+      - go test -p 1 -parallel 1 -count=1 -json ./... | gotestsum --format testname --hide-summary=all
+
+
+  # lint target is run from CI
+  lint:
+    desc: "Ensure linter pass"
+    cmds:
+      - schema-gen extract -o - | schema-gen lint -i -
+
+  deps:
+    desc: "Update deps"
+    cmds:
+      - go install github.com/TykTechnologies/exp/cmd/schema-gen@main

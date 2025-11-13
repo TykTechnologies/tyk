@@ -2,7 +2,7 @@ package gateway
 
 import (
 	"fmt"
-	"math/rand"
+	mathrand "math/rand"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -27,6 +27,7 @@ const (
 
 func (gw *Gateway) initNormalisationPatterns() (pats config.NormaliseURLPatterns) {
 	pats.UUIDs = regexp.MustCompile(`[0-9a-fA-F]{8}(-)?[0-9a-fA-F]{4}(-)?[0-9a-fA-F]{4}(-)?[0-9a-fA-F]{4}(-)?[0-9a-fA-F]{12}`)
+	pats.ULIDs = regexp.MustCompile(`(?i)[0-7][0-9A-HJKMNP-TV-Z]{25}`)
 	pats.IDs = regexp.MustCompile(`\/(\d+)`)
 
 	for _, pattern := range gw.GetConfig().AnalyticsConfig.NormaliseUrls.Custom {
@@ -140,14 +141,14 @@ func (r *RedisAnalyticsHandler) recordWorker() {
 	// this is buffer to send one pipelined command to redis
 	// use r.recordsBufferSize as cap to reduce slice re-allocations
 	recordsBuffer := make([][]byte, 0, r.workerBufferSize)
-	rand.Seed(time.Now().Unix())
+	mathrand.Seed(time.Now().Unix())
 
 	// read records from channel and process
 	lastSentTs := time.Now()
 	for {
 		analyticKey := analyticsKeyName
 		if r.enableMultipleAnalyticsKeys {
-			suffix := rand.Intn(10)
+			suffix := mathrand.Intn(10)
 			analyticKey = fmt.Sprintf("%v_%v", analyticKey, suffix)
 		}
 		serliazerSuffix := r.analyticsSerializer.GetSuffix()
@@ -236,6 +237,10 @@ func NormalisePath(a *analytics.AnalyticsRecord, globalConfig *config.Config) {
 
 	if globalConfig.AnalyticsConfig.NormaliseUrls.NormaliseUUIDs {
 		a.Path = globalConfig.AnalyticsConfig.NormaliseUrls.CompiledPatternSet.UUIDs.ReplaceAllString(a.Path, "{uuid}")
+	}
+
+	if globalConfig.AnalyticsConfig.NormaliseUrls.NormaliseULIDs {
+		a.Path = globalConfig.AnalyticsConfig.NormaliseUrls.CompiledPatternSet.ULIDs.ReplaceAllString(a.Path, "{ulid}")
 	}
 
 	if globalConfig.AnalyticsConfig.NormaliseUrls.NormaliseNumbers {

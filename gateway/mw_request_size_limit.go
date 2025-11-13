@@ -11,11 +11,25 @@ import (
 	"github.com/TykTechnologies/tyk/header"
 )
 
+// As for the HTTP methods spec:
+//
+//	HTTP request bodies are theoretically allowed for all methods except TRACE,
+//	however they are not commonly used except in PUT, POST and PATCH. Because of this,
+//	they may not be supported properly by some client frameworks, and you should not allow
+//	request bodies for GET, DELETE, TRACE, OPTIONS and HEAD methods.
+var skippedMethods = map[string]struct{}{
+	http.MethodGet:     {},
+	http.MethodDelete:  {},
+	http.MethodTrace:   {},
+	http.MethodOptions: {},
+	http.MethodHead:    {},
+}
+
 // RequestSizeLimitMiddleware is a middleware that will enforce a limit on the request body size. The request has
 // already been copied to memory when this middleware is called. Therefore, this middleware can't protect the gateway
 // itself from large requests.
 type RequestSizeLimitMiddleware struct {
-	BaseMiddleware
+	*BaseMiddleware
 }
 
 func (t *RequestSizeLimitMiddleware) Name() string {
@@ -25,7 +39,7 @@ func (t *RequestSizeLimitMiddleware) Name() string {
 func (t *RequestSizeLimitMiddleware) EnabledForSpec() bool {
 	for _, version := range t.Spec.VersionData.Versions {
 		if len(version.ExtendedPaths.SizeLimit) > 0 ||
-			version.GlobalSizeLimit > 0 {
+			(!version.GlobalSizeLimitDisabled && version.GlobalSizeLimit > 0) {
 			return true
 		}
 	}
@@ -59,6 +73,10 @@ func (t *RequestSizeLimitMiddleware) checkRequestLimit(r *http.Request, sizeLimi
 
 // RequestSizeLimit will check a request for maximum request size, this can be a global limit or a matched limit.
 func (t *RequestSizeLimitMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
+	if _, ok := skippedMethods[r.Method]; ok {
+		return nil, http.StatusOK
+	}
+
 	logger := t.Logger()
 	logger.Debug("Request size limiter active")
 

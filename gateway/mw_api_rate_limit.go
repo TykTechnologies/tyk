@@ -1,31 +1,79 @@
 package gateway
 
 import (
-	"errors"
+	"fmt"
 	"net/http"
 
 	"strconv"
 	"time"
 
-	"github.com/TykTechnologies/tyk/request"
+	"github.com/TykTechnologies/tyk/internal/event"
 	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/user"
 )
 
-// RateLimitAndQuotaCheck will check the incoming request and key whether it is within it's quota and
+// RateLimitForAPI will check the incoming request and key whether it is within it's quota and
 // within it's rate limit, it makes use of the SessionLimiter object to do this
 type RateLimitForAPI struct {
-	BaseMiddleware
-	keyName string
-	apiSess *user.SessionState
+	*BaseMiddleware
+
+	keyName  string
+	quotaKey string
+	apiSess  *user.SessionState
 }
 
 func (k *RateLimitForAPI) Name() string {
 	return "RateLimitForAPI"
 }
 
+func (k *RateLimitForAPI) shouldEnable() bool {
+	if k.Spec.DisableRateLimit {
+		return false
+	}
+
+	// per endpoint rate limits
+	for _, version := range k.Spec.VersionData.Versions {
+		for _, v := range version.ExtendedPaths.RateLimit {
+			if !v.Disabled {
+				return true
+			}
+		}
+	}
+
+	// global api rate limit
+	if k.Spec.GlobalRateLimit.Rate == 0 || k.Spec.GlobalRateLimit.Disabled {
+		return false
+	}
+
+	return true
+}
+
+func (k *RateLimitForAPI) getSession(r *http.Request) *user.SessionState {
+	versionInfo, _ := k.Spec.Version(r)
+	versionPaths := k.Spec.RxPaths[versionInfo.Name]
+
+	spec, ok := k.Spec.FindSpecMatchesStatus(r, versionPaths, RateLimit)
+	if ok {
+		if limits := spec.RateLimit; limits.Valid() {
+			// track per-endpoint with a hash of the path
+			keyname := k.keyName + "-" + storage.HashStr(fmt.Sprintf("%s:%s", limits.Method, limits.Path))
+
+			session := &user.SessionState{
+				Rate:        limits.Rate,
+				Per:         limits.Per,
+				LastUpdated: k.apiSess.LastUpdated,
+			}
+			session.SetKeyHash(storage.HashKey(keyname, k.Gw.GetConfig().HashKeys))
+
+			return session
+		}
+	}
+
+	return k.apiSess
+}
+
 func (k *RateLimitForAPI) EnabledForSpec() bool {
-	if k.Spec.DisableRateLimit || k.Spec.GlobalRateLimit.Rate == 0 {
+	if !k.shouldEnable() {
 		return false
 	}
 
@@ -43,43 +91,31 @@ func (k *RateLimitForAPI) EnabledForSpec() bool {
 	return true
 }
 
-func (k *RateLimitForAPI) handleRateLimitFailure(r *http.Request, token string) (error, int) {
-	k.Logger().WithField("key", k.Gw.obfuscateKey(token)).Info("API rate limit exceeded.")
-
-	// Fire a rate limit exceeded event
-	k.FireEvent(EventRateLimitExceeded, EventKeyFailureMeta{
-		EventMetaDefault: EventMetaDefault{Message: "API Rate Limit Exceeded", OriginatingRequest: EncodeRequestToEvent(r)},
-		Path:             r.URL.Path,
-		Origin:           request.RealIP(r),
-		Key:              token,
-	})
-
-	// Report in health check
-	reportHealthValue(k.Spec, Throttle, "-1")
-
-	return errors.New("API Rate limit exceeded"), http.StatusTooManyRequests
-}
-
 // ProcessRequest will run any checks on the request on the way through the system, return an error to have the chain fail
-func (k *RateLimitForAPI) ProcessRequest(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
+func (k *RateLimitForAPI) ProcessRequest(_ http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
 	// Skip rate limiting and quotas for looping
 	if !ctxCheckLimits(r) {
 		return nil, http.StatusOK
 	}
 
 	storeRef := k.Gw.GlobalSessionManager.Store()
-	reason := k.Gw.SessionLimiter.ForwardMessage(r, k.apiSess,
+
+	reason := k.Gw.SessionLimiter.ForwardMessage(
+		r,
+		k.getSession(r),
 		k.keyName,
+		k.quotaKey,
 		storeRef,
 		true,
 		false,
-		&k.Spec.GlobalConfig,
 		k.Spec,
 		false,
 	)
 
+	k.emitRateLimitEvents(r, k.keyName)
+
 	if reason == sessionFailRateLimit {
-		return k.handleRateLimitFailure(r, k.keyName)
+		return k.handleRateLimitFailure(r, event.RateLimitExceeded, "API Rate Limit Exceeded", k.keyName)
 	}
 
 	// Request is valid, carry on

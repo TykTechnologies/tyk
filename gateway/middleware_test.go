@@ -12,6 +12,7 @@ import (
 	"github.com/TykTechnologies/tyk/apidef"
 	headers2 "github.com/TykTechnologies/tyk/header"
 	"github.com/TykTechnologies/tyk/internal/cache"
+	"github.com/TykTechnologies/tyk/internal/uuid"
 	"github.com/TykTechnologies/tyk/test"
 
 	"github.com/TykTechnologies/tyk/config"
@@ -37,7 +38,7 @@ func TestBaseMiddleware_OrgSessionExpiry(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
 
-	m := BaseMiddleware{
+	m := &BaseMiddleware{
 		Spec: &APISpec{
 			GlobalConfig: config.Config{
 				EnforceOrgDataAge: true,
@@ -80,7 +81,7 @@ func TestBaseMiddleware_getAuthType(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
 
-	baseMid := BaseMiddleware{Spec: spec, Gw: ts.Gw}
+	baseMid := &BaseMiddleware{Spec: spec, Gw: ts.Gw}
 
 	r, _ := http.NewRequest(http.MethodGet, "", nil)
 	r.Header.Set("h1", "t1")
@@ -133,7 +134,7 @@ func TestBaseMiddleware_getAuthToken(t *testing.T) {
 		ts := StartTest(nil)
 		defer ts.Close()
 
-		baseMid := BaseMiddleware{Spec: spec, Gw: ts.Gw}
+		baseMid := &BaseMiddleware{Spec: spec, Gw: ts.Gw}
 
 		r, _ := http.NewRequest(http.MethodGet, "", nil)
 		r.AddCookie(&http.Cookie{
@@ -161,7 +162,7 @@ func TestBaseMiddleware_getAuthToken(t *testing.T) {
 		ts := StartTest(nil)
 		defer ts.Close()
 
-		baseMid := BaseMiddleware{Spec: spec, Gw: ts.Gw}
+		baseMid := &BaseMiddleware{Spec: spec, Gw: ts.Gw}
 
 		r, _ := http.NewRequest(http.MethodGet, "", nil)
 		r.AddCookie(&http.Cookie{
@@ -189,7 +190,7 @@ func TestBaseMiddleware_getAuthToken(t *testing.T) {
 		ts := StartTest(nil)
 		defer ts.Close()
 
-		baseMid := BaseMiddleware{Spec: spec, Gw: ts.Gw}
+		baseMid := &BaseMiddleware{Spec: spec, Gw: ts.Gw}
 
 		r, _ := http.NewRequest(http.MethodGet, "", nil)
 		r.Header.Set("h1", "t1")
@@ -214,7 +215,7 @@ func TestBaseMiddleware_getAuthToken(t *testing.T) {
 		ts := StartTest(nil)
 		defer ts.Close()
 
-		baseMid := BaseMiddleware{Spec: spec, Gw: ts.Gw}
+		baseMid := &BaseMiddleware{Spec: spec, Gw: ts.Gw}
 
 		r, _ := http.NewRequest(http.MethodGet, "", nil)
 		r.URL.RawQuery = "q1=t1"
@@ -239,7 +240,7 @@ func TestBaseMiddleware_getAuthToken(t *testing.T) {
 		ts := StartTest(nil)
 		defer ts.Close()
 
-		baseMid := BaseMiddleware{Spec: spec, Gw: ts.Gw}
+		baseMid := &BaseMiddleware{Spec: spec, Gw: ts.Gw}
 
 		r, _ := http.NewRequest(http.MethodGet, "", nil)
 		r.URL.RawQuery = "q1=t1"
@@ -258,24 +259,20 @@ func TestBaseMiddleware_getAuthToken(t *testing.T) {
 }
 
 func TestSessionLimiter_RedisQuotaExceeded_PerAPI(t *testing.T) {
+	t.Skip() // DeleteAllKeys interferes with other tests.
+
 	g := StartTest(nil)
 	defer g.Close()
-	g.Gw.GlobalSessionManager.Store().DeleteAllKeys()
-	defer g.Gw.GlobalSessionManager.Store().DeleteAllKeys()
 
-	apis := BuildAPI(func(spec *APISpec) {
-		spec.APIID = "api1"
+	g.Gw.GlobalSessionManager.Store().DeleteAllKeys()       // exclusive
+	defer g.Gw.GlobalSessionManager.Store().DeleteAllKeys() // exclusive
+
+	api := func(spec *APISpec) {
+		spec.APIID = uuid.New()
 		spec.UseKeylessAccess = false
-		spec.Proxy.ListenPath = "/api1/"
-	}, func(spec *APISpec) {
-		spec.APIID = "api2"
-		spec.UseKeylessAccess = false
-		spec.Proxy.ListenPath = "/api2/"
-	}, func(spec *APISpec) {
-		spec.APIID = "api3"
-		spec.UseKeylessAccess = false
-		spec.Proxy.ListenPath = "/api3/"
-	})
+		spec.Proxy.ListenPath = fmt.Sprintf("/%s/", spec.APIID)
+	}
+	apis := BuildAPI(api, api, api)
 
 	g.Gw.LoadAPI(apis...)
 
@@ -311,10 +308,11 @@ func TestSessionLimiter_RedisQuotaExceeded_PerAPI(t *testing.T) {
 	assert.Equal(t, session.AccessRights[apis[0].APIID].AllowanceScope, apis[0].APIID)
 	assert.Equal(t, session.AccessRights[apis[1].APIID].AllowanceScope, apis[1].APIID)
 
-	// Check allowcance scope is equal to "" because per api is not enabled for api3
+	// Check allowance scope is equal to "" because per api is not enabled for api3
 	assert.Equal(t, session.AccessRights[apis[2].APIID].AllowanceScope, "")
 
 	sendReqAndCheckQuota := func(t *testing.T, apiID string, expectedQuotaRemaining int64, perAPI bool) {
+		t.Helper()
 		_, _ = g.Run(t, test.TestCase{Path: fmt.Sprintf("/%s/", apiID), Headers: headers, Code: http.StatusOK})
 
 		resp, _ := g.Run(t, test.TestCase{Path: "/tyk/keys/" + key, AdminAuth: true, Code: http.StatusOK})
@@ -330,16 +328,140 @@ func TestSessionLimiter_RedisQuotaExceeded_PerAPI(t *testing.T) {
 		}
 	}
 
-	// for api1 - per api
-	sendReqAndCheckQuota(t, apis[0].APIID, 9, true)
-	sendReqAndCheckQuota(t, apis[0].APIID, 8, true)
-	sendReqAndCheckQuota(t, apis[0].APIID, 7, true)
+	t.Run("For api1 - per api", func(t *testing.T) {
+		sendReqAndCheckQuota(t, apis[0].APIID, 9, true)
+		sendReqAndCheckQuota(t, apis[0].APIID, 8, true)
+		sendReqAndCheckQuota(t, apis[0].APIID, 7, true)
+	})
 
-	// for api2 - per api
-	sendReqAndCheckQuota(t, apis[1].APIID, 1, true)
-	sendReqAndCheckQuota(t, apis[1].APIID, 0, true)
+	t.Run("For api2 - per api", func(t *testing.T) {
+		sendReqAndCheckQuota(t, apis[1].APIID, 1, true)
+		sendReqAndCheckQuota(t, apis[1].APIID, 0, true)
+	})
 
-	// for api3 - global
-	sendReqAndCheckQuota(t, apis[2].APIID, 24, false)
-	sendReqAndCheckQuota(t, apis[2].APIID, 23, false)
+	t.Run("For api3 - global", func(t *testing.T) {
+		sendReqAndCheckQuota(t, apis[2].APIID, 24, false)
+		sendReqAndCheckQuota(t, apis[2].APIID, 23, false)
+		sendReqAndCheckQuota(t, apis[2].APIID, 22, false)
+		sendReqAndCheckQuota(t, apis[2].APIID, 21, false)
+		sendReqAndCheckQuota(t, apis[2].APIID, 20, false)
+	})
+}
+
+func TestCopyAllowedURLs(t *testing.T) {
+	testCases := []struct {
+		name  string
+		input []user.AccessSpec
+	}{
+		{
+			name: "Copy non-empty slice of AccessSpec with non-empty Methods",
+			input: []user.AccessSpec{
+				{
+					URL:     "http://example.com",
+					Methods: []string{"GET", "POST"},
+				},
+				{
+					URL:     "http://example.org",
+					Methods: []string{"GET"},
+				},
+			},
+		},
+		{
+			name: "Copy non-empty slice of AccessSpec with empty Methods",
+			input: []user.AccessSpec{
+				{
+					URL:     "http://example.com",
+					Methods: []string{},
+				},
+				{
+					URL:     "http://example.org",
+					Methods: []string{},
+				},
+			},
+		},
+		{
+			name: "Copy non-empty slice of AccessSpec with nil Methods",
+			input: []user.AccessSpec{
+				{
+					URL:     "http://example.com",
+					Methods: nil,
+				},
+				{
+					URL:     "http://example.org",
+					Methods: nil,
+				},
+			},
+		},
+		{
+			name:  "Copy empty slice of AccessSpec",
+			input: []user.AccessSpec{},
+		},
+		{
+			name:  "Copy nil slice of AccessSpec",
+			input: []user.AccessSpec(nil),
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			copied := copyAllowedURLs(tc.input)
+			assert.Equal(t, tc.input, copied)
+		})
+	}
+}
+
+func TestQuotaNotAppliedWithURLRewrite(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	spec := ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		spec.Proxy.ListenPath = "/quota-test"
+		spec.UseKeylessAccess = false
+		UpdateAPIVersion(spec, "v1", func(v *apidef.VersionInfo) {
+			v.UseExtendedPaths = true
+			v.ExtendedPaths.URLRewrite = []apidef.URLRewriteMeta{{
+				Path:         "/abc",
+				Method:       http.MethodGet,
+				MatchPattern: "/abc",
+				RewriteTo:    "tyk://self/anything",
+			}}
+		})
+	})[0]
+
+	_, authKey := ts.CreateSession(func(s *user.SessionState) {
+		s.AccessRights = map[string]user.AccessDefinition{
+			spec.APIID: {
+				APIName:  spec.Name,
+				APIID:    spec.APIID,
+				Versions: []string{"default"},
+				Limit: user.APILimit{
+					QuotaMax:         2,
+					QuotaRenewalRate: 3600,
+				},
+				AllowanceScope: spec.APIID,
+			},
+		}
+		s.OrgID = spec.OrgID
+	})
+
+	authorization := map[string]string{
+		"Authorization": authKey,
+	}
+	_, _ = ts.Run(t, []test.TestCase{
+		{
+			Headers: authorization,
+			Path:    "/quota-test/abc",
+			Code:    http.StatusOK,
+		},
+		{
+			Headers: authorization,
+			Path:    "/quota-test/abc",
+			Code:    http.StatusOK,
+		},
+		{
+			Headers: authorization,
+			Path:    "/quota-test/abc",
+			Code:    http.StatusForbidden,
+		},
+	}...)
 }

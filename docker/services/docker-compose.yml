@@ -1,0 +1,16 @@
+---
+# This file is intended only to start the docker compose services that
+# are required for testing. It will not start any tyk services. It's
+# intended to be used for go tests.
+#
+# To start the full docker compose stack take a look at the
+# docker-compose.yml file in the root directory.
+
+include:
+  - ./redis.yml
+  - ./httpbin.yml
+
+networks:
+  proxy:
+    name: proxy
+    driver: bridge

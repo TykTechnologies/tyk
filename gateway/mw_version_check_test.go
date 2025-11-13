@@ -20,6 +20,8 @@ func (ts *Test) testPrepareVersioning() (string, string) {
 		spec.VersionDefinition.Location = "header"
 		spec.VersionDefinition.Key = "version"
 		spec.Proxy.ListenPath = "/"
+		spec.DisableRateLimit = true
+		spec.DisableQuota = true
 		spec.VersionData.Versions["expired"] = apidef.VersionInfo{
 			Name:    "expired",
 			Expires: "2006-01-02 15:04",
@@ -274,6 +276,29 @@ func TestNewVersioning(t *testing.T) {
 		_, _ = ts.Run(t, test.TestCase{Path: "/default?version=notFound", BodyMatch: string(VersionDoesNotExist), Code: http.StatusNotFound})
 	})
 
+	t.Run("fallback to default", func(t *testing.T) {
+		baseAPI.VersionDefinition.Default = baseVersionName
+		baseAPI.VersionDefinition.FallbackToDefault = true
+		ts.Gw.LoadAPI(baseAPI, v1, v2)
+
+		// fallback to base
+		_, _ = ts.Run(t, test.TestCase{Path: "/default?version=notFound", Code: http.StatusOK})
+
+		baseAPI.VersionDefinition.Default = apidef.Self
+		baseAPI.VersionDefinition.FallbackToDefault = true
+		ts.Gw.LoadAPI(baseAPI, v1, v2)
+
+		// fallback to base
+		_, _ = ts.Run(t, test.TestCase{Path: "/default?version=notFound", Code: http.StatusOK})
+
+		baseAPI.VersionDefinition.Default = v1VersionName
+		baseAPI.VersionDefinition.FallbackToDefault = true
+		ts.Gw.LoadAPI(baseAPI, v1, v2)
+
+		// fallback to v1
+		_, _ = ts.Run(t, test.TestCase{Path: "/default?version=notFound", Code: http.StatusUnauthorized})
+	})
+
 	t.Run("accessing to sub-version with base API listen path should require base API key", func(t *testing.T) {
 		t.SkipNow()
 		_, _ = ts.Run(t, []test.TestCase{
@@ -332,6 +357,7 @@ func TestOldVersioning_DefaultVersionEmpty(t *testing.T) {
 	})[0]
 
 	check := func(t *testing.T, tc []test.TestCase, apis ...*APISpec) {
+		t.Helper()
 		ts.Gw.LoadAPI(apis...)
 		_, _ = ts.Run(t, tc...)
 	}
@@ -373,6 +399,7 @@ func TestOldVersioning_StripPath(t *testing.T) {
 	}
 
 	check := func(t *testing.T, api *APISpec, tc test.TestCase) {
+		t.Helper()
 		ts.Gw.LoadAPI(api)
 		_, _ = ts.Run(t, tc)
 
@@ -420,7 +447,9 @@ func TestOldVersioning_Expires(t *testing.T) {
 	}
 
 	check := func(t *testing.T, api *APISpec, tc test.TestCase, expirationHeaderEmpty bool) {
+		t.Helper()
 		subCheck := func(t *testing.T, apis ...*APISpec) {
+			t.Helper()
 			ts.Gw.LoadAPI(apis...)
 			resp, _ := ts.Run(t, tc)
 

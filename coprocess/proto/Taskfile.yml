@@ -1,12 +1,31 @@
 version: '3'
 
 tasks:
+  setup_venv:
+    internal: true
+    silent: true
+    cmds:
+      - |
+        if [ ! -d .venv ]; then
+          echo "Creating virtual environment"
+          python3 -m venv .venv
+          source .venv/bin/activate
+          pip install grpcio grpcio-tools
+          source deactivate
+        fi
+ 
   install-deps:
+    internal: true
+    silent: true
+    status:
+      - command -v protoc >/dev/null 2>&1 || { echo >&2 "protoc is not installed or not in PATH"; exit 1; }
     desc: install the required dependencies to generate the bindings. gRPC is required to be installed
     cmds:
       - echo "Installing dependencies to build the bindings."
       - go get -u github.com/golang/protobuf/protoc-gen-go
-      - pip3 install grpcio grpcio-tools
+    deps:
+      - setup_venv    
+
   generate:
     desc: Generating bindings for Go, Python and Ruby
     cmds:
@@ -18,10 +37,14 @@ tasks:
       - echo "Generating bindings for Python."
       - mkdir -p ../bindings/python
       - protoc -I. --python_out=../bindings/python *.proto
-      - python3 codegen.py
-      
+      - |-
+        source .venv/bin/activate
+        python codegen.py
+        source deactivate
+
       - echo "Generating bindings for Ruby."
       - mkdir -p ../bindings/ruby
       - protoc -I. --ruby_out=plugins=grpc:../bindings/ruby *.proto
       - cp ../bindings/python/* ../python/proto/
       - echo "Done"
+    deps: [install-deps]  # Specify install-deps as a dependency for generate task

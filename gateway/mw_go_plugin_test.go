@@ -20,7 +20,9 @@ func TestLoadPlugin(t *testing.T) {
 }
 
 func TestGoPluginMiddleware_EnabledForSpec(t *testing.T) {
-	gpm := GoPluginMiddleware{}
+	gpm := GoPluginMiddleware{
+		BaseMiddleware: &BaseMiddleware{},
+	}
 	apiSpec := &APISpec{APIDefinition: &apidef.APIDefinition{}}
 	gpm.Spec = apiSpec
 

@@ -5,15 +5,19 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/TykTechnologies/graphql-go-tools/pkg/graphql"
-	"github.com/TykTechnologies/tyk-pump/analytics"
-	"github.com/TykTechnologies/tyk/test"
-
+	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/assert"
+	"go.opentelemetry.io/otel/trace"
+
+	"github.com/TykTechnologies/graphql-go-tools/pkg/engine/datasource/httpclient"
+	"github.com/TykTechnologies/graphql-go-tools/pkg/graphql"
+
+	"github.com/TykTechnologies/tyk-pump/analytics"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
 	ctxpkg "github.com/TykTechnologies/tyk/ctx"
+	"github.com/TykTechnologies/tyk/test"
 	"github.com/TykTechnologies/tyk/user"
 )
 
@@ -100,6 +104,13 @@ func TestRecordDetail(t *testing.T) {
 			},
 			expect: true,
 		},
+		{
+			title: "graphql request",
+			spec: testAPISpec(func(spec *APISpec) {
+				spec.GraphQL.Enabled = true
+			}),
+			expect: true,
+		},
 	}
 
 	for _, tc := range testcases {
@@ -107,6 +118,159 @@ func TestRecordDetail(t *testing.T) {
 			req := testRequestWithContext(tc.binding)
 			got := recordDetail(req, tc.spec)
 			assert.Equal(t, tc.expect, got)
+		})
+	}
+}
+
+func TestAnalyticRecord_GraphStats(t *testing.T) {
+
+	generateApiDefinition := func(spec *APISpec) {
+		spec.Name = "graphql API"
+		spec.APIID = "graphql-api"
+		spec.Proxy.TargetURL = testGraphQLProxyUpstream
+		spec.Proxy.ListenPath = "/"
+		spec.GraphQL = apidef.GraphQLConfig{
+			Enabled:       true,
+			ExecutionMode: apidef.GraphQLExecutionModeProxyOnly,
+			Version:       apidef.GraphQLConfigVersion2,
+			Schema:        gqlProxyUpstreamSchema,
+		}
+	}
+
+	testCases := []struct {
+		name      string
+		code      int
+		request   graphql.Request
+		checkFunc func(*testing.T, *analytics.AnalyticsRecord)
+		reloadAPI func(*APISpec)
+		headers   map[string]string
+	}{
+		{
+			name: "successfully generate stats",
+			code: http.StatusOK,
+			request: graphql.Request{
+				Query: `{ hello(name: "World") httpMethod }`,
+			},
+			checkFunc: func(t *testing.T, record *analytics.AnalyticsRecord) {
+				t.Helper()
+				assert.True(t, record.GraphQLStats.IsGraphQL)
+				assert.False(t, record.GraphQLStats.HasErrors)
+				assert.ElementsMatch(t, []string{"hello", "httpMethod"}, record.GraphQLStats.RootFields)
+				assert.Equal(t, map[string][]string{}, record.GraphQLStats.Types)
+				assert.Equal(t, analytics.OperationQuery, record.GraphQLStats.OperationType)
+			},
+		},
+		{
+			name: "should have variables",
+			code: http.StatusOK,
+			request: graphql.Request{
+				Query:     `{ hello(name: "World") httpMethod }`,
+				Variables: []byte(`{"in":"hello"}`),
+			},
+			checkFunc: func(t *testing.T, record *analytics.AnalyticsRecord) {
+				t.Helper()
+				assert.True(t, record.GraphQLStats.IsGraphQL)
+				assert.False(t, record.GraphQLStats.HasErrors)
+				assert.ElementsMatch(t, []string{"httpMethod", "hello"}, record.GraphQLStats.RootFields)
+				assert.Equal(t, map[string][]string{}, record.GraphQLStats.Types)
+				assert.Equal(t, analytics.OperationQuery, record.GraphQLStats.OperationType)
+				assert.Equal(t, `{"in":"hello"}`, record.GraphQLStats.Variables)
+			},
+		},
+		{
+			name: "should read response and error response request with detailed recording",
+			code: http.StatusInternalServerError,
+			request: graphql.Request{
+				Query:     `{ hello(name: "World") httpMethod }`,
+				Variables: []byte(`{"in":"hello"}`),
+			},
+			reloadAPI: func(spec *APISpec) {
+				spec.Proxy.TargetURL = testGraphQLProxyUpstreamError
+				spec.EnableDetailedRecording = true
+			},
+			checkFunc: func(t *testing.T, record *analytics.AnalyticsRecord) {
+				t.Helper()
+				assert.True(t, record.GraphQLStats.IsGraphQL)
+				assert.True(t, record.GraphQLStats.HasErrors)
+				assert.ElementsMatch(t, []string{"hello", "httpMethod"}, record.GraphQLStats.RootFields)
+				assert.Equal(t, map[string][]string{}, record.GraphQLStats.Types)
+				assert.Equal(t, analytics.OperationQuery, record.GraphQLStats.OperationType)
+				assert.Equal(t, `{"in":"hello"}`, record.GraphQLStats.Variables)
+				assert.Equal(t, []analytics.GraphError{
+					{Message: "unable to resolve"},
+				}, record.GraphQLStats.Errors)
+			},
+		},
+		{
+			name: "should read response request without detailed recording",
+			code: http.StatusInternalServerError,
+			request: graphql.Request{
+				Query:     `{ hello(name: "World") httpMethod }`,
+				Variables: []byte(`{"in":"hello"}`),
+			},
+			reloadAPI: func(spec *APISpec) {
+				spec.Proxy.TargetURL = testGraphQLProxyUpstreamError
+			},
+			checkFunc: func(t *testing.T, record *analytics.AnalyticsRecord) {
+				t.Helper()
+				assert.True(t, record.GraphQLStats.IsGraphQL)
+				assert.True(t, record.GraphQLStats.HasErrors)
+				assert.ElementsMatch(t, []string{"hello", "httpMethod"}, record.GraphQLStats.RootFields)
+				assert.Equal(t, map[string][]string{}, record.GraphQLStats.Types)
+				assert.Equal(t, analytics.OperationQuery, record.GraphQLStats.OperationType)
+				assert.Equal(t, `{"in":"hello"}`, record.GraphQLStats.Variables)
+				assert.Equal(t, []analytics.GraphError{
+					{Message: "unable to resolve"},
+				}, record.GraphQLStats.Errors)
+			},
+		},
+		{
+			name: "successfully generate stats for compressed request body",
+			code: http.StatusOK,
+			request: graphql.Request{
+				Query: `{ hello(name: "World") httpMethod }`,
+			},
+			headers: map[string]string{
+				httpclient.AcceptEncodingHeader: "gzip",
+			},
+			checkFunc: func(t *testing.T, record *analytics.AnalyticsRecord) {
+				t.Helper()
+				assert.True(t, record.GraphQLStats.IsGraphQL)
+				assert.False(t, record.GraphQLStats.HasErrors)
+				assert.ElementsMatch(t, []string{"hello", "httpMethod"}, record.GraphQLStats.RootFields)
+				assert.Equal(t, map[string][]string{}, record.GraphQLStats.Types)
+				assert.Equal(t, analytics.OperationQuery, record.GraphQLStats.OperationType)
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			spec := BuildAPI(generateApiDefinition)[0]
+			if tc.reloadAPI != nil {
+				tc.reloadAPI(spec)
+			}
+
+			ts := StartTest(nil)
+			defer ts.Close()
+			ts.Gw.LoadAPI(spec)
+			ts.Gw.Analytics.mockEnabled = true
+			ts.Gw.Analytics.mockRecordHit = func(record *analytics.AnalyticsRecord) {
+				tc.checkFunc(t, record)
+			}
+			var headers = map[string]string{
+				httpclient.AcceptEncodingHeader: "",
+			}
+			if tc.headers != nil {
+				headers = tc.headers
+			}
+			_, err := ts.Run(t, test.TestCase{
+				Data:    tc.request,
+				Method:  http.MethodPost,
+				Code:    tc.code,
+				Headers: headers,
+			})
+			assert.NoError(t, err)
 		})
 	}
 }
@@ -136,6 +300,7 @@ func TestAnalyticsIgnoreSubgraph(t *testing.T) {
 		spec.Name = "supergraph"
 		spec.APIID = "supergraph"
 		spec.Proxy.ListenPath = "/supergraph"
+		spec.EnableDetailedRecording = true
 		spec.GraphQL = apidef.GraphQLConfig{
 			Enabled:       true,
 			ExecutionMode: apidef.GraphQLExecutionModeSupergraph,
@@ -172,6 +337,7 @@ func TestAnalyticsIgnoreSubgraph(t *testing.T) {
 		if record.ApiSchema != "" && found {
 			t.Error("subgraph request should not tagged or have schema")
 		}
+		assert.False(t, record.GraphQLStats.IsGraphQL)
 	}
 
 	_, err := ts.Run(t,
@@ -191,4 +357,73 @@ func TestAnalyticsIgnoreSubgraph(t *testing.T) {
 		},
 	)
 	assert.NoError(t, err)
+}
+
+func TestSuccessHandler_addTraceIDTag(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	s := &SuccessHandler{
+		BaseMiddleware: &BaseMiddleware{Gw: ts.Gw},
+	}
+
+	makeCtxWithTrace := func(hex string) context.Context {
+		tid, err := trace.TraceIDFromHex(hex)
+		if err != nil {
+			t.Fatalf("invalid trace id: %v", err)
+		}
+		sc := trace.NewSpanContext(trace.SpanContextConfig{
+			TraceID:    tid,
+			TraceFlags: trace.FlagsSampled,
+		})
+		return trace.ContextWithSpanContext(context.Background(), sc)
+	}
+
+	tests := map[string]struct {
+		enableOTel bool
+		ctx        context.Context
+		in         []string
+		want       []string
+	}{
+		"enabled_with_trace_appends": {
+			enableOTel: true,
+			ctx:        makeCtxWithTrace("0123456789abcdef0123456789abcdef"),
+			in:         []string{"a", "b"},
+			want:       []string{"a", "b", traceTagPrefix + "0123456789abcdef0123456789abcdef"},
+		},
+		"enabled_without_trace_noop": {
+			enableOTel: true,
+			ctx:        context.Background(),
+			in:         []string{"x"},
+			want:       []string{"x"},
+		},
+		"disabled_with_trace_noop": {
+			enableOTel: false,
+			ctx:        makeCtxWithTrace("ffffffffffffffffffffffffffffffff"),
+			in:         []string{},
+			want:       []string{},
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			cfg := ts.Gw.GetConfig()
+			cfg.OpenTelemetry.Enabled = tc.enableOTel
+			ts.Gw.SetConfig(cfg)
+
+			tags := make([]string, 0, len(tc.in))
+			tags = append(tags, tc.in...)
+
+			tags = s.addTraceIDTag(tc.ctx, tags)
+
+			want := tc.want
+			if want == nil {
+				want = []string{}
+			}
+
+			if diff := cmp.Diff(tags, want); diff != "" {
+				t.Fatalf("tags mismatch (-got +want):\n%s", diff)
+			}
+		})
+	}
 }

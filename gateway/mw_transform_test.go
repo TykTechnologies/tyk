@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"strings"
 	"testing"
-	"text/template"
+	texttemplate "text/template"
 
 	"github.com/TykTechnologies/tyk/test"
 
@@ -22,7 +22,7 @@ func testPrepareTransformNonAscii() (*TransformSpec, string) {
 	tmpl := `[{{range $x, $s := .names.name}}"{{$s}}"{{if not $x}}, {{end}}{{end}}]`
 	tmeta := &TransformSpec{}
 	tmeta.TemplateData.Input = apidef.RequestXML
-	tmeta.Template = template.Must(template.New("blob").Parse(tmpl))
+	tmeta.Template = texttemplate.Must(texttemplate.New("blob").Parse(tmpl))
 	return tmeta, in
 }
 
@@ -37,11 +37,10 @@ func TestTransformNonAscii(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
 
-	ad := apidef.APIDefinition{}
-	spec := APISpec{APIDefinition: &ad}
-	spec.EnableContextVars = false
-	base := BaseMiddleware{Spec: &spec, Gw: ts.Gw}
-	base.Spec.EnableContextVars = false
+	ad := &apidef.APIDefinition{}
+	spec := &APISpec{APIDefinition: ad}
+	base := &BaseMiddleware{Spec: spec, Gw: ts.Gw}
+
 	transform := TransformMiddleware{base}
 
 	if err := transformBody(r, tmeta, &transform); err != nil {
@@ -64,15 +63,16 @@ func BenchmarkTransformNonAscii(b *testing.B) {
 	ts := StartTest(nil)
 	defer ts.Close()
 
-	spec := APISpec{}
-	base := BaseMiddleware{Spec: &spec, Gw: ts.Gw}
-	base.Spec.EnableContextVars = false
-	transform := TransformMiddleware{base}
+	ad := &apidef.APIDefinition{}
+	spec := &APISpec{APIDefinition: ad}
+	base := &BaseMiddleware{Spec: spec, Gw: ts.Gw}
+
+	transform := &TransformMiddleware{base}
 
 	for i := 0; i < b.N; i++ {
 		r := TestReq(b, "GET", "/", in)
 
-		if err := transformBody(r, tmeta, &transform); err != nil {
+		if err := transformBody(r, tmeta, transform); err != nil {
 			b.Fatalf("wanted nil error, got %v", err)
 		}
 	}
@@ -85,15 +85,15 @@ func TestTransformXMLCrash(t *testing.T) {
 	r := TestReq(t, "GET", "/", in)
 	tmeta := &TransformSpec{}
 	tmeta.TemplateData.Input = apidef.RequestXML
-	tmeta.Template = template.Must(apidef.Template.New("").Parse(""))
+	tmeta.Template = texttemplate.Must(apidef.Template.New("").Parse(""))
 
 	ts := StartTest(nil)
 	defer ts.Close()
 
-	ad := apidef.APIDefinition{}
-	spec := APISpec{APIDefinition: &ad}
-	base := BaseMiddleware{Spec: &spec, Gw: ts.Gw}
-	base.Spec.EnableContextVars = false
+	ad := &apidef.APIDefinition{}
+	spec := &APISpec{APIDefinition: ad}
+	base := &BaseMiddleware{Spec: spec, Gw: ts.Gw}
+
 	transform := TransformMiddleware{base}
 
 	if err := transformBody(r, tmeta, &transform); err == nil {
@@ -105,7 +105,7 @@ func testPrepareTransformJSONMarshal(inputType string) (tmeta *TransformSpec, in
 	tmeta = &TransformSpec{}
 	tmpl := `[{{range $x, $s := .names.name}}{{$s | jsonMarshal}}{{if not $x}}, {{end}}{{end}}]`
 	tmeta.TemplateData.Input = apidef.RequestXML
-	tmeta.Template = template.Must(apidef.Template.New("").Parse(tmpl))
+	tmeta.Template = texttemplate.Must(apidef.Template.New("").Parse(tmpl))
 
 	switch inputType {
 	case "json":
@@ -124,7 +124,7 @@ func testPrepareTransformJSONMarshal(inputType string) (tmeta *TransformSpec, in
 
 func testPrepareTransformXMLMarshal(tmpl string, inputType apidef.RequestInputType) (tmeta *TransformSpec) {
 	tmeta = &TransformSpec{}
-	tmeta.Template = template.Must(apidef.Template.New("").Parse(tmpl))
+	tmeta.Template = texttemplate.Must(apidef.Template.New("").Parse(tmpl))
 
 	switch inputType {
 	case apidef.RequestJSON:
@@ -145,10 +145,10 @@ func TestTransformJSONMarshalXMLInput(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
 
-	ad := apidef.APIDefinition{}
-	spec := APISpec{APIDefinition: &ad}
-	base := BaseMiddleware{Spec: &spec, Gw: ts.Gw}
-	base.Spec.EnableContextVars = false
+	ad := &apidef.APIDefinition{}
+	spec := &APISpec{APIDefinition: ad}
+	base := &BaseMiddleware{Spec: spec, Gw: ts.Gw}
+
 	transform := TransformMiddleware{base}
 
 	if err := transformBody(r, tmeta, &transform); err != nil {
@@ -172,10 +172,10 @@ func TestTransformJSONMarshalJSONInput(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
 
-	ad := apidef.APIDefinition{}
-	spec := APISpec{APIDefinition: &ad}
-	base := BaseMiddleware{Spec: &spec, Gw: ts.Gw}
-	base.Spec.EnableContextVars = false
+	ad := &apidef.APIDefinition{}
+	spec := &APISpec{APIDefinition: ad}
+	base := &BaseMiddleware{Spec: spec, Gw: ts.Gw}
+
 	transform := TransformMiddleware{base}
 
 	if err := transformBody(r, tmeta, &transform); err != nil {
@@ -194,7 +194,7 @@ func testPrepareTransformJSONMarshalArray(tb testing.TB) (tmeta *TransformSpec, 
 	tmeta = &TransformSpec{}
 	tmpl := `[{{ range $key, $value := .array }}{{ if $key }},{{ end }}{{ .abc }}{{ end }}]`
 	tmeta.TemplateData.Input = apidef.RequestXML
-	tmeta.Template = template.Must(apidef.Template.New("").Parse(tmpl))
+	tmeta.Template = texttemplate.Must(apidef.Template.New("").Parse(tmpl))
 
 	tmeta.TemplateData.Input = apidef.RequestJSON
 	in = `[{"abc": 123}, {"abc": 456}]`
@@ -211,10 +211,10 @@ func TestTransformJSONMarshalJSONArrayInput(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
 
-	ad := apidef.APIDefinition{}
-	spec := APISpec{APIDefinition: &ad}
-	base := BaseMiddleware{Spec: &spec, Gw: ts.Gw}
-	base.Spec.EnableContextVars = false
+	ad := &apidef.APIDefinition{}
+	spec := &APISpec{APIDefinition: ad}
+	base := &BaseMiddleware{Spec: spec, Gw: ts.Gw}
+
 	transform := TransformMiddleware{base}
 
 	if err := transformBody(r, tmeta, &transform); err != nil {
@@ -236,9 +236,10 @@ func BenchmarkTransformJSONMarshal(b *testing.B) {
 	ts := StartTest(nil)
 	defer ts.Close()
 
-	spec := APISpec{}
-	base := BaseMiddleware{Spec: &spec, Gw: ts.Gw}
-	base.Spec.EnableContextVars = false
+	ad := &apidef.APIDefinition{}
+	spec := &APISpec{APIDefinition: ad}
+	base := &BaseMiddleware{Spec: spec, Gw: ts.Gw}
+
 	transform := TransformMiddleware{base}
 
 	for i := 0; i < b.N; i++ {
@@ -251,16 +252,17 @@ func BenchmarkTransformJSONMarshal(b *testing.B) {
 
 func TestTransformXMLMarshal(t *testing.T) {
 	assert := func(t *testing.T, input string, tmpl string, output string, inputType apidef.RequestInputType) {
+		t.Helper()
 		tmeta := testPrepareTransformXMLMarshal(tmpl, inputType)
 		r := TestReq(t, "GET", "/", input)
 
 		ts := StartTest(nil)
 		defer ts.Close()
 
-		ad := apidef.APIDefinition{}
-		spec := APISpec{APIDefinition: &ad}
-		base := BaseMiddleware{Spec: &spec, Gw: ts.Gw}
-		base.Spec.EnableContextVars = false
+		ad := &apidef.APIDefinition{}
+		spec := &APISpec{APIDefinition: ad}
+		base := &BaseMiddleware{Spec: spec, Gw: ts.Gw}
+
 		transform := TransformMiddleware{base}
 
 		if err := transformBody(r, tmeta, &transform); err != nil {

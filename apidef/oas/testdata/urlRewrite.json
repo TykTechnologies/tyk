@@ -1,0 +1,66 @@
+{
+  "components": {},
+  "info": {
+    "title": "test_url_rewrite",
+    "version": "1.0.0"
+  },
+  "openapi": "3.0.3",
+  "paths": {
+    "/status/{statusCode}": {
+      "get": {
+        "operationId": "status/{statusCode}get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "statusCode",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        }
+      }
+    }
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8181/test_url_rewrite/"
+    }
+  ],
+  "x-tyk-api-gateway": {
+    "info": {
+      "id": "3659a8b96b2b43c64a0b0b0e86788edd",
+      "dbId": "65a7a01b86341f3d8d2c7f16",
+      "orgId": "646490d486341f29c665c45c",
+      "name": "test_url_rewrite",
+      "state": {
+        "active": true
+      }
+    },
+    "upstream": {
+      "url": "http://httpbin.org/"
+    },
+    "server": {
+      "listenPath": {
+        "value": "/test_url_rewrite/",
+        "strip": true
+      }
+    },
+    "middleware": {
+      "operations": {
+        "status/{statusCode}get": {
+          "urlRewrite": {
+            "enabled": true,
+            "pattern": "/status/200",
+            "rewriteTo": "/anything"
+          }
+        }
+      }
+    }
+  }
+}

@@ -1,18 +1,17 @@
 package python
 
 import (
-	"fmt"
 	"os"
 	"testing"
 )
 
 var testVersion = "3.5"
 
-func init() {
+func TestMain(m *testing.M) {
 	if versionOverride := os.Getenv("PYTHON_VERSION"); versionOverride != "" {
 		testVersion = versionOverride
 	}
-	fmt.Printf("Using Python %s for tests\n", testVersion)
+	os.Exit(m.Run())
 }
 
 func TestFindPythonConfig(t *testing.T) {
@@ -21,7 +20,8 @@ func TestFindPythonConfig(t *testing.T) {
 	if err == nil {
 		t.Fatal("Should fail when loading a nonexistent Python version")
 	}
-	_, err = FindPythonConfig(testVersion)
+	pythonVersion, err := FindPythonConfig(testVersion)
+	t.Logf("Version is %s", pythonVersion)
 	t.Logf("Library path is %s", pythonLibraryPath)
 	if err != nil {
 		t.Fatalf("Couldn't find Python %s", testVersion)

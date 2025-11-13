@@ -2,22 +2,26 @@ package gateway
 
 import (
 	"bytes"
+	"context"
 	"encoding/base64"
 	"io"
 	"io/ioutil"
 	"net/http"
-	"runtime/pprof"
 	"strconv"
 	"strings"
 	"time"
 
+	graphqlinternal "github.com/TykTechnologies/tyk/internal/graphql"
+
+	"github.com/TykTechnologies/tyk-pump/analytics"
+
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/internal/httputil"
 
-	"github.com/TykTechnologies/tyk-pump/analytics"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/ctx"
 	"github.com/TykTechnologies/tyk/header"
+	"github.com/TykTechnologies/tyk/internal/otel"
 	"github.com/TykTechnologies/tyk/request"
 	"github.com/TykTechnologies/tyk/user"
 )
@@ -42,7 +46,7 @@ type ReturningHttpHandler interface {
 
 // SuccessHandler represents the final ServeHTTP() request for a proxied API request
 type SuccessHandler struct {
-	BaseMiddleware
+	*BaseMiddleware
 }
 
 func tagHeaders(r *http.Request, th []string, tags []string) []string {
@@ -119,7 +123,65 @@ func getSessionTags(session *user.SessionState) []string {
 	return tags
 }
 
-func (s *SuccessHandler) RecordHit(r *http.Request, timing analytics.Latency, code int, responseCopy *http.Response) {
+func recordGraphDetails(rec *analytics.AnalyticsRecord, r *http.Request, resp *http.Response, spec *APISpec) {
+	if !spec.GraphQL.Enabled || spec.GraphQL.ExecutionMode == apidef.GraphQLExecutionModeSubgraph {
+		return
+	}
+	logger := log.WithField("location", "recordGraphDetails")
+	if r.Body == nil {
+		return
+	}
+	body, err := io.ReadAll(r.Body)
+	defer func() {
+		_ = r.Body.Close()
+		r.Body = io.NopCloser(bytes.NewBuffer(body))
+	}()
+	if err != nil {
+		logger.WithError(err).Error("error recording graph analytics")
+		return
+	}
+	var (
+		respBody []byte
+	)
+	if resp.Body != nil {
+		httputil.RemoveResponseTransferEncoding(resp, "chunked")
+		// respBodyReader tries to decompress the response body if the Accept-Encoding
+		// header is a non-empty string.
+		resp.Body = respBodyReader(r, resp)
+		respBody, err = io.ReadAll(resp.Body)
+		defer func() {
+			_ = resp.Body.Close()
+			// Create a new Reader and assign it to the response body.
+			resp.Body = io.NopCloser(bytes.NewBuffer(respBody))
+		}()
+		if err != nil {
+			logger.WithError(err).Error("error recording graph analytics")
+			return
+		}
+	}
+
+	extractor := graphqlinternal.NewGraphStatsExtractor()
+	stats, err := extractor.ExtractStats(string(body), string(respBody), spec.GraphQL.Schema)
+	if err != nil {
+		logger.WithError(err).Error("error recording graph analytics")
+		return
+	}
+	rec.GraphQLStats = stats
+}
+
+const traceTagPrefix = "trace-id-"
+
+func (s *SuccessHandler) addTraceIDTag(reqCtx context.Context, tags []string) []string {
+	if !s.Gw.GetConfig().OpenTelemetry.Enabled {
+		return tags
+	}
+	if id := otel.ExtractTraceID(reqCtx); id != "" {
+		tags = append(tags, traceTagPrefix+id)
+	}
+	return tags
+}
+
+func (s *SuccessHandler) RecordHit(r *http.Request, timing analytics.Latency, code int, responseCopy *http.Response, cached bool) {
 
 	if s.Spec.DoNotTrack || ctxGetDoNotTrack(r) {
 		return
@@ -158,6 +220,12 @@ func (s *SuccessHandler) RecordHit(r *http.Request, timing analytics.Latency, co
 			tags = append(tags, s.Spec.Tags...)
 		}
 
+		if cached {
+			tags = append(tags, "cached-response")
+		}
+
+		tags = s.addTraceIDTag(r.Context(), tags)
+
 		rawRequest := ""
 		rawResponse := ""
 
@@ -173,11 +241,11 @@ func (s *SuccessHandler) RecordHit(r *http.Request, timing analytics.Latency, co
 			// TODO: pass a copy of the cached response in
 			// mw_redis_cache instead? is there a reason not
 			// to include that in the analytics?
-			if responseCopy != nil {
+			if responseCopy != nil && responseCopy.Body != nil {
 				// we need to delete the chunked transfer encoding header to avoid malformed body in our rawResponse
 				httputil.RemoveResponseTransferEncoding(responseCopy, "chunked")
 
-				contents, err := ioutil.ReadAll(responseCopy.Body)
+				responseContent, err := io.ReadAll(responseCopy.Body)
 				if err != nil {
 					log.Error("Couldn't read response body", err)
 				}
@@ -187,7 +255,7 @@ func (s *SuccessHandler) RecordHit(r *http.Request, timing analytics.Latency, co
 				// Get the wire format representation
 				var wireFormatRes bytes.Buffer
 				responseCopy.Write(&wireFormatRes)
-				responseCopy.Body = ioutil.NopCloser(bytes.NewBuffer(contents))
+				responseCopy.Body = ioutil.NopCloser(bytes.NewBuffer(responseContent))
 				rawResponse = base64.StdEncoding.EncodeToString(wireFormatRes.Bytes())
 			}
 		}
@@ -240,6 +308,7 @@ func (s *SuccessHandler) RecordHit(r *http.Request, timing analytics.Latency, co
 			record.GetGeo(ip, s.Gw.Analytics.GeoIPDB)
 		}
 
+		recordGraphDetails(&record, r, responseCopy, s.Spec)
 		// skip tagging subgraph requests for graphpump, it only handles generated supergraph requests
 		if s.Spec.GraphQL.Enabled && s.Spec.GraphQL.ExecutionMode != apidef.GraphQLExecutionModeSubgraph {
 			record.Tags = append(record.Tags, "tyk-graph-analytics")
@@ -270,7 +339,6 @@ func (s *SuccessHandler) RecordHit(r *http.Request, timing analytics.Latency, co
 		}
 
 		err := s.Gw.Analytics.RecordHit(&record)
-
 		if err != nil {
 			log.WithError(err).Error("could not store analytic record")
 		}
@@ -278,18 +346,18 @@ func (s *SuccessHandler) RecordHit(r *http.Request, timing analytics.Latency, co
 
 	// Report in health check
 	reportHealthValue(s.Spec, RequestLog, strconv.FormatInt(timing.Total, 10))
-
-	if memProfFile != nil {
-		pprof.WriteHeapProfile(memProfFile)
-	}
 }
 
 func recordDetail(r *http.Request, spec *APISpec) bool {
 	// when streaming in grpc, we do not record the request
-	if IsGrpcStreaming(r) {
+	if httputil.IsStreamingRequest(r) {
 		return false
 	}
 
+	return recordDetailUnsafe(r, spec)
+}
+
+func recordDetailUnsafe(r *http.Request, spec *APISpec) bool {
 	if spec.EnableDetailedRecording {
 		return true
 	}
@@ -300,19 +368,16 @@ func recordDetail(r *http.Request, spec *APISpec) bool {
 		}
 	}
 
-	// Are we even checking?
-	if !spec.GlobalConfig.EnforceOrgDataDetailLogging {
-		return spec.GlobalConfig.AnalyticsConfig.EnableDetailedRecording
+	// decide based on org session.
+	if spec.GlobalConfig.EnforceOrgDataDetailLogging {
+		session, ok := r.Context().Value(ctx.OrgSessionContext).(*user.SessionState)
+		if ok && session != nil {
+			return session.EnableDetailedRecording || session.EnableDetailRecording // nolint:staticcheck // Deprecated DetailRecording
+		}
 	}
 
-	// We are, so get session data
-	session, ok := r.Context().Value(ctx.OrgSessionContext).(*user.SessionState)
-	if ok && session != nil {
-		return session.EnableDetailedRecording || session.EnableDetailRecording // nolint:staticcheck // Deprecated DetailRecording
-	}
-
-	// no session found, use global config
-	return spec.GlobalConfig.AnalyticsConfig.EnableDetailedRecording
+	// no org session found, use global config
+	return spec.GraphQL.Enabled || spec.GlobalConfig.AnalyticsConfig.EnableDetailedRecording
 }
 
 // ServeHTTP will store the request details in the analytics store if necessary and proxy the request to it's
@@ -330,17 +395,36 @@ func (s *SuccessHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) *http
 	t1 := time.Now()
 	resp := s.Proxy.ServeHTTP(w, r)
 
-	millisec := DurationToMillisecond(time.Since(t1))
+	t2 := time.Now()
+	proxyDuration := t2.Sub(t1)
+	millisec := DurationToMillisecond(proxyDuration)
 	log.Debug("Upstream request took (ms): ", millisec)
 
 	if resp.Response != nil {
-		latency := analytics.Latency{
-			Total:    int64(millisec),
-			Upstream: int64(DurationToMillisecond(resp.UpstreamLatency)),
+		upstreamMs := int64(DurationToMillisecond(resp.UpstreamLatency))
+
+		// Calculate total time including all middlewares
+		var totalMs int64
+		requestStartTime := ctxGetRequestStartTime(r)
+		if !requestStartTime.IsZero() {
+			totalMs = int64(DurationToMillisecond(t2.Sub(requestStartTime)))
+			log.Debugf("Request start time found (UTC): %s, total time: %dms", requestStartTime.UTC().Format(time.RFC3339), totalMs)
+		} else {
+			// Fallback to proxy duration if start time not set
+			totalMs = int64(millisec)
+			log.Debug("Request start time NOT found, using proxy duration as fallback")
 		}
-		s.RecordHit(r, latency, resp.Response.StatusCode, resp.Response)
+
+		latency := analytics.Latency{
+			Total:    totalMs,
+			Upstream: upstreamMs,
+			Gateway:  totalMs - upstreamMs,
+		}
+		s.RecordHit(r, latency, resp.Response.StatusCode, resp.Response, false)
+		s.RecordAccessLog(r, resp.Response, latency)
 	}
 	log.Debug("Done proxy")
+
 	return nil
 }
 
@@ -354,18 +438,32 @@ func (s *SuccessHandler) ServeHTTPWithCache(w http.ResponseWriter, r *http.Reque
 
 	t1 := time.Now()
 	inRes := s.Proxy.ServeHTTPForCache(w, r)
-	millisec := DurationToMillisecond(time.Since(t1))
+	t2 := time.Now()
+	proxyDuration := t2.Sub(t1)
+	millisec := DurationToMillisecond(proxyDuration)
 
 	addVersionHeader(w, r, s.Spec.GlobalConfig)
 
 	log.Debug("Upstream request took (ms): ", millisec)
 
 	if inRes.Response != nil {
-		latency := analytics.Latency{
-			Total:    int64(millisec),
-			Upstream: int64(DurationToMillisecond(inRes.UpstreamLatency)),
+		upstreamMs := int64(DurationToMillisecond(inRes.UpstreamLatency))
+
+		// Calculate total time including all middlewares
+		var totalMs int64
+		if requestStartTime := ctxGetRequestStartTime(r); !requestStartTime.IsZero() {
+			totalMs = int64(DurationToMillisecond(t2.Sub(requestStartTime)))
+		} else {
+			// Fallback to proxy duration if start time not set
+			totalMs = int64(millisec)
 		}
-		s.RecordHit(r, latency, inRes.Response.StatusCode, inRes.Response)
+
+		latency := analytics.Latency{
+			Total:    totalMs,
+			Upstream: upstreamMs,
+			Gateway:  totalMs - upstreamMs,
+		}
+		s.RecordHit(r, latency, inRes.Response.StatusCode, inRes.Response, false)
 	}
 
 	return inRes

@@ -1,0 +1,28 @@
+---
+version: "3"
+
+tasks:
+  # pre-commit: run formatting linters on each commit
+  # golangci-lint with --fix handles: go fmt (via gofmt formatter), go vet (via govet linter)
+  pre-commit:
+    desc: "Run pre-commit hooks"
+    cmds:
+      - task: :lint:tidy
+      # this takes care of quality gates that are sonarcould reported kpis, don't add new issues
+      - golangci-lint run --config .golangci.dev.yml --new-from-rev=origin/{{.BASE_BRANCH}} --issues-exit-code=1 --fix ./...
+
+  # pre-push: in essence runs `task lint` with some additional
+  # build tests for the package and the tests.
+  pre-push:
+    desc: "Run pre-push hooks"
+    cmds:
+      - task: :lint
+      # Run builds in parallel since they're independent
+      - task: builds
+
+  builds:
+    desc: "Run build and build-test in parallel"
+    deps:
+      - :lint:build-test
+      - :lint:build
+

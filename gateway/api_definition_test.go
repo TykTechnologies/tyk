@@ -10,22 +10,24 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"sync"
 	"testing"
-	"text/template"
+	texttemplate "text/template"
 	"time"
 
-	"github.com/TykTechnologies/tyk/apidef/oas"
-
-	"github.com/TykTechnologies/storage/persistent/model"
-	"github.com/TykTechnologies/tyk/config"
-	"github.com/TykTechnologies/tyk/rpc"
-
+	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/stretchr/testify/assert"
 
-	redis "github.com/go-redis/redis/v8"
+	persistentmodel "github.com/TykTechnologies/storage/persistent/model"
 
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/apidef/oas"
+	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/ee/middleware/streams"
+	"github.com/TykTechnologies/tyk/internal/model"
+	"github.com/TykTechnologies/tyk/internal/policy"
+	"github.com/TykTechnologies/tyk/rpc"
 	"github.com/TykTechnologies/tyk/test"
 	"github.com/TykTechnologies/tyk/user"
 )
@@ -110,7 +112,7 @@ func TestWhitelist(t *testing.T) {
 
 		ts.Run(t, []test.TestCase{
 			// Should mock path
-			{Path: "/reply/", Code: http.StatusOK, BodyMatch: "flump"},
+			{Path: "/reply/", Code: http.StatusForbidden},
 			{Path: "/reply/123", Code: http.StatusOK, BodyMatch: "flump"},
 			// Should get original upstream response
 			{Path: "/get", Code: http.StatusOK, BodyMatch: `"Url":"/get"`},
@@ -151,14 +153,14 @@ func TestWhitelist(t *testing.T) {
 
 		ts.Run(t, []test.TestCase{
 			{Path: "/foo", Code: http.StatusForbidden},
-			{Path: "/foo/", Code: http.StatusOK},
+			{Path: "/foo/", Code: http.StatusForbidden},
 			{Path: "/foo/1", Code: http.StatusOK},
 			{Path: "/foo/1/bar", Code: http.StatusForbidden},
-			{Path: "/foo/1/bar/", Code: http.StatusOK},
+			{Path: "/foo/1/bar/", Code: http.StatusForbidden},
 			{Path: "/foo/1/bar/1", Code: http.StatusOK},
 			{Path: "/", Code: http.StatusForbidden},
 			{Path: "/baz", Code: http.StatusForbidden},
-			{Path: "/baz/", Code: http.StatusOK},
+			{Path: "/baz/", Code: http.StatusForbidden},
 			{Path: "/baz/1", Code: http.StatusOK},
 			{Path: "/baz/1/", Code: http.StatusOK},
 			{Path: "/baz/1/bazz", Code: http.StatusOK},
@@ -239,8 +241,8 @@ func TestGatewayTagsFilter(t *testing.T) {
 		}
 	}
 
-	data := &nestedApiDefinitionList{}
-	data.set([]*apidef.APIDefinition{
+	data := &model.MergedAPIList{}
+	data.SetClassic([]*apidef.APIDefinition{
 		newApiWithTags(false, []string{}),
 		newApiWithTags(true, []string{}),
 		newApiWithTags(true, []string{"a", "b", "c"}),
@@ -250,22 +252,30 @@ func TestGatewayTagsFilter(t *testing.T) {
 
 	assert.Len(t, data.Message, 5)
 
-	// Test NodeIsSegmented=true
-	{
-		enabled := true
-		assert.Len(t, data.filter(enabled), 0)
-		assert.Len(t, data.filter(enabled, "a"), 3)
-		assert.Len(t, data.filter(enabled, "b"), 2)
-		assert.Len(t, data.filter(enabled, "c"), 1)
-	}
-
 	// Test NodeIsSegmented=false
 	{
 		enabled := false
-		assert.Len(t, data.filter(enabled), 5)
-		assert.Len(t, data.filter(enabled, "a"), 5)
-		assert.Len(t, data.filter(enabled, "b"), 5)
-		assert.Len(t, data.filter(enabled, "c"), 5)
+		assert.Len(t, data.Filter(enabled), 5)
+		assert.Len(t, data.Filter(enabled, "a"), 5)
+		assert.Len(t, data.Filter(enabled, "b"), 5)
+		assert.Len(t, data.Filter(enabled, "c"), 5)
+	}
+
+	// Test NodeIsSegmented=true
+	{
+		enabled := true
+		assert.Len(t, data.Filter(enabled), 0)
+		assert.Len(t, data.Filter(enabled, "a"), 3)
+		assert.Len(t, data.Filter(enabled, "b"), 2)
+		assert.Len(t, data.Filter(enabled, "c"), 1)
+	}
+
+	// Test NodeIsSegmented=true, multiple gw tags
+	{
+		enabled := true
+		assert.Len(t, data.Filter(enabled), 0)
+		assert.Len(t, data.Filter(enabled, "a", "b"), 3)
+		assert.Len(t, data.Filter(enabled, "b", "c"), 2)
 	}
 }
 
@@ -408,13 +418,15 @@ func TestConflictingPaths(t *testing.T) {
 
 	ts.Run(t, []test.TestCase{
 		// Should ignore auth check
-		{Method: "POST", Path: "/customer-servicing/documents/metadata/purge", Code: http.StatusOK},
-		{Method: "GET", Path: "/customer-servicing/documents/metadata/{id}", Code: http.StatusOK},
+		{Method: "POST", Path: "/metadata/purge", Code: http.StatusOK},
+		{Method: "GET", Path: "/metadata/{id}", Code: http.StatusOK},
 	}...)
 }
 
 func TestIgnored(t *testing.T) {
-	ts := StartTest(nil)
+	ts := StartTest(func(c *config.Config) {
+		c.HttpServerOptions.EnablePathPrefixMatching = true
+	})
 	defer ts.Close()
 
 	t.Run("Extended Paths", func(t *testing.T) {
@@ -441,14 +453,13 @@ func TestIgnored(t *testing.T) {
 			{Path: "/ignored/literal", Code: http.StatusOK},
 			{Path: "/ignored/123/test", Code: http.StatusOK},
 			// Only GET is ignored
-			{Method: "POST", Path: "/ext/ignored/literal", Code: 401},
+			{Method: "POST", Path: "/ext/ignored/literal", Code: http.StatusUnauthorized},
 
-			{Path: "/", Code: 401},
+			{Path: "/", Code: http.StatusUnauthorized},
 		}...)
 	})
 
 	t.Run("Simple Paths", func(t *testing.T) {
-
 		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 			UpdateAPIVersion(spec, "v1", func(v *apidef.VersionInfo) {
 				v.Paths.Ignored = []string{"/ignored/literal", "/ignored/{id}/test"}
@@ -463,15 +474,14 @@ func TestIgnored(t *testing.T) {
 			// Should ignore auth check
 			{Path: "/ignored/literal", Code: http.StatusOK},
 			{Path: "/ignored/123/test", Code: http.StatusOK},
-			// All methods ignored
-			{Method: "POST", Path: "/ext/ignored/literal", Code: http.StatusOK},
 
-			{Path: "/", Code: 401},
+			{Method: "POST", Path: "/ext/ignored/literal", Code: http.StatusUnauthorized},
+
+			{Path: "/", Code: http.StatusUnauthorized},
 		}...)
 	})
 
 	t.Run("With URL rewrite", func(t *testing.T) {
-
 		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 			UpdateAPIVersion(spec, "v1", func(v *apidef.VersionInfo) {
 				v.ExtendedPaths.URLRewrite = []apidef.URLRewriteMeta{{
@@ -506,7 +516,6 @@ func TestIgnored(t *testing.T) {
 	})
 
 	t.Run("Case Sensitivity", func(t *testing.T) {
-
 		spec := BuildAPI(func(spec *APISpec) {
 			UpdateAPIVersion(spec, "v1", func(v *apidef.VersionInfo) {
 				v.ExtendedPaths.Ignored = []apidef.EndPointMeta{{Path: "/Foo", IgnoreCase: false}, {Path: "/bar", IgnoreCase: true}}
@@ -660,6 +669,7 @@ func TestOldMockResponse(t *testing.T) {
 	}
 
 	check := func(t *testing.T, api *APISpec, tc []test.TestCase) {
+		t.Helper()
 		ts.Gw.LoadAPI(api)
 		_, _ = ts.Run(t, tc...)
 
@@ -818,8 +828,6 @@ func TestWhitelistMethodWithAdditionalMiddleware(t *testing.T) {
 					}
 				]`), &v.ExtendedPaths.TransformResponseHeader)
 			})
-			spec.ResponseProcessors = []apidef.ResponseProcessor{{Name: "header_injector"}}
-
 		})
 
 		//headers := map[string]string{"foo": "bar"}
@@ -861,7 +869,7 @@ func TestSyncAPISpecsDashboardSuccess(t *testing.T) {
 
 	var wg sync.WaitGroup
 	wg.Add(1)
-	msg := redis.Message{Payload: `{"Command": "ApiUpdated"}`}
+	msg := testMessageAdapter{Msg: `{"Command": "ApiUpdated"}`}
 	handled := func(got NotificationCommand) {
 		if want := NoticeApiUpdated; got != want {
 			t.Fatalf("want %q, got %q", want, got)
@@ -950,7 +958,7 @@ func TestDefaultVersion(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
 
-	key := ts.testPrepareDefaultVersion()
+	key, api := ts.testPrepareDefaultVersion()
 	authHeaders := map[string]string{"authorization": key}
 
 	ts.Run(t, []test.TestCase{
@@ -959,6 +967,19 @@ func TestDefaultVersion(t *testing.T) {
 		{Path: "/foo?v=v1", Headers: authHeaders, Code: http.StatusOK},        // Allowed for v1
 		{Path: "/bar?v=v1", Headers: authHeaders, Code: http.StatusForbidden}, // Not allowed for v1
 	}...)
+
+	t.Run("fallback to default", func(t *testing.T) {
+		_, _ = ts.Run(t, test.TestCase{
+			Path: "/bar?v=notFound", Headers: authHeaders, BodyMatch: string(VersionDoesNotExist), Code: http.StatusForbidden,
+		})
+
+		api.VersionDefinition.FallbackToDefault = true
+		ts.Gw.LoadAPI(api)
+
+		_, _ = ts.Run(t, test.TestCase{
+			Path: "/bar?v=notFound", Headers: authHeaders, Code: http.StatusOK,
+		})
+	})
 }
 
 func BenchmarkDefaultVersion(b *testing.B) {
@@ -967,7 +988,7 @@ func BenchmarkDefaultVersion(b *testing.B) {
 	ts := StartTest(nil)
 	defer ts.Close()
 
-	key := ts.testPrepareDefaultVersion()
+	key, _ := ts.testPrepareDefaultVersion()
 
 	authHeaders := map[string]string{"authorization": key}
 
@@ -984,9 +1005,9 @@ func BenchmarkDefaultVersion(b *testing.B) {
 	}
 }
 
-func (ts *Test) testPrepareDefaultVersion() string {
+func (ts *Test) testPrepareDefaultVersion() (string, *APISpec) {
 
-	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+	api := ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 		v1 := apidef.VersionInfo{Name: "v1"}
 		v1.Name = "v1"
 		v1.Paths.WhiteList = []string{"/foo"}
@@ -1004,19 +1025,21 @@ func (ts *Test) testPrepareDefaultVersion() string {
 		spec.Proxy.ListenPath = "/"
 
 		spec.UseKeylessAccess = false
-	})
+		spec.DisableRateLimit = true
+		spec.DisableQuota = true
+	})[0]
 
 	return CreateSession(ts.Gw, func(s *user.SessionState) {
 		s.AccessRights = map[string]user.AccessDefinition{"test": {
 			APIID: "test", Versions: []string{"v1", "v2"},
 		}}
-	})
+	}), api
 }
 
 func TestGetVersionFromRequest(t *testing.T) {
 
 	versionInfo := apidef.VersionInfo{}
-	versionInfo.Paths.WhiteList = []string{"/foo"}
+	versionInfo.Paths.WhiteList = []string{"/foo", "/v3/foo"}
 	versionInfo.Paths.BlackList = []string{"/bar"}
 
 	t.Run("Header location", func(t *testing.T) {
@@ -1199,7 +1222,7 @@ func TestSyncAPISpecsDashboardJSONFailure(t *testing.T) {
 
 	var wg sync.WaitGroup
 	wg.Add(1)
-	msg := redis.Message{Payload: `{"Command": "ApiUpdated"}`}
+	msg := testMessageAdapter{Msg: `{"Command": "ApiUpdated"}`}
 	handled := func(got NotificationCommand) {
 		if want := NoticeApiUpdated; got != want {
 			t.Fatalf("want %q, got %q", want, got)
@@ -1243,9 +1266,10 @@ func TestAPIDefinitionLoader(t *testing.T) {
 
 	l := APIDefinitionLoader{Gw: ts.Gw}
 
-	executeAndAssert := func(t *testing.T, template *template.Template) {
+	executeAndAssert := func(t *testing.T, tpl *texttemplate.Template) {
+		t.Helper()
 		var bodyBuffer bytes.Buffer
-		err := template.Execute(&bodyBuffer, map[string]string{
+		err := tpl.Execute(&bodyBuffer, map[string]string{
 			"value1": "value-1",
 			"value2": "value-2",
 		})
@@ -1322,23 +1346,6 @@ func TestAPIExpiration(t *testing.T) {
 	}
 }
 
-func TestStripListenPath(t *testing.T) {
-	assert.Equal(t, "/get", stripListenPath("/listen", "/listen/get"))
-	assert.Equal(t, "/get", stripListenPath("/listen/", "/listen/get"))
-	assert.Equal(t, "/get", stripListenPath("listen", "listen/get"))
-	assert.Equal(t, "/get", stripListenPath("listen/", "listen/get"))
-	assert.Equal(t, "/", stripListenPath("/listen/", "/listen/"))
-	assert.Equal(t, "/", stripListenPath("/listen", "/listen"))
-	assert.Equal(t, "/", stripListenPath("listen/", ""))
-
-	assert.Equal(t, "/get", stripListenPath("/{_:.*}/post/", "/listen/post/get"))
-	assert.Equal(t, "/get", stripListenPath("/{_:.*}/", "/listen/get"))
-	assert.Equal(t, "/get", stripListenPath("/pre/{_:.*}/", "/pre/listen/get"))
-	assert.Equal(t, "/", stripListenPath("/{_:.*}", "/listen"))
-	assert.Equal(t, "/get", stripListenPath("/{myPattern:foo|bar}", "/foo/get"))
-	assert.Equal(t, "/anything/get", stripListenPath("/{myPattern:foo|bar}", "/anything/get"))
-}
-
 func TestAPISpec_SanitizeProxyPaths(t *testing.T) {
 	a := APISpec{APIDefinition: &apidef.APIDefinition{}}
 	a.Proxy.ListenPath = "/listen/"
@@ -1369,7 +1376,7 @@ func TestEnforcedTimeout(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
 
-	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(_ http.ResponseWriter, _ *http.Request) {
 		time.Sleep(2 * time.Second)
 	}))
 
@@ -1445,13 +1452,13 @@ func TestAPISpec_isListeningOnPort(t *testing.T) {
 func Test_LoadAPIsFromRPC(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
-	objectID := model.NewObjectID()
+	objectID := persistentmodel.NewObjectID()
 	loader := APIDefinitionLoader{Gw: ts.Gw}
 
 	t.Run("load APIs from RPC - success", func(t *testing.T) {
-		mockedStorage := &RPCDataLoaderMock{
+		mockedStorage := &policy.RPCDataLoaderMock{
 			ShouldConnect: true,
-			Apis: []nestedApiDefinition{
+			Apis: []model.MergedAPI{
 				{APIDefinition: &apidef.APIDefinition{Id: objectID, OrgID: "org1", APIID: "api1"}},
 			},
 		}
@@ -1463,9 +1470,9 @@ func Test_LoadAPIsFromRPC(t *testing.T) {
 	})
 
 	t.Run("load APIs from RPC - success - then fail", func(t *testing.T) {
-		mockedStorage := &RPCDataLoaderMock{
+		mockedStorage := &policy.RPCDataLoaderMock{
 			ShouldConnect: true,
-			Apis: []nestedApiDefinition{
+			Apis: []model.MergedAPI{
 				{APIDefinition: &apidef.APIDefinition{Id: objectID, OrgID: "org1", APIID: "api1"}},
 			},
 		}
@@ -1492,43 +1499,916 @@ func Test_LoadAPIsFromRPC(t *testing.T) {
 	})
 }
 
-func TestAPISpec_setHasMock(t *testing.T) {
+func TestAPISpec_hasMock(t *testing.T) {
 	s := APISpec{APIDefinition: &apidef.APIDefinition{}}
-
-	s.setHasMock()
-	assert.False(t, s.HasMock)
+	assert.False(t, s.hasActiveMock())
 
 	s.IsOAS = true
-	s.setHasMock()
-	assert.False(t, s.HasMock)
+	assert.False(t, s.hasActiveMock())
 
 	s.OAS = oas.OAS{}
-	s.setHasMock()
-	assert.False(t, s.HasMock)
+	assert.False(t, s.hasActiveMock())
 
 	xTyk := &oas.XTykAPIGateway{}
 	s.OAS.SetTykExtension(xTyk)
-	s.setHasMock()
-	assert.False(t, s.HasMock)
+	assert.False(t, s.hasActiveMock())
 
 	middleware := &oas.Middleware{}
 	xTyk.Middleware = middleware
-	s.setHasMock()
-	assert.False(t, s.HasMock)
+	assert.False(t, s.hasActiveMock())
 
 	op := &oas.Operation{}
 	middleware.Operations = oas.Operations{
 		"my-operation": op,
 	}
-	s.setHasMock()
-	assert.False(t, s.HasMock)
+	assert.False(t, s.hasActiveMock())
 
 	mock := &oas.MockResponse{}
 	op.MockResponse = mock
-	s.setHasMock()
-	assert.False(t, s.HasMock)
+	assert.False(t, s.hasActiveMock())
 
 	mock.Enabled = true
-	s.setHasMock()
-	assert.True(t, s.HasMock)
+	assert.True(t, s.hasActiveMock())
+}
+
+func TestAPISpec_isStreamingAPI(t *testing.T) {
+	type testCase struct {
+		name           string
+		inputOAS       oas.OAS
+		expectedResult bool
+	}
+
+	testCases := []testCase{
+		{
+			name:           "should return false if oas is set to default",
+			inputOAS:       oas.OAS{},
+			expectedResult: false,
+		},
+		{
+			name: "should return false if streaming section is missing",
+			inputOAS: oas.OAS{
+				T: openapi3.T{
+					Extensions: map[string]any{
+						"x-tyk-api-gateway": nil,
+					},
+				},
+			},
+			expectedResult: false,
+		},
+		{
+			name: "should return true if streaming section is present",
+			inputOAS: oas.OAS{
+				T: openapi3.T{
+					Extensions: map[string]any{
+						streams.ExtensionTykStreaming: nil,
+						"x-tyk-api-gateway":           nil,
+					},
+				},
+			},
+			expectedResult: true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			apiSpec := &APISpec{
+				OAS: tc.inputOAS,
+			}
+			assert.Equal(t, tc.expectedResult, apiSpec.isStreamingAPI())
+		})
+	}
+}
+
+func TestReplaceSecrets(t *testing.T) {
+	ts := StartTest(func(globalConf *config.Config) {
+		globalConf.Secrets = map[string]string{
+			"Laurentiu": "Ghiur",
+		}
+	})
+	defer ts.Close()
+
+	t.Setenv("Furkan", "Şenharputlu")
+	t.Setenv("Leonid", "Bugaev")
+
+	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		spec.APIID = "1"
+		spec.JWTSource = "env://Furkan"
+		spec.JWTSigningMethod = "secrets://Laurentiu"
+	}, func(spec *APISpec) {
+		spec.APIID = "2"
+		spec.AuthConfigs = map[string]apidef.AuthConfig{
+			apidef.BasicType: {
+				AuthHeaderName: "env://Leonid",
+			},
+			apidef.AuthTokenType: {
+				AuthHeaderName: "env://Furkan",
+			},
+			apidef.OAuthType: {
+				AuthHeaderName: "secrets://Laurentiu",
+			},
+		}
+	})
+
+	api1 := ts.Gw.getApiSpec("1")
+	api2 := ts.Gw.getApiSpec("2")
+	assert.Equal(t, "Şenharputlu", api1.JWTSource)
+	assert.Equal(t, "Bugaev", api2.AuthConfigs[apidef.BasicType].AuthHeaderName)
+	assert.Equal(t, "Şenharputlu", api2.AuthConfigs[apidef.AuthTokenType].AuthHeaderName)
+	assert.Equal(t, "Ghiur", api1.JWTSigningMethod)
+	assert.Equal(t, "Ghiur", api2.AuthConfigs[apidef.OAuthType].AuthHeaderName)
+}
+
+func TestInternalEndpointMW_TT_11126(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		UpdateAPIVersion(spec, "v1", func(v *apidef.VersionInfo) {
+			assert.NoError(t, json.Unmarshal([]byte(`[
+                    {
+                        "disabled": false,
+                        "add_headers": {
+                            "New-Header": "Value"
+                        },
+                        "path": "/headers",
+                        "method": "GET"
+                    }
+                ]`), &v.ExtendedPaths.TransformHeader))
+			assert.NoError(t, json.Unmarshal([]byte(`[
+                        {
+                            "path": "/headers",
+                            "method": "GET",
+                            "disabled": false
+						}
+				]`), &v.ExtendedPaths.Internal))
+		})
+		spec.Proxy.ListenPath = "/"
+	})
+
+	_, _ = ts.Run(t, []test.TestCase{
+		{Path: "/headers", Code: http.StatusForbidden},
+	}...)
+}
+
+// TestFromDashboardServiceAutoRecovery tests nonce desynchronization auto-recovery for API definitions
+func TestFromDashboardServiceAutoRecovery(t *testing.T) {
+	requestCount := 0
+	registrationCount := 0
+
+	// Mock dashboard server
+	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Handle registration requests
+		if strings.Contains(r.URL.Path, "/register/node") {
+			registrationCount++
+			w.Header().Set("Content-Type", "application/json")
+			response := NodeResponseOK{
+				Status:  "ok",
+				Message: map[string]string{"NodeID": "test-node-id"},
+				Nonce:   fmt.Sprintf("nonce-%d", registrationCount),
+			}
+			json.NewEncoder(w).Encode(response)
+			return
+		}
+
+		// Handle API definition requests
+		requestCount++
+
+		// First request: return 403 to simulate nonce mismatch
+		if requestCount == 1 {
+			w.WriteHeader(http.StatusForbidden)
+			w.Write([]byte("Nonce failed"))
+			return
+		}
+
+		// Subsequent requests: success after auto-recovery
+		w.Header().Set("Content-Type", "application/json")
+		list := model.NewMergedAPIList()
+		list.Nonce = "success-nonce"
+		json.NewEncoder(w).Encode(list)
+	}))
+	defer mockServer.Close()
+
+	conf := func(globalConf *config.Config) {
+		globalConf.UseDBAppConfigs = false // Simplified setup
+		globalConf.NodeSecret = "test-secret"
+		globalConf.DBAppConfOptions.ConnectionTimeout = 2
+		globalConf.DisableDashboardZeroConf = true
+	}
+	g := StartTest(conf)
+	defer g.Close()
+
+	// Set up simplified dashboard service
+	g.Gw.DashService = &HTTPDashboardHandler{
+		Gw:                   g.Gw,
+		Secret:               "test-secret",
+		RegistrationEndpoint: mockServer.URL + "/register/node",
+	}
+
+	// Create API definition loader
+	loader := APIDefinitionLoader{Gw: g.Gw}
+
+	// Test: Load API definitions should auto-recover from nonce failure
+	endpoint := mockServer.URL + "/system/apis"
+
+	_, err := loader.FromDashboardService(endpoint)
+
+	// Should succeed due to auto-recovery (specs can be empty but shouldn't error)
+	assert.NoError(t, err, "Auto-recovery should allow successful API definitions loading")
+
+	// Verify the auto-recovery process happened
+	assert.GreaterOrEqual(t, requestCount, 1, "Should have made at least 1 API definition request")
+}
+
+// TestFromDashboardServiceInvalidSecret tests invalid secret handling for API definitions
+func TestFromDashboardServiceInvalidSecret(t *testing.T) {
+	var requestCount int
+
+	// Mock dashboard that returns "Secret incorrect" error
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		requestCount++
+		w.WriteHeader(http.StatusForbidden)
+		w.Write([]byte("Authorization failed (Secret incorrect)"))
+	}))
+	defer ts.Close()
+
+	conf := func(globalConf *config.Config) {
+		globalConf.UseDBAppConfigs = false // Disable to prevent registration during startup
+		// Set short timeout for tests to prevent hanging
+		globalConf.DBAppConfOptions.ConnectionTimeout = 2
+		// Disable zeroconf to prevent blocking
+		globalConf.DisableDashboardZeroConf = true
+		// Set NodeSecret to prevent Fatal error in Init
+		globalConf.NodeSecret = "test-secret"
+	}
+	g := StartTest(conf)
+	defer g.Close()
+
+	// Set up simplified dashboard service
+	g.Gw.DashService = &HTTPDashboardHandler{
+		Gw:     g.Gw,
+		Secret: "test-secret",
+	}
+
+	// Create API definition loader
+	loader := APIDefinitionLoader{Gw: g.Gw}
+
+	specs, err := loader.FromDashboardService(ts.URL)
+
+	// Should fail with standard error, NOT trigger nonce recovery
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "login failure")
+	assert.Nil(t, specs)
+	assert.Equal(t, 1, requestCount, "Should make only one request, no retry for invalid secret")
+}
+
+// TestFromDashboardServiceServerError tests server error handling for API definitions
+func TestFromDashboardServiceServerError(t *testing.T) {
+	var requestCount int
+
+	// Mock dashboard that returns 500 Internal Server Error
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		requestCount++
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte("Internal Server Error: Cannot connect to Redis"))
+	}))
+	defer ts.Close()
+
+	conf := func(globalConf *config.Config) {
+		globalConf.UseDBAppConfigs = false // Disable to prevent registration during startup
+		// Set short timeout for tests to prevent hanging
+		globalConf.DBAppConfOptions.ConnectionTimeout = 2
+		// Disable zeroconf to prevent blocking
+		globalConf.DisableDashboardZeroConf = true
+		// Set NodeSecret to prevent Fatal error in Init
+		globalConf.NodeSecret = "test-secret"
+	}
+	g := StartTest(conf)
+	defer g.Close()
+
+	// Set up simplified dashboard service
+	g.Gw.DashService = &HTTPDashboardHandler{
+		Gw:     g.Gw,
+		Secret: "test-secret",
+	}
+
+	// Create API definition loader
+	loader := APIDefinitionLoader{Gw: g.Gw}
+
+	specs, err := loader.FromDashboardService(ts.URL)
+
+	// Should fail with standard error, NOT trigger nonce recovery
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "dashboard API error")
+	assert.Nil(t, specs)
+	assert.Equal(t, 1, requestCount, "Should make only one request, no retry for server errors")
+}
+
+// TestFromDashboardServiceNoDashServiceFallback tests graceful fallback for API definitions
+func TestFromDashboardServiceNoDashServiceFallback(t *testing.T) {
+	// Mock dashboard that returns nonce error
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusForbidden)
+		w.Write([]byte("Nonce failed"))
+	}))
+	defer ts.Close()
+
+	conf := func(globalConf *config.Config) {
+		globalConf.UseDBAppConfigs = false // Disable to prevent registration during startup
+		// Set short timeout for tests to prevent hanging
+		globalConf.DBAppConfOptions.ConnectionTimeout = 2
+		// Disable zeroconf to prevent blocking
+		globalConf.DisableDashboardZeroConf = true
+		// Set NodeSecret to prevent Fatal error in Init
+		globalConf.NodeSecret = "test-secret"
+	}
+	g := StartTest(conf)
+	defer g.Close()
+
+	// DO NOT set up DashService - simulating environment where it's not available
+	g.Gw.DashService = nil
+
+	// Create API definition loader
+	loader := APIDefinitionLoader{Gw: g.Gw}
+
+	specs, err := loader.FromDashboardService(ts.URL)
+
+	// Should fail gracefully without causing panic
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "login failure")
+	assert.Nil(t, specs)
+}
+
+// TestFromDashboardServiceNoNodeIDFound tests that missing node ID error triggers auto-recovery for API definitions
+func TestFromDashboardServiceNoNodeIDFound(t *testing.T) {
+	requestCount := 0
+	registrationCount := 0
+
+	// Mock dashboard server
+	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Handle registration requests
+		if strings.Contains(r.URL.Path, "/register/node") {
+			registrationCount++
+			w.Header().Set("Content-Type", "application/json")
+			response := NodeResponseOK{
+				Status:  "ok",
+				Message: map[string]string{"NodeID": "test-node-id"},
+				Nonce:   fmt.Sprintf("nonce-%d", registrationCount),
+			}
+			json.NewEncoder(w).Encode(response)
+			return
+		}
+
+		// Handle API definition requests
+		requestCount++
+
+		// First request: return 403 with "No node ID Found" error
+		if requestCount == 1 {
+			w.WriteHeader(http.StatusForbidden)
+			w.Write([]byte("Authorization failed (No node ID Found)"))
+			return
+		}
+
+		// Subsequent requests: success after auto-recovery
+		w.Header().Set("Content-Type", "application/json")
+		list := model.NewMergedAPIList()
+		list.Nonce = "success-nonce"
+		json.NewEncoder(w).Encode(list)
+	}))
+	defer mockServer.Close()
+
+	conf := func(globalConf *config.Config) {
+		globalConf.UseDBAppConfigs = false // Simplified setup
+		globalConf.NodeSecret = "test-secret"
+		globalConf.DBAppConfOptions.ConnectionTimeout = 2
+		globalConf.DisableDashboardZeroConf = true
+	}
+	g := StartTest(conf)
+	defer g.Close()
+
+	// Set up simplified dashboard service
+	g.Gw.DashService = &HTTPDashboardHandler{
+		Gw:                   g.Gw,
+		Secret:               "test-secret",
+		RegistrationEndpoint: mockServer.URL + "/register/node",
+	}
+
+	// Create API definition loader
+	loader := APIDefinitionLoader{Gw: g.Gw}
+
+	// Test: Load API definitions should auto-recover from missing node ID
+	endpoint := mockServer.URL + "/system/apis"
+
+	_, err := loader.FromDashboardService(endpoint)
+
+	// Should succeed due to auto-recovery
+	assert.NoError(t, err, "Auto-recovery should allow successful API definitions loading after node ID error")
+
+	// Verify the auto-recovery process happened
+	assert.GreaterOrEqual(t, requestCount, 2, "Should have made at least 2 API definition requests")
+	assert.GreaterOrEqual(t, registrationCount, 1, "Should have re-registered at least once")
+}
+
+// TestFromDashboardServiceNetworkErrors tests various network error scenarios for API definitions
+func TestFromDashboardServiceNetworkErrors(t *testing.T) {
+	testCases := []struct {
+		name          string
+		serverFunc    func() *httptest.Server
+		expectedError string
+		description   string
+	}{
+		{
+			name: "Connection Refused",
+			serverFunc: func() *httptest.Server {
+				// Create and immediately close server to simulate connection refused
+				ts := httptest.NewServer(http.HandlerFunc(func(_ http.ResponseWriter, _ *http.Request) {}))
+				ts.Close()
+				return ts
+			},
+			expectedError: "connection refused",
+			description:   "Dashboard is completely down",
+		},
+		{
+			name: "Network Timeout",
+			serverFunc: func() *httptest.Server {
+				return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+					// Simulate timeout by not responding at all
+					// This ensures a predictable timeout error
+					select {
+					case <-time.After(5 * time.Second):
+						// This will never be reached due to client timeout
+					case <-w.(http.CloseNotifier).CloseNotify():
+						// Client disconnected due to timeout
+						return
+					}
+				}))
+			},
+			expectedError: "",
+			description:   "Request times out before response",
+		},
+		{
+			name: "Connection Dropped Mid-Response",
+			serverFunc: func() *httptest.Server {
+				return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+					// Start writing response then close connection
+					w.Header().Set("Content-Type", "application/json")
+					w.WriteHeader(http.StatusOK)
+					// Force flush to send headers
+					if f, ok := w.(http.Flusher); ok {
+						f.Flush()
+					}
+					// Simulate connection drop by hijacking and closing
+					if hj, ok := w.(http.Hijacker); ok {
+						conn, _, _ := hj.Hijack()
+						conn.Close()
+					}
+				}))
+			},
+			expectedError: "unexpected EOF",
+			description:   "Connection drops while reading response",
+		},
+		{
+			name: "Malformed JSON Response",
+			serverFunc: func() *httptest.Server {
+				return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+					// Return 200 OK but with malformed JSON
+					w.Header().Set("Content-Type", "application/json")
+					w.WriteHeader(http.StatusOK)
+					w.Write([]byte("{invalid json"))
+				}))
+			},
+			expectedError: "invalid character",
+			description:   "Server returns malformed JSON",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			ts := tc.serverFunc()
+			if ts != nil {
+				defer ts.Close()
+			}
+
+			conf := func(globalConf *config.Config) {
+				globalConf.UseDBAppConfigs = false
+				// Set a short timeout to make tests run faster
+				globalConf.DBAppConfOptions.ConnectionTimeout = 2
+			}
+			g := StartTest(conf)
+			defer g.Close()
+
+			// Create API definition loader
+			loader := APIDefinitionLoader{Gw: g.Gw}
+
+			// Test: Load API definitions should fail with network error
+			specs, err := loader.FromDashboardService(ts.URL)
+
+			// Should fail with appropriate error
+			assert.Error(t, err, tc.description)
+			assert.Nil(t, specs)
+
+			// For now, network errors are not auto-recovered
+			// This is a potential enhancement for the future
+			if tc.name == "Network Timeout" && err != nil {
+				// Timeout errors can vary based on where the timeout occurs
+				// Could be "context deadline exceeded", "unexpected end of JSON input", or "Client.Timeout"
+				assert.True(t,
+					strings.Contains(err.Error(), "context deadline exceeded") ||
+						strings.Contains(err.Error(), "unexpected end of JSON input") ||
+						strings.Contains(err.Error(), "Client.Timeout") ||
+						strings.Contains(err.Error(), "timeout"),
+					fmt.Sprintf("Expected timeout-related error, got: %v", err))
+			} else if tc.expectedError != "" && err != nil {
+				assert.Contains(t, err.Error(), tc.expectedError, "Error should indicate network issue")
+			}
+		})
+	}
+}
+
+// TestFromDashboardServiceNetworkErrorRecovery tests auto-recovery from network errors for API definitions
+func TestFromDashboardServiceNetworkErrorRecovery(t *testing.T) {
+	requestCount := 0
+	registrationCount := 0
+
+	// Mock dashboard server that simulates network error then recovery
+	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Handle registration requests
+		if strings.Contains(r.URL.Path, "/register/node") {
+			registrationCount++
+			w.Header().Set("Content-Type", "application/json")
+			response := NodeResponseOK{
+				Status:  "ok",
+				Message: map[string]string{"NodeID": "test-node-id"},
+				Nonce:   fmt.Sprintf("nonce-%d", registrationCount),
+			}
+			json.NewEncoder(w).Encode(response)
+			return
+		}
+
+		// Handle API definition requests
+		requestCount++
+
+		// First request: simulate connection drop
+		if requestCount == 1 {
+			// Simulate load balancer draining connection mid-flight
+			if hj, ok := w.(http.Hijacker); ok {
+				conn, _, _ := hj.Hijack()
+				conn.Close()
+			}
+			return
+		}
+
+		// Subsequent requests: success after re-registration
+		w.Header().Set("Content-Type", "application/json")
+		list := model.NewMergedAPIList()
+		list.Nonce = "success-nonce"
+		json.NewEncoder(w).Encode(list)
+	}))
+	defer mockServer.Close()
+
+	conf := func(globalConf *config.Config) {
+		globalConf.UseDBAppConfigs = false
+		globalConf.NodeSecret = "test-secret"
+		globalConf.DBAppConfOptions.ConnectionTimeout = 2
+		globalConf.DisableDashboardZeroConf = true
+	}
+	g := StartTest(conf)
+	defer g.Close()
+
+	// Set up dashboard service
+	g.Gw.DashService = &HTTPDashboardHandler{
+		Gw:                   g.Gw,
+		Secret:               "test-secret",
+		RegistrationEndpoint: mockServer.URL + "/register/node",
+	}
+
+	// Create API definition loader
+	loader := APIDefinitionLoader{Gw: g.Gw}
+
+	// Test: Load API definitions should auto-recover from network error
+	endpoint := mockServer.URL + "/system/apis"
+	_, err := loader.FromDashboardService(endpoint)
+
+	// Should succeed due to auto-recovery from network error
+	assert.NoError(t, err, "Auto-recovery should handle network errors for API definitions")
+
+	// Verify the auto-recovery process happened
+	assert.Equal(t, 2, requestCount, "Should have made 2 API requests (failed + retry)")
+	assert.GreaterOrEqual(t, registrationCount, 1, "Should have re-registered after network error")
+}
+
+func TestAPISpec_GetSingleOrDefaultVersion(t *testing.T) {
+	type testCase struct {
+		name            string
+		spec            *APISpec
+		expectedVersion apidef.VersionInfo
+		expectedOk      bool
+	}
+
+	testCases := []testCase{
+		{
+			name: "should get the single existing version",
+			spec: &APISpec{
+				APIDefinition: &apidef.APIDefinition{
+					VersionData: apidef.VersionData{
+						NotVersioned: true,
+						Versions: map[string]apidef.VersionInfo{
+							"v1": {Name: "v1"},
+						},
+					},
+				},
+			},
+			expectedVersion: apidef.VersionInfo{Name: "v1"},
+			expectedOk:      true,
+		},
+		{
+			name: "should get the defined default version when not_versioned is false",
+			spec: &APISpec{
+				APIDefinition: &apidef.APIDefinition{
+					VersionData: apidef.VersionData{
+						NotVersioned:   false,
+						DefaultVersion: "v1",
+						Versions: map[string]apidef.VersionInfo{
+							"Default": {Name: "Default"},
+							"v1":      {Name: "v1"},
+							"v2":      {Name: "v2"},
+						},
+					},
+				},
+			},
+			expectedVersion: apidef.VersionInfo{Name: "v1"},
+			expectedOk:      true,
+		},
+		{
+			name: "should get the default version when not_versioned is true",
+			spec: &APISpec{
+				APIDefinition: &apidef.APIDefinition{
+					VersionData: apidef.VersionData{
+						NotVersioned:   true,
+						DefaultVersion: "v1",
+						Versions: map[string]apidef.VersionInfo{
+							"Default": {Name: "Default"},
+							"v1":      {Name: "v1"},
+							"v2":      {Name: "v2"},
+						},
+					},
+				},
+			},
+			expectedVersion: apidef.VersionInfo{Name: "Default"},
+			expectedOk:      true,
+		},
+		{
+			name: "should get the default version when no default version is set and the default version is stored as Default (upper-case)",
+			spec: &APISpec{
+				APIDefinition: &apidef.APIDefinition{
+					VersionData: apidef.VersionData{
+						NotVersioned:   true,
+						DefaultVersion: "",
+						Versions: map[string]apidef.VersionInfo{
+							"Default": {Name: "Default"},
+							"v1":      {Name: "v1"},
+							"v2":      {Name: "v2"},
+						},
+					},
+				},
+			},
+			expectedVersion: apidef.VersionInfo{Name: "Default"},
+			expectedOk:      true,
+		},
+		{
+			name: "should get the default version when no default version is set and the default version is stored as default (lower-case)",
+			spec: &APISpec{
+				APIDefinition: &apidef.APIDefinition{
+					VersionData: apidef.VersionData{
+						NotVersioned:   true,
+						DefaultVersion: "",
+						Versions: map[string]apidef.VersionInfo{
+							"default": {Name: "default"},
+							"v1":      {Name: "v1"},
+							"v2":      {Name: "v2"},
+						},
+					},
+				},
+			},
+			expectedVersion: apidef.VersionInfo{Name: "default"},
+			expectedOk:      true,
+		},
+		{
+			name: "should get the default version when no default version is set and the default version is stored as empty string",
+			spec: &APISpec{
+				APIDefinition: &apidef.APIDefinition{
+					VersionData: apidef.VersionData{
+						NotVersioned:   true,
+						DefaultVersion: "",
+						Versions: map[string]apidef.VersionInfo{
+							"":   {Name: "empty-string"},
+							"v1": {Name: "v1"},
+							"v2": {Name: "v2"},
+						},
+					},
+				},
+			},
+			expectedVersion: apidef.VersionInfo{Name: "empty-string"},
+			expectedOk:      true,
+		},
+		{
+			name: "should return false for ok, if all checks failed",
+			spec: &APISpec{
+				APIDefinition: &apidef.APIDefinition{
+					VersionData: apidef.VersionData{
+						NotVersioned:   true,
+						DefaultVersion: "",
+						Versions: map[string]apidef.VersionInfo{
+							"v1": {Name: "v1"},
+							"v2": {Name: "v2"},
+						},
+					},
+				},
+			},
+			expectedVersion: apidef.VersionInfo{},
+			expectedOk:      false,
+		},
+	}
+
+	for _, tc := range testCases {
+		tc := tc
+
+		t.Run(tc.name, func(t *testing.T) {
+			version, ok := tc.spec.GetSingleOrDefaultVersion()
+			assert.Equal(t, tc.expectedVersion, version)
+			assert.Equal(t, tc.expectedOk, ok)
+		})
+	}
+}
+
+func TestAPISpec_CheckForAmbiguousDefaultVersions(t *testing.T) {
+	type testCase struct {
+		name              string
+		spec              *APISpec
+		expectedAmbiguous bool
+	}
+
+	testCases := []testCase{
+		{
+			name: "should return false if no default version is found",
+			spec: &APISpec{
+				APIDefinition: &apidef.APIDefinition{
+					VersionData: apidef.VersionData{
+						NotVersioned:   true,
+						DefaultVersion: "",
+						Versions: map[string]apidef.VersionInfo{
+							"v1": {Name: "v1"},
+						},
+					},
+				},
+			},
+			expectedAmbiguous: false,
+		},
+		{
+			name: "should return true if Default and default versions are found",
+			spec: &APISpec{
+				APIDefinition: &apidef.APIDefinition{
+					VersionData: apidef.VersionData{
+						NotVersioned:   true,
+						DefaultVersion: "",
+						Versions: map[string]apidef.VersionInfo{
+							"Default": {Name: "Default"},
+							"default": {Name: "default"},
+						},
+					},
+				},
+			},
+			expectedAmbiguous: true,
+		},
+		{
+			name: "should return true if Default and '' versions are found",
+			spec: &APISpec{
+				APIDefinition: &apidef.APIDefinition{
+					VersionData: apidef.VersionData{
+						NotVersioned:   true,
+						DefaultVersion: "",
+						Versions: map[string]apidef.VersionInfo{
+							"":        {Name: "empty"},
+							"Default": {Name: "Default"},
+						},
+					},
+				},
+			},
+			expectedAmbiguous: true,
+		},
+		{
+			name: "should return true if default and '' versions are found",
+			spec: &APISpec{
+				APIDefinition: &apidef.APIDefinition{
+					VersionData: apidef.VersionData{
+						NotVersioned:   true,
+						DefaultVersion: "",
+						Versions: map[string]apidef.VersionInfo{
+							"":        {Name: "empty"},
+							"default": {Name: "default"},
+						},
+					},
+				},
+			},
+			expectedAmbiguous: true,
+		},
+		{
+			name: "should return true if all default versions are found",
+			spec: &APISpec{
+				APIDefinition: &apidef.APIDefinition{
+					VersionData: apidef.VersionData{
+						NotVersioned:   true,
+						DefaultVersion: "",
+						Versions: map[string]apidef.VersionInfo{
+							"":        {Name: "empty"},
+							"Default": {Name: "Default"},
+							"default": {Name: "default"},
+						},
+					},
+				},
+			},
+			expectedAmbiguous: true,
+		},
+	}
+
+	for _, tc := range testCases {
+		tc := tc
+
+		t.Run(tc.name, func(t *testing.T) {
+			assert.Equal(t, tc.expectedAmbiguous, tc.spec.CheckForAmbiguousDefaultVersions())
+		})
+	}
+}
+
+func TestAPISpec_Version(t *testing.T) {
+	t.Run("for not_versioned set to true", func(t *testing.T) {
+		type testCase struct {
+			name                  string
+			spec                  *APISpec
+			expectedVersion       *apidef.VersionInfo
+			expectedRequestStatus RequestStatus
+		}
+
+		testCases := []testCase{
+			{
+				name: "should return the single or default version of the API",
+				spec: &APISpec{
+					APIDefinition: &apidef.APIDefinition{
+						VersionData: apidef.VersionData{
+							NotVersioned: true,
+							Versions: map[string]apidef.VersionInfo{
+								"v1":      {Name: "v1"},
+								"Default": {Name: "Default"},
+							},
+						},
+					},
+				},
+				expectedVersion:       &apidef.VersionInfo{Name: "Default"},
+				expectedRequestStatus: StatusOk,
+			},
+			{
+				name: "should return RequestStatus VersionDefaultForNotVersionedNotFound if no default version can be found",
+				spec: &APISpec{
+					APIDefinition: &apidef.APIDefinition{
+						VersionData: apidef.VersionData{
+							NotVersioned: true,
+							Versions: map[string]apidef.VersionInfo{
+								"v1": {Name: "v1"},
+								"v2": {Name: "v2"},
+							},
+						},
+					},
+				},
+				expectedVersion:       nil,
+				expectedRequestStatus: VersionDefaultForNotVersionedNotFound,
+			},
+			{
+				name: "should return RequestStatus VersionAmbiguousDefault if multiple default version can be found",
+				spec: &APISpec{
+					APIDefinition: &apidef.APIDefinition{
+						VersionData: apidef.VersionData{
+							NotVersioned: true,
+							Versions: map[string]apidef.VersionInfo{
+								"default": {Name: "default"},
+								"Default": {Name: "Default"},
+							},
+						},
+					},
+				},
+				expectedVersion:       nil,
+				expectedRequestStatus: VersionAmbiguousDefault,
+			},
+		}
+
+		for _, tc := range testCases {
+			tc := tc
+
+			t.Run(tc.name, func(t *testing.T) {
+				r := &http.Request{}
+				versionInfo, requestStatus := tc.spec.Version(r)
+				assert.Equal(t, tc.expectedVersion, versionInfo)
+				assert.Equal(t, tc.expectedRequestStatus, requestStatus)
+			})
+		}
+	})
+
 }

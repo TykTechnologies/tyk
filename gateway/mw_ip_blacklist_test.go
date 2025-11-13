@@ -5,6 +5,9 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+
+	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/header"
 )
 
@@ -27,6 +30,83 @@ func testPrepareIPBlacklistMiddleware() *APISpec {
 	})[0]
 }
 
+func TestIPBlackListMiddleware_EnabledForSpec(t *testing.T) {
+	tests := []struct {
+		name       string
+		spec       *APISpec
+		wantResult bool
+	}{
+		{
+			name: "IpBlacklisting enabled and BlacklistedIPs not empty",
+			spec: &APISpec{
+				APIDefinition: &apidef.APIDefinition{
+					EnableIpBlacklisting: true,
+					BlacklistedIPs:       []string{"192.168.1.1"},
+				},
+			},
+			wantResult: true,
+		},
+		{
+			name: "IpBlacklisting disabled and IPAccessControl disabled and BlacklistedIPs not empty",
+			spec: &APISpec{
+				APIDefinition: &apidef.APIDefinition{
+					EnableIpBlacklisting:    false,
+					IPAccessControlDisabled: true,
+					BlacklistedIPs:          []string{"192.168.1.1"},
+				},
+			},
+			wantResult: false,
+		},
+		{
+			name: "IpBlacklisting enabled and BlacklistedIPs empty",
+			spec: &APISpec{
+				APIDefinition: &apidef.APIDefinition{
+					EnableIpBlacklisting: true,
+					BlacklistedIPs:       []string{},
+				},
+			},
+			wantResult: false,
+		},
+		{
+			name: "IpBlacklisting disabled and BlacklistedIPs empty",
+			spec: &APISpec{
+				APIDefinition: &apidef.APIDefinition{
+					EnableIpBlacklisting: false,
+					BlacklistedIPs:       []string{},
+				},
+			},
+			wantResult: false,
+		},
+		{
+			name: "IPAccessControlDisabled true and BlacklistedIPs not empty",
+			spec: &APISpec{
+				APIDefinition: &apidef.APIDefinition{
+					IPAccessControlDisabled: true,
+					BlacklistedIPs:          []string{"192.168.1.1"},
+				},
+			},
+			wantResult: false,
+		},
+		{
+			name: "IPAccessControlDisabled false and BlacklistedIPs not empty",
+			spec: &APISpec{
+				APIDefinition: &apidef.APIDefinition{
+					IPAccessControlDisabled: false,
+					BlacklistedIPs:          []string{"192.168.1.1"},
+				},
+			},
+			wantResult: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			middleware := &IPBlackListMiddleware{BaseMiddleware: &BaseMiddleware{Spec: tt.spec}}
+			gotResult := middleware.EnabledForSpec()
+			assert.Equal(t, tt.wantResult, gotResult)
+		})
+	}
+}
 func TestIPBlacklistMiddleware(t *testing.T) {
 	spec := testPrepareIPBlacklistMiddleware()
 
@@ -42,7 +122,7 @@ func TestIPBlacklistMiddleware(t *testing.T) {
 			req.Header.Set(header.XRealIP, tc.xRealIP)
 		}
 
-		mw := &IPBlackListMiddleware{}
+		mw := &IPBlackListMiddleware{BaseMiddleware: &BaseMiddleware{}}
 		mw.Spec = spec
 		_, code := mw.ProcessRequest(rec, req, nil)
 
@@ -58,7 +138,7 @@ func BenchmarkIPBlacklistMiddleware(b *testing.B) {
 
 	spec := testPrepareIPBlacklistMiddleware()
 
-	mw := &IPBlackListMiddleware{}
+	mw := &IPBlackListMiddleware{BaseMiddleware: &BaseMiddleware{}}
 	mw.Spec = spec
 
 	rec := httptest.NewRecorder()

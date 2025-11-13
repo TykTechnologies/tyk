@@ -6,19 +6,47 @@ package coprocess;
 
 option go_package = "/coprocess";
 
+// MiniRequestObject is used for middleware calls and contains important fields like headers, parameters, body and URL.
 message MiniRequestObject {
+  // Headers is a read-only field for reading headers injected by previous middleware.
   map<string, string> headers = 1;
+  
+  // SetHeaders is a map of header key values to append to the request.
   map<string, string> set_headers = 2;
+  
+  // DeleteHeaders is a list of header names to be removed from the request.
   repeated string delete_headers = 3;
+  
+  // Body is the request body.
   string body = 4;
+
+  // Url is the request URL.
   string url = 5;
+
+  // Params is a read only map of request params.
   map<string, string> params = 6;
+
+  // AddParams is a map of parameter keys and values to add to the request.
   map<string, string> add_params = 7;
+
+  // ExtendedParams allows a parameter to have multiple values, currently unsupported.
   map<string, string> extended_params = 8;
+
+  // DeleteParams is a list of parameter keys to be removed from the request.
   repeated string delete_params = 9;
+  
+  // ReturnOverrides override the response for the request, see ReturnOverrides.
   ReturnOverrides return_overrides = 10;
+
+  // Method is the request method, eg GET, POST, etc.
   string method = 11;
+
+  // RequestUri is the raw unprocessed request URL, including query string and fragments.
   string request_uri = 12;
+
+  // Scheme is the URL scheme, e.g. http or https.
   string scheme = 13;
+
+  // RawBody is the raw request body.
   bytes raw_body = 14;
 }

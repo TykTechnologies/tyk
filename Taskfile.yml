@@ -2,14 +2,72 @@
 version: "3"
 
 includes:
-  deps: ./.taskfiles/deps/Taskfile.yml
-  tracetest: ./.taskfiles/tracetest/Taskfile.yml
+  test: .taskfiles/test.yml
+  deps: .taskfiles/deps.yml
+  lint: .taskfiles/lint.yml
+  hooks: .taskfiles/hooks.yml
+  opentelemetry:
+    taskfile: ci/tests/tracing/Taskfile.yml
+    dir: ci/tests/tracing/
+  services:
+    taskfile: docker/services/Taskfile.yml
+    dir: docker/services/
+  coprocess:
+    taskfile: coprocess/Taskfile.yml
+    dir: coprocess/
+  config:
+    taskfile: config/Taskfile.yml
+    dir: config/
+  apidef-oas:
+    taskfile: apidef/oas/Taskfile.yml
+    dir: apidef/oas/
+
+vars:
+  path: ./...
+  # BASE_BRANCH: Determines the base branch for diff-based operations (linting, codegen)
+  # This variable is inherited by all included taskfiles.
+  #
+  # Detection logic:
+  # 1. If BASE_BRANCH env var is set, use it
+  # 2. If current branch follows release bot naming convention (merge/release-X.X/*),
+  #    extract and use the release branch (e.g., merge/release-5.8/foo -> release-5.8)
+  # 3. Otherwise, default to master
+  #
+  # This ensures git hooks and linting compare against the correct baseline branch.
+  BASE_BRANCH:
+    sh: |
+      if [ -n "${BASE_BRANCH}" ]; then
+        echo "${BASE_BRANCH}"
+      else
+        current_branch=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "")
+        case "$current_branch" in
+          merge/release-*/*)
+            echo "$current_branch" | sed -n 's|^merge/\(release-[^/]*\)/.*|\1|p'
+            ;;
+          *)
+            echo "master"
+            ;;
+        esac
+      fi
 
 tasks:
+  build:
+    desc: "Build tyk gateway"
+    sources:
+      - '**/*.go'
+      - 'go.mod'
+      - 'go.sum'
+    generates:
+      - '.task-build-cache'
+    cmds:
+      - go build .
+      - cd gateway && go test -c . && cd ..
+      - touch .task-build-cache
+
   docker:
     desc: "build Tyk gateway internal/tyk-gateway"
     cmds:
-      - docker build --platform "linux/amd64" --rm -t internal/tyk-gateway .
+      - docker build --build-arg GO_VERSION="$(go mod edit -json | jq .Go -r)" --platform "linux/amd64" --rm -t internal/tyk-gateway .
     sources:
       - go.mod
       - go.sum
@@ -18,9 +76,9 @@ tasks:
   test:plugin-compiler:
     desc: "Plugin compiler local build/test"
     cmds:
-      - docker build --build-arg GO_VERSION=1.19 --build-arg BASE_IMAGE=tykio/golang-cross:1.19-bullseye --build-arg GITHUB_TAG=v5.1.0-alpha18 --build-arg GITHUB_SHA=$(git rev-parse HEAD) --platform=linux/amd64 --rm -t internal/plugin-compiler -f ci/images/plugin-compiler/Dockerfile .
+      - docker build --build-arg GO_VERSION=1.22 --build-arg BASE_IMAGE=tykio/golang-cross:1.22-bullseye --build-arg GITHUB_TAG=v5.1.0-alpha18 --build-arg GITHUB_SHA=$(git rev-parse HEAD) --platform=linux/amd64 --rm -t internal/plugin-compiler -f ci/images/plugin-compiler/Dockerfile .
       - docker run -it -e GOARCH=arm64 -e GOOS=linux --rm -v $(readlink -f .)/ci/images/plugin-compiler/data/basic-plugin:/plugin-source internal/plugin-compiler basic-plugin.so
-      - docker run -it --rm -v $PWD:/go/src/github.com/TykTechnologies/tyk -w /go/src/github.com/TykTechnologies/tyk tykio/golang-cross:1.19-bullseye go build -trimpath -tags=goplugin .
+      - docker run -it --rm -v $PWD:/go/src/github.com/TykTechnologies/tyk -w /go/src/github.com/TykTechnologies/tyk tykio/golang-cross:1.22-bullseye go build -trimpath -tags=goplugin .
       - ./tyk plugin load -f ./ci/images/plugin-compiler/data/basic-plugin/basic-plugin*.so -s MyPluginPre
       - docker rmi internal/plugin-compiler
 
@@ -39,45 +97,91 @@ tasks:
         yq -i ".dockers[4].extra_files |= [\"$replacement\"]" ci/goreleaser/goreleaser.yml
       - echo goreleaser release --clean --snapshot -f ci/goreleaser/goreleaser.yml
 
-  test:opentelemetry:setup:
-    desc: "setup e2e opentelemetry tests"
-    deps:
-      - tracetest
-      - docker
-    status:
-      - tracetest version
+  codegen:
+    deps: [deps]
+    desc: "Run code generation steps"
     cmds:
-      - docker compose -f ci/tests/tracing/docker-compose.yml up -d
-      - tracetest configure -g --endpoint http://localhost:11633
+      - go generate ./...
 
-  test:opentelemetry:test:
-    desc: "run e2e opentelemetry tests"
-    deps:
-      - test:opentelemetry:setup
-    cmds:
-      - tracetest test run -d ./ci/tests/tracing/scenarios/tyk_test_200.yml -w -o pretty
-      - tracetest test run -d ./ci/tests/tracing/scenarios/tyk_test_500.yml -w -o pretty
-      - tracetest test run -d ./ci/tests/tracing/scenarios/tyk_testauth_401.yml -w -o pretty
-      - tracetest test run -d ./ci/tests/tracing/scenarios/tyk_tykprotocol_200.yml -w -o pretty
-      - tracetest test run -d ./ci/tests/tracing/scenarios/tyk_tykprotocol-auth_401.yml -w -o pretty
-      - tracetest test run -d ./ci/tests/tracing/scenarios/tyk_grpcapi_200.yml -w -o pretty
-      - tracetest test run -d ./ci/tests/tracing/scenarios/tyk_versioned_200.yml -w -o pretty
-      - tracetest test run -d ./ci/tests/tracing/scenarios/tyk_versioned_403.yml -w -o pretty
-      - tracetest test run -d ./ci/tests/tracing/scenarios/tyk_versioned_not_detailed_200.yml -w -o pretty
-      - tracetest test run -d ./ci/tests/tracing/scenarios/tyk_versioned_not_detailed_403.yml -w -o pretty
-      - tracetest test run -d ./ci/tests/tracing/scenarios/tyk_test-graphql-tracing_200.yml -w -o pretty
-      - tracetest test run -d ./ci/tests/tracing/scenarios/tyk_test-graphql-tracing-invalid_404.yml -w -o pretty
-
-  test:opentelemetry:teardown:
-    desc: "teardown e2e opentelemetry tests enviroment"
-    cmds:
-      - docker compose -f ci/tests/tracing/docker-compose.yml down --remove-orphans
-
-  test:opentelemetry:
-    desc: "setup, execute and shutdown e2e opentelemetry tests"
+  codegen:smart:
+    deps: [deps:mockgen]
+    desc: "Run code generation only if files with go:generate changed vs base branch"
+    sources:
+      - '**/*.go'
+    generates:
+      - .task-codegen-cache
     cmds:
       - |
-        set -e
-        task test:opentelemetry:setup
-        trap 'task test:opentelemetry:teardown' EXIT
-        task test:opentelemetry:test
+        # Only check files that changed vs base branch, avoiding grep on unchanged files
+        changed=$(git diff --name-only origin/{{.BASE_BRANCH}}...HEAD -- '*.go' 2>/dev/null || true)
+        if [ -z "$changed" ]; then
+          echo "✓ No Go files changed vs origin/{{.BASE_BRANCH}} - skipping codegen"
+          touch .task-codegen-cache
+          exit 0
+        fi
+        # Only grep in changed files for go:generate directive
+        files_with_generate=$(echo "$changed" | xargs grep -l "//go:generate" 2>/dev/null || true)
+        if [ -z "$files_with_generate" ]; then
+          echo "✓ No files with go:generate changed vs origin/{{.BASE_BRANCH}} - skipping codegen"
+          touch .task-codegen-cache
+          exit 0
+        fi
+        echo "Files with go:generate changed: $(echo $files_with_generate | tr '\n' ' ')"
+        go generate ./...
+        touch .task-codegen-cache
+
+  # Used in CI
+  lint:
+    desc: "Tidy the codebase"
+    cmds:
+      - task: codegen:smart
+      - task: lint:run
+      - task: lint:extras
+
+  tidy:
+    desc: "Tidy the codebase without auto-fixing"
+    cmds:
+      - task: codegen:smart
+      - task: lint:basic
+      - task: lint:extras
+
+  lint:extras:
+    desc: "Run more specific linters"
+    deps:
+      - task: coprocess:lint
+      - task: apidef-oas:lint
+
+  # Used in CI by hooks, lint.
+  fmt:
+    desc: "Reformat import groups"
+    cmds:
+      - task: lint:fmt
+
+  # This reformats imports using golangci-lint fmt with gci formatter
+  #
+  # To limit reformatting scope to packages or files, set `path`:
+  #
+  # - `task fmt:imports path="./ctx ./rpc"`
+  #
+  # Uses gci formatter configured in .golangci.yml with Tyk import ordering
+  fmt:imports:
+    desc: "Format imports using golangci-lint fmt"
+    cmds:
+      - golangci-lint fmt {{.path | default "./..."}}
+
+  setup:
+    desc: "Setup the project including dependencies and git hooks using lefthooks"
+    cmds:
+      - task: deps:default
+      - lefthook install
+
+  clean:
+    desc: "Clean test files"
+    cmds:
+      - find -name '*.so' -delete -print
+      - find -name '*.test' -delete -print
+
+  generate-bento-config-validator-schema:
+    desc: "Generate Bento Config Validator Schema"
+    cmds:
+      - go run apidef/streams/bento/schema/generate_bento_config_schema.go -o apidef/streams/bento/schema/bento-config-schema.json

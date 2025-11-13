@@ -38,7 +38,7 @@ func TestStripAuth_stripFromHeaders(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(fmt.Sprintf("stripping %+v", tc), func(t *testing.T) {
 
-			sa := StripAuth{}
+			sa := StripAuth{BaseMiddleware: &BaseMiddleware{}}
 			sa.Spec = &APISpec{APIDefinition: &apidef.APIDefinition{}}
 
 			req, err := http.NewRequest("GET", "http://example.com", nil)
@@ -76,7 +76,7 @@ func TestStripAuth_stripFromHeaders(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		sa := StripAuth{}
+		sa := StripAuth{BaseMiddleware: &BaseMiddleware{}}
 		sa.Spec = &APISpec{APIDefinition: &apidef.APIDefinition{}}
 
 		key := "Authorization"
@@ -114,7 +114,7 @@ func BenchmarkStripAuth_stripFromHeaders(b *testing.B) {
 
 	for i := 0; i < b.N; i++ {
 		for _, tc := range testCases {
-			sa := StripAuth{}
+			sa := StripAuth{BaseMiddleware: &BaseMiddleware{}}
 			sa.Spec = &APISpec{APIDefinition: &apidef.APIDefinition{}}
 
 			req, err := http.NewRequest("GET", "http://example.com", nil)
@@ -165,7 +165,7 @@ func TestStripAuth_stripFromParams(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(fmt.Sprintf("stripping %s", tc.QueryParam), func(t *testing.T) {
 
-			sa := StripAuth{}
+			sa := StripAuth{BaseMiddleware: &BaseMiddleware{}}
 			sa.Spec = &APISpec{APIDefinition: &apidef.APIDefinition{}}
 
 			rawUrl := "http://example.com/abc"
@@ -207,7 +207,7 @@ func BenchmarkStripAuth_stripFromParams(b *testing.B) {
 
 	for i := 0; i < b.N; i++ {
 		for _, tc := range testCases {
-			sa := StripAuth{}
+			sa := StripAuth{BaseMiddleware: &BaseMiddleware{}}
 			sa.Spec = &APISpec{APIDefinition: &apidef.APIDefinition{}}
 
 			req, err := http.NewRequest("GET", "http://example.com/abc", nil)

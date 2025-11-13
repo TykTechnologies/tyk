@@ -25,6 +25,7 @@ package gateway
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"math"
@@ -80,7 +81,7 @@ func (s *routeGuideServer) RecordRoute(stream pb.RouteGuide_RecordRouteServer) e
 	startTime := time.Now()
 	for {
 		point, err := stream.Recv()
-		if err == io.EOF {
+		if errors.Is(err, io.EOF) {
 			endTime := time.Now()
 			return stream.SendAndClose(&pb.RouteSummary{
 				PointCount:   pointCount,
@@ -110,7 +111,7 @@ func (s *routeGuideServer) RecordRoute(stream pb.RouteGuide_RecordRouteServer) e
 func (s *routeGuideServer) RouteChat(stream pb.RouteGuide_RouteChatServer) error {
 	for {
 		in, err := stream.Recv()
-		if err == io.EOF {
+		if errors.Is(err, io.EOF) {
 			return nil
 		}
 		if err != nil {
@@ -137,6 +138,7 @@ func (s *routeGuideServer) RouteChat(stream pb.RouteGuide_RouteChatServer) error
 
 // loadFeatures loads features from a JSON file.
 func (s *routeGuideServer) loadFeatures(t *testing.T) {
+	t.Helper()
 	if err := json.Unmarshal(exampleData, &s.savedFeatures); err != nil {
 		t.Fatalf("Failed to load default features: %v", err)
 	}
@@ -187,12 +189,14 @@ func serialize(point *pb.Point) string {
 }
 
 func newServer(t *testing.T) *routeGuideServer {
+	t.Helper()
 	s := &routeGuideServer{routeNotes: make(map[string][]*pb.RouteNote)}
 	s.loadFeatures(t)
 	return s
 }
 
 func setupStreamSVC(t *testing.T, grpcServer *grpc.Server) {
+	t.Helper()
 	pb.RegisterRouteGuideServer(grpcServer, newServer(t))
 }
 

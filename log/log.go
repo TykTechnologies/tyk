@@ -3,10 +3,9 @@ package log
 import (
 	"os"
 	"strings"
+	"time"
 
 	"github.com/sirupsen/logrus"
-
-	"github.com/TykTechnologies/tyk/internal/maps"
 )
 
 var (
@@ -15,65 +14,83 @@ var (
 	translations = make(map[string]string)
 )
 
-// LoadTranslations takes a map[string]interface and flattens it to map[string]string
-// Because translations have been loaded - we internally override log the formatter
-// Nested entries are accessible using dot notation.
-// example:   `{"foo": {"bar": "baz"}}`
-// flattened: `foo.bar: baz`
-func LoadTranslations(thing map[string]interface{}) {
-	formatter := new(logrus.TextFormatter)
-	formatter.TimestampFormat = `Jan 02 15:04:05`
-	formatter.FullTimestamp = true
-	formatter.DisableColors = true
-	log.Formatter = &TranslationFormatter{formatter}
-	translations, _ = maps.Flatten(thing)
-}
-
-type TranslationFormatter struct {
-	*logrus.TextFormatter
-}
-
-func (t *TranslationFormatter) Format(entry *logrus.Entry) ([]byte, error) {
-	if code, ok := entry.Data["code"]; ok {
-		if translation, ok := translations[code.(string)]; ok {
-			entry.Message = translation
-		}
-	}
-	return t.TextFormatter.Format(entry)
-}
-
+// RawFormatter returns the logrus entry message as bytes.
 type RawFormatter struct{}
 
+// Format returns the entry.Message as a []byte.
 func (f *RawFormatter) Format(entry *logrus.Entry) ([]byte, error) {
 	return []byte(entry.Message), nil
 }
 
+//nolint:gochecknoinits
 func init() {
-	formatter := new(logrus.TextFormatter)
-	formatter.TimestampFormat = `Jan 02 15:04:05`
-	formatter.FullTimestamp = true
-	formatter.DisableColors = true
+	setupGlobals()
+}
 
-	log.Formatter = formatter
+func getenv(names ...string) string {
+	for _, name := range names {
+		val := os.Getenv(name)
+		if val == "" {
+			continue
+		}
+		return strings.ToLower(val)
+	}
+	return ""
+}
 
-	switch strings.ToLower(os.Getenv("TYK_LOGLEVEL")) {
-	case "error":
-		log.Level = logrus.ErrorLevel
-	case "warn":
-		log.Level = logrus.WarnLevel
-	case "debug":
-		log.Level = logrus.DebugLevel
-	default:
-		log.Level = logrus.InfoLevel
+var logLevels = map[string]logrus.Level{
+	"error": logrus.ErrorLevel,
+	"warn":  logrus.WarnLevel,
+	"debug": logrus.DebugLevel,
+	"info":  logrus.InfoLevel,
+}
+
+func setupGlobals() {
+	format := getenv("TYK_LOGFORMAT", "TYK_GW_LOGFORMAT")
+	logLevel := getenv("TYK_LOGLEVEL", "TYK_GW_LOGLEVEL")
+
+	log.Formatter = NewFormatter(format)
+
+	if level, ok := logLevels[logLevel]; ok {
+		log.Level = level
 	}
 
 	rawLog.Formatter = new(RawFormatter)
 }
 
+// Get returns the default configured logger.
 func Get() *logrus.Logger {
 	return log
 }
 
+// GetRaw is used internally. Should likely be removed first, do not rely on it.
 func GetRaw() *logrus.Logger {
 	return rawLog
+}
+
+// formatterIndex serves as a list of formatters supported.
+// it can be extended from test scope for benchmark purposes.
+var (
+	formatterIndex = map[string]func() logrus.Formatter{
+		"default": func() logrus.Formatter {
+			return &logrus.TextFormatter{
+				TimestampFormat: "Jan 02 15:04:05",
+				FullTimestamp:   true,
+				DisableColors:   true,
+			}
+		},
+		"json": func() logrus.Formatter {
+			return &JSONFormatter{
+				TimestampFormat: time.RFC3339,
+			}
+		},
+	}
+)
+
+func NewFormatter(format string) logrus.Formatter {
+	ctor, ok := formatterIndex[format]
+	if !ok {
+		ctor, _ = formatterIndex["default"]
+	}
+	return ctor()
 }

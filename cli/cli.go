@@ -6,13 +6,16 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"sync"
 
-	kingpin "gopkg.in/alecthomas/kingpin.v2"
+	kingpin "github.com/alecthomas/kingpin/v2"
 
 	"github.com/TykTechnologies/tyk/cli/bundler"
 	"github.com/TykTechnologies/tyk/cli/importer"
 	"github.com/TykTechnologies/tyk/cli/linter"
 	"github.com/TykTechnologies/tyk/cli/plugin"
+	"github.com/TykTechnologies/tyk/cli/version"
+	"github.com/TykTechnologies/tyk/internal/build"
 	logger "github.com/TykTechnologies/tyk/log"
 )
 
@@ -49,11 +52,21 @@ var (
 	log = logger.Get()
 )
 
+var initOnce sync.Once
+
 // Init sets all flags and subcommands.
-func Init(version string, confPaths []string) {
+// It's only run once to avoid races over the globals.
+// The arguments are ignored for subsequent runs.
+func Init(confPaths []string) {
+	initOnce.Do(func() {
+		setup(confPaths)
+	})
+}
+
+func setup(confPaths []string) {
 	app = kingpin.New(appName, appDesc)
 	app.HelpFlag.Short('h')
-	app.Version(version)
+	app.Version(build.Version)
 
 	// Start/default command:
 	startCmd := app.Command("start", "Starts the Tyk Gateway")
@@ -96,6 +109,9 @@ func Init(version string, confPaths []string) {
 		os.Exit(1)
 		return nil
 	})
+
+	// Add version command:
+	version.AddTo(app)
 
 	// Add import command:
 	importer.AddTo(app)

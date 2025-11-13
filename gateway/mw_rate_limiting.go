@@ -7,13 +7,14 @@ import (
 
 	"github.com/sirupsen/logrus"
 
+	"github.com/TykTechnologies/tyk/internal/event"
 	"github.com/TykTechnologies/tyk/request"
 )
 
 // RateLimitAndQuotaCheck will check the incomming request and key whether it is within it's quota and
 // within it's rate limit, it makes use of the SessionLimiter object to do this
 type RateLimitAndQuotaCheck struct {
-	BaseMiddleware
+	*BaseMiddleware
 }
 
 func (k *RateLimitAndQuotaCheck) Name() string {
@@ -22,23 +23,6 @@ func (k *RateLimitAndQuotaCheck) Name() string {
 
 func (k *RateLimitAndQuotaCheck) EnabledForSpec() bool {
 	return !k.Spec.DisableRateLimit || !k.Spec.DisableQuota
-}
-
-func (k *RateLimitAndQuotaCheck) handleRateLimitFailure(r *http.Request, token string) (error, int) {
-	k.Logger().WithField("key", k.Gw.obfuscateKey(token)).Info("Key rate limit exceeded.")
-
-	// Fire a rate limit exceeded event
-	k.FireEvent(EventRateLimitExceeded, EventKeyFailureMeta{
-		EventMetaDefault: EventMetaDefault{Message: "Key Rate Limit Exceeded", OriginatingRequest: EncodeRequestToEvent(r)},
-		Path:             r.URL.Path,
-		Origin:           request.RealIP(r),
-		Key:              token,
-	})
-
-	// Report in health check
-	reportHealthValue(k.Spec, Throttle, "-1")
-
-	return errors.New("Rate limit exceeded"), http.StatusTooManyRequests
 }
 
 func (k *RateLimitAndQuotaCheck) handleQuotaFailure(r *http.Request, token string) (error, int) {
@@ -70,17 +54,27 @@ func (k *RateLimitAndQuotaCheck) ProcessRequest(w http.ResponseWriter, r *http.R
 	}
 
 	session := ctxGetSession(r)
-	token := ctxGetAuthToken(r)
+	rateLimitKey := ctxGetAuthToken(r)
+	quotaKey := ""
+
+	if pattern, found := session.MetaData["rate_limit_pattern"]; found {
+		if patternString, ok := pattern.(string); ok && patternString != "" {
+			if customKeyValue := k.Gw.ReplaceTykVariables(r, patternString, false); customKeyValue != "" {
+				rateLimitKey = customKeyValue
+				quotaKey = customKeyValue
+			}
+		}
+	}
 
 	storeRef := k.Gw.GlobalSessionManager.Store()
 	reason := k.Gw.SessionLimiter.ForwardMessage(
 		r,
 		session,
-		token,
+		rateLimitKey,
+		quotaKey,
 		storeRef,
 		!k.Spec.DisableRateLimit,
 		!k.Spec.DisableQuota,
-		&k.Spec.GlobalConfig,
 		k.Spec,
 		false,
 	)
@@ -97,10 +91,12 @@ func (k *RateLimitAndQuotaCheck) ProcessRequest(w http.ResponseWriter, r *http.R
 		}
 	}
 
+	k.emitRateLimitEvents(r, rateLimitKey)
+
 	switch reason {
 	case sessionFailNone:
 	case sessionFailRateLimit:
-		err, errCode := k.handleRateLimitFailure(r, token)
+		err, errCode := k.handleRateLimitFailure(r, event.RateLimitExceeded, "Rate Limit Exceeded", rateLimitKey)
 		if throttleRetryLimit > 0 {
 			for {
 				ctxIncThrottleLevel(r, throttleRetryLimit)
@@ -109,11 +105,11 @@ func (k *RateLimitAndQuotaCheck) ProcessRequest(w http.ResponseWriter, r *http.R
 				reason = k.Gw.SessionLimiter.ForwardMessage(
 					r,
 					session,
-					token,
+					rateLimitKey,
+					quotaKey,
 					storeRef,
 					!k.Spec.DisableRateLimit,
 					!k.Spec.DisableQuota,
-					&k.Spec.GlobalConfig,
 					k.Spec,
 					true,
 				)
@@ -135,7 +131,7 @@ func (k *RateLimitAndQuotaCheck) ProcessRequest(w http.ResponseWriter, r *http.R
 		return err, errCode
 
 	case sessionFailQuota:
-		return k.handleQuotaFailure(r, token)
+		return k.handleQuotaFailure(r, rateLimitKey)
 	case sessionFailInternalServerError:
 		return ProxyingRequestFailedErr, http.StatusInternalServerError
 	default:
@@ -144,7 +140,7 @@ func (k *RateLimitAndQuotaCheck) ProcessRequest(w http.ResponseWriter, r *http.R
 	}
 	// Run the trigger monitor
 	if k.Spec.GlobalConfig.Monitor.MonitorUserKeys {
-		k.Gw.SessionMonitor.Check(session, token)
+		k.Gw.SessionMonitor.Check(session, rateLimitKey)
 	}
 
 	// Request is valid, carry on

@@ -4,15 +4,19 @@ import (
 	"errors"
 	"strings"
 
-	"github.com/hashicorp/vault/api"
+	vaultapi "github.com/hashicorp/vault/api"
 
 	"github.com/TykTechnologies/tyk/config"
 )
 
 // Vault is an implementation of a KV store which uses Consul as it's backend
 type Vault struct {
-	client *api.Client
+	client *vaultapi.Client
 	kvV2   bool
+}
+
+func (v *Vault) Client() *vaultapi.Client {
+	return v.client
 }
 
 // NewVault returns a configured vault KV store adapter
@@ -21,7 +25,6 @@ func NewVault(conf config.VaultConfig) (Store, error) {
 }
 
 func (v *Vault) Get(key string) (string, error) {
-
 	logicalStore := v.client.Logical()
 
 	if v.kvV2 {
@@ -66,8 +69,43 @@ func (v *Vault) Get(key string) (string, error) {
 	return value.(string), nil
 }
 
+func (v *Vault) Put(key string, value string) error {
+	logicalStore := v.client.Logical()
+
+	if v.kvV2 {
+		// Version 2 engine. Make sure to append data in front
+		splitKey := strings.Split(key, "/")
+		if len(splitKey) > 0 {
+			splitKey[0] = splitKey[0] + "/data"
+			key = strings.Join(splitKey, "/")
+		}
+	}
+
+	splitted := strings.Split(key, ".")
+	if len(splitted) != 2 {
+		return errors.New("key should be in form of config.value")
+	}
+
+	// For v2, we need to wrap the data in a data object
+	var data map[string]interface{}
+	if v.kvV2 {
+		data = map[string]interface{}{
+			"data": map[string]interface{}{
+				splitted[1]: value,
+			},
+		}
+	} else {
+		data = map[string]interface{}{
+			splitted[1]: value,
+		}
+	}
+
+	_, err := logicalStore.Write(splitted[0], data)
+	return err
+}
+
 func newVault(conf config.VaultConfig) (Store, error) {
-	defaultCfg := api.DefaultConfig()
+	defaultCfg := vaultapi.DefaultConfig()
 
 	if conf.Address != "" {
 		defaultCfg.Address = conf.Address
@@ -89,7 +127,7 @@ func newVault(conf config.VaultConfig) (Store, error) {
 		return nil, errors.New("you must provide a root token in other to use vault")
 	}
 
-	client, err := api.NewClient(defaultCfg)
+	client, err := vaultapi.NewClient(defaultCfg)
 	if err != nil {
 		return nil, err
 	}

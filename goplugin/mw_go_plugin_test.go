@@ -8,14 +8,24 @@ import (
 	"net/http"
 	"testing"
 
+	"github.com/TykTechnologies/tyk/user"
+
 	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/apidef/oas"
 	"github.com/TykTechnologies/tyk/gateway"
 	"github.com/TykTechnologies/tyk/test"
 )
+
+func goPluginFilename() string {
+	if test.IsRaceEnabled() {
+		return "../test/goplugins/goplugins_race.so"
+	}
+	return "../test/goplugins/goplugins.so"
+}
 
 /*func TestMain(m *testing.M) {
 	os.Exit(gateway.InitTestMain(context.Background(), m))
@@ -41,23 +51,23 @@ func TestGoPluginMWs(t *testing.T) {
 			Pre: []apidef.MiddlewareDefinition{
 				{
 					Name: "MyPluginPre",
-					Path: "../test/goplugins/goplugins.so",
+					Path: goPluginFilename(),
 				},
 			},
 			AuthCheck: apidef.MiddlewareDefinition{
 				Name: "MyPluginAuthCheck",
-				Path: "../test/goplugins/goplugins.so",
+				Path: goPluginFilename(),
 			},
 			PostKeyAuth: []apidef.MiddlewareDefinition{
 				{
 					Name: "MyPluginPostKeyAuth",
-					Path: "../test/goplugins/goplugins.so",
+					Path: goPluginFilename(),
 				},
 			},
 			Post: []apidef.MiddlewareDefinition{
 				{
 					Name: "MyPluginPost",
-					Path: "../test/goplugins/goplugins.so",
+					Path: goPluginFilename(),
 				},
 			},
 		}
@@ -76,23 +86,23 @@ func TestGoPluginMWs(t *testing.T) {
 			Pre: []apidef.MiddlewareDefinition{
 				{
 					Name: "MyPluginPre",
-					Path: "../test/goplugins/goplugins.so",
+					Path: goPluginFilename(),
 				},
 			},
 			AuthCheck: apidef.MiddlewareDefinition{
 				Name: "MyPluginAuthCheck",
-				Path: "../test/goplugins/goplugins.so",
+				Path: goPluginFilename(),
 			},
 			PostKeyAuth: []apidef.MiddlewareDefinition{
 				{
 					Name: "MyPluginPostKeyAuth",
-					Path: "../test/goplugins/goplugins.so",
+					Path: goPluginFilename(),
 				},
 			},
 			Post: []apidef.MiddlewareDefinition{
 				{
 					Name: "MyPluginPost",
-					Path: "../test/goplugins/goplugins.so",
+					Path: goPluginFilename(),
 				},
 			},
 		}
@@ -111,21 +121,21 @@ func TestGoPluginMWs(t *testing.T) {
 				{
 					Disabled: true,
 					Name:     "MyPluginPre",
-					Path:     "../test/goplugins/goplugins.so",
+					Path:     goPluginFilename(),
 				},
 			},
 			PostKeyAuth: []apidef.MiddlewareDefinition{
 				{
 					Disabled: true,
 					Name:     "MyPluginPostKeyAuth",
-					Path:     "../test/goplugins/goplugins.so",
+					Path:     goPluginFilename(),
 				},
 			},
 			Post: []apidef.MiddlewareDefinition{
 				{
 					Disabled: true,
 					Name:     "MyPluginPost",
-					Path:     "../test/goplugins/goplugins.so",
+					Path:     goPluginFilename(),
 				},
 			},
 		}
@@ -146,26 +156,26 @@ func TestGoPluginMWs(t *testing.T) {
 					{
 						Disabled: true,
 						Name:     "MyPluginPre",
-						Path:     "../test/goplugins/goplugins.so",
+						Path:     goPluginFilename(),
 					},
 				},
 				AuthCheck: apidef.MiddlewareDefinition{
 					Disabled: true,
 					Name:     "MyPluginAuthCheck",
-					Path:     "../test/goplugins/goplugins.so",
+					Path:     goPluginFilename(),
 				},
 				PostKeyAuth: []apidef.MiddlewareDefinition{
 					{
 						Disabled: true,
 						Name:     "MyPluginPostKeyAuth",
-						Path:     "../test/goplugins/goplugins.so",
+						Path:     goPluginFilename(),
 					},
 				},
 				Post: []apidef.MiddlewareDefinition{
 					{
 						Disabled: true,
 						Name:     "MyPluginPost",
-						Path:     "../test/goplugins/goplugins.so",
+						Path:     goPluginFilename(),
 					},
 				},
 			}
@@ -287,7 +297,7 @@ func TestGoPluginResponseHook(t *testing.T) {
 			Response: []apidef.MiddlewareDefinition{
 				{
 					Name: "MyPluginResponse",
-					Path: "../test/goplugins/goplugins.so",
+					Path: goPluginFilename(),
 				},
 			},
 		}
@@ -327,21 +337,21 @@ func TestGoPluginPerPathSingleFile(t *testing.T) {
 		goPluginMetaFoo := apidef.GoPluginMeta{
 			Path:       "/foo",
 			Method:     "GET",
-			PluginPath: "../test/goplugins/goplugins.so",
+			PluginPath: goPluginFilename(),
 			SymbolName: "MyPluginPerPathFoo",
 		}
 
 		goPluginMetaBar := apidef.GoPluginMeta{
 			Path:       "/bar",
 			Method:     "GET",
-			PluginPath: "../test/goplugins/goplugins.so",
+			PluginPath: goPluginFilename(),
 			SymbolName: "MyPluginPerPathBar",
 		}
 
 		goPluginMetaResp := apidef.GoPluginMeta{
 			Path:       "/resp",
 			Method:     "GET",
-			PluginPath: "../test/goplugins/goplugins.so",
+			PluginPath: goPluginFilename(),
 			SymbolName: "MyPluginPerPathResp",
 		}
 
@@ -349,7 +359,7 @@ func TestGoPluginPerPathSingleFile(t *testing.T) {
 			Disabled:   true,
 			Path:       "/disabled",
 			Method:     "GET",
-			PluginPath: "../test/goplugins/goplugins.so",
+			PluginPath: goPluginFilename(),
 			SymbolName: "MyPluginPerPathResp",
 		}
 
@@ -422,14 +432,14 @@ func TestGoPluginAPIandPerPath(t *testing.T) {
 			Pre: []apidef.MiddlewareDefinition{
 				{
 					Name: "MyPluginPre",
-					Path: "../test/goplugins/goplugins.so",
+					Path: goPluginFilename(),
 				},
 			},
 		}
 		goPluginMetaFoo := apidef.GoPluginMeta{
 			Path:       "/foo",
 			Method:     "GET",
-			PluginPath: "../test/goplugins/goplugins.so",
+			PluginPath: goPluginFilename(),
 			SymbolName: "MyPluginPerPathFoo",
 		}
 		v := spec.VersionData.Versions["v1"]
@@ -513,7 +523,7 @@ func TestGoPlugin_AccessingOASAPIDef(t *testing.T) {
 		Version: "1",
 		Title:   oasDocTitle,
 	}
-	oasDoc.Paths = openapi3.Paths{}
+	oasDoc.Paths = openapi3.NewPaths()
 
 	oasDoc.SetTykExtension(&oas.XTykAPIGateway{})
 
@@ -531,7 +541,7 @@ func TestGoPlugin_AccessingOASAPIDef(t *testing.T) {
 			Pre: []apidef.MiddlewareDefinition{
 				{
 					Name: "MyPluginAccessingOASAPI",
-					Path: "../test/goplugins/goplugins.so",
+					Path: goPluginFilename(),
 				},
 			},
 		}
@@ -546,4 +556,192 @@ func TestGoPlugin_AccessingOASAPIDef(t *testing.T) {
 			},
 		},
 	}...)
+}
+
+func TestGoPlugin_MyResponsePluginAccessingOASAPI(t *testing.T) {
+	ts := gateway.StartTest(nil)
+	defer ts.Close()
+
+	oasDoc := oas.OAS{}
+	oasDoc.OpenAPI = "3.0.3"
+	oasDoc.Info = &openapi3.Info{
+		Version: "1",
+		Title:   "My OAS Documentation TestGoPlugin_MyResponsePluginAccessingOASAPI",
+	}
+	oasDoc.Paths = openapi3.NewPaths()
+	oasDoc.SetTykExtension(&oas.XTykAPIGateway{})
+	err := oasDoc.Validate(context.Background())
+
+	require.NoError(t, err)
+
+	t.Run("Run Go-plugin on standalone response plugin", func(t *testing.T) {
+		ts.Gw.BuildAndLoadAPI(func(spec *gateway.APISpec) {
+			spec.IsOAS = true
+			spec.OAS = oasDoc
+			spec.Proxy.ListenPath = "/goplugin/standalone_response_plugin"
+			spec.UseKeylessAccess = true
+			spec.UseStandardAuth = false
+			spec.UseGoPluginAuth = false
+			spec.CustomMiddleware = apidef.MiddlewareSection{
+				Driver: apidef.GoPluginDriver,
+				Response: []apidef.MiddlewareDefinition{
+					{
+						Name: "MyResponsePluginAccessingOASAPI",
+						Path: goPluginFilename(),
+					},
+				},
+			}
+		})
+
+		ts.Run(t, []test.TestCase{
+			{
+				Path: "/goplugin/standalone_response_plugin/plugin_hit",
+				Code: http.StatusOK,
+				HeadersMatch: map[string]string{
+					"X-OAS-Doc-Title": oasDoc.Info.Title,
+				},
+			},
+		}...)
+	})
+
+	t.Run("request-pre and response plugins chained work good", func(t *testing.T) {
+		ts.Gw.BuildAndLoadAPI(func(spec *gateway.APISpec) {
+			spec.IsOAS = true
+			spec.OAS = oasDoc
+			spec.Proxy.ListenPath = "/goplugin/request_and_response_plugin"
+			spec.UseKeylessAccess = true
+			spec.UseStandardAuth = false
+			spec.UseGoPluginAuth = false
+			spec.CustomMiddleware = apidef.MiddlewareSection{
+				Driver: apidef.GoPluginDriver,
+				Pre: []apidef.MiddlewareDefinition{
+					{
+						Name: "MyPluginAccessingOASAPI",
+						Path: goPluginFilename(),
+					},
+				},
+				Response: []apidef.MiddlewareDefinition{
+					{
+						Name: "MyResponsePluginAccessingOASAPI",
+						Path: goPluginFilename(),
+					},
+				},
+			}
+		})
+
+		ts.Run(t, []test.TestCase{
+			{
+				Path: "/goplugin/request_and_response_plugin/plugin_hit",
+				Code: http.StatusOK,
+				HeadersMatch: map[string]string{
+					"X-OAS-Doc-Title":                        oasDoc.Info.Title,
+					"X-My-Plugin-Accessing-OAS-API":          oasDoc.Info.Title,
+					"X-My-Response-Plugin-Accessing-OAS-API": oasDoc.Info.Title,
+				},
+			},
+		}...)
+	})
+
+	t.Run("chained response plugin work fine", func(t *testing.T) {
+		ts.Gw.BuildAndLoadAPI(func(spec *gateway.APISpec) {
+			spec.IsOAS = true
+			spec.OAS = oasDoc
+			spec.Proxy.ListenPath = "/goplugin/request_chaining"
+			spec.UseKeylessAccess = true
+			spec.UseStandardAuth = false
+			spec.UseGoPluginAuth = false
+			spec.CustomMiddleware = apidef.MiddlewareSection{
+				Driver: apidef.GoPluginDriver,
+				Response: []apidef.MiddlewareDefinition{
+					{
+						Name: "MyResponsePluginAccessingOASAPI",
+						Path: goPluginFilename(),
+					},
+					{
+						Name: "MyResponsePluginAccessingOASAPI2",
+						Path: goPluginFilename(),
+					},
+				},
+			}
+		})
+
+		ts.Run(t, []test.TestCase{
+			{
+				Path: "/goplugin/request_chaining/plugin_hit",
+				Code: http.StatusOK,
+				HeadersMatch: map[string]string{
+					"X-OAS-Doc-Title":                          oasDoc.Info.Title,
+					"X-My-Response-Plugin-Accessing-OAS-API-2": oasDoc.Info.Title,
+					"X-My-Response-Plugin-Accessing-OAS-API":   oasDoc.Info.Title,
+				},
+			},
+		}...)
+	})
+}
+
+func TestGoPlugin_PreventDoubleError(t *testing.T) {
+	ts := gateway.StartTest(nil)
+	defer ts.Close()
+
+	ts.Gw.BuildAndLoadAPI(func(spec *gateway.APISpec) {
+		spec.Proxy.ListenPath = "/my-goplugin/"
+		spec.UseKeylessAccess = true
+		spec.UseStandardAuth = false
+		spec.CustomMiddleware = apidef.MiddlewareSection{
+			Driver: apidef.GoPluginDriver,
+			Pre: []apidef.MiddlewareDefinition{
+				{
+					Name: "MyPluginReturningError",
+					Path: goPluginFilename(),
+				},
+			},
+		}
+	})
+
+	ts.Run(t, []test.TestCase{
+		{
+			Path: "/my-goplugin/get",
+			Code: http.StatusTeapot,
+			BodyMatchFunc: func(bytes []byte) bool {
+				assert.Equal(t, http.StatusText(http.StatusTeapot), string(bytes))
+				return true
+			},
+		},
+	}...)
+}
+
+func TestGoPlugin_ApplyPolicy(t *testing.T) {
+	ts := gateway.StartTest(nil)
+	defer ts.Close()
+
+	ts.CreatePolicy(func(p *user.Policy) {
+		p.ID = "my-pol"
+		p.Rate = 114
+	})
+
+	ts.Gw.BuildAndLoadAPI(func(spec *gateway.APISpec) {
+		spec.Proxy.ListenPath = "/my-goplugin/"
+		spec.UseKeylessAccess = true
+		spec.UseStandardAuth = false
+		spec.CustomMiddleware = apidef.MiddlewareSection{
+			Driver: apidef.GoPluginDriver,
+			Pre: []apidef.MiddlewareDefinition{
+				{
+					Name: "MyPluginApplyingPolicy",
+					Path: goPluginFilename(),
+				},
+			},
+		}
+	})
+
+	ts.Run(t, []test.TestCase{
+		{
+			Path: "/my-goplugin/get",
+			Code: http.StatusOK,
+		},
+	}...)
+
+	session, found := ts.Gw.GlobalSessionManager.SessionDetail("", "my-key", false)
+	assert.True(t, found)
+	assert.Equal(t, float64(114), session.Rate)
 }

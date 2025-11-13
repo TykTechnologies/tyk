@@ -1,38 +1,21 @@
 package python
 
 import (
+	"crypto/md5"
+	"fmt"
 	"net/http"
 	"net/url"
+	"strings"
 	"testing"
-	"time"
 
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/gateway"
+	"github.com/TykTechnologies/tyk/internal/uuid"
 	"github.com/TykTechnologies/tyk/test"
 )
 
-var pythonIDExtractorHeaderValue = map[string]string{
-	"manifest.json": `
-		{
-		    "file_list": [
-		        "middleware.py"
-		    ],
-		    "custom_middleware": {
-		        "driver": "python",
-		        "auth_check": {
-		            "name": "MyAuthHook"
-		        },
-		        "id_extractor": {
-		        	"extract_from": "header",
-		        	"extract_with": "value",
-		        	"extractor_config": {
-		        		"header_name": "Authorization"
-		        	}
-		        }
-		    }
-		}
-	`,
-	"middleware.py": `
+var pythonIDExtractorHeaderValue = func(token string) map[string]string {
+	middleware := `
 import time
 from tyk.decorators import *
 from gateway import TykGateway as tyk
@@ -50,11 +33,13 @@ def MyAuthHook(request, session, metadata, spec):
         session.id_extractor_deadline = int(time.time()) + 60
         metadata["token"] = "valid_token"
     return request, session, metadata
-	`,
-}
+	`
 
-var pythonIDExtractorFormValue = map[string]string{
-	"manifest.json": `
+	middleware = strings.ReplaceAll(middleware, "valid_token", token)
+	checksum := fmt.Sprintf("%x", md5.Sum([]byte(middleware)))
+
+	return map[string]string{
+		"manifest.json": fmt.Sprintf(`
 		{
 		    "file_list": [
 		        "middleware.py"
@@ -65,16 +50,22 @@ var pythonIDExtractorFormValue = map[string]string{
 		            "name": "MyAuthHook"
 		        },
 		        "id_extractor": {
-		        	"extract_from": "form",
+		        	"extract_from": "header",
 		        	"extract_with": "value",
 		        	"extractor_config": {
-		        		"param_name": "auth"
+		        		"header_name": "Authorization"
 		        	}
 		        }
-		    }
+		    },
+			"checksum":"%s"
 		}
-	`,
-	"middleware.py": `
+	`, checksum),
+		"middleware.py": middleware,
+	}
+}
+
+var pythonIDExtractorFormValue = func(token string) map[string]string {
+	middleware := `
 import time
 from tyk.decorators import *
 from gateway import TykGateway as tyk
@@ -93,11 +84,13 @@ def MyAuthHook(request, session, metadata, spec):
         session.id_extractor_deadline = int(time.time()) + 60
         metadata["token"] = "valid_token"
     return request, session, metadata
-`,
-}
+`
 
-var pythonIDExtractorHeaderRegex = map[string]string{
-	"manifest.json": `
+	middleware = strings.ReplaceAll(middleware, "valid_token", token)
+	checksum := fmt.Sprintf("%x", md5.Sum([]byte(middleware)))
+
+	return map[string]string{
+		"manifest.json": fmt.Sprintf(`
 		{
 		    "file_list": [
 		        "middleware.py"
@@ -108,18 +101,22 @@ var pythonIDExtractorHeaderRegex = map[string]string{
 		            "name": "MyAuthHook"
 		        },
 		        "id_extractor": {
-		        	"extract_from": "header",
-		        	"extract_with": "regex",
+		        	"extract_from": "form",
+		        	"extract_with": "value",
 		        	"extractor_config": {
-		        		"header_name": "Authorization",
-						"regex_expression": "[0-9]+",
-						"regex_match_index": 0
+		        		"param_name": "auth"
 		        	}
 		        }
-		    }
+		    },
+			"checksum":"%s"
 		}
-	`,
-	"middleware.py": `
+	`, checksum),
+		"middleware.py": middleware,
+	}
+}
+
+var pythonIDExtractorHeaderRegex = func(token string) map[string]string {
+	middleware := `
 import time
 from tyk.decorators import *
 from gateway import TykGateway as tyk
@@ -138,7 +135,37 @@ def MyAuthHook(request, session, metadata, spec):
         session.id_extractor_deadline = int(time.time()) + 60
         metadata["token"] = "valid_token"
     return request, session, metadata
-	`,
+	`
+
+	middleware = strings.ReplaceAll(middleware, "valid_token", token)
+	checksum := fmt.Sprintf("%x", md5.Sum([]byte(middleware)))
+
+	return map[string]string{
+		"manifest.json": fmt.Sprintf(`
+		{
+		    "file_list": [
+		        "middleware.py"
+		    ],
+		    "custom_middleware": {
+		        "driver": "python",
+		        "auth_check": {
+		            "name": "MyAuthHook"
+		        },
+		        "id_extractor": {
+		        	"extract_from": "header",
+		        	"extract_with": "regex",
+		        	"extractor_config": {
+		        		"header_name": "Authorization",
+						"regex_expression": "[0-9]+",
+						"regex_match_index": 0
+		        	}
+		        }
+		    },
+			"checksum":"%s"
+		}
+	`, checksum),
+		"middleware.py": middleware,
+	}
 }
 
 /* Value Extractor tests, using "header" source */
@@ -146,60 +173,79 @@ def MyAuthHook(request, session, metadata, spec):
 // Our `pythonBundleWithAuthCheck` plugin restrict more then 1 call
 // With ID extractor, it should run multiple times (because cache)
 func TestValueExtractorHeaderSource(t *testing.T) {
-	test.Flaky(t)
-	pythonVersion := test.GetPythonVersion()
-	ts := gateway.StartTest(nil, gateway.TestConfig{
-		CoprocessConfig: config.CoProcessConfig{
-			EnableCoProcess:  true,
-			PythonPathPrefix: pkgPath,
-			PythonVersion:    pythonVersion,
-		},
-		Delay: 10 * time.Millisecond,
-	})
-	defer ts.Close()
-
-	spec := gateway.BuildAPI(func(spec *gateway.APISpec) {
-		spec.Proxy.ListenPath = "/"
-		spec.UseKeylessAccess = false
-		spec.EnableCoProcessAuth = true
-	})[0]
 	t.Run("Header value", func(t *testing.T) {
-		bundleID := ts.RegisterBundle("id_extractor_header_value", pythonIDExtractorHeaderValue)
-		spec.CustomMiddlewareBundle = bundleID
-		spec.APIID = "api1"
+		ts := gateway.StartTest(nil, gateway.TestConfig{
+			CoprocessConfig: config.CoProcessConfig{
+				EnableCoProcess:  true,
+				PythonPathPrefix: pkgPath(),
+			},
+		})
+		defer ts.Close()
 
-		ts.Gw.LoadAPI(spec)
-		time.Sleep(1 * time.Second)
+		validToken := uuid.NewHex()
+		bundleID := ts.RegisterBundle("id_extractor_header_value", pythonIDExtractorHeaderValue(validToken))
+
+		ts.Gw.BuildAndLoadAPI(func(spec *gateway.APISpec) {
+			spec.Proxy.ListenPath = "/"
+			spec.UseKeylessAccess = false
+			spec.EnableCoProcessAuth = true
+			spec.CustomMiddlewareBundle = bundleID
+			spec.APIID = "api1"
+		})
 
 		ts.Run(t, []test.TestCase{
-			{Path: "/", Headers: map[string]string{"Authorization": "valid_token"}, Code: http.StatusOK},
-			{Path: "/", Headers: map[string]string{"Authorization": "valid_token"}, Code: http.StatusOK},
+			{Path: "/", Headers: map[string]string{"Authorization": validToken}, Code: http.StatusOK},
+			{Path: "/", Headers: map[string]string{"Authorization": validToken}, Code: http.StatusOK},
 			{Path: "/", Headers: map[string]string{"Authorization": "invalid_token"}, Code: http.StatusForbidden},
 		}...)
 	})
 	t.Run("Form value", func(t *testing.T) {
-		bundleID := ts.RegisterBundle("id_extractor_form_value", pythonIDExtractorFormValue)
-		spec.CustomMiddlewareBundle = bundleID
-		spec.APIID = "api2"
+		ts := gateway.StartTest(nil, gateway.TestConfig{
+			CoprocessConfig: config.CoProcessConfig{
+				EnableCoProcess:  true,
+				PythonPathPrefix: pkgPath(),
+			},
+		})
+		defer ts.Close()
 
-		ts.Gw.LoadAPI(spec)
-		time.Sleep(1 * time.Second)
+		validToken := uuid.NewHex()
+		bundleID := ts.RegisterBundle("id_extractor_form_value", pythonIDExtractorFormValue(validToken))
+
+		ts.Gw.BuildAndLoadAPI(func(spec *gateway.APISpec) {
+			spec.Proxy.ListenPath = "/"
+			spec.UseKeylessAccess = false
+			spec.EnableCoProcessAuth = true
+			spec.CustomMiddlewareBundle = bundleID
+			spec.APIID = "api2"
+		})
 
 		formHeaders := map[string]string{"Content-Type": "application/x-www-form-urlencoded"}
 
 		ts.Run(t, []test.TestCase{
-			{Method: "POST", Path: "/", Headers: formHeaders, Data: url.Values{"auth": []string{"valid_token"}}.Encode(), Code: http.StatusOK},
-			{Method: "POST", Path: "/", Headers: formHeaders, Data: url.Values{"auth": []string{"valid_token"}}.Encode(), Code: http.StatusOK},
+			{Method: "POST", Path: "/", Headers: formHeaders, Data: url.Values{"auth": []string{validToken}}.Encode(), Code: http.StatusOK},
+			{Method: "POST", Path: "/", Headers: formHeaders, Data: url.Values{"auth": []string{validToken}}.Encode(), Code: http.StatusOK},
 			{Method: "POST", Path: "/", Headers: formHeaders, Data: url.Values{"auth": []string{"invalid_token"}}.Encode(), Code: http.StatusForbidden},
 		}...)
 	})
 	t.Run("Header regex", func(t *testing.T) {
-		bundleID := ts.RegisterBundle("id_extractor_header_regex", pythonIDExtractorHeaderRegex)
-		spec.CustomMiddlewareBundle = bundleID
-		spec.APIID = "api3"
+		ts := gateway.StartTest(nil, gateway.TestConfig{
+			CoprocessConfig: config.CoProcessConfig{
+				EnableCoProcess:  true,
+				PythonPathPrefix: pkgPath(),
+			},
+		})
+		defer ts.Close()
 
-		ts.Gw.LoadAPI(spec)
-		time.Sleep(1 * time.Second)
+		validToken := uuid.NewHex()
+		bundleID := ts.RegisterBundle("id_extractor_header_regex", pythonIDExtractorHeaderRegex(validToken))
+
+		ts.Gw.BuildAndLoadAPI(func(spec *gateway.APISpec) {
+			spec.Proxy.ListenPath = "/"
+			spec.UseKeylessAccess = false
+			spec.EnableCoProcessAuth = true
+			spec.CustomMiddlewareBundle = bundleID
+			spec.APIID = "api3"
+		})
 
 		ts.Run(t, []test.TestCase{
 			{Path: "/", Headers: map[string]string{"Authorization": "prefix-12345"}, Code: http.StatusOK},

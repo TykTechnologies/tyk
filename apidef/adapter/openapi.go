@@ -12,12 +12,17 @@ import (
 	"github.com/getkin/kin-openapi/openapi3"
 
 	"github.com/TykTechnologies/graphql-go-tools/pkg/astprinter"
-	"github.com/TykTechnologies/graphql-go-tools/pkg/openapi"
 	"github.com/TykTechnologies/graphql-go-tools/pkg/operationreport"
+	"github.com/TykTechnologies/graphql-translator/openapi"
 	"github.com/TykTechnologies/tyk/apidef"
 )
 
 const defaultRequestBodyMimeType = "application/json"
+
+const (
+	GraphQLTypeQuery    = "Query"
+	GraphQLTypeMutation = "Mutation"
+)
 
 type openAPI struct {
 	orgId         string
@@ -49,8 +54,8 @@ func (o *openAPI) prepareGraphQLEngineConfig() error {
 	}
 
 	graphqlTypes := map[string][]string{
-		"Query":    {http.MethodGet},
-		"Mutation": {http.MethodPost, http.MethodPut, http.MethodDelete},
+		GraphQLTypeQuery:    {http.MethodGet},
+		GraphQLTypeMutation: {http.MethodPost, http.MethodPut, http.MethodDelete},
 	}
 
 	// We only support one server definition and always pick the first one.
@@ -59,7 +64,7 @@ func (o *openAPI) prepareGraphQLEngineConfig() error {
 		return err
 	}
 
-	for rawEndpoint, pathItem := range o.document.Paths {
+	for rawEndpoint, pathItem := range o.document.Paths.Map() {
 		// Converts /pets/{id} to /pets/{{.arguments.id}}
 		endpoint := processArgumentSection(rawEndpoint)
 
@@ -94,7 +99,12 @@ func (o *openAPI) prepareGraphQLEngineConfig() error {
 				if fieldName == "" {
 					// If "operationId" is not defined by the user, try to make an operationId
 					// from endpoint's itself. The same technique is used by IBM/openapi-to-graphql tool.
-					fieldName = openapi.MakeFieldNameFromEndpoint(method, rawEndpoint)
+					if graphqlType == GraphQLTypeQuery {
+						fieldName = openapi.MakeFieldNameFromEndpoint(rawEndpoint)
+					} else if graphqlType == GraphQLTypeMutation {
+						// IBM/openapi-to-graphql adds method name to the generated field name.
+						fieldName = openapi.MakeFieldNameFromEndpointForMutation(method, rawEndpoint)
+					}
 				}
 
 				fieldConfig := apidef.GraphQLFieldConfig{

@@ -2,6 +2,7 @@ package oas
 
 import (
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 
@@ -21,15 +22,41 @@ func TestAuthentication(t *testing.T) {
 }
 
 func TestScopes(t *testing.T) {
-	var emptyScopes Scopes
+	t.Run("default", func(t *testing.T) {
+		var emptyScopes Scopes
 
-	scopeClaim := apidef.ScopeClaim{}
-	emptyScopes.ExtractTo(&scopeClaim)
+		scopeClaim := apidef.ScopeClaim{}
+		emptyScopes.ExtractTo(&scopeClaim)
 
-	var resultScopes Scopes
-	resultScopes.Fill(&scopeClaim)
+		var resultScopes Scopes
+		resultScopes.Fill(&scopeClaim)
 
-	assert.Equal(t, emptyScopes, resultScopes)
+		assert.Equal(t, emptyScopes, resultScopes)
+	})
+	t.Run("fill scope claim", func(t *testing.T) {
+		var emptyScopes Scopes
+
+		scopeClaim := apidef.ScopeClaim{
+			ScopeClaimName: "test",
+		}
+
+		emptyScopes.Fill(&scopeClaim)
+
+		assert.Equal(t, emptyScopes.Claims, []string{scopeClaim.ScopeClaimName})
+	})
+
+	t.Run("extract scope claim", func(t *testing.T) {
+		var emptydefScopeClaim apidef.ScopeClaim
+
+		scope := Scopes{
+			Claims:    []string{"test", "second"},
+			ClaimName: "test",
+		}
+
+		scope.ExtractTo(&emptydefScopeClaim)
+		assert.Equal(t, emptydefScopeClaim.ScopeClaimName, "test")
+	})
+
 }
 
 func TestAuthSources(t *testing.T) {
@@ -126,6 +153,41 @@ func TestOIDC(t *testing.T) {
 	})
 }
 
+func TestKeyRetentionPeriod(t *testing.T) {
+	t.Run("empty", func(t *testing.T) {
+		var emptyCustomKeyLifetime CustomKeyLifetime
+		var convertedAPI apidef.APIDefinition
+		var resultCustomKeyLifetime CustomKeyLifetime
+
+		convertedAPI.SetDisabledFlags()
+		emptyCustomKeyLifetime.ExtractTo(&convertedAPI)
+		resultCustomKeyLifetime.Fill(convertedAPI)
+
+		assert.Equal(t, int64(0), convertedAPI.SessionLifetime)
+
+		assert.Equal(t, emptyCustomKeyLifetime, resultCustomKeyLifetime)
+	})
+
+	t.Run("filled", func(t *testing.T) {
+		keyRetentionPeriod := CustomKeyLifetime{
+			Enabled:         true,
+			Value:           ReadableDuration(5 * time.Minute),
+			RespectValidity: true,
+		}
+		var convertedAPI apidef.APIDefinition
+		var resultKeyRetentionPeriod CustomKeyLifetime
+
+		keyRetentionPeriod.ExtractTo(&convertedAPI)
+
+		assert.Equal(t, int64(300), convertedAPI.SessionLifetime)
+		assert.True(t, convertedAPI.SessionLifetimeRespectsKeyExpiration)
+
+		resultKeyRetentionPeriod.Fill(convertedAPI)
+
+		assert.Equal(t, keyRetentionPeriod, resultKeyRetentionPeriod)
+	})
+}
+
 func TestCustomPlugin(t *testing.T) {
 	t.Run("empty", func(t *testing.T) {
 		var emptyCustomPlugin CustomPluginAuthentication
@@ -142,12 +204,13 @@ func TestCustomPlugin(t *testing.T) {
 
 	t.Run("values", func(t *testing.T) {
 		t.Run("goplugin", func(t *testing.T) {
-			var expectedCustomPluginAuth = CustomPluginAuthentication{
+			expectedCustomPluginAuth := CustomPluginAuthentication{
 				Enabled: true,
 				Config: &AuthenticationPlugin{
-					Enabled:      true,
-					FunctionName: "Auth",
-					Path:         "/path/to/plugin",
+					Enabled:        true,
+					FunctionName:   "Auth",
+					Path:           "/path/to/plugin",
+					RequireSession: true,
 				},
 			}
 
@@ -163,12 +226,13 @@ func TestCustomPlugin(t *testing.T) {
 		})
 
 		t.Run("coprocess", func(t *testing.T) {
-			var expectedCustomPluginAuth = CustomPluginAuthentication{
+			expectedCustomPluginAuth := CustomPluginAuthentication{
 				Enabled: true,
 				Config: &AuthenticationPlugin{
-					Enabled:      true,
-					FunctionName: "Auth",
-					Path:         "/path/to/plugin",
+					Enabled:        true,
+					FunctionName:   "Auth",
+					Path:           "/path/to/plugin",
+					RequireSession: true,
 				},
 				AuthSources: AuthSources{
 					Header: &AuthSource{
@@ -189,7 +253,6 @@ func TestCustomPlugin(t *testing.T) {
 			assert.NotEmpty(t, actualCustomPluginAuth.AuthSources)
 		})
 	})
-
 }
 
 func TestIDExtractorConfig(t *testing.T) {
@@ -210,7 +273,8 @@ func TestIDExtractorConfig(t *testing.T) {
 
 	t.Run("values", func(t *testing.T) {
 		t.Parallel()
-		var expectedIDExtractorConfig = IDExtractorConfig{
+
+		expectedIDExtractorConfig := IDExtractorConfig{
 			HeaderName:       "Authorization",
 			FormParamName:    "Authorization",
 			RegexpMatchIndex: 1,
@@ -247,7 +311,8 @@ func TestIDExtractor(t *testing.T) {
 
 	t.Run("values", func(t *testing.T) {
 		t.Parallel()
-		var expectedIDExtractor = IDExtractor{
+
+		expectedIDExtractor := IDExtractor{
 			Enabled: true,
 			Source:  apidef.HeaderSource,
 			With:    apidef.ValueExtractor,
@@ -268,5 +333,158 @@ func TestIDExtractor(t *testing.T) {
 		actualIDExtractor.Fill(convertedAPI)
 
 		assert.Equal(t, expectedIDExtractor, actualIDExtractor)
+	})
+}
+
+func TestSecurityProcessingMode(t *testing.T) {
+	t.Run("DefaultValues", func(t *testing.T) {
+		testCases := []struct {
+			name     string
+			input    *Authentication
+			expected string
+		}{
+			{
+				name:     "empty field stays empty",
+				input:    &Authentication{},
+				expected: "",
+			},
+			{
+				name: "empty string stays empty",
+				input: &Authentication{
+					SecurityProcessingMode: "",
+				},
+				expected: "",
+			},
+			{
+				name: "explicit legacy",
+				input: &Authentication{
+					SecurityProcessingMode: SecurityProcessingModeLegacy,
+				},
+				expected: "legacy",
+			},
+			{
+				name: "explicit compliant",
+				input: &Authentication{
+					SecurityProcessingMode: SecurityProcessingModeCompliant,
+				},
+				expected: "compliant",
+			},
+		}
+
+		for _, tc := range testCases {
+			t.Run(tc.name, func(t *testing.T) {
+				var api apidef.APIDefinition
+				tc.input.ExtractTo(&api)
+				assert.Equal(t, tc.expected, tc.input.SecurityProcessingMode)
+			})
+		}
+	})
+
+	t.Run("Validation", func(t *testing.T) {
+		testCases := []struct {
+			name          string
+			mode          string
+			shouldBeValid bool
+		}{
+			{"valid legacy", "legacy", true},
+			{"valid compliant", "compliant", true},
+			{"empty string", "", true},
+			{"invalid mode", "invalid", false},
+			{"numeric value", "123", false},
+			{"mixed case", "Legacy", false},
+			{"with spaces", "legacy ", false},
+		}
+
+		for _, tc := range testCases {
+			t.Run(tc.name, func(t *testing.T) {
+				isValid := ValidateSecurityProcessingMode(tc.mode)
+				assert.Equal(t, tc.shouldBeValid, isValid)
+			})
+		}
+	})
+
+	t.Run("ExtractToWithValidation", func(t *testing.T) {
+		testCases := []struct {
+			name     string
+			input    string
+			expected string
+		}{
+			{"empty stays empty", "", ""},
+			{"legacy stays legacy", "legacy", "legacy"},
+			{"compliant stays compliant", "compliant", "compliant"},
+			{"invalid defaults to legacy", "invalid", "legacy"},
+		}
+
+		for _, tc := range testCases {
+			t.Run(tc.name, func(t *testing.T) {
+				auth := &Authentication{
+					SecurityProcessingMode: tc.input,
+				}
+				var api apidef.APIDefinition
+				auth.ExtractTo(&api)
+				assert.Equal(t, tc.input, auth.SecurityProcessingMode)
+			})
+		}
+	})
+
+	t.Run("FillFromAPIDefinition", func(t *testing.T) {
+		// Test that SecurityProcessingMode is OAS-only and NOT filled from APIDefinition
+		t.Run("preserves existing OAS value", func(t *testing.T) {
+			api := apidef.APIDefinition{}
+
+			auth := &Authentication{
+				SecurityProcessingMode: SecurityProcessingModeCompliant, // Pre-existing OAS value
+			}
+			auth.Fill(api)
+
+			// Should preserve the OAS value, not overwrite from APIDefinition
+			assert.Equal(t, SecurityProcessingModeCompliant, auth.SecurityProcessingMode)
+		})
+
+		t.Run("empty stays empty if not set", func(t *testing.T) {
+			api := apidef.APIDefinition{}
+
+			auth := &Authentication{}
+			auth.Fill(api)
+
+			// Should remain empty since it's not filled from APIDefinition
+			assert.Equal(t, "", auth.SecurityProcessingMode)
+		})
+
+		t.Run("legacy value preserved", func(t *testing.T) {
+			api := apidef.APIDefinition{}
+
+			auth := &Authentication{
+				SecurityProcessingMode: SecurityProcessingModeLegacy, // Pre-existing OAS value
+			}
+			auth.Fill(api)
+
+			// Should preserve the OAS value
+			assert.Equal(t, SecurityProcessingModeLegacy, auth.SecurityProcessingMode)
+		})
+	})
+
+	t.Run("GetDefaultSecurityProcessingMode", func(t *testing.T) {
+		assert.Equal(t, SecurityProcessingModeLegacy, GetDefaultSecurityProcessingMode())
+	})
+}
+
+func TestVendorExtensionSecurity(t *testing.T) {
+	t.Run("Security array field", func(t *testing.T) {
+		auth := &Authentication{
+			Security: [][]string{
+				{"hmac"},
+				{"custom"},
+				{"hmac", "jwt"},
+			},
+		}
+
+		var api apidef.APIDefinition
+		auth.ExtractTo(&api)
+
+		auth2 := &Authentication{}
+		auth2.Fill(api)
+
+		assert.Nil(t, auth2.Security)
 	})
 }

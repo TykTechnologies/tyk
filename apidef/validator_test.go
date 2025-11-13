@@ -43,6 +43,7 @@ func TestValidationResult_ErrorStrings(t *testing.T) {
 
 func runValidationTest(apiDef *APIDefinition, ruleSet ValidationRuleSet, expectedValidationResult ValidationResult) func(t *testing.T) {
 	return func(t *testing.T) {
+		t.Helper()
 		result := Validate(apiDef, ruleSet)
 		assert.Equal(t, expectedValidationResult.IsValid, result.IsValid)
 		assert.ElementsMatch(t, expectedValidationResult.Errors, result.Errors)
@@ -404,6 +405,173 @@ func TestRuleValidateEnforceTimeout_Validate(t *testing.T) {
 					TimeOut:  10,
 				},
 			}),
+			result: ValidationResult{
+				IsValid: true,
+				Errors:  nil,
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, runValidationTest(tc.apiDef, ruleSet, tc.result))
+	}
+}
+
+func TestRuleUpstreamAuth_Validate(t *testing.T) {
+	ruleSet := ValidationRuleSet{
+		&RuleUpstreamAuth{},
+	}
+
+	testCases := []struct {
+		name         string
+		upstreamAuth UpstreamAuth
+		result       ValidationResult
+	}{
+		{
+			name: "not enabled",
+			upstreamAuth: UpstreamAuth{
+				Enabled: false,
+			},
+			result: ValidationResult{
+				IsValid: true,
+				Errors:  nil,
+			},
+		},
+		{
+			name: "basic auth and OAuth enabled",
+			upstreamAuth: UpstreamAuth{
+				Enabled: true,
+				BasicAuth: UpstreamBasicAuth{
+					Enabled: true,
+				},
+				OAuth: UpstreamOAuth{
+					Enabled:               true,
+					AllowedAuthorizeTypes: []string{OAuthAuthorizationTypeClientCredentials},
+				},
+			},
+			result: ValidationResult{
+				IsValid: false,
+				Errors: []error{
+					ErrMultipleUpstreamAuthEnabled,
+				},
+			},
+		},
+		{
+			name: "no upstream OAuth authorization type specified",
+			upstreamAuth: UpstreamAuth{
+				Enabled: true,
+				OAuth: UpstreamOAuth{
+					Enabled:               true,
+					AllowedAuthorizeTypes: []string{},
+				},
+			},
+			result: ValidationResult{
+				IsValid: false,
+				Errors:  []error{ErrUpstreamOAuthAuthorizationTypeRequired},
+			},
+		},
+		{
+			name: "multiple upstream OAuth authorization type specified",
+			upstreamAuth: UpstreamAuth{
+				Enabled: true,
+				OAuth: UpstreamOAuth{
+					Enabled:               true,
+					AllowedAuthorizeTypes: []string{OAuthAuthorizationTypeClientCredentials, OAuthAuthorizationTypePassword},
+				},
+			},
+			result: ValidationResult{
+				IsValid: false,
+				Errors:  []error{ErrMultipleUpstreamOAuthAuthorizationType},
+			},
+		},
+		{
+			name: "invalid upstream OAuth authorization type specified",
+			upstreamAuth: UpstreamAuth{
+				Enabled: true,
+				OAuth: UpstreamOAuth{
+					Enabled:               true,
+					AllowedAuthorizeTypes: []string{"auth-type1"},
+				},
+			},
+			result: ValidationResult{
+				IsValid: false,
+				Errors:  []error{ErrInvalidUpstreamOAuthAuthorizationType},
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		apiDef := &APIDefinition{
+			UpstreamAuth: tc.upstreamAuth,
+		}
+
+		t.Run(tc.name, runValidationTest(apiDef, ruleSet, tc.result))
+	}
+}
+
+func TestRuleLoadBalancingTargets_Validate(t *testing.T) {
+	ruleSet := ValidationRuleSet{
+		&RuleLoadBalancingTargets{},
+	}
+
+	testCases := []struct {
+		name   string
+		apiDef *APIDefinition
+		result ValidationResult
+	}{
+		{
+			name: "load balancing disabled",
+			apiDef: &APIDefinition{
+				Proxy: ProxyConfig{
+					EnableLoadBalancing: false,
+					Targets:             []string{},
+				},
+			},
+			result: ValidationResult{
+				IsValid: true,
+				Errors:  nil,
+			},
+		},
+		{
+			name: "load balancing enabled with valid targets",
+			apiDef: &APIDefinition{
+				Proxy: ProxyConfig{
+					EnableLoadBalancing: true,
+					Targets: []string{
+						"http://target-1",
+						"http://target-1",
+						"http://target-2",
+					},
+				},
+			},
+			result: ValidationResult{
+				IsValid: true,
+				Errors:  nil,
+			},
+		},
+		{
+			name: "load balancing enabled with all targets weight 0",
+			apiDef: &APIDefinition{
+				Proxy: ProxyConfig{
+					EnableLoadBalancing: true,
+					Targets:             []string{},
+				},
+			},
+			result: ValidationResult{
+				IsValid: false,
+				Errors: []error{
+					ErrAllLoadBalancingTargetsZeroWeight,
+				},
+			},
+		},
+		{
+			name: "load balancing disabled with empty targets",
+			apiDef: &APIDefinition{
+				Proxy: ProxyConfig{
+					EnableLoadBalancing: false,
+					Targets:             []string{},
+				},
+			},
 			result: ValidationResult{
 				IsValid: true,
 				Errors:  nil,

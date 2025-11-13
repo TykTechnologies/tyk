@@ -1,0 +1,43 @@
+# We have an external Swagger file that we use for Tyk OAs Endpoints this file ignores that external file
+# We have ambiguous-paths that would require to change the endpoint that the gateway level.
+#Those are also ignored (Currently only one of those exists)
+swagger.yml:
+  no-ambiguous-paths:
+    - '#/paths/~1tyk~1apis~1oas~1{apiID}'
+  no-invalid-media-type-examples:
+    - >-
+      #/paths/~1tyk~1apis~1oas/get/responses/200/content/application~1json/schema
+    - '#/paths/~1tyk~1apis~1oas/post/requestBody/content/application~1json/schema'
+    - >-
+      #/paths/~1tyk~1apis~1oas~1{apiID}/get/responses/200/content/application~1json/schema
+    - >-
+      #/paths/~1tyk~1apis~1oas~1{apiID}/put/requestBody/content/application~1json/schema
+    - >-
+      #/paths/~1tyk~1apis~1oas~1{apiID}/patch/requestBody/content/application~1json/schema
+    - >-
+      #/paths/~1tyk~1apis~1oas~1import/post/requestBody/content/application~1json/schema
+    - '#/paths/~1tyk~1debug/post/requestBody/content/application~1json/schema'
+https://raw.githubusercontent.com/TykTechnologies/tyk/refs/heads/master/apidef/oas/schema/3.0.json:
+  spec:
+    - '#/id'
+    - '#/$schema'
+    - '#/patternProperties'
+    - '#/definitions'
+    - '#/definitions/Info/patternProperties'
+    - '#/definitions/Contact/patternProperties'
+    - '#/definitions/License/patternProperties'
+    - '#/definitions/ExternalDocumentation/patternProperties'
+    - '#/definitions/Server/patternProperties'
+    - '#/definitions/ServerVariable/patternProperties'
+    - '#/definitions/Tag/patternProperties'
+    - '#/definitions/Paths/patternProperties'
+    - '#/definitions/Components/patternProperties'
+    - '#/definitions/Components/properties/schemas/patternProperties'
+    - '#/definitions/Components/properties/responses/patternProperties'
+    - '#/definitions/Components/properties/parameters/patternProperties'
+    - '#/definitions/Components/properties/examples/patternProperties'
+    - '#/definitions/Components/properties/requestBodies/patternProperties'
+    - '#/definitions/Components/properties/headers/patternProperties'
+    - '#/definitions/Components/properties/securitySchemes/patternProperties'
+    - '#/definitions/Components/properties/links/patternProperties'
+    - '#/definitions/Components/properties/callbacks/patternProperties'

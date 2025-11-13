@@ -1,5 +1,24 @@
-/ci/ @TykTechnologies/devops
-.github/workflows/release.yml @TykTechnologies/devops
-.github/workflows/sync-automation.yml @TykTechnologies/devops
-.github/workflows/pac.yml @TykTechnologies/devops
-/repo-policy/ @TykTechnologies/devops
+# SysE/DevOps ownership of CI release pipeline, repo policy, automations.
+
+/ci/                                    @TykTechnologies/devops
+.github/workflows/release.yml           @TykTechnologies/devops
+
+# Core API Squad ownership of CI test pipeline and developer tooling.
+
+/bin/                                   @TykTechnologies/core-api-squad
+.github/workflows/ci-tests.yml          @TykTechnologies/core-api-squad
+.github/workflows/release-tests.yml     @TykTechnologies/core-api-squad
+/.taskfiles/                            @TykTechnologies/core-api-squad
+/Dockerfile                             @TykTechnologies/core-api-squad
+/docker/                                @TykTechnologies/core-api-squad
+/Makefile                               @TykTechnologies/core-api-squad
+/Taskfile.yml                           @TykTechnologies/core-api-squad
+/docker-compose.yml                     @TykTechnologies/core-api-squad
+/.golangci.yml                          @TykTechnologies/core-api-squad
+/.golangci.dev.yml                      @TykTechnologies/core-api-squad
+
+# Core API Squad ownership of plugin compiler and related tests.
+
+/smoke-tests/                           @TykTechnologies/core-api-squad
+/ci/tests/                              @TykTechnologies/core-api-squad
+/ci/images/plugin-compiler/             @TykTechnologies/core-api-squad

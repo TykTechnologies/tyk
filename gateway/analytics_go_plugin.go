@@ -49,7 +49,7 @@ func (m *GoAnalyticsPlugin) processRecord(record *analytics.AnalyticsRecord) (er
 	defer func() {
 
 		if e := recover(); e != nil {
-			err = fmt.Errorf("%v", errors.New(fmt.Sprint(err)))
+			err = errors.New(fmt.Sprint(err))
 			m.logger.WithError(err).Error("Recovered from panic while running Go-plugin middleware func")
 		}
 

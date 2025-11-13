@@ -27,7 +27,8 @@ func TestRedisCacheMiddlewareUnit(t *testing.T) {
 		{
 			Name: "isTimeStampExpired",
 			Fn: func(t *testing.T) {
-				mw := &RedisCacheMiddleware{}
+				t.Helper()
+				mw := &RedisCacheMiddleware{BaseMiddleware: &BaseMiddleware{}}
 
 				assert.True(t, mw.isTimeStampExpired("invalid"))
 				assert.True(t, mw.isTimeStampExpired("1"))
@@ -38,7 +39,8 @@ func TestRedisCacheMiddlewareUnit(t *testing.T) {
 		{
 			Name: "decodePayload",
 			Fn: func(t *testing.T) {
-				mw := &RedisCacheMiddleware{}
+				t.Helper()
+				mw := &RedisCacheMiddleware{BaseMiddleware: &BaseMiddleware{}}
 
 				if data, expire, err := mw.decodePayload("dGVzdGluZwo=|123"); true {
 					assert.Equal(t, "testing\n", data)
@@ -59,6 +61,7 @@ func TestRedisCacheMiddlewareUnit(t *testing.T) {
 		{
 			Name: "encodePayload",
 			Fn: func(t *testing.T) {
+				t.Helper()
 				mw := &ResponseCacheMiddleware{}
 
 				result := mw.encodePayload("test", 123)
@@ -107,6 +110,7 @@ func TestRedisCacheMiddleware(t *testing.T) {
 
 	check := func(t *testing.T, p params) {
 		subCheck := func(t *testing.T, cachingActive bool, p params) {
+			t.Helper()
 			headersMatch := make(map[string]string)
 			if cachingActive {
 				headersMatch["x-tyk-cached-response"] = "1"
@@ -141,10 +145,10 @@ func TestRedisCacheMiddleware(t *testing.T) {
 
 		t.Run("with cache and dynamic redis", func(t *testing.T) {
 			createAPI(true)
-			ts.Gw.RedisController.DisableRedis(true)
+			ts.Gw.StorageConnectionHandler.DisableStorage(true)
 			subCheck(t, false, p)
 
-			ts.Gw.RedisController.DisableRedis(false)
+			ts.Gw.StorageConnectionHandler.DisableStorage(false)
 			subCheck(t, true, p)
 		})
 	}

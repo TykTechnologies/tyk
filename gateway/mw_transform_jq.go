@@ -18,7 +18,7 @@ import (
 )
 
 type TransformJQMiddleware struct {
-	BaseMiddleware
+	*BaseMiddleware
 }
 
 // JQResult structure stores the result of Tyk-JQ filter.

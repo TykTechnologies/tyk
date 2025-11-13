@@ -1,4 +1,3 @@
-version: "3"
 services:
   redis:
     image: redis
@@ -15,10 +14,13 @@ services:
     build:
       context: ./src
       args:
-        - tag=${tag}
+        - BASE_IMAGE=${GATEWAY_IMAGE}
       
   gw:
-    image: tykio/tyk-gateway:${tag}
+    build:
+      context: ./extend-python
+      args:
+        - BASE_IMAGE=${GATEWAY_IMAGE}
     volumes:
       - ./src/apidef.json:/opt/tyk-gateway/apps/python.json
       - ./src/tyk.conf:/opt/tyk-gateway/tyk.conf
@@ -26,23 +28,19 @@ services:
       - "0.0.0.0:8080:8080"
     environment:
       - TYK_LOGLEVEL=debug
+      - TYK_DB_REDISHOST=redis
 
   gw-checker:
-    image: curlimages/curl
+    image: badouralix/curl-jq
     command: tail -f /dev/null
     depends_on:
       - gw
     healthcheck:
-      test: curl -s --fail http://gw:8080/hello | grep -o '.*{"redis":{"status":"pass",'
+      test: curl -s --fail http://gw:8080/hello | jq --exit-status -n 'inputs | if has("status") then .status=="pass" else false end' > /dev/null || exit 1
       interval: 5s
       retries: 10
       start_period: 4s
       timeout: 10s
 
-  wait:
-    image: hello-world:linux
-    depends_on:
-        redis:
-            condition: service_healthy
-        gw-checker:
-            condition: service_healthy
+  httpbin.org:
+    image: kennethreitz/httpbin

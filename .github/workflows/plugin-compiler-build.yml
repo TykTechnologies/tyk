@@ -4,20 +4,33 @@ name: Plugin-compiler build
 on:
   pull_request:
   push:
+    branches:
+      - master
+      - release-**
     tags:
-      - 'v*'
+      - "v*"
 
 env:
-  GOLANG_CROSS: 1.19-bullseye
+  GOLANG_CROSS: 1.24-bullseye
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   docker-build:
     runs-on: ubuntu-latest
+    if: ${{ !github.event.pull_request.draft }}
     permissions:
       id-token: write
     steps:
+      - name: "Reclaim some runner space"
+        run: sudo rm -rf /usr/local/bin/* /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
+
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
 
       - name: Configure AWS Credentials
         id: configure-aws
@@ -42,10 +55,11 @@ jobs:
             org.opencontainers.image.title=tyk-plugin-compiler
             org.opencontainers.image.description=Plugin compiler for the Tyk API Gateway
           tags: |
+            type=ref,event=pr
             type=semver,pattern=v{{version}}
             type=semver,pattern=v{{major}}.{{minor}}
             type=semver,pattern={{raw}}
-            type=raw,value=${{ github.sha }},enable=${{ !startsWith(github.ref, 'refs/tags') }}
+            type=sha,format=long
 
       - name: Login to Dockerhub
         uses: docker/login-action@v2
@@ -63,6 +77,38 @@ jobs:
           labels: ${{ steps.set-metadata.outputs.labels }}
           tags: ${{ steps.set-metadata.outputs.tags }}
           build-args: |
-            BASE-IMAGE=tykio/golang-cross:${{ env.GOLANG_CROSS }}
+            BASE_IMAGE=tykio/golang-cross:${{ env.GOLANG_CROSS }}
             GITHUB_SHA=${{ github.sha }}
             GITHUB_TAG=${{ github.ref_name }}
+
+      - name: Set docker metadata EE
+        id: set-metadata-ee
+        uses: docker/metadata-action@v4
+        with:
+          images: |
+            tykio/tyk-plugin-compiler-ee,enable=${{ startsWith(github.ref, 'refs/tags') }}
+            ${{ steps.login-ecr.outputs.registry }}/tyk-plugin-compiler-ee
+          labels: |
+            org.opencontainers.image.title=tyk-plugin-compiler-ee
+            org.opencontainers.image.description=Plugin compiler for the Tyk API Gateway Enterprise Edition
+          tags: |
+            type=ref,event=pr
+            type=semver,pattern=v{{version}}
+            type=semver,pattern=v{{major}}.{{minor}}
+            type=semver,pattern={{raw}}
+            type=sha,format=long
+
+      - name: Build and push to dockerhub/ECR EE
+        uses: docker/build-push-action@v4
+        with:
+          context: .
+          file: ci/images/plugin-compiler/Dockerfile
+          platforms: linux/amd64
+          push: true
+          labels: ${{ steps.set-metadata-ee.outputs.labels }}
+          tags: ${{ steps.set-metadata-ee.outputs.tags }}
+          build-args: |
+            BASE_IMAGE=tykio/golang-cross:${{ env.GOLANG_CROSS }}
+            GITHUB_SHA=${{ github.sha }}
+            GITHUB_TAG=${{ github.ref_name }}
+            BUILD_TAG=ee

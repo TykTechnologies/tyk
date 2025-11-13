@@ -1,0 +1,116 @@
+---
+version: "3"
+
+includes:
+  deps: ./deps.yml
+  services:
+    taskfile: ../docker/services/Taskfile.yml
+    dir: ../docker/services
+
+# Build and test flags should match. We don't include
+# `-trimpath` in CI tests, as there is a problem resolving
+# runtime.Caller to a valid path, needs test fixes.
+
+vars:
+  dir:
+    sh: git rev-parse --show-toplevel
+  product: 'gateway'
+  tags: '{{ .tags | default "goplugin dev" }}'
+  buildArgs: -cover -tags "{{.tags}}"
+  testArgs: -timeout 15m -coverpkg=github.com/TykTechnologies/tyk/...,./... {{.buildArgs}}
+  python:
+    sh: python3 -c 'import sys; print("%d.%d" % (sys.version_info[0], sys.version_info[1]))'
+
+env:
+  PYTHON_VERSION: '{{.python}}'
+  CI: 'true'
+
+tasks:
+
+  # integration - run go tests with services
+  #
+  # Most of our go tests are integration tests using related services like
+  # mongodb, postgresql or redis. This task spins up the required services
+  # to run the tests and then runs the tests on the individual packages.
+
+  integration:
+    desc: "Run e2e/integration tests"
+    dir: '{{.dir}}'
+    aliases: [ e2e ]
+    deps: [ clean, deps, plugin:race, plugin:norace, services:up ]
+    silent: true
+    vars:
+      package:
+        sh: go mod edit -json | jq .Module.Path -r
+      packages:
+        sh: go list ./... | sed -e 's|{{.package}}|.|g'
+    cmds:
+      - defer: { task: services:down }
+      - rm -rf coverage && mkdir -p coverage
+      - for: { var: packages, as: package }
+        cmd: |-
+          gotestsum --no-color=false --hide-summary=skipped \
+          --jsonfile coverage/{{.product}}-{{.package | replace "." "gateway" | replace "/" "-"}}.json \
+          --raw-command go test -p 1 -parallel 1 -json {{.testArgs}} -count=1 -v \
+          -coverprofile=coverage/{{.package | replace "." "gateway" | replace "/" "-"}}.cov {{.package}} | head -n -2
+
+  integration-combined:
+    dir: '{{.dir}}'
+    desc: "Run e2e/integration tests"
+    aliases: [ e2e-combined ]
+    deps: [ clean, deps, plugin:race, plugin:norace, services:up ]
+    vars:
+      package:
+        sh: go mod edit -json | jq .Module.Path -r
+    cmds:
+      - defer: { task: services:down }
+      - defer: { task: report }
+      - rm -rf coverage && mkdir -p coverage
+      - go test -p 1 -parallel 1 -json {{.testArgs}} -coverprofile=coverage/{{.product}}-all.cov -count=1 -v ./... > coverage/{{.product}}-all.json
+
+  plugin:race:
+    dir: '{{.dir}}'
+    desc: "Build plugin required for tests (with race)"
+    cmds:
+      - go build {{.buildArgs}} -race -o ./test/goplugins/goplugins_race.so -buildmode=plugin ./test/goplugins
+
+  plugin:norace:
+    dir: '{{.dir}}'
+    desc: "Build plugin required for tests (no race)"
+    cmds:
+      - go build {{.buildArgs}} -o ./test/goplugins/goplugins.so -buildmode=plugin ./test/goplugins
+
+  report:
+    dir: '{{.dir}}'
+    desc: "Run gotestsum on test run output"
+    vars:
+      count: '{{ .count | default "10" }}'
+    cmds:
+      - gotestsum --hide-summary=skipped --junitfile=unit-tests.xml --raw-command cat coverage/*.json
+      - echo "Slowest {{.count}} tests:" && cat coverage/*.json | gotestsum tool slowest | head -n {{.count}} | sed -e 's|{{.package}}/||g'
+
+  clean:
+    desc: "Clean test outputs"
+    cmds:
+      - rm -f coverage/*.{json,cov}
+
+  cover:
+    desc: "Show source coverage"
+    aliases: [cov, coverage]
+    deps: [cover:merge]
+    cmds:
+      - go tool cover -func=coverage/{{.product}}-all.cov | summary coverfunc
+
+  uncover:
+    desc: "Show uncovered source"
+    deps: [cover:merge]
+    cmds:
+      - uncover coverage/{{.product}}-all.cov
+
+  cover:merge:
+    desc: "Merge coverage from e2e tests"
+    internal: true
+    status:
+      - test -f coverage/{{.product}}-all.cov
+    cmds:
+      - gocovmerge coverage/*.cov > coverage/{{.product}}-all.cov

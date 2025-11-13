@@ -15,20 +15,20 @@ export PKG_PATH=${GOPATH}/src/github.com/TykTechnologies/tyk
 # exit on non-zero exit from go test/vet
 set -e
 
+# set tags for the CI tests run / plugin builds
+
+tags="goplugin dev"
+
 # build Go-plugin used in tests
 echo "Building go plugin"
-go build -race -o ./test/goplugins/goplugins.so -buildmode=plugin ./test/goplugins
+go build -tags "${tags}" -buildmode=plugin       -o ./test/goplugins/goplugins.so      ./test/goplugins
+go build -tags "${tags}" -buildmode=plugin -race -o ./test/goplugins/goplugins_race.so ./test/goplugins
 
 for pkg in ${PKGS}; do
-    tags=""
-    if [[ ${pkg} == *"goplugin" ]]; then
-        tags="-tags 'goplugin'"
-    fi
-
     coveragefile=`echo "$pkg" | awk -F/ '{print $NF}'`
 
-    echo go test ${OPTS} -timeout ${TEST_TIMEOUT} -coverprofile=${coveragefile}.cov ${pkg} ${tags}
-    go test ${OPTS} -timeout ${TEST_TIMEOUT} -coverprofile=${coveragefile}.cov ${pkg} ${tags}
+    echo go test ${OPTS} -timeout ${TEST_TIMEOUT} -coverprofile=${coveragefile}.cov ${pkg} -tags "${tags}"
+    go test ${OPTS} -timeout ${TEST_TIMEOUT} -coverprofile=${coveragefile}.cov ${pkg} -tags "${tags}"
 done
 
 # run rpc tests separately

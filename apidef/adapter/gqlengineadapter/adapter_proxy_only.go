@@ -4,7 +4,7 @@ import (
 	"net/http"
 	"strings"
 
-	graphqlDataSource "github.com/TykTechnologies/graphql-go-tools/pkg/engine/datasource/graphql_datasource"
+	graphqldatasource "github.com/TykTechnologies/graphql-go-tools/pkg/engine/datasource/graphql_datasource"
 	"github.com/TykTechnologies/graphql-go-tools/pkg/graphql"
 
 	"github.com/TykTechnologies/tyk/apidef"
@@ -16,7 +16,7 @@ type ProxyOnly struct {
 	StreamingClient *http.Client
 	Schema          *graphql.Schema
 
-	subscriptionClientFactory graphqlDataSource.GraphQLSubscriptionClientFactory
+	subscriptionClientFactory graphqldatasource.GraphQLSubscriptionClientFactory
 }
 
 func (p *ProxyOnly) EngineConfig() (*graphql.EngineV2Configuration, error) {
@@ -43,17 +43,18 @@ func (p *ProxyOnly) EngineConfig() (*graphql.EngineV2Configuration, error) {
 		URL:              url,
 		StaticHeaders:    staticHeaders,
 		SubscriptionType: graphqlSubscriptionType(p.ApiDefinition.GraphQL.Proxy.SubscriptionType),
+		SSEMethodPost:    p.ApiDefinition.GraphQL.Proxy.SSEUsePost,
 	}
 
 	v2Config, err := graphql.NewProxyEngineConfigFactory(
 		p.Schema,
 		upstreamConfig,
-		graphqlDataSource.NewBatchFactory(),
+		graphqldatasource.NewBatchFactory(),
 		graphql.WithProxyHttpClient(p.HttpClient),
 		graphql.WithProxyStreamingClient(p.StreamingClient),
 		graphql.WithProxySubscriptionClientFactory(subscriptionClientFactoryOrDefault(p.subscriptionClientFactory)),
 	).EngineV2Configuration()
 
-	v2Config.EnableSingleFlight(true)
+	v2Config.EnableSingleFlight(false)
 	return &v2Config, err
 }

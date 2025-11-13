@@ -27,7 +27,6 @@ package gateway
 
 import (
 	"bytes"
-	"context"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
@@ -43,11 +42,16 @@ import (
 	"sync"
 	"time"
 
+	"github.com/TykTechnologies/tyk/internal/httpctx"
 	"github.com/getkin/kin-openapi/openapi3"
+
+	gqlv2 "github.com/TykTechnologies/graphql-go-tools/v2/pkg/graphql"
 
 	"github.com/TykTechnologies/tyk/config"
 
+	"github.com/TykTechnologies/tyk/internal/osutil"
 	"github.com/TykTechnologies/tyk/internal/otel"
+	"github.com/TykTechnologies/tyk/internal/redis"
 	"github.com/TykTechnologies/tyk/internal/uuid"
 
 	"github.com/TykTechnologies/tyk/apidef/oas"
@@ -66,6 +70,11 @@ import (
 	"github.com/TykTechnologies/tyk/user"
 
 	gql "github.com/TykTechnologies/graphql-go-tools/pkg/graphql"
+	lib "github.com/TykTechnologies/tyk/lib/apidef"
+)
+
+const (
+	oAuthClientTokensKeyPattern = "oauth-data.*oauth-client-tokens.*"
 )
 
 var (
@@ -252,7 +261,7 @@ func (gw *Gateway) checkAndApplyTrialPeriod(keyName string, newSession *user.Ses
 
 func (gw *Gateway) applyPoliciesAndSave(keyName string, session *user.SessionState, spec *APISpec, isHashed bool) error {
 	// use basic middleware to apply policies to key/session (it also saves it)
-	mw := BaseMiddleware{
+	mw := &BaseMiddleware{
 		Spec: spec,
 		Gw:   gw,
 	}
@@ -443,7 +452,7 @@ func (gw *Gateway) handleAddOrUpdate(keyName string, r *http.Request, isHashed b
 		return apiError("Request malformed"), http.StatusBadRequest
 	}
 
-	mw := BaseMiddleware{Gw: gw}
+	mw := &BaseMiddleware{Gw: gw}
 	// TODO: handle apply policies error
 	mw.ApplyPolicies(newSession)
 	// DO ADD OR UPDATE
@@ -603,7 +612,7 @@ func (gw *Gateway) handleGetDetail(sessionKey, apiID, orgID string, byHash bool)
 		return apiError("Key not found"), http.StatusNotFound
 	}
 
-	mw := BaseMiddleware{Spec: spec, Gw: gw}
+	mw := &BaseMiddleware{Spec: spec, Gw: gw}
 	// TODO: handle apply policies error
 	mw.ApplyPolicies(&session)
 
@@ -613,7 +622,7 @@ func (gw *Gateway) handleGetDetail(sessionKey, apiID, orgID string, byHash bool)
 			quotaKey = QuotaKeyPrefix + sessionKey
 		}
 
-		if usedQuota, err := gw.GlobalSessionManager.Store().GetRawKey(quotaKey); err == nil {
+		if usedQuota, err := gw.GlobalSessionManager.Store().GetRawKey(quotaKey); err == nil || errors.Is(err, redis.Nil) {
 			qInt, _ := strconv.Atoi(usedQuota)
 			remaining := session.QuotaMax - int64(qInt)
 
@@ -623,11 +632,10 @@ func (gw *Gateway) handleGetDetail(sessionKey, apiID, orgID string, byHash bool)
 				session.QuotaRemaining = remaining
 			}
 		} else {
-			log.WithFields(logrus.Fields{
-				"prefix":  "api",
-				"key":     gw.obfuscateKey(quotaKey),
-				"message": err,
-				"status":  "ok",
+			log.WithError(err).WithFields(logrus.Fields{
+				"prefix": "api",
+				"key":    gw.obfuscateKey(quotaKey),
+				"status": "ok",
 			}).Info("Can't retrieve key quota")
 		}
 	}
@@ -739,12 +747,13 @@ func (gw *Gateway) handleAddKey(keyName, sessionString, orgId string) {
 			"status": "fail",
 			"err":    err,
 		}).Error("Failed to update key.")
+		return
 	}
 	log.WithFields(logrus.Fields{
 		"prefix": "RPC",
 		"key":    gw.obfuscateKey(keyName),
 		"status": "ok",
-	}).Info("Updated hashed key in slave storage.")
+	}).Info("Updated key in slave storage.")
 }
 
 func (gw *Gateway) handleDeleteKey(keyName, orgID, apiID string, resetQuota bool) (interface{}, int) {
@@ -885,7 +894,7 @@ func (gw *Gateway) handleRemoveSortedSetRange(keyName, scoreFrom, scoreTo string
 }
 
 func (gw *Gateway) handleGetPolicy(polID string) (interface{}, int) {
-	if pol := gw.getPolicy(polID); pol.ID != "" {
+	if pol, ok := gw.PolicyByID(polID); ok && pol.ID != "" {
 		return pol, http.StatusOK
 	}
 
@@ -908,6 +917,16 @@ func (gw *Gateway) handleGetPolicyList() (interface{}, int) {
 	return polIDList, http.StatusOK
 }
 
+func (gw *Gateway) newPolicyPathRoot() (*osutil.Root, error) {
+	policyPath := gw.GetConfig().Policies.PolicyPath
+
+	if policyPath == "" {
+		policyPath = "."
+	}
+
+	return osutil.NewRoot(policyPath)
+}
+
 func (gw *Gateway) handleAddOrUpdatePolicy(polID string, r *http.Request) (interface{}, int) {
 	if gw.GetConfig().Policies.PolicySource == "service" {
 		log.Error("Rejected new policy due to PolicySource = service")
@@ -925,8 +944,17 @@ func (gw *Gateway) handleAddOrUpdatePolicy(polID string, r *http.Request) (inter
 		return apiError("Request ID does not match that in policy! For Update operations these must match."), http.StatusBadRequest
 	}
 
-	// Create a filename
-	polFilePath := filepath.Join(gw.GetConfig().Policies.PolicyPath, newPol.ID+".json")
+	if !ensurePolicyId(newPol) {
+		const errMsg = "Unable to create policy without id."
+		log.Error(errMsg)
+		return apiError(errMsg), http.StatusBadRequest
+	}
+
+	root, err := gw.newPolicyPathRoot()
+	if err != nil {
+		log.WithError(err).Error("Unable to access the policy storage root path.")
+		return apiError("Unable to access policy storage."), http.StatusInternalServerError
+	}
 
 	asByte, err := json.MarshalIndent(newPol, "", "  ")
 	if err != nil {
@@ -934,7 +962,7 @@ func (gw *Gateway) handleAddOrUpdatePolicy(polID string, r *http.Request) (inter
 		return apiError("Marshalling failed"), http.StatusInternalServerError
 	}
 
-	if err := ioutil.WriteFile(polFilePath, asByte, 0644); err != nil {
+	if err := root.WriteFile(newPol.ID+".json", asByte, 0644); err != nil {
 		log.Error("Failed to create file! - ", err)
 		return apiError("Failed to create file!"), http.StatusInternalServerError
 	}
@@ -954,16 +982,22 @@ func (gw *Gateway) handleAddOrUpdatePolicy(polID string, r *http.Request) (inter
 }
 
 func (gw *Gateway) handleDeletePolicy(polID string) (interface{}, int) {
-	// Generate a filename
-	defFilePath := filepath.Join(gw.GetConfig().Policies.PolicyPath, polID+".json")
+	root, err := gw.newPolicyPathRoot()
+
+	if err != nil {
+		log.WithError(err).Error("Unable to create policy root.")
+		return apiError("Delete failed"), http.StatusInternalServerError
+	}
+
+	defFilePath := polID + ".json"
 
 	// If it exists, delete it
-	if _, err := os.Stat(defFilePath); err != nil {
+	if _, err := root.Stat(defFilePath); err != nil {
 		log.Warningf("Error describing named file: %v ", err)
 		return apiError("Delete failed"), http.StatusInternalServerError
 	}
 
-	if err := os.Remove(defFilePath); err != nil {
+	if err := root.Remove(defFilePath); err != nil {
 		log.Warningf("Delete failed: %v", err)
 		return apiError("Delete failed"), http.StatusInternalServerError
 	}
@@ -1042,13 +1076,31 @@ func (gw *Gateway) handleGetAPIOAS(apiID string, modePublic bool) (interface{}, 
 
 func (gw *Gateway) handleAddApi(r *http.Request, fs afero.Fs, oasEndpoint bool) (interface{}, int) {
 	var (
-		newDef             apidef.APIDefinition
-		oasObj             oas.OAS
-		baseAPIID          = r.FormValue("base_api_id")
-		baseAPIVersionName = r.FormValue("base_api_version_name")
-		newVersionName     = r.FormValue("new_version_name")
-		setDefault         = r.FormValue("set_default") == "true"
+		newDef apidef.APIDefinition
+		oasObj oas.OAS
 	)
+
+	versionParams := lib.NewVersionQueryParameters(r.URL.Query())
+	err := versionParams.Validate(func() (bool, string) {
+		baseApiID := versionParams.Get(lib.BaseAPIID)
+		baseApi := gw.getApiSpec(baseApiID)
+		if baseApi != nil {
+			return true, baseApi.VersionDefinition.Name
+		}
+
+		return false, ""
+	})
+
+	if err != nil {
+		// https://tyktech.atlassian.net/browse/TT-7523?focusedCommentId=100547
+		// Sadly we are averse to changing (incorrect) HTTP error codes, because these could be considered breaking changes by some of our clients.
+		// Please return HTTP 422 here, because currently the request doesn’t generate an error.
+		if errors.Is(err, lib.ErrNewVersionRequired) {
+			return apiError(err.Error()), http.StatusUnprocessableEntity
+		}
+
+		return apiError(err.Error()), http.StatusBadRequest
+	}
 
 	if oasEndpoint {
 		if err := json.NewDecoder(r.Body).Decode(&oasObj); err != nil {
@@ -1073,8 +1125,14 @@ func (gw *Gateway) handleAddApi(r *http.Request, fs afero.Fs, oasEndpoint bool) 
 	}
 
 	if oasEndpoint {
-		newAPIURL := getAPIURL(newDef, gw.GetConfig())
-		oasObj.AddServers(newAPIURL)
+		versioningParams := extractVersioningParams(
+			versionParams.Get(lib.BaseAPIID),
+			versionParams.Get(lib.NewVersionName),
+		)
+
+		if err := gw.handleOASServersForNewAPI(&newDef, &oasObj, versioningParams); err != nil {
+			return apiError(err.Error()), http.StatusBadRequest
+		}
 
 		newDef.IsOAS = true
 		oasObj.GetTykExtension().Info.ID = newDef.APIID
@@ -1092,60 +1150,33 @@ func (gw *Gateway) handleAddApi(r *http.Request, fs afero.Fs, oasEndpoint bool) 
 		}
 	}
 
-	if baseAPIID != "" {
-		if baseAPIPtr := gw.getApiSpec(baseAPIID); baseAPIPtr == nil {
-			log.Errorf("Couldn't find a base API to bind with the given API id: %s", baseAPIID)
+	if !versionParams.IsEmpty(lib.BaseAPIID) {
+		baseAPI := gw.getApiSpec(versionParams.Get(lib.BaseAPIID))
+
+		// Capture the old default version BEFORE updating the base API
+		oldDefaultVersion := baseAPI.VersionDefinition.Default
+
+		baseAPI.VersionDefinition = lib.ConfigureVersionDefinition(baseAPI.VersionDefinition, versionParams, newDef.APIID)
+
+		if baseAPI.IsOAS {
+			baseAPI.OAS.Fill(*baseAPI.APIDefinition)
+			err, _ := gw.writeOASAndAPIDefToFile(fs, baseAPI.APIDefinition, &baseAPI.OAS)
+			if err != nil {
+				log.WithError(err).Errorf("Error occurred while updating base OAS API with id: %s", baseAPI.APIID)
+			}
 		} else {
-			apiInBytes, err := json.Marshal(baseAPIPtr)
+			err, _ := gw.writeToFile(fs, baseAPI.APIDefinition, baseAPI.APIID)
 			if err != nil {
-				log.WithError(err).Error("Couldn't marshal API spec")
+				log.WithError(err).Errorf("Error occurred while updating base API with id: %s", baseAPI.APIID)
 			}
+		}
 
-			var baseAPI APISpec
-			err = json.Unmarshal(apiInBytes, &baseAPI)
-			if err != nil {
-				log.WithError(err).Error("Couldn't unmarshal API spec")
-			}
-
-			baseAPI.VersionDefinition.Enabled = true
-			if baseAPIVersionName != "" {
-				baseAPI.VersionDefinition.Name = baseAPIVersionName
-				baseAPI.VersionDefinition.Default = baseAPIVersionName
-			}
-
-			if baseAPI.VersionDefinition.Key == "" {
-				baseAPI.VersionDefinition.Key = apidef.DefaultAPIVersionKey
-			}
-
-			if baseAPI.VersionDefinition.Location == "" {
-				baseAPI.VersionDefinition.Location = apidef.HeaderLocation
-			}
-
-			if baseAPI.VersionDefinition.Default == "" {
-				baseAPI.VersionDefinition.Default = apidef.Self
-			}
-
-			if baseAPI.VersionDefinition.Versions == nil {
-				baseAPI.VersionDefinition.Versions = make(map[string]string)
-			}
-
-			baseAPI.VersionDefinition.Versions[newVersionName] = newDef.APIID
-
-			if setDefault {
-				baseAPI.VersionDefinition.Default = newVersionName
-			}
-
-			if baseAPI.IsOAS {
-				baseAPI.OAS.Fill(*baseAPI.APIDefinition)
-				err, _ := gw.writeOASAndAPIDefToFile(fs, baseAPI.APIDefinition, &baseAPI.OAS)
-				if err != nil {
-					log.WithError(err).Errorf("Error occurred while updating base OAS API with id: %s", baseAPI.APIID)
-				}
-			} else {
-				err, _ := gw.writeToFile(fs, baseAPI.APIDefinition, baseAPI.APIID)
-				if err != nil {
-					log.WithError(err).Errorf("Error occurred while updating base API with id: %s", baseAPI.APIID)
-				}
+		// Update old default child's servers if needed (removes fallback URL)
+		setDefault := !versionParams.IsEmpty(lib.SetDefault) && versionParams.Get(lib.SetDefault) == "true"
+		if oas.ShouldUpdateOldDefaultChild(setDefault, oldDefaultVersion, baseAPI.VersionDefinition.Default) {
+			if err := gw.updateOldDefaultChildServersGW(oldDefaultVersion, baseAPI, fs); err != nil {
+				log.WithError(err).Warn("Failed to update old default child API servers")
+				// Don't fail the whole operation if child update fails
 			}
 		}
 	}
@@ -1183,7 +1214,7 @@ func (gw *Gateway) handleUpdateApi(apiID string, r *http.Request, fs afero.Fs, o
 		oasObj.ExtractTo(&newDef)
 	} else {
 		if spec.IsOAS {
-			return apiError(apidef.ErrAPIMigrated.Error()), http.StatusBadRequest
+			return apiError(apidef.ErrClassicAPIExpected.Error()), http.StatusBadRequest
 		}
 
 		if err := json.NewDecoder(r.Body).Decode(&newDef); err != nil {
@@ -1203,7 +1234,11 @@ func (gw *Gateway) handleUpdateApi(apiID string, r *http.Request, fs afero.Fs, o
 	}
 
 	if oasEndpoint && spec.IsOAS {
-		updateOASServers(spec, gw.GetConfig(), &newDef, &oasObj)
+		// Handle OAS server regeneration and cascade updates for API update
+		if err := gw.handleOASServersForUpdate(spec, &newDef, &oasObj); err != nil {
+			return apiError(err.Error()), http.StatusBadRequest
+		}
+
 		newDef.IsOAS = true
 
 		err, errCode := gw.writeOASAndAPIDefToFile(fs, &newDef, &oasObj)
@@ -1428,17 +1463,16 @@ func (gw *Gateway) apiHandler(w http.ResponseWriter, r *http.Request) {
 
 func (gw *Gateway) apiOASGetHandler(w http.ResponseWriter, r *http.Request) {
 	var (
-		apiID       = mux.Vars(r)["apiID"]
-		scopePublic = r.URL.Query().Get("mode") == "public"
-		obj         interface{}
-		code        int
+		apiID = mux.Vars(r)["apiID"]
+		obj   interface{}
+		code  int
 	)
 	if apiID != "" {
 		log.Debugf("Requesting API definition for %q", apiID)
-		obj, code = gw.handleGetAPIOAS(apiID, scopePublic)
+		obj, code = gw.handleGetAPIOAS(apiID, false)
 	} else {
 		log.Debug("Requesting API list")
-		obj, code = gw.handleGetAPIListOAS(scopePublic)
+		obj, code = gw.handleGetAPIListOAS(false)
 	}
 
 	if oasAPI, ok := obj.(*oas.OAS); ok {
@@ -1525,7 +1559,27 @@ func (gw *Gateway) apiOASPatchHandler(w http.ResponseWriter, r *http.Request) {
 		tykExtToPatch = oasObjToPatch.GetTykExtension()
 	}
 
-	oasObj.Servers = oas.RetainOldServerURL(oasObjToPatch.Servers, oasObj.Servers)
+	serverConfig := buildServerRegenerationConfig(gw.GetConfig())
+	existingUserServers, err := oas.ExtractUserServers(
+		oasObjToPatch.Servers,
+		existingAPISpec.APIDefinition,
+		nil,
+		serverConfig,
+		"",
+	)
+	if err != nil {
+		doJSONWrite(w, http.StatusInternalServerError, apiError(err.Error()))
+		return
+	}
+
+	patchUserServers := oasObj.Servers
+
+	userServersToKeep := patchUserServers
+	if len(patchUserServers) == 0 {
+		userServersToKeep = existingUserServers
+	}
+
+	oasObj.Servers = userServersToKeep
 
 	oasObjToPatch.T = oasObj.T
 
@@ -1538,8 +1592,10 @@ func (gw *Gateway) apiOASPatchHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
+	// Update middlewares even when no query params are provided.
+	oasObjToPatch.ImportMiddlewares(oas.TykExtensionConfigParams{})
 
-	oasAPIInBytes, err := oasObj.MarshalJSON()
+	oasAPIInBytes, err := oasObjToPatch.MarshalJSON()
 	if err != nil {
 		doJSONWrite(w, http.StatusInternalServerError, apiError(err.Error()))
 		return
@@ -1891,11 +1947,9 @@ func (gw *Gateway) handleDeleteOrgKey(orgID string) (interface{}, int) {
 	}).Info("Org key deleted.")
 
 	// identify that spec has no org session
-	if spec != nil {
-		spec.Lock()
-		spec.OrgHasNoSession = true
-		spec.Unlock()
-	}
+	spec.Lock()
+	spec.OrgHasNoSession = true
+	spec.Unlock()
 
 	statusObj := apiModifyKeySuccess{
 		Key:    orgID,
@@ -1975,7 +2029,7 @@ func (gw *Gateway) createKeyHandler(w http.ResponseWriter, r *http.Request) {
 
 	sessionManager := gw.GlobalSessionManager
 
-	mw := BaseMiddleware{Gw: gw}
+	mw := &BaseMiddleware{Gw: gw}
 	if err := mw.ApplyPolicies(newSession); err != nil {
 		doJSONWrite(w, http.StatusInternalServerError, apiError("Failed to create key - "+err.Error()))
 		return
@@ -2097,7 +2151,7 @@ func (gw *Gateway) previewKeyHandler(w http.ResponseWriter, r *http.Request) {
 	newSession.LastUpdated = strconv.Itoa(int(time.Now().Unix()))
 	newSession.DateCreated = time.Now()
 
-	mw := BaseMiddleware{Gw: gw}
+	mw := &BaseMiddleware{Gw: gw}
 	// TODO: handle apply policies error
 	mw.ApplyPolicies(newSession)
 
@@ -2180,7 +2234,7 @@ func (gw *Gateway) createOauthClient(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		err := apiSpec.OAuthManager.OsinServer.Storage.SetClient(storageID, apiSpec.OrgID, &newClient, true)
+		err := apiSpec.OAuthManager.Storage().SetClient(storageID, apiSpec.OrgID, &newClient, true)
 		if err != nil {
 			log.WithFields(logrus.Fields{
 				"prefix": "api",
@@ -2230,19 +2284,22 @@ func (gw *Gateway) createOauthClient(w http.ResponseWriter, r *http.Request) {
 					storageManager := gw.getGlobalMDCBStorageHandler(prefix, false)
 					storageManager.Connect()
 
+					storageDriver := &storage.RedisCluster{KeyPrefix: prefix, HashKeys: false, ConnectionHandler: gw.StorageConnectionHandler}
+					storageDriver.Connect()
+
 					apiSpec.OAuthManager = &OAuthManager{
 						OsinServer: gw.TykOsinNewServer(
 							&osin.ServerConfig{},
 							&RedisOsinStorageInterface{
 								storageManager,
 								gw.GlobalSessionManager,
-								&storage.RedisCluster{KeyPrefix: prefix, HashKeys: false, RedisController: gw.RedisController},
+								storageDriver,
 								apiSpec.OrgID,
 								gw,
 							}),
 					}
 				}
-				err := apiSpec.OAuthManager.OsinServer.Storage.SetClient(storageID, apiSpec.APIDefinition.OrgID, &newClient, true)
+				err := apiSpec.OAuthManager.Storage().SetClient(storageID, apiSpec.APIDefinition.OrgID, &newClient, true)
 				if err != nil {
 					log.WithFields(logrus.Fields{
 						"prefix": "api",
@@ -2294,7 +2351,7 @@ func (gw *Gateway) rotateOauthClient(keyName, apiID string) (interface{}, int) {
 
 	// get existing version of oauth-client
 	storageID := oauthClientStorageID(keyName)
-	client, err := apiSpec.OAuthManager.OsinServer.Storage.GetExtendedClientNoPrefix(storageID)
+	client, err := apiSpec.OAuthManager.Storage().GetExtendedClientNoPrefix(storageID)
 	if err != nil {
 		return apiError("OAuth Client ID not found"), http.StatusNotFound
 	}
@@ -2309,7 +2366,7 @@ func (gw *Gateway) rotateOauthClient(keyName, apiID string) (interface{}, int) {
 		Description:       client.GetDescription(),
 	}
 
-	err = apiSpec.OAuthManager.OsinServer.Storage.SetClient(storageID, apiSpec.OrgID, &updatedClient, true)
+	err = apiSpec.OAuthManager.Storage().SetClient(storageID, apiSpec.OrgID, &updatedClient, true)
 	if err != nil {
 		log.WithFields(logrus.Fields{
 			"prefix": "api",
@@ -2371,7 +2428,7 @@ func (gw *Gateway) updateOauthClient(keyName, apiID string, r *http.Request) (in
 
 	// get existing version of oauth-client
 	storageID := oauthClientStorageID(keyName)
-	client, err := apiSpec.OAuthManager.OsinServer.Storage.GetExtendedClientNoPrefix(storageID)
+	client, err := apiSpec.OAuthManager.Storage().GetExtendedClientNoPrefix(storageID)
 	if err != nil {
 		return apiError("OAuth Client ID not found"), http.StatusNotFound
 	}
@@ -2386,7 +2443,7 @@ func (gw *Gateway) updateOauthClient(keyName, apiID string, r *http.Request) (in
 		Description:       updateClientData.Description,       // update
 	}
 
-	err = apiSpec.OAuthManager.OsinServer.Storage.SetClient(storageID, apiSpec.OrgID, &updatedClient, true)
+	err = apiSpec.OAuthManager.Storage().SetClient(storageID, apiSpec.OrgID, &updatedClient, true)
 	if err != nil {
 		log.WithFields(logrus.Fields{
 			"prefix": "api",
@@ -2451,7 +2508,7 @@ func (gw *Gateway) invalidateOauthRefresh(w http.ResponseWriter, r *http.Request
 	}
 
 	keyName := mux.Vars(r)["keyName"]
-	err := apiSpec.OAuthManager.OsinServer.Storage.RemoveRefresh(keyName)
+	err := apiSpec.OAuthManager.Storage().RemoveRefresh(keyName)
 	if err != nil {
 		log.WithFields(logrus.Fields{
 			"prefix": "api",
@@ -2571,7 +2628,7 @@ func (gw *Gateway) oAuthClientTokensHandler(w http.ResponseWriter, r *http.Reque
 			page = 1
 		}
 
-		tokens, totalPages, err := apiSpec.OAuthManager.OsinServer.Storage.GetPaginatedClientTokens(keyName, page)
+		tokens, totalPages, err := apiSpec.OAuthManager.Storage().GetPaginatedClientTokens(keyName, page)
 		if err != nil {
 			doJSONWrite(w, http.StatusInternalServerError, apiError("Get client tokens failed"))
 			return
@@ -2589,7 +2646,7 @@ func (gw *Gateway) oAuthClientTokensHandler(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	tokens, err := apiSpec.OAuthManager.OsinServer.Storage.GetClientTokens(keyName)
+	tokens, err := apiSpec.OAuthManager.Storage().GetClientTokens(keyName)
 	if err != nil {
 		doJSONWrite(w, http.StatusInternalServerError, apiError("Get client tokens failed"))
 		return
@@ -2617,19 +2674,23 @@ func (gw *Gateway) getOauthClientDetails(keyName, apiID string) (interface{}, in
 		prefix := generateOAuthPrefix(apiSpec.APIID)
 		storageManager := gw.getGlobalMDCBStorageHandler(prefix, false)
 		storageManager.Connect()
+
+		storageDriver := &storage.RedisCluster{KeyPrefix: prefix, HashKeys: false, ConnectionHandler: gw.StorageConnectionHandler}
+		storageDriver.Connect()
+
 		apiSpec.OAuthManager = &OAuthManager{
 			OsinServer: gw.TykOsinNewServer(&osin.ServerConfig{},
 				&RedisOsinStorageInterface{
 					storageManager,
 					gw.GlobalSessionManager,
-					&storage.RedisCluster{KeyPrefix: prefix, HashKeys: false, RedisController: gw.RedisController},
+					storageDriver,
 					apiSpec.OrgID,
 					gw,
 				}),
 		}
 	}
 
-	clientData, err := apiSpec.OAuthManager.OsinServer.Storage.GetExtendedClientNoPrefix(storageID)
+	clientData, err := apiSpec.OAuthManager.Storage().GetExtendedClientNoPrefix(storageID)
 	if err != nil {
 		return apiError("OAuth Client ID not found"), http.StatusNotFound
 	}
@@ -2652,6 +2713,26 @@ func (gw *Gateway) getOauthClientDetails(keyName, apiID string) (interface{}, in
 	return reportableClientData, http.StatusOK
 }
 
+func (gw *Gateway) oAuthTokensHandler(w http.ResponseWriter, r *http.Request) {
+	if !r.URL.Query().Has("scope") {
+		doJSONWrite(w, http.StatusUnprocessableEntity, apiError("scope parameter is required"))
+		return
+	}
+
+	if r.URL.Query().Get("scope") != "lapsed" {
+		doJSONWrite(w, http.StatusBadRequest, apiError("unknown scope"))
+		return
+	}
+
+	err := gw.purgeLapsedOAuthTokens()
+	if err != nil {
+		doJSONWrite(w, http.StatusInternalServerError, apiError("error purging lapsed tokens"))
+		return
+	}
+
+	doJSONWrite(w, http.StatusOK, apiOk("lapsed tokens purged"))
+}
+
 // Delete Client
 func (gw *Gateway) handleDeleteOAuthClient(keyName, apiID string) (interface{}, int) {
 	storageID := oauthClientStorageID(keyName)
@@ -2670,7 +2751,7 @@ func (gw *Gateway) handleDeleteOAuthClient(keyName, apiID string) (interface{}, 
 	}
 
 	if apiSpec.OAuthManager != nil {
-		err := apiSpec.OAuthManager.OsinServer.Storage.DeleteClient(storageID, apiSpec.OrgID, true)
+		err := apiSpec.OAuthManager.Storage().DeleteClient(storageID, apiSpec.OrgID, true)
 		if err != nil {
 			return apiError("Delete failed"), http.StatusInternalServerError
 		}
@@ -2718,7 +2799,7 @@ func (gw *Gateway) getApiClients(apiID string) ([]ExtendedOsinClientInterface, a
 
 	clientData := []ExtendedOsinClientInterface{}
 	if apiSpec.UseOauth2 {
-		clientData, err = apiSpec.OAuthManager.OsinServer.Storage.GetClients(filterID, apiSpec.OrgID, true)
+		clientData, err = apiSpec.OAuthManager.Storage().GetClients(filterID, apiSpec.OrgID, true)
 		if err != nil {
 			log.WithFields(logrus.Fields{
 				"prefix": "api",
@@ -2822,11 +2903,7 @@ func userRatesCheck(w http.ResponseWriter, r *http.Request) {
 func (gw *Gateway) invalidateCacheHandler(w http.ResponseWriter, r *http.Request) {
 	apiID := mux.Vars(r)["apiID"]
 
-	keyPrefix := "cache-" + apiID
-	matchPattern := keyPrefix + "*"
-	store := storage.RedisCluster{KeyPrefix: keyPrefix, IsCache: true, RedisController: gw.RedisController}
-
-	if ok := store.DeleteScanMatch(matchPattern); !ok {
+	if ok := gw.invalidateAPICache(apiID); !ok {
 		err := errors.New("scan/delete failed")
 		var orgid string
 		if spec := gw.getApiSpec(apiID); spec != nil {
@@ -2913,7 +2990,7 @@ func (gw *Gateway) GetStorageForApi(apiID string) (ExtendedOsinStorageInterface,
 		return nil, http.StatusNotFound, errors.New(oAuthNotPropagatedErr)
 	}
 
-	return apiSpec.OAuthManager.OsinServer.Storage, http.StatusOK, nil
+	return apiSpec.OAuthManager.Storage(), http.StatusOK, nil
 }
 
 func (gw *Gateway) RevokeAllTokensHandler(w http.ResponseWriter, r *http.Request) {
@@ -2988,7 +3065,7 @@ func (gw *Gateway) validateOAS(next http.HandlerFunc) http.HandlerFunc {
 			return
 		}
 
-		if err = oasObj.Validate(r.Context()); err != nil {
+		if err = oasObj.Validate(r.Context(), oas.GetValidationOptionsFromConfig(gw.GetConfig().OAS)...); err != nil {
 			doJSONWrite(w, http.StatusBadRequest, apiError(err.Error()))
 			return
 		}
@@ -3041,34 +3118,6 @@ func (gw *Gateway) makeImportedOASTykAPI(next http.HandlerFunc) http.HandlerFunc
 	}
 }
 
-// TODO: Don't modify http.Request values in-place. We must right now
-// because our middleware design doesn't pass around http.Request
-// pointers, so we have no way to modify the pointer in a middleware.
-//
-// If we ever redesign middlewares - or if we find another workaround -
-// revisit this.
-func setContext(r *http.Request, ctx context.Context) {
-	r2 := r.WithContext(ctx)
-	*r = *r2
-}
-func setCtxValue(r *http.Request, key, val interface{}) {
-	setContext(r, context.WithValue(r.Context(), key, val))
-}
-
-func ctxGetData(r *http.Request) map[string]interface{} {
-	if v := r.Context().Value(ctx.ContextData); v != nil {
-		return v.(map[string]interface{})
-	}
-	return nil
-}
-
-func ctxSetData(r *http.Request, m map[string]interface{}) {
-	if m == nil {
-		panic("setting a nil context ContextData")
-	}
-	setCtxValue(r, ctx.ContextData, m)
-}
-
 // ctxSetCacheOptions sets a cache key to use for the http request
 func ctxSetCacheOptions(r *http.Request, options *cacheOptions) {
 	setCtxValue(r, ctx.CacheOptions, options)
@@ -3086,21 +3135,6 @@ func ctxGetSession(r *http.Request) *user.SessionState {
 
 func ctxSetSession(r *http.Request, s *user.SessionState, scheduleUpdate bool, hashKey bool) {
 	ctx.SetSession(r, s, scheduleUpdate, hashKey)
-}
-
-func ctxScheduleSessionUpdate(r *http.Request) {
-	setCtxValue(r, ctx.UpdateSession, true)
-}
-
-func ctxDisableSessionUpdate(r *http.Request) {
-	setCtxValue(r, ctx.UpdateSession, false)
-}
-
-func ctxSessionUpdateScheduled(r *http.Request) bool {
-	if v := r.Context().Value(ctx.UpdateSession); v != nil {
-		return v.(bool)
-	}
-	return false
 }
 
 func ctxGetAuthToken(r *http.Request) string {
@@ -3127,6 +3161,19 @@ func ctxGetDoNotTrack(r *http.Request) bool {
 
 func ctxSetDoNotTrack(r *http.Request, b bool) {
 	setCtxValue(r, ctx.DoNotTrackThisEndpoint, b)
+}
+
+func ctxSetRequestStartTime(r *http.Request, t time.Time) {
+	setCtxValue(r, ctx.RequestStartTime, t)
+}
+
+func ctxGetRequestStartTime(r *http.Request) time.Time {
+	if v := r.Context().Value(ctx.RequestStartTime); v != nil {
+		if t, ok := v.(time.Time); ok {
+			return t
+		}
+	}
+	return time.Time{}
 }
 
 func ctxGetVersionInfo(r *http.Request) *apidef.VersionInfo {
@@ -3193,12 +3240,36 @@ func ctxGetUrlRewritePath(r *http.Request) string {
 	return ""
 }
 
+func ctxSetInternalRedirectTarget(r *http.Request, u *url.URL) {
+	setCtxValue(r, ctx.InternalRedirectTarget, u)
+}
+
+func ctxGetInternalRedirectTarget(r *http.Request) *url.URL {
+	if v := r.Context().Value(ctx.InternalRedirectTarget); v != nil {
+		if val, ok := v.(*url.URL); ok {
+			return val
+		}
+	}
+
+	if r.URL == nil {
+		return nil
+	}
+
+	clone := *r.URL
+	return &clone
+}
+
 func ctxSetCheckLoopLimits(r *http.Request, b bool) {
 	setCtxValue(r, ctx.CheckLoopLimits, b)
 }
 
 // Should we check Rate limits and Quotas?
 func ctxCheckLimits(r *http.Request) bool {
+	// If this is a self loop, do not need to check the limits and quotas.
+	if httpctx.IsSelfLooping(r) {
+		return false
+	}
+
 	// If looping disabled, allow all
 	if !ctxLoopingEnabled(r) {
 		return true
@@ -3244,6 +3315,19 @@ func ctxSetGraphQLRequest(r *http.Request, gqlRequest *gql.Request) {
 func ctxGetGraphQLRequest(r *http.Request) (gqlRequest *gql.Request) {
 	if v := r.Context().Value(ctx.GraphQLRequest); v != nil {
 		if gqlRequest, ok := v.(*gql.Request); ok {
+			return gqlRequest
+		}
+	}
+	return nil
+}
+
+func ctxSetGraphQLRequestV2(r *http.Request, gqlRequest *gqlv2.Request) {
+	setCtxValue(r, ctx.GraphQLRequest, gqlRequest)
+}
+
+func ctxGetGraphQLRequestV2(r *http.Request) (gqlRequest *gqlv2.Request) {
+	if v := r.Context().Value(ctx.GraphQLRequest); v != nil {
+		if gqlRequest, ok := v.(*gqlv2.Request); ok {
 			return gqlRequest
 		}
 	}
@@ -3348,14 +3432,6 @@ func ctxIncThrottleLevel(r *http.Request, throttleLimit int) {
 	ctxSetThrottleLevel(r, ctxThrottleLevel(r)+1)
 }
 
-func ctxTraceEnabled(r *http.Request) bool {
-	return r.Context().Value(ctx.Trace) != nil
-}
-
-func ctxSetTrace(r *http.Request) {
-	setCtxValue(r, ctx.Trace, true)
-}
-
 func ctxSetSpanAttributes(r *http.Request, mwName string, attrs ...otel.SpanAttribute) {
 	if len(attrs) > 0 {
 		setCtxValue(r, mwName, attrs)
@@ -3383,33 +3459,21 @@ func ctxGetRequestStatus(r *http.Request) (stat RequestStatus) {
 	return
 }
 
-func ctxSetOperation(r *http.Request, op *Operation) {
-	setCtxValue(r, ctx.OASOperation, op)
-}
-
-func ctxGetOperation(r *http.Request) (op *Operation) {
-	if v := r.Context().Value(ctx.OASOperation); v != nil {
-		op = v.(*Operation)
-	}
-	return
-}
-
 var createOauthClientSecret = func() string {
 	secret := uuid.New()
 	return base64.StdEncoding.EncodeToString([]byte(secret))
 }
 
 // invalidate tokens if we had a new policy
-func invalidateTokens(prevClient ExtendedOsinClientInterface, updatedClient OAuthClient, oauthManager *OAuthManager) {
-
+func invalidateTokens(prevClient ExtendedOsinClientInterface, updatedClient OAuthClient, oauthManager OAuthManagerInterface) {
 	if prevPolicy := prevClient.GetPolicyID(); prevPolicy != "" && prevPolicy != updatedClient.PolicyID {
-		tokenList, err := oauthManager.OsinServer.Storage.GetClientTokens(updatedClient.ClientID)
+		tokenList, err := oauthManager.Storage().GetClientTokens(updatedClient.ClientID)
 		if err != nil {
 			log.WithError(err).Warning("Could not get list of tokens for updated OAuth client")
 		}
 
 		for _, token := range tokenList {
-			if err := oauthManager.OsinServer.Storage.RemoveAccess(token.Token); err != nil {
+			if err := oauthManager.Storage().RemoveAccess(token.Token); err != nil {
 				log.WithError(err).Warning("Could not remove token for updated OAuth client policy")
 			}
 		}

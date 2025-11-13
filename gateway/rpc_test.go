@@ -1,6 +1,4 @@
-//go:build !race
-// +build !race
-
+//nolint:revive
 package gateway
 
 import (
@@ -10,8 +8,8 @@ import (
 	"time"
 
 	"github.com/TykTechnologies/gorpc"
-	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/internal/model"
 	"github.com/TykTechnologies/tyk/rpc"
 	"github.com/TykTechnologies/tyk/test"
 )
@@ -112,6 +110,7 @@ const apiDefListTest2 = `[{
 }]`
 
 func TestSyncAPISpecsRPCFailure_CheckGlobals(t *testing.T) {
+	test.Flaky(t) // TT-9117
 
 	// We test to check if we are actually calling the GetApiDefinitions and
 	// GetPolicies.
@@ -134,7 +133,7 @@ func TestSyncAPISpecsRPCFailure_CheckGlobals(t *testing.T) {
 		}
 	}()
 	dispatcher := gorpc.NewDispatcher()
-	dispatcher.AddFunc("GetApiDefinitions", func(clientAddr string, dr *apidef.DefRequest) (string, error) {
+	dispatcher.AddFunc("GetApiDefinitions", func(clientAddr string, dr *model.DefRequest) (string, error) {
 		// the first time called is when we start the slave gateway
 		return a()
 	})
@@ -166,11 +165,13 @@ func TestSyncAPISpecsRPCFailure_CheckGlobals(t *testing.T) {
 }
 
 func TestSyncAPISpecsRPCSuccess(t *testing.T) {
+	test.Flaky(t) // TT-9117
+
 	// Test RPC
 	rpc.UseSyncLoginRPC = true
 	var GetKeyCounter int
 	dispatcher := gorpc.NewDispatcher()
-	dispatcher.AddFunc("GetApiDefinitions", func(clientAddr string, dr *apidef.DefRequest) (string, error) {
+	dispatcher.AddFunc("GetApiDefinitions", func(clientAddr string, dr *model.DefRequest) (string, error) {
 		return jsonMarshalString(BuildAPI(func(spec *APISpec) {
 			spec.UseKeylessAccess = false
 		})), nil
@@ -260,7 +261,7 @@ func TestSyncAPISpecsRPCSuccess(t *testing.T) {
 		rpc.ResetEmergencyMode()
 
 		dispatcher := gorpc.NewDispatcher()
-		dispatcher.AddFunc("GetApiDefinitions", func(clientAddr string, dr *apidef.DefRequest) (string, error) {
+		dispatcher.AddFunc("GetApiDefinitions", func(clientAddr string, dr *model.DefRequest) (string, error) {
 			return jsonMarshalString(BuildAPI(
 				func(spec *APISpec) { spec.UseKeylessAccess = false },
 				func(spec *APISpec) { spec.UseKeylessAccess = false },
@@ -345,8 +346,10 @@ func TestSyncAPISpecsRPCSuccess(t *testing.T) {
 }
 
 func TestSyncAPISpecsRPC_redis_failure(t *testing.T) {
+	test.Flaky(t) // Test uses StorageConnectionHandler (singleton).
+
 	dispatcher := gorpc.NewDispatcher()
-	dispatcher.AddFunc("GetApiDefinitions", func(clientAddr string, dr *apidef.DefRequest) (string, error) {
+	dispatcher.AddFunc("GetApiDefinitions", func(clientAddr string, dr *model.DefRequest) (string, error) {
 		return jsonMarshalString(BuildAPI(func(spec *APISpec) {
 			spec.UseKeylessAccess = false
 		})), nil
@@ -369,7 +372,7 @@ func TestSyncAPISpecsRPC_redis_failure(t *testing.T) {
 
 	t.Run("Should load apis when redis is down", func(t *testing.T) {
 
-		ts.Gw.RedisController.DisableRedis(true)
+		ts.Gw.StorageConnectionHandler.DisableStorage(true)
 		//defer ts.Gw.RedisController.DisableRedis((false)
 
 		authHeaders := map[string]string{"Authorization": "test"}
@@ -380,7 +383,7 @@ func TestSyncAPISpecsRPC_redis_failure(t *testing.T) {
 
 	t.Run("Should reload when redis is back up", func(t *testing.T) {
 
-		ts.Gw.RedisController.DisableRedis(true)
+		ts.Gw.StorageConnectionHandler.DisableStorage(true)
 		event := make(chan struct{}, 1)
 		ts.Gw.OnConnect = func() {
 			event <- struct{}{}
@@ -392,7 +395,7 @@ func TestSyncAPISpecsRPC_redis_failure(t *testing.T) {
 			t.Fatal("OnConnect should only run after reconnection")
 		case <-time.After(1 * time.Second):
 		}
-		ts.Gw.RedisController.DisableRedis(false)
+		ts.Gw.StorageConnectionHandler.DisableStorage(false)
 
 		select {
 		case <-event:
@@ -409,6 +412,8 @@ func TestSyncAPISpecsRPC_redis_failure(t *testing.T) {
 }
 
 func TestOrgSessionWithRPCDown(t *testing.T) {
+	test.Flaky(t) // TT-9117
+
 	//we need rpc down
 	conf := func(globalConf *config.Config) {
 		globalConf.SlaveOptions.ConnectionString = testHttpFailure
@@ -418,9 +423,9 @@ func TestOrgSessionWithRPCDown(t *testing.T) {
 		globalConf.Policies.PolicySource = "rpc"
 	}
 	ts := StartTest(conf)
-	defer ts.Close()
+	t.Cleanup(ts.Close)
 
-	m := BaseMiddleware{
+	m := &BaseMiddleware{
 		Spec: &APISpec{
 			GlobalConfig: config.Config{
 				EnforceOrgDataAge: true,

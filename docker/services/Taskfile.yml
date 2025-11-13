@@ -1,0 +1,13 @@
+---
+version: "3"
+
+tasks:
+  up:
+    desc: "Bring up services"
+    cmds:
+      - docker compose up -d --remove-orphans --wait
+
+  down:
+    desc: "Tear down services"
+    cmds:
+      - docker compose down --remove-orphans

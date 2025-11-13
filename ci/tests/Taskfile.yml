@@ -1,0 +1,33 @@
+---
+version: "3"
+
+tasks:
+  run:
+    desc: "Run detected tests"
+    vars:
+      tag: v5.2.1
+    cmds:
+      - cd plugin-compiler && ./test.sh {{.tag}} && cd ..
+      - cd api-functionality && ./test.sh {{.tag}} && cd ..
+      - cd python-plugins && ./test.sh {{.tag}} && cd ..
+
+  lint:
+    desc: "Lint bash scripts with shellcheck"
+    deps:
+      - install:shellcheck
+    cmds:
+      - cmd: find -name '*.sh' | xargs -n1 shellcheck -e SC2086
+        platforms: [linux]
+      - cmd: find . -name '*.sh' | xargs -n1 shellcheck -e SC2086
+        platforms: [ darwin ]
+
+  install:shellcheck:
+    desc: "Install shellcheck"
+    internal: true
+    status:
+      - type shellcheck
+    cmds:
+      - cmd: brew install shellcheck
+        platforms: [darwin]
+      - cmd: apt install shellcheck
+        platforms: [linux]

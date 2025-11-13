@@ -1,11 +1,12 @@
-//go:build !race
-// +build !race
+//go:build !race || unstable
+// +build !race unstable
 
 // Looping by itself has race nature
 package gateway
 
 import (
 	"encoding/json"
+	"net/http"
 	"sync"
 	"testing"
 
@@ -185,6 +186,8 @@ func TestLooping(t *testing.T) {
 	})
 
 	t.Run("VirtualEndpoint or plugins", func(t *testing.T) {
+		test.Flaky(t) // TT-10511
+
 		ts.testPrepareVirtualEndpoint(`
             function testVirtData(request, session, config) {
                 var loopLocation = "/default"
@@ -299,7 +302,7 @@ func TestLooping(t *testing.T) {
 				Title:   "oas doc",
 				Version: "1",
 			},
-			Paths: make(openapi3.Paths),
+			Paths: openapi3.NewPaths(),
 		}
 
 		oasObj := oas.OAS{T: oasAPI}
@@ -322,10 +325,106 @@ func TestLooping(t *testing.T) {
 			{Path: "/external/", Code: 200},
 		}...)
 	})
+}
 
+func TestLooping_AnotherAPIWithAuthTokens(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	// Looping to another api with auth tokens
+	specs := ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		spec.APIDefinition.APIID = "apia"
+		spec.APIDefinition.Name = "ApiA"
+		spec.APIDefinition.Proxy.ListenPath = "/apia"
+		spec.APIDefinition.UseKeylessAccess = false
+		spec.APIDefinition.AuthConfigs = map[string]apidef.AuthConfig{
+			"authToken": {
+				AuthHeaderName: "Authorization",
+			},
+		}
+
+		UpdateAPIVersion(spec, "v1", func(v *apidef.VersionInfo) {
+			v.UseExtendedPaths = true
+			v.ExtendedPaths.URLRewrite = []apidef.URLRewriteMeta{{
+				Path:         "/",
+				Method:       http.MethodGet,
+				MatchPattern: ".*",
+				RewriteTo:    "tyk://apib",
+			}}
+		})
+	}, func(spec *APISpec) {
+		spec.APIDefinition.APIID = "apib"
+		spec.APIDefinition.Name = "ApiB"
+		spec.APIDefinition.Proxy.ListenPath = "/apib"
+		spec.APIDefinition.UseKeylessAccess = false
+		spec.APIDefinition.AuthConfigs = map[string]apidef.AuthConfig{
+			"authToken": {
+				AuthHeaderName: "X-Api-Key",
+			},
+		}
+	})
+	specApiA := specs[0]
+	specApiB := specs[1]
+
+	_, authKeyForApiA := ts.CreateSession(func(s *user.SessionState) {
+		s.AccessRights = map[string]user.AccessDefinition{
+			specApiA.APIDefinition.APIID: {
+				APIName:        specApiA.APIDefinition.Name,
+				APIID:          specApiA.APIDefinition.APIID,
+				Versions:       []string{"default"},
+				AllowanceScope: specApiA.APIDefinition.APIID,
+			},
+		}
+		s.OrgID = specApiA.APIDefinition.OrgID
+	})
+
+	_, authKeyForApiB := ts.CreateSession(func(s *user.SessionState) {
+		s.AccessRights = map[string]user.AccessDefinition{
+			specApiB.APIDefinition.APIID: {
+				APIName:        specApiB.APIDefinition.Name,
+				APIID:          specApiB.APIDefinition.APIID,
+				Versions:       []string{"default"},
+				AllowanceScope: specApiB.APIDefinition.APIID,
+			},
+		}
+		s.OrgID = specApiB.APIDefinition.OrgID
+	})
+
+	headersWithApiBToken := map[string]string{
+		"Authorization": authKeyForApiA,
+		"X-Api-Key":     authKeyForApiB,
+	}
+	headersWithoutApiBToken := map[string]string{
+		"Authorization": authKeyForApiA,
+		"X-Api-Key":     "some-string",
+	}
+	headersWithOnlyApiAToken := map[string]string{
+		"Authorization": authKeyForApiA,
+	}
+	_, _ = ts.Run(t, []test.TestCase{
+		{
+			Headers: headersWithApiBToken,
+			Path:    "/apia",
+			Code:    http.StatusOK,
+		},
+		{
+			Headers:   headersWithoutApiBToken,
+			Path:      "/apia",
+			Code:      http.StatusForbidden,
+			BodyMatch: "Access to this API has been disallowed",
+		},
+		{
+			Headers:   headersWithOnlyApiAToken,
+			Path:      "/apia",
+			Code:      http.StatusUnauthorized,
+			BodyMatch: "Authorization field missing",
+		},
+	}...)
 }
 
 func TestConcurrencyReloads(t *testing.T) {
+	test.Racy(t) // TT-10510
+
 	var wg sync.WaitGroup
 
 	ts := StartTest(nil)

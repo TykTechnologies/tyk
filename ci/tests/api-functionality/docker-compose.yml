@@ -1,7 +1,6 @@
 services:
   redis:
     image: redis:6.0-alpine
-    networks: [ test-api-functionality ]
     healthcheck:
       test: [ "CMD", "redis-cli", "--raw", "incr", "ping" ]
       interval: 5s
@@ -10,8 +9,7 @@ services:
       timeout: 10s
 
   gw:
-    image: tykio/tyk-gateway:${tag}
-    networks: [ test-api-functionality ]
+    image: ${GATEWAY_IMAGE}
     depends_on:
       - redis
     volumes:
@@ -23,27 +21,16 @@ services:
       - TYK_LOGLEVEL=debug
 
   gw-checker:
-    image: curlimages/curl
-    networks: [ test-api-functionality ]
+    image: badouralix/curl-jq
     command: tail -f /dev/null
     depends_on:
       - gw
     healthcheck:
-      test: curl -s --fail http://gw:8080/hello | grep -o '.*{"redis":{"status":"pass",'
+      test: curl -s --fail http://gw:8080/hello | jq --exit-status -n 'inputs | if has("status") then .status=="pass" else false end' > /dev/null || exit 1
       interval: 5s
       retries: 10
       start_period: 4s
       timeout: 10s
 
-  wait:
-    image: hello-world:linux
-    depends_on:
-        redis:
-            condition: service_healthy
-        gw-checker:
-            condition: service_healthy
-
-networks:
-  test-api-functionality:
-    name: test-api-functionality
-    driver: bridge
+  httpbin.org:
+    image: kennethreitz/httpbin

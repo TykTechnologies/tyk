@@ -70,6 +70,11 @@ type Proxy struct {
 	SyncStats func(Stat)
 	// Duration in which connection stats will be flushed. Defaults to one second.
 	StatsSyncInterval time.Duration
+
+	// Connection tracking for graceful shutdown
+	activeConns sync.WaitGroup
+	shutdownCtx context.Context
+	shutdown    context.CancelFunc
 }
 
 func (p *Proxy) AddDomainHandler(domain, target string, modifier *Modifier) {
@@ -105,14 +110,61 @@ func (p *Proxy) RemoveDomainHandler(domain string) {
 	delete(p.muxer, domain)
 }
 
+// Shutdown initiates graceful shutdown and waits for all connections to finish
+func (p *Proxy) Shutdown(ctx context.Context) error {
+	// Wait for all connections to finish or timeout
+	done := make(chan struct{})
+	go func() {
+		p.activeConns.Wait()
+		close(done)
+	}()
+
+	select {
+	case <-done:
+		log.Debug("All TCP connections gracefully closed")
+		return nil
+	case <-ctx.Done():
+		log.Warning("TCP proxy shutdown timeout reached, forcing connection termination")
+		// Only now force cancel all connections
+		p.Lock()
+		if p.shutdown != nil {
+			p.shutdown()
+		}
+		p.Unlock()
+		return ctx.Err()
+	}
+}
+
+// SetShutdownContext sets the shutdown context from the caller
+func (p *Proxy) SetShutdownContext(ctx context.Context) {
+	p.Lock()
+	defer p.Unlock()
+	p.shutdownCtx, p.shutdown = context.WithCancel(ctx)
+}
+
+// initShutdownContext initializes the shutdown context if not already done
+func (p *Proxy) initShutdownContext() {
+	p.Lock()
+	defer p.Unlock()
+	if p.shutdownCtx == nil {
+		p.shutdownCtx, p.shutdown = context.WithCancel(context.Background())
+	}
+}
+
 func (p *Proxy) Serve(l net.Listener) error {
+	p.initShutdownContext()
+
 	for {
 		conn, err := l.Accept()
 		if err != nil {
 			log.WithError(err).Warning("Can't accept connection")
 			return err
 		}
+
+		p.activeConns.Add(1)
 		go func() {
+			// Track this connection only when we actually start handling it
+			defer p.activeConns.Done()
 			if err := p.handleConn(conn); err != nil {
 				log.WithError(err).Warning("Can't handle connection")
 			}
@@ -261,7 +313,7 @@ func (p *Proxy) handleConn(conn net.Conn) error {
 			if IsSocketClosed(err) && connectionClosed.Load().(bool) {
 				return
 			}
-			if err == io.EOF {
+			if errors.Is(err, io.EOF) {
 				// End of stream from the client.
 				connectionClosed.Store(true)
 				log.WithField("conn", clientConn(conn)).Debug("End of client stream")
@@ -289,7 +341,7 @@ func (p *Proxy) handleConn(conn net.Conn) error {
 			if IsSocketClosed(err) && connectionClosed.Load().(bool) {
 				return
 			}
-			if err == io.EOF {
+			if errors.Is(err, io.EOF) {
 				// End of stream from upstream
 				connectionClosed.Store(true)
 				log.WithField("conn", upstreamConn(rconn)).Debug("End of upstream stream")
@@ -344,6 +396,14 @@ func (p *Proxy) pipe(src, dst net.Conn, opts pipeOpts) {
 	buf := make([]byte, 65535)
 
 	for {
+		// Check if shutdown has been initiated
+		select {
+		case <-p.shutdownCtx.Done():
+			log.Debug("TCP connection terminating due to graceful shutdown")
+			return
+		default:
+		}
+
 		var readDeadline time.Time
 		if p.ReadTimeout != 0 {
 			readDeadline = time.Now().Add(p.ReadTimeout)

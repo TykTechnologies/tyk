@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/internal/model"
 	"github.com/TykTechnologies/tyk/storage"
 )
 
@@ -30,19 +31,27 @@ const (
 
 func (ts *Test) createSpecTestFrom(tb testing.TB, def *apidef.APIDefinition) *APISpec {
 	tb.Helper()
+
 	loader := APIDefinitionLoader{Gw: ts.Gw}
-	spec := loader.MakeSpec(&nestedApiDefinition{APIDefinition: def}, nil)
+	spec, _ := loader.MakeSpec(&model.MergedAPI{APIDefinition: def}, nil)
 	tname := tb.Name()
-	redisStore := &storage.RedisCluster{KeyPrefix: tname + "-apikey.", RedisController: ts.Gw.RedisController}
-	healthStore := &storage.RedisCluster{KeyPrefix: tname + "-apihealth.", RedisController: ts.Gw.RedisController}
-	orgStore := &storage.RedisCluster{KeyPrefix: tname + "-orgKey.", RedisController: ts.Gw.RedisController}
+
+	redisStore := &storage.RedisCluster{KeyPrefix: tname + "-apikey.", ConnectionHandler: ts.Gw.StorageConnectionHandler}
+	redisStore.Connect()
+
+	healthStore := &storage.RedisCluster{KeyPrefix: tname + "-apihealth.", ConnectionHandler: ts.Gw.StorageConnectionHandler}
+	healthStore.Connect()
+
+	orgStore := &storage.RedisCluster{KeyPrefix: tname + "-orgKey.", ConnectionHandler: ts.Gw.StorageConnectionHandler}
+	orgStore.Connect()
+
 	spec.Init(redisStore, redisStore, healthStore, orgStore)
 	return spec
 }
 
-func (ts *Test) prepareExtractor(tb testing.TB, extractorSource apidef.IdExtractorSource, extractorType apidef.IdExtractorType,
-	config map[string]interface{}, disabled bool) (IdExtractor, *APISpec) {
+func (ts *Test) prepareExtractor(tb testing.TB, extractorSource apidef.IdExtractorSource, extractorType apidef.IdExtractorType, config map[string]interface{}, disabled bool) (IdExtractor, *APISpec) {
 	tb.Helper()
+
 	def := &apidef.APIDefinition{
 		OrgID: MockOrgID,
 		CustomMiddleware: apidef.MiddlewareSection{
@@ -56,7 +65,7 @@ func (ts *Test) prepareExtractor(tb testing.TB, extractorSource apidef.IdExtract
 	}
 
 	spec := ts.createSpecTestFrom(tb, def)
-	mw := BaseMiddleware{Spec: spec, Gw: ts.Gw}
+	mw := &BaseMiddleware{Spec: spec, Gw: ts.Gw}
 	newExtractor(spec, mw)
 
 	extractor, ok := spec.CustomMiddleware.IdExtractor.Extractor.(IdExtractor)

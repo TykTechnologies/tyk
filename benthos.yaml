@@ -1,0 +1,11 @@
+input:
+  stdin: {}
+
+output:
+  http_server:
+    address: "0.0.0.0:4196"
+    path: /get
+    stream_path: /get/stream
+    ws_path: /get/ws
+    allowed_verbs:
+      - GET

@@ -3,9 +3,11 @@ package kv
 import (
 	"testing"
 
-	"github.com/TykTechnologies/tyk/config"
+	"github.com/stretchr/testify/assert"
 
-	"github.com/hashicorp/consul/api"
+	consulapi "github.com/hashicorp/consul/api"
+
+	"github.com/TykTechnologies/tyk/config"
 )
 
 var _ Store = (*Consul)(nil)
@@ -20,13 +22,11 @@ func TestConsul_Get(t *testing.T) {
 
 	_, err = store.Get("key")
 
-	if err != ErrKeyNotFound {
-		t.Fatal("Expect key not to exists")
-	}
+	assert.ErrorIs(t, err, ErrKeyNotFound)
 
 	con := store.(*Consul)
 
-	_, err = con.store.Put(&api.KVPair{
+	_, err = con.store.Put(&consulapi.KVPair{
 		Key:   "key",
 		Value: []byte("value"),
 	}, nil)

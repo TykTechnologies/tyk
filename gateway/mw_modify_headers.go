@@ -8,18 +8,20 @@ import (
 
 // TransformMiddleware is a middleware that will apply a template to a request body to transform it's contents ready for an upstream API
 type TransformHeaders struct {
-	BaseMiddleware
+	*BaseMiddleware
 }
 
 func (t *TransformHeaders) Name() string {
-	return "TransformHeaders"
+	return "RequestHeaderInjector"
 }
 
 func (t *TransformHeaders) EnabledForSpec() bool {
 	for _, version := range t.Spec.VersionData.Versions {
-		if len(version.ExtendedPaths.TransformHeader) > 0 ||
-			len(version.GlobalHeaders) > 0 ||
-			len(version.GlobalHeadersRemove) > 0 {
+		if version.GlobalHeadersEnabled() {
+			return true
+		}
+
+		if version.HasEndpointReqHeader() {
 			return true
 		}
 	}
@@ -30,17 +32,21 @@ func (t *TransformHeaders) EnabledForSpec() bool {
 func (t *TransformHeaders) ProcessRequest(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
 	vInfo, _ := t.Spec.Version(r)
 
-	// Manage global headers first - remove
-	for _, gdKey := range vInfo.GlobalHeadersRemove {
-		t.Logger().Debug("Removing: ", gdKey)
-		r.Header.Del(gdKey)
-	}
-
-	// Add
 	ignoreCanonical := t.Gw.GetConfig().IgnoreCanonicalMIMEHeaderKey
-	for nKey, nVal := range vInfo.GlobalHeaders {
-		t.Logger().Debug("Adding: ", nKey)
-		setCustomHeader(r.Header, nKey, t.Gw.replaceTykVariables(r, nVal, false), ignoreCanonical)
+	logger := t.Logger()
+
+	// Manage global headers first - remove
+	if !vInfo.GlobalHeadersDisabled {
+		for _, gdKey := range vInfo.GlobalHeadersRemove {
+			logger.Debugf("Removing global: %s", gdKey)
+			r.Header.Del(gdKey)
+		}
+
+		// Add
+		for nKey, nVal := range vInfo.GlobalHeaders {
+			logger.Debugf("Adding global: %s: %s", nKey, nVal)
+			setCustomHeader(r.Header, nKey, t.Gw.ReplaceTykVariables(r, nVal, false), ignoreCanonical)
+		}
 	}
 
 	versionPaths := t.Spec.RxPaths[vInfo.Name]
@@ -49,9 +55,11 @@ func (t *TransformHeaders) ProcessRequest(w http.ResponseWriter, r *http.Request
 		hmeta := meta.(*apidef.HeaderInjectionMeta)
 		for _, dKey := range hmeta.DeleteHeaders {
 			r.Header.Del(dKey)
+			logger.Debugf("Removing: %s", dKey)
 		}
 		for nKey, nVal := range hmeta.AddHeaders {
-			setCustomHeader(r.Header, nKey, t.Gw.replaceTykVariables(r, nVal, false), ignoreCanonical)
+			setCustomHeader(r.Header, nKey, t.Gw.ReplaceTykVariables(r, nVal, false), ignoreCanonical)
+			logger.Debugf("Adding: %s: %s", nKey, nVal)
 		}
 	}
 

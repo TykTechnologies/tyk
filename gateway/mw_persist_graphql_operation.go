@@ -14,7 +14,7 @@ import (
 
 // PersistGraphQLOperationMiddleware lets you convert any HTTP request into a GraphQL Operation
 type PersistGraphQLOperationMiddleware struct {
-	BaseMiddleware
+	*BaseMiddleware
 }
 
 func (i *PersistGraphQLOperationMiddleware) Name() string {
@@ -74,7 +74,7 @@ func (i *PersistGraphQLOperationMiddleware) ProcessRequest(w http.ResponseWriter
 		return ProxyingRequestFailedErr, http.StatusInternalServerError
 	}
 
-	variablesStr := i.Gw.replaceTykVariables(r, string(varBytes), false)
+	variablesStr := i.Gw.ReplaceTykVariables(r, string(varBytes), false)
 
 	requestPathParts := strings.Split(r.RequestURI, "/")
 	for replacer, pathIndex := range replacers {

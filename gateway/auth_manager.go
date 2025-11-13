@@ -9,7 +9,6 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"github.com/TykTechnologies/tyk/internal/uuid"
-
 	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/user"
 )
@@ -74,14 +73,34 @@ func (b *DefaultSessionManager) ResetQuota(keyName string, session *user.Session
 
 	rateLimiterSentinelKey := RateLimitKeyPrefix + keyName + ".BLOCKED"
 
-	// Clear the rate limiter
-	b.store.DeleteRawKey(rateLimiterSentinelKey)
+	// Clear the rate limiter and
 	// Fix the raw key
-	b.store.DeleteRawKey(rawKey)
+	defaultKeys := []string{rateLimiterSentinelKey, rawKey}
+	keys := rawKeysWithAllowanceScope(defaultKeys, keyName, session)
+	b.store.DeleteRawKeys(keys)
+}
+
+func rawKeysWithAllowanceScope(keys []string, keyName string, session *user.SessionState) []string {
+	for _, acl := range session.AccessRights {
+		if acl.AllowanceScope == "" {
+			continue
+		}
+		keys = append(keys, QuotaKeyPrefix+acl.AllowanceScope+"-"+keyName)
+	}
+	return keys
+}
+
+func (b *DefaultSessionManager) deleteRawKeysWithAllowanceScope(store storage.Handler, session *user.SessionState, keyName string) {
+	if store == nil || session == nil {
+		return
+	}
 
 	for _, acl := range session.AccessRights {
-		rawKey = QuotaKeyPrefix + acl.AllowanceScope + "-" + keyName
-		b.store.DeleteRawKey(rawKey)
+		if acl.AllowanceScope == "" {
+			continue
+		}
+		rawKey := QuotaKeyPrefix + acl.AllowanceScope + "-" + keyName
+		store.DeleteRawKey(rawKey)
 	}
 }
 
@@ -150,11 +169,12 @@ func (b *DefaultSessionManager) SessionDetail(orgID string, keyName string, hash
 	} else {
 		if storage.TokenOrg(keyName) != orgID {
 			// try to get legacy and new format key at once
-			toSearchList := []string{keyName}
+			toSearchList := []string{}
 			if !b.Gw.GetConfig().DisableKeyActionsByUsername {
 				toSearchList = append(toSearchList, b.Gw.generateToken(orgID, keyName))
 			}
 
+			toSearchList = append(toSearchList, keyName)
 			for _, fallback := range b.Gw.GetConfig().HashKeyFunctionFallback {
 				if !b.Gw.GetConfig().DisableKeyActionsByUsername {
 					toSearchList = append(toSearchList, b.Gw.generateToken(orgID, keyName, fallback))
@@ -164,7 +184,6 @@ func (b *DefaultSessionManager) SessionDetail(orgID string, keyName string, hash
 			var jsonKeyValList []string
 
 			jsonKeyValList, err = b.store.GetMultiKey(toSearchList)
-
 			// pick the 1st non empty from the returned list
 			for idx, val := range jsonKeyValList {
 				if val != "" {

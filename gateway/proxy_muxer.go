@@ -63,6 +63,9 @@ func (h *handleWrapper) handleRequestLimits(w http.ResponseWriter, r *http.Reque
 }
 
 func (h *handleWrapper) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	// Store request start time for accurate latency measurement including all middlewares
+	ctxSetRequestStartTime(r, time.Now())
+
 	if r.Body != nil {
 		if !h.handleRequestLimits(w, r) {
 			return
@@ -95,12 +98,6 @@ func (h *handleWrapper) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if NewRelicApplication != nil {
-		txn := NewRelicApplication.StartTransaction(r.URL.Path, w, r)
-		defer txn.End()
-		h.router.ServeHTTP(txn, r)
-		return
-	}
 	h.router.ServeHTTP(w, r)
 }
 

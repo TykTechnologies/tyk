@@ -2,28 +2,28 @@ package linter
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net"
 	"os"
 
-	schema "github.com/xeipuuv/gojsonschema"
-
 	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/internal/service/gojsonschema"
 )
 
 // Run will lint the configuration file. It will return the path to the
 // config file that was checked, a list of warnings and an error, if any
 // happened.
 func Run(schm string, paths []string) (string, []string, error) {
-	addFormats(&schema.FormatCheckers)
+	addFormats(&gojsonschema.FormatCheckers)
 	var conf config.Config
 	if err := config.Load(paths, &conf); err != nil {
 		return "", nil, err
 	}
-	schemaLoader := schema.NewBytesLoader([]byte(schm))
+	schemaLoader := gojsonschema.NewBytesLoader([]byte(schm))
 
 	var orig map[string]interface{}
-	f, err := os.Open(conf.OriginalPath)
+	f, err := os.Open(conf.Private.OriginalPath)
 	if err != nil {
 		return "", nil, err
 	}
@@ -39,18 +39,18 @@ func Run(schm string, paths []string) (string, []string, error) {
 		delete(orig, "Monitor")
 	}
 
-	fileLoader := schema.NewGoLoader(orig)
-	result, err := schema.Validate(schemaLoader, fileLoader)
+	fileLoader := gojsonschema.NewGoLoader(orig)
+	result, err := gojsonschema.Validate(schemaLoader, fileLoader)
 	if err != nil {
 		return "", nil, err
 	}
 
 	// ensure it's well formatted and the keys are all lowercase
-	if err := config.WriteConf(conf.OriginalPath, &conf); err != nil {
+	if err := config.WriteConf(conf.Private.OriginalPath, &conf); err != nil {
 		return "", nil, err
 	}
 
-	return conf.OriginalPath, resultWarns(result), nil
+	return conf.Private.OriginalPath, resultWarns(result), nil
 }
 
 type stringFormat func(string) bool
@@ -63,14 +63,15 @@ func (f stringFormat) IsFormat(v interface{}) bool {
 	return f(s)
 }
 
-func addFormats(chain *schema.FormatCheckerChain) {
+func addFormats(chain *gojsonschema.FormatCheckerChain) {
 	chain.Add("path", stringFormat(func(path string) bool {
 		_, err := os.Stat(path)
 		return err == nil // must be accessible
 	}))
 	chain.Add("host-no-port", stringFormat(func(host string) bool {
 		_, port, err := net.SplitHostPort(host)
-		if a, ok := err.(*net.AddrError); ok && a.Err == "missing port in address" {
+		var a *net.AddrError
+		if errors.As(err, &a) && a.Err == "missing port in address" {
 			// port being missing is ok
 			err = nil
 		}
@@ -78,11 +79,11 @@ func addFormats(chain *schema.FormatCheckerChain) {
 	}))
 }
 
-func resultWarns(result *schema.Result) []string {
+func resultWarns(result *gojsonschema.Result) []string {
 	warns := result.Errors()
 	strs := make([]string, len(warns))
 	for i, warn := range warns {
-		ferr, ok := warn.(*schema.DoesNotMatchFormatError)
+		ferr, ok := warn.(*gojsonschema.DoesNotMatchFormatError)
 		if !ok {
 			strs[i] = warn.String()
 			continue

@@ -4,8 +4,9 @@ package plugin
 
 import (
 	"fmt"
+	"strings"
 
-	kingpin "gopkg.in/alecthomas/kingpin.v2"
+	kingpin "github.com/alecthomas/kingpin/v2"
 
 	"github.com/TykTechnologies/tyk/goplugin"
 )
@@ -33,12 +34,14 @@ func (p *pluginLoader) Load(_ *kingpin.ParseContext) (err error) {
 }
 
 func (p *pluginLoader) load() error {
-	funcSymbol, err := goplugin.GetSymbol(*p.file, *p.symbol)
-	if err != nil {
-		return fmt.Errorf("unexpected error: %w", err)
-	}
+	for _, filename := range strings.Split(*p.file, ",") {
+		funcSymbol, err := goplugin.GetSymbol(filename, *p.symbol)
+		if err != nil {
+			return fmt.Errorf("unexpected error: %w", err)
+		}
 
-	fmt.Printf("[file=%s, symbol=%s] loaded ok, got %v\n", *p.file, *p.symbol, funcSymbol)
+		fmt.Printf("[file=%s, symbol=%s] loaded ok, got %v\n", filename, *p.symbol, funcSymbol)
+	}
 	return nil
 }
 

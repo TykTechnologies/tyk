@@ -1,0 +1,55 @@
+---
+version: "3"
+
+includes:
+  tracetest: ./tracetest/Taskfile.yml
+
+tasks:
+  default:
+    desc: "setup, execute and shutdown e2e opentelemetry tests"
+    cmds:
+      - defer:
+          task: teardown
+      - task: setup
+      - task: info
+      - task: test
+
+  info:
+    desc: "Print pre-flight info"
+    cmds:
+      - docker compose run --rm tyk version
+      - docker version
+      - docker compose ps
+      - tracetest version
+
+  setup:
+    desc: "setup e2e opentelemetry tests"
+    cmds:
+      - docker compose up -d --wait
+      - task: tracetest:configure
+
+  test:
+    desc: "run e2e opentelemetry tests"
+    deps: [ setup ]
+    cmds:
+      - docker compose logs -f &
+      - tracetest run test -f ./scenarios/tyk_test_200.yml -o pretty
+      - tracetest run test -f ./scenarios/tyk_test_500.yml -o pretty
+      - tracetest run test -f ./scenarios/tyk_testauth_401.yml -o pretty
+      - tracetest run test -f ./scenarios/tyk_tykprotocol_200.yml -o pretty
+      - tracetest run test -f ./scenarios/tyk_tykprotocol-auth_401.yml -o pretty
+      - tracetest run test -f ./scenarios/tyk_grpcapi_200.yml -o pretty
+      - tracetest run test -f ./scenarios/tyk_versioned_200.yml -o pretty
+      - tracetest run test -f ./scenarios/tyk_versioned_403.yml -o pretty
+      - tracetest run test -f ./scenarios/tyk_versioned_not_detailed_200.yml -o pretty
+      - tracetest run test -f ./scenarios/tyk_versioned_not_detailed_403.yml -o pretty
+      - tracetest run test -f ./scenarios/tyk_test-graphql-tracing_200.yml -o pretty
+      - tracetest run test -f ./scenarios/tyk_test-graphql-tracing_400.yml -o pretty
+      - tracetest run test -f ./scenarios/tyk_test-graphql-tracing-invalid_404.yml -o pretty
+      - tracetest run test -f ./scenarios/tyk_test-graphql-detailed-tracing-disabled_200.yaml -o pretty
+      - tracetest run test -f ./scenarios/tyk_test-graphql-detailed-tracing-disabled_400.yaml -o pretty
+
+  teardown:
+    desc: "teardown e2e opentelemetry tests enviroment"
+    cmds:
+      - docker compose down --remove-orphans

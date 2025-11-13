@@ -4,15 +4,31 @@ package coprocess;
 
 option go_package = "/coprocess";
 
+// ResponseObject is used by response hooks. All fields are modifiable.
 message ResponseObject {
+
+  // StatusCode is the HTTP status code received from the upstream.
   int32 status_code = 1;
+
+  // RawBody represents the raw bytes of HTTP response body.
   bytes raw_body = 2;
+
+  // Body represents the HTTP response body. Excluded when the raw_body contains invalid UTF-8 characters.
   string body = 3;
+
+  // Headers represents the headers received from upstream.
   map<string, string> headers = 4;
+
+  // MultivalueHeaders is a list of headers. Useful when header has multiple values. See Header.
   repeated Header multivalue_headers = 5;
 }
 
+// Header is a reponse header that contains multiple associated values.
 message Header {
+
+  // Key represents the name of the header.
   string key = 1;
+
+  // Values is a list of values for a given header content.
   repeated string values = 2;
 }

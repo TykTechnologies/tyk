@@ -1,0 +1,29 @@
+---
+version: "3"
+
+vars:
+  tag: v0.0.0
+  image: internal/plugin-compiler
+  sha:
+    sh: git rev-parse HEAD
+  root:
+    sh: git rev-parse --show-toplevel
+
+tasks:
+  build:
+    desc: "Build plugin compiler"
+    dir: '{{.root}}'
+    cmds:
+      - docker build --build-arg GITHUB_TAG={{.tag}} --build-arg GITHUB_SHA={{.sha}} --platform=linux/amd64 --rm -t {{.image}} -f ci/images/plugin-compiler/Dockerfile .
+
+  build-nocache:
+    desc: "Build plugin compiler"
+    dir: '{{.root}}'
+    cmds:
+      - docker build --no-cache --progress=plain --build-arg GITHUB_TAG={{.tag}} --build-arg GITHUB_SHA={{.sha}} --platform=linux/amd64 --rm -t {{.image}} -f ci/images/plugin-compiler/Dockerfile .
+
+  test:
+    desc: "Run test docker image"
+    dir: '{{.root}}'
+    cmds:
+      - docker run -it --rm --platform=linux/amd64 --entrypoint=/bin/bash {{.image}}

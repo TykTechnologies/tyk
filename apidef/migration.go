@@ -13,6 +13,8 @@ import (
 
 const (
 	ResponseProcessorResponseBodyTransform = "response_body_transform"
+	// DefaultCacheTimeout is the default cache TTL in seconds if not specified for api and endpoint level caching
+	DefaultCacheTimeout int64 = 60
 )
 
 var (
@@ -69,7 +71,16 @@ func (a *APIDefinition) MigrateVersioning() (versions []APIDefinition, err error
 			newAPI.Id = ""
 			newAPI.Name += "-" + url.QueryEscape(vName)
 			newAPI.Internal = true
-			newAPI.Proxy.ListenPath = strings.TrimSuffix(newAPI.Proxy.ListenPath, "/") + "-" + url.QueryEscape(vName) + "/"
+
+			listenPathClean := strings.TrimSuffix(newAPI.Proxy.ListenPath, "/")
+			if listenPathClean == "" {
+				listenPathClean = "/" + url.QueryEscape(vName) + "/"
+			} else {
+				listenPathClean += "-" + url.QueryEscape(vName) + "/"
+			}
+
+			newAPI.Proxy.ListenPath = listenPathClean
+
 			newAPI.VersionDefinition = VersionDefinition{BaseID: a.APIID}
 			newAPI.VersionName = vName
 
@@ -238,6 +249,8 @@ func (a *APIDefinition) Migrate() (versions []APIDefinition, err error) {
 	a.migrateCustomDomain()
 	a.migrateScopeToPolicy()
 	a.migrateResponseProcessors()
+	a.migrateGlobalRateLimit()
+	a.migrateIPAccessControl()
 
 	versions, err = a.MigrateVersioning()
 	if err != nil {
@@ -246,9 +259,13 @@ func (a *APIDefinition) Migrate() (versions []APIDefinition, err error) {
 
 	a.MigrateEndpointMeta()
 	a.MigrateCachePlugin()
+	a.migrateGlobalHeaders()
+	a.migrateGlobalResponseHeaders()
 	for i := 0; i < len(versions); i++ {
 		versions[i].MigrateEndpointMeta()
 		versions[i].MigrateCachePlugin()
+		versions[i].migrateGlobalHeaders()
+		versions[i].migrateGlobalResponseHeaders()
 	}
 
 	return versions, nil
@@ -311,6 +328,22 @@ func (a *APIDefinition) migrateCustomDomain() {
 	}
 }
 
+func (a *APIDefinition) migrateGlobalHeaders() {
+	vInfo := a.VersionData.Versions[""]
+	if len(vInfo.GlobalHeaders) == 0 && len(vInfo.GlobalHeadersRemove) == 0 {
+		vInfo.GlobalHeadersDisabled = true
+		a.VersionData.Versions[""] = vInfo
+	}
+}
+
+func (a *APIDefinition) migrateGlobalResponseHeaders() {
+	vInfo := a.VersionData.Versions[""]
+	if len(vInfo.GlobalResponseHeaders) == 0 && len(vInfo.GlobalResponseHeadersRemove) == 0 {
+		vInfo.GlobalResponseHeadersDisabled = true
+		a.VersionData.Versions[""] = vInfo
+	}
+}
+
 func (a *APIDefinition) MigrateCachePlugin() {
 	vInfo := a.VersionData.Versions[""]
 	list := vInfo.ExtendedPaths.Cached
@@ -318,27 +351,50 @@ func (a *APIDefinition) MigrateCachePlugin() {
 	if vInfo.UseExtendedPaths && len(list) > 0 {
 		var advCacheMethods []CacheMeta
 		for _, cache := range list {
-			newGetMethodCache := CacheMeta{
-				Path:   cache,
-				Method: http.MethodGet,
-			}
-			newHeadMethodCache := CacheMeta{
-				Path:   cache,
-				Method: http.MethodHead,
-			}
-			newOptionsMethodCache := CacheMeta{
-				Path:   cache,
-				Method: http.MethodOptions,
-			}
+			newGetMethodCache := createAdvancedCacheConfig(a.CacheOptions, cache, http.MethodGet)
+			newHeadMethodCache := createAdvancedCacheConfig(a.CacheOptions, cache, http.MethodHead)
+			newOptionsMethodCache := createAdvancedCacheConfig(a.CacheOptions, cache, http.MethodOptions)
+
 			advCacheMethods = append(advCacheMethods, newGetMethodCache, newHeadMethodCache, newOptionsMethodCache)
 		}
 
-		vInfo.ExtendedPaths.AdvanceCacheConfig = advCacheMethods
-		// reset cache to empty
+		// Combine the new method-specific cache configs with any existing advanced configs
+		// Note: existing configs are added last so they have higher priority (last wins)
+		vInfo.ExtendedPaths.AdvanceCacheConfig = append(advCacheMethods, vInfo.ExtendedPaths.AdvanceCacheConfig...)
+
+		// Clear the old simple cache paths since they've been migrated to the advanced configuration
 		vInfo.ExtendedPaths.Cached = nil
 	}
 
 	a.VersionData.Versions[""] = vInfo
+}
+
+// createAdvancedCacheConfig creates a new CacheMeta configuration for advanced caching.
+func createAdvancedCacheConfig(cacheOpts CacheOptions, path string, method string) CacheMeta {
+	// Default cache timeout in seconds if none is specified but caching is enabled
+	timeout := DefaultCacheTimeout
+
+	// Use the global cache timeout from cache_options.
+	// If not set (0), defaults to DefaultCacheTimeout (60s)
+	if cacheOpts.CacheTimeout > 0 {
+		timeout = cacheOpts.CacheTimeout
+	}
+
+	cacheResponseCodes := cacheOpts.CacheOnlyResponseCodes
+
+	return CacheMeta{
+		// When migrating to advanced cache configuration:
+		// - If global cache is disabled, create the advanced config but mark it as disabled
+		// - If global cache is enabled, create the advanced config as enabled
+		Disabled: !cacheOpts.EnableCache,
+		Path:     path,
+		Method:   method,
+		// Use the global cache timeout from cache_options.
+		// If not set (0), defaults to DefaultCacheTimeout (60s)
+		Timeout: timeout,
+		// We should take response codes from global cache (cache_options)
+		CacheOnlyResponseCodes: cacheResponseCodes,
+	}
 }
 
 func (a *APIDefinition) MigrateAuthentication() {
@@ -407,7 +463,6 @@ func (a *APIDefinition) SetDisabledFlags() {
 	a.ConfigDataDisabled = true
 	a.Proxy.ServiceDiscovery.CacheDisabled = true
 	a.UptimeTests.Config.ServiceDiscovery.CacheDisabled = true
-
 	for i := 0; i < len(a.CustomMiddleware.Pre); i++ {
 		a.CustomMiddleware.Pre[i].Disabled = true
 	}
@@ -427,7 +482,28 @@ func (a *APIDefinition) SetDisabledFlags() {
 	for version := range a.VersionData.Versions {
 		for i := 0; i < len(a.VersionData.Versions[version].ExtendedPaths.Virtual); i++ {
 			a.VersionData.Versions[version].ExtendedPaths.Virtual[i].Disabled = true
+		}
+
+		for i := 0; i < len(a.VersionData.Versions[version].ExtendedPaths.GoPlugin); i++ {
 			a.VersionData.Versions[version].ExtendedPaths.GoPlugin[i].Disabled = true
+		}
+	}
+
+	if a.GlobalRateLimit.Per <= 0 || a.GlobalRateLimit.Rate <= 0 {
+		a.GlobalRateLimit.Disabled = true
+	}
+
+	a.DoNotTrack = true
+
+	a.setEventHandlersDisabledFlags()
+}
+
+func (a *APIDefinition) setEventHandlersDisabledFlags() {
+	for k := range a.EventHandlers.Events {
+		for i := range a.EventHandlers.Events[k] {
+			if a.EventHandlers.Events[k][i].HandlerMeta != nil {
+				a.EventHandlers.Events[k][i].HandlerMeta["disabled"] = true
+			}
 		}
 	}
 }
@@ -459,4 +535,24 @@ func (a *APIDefinition) migrateResponseProcessors() {
 	}
 
 	a.ResponseProcessors = responseProcessors
+}
+
+func (a *APIDefinition) migrateGlobalRateLimit() {
+	if a.GlobalRateLimit.Per <= 0 || a.GlobalRateLimit.Rate <= 0 {
+		a.GlobalRateLimit.Disabled = true
+	}
+}
+
+func (a *APIDefinition) migrateIPAccessControl() {
+	a.IPAccessControlDisabled = false
+
+	if a.EnableIpBlacklisting && len(a.BlacklistedIPs) > 0 {
+		return
+	}
+
+	if a.EnableIpWhiteListing && len(a.AllowedIPs) > 0 {
+		return
+	}
+
+	a.IPAccessControlDisabled = true
 }

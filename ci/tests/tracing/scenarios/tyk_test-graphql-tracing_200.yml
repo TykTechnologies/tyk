@@ -8,7 +8,7 @@ spec:
     httpRequest:
       method: POST
       url: tyk:8080/test-graphql-tracing/test-graphql-tracing
-      body: "{\n  \"query\": \"{\\n  country(code: \\\"NG\\\"){\\n    name\\n  }\\n}\"\n}"
+      body: "{\n  \"query\": \"query test {\\n  country(code: \\\"NG\\\"){\\n    name\\n  }\\n}\",\n  \"operationName\": \"test\"\n}"
       headers:
         - key: Content-Type
           value: application/json
@@ -20,13 +20,16 @@ spec:
         - attr:http.url   =   "https://countries.trevorblades.com/"
         - attr:http.method  =  "POST"
     - selector: span[tracetest.span.type="general" name="GraphqlEngine"] span[tracetest.span.type="general"]
-      name: Make sure there are 5 subspans for graphql engine
+      name: Make sure there are 3 subspans for graphql engine
       assertions:
-        - attr:tracetest.selected_spans.count = 5
-    - selector: span[tracetest.span.type="general" name="GraphqlMiddleware Validation"]
-      name: Ensure Graphql Middleware Validation Exists
+        - attr:tracetest.selected_spans.count = 3
+    - selector: span[tracetest.span.type="general" name="ValidateRequest"]
+      name: Ensure Graphql Middleware Validation Exists And Spans correct
       assertions:
-        - attr:tracetest.span.name  =  "GraphqlMiddleware Validation"
+        - attr:tracetest.span.name   =   "ValidateRequest"
+        - attr:graphql.operation.type      =      "query"
+        - attr:graphql.operation.name      =      "test"
+        - "attr:graphql.document  =  'query test {\n  country(code: \"NG\"){\n    name\n  }\n}'"
     - selector: span[tracetest.span.type="general" name="ResolvePlan"]
       name: Ensure resolve plan exists
       assertions:

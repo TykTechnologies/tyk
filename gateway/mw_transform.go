@@ -20,11 +20,11 @@ func WrappedCharsetReader(s string, i io.Reader) (io.Reader, error) {
 
 // TransformMiddleware is a middleware that will apply a template to a request body to transform it's contents ready for an upstream API
 type TransformMiddleware struct {
-	BaseMiddleware
+	*BaseMiddleware
 }
 
 func (t *TransformMiddleware) Name() string {
-	return "TransformMiddleware"
+	return "RequestTransformMiddleware"
 }
 
 func (t *TransformMiddleware) EnabledForSpec() bool {
@@ -45,9 +45,13 @@ func (t *TransformMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 		return nil, http.StatusOK
 	}
 	err := transformBody(r, meta.(*TransformSpec), t)
+
 	if err != nil {
 		t.Logger().WithError(err).Error("Body transform failure")
+	} else {
+		t.Logger().Debugf("%s", msgBodyTransformed)
 	}
+
 	return nil, http.StatusOK
 }
 
@@ -67,7 +71,7 @@ func transformBody(r *http.Request, tmeta *TransformSpec, t *TransformMiddleware
 		var err error
 		bodyData, err = mxj.NewMapXml(body) // unmarshal
 		if err != nil {
-			return fmt.Errorf("error unmarshalling XML: %v", err)
+			return fmt.Errorf("error unmarshalling XML: %w", err)
 		}
 	case apidef.RequestJSON:
 		if len(body) == 0 {
@@ -104,10 +108,10 @@ func transformBody(r *http.Request, tmeta *TransformSpec, t *TransformMiddleware
 	// Apply to template
 	var bodyBuffer bytes.Buffer
 	if err := tmeta.Template.Execute(&bodyBuffer, bodyData); err != nil {
-		return fmt.Errorf("failed to apply template to request: %v", err)
+		return fmt.Errorf("failed to apply template to request: %w", err)
 	}
 
-	s := t.Gw.replaceTykVariables(r, bodyBuffer.String(), true)
+	s := t.Gw.ReplaceTykVariables(r, bodyBuffer.String(), true)
 
 	newBuf := bytes.NewBufferString(s)
 

@@ -1,8 +1,7 @@
 package gateway
 
 import (
-	"crypto"
-	"crypto/rand"
+	cryptorand "crypto/rand"
 	"crypto/rsa"
 	"crypto/sha256"
 	"encoding/base64"
@@ -13,10 +12,12 @@ import (
 	"time"
 
 	"github.com/TykTechnologies/tyk/certs"
+
+	"github.com/TykTechnologies/tyk/internal/crypto"
 )
 
 type RequestSigning struct {
-	BaseMiddleware
+	*BaseMiddleware
 }
 
 func (s *RequestSigning) Name() string {
@@ -76,21 +77,21 @@ func generateHeaderList(r *http.Request, headerList []string) []string {
 }
 
 func (s *RequestSigning) getRequestPath(r *http.Request) string {
-	path := r.URL.RequestURI()
+	urlPath := r.URL.RequestURI()
 
 	if newURL := ctxGetURLRewriteTarget(r); newURL != nil {
-		path = newURL.RequestURI()
+		urlPath = newURL.RequestURI()
 	} else {
 		if s.Spec.Proxy.StripListenPath {
-			path = s.Spec.StripListenPath(r, path)
+			urlPath = s.Spec.StripListenPath(urlPath)
 		}
 	}
 
-	return path
+	return urlPath
 }
 
 func (s *RequestSigning) ProcessRequest(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
-	if (s.Spec.RequestSigning.Secret == "" && s.Spec.RequestSigning.CertificateId == "") || s.Spec.RequestSigning.KeyId == "" || s.Spec.RequestSigning.Algorithm == "" {
+	if !s.isRequestSigningConfigValid() {
 		log.Error("Fields required for signing the request are missing")
 		return errors.New("Fields required for signing the request are missing"), http.StatusInternalServerError
 	}
@@ -179,6 +180,23 @@ func (s *RequestSigning) ProcessRequest(w http.ResponseWriter, r *http.Request, 
 	return nil, http.StatusOK
 }
 
+func (s *RequestSigning) isRequestSigningConfigValid() bool {
+	if s.Spec.RequestSigning.KeyId == "" || s.Spec.RequestSigning.Algorithm == "" {
+		return false
+	}
+
+	isRSAAlgorithm := strings.HasPrefix(s.Spec.RequestSigning.Algorithm, "rsa")
+	if isRSAAlgorithm && s.Spec.RequestSigning.CertificateId == "" {
+		return false
+	}
+
+	if !isRSAAlgorithm && s.Spec.RequestSigning.Secret == "" {
+		return false
+	}
+
+	return true
+}
+
 func generateRSAEncodedSignature(signatureString string, privateKey *rsa.PrivateKey, algorithm string) (string, error) {
 	var hashFunction hash.Hash
 	var hashType crypto.Hash
@@ -194,7 +212,7 @@ func generateRSAEncodedSignature(signatureString string, privateKey *rsa.Private
 	hashFunction.Write([]byte(signatureString))
 	hashed := hashFunction.Sum(nil)
 
-	rawsignature, err := rsa.SignPKCS1v15(rand.Reader, privateKey, hashType, hashed)
+	rawsignature, err := rsa.SignPKCS1v15(cryptorand.Reader, privateKey, hashType, hashed)
 	if err != nil {
 		return "", err
 	}

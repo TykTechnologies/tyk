@@ -1,7 +1,6 @@
 package user
 
 import (
-	"fmt"
 	"reflect"
 	"testing"
 
@@ -49,7 +48,7 @@ func TestSessionState_CustomPolicies(t *testing.T) {
 		{
 			name: "policies-invalid-object",
 			session: &SessionState{
-				MetaData: map[string]interface{}{"policies": []interface{}{fmt.Print}},
+				MetaData: map[string]interface{}{"policies": []interface{}{TestSessionState_SetCustomPolicies}},
 			},
 			want:    nil,
 			wantErr: true,

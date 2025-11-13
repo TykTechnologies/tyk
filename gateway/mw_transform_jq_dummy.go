@@ -10,7 +10,7 @@ import (
 )
 
 type TransformJQMiddleware struct {
-	BaseMiddleware
+	*BaseMiddleware
 }
 
 func (t *TransformJQMiddleware) Name() string {

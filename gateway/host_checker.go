@@ -3,7 +3,8 @@ package gateway
 import (
 	"context"
 	"crypto/tls"
-	"math/rand"
+	"errors"
+	mathrand "math/rand"
 	"net"
 	"net/http"
 	"net/url"
@@ -17,6 +18,7 @@ import (
 	proxyproto "github.com/pires/go-proxyproto"
 
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/internal/httpclient"
 )
 
 const (
@@ -90,11 +92,11 @@ func (h *HostUptimeChecker) getStaggeredTime() time.Duration {
 		return time.Duration(h.checkTimeout) * time.Second
 	}
 
-	rand.Seed(time.Now().Unix())
+	mathrand.Seed(time.Now().Unix())
 	min := h.checkTimeout - 3
 	max := h.checkTimeout + 3
 
-	dur := rand.Intn(max-min) + min
+	dur := mathrand.Intn(max-min) + min
 
 	return time.Duration(dur) * time.Second
 }
@@ -137,7 +139,7 @@ func (h *HostUptimeChecker) execCheck() {
 	h.resetListMu.Unlock()
 	for _, host := range h.HostList {
 		_, err := h.pool.ProcessCtx(h.Gw.ctx, host)
-		if err != nil && err != tunny.ErrPoolNotRunning {
+		if err != nil && !errors.Is(err, tunny.ErrPoolNotRunning) {
 			log.Warnf("[HOST CHECKER] could not send work, error: %v", err)
 		}
 	}
@@ -248,7 +250,7 @@ func (h *HostUptimeChecker) CheckHost(toCheck HostData) {
 		}
 		if toCheck.EnableProxyProtocol {
 			log.Debug("using proxy protocol")
-			ls = proxyproto.NewConn(ls, 0)
+			ls = proxyproto.NewConn(ls)
 		}
 		defer ls.Close()
 		for _, cmd := range toCheck.Commands {
@@ -294,16 +296,43 @@ func (h *HostUptimeChecker) CheckHost(toCheck HostData) {
 			setCustomHeader(req.Header, headerName, headerValue, ignoreCanonical)
 		}
 		req.Header.Set("Connection", "close")
-		h.Gw.HostCheckerClient.Transport = &http.Transport{
-			TLSClientConfig: &tls.Config{
-				InsecureSkipVerify: h.Gw.GetConfig().ProxySSLInsecureSkipVerify,
-				MaxVersion:         h.Gw.GetConfig().ProxySSLMaxVersion,
-			},
+
+		// Try to use HTTP client factory for health check service
+		clientFactory := NewExternalHTTPClientFactory(h.Gw)
+		client, clientErr := clientFactory.CreateHealthCheckClient()
+		if clientErr != nil {
+			// Check if mTLS is explicitly enabled and error is certificate-related - if so, don't fallback as it would bypass security
+			gwConfig := h.Gw.GetConfig()
+			if gwConfig.ExternalServices.Health.MTLS.Enabled && httpclient.IsMTLSError(clientErr) {
+				log.WithError(clientErr).Error("mTLS configuration failed for health checks. Health check will be marked as failed to maintain security.")
+				// Mark health check as failed when mTLS is misconfigured
+				report.IsTCPError = true
+				break
+			} else {
+				// For other errors (not configured, proxy config), fallback to default client
+				log.WithError(clientErr).Debug("Failed to create health check HTTP client, falling back to default")
+				log.Debug("[ExternalServices] Falling back to legacy host checker client due to factory error")
+				// Fallback to original HostCheckerClient
+				h.Gw.HostCheckerClient.Transport = &http.Transport{
+					TLSClientConfig: &tls.Config{
+						InsecureSkipVerify: h.Gw.GetConfig().ProxySSLInsecureSkipVerify,
+						MaxVersion:         h.Gw.GetConfig().ProxySSLMaxVersion,
+					},
+				}
+				if toCheck.Timeout != 0 {
+					h.Gw.HostCheckerClient.Timeout = toCheck.Timeout
+				}
+				client = h.Gw.HostCheckerClient
+			}
+		} else {
+			log.Debugf("[ExternalServices] Using external services health check client for URL: %s", toCheck.CheckURL)
+			// Set the timeout for the factory-created client if specified
+			if toCheck.Timeout != 0 {
+				client.Timeout = toCheck.Timeout
+			}
 		}
-		if toCheck.Timeout != 0 {
-			h.Gw.HostCheckerClient.Timeout = toCheck.Timeout
-		}
-		response, err := h.Gw.HostCheckerClient.Do(req)
+
+		response, err := client.Do(req)
 		if err != nil {
 			report.IsTCPError = true
 			break
@@ -369,7 +398,6 @@ func (h *HostUptimeChecker) Init(workers, triggerLimit, timeout int, hostList ma
 	log.Debug("[HOST CHECKER] Config:Timeout: ~", h.checkTimeout)
 	log.Debug("[HOST CHECKER] Config:WorkerPool: ", h.workerPoolSize)
 
-	var err error
 	h.pool = tunny.NewFunc(h.workerPoolSize, func(hostData interface{}) interface{} {
 		input, _ := hostData.(HostData)
 		h.CheckHost(input)
@@ -377,10 +405,6 @@ func (h *HostUptimeChecker) Init(workers, triggerLimit, timeout int, hostList ma
 	})
 
 	log.Debug("[HOST CHECKER] Init complete")
-
-	if err != nil {
-		log.Errorf("[HOST CHECKER POOL] Error: %v\n", err)
-	}
 }
 
 func (h *HostUptimeChecker) Start(ctx context.Context) {
@@ -402,6 +426,10 @@ func eraseSyncMap(m *sync.Map) {
 }
 
 func (h *HostUptimeChecker) Stop() {
+	if h == nil {
+		return
+	}
+
 	was := atomic.SwapInt32(&h.isClosed, CLOSED)
 	if was == OPEN {
 		eraseSyncMap(h.samples)

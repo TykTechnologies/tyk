@@ -25,13 +25,12 @@ import (
 var algoList = [4]string{"hmac-sha1", "hmac-sha256", "hmac-sha384", "hmac-sha512"}
 
 func (ts *Test) getMiddlewareChain(spec *APISpec) http.Handler {
-
 	remote, _ := url.Parse(TestHttpAny)
 	proxy := ts.Gw.TykNewSingleHostReverseProxy(remote, spec, logrus.New().WithFields(logrus.Fields{}))
 	proxyHandler := ProxyHandler(proxy, spec)
-	baseMid := BaseMiddleware{Spec: spec, Proxy: proxy, Gw: ts.Gw}
+	baseMid := &BaseMiddleware{Spec: spec, Proxy: proxy, Gw: ts.Gw}
 	chain := alice.New(ts.Gw.mwList(
-		&IPWhiteListMiddleware{baseMid},
+		&IPWhiteListMiddleware{BaseMiddleware: baseMid},
 		&IPBlackListMiddleware{BaseMiddleware: baseMid},
 		&RequestSigning{BaseMiddleware: baseMid},
 		&HTTPSignatureValidationMiddleware{BaseMiddleware: baseMid},
@@ -585,7 +584,9 @@ func TestRequestSigning_getRequestPath(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
 
-	rs := RequestSigning{BaseMiddleware{Spec: api, Gw: ts.Gw}}
+	rs := RequestSigning{
+		BaseMiddleware: &BaseMiddleware{Spec: api, Gw: ts.Gw},
+	}
 
 	req, _ := http.NewRequest(http.MethodGet, "http://example.com/test/get?param1=value1", nil)
 
@@ -607,4 +608,89 @@ func TestRequestSigning_getRequestPath(t *testing.T) {
 		assert.Equal(t, "/test/rewritten?param1=value1", rs.getRequestPath(req))
 		ctxSetURLRewriteTarget(req, nil)
 	})
+}
+
+func TestRequestSigning_isRequestSigningConfigValid(t *testing.T) {
+	type testCase struct {
+		name     string
+		conf     apidef.RequestSigningMeta
+		expected bool
+	}
+
+	testCases := []testCase{
+		{
+			name: "missing keyID",
+			conf: apidef.RequestSigningMeta{
+				Secret:        "secret",
+				KeyId:         "",
+				Algorithm:     "hmac-sha256",
+				CertificateId: "certID",
+			},
+			expected: false,
+		},
+		{
+			name: "missing algorithm",
+			conf: apidef.RequestSigningMeta{
+				Secret:        "secret",
+				KeyId:         "keyID",
+				Algorithm:     "",
+				CertificateId: "certID",
+			},
+			expected: false,
+		},
+		{
+			name: "RSA and empty cert ID",
+			conf: apidef.RequestSigningMeta{
+				Secret:        "secret",
+				KeyId:         "keyID",
+				Algorithm:     "rsa-sha256",
+				CertificateId: "",
+			},
+			expected: false,
+		},
+		{
+			name: "non-RSA and empty secret",
+			conf: apidef.RequestSigningMeta{
+				Secret:        "",
+				KeyId:         "keyID",
+				Algorithm:     "hmac-sha256",
+				CertificateId: "certID",
+			},
+			expected: false,
+		},
+		{
+			name: "valid RSA config",
+			conf: apidef.RequestSigningMeta{
+				Secret:        "",
+				KeyId:         "keyID",
+				Algorithm:     "rsa-sha256",
+				CertificateId: "certID",
+			},
+			expected: true,
+		},
+		{
+			name: "valid non-RSA config",
+			conf: apidef.RequestSigningMeta{
+				Secret:        "secret",
+				KeyId:         "keyID",
+				Algorithm:     "hmac-sha256",
+				CertificateId: "",
+			},
+			expected: true,
+		},
+	}
+
+	for _, tc := range testCases {
+		tc := tc
+
+		api := BuildAPI(func(spec *APISpec) {
+			spec.RequestSigning = tc.conf
+		})[0]
+
+		rs := RequestSigning{
+			BaseMiddleware: &BaseMiddleware{Spec: api},
+		}
+
+		assert.Equal(t, tc.expected, rs.isRequestSigningConfigValid())
+	}
 }

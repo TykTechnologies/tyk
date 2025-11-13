@@ -1,5 +1,0 @@
-{
-    "ami_search_string": "amzn2-ami-hvm*",
-    "flavour": "AWSLinux",
-    "source_ami_owner": "amazon"
-}

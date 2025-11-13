@@ -12,8 +12,9 @@ import (
 	"github.com/buger/jsonparser"
 	"github.com/hashicorp/go-multierror"
 	pkgver "github.com/hashicorp/go-version"
-	"github.com/xeipuuv/gojsonschema"
 
+	tykerrors "github.com/TykTechnologies/tyk/internal/errors"
+	"github.com/TykTechnologies/tyk/internal/service/gojsonschema"
 	logger "github.com/TykTechnologies/tyk/log"
 )
 
@@ -23,87 +24,106 @@ var schemaDir embed.FS
 const (
 	keyDefinitions              = "definitions"
 	keyProperties               = "properties"
+	keyRequired                 = "required"
+	keyAnyOf                    = "anyOf"
 	oasSchemaVersionNotFoundFmt = "Schema not found for version %q"
 )
 
 var (
-	log            = logger.Get()
-	oasJSONSchemas map[string][]byte
-	mu             sync.Mutex
-	errorFormatter = func(errs []error) string {
-		var result strings.Builder
-		for i, err := range errs {
-			result.WriteString(err.Error())
-			if i < len(errs)-1 {
-				result.WriteString("\n")
-			}
-		}
+	log = logger.Get()
 
-		return result.String()
-	}
+	schemaOnce sync.Once
+
+	oasJSONSchemas map[string][]byte
 
 	defaultVersion string
 )
 
-func init() {
-	if err := loadOASSchema(); err != nil {
-		log.WithError(err).Error("loadOASSchema failed!")
-		return
+func loadOASSchema() error {
+	load := func() error {
+		xTykAPIGwSchema, err := schemaDir.ReadFile(fmt.Sprintf("schema/%s.json", ExtensionTykAPIGateway))
+		if err != nil {
+			return fmt.Errorf("%s loading failed: %w", ExtensionTykAPIGateway, err)
+		}
+
+		xTykAPIGwSchemaWithoutDefs := jsonparser.Delete(xTykAPIGwSchema, keyDefinitions)
+
+		oasJSONSchemas = make(map[string][]byte)
+		members, err := schemaDir.ReadDir("schema")
+		for _, member := range members {
+			if member.IsDir() {
+				continue
+			}
+
+			fileName := member.Name()
+			if !strings.HasSuffix(fileName, ".json") {
+				continue
+			}
+
+			if strings.HasSuffix(fileName, fmt.Sprintf("%s.json", ExtensionTykAPIGateway)) {
+				continue
+			}
+			if strings.HasSuffix(fileName, fmt.Sprintf("%s.strict.json", ExtensionTykAPIGateway)) {
+				continue
+			}
+
+			var data []byte
+			data, err = schemaDir.ReadFile(filepath.Join("schema/", fileName))
+			if err != nil {
+				return err
+			}
+
+			data, err = jsonparser.Set(data, xTykAPIGwSchemaWithoutDefs, keyProperties, ExtensionTykAPIGateway)
+			if err != nil {
+				return err
+			}
+
+			err = jsonparser.ObjectEach(xTykAPIGwSchema, func(key []byte, value []byte, dataType jsonparser.ValueType, offset int) error {
+				data, err = jsonparser.Set(data, value, keyDefinitions, string(key))
+				return err
+			}, keyDefinitions)
+			if err != nil {
+				return err
+			}
+
+			oasVersion := strings.TrimSuffix(fileName, ".json")
+			oasJSONSchemas[oasVersion] = data
+		}
+
+		setDefaultVersion()
+
+		return nil
 	}
 
-	setDefaultVersion()
+	var err error
+	schemaOnce.Do(func() {
+		err = load()
+	})
+	return err
 }
 
-func loadOASSchema() error {
-	mu.Lock()
-	defer mu.Unlock()
+func validateJSON(schema, document []byte) error {
+	schemaLoader := gojsonschema.NewBytesLoader(schema)
+	documentLoader := gojsonschema.NewBytesLoader(document)
+	result, err := gojsonschema.Validate(schemaLoader, documentLoader)
 
-	xTykAPIGwSchema, err := schemaDir.ReadFile(fmt.Sprintf("schema/%s.json", ExtensionTykAPIGateway))
 	if err != nil {
-		return fmt.Errorf("%s loading failed: %w", ExtensionTykAPIGateway, err)
+		return err
 	}
 
-	xTykAPIGwSchemaWithoutDefs := jsonparser.Delete(xTykAPIGwSchema, keyDefinitions)
-	oasJSONSchemas = make(map[string][]byte)
-	members, err := schemaDir.ReadDir("schema")
-	for _, member := range members {
-		if member.IsDir() {
-			continue
-		}
-
-		fileName := member.Name()
-		if !strings.HasSuffix(fileName, ".json") {
-			continue
-		}
-
-		if strings.HasSuffix(fileName, fmt.Sprintf("%s.json", ExtensionTykAPIGateway)) {
-			continue
-		}
-
-		var data []byte
-		data, err = schemaDir.ReadFile(filepath.Join("schema/", fileName))
-		if err != nil {
-			return err
-		}
-
-		data, err = jsonparser.Set(data, xTykAPIGwSchemaWithoutDefs, keyProperties, ExtensionTykAPIGateway)
-		if err != nil {
-			return err
-		}
-
-		err = jsonparser.ObjectEach(xTykAPIGwSchema, func(key []byte, value []byte, dataType jsonparser.ValueType, offset int) error {
-			data, err = jsonparser.Set(data, value, keyDefinitions, string(key))
-			return err
-		}, keyDefinitions)
-		if err != nil {
-			return err
-		}
-
-		oasVersion := strings.TrimSuffix(fileName, ".json")
-		oasJSONSchemas[oasVersion] = data
+	if result.Valid() {
+		return nil
 	}
 
-	return nil
+	combinedErr := &multierror.Error{}
+	combinedErr.ErrorFormat = tykerrors.Formatter
+
+	validationErrs := result.Errors()
+	for _, validationErr := range validationErrs {
+		combinedErr = multierror.Append(combinedErr, errors.New(validationErr.String()))
+	}
+	return combinedErr.ErrorOrNil()
+
 }
 
 // ValidateOASObject validates an OAS document against a particular OAS version.
@@ -113,32 +133,57 @@ func ValidateOASObject(documentBody []byte, oasVersion string) error {
 		return err
 	}
 
-	schemaLoader := gojsonschema.NewBytesLoader(oasSchema)
-	documentLoader := gojsonschema.NewBytesLoader(documentBody)
-	result, err := gojsonschema.Validate(schemaLoader, documentLoader)
+	return validateJSON(oasSchema, documentBody)
+}
 
+// ValidateOASTemplate checks a Tyk OAS API template for necessary fields,
+// acknowledging that some standard Tyk OAS API fields are optional in templates.
+func ValidateOASTemplate(documentBody []byte, oasVersion string) error {
+	oasSchema, err := GetOASSchema(oasVersion)
 	if err != nil {
 		return err
 	}
 
-	if !result.Valid() {
-		combinedErr := &multierror.Error{}
-		combinedErr.ErrorFormat = errorFormatter
+	oasSchema = jsonparser.Delete(oasSchema, keyProperties, ExtensionTykAPIGateway, keyRequired)
 
-		validationErrs := result.Errors()
-		for _, validationErr := range validationErrs {
-			combinedErr = multierror.Append(combinedErr, errors.New(validationErr.String()))
-		}
-		return combinedErr.ErrorOrNil()
+	definitions, _, _, err := jsonparser.Get(oasSchema, keyDefinitions)
+	if err != nil {
+		return err
 	}
 
-	return nil
+	unsetReqFieldsPaths := []string{
+		"X-Tyk-Info",
+		"X-Tyk-State",
+		"X-Tyk-Server",
+		"X-Tyk-ListenPath",
+		"X-Tyk-Upstream",
+	}
+
+	for _, path := range unsetReqFieldsPaths {
+		definitions = jsonparser.Delete(definitions, path, keyRequired)
+	}
+
+	unsetAnyOfFieldsPaths := []string{
+		"X-Tyk-Upstream",
+	}
+
+	for _, path := range unsetAnyOfFieldsPaths {
+		definitions = jsonparser.Delete(definitions, path, keyAnyOf)
+	}
+
+	oasSchema, err = jsonparser.Set(oasSchema, definitions, keyDefinitions)
+	if err != nil {
+		return err
+	}
+
+	return validateJSON(oasSchema, documentBody)
 }
 
 // GetOASSchema returns an oas schema for a particular version.
 func GetOASSchema(version string) ([]byte, error) {
-	mu.Lock()
-	defer mu.Unlock()
+	if err := loadOASSchema(); err != nil {
+		return nil, fmt.Errorf("loadOASSchema failed: %w", err)
+	}
 
 	if version == "" {
 		return oasJSONSchemas[defaultVersion], nil
@@ -171,8 +216,6 @@ func findDefaultVersion(rawVersions []string) string {
 }
 
 func setDefaultVersion() {
-	mu.Lock()
-	defer mu.Unlock()
 	var versions []string
 	for k := range oasJSONSchemas {
 		versions = append(versions, k)

@@ -9,6 +9,7 @@ import (
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/apidef/oas"
+	"github.com/TykTechnologies/tyk/internal/middleware"
 	"github.com/TykTechnologies/tyk/internal/otel"
 	"github.com/TykTechnologies/tyk/request"
 )
@@ -17,7 +18,8 @@ const XTykAPIExpires = "x-tyk-api-expires"
 
 // VersionCheck will check whether the version of the requested API the request is accessing has any restrictions on URL endpoints
 type VersionCheck struct {
-	BaseMiddleware
+	*BaseMiddleware
+
 	sh SuccessHandler
 }
 
@@ -45,20 +47,6 @@ type Operation struct {
 	pathParams map[string]string
 }
 
-func findRouteAndOperation(spec *APISpec, r *http.Request) {
-	route, pathParams, err := spec.OASRouter.FindRoute(r)
-	if err != nil {
-		return
-	}
-
-	operation, ok := spec.OAS.GetTykExtension().Middleware.Operations[route.Operation.OperationID]
-	if !ok {
-		return
-	}
-
-	ctxSetOperation(r, &Operation{Operation: operation, route: route, pathParams: pathParams})
-}
-
 // ProcessRequest will run any checks on the request on the way through the system, return an error to have the chain fail
 func (v *VersionCheck) ProcessRequest(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
 	targetVersion := v.Spec.getVersionFromRequest(r)
@@ -68,7 +56,11 @@ func (v *VersionCheck) ProcessRequest(w http.ResponseWriter, r *http.Request, _ 
 
 	ctxSetSpanAttributes(r, v.Name(), otel.APIVersionAttribute(targetVersion))
 
-	if v.Spec.VersionDefinition.Enabled && targetVersion != apidef.Self && targetVersion != v.Spec.VersionDefinition.Name {
+	isBase := func(vName string) bool {
+		return vName == apidef.Self || vName == v.Spec.VersionDefinition.Name
+	}
+
+	if v.Spec.VersionDefinition.Enabled && !isBase(targetVersion) {
 		if targetVersion == "" {
 			return errors.New(string(VersionNotFound)), http.StatusForbidden
 		}
@@ -76,20 +68,33 @@ func (v *VersionCheck) ProcessRequest(w http.ResponseWriter, r *http.Request, _ 
 		subVersionID := v.Spec.VersionDefinition.Versions[targetVersion]
 		handler, _, found := v.Gw.findInternalHttpHandlerByNameOrID(subVersionID)
 		if !found {
-			return errors.New(string(VersionDoesNotExist)), http.StatusNotFound
+			if !v.Spec.VersionDefinition.FallbackToDefault {
+				return errors.New(string(VersionDoesNotExist)), http.StatusNotFound
+			}
+
+			if isBase(v.Spec.VersionDefinition.Default) {
+				goto outside
+			}
+
+			targetID, ok := v.Spec.VersionDefinition.Versions[v.Spec.VersionDefinition.Default]
+			if !ok {
+				log.Errorf("fallback to default but %s is not in the versions list", v.Spec.VersionDefinition.Default)
+				return errors.New(http.StatusText(http.StatusInternalServerError)), http.StatusInternalServerError
+			}
+
+			handler, _, found = v.Gw.findInternalHttpHandlerByNameOrID(targetID)
+			if !found {
+				log.Errorf("fallback to default but there is no such API found with the id: %s", targetID)
+				return errors.New(http.StatusText(http.StatusInternalServerError)), http.StatusInternalServerError
+			}
 		}
 
 		v.Spec.SanitizeProxyPaths(r)
 
 		handler.ServeHTTP(w, r)
-		return nil, mwStatusRespond
+		return nil, middleware.StatusRespond
 	}
-
-	// For OAS route matching
-	if v.Spec.HasMock || v.Spec.HasValidateRequest {
-		findRouteAndOperation(v.Spec, r)
-	}
-
+outside:
 	// Check versioning, blacklist, whitelist and ignored status
 	requestValid, stat := v.Spec.RequestValid(r)
 	if !requestValid {
@@ -123,7 +128,7 @@ func (v *VersionCheck) ProcessRequest(w http.ResponseWriter, r *http.Request, _ 
 		}
 
 		v.DoMockReply(w, mockMeta)
-		return nil, mwStatusRespond
+		return nil, middleware.StatusRespond
 	}
 
 	if !v.Spec.ExpirationTs.IsZero() {

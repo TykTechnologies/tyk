@@ -16,6 +16,7 @@ func TestIsSupergraphAPIDefinition(t *testing.T) {
 	}
 	run := func(input testInput) func(t *testing.T) {
 		return func(t *testing.T) {
+			t.Helper()
 			for _, executionMode := range input.executionModes {
 				apiDef := &apidef.APIDefinition{
 					GraphQL: apidef.GraphQLConfig{
@@ -72,6 +73,7 @@ func TestIsProxyOnlyAPIDefinition(t *testing.T) {
 	}
 	run := func(input testInput) func(t *testing.T) {
 		return func(t *testing.T) {
+			t.Helper()
 			for _, executionMode := range input.executionModes {
 				apiDef := &apidef.APIDefinition{
 					GraphQL: apidef.GraphQLConfig{
@@ -128,6 +130,7 @@ func TestIsUniversalDataGraphAPIDefinition(t *testing.T) {
 	}
 	run := func(input testInput) func(t *testing.T) {
 		return func(t *testing.T) {
+			t.Helper()
 			for _, executionMode := range input.executionModes {
 				apiDef := &apidef.APIDefinition{
 					GraphQL: apidef.GraphQLConfig{
@@ -184,6 +187,7 @@ func TestGraphqlEngineAdapterTypeFromApiDefinition(t *testing.T) {
 
 	run := func(input testInput) func(t *testing.T) {
 		return func(t *testing.T) {
+			t.Helper()
 			apiDef := &apidef.APIDefinition{
 				GraphQL: apidef.GraphQLConfig{
 					Enabled:       true,

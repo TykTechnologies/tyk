@@ -1,46 +1,30 @@
 #!/bin/bash
-
 set -eo pipefail
 
-function usage {
-    local progname=$1
-    cat <<EOF
-Usage:
-$progname <tag>
+function setup {
+	local tag=${1:-"v0.0.0"}
 
-Builds the plugin in testplugin using the supplied tag and tests it in the corresponding gw image.
-Requires docker compose.
-EOF
-    exit 1
+	# Setup required env vars for docker compose
+	export GATEWAY_IMAGE=${GATEWAY_IMAGE:-"tykio/tyk-gateway:${tag}"}
+	export PLUGIN_COMPILER_IMAGE=${PLUGIN_COMPILER_IMAGE:-"tykio/tyk-plugin-compiler:${tag}"}
+
+	docker pull -q $GATEWAY_IMAGE
+	docker pull -q $PLUGIN_COMPILER_IMAGE
 }
 
-[[ -z $1 ]] && usage $0
+setup $1
 
-# if params were not sent, then attempt to get them from env vars
-if [[ $GOOS == "" ]] && [[ $GOARCH == "" ]]; then
-    GOOS=$(go env GOOS)
-    GOARCH=$(go env GOARCH)
-fi
+trap "docker compose down --remove-orphans" EXIT
 
-# pass plugin params to docker compose
-set -x
-export plugin_version=$(echo $1 | perl -n -e'/v(\d+).(\d+).(\d+)/'' && print "v$1\.$2\.$3"')
-export plugin_os=${GOOS}
-export plugin_arch=${GOARCH}
+# Clean up loose .so files, rebuild plugin and normalize plugin name.
+PLUGIN_SOURCE_PATH=$PWD/testdata/test-plugin
+rm -fv $PLUGIN_SOURCE_PATH/*.so || true
+docker run --rm -v $PLUGIN_SOURCE_PATH:/plugin-source $PLUGIN_COMPILER_IMAGE plugin.so
+cp $PLUGIN_SOURCE_PATH/*.so $PLUGIN_SOURCE_PATH/plugin.so 
 
-compose='docker-compose'
-# composev2 is a client plugin
-[[ $(docker version --format='{{ .Client.Version }}') =~ "20.10" ]] && compose='docker compose'
+# Cross compile to arm64
+docker run --rm -e GOARCH=arm64 -v $PLUGIN_SOURCE_PATH:/plugin-source $PLUGIN_COMPILER_IMAGE plugin.so
 
-export tag=$1
+docker compose up -d --wait --force-recreate || { docker compose logs gw; exit 1; }
 
-trap "$compose down" EXIT
-
-rm -fv testplugin/*.so || true
-docker run --rm -v `pwd`/testplugin:/plugin-source tykio/tyk-plugin-compiler:${tag} testplugin.so
-
-$compose up -d
-
-
-curl -vvv http://localhost:8080/goplugin/headers
-curl http://localhost:8080/goplugin/headers | jq -e '.headers.Foo == "Bar"' || { $compose logs gw; exit 1; }
+curl http://localhost:8080/goplugin/headers | jq -e '.headers.Foo == "Bar"' || { docker compose logs gw; exit 1; }

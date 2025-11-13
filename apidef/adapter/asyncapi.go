@@ -10,9 +10,9 @@ import (
 	"github.com/buger/jsonparser"
 
 	"github.com/TykTechnologies/graphql-go-tools/pkg/astprinter"
-	"github.com/TykTechnologies/graphql-go-tools/pkg/asyncapi"
-	"github.com/TykTechnologies/graphql-go-tools/pkg/engine/datasource/kafka_datasource"
+	kafkadatasource "github.com/TykTechnologies/graphql-go-tools/pkg/engine/datasource/kafka_datasource"
 	"github.com/TykTechnologies/graphql-go-tools/pkg/operationreport"
+	"github.com/TykTechnologies/graphql-translator/asyncapi"
 	"github.com/TykTechnologies/tyk/apidef"
 )
 
@@ -43,10 +43,10 @@ func processArgumentSection(input string) string {
 	return input
 }
 
-func prepareKafkaDataSourceConfig(parsed *asyncapi.AsyncAPI) (map[string]kafka_datasource.GraphQLSubscriptionOptions, error) {
-	serverConfig := make(map[string]kafka_datasource.GraphQLSubscriptionOptions)
+func prepareKafkaDataSourceConfig(parsed *asyncapi.AsyncAPI) (map[string]kafkadatasource.GraphQLSubscriptionOptions, error) {
+	serverConfig := make(map[string]kafkadatasource.GraphQLSubscriptionOptions)
 	for name, server := range parsed.Servers {
-		c := kafka_datasource.GraphQLSubscriptionOptions{}
+		c := kafkadatasource.GraphQLSubscriptionOptions{}
 		switch server.Protocol {
 		case "kafka", "kafka-secure":
 		default:
@@ -84,7 +84,7 @@ func prepareKafkaDataSourceConfig(parsed *asyncapi.AsyncAPI) (map[string]kafka_d
 	return serverConfig, nil
 }
 
-func encodeKafkaDataSourceConfig(cfg kafka_datasource.GraphQLSubscriptionOptions, topic string) ([]byte, error) {
+func encodeKafkaDataSourceConfig(cfg kafkadatasource.GraphQLSubscriptionOptions, topic string) ([]byte, error) {
 	localConfig := cfg
 	localConfig.Topics = append(localConfig.Topics, topic)
 

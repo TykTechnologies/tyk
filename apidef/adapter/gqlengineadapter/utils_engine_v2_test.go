@@ -7,8 +7,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	graphqlDataSource "github.com/TykTechnologies/graphql-go-tools/pkg/engine/datasource/graphql_datasource"
-	restDataSource "github.com/TykTechnologies/graphql-go-tools/pkg/engine/datasource/rest_datasource"
+	graphqldatasource "github.com/TykTechnologies/graphql-go-tools/pkg/engine/datasource/graphql_datasource"
+	restdatasource "github.com/TykTechnologies/graphql-go-tools/pkg/engine/datasource/rest_datasource"
 	"github.com/TykTechnologies/graphql-go-tools/pkg/engine/plan"
 
 	"github.com/TykTechnologies/tyk/apidef"
@@ -20,10 +20,11 @@ func TestGraphqlDataSourceConfiguration(t *testing.T) {
 		method           string
 		headers          map[string]string
 		subscriptionType apidef.SubscriptionType
+		sseUsePost       bool
 	}
 
 	t.Run("with internal data source url and sse", func(t *testing.T) {
-		internalDataSource := testInput{
+		internaldatasource := testInput{
 			url:    "tyk://data-source.fake",
 			method: http.MethodGet,
 			headers: map[string]string{
@@ -33,8 +34,8 @@ func TestGraphqlDataSourceConfiguration(t *testing.T) {
 			subscriptionType: apidef.GQLSubscriptionSSE,
 		}
 
-		expectedGraphqlDataSourceConfiguration := graphqlDataSource.Configuration{
-			Fetch: graphqlDataSource.FetchConfiguration{
+		expectedGraphqlDataSourceConfiguration := graphqldatasource.Configuration{
+			Fetch: graphqldatasource.FetchConfiguration{
 				URL:    "http://data-source.fake",
 				Method: http.MethodGet,
 				Header: http.Header{
@@ -43,7 +44,7 @@ func TestGraphqlDataSourceConfiguration(t *testing.T) {
 					"X-Tyk-Key": {"value"},
 				},
 			},
-			Subscription: graphqlDataSource.SubscriptionConfiguration{
+			Subscription: graphqldatasource.SubscriptionConfiguration{
 				URL:           "http://data-source.fake",
 				UseSSE:        true,
 				SSEMethodPost: false,
@@ -51,13 +52,29 @@ func TestGraphqlDataSourceConfiguration(t *testing.T) {
 		}
 
 		actualGraphqlDataSourceConfiguration := graphqlDataSourceConfiguration(
-			internalDataSource.url,
-			internalDataSource.method,
-			internalDataSource.headers,
-			internalDataSource.subscriptionType,
+			internaldatasource.url,
+			internaldatasource.method,
+			internaldatasource.headers,
+			internaldatasource.subscriptionType,
+			internaldatasource.sseUsePost,
 		)
 
 		assert.Equal(t, expectedGraphqlDataSourceConfiguration, actualGraphqlDataSourceConfiguration)
+
+		t.Run("sse post", func(t *testing.T) {
+			internaldatasource.sseUsePost = true
+			expectedGraphqlDataSourceConfiguration.Subscription.SSEMethodPost = true
+
+			actual := graphqlDataSourceConfiguration(
+				internaldatasource.url,
+				internaldatasource.method,
+				internaldatasource.headers,
+				internaldatasource.subscriptionType,
+				internaldatasource.sseUsePost,
+			)
+
+			assert.Equal(t, expectedGraphqlDataSourceConfiguration, actual)
+		})
 	})
 
 	t.Run("with external data source url and no sse", func(t *testing.T) {
@@ -71,8 +88,8 @@ func TestGraphqlDataSourceConfiguration(t *testing.T) {
 			subscriptionType: apidef.GQLSubscriptionTransportWS,
 		}
 
-		expectedGraphqlDataSourceConfiguration := graphqlDataSource.Configuration{
-			Fetch: graphqlDataSource.FetchConfiguration{
+		expectedGraphqlDataSourceConfiguration := graphqldatasource.Configuration{
+			Fetch: graphqldatasource.FetchConfiguration{
 				URL:    "http://data-source.fake",
 				Method: http.MethodGet,
 				Header: http.Header{
@@ -80,7 +97,7 @@ func TestGraphqlDataSourceConfiguration(t *testing.T) {
 					"X-Tyk-Key":     {"value"},
 				},
 			},
-			Subscription: graphqlDataSource.SubscriptionConfiguration{
+			Subscription: graphqldatasource.SubscriptionConfiguration{
 				URL:           "http://data-source.fake",
 				UseSSE:        false,
 				SSEMethodPost: false,
@@ -92,6 +109,7 @@ func TestGraphqlDataSourceConfiguration(t *testing.T) {
 			externalDataSource.method,
 			externalDataSource.headers,
 			externalDataSource.subscriptionType,
+			externalDataSource.sseUsePost,
 		)
 
 		assert.Equal(t, expectedGraphqlDataSourceConfiguration, actualGraphqlDataSourceConfiguration)
@@ -118,7 +136,7 @@ func TestCreateArgumentConfigurationsForArgumentNames(t *testing.T) {
 func TestExtractURLQueryParamsForEngineV2(t *testing.T) {
 	type expectedOutput struct {
 		urlWithoutParams string
-		engineV2Queries  []restDataSource.QueryConfiguration
+		engineV2Queries  []restdatasource.QueryConfiguration
 		err              error
 	}
 
@@ -137,7 +155,7 @@ func TestExtractURLQueryParamsForEngineV2(t *testing.T) {
 		inputUrl := "http://rest-data-source.fake"
 		expected := expectedOutput{
 			urlWithoutParams: "http://rest-data-source.fake",
-			engineV2Queries: []restDataSource.QueryConfiguration{
+			engineV2Queries: []restdatasource.QueryConfiguration{
 				{
 					Name:  "providedQueryName1",
 					Value: "providedQueryValue1",
@@ -159,7 +177,7 @@ func TestExtractURLQueryParamsForEngineV2(t *testing.T) {
 		inputUrl := "http://rest-data-source.fake?urlParam=urlParamValue"
 		expected := expectedOutput{
 			urlWithoutParams: "http://rest-data-source.fake",
-			engineV2Queries: []restDataSource.QueryConfiguration{
+			engineV2Queries: []restdatasource.QueryConfiguration{
 				{
 					Name:  "urlParam",
 					Value: "urlParamValue",
@@ -183,7 +201,7 @@ func TestExtractURLQueryParamsForEngineV2(t *testing.T) {
 }
 
 func TestAppendURLQueryParamsToEngineV2Queries(t *testing.T) {
-	existingEngineV2Queries := &[]restDataSource.QueryConfiguration{
+	existingEngineV2Queries := &[]restdatasource.QueryConfiguration{
 		{
 			Name:  "existingName",
 			Value: "existingValue",
@@ -195,7 +213,7 @@ func TestAppendURLQueryParamsToEngineV2Queries(t *testing.T) {
 		"newKey2": {"newKey2Value1", "newKey2Value2"},
 	}
 
-	expectedEngineV2Queries := &[]restDataSource.QueryConfiguration{
+	expectedEngineV2Queries := &[]restdatasource.QueryConfiguration{
 		{
 			Name:  "existingName",
 			Value: "existingValue",
@@ -215,7 +233,7 @@ func TestAppendURLQueryParamsToEngineV2Queries(t *testing.T) {
 }
 
 func TestAppendApiDefQueriesConfigToEngineV2Queries(t *testing.T) {
-	existingEngineV2Queries := &[]restDataSource.QueryConfiguration{
+	existingEngineV2Queries := &[]restdatasource.QueryConfiguration{
 		{
 			Name:  "existingName",
 			Value: "existingValue",
@@ -233,7 +251,7 @@ func TestAppendApiDefQueriesConfigToEngineV2Queries(t *testing.T) {
 		},
 	}
 
-	expectedEngineV2Queries := &[]restDataSource.QueryConfiguration{
+	expectedEngineV2Queries := &[]restdatasource.QueryConfiguration{
 		{
 			Name:  "existingName",
 			Value: "existingValue",
@@ -266,7 +284,7 @@ func TestCreateGraphQLDataSourceFactory(t *testing.T) {
 		},
 	}
 
-	expectedGraphQLDataSourceFactory := &graphqlDataSource.Factory{
+	expectedGraphQLDataSourceFactory := &graphqldatasource.Factory{
 		HTTPClient: &http.Client{
 			Timeout: 0,
 		},
@@ -289,6 +307,6 @@ func TestSubscriptionClientFactoryOrDefault(t *testing.T) {
 	})
 	t.Run("should return default subscriptionClientFactory if provided one is nil", func(t *testing.T) {
 		actualFactory := subscriptionClientFactoryOrDefault(nil)
-		assert.Equal(t, &graphqlDataSource.DefaultSubscriptionClientFactory{}, actualFactory)
+		assert.Equal(t, &graphqldatasource.DefaultSubscriptionClientFactory{}, actualFactory)
 	})
 }

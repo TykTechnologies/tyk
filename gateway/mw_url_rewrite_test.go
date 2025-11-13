@@ -2,17 +2,16 @@ package gateway
 
 import (
 	"bytes"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/TykTechnologies/tyk/ctx"
-
-	"github.com/TykTechnologies/tyk/test"
-
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/ctx"
+	"github.com/TykTechnologies/tyk/test"
 	"github.com/TykTechnologies/tyk/user"
 )
 
@@ -40,6 +39,16 @@ var testRewriterData = []struct {
 		"OneVal",
 		"test/val/(.*)", "change/to/$1",
 		"/test/val/VALUE", "change/to/VALUE",
+	},
+	{
+		"OneVal Special Case",
+		"test/val/(.*)", "/test/val/$1",
+		"/test/val/VALUE%2C", "/test/val/VALUE%2C",
+	},
+	{
+		"OneVal Special Case With Query Param Encoded",
+		"test/val/(.*)", "/test/val/$1",
+		"/test/val/VALUE%2C?a=te%2Cst", "/test/val/VALUE%2C?a=te%2Cst",
 	},
 	{
 		"ThreeVals",
@@ -107,7 +116,7 @@ func TestRewriter(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			r := tc.reqMaker()
-			got, err := ts.Gw.urlRewrite(tc.meta, r, false)
+			got, err := ts.Gw.urlRewrite(tc.meta, r)
 			if err != nil {
 				t.Error("compile failed:", err)
 			}
@@ -125,7 +134,10 @@ func BenchmarkRewriter(b *testing.B) {
 	//warm-up regexp caches
 	for _, tc := range cases {
 		r := tc.reqMaker()
-		ts.Gw.urlRewrite(tc.meta, r, false)
+		_, err := ts.Gw.urlRewrite(tc.meta, r)
+		if err != nil {
+			b.Errorf("benchmark failed %s", err.Error())
+		}
 	}
 
 	b.ReportAllocs()
@@ -135,18 +147,22 @@ func BenchmarkRewriter(b *testing.B) {
 			b.StopTimer()
 			r := tc.reqMaker()
 			b.StartTimer()
-			ts.Gw.urlRewrite(tc.meta, r, false)
+			_, err := ts.Gw.urlRewrite(tc.meta, r)
+			if err != nil {
+				b.Errorf("benchmark failed %s", err.Error())
+			}
 		}
 	}
 }
 
 func TestRewriterTriggers(t *testing.T) {
 	type TestDef struct {
-		name        string
-		pattern, to string
-		in, want    string
-		triggerConf []apidef.RoutingTrigger
-		req         *http.Request
+		name           string
+		pattern, to    string
+		in, want       string
+		triggerConf    []apidef.RoutingTrigger
+		req            *http.Request
+		payloadTrigger bool
 	}
 
 	ts := StartTest(nil)
@@ -178,6 +194,7 @@ func TestRewriterTriggers(t *testing.T) {
 					},
 				},
 				r,
+				false,
 			}
 		},
 		func() TestDef {
@@ -204,6 +221,7 @@ func TestRewriterTriggers(t *testing.T) {
 					},
 				},
 				r,
+				false,
 			}
 		},
 		func() TestDef {
@@ -234,6 +252,7 @@ func TestRewriterTriggers(t *testing.T) {
 					},
 				},
 				r,
+				false,
 			}
 		},
 		func() TestDef {
@@ -264,6 +283,7 @@ func TestRewriterTriggers(t *testing.T) {
 					},
 				},
 				r,
+				false,
 			}
 		},
 		func() TestDef {
@@ -294,6 +314,7 @@ func TestRewriterTriggers(t *testing.T) {
 					},
 				},
 				r,
+				false,
 			}
 		},
 		func() TestDef {
@@ -339,6 +360,7 @@ func TestRewriterTriggers(t *testing.T) {
 					},
 				},
 				r,
+				false,
 			}
 		},
 		func() TestDef {
@@ -369,6 +391,7 @@ func TestRewriterTriggers(t *testing.T) {
 					},
 				},
 				r,
+				false,
 			}
 		},
 		func() TestDef {
@@ -399,6 +422,7 @@ func TestRewriterTriggers(t *testing.T) {
 					},
 				},
 				r,
+				false,
 			}
 		},
 		func() TestDef {
@@ -423,6 +447,7 @@ func TestRewriterTriggers(t *testing.T) {
 					},
 				},
 				r,
+				false,
 			}
 		},
 		func() TestDef {
@@ -447,6 +472,7 @@ func TestRewriterTriggers(t *testing.T) {
 					},
 				},
 				r,
+				false,
 			}
 		},
 		func() TestDef {
@@ -474,6 +500,7 @@ func TestRewriterTriggers(t *testing.T) {
 					},
 				},
 				r,
+				false,
 			}
 		},
 		func() TestDef {
@@ -504,6 +531,7 @@ func TestRewriterTriggers(t *testing.T) {
 					},
 				},
 				r,
+				false,
 			}
 		},
 		func() TestDef {
@@ -534,6 +562,7 @@ func TestRewriterTriggers(t *testing.T) {
 					},
 				},
 				r,
+				false,
 			}
 		},
 		func() TestDef {
@@ -568,6 +597,7 @@ func TestRewriterTriggers(t *testing.T) {
 					},
 				},
 				r,
+				false,
 			}
 		},
 		func() TestDef {
@@ -602,6 +632,7 @@ func TestRewriterTriggers(t *testing.T) {
 					},
 				},
 				r,
+				false,
 			}
 		},
 		func() TestDef {
@@ -636,6 +667,7 @@ func TestRewriterTriggers(t *testing.T) {
 					},
 				},
 				r,
+				false,
 			}
 		},
 		func() TestDef {
@@ -659,6 +691,7 @@ func TestRewriterTriggers(t *testing.T) {
 					},
 				},
 				r,
+				true,
 			}
 		},
 		func() TestDef {
@@ -682,6 +715,7 @@ func TestRewriterTriggers(t *testing.T) {
 					},
 				},
 				r,
+				true,
 			}
 		},
 		func() TestDef {
@@ -705,6 +739,7 @@ func TestRewriterTriggers(t *testing.T) {
 					},
 				},
 				r,
+				true,
 			}
 		},
 		func() TestDef {
@@ -728,6 +763,7 @@ func TestRewriterTriggers(t *testing.T) {
 					},
 				},
 				r,
+				true,
 			}
 		},
 		func() TestDef {
@@ -757,6 +793,7 @@ func TestRewriterTriggers(t *testing.T) {
 					},
 				},
 				r,
+				true,
 			}
 		},
 		func() TestDef {
@@ -786,6 +823,7 @@ func TestRewriterTriggers(t *testing.T) {
 					},
 				},
 				r,
+				true,
 			}
 		},
 		func() TestDef {
@@ -809,6 +847,7 @@ func TestRewriterTriggers(t *testing.T) {
 					},
 				},
 				r,
+				false,
 			}
 		},
 		func() TestDef {
@@ -838,6 +877,7 @@ func TestRewriterTriggers(t *testing.T) {
 					},
 				},
 				r,
+				true,
 			}
 		},
 		func() TestDef {
@@ -867,6 +907,7 @@ func TestRewriterTriggers(t *testing.T) {
 					},
 				},
 				r,
+				true,
 			}
 		},
 		func() TestDef {
@@ -890,6 +931,7 @@ func TestRewriterTriggers(t *testing.T) {
 					},
 				},
 				r,
+				false,
 			}
 		},
 		func() TestDef {
@@ -913,6 +955,7 @@ func TestRewriterTriggers(t *testing.T) {
 					},
 				},
 				r,
+				false,
 			}
 		},
 		func() TestDef {
@@ -942,6 +985,7 @@ func TestRewriterTriggers(t *testing.T) {
 					},
 				},
 				r,
+				false,
 			}
 		},
 		func() TestDef {
@@ -971,6 +1015,7 @@ func TestRewriterTriggers(t *testing.T) {
 					},
 				},
 				r,
+				false,
 			}
 		},
 		func() TestDef {
@@ -1001,6 +1046,7 @@ func TestRewriterTriggers(t *testing.T) {
 					},
 				},
 				r,
+				false,
 			}
 		},
 		func() TestDef {
@@ -1028,6 +1074,7 @@ func TestRewriterTriggers(t *testing.T) {
 					},
 				},
 				r,
+				false,
 			}
 		},
 		func() TestDef {
@@ -1057,6 +1104,7 @@ func TestRewriterTriggers(t *testing.T) {
 					},
 				},
 				r,
+				false,
 			}
 		},
 		func() TestDef {
@@ -1080,6 +1128,7 @@ func TestRewriterTriggers(t *testing.T) {
 					},
 				},
 				r,
+				false,
 			}
 		},
 	}
@@ -1093,10 +1142,18 @@ func TestRewriterTriggers(t *testing.T) {
 				Triggers:     tc.triggerConf,
 			}
 
-			got, err := ts.Gw.urlRewrite(&testConf, tc.req, false)
+			got, err := ts.Gw.urlRewrite(&testConf, tc.req)
 			if err != nil {
 				t.Error("compile failed:", err)
 			}
+
+			//added check to ensure that reading the payload to check for the trigger does not break the request
+			if tc.payloadTrigger {
+				body, err := io.ReadAll(tc.req.Body)
+				assert.NotEqual(t, "", string(body))
+				assert.NoError(t, err)
+			}
+
 			if got != tc.want {
 				t.Errorf("rewrite failed, want %q, got %q", tc.want, got)
 			}
@@ -1110,7 +1167,7 @@ func TestInitTriggerRx(t *testing.T) {
 
 	// prepare test data
 	testRewriteMW := &URLRewriteMiddleware{
-		BaseMiddleware: BaseMiddleware{
+		BaseMiddleware: &BaseMiddleware{
 			Spec: &APISpec{
 				APIDefinition: &apidef.APIDefinition{},
 			},
@@ -1360,7 +1417,7 @@ func TestURLRewriteMiddleware_CheckHostRewrite(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			m := &URLRewriteMiddleware{}
+			m := &URLRewriteMiddleware{BaseMiddleware: &BaseMiddleware{}}
 			r := &http.Request{}
 			err := m.CheckHostRewrite(tt.args.oldPath, tt.args.newTarget, r)
 			assert.Equal(t, tt.errExpected, err != nil)

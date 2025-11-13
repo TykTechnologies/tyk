@@ -1,0 +1,24 @@
+{
+  "api_id": "deadbeefce7c2b0001a066e0",
+  "active": true,
+  "auth": {
+    "auth_header_name": "Authorization"
+  },
+  "domain": "",
+  "name": "api1",
+  "proxy": {
+    "listen_path": "/test/",
+    "strip_listen_path": true,
+    "target_url": "http://httpbin.org/anything/api1/fallthrough"
+  },
+  "use_keyless": true,
+  "version_data": {
+    "not_versioned": true,
+    "versions": {
+      "Default": {
+        "name": "Default",
+        "use_extended_paths": true
+      }
+    }
+  }
+}

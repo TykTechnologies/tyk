@@ -1,0 +1,78 @@
+{
+  "disabled": false,
+  "path": "",
+  "method": "",
+  "match_pattern": "example_pattern",
+  "rewrite_to": "http://example.com",
+  "triggers": [
+    {
+      "on": "any",
+      "options": {
+        "header_matches": {
+          "header_name": {
+            "match_rx": "header_pattern",
+            "reverse": true
+          },
+          "content-type": {
+            "match_rx": "header_pattern_without_negate",
+            "reverse": false
+          }
+        },
+        "query_val_matches": {
+          "query_name": {
+            "match_rx": "query_pattern",
+            "reverse": true
+          }
+        },
+        "path_part_matches": {
+          "path_name": {
+            "match_rx": "path_pattern",
+            "reverse": false
+          }
+        },
+        "session_meta_matches": {
+          "session_metadata_name": {
+            "match_rx": "session_metadata_pattern",
+            "reverse": false
+          }
+        },
+        "request_context_matches": {
+          "request_context_name": {
+            "match_rx": "request_context_pattern",
+            "reverse": false
+          }
+        },
+        "payload_matches": {
+          "match_rx": "request_body_pattern",
+          "reverse": true
+        }
+      },
+      "rewrite_to": "http://example.com/rewritten-one"
+    },
+    {
+      "on": "all",
+      "options": {
+        "header_matches": {},
+        "query_val_matches": {
+          "query_name": {
+            "match_rx": "query_pattern",
+            "reverse": false
+          }
+        },
+        "path_part_matches": {
+          "path_name": {
+            "match_rx": "path_pattern",
+            "reverse": true
+          }
+        },
+        "session_meta_matches": {},
+        "request_context_matches": {},
+        "payload_matches": {
+          "match_rx": "",
+          "reverse": false
+        }
+      },
+      "rewrite_to": "http://example.com/rewritten-two"
+    }
+  ]
+}

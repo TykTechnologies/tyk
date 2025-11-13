@@ -3,44 +3,31 @@ package python
 import (
 	"bytes"
 	"context"
+	"crypto/md5"
+	"fmt"
 	"mime/multipart"
 	"net/http"
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"testing"
-	"time"
 
 	"github.com/TykTechnologies/tyk/apidef"
-
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/gateway"
+	"github.com/TykTechnologies/tyk/internal/uuid"
 	"github.com/TykTechnologies/tyk/test"
 	"github.com/TykTechnologies/tyk/user"
 )
 
-var pkgPath string
-
-func init() {
+func pkgPath() string {
 	_, filename, _, _ := runtime.Caller(0)
-	pkgPath = filepath.Dir(filename) + "./../../"
+	return filepath.Dir(filename) + "./../../"
 }
 
-var pythonBundleWithAuthCheck = map[string]string{
-	"manifest.json": `
-		{
-		    "file_list": [
-		        "middleware.py"
-		    ],
-		    "custom_middleware": {
-		        "driver": "python",
-		        "auth_check": {
-		            "name": "MyAuthHook"
-		        }
-		    }
-		}
-`,
-	"middleware.py": `
+var pythonBundleWithAuthCheck = func(token1, token2 string) map[string]string {
+	middleware := `
 from tyk.decorators import *
 from gateway import TykGateway as tyk
 
@@ -54,29 +41,37 @@ def MyAuthHook(request, session, metadata, spec):
     session.quota_max = 1
     session.quota_renewal_rate = 60
     metadata["token"] = "valid_token"
-  if auth_header == '47a0c79c427728b3df4af62b9228c8ae11':
+  if auth_header == 'token_without_quota':
     policy_id = request.get_header('Policy')
     session.apply_policy_id = policy_id
-    metadata["token"] = "47a0c79c427728b3df4af62b9228c8ae11"
+    metadata["token"] = "token_without_quota"
   return request, session, metadata
-`,
-}
+`
 
-var pythonBundleWithPostHook = map[string]string{
-	"manifest.json": `
+	middleware = strings.ReplaceAll(middleware, "valid_token", token1)
+	middleware = strings.ReplaceAll(middleware, "token_without_quota", token2)
+	checksum := fmt.Sprintf("%x", md5.Sum([]byte(middleware)))
+
+	return map[string]string{
+		"manifest.json": fmt.Sprintf(`
 		{
 		    "file_list": [
 		        "middleware.py"
 		    ],
 		    "custom_middleware": {
 		        "driver": "python",
-		        "post": [{
-		            "name": "MyPostHook"
-		        }]
-		    }
-		}
-	`,
-	"middleware.py": `
+		        "auth_check": {
+		            "name": "MyAuthHook"
+		        }
+		    },
+		    "checksum": "%s"
+		}`, checksum),
+		"middleware.py": middleware,
+	}
+}
+
+var pythonBundleWithPostHook = func() map[string]string {
+	middleware := `
 from tyk.decorators import *
 from gateway import TykGateway as tyk
 import json
@@ -102,13 +97,10 @@ def MyPostHook(request, session, spec):
         request.object.return_overrides.response_error = "'stringkey' value doesn't match"
         return request, session	
     return request, session
-
-`,
-}
-
-var pythonPostRequestTransform = map[string]string{
-	"manifest.json": `
-		{
+`
+	checksum := fmt.Sprintf("%x", md5.Sum([]byte(middleware)))
+	return map[string]string{
+		`manifest.json`: fmt.Sprintf(`{
 		    "file_list": [
 		        "middleware.py"
 		    ],
@@ -117,18 +109,21 @@ var pythonPostRequestTransform = map[string]string{
 		        "post": [{
 		            "name": "MyPostHook"
 		        }]
-		    }
-		}
-	`,
-	"middleware.py": `
+		    },
+			"checksum": "%s"
+		}`, checksum),
+		"middleware.py": middleware,
+	}
+}
+
+var pythonPostRequestTransform = func() map[string]string {
+	middleware := `
 from tyk.decorators import *
 from gateway import TykGateway as tyk
 import json
 
 @Hook
 def MyPostHook(request, session, spec):
-	
-	
 	if request.object.url == "/test2":
 		if request.object.method != "POST":
 			request.object.return_overrides.response_code = 500
@@ -138,24 +133,27 @@ def MyPostHook(request, session, spec):
 		request.object.method = "GET"
 
 	return request , session
-`,
-}
-
-var pythonBundleWithPreHook = map[string]string{
-	"manifest.json": `
-		{
+`
+	checksum := fmt.Sprintf("%x", md5.Sum([]byte(middleware)))
+	return map[string]string{
+		`manifest.json`: fmt.Sprintf(`{
 		    "file_list": [
 		        "middleware.py"
 		    ],
 		    "custom_middleware": {
 		        "driver": "python",
-		        "pre": [{
-		            "name": "MyPreHook"
+		        "post": [{
+		            "name": "MyPostHook"
 		        }]
-		    }
-		}
-	`,
-	"middleware.py": `
+		    },
+			"checksum": "%s"
+		}`, checksum),
+		"middleware.py": middleware,
+	}
+}
+
+var pythonBundleWithPreHook = func() map[string]string {
+	middleware := `
 from tyk.decorators import *
 from gateway import TykGateway as tyk
 
@@ -179,12 +177,38 @@ def MyPreHook(request, session, metadata, spec):
         request.object.return_overrides.response_code = 400
         request.object.return_overrides.response_error = "Raw body field is empty"
     return request, session, metadata
-
-`,
+`
+	checksum := fmt.Sprintf("%x", md5.Sum([]byte(middleware)))
+	return map[string]string{
+		`manifest.json`: fmt.Sprintf(`{
+		    "file_list": [
+		        "middleware.py"
+		    ],
+		    "custom_middleware": {
+		        "driver": "python",
+		        "pre": [{
+		            "name": "MyPreHook"
+		        }]
+		    },
+			"checksum": "%s"
+		}`, checksum),
+		"middleware.py": middleware,
+	}
 }
 
-var pythonBundleWithResponseHook = map[string]string{
-	"manifest.json": `
+var pythonBundleWithResponseHook = func() map[string]string {
+	middleware := `
+from tyk.decorators import *
+from gateway import TykGateway as tyk
+
+@Hook
+def MyResponseHook(request, response, session, metadata, spec):
+  response.raw_body = b'newbody'
+  return response
+`
+	checksum := fmt.Sprintf("%x", md5.Sum([]byte(middleware)))
+	return map[string]string{
+		`manifest.json`: fmt.Sprintf(`
 		{
 		    "file_list": [
 		        "middleware.py"
@@ -194,40 +218,38 @@ var pythonBundleWithResponseHook = map[string]string{
 		        "response": [{
 		            "name": "MyResponseHook"
 		        }]
-		    }
+		    },
+			"checksum": "%s"
 		}
-	`,
-	"middleware.py": `
-from tyk.decorators import *
-from gateway import TykGateway as tyk
-
-@Hook
-def MyResponseHook(request, response, session, metadata, spec):
-  response.raw_body = b'newbody'
-  return response
-
-`,
+`, checksum),
+		"middleware.py": middleware,
+	}
 }
 
 func TestMain(m *testing.M) {
 	os.Exit(gateway.InitTestMain(context.Background(), m))
 }
 
-func TestPythonBundles(t *testing.T) {
+func setupGateway() *gateway.Test {
 	ts := gateway.StartTest(nil, gateway.TestConfig{
 		CoprocessConfig: config.CoProcessConfig{
 			EnableCoProcess:  true,
-			PythonPathPrefix: pkgPath,
+			PythonPathPrefix: pkgPath(),
 		}})
-	defer ts.Close()
 
-	authCheckBundle := ts.RegisterBundle("python_with_auth_check", pythonBundleWithAuthCheck)
-	postHookBundle := ts.RegisterBundle("python_with_post_hook", pythonBundleWithPostHook)
-	preHookBundle := ts.RegisterBundle("python_with_pre_hook", pythonBundleWithPreHook)
-	responseHookBundle := ts.RegisterBundle("python_with_response_hook", pythonBundleWithResponseHook)
-	postRequestTransformHookBundle := ts.RegisterBundle("python_post_with_request_transform_hook", pythonPostRequestTransform)
+	return ts
+}
+
+func TestPythonBundles(t *testing.T) {
+	unused := uuid.NewHex()
 
 	t.Run("Single-file bundle with authentication hook", func(t *testing.T) {
+		ts := setupGateway()
+		defer ts.Close()
+
+		validToken := uuid.NewHex()
+		authCheckBundle := ts.RegisterBundle("python_with_auth_check", pythonBundleWithAuthCheck(validToken, unused))
+
 		ts.Gw.BuildAndLoadAPI(func(spec *gateway.APISpec) {
 			spec.Proxy.ListenPath = "/test-api/"
 			spec.UseKeylessAccess = false
@@ -242,7 +264,7 @@ func TestPythonBundles(t *testing.T) {
 			spec.VersionData.NotVersioned = true
 		})
 
-		validAuth := map[string]string{"Authorization": "valid_token"}
+		validAuth := map[string]string{"Authorization": validToken}
 		invalidAuth := map[string]string{"Authorization": "invalid_token"}
 
 		ts.Run(t, []test.TestCase{
@@ -251,7 +273,7 @@ func TestPythonBundles(t *testing.T) {
 			{Path: "/test-api/", Code: http.StatusForbidden, Headers: validAuth},
 
 			// Delete sessions so that next set of tests works afresh
-			{Method: http.MethodDelete, Path: "/tyk/keys/valid_token", AdminAuth: true, Code: http.StatusOK, BodyMatch: `"action":"deleted"`},
+			{Method: http.MethodDelete, Path: "/tyk/keys/" + validToken, AdminAuth: true, Code: http.StatusOK, BodyMatch: `"action":"deleted"`},
 
 			{Path: "/test-api-with-customplugin-auth-enabled/", Code: http.StatusOK, Headers: validAuth},
 			{Path: "/test-api-with-customplugin-auth-enabled/", Code: http.StatusForbidden, Headers: invalidAuth},
@@ -260,6 +282,12 @@ func TestPythonBundles(t *testing.T) {
 	})
 
 	t.Run("Auth with policy", func(t *testing.T) {
+		ts := setupGateway()
+		defer ts.Close()
+
+		validToken := uuid.NewHex()
+		authCheckBundle := ts.RegisterBundle("python_with_auth_check", pythonBundleWithAuthCheck(unused, validToken))
+
 		specs := ts.Gw.BuildAndLoadAPI(func(spec *gateway.APISpec) {
 			spec.Auth.AuthHeaderName = "Authorization"
 			spec.Proxy.ListenPath = "/test-api/"
@@ -269,8 +297,6 @@ func TestPythonBundles(t *testing.T) {
 			spec.VersionData.NotVersioned = true
 		})
 
-		time.Sleep(1 * time.Second)
-
 		pID := ts.CreatePolicy(func(p *user.Policy) {
 			p.QuotaMax = 1
 			p.QuotaRenewalRate = 60
@@ -278,9 +304,11 @@ func TestPythonBundles(t *testing.T) {
 				APIID:    specs[0].APIID,
 				Versions: []string{"Default"},
 			}}
+
+			t.Log(p.ID)
 		})
 
-		policyAuth := map[string]string{"authorization": "47a0c79c427728b3df4af62b9228c8ae11", "policy": pID}
+		policyAuth := map[string]string{"authorization": validToken, "policy": pID}
 
 		ts.Run(t, []test.TestCase{
 			{Path: "/test-api/", Code: http.StatusOK, Headers: policyAuth},
@@ -289,6 +317,10 @@ func TestPythonBundles(t *testing.T) {
 	})
 
 	t.Run("Single-file bundle with post hook", func(t *testing.T) {
+		ts := setupGateway()
+		defer ts.Close()
+
+		postHookBundle := ts.RegisterBundle("python_with_post_hook", pythonBundleWithPostHook())
 
 		keyID := gateway.CreateSession(ts.Gw, func(s *user.SessionState) {
 			s.MetaData = map[string]interface{}{
@@ -305,8 +337,6 @@ func TestPythonBundles(t *testing.T) {
 			spec.VersionData.NotVersioned = true
 		})
 
-		time.Sleep(1 * time.Second)
-
 		auth := map[string]string{"Authorization": keyID}
 
 		ts.Run(t, []test.TestCase{
@@ -315,6 +345,10 @@ func TestPythonBundles(t *testing.T) {
 	})
 
 	t.Run("Single-file bundle with response hook", func(t *testing.T) {
+		ts := setupGateway()
+		defer ts.Close()
+
+		responseHookBundle := ts.RegisterBundle("python_with_response_hook", pythonBundleWithResponseHook())
 
 		keyID := gateway.CreateSession(ts.Gw, func(s *user.SessionState) {
 			s.MetaData = map[string]interface{}{
@@ -331,8 +365,6 @@ func TestPythonBundles(t *testing.T) {
 			spec.VersionData.NotVersioned = true
 		})
 
-		time.Sleep(1 * time.Second)
-
 		auth := map[string]string{"Authorization": keyID}
 
 		ts.Run(t, []test.TestCase{
@@ -341,6 +373,11 @@ func TestPythonBundles(t *testing.T) {
 	})
 
 	t.Run("Single-file bundle with pre hook and UTF-8/non-UTF-8 request data", func(t *testing.T) {
+		ts := setupGateway()
+		defer ts.Close()
+
+		preHookBundle := ts.RegisterBundle("python_with_pre_hook", pythonBundleWithPreHook())
+
 		ts.Gw.BuildAndLoadAPI(func(spec *gateway.APISpec) {
 			spec.Proxy.ListenPath = "/test-api-2/"
 			spec.UseKeylessAccess = true
@@ -348,8 +385,6 @@ func TestPythonBundles(t *testing.T) {
 			spec.CustomMiddlewareBundle = preHookBundle
 			spec.VersionData.NotVersioned = true
 		})
-
-		time.Sleep(1 * time.Second)
 
 		fileData := gateway.GenerateTestBinaryData()
 		var buf bytes.Buffer
@@ -382,6 +417,11 @@ func TestPythonBundles(t *testing.T) {
 	})
 
 	t.Run("python post hook with url rewrite and method transform", func(t *testing.T) {
+		ts := setupGateway()
+		defer ts.Close()
+
+		postRequestTransformHookBundle := ts.RegisterBundle("python_post_with_request_transform_hook", pythonPostRequestTransform())
+
 		ts.Gw.BuildAndLoadAPI(func(spec *gateway.APISpec) {
 			spec.Proxy.ListenPath = "/test-api-1/"
 			spec.UseKeylessAccess = true
@@ -412,8 +452,6 @@ func TestPythonBundles(t *testing.T) {
 			spec.EnableCoProcessAuth = false
 			spec.UseKeylessAccess = true
 		})
-
-		time.Sleep(1 * time.Second)
 
 		ts.Run(t, []test.TestCase{
 			{Path: "/test-api-1/get", Code: http.StatusOK, BodyMatch: "newpath"},

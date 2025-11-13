@@ -11,7 +11,7 @@ import (
 
 	log "github.com/sirupsen/logrus"
 
-	kingpin "gopkg.in/alecthomas/kingpin.v2"
+	kingpin "github.com/alecthomas/kingpin/v2"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/apidef/importer"
@@ -23,8 +23,9 @@ const (
 )
 
 var (
-	imp            *Importer
-	errUnknownMode = errors.New("Unknown mode")
+	imp *Importer = &Importer{}
+
+	errUnknownMode = errors.New("unknown mode")
 )
 
 // Importer wraps the import functionality.
@@ -40,10 +41,6 @@ type Importer struct {
 	asMock         *bool
 	forAPI         *string
 	asVersion      *string
-}
-
-func init() {
-	imp = &Importer{}
 }
 
 // AddTo initializes an importer object.
@@ -64,7 +61,7 @@ func AddTo(app *kingpin.Application) {
 }
 
 // Import performs the import process.
-func (i *Importer) Import(ctx *kingpin.ParseContext) (err error) {
+func (i *Importer) Import(_ *kingpin.ParseContext) (err error) {
 	if *i.swaggerMode {
 		err = i.handleSwaggerMode()
 		if err != nil {
@@ -91,15 +88,15 @@ func (i *Importer) validateInput() error {
 
 	if *i.createAPI {
 		if *i.upstreamTarget == "" || *i.orgID == "" {
-			return fmt.Errorf("No upstream target or org ID defined, these are both required")
+			return fmt.Errorf("no upstream target or org ID defined, these are both required")
 		}
 	} else {
 		if *i.forAPI == "" {
-			return fmt.Errorf("If adding to an API, the path to the definition must be listed")
+			return fmt.Errorf("if adding to an API, the path to the definition must be listed")
 		}
 
 		if *i.asVersion == "" {
-			return fmt.Errorf("No version defined for this import operation, please set an import ID using the --as-version flag")
+			return fmt.Errorf("no version defined for this import operation, please set an import ID using the --as-version flag")
 		}
 	}
 
@@ -127,29 +124,29 @@ func (i *Importer) handleBluePrintMode() error {
 	if !*i.createAPI {
 		// Different branch, here we need an API Definition to modify
 		if *i.forAPI == "" {
-			return fmt.Errorf("If adding to an API, the path to the definition must be listed")
+			return fmt.Errorf("if adding to an API, the path to the definition must be listed")
 		}
 
 		if *i.asVersion == "" {
-			return fmt.Errorf("No version defined for this import operation, please set an import ID using the --as-version flag")
+			return fmt.Errorf("no version defined for this import operation, please set an import ID using the --as-version flag")
 		}
 
 		defFromFile, err := i.apiDefLoadFile(*i.forAPI)
 		if err != nil {
-			return fmt.Errorf("failed to load and decode file data for API Definition: %v", err)
+			return fmt.Errorf("failed to load and decode file data for API Definition: %w", err)
 		}
 
 		bp, err := i.bluePrintLoadFile(*i.input)
 		if err != nil {
-			return fmt.Errorf("File load error: %v", err)
+			return fmt.Errorf("file load error: %w", err)
 		}
 		versionData, err := bp.ConvertIntoApiVersion(*i.asMock)
 		if err != nil {
-			return fmt.Errorf("onversion into API Def failed: %v", err)
+			return fmt.Errorf("onversion into API Def failed: %w", err)
 		}
 
 		if err := bp.InsertIntoAPIDefinitionAsVersion(versionData, defFromFile, *i.asVersion); err != nil {
-			return fmt.Errorf("Insertion failed: %v", err)
+			return fmt.Errorf("insertion failed: %w", err)
 		}
 
 		i.printDef(defFromFile)
@@ -157,18 +154,18 @@ func (i *Importer) handleBluePrintMode() error {
 	}
 
 	if *i.upstreamTarget == "" && *i.orgID == "" {
-		return fmt.Errorf("No upstream target or org ID defined, these are both required")
+		return fmt.Errorf("no upstream target or org ID defined, these are both required")
 	}
 
 	// Create the API with the blueprint
 	bp, err := i.bluePrintLoadFile(*i.input)
 	if err != nil {
-		return fmt.Errorf("File load error: %v", err)
+		return fmt.Errorf("file load error: %w", err)
 	}
 
 	def, err := bp.ToAPIDefinition(*i.orgID, *i.upstreamTarget, *i.asMock)
 	if err != nil {
-		return fmt.Errorf("Failed to create API Definition from file")
+		return fmt.Errorf("failed to create API Definition from file")
 	}
 
 	i.printDef(def)
@@ -181,48 +178,48 @@ func (i *Importer) handleSwaggerMode() error {
 			// Create the API with the blueprint
 			s, err := i.swaggerLoadFile(*i.input)
 			if err != nil {
-				return fmt.Errorf("File load error: %v", err)
+				return fmt.Errorf("file load error: %w", err)
 			}
 
 			def, err := s.ToAPIDefinition(*i.orgID, *i.upstreamTarget, *i.asMock)
 			if err != nil {
-				return fmt.Errorf("Failed to create API Defintition from file")
+				return fmt.Errorf("failed to create API Defintition from file")
 			}
 
 			i.printDef(def)
 			return nil
 		}
 
-		return fmt.Errorf("No upstream target or org ID defined, these are both required")
+		return fmt.Errorf("no upstream target or org ID defined, these are both required")
 
 	}
 
 	// Different branch, here we need an API Definition to modify
 	if *i.forAPI == "" {
-		return fmt.Errorf("If adding to an API, the path to the definition must be listed")
+		return fmt.Errorf("if adding to an API, the path to the definition must be listed")
 	}
 
 	if *i.asVersion == "" {
-		return fmt.Errorf("No version defined for this import operation, please set an import ID using the --as-version flag")
+		return fmt.Errorf("no version defined for this import operation, please set an import ID using the --as-version flag")
 	}
 
 	defFromFile, err := i.apiDefLoadFile(*i.forAPI)
 	if err != nil {
-		return fmt.Errorf("failed to load and decode file data for API Definition: %v", err)
+		return fmt.Errorf("failed to load and decode file data for API Definition: %w", err)
 	}
 
 	s, err := i.swaggerLoadFile(*i.input)
 	if err != nil {
-		return fmt.Errorf("File load error: %v", err)
+		return fmt.Errorf("file load error: %w", err)
 	}
 
 	versionData, err := s.ConvertIntoApiVersion(*i.asMock)
 	if err != nil {
-		return fmt.Errorf("Conversion into API Def failed: %v", err)
+		return fmt.Errorf("conversion into API Def failed: %w", err)
 	}
 
 	if err := s.InsertIntoAPIDefinitionAsVersion(versionData, defFromFile, *i.asVersion); err != nil {
-		return fmt.Errorf("Insertion failed: %v", err)
+		return fmt.Errorf("insertion failed: %w", err)
 	}
 
 	i.printDef(defFromFile)
@@ -242,7 +239,7 @@ func (i *Importer) handleWSDLMode() error {
 	//Load WSDL file
 	w, err := i.wsdlLoadFile(*i.input)
 	if err != nil {
-		return fmt.Errorf("File load error: %v", err)
+		return fmt.Errorf("file load error: %w", err)
 	}
 
 	w.SetServicePortMapping(serviceportMapping)
@@ -251,22 +248,22 @@ func (i *Importer) handleWSDLMode() error {
 		//Create new API
 		def, err = w.ToAPIDefinition(*i.orgID, *i.upstreamTarget, *i.asMock)
 		if err != nil {
-			return fmt.Errorf("Failed to create API Defintition from file")
+			return fmt.Errorf("failed to create API Defintition from file")
 		}
 	} else {
 		//Add into existing API
 		def, err = i.apiDefLoadFile(*i.forAPI)
 		if err != nil {
-			return fmt.Errorf("failed to load and decode file data for API Definition: %v", err)
+			return fmt.Errorf("failed to load and decode file data for API Definition: %w", err)
 		}
 
 		versionData, err := w.ConvertIntoApiVersion(*i.asMock)
 		if err != nil {
-			return fmt.Errorf("Conversion into API Def failed: %v", err)
+			return fmt.Errorf("conversion into API Def failed: %w", err)
 		}
 
 		if err := w.InsertIntoAPIDefinitionAsVersion(versionData, def, *i.asVersion); err != nil {
-			return fmt.Errorf("Insertion failed: %v", err)
+			return fmt.Errorf("insertion failed: %w", err)
 		}
 
 	}

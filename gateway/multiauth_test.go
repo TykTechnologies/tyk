@@ -81,7 +81,7 @@ func (ts *Test) getMultiAuthStandardAndBasicAuthChain(spec *APISpec) http.Handle
 	remote, _ := url.Parse(TestHttpAny)
 	proxy := ts.Gw.TykNewSingleHostReverseProxy(remote, spec, nil)
 	proxyHandler := ProxyHandler(proxy, spec)
-	baseMid := BaseMiddleware{Spec: spec, Proxy: proxy, Gw: ts.Gw}
+	baseMid := &BaseMiddleware{Spec: spec, Proxy: proxy, Gw: ts.Gw}
 	chain := alice.New(ts.Gw.mwList(
 		&IPWhiteListMiddleware{baseMid},
 		&IPBlackListMiddleware{BaseMiddleware: baseMid},
@@ -96,7 +96,7 @@ func (ts *Test) getMultiAuthStandardAndBasicAuthChain(spec *APISpec) http.Handle
 }
 
 func (ts *Test) testPrepareMultiSessionBA(t testing.TB, isBench bool) (*APISpec, *http.Request) {
-
+	t.Helper()
 	spec := ts.Gw.LoadSampleAPI(multiAuthDev)
 
 	// Create BA
@@ -304,11 +304,16 @@ func TestJWTAuthKeyMultiAuth(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
 
-	pID := ts.CreatePolicy()
+	const testAPIID = "test-api-id"
+	pID := ts.CreatePolicy(func(p *user.Policy) {
+		p.AccessRights = map[string]user.AccessDefinition{
+			testAPIID: {APIID: testAPIID, APIName: "test-api"},
+		}
+	})
 
 	spec := ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 		spec.UseKeylessAccess = false
-
+		spec.APIID = testAPIID
 		spec.AuthConfigs = make(map[string]apidef.AuthConfig)
 
 		spec.UseStandardAuth = true
