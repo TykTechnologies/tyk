@@ -51,9 +51,9 @@ func TestXTykAPIGateway(t *testing.T) {
 		var xTykAPIGateway XTykAPIGateway
 		Fill(t, &xTykAPIGateway, 0)
 		xTykAPIGateway.Server.Authentication = &Authentication{
-			SecuritySchemes: SecuritySchemes{
+			SecuritySchemes: newTestSecuritySchemes(map[string]interface{}{
 				"custome": &Token{},
-			},
+			}),
 		}
 
 		oas.Extensions = map[string]interface{}{

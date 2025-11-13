@@ -71,10 +71,10 @@ func (s *OAS) fillToken(api apidef.APIDefinition) {
 		token.Signature = nil
 	}
 
-	s.getTykSecuritySchemes()[authConfig.Name] = token
+	s.getTykSecuritySchemes().Set(authConfig.Name, token)
 
 	if ShouldOmit(token) {
-		delete(s.getTykSecuritySchemes(), authConfig.Name)
+		s.getTykSecuritySchemes().Delete(authConfig.Name)
 	}
 }
 
@@ -383,10 +383,10 @@ func (s *OAS) fillJWT(api apidef.APIDefinition) {
 	jwt.ExpiresAtValidationSkew = api.JWTExpiresAtValidationSkew
 	jwt.IDPClientIDMappingDisabled = api.IDPClientIDMappingDisabled
 
-	s.getTykSecuritySchemes()[ac.Name] = jwt
+	s.getTykSecuritySchemes().Set(ac.Name, jwt)
 
 	if ShouldOmit(jwt) {
-		delete(s.getTykSecuritySchemes(), ac.Name)
+		s.getTykSecuritySchemes().Delete(ac.Name)
 	}
 }
 
@@ -498,10 +498,10 @@ func (s *OAS) fillBasic(api apidef.APIDefinition) {
 		basic.ExtractCredentialsFromBody = nil
 	}
 
-	s.getTykSecuritySchemes()[ac.Name] = basic
+	s.getTykSecuritySchemes().Set(ac.Name, basic)
 
 	if ShouldOmit(basic) {
-		delete(s.getTykSecuritySchemes(), ac.Name)
+		s.getTykSecuritySchemes().Delete(ac.Name)
 	}
 }
 
@@ -627,7 +627,7 @@ func (s *OAS) fillOAuth(api apidef.APIDefinition) {
 		oauth = nil
 	}
 
-	s.getTykSecuritySchemes()[authConfig.Name] = oauth
+	s.getTykSecuritySchemes().Set(authConfig.Name, oauth)
 }
 
 func (s *OAS) extractOAuthTo(api *apidef.APIDefinition, name string) {
@@ -878,7 +878,7 @@ func (s *OAS) fillExternalOAuth(api apidef.APIDefinition) {
 		externalOAuth = nil
 	}
 
-	s.getTykSecuritySchemes()[authConfig.Name] = externalOAuth
+	s.getTykSecuritySchemes().Set(authConfig.Name, externalOAuth)
 }
 
 func (s *OAS) extractExternalOAuthTo(api *apidef.APIDefinition, name string) {
@@ -987,7 +987,7 @@ func (s *OAS) isProprietaryInVendor(schemeName string, tykAuth *Authentication) 
 
 	// If in both vendor and OAS, check SecuritySchemes type
 	if tykAuth.SecuritySchemes != nil {
-		if scheme, exists := tykAuth.SecuritySchemes[schemeName]; exists {
+		if scheme, exists := tykAuth.SecuritySchemes.Get(schemeName); exists {
 			return s.isProprietarySchemeType(scheme)
 		}
 	}
@@ -1002,7 +1002,7 @@ func (s *OAS) isProprietaryInSecuritySchemes(schemeName string, tykAuth *Authent
 		return false
 	}
 
-	scheme, exists := tykAuth.SecuritySchemes[schemeName]
+	scheme, exists := tykAuth.SecuritySchemes.Get(schemeName)
 	if !exists {
 		return false
 	}
@@ -1040,7 +1040,7 @@ func (s *OAS) fillSecurity(api apidef.APIDefinition) {
 	}
 
 	if tykAuthentication.SecuritySchemes == nil {
-		s.GetTykExtension().Server.Authentication.SecuritySchemes = make(SecuritySchemes)
+		tykAuthentication.SecuritySchemes = NewSecuritySchemes()
 	}
 
 	tykAuthentication.Fill(api)
@@ -1100,10 +1100,10 @@ func (s *OAS) fillSecurity(api apidef.APIDefinition) {
 					oasSecurity = append(oasSecurity, oasReq)
 				}
 			}
-		} else if len(tykAuthentication.SecuritySchemes) > 0 {
+		} else if tykAuthentication.SecuritySchemes.Len() > 0 {
 			// No explicit requirements, create from schemes
 			secReq := openapi3.NewSecurityRequirement()
-			for name := range tykAuthentication.SecuritySchemes {
+			for name := range tykAuthentication.SecuritySchemes.Iter() {
 				if !s.isProprietaryAuthScheme(name) {
 					secReq[name] = []string{}
 				}
@@ -1148,11 +1148,11 @@ func (s *OAS) fillSecurity(api apidef.APIDefinition) {
 			if len(vendorSecurity) > 0 {
 				tykAuthentication.Security = vendorSecurity
 			}
-		} else if len(tykAuthentication.SecuritySchemes) > 0 {
+		} else if tykAuthentication.SecuritySchemes.Len() > 0 {
 			// When no explicit requirements, create from schemes
 			// Only add non-proprietary schemes to OAS security
 			secReq := openapi3.NewSecurityRequirement()
-			for name := range tykAuthentication.SecuritySchemes {
+			for name := range tykAuthentication.SecuritySchemes.Iter() {
 				if !s.isProprietaryAuthScheme(name) {
 					secReq[name] = []string{}
 				}
@@ -1163,7 +1163,7 @@ func (s *OAS) fillSecurity(api apidef.APIDefinition) {
 		}
 	}
 
-	if len(tykAuthentication.SecuritySchemes) == 0 {
+	if tykAuthentication.SecuritySchemes.Len() == 0 {
 		tykAuthentication.SecuritySchemes = nil
 	}
 
@@ -1237,7 +1237,7 @@ func (s *OAS) extractSecurityTo(api *apidef.APIDefinition) {
 	hasEnabledSchemes := false
 	if tykAuth != nil && tykAuth.SecuritySchemes != nil {
 		// Check if any security scheme is defined in Tyk extension
-		hasEnabledSchemes = len(tykAuth.SecuritySchemes) > 0
+		hasEnabledSchemes = tykAuth.SecuritySchemes.Len() > 0
 	}
 
 	if processingMode == SecurityProcessingModeCompliant {
@@ -1349,7 +1349,7 @@ func (s *OAS) GetJWTConfiguration() *JWT {
 	if processingMode == SecurityProcessingModeLegacy {
 		// Legacy mode: only check the first security requirement in OAS security
 		if len(s.Security) > 0 {
-			for keyName := range s.getTykSecuritySchemes() {
+			for keyName := range s.getTykSecuritySchemes().Iter() {
 				if _, ok := s.Security[0][keyName]; ok && isJWTScheme(keyName) {
 					return s.getTykJWTAuth(keyName)
 				}
@@ -1360,7 +1360,7 @@ func (s *OAS) GetJWTConfiguration() *JWT {
 
 		// First check OAS security requirements
 		for _, securityRequirement := range s.Security {
-			for keyName := range s.getTykSecuritySchemes() {
+			for keyName := range s.getTykSecuritySchemes().Iter() {
 				if _, ok := securityRequirement[keyName]; ok && isJWTScheme(keyName) {
 					return s.getTykJWTAuth(keyName)
 				}

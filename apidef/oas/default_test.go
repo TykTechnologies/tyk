@@ -12,6 +12,14 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+func newTestSecuritySchemes(schemes map[string]interface{}) *SecuritySchemes {
+	ss := NewSecuritySchemes()
+	for k, v := range schemes {
+		ss.Set(k, v)
+	}
+	return ss
+}
+
 func TestOAS_BuildDefaultTykExtension(t *testing.T) {
 	t.Parallel()
 
@@ -245,6 +253,30 @@ func TestOAS_BuildDefaultTykExtension(t *testing.T) {
 
 		assert.Nil(t, err)
 
+		expectedSecuritySchemes := newTestSecuritySchemes(map[string]interface{}{
+			testSSMyAuth: &Token{
+				Enabled: getBoolPointer(true),
+			},
+			testSSMyAuthWithAnd: &OAuth{
+				Enabled: true,
+				AuthSources: AuthSources{
+					Header: &AuthSource{
+						Enabled: true,
+						Name:    defaultAuthSourceName,
+					},
+				},
+			},
+			testSSMyAuthWithOR: &Basic{
+				Enabled: true,
+				AuthSources: AuthSources{
+					Header: &AuthSource{
+						Enabled: true,
+						Name:    defaultAuthSourceName,
+					},
+				},
+			},
+		})
+
 		expectedTykExtension := XTykAPIGateway{
 			Server: Server{
 				ListenPath: ListenPath{
@@ -255,30 +287,7 @@ func TestOAS_BuildDefaultTykExtension(t *testing.T) {
 				Authentication: &Authentication{
 					Enabled:              true,
 					BaseIdentityProvider: apidef.AuthToken,
-					SecuritySchemes: SecuritySchemes{
-						testSSMyAuth: &Token{
-							Enabled: getBoolPointer(true),
-						},
-						testSSMyAuthWithAnd: &OAuth{
-							Enabled: true,
-							AuthSources: AuthSources{
-								Header: &AuthSource{
-									Enabled: true,
-									Name:    defaultAuthSourceName,
-								},
-							},
-						},
-						// OR alternative authentication method should also be imported
-						testSSMyAuthWithOR: &Basic{
-							Enabled: true,
-							AuthSources: AuthSources{
-								Header: &AuthSource{
-									Enabled: true,
-									Name:    defaultAuthSourceName,
-								},
-							},
-						},
-					},
+					SecuritySchemes:      expectedSecuritySchemes,
 				},
 			},
 			Upstream: Upstream{
@@ -1780,7 +1789,7 @@ func TestOAS_importAuthentication(t *testing.T) {
 
 			// When there are multiple security requirements (OR condition),
 			// ALL authentication methods should be imported to enable OR logic
-			expectedSecuritySchemes := SecuritySchemes{
+			expectedSecuritySchemes := newTestSecuritySchemes(map[string]interface{}{
 				testSecurityNameToken: &Token{
 					Enabled: &enable,
 				},
@@ -1793,7 +1802,7 @@ func TestOAS_importAuthentication(t *testing.T) {
 						},
 					},
 				},
-			}
+			})
 
 			assert.Equal(t, expectedSecuritySchemes, authentication.SecuritySchemes)
 			// Base identity provider should be determined from the security schemes
@@ -1831,11 +1840,11 @@ func TestOAS_importAuthentication(t *testing.T) {
 		xTykAPIGateway := &XTykAPIGateway{
 			Server: Server{
 				Authentication: &Authentication{
-					SecuritySchemes: SecuritySchemes{
+					SecuritySchemes: newTestSecuritySchemes(map[string]interface{}{
 						testSecurityNameToken: &Token{
 							Enabled: getBoolPointer(false),
 						},
-					},
+					}),
 				},
 			},
 		}
@@ -1849,11 +1858,11 @@ func TestOAS_importAuthentication(t *testing.T) {
 
 		assert.True(t, authentication.Enabled)
 
-		expectedSecuritySchemes := SecuritySchemes{
+		expectedSecuritySchemes := newTestSecuritySchemes(map[string]interface{}{
 			testSecurityNameToken: &Token{
 				Enabled: getBoolPointer(true),
 			},
-		}
+		})
 
 		assert.Equal(t, expectedSecuritySchemes, authentication.SecuritySchemes)
 	})
@@ -1896,7 +1905,7 @@ func TestOAS_importAuthentication(t *testing.T) {
 
 			assert.Equal(t, enable, authentication.Enabled)
 
-			expectedSecuritySchemes := SecuritySchemes{
+			expectedSecuritySchemes := newTestSecuritySchemes(map[string]interface{}{
 				testSecurityNameToken: &Token{
 					Enabled: &enable,
 				},
@@ -1909,7 +1918,7 @@ func TestOAS_importAuthentication(t *testing.T) {
 						},
 					},
 				},
-			}
+			})
 
 			assert.Equal(t, expectedSecuritySchemes, authentication.SecuritySchemes)
 			assert.Equal(t, apidef.AuthToken, authentication.BaseIdentityProvider)
@@ -1939,7 +1948,7 @@ func TestSecuritySchemes_Import(t *testing.T) {
 	t.Run("token", func(t *testing.T) {
 		check := func(t *testing.T, enable bool) {
 			t.Helper()
-			securitySchemes := SecuritySchemes{}
+			securitySchemes := NewSecuritySchemes()
 			nativeSecurityScheme := &openapi3.SecurityScheme{
 				Type: typeAPIKey,
 				In:   header,
@@ -1953,7 +1962,9 @@ func TestSecuritySchemes_Import(t *testing.T) {
 				Enabled: &enable,
 			}
 
-			assert.Equal(t, expectedToken, securitySchemes[testSecurityNameToken])
+			actualToken, exists := securitySchemes.Get(testSecurityNameToken)
+			assert.True(t, exists)
+			assert.Equal(t, expectedToken, actualToken)
 		}
 
 		t.Run("enable=true", func(t *testing.T) {
@@ -1966,7 +1977,7 @@ func TestSecuritySchemes_Import(t *testing.T) {
 	})
 
 	t.Run("jwt", func(t *testing.T) {
-		securitySchemes := SecuritySchemes{}
+		securitySchemes := NewSecuritySchemes()
 		nativeSecurityScheme := &openapi3.SecurityScheme{
 			Type:         typeHTTP,
 			Scheme:       schemeBearer,
@@ -1986,11 +1997,13 @@ func TestSecuritySchemes_Import(t *testing.T) {
 			},
 		}
 
-		assert.Equal(t, expectedJWT, securitySchemes[testSecurityNameJWT])
+		actualJWT, exists := securitySchemes.Get(testSecurityNameJWT)
+		assert.True(t, exists)
+		assert.Equal(t, expectedJWT, actualJWT)
 	})
 
 	t.Run("basic", func(t *testing.T) {
-		securitySchemes := SecuritySchemes{}
+		securitySchemes := NewSecuritySchemes()
 		nativeSecurityScheme := &openapi3.SecurityScheme{
 			Type:   typeHTTP,
 			Scheme: schemeBasic,
@@ -2009,11 +2022,13 @@ func TestSecuritySchemes_Import(t *testing.T) {
 			},
 		}
 
-		assert.Equal(t, expectedBasic, securitySchemes[testSecurityNameBasic])
+		actualBasic, exists := securitySchemes.Get(testSecurityNameBasic)
+		assert.True(t, exists)
+		assert.Equal(t, expectedBasic, actualBasic)
 	})
 
 	t.Run("oauth", func(t *testing.T) {
-		securitySchemes := SecuritySchemes{}
+		securitySchemes := NewSecuritySchemes()
 		nativeSecurityScheme := &openapi3.SecurityScheme{
 			Type: typeOAuth2,
 		}
@@ -2031,11 +2046,13 @@ func TestSecuritySchemes_Import(t *testing.T) {
 			},
 		}
 
-		assert.Equal(t, expectedOAuth, securitySchemes[testSecurityNameOauth])
+		actualOAuth, exists := securitySchemes.Get(testSecurityNameOauth)
+		assert.True(t, exists)
+		assert.Equal(t, expectedOAuth, actualOAuth)
 	})
 
 	t.Run("unsupported scheme", func(t *testing.T) {
-		securitySchemes := SecuritySchemes{}
+		securitySchemes := NewSecuritySchemes()
 		nativeSecurityScheme := &openapi3.SecurityScheme{
 			Type: "unknown",
 		}
@@ -2046,9 +2063,8 @@ func TestSecuritySchemes_Import(t *testing.T) {
 
 	t.Run("update existing one", func(t *testing.T) {
 		existingToken := &Token{}
-		securitySchemes := SecuritySchemes{
-			testSecurityNameToken: existingToken,
-		}
+		securitySchemes := NewSecuritySchemes()
+		securitySchemes.Set(testSecurityNameToken, existingToken)
 
 		nativeSecurityScheme := &openapi3.SecurityScheme{
 			Type: typeAPIKey,
@@ -2063,41 +2079,43 @@ func TestSecuritySchemes_Import(t *testing.T) {
 			Enabled: getBoolPointer(true),
 		}
 
-		assert.Equal(t, expectedToken, securitySchemes[testSecurityNameToken])
+		actualToken, exists := securitySchemes.Get(testSecurityNameToken)
+		assert.True(t, exists)
+		assert.Equal(t, expectedToken, actualToken)
 	})
 }
 
 func TestSecuritySchemes_GetBaseIdentityProvider(t *testing.T) {
 	t.Run("empty", func(t *testing.T) {
-		ss := SecuritySchemes{}
+		ss := NewSecuritySchemes()
 		t.Run("zero", func(t *testing.T) {
 			assert.Equal(t, apidef.AuthTypeNone, ss.GetBaseIdentityProvider())
 		})
 
-		ss["token"] = &Token{}
+		ss.Set("token", &Token{})
 
 		t.Run("one", func(t *testing.T) {
 			assert.Equal(t, apidef.AuthTypeNone, ss.GetBaseIdentityProvider())
 		})
 	})
 
-	ss := SecuritySchemes{}
-	ss["token"] = &Token{}
-	ss["jwt"] = &JWT{}
-	ss["oauth"] = &OAuth{}
-	ss["basic"] = &Basic{}
+	ss := NewSecuritySchemes()
+	ss.Set("token", &Token{})
+	ss.Set("jwt", &JWT{})
+	ss.Set("oauth", &OAuth{})
+	ss.Set("basic", &Basic{})
 
 	t.Run("token", func(t *testing.T) {
 		assert.Equal(t, apidef.AuthToken, ss.GetBaseIdentityProvider())
 	})
 
-	delete(ss, "token")
+	ss.Delete("token")
 
 	t.Run("jwt", func(t *testing.T) {
 		assert.Equal(t, apidef.JWTClaim, ss.GetBaseIdentityProvider())
 	})
 
-	delete(ss, "jwt")
+	ss.Delete("jwt")
 
 	t.Run("oauth", func(t *testing.T) {
 		assert.Equal(t, apidef.OAuthKey, ss.GetBaseIdentityProvider())

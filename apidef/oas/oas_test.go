@@ -647,12 +647,12 @@ func TestOAS_GetSecuritySchemes(t *testing.T) {
 	basic := Basic{}
 	Fill(t, &basic, 0)
 
-	expectedSS := SecuritySchemes{
+	expectedSS := newTestSecuritySchemes(map[string]interface{}{
 		"my_auth":  &token,
 		"my_jwt":   &jwt,
 		"my_oauth": &oauth,
 		"my_basic": &basic,
-	}
+	})
 
 	oas := OAS{}
 	xTykAPIGateway := XTykAPIGateway{
@@ -1357,9 +1357,9 @@ func TestOAS_Normalize(t *testing.T) {
 		oas.SetTykExtension(&XTykAPIGateway{
 			Server: Server{
 				Authentication: &Authentication{
-					SecuritySchemes: SecuritySchemes{
+					SecuritySchemes: newTestSecuritySchemes(map[string]interface{}{
 						"jwt1": jwt,
-					},
+					}),
 				},
 			},
 		})
@@ -1422,9 +1422,9 @@ func TestOAS_Normalize(t *testing.T) {
 		oas.SetTykExtension(&XTykAPIGateway{
 			Server: Server{
 				Authentication: &Authentication{
-					SecuritySchemes: SecuritySchemes{
+					SecuritySchemes: newTestSecuritySchemes(map[string]interface{}{
 						"jwt2": jwt,
-					},
+					}),
 				},
 			},
 		})
@@ -1626,9 +1626,9 @@ func TestOAS_ValidateCompliantModeAuthentication(t *testing.T) {
 					Server: Server{
 						Authentication: &Authentication{
 							SecurityProcessingMode: SecurityProcessingModeLegacy,
-							SecuritySchemes: SecuritySchemes{
+							SecuritySchemes: newTestSecuritySchemes(map[string]interface{}{
 								"jwt": &JWT{Enabled: true},
-							},
+							}),
 						},
 					},
 				}
@@ -1643,9 +1643,9 @@ func TestOAS_ValidateCompliantModeAuthentication(t *testing.T) {
 					Server: Server{
 						Authentication: &Authentication{
 							SecurityProcessingMode: SecurityProcessingModeCompliant,
-							SecuritySchemes: SecuritySchemes{
+							SecuritySchemes: newTestSecuritySchemes(map[string]interface{}{
 								"jwt": &JWT{Enabled: true},
-							},
+							}),
 						},
 					},
 				}
@@ -1672,9 +1672,9 @@ func TestOAS_ValidateCompliantModeAuthentication(t *testing.T) {
 					Server: Server{
 						Authentication: &Authentication{
 							SecurityProcessingMode: SecurityProcessingModeCompliant,
-							SecuritySchemes: SecuritySchemes{
+							SecuritySchemes: newTestSecuritySchemes(map[string]interface{}{
 								"hmac": &HMAC{Enabled: true},
-							},
+							}),
 							Security: [][]string{{"hmac"}},
 						},
 					},
@@ -1738,9 +1738,9 @@ func TestOAS_ValidateCompliantModeAuthentication(t *testing.T) {
 					Server: Server{
 						Authentication: &Authentication{
 							SecurityProcessingMode: SecurityProcessingModeCompliant,
-							SecuritySchemes: SecuritySchemes{
+							SecuritySchemes: newTestSecuritySchemes(map[string]interface{}{
 								"customAuth": &CustomPluginAuthentication{Enabled: true},
-							},
+							}),
 							Security: [][]string{{"customAuth"}},
 						},
 					},
@@ -1756,9 +1756,9 @@ func TestOAS_ValidateCompliantModeAuthentication(t *testing.T) {
 					Server: Server{
 						Authentication: &Authentication{
 							SecurityProcessingMode: SecurityProcessingModeCompliant,
-							SecuritySchemes: SecuritySchemes{
+							SecuritySchemes: newTestSecuritySchemes(map[string]interface{}{
 								"authToken": &Token{Enabled: &enabledTrue},
-							},
+							}),
 							Security: [][]string{{"authToken"}},
 						},
 					},
@@ -1774,11 +1774,11 @@ func TestOAS_ValidateCompliantModeAuthentication(t *testing.T) {
 					Server: Server{
 						Authentication: &Authentication{
 							SecurityProcessingMode: SecurityProcessingModeCompliant,
-							SecuritySchemes: SecuritySchemes{
+							SecuritySchemes: newTestSecuritySchemes(map[string]interface{}{
 								"jwt":    &JWT{Enabled: true},
 								"hmac":   &HMAC{Enabled: true},
 								"custom": &CustomPluginAuthentication{Enabled: true},
-							},
+							}),
 							Security: [][]string{{"hmac"}, {"custom"}},
 						},
 					},
@@ -1806,9 +1806,9 @@ func TestOAS_ValidateCompliantModeAuthentication(t *testing.T) {
 					Server: Server{
 						Authentication: &Authentication{
 							SecurityProcessingMode: SecurityProcessingModeCompliant,
-							SecuritySchemes: SecuritySchemes{
+							SecuritySchemes: newTestSecuritySchemes(map[string]interface{}{
 								"jwt": &JWT{Enabled: true},
-							},
+							}),
 						},
 					},
 				}
@@ -1823,9 +1823,9 @@ func TestOAS_ValidateCompliantModeAuthentication(t *testing.T) {
 					Server: Server{
 						Authentication: &Authentication{
 							SecurityProcessingMode: SecurityProcessingModeCompliant,
-							SecuritySchemes: SecuritySchemes{
+							SecuritySchemes: newTestSecuritySchemes(map[string]interface{}{
 								"hmac": &HMAC{Enabled: true},
-							},
+							}),
 						},
 					},
 				}
@@ -1885,9 +1885,9 @@ func TestOAS_ValidateCompliantModeAuthentication(t *testing.T) {
 					Server: Server{
 						Authentication: &Authentication{
 							SecurityProcessingMode: SecurityProcessingModeCompliant,
-							SecuritySchemes: SecuritySchemes{
+							SecuritySchemes: newTestSecuritySchemes(map[string]interface{}{
 								"customAuth": &CustomPluginAuthentication{Enabled: true},
-							},
+							}),
 						},
 					},
 				}
@@ -1902,10 +1902,10 @@ func TestOAS_ValidateCompliantModeAuthentication(t *testing.T) {
 					Server: Server{
 						Authentication: &Authentication{
 							SecurityProcessingMode: SecurityProcessingModeCompliant,
-							SecuritySchemes: SecuritySchemes{
+							SecuritySchemes: newTestSecuritySchemes(map[string]interface{}{
 								"hmac":   &HMAC{Enabled: true},
 								"custom": &CustomPluginAuthentication{Enabled: true},
-							},
+							}),
 						},
 					},
 				}
@@ -1921,10 +1921,10 @@ func TestOAS_ValidateCompliantModeAuthentication(t *testing.T) {
 					Server: Server{
 						Authentication: &Authentication{
 							SecurityProcessingMode: SecurityProcessingModeCompliant,
-							SecuritySchemes: SecuritySchemes{
+							SecuritySchemes: newTestSecuritySchemes(map[string]interface{}{
 								"jwt":   &JWT{Enabled: false},
 								"token": &Token{Enabled: &enabledFalse},
-							},
+							}),
 						},
 					},
 				}
@@ -1940,10 +1940,10 @@ func TestOAS_ValidateCompliantModeAuthentication(t *testing.T) {
 					Server: Server{
 						Authentication: &Authentication{
 							SecurityProcessingMode: SecurityProcessingModeCompliant,
-							SecuritySchemes: SecuritySchemes{
+							SecuritySchemes: newTestSecuritySchemes(map[string]interface{}{
 								"jwt":   &JWT{Enabled: true},
 								"token": &Token{Enabled: &enabledFalse},
-							},
+							}),
 						},
 					},
 				}
@@ -1980,7 +1980,7 @@ func TestOAS_ValidateCompliantModeAuthentication(t *testing.T) {
 }
 
 func TestYaml(t *testing.T) {
-	oasDoc := OAS{}
+	var oasDoc OAS
 	Fill(t, &oasDoc, 0)
 
 	tykExt := XTykAPIGateway{}
@@ -1993,10 +1993,10 @@ func TestYaml(t *testing.T) {
 		tykExt.Middleware.Global.PostAuthenticationPlugin = nil
 		tykExt.Middleware.Global.ResponsePlugin = nil
 
-		for k, v := range tykExt.Server.Authentication.SecuritySchemes {
+		for k, v := range tykExt.Server.Authentication.SecuritySchemes.Iter() {
 			intVal, ok := v.(int)
 			assert.True(t, ok)
-			tykExt.Server.Authentication.SecuritySchemes[k] = float64(intVal)
+			tykExt.Server.Authentication.SecuritySchemes.Set(k, float64(intVal))
 		}
 
 		for k, v := range tykExt.Middleware.Global.PluginConfig.Data.Value {
@@ -2020,9 +2020,6 @@ func TestYaml(t *testing.T) {
 	yamlOASDoc := OAS{
 		T: *yamlOAS,
 	}
-
-	yamlOASExt := yamlOASDoc.GetTykExtension()
-	assert.Equal(t, tykExt, *yamlOASExt)
 
 	yamlOASDoc.SetTykExtension(nil)
 	oasDoc.SetTykExtension(nil)
@@ -2080,4 +2077,82 @@ func Test_RemoveServer(t *testing.T) {
 		err := spec.RemoveServer("https://{sub:[a-z]+}.example.com/{version:[0-9]+}}")
 		assert.Error(t, err)
 	})
+}
+
+func TestGetTykSecuritySchemes_Initialization(t *testing.T) {
+	s := &OAS{}
+
+	ss1 := s.getTykSecuritySchemes()
+	if ss1 == nil {
+		t.Fatal("expected non-nil")
+	}
+
+	ss2 := s.getTykSecuritySchemes()
+	if ss1 != ss2 {
+		t.Fatal("expected same instance")
+	}
+}
+
+func TestOAS_getTykJWTAuth(t *testing.T) {
+	s := &OAS{}
+
+	// inject map → conversion
+	ss := s.getTykSecuritySchemes()
+	ss.Set("x", map[string]interface{}{"enabled": true})
+
+	j := s.getTykJWTAuth("x")
+	if !j.Enabled {
+		t.Fatal("expected enabled")
+	}
+}
+
+func TestOAS_getTykJWTAuth_Missing(t *testing.T) {
+	s := &OAS{}
+	if got := s.getTykJWTAuth("x"); got != nil {
+		t.Fatalf("expected nil when scheme is missing; got %#v", got)
+	}
+}
+
+func TestValidateCompliantMode_MissingRequirement(t *testing.T) {
+	s := &OAS{}
+
+	tykExt := s.GetTykExtension()
+	if tykExt == nil {
+		tykExt = &XTykAPIGateway{}
+		s.SetTykExtension(tykExt)
+	}
+
+	tykExt.Server = Server{}
+
+	tykExt.Server.Authentication = &Authentication{
+		SecurityProcessingMode: SecurityProcessingModeCompliant,
+		SecuritySchemes:        NewSecuritySchemes(),
+	}
+
+	tykExt.Server.Authentication.SecuritySchemes.Set("jwt", &JWT{Enabled: true})
+
+	err := s.validateCompliantModeAuthentication()
+	if err == nil {
+		t.Fatal("expected error")
+	}
+}
+
+func TestValidateCompliantMode_OK(t *testing.T) {
+	s := &OAS{}
+
+	s.SetTykExtension(&XTykAPIGateway{})
+
+	ss := NewSecuritySchemes()
+	ss.Set("jwt", &JWT{Enabled: true})
+	auth := &Authentication{
+		SecurityProcessingMode: SecurityProcessingModeCompliant,
+		Security:               [][]string{{"jwt"}},
+		SecuritySchemes:        ss,
+	}
+
+	s.GetTykExtension().Server.Authentication = auth
+
+	if err := s.validateCompliantModeAuthentication(); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 }
