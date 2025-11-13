@@ -29,14 +29,14 @@ func BenchmarkRoutersPerformance(b *testing.B) {
 		addRouterBenchmark(b, "one resource", newClassicRouter(b, 1), newRequestPool(b, 1, routePathGenerator))
 		addRouterBenchmark(b, "hundred resources", newClassicRouter(b, 100), newRequestPool(b, 100, routePathGenerator))
 		addRouterBenchmark(b, "1k resources", newClassicRouter(b, 1000), newRequestPool(b, 1000, routePathGenerator))
-		addRouterBenchmark(b, "one resource", newClassicRouter(b, 10_000), newRequestPool(b, 10_000, routePathGenerator))
+		addRouterBenchmark(b, "10k resources", newClassicRouter(b, 10_000), newRequestPool(b, 10_000, routePathGenerator))
 	})
 
 	b.Run("kin-openapi gorillamux /resource/{0..n}", func(b *testing.B) {
 		addRouterBenchmark(b, "one resource", newMuxRouter(b, 1), newRequestPool(b, 1, routePathGenerator))
 		addRouterBenchmark(b, "hundred resources", newMuxRouter(b, 100), newRequestPool(b, 100, routePathGenerator))
 		addRouterBenchmark(b, "1k resources", newMuxRouter(b, 1000), newRequestPool(b, 1000, routePathGenerator))
-		addRouterBenchmark(b, "1k resources", newMuxRouter(b, 10_000), newRequestPool(b, 10_000, routePathGenerator))
+		addRouterBenchmark(b, "10k resources", newMuxRouter(b, 10_000), newRequestPool(b, 10_000, routePathGenerator))
 	})
 }
 
