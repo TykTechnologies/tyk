@@ -597,8 +597,8 @@ jobs:
           git config --global url."https://${ORG_GH_TOKEN}@github.com".insteadOf "https://github.com"
           git config --global --add safe.directory /go/src/github.com/TykTechnologies/tyk-analytics
 
-          # Build packages for single target (current platform)
-          goreleaser release --clean -f ci/goreleaser/goreleaser.yml --snapshot --skip=sign,docker --single-target
+          # Build packages for current platform (GOOS and GOARCH are set via docker -e)
+          goreleaser release --clean -f ci/goreleaser/goreleaser.yml --snapshot --skip=sign,docker
           EOF
 
           chmod +x /tmp/build-dashboard.sh
