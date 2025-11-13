@@ -319,35 +319,21 @@ jobs:
           fetch-depth: 0
           ref: ${{ github.event.pull_request.head.sha }}
 
-      - name: Check for relevant package changes in pushed commits
+      - name: Check for relevant package changes in PR
         id: check_changes
         shell: bash
-        env:
-          BEFORE_SHA: ${{ github.event.before }}
-          # For pull_request events, github.sha points to a temporary merge commit GitHub creates
-          # We need the actual PR head SHA to compare the commits that were pushed
-          AFTER_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
           # Packages that affect dashboard compatibility
           RELEVANT_PACKAGES="pkg apidef lib common certs log config test user header"
 
-          echo "Checking commits pushed in this workflow run for changes in packages: $RELEVANT_PACKAGES"
-          echo "Commit range: $BEFORE_SHA..$AFTER_SHA"
+          echo "Checking PR for changes in packages: $RELEVANT_PACKAGES"
+          echo "Comparing PR against base branch: ${{ env.BASE_REF }}"
 
-          # Get all changed files in the commits being pushed
-          # When pushing to a new branch, github.event.before is all zeros (null SHA)
-          if [ "$BEFORE_SHA" = "0000000000000000000000000000000000000000" ]; then
-            # First push to branch - compare against base branch
-            git fetch origin ${{ env.BASE_REF }} 2>/dev/null || true
-            CHANGED_FILES=$(git diff --name-only origin/${{ env.BASE_REF }}...HEAD 2>/dev/null || echo "")
-            echo "First push - comparing against base branch"
-          else
-            # Subsequent push - compare against previous commit
-            CHANGED_FILES=$(git diff --name-only $BEFORE_SHA..$AFTER_SHA 2>/dev/null || echo "")
-            echo "Comparing against previous push"
-          fi
+          # Compare entire PR against base branch
+          git fetch origin ${{ env.BASE_REF }} 2>/dev/null || true
+          CHANGED_FILES=$(git diff --name-only origin/${{ env.BASE_REF }}...HEAD 2>/dev/null || echo "")
 
-          echo "Changed files in pushed commits:"
+          echo "Changed files in PR:"
           echo "$CHANGED_FILES"
 
           # Check if any changed files are in relevant packages
@@ -361,10 +347,10 @@ jobs:
 
           if [ "$HAS_RELEVANT_CHANGES" = "true" ]; then
             echo "has_relevant_changes=true" >> $GITHUB_OUTPUT
-            echo "📦 Relevant package changes in pushed commits - will build dashboard"
+            echo "📦 Relevant package changes in PR - will build dashboard"
           else
             echo "has_relevant_changes=false" >> $GITHUB_OUTPUT
-            echo "ℹ️ No relevant package changes in pushed commits"
+            echo "ℹ️ No relevant package changes in PR"
           fi
 
       - name: Configure AWS credentials
@@ -458,7 +444,7 @@ jobs:
           echo "Branch name: $BRANCH"
           echo "PR image tag: $IMAGE_TAG"
           echo "Commit SHA: $COMMIT_SHA"
-          echo "Has relevant changes in latest commit: $HAS_RELEVANT_CHANGES"
+          echo "Has relevant changes in PR: $HAS_RELEVANT_CHANGES"
           echo "=================================="
 
           # Only use custom build strategies for PRs targeting master
@@ -479,10 +465,10 @@ jobs:
             echo "dashboard_branch=$BRANCH" >> $GITHUB_OUTPUT
             echo "strategy=gromit-branch" >> $GITHUB_OUTPUT
 
-          # Strategy 2a: Latest commit has relevant changes → build new image
+          # Strategy 2a: PR has relevant changes → build new image
           elif [ "$HAS_RELEVANT_CHANGES" = "true" ]; then
             PR_IMAGE_TAG="tyk-${PR_NUMBER}"
-            echo "🔨 Strategy: Build dashboard (latest commit has relevant changes)"
+            echo "🔨 Strategy: Build dashboard (PR has relevant package changes)"
             echo "    → Will update gateway ref to $COMMIT_SHA"
             echo "    → Will push to: ${REGISTRY}/tyk-analytics:${PR_IMAGE_TAG}"
             echo "dashboard_image=${REGISTRY}/tyk-analytics:${PR_IMAGE_TAG}" >> $GITHUB_OUTPUT
@@ -490,9 +476,9 @@ jobs:
             echo "dashboard_branch=$BASE_REF" >> $GITHUB_OUTPUT
             echo "strategy=build-required" >> $GITHUB_OUTPUT
 
-          # Strategy 2b: PR image exists and no changes → reuse existing image
+          # Strategy 2b: PR image exists and no relevant changes → reuse existing image
           elif [ "$IMAGE_EXISTS" = "true" ]; then
-            echo "🐳 Strategy: Reuse existing PR image (no changes in latest commit)"
+            echo "🐳 Strategy: Reuse existing PR image (no relevant package changes in PR)"
             echo "    → Image: ${REGISTRY}/tyk-analytics:${IMAGE_TAG}"
             echo "dashboard_image=${REGISTRY}/tyk-analytics:${IMAGE_TAG}" >> $GITHUB_OUTPUT
             echo "needs_build=false" >> $GITHUB_OUTPUT
