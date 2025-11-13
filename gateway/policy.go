@@ -8,12 +8,13 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/sirupsen/logrus"
+
 	"github.com/TykTechnologies/graphql-go-tools/pkg/graphql"
+
 	"github.com/TykTechnologies/tyk/header"
 	"github.com/TykTechnologies/tyk/rpc"
 	"github.com/TykTechnologies/tyk/user"
-
-	"github.com/sirupsen/logrus"
 )
 
 var (
