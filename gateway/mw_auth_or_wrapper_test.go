@@ -56,6 +56,14 @@ func generateHMACSignature(method, path string, headers map[string]string, secre
 	return url.QueryEscape(sigString)
 }
 
+func newTestSecuritySchemes(input map[string]interface{}) *oas.SecuritySchemes {
+	ss := oas.NewSecuritySchemes()
+	for k, v := range input {
+		ss.Set(k, v)
+	}
+	return ss
+}
+
 // TestLegacyMode_BackwardCompatibility tests that legacy mode is the default
 func TestLegacyMode_BackwardCompatibility(t *testing.T) {
 	ts := StartTest(nil)
@@ -134,7 +142,7 @@ func TestLegacyMode_BackwardCompatibility(t *testing.T) {
 					Authentication: &oas.Authentication{
 						Enabled: true,
 						// No securityProcessingMode specified - should default to legacy
-						SecuritySchemes: oas.SecuritySchemes{
+						SecuritySchemes: newTestSecuritySchemes(map[string]interface{}{
 							"apikey": &oas.Token{
 								Enabled: func() *bool { b := true; return &b }(),
 								AuthSources: oas.AuthSources{
@@ -144,7 +152,7 @@ func TestLegacyMode_BackwardCompatibility(t *testing.T) {
 									},
 								},
 							},
-						},
+						}),
 					},
 				},
 				Upstream: oas.Upstream{
@@ -248,7 +256,7 @@ func TestLegacyMode_BackwardCompatibility(t *testing.T) {
 					Authentication: &oas.Authentication{
 						Enabled:                true,
 						SecurityProcessingMode: oas.SecurityProcessingModeLegacy, // Explicit legacy mode
-						SecuritySchemes: oas.SecuritySchemes{
+						SecuritySchemes: newTestSecuritySchemes(map[string]interface{}{
 							"apikey": &oas.Token{
 								Enabled: func() *bool { b := true; return &b }(),
 								AuthSources: oas.AuthSources{
@@ -258,7 +266,7 @@ func TestLegacyMode_BackwardCompatibility(t *testing.T) {
 									},
 								},
 							},
-						},
+						}),
 					},
 				},
 				Upstream: oas.Upstream{
@@ -381,7 +389,7 @@ func TestLegacyMode_OnlyFirstRequirementProcessed(t *testing.T) {
 				Authentication: &oas.Authentication{
 					Enabled:                true,
 					SecurityProcessingMode: oas.SecurityProcessingModeLegacy,
-					SecuritySchemes: oas.SecuritySchemes{
+					SecuritySchemes: newTestSecuritySchemes(map[string]interface{}{
 						"basic": &oas.Basic{
 							Enabled: true,
 							AuthSources: oas.AuthSources{
@@ -400,7 +408,7 @@ func TestLegacyMode_OnlyFirstRequirementProcessed(t *testing.T) {
 								},
 							},
 						},
-					},
+					}),
 				},
 			},
 			Upstream: oas.Upstream{
@@ -543,7 +551,7 @@ func TestLegacyMode_ANDLogicWithinSingleRequirement(t *testing.T) {
 
 		// Configure both auth methods
 		enabled := true
-		tykExtension.Server.Authentication.SecuritySchemes = oas.SecuritySchemes{
+		tykExtension.Server.Authentication.SecuritySchemes = newTestSecuritySchemes(map[string]interface{}{
 			"jwt": &oas.JWT{
 				Enabled:           true,
 				Source:            base64.StdEncoding.EncodeToString([]byte(jwtRSAPubKey)),
@@ -567,7 +575,7 @@ func TestLegacyMode_ANDLogicWithinSingleRequirement(t *testing.T) {
 					},
 				},
 			},
-		}
+		})
 
 		oasDoc.SetTykExtension(tykExtension)
 		oasDoc.ExtractTo(spec.APIDefinition)
@@ -743,7 +751,7 @@ func TestCompliantMode_JWTOrAPIKeyOrHMAC(t *testing.T) {
 
 		// Configure auth methods
 		enabled := true
-		tykExtension.Server.Authentication.SecuritySchemes = oas.SecuritySchemes{
+		tykExtension.Server.Authentication.SecuritySchemes = newTestSecuritySchemes(map[string]interface{}{
 			"jwt": &oas.JWT{
 				Enabled:           true,
 				Source:            base64.StdEncoding.EncodeToString([]byte(jwtRSAPubKey)),
@@ -776,7 +784,7 @@ func TestCompliantMode_JWTOrAPIKeyOrHMAC(t *testing.T) {
 					},
 				},
 			},
-		}
+		})
 
 		oasDoc.SetTykExtension(tykExtension)
 		oasDoc.ExtractTo(spec.APIDefinition)
@@ -1066,7 +1074,7 @@ func TestCompliantMode_ThreeAuthMethods(t *testing.T) {
 				Authentication: &oas.Authentication{
 					Enabled:                true,
 					SecurityProcessingMode: oas.SecurityProcessingModeCompliant,
-					SecuritySchemes: oas.SecuritySchemes{
+					SecuritySchemes: newTestSecuritySchemes(map[string]interface{}{
 						"jwt": &oas.JWT{
 							Enabled:           true,
 							Source:            base64.StdEncoding.EncodeToString([]byte(jwtRSAPubKey)),
@@ -1099,7 +1107,7 @@ func TestCompliantMode_ThreeAuthMethods(t *testing.T) {
 								},
 							},
 						},
-					},
+					}),
 				},
 			},
 			Upstream: oas.Upstream{
@@ -1529,7 +1537,7 @@ func TestHMACInORAuthentication(t *testing.T) {
 					Security: [][]string{
 						{"hmac"}, // HMAC as vendor extension option
 					},
-					SecuritySchemes: oas.SecuritySchemes{
+					SecuritySchemes: newTestSecuritySchemes(map[string]interface{}{
 						"apikey": &oas.Token{
 							Enabled: func() *bool { b := true; return &b }(),
 							AuthSources: oas.AuthSources{
@@ -1548,7 +1556,7 @@ func TestHMACInORAuthentication(t *testing.T) {
 								},
 							},
 						},
-					},
+					}),
 				},
 			},
 			Upstream: oas.Upstream{
@@ -1750,7 +1758,7 @@ func TestMultiAuthMiddleware_OR_JWT_And_ApiKey_Combination(t *testing.T) {
 				Authentication: &oas.Authentication{
 					Enabled:                true,
 					SecurityProcessingMode: oas.SecurityProcessingModeCompliant,
-					SecuritySchemes: oas.SecuritySchemes{
+					SecuritySchemes: newTestSecuritySchemes(map[string]interface{}{
 						"jwt": &oas.JWT{
 							Enabled:           true,
 							Source:            base64.StdEncoding.EncodeToString([]byte(jwtRSAPubKey)),
@@ -1774,7 +1782,7 @@ func TestMultiAuthMiddleware_OR_JWT_And_ApiKey_Combination(t *testing.T) {
 								},
 							},
 						},
-					},
+					}),
 				},
 			},
 			Upstream: oas.Upstream{
@@ -1897,7 +1905,7 @@ func TestMultiAuthMiddleware_OR_AllMethodsFail(t *testing.T) {
 				Authentication: &oas.Authentication{
 					Enabled:                true,
 					SecurityProcessingMode: oas.SecurityProcessingModeCompliant,
-					SecuritySchemes: oas.SecuritySchemes{
+					SecuritySchemes: newTestSecuritySchemes(map[string]interface{}{
 						"jwt": &oas.JWT{
 							Enabled:           true,
 							Source:            base64.StdEncoding.EncodeToString([]byte(jwtRSAPubKey)),
@@ -1920,7 +1928,7 @@ func TestMultiAuthMiddleware_OR_AllMethodsFail(t *testing.T) {
 								},
 							},
 						},
-					},
+					}),
 				},
 			},
 			Upstream: oas.Upstream{
@@ -2023,7 +2031,7 @@ func createOASAPIWithBasicAndAPIKey(spec *APISpec) {
 			},
 			Authentication: &oas.Authentication{
 				Enabled: true,
-				SecuritySchemes: oas.SecuritySchemes{
+				SecuritySchemes: newTestSecuritySchemes(map[string]interface{}{
 					"basic": &oas.Basic{
 						Enabled: true,
 						AuthSources: oas.AuthSources{
@@ -2042,7 +2050,7 @@ func createOASAPIWithBasicAndAPIKey(spec *APISpec) {
 							},
 						},
 					},
-				},
+				}),
 			},
 		},
 		Upstream: oas.Upstream{
@@ -2229,7 +2237,7 @@ func TestSingleSecurityRequirementANDLogic(t *testing.T) {
 				Authentication: &oas.Authentication{
 					Enabled:                true,
 					SecurityProcessingMode: oas.SecurityProcessingModeCompliant, // Even in compliant mode, single requirement = AND
-					SecuritySchemes: oas.SecuritySchemes{
+					SecuritySchemes: newTestSecuritySchemes(map[string]interface{}{
 						"jwt": &oas.JWT{
 							Enabled:           true,
 							Source:            base64.StdEncoding.EncodeToString([]byte(jwtRSAPubKey)),
@@ -2253,7 +2261,7 @@ func TestSingleSecurityRequirementANDLogic(t *testing.T) {
 								},
 							},
 						},
-					},
+					}),
 				},
 			},
 			Upstream: oas.Upstream{
@@ -2614,7 +2622,7 @@ func TestMultiAuthMiddleware_OR_CompliantMode_JWT_Second(t *testing.T) {
 				Authentication: &oas.Authentication{
 					Enabled:                true,
 					SecurityProcessingMode: oas.SecurityProcessingModeCompliant,
-					SecuritySchemes: oas.SecuritySchemes{
+					SecuritySchemes: newTestSecuritySchemes(map[string]interface{}{
 						"apiKeyAuth": &oas.Token{
 							Enabled: func() *bool { b := true; return &b }(),
 							AuthSources: oas.AuthSources{
@@ -2638,7 +2646,7 @@ func TestMultiAuthMiddleware_OR_CompliantMode_JWT_Second(t *testing.T) {
 								},
 							},
 						},
-					},
+					}),
 				},
 			},
 			Upstream: oas.Upstream{
@@ -2825,7 +2833,7 @@ func TestVendorExtension_MixedANDOR_LegacyMode(t *testing.T) {
 						{"jwt", "hmac"},
 						{"apikey"},
 					},
-					SecuritySchemes: oas.SecuritySchemes{
+					SecuritySchemes: newTestSecuritySchemes(map[string]interface{}{
 						"jwt": &oas.JWT{
 							Enabled:           true,
 							Source:            base64.StdEncoding.EncodeToString([]byte(jwtRSAPubKey)),
@@ -2858,7 +2866,7 @@ func TestVendorExtension_MixedANDOR_LegacyMode(t *testing.T) {
 								},
 							},
 						},
-					},
+					}),
 				},
 			},
 			Upstream: oas.Upstream{
@@ -3037,7 +3045,7 @@ func TestVendorExtension_MixedANDOR_CompliantMode(t *testing.T) {
 						{"jwt", "hmac"},
 						{"apikey"},
 					},
-					SecuritySchemes: oas.SecuritySchemes{
+					SecuritySchemes: newTestSecuritySchemes(map[string]interface{}{
 						"jwt": &oas.JWT{
 							Enabled:           true,
 							Source:            base64.StdEncoding.EncodeToString([]byte(jwtRSAPubKey)),
@@ -3070,7 +3078,7 @@ func TestVendorExtension_MixedANDOR_CompliantMode(t *testing.T) {
 								},
 							},
 						},
-					},
+					}),
 				},
 			},
 			Upstream: oas.Upstream{
@@ -3194,7 +3202,7 @@ func TestVendorExtension_ComplexCombination_LegacyMode(t *testing.T) {
 						{"oauth2"},
 						{"hmac", "custom"},
 					},
-					SecuritySchemes: oas.SecuritySchemes{
+					SecuritySchemes: newTestSecuritySchemes(map[string]interface{}{
 						"oauth2": &oas.OAuth{
 							Enabled: true,
 							AuthSources: oas.AuthSources{
@@ -3222,7 +3230,7 @@ func TestVendorExtension_ComplexCombination_LegacyMode(t *testing.T) {
 								},
 							},
 						},
-					},
+					}),
 				},
 			},
 			Upstream: oas.Upstream{
@@ -3326,7 +3334,7 @@ func TestVendorExtension_ComplexCombination_CompliantMode(t *testing.T) {
 						{"oauth2"},
 						{"hmac", "custom"},
 					},
-					SecuritySchemes: oas.SecuritySchemes{
+					SecuritySchemes: newTestSecuritySchemes(map[string]interface{}{
 						"oauth2": &oas.OAuth{
 							Enabled: true,
 							AuthSources: oas.AuthSources{
@@ -3354,7 +3362,7 @@ func TestVendorExtension_ComplexCombination_CompliantMode(t *testing.T) {
 								},
 							},
 						},
-					},
+					}),
 				},
 			},
 			Upstream: oas.Upstream{
@@ -3481,7 +3489,7 @@ func TestVendorExtension_EmptyOAS_LegacyMode(t *testing.T) {
 						{"hmac"},
 						{"apikey"}, // Ignored in legacy
 					},
-					SecuritySchemes: oas.SecuritySchemes{
+					SecuritySchemes: newTestSecuritySchemes(map[string]interface{}{
 						"hmac": &oas.HMAC{
 							Enabled: true,
 							AuthSources: oas.AuthSources{
@@ -3500,7 +3508,7 @@ func TestVendorExtension_EmptyOAS_LegacyMode(t *testing.T) {
 								},
 							},
 						},
-					},
+					}),
 				},
 			},
 			Upstream: oas.Upstream{
@@ -3629,7 +3637,7 @@ func TestVendorExtension_EmptyOAS_CompliantMode(t *testing.T) {
 						{"hmac"},
 						{"apikey"},
 					},
-					SecuritySchemes: oas.SecuritySchemes{
+					SecuritySchemes: newTestSecuritySchemes(map[string]interface{}{
 						"hmac": &oas.HMAC{
 							Enabled: true,
 							AuthSources: oas.AuthSources{
@@ -3648,7 +3656,7 @@ func TestVendorExtension_EmptyOAS_CompliantMode(t *testing.T) {
 								},
 							},
 						},
-					},
+					}),
 				},
 			},
 			Upstream: oas.Upstream{
@@ -3822,7 +3830,7 @@ func TestMultiAuthMiddleware_AND_Within_OR_Groups(t *testing.T) {
 				Authentication: &oas.Authentication{
 					Enabled:                true,
 					SecurityProcessingMode: oas.SecurityProcessingModeCompliant,
-					SecuritySchemes: oas.SecuritySchemes{
+					SecuritySchemes: newTestSecuritySchemes(map[string]interface{}{
 						"jwtAuth": &oas.JWT{
 							Enabled:           true,
 							Source:            base64.StdEncoding.EncodeToString([]byte(jwtRSAPubKey)),
@@ -3845,7 +3853,7 @@ func TestMultiAuthMiddleware_AND_Within_OR_Groups(t *testing.T) {
 								},
 							},
 						},
-					},
+					}),
 				},
 			},
 			Upstream: oas.Upstream{
@@ -4004,7 +4012,7 @@ func TestAuthORWrapper_OAuth2_Internal(t *testing.T) {
 				Authentication: &oas.Authentication{
 					Enabled:                true,
 					SecurityProcessingMode: oas.SecurityProcessingModeCompliant,
-					SecuritySchemes: oas.SecuritySchemes{
+					SecuritySchemes: newTestSecuritySchemes(map[string]interface{}{
 						"oauth2": &oas.OAuth{
 							Enabled: true,
 							AuthSources: oas.AuthSources{
@@ -4023,7 +4031,7 @@ func TestAuthORWrapper_OAuth2_Internal(t *testing.T) {
 								},
 							},
 						},
-					},
+					}),
 				},
 			},
 			Upstream: oas.Upstream{
@@ -4230,11 +4238,11 @@ func TestAuthORWrapper_getMiddlewareForScheme(t *testing.T) {
 				tykExt := &oas.XTykAPIGateway{
 					Server: oas.Server{
 						Authentication: &oas.Authentication{
-							SecuritySchemes: oas.SecuritySchemes{
+							SecuritySchemes: newTestSecuritySchemes(map[string]interface{}{
 								"jwtAuth": &oas.JWT{
 									Enabled: true,
 								},
-							},
+							}),
 						},
 					},
 				}
@@ -4253,11 +4261,11 @@ func TestAuthORWrapper_getMiddlewareForScheme(t *testing.T) {
 				tykExt := &oas.XTykAPIGateway{
 					Server: oas.Server{
 						Authentication: &oas.Authentication{
-							SecuritySchemes: oas.SecuritySchemes{
+							SecuritySchemes: newTestSecuritySchemes(map[string]interface{}{
 								"hmacAuth": &oas.HMAC{
 									Enabled: true,
 								},
-							},
+							}),
 						},
 					},
 				}
@@ -4276,11 +4284,11 @@ func TestAuthORWrapper_getMiddlewareForScheme(t *testing.T) {
 				tykExt := &oas.XTykAPIGateway{
 					Server: oas.Server{
 						Authentication: &oas.Authentication{
-							SecuritySchemes: oas.SecuritySchemes{
+							SecuritySchemes: newTestSecuritySchemes(map[string]interface{}{
 								"oidcAuth": &oas.OIDC{
 									Enabled: true,
 								},
-							},
+							}),
 						},
 					},
 				}
@@ -4533,7 +4541,7 @@ func TestIntegration_StandardOAS_JWT(t *testing.T) {
 				Authentication: &oas.Authentication{
 					Enabled:                true,
 					SecurityProcessingMode: oas.SecurityProcessingModeCompliant,
-					SecuritySchemes: oas.SecuritySchemes{
+					SecuritySchemes: newTestSecuritySchemes(map[string]interface{}{
 						"jwt": &oas.JWT{
 							Enabled:           true,
 							Source:            base64.StdEncoding.EncodeToString([]byte(jwtRSAPubKey)),
@@ -4548,7 +4556,7 @@ func TestIntegration_StandardOAS_JWT(t *testing.T) {
 								},
 							},
 						},
-					},
+					}),
 				},
 			},
 			Upstream: oas.Upstream{URL: TestHttpAny},
@@ -4659,7 +4667,7 @@ func TestIntegration_StandardOAS_APIKey(t *testing.T) {
 				Authentication: &oas.Authentication{
 					Enabled:                true,
 					SecurityProcessingMode: oas.SecurityProcessingModeCompliant,
-					SecuritySchemes: oas.SecuritySchemes{
+					SecuritySchemes: newTestSecuritySchemes(map[string]interface{}{
 						"apikey": &oas.Token{
 							Enabled: func() *bool { b := true; return &b }(),
 							AuthSources: oas.AuthSources{
@@ -4669,7 +4677,7 @@ func TestIntegration_StandardOAS_APIKey(t *testing.T) {
 								},
 							},
 						},
-					},
+					}),
 				},
 			},
 			Upstream: oas.Upstream{URL: TestHttpAny},
@@ -4777,7 +4785,7 @@ func TestIntegration_StandardOAS_Basic(t *testing.T) {
 				Authentication: &oas.Authentication{
 					Enabled:                true,
 					SecurityProcessingMode: oas.SecurityProcessingModeCompliant,
-					SecuritySchemes: oas.SecuritySchemes{
+					SecuritySchemes: newTestSecuritySchemes(map[string]interface{}{
 						"basic": &oas.Basic{
 							Enabled: true,
 							AuthSources: oas.AuthSources{
@@ -4787,7 +4795,7 @@ func TestIntegration_StandardOAS_Basic(t *testing.T) {
 								},
 							},
 						},
-					},
+					}),
 				},
 			},
 			Upstream: oas.Upstream{URL: TestHttpAny},
@@ -4916,7 +4924,7 @@ func TestIntegration_OR_JWT_And_APIKey(t *testing.T) {
 				Authentication: &oas.Authentication{
 					Enabled:                true,
 					SecurityProcessingMode: oas.SecurityProcessingModeCompliant,
-					SecuritySchemes: oas.SecuritySchemes{
+					SecuritySchemes: newTestSecuritySchemes(map[string]interface{}{
 						"jwt": &oas.JWT{
 							Enabled:           true,
 							Source:            base64.StdEncoding.EncodeToString([]byte(jwtRSAPubKey)),
@@ -4940,7 +4948,7 @@ func TestIntegration_OR_JWT_And_APIKey(t *testing.T) {
 								},
 							},
 						},
-					},
+					}),
 				},
 			},
 			Upstream: oas.Upstream{URL: TestHttpAny},
@@ -5082,7 +5090,7 @@ func TestIntegration_AND_JWT_And_APIKey(t *testing.T) {
 				Authentication: &oas.Authentication{
 					Enabled:                true,
 					SecurityProcessingMode: oas.SecurityProcessingModeCompliant,
-					SecuritySchemes: oas.SecuritySchemes{
+					SecuritySchemes: newTestSecuritySchemes(map[string]interface{}{
 						"jwt": &oas.JWT{
 							Enabled:           true,
 							Source:            base64.StdEncoding.EncodeToString([]byte(jwtRSAPubKey)),
@@ -5106,7 +5114,7 @@ func TestIntegration_AND_JWT_And_APIKey(t *testing.T) {
 								},
 							},
 						},
-					},
+					}),
 				},
 			},
 			Upstream: oas.Upstream{URL: TestHttpAny},
@@ -5258,7 +5266,7 @@ func TestIntegration_AND_Groups_With_HMAC(t *testing.T) {
 					Security: [][]string{
 						{"apikey", "hmac"}, // AND group: both API Key AND HMAC required
 					},
-					SecuritySchemes: oas.SecuritySchemes{
+					SecuritySchemes: newTestSecuritySchemes(map[string]interface{}{
 						"jwt": &oas.JWT{
 							Enabled:           true,
 							Source:            base64.StdEncoding.EncodeToString([]byte(jwtRSAPubKey)),
@@ -5291,7 +5299,7 @@ func TestIntegration_AND_Groups_With_HMAC(t *testing.T) {
 								},
 							},
 						},
-					},
+					}),
 				},
 			},
 			Upstream: oas.Upstream{URL: TestHttpAny},
