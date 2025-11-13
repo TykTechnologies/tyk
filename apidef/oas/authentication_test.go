@@ -1,10 +1,12 @@
 package oas
 
 import (
+	"encoding/json"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"gopkg.in/yaml.v3"
 
 	"github.com/TykTechnologies/tyk/apidef"
 )
@@ -487,4 +489,110 @@ func TestVendorExtensionSecurity(t *testing.T) {
 
 		assert.Nil(t, auth2.Security)
 	})
+}
+
+func TestSecuritySchemesSet_Typed(t *testing.T) {
+	ss := NewSecuritySchemes()
+
+	in := &JWT{Enabled: true}
+	ss.Set("x", in)
+
+	v, ok := ss.Get("x")
+
+	if !ok {
+		t.Fatal("expected ok")
+	}
+	if v != in {
+		t.Fatal("expected same ptr")
+	}
+}
+
+func TestSecuritySchemesSet_MapPromotes(t *testing.T) {
+	ss := NewSecuritySchemes()
+
+	ss.Set("x", map[string]interface{}{
+		"enabled": true,
+	})
+
+	out := &JWT{}
+	ss.Set("x", out)
+
+	v, ok := ss.Get("x")
+	if !ok {
+		t.Fatal("expected ok")
+	}
+	j, ok := v.(*JWT)
+	if !ok {
+		t.Fatal("not JWT")
+	}
+	if !j.Enabled {
+		t.Fatal("expected enabled=true")
+	}
+}
+
+func TestSecuritySchemesSet_MapPromotesFail(t *testing.T) {
+	ss := NewSecuritySchemes()
+
+	ss.Set("x", map[string]interface{}{
+		"enabled": 123, // wrong type
+	})
+
+	out := &JWT{}
+	ss.Set("x", out)
+
+	v, ok := ss.Get("x")
+	if !ok {
+		t.Fatal("expected ok")
+	}
+	if _, isJWT := v.(*JWT); isJWT {
+		t.Fatal("expected conversion failure to keep original value")
+	}
+}
+
+func TestSecuritySchemes_UnmarshalJSON_Null(t *testing.T) {
+	var ss SecuritySchemes
+	err := json.Unmarshal([]byte("null"), &ss)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if ss.Len() != 0 {
+		t.Fatalf("expected empty map")
+	}
+}
+
+func TestSecuritySchemes_UnmarshalJSON_Map(t *testing.T) {
+	var ss SecuritySchemes
+	err := json.Unmarshal([]byte(`{"x": {"enabled": true}}`), &ss)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if ss.Len() != 1 {
+		t.Fatal("expected 1")
+	}
+}
+
+func TestSecuritySchemes_YAMLRoundTrip(t *testing.T) {
+	ss := NewSecuritySchemes()
+	ss.Set("token", map[string]interface{}{"enabled": true})
+
+	out, err := yaml.Marshal(ss)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var decoded map[string]interface{}
+	if err := yaml.Unmarshal(out, &decoded); err != nil {
+		t.Fatal(err)
+	}
+	if len(decoded) != 1 {
+		t.Fatalf("expected 1 entry after marshal, got: %d", len(decoded))
+	}
+
+	var roundtrip SecuritySchemes
+	if err := yaml.Unmarshal(out, &roundtrip); err != nil {
+		t.Fatal(err)
+	}
+	if roundtrip.Len() != 1 {
+		t.Fatalf("expected 1 entry after round-trip, got: %d", roundtrip.Len())
+	}
 }
