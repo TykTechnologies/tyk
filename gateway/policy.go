@@ -3,18 +3,17 @@ package gateway
 import (
 	"encoding/json"
 	"errors"
-	"github.com/TykTechnologies/tyk/header"
 	"io/ioutil"
 	"net/http"
 	"os"
 	"path/filepath"
 
-	"github.com/TykTechnologies/graphql-go-tools/pkg/graphql"
-
-	"github.com/TykTechnologies/tyk/rpc"
-
 	"github.com/sirupsen/logrus"
 
+	"github.com/TykTechnologies/graphql-go-tools/pkg/graphql"
+
+	"github.com/TykTechnologies/tyk/header"
+	"github.com/TykTechnologies/tyk/rpc"
 	"github.com/TykTechnologies/tyk/user"
 )
 
