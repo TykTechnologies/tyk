@@ -8,6 +8,8 @@ on:
 jobs:
   s1_scanner:
     uses: TykTechnologies/github-actions/.github/workflows/s1-cns-scan.yml@main
+    permissions:
+      contents: read
     with:
       iac_enabled: false
       tag: service:vulnscan
