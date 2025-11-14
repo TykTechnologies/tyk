@@ -533,8 +533,9 @@ func TestSecuritySchemesSet_MapPromotes(t *testing.T) {
 func TestSecuritySchemesSet_MapPromotesFail(t *testing.T) {
 	ss := NewSecuritySchemes()
 
+	// Malformed map: "enabled" has the wrong type, so toStructIfMap should fail.
 	ss.Set("x", map[string]interface{}{
-		"enabled": 123, // wrong type
+		"enabled": 123,
 	})
 
 	out := &JWT{}
@@ -544,8 +545,24 @@ func TestSecuritySchemesSet_MapPromotesFail(t *testing.T) {
 	if !ok {
 		t.Fatal("expected ok")
 	}
-	if _, isJWT := v.(*JWT); isJWT {
-		t.Fatal("expected conversion failure to keep original value")
+
+	j, isJWT := v.(*JWT)
+	if !isJWT {
+		t.Fatalf("expected *JWT stored after Set, got %T", v)
+	}
+
+	if j != out {
+		t.Fatalf("expected stored pointer to be the one passed to Set")
+	}
+
+	if j.Enabled {
+		t.Fatalf("expected Enabled to be false after failed promotion, got true")
+	}
+	if j.Source != "" {
+		t.Fatalf("expected Source to be empty after failed promotion, got %q", j.Source)
+	}
+	if len(j.JwksURIs) != 0 {
+		t.Fatalf("expected no JwksURIs after failed promotion, got %v", j.JwksURIs)
 	}
 }
 
