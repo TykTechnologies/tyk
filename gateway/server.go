@@ -387,6 +387,19 @@ func (gw *Gateway) getAPIDefinition(apiID string) (*apidef.APIDefinition, error)
 	return apiSpec.APIDefinition, nil
 }
 
+func (gw *Gateway) getPolicy(polID string) user.Policy {
+	gw.policiesMu.RLock()
+	pol := gw.policiesByID[polID]
+	gw.policiesMu.RUnlock()
+	return pol
+}
+
+func (gw *Gateway) policiesByIDLen() int {
+	gw.policiesMu.RLock()
+	defer gw.policiesMu.RUnlock()
+	return len(gw.policiesByID)
+}
+
 func (gw *Gateway) apisByIDLen() int {
 	gw.apisMu.RLock()
 	defer gw.apisMu.RUnlock()
@@ -485,6 +498,7 @@ func (gw *Gateway) setupGlobals() {
 	}
 
 	// Load all the files that have the "error" prefix.
+	//	gwConfig.TemplatePath = "/Users/sredny/go/src/github.com/TykTechnologies/tyk/templates"
 	templatesDir := filepath.Join(gwConfig.TemplatePath, "error*")
 	gw.templates = htmltemplate.Must(htmltemplate.ParseGlob(templatesDir))
 	gw.templatesRaw = texttemplate.Must(texttemplate.ParseGlob(templatesDir))

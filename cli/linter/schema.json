@@ -443,6 +443,9 @@
     "jwt_ssl_insecure_skip_verify": {
       "type": "boolean"
     },
+    "enable_proxy_protocol_http": {
+      "type": "boolean"
+    },
     "disable_virtual_path_blobs": {
       "type": "boolean"
     },
