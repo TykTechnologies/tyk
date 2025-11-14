@@ -539,6 +539,7 @@ func (t *BaseMiddleware) CheckSessionAndIdentityForValidKey(originalKey string, 
 	}
 
 	if _, ok := t.Spec.AuthManager.Store().(*RPCStorageHandler); ok && rpc.IsEmergencyMode() {
+		session.KeyID = key
 		return session.Clone(), false
 	}
 
