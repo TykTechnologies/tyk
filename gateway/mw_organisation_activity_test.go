@@ -522,26 +522,22 @@ func TestOrganizationMonitor_RefreshOrgSession(t *testing.T) {
 	})
 }
 
-func TestOrganizationMonitor_AsyncRPCMode(t *testing.T) {
-	test.Flaky(t)
-
-	orgID := "test-org-async-rpc-" + uuid.New()
-
-	// Create a mock RPC server that simulates MDCB being slow or down
+// setupMockRPCServer creates a mock RPC server for testing async RPC behavior.
+// It simulates a slow MDCB backend with configurable delay.
+func setupMockRPCServer(orgID string, rpcDelay time.Duration) (*gorpc.Server, string) {
 	dispatcher := gorpc.NewDispatcher()
 
 	// Simulate slow GetKey response to test async behavior
-	dispatcher.AddFunc("GetKey", func(clientAddr, key string) (string, error) {
-		// Simulate a slow MDCB response
-		time.Sleep(500 * time.Millisecond)
+	dispatcher.AddFunc("GetKey", func(_clientAddr, _key string) (string, error) {
+		time.Sleep(rpcDelay)
 		return `{"rate": 1000, "per": 1, "quota_max": -1}`, nil
 	})
 
-	dispatcher.AddFunc("Login", func(clientAddr, userKey string) bool {
+	dispatcher.AddFunc("Login", func(_clientAddr, _userKey string) bool {
 		return true
 	})
 
-	dispatcher.AddFunc("GetApiDefinitions", func(clientAddr string, dr interface{}) (string, error) {
+	dispatcher.AddFunc("GetApiDefinitions", func(_clientAddr string, _dr interface{}) (string, error) {
 		return jsonMarshalString(BuildAPI(func(spec *APISpec) {
 			spec.UseKeylessAccess = true
 			spec.OrgID = orgID
@@ -549,11 +545,23 @@ func TestOrganizationMonitor_AsyncRPCMode(t *testing.T) {
 		})), nil
 	})
 
-	dispatcher.AddFunc("GetPolicies", func(clientAddr, orgId string) (string, error) {
+	dispatcher.AddFunc("GetPolicies", func(_clientAddr, _orgId string) (string, error) {
 		return "[]", nil
 	})
 
-	rpcMock, connectionString := startRPCMock(dispatcher)
+	return startRPCMock(dispatcher)
+}
+
+func TestOrganizationMonitor_AsyncRPCMode(t *testing.T) {
+	test.Flaky(t)
+
+	maxRequestTime := 100 * time.Millisecond
+	maxConcurrentTime := 200 * time.Millisecond
+
+	orgID := "test-org-async-rpc-" + uuid.New()
+
+	// Create a mock RPC server that simulates slow MDCB
+	rpcMock, connectionString := setupMockRPCServer(orgID, 500*time.Millisecond)
 	defer stopRPCMock(rpcMock)
 
 	// Configure gateway with RPC mode enabled
@@ -597,18 +605,18 @@ func TestOrganizationMonitor_AsyncRPCMode(t *testing.T) {
 		}
 
 		// Verify request completed quickly
-		if elapsed > 100*time.Millisecond {
-			t.Errorf("Request took too long (%v), suggesting it blocked waiting for RPC. Expected < 100ms", elapsed)
+		if elapsed > maxRequestTime {
+			t.Errorf("Request took too long (%v), suggesting it blocked waiting for RPC. Expected < %v", elapsed, maxRequestTime)
 		}
 
-		t.Logf("Request completed in %v (expected < 100ms), async behavior confirmed", elapsed)
+		t.Logf("Request completed in %v (expected < %v), async behavior confirmed", elapsed, maxRequestTime)
 	})
 
 	t.Run("Multiple concurrent requests do not block in RPC mode", func(t *testing.T) {
 		ts.Gw.SessionCache.Flush()
 
 		// Make multiple concurrent requests
-		const numRequests = 10
+		numRequests := 10
 		results := make(chan time.Duration, numRequests)
 
 		start := time.Now()
@@ -629,7 +637,7 @@ func TestOrganizationMonitor_AsyncRPCMode(t *testing.T) {
 		// Wait for all requests to complete
 		for i := 0; i < numRequests; i++ {
 			reqDuration := <-results
-			if reqDuration > 100*time.Millisecond {
+			if reqDuration > maxRequestTime {
 				t.Errorf("Request %d took too long (%v)", i, reqDuration)
 			}
 		}
@@ -637,7 +645,7 @@ func TestOrganizationMonitor_AsyncRPCMode(t *testing.T) {
 		totalElapsed := time.Since(start)
 
 		// All requests should complete quickly
-		if totalElapsed > 200*time.Millisecond {
+		if totalElapsed > maxConcurrentTime {
 			t.Errorf("Requests took too long (%v), suggesting blocking behavior", totalElapsed)
 		}
 
