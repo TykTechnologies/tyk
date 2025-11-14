@@ -190,7 +190,7 @@ func (s *OAS) importAuthentication(enable bool) error {
 
 	tykSecuritySchemes := authentication.SecuritySchemes
 	if tykSecuritySchemes == nil {
-		tykSecuritySchemes = make(SecuritySchemes)
+		tykSecuritySchemes = NewSecuritySchemes()
 		authentication.SecuritySchemes = tykSecuritySchemes
 	}
 

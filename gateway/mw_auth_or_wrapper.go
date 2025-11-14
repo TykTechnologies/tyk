@@ -149,7 +149,7 @@ func (a *AuthORWrapper) getMiddlewareForScheme(schemeName string) TykMiddleware 
 		if auth := tykExt.Server.Authentication; auth != nil {
 			// First check if the scheme is defined in SecuritySchemes
 			if auth.SecuritySchemes != nil {
-				if tykScheme := auth.SecuritySchemes[schemeName]; tykScheme != nil {
+				if tykScheme, _ := auth.SecuritySchemes.Get(schemeName); tykScheme != nil {
 					// Use type switch for standard auth types (JWT, Token, Basic, OAuth)
 					// These can be reliably determined by their OAS type
 					switch tykScheme.(type) {
