@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 
@@ -48,22 +49,44 @@ func TestBaseMiddleware_OrgSessionExpiry(t *testing.T) {
 		logger: mainLog,
 		Gw:     ts.Gw,
 	}
-	v := int64(100)
-	ts.Gw.ExpiryCache.Set(sess.OrgID, v, cache.DefaultExpiration)
 
-	got := m.OrgSessionExpiry(sess.OrgID)
-	assert.Equal(t, v, got)
-	ts.Gw.ExpiryCache.Delete(sess.OrgID)
+	t.Run("Returns cached value when present", func(t *testing.T) {
+		v := int64(100)
+		ts.Gw.ExpiryCache.Set(sess.OrgID, v, cache.DefaultExpiration)
 
-	got = m.OrgSessionExpiry(sess.OrgID)
-	assert.Equal(t, sess.DataExpires, got)
-	ts.Gw.ExpiryCache.Delete(sess.OrgID)
+		got := m.OrgSessionExpiry(sess.OrgID)
+		assert.Equal(t, v, got)
+		ts.Gw.ExpiryCache.Delete(sess.OrgID)
+	})
 
-	m.Spec.OrgSessionManager = mockStore{DetailNotFound: true}
-	noOrgSess := "nonexistent_org"
-	got = m.OrgSessionExpiry(noOrgSess)
-	assert.Equal(t, DEFAULT_ORG_SESSION_EXPIRATION, got)
+	t.Run("Returns default on cache miss, then fetches in background", func(t *testing.T) {
+		// Cache miss, should return default immediately
+		got := m.OrgSessionExpiry(sess.OrgID)
+		assert.Equal(t, DEFAULT_ORG_SESSION_EXPIRATION, got)
 
+		// Wait for background fetch to complete
+		time.Sleep(50 * time.Millisecond)
+
+		// Now should have cached value from background fetch
+		got = m.OrgSessionExpiry(sess.OrgID)
+		assert.Equal(t, sess.DataExpires, got)
+		ts.Gw.ExpiryCache.Delete(sess.OrgID)
+	})
+
+	t.Run("Returns default when org session not found", func(t *testing.T) {
+		m.Spec.OrgSessionManager = mockStore{DetailNotFound: true}
+		noOrgSess := "nonexistent_org"
+
+		got := m.OrgSessionExpiry(noOrgSess)
+		assert.Equal(t, DEFAULT_ORG_SESSION_EXPIRATION, got)
+
+		// Wait for background fetch
+		time.Sleep(50 * time.Millisecond)
+
+		// Should still return default since org doesn't exist
+		got = m.OrgSessionExpiry(noOrgSess)
+		assert.Equal(t, DEFAULT_ORG_SESSION_EXPIRATION, got)
+	})
 }
 
 func TestBaseMiddleware_getAuthType(t *testing.T) {

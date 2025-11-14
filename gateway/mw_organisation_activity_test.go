@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/TykTechnologies/gorpc"
 	"github.com/TykTechnologies/tyk/internal/uuid"
 
 	"github.com/TykTechnologies/tyk/config"
@@ -424,4 +425,230 @@ func BenchmarkProcessRequestOffThreadRedisRollingLimiter(b *testing.B) {
 			Code: http.StatusOK,
 		})
 	}
+}
+
+func TestOrganizationMonitor_RefreshOrgSession(t *testing.T) {
+	conf := func(globalConf *config.Config) {
+		globalConf.EnforceOrgQuotas = true
+		globalConf.LocalSessionCache.DisableCacheSessionState = false
+	}
+
+	ts := StartTest(conf)
+	defer ts.Close()
+
+	orgID := "test-org-refresh-" + uuid.New()
+
+	// Build API
+	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		spec.UseKeylessAccess = true
+		spec.OrgID = orgID
+		spec.Proxy.ListenPath = "/"
+	})
+
+	t.Run("refreshOrgSession populates cache when session found", func(t *testing.T) {
+		// Create org session
+		ts.Run(t, test.TestCase{
+			Path:      "/tyk/org/keys/" + orgID,
+			AdminAuth: true,
+			Method:    http.MethodPost,
+			Code:      http.StatusOK,
+			Data: map[string]interface{}{
+				"quota_max":          10,
+				"quota_remaining":    10,
+				"quota_renewal_rate": 60,
+			},
+		})
+
+		ts.Gw.SessionCache.Flush()
+
+		// Verify cache is empty
+		_, found := ts.Gw.SessionCache.Get(orgID)
+		if found {
+			t.Error("Cache should be empty")
+		}
+
+		spec := ts.Gw.apisByID[ts.Gw.apiSpecs[0].APIID]
+		monitor := &OrganizationMonitor{
+			BaseMiddleware: &BaseMiddleware{
+				Spec: spec,
+				Gw:   ts.Gw,
+			},
+		}
+
+		// Call refreshOrgSession
+		monitor.refreshOrgSession(orgID)
+
+		// Wait a bit for async operation
+		time.Sleep(50 * time.Millisecond)
+
+		// Verify cache is now populated
+		_, found = ts.Gw.SessionCache.Get(orgID)
+		if !found {
+			t.Error("Cache should be populated after refreshOrgSession")
+		}
+	})
+
+	t.Run("refreshOrgSession sets OrgHasNoSession when session not found", func(t *testing.T) {
+		nonExistentOrgID := "test-org-nonexistent-" + uuid.New()
+
+		// Build API with non-existent org
+		spec := ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+			spec.UseKeylessAccess = true
+			spec.OrgID = nonExistentOrgID
+			spec.Proxy.ListenPath = "/nonexistent/"
+		})[0]
+
+		// Verify OrgHasNoSession is initially false
+		if spec.OrgHasNoSession {
+			t.Error("OrgHasNoSession should initially be false")
+		}
+
+		monitor := &OrganizationMonitor{
+			BaseMiddleware: &BaseMiddleware{
+				Spec: spec,
+				Gw:   ts.Gw,
+			},
+		}
+
+		monitor.refreshOrgSession(nonExistentOrgID)
+
+		// Wait for async operation
+		time.Sleep(50 * time.Millisecond)
+
+		// Verify OrgHasNoSession is now true
+		if !monitor.getOrgHasNoSession() {
+			t.Error("OrgHasNoSession should be true after refreshOrgSession for non-existent org")
+		}
+	})
+}
+
+// setupMockRPCServer creates a mock RPC server for testing async RPC behavior.
+// It simulates a slow MDCB backend with configurable delay.
+func setupMockRPCServer(orgID string, rpcDelay time.Duration) (*gorpc.Server, string) {
+	dispatcher := gorpc.NewDispatcher()
+
+	// Simulate slow GetKey response to test async behavior
+	dispatcher.AddFunc("GetKey", func(_clientAddr, _key string) (string, error) {
+		time.Sleep(rpcDelay)
+		return `{"rate": 1000, "per": 1, "quota_max": -1}`, nil
+	})
+
+	dispatcher.AddFunc("Login", func(_clientAddr, _userKey string) bool {
+		return true
+	})
+
+	dispatcher.AddFunc("GetApiDefinitions", func(_clientAddr string, _dr interface{}) (string, error) {
+		return jsonMarshalString(BuildAPI(func(spec *APISpec) {
+			spec.UseKeylessAccess = true
+			spec.OrgID = orgID
+			spec.Proxy.ListenPath = "/"
+		})), nil
+	})
+
+	dispatcher.AddFunc("GetPolicies", func(_clientAddr, _orgId string) (string, error) {
+		return "[]", nil
+	})
+
+	return startRPCMock(dispatcher)
+}
+
+func TestOrganizationMonitor_AsyncRPCMode(t *testing.T) {
+	test.Flaky(t)
+
+	maxRequestTime := 100 * time.Millisecond
+	maxConcurrentTime := 200 * time.Millisecond
+
+	orgID := "test-org-async-rpc-" + uuid.New()
+
+	// Create a mock RPC server that simulates slow MDCB
+	rpcMock, connectionString := setupMockRPCServer(orgID, 500*time.Millisecond)
+	defer stopRPCMock(rpcMock)
+
+	// Configure gateway with RPC mode enabled
+	conf := func(globalConf *config.Config) {
+		globalConf.EnforceOrgQuotas = true
+		globalConf.LocalSessionCache.DisableCacheSessionState = true
+		globalConf.SlaveOptions.UseRPC = true
+		globalConf.SlaveOptions.RPCKey = "test_org"
+		globalConf.SlaveOptions.APIKey = "test"
+		globalConf.SlaveOptions.ConnectionString = connectionString
+		globalConf.SlaveOptions.CallTimeout = 1
+		globalConf.SlaveOptions.RPCPoolSize = 2
+		globalConf.Policies.PolicySource = "rpc"
+	}
+
+	ts := StartTest(conf)
+	defer ts.Close()
+
+	// Wait for RPC connection and API load
+	time.Sleep(100 * time.Millisecond)
+
+	t.Run("Request does not block in RPC mode when org session not in cache", func(t *testing.T) {
+		ts.Gw.SessionCache.Flush()
+
+		_, found := ts.Gw.SessionCache.Get(orgID)
+		if found {
+			t.Error("Cache should be empty before test")
+		}
+
+		// Make a request, this should not block even though org session is not in cache
+		start := time.Now()
+
+		resp, _ := ts.Run(t, test.TestCase{
+			Path: "/",
+		})
+
+		elapsed := time.Since(start)
+
+		if resp != nil {
+			resp.Body.Close()
+		}
+
+		// Verify request completed quickly
+		if elapsed > maxRequestTime {
+			t.Errorf("Request took too long (%v), suggesting it blocked waiting for RPC. Expected < %v", elapsed, maxRequestTime)
+		}
+
+		t.Logf("Request completed in %v (expected < %v), async behavior confirmed", elapsed, maxRequestTime)
+	})
+
+	t.Run("Multiple concurrent requests do not block in RPC mode", func(t *testing.T) {
+		ts.Gw.SessionCache.Flush()
+
+		// Make multiple concurrent requests
+		numRequests := 10
+		results := make(chan time.Duration, numRequests)
+
+		start := time.Now()
+
+		for i := 0; i < numRequests; i++ {
+			go func() {
+				reqStart := time.Now()
+				resp, _ := ts.Run(t, test.TestCase{
+					Path: "/",
+				})
+				if resp != nil {
+					resp.Body.Close()
+				}
+				results <- time.Since(reqStart)
+			}()
+		}
+
+		// Wait for all requests to complete
+		for i := 0; i < numRequests; i++ {
+			reqDuration := <-results
+			if reqDuration > maxRequestTime {
+				t.Errorf("Request %d took too long (%v)", i, reqDuration)
+			}
+		}
+
+		totalElapsed := time.Since(start)
+
+		// All requests should complete quickly
+		if totalElapsed > maxConcurrentTime {
+			t.Errorf("Requests took too long (%v), suggesting blocking behavior", totalElapsed)
+		}
+
+		t.Logf("All %d requests completed in %v, no blocking detected", numRequests, totalElapsed)
+	})
 }
