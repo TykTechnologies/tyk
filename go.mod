@@ -29,7 +29,7 @@ require (
 	github.com/TykTechnologies/graphql-translator v0.0.0-20250602105400-41c2e7514a36
 	github.com/TykTechnologies/murmur3 v0.0.0-20230310161213-aad17efd5632
 	github.com/TykTechnologies/openid2go v0.1.2
-	github.com/TykTechnologies/storage v1.2.2
+	github.com/TykTechnologies/storage v1.3.0
 	github.com/TykTechnologies/tyk-pump v1.13.0-rc2.0.20251023125113-bc7641d42e63
 	github.com/akutz/memconn v0.1.0
 	github.com/bshuster-repo/logrus-logstash-hook v1.1.0
@@ -556,7 +556,7 @@ require (
 	gopkg.in/mgo.v2 v2.0.0-20190816093944-a6b53ec6cb22 // indirect
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1 // indirect
 	gopkg.in/sourcemap.v1 v1.0.5 // indirect
-	gorm.io/gorm v1.30.0 // indirect
+	gorm.io/gorm v1.30.1 // indirect
 	modernc.org/gc/v3 v3.0.0-20240107210532-573471604cb6 // indirect
 	modernc.org/libc v1.41.0 // indirect
 	modernc.org/mathutil v1.6.0 // indirect
