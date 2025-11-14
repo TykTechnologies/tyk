@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"sync"
 
 	"github.com/samber/lo"
 
@@ -34,6 +35,7 @@ const (
 // OAS holds the upstream OAS definition as well as adds functionality like custom JSON marshalling.
 type OAS struct {
 	openapi3.T
+	securitySchemesOnce sync.Once
 }
 
 // MarshalJSON implements json.Marshaller.
@@ -364,22 +366,27 @@ func (s *OAS) getTykExternalOAuthAuth(name string) (externalOAuth *ExternalOAuth
 }
 
 func (s *OAS) getTykSecuritySchemes() *SecuritySchemes {
-	ext := s.GetTykExtension()
-	if ext == nil {
-		ext = &XTykAPIGateway{}
-		s.SetTykExtension(ext)
+	if s == nil {
+		return nil
 	}
 
-	// Server is a value field; ensure Authentication exists.
-	if ext.Server.Authentication == nil {
-		ext.Server.Authentication = &Authentication{}
-	}
+	s.securitySchemesOnce.Do(func() {
+		ext := s.GetTykExtension()
+		if ext == nil {
+			ext = &XTykAPIGateway{}
+			s.SetTykExtension(ext)
+		}
 
-	if ext.Server.Authentication.SecuritySchemes == nil {
-		ext.Server.Authentication.SecuritySchemes = NewSecuritySchemes()
-	}
+		if ext.Server.Authentication == nil {
+			ext.Server.Authentication = &Authentication{}
+		}
 
-	return ext.Server.Authentication.SecuritySchemes
+		if ext.Server.Authentication.SecuritySchemes == nil {
+			ext.Server.Authentication.SecuritySchemes = NewSecuritySchemes()
+		}
+	})
+
+	return s.GetTykExtension().Server.Authentication.SecuritySchemes
 }
 
 func (s *OAS) getTykSecurityScheme(name string) interface{} {
