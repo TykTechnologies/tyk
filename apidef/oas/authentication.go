@@ -274,7 +274,7 @@ func (ss *SecuritySchemes) Set(key string, value interface{}) {
 	if existing, ok := ss.container[key]; ok && isStructPointer(value) {
 		if m, isMap := existing.(map[string]interface{}); isMap {
 			if !toStructIfMap(m, value) {
-				return
+				log.Warnf("Failed to convert map-based scheme %q into %T; overwriting malformed data", key, value)
 			}
 		}
 	}
@@ -437,8 +437,28 @@ type SecurityScheme interface {
 	Import(nativeSS *openapi3.SecurityScheme, enable bool)
 }
 
-// Import takes the openapi3.SecurityScheme as argument and applies it to the receiver.
-// The SecuritySchemes type uses internal synchronization to safely modify its contents.
+// loadForImport returns an existing *T if present,
+// or builds a new *T hydrated from a map (if possible),
+// or otherwise returns a zero-value *T.
+func loadForImport[T any](ss *SecuritySchemes, name string) *T {
+	if ss == nil {
+		return nil
+	}
+
+	scheme, exists := ss.Get(name)
+	if !exists {
+		return new(T)
+	}
+
+	if typed, ok := scheme.(*T); ok {
+		return typed
+	}
+
+	v := new(T)
+	toStructIfMap(scheme, v)
+	return v
+}
+
 func (ss *SecuritySchemes) Import(name string, nativeSS *openapi3.SecurityScheme, enable bool) error {
 	if ss == nil {
 		return fmt.Errorf("SecuritySchemes is nil")
@@ -446,57 +466,30 @@ func (ss *SecuritySchemes) Import(name string, nativeSS *openapi3.SecurityScheme
 
 	switch {
 	case nativeSS.Type == typeAPIKey:
-		token := &Token{}
-		scheme, exists := ss.Get(name)
-		if !exists {
-			ss.Set(name, token)
-		}
-		if tokenVal, ok := scheme.(*Token); ok {
-			token = tokenVal
-		} else {
-			toStructIfMap(scheme, token)
-		}
-
+		token := loadForImport[Token](ss, name)
 		token.Enabled = &enable
-	case nativeSS.Type == typeHTTP && nativeSS.Scheme == schemeBearer && nativeSS.BearerFormat == bearerFormatJWT:
-		jwt := &JWT{}
-		scheme, exists := ss.Get(name)
-		if !exists {
-			ss.Set(name, jwt)
-		}
-		if jwtVal, ok := scheme.(*JWT); ok {
-			jwt = jwtVal
-		} else {
-			toStructIfMap(scheme, jwt)
-		}
+		ss.Set(name, token)
 
+	case nativeSS.Type == typeHTTP &&
+		nativeSS.Scheme == schemeBearer &&
+		nativeSS.BearerFormat == bearerFormatJWT:
+
+		jwt := loadForImport[JWT](ss, name)
 		jwt.Import(enable)
-	case nativeSS.Type == typeHTTP && nativeSS.Scheme == schemeBasic:
-		basic := &Basic{}
-		scheme, exists := ss.Get(name)
-		if !exists {
-			ss.Set(name, basic)
-		}
-		if basicVal, ok := scheme.(*Basic); ok {
-			basic = basicVal
-		} else {
-			toStructIfMap(scheme, basic)
-		}
+		ss.Set(name, jwt)
 
+	case nativeSS.Type == typeHTTP &&
+		nativeSS.Scheme == schemeBasic:
+
+		basic := loadForImport[Basic](ss, name)
 		basic.Import(enable)
-	case nativeSS.Type == typeOAuth2:
-		oauth := &OAuth{}
-		scheme, exists := ss.Get(name)
-		if !exists {
-			ss.Set(name, oauth)
-		}
-		if oauthVal, ok := scheme.(*OAuth); ok {
-			oauth = oauthVal
-		} else {
-			toStructIfMap(scheme, oauth)
-		}
+		ss.Set(name, basic)
 
+	case nativeSS.Type == typeOAuth2:
+		oauth := loadForImport[OAuth](ss, name)
 		oauth.Import(enable)
+		ss.Set(name, oauth)
+
 	default:
 		return fmt.Errorf(unsupportedSecuritySchemeFmt, name)
 	}
