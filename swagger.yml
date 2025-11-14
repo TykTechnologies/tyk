@@ -745,7 +745,7 @@ paths:
                 items:
                   allOf:
                   - $ref: https://raw.githubusercontent.com/TykTechnologies/tyk/refs/heads/master/apidef/oas/schema/3.0.json
-                  - $ref: '#/components/schemas/XTykAPIGateway'
+                  - $ref: '#/components/schemas/TykVendorExtension'
                 type: array
           description: List of API definitions in Tyk OAS format.
         "403":
@@ -846,7 +846,7 @@ paths:
             schema:
               allOf:
               - $ref: https://raw.githubusercontent.com/TykTechnologies/tyk/refs/heads/master/apidef/oas/schema/3.0.json
-              - $ref: '#/components/schemas/XTykAPIGateway'
+              - $ref: '#/components/schemas/TykVendorExtension'
       responses:
         "200":
           content:
@@ -984,7 +984,7 @@ paths:
               schema:
                 allOf:
                 - $ref: https://raw.githubusercontent.com/TykTechnologies/tyk/refs/heads/master/apidef/oas/schema/3.0.json
-                - $ref: '#/components/schemas/XTykAPIGateway'
+                - $ref: '#/components/schemas/TykVendorExtension'
           description: OK
           headers:
             x-tyk-base-api-id:
@@ -1207,7 +1207,7 @@ paths:
             schema:
               allOf:
               - $ref: https://raw.githubusercontent.com/TykTechnologies/tyk/refs/heads/master/apidef/oas/schema/3.0.json
-              - $ref: '#/components/schemas/XTykAPIGateway'
+              - $ref: '#/components/schemas/TykVendorExtension'
       responses:
         "200":
           content:
@@ -1946,9 +1946,6 @@ paths:
         name: hashed
         required: false
         schema:
-          enum:
-          - true
-          - false
           type: boolean
       requestBody:
         content:
@@ -2051,9 +2048,6 @@ paths:
         name: hashed
         required: false
         schema:
-          enum:
-          - true
-          - false
           type: boolean
       - description: The key ID.
         example: 5e9d9544a1dcd60001d0ed20e7f75f9e03534825b7aef9df749582e5
@@ -2114,9 +2108,6 @@ paths:
         name: hashed
         required: false
         schema:
-          enum:
-          - true
-          - false
           type: boolean
       - description: The key ID.
         example: 5e9d9544a1dcd60001d0ed20e7f75f9e03534825b7aef9df749582e5
@@ -2230,9 +2221,6 @@ paths:
         name: hashed
         required: false
         schema:
-          enum:
-          - true
-          - false
           type: boolean
       - description: Name to give the custom key.
         example: customKey
@@ -2357,9 +2345,6 @@ paths:
         name: hashed
         required: false
         schema:
-          enum:
-          - true
-          - false
           type: boolean
       - description: ID of the key you want to update.
         example: 5e9d9544a1dcd60001d0ed20766d9a6ec6b4403b93a554feefef4708
@@ -4398,9 +4383,6 @@ paths:
         name: block
         required: false
         schema:
-          enum:
-          - true
-          - false
           type: boolean
       responses:
         "200":
@@ -5616,9 +5598,6 @@ components:
           type: string
       type: object
     BooleanQueryParam:
-      enum:
-      - true
-      - false
       example: true
       type: boolean
     CORS:
@@ -7771,7 +7750,7 @@ components:
         oas:
           oneOf:
             - $ref: 'https://raw.githubusercontent.com/TykTechnologies/tyk/refs/heads/master/apidef/oas/schema/3.0.json'
-            - $ref: '#/components/schemas/XTykAPIGateway'
+            - $ref: '#/components/schemas/TykVendorExtension'
       oneOf:
         - required: [oas]
         - required: [spec]
@@ -8187,6 +8166,11 @@ components:
           $ref: '#/components/schemas/Server'
         upstream:
           $ref: '#/components/schemas/Upstream'
+      type: object
+    TykVendorExtension:
+      properties:
+        x-tyk-api-gateway:
+          $ref: '#/components/schemas/XTykAPIGateway'
       type: object
   securitySchemes:
     api_key:
