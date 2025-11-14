@@ -1,9 +1,10 @@
+---
 name: SentinelOne CNS Scan
 
-on:
+on:  # yamllint disable-line rule:truthy
   pull_request:
-    types: [ opened, reopened, synchronize ]
-    branches: [ master ]
+    types: [opened, reopened, synchronize, ready_for_review]
+    branches: [master]
 
 jobs:
   s1_scanner:
@@ -18,5 +19,3 @@ jobs:
       S1_API_TOKEN: ${{ secrets.S1_API_TOKEN }}
       CONSOLE_URL: ${{ secrets.S1_CONSOLE_URL }}
       SCOPE_ID: ${{ secrets.S1_SCOPE_ID }}
-
-
