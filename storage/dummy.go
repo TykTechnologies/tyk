@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"context"
 	"errors"
 	"fmt"
 )
@@ -255,4 +256,19 @@ func (s *DummyStorage) GetKeys(pattern string) (keys []string) {
 	}
 
 	return keys
+}
+
+// GetKeyContext retrieves the value for a given key with context support (delegates to GetKey).
+func (s *DummyStorage) GetKeyContext(_ context.Context, key string) (string, error) {
+	return s.GetKey(key)
+}
+
+// GetRawKeyContext retrieves a raw key value with context support (delegates to GetRawKey).
+func (s *DummyStorage) GetRawKeyContext(_ context.Context, key string) (string, error) {
+	return s.GetRawKey(key)
+}
+
+// GetMultiKeyContext retrieves multiple keys with context support (delegates to GetMultiKey).
+func (s *DummyStorage) GetMultiKeyContext(_ context.Context, keys []string) ([]string, error) {
+	return s.GetMultiKey(keys)
 }

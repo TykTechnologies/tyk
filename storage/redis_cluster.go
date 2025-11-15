@@ -266,13 +266,18 @@ func (r *RedisCluster) up() error {
 
 // GetKey will retrieve a key from the database
 func (r *RedisCluster) GetKey(keyName string) (string, error) {
+	return r.GetKeyContext(context.Background(), keyName)
+}
+
+// GetKeyContext will retrieve a key from the database with context support for cancellation
+func (r *RedisCluster) GetKeyContext(ctx context.Context, keyName string) (string, error) {
 	storage, err := r.kv()
 	if err != nil {
 		log.Error(err)
 		return "", err
 	}
 
-	value, err := storage.Get(context.Background(), r.fixKey(keyName))
+	value, err := storage.Get(ctx, r.fixKey(keyName))
 	if err != nil {
 		if !errors.Is(err, redis.Nil) {
 			log.Debug("Error trying to get value:", err)
@@ -285,6 +290,11 @@ func (r *RedisCluster) GetKey(keyName string) (string, error) {
 
 // GetMultiKey gets multiple keys from the database
 func (r *RedisCluster) GetMultiKey(keys []string) ([]string, error) {
+	return r.GetMultiKeyContext(context.Background(), keys)
+}
+
+// GetMultiKeyContext gets multiple keys from the database with context support for cancellation
+func (r *RedisCluster) GetMultiKeyContext(ctx context.Context, keys []string) ([]string, error) {
 	storage, err := r.kv()
 	if err != nil {
 		log.Error(err)
@@ -297,7 +307,7 @@ func (r *RedisCluster) GetMultiKey(keys []string) ([]string, error) {
 		keyNames[index] = r.fixKey(val)
 	}
 
-	values, err := storage.GetMulti(context.Background(), keyNames)
+	values, err := storage.GetMulti(ctx, keyNames)
 	if err != nil {
 		log.WithError(err).Debug("Error trying to get value")
 		return nil, ErrKeyNotFound
@@ -331,13 +341,18 @@ func (r *RedisCluster) GetKeyTTL(keyName string) (ttl int64, err error) {
 }
 
 func (r *RedisCluster) GetRawKey(keyName string) (string, error) {
+	return r.GetRawKeyContext(context.Background(), keyName)
+}
+
+// GetRawKeyContext will retrieve a raw key from the database with context support for cancellation
+func (r *RedisCluster) GetRawKeyContext(ctx context.Context, keyName string) (string, error) {
 	storage, err := r.kv()
 	if err != nil {
 		log.Error(err)
 		return "", err
 	}
 
-	value, err := storage.Get(context.Background(), keyName)
+	value, err := storage.Get(ctx, keyName)
 	if err != nil {
 		if !errors.Is(err, redis.Nil) {
 			log.Debug("Error trying to get value:", err)

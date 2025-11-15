@@ -1,6 +1,7 @@
 package gateway
 
 import (
+	"context"
 	"crypto/x509"
 	"encoding/json"
 	"fmt"
@@ -577,4 +578,16 @@ func (c *countingStorageHandler) AppendToSet(s string, s2 string) {}
 
 func (c *countingStorageHandler) Exists(s string) (bool, error) {
 	return false, nil
+}
+
+func (c *countingStorageHandler) GetKeyContext(ctx context.Context, s string) (string, error) {
+	return "", nil
+}
+
+func (c *countingStorageHandler) GetRawKeyContext(ctx context.Context, key string) (string, error) {
+	return "", nil
+}
+
+func (c *countingStorageHandler) GetMultiKeyContext(ctx context.Context, keys []string) ([]string, error) {
+	return nil, nil
 }
