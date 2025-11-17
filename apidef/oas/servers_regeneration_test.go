@@ -2250,3 +2250,164 @@ func TestRegenerateServers_FallbackToDefaultTransition(t *testing.T) {
 		assert.Len(t, finalURLs, 2, "Should have 1 Tyk URL + 1 user URL")
 	})
 }
+
+func TestRegenerateServers_BaseAPILosesFallbackWhenNewDefaultSet(t *testing.T) {
+	t.Parallel()
+
+	config := ServerRegenerationConfig{
+		Protocol:    "http://",
+		DefaultHost: "localhost:8080",
+	}
+
+	t.Run("base API loses fallback URL when new version becomes default", func(t *testing.T) {
+		oldBaseAPI := &apidef.APIDefinition{
+			APIID: "base-api-123",
+			Proxy: apidef.ProxyConfig{
+				ListenPath: "/api",
+			},
+			VersionDefinition: apidef.VersionDefinition{
+				Enabled:           true,
+				Name:              "v1",
+				Default:           "v1",
+				FallbackToDefault: true,
+				Location:          "url",
+				BaseID:            "",
+				Versions:          map[string]string{},
+			},
+		}
+
+		baseOAS := &OAS{T: openapi3.T{}}
+		err := baseOAS.RegenerateServers(oldBaseAPI, nil, oldBaseAPI, nil, config, "v1")
+		require.NoError(t, err)
+
+		initialURLs := make([]string, len(baseOAS.Servers))
+		for i, s := range baseOAS.Servers {
+			initialURLs[i] = s.URL
+		}
+		assert.Contains(t, initialURLs, "http://localhost:8080/api/v1")
+		assert.Contains(t, initialURLs, "http://localhost:8080/api")
+		assert.Len(t, initialURLs, 2)
+
+		newBaseAPI := &apidef.APIDefinition{
+			APIID: "base-api-123",
+			Proxy: apidef.ProxyConfig{
+				ListenPath: "/api",
+			},
+			VersionDefinition: apidef.VersionDefinition{
+				Enabled:           true,
+				Name:              "v1",
+				Default:           "v2",
+				FallbackToDefault: true,
+				Location:          "url",
+				BaseID:            "",
+				Versions: map[string]string{
+					"v2": "child-api-456",
+				},
+			},
+		}
+
+		err = baseOAS.RegenerateServers(newBaseAPI, oldBaseAPI, newBaseAPI, oldBaseAPI, config, "v1")
+		require.NoError(t, err)
+
+		finalURLs := make([]string, len(baseOAS.Servers))
+		for i, s := range baseOAS.Servers {
+			finalURLs[i] = s.URL
+		}
+		assert.Contains(t, finalURLs, "http://localhost:8080/api/v1")
+		assert.NotContains(t, finalURLs, "http://localhost:8080/api")
+		assert.Len(t, finalURLs, 1)
+	})
+
+	t.Run("child API gets fallback URL when set as default", func(t *testing.T) {
+		baseAPI := &apidef.APIDefinition{
+			APIID: "base-api-123",
+			Proxy: apidef.ProxyConfig{
+				ListenPath: "/api",
+			},
+			VersionDefinition: apidef.VersionDefinition{
+				Enabled:           true,
+				Name:              "v1",
+				Default:           "v2",
+				FallbackToDefault: true,
+				Location:          "url",
+				BaseID:            "",
+				Versions: map[string]string{
+					"v2": "child-api-456",
+				},
+			},
+		}
+
+		childV2 := &apidef.APIDefinition{
+			APIID: "child-api-456",
+			Proxy: apidef.ProxyConfig{
+				ListenPath: "/api-v2",
+			},
+			VersionDefinition: apidef.VersionDefinition{
+				Enabled:  false,
+				Name:     "v2",
+				Location: "url",
+				BaseID:   "base-api-123",
+			},
+		}
+
+		childOAS := &OAS{T: openapi3.T{}}
+		err := childOAS.RegenerateServers(childV2, nil, baseAPI, nil, config, "v2")
+		require.NoError(t, err)
+
+		childURLs := make([]string, len(childOAS.Servers))
+		for i, s := range childOAS.Servers {
+			childURLs[i] = s.URL
+		}
+		assert.Contains(t, childURLs, "http://localhost:8080/api/v2")
+		assert.Contains(t, childURLs, "http://localhost:8080/api")
+		assert.Contains(t, childURLs, "http://localhost:8080/api-v2")
+		assert.Len(t, childURLs, 3)
+	})
+
+	t.Run("non-default child API does not get fallback URL", func(t *testing.T) {
+		baseAPI := &apidef.APIDefinition{
+			APIID: "base-api-123",
+			Proxy: apidef.ProxyConfig{
+				ListenPath: "/api",
+			},
+			VersionDefinition: apidef.VersionDefinition{
+				Enabled:           true,
+				Name:              "v1",
+				Default:           "v2",
+				FallbackToDefault: true,
+				Location:          "url",
+				BaseID:            "",
+				Versions: map[string]string{
+					"v2": "child-api-456",
+					"v3": "child-api-789",
+				},
+			},
+		}
+
+		childV3 := &apidef.APIDefinition{
+			APIID: "child-api-789",
+			Proxy: apidef.ProxyConfig{
+				ListenPath: "/api-v3",
+			},
+			VersionDefinition: apidef.VersionDefinition{
+				Enabled:  false,
+				Name:     "v3",
+				Location: "url",
+				BaseID:   "base-api-123",
+			},
+		}
+
+		childOAS := &OAS{T: openapi3.T{}}
+		err := childOAS.RegenerateServers(childV3, nil, baseAPI, nil, config, "v3")
+		require.NoError(t, err)
+
+		childURLs := make([]string, len(childOAS.Servers))
+		for i, s := range childOAS.Servers {
+			childURLs[i] = s.URL
+		}
+		assert.Contains(t, childURLs, "http://localhost:8080/api/v3")
+		assert.NotContains(t, childURLs, "http://localhost:8080/api")
+		assert.Contains(t, childURLs, "http://localhost:8080/api-v3")
+		assert.Len(t, childURLs, 2)
+	})
+}
