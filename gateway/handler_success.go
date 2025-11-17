@@ -190,7 +190,7 @@ func (s *SuccessHandler) RecordHit(r *http.Request, timing analytics.Latency, co
 	ip := request.RealIP(r)
 	if s.Spec.GlobalConfig.StoreAnalytics(ip) {
 
-		t := time.Now()
+		t := ctx.GetRequestReceivedTime(r)
 
 		// Track the key ID if it exists
 		token := ctxGetAuthToken(r)
