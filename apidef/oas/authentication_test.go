@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v3"
 
 	"github.com/TykTechnologies/tyk/apidef"
@@ -499,12 +500,8 @@ func TestSecuritySchemesSet_Typed(t *testing.T) {
 
 	v, ok := ss.Get("x")
 
-	if !ok {
-		t.Fatal("expected ok")
-	}
-	if v != in {
-		t.Fatal("expected same ptr")
-	}
+	require.True(t, ok, "expected ok")
+	require.Equal(t, in, v)
 }
 
 func TestSecuritySchemesSet_MapPromotes(t *testing.T) {
@@ -518,16 +515,12 @@ func TestSecuritySchemesSet_MapPromotes(t *testing.T) {
 	ss.Set("x", out)
 
 	v, ok := ss.Get("x")
-	if !ok {
-		t.Fatal("expected ok")
-	}
+	require.True(t, ok, "expected ok")
+
 	j, ok := v.(*JWT)
-	if !ok {
-		t.Fatal("not JWT")
-	}
-	if !j.Enabled {
-		t.Fatal("expected enabled=true")
-	}
+	require.True(t, ok, "not JWT")
+
+	require.True(t, j.Enabled, "expected enabled=true")
 }
 
 func TestSecuritySchemesSet_MapPromotesFail(t *testing.T) {
@@ -542,50 +535,33 @@ func TestSecuritySchemesSet_MapPromotesFail(t *testing.T) {
 	ss.Set("x", out)
 
 	v, ok := ss.Get("x")
-	if !ok {
-		t.Fatal("expected ok")
-	}
+	require.True(t, ok, "expected ok")
 
 	j, isJWT := v.(*JWT)
-	if !isJWT {
-		t.Fatalf("expected *JWT stored after Set, got %T", v)
-	}
+	require.Truef(t, isJWT, "expected *JWT stored after Set, got %T", v)
 
-	if j != out {
-		t.Fatalf("expected stored pointer to be the one passed to Set")
-	}
+	require.Same(t, out, j, "expected stored pointer to be the one passed to Set")
 
-	if j.Enabled {
-		t.Fatalf("expected Enabled to be false after failed promotion, got true")
-	}
-	if j.Source != "" {
-		t.Fatalf("expected Source to be empty after failed promotion, got %q", j.Source)
-	}
-	if len(j.JwksURIs) != 0 {
-		t.Fatalf("expected no JwksURIs after failed promotion, got %v", j.JwksURIs)
-	}
+	require.False(t, j.Enabled, "expected Enabled to be false after failed promotion")
+	require.Empty(t, j.Source, "expected Source to be empty after failed promotion")
+	require.Empty(t, j.JwksURIs, "expected no JwksURIs after failed promotion")
 }
 
 func TestSecuritySchemes_UnmarshalJSON_Null(t *testing.T) {
 	var ss SecuritySchemes
+
 	err := json.Unmarshal([]byte("null"), &ss)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if ss.Len() != 0 {
-		t.Fatalf("expected empty map")
-	}
+	require.NoError(t, err, "unmarshal of null should not error")
+
+	require.Equal(t, 0, ss.Len(), "expected empty map")
 }
 
 func TestSecuritySchemes_UnmarshalJSON_Map(t *testing.T) {
 	var ss SecuritySchemes
 	err := json.Unmarshal([]byte(`{"x": {"enabled": true}}`), &ss)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if ss.Len() != 1 {
-		t.Fatal("expected 1")
-	}
+	require.NoError(t, err)
+
+	require.Equal(t, 1, ss.Len(), "expected exactly one entry")
 }
 
 func TestSecuritySchemes_YAMLRoundTrip(t *testing.T) {
@@ -593,23 +569,13 @@ func TestSecuritySchemes_YAMLRoundTrip(t *testing.T) {
 	ss.Set("token", map[string]interface{}{"enabled": true})
 
 	out, err := yaml.Marshal(ss)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
 	var decoded map[string]interface{}
-	if err := yaml.Unmarshal(out, &decoded); err != nil {
-		t.Fatal(err)
-	}
-	if len(decoded) != 1 {
-		t.Fatalf("expected 1 entry after marshal, got: %d", len(decoded))
-	}
+	require.NoError(t, yaml.Unmarshal(out, &decoded))
+	require.Len(t, decoded, 1, "expected 1 entry after marshal")
 
 	var roundtrip SecuritySchemes
-	if err := yaml.Unmarshal(out, &roundtrip); err != nil {
-		t.Fatal(err)
-	}
-	if roundtrip.Len() != 1 {
-		t.Fatalf("expected 1 entry after round-trip, got: %d", roundtrip.Len())
-	}
+	require.NoError(t, yaml.Unmarshal(out, &roundtrip))
+	require.Equal(t, 1, roundtrip.Len(), "expected 1 entry after round-trip")
 }
