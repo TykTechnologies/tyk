@@ -10,11 +10,11 @@ import (
 	"time"
 
 	"github.com/getkin/kin-openapi/openapi3"
+	clone "github.com/huandu/go-clone/generic"
 	"github.com/mitchellh/mapstructure"
 	"gopkg.in/yaml.v3"
 
 	"github.com/TykTechnologies/tyk/apidef"
-	clone "github.com/huandu/go-clone/generic"
 )
 
 // SecurityProcessingMode constants define how multiple security requirements are processed
@@ -246,21 +246,7 @@ func NewSecuritySchemes() *SecuritySchemes {
 	return &SecuritySchemes{container: make(map[string]interface{})}
 }
 
-// isStructPointer reports whether the provided value is a non-nil pointer to a struct.
-// We use this to detect write targets that can absorb map-backed schemes so that we can
-// promote stored maps to concrete structs without allocating new containers.
-func isStructPointer(value interface{}) bool {
-	if value == nil {
-		return false
-	}
-
-	val := reflect.ValueOf(value)
-	return val.Kind() == reflect.Ptr && !val.IsNil() && val.Elem().Kind() == reflect.Struct
-}
-
 // Set stores a security scheme by name.
-// Normalizing any existing map-backed data here ensures every caller subsequently observes a typed
-// value instead of JSON-shaped maps, keeping conversions centralized and thread-safe.
 func (ss *SecuritySchemes) Set(key string, value interface{}) {
 	if ss == nil {
 		return
@@ -270,18 +256,6 @@ func (ss *SecuritySchemes) Set(key string, value interface{}) {
 
 	if ss.container == nil {
 		ss.container = make(map[string]interface{})
-	}
-
-	existing, exists := ss.container[key]
-	if exists && isStructPointer(value) {
-		if isStructPointer(existing) && reflect.TypeOf(existing) == reflect.TypeOf(value) {
-			return
-		}
-		if m, isMap := existing.(map[string]interface{}); isMap {
-			if !toStructIfMap(m, value) {
-				log.Warnf("Failed to convert map-based scheme %q into %T; overwriting malformed data", key, value)
-			}
-		}
 	}
 
 	ss.container[key] = value

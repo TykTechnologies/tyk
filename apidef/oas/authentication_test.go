@@ -504,14 +504,14 @@ func TestSecuritySchemesSet_Typed(t *testing.T) {
 	require.Equal(t, in, v)
 }
 
-func TestSecuritySchemesSet_MapPromotes(t *testing.T) {
+func TestSecuritySchemesSet_Overwrite(t *testing.T) {
 	ss := NewSecuritySchemes()
 
 	ss.Set("x", map[string]interface{}{
 		"enabled": true,
 	})
 
-	out := &JWT{}
+	out := &JWT{Enabled: true}
 	ss.Set("x", out)
 
 	v, ok := ss.Get("x")
@@ -520,31 +520,8 @@ func TestSecuritySchemesSet_MapPromotes(t *testing.T) {
 	j, ok := v.(*JWT)
 	require.True(t, ok, "not JWT")
 
-	require.True(t, j.Enabled, "expected enabled=true")
-}
-
-func TestSecuritySchemesSet_MapPromotesFail(t *testing.T) {
-	ss := NewSecuritySchemes()
-
-	// Malformed map: "enabled" has the wrong type, so toStructIfMap should fail.
-	ss.Set("x", map[string]interface{}{
-		"enabled": 123,
-	})
-
-	out := &JWT{}
-	ss.Set("x", out)
-
-	v, ok := ss.Get("x")
-	require.True(t, ok, "expected ok")
-
-	j, isJWT := v.(*JWT)
-	require.Truef(t, isJWT, "expected *JWT stored after Set, got %T", v)
-
+	require.True(t, j.Enabled, "expected Enabled=true on stored struct")
 	require.Same(t, out, j, "expected stored pointer to be the one passed to Set")
-
-	require.False(t, j.Enabled, "expected Enabled to be false after failed promotion")
-	require.Empty(t, j.Source, "expected Source to be empty after failed promotion")
-	require.Empty(t, j.JwksURIs, "expected no JwksURIs after failed promotion")
 }
 
 func TestSecuritySchemes_UnmarshalJSON_Null(t *testing.T) {

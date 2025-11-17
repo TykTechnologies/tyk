@@ -234,20 +234,22 @@ func (s *OAS) getTykTokenAuth(name string) (token *Token) {
 	}
 
 	if tokenVal, ok := v.(*Token); ok {
-		token = tokenVal
+		return tokenVal
+	}
+
+	m, ok := v.(map[string]interface{})
+	if !ok {
 		return
 	}
 
 	candidate := &Token{}
-	// Delegate map→struct promotion to SecuritySchemes so it can update the cache under lock.
-	ss.Set(name, candidate)
-	if converted, ok := ss.Get(name); ok {
-		if tokenVal, ok := converted.(*Token); ok {
-			token = tokenVal
-		}
+	if !toStructIfMap(m, candidate) {
+		return
 	}
 
-	return
+	ss.Set(name, candidate)
+
+	return candidate
 }
 
 func (s *OAS) getTykJWTAuth(name string) (jwt *JWT) {
@@ -262,20 +264,21 @@ func (s *OAS) getTykJWTAuth(name string) (jwt *JWT) {
 	}
 
 	if jwtVal, ok := v.(*JWT); ok {
-		jwt = jwtVal
+		return jwtVal
+	}
+
+	m, ok := v.(map[string]interface{})
+	if !ok {
 		return
 	}
 
 	candidate := &JWT{}
-	// Delegate map→struct promotion to SecuritySchemes so it can update the cache under lock.
-	ss.Set(name, candidate)
-	if converted, ok := ss.Get(name); ok {
-		if jwtVal, ok := converted.(*JWT); ok {
-			jwt = jwtVal
-		}
+	if !toStructIfMap(m, candidate) {
+		return
 	}
 
-	return
+	ss.Set(name, candidate)
+	return candidate
 }
 
 // getTykBasicAuth returns the `Basic` security scheme for the given name from the
@@ -293,20 +296,21 @@ func (s *OAS) getTykBasicAuth(name string) (basic *Basic) {
 	}
 
 	if basicVal, ok := v.(*Basic); ok {
-		basic = basicVal
+		return basicVal
+	}
+
+	m, ok := v.(map[string]interface{})
+	if !ok {
 		return
 	}
 
 	candidate := &Basic{}
-	// Delegate map→struct promotion to SecuritySchemes so it can update the cache under lock.
-	ss.Set(name, candidate)
-	if converted, ok := ss.Get(name); ok {
-		if basicVal, ok := converted.(*Basic); ok {
-			basic = basicVal
-		}
+	if !toStructIfMap(m, candidate) {
+		return
 	}
 
-	return
+	ss.Set(name, candidate)
+	return candidate
 }
 
 func (s *OAS) getTykOAuthAuth(name string) (oauth *OAuth) {
@@ -321,20 +325,21 @@ func (s *OAS) getTykOAuthAuth(name string) (oauth *OAuth) {
 	}
 
 	if oauthVal, ok := v.(*OAuth); ok {
-		oauth = oauthVal
+		return oauthVal
+	}
+
+	m, ok := v.(map[string]interface{})
+	if !ok {
 		return
 	}
 
 	candidate := &OAuth{}
-	// Delegate map→struct promotion to SecuritySchemes so it can update the cache under lock.
-	ss.Set(name, candidate)
-	if converted, ok := ss.Get(name); ok {
-		if oauthVal, ok := converted.(*OAuth); ok {
-			oauth = oauthVal
-		}
+	if !toStructIfMap(m, candidate) {
+		return
 	}
 
-	return
+	ss.Set(name, candidate)
+	return candidate
 }
 
 func (s *OAS) getTykExternalOAuthAuth(name string) (externalOAuth *ExternalOAuth) {
@@ -349,20 +354,21 @@ func (s *OAS) getTykExternalOAuthAuth(name string) (externalOAuth *ExternalOAuth
 	}
 
 	if oauthVal, ok := v.(*ExternalOAuth); ok {
-		externalOAuth = oauthVal
+		return oauthVal
+	}
+
+	m, ok := v.(map[string]interface{})
+	if !ok {
 		return
 	}
 
 	candidate := &ExternalOAuth{}
-	// Delegate map→struct promotion to SecuritySchemes so it can update the cache under lock.
-	ss.Set(name, candidate)
-	if converted, ok := ss.Get(name); ok {
-		if oauthVal, ok := converted.(*ExternalOAuth); ok {
-			externalOAuth = oauthVal
-		}
+	if !toStructIfMap(m, candidate) {
+		return
 	}
 
-	return
+	ss.Set(name, candidate)
+	return candidate
 }
 
 func (s *OAS) getTykSecuritySchemes() *SecuritySchemes {
