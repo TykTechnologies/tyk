@@ -14,6 +14,7 @@ import (
 	"gopkg.in/yaml.v3"
 
 	"github.com/TykTechnologies/tyk/apidef"
+	clone "github.com/huandu/go-clone/generic"
 )
 
 // SecurityProcessingMode constants define how multiple security requirements are processed
@@ -271,7 +272,11 @@ func (ss *SecuritySchemes) Set(key string, value interface{}) {
 		ss.container = make(map[string]interface{})
 	}
 
-	if existing, ok := ss.container[key]; ok && isStructPointer(value) {
+	existing, exists := ss.container[key]
+	if exists && isStructPointer(value) {
+		if isStructPointer(existing) && reflect.TypeOf(existing) == reflect.TypeOf(value) {
+			return
+		}
 		if m, isMap := existing.(map[string]interface{}); isMap {
 			if !toStructIfMap(m, value) {
 				log.Warnf("Failed to convert map-based scheme %q into %T; overwriting malformed data", key, value)
@@ -408,8 +413,7 @@ func (ss *SecuritySchemes) MarshalYAML() (interface{}, error) {
 	if ss.container == nil {
 		return map[string]interface{}{}, nil
 	}
-	// Return the raw map so yaml can encode it normally.
-	return ss.container, nil
+	return clone.Clone(ss.container), nil
 }
 
 // UnmarshalYAML populates SecuritySchemes.container from YAML.
