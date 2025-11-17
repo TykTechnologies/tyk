@@ -187,25 +187,15 @@ func generateVersionedServers(
 	hosts := determineHosts(apiData, config)
 	servers := make([]serverInfo, 0, len(hosts)*2) // *2 for potential direct access URLs
 
-	// Determine if this API is the base API itself or a child
 	isBaseAPI := apiData.APIID == baseAPI.APIID
 
-	// Check if we should add a fallback URL (without version identifier)
-	// This applies when:
-	// 1. FallbackToDefault is enabled in base API's versioning config
-	// 2. AND a default version is explicitly set (not empty)
-	// 3. AND versioning is not header-based
-	// 4. AND either:
-	//    a) This is the base API itself (always add fallback URL when conditions met)
-	//    b) This is a child API and its version name matches the default version
+	// Add fallback URL only for the default version when fallback is enabled
 	shouldAddFallbackURL := baseAPI.VersionDefinition.FallbackToDefault &&
 		baseAPI.VersionDefinition.Default != "" &&
 		baseAPI.VersionDefinition.Location != "header" &&
-		(isBaseAPI || versionName == baseAPI.VersionDefinition.Default)
+		versionName == baseAPI.VersionDefinition.Default
 
-	// Scenario 1 & 2: Always add versioned URLs
-	// - Scenario 1: Versioning enabled, no default or no fallback → version required
-	// - Scenario 2: Versioning enabled, default set, fallback true → version optional but valid
+	// Always add versioned URLs
 	for _, host := range hosts {
 		versionedURL, description := buildVersionedServerURL(
 			config.Protocol, host, baseListenPath,
@@ -218,10 +208,7 @@ func generateVersionedServers(
 		})
 	}
 
-	// Add fallback URL (without version) when appropriate
-	// This handles:
-	// - Scenario 2: Base API with default version and fallback enabled
-	// - Scenario 3: Child API matching default version with fallback enabled
+	// Add fallback URL for the default version
 	if shouldAddFallbackURL {
 		for _, host := range hosts {
 			fallbackURL := buildServerURL(config.Protocol, host, baseListenPath)
@@ -232,8 +219,7 @@ func generateVersionedServers(
 		}
 	}
 
-	// If API is external AND it's a child API (not the base itself), also add direct access URLs
-	// This is for child APIs that have their own listen paths separate from the base API
+	// External child APIs get direct access URLs
 	if !apiData.Internal && !isBaseAPI {
 		for _, host := range hosts {
 			directURL := buildServerURL(config.Protocol, host, apiData.Proxy.ListenPath)
