@@ -322,10 +322,9 @@ jobs:
       - name: Check for relevant package changes in PR
         id: check_changes
         shell: bash
+        env:
+          RELEVANT_PACKAGES: ${{ vars.DASHBOARD_DEPENDENCY_PACKAGES || 'pkg apidef lib common certs log config test user header' }}
         run: |
-          # Packages that affect dashboard compatibility
-          RELEVANT_PACKAGES="pkg apidef lib common certs log config test user header"
-
           echo "Checking PR for changes in packages: $RELEVANT_PACKAGES"
           echo "Comparing PR against base branch: ${{ env.BASE_REF }}"
 
