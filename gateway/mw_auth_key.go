@@ -27,11 +27,13 @@ const (
 	ErrAuthKeyNotFound               = "auth.key_not_found"
 	ErrAuthCertNotFound              = "auth.cert_not_found"
 	ErrAuthCertExpired               = "auth.cert_expired"
+	ErrAuthCertMismatch              = "auth.cert_mismatch"
 	ErrAuthKeyIsInvalid              = "auth.key_is_invalid"
 
-	MsgNonExistentKey  = "Attempted access with non-existent key."
-	MsgNonExistentCert = "Attempted access with non-existent cert."
-	MsgInvalidKey      = "Attempted access with invalid key."
+	MsgNonExistentKey      = "Attempted access with non-existent key."
+	MsgNonExistentCert     = "Attempted access with non-existent cert."
+	MsgCertificateMismatch = "Attempted access with incorrect certificate."
+	MsgInvalidKey          = "Attempted access with invalid key."
 )
 
 func initAuthKeyErrors() {
@@ -57,6 +59,11 @@ func initAuthKeyErrors() {
 
 	TykErrors[ErrAuthCertExpired] = config.TykError{
 		Message: MsgCertificateExpired,
+		Code:    http.StatusForbidden,
+	}
+
+	TykErrors[ErrAuthCertMismatch] = config.TykError{
+		Message: MsgApiAccessDisallowed,
 		Code:    http.StatusForbidden,
 	}
 }
@@ -130,18 +137,8 @@ func (k *AuthKey) ProcessRequest(_ http.ResponseWriter, r *http.Request, _ inter
 	}
 
 	if authConfig.UseCertificate {
-		certLookup := session.Certificate
-
-		if r.TLS != nil && len(r.TLS.PeerCertificates) > 0 {
-			certLookup = certHash
-			if session.Certificate != certHash {
-				session.Certificate = certHash
-				updateSession = true
-			}
-		}
-
-		if _, err := k.Gw.CertificateManager.GetRaw(certLookup); err != nil {
-			return k.reportInvalidKey(key, r, MsgNonExistentCert, ErrAuthCertNotFound)
+		if err, code := k.validateCertificate(r, key, &session, &certHash, &updateSession); err != nil {
+			return err, code
 		}
 	}
 
@@ -271,4 +268,115 @@ func AuthFailed(m TykMiddleware, r *http.Request, token string) {
 		Origin:           request.RealIP(r),
 		Key:              token,
 	})
+}
+
+// validateCertificate performs certificate validation for UseCertificate authentication
+// It handles both certificate binding mode and legacy auto-update mode
+func (k *AuthKey) validateCertificate(r *http.Request, key string, session *user.SessionState, certHash *string, updateSession *bool) (error, int) {
+	if r.TLS != nil && len(r.TLS.PeerCertificates) > 0 {
+		return k.validateWithTLSCertificate(r, key, session, certHash, updateSession)
+	}
+	return k.validateWithoutTLSCertificate(r, key, session)
+}
+
+// validateWithTLSCertificate handles validation when a TLS client certificate is provided
+func (k *AuthKey) validateWithTLSCertificate(r *http.Request, key string, session *user.SessionState, certHash *string, updateSession *bool) (error, int) {
+	// Check certificate expiry when a token is provided (not checked earlier in the flow)
+	if err, code := k.checkCertificateExpiry(r, key); err != nil {
+		return err, code
+	}
+
+	// Compute cert hash for comparison
+	*certHash = k.computeCertHash(r, *certHash)
+
+	bindingEnabled := k.Gw.GetConfig().Security.EnableCertificateBinding
+	if bindingEnabled {
+		return k.validateCertificateBinding(r, key, session, *certHash)
+	}
+	return k.validateLegacyMode(r, session, *certHash, updateSession)
+}
+
+// validateWithoutTLSCertificate handles validation when no TLS client certificate is provided
+func (k *AuthKey) validateWithoutTLSCertificate(r *http.Request, key string, session *user.SessionState) (error, int) {
+	bindingEnabled := k.Gw.GetConfig().Security.EnableCertificateBinding
+
+	if bindingEnabled {
+		return k.validateBindingWithoutCert(r, key, session)
+	}
+	return k.validateLegacyWithoutCert(r, session)
+}
+
+// checkCertificateExpiry validates that the certificate hasn't expired
+func (k *AuthKey) checkCertificateExpiry(r *http.Request, key string) (error, int) {
+	if key != "" && time.Now().After(r.TLS.PeerCertificates[0].NotAfter) {
+		return errorAndStatusCode(ErrAuthCertExpired)
+	}
+	return nil, http.StatusOK
+}
+
+// computeCertHash computes the certificate hash if not already computed
+func (k *AuthKey) computeCertHash(r *http.Request, existingHash string) string {
+	if existingHash == "" {
+		return k.Spec.OrgID + crypto.HexSHA256(r.TLS.PeerCertificates[0].Raw)
+	}
+	return existingHash
+}
+
+// validateCertificateBinding validates certificate-to-token binding
+// This enforces that the presented certificate matches the one bound to the session
+func (k *AuthKey) validateCertificateBinding(r *http.Request, key string, session *user.SessionState, certHash string) (error, int) {
+	// Only validate if both token and session have certificates
+	if key == "" || session.Certificate == "" {
+		return nil, http.StatusOK
+	}
+
+	// If certificates don't match, reject the request
+	if certHash != session.Certificate {
+		k.Logger().WithField("key", k.Gw.obfuscateKey(key)).Warn("Certificate mismatch detected for token")
+		return k.reportInvalidKey(key, r, MsgCertificateMismatch, ErrAuthCertMismatch)
+	}
+
+	// Note: In binding mode, certificate whitelist validation is performed at TLS handshake level (UseMutualTLSAuth)
+	// or by CertificateCheckMW middleware. We don't validate against cert manager here because
+	// session.Certificate contains a hash for binding, not a cert ID for whitelist lookup
+	return nil, http.StatusOK
+}
+
+// validateLegacyMode handles the legacy auto-update behavior
+// Updates session certificate and validates it exists in cert manager
+func (k *AuthKey) validateLegacyMode(r *http.Request, session *user.SessionState, certHash string, updateSession *bool) (error, int) {
+	// Auto-update session certificate with current cert hash
+	if session.Certificate != certHash {
+		session.Certificate = certHash
+		*updateSession = true
+	}
+
+	// Validate the certificate exists in cert manager (whitelist check)
+	// This catches edge cases like deleted certificates or corrupted session data
+	if _, err := k.Gw.CertificateManager.GetRaw(certHash); err != nil {
+		return k.reportInvalidKey("", r, MsgNonExistentCert, ErrAuthCertNotFound)
+	}
+
+	return nil, http.StatusOK
+}
+
+// validateBindingWithoutCert validates when binding is enabled but no certificate is provided
+// Rejects only if the session has a certificate bound to it
+func (k *AuthKey) validateBindingWithoutCert(r *http.Request, key string, session *user.SessionState) (error, int) {
+	if session.Certificate != "" {
+		k.Logger().WithField("key", k.Gw.obfuscateKey(key)).Warn("Certificate required but not provided")
+		return k.reportInvalidKey(key, r, MsgCertificateMismatch, ErrAuthCertMismatch)
+	}
+	return nil, http.StatusOK
+}
+
+// validateLegacyWithoutCert validates session certificate in legacy mode when no TLS cert is provided
+// Checks if stored certificate exists in cert manager to catch corrupted data
+func (k *AuthKey) validateLegacyWithoutCert(r *http.Request, session *user.SessionState) (error, int) {
+	if session.Certificate != "" {
+		if _, err := k.Gw.CertificateManager.GetRaw(session.Certificate); err != nil {
+			return k.reportInvalidKey("", r, MsgNonExistentCert, ErrAuthCertNotFound)
+		}
+	}
+	return nil, http.StatusOK
 }
