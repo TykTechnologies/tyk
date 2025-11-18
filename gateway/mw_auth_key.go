@@ -136,7 +136,13 @@ func (k *AuthKey) ProcessRequest(_ http.ResponseWriter, r *http.Request, _ inter
 		}
 	}
 
-	if authConfig.UseCertificate {
+	// Validate certificate binding or legacy certificate auth
+	// Certificate binding validation runs when:
+	// 1. Certificate binding is globally enabled AND a TLS connection exists, OR
+	// 2. UseCertificate is explicitly set for this API
+	bindingEnabled := k.Gw.GetConfig().Security.EnableCertificateBinding
+	hasTLSCert := r.TLS != nil && len(r.TLS.PeerCertificates) > 0
+	if authConfig.UseCertificate || (bindingEnabled && (hasTLSCert || session.Certificate != "")) {
 		if err, code := k.validateCertificate(r, key, &session, &certHash, &updateSession); err != nil {
 			return err, code
 		}
