@@ -222,153 +222,90 @@ func (s *OAS) getTykAuthentication() (authentication *Authentication) {
 	return
 }
 
-func (s *OAS) getTykTokenAuth(name string) (token *Token) {
-	ss := s.getTykSecuritySchemes()
+// promoteStruct atomically reads a scheme, converts a map[string]interface{} to *T if needed,
+// stores the promoted value back, and returns the typed pointer.
+// If the key doesn't exist, is nil, or is not convertible, it returns nil.
+func promoteStruct[T any](ss *SecuritySchemes, key string) *T {
 	if ss == nil {
-		return
+		return nil
 	}
 
-	v, ok := ss.Get(name)
+	ss.mutex.Lock()
+	defer ss.mutex.Unlock()
+
+	if ss.container == nil {
+		return nil
+	}
+
+	v, ok := ss.container[key]
 	if !ok || v == nil {
-		return
+		return nil
 	}
 
-	if tokenVal, ok := v.(*Token); ok {
-		return tokenVal
+	if typed, ok := v.(*T); ok {
+		return typed
 	}
 
 	m, ok := v.(map[string]interface{})
 	if !ok {
-		return
+		return nil
 	}
 
-	candidate := &Token{}
-	if !toStructIfMap(m, candidate) {
-		return
+	dst := new(T)
+	if !toStructIfMap(m, dst) {
+		return nil
 	}
 
-	ss.Set(name, candidate)
-
-	return candidate
+	ss.container[key] = dst
+	return dst
 }
 
-func (s *OAS) getTykJWTAuth(name string) (jwt *JWT) {
+func (s *OAS) getTykTokenAuth(name string) *Token {
 	ss := s.getTykSecuritySchemes()
 	if ss == nil {
-		return
+		return nil
 	}
 
-	v, ok := ss.Get(name)
-	if !ok || v == nil {
-		return
+	return promoteStruct[Token](ss, name)
+}
+
+func (s *OAS) getTykJWTAuth(name string) *JWT {
+	ss := s.getTykSecuritySchemes()
+	if ss == nil {
+		return nil
 	}
 
-	if jwtVal, ok := v.(*JWT); ok {
-		return jwtVal
-	}
-
-	m, ok := v.(map[string]interface{})
-	if !ok {
-		return
-	}
-
-	candidate := &JWT{}
-	if !toStructIfMap(m, candidate) {
-		return
-	}
-
-	ss.Set(name, candidate)
-	return candidate
+	return promoteStruct[JWT](ss, name)
 }
 
 // getTykBasicAuth returns the `Basic` security scheme for the given name from the
 // Tyk extension, normalizing map-based representations into `*Basic` and caching
 // the converted pointer for subsequent requests.
-func (s *OAS) getTykBasicAuth(name string) (basic *Basic) {
+func (s *OAS) getTykBasicAuth(name string) *Basic {
 	ss := s.getTykSecuritySchemes()
 	if ss == nil {
-		return
+		return nil
 	}
 
-	v, ok := ss.Get(name)
-	if !ok || v == nil {
-		return
-	}
-
-	if basicVal, ok := v.(*Basic); ok {
-		return basicVal
-	}
-
-	m, ok := v.(map[string]interface{})
-	if !ok {
-		return
-	}
-
-	candidate := &Basic{}
-	if !toStructIfMap(m, candidate) {
-		return
-	}
-
-	ss.Set(name, candidate)
-	return candidate
+	return promoteStruct[Basic](ss, name)
 }
 
-func (s *OAS) getTykOAuthAuth(name string) (oauth *OAuth) {
+func (s *OAS) getTykOAuthAuth(name string) *OAuth {
 	ss := s.getTykSecuritySchemes()
 	if ss == nil {
-		return
+		return nil
 	}
 
-	v, ok := ss.Get(name)
-	if !ok || v == nil {
-		return
-	}
-
-	if oauthVal, ok := v.(*OAuth); ok {
-		return oauthVal
-	}
-
-	m, ok := v.(map[string]interface{})
-	if !ok {
-		return
-	}
-
-	candidate := &OAuth{}
-	if !toStructIfMap(m, candidate) {
-		return
-	}
-
-	ss.Set(name, candidate)
-	return candidate
+	return promoteStruct[OAuth](ss, name)
 }
 
-func (s *OAS) getTykExternalOAuthAuth(name string) (externalOAuth *ExternalOAuth) {
+func (s *OAS) getTykExternalOAuthAuth(name string) *ExternalOAuth {
 	ss := s.getTykSecuritySchemes()
 	if ss == nil {
-		return
+		return nil
 	}
 
-	v, ok := ss.Get(name)
-	if !ok || v == nil {
-		return
-	}
-
-	if oauthVal, ok := v.(*ExternalOAuth); ok {
-		return oauthVal
-	}
-
-	m, ok := v.(map[string]interface{})
-	if !ok {
-		return
-	}
-
-	candidate := &ExternalOAuth{}
-	if !toStructIfMap(m, candidate) {
-		return
-	}
-
-	ss.Set(name, candidate)
-	return candidate
+	return promoteStruct[ExternalOAuth](ss, name)
 }
 
 func (s *OAS) getTykSecuritySchemes() *SecuritySchemes {
