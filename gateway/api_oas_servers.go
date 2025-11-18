@@ -34,7 +34,8 @@ func buildServerRegenerationConfig(conf config.Config) oas.ServerRegenerationCon
 	return oas.ServerRegenerationConfig{
 		Protocol:      protocol,
 		DefaultHost:   defaultHost,
-		EdgeEndpoints: nil, // Gateway doesn't have edge endpoints
+		EdgeEndpoints: nil,                      // Gateway doesn't have edge endpoints
+		HybridEnabled: conf.SlaveOptions.UseRPC, // MDCB/hybrid mode flag
 	}
 }
 
