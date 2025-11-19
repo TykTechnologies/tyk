@@ -249,7 +249,7 @@ func TestDetermineHosts(t *testing.T) {
 					{Endpoint: "http://edge2.example.com", Tags: []string{"prod", "backup"}},
 				},
 			},
-			expected: []string{"http://edge1.example.com", "http://edge2.example.com"},
+			expected: []string{"http://edge1.example.com", "http://edge2.example.com", ""},
 		},
 		{
 			name:    "default host when no custom domain or edge endpoints",
@@ -258,7 +258,7 @@ func TestDetermineHosts(t *testing.T) {
 				DefaultHost:   "localhost:8080",
 				EdgeEndpoints: []EdgeEndpoint{},
 			},
-			expected: []string{"localhost:8080"},
+			expected: []string{"localhost:8080", ""},
 		},
 		{
 			name: "edge endpoints but no matching tags → relative paths",
@@ -388,8 +388,8 @@ func TestGenerateStandardServers(t *testing.T) {
 				Protocol:    "http://",
 				DefaultHost: "localhost:8080",
 			},
-			expectedCount: 1,
-			expectedURLs:  []string{"http://localhost:8080/api"},
+			expectedCount: 2,
+			expectedURLs:  []string{"http://localhost:8080/api", "/api"},
 		},
 		{
 			name: "custom domain",
@@ -422,8 +422,8 @@ func TestGenerateStandardServers(t *testing.T) {
 					{Endpoint: "http://edge2.example.com", Tags: []string{"prod"}},
 				},
 			},
-			expectedCount: 2,
-			expectedURLs:  []string{"http://edge1.example.com/api", "http://edge2.example.com/api"},
+			expectedCount: 3,
+			expectedURLs:  []string{"http://edge1.example.com/api", "http://edge2.example.com/api", "/api"},
 		},
 	}
 
@@ -636,8 +636,8 @@ func TestRegenerateServers(t *testing.T) {
 		err := oas.RegenerateServers(newAPI, oldAPI, nil, nil, config, "")
 		require.NoError(t, err)
 
-		// Should have 3 servers: 1 new Tyk + 2 user
-		assert.Equal(t, 3, len(oas.Servers))
+		// Should have 4 servers: 2 new Tyk (absolute + relative) + 2 user
+		assert.Equal(t, 4, len(oas.Servers))
 
 		// Old Tyk URL should be gone
 		for _, server := range oas.Servers {
@@ -696,8 +696,8 @@ func TestRegenerateServers(t *testing.T) {
 		err := oas.RegenerateServers(newAPI, nil, nil, nil, config, "")
 		require.NoError(t, err)
 
-		// Should have 3 servers: 1 Tyk + 2 user
-		assert.Equal(t, 3, len(oas.Servers))
+		// Should have 4 servers: 2 Tyk (absolute + relative) + 2 user
+		assert.Equal(t, 4, len(oas.Servers))
 
 		// Tyk URL should be present
 		foundTyk := false
@@ -736,9 +736,10 @@ func TestRegenerateServers(t *testing.T) {
 		err := oas.RegenerateServers(newAPI, nil, nil, nil, config, "")
 		require.NoError(t, err)
 
-		// Should only have 1 server (deduplicated)
-		assert.Equal(t, 1, len(oas.Servers))
+		// Should have 2 servers: absolute URL (deduplicated) + relative path
+		assert.Equal(t, 2, len(oas.Servers))
 		assert.Equal(t, "http://localhost:8080/api", oas.Servers[0].URL)
+		assert.Equal(t, "/api", oas.Servers[1].URL)
 	})
 }
 
@@ -2146,7 +2147,7 @@ func TestRegenerateServers_FallbackToDefaultTransition(t *testing.T) {
 		}
 		assert.Contains(t, finalURLs, "http://localhost:8080/api/v1", "Should still have versioned URL")
 		assert.NotContains(t, finalURLs, "http://localhost:8080/api", "Fallback URL should be removed")
-		assert.Len(t, finalURLs, 1, "Should have exactly 1 URL after transition")
+		assert.Len(t, finalURLs, 2, "Should have 2 URLs after transition (absolute + relative)")
 	})
 
 	t.Run("changing fallbackToDefault from false to true adds fallback URL", func(t *testing.T) {
@@ -2206,7 +2207,7 @@ func TestRegenerateServers_FallbackToDefaultTransition(t *testing.T) {
 		}
 		assert.Contains(t, finalURLs, "http://localhost:8080/api/v1", "Should have versioned URL")
 		assert.Contains(t, finalURLs, "http://localhost:8080/api", "Fallback URL should be added")
-		assert.Len(t, finalURLs, 2, "Should have exactly 2 URLs after transition")
+		assert.Len(t, finalURLs, 4, "Should have 4 URLs after transition (2 absolute + 2 relative)")
 	})
 
 	t.Run("preserves user servers during fallbackToDefault transition", func(t *testing.T) {
@@ -2237,7 +2238,7 @@ func TestRegenerateServers_FallbackToDefaultTransition(t *testing.T) {
 		})
 
 		// Verify we have Tyk servers + user server
-		assert.Len(t, oasAPI.Servers, 3, "Should have 2 Tyk URLs + 1 user URL")
+		assert.Len(t, oasAPI.Servers, 5, "Should have 4 Tyk URLs (2 absolute + 2 relative) + 1 user URL")
 
 		// New state: fallbackToDefault changed to false
 		newAPI := &apidef.APIDefinition{
@@ -2268,7 +2269,7 @@ func TestRegenerateServers_FallbackToDefaultTransition(t *testing.T) {
 		assert.Contains(t, finalURLs, "http://localhost:8080/api/v1", "Should have versioned Tyk URL")
 		assert.NotContains(t, finalURLs, "http://localhost:8080/api", "Fallback Tyk URL should be removed")
 		assert.Contains(t, finalURLs, "https://my-custom-upstream.com/api", "User server should be preserved")
-		assert.Len(t, finalURLs, 2, "Should have 1 Tyk URL + 1 user URL")
+		assert.Len(t, finalURLs, 3, "Should have 2 Tyk URLs (1 absolute + 1 relative) + 1 user URL")
 	})
 }
 
@@ -2307,7 +2308,7 @@ func TestRegenerateServers_BaseAPILosesFallbackWhenNewDefaultSet(t *testing.T) {
 		}
 		assert.Contains(t, initialURLs, "http://localhost:8080/api/v1")
 		assert.Contains(t, initialURLs, "http://localhost:8080/api")
-		assert.Len(t, initialURLs, 2)
+		assert.Len(t, initialURLs, 4, "Initial: 2 absolute + 2 relative")
 
 		newBaseAPI := &apidef.APIDefinition{
 			APIID: "base-api-123",
@@ -2336,7 +2337,7 @@ func TestRegenerateServers_BaseAPILosesFallbackWhenNewDefaultSet(t *testing.T) {
 		}
 		assert.Contains(t, finalURLs, "http://localhost:8080/api/v1")
 		assert.NotContains(t, finalURLs, "http://localhost:8080/api")
-		assert.Len(t, finalURLs, 1)
+		assert.Len(t, finalURLs, 2, "Final: 1 absolute + 1 relative")
 	})
 
 	t.Run("child API gets fallback URL when set as default", func(t *testing.T) {
@@ -2382,7 +2383,7 @@ func TestRegenerateServers_BaseAPILosesFallbackWhenNewDefaultSet(t *testing.T) {
 		assert.Contains(t, childURLs, "http://localhost:8080/api/v2")
 		assert.Contains(t, childURLs, "http://localhost:8080/api")
 		assert.Contains(t, childURLs, "http://localhost:8080/api-v2")
-		assert.Len(t, childURLs, 3)
+		assert.Len(t, childURLs, 6, "3 absolute + 3 relative")
 	})
 
 	t.Run("non-default child API does not get fallback URL", func(t *testing.T) {
@@ -2429,7 +2430,7 @@ func TestRegenerateServers_BaseAPILosesFallbackWhenNewDefaultSet(t *testing.T) {
 		assert.Contains(t, childURLs, "http://localhost:8080/api/v3")
 		assert.NotContains(t, childURLs, "http://localhost:8080/api")
 		assert.Contains(t, childURLs, "http://localhost:8080/api-v3")
-		assert.Len(t, childURLs, 2)
+		assert.Len(t, childURLs, 4, "2 absolute + 2 relative")
 	})
 }
 
@@ -2457,7 +2458,7 @@ func TestDetermineHosts_MDCB(t *testing.T) {
 			comment:  "Scenario 1: No edge endpoints, should return relative path",
 		},
 		{
-			name: "MDCB: API has no tags → no URLs",
+			name: "MDCB: API has no tags → relative path",
 			apiData: &apidef.APIDefinition{
 				Tags: []string{},
 			},
@@ -2468,8 +2469,8 @@ func TestDetermineHosts_MDCB(t *testing.T) {
 					{Endpoint: "http://edge1.example.com", Tags: []string{"prod"}},
 				},
 			},
-			expected: []string{},
-			comment:  "Scenario 2: API has no tags, should return empty",
+			expected: []string{""},
+			comment:  "Scenario 2: API has no tags, should return relative path (bug fix)",
 		},
 		{
 			name: "MDCB: API tags don't match any edge endpoint → relative paths only",
@@ -2488,7 +2489,7 @@ func TestDetermineHosts_MDCB(t *testing.T) {
 			comment:  "Scenario 3: No tag matches, should return relative path",
 		},
 		{
-			name: "MDCB Scenario 4a: all API tags match edge endpoints → only matching endpoints",
+			name: "MDCB Scenario 4a: all API tags match edge endpoints → matching endpoints + relative",
 			apiData: &apidef.APIDefinition{
 				Tags: []string{"prod"},
 			},
@@ -2501,8 +2502,8 @@ func TestDetermineHosts_MDCB(t *testing.T) {
 					{Endpoint: "http://edge3.example.com", Tags: []string{"dev"}},
 				},
 			},
-			expected: []string{"http://edge1.example.com", "http://edge2.example.com"},
-			comment:  "Scenario 4a: All API tags matched, should return only matching endpoints (no relative paths)",
+			expected: []string{"http://edge1.example.com", "http://edge2.example.com", ""},
+			comment:  "Scenario 4a: All API tags matched, should return matching endpoints + relative path",
 		},
 		{
 			name: "MDCB Scenario 4b: some API tags match, some don't → endpoints + relative paths",
@@ -2550,8 +2551,8 @@ func TestDetermineHosts_MDCB(t *testing.T) {
 					{Endpoint: "http://edge2.example.com", Tags: []string{"prod"}},
 				},
 			},
-			expected: []string{"http://edge1.example.com", "http://edge2.example.com"},
-			comment:  "Standard mode should return matching endpoints without relative paths",
+			expected: []string{"http://edge1.example.com", "http://edge2.example.com", ""},
+			comment:  "Standard mode should return matching endpoints with relative path",
 		},
 		{
 			name: "Standard mode: no matching tags → relative paths",
@@ -2765,81 +2766,6 @@ func TestBuildTagSet(t *testing.T) {
 	}
 }
 
-func TestAllAPITagsHaveMatches(t *testing.T) {
-	t.Parallel()
-
-	tests := []struct {
-		name          string
-		apiTags       []string
-		edgeEndpoints []EdgeEndpoint
-		expected      bool
-		comment       string
-	}{
-		{
-			name:    "all tags match",
-			apiTags: []string{"prod"},
-			edgeEndpoints: []EdgeEndpoint{
-				{Endpoint: "http://edge1.com", Tags: []string{"prod"}},
-			},
-			expected: true,
-			comment:  "Single tag matches endpoint",
-		},
-		{
-			name:    "multiple tags, all match",
-			apiTags: []string{"prod", "eu"},
-			edgeEndpoints: []EdgeEndpoint{
-				{Endpoint: "http://edge1.com", Tags: []string{"prod"}},
-				{Endpoint: "http://edge2.com", Tags: []string{"eu"}},
-			},
-			expected: true,
-			comment:  "Each API tag matches at least one endpoint",
-		},
-		{
-			name:    "some tags don't match",
-			apiTags: []string{"prod", "nonexistent"},
-			edgeEndpoints: []EdgeEndpoint{
-				{Endpoint: "http://edge1.com", Tags: []string{"prod"}},
-			},
-			expected: false,
-			comment:  "Tag 'nonexistent' doesn't match any endpoint",
-		},
-		{
-			name:    "no tags match",
-			apiTags: []string{"dev"},
-			edgeEndpoints: []EdgeEndpoint{
-				{Endpoint: "http://edge1.com", Tags: []string{"prod"}},
-			},
-			expected: false,
-			comment:  "No API tags match endpoint tags",
-		},
-		{
-			name:          "empty API tags",
-			apiTags:       []string{},
-			edgeEndpoints: []EdgeEndpoint{},
-			expected:      true,
-			comment:       "Empty API tags means all (zero) tags matched",
-		},
-		{
-			name:    "single endpoint with multiple tags",
-			apiTags: []string{"prod", "eu"},
-			edgeEndpoints: []EdgeEndpoint{
-				{Endpoint: "http://edge1.com", Tags: []string{"prod", "eu", "us"}},
-			},
-			expected: true,
-			comment:  "Both API tags match the same endpoint",
-		},
-	}
-
-	for _, tt := range tests {
-		tt := tt
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-			result := allAPITagsHaveMatches(tt.apiTags, tt.edgeEndpoints)
-			assert.Equal(t, tt.expected, result, tt.comment)
-		})
-	}
-}
-
 func TestAppendRelativePathIfNotPresent(t *testing.T) {
 	t.Parallel()
 
@@ -2892,7 +2818,7 @@ func TestGenerateStandardServers_MDCB(t *testing.T) {
 		comment       string
 	}{
 		{
-			name: "MDCB Scenario 4a: all tags match → only absolute URLs",
+			name: "MDCB Scenario 4a: all tags match → absolute + relative URLs",
 			apiData: &apidef.APIDefinition{
 				Tags: []string{"prod"},
 				Proxy: apidef.ProxyConfig{
@@ -2908,12 +2834,13 @@ func TestGenerateStandardServers_MDCB(t *testing.T) {
 					{Endpoint: "http://edge2.example.com", Tags: []string{"prod"}},
 				},
 			},
-			expectedCount: 2,
+			expectedCount: 3,
 			expectedURLs: []string{
 				"http://edge1.example.com/api",
 				"http://edge2.example.com/api",
+				"/api",
 			},
-			comment: "Scenario 4a: All tags matched, should only include matching edge endpoints (no relative paths)",
+			comment: "Scenario 4a: All tags matched, should include matching endpoints + relative path",
 		},
 		{
 			name: "MDCB Scenario 4b: some tags don't match → absolute + relative URLs",
@@ -2963,7 +2890,7 @@ func TestGenerateStandardServers_MDCB(t *testing.T) {
 			comment: "MDCB with no matching tags should only generate relative path",
 		},
 		{
-			name: "MDCB with no API tags generates no URLs",
+			name: "MDCB with no API tags generates relative URL",
 			apiData: &apidef.APIDefinition{
 				Tags: []string{},
 				Proxy: apidef.ProxyConfig{
@@ -2978,9 +2905,9 @@ func TestGenerateStandardServers_MDCB(t *testing.T) {
 					{Endpoint: "http://edge1.example.com", Tags: []string{"prod"}},
 				},
 			},
-			expectedCount: 0,
-			expectedURLs:  []string{},
-			comment:       "MDCB with no API tags should generate no URLs",
+			expectedCount: 1,
+			expectedURLs:  []string{"/api"},
+			comment:       "MDCB with no API tags should generate relative URL (bug fix)",
 		},
 	}
 
