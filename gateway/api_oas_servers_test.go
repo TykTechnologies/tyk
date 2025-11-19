@@ -3,11 +3,11 @@ package gateway
 import (
 	"testing"
 
-	"github.com/spf13/afero"
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/apidef/oas"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/getkin/kin-openapi/openapi3"
+	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -556,8 +556,8 @@ func TestUpdateOldDefaultChildServersGW(t *testing.T) {
 			APIDefinition: oldDefaultChildAPIDef,
 			OAS: oas.OAS{T: openapi3.T{
 				Servers: openapi3.Servers{
-					{URL: "http://localhost:8080/products/v1"},  // Versioned URL
-					{URL: "http://localhost:8080/products"},     // Fallback URL (should be removed)
+					{URL: "http://localhost:8080/products/v1"}, // Versioned URL
+					{URL: "http://localhost:8080/products"},    // Fallback URL (should be removed)
 				},
 			}},
 		}
@@ -828,9 +828,9 @@ func TestUpdateOldDefaultChildServersGW(t *testing.T) {
 			APIDefinition: oldDefaultChildAPIDef,
 			OAS: oas.OAS{T: openapi3.T{
 				Servers: openapi3.Servers{
-					{URL: "http://localhost:8080/products/v1"},   // Versioned URL
-					{URL: "http://localhost:8080/products"},      // Fallback URL (should be removed)
-					{URL: "http://localhost:8080/products-v1"},   // Direct URL (should remain)
+					{URL: "http://localhost:8080/products/v1"}, // Versioned URL
+					{URL: "http://localhost:8080/products"},    // Fallback URL (should be removed)
+					{URL: "http://localhost:8080/products-v1"}, // Direct URL (should remain)
 				},
 			}},
 		}

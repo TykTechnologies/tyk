@@ -18,6 +18,8 @@ type ServerRegenerationConfig struct {
 	DefaultHost string
 	// EdgeEndpoints contains edge gateway configurations.
 	EdgeEndpoints []EdgeEndpoint
+	// HybridEnabled indicates if the gateway is in MDCB/hybrid mode.
+	HybridEnabled bool
 }
 
 // EdgeEndpoint represents an edge gateway endpoint configuration.
@@ -187,25 +189,15 @@ func generateVersionedServers(
 	hosts := determineHosts(apiData, config)
 	servers := make([]serverInfo, 0, len(hosts)*2) // *2 for potential direct access URLs
 
-	// Determine if this API is the base API itself or a child
 	isBaseAPI := apiData.APIID == baseAPI.APIID
 
-	// Check if we should add a fallback URL (without version identifier)
-	// This applies when:
-	// 1. FallbackToDefault is enabled in base API's versioning config
-	// 2. AND a default version is explicitly set (not empty)
-	// 3. AND versioning is not header-based
-	// 4. AND either:
-	//    a) This is the base API itself (always add fallback URL when conditions met)
-	//    b) This is a child API and its version name matches the default version
+	// Add fallback URL only for the default version when fallback is enabled
 	shouldAddFallbackURL := baseAPI.VersionDefinition.FallbackToDefault &&
 		baseAPI.VersionDefinition.Default != "" &&
 		baseAPI.VersionDefinition.Location != "header" &&
-		(isBaseAPI || versionName == baseAPI.VersionDefinition.Default)
+		versionName == baseAPI.VersionDefinition.Default
 
-	// Scenario 1 & 2: Always add versioned URLs
-	// - Scenario 1: Versioning enabled, no default or no fallback → version required
-	// - Scenario 2: Versioning enabled, default set, fallback true → version optional but valid
+	// Always add versioned URLs
 	for _, host := range hosts {
 		versionedURL, description := buildVersionedServerURL(
 			config.Protocol, host, baseListenPath,
@@ -218,10 +210,7 @@ func generateVersionedServers(
 		})
 	}
 
-	// Add fallback URL (without version) when appropriate
-	// This handles:
-	// - Scenario 2: Base API with default version and fallback enabled
-	// - Scenario 3: Child API matching default version with fallback enabled
+	// Add fallback URL for the default version
 	if shouldAddFallbackURL {
 		for _, host := range hosts {
 			fallbackURL := buildServerURL(config.Protocol, host, baseListenPath)
@@ -232,8 +221,7 @@ func generateVersionedServers(
 		}
 	}
 
-	// If API is external AND it's a child API (not the base itself), also add direct access URLs
-	// This is for child APIs that have their own listen paths separate from the base API
+	// External child APIs get direct access URLs
 	if !apiData.Internal && !isBaseAPI {
 		for _, host := range hosts {
 			directURL := buildServerURL(config.Protocol, host, apiData.Proxy.ListenPath)
@@ -248,43 +236,111 @@ func generateVersionedServers(
 }
 
 // determineHosts determines which hosts to use for server URL generation.
-// Priority: Custom Domain > Edge Endpoints > Default Host
 func determineHosts(apiData *apidef.APIDefinition, config ServerRegenerationConfig) []string {
-	// Priority 1: Custom domain
 	if apiData.Domain != "" {
 		return []string{apiData.Domain}
 	}
 
-	// Priority 2: Edge endpoints matching API tags
-	if len(config.EdgeEndpoints) > 0 && len(apiData.Tags) > 0 {
-		hosts := make([]string, 0, len(config.EdgeEndpoints))
-		for _, endpoint := range config.EdgeEndpoints {
-			endpointTagsMap := make(map[string]bool, len(endpoint.Tags))
-			for _, tag := range endpoint.Tags {
-				endpointTagsMap[tag] = true
-			}
+	return determineHostsWithEdgeSupport(apiData, config)
+}
 
-			for _, apiTag := range apiData.Tags {
-				if endpointTagsMap[apiTag] {
-					hosts = append(hosts, endpoint.Endpoint)
-					break
-				}
-			}
+// determineHostsWithEdgeSupport determines hosts based on edge endpoints and API tags.
+func determineHostsWithEdgeSupport(apiData *apidef.APIDefinition, config ServerRegenerationConfig) []string {
+	if len(config.EdgeEndpoints) == 0 {
+		if config.HybridEnabled {
+			return []string{""}
 		}
+		return []string{config.DefaultHost}
+	}
 
-		if len(hosts) > 0 {
-			return hosts
+	if len(apiData.Tags) == 0 {
+		if config.HybridEnabled {
+			return []string{}
+		}
+		return []string{config.DefaultHost}
+	}
+
+	matchingHosts := findEndpointsMatchingTags(apiData.Tags, config.EdgeEndpoints)
+	if len(matchingHosts) == 0 {
+		return []string{""}
+	}
+
+	if allAPITagsHaveMatches(apiData.Tags, config.EdgeEndpoints) {
+		return matchingHosts
+	}
+
+	return appendRelativePathIfNotPresent(matchingHosts)
+}
+
+// findEndpointsMatchingTags returns edge endpoint URLs with at least one matching tag.
+func findEndpointsMatchingTags(apiTags []string, edgeEndpoints []EdgeEndpoint) []string {
+	var matchingHosts []string
+
+	for _, endpoint := range edgeEndpoints {
+		if hasAnyTagMatch(apiTags, endpoint.Tags) {
+			matchingHosts = append(matchingHosts, endpoint.Endpoint)
 		}
 	}
 
-	// Priority 3: Default host
-	return []string{config.DefaultHost}
+	return matchingHosts
 }
 
-// buildServerURL constructs a server URL from protocol, host, and path.
+// buildTagSet creates a map for O(1) tag lookups.
+func buildTagSet(tags []string) map[string]bool {
+	tagSet := make(map[string]bool, len(tags))
+	for _, tag := range tags {
+		tagSet[tag] = true
+	}
+	return tagSet
+}
+
+// hasAnyTagMatch returns true if any API tag matches any endpoint tag.
+func hasAnyTagMatch(apiTags []string, endpointTags []string) bool {
+	tagSet := buildTagSet(endpointTags)
+	for _, apiTag := range apiTags {
+		if tagSet[apiTag] {
+			return true
+		}
+	}
+	return false
+}
+
+// allAPITagsHaveMatches returns true if every API tag matches at least one edge endpoint.
+func allAPITagsHaveMatches(apiTags []string, edgeEndpoints []EdgeEndpoint) bool {
+	for _, apiTag := range apiTags {
+		matched := false
+		for _, endpoint := range edgeEndpoints {
+			if containsString(endpoint.Tags, apiTag) {
+				matched = true
+				break
+			}
+		}
+		if !matched {
+			return false
+		}
+	}
+	return true
+}
+
+// appendRelativePathIfNotPresent adds a relative path (empty string) if not present.
+func appendRelativePathIfNotPresent(hosts []string) []string {
+	for _, host := range hosts {
+		if host == "" {
+			return hosts
+		}
+	}
+	return append(hosts, "")
+}
+
+// buildServerURL constructs a server URL. Returns relative path if host is empty.
 func buildServerURL(protocol, host, listenPath string) string {
 	if !strings.HasPrefix(listenPath, "/") {
 		listenPath = "/" + listenPath
+	}
+
+	// Empty host means relative path - return just the listen path
+	if host == "" {
+		return path.Clean(listenPath)
 	}
 
 	host = strings.TrimSuffix(host, "/")
