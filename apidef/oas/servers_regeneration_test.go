@@ -2470,7 +2470,7 @@ func TestDetermineHosts_MDCB(t *testing.T) {
 				},
 			},
 			expected: []string{""},
-			comment:  "Scenario 2: API has no tags, should return relative path (bug fix)",
+			comment:  "Scenario 2: API has no tags, should return relative path",
 		},
 		{
 			name: "MDCB: API tags don't match any edge endpoint → relative paths only",
@@ -2907,7 +2907,7 @@ func TestGenerateStandardServers_MDCB(t *testing.T) {
 			},
 			expectedCount: 1,
 			expectedURLs:  []string{"/api"},
-			comment:       "MDCB with no API tags should generate relative URL (bug fix)",
+			comment:       "MDCB with no API tags should generate relative URL",
 		},
 	}
 
