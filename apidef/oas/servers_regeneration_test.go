@@ -62,6 +62,27 @@ func TestBuildServerURL(t *testing.T) {
 			listenPath: "/api",
 			expected:   "https://{subdomain}.example.com/api",
 		},
+		{
+			name:       "empty host returns relative path",
+			protocol:   "http://",
+			host:       "",
+			listenPath: "/api",
+			expected:   "/api",
+		},
+		{
+			name:       "empty host with complex path",
+			protocol:   "https://",
+			host:       "",
+			listenPath: "/api/v1/users",
+			expected:   "/api/v1/users",
+		},
+		{
+			name:       "empty host cleans double slashes",
+			protocol:   "http://",
+			host:       "",
+			listenPath: "/api//v1",
+			expected:   "/api/v1",
+		},
 	}
 
 	for _, tt := range tests {
@@ -240,7 +261,7 @@ func TestDetermineHosts(t *testing.T) {
 			expected: []string{"localhost:8080"},
 		},
 		{
-			name: "edge endpoints but no matching tags",
+			name: "edge endpoints but no matching tags → relative paths",
 			apiData: &apidef.APIDefinition{
 				Tags: []string{"dev"},
 			},
@@ -250,7 +271,7 @@ func TestDetermineHosts(t *testing.T) {
 					{Endpoint: "http://edge1.example.com", Tags: []string{"prod"}},
 				},
 			},
-			expected: []string{"localhost:8080"},
+			expected: []string{""},
 		},
 	}
 
@@ -2410,4 +2431,576 @@ func TestRegenerateServers_BaseAPILosesFallbackWhenNewDefaultSet(t *testing.T) {
 		assert.Contains(t, childURLs, "http://localhost:8080/api-v3")
 		assert.Len(t, childURLs, 2)
 	})
+}
+
+func TestDetermineHosts_MDCB(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		apiData  *apidef.APIDefinition
+		config   ServerRegenerationConfig
+		expected []string
+		comment  string
+	}{
+		{
+			name: "MDCB: no edge endpoints configured → relative paths",
+			apiData: &apidef.APIDefinition{
+				Tags: []string{"prod"},
+			},
+			config: ServerRegenerationConfig{
+				DefaultHost:   "localhost:8080",
+				HybridEnabled: true,
+				EdgeEndpoints: []EdgeEndpoint{},
+			},
+			expected: []string{""},
+			comment:  "Scenario 1: No edge endpoints, should return relative path",
+		},
+		{
+			name: "MDCB: API has no tags → no URLs",
+			apiData: &apidef.APIDefinition{
+				Tags: []string{},
+			},
+			config: ServerRegenerationConfig{
+				DefaultHost:   "localhost:8080",
+				HybridEnabled: true,
+				EdgeEndpoints: []EdgeEndpoint{
+					{Endpoint: "http://edge1.example.com", Tags: []string{"prod"}},
+				},
+			},
+			expected: []string{},
+			comment:  "Scenario 2: API has no tags, should return empty",
+		},
+		{
+			name: "MDCB: API tags don't match any edge endpoint → relative paths only",
+			apiData: &apidef.APIDefinition{
+				Tags: []string{"dev", "staging"},
+			},
+			config: ServerRegenerationConfig{
+				DefaultHost:   "localhost:8080",
+				HybridEnabled: true,
+				EdgeEndpoints: []EdgeEndpoint{
+					{Endpoint: "http://edge1.example.com", Tags: []string{"prod"}},
+					{Endpoint: "http://edge2.example.com", Tags: []string{"prod", "backup"}},
+				},
+			},
+			expected: []string{""},
+			comment:  "Scenario 3: No tag matches, should return relative path",
+		},
+		{
+			name: "MDCB Scenario 4a: all API tags match edge endpoints → only matching endpoints",
+			apiData: &apidef.APIDefinition{
+				Tags: []string{"prod"},
+			},
+			config: ServerRegenerationConfig{
+				DefaultHost:   "localhost:8080",
+				HybridEnabled: true,
+				EdgeEndpoints: []EdgeEndpoint{
+					{Endpoint: "http://edge1.example.com", Tags: []string{"prod"}},
+					{Endpoint: "http://edge2.example.com", Tags: []string{"prod", "us"}},
+					{Endpoint: "http://edge3.example.com", Tags: []string{"dev"}},
+				},
+			},
+			expected: []string{"http://edge1.example.com", "http://edge2.example.com"},
+			comment:  "Scenario 4a: All API tags matched, should return only matching endpoints (no relative paths)",
+		},
+		{
+			name: "MDCB Scenario 4b: some API tags match, some don't → endpoints + relative paths",
+			apiData: &apidef.APIDefinition{
+				Tags: []string{"prod", "nonexistent"},
+			},
+			config: ServerRegenerationConfig{
+				DefaultHost:   "localhost:8080",
+				HybridEnabled: true,
+				EdgeEndpoints: []EdgeEndpoint{
+					{Endpoint: "http://edge1.example.com", Tags: []string{"prod"}},
+					{Endpoint: "http://edge2.example.com", Tags: []string{"prod", "us"}},
+					{Endpoint: "http://edge3.example.com", Tags: []string{"dev"}},
+				},
+			},
+			expected: []string{"http://edge1.example.com", "http://edge2.example.com", ""},
+			comment:  "Scenario 4b: Some tags didn't match, should return matching endpoints + relative path",
+		},
+		{
+			name: "MDCB: custom domain takes precedence even in hybrid mode",
+			apiData: &apidef.APIDefinition{
+				Domain: "api.custom.com",
+				Tags:   []string{"prod"},
+			},
+			config: ServerRegenerationConfig{
+				DefaultHost:   "localhost:8080",
+				HybridEnabled: true,
+				EdgeEndpoints: []EdgeEndpoint{
+					{Endpoint: "http://edge1.example.com", Tags: []string{"prod"}},
+				},
+			},
+			expected: []string{"api.custom.com"},
+			comment:  "Custom domain should override MDCB logic",
+		},
+		{
+			name: "Standard mode: edge endpoints with matching tags",
+			apiData: &apidef.APIDefinition{
+				Tags: []string{"prod"},
+			},
+			config: ServerRegenerationConfig{
+				DefaultHost:   "localhost:8080",
+				HybridEnabled: false,
+				EdgeEndpoints: []EdgeEndpoint{
+					{Endpoint: "http://edge1.example.com", Tags: []string{"prod"}},
+					{Endpoint: "http://edge2.example.com", Tags: []string{"prod"}},
+				},
+			},
+			expected: []string{"http://edge1.example.com", "http://edge2.example.com"},
+			comment:  "Standard mode should return matching endpoints without relative paths",
+		},
+		{
+			name: "Standard mode: no matching tags → relative paths",
+			apiData: &apidef.APIDefinition{
+				Tags: []string{"dev"},
+			},
+			config: ServerRegenerationConfig{
+				DefaultHost:   "localhost:8080",
+				HybridEnabled: false,
+				EdgeEndpoints: []EdgeEndpoint{
+					{Endpoint: "http://edge1.example.com", Tags: []string{"prod"}},
+				},
+			},
+			expected: []string{""},
+			comment:  "Standard mode with no tag matches should return relative paths",
+		},
+		{
+			name: "Standard mode: some tags match, some don't → endpoints + relative paths",
+			apiData: &apidef.APIDefinition{
+				Tags: []string{"external", "asdadasdasd"},
+			},
+			config: ServerRegenerationConfig{
+				DefaultHost:   "localhost:8080",
+				HybridEnabled: false,
+				EdgeEndpoints: []EdgeEndpoint{
+					{Endpoint: "http://ddd", Tags: []string{"external"}},
+				},
+			},
+			expected: []string{"http://ddd", ""},
+			comment:  "Standard mode with mixed tag matches should return matching endpoints + relative paths",
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			result := determineHosts(tt.apiData, tt.config)
+			assert.Equal(t, tt.expected, result, tt.comment)
+		})
+	}
+}
+
+func TestFindEndpointsMatchingTags(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name          string
+		apiTags       []string
+		edgeEndpoints []EdgeEndpoint
+		expected      []string
+	}{
+		{
+			name:          "no endpoints",
+			apiTags:       []string{"prod"},
+			edgeEndpoints: []EdgeEndpoint{},
+			expected:      []string{},
+		},
+		{
+			name:    "single match",
+			apiTags: []string{"prod"},
+			edgeEndpoints: []EdgeEndpoint{
+				{Endpoint: "http://edge1.com", Tags: []string{"prod"}},
+			},
+			expected: []string{"http://edge1.com"},
+		},
+		{
+			name:    "multiple matches",
+			apiTags: []string{"prod"},
+			edgeEndpoints: []EdgeEndpoint{
+				{Endpoint: "http://edge1.com", Tags: []string{"prod"}},
+				{Endpoint: "http://edge2.com", Tags: []string{"prod", "backup"}},
+			},
+			expected: []string{"http://edge1.com", "http://edge2.com"},
+		},
+		{
+			name:    "no matches",
+			apiTags: []string{"dev"},
+			edgeEndpoints: []EdgeEndpoint{
+				{Endpoint: "http://edge1.com", Tags: []string{"prod"}},
+			},
+			expected: []string{},
+		},
+		{
+			name:    "API has multiple tags, one matches",
+			apiTags: []string{"dev", "prod", "staging"},
+			edgeEndpoints: []EdgeEndpoint{
+				{Endpoint: "http://edge1.com", Tags: []string{"prod"}},
+			},
+			expected: []string{"http://edge1.com"},
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			result := findEndpointsMatchingTags(tt.apiTags, tt.edgeEndpoints)
+			if len(tt.expected) == 0 {
+				assert.Empty(t, result)
+			} else {
+				assert.Equal(t, tt.expected, result)
+			}
+		})
+	}
+}
+
+func TestHasAnyTagMatch(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name         string
+		apiTags      []string
+		endpointTags []string
+		expected     bool
+	}{
+		{
+			name:         "single match",
+			apiTags:      []string{"prod"},
+			endpointTags: []string{"prod"},
+			expected:     true,
+		},
+		{
+			name:         "no match",
+			apiTags:      []string{"dev"},
+			endpointTags: []string{"prod"},
+			expected:     false,
+		},
+		{
+			name:         "multiple tags, one matches",
+			apiTags:      []string{"dev", "staging"},
+			endpointTags: []string{"staging", "prod"},
+			expected:     true,
+		},
+		{
+			name:         "empty API tags",
+			apiTags:      []string{},
+			endpointTags: []string{"prod"},
+			expected:     false,
+		},
+		{
+			name:         "empty endpoint tags",
+			apiTags:      []string{"prod"},
+			endpointTags: []string{},
+			expected:     false,
+		},
+		{
+			name:         "both empty",
+			apiTags:      []string{},
+			endpointTags: []string{},
+			expected:     false,
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			result := hasAnyTagMatch(tt.apiTags, tt.endpointTags)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+func TestBuildTagSet(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		tags     []string
+		expected map[string]bool
+	}{
+		{
+			name:     "empty tags",
+			tags:     []string{},
+			expected: map[string]bool{},
+		},
+		{
+			name: "single tag",
+			tags: []string{"prod"},
+			expected: map[string]bool{
+				"prod": true,
+			},
+		},
+		{
+			name: "multiple tags",
+			tags: []string{"prod", "us", "staging"},
+			expected: map[string]bool{
+				"prod":    true,
+				"us":      true,
+				"staging": true,
+			},
+		},
+		{
+			name: "duplicate tags",
+			tags: []string{"prod", "prod", "dev"},
+			expected: map[string]bool{
+				"prod": true,
+				"dev":  true,
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			result := buildTagSet(tt.tags)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+func TestAllAPITagsHaveMatches(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name          string
+		apiTags       []string
+		edgeEndpoints []EdgeEndpoint
+		expected      bool
+		comment       string
+	}{
+		{
+			name:    "all tags match",
+			apiTags: []string{"prod"},
+			edgeEndpoints: []EdgeEndpoint{
+				{Endpoint: "http://edge1.com", Tags: []string{"prod"}},
+			},
+			expected: true,
+			comment:  "Single tag matches endpoint",
+		},
+		{
+			name:    "multiple tags, all match",
+			apiTags: []string{"prod", "eu"},
+			edgeEndpoints: []EdgeEndpoint{
+				{Endpoint: "http://edge1.com", Tags: []string{"prod"}},
+				{Endpoint: "http://edge2.com", Tags: []string{"eu"}},
+			},
+			expected: true,
+			comment:  "Each API tag matches at least one endpoint",
+		},
+		{
+			name:    "some tags don't match",
+			apiTags: []string{"prod", "nonexistent"},
+			edgeEndpoints: []EdgeEndpoint{
+				{Endpoint: "http://edge1.com", Tags: []string{"prod"}},
+			},
+			expected: false,
+			comment:  "Tag 'nonexistent' doesn't match any endpoint",
+		},
+		{
+			name:    "no tags match",
+			apiTags: []string{"dev"},
+			edgeEndpoints: []EdgeEndpoint{
+				{Endpoint: "http://edge1.com", Tags: []string{"prod"}},
+			},
+			expected: false,
+			comment:  "No API tags match endpoint tags",
+		},
+		{
+			name:          "empty API tags",
+			apiTags:       []string{},
+			edgeEndpoints: []EdgeEndpoint{},
+			expected:      true,
+			comment:       "Empty API tags means all (zero) tags matched",
+		},
+		{
+			name:    "single endpoint with multiple tags",
+			apiTags: []string{"prod", "eu"},
+			edgeEndpoints: []EdgeEndpoint{
+				{Endpoint: "http://edge1.com", Tags: []string{"prod", "eu", "us"}},
+			},
+			expected: true,
+			comment:  "Both API tags match the same endpoint",
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			result := allAPITagsHaveMatches(tt.apiTags, tt.edgeEndpoints)
+			assert.Equal(t, tt.expected, result, tt.comment)
+		})
+	}
+}
+
+func TestAppendRelativePathIfNotPresent(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		input    []string
+		expected []string
+	}{
+		{
+			name:     "empty list",
+			input:    []string{},
+			expected: []string{""},
+		},
+		{
+			name:     "list without relative path",
+			input:    []string{"http://edge1.com", "http://edge2.com"},
+			expected: []string{"http://edge1.com", "http://edge2.com", ""},
+		},
+		{
+			name:     "list already has relative path",
+			input:    []string{"http://edge1.com", "", "http://edge2.com"},
+			expected: []string{"http://edge1.com", "", "http://edge2.com"},
+		},
+		{
+			name:     "list with only relative path",
+			input:    []string{""},
+			expected: []string{""},
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			result := appendRelativePathIfNotPresent(tt.input)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+func TestGenerateStandardServers_MDCB(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name          string
+		apiData       *apidef.APIDefinition
+		config        ServerRegenerationConfig
+		expectedCount int
+		expectedURLs  []string
+		comment       string
+	}{
+		{
+			name: "MDCB Scenario 4a: all tags match → only absolute URLs",
+			apiData: &apidef.APIDefinition{
+				Tags: []string{"prod"},
+				Proxy: apidef.ProxyConfig{
+					ListenPath: "/api",
+				},
+			},
+			config: ServerRegenerationConfig{
+				Protocol:      "http://",
+				DefaultHost:   "localhost:8080",
+				HybridEnabled: true,
+				EdgeEndpoints: []EdgeEndpoint{
+					{Endpoint: "http://edge1.example.com", Tags: []string{"prod"}},
+					{Endpoint: "http://edge2.example.com", Tags: []string{"prod"}},
+				},
+			},
+			expectedCount: 2,
+			expectedURLs: []string{
+				"http://edge1.example.com/api",
+				"http://edge2.example.com/api",
+			},
+			comment: "Scenario 4a: All tags matched, should only include matching edge endpoints (no relative paths)",
+		},
+		{
+			name: "MDCB Scenario 4b: some tags don't match → absolute + relative URLs",
+			apiData: &apidef.APIDefinition{
+				Tags: []string{"prod", "nonexistent"},
+				Proxy: apidef.ProxyConfig{
+					ListenPath: "/api",
+				},
+			},
+			config: ServerRegenerationConfig{
+				Protocol:      "http://",
+				DefaultHost:   "localhost:8080",
+				HybridEnabled: true,
+				EdgeEndpoints: []EdgeEndpoint{
+					{Endpoint: "http://edge1.example.com", Tags: []string{"prod"}},
+					{Endpoint: "http://edge2.example.com", Tags: []string{"prod"}},
+				},
+			},
+			expectedCount: 3,
+			expectedURLs: []string{
+				"http://edge1.example.com/api",
+				"http://edge2.example.com/api",
+				"/api", // Relative path for non-matching tag
+			},
+			comment: "Scenario 4b: Some tags didn't match, should include edge endpoints + relative path",
+		},
+		{
+			name: "MDCB with no matching tags generates only relative URL",
+			apiData: &apidef.APIDefinition{
+				Tags: []string{"dev"},
+				Proxy: apidef.ProxyConfig{
+					ListenPath: "/api",
+				},
+			},
+			config: ServerRegenerationConfig{
+				Protocol:      "http://",
+				DefaultHost:   "localhost:8080",
+				HybridEnabled: true,
+				EdgeEndpoints: []EdgeEndpoint{
+					{Endpoint: "http://edge1.example.com", Tags: []string{"prod"}},
+				},
+			},
+			expectedCount: 1,
+			expectedURLs: []string{
+				"/api", // Only relative path
+			},
+			comment: "MDCB with no matching tags should only generate relative path",
+		},
+		{
+			name: "MDCB with no API tags generates no URLs",
+			apiData: &apidef.APIDefinition{
+				Tags: []string{},
+				Proxy: apidef.ProxyConfig{
+					ListenPath: "/api",
+				},
+			},
+			config: ServerRegenerationConfig{
+				Protocol:      "http://",
+				DefaultHost:   "localhost:8080",
+				HybridEnabled: true,
+				EdgeEndpoints: []EdgeEndpoint{
+					{Endpoint: "http://edge1.example.com", Tags: []string{"prod"}},
+				},
+			},
+			expectedCount: 0,
+			expectedURLs:  []string{},
+			comment:       "MDCB with no API tags should generate no URLs",
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			result := generateStandardServers(tt.apiData, tt.config)
+			assert.Equal(t, tt.expectedCount, len(result), tt.comment)
+
+			for _, expectedURL := range tt.expectedURLs {
+				found := false
+				for _, server := range result {
+					if server.url == expectedURL {
+						found = true
+						break
+					}
+				}
+				assert.True(t, found, "Expected URL %s not found. %s", expectedURL, tt.comment)
+			}
+		})
+	}
 }
