@@ -3300,7 +3300,7 @@ func TestOAS(t *testing.T) {
 				patchedOASObj := testGetOASAPI(t, ts, apiID, tykExt.Info.Name, apiInOAS.T.Info.Title)
 
 				assert.EqualValues(t, gwServerURL, patchedOASObj.Servers[0].URL)
-				assert.Equal(t, serverURL, patchedOASObj.Servers[1].URL)
+				assert.Equal(t, serverURL, patchedOASObj.Servers[2].URL)
 				// Reset
 				testUpdateAPI(t, ts, &oasAPI, oasAPIID, true)
 			})
