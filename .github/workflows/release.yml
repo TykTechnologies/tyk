@@ -200,7 +200,7 @@ jobs:
             BUILD_PACKAGE_NAME=tyk-gateway-ee
       - name: Docker metadata for fips CI
         id: ci_metadata_fips
-        if: ${{ matrix.golang_cross == '1.24-bullseye' }}
+        if: ${{ matrix.golang_cross == '1.24-bullseye' && endsWith(github.ref_name, 'lts') }}
         uses: docker/metadata-action@v5
         with:
           images: |
@@ -215,7 +215,7 @@ jobs:
             type=semver,pattern={{major}}.{{minor}},prefix=v
             type=semver,pattern={{version}},prefix=v
       - name: push fips image to CI
-        if: ${{ matrix.golang_cross == '1.24-bullseye' }}
+        if: ${{ matrix.golang_cross == '1.24-bullseye' && endsWith(github.ref_name, 'lts') }}
         uses: docker/build-push-action@v6
         with:
           context: "dist"
@@ -232,6 +232,7 @@ jobs:
             BUILD_PACKAGE_NAME=tyk-gateway-fips
       - name: Docker metadata for fips tag push
         id: tag_metadata_fips
+        if: ${{ endsWith(github.ref_name, 'lts') }}
         uses: docker/metadata-action@v5
         with:
           images: |
@@ -248,7 +249,7 @@ jobs:
             org.opencontainers.image.vendor=tyk.io
             org.opencontainers.image.version=${{ github.ref_name }}
       - name: push fips image to prod
-        if: ${{ matrix.golang_cross == '1.24-bullseye' }}
+        if: ${{ matrix.golang_cross == '1.24-bullseye' && endsWith(github.ref_name, 'lts') }}
         uses: docker/build-push-action@v6
         with:
           context: "dist"
