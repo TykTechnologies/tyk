@@ -487,26 +487,22 @@ func TestGenerateVersionedServers(t *testing.T) {
 
 		servers := generateVersionedServers(childAPI, baseAPI, config, "v2")
 
-		// External child should have 2 URLs: versioned + direct
-		assert.Equal(t, 2, len(servers))
+		// External child should have 4 URLs: versioned absolute, versioned relative, direct absolute, direct relative
+		assert.Equal(t, 4, len(servers))
 
-		// Check versioned URL
-		hasVersioned := false
+		// Collect all URLs
+		urls := make([]string, 0, len(servers))
 		for _, s := range servers {
-			if s.url == "http://localhost:8080/products/v2" {
-				hasVersioned = true
-			}
+			urls = append(urls, s.url)
 		}
-		assert.True(t, hasVersioned, "Should have versioned URL")
 
-		// Check direct URL
-		hasDirect := false
-		for _, s := range servers {
-			if s.url == "http://localhost:8080/products-v2" {
-				hasDirect = true
-			}
-		}
-		assert.True(t, hasDirect, "Should have direct URL")
+		// Check versioned URLs (absolute and relative)
+		assert.Contains(t, urls, "http://localhost:8080/products/v2", "Should have versioned absolute URL")
+		assert.Contains(t, urls, "/products/v2", "Should have versioned relative URL")
+
+		// Check direct URLs (absolute and relative)
+		assert.Contains(t, urls, "http://localhost:8080/products-v2", "Should have direct absolute URL")
+		assert.Contains(t, urls, "/products-v2", "Should have direct relative URL")
 	})
 
 	t.Run("child API with query param versioning", func(t *testing.T) {
@@ -589,9 +585,18 @@ func TestGenerateVersionedServers(t *testing.T) {
 
 		servers := generateVersionedServers(childAPI, baseAPI, config, "v2")
 
-		// Internal child should have only 1 URL: versioned
-		assert.Equal(t, 1, len(servers))
-		assert.Equal(t, "http://localhost:8080/products/v2", servers[0].url)
+		// Internal child should have 2 URLs: versioned absolute and versioned relative
+		assert.Equal(t, 2, len(servers))
+
+		// Collect all URLs
+		urls := make([]string, 0, len(servers))
+		for _, s := range servers {
+			urls = append(urls, s.url)
+		}
+
+		// Check versioned URLs (absolute and relative)
+		assert.Contains(t, urls, "http://localhost:8080/products/v2", "Should have versioned absolute URL")
+		assert.Contains(t, urls, "/products/v2", "Should have versioned relative URL")
 	})
 }
 
@@ -773,9 +778,15 @@ func TestGenerateTykServersBaseAPIWithVersioning(t *testing.T) {
 
 		servers := generateTykServers(baseAPI, nil, config, "")
 
-		// Base API should have only versioned URL (no direct access)
-		assert.Equal(t, 1, len(servers))
-		assert.Equal(t, "http://localhost:8080/products/v1", servers[0].url)
+		assert.Equal(t, 2, len(servers))
+
+		urls := make([]string, len(servers))
+		for i, s := range servers {
+			urls[i] = s.url
+		}
+
+		assert.Contains(t, urls, "http://localhost:8080/products/v1")
+		assert.Contains(t, urls, "/products/v1")
 	})
 }
 
@@ -800,8 +811,15 @@ func TestOAS_GenerateTykServers(t *testing.T) {
 
 		servers := oas.GenerateTykServers(apiDef, nil, config, "")
 
-		require.Len(t, servers, 1)
-		assert.Equal(t, "http://localhost:8080/test", servers[0].URL)
+		require.Len(t, servers, 2)
+
+		urls := make([]string, len(servers))
+		for i, server := range servers {
+			urls[i] = server.URL
+		}
+
+		assert.Contains(t, urls, "http://localhost:8080/test")
+		assert.Contains(t, urls, "/test")
 	})
 
 	t.Run("versioned child API with URL path versioning", func(t *testing.T) {
@@ -907,11 +925,17 @@ func TestOAS_GenerateTykServers(t *testing.T) {
 
 		servers := oas.GenerateTykServers(baseAPI, nil, config, "")
 
-		// Should have both versioned URL and fallback URL
-		require.Len(t, servers, 2)
-		urls := []string{servers[0].URL, servers[1].URL}
+		require.Len(t, servers, 4)
+
+		urls := make([]string, len(servers))
+		for i, server := range servers {
+			urls[i] = server.URL
+		}
+
 		assert.Contains(t, urls, "http://localhost:8080/products/v1")
+		assert.Contains(t, urls, "/products/v1")
 		assert.Contains(t, urls, "http://localhost:8080/products")
+		assert.Contains(t, urls, "/products")
 	})
 
 	t.Run("returns openapi3.Server type not serverInfo", func(t *testing.T) {
@@ -932,11 +956,18 @@ func TestOAS_GenerateTykServers(t *testing.T) {
 
 		servers := oas.GenerateTykServers(apiDef, nil, config, "")
 
-		// Verify it returns the correct type
 		require.NotNil(t, servers)
 		require.IsType(t, []*openapi3.Server{}, servers)
-		require.Len(t, servers, 1)
+		require.Len(t, servers, 2)
 		require.IsType(t, &openapi3.Server{}, servers[0])
+
+		urls := make([]string, len(servers))
+		for i, server := range servers {
+			urls[i] = server.URL
+		}
+
+		assert.Contains(t, urls, "http://localhost:8080/test")
+		assert.Contains(t, urls, "/test")
 	})
 }
 
@@ -1773,8 +1804,10 @@ func TestGenerateVersionedServers_Scenario2_BaseAPIWithFallback(t *testing.T) {
 			defaultVersion: "v1",
 			listenPath:     "/api",
 			expectedURLs: []string{
-				"http://localhost:8080/api/v1", // Versioned URL
-				"http://localhost:8080/api",    // Fallback URL
+				"http://localhost:8080/api/v1", // Versioned URL (absolute)
+				"/api/v1",                      // Versioned URL (relative)
+				"http://localhost:8080/api",    // Fallback URL (absolute)
+				"/api",                         // Fallback URL (relative)
 			},
 			description: "Base API should have both versioned and fallback URLs",
 		},
@@ -1784,8 +1817,10 @@ func TestGenerateVersionedServers_Scenario2_BaseAPIWithFallback(t *testing.T) {
 			defaultVersion: "v2",
 			listenPath:     "/myapi",
 			expectedURLs: []string{
-				"http://localhost:8080/myapi/v2", // Versioned URL
-				"http://localhost:8080/myapi",    // Fallback URL
+				"http://localhost:8080/myapi/v2", // Versioned URL (absolute)
+				"/myapi/v2",                      // Versioned URL (relative)
+				"http://localhost:8080/myapi",    // Fallback URL (absolute)
+				"/myapi",                         // Fallback URL (relative)
 			},
 			description: "Base API with v2 should have both URLs",
 		},
@@ -1795,8 +1830,10 @@ func TestGenerateVersionedServers_Scenario2_BaseAPIWithFallback(t *testing.T) {
 			defaultVersion: "v1",
 			listenPath:     "/api/service",
 			expectedURLs: []string{
-				"http://localhost:8080/api/service/v1", // Versioned URL
-				"http://localhost:8080/api/service",    // Fallback URL
+				"http://localhost:8080/api/service/v1", // Versioned URL (absolute)
+				"/api/service/v1",                      // Versioned URL (relative)
+				"http://localhost:8080/api/service",    // Fallback URL (absolute)
+				"/api/service",                         // Fallback URL (relative)
 			},
 			description: "Base API with nested path should have both URLs",
 		},
