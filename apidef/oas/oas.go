@@ -222,13 +222,23 @@ func (s *OAS) getTykAuthentication() (authentication *Authentication) {
 	return
 }
 
-// promoteStruct atomically reads a scheme, converts a map[string]interface{} to *T if needed,
-// stores the promoted value back, and returns the typed pointer.
-// If the key doesn't exist, is nil, or is not convertible, it returns nil.
+// promoteStruct atomically promotes a scheme from map[string]interface{} to *T,
+// caching the result. It uses a fast path under RLock and a slow path under Lock.
 func promoteStruct[T any](ss *SecuritySchemes, key string) *T {
 	if ss == nil {
 		return nil
 	}
+
+	ss.mutex.RLock()
+	if ss.container != nil {
+		if v, ok := ss.container[key]; ok && v != nil {
+			if typed, ok := v.(*T); ok {
+				ss.mutex.RUnlock()
+				return typed
+			}
+		}
+	}
+	ss.mutex.RUnlock()
 
 	ss.mutex.Lock()
 	defer ss.mutex.Unlock()
