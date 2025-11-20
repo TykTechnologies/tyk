@@ -241,7 +241,8 @@ func determineHosts(apiData *apidef.APIDefinition, config ServerRegenerationConf
 		return []string{apiData.Domain}
 	}
 
-	return determineHostsWithEdgeSupport(apiData, config)
+	hosts := determineHostsWithEdgeSupport(apiData, config)
+	return appendRelativePathIfNotPresent(hosts)
 }
 
 // determineHostsWithEdgeSupport determines hosts based on edge endpoints and API tags.
@@ -255,7 +256,7 @@ func determineHostsWithEdgeSupport(apiData *apidef.APIDefinition, config ServerR
 
 	if len(apiData.Tags) == 0 {
 		if config.HybridEnabled {
-			return []string{}
+			return []string{""}
 		}
 		return []string{config.DefaultHost}
 	}
@@ -263,10 +264,6 @@ func determineHostsWithEdgeSupport(apiData *apidef.APIDefinition, config ServerR
 	matchingHosts := findEndpointsMatchingTags(apiData.Tags, config.EdgeEndpoints)
 	if len(matchingHosts) == 0 {
 		return []string{""}
-	}
-
-	if allAPITagsHaveMatches(apiData.Tags, config.EdgeEndpoints) {
-		return matchingHosts
 	}
 
 	return appendRelativePathIfNotPresent(matchingHosts)
@@ -303,23 +300,6 @@ func hasAnyTagMatch(apiTags []string, endpointTags []string) bool {
 		}
 	}
 	return false
-}
-
-// allAPITagsHaveMatches returns true if every API tag matches at least one edge endpoint.
-func allAPITagsHaveMatches(apiTags []string, edgeEndpoints []EdgeEndpoint) bool {
-	for _, apiTag := range apiTags {
-		matched := false
-		for _, endpoint := range edgeEndpoints {
-			if containsString(endpoint.Tags, apiTag) {
-				matched = true
-				break
-			}
-		}
-		if !matched {
-			return false
-		}
-	}
-	return true
 }
 
 // appendRelativePathIfNotPresent adds a relative path (empty string) if not present.
