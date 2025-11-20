@@ -138,11 +138,11 @@ func (k *AuthKey) ProcessRequest(_ http.ResponseWriter, r *http.Request, _ inter
 
 	// Validate certificate binding or legacy certificate auth
 	// Certificate binding validation runs when:
-	// 1. Certificate binding is globally enabled AND a TLS connection exists, OR
-	// 2. UseCertificate is explicitly set for this API
+	// 1. Certificate binding is globally enabled AND the session has certificate bindings, OR
+	// 2. UseCertificate is explicitly set for this API (legacy dynamic mTLS mode)
 	bindingEnabled := k.Gw.GetConfig().Security.EnableCertificateBinding
-	hasTLSCert := r.TLS != nil && len(r.TLS.PeerCertificates) > 0
-	if authConfig.UseCertificate || (bindingEnabled && (hasTLSCert || session.Certificate != "")) {
+	hasBindings := len(session.MtlsStaticCertificateBindings) > 0
+	if authConfig.UseCertificate || (bindingEnabled && hasBindings) {
 		if err, code := k.validateCertificate(r, key, &session, &certHash, &updateSession); err != nil {
 			return err, code
 		}
@@ -295,8 +295,13 @@ func (k *AuthKey) validateWithTLSCertificate(r *http.Request, key string, sessio
 	// Compute cert hash for comparison
 	*certHash = k.computeCertHash(r, *certHash)
 
+	// Use binding mode only if:
+	// 1. Certificate binding is enabled globally, AND
+	// 2. The session has static certificate bindings configured
+	// Otherwise, use legacy mode for backward compatibility with dynamic mTLS
 	bindingEnabled := k.Gw.GetConfig().Security.EnableCertificateBinding
-	if bindingEnabled {
+	hasBindings := len(session.MtlsStaticCertificateBindings) > 0
+	if bindingEnabled && hasBindings {
 		return k.validateCertificateBinding(r, key, session, *certHash)
 	}
 	return k.validateLegacyMode(r, session, *certHash, updateSession)
@@ -304,9 +309,14 @@ func (k *AuthKey) validateWithTLSCertificate(r *http.Request, key string, sessio
 
 // validateWithoutTLSCertificate handles validation when no TLS client certificate is provided
 func (k *AuthKey) validateWithoutTLSCertificate(r *http.Request, key string, session *user.SessionState) (error, int) {
+	// Use binding mode only if:
+	// 1. Certificate binding is enabled globally, AND
+	// 2. The session has static certificate bindings configured
+	// Otherwise, use legacy mode for backward compatibility with dynamic mTLS
 	bindingEnabled := k.Gw.GetConfig().Security.EnableCertificateBinding
+	hasBindings := len(session.MtlsStaticCertificateBindings) > 0
 
-	if bindingEnabled {
+	if bindingEnabled && hasBindings {
 		return k.validateBindingWithoutCert(r, key, session)
 	}
 	return k.validateLegacyWithoutCert(r, session)
@@ -331,25 +341,34 @@ func (k *AuthKey) computeCertHash(r *http.Request, existingHash string) string {
 // validateCertificateBinding validates certificate-to-token binding
 // This enforces that the presented certificate matches the one bound to the session
 func (k *AuthKey) validateCertificateBinding(r *http.Request, key string, session *user.SessionState, certHash string) (error, int) {
-	// Only validate if both token and session have certificates
-	if key == "" || session.Certificate == "" {
+	// Only validate if both token and session have certificate bindings
+	if key == "" || len(session.MtlsStaticCertificateBindings) == 0 {
 		return nil, http.StatusOK
 	}
 
+	// Check if the presented certificate hash matches any of the bound certificates
+	certMatched := false
+	for _, boundCert := range session.MtlsStaticCertificateBindings {
+		if certHash == boundCert {
+			certMatched = true
+			break
+		}
+	}
+
 	// If certificates don't match, reject the request
-	if certHash != session.Certificate {
+	if !certMatched {
 		k.Logger().WithField("key", k.Gw.obfuscateKey(key)).Warn("Certificate mismatch detected for token")
 		return k.reportInvalidKey(key, r, MsgCertificateMismatch, ErrAuthCertMismatch)
 	}
 
 	// Note: In binding mode, certificate whitelist validation is performed at TLS handshake level (UseMutualTLSAuth)
 	// or by CertificateCheckMW middleware. We don't validate against cert manager here because
-	// session.Certificate contains a hash for binding, not a cert ID for whitelist lookup
+	// MtlsStaticCertificateBindings contains hashes for binding, not cert IDs for whitelist lookup
 	return nil, http.StatusOK
 }
 
 // validateLegacyMode handles the legacy auto-update behavior
-// Updates session certificate and validates it exists in cert manager
+// Updates session certificate with current cert hash and validates whitelist
 func (k *AuthKey) validateLegacyMode(r *http.Request, session *user.SessionState, certHash string, updateSession *bool) (error, int) {
 	// Auto-update session certificate with current cert hash
 	if session.Certificate != certHash {
@@ -358,7 +377,6 @@ func (k *AuthKey) validateLegacyMode(r *http.Request, session *user.SessionState
 	}
 
 	// Validate the certificate exists in cert manager (whitelist check)
-	// This catches edge cases like deleted certificates or corrupted session data
 	if _, err := k.Gw.CertificateManager.GetRaw(certHash); err != nil {
 		return k.reportInvalidKey("", r, MsgNonExistentCert, ErrAuthCertNotFound)
 	}
@@ -369,7 +387,7 @@ func (k *AuthKey) validateLegacyMode(r *http.Request, session *user.SessionState
 // validateBindingWithoutCert validates when binding is enabled but no certificate is provided
 // Rejects only if the session has a certificate bound to it
 func (k *AuthKey) validateBindingWithoutCert(r *http.Request, key string, session *user.SessionState) (error, int) {
-	if session.Certificate != "" {
+	if len(session.MtlsStaticCertificateBindings) > 0 {
 		k.Logger().WithField("key", k.Gw.obfuscateKey(key)).Warn("Certificate required but not provided")
 		return k.reportInvalidKey(key, r, MsgCertificateMismatch, ErrAuthCertMismatch)
 	}

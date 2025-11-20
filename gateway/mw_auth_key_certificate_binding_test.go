@@ -78,7 +78,7 @@ func TestCertificateTokenBinding(t *testing.T) {
 			s.AccessRights = map[string]user.AccessDefinition{"test-api": {
 				APIID: "test-api",
 			}}
-			s.Certificate = certHash1
+			s.MtlsStaticCertificateBindings = []string{certHash1}
 		})
 
 		assert.NotEmpty(t, key, "Should create key with certificate")
@@ -99,7 +99,7 @@ func TestCertificateTokenBinding(t *testing.T) {
 			s.AccessRights = map[string]user.AccessDefinition{"test-api": {
 				APIID: "test-api",
 			}}
-			s.Certificate = certHash1
+			s.MtlsStaticCertificateBindings = []string{certHash1}
 		})
 
 		assert.NotEmpty(t, key, "Should create key with certificate")
@@ -122,7 +122,7 @@ func TestCertificateTokenBinding(t *testing.T) {
 			s.AccessRights = map[string]user.AccessDefinition{"test-api": {
 				APIID: "test-api",
 			}}
-			s.Certificate = certHash1
+			s.MtlsStaticCertificateBindings = []string{certHash1}
 		})
 
 		assert.NotEmpty(t, key, "Should create key with certificate")
@@ -151,7 +151,7 @@ func TestCertificateTokenBinding(t *testing.T) {
 			s.AccessRights = map[string]user.AccessDefinition{"test-api": {
 				APIID: "test-api",
 			}}
-			s.Certificate = certHash1
+			s.MtlsStaticCertificateBindings = []string{certHash1}
 		})
 
 		assert.NotEmpty(t, key, "Should create key with certificate")
@@ -187,7 +187,7 @@ func TestCertificateTokenBinding(t *testing.T) {
 			s.AccessRights = map[string]user.AccessDefinition{"test-api": {
 				APIID: "test-api",
 			}}
-			// Don't set Certificate field
+			// Don't set MtlsStaticCertificateBindings field
 		})
 
 		assert.NotEmpty(t, key, "Should create key without certificate")
@@ -264,7 +264,7 @@ func TestCertificateTokenBindingWithExpiredCert(t *testing.T) {
 			s.AccessRights = map[string]user.AccessDefinition{"test-api": {
 				APIID: "test-api",
 			}}
-			s.Certificate = certHash
+			s.MtlsStaticCertificateBindings = []string{certHash}
 		})
 
 		assert.NotEmpty(t, key, "Should create key with certificate")
