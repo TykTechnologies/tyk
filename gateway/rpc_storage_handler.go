@@ -2,6 +2,7 @@
 package gateway
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -1274,4 +1275,19 @@ func (r *RPCStorageHandler) GetListRange(keyName string, from, to int64) ([]stri
 func (r *RPCStorageHandler) Exists(keyName string) (bool, error) {
 	log.Error("Not implemented")
 	return false, nil
+}
+
+// GetKeyContext retrieves a key with context support.
+func (r *RPCStorageHandler) GetKeyContext(ctx context.Context, keyName string) (string, error) {
+	return r.GetKey(keyName)
+}
+
+// GetRawKeyContext retrieves a raw key with context support.
+func (r *RPCStorageHandler) GetRawKeyContext(ctx context.Context, keyName string) (string, error) {
+	return r.GetRawKey(keyName)
+}
+
+// GetMultiKeyContext retrieves multiple keys with context support.
+func (r *RPCStorageHandler) GetMultiKeyContext(ctx context.Context, keyNames []string) ([]string, error) {
+	return r.GetMultiKey(keyNames)
 }

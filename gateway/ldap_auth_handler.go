@@ -1,6 +1,7 @@
 package gateway
 
 import (
+	"context"
 	"errors"
 	"strings"
 
@@ -241,4 +242,19 @@ func (l *LDAPStorageHandler) GetListRange(keyName string, from, to int64) ([]str
 func (l LDAPStorageHandler) Exists(keyName string) (bool, error) {
 	log.Error("Not implemented")
 	return false, nil
+}
+
+// GetKeyContext retrieves a key with context support.
+func (l *LDAPStorageHandler) GetKeyContext(ctx context.Context, keyName string) (string, error) {
+	return l.GetKey(keyName)
+}
+
+// GetRawKeyContext retrieves a raw key with context support.
+func (l *LDAPStorageHandler) GetRawKeyContext(ctx context.Context, keyName string) (string, error) {
+	return l.GetRawKey(keyName)
+}
+
+// GetMultiKeyContext retrieves multiple keys with context support.
+func (l *LDAPStorageHandler) GetMultiKeyContext(ctx context.Context, keyNames []string) ([]string, error) {
+	return l.GetMultiKey(keyNames)
 }

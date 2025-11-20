@@ -39,6 +39,7 @@ import (
 
 const (
 	DEFAULT_ORG_SESSION_EXPIRATION = int64(604800)
+	orgSessionFetchTimeout         = 2 * time.Second
 )
 
 var (
@@ -343,25 +344,66 @@ func (t *BaseMiddleware) GetSpec() *APISpec {
 	return t.Spec
 }
 
-func (t *BaseMiddleware) OrgSession(orgID string) (user.SessionState, bool) {
+// fetchOrgSessionWithTimeout fetches org session with a timeout to prevent hanging
+func (t *BaseMiddleware) fetchOrgSessionWithTimeout(orgID string) (user.SessionState, bool) {
+	timeoutCtx, cancel := context.WithTimeout(context.Background(), orgSessionFetchTimeout)
+	defer cancel()
 
+	resultChan := make(chan struct {
+		session user.SessionState
+		found   bool
+	}, 1)
+
+	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				t.Logger().Errorf("Panic recovered during org session fetch for org %s: %v", orgID, r)
+				select {
+				case resultChan <- struct {
+					session user.SessionState
+					found   bool
+				}{session: user.SessionState{}, found: false}:
+				case <-timeoutCtx.Done():
+				}
+			}
+		}()
+
+		session, found := t.Spec.OrgSessionManager.SessionDetailContext(timeoutCtx, orgID, orgID, false)
+		if found && t.Spec.GlobalConfig.EnforceOrgDataAge {
+			t.Logger().Debug("Setting data expiry: ", orgID)
+			t.Gw.ExpiryCache.Set(session.OrgID, session.DataExpires, cache.DefaultExpiration)
+		}
+		session.SetKeyHash(storage.HashKey(orgID, t.Gw.GetConfig().HashKeys))
+
+		select {
+		case resultChan <- struct {
+			session user.SessionState
+			found   bool
+		}{session: session.Clone(), found: found}:
+		case <-timeoutCtx.Done():
+			return
+		}
+	}()
+
+	select {
+	case res := <-resultChan:
+		return res.session, res.found
+	case <-timeoutCtx.Done():
+		t.Logger().Warning("Org session fetch timed out after 2s")
+		return user.SessionState{}, false
+	}
+}
+
+func (t *BaseMiddleware) OrgSession(orgID string) (user.SessionState, bool) {
 	if rpc.IsEmergencyMode() {
 		return user.SessionState{}, false
 	}
 
-	// Try and get the session from the session store
-	session, found := t.Spec.OrgSessionManager.SessionDetail(orgID, orgID, false)
-	if found && t.Spec.GlobalConfig.EnforceOrgDataAge {
-		// If exists, assume it has been authorized and pass on
-		// We cache org expiry data
-		t.Logger().Debug("Setting data expiry: ", orgID)
+	// Fetch with timeout to prevent blocking
+	t.Logger().Debug("Fetching org session with timeout")
+	session, found := t.fetchOrgSessionWithTimeout(orgID)
 
-		t.Gw.ExpiryCache.Set(session.OrgID, session.DataExpires, cache.DefaultExpiration)
-	}
-
-	session.SetKeyHash(storage.HashKey(orgID, t.Gw.GetConfig().HashKeys))
-
-	return session.Clone(), found
+	return session, found
 }
 
 func (t *BaseMiddleware) SetOrgExpiry(orgid string, expiry int64) {
@@ -371,27 +413,44 @@ func (t *BaseMiddleware) SetOrgExpiry(orgid string, expiry int64) {
 func (t *BaseMiddleware) OrgSessionExpiry(orgid string) int64 {
 	t.Logger().Debug("Checking: ", orgid)
 
-	// Cache failed attempt
-	id, err, _ := orgSessionExpiryCache.Do(orgid, func() (interface{}, error) {
-		cachedVal, found := t.Gw.ExpiryCache.Get(orgid)
-		if found {
-			return cachedVal, nil
+	// Check cache first
+	cachedVal, found := t.Gw.ExpiryCache.Get(orgid)
+	if found {
+		val, ok := cachedVal.(int64)
+		if !ok {
+			t.Logger().Error("Type assertion failed")
+			return DEFAULT_ORG_SESSION_EXPIRATION
 		}
-
-		s, found := t.OrgSession(orgid)
-		if found && t.Spec.GlobalConfig.EnforceOrgDataAge {
-			return s.DataExpires, nil
-		}
-		return 0, errors.New("missing session")
-	})
-
-	if err != nil {
-		t.Logger().Debug("no cached entry found, returning 7 days")
-		t.SetOrgExpiry(orgid, DEFAULT_ORG_SESSION_EXPIRATION)
-		return DEFAULT_ORG_SESSION_EXPIRATION
+		return val
 	}
 
-	return id.(int64)
+	// Cache miss
+	go orgSessionExpiryCache.Do(orgid, func() (interface{}, error) {
+		return t.refreshOrgSessionExpiry(orgid)
+	})
+
+	t.Logger().Debug("no cached entry found, returning 7 days (async refresh started)")
+	return DEFAULT_ORG_SESSION_EXPIRATION
+}
+
+// refreshOrgSessionExpiry fetches org session expiry in the background
+func (t *BaseMiddleware) refreshOrgSessionExpiry(orgid string) (interface{}, error) {
+	defer func() {
+		if r := recover(); r != nil {
+			t.Logger().Errorf("Panic recovered during org session expiry refresh for org %s: %v", orgid, r)
+		}
+	}()
+
+	s, found := t.OrgSession(orgid) // RPC call happens in background
+	if found && t.Spec.GlobalConfig.EnforceOrgDataAge {
+		t.Logger().Debug("Background refresh: setting data expiry for org: ", orgid)
+		t.SetOrgExpiry(orgid, s.DataExpires)
+		return s.DataExpires, nil
+	}
+
+	t.Logger().Debug("Background refresh: org session not found, setting default expiry")
+	t.SetOrgExpiry(orgid, DEFAULT_ORG_SESSION_EXPIRATION)
+	return DEFAULT_ORG_SESSION_EXPIRATION, nil
 }
 
 func (t *BaseMiddleware) UpdateRequestSession(r *http.Request) bool {

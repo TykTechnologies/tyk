@@ -1,6 +1,7 @@
 package gateway
 
 import (
+	"context"
 	"encoding/base64"
 	"encoding/json"
 	"strings"
@@ -21,6 +22,7 @@ type SessionHandler interface {
 	UpdateSession(keyName string, session *user.SessionState, resetTTLTo int64, hashed bool) error
 	RemoveSession(orgID string, keyName string, hashed bool) bool
 	SessionDetail(orgID string, keyName string, hashed bool) (user.SessionState, bool)
+	SessionDetailContext(ctx context.Context, orgID string, keyName string, hashed bool) (user.SessionState, bool)
 	KeyExpired(newSession *user.SessionState) bool
 	Sessions(filter string) []string
 	ResetQuota(string, *user.SessionState, bool)
@@ -195,6 +197,73 @@ func (b *DefaultSessionManager) SessionDetail(orgID string, keyName string, hash
 		} else {
 			// key is not an imported one
 			jsonKeyVal, err = b.store.GetKey(keyName)
+		}
+	}
+
+	if err != nil {
+		log.WithFields(logrus.Fields{
+			"prefix":      "auth-mgr",
+			"inbound-key": b.Gw.obfuscateKey(keyName),
+			"err":         err,
+		}).Debug("Could not get session detail, key not found")
+		return user.SessionState{}, false
+	}
+	session := &user.SessionState{}
+	if err := json.Unmarshal([]byte(jsonKeyVal), &session); err != nil {
+		log.Error("Couldn't unmarshal session object (may be cache miss): ", err)
+		return user.SessionState{}, false
+	}
+	session.KeyID = keyId
+	return session.Clone(), true
+}
+
+// SessionDetailContext returns the session detail using the storage engine with context support for cancellation
+func (b *DefaultSessionManager) SessionDetailContext(ctx context.Context, orgID string, keyName string, hashed bool) (user.SessionState, bool) {
+	select {
+	case <-ctx.Done():
+		log.WithFields(logrus.Fields{
+			"prefix":      "auth-mgr",
+			"inbound-key": b.Gw.obfuscateKey(keyName),
+		}).Debug("Context cancelled")
+		return user.SessionState{}, false
+	default:
+	}
+
+	var jsonKeyVal string
+	var err error
+	keyId := keyName
+
+	if hashed {
+		jsonKeyVal, err = b.store.GetRawKeyContext(ctx, b.store.GetKeyPrefix()+keyName)
+	} else {
+		if storage.TokenOrg(keyName) != orgID {
+			// try to get legacy and new format key at once
+			toSearchList := []string{}
+			if !b.Gw.GetConfig().DisableKeyActionsByUsername {
+				toSearchList = append(toSearchList, b.Gw.generateToken(orgID, keyName))
+			}
+
+			toSearchList = append(toSearchList, keyName)
+			for _, fallback := range b.Gw.GetConfig().HashKeyFunctionFallback {
+				if !b.Gw.GetConfig().DisableKeyActionsByUsername {
+					toSearchList = append(toSearchList, b.Gw.generateToken(orgID, keyName, fallback))
+				}
+			}
+
+			var jsonKeyValList []string
+
+			jsonKeyValList, err = b.store.GetMultiKeyContext(ctx, toSearchList)
+			// pick the 1st non empty from the returned list
+			for idx, val := range jsonKeyValList {
+				if val != "" {
+					jsonKeyVal = val
+					keyId = toSearchList[idx]
+					break
+				}
+			}
+		} else {
+			// key is not an imported one
+			jsonKeyVal, err = b.store.GetKeyContext(ctx, keyName)
 		}
 	}
 

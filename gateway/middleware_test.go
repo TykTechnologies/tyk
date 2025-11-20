@@ -1,11 +1,13 @@
 package gateway
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"net/http"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 
@@ -21,8 +23,10 @@ import (
 
 type mockStore struct {
 	SessionHandler
-	//DetailNotFound is used to make mocked SessionDetail return (x,false), as if it don't find the session in the mocked storage.
+	//DetailNotFound is used to make mocked SessionDetail return (x,false), as if it doesn't find the session in the mocked storage.
 	DetailNotFound bool
+	// Delay simulates a slow RPC call for timeout testing
+	Delay time.Duration
 }
 
 var sess = user.SessionState{
@@ -31,6 +35,20 @@ var sess = user.SessionState{
 }
 
 func (m mockStore) SessionDetail(orgID string, keyName string, hashed bool) (user.SessionState, bool) {
+	if m.Delay > 0 {
+		time.Sleep(m.Delay)
+	}
+	return sess.Clone(), !m.DetailNotFound
+}
+
+func (m mockStore) SessionDetailContext(ctx context.Context, orgID string, keyName string, hashed bool) (user.SessionState, bool) {
+	if m.Delay > 0 {
+		select {
+		case <-time.After(m.Delay):
+		case <-ctx.Done():
+			return user.SessionState{}, false
+		}
+	}
 	return sess.Clone(), !m.DetailNotFound
 }
 
@@ -42,28 +60,52 @@ func TestBaseMiddleware_OrgSessionExpiry(t *testing.T) {
 		Spec: &APISpec{
 			GlobalConfig: config.Config{
 				EnforceOrgDataAge: true,
+				LocalSessionCache: config.LocalSessionCacheConf{
+					DisableCacheSessionState: false,
+				},
 			},
 			OrgSessionManager: mockStore{},
 		},
 		logger: mainLog,
 		Gw:     ts.Gw,
 	}
-	v := int64(100)
-	ts.Gw.ExpiryCache.Set(sess.OrgID, v, cache.DefaultExpiration)
 
-	got := m.OrgSessionExpiry(sess.OrgID)
-	assert.Equal(t, v, got)
-	ts.Gw.ExpiryCache.Delete(sess.OrgID)
+	t.Run("should return cached value immediately when present", func(t *testing.T) {
+		v := int64(100)
+		ts.Gw.ExpiryCache.Set(sess.OrgID, v, cache.DefaultExpiration)
 
-	got = m.OrgSessionExpiry(sess.OrgID)
-	assert.Equal(t, sess.DataExpires, got)
-	ts.Gw.ExpiryCache.Delete(sess.OrgID)
+		got := m.OrgSessionExpiry(sess.OrgID)
+		assert.Equal(t, v, got, "Should return cached value")
 
-	m.Spec.OrgSessionManager = mockStore{DetailNotFound: true}
-	noOrgSess := "nonexistent_org"
-	got = m.OrgSessionExpiry(noOrgSess)
-	assert.Equal(t, DEFAULT_ORG_SESSION_EXPIRATION, got)
+		ts.Gw.ExpiryCache.Delete(sess.OrgID)
+	})
 
+	t.Run("should return default immediately on cache miss and refresh in background", func(t *testing.T) {
+		ts.Gw.ExpiryCache.Delete(sess.OrgID)
+		cacheKey := "org:" + sess.OrgID
+		ts.Gw.SessionCache.Delete(cacheKey)
+
+		got := m.OrgSessionExpiry(sess.OrgID)
+		assert.Equal(t, DEFAULT_ORG_SESSION_EXPIRATION, got, "Should return default immediately on cache miss")
+
+		time.Sleep(100 * time.Millisecond)
+
+		cachedVal, found := ts.Gw.ExpiryCache.Get(sess.OrgID)
+		if found {
+			assert.Equal(t, sess.DataExpires, cachedVal.(int64), "Background refresh should populate cache")
+		}
+
+		ts.Gw.ExpiryCache.Delete(sess.OrgID)
+		ts.Gw.SessionCache.Delete(cacheKey)
+	})
+
+	t.Run("should return default for non-existent org", func(t *testing.T) {
+		m.Spec.OrgSessionManager = mockStore{DetailNotFound: true}
+		noOrgSess := "nonexistent_org"
+
+		got := m.OrgSessionExpiry(noOrgSess)
+		assert.Equal(t, DEFAULT_ORG_SESSION_EXPIRATION, got, "Should return default for non-existent org")
+	})
 }
 
 func TestBaseMiddleware_getAuthType(t *testing.T) {
@@ -464,4 +506,167 @@ func TestQuotaNotAppliedWithURLRewrite(t *testing.T) {
 			Code:    http.StatusForbidden,
 		},
 	}...)
+}
+
+func TestBaseMiddleware_OrgSession(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	orgID := "test-org-" + uuid.New()
+
+	// Use mock store that returns our test session
+	mockOrgStore := mockStore{DetailNotFound: false}
+
+	spec := &APISpec{
+		GlobalConfig: config.Config{
+			EnforceOrgDataAge: true,
+			LocalSessionCache: config.LocalSessionCacheConf{
+				DisableCacheSessionState: false,
+			},
+		},
+		OrgSessionManager: mockOrgStore,
+	}
+
+	baseMid := &BaseMiddleware{
+		Spec:   spec,
+		Gw:     ts.Gw,
+		logger: mainLog,
+	}
+
+	t.Run("should fetch org session successfully", func(t *testing.T) {
+		session, found := baseMid.OrgSession(orgID)
+		assert.True(t, found, "Should find org session")
+		assert.Equal(t, sess.OrgID, session.OrgID)
+	})
+
+	t.Run("should handle fetch timeout for non-existent org", func(t *testing.T) {
+		nonExistentOrgID := "timeout-org-" + uuid.New()
+
+		// Use mock that returns not found
+		mockNotFound := mockStore{DetailNotFound: true}
+		specNotFound := &APISpec{
+			GlobalConfig: config.Config{
+				EnforceOrgDataAge: true,
+				LocalSessionCache: config.LocalSessionCacheConf{
+					DisableCacheSessionState: false,
+				},
+			},
+			OrgSessionManager: mockNotFound,
+		}
+
+		baseMidNotFound := &BaseMiddleware{
+			Spec:   specNotFound,
+			Gw:     ts.Gw,
+			logger: mainLog,
+		}
+
+		// Should return false for non-existent org
+		_, found := baseMidNotFound.fetchOrgSessionWithTimeout(nonExistentOrgID)
+		assert.False(t, found, "Should not find non-existent org")
+	})
+
+	t.Run("should handle cold start gracefully", func(t *testing.T) {
+		nonExistentOrgID := "cold-start-org-" + uuid.New()
+		cacheKey := "org:" + nonExistentOrgID
+		ts.Gw.SessionCache.Delete(cacheKey)
+
+		// Use mock that returns not found
+		mockNotFound := mockStore{DetailNotFound: true}
+		specNotFound := &APISpec{
+			GlobalConfig: config.Config{
+				EnforceOrgDataAge: true,
+				LocalSessionCache: config.LocalSessionCacheConf{
+					DisableCacheSessionState: false,
+				},
+			},
+			OrgSessionManager: mockNotFound,
+		}
+
+		baseMidNotFound := &BaseMiddleware{
+			Spec:   specNotFound,
+			Gw:     ts.Gw,
+			logger: mainLog,
+		}
+
+		// Cold start with non-existent org should return quickly (not found)
+		_, found := baseMidNotFound.OrgSession(nonExistentOrgID)
+		assert.False(t, found, "Should not find non-existent org session")
+	})
+
+	t.Run("should fetch fresh data when cache is disabled", func(t *testing.T) {
+		freshOrgID := "fresh-org-" + uuid.New()
+
+		specNoCache := &APISpec{
+			GlobalConfig: config.Config{
+				EnforceOrgDataAge: true,
+				LocalSessionCache: config.LocalSessionCacheConf{
+					DisableCacheSessionState: true,
+				},
+			},
+			OrgSessionManager: mockOrgStore,
+		}
+
+		baseMidNoCache := &BaseMiddleware{
+			Spec:   specNoCache,
+			Gw:     ts.Gw,
+			logger: mainLog,
+		}
+
+		// Should fetch fresh data each time when cache is disabled
+		session1, found1 := baseMidNoCache.OrgSession(freshOrgID)
+		assert.True(t, found1, "Should find session")
+		assert.Equal(t, sess.OrgID, session1.OrgID)
+
+		session2, found2 := baseMidNoCache.OrgSession(freshOrgID)
+		assert.True(t, found2, "Should find session again")
+		assert.Equal(t, sess.OrgID, session2.OrgID)
+	})
+
+	t.Run("should handle panic during fetch gracefully", func(t *testing.T) {
+		panicOrgID := "panic-org-" + uuid.New()
+
+		session, found := baseMid.fetchOrgSessionWithTimeout(panicOrgID)
+
+		// Should either find the session or return false, but not panic
+		if found {
+			assert.NotEmpty(t, session.OrgID)
+		}
+	})
+
+	t.Run("should timeout when RPC call takes too long", func(t *testing.T) {
+		timeoutOrgID := "timeout-org-" + uuid.New()
+
+		slowMockStore := mockStore{
+			DetailNotFound: false,
+			Delay:          3 * time.Second,
+		}
+
+		specSlow := &APISpec{
+			GlobalConfig: config.Config{
+				EnforceOrgDataAge: true,
+				LocalSessionCache: config.LocalSessionCacheConf{
+					DisableCacheSessionState: false,
+				},
+			},
+			OrgSessionManager: slowMockStore,
+		}
+
+		baseMidSlow := &BaseMiddleware{
+			Spec:   specSlow,
+			Gw:     ts.Gw,
+			logger: mainLog,
+		}
+
+		start := time.Now()
+		session, found := baseMidSlow.fetchOrgSessionWithTimeout(timeoutOrgID)
+		elapsed := time.Since(start)
+
+		// Should timeout and return false
+		assert.False(t, found, "Should timeout and return false")
+		assert.Empty(t, session.OrgID, "Session should be empty on timeout")
+
+		// Should timeout around 2 seconds, not wait for the full 3 second delay
+		assert.Less(t, elapsed, 3*time.Second, "Should timeout before slow RPC completes")
+		assert.GreaterOrEqual(t, elapsed, 2*time.Second, "Should wait for timeout duration")
+	})
 }
