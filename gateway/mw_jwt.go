@@ -1593,8 +1593,7 @@ func getUserIDFromClaim(claims jwt.MapClaims, identityBaseField string, shouldFa
 	return "", ErrNoSuitableUserIDClaimFound
 }
 
-func (gw *Gateway) invalidateJWKSCacheForAPIID(w http.ResponseWriter, r *http.Request) {
-	apiID := mux.Vars(r)["apiID"]
+func invalidateJWKSCacheByAPIID(apiID string) {
 	raw, ok := JWKCaches.Load(apiID)
 	if ok {
 		jwkCache, interfaceOK := raw.(cache.Repository)
@@ -1602,7 +1601,13 @@ func (gw *Gateway) invalidateJWKSCacheForAPIID(w http.ResponseWriter, r *http.Re
 			panic("JWKCache must implement cache.Repository")
 		}
 		jwkCache.Flush()
+		mainLog.Debugf("JWKS cache for API: %s has been flushed", apiID)
 	}
+}
+
+func (gw *Gateway) invalidateJWKSCacheForAPIID(w http.ResponseWriter, r *http.Request) {
+	apiID := mux.Vars(r)["apiID"]
+	invalidateJWKSCacheByAPIID(apiID)
 	// Cache invalidation is idempotent: calling it ensures the key is absent,
 	// regardless of whether it was cached before or not.
 	doJSONWrite(w, http.StatusOK, apiOk("cache invalidated"))

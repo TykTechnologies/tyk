@@ -12,16 +12,16 @@ import (
 	"testing"
 	"time"
 
+	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/apidef/oas"
+	"github.com/TykTechnologies/tyk/config"
 	tyktime "github.com/TykTechnologies/tyk/internal/time"
+	"github.com/TykTechnologies/tyk/test"
+	"github.com/TykTechnologies/tyk/user"
 	"github.com/go-jose/go-jose/v3"
 	"github.com/golang-jwt/jwt/v4"
 	"github.com/stretchr/testify/assert"
-
-	"github.com/TykTechnologies/tyk/apidef"
-	"github.com/TykTechnologies/tyk/config"
-	"github.com/TykTechnologies/tyk/test"
-	"github.com/TykTechnologies/tyk/user"
+	"github.com/stretchr/testify/require"
 
 	"github.com/TykTechnologies/tyk/internal/cache"
 	"github.com/TykTechnologies/tyk/internal/uuid"
@@ -2423,6 +2423,41 @@ func TestJWKSCache_InvalidateJWKSCache(t *testing.T) {
 
 	jwkCache = loadOrCreateJWKCacheByApiID(spec.APIID)
 	assert.Equal(t, 0, jwkCache.Count())
+}
+
+func Test_NoticeInvalidateJWKSCacheForAPI(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	spec, jwtToken := ts.prepareJWTSessionRSAWithEncodedJWKWithAPIID(uuid.NewHex())
+
+	authHeaders := map[string]string{"authorization": jwtToken}
+
+	spec.JWTSource = testHttpJWK
+	ts.Gw.LoadAPI(spec)
+
+	// Fill the JWKS cache
+	_, err := ts.Run(t, test.TestCase{
+		Headers: authHeaders, Code: http.StatusOK,
+	})
+	assert.Nil(t, err)
+
+	// The previous request should have filled the cache with some entries
+	jwkCache := loadOrCreateJWKCacheByApiID(spec.APIID)
+	assert.True(t, jwkCache.Count() > 0)
+
+	// Emit event
+	n := Notification{
+		Command: NoticeInvalidateJWKSCacheForAPI,
+		Payload: spec.APIID,
+		Gw:      ts.Gw,
+	}
+	ts.Gw.MainNotifier.Notify(n)
+
+	require.Eventuallyf(t, func() bool {
+		jwkCache = loadOrCreateJWKCacheByApiID(spec.APIID)
+		return jwkCache.Count() == 0
+	}, 5*time.Second, 100*time.Millisecond, "JWKS cache could not be flushed")
 }
 
 func TestJWTSessionRSAWithEncodedJWK(t *testing.T) {

@@ -3,11 +3,11 @@ package gateway
 import (
 	"testing"
 
-	"github.com/spf13/afero"
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/apidef/oas"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/getkin/kin-openapi/openapi3"
+	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -163,8 +163,9 @@ func TestHandleOASServersForNewAPI(t *testing.T) {
 		err := gw.handleOASServersForNewAPI(apiDef, oasObj, versionParams)
 
 		require.NoError(t, err)
-		require.Len(t, oasObj.Servers, 1)
+		require.Len(t, oasObj.Servers, 2) // Absolute + relative
 		assert.Equal(t, "http://localhost:8080/api", oasObj.Servers[0].URL)
+		assert.Equal(t, "/api", oasObj.Servers[1].URL)
 	})
 
 	t.Run("versioned child API with base API", func(t *testing.T) {
@@ -224,9 +225,10 @@ func TestHandleOASServersForNewAPI(t *testing.T) {
 		err := gw.handleOASServersForNewAPI(childAPIDef, oasObj, versionParams)
 
 		require.NoError(t, err)
-		// Internal child should have only versioned URL
-		require.Len(t, oasObj.Servers, 1)
+		// Internal child should have only versioned URL (absolute + relative)
+		require.Len(t, oasObj.Servers, 2)
 		assert.Equal(t, "http://localhost:8080/products/v2", oasObj.Servers[0].URL)
+		assert.Equal(t, "/products/v2", oasObj.Servers[1].URL)
 	})
 
 	t.Run("external versioned child API - gets both URLs", func(t *testing.T) {
@@ -284,13 +286,15 @@ func TestHandleOASServersForNewAPI(t *testing.T) {
 		err := gw.handleOASServersForNewAPI(childAPIDef, oasObj, versionParams)
 
 		require.NoError(t, err)
-		// External child should have both versioned + direct URLs
-		require.Len(t, oasObj.Servers, 2)
+		// External child should have versioned + direct URLs (absolute + relative for each)
+		require.Len(t, oasObj.Servers, 4)
 
-		// Check both URLs are present
-		urls := []string{oasObj.Servers[0].URL, oasObj.Servers[1].URL}
-		assert.Contains(t, urls, "http://localhost:8080/products/v2") // Versioned
-		assert.Contains(t, urls, "http://localhost:8080/products-v2") // Direct
+		// Check all URLs are present
+		urls := []string{oasObj.Servers[0].URL, oasObj.Servers[1].URL, oasObj.Servers[2].URL, oasObj.Servers[3].URL}
+		assert.Contains(t, urls, "http://localhost:8080/products/v2") // Versioned absolute
+		assert.Contains(t, urls, "/products/v2")                      // Versioned relative
+		assert.Contains(t, urls, "http://localhost:8080/products-v2") // Direct absolute
+		assert.Contains(t, urls, "/products-v2")                      // Direct relative
 	})
 }
 
@@ -341,17 +345,18 @@ func TestHandleOASServersForUpdate(t *testing.T) {
 		err := gw.handleOASServersForUpdate(oldSpec, newAPIDef, newOAS)
 
 		require.NoError(t, err)
-		// Should have 3 servers: 1 new Tyk + 2 user
-		require.Len(t, newOAS.Servers, 3)
+		// Should have 4 servers: 2 new Tyk (absolute + relative) + 2 user
+		require.Len(t, newOAS.Servers, 4)
 
 		// Old Tyk server should be gone
 		for _, server := range newOAS.Servers {
 			assert.NotEqual(t, "http://localhost:8080/api", server.URL)
 		}
 
-		// New Tyk server should be present
-		urls := []string{newOAS.Servers[0].URL, newOAS.Servers[1].URL, newOAS.Servers[2].URL}
-		assert.Contains(t, urls, "http://localhost:8080/api/v2")
+		// New Tyk servers should be present
+		urls := []string{newOAS.Servers[0].URL, newOAS.Servers[1].URL, newOAS.Servers[2].URL, newOAS.Servers[3].URL}
+		assert.Contains(t, urls, "http://localhost:8080/api/v2") // Absolute
+		assert.Contains(t, urls, "/api/v2")                      // Relative
 		assert.Contains(t, urls, "https://api.example.com")
 		assert.Contains(t, urls, "https://backup.example.com")
 	})
@@ -556,8 +561,8 @@ func TestUpdateOldDefaultChildServersGW(t *testing.T) {
 			APIDefinition: oldDefaultChildAPIDef,
 			OAS: oas.OAS{T: openapi3.T{
 				Servers: openapi3.Servers{
-					{URL: "http://localhost:8080/products/v1"},  // Versioned URL
-					{URL: "http://localhost:8080/products"},     // Fallback URL (should be removed)
+					{URL: "http://localhost:8080/products/v1"}, // Versioned URL
+					{URL: "http://localhost:8080/products"},    // Fallback URL (should be removed)
 				},
 			}},
 		}
@@ -828,9 +833,9 @@ func TestUpdateOldDefaultChildServersGW(t *testing.T) {
 			APIDefinition: oldDefaultChildAPIDef,
 			OAS: oas.OAS{T: openapi3.T{
 				Servers: openapi3.Servers{
-					{URL: "http://localhost:8080/products/v1"},   // Versioned URL
-					{URL: "http://localhost:8080/products"},      // Fallback URL (should be removed)
-					{URL: "http://localhost:8080/products-v1"},   // Direct URL (should remain)
+					{URL: "http://localhost:8080/products/v1"}, // Versioned URL
+					{URL: "http://localhost:8080/products"},    // Fallback URL (should be removed)
+					{URL: "http://localhost:8080/products-v1"}, // Direct URL (should remain)
 				},
 			}},
 		}
