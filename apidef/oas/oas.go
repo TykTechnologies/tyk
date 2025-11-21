@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"sync"
 
 	"github.com/samber/lo"
 
@@ -34,6 +35,7 @@ const (
 // OAS holds the upstream OAS definition as well as adds functionality like custom JSON marshalling.
 type OAS struct {
 	openapi3.T
+	securitySchemesOnce sync.Once
 }
 
 // MarshalJSON implements json.Marshaller.
@@ -220,107 +222,124 @@ func (s *OAS) getTykAuthentication() (authentication *Authentication) {
 	return
 }
 
-func (s *OAS) getTykTokenAuth(name string) (token *Token) {
-	securityScheme := s.getTykSecurityScheme(name)
-	if securityScheme == nil {
-		return
+// promoteStruct atomically promotes a scheme from map[string]interface{} to *T,
+// caching the result. It uses a fast path under RLock and a slow path under Lock.
+func promoteStruct[T any](ss *SecuritySchemes, key string) *T {
+	if ss == nil {
+		return nil
 	}
 
-	token = &Token{}
-	if tokenVal, ok := securityScheme.(*Token); ok {
-		token = tokenVal
-	} else {
-		toStructIfMap(securityScheme, token)
-	}
-
-	s.getTykSecuritySchemes()[name] = token
-
-	return
-}
-
-func (s *OAS) getTykJWTAuth(name string) (jwt *JWT) {
-	securityScheme := s.getTykSecurityScheme(name)
-	if securityScheme == nil {
-		return
-	}
-
-	jwt = &JWT{}
-	if jwtVal, ok := securityScheme.(*JWT); ok {
-		jwt = jwtVal
-	} else {
-		toStructIfMap(securityScheme, jwt)
-	}
-
-	s.getTykSecuritySchemes()[name] = jwt
-
-	return
-}
-
-// getTykBasicAuth retrieves the Basic auth configuration from Tyk extension.
-// It handles both typed (*Basic) and untyped (map[string]interface{}) security schemes.
-// When an untyped scheme is found, it converts it to *Basic and caches the result.
-func (s *OAS) getTykBasicAuth(name string) (basic *Basic) {
-	securityScheme := s.getTykSecurityScheme(name)
-	if securityScheme == nil {
-		return
-	}
-
-	basic = &Basic{}
-	if basicVal, ok := securityScheme.(*Basic); ok {
-		basic = basicVal
-	} else {
-		// Security scheme is stored as map[string]interface{}, convert it to Basic struct
-		if toStructIfMap(securityScheme, basic) {
-			// Cache the converted struct for future use
-			s.getTykSecuritySchemes()[name] = basic
+	ss.mutex.RLock()
+	if ss.container != nil {
+		if v, ok := ss.container[key]; ok && v != nil {
+			if typed, ok := v.(*T); ok {
+				ss.mutex.RUnlock()
+				return typed
+			}
 		}
 	}
+	ss.mutex.RUnlock()
 
-	return
+	ss.mutex.Lock()
+	defer ss.mutex.Unlock()
+
+	if ss.container == nil {
+		return nil
+	}
+
+	v, ok := ss.container[key]
+	if !ok || v == nil {
+		return nil
+	}
+
+	if typed, ok := v.(*T); ok {
+		return typed
+	}
+
+	m, ok := v.(map[string]interface{})
+	if !ok {
+		return nil
+	}
+
+	dst := new(T)
+	if !toStructIfMap(m, dst) {
+		return nil
+	}
+
+	ss.container[key] = dst
+	return dst
 }
 
-func (s *OAS) getTykOAuthAuth(name string) (oauth *OAuth) {
-	securityScheme := s.getTykSecurityScheme(name)
-	if securityScheme == nil {
-		return
+func (s *OAS) getTykTokenAuth(name string) *Token {
+	ss := s.getTykSecuritySchemes()
+	if ss == nil {
+		return nil
 	}
 
-	oauth = &OAuth{}
-	if oauthVal, ok := securityScheme.(*OAuth); ok {
-		oauth = oauthVal
-	} else {
-		toStructIfMap(securityScheme, oauth)
-	}
-
-	s.getTykSecuritySchemes()[name] = oauth
-
-	return
+	return promoteStruct[Token](ss, name)
 }
 
-func (s *OAS) getTykExternalOAuthAuth(name string) (externalOAuth *ExternalOAuth) {
-	securityScheme := s.getTykSecurityScheme(name)
-	if securityScheme == nil {
-		return
+func (s *OAS) getTykJWTAuth(name string) *JWT {
+	ss := s.getTykSecuritySchemes()
+	if ss == nil {
+		return nil
 	}
 
-	externalOAuth = &ExternalOAuth{}
-	if oauthVal, ok := securityScheme.(*ExternalOAuth); ok {
-		externalOAuth = oauthVal
-	} else {
-		toStructIfMap(securityScheme, externalOAuth)
-	}
-
-	s.getTykSecuritySchemes()[name] = externalOAuth
-
-	return
+	return promoteStruct[JWT](ss, name)
 }
 
-func (s *OAS) getTykSecuritySchemes() (securitySchemes SecuritySchemes) {
-	if s.getTykAuthentication() != nil {
-		securitySchemes = s.getTykAuthentication().SecuritySchemes
+// getTykBasicAuth returns the `Basic` security scheme for the given name from the
+// Tyk extension, normalizing map-based representations into `*Basic` and caching
+// the converted pointer for subsequent requests.
+func (s *OAS) getTykBasicAuth(name string) *Basic {
+	ss := s.getTykSecuritySchemes()
+	if ss == nil {
+		return nil
 	}
 
-	return
+	return promoteStruct[Basic](ss, name)
+}
+
+func (s *OAS) getTykOAuthAuth(name string) *OAuth {
+	ss := s.getTykSecuritySchemes()
+	if ss == nil {
+		return nil
+	}
+
+	return promoteStruct[OAuth](ss, name)
+}
+
+func (s *OAS) getTykExternalOAuthAuth(name string) *ExternalOAuth {
+	ss := s.getTykSecuritySchemes()
+	if ss == nil {
+		return nil
+	}
+
+	return promoteStruct[ExternalOAuth](ss, name)
+}
+
+func (s *OAS) getTykSecuritySchemes() *SecuritySchemes {
+	if s == nil {
+		return nil
+	}
+
+	s.securitySchemesOnce.Do(func() {
+		ext := s.GetTykExtension()
+		if ext == nil {
+			ext = &XTykAPIGateway{}
+			s.SetTykExtension(ext)
+		}
+
+		if ext.Server.Authentication == nil {
+			ext.Server.Authentication = &Authentication{}
+		}
+
+		if ext.Server.Authentication.SecuritySchemes == nil {
+			ext.Server.Authentication.SecuritySchemes = NewSecuritySchemes()
+		}
+	})
+
+	return s.GetTykExtension().Server.Authentication.SecuritySchemes
 }
 
 func (s *OAS) getTykSecurityScheme(name string) interface{} {
@@ -329,7 +348,8 @@ func (s *OAS) getTykSecurityScheme(name string) interface{} {
 		return nil
 	}
 
-	return securitySchemes[name]
+	ss, _ := securitySchemes.Get(name)
+	return ss
 }
 
 // GetTykMiddleware returns middleware section from XTykAPIGateway.
@@ -571,8 +591,8 @@ func (s *OAS) validateCompliantModeAuthentication() error {
 	}
 
 	// Check auth methods in SecuritySchemes
-	if len(tykAuth.SecuritySchemes) > 0 {
-		for schemeName, scheme := range tykAuth.SecuritySchemes {
+	if tykAuth.SecuritySchemes.Len() > 0 {
+		for schemeName, scheme := range tykAuth.SecuritySchemes.Iter() {
 			// Check if this auth method is enabled
 			enabled := false
 

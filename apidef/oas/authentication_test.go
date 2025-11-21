@@ -1,10 +1,13 @@
 package oas
 
 import (
+	"encoding/json"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"gopkg.in/yaml.v3"
 
 	"github.com/TykTechnologies/tyk/apidef"
 )
@@ -487,4 +490,69 @@ func TestVendorExtensionSecurity(t *testing.T) {
 
 		assert.Nil(t, auth2.Security)
 	})
+}
+
+func TestSecuritySchemesSet_Typed(t *testing.T) {
+	ss := NewSecuritySchemes()
+
+	in := &JWT{Enabled: true}
+	ss.Set("x", in)
+
+	v, ok := ss.Get("x")
+
+	require.True(t, ok, "expected ok")
+	require.Equal(t, in, v)
+}
+
+func TestSecuritySchemesSet_Overwrite(t *testing.T) {
+	ss := NewSecuritySchemes()
+
+	ss.Set("x", map[string]interface{}{
+		"enabled": true,
+	})
+
+	out := &JWT{Enabled: true}
+	ss.Set("x", out)
+
+	v, ok := ss.Get("x")
+	require.True(t, ok, "expected ok")
+
+	j, ok := v.(*JWT)
+	require.True(t, ok, "not JWT")
+
+	require.True(t, j.Enabled, "expected Enabled=true on stored struct")
+	require.Same(t, out, j, "expected stored pointer to be the one passed to Set")
+}
+
+func TestSecuritySchemes_UnmarshalJSON_Null(t *testing.T) {
+	var ss SecuritySchemes
+
+	err := json.Unmarshal([]byte("null"), &ss)
+	require.NoError(t, err, "unmarshal of null should not error")
+
+	require.Equal(t, 0, ss.Len(), "expected empty map")
+}
+
+func TestSecuritySchemes_UnmarshalJSON_Map(t *testing.T) {
+	var ss SecuritySchemes
+	err := json.Unmarshal([]byte(`{"x": {"enabled": true}}`), &ss)
+	require.NoError(t, err)
+
+	require.Equal(t, 1, ss.Len(), "expected exactly one entry")
+}
+
+func TestSecuritySchemes_YAMLRoundTrip(t *testing.T) {
+	ss := NewSecuritySchemes()
+	ss.Set("token", map[string]interface{}{"enabled": true})
+
+	out, err := yaml.Marshal(ss)
+	require.NoError(t, err)
+
+	var decoded map[string]interface{}
+	require.NoError(t, yaml.Unmarshal(out, &decoded))
+	require.Len(t, decoded, 1, "expected 1 entry after marshal")
+
+	var roundtrip SecuritySchemes
+	require.NoError(t, yaml.Unmarshal(out, &roundtrip))
+	require.Equal(t, 1, roundtrip.Len(), "expected 1 entry after round-trip")
 }
