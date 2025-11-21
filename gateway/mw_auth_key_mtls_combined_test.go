@@ -349,6 +349,163 @@ func TestStaticAndDynamicMTLS(t *testing.T) {
 	})
 }
 
+// TestCertificateCheckMW_ValidateCertificateFromToken tests the fallback path in CertificateCheckMW
+// where a certificate not in the static allowlist is validated through token binding.
+// This covers the code path at gateway/mw_certificate_check.go:111
+func TestCertificateCheckMW_ValidateCertificateFromToken(t *testing.T) {
+	// Setup server certificate
+	serverCertPem, _, combinedPEM, _ := certs.GenServerCertificate()
+	certID, _, _ := certs.GetCertIDAndChainPEM(combinedPEM, "")
+
+	conf := func(globalConf *config.Config) {
+		globalConf.Security.ControlAPIUseMutualTLS = false
+		globalConf.HttpServerOptions.UseSSL = true
+		globalConf.HttpServerOptions.SSLInsecureSkipVerify = true
+		globalConf.HttpServerOptions.SSLCertificates = []string{"default" + certID}
+		globalConf.Security.EnableCertificateBinding = true
+	}
+	ts := StartTest(conf)
+	defer ts.Close()
+
+	certID, err := ts.Gw.CertificateManager.Add(combinedPEM, "default")
+	assert.NoError(t, err)
+	defer ts.Gw.CertificateManager.Delete(certID, "default")
+	ts.ReloadGatewayProxy()
+
+	// Create client certificates
+	// Cert 1: Will be in allowlist
+	clientCertPem1, _, _, clientCert1 := certs.GenCertificate(&x509.Certificate{}, false)
+	clientCertID1, err := ts.Gw.CertificateManager.Add(clientCertPem1, "default")
+	assert.NoError(t, err)
+	defer ts.Gw.CertificateManager.Delete(clientCertID1, "default")
+
+	// Cert 2: Will NOT be in allowlist but will be bound to token
+	clientCertPem2, _, _, clientCert2 := certs.GenCertificate(&x509.Certificate{}, false)
+	clientCertID2, err := ts.Gw.CertificateManager.Add(clientCertPem2, "default")
+	assert.NoError(t, err)
+	defer ts.Gw.CertificateManager.Delete(clientCertID2, "default")
+	certHash2 := "default" + certs.HexSHA256(clientCert2.Certificate[0])
+
+	// Create API with static mTLS that only allows cert1
+	// Cert2 is NOT in the allowlist but can be validated via token binding
+	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		spec.APIID = "token-binding-fallback-api"
+		spec.OrgID = "default"
+		// Enable static mTLS with allowlist containing only cert1
+		spec.UseMutualTLSAuth = true
+		spec.ClientCertificates = []string{clientCertID1} // Only cert1 in allowlist
+		// Enable dynamic mTLS for token binding
+		spec.UseStandardAuth = true
+		spec.UseKeylessAccess = false
+		authConf := apidef.AuthConfig{
+			Name:           "authToken",
+			UseCertificate: true,
+			AuthHeaderName: "Authorization",
+		}
+		spec.AuthConfigs = map[string]apidef.AuthConfig{
+			"authToken": authConf,
+		}
+		spec.Auth = authConf
+		spec.Proxy.ListenPath = "/token-binding-fallback"
+	})
+
+	t.Run("Certificate validated through static certificate bindings", func(t *testing.T) {
+		// Create session with cert2 bound via MtlsStaticCertificateBindings
+		// Cert2 is NOT in the static allowlist, but should pass via token binding
+		key := CreateSession(ts.Gw, func(s *user.SessionState) {
+			s.AccessRights = map[string]user.AccessDefinition{"token-binding-fallback-api": {
+				APIID: "token-binding-fallback-api",
+			}}
+			s.MtlsStaticCertificateBindings = []string{certHash2} // Static binding to cert2
+		})
+
+		assert.NotEmpty(t, key, "Should create key with static certificate binding")
+
+		// Request with cert2 (NOT in allowlist but statically bound) should succeed
+		// This triggers validateCertificateFromToken fallback path
+		client2 := GetTLSClient(&clientCert2, serverCertPem)
+		_, _ = ts.Run(t, test.TestCase{
+			Domain:  "localhost",
+			Client:  client2,
+			Path:    "/token-binding-fallback",
+			Headers: map[string]string{"Authorization": key},
+			Code:    http.StatusOK,
+		})
+	})
+
+	t.Run("Allowlisted certificate still works", func(t *testing.T) {
+		// Create session with cert1 (which is in the allowlist)
+		key := CreateSession(ts.Gw, func(s *user.SessionState) {
+			s.AccessRights = map[string]user.AccessDefinition{"token-binding-fallback-api": {
+				APIID: "token-binding-fallback-api",
+			}}
+			s.Certificate = clientCertID1
+		})
+
+		assert.NotEmpty(t, key, "Should create key")
+
+		// Request with cert1 (in allowlist) should succeed via normal path
+		client1 := GetTLSClient(&clientCert1, serverCertPem)
+		_, _ = ts.Run(t, test.TestCase{
+			Domain:  "localhost",
+			Client:  client1,
+			Path:    "/token-binding-fallback",
+			Headers: map[string]string{"Authorization": key},
+			Code:    http.StatusOK,
+		})
+	})
+
+	t.Run("Unbound certificate fails", func(t *testing.T) {
+		// Create session without any certificate binding
+		key := CreateSession(ts.Gw, func(s *user.SessionState) {
+			s.AccessRights = map[string]user.AccessDefinition{"token-binding-fallback-api": {
+				APIID: "token-binding-fallback-api",
+			}}
+			// No certificate binding
+		})
+
+		assert.NotEmpty(t, key, "Should create key")
+
+		// Request with cert2 (NOT in allowlist and NOT bound) should fail
+		client2 := GetTLSClient(&clientCert2, serverCertPem)
+		_, _ = ts.Run(t, test.TestCase{
+			Domain:    "localhost",
+			Client:    client2,
+			Path:      "/token-binding-fallback",
+			Headers:   map[string]string{"Authorization": key},
+			Code:      http.StatusForbidden,
+			BodyMatch: "not allowed",
+		})
+	})
+
+	t.Run("No auth token fails validateCertificateFromToken", func(t *testing.T) {
+		// Request with cert2 (NOT in allowlist) and no auth token should fail
+		// This tests the path where validateCertificateFromToken returns false due to missing token
+		client2 := GetTLSClient(&clientCert2, serverCertPem)
+		_, _ = ts.Run(t, test.TestCase{
+			Domain:    "localhost",
+			Client:    client2,
+			Path:      "/token-binding-fallback",
+			Code:      http.StatusForbidden,
+			BodyMatch: "not allowed",
+		})
+	})
+
+	t.Run("Invalid auth token fails validateCertificateFromToken", func(t *testing.T) {
+		// Request with cert2 (NOT in allowlist) and invalid auth token should fail
+		// This tests the path where validateCertificateFromToken returns false due to invalid token
+		client2 := GetTLSClient(&clientCert2, serverCertPem)
+		_, _ = ts.Run(t, test.TestCase{
+			Domain:    "localhost",
+			Client:    client2,
+			Path:      "/token-binding-fallback",
+			Headers:   map[string]string{"Authorization": "invalid-token"},
+			Code:      http.StatusForbidden,
+			BodyMatch: "not allowed",
+		})
+	})
+}
+
 // TestStaticAndDynamicMTLS_ExpiredCertificate tests expired certificate handling
 // Note: The certificate manager rejects expired certificates on Add, so we test
 // the expiry check that happens at runtime in the AuthKey middleware
