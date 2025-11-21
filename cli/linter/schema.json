@@ -1166,6 +1166,9 @@
               "default": 86400
             }
           }
+        },
+        "enable_certificate_binding": {
+          "type": "boolean"
         }
       }
     },
