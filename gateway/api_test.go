@@ -3300,7 +3300,7 @@ func TestOAS(t *testing.T) {
 				patchedOASObj := testGetOASAPI(t, ts, apiID, tykExt.Info.Name, apiInOAS.T.Info.Title)
 
 				assert.EqualValues(t, gwServerURL, patchedOASObj.Servers[0].URL)
-				assert.Equal(t, serverURL, patchedOASObj.Servers[1].URL)
+				assert.Equal(t, serverURL, patchedOASObj.Servers[2].URL)
 				// Reset
 				testUpdateAPI(t, ts, &oasAPI, oasAPIID, true)
 			})
@@ -3332,9 +3332,12 @@ func TestOAS(t *testing.T) {
 				testPatchOAS(t, ts, apiInOAS, nil, apiID)
 				patchedOASObj := testGetOASAPI(t, ts, apiID, tykExt.Info.Name, apiInOAS.T.Info.Title)
 
+				// Should now have 4 servers: Tyk absolute + Tyk relative + 2 user servers
+				require.Len(t, patchedOASObj.Servers, 4)
 				assert.EqualValues(t, serverURL1, patchedOASObj.Servers[0].URL)
-				assert.Equal(t, serverURL2, patchedOASObj.Servers[1].URL)
-				assert.Equal(t, serverURL3, patchedOASObj.Servers[2].URL)
+				// patchedOASObj.Servers[1] is the relative path for Tyk server
+				assert.Equal(t, serverURL2, patchedOASObj.Servers[2].URL)
+				assert.Equal(t, serverURL3, patchedOASObj.Servers[3].URL)
 				// Reset
 				testUpdateAPI(t, ts, &oasAPI, oasAPIID, true)
 			})
