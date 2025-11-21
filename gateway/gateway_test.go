@@ -629,6 +629,51 @@ func TestManagementNodeRedisEvents(t *testing.T) {
 	})
 }
 
+func TestDistributedRateLimiterDisabledRedisEvents(t *testing.T) {
+	ts := StartTest(nil)
+	t.Cleanup(ts.Close)
+
+	drlNotificationCommand := &testMessageAdapter{
+		Msg: `{"Command": "NoticeGatewayDRLNotification"}`,
+	}
+
+	shouldNotHandleNotification := func(NotificationCommand) {
+		assert.Fail(t, "should skip redis event")
+	}
+
+	globalConf := ts.Gw.GetConfig()
+
+	t.Run("enabled Sentinel Rate Limiter - should skip DRL updates", func(*testing.T) {
+		globalConf.EnableSentinelRateLimiter = true
+		ts.Gw.SetConfig(globalConf)
+
+		ts.Gw.handleRedisEvent(drlNotificationCommand, shouldNotHandleNotification, nil)
+
+		globalConf.EnableSentinelRateLimiter = false
+		ts.Gw.SetConfig(globalConf)
+	})
+
+	t.Run("enabled Redis Rolling Limiter - should skip DRL updates", func(*testing.T) {
+		globalConf.EnableRedisRollingLimiter = true
+		ts.Gw.SetConfig(globalConf)
+
+		ts.Gw.handleRedisEvent(drlNotificationCommand, shouldNotHandleNotification, nil)
+
+		globalConf.EnableRedisRollingLimiter = false
+		ts.Gw.SetConfig(globalConf)
+	})
+
+	t.Run("enabled Fixed Window Rate Limiter - should skip DRL updates", func(*testing.T) {
+		globalConf.EnableFixedWindowRateLimiter = true
+		ts.Gw.SetConfig(globalConf)
+
+		ts.Gw.handleRedisEvent(drlNotificationCommand, shouldNotHandleNotification, nil)
+
+		globalConf.EnableFixedWindowRateLimiter = false
+		ts.Gw.SetConfig(globalConf)
+	})
+}
+
 func TestListenPathTykPrefix(t *testing.T) {
 	ts := StartTest(nil)
 	t.Cleanup(ts.Close)

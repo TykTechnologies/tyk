@@ -140,10 +140,8 @@ func (gw *Gateway) handleRedisEvent(v interface{}, handled func(NotificationComm
 	case NoticeDashboardConfigRequest:
 		gw.handleSendMiniConfig(notif.Payload)
 	case NoticeGatewayDRLNotification:
-		if gw.GetConfig().ManagementNode {
-			// DRL is not initialized, going through would
-			// be mostly harmless but would flood the log
-			// with warnings since DRLManager.Ready == false
+		if gw.isDRLDisabled() {
+			// DRL is disabled - other Rate Limiter is being used or this node is a Management Node.
 			return
 		}
 		gw.onServerStatusReceivedHandler(notif.Payload)
