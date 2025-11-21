@@ -195,7 +195,8 @@ func generateVersionedServers(
 	shouldAddFallbackURL := baseAPI.VersionDefinition.FallbackToDefault &&
 		baseAPI.VersionDefinition.Default != "" &&
 		baseAPI.VersionDefinition.Location != "header" &&
-		versionName == baseAPI.VersionDefinition.Default
+		(versionName == baseAPI.VersionDefinition.Default ||
+			(baseAPI.VersionDefinition.Default == apidef.Self && isBaseAPI))
 
 	// Always add versioned URLs
 	for _, host := range hosts {
@@ -237,8 +238,8 @@ func generateVersionedServers(
 
 // determineHosts determines which hosts to use for server URL generation.
 func determineHosts(apiData *apidef.APIDefinition, config ServerRegenerationConfig) []string {
-	if apiData.Domain != "" {
-		return []string{apiData.Domain}
+	if domain := apiData.GetAPIDomain(); domain != "" {
+		return []string{domain}
 	}
 
 	hosts := determineHostsWithEdgeSupport(apiData, config)

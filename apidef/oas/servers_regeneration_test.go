@@ -238,6 +238,33 @@ func TestDetermineHosts(t *testing.T) {
 			expected: []string{"api.example.com"},
 		},
 		{
+			name: "disabled custom domain falls back to edge endpoints",
+			apiData: &apidef.APIDefinition{
+				Domain:         "api.example.com",
+				DomainDisabled: true,
+				Tags:           []string{"prod"},
+			},
+			config: ServerRegenerationConfig{
+				DefaultHost: "localhost:8080",
+				EdgeEndpoints: []EdgeEndpoint{
+					{Endpoint: "http://edge1.example.com", Tags: []string{"prod"}},
+				},
+			},
+			expected: []string{"http://edge1.example.com", ""},
+		},
+		{
+			name: "disabled custom domain falls back to default host",
+			apiData: &apidef.APIDefinition{
+				Domain:         "api.example.com",
+				DomainDisabled: true,
+			},
+			config: ServerRegenerationConfig{
+				DefaultHost:   "localhost:8080",
+				EdgeEndpoints: []EdgeEndpoint{},
+			},
+			expected: []string{"localhost:8080", ""},
+		},
+		{
 			name: "edge endpoints when no custom domain",
 			apiData: &apidef.APIDefinition{
 				Tags: []string{"prod"},
@@ -1837,6 +1864,19 @@ func TestGenerateVersionedServers_Scenario2_BaseAPIWithFallback(t *testing.T) {
 			},
 			description: "Base API with nested path should have both URLs",
 		},
+		{
+			name:           "base API with default: self and fallback true",
+			versionName:    "v1",
+			defaultVersion: apidef.Self,
+			listenPath:     "/api",
+			expectedURLs: []string{
+				"http://localhost:8080/api/v1", // Versioned URL (absolute)
+				"/api/v1",                      // Versioned URL (relative)
+				"http://localhost:8080/api",    // Fallback URL (absolute) - should be present when default is "self"
+				"/api",                         // Fallback URL (relative) - should be present when default is "self"
+			},
+			description: "Base API with default: self should have both versioned and fallback URLs",
+		},
 	}
 
 	for _, tt := range tests {
@@ -1965,6 +2005,22 @@ func TestGenerateVersionedServers_Scenario3_ChildAPIMatchingDefault(t *testing.T
 				"http://localhost:8080/api-v2-internal", // No direct URL (internal)
 			},
 			description: "Internal child NOT matching default should only have versioned URL",
+		},
+		{
+			name:             "child API when base has default: self",
+			childVersionName: "v2",
+			defaultVersion:   apidef.Self,
+			baseListenPath:   "/api",
+			childListenPath:  "/api-v2",
+			isExternal:       true,
+			expectedURLs: []string{
+				"http://localhost:8080/api/v2", // Versioned URL through base
+				"http://localhost:8080/api-v2", // Direct access URL (external child)
+			},
+			unexpectedURLs: []string{
+				"http://localhost:8080/api", // Fallback URL should NOT exist (default is "self" which refers to base API)
+			},
+			description: "Child API should NOT get fallback URL when base has default: self",
 		},
 	}
 
