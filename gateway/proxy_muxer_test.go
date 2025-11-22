@@ -16,6 +16,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
+	"github.com/TykTechnologies/tyk-pump/analytics"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/test"
 )
@@ -363,6 +364,115 @@ func TestHandle404(t *testing.T) {
 		{Path: "/existing", Code: http.StatusOK},
 		{Path: "/nonexisting", Code: http.StatusNotFound, BodyMatch: http.StatusText(http.StatusNotFound)},
 	}...)
+}
+
+func TestHandle404WithAnalytics(t *testing.T) {
+	t.Run("track_404_logs disabled - no analytics record", func(t *testing.T) {
+		ts := StartTest(func(c *config.Config) {
+			c.Track404Logs = false
+			c.EnableAnalytics = true
+		})
+		defer ts.Close()
+
+		redisAnalyticsKeyName := analyticsKeyName + ts.Gw.Analytics.analyticsSerializer.GetSuffix()
+
+		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+			spec.Proxy.ListenPath = "/api/"
+			spec.UseKeylessAccess = true
+		})
+
+		// Cleanup before test
+		ts.Gw.Analytics.Store.GetAndDeleteSet(redisAnalyticsKeyName)
+
+		// Make request to non-existent path
+		_, _ = ts.Run(t, test.TestCase{
+			Path: "/nonexistent",
+			Code: http.StatusNotFound,
+		})
+
+		// Flush analytics to Redis
+		ts.Gw.Analytics.Flush()
+
+		// Verify NO analytics record was created
+		results := ts.Gw.Analytics.Store.GetAndDeleteSet(redisAnalyticsKeyName)
+		assert.Equal(t, 0, len(results), "No analytics record should be created when track_404_logs is disabled")
+	})
+
+	t.Run("track_404_logs enabled + analytics enabled - record created", func(t *testing.T) {
+		ts := StartTest(func(c *config.Config) {
+			c.Track404Logs = true
+			c.EnableAnalytics = true
+		})
+		defer ts.Close()
+
+		redisAnalyticsKeyName := analyticsKeyName + ts.Gw.Analytics.analyticsSerializer.GetSuffix()
+
+		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+			spec.Proxy.ListenPath = "/api/"
+			spec.UseKeylessAccess = true
+		})
+
+		// Cleanup before test
+		ts.Gw.Analytics.Store.GetAndDeleteSet(redisAnalyticsKeyName)
+
+		// Make request to non-existent path
+		_, _ = ts.Run(t, test.TestCase{
+			Path: "/nonexistent",
+			Code: http.StatusNotFound,
+		})
+
+		// Flush analytics to Redis
+		ts.Gw.Analytics.Flush()
+
+		// Verify analytics record was created
+		results := ts.Gw.Analytics.Store.GetAndDeleteSet(redisAnalyticsKeyName)
+		assert.True(t, len(results) > 0, "Analytics record should be created when track_404_logs and enable_analytics are true")
+
+		// Verify the record has correct fields
+		if len(results) > 0 {
+			var record analytics.AnalyticsRecord
+			err := ts.Gw.Analytics.analyticsSerializer.Decode([]byte(results[0].(string)), &record)
+			if err != nil {
+				t.Fatal("Error decoding analytics:", err)
+			}
+			assert.Equal(t, http.StatusNotFound, record.ResponseCode, "Response code should be 404")
+			assert.Contains(t, record.Tags, "404", "Tags should contain '404'")
+			assert.Contains(t, record.Tags, "path-not-found", "Tags should contain 'path-not-found'")
+			assert.Equal(t, "/nonexistent", record.Path, "Path should be '/nonexistent'")
+		}
+	})
+
+	t.Run("IP in ignored_ips - no record", func(t *testing.T) {
+		ts := StartTest(func(c *config.Config) {
+			c.Track404Logs = true
+			c.EnableAnalytics = true
+			c.AnalyticsConfig.IgnoredIPs = []string{"127.0.0.1"}
+		})
+		defer ts.Close()
+
+		redisAnalyticsKeyName := analyticsKeyName + ts.Gw.Analytics.analyticsSerializer.GetSuffix()
+
+		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+			spec.Proxy.ListenPath = "/api/"
+			spec.UseKeylessAccess = true
+		})
+
+		// Cleanup before test
+		ts.Gw.Analytics.Store.GetAndDeleteSet(redisAnalyticsKeyName)
+
+		// Make request to non-existent path from localhost (127.0.0.1)
+		_, _ = ts.Run(t, test.TestCase{
+			Path: "/nonexistent",
+			Code: http.StatusNotFound,
+		})
+
+		// Flush analytics to Redis
+		ts.Gw.Analytics.Flush()
+
+		// Verify NO analytics record (IP is ignored)
+		results := ts.Gw.Analytics.Store.GetAndDeleteSet(redisAnalyticsKeyName)
+		assert.Equal(t, 0, len(results), "No analytics record should be created when IP is in ignored_ips list")
+	})
 }
 
 func TestHandleSubroutes(t *testing.T) {
