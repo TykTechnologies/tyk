@@ -145,6 +145,7 @@ func (k *CustomKeyLifetime) ExtractTo(api *apidef.APIDefinition) {
 	}
 }
 
+// todo
 // Fill fills *Authentication from apidef.APIDefinition.
 func (a *Authentication) Fill(api apidef.APIDefinition) {
 	a.Enabled = !api.UseKeylessAccess

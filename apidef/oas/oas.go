@@ -35,9 +35,11 @@ const (
 // OAS holds the upstream OAS definition as well as adds functionality like custom JSON marshalling.
 type OAS struct {
 	openapi3.T
+	//todo add the mutex here instead of ss
 	securitySchemesOnce sync.Once
 }
 
+// todo ss fields should be private and unaccessible
 // MarshalJSON implements json.Marshaller.
 func (s *OAS) MarshalJSON() ([]byte, error) {
 	if ShouldOmit(s.ExternalDocs) { // for sql case
@@ -292,6 +294,7 @@ func (s *OAS) getTykJWTAuth(name string) *JWT {
 // Tyk extension, normalizing map-based representations into `*Basic` and caching
 // the converted pointer for subsequent requests.
 func (s *OAS) getTykBasicAuth(name string) *Basic {
+	//todo add the ss initialization here
 	ss := s.getTykSecuritySchemes()
 	if ss == nil {
 		return nil
@@ -300,6 +303,7 @@ func (s *OAS) getTykBasicAuth(name string) *Basic {
 	return promoteStruct[Basic](ss, name)
 }
 
+// todo move the mutex to the oas object -> as a solution
 func (s *OAS) getTykOAuthAuth(name string) *OAuth {
 	ss := s.getTykSecuritySchemes()
 	if ss == nil {
@@ -333,8 +337,9 @@ func (s *OAS) getTykSecuritySchemes() *SecuritySchemes {
 		if ext.Server.Authentication == nil {
 			ext.Server.Authentication = &Authentication{}
 		}
-
+		//todo remove intiializtion from here
 		if ext.Server.Authentication.SecuritySchemes == nil {
+			//todo there is a lazy initiation
 			ext.Server.Authentication.SecuritySchemes = NewSecuritySchemes()
 		}
 	})
