@@ -155,22 +155,32 @@ func TestLogJWKSFetchError(t *testing.T) {
 				URL: "https://example.com/jwks",
 				Err: errors.New("no such host"),
 			},
-			wantOutput: "JWKS endpoint resolution failed: invalid or unreachable host https://example.com/jwks",
+			wantOutput: "JWKS endpoint resolution failed: invalid or unreachable host https://example.com/...(truncated)",
+		},
+		{
+			name:    "short url passes through",
+			jwksURL: "http://short.com",
+			err: &url.Error{
+				Op:  "Get",
+				URL: "http://short.com",
+				Err: errors.New("timeout"),
+			},
+			wantOutput: "JWKS endpoint resolution failed: invalid or unreachable host http://short.com",
 		},
 		{
 			name:       "invalid JWKS JSON",
-			jwksURL:    "https://example.com/jwks",
+			jwksURL:    "https://valid-url.com",
 			err:        errors.New("failed to parse JWKS JSON"),
-			wantOutput: "Invalid JWKS retrieved from endpoint: https://example.com/jwks",
+			wantOutput: "Invalid JWKS retrieved from endpoint: https://valid-url.co...(truncated)",
 		},
 		{
-			name:    "base64 decode error",
-			jwksURL: "bad_base64_string",
+			name:    "base64 decode error long secret",
+			jwksURL: "very_long_secret_string_that_should_be_truncated",
 			err: &Base64DecodeError{
-				URL: "bad_base64_string",
-				Err: errors.New("illegal base64 data"),
+				Source: "very_long_secret_string_that_should_be_truncated",
+				Err:    errors.New("illegal base64 data"),
 			},
-			wantOutput: "Failed to decode base64-encoded JWKS URL: bad_base64_string",
+			wantOutput: "JWKS configuration error for source: very_long_secret_str...(truncated)",
 		},
 	}
 
@@ -186,6 +196,9 @@ func TestLogJWKSFetchError(t *testing.T) {
 			output := buf.String()
 			if !strings.Contains(output, tt.wantOutput) {
 				t.Errorf("expected log output to contain %q, got %q", tt.wantOutput, output)
+			}
+			if !strings.Contains(output, "level=error") && !strings.Contains(output, `"level":"error"`) {
+				t.Errorf("expected log output to be at error level, got %q", output)
 			}
 		})
 	}

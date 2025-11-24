@@ -277,6 +277,8 @@ func (k *JWTMiddleware) getSecretFromURL(url string, kidVal interface{}, keyType
 			if jwkSet, err = GetJWK(url, k.Gw.GetConfig().JWTSSLInsecureSkipVerify); err != nil {
 				logJWKSFetchError(k.Logger(), url, err)
 
+				k.Logger().Info("Trying x5c PEM fallback.")
+
 				key, legacyError := k.legacyGetSecretFromURL(url, kid, keyType)
 				if legacyError == nil {
 					return key, nil
@@ -341,12 +343,12 @@ func (k *JWTMiddleware) getSecretToVerifySignature(r *http.Request, token *jwt.T
 		decodedCert, err := base64.StdEncoding.DecodeString(config.JWTSource)
 		if err != nil {
 			wrappedErr := &Base64DecodeError{
-				URL: config.JWTSource,
-				Err: err,
+				Source: config.JWTSource,
+				Err:    err,
 			}
 			logJWKSFetchError(k.Logger(), config.JWTSource, wrappedErr)
 
-			return nil, fmt.Errorf("failed to decode base64-encoded JWKS URL")
+			return nil, wrappedErr
 		}
 
 		// Is decoded url too?

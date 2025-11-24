@@ -4,6 +4,7 @@ import (
 	"errors"
 	"net/http"
 	"net/url"
+	"strings"
 
 	"github.com/sirupsen/logrus"
 
@@ -11,16 +12,29 @@ import (
 )
 
 type Base64DecodeError struct {
-	URL string
-	Err error
+	Source string
+	Err    error
 }
 
 func (e *Base64DecodeError) Error() string {
-	return "Failed to decode base64-encoded JWKS URL: " + e.URL + " - " + e.Err.Error()
+	return "Failed to decode base64-encoded JWKS source: " + sanitizeSource(e.Source) + " - " + e.Err.Error()
 }
 
 // identifies that field value was hidden before output to the log
 const logHiddenValue = "<hidden>"
+
+// sanitizeSource truncates the source string and removes control characters
+// to prevent leaking secrets or log injection.
+func sanitizeSource(source string) string {
+	clean := strings.ReplaceAll(source, "\n", "")
+	clean = strings.ReplaceAll(clean, "\r", "")
+
+	const maxLen = 20
+	if len(clean) > maxLen {
+		return clean[:maxLen] + "...(truncated)"
+	}
+	return clean
+}
 
 func (gw *Gateway) obfuscateKey(keyName string) string {
 	if gw.GetConfig().EnableKeyLogging {
@@ -77,17 +91,16 @@ func (gw *Gateway) getExplicitLogEntryForRequest(logger *logrus.Entry, path stri
 	return logger.WithFields(fields)
 }
 
-func logJWKSFetchError(logger *logrus.Entry, jwksURL string, err error) {
+func logJWKSFetchError(logger *logrus.Entry, sourceOrURL string, err error) {
 	if logger == nil {
 		logger = logrus.NewEntry(log)
 	}
 
+	sanitized := sanitizeSource(sourceOrURL)
+
 	var decodeErr *Base64DecodeError
 	if errors.As(err, &decodeErr) {
-		logger.WithError(err).Errorf(
-			"Failed to decode base64-encoded JWKS URL: %s",
-			jwksURL,
-		)
+		logger.WithError(err).Error("JWKS configuration error")
 		return
 	}
 
@@ -95,13 +108,13 @@ func logJWKSFetchError(logger *logrus.Entry, jwksURL string, err error) {
 	if errors.As(err, &urlErr) {
 		logger.WithError(err).Errorf(
 			"JWKS endpoint resolution failed: invalid or unreachable host %s",
-			jwksURL,
+			sanitized,
 		)
 		return
 	}
 
 	logger.WithError(err).Errorf(
 		"Invalid JWKS retrieved from endpoint: %s",
-		jwksURL,
+		sanitized,
 	)
 }

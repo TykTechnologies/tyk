@@ -218,12 +218,12 @@ func (k *ExternalOAuthMiddleware) getSecretFromJWKOrConfig(kid interface{}, jwtV
 	decodedSource, err := base64.StdEncoding.DecodeString(jwtValidation.Source)
 	if err != nil {
 		wrappedErr := &Base64DecodeError{
-			URL: jwtValidation.Source,
-			Err: err,
+			Source: jwtValidation.Source,
+			Err:    err,
 		}
 		logJWKSFetchError(k.Logger(), jwtValidation.Source, wrappedErr)
 
-		return nil, fmt.Errorf("failed to decode base64-encoded JWKS URL")
+		return nil, wrappedErr
 	}
 
 	// is decoded a JWK url too?
