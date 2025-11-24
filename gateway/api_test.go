@@ -3278,7 +3278,7 @@ func TestOAS(t *testing.T) {
 		})
 
 		t.Run("retain old OAS servers", func(t *testing.T) {
-			t.Run("should retain first entry in existing API", func(t *testing.T) {
+			t.Run("should merge Tyk servers with user-provided servers", func(t *testing.T) {
 				apiInOAS := copyOAS(oasAPI)
 				fillPaths(&apiInOAS)
 
@@ -3300,12 +3300,20 @@ func TestOAS(t *testing.T) {
 				patchedOASObj := testGetOASAPI(t, ts, apiID, tykExt.Info.Name, apiInOAS.T.Info.Title)
 
 				assert.EqualValues(t, gwServerURL, patchedOASObj.Servers[0].URL)
-				assert.Equal(t, serverURL, patchedOASObj.Servers[2].URL)
+
+				foundUserServer := false
+				for _, srv := range patchedOASObj.Servers {
+					if srv.URL == serverURL {
+						foundUserServer = true
+						break
+					}
+				}
+				assert.True(t, foundUserServer, "User-provided server URL should be retained")
 				// Reset
 				testUpdateAPI(t, ts, &oasAPI, oasAPIID, true)
 			})
 
-			t.Run("do not modify if first server is same as that of gw", func(t *testing.T) {
+			t.Run("should deduplicate user servers matching Tyk servers", func(t *testing.T) {
 				apiInOAS := copyOAS(oasAPI)
 				fillPaths(&apiInOAS)
 
@@ -3332,12 +3340,21 @@ func TestOAS(t *testing.T) {
 				testPatchOAS(t, ts, apiInOAS, nil, apiID)
 				patchedOASObj := testGetOASAPI(t, ts, apiID, tykExt.Info.Name, apiInOAS.T.Info.Title)
 
-				// Should now have 4 servers: Tyk absolute + Tyk relative + 2 user servers
-				require.Len(t, patchedOASObj.Servers, 4)
+				require.Len(t, patchedOASObj.Servers, 3)
 				assert.EqualValues(t, serverURL1, patchedOASObj.Servers[0].URL)
-				// patchedOASObj.Servers[1] is the relative path for Tyk server
-				assert.Equal(t, serverURL2, patchedOASObj.Servers[2].URL)
-				assert.Equal(t, serverURL3, patchedOASObj.Servers[3].URL)
+
+				foundServer2 := false
+				foundServer3 := false
+				for _, srv := range patchedOASObj.Servers {
+					if srv.URL == serverURL2 {
+						foundServer2 = true
+					}
+					if srv.URL == serverURL3 {
+						foundServer3 = true
+					}
+				}
+				assert.True(t, foundServer2, "User server 2 should be retained")
+				assert.True(t, foundServer3, "User server 3 should be retained")
 				// Reset
 				testUpdateAPI(t, ts, &oasAPI, oasAPIID, true)
 			})
