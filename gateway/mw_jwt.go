@@ -268,12 +268,14 @@ func (k *JWTMiddleware) getSecretFromURL(url string, kidVal interface{}, keyType
 		client, clientErr := clientFactory.CreateJWKClient()
 		if clientErr == nil {
 			if jwkSet, err = getJWKWithClient(url, client); err != nil {
-				logJWKSFetchError(k.Logger(), url, err)
+				k.Logger().WithError(err).Debug("Factory client failed to fetch JWKS, attempting fallback")
 			}
 		}
 
 		// Fallback to original method if factory fails or JWK fetch fails
 		if clientErr != nil || err != nil {
+			k.Logger().Info("Falling back to legacy JWKS client")
+
 			if jwkSet, err = GetJWK(url, k.Gw.GetConfig().JWTSSLInsecureSkipVerify); err != nil {
 				logJWKSFetchError(k.Logger(), url, err)
 

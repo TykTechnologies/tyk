@@ -5,33 +5,83 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"unicode"
 
 	"github.com/sirupsen/logrus"
 
 	"github.com/TykTechnologies/tyk/request"
 )
 
+var sensitiveKeys = []string{"token", "secret", "key", "auth", "sig", "password"}
+
+// Base64DecodeError indicates a failure to decode the JWT Source string.
 type Base64DecodeError struct {
 	Source string
 	Err    error
 }
 
 func (e *Base64DecodeError) Error() string {
-	return "Failed to decode base64-encoded JWKS source: " + sanitizeSource(e.Source) + " - " + e.Err.Error()
+	// Simple return. The logging helper handles the context and sanitization.
+	return "failed to decode base64-encoded JWKS source: " + e.Err.Error()
 }
 
 // identifies that field value was hidden before output to the log
 const logHiddenValue = "<hidden>"
 
-// sanitizeSource truncates the source string and removes control characters
-// to prevent leaking secrets or log injection.
+// sanitizeSource truncates the source string, removes control characters,
+// and redacts credentials to prevent leaking secrets.
 func sanitizeSource(source string) string {
-	clean := strings.ReplaceAll(source, "\n", "")
-	clean = strings.ReplaceAll(clean, "\r", "")
+	clean := strings.Map(func(r rune) rune {
+		if unicode.IsControl(r) {
+			return -1
+		}
+		return r
+	}, source)
 
-	const maxLen = 20
-	if len(clean) > maxLen {
-		return clean[:maxLen] + "...(truncated)"
+	parseTarget := clean
+	addedScheme := false
+	if !strings.Contains(clean, "://") {
+		parseTarget = "http://" + clean
+		addedScheme = true
+	}
+
+	u, err := url.Parse(parseTarget)
+	if err != nil {
+		// Return a generic placeholder to prevent leaking secrets in malformed URLs.
+		return "(malformed input)"
+	}
+
+	if u.User != nil {
+		u.User = url.UserPassword(u.User.Username(), "xxxxx")
+	}
+
+	q := u.Query()
+	queryChanged := false
+
+	for param := range q {
+		lowerParam := strings.ToLower(param)
+		for _, sensitive := range sensitiveKeys {
+			if strings.Contains(lowerParam, sensitive) {
+				q.Set(param, "xxxxx")
+				queryChanged = true
+				break
+			}
+		}
+	}
+	if queryChanged {
+		u.RawQuery = q.Encode()
+	}
+
+	clean = u.String()
+
+	if addedScheme {
+		clean = strings.TrimPrefix(clean, "http://")
+	}
+
+	runes := []rune(clean)
+	const maxLen = 50
+	if len(runes) > maxLen {
+		return string(runes[:maxLen]) + "...(truncated)"
 	}
 	return clean
 }
@@ -100,13 +150,16 @@ func logJWKSFetchError(logger *logrus.Entry, sourceOrURL string, err error) {
 
 	var decodeErr *Base64DecodeError
 	if errors.As(err, &decodeErr) {
-		logger.WithError(err).Error("JWKS configuration error")
+		logger.WithField("source", sanitized).WithError(decodeErr.Err).Error("Failed to decode base64-encoded JWKS source")
 		return
 	}
 
 	var urlErr *url.Error
 	if errors.As(err, &urlErr) {
-		logger.WithError(err).Errorf(
+		safeErr := *urlErr
+		safeErr.URL = sanitized
+
+		logger.WithError(&safeErr).Errorf(
 			"JWKS endpoint resolution failed: invalid or unreachable host %s",
 			sanitized,
 		)

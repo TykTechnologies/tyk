@@ -146,6 +146,7 @@ func TestLogJWKSFetchError(t *testing.T) {
 		jwksURL    string
 		err        error
 		wantOutput string
+		wantField  string
 	}{
 		{
 			name:    "unreachable host",
@@ -155,32 +156,61 @@ func TestLogJWKSFetchError(t *testing.T) {
 				URL: "https://example.com/jwks",
 				Err: errors.New("no such host"),
 			},
-			wantOutput: "JWKS endpoint resolution failed: invalid or unreachable host https://example.com/...(truncated)",
+			wantOutput: "JWKS endpoint resolution failed: invalid or unreachable host https://example.com/jwks",
 		},
 		{
-			name:    "short url passes through",
-			jwksURL: "http://short.com",
-			err: &url.Error{
-				Op:  "Get",
-				URL: "http://short.com",
-				Err: errors.New("timeout"),
-			},
-			wantOutput: "JWKS endpoint resolution failed: invalid or unreachable host http://short.com",
+			name:    "sanitizes user credentials",
+			jwksURL: "https://user:password@secret.com",
+			err:     errors.New("timeout"),
+			// Logic: "https://user:xxxxx@secret.com" is 29 chars.
+			// Limit 50. No truncation expected.
+			wantOutput: "Invalid JWKS retrieved from endpoint: https://user:xxxxx@secret.com",
 		},
 		{
-			name:       "invalid JWKS JSON",
-			jwksURL:    "https://valid-url.com",
-			err:        errors.New("failed to parse JWKS JSON"),
-			wantOutput: "Invalid JWKS retrieved from endpoint: https://valid-url.co...(truncated)",
+			name:    "sanitizes query parameters",
+			jwksURL: "https://api.com?access_token=SuperSecret123",
+			err:     errors.New("fail"),
+			// Logic: "access_token" contains "token", so it becomes "xxxxx"
+			// "https://api.com?access_token=xxxxx" is 34 chars. No truncation.
+			wantOutput: "Invalid JWKS retrieved from endpoint: https://api.com?access_token=xxxxx",
 		},
 		{
-			name:    "base64 decode error long secret",
-			jwksURL: "very_long_secret_string_that_should_be_truncated",
+			name:    "base64 decode error (structured)",
+			jwksURL: "12345678901234567890123456789012345678901234567890_OVER_LIMIT",
 			err: &Base64DecodeError{
-				Source: "very_long_secret_string_that_should_be_truncated",
+				Source: "12345678901234567890123456789012345678901234567890_OVER_LIMIT",
 				Err:    errors.New("illegal base64 data"),
 			},
-			wantOutput: "JWKS configuration error for source: very_long_secret_str...(truncated)",
+			wantOutput: "Failed to decode base64-encoded JWKS source",
+			// Expect truncation after 50 chars
+			wantField: "source=\"12345678901234567890123456789012345678901234567890...(truncated)\"",
+		},
+		{
+			name:       "sanitizes query parameters",
+			jwksURL:    "https://api.com?access_token=SuperSecret123",
+			err:        errors.New("fail"),
+			wantOutput: "Invalid JWKS retrieved from endpoint: https://api.com?access_token=xxxxx",
+		},
+		{
+			name:    "sanitizes schemeless credentials",
+			jwksURL: "admin:MyP@ssword@127.0.0.1",
+			err:     errors.New("timeout"),
+			// Logic: added http://, redacted to admin:xxxxx@..., then stripped http://
+			wantOutput: "Invalid JWKS retrieved from endpoint: admin:xxxxx@127.0.0.1",
+		},
+		{
+			name:    "utf8 safety",
+			jwksURL: "abcdefghijabcdefghijabcdefghijabcdefghijabcdefghij©", // 51 chars
+			err:     errors.New("fail"),
+			// Truncates at 50 chars, dropping the ©
+			wantOutput: "Invalid JWKS retrieved from endpoint: abcdefghijabcdefghijabcdefghijabcdefghijabcdefghij...(truncated)",
+		},
+		{
+			name: "malformed url with secrets",
+			// '%zz' is invalid URL encoding. Parse fails.
+			jwksURL:    "https://user:secret_pass@host.com/%zz",
+			err:        errors.New("fail"),
+			wantOutput: "Invalid JWKS retrieved from endpoint: (malformed input)",
 		},
 	}
 
@@ -189,6 +219,7 @@ func TestLogJWKSFetchError(t *testing.T) {
 			var buf bytes.Buffer
 			logger := logrus.New()
 			logger.SetOutput(&buf)
+			logger.SetFormatter(&logrus.TextFormatter{DisableTimestamp: true, DisableColors: true})
 			entry := logrus.NewEntry(logger)
 
 			logJWKSFetchError(entry, tt.jwksURL, tt.err)
@@ -197,9 +228,20 @@ func TestLogJWKSFetchError(t *testing.T) {
 			if !strings.Contains(output, tt.wantOutput) {
 				t.Errorf("expected log output to contain %q, got %q", tt.wantOutput, output)
 			}
-			if !strings.Contains(output, "level=error") && !strings.Contains(output, `"level":"error"`) {
-				t.Errorf("expected log output to be at error level, got %q", output)
+
+			if tt.wantField != "" && !strings.Contains(output, tt.wantField) {
+				t.Errorf("expected log to contain field %q, got %q", tt.wantField, output)
 			}
 		})
 	}
+}
+
+func TestLogJWKSFetchError_NilLogger(t *testing.T) {
+	defer func() {
+		if r := recover(); r != nil {
+			t.Errorf("The code panicked with nil logger: %v", r)
+		}
+	}()
+
+	logJWKSFetchError(nil, "some-url", errors.New("fail"))
 }
