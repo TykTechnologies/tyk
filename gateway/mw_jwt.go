@@ -97,7 +97,7 @@ func (k *JWTMiddleware) Init() {
 				}
 
 				if err != nil {
-					k.Logger().WithError(err).Infof("Failed to fetch or decode JWKs from %s", jwk.URL)
+					logJWKSFetchError(k.Logger(), jwk.URL, err)
 					continue
 				}
 
@@ -154,9 +154,8 @@ type JWKs struct {
 
 func parseJWK(buf []byte) (*jose.JSONWebKeySet, error) {
 	var j jose.JSONWebKeySet
-	err := json.Unmarshal(buf, &j)
-	if err != nil {
-		return nil, err
+	if err := json.Unmarshal(buf, &j); err != nil {
+		return nil, fmt.Errorf("failed to parse JWKS JSON: %w", err)
 	}
 	return &j, nil
 }
@@ -269,14 +268,14 @@ func (k *JWTMiddleware) getSecretFromURL(url string, kidVal interface{}, keyType
 		client, clientErr := clientFactory.CreateJWKClient()
 		if clientErr == nil {
 			if jwkSet, err = getJWKWithClient(url, client); err != nil {
-				k.Logger().WithError(err).Info("Failed to decode JWKs body with factory client. Trying x5c PEM fallback.")
+				logJWKSFetchError(k.Logger(), url, err)
 			}
 		}
 
 		// Fallback to original method if factory fails or JWK fetch fails
 		if clientErr != nil || err != nil {
 			if jwkSet, err = GetJWK(url, k.Gw.GetConfig().JWTSSLInsecureSkipVerify); err != nil {
-				k.Logger().WithError(err).Info("Failed to decode JWKs body. Trying x5c PEM fallback.")
+				logJWKSFetchError(k.Logger(), url, err)
 
 				key, legacyError := k.legacyGetSecretFromURL(url, kid, keyType)
 				if legacyError == nil {
@@ -341,7 +340,13 @@ func (k *JWTMiddleware) getSecretToVerifySignature(r *http.Request, token *jwt.T
 		// If not, return the actual value
 		decodedCert, err := base64.StdEncoding.DecodeString(config.JWTSource)
 		if err != nil {
-			return nil, err
+			wrappedErr := &Base64DecodeError{
+				URL: config.JWTSource,
+				Err: err,
+			}
+			logJWKSFetchError(k.Logger(), config.JWTSource, wrappedErr)
+
+			return nil, fmt.Errorf("failed to decode base64-encoded JWKS URL")
 		}
 
 		// Is decoded url too?
@@ -452,7 +457,7 @@ func (k *JWTMiddleware) getSecretFromMultipleJWKURIs(jwkURIs []apidef.JWK, kidVa
 			}
 
 			if err != nil {
-				k.Logger().WithError(err).Infof("Failed to fetch or decode JWKs from %s", jwk.URL)
+				logJWKSFetchError(k.Logger(), jwk.URL, err)
 				fallbackJWKURIs = append(fallbackJWKURIs, jwk)
 				continue
 			}

@@ -1,12 +1,23 @@
 package gateway
 
 import (
+	"errors"
 	"net/http"
+	"net/url"
 
 	"github.com/sirupsen/logrus"
 
 	"github.com/TykTechnologies/tyk/request"
 )
+
+type Base64DecodeError struct {
+	URL string
+	Err error
+}
+
+func (e *Base64DecodeError) Error() string {
+	return "Failed to decode base64-encoded JWKS URL: " + e.URL + " - " + e.Err.Error()
+}
 
 // identifies that field value was hidden before output to the log
 const logHiddenValue = "<hidden>"
@@ -64,4 +75,33 @@ func (gw *Gateway) getExplicitLogEntryForRequest(logger *logrus.Entry, path stri
 		fields[key] = val
 	}
 	return logger.WithFields(fields)
+}
+
+func logJWKSFetchError(logger *logrus.Entry, jwksURL string, err error) {
+	if logger == nil {
+		logger = logrus.NewEntry(log)
+	}
+
+	var decodeErr *Base64DecodeError
+	if errors.As(err, &decodeErr) {
+		logger.WithError(err).Errorf(
+			"Failed to decode base64-encoded JWKS URL: %s",
+			jwksURL,
+		)
+		return
+	}
+
+	var urlErr *url.Error
+	if errors.As(err, &urlErr) {
+		logger.WithError(err).Errorf(
+			"JWKS endpoint resolution failed: invalid or unreachable host %s",
+			jwksURL,
+		)
+		return
+	}
+
+	logger.WithError(err).Errorf(
+		"Invalid JWKS retrieved from endpoint: %s",
+		jwksURL,
+	)
 }

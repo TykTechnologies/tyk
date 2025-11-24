@@ -182,11 +182,13 @@ func (k *ExternalOAuthMiddleware) getSecretFromJWKURL(url string, kid interface{
 			// Fallback to original method if client factory fails
 			k.Logger().Debug("[ExternalServices] Falling back to legacy JWK client due to factory error")
 			if jwkSet, err = getJWK(url, k.Gw.GetConfig().JWTSSLInsecureSkipVerify); err != nil {
+				logJWKSFetchError(k.Logger(), url, err)
 				return nil, err
 			}
 		} else {
 			k.Logger().Debugf("[ExternalServices] Using external services JWK client to fetch: %s", url)
 			if jwkSet, err = getJWKWithClient(url, client); err != nil {
+				logJWKSFetchError(k.Logger(), url, err)
 				return nil, err
 			}
 		}
@@ -215,7 +217,13 @@ func (k *ExternalOAuthMiddleware) getSecretFromJWKOrConfig(kid interface{}, jwtV
 
 	decodedSource, err := base64.StdEncoding.DecodeString(jwtValidation.Source)
 	if err != nil {
-		return nil, err
+		wrappedErr := &Base64DecodeError{
+			URL: jwtValidation.Source,
+			Err: err,
+		}
+		logJWKSFetchError(k.Logger(), jwtValidation.Source, wrappedErr)
+
+		return nil, fmt.Errorf("failed to decode base64-encoded JWKS URL")
 	}
 
 	// is decoded a JWK url too?

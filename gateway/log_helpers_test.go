@@ -1,7 +1,11 @@
 package gateway
 
 import (
+	"bytes"
+	"errors"
 	"net/http/httptest"
+	"net/url"
+	"strings"
 	"testing"
 
 	"github.com/sirupsen/logrus"
@@ -133,5 +137,56 @@ func TestGetLogEntryForRequest(t *testing.T) {
 				}
 			}
 		}
+	}
+}
+
+func TestLogJWKSFetchError(t *testing.T) {
+	tests := []struct {
+		name       string
+		jwksURL    string
+		err        error
+		wantOutput string
+	}{
+		{
+			name:    "unreachable host",
+			jwksURL: "https://example.com/jwks",
+			err: &url.Error{
+				Op:  "Get",
+				URL: "https://example.com/jwks",
+				Err: errors.New("no such host"),
+			},
+			wantOutput: "JWKS endpoint resolution failed: invalid or unreachable host https://example.com/jwks",
+		},
+		{
+			name:       "invalid JWKS JSON",
+			jwksURL:    "https://example.com/jwks",
+			err:        errors.New("failed to parse JWKS JSON"),
+			wantOutput: "Invalid JWKS retrieved from endpoint: https://example.com/jwks",
+		},
+		{
+			name:    "base64 decode error",
+			jwksURL: "bad_base64_string",
+			err: &Base64DecodeError{
+				URL: "bad_base64_string",
+				Err: errors.New("illegal base64 data"),
+			},
+			wantOutput: "Failed to decode base64-encoded JWKS URL: bad_base64_string",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var buf bytes.Buffer
+			logger := logrus.New()
+			logger.SetOutput(&buf)
+			entry := logrus.NewEntry(logger)
+
+			logJWKSFetchError(entry, tt.jwksURL, tt.err)
+
+			output := buf.String()
+			if !strings.Contains(output, tt.wantOutput) {
+				t.Errorf("expected log output to contain %q, got %q", tt.wantOutput, output)
+			}
+		})
 	}
 }
