@@ -691,7 +691,7 @@ type SecurityConfig struct {
 	CertificateExpiryMonitor CertificateExpiryMonitorConfig `json:"certificate_expiry_monitor"`
 
 	// DisableCertificateTokenBinding enables certificate-token binding for static mTLS authentication.
-	// When enabled, access tokens will be linked to the client certificate used during authentication.
+	// When enabled, access tokens will be linked (bound) to one or more client certificates during creation or update.
 	// Any subsequent request with that token must present the same certificate, otherwise the request will be rejected.
 	// This provides protection against token theft and misuse in mTLS environments.
 	// Environment variable: TYK_GW_SECURITY_ENABLECERTIFICATETOKENBINDING
