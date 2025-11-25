@@ -1039,6 +1039,7 @@ func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string, orgId string) 
 	OauthClients := map[string]string{}
 	apiIDsToDeleteCache := make([]string, 0)
 	userKeyResets := make(map[string]string)
+	apiIDsToInvalidateJWKSCache := make([]string, 0)
 
 	for _, key := range keys {
 		splitKeys := strings.Split(key, ":")
@@ -1064,6 +1065,9 @@ func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string, orgId string) 
 				notRegularKeys[key] = true
 			case NoticeDeleteAPICache.String():
 				apiIDsToDeleteCache = append(apiIDsToDeleteCache, splitKeys[0])
+				notRegularKeys[key] = true
+			case NoticeInvalidateJWKSCacheForAPI.String():
+				apiIDsToInvalidateJWKSCache = append(apiIDsToInvalidateJWKSCache, splitKeys[0])
 				notRegularKeys[key] = true
 			case NoticeUserKeyReset.String():
 				keyParts := strings.Split(splitKeys[0], ".")
@@ -1217,6 +1221,11 @@ func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string, orgId string) 
 		}
 
 		log.WithField("apiID", apiID).Error("cache invalidation failed")
+	}
+
+	for _, apiID := range apiIDsToInvalidateJWKSCache {
+		log.WithField("apiID", apiID).Debug("Received request to flush JWKS cache")
+		invalidateJWKSCacheByAPIID(apiID)
 	}
 
 	// Notify rest of gateways in cluster to flush cache
