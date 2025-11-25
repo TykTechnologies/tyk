@@ -148,45 +148,43 @@ func (a *AuthORWrapper) getMiddlewareForScheme(schemeName string) TykMiddleware 
 	if tykExt := a.Spec.OAS.GetTykExtension(); tykExt != nil {
 		if auth := tykExt.Server.Authentication; auth != nil {
 			// First check if the scheme is defined in SecuritySchemes
-			if auth.SecuritySchemes != nil {
-				if tykScheme, _ := auth.SecuritySchemes.Get(schemeName); tykScheme != nil {
-					// Use type switch for standard auth types (JWT, Token, Basic, OAuth)
-					// These can be reliably determined by their OAS type
-					switch tykScheme.(type) {
-					case *oas.JWT:
-						return a.findMiddlewareByType(&JWTMiddleware{})
-					case *oas.Token:
-						return a.findMiddlewareByType(&AuthKey{})
-					case *oas.Basic:
-						return a.findMiddlewareByType(&BasicAuthKeyIsValid{})
-					case *oas.OAuth:
-						if a.Spec.ExternalOAuth.Enabled {
-							return a.findMiddlewareByType(&ExternalOAuthMiddleware{})
-						}
-						return a.findMiddlewareByType(&Oauth2KeyExists{})
+			if tykScheme, _ := auth.SecuritySchemes.Get(schemeName); tykScheme != nil {
+				// Use type switch for standard auth types (JWT, Token, Basic, OAuth)
+				// These can be reliably determined by their OAS type
+				switch tykScheme.(type) {
+				case *oas.JWT:
+					return a.findMiddlewareByType(&JWTMiddleware{})
+				case *oas.Token:
+					return a.findMiddlewareByType(&AuthKey{})
+				case *oas.Basic:
+					return a.findMiddlewareByType(&BasicAuthKeyIsValid{})
+				case *oas.OAuth:
+					if a.Spec.ExternalOAuth.Enabled {
+						return a.findMiddlewareByType(&ExternalOAuthMiddleware{})
 					}
+					return a.findMiddlewareByType(&Oauth2KeyExists{})
+				}
 
-					// For HMAC, OIDC, and Custom plugins, use legacy flag checks
-					// This maintains backward compatibility with existing tests and configurations
-					if a.Spec.EnableSignatureChecking {
-						return a.findMiddlewareByType(&HTTPSignatureValidationMiddleware{})
+				// For HMAC, OIDC, and Custom plugins, use legacy flag checks
+				// This maintains backward compatibility with existing tests and configurations
+				if a.Spec.EnableSignatureChecking {
+					return a.findMiddlewareByType(&HTTPSignatureValidationMiddleware{})
+				}
+
+				if a.Spec.UseOpenID {
+					return a.findMiddlewareByType(&OpenIDMW{})
+				}
+
+				customPluginAuthEnabled := a.Spec.CustomPluginAuthEnabled || a.Spec.UseGoPluginAuth || a.Spec.EnableCoProcessAuth
+				if customPluginAuthEnabled {
+					if mw := a.findMiddlewareByType(&GoPluginMiddleware{}); mw != nil {
+						return mw
 					}
-
-					if a.Spec.UseOpenID {
-						return a.findMiddlewareByType(&OpenIDMW{})
+					if mw := a.findMiddlewareByType(&CoProcessMiddleware{}); mw != nil {
+						return mw
 					}
-
-					customPluginAuthEnabled := a.Spec.CustomPluginAuthEnabled || a.Spec.UseGoPluginAuth || a.Spec.EnableCoProcessAuth
-					if customPluginAuthEnabled {
-						if mw := a.findMiddlewareByType(&GoPluginMiddleware{}); mw != nil {
-							return mw
-						}
-						if mw := a.findMiddlewareByType(&CoProcessMiddleware{}); mw != nil {
-							return mw
-						}
-						if mw := a.findMiddlewareByType(&DynamicMiddleware{}); mw != nil {
-							return mw
-						}
+					if mw := a.findMiddlewareByType(&DynamicMiddleware{}); mw != nil {
+						return mw
 					}
 				}
 			}

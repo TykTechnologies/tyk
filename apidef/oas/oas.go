@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"strings"
-	"sync"
 
 	"github.com/samber/lo"
 
@@ -35,11 +34,8 @@ const (
 // OAS holds the upstream OAS definition as well as adds functionality like custom JSON marshalling.
 type OAS struct {
 	openapi3.T
-	//todo add the mutex here instead of ss
-	securitySchemesOnce sync.Once
 }
 
-// todo ss fields should be private and unaccessible
 // MarshalJSON implements json.Marshaller.
 func (s *OAS) MarshalJSON() ([]byte, error) {
 	if ShouldOmit(s.ExternalDocs) { // for sql case
@@ -227,26 +223,14 @@ func (s *OAS) getTykAuthentication() (authentication *Authentication) {
 // promoteStruct atomically promotes a scheme from map[string]interface{} to *T,
 // caching the result. It uses a fast path under RLock and a slow path under Lock.
 func promoteStruct[T any](ss *SecuritySchemes, key string) *T {
-	if ss == nil {
+	if ss == nil || ss.container == nil {
 		return nil
 	}
 
-	ss.mutex.RLock()
-	if ss.container != nil {
-		if v, ok := ss.container[key]; ok && v != nil {
-			if typed, ok := v.(*T); ok {
-				ss.mutex.RUnlock()
-				return typed
-			}
+	if v, ok := ss.container[key]; ok && v != nil {
+		if typed, ok := v.(*T); ok {
+			return typed
 		}
-	}
-	ss.mutex.RUnlock()
-
-	ss.mutex.Lock()
-	defer ss.mutex.Unlock()
-
-	if ss.container == nil {
-		return nil
 	}
 
 	v, ok := ss.container[key]
@@ -274,84 +258,47 @@ func promoteStruct[T any](ss *SecuritySchemes, key string) *T {
 
 func (s *OAS) getTykTokenAuth(name string) *Token {
 	ss := s.getTykSecuritySchemes()
-	if ss == nil {
-		return nil
-	}
-
-	return promoteStruct[Token](ss, name)
+	return promoteStruct[Token](&ss, name)
 }
 
 func (s *OAS) getTykJWTAuth(name string) *JWT {
 	ss := s.getTykSecuritySchemes()
-	if ss == nil {
-		return nil
-	}
 
-	return promoteStruct[JWT](ss, name)
+	return promoteStruct[JWT](&ss, name)
 }
 
 // getTykBasicAuth returns the `Basic` security scheme for the given name from the
 // Tyk extension, normalizing map-based representations into `*Basic` and caching
 // the converted pointer for subsequent requests.
 func (s *OAS) getTykBasicAuth(name string) *Basic {
-	//todo add the ss initialization here
 	ss := s.getTykSecuritySchemes()
-	if ss == nil {
-		return nil
-	}
 
-	return promoteStruct[Basic](ss, name)
+	return promoteStruct[Basic](&ss, name)
 }
 
 // todo move the mutex to the oas object -> as a solution
 func (s *OAS) getTykOAuthAuth(name string) *OAuth {
 	ss := s.getTykSecuritySchemes()
-	if ss == nil {
-		return nil
-	}
 
-	return promoteStruct[OAuth](ss, name)
+	return promoteStruct[OAuth](&ss, name)
 }
 
 func (s *OAS) getTykExternalOAuthAuth(name string) *ExternalOAuth {
 	ss := s.getTykSecuritySchemes()
-	if ss == nil {
-		return nil
-	}
 
-	return promoteStruct[ExternalOAuth](ss, name)
+	return promoteStruct[ExternalOAuth](&ss, name)
 }
 
-func (s *OAS) getTykSecuritySchemes() *SecuritySchemes {
-	if s == nil {
-		return nil
+func (s *OAS) getTykSecuritySchemes() (securitySchemes SecuritySchemes) {
+	if s.getTykAuthentication() != nil {
+		securitySchemes = s.getTykAuthentication().SecuritySchemes
 	}
 
-	s.securitySchemesOnce.Do(func() {
-		ext := s.GetTykExtension()
-		if ext == nil {
-			ext = &XTykAPIGateway{}
-			s.SetTykExtension(ext)
-		}
-
-		if ext.Server.Authentication == nil {
-			ext.Server.Authentication = &Authentication{}
-		}
-		//todo remove intiializtion from here
-		if ext.Server.Authentication.SecuritySchemes == nil {
-			//todo there is a lazy initiation
-			ext.Server.Authentication.SecuritySchemes = NewSecuritySchemes()
-		}
-	})
-
-	return s.GetTykExtension().Server.Authentication.SecuritySchemes
+	return
 }
 
 func (s *OAS) getTykSecurityScheme(name string) interface{} {
 	securitySchemes := s.getTykSecuritySchemes()
-	if securitySchemes == nil {
-		return nil
-	}
 
 	ss, _ := securitySchemes.Get(name)
 	return ss
@@ -597,7 +544,7 @@ func (s *OAS) validateCompliantModeAuthentication() error {
 
 	// Check auth methods in SecuritySchemes
 	if tykAuth.SecuritySchemes.Len() > 0 {
-		for schemeName, scheme := range tykAuth.SecuritySchemes.Iter() {
+		for schemeName, scheme := range tykAuth.SecuritySchemes.iter() {
 			// Check if this auth method is enabled
 			enabled := false
 

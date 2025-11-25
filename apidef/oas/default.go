@@ -189,10 +189,8 @@ func (s *OAS) importAuthentication(enable bool) error {
 	authentication.Enabled = enable
 
 	tykSecuritySchemes := authentication.SecuritySchemes
-	if tykSecuritySchemes == nil {
-		tykSecuritySchemes = NewSecuritySchemes()
-		authentication.SecuritySchemes = tykSecuritySchemes
-	}
+
+	authentication.SecuritySchemes = tykSecuritySchemes
 
 	processedSchemes := make(map[string]bool)
 	for _, securityReq := range s.Security {

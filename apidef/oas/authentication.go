@@ -6,7 +6,6 @@ import (
 	"iter"
 	"reflect"
 	"sort"
-	"sync"
 	"time"
 
 	"github.com/getkin/kin-openapi/openapi3"
@@ -80,7 +79,7 @@ type Authentication struct {
 	Custom *CustomPluginAuthentication `bson:"custom,omitempty" json:"custom,omitempty"`
 
 	// SecuritySchemes contains security schemes definitions.
-	SecuritySchemes *SecuritySchemes `bson:"securitySchemes,omitempty" json:"securitySchemes,omitempty"`
+	SecuritySchemes SecuritySchemes `bson:"securitySchemes,omitempty" json:"securitySchemes,omitempty"`
 
 	// CustomKeyLifetime contains configuration for the maximum retention period for access tokens.
 	CustomKeyLifetime *CustomKeyLifetime `bson:"customKeyLifetime,omitempty" json:"customKeyLifetime,omitempty"`
@@ -145,7 +144,6 @@ func (k *CustomKeyLifetime) ExtractTo(api *apidef.APIDefinition) {
 	}
 }
 
-// todo
 // Fill fills *Authentication from apidef.APIDefinition.
 func (a *Authentication) Fill(api apidef.APIDefinition) {
 	a.Enabled = !api.UseKeylessAccess
@@ -238,23 +236,10 @@ func (a *Authentication) ExtractTo(api *apidef.APIDefinition) {
 // Recommendation: prefer NewSecuritySchemes for clarity and explicit initialization.
 type SecuritySchemes struct {
 	container map[string]interface{}
-	mutex     sync.RWMutex
-}
-
-// NewSecuritySchemes constructs a new, empty `SecuritySchemes` value with an initialized container map.
-// The returned pointer is safe for concurrent use via the provided methods.
-func NewSecuritySchemes() *SecuritySchemes {
-	return &SecuritySchemes{container: make(map[string]interface{})}
 }
 
 // Set stores a security scheme by name.
-func (ss *SecuritySchemes) Set(key string, value interface{}) {
-	if ss == nil {
-		return
-	}
-	ss.mutex.Lock()
-	defer ss.mutex.Unlock()
-
+func (ss SecuritySchemes) set(key string, value interface{}) {
 	if ss.container == nil {
 		ss.container = make(map[string]interface{})
 	}
@@ -264,13 +249,7 @@ func (ss *SecuritySchemes) Set(key string, value interface{}) {
 
 // Get retrieves a security scheme by name.
 // It returns the stored value and true when present, otherwise (nil, false).
-func (ss *SecuritySchemes) Get(key string) (interface{}, bool) {
-	if ss == nil {
-		return nil, false
-	}
-	ss.mutex.RLock()
-	defer ss.mutex.RUnlock()
-
+func (ss SecuritySchemes) Get(key string) (interface{}, bool) {
 	if ss.container == nil {
 		return nil, false
 	}
@@ -280,13 +259,7 @@ func (ss *SecuritySchemes) Get(key string) (interface{}, bool) {
 
 // Delete removes a scheme from the receiver by name.
 // It silently returns when the receiver or its container map is nil.
-func (ss *SecuritySchemes) Delete(key string) {
-	if ss == nil {
-		return
-	}
-	ss.mutex.Lock()
-	defer ss.mutex.Unlock()
-
+func (ss SecuritySchemes) delete(key string) {
 	if ss.container == nil {
 		return
 	}
@@ -295,27 +268,16 @@ func (ss *SecuritySchemes) Delete(key string) {
 
 // Len reports the number of registered security schemes.
 // A nil receiver reports zero.
-func (ss *SecuritySchemes) Len() int {
-	if ss == nil {
-		return 0
-	}
-	ss.mutex.RLock()
-	defer ss.mutex.RUnlock()
-
+func (ss SecuritySchemes) Len() int {
 	return len(ss.container)
 }
 
 // Iter returns a snapshot under a short read lock to avoid holding locks during iteration.
 // This allocates per call. Given the typical small number of schemes, the trade-off is acceptable.
-func (ss *SecuritySchemes) Iter() iter.Seq2[string, interface{}] {
+func (ss SecuritySchemes) iter() iter.Seq2[string, interface{}] {
+	//todo refactor here if need be
 	return func(yield func(string, interface{}) bool) {
-		if ss == nil {
-			return
-		}
-
-		ss.mutex.RLock()
 		if ss.container == nil {
-			ss.mutex.RUnlock()
 			return
 		}
 
@@ -329,7 +291,6 @@ func (ss *SecuritySchemes) Iter() iter.Seq2[string, interface{}] {
 				v interface{}
 			}{k, v})
 		}
-		ss.mutex.RUnlock()
 
 		for _, e := range snap {
 			if !yield(e.k, e.v) {
@@ -341,14 +302,7 @@ func (ss *SecuritySchemes) Iter() iter.Seq2[string, interface{}] {
 
 // MarshalJSON implements json.Marshaler.
 // It snapshots the map under RLock, unlocks, then marshals.
-func (ss *SecuritySchemes) MarshalJSON() ([]byte, error) {
-	if ss == nil {
-		return []byte(`{}`), nil
-	}
-
-	ss.mutex.RLock()
-	defer ss.mutex.RUnlock()
-
+func (ss SecuritySchemes) MarshalJSON() ([]byte, error) {
 	if ss.container == nil {
 		return []byte(`{}`), nil
 	}
@@ -358,11 +312,10 @@ func (ss *SecuritySchemes) MarshalJSON() ([]byte, error) {
 
 // UnmarshalJSON implements json.Unmarshaler.
 // It builds a temporary map, then replaces the internal map under Lock.
-func (ss *SecuritySchemes) UnmarshalJSON(b []byte) error {
+func (ss SecuritySchemes) UnmarshalJSON(b []byte) error {
+	//todo remap keys in the existing map
 	if string(b) == "null" {
-		ss.mutex.Lock()
-		ss.container = make(map[string]interface{})
-		ss.mutex.Unlock()
+		ss.container = nil
 		return nil
 	}
 
@@ -371,20 +324,12 @@ func (ss *SecuritySchemes) UnmarshalJSON(b []byte) error {
 		return err
 	}
 
-	ss.mutex.Lock()
 	ss.container = tmp
-	ss.mutex.Unlock()
 	return nil
 }
 
 // MarshalYAML makes SecuritySchemes YAML-friendly by exposing its container map.
-func (ss *SecuritySchemes) MarshalYAML() (interface{}, error) {
-	if ss == nil {
-		return map[string]interface{}{}, nil
-	}
-	ss.mutex.RLock()
-	defer ss.mutex.RUnlock()
-
+func (ss SecuritySchemes) MarshalYAML() (interface{}, error) {
 	if ss.container == nil {
 		return map[string]interface{}{}, nil
 	}
@@ -392,11 +337,10 @@ func (ss *SecuritySchemes) MarshalYAML() (interface{}, error) {
 }
 
 // UnmarshalYAML populates SecuritySchemes.container from YAML.
-func (ss *SecuritySchemes) UnmarshalYAML(n *yaml.Node) error {
+func (ss SecuritySchemes) UnmarshalYAML(n *yaml.Node) error {
+	//todo remap keys in the existing map
 	if n.Tag == "!!null" {
-		ss.mutex.Lock()
 		ss.container = make(map[string]interface{})
-		ss.mutex.Unlock()
 		return nil
 	}
 
@@ -405,9 +349,7 @@ func (ss *SecuritySchemes) UnmarshalYAML(n *yaml.Node) error {
 		return err
 	}
 
-	ss.mutex.Lock()
 	ss.container = tmp
-	ss.mutex.Unlock()
 	return nil
 }
 
@@ -434,40 +376,48 @@ func loadForImport[T any](ss *SecuritySchemes, name string) *T {
 	}
 
 	v := new(T)
-	toStructIfMap(scheme, v)
+	decoder, err := mapstructure.NewDecoder(&mapstructure.DecoderConfig{TagName: "json", Result: v})
+	if err != nil {
+		log.Debug("Initialization of the new decoder couldn't succeed")
+
+		return nil
+	}
+	err = decoder.Decode(scheme)
+	if err != nil {
+		log.Debug("Unmarshalling to struct couldn't succeed")
+
+		return nil
+	}
+
 	return v
 }
 
-func (ss *SecuritySchemes) Import(name string, nativeSS *openapi3.SecurityScheme, enable bool) error {
-	if ss == nil {
-		return fmt.Errorf("SecuritySchemes is nil")
-	}
-
+func (ss SecuritySchemes) Import(name string, nativeSS *openapi3.SecurityScheme, enable bool) error {
 	switch {
 	case nativeSS.Type == typeAPIKey:
-		token := loadForImport[Token](ss, name)
+		token := loadForImport[Token](&ss, name)
 		token.Enabled = &enable
-		ss.Set(name, token)
+		ss.set(name, token)
 
 	case nativeSS.Type == typeHTTP &&
 		nativeSS.Scheme == schemeBearer &&
 		nativeSS.BearerFormat == bearerFormatJWT:
 
-		jwt := loadForImport[JWT](ss, name)
+		jwt := loadForImport[JWT](&ss, name)
 		jwt.Import(enable)
-		ss.Set(name, jwt)
+		ss.set(name, jwt)
 
 	case nativeSS.Type == typeHTTP &&
 		nativeSS.Scheme == schemeBasic:
 
-		basic := loadForImport[Basic](ss, name)
+		basic := loadForImport[Basic](&ss, name)
 		basic.Import(enable)
-		ss.Set(name, basic)
+		ss.set(name, basic)
 
 	case nativeSS.Type == typeOAuth2:
-		oauth := loadForImport[OAuth](ss, name)
+		oauth := loadForImport[OAuth](&ss, name)
 		oauth.Import(enable)
-		ss.Set(name, oauth)
+		ss.set(name, oauth)
 
 	default:
 		return fmt.Errorf(unsupportedSecuritySchemeFmt, name)
@@ -492,15 +442,15 @@ func baseIdentityProviderPrecedence(authType apidef.AuthTypeEnum) int {
 }
 
 // GetBaseIdentityProvider returns the identity provider by precedence from SecuritySchemes.
-func (ss *SecuritySchemes) GetBaseIdentityProvider() (res apidef.AuthTypeEnum) {
-	if ss == nil || ss.Len() < 2 {
+func (ss SecuritySchemes) GetBaseIdentityProvider() (res apidef.AuthTypeEnum) {
+	if ss.Len() < 2 {
 		return
 	}
 
 	resBaseIdentityProvider := baseIdentityProviderPrecedence(apidef.AuthTypeNone)
 	res = apidef.OAuthKey
 
-	for _, scheme := range ss.Iter() {
+	for _, scheme := range ss.iter() {
 		if _, ok := scheme.(*Token); ok {
 			return apidef.AuthToken
 		}
