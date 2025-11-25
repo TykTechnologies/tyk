@@ -1366,7 +1366,9 @@ func TestJWTCustomClaimsValidation(t *testing.T) {
 			jwtConfig := &oas.JWT{
 				CustomClaimValidation: tc.validation,
 			}
-			o.GetTykExtension().Server.Authentication.SecuritySchemes.Set("jwtAuth", jwtConfig)
+
+			authentication := o.GetTykExtension().Server.Authentication
+			authentication.SecuritySchemes = authentication.SecuritySchemes.SetImmutable("jwtAuth", jwtConfig)
 			o.ExtractTo(&api)
 
 			spec := &APISpec{
@@ -1535,8 +1537,8 @@ func TestJWTExtraClaimsValidation(t *testing.T) {
 			var o oas.OAS
 			o.SetTykExtension(&oas.XTykAPIGateway{})
 			o.Fill(api)
-
-			o.GetTykExtension().Server.Authentication.SecuritySchemes.Set("jwtAuth", tc.oasConfig)
+			authentication := o.GetTykExtension().Server.Authentication
+			authentication.SecuritySchemes = authentication.SecuritySchemes.SetImmutable("jwtAuth", tc.oasConfig)
 			o.ExtractTo(&api)
 
 			spec := &APISpec{

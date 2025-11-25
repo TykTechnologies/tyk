@@ -493,10 +493,10 @@ func TestVendorExtensionSecurity(t *testing.T) {
 }
 
 func TestSecuritySchemesSet_Typed(t *testing.T) {
-	ss := NewSecuritySchemes()
+	var ss SecuritySchemes
 
 	in := &JWT{Enabled: true}
-	ss.Set("x", in)
+	ss.set("x", in)
 
 	v, ok := ss.Get("x")
 
@@ -505,14 +505,14 @@ func TestSecuritySchemesSet_Typed(t *testing.T) {
 }
 
 func TestSecuritySchemesSet_Overwrite(t *testing.T) {
-	ss := NewSecuritySchemes()
+	var ss SecuritySchemes
 
-	ss.Set("x", map[string]interface{}{
+	ss.set("x", map[string]interface{}{
 		"enabled": true,
 	})
 
 	out := &JWT{Enabled: true}
-	ss.Set("x", out)
+	ss.set("x", out)
 
 	v, ok := ss.Get("x")
 	require.True(t, ok, "expected ok")
@@ -542,8 +542,8 @@ func TestSecuritySchemes_UnmarshalJSON_Map(t *testing.T) {
 }
 
 func TestSecuritySchemes_YAMLRoundTrip(t *testing.T) {
-	ss := NewSecuritySchemes()
-	ss.Set("token", map[string]interface{}{"enabled": true})
+	var ss SecuritySchemes
+	ss.set("token", map[string]interface{}{"enabled": true})
 
 	out, err := yaml.Marshal(ss)
 	require.NoError(t, err)

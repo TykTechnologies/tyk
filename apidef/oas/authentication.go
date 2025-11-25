@@ -247,6 +247,16 @@ func (ss SecuritySchemes) set(key string, value interface{}) {
 	ss.container[key] = value
 }
 
+// SetImmutable test helpers.
+// Deprecated: use only for test purposes.
+// don't use it in production code.
+func (ss SecuritySchemes) SetImmutable(key string, value interface{}) SecuritySchemes {
+	var res SecuritySchemes
+	res.container = clone.Clone(ss.container)
+	ss.container[key] = value
+	return res
+}
+
 // Get retrieves a security scheme by name.
 // It returns the stored value and true when present, otherwise (nil, false).
 func (ss SecuritySchemes) Get(key string) (interface{}, bool) {
@@ -255,6 +265,13 @@ func (ss SecuritySchemes) Get(key string) (interface{}, bool) {
 	}
 	value, ok := ss.container[key]
 	return value, ok
+}
+
+// GetVal retrieves a security scheme by name.
+// It returns the stored value and true when present, otherwise nil.
+func (ss SecuritySchemes) GetVal(key string) interface{} {
+	val, _ := ss.Get(key)
+	return val
 }
 
 // Delete removes a scheme from the receiver by name.
@@ -312,7 +329,7 @@ func (ss SecuritySchemes) MarshalJSON() ([]byte, error) {
 
 // UnmarshalJSON implements json.Unmarshaler.
 // It builds a temporary map, then replaces the internal map under Lock.
-func (ss SecuritySchemes) UnmarshalJSON(b []byte) error {
+func (ss *SecuritySchemes) UnmarshalJSON(b []byte) error {
 	//todo remap keys in the existing map
 	if string(b) == "null" {
 		ss.container = nil
@@ -337,7 +354,7 @@ func (ss SecuritySchemes) MarshalYAML() (interface{}, error) {
 }
 
 // UnmarshalYAML populates SecuritySchemes.container from YAML.
-func (ss SecuritySchemes) UnmarshalYAML(n *yaml.Node) error {
+func (ss *SecuritySchemes) UnmarshalYAML(n *yaml.Node) error {
 	//todo remap keys in the existing map
 	if n.Tag == "!!null" {
 		ss.container = make(map[string]interface{})

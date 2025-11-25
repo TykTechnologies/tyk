@@ -32,7 +32,7 @@ func TestGetJWTConfiguration(t *testing.T) {
 		j.BasePolicyClaims = []string{"policy"}
 		j.SubjectClaims = []string{"new_sub"}
 
-		oas.GetTykExtension().Server.Authentication.SecuritySchemes.Set("jwtAuth", j)
+		oas.GetTykExtension().Server.Authentication.SecuritySchemes.set("jwtAuth", j)
 		gotten := oas.GetJWTConfiguration()
 
 		assert.Equal(t, j.AllowedIssuers, gotten.AllowedIssuers)

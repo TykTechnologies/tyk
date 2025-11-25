@@ -543,54 +543,52 @@ func (s *OAS) validateCompliantModeAuthentication() error {
 	}
 
 	// Check auth methods in SecuritySchemes
-	if tykAuth.SecuritySchemes.Len() > 0 {
-		for schemeName, scheme := range tykAuth.SecuritySchemes.iter() {
-			// Check if this auth method is enabled
-			enabled := false
+	for schemeName, scheme := range tykAuth.SecuritySchemes.iter() {
+		// Check if this auth method is enabled
+		enabled := false
 
-			// Type-specific enabled checks
-			switch v := scheme.(type) {
-			case *Token:
-				if v.Enabled != nil && *v.Enabled {
+		// Type-specific enabled checks
+		switch v := scheme.(type) {
+		case *Token:
+			if v.Enabled != nil && *v.Enabled {
+				enabled = true
+			}
+		case *JWT:
+			if v.Enabled {
+				enabled = true
+			}
+		case *Basic:
+			if v.Enabled {
+				enabled = true
+			}
+		case *OAuth:
+			if v.Enabled {
+				enabled = true
+			}
+		case *HMAC:
+			if v.Enabled {
+				enabled = true
+			}
+		case *OIDC:
+			if v.Enabled {
+				enabled = true
+			}
+		case *CustomPluginAuthentication:
+			if v.Enabled {
+				enabled = true
+			}
+		case map[string]interface{}:
+			// Handle untyped schemes
+			if enabledVal, ok := v["enabled"]; ok {
+				if enabledBool, ok := enabledVal.(bool); ok && enabledBool {
 					enabled = true
-				}
-			case *JWT:
-				if v.Enabled {
-					enabled = true
-				}
-			case *Basic:
-				if v.Enabled {
-					enabled = true
-				}
-			case *OAuth:
-				if v.Enabled {
-					enabled = true
-				}
-			case *HMAC:
-				if v.Enabled {
-					enabled = true
-				}
-			case *OIDC:
-				if v.Enabled {
-					enabled = true
-				}
-			case *CustomPluginAuthentication:
-				if v.Enabled {
-					enabled = true
-				}
-			case map[string]interface{}:
-				// Handle untyped schemes
-				if enabledVal, ok := v["enabled"]; ok {
-					if enabledBool, ok := enabledVal.(bool); ok && enabledBool {
-						enabled = true
-					}
 				}
 			}
+		}
 
-			// If enabled but not in any security requirement, add to misconfigured list
-			if enabled && !configuredAuthMethods[schemeName] {
-				misconfiguredMethods = append(misconfiguredMethods, schemeName)
-			}
+		// If enabled but not in any security requirement, add to misconfigured list
+		if enabled && !configuredAuthMethods[schemeName] {
+			misconfiguredMethods = append(misconfiguredMethods, schemeName)
 		}
 	}
 

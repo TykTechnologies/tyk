@@ -12,10 +12,10 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func newTestSecuritySchemes(schemes map[string]interface{}) *SecuritySchemes {
-	ss := NewSecuritySchemes()
+func newTestSecuritySchemes(schemes map[string]interface{}) SecuritySchemes {
+	var ss SecuritySchemes
 	for k, v := range schemes {
-		ss.Set(k, v)
+		ss.set(k, v)
 	}
 	return ss
 }
@@ -1840,10 +1840,8 @@ func TestOAS_importAuthentication(t *testing.T) {
 		xTykAPIGateway := &XTykAPIGateway{
 			Server: Server{
 				Authentication: &Authentication{
-					SecuritySchemes: newTestSecuritySchemes(map[string]interface{}{
-						testSecurityNameToken: &Token{
-							Enabled: getBoolPointer(false),
-						},
+					SecuritySchemes: SecuritySchemes{}.SetImmutable(testSecurityNameToken, &Token{
+						Enabled: getBoolPointer(false),
 					}),
 				},
 			},
@@ -1948,7 +1946,7 @@ func TestSecuritySchemes_Import(t *testing.T) {
 	t.Run("token", func(t *testing.T) {
 		check := func(t *testing.T, enable bool) {
 			t.Helper()
-			securitySchemes := NewSecuritySchemes()
+			var securitySchemes SecuritySchemes
 			nativeSecurityScheme := &openapi3.SecurityScheme{
 				Type: typeAPIKey,
 				In:   header,
@@ -1977,7 +1975,7 @@ func TestSecuritySchemes_Import(t *testing.T) {
 	})
 
 	t.Run("jwt", func(t *testing.T) {
-		securitySchemes := NewSecuritySchemes()
+		var securitySchemes SecuritySchemes
 		nativeSecurityScheme := &openapi3.SecurityScheme{
 			Type:         typeHTTP,
 			Scheme:       schemeBearer,
@@ -2003,7 +2001,7 @@ func TestSecuritySchemes_Import(t *testing.T) {
 	})
 
 	t.Run("basic", func(t *testing.T) {
-		securitySchemes := NewSecuritySchemes()
+		var securitySchemes SecuritySchemes
 		nativeSecurityScheme := &openapi3.SecurityScheme{
 			Type:   typeHTTP,
 			Scheme: schemeBasic,
@@ -2028,7 +2026,7 @@ func TestSecuritySchemes_Import(t *testing.T) {
 	})
 
 	t.Run("oauth", func(t *testing.T) {
-		securitySchemes := NewSecuritySchemes()
+		var securitySchemes SecuritySchemes
 		nativeSecurityScheme := &openapi3.SecurityScheme{
 			Type: typeOAuth2,
 		}
@@ -2052,7 +2050,7 @@ func TestSecuritySchemes_Import(t *testing.T) {
 	})
 
 	t.Run("unsupported scheme", func(t *testing.T) {
-		securitySchemes := NewSecuritySchemes()
+		var securitySchemes SecuritySchemes
 		nativeSecurityScheme := &openapi3.SecurityScheme{
 			Type: "unknown",
 		}
@@ -2063,8 +2061,8 @@ func TestSecuritySchemes_Import(t *testing.T) {
 
 	t.Run("update existing one", func(t *testing.T) {
 		existingToken := &Token{}
-		securitySchemes := NewSecuritySchemes()
-		securitySchemes.Set(testSecurityNameToken, existingToken)
+		var securitySchemes SecuritySchemes
+		securitySchemes.set(testSecurityNameToken, existingToken)
 
 		nativeSecurityScheme := &openapi3.SecurityScheme{
 			Type: typeAPIKey,
@@ -2087,35 +2085,35 @@ func TestSecuritySchemes_Import(t *testing.T) {
 
 func TestSecuritySchemes_GetBaseIdentityProvider(t *testing.T) {
 	t.Run("empty", func(t *testing.T) {
-		ss := NewSecuritySchemes()
+		var ss SecuritySchemes
 		t.Run("zero", func(t *testing.T) {
 			assert.Equal(t, apidef.AuthTypeNone, ss.GetBaseIdentityProvider())
 		})
 
-		ss.Set("token", &Token{})
+		ss.set("token", &Token{})
 
 		t.Run("one", func(t *testing.T) {
 			assert.Equal(t, apidef.AuthTypeNone, ss.GetBaseIdentityProvider())
 		})
 	})
 
-	ss := NewSecuritySchemes()
-	ss.Set("token", &Token{})
-	ss.Set("jwt", &JWT{})
-	ss.Set("oauth", &OAuth{})
-	ss.Set("basic", &Basic{})
+	var ss SecuritySchemes
+	ss.set("token", &Token{})
+	ss.set("jwt", &JWT{})
+	ss.set("oauth", &OAuth{})
+	ss.set("basic", &Basic{})
 
 	t.Run("token", func(t *testing.T) {
 		assert.Equal(t, apidef.AuthToken, ss.GetBaseIdentityProvider())
 	})
 
-	ss.Delete("token")
+	ss.delete("token")
 
 	t.Run("jwt", func(t *testing.T) {
 		assert.Equal(t, apidef.JWTClaim, ss.GetBaseIdentityProvider())
 	})
 
-	ss.Delete("jwt")
+	ss.delete("jwt")
 
 	t.Run("oauth", func(t *testing.T) {
 		assert.Equal(t, apidef.OAuthKey, ss.GetBaseIdentityProvider())

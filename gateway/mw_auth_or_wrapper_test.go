@@ -56,10 +56,10 @@ func generateHMACSignature(method, path string, headers map[string]string, secre
 	return url.QueryEscape(sigString)
 }
 
-func newTestSecuritySchemes(input map[string]interface{}) *oas.SecuritySchemes {
-	ss := oas.NewSecuritySchemes()
+func newTestSecuritySchemes(input map[string]interface{}) oas.SecuritySchemes {
+	var ss oas.SecuritySchemes
 	for k, v := range input {
-		ss.Set(k, v)
+		ss = ss.SetImmutable(k, v)
 	}
 	return ss
 }
