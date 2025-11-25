@@ -695,7 +695,7 @@ type SecurityConfig struct {
 	// Any subsequent request with that token must present one of the bound certificates, otherwise the request will be rejected.
 	// This provides protection against token theft and misuse in mTLS environments.
 	// Environment variable: TYK_GW_SECURITY_ENABLECERTIFICATETOKENBINDING
-	DisableCertificateTokenBinding bool `json:"enable_certificate_token_binding"`
+	DisableCertificateTokenBinding bool `json:"disable_certificate_token_binding"`
 }
 
 type NewRelicConfig struct {
