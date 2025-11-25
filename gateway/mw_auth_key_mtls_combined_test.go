@@ -32,7 +32,7 @@ func TestStaticAndDynamicMTLS(t *testing.T) {
 		globalConf.HttpServerOptions.SSLInsecureSkipVerify = true
 		globalConf.HttpServerOptions.SSLCertificates = []string{"default" + certID}
 		// Enable certificate binding for dynamic mTLS
-		globalConf.Security.EnableCertificateBinding = true
+		globalConf.Security.DisableCertificateTokenBinding = false
 	}
 	ts := StartTest(conf)
 	defer ts.Close()
@@ -111,7 +111,7 @@ func TestStaticAndDynamicMTLS(t *testing.T) {
 	})
 
 	t.Run("Legacy dynamic mTLS auto-updates session certificate", func(t *testing.T) {
-		// In legacy mode (using session.Certificate without EnableCertificateBinding or MtlsStaticCertificateBindings),
+		// In legacy mode (using session.Certificate without DisableCertificateTokenBinding or MtlsStaticCertificateBindings),
 		// the session certificate gets auto-updated with the current cert hash.
 		// This means ANY allowlisted certificate will work - no strict binding enforcement.
 		key := CreateSession(ts.Gw, func(s *user.SessionState) {
@@ -362,7 +362,7 @@ func TestCertificateCheckMW_ValidateCertificateFromToken(t *testing.T) {
 		globalConf.HttpServerOptions.UseSSL = true
 		globalConf.HttpServerOptions.SSLInsecureSkipVerify = true
 		globalConf.HttpServerOptions.SSLCertificates = []string{"default" + certID}
-		globalConf.Security.EnableCertificateBinding = true
+		globalConf.Security.DisableCertificateTokenBinding = true
 	}
 	ts := StartTest(conf)
 	defer ts.Close()
@@ -519,7 +519,7 @@ func TestStaticAndDynamicMTLS_ExpiredCertificate(t *testing.T) {
 		globalConf.HttpServerOptions.UseSSL = true
 		globalConf.HttpServerOptions.SSLInsecureSkipVerify = true
 		globalConf.HttpServerOptions.SSLCertificates = []string{"default" + certID}
-		globalConf.Security.EnableCertificateBinding = true
+		globalConf.Security.DisableCertificateTokenBinding = false
 	}
 	ts := StartTest(conf)
 	defer ts.Close()
@@ -620,7 +620,7 @@ func TestMultipleCertificateBindings(t *testing.T) {
 		globalConf.HttpServerOptions.UseSSL = true
 		globalConf.HttpServerOptions.SSLInsecureSkipVerify = true
 		globalConf.HttpServerOptions.SSLCertificates = []string{"default" + certID}
-		globalConf.Security.EnableCertificateBinding = true
+		globalConf.Security.DisableCertificateTokenBinding = false
 	}
 	ts := StartTest(conf)
 	defer ts.Close()

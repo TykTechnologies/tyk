@@ -27,7 +27,7 @@ func TestCertificateTokenBinding(t *testing.T) {
 		globalConf.HttpServerOptions.SSLInsecureSkipVerify = true
 		globalConf.HttpServerOptions.SSLCertificates = []string{"default" + certID}
 		// Enable certificate binding
-		globalConf.Security.EnableCertificateBinding = true
+		globalConf.Security.DisableCertificateTokenBinding = false
 	}
 	ts := StartTest(conf)
 	defer ts.Close()
@@ -143,7 +143,7 @@ func TestCertificateTokenBinding(t *testing.T) {
 	t.Run("Certificate binding disabled - token works with any cert", func(t *testing.T) {
 		// Temporarily disable certificate binding
 		globalConf := ts.Gw.GetConfig()
-		globalConf.Security.EnableCertificateBinding = false
+		globalConf.Security.DisableCertificateTokenBinding = true
 		ts.Gw.SetConfig(globalConf)
 
 		// Create session with certificate 1 hash
@@ -177,7 +177,7 @@ func TestCertificateTokenBinding(t *testing.T) {
 		})
 
 		// Re-enable certificate binding for other tests
-		globalConf.Security.EnableCertificateBinding = true
+		globalConf.Security.DisableCertificateTokenBinding = false
 		ts.Gw.SetConfig(globalConf)
 	})
 
@@ -224,7 +224,7 @@ func TestCertificateTokenBindingWithExpiredCert(t *testing.T) {
 		globalConf.HttpServerOptions.UseSSL = true
 		globalConf.HttpServerOptions.SSLInsecureSkipVerify = true
 		globalConf.HttpServerOptions.SSLCertificates = []string{"default" + certID}
-		globalConf.Security.EnableCertificateBinding = true
+		globalConf.Security.DisableCertificateTokenBinding = false
 	}
 	ts := StartTest(conf)
 	defer ts.Close()
