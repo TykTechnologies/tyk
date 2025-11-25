@@ -300,6 +300,47 @@ func TestDetermineHosts(t *testing.T) {
 			},
 			expected: []string{""},
 		},
+		{
+			name: "gateway tags disabled with tags and edge endpoints → relative path only",
+			apiData: &apidef.APIDefinition{
+				TagsDisabled: true,
+				Tags:         []string{"prod"},
+			},
+			config: ServerRegenerationConfig{
+				DefaultHost: "localhost:8080",
+				EdgeEndpoints: []EdgeEndpoint{
+					{Endpoint: "http://edge1.example.com", Tags: []string{"prod"}},
+					{Endpoint: "http://edge2.example.com", Tags: []string{"prod"}},
+				},
+			},
+			expected: []string{""},
+		},
+		{
+			name: "gateway tags disabled without tags but with edge endpoints → relative path only",
+			apiData: &apidef.APIDefinition{
+				TagsDisabled: true,
+				Tags:         []string{},
+			},
+			config: ServerRegenerationConfig{
+				DefaultHost: "localhost:8080",
+				EdgeEndpoints: []EdgeEndpoint{
+					{Endpoint: "http://edge1.example.com", Tags: []string{"prod"}},
+				},
+			},
+			expected: []string{""},
+		},
+		{
+			name: "gateway tags disabled without edge endpoints → relative path only",
+			apiData: &apidef.APIDefinition{
+				TagsDisabled: true,
+				Tags:         []string{"prod"},
+			},
+			config: ServerRegenerationConfig{
+				DefaultHost:   "localhost:8080",
+				EdgeEndpoints: []EdgeEndpoint{},
+			},
+			expected: []string{""},
+		},
 	}
 
 	for _, tt := range tests {
@@ -772,6 +813,63 @@ func TestRegenerateServers(t *testing.T) {
 		assert.Equal(t, 2, len(oas.Servers))
 		assert.Equal(t, "http://localhost:8080/api", oas.Servers[0].URL)
 		assert.Equal(t, "/api", oas.Servers[1].URL)
+	})
+
+	t.Run("gateway tags disabled removes edge endpoint URLs", func(t *testing.T) {
+		t.Parallel()
+
+		oldAPI := &apidef.APIDefinition{
+			APIID:        "test-api",
+			TagsDisabled: false,
+			Tags:         []string{"prod"},
+			Proxy: apidef.ProxyConfig{
+				ListenPath: "/api",
+			},
+		}
+
+		newAPI := &apidef.APIDefinition{
+			APIID:        "test-api",
+			TagsDisabled: true,
+			Tags:         []string{"prod"},
+			Proxy: apidef.ProxyConfig{
+				ListenPath: "/api",
+			},
+		}
+
+		config := ServerRegenerationConfig{
+			Protocol:    "http://",
+			DefaultHost: "localhost:8080",
+			EdgeEndpoints: []EdgeEndpoint{
+				{Endpoint: "http://edge1.example.com", Tags: []string{"prod"}},
+				{Endpoint: "http://edge2.example.com", Tags: []string{"prod"}},
+			},
+		}
+
+		oas := &OAS{
+			T: openapi3.T{
+				Servers: openapi3.Servers{
+					{URL: "http://edge1.example.com/api"},
+					{URL: "http://edge2.example.com/api"},
+					{URL: "/api"},
+					{URL: "https://user-custom.example.com"},
+				},
+			},
+		}
+
+		err := oas.RegenerateServers(newAPI, oldAPI, nil, nil, config, "")
+		require.NoError(t, err)
+
+		assert.Equal(t, 2, len(oas.Servers))
+
+		urls := make([]string, len(oas.Servers))
+		for i, server := range oas.Servers {
+			urls[i] = server.URL
+		}
+
+		assert.Contains(t, urls, "/api", "Should have relative path URL")
+		assert.Contains(t, urls, "https://user-custom.example.com", "Should preserve user server")
+		assert.NotContains(t, urls, "http://edge1.example.com/api", "Should remove edge endpoint URL 1")
+		assert.NotContains(t, urls, "http://edge2.example.com/api", "Should remove edge endpoint URL 2")
 	})
 }
 

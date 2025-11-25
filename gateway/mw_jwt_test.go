@@ -2460,6 +2460,46 @@ func Test_NoticeInvalidateJWKSCacheForAPI(t *testing.T) {
 	}, 5*time.Second, 100*time.Millisecond, "JWKS cache could not be flushed")
 }
 
+func Test_NoticeInvalidateJWKSCacheForAPI_With_RPC_Listener(t *testing.T) {
+	ts := StartTest(nil)
+	t.Cleanup(ts.Close)
+
+	rpcListener := RPCStorageHandler{
+		KeyPrefix:        "rpc.listener.",
+		SuppressRegister: true,
+		Gw:               ts.Gw,
+	}
+
+	spec, jwtToken := ts.prepareJWTSessionRSAWithEncodedJWKWithAPIID(uuid.NewHex())
+
+	authHeaders := map[string]string{"authorization": jwtToken}
+
+	spec.JWTSource = testHttpJWK
+	ts.Gw.LoadAPI(spec)
+
+	// Fill the JWKS cache
+	_, err := ts.Run(t, test.TestCase{
+		Headers: authHeaders, Code: http.StatusOK,
+	})
+	assert.Nil(t, err)
+
+	// The previous request should have filled the cache with some entries
+	jwkCache := loadOrCreateJWKCacheByApiID(spec.APIID)
+	assert.True(t, jwkCache.Count() > 0)
+
+	jwksFlushEventBuilder := func(apiID string) string {
+		return fmt.Sprintf("%s:%s", apiID, NoticeInvalidateJWKSCacheForAPI.String())
+	}
+
+	rpcListener.ProcessKeySpaceChanges([]string{jwksFlushEventBuilder(spec.APIID)}, spec.OrgID)
+
+	// Should be empty after the event
+	require.Eventuallyf(t, func() bool {
+		jwkCache = loadOrCreateJWKCacheByApiID(spec.APIID)
+		return jwkCache.Count() == 0
+	}, 5*time.Second, 100*time.Millisecond, "JWKS cache could not be flushed")
+}
+
 func TestJWTSessionRSAWithEncodedJWK(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()

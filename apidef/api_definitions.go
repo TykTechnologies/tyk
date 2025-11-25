@@ -464,6 +464,13 @@ type VersionDefinition struct {
 	BaseID string `bson:"base_id" json:"-"` // json tag is `-` because we want this to be hidden to user
 }
 
+func (v *VersionDefinition) ResolvedDefault() string {
+	if v.Default == Self {
+		return v.Name
+	}
+	return v.Default
+}
+
 type VersionData struct {
 	NotVersioned   bool                   `bson:"not_versioned" json:"not_versioned"`
 	DefaultVersion string                 `bson:"default_version" json:"default_version"`

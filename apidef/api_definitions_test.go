@@ -585,3 +585,59 @@ func TestAPIDefinition_IsBaseAPIWithVersioning(t *testing.T) {
 		})
 	}
 }
+
+func TestVersionDefinition_ResolvedDefault(t *testing.T) {
+	tests := []struct {
+		name     string
+		vd       VersionDefinition
+		expected string
+	}{
+		{
+			name: "resolves 'self' to actual version name",
+			vd: VersionDefinition{
+				Name:    "v1",
+				Default: Self,
+			},
+			expected: "v1",
+		},
+		{
+			name: "keeps specific version unchanged",
+			vd: VersionDefinition{
+				Name:    "v1",
+				Default: "v2",
+			},
+			expected: "v2",
+		},
+		{
+			name: "handles empty default",
+			vd: VersionDefinition{
+				Name:    "v1",
+				Default: "",
+			},
+			expected: "",
+		},
+		{
+			name: "handles empty name with self",
+			vd: VersionDefinition{
+				Name:    "",
+				Default: Self,
+			},
+			expected: "",
+		},
+		{
+			name: "handles both empty",
+			vd: VersionDefinition{
+				Name:    "",
+				Default: "",
+			},
+			expected: "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := tt.vd.ResolvedDefault()
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
