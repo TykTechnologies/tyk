@@ -1167,7 +1167,7 @@
             }
           }
         },
-        "disable_certificate_binding": {
+        "disable_certificate_token_binding": {
           "type": "boolean"
         }
       }
