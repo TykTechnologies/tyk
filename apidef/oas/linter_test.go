@@ -68,7 +68,7 @@ func TestXTykGateway_Lint(t *testing.T) {
 		settings.Server.Authentication.SecurityProcessingMode = SecurityProcessingModeLegacy
 		settings.Server.Authentication.Custom.Config.IDExtractor.Source = "body"
 		settings.Server.Authentication.Custom.Config.IDExtractor.With = "regex"
-		settings.Server.Authentication.SecuritySchemes = newTestSecuritySchemes(map[string]interface{}{
+		settings.Server.Authentication.SecuritySchemes = newTestSecuritySchemes(map[string]SecuritySchemeMarker{
 			"test-basic": securityScheme,
 		})
 		settings.Server.Protocol = "http"

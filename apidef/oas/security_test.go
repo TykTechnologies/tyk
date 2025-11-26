@@ -33,7 +33,8 @@ func TestGetJWTConfiguration(t *testing.T) {
 		j.SubjectClaims = []string{"new_sub"}
 
 		//todo same here
-		oas.GetTykExtension().Server.Authentication.SecuritySchemes.set("jwtAuth", j)
+		auth := oas.GetTykExtension().Server.Authentication
+		auth.SecuritySchemes = auth.SecuritySchemes.Set("jwtAuth", j)
 		gotten := oas.GetJWTConfiguration()
 
 		assert.Equal(t, j.AllowedIssuers, gotten.AllowedIssuers)
@@ -256,7 +257,7 @@ func TestOAS_Token(t *testing.T) {
 			ExtensionTykAPIGateway: &XTykAPIGateway{
 				Server: Server{
 					Authentication: &Authentication{
-						SecuritySchemes: newTestSecuritySchemes(map[string]interface{}{
+						SecuritySchemes: newTestSecuritySchemes(map[string]SecuritySchemeMarker{
 							securityName: &token,
 						}),
 					},
@@ -275,7 +276,7 @@ func TestOAS_Token(t *testing.T) {
 			SecuritySchemes: oas.Components.SecuritySchemes,
 		}
 
-		convertedOAS.SetTykExtension(&XTykAPIGateway{Server: Server{Authentication: &Authentication{SecuritySchemes: newTestSecuritySchemes(map[string]interface{}{})}}})
+		convertedOAS.SetTykExtension(&XTykAPIGateway{Server: Server{Authentication: &Authentication{SecuritySchemes: newTestSecuritySchemes(map[string]SecuritySchemeMarker{})}}})
 		convertedOAS.fillToken(api)
 
 		return convertedOAS
@@ -340,7 +341,7 @@ func TestOAS_Token_MultipleSecuritySchemes(t *testing.T) {
 		Server: Server{
 			Authentication: &Authentication{
 				Enabled: true,
-				SecuritySchemes: newTestSecuritySchemes(map[string]interface{}{
+				SecuritySchemes: newTestSecuritySchemes(map[string]SecuritySchemeMarker{
 					securityName: &Token{
 						Enabled: getBoolPointer(true),
 					},
@@ -437,7 +438,7 @@ func TestOAS_JWT(t *testing.T) {
 		ExtensionTykAPIGateway: &XTykAPIGateway{
 			Server: Server{
 				Authentication: &Authentication{
-					SecuritySchemes: newTestSecuritySchemes(map[string]interface{}{
+					SecuritySchemes: newTestSecuritySchemes(map[string]SecuritySchemeMarker{
 						securityName: &jwt,
 					}),
 				},
@@ -455,7 +456,7 @@ func TestOAS_JWT(t *testing.T) {
 		&XTykAPIGateway{
 			Server: Server{
 				Authentication: &Authentication{
-					SecuritySchemes: newTestSecuritySchemes(map[string]interface{}{}),
+					SecuritySchemes: newTestSecuritySchemes(map[string]SecuritySchemeMarker{}),
 				},
 			},
 		})
@@ -483,7 +484,7 @@ func TestOAS_JWT(t *testing.T) {
 		ExtensionTykAPIGateway: &XTykAPIGateway{
 			Server: Server{
 				Authentication: &Authentication{
-					SecuritySchemes: newTestSecuritySchemes(map[string]interface{}{
+					SecuritySchemes: newTestSecuritySchemes(map[string]SecuritySchemeMarker{
 						securityName: &JWT{
 							CustomClaimValidation: oas.GetJWTConfiguration().CustomClaimValidation,
 							JTIValidation: JTIValidation{
@@ -536,7 +537,7 @@ func TestOAS_Basic(t *testing.T) {
 		ExtensionTykAPIGateway: &XTykAPIGateway{
 			Server: Server{
 				Authentication: &Authentication{
-					SecuritySchemes: newTestSecuritySchemes(map[string]interface{}{
+					SecuritySchemes: newTestSecuritySchemes(map[string]SecuritySchemeMarker{
 						securityName: &basic,
 					}),
 				},
@@ -553,7 +554,7 @@ func TestOAS_Basic(t *testing.T) {
 	convertedOAS.SetTykExtension(&XTykAPIGateway{
 		Server: Server{
 			Authentication: &Authentication{
-				SecuritySchemes: newTestSecuritySchemes(map[string]interface{}{}),
+				SecuritySchemes: newTestSecuritySchemes(map[string]SecuritySchemeMarker{}),
 			},
 		},
 	})
@@ -603,7 +604,7 @@ func TestOAS_OAuth(t *testing.T) {
 		ExtensionTykAPIGateway: &XTykAPIGateway{
 			Server: Server{
 				Authentication: &Authentication{
-					SecuritySchemes: newTestSecuritySchemes(map[string]interface{}{
+					SecuritySchemes: newTestSecuritySchemes(map[string]SecuritySchemeMarker{
 						securityName: &oauth,
 					}),
 				},
@@ -667,7 +668,7 @@ func TestOAS_ExternalOAuth(t *testing.T) {
 		ExtensionTykAPIGateway: &XTykAPIGateway{
 			Server: Server{
 				Authentication: &Authentication{
-					SecuritySchemes: newTestSecuritySchemes(map[string]interface{}{
+					SecuritySchemes: newTestSecuritySchemes(map[string]SecuritySchemeMarker{
 						securityName: &externalOAuth,
 					}),
 				},
@@ -893,7 +894,7 @@ func TestOAS_extractSecurityTo_ORLogic(t *testing.T) {
 		oas.SetTykExtension(&XTykAPIGateway{
 			Server: Server{
 				Authentication: &Authentication{
-					SecuritySchemes: newTestSecuritySchemes(map[string]interface{}{
+					SecuritySchemes: newTestSecuritySchemes(map[string]SecuritySchemeMarker{
 						"token-auth": &Token{Enabled: &trueVal},
 						"jwt-auth":   &JWT{Enabled: true},
 					}),
@@ -941,7 +942,7 @@ func TestOAS_extractSecurityTo_ORLogic(t *testing.T) {
 		oas.SetTykExtension(&XTykAPIGateway{
 			Server: Server{
 				Authentication: &Authentication{
-					SecuritySchemes: newTestSecuritySchemes(map[string]interface{}{
+					SecuritySchemes: newTestSecuritySchemes(map[string]SecuritySchemeMarker{
 						"token-auth": &Token{Enabled: &trueVal},
 						"jwt-auth":   &JWT{Enabled: true},
 					}),
@@ -1001,7 +1002,7 @@ func TestOAS_extractSecurityTo_VendorExtensionSecurity(t *testing.T) {
 				Authentication: &Authentication{
 					Enabled:                true,
 					SecurityProcessingMode: SecurityProcessingModeCompliant,
-					SecuritySchemes: newTestSecuritySchemes(map[string]interface{}{
+					SecuritySchemes: newTestSecuritySchemes(map[string]SecuritySchemeMarker{
 						"authToken": &Token{Enabled: &trueVal},
 						"jwtAuth": &JWT{
 							Enabled:           true,
@@ -1143,7 +1144,7 @@ func TestOAS_GetJWTConfiguration_VendorSecurity(t *testing.T) {
 			Server: Server{
 				Authentication: &Authentication{
 					SecurityProcessingMode: SecurityProcessingModeCompliant,
-					SecuritySchemes: newTestSecuritySchemes(map[string]interface{}{
+					SecuritySchemes: newTestSecuritySchemes(map[string]SecuritySchemeMarker{
 						"jwtAuth": expectedJWT,
 					}),
 					Security: [][]string{
@@ -1177,7 +1178,7 @@ func TestOAS_GetJWTConfiguration_EmptySecurity(t *testing.T) {
 		oas.SetTykExtension(&XTykAPIGateway{
 			Server: Server{
 				Authentication: &Authentication{
-					SecuritySchemes: newTestSecuritySchemes(map[string]interface{}{
+					SecuritySchemes: newTestSecuritySchemes(map[string]SecuritySchemeMarker{
 						"jwt-auth": &JWT{
 							Enabled: true,
 							Source:  "header",
@@ -1210,7 +1211,7 @@ func TestOAS_GetJWTConfiguration_EmptySecurity(t *testing.T) {
 		oas.SetTykExtension(&XTykAPIGateway{
 			Server: Server{
 				Authentication: &Authentication{
-					SecuritySchemes: newTestSecuritySchemes(map[string]interface{}{
+					SecuritySchemes: newTestSecuritySchemes(map[string]SecuritySchemeMarker{
 						"jwt-auth": &JWT{
 							Enabled: true,
 							Source:  "header",
@@ -1231,7 +1232,7 @@ func TestOAS_GetJWTConfiguration_EmptySecurity(t *testing.T) {
 		oas.SetTykExtension(&XTykAPIGateway{
 			Server: Server{
 				Authentication: &Authentication{
-					SecuritySchemes: newTestSecuritySchemes(map[string]interface{}{}),
+					SecuritySchemes: newTestSecuritySchemes(map[string]SecuritySchemeMarker{}),
 				},
 			},
 		})
@@ -1257,7 +1258,7 @@ func TestOAS_GetJWTConfiguration_EmptySecurity(t *testing.T) {
 		oas.SetTykExtension(&XTykAPIGateway{
 			Server: Server{
 				Authentication: &Authentication{
-					SecuritySchemes: newTestSecuritySchemes(map[string]interface{}{
+					SecuritySchemes: newTestSecuritySchemes(map[string]SecuritySchemeMarker{
 						"jwt-auth": &JWT{
 							Enabled: true,
 							Source:  "header",
@@ -1534,7 +1535,7 @@ func createTestTykExtension() *XTykAPIGateway {
 			},
 			Authentication: &Authentication{
 				Enabled: true,
-				SecuritySchemes: newTestSecuritySchemes(map[string]interface{}{
+				SecuritySchemes: newTestSecuritySchemes(map[string]SecuritySchemeMarker{
 					"apiKey": &Token{
 						Enabled: &boolTrue,
 					},
@@ -1647,7 +1648,7 @@ func TestCompliantModeSecuritySeparation(t *testing.T) {
 				Authentication: &Authentication{
 					Enabled:                true,
 					SecurityProcessingMode: SecurityProcessingModeCompliant,
-					SecuritySchemes: newTestSecuritySchemes(map[string]interface{}{
+					SecuritySchemes: newTestSecuritySchemes(map[string]SecuritySchemeMarker{
 						"jwt": &JWT{
 							Enabled: true,
 						},
@@ -1698,7 +1699,7 @@ func TestCompliantModeSecuritySeparation(t *testing.T) {
 				Authentication: &Authentication{
 					Enabled:                true,
 					SecurityProcessingMode: SecurityProcessingModeCompliant,
-					SecuritySchemes: newTestSecuritySchemes(map[string]interface{}{
+					SecuritySchemes: newTestSecuritySchemes(map[string]SecuritySchemeMarker{
 						"jwt": &JWT{
 							Enabled: true,
 						},
@@ -1856,7 +1857,7 @@ func TestGetJWTConfiguration_ORAuthentication(t *testing.T) {
 			Server: Server{
 				Authentication: &Authentication{
 					SecurityProcessingMode: processingMode,
-					SecuritySchemes: newTestSecuritySchemes(map[string]interface{}{
+					SecuritySchemes: newTestSecuritySchemes(map[string]SecuritySchemeMarker{
 						"apiKeyAuth": &Token{
 							Enabled: func() *bool { b := true; return &b }(),
 						},
@@ -1939,7 +1940,7 @@ func TestGetJWTConfiguration_ORAuthentication(t *testing.T) {
 			Server: Server{
 				Authentication: &Authentication{
 					SecurityProcessingMode: SecurityProcessingModeLegacy,
-					SecuritySchemes: newTestSecuritySchemes(map[string]interface{}{
+					SecuritySchemes: newTestSecuritySchemes(map[string]SecuritySchemeMarker{
 						"jwtAuth": &JWT{
 							Enabled:       true,
 							SigningMethod: "rsa",
@@ -1996,7 +1997,7 @@ func TestGetJWTConfiguration_ORAuthentication(t *testing.T) {
 			Server: Server{
 				Authentication: &Authentication{
 					SecurityProcessingMode: SecurityProcessingModeCompliant,
-					SecuritySchemes: newTestSecuritySchemes(map[string]interface{}{
+					SecuritySchemes: newTestSecuritySchemes(map[string]SecuritySchemeMarker{
 						"jwtAuth": &JWT{
 							Enabled:       true,
 							SigningMethod: "ecdsa",
@@ -2046,7 +2047,7 @@ func TestGetJWTConfiguration_ORAuthentication(t *testing.T) {
 					Server: Server{
 						Authentication: &Authentication{
 							SecurityProcessingMode: mode,
-							SecuritySchemes: newTestSecuritySchemes(map[string]interface{}{
+							SecuritySchemes: newTestSecuritySchemes(map[string]SecuritySchemeMarker{
 								"apiKeyAuth": &Token{
 									Enabled: func() *bool { b := true; return &b }(),
 								},
@@ -2085,7 +2086,7 @@ func TestGetJWTConfiguration_ORAuthentication(t *testing.T) {
 			Server: Server{
 				Authentication: &Authentication{
 					SecurityProcessingMode: SecurityProcessingModeCompliant,
-					SecuritySchemes: newTestSecuritySchemes(map[string]interface{}{
+					SecuritySchemes: newTestSecuritySchemes(map[string]SecuritySchemeMarker{
 						"wrongJWT": &JWT{
 							Enabled: true,
 						},
@@ -2123,7 +2124,7 @@ func TestGetJWTConfiguration_ORAuthentication(t *testing.T) {
 					Server: Server{
 						Authentication: &Authentication{
 							SecurityProcessingMode: mode,
-							SecuritySchemes: newTestSecuritySchemes(map[string]interface{}{
+							SecuritySchemes: newTestSecuritySchemes(map[string]SecuritySchemeMarker{
 								"jwtAuth": &JWT{
 									Enabled: true,
 								},
@@ -2222,7 +2223,7 @@ func TestIsProprietaryAuthScheme(t *testing.T) {
 					Security: [][]string{
 						{"jwtAuth"},
 					},
-					SecuritySchemes: newTestSecuritySchemes(map[string]interface{}{
+					SecuritySchemes: newTestSecuritySchemes(map[string]SecuritySchemeMarker{
 						"jwtAuth": &JWT{Enabled: true},
 					}),
 				},
@@ -2237,7 +2238,7 @@ func TestIsProprietaryAuthScheme(t *testing.T) {
 		oas.SetTykExtension(&XTykAPIGateway{
 			Server: Server{
 				Authentication: &Authentication{
-					SecuritySchemes: newTestSecuritySchemes(map[string]interface{}{
+					SecuritySchemes: newTestSecuritySchemes(map[string]SecuritySchemeMarker{
 						"customPlugin": &CustomPluginAuthentication{Enabled: true},
 					}),
 				},
@@ -2253,7 +2254,7 @@ func TestIsProprietaryAuthScheme(t *testing.T) {
 		oas.SetTykExtension(&XTykAPIGateway{
 			Server: Server{
 				Authentication: &Authentication{
-					SecuritySchemes: newTestSecuritySchemes(map[string]interface{}{
+					SecuritySchemes: newTestSecuritySchemes(map[string]SecuritySchemeMarker{
 						"jwt":   &JWT{Enabled: true},
 						"token": &Token{Enabled: &trueVal},
 						"basic": &Basic{Enabled: true},
@@ -2358,7 +2359,7 @@ func TestIsProprietaryInVendor(t *testing.T) {
 			},
 		}
 		auth := &Authentication{
-			SecuritySchemes: newTestSecuritySchemes(map[string]interface{}{
+			SecuritySchemes: newTestSecuritySchemes(map[string]SecuritySchemeMarker{
 				"jwtAuth": &JWT{Enabled: true},
 			}),
 		}
@@ -2376,7 +2377,7 @@ func TestIsProprietaryInVendor(t *testing.T) {
 			},
 		}
 		auth := &Authentication{
-			SecuritySchemes: newTestSecuritySchemes(map[string]interface{}{
+			SecuritySchemes: newTestSecuritySchemes(map[string]SecuritySchemeMarker{
 				"customAuth": &CustomPluginAuthentication{Enabled: true},
 			}),
 		}
@@ -2394,7 +2395,7 @@ func TestIsProprietaryInVendor(t *testing.T) {
 			},
 		}
 		auth := &Authentication{
-			SecuritySchemes: newTestSecuritySchemes(map[string]interface{}{}),
+			SecuritySchemes: newTestSecuritySchemes(map[string]SecuritySchemeMarker{}),
 		}
 
 		assert.False(t, oas.isProprietaryInVendor("someAuth", auth), "Should assume standard when can't determine type")
@@ -2412,7 +2413,7 @@ func TestIsProprietaryInSecuritySchemes(t *testing.T) {
 	t.Run("should return false when scheme not in SecuritySchemes", func(t *testing.T) {
 		oas := &OAS{}
 		auth := &Authentication{
-			SecuritySchemes: newTestSecuritySchemes(map[string]interface{}{
+			SecuritySchemes: newTestSecuritySchemes(map[string]SecuritySchemeMarker{
 				"jwt": &JWT{Enabled: true},
 			}),
 		}
@@ -2423,7 +2424,7 @@ func TestIsProprietaryInSecuritySchemes(t *testing.T) {
 	t.Run("should return true for CustomPluginAuthentication", func(t *testing.T) {
 		oas := &OAS{}
 		auth := &Authentication{
-			SecuritySchemes: newTestSecuritySchemes(map[string]interface{}{
+			SecuritySchemes: newTestSecuritySchemes(map[string]SecuritySchemeMarker{
 				"custom": &CustomPluginAuthentication{Enabled: true},
 			}),
 		}
@@ -2435,7 +2436,7 @@ func TestIsProprietaryInSecuritySchemes(t *testing.T) {
 		oas := &OAS{}
 		trueVal := true
 		auth := &Authentication{
-			SecuritySchemes: newTestSecuritySchemes(map[string]interface{}{
+			SecuritySchemes: newTestSecuritySchemes(map[string]SecuritySchemeMarker{
 				"jwt":   &JWT{Enabled: true},
 				"token": &Token{Enabled: &trueVal},
 				"basic": &Basic{Enabled: true},
@@ -2592,7 +2593,7 @@ func TestModeSwitching(t *testing.T) {
 				Authentication: &Authentication{
 					Enabled:                true,
 					SecurityProcessingMode: SecurityProcessingModeCompliant, // Switch to compliant
-					SecuritySchemes: newTestSecuritySchemes(map[string]interface{}{
+					SecuritySchemes: newTestSecuritySchemes(map[string]SecuritySchemeMarker{
 						"jwtAuth": &JWT{
 							Enabled: true,
 						},
@@ -2645,7 +2646,7 @@ func TestModeSwitching(t *testing.T) {
 				Authentication: &Authentication{
 					Enabled:                true,
 					SecurityProcessingMode: SecurityProcessingModeLegacy, // Switch to legacy
-					SecuritySchemes: newTestSecuritySchemes(map[string]interface{}{
+					SecuritySchemes: newTestSecuritySchemes(map[string]SecuritySchemeMarker{
 						"jwtAuth": &JWT{
 							Enabled: true,
 						},
@@ -2698,7 +2699,7 @@ func TestModeSwitching(t *testing.T) {
 				Authentication: &Authentication{
 					Enabled:                true,
 					SecurityProcessingMode: SecurityProcessingModeCompliant,
-					SecuritySchemes: newTestSecuritySchemes(map[string]interface{}{
+					SecuritySchemes: newTestSecuritySchemes(map[string]SecuritySchemeMarker{
 						"jwtAuth": &JWT{
 							Enabled: true,
 						},
@@ -2756,7 +2757,7 @@ func TestModeSwitching(t *testing.T) {
 				Authentication: &Authentication{
 					Enabled:                true,
 					SecurityProcessingMode: SecurityProcessingModeLegacy,
-					SecuritySchemes: newTestSecuritySchemes(map[string]interface{}{
+					SecuritySchemes: newTestSecuritySchemes(map[string]SecuritySchemeMarker{
 						"jwtAuth": &JWT{
 							Enabled: true,
 						},
@@ -2810,7 +2811,7 @@ func TestModeSwitching(t *testing.T) {
 				Authentication: &Authentication{
 					Enabled:                true,
 					SecurityProcessingMode: SecurityProcessingModeCompliant,
-					SecuritySchemes: newTestSecuritySchemes(map[string]interface{}{
+					SecuritySchemes: newTestSecuritySchemes(map[string]SecuritySchemeMarker{
 						"jwtAuth": &JWT{
 							Enabled: true,
 						},
@@ -2834,7 +2835,7 @@ func TestModeSwitching(t *testing.T) {
 				Authentication: &Authentication{
 					Enabled:                true,
 					SecurityProcessingMode: SecurityProcessingModeCompliant,
-					SecuritySchemes: newTestSecuritySchemes(map[string]interface{}{
+					SecuritySchemes: newTestSecuritySchemes(map[string]SecuritySchemeMarker{
 						"jwtAuth": &JWT{
 							Enabled: true,
 						},
@@ -2881,7 +2882,7 @@ func TestModeSwitching(t *testing.T) {
 				Authentication: &Authentication{
 					Enabled:                true,
 					SecurityProcessingMode: SecurityProcessingModeCompliant,
-					SecuritySchemes: newTestSecuritySchemes(map[string]interface{}{
+					SecuritySchemes: newTestSecuritySchemes(map[string]SecuritySchemeMarker{
 						"jwtAuth": &JWT{
 							Enabled: true,
 						},
@@ -2939,7 +2940,7 @@ func TestModeSwitching(t *testing.T) {
 				Authentication: &Authentication{
 					Enabled:                true,
 					SecurityProcessingMode: SecurityProcessingModeCompliant,
-					SecuritySchemes: newTestSecuritySchemes(map[string]interface{}{
+					SecuritySchemes: newTestSecuritySchemes(map[string]SecuritySchemeMarker{
 						"hmac": &HMAC{
 							Enabled: true,
 						},
@@ -2995,7 +2996,7 @@ func TestModeSwitching(t *testing.T) {
 				Authentication: &Authentication{
 					Enabled:                true,
 					SecurityProcessingMode: SecurityProcessingModeCompliant,
-					SecuritySchemes: newTestSecuritySchemes(map[string]interface{}{
+					SecuritySchemes: newTestSecuritySchemes(map[string]SecuritySchemeMarker{
 						"hmac": &HMAC{
 							Enabled: true,
 						},
@@ -3056,7 +3057,7 @@ func TestModeSwitching(t *testing.T) {
 				Authentication: &Authentication{
 					Enabled:                true,
 					SecurityProcessingMode: SecurityProcessingModeCompliant,
-					SecuritySchemes: newTestSecuritySchemes(map[string]interface{}{
+					SecuritySchemes: newTestSecuritySchemes(map[string]SecuritySchemeMarker{
 						"hmac":    &HMAC{Enabled: true},
 						"custom":  &CustomPluginAuthentication{Enabled: true},
 						"jwtAuth": &JWT{Enabled: true},
@@ -3077,7 +3078,7 @@ func TestModeSwitching(t *testing.T) {
 				Authentication: &Authentication{
 					Enabled:                true,
 					SecurityProcessingMode: SecurityProcessingModeCompliant,
-					SecuritySchemes: newTestSecuritySchemes(map[string]interface{}{
+					SecuritySchemes: newTestSecuritySchemes(map[string]SecuritySchemeMarker{
 						"hmac":    &HMAC{Enabled: true},
 						"custom":  &CustomPluginAuthentication{Enabled: true},
 						"jwtAuth": &JWT{Enabled: true},
@@ -3130,7 +3131,7 @@ func TestModeSwitching(t *testing.T) {
 				Authentication: &Authentication{
 					Enabled:                true,
 					SecurityProcessingMode: SecurityProcessingModeCompliant,
-					SecuritySchemes: newTestSecuritySchemes(map[string]interface{}{
+					SecuritySchemes: newTestSecuritySchemes(map[string]SecuritySchemeMarker{
 						"hmac":    &HMAC{Enabled: true},
 						"custom":  &CustomPluginAuthentication{Enabled: true},
 						"jwtAuth": &JWT{Enabled: true},

@@ -503,8 +503,8 @@ func TestSecuritySchemesSet_Typed(t *testing.T) {
 	in := &JWT{Enabled: true}
 	//todo
 	// IF you change the method signature to return SecuritySchemes:
-	// ss = ss.set("x", in)
-	ss.set("x", in) // Current failure: modifies a copy and discards it.
+	// ss = ss.set("x", src)
+	ss = ss.Set("x", in) // Current failure: modifies a copy and discards it.
 
 	v, ok := ss.Get("x")
 
@@ -521,13 +521,12 @@ func TestSecuritySchemesSet_Overwrite(t *testing.T) {
 	var ss SecuritySchemes
 
 	// ss = ss.set("x", ...)
-	ss.set("x", map[string]interface{}{
-		"enabled": true,
-	})
+
+	ss = ss.Set("x", &JWT{Enabled: true})
 
 	out := &JWT{Enabled: true}
 	// ss = ss.set("x", ...)
-	ss.set("x", out)
+	ss = ss.Set("x", out)
 
 	v, ok := ss.Get("x")
 	require.True(t, ok, "expected ok")
@@ -561,17 +560,14 @@ func TestSecuritySchemes_UnmarshalJSON_Map(t *testing.T) {
 // The resulting YAML is `{}`, so `decoded` has a length of 0 instead of 1.
 func TestSecuritySchemes_YAMLRoundTrip(t *testing.T) {
 	var ss SecuritySchemes
-	//todo same here
-	ss.set("token", map[string]interface{}{"enabled": true})
+	ss = ss.Set("token", &JWT{Enabled: true})
 
-	out, err := yaml.Marshal(ss)
+	out, err := yaml.Marshal(&ss)
 	require.NoError(t, err)
 
-	var decoded map[string]interface{}
-	require.NoError(t, yaml.Unmarshal(out, &decoded))
-	require.Len(t, decoded, 1, "expected 1 entry after marshal")
-
-	var roundtrip SecuritySchemes
-	require.NoError(t, yaml.Unmarshal(out, &roundtrip))
-	require.Equal(t, 1, roundtrip.Len(), "expected 1 entry after round-trip")
+	var ssDecoded SecuritySchemes
+	require.NoError(t, yaml.Unmarshal(out, &ssDecoded))
+	require.Len(t, ssDecoded.Len(), 1, "expected 1 entry after marshal")
+	_, ok := ssDecoded.Get("token")
+	require.True(t, ok)
 }

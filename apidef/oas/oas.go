@@ -220,74 +220,40 @@ func (s *OAS) getTykAuthentication() (authentication *Authentication) {
 	return
 }
 
-// promoteStruct atomically promotes a scheme from map[string]interface{} to *T,
+// getTypedSchema atomically promotes a scheme from map[string]interface{} to *T,
 // caching the result. It uses a fast path under RLock and a slow path under Lock.
-// todo from visor The `promoteStruct` function performs a read-check-write pattern on the `SecuritySchemes` map without any locking, which is a race condition. The function comment incorrectly claims it is atomic and uses locks, which is dangerously misleading.
-func promoteStruct[T any](ss *SecuritySchemes, key string) *T {
-	if ss == nil || ss.container == nil {
-		return nil
+func getTypedSchema[T SecuritySchemeMarker](s *OAS, key string) T {
+	res, _ := s.getTykSecuritySchemes().Get(key)
+
+	if val, ok := res.(T); ok {
+		return val
 	}
 
-	if v, ok := ss.container[key]; ok && v != nil {
-		if typed, ok := v.(*T); ok {
-			return typed
-		}
-	}
-
-	v, ok := ss.container[key]
-	if !ok || v == nil {
-		return nil
-	}
-
-	if typed, ok := v.(*T); ok {
-		return typed
-	}
-
-	m, ok := v.(map[string]interface{})
-	if !ok {
-		return nil
-	}
-
-	dst := new(T)
-	if !toStructIfMap(m, dst) {
-		return nil
-	}
-
-	ss.container[key] = dst
-	return dst
+	var zero T
+	return zero
 }
 
 func (s *OAS) getTykTokenAuth(name string) *Token {
-	ss := s.getTykSecuritySchemes()
-	return promoteStruct[Token](&ss, name)
+	return getTypedSchema[*Token](s, name)
 }
 
 func (s *OAS) getTykJWTAuth(name string) *JWT {
-	ss := s.getTykSecuritySchemes()
-
-	return promoteStruct[JWT](&ss, name)
+	return getTypedSchema[*JWT](s, name)
 }
 
 // getTykBasicAuth returns the `Basic` security scheme for the given name from the
 // Tyk extension, normalizing map-based representations into `*Basic` and caching
 // the converted pointer for subsequent requests.
 func (s *OAS) getTykBasicAuth(name string) *Basic {
-	ss := s.getTykSecuritySchemes()
-
-	return promoteStruct[Basic](&ss, name)
+	return getTypedSchema[*Basic](s, name)
 }
 
-// todo move the mutex to the oas object -> as a solution
 func (s *OAS) getTykOAuthAuth(name string) *OAuth {
-	ss := s.getTykSecuritySchemes()
-
-	return promoteStruct[OAuth](&ss, name)
+	return getTypedSchema[*OAuth](s, name)
 }
 
 func (s *OAS) getTykExternalOAuthAuth(name string) *ExternalOAuth {
-	ss := s.getTykSecuritySchemes()
-
-	return promoteStruct[ExternalOAuth](&ss, name)
+	return getTypedSchema[*ExternalOAuth](s, name)
 }
 
 func (s *OAS) getTykSecuritySchemes() (securitySchemes SecuritySchemes) {
@@ -544,7 +510,7 @@ func (s *OAS) validateCompliantModeAuthentication() error {
 	}
 
 	// Check auth methods in SecuritySchemes
-	for schemeName, scheme := range tykAuth.SecuritySchemes.iter() {
+	for schemeName, scheme := range tykAuth.SecuritySchemes.Iter() {
 		// Check if this auth method is enabled
 		enabled := false
 

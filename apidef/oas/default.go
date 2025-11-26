@@ -196,11 +196,13 @@ func (s *OAS) importAuthentication(enable bool) error {
 	for _, securityReq := range s.Security {
 		for name := range securityReq {
 			if !processedSchemes[name] {
+				var err error
 				securityScheme := s.Components.SecuritySchemes[name]
-				err := tykSecuritySchemes.Import(name, securityScheme.Value, enable)
+				tykSecuritySchemes, err = tykSecuritySchemes.importNative(name, securityScheme.Value, enable)
 				if err != nil {
 					log.WithError(err).Errorf("Error while importing security scheme: %s", name)
 				}
+				s.Components.SecuritySchemes[name] = securityScheme
 				processedSchemes[name] = true
 			}
 		}

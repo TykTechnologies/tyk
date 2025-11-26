@@ -2,18 +2,18 @@ package oas
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"iter"
 	"reflect"
 	"sort"
 	"time"
 
+	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/getkin/kin-openapi/openapi3"
 	clone "github.com/huandu/go-clone/generic"
 	"github.com/mitchellh/mapstructure"
 	"gopkg.in/yaml.v3"
-
-	"github.com/TykTechnologies/tyk/apidef"
 )
 
 // SecurityProcessingMode constants define how multiple security requirements are processed
@@ -235,19 +235,26 @@ func (a *Authentication) ExtractTo(api *apidef.APIDefinition) {
 // SecuritySchemes zero value is usable. Methods lazily initialize internal state.
 // Recommendation: prefer NewSecuritySchemes for clarity and explicit initialization.
 type SecuritySchemes struct {
-	container map[string]interface{}
+	container map[string]SecuritySchemeMarker
 }
 
-func (ss SecuritySchemes) Set(key string, value interface{}) SecuritySchemes {
+func (ss SecuritySchemes) Set(key string, value SecuritySchemeMarker) SecuritySchemes {
+	if reflect.TypeOf(value).Kind() != reflect.Pointer {
+		panic("value must be a pointer")
+	}
+
 	var res SecuritySchemes
 	res.container = clone.Clone(ss.container)
+	if res.container == nil {
+		res.container = map[string]SecuritySchemeMarker{}
+	}
 	res.container[key] = value
 	return res
 }
 
 // Get retrieves a security scheme by name.
 // It returns the stored value and true when present, otherwise (nil, false).
-func (ss SecuritySchemes) Get(key string) (interface{}, bool) {
+func (ss SecuritySchemes) Get(key string) (SecuritySchemeMarker, bool) {
 	if ss.container == nil {
 		return nil, false
 	}
@@ -280,7 +287,7 @@ func (ss SecuritySchemes) Len() int {
 
 // Iter returns a snapshot under a short read lock to avoid holding locks during iteration.
 // This allocates per call. Given the typical small number of schemes, the trade-off is acceptable.
-func (ss SecuritySchemes) iter() iter.Seq2[string, interface{}] {
+func (ss SecuritySchemes) Iter() iter.Seq2[string, interface{}] {
 	return func(yield func(string, interface{}) bool) {
 		for k, v := range ss.container {
 			if !yield(k, v) {
@@ -291,7 +298,7 @@ func (ss SecuritySchemes) iter() iter.Seq2[string, interface{}] {
 }
 
 // MarshalJSON implements json.Marshaler.
-func (ss SecuritySchemes) MarshalJSON() ([]byte, error) {
+func (ss *SecuritySchemes) MarshalJSON() ([]byte, error) {
 	if ss.container == nil {
 		return []byte(`{}`), nil
 	}
@@ -311,18 +318,25 @@ func (ss *SecuritySchemes) UnmarshalJSON(b []byte) error {
 		return err
 	}
 
+	container := make(map[string]SecuritySchemeMarker)
 	for k, v := range tmp {
-		ss.container[k] = v
+		if decoded, err := decodeScheme(v); err != nil {
+			return err
+		} else {
+			container[k] = decoded
+		}
 	}
-	ss.container = tmp
+
+	ss.container = container
 	return nil
 }
 
 // MarshalYAML makes SecuritySchemes YAML-friendly by exposing its container map.
-func (ss SecuritySchemes) MarshalYAML() (interface{}, error) {
+func (ss *SecuritySchemes) MarshalYAML() (interface{}, error) {
 	if ss.container == nil {
 		return map[string]interface{}{}, nil
 	}
+
 	return clone.Clone(ss.container), nil
 }
 
@@ -330,7 +344,7 @@ func (ss SecuritySchemes) MarshalYAML() (interface{}, error) {
 func (ss *SecuritySchemes) UnmarshalYAML(n *yaml.Node) error {
 	//todo remap keys in the existing map
 	if n.Tag == "!!null" {
-		ss.container = make(map[string]interface{})
+		ss.container = make(map[string]SecuritySchemeMarker)
 		return nil
 	}
 
@@ -339,9 +353,19 @@ func (ss *SecuritySchemes) UnmarshalYAML(n *yaml.Node) error {
 		return err
 	}
 
-	ss.container = tmp
+	if container, err := decodeSchemes(tmp); err != nil {
+		return err
+	} else {
+		ss.container = container
+	}
+
 	return nil
 }
+
+var _ yaml.Unmarshaler = (*SecuritySchemes)(nil)
+var _ yaml.Marshaler = (*SecuritySchemes)(nil)
+var _ json.Marshaler = (*SecuritySchemes)(nil)
+var _ json.Unmarshaler = (*SecuritySchemes)(nil)
 
 // SecurityScheme defines an Importer interface for security schemes.
 type SecurityScheme interface {
@@ -351,91 +375,90 @@ type SecurityScheme interface {
 // loadForImport returns an existing *T if present,
 // or builds a new *T hydrated from a map (if possible),
 // or otherwise returns a zero-value *T.
-func loadForImport[T any](ss *SecuritySchemes, name string) *T {
+func loadForImport[T SecuritySchemeMarker](ss *SecuritySchemes, name string) T {
+	var zero T
+
 	if ss == nil {
-		return nil
+		return zero
 	}
 
 	scheme, exists := ss.Get(name)
 	if !exists {
-		return new(T)
+		return zero
 	}
 
-	if typed, ok := scheme.(*T); ok {
+	if typed, ok := scheme.(T); ok {
 		return typed
 	}
 
-	v := new(T)
+	var v T
 	decoder, err := mapstructure.NewDecoder(&mapstructure.DecoderConfig{TagName: "json", Result: v})
 	if err != nil {
 		log.Debug("Initialization of the new decoder couldn't succeed")
-
-		return nil
-	}
-	err = decoder.Decode(scheme)
-	if err != nil {
-		log.Debug("Unmarshalling to struct couldn't succeed")
-
-		return nil
-	}
-
-	return v
-}
-
-func decode[T any](m map[string]interface{}) *T {
-	v := new(T)
-	decoder, err := mapstructure.NewDecoder(&mapstructure.DecoderConfig{TagName: "json", Result: v})
-	if err != nil {
-		log.Debug("Initialization of the new decoder couldn't succeed")
-
-		return nil
+		return zero
 	}
 
 	err = decoder.Decode(scheme)
 	if err != nil {
 		log.Debug("Unmarshalling to struct couldn't succeed")
-
-		return nil
+		return zero
 	}
 
 	return v
 }
-func (ss SecuritySchemes) Import(name string, nativeSS *openapi3.SecurityScheme, enable bool) error {
+
+func decodeSchemes(in map[string]interface{}) (map[string]SecuritySchemeMarker, error) {
+	out := make(map[string]SecuritySchemeMarker, len(in))
+
+	for k, v := range in {
+		if decoded, err := decodeScheme(v); err != nil {
+			return nil, err
+		} else {
+			out[k] = decoded
+		}
+	}
+
+	return out, nil
+}
+
+func decodeScheme(raw interface{}) (SecuritySchemeMarker, error) {
+	return nil, errors.New("not implemented")
+}
+
+func (ss SecuritySchemes) importNative(name string, nativeSS *openapi3.SecurityScheme, enable bool) (SecuritySchemes, error) {
+	self := ss
+
 	switch {
 	case nativeSS.Type == typeAPIKey:
-		token := loadForImport[Token](&ss, name)
+		token := loadForImport[*Token](&ss, name)
 		token.Enabled = &enable
-		//todo same here
-		ss.set(name, token)
+		self = self.Set(name, token)
 
 	case nativeSS.Type == typeHTTP &&
 		nativeSS.Scheme == schemeBearer &&
 		nativeSS.BearerFormat == bearerFormatJWT:
 
-		jwt := loadForImport[JWT](&ss, name)
+		jwt := loadForImport[*JWT](&ss, name)
 		jwt.Import(enable)
-		//todo same here
-		ss.set(name, jwt)
+		self = self.Set(name, jwt)
 
 	case nativeSS.Type == typeHTTP &&
 		nativeSS.Scheme == schemeBasic:
 
-		basic := loadForImport[Basic](&ss, name)
+		basic := loadForImport[*Basic](&ss, name)
 		basic.Import(enable)
-		//todo same here
-		ss.set(name, basic)
+		self = self.Set(name, basic)
 
 	case nativeSS.Type == typeOAuth2:
-		oauth := loadForImport[OAuth](&ss, name)
+		oauth := loadForImport[*OAuth](&ss, name)
 		oauth.Import(enable)
-		//todo same here
-		ss.set(name, oauth)
+		self = self.Set(name, oauth)
 
 	default:
-		return fmt.Errorf(unsupportedSecuritySchemeFmt, name)
+		return SecuritySchemes{}, fmt.Errorf(unsupportedSecuritySchemeFmt, name)
 	}
 
-	return nil
+	return self, nil
 }
 
 func baseIdentityProviderPrecedence(authType apidef.AuthTypeEnum) int {
@@ -462,7 +485,7 @@ func (ss SecuritySchemes) GetBaseIdentityProvider() (res apidef.AuthTypeEnum) {
 	resBaseIdentityProvider := baseIdentityProviderPrecedence(apidef.AuthTypeNone)
 	res = apidef.OAuthKey
 
-	for _, scheme := range ss.iter() {
+	for _, scheme := range ss.Iter() {
 		if _, ok := scheme.(*Token); ok {
 			return apidef.AuthToken
 		}
@@ -713,6 +736,8 @@ type ScopeToPolicy struct {
 
 // HMAC holds the configuration for the HMAC authentication mode.
 type HMAC struct {
+	SecuritySchemeMarkerImpl
+
 	// Enabled activates the HMAC authentication mode.
 	//
 	// Tyk classic API definition: `enable_signature_checking`.
@@ -894,6 +919,7 @@ type ClientToPolicy struct {
 
 // CustomPluginAuthentication holds configuration for custom plugins.
 type CustomPluginAuthentication struct {
+	SecuritySchemeMarkerImpl
 	// Enabled activates the CustomPluginAuthentication authentication mode.
 	//
 	// Tyk classic API definition: `enable_coprocess_auth`/`use_go_plugin_auth`.
@@ -1155,3 +1181,57 @@ func (id *IDExtractor) ExtractTo(api *apidef.APIDefinition) {
 
 	id.Config.ExtractTo(api)
 }
+
+//
+//var _ json.Marshaler = (*Scheme)(nil)
+//var _ json.Unmarshaler = (*Scheme)(nil)
+//var _ yaml.Marshaler = (*Scheme)(nil)
+//var _ yaml.Unmarshaler = (*Scheme)(nil)
+//
+//type Scheme struct {
+//	src map[string]any
+//	mu  sync.RWMutex
+//
+//	jwt   *JWT
+//	basic *Basic
+//}
+//
+//func NewSchemeFromMap(in map[string]any) *Scheme {
+//	return &Scheme{
+//		src: in,
+//	}
+//}
+//
+//func (a *Scheme) Jwt() *JWT {
+//	return a.jwt
+//}
+//
+//func (a *Scheme) Basic() *Basic {
+//	return a.basic
+//}
+//
+//func (a *Scheme) MarshalJSON() ([]byte, error) {
+//	a.mu.RLock()
+//	defer a.mu.RUnlock()
+//	return json.Marshal(a.src)
+//}
+//
+//func (a *Scheme) UnmarshalJSON(bytes []byte) error {
+//	a.mu.Lock()
+//	defer a.mu.Unlock()
+//	return json.Unmarshal(bytes, &a.src)
+//}
+//
+//func (a *Scheme) MarshalYAML() (interface{}, error) {
+//	a.mu.RLock()
+//	defer a.mu.RUnlock()
+//
+//	return yaml.Marshal(a.src)
+//}
+//
+//func (a *Scheme) UnmarshalYAML(value *yaml.Node) error {
+//	a.mu.Lock()
+//	defer a.mu.Unlock()
+//
+//	return yaml.Unmarshal(value, &a.src)
+//}

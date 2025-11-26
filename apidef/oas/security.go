@@ -23,8 +23,18 @@ const (
 	cookie = "cookie"
 )
 
+type SecuritySchemeMarker interface {
+	markSecuritySchemeIf()
+}
+
+type SecuritySchemeMarkerImpl struct{}
+
+func (s SecuritySchemeMarkerImpl) markSecuritySchemeIf() {}
+
 // Token holds the values related to authentication tokens.
 type Token struct {
+	SecuritySchemeMarkerImpl
+
 	// Enabled activates the token based authentication mode.
 	//
 	// Tyk classic API definition: `auth_configs["authToken"].use_standard_auth`
@@ -110,6 +120,8 @@ type JWK struct {
 
 // JWT holds the configuration for the JWT middleware.
 type JWT struct {
+	SecuritySchemeMarkerImpl
+
 	// Enabled activates the basic authentication mode.
 	//
 	// Tyk classic API definition: `enable_jwt`
@@ -433,6 +445,8 @@ func (s *OAS) extractJWTTo(api *apidef.APIDefinition, name string) {
 
 // Basic type holds configuration values related to http basic authentication.
 type Basic struct {
+	SecuritySchemeMarkerImpl
+
 	// Enabled activates the basic authentication mode.
 	// Tyk classic API definition: `use_basic_auth`
 	Enabled bool `bson:"enabled" json:"enabled"` // required
@@ -505,14 +519,14 @@ func (s *OAS) fillBasic(api apidef.APIDefinition) {
 	}
 }
 
-func (s *OAS) setTykSecurityScheme(key string, value any) bool {
+func (s *OAS) setTykSecurityScheme(key string, value SecuritySchemeMarker) bool {
 	auth := s.getTykAuthentication()
 
 	if auth == nil {
 		return false
 	}
 
-	auth.SecuritySchemes.set(key, value)
+	auth.SecuritySchemes = auth.SecuritySchemes.Set(key, value)
 
 	return true
 }
@@ -566,6 +580,8 @@ func (e *ExtractCredentialsFromBody) ExtractTo(api *apidef.APIDefinition) {
 
 // OAuth configures the OAuth middleware.
 type OAuth struct {
+	SecuritySchemeMarkerImpl
+
 	// Enabled activates the OAuth middleware.
 	//
 	// Tyk classic API definition: `use_oauth2`.
@@ -825,6 +841,8 @@ func (c *IntrospectionCache) ExtractTo(cache *apidef.IntrospectionCache) {
 // To avoid any disruptions, we recommend that you use JSON Web Token (JWT) instead,
 // as explained in https://tyk.io/docs/basic-config-and-security/security/authentication-authorization/ext-oauth-middleware/.
 type ExternalOAuth struct {
+	SecuritySchemeMarkerImpl
+
 	// Enabled activates external oauth functionality.
 	//
 	// Tyk classic API definition: `external_oauth.enabled`.
@@ -889,7 +907,7 @@ func (s *OAS) fillExternalOAuth(api apidef.APIDefinition) {
 	if ShouldOmit(externalOAuth) {
 		externalOAuth = nil
 	}
-	
+
 	s.setTykSecurityScheme(authConfig.Name, externalOAuth)
 }
 
@@ -1106,7 +1124,7 @@ func (s *OAS) fillSecurity(api apidef.APIDefinition) {
 		} else if tykAuthentication.SecuritySchemes.Len() > 0 {
 			// No explicit requirements, create from schemes
 			secReq := openapi3.NewSecurityRequirement()
-			for name := range tykAuthentication.SecuritySchemes.iter() {
+			for name := range tykAuthentication.SecuritySchemes.Iter() {
 				if !s.isProprietaryAuthScheme(name) {
 					secReq[name] = []string{}
 				}
@@ -1155,7 +1173,7 @@ func (s *OAS) fillSecurity(api apidef.APIDefinition) {
 			// When no explicit requirements, create from schemes
 			// Only add non-proprietary schemes to OAS security
 			secReq := openapi3.NewSecurityRequirement()
-			for name := range tykAuthentication.SecuritySchemes.iter() {
+			for name := range tykAuthentication.SecuritySchemes.Iter() {
 				if !s.isProprietaryAuthScheme(name) {
 					secReq[name] = []string{}
 				}
@@ -1348,7 +1366,7 @@ func (s *OAS) GetJWTConfiguration() *JWT {
 	if processingMode == SecurityProcessingModeLegacy {
 		// Legacy mode: only check the first security requirement in OAS security
 		if len(s.Security) > 0 {
-			for keyName := range s.getTykSecuritySchemes().iter() {
+			for keyName := range s.getTykSecuritySchemes().Iter() {
 				if _, ok := s.Security[0][keyName]; ok && isJWTScheme(keyName) {
 					return s.getTykJWTAuth(keyName)
 				}
@@ -1359,7 +1377,7 @@ func (s *OAS) GetJWTConfiguration() *JWT {
 
 		// First check OAS security requirements
 		for _, securityRequirement := range s.Security {
-			for keyName := range s.getTykSecuritySchemes().iter() {
+			for keyName := range s.getTykSecuritySchemes().Iter() {
 				if _, ok := securityRequirement[keyName]; ok && isJWTScheme(keyName) {
 					return s.getTykJWTAuth(keyName)
 				}

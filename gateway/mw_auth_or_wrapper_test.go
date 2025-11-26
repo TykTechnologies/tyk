@@ -142,7 +142,7 @@ func TestLegacyMode_BackwardCompatibility(t *testing.T) {
 					Authentication: &oas.Authentication{
 						Enabled: true,
 						// No securityProcessingMode specified - should default to legacy
-						SecuritySchemes: newTestSecuritySchemes(map[string]interface{}{
+						SecuritySchemes: newTestSecuritySchemes(map[string]SecuritySchemeMarker{
 							"apikey": &oas.Token{
 								Enabled: func() *bool { b := true; return &b }(),
 								AuthSources: oas.AuthSources{
@@ -256,7 +256,7 @@ func TestLegacyMode_BackwardCompatibility(t *testing.T) {
 					Authentication: &oas.Authentication{
 						Enabled:                true,
 						SecurityProcessingMode: oas.SecurityProcessingModeLegacy, // Explicit legacy mode
-						SecuritySchemes: newTestSecuritySchemes(map[string]interface{}{
+						SecuritySchemes: newTestSecuritySchemes(map[string]SecuritySchemeMarker{
 							"apikey": &oas.Token{
 								Enabled: func() *bool { b := true; return &b }(),
 								AuthSources: oas.AuthSources{
@@ -389,7 +389,7 @@ func TestLegacyMode_OnlyFirstRequirementProcessed(t *testing.T) {
 				Authentication: &oas.Authentication{
 					Enabled:                true,
 					SecurityProcessingMode: oas.SecurityProcessingModeLegacy,
-					SecuritySchemes: newTestSecuritySchemes(map[string]interface{}{
+					SecuritySchemes: newTestSecuritySchemes(map[string]SecuritySchemeMarker{
 						"basic": &oas.Basic{
 							Enabled: true,
 							AuthSources: oas.AuthSources{
@@ -551,7 +551,7 @@ func TestLegacyMode_ANDLogicWithinSingleRequirement(t *testing.T) {
 
 		// Configure both auth methods
 		enabled := true
-		tykExtension.Server.Authentication.SecuritySchemes = newTestSecuritySchemes(map[string]interface{}{
+		tykExtension.Server.Authentication.SecuritySchemes = newTestSecuritySchemes(map[string]SecuritySchemeMarker{
 			"jwt": &oas.JWT{
 				Enabled:           true,
 				Source:            base64.StdEncoding.EncodeToString([]byte(jwtRSAPubKey)),
@@ -751,7 +751,7 @@ func TestCompliantMode_JWTOrAPIKeyOrHMAC(t *testing.T) {
 
 		// Configure auth methods
 		enabled := true
-		tykExtension.Server.Authentication.SecuritySchemes = newTestSecuritySchemes(map[string]interface{}{
+		tykExtension.Server.Authentication.SecuritySchemes = newTestSecuritySchemes(map[string]SecuritySchemeMarker{
 			"jwt": &oas.JWT{
 				Enabled:           true,
 				Source:            base64.StdEncoding.EncodeToString([]byte(jwtRSAPubKey)),
@@ -1074,7 +1074,7 @@ func TestCompliantMode_ThreeAuthMethods(t *testing.T) {
 				Authentication: &oas.Authentication{
 					Enabled:                true,
 					SecurityProcessingMode: oas.SecurityProcessingModeCompliant,
-					SecuritySchemes: newTestSecuritySchemes(map[string]interface{}{
+					SecuritySchemes: newTestSecuritySchemes(map[string]SecuritySchemeMarker{
 						"jwt": &oas.JWT{
 							Enabled:           true,
 							Source:            base64.StdEncoding.EncodeToString([]byte(jwtRSAPubKey)),
@@ -1537,7 +1537,7 @@ func TestHMACInORAuthentication(t *testing.T) {
 					Security: [][]string{
 						{"hmac"}, // HMAC as vendor extension option
 					},
-					SecuritySchemes: newTestSecuritySchemes(map[string]interface{}{
+					SecuritySchemes: newTestSecuritySchemes(map[string]SecuritySchemeMarker{
 						"apikey": &oas.Token{
 							Enabled: func() *bool { b := true; return &b }(),
 							AuthSources: oas.AuthSources{
@@ -1758,7 +1758,7 @@ func TestMultiAuthMiddleware_OR_JWT_And_ApiKey_Combination(t *testing.T) {
 				Authentication: &oas.Authentication{
 					Enabled:                true,
 					SecurityProcessingMode: oas.SecurityProcessingModeCompliant,
-					SecuritySchemes: newTestSecuritySchemes(map[string]interface{}{
+					SecuritySchemes: newTestSecuritySchemes(map[string]SecuritySchemeMarker{
 						"jwt": &oas.JWT{
 							Enabled:           true,
 							Source:            base64.StdEncoding.EncodeToString([]byte(jwtRSAPubKey)),
@@ -1905,7 +1905,7 @@ func TestMultiAuthMiddleware_OR_AllMethodsFail(t *testing.T) {
 				Authentication: &oas.Authentication{
 					Enabled:                true,
 					SecurityProcessingMode: oas.SecurityProcessingModeCompliant,
-					SecuritySchemes: newTestSecuritySchemes(map[string]interface{}{
+					SecuritySchemes: newTestSecuritySchemes(map[string]SecuritySchemeMarker{
 						"jwt": &oas.JWT{
 							Enabled:           true,
 							Source:            base64.StdEncoding.EncodeToString([]byte(jwtRSAPubKey)),
@@ -2031,7 +2031,7 @@ func createOASAPIWithBasicAndAPIKey(spec *APISpec) {
 			},
 			Authentication: &oas.Authentication{
 				Enabled: true,
-				SecuritySchemes: newTestSecuritySchemes(map[string]interface{}{
+				SecuritySchemes: newTestSecuritySchemes(map[string]SecuritySchemeMarker{
 					"basic": &oas.Basic{
 						Enabled: true,
 						AuthSources: oas.AuthSources{
@@ -2237,7 +2237,7 @@ func TestSingleSecurityRequirementANDLogic(t *testing.T) {
 				Authentication: &oas.Authentication{
 					Enabled:                true,
 					SecurityProcessingMode: oas.SecurityProcessingModeCompliant, // Even in compliant mode, single requirement = AND
-					SecuritySchemes: newTestSecuritySchemes(map[string]interface{}{
+					SecuritySchemes: newTestSecuritySchemes(map[string]SecuritySchemeMarker{
 						"jwt": &oas.JWT{
 							Enabled:           true,
 							Source:            base64.StdEncoding.EncodeToString([]byte(jwtRSAPubKey)),
@@ -2622,7 +2622,7 @@ func TestMultiAuthMiddleware_OR_CompliantMode_JWT_Second(t *testing.T) {
 				Authentication: &oas.Authentication{
 					Enabled:                true,
 					SecurityProcessingMode: oas.SecurityProcessingModeCompliant,
-					SecuritySchemes: newTestSecuritySchemes(map[string]interface{}{
+					SecuritySchemes: newTestSecuritySchemes(map[string]SecuritySchemeMarker{
 						"apiKeyAuth": &oas.Token{
 							Enabled: func() *bool { b := true; return &b }(),
 							AuthSources: oas.AuthSources{
@@ -2833,7 +2833,7 @@ func TestVendorExtension_MixedANDOR_LegacyMode(t *testing.T) {
 						{"jwt", "hmac"},
 						{"apikey"},
 					},
-					SecuritySchemes: newTestSecuritySchemes(map[string]interface{}{
+					SecuritySchemes: newTestSecuritySchemes(map[string]SecuritySchemeMarker{
 						"jwt": &oas.JWT{
 							Enabled:           true,
 							Source:            base64.StdEncoding.EncodeToString([]byte(jwtRSAPubKey)),
@@ -3045,7 +3045,7 @@ func TestVendorExtension_MixedANDOR_CompliantMode(t *testing.T) {
 						{"jwt", "hmac"},
 						{"apikey"},
 					},
-					SecuritySchemes: newTestSecuritySchemes(map[string]interface{}{
+					SecuritySchemes: newTestSecuritySchemes(map[string]SecuritySchemeMarker{
 						"jwt": &oas.JWT{
 							Enabled:           true,
 							Source:            base64.StdEncoding.EncodeToString([]byte(jwtRSAPubKey)),
@@ -3202,7 +3202,7 @@ func TestVendorExtension_ComplexCombination_LegacyMode(t *testing.T) {
 						{"oauth2"},
 						{"hmac", "custom"},
 					},
-					SecuritySchemes: newTestSecuritySchemes(map[string]interface{}{
+					SecuritySchemes: newTestSecuritySchemes(map[string]SecuritySchemeMarker{
 						"oauth2": &oas.OAuth{
 							Enabled: true,
 							AuthSources: oas.AuthSources{
@@ -3334,7 +3334,7 @@ func TestVendorExtension_ComplexCombination_CompliantMode(t *testing.T) {
 						{"oauth2"},
 						{"hmac", "custom"},
 					},
-					SecuritySchemes: newTestSecuritySchemes(map[string]interface{}{
+					SecuritySchemes: newTestSecuritySchemes(map[string]SecuritySchemeMarker{
 						"oauth2": &oas.OAuth{
 							Enabled: true,
 							AuthSources: oas.AuthSources{
@@ -3489,7 +3489,7 @@ func TestVendorExtension_EmptyOAS_LegacyMode(t *testing.T) {
 						{"hmac"},
 						{"apikey"}, // Ignored in legacy
 					},
-					SecuritySchemes: newTestSecuritySchemes(map[string]interface{}{
+					SecuritySchemes: newTestSecuritySchemes(map[string]SecuritySchemeMarker{
 						"hmac": &oas.HMAC{
 							Enabled: true,
 							AuthSources: oas.AuthSources{
@@ -3637,7 +3637,7 @@ func TestVendorExtension_EmptyOAS_CompliantMode(t *testing.T) {
 						{"hmac"},
 						{"apikey"},
 					},
-					SecuritySchemes: newTestSecuritySchemes(map[string]interface{}{
+					SecuritySchemes: newTestSecuritySchemes(map[string]SecuritySchemeMarker{
 						"hmac": &oas.HMAC{
 							Enabled: true,
 							AuthSources: oas.AuthSources{
@@ -3830,7 +3830,7 @@ func TestMultiAuthMiddleware_AND_Within_OR_Groups(t *testing.T) {
 				Authentication: &oas.Authentication{
 					Enabled:                true,
 					SecurityProcessingMode: oas.SecurityProcessingModeCompliant,
-					SecuritySchemes: newTestSecuritySchemes(map[string]interface{}{
+					SecuritySchemes: newTestSecuritySchemes(map[string]SecuritySchemeMarker{
 						"jwtAuth": &oas.JWT{
 							Enabled:           true,
 							Source:            base64.StdEncoding.EncodeToString([]byte(jwtRSAPubKey)),
@@ -4012,7 +4012,7 @@ func TestAuthORWrapper_OAuth2_Internal(t *testing.T) {
 				Authentication: &oas.Authentication{
 					Enabled:                true,
 					SecurityProcessingMode: oas.SecurityProcessingModeCompliant,
-					SecuritySchemes: newTestSecuritySchemes(map[string]interface{}{
+					SecuritySchemes: newTestSecuritySchemes(map[string]SecuritySchemeMarker{
 						"oauth2": &oas.OAuth{
 							Enabled: true,
 							AuthSources: oas.AuthSources{
@@ -4238,7 +4238,7 @@ func TestAuthORWrapper_getMiddlewareForScheme(t *testing.T) {
 				tykExt := &oas.XTykAPIGateway{
 					Server: oas.Server{
 						Authentication: &oas.Authentication{
-							SecuritySchemes: newTestSecuritySchemes(map[string]interface{}{
+							SecuritySchemes: newTestSecuritySchemes(map[string]SecuritySchemeMarker{
 								"jwtAuth": &oas.JWT{
 									Enabled: true,
 								},
@@ -4261,7 +4261,7 @@ func TestAuthORWrapper_getMiddlewareForScheme(t *testing.T) {
 				tykExt := &oas.XTykAPIGateway{
 					Server: oas.Server{
 						Authentication: &oas.Authentication{
-							SecuritySchemes: newTestSecuritySchemes(map[string]interface{}{
+							SecuritySchemes: newTestSecuritySchemes(map[string]SecuritySchemeMarker{
 								"hmacAuth": &oas.HMAC{
 									Enabled: true,
 								},
@@ -4284,7 +4284,7 @@ func TestAuthORWrapper_getMiddlewareForScheme(t *testing.T) {
 				tykExt := &oas.XTykAPIGateway{
 					Server: oas.Server{
 						Authentication: &oas.Authentication{
-							SecuritySchemes: newTestSecuritySchemes(map[string]interface{}{
+							SecuritySchemes: newTestSecuritySchemes(map[string]SecuritySchemeMarker{
 								"oidcAuth": &oas.OIDC{
 									Enabled: true,
 								},
@@ -4541,7 +4541,7 @@ func TestIntegration_StandardOAS_JWT(t *testing.T) {
 				Authentication: &oas.Authentication{
 					Enabled:                true,
 					SecurityProcessingMode: oas.SecurityProcessingModeCompliant,
-					SecuritySchemes: newTestSecuritySchemes(map[string]interface{}{
+					SecuritySchemes: newTestSecuritySchemes(map[string]SecuritySchemeMarker{
 						"jwt": &oas.JWT{
 							Enabled:           true,
 							Source:            base64.StdEncoding.EncodeToString([]byte(jwtRSAPubKey)),
@@ -4667,7 +4667,7 @@ func TestIntegration_StandardOAS_APIKey(t *testing.T) {
 				Authentication: &oas.Authentication{
 					Enabled:                true,
 					SecurityProcessingMode: oas.SecurityProcessingModeCompliant,
-					SecuritySchemes: newTestSecuritySchemes(map[string]interface{}{
+					SecuritySchemes: newTestSecuritySchemes(map[string]SecuritySchemeMarker{
 						"apikey": &oas.Token{
 							Enabled: func() *bool { b := true; return &b }(),
 							AuthSources: oas.AuthSources{
@@ -4785,7 +4785,7 @@ func TestIntegration_StandardOAS_Basic(t *testing.T) {
 				Authentication: &oas.Authentication{
 					Enabled:                true,
 					SecurityProcessingMode: oas.SecurityProcessingModeCompliant,
-					SecuritySchemes: newTestSecuritySchemes(map[string]interface{}{
+					SecuritySchemes: newTestSecuritySchemes(map[string]SecuritySchemeMarker{
 						"basic": &oas.Basic{
 							Enabled: true,
 							AuthSources: oas.AuthSources{
@@ -4924,7 +4924,7 @@ func TestIntegration_OR_JWT_And_APIKey(t *testing.T) {
 				Authentication: &oas.Authentication{
 					Enabled:                true,
 					SecurityProcessingMode: oas.SecurityProcessingModeCompliant,
-					SecuritySchemes: newTestSecuritySchemes(map[string]interface{}{
+					SecuritySchemes: newTestSecuritySchemes(map[string]SecuritySchemeMarker{
 						"jwt": &oas.JWT{
 							Enabled:           true,
 							Source:            base64.StdEncoding.EncodeToString([]byte(jwtRSAPubKey)),
@@ -5090,7 +5090,7 @@ func TestIntegration_AND_JWT_And_APIKey(t *testing.T) {
 				Authentication: &oas.Authentication{
 					Enabled:                true,
 					SecurityProcessingMode: oas.SecurityProcessingModeCompliant,
-					SecuritySchemes: newTestSecuritySchemes(map[string]interface{}{
+					SecuritySchemes: newTestSecuritySchemes(map[string]SecuritySchemeMarker{
 						"jwt": &oas.JWT{
 							Enabled:           true,
 							Source:            base64.StdEncoding.EncodeToString([]byte(jwtRSAPubKey)),
@@ -5266,7 +5266,7 @@ func TestIntegration_AND_Groups_With_HMAC(t *testing.T) {
 					Security: [][]string{
 						{"apikey", "hmac"}, // AND group: both API Key AND HMAC required
 					},
-					SecuritySchemes: newTestSecuritySchemes(map[string]interface{}{
+					SecuritySchemes: newTestSecuritySchemes(map[string]SecuritySchemeMarker{
 						"jwt": &oas.JWT{
 							Enabled:           true,
 							Source:            base64.StdEncoding.EncodeToString([]byte(jwtRSAPubKey)),

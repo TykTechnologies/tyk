@@ -7,6 +7,7 @@ import (
 	internalreflect "github.com/TykTechnologies/tyk/internal/reflect"
 )
 
+// todo: check if it is usable
 func toStructIfMap(input interface{}, val interface{}) bool {
 	mapInput, ok := input.(map[string]interface{})
 	if !ok {
