@@ -238,26 +238,10 @@ type SecuritySchemes struct {
 	container map[string]interface{}
 }
 
-// Set stores a security scheme by name.
-// todo because this is not a pointer operator anymore if we make changes to ss it will not be stored,
-// so we need to return securityschemes as a response
-// maybe switch to pointer?
-func (ss SecuritySchemes) set(key string, value interface{}) {
-	if ss.container == nil {
-		ss.container = make(map[string]interface{})
-	}
-
-	ss.container[key] = value
-}
-
-// SetImmutable test helpers.
-// Deprecated: use only for test purposes.
-// don't use it in production code.
-// todo The test helper `SetImmutable` is buggy. It modifies the map of a value-receiver copy (`ss`) but returns a different struct (`res`) that holds a clone of the map from before the modification. The modification `ss.container[key] = value` is therefore lost.
-func (ss SecuritySchemes) SetImmutable(key string, value interface{}) SecuritySchemes {
+func (ss SecuritySchemes) Set(key string, value interface{}) SecuritySchemes {
 	var res SecuritySchemes
 	res.container = clone.Clone(ss.container)
-	ss.container[key] = value
+	res.container[key] = value
 	return res
 }
 
@@ -280,11 +264,12 @@ func (ss SecuritySchemes) GetVal(key string) interface{} {
 
 // Delete removes a scheme from the receiver by name.
 // It silently returns when the receiver or its container map is nil.
-func (ss SecuritySchemes) delete(key string) {
-	if ss.container == nil {
-		return
-	}
-	delete(ss.container, key)
+func (ss SecuritySchemes) delete(key string) SecuritySchemes {
+	var res SecuritySchemes
+	res.container = clone.Clone(ss.container)
+
+	delete(res.container, key)
+	return res
 }
 
 // Len reports the number of registered security schemes.
@@ -296,25 +281,9 @@ func (ss SecuritySchemes) Len() int {
 // Iter returns a snapshot under a short read lock to avoid holding locks during iteration.
 // This allocates per call. Given the typical small number of schemes, the trade-off is acceptable.
 func (ss SecuritySchemes) iter() iter.Seq2[string, interface{}] {
-	//todo refactor here if need be
 	return func(yield func(string, interface{}) bool) {
-		if ss.container == nil {
-			return
-		}
-
-		snap := make([]struct {
-			k string
-			v interface{}
-		}, 0, len(ss.container))
 		for k, v := range ss.container {
-			snap = append(snap, struct {
-				k string
-				v interface{}
-			}{k, v})
-		}
-
-		for _, e := range snap {
-			if !yield(e.k, e.v) {
+			if !yield(k, v) {
 				return
 			}
 		}
@@ -322,7 +291,6 @@ func (ss SecuritySchemes) iter() iter.Seq2[string, interface{}] {
 }
 
 // MarshalJSON implements json.Marshaler.
-// It snapshots the map under RLock, unlocks, then marshals.
 func (ss SecuritySchemes) MarshalJSON() ([]byte, error) {
 	if ss.container == nil {
 		return []byte(`{}`), nil
@@ -332,9 +300,7 @@ func (ss SecuritySchemes) MarshalJSON() ([]byte, error) {
 }
 
 // UnmarshalJSON implements json.Unmarshaler.
-// It builds a temporary map, then replaces the internal map under Lock.
 func (ss *SecuritySchemes) UnmarshalJSON(b []byte) error {
-	//todo remap keys in the existing map
 	if string(b) == "null" {
 		ss.container = nil
 		return nil
@@ -345,6 +311,9 @@ func (ss *SecuritySchemes) UnmarshalJSON(b []byte) error {
 		return err
 	}
 
+	for k, v := range tmp {
+		ss.container[k] = v
+	}
 	ss.container = tmp
 	return nil
 }
@@ -413,6 +382,24 @@ func loadForImport[T any](ss *SecuritySchemes, name string) *T {
 	return v
 }
 
+func decode[T any](m map[string]interface{}) *T {
+	v := new(T)
+	decoder, err := mapstructure.NewDecoder(&mapstructure.DecoderConfig{TagName: "json", Result: v})
+	if err != nil {
+		log.Debug("Initialization of the new decoder couldn't succeed")
+
+		return nil
+	}
+
+	err = decoder.Decode(scheme)
+	if err != nil {
+		log.Debug("Unmarshalling to struct couldn't succeed")
+
+		return nil
+	}
+
+	return v
+}
 func (ss SecuritySchemes) Import(name string, nativeSS *openapi3.SecurityScheme, enable bool) error {
 	switch {
 	case nativeSS.Type == typeAPIKey:

@@ -70,8 +70,8 @@ func (s *OAS) fillToken(api apidef.APIDefinition) {
 	if ShouldOmit(token.Signature) {
 		token.Signature = nil
 	}
-	//todo same thing with reassignment here
-	s.getTykSecuritySchemes().set(authConfig.Name, token)
+
+	s.setTykSecurityScheme(authConfig.Name, token)
 
 	if ShouldOmit(token) {
 		s.getTykSecuritySchemes().delete(authConfig.Name)
@@ -382,8 +382,8 @@ func (s *OAS) fillJWT(api apidef.APIDefinition) {
 	jwt.NotBeforeValidationSkew = api.JWTNotBeforeValidationSkew
 	jwt.ExpiresAtValidationSkew = api.JWTExpiresAtValidationSkew
 	jwt.IDPClientIDMappingDisabled = api.IDPClientIDMappingDisabled
-	//todo same here
-	s.getTykSecuritySchemes().set(ac.Name, jwt)
+
+	s.setTykSecurityScheme(ac.Name, jwt)
 
 	if ShouldOmit(jwt) {
 		s.getTykSecuritySchemes().delete(ac.Name)
@@ -497,12 +497,24 @@ func (s *OAS) fillBasic(api apidef.APIDefinition) {
 	if ShouldOmit(basic.ExtractCredentialsFromBody) {
 		basic.ExtractCredentialsFromBody = nil
 	}
-	//todo same here
-	s.getTykSecuritySchemes().set(ac.Name, basic)
+
+	s.setTykSecurityScheme(ac.Name, basic)
 
 	if ShouldOmit(basic) {
 		s.getTykSecuritySchemes().delete(ac.Name)
 	}
+}
+
+func (s *OAS) setTykSecurityScheme(key string, value any) bool {
+	auth := s.getTykAuthentication()
+
+	if auth == nil {
+		return false
+	}
+
+	auth.SecuritySchemes.set(key, value)
+
+	return true
 }
 
 func (s *OAS) extractBasicTo(api *apidef.APIDefinition, name string) {
@@ -626,8 +638,8 @@ func (s *OAS) fillOAuth(api apidef.APIDefinition) {
 	if ShouldOmit(oauth) {
 		oauth = nil
 	}
-	//todo same here
-	s.getTykSecuritySchemes().set(authConfig.Name, oauth)
+
+	s.setTykSecurityScheme(authConfig.Name, oauth)
 }
 
 func (s *OAS) extractOAuthTo(api *apidef.APIDefinition, name string) {
@@ -877,9 +889,8 @@ func (s *OAS) fillExternalOAuth(api apidef.APIDefinition) {
 	if ShouldOmit(externalOAuth) {
 		externalOAuth = nil
 	}
-
-	//todo same here
-	s.getTykSecuritySchemes().set(authConfig.Name, externalOAuth)
+	
+	s.setTykSecurityScheme(authConfig.Name, externalOAuth)
 }
 
 func (s *OAS) extractExternalOAuthTo(api *apidef.APIDefinition, name string) {

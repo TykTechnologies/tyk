@@ -59,7 +59,7 @@ func generateHMACSignature(method, path string, headers map[string]string, secre
 func newTestSecuritySchemes(input map[string]interface{}) oas.SecuritySchemes {
 	var ss oas.SecuritySchemes
 	for k, v := range input {
-		ss = ss.SetImmutable(k, v)
+		ss = ss.Set(k, v)
 	}
 	return ss
 }

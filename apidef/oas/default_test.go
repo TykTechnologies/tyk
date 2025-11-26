@@ -1841,7 +1841,7 @@ func TestOAS_importAuthentication(t *testing.T) {
 		xTykAPIGateway := &XTykAPIGateway{
 			Server: Server{
 				Authentication: &Authentication{
-					SecuritySchemes: SecuritySchemes{}.SetImmutable(testSecurityNameToken, &Token{
+					SecuritySchemes: SecuritySchemes{}.Set(testSecurityNameToken, &Token{
 						Enabled: getBoolPointer(false),
 					}),
 				},
