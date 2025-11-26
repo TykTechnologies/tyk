@@ -2040,15 +2040,13 @@ func handleDashboardRegistration(gw *Gateway) {
 func (gw *Gateway) startDRL() {
 	gwConfig := gw.GetConfig()
 
-	disabled := gwConfig.ManagementNode || gwConfig.EnableSentinelRateLimiter || gwConfig.EnableRedisRollingLimiter || gwConfig.EnableFixedWindowRateLimiter
-
 	gw.drlOnce.Do(func() {
 		drlManager := &drl.DRL{}
 		gw.SessionLimiter = NewSessionLimiter(gw.ctx, &gwConfig, drlManager)
 
 		gw.DRLManager = drlManager
 
-		if disabled {
+		if gw.isDRLDisabled() {
 			return
 		}
 
@@ -2063,6 +2061,12 @@ func (gw *Gateway) startDRL() {
 
 		gw.startRateLimitNotifications()
 	})
+}
+
+func (gw *Gateway) isDRLDisabled() bool {
+	gwConfig := gw.GetConfig()
+
+	return gwConfig.ManagementNode || gwConfig.EnableSentinelRateLimiter || gwConfig.EnableRedisRollingLimiter || gwConfig.EnableFixedWindowRateLimiter
 }
 
 func (gw *Gateway) setupPortsWhitelist() {
