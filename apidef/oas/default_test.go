@@ -15,6 +15,7 @@ import (
 func newTestSecuritySchemes(schemes map[string]interface{}) SecuritySchemes {
 	var ss SecuritySchemes
 	for k, v := range schemes {
+		//todo same here
 		ss.set(k, v)
 	}
 	return ss
@@ -2062,6 +2063,7 @@ func TestSecuritySchemes_Import(t *testing.T) {
 	t.Run("update existing one", func(t *testing.T) {
 		existingToken := &Token{}
 		var securitySchemes SecuritySchemes
+		//todo same here
 		securitySchemes.set(testSecurityNameToken, existingToken)
 
 		nativeSecurityScheme := &openapi3.SecurityScheme{
@@ -2090,6 +2092,7 @@ func TestSecuritySchemes_GetBaseIdentityProvider(t *testing.T) {
 			assert.Equal(t, apidef.AuthTypeNone, ss.GetBaseIdentityProvider())
 		})
 
+		//todo same here
 		ss.set("token", &Token{})
 
 		t.Run("one", func(t *testing.T) {
@@ -2098,9 +2101,13 @@ func TestSecuritySchemes_GetBaseIdentityProvider(t *testing.T) {
 	})
 
 	var ss SecuritySchemes
+	//todo same here
 	ss.set("token", &Token{})
+	//todo same here
 	ss.set("jwt", &JWT{})
+	//todo same here
 	ss.set("oauth", &OAuth{})
+	//todo same here
 	ss.set("basic", &Basic{})
 
 	t.Run("token", func(t *testing.T) {

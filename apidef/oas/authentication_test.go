@@ -492,11 +492,19 @@ func TestVendorExtensionSecurity(t *testing.T) {
 	})
 }
 
+// TODO: Fails because `set` uses a value receiver.
+// The `ss.set` call modifies a copy of the struct. The original `ss` variable
+// remains nil/empty, so `ss.Get("x")` returns false.
 func TestSecuritySchemesSet_Typed(t *testing.T) {
+	// TODO: Fails because 'ss' is treated as a Value Object but the result is discarded.
+	// FIX: Reassign the result. Change `ss.set(...)` to `ss = ss.set(...)`.
 	var ss SecuritySchemes
 
 	in := &JWT{Enabled: true}
-	ss.set("x", in)
+	//todo
+	// IF you change the method signature to return SecuritySchemes:
+	// ss = ss.set("x", in)
+	ss.set("x", in) // Current failure: modifies a copy and discards it.
 
 	v, ok := ss.Get("x")
 
@@ -504,14 +512,21 @@ func TestSecuritySchemesSet_Typed(t *testing.T) {
 	require.Equal(t, in, v)
 }
 
+// TODO: Fails because state mutations are lost.
+// Both `set` calls operate on transient copies. The second `set` cannot see
+// the map created by the first `set`, and the final `Get` sees nothing at all.
 func TestSecuritySchemesSet_Overwrite(t *testing.T) {
+	// TODO: Fails because updates are lost between calls.
+	// FIX: Chain the updates or reassign: `ss = ss.set(...)`.
 	var ss SecuritySchemes
 
+	// ss = ss.set("x", ...)
 	ss.set("x", map[string]interface{}{
 		"enabled": true,
 	})
 
 	out := &JWT{Enabled: true}
+	// ss = ss.set("x", ...)
 	ss.set("x", out)
 
 	v, ok := ss.Get("x")
@@ -541,8 +556,12 @@ func TestSecuritySchemes_UnmarshalJSON_Map(t *testing.T) {
 	require.Equal(t, 1, ss.Len(), "expected exactly one entry")
 }
 
+// TODO: Fails because `Marshal` sees an empty struct.
+// Since `set` updated a copy, the `ss` passed to `yaml.Marshal` is empty.
+// The resulting YAML is `{}`, so `decoded` has a length of 0 instead of 1.
 func TestSecuritySchemes_YAMLRoundTrip(t *testing.T) {
 	var ss SecuritySchemes
+	//todo same here
 	ss.set("token", map[string]interface{}{"enabled": true})
 
 	out, err := yaml.Marshal(ss)

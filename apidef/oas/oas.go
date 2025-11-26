@@ -222,6 +222,7 @@ func (s *OAS) getTykAuthentication() (authentication *Authentication) {
 
 // promoteStruct atomically promotes a scheme from map[string]interface{} to *T,
 // caching the result. It uses a fast path under RLock and a slow path under Lock.
+// todo from visor The `promoteStruct` function performs a read-check-write pattern on the `SecuritySchemes` map without any locking, which is a race condition. The function comment incorrectly claims it is atomic and uses locks, which is dangerously misleading.
 func promoteStruct[T any](ss *SecuritySchemes, key string) *T {
 	if ss == nil || ss.container == nil {
 		return nil

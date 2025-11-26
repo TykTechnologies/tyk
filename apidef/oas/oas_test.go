@@ -1996,6 +1996,7 @@ func TestYaml(t *testing.T) {
 		for k, v := range tykExt.Server.Authentication.SecuritySchemes.iter() {
 			intVal, ok := v.(int)
 			assert.True(t, ok)
+			//todo same here
 			tykExt.Server.Authentication.SecuritySchemes.set(k, float64(intVal))
 		}
 
@@ -2084,6 +2085,7 @@ func TestOAS_getTykJWTAuth(t *testing.T) {
 
 	// inject map → conversion
 	ss := s.getTykSecuritySchemes()
+	//todo same here
 	ss.set("x", map[string]interface{}{"enabled": true})
 
 	j := s.getTykJWTAuth("x")
@@ -2099,9 +2101,13 @@ func TestOAS_getTykJWTAuth_Missing(t *testing.T) {
 	}
 }
 
+// TODO: Fails because the validator iterates over an empty map.
+// The `set` call failed to persist "jwt" to the struct. `validateCompliantModeAuthentication`
+// loops over `SecuritySchemes`, finds 0 entries, assumes no conflicts exist,
+// and returns nil (success) instead of the expected error.
 func TestValidateCompliantMode_MissingRequirement(t *testing.T) {
-	t.Skipf("todo: investigate")
-
+	// TODO: Fails because the main Authentication struct is never updated.
+	// FIX: You must assign the result of set back to the parent struct.
 	s := &OAS{}
 
 	tykExt := s.GetTykExtension()
@@ -2116,7 +2122,11 @@ func TestValidateCompliantMode_MissingRequirement(t *testing.T) {
 		SecurityProcessingMode: SecurityProcessingModeCompliant,
 	}
 
+	// FAILING LINE:
 	tykExt.Server.Authentication.SecuritySchemes.set("jwt", &JWT{Enabled: true})
+	// todo REQUIRED FIX:
+	// tykExt.Server.Authentication.SecuritySchemes =
+	//     tykExt.Server.Authentication.SecuritySchemes.set("jwt", &JWT{Enabled: true})
 
 	err := s.validateCompliantModeAuthentication()
 	if err == nil {
@@ -2130,6 +2140,7 @@ func TestValidateCompliantMode_OK(t *testing.T) {
 	s.SetTykExtension(&XTykAPIGateway{})
 
 	var ss SecuritySchemes
+	//todo same here
 	ss.set("jwt", &JWT{Enabled: true})
 	auth := &Authentication{
 		SecurityProcessingMode: SecurityProcessingModeCompliant,

@@ -239,6 +239,9 @@ type SecuritySchemes struct {
 }
 
 // Set stores a security scheme by name.
+// todo because this is not a pointer operator anymore if we make changes to ss it will not be stored,
+// so we need to return securityschemes as a response
+// maybe switch to pointer?
 func (ss SecuritySchemes) set(key string, value interface{}) {
 	if ss.container == nil {
 		ss.container = make(map[string]interface{})
@@ -250,6 +253,7 @@ func (ss SecuritySchemes) set(key string, value interface{}) {
 // SetImmutable test helpers.
 // Deprecated: use only for test purposes.
 // don't use it in production code.
+// todo The test helper `SetImmutable` is buggy. It modifies the map of a value-receiver copy (`ss`) but returns a different struct (`res`) that holds a clone of the map from before the modification. The modification `ss.container[key] = value` is therefore lost.
 func (ss SecuritySchemes) SetImmutable(key string, value interface{}) SecuritySchemes {
 	var res SecuritySchemes
 	res.container = clone.Clone(ss.container)
@@ -414,6 +418,7 @@ func (ss SecuritySchemes) Import(name string, nativeSS *openapi3.SecurityScheme,
 	case nativeSS.Type == typeAPIKey:
 		token := loadForImport[Token](&ss, name)
 		token.Enabled = &enable
+		//todo same here
 		ss.set(name, token)
 
 	case nativeSS.Type == typeHTTP &&
@@ -422,6 +427,7 @@ func (ss SecuritySchemes) Import(name string, nativeSS *openapi3.SecurityScheme,
 
 		jwt := loadForImport[JWT](&ss, name)
 		jwt.Import(enable)
+		//todo same here
 		ss.set(name, jwt)
 
 	case nativeSS.Type == typeHTTP &&
@@ -429,11 +435,13 @@ func (ss SecuritySchemes) Import(name string, nativeSS *openapi3.SecurityScheme,
 
 		basic := loadForImport[Basic](&ss, name)
 		basic.Import(enable)
+		//todo same here
 		ss.set(name, basic)
 
 	case nativeSS.Type == typeOAuth2:
 		oauth := loadForImport[OAuth](&ss, name)
 		oauth.Import(enable)
+		//todo same here
 		ss.set(name, oauth)
 
 	default:
