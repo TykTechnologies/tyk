@@ -498,8 +498,6 @@ jobs:
           path: ${{ github.workspace }}/docker-compose.log
           retention-days: 3
           overwrite: true
-          report_xml: 'true'
-          execution_status: ${{ steps.test_execution.outcome }}
   aggregator-ci-test:
     name: Aggregated CI Status
     runs-on: ubuntu-latest
