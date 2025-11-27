@@ -251,7 +251,7 @@ func (s *OAS) getTykJWTAuth(name string) (jwt *JWT) {
 		toStructIfMap(securityScheme, jwt)
 	}
 
-	s.getTykSecuritySchemes()[name] = jwt
+	// s.getTykSecuritySchemes()[name] = jwt
 
 	return
 }
