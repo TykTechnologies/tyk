@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"strings"
 
+	clone "github.com/huandu/go-clone/generic"
 	"github.com/samber/lo"
 
 	"github.com/TykTechnologies/tyk/apidef"
@@ -247,11 +248,9 @@ func (s *OAS) getTykJWTAuth(name string) (jwt *JWT) {
 	jwt = &JWT{}
 	if jwtVal, ok := securityScheme.(*JWT); ok {
 		jwt = jwtVal
-	} else {
-		toStructIfMap(securityScheme, jwt)
+	} else if toStructIfMap(securityScheme, jwt) {
+		s.rewriteSecurityScheme(name, jwt)
 	}
-
-	// s.getTykSecuritySchemes()[name] = jwt
 
 	return
 }
@@ -321,6 +320,16 @@ func (s *OAS) getTykSecuritySchemes() (securitySchemes SecuritySchemes) {
 	}
 
 	return
+}
+
+func (s *OAS) rewriteSecurityScheme(key string, val any) {
+	if s.getTykAuthentication() == nil {
+		return
+	}
+
+	ss := clone.Clone(s.getTykAuthentication().SecuritySchemes)
+	ss[key] = val
+	s.getTykAuthentication().SecuritySchemes = ss
 }
 
 func (s *OAS) getTykSecurityScheme(name string) interface{} {

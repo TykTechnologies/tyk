@@ -16,11 +16,13 @@ func toStructIfMap(input interface{}, val interface{}) bool {
 	inBytes, err := json.Marshal(mapInput)
 	if err != nil {
 		log.Debug("Map input couldn't be marshalled")
+		return false
 	}
 
 	err = json.Unmarshal(inBytes, val)
 	if err != nil {
 		log.Debug("Unmarshalling to struct couldn't succeed")
+		return false
 	}
 
 	return true
