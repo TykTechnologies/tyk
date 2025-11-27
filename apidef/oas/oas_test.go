@@ -1523,6 +1523,247 @@ func TestYaml(t *testing.T) {
 	assert.Equal(t, oasDoc, yamlOASDoc)
 }
 
+func TestOAS_Initialize(t *testing.T) {
+	t.Parallel()
+
+	t.Run("should initialize all security schemes", func(t *testing.T) {
+		t.Parallel()
+
+		// Create OAS with various security schemes
+		oasDoc := &OAS{
+			T: openapi3.T{
+				Components: &openapi3.Components{
+					SecuritySchemes: openapi3.SecuritySchemes{
+						"jwt": &openapi3.SecuritySchemeRef{
+							Value: &openapi3.SecurityScheme{
+								Type:         typeHTTP,
+								Scheme:       schemeBearer,
+								BearerFormat: bearerFormatJWT,
+							},
+						},
+						"basic": &openapi3.SecuritySchemeRef{
+							Value: &openapi3.SecurityScheme{
+								Type:   typeHTTP,
+								Scheme: schemeBasic,
+							},
+						},
+						"apiKey": &openapi3.SecuritySchemeRef{
+							Value: &openapi3.SecurityScheme{
+								Type: typeAPIKey,
+								In:   "header",
+								Name: "X-API-Key",
+							},
+						},
+						"oauth": &openapi3.SecuritySchemeRef{
+							Value: &openapi3.SecurityScheme{
+								Type: typeOAuth2,
+								Flows: &openapi3.OAuthFlows{
+									AuthorizationCode: &openapi3.OAuthFlow{
+										AuthorizationURL: "/oauth/authorize",
+										TokenURL:         "/oauth/token",
+										Scopes:           map[string]string{},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		}
+
+		// Set up Tyk extension with security schemes as map[string]interface{}
+		// This simulates what happens when JSON is unmarshalled
+		xTykAPIGateway := &XTykAPIGateway{
+			Server: Server{
+				Authentication: &Authentication{
+					SecuritySchemes: SecuritySchemes{
+						"jwt": map[string]interface{}{
+							"enabled": true,
+							"source":  "test-source",
+						},
+						"basic": map[string]interface{}{
+							"enabled": true,
+						},
+						"apiKey": map[string]interface{}{
+							"enabled": true,
+						},
+						"oauth": map[string]interface{}{
+							"enabled": true,
+						},
+					},
+				},
+			},
+		}
+		oasDoc.SetTykExtension(xTykAPIGateway)
+
+		// Call Initialize
+		oasDoc.Initialize()
+
+		// Verify that all security schemes have been converted to their proper types
+		securitySchemes := oasDoc.getTykSecuritySchemes()
+
+		// JWT should be converted to *JWT
+		jwt, ok := securitySchemes["jwt"].(*JWT)
+		assert.True(t, ok, "JWT should be converted to *JWT type")
+		assert.True(t, jwt.Enabled)
+
+		// Basic should be converted to *Basic
+		basic, ok := securitySchemes["basic"].(*Basic)
+		assert.True(t, ok, "Basic should be converted to *Basic type")
+		assert.True(t, basic.Enabled)
+
+		// Token should be converted to *Token
+		token, ok := securitySchemes["apiKey"].(*Token)
+		assert.True(t, ok, "Token should be converted to *Token type")
+		assert.NotNil(t, token.Enabled)
+		assert.True(t, *token.Enabled)
+
+		// OAuth should be converted to *OAuth
+		oauth, ok := securitySchemes["oauth"].(*OAuth)
+		assert.True(t, ok, "OAuth should be converted to *OAuth type")
+		assert.True(t, oauth.Enabled)
+	})
+
+	t.Run("should handle nil components gracefully", func(t *testing.T) {
+		t.Parallel()
+
+		oasDoc := &OAS{
+			T: openapi3.T{
+				Components: nil,
+			},
+		}
+
+		// Should not panic
+		oasDoc.Initialize()
+	})
+
+	t.Run("should handle nil security schemes gracefully", func(t *testing.T) {
+		t.Parallel()
+
+		oasDoc := &OAS{
+			T: openapi3.T{
+				Components: &openapi3.Components{
+					SecuritySchemes: nil,
+				},
+			},
+		}
+
+		// Should not panic
+		oasDoc.Initialize()
+	})
+
+	t.Run("should handle external OAuth", func(t *testing.T) {
+		t.Parallel()
+
+		oasDoc := &OAS{
+			T: openapi3.T{
+				Components: &openapi3.Components{
+					SecuritySchemes: openapi3.SecuritySchemes{
+						"externalOAuth": &openapi3.SecuritySchemeRef{
+							Value: &openapi3.SecurityScheme{
+								Type: typeOAuth2,
+								Flows: &openapi3.OAuthFlows{
+									AuthorizationCode: &openapi3.OAuthFlow{
+										AuthorizationURL: "/oauth/authorize",
+										TokenURL:         "/oauth/token",
+										Scopes:           map[string]string{},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		}
+
+		// Set up Tyk extension with external OAuth (has providers)
+		xTykAPIGateway := &XTykAPIGateway{
+			Server: Server{
+				Authentication: &Authentication{
+					SecuritySchemes: SecuritySchemes{
+						"externalOAuth": map[string]interface{}{
+							"enabled": true,
+							"providers": []interface{}{
+								map[string]interface{}{
+									"jwt": map[string]interface{}{
+										"enabled": true,
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		}
+		oasDoc.SetTykExtension(xTykAPIGateway)
+
+		// Call Initialize
+		oasDoc.Initialize()
+
+		// Verify external OAuth is converted
+		securitySchemes := oasDoc.getTykSecuritySchemes()
+		externalOAuth, ok := securitySchemes["externalOAuth"].(*ExternalOAuth)
+		assert.True(t, ok, "ExternalOAuth should be converted to *ExternalOAuth type")
+		assert.True(t, externalOAuth.Enabled)
+		assert.Len(t, externalOAuth.Providers, 1)
+	})
+
+	t.Run("concurrent access should not cause panic", func(t *testing.T) {
+		t.Parallel()
+
+		// Create OAS with JWT security scheme
+		oasDoc := &OAS{
+			T: openapi3.T{
+				Components: &openapi3.Components{
+					SecuritySchemes: openapi3.SecuritySchemes{
+						"jwt": &openapi3.SecuritySchemeRef{
+							Value: &openapi3.SecurityScheme{
+								Type:         typeHTTP,
+								Scheme:       schemeBearer,
+								BearerFormat: bearerFormatJWT,
+							},
+						},
+					},
+				},
+			},
+		}
+
+		xTykAPIGateway := &XTykAPIGateway{
+			Server: Server{
+				Authentication: &Authentication{
+					SecuritySchemes: SecuritySchemes{
+						"jwt": map[string]interface{}{
+							"enabled": true,
+							"source":  "test-source",
+						},
+					},
+				},
+			},
+		}
+		oasDoc.SetTykExtension(xTykAPIGateway)
+
+		// Call Initialize first to properly initialize
+		oasDoc.Initialize()
+
+		// Now simulate concurrent access (which should be safe after initialization)
+		done := make(chan bool)
+		for i := 0; i < 100; i++ {
+			go func() {
+				defer func() {
+					done <- true
+				}()
+				// After Initialize, these calls should just return the cached value
+				_ = oasDoc.getTykJWTAuth("jwt")
+			}()
+		}
+
+		// Wait for all goroutines to complete
+		for i := 0; i < 100; i++ {
+			<-done
+		}
+	})
+}
+
 func Test_RemoveServer(t *testing.T) {
 	createOas := func() *OAS {
 		var spec openapi3.T
