@@ -167,8 +167,7 @@ jobs:
         uses: docker/metadata-action@v5
         with:
           images: |
-            docker.tyk.io/tyk-gateway/tyk-gateway
-            
+            docker.tyk.io/tyk-gateway/tyk-gateway            
             tykio/tyk-gateway
           flavor: |
             latest=false
@@ -199,7 +198,7 @@ jobs:
             BUILD_PACKAGE_NAME=tyk-gateway
       - name: save deb
         uses: actions/upload-artifact@v4
-        if: ${{ matrix.golang_cross == '1.24-bullseye' }}
+        if: ${{ matrix.golang_cross == '1.23-bullseye' }}
         with:
           name: deb
           retention-days: 1
@@ -361,25 +360,25 @@ jobs:
         working-directory: tyk-analytics/tests/api
         run: |
           pytest="pytest --ci --random-order --force-flaky --no-success-flaky-report --maxfail=3 --junitxml=${XUNIT_REPORT_PATH} --cache-clear --ignore=./tests/mdcb -v --log-cli-level=ERROR"
-            pip install -r requirements.txt
-            cat >pytest.env <<-EOF
-            TYK_TEST_BASE_URL=http://localhost:3000/
-            TYK_TEST_GW_URL=https://localhost:8080/
-            TYK_TEST_GW_1_ALFA_URL=https://localhost:8181/
-            TYK_TEST_GW_1_BETA_URL=https://localhost:8182/
-            TYK_TEST_GW_2_ALFA_URL=https://localhost:8281/
-            TYK_TEST_GW_2_BETA_URL=https://localhost:8282/
-            TYK_TEST_MONGODB=localhost:27017
-            TYK_TEST_REDIS=localhost
-            TYK_TEST_DB_ADMIN=12345
-            TYK_TEST_GW_SECRET=352d20ee67be67f6340b4c0605b044b7
-            TYK_TEST_DB_NAME=tyk_analytics
-            TYK_TEST_FEDERATION_HOST=federation
-            TYK_TEST_GRAPHQL_FAKER_HOST=graphql-faker
-            GATEWAY_CONTAINER_NAME=tyk
-            USER_API_SECRET=${{ steps.env_up.outputs.USER_API_SECRET }}
-            EOF
-            env $(cat pytest.env | xargs) $pytest -m "${{ matrix.envfiles.apimarkers }}"
+          pip install -r requirements.txt
+          cat >pytest.env <<-EOF
+          TYK_TEST_BASE_URL=http://localhost:3000/
+          TYK_TEST_GW_URL=https://localhost:8080/
+          TYK_TEST_GW_1_ALFA_URL=https://localhost:8181/
+          TYK_TEST_GW_1_BETA_URL=https://localhost:8182/
+          TYK_TEST_GW_2_ALFA_URL=https://localhost:8281/
+          TYK_TEST_GW_2_BETA_URL=https://localhost:8282/
+          TYK_TEST_MONGODB=localhost:27017
+          TYK_TEST_REDIS=localhost
+          TYK_TEST_DB_ADMIN=12345
+          TYK_TEST_GW_SECRET=352d20ee67be67f6340b4c0605b044b7
+          TYK_TEST_DB_NAME=tyk_analytics
+          TYK_TEST_FEDERATION_HOST=federation
+          TYK_TEST_GRAPHQL_FAKER_HOST=graphql-faker
+          GATEWAY_CONTAINER_NAME=tyk
+          USER_API_SECRET=${{ steps.env_up.outputs.USER_API_SECRET }}
+          EOF
+          env $(cat pytest.env | xargs) $pytest -m "${{ matrix.envfiles.apimarkers }}"
       - name: Generate metadata and upload test reports
         id: metadata_report
         if: always() && (steps.test_execution.conclusion != 'skipped')
@@ -388,22 +387,22 @@ jobs:
           METADATA_REPORT_PATH: metadata.toml
         run: |
           # Generate metadata report
-            set -eo pipefail
-            echo "[metadata]
-            repo = ${{ github.repository }}
-            branch = ${{ github.ref }}
-            commit = ${{ github.sha }}
-            test_suite_version = $BASE_REF
-            test_suite_name = ${{ github.job }}
-            test_suite_run = ${{ github.run_id }}-${{ github.run_attempt }}
-            db = ${{ matrix.envfiles.db }}
-            conf = ${{ matrix.envfiles.config }}
-            cache = ${{ matrix.envfiles.cache }}
-            pump_compatibility = ${{ matrix.pump }}
-            sink_compatibility = ${{ matrix.sink }}
-            " | tee ${METADATA_REPORT_PATH}
-            aws s3 cp ${XUNIT_REPORT_PATH}  s3://assets.dev.tyk.technology/testreports/${REPORT_NAME#*/}.xml
-            aws s3 cp ${METADATA_REPORT_PATH} s3://assets.dev.tyk.technology/testreports/${REPORT_NAME#*/}.metadata.toml
+          set -eo pipefail
+          echo "[metadata]
+          repo = ${{ github.repository }}
+          branch = ${{ github.ref }}
+          commit = ${{ github.sha }}
+          test_suite_version = $BASE_REF
+          test_suite_name = ${{ github.job }}
+          test_suite_run = ${{ github.run_id }}-${{ github.run_attempt }}
+          db = ${{ matrix.envfiles.db }}
+          conf = ${{ matrix.envfiles.config }}
+          cache = ${{ matrix.envfiles.cache }}
+          pump_compatibility = ${{ matrix.pump }}
+          sink_compatibility = ${{ matrix.sink }}
+          " | tee ${METADATA_REPORT_PATH}
+          aws s3 cp ${XUNIT_REPORT_PATH}  s3://assets.dev.tyk.technology/testreports/${REPORT_NAME#*/}.xml
+          aws s3 cp ${METADATA_REPORT_PATH} s3://assets.dev.tyk.technology/testreports/${REPORT_NAME#*/}.metadata.toml
       - name: Docker logs for all components
         if: failure() && (steps.test_execution.outcome != 'success' || steps.env_up.outcome != 'success')
         working-directory: auto
@@ -414,10 +413,10 @@ jobs:
           TYK_MDCB_LICENSE: ${{ secrets.MDCB_LICENSE }}
           ECR: ${{ steps.ecr.outputs.registry }}
         run: |
-            docker compose -p auto -f pro-ha.yml -f deps_pro-ha.yml -f ${{ matrix.envfiles.db }}.yml -f ${{ matrix.envfiles.cache }}.yml --env-file versions.env --profile all logs | sort > ${{ github.workspace }}/docker-compose.log
-            echo "::group::DockerLogs"
-            cat ${{ github.workspace }}/docker-compose.log
-            echo "::endgroup::"
+          docker compose -p auto -f pro-ha.yml -f deps_pro-ha.yml -f ${{ matrix.envfiles.db }}.yml -f ${{ matrix.envfiles.cache }}.yml --env-file versions.env --profile all logs | sort > ${{ github.workspace }}/docker-compose.log
+          echo "::group::DockerLogs"
+          cat ${{ github.workspace }}/docker-compose.log
+          echo "::endgroup::"
       - name: Upload compose logs
         uses: actions/upload-artifact@v4
         if: failure() && (steps.test_execution.outcome != 'success' || steps.env_up.outcome != 'success')
@@ -508,7 +507,6 @@ jobs:
           COPY tyk-gateway*_${TARGETARCH}.deb /tyk-gateway.deb
           RUN apt-get update && apt-get install -y curl
           RUN curl -fsSL https://packagecloud.io/install/repositories/tyk/tyk-gateway/script.deb.sh | bash && apt-get install -y tyk-gateway=3.0.8
-          RUN apt-get install -y tyk-gateway=3.0.8 || echo "Previous version not found, testing fresh install"
           RUN dpkg -i /tyk-gateway.deb
 
           RUN /opt/tyk-gateway/install/setup.sh --listenport=8080 --redishost=localhost --redisport=6379 --domain=""
@@ -567,7 +565,6 @@ jobs:
           RUN command -v curl || yum install -y curl
           RUN command -v useradd || yum install -y shadow-utils
           RUN curl -fsSL https://packagecloud.io/install/repositories/tyk/tyk-gateway/script.rpm.sh | bash && yum install -y tyk-gateway-3.0.8-1
-          RUN yum install -y tyk-gateway-3.0.8-1 || echo "Previous version not found, testing fresh install"
           RUN curl https://keyserver.tyk.io/tyk.io.rpm.signing.key.2020 -o tyk-gateway.key && rpm --import tyk-gateway.key
           RUN rpm --checksig /tyk-gateway.rpm
           RUN rpm -Uvh --force /tyk-gateway.rpm
