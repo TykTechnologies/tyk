@@ -3513,6 +3513,7 @@ func validateAPIDef(apiDef *apidef.APIDefinition) *apiStatusMessage {
 	return nil
 }
 
+
 func updateOASServers(spec *APISpec, conf config.Config, apiDef *apidef.APIDefinition, oasObj *oas.OAS) {
 	var oldAPIURL string
 	if spec != nil && spec.OAS.Servers != nil {
