@@ -215,10 +215,9 @@ func (s *OAS) Clone() (*OAS, error) {
 // Initialize eagerly parses and caches all security schemes and extensions.
 // This should be called once when an API definition is loaded to prevent
 // race conditions caused by lazy-initialization during request processing.
-// The issue is that functions like getTykJWTAuth, getTykBasicAuth, etc. perform
-// lazy initialization by converting map[string]interface{} to typed structs and
-// caching the result. When multiple goroutines do this concurrently, it causes
-// "concurrent map writes" panic.
+// When multiple goroutines access uninitialized security schemes concurrently,
+// they would all try to convert map[string]interface{} to typed structs and
+// cache the result, causing "concurrent map writes" panic.
 func (s *OAS) Initialize() {
 	// First, ensure the main Tyk extensions are parsed and cached.
 	// These functions convert raw JSON to typed structs and cache them.
@@ -229,45 +228,69 @@ func (s *OAS) Initialize() {
 		return
 	}
 
-	// Iterate through all defined security schemes and trigger their caching.
-	// This converts map[string]interface{} entries to their proper typed structs.
+	securitySchemes := s.getTykSecuritySchemes()
+	if securitySchemes == nil {
+		return
+	}
+
+	// Iterate through all defined security schemes and convert them to typed structs.
+	// This converts map[string]interface{} entries to their proper typed structs and caches them.
 	for name, schemeRef := range s.Components.SecuritySchemes {
 		if schemeRef == nil || schemeRef.Value == nil {
 			continue
 		}
 
+		// Get the raw security scheme from Tyk extension
+		rawScheme := securitySchemes[name]
+		if rawScheme == nil {
+			continue
+		}
+
+		// Skip if already converted to a typed struct
+		switch rawScheme.(type) {
+		case *Token, *JWT, *Basic, *OAuth, *ExternalOAuth:
+			continue
+		}
+
+		// Convert based on OAS security scheme type
 		v := schemeRef.Value
 		switch v.Type {
 		case typeHTTP:
 			switch v.Scheme {
 			case schemeBasic:
-				s.getTykBasicAuth(name)
+				basic := &Basic{}
+				if toStructIfMap(rawScheme, basic) {
+					securitySchemes[name] = basic
+				}
 			case schemeBearer:
 				if v.BearerFormat == bearerFormatJWT {
-					s.getTykJWTAuth(name)
+					jwt := &JWT{}
+					if toStructIfMap(rawScheme, jwt) {
+						securitySchemes[name] = jwt
+					}
 				} else {
 					// A bearer token that isn't a JWT is treated as a standard auth token.
-					s.getTykTokenAuth(name)
+					token := &Token{}
+					if toStructIfMap(rawScheme, token) {
+						securitySchemes[name] = token
+					}
 				}
 			}
 		case typeAPIKey:
-			s.getTykTokenAuth(name)
-		case typeOAuth2:
-			// For OAuth2, we need to check the Tyk extension data to determine
-			// if it is a standard OAuth or external OAuth provider.
-			securityScheme := s.getTykSecurityScheme(name)
-			if securityScheme == nil {
-				continue
+			token := &Token{}
+			if toStructIfMap(rawScheme, token) {
+				securitySchemes[name] = token
 			}
-
-			// Check if the scheme has providers configured (indicates ExternalOAuth)
+		case typeOAuth2:
+			// For OAuth2, check if it has providers configured (indicates ExternalOAuth)
 			externalOAuth := &ExternalOAuth{}
-			if _, ok := securityScheme.(*ExternalOAuth); ok {
-				s.getTykExternalOAuthAuth(name)
-			} else if toStructIfMap(securityScheme, externalOAuth) && len(externalOAuth.Providers) > 0 {
-				s.getTykExternalOAuthAuth(name)
+			if toStructIfMap(rawScheme, externalOAuth) && len(externalOAuth.Providers) > 0 {
+				securitySchemes[name] = externalOAuth
 			} else {
-				s.getTykOAuthAuth(name)
+				oauth := &OAuth{}
+				if toStructIfMap(rawScheme, oauth) {
+					securitySchemes[name] = oauth
+				}
 			}
 		}
 	}
@@ -287,15 +310,9 @@ func (s *OAS) getTykTokenAuth(name string) (token *Token) {
 		return
 	}
 
-	token = &Token{}
+	// After Initialize() is called, the security scheme is already converted to *Token
 	if tokenVal, ok := securityScheme.(*Token); ok {
-		token = tokenVal
-	} else {
-		// Security scheme is stored as map[string]interface{}, convert it to Token struct
-		if toStructIfMap(securityScheme, token) {
-			// Cache the converted struct for future use
-			s.getTykSecuritySchemes()[name] = token
-		}
+		return tokenVal
 	}
 
 	return
@@ -307,38 +324,25 @@ func (s *OAS) getTykJWTAuth(name string) (jwt *JWT) {
 		return
 	}
 
-	jwt = &JWT{}
+	// After Initialize() is called, the security scheme is already converted to *JWT
 	if jwtVal, ok := securityScheme.(*JWT); ok {
-		jwt = jwtVal
-	} else {
-		// Security scheme is stored as map[string]interface{}, convert it to JWT struct
-		if toStructIfMap(securityScheme, jwt) {
-			// Cache the converted struct for future use
-			s.getTykSecuritySchemes()[name] = jwt
-		}
+		return jwtVal
 	}
 
 	return
 }
 
 // getTykBasicAuth retrieves the Basic auth configuration from Tyk extension.
-// It handles both typed (*Basic) and untyped (map[string]interface{}) security schemes.
-// When an untyped scheme is found, it converts it to *Basic and caches the result.
+// After Initialize() is called, the security scheme is already converted to *Basic.
 func (s *OAS) getTykBasicAuth(name string) (basic *Basic) {
 	securityScheme := s.getTykSecurityScheme(name)
 	if securityScheme == nil {
 		return
 	}
 
-	basic = &Basic{}
+	// After Initialize() is called, the security scheme is already converted to *Basic
 	if basicVal, ok := securityScheme.(*Basic); ok {
-		basic = basicVal
-	} else {
-		// Security scheme is stored as map[string]interface{}, convert it to Basic struct
-		if toStructIfMap(securityScheme, basic) {
-			// Cache the converted struct for future use
-			s.getTykSecuritySchemes()[name] = basic
-		}
+		return basicVal
 	}
 
 	return
@@ -350,15 +354,9 @@ func (s *OAS) getTykOAuthAuth(name string) (oauth *OAuth) {
 		return
 	}
 
-	oauth = &OAuth{}
+	// After Initialize() is called, the security scheme is already converted to *OAuth
 	if oauthVal, ok := securityScheme.(*OAuth); ok {
-		oauth = oauthVal
-	} else {
-		// Security scheme is stored as map[string]interface{}, convert it to OAuth struct
-		if toStructIfMap(securityScheme, oauth) {
-			// Cache the converted struct for future use
-			s.getTykSecuritySchemes()[name] = oauth
-		}
+		return oauthVal
 	}
 
 	return
@@ -370,15 +368,9 @@ func (s *OAS) getTykExternalOAuthAuth(name string) (externalOAuth *ExternalOAuth
 		return
 	}
 
-	externalOAuth = &ExternalOAuth{}
+	// After Initialize() is called, the security scheme is already converted to *ExternalOAuth
 	if oauthVal, ok := securityScheme.(*ExternalOAuth); ok {
-		externalOAuth = oauthVal
-	} else {
-		// Security scheme is stored as map[string]interface{}, convert it to ExternalOAuth struct
-		if toStructIfMap(securityScheme, externalOAuth) {
-			// Cache the converted struct for future use
-			s.getTykSecuritySchemes()[name] = externalOAuth
-		}
+		return oauthVal
 	}
 
 	return
