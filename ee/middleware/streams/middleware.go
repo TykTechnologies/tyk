@@ -183,10 +183,19 @@ func (s *Middleware) getStreamsConfig(r *http.Request) *StreamsConfig {
 		return config
 	}
 
+	// Handle both map[string]any (raw) and *XTykStreaming (typed) formats.
+	// After Initialize() is called on OAS, the extension is converted to *XTykStreaming.
+	var streams map[string]any
 	if streamsMap, ok := extension.(map[string]any); ok {
-		if streams, ok := streamsMap["streams"].(map[string]any); ok {
-			s.processStreamsConfig(r, streams, config)
-		}
+		// Raw format: extension is map[string]any with "streams" key
+		streams, _ = streamsMap["streams"].(map[string]any)
+	} else if xTykStreaming := s.Spec.OAS.GetTykStreamingExtension(); xTykStreaming != nil {
+		// Typed format: extension is *XTykStreaming with Streams field
+		streams = xTykStreaming.Streams
+	}
+
+	if streams != nil {
+		s.processStreamsConfig(r, streams, config)
 	}
 
 	return config
