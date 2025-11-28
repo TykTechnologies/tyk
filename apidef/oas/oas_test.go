@@ -654,7 +654,37 @@ func TestOAS_GetSecuritySchemes(t *testing.T) {
 		"my_basic": &basic,
 	}
 
-	oas := OAS{}
+	oas := OAS{
+		T: openapi3.T{
+			Components: &openapi3.Components{
+				SecuritySchemes: openapi3.SecuritySchemes{
+					"my_auth": &openapi3.SecuritySchemeRef{
+						Value: &openapi3.SecurityScheme{
+							Type: "apiKey",
+						},
+					},
+					"my_jwt": &openapi3.SecuritySchemeRef{
+						Value: &openapi3.SecurityScheme{
+							Type:         "http",
+							Scheme:       "bearer",
+							BearerFormat: "JWT",
+						},
+					},
+					"my_basic": &openapi3.SecuritySchemeRef{
+						Value: &openapi3.SecurityScheme{
+							Type:   "http",
+							Scheme: "basic",
+						},
+					},
+					"my_oauth": &openapi3.SecuritySchemeRef{
+						Value: &openapi3.SecurityScheme{
+							Type: "oauth2",
+						},
+					},
+				},
+			},
+		},
+	}
 	xTykAPIGateway := XTykAPIGateway{
 		Server: Server{
 			Authentication: &Authentication{
@@ -671,6 +701,9 @@ func TestOAS_GetSecuritySchemes(t *testing.T) {
 	var resOAS OAS
 	err = json.Unmarshal(oasInBytes, &resOAS)
 	assert.NoError(t, err)
+
+	// Initialize must be called to convert security schemes from map[string]interface{} to typed structs
+	resOAS.Initialize()
 
 	assert.Equal(t, &token, resOAS.getTykTokenAuth("my_auth"))
 	assert.Equal(t, &jwt, resOAS.getTykJWTAuth("my_jwt"))
