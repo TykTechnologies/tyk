@@ -12,7 +12,21 @@ import (
 	"github.com/TykTechnologies/tyk/request"
 )
 
-var sensitiveKeys = []string{"token", "secret", "key", "auth", "sig", "password"}
+// sensitiveKeys defines which parameters to redact.
+// Using a map for O(1) lookup efficiency.
+var sensitiveKeys = map[string]struct{}{
+	"token":         {},
+	"access_token":  {},
+	"id_token":      {},
+	"secret":        {},
+	"client_secret": {},
+	"key":           {},
+	"api_key":       {},
+	"auth":          {},
+	"auth_sig":      {},
+	"sig":           {},
+	"password":      {},
+}
 
 type Base64DecodeError struct {
 	Err error
@@ -27,7 +41,7 @@ func (e *Base64DecodeError) Error() string {
 const logHiddenValue = "<hidden>"
 
 // sanitizeSource truncates the source string, removes control characters,
-// and redacts credentials to prevent leaking secrets.
+// and redacts credentials (query params, fragments, user info) to prevent leaking secrets.
 func sanitizeSource(source string) string {
 	clean := strings.Map(func(r rune) rune {
 		if unicode.IsControl(r) {
@@ -50,24 +64,34 @@ func sanitizeSource(source string) string {
 	}
 
 	if u.User != nil {
-		u.User = url.UserPassword(u.User.Username(), "xxxxx")
+		if _, hasPassword := u.User.Password(); hasPassword {
+			u.User = url.UserPassword(u.User.Username(), "xxxxx")
+		}
+	}
+
+	redactValues := func(vals url.Values) bool {
+		changed := false
+		for param := range vals {
+			if _, isSensitive := sensitiveKeys[strings.ToLower(param)]; isSensitive {
+				vals.Set(param, "xxxxx")
+				changed = true
+			}
+		}
+		return changed
 	}
 
 	q := u.Query()
-	queryChanged := false
+	if redactValues(q) {
+		u.RawQuery = q.Encode()
+	}
 
-	for param := range q {
-		lowerParam := strings.ToLower(param)
-		for _, sensitive := range sensitiveKeys {
-			if strings.Contains(lowerParam, sensitive) {
-				q.Set(param, "xxxxx")
-				queryChanged = true
-				break
+	if u.Fragment != "" {
+		fragVals, err := url.ParseQuery(u.Fragment)
+		if err == nil && len(fragVals) > 0 {
+			if redactValues(fragVals) {
+				u.Fragment = fragVals.Encode()
 			}
 		}
-	}
-	if queryChanged {
-		u.RawQuery = q.Encode()
 	}
 
 	clean = u.String()
@@ -76,8 +100,8 @@ func sanitizeSource(source string) string {
 		clean = strings.TrimPrefix(clean, "http://")
 	}
 
+	const maxLen = 255
 	runes := []rune(clean)
-	const maxLen = 50
 	if len(runes) > maxLen {
 		return string(runes[:maxLen]) + "...(truncated)"
 	}

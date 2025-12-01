@@ -1,7 +1,6 @@
 package gateway
 
 import (
-	"bytes"
 	"errors"
 	"net/http/httptest"
 	"net/url"
@@ -9,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/sirupsen/logrus"
+	"github.com/sirupsen/logrus/hooks/test"
 )
 
 func TestGetLogEntryForRequest(t *testing.T) {
@@ -141,12 +141,20 @@ func TestGetLogEntryForRequest(t *testing.T) {
 }
 
 func TestLogJWKSFetchError(t *testing.T) {
+	generateLongString := func(n int) string {
+		return strings.Repeat("a", n)
+	}
+
+	longURL := "https://example.com/" + generateLongString(300)
+	longURLRunes := []rune(longURL)
+	expectedTruncatedURL := string(longURLRunes[:255]) + "...(truncated)"
+
 	tests := []struct {
-		name    string
-		jwksURL string
-		err     error
-		wantMsg string
-		wantKV  string
+		name       string
+		jwksURL    string
+		err        error
+		wantMsg    string
+		wantFields map[string]string
 	}{
 		{
 			name:    "unreachable host",
@@ -157,86 +165,126 @@ func TestLogJWKSFetchError(t *testing.T) {
 				Err: errors.New("no such host"),
 			},
 			wantMsg: "JWKS endpoint resolution failed: invalid or unreachable host",
-			wantKV:  "op=Get url=\"https://example.com/jwks\"",
+			wantFields: map[string]string{
+				"op":  "Get",
+				"url": "https://example.com/jwks",
+			},
 		},
 		{
 			name:    "sanitizes user credentials",
 			jwksURL: "https://user:password@secret.com",
 			err:     errors.New("timeout"),
 			wantMsg: "Invalid JWKS retrieved from endpoint",
-			wantKV:  "url=\"https://user:xxxxx@secret.com\"",
+			wantFields: map[string]string{
+				"url": "https://user:xxxxx@secret.com",
+			},
 		},
 		{
 			name:    "sanitizes query parameters",
 			jwksURL: "https://api.com?access_token=SuperSecret123",
 			err:     errors.New("fail"),
 			wantMsg: "Invalid JWKS retrieved from endpoint",
-			wantKV:  "url=\"https://api.com?access_token=xxxxx\"",
+			wantFields: map[string]string{
+				"url": "https://api.com?access_token=xxxxx",
+			},
+		},
+		{
+			name:    "sanitizes url fragments",
+			jwksURL: "https://api.com/auth#id_token=SECRET_TOKEN&state=123",
+			err:     errors.New("fail"),
+			wantMsg: "Invalid JWKS retrieved from endpoint",
+			wantFields: map[string]string{
+				"url": "https://api.com/auth#id_token=xxxxx&state=123",
+			},
 		},
 		{
 			name:    "base64 decode error (structured)",
-			jwksURL: "12345678901234567890123456789012345678901234567890_OVER_LIMIT",
+			jwksURL: "some_base64_source",
 			err: &Base64DecodeError{
 				Err: errors.New("illegal base64 data"),
 			},
 			wantMsg: "Failed to decode base64-encoded JWKS source",
-			wantKV:  "source=\"12345678901234567890123456789012345678901234567890...(truncated)\"",
-		},
-		{
-			name:    "strips control characters",
-			jwksURL: "http://bad\nurl\r\tcheck.com",
-			err:     errors.New("fail"),
-			wantMsg: "Invalid JWKS retrieved from endpoint",
-			wantKV:  "url=\"http://badurlcheck.com\"",
+			wantFields: map[string]string{
+				"source": "some_base64_source",
+			},
 		},
 		{
 			name:    "sanitizes multiple sensitive keywords",
 			jwksURL: "https://api.com?api_key=123&client_secret=abc&auth_sig=xyz",
 			err:     errors.New("fail"),
 			wantMsg: "Invalid JWKS retrieved from endpoint",
-			wantKV:  "url=\"https://api.com?api_key=xxxxx&auth_sig=xxxxx&clien...(truncated)\"",
+			wantFields: map[string]string{
+				// url.Values.Encode() sorts keys alphabetically
+				"url": "https://api.com?api_key=xxxxx&auth_sig=xxxxx&client_secret=xxxxx",
+			},
 		},
 		{
 			name:    "sanitizes schemeless credentials",
 			jwksURL: "admin:MyP@ssword@127.0.0.1",
 			err:     errors.New("timeout"),
 			wantMsg: "Invalid JWKS retrieved from endpoint",
-			wantKV:  "url=\"admin:xxxxx@127.0.0.1\"",
+			wantFields: map[string]string{
+				"url": "admin:xxxxx@127.0.0.1",
+			},
 		},
 		{
-			name:    "utf8 safety",
-			jwksURL: "abcdefghijabcdefghijabcdefghijabcdefghijabcdefghij©", // 51 chars
+			name:    "utf8 safety and length check",
+			jwksURL: "abcdefghijabcdefghijabcdefghijabcdefghijabcdefghij©",
 			err:     errors.New("fail"),
 			wantMsg: "Invalid JWKS retrieved from endpoint",
-			wantKV:  "url=\"abcdefghijabcdefghijabcdefghijabcdefghijabcdefghij...(truncated)\"",
+			wantFields: map[string]string{
+				// Expect URL encoded output for special char (%C2%A9 for ©)
+				"url": "abcdefghijabcdefghijabcdefghijabcdefghijabcdefghij%C2%A9",
+			},
+		},
+		{
+			name:    "truncates extremely long urls",
+			jwksURL: longURL,
+			err:     errors.New("fail"),
+			wantMsg: "Invalid JWKS retrieved from endpoint",
+			wantFields: map[string]string{
+				"url": expectedTruncatedURL,
+			},
 		},
 		{
 			name:    "malformed url with secrets",
 			jwksURL: "https://user:secret_pass@host.com/%zz",
 			err:     errors.New("fail"),
 			wantMsg: "Invalid JWKS retrieved from endpoint",
-			wantKV:  "url=\"(malformed input)\"",
+			wantFields: map[string]string{
+				"url": "(malformed input)",
+			},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			var buf bytes.Buffer
-			logger := logrus.New()
-			logger.SetOutput(&buf)
-			logger.SetFormatter(&logrus.TextFormatter{DisableTimestamp: true, DisableColors: true})
-			entry := logrus.NewEntry(logger)
+			logger, hook := test.NewNullLogger()
 
-			logJWKSFetchError(entry, tt.jwksURL, tt.err)
+			logJWKSFetchError(logger.WithField("ctx", "test"), tt.jwksURL, tt.err)
 
-			output := buf.String()
+			if len(hook.Entries) != 1 {
+				t.Fatalf("expected 1 log entry, got %d", len(hook.Entries))
+			}
+			entry := hook.LastEntry()
 
-			if !strings.Contains(output, tt.wantMsg) {
-				t.Errorf("expected log output to contain message %q, got %q", tt.wantMsg, output)
+			if entry.Message != tt.wantMsg {
+				t.Errorf("expected message %q, got %q", tt.wantMsg, entry.Message)
 			}
 
-			if !strings.Contains(output, tt.wantKV) {
-				t.Errorf("expected log to contain field %q, got %q", tt.wantKV, output)
+			for k, wantV := range tt.wantFields {
+				gotV, ok := entry.Data[k]
+				if !ok {
+					t.Errorf("expected field %q to exist", k)
+					continue
+				}
+				if gotVStr, ok := gotV.(string); ok {
+					if gotVStr != wantV {
+						t.Errorf("field %q: expected %q, got %q", k, wantV, gotVStr)
+					}
+				} else {
+					t.Errorf("field %q is not a string", k)
+				}
 			}
 		})
 	}
