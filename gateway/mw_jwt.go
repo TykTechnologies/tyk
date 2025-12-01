@@ -273,7 +273,10 @@ func (k *JWTMiddleware) getSecretFromURL(url string, kidVal interface{}, keyType
 		// Fallback to original method if factory fails or JWK fetch fails
 		if clientErr != nil || err != nil {
 			k.Logger().Info("Falling back to legacy JWKS client")
-
+			primaryErr := err
+			if clientErr != nil {
+				primaryErr = clientErr
+			}
 			if jwkSet, err = GetJWK(url, k.Gw.GetConfig().JWTSSLInsecureSkipVerify); err != nil {
 				logJWKSFetchError(k.Logger(), url, err)
 
@@ -285,6 +288,10 @@ func (k *JWTMiddleware) getSecretFromURL(url string, kidVal interface{}, keyType
 				}
 
 				logJWKSFetchError(k.Logger(), url, legacyError)
+
+				if primaryErr != nil {
+					return nil, primaryErr
+				}
 				return nil, err
 			}
 		}
@@ -343,7 +350,7 @@ func (k *JWTMiddleware) getSecretToVerifySignature(r *http.Request, token *jwt.T
 		// If not, return the actual value
 		decodedCert, err := base64.StdEncoding.DecodeString(config.JWTSource)
 		if err != nil {
-			wrappedErr := &Base64DecodeError{
+			wrappedErr := &base64DecodeError{
 				Err: err,
 			}
 			logJWKSFetchError(k.Logger(), config.JWTSource, wrappedErr)

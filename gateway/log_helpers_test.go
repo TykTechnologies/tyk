@@ -150,6 +150,10 @@ func TestLogJWKSFetchError(t *testing.T) {
 	longURLRunes := []rune(longURL)
 	expectedTruncatedURL := string(longURLRunes[:255]) + "...(truncated)"
 
+	dosURL := "https://example.com/" + generateLongString(5000)
+	dosURLRunes := []rune(dosURL)
+	expectedDosURL := string(dosURLRunes[:255]) + "...(truncated)"
+
 	tests := []struct {
 		name       string
 		jwksURL    string
@@ -159,11 +163,11 @@ func TestLogJWKSFetchError(t *testing.T) {
 	}{
 		{
 			name:    "handles excessively large input (dos prevention)",
-			jwksURL: "https://example.com/" + generateLongString(5000),
+			jwksURL: dosURL,
 			err:     errors.New("fail"),
 			wantMsg: "Invalid JWKS retrieved from endpoint",
 			wantFields: map[string]string{
-				"url": expectedTruncatedURL,
+				"url": expectedDosURL,
 			},
 		},
 		{
@@ -210,7 +214,7 @@ func TestLogJWKSFetchError(t *testing.T) {
 		{
 			name:    "base64 decode error (structured)",
 			jwksURL: "some_base64_source",
-			err: &Base64DecodeError{
+			err: &base64DecodeError{
 				Err: errors.New("illegal base64 data"),
 			},
 			wantMsg: "Failed to decode base64-encoded JWKS source",
@@ -275,6 +279,15 @@ func TestLogJWKSFetchError(t *testing.T) {
 			wantMsg: "Failed to parse JWKS: invalid JSON format",
 			wantFields: map[string]string{
 				"url": "https://api.com/jwks",
+			},
+		},
+		{
+			name:    "sanitizes malformed fragments (fail-safe)",
+			jwksURL: "https://api.com/auth#%zz&token=secret",
+			err:     errors.New("fail"),
+			wantMsg: "Invalid JWKS retrieved from endpoint",
+			wantFields: map[string]string{
+				"url": "(malformed input)",
 			},
 		},
 	}

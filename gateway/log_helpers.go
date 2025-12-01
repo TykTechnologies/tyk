@@ -14,7 +14,6 @@ import (
 )
 
 // sensitiveKeys defines which parameters to redact.
-// Using a map for O(1) lookup efficiency.
 var sensitiveKeys = map[string]struct{}{
 	"token":         {},
 	"access_token":  {},
@@ -29,11 +28,11 @@ var sensitiveKeys = map[string]struct{}{
 	"password":      {},
 }
 
-type Base64DecodeError struct {
+type base64DecodeError struct {
 	Err error
 }
 
-func (e *Base64DecodeError) Error() string {
+func (e *base64DecodeError) Error() string {
 	// Simple return. The logging helper handles the context and sanitization.
 	return "failed to decode base64-encoded JWKS source: " + e.Err.Error()
 }
@@ -42,7 +41,7 @@ func (e *Base64DecodeError) Error() string {
 const logHiddenValue = "<hidden>"
 
 // sanitizeSource truncates the source string, removes control characters,
-// and redacts credentials (query params, fragments, user info) to prevent leaking secrets.
+// and redacts credentials to prevent leaking secrets.
 func sanitizeSource(source string) string {
 	const maxInputLen = 4096
 	if len(source) > maxInputLen {
@@ -65,7 +64,6 @@ func sanitizeSource(source string) string {
 
 	u, err := url.Parse(parseTarget)
 	if err != nil {
-		// Return a generic placeholder to prevent leaking secrets in malformed URLs.
 		return "(malformed input)"
 	}
 
@@ -78,9 +76,12 @@ func sanitizeSource(source string) string {
 	redactValues := func(vals url.Values) bool {
 		changed := false
 		for param := range vals {
-			if _, isSensitive := sensitiveKeys[strings.ToLower(param)]; isSensitive {
-				vals.Set(param, "xxxxx")
-				changed = true
+			for sensitive := range sensitiveKeys {
+				if strings.EqualFold(param, sensitive) {
+					vals.Set(param, "xxxxx")
+					changed = true
+					break
+				}
 			}
 		}
 		return changed
@@ -92,10 +93,16 @@ func sanitizeSource(source string) string {
 	}
 
 	if u.Fragment != "" {
-		fragVals, err := url.ParseQuery(u.Fragment)
-		if err == nil && len(fragVals) > 0 {
-			if redactValues(fragVals) {
-				u.Fragment = fragVals.Encode()
+		if !strings.Contains(u.Fragment, "=") {
+			u.Fragment = "xxxxx"
+		} else {
+			fragVals, err := url.ParseQuery(u.Fragment)
+			if err != nil {
+				u.Fragment = "xxxxx"
+			} else if len(fragVals) > 0 {
+				if redactValues(fragVals) {
+					u.Fragment = fragVals.Encode()
+				}
 			}
 		}
 	}
@@ -176,7 +183,7 @@ func logJWKSFetchError(logger *logrus.Entry, sourceOrURL string, err error) {
 
 	sanitized := sanitizeSource(sourceOrURL)
 
-	var decodeErr *Base64DecodeError
+	var decodeErr *base64DecodeError
 	if errors.As(err, &decodeErr) {
 		logger.WithField("source", sanitized).
 			WithError(decodeErr.Err).
