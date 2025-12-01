@@ -186,10 +186,18 @@ func TestLogJWKSFetchError(t *testing.T) {
 			wantField: "source=\"12345678901234567890123456789012345678901234567890...(truncated)\"",
 		},
 		{
-			name:       "sanitizes query parameters",
-			jwksURL:    "https://api.com?access_token=SuperSecret123",
-			err:        errors.New("fail"),
-			wantOutput: "Invalid JWKS retrieved from endpoint: https://api.com?access_token=xxxxx",
+			name:    "strips control characters",
+			jwksURL: "http://bad\nurl\r\tcheck.com",
+			err:     errors.New("fail"),
+			// Logic: "http://bad\nurl\r\tcheck.com" -> "http://badurlcheck.com"
+			wantOutput: "Invalid JWKS retrieved from endpoint: http://badurlcheck.com",
+		},
+		{
+			name:    "sanitizes multiple sensitive keywords",
+			jwksURL: "https://api.com?api_key=123&client_secret=abc&auth_sig=xyz",
+			err:     errors.New("fail"),
+			// Go's url.Encode() sorts keys alphabetically: api_key, auth_sig, client_secret
+			wantOutput: "Invalid JWKS retrieved from endpoint: https://api.com?api_key=xxxxx&auth_sig=xxxxx&client_secret=xxxxx",
 		},
 		{
 			name:    "sanitizes schemeless credentials",
