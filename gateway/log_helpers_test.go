@@ -142,11 +142,11 @@ func TestGetLogEntryForRequest(t *testing.T) {
 
 func TestLogJWKSFetchError(t *testing.T) {
 	tests := []struct {
-		name       string
-		jwksURL    string
-		err        error
-		wantOutput string
-		wantField  string
+		name    string
+		jwksURL string
+		err     error
+		wantMsg string
+		wantKV  string
 	}{
 		{
 			name:    "unreachable host",
@@ -156,69 +156,66 @@ func TestLogJWKSFetchError(t *testing.T) {
 				URL: "https://example.com/jwks",
 				Err: errors.New("no such host"),
 			},
-			wantOutput: "JWKS endpoint resolution failed: invalid or unreachable host https://example.com/jwks",
+			wantMsg: "JWKS endpoint resolution failed: invalid or unreachable host",
+			wantKV:  "op=Get url=\"https://example.com/jwks\"",
 		},
 		{
 			name:    "sanitizes user credentials",
 			jwksURL: "https://user:password@secret.com",
 			err:     errors.New("timeout"),
-			// Logic: "https://user:xxxxx@secret.com" is 29 chars.
-			// Limit 50. No truncation expected.
-			wantOutput: "Invalid JWKS retrieved from endpoint: https://user:xxxxx@secret.com",
+			wantMsg: "Invalid JWKS retrieved from endpoint",
+			wantKV:  "url=\"https://user:xxxxx@secret.com\"",
 		},
 		{
 			name:    "sanitizes query parameters",
 			jwksURL: "https://api.com?access_token=SuperSecret123",
 			err:     errors.New("fail"),
-			// Logic: "access_token" contains "token", so it becomes "xxxxx"
-			// "https://api.com?access_token=xxxxx" is 34 chars. No truncation.
-			wantOutput: "Invalid JWKS retrieved from endpoint: https://api.com?access_token=xxxxx",
+			wantMsg: "Invalid JWKS retrieved from endpoint",
+			wantKV:  "url=\"https://api.com?access_token=xxxxx\"",
 		},
 		{
 			name:    "base64 decode error (structured)",
 			jwksURL: "12345678901234567890123456789012345678901234567890_OVER_LIMIT",
 			err: &Base64DecodeError{
-				Source: "12345678901234567890123456789012345678901234567890_OVER_LIMIT",
-				Err:    errors.New("illegal base64 data"),
+				Err: errors.New("illegal base64 data"),
 			},
-			wantOutput: "Failed to decode base64-encoded JWKS source",
-			// Expect truncation after 50 chars
-			wantField: "source=\"12345678901234567890123456789012345678901234567890...(truncated)\"",
+			wantMsg: "Failed to decode base64-encoded JWKS source",
+			wantKV:  "source=\"12345678901234567890123456789012345678901234567890...(truncated)\"",
 		},
 		{
 			name:    "strips control characters",
 			jwksURL: "http://bad\nurl\r\tcheck.com",
 			err:     errors.New("fail"),
-			// Logic: "http://bad\nurl\r\tcheck.com" -> "http://badurlcheck.com"
-			wantOutput: "Invalid JWKS retrieved from endpoint: http://badurlcheck.com",
+			wantMsg: "Invalid JWKS retrieved from endpoint",
+			wantKV:  "url=\"http://badurlcheck.com\"",
 		},
 		{
 			name:    "sanitizes multiple sensitive keywords",
 			jwksURL: "https://api.com?api_key=123&client_secret=abc&auth_sig=xyz",
 			err:     errors.New("fail"),
-			// Go's url.Encode() sorts keys alphabetically: api_key, auth_sig, client_secret
-			wantOutput: "Invalid JWKS retrieved from endpoint: https://api.com?api_key=xxxxx&auth_sig=xxxxx&client_secret=xxxxx",
+			wantMsg: "Invalid JWKS retrieved from endpoint",
+			wantKV:  "url=\"https://api.com?api_key=xxxxx&auth_sig=xxxxx&clien...(truncated)\"",
 		},
 		{
 			name:    "sanitizes schemeless credentials",
 			jwksURL: "admin:MyP@ssword@127.0.0.1",
 			err:     errors.New("timeout"),
-			// Logic: added http://, redacted to admin:xxxxx@..., then stripped http://
-			wantOutput: "Invalid JWKS retrieved from endpoint: admin:xxxxx@127.0.0.1",
+			wantMsg: "Invalid JWKS retrieved from endpoint",
+			wantKV:  "url=\"admin:xxxxx@127.0.0.1\"",
 		},
 		{
 			name:    "utf8 safety",
 			jwksURL: "abcdefghijabcdefghijabcdefghijabcdefghijabcdefghij©", // 51 chars
 			err:     errors.New("fail"),
-			// Truncates at 50 chars, dropping the ©
-			wantOutput: "Invalid JWKS retrieved from endpoint: abcdefghijabcdefghijabcdefghijabcdefghijabcdefghij...(truncated)",
+			wantMsg: "Invalid JWKS retrieved from endpoint",
+			wantKV:  "url=\"abcdefghijabcdefghijabcdefghijabcdefghijabcdefghij...(truncated)\"",
 		},
 		{
-			name: "malformed url with secrets",
-			// '%zz' is invalid URL encoding. Parse fails.
-			jwksURL:    "https://user:secret_pass@host.com/%zz",
-			err:        errors.New("fail"),
-			wantOutput: "Invalid JWKS retrieved from endpoint: (malformed input)",
+			name:    "malformed url with secrets",
+			jwksURL: "https://user:secret_pass@host.com/%zz",
+			err:     errors.New("fail"),
+			wantMsg: "Invalid JWKS retrieved from endpoint",
+			wantKV:  "url=\"(malformed input)\"",
 		},
 	}
 
@@ -233,12 +230,13 @@ func TestLogJWKSFetchError(t *testing.T) {
 			logJWKSFetchError(entry, tt.jwksURL, tt.err)
 
 			output := buf.String()
-			if !strings.Contains(output, tt.wantOutput) {
-				t.Errorf("expected log output to contain %q, got %q", tt.wantOutput, output)
+
+			if !strings.Contains(output, tt.wantMsg) {
+				t.Errorf("expected log output to contain message %q, got %q", tt.wantMsg, output)
 			}
 
-			if tt.wantField != "" && !strings.Contains(output, tt.wantField) {
-				t.Errorf("expected log to contain field %q, got %q", tt.wantField, output)
+			if !strings.Contains(output, tt.wantKV) {
+				t.Errorf("expected log to contain field %q, got %q", tt.wantKV, output)
 			}
 		})
 	}

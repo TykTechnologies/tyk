@@ -218,8 +218,7 @@ func (k *ExternalOAuthMiddleware) getSecretFromJWKOrConfig(kid interface{}, jwtV
 	decodedSource, err := base64.StdEncoding.DecodeString(jwtValidation.Source)
 	if err != nil {
 		wrappedErr := &Base64DecodeError{
-			Source: jwtValidation.Source,
-			Err:    err,
+			Err: err,
 		}
 		logJWKSFetchError(k.Logger(), jwtValidation.Source, wrappedErr)
 

@@ -345,8 +345,7 @@ func (k *JWTMiddleware) getSecretToVerifySignature(r *http.Request, token *jwt.T
 		decodedCert, err := base64.StdEncoding.DecodeString(config.JWTSource)
 		if err != nil {
 			wrappedErr := &Base64DecodeError{
-				Source: config.JWTSource,
-				Err:    err,
+				Err: err,
 			}
 			logJWKSFetchError(k.Logger(), config.JWTSource, wrappedErr)
 

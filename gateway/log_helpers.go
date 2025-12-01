@@ -14,10 +14,8 @@ import (
 
 var sensitiveKeys = []string{"token", "secret", "key", "auth", "sig", "password"}
 
-// Base64DecodeError indicates a failure to decode the JWT Source string.
 type Base64DecodeError struct {
-	Source string
-	Err    error
+	Err error
 }
 
 func (e *Base64DecodeError) Error() string {
@@ -150,24 +148,24 @@ func logJWKSFetchError(logger *logrus.Entry, sourceOrURL string, err error) {
 
 	var decodeErr *Base64DecodeError
 	if errors.As(err, &decodeErr) {
-		logger.WithField("source", sanitized).WithError(decodeErr.Err).Error("Failed to decode base64-encoded JWKS source")
+		logger.WithField("source", sanitized).
+			WithError(decodeErr.Err).
+			Error("Failed to decode base64-encoded JWKS source")
 		return
 	}
 
 	var urlErr *url.Error
 	if errors.As(err, &urlErr) {
-		safeErr := *urlErr
-		safeErr.URL = sanitized
-
-		logger.WithError(&safeErr).Errorf(
-			"JWKS endpoint resolution failed: invalid or unreachable host %s",
-			sanitized,
-		)
+		logger.WithFields(logrus.Fields{
+			"url": sanitized,
+			"op":  urlErr.Op,
+		}).
+			WithError(urlErr.Err).
+			Error("JWKS endpoint resolution failed: invalid or unreachable host")
 		return
 	}
 
-	logger.WithError(err).Errorf(
-		"Invalid JWKS retrieved from endpoint: %s",
-		sanitized,
-	)
+	logger.WithError(err).
+		WithField("url", sanitized).
+		Error("Invalid JWKS retrieved from endpoint")
 }
