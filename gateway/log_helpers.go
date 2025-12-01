@@ -1,6 +1,7 @@
 package gateway
 
 import (
+	"encoding/json"
 	"errors"
 	"net/http"
 	"net/url"
@@ -191,6 +192,14 @@ func logJWKSFetchError(logger *logrus.Entry, sourceOrURL string, err error) {
 		}).
 			WithError(urlErr.Err).
 			Error("JWKS endpoint resolution failed: invalid or unreachable host")
+		return
+	}
+
+	var syntaxErr *json.SyntaxError
+	var typeErr *json.UnmarshalTypeError
+	if errors.As(err, &syntaxErr) || errors.As(err, &typeErr) {
+		logger.WithField("url", sanitized).
+			Error("Failed to parse JWKS: invalid JSON format")
 		return
 	}
 

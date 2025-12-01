@@ -1,6 +1,7 @@
 package gateway
 
 import (
+	"encoding/json"
 	"errors"
 	"net/http/httptest"
 	"net/url"
@@ -262,6 +263,18 @@ func TestLogJWKSFetchError(t *testing.T) {
 			wantMsg: "Invalid JWKS retrieved from endpoint",
 			wantFields: map[string]string{
 				"url": "(malformed input)",
+			},
+		},
+		{
+			name:    "sanitizes json syntax errors",
+			jwksURL: "https://api.com/jwks",
+			err: func() error {
+				var v interface{}
+				return json.Unmarshal([]byte("invalid-json"), &v)
+			}(),
+			wantMsg: "Failed to parse JWKS: invalid JSON format",
+			wantFields: map[string]string{
+				"url": "https://api.com/jwks",
 			},
 		},
 	}
