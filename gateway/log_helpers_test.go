@@ -157,6 +157,15 @@ func TestLogJWKSFetchError(t *testing.T) {
 		wantFields map[string]string
 	}{
 		{
+			name:    "handles excessively large input (dos prevention)",
+			jwksURL: "https://example.com/" + generateLongString(5000),
+			err:     errors.New("fail"),
+			wantMsg: "Invalid JWKS retrieved from endpoint",
+			wantFields: map[string]string{
+				"url": expectedTruncatedURL,
+			},
+		},
+		{
 			name:    "unreachable host",
 			jwksURL: "https://example.com/jwks",
 			err: &url.Error{

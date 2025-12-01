@@ -179,14 +179,12 @@ func (k *JWTMiddleware) legacyGetSecretFromURL(url, kid, keyType string) (interf
 	if !found {
 		resp, err := client.Get(url)
 		if err != nil {
-			k.Logger().WithError(err).Error("Failed to get resource URL")
 			return nil, err
 		}
 		defer resp.Body.Close()
 
 		// Decode it
 		if err := json.NewDecoder(resp.Body).Decode(&jwkSet); err != nil {
-			k.Logger().WithError(err).Error("Failed to decode body JWK")
 			return nil, err
 		}
 
@@ -286,6 +284,7 @@ func (k *JWTMiddleware) getSecretFromURL(url string, kidVal interface{}, keyType
 					return key, nil
 				}
 
+				logJWKSFetchError(k.Logger(), url, legacyError)
 				return nil, err
 			}
 		}
@@ -486,7 +485,7 @@ func (k *JWTMiddleware) getSecretFromMultipleJWKURIs(jwkURIs []apidef.JWK, kidVa
 		if legacyErr == nil {
 			return key, nil
 		}
-		k.Logger().WithError(legacyErr).Warnf("Legacy fallback failed for %s", jwk.URL)
+		logJWKSFetchError(k.Logger(), jwk.URL, legacyErr)
 	}
 
 	err := errors.New("no matching KID found in any JWKs or fallback")

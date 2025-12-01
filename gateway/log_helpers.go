@@ -43,6 +43,11 @@ const logHiddenValue = "<hidden>"
 // sanitizeSource truncates the source string, removes control characters,
 // and redacts credentials (query params, fragments, user info) to prevent leaking secrets.
 func sanitizeSource(source string) string {
+	const maxInputLen = 4096
+	if len(source) > maxInputLen {
+		source = source[:maxInputLen]
+	}
+
 	clean := strings.Map(func(r rune) rune {
 		if unicode.IsControl(r) {
 			return -1
