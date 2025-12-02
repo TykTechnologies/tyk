@@ -17,6 +17,7 @@ import (
 var sensitiveKeys = map[string]struct{}{
 	"token":         {},
 	"access_token":  {},
+	"refresh_token": {},
 	"id_token":      {},
 	"secret":        {},
 	"client_secret": {},

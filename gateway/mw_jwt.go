@@ -272,11 +272,11 @@ func (k *JWTMiddleware) getSecretFromURL(url string, kidVal interface{}, keyType
 
 		// Fallback to original method if factory fails or JWK fetch fails
 		if clientErr != nil || err != nil {
-			k.Logger().Info("Falling back to legacy JWKS client")
+			// If the factory method could not create a client, that is not a fetch error, so we shouldn't return it.
 			primaryErr := err
-			if clientErr != nil {
-				primaryErr = clientErr
-			}
+
+			k.Logger().Info("Falling back to legacy JWKS client")
+
 			if jwkSet, err = GetJWK(url, k.Gw.GetConfig().JWTSSLInsecureSkipVerify); err != nil {
 				logJWKSFetchError(k.Logger(), url, err)
 
@@ -289,6 +289,7 @@ func (k *JWTMiddleware) getSecretFromURL(url string, kidVal interface{}, keyType
 
 				logJWKSFetchError(k.Logger(), url, legacyError)
 
+				// Return primary fetch error only if there was a fetch attempt
 				if primaryErr != nil {
 					return nil, primaryErr
 				}
