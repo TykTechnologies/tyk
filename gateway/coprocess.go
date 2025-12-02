@@ -297,7 +297,7 @@ func (m *CoProcessMiddleware) EnabledForSpec() bool {
 		return false
 	}
 
-	if d, _ := loadedDrivers[m.Spec.CustomMiddleware.Driver]; d == nil {
+	if d := loadedDrivers[m.Spec.CustomMiddleware.Driver]; d == nil {
 		log.WithFields(logrus.Fields{
 			"prefix": "coprocess",
 		}).Errorf("Driver '%s' isn't loaded", m.Spec.CustomMiddleware.Driver)
