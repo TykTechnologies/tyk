@@ -99,7 +99,7 @@ require (
 	github.com/TykTechnologies/opentelemetry v0.0.22
 	github.com/alecthomas/kingpin/v2 v2.4.0
 	github.com/eclipse/paho.mqtt.golang v1.4.3
-	github.com/getkin/kin-openapi v0.132.0
+	github.com/getkin/kin-openapi v0.133.0
 	github.com/go-redis/redismock/v9 v9.2.0
 	github.com/goccy/go-json v0.10.4
 	github.com/goccy/go-yaml v1.15.23
@@ -184,6 +184,7 @@ require (
 	github.com/OneOfOne/xxhash v1.2.8 // indirect
 	github.com/PaesslerAG/gval v1.2.3 // indirect
 	github.com/PaesslerAG/jsonpath v0.1.1 // indirect
+	github.com/TykTechnologies/kin-openapi v0.91.0 // indirect
 	github.com/alecthomas/units v0.0.0-20211218093645-b94a6e3cc137 // indirect
 	github.com/alitto/pond v1.8.3 // indirect
 	github.com/andybalholm/brotli v1.1.1 // indirect
@@ -361,6 +362,7 @@ require (
 	github.com/imdario/mergo v0.3.13 // indirect
 	github.com/influxdata/go-syslog/v3 v3.0.0 // indirect
 	github.com/influxdata/influxdb1-client v0.0.0-20220302092344-a9ab5670611c // indirect
+	github.com/invopop/yaml v0.1.0 // indirect
 	github.com/itchyny/gojq v0.12.16 // indirect
 	github.com/itchyny/timefmt-go v0.1.6 // indirect
 	github.com/jackc/chunkreader/v2 v2.0.1 // indirect
@@ -501,6 +503,7 @@ require (
 	github.com/valyala/bytebufferpool v1.0.0 // indirect
 	github.com/vmihailenco/msgpack/v5 v5.4.1 // indirect
 	github.com/vmihailenco/tagparser/v2 v2.0.0 // indirect
+	github.com/woodsbury/decimal128 v1.3.0 // indirect
 	github.com/xdg-go/pbkdf2 v1.0.0 // indirect
 	github.com/xdg-go/scram v1.1.2 // indirect
 	github.com/xdg-go/stringprep v1.0.4 // indirect
@@ -567,3 +570,5 @@ require (
 )
 
 replace go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.54.0 => go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.49.0
+
+replace github.com/getkin/kin-openapi => github.com/TykTechnologies/kin-openapi v0.91.1-0.20251203105445-8da31dfd4808
