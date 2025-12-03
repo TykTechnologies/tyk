@@ -571,4 +571,4 @@ require (
 
 replace go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.54.0 => go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.49.0
 
-replace github.com/getkin/kin-openapi => github.com/TykTechnologies/kin-openapi v0.91.1-0.20251203105445-8da31dfd4808
+replace github.com/getkin/kin-openapi => github.com/TykTechnologies/kin-openapi v0.0.0-20251203130513-ffdaa130e24d
