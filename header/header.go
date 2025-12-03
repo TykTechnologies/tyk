@@ -14,6 +14,9 @@ const (
 	Expires                 = "Expires"
 	Connection              = "Connection"
 	WWWAuthenticate         = "WWW-Authenticate"
+	SetCookie               = "Set-Cookie"
+	TransferEncoding        = "Transfer-Encoding"
+	Host                    = "Host"
 )
 
 const (
