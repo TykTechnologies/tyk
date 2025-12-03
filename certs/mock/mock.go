@@ -23,6 +23,7 @@ import (
 type MockCertificateManager struct {
 	ctrl     *gomock.Controller
 	recorder *MockCertificateManagerMockRecorder
+	isgomock struct{}
 }
 
 // MockCertificateManagerMockRecorder is the mock recorder for MockCertificateManager.
@@ -43,44 +44,44 @@ func (m *MockCertificateManager) EXPECT() *MockCertificateManagerMockRecorder {
 }
 
 // Add mocks base method.
-func (m *MockCertificateManager) Add(arg0 []byte, arg1 string) (string, error) {
+func (m *MockCertificateManager) Add(certData []byte, orgID string) (string, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Add", arg0, arg1)
+	ret := m.ctrl.Call(m, "Add", certData, orgID)
 	ret0, _ := ret[0].(string)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // Add indicates an expected call of Add.
-func (mr *MockCertificateManagerMockRecorder) Add(arg0, arg1 any) *gomock.Call {
+func (mr *MockCertificateManagerMockRecorder) Add(certData, orgID any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Add", reflect.TypeOf((*MockCertificateManager)(nil).Add), arg0, arg1)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Add", reflect.TypeOf((*MockCertificateManager)(nil).Add), certData, orgID)
 }
 
 // CertPool mocks base method.
-func (m *MockCertificateManager) CertPool(arg0 []string) *x509.CertPool {
+func (m *MockCertificateManager) CertPool(certIDs []string) *x509.CertPool {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "CertPool", arg0)
+	ret := m.ctrl.Call(m, "CertPool", certIDs)
 	ret0, _ := ret[0].(*x509.CertPool)
 	return ret0
 }
 
 // CertPool indicates an expected call of CertPool.
-func (mr *MockCertificateManagerMockRecorder) CertPool(arg0 any) *gomock.Call {
+func (mr *MockCertificateManagerMockRecorder) CertPool(certIDs any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CertPool", reflect.TypeOf((*MockCertificateManager)(nil).CertPool), arg0)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CertPool", reflect.TypeOf((*MockCertificateManager)(nil).CertPool), certIDs)
 }
 
 // Delete mocks base method.
-func (m *MockCertificateManager) Delete(arg0, arg1 string) {
+func (m *MockCertificateManager) Delete(certID, orgID string) {
 	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "Delete", arg0, arg1)
+	m.ctrl.Call(m, "Delete", certID, orgID)
 }
 
 // Delete indicates an expected call of Delete.
-func (mr *MockCertificateManagerMockRecorder) Delete(arg0, arg1 any) *gomock.Call {
+func (mr *MockCertificateManagerMockRecorder) Delete(certID, orgID any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Delete", reflect.TypeOf((*MockCertificateManager)(nil).Delete), arg0, arg1)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Delete", reflect.TypeOf((*MockCertificateManager)(nil).Delete), certID, orgID)
 }
 
 // FlushCache mocks base method.
@@ -96,72 +97,72 @@ func (mr *MockCertificateManagerMockRecorder) FlushCache() *gomock.Call {
 }
 
 // GetRaw mocks base method.
-func (m *MockCertificateManager) GetRaw(arg0 string) (string, error) {
+func (m *MockCertificateManager) GetRaw(certID string) (string, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetRaw", arg0)
+	ret := m.ctrl.Call(m, "GetRaw", certID)
 	ret0, _ := ret[0].(string)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // GetRaw indicates an expected call of GetRaw.
-func (mr *MockCertificateManagerMockRecorder) GetRaw(arg0 any) *gomock.Call {
+func (mr *MockCertificateManagerMockRecorder) GetRaw(certID any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetRaw", reflect.TypeOf((*MockCertificateManager)(nil).GetRaw), arg0)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetRaw", reflect.TypeOf((*MockCertificateManager)(nil).GetRaw), certID)
 }
 
 // List mocks base method.
-func (m *MockCertificateManager) List(arg0 []string, arg1 certs.CertificateType) []*tls.Certificate {
+func (m *MockCertificateManager) List(certIDs []string, mode certs.CertificateType) []*tls.Certificate {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "List", arg0, arg1)
+	ret := m.ctrl.Call(m, "List", certIDs, mode)
 	ret0, _ := ret[0].([]*tls.Certificate)
 	return ret0
 }
 
 // List indicates an expected call of List.
-func (mr *MockCertificateManagerMockRecorder) List(arg0, arg1 any) *gomock.Call {
+func (mr *MockCertificateManagerMockRecorder) List(certIDs, mode any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "List", reflect.TypeOf((*MockCertificateManager)(nil).List), arg0, arg1)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "List", reflect.TypeOf((*MockCertificateManager)(nil).List), certIDs, mode)
 }
 
 // ListAllIds mocks base method.
-func (m *MockCertificateManager) ListAllIds(arg0 string) []string {
+func (m *MockCertificateManager) ListAllIds(prefix string) []string {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ListAllIds", arg0)
+	ret := m.ctrl.Call(m, "ListAllIds", prefix)
 	ret0, _ := ret[0].([]string)
 	return ret0
 }
 
 // ListAllIds indicates an expected call of ListAllIds.
-func (mr *MockCertificateManagerMockRecorder) ListAllIds(arg0 any) *gomock.Call {
+func (mr *MockCertificateManagerMockRecorder) ListAllIds(prefix any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListAllIds", reflect.TypeOf((*MockCertificateManager)(nil).ListAllIds), arg0)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListAllIds", reflect.TypeOf((*MockCertificateManager)(nil).ListAllIds), prefix)
 }
 
 // ListPublicKeys mocks base method.
-func (m *MockCertificateManager) ListPublicKeys(arg0 []string) []string {
+func (m *MockCertificateManager) ListPublicKeys(keyIDs []string) []string {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ListPublicKeys", arg0)
+	ret := m.ctrl.Call(m, "ListPublicKeys", keyIDs)
 	ret0, _ := ret[0].([]string)
 	return ret0
 }
 
 // ListPublicKeys indicates an expected call of ListPublicKeys.
-func (mr *MockCertificateManagerMockRecorder) ListPublicKeys(arg0 any) *gomock.Call {
+func (mr *MockCertificateManagerMockRecorder) ListPublicKeys(keyIDs any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListPublicKeys", reflect.TypeOf((*MockCertificateManager)(nil).ListPublicKeys), arg0)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListPublicKeys", reflect.TypeOf((*MockCertificateManager)(nil).ListPublicKeys), keyIDs)
 }
 
 // ListRawPublicKey mocks base method.
-func (m *MockCertificateManager) ListRawPublicKey(arg0 string) any {
+func (m *MockCertificateManager) ListRawPublicKey(keyID string) any {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ListRawPublicKey", arg0)
+	ret := m.ctrl.Call(m, "ListRawPublicKey", keyID)
 	ret0, _ := ret[0].(any)
 	return ret0
 }
 
 // ListRawPublicKey indicates an expected call of ListRawPublicKey.
-func (mr *MockCertificateManagerMockRecorder) ListRawPublicKey(arg0 any) *gomock.Call {
+func (mr *MockCertificateManagerMockRecorder) ListRawPublicKey(keyID any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListRawPublicKey", reflect.TypeOf((*MockCertificateManager)(nil).ListRawPublicKey), arg0)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListRawPublicKey", reflect.TypeOf((*MockCertificateManager)(nil).ListRawPublicKey), keyID)
 }
