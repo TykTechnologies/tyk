@@ -185,7 +185,7 @@ func TestValidateRequest(t *testing.T) {
 		},
 	)
 
-	headers := map[string]string{header.ContentType: "application/json"}
+	headers := map[string]string{}
 
 	t.Run("default error response code", func(t *testing.T) {
 		check := func(t *testing.T) {
@@ -358,23 +358,6 @@ func TestValidateRequest_NormalizeHeaders(t *testing.T) {
 				header.ContentLength:    []string{"100", "200"},
 				header.TransferEncoding: []string{"chunked", "gzip"},
 				header.Host:             []string{"example.com", "test.com"},
-			},
-		},
-		{
-			name: "Case insensitivity for header names",
-			input: http.Header{
-				"accept":            []string{"application/json", "text/html"},
-				"SET-cookie":        []string{"cookie1=value1", "cookie2=value2"},
-				"Content-length":    []string{"100", "200"},
-				"transfer-encoding": []string{"chunked", "gzip"},
-				"HOST":              []string{"example.com", "test.com"},
-			},
-			expected: http.Header{
-				"accept":            []string{"application/json,text/html"},
-				"SET-cookie":        []string{"cookie1=value1", "cookie2=value2"},
-				"Content-length":    []string{"100", "200"},
-				"transfer-encoding": []string{"chunked", "gzip"},
-				"HOST":              []string{"example.com", "test.com"},
 			},
 		},
 		{

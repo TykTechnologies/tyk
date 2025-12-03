@@ -15,10 +15,11 @@ import (
 
 var (
 	skipHeaderNormalization = map[string]bool{
-		strings.ToLower(header.SetCookie):        true,
-		strings.ToLower(header.ContentLength):    true,
-		strings.ToLower(header.TransferEncoding): true,
-		strings.ToLower(header.Host):             true,
+		header.SetCookie:        true,
+		header.Cookie:           true,
+		header.ContentLength:    true,
+		header.TransferEncoding: true,
+		header.Host:             true,
 	}
 )
 
@@ -120,7 +121,7 @@ func (k *ValidateRequest) ProcessRequest(w http.ResponseWriter, r *http.Request,
 // Headers in the skipHeaderNormalization map are excluded from this process.
 func normalizeHeaders(headers http.Header) {
 	for key, values := range headers {
-		if !skipHeaderNormalization[strings.ToLower(key)] && len(values) > 1 {
+		if !skipHeaderNormalization[key] && len(values) > 1 {
 			headers[key] = []string{strings.Join(values, ",")}
 		}
 	}
