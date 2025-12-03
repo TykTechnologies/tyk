@@ -60,6 +60,7 @@ builds:
   - id: fips-amd64
     flags:
       - -tags=goplugin,ee,fips,boringcrypto
+      - -trimpath
     env:
       - NOP=nop # ignore this, it is jsut to avoid a complex conditional in the templates
       - CC=gcc
@@ -77,6 +78,7 @@ builds:
   - id: fips-arm64
     flags:
       - -tags=goplugin,ee,fips,boringcrypto
+      - -trimpath
     env:
       - NOP=nop # ignore this, it is jsut to avoid a complex conditional in the templates
       - CC=aarch64-linux-gnu-gcc
