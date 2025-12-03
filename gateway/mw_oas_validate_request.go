@@ -16,7 +16,6 @@ import (
 var (
 	skipHeaderNormalization = map[string]bool{
 		header.SetCookie:        true,
-		header.Cookie:           true,
 		header.ContentLength:    true,
 		header.TransferEncoding: true,
 		header.Host:             true,
@@ -122,7 +121,11 @@ func (k *ValidateRequest) ProcessRequest(w http.ResponseWriter, r *http.Request,
 func normalizeHeaders(headers http.Header) {
 	for key, values := range headers {
 		if !skipHeaderNormalization[key] && len(values) > 1 {
-			headers[key] = []string{strings.Join(values, ",")}
+			if key == header.Cookie {
+				headers[key] = []string{strings.Join(values, "; ")}
+			} else {
+				headers[key] = []string{strings.Join(values, ",")}
+			}
 		}
 	}
 }

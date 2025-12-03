@@ -365,6 +365,7 @@ func TestValidateRequest_NormalizeHeaders(t *testing.T) {
 			input: http.Header{
 				header.Accept:           []string{"application/json", "text/html"},
 				header.SetCookie:        []string{"cookie1=value1", "cookie2=value2"},
+				header.Cookie:           []string{"cookie1=value1", "cookie2=value2"},
 				customHeader:            []string{"value1", "value2", "value3"},
 				header.ContentLength:    []string{"100"},
 				header.TransferEncoding: []string{"chunked"},
@@ -373,6 +374,7 @@ func TestValidateRequest_NormalizeHeaders(t *testing.T) {
 			expected: http.Header{
 				header.Accept:           []string{"application/json,text/html"},
 				header.SetCookie:        []string{"cookie1=value1", "cookie2=value2"},
+				header.Cookie:           []string{"cookie1=value1; cookie2=value2"},
 				customHeader:            []string{"value1,value2,value3"},
 				header.ContentLength:    []string{"100"},
 				header.TransferEncoding: []string{"chunked"},
