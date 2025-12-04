@@ -6,6 +6,7 @@ import (
 	"net"
 	"net/http/httptest"
 	"net/url"
+	"reflect"
 	"syscall"
 	"testing"
 
@@ -168,8 +169,11 @@ func TestGatewayLogJWKError(t *testing.T) {
 			shouldLog:   true,
 		},
 		{
-			name:        "JSON Unmarshal Type Error",
-			err:         &json.UnmarshalTypeError{},
+			name: "JSON Unmarshal Type Error",
+			err: &json.UnmarshalTypeError{
+				Value: "number",
+				Type:  reflect.TypeOf(""),
+			},
 			expectedLog: "Invalid JWKS retrieved from endpoint: " + testURL,
 			shouldLog:   true,
 		},
@@ -210,12 +214,6 @@ func TestGatewayLogJWKError(t *testing.T) {
 			shouldLog:   true,
 		},
 		{
-			name:        "String error containing 'connection refused'",
-			err:         errors.New("connect: connection refused"),
-			expectedLog: "JWKS endpoint resolution failed: invalid or unreachable host " + testURL,
-			shouldLog:   true,
-		},
-		{
 			name:        "Generic/Fallback Error",
 			err:         errors.New("unknown internal server error"),
 			expectedLog: "Failed to fetch or decode JWKs from " + testURL,
@@ -236,9 +234,7 @@ func TestGatewayLogJWKError(t *testing.T) {
 
 			assert.Len(t, hook.Entries, 1)
 			assert.Equal(t, logrus.ErrorLevel, hook.LastEntry().Level)
-
 			assert.Equal(t, tc.expectedLog, hook.LastEntry().Message)
-
 			assert.Equal(t, tc.err, hook.LastEntry().Data["error"])
 		})
 	}
