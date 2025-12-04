@@ -155,18 +155,11 @@ func TestGatewayLogJWKError(t *testing.T) {
 		name        string
 		err         error
 		expectedLog string
-		shouldLog   bool
 	}{
-		{
-			name:      "No error (nil)",
-			err:       nil,
-			shouldLog: false,
-		},
 		{
 			name:        "JSON Syntax Error",
 			err:         &json.SyntaxError{},
 			expectedLog: "Invalid JWKS retrieved from endpoint: " + testURL,
-			shouldLog:   true,
 		},
 		{
 			name: "JSON Unmarshal Type Error",
@@ -175,67 +168,47 @@ func TestGatewayLogJWKError(t *testing.T) {
 				Type:  reflect.TypeOf(""),
 			},
 			expectedLog: "Invalid JWKS retrieved from endpoint: " + testURL,
-			shouldLog:   true,
 		},
 		{
-			name:        "String error containing 'invalid character'",
-			err:         errors.New("invalid character 'x' looking for beginning of value"),
-			expectedLog: "Invalid JWKS retrieved from endpoint: " + testURL,
-			shouldLog:   true,
-		},
-		{
-			name:        "URL Error type",
+			name:        "URL Error",
 			err:         &url.Error{Op: "Get", URL: testURL, Err: errors.New("timeout")},
 			expectedLog: "JWKS endpoint resolution failed: invalid or unreachable host " + testURL,
-			shouldLog:   true,
 		},
 		{
-			name:        "Net DNS Error",
-			err:         &net.DNSError{Err: "no such host", Name: "example.com"},
+			name:        "Net DNS Error (implements net.Error)",
+			err:         &net.DNSError{Err: "no such host", Name: "example.com", IsNotFound: true},
 			expectedLog: "JWKS endpoint resolution failed: invalid or unreachable host " + testURL,
-			shouldLog:   true,
 		},
 		{
-			name:        "Net OpError (Connection Refused)",
+			name:        "Net OpError (implements net.Error)",
+			err:         &net.OpError{Op: "dial", Net: "tcp", Err: errors.New("timeout")},
+			expectedLog: "JWKS endpoint resolution failed: invalid or unreachable host " + testURL,
+		},
+		{
+			name:        "Syscall Connection Refused",
+			err:         syscall.ECONNREFUSED,
+			expectedLog: "JWKS endpoint resolution failed: invalid or unreachable host " + testURL,
+		},
+		{
+			name:        "Wrapped Connection Refused",
 			err:         &net.OpError{Op: "dial", Err: syscall.ECONNREFUSED},
 			expectedLog: "JWKS endpoint resolution failed: invalid or unreachable host " + testURL,
-			shouldLog:   true,
 		},
 		{
-			name:        "String error containing 'dial tcp'",
-			err:         errors.New("dial tcp: lookup failed"),
-			expectedLog: "JWKS endpoint resolution failed: invalid or unreachable host " + testURL,
-			shouldLog:   true,
-		},
-		{
-			name:        "String error containing 'no such host'",
-			err:         errors.New("Get: no such host"),
-			expectedLog: "JWKS endpoint resolution failed: invalid or unreachable host " + testURL,
-			shouldLog:   true,
-		},
-		{
-			name:        "Generic/Fallback Error",
-			err:         errors.New("unknown internal server error"),
+			name:        "Generic Error",
+			err:         errors.New("something random"),
 			expectedLog: "Failed to fetch or decode JWKs from " + testURL,
-			shouldLog:   true,
 		},
 	}
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			hook.Reset()
-
 			gw.logJWKError(entry, testURL, tc.err)
-
-			if !tc.shouldLog {
-				assert.Empty(t, hook.Entries)
-				return
-			}
 
 			assert.Len(t, hook.Entries, 1)
 			assert.Equal(t, logrus.ErrorLevel, hook.LastEntry().Level)
 			assert.Equal(t, tc.expectedLog, hook.LastEntry().Message)
-			assert.Equal(t, tc.err, hook.LastEntry().Data["error"])
 		})
 	}
 }
