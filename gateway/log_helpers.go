@@ -1,7 +1,11 @@
 package gateway
 
 import (
+	"encoding/json"
+	"errors"
 	"net/http"
+	"net/url"
+	"strings"
 
 	"github.com/sirupsen/logrus"
 
@@ -64,4 +68,27 @@ func (gw *Gateway) getExplicitLogEntryForRequest(logger *logrus.Entry, path stri
 		fields[key] = val
 	}
 	return logger.WithFields(fields)
+}
+
+func (gw *Gateway) logJWKError(logger *logrus.Entry, jwkURL string, err error) {
+	if err == nil {
+		return
+	}
+
+	// invalid content (JSON errors)
+	var syntaxErr *json.SyntaxError
+	var unmarshalErr *json.UnmarshalTypeError
+	if errors.As(err, &syntaxErr) || errors.As(err, &unmarshalErr) || strings.Contains(err.Error(), "invalid character") {
+		logger.WithError(err).Errorf("Invalid JWKS retrieved from endpoint: %s", jwkURL)
+		return
+	}
+
+	// network/URL errors (DNS, TCP, Refused)
+	var urlErr *url.Error
+	if errors.As(err, &urlErr) || strings.Contains(err.Error(), "dial tcp") || strings.Contains(err.Error(), "no such host") || strings.Contains(err.Error(), "connection refused") {
+		logger.WithError(err).Errorf("JWKS endpoint resolution failed: invalid or unreachable host %s", jwkURL)
+		return
+	}
+
+	logger.WithError(err).Errorf("Failed to fetch or decode JWKs from %s", jwkURL)
 }
