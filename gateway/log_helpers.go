@@ -77,10 +77,13 @@ func (gw *Gateway) logJWKError(logger *logrus.Entry, jwkURL string, err error) {
 		return
 	}
 
+	errStr := err.Error()
+
 	// content/JSON errors
 	var syntaxErr *json.SyntaxError
 	var unmarshalErr *json.UnmarshalTypeError
-	if errors.As(err, &syntaxErr) || errors.As(err, &unmarshalErr) || strings.Contains(err.Error(), "invalid character") {
+
+	if errors.As(err, &syntaxErr) || errors.As(err, &unmarshalErr) || strings.Contains(errStr, "invalid character") {
 		logger.WithError(err).Errorf("Invalid JWKS retrieved from endpoint: %s", jwkURL)
 		return
 	}
@@ -90,30 +93,14 @@ func (gw *Gateway) logJWKError(logger *logrus.Entry, jwkURL string, err error) {
 	var netOpErr *net.OpError
 	var dnsErr *net.DNSError
 
-	if errors.As(err, &urlErr) {
-		logger.WithError(err).Errorf("JWKS endpoint resolution failed: invalid or unreachable host %s", jwkURL)
-		return
-	}
-
-	// DNS errors
-	if errors.As(err, &dnsErr) {
-		logger.WithError(err).Errorf("JWKS endpoint resolution failed: invalid or unreachable host %s", jwkURL)
-		return
-	}
-
-	// connection refused
-	if errors.As(err, &netOpErr) {
-		if errors.Is(netOpErr, syscall.ECONNREFUSED) {
-			logger.WithError(err).Errorf("JWKS endpoint resolution failed: invalid or unreachable host %s", jwkURL)
-			return
-		}
-	}
-
-	// fallback check strings
-	errStr := err.Error()
-	if strings.Contains(errStr, "dial tcp") ||
+	isNetworkError := errors.As(err, &urlErr) ||
+		errors.As(err, &dnsErr) ||
+		(errors.As(err, &netOpErr) && errors.Is(netOpErr, syscall.ECONNREFUSED)) ||
+		strings.Contains(errStr, "dial tcp") ||
 		strings.Contains(errStr, "no such host") ||
-		strings.Contains(errStr, "connection refused") {
+		strings.Contains(errStr, "connection refused")
+
+	if isNetworkError {
 		logger.WithError(err).Errorf("JWKS endpoint resolution failed: invalid or unreachable host %s", jwkURL)
 		return
 	}
