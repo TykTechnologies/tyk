@@ -182,11 +182,13 @@ func (k *ExternalOAuthMiddleware) getSecretFromJWKURL(url string, kid interface{
 			// Fallback to original method if client factory fails
 			k.Logger().Debug("[ExternalServices] Falling back to legacy JWK client due to factory error")
 			if jwkSet, err = getJWK(url, k.Gw.GetConfig().JWTSSLInsecureSkipVerify); err != nil {
+				k.Gw.logJWKError(k.Logger(), url, err)
 				return nil, err
 			}
 		} else {
 			k.Logger().Debugf("[ExternalServices] Using external services JWK client to fetch: %s", url)
 			if jwkSet, err = getJWKWithClient(url, client); err != nil {
+				k.Gw.logJWKError(k.Logger(), url, err)
 				return nil, err
 			}
 		}
@@ -215,6 +217,7 @@ func (k *ExternalOAuthMiddleware) getSecretFromJWKOrConfig(kid interface{}, jwtV
 
 	decodedSource, err := base64.StdEncoding.DecodeString(jwtValidation.Source)
 	if err != nil {
+		k.Logger().WithError(err).Errorf("JWKS source decode failed: %s is not a base64 string", jwtValidation.Source)
 		return nil, err
 	}
 

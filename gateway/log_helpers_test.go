@@ -1,10 +1,15 @@
 package gateway
 
 import (
+	"encoding/json"
+	"errors"
 	"net/http/httptest"
+	"net/url"
 	"testing"
 
 	"github.com/sirupsen/logrus"
+	"github.com/sirupsen/logrus/hooks/test"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestGetLogEntryForRequest(t *testing.T) {
@@ -133,5 +138,99 @@ func TestGetLogEntryForRequest(t *testing.T) {
 				}
 			}
 		}
+	}
+}
+
+func TestGatewayLogJWKError(t *testing.T) {
+	// Setup logrus hook to capture logs
+	logger, hook := test.NewNullLogger()
+	entry := logrus.NewEntry(logger)
+
+	// We only need a minimal Gateway struct since logJWKError doesn't access Gateway fields
+	gw := &Gateway{}
+	testURL := "https://idp.example.com/jwks"
+
+	tests := []struct {
+		name        string
+		err         error
+		expectedLog string
+		shouldLog   bool
+	}{
+		{
+			name:      "No error (nil)",
+			err:       nil,
+			shouldLog: false,
+		},
+		{
+			name:        "JSON Syntax Error",
+			err:         &json.SyntaxError{},
+			expectedLog: "Invalid JWKS retrieved from endpoint: " + testURL,
+			shouldLog:   true,
+		},
+		{
+			name:        "JSON Unmarshal Type Error",
+			err:         &json.UnmarshalTypeError{},
+			expectedLog: "Invalid JWKS retrieved from endpoint: " + testURL,
+			shouldLog:   true,
+		},
+		{
+			name:        "String error containing 'invalid character'",
+			err:         errors.New("invalid character 'x' looking for beginning of value"),
+			expectedLog: "Invalid JWKS retrieved from endpoint: " + testURL,
+			shouldLog:   true,
+		},
+		{
+			name:        "URL Error type",
+			err:         &url.Error{Op: "Get", URL: testURL, Err: errors.New("timeout")},
+			expectedLog: "JWKS endpoint resolution failed: invalid or unreachable host " + testURL,
+			shouldLog:   true,
+		},
+		{
+			name:        "String error containing 'dial tcp'",
+			err:         errors.New("dial tcp: lookup failed"),
+			expectedLog: "JWKS endpoint resolution failed: invalid or unreachable host " + testURL,
+			shouldLog:   true,
+		},
+		{
+			name:        "String error containing 'no such host'",
+			err:         errors.New("Get: no such host"),
+			expectedLog: "JWKS endpoint resolution failed: invalid or unreachable host " + testURL,
+			shouldLog:   true,
+		},
+		{
+			name:        "String error containing 'connection refused'",
+			err:         errors.New("connect: connection refused"),
+			expectedLog: "JWKS endpoint resolution failed: invalid or unreachable host " + testURL,
+			shouldLog:   true,
+		},
+		{
+			name:        "Generic/Fallback Error",
+			err:         errors.New("unknown internal server error"),
+			expectedLog: "Failed to fetch or decode JWKs from " + testURL,
+			shouldLog:   true,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			hook.Reset()
+
+			gw.logJWKError(entry, testURL, tc.err)
+
+			if !tc.shouldLog {
+				assert.Empty(t, hook.Entries)
+				return
+			}
+
+			// Verify log was written
+			assert.Len(t, hook.Entries, 1)
+			assert.Equal(t, logrus.ErrorLevel, hook.LastEntry().Level)
+
+			// Verify message matches ticket requirements
+			assert.Equal(t, tc.expectedLog, hook.LastEntry().Message)
+
+			// Verify the original error is attached
+			assert.Equal(t, tc.err, hook.LastEntry().Data["error"])
+		})
 	}
 }
