@@ -3,8 +3,10 @@ package gateway
 import (
 	"encoding/json"
 	"errors"
+	"net"
 	"net/http/httptest"
 	"net/url"
+	"syscall"
 	"testing"
 
 	"github.com/sirupsen/logrus"
@@ -142,11 +144,9 @@ func TestGetLogEntryForRequest(t *testing.T) {
 }
 
 func TestGatewayLogJWKError(t *testing.T) {
-	// Setup logrus hook to capture logs
 	logger, hook := test.NewNullLogger()
 	entry := logrus.NewEntry(logger)
 
-	// We only need a minimal Gateway struct since logJWKError doesn't access Gateway fields
 	gw := &Gateway{}
 	testURL := "https://idp.example.com/jwks"
 
@@ -182,6 +182,18 @@ func TestGatewayLogJWKError(t *testing.T) {
 		{
 			name:        "URL Error type",
 			err:         &url.Error{Op: "Get", URL: testURL, Err: errors.New("timeout")},
+			expectedLog: "JWKS endpoint resolution failed: invalid or unreachable host " + testURL,
+			shouldLog:   true,
+		},
+		{
+			name:        "Net DNS Error",
+			err:         &net.DNSError{Err: "no such host", Name: "example.com"},
+			expectedLog: "JWKS endpoint resolution failed: invalid or unreachable host " + testURL,
+			shouldLog:   true,
+		},
+		{
+			name:        "Net OpError (Connection Refused)",
+			err:         &net.OpError{Op: "dial", Err: syscall.ECONNREFUSED},
 			expectedLog: "JWKS endpoint resolution failed: invalid or unreachable host " + testURL,
 			shouldLog:   true,
 		},
@@ -222,14 +234,11 @@ func TestGatewayLogJWKError(t *testing.T) {
 				return
 			}
 
-			// Verify log was written
 			assert.Len(t, hook.Entries, 1)
 			assert.Equal(t, logrus.ErrorLevel, hook.LastEntry().Level)
 
-			// Verify message matches ticket requirements
 			assert.Equal(t, tc.expectedLog, hook.LastEntry().Message)
 
-			// Verify the original error is attached
 			assert.Equal(t, tc.err, hook.LastEntry().Data["error"])
 		})
 	}
