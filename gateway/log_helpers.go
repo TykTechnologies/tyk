@@ -6,7 +6,6 @@ import (
 	"net"
 	"net/http"
 	"net/url"
-	"strings"
 	"syscall"
 
 	"github.com/sirupsen/logrus"
@@ -77,30 +76,23 @@ func (gw *Gateway) logJWKError(logger *logrus.Entry, jwkURL string, err error) {
 		return
 	}
 
-	errStr := err.Error()
-
 	// content/JSON errors
 	var syntaxErr *json.SyntaxError
 	var unmarshalErr *json.UnmarshalTypeError
 
-	if errors.As(err, &syntaxErr) || errors.As(err, &unmarshalErr) || strings.Contains(errStr, "invalid character") {
+	if errors.As(err, &syntaxErr) || errors.As(err, &unmarshalErr) {
 		logger.WithError(err).Errorf("Invalid JWKS retrieved from endpoint: %s", jwkURL)
 		return
 	}
 
 	// network errors
 	var urlErr *url.Error
-	var netOpErr *net.OpError
-	var dnsErr *net.DNSError
+	var netErr net.Error
 
-	isNetworkError := errors.As(err, &urlErr) ||
-		errors.As(err, &dnsErr) ||
-		(errors.As(err, &netOpErr) && errors.Is(netOpErr, syscall.ECONNREFUSED)) ||
-		strings.Contains(errStr, "dial tcp") ||
-		strings.Contains(errStr, "no such host") ||
-		strings.Contains(errStr, "connection refused")
-
-	if isNetworkError {
+	// errors.As(err, &netErr) catches any error that implements the net.Error interface.
+	// This covers DNS errors, timeouts, connection refused, dial errors, etc.
+	// errors.Is(err, syscall.ECONNREFUSED) catches underlying system call errors specifically.
+	if errors.As(err, &urlErr) || errors.As(err, &netErr) || errors.Is(err, syscall.ECONNREFUSED) {
 		logger.WithError(err).Errorf("JWKS endpoint resolution failed: invalid or unreachable host %s", jwkURL)
 		return
 	}

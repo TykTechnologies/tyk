@@ -278,7 +278,6 @@ func (k *JWTMiddleware) getSecretFromURL(url string, kidVal interface{}, keyType
 		// Fallback to original method if factory fails or JWK fetch fails
 		if clientErr != nil || err != nil {
 			if jwkSet, err = GetJWK(url, k.Gw.GetConfig().JWTSSLInsecureSkipVerify); err != nil {
-				// CHANGED: Call shared helper
 				k.Gw.logJWKError(k.Logger(), url, err)
 				k.Logger().Info("Failed to decode JWKs body. Trying x5c PEM fallback.")
 
