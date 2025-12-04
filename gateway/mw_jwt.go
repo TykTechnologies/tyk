@@ -180,14 +180,14 @@ func (k *JWTMiddleware) legacyGetSecretFromURL(url, kid, keyType string) (interf
 	if !found {
 		resp, err := client.Get(url)
 		if err != nil {
-			k.Logger().WithError(err).Errorf("JWKS endpoint resolution failed: invalid or unreachable host %s", url)
+			k.Gw.logJWKError(k.Logger(), url, err)
 			return nil, err
 		}
 		defer resp.Body.Close()
 
 		// Decode it
 		if err := json.NewDecoder(resp.Body).Decode(&jwkSet); err != nil {
-			k.Logger().WithError(err).Errorf("Invalid JWKS retrieved from endpoint: %s", url)
+			k.Gw.logJWKError(k.Logger(), url, err)
 			return nil, err
 		}
 
