@@ -1,8 +1,10 @@
 package gateway
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"io"
 	"net"
 	"net/http/httptest"
 	"net/url"
@@ -169,6 +171,22 @@ func TestGatewayLogJWKError(t *testing.T) {
 			},
 			expectedLog: "Invalid JWKS retrieved from endpoint: " + testURL,
 		},
+		{
+			name:        "Empty Body (io.EOF)",
+			err:         io.EOF,
+			expectedLog: "Invalid JWKS retrieved from endpoint: " + testURL,
+		},
+		{
+			name:        "Typed Base64 Error",
+			err:         base64.CorruptInputError(10),
+			expectedLog: "Invalid JWKS retrieved from endpoint: " + testURL,
+		},
+		{
+			name:        "String-based 'illegal base64' (go-jose fallback)",
+			err:         errors.New("illegal base64 data at input byte 0"),
+			expectedLog: "Invalid JWKS retrieved from endpoint: " + testURL,
+		},
+
 		{
 			name:        "URL Error",
 			err:         &url.Error{Op: "Get", URL: testURL, Err: errors.New("timeout")},

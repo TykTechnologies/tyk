@@ -1,11 +1,14 @@
 package gateway
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"io"
 	"net"
 	"net/http"
 	"net/url"
+	"strings"
 	"syscall"
 
 	"github.com/sirupsen/logrus"
@@ -79,8 +82,13 @@ func (gw *Gateway) logJWKError(logger *logrus.Entry, jwkURL string, err error) {
 	// content/JSON errors
 	var syntaxErr *json.SyntaxError
 	var unmarshalErr *json.UnmarshalTypeError
+	var b64Err base64.CorruptInputError
 
-	if errors.As(err, &syntaxErr) || errors.As(err, &unmarshalErr) {
+	if errors.As(err, &syntaxErr) ||
+		errors.As(err, &unmarshalErr) ||
+		errors.As(err, &b64Err) ||
+		errors.Is(err, io.EOF) ||
+		strings.Contains(err.Error(), "illegal base64") {
 		logger.WithError(err).Errorf("Invalid JWKS retrieved from endpoint: %s", jwkURL)
 		return
 	}
