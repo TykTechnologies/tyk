@@ -32,6 +32,7 @@
     "allow_explicit_policy_id": true
   },
   "http_server_options": {
+    "xff_depth": 1,
     "enable_strict_routes": true,
     "enable_path_prefix_matching": true,
     "enable_path_suffix_matching": true
