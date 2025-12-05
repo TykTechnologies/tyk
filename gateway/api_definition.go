@@ -12,39 +12,35 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync/atomic"
 	texttemplate "text/template"
 	"time"
 
-	"github.com/TykTechnologies/tyk/ee/middleware/streams"
-	"github.com/TykTechnologies/tyk/storage/kv"
-
-	"github.com/TykTechnologies/tyk/internal/httputil"
-
-	"github.com/getkin/kin-openapi/routers/gorillamux"
-
-	"github.com/getkin/kin-openapi/openapi3"
-
-	"github.com/TykTechnologies/tyk/apidef/oas"
-
-	"github.com/cenk/backoff"
-
 	"github.com/Masterminds/sprig/v3"
-
+	"github.com/cenk/backoff"
+	"github.com/getkin/kin-openapi/openapi3"
+	"github.com/getkin/kin-openapi/routers"
+	"github.com/getkin/kin-openapi/routers/gorillamux"
 	"github.com/sirupsen/logrus"
 
 	circuit "github.com/TykTechnologies/circuitbreaker"
 
-	"github.com/TykTechnologies/tyk/internal/service/gojsonschema"
-
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/apidef/oas"
 	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/ee/middleware/streams"
 	"github.com/TykTechnologies/tyk/header"
+	"github.com/TykTechnologies/tyk/internal/httputil"
 	"github.com/TykTechnologies/tyk/internal/model"
+	"github.com/TykTechnologies/tyk/internal/oasutil"
+	"github.com/TykTechnologies/tyk/internal/reflect"
+	"github.com/TykTechnologies/tyk/internal/service/gojsonschema"
 	"github.com/TykTechnologies/tyk/regexp"
 	"github.com/TykTechnologies/tyk/rpc"
 	"github.com/TykTechnologies/tyk/storage"
+	"github.com/TykTechnologies/tyk/storage/kv"
 )
 
 // const used by cache middleware
@@ -86,6 +82,9 @@ const (
 	GoPlugin
 	PersistGraphQL
 	RateLimit
+
+	OasMock
+	OasValidate
 )
 
 // RequestStatus is a custom type to avoid collisions
@@ -353,7 +352,7 @@ func (a APIDefinitionLoader) MakeSpec(def *model.MergedAPI, logger *logrus.Entry
 
 		// If we have transitioned to extended path specifications, we should use these now
 		if v.UseExtendedPaths {
-			pathSpecs, whiteListSpecs = a.getExtendedPathSpecs(v, spec, a.Gw.GetConfig())
+			pathSpecs, whiteListSpecs = a.getExtendedPathSpecs(v, spec, a.Gw.GetConfig(), def.OAS)
 		} else {
 			logger.Warning("Legacy path detected! Upgrade to extended.")
 			pathSpecs, whiteListSpecs = a.getPathSpecs(v, a.Gw.GetConfig())
@@ -1301,9 +1300,109 @@ func (a APIDefinitionLoader) compileRateLimitPathsSpec(paths []apidef.RateLimitM
 	return urlSpec
 }
 
-func (a APIDefinitionLoader) getExtendedPathSpecs(apiVersionDef apidef.VersionInfo, apiSpec *APISpec, conf config.Config) ([]URLSpec, bool) {
-	// TODO: New compiler here, needs to put data into a different structure
+type middlewareFnCfg struct {
+	method   string
+	path     string
+	pathItem *openapi3.PathItem
+	op       *openapi3.Operation
+	tykOp    *oas.Operation
+}
 
+// compileOasMiddleware helper for compile oas based middlewares to classic RxPaths
+func (a APIDefinitionLoader) compileOasMiddleware(
+	status URLStatus,
+	spec *oas.OAS,
+	cfg config.Config,
+	middlewareFn func(*middlewareFnCfg) urlSpecExtractor,
+) []URLSpec {
+
+	if spec == nil || spec.Paths == nil {
+		return nil
+	}
+
+	var urlSpecs []URLSpec
+	tykExt := spec.GetTykExtension()
+	if tykExt == nil || tykExt.Middleware == nil {
+		return nil
+	}
+
+	for _, pathItem := range oasutil.SortByPathLength(*spec.Paths) {
+		for method, operation := range pathItem.Operations() {
+			tykOp := tykExt.Middleware.Operations[operation.OperationID]
+			if tykOp == nil {
+				continue
+			}
+
+			middleware := middlewareFn(&middlewareFnCfg{
+				method:   method,
+				path:     pathItem.Path,
+				pathItem: pathItem.PathItem,
+				op:       operation,
+				tykOp:    tykOp,
+			})
+
+			if middleware == nil {
+				continue
+			}
+
+			newSpec := URLSpec{}
+			a.generateRegex(pathItem.Path, &newSpec, status, cfg)
+
+			middleware.extract(&newSpec)
+
+			urlSpecs = append(urlSpecs, newSpec)
+		}
+	}
+
+	return urlSpecs
+}
+
+// Compile OAS mock specs
+func (a APIDefinitionLoader) compileOasMock(status URLStatus, oasSpec *oas.OAS, cfg config.Config) []URLSpec {
+	return a.compileOasMiddleware(status, oasSpec, cfg, func(cfg *middlewareFnCfg) urlSpecExtractor {
+		if cfg.tykOp.MockResponse == nil || !cfg.tykOp.MockResponse.Enabled {
+			return nil
+		}
+
+		return oasMockMiddleware{
+			MockResponse: cfg.tykOp.MockResponse,
+			endpointMiddleware: endpointMiddleware{
+				method: cfg.method,
+				path:   cfg.path,
+				op:     cfg.op,
+			},
+		}
+	})
+}
+
+// Compile OAS validator specs
+func (a APIDefinitionLoader) compileOasValidator(status URLStatus, oasSpec *oas.OAS, cfg config.Config) []URLSpec {
+	return a.compileOasMiddleware(status, oasSpec, cfg, func(cfg *middlewareFnCfg) urlSpecExtractor {
+		if cfg.tykOp.ValidateRequest == nil || !cfg.tykOp.ValidateRequest.Enabled {
+			return nil
+		}
+
+		route := &routers.Route{
+			Path:      cfg.path,
+			Method:    cfg.method,
+			Operation: cfg.op,
+			Spec:      &oasSpec.T,
+			PathItem:  reflect.Clone(cfg.pathItem),
+		}
+
+		return oasValidateMiddleware{
+			ValidateRequest: cfg.tykOp.ValidateRequest,
+			endpointMiddleware: endpointMiddleware{
+				method: cfg.method,
+				path:   cfg.path,
+				op:     cfg.op,
+			},
+			route: route,
+		}
+	})
+}
+
+func (a APIDefinitionLoader) getExtendedPathSpecs(apiVersionDef apidef.VersionInfo, apiSpec *APISpec, conf config.Config, oasSpec *oas.OAS) ([]URLSpec, bool) {
 	mockResponsePaths := a.compileMockResponsePathSpec(apiVersionDef.IgnoreEndpointCase, apiVersionDef.ExtendedPaths.MockResponse, MockResponse, conf)
 	ignoredPaths := a.compileExtendedPathSpec(apiVersionDef.IgnoreEndpointCase, apiVersionDef.ExtendedPaths.Ignored, Ignored, conf)
 	blackListPaths := a.compileExtendedPathSpec(apiVersionDef.IgnoreEndpointCase, apiVersionDef.ExtendedPaths.BlackList, BlackList, conf)
@@ -1329,31 +1428,39 @@ func (a APIDefinitionLoader) getExtendedPathSpecs(apiVersionDef apidef.VersionIn
 	persistGraphQL := a.compilePersistGraphQLPathSpec(apiVersionDef.ExtendedPaths.PersistGraphQL, PersistGraphQL, apiSpec, conf)
 	rateLimitPaths := a.compileRateLimitPathsSpec(apiVersionDef.ExtendedPaths.RateLimit, RateLimit, conf)
 
-	combinedPath := []URLSpec{}
-	combinedPath = append(combinedPath, mockResponsePaths...)
-	combinedPath = append(combinedPath, ignoredPaths...)
-	combinedPath = append(combinedPath, blackListPaths...)
-	combinedPath = append(combinedPath, whiteListPaths...)
-	combinedPath = append(combinedPath, cachedPaths...)
-	combinedPath = append(combinedPath, transformPaths...)
-	combinedPath = append(combinedPath, transformResponsePaths...)
-	combinedPath = append(combinedPath, transformJQPaths...)
-	combinedPath = append(combinedPath, transformJQResponsePaths...)
-	combinedPath = append(combinedPath, headerTransformPaths...)
-	combinedPath = append(combinedPath, headerTransformPathsOnResponse...)
-	combinedPath = append(combinedPath, hardTimeouts...)
-	combinedPath = append(combinedPath, circuitBreakers...)
-	combinedPath = append(combinedPath, urlRewrites...)
-	combinedPath = append(combinedPath, requestSizes...)
-	combinedPath = append(combinedPath, goPlugins...)
-	combinedPath = append(combinedPath, persistGraphQL...)
-	combinedPath = append(combinedPath, virtualPaths...)
-	combinedPath = append(combinedPath, methodTransforms...)
-	combinedPath = append(combinedPath, trackedPaths...)
-	combinedPath = append(combinedPath, unTrackedPaths...)
-	combinedPath = append(combinedPath, validateJSON...)
-	combinedPath = append(combinedPath, internalPaths...)
-	combinedPath = append(combinedPath, rateLimitPaths...)
+	oasMock := a.compileOasMock(OasMock, oasSpec, conf)
+	oasValidate := a.compileOasValidator(OasValidate, oasSpec, conf)
+
+	combinedPath := slices.Concat(
+		mockResponsePaths,
+		ignoredPaths,
+		blackListPaths,
+		whiteListPaths,
+		cachedPaths,
+		transformPaths,
+		transformResponsePaths,
+		transformJQPaths,
+		transformJQResponsePaths,
+		headerTransformPaths,
+		headerTransformPathsOnResponse,
+		hardTimeouts,
+		circuitBreakers,
+		urlRewrites,
+		requestSizes,
+		goPlugins,
+		persistGraphQL,
+		virtualPaths,
+		methodTransforms,
+		trackedPaths,
+		unTrackedPaths,
+		validateJSON,
+		internalPaths,
+		rateLimitPaths,
+
+		// oas-based
+		oasValidate,
+		oasMock,
+	)
 
 	return combinedPath, len(whiteListPaths) > 0
 }
@@ -1425,7 +1532,7 @@ func (a *APISpec) getURLStatus(stat URLStatus) RequestStatus {
 // URLAllowedAndIgnored checks if a url is allowed and ignored.
 func (a *APISpec) URLAllowedAndIgnored(r *http.Request, rxPaths []URLSpec, whiteListStatus bool) (RequestStatus, interface{}) {
 	for i := range rxPaths {
-		if !rxPaths[i].matchesPath(r.URL.Path, a) {
+		if ok, _ := rxPaths[i].matchesPath(r.URL.Path, a); !ok {
 			continue
 		}
 
@@ -1436,7 +1543,7 @@ func (a *APISpec) URLAllowedAndIgnored(r *http.Request, rxPaths []URLSpec, white
 
 	// Check if ignored
 	for i := range rxPaths {
-		if !rxPaths[i].matchesPath(r.URL.Path, a) {
+		if ok, _ := rxPaths[i].matchesPath(r.URL.Path, a); !ok {
 			continue
 		}
 
@@ -1472,8 +1579,20 @@ func (a *APISpec) URLAllowedAndIgnored(r *http.Request, rxPaths []URLSpec, white
 				}
 
 				return StatusRedirectFlowByReply, rxPaths[i].MockResponse
+			case OasMock:
+				if rxPaths[i].oasMock.method != r.Method {
+					continue
+				}
+
+				return StatusOk, rxPaths[i].oasMock
+			case OasValidate:
+				if rxPaths[i].oasMock.method != r.Method {
+					continue
+				}
+
+				return StatusOk, rxPaths[i].oasValidateRequest
 			}
-		} else { // Deprecated
+		} else {
 			// We are using an extended path set, check for the method
 			methodMeta, matchMethodOk := rxPaths[i].MethodActions[r.Method]
 			if !matchMethodOk {

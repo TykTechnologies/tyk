@@ -38,6 +38,10 @@ type URLSpec struct {
 	PersistGraphQL            apidef.PersistGraphQLMeta
 	RateLimit                 apidef.RateLimitMeta
 
+	// oas operation
+	oasMock            oasMockMiddleware
+	oasValidateRequest oasValidateMiddleware
+
 	IgnoreCase bool
 }
 
@@ -85,6 +89,11 @@ func (u *URLSpec) modeSpecificSpec(mode URLStatus) (interface{}, bool) {
 		return &u.GoPluginMeta, true
 	case PersistGraphQL:
 		return &u.PersistGraphQL, true
+	case OasMock:
+		return &u.oasMock, true
+	case OasValidate:
+		return &u.oasValidateRequest, true
+
 	default:
 		return nil, false
 	}
@@ -135,6 +144,10 @@ func (u *URLSpec) matchesMethod(method string) bool {
 		return method == u.PersistGraphQL.Method
 	case RateLimit:
 		return method == u.RateLimit.Method
+	case OasMock:
+		return method == u.oasMock.method
+	case OasValidate:
+		return method == u.oasValidateRequest.method
 	default:
 		return false
 	}
@@ -144,20 +157,20 @@ func (u *URLSpec) matchesMethod(method string) bool {
 // it will match the regex against the clean URL with stripped listen path first,
 // then it will match against the full URL including the listen path as provided.
 // APISpec to provide URL sanitization of the input is passed along.
-func (a *URLSpec) matchesPath(reqPath string, api *APISpec) bool {
+func (a *URLSpec) matchesPath(reqPath string, api *APISpec) (bool, string) {
 	clean := api.StripListenPath(reqPath)
 	noVersion := api.StripVersionPath(clean)
 	// match /users
 	if noVersion != clean && a.spec.MatchString(noVersion) {
-		return true
+		return true, noVersion
 	}
 	// match /v3/users
 	if a.spec.MatchString(clean) {
-		return true
+		return true, clean
 	}
 	// match /listenpath/v3/users
 	if a.spec.MatchString(reqPath) {
-		return true
+		return true, reqPath
 	}
-	return false
+	return false, ""
 }
