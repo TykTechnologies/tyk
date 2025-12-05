@@ -286,7 +286,7 @@ jobs:
   resolve-dashboard-image:
     if: github.event.pull_request.draft == false
     needs: goreleaser
-    runs-on: ${{ vars.DEFAULT_RUNNER }}
+    runs-on: warp-ubuntu-latest-x64-8x
     permissions:
       id-token: write
       contents: read
