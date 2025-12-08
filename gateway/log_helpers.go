@@ -83,12 +83,14 @@ func (gw *Gateway) logJWKError(logger *logrus.Entry, jwkURL string, err error) {
 	var syntaxErr *json.SyntaxError
 	var unmarshalErr *json.UnmarshalTypeError
 	var b64Err base64.CorruptInputError
+	errStr := err.Error()
 
 	if errors.As(err, &syntaxErr) ||
 		errors.As(err, &unmarshalErr) ||
 		errors.As(err, &b64Err) ||
 		errors.Is(err, io.EOF) ||
-		strings.Contains(err.Error(), "illegal base64") {
+		strings.Contains(errStr, "invalid JWK") ||
+		strings.Contains(errStr, "illegal base64") {
 		logger.WithError(err).Errorf("Invalid JWKS retrieved from endpoint: %s", jwkURL)
 		return
 	}
