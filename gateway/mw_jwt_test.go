@@ -7,24 +7,25 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"net/http/httptest"
 	"reflect"
 	"sort"
 	"testing"
 	"time"
 
-	"github.com/TykTechnologies/tyk/apidef"
-	"github.com/TykTechnologies/tyk/apidef/oas"
-	"github.com/TykTechnologies/tyk/config"
-	tyktime "github.com/TykTechnologies/tyk/internal/time"
-	"github.com/TykTechnologies/tyk/test"
-	"github.com/TykTechnologies/tyk/user"
 	"github.com/go-jose/go-jose/v3"
 	"github.com/golang-jwt/jwt/v4"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/apidef/oas"
+	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/internal/cache"
+	tyktime "github.com/TykTechnologies/tyk/internal/time"
 	"github.com/TykTechnologies/tyk/internal/uuid"
+	"github.com/TykTechnologies/tyk/test"
+	"github.com/TykTechnologies/tyk/user"
 )
 
 // openssl rsa -in app.rsa -pubout > app.rsa.pub
@@ -3834,6 +3835,23 @@ func TestGetSecretFromMultipleJWKURIs(t *testing.T) {
 			isOas:       true,
 		},
 		{
+			name: "cached API definition has invalid base64 JWTSource",
+			setup: func(isOas bool) {
+				api.IsOAS = isOas
+
+				jwkCache := loadOrCreateJWKCacheByApiID(api.APIID)
+				jwkCache.Set(cacheKey, &apidef.APIDefinition{
+					APIID:     testAPIID,
+					JWTSource: "not-valid-base-64!!",
+				}, cache.DefaultExpiration)
+			},
+			jwkURI:              apidef.JWK{URL: testJWKURL},
+			kid:                 "any-kid",
+			useGetSecretFromURL: true,
+			isOas:               true,
+			expectError:         base64.CorruptInputError(3),
+		},
+		{
 			name: "JWK URLs changed triggers refetch",
 			setup: func(isOas bool) {
 				api.IsOAS = isOas
@@ -3929,6 +3947,19 @@ func TestGetSecretFromMultipleJWKURIs(t *testing.T) {
 			expectError:         errors.New("failed to fetch JWK"),
 			useGetSecretFromURL: true,
 			isOas:               true,
+		},
+		{
+			name: "Primary fetch fails (logs error), Legacy fallback fails",
+			setup: func(isOas bool) {
+				api.IsOAS = isOas
+				GetJWK = func(_ string, _ bool) (*jose.JSONWebKeySet, error) {
+					return nil, errors.New("factory client failed")
+				}
+			},
+			jwkURI:              apidef.JWK{URL: testJWKURL},
+			kid:                 "any-kid",
+			useGetSecretFromURL: true,
+			expectError:         errors.New("factory client failed"),
 		},
 		{
 			name: "ensure jwksURIs faeature works only with OAS",
@@ -5021,4 +5052,44 @@ func TestJWT_TraditionalAuth_ExistingSessionNoPolicyInToken(t *testing.T) {
 			BodyMatch: `key not authorized: no matching policy found`,
 		})
 	})
+}
+
+func TestLegacyGetSecretFromURL_InvalidJSON(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		_, err := w.Write([]byte("this-is-not-json"))
+		require.NoError(t, err)
+	}))
+	defer ts.Close()
+
+	gw := &Gateway{}
+	gw.SetConfig(config.Config{JWTSSLInsecureSkipVerify: true})
+	m := JWTMiddleware{BaseMiddleware: &BaseMiddleware{Gw: gw}}
+
+	m.Spec = &APISpec{
+		APIDefinition: &apidef.APIDefinition{APIID: "test-api"},
+	}
+
+	val, err := m.legacyGetSecretFromURL(ts.URL, "kid", "RS256")
+
+	assert.Error(t, err)
+	assert.Nil(t, val)
+}
+
+func TestGetSecretToVerifySignature_InvalidBase64Source(t *testing.T) {
+	m := JWTMiddleware{BaseMiddleware: &BaseMiddleware{}}
+	api := &apidef.APIDefinition{
+		JWTSource: "this-is-not-base64!",
+	}
+	m.Spec = &APISpec{APIDefinition: api}
+
+	token := &jwt.Token{Header: map[string]interface{}{"kid": "123"}}
+	val, err := m.getSecretToVerifySignature(nil, token)
+
+	assert.Error(t, err)
+	assert.Nil(t, val)
+
+	var corruptInputError base64.CorruptInputError
+	ok := errors.As(err, &corruptInputError)
+	assert.True(t, ok, "Expected base64 error")
 }
