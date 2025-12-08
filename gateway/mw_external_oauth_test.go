@@ -10,8 +10,9 @@ import (
 	"time"
 
 	"github.com/golang-jwt/jwt/v4"
+	"github.com/sirupsen/logrus"
+	logrustest "github.com/sirupsen/logrus/hooks/test"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/test"
@@ -424,10 +425,16 @@ func TestGetSecretFromJWKURL_FetchError_LogsError(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
 
+	if externalOAuthJWKCache != nil {
+		externalOAuthJWKCache.Flush()
+	}
+
+	logger, hook := logrustest.NewNullLogger()
+
 	tsServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		_, err := w.Write([]byte("invalid-json-content"))
-		require.NoError(t, err)
+		assert.NoError(t, err)
 	}))
 	defer tsServer.Close()
 
@@ -447,17 +454,20 @@ func TestGetSecretFromJWKURL_FetchError_LogsError(t *testing.T) {
 		}
 	})[0]
 
-	k := ExternalOAuthMiddleware{
-		&BaseMiddleware{
-			Gw:   ts.Gw,
-			Spec: spec,
-		},
-	}
+	baseMw := &BaseMiddleware{Gw: ts.Gw, Spec: spec}
+	baseMw.logger = logger.WithField("mw", "ExternalOAuthMiddleware")
+	k := ExternalOAuthMiddleware{BaseMiddleware: baseMw}
 
 	t.Run("Standard fetch failure triggers logJWKError", func(t *testing.T) {
 		_, err := k.getSecretFromJWKOrConfig("any-kid", spec.ExternalOAuth.Providers[0].JWT)
-
 		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "invalid character")
+
+		assert.NotEmpty(t, hook.Entries, "Expected a log entry but found none")
+		if len(hook.Entries) > 0 {
+			lastLog := hook.LastEntry()
+			assert.Equal(t, logrus.ErrorLevel, lastLog.Level)
+			assert.Contains(t, lastLog.Message, "Invalid JWKS retrieved from endpoint")
+			assert.Contains(t, lastLog.Message, tsServer.URL)
+		}
 	})
 }

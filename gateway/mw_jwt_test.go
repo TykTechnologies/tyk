@@ -10,11 +10,14 @@ import (
 	"net/http/httptest"
 	"reflect"
 	"sort"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/go-jose/go-jose/v3"
 	"github.com/golang-jwt/jwt/v4"
+	"github.com/sirupsen/logrus"
+	logrustest "github.com/sirupsen/logrus/hooks/test"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -3744,8 +3747,10 @@ func TestGetSecretFromMultipleJWKURIs(t *testing.T) {
 		kid                 interface{}
 		expectKey           interface{}
 		expectError         error
+		expectErrorType     interface{}
 		useGetSecretFromURL bool
 		isOas               bool
+		expectedLogPart     string
 	}{
 		{
 			name: "success with valid JWK URL and matching KID",
@@ -3849,7 +3854,8 @@ func TestGetSecretFromMultipleJWKURIs(t *testing.T) {
 			kid:                 "any-kid",
 			useGetSecretFromURL: true,
 			isOas:               true,
-			expectError:         base64.CorruptInputError(3),
+			expectErrorType:     new(base64.CorruptInputError),
+			expectedLogPart:     "JWKS source decode failed",
 		},
 		{
 			name: "JWK URLs changed triggers refetch",
@@ -3960,6 +3966,7 @@ func TestGetSecretFromMultipleJWKURIs(t *testing.T) {
 			kid:                 "any-kid",
 			useGetSecretFromURL: true,
 			expectError:         errors.New("factory client failed"),
+			expectedLogPart:     "Failed to fetch or decode JWKs",
 		},
 		{
 			name: "ensure jwksURIs faeature works only with OAS",
@@ -3990,6 +3997,10 @@ func TestGetSecretFromMultipleJWKURIs(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			logger, hook := logrustest.NewNullLogger()
+
+			m.logger = logger.WithField("mw", "JWTMiddleware")
+
 			m.loadOrCreateJWKCache().Flush()
 
 			if tt.setup != nil {
@@ -4007,7 +4018,9 @@ func TestGetSecretFromMultipleJWKURIs(t *testing.T) {
 				key, err = mw.getSecretFromURL(tt.jwkURI.URL, tt.kid, "RS256")
 			}
 
-			if tt.expectError != nil {
+			if tt.expectErrorType != nil {
+				assert.ErrorAs(t, err, tt.expectErrorType)
+			} else if tt.expectError != nil {
 				assert.Error(t, err)
 				assert.Contains(t, err.Error(), tt.expectError.Error())
 			} else {
@@ -4015,6 +4028,18 @@ func TestGetSecretFromMultipleJWKURIs(t *testing.T) {
 			}
 
 			assert.Equal(t, tt.expectKey, key)
+
+			if tt.expectedLogPart != "" {
+				assert.NotEmpty(t, hook.Entries, "Expected log entries but found none")
+				found := false
+				for _, entry := range hook.Entries {
+					if strings.Contains(entry.Message, tt.expectedLogPart) {
+						found = true
+						break
+					}
+				}
+				assert.True(t, found, "Expected log message containing '%s', logs were: %v", tt.expectedLogPart, hook.Entries)
+			}
 		})
 	}
 }
@@ -5055,16 +5080,22 @@ func TestJWT_TraditionalAuth_ExistingSessionNoPolicyInToken(t *testing.T) {
 }
 
 func TestLegacyGetSecretFromURL_InvalidJSON(t *testing.T) {
+	logger, hook := logrustest.NewNullLogger()
+
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		_, err := w.Write([]byte("this-is-not-json"))
-		require.NoError(t, err)
+		assert.NoError(t, err)
 	}))
 	defer ts.Close()
 
 	gw := &Gateway{}
 	gw.SetConfig(config.Config{JWTSSLInsecureSkipVerify: true})
-	m := JWTMiddleware{BaseMiddleware: &BaseMiddleware{Gw: gw}}
+
+	m := JWTMiddleware{BaseMiddleware: &BaseMiddleware{
+		Gw:     gw,
+		logger: logger.WithField("mw", "JWTMiddleware"),
+	}}
 
 	m.Spec = &APISpec{
 		APIDefinition: &apidef.APIDefinition{APIID: "test-api"},
@@ -5074,13 +5105,25 @@ func TestLegacyGetSecretFromURL_InvalidJSON(t *testing.T) {
 
 	assert.Error(t, err)
 	assert.Nil(t, val)
+
+	assert.NotEmpty(t, hook.Entries)
+	if len(hook.Entries) > 0 {
+		lastLog := hook.LastEntry()
+		assert.Equal(t, logrus.ErrorLevel, lastLog.Level)
+		assert.Contains(t, lastLog.Message, "Invalid JWKS retrieved from endpoint")
+	}
 }
 
 func TestGetSecretToVerifySignature_InvalidBase64Source(t *testing.T) {
-	m := JWTMiddleware{BaseMiddleware: &BaseMiddleware{}}
+	logger, hook := logrustest.NewNullLogger()
+
 	api := &apidef.APIDefinition{
 		JWTSource: "this-is-not-base64!",
 	}
+	baseMw := &BaseMiddleware{
+		logger: logger.WithField("mw", "JWTMiddleware"),
+	}
+	m := JWTMiddleware{BaseMiddleware: baseMw}
 	m.Spec = &APISpec{APIDefinition: api}
 
 	token := &jwt.Token{Header: map[string]interface{}{"kid": "123"}}
@@ -5089,7 +5132,36 @@ func TestGetSecretToVerifySignature_InvalidBase64Source(t *testing.T) {
 	assert.Error(t, err)
 	assert.Nil(t, val)
 
-	var corruptInputError base64.CorruptInputError
-	ok := errors.As(err, &corruptInputError)
-	assert.True(t, ok, "Expected base64 error")
+	assert.NotEmpty(t, hook.Entries)
+	if len(hook.Entries) > 0 {
+		lastLog := hook.LastEntry()
+		assert.Equal(t, logrus.ErrorLevel, lastLog.Level)
+		assert.Contains(t, lastLog.Message, "JWKS source decode failed")
+		assert.Contains(t, lastLog.Message, "not a base64 string")
+	}
+}
+
+func TestLegacyGetSecretFromURL_NetworkError(t *testing.T) {
+	logger, hook := logrustest.NewNullLogger()
+	gw := &Gateway{}
+	gw.SetConfig(config.Config{JWTSSLInsecureSkipVerify: true})
+	m := JWTMiddleware{BaseMiddleware: &BaseMiddleware{
+		Gw:     gw,
+		logger: logger.WithField("mw", "JWTMiddleware"),
+	}}
+	m.Spec = &APISpec{
+		APIDefinition: &apidef.APIDefinition{APIID: "test-api"},
+	}
+
+	val, err := m.legacyGetSecretFromURL("http://[::1]:namedport", "kid", "RS256")
+
+	assert.Error(t, err)
+	assert.Nil(t, val)
+
+	assert.NotEmpty(t, hook.Entries, "Expected log entries for network failure")
+	if len(hook.Entries) > 0 {
+		lastLog := hook.LastEntry()
+		assert.Equal(t, logrus.ErrorLevel, lastLog.Level)
+		assert.Contains(t, lastLog.Message, "JWKS endpoint resolution failed")
+	}
 }

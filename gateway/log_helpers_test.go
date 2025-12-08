@@ -157,7 +157,19 @@ func TestGatewayLogJWKError(t *testing.T) {
 		name        string
 		err         error
 		expectedLog string
+		shouldLog   bool
 	}{
+		{
+			name:      "Nil Error (Should not log)",
+			err:       nil,
+			shouldLog: false,
+		},
+		{
+			name:        "String-based 'invalid JWK' (go-jose mismatch)",
+			err:         errors.New("go-jose: invalid JWK, public keys mismatch"),
+			expectedLog: "Invalid JWKS retrieved from endpoint: " + testURL,
+			shouldLog:   true,
+		},
 		{
 			name:        "JSON Syntax Error",
 			err:         &json.SyntaxError{},
@@ -224,9 +236,15 @@ func TestGatewayLogJWKError(t *testing.T) {
 			hook.Reset()
 			gw.logJWKError(entry, testURL, tc.err)
 
-			assert.Len(t, hook.Entries, 1)
-			assert.Equal(t, logrus.ErrorLevel, hook.LastEntry().Level)
-			assert.Equal(t, tc.expectedLog, hook.LastEntry().Message)
+			if tc.expectedLog == "" {
+				assert.Empty(t, hook.Entries)
+				return
+			}
+
+			if assert.Len(t, hook.Entries, 1) {
+				assert.Equal(t, logrus.ErrorLevel, hook.LastEntry().Level)
+				assert.Equal(t, tc.expectedLog, hook.LastEntry().Message)
+			}
 		})
 	}
 }
