@@ -97,7 +97,8 @@ func (k *JWTMiddleware) Init() {
 				}
 
 				if err != nil {
-					// TODO: for the reviewer to identify if this log is necessary for the clients
+					// TODO: for the reviewer to identify if this log is necessary
+					// for the clients (this was not a part of the previous code)
 					k.Gw.logJWKError(k.Logger(), jwk.URL, err)
 					continue
 				}
@@ -272,6 +273,8 @@ func (k *JWTMiddleware) getSecretFromURL(url string, kidVal interface{}, keyType
 		if clientErr == nil {
 			if jwkSet, err = getJWKWithClient(url, client); err != nil {
 				k.Gw.logJWKError(k.Logger(), url, err)
+				// TODO: for the reviewer to identify if this log is necessary
+				// for the clients (this is left from the previous code)
 				k.Logger().Info("Failed to decode JWKs body with factory client. Trying x5c PEM fallback.")
 			}
 		}
