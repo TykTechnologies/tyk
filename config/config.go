@@ -1150,6 +1150,10 @@ type Config struct {
 	HTTPProfile bool `json:"enable_http_profiler"`
 
 	// Enables the real-time Gateway log view in the Dashboard.
+	// 
+	// Note:
+	//   For logs to appear in the Tyk Dashboard, both the Gateway and the Dashboard must be configured to use the **same Redis instance**. 
+	//   In deployments where the Data Plane (Gateway) and Control Plane (Dashboard) use separate Redis instances, enabling this option on the Gateway will not make logs available in the Dashboard.
 	UseRedisLog bool `json:"use_redis_log"`
 
 	// Enable Sentry logging
