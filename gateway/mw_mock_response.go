@@ -90,17 +90,34 @@ func (m *mockResponseMiddleware) ProcessRequest(rw http.ResponseWriter, r *http.
 }
 
 func (m *mockResponseMiddleware) mockResponse(r *http.Request) (*http.Response, error) {
-	// if response is nil we go further
-	operation := m.Spec.findOperation(r)
+	// Use FindSpecMatchesStatus to check if this path should be mocked
+	// This ensures the standard regex-based path matching is used, respecting gateway configurations
+	versionName := m.Spec.getVersionFromRequest(r)
+	versionPaths := m.Spec.RxPaths[versionName]
 
-	if operation == nil {
+	// For unversioned APIs, getVersionFromRequest returns "" but paths might be stored
+	// under a version name, so we need to use the first available version
+	if versionName == "" && len(versionPaths) == 0 && len(m.Spec.RxPaths) > 0 {
+		for _, paths := range m.Spec.RxPaths {
+			versionPaths = paths
+			break
+		}
+	}
+
+	urlSpec, found := m.Spec.FindSpecMatchesStatus(r, versionPaths, OASMockResponse)
+
+	if !found || urlSpec == nil {
+		// No mock response configured for this path
 		return nil, nil
 	}
 
-	mockResponse := operation.MockResponse
+	mockResponse := urlSpec.OASMockResponseMeta
 	if mockResponse == nil || !mockResponse.Enabled {
 		return nil, nil
 	}
+
+	// Now that we know mocking should occur, find the operation for OAS examples
+	operation := m.Spec.findOperation(r)
 
 	res := &http.Response{Header: http.Header{}}
 
@@ -111,6 +128,11 @@ func (m *mockResponseMiddleware) mockResponse(r *http.Request) (*http.Response, 
 	var err error
 
 	if mockResponse.FromOASExamples != nil && mockResponse.FromOASExamples.Enabled {
+		// Need operation for OAS examples
+		if operation == nil {
+			log.Tracef("URL spec matched for mock response but operation not found for %s %v", r.Method, r.URL)
+			return nil, nil
+		}
 		code, contentType, body, headers, err = mockFromOAS(r, operation.route.Operation, mockResponse.FromOASExamples)
 		res.StatusCode = code
 		if err != nil {

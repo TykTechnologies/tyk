@@ -82,10 +82,12 @@ const (
 	RequestTracked
 	RequestNotTracked
 	ValidateJSONRequest
+	OASValidateRequest
 	Internal
 	GoPlugin
 	PersistGraphQL
 	RateLimit
+	OASMockResponse
 )
 
 // RequestStatus is a custom type to avoid collisions
@@ -121,6 +123,8 @@ const (
 	StatusRequestNotTracked               RequestStatus = "Request Not Tracked"
 	StatusValidateJSON                    RequestStatus = "Validate JSON"
 	StatusValidateRequest                 RequestStatus = "Validate Request"
+	StatusOASValidateRequest              RequestStatus = "OAS Validate Request"
+	StatusOASMockResponse                 RequestStatus = "OAS Mock Response"
 	StatusInternal                        RequestStatus = "Internal path"
 	StatusGoPlugin                        RequestStatus = "Go plugin"
 	StatusPersistGraphQL                  RequestStatus = "Persist GraphQL"
@@ -389,6 +393,19 @@ func (a APIDefinitionLoader) MakeSpec(def *model.MergedAPI, logger *logrus.Entry
 	spec.oasRouter, err = gorillamux.NewRouter(&oasSpec)
 	if err != nil {
 		logger.WithError(err).Error("Could not create OAS router")
+	}
+
+	// Now that OAS is initialized, compile OAS-specific middleware paths and add to RxPaths
+	if spec.IsOAS {
+		oasValidateRequestPaths := a.compileOASValidateRequestPathSpec(spec, a.Gw.GetConfig())
+		oasMockResponsePaths := a.compileOASMockResponsePathSpec(spec, a.Gw.GetConfig())
+
+		// Add OAS paths to all versions in RxPaths
+		// OAS middleware applies to all versions since it's defined at the API level
+		for versionName := range spec.RxPaths {
+			spec.RxPaths[versionName] = append(spec.RxPaths[versionName], oasValidateRequestPaths...)
+			spec.RxPaths[versionName] = append(spec.RxPaths[versionName], oasMockResponsePaths...)
+		}
 	}
 
 	return spec, nil
@@ -1301,6 +1318,111 @@ func (a APIDefinitionLoader) compileRateLimitPathsSpec(paths []apidef.RateLimitM
 	return urlSpec
 }
 
+// compileOASValidateRequestPathSpec extracts ValidateRequest operations from OAS middleware
+// and converts them to URLSpec entries that use the standard regex-based path matching algorithm.
+// This ensures OAS validateRequest middleware respects gateway configurations like
+// EnablePathPrefixMatching, EnablePathSuffixMatching, and IgnoreEndpointCase.
+func (a APIDefinitionLoader) compileOASValidateRequestPathSpec(apiSpec *APISpec, conf config.Config) []URLSpec {
+	if !apiSpec.IsOAS {
+		return nil
+	}
+
+	middleware := apiSpec.OAS.GetTykMiddleware()
+	if middleware == nil || len(middleware.Operations) == 0 {
+		return nil
+	}
+
+	urlSpec := []URLSpec{}
+
+	// Iterate through all OAS operations and find those with ValidateRequest enabled
+	for operationID, operation := range middleware.Operations {
+		if operation.ValidateRequest == nil || !operation.ValidateRequest.Enabled {
+			continue
+		}
+
+		// Find the path and method for this operation
+		path, method := a.findPathAndMethodForOperation(apiSpec, operationID)
+		if path == "" || method == "" {
+			continue
+		}
+
+		newSpec := URLSpec{
+			OASValidateRequestMeta: operation.ValidateRequest,
+			OASMethod:              method,
+			OASPath:                path,
+		}
+
+		// The path in OAS is relative to the server URL (listenPath)
+		// For regex matching, we don't prepend listenPath because URLSpec.matchesPath
+		// will strip the listenPath before matching
+		// Use standard regex generation with gateway config
+		a.generateRegex(path, &newSpec, OASValidateRequest, conf)
+		urlSpec = append(urlSpec, newSpec)
+	}
+
+	return urlSpec
+}
+
+// compileOASMockResponsePathSpec extracts MockResponse operations from OAS middleware
+// and converts them to URLSpec entries that use the standard regex-based path matching algorithm.
+// This ensures OAS mockResponse middleware respects gateway configurations like
+// EnablePathPrefixMatching, EnablePathSuffixMatching, and IgnoreEndpointCase.
+func (a APIDefinitionLoader) compileOASMockResponsePathSpec(apiSpec *APISpec, conf config.Config) []URLSpec {
+	if !apiSpec.IsOAS {
+		return nil
+	}
+
+	middleware := apiSpec.OAS.GetTykMiddleware()
+	if middleware == nil || len(middleware.Operations) == 0 {
+		return nil
+	}
+
+	urlSpec := []URLSpec{}
+
+	// Iterate through all OAS operations and find those with MockResponse enabled
+	for operationID, operation := range middleware.Operations {
+		if operation.MockResponse == nil || !operation.MockResponse.Enabled {
+			continue
+		}
+
+		// Find the path and method for this operation
+		path, method := a.findPathAndMethodForOperation(apiSpec, operationID)
+		if path == "" || method == "" {
+			continue
+		}
+
+		newSpec := URLSpec{
+			OASMockResponseMeta: operation.MockResponse,
+			OASMethod:           method,
+			OASPath:             path,
+		}
+
+		// Use standard regex generation with gateway config
+		a.generateRegex(path, &newSpec, OASMockResponse, conf)
+		urlSpec = append(urlSpec, newSpec)
+	}
+
+	return urlSpec
+}
+
+// findPathAndMethodForOperation finds the path and method for a given operation ID
+// by searching through the OAS paths.
+func (a APIDefinitionLoader) findPathAndMethodForOperation(apiSpec *APISpec, operationID string) (string, string) {
+	if apiSpec.OAS.Paths == nil {
+		return "", ""
+	}
+
+	for path, pathItem := range apiSpec.OAS.Paths.Map() {
+		for method, operation := range pathItem.Operations() {
+			if operation.OperationID == operationID {
+				return path, method
+			}
+		}
+	}
+
+	return "", ""
+}
+
 func (a APIDefinitionLoader) getExtendedPathSpecs(apiVersionDef apidef.VersionInfo, apiSpec *APISpec, conf config.Config) ([]URLSpec, bool) {
 	// TODO: New compiler here, needs to put data into a different structure
 
@@ -1328,6 +1450,9 @@ func (a APIDefinitionLoader) getExtendedPathSpecs(apiVersionDef apidef.VersionIn
 	goPlugins := a.compileGopluginPathsSpec(apiVersionDef.ExtendedPaths.GoPlugin, GoPlugin, apiSpec, conf)
 	persistGraphQL := a.compilePersistGraphQLPathSpec(apiVersionDef.ExtendedPaths.PersistGraphQL, PersistGraphQL, apiSpec, conf)
 	rateLimitPaths := a.compileRateLimitPathsSpec(apiVersionDef.ExtendedPaths.RateLimit, RateLimit, conf)
+
+	// Note: OAS-specific middleware paths (OASValidateRequest, OASMockResponse) are compiled
+	// separately after OAS initialization in MakeSpec, not here
 
 	combinedPath := []URLSpec{}
 	combinedPath = append(combinedPath, mockResponsePaths...)
@@ -1408,6 +1533,10 @@ func (a *APISpec) getURLStatus(stat URLStatus) RequestStatus {
 		return StatusRequestNotTracked
 	case ValidateJSONRequest:
 		return StatusValidateJSON
+	case OASValidateRequest:
+		return StatusOASValidateRequest
+	case OASMockResponse:
+		return StatusOASMockResponse
 	case Internal:
 		return StatusInternal
 	case GoPlugin:

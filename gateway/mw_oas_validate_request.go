@@ -66,14 +66,37 @@ func (k *ValidateRequest) EnabledForSpec() bool {
 
 // ProcessRequest will run any checks on the request on the way through the system, return an error to have the chain fail
 func (k *ValidateRequest) ProcessRequest(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
-	operation := k.Spec.findOperation(r)
+	// Use FindSpecMatchesStatus to check if this path should be validated
+	// This ensures the standard regex-based path matching is used, respecting gateway configurations
+	versionName := k.Spec.getVersionFromRequest(r)
+	versionPaths := k.Spec.RxPaths[versionName]
 
-	if operation == nil {
+	// For unversioned APIs, getVersionFromRequest returns "" but paths might be stored
+	// under a version name, so we need to use the first available version
+	if versionName == "" && len(versionPaths) == 0 && len(k.Spec.RxPaths) > 0 {
+		for _, paths := range k.Spec.RxPaths {
+			versionPaths = paths
+			break
+		}
+	}
+
+	urlSpec, found := k.Spec.FindSpecMatchesStatus(r, versionPaths, OASValidateRequest)
+
+	if !found || urlSpec == nil {
+		// No validation configured for this path
 		return nil, http.StatusOK
 	}
 
-	validateRequest := operation.ValidateRequest
+	validateRequest := urlSpec.OASValidateRequestMeta
 	if validateRequest == nil || !validateRequest.Enabled {
+		return nil, http.StatusOK
+	}
+
+	// Now that we know validation should occur, find the operation for path params and route
+	operation := k.Spec.findOperation(r)
+	if operation == nil {
+		// Path matched in RxPaths but couldn't find operation - log warning and skip validation
+		log.Tracef("URL spec matched for validation but operation not found for %s %v", r.Method, r.URL)
 		return nil, http.StatusOK
 	}
 
