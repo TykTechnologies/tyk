@@ -951,7 +951,8 @@ type Config struct {
 
 	// Maximum idle connections, per API, between Tyk and Upstream. By default not limited.
 	MaxIdleConns int `bson:"max_idle_connections" json:"max_idle_connections"`
-	// Maximum idle connections, per API, per upstream, between Tyk and Upstream. Default:100
+	// Maximum idle connections, per API, per upstream, between Tyk and Upstream.
+	// A value of `0` will use the default from the Go standard library, which is 2 connections. Tyk recommends setting this value to `500` for production environments.
 	MaxIdleConnsPerHost int `bson:"max_idle_connections_per_host" json:"max_idle_connections_per_host"`
 	// Maximum connection time. If set it will force gateway reconnect to the upstream.
 	MaxConnTime int64 `json:"max_conn_time"`
