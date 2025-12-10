@@ -97,9 +97,6 @@ func (k *JWTMiddleware) Init() {
 				}
 
 				if err != nil {
-					// TODO: for the reviewer to identify if this log is necessary
-					// for the clients (this was not a part of the previous code)
-					k.Gw.logJWKError(k.Logger(), jwk.URL, err)
 					continue
 				}
 
