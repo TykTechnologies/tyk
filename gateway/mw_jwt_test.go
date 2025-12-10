@@ -5107,11 +5107,9 @@ func TestLegacyGetSecretFromURL_InvalidJSON(t *testing.T) {
 	assert.Nil(t, val)
 
 	assert.NotEmpty(t, hook.Entries)
-	if len(hook.Entries) > 0 {
-		lastLog := hook.LastEntry()
-		assert.Equal(t, logrus.ErrorLevel, lastLog.Level)
-		assert.Contains(t, lastLog.Message, "Invalid JWKS retrieved from endpoint")
-	}
+	lastLog := hook.LastEntry()
+	assert.Equal(t, logrus.ErrorLevel, lastLog.Level)
+	assert.Contains(t, lastLog.Message, "Invalid JWKS retrieved from endpoint")
 }
 
 func TestGetSecretToVerifySignature_InvalidBase64Source(t *testing.T) {
@@ -5133,12 +5131,10 @@ func TestGetSecretToVerifySignature_InvalidBase64Source(t *testing.T) {
 	assert.Nil(t, val)
 
 	assert.NotEmpty(t, hook.Entries)
-	if len(hook.Entries) > 0 {
-		lastLog := hook.LastEntry()
-		assert.Equal(t, logrus.ErrorLevel, lastLog.Level)
-		assert.Contains(t, lastLog.Message, "JWKS source decode failed")
-		assert.Contains(t, lastLog.Message, "not a base64 string")
-	}
+	lastLog := hook.LastEntry()
+	assert.Equal(t, logrus.ErrorLevel, lastLog.Level)
+	assert.Contains(t, lastLog.Message, "JWKS source decode failed")
+	assert.Contains(t, lastLog.Message, "not a base64 string")
 }
 
 func TestLegacyGetSecretFromURL_NetworkError(t *testing.T) {
@@ -5159,9 +5155,7 @@ func TestLegacyGetSecretFromURL_NetworkError(t *testing.T) {
 	assert.Nil(t, val)
 
 	assert.NotEmpty(t, hook.Entries, "Expected log entries for network failure")
-	if len(hook.Entries) > 0 {
-		lastLog := hook.LastEntry()
-		assert.Equal(t, logrus.ErrorLevel, lastLog.Level)
-		assert.Contains(t, lastLog.Message, "JWKS endpoint resolution failed")
-	}
+	lastLog := hook.LastEntry()
+	assert.Equal(t, logrus.ErrorLevel, lastLog.Level)
+	assert.Contains(t, lastLog.Message, "JWKS endpoint resolution failed")
 }
