@@ -192,6 +192,38 @@ func (a *APISpec) findOperation(r *http.Request) *Operation {
 	}
 }
 
+// findRouteForOASPath finds the OAS route using the OAS path pattern (e.g., "/users/{id}")
+// and method, rather than the actual request path. This is used when gateway path matching
+// (prefix/suffix) matches a broader pattern than the exact OAS path.
+func (a *APISpec) findRouteForOASPath(oasPath, method string) (*routers.Route, map[string]string, error) {
+	if a.oasRouter == nil {
+		return nil, nil, errors.New("OAS router not initialized")
+	}
+
+	// The OAS router is configured with ListenPath as the server URL,
+	// so we need to prepend it to the OAS path.
+	// ListenPath typically ends with "/", and oasPath starts with "/",
+	// so we need to handle the join properly.
+	fullPath := strings.TrimSuffix(a.Proxy.ListenPath, "/") + oasPath
+
+	syntheticURL, err := url.Parse(fullPath)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	syntheticReq := &http.Request{
+		Method: method,
+		URL:    syntheticURL,
+	}
+
+	route, pathParams, err := a.oasRouter.FindRoute(syntheticReq)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return route, pathParams, nil
+}
+
 func (a *APISpec) sendRateLimitHeaders(session *user.SessionState, dest *http.Response) {
 	quotaMax, quotaRemaining, quotaRenews := int64(0), int64(0), int64(0)
 

@@ -116,9 +116,6 @@ func (m *mockResponseMiddleware) mockResponse(r *http.Request) (*http.Response, 
 		return nil, nil
 	}
 
-	// Now that we know mocking should occur, find the operation for OAS examples
-	operation := m.Spec.findOperation(r)
-
 	res := &http.Response{Header: http.Header{}}
 
 	var code int
@@ -128,12 +125,14 @@ func (m *mockResponseMiddleware) mockResponse(r *http.Request) (*http.Response, 
 	var err error
 
 	if mockResponse.FromOASExamples != nil && mockResponse.FromOASExamples.Enabled {
-		// Need operation for OAS examples
-		if operation == nil {
-			log.Tracef("URL spec matched for mock response but operation not found for %s %v", r.Method, r.URL)
+		// Find the route using the OAS path from URLSpec, not the actual request path.
+		// This allows prefix/suffix matching to work correctly.
+		route, _, routeErr := m.Spec.findRouteForOASPath(urlSpec.OASPath, urlSpec.OASMethod)
+		if routeErr != nil || route == nil {
+			log.Tracef("URL spec matched for mock response but route not found for OAS path %s: %v", urlSpec.OASPath, routeErr)
 			return nil, nil
 		}
-		code, contentType, body, headers, err = mockFromOAS(r, operation.route.Operation, mockResponse.FromOASExamples)
+		code, contentType, body, headers, err = mockFromOAS(r, route.Operation, mockResponse.FromOASExamples)
 		res.StatusCode = code
 		if err != nil {
 			err = fmt.Errorf("mock: %w", err)

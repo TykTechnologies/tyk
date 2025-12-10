@@ -7,8 +7,8 @@ import (
 	"time"
 
 	"github.com/getkin/kin-openapi/openapi3"
-
 	"github.com/getkin/kin-openapi/openapi3filter"
+	"github.com/sirupsen/logrus"
 )
 
 func init() {
@@ -92,24 +92,30 @@ func (k *ValidateRequest) ProcessRequest(w http.ResponseWriter, r *http.Request,
 		return nil, http.StatusOK
 	}
 
-	// Now that we know validation should occur, find the operation for path params and route
-	operation := k.Spec.findOperation(r)
-	if operation == nil {
-		// Path matched in RxPaths but couldn't find operation - log warning and skip validation
-		log.Tracef("URL spec matched for validation but operation not found for %s %v", r.Method, r.URL)
-		return nil, http.StatusOK
-	}
-
 	errResponseCode := http.StatusUnprocessableEntity
 	if validateRequest.ErrorResponseCode != 0 {
 		errResponseCode = validateRequest.ErrorResponseCode
 	}
 
+	// Find the route using the OAS path from URLSpec, not the actual request path.
+	// This allows prefix/suffix matching to work: request to /anything/abc can be
+	// validated against the /anything operation.
+	route, pathParams, err := k.Spec.findRouteForOASPath(urlSpec.OASPath, urlSpec.OASMethod)
+	if err != nil || route == nil {
+		log.WithFields(logrus.Fields{
+			"method":   r.Method,
+			"path":     r.URL.Path,
+			"oas_path": urlSpec.OASPath,
+			"error":    err,
+		}).Error("OAS ValidateRequest: could not find route for matched OAS path")
+		return fmt.Errorf("request validation error: no matching operation was found for request: %s %s", r.Method, r.URL.Path), errResponseCode
+	}
+
 	// Validate request
 	requestValidationInput := &openapi3filter.RequestValidationInput{
 		Request:    r,
-		PathParams: operation.pathParams,
-		Route:      operation.route,
+		PathParams: pathParams,
+		Route:      route,
 		Options: &openapi3filter.Options{
 			AuthenticationFunc: func(ctx context.Context, input *openapi3filter.AuthenticationInput) error {
 				return nil
@@ -117,7 +123,7 @@ func (k *ValidateRequest) ProcessRequest(w http.ResponseWriter, r *http.Request,
 		},
 	}
 
-	err := openapi3filter.ValidateRequest(r.Context(), requestValidationInput)
+	err = openapi3filter.ValidateRequest(r.Context(), requestValidationInput)
 	if err != nil {
 		return fmt.Errorf("request validation error: %w", err), errResponseCode
 	}
