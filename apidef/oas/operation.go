@@ -15,7 +15,7 @@ import (
 	"github.com/TykTechnologies/tyk/regexp"
 )
 
-// Operations holds Operation definitions.
+// Operations holds Operation definitions. The string key in this object is the `operationID`, which is a unique identifier for each API operation.
 type Operations map[string]*Operation
 
 // Operation holds a request operation configuration, allowances, tranformations, caching, timeouts and validation.
@@ -27,6 +27,8 @@ type Operation struct {
 	Block *Allowance `bson:"block,omitempty" json:"block,omitempty"`
 
 	// IgnoreAuthentication ignores authentication on request by allowance.
+	//
+	// Tyk classic API definition: version_data.versions..extended_paths.ignored[].
 	IgnoreAuthentication *Allowance `bson:"ignoreAuthentication,omitempty" json:"ignoreAuthentication,omitempty"`
 
 	// Internal makes the endpoint only respond to internal requests.
