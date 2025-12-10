@@ -711,16 +711,8 @@ type apiAllKeys struct {
 }
 
 // handleGetAllKeys retrieves keys and filters them by API ID using a Worker Pool.
-// It accepts a Context to support cancellation (client disconnects) and timeouts.
 func (gw *Gateway) handleGetAllKeys(c context.Context, filter string, apiID string, hashed bool) (interface{}, int) {
-	keys := gw.GlobalSessionManager.Sessions(filter)
-	if filter != "" {
-		filterB64 := base64.StdEncoding.WithPadding(base64.NoPadding).EncodeToString([]byte(fmt.Sprintf(`{"org":"%s"`, filter)))
-		// Remove last 2 digits to look exact match
-		filterB64 = filterB64[0 : len(filterB64)-2]
-		orgIDB64Sessions := gw.GlobalSessionManager.Sessions(filterB64)
-		keys = append(keys, orgIDB64Sessions...)
-	}
+	keys := gw.getAllSessionKeys(filter)
 	validSessions := make([]string, 0)
 
 	if apiID == "" {
@@ -740,55 +732,36 @@ func (gw *Gateway) handleGetAllKeys(c context.Context, filter string, apiID stri
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
+			localMatches := make([]string, 0)
+
 			for {
 				select {
 				case <-c.Done():
 					return
 				case keyName, ok := <-jobs:
 					if !ok {
+						if len(localMatches) > 0 {
+							mu.Lock()
+							validSessions = append(validSessions, localMatches...)
+							mu.Unlock()
+						}
 						return
 					}
 
-					session, found := gw.GlobalSessionManager.SessionDetail(filter, keyName, hashed)
-					if found {
-						match := false
-						if _, ok := session.AccessRights[apiID]; ok {
-							match = true
-						} else if len(session.AccessRights) == 0 && gw.GetConfig().AllowMasterKeys {
-							match = true
-						}
-
-						if match {
-							mu.Lock()
-							validSessions = append(validSessions, keyName)
-							mu.Unlock()
-						}
+					if gw.keyHasAccess(filter, keyName, apiID, hashed) {
+						localMatches = append(localMatches, keyName)
 					}
 				}
 			}
 		}()
 	}
 
-	go func() {
-		for _, k := range keys {
-			if strings.HasPrefix(k, QuotaKeyPrefix) || strings.HasPrefix(k, RateLimitKeyPrefix) {
-				continue
-			}
-
-			select {
-			case <-c.Done():
-				close(jobs)
-				return
-			case jobs <- k:
-			}
-		}
-		close(jobs)
-	}()
+	go gw.feedKeyListingWorkers(c, keys, jobs)
 
 	wg.Wait()
 
 	if c.Err() != nil {
-		log.WithError(c.Err()).Warn("Key listing operation cancelled or timed out")
+		log.WithError(c.Err()).Warn("Request timeout while processing keys")
 		return apiError("Request timeout while processing keys"), http.StatusGatewayTimeout
 	}
 
@@ -803,10 +776,58 @@ func (gw *Gateway) handleGetAllKeys(c context.Context, filter string, apiID stri
 	return apiAllKeys{validSessions}, http.StatusOK
 }
 
+// getAllSessionKeys handles the retrieval of raw keys from the session manager,
+// including the legacy base64 filter logic.
+func (gw *Gateway) getAllSessionKeys(filter string) []string {
+	keys := gw.GlobalSessionManager.Sessions(filter)
+	if filter != "" {
+		filterB64 := base64.StdEncoding.WithPadding(base64.NoPadding).EncodeToString([]byte(fmt.Sprintf(`{"org":"%s"`, filter)))
+		filterB64 = filterB64[0 : len(filterB64)-2]
+		orgIDB64Sessions := gw.GlobalSessionManager.Sessions(filterB64)
+		keys = append(keys, orgIDB64Sessions...)
+	}
+	return keys
+}
+
+// keyHasAccess checks if a specific key has access to the requested API ID.
+func (gw *Gateway) keyHasAccess(filter, keyName, apiID string, hashed bool) bool {
+	session, found := gw.GlobalSessionManager.SessionDetail(filter, keyName, hashed)
+	if !found {
+		return false
+	}
+
+	if _, ok := session.AccessRights[apiID]; ok {
+		return true
+	}
+
+	if len(session.AccessRights) == 0 && gw.GetConfig().AllowMasterKeys {
+		return true
+	}
+
+	return false
+}
+
+// feedKeyListingWorkers pushes keys into the job channel while filtering out internal system keys.
+func (gw *Gateway) feedKeyListingWorkers(c context.Context, keys []string, jobs chan<- string) {
+	defer close(jobs)
+	for _, k := range keys {
+		if strings.HasPrefix(k, QuotaKeyPrefix) || strings.HasPrefix(k, RateLimitKeyPrefix) {
+			continue
+		}
+
+		select {
+		case <-c.Done():
+			return
+		case jobs <- k:
+		}
+	}
+}
+
 func (gw *Gateway) handleAddKey(keyName, sessionString, orgId string) {
 	sess := &user.SessionState{}
 	err := json.Unmarshal([]byte(sessionString), sess)
 	if err != nil {
+		log.WithError(err).WithField("keyName", keyName).Error("Failed to unmarshal session state during key update")
 		return
 	}
 	sess.LastUpdated = strconv.Itoa(int(time.Now().Unix()))
@@ -1757,7 +1778,7 @@ func (gw *Gateway) keyHandler(w http.ResponseWriter, r *http.Request) {
 			if gwConfig.HashKeys {
 				// get all keys is disabled by default
 				if !gwConfig.EnableHashedKeysListing {
-					doJSONWrite(w, http.StatusNotFound, apiError("Hashed key listing disabled"))
+					doJSONWrite(w, http.StatusNotFound, apiError("Hashed key listing is disabled in config (enable_hashed_keys_listing)"))
 					return
 				}
 				obj, code = gw.handleGetAllKeys(r.Context(), "", apiID, true)
