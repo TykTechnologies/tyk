@@ -988,7 +988,7 @@ type Config struct {
 
 	// This can specify a default timeout in seconds for upstream API requests.
 	// Default: 30 seconds
-	// 
+	//
 	// Note:
 	//   If you set `proxy_default_timeout` to a value greater than 120 seconds, you must also increase [http_server_options.write_timeout](#http-server-options-write-timeout) to a value greater than `proxy_default_timeout`. The `write_timeout` setting defaults to 120 seconds and controls how long Tyk waits to write the response back to the client. If not adjusted, the client connection will be closed before the upstream response is received.
 	ProxyDefaultTimeout float64 `json:"proxy_default_timeout"`
