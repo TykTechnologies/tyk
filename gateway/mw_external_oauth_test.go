@@ -463,11 +463,9 @@ func TestGetSecretFromJWKURL_FetchError_LogsError(t *testing.T) {
 		assert.Error(t, err)
 
 		assert.NotEmpty(t, hook.Entries, "Expected a log entry but found none")
-		if len(hook.Entries) > 0 {
-			lastLog := hook.LastEntry()
-			assert.Equal(t, logrus.ErrorLevel, lastLog.Level)
-			assert.Contains(t, lastLog.Message, "Invalid JWKS retrieved from endpoint")
-			assert.Contains(t, lastLog.Message, tsServer.URL)
-		}
+		lastLog := hook.LastEntry()
+		assert.Equal(t, logrus.ErrorLevel, lastLog.Level)
+		assert.Contains(t, lastLog.Message, "Invalid JWKS retrieved from endpoint")
+		assert.Contains(t, lastLog.Message, tsServer.URL)
 	})
 }
