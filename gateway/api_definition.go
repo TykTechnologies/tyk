@@ -349,6 +349,22 @@ func (a APIDefinitionLoader) MakeSpec(def *model.MergedAPI, logger *logrus.Entry
 		}
 	}
 
+	// Initialize OAS before compiling path specs, as OAS middleware compilation
+	// needs access to the initialized OAS structure
+	if spec.IsOAS && def.OAS != nil {
+		loader := openapi3.NewLoader()
+		if err := loader.ResolveRefsIn(&def.OAS.T, nil); err != nil {
+			logger.WithError(err).Errorf("Dashboard loaded API's OAS reference resolve failed: %s", def.APIID)
+		}
+
+		spec.OAS = *def.OAS
+
+		// Eagerly initialize all OAS security schemes and extensions to prevent
+		// race conditions caused by lazy-initialization during request processing.
+		// See: https://github.com/TykTechnologies/tyk/issues/7573
+		spec.OAS.Initialize()
+	}
+
 	spec.RxPaths = make(map[string][]URLSpec, len(def.VersionData.Versions))
 	spec.WhiteListEnabled = make(map[string]bool, len(def.VersionData.Versions))
 	for _, v := range def.VersionData.Versions {
@@ -366,20 +382,6 @@ func (a APIDefinitionLoader) MakeSpec(def *model.MergedAPI, logger *logrus.Entry
 		spec.WhiteListEnabled[v.Name] = whiteListSpecs
 	}
 
-	if spec.IsOAS && def.OAS != nil {
-		loader := openapi3.NewLoader()
-		if err := loader.ResolveRefsIn(&def.OAS.T, nil); err != nil {
-			logger.WithError(err).Errorf("Dashboard loaded API's OAS reference resolve failed: %s", def.APIID)
-		}
-
-		spec.OAS = *def.OAS
-
-		// Eagerly initialize all OAS security schemes and extensions to prevent
-		// race conditions caused by lazy-initialization during request processing.
-		// See: https://github.com/TykTechnologies/tyk/issues/7573
-		spec.OAS.Initialize()
-	}
-
 	if err := httputil.ValidatePath(spec.Proxy.ListenPath); err != nil {
 		logger.WithError(err).Error("Invalid listen path when creating router")
 		return nil, err
@@ -393,19 +395,6 @@ func (a APIDefinitionLoader) MakeSpec(def *model.MergedAPI, logger *logrus.Entry
 	spec.oasRouter, err = gorillamux.NewRouter(&oasSpec)
 	if err != nil {
 		logger.WithError(err).Error("Could not create OAS router")
-	}
-
-	// Now that OAS is initialized, compile OAS-specific middleware paths and add to RxPaths
-	if spec.IsOAS {
-		oasValidateRequestPaths := a.compileOASValidateRequestPathSpec(spec, a.Gw.GetConfig())
-		oasMockResponsePaths := a.compileOASMockResponsePathSpec(spec, a.Gw.GetConfig())
-
-		// Add OAS paths to all versions in RxPaths
-		// OAS middleware applies to all versions since it's defined at the API level
-		for versionName := range spec.RxPaths {
-			spec.RxPaths[versionName] = append(spec.RxPaths[versionName], oasValidateRequestPaths...)
-			spec.RxPaths[versionName] = append(spec.RxPaths[versionName], oasMockResponsePaths...)
-		}
 	}
 
 	return spec, nil
@@ -1451,8 +1440,10 @@ func (a APIDefinitionLoader) getExtendedPathSpecs(apiVersionDef apidef.VersionIn
 	persistGraphQL := a.compilePersistGraphQLPathSpec(apiVersionDef.ExtendedPaths.PersistGraphQL, PersistGraphQL, apiSpec, conf)
 	rateLimitPaths := a.compileRateLimitPathsSpec(apiVersionDef.ExtendedPaths.RateLimit, RateLimit, conf)
 
-	// Note: OAS-specific middleware paths (OASValidateRequest, OASMockResponse) are compiled
-	// separately after OAS initialization in MakeSpec, not here
+	// OAS-specific middleware paths - compiled alongside Classic middleware
+	// The compile functions handle nil/empty OAS gracefully by returning empty slices
+	oasValidateRequestPaths := a.compileOASValidateRequestPathSpec(apiSpec, conf)
+	oasMockResponsePaths := a.compileOASMockResponsePathSpec(apiSpec, conf)
 
 	combinedPath := []URLSpec{}
 	combinedPath = append(combinedPath, mockResponsePaths...)
@@ -1479,6 +1470,8 @@ func (a APIDefinitionLoader) getExtendedPathSpecs(apiVersionDef apidef.VersionIn
 	combinedPath = append(combinedPath, validateJSON...)
 	combinedPath = append(combinedPath, internalPaths...)
 	combinedPath = append(combinedPath, rateLimitPaths...)
+	combinedPath = append(combinedPath, oasValidateRequestPaths...)
+	combinedPath = append(combinedPath, oasMockResponsePaths...)
 
 	return combinedPath, len(whiteListPaths) > 0
 }
