@@ -74,9 +74,9 @@ require (
 	github.com/valyala/fasthttp v1.58.0 // test
 	github.com/vmihailenco/msgpack v4.0.4+incompatible
 	github.com/xeipuuv/gojsonschema v1.2.0
-	golang.org/x/crypto v0.41.0
-	golang.org/x/net v0.42.0
-	golang.org/x/sync v0.16.0
+	golang.org/x/crypto v0.42.0
+	golang.org/x/net v0.44.0
+	golang.org/x/sync v0.17.0
 	google.golang.org/grpc v1.70.0
 	google.golang.org/grpc/examples v0.0.0-20220317213542-f95b001a48df // test
 	google.golang.org/protobuf v1.36.5
@@ -98,7 +98,7 @@ require (
 	github.com/TykTechnologies/graphql-go-tools/v2 v2.0.0-20250926102005-c54e73aae17d
 	github.com/TykTechnologies/opentelemetry v0.0.22
 	github.com/alecthomas/kingpin/v2 v2.4.0
-	github.com/eclipse/paho.mqtt.golang v1.4.3
+	github.com/eclipse/paho.mqtt.golang v1.5.1
 	github.com/getkin/kin-openapi v0.133.0
 	github.com/go-redis/redismock/v9 v9.2.0
 	github.com/goccy/go-json v0.10.4
@@ -536,12 +536,12 @@ require (
 	go.uber.org/multierr v1.11.0 // indirect
 	go.uber.org/zap v1.27.0 // indirect
 	golang.org/x/exp v0.0.0-20250106191152-7588d65b2ba8 // indirect
-	golang.org/x/mod v0.26.0 // indirect
-	golang.org/x/sys v0.35.0 // indirect
-	golang.org/x/term v0.34.0 // indirect
-	golang.org/x/text v0.28.0 // indirect
+	golang.org/x/mod v0.27.0 // indirect
+	golang.org/x/sys v0.36.0 // indirect
+	golang.org/x/term v0.35.0 // indirect
+	golang.org/x/text v0.29.0 // indirect
 	golang.org/x/time v0.9.0 // indirect
-	golang.org/x/tools v0.35.0 // indirect
+	golang.org/x/tools v0.36.0 // indirect
 	golang.org/x/xerrors v0.0.0-20240903120638-7835f813f4da // indirect
 	google.golang.org/api v0.203.0 // indirect
 	google.golang.org/appengine v1.6.8 // indirect
