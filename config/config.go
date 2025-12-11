@@ -555,14 +555,6 @@ type HttpServerOptionsConfig struct {
 	// https://tyk.io/docs/api-management/traffic-transformation/#request-size-limits
 	MaxRequestBodySize int64 `json:"max_request_body_size"`
 
-	// XFFDepth controls which position in the X-Forwarded-For chain to use for determining client IP address.
-	// A value of 0 means using the first IP (default). this is way the Gateway has calculated the client IP historically,
-	// the most common case, and will be used when this config is not set.
-	// However, any non-zero value will use that position from the right in the X-Forwarded-For chain.
-	// This is a security feature to prevent against IP spoofing attacks, and is recommended to be set to a non-zero value.
-	// A value of 1 means using the last IP, 2 means second to last, and so on.
-	XFFDepth int `json:"xff_depth"`
-
 	// MaxResponseBodySize sets an upper limit on the response body (payload) size in bytes. It defaults to 0, which means there is no restriction on the response body size.
 	//
 	// The Gateway will return `HTTP 500 Response Body Too Large` if the response payload exceeds MaxResponseBodySize+1 bytes.
