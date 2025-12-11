@@ -27,6 +27,7 @@ package gateway
 
 import (
 	"bytes"
+	"context"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
@@ -37,6 +38,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -75,6 +77,12 @@ import (
 
 const (
 	oAuthClientTokensKeyPattern = "oauth-data.*oauth-client-tokens.*"
+
+	// KeyListingWorkerCount defines how many parallel goroutines we use to fetch key details.
+	KeyListingWorkerCount = 20
+
+	// KeyListingBufferSize defines the channel buffer size.
+	KeyListingBufferSize = 100
 )
 
 var (
@@ -702,36 +710,126 @@ type apiAllKeys struct {
 	APIKeys []string `json:"keys"`
 }
 
-func (gw *Gateway) handleGetAllKeys(filter string) (interface{}, int) {
-	sessions := gw.GlobalSessionManager.Sessions(filter)
-	if filter != "" {
-		filterB64 := base64.StdEncoding.WithPadding(base64.NoPadding).EncodeToString([]byte(fmt.Sprintf(`{"org":"%s"`, filter)))
-		// Remove last 2 digits to look exact match
-		filterB64 = filterB64[0 : len(filterB64)-2]
-		orgIDB64Sessions := gw.GlobalSessionManager.Sessions(filterB64)
-		sessions = append(sessions, orgIDB64Sessions...)
-	}
+// handleGetAllKeys retrieves keys and filters them by API ID using a Worker Pool.
+func (gw *Gateway) handleGetAllKeys(c context.Context, filter string, apiID string, hashed bool) (interface{}, int) {
+	keys := gw.getAllSessionKeys(filter)
+	validSessions := make([]string, 0)
 
-	fixedSessions := make([]string, 0)
-	for _, s := range sessions {
-		if !strings.HasPrefix(s, QuotaKeyPrefix) && !strings.HasPrefix(s, RateLimitKeyPrefix) {
-			fixedSessions = append(fixedSessions, s)
+	if apiID == "" {
+		for _, k := range keys {
+			if !strings.HasPrefix(k, QuotaKeyPrefix) && !strings.HasPrefix(k, RateLimitKeyPrefix) {
+				validSessions = append(validSessions, k)
+			}
 		}
+		return apiAllKeys{validSessions}, http.StatusOK
 	}
 
-	sessionsObj := apiAllKeys{fixedSessions}
+	jobs := make(chan string, KeyListingBufferSize)
+	var wg sync.WaitGroup
+	var mu sync.Mutex
+
+	for w := 0; w < KeyListingWorkerCount; w++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			localMatches := make([]string, 0)
+
+			for {
+				select {
+				case <-c.Done():
+					return
+				case keyName, ok := <-jobs:
+					if !ok {
+						if len(localMatches) > 0 {
+							mu.Lock()
+							validSessions = append(validSessions, localMatches...)
+							mu.Unlock()
+						}
+						return
+					}
+
+					if gw.keyHasAccess(filter, keyName, apiID, hashed) {
+						localMatches = append(localMatches, keyName)
+					}
+				}
+			}
+		}()
+	}
+
+	go gw.feedKeyListingWorkers(c, keys, jobs)
+
+	wg.Wait()
+
+	if c.Err() != nil {
+		log.WithError(c.Err()).Warn("Request timeout while processing keys")
+		return apiError("Request timeout while processing keys"), http.StatusGatewayTimeout
+	}
+
+	sort.Strings(validSessions)
 
 	log.WithFields(logrus.Fields{
 		"prefix": "api",
 		"status": "ok",
+		"count":  len(validSessions),
 	}).Info("Retrieved key list.")
 
-	return sessionsObj, http.StatusOK
+	return apiAllKeys{validSessions}, http.StatusOK
+}
+
+// getAllSessionKeys handles the retrieval of raw keys from the session manager,
+// including the legacy base64 filter logic.
+func (gw *Gateway) getAllSessionKeys(filter string) []string {
+	keys := gw.GlobalSessionManager.Sessions(filter)
+	if filter != "" {
+		filterB64 := base64.StdEncoding.WithPadding(base64.NoPadding).EncodeToString([]byte(fmt.Sprintf(`{"org":"%s"`, filter)))
+		filterB64 = filterB64[0 : len(filterB64)-2]
+		orgIDB64Sessions := gw.GlobalSessionManager.Sessions(filterB64)
+		keys = append(keys, orgIDB64Sessions...)
+	}
+	return keys
+}
+
+// keyHasAccess checks if a specific key has access to the requested API ID.
+func (gw *Gateway) keyHasAccess(filter, keyName, apiID string, hashed bool) bool {
+	session, found := gw.GlobalSessionManager.SessionDetail(filter, keyName, hashed)
+	if !found {
+		return false
+	}
+
+	if _, ok := session.AccessRights[apiID]; ok {
+		return true
+	}
+
+	if len(session.AccessRights) == 0 && gw.GetConfig().AllowMasterKeys {
+		return true
+	}
+
+	return false
+}
+
+// feedKeyListingWorkers pushes keys into the job channel while filtering out internal system keys.
+func (gw *Gateway) feedKeyListingWorkers(c context.Context, keys []string, jobs chan<- string) {
+	defer close(jobs)
+	for _, k := range keys {
+		if strings.HasPrefix(k, QuotaKeyPrefix) || strings.HasPrefix(k, RateLimitKeyPrefix) {
+			continue
+		}
+
+		select {
+		case <-c.Done():
+			return
+		case jobs <- k:
+		}
+	}
 }
 
 func (gw *Gateway) handleAddKey(keyName, sessionString, orgId string) {
 	sess := &user.SessionState{}
-	json.Unmarshal([]byte(sessionString), sess)
+	err := json.Unmarshal([]byte(sessionString), sess)
+	if err != nil {
+		log.WithError(err).WithField("keyName", keyName).Error("Failed to unmarshal session state during key update")
+		return
+	}
 	sess.LastUpdated = strconv.Itoa(int(time.Now().Unix()))
 
 	if sess.OrgID != orgId {
@@ -739,7 +837,7 @@ func (gw *Gateway) handleAddKey(keyName, sessionString, orgId string) {
 	}
 
 	lifetime := gw.ApplyLifetime(sess, nil)
-	err := gw.GlobalSessionManager.UpdateSession(keyName, sess, lifetime, gw.GetConfig().HashKeys)
+	err = gw.GlobalSessionManager.UpdateSession(keyName, sess, lifetime, gw.GetConfig().HashKeys)
 	if err != nil {
 		log.WithFields(logrus.Fields{
 			"prefix": "api",
@@ -1680,19 +1778,13 @@ func (gw *Gateway) keyHandler(w http.ResponseWriter, r *http.Request) {
 			if gwConfig.HashKeys {
 				// get all keys is disabled by default
 				if !gwConfig.EnableHashedKeysListing {
-					doJSONWrite(
-						w,
-						http.StatusNotFound,
-						apiError("Hashed key listing is disabled in config (enable_hashed_keys_listing)"),
-					)
+					doJSONWrite(w, http.StatusNotFound, apiError("Hashed key listing is disabled in config (enable_hashed_keys_listing)"))
 					return
 				}
-
-				// we don't use filter for hashed keys
-				obj, code = gw.handleGetAllKeys("")
+				obj, code = gw.handleGetAllKeys(r.Context(), "", apiID, true)
 			} else {
 				filter := r.URL.Query().Get("filter")
-				obj, code = gw.handleGetAllKeys(filter)
+				obj, code = gw.handleGetAllKeys(r.Context(), filter, apiID, false)
 			}
 		}
 
