@@ -92,17 +92,8 @@ func (m *mockResponseMiddleware) ProcessRequest(rw http.ResponseWriter, r *http.
 func (m *mockResponseMiddleware) mockResponse(r *http.Request) (*http.Response, error) {
 	// Use FindSpecMatchesStatus to check if this path should be mocked
 	// This ensures the standard regex-based path matching is used, respecting gateway configurations
-	versionName := m.Spec.getVersionFromRequest(r)
-	versionPaths := m.Spec.RxPaths[versionName]
-
-	// For unversioned APIs, getVersionFromRequest returns "" but paths might be stored
-	// under a version name, so we need to use the first available version
-	if versionName == "" && len(versionPaths) == 0 && len(m.Spec.RxPaths) > 0 {
-		for _, paths := range m.Spec.RxPaths {
-			versionPaths = paths
-			break
-		}
-	}
+	versionInfo, _ := m.Spec.Version(r)
+	versionPaths := m.Spec.RxPaths[versionInfo.Name]
 
 	urlSpec, found := m.Spec.FindSpecMatchesStatus(r, versionPaths, OASMockResponse)
 

@@ -77,17 +77,8 @@ func (k *ValidateRequest) ProcessRequest(w http.ResponseWriter, r *http.Request,
 
 	// Use FindSpecMatchesStatus to check if this path should be validated
 	// This ensures the standard regex-based path matching is used, respecting gateway configurations
-	versionName := k.Spec.getVersionFromRequest(r)
-	versionPaths := k.Spec.RxPaths[versionName]
-
-	// For unversioned APIs, getVersionFromRequest returns "" but paths might be stored
-	// under a version name, so we need to use the first available version
-	if versionName == "" && len(versionPaths) == 0 && len(k.Spec.RxPaths) > 0 {
-		for _, paths := range k.Spec.RxPaths {
-			versionPaths = paths
-			break
-		}
-	}
+	versionInfo, _ := k.Spec.Version(r)
+	versionPaths := k.Spec.RxPaths[versionInfo.Name]
 
 	urlSpec, found := k.Spec.FindSpecMatchesStatus(r, versionPaths, OASValidateRequest)
 
