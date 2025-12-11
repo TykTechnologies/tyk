@@ -28,19 +28,20 @@ type TestCase struct {
 	// Code is the expected HTTP response status code.
 	Code int `json:",omitempty"`
 
-	Data            interface{}       `json:",omitempty"`
-	Headers         map[string]string `json:",omitempty"`
-	PathParams      map[string]string `json:",omitempty"`
-	FormParams      map[string]string `json:",omitempty"`
-	QueryParams     map[string]string `json:",omitempty"`
-	Cookies         []*http.Cookie    `json:",omitempty"`
-	Delay           time.Duration     `json:",omitempty"`
-	BodyMatch       string            `json:",omitempty"` // regex
-	BodyNotMatch    string            `json:",omitempty"`
-	HeadersMatch    map[string]string `json:",omitempty"`
-	HeadersNotMatch map[string]string `json:",omitempty"`
-	JSONMatch       map[string]string `json:",omitempty"`
-	ErrorMatch      string            `json:",omitempty"`
+	Data            interface{}         `json:",omitempty"`
+	Headers         map[string]string   `json:",omitempty"`
+	HeadersArray    map[string][]string `json:",omitempty"`
+	PathParams      map[string]string   `json:",omitempty"`
+	FormParams      map[string]string   `json:",omitempty"`
+	QueryParams     map[string]string   `json:",omitempty"`
+	Cookies         []*http.Cookie      `json:",omitempty"`
+	Delay           time.Duration       `json:",omitempty"`
+	BodyMatch       string              `json:",omitempty"` // regex
+	BodyNotMatch    string              `json:",omitempty"`
+	HeadersMatch    map[string]string   `json:",omitempty"`
+	HeadersNotMatch map[string]string   `json:",omitempty"`
+	JSONMatch       map[string]string   `json:",omitempty"`
+	ErrorMatch      string              `json:",omitempty"`
 
 	BodyMatchFunc func([]byte) bool `json:"-"`
 	BeforeFn      func()            `json:"-"`
@@ -163,6 +164,12 @@ func NewRequest(tc *TestCase) (req *http.Request, err error) {
 
 	for k, v := range tc.Headers {
 		req.Header.Add(k, v)
+	}
+
+	for header, values := range tc.HeadersArray {
+		for _, v := range values {
+			req.Header.Add(header, v)
+		}
 	}
 
 	req.Header.Add("Content-Type", "application/json")

@@ -4,11 +4,22 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/getkin/kin-openapi/openapi3"
-
 	"github.com/getkin/kin-openapi/openapi3filter"
+
+	"github.com/TykTechnologies/tyk/header"
+)
+
+var (
+	skipHeaderNormalization = map[string]bool{
+		header.SetCookie:        true,
+		header.ContentLength:    true,
+		header.TransferEncoding: true,
+		header.Host:             true,
+	}
 )
 
 func init() {
@@ -82,6 +93,8 @@ func (k *ValidateRequest) ProcessRequest(w http.ResponseWriter, r *http.Request,
 		errResponseCode = validateRequest.ErrorResponseCode
 	}
 
+	normalizeHeaders(r.Header)
+
 	// Validate request
 	requestValidationInput := &openapi3filter.RequestValidationInput{
 		Request:    r,
@@ -101,4 +114,18 @@ func (k *ValidateRequest) ProcessRequest(w http.ResponseWriter, r *http.Request,
 
 	// Handle Success
 	return nil, http.StatusOK
+}
+
+// normalizeHeaders prepares HTTP headers for OpenAPI validation by joining multiple values with commas.
+// Headers in the skipHeaderNormalization map are excluded from this process.
+func normalizeHeaders(headers http.Header) {
+	for key, values := range headers {
+		if !skipHeaderNormalization[key] && len(values) > 1 {
+			if key == header.Cookie {
+				headers[key] = []string{strings.Join(values, "; ")}
+			} else {
+				headers[key] = []string{strings.Join(values, ",")}
+			}
+		}
+	}
 }
