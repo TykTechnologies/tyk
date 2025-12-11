@@ -217,9 +217,9 @@ type JWT struct {
 	// - "contains": for strings, must contain one of the values as substring; for arrays, must contain one of the values as element
 	//
 	// Examples:
-	// Basic validation: {"role": {"type": "exact_match", "allowedValues": ["admin", "user"]}}
-	// Nested claim: {"user.metadata.level": {"type": "contains", "allowedValues": ["gold", "silver"]}}
-	// Multiple rules: {"permissions": {"type": "contains", "allowedValues": ["read", "write"], "nonBlocking": true}}
+	// Basic validation: `{"role": {"type": "exact_match", "allowedValues": ["admin", "user"]}}`
+	// Nested claim: `{"user.metadata.level": {"type": "contains", "allowedValues": ["gold", "silver"]}}`
+	// Multiple rules: `{"permissions": {"type": "contains", "allowedValues": ["read", "write"], "nonBlocking": true}}`
 	//
 	// Claims can be of type string, number, boolean, or array. For arrays, the contains validation
 	// checks if any of the array elements exactly match any of the allowed values.
