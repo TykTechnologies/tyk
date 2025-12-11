@@ -322,6 +322,8 @@ func (a *AuthORWrapper) Init() {
 		dynamicMw := &DynamicMiddleware{BaseMiddleware: a.BaseMiddleware.Copy()}
 		dynamicMw.Spec = spec
 		dynamicMw.Gw = a.Gw
+		dynamicMw.MiddlewareClassName = spec.CustomMiddleware.AuthCheck.Name
+		dynamicMw.Auth = true
 		dynamicMw.Init()
 		a.authMiddlewares = append(a.authMiddlewares, dynamicMw)
 	}
