@@ -480,7 +480,8 @@ func (s *OAS) AddServers(apiURLs ...string) error {
 	return nil
 }
 
-// UpdateServers sets or updates the first servers URL if it matches oldAPIURL.
+// UpdateServers sets or updates the first servers URL if it matches oldAPIURL
+// dummy change to trigger UI build
 func (s *OAS) UpdateServers(apiURL, oldAPIURL string) {
 	apiURLContainsNamedRegex := strings.Contains(apiURL, "{") && strings.Contains(apiURL, "}")
 	serverAddedByTyk := len(s.Servers) > 0 && s.Servers[0].URL == oldAPIURL
