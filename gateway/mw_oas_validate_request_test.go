@@ -260,3 +260,277 @@ func TestValidateRequest_AfterMigration(t *testing.T) {
 		{Method: http.MethodPost, Path: "/listen/post", Data: `{"name":"Furkan"}`, Code: http.StatusOK},
 	}...)
 }
+
+func TestNormalizeHeaders(t *testing.T) {
+	t.Run("single header value", func(t *testing.T) {
+		headers := http.Header{
+			"Content-Type": []string{"application/json"},
+			"Accept":       []string{"application/json"},
+		}
+		normalized := normalizeHeaders(headers)
+		assert.Equal(t, "application/json", normalized.Get("Content-Type"))
+		assert.Equal(t, "application/json", normalized.Get("Accept"))
+	})
+
+	t.Run("multiple standard headers combined", func(t *testing.T) {
+		headers := http.Header{
+			"Accept":   []string{"text/html", "application/json", "application/xml"},
+			"X-Custom": []string{"value1", "value2"},
+		}
+		normalized := normalizeHeaders(headers)
+		assert.Equal(t, "text/html,application/json,application/xml", normalized.Get("Accept"))
+		assert.Equal(t, "value1,value2", normalized.Get("X-Custom"))
+	})
+
+	t.Run("special headers not combined - Set-Cookie", func(t *testing.T) {
+		headers := http.Header{
+			"Set-Cookie": []string{"session=abc123", "user=john"},
+		}
+		normalized := normalizeHeaders(headers)
+		// Only first value should be kept for special headers
+		assert.Equal(t, "session=abc123", normalized.Get("Set-Cookie"))
+		// Ensure it's not combined
+		assert.NotEqual(t, "session=abc123,user=john", normalized.Get("Set-Cookie"))
+	})
+
+	t.Run("special headers not combined - WWW-Authenticate", func(t *testing.T) {
+		headers := http.Header{
+			"WWW-Authenticate": []string{"Basic realm=\"test\"", "Bearer realm=\"api\""},
+		}
+		normalized := normalizeHeaders(headers)
+		assert.Equal(t, "Basic realm=\"test\"", normalized.Get("WWW-Authenticate"))
+		assert.NotEqual(t, "Basic realm=\"test\",Bearer realm=\"api\"", normalized.Get("WWW-Authenticate"))
+	})
+
+	t.Run("headers with comma not combined", func(t *testing.T) {
+		headers := http.Header{
+			"X-Custom": []string{"value1,value2", "value3"},
+		}
+		normalized := normalizeHeaders(headers)
+		// Should keep only first value when comma detected
+		assert.Equal(t, "value1,value2", normalized.Get("X-Custom"))
+		assert.NotEqual(t, "value1,value2,value3", normalized.Get("X-Custom"))
+	})
+
+	t.Run("case insensitive header names", func(t *testing.T) {
+		headers := http.Header{
+			"content-type": []string{"application/json"},
+			"Content-Type": []string{"text/html"},
+		}
+		normalized := normalizeHeaders(headers)
+		// Should handle case-insensitive keys properly
+		val := normalized.Get("Content-Type")
+		// Due to http.Header behavior, one of the values will be set
+		assert.NotEmpty(t, val)
+	})
+
+	t.Run("empty header values", func(t *testing.T) {
+		headers := http.Header{
+			"X-Empty": []string{},
+		}
+		normalized := normalizeHeaders(headers)
+		assert.Empty(t, normalized.Get("X-Empty"))
+	})
+
+	t.Run("mixed scenarios", func(t *testing.T) {
+		headers := http.Header{
+			"Accept":           []string{"text/html", "application/json"},
+			"Set-Cookie":       []string{"session=abc", "user=john"},
+			"Content-Type":     []string{"application/json"},
+			"X-Custom-Comma":   []string{"a,b", "c"},
+			"X-Custom-Regular": []string{"x", "y", "z"},
+		}
+		normalized := normalizeHeaders(headers)
+
+		// Standard headers should be combined
+		assert.Equal(t, "text/html,application/json", normalized.Get("Accept"))
+		assert.Equal(t, "x,y,z", normalized.Get("X-Custom-Regular"))
+
+		// Special headers should keep only first value
+		assert.Equal(t, "session=abc", normalized.Get("Set-Cookie"))
+
+		// Single value headers unchanged
+		assert.Equal(t, "application/json", normalized.Get("Content-Type"))
+
+		// Headers with commas should keep only first value
+		assert.Equal(t, "a,b", normalized.Get("X-Custom-Comma"))
+	})
+}
+
+func TestCloneRequestWithNormalizedHeaders(t *testing.T) {
+	t.Run("clone preserves request but normalizes headers", func(t *testing.T) {
+		originalHeaders := http.Header{
+			"Accept":   []string{"text/html", "application/json"},
+			"X-Custom": []string{"value1", "value2"},
+		}
+
+		req, err := http.NewRequest(http.MethodGet, "/test", nil)
+		assert.NoError(t, err)
+		req.Header = originalHeaders
+
+		clonedReq := cloneRequestWithNormalizedHeaders(req)
+
+		// Original request should be unchanged
+		assert.NotEqual(t, originalHeaders.Get("Accept"), "text/html,application/json")
+
+		// Cloned request should preserve URL and method
+		assert.Equal(t, "/test", clonedReq.URL.Path)
+		assert.Equal(t, http.MethodGet, clonedReq.Method)
+
+		// Cloned request headers should be normalized
+		assert.Equal(t, "text/html,application/json", clonedReq.Header.Get("Accept"))
+		assert.Equal(t, "value1,value2", clonedReq.Header.Get("X-Custom"))
+	})
+
+	t.Run("clone handles all header scenarios", func(t *testing.T) {
+		originalHeaders := http.Header{
+			"Accept":           []string{"text/html", "application/json"},
+			"Set-Cookie":       []string{"session=abc", "user=john"},
+			"Content-Type":     []string{"application/json"},
+			"X-Custom-Comma":   []string{"a,b", "c"},
+			"X-Custom-Regular": []string{"x", "y", "z"},
+		}
+
+		req, err := http.NewRequest(http.MethodPost, "/api/test", nil)
+		assert.NoError(t, err)
+		req.Header = originalHeaders
+
+		clonedReq := cloneRequestWithNormalizedHeaders(req)
+
+		// Standard headers should be combined
+		assert.Equal(t, "text/html,application/json", clonedReq.Header.Get("Accept"))
+		assert.Equal(t, "x,y,z", clonedReq.Header.Get("X-Custom-Regular"))
+
+		// Special headers should keep only first value
+		assert.Equal(t, "session=abc", clonedReq.Header.Get("Set-Cookie"))
+
+		// Single value headers unchanged
+		assert.Equal(t, "application/json", clonedReq.Header.Get("Content-Type"))
+
+		// Headers with commas should keep only first value
+		assert.Equal(t, "a,b", clonedReq.Header.Get("X-Custom-Comma"))
+	})
+}
+
+func TestContainsComma(t *testing.T) {
+	t.Run("no commas", func(t *testing.T) {
+		values := []string{"value1", "value2", "value3"}
+		assert.False(t, containsComma(values))
+	})
+
+	t.Run("with comma", func(t *testing.T) {
+		values := []string{"value1", "value2,value3", "value4"}
+		assert.True(t, containsComma(values))
+	})
+
+	t.Run("empty slice", func(t *testing.T) {
+		values := []string{}
+		assert.False(t, containsComma(values))
+	})
+
+	t.Run("comma in first value", func(t *testing.T) {
+		values := []string{"value1,value2", "value3"}
+		assert.True(t, containsComma(values))
+	})
+
+	t.Run("comma in last value", func(t *testing.T) {
+		values := []string{"value1", "value2", "value3,value4"}
+		assert.True(t, containsComma(values))
+	})
+}
+
+func TestValidateRequest_DuplicateHeaders(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	oasWithHeaderValidation := `{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "header-validation-test",
+    "version": "1.0.0"
+  },
+  "paths": {
+    "/test": {
+      "get": {
+        "operationId": "getTest",
+        "parameters": [{
+          "name": "Accept",
+          "in": "header",
+          "required": false,
+          "schema": {
+            "type": "string"
+          }
+        }],
+        "responses": {
+          "200": {
+            "description": "success"
+          }
+        }
+      }
+    }
+  },
+  "servers": [{"url": "/"}]
+}`
+
+	const operationID = "getTest"
+
+	oasDoc, err := openapi3.NewLoader().LoadFromData([]byte(oasWithHeaderValidation))
+	assert.NoError(t, err)
+
+	xTykAPIGateway := &oas.XTykAPIGateway{
+		Middleware: &oas.Middleware{
+			Operations: oas.Operations{
+				operationID: {
+					ValidateRequest: &oas.ValidateRequest{
+						Enabled: true,
+					},
+				},
+			},
+		},
+	}
+
+	oasAPI := oas.OAS{T: *oasDoc}
+	oasAPI.SetTykExtension(xTykAPIGateway)
+
+	var def apidef.APIDefinition
+	oasAPI.ExtractTo(&def)
+
+	err = oasAPI.Validate(context.Background())
+	assert.NoError(t, err)
+
+	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		spec.VersionData = def.VersionData
+		spec.OAS = oasAPI
+		spec.IsOAS = true
+		spec.Proxy.ListenPath = "/duplicate-header-test"
+		spec.UseKeylessAccess = true
+	})
+
+	t.Run("single header value passes validation", func(t *testing.T) {
+		headers := map[string]string{
+			"Accept": "application/json",
+		}
+		_, _ = ts.Run(t, test.TestCase{
+			Method:  http.MethodGet,
+			Path:    "/duplicate-header-test/test",
+			Headers: headers,
+			Code:    http.StatusOK,
+		})
+	})
+
+	t.Run("duplicate standard headers are normalized and pass validation", func(t *testing.T) {
+		req, err := http.NewRequest(http.MethodGet, ts.URL+"/duplicate-header-test/test", nil)
+		assert.NoError(t, err)
+
+		req.Header.Add("Accept", "text/html")
+		req.Header.Add("Accept", "application/json")
+
+		assert.Len(t, req.Header["Accept"], 2, "Should have 2 Accept headers")
+
+		client := &http.Client{}
+		resp, err := client.Do(req)
+		assert.NoError(t, err)
+		defer resp.Body.Close()
+		assert.Equal(t, http.StatusOK, resp.StatusCode, "Request with duplicate headers should pass validation after normalization")
+	})
+}
