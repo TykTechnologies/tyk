@@ -127,7 +127,8 @@ func (m *mockResponseMiddleware) mockResponse(r *http.Request) (*http.Response, 
 	if mockResponse.FromOASExamples != nil && mockResponse.FromOASExamples.Enabled {
 		// Find the route using the OAS path from URLSpec, not the actual request path.
 		// This allows prefix/suffix matching to work correctly.
-		route, _, routeErr := m.Spec.findRouteForOASPath(urlSpec.OASPath, urlSpec.OASMethod)
+		strippedPath := m.Spec.StripListenPath(r.URL.Path)
+		route, _, routeErr := m.Spec.findRouteForOASPath(urlSpec.OASPath, urlSpec.OASMethod, strippedPath, r.URL.Path)
 		if routeErr != nil || route == nil {
 			log.Tracef("URL spec matched for mock response but route not found for OAS path %s: %v", urlSpec.OASPath, routeErr)
 			return nil, nil
