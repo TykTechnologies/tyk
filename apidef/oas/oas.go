@@ -5,9 +5,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
+
 	"github.com/TykTechnologies/tyk/common/option"
 	"github.com/TykTechnologies/tyk/internal/pathutil"
-	"strings"
 
 	"github.com/samber/lo"
 
@@ -727,15 +728,10 @@ func (s *OAS) validatePath() error {
 	}
 
 	for path := range s.Paths.Map() {
-		parsed, err := pathutil.ParsePath(path)
-
-		if err != nil {
-			log.WithError(err).Warnf("Failed to parse path '%s'", path)
-			return fmt.Errorf("Failed to parse path '%s'", path)
-		}
-
-		if parsed.HasReParams() {
-			return fmt.Errorf("OAS does not support classic-based path like this: '%s'", path)
+		if parsed, err := pathutil.ParsePath(path); err != nil {
+			return fmt.Errorf("Failed to parse path '%s': %w", path, err)
+		} else if parsed.HasReParams() {
+			return fmt.Errorf("OpenAPI description contains a regex pattern in an endpoint path, please convert to a parameterised path '%s'", path)
 		}
 	}
 
