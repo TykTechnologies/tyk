@@ -133,7 +133,7 @@ type State struct {
 	Active bool `bson:"active" json:"active"` // required
 	// Internal controls the exposure of the API on the Gateway.
 	// When set to `true`, the API will not be made available for external access and will not be included in API listings returned by the Gateway's management APIs;
-	// it will be accessible only via [internal looping]({{< ref "advanced-configuration/transform-traffic/looping" >}}) or as a [child API version]({{< ref "api-management/api-versioning#base-and-child-apis" >}}).
+	// it will be accessible only via [internal looping](/advanced-configuration/transform-traffic/looping) or as a [child API version](/api-management/api-versioning#base-and-child-apis).
 	//
 	// Tyk classic API definition: `internal`
 	Internal bool `bson:"internal,omitempty" json:"internal,omitempty"`
