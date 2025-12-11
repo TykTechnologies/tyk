@@ -1,10 +1,20 @@
 package gateway
 
 import (
+	"encoding/base64"
+	"encoding/json"
+	"errors"
+	"io"
+	"net"
 	"net/http/httptest"
+	"net/url"
+	"reflect"
+	"syscall"
 	"testing"
 
 	"github.com/sirupsen/logrus"
+	"github.com/sirupsen/logrus/hooks/test"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestGetLogEntryForRequest(t *testing.T) {
@@ -133,5 +143,108 @@ func TestGetLogEntryForRequest(t *testing.T) {
 				}
 			}
 		}
+	}
+}
+
+func TestGatewayLogJWKError(t *testing.T) {
+	logger, hook := test.NewNullLogger()
+	entry := logrus.NewEntry(logger)
+
+	gw := &Gateway{}
+	testURL := "https://idp.example.com/jwks"
+
+	tests := []struct {
+		name        string
+		err         error
+		expectedLog string
+		shouldLog   bool
+	}{
+		{
+			name:      "Nil Error (Should not log)",
+			err:       nil,
+			shouldLog: false,
+		},
+		{
+			name:        "String-based 'invalid JWK' (go-jose mismatch)",
+			err:         errors.New("go-jose: invalid JWK, public keys mismatch"),
+			expectedLog: "Invalid JWKS retrieved from endpoint: " + testURL,
+			shouldLog:   true,
+		},
+		{
+			name:        "JSON Syntax Error",
+			err:         &json.SyntaxError{},
+			expectedLog: "Invalid JWKS retrieved from endpoint: " + testURL,
+		},
+		{
+			name: "JSON Unmarshal Type Error",
+			err: &json.UnmarshalTypeError{
+				Value: "number",
+				Type:  reflect.TypeOf(""),
+			},
+			expectedLog: "Invalid JWKS retrieved from endpoint: " + testURL,
+		},
+		{
+			name:        "Empty Body (io.EOF)",
+			err:         io.EOF,
+			expectedLog: "Invalid JWKS retrieved from endpoint: " + testURL,
+		},
+		{
+			name:        "Typed Base64 Error",
+			err:         base64.CorruptInputError(10),
+			expectedLog: "Invalid JWKS retrieved from endpoint: " + testURL,
+		},
+		{
+			name:        "String-based 'illegal base64' (go-jose fallback)",
+			err:         errors.New("illegal base64 data at input byte 0"),
+			expectedLog: "Invalid JWKS retrieved from endpoint: " + testURL,
+		},
+
+		{
+			name:        "URL Error",
+			err:         &url.Error{Op: "Get", URL: testURL, Err: errors.New("timeout")},
+			expectedLog: "JWKS endpoint resolution failed: invalid or unreachable host " + testURL,
+		},
+		{
+			name:        "Net DNS Error (implements net.Error)",
+			err:         &net.DNSError{Err: "no such host", Name: "example.com", IsNotFound: true},
+			expectedLog: "JWKS endpoint resolution failed: invalid or unreachable host " + testURL,
+		},
+		{
+			name:        "Net OpError (implements net.Error)",
+			err:         &net.OpError{Op: "dial", Net: "tcp", Err: errors.New("timeout")},
+			expectedLog: "JWKS endpoint resolution failed: invalid or unreachable host " + testURL,
+		},
+		{
+			name:        "Syscall Connection Refused",
+			err:         syscall.ECONNREFUSED,
+			expectedLog: "JWKS endpoint resolution failed: invalid or unreachable host " + testURL,
+		},
+		{
+			name:        "Wrapped Connection Refused",
+			err:         &net.OpError{Op: "dial", Err: syscall.ECONNREFUSED},
+			expectedLog: "JWKS endpoint resolution failed: invalid or unreachable host " + testURL,
+		},
+		{
+			name:        "Generic Error",
+			err:         errors.New("something random"),
+			expectedLog: "Failed to fetch or decode JWKs from " + testURL,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			hook.Reset()
+			gw.logJWKError(entry, testURL, tc.err)
+
+			if tc.expectedLog == "" {
+				assert.Empty(t, hook.Entries)
+				return
+			}
+
+			if assert.Len(t, hook.Entries, 1) {
+				assert.Equal(t, logrus.ErrorLevel, hook.LastEntry().Level)
+				assert.Equal(t, tc.expectedLog, hook.LastEntry().Message)
+			}
+		})
 	}
 }

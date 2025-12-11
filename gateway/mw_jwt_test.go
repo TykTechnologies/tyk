@@ -7,24 +7,28 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"net/http/httptest"
 	"reflect"
 	"sort"
+	"strings"
 	"testing"
 	"time"
+
+	"github.com/go-jose/go-jose/v3"
+	"github.com/golang-jwt/jwt/v4"
+	"github.com/sirupsen/logrus"
+	logrustest "github.com/sirupsen/logrus/hooks/test"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/apidef/oas"
 	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/internal/cache"
 	tyktime "github.com/TykTechnologies/tyk/internal/time"
+	"github.com/TykTechnologies/tyk/internal/uuid"
 	"github.com/TykTechnologies/tyk/test"
 	"github.com/TykTechnologies/tyk/user"
-	"github.com/go-jose/go-jose/v3"
-	"github.com/golang-jwt/jwt/v4"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
-
-	"github.com/TykTechnologies/tyk/internal/cache"
-	"github.com/TykTechnologies/tyk/internal/uuid"
 )
 
 // openssl rsa -in app.rsa -pubout > app.rsa.pub
@@ -3743,8 +3747,10 @@ func TestGetSecretFromMultipleJWKURIs(t *testing.T) {
 		kid                 interface{}
 		expectKey           interface{}
 		expectError         error
+		expectErrorType     interface{}
 		useGetSecretFromURL bool
 		isOas               bool
+		expectedLogPart     string
 	}{
 		{
 			name: "success with valid JWK URL and matching KID",
@@ -3832,6 +3838,24 @@ func TestGetSecretFromMultipleJWKURIs(t *testing.T) {
 			expectKey:   "fresh-key",
 			expectError: nil,
 			isOas:       true,
+		},
+		{
+			name: "cached API definition has invalid base64 JWTSource",
+			setup: func(isOas bool) {
+				api.IsOAS = isOas
+
+				jwkCache := loadOrCreateJWKCacheByApiID(api.APIID)
+				jwkCache.Set(cacheKey, &apidef.APIDefinition{
+					APIID:     testAPIID,
+					JWTSource: "not-valid-base-64!!",
+				}, cache.DefaultExpiration)
+			},
+			jwkURI:              apidef.JWK{URL: testJWKURL},
+			kid:                 "any-kid",
+			useGetSecretFromURL: true,
+			isOas:               true,
+			expectErrorType:     new(base64.CorruptInputError),
+			expectedLogPart:     "JWKS source decode failed",
 		},
 		{
 			name: "JWK URLs changed triggers refetch",
@@ -3931,6 +3955,20 @@ func TestGetSecretFromMultipleJWKURIs(t *testing.T) {
 			isOas:               true,
 		},
 		{
+			name: "Primary fetch fails (logs error), Legacy fallback fails",
+			setup: func(isOas bool) {
+				api.IsOAS = isOas
+				GetJWK = func(_ string, _ bool) (*jose.JSONWebKeySet, error) {
+					return nil, errors.New("factory client failed")
+				}
+			},
+			jwkURI:              apidef.JWK{URL: testJWKURL},
+			kid:                 "any-kid",
+			useGetSecretFromURL: true,
+			expectError:         errors.New("factory client failed"),
+			expectedLogPart:     "Failed to fetch or decode JWKs",
+		},
+		{
 			name: "ensure jwksURIs faeature works only with OAS",
 			setup: func(isOas bool) {
 				api.IsOAS = isOas
@@ -3959,6 +3997,10 @@ func TestGetSecretFromMultipleJWKURIs(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			logger, hook := logrustest.NewNullLogger()
+
+			m.logger = logger.WithField("mw", "JWTMiddleware")
+
 			m.loadOrCreateJWKCache().Flush()
 
 			if tt.setup != nil {
@@ -3976,7 +4018,9 @@ func TestGetSecretFromMultipleJWKURIs(t *testing.T) {
 				key, err = mw.getSecretFromURL(tt.jwkURI.URL, tt.kid, "RS256")
 			}
 
-			if tt.expectError != nil {
+			if tt.expectErrorType != nil {
+				assert.ErrorAs(t, err, tt.expectErrorType)
+			} else if tt.expectError != nil {
 				assert.Error(t, err)
 				assert.Contains(t, err.Error(), tt.expectError.Error())
 			} else {
@@ -3984,6 +4028,18 @@ func TestGetSecretFromMultipleJWKURIs(t *testing.T) {
 			}
 
 			assert.Equal(t, tt.expectKey, key)
+
+			if tt.expectedLogPart != "" {
+				assert.NotEmpty(t, hook.Entries, "Expected log entries but found none")
+				found := false
+				for _, entry := range hook.Entries {
+					if strings.Contains(entry.Message, tt.expectedLogPart) {
+						found = true
+						break
+					}
+				}
+				assert.True(t, found, "Expected log message containing '%s', logs were: %v", tt.expectedLogPart, hook.Entries)
+			}
 		})
 	}
 }
@@ -5021,4 +5077,93 @@ func TestJWT_TraditionalAuth_ExistingSessionNoPolicyInToken(t *testing.T) {
 			BodyMatch: `key not authorized: no matching policy found`,
 		})
 	})
+}
+
+func TestJWTMiddleware_ErrorLogging(t *testing.T) {
+	invalidJSONHandler := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		_, err := w.Write([]byte("this-is-not-json"))
+		assert.NoError(t, err)
+	})
+
+	tests := []struct {
+		name             string
+		mockHandler      http.Handler
+		configureSpec    func(*APISpec)
+		action           func(*JWTMiddleware, string) error
+		expectedLogParts []string
+	}{
+		{
+			name:        "Legacy GetSecret Invalid JSON",
+			mockHandler: invalidJSONHandler,
+			action: func(m *JWTMiddleware, serverURL string) error {
+				_, err := m.legacyGetSecretFromURL(serverURL, "kid", "RS256")
+				return err
+			},
+			expectedLogParts: []string{"Invalid JWKS retrieved from endpoint"},
+		},
+		{
+			name: "Legacy GetSecret Network Error",
+			action: func(m *JWTMiddleware, _ string) error {
+				_, err := m.legacyGetSecretFromURL("http://[::1]:namedport", "kid", "RS256")
+				return err
+			},
+			expectedLogParts: []string{"JWKS endpoint resolution failed"},
+		},
+		{
+			name: "VerifySignature Invalid Base64 Source",
+			configureSpec: func(s *APISpec) {
+				s.JWTSource = "this-is-not-base64!"
+			},
+			action: func(m *JWTMiddleware, _ string) error {
+				token := &jwt.Token{Header: map[string]interface{}{"kid": "123"}}
+				_, err := m.getSecretToVerifySignature(nil, token)
+				return err
+			},
+			expectedLogParts: []string{"JWKS source decode failed", "not a base64 string"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var serverURL string
+			if tt.mockHandler != nil {
+				ts := httptest.NewServer(tt.mockHandler)
+				defer ts.Close()
+				serverURL = ts.URL
+			}
+
+			logger, hook := logrustest.NewNullLogger()
+
+			gw := &Gateway{}
+			gw.SetConfig(config.Config{JWTSSLInsecureSkipVerify: true})
+
+			spec := &APISpec{
+				APIDefinition: &apidef.APIDefinition{
+					APIID: "test-api-" + tt.name,
+				},
+			}
+			if tt.configureSpec != nil {
+				tt.configureSpec(spec)
+			}
+
+			m := JWTMiddleware{BaseMiddleware: &BaseMiddleware{
+				Gw:     gw,
+				logger: logger.WithField("mw", "JWTMiddleware"),
+			}}
+			m.Spec = spec
+
+			err := tt.action(&m, serverURL)
+
+			assert.Error(t, err)
+
+			require.NotEmpty(t, hook.Entries, "Expected log entries but found none")
+			lastLog := hook.LastEntry()
+
+			assert.Equal(t, logrus.ErrorLevel, lastLog.Level)
+			for _, part := range tt.expectedLogParts {
+				assert.Contains(t, lastLog.Message, part)
+			}
+		})
+	}
 }
