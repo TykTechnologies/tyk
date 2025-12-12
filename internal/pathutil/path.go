@@ -1,10 +1,12 @@
 package pathutil
 
 import (
-	"github.com/TykTechnologies/tyk/internal/reflect"
+	"strings"
+
 	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/samber/lo"
-	"strings"
+
+	"github.com/TykTechnologies/tyk/internal/reflect"
 )
 
 const (

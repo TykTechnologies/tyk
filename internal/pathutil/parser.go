@@ -6,8 +6,9 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/TykTechnologies/tyk/common/option"
 	"github.com/getkin/kin-openapi/openapi3"
+
+	"github.com/TykTechnologies/tyk/common/option"
 )
 
 const (
@@ -109,8 +110,8 @@ func (p *pathParser) parse() ([]pathPart, error) {
 		var err error
 		var part pathPart
 
-		switch {
-		case ch == slash:
+		switch ch {
+		case slash:
 			if p.parent.stripSlashes {
 				p.consumeAll(slash)
 			} else {
@@ -118,7 +119,7 @@ func (p *pathParser) parse() ([]pathPart, error) {
 			}
 
 			part = newPathPartSplitter()
-		case ch == curlyBraceLeft:
+		case curlyBraceLeft:
 			part, err = p.parseMuxRe()
 		default:
 			if id, ok := p.consumeSegmentPart(); ok {
