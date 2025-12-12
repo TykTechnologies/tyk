@@ -244,7 +244,7 @@ jobs:
 
 
   aggregator-ci-test:
-    name: Aggregated CI Status
+    name: Unit Tests & Linting
     runs-on: ubuntu-latest
     if: ${{ always() && github.event_name == 'pull_request' }}
     needs: [ test ]
