@@ -1,11 +1,12 @@
 package pathutil_test
 
 import (
-	"github.com/TykTechnologies/tyk/internal/pathutil"
 	"testing"
 
 	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/TykTechnologies/tyk/internal/pathutil"
 )
 
 func TestParser(t *testing.T) {

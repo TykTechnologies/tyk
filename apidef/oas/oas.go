@@ -7,17 +7,15 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/TykTechnologies/tyk/common/option"
-	"github.com/TykTechnologies/tyk/internal/pathutil"
-
+	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/samber/lo"
 
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/common/option"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/internal/oasutil"
+	"github.com/TykTechnologies/tyk/internal/pathutil"
 	"github.com/TykTechnologies/tyk/internal/reflect"
-
-	"github.com/getkin/kin-openapi/openapi3"
 )
 
 const (
@@ -729,7 +727,7 @@ func (s *OAS) validatePath() error {
 
 	for path := range s.Paths.Map() {
 		if parsed, err := pathutil.ParsePath(path); err != nil {
-			return fmt.Errorf("Failed to parse path '%s': %w", path, err)
+			return fmt.Errorf("failed to parse path '%s': %w", path, err)
 		} else if parsed.HasReParams() {
 			return fmt.Errorf("OpenAPI description contains a regex pattern in an endpoint path, please convert to a parameterised path '%s'", path)
 		}
