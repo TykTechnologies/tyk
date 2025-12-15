@@ -21,10 +21,11 @@ const (
 )
 
 const (
-	TykHookshot     = "Tyk-Hookshot"
-	ApplicationJSON = "application/json"
-	ApplicationXML  = "application/xml"
-	TextXML         = "text/xml"
+	TykHookshot     	= "Tyk-Hookshot"
+	ApplicationJSON 	= "application/json"
+	ApplicationXML  	= "application/xml"
+	ApplicationSoapXML 	= "application/soap+xml"
+	TextXML         	= "text/xml"
 )
 
 const (
