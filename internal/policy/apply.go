@@ -111,7 +111,12 @@ func (t *Service) Apply(session *user.SessionState) error {
 	}
 
 	// Only the status of policies applied to a key should determine the validity of the key.
-	sessionInactiveState := false
+	// If no policies are applied, preserve the session's own IsInactive state.
+	sessionInactiveState := session.IsInactive
+	hasPolicies := len(policyIDs) > 0
+	if hasPolicies {
+		sessionInactiveState = false
+	}
 
 	for _, polID := range policyIDs {
 		policy, ok := storage.PolicyByID(polID)
