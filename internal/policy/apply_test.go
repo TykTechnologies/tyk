@@ -505,6 +505,17 @@ func testPrepareApplyPolicies(tb testing.TB) (*policy.Service, []testApplyPolici
 
 	inactiveTCs := []testApplyPoliciesData{
 		{
+			"InactiveNoPolicies", []string{},
+			"", func(t *testing.T, s *user.SessionState) {
+				t.Helper()
+				if !s.IsInactive {
+					t.Fatalf("key without policies should preserve IsInactive=true from session")
+				}
+			}, &user.SessionState{
+				IsInactive: true,
+			}, false,
+		},
+		{
 			"InactiveMergeOne", []string{"tags1", "inactive1"},
 			"", func(t *testing.T, s *user.SessionState) {
 				t.Helper()
