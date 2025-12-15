@@ -21,6 +21,15 @@
     "type": "",
     "ignored_ips": []
   },
+  "prometheus": {
+    "enabled": false,
+    "listen_address": ":9090",
+    "path": "/metrics",
+    "metric_prefix": "tyk_gateway",
+    "enable_go_collector": true,
+    "enable_process_collector": true,
+    "enable_per_api_metrics": false
+  },
   "dns_cache": {
     "enabled": false,
     "ttl": 3600,

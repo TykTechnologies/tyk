@@ -38,4 +38,6 @@ type (
 	IntCmd         = redis.IntCmd
 	StringCmd      = redis.StringCmd
 	StringSliceCmd = redis.StringSliceCmd
+
+	PoolStats = redis.PoolStats
 )
