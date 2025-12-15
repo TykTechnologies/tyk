@@ -2,13 +2,19 @@ package gateway
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"time"
 
 	"github.com/getkin/kin-openapi/openapi3"
-
 	"github.com/getkin/kin-openapi/openapi3filter"
+	"github.com/getkin/kin-openapi/routers"
+	"github.com/sirupsen/logrus"
+
+	"github.com/TykTechnologies/tyk/apidef/oas"
+	"github.com/TykTechnologies/tyk/internal/paramextractor"
+	"github.com/TykTechnologies/tyk/internal/reflect"
 )
 
 func init() {
@@ -64,15 +70,29 @@ func (k *ValidateRequest) EnabledForSpec() bool {
 	return false
 }
 
+func (k *ValidateRequest) newParamExtractor() paramextractor.Extractor {
+	opt := k.Gw.GetConfig().HttpServerOptions
+	return paramextractor.NewParamExtractorFromFlags(
+		opt.EnablePathPrefixMatching,
+		opt.EnablePathSuffixMatching,
+	)
+}
+
 // ProcessRequest will run any checks on the request on the way through the system, return an error to have the chain fail
 func (k *ValidateRequest) ProcessRequest(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
-	operation := k.Spec.findOperation(r)
+	version, _ := k.Spec.Version(r)
+	versionPaths := k.Spec.RxPaths[version.Name]
+	found, meta, matchedPath := k.Spec.checkSpecMatchesStatus(r, versionPaths, OasValidate)
 
-	if operation == nil {
+	if !found {
 		return nil, http.StatusOK
 	}
 
-	validateRequest := operation.ValidateRequest
+	validateRequest, ok := meta.(*oasValidateMiddleware)
+	if !ok {
+		return errors.New("unexpected type"), http.StatusInternalServerError
+	}
+
 	if validateRequest == nil || !validateRequest.Enabled {
 		return nil, http.StatusOK
 	}
@@ -82,11 +102,27 @@ func (k *ValidateRequest) ProcessRequest(w http.ResponseWriter, r *http.Request,
 		errResponseCode = validateRequest.ErrorResponseCode
 	}
 
+	pathParams, err := k.newParamExtractor().Extract(matchedPath, validateRequest.path)
+	if err != nil {
+		log.
+			WithError(err).
+			WithFields(logrus.Fields{
+				"path":    r.URL.Path,
+				"pattern": validateRequest.path,
+				"method":  r.Method,
+			}).
+			Error("Parameter extraction failed")
+
+		return fmt.Errorf("param extraction error: %w", err), http.StatusInternalServerError
+	}
+
+	route := reflect.Clone(validateRequest.route)
+
 	// Validate request
 	requestValidationInput := &openapi3filter.RequestValidationInput{
 		Request:    r,
-		PathParams: operation.pathParams,
-		Route:      operation.route,
+		PathParams: pathParams,
+		Route:      route,
 		Options: &openapi3filter.Options{
 			AuthenticationFunc: func(ctx context.Context, input *openapi3filter.AuthenticationInput) error {
 				return nil
@@ -94,11 +130,23 @@ func (k *ValidateRequest) ProcessRequest(w http.ResponseWriter, r *http.Request,
 		},
 	}
 
-	err := openapi3filter.ValidateRequest(r.Context(), requestValidationInput)
+	err = openapi3filter.ValidateRequest(r.Context(), requestValidationInput)
 	if err != nil {
 		return fmt.Errorf("request validation error: %w", err), errResponseCode
 	}
 
 	// Handle Success
 	return nil, http.StatusOK
+}
+
+var _ urlSpecExtractor = (*oasValidateMiddleware)(nil)
+
+type oasValidateMiddleware struct {
+	*oas.ValidateRequest
+	endpointMiddleware
+	route *routers.Route
+}
+
+func (o oasValidateMiddleware) extract(spec *URLSpec) {
+	spec.oasValidateRequest = o
 }

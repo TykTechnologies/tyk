@@ -1,9 +1,6 @@
 package gateway
 
 import (
-	"github.com/TykTechnologies/tyk/header"
-	"github.com/TykTechnologies/tyk/internal/errors"
-	"github.com/TykTechnologies/tyk/user"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -18,7 +15,10 @@ import (
 	"github.com/TykTechnologies/tyk/apidef/oas"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/ctx"
+	"github.com/TykTechnologies/tyk/header"
+	"github.com/TykTechnologies/tyk/internal/errors"
 	"github.com/TykTechnologies/tyk/internal/graphengine"
+	"github.com/TykTechnologies/tyk/user"
 )
 
 // APISpec represents a path specification for an API, to avoid enumerating multiple nested lists, a single
@@ -68,24 +68,32 @@ type APISpec struct {
 // CheckSpecMatchesStatus checks if a URL spec has a specific status.
 // Deprecated: The function doesn't follow go return conventions (T, ok); use FindSpecMatchesStatus;
 func (a *APISpec) CheckSpecMatchesStatus(r *http.Request, rxPaths []URLSpec, mode URLStatus) (bool, interface{}) {
+	ok, spec, _ := a.checkSpecMatchesStatus(r, rxPaths, mode)
+	return ok, spec
+}
+
+func (a *APISpec) checkSpecMatchesStatus(r *http.Request, rxPaths []URLSpec, mode URLStatus) (ok bool, spec interface{}, match string) {
 	matchPath, method := a.getMatchPathAndMethod(r, mode)
 
-	for i := range rxPaths {
-		if rxPaths[i].Status != mode {
+	for _, rx := range rxPaths {
+		if rx.Status != mode {
 			continue
 		}
-		if !rxPaths[i].matchesMethod(method) {
-			continue
-		}
-		if !rxPaths[i].matchesPath(matchPath, a) {
+		if !rx.matchesMethod(method) {
 			continue
 		}
 
-		if spec, ok := rxPaths[i].modeSpecificSpec(mode); ok {
-			return true, spec
+		okPath, matchedPath := rx.matchesPath(matchPath, a)
+		if !okPath {
+			continue
+		}
+
+		if spec, ok := rx.modeSpecificSpec(mode); ok {
+			return true, spec, matchedPath
 		}
 	}
-	return false, nil
+
+	return false, nil, ""
 }
 
 func (a *APISpec) GetTykExtension() *oas.XTykAPIGateway {
@@ -110,7 +118,7 @@ func (a *APISpec) FindSpecMatchesStatus(r *http.Request, rxPaths []URLSpec, mode
 		if !rxPaths[i].matchesMethod(method) {
 			continue
 		}
-		if !rxPaths[i].matchesPath(matchPath, a) {
+		if ok, _ := rxPaths[i].matchesPath(matchPath, a); !ok {
 			continue
 		}
 
