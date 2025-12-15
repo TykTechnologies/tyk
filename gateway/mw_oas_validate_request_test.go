@@ -11,6 +11,7 @@ import (
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/apidef/oas"
+	"github.com/TykTechnologies/tyk/header"
 	"github.com/TykTechnologies/tyk/test"
 )
 
@@ -87,6 +88,34 @@ const testOASForValidateRequest = `{
           }
         }
       }
+    },
+    "/test": {
+      "get": {
+        "operationId": "testget",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "test",
+            "required": true,
+            "schema": {
+              "items": {
+                "maxLength": 5,
+                "minLength": 1,
+                "pattern": "^[A-Za-z]+$",
+                "type": "string"
+              },
+              "maxItems": 999,
+              "minItems": 1,
+              "type": "array"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        }
+      }
     }
   },
   "servers": [
@@ -101,6 +130,7 @@ func TestValidateRequest(t *testing.T) {
 	defer ts.Close()
 
 	const operationID = "postpost"
+	const getOperationID = "testget"
 
 	oasDoc, err := openapi3.NewLoader().LoadFromData([]byte(testOASForValidateRequest))
 	assert.NoError(t, err)
@@ -111,6 +141,12 @@ func TestValidateRequest(t *testing.T) {
 				operationID: {
 					ValidateRequest: &oas.ValidateRequest{
 						Enabled: true,
+					},
+				},
+				getOperationID: {
+					ValidateRequest: &oas.ValidateRequest{
+						Enabled:           true,
+						ErrorResponseCode: http.StatusUnprocessableEntity,
 					},
 				},
 			},
@@ -150,7 +186,7 @@ func TestValidateRequest(t *testing.T) {
 		},
 	)
 
-	headers := map[string]string{"Content-Type": "application/json"}
+	headers := map[string]string{}
 
 	t.Run("default error response code", func(t *testing.T) {
 		check := func(t *testing.T) {
@@ -220,6 +256,21 @@ func TestValidateRequest(t *testing.T) {
 			{Data: `{"name": 123}`, Code: http.StatusTeapot, Method: http.MethodPost, Headers: headers, Path: "/product/post"},
 		}...)
 	})
+
+	t.Run("multiple headers with the same name", func(t *testing.T) {
+		headerName := "test"
+
+		validHeader := map[string][]string{headerName: {"y", "x"}}
+		invalidHeader1 := map[string][]string{headerName: {"y", "toolong"}}
+		invalidHeader2 := map[string][]string{headerName: {"toolong", "x"}}
+
+		path := "/product/test"
+		_, _ = ts.Run(t, []test.TestCase{
+			{Code: http.StatusOK, Method: http.MethodGet, HeadersArray: validHeader, Path: path},
+			{Code: http.StatusUnprocessableEntity, Method: http.MethodGet, HeadersArray: invalidHeader1, Path: path},
+			{Code: http.StatusUnprocessableEntity, Method: http.MethodGet, HeadersArray: invalidHeader2, Path: path},
+		}...)
+	})
 }
 
 func TestValidateRequest_AfterMigration(t *testing.T) {
@@ -260,4 +311,100 @@ func TestValidateRequest_AfterMigration(t *testing.T) {
 		{Method: http.MethodPost, Path: "/listen/post", Data: `{"age":27}`, Code: http.StatusTeapot},
 		{Method: http.MethodPost, Path: "/listen/post", Data: `{"name":"Furkan"}`, Code: http.StatusOK},
 	}...)
+}
+
+func TestValidateRequest_NormalizeHeaders(t *testing.T) {
+	customHeader := "X-Custom"
+	tests := []struct {
+		name     string
+		input    http.Header
+		expected http.Header
+	}{
+		{
+			name: "Single value headers remain unchanged",
+			input: http.Header{
+				header.Accept:      []string{"application/json"},
+				header.ContentType: []string{"application/json"},
+				header.UserAgent:   []string{"Tyk-Test"},
+			},
+			expected: http.Header{
+				header.Accept:      []string{"application/json"},
+				header.ContentType: []string{"application/json"},
+				header.UserAgent:   []string{"Tyk-Test"},
+			},
+		},
+		{
+			name: "Multiple value headers are joined with commas",
+			input: http.Header{
+				header.Accept:    []string{"application/json", "text/html"},
+				customHeader:     []string{"value1", "value2", "value3"},
+				header.UserAgent: []string{"Tyk-Test"},
+			},
+			expected: http.Header{
+				header.Accept:    []string{"application/json,text/html"},
+				customHeader:     []string{"value1,value2,value3"},
+				header.UserAgent: []string{"Tyk-Test"},
+			},
+		},
+		{
+			name: "Excluded headers remain unchanged even with multiple values",
+			input: http.Header{
+				header.SetCookie:        []string{"cookie1=value1", "cookie2=value2"},
+				header.ContentLength:    []string{"100", "200"},
+				header.TransferEncoding: []string{"chunked", "gzip"},
+				header.Host:             []string{"example.com", "test.com"},
+			},
+			expected: http.Header{
+				header.SetCookie:        []string{"cookie1=value1", "cookie2=value2"},
+				header.ContentLength:    []string{"100", "200"},
+				header.TransferEncoding: []string{"chunked", "gzip"},
+				header.Host:             []string{"example.com", "test.com"},
+			},
+		},
+		{
+			name: "Mixed regular and excluded headers",
+			input: http.Header{
+				header.Accept:           []string{"application/json", "text/html"},
+				header.SetCookie:        []string{"cookie1=value1", "cookie2=value2"},
+				header.Cookie:           []string{"cookie1=value1", "cookie2=value2"},
+				customHeader:            []string{"value1", "value2", "value3"},
+				header.ContentLength:    []string{"100"},
+				header.TransferEncoding: []string{"chunked"},
+				header.Host:             []string{"example.com"},
+			},
+			expected: http.Header{
+				header.Accept:           []string{"application/json,text/html"},
+				header.SetCookie:        []string{"cookie1=value1", "cookie2=value2"},
+				header.Cookie:           []string{"cookie1=value1; cookie2=value2"},
+				customHeader:            []string{"value1,value2,value3"},
+				header.ContentLength:    []string{"100"},
+				header.TransferEncoding: []string{"chunked"},
+				header.Host:             []string{"example.com"},
+			},
+		},
+		{
+			name:     "Empty headers remain empty",
+			input:    http.Header{},
+			expected: http.Header{},
+		},
+		{
+			name: "Headers with empty values",
+			input: http.Header{
+				"X-Empty":  []string{""},
+				"X-Empty2": []string{"", ""},
+			},
+			expected: http.Header{
+				"X-Empty":  []string{""},
+				"X-Empty2": []string{","},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			normalizeHeaders(tt.input)
+
+			assert.Equal(t, tt.expected, tt.input)
+		})
+	}
 }
