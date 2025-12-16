@@ -33,8 +33,8 @@ const (
 
 var dollarMatch = regexp.MustCompile(`\$\d+`)
 var contextMatch = regexp.MustCompile(`\$tyk_context.([A-Za-z0-9_\-\.]+)`)
-var consulMatch = regexp.MustCompile(`\$secret_consul.([A-Za-z0-9\/\-\.]+)`)
-var vaultMatch = regexp.MustCompile(`\$secret_vault.([A-Za-z0-9\/\-\.]+)`)
+var consulMatch = regexp.MustCompile(`\$secret_consul.([A-Za-z0-9_\/\-\.]+)`)
+var vaultMatch = regexp.MustCompile(`\$secret_vault.([A-Za-z0-9_\/\-\.]+)`)
 var envValueMatch = regexp.MustCompile(`\$secret_env.([A-Za-z0-9_\-\.]+)`)
 var metaMatch = regexp.MustCompile(`\$tyk_meta.([A-Za-z0-9_\-\.]+)`)
 var secretsConfMatch = regexp.MustCompile(`\$secret_conf.([A-Za-z0-9[.\-\_]+)`)
