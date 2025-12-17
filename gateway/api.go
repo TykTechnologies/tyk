@@ -713,9 +713,9 @@ type apiAllKeys struct {
 // handleGetAllKeys retrieves keys and filters them by API ID using a Worker Pool.
 func (gw *Gateway) handleGetAllKeys(c context.Context, filter string, apiID string, hashed bool) (interface{}, int) {
 	keys := gw.getAllSessionKeys(filter)
-	validSessions := make([]string, 0)
 
 	if apiID == "" {
+		validSessions := make([]string, 0, len(keys))
 		for _, k := range keys {
 			if !strings.HasPrefix(k, QuotaKeyPrefix) && !strings.HasPrefix(k, RateLimitKeyPrefix) {
 				validSessions = append(validSessions, k)
@@ -724,7 +724,27 @@ func (gw *Gateway) handleGetAllKeys(c context.Context, filter string, apiID stri
 		return apiAllKeys{validSessions}, http.StatusOK
 	}
 
+	validSessions, err := gw.filterKeysByAPIID(c, keys, filter, apiID, hashed)
+	if err != nil {
+		log.WithError(err).Warn("Request timeout while processing keys")
+		return apiError("Request timeout while processing keys"), http.StatusGatewayTimeout
+	}
+
+	sort.Strings(validSessions)
+
+	log.WithFields(logrus.Fields{
+		"prefix": "api",
+		"status": "ok",
+		"count":  len(validSessions),
+	}).Info("Retrieved key list.")
+
+	return apiAllKeys{validSessions}, http.StatusOK
+}
+
+// filterKeysByAPIID handles the concurrent processing of key permissions
+func (gw *Gateway) filterKeysByAPIID(c context.Context, keys []string, filter, apiID string, hashed bool) ([]string, error) {
 	jobs := make(chan string, KeyListingBufferSize)
+	validSessions := make([]string, 0)
 	var wg sync.WaitGroup
 	var mu sync.Mutex
 
@@ -761,19 +781,10 @@ func (gw *Gateway) handleGetAllKeys(c context.Context, filter string, apiID stri
 	wg.Wait()
 
 	if c.Err() != nil {
-		log.WithError(c.Err()).Warn("Request timeout while processing keys")
-		return apiError("Request timeout while processing keys"), http.StatusGatewayTimeout
+		return nil, c.Err()
 	}
 
-	sort.Strings(validSessions)
-
-	log.WithFields(logrus.Fields{
-		"prefix": "api",
-		"status": "ok",
-		"count":  len(validSessions),
-	}).Info("Retrieved key list.")
-
-	return apiAllKeys{validSessions}, http.StatusOK
+	return validSessions, nil
 }
 
 // getAllSessionKeys handles the retrieval of raw keys from the session manager,
