@@ -270,9 +270,7 @@ func (k *JWTMiddleware) getSecretFromURL(url string, kidVal interface{}, keyType
 		if clientErr == nil {
 			if jwkSet, err = getJWKWithClient(url, client); err != nil {
 				k.Gw.logJWKError(k.Logger(), url, err)
-				// TODO: for the reviewer to identify if this log is necessary
-				// for the clients (this is left from the previous code)
-				k.Logger().Info("Failed to decode JWKs body with factory client. Trying x5c PEM fallback.")
+				k.Logger().WithError(err).Info("Failed to decode JWKs body with factory client. Trying x5c PEM fallback.")
 			}
 		}
 
