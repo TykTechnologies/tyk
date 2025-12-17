@@ -20,10 +20,9 @@ import (
 	"github.com/lonelycode/osin"
 
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/internal/cache"
 	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/user"
-
-	"github.com/TykTechnologies/tyk/internal/cache"
 )
 
 type JWTMiddleware struct {
@@ -97,14 +96,14 @@ func (k *JWTMiddleware) legacyGetSecretFromURL(url, kid, keyType string) (interf
 	if !found {
 		resp, err := client.Get(url)
 		if err != nil {
-			k.Logger().WithError(err).Error("Failed to get resource URL")
+			k.Gw.logJWKError(k.Logger(), url, err)
 			return nil, err
 		}
 		defer resp.Body.Close()
 
 		// Decode it
 		if err := json.NewDecoder(resp.Body).Decode(&jwkSet); err != nil {
-			k.Logger().WithError(err).Error("Failed to decode body JWK")
+			k.Gw.logJWKError(k.Logger(), url, err)
 			return nil, err
 		}
 
@@ -148,6 +147,8 @@ func (k *JWTMiddleware) getSecretFromURL(url string, kidVal interface{}, keyType
 	cachedJWK, found := JWKCache.Get(k.Spec.APIID)
 	if !found {
 		if jwkSet, err = getJWK(url, k.Gw.GetConfig().JWTSSLInsecureSkipVerify); err != nil {
+			k.Gw.logJWKError(k.Logger(), url, err)
+
 			k.Logger().WithError(err).Info("Failed to decode JWKs body. Trying x5c PEM fallback.")
 
 			key, legacyError := k.legacyGetSecretFromURL(url, kid, keyType)
