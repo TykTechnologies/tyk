@@ -27,6 +27,7 @@ package gateway
 
 import (
 	"bytes"
+	"context"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
@@ -37,6 +38,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -702,31 +704,81 @@ type apiAllKeys struct {
 	APIKeys []string `json:"keys"`
 }
 
-func (gw *Gateway) handleGetAllKeys(filter string) (interface{}, int) {
-	sessions := gw.GlobalSessionManager.Sessions(filter)
-	if filter != "" {
-		filterB64 := base64.StdEncoding.WithPadding(base64.NoPadding).EncodeToString([]byte(fmt.Sprintf(`{"org":"%s"`, filter)))
-		// Remove last 2 digits to look exact match
-		filterB64 = filterB64[0 : len(filterB64)-2]
-		orgIDB64Sessions := gw.GlobalSessionManager.Sessions(filterB64)
-		sessions = append(sessions, orgIDB64Sessions...)
+func (gw *Gateway) handleGetAllKeys(c context.Context, filter string, apiID string, hashed bool) (interface{}, int) {
+	keys := gw.getAllSessionKeys(filter)
+	validSessions := make([]string, 0)
+
+	if apiID == "" {
+		for _, k := range keys {
+			if !strings.HasPrefix(k, QuotaKeyPrefix) && !strings.HasPrefix(k, RateLimitKeyPrefix) {
+				validSessions = append(validSessions, k)
+			}
+		}
+		return apiAllKeys{validSessions}, http.StatusOK
 	}
 
-	fixedSessions := make([]string, 0)
-	for _, s := range sessions {
-		if !strings.HasPrefix(s, QuotaKeyPrefix) && !strings.HasPrefix(s, RateLimitKeyPrefix) {
-			fixedSessions = append(fixedSessions, s)
+	filteredKeys := make([]string, 0, len(keys))
+	for _, k := range keys {
+		if !strings.HasPrefix(k, QuotaKeyPrefix) && !strings.HasPrefix(k, RateLimitKeyPrefix) {
+			filteredKeys = append(filteredKeys, k)
 		}
 	}
 
-	sessionsObj := apiAllKeys{fixedSessions}
+	const batchSize = 1000
+	for i := 0; i < len(filteredKeys); i += batchSize {
+		select {
+		case <-c.Done():
+			log.WithError(c.Err()).Warn("Request timeout while processing keys")
+			return apiError("Request timeout while processing keys"), http.StatusGatewayTimeout
+		default:
+		}
+
+		end := i + batchSize
+		if end > len(filteredKeys) {
+			end = len(filteredKeys)
+		}
+
+		batch := filteredKeys[i:end]
+
+		sessions := gw.GlobalSessionManager.SessionDetailBulk(filter, batch, hashed)
+
+		for _, key := range batch {
+			session, found := sessions[key]
+			if !found {
+				continue
+			}
+
+			if _, ok := session.AccessRights[apiID]; ok {
+				validSessions = append(validSessions, key)
+				continue
+			}
+
+			if len(session.AccessRights) == 0 && gw.GetConfig().AllowMasterKeys {
+				validSessions = append(validSessions, key)
+			}
+		}
+	}
+
+	sort.Strings(validSessions)
 
 	log.WithFields(logrus.Fields{
 		"prefix": "api",
 		"status": "ok",
+		"count":  len(validSessions),
 	}).Info("Retrieved key list.")
 
-	return sessionsObj, http.StatusOK
+	return apiAllKeys{validSessions}, http.StatusOK
+}
+
+func (gw *Gateway) getAllSessionKeys(filter string) []string {
+	keys := gw.GlobalSessionManager.Sessions(filter)
+	if filter != "" {
+		filterB64 := base64.StdEncoding.WithPadding(base64.NoPadding).EncodeToString([]byte(fmt.Sprintf(`{"org":"%s"`, filter)))
+		filterB64 = filterB64[0 : len(filterB64)-2]
+		orgIDB64Sessions := gw.GlobalSessionManager.Sessions(filterB64)
+		keys = append(keys, orgIDB64Sessions...)
+	}
+	return keys
 }
 
 func (gw *Gateway) handleAddKey(keyName, sessionString, orgId string) {
@@ -1688,11 +1740,10 @@ func (gw *Gateway) keyHandler(w http.ResponseWriter, r *http.Request) {
 					return
 				}
 
-				// we don't use filter for hashed keys
-				obj, code = gw.handleGetAllKeys("")
+				obj, code = gw.handleGetAllKeys(r.Context(), "", apiID, true)
 			} else {
 				filter := r.URL.Query().Get("filter")
-				obj, code = gw.handleGetAllKeys(filter)
+				obj, code = gw.handleGetAllKeys(r.Context(), filter, apiID, false)
 			}
 		}
 

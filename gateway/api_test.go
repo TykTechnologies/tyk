@@ -4203,3 +4203,118 @@ func TestPurgeOAuthClientTokensEndpoint(t *testing.T) {
 		assertTokensLen(t, storageManager, storageKey2, 0)
 	})
 }
+
+func TestKeyHandler_BatchFiltering_Integration(t *testing.T) {
+	//ts := StartTest(func(globalConf *config.Config) {
+	//	globalConf.HashKeys = true
+	//	globalConf.EnableHashedKeysListing = true
+	//	globalConf.AllowMasterKeys = true
+	//})
+	//defer ts.Close()
+
+	ts := StartTest(func(globalConf *config.Config) {
+		// 1. Main Storage (Cluster on 127.0.0.1)
+		globalConf.Storage = config.StorageOptionsConf{
+			Type:          "redis",
+			EnableCluster: true,
+			Hosts: map[string]string{
+				"n1": "127.0.0.1:7001",
+				"n2": "127.0.0.1:7002",
+				"n3": "127.0.0.1:7003",
+			},
+		}
+
+		// 2. Feature Flags
+		globalConf.HashKeys = true
+		globalConf.EnableHashedKeysListing = true
+		globalConf.AllowMasterKeys = true
+
+		// 3. Disable Analytics & GeoIP (Prevents GeoIP Panic)
+		globalConf.EnableAnalytics = false
+		globalConf.AnalyticsConfig.EnableGeoIP = false
+		globalConf.AnalyticsConfig.Type = "console"
+		globalConf.AnalyticsConfig.IgnoredIPs = []string{}
+
+		// 4. CRITICAL: Disable Secondary Redis Connections
+		// These default to localhost:6379 if not disabled!
+		globalConf.EnableSeperateCacheStore = false
+		globalConf.EnableSeperateAnalyticsStore = false
+
+		// 5. Disable Uptime Tests & RPC
+		globalConf.UptimeTests.Disable = true
+		globalConf.SlaveOptions.UseRPC = false
+		globalConf.Policies.PolicySource = "file"
+		globalConf.DisableDashboardZeroConf = true
+	})
+	defer ts.Close()
+
+	keyA := "key-access-api-one"
+	hashA := storage.HashKey(keyA, true)
+	sessionA := CreateStandardSession()
+	sessionA.AccessRights = map[string]user.AccessDefinition{
+		"api-one": {APIID: "api-one", Versions: []string{"Default"}},
+	}
+	assert.NoError(t, ts.Gw.GlobalSessionManager.UpdateSession(hashA, sessionA, 100, true))
+
+	keyB := "key-access-api-two"
+	hashB := storage.HashKey(keyB, true)
+	sessionB := CreateStandardSession()
+	sessionB.AccessRights = map[string]user.AccessDefinition{
+		"api-two": {APIID: "api-two", Versions: []string{"Default"}},
+	}
+	assert.NoError(t, ts.Gw.GlobalSessionManager.UpdateSession(hashB, sessionB, 100, true))
+
+	keyC := "key-master"
+	hashC := storage.HashKey(keyC, true)
+	sessionC := CreateStandardSession()
+	sessionC.AccessRights = map[string]user.AccessDefinition{}
+	assert.NoError(t, ts.Gw.GlobalSessionManager.UpdateSession(hashC, sessionC, 100, true))
+
+	t.Cleanup(func() {
+		ts.Gw.GlobalSessionManager.RemoveSession("", keyA, true)
+		ts.Gw.GlobalSessionManager.RemoveSession("", keyB, true)
+		ts.Gw.GlobalSessionManager.RemoveSession("", keyC, true)
+	})
+
+	t.Run("Filter API One - Should find Key A and Master Key", func(t *testing.T) {
+		uri := "/tyk/keys/?api_id=api-one"
+		req := ts.withAuth(TestReq(t, "GET", uri, nil))
+		rec := httptest.NewRecorder()
+		ts.mainRouter().ServeHTTP(rec, req)
+
+		assert.Equal(t, http.StatusOK, rec.Code)
+		body := rec.Body.String()
+
+		assert.Contains(t, body, hashA, "Should contain key for api-one")
+		assert.Contains(t, body, hashC, "Should contain master key")
+		assert.NotContains(t, body, hashB, "Should NOT contain key for api-two")
+	})
+
+	t.Run("Filter API Two - Should find Key B and Master Key", func(t *testing.T) {
+		uri := "/tyk/keys/?api_id=api-two"
+		req := ts.withAuth(TestReq(t, "GET", uri, nil))
+		rec := httptest.NewRecorder()
+		ts.mainRouter().ServeHTTP(rec, req)
+
+		assert.Equal(t, http.StatusOK, rec.Code)
+		body := rec.Body.String()
+
+		assert.NotContains(t, body, hashA, "Should NOT contain key for api-one")
+		assert.Contains(t, body, hashB, "Should contain key for api-two")
+		assert.Contains(t, body, hashC, "Should contain master key")
+	})
+
+	t.Run("Filter Unknown API - Should only find Master Key", func(t *testing.T) {
+		uri := "/tyk/keys/?api_id=api-unknown"
+		req := ts.withAuth(TestReq(t, "GET", uri, nil))
+		rec := httptest.NewRecorder()
+		ts.mainRouter().ServeHTTP(rec, req)
+
+		assert.Equal(t, http.StatusOK, rec.Code)
+		body := rec.Body.String()
+
+		assert.NotContains(t, body, hashA)
+		assert.NotContains(t, body, hashB)
+		assert.Contains(t, body, hashC, "Master key is valid for all APIs")
+	})
+}

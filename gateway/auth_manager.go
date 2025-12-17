@@ -21,6 +21,7 @@ type SessionHandler interface {
 	UpdateSession(keyName string, session *user.SessionState, resetTTLTo int64, hashed bool) error
 	RemoveSession(orgID string, keyName string, hashed bool) bool
 	SessionDetail(orgID string, keyName string, hashed bool) (user.SessionState, bool)
+	SessionDetailBulk(orgID string, keyNames []string, hashed bool) map[string]user.SessionState
 	KeyExpired(newSession *user.SessionState) bool
 	Sessions(filter string) []string
 	ResetQuota(string, *user.SessionState, bool)
@@ -213,6 +214,94 @@ func (b *DefaultSessionManager) SessionDetail(orgID string, keyName string, hash
 	}
 	session.KeyID = keyId
 	return session.Clone(), true
+}
+
+func (b *DefaultSessionManager) SessionDetailBulk(orgID string, keyNames []string, hashed bool) map[string]user.SessionState {
+	result := make(map[string]user.SessionState)
+	if len(keyNames) == 0 {
+		return result
+	}
+
+	if hashed {
+		prefix := b.store.GetKeyPrefix()
+		prefixedKeys := make([]string, len(keyNames))
+		for i, keyName := range keyNames {
+			prefixedKeys[i] = prefix + keyName
+		}
+
+		jsonValues, err := b.store.GetRawMultiKey(prefixedKeys)
+		if err != nil {
+			log.WithError(err).Debug("Failed to bulk fetch hashed sessions")
+			return result
+		}
+
+		for i, jsonVal := range jsonValues {
+			if jsonVal == "" {
+				continue
+			}
+			session := &user.SessionState{}
+			if err := json.Unmarshal([]byte(jsonVal), session); err != nil {
+				log.WithField("key", keyNames[i]).Error("Failed to unmarshal session in bulk fetch")
+				continue
+			}
+			session.KeyID = keyNames[i]
+			result[keyNames[i]] = *session
+		}
+		return result
+	}
+
+	allKeysToSearch := make([]string, 0, len(keyNames)*2)
+	searchToOriginal := make(map[string]string)
+
+	for _, keyName := range keyNames {
+		if storage.TokenOrg(keyName) != orgID {
+			if !b.Gw.GetConfig().DisableKeyActionsByUsername {
+				legacyKey := b.Gw.generateToken(orgID, keyName)
+				allKeysToSearch = append(allKeysToSearch, legacyKey)
+				searchToOriginal[legacyKey] = keyName
+			}
+			allKeysToSearch = append(allKeysToSearch, keyName)
+			searchToOriginal[keyName] = keyName
+
+			for _, fallback := range b.Gw.GetConfig().HashKeyFunctionFallback {
+				if !b.Gw.GetConfig().DisableKeyActionsByUsername {
+					fallbackKey := b.Gw.generateToken(orgID, keyName, fallback)
+					allKeysToSearch = append(allKeysToSearch, fallbackKey)
+					searchToOriginal[fallbackKey] = keyName
+				}
+			}
+		} else {
+			allKeysToSearch = append(allKeysToSearch, keyName)
+			searchToOriginal[keyName] = keyName
+		}
+	}
+
+	jsonValues, err := b.store.GetMultiKey(allKeysToSearch)
+	if err != nil {
+		log.WithError(err).Debug("Failed to bulk fetch legacy sessions")
+		return result
+	}
+
+	for i, jsonVal := range jsonValues {
+		if jsonVal == "" {
+			continue
+		}
+		foundKey := allKeysToSearch[i]
+		originalKey := searchToOriginal[foundKey]
+
+		if _, exists := result[originalKey]; exists {
+			continue
+		}
+
+		session := &user.SessionState{}
+		if err := json.Unmarshal([]byte(jsonVal), session); err != nil {
+			continue
+		}
+		session.KeyID = foundKey
+		result[originalKey] = *session
+	}
+
+	return result
 }
 
 func (b *DefaultSessionManager) Stop() {}

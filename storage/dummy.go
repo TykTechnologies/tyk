@@ -35,6 +35,12 @@ func (s *DummyStorage) GetMultiKey(keys []string) ([]string, error) {
 	return values, nil
 }
 
+// GetRawMultiKey retrieves multiple values from the DummyStorage.
+// Since DummyStorage is an in-memory map, we just delegate to GetMultiKey.
+func (s *DummyStorage) GetRawMultiKey(keys []string) ([]string, error) {
+	return s.GetMultiKey(keys)
+}
+
 // GetRawKey retrieves the value associated with a given key from the DummyStorage.
 // The method accepts a single string as the key and returns the corresponding string value.
 // An error is also returned to indicate whether the retrieval was successful.

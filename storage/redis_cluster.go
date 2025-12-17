@@ -320,6 +320,67 @@ func (r *RedisCluster) GetMultiKey(keys []string) ([]string, error) {
 	return nil, ErrKeyNotFound
 }
 
+// GetRawMultiKey retrieves multiple values using a Pipeline.
+func (r *RedisCluster) GetRawMultiKey(keys []string) ([]string, error) {
+	client, err := r.Client()
+	if err != nil {
+		return nil, err
+	}
+
+	if clusterClient, ok := client.(*redis.ClusterClient); ok {
+		return r.pipelineFetch(clusterClient, keys)
+	}
+
+	cmd := client.MGet(context.Background(), keys...)
+	vals, err := cmd.Result()
+	if err != nil {
+		return nil, err
+	}
+
+	// Convert []interface{} to []string
+	result := make([]string, len(vals))
+	for i, v := range vals {
+		if v == nil {
+			result[i] = ""
+		} else {
+			result[i] = fmt.Sprint(v)
+		}
+	}
+
+	return result, nil
+}
+
+// pipelineFetch executes the batch using a Redis Pipeline.
+func (r *RedisCluster) pipelineFetch(client *redis.ClusterClient, keys []string) ([]string, error) {
+	ctx := context.Background()
+
+	pipe := client.Pipeline()
+
+	cmds := make([]*redis.StringCmd, len(keys))
+	for i, key := range keys {
+		cmds[i] = pipe.Get(ctx, key)
+	}
+
+	_, err := pipe.Exec(ctx)
+	if err != nil && !errors.Is(err, redis.Nil) {
+		return nil, err
+	}
+
+	result := make([]string, len(keys))
+	for i, cmd := range cmds {
+		val, err := cmd.Result()
+		if errors.Is(err, redis.Nil) {
+			result[i] = ""
+		} else if err != nil {
+			return nil, err
+		} else {
+			result[i] = val
+		}
+	}
+
+	return result, nil
+}
+
 func (r *RedisCluster) GetKeyTTL(keyName string) (ttl int64, err error) {
 	storage, err := r.kv()
 	if err != nil {

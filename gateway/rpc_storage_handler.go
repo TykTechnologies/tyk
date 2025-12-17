@@ -319,6 +319,12 @@ func (r *RPCStorageHandler) GetMultiKey(keyNames []string) ([]string, error) {
 	return nil, err
 }
 
+// GetRawMultiKey retrieves multiple values via RPC.
+// RPC fetches sequentially, so we delegate to GetMultiKey.
+func (r *RPCStorageHandler) GetRawMultiKey(keys []string) ([]string, error) {
+	return r.GetMultiKey(keys)
+}
+
 func (r *RPCStorageHandler) GetExp(keyName string) (int64, error) {
 	log.Debug("GetExp called")
 	value, err := rpc.FuncClientSingleton("GetExp", r.fixKey(keyName))

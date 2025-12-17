@@ -439,15 +439,64 @@ func TestDeleteRawKeysWithAllowanceScope(t *testing.T) {
 	})
 }
 
+func TestDefaultSessionManager_SessionDetailBulk(t *testing.T) {
+	t.Run("Hashed Mode", func(t *testing.T) {
+		handler := newCountingStorageHandler()
+		validJSON1 := `{"org_id":"org1", "quota_max": 100}`
+		validJSON2 := `{"org_id":"org1", "quota_max": 200}`
+		handler.mockMultiKeyResponse = []string{validJSON1, validJSON2}
+
+		conf := config.Config{}
+		conf.HashKeys = true
+
+		gw := &Gateway{}
+		gw.SetConfig(conf)
+
+		sm := &DefaultSessionManager{store: handler, Gw: gw}
+
+		keysToFetch := []string{"key1", "key2"}
+		sessions := sm.SessionDetailBulk("org1", keysToFetch, true)
+
+		assert.Len(t, sessions, 2)
+		assert.Equal(t, int64(100), sessions["key1"].QuotaMax)
+	})
+
+	t.Run("Legacy Mode", func(t *testing.T) {
+		handler := newCountingStorageHandler()
+		handler.mockMultiKeyResponse = []string{
+			"",
+			`{"id":"s1"}`,
+			`{"id":"s2"}`,
+			"",
+		}
+
+		conf := config.Config{}
+		conf.HashKeys = false
+
+		gw := &Gateway{}
+		gw.SetConfig(conf)
+
+		sm := &DefaultSessionManager{store: handler, Gw: gw}
+
+		keysToFetch := []string{"key1", "key2"}
+		sessions := sm.SessionDetailBulk("org1", keysToFetch, false)
+
+		assert.Len(t, sessions, 2)
+		assert.Equal(t, "org1key2", sessions["key2"].KeyID)
+	})
+}
+
 type countingStorageHandler struct {
-	deleteRawKeyMutex *sync.Mutex
-	deleteRawKeyCount int
+	deleteRawKeyMutex    *sync.Mutex
+	deleteRawKeyCount    int
+	mockMultiKeyResponse []string
 }
 
 func newCountingStorageHandler() *countingStorageHandler {
 	return &countingStorageHandler{
-		deleteRawKeyMutex: &sync.Mutex{},
-		deleteRawKeyCount: 0,
+		deleteRawKeyMutex:    &sync.Mutex{},
+		deleteRawKeyCount:    0,
+		mockMultiKeyResponse: nil,
 	}
 }
 
@@ -456,6 +505,16 @@ func (c *countingStorageHandler) GetKey(s string) (string, error) {
 }
 
 func (c *countingStorageHandler) GetMultiKey(strings []string) ([]string, error) {
+	if c.mockMultiKeyResponse != nil {
+		return c.mockMultiKeyResponse, nil
+	}
+	return nil, nil
+}
+
+func (c *countingStorageHandler) GetRawMultiKey(keys []string) ([]string, error) {
+	if c.mockMultiKeyResponse != nil {
+		return c.mockMultiKeyResponse, nil
+	}
 	return nil, nil
 }
 
