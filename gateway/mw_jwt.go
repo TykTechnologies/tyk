@@ -200,6 +200,7 @@ func (k *JWTMiddleware) getSecretToVerifySignature(r *http.Request, token *jwt.T
 		// If not, return the actual value
 		decodedCert, err := base64.StdEncoding.DecodeString(config.JWTSource)
 		if err != nil {
+			k.Logger().WithError(err).Errorf("JWKS source decode failed: %s is not a base64 string", config.JWTSource)
 			return nil, err
 		}
 
