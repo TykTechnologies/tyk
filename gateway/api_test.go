@@ -4204,47 +4204,13 @@ func TestPurgeOAuthClientTokensEndpoint(t *testing.T) {
 	})
 }
 
+// TestKeyHandler_BatchFiltering_Integration is only able to cover the fallback redis standalone case
+// as redis cluster is not running in the pipeline
 func TestKeyHandler_BatchFiltering_Integration(t *testing.T) {
-	//ts := StartTest(func(globalConf *config.Config) {
-	//	globalConf.HashKeys = true
-	//	globalConf.EnableHashedKeysListing = true
-	//	globalConf.AllowMasterKeys = true
-	//})
-	//defer ts.Close()
-
 	ts := StartTest(func(globalConf *config.Config) {
-		// 1. Main Storage (Cluster on 127.0.0.1)
-		globalConf.Storage = config.StorageOptionsConf{
-			Type:          "redis",
-			EnableCluster: true,
-			Hosts: map[string]string{
-				"n1": "127.0.0.1:7001",
-				"n2": "127.0.0.1:7002",
-				"n3": "127.0.0.1:7003",
-			},
-		}
-
-		// 2. Feature Flags
 		globalConf.HashKeys = true
 		globalConf.EnableHashedKeysListing = true
 		globalConf.AllowMasterKeys = true
-
-		// 3. Disable Analytics & GeoIP (Prevents GeoIP Panic)
-		globalConf.EnableAnalytics = false
-		globalConf.AnalyticsConfig.EnableGeoIP = false
-		globalConf.AnalyticsConfig.Type = "console"
-		globalConf.AnalyticsConfig.IgnoredIPs = []string{}
-
-		// 4. CRITICAL: Disable Secondary Redis Connections
-		// These default to localhost:6379 if not disabled!
-		globalConf.EnableSeperateCacheStore = false
-		globalConf.EnableSeperateAnalyticsStore = false
-
-		// 5. Disable Uptime Tests & RPC
-		globalConf.UptimeTests.Disable = true
-		globalConf.SlaveOptions.UseRPC = false
-		globalConf.Policies.PolicySource = "file"
-		globalConf.DisableDashboardZeroConf = true
 	})
 	defer ts.Close()
 

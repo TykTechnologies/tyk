@@ -511,7 +511,7 @@ func (c *countingStorageHandler) GetMultiKey(strings []string) ([]string, error)
 	return nil, nil
 }
 
-func (c *countingStorageHandler) GetRawMultiKey(keys []string) ([]string, error) {
+func (c *countingStorageHandler) GetRawMultiKey(_ []string) ([]string, error) {
 	if c.mockMultiKeyResponse != nil {
 		return c.mockMultiKeyResponse, nil
 	}

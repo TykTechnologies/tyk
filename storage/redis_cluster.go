@@ -352,7 +352,8 @@ func (r *RedisCluster) GetRawMultiKey(keys []string) ([]string, error) {
 
 // pipelineFetch executes the batch using a Redis Pipeline.
 func (r *RedisCluster) pipelineFetch(client *redis.ClusterClient, keys []string) ([]string, error) {
-	ctx := context.Background()
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
 
 	pipe := client.Pipeline()
 
