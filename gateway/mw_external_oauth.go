@@ -15,10 +15,9 @@ import (
 	"github.com/golang-jwt/jwt/v4"
 
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/internal/cache"
 	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/user"
-
-	"github.com/TykTechnologies/tyk/internal/cache"
 )
 
 var (
@@ -172,6 +171,7 @@ func (k *ExternalOAuthMiddleware) getSecretFromJWKURL(url string, kid interface{
 	cachedJWK, found := externalOAuthJWKCache.Get(k.Spec.APIID)
 	if !found {
 		if jwkSet, err = getJWK(url, k.Gw.GetConfig().JWTSSLInsecureSkipVerify); err != nil {
+			k.Gw.logJWKError(k.Logger(), url, err)
 			return nil, err
 		}
 
