@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"context"
 	"errors"
 
 	logger "github.com/TykTechnologies/tyk/log"
@@ -20,7 +21,7 @@ var ErrMDCBConnectionLost = errors.New("mdcb connection is lost")
 type Handler interface {
 	GetKey(string) (string, error) // Returned string is expected to be a JSON object (user.SessionState)
 	GetMultiKey([]string) ([]string, error)
-	GetRawMultiKey([]string) ([]string, error)
+	GetRawMultiKey(context.Context, []string) ([]string, error)
 	GetRawKey(string) (string, error)
 	SetKey(string, string, int64) error // Second input string is expected to be a JSON object (user.SessionState)
 	SetRawKey(string, string, int64) error

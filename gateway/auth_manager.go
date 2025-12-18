@@ -1,6 +1,7 @@
 package gateway
 
 import (
+	"context"
 	"encoding/base64"
 	"encoding/json"
 	"strings"
@@ -21,7 +22,7 @@ type SessionHandler interface {
 	UpdateSession(keyName string, session *user.SessionState, resetTTLTo int64, hashed bool) error
 	RemoveSession(orgID string, keyName string, hashed bool) bool
 	SessionDetail(orgID string, keyName string, hashed bool) (user.SessionState, bool)
-	SessionDetailBulk(orgID string, keyNames []string, hashed bool) map[string]user.SessionState
+	SessionDetailBulk(ctx context.Context, orgID string, keyNames []string, hashed bool) map[string]user.SessionState
 	KeyExpired(newSession *user.SessionState) bool
 	Sessions(filter string) []string
 	ResetQuota(string, *user.SessionState, bool)
@@ -216,7 +217,7 @@ func (b *DefaultSessionManager) SessionDetail(orgID string, keyName string, hash
 	return session.Clone(), true
 }
 
-func (b *DefaultSessionManager) SessionDetailBulk(orgID string, keyNames []string, hashed bool) map[string]user.SessionState {
+func (b *DefaultSessionManager) SessionDetailBulk(ctx context.Context, orgID string, keyNames []string, hashed bool) map[string]user.SessionState {
 	result := make(map[string]user.SessionState)
 	if len(keyNames) == 0 {
 		return result
@@ -229,7 +230,7 @@ func (b *DefaultSessionManager) SessionDetailBulk(orgID string, keyNames []strin
 			prefixedKeys[i] = prefix + keyName
 		}
 
-		jsonValues, err := b.store.GetRawMultiKey(prefixedKeys)
+		jsonValues, err := b.store.GetRawMultiKey(ctx, prefixedKeys)
 		if err != nil {
 			log.WithError(err).Debug("Failed to bulk fetch hashed sessions")
 			return result
@@ -295,6 +296,7 @@ func (b *DefaultSessionManager) SessionDetailBulk(orgID string, keyNames []strin
 
 		session := &user.SessionState{}
 		if err := json.Unmarshal([]byte(jsonVal), session); err != nil {
+			log.WithField("key", foundKey).WithError(err).Error("Failed to unmarshal session in bulk fetch")
 			continue
 		}
 		session.KeyID = foundKey

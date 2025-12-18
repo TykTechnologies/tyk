@@ -2,6 +2,7 @@
 package gateway
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -321,7 +322,7 @@ func (r *RPCStorageHandler) GetMultiKey(keyNames []string) ([]string, error) {
 
 // GetRawMultiKey retrieves multiple values via RPC.
 // RPC fetches sequentially, so we delegate to GetMultiKey.
-func (r *RPCStorageHandler) GetRawMultiKey(keys []string) ([]string, error) {
+func (r *RPCStorageHandler) GetRawMultiKey(_ context.Context, keys []string) ([]string, error) {
 	return r.GetMultiKey(keys)
 }
 

@@ -10,6 +10,7 @@
 package mock
 
 import (
+	context "context"
 	reflect "reflect"
 
 	gomock "go.uber.org/mock/gomock"
@@ -330,19 +331,6 @@ func (mr *MockHandlerMockRecorder) GetMultiKey(arg0 any) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetMultiKey", reflect.TypeOf((*MockHandler)(nil).GetMultiKey), arg0)
 }
 
-func (m *MockHandler) GetRawMultiKey(arg0 []string) ([]string, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetRawMultiKey", arg0)
-	ret0, _ := ret[0].([]string)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-func (mr *MockHandlerMockRecorder) GetRawMultiKey(arg0 any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetRawMultiKey", reflect.TypeOf((*MockHandler)(nil).GetRawMultiKey), arg0)
-}
-
 // GetRawKey mocks base method.
 func (m *MockHandler) GetRawKey(arg0 string) (string, error) {
 	m.ctrl.T.Helper()
@@ -356,6 +344,21 @@ func (m *MockHandler) GetRawKey(arg0 string) (string, error) {
 func (mr *MockHandlerMockRecorder) GetRawKey(arg0 any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetRawKey", reflect.TypeOf((*MockHandler)(nil).GetRawKey), arg0)
+}
+
+// GetRawMultiKey mocks base method.
+func (m *MockHandler) GetRawMultiKey(arg0 context.Context, arg1 []string) ([]string, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetRawMultiKey", arg0, arg1)
+	ret0, _ := ret[0].([]string)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetRawMultiKey indicates an expected call of GetRawMultiKey.
+func (mr *MockHandlerMockRecorder) GetRawMultiKey(arg0, arg1 any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetRawMultiKey", reflect.TypeOf((*MockHandler)(nil).GetRawMultiKey), arg0, arg1)
 }
 
 // GetRollingWindow mocks base method.

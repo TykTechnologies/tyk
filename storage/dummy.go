@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"context"
 	"errors"
 	"fmt"
 )
@@ -37,7 +38,7 @@ func (s *DummyStorage) GetMultiKey(keys []string) ([]string, error) {
 
 // GetRawMultiKey retrieves multiple values from the DummyStorage.
 // Since DummyStorage is an in-memory map, we just delegate to GetMultiKey.
-func (s *DummyStorage) GetRawMultiKey(keys []string) ([]string, error) {
+func (s *DummyStorage) GetRawMultiKey(_ context.Context, keys []string) ([]string, error) {
 	return s.GetMultiKey(keys)
 }
 

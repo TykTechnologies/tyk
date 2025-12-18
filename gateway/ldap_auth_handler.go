@@ -1,6 +1,7 @@
 package gateway
 
 import (
+	"context"
 	"errors"
 	"strings"
 
@@ -95,7 +96,7 @@ func (r *LDAPStorageHandler) GetMultiKey(keyNames []string) ([]string, error) {
 	return nil, nil
 }
 
-func (l *LDAPStorageHandler) GetRawMultiKey(keys []string) ([]string, error) {
+func (l *LDAPStorageHandler) GetRawMultiKey(_ context.Context, keys []string) ([]string, error) {
 	return l.GetMultiKey(keys)
 }
 

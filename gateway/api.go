@@ -717,15 +717,8 @@ func (gw *Gateway) handleGetAllKeys(c context.Context, filter string, apiID stri
 		return apiAllKeys{validSessions}, http.StatusOK
 	}
 
-	filteredKeys := make([]string, 0, len(keys))
-	for _, k := range keys {
-		if !strings.HasPrefix(k, QuotaKeyPrefix) && !strings.HasPrefix(k, RateLimitKeyPrefix) {
-			filteredKeys = append(filteredKeys, k)
-		}
-	}
-
 	const batchSize = 1000
-	for i := 0; i < len(filteredKeys); i += batchSize {
+	for i := 0; i < len(keys); i += batchSize {
 		select {
 		case <-c.Done():
 			log.WithError(c.Err()).Warn("Request timeout while processing keys")
@@ -734,13 +727,22 @@ func (gw *Gateway) handleGetAllKeys(c context.Context, filter string, apiID stri
 		}
 
 		end := i + batchSize
-		if end > len(filteredKeys) {
-			end = len(filteredKeys)
+		if end > len(keys) {
+			end = len(keys)
 		}
 
-		batch := filteredKeys[i:end]
+		batch := make([]string, 0, batchSize)
+		for _, k := range keys[i:end] {
+			if !strings.HasPrefix(k, QuotaKeyPrefix) && !strings.HasPrefix(k, RateLimitKeyPrefix) {
+				batch = append(batch, k)
+			}
+		}
 
-		sessions := gw.GlobalSessionManager.SessionDetailBulk(filter, batch, hashed)
+		if len(batch) == 0 {
+			continue
+		}
+
+		sessions := gw.GlobalSessionManager.SessionDetailBulk(c, filter, batch, hashed)
 
 		for _, key := range batch {
 			session, found := sessions[key]
