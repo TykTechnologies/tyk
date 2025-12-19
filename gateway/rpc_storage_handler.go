@@ -2,7 +2,6 @@
 package gateway
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -306,27 +305,25 @@ func (r *RPCStorageHandler) GetRawKey(keyName string) (string, error) {
 	return value.(string), nil
 }
 
-func (r *RPCStorageHandler) GetMultiKey(ctx context.Context, keyNames []string) ([]string, error) {
-	var err error
-	var value string
+func (r *RPCStorageHandler) GetMultiKey(keyNames []string) ([]string, error) {
+	var lastErr error
+	results := make([]string, len(keyNames))
 
-	for _, key := range keyNames {
-		if err := ctx.Err(); err != nil {
-			return nil, err
+	for i, key := range keyNames {
+		value, err := r.GetKey(key)
+		if err != nil {
+			lastErr = err
+			results[i] = ""
+			continue
 		}
-		value, err = r.GetKey(key)
-		if err == nil {
-			return []string{value}, nil
-		}
+		results[i] = value
 	}
 
-	return nil, err
+	return results, lastErr
 }
 
-// GetRawMultiKey retrieves multiple values via RPC.
-// RPC fetches sequentially, so we delegate to GetMultiKey.
-func (r *RPCStorageHandler) GetRawMultiKey(ctx context.Context, keys []string) ([]string, error) {
-	return r.GetMultiKey(ctx, keys)
+func (r *RPCStorageHandler) GetRawMultiKey(keys []string) ([]string, error) {
+	return r.GetMultiKey(keys)
 }
 
 func (r *RPCStorageHandler) GetExp(keyName string) (int64, error) {

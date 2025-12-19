@@ -1,7 +1,6 @@
 package storage
 
 import (
-	"context"
 	"errors"
 
 	logger "github.com/TykTechnologies/tyk/log"
@@ -20,8 +19,8 @@ var ErrMDCBConnectionLost = errors.New("mdcb connection is lost")
 // AuthorisationManager to read and write key values to the backend
 type Handler interface {
 	GetKey(string) (string, error) // Returned string is expected to be a JSON object (user.SessionState)
-	GetMultiKey(context.Context, []string) ([]string, error)
-	GetRawMultiKey(context.Context, []string) ([]string, error)
+	GetMultiKey([]string) ([]string, error)
+	GetRawMultiKey([]string) ([]string, error)
 	GetRawKey(string) (string, error)
 	SetKey(string, string, int64) error // Second input string is expected to be a JSON object (user.SessionState)
 	SetRawKey(string, string, int64) error

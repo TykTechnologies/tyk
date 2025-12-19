@@ -1,7 +1,6 @@
 package gateway
 
 import (
-	"context"
 	"errors"
 	"strings"
 
@@ -90,14 +89,12 @@ func (l *LDAPStorageHandler) GetKey(filter string) (string, error) {
 	return "", nil
 }
 
-func (r *LDAPStorageHandler) GetMultiKey(_ context.Context, _ []string) ([]string, error) {
-	log.Warning("Not implementated")
-
-	return nil, nil
+func (r *LDAPStorageHandler) GetMultiKey(_ []string) ([]string, error) {
+	return nil, errors.New("bulk key retrieval is not supported for LDAP")
 }
 
-func (l *LDAPStorageHandler) GetRawMultiKey(ctx context.Context, keys []string) ([]string, error) {
-	return l.GetMultiKey(ctx, keys)
+func (l *LDAPStorageHandler) GetRawMultiKey(keys []string) ([]string, error) {
+	return l.GetMultiKey(keys)
 }
 
 func (l *LDAPStorageHandler) GetRawKey(filter string) (string, error) {

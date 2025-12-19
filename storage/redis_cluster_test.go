@@ -115,7 +115,7 @@ func TestRedisClusterGetMultiKey(t *testing.T) {
 
 	r.DeleteAllKeys()
 
-	_, err := r.GetMultiKey(context.Background(), keys)
+	_, err := r.GetMultiKey(keys)
 	if !errors.Is(err, ErrKeyNotFound) {
 		t.Errorf("expected %v got %v", ErrKeyNotFound, err)
 	}
@@ -124,7 +124,7 @@ func TestRedisClusterGetMultiKey(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	v, err := r.GetMultiKey(context.Background(), []string{"first", "second"})
+	v, err := r.GetMultiKey([]string{"first", "second"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -423,7 +423,7 @@ func TestGetMultiKey(t *testing.T) {
 
 		defer storage.ConnectionHandler.storageUp.Store(true)
 
-		_, err := storage.GetMultiKey(context.Background(), []string{"key1", "key"})
+		_, err := storage.GetMultiKey([]string{"key1", "key"})
 		assert.Error(t, err)
 		assert.Equal(t, ErrRedisIsDown, err)
 		mockKv.AssertExpectations(t)
@@ -434,7 +434,7 @@ func TestGetMultiKey(t *testing.T) {
 		storage.kvStorage = mockKv
 		mockKv.On("GetMulti", mock.Anything, []string{"key1", "key"}).Return([]interface{}{"<nil>", "value"}, nil)
 
-		val, err := storage.GetMultiKey(context.Background(), []string{"key1", "key"})
+		val, err := storage.GetMultiKey([]string{"key1", "key"})
 		assert.NoError(t, err)
 		assert.Equal(t, []string{"", "value"}, val)
 		mockKv.AssertExpectations(t)
@@ -445,7 +445,7 @@ func TestGetMultiKey(t *testing.T) {
 		storage.kvStorage = mockKv
 		mockKv.On("GetMulti", mock.Anything, []string{"prefix:key1", "prefix:key"}).Return([]interface{}{"<nil>", "value"}, nil)
 
-		val, err := storage.GetMultiKey(context.Background(), []string{"key1", "key"})
+		val, err := storage.GetMultiKey([]string{"key1", "key"})
 		assert.NoError(t, err)
 		assert.Equal(t, []string{"", "value"}, val)
 		mockKv.AssertExpectations(t)
@@ -456,7 +456,7 @@ func TestGetMultiKey(t *testing.T) {
 		storage.kvStorage = mockKv
 		mockKv.On("GetMulti", mock.Anything, []string{"key"}).Return([]interface{}{}, errors.New("key not found"))
 
-		val, err := storage.GetMultiKey(context.Background(), []string{"key"})
+		val, err := storage.GetMultiKey([]string{"key"})
 		assert.Error(t, err)
 		assert.Equal(t, ErrKeyNotFound, err)
 		assert.Equal(t, []string(nil), val)

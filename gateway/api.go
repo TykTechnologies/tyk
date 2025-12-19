@@ -705,7 +705,7 @@ type apiAllKeys struct {
 }
 
 func (gw *Gateway) handleGetAllKeys(c context.Context, filter string, apiID string, hashed bool) (interface{}, int) {
-	keys := gw.getAllSessionKeys(c, filter)
+	keys := gw.getAllSessionKeys(filter)
 	validSessions := make([]string, 0)
 
 	if apiID == "" {
@@ -721,8 +721,8 @@ func (gw *Gateway) handleGetAllKeys(c context.Context, filter string, apiID stri
 	for i := 0; i < len(keys); i += batchSize {
 		select {
 		case <-c.Done():
-			log.WithError(c.Err()).Warn("Request timeout while processing keys")
-			return apiError("Request timeout while processing keys"), http.StatusGatewayTimeout
+			log.WithError(c.Err()).Warn("Context finished while processing keys")
+			return apiError("Request processing terminated"), http.StatusGatewayTimeout
 		default:
 		}
 
@@ -742,7 +742,7 @@ func (gw *Gateway) handleGetAllKeys(c context.Context, filter string, apiID stri
 			continue
 		}
 
-		sessions, err := gw.GlobalSessionManager.SessionDetailBulk(c, filter, batch, hashed)
+		sessions, err := gw.GlobalSessionManager.SessionDetailBulk(filter, batch, hashed)
 		if err != nil {
 			log.WithError(err).Error("Failed to fetch sessions from storage")
 			return apiError("Internal Server Error"), http.StatusInternalServerError
@@ -776,12 +776,16 @@ func (gw *Gateway) handleGetAllKeys(c context.Context, filter string, apiID stri
 	return apiAllKeys{validSessions}, http.StatusOK
 }
 
-func (gw *Gateway) getAllSessionKeys(c context.Context, filter string) []string {
-	keys := gw.GlobalSessionManager.Sessions(c, filter)
+func (gw *Gateway) getAllSessionKeys(filter string) []string {
+	if strings.ContainsAny(filter, "*?\"{}[]") {
+		log.WithField("filter", filter).Warn("Rejected potentially unsafe filter characters")
+		return []string{}
+	}
+	keys := gw.GlobalSessionManager.Sessions(filter)
 	if filter != "" {
 		filterB64 := base64.StdEncoding.WithPadding(base64.NoPadding).EncodeToString([]byte(fmt.Sprintf(`{"org":"%s"`, filter)))
 		filterB64 = filterB64[0 : len(filterB64)-2]
-		orgIDB64Sessions := gw.GlobalSessionManager.Sessions(c, filterB64)
+		orgIDB64Sessions := gw.GlobalSessionManager.Sessions(filterB64)
 		keys = append(keys, orgIDB64Sessions...)
 	}
 	return keys
@@ -1864,7 +1868,7 @@ func (gw *Gateway) orgHandler(w http.ResponseWriter, r *http.Request) {
 			obj, code = gw.handleGetOrgDetail(orgID)
 		} else {
 			// Return list of keys
-			obj, code = gw.handleGetAllOrgKeys(r.Context(), filter)
+			obj, code = gw.handleGetAllOrgKeys(filter)
 		}
 
 	case "DELETE":
@@ -1963,13 +1967,13 @@ func (gw *Gateway) handleGetOrgDetail(orgID string) (interface{}, int) {
 	return session.Clone(), http.StatusOK
 }
 
-func (gw *Gateway) handleGetAllOrgKeys(c context.Context, filter string) (interface{}, int) {
+func (gw *Gateway) handleGetAllOrgKeys(filter string) (interface{}, int) {
 	spec := gw.getSpecForOrg("")
 	if spec == nil {
 		return apiError("ORG not found"), http.StatusNotFound
 	}
 
-	sessions := spec.OrgSessionManager.Sessions(c, filter)
+	sessions := spec.OrgSessionManager.Sessions(filter)
 	fixed_sessions := make([]string, 0)
 	for _, s := range sessions {
 		if !strings.HasPrefix(s, QuotaKeyPrefix) && !strings.HasPrefix(s, RateLimitKeyPrefix) {

@@ -284,7 +284,7 @@ func (r *RedisCluster) GetKey(keyName string) (string, error) {
 }
 
 // GetMultiKey gets multiple keys from the database
-func (r *RedisCluster) GetMultiKey(ctx context.Context, keys []string) ([]string, error) {
+func (r *RedisCluster) GetMultiKey(keys []string) ([]string, error) {
 	storage, err := r.kv()
 	if err != nil {
 		log.Error(err)
@@ -297,7 +297,7 @@ func (r *RedisCluster) GetMultiKey(ctx context.Context, keys []string) ([]string
 		keyNames[index] = r.fixKey(val)
 	}
 
-	values, err := storage.GetMulti(ctx, keyNames)
+	values, err := storage.GetMulti(context.Background(), keyNames)
 	if err != nil {
 		log.WithError(err).Debug("Error trying to get value")
 		return nil, ErrKeyNotFound
@@ -321,17 +321,17 @@ func (r *RedisCluster) GetMultiKey(ctx context.Context, keys []string) ([]string
 }
 
 // GetRawMultiKey retrieves multiple values using a Pipeline.
-func (r *RedisCluster) GetRawMultiKey(ctx context.Context, keys []string) ([]string, error) {
+func (r *RedisCluster) GetRawMultiKey(keys []string) ([]string, error) {
 	client, err := r.Client()
 	if err != nil {
 		return nil, err
 	}
 
 	if clusterClient, ok := client.(*redis.ClusterClient); ok {
-		return r.pipelineFetch(ctx, clusterClient, keys)
+		return r.pipelineFetch(clusterClient, keys)
 	}
 
-	cmd := client.MGet(ctx, keys...)
+	cmd := client.MGet(context.Background(), keys...)
 	vals, err := cmd.Result()
 	if err != nil {
 		return nil, err
@@ -351,8 +351,9 @@ func (r *RedisCluster) GetRawMultiKey(ctx context.Context, keys []string) ([]str
 }
 
 // pipelineFetch executes the batch using a Redis Pipeline.
-func (r *RedisCluster) pipelineFetch(ctx context.Context, client *redis.ClusterClient, keys []string) ([]string, error) {
+func (r *RedisCluster) pipelineFetch(client *redis.ClusterClient, keys []string) ([]string, error) {
 	pipe := client.Pipeline()
+	ctx := context.Background()
 
 	cmds := make([]*redis.StringCmd, len(keys))
 	for i, key := range keys {

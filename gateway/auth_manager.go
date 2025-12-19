@@ -1,7 +1,6 @@
 package gateway
 
 import (
-	"context"
 	"encoding/base64"
 	"encoding/json"
 	"strings"
@@ -22,9 +21,9 @@ type SessionHandler interface {
 	UpdateSession(keyName string, session *user.SessionState, resetTTLTo int64, hashed bool) error
 	RemoveSession(orgID string, keyName string, hashed bool) bool
 	SessionDetail(orgID string, keyName string, hashed bool) (user.SessionState, bool)
-	SessionDetailBulk(ctx context.Context, orgID string, keyNames []string, hashed bool) (map[string]user.SessionState, error)
+	SessionDetailBulk(orgID string, keyNames []string, hashed bool) (map[string]user.SessionState, error)
 	KeyExpired(newSession *user.SessionState) bool
-	Sessions(ctx context.Context, filter string) []string
+	Sessions(filter string) []string
 	ResetQuota(string, *user.SessionState, bool)
 	Stop()
 }
@@ -185,7 +184,7 @@ func (b *DefaultSessionManager) SessionDetail(orgID string, keyName string, hash
 
 			var jsonKeyValList []string
 
-			jsonKeyValList, err = b.store.GetMultiKey(context.Background(), toSearchList)
+			jsonKeyValList, err = b.store.GetMultiKey(toSearchList)
 			// pick the 1st non empty from the returned list
 			for idx, val := range jsonKeyValList {
 				if val != "" {
@@ -217,7 +216,7 @@ func (b *DefaultSessionManager) SessionDetail(orgID string, keyName string, hash
 	return session.Clone(), true
 }
 
-func (b *DefaultSessionManager) SessionDetailBulk(ctx context.Context, orgID string, keyNames []string, hashed bool) (map[string]user.SessionState, error) {
+func (b *DefaultSessionManager) SessionDetailBulk(orgID string, keyNames []string, hashed bool) (map[string]user.SessionState, error) {
 	result := make(map[string]user.SessionState)
 	if len(keyNames) == 0 {
 		return result, nil
@@ -230,7 +229,7 @@ func (b *DefaultSessionManager) SessionDetailBulk(ctx context.Context, orgID str
 			prefixedKeys[i] = prefix + keyName
 		}
 
-		jsonValues, err := b.store.GetRawMultiKey(ctx, prefixedKeys)
+		jsonValues, err := b.store.GetRawMultiKey(prefixedKeys)
 		if err != nil {
 			log.WithError(err).Debug("Failed to bulk fetch hashed sessions")
 			return nil, err
@@ -277,7 +276,7 @@ func (b *DefaultSessionManager) SessionDetailBulk(ctx context.Context, orgID str
 		}
 	}
 
-	jsonValues, err := b.store.GetMultiKey(ctx, allKeysToSearch)
+	jsonValues, err := b.store.GetMultiKey(allKeysToSearch)
 	if err != nil {
 		log.WithError(err).Debug("Failed to bulk fetch legacy sessions")
 		return nil, err
@@ -309,7 +308,7 @@ func (b *DefaultSessionManager) SessionDetailBulk(ctx context.Context, orgID str
 func (b *DefaultSessionManager) Stop() {}
 
 // Sessions returns all sessions in the key store that match a filter key (a prefix)
-func (b *DefaultSessionManager) Sessions(_ context.Context, filter string) []string {
+func (b *DefaultSessionManager) Sessions(filter string) []string {
 	return b.store.GetKeys(filter)
 }
 

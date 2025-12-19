@@ -1,7 +1,6 @@
 package gateway
 
 import (
-	"context"
 	"crypto/x509"
 	"encoding/json"
 	"fmt"
@@ -456,7 +455,7 @@ func TestDefaultSessionManager_SessionDetailBulk(t *testing.T) {
 		sm := &DefaultSessionManager{store: handler, Gw: gw}
 
 		keysToFetch := []string{"key1", "key2"}
-		sessions, err := sm.SessionDetailBulk(context.Background(), "org1", keysToFetch, true)
+		sessions, err := sm.SessionDetailBulk("org1", keysToFetch, true)
 		assert.NoError(t, err)
 
 		assert.Len(t, sessions, 2)
@@ -481,7 +480,7 @@ func TestDefaultSessionManager_SessionDetailBulk(t *testing.T) {
 		sm := &DefaultSessionManager{store: handler, Gw: gw}
 
 		keysToFetch := []string{"key1", "key2"}
-		sessions, err := sm.SessionDetailBulk(context.Background(), "org1", keysToFetch, false)
+		sessions, err := sm.SessionDetailBulk("org1", keysToFetch, false)
 		assert.NoError(t, err)
 
 		assert.Len(t, sessions, 2)
@@ -507,14 +506,14 @@ func (c *countingStorageHandler) GetKey(s string) (string, error) {
 	return "", nil
 }
 
-func (c *countingStorageHandler) GetMultiKey(_ context.Context, _ []string) ([]string, error) {
+func (c *countingStorageHandler) GetMultiKey(_ []string) ([]string, error) {
 	if c.mockMultiKeyResponse != nil {
 		return c.mockMultiKeyResponse, nil
 	}
 	return nil, nil
 }
 
-func (c *countingStorageHandler) GetRawMultiKey(_ context.Context, _ []string) ([]string, error) {
+func (c *countingStorageHandler) GetRawMultiKey(_ []string) ([]string, error) {
 	if c.mockMultiKeyResponse != nil {
 		return c.mockMultiKeyResponse, nil
 	}

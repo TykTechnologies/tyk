@@ -1,7 +1,6 @@
 package storage
 
 import (
-	"context"
 	"reflect"
 	"sort"
 	"testing"
@@ -47,7 +46,7 @@ func TestDummyStorage_GetMultiKey(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := ds.GetMultiKey(context.Background(), tt.keys)
+			got, err := ds.GetMultiKey(tt.keys)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("DummyStorage.GetMultiKey() error = %v, wantErr %v", err, tt.wantErr)
 				return
