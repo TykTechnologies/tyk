@@ -22,9 +22,9 @@ type SessionHandler interface {
 	UpdateSession(keyName string, session *user.SessionState, resetTTLTo int64, hashed bool) error
 	RemoveSession(orgID string, keyName string, hashed bool) bool
 	SessionDetail(orgID string, keyName string, hashed bool) (user.SessionState, bool)
-	SessionDetailBulk(ctx context.Context, orgID string, keyNames []string, hashed bool) map[string]user.SessionState
+	SessionDetailBulk(ctx context.Context, orgID string, keyNames []string, hashed bool) (map[string]user.SessionState, error)
 	KeyExpired(newSession *user.SessionState) bool
-	Sessions(filter string) []string
+	Sessions(ctx context.Context, filter string) []string
 	ResetQuota(string, *user.SessionState, bool)
 	Stop()
 }
@@ -185,7 +185,7 @@ func (b *DefaultSessionManager) SessionDetail(orgID string, keyName string, hash
 
 			var jsonKeyValList []string
 
-			jsonKeyValList, err = b.store.GetMultiKey(toSearchList)
+			jsonKeyValList, err = b.store.GetMultiKey(context.Background(), toSearchList)
 			// pick the 1st non empty from the returned list
 			for idx, val := range jsonKeyValList {
 				if val != "" {
@@ -217,10 +217,10 @@ func (b *DefaultSessionManager) SessionDetail(orgID string, keyName string, hash
 	return session.Clone(), true
 }
 
-func (b *DefaultSessionManager) SessionDetailBulk(ctx context.Context, orgID string, keyNames []string, hashed bool) map[string]user.SessionState {
+func (b *DefaultSessionManager) SessionDetailBulk(ctx context.Context, orgID string, keyNames []string, hashed bool) (map[string]user.SessionState, error) {
 	result := make(map[string]user.SessionState)
 	if len(keyNames) == 0 {
-		return result
+		return result, nil
 	}
 
 	if hashed {
@@ -233,7 +233,7 @@ func (b *DefaultSessionManager) SessionDetailBulk(ctx context.Context, orgID str
 		jsonValues, err := b.store.GetRawMultiKey(ctx, prefixedKeys)
 		if err != nil {
 			log.WithError(err).Debug("Failed to bulk fetch hashed sessions")
-			return result
+			return nil, err
 		}
 
 		for i, jsonVal := range jsonValues {
@@ -248,7 +248,7 @@ func (b *DefaultSessionManager) SessionDetailBulk(ctx context.Context, orgID str
 			session.KeyID = keyNames[i]
 			result[keyNames[i]] = *session
 		}
-		return result
+		return result, nil
 	}
 
 	allKeysToSearch := make([]string, 0, len(keyNames)*2)
@@ -277,10 +277,10 @@ func (b *DefaultSessionManager) SessionDetailBulk(ctx context.Context, orgID str
 		}
 	}
 
-	jsonValues, err := b.store.GetMultiKey(allKeysToSearch)
+	jsonValues, err := b.store.GetMultiKey(ctx, allKeysToSearch)
 	if err != nil {
 		log.WithError(err).Debug("Failed to bulk fetch legacy sessions")
-		return result
+		return nil, err
 	}
 
 	for i, jsonVal := range jsonValues {
@@ -303,13 +303,13 @@ func (b *DefaultSessionManager) SessionDetailBulk(ctx context.Context, orgID str
 		result[originalKey] = *session
 	}
 
-	return result
+	return result, nil
 }
 
 func (b *DefaultSessionManager) Stop() {}
 
 // Sessions returns all sessions in the key store that match a filter key (a prefix)
-func (b *DefaultSessionManager) Sessions(filter string) []string {
+func (b *DefaultSessionManager) Sessions(_ context.Context, filter string) []string {
 	return b.store.GetKeys(filter)
 }
 

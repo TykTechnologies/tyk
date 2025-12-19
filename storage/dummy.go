@@ -24,7 +24,7 @@ func NewDummyStorage() *DummyStorage {
 // GetMultiKey retrieves multiple values from the DummyStorage based on a slice of keys.
 // It returns a slice of strings containing the values corresponding to each provided key,
 // and an error if the operation cannot be completed.
-func (s *DummyStorage) GetMultiKey(keys []string) ([]string, error) {
+func (s *DummyStorage) GetMultiKey(_ context.Context, keys []string) ([]string, error) {
 	var values []string
 	for _, key := range keys {
 		value, ok := s.Data[key]
@@ -38,8 +38,8 @@ func (s *DummyStorage) GetMultiKey(keys []string) ([]string, error) {
 
 // GetRawMultiKey retrieves multiple values from the DummyStorage.
 // Since DummyStorage is an in-memory map, we just delegate to GetMultiKey.
-func (s *DummyStorage) GetRawMultiKey(_ context.Context, keys []string) ([]string, error) {
-	return s.GetMultiKey(keys)
+func (s *DummyStorage) GetRawMultiKey(ctx context.Context, keys []string) ([]string, error) {
+	return s.GetMultiKey(ctx, keys)
 }
 
 // GetRawKey retrieves the value associated with a given key from the DummyStorage.

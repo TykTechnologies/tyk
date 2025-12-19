@@ -306,11 +306,14 @@ func (r *RPCStorageHandler) GetRawKey(keyName string) (string, error) {
 	return value.(string), nil
 }
 
-func (r *RPCStorageHandler) GetMultiKey(keyNames []string) ([]string, error) {
+func (r *RPCStorageHandler) GetMultiKey(ctx context.Context, keyNames []string) ([]string, error) {
 	var err error
 	var value string
 
 	for _, key := range keyNames {
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
 		value, err = r.GetKey(key)
 		if err == nil {
 			return []string{value}, nil
@@ -322,8 +325,8 @@ func (r *RPCStorageHandler) GetMultiKey(keyNames []string) ([]string, error) {
 
 // GetRawMultiKey retrieves multiple values via RPC.
 // RPC fetches sequentially, so we delegate to GetMultiKey.
-func (r *RPCStorageHandler) GetRawMultiKey(_ context.Context, keys []string) ([]string, error) {
-	return r.GetMultiKey(keys)
+func (r *RPCStorageHandler) GetRawMultiKey(ctx context.Context, keys []string) ([]string, error) {
+	return r.GetMultiKey(ctx, keys)
 }
 
 func (r *RPCStorageHandler) GetExp(keyName string) (int64, error) {

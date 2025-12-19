@@ -972,7 +972,7 @@ func TestKeyHandler_CheckKeysNotDuplicateOnUpdate(t *testing.T) {
 			r := httptest.NewRequest(http.MethodPut, "/tyk/keys/"+keyName, bytes.NewReader(requestByte))
 			ts.Gw.handleAddOrUpdate(keyName, r, tc.HashKeys)
 
-			sessions := ts.Gw.GlobalSessionManager.Sessions("")
+			sessions := ts.Gw.GlobalSessionManager.Sessions(context.Background(), "")
 			if len(sessions) != 1 {
 				t.Errorf("Sessions stored in global manager should be 1. But got: %v", len(sessions))
 			}

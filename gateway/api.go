@@ -705,7 +705,7 @@ type apiAllKeys struct {
 }
 
 func (gw *Gateway) handleGetAllKeys(c context.Context, filter string, apiID string, hashed bool) (interface{}, int) {
-	keys := gw.getAllSessionKeys(filter)
+	keys := gw.getAllSessionKeys(c, filter)
 	validSessions := make([]string, 0)
 
 	if apiID == "" {
@@ -742,7 +742,11 @@ func (gw *Gateway) handleGetAllKeys(c context.Context, filter string, apiID stri
 			continue
 		}
 
-		sessions := gw.GlobalSessionManager.SessionDetailBulk(c, filter, batch, hashed)
+		sessions, err := gw.GlobalSessionManager.SessionDetailBulk(c, filter, batch, hashed)
+		if err != nil {
+			log.WithError(err).Error("Failed to fetch sessions from storage")
+			return apiError("Internal Server Error"), http.StatusInternalServerError
+		}
 
 		for _, key := range batch {
 			session, found := sessions[key]
@@ -772,12 +776,12 @@ func (gw *Gateway) handleGetAllKeys(c context.Context, filter string, apiID stri
 	return apiAllKeys{validSessions}, http.StatusOK
 }
 
-func (gw *Gateway) getAllSessionKeys(filter string) []string {
-	keys := gw.GlobalSessionManager.Sessions(filter)
+func (gw *Gateway) getAllSessionKeys(c context.Context, filter string) []string {
+	keys := gw.GlobalSessionManager.Sessions(c, filter)
 	if filter != "" {
 		filterB64 := base64.StdEncoding.WithPadding(base64.NoPadding).EncodeToString([]byte(fmt.Sprintf(`{"org":"%s"`, filter)))
 		filterB64 = filterB64[0 : len(filterB64)-2]
-		orgIDB64Sessions := gw.GlobalSessionManager.Sessions(filterB64)
+		orgIDB64Sessions := gw.GlobalSessionManager.Sessions(c, filterB64)
 		keys = append(keys, orgIDB64Sessions...)
 	}
 	return keys
@@ -1860,7 +1864,7 @@ func (gw *Gateway) orgHandler(w http.ResponseWriter, r *http.Request) {
 			obj, code = gw.handleGetOrgDetail(orgID)
 		} else {
 			// Return list of keys
-			obj, code = gw.handleGetAllOrgKeys(filter)
+			obj, code = gw.handleGetAllOrgKeys(r.Context(), filter)
 		}
 
 	case "DELETE":
@@ -1959,13 +1963,13 @@ func (gw *Gateway) handleGetOrgDetail(orgID string) (interface{}, int) {
 	return session.Clone(), http.StatusOK
 }
 
-func (gw *Gateway) handleGetAllOrgKeys(filter string) (interface{}, int) {
+func (gw *Gateway) handleGetAllOrgKeys(c context.Context, filter string) (interface{}, int) {
 	spec := gw.getSpecForOrg("")
 	if spec == nil {
 		return apiError("ORG not found"), http.StatusNotFound
 	}
 
-	sessions := spec.OrgSessionManager.Sessions(filter)
+	sessions := spec.OrgSessionManager.Sessions(c, filter)
 	fixed_sessions := make([]string, 0)
 	for _, s := range sessions {
 		if !strings.HasPrefix(s, QuotaKeyPrefix) && !strings.HasPrefix(s, RateLimitKeyPrefix) {

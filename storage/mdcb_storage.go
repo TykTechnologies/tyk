@@ -57,7 +57,7 @@ func getResourceType(key string) string {
 }
 
 // GetMultiKey gets multiple keys from the MDCB layer
-func (m MdcbStorage) GetMultiKey(keyNames []string) ([]string, error) {
+func (m MdcbStorage) GetMultiKey(_ context.Context, keyNames []string) ([]string, error) {
 	var err error
 	var value string
 
@@ -74,8 +74,8 @@ func (m MdcbStorage) GetMultiKey(keyNames []string) ([]string, error) {
 // GetRawMultiKey retrieves multiple values from the MdcbStorage based on a slice of keys.
 // Since MdcbStorage is a wrapper that manages fallback logic between local and RPC layers,
 // this method delegates to GetMultiKey to avoid duplicating that fallback logic.
-func (m MdcbStorage) GetRawMultiKey(_ context.Context, keys []string) ([]string, error) {
-	return m.GetMultiKey(keys)
+func (m MdcbStorage) GetRawMultiKey(ctx context.Context, keys []string) ([]string, error) {
+	return m.GetMultiKey(ctx, keys)
 }
 
 func (m MdcbStorage) GetRawKey(string) (string, error) {

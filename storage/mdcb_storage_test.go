@@ -130,7 +130,7 @@ func TestMdcbStorage_GetMultiKey(t *testing.T) {
 
 	for _, tc := range testsCases {
 		t.Run(tc.name, func(t *testing.T) {
-			keys, err := mdcb.GetMultiKey(tc.keyNames)
+			keys, err := mdcb.GetMultiKey(context.Background(), tc.keyNames)
 
 			didErr := err != nil
 			assert.Equal(t, tc.wantErr, didErr)

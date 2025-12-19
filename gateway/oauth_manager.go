@@ -2,6 +2,7 @@ package gateway
 
 import (
 	"bytes"
+	"context"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
@@ -683,7 +684,7 @@ func (r *RedisOsinStorageInterface) GetClients(filter string, orgID string, igno
 				log.Error("Couldn't get OAuth client index list: ", err)
 				return nil, err
 			}
-			keyVals, err := r.store.GetMultiKey(keys)
+			keyVals, err := r.store.GetMultiKey(context.Background(), keys)
 			if err != nil {
 				log.Error("Couldn't get OAuth client index list values: ", err)
 				return nil, err
