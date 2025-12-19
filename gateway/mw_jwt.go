@@ -97,7 +97,6 @@ func (k *JWTMiddleware) Init() {
 				}
 
 				if err != nil {
-					k.Logger().WithError(err).Infof("Failed to fetch or decode JWKs from %s", jwk.URL)
 					continue
 				}
 
@@ -180,14 +179,14 @@ func (k *JWTMiddleware) legacyGetSecretFromURL(url, kid, keyType string) (interf
 	if !found {
 		resp, err := client.Get(url)
 		if err != nil {
-			k.Logger().WithError(err).Error("Failed to get resource URL")
+			k.Gw.logJWKError(k.Logger(), url, err)
 			return nil, err
 		}
 		defer resp.Body.Close()
 
 		// Decode it
 		if err := json.NewDecoder(resp.Body).Decode(&jwkSet); err != nil {
-			k.Logger().WithError(err).Error("Failed to decode body JWK")
+			k.Gw.logJWKError(k.Logger(), url, err)
 			return nil, err
 		}
 
@@ -242,6 +241,7 @@ func (k *JWTMiddleware) getSecretFromURL(url string, kidVal interface{}, keyType
 
 		decodedURL, err := base64.StdEncoding.DecodeString(cachedAPIDef.JWTSource)
 		if err != nil {
+			k.Logger().WithError(err).Errorf("JWKS source decode failed: %s is not a base64 string", cachedAPIDef.JWTSource)
 			return nil, err
 		}
 
@@ -269,6 +269,7 @@ func (k *JWTMiddleware) getSecretFromURL(url string, kidVal interface{}, keyType
 		client, clientErr := clientFactory.CreateJWKClient()
 		if clientErr == nil {
 			if jwkSet, err = getJWKWithClient(url, client); err != nil {
+				k.Gw.logJWKError(k.Logger(), url, err)
 				k.Logger().WithError(err).Info("Failed to decode JWKs body with factory client. Trying x5c PEM fallback.")
 			}
 		}
@@ -276,7 +277,8 @@ func (k *JWTMiddleware) getSecretFromURL(url string, kidVal interface{}, keyType
 		// Fallback to original method if factory fails or JWK fetch fails
 		if clientErr != nil || err != nil {
 			if jwkSet, err = GetJWK(url, k.Gw.GetConfig().JWTSSLInsecureSkipVerify); err != nil {
-				k.Logger().WithError(err).Info("Failed to decode JWKs body. Trying x5c PEM fallback.")
+				k.Gw.logJWKError(k.Logger(), url, err)
+				k.Logger().Info("Failed to decode JWKs body. Trying x5c PEM fallback.")
 
 				key, legacyError := k.legacyGetSecretFromURL(url, kid, keyType)
 				if legacyError == nil {
@@ -341,6 +343,7 @@ func (k *JWTMiddleware) getSecretToVerifySignature(r *http.Request, token *jwt.T
 		// If not, return the actual value
 		decodedCert, err := base64.StdEncoding.DecodeString(config.JWTSource)
 		if err != nil {
+			k.Logger().WithError(err).Errorf("JWKS source decode failed: %s is not a base64 string", config.JWTSource)
 			return nil, err
 		}
 
@@ -452,7 +455,7 @@ func (k *JWTMiddleware) getSecretFromMultipleJWKURIs(jwkURIs []apidef.JWK, kidVa
 			}
 
 			if err != nil {
-				k.Logger().WithError(err).Infof("Failed to fetch or decode JWKs from %s", jwk.URL)
+				k.Gw.logJWKError(k.Logger(), jwk.URL, err)
 				fallbackJWKURIs = append(fallbackJWKURIs, jwk)
 				continue
 			}
