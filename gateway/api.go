@@ -1383,6 +1383,8 @@ func (gw *Gateway) handleDeleteAPI(apiID string) (interface{}, int) {
 
 func (gw *Gateway) polHandler(w http.ResponseWriter, r *http.Request) {
 	polID := mux.Vars(r)["polID"]
+	//
+	//
 
 	var obj interface{}
 	var code int

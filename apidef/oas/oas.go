@@ -544,19 +544,17 @@ func (s *OAS) Validate(ctx context.Context, opts ...option.Option[validatorCnf])
 		allowClassic: false,
 	})
 
-	if err := errors.Join(
+	var errs = []error{
 		s.T.Validate(ctx, cnf.opts...),
 		s.validateSecurity(),
 		s.validateCompliantModeAuthentication(),
-	); err != nil {
-		return err
 	}
 
-	if cnf.allowClassic {
-		return nil
+	if !cnf.allowClassic {
+		errs = append(errs, s.validatePath())
 	}
 
-	return s.validatePath()
+	return errors.Join(errs...)
 }
 
 // Normalize converts the OAS api to a normalized state.
@@ -570,6 +568,22 @@ func (s *OAS) Normalize() {
 	if jwtConfiguration != nil {
 		jwtConfiguration.Normalize()
 	}
+}
+
+func (s *OAS) CleanPatternBasedPaths() error {
+	if s.Paths == nil {
+		return nil
+	}
+
+	for path := range s.Paths.Map() {
+		if parsed, err := pathutil.ParsePath(path); err != nil {
+			return fmt.Errorf("Failed to parse path %q: %w", path, err)
+		} else if parsed.HasReParams() {
+			return fmt.Errorf("OpenAPI description contains a regex pattern in an endpoint path, please convert to a parameterised path '%s'", path)
+		}
+	}
+
+	return nil
 }
 
 // validateSecurity verifies that existing Security Requirement Objects has Security Schemes declared in the Security

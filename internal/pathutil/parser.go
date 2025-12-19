@@ -444,17 +444,8 @@ func isOneOf(str string) func(byte) bool {
 	}
 }
 
-func isHex(ch byte) bool {
-	return isDigit(ch) || (ch >= 'A' && ch <= 'F') || (ch >= 'a' && ch <= 'f')
-}
-
 var isUnderscoreOrMinus = isOneOf("_-")
 
 // isUnderscoreOrMinusOrDot
 // Using this function makes some inconsistency with RFC3986 and some valid parts cannot be accepted by gateway
-// Deprecated
 var isUnderscoreOrMinusOrDot = isOneOf("._-")
-
-// https://datatracker.ietf.org/doc/html/rfc3986#section-3.3
-// https://stackoverflow.com/questions/4669692/valid-characters-for-directory-part-of-a-url-for-short-links
-var isPathSegmentSpecial = isOneOf("-._~!$&'()*+,;=@:")
