@@ -1188,7 +1188,10 @@ func BenchmarkSessionState_Unmarshal(b *testing.B) {
 	}
 
 	for name, session := range sessions {
-		data, _ := json.Marshal(session)
+		data, err := json.Marshal(session)
+		if err != nil {
+			b.Fatal(err)
+		}
 		b.Run(name, func(b *testing.B) {
 			b.ReportAllocs()
 			for i := 0; i < b.N; i++ {
