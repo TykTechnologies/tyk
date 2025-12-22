@@ -10,6 +10,7 @@ import (
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/storage"
+	"github.com/TykTechnologies/tyk/test"
 	"github.com/TykTechnologies/tyk/user"
 )
 
@@ -142,6 +143,185 @@ func TestGetAccessDefinitionByAPIIDOrSession(t *testing.T) {
 		}, accessDef)
 		assert.Equal(t, "b", allowanceScope)
 		assert.NoError(t, err)
+	})
+}
+
+// TestSessionState_RedisStorageSizeReduced verifies that the omitzero optimization
+// reduces the size of session data stored in Redis by omitting zero-value fields.
+func TestSessionState_RedisStorageSizeReduced(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	// Create an API that requires authentication
+	api := BuildAPI(func(spec *APISpec) {
+		spec.UseKeylessAccess = false
+		spec.Proxy.ListenPath = "/"
+	})[0]
+
+	ts.Gw.LoadAPI(api)
+
+	// Create a minimal key with only Rate, Per, and one API access right
+	key := CreateSession(ts.Gw, func(s *user.SessionState) {
+		s.Rate = 100
+		s.Per = 60
+		s.AccessRights = map[string]user.AccessDefinition{
+			api.APIID: {
+				APIID:   api.APIID,
+				APIName: api.Name,
+			},
+		}
+		// Explicitly set other fields to zero to test omitzero
+		s.QuotaMax = 0
+		s.QuotaRenews = 0
+		s.QuotaRemaining = 0
+		s.QuotaRenewalRate = 0
+	})
+
+	// Get the raw JSON value from Redis
+	hashKeys := ts.Gw.GetConfig().HashKeys
+	hashedKey := storage.HashKey(key, hashKeys)
+
+	redisStore := storage.RedisCluster{
+		KeyPrefix:         "apikey-",
+		HashKeys:          hashKeys,
+		ConnectionHandler: ts.Gw.StorageConnectionHandler,
+	}
+
+	// GetRawKey needs the full key including prefix
+	fullKey := "apikey-" + hashedKey
+	rawJSON, err := redisStore.GetRawKey(fullKey)
+	assert.NoError(t, err)
+	assert.NotEmpty(t, rawJSON)
+
+	// Log the JSON for debugging
+	t.Logf("Session JSON: %s", rawJSON)
+	t.Logf("Minimal session JSON size: %d bytes", len(rawJSON))
+
+	// Verify that zero-value fields are omitted (compact JSON)
+	// Note: CreateSession sets some fields like last_check, allowance, so we only check
+	// fields that are truly zero in our test setup
+	assert.NotContains(t, rawJSON, `"hmac_enabled"`, "False hmac_enabled should be omitted")
+	assert.NotContains(t, rawJSON, `"is_inactive"`, "False is_inactive should be omitted")
+	assert.NotContains(t, rawJSON, `"quota_max"`, "Zero quota_max should be omitted")
+	assert.NotContains(t, rawJSON, `"quota_renews"`, "Zero quota_renews should be omitted")
+	assert.NotContains(t, rawJSON, `"quota_remaining"`, "Zero quota_remaining should be omitted")
+	assert.NotContains(t, rawJSON, `"quota_renewal_rate"`, "Zero quota_renewal_rate should be omitted")
+	assert.NotContains(t, rawJSON, `"basic_auth_data"`, "Empty basic_auth_data should be omitted")
+	assert.NotContains(t, rawJSON, `"jwt_data"`, "Empty jwt_data should be omitted")
+	assert.NotContains(t, rawJSON, `"monitor"`, "Empty monitor should be omitted")
+	assert.NotContains(t, rawJSON, `"hmac_string"`, "Empty hmac_string should be omitted")
+	assert.NotContains(t, rawJSON, `"certificate"`, "Empty certificate should be omitted")
+
+	// Verify expected fields are present
+	assert.Contains(t, rawJSON, `"rate"`)
+	assert.Contains(t, rawJSON, `"per"`)
+	assert.Contains(t, rawJSON, `"access_rights"`)
+
+	// Verify JSON size is reasonable (should be less than 500 bytes for minimal key)
+	assert.Less(t, len(rawJSON), 500, "Minimal session JSON should be under 500 bytes")
+}
+
+// TestSessionState_KeyAuthenticationWorksAfterOptimization verifies that authentication
+// and rate limiting work correctly with the compact JSON format from omitzero.
+func TestSessionState_KeyAuthenticationWorksAfterOptimization(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	// Create an API that requires authentication
+	api := BuildAPI(func(spec *APISpec) {
+		spec.UseKeylessAccess = false
+		spec.Proxy.ListenPath = "/"
+	})[0]
+
+	ts.Gw.LoadAPI(api)
+
+	// Create a key with rate limiting configured
+	key := CreateSession(ts.Gw, func(s *user.SessionState) {
+		s.Rate = 10 // 10 requests
+		s.Per = 60  // per 60 seconds
+		s.AccessRights = map[string]user.AccessDefinition{
+			api.APIID: {
+				APIID:   api.APIID,
+				APIName: api.Name,
+			},
+		}
+	})
+
+	authHeader := map[string]string{"Authorization": key}
+
+	// Test 1: Authentication works with the compact format
+	ts.Run(t, test.TestCase{
+		Path:    "/",
+		Headers: authHeader,
+		Code:    http.StatusOK,
+	})
+
+	// Test 2: Multiple requests work (rate limiting doesn't immediately block)
+	for i := 0; i < 5; i++ {
+		ts.Run(t, test.TestCase{
+			Path:    "/",
+			Headers: authHeader,
+			Code:    http.StatusOK,
+		})
+	}
+
+	// Test 3: Invalid key is rejected
+	ts.Run(t, test.TestCase{
+		Path:    "/",
+		Headers: map[string]string{"Authorization": "invalid-key"},
+		Code:    http.StatusForbidden,
+	})
+}
+
+// TestSessionState_QuotaEnforcementWorksAfterOptimization verifies that quota enforcement
+// works correctly with the compact JSON format.
+func TestSessionState_QuotaEnforcementWorksAfterOptimization(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	// Create an API that requires authentication
+	api := BuildAPI(func(spec *APISpec) {
+		spec.UseKeylessAccess = false
+		spec.Proxy.ListenPath = "/"
+	})[0]
+
+	ts.Gw.LoadAPI(api)
+
+	// Create a key with a very small quota (2 requests)
+	key := CreateSession(ts.Gw, func(s *user.SessionState) {
+		s.Rate = 1000         // High rate limit so we hit quota first
+		s.Per = 1             // per 1 second
+		s.QuotaMax = 2        // Only 2 requests allowed
+		s.QuotaRemaining = 2  // 2 remaining
+		s.QuotaRenewalRate = 3600
+		s.AccessRights = map[string]user.AccessDefinition{
+			api.APIID: {
+				APIID:   api.APIID,
+				APIName: api.Name,
+			},
+		}
+	})
+
+	authHeader := map[string]string{"Authorization": key}
+
+	// First 2 requests should succeed
+	ts.Run(t, test.TestCase{
+		Path:    "/",
+		Headers: authHeader,
+		Code:    http.StatusOK,
+	})
+	ts.Run(t, test.TestCase{
+		Path:    "/",
+		Headers: authHeader,
+		Code:    http.StatusOK,
+	})
+
+	// Third request should be quota-limited
+	ts.Run(t, test.TestCase{
+		Path:      "/",
+		Headers:   authHeader,
+		Code:      http.StatusForbidden,
+		BodyMatch: "Quota exceeded",
 	})
 }
 

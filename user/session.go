@@ -40,24 +40,24 @@ type AccessSpec struct {
 // RateLimit holds rate limit configuration.
 type RateLimit struct {
 	// Rate is the allowed number of requests per interval.
-	Rate float64 `json:"rate" msg:"rate"`
+	Rate float64 `json:"rate,omitzero" msg:"rate"`
 	// Per is the interval at which rate limit is enforced.
-	Per float64 `json:"per" msg:"per"`
+	Per float64 `json:"per,omitzero" msg:"per"`
 
 	// Smoothing contains rate limit smoothing settings.
-	Smoothing *apidef.RateLimitSmoothing `json:"smoothing,omitempty" bson:"smoothing,omitempty"`
+	Smoothing *apidef.RateLimitSmoothing `json:"smoothing,omitzero" bson:"smoothing,omitempty"`
 }
 
 // APILimit stores quota and rate limit on ACL level (per API)
 type APILimit struct {
 	RateLimit
-	ThrottleInterval   float64 `json:"throttle_interval" msg:"throttle_interval"`
-	ThrottleRetryLimit int     `json:"throttle_retry_limit" msg:"throttle_retry_limit"`
-	MaxQueryDepth      int     `json:"max_query_depth" msg:"max_query_depth"`
-	QuotaMax           int64   `json:"quota_max" msg:"quota_max"`
-	QuotaRenews        int64   `json:"quota_renews" msg:"quota_renews"`
-	QuotaRemaining     int64   `json:"quota_remaining" msg:"quota_remaining"`
-	QuotaRenewalRate   int64   `json:"quota_renewal_rate" msg:"quota_renewal_rate"`
+	ThrottleInterval   float64 `json:"throttle_interval,omitzero" msg:"throttle_interval"`
+	ThrottleRetryLimit int     `json:"throttle_retry_limit,omitzero" msg:"throttle_retry_limit"`
+	MaxQueryDepth      int     `json:"max_query_depth,omitzero" msg:"max_query_depth"`
+	QuotaMax           int64   `json:"quota_max,omitzero" msg:"quota_max"`
+	QuotaRenews        int64   `json:"quota_renews,omitzero" msg:"quota_renews"`
+	QuotaRemaining     int64   `json:"quota_remaining,omitzero" msg:"quota_remaining"`
+	QuotaRenewalRate   int64   `json:"quota_renewal_rate,omitzero" msg:"quota_renewal_rate"`
 	SetBy              string  `json:"-" msg:"-"`
 }
 
@@ -100,19 +100,19 @@ func (r RateLimit) Duration() time.Duration {
 // in the gateway/policy.go:19
 // TODO: is it possible to share fields?
 type AccessDefinition struct {
-	APIName              string                  `json:"api_name" msg:"api_name"`
-	APIID                string                  `json:"api_id" msg:"api_id"`
-	Versions             []string                `json:"versions" msg:"versions"`
-	AllowedURLs          []AccessSpec            `bson:"allowed_urls" json:"allowed_urls" msg:"allowed_urls"` // mapped string MUST be a valid regex
-	RestrictedTypes      []graphql.Type          `json:"restricted_types" msg:"restricted_types"`
-	AllowedTypes         []graphql.Type          `json:"allowed_types" msg:"allowed_types"`
-	Limit                APILimit                `json:"limit" msg:"limit"`
-	FieldAccessRights    []FieldAccessDefinition `json:"field_access_rights" msg:"field_access_rights"`
-	DisableIntrospection bool                    `json:"disable_introspection" msg:"disable_introspection"`
+	APIName              string                  `json:"api_name,omitzero" msg:"api_name"`
+	APIID                string                  `json:"api_id,omitzero" msg:"api_id"`
+	Versions             []string                `json:"versions,omitzero" msg:"versions"`
+	AllowedURLs          []AccessSpec            `json:"allowed_urls,omitzero" bson:"allowed_urls" msg:"allowed_urls"` // mapped string MUST be a valid regex
+	RestrictedTypes      []graphql.Type          `json:"restricted_types,omitzero" msg:"restricted_types"`
+	AllowedTypes         []graphql.Type          `json:"allowed_types,omitzero" msg:"allowed_types"`
+	Limit                APILimit                `json:"limit,omitzero" msg:"limit"`
+	FieldAccessRights    []FieldAccessDefinition `json:"field_access_rights,omitzero" msg:"field_access_rights"`
+	DisableIntrospection bool                    `json:"disable_introspection,omitzero" msg:"disable_introspection"`
 
-	AllowanceScope string `json:"allowance_scope" msg:"allowance_scope"`
+	AllowanceScope string `json:"allowance_scope,omitzero" msg:"allowance_scope"`
 
-	Endpoints Endpoints `json:"endpoints,omitempty" msg:"endpoints,omitempty"`
+	Endpoints Endpoints `json:"endpoints,omitzero" msg:"endpoints,omitempty"`
 }
 
 // IsEmpty checks if APILimit is empty.
@@ -160,27 +160,58 @@ func (a APILimit) IsEmpty() bool {
 	return true
 }
 
+// IsZero returns true if APILimit is empty (for omitzero support).
+// This is an alias for IsEmpty() to satisfy the omitzero interface.
+func (a APILimit) IsZero() bool {
+	return a.IsEmpty()
+}
+
+// IsZero returns true if RateLimit is empty (for omitzero support).
+func (r RateLimit) IsZero() bool {
+	return r.Rate == 0 && r.Per == 0 && r.Smoothing == nil
+}
+
+// IsZero returns true if FieldLimits is empty (for omitzero support).
+func (f FieldLimits) IsZero() bool {
+	return f.MaxQueryDepth == 0
+}
+
 type FieldAccessDefinition struct {
-	TypeName  string      `json:"type_name" msg:"type_name"`
-	FieldName string      `json:"field_name" msg:"field_name"`
-	Limits    FieldLimits `json:"limits" msg:"limits"`
+	TypeName  string      `json:"type_name,omitzero" msg:"type_name"`
+	FieldName string      `json:"field_name,omitzero" msg:"field_name"`
+	Limits    FieldLimits `json:"limits,omitzero" msg:"limits"`
 }
 
 type FieldLimits struct {
-	MaxQueryDepth int `json:"max_query_depth" msg:"max_query_depth"`
+	MaxQueryDepth int `json:"max_query_depth,omitzero" msg:"max_query_depth"`
 }
 
 type BasicAuthData struct {
-	Password string   `json:"password" msg:"password"`
-	Hash     HashType `json:"hash_type" msg:"hash_type"`
+	Password string   `json:"password,omitzero" msg:"password"`
+	Hash     HashType `json:"hash_type,omitzero" msg:"hash_type"`
+}
+
+// IsZero returns true if BasicAuthData is empty (for omitzero support).
+func (b BasicAuthData) IsZero() bool {
+	return b.Password == "" && b.Hash == ""
 }
 
 type JWTData struct {
-	Secret string `json:"secret" msg:"secret"`
+	Secret string `json:"secret,omitzero" msg:"secret"`
+}
+
+// IsZero returns true if JWTData is empty (for omitzero support).
+func (j JWTData) IsZero() bool {
+	return j.Secret == ""
 }
 
 type Monitor struct {
-	TriggerLimits []float64 `json:"trigger_limits" msg:"trigger_limits"`
+	TriggerLimits []float64 `json:"trigger_limits,omitzero" msg:"trigger_limits"`
+}
+
+// IsZero returns true if Monitor is empty (for omitzero support).
+func (m Monitor) IsZero() bool {
+	return len(m.TriggerLimits) == 0
 }
 
 // Endpoints is a collection of Endpoint.
@@ -246,52 +277,52 @@ type EndpointMethod struct {
 //
 // swagger:model
 type SessionState struct {
-	LastCheck                     int64                       `json:"last_check" msg:"last_check"`
-	Allowance                     float64                     `json:"allowance" msg:"allowance"`
-	Rate                          float64                     `json:"rate" msg:"rate"`
-	Per                           float64                     `json:"per" msg:"per"`
-	ThrottleInterval              float64                     `json:"throttle_interval" msg:"throttle_interval"`
-	ThrottleRetryLimit            int                         `json:"throttle_retry_limit" msg:"throttle_retry_limit"`
-	MaxQueryDepth                 int                         `json:"max_query_depth" msg:"max_query_depth"`
-	DateCreated                   time.Time                   `json:"date_created" msg:"date_created"`
-	Expires                       int64                       `json:"expires" msg:"expires"`
-	QuotaMax                      int64                       `json:"quota_max" msg:"quota_max"`
-	QuotaRenews                   int64                       `json:"quota_renews" msg:"quota_renews"`
-	QuotaRemaining                int64                       `json:"quota_remaining" msg:"quota_remaining"`
-	QuotaRenewalRate              int64                       `json:"quota_renewal_rate" msg:"quota_renewal_rate"`
-	AccessRights                  map[string]AccessDefinition `json:"access_rights" msg:"access_rights"`
-	OrgID                         string                      `json:"org_id" msg:"org_id"`
-	OauthClientID                 string                      `json:"oauth_client_id" msg:"oauth_client_id"`
-	OauthKeys                     map[string]string           `json:"oauth_keys" msg:"oauth_keys"`
-	Certificate                   string                      `json:"certificate" msg:"certificate"`
-	BasicAuthData                 BasicAuthData               `json:"basic_auth_data" msg:"basic_auth_data"`
-	JWTData                       JWTData                     `json:"jwt_data" msg:"jwt_data"`
-	HMACEnabled                   bool                        `json:"hmac_enabled" msg:"hmac_enabled"`
-	EnableHTTPSignatureValidation bool                        `json:"enable_http_signature_validation" msg:"enable_http_signature_validation"`
-	HmacSecret                    string                      `json:"hmac_string" msg:"hmac_string"`
-	RSACertificateId              string                      `json:"rsa_certificate_id" msg:"rsa_certificate_id"`
-	IsInactive                    bool                        `json:"is_inactive" msg:"is_inactive"`
-	ApplyPolicyID                 string                      `json:"apply_policy_id" msg:"apply_policy_id"`
-	ApplyPolicies                 []string                    `json:"apply_policies" msg:"apply_policies"`
-	DataExpires                   int64                       `json:"data_expires" msg:"data_expires"`
-	Monitor                       Monitor                     `json:"monitor" msg:"monitor"`
+	LastCheck                     int64                       `json:"last_check,omitzero" msg:"last_check"`
+	Allowance                     float64                     `json:"allowance,omitzero" msg:"allowance"`
+	Rate                          float64                     `json:"rate,omitzero" msg:"rate"`
+	Per                           float64                     `json:"per,omitzero" msg:"per"`
+	ThrottleInterval              float64                     `json:"throttle_interval,omitzero" msg:"throttle_interval"`
+	ThrottleRetryLimit            int                         `json:"throttle_retry_limit,omitzero" msg:"throttle_retry_limit"`
+	MaxQueryDepth                 int                         `json:"max_query_depth,omitzero" msg:"max_query_depth"`
+	DateCreated                   time.Time                   `json:"date_created,omitzero" msg:"date_created"`
+	Expires                       int64                       `json:"expires,omitzero" msg:"expires"`
+	QuotaMax                      int64                       `json:"quota_max,omitzero" msg:"quota_max"`
+	QuotaRenews                   int64                       `json:"quota_renews,omitzero" msg:"quota_renews"`
+	QuotaRemaining                int64                       `json:"quota_remaining,omitzero" msg:"quota_remaining"`
+	QuotaRenewalRate              int64                       `json:"quota_renewal_rate,omitzero" msg:"quota_renewal_rate"`
+	AccessRights                  map[string]AccessDefinition `json:"access_rights,omitzero" msg:"access_rights"`
+	OrgID                         string                      `json:"org_id,omitzero" msg:"org_id"`
+	OauthClientID                 string                      `json:"oauth_client_id,omitzero" msg:"oauth_client_id"`
+	OauthKeys                     map[string]string           `json:"oauth_keys,omitzero" msg:"oauth_keys"`
+	Certificate                   string                      `json:"certificate,omitzero" msg:"certificate"`
+	BasicAuthData                 BasicAuthData               `json:"basic_auth_data,omitzero" msg:"basic_auth_data"`
+	JWTData                       JWTData                     `json:"jwt_data,omitzero" msg:"jwt_data"`
+	HMACEnabled                   bool                        `json:"hmac_enabled,omitzero" msg:"hmac_enabled"`
+	EnableHTTPSignatureValidation bool                        `json:"enable_http_signature_validation,omitzero" msg:"enable_http_signature_validation"`
+	HmacSecret                    string                      `json:"hmac_string,omitzero" msg:"hmac_string"`
+	RSACertificateId              string                      `json:"rsa_certificate_id,omitzero" msg:"rsa_certificate_id"`
+	IsInactive                    bool                        `json:"is_inactive,omitzero" msg:"is_inactive"`
+	ApplyPolicyID                 string                      `json:"apply_policy_id,omitzero" msg:"apply_policy_id"`
+	ApplyPolicies                 []string                    `json:"apply_policies,omitzero" msg:"apply_policies"`
+	DataExpires                   int64                       `json:"data_expires,omitzero" msg:"data_expires"`
+	Monitor                       Monitor                     `json:"monitor,omitzero" msg:"monitor"`
 	// Deprecated: EnableDetailRecording is deprecated. Use EnableDetailedRecording
 	// going forward instead
-	EnableDetailRecording   bool                   `json:"enable_detail_recording" msg:"enable_detail_recording"`
-	EnableDetailedRecording bool                   `json:"enable_detailed_recording" msg:"enable_detailed_recording"`
-	MetaData                map[string]interface{} `json:"meta_data" msg:"meta_data"`
-	Tags                    []string               `json:"tags" msg:"tags"`
-	Alias                   string                 `json:"alias" msg:"alias"`
-	LastUpdated             string                 `json:"last_updated" msg:"last_updated"`
-	IdExtractorDeadline     int64                  `json:"id_extractor_deadline" msg:"id_extractor_deadline"`
-	SessionLifetime         int64                  `bson:"session_lifetime" json:"session_lifetime"`
+	EnableDetailRecording   bool                   `json:"enable_detail_recording,omitzero" msg:"enable_detail_recording"`
+	EnableDetailedRecording bool                   `json:"enable_detailed_recording,omitzero" msg:"enable_detailed_recording"`
+	MetaData                map[string]interface{} `json:"meta_data,omitzero" msg:"meta_data"`
+	Tags                    []string               `json:"tags,omitzero" msg:"tags"`
+	Alias                   string                 `json:"alias,omitzero" msg:"alias"`
+	LastUpdated             string                 `json:"last_updated,omitzero" msg:"last_updated"`
+	IdExtractorDeadline     int64                  `json:"id_extractor_deadline,omitzero" msg:"id_extractor_deadline"`
+	SessionLifetime         int64                  `json:"session_lifetime,omitzero" bson:"session_lifetime"`
 
 	// Used to store token hash
 	keyHash string
 	KeyID   string `json:"-"`
 
 	// Smoothing contains rate limit smoothing settings.
-	Smoothing *apidef.RateLimitSmoothing `json:"smoothing" bson:"smoothing"`
+	Smoothing *apidef.RateLimitSmoothing `json:"smoothing,omitzero" bson:"smoothing"`
 
 	// modified holds the hint if a session has been modified for update.
 	// use Touch() to set it, and IsModified() to get it.
