@@ -289,10 +289,10 @@ func TestSessionState_QuotaEnforcementWorksAfterOptimization(t *testing.T) {
 
 	// Create a key with a very small quota (2 requests)
 	key := CreateSession(ts.Gw, func(s *user.SessionState) {
-		s.Rate = 1000         // High rate limit so we hit quota first
-		s.Per = 1             // per 1 second
-		s.QuotaMax = 2        // Only 2 requests allowed
-		s.QuotaRemaining = 2  // 2 remaining
+		s.Rate = 1000        // High rate limit so we hit quota first
+		s.Per = 1            // per 1 second
+		s.QuotaMax = 2       // Only 2 requests allowed
+		s.QuotaRemaining = 2 // 2 remaining
 		s.QuotaRenewalRate = 3600
 		s.AccessRights = map[string]user.AccessDefinition{
 			api.APIID: {
