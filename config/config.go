@@ -1264,6 +1264,11 @@ type Config struct {
 	// Skip TLS verification for JWT JWKs url validation
 	JWTSSLInsecureSkipVerify bool `json:"jwt_ssl_insecure_skip_verify"`
 
+	// Enable proxy protocol for all HTTP/HTTPS/h2c
+	// Handle request with and without proxy protocol if true
+	// Handle only requests without proxy protocol if false
+	EnableProxyProtocolHTTP bool `json:"enable_proxy_protocol_http"`
+
 	// ResourceSync configures mitigation strategy in case sync fails.
 	ResourceSync ResourceSyncConfig `json:"resource_sync"`
 
