@@ -89,10 +89,12 @@ func (l *LDAPStorageHandler) GetKey(filter string) (string, error) {
 	return "", nil
 }
 
-func (r *LDAPStorageHandler) GetMultiKey(keyNames []string) ([]string, error) {
-	log.Warning("Not implementated")
+func (r *LDAPStorageHandler) GetMultiKey(_ []string) ([]string, error) {
+	return nil, errors.New("bulk key retrieval is not supported for LDAP")
+}
 
-	return nil, nil
+func (l *LDAPStorageHandler) GetRawMultiKey(keys []string) ([]string, error) {
+	return l.GetMultiKey(keys)
 }
 
 func (l *LDAPStorageHandler) GetRawKey(filter string) (string, error) {

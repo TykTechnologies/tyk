@@ -306,17 +306,24 @@ func (r *RPCStorageHandler) GetRawKey(keyName string) (string, error) {
 }
 
 func (r *RPCStorageHandler) GetMultiKey(keyNames []string) ([]string, error) {
-	var err error
-	var value string
+	var lastErr error
+	results := make([]string, len(keyNames))
 
-	for _, key := range keyNames {
-		value, err = r.GetKey(key)
-		if err == nil {
-			return []string{value}, nil
+	for i, key := range keyNames {
+		value, err := r.GetKey(key)
+		if err != nil {
+			lastErr = err
+			results[i] = ""
+			continue
 		}
+		results[i] = value
 	}
 
-	return nil, err
+	return results, lastErr
+}
+
+func (r *RPCStorageHandler) GetRawMultiKey(keys []string) ([]string, error) {
+	return r.GetMultiKey(keys)
 }
 
 func (r *RPCStorageHandler) GetExp(keyName string) (int64, error) {

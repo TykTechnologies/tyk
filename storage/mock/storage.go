@@ -345,6 +345,21 @@ func (mr *MockHandlerMockRecorder) GetRawKey(arg0 any) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetRawKey", reflect.TypeOf((*MockHandler)(nil).GetRawKey), arg0)
 }
 
+// GetRawMultiKey mocks base method.
+func (m *MockHandler) GetRawMultiKey(arg0 []string) ([]string, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetRawMultiKey", arg0)
+	ret0, _ := ret[0].([]string)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetRawMultiKey indicates an expected call of GetRawMultiKey.
+func (mr *MockHandlerMockRecorder) GetRawMultiKey(arg0 any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetRawMultiKey", reflect.TypeOf((*MockHandler)(nil).GetRawMultiKey), arg0)
+}
+
 // GetRollingWindow mocks base method.
 func (m *MockHandler) GetRollingWindow(key string, per int64, pipeline bool) (int, []any) {
 	m.ctrl.T.Helper()
