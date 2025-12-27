@@ -1,6 +1,8 @@
 package oas
 
 import (
+	"crypto/tls"
+	"fmt"
 	"sort"
 	"strings"
 
@@ -18,23 +20,46 @@ type Upstream struct {
 	// Tyk classic API definition: `proxy.service_discovery`
 	ServiceDiscovery *ServiceDiscovery `bson:"serviceDiscovery,omitempty" json:"serviceDiscovery,omitempty"`
 
-	// Test contains the configuration related to uptime tests.
-	Test *Test `bson:"test,omitempty" json:"test,omitempty"`
+	// UptimeTests contains the configuration related to uptime tests.
+	// Tyk classic API definition: `uptime_tests` and `check_host_against_uptime_tests`.
+	UptimeTests *UptimeTests `bson:"uptimeTests,omitempty" json:"uptimeTests,omitempty"`
 
 	// MutualTLS contains the configuration for establishing a mutual TLS connection between Tyk and the upstream server.
+	// Tyk classic API definition: `upstream_certificates_disabled` and `upstream_certificates`.
 	MutualTLS *MutualTLS `bson:"mutualTLS,omitempty" json:"mutualTLS,omitempty"`
 
 	// CertificatePinning contains the configuration related to certificate pinning.
+	// Tyk classic API definition: `certificate_pinning_disabled` and `pinned_public_keys`.
 	CertificatePinning *CertificatePinning `bson:"certificatePinning,omitempty" json:"certificatePinning,omitempty"`
 
 	// RateLimit contains the configuration related to API level rate limit.
+	// Tyk classic API definition: `global_rate_limit`.
 	RateLimit *RateLimit `bson:"rateLimit,omitempty" json:"rateLimit,omitempty"`
 
 	// Authentication contains the configuration related to upstream authentication.
+	// Tyk classic API definition: `upstream_auth`.
 	Authentication *UpstreamAuth `bson:"authentication,omitempty" json:"authentication,omitempty"`
 
 	// LoadBalancing contains configuration for load balancing between multiple upstream targets.
+	// Tyk classic API definition: `proxy.enable_load_balancing` and `proxy.targets`.
 	LoadBalancing *LoadBalancing `bson:"loadBalancing,omitempty" json:"loadBalancing,omitempty"`
+
+	// PreserveHostHeader contains the configuration for preserving the host header.
+	// Tyk classic API definition: `proxy.preserve_host_header`.
+	PreserveHostHeader *PreserveHostHeader `bson:"preserveHostHeader,omitempty" json:"preserveHostHeader,omitempty"`
+
+	// PreserveTrailingSlash controls whether Tyk preserves trailing slashes in URLs when proxying
+	// requests to upstream services. When enabled, URLs like "/users/" will retain the trailing slash.
+	// Tyk classic API definition: `proxy.disable_strip_slash`.
+	PreserveTrailingSlash *PreserveTrailingSlash `bson:"preserveTrailingSlash,omitempty" json:"preserveTrailingSlash,omitempty"`
+
+	// TLSTransport contains the configuration for TLS transport settings.
+	// Tyk classic API definition: `proxy.transport`
+	TLSTransport *TLSTransport `bson:"tlsTransport,omitempty" json:"tlsTransport,omitempty"`
+
+	// Proxy contains the configuration for an internal proxy.
+	// Tyk classic API definition: `proxy.proxy_url`
+	Proxy *Proxy `bson:"proxy,omitempty" json:"proxy,omitempty"`
 }
 
 // Fill fills *Upstream from apidef.APIDefinition.
@@ -50,13 +75,13 @@ func (u *Upstream) Fill(api apidef.APIDefinition) {
 		u.ServiceDiscovery = nil
 	}
 
-	if u.Test == nil {
-		u.Test = &Test{}
+	if u.UptimeTests == nil {
+		u.UptimeTests = &UptimeTests{}
 	}
 
-	u.Test.Fill(api.UptimeTests)
-	if ShouldOmit(u.Test) {
-		u.Test = nil
+	u.UptimeTests.Fill(api.UptimeTests)
+	if ShouldOmit(u.UptimeTests) {
+		u.UptimeTests = nil
 	}
 
 	if u.MutualTLS == nil {
@@ -90,12 +115,53 @@ func (u *Upstream) Fill(api apidef.APIDefinition) {
 		u.Authentication = &UpstreamAuth{}
 	}
 
-	u.Authentication.Fill(api.UpstreamAuth)
+	u.Authentication.Fill(api)
 	if ShouldOmit(u.Authentication) {
 		u.Authentication = nil
 	}
 
+	if u.TLSTransport == nil {
+		u.TLSTransport = &TLSTransport{}
+	}
+	u.TLSTransport.Fill(api)
+	if ShouldOmit(u.TLSTransport) {
+		u.TLSTransport = nil
+	}
+
+	if u.Proxy == nil {
+		u.Proxy = &Proxy{}
+	}
+	u.Proxy.Fill(api)
+	if ShouldOmit(u.Proxy) {
+		u.Proxy = nil
+	}
+
 	u.fillLoadBalancing(api)
+	u.fillPreserveHostHeader(api)
+	u.fillPreserveTrailingSlash(api)
+}
+
+func (u *Upstream) fillPreserveTrailingSlash(api apidef.APIDefinition) {
+	if u.PreserveTrailingSlash == nil {
+		u.PreserveTrailingSlash = &PreserveTrailingSlash{}
+	}
+	u.PreserveTrailingSlash.Fill(api)
+
+	if !u.PreserveTrailingSlash.Enabled {
+		u.PreserveTrailingSlash = nil
+	}
+}
+
+func (u *Upstream) fillPreserveHostHeader(api apidef.APIDefinition) {
+	if u.PreserveHostHeader == nil {
+		u.PreserveHostHeader = &PreserveHostHeader{}
+	}
+
+	u.PreserveHostHeader.Fill(api)
+
+	if !u.PreserveHostHeader.Enabled {
+		u.PreserveHostHeader = nil
+	}
 }
 
 // ExtractTo extracts *Upstream into *apidef.APIDefinition.
@@ -111,14 +177,14 @@ func (u *Upstream) ExtractTo(api *apidef.APIDefinition) {
 
 	u.ServiceDiscovery.ExtractTo(&api.Proxy.ServiceDiscovery)
 
-	if u.Test == nil {
-		u.Test = &Test{}
+	if u.UptimeTests == nil {
+		u.UptimeTests = &UptimeTests{}
 		defer func() {
-			u.Test = nil
+			u.UptimeTests = nil
 		}()
 	}
 
-	u.Test.ExtractTo(&api.UptimeTests)
+	u.UptimeTests.ExtractTo(&api.UptimeTests)
 
 	if u.MutualTLS == nil {
 		u.MutualTLS = &MutualTLS{}
@@ -154,9 +220,50 @@ func (u *Upstream) ExtractTo(api *apidef.APIDefinition) {
 		}()
 	}
 
-	u.Authentication.ExtractTo(&api.UpstreamAuth)
+	u.Authentication.ExtractTo(api)
 
 	u.loadBalancingExtractTo(api)
+
+	if u.TLSTransport == nil {
+		u.TLSTransport = &TLSTransport{}
+		defer func() {
+			u.TLSTransport = nil
+		}()
+	}
+	u.TLSTransport.ExtractTo(api)
+
+	if u.Proxy == nil {
+		u.Proxy = &Proxy{}
+		defer func() {
+			u.Proxy = nil
+		}()
+	}
+	u.Proxy.ExtractTo(api)
+
+	u.preserveHostHeaderExtractTo(api)
+	u.preserveTrailingSlashExtractTo(api)
+}
+
+func (u *Upstream) preserveHostHeaderExtractTo(api *apidef.APIDefinition) {
+	if u.PreserveHostHeader == nil {
+		u.PreserveHostHeader = &PreserveHostHeader{}
+		defer func() {
+			u.PreserveHostHeader = nil
+		}()
+	}
+
+	u.PreserveHostHeader.ExtractTo(api)
+}
+
+func (u *Upstream) preserveTrailingSlashExtractTo(api *apidef.APIDefinition) {
+	if u.PreserveTrailingSlash == nil {
+		u.PreserveTrailingSlash = &PreserveTrailingSlash{}
+		defer func() {
+			u.PreserveTrailingSlash = nil
+		}()
+	}
+
+	u.PreserveTrailingSlash.ExtractTo(api)
 }
 
 func (u *Upstream) fillLoadBalancing(api apidef.APIDefinition) {
@@ -179,6 +286,124 @@ func (u *Upstream) loadBalancingExtractTo(api *apidef.APIDefinition) {
 	}
 
 	u.LoadBalancing.ExtractTo(api)
+}
+
+// TLSTransport contains the configuration for TLS transport settings.
+// This struct allows you to specify a custom proxy and set the minimum TLS versions and any SSL ciphers.
+//
+// Example:
+//
+//	```
+//	{
+//	  "proxy_url": "http(s)://proxy.url:1234",
+//	  "minVersion": "1.0",
+//	  "maxVersion": "1.0",
+//	  "ciphers": [
+//	    "TLS_RSA_WITH_AES_128_GCM_SHA256",
+//	    "TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA"
+//	  ],
+//	  "insecureSkipVerify": true,
+//	  "forceCommonNameCheck": false
+//	}
+//	```
+//
+// Tyk classic API definition: `proxy.transport`
+type TLSTransport struct {
+	// InsecureSkipVerify controls whether a client verifies the server's certificate chain and host name.
+	// If InsecureSkipVerify is true, crypto/tls accepts any certificate presented by the server and any host name in that certificate.
+	// In this mode, TLS is susceptible to machine-in-the-middle attacks unless custom verification is used.
+	// This should be used only for testing or in combination with VerifyConnection or VerifyPeerCertificate.
+	//
+	// Tyk classic API definition: `proxy.transport.ssl_insecure_skip_verify`
+	InsecureSkipVerify bool `bson:"insecureSkipVerify,omitempty" json:"insecureSkipVerify,omitempty"`
+
+	// Ciphers is a list of SSL ciphers to be used. If unset, the default ciphers will be used.
+	//
+	// Tyk classic API definition: `proxy.transport.ssl_ciphers`
+	Ciphers []string `bson:"ciphers,omitempty" json:"ciphers,omitempty"`
+
+	// MinVersion is the minimum SSL/TLS version that is acceptable.
+	// Tyk classic API definition: `proxy.transport.ssl_min_version`
+	MinVersion string `bson:"minVersion,omitempty" json:"minVersion,omitempty"`
+
+	// MaxVersion is the maximum SSL/TLS version that is acceptable.
+	MaxVersion string `bson:"maxVersion,omitempty" json:"maxVersion,omitempty"`
+
+	// ForceCommonNameCheck forces the validation of the hostname against the certificate Common Name.
+	//
+	// Tyk classic API definition: `proxy.transport.ssl_force_common_name_check`
+	ForceCommonNameCheck bool `bson:"forceCommonNameCheck,omitempty" json:"forceCommonNameCheck,omitempty"`
+}
+
+// Fill fills *TLSTransport from apidef.ServiceDiscoveryConfiguration.
+func (t *TLSTransport) Fill(api apidef.APIDefinition) {
+	t.ForceCommonNameCheck = api.Proxy.Transport.SSLForceCommonNameCheck
+	t.Ciphers = api.Proxy.Transport.SSLCipherSuites
+	t.MaxVersion = t.tlsVersionToString(api.Proxy.Transport.SSLMaxVersion)
+	t.MinVersion = t.tlsVersionToString(api.Proxy.Transport.SSLMinVersion)
+	t.InsecureSkipVerify = api.Proxy.Transport.SSLInsecureSkipVerify
+}
+
+// ExtractTo extracts *TLSTransport into *apidef.ServiceDiscoveryConfiguration.
+func (t *TLSTransport) ExtractTo(api *apidef.APIDefinition) {
+	api.Proxy.Transport.SSLForceCommonNameCheck = t.ForceCommonNameCheck
+	api.Proxy.Transport.SSLCipherSuites = t.Ciphers
+	api.Proxy.Transport.SSLMaxVersion = t.tlsVersionFromString(t.MaxVersion)
+	api.Proxy.Transport.SSLMinVersion = t.tlsVersionFromString(t.MinVersion)
+	api.Proxy.Transport.SSLInsecureSkipVerify = t.InsecureSkipVerify
+}
+
+// tlsVersionFromString converts v in the form of 1.2/1.3 to the version int
+func (t *TLSTransport) tlsVersionFromString(v string) uint16 {
+	switch v {
+	case "1.0":
+		return tls.VersionTLS10
+	case "1.1":
+		return tls.VersionTLS11
+	case "1.2":
+		return tls.VersionTLS12
+	case "1.3":
+		return tls.VersionTLS13
+	default:
+		return 0
+	}
+}
+
+// tlsVersionFromString converts v from version into to the form 1.0/1.1
+func (t *TLSTransport) tlsVersionToString(v uint16) string {
+	switch v {
+	case tls.VersionTLS10:
+		return "1.0"
+	case tls.VersionTLS11:
+		return "1.1"
+	case tls.VersionTLS12:
+		return "1.2"
+	case tls.VersionTLS13:
+		return "1.3"
+	default:
+		return ""
+	}
+}
+
+// Proxy contains the configuration for an internal proxy.
+//
+// Tyk classic API definition: `proxy.proxy_url`
+type Proxy struct {
+	// Enabled determines if the proxy is active.
+	Enabled bool `bson:"enabled" json:"enabled"`
+
+	// URL specifies the URL of the internal proxy.
+	URL string `bson:"url" json:"url"`
+}
+
+// Fill fills *Proxy from apidef.ServiceDiscoveryConfiguration.
+func (p *Proxy) Fill(api apidef.APIDefinition) {
+	p.URL = api.Proxy.Transport.ProxyURL
+}
+
+// ExtractTo extracts *Proxy into *apidef.ServiceDiscoveryConfiguration.
+func (p *Proxy) ExtractTo(api *apidef.APIDefinition) {
+	api.Proxy.Transport.ProxyURL = p.URL
 }
 
 // ServiceDiscovery holds configuration required for service discovery.
@@ -319,17 +544,17 @@ func (sd *ServiceDiscovery) Fill(serviceDiscovery apidef.ServiceDiscoveryConfigu
 	sd.DataPath = serviceDiscovery.DataPath
 	sd.PortDataPath = serviceDiscovery.PortDataPath
 
-	enabled := !serviceDiscovery.CacheDisabled
-	timeout := serviceDiscovery.CacheTimeout
-
-	sd.CacheTimeout = 0
+	timeout, enabled := serviceDiscovery.CacheOptions()
 	sd.Cache = &ServiceDiscoveryCache{
-		Enabled: enabled,
+		Enabled: enabled && sd.Enabled,
 		Timeout: timeout,
 	}
-	if ShouldOmit(sd.Cache) {
+
+	if !sd.Cache.Enabled {
 		sd.Cache = nil
 	}
+
+	sd.CacheTimeout = 0
 }
 
 // ExtractTo extracts *ServiceDiscovery into *apidef.ServiceDiscoveryConfiguration.
@@ -345,39 +570,190 @@ func (sd *ServiceDiscovery) ExtractTo(serviceDiscovery *apidef.ServiceDiscoveryC
 	serviceDiscovery.PortDataPath = sd.PortDataPath
 
 	timeout, enabled := sd.CacheOptions()
-	serviceDiscovery.CacheTimeout = timeout
 	serviceDiscovery.CacheDisabled = !enabled
+	serviceDiscovery.CacheTimeout = timeout
+	if !sd.Enabled {
+		serviceDiscovery.CacheDisabled = true
+	}
 }
 
-// Test holds the test configuration for service discovery.
-type Test struct {
+// UptimeTests configures uptime tests.
+type UptimeTests struct {
+	// Enabled specifies whether the uptime tests are active or not.
+	// Tyk classic API definition: `uptime_tests.disabled`
+	Enabled bool `bson:"enabled" json:"enabled"`
+
 	// ServiceDiscovery contains the configuration related to test Service Discovery.
 	// Tyk classic API definition: `proxy.service_discovery`
 	ServiceDiscovery *ServiceDiscovery `bson:"serviceDiscovery,omitempty" json:"serviceDiscovery,omitempty"`
+
+	// Tests contains individual connectivity tests defined for checking if a service is online.
+	Tests []UptimeTest `bson:"tests,omitempty" json:"tests,omitempty"`
+
+	// HostDownRetestPeriod is the time to wait until rechecking a failed test.
+	// If undefined, the default testing interval (10s) is in use.
+	// Setting this to a lower value would result in quicker recovery on failed checks.
+	HostDownRetestPeriod time.ReadableDuration `bson:"hostDownRetestPeriod" json:"hostDownRetestPeriod,omitempty"`
+
+	// LogRetentionPeriod holds a time to live for the uptime test results.
+	// If unset, a value of 100 years is the default.
+	LogRetentionPeriod time.ReadableDuration `bson:"logRetentionPeriod" json:"logRetentionPeriod,omitempty"`
 }
 
-// Fill fills *Test from apidef.UptimeTests.
-func (t *Test) Fill(uptimeTests apidef.UptimeTests) {
-	if t.ServiceDiscovery == nil {
-		t.ServiceDiscovery = &ServiceDiscovery{}
-	}
+// UptimeTest configures an uptime test check.
+type UptimeTest struct {
+	// CheckURL is the URL for a request. If service discovery is in use,
+	// the hostname will be resolved to a service host.
+	//
+	// Examples:
+	//
+	// - `http://database1.company.local`
+	// - `https://webcluster.service/health`
+	// - `tcp://127.0.0.1:6379` (for TCP checks).
+	CheckURL string `bson:"url" json:"url"`
 
-	t.ServiceDiscovery.Fill(uptimeTests.Config.ServiceDiscovery)
-	if ShouldOmit(t.ServiceDiscovery) {
-		t.ServiceDiscovery = nil
-	}
+	// Timeout declares a timeout for the request. If the test exceeds
+	// this timeout, the check fails.
+	Timeout time.ReadableDuration `bson:"timeout" json:"timeout,omitempty"`
+
+	// Method allows you to customize the HTTP method for the test (`GET`, `POST`,...).
+	Method string `bson:"method" json:"method"`
+
+	// Headers contain any custom headers for the back end service.
+	Headers map[string]string `bson:"headers" json:"headers,omitempty"`
+
+	// Body is the body of the test request.
+	Body string `bson:"body" json:"body,omitempty"`
+
+	// Commands are used for TCP checks.
+	Commands []UptimeTestCommand `bson:"commands" json:"commands,omitempty"`
+
+	// EnableProxyProtocol enables proxy protocol support when making request.
+	// The back end service needs to support this.
+	EnableProxyProtocol bool `bson:"enableProxyProtocol" json:"enableProxyProtocol"`
 }
 
-// ExtractTo extracts *Test into *apidef.UptimeTests.
-func (t *Test) ExtractTo(uptimeTests *apidef.UptimeTests) {
-	if t.ServiceDiscovery == nil {
-		t.ServiceDiscovery = &ServiceDiscovery{}
+// AddCommand will append a new command to the test.
+func (t *UptimeTest) AddCommand(name, message string) {
+	command := UptimeTestCommand{
+		Name:    name,
+		Message: message,
+	}
+
+	t.Commands = append(t.Commands, command)
+}
+
+// UptimeTestCommand handles additional checks for tcp connections.
+type UptimeTestCommand struct {
+	// Name can be either `send` or `expect`, designating if the
+	// message should be sent, or read from the connection.
+	Name string `bson:"name" json:"name"`
+
+	// Message contains the payload to send or expect.
+	Message string `bson:"message" json:"message"`
+}
+
+// Fill fills *UptimeTests from apidef.UptimeTests.
+func (u *UptimeTests) Fill(uptimeTests apidef.UptimeTests) {
+	if u.ServiceDiscovery == nil {
+		u.ServiceDiscovery = &ServiceDiscovery{}
+	}
+
+	u.ServiceDiscovery.Fill(uptimeTests.Config.ServiceDiscovery)
+
+	if ShouldOmit(u.ServiceDiscovery) {
+		u.ServiceDiscovery = nil
+	}
+
+	u.LogRetentionPeriod = ReadableDuration(time.Duration(uptimeTests.Config.ExpireUptimeAnalyticsAfter) * time.Second)
+	u.HostDownRetestPeriod = ReadableDuration(time.Duration(uptimeTests.Config.RecheckWait) * time.Second)
+
+	u.Tests = nil
+	for _, v := range uptimeTests.CheckList {
+		check := UptimeTest{
+			CheckURL:            u.fillCheckURL(v.Protocol, v.CheckURL),
+			Timeout:             ReadableDuration(v.Timeout),
+			Method:              v.Method,
+			Headers:             v.Headers,
+			Body:                v.Body,
+			EnableProxyProtocol: v.EnableProxyProtocol,
+		}
+		for _, command := range v.Commands {
+			check.AddCommand(command.Name, command.Message)
+		}
+		u.Tests = append(u.Tests, check)
+	}
+
+	u.Enabled = len(u.Tests) > 0 && !uptimeTests.Disabled
+}
+
+// ExtractTo extracts *UptimeTests into *apidef.UptimeTests.
+func (u *UptimeTests) ExtractTo(uptimeTests *apidef.UptimeTests) {
+	uptimeTests.Disabled = !u.Enabled
+
+	if u.ServiceDiscovery == nil {
+		u.ServiceDiscovery = &ServiceDiscovery{}
 		defer func() {
-			t.ServiceDiscovery = nil
+			u.ServiceDiscovery = nil
 		}()
 	}
 
-	t.ServiceDiscovery.ExtractTo(&uptimeTests.Config.ServiceDiscovery)
+	u.ServiceDiscovery.ExtractTo(&uptimeTests.Config.ServiceDiscovery)
+
+	uptimeTests.Config.ExpireUptimeAnalyticsAfter = int64(u.LogRetentionPeriod.Seconds())
+	uptimeTests.Config.RecheckWait = int(u.HostDownRetestPeriod.Seconds())
+
+	uptimeTests.CheckList = nil
+
+	result := []apidef.HostCheckObject{}
+	for _, v := range u.Tests {
+		classicProtocol, classicCheckURL := u.extractToProtocolAndCheckURL(v.CheckURL)
+		check := apidef.HostCheckObject{
+			CheckURL:            classicCheckURL,
+			Protocol:            classicProtocol,
+			Timeout:             time.Duration(v.Timeout),
+			Method:              v.Method,
+			Headers:             v.Headers,
+			Body:                v.Body,
+			EnableProxyProtocol: v.EnableProxyProtocol,
+		}
+		for _, command := range v.Commands {
+			check.AddCommand(command.Name, command.Message)
+		}
+
+		result = append(result, check)
+	}
+
+	if len(result) > 0 {
+		uptimeTests.CheckList = result
+	}
+}
+
+// fillCheckURL constructs a valid URL by appending the protocol to the provided URL, removing any existing protocol.
+// This needs to be done because classic can have invalid protocol and checkURL combinations, e.g.
+// protocol=tcp, checkURL=https://myservice.fake
+func (u *UptimeTests) fillCheckURL(protocol string, checkURL string) string {
+	// in classic API, protocol can be empty so we need to check for that and return the original URL
+	if protocol == "" {
+		return checkURL
+	}
+	protocolessURL := checkURL
+	splitURL := strings.Split(checkURL, "://")
+	if len(splitURL) > 1 {
+		protocolessURL = splitURL[1]
+	}
+
+	return fmt.Sprintf("%s://%s", protocol, protocolessURL)
+}
+
+// extractToProtocolAndCheckURL splits a URL into its protocol and the remaining part of the URL, returning both as strings.
+// Classic has a special field for protocol while OAS only has checkURL. The protocol should remain inside checkURL.
+func (u *UptimeTests) extractToProtocolAndCheckURL(checkURL string) (classicProtocol, classicCheckURL string) {
+	splitURL := strings.Split(checkURL, "://")
+	if len(splitURL) > 1 {
+		return splitURL[0], checkURL
+	}
+	return "", checkURL // should never happen, but let's be sure to not have panics
 }
 
 // MutualTLS contains the configuration for establishing a mutual TLS connection between Tyk and the upstream server.
@@ -588,16 +964,18 @@ type UpstreamAuth struct {
 	BasicAuth *UpstreamBasicAuth `bson:"basicAuth,omitempty" json:"basicAuth,omitempty"`
 	// OAuth contains the configuration for OAuth2 Client Credentials flow.
 	OAuth *UpstreamOAuth `bson:"oauth,omitempty" json:"oauth,omitempty"`
+	// RequestSigning holds the configuration for generating signed requests to an upstream API.
+	RequestSigning *UpstreamRequestSigning `bson:"requestSigning,omitempty" json:"requestSigning,omitempty"`
 }
 
-// Fill fills *UpstreamAuth from apidef.UpstreamAuth.
-func (u *UpstreamAuth) Fill(api apidef.UpstreamAuth) {
-	u.Enabled = api.Enabled
+// Fill fills *UpstreamAuth from apidef.APIDefinition.
+func (u *UpstreamAuth) Fill(api apidef.APIDefinition) {
+	u.Enabled = api.UpstreamAuth.Enabled
 
 	if u.BasicAuth == nil {
 		u.BasicAuth = &UpstreamBasicAuth{}
 	}
-	u.BasicAuth.Fill(api.BasicAuth)
+	u.BasicAuth.Fill(api.UpstreamAuth.BasicAuth)
 	if ShouldOmit(u.BasicAuth) {
 		u.BasicAuth = nil
 	}
@@ -605,15 +983,17 @@ func (u *UpstreamAuth) Fill(api apidef.UpstreamAuth) {
 	if u.OAuth == nil {
 		u.OAuth = &UpstreamOAuth{}
 	}
-	u.OAuth.Fill(api.OAuth)
+	u.OAuth.Fill(api.UpstreamAuth.OAuth)
 	if ShouldOmit(u.OAuth) {
 		u.OAuth = nil
 	}
+
+	u.fillRequestSigning(api)
 }
 
-// ExtractTo extracts *UpstreamAuth into *apidef.UpstreamAuth.
-func (u *UpstreamAuth) ExtractTo(api *apidef.UpstreamAuth) {
-	api.Enabled = u.Enabled
+// ExtractTo extracts *UpstreamAuth into *apidef.APIDefinition.
+func (u *UpstreamAuth) ExtractTo(api *apidef.APIDefinition) {
+	api.UpstreamAuth.Enabled = u.Enabled
 
 	if u.BasicAuth == nil {
 		u.BasicAuth = &UpstreamBasicAuth{}
@@ -621,7 +1001,7 @@ func (u *UpstreamAuth) ExtractTo(api *apidef.UpstreamAuth) {
 			u.BasicAuth = nil
 		}()
 	}
-	u.BasicAuth.ExtractTo(&api.BasicAuth)
+	u.BasicAuth.ExtractTo(&api.UpstreamAuth.BasicAuth)
 
 	if u.OAuth == nil {
 		u.OAuth = &UpstreamOAuth{}
@@ -629,7 +1009,29 @@ func (u *UpstreamAuth) ExtractTo(api *apidef.UpstreamAuth) {
 			u.OAuth = nil
 		}()
 	}
-	u.OAuth.ExtractTo(&api.OAuth)
+	u.OAuth.ExtractTo(&api.UpstreamAuth.OAuth)
+
+	u.requestSigningExtractTo(api)
+}
+
+func (u *UpstreamAuth) fillRequestSigning(api apidef.APIDefinition) {
+	if u.RequestSigning == nil {
+		u.RequestSigning = &UpstreamRequestSigning{}
+	}
+	u.RequestSigning.Fill(api)
+	if ShouldOmit(u.RequestSigning) {
+		u.RequestSigning = nil
+	}
+}
+
+func (u *UpstreamAuth) requestSigningExtractTo(api *apidef.APIDefinition) {
+	if u.RequestSigning == nil {
+		u.RequestSigning = &UpstreamRequestSigning{}
+		defer func() {
+			u.BasicAuth = nil
+		}()
+	}
+	u.RequestSigning.ExtractTo(api)
 }
 
 // UpstreamBasicAuth holds upstream basic authentication configuration.
@@ -835,10 +1237,54 @@ func (u *UpstreamOAuth) ExtractTo(api *apidef.UpstreamOAuth) {
 	u.PasswordAuthentication.ExtractTo(&api.PasswordAuthentication)
 }
 
+// UpstreamRequestSigning represents configuration for generating signed requests to an upstream API.
+// Tyk classic API definition: `request_signing`.
+type UpstreamRequestSigning struct {
+	// Enabled determines if request signing is enabled or disabled.
+	Enabled bool `bson:"enabled" json:"enabled"` // required
+	// SignatureHeader specifies the HTTP header name for the signature.
+	SignatureHeader string `bson:"signatureHeader,omitempty" json:"signatureHeader,omitempty"`
+	// Algorithm represents the signing algorithm used (e.g., HMAC-SHA256).
+	Algorithm string `bson:"algorithm,omitempty" json:"algorithm,omitempty"`
+	// KeyID identifies the key used for signing purposes.
+	KeyID string `bson:"keyId,omitempty" json:"keyId,omitempty"`
+	// Headers contains a list of headers included in the signature calculation.
+	Headers []string `bson:"headers,omitempty" json:"headers,omitempty"`
+	// Secret holds the secret used for signing when applicable.
+	Secret string `bson:"secret,omitempty" json:"secret,omitempty"`
+	// CertificateID specifies the certificate ID used in signing operations.
+	CertificateID string `bson:"certificateId,omitempty" json:"certificateId,omitempty"`
+}
+
+// Fill populates the UpstreamRequestSigning fields from the given apidef.APIDefinition configuration.
+func (l *UpstreamRequestSigning) Fill(api apidef.APIDefinition) {
+	l.Enabled = api.RequestSigning.IsEnabled
+	l.SignatureHeader = api.RequestSigning.SignatureHeader
+	l.Algorithm = api.RequestSigning.Algorithm
+	l.KeyID = api.RequestSigning.KeyId
+	l.Headers = api.RequestSigning.HeaderList
+	l.Secret = api.RequestSigning.Secret
+	l.CertificateID = api.RequestSigning.CertificateId
+}
+
+// ExtractTo populates the given apidef.APIDefinition RequestSigning fields with values from the UpstreamRequestSigning.
+func (l *UpstreamRequestSigning) ExtractTo(api *apidef.APIDefinition) {
+	api.RequestSigning.IsEnabled = l.Enabled
+	api.RequestSigning.SignatureHeader = l.SignatureHeader
+	api.RequestSigning.Algorithm = l.Algorithm
+	api.RequestSigning.KeyId = l.KeyID
+	api.RequestSigning.HeaderList = l.Headers
+	api.RequestSigning.Secret = l.Secret
+	api.RequestSigning.CertificateId = l.CertificateID
+}
+
 // LoadBalancing represents the configuration for load balancing between multiple upstream targets.
 type LoadBalancing struct {
 	// Enabled determines if load balancing is active.
 	Enabled bool `json:"enabled" bson:"enabled"` // required
+	// SkipUnavailableHosts determines whether to skip unavailable hosts during load balancing based on uptime tests.
+	// Tyk classic field: `proxy.check_host_against_uptime_tests`
+	SkipUnavailableHosts bool `json:"skipUnavailableHosts,omitempty" bson:"skipUnavailableHosts,omitempty"`
 	// Targets defines the list of targets with their respective weights for load balancing.
 	Targets []LoadBalancingTarget `json:"targets,omitempty" bson:"targets,omitempty"`
 }
@@ -855,11 +1301,13 @@ type LoadBalancingTarget struct {
 func (l *LoadBalancing) Fill(api apidef.APIDefinition) {
 	if len(api.Proxy.Targets) == 0 {
 		api.Proxy.EnableLoadBalancing = false
+		api.Proxy.CheckHostAgainstUptimeTests = false
 		api.Proxy.Targets = nil
 		return
 	}
 
 	l.Enabled = api.Proxy.EnableLoadBalancing
+	l.SkipUnavailableHosts = api.Proxy.CheckHostAgainstUptimeTests
 
 	targetCounter := make(map[string]*LoadBalancingTarget)
 	for _, target := range api.Proxy.Targets {
@@ -870,6 +1318,21 @@ func (l *LoadBalancing) Fill(api apidef.APIDefinition) {
 			}
 		}
 		targetCounter[target].Weight++
+	}
+
+	// Preserve weight=0 targets from existing OAS structure that aren't in active targets
+	if l.Targets != nil {
+		for _, existingTarget := range l.Targets {
+			if existingTarget.Weight == 0 {
+				// Only preserve if it's not already in targetCounter (not an active target)
+				if _, exists := targetCounter[existingTarget.URL]; !exists {
+					targetCounter[existingTarget.URL] = &LoadBalancingTarget{
+						URL:    existingTarget.URL,
+						Weight: 0,
+					}
+				}
+			}
+		}
 	}
 
 	targets := make([]LoadBalancingTarget, len(targetCounter))
@@ -891,16 +1354,14 @@ func (l *LoadBalancing) Fill(api apidef.APIDefinition) {
 func (l *LoadBalancing) ExtractTo(api *apidef.APIDefinition) {
 	if len(l.Targets) == 0 {
 		api.Proxy.EnableLoadBalancing = false
+		api.Proxy.CheckHostAgainstUptimeTests = false
 		api.Proxy.Targets = nil
 		return
 	}
 
-	proxyConfTargets := api.Proxy.Targets
-	if proxyConfTargets == nil {
-		proxyConfTargets = make([]string, 0)
-	}
-
+	proxyConfTargets := make([]string, 0, len(l.Targets))
 	api.Proxy.EnableLoadBalancing = l.Enabled
+	api.Proxy.CheckHostAgainstUptimeTests = l.SkipUnavailableHosts
 	for _, target := range l.Targets {
 		for i := 0; i < target.Weight; i++ {
 			proxyConfTargets = append(proxyConfTargets, target.URL)
@@ -908,4 +1369,42 @@ func (l *LoadBalancing) ExtractTo(api *apidef.APIDefinition) {
 	}
 
 	api.Proxy.Targets = proxyConfTargets
+}
+
+// PreserveHostHeader holds the configuration for preserving the host header.
+type PreserveHostHeader struct {
+	// Enabled activates preserving the host header.
+	Enabled bool `json:"enabled" bson:"enabled"`
+}
+
+// Fill fills *PreserveHostHeader from apidef.APIDefinition.
+func (p *PreserveHostHeader) Fill(api apidef.APIDefinition) {
+	p.Enabled = api.Proxy.PreserveHostHeader
+}
+
+// ExtractTo extracts *PreserveHostHeader into *apidef.APIDefinition.
+func (p *PreserveHostHeader) ExtractTo(api *apidef.APIDefinition) {
+	api.Proxy.PreserveHostHeader = p.Enabled
+}
+
+// PreserveTrailingSlash holds the configuration for preserving the
+// trailing slash when routed to upstream services.
+//
+// The default behaviour of Tyk is to strip any trailing slash (/) from
+// the target URL when proxying the request upstream. In some use cases the
+// upstream might expect the trailing slash - or might consider /users/ to
+// be a different endpoint from /users (for example).
+type PreserveTrailingSlash struct {
+	// Enabled activates preserving the trailing slash when routing requests.
+	Enabled bool `json:"enabled" bson:"enabled"` // required
+}
+
+// Fill fills *PreserveTrailingSlash from apidef.APIDefinition.
+func (p *PreserveTrailingSlash) Fill(api apidef.APIDefinition) {
+	p.Enabled = api.Proxy.DisableStripSlash
+}
+
+// ExtractTo extracts *PreserveTrailingSlash into *apidef.APIDefinition.
+func (p *PreserveTrailingSlash) ExtractTo(api *apidef.APIDefinition) {
+	api.Proxy.DisableStripSlash = p.Enabled
 }

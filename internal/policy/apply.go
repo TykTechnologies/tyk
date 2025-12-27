@@ -110,6 +110,14 @@ func (t *Service) Apply(session *user.SessionState) error {
 		policyIDs = storage.PolicyIDs()
 	}
 
+	// Only the status of policies applied to a key should determine the validity of the key.
+	// If no policies are applied, preserve the session's own IsInactive state.
+	sessionInactiveState := session.IsInactive
+	hasPolicies := len(policyIDs) > 0
+	if hasPolicies {
+		sessionInactiveState = false
+	}
+
 	for _, polID := range policyIDs {
 		policy, ok := storage.PolicyByID(polID)
 		if !ok {
@@ -145,7 +153,7 @@ func (t *Service) Apply(session *user.SessionState) error {
 			}
 		}
 
-		session.IsInactive = session.IsInactive || policy.IsInactive
+		sessionInactiveState = sessionInactiveState || policy.IsInactive
 
 		for _, tag := range policy.Tags {
 			tags[tag] = true
@@ -159,6 +167,8 @@ func (t *Service) Apply(session *user.SessionState) error {
 			session.LastUpdated = policy.LastUpdated
 		}
 	}
+
+	session.IsInactive = sessionInactiveState
 
 	for _, tag := range session.Tags {
 		tags[tag] = true
@@ -375,26 +385,57 @@ func (t *Service) applyPartitions(policy user.Policy, session *user.SessionState
 
 				r.AllowedURLs = MergeAllowedURLs(r.AllowedURLs, v.AllowedURLs)
 
+				// When two or more non-empty policies are applied, only the
+				// fields restricted by all policies are in the resulting policy.
+				// A merge of `[a b]` and `[b c]` becomes `[b]`, as `b` is
+				// restricted by both of the policies.
 				if len(r.RestrictedTypes) == 0 {
 					r.RestrictedTypes = v.RestrictedTypes
 				} else {
+					// Create a map to track which types have been processed
+					processedTypes := make(map[string]bool)
+
 					for _, t := range v.RestrictedTypes {
+						typeFound := false
 						for ri, rt := range r.RestrictedTypes {
 							if t.Name == rt.Name {
-								r.RestrictedTypes[ri].Fields = intersection(rt.Fields, t.Fields)
+								// Merge fields for existing types
+								r.RestrictedTypes[ri].Fields = appendIfMissing(rt.Fields, t.Fields...)
+								typeFound = true
+								processedTypes[t.Name] = true
+								break
 							}
+						}
+						// Add new types that don't exist in destination
+						if !typeFound {
+							r.RestrictedTypes = append(r.RestrictedTypes, t)
 						}
 					}
 				}
 
+				// When two or more non-empty policies are applied, the fields allowed
+				// are merged in the resulting policy. For an example, `[a b]` and `[b c]`,
+				// results in a polict that allows `[a b c]`.
 				if len(r.AllowedTypes) == 0 {
 					r.AllowedTypes = v.AllowedTypes
 				} else {
+					// Create a map to track which types have been processed
+					processedTypes := make(map[string]bool)
+
 					for _, t := range v.AllowedTypes {
+						typeFound := false
 						for ri, rt := range r.AllowedTypes {
 							if t.Name == rt.Name {
-								r.AllowedTypes[ri].Fields = intersection(rt.Fields, t.Fields)
+								// Merge fields for existing types
+								r.AllowedTypes[ri].Fields = appendIfMissing(rt.Fields, t.Fields...)
+								typeFound = true
+								processedTypes[t.Name] = true
+								break
 							}
+						}
+						// Add new types that don't exist in destination
+						if !typeFound {
+							r.AllowedTypes = append(r.AllowedTypes, t)
 						}
 					}
 				}

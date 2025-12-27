@@ -505,6 +505,17 @@ func testPrepareApplyPolicies(tb testing.TB) (*policy.Service, []testApplyPolici
 
 	inactiveTCs := []testApplyPoliciesData{
 		{
+			"InactiveNoPolicies", []string{},
+			"", func(t *testing.T, s *user.SessionState) {
+				t.Helper()
+				if !s.IsInactive {
+					t.Fatalf("key without policies should preserve IsInactive=true from session")
+				}
+			}, &user.SessionState{
+				IsInactive: true,
+			}, false,
+		},
+		{
 			"InactiveMergeOne", []string{"tags1", "inactive1"},
 			"", func(t *testing.T, s *user.SessionState) {
 				t.Helper()
@@ -526,8 +537,8 @@ func testPrepareApplyPolicies(tb testing.TB) (*policy.Service, []testApplyPolici
 			"InactiveWithSession", []string{"tags1", "tags2"},
 			"", func(t *testing.T, s *user.SessionState) {
 				t.Helper()
-				if !s.IsInactive {
-					t.Fatalf("want IsInactive to be true")
+				if s.IsInactive {
+					t.Fatalf("both policies are active so we expect IsInactive to be false")
 				}
 			}, &user.SessionState{
 				IsInactive: true,
@@ -759,10 +770,10 @@ func testPrepareApplyPolicies(tb testing.TB) (*policy.Service, []testApplyPolici
 				t.Helper()
 
 				want := map[string]user.AccessDefinition{
-					"a": { // It should get intersection of restricted types.
+					"a": {
 						RestrictedTypes: []graphql.Type{
-							{Name: "Country", Fields: []string{"code"}},
-							{Name: "Person", Fields: []string{"name"}},
+							{Name: "Country", Fields: []string{"code", "name", "phone"}},
+							{Name: "Person", Fields: []string{"name", "height", "mass"}},
 						},
 						Limit: user.APILimit{},
 					},
@@ -778,10 +789,14 @@ func testPrepareApplyPolicies(tb testing.TB) (*policy.Service, []testApplyPolici
 				t.Helper()
 
 				want := map[string]user.AccessDefinition{
-					"a": { // It should get intersection of restricted types.
+					"a": {
 						AllowedTypes: []graphql.Type{
-							{Name: "Country", Fields: []string{"code"}},
-							{Name: "Person", Fields: []string{"name"}},
+							{Name: "Country", Fields: []string{"code", "name", "phone"}},
+							{Name: "Person", Fields: []string{"name", "height", "mass"}},
+						},
+						RestrictedTypes: []graphql.Type{
+							{Name: "Dog", Fields: []string{"name", "breed", "country"}},
+							{Name: "Cat", Fields: []string{"name", "country"}},
 						},
 						Limit: user.APILimit{},
 					},
@@ -1287,7 +1302,12 @@ func TestService_Apply(t *testing.T) {
 				}
 				sess.SetPolicies(policies...)
 				if err := service.Apply(sess); err != nil {
-					assert.ErrorContains(t, err, tc.errMatch)
+					if tc.errMatch != "" {
+						assert.ErrorContains(t, err, tc.errMatch)
+					} else {
+						t.Fail()
+					}
+
 					return
 				}
 

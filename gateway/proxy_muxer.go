@@ -64,6 +64,9 @@ func (h *handleWrapper) handleRequestLimits(w http.ResponseWriter, r *http.Reque
 }
 
 func (h *handleWrapper) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	// Store request start time for accurate latency measurement including all middlewares
+	ctxSetRequestStartTime(r, time.Now())
+
 	if r.Body != nil {
 		if !h.handleRequestLimits(w, r) {
 			return
@@ -289,11 +292,7 @@ func (gw *Gateway) flushNetworkAnalytics(ctx context.Context) {
 					APIID:        spec.APIID,
 					OrgID:        spec.OrgID,
 				}
-				if spec.DisableExpireAnalytics {
-					record.SetExpiry(0)
-				} else {
-					record.SetExpiry(spec.ExpireAnalyticsAfter)
-				}
+				record.SetExpiry(spec.ExpireAnalyticsAfter)
 				_ = gw.Analytics.RecordHit(&record)
 			}
 			gw.apisMu.RUnlock()

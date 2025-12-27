@@ -86,3 +86,46 @@ func TestValidateBentoConfiguration(t *testing.T) {
 		require.NoError(t, err)
 	})
 }
+
+func TestValidateBentoConfiguration_NewEnableAllExperimentalConfigValidator(t *testing.T) {
+	// The purpose of this test is to make SonarCloud happy. EnableAllExperimentalConfigValidator validates everything.
+	validator := NewEnableAllExperimentalConfigValidator()
+	require.NotNil(t, validator)
+
+	validDocumentWithAdditionalProperties := []byte(`{
+    "input": {
+        "label": "",
+        "kafka": {
+            "addresses": [],
+            "topics": [],
+            "target_version": "2.1.0",
+            "consumer_group": "",
+            "checkpoint_limit": 1024,
+            "auto_replay_nacks": true
+        },
+        "additional": {
+            "configuration": true
+        }
+    },
+    "output": {
+        "label": "",
+        "drop_on": {
+            "error": false,
+            "error_patterns": [],
+            "back_pressure": "30s",
+            "output": null
+        },
+        "aws_sns": {
+            "topic_arn": "",
+            "message_group_id": "",
+            "message_deduplication_id": "",
+            "max_in_flight": 64,
+            "metadata": {
+                "exclude_prefixes": []
+            }
+        }
+    }
+}`)
+	err := validator.Validate(validDocumentWithAdditionalProperties)
+	require.NoError(t, err)
+}

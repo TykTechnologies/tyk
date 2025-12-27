@@ -5,6 +5,7 @@ import (
 	"crypto/md5"
 	"encoding/hex"
 	"errors"
+	"fmt"
 	htmltemplate "html/template"
 	"io/ioutil"
 	"net/http"
@@ -18,7 +19,8 @@ import (
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/header"
-	"github.com/TykTechnologies/tyk/internal/event"
+	"github.com/TykTechnologies/tyk/internal/certcheck"
+	"github.com/TykTechnologies/tyk/internal/httpclient"
 	"github.com/TykTechnologies/tyk/storage"
 )
 
@@ -30,15 +32,14 @@ const (
 	WH_POST   WebHookRequestMethod = "POST"
 	WH_DELETE WebHookRequestMethod = "DELETE"
 	WH_PATCH  WebHookRequestMethod = "PATCH"
-
-	// EH_WebHook is an alias maintained for backwards compatibility.
-	// it is the handler to register a webhook event.
-	EH_WebHook = event.WebHookHandler
 )
 
 var (
 	// ErrEventHandlerDisabled is returned when the event handler is disabled.
 	ErrEventHandlerDisabled = errors.New("event handler disabled")
+
+	// ErrCouldNotCastMetaData is returned when metadata cannot be cast to the expected type.
+	ErrCouldNotCastMetaData = errors.New("could not cast meta data")
 )
 
 // WebHookHandler is an event handler that triggers web hooks
@@ -95,7 +96,11 @@ func (w *WebHookHandler) Init(handlerConf interface{}) error {
 			"target": w.conf.TargetPath,
 		}).Info("Loading default template.")
 		defaultPath := filepath.Join(w.Gw.GetConfig().TemplatePath, "default_webhook.json")
-		w.template, err = htmltemplate.ParseFiles(defaultPath)
+		w.template = htmltemplate.New("default_webhook.json").Funcs(htmltemplate.FuncMap{
+			"as_rfc3339":             templateFuncAsRFC3339(),
+			"as_rfc3339_from_string": templateFuncAsRFC3339FromString(log),
+		})
+		w.template, err = w.template.ParseFiles(defaultPath)
 		if err != nil {
 			log.WithFields(logrus.Fields{
 				"prefix": "webhooks",
@@ -178,11 +183,49 @@ func (w *WebHookHandler) checkURL(r string) bool {
 	return true
 }
 
-func (w *WebHookHandler) Checksum(reqBody string) (string, error) {
-	// We do this twice because fuck it.
-	localRequest, _ := http.NewRequest(string(w.getRequestMethod(w.conf.Method)), w.conf.TargetPath, strings.NewReader(reqBody))
+func (w *WebHookHandler) Checksum(em config.EventMessage, reqBody string) (string, error) {
 	h := md5.New()
-	localRequest.Write(h)
+
+	// EventCertificateExpiringSoon and EventCertificateExpired do have dynamic bodies.
+	// Checksum will always be different, so a different strategy is needed in those cases.
+	switch em.Type {
+	case EventCertificateExpiringSoon:
+		meta, ok := em.Meta.(certcheck.EventCertificateExpiringSoonMeta)
+		if !ok {
+			return "", ErrCouldNotCastMetaData
+		}
+		hashBody := fmt.Sprintf("%s%s%s%s%s",
+			em.Type,
+			meta.CertID,
+			meta.CertName,
+			meta.ExpiresAt.String(),
+			meta.APIID,
+		)
+		h.Write([]byte(hashBody))
+	case EventCertificateExpired:
+		meta, ok := em.Meta.(certcheck.EventCertificateExpiredMeta)
+		if !ok {
+			return "", ErrCouldNotCastMetaData
+		}
+		hashBody := fmt.Sprintf("%s%s%s%s%s",
+			em.Type,
+			meta.CertID,
+			meta.CertName,
+			meta.ExpiredAt.String(),
+			meta.APIID,
+		)
+		h.Write([]byte(hashBody))
+	default:
+		localRequest, err := http.NewRequest(string(w.getRequestMethod(w.conf.Method)), w.conf.TargetPath, strings.NewReader(reqBody))
+		if err != nil {
+			return "", err
+		}
+		err = localRequest.Write(h)
+		if err != nil {
+			return "", err
+		}
+	}
+
 	return hex.EncodeToString(h.Sum(nil)), nil
 }
 
@@ -241,14 +284,38 @@ func (w *WebHookHandler) HandleEvent(em config.EventMessage) {
 	}
 
 	// Generate signature for request
-	reqChecksum, _ := w.Checksum(reqBody)
+	reqChecksum, err := w.Checksum(em, reqBody)
+	if err != nil {
+		log.WithError(err).WithFields(logrus.Fields{
+			"prefix": "webhooks",
+		}).Error("Webhook checksum error")
+		return
+	}
 
 	// Check request velocity for this hook (wasHookFired())
 	if w.WasHookFired(reqChecksum) {
 		return
 	}
 
-	cli := &http.Client{Timeout: 30 * time.Second}
+	// Create HTTP client using factory for webhook service
+	clientFactory := NewExternalHTTPClientFactory(w.Gw)
+	cli, err := clientFactory.CreateWebhookClient()
+	if err != nil {
+		// Check if mTLS is explicitly enabled and error is certificate-related - if so, don't fallback as it would bypass security
+		gwConfig := w.Gw.GetConfig()
+		if gwConfig.ExternalServices.Webhooks.MTLS.Enabled && httpclient.IsMTLSError(err) {
+			log.WithError(err).Error("mTLS configuration failed for webhooks. Webhook delivery will be skipped to maintain security.")
+			// Skip webhook delivery entirely when mTLS is misconfigured
+			return
+		} else {
+			// For other errors (not configured, proxy config), fallback to default client
+			log.WithError(err).Debug("Failed to create webhook HTTP client, falling back to default")
+			log.Debug("[ExternalServices] Falling back to legacy webhook client due to factory error")
+			cli = &http.Client{Timeout: 30 * time.Second}
+		}
+	} else {
+		log.Debugf("[ExternalServices] Using external services webhook client for URL: %s", req.URL.String())
+	}
 
 	resp, err := cli.Do(req)
 	if err != nil {
@@ -283,4 +350,29 @@ func (w *WebHookHandler) HandleEvent(em config.EventMessage) {
 	}
 
 	w.setHookFired(reqChecksum)
+}
+
+func templateFuncAsRFC3339() func(time.Time) string {
+	return func(t time.Time) string {
+		return t.Format(time.RFC3339)
+	}
+}
+
+func templateFuncAsRFC3339FromString(log *logrus.Logger) func(string) string {
+	return func(s string) string {
+		t, err := time.Parse("2006-01-02 15:04:05.999999 -0700 MST", s)
+		if err == nil {
+			return t.Format(time.RFC3339)
+		}
+
+		log.WithFields(logrus.Fields{
+			"prefix":   "webhooks",
+			"datetime": s,
+			"error":    err.Error(),
+		}).
+			Debug("Could not parse time to RFC3339 from string.")
+
+		// Fallback to the original string
+		return s
+	}
 }

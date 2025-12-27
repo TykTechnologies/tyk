@@ -302,7 +302,7 @@ func TestLooping(t *testing.T) {
 				Title:   "oas doc",
 				Version: "1",
 			},
-			Paths: make(openapi3.Paths),
+			Paths: openapi3.NewPaths(),
 		}
 
 		oasObj := oas.OAS{T: oasAPI}

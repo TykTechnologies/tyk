@@ -2,6 +2,7 @@ package gateway
 
 import (
 	"bytes"
+	"context"
 	"encoding/base64"
 	"io"
 	"io/ioutil"
@@ -20,6 +21,7 @@ import (
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/ctx"
 	"github.com/TykTechnologies/tyk/header"
+	"github.com/TykTechnologies/tyk/internal/otel"
 	"github.com/TykTechnologies/tyk/request"
 	"github.com/TykTechnologies/tyk/user"
 )
@@ -143,10 +145,14 @@ func recordGraphDetails(rec *analytics.AnalyticsRecord, r *http.Request, resp *h
 	)
 	if resp.Body != nil {
 		httputil.RemoveResponseTransferEncoding(resp, "chunked")
+		// respBodyReader tries to decompress the response body if the Accept-Encoding
+		// header is a non-empty string.
+		resp.Body = respBodyReader(r, resp)
 		respBody, err = io.ReadAll(resp.Body)
 		defer func() {
 			_ = resp.Body.Close()
-			resp.Body = respBodyReader(r, resp)
+			// Create a new Reader and assign it to the response body.
+			resp.Body = io.NopCloser(bytes.NewBuffer(respBody))
 		}()
 		if err != nil {
 			logger.WithError(err).Error("error recording graph analytics")
@@ -161,6 +167,18 @@ func recordGraphDetails(rec *analytics.AnalyticsRecord, r *http.Request, resp *h
 		return
 	}
 	rec.GraphQLStats = stats
+}
+
+const traceTagPrefix = "trace-id-"
+
+func (s *SuccessHandler) addTraceIDTag(reqCtx context.Context, tags []string) []string {
+	if !s.Gw.GetConfig().OpenTelemetry.Enabled {
+		return tags
+	}
+	if id := otel.ExtractTraceID(reqCtx); id != "" {
+		tags = append(tags, traceTagPrefix+id)
+	}
+	return tags
 }
 
 func (s *SuccessHandler) RecordHit(r *http.Request, timing analytics.Latency, code int, responseCopy *http.Response, cached bool) {
@@ -205,6 +223,8 @@ func (s *SuccessHandler) RecordHit(r *http.Request, timing analytics.Latency, co
 		if cached {
 			tags = append(tags, "cached-response")
 		}
+
+		tags = s.addTraceIDTag(r.Context(), tags)
 
 		rawRequest := ""
 		rawResponse := ""
@@ -305,10 +325,6 @@ func (s *SuccessHandler) RecordHit(r *http.Request, timing analytics.Latency, co
 			}
 		}
 
-		if s.Spec.DisableExpireAnalytics {
-			expiresAfter = 0
-		}
-
 		record.SetExpiry(expiresAfter)
 
 		if s.Spec.GlobalConfig.AnalyticsConfig.NormaliseUrls.Enabled {
@@ -379,13 +395,30 @@ func (s *SuccessHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) *http
 	t1 := time.Now()
 	resp := s.Proxy.ServeHTTP(w, r)
 
-	millisec := DurationToMillisecond(time.Since(t1))
+	t2 := time.Now()
+	proxyDuration := t2.Sub(t1)
+	millisec := DurationToMillisecond(proxyDuration)
 	log.Debug("Upstream request took (ms): ", millisec)
 
 	if resp.Response != nil {
+		upstreamMs := int64(DurationToMillisecond(resp.UpstreamLatency))
+
+		// Calculate total time including all middlewares
+		var totalMs int64
+		requestStartTime := ctxGetRequestStartTime(r)
+		if !requestStartTime.IsZero() {
+			totalMs = int64(DurationToMillisecond(t2.Sub(requestStartTime)))
+			log.Debugf("Request start time found (UTC): %s, total time: %dms", requestStartTime.UTC().Format(time.RFC3339), totalMs)
+		} else {
+			// Fallback to proxy duration if start time not set
+			totalMs = int64(millisec)
+			log.Debug("Request start time NOT found, using proxy duration as fallback")
+		}
+
 		latency := analytics.Latency{
-			Total:    int64(millisec),
-			Upstream: int64(DurationToMillisecond(resp.UpstreamLatency)),
+			Total:    totalMs,
+			Upstream: upstreamMs,
+			Gateway:  totalMs - upstreamMs,
 		}
 		s.RecordHit(r, latency, resp.Response.StatusCode, resp.Response, false)
 		s.RecordAccessLog(r, resp.Response, latency)
@@ -405,16 +438,30 @@ func (s *SuccessHandler) ServeHTTPWithCache(w http.ResponseWriter, r *http.Reque
 
 	t1 := time.Now()
 	inRes := s.Proxy.ServeHTTPForCache(w, r)
-	millisec := DurationToMillisecond(time.Since(t1))
+	t2 := time.Now()
+	proxyDuration := t2.Sub(t1)
+	millisec := DurationToMillisecond(proxyDuration)
 
 	addVersionHeader(w, r, s.Spec.GlobalConfig)
 
 	log.Debug("Upstream request took (ms): ", millisec)
 
 	if inRes.Response != nil {
+		upstreamMs := int64(DurationToMillisecond(inRes.UpstreamLatency))
+
+		// Calculate total time including all middlewares
+		var totalMs int64
+		if requestStartTime := ctxGetRequestStartTime(r); !requestStartTime.IsZero() {
+			totalMs = int64(DurationToMillisecond(t2.Sub(requestStartTime)))
+		} else {
+			// Fallback to proxy duration if start time not set
+			totalMs = int64(millisec)
+		}
+
 		latency := analytics.Latency{
-			Total:    int64(millisec),
-			Upstream: int64(DurationToMillisecond(inRes.UpstreamLatency)),
+			Total:    totalMs,
+			Upstream: upstreamMs,
+			Gateway:  totalMs - upstreamMs,
 		}
 		s.RecordHit(r, latency, inRes.Response.StatusCode, inRes.Response, false)
 	}

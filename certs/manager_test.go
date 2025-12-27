@@ -15,11 +15,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/TykTechnologies/tyk/storage"
-
 	"github.com/stretchr/testify/assert"
 
 	tykcrypto "github.com/TykTechnologies/tyk/internal/crypto"
+	"github.com/TykTechnologies/tyk/storage"
 )
 
 func newManager() *certificateManager {
@@ -68,7 +67,9 @@ func TestAddCertificate(t *testing.T) {
 	cert2Pem, key2Pem := genCertificateFromCommonName("test2", false)
 	combinedPem := append(cert2Pem, key2Pem...)
 	combinedPemWrongPrivate := append(cert2Pem, keyPem...)
-	priv, _ := rsa.GenerateKey(rand.Reader, 512)
+
+	// crypto/rsa: 512-bit keys are insecure (see https://go.dev/pkg/crypto/rsa#hdr-Minimum_key_size)
+	priv, _ := rsa.GenerateKey(rand.Reader, 2048)
 	privDer, _ := x509.MarshalPKIXPublicKey(&priv.PublicKey)
 	pubPem := pem.EncodeToMemory(&pem.Block{Type: "PUBLIC KEY", Bytes: privDer})
 	pubID := tykcrypto.HexSHA256(privDer)

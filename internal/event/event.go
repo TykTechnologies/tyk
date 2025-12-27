@@ -15,6 +15,8 @@ const (
 	QuotaExceeded Event = "QuotaExceeded"
 	// AuthFailure is the event triggered when key has failed authentication or has attempted access and was denied.
 	AuthFailure Event = "AuthFailure"
+	// UpstreamOAuthError is the event triggered when an upstream OAuth error occurs.
+	UpstreamOAuthError Event = "UpstreamOAuthError"
 	// KeyExpired is the event triggered when a key has attempted access but is expired.
 	KeyExpired Event = "KeyExpired"
 	// VersionFailure is the event triggered when a key has attempted access to a version it does not have permission to access.
@@ -42,6 +44,10 @@ const (
 	TokenUpdated Event = "TokenUpdated"
 	// TokenDeleted is the event triggered when a token is deleted.
 	TokenDeleted Event = "TokenDeleted"
+	// CertificateExpiringSoon is the event triggered when a certificate is approaching expiration.
+	CertificateExpiringSoon Event = "CertificateExpiringSoon"
+	// CertificateExpired is the event triggered when a certificate is expired.
+	CertificateExpired Event = "CertificateExpired"
 )
 
 // Rate limiter events
@@ -93,6 +99,10 @@ type Kind string
 const (
 	// WebhookKind is the action to be specified in OAS API definition.
 	WebhookKind Kind = "webhook"
+	// JSVMKind represents a custom action to be executed when an event is triggered.
+	JSVMKind Kind = "custom"
+	// LogKind represents a log action to be performed when an event is triggered.
+	LogKind Kind = "log"
 )
 
 type contextKey string

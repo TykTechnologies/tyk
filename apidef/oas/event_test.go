@@ -89,6 +89,106 @@ func TestEventHandlers(t *testing.T) {
 				},
 			},
 			{
+				title: "jsvm events",
+				input: EventHandlers{
+					{
+						Enabled: true,
+						Trigger: event.QuotaExceeded,
+						Kind:    event.JSVMKind,
+						ID:      "random-id",
+						Name:    "myQuotaEventHandler",
+						JSVMEvent: JSVMEvent{
+							FunctionName: "myQuotaEventHandler",
+							Path:         "my_script.js",
+						},
+					},
+					{
+						Enabled: false,
+						Trigger: event.RateLimitExceeded,
+						Kind:    event.JSVMKind,
+						ID:      "",
+						Name:    "myRateLimitEventHandler",
+						JSVMEvent: JSVMEvent{
+							FunctionName: "myRateLimitEventHandler",
+							Path:         "my_script.js",
+						},
+					},
+				},
+				expected: apidef.EventHandlerMetaConfig{
+					Events: map[event.Event][]apidef.EventHandlerTriggerConfig{
+						event.QuotaExceeded: {
+							{
+								Handler: event.JSVMHandler,
+								HandlerMeta: map[string]any{
+									"disabled": false,
+									"id":       "random-id",
+									"name":     "myQuotaEventHandler",
+									"path":     "my_script.js",
+								},
+							},
+						},
+						event.RateLimitExceeded: {
+							{
+								Handler: event.JSVMHandler,
+								HandlerMeta: map[string]any{
+									"disabled": true,
+									"id":       "",
+									"name":     "myRateLimitEventHandler",
+									"path":     "my_script.js",
+								},
+							},
+						},
+					},
+				},
+			},
+			{
+				title: "log events",
+				input: EventHandlers{
+					{
+						Enabled: true,
+						Trigger: event.QuotaExceeded,
+						Kind:    event.LogKind,
+						ID:      "random-id",
+						Name:    "QuotaExceededEvent",
+						LogEvent: LogEvent{
+							LogPrefix: "QuotaExceededEvent",
+						},
+					},
+					{
+						Enabled: false,
+						Trigger: event.RateLimitExceeded,
+						Kind:    event.LogKind,
+						ID:      "",
+						Name:    "RateLimitExceededEvent",
+						LogEvent: LogEvent{
+							LogPrefix: "RateLimitExceededEvent",
+						},
+					},
+				},
+				expected: apidef.EventHandlerMetaConfig{
+					Events: map[event.Event][]apidef.EventHandlerTriggerConfig{
+						event.QuotaExceeded: {
+							{
+								Handler: event.LogHandler,
+								HandlerMeta: map[string]any{
+									"disabled": false,
+									"prefix":   "QuotaExceededEvent",
+								},
+							},
+						},
+						event.RateLimitExceeded: {
+							{
+								Handler: event.LogHandler,
+								HandlerMeta: map[string]any{
+									"disabled": true,
+									"prefix":   "RateLimitExceededEvent",
+								},
+							},
+						},
+					},
+				},
+			},
+			{
 				title: "skip non webhook actions",
 				input: EventHandlers{
 					{
@@ -217,7 +317,107 @@ func TestEventHandlers(t *testing.T) {
 				},
 			},
 			{
-				title:    "skip non webhook actions",
+				title: "jsvm event",
+				input: apidef.EventHandlerMetaConfig{
+					Events: map[event.Event][]apidef.EventHandlerTriggerConfig{
+						event.QuotaExceeded: {
+							{
+								Handler: event.JSVMHandler,
+								HandlerMeta: map[string]any{
+									"disabled": false,
+									"id":       "random-id",
+									"name":     "myQuotaEventHandler",
+									"path":     "my_script.js",
+								},
+							},
+						},
+						event.RateLimitExceeded: {
+							{
+								Handler: event.JSVMHandler,
+								HandlerMeta: map[string]any{
+									"disabled": true,
+									"id":       "",
+									"name":     "myRateLimitEventHandler",
+									"path":     "my_script.js",
+								},
+							},
+						},
+					},
+				},
+				expected: EventHandlers{
+					{
+						Enabled: true,
+						Trigger: event.QuotaExceeded,
+						Kind:    event.JSVMKind,
+						ID:      "random-id",
+						Name:    "myQuotaEventHandler",
+						JSVMEvent: JSVMEvent{
+							FunctionName: "myQuotaEventHandler",
+							Path:         "my_script.js",
+						},
+					},
+					{
+						Enabled: false,
+						Trigger: event.RateLimitExceeded,
+						Kind:    event.JSVMKind,
+						ID:      "",
+						Name:    "myRateLimitEventHandler",
+						JSVMEvent: JSVMEvent{
+							FunctionName: "myRateLimitEventHandler",
+							Path:         "my_script.js",
+						},
+					},
+				},
+			},
+			{
+				title: "log event",
+				input: apidef.EventHandlerMetaConfig{
+					Events: map[event.Event][]apidef.EventHandlerTriggerConfig{
+						event.QuotaExceeded: {
+							{
+								Handler: event.LogHandler,
+								HandlerMeta: map[string]any{
+									"disabled": false,
+									"prefix":   "QuotaExceededEvent",
+								},
+							},
+						},
+						event.RateLimitExceeded: {
+							{
+								Handler: event.LogHandler,
+								HandlerMeta: map[string]any{
+									"disabled": true,
+									"prefix":   "RateLimitExceededEvent",
+								},
+							},
+						},
+					},
+				},
+				expected: EventHandlers{
+					{
+						Enabled: true,
+						Trigger: event.QuotaExceeded,
+						Kind:    event.LogKind,
+						ID:      "",
+						Name:    "QuotaExceededEvent",
+						LogEvent: LogEvent{
+							LogPrefix: "QuotaExceededEvent",
+						},
+					},
+					{
+						Enabled: false,
+						Trigger: event.RateLimitExceeded,
+						Kind:    event.LogKind,
+						ID:      "",
+						Name:    "RateLimitExceededEvent",
+						LogEvent: LogEvent{
+							LogPrefix: "RateLimitExceededEvent",
+						},
+					},
+				},
+			},
+			{
+				title:    "skip empty actions",
 				input:    apidef.EventHandlerMetaConfig{},
 				expected: nil,
 			},
@@ -255,86 +455,208 @@ func TestEventHandlers(t *testing.T) {
 }
 
 func TestEventHandler_MarshalJSON(t *testing.T) {
-	e := EventHandler{
-		Enabled: true,
-		Trigger: event.QuotaExceeded,
-		Kind:    event.WebhookKind,
-		ID:      "random-id",
-		Name:    "test-webhook",
-		Webhook: WebhookEvent{
-			URL:            "https://webhook.site/uuid",
-			Headers:        Headers{{Name: "Auth", Value: "key"}},
-			BodyTemplate:   "/path/to/template",
-			CoolDownPeriod: ReadableDuration(time.Second * 20),
-			Method:         http.MethodPost,
-		},
+	type testCase struct {
+		title    string
+		input    EventHandler
+		expected map[string]any
 	}
 
-	data, err := json.Marshal(e)
-	assert.NoError(t, err)
-	expected := map[string]interface{}{
-		"id":      "random-id",
-		"enabled": true,
-		"trigger": "QuotaExceeded",
-		"type":    "webhook",
-		"name":    "test-webhook",
-		"url":     "https://webhook.site/uuid",
-		"headers": []interface{}{
-			map[string]interface{}{
-				"name":  "Auth",
-				"value": "key",
+	testCases := []testCase{
+		{
+			title: "should marshal webhook event handler",
+			input: EventHandler{
+				Enabled: true,
+				Trigger: event.QuotaExceeded,
+				Kind:    event.WebhookKind,
+				ID:      "random-id",
+				Name:    "test-webhook",
+				Webhook: WebhookEvent{
+					URL:            "https://webhook.site/uuid",
+					Headers:        Headers{{Name: "Auth", Value: "key"}},
+					BodyTemplate:   "/path/to/template",
+					CoolDownPeriod: ReadableDuration(time.Second * 20),
+					Method:         http.MethodPost,
+				},
+			},
+			expected: map[string]any{
+				"id":      "random-id",
+				"enabled": true,
+				"trigger": "QuotaExceeded",
+				"type":    "webhook",
+				"name":    "test-webhook",
+				"url":     "https://webhook.site/uuid",
+				"headers": []any{
+					map[string]any{
+						"name":  "Auth",
+						"value": "key",
+					},
+				},
+				"bodyTemplate":   "/path/to/template",
+				"cooldownPeriod": "20s",
+				"method":         "POST",
 			},
 		},
-		"bodyTemplate":   "/path/to/template",
-		"cooldownPeriod": "20s",
-		"method":         "POST",
+		{
+			title: "should marshal jsvm event handler",
+			input: EventHandler{
+				Enabled: true,
+				Trigger: event.QuotaExceeded,
+				Kind:    event.JSVMKind,
+				ID:      "random-id",
+				Name:    "test-custom",
+				JSVMEvent: JSVMEvent{
+					FunctionName: "myCustomEventHandler",
+					Path:         "event_handlers/session_editor.js",
+				},
+			},
+			expected: map[string]any{
+				"id":           "random-id",
+				"enabled":      true,
+				"trigger":      "QuotaExceeded",
+				"type":         "custom",
+				"name":         "test-custom",
+				"functionName": "myCustomEventHandler",
+				"path":         "event_handlers/session_editor.js",
+			},
+		},
+		{
+			title: "should marshal log event handler",
+			input: EventHandler{
+				Enabled: true,
+				Trigger: event.QuotaExceeded,
+				Kind:    event.LogKind,
+				ID:      "random-id",
+				Name:    "test-log",
+				LogEvent: LogEvent{
+					LogPrefix: "QuotaExceededEvent",
+				},
+			},
+			expected: map[string]any{
+				"id":        "random-id",
+				"enabled":   true,
+				"trigger":   "QuotaExceeded",
+				"type":      "log",
+				"name":      "test-log",
+				"logPrefix": "QuotaExceededEvent",
+			},
+		},
 	}
 
-	actual := map[string]interface{}{}
-	err = json.Unmarshal(data, &actual)
-	assert.NoError(t, err)
-	assert.EqualValues(t, expected, actual)
+	for _, tc := range testCases {
+		tc := tc
+		t.Run(tc.title, func(t *testing.T) {
+			data, err := json.Marshal(tc.input)
+			assert.NoError(t, err)
+
+			actual := map[string]any{}
+			err = json.Unmarshal(data, &actual)
+			assert.NoError(t, err)
+			assert.EqualValues(t, tc.expected, actual)
+		})
+	}
+
 }
 
 func TestEventHandler_UnmarshalJSON(t *testing.T) {
-	in := map[string]interface{}{
-		"id":      "random-id",
-		"enabled": true,
-		"trigger": "QuotaExceeded",
-		"type":    "webhook",
-		"name":    "test-webhook",
-		"url":     "https://webhook.site/uuid",
-		"headers": []interface{}{
-			map[string]interface{}{
-				"name":  "Auth",
-				"value": "key",
+	type testCase struct {
+		title    string
+		input    map[string]any
+		expected EventHandler
+	}
+
+	testCases := []testCase{
+		{
+			title: "should unmarshal webhook event handler",
+			input: map[string]any{
+				"id":      "random-id",
+				"enabled": true,
+				"trigger": "QuotaExceeded",
+				"type":    "webhook",
+				"name":    "test-webhook",
+				"url":     "https://webhook.site/uuid",
+				"headers": []any{
+					map[string]any{
+						"name":  "Auth",
+						"value": "key",
+					},
+				},
+				"bodyTemplate":   "/path/to/template",
+				"cooldownPeriod": "20s",
+				"method":         "POST",
+			},
+			expected: EventHandler{
+				Enabled: true,
+				Trigger: event.QuotaExceeded,
+				Kind:    event.WebhookKind,
+				ID:      "random-id",
+				Name:    "test-webhook",
+				Webhook: WebhookEvent{
+					URL:            "https://webhook.site/uuid",
+					Headers:        Headers{{Name: "Auth", Value: "key"}},
+					BodyTemplate:   "/path/to/template",
+					CoolDownPeriod: ReadableDuration(time.Second * 20),
+					Method:         http.MethodPost,
+				},
 			},
 		},
-		"bodyTemplate":   "/path/to/template",
-		"cooldownPeriod": "20s",
-		"method":         "POST",
-	}
-
-	data, err := json.Marshal(in)
-	assert.NoError(t, err)
-
-	e := EventHandler{}
-	err = json.Unmarshal(data, &e)
-	assert.NoError(t, err)
-	expected := EventHandler{
-		Enabled: true,
-		Trigger: event.QuotaExceeded,
-		Kind:    event.WebhookKind,
-		ID:      "random-id",
-		Name:    "test-webhook",
-		Webhook: WebhookEvent{
-			URL:            "https://webhook.site/uuid",
-			Headers:        Headers{{Name: "Auth", Value: "key"}},
-			BodyTemplate:   "/path/to/template",
-			CoolDownPeriod: ReadableDuration(time.Second * 20),
-			Method:         http.MethodPost,
+		{
+			title: "should unmarshal jsvm event handler",
+			input: map[string]any{
+				"id":           "random-id",
+				"enabled":      true,
+				"trigger":      "QuotaExceeded",
+				"type":         "custom",
+				"name":         "test-custom",
+				"functionName": "myCustomEventHandler",
+				"path":         "event_handlers/session_editor.js",
+				"body":         "console.log('hello world');",
+			},
+			expected: EventHandler{
+				Enabled: true,
+				Trigger: event.QuotaExceeded,
+				Kind:    event.JSVMKind,
+				ID:      "random-id",
+				Name:    "test-custom",
+				JSVMEvent: JSVMEvent{
+					FunctionName: "myCustomEventHandler",
+					Path:         "event_handlers/session_editor.js",
+				},
+			},
+		},
+		{
+			title: "should unmarshal log event handler",
+			input: map[string]any{
+				"id":        "random-id",
+				"enabled":   true,
+				"trigger":   "QuotaExceeded",
+				"type":      "log",
+				"name":      "test-log",
+				"logPrefix": "QuotaExceededEvent",
+			},
+			expected: EventHandler{
+				Enabled: true,
+				Trigger: event.QuotaExceeded,
+				Kind:    event.LogKind,
+				ID:      "random-id",
+				Name:    "test-log",
+				LogEvent: LogEvent{
+					LogPrefix: "QuotaExceededEvent",
+				},
+			},
 		},
 	}
 
-	assert.EqualValues(t, expected, e)
+	for _, tc := range testCases {
+		tc := tc
+		t.Run(tc.title, func(t *testing.T) {
+			data, err := json.Marshal(tc.input)
+			assert.NoError(t, err)
+
+			e := EventHandler{}
+			err = json.Unmarshal(data, &e)
+			assert.NoError(t, err)
+
+			assert.EqualValues(t, tc.expected, e)
+		})
+	}
 }

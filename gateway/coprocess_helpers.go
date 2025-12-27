@@ -29,26 +29,18 @@ func TykSessionState(session *coprocess.SessionState) *user.SessionState {
 		}
 	}
 
-	var basicAuthData struct {
-		Password string        `json:"password" msg:"password"`
-		Hash     user.HashType `json:"hash_type" msg:"hash_type"`
-	}
+	var basicAuthData user.BasicAuthData
 	if session.BasicAuthData != nil {
 		basicAuthData.Password = session.BasicAuthData.Password
 		basicAuthData.Hash = user.HashType(session.BasicAuthData.Hash)
 	}
 
-	var jwtData struct {
-		Secret string `json:"secret" msg:"secret"`
-	}
+	var jwtData user.JWTData
 	if session.JwtData != nil {
 		jwtData.Secret = session.JwtData.Secret
 	}
 
-	var monitor struct {
-		TriggerLimits []float64 `json:"trigger_limits" msg:"trigger_limits"`
-	}
-
+	var monitor user.Monitor
 	if session.Monitor != nil {
 		monitor.TriggerLimits = session.Monitor.TriggerLimits
 	}
@@ -92,6 +84,7 @@ func TykSessionState(session *coprocess.SessionState) *user.SessionState {
 		LastUpdated:             session.LastUpdated,
 		IdExtractorDeadline:     session.IdExtractorDeadline,
 		SessionLifetime:         session.SessionLifetime,
+		KeyID:                   session.KeyId,
 	}
 }
 
@@ -178,6 +171,7 @@ func ProtoSessionState(session *user.SessionState) *coprocess.SessionState {
 		LastUpdated:             session.LastUpdated,
 		IdExtractorDeadline:     session.IdExtractorDeadline,
 		SessionLifetime:         session.SessionLifetime,
+		KeyId:                   session.KeyID,
 	}
 }
 

@@ -14,6 +14,8 @@
 /Makefile                               @TykTechnologies/core-api-squad
 /Taskfile.yml                           @TykTechnologies/core-api-squad
 /docker-compose.yml                     @TykTechnologies/core-api-squad
+/.golangci.yml                          @TykTechnologies/core-api-squad
+/.golangci.dev.yml                      @TykTechnologies/core-api-squad
 
 # Core API Squad ownership of plugin compiler and related tests.
 

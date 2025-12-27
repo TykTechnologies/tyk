@@ -1914,6 +1914,7 @@
         "RateLimitSmoothingUp",
         "RateLimitSmoothingDown",
         "AuthFailure",
+        "UpstreamOAuthError",
         "KeyExpired",
         "VersionFailure",
         "OrgQuotaExceeded",
@@ -1926,7 +1927,9 @@
         "HostUp",
         "TokenCreated",
         "TokenUpdated",
-        "TokenDeleted"
+        "TokenDeleted",
+        "CertificateExpiringSoon",
+        "CertificateExpired"
       ]
     },
     "X-Tyk-ContextVariables": {

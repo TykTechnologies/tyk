@@ -18,6 +18,7 @@ import (
 	"github.com/TykTechnologies/tyk/internal/event"
 
 	"github.com/TykTechnologies/tyk/internal/reflect"
+	tyktime "github.com/TykTechnologies/tyk/internal/time"
 
 	"golang.org/x/oauth2"
 
@@ -111,14 +112,23 @@ const (
 	DefaultAPIVersionKey = "x-api-version"
 	HeaderBaseAPIID      = "x-tyk-base-api-id"
 
-	AuthTokenType     = "authToken"
-	JWTType           = "jwt"
-	HMACType          = "hmac"
-	BasicType         = "basic"
-	CoprocessType     = "coprocess"
-	OAuthType         = "oauth"
+	AuthTokenType = "authToken"
+	JWTType       = "jwt"
+	HMACType      = "hmac"
+	BasicType     = "basic"
+	CoprocessType = "coprocess"
+	OAuthType     = "oauth"
+	// ExternalOAuthType holds configuration for an external OAuth provider.
+	// Deprecated: ExternalOAuth support was deprecated in Tyk 5.7.0.
+	// To avoid any disruptions, we recommend that you use JSON Web Token (JWT) instead,
+	// as explained in https://tyk.io/docs/basic-config-and-security/security/authentication-authorization/ext-oauth-middleware/.
 	ExternalOAuthType = "externalOAuth"
-	OIDCType          = "oidc"
+	// OIDCType holds configuration for OpenID Connect.
+	// Deprecated: OIDC support has been deprecated from 5.7.0.
+	// To avoid any disruptions, we recommend that you use JSON Web Token (JWT) instead,
+	// as explained in https://tyk.io/docs/api-management/client-authentication/#integrate-with-openid-connect-deprecated.
+
+	OIDCType = "oidc"
 
 	// OAuthAuthorizationTypeClientCredentials is the authorization type for client credentials flow.
 	OAuthAuthorizationTypeClientCredentials = "clientCredentials"
@@ -454,6 +464,13 @@ type VersionDefinition struct {
 	BaseID string `bson:"base_id" json:"-"` // json tag is `-` because we want this to be hidden to user
 }
 
+func (v *VersionDefinition) ResolvedDefault() string {
+	if v.Default == Self {
+		return v.Name
+	}
+	return v.Default
+}
+
 type VersionData struct {
 	NotVersioned   bool                   `bson:"not_versioned" json:"not_versioned"`
 	DefaultVersion string                 `bson:"default_version" json:"default_version"`
@@ -576,7 +593,6 @@ type MiddlewareSection struct {
 	PostKeyAuth []MiddlewareDefinition `bson:"post_key_auth" json:"post_key_auth"`
 	AuthCheck   MiddlewareDefinition   `bson:"auth_check" json:"auth_check"`
 	Response    []MiddlewareDefinition `bson:"response" json:"response"`
-	TrafficLogs []MiddlewareDefinition `bson:"traffic_logs" json:"traffic_logs"`
 	Driver      MiddlewareDriver       `bson:"driver" json:"driver"`
 	IdExtractor MiddlewareIdExtractor  `bson:"id_extractor" json:"id_extractor"`
 }
@@ -594,22 +610,6 @@ type CacheOptions struct {
 type ResponseProcessor struct {
 	Name    string      `bson:"name" json:"name"`
 	Options interface{} `bson:"options" json:"options"`
-}
-
-type HostCheckObject struct {
-	CheckURL            string            `bson:"url" json:"url"`
-	Protocol            string            `bson:"protocol" json:"protocol"`
-	Timeout             time.Duration     `bson:"timeout" json:"timeout"`
-	EnableProxyProtocol bool              `bson:"enable_proxy_protocol" json:"enable_proxy_protocol"`
-	Commands            []CheckCommand    `bson:"commands" json:"commands"`
-	Method              string            `bson:"method" json:"method"`
-	Headers             map[string]string `bson:"headers" json:"headers"`
-	Body                string            `bson:"body" json:"body"`
-}
-
-type CheckCommand struct {
-	Name    string `bson:"name" json:"name"`
-	Message string `bson:"message" json:"message"`
 }
 
 type ServiceDiscoveryConfiguration struct {
@@ -708,6 +708,7 @@ type APIDefinition struct {
 	CustomPluginAuthEnabled              bool                   `bson:"custom_plugin_auth_enabled" json:"custom_plugin_auth_enabled"`
 	JWTSigningMethod                     string                 `bson:"jwt_signing_method" json:"jwt_signing_method"`
 	JWTSource                            string                 `bson:"jwt_source" json:"jwt_source"`
+	JWTJwksURIs                          []JWK                  `bson:"jwt_jwks_uris" json:"jwt_jwks_uris"`
 	JWTIdentityBaseField                 string                 `bson:"jwt_identit_base_field" json:"jwt_identity_base_field"`
 	JWTClientIDBaseField                 string                 `bson:"jwt_client_base_field" json:"jwt_client_base_field"`
 	JWTPolicyFieldName                   string                 `bson:"jwt_policy_field_name" json:"jwt_policy_field_name"`
@@ -738,7 +739,6 @@ type APIDefinition struct {
 	CacheOptions                         CacheOptions           `bson:"cache_options" json:"cache_options"`
 	SessionLifetimeRespectsKeyExpiration bool                   `bson:"session_lifetime_respects_key_expiration" json:"session_lifetime_respects_key_expiration,omitempty"`
 	SessionLifetime                      int64                  `bson:"session_lifetime" json:"session_lifetime"`
-	SessionLifetimeDisabled              bool                   `bson:"session_lifetime_disabled" json:"session_lifetime_disabled"`
 	Active                               bool                   `bson:"active" json:"active"`
 	Internal                             bool                   `bson:"internal" json:"internal"`
 	AuthProvider                         AuthProviderMeta       `bson:"auth_provider" json:"auth_provider"`
@@ -752,7 +752,6 @@ type APIDefinition struct {
 	IPAccessControlDisabled              bool                   `mapstructure:"ip_access_control_disabled" bson:"ip_access_control_disabled" json:"ip_access_control_disabled"`
 	DontSetQuotasOnCreate                bool                   `mapstructure:"dont_set_quota_on_create" bson:"dont_set_quota_on_create" json:"dont_set_quota_on_create"`
 	ExpireAnalyticsAfter                 int64                  `mapstructure:"expire_analytics_after" bson:"expire_analytics_after" json:"expire_analytics_after"` // must have an expireAt TTL index set (http://docs.mongodb.org/manual/tutorial/expire-data/)
-	DisableExpireAnalytics               bool                   `mapstructure:"disable_expire_analytics" bson:"disable_expire_analytics" json:"disable_expire_analytics"`
 	ResponseProcessors                   []ResponseProcessor    `bson:"response_processors" json:"response_processors"`
 	CORS                                 CORSConfig             `bson:"CORS" json:"CORS"`
 	Domain                               string                 `bson:"domain" json:"domain"`
@@ -781,6 +780,25 @@ type APIDefinition struct {
 
 	// UpstreamAuth stores information about authenticating against upstream.
 	UpstreamAuth UpstreamAuth `bson:"upstream_auth" json:"upstream_auth"`
+
+	// SecurityRequirements stores all OAS security requirements (auto-populated from OpenAPI description import)
+	// When len(SecurityRequirements) > 1, OR logic is automatically applied
+	SecurityRequirements [][]string `json:"security_requirements,omitempty" bson:"security_requirements,omitempty"`
+}
+
+type JWK struct {
+	// URL is the jwk endpoint
+	URL string `json:"url"`
+	// CacheTimeout defines how long the JWKS will be kept in the cache before forcing a refresh from the JWKS endpoint.
+	CacheTimeout tyktime.ReadableDuration `bson:"cache_timeout" json:"cache_timeout"`
+}
+
+// GetCacheTimeoutSeconds returns the cache timeout in seconds, using the default expiration if CacheTimeout is zero or negative.
+func (jwk *JWK) GetCacheTimeoutSeconds(defaultExpiration int64) int64 {
+	if jwk.CacheTimeout > 0 {
+		return int64(jwk.CacheTimeout.Seconds())
+	}
+	return defaultExpiration
 }
 
 // UpstreamAuth holds the configurations related to upstream API authentication.
@@ -896,15 +914,52 @@ func (a AuthSource) AuthKeyName() string {
 	return a.Name
 }
 
+// AnalyticsPluginConfig holds the configuration for the analytics custom function plugins
 type AnalyticsPluginConfig struct {
-	Enabled    bool   `bson:"enable" json:"enable,omitempty"`
+	// Enabled activates the custom plugin
+	Enabled bool `bson:"enable" json:"enable,omitempty"`
+	// PluginPath is the path to the shared object file or path to js code.
 	PluginPath string `bson:"plugin_path" json:"plugin_path,omitempty"`
-	FuncName   string `bson:"func_name" json:"func_name,omitempty"`
+	// FunctionName is the name of the method.
+	FuncName string `bson:"func_name" json:"func_name,omitempty"`
 }
 
+// UptimeTests holds the test configuration for uptime tests.
 type UptimeTests struct {
+	// Disabled indicates whether the uptime test configuration is disabled.
+	Disabled bool `bson:"disabled" json:"disabled"`
+	// CheckList represents a collection of HostCheckObject used to define multiple checks in uptime test configurations.
 	CheckList []HostCheckObject `bson:"check_list" json:"check_list"`
-	Config    UptimeTestsConfig `bson:"config" json:"config"`
+	// Config defines the configuration settings for uptime tests, including analytics expiration and service discovery.
+	Config UptimeTestsConfig `bson:"config" json:"config"`
+}
+
+// UptimeTestCommand handles additional checks for tcp connections.
+type CheckCommand struct {
+	Name    string `bson:"name" json:"name"`
+	Message string `bson:"message" json:"message"`
+}
+
+// HostCheckObject represents a single uptime test check.
+type HostCheckObject struct {
+	CheckURL            string            `bson:"url" json:"url"`
+	Protocol            string            `bson:"protocol" json:"protocol"`
+	Timeout             time.Duration     `bson:"timeout" json:"timeout"`
+	EnableProxyProtocol bool              `bson:"enable_proxy_protocol" json:"enable_proxy_protocol"`
+	Commands            []CheckCommand    `bson:"commands" json:"commands"`
+	Method              string            `bson:"method" json:"method"`
+	Headers             map[string]string `bson:"headers" json:"headers"`
+	Body                string            `bson:"body" json:"body"`
+}
+
+// AddCommand will append a new command to the test.
+func (h *HostCheckObject) AddCommand(name, message string) {
+	command := CheckCommand{
+		Name:    name,
+		Message: message,
+	}
+
+	h.Commands = append(h.Commands, command)
 }
 
 type UptimeTestsConfig struct {
@@ -1042,6 +1097,7 @@ type GraphQLProxyConfig struct {
 	Features              GraphQLProxyFeaturesConfig             `bson:"features" json:"features"`
 	AuthHeaders           map[string]string                      `bson:"auth_headers" json:"auth_headers"`
 	SubscriptionType      SubscriptionType                       `bson:"subscription_type" json:"subscription_type,omitempty"`
+	SSEUsePost            bool                                   `bson:"sse_use_post" json:"sse_use_post"`
 	RequestHeaders        map[string]string                      `bson:"request_headers" json:"request_headers"`
 	UseResponseExtensions GraphQLResponseExtensions              `bson:"use_response_extensions" json:"use_response_extensions"`
 	RequestHeadersRewrite map[string]RequestHeadersRewriteConfig `json:"request_headers_rewrite" bson:"request_headers_rewrite"`
@@ -1076,6 +1132,7 @@ type GraphQLSubgraphEntity struct {
 	SDL              string            `bson:"sdl" json:"sdl"`
 	Headers          map[string]string `bson:"headers" json:"headers"`
 	SubscriptionType SubscriptionType  `bson:"subscription_type" json:"subscription_type,omitempty"`
+	SSEUsePost       bool              `bson:"sse_use_post" json:"sse_use_post"`
 }
 
 type GraphQLEngineConfig struct {
@@ -1130,6 +1187,7 @@ type GraphQLEngineDataSourceConfigGraphQL struct {
 	Method           string            `bson:"method" json:"method"`
 	Headers          map[string]string `bson:"headers" json:"headers"`
 	SubscriptionType SubscriptionType  `bson:"subscription_type" json:"subscription_type,omitempty"`
+	SSEUsePost       bool              `bson:"sse_use_post" json:"sse_use_post"`
 	HasOperation     bool              `bson:"has_operation" json:"has_operation"`
 	Operation        string            `bson:"operation" json:"operation"`
 	Variables        json.RawMessage   `bson:"variables" json:"variables"`
@@ -1370,6 +1428,27 @@ func (a *APIDefinition) GetAPIDomain() string {
 		return ""
 	}
 	return a.Domain
+}
+
+// IsChildAPI returns true if this API is a child API in a versioning hierarchy.
+// A child API is identified by having a BaseID that differs from its own APIID.
+func (a *APIDefinition) IsChildAPI() bool {
+	return a.VersionDefinition.BaseID != "" && a.VersionDefinition.BaseID != a.APIID
+}
+
+// IsBaseAPI returns true if this API is a base API with child versions.
+// A base API is identified by having versions defined and either no BaseID or BaseID equal to its own APIID.
+func (a *APIDefinition) IsBaseAPI() bool {
+	return len(a.VersionDefinition.Versions) > 0 &&
+		(a.VersionDefinition.BaseID == "" || a.VersionDefinition.BaseID == a.APIID)
+}
+
+// IsBaseAPIWithVersioning returns true if this API is a base API with versioning explicitly enabled.
+// This is similar to IsBaseAPI but additionally requires versioning to be enabled and have a version name.
+func (a *APIDefinition) IsBaseAPIWithVersioning() bool {
+	return a.VersionDefinition.Enabled &&
+		(a.VersionDefinition.BaseID == "" || a.VersionDefinition.BaseID == a.APIID) &&
+		a.VersionDefinition.Name != ""
 }
 
 func DummyAPI() APIDefinition {
@@ -1650,5 +1729,46 @@ func (w *WebHookHandlerConf) Scan(in any) error {
 	}
 
 	*w = *conf
+	return nil
+}
+
+// JSVMEventHandlerConf represents the configuration for a JavaScript VM event handler in the API definition.
+type JSVMEventHandlerConf struct {
+	// Disabled indicates whether the event handler is inactive.
+	Disabled bool `bson:"disabled" json:"disabled"`
+	// ID is the optional unique identifier for the event handler.
+	ID string `bson:"id" json:"id"`
+	// MethodName specifies the JavaScript function name to be executed.
+	MethodName string `bson:"name" json:"name"`
+	// Path refers to the file path of the JavaScript source code for the handler.
+	Path string `bson:"path" json:"path"`
+}
+
+// Scan populates the JSVMEventHandlerConf struct by casting and copying data from the provided input.
+func (j *JSVMEventHandlerConf) Scan(in any) error {
+	conf, err := reflect.Cast[JSVMEventHandlerConf](in)
+	if err != nil {
+		return err
+	}
+
+	*j = *conf
+	return nil
+}
+
+// LogEventHandlerConf represents the configuration for a log event handler.
+type LogEventHandlerConf struct {
+	// Disabled indicates whether the handler is inactive.
+	Disabled bool `bson:"disabled" json:"disabled"`
+	// Prefix specifies the prefix used for log events.
+	Prefix string `bson:"prefix" json:"prefix"`
+}
+
+// Scan extracts data from the input into the LogEventHandlerConf struct by performing type conversion.
+func (l *LogEventHandlerConf) Scan(in any) error {
+	conf, err := reflect.Cast[LogEventHandlerConf](in)
+	if err != nil {
+		return err
+	}
+	*l = *conf
 	return nil
 }

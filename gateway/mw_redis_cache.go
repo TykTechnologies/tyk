@@ -17,7 +17,7 @@ import (
 	"github.com/TykTechnologies/tyk-pump/analytics"
 
 	"github.com/TykTechnologies/murmur3"
-	"github.com/TykTechnologies/tyk/header"
+	"github.com/TykTechnologies/tyk/internal/middleware"
 	"github.com/TykTechnologies/tyk/regexp"
 	"github.com/TykTechnologies/tyk/request"
 	"github.com/TykTechnologies/tyk/storage"
@@ -246,15 +246,8 @@ func (m *RedisCacheMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 		newRes.Header.Del(h)
 	}
 
-	session := ctxGetSession(r)
+	m.Spec.sendRateLimitHeaders(ctxGetSession(r), newRes)
 
-	// Only add ratelimit data to keyed sessions
-	if session != nil {
-		quotaMax, quotaRemaining, _, quotaRenews := session.GetQuotaLimitByAPIID(m.Spec.APIID)
-		newRes.Header.Set(header.XRateLimitLimit, strconv.Itoa(int(quotaMax)))
-		newRes.Header.Set(header.XRateLimitRemaining, strconv.Itoa(int(quotaRemaining)))
-		newRes.Header.Set(header.XRateLimitReset, strconv.Itoa(int(quotaRenews)))
-	}
 	newRes.Header.Set(cachedResponseHeader, "1")
 
 	copyHeader(w.Header(), newRes.Header, m.Gw.GetConfig().IgnoreCanonicalMIMEHeaderKey)
@@ -275,11 +268,11 @@ func (m *RedisCacheMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 	// Record analytics
 	if !m.Spec.DoNotTrack {
 		ms := DurationToMillisecond(time.Since(t1))
-		m.sh.RecordHit(r, analytics.Latency{Total: int64(ms)}, newRes.StatusCode, newRes, true)
+		m.sh.RecordHit(r, analytics.Latency{Total: int64(ms), Upstream: 0, Gateway: int64(ms)}, newRes.StatusCode, newRes, true)
 	}
 
 	// Stop any further execution after we wrote cache out
-	return nil, mwStatusRespond
+	return nil, middleware.StatusRespond
 }
 
 func isSafeMethod(method string) bool {

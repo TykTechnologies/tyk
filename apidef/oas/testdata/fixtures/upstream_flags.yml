@@ -1,0 +1,38 @@
+---
+name: "Upstream flag booleans"
+tests:
+  - desc: "upstream flags default"
+    source: oas
+    input:
+      x-tyk-api-gateway:
+        upstream: {}
+    output:
+      proxy:
+        preserve_host_header: false
+        disable_strip_slash: false
+  - desc: "upstream flags enabled"
+    source: oas
+    input:
+      x-tyk-api-gateway:
+        upstream:
+          preserveHostHeader:
+            enabled: true
+          preserveTrailingSlash:
+            enabled: true
+    output:
+      proxy:
+        preserve_host_header: true
+        disable_strip_slash: true
+  - desc: "upstream flags disabled"
+    source: oas
+    input:
+      x-tyk-api-gateway:
+        upstream:
+          preserveTrailingSlash:
+            enabled: false
+          preserveHostHeader:
+            enabled: false
+    output:
+      proxy:
+        preserve_host_header: false
+        disable_strip_slash: false

@@ -3,7 +3,9 @@ package time
 import (
 	"errors"
 	"fmt"
+	"math"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -25,6 +27,15 @@ const (
 	Hour = time.Hour
 )
 
+const (
+	EndingHour        = "h"
+	EndingMinute      = "m"
+	EndingSecond      = "s"
+	EndingMillisecond = "ms"
+	EndingMicrosecond = "µs"
+	EndingNanosecond  = "ns"
+)
+
 // ReadableDuration is a type alias for time.Duration, so that shorthand notation can be used.
 // Examples of valid shorthand notations:
 // - "1h"   : one hour
@@ -40,7 +51,7 @@ type ReadableDuration time.Duration
 
 // MarshalJSON converts ReadableDuration into human-readable shorthand notation for time.Duration into json format.
 func (d ReadableDuration) MarshalJSON() ([]byte, error) {
-	return []byte(fmt.Sprintf(`"%s"`, time.Duration(d).String())), nil
+	return []byte(fmt.Sprintf(`"%s"`, d.format())), nil
 }
 
 // UnmarshalJSON converts human-readable shorthand notation for time.Duration into ReadableDuration from json format.
@@ -61,7 +72,70 @@ func (d *ReadableDuration) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-// Seconds returns ReadableDuration in seconds.
+// Seconds returns ReadableDuration rounded down to the seconds.
 func (d ReadableDuration) Seconds() float64 {
-	return Duration(d).Seconds()
+	durationInSeconds := math.Floor(Duration(d).Seconds())
+	return durationInSeconds
+}
+
+// Millisecond returns ReadableDuration in milliseconds.
+func (d ReadableDuration) Milliseconds() int64 {
+	return Duration(d).Milliseconds()
+}
+
+// Nanoseconds returns ReadableDuration in nanoseconds.
+func (d ReadableDuration) Nanoseconds() int64 {
+	return Duration(d).Nanoseconds()
+}
+
+// Microseconds returns ReadableDuration in microseconds.
+func (d ReadableDuration) Microseconds() int64 {
+	return Duration(d).Microseconds()
+}
+
+// formats time duration dur to validation pattern ^(\d+h)?(\d+m)?(\d+s)?(\d+ms)?(\d+µs)?(\d+ns)%
+func (d ReadableDuration) format() string {
+	if d == 0 {
+		return "0s"
+	}
+
+	var sb strings.Builder
+	var rest = int64(d)
+
+	if rest < 0 {
+		rest *= -1
+		sb.WriteByte('-')
+	}
+
+	for _, conv := range convertCases {
+		if rest == 0 {
+			break
+		}
+
+		curr := rest / int64(conv.duration)
+		rest -= curr * int64(conv.duration)
+
+		if curr == 0 {
+			continue
+		}
+
+		sb.WriteString(strconv.FormatInt(curr, 10))
+		sb.WriteString(conv.ending)
+	}
+
+	return sb.String()
+}
+
+type convertCase struct {
+	duration time.Duration
+	ending   string
+}
+
+var convertCases = []convertCase{
+	{time.Hour, EndingHour},
+	{time.Minute, EndingMinute},
+	{time.Second, EndingSecond},
+	{time.Millisecond, EndingMillisecond},
+	{time.Microsecond, EndingMicrosecond},
+	{time.Nanosecond, EndingNanosecond},
 }

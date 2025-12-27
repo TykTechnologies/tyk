@@ -15,6 +15,7 @@ import (
 	_ "github.com/warpstreamlabs/bento/public/components/kafka"
 
 	"github.com/TykTechnologies/tyk/apidef/oas"
+	"github.com/TykTechnologies/tyk/apidef/streams/bento"
 )
 
 //go:embed testdata/*-oas-template.json
@@ -26,7 +27,7 @@ func TestValidateTykStreamsOASObject(t *testing.T) {
 		T: openapi3.T{
 			OpenAPI:    "3.0.3",
 			Info:       &openapi3.Info{},
-			Paths:      map[string]*openapi3.PathItem{},
+			Paths:      openapi3.NewPaths(),
 			Extensions: map[string]interface{}{},
 		},
 	}
@@ -241,7 +242,14 @@ func TestValidateTykStreams_BentoConfigValidation(t *testing.T) {
                         "checkpoint_limit": 1024,
                         "auto_replay_nacks": true
                     }
-                }
+                },
+				"pipeline": {
+					"processors": [
+						{
+							"bloblang": "root = this \n root.fans = this.fans.filter(fan -> fan.obsession > 0.5)"
+						}
+					]
+				}
             }
         }
     },
@@ -284,7 +292,10 @@ func TestValidateTykStreams_BentoConfigValidation_Invalid_Config(t *testing.T) {
                         "checkpoint_limit": 1024,
                         "auto_replay_nacks": "true"
                     }
-                }
+                }, 
+				"pipeline": {
+					"bloblang": "root = this \n root.fans = this.fans.filter(fan -> fan.obsession > 0.5)"
+				}
             }
         }
     },
@@ -303,7 +314,8 @@ func TestValidateTykStreams_BentoConfigValidation_Invalid_Config(t *testing.T) {
     }
 }`)
 	err := ValidateOASObject(document, "3.0.3")
-	require.ErrorContains(t, err, "test-kafka-stream: input.kafka.auto_replay_nacks: Invalid type. Expected: boolean, given: string")
+	require.ErrorContains(t, err, "input.kafka.auto_replay_nacks: Invalid type. Expected: boolean, given: string")
+	require.ErrorContains(t, err, "pipeline: Additional property bloblang is not allowed")
 }
 
 func TestValidateTykStreams_BentoConfigValidation_Additional_Properties(t *testing.T) {
@@ -388,6 +400,80 @@ func TestValidateTykStreams_BentoConfigValidation_Additional_Properties(t *testi
         }
     }
 }`)
-	err := ValidateOASObject(document, "3.0.3")
-	require.NoError(t, err)
+	t.Run("with default validator", func(t *testing.T) {
+		err := ValidateOASObjectWithBentoConfigValidator(document, "3.0.3", bento.DefaultValidator)
+		require.NoError(t, err)
+	})
+
+	t.Run("with enable-all validator", func(t *testing.T) {
+		err := ValidateOASObjectWithBentoConfigValidator(document, "3.0.3", bento.EnableAllExperimental)
+		require.NoError(t, err)
+
+		// Test with aws_sns output configuration, it's not officially supported by Tyk Streams.
+		var amqpDocument = []byte(`{
+    "info": {
+        "title": "test-streams",
+        "version": "1.0.0"
+    },
+    "openapi": "3.0.3",
+    "paths": {},
+    "x-tyk-streaming": {
+        "streams": {
+            "test-enable-all-stream": {
+                "input": {
+                    "label": "",
+                    "kafka": {
+                        "addresses": [],
+                        "topics": [],
+                        "target_version": "2.1.0",
+                        "consumer_group": "",
+                        "checkpoint_limit": 1024,
+                        "auto_replay_nacks": true
+                    },
+                    "additional": {
+                        "configuration": true
+                    }
+                },
+                "output": {
+                    "label": "",
+                    "drop_on": {
+                        "error": false,
+                        "error_patterns": [],
+                        "back_pressure": "30s",
+                        "output": null
+                    },
+                    "aws_sns": {
+                        "topic_arn": "",
+                        "message_group_id": "",
+                        "message_deduplication_id": "",
+                        "max_in_flight": 64,
+                        "metadata": {
+                            "exclude_prefixes": []
+                        }
+                    }
+                }
+            }
+        }
+    },
+    "x-tyk-api-gateway": {
+        "info": {
+            "name": "test-streams",
+            "state": {
+                "active": true
+            }
+        },
+        "server": {
+            "listenPath": {
+                "value": "/test-streams"
+            }
+        }
+    }
+}`)
+		err = ValidateOASObjectWithBentoConfigValidator(amqpDocument, "3.0.3", bento.EnableAllExperimental)
+		require.NoError(t, err)
+
+		// This method is used by the Dashboard, so we need to test it as well.
+		err = ValidateOASObjectWithConfig(amqpDocument, "3.0.3", true)
+		require.NoError(t, err)
+	})
 }

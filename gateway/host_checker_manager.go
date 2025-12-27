@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"github.com/TykTechnologies/tyk/pkg/errpack"
 	"net/http"
 	"net/url"
 	"sync"
@@ -233,7 +234,11 @@ func (hc *HostCheckerManager) getHostKey(report HostHealthReport) string {
 
 func (hc *HostCheckerManager) OnHostReport(ctx context.Context, report HostHealthReport) {
 	if hc.Gw.GetConfig().UptimeTests.Config.EnableUptimeAnalytics {
-		go hc.RecordUptimeAnalytics(report)
+		go func() {
+			if err := hc.RecordUptimeAnalytics(report); err != nil {
+				log.WithError(err).Error("failed to record uptime metrics")
+			}
+		}()
 	}
 }
 
@@ -433,7 +438,7 @@ func (hc *HostCheckerManager) ListFromService(apiID string) ([]HostData, error) 
 		return nil, errors.New("API ID not found in register")
 	}
 	sd := ServiceDiscovery{}
-	sd.Init(&spec.UptimeTests.Config.ServiceDiscovery)
+	sd.Init(&spec.UptimeTests.Config.ServiceDiscovery, hc.Gw)
 	data, err := sd.Target(spec.UptimeTests.Config.ServiceDiscovery.QueryEndpoint)
 
 	if err != nil {
@@ -489,12 +494,14 @@ func (hc *HostCheckerManager) DoServiceDiscoveryListUpdateForID(apiID string) {
 func (hc *HostCheckerManager) RecordUptimeAnalytics(report HostHealthReport) error {
 	// If we are obfuscating API Keys, store the hashed representation (config check handled in hashing function)
 
-	spec := hc.Gw.getApiSpec(report.MetaData[UnHealthyHostMetaDataAPIKey])
-	orgID := ""
-	if spec != nil {
-		orgID = spec.OrgID
+	apiID := report.MetaData[UnHealthyHostMetaDataAPIKey]
+	spec := hc.Gw.getApiSpec(apiID)
+
+	if spec == nil {
+		return errpack.NotFoundWithId(apiID)
 	}
 
+	orgID := spec.OrgID
 	t := time.Now()
 
 	var serverError bool
@@ -559,41 +566,49 @@ func (gw *Gateway) SetCheckerHostList() {
 	hostList := []HostData{}
 	gw.apisMu.RLock()
 	for _, spec := range gw.apisByID {
-		if spec.UptimeTests.Config.ServiceDiscovery.UseDiscoveryService {
-			hostList, err := gw.GlobalHostChecker.ListFromService(spec.APIID)
-			if err == nil {
-				hostList = append(hostList, hostList...)
-				for _, t := range hostList {
-					log.WithFields(logrus.Fields{
-						"prefix": "host-check-mgr",
-					}).WithFields(logrus.Fields{
-						"prefix": "host-check-mgr",
-					}).Info("---> Adding uptime test: ", t.CheckURL)
-				}
-			}
-		} else {
-			for _, checkItem := range spec.UptimeTests.CheckList {
-				newHostDoc, err := gw.GlobalHostChecker.PrepareTrackingHost(checkItem, spec.APIID)
-				if err == nil {
-					hostList = append(hostList, newHostDoc)
-					log.WithFields(logrus.Fields{
-						"prefix": "host-check-mgr",
-					}).Info("---> Adding uptime test: ", checkItem.CheckURL)
-				} else {
-					log.WithFields(logrus.Fields{
-						"prefix": "host-check-mgr",
-					}).Warning("---> Adding uptime test failed: ", checkItem.CheckURL)
-					log.WithFields(logrus.Fields{
-						"prefix": "host-check-mgr",
-					}).Warning("--------> Error was: ", err)
-				}
-
-			}
-		}
+		gw.populateHostListByApiSpec(&hostList, spec)
 	}
 	gw.apisMu.RUnlock()
 
 	gw.GlobalHostChecker.UpdateTrackingList(hostList)
+}
+
+func (gw *Gateway) populateHostListByApiSpec(hostList *[]HostData, spec *APISpec) {
+	if spec.UptimeTests.Disabled {
+		return
+	}
+
+	if spec.UptimeTests.Config.ServiceDiscovery.UseDiscoveryService {
+		hostList, err := gw.GlobalHostChecker.ListFromService(spec.APIID)
+		if err == nil {
+			hostList = append(hostList, hostList...)
+			for _, t := range hostList {
+				log.WithFields(logrus.Fields{
+					"prefix": "host-check-mgr",
+				}).WithFields(logrus.Fields{
+					"prefix": "host-check-mgr",
+				}).Info("---> Adding uptime test: ", t.CheckURL)
+			}
+		}
+	} else {
+		for _, checkItem := range spec.UptimeTests.CheckList {
+			newHostDoc, err := gw.GlobalHostChecker.PrepareTrackingHost(checkItem, spec.APIID)
+			if err == nil {
+				*hostList = append(*hostList, newHostDoc)
+				log.WithFields(logrus.Fields{
+					"prefix": "host-check-mgr",
+				}).Info("---> Adding uptime test: ", checkItem.CheckURL)
+			} else {
+				log.WithFields(logrus.Fields{
+					"prefix": "host-check-mgr",
+				}).Warning("---> Adding uptime test failed: ", checkItem.CheckURL)
+				log.WithFields(logrus.Fields{
+					"prefix": "host-check-mgr",
+				}).Warning("--------> Error was: ", err)
+			}
+
+		}
+	}
 }
 
 /*

@@ -13,6 +13,7 @@ import (
 	oauth2clientcredentials "golang.org/x/oauth2/clientcredentials"
 
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/internal/event"
 	"github.com/TykTechnologies/tyk/internal/model"
 )
 
@@ -75,7 +76,7 @@ func (p *ClientCredentialsOAuthProvider) getOAuthToken(r *http.Request, mw *Midd
 }
 
 func handleOAuthError(r *http.Request, mw *Middleware, err error) (string, error) {
-	mw.FireEvent(r, ErrorEventName, err.Error(), mw.Spec.APIID)
+	mw.FireEvent(r, event.UpstreamOAuthError, err.Error(), mw.Spec.APIID)
 	return "", err
 }
 

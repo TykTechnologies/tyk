@@ -9,6 +9,7 @@ import (
 	"github.com/Jeffail/gabs/v2"
 
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/internal/httpclient"
 )
 
 const arrayName = "tyk_array"
@@ -23,10 +24,12 @@ type ServiceDiscovery struct {
 	parentPath          string
 	portPath            string
 	targetPath          string
+	gw                  *Gateway // Added for HTTP client factory access
 }
 
-func (s *ServiceDiscovery) Init(spec *apidef.ServiceDiscoveryConfiguration) {
+func (s *ServiceDiscovery) Init(spec *apidef.ServiceDiscoveryConfiguration, gw *Gateway) {
 	s.spec = spec
+	s.gw = gw
 	s.isNested = spec.UseNestedQuery
 	s.isTargetList = spec.UseTargetList
 	s.endpointReturnsList = spec.EndpointReturnsList
@@ -46,7 +49,36 @@ func (s *ServiceDiscovery) Init(spec *apidef.ServiceDiscoveryConfiguration) {
 
 func (s *ServiceDiscovery) getServiceData(name string) (string, error) {
 	log.Debug("Getting ", name)
-	resp, err := http.Get(name)
+
+	// Try to use HTTP client factory for discovery service
+	var resp *http.Response
+	var err error
+
+	if s.gw != nil {
+		clientFactory := NewExternalHTTPClientFactory(s.gw)
+		if client, clientErr := clientFactory.CreateClient("discovery"); clientErr == nil {
+			log.Debugf("[ExternalServices] Using external services discovery client for URL: %s", name)
+			resp, err = client.Get(name)
+		} else {
+			// Check if mTLS is explicitly enabled and error is certificate-related - if so, don't fallback as it would bypass security
+			gwConfig := s.gw.GetConfig()
+			if gwConfig.ExternalServices.Discovery.MTLS.Enabled && httpclient.IsMTLSError(clientErr) {
+				log.WithError(clientErr).Error("mTLS configuration failed for service discovery. Discovery request will fail to maintain security.")
+				// Return the TLS configuration error directly
+				return "", clientErr
+			} else {
+				// For other errors (not configured, proxy config), fallback to default client
+				log.WithError(clientErr).Debug("Failed to create discovery HTTP client, falling back to default")
+				log.Debug("[ExternalServices] Falling back to legacy discovery client due to factory error")
+				resp, err = http.Get(name)
+			}
+		}
+	} else {
+		// Fallback to default client if gateway not set
+		log.Debug("[ExternalServices] Using default HTTP client for discovery (no gateway context)")
+		resp, err = http.Get(name)
+	}
+
 	if err != nil {
 		return "", err
 	}

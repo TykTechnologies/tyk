@@ -115,6 +115,26 @@
     "jwt_source": {
       "type": "string"
     },
+    "jwt_jwks_uris": {
+      "type": [
+        "array",
+        "null"
+      ],
+      "items": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string",
+            "format": "uri"
+          },
+          "cache_timeout": {
+            "type": "string",
+            "pattern": "^(\\d+h)?(\\d+m)?(\\d+s)?(\\d+ms)?(\\d+µs)?(\\d+ns)?$"
+          }
+        },
+        "required": ["url"]
+      }
+    },     
     "jwt_identity_base_field": {
       "type": "string"
     },
@@ -1115,6 +1135,18 @@
               }
             }
           }
+        }
+      }
+    },
+    "security_requirements": {
+      "type": [
+        "array",
+        "null"
+      ],
+      "items": {
+        "type": "array",
+        "items": {
+          "type": "string"
         }
       }
     }

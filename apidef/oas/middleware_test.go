@@ -46,7 +46,7 @@ func TestMiddleware(t *testing.T) {
 					Plugins: customPlugins,
 				},
 				TrafficLogs: &TrafficLogs{
-					Plugins: customPlugins,
+					Plugins: CustomAnalyticsPlugins(customPlugins),
 				},
 			},
 		}
@@ -74,7 +74,7 @@ func TestMiddleware(t *testing.T) {
 				PostPlugins:               customPlugins,
 				ResponsePlugins:           customPlugins,
 				TrafficLogs: &TrafficLogs{
-					Plugins: customPlugins,
+					Plugins: CustomAnalyticsPlugins(customPlugins),
 				},
 			},
 		}
@@ -181,6 +181,50 @@ func TestGlobal(t *testing.T) {
 		assert.Nil(t, updatedGlobal.ResponsePlugin)
 		assert.NotNil(t, updatedGlobal.ResponsePlugins)
 	})
+
+	t.Run("skips", func(t *testing.T) {
+		t.Run("fill", func(t *testing.T) {
+			api := apidef.APIDefinition{
+				DisableRateLimit:      true,
+				DisableQuota:          true,
+				DontSetQuotasOnCreate: true,
+			}
+
+			expectedGlobal := Global{
+				SkipRateLimit:  true,
+				SkipQuota:      true,
+				SkipQuotaReset: true,
+			}
+
+			actualGlobal := Global{}
+			actualGlobal.Fill(api)
+
+			assert.Equal(t, expectedGlobal.SkipRateLimit, actualGlobal.SkipRateLimit)
+			assert.Equal(t, expectedGlobal.SkipQuota, actualGlobal.SkipQuota)
+			assert.Equal(t, expectedGlobal.SkipQuotaReset, actualGlobal.SkipQuotaReset)
+		})
+
+		t.Run("extractTo", func(t *testing.T) {
+			global := Global{
+				SkipRateLimit:  true,
+				SkipQuota:      true,
+				SkipQuotaReset: true,
+			}
+
+			expectedApi := apidef.APIDefinition{
+				DisableRateLimit:      true,
+				DisableQuota:          true,
+				DontSetQuotasOnCreate: true,
+			}
+
+			actualApi := apidef.APIDefinition{}
+			global.ExtractTo(&actualApi)
+
+			assert.Equal(t, expectedApi.DisableRateLimit, actualApi.DisableRateLimit)
+			assert.Equal(t, expectedApi.DisableQuota, actualApi.DisableQuota)
+			assert.Equal(t, expectedApi.DontSetQuotasOnCreate, actualApi.DontSetQuotasOnCreate)
+		})
+	})
 }
 
 func TestTrafficLogs(t *testing.T) {
@@ -228,44 +272,25 @@ func TestTrafficLogs(t *testing.T) {
 		assert.Empty(t, convertedAPI.TagHeaders)
 	})
 
-	t.Run("retention header enabled", func(t *testing.T) {
-		trafficLogs := TrafficLogs{
-			Enabled: true,
-			RetentionPeriod: &RetentionPeriod{
-				Enabled: true,
-				Value:   ReadableDuration(time.Minute * 2),
-			},
-		}
-
+	t.Run("enable with retention period", func(t *testing.T) {
 		var convertedAPI apidef.APIDefinition
 		var resultTrafficLogs TrafficLogs
+		trafficLogs := TrafficLogs{
+			Enabled: true,
+			// add 50 milliseconds tp make sure the duration is floored
+			CustomRetentionPeriod: ReadableDuration(time.Minute*2 + time.Millisecond*50),
+		}
+
 		convertedAPI.SetDisabledFlags()
 		trafficLogs.ExtractTo(&convertedAPI)
 
-		assert.Equal(t, trafficLogs.RetentionPeriod.Enabled, !convertedAPI.DisableExpireAnalytics)
 		assert.Equal(t, int64(120), convertedAPI.ExpireAnalyticsAfter)
 
 		resultTrafficLogs.Fill(convertedAPI)
+		// change customretentionPeriod back to 2 minutes for comparison
+		trafficLogs.CustomRetentionPeriod = ReadableDuration(time.Minute * 2)
+
 		assert.Equal(t, trafficLogs, resultTrafficLogs)
-	})
-
-	t.Run("retention header disabled", func(t *testing.T) {
-		trafficLogs := TrafficLogs{
-			Enabled:         true,
-			RetentionPeriod: nil,
-		}
-
-		var convertedAPI apidef.APIDefinition
-		var resultTrafficLogs TrafficLogs
-
-		convertedAPI.SetDisabledFlags()
-		trafficLogs.ExtractTo(&convertedAPI)
-
-		assert.Equal(t, true, convertedAPI.DisableExpireAnalytics)
-		assert.Equal(t, int64(0), convertedAPI.ExpireAnalyticsAfter)
-
-		resultTrafficLogs.Fill(convertedAPI)
-		assert.Nil(t, resultTrafficLogs.RetentionPeriod)
 	})
 
 	t.Run("with custom analytics plugin", func(t *testing.T) {
@@ -273,7 +298,7 @@ func TestTrafficLogs(t *testing.T) {
 		expectedTrafficLogsPlugin := TrafficLogs{
 			Enabled:    true,
 			TagHeaders: []string{},
-			Plugins: CustomPlugins{
+			Plugins: CustomAnalyticsPlugins{
 				{
 					Enabled:      true,
 					FunctionName: "CustomAnalyticsPlugin",
@@ -285,6 +310,10 @@ func TestTrafficLogs(t *testing.T) {
 		api := apidef.APIDefinition{}
 		api.SetDisabledFlags()
 		expectedTrafficLogsPlugin.ExtractTo(&api)
+
+		assert.Equal(t, expectedTrafficLogsPlugin.Plugins[0].FunctionName, api.AnalyticsPlugin.FuncName)
+		assert.Equal(t, true, api.AnalyticsPlugin.Enabled)
+		assert.Equal(t, expectedTrafficLogsPlugin.Plugins[0].Path, api.AnalyticsPlugin.PluginPath)
 
 		actualTrafficLogsPlugin := TrafficLogs{}
 		actualTrafficLogsPlugin.Fill(api)
@@ -1299,5 +1328,129 @@ func TestGlobalRequestSizeLimit(t *testing.T) {
 				assert.Equal(t, tc.expectedGlobalRequestSizeLimitDisabled, apiDef.VersionData.Versions[Main].GlobalSizeLimitDisabled)
 			})
 		}
+	})
+}
+
+func TestCachePlugin_Fill(t *testing.T) {
+	t.Run("should fill cache plugin with provided values", func(t *testing.T) {
+		cacheMeta := apidef.CacheMeta{
+			Disabled:               false,
+			CacheKeyRegex:          "test-regex",
+			CacheOnlyResponseCodes: []int{200, 201},
+			Timeout:                60,
+		}
+
+		cachePlugin := &CachePlugin{}
+		cachePlugin.Fill(cacheMeta)
+
+		assert.True(t, cachePlugin.Enabled)
+		assert.Equal(t, "test-regex", cachePlugin.CacheByRegex)
+		assert.Equal(t, []int{200, 201}, cachePlugin.CacheResponseCodes)
+		assert.Equal(t, int64(60), cachePlugin.Timeout)
+	})
+
+	t.Run("should apply default timeout when enabled but no timeout specified", func(t *testing.T) {
+		cacheMeta := apidef.CacheMeta{
+			Disabled:               false,
+			CacheKeyRegex:          "test-regex",
+			CacheOnlyResponseCodes: []int{200},
+			Timeout:                0,
+		}
+
+		cachePlugin := &CachePlugin{}
+		cachePlugin.Fill(cacheMeta)
+
+		assert.True(t, cachePlugin.Enabled)
+		assert.Equal(t, apidef.DefaultCacheTimeout, cachePlugin.Timeout)
+	})
+
+	t.Run("should not apply default timeout when disabled", func(t *testing.T) {
+		cacheMeta := apidef.CacheMeta{
+			Disabled: true,
+			Timeout:  0,
+		}
+
+		cachePlugin := &CachePlugin{}
+		cachePlugin.Fill(cacheMeta)
+
+		assert.False(t, cachePlugin.Enabled)
+		assert.Equal(t, int64(0), cachePlugin.Timeout)
+	})
+
+	t.Run("should handle empty response codes", func(t *testing.T) {
+		cacheMeta := apidef.CacheMeta{
+			Disabled:               false,
+			CacheKeyRegex:          "test-regex",
+			CacheOnlyResponseCodes: []int{},
+			Timeout:                60,
+		}
+
+		cachePlugin := &CachePlugin{}
+		cachePlugin.Fill(cacheMeta)
+
+		assert.True(t, cachePlugin.Enabled)
+		assert.Empty(t, cachePlugin.CacheResponseCodes)
+	})
+
+	t.Run("should handle empty regex", func(t *testing.T) {
+		cacheMeta := apidef.CacheMeta{
+			Disabled:               false,
+			CacheKeyRegex:          "",
+			CacheOnlyResponseCodes: []int{200},
+			Timeout:                60,
+		}
+
+		cachePlugin := &CachePlugin{}
+		cachePlugin.Fill(cacheMeta)
+
+		assert.True(t, cachePlugin.Enabled)
+		assert.Empty(t, cachePlugin.CacheByRegex)
+	})
+
+	t.Run("should handle negative timeout", func(t *testing.T) {
+		cacheMeta := apidef.CacheMeta{
+			Disabled:               false,
+			CacheKeyRegex:          "test-regex",
+			CacheOnlyResponseCodes: []int{200},
+			Timeout:                -1,
+		}
+
+		cachePlugin := &CachePlugin{}
+		cachePlugin.Fill(cacheMeta)
+
+		assert.True(t, cachePlugin.Enabled)
+		assert.Equal(t, int64(-1), cachePlugin.Timeout)
+	})
+
+	t.Run("should handle nil response codes", func(t *testing.T) {
+		cacheMeta := apidef.CacheMeta{
+			Disabled:               false,
+			CacheKeyRegex:          "test-regex",
+			CacheOnlyResponseCodes: nil,
+			Timeout:                60,
+		}
+
+		cachePlugin := &CachePlugin{}
+		cachePlugin.Fill(cacheMeta)
+
+		assert.True(t, cachePlugin.Enabled)
+		assert.Nil(t, cachePlugin.CacheResponseCodes)
+	})
+
+	t.Run("should preserve zero values when disabled", func(t *testing.T) {
+		cacheMeta := apidef.CacheMeta{
+			Disabled:               true,
+			CacheKeyRegex:          "test-regex",
+			CacheOnlyResponseCodes: []int{200, 201},
+			Timeout:                60,
+		}
+
+		cachePlugin := &CachePlugin{}
+		cachePlugin.Fill(cacheMeta)
+
+		assert.False(t, cachePlugin.Enabled)
+		assert.Equal(t, "test-regex", cachePlugin.CacheByRegex)
+		assert.Equal(t, []int{200, 201}, cachePlugin.CacheResponseCodes)
+		assert.Equal(t, int64(60), cachePlugin.Timeout)
 	})
 }

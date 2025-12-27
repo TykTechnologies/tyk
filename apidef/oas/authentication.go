@@ -13,6 +13,25 @@ import (
 	"github.com/TykTechnologies/tyk/apidef"
 )
 
+// SecurityProcessingMode constants define how multiple security requirements are processed
+const (
+	// SecurityProcessingModeLegacy processes only the first security requirement and uses BaseIdentityProvider
+	SecurityProcessingModeLegacy = "legacy"
+
+	// SecurityProcessingModeCompliant processes all security requirements with OR logic and uses dynamic identity provider
+	SecurityProcessingModeCompliant = "compliant"
+)
+
+// ValidateSecurityProcessingMode validates the security processing mode value.
+func ValidateSecurityProcessingMode(mode string) bool {
+	return mode == "" || mode == SecurityProcessingModeLegacy || mode == SecurityProcessingModeCompliant
+}
+
+// GetDefaultSecurityProcessingMode returns the default security processing mode.
+func GetDefaultSecurityProcessingMode() string {
+	return SecurityProcessingModeLegacy
+}
+
 // Authentication contains configuration about the authentication methods and security policies applied to requests.
 type Authentication struct {
 	// Enabled makes the API protected when one of the authentication modes is enabled.
@@ -59,15 +78,22 @@ type Authentication struct {
 	// SecuritySchemes contains security schemes definitions.
 	SecuritySchemes SecuritySchemes `bson:"securitySchemes,omitempty" json:"securitySchemes,omitempty"`
 
-	// KeyRetentionPeriod contains configuration for key retention.
-	KeyRetentionPeriod *KeyRetentionPeriod `bson:"keyRetentionPeriod,omitempty" json:"keyRetentionPeriod,omitempty"`
+	// CustomKeyLifetime contains configuration for the maximum retention period for access tokens.
+	CustomKeyLifetime *CustomKeyLifetime `bson:"customKeyLifetime,omitempty" json:"customKeyLifetime,omitempty"`
+
+	// SecurityProcessingMode controls how Tyk will process the OpenAPI `security` field if multiple security requirement objects are declared.
+	// - "legacy" (default): Only the first security requirement object will be processed; uses BaseIdentityProvider to create the session object.
+	// - "compliant": All security requirement objects will be processed, request will be authorized if any of these are validated; the origin for the session object will be determined dynamically based on the validated security requirement.
+	SecurityProcessingMode string `bson:"securityProcessingMode,omitempty" json:"securityProcessingMode,omitempty"`
+
+	// Security is an extension to the OpenAPI security field and is used when securityProcessingMode is set to "compliant".
+	// This can be used to combine any declared securitySchemes including Tyk proprietary auth methods.
+	Security [][]string `bson:"security,omitempty" json:"security,omitempty"`
 }
 
-// KeyRetentionPeriod contains configuration for key retention.
-type KeyRetentionPeriod struct {
-	// Enabled enables Key retention for the API
-	//
-	// Tyk classic API definition: `disable_expire_analytics`.
+// CustomKeyLifetime contains configuration for custom key retention.
+type CustomKeyLifetime struct {
+	// Enabled enables custom maximum retention for keys for the API.
 	Enabled bool `bson:"enabled,omitempty" json:"enabled,omitempty"`
 	// Value configures the expiry interval for a Key.
 	// The value is a string that specifies the interval in a compact form,
@@ -83,20 +109,36 @@ type KeyRetentionPeriod struct {
 	//
 	// An empty value is interpreted as "0s"
 	//
-	// Tyk classic API definition: `expire_analytics_after`.
+	// Tyk classic API definition: `session_lifetime`.
 	Value ReadableDuration `bson:"value" json:"value"`
+	// RespectValidity ensures that Tyk respects the expiry configured in the key when the API level configuration grants a shorter lifetime.
+	// That is, Redis waits until the key has expired before deleting it.
+	//
+	// Tyk classic API definition: `session_lifetime_respects_key_expiration`.
+	RespectValidity bool `bson:"respectValidity,omitempty" json:"respectValidity,omitempty"`
 }
 
-// Fill fills *KeyRetentionPeriod from apidef.APIDefinition.
-func (k *KeyRetentionPeriod) Fill(api apidef.APIDefinition) {
-	k.Enabled = !api.SessionLifetimeDisabled
-	k.Value = ReadableDuration(time.Duration(api.ExpireAnalyticsAfter) * time.Second)
+// Fill fills *CustomKeyLifetime from apidef.APIDefinition.
+func (k *CustomKeyLifetime) Fill(api apidef.APIDefinition) {
+	k.RespectValidity = api.SessionLifetimeRespectsKeyExpiration
+
+	if api.SessionLifetime == 0 {
+		k.Enabled = false
+	} else {
+		k.Enabled = true
+		k.Value = ReadableDuration(time.Duration(api.SessionLifetime) * time.Second)
+	}
 }
 
 // ExtractTo extracts *Authentication into *apidef.APIDefinition.
-func (k *KeyRetentionPeriod) ExtractTo(api *apidef.APIDefinition) {
-	api.SessionLifetimeDisabled = !k.Enabled
-	api.SessionLifetime = int64(k.Value.Seconds())
+func (k *CustomKeyLifetime) ExtractTo(api *apidef.APIDefinition) {
+	api.SessionLifetimeRespectsKeyExpiration = k.RespectValidity
+
+	if k.Enabled {
+		api.SessionLifetime = int64(k.Value.Seconds())
+	} else {
+		api.SessionLifetime = 0
+	}
 }
 
 // Fill fills *Authentication from apidef.APIDefinition.
@@ -115,12 +157,14 @@ func (a *Authentication) Fill(api apidef.APIDefinition) {
 		a.Custom = nil
 	}
 
-	if a.KeyRetentionPeriod == nil {
-		a.KeyRetentionPeriod = &KeyRetentionPeriod{}
+	if a.CustomKeyLifetime == nil {
+		a.CustomKeyLifetime = &CustomKeyLifetime{}
 	}
-	a.KeyRetentionPeriod.Fill(api)
-	if ShouldOmit(a.KeyRetentionPeriod) {
-		a.KeyRetentionPeriod = nil
+
+	a.CustomKeyLifetime.Fill(api)
+
+	if ShouldOmit(a.CustomKeyLifetime) {
+		a.CustomKeyLifetime = nil
 	}
 
 	if api.AuthConfigs == nil || len(api.AuthConfigs) == 0 {
@@ -175,13 +219,14 @@ func (a *Authentication) ExtractTo(api *apidef.APIDefinition) {
 
 	a.Custom.ExtractTo(api)
 
-	if a.KeyRetentionPeriod == nil {
-		a.KeyRetentionPeriod = &KeyRetentionPeriod{}
+	if a.CustomKeyLifetime == nil {
+		a.CustomKeyLifetime = &CustomKeyLifetime{}
 		defer func() {
-			a.KeyRetentionPeriod = nil
+			a.CustomKeyLifetime = nil
 		}()
 	}
-	a.KeyRetentionPeriod.ExtractTo(api)
+
+	a.CustomKeyLifetime.ExtractTo(api)
 }
 
 // SecuritySchemes holds security scheme values, filled with Import().
@@ -209,7 +254,7 @@ func (ss SecuritySchemes) Import(name string, nativeSS *openapi3.SecurityScheme,
 			}
 		}
 
-		token.Import(nativeSS, enable)
+		token.Enabled = &enable
 	case nativeSS.Type == typeHTTP && nativeSS.Scheme == schemeBearer && nativeSS.BearerFormat == bearerFormatJWT:
 		jwt := &JWT{}
 		if ss[name] == nil {
@@ -371,10 +416,12 @@ func (as *AuthSources) ExtractTo(authConfig *apidef.AuthConfig) {
 // AuthSource defines an authentication source.
 type AuthSource struct {
 	// Enabled activates the auth source.
-	// Tyk classic API definition: `auth_configs[X].use_param/use_cookie`
+	//
+	// Tyk classic API definition: `auth_configs[X].use_param/use_cookie`.
 	Enabled bool `bson:"enabled" json:"enabled"` // required
 	// Name is the name of the auth source.
-	// Tyk classic API definition: `auth_configs[X].param_name/cookie_name`
+	//
+	// Tyk classic API definition: `auth_configs[X].param_name/cookie_name`.
 	Name string `bson:"name,omitempty" json:"name,omitempty"`
 }
 
@@ -393,29 +440,37 @@ func (as *AuthSource) ExtractTo(enabled *bool, name *string) {
 // Signature holds the configuration for signature validation.
 type Signature struct {
 	// Enabled activates signature validation.
+	//
 	// Tyk classic API definition: `auth_configs[X].validate_signature`.
 	Enabled bool `bson:"enabled" json:"enabled"` // required
 	// Algorithm is the signature method to use.
+	//
 	// Tyk classic API definition: `auth_configs[X].signature.algorithm`.
 	Algorithm string `bson:"algorithm,omitempty" json:"algorithm,omitempty"`
 	// Header is the name of the header to consume.
+	//
 	// Tyk classic API definition: `auth_configs[X].signature.header`.
 	Header string `bson:"header,omitempty" json:"header,omitempty"`
 	// Query is the name of the query parameter to consume.
+	//
 	// Tyk classic API definition: `auth_configs[X].signature.use_param/param_name`.
 	Query AuthSource `bson:"query,omitempty" json:"query,omitempty"`
 	// Secret is the signing secret used for signature validation.
+	//
 	// Tyk classic API definition: `auth_configs[X].signature.secret`.
 	Secret string `bson:"secret,omitempty" json:"secret,omitempty"`
 	// AllowedClockSkew configures a grace period in seconds during which an expired token is still valid.
+	//
 	// Tyk classic API definition: `auth_configs[X].signature.allowed_clock_skew`.
 	AllowedClockSkew int64 `bson:"allowedClockSkew,omitempty" json:"allowedClockSkew,omitempty"`
 	// ErrorCode configures the HTTP response code for a validation failure.
 	// If unconfigured, a HTTP 401 Unauthorized status code will be emitted.
+	//
 	// Tyk classic API definition: `auth_configs[X].signature.error_code`.
 	ErrorCode int `bson:"errorCode,omitempty" json:"errorCode,omitempty"`
 	// ErrorMessage configures the error message that is emitted on validation failure.
 	// A default error message is emitted if unset.
+	//
 	// Tyk classic API definition: `auth_configs[X].signature.error_message`.
 	ErrorMessage string `bson:"errorMessage,omitempty" json:"errorMessage,omitempty"`
 }
@@ -448,17 +503,33 @@ func (s *Signature) ExtractTo(authConfig *apidef.AuthConfig) {
 }
 
 // Scopes holds the scope to policy mappings for a claim name.
+// This struct is used for both JWT and OIDC authentication.
 type Scopes struct {
 	// ClaimName contains the claim name.
+	//
+	// Tyk classic API definition:
+	// - For OIDC: `scopes.oidc.scope_claim_name`
+	// - For JWT: `scopes.jwt.scope_claim_name`
 	ClaimName string `bson:"claimName,omitempty" json:"claimName,omitempty"`
 
+	// Claims specifies a list of claims that can be used to provide the scope-to-policy mapping.
+	// The first match from the list found in the token will be interrogated to retrieve the scopes that are then checked against the scopeToPolicyMapping.
+	Claims []string `bson:"claims,omitempty" json:"claims,omitempty"`
+
 	// ScopeToPolicyMapping contains the mappings of scopes to policy IDs.
+	//
+	// Tyk classic API definition:
+	// - For OIDC: `scopes.oidc.scope_to_policy`
+	// - For JWT: `scopes.jwt.scope_to_policy`
 	ScopeToPolicyMapping []ScopeToPolicy `bson:"scopeToPolicyMapping,omitempty" json:"scopeToPolicyMapping,omitempty"`
 }
 
 // Fill fills *Scopes from *apidef.ScopeClaim.
 func (s *Scopes) Fill(scopeClaim *apidef.ScopeClaim) {
 	s.ClaimName = scopeClaim.ScopeClaimName
+	if s.ClaimName != "" && len(s.Claims) < 1 {
+		s.Claims = []string{scopeClaim.ScopeClaimName}
+	}
 
 	s.ScopeToPolicyMapping = []ScopeToPolicy{}
 
@@ -486,18 +557,28 @@ func (s *Scopes) ExtractTo(scopeClaim *apidef.ScopeClaim) {
 }
 
 // ScopeToPolicy contains a single scope to policy ID mapping.
+// This struct is used for both JWT and OIDC authentication.
 type ScopeToPolicy struct {
 	// Scope contains the scope name.
+	//
+	// Tyk classic API definition:
+	// - For OIDC: Key in `scopes.oidc.scope_to_policy` map
+	// - For JWT: Key in `scopes.jwt.scope_to_policy` map.
 	Scope string `bson:"scope,omitempty" json:"scope,omitempty"`
 
 	// PolicyID contains the Policy ID.
+	//
+	// Tyk classic API definition:
+	// - For OIDC: Value in `scopes.oidc.scope_to_policy` map
+	// - For JWT: Value in `scopes.jwt.scope_to_policy` map.
 	PolicyID string `bson:"policyId,omitempty" json:"policyId,omitempty"`
 }
 
 // HMAC holds the configuration for the HMAC authentication mode.
 type HMAC struct {
 	// Enabled activates the HMAC authentication mode.
-	// Tyk classic API definition: `enable_signature_checking`
+	//
+	// Tyk classic API definition: `enable_signature_checking`.
 	Enabled bool `bson:"enabled" json:"enabled"` // required
 
 	// AuthSources contains authentication token source configuration (header, cookie, query).
@@ -514,12 +595,13 @@ type HMAC struct {
 	//
 	// and reads the value from the algorithm header.
 	//
-	// Tyk classic API definition: `hmac_allowed_algorithms`
+	// Tyk classic API definition: `hmac_allowed_algorithms`.
 	AllowedAlgorithms []string `bson:"allowedAlgorithms,omitempty" json:"allowedAlgorithms,omitempty"`
 
 	// AllowedClockSkew is the amount of milliseconds that will be tolerated for clock skew. It is used against replay attacks.
 	// The default value is `0`, which deactivates clock skew checks.
-	// Tyk classic API definition: `hmac_allowed_clock_skew`
+	//
+	// Tyk classic API definition: `hmac_allowed_clock_skew`.
 	AllowedClockSkew float64 `bson:"allowedClockSkew,omitempty" json:"allowedClockSkew,omitempty"`
 }
 
@@ -650,18 +732,26 @@ func (o *OIDC) ExtractTo(api *apidef.APIDefinition) {
 // Provider defines an issuer to validate and the Client ID to Policy ID mappings.
 type Provider struct {
 	// Issuer contains a validation value for the issuer claim, usually a domain name e.g. `accounts.google.com` or similar.
+	//
+	// Tyk classic API definition: `openid_options.providers[].issuer`.
 	Issuer string `bson:"issuer,omitempty" json:"issuer,omitempty"`
 
 	// ClientToPolicyMapping contains mappings of Client IDs to Policy IDs.
+	//
+	// Tyk classic API definition: `openid_options.providers[].client_ids`.
 	ClientToPolicyMapping []ClientToPolicy `bson:"clientToPolicyMapping,omitempty" json:"clientToPolicyMapping,omitempty"`
 }
 
 // ClientToPolicy contains a 1-1 mapping between Client ID and Policy ID.
 type ClientToPolicy struct {
 	// ClientID contains a Client ID.
+	//
+	// Tyk classic API definition: Key in `openid_options.providers[].client_ids` map.
 	ClientID string `bson:"clientId,omitempty" json:"clientId,omitempty"`
 
 	// PolicyID contains a Policy ID.
+	//
+	// Tyk classic API definition: Value in `openid_options.providers[].client_ids` map.
 	PolicyID string `bson:"policyId,omitempty" json:"policyId,omitempty"`
 }
 
@@ -673,11 +763,14 @@ type CustomPluginAuthentication struct {
 	Enabled bool `bson:"enabled" json:"enabled"` // required
 
 	// Config contains configuration related to custom authentication plugin.
+	//
 	// Tyk classic API definition: `custom_middleware.auth_check`.
 	Config *AuthenticationPlugin `bson:"config,omitempty" json:"config,omitempty"`
 
-	// Authentication token sources (header, cookie, query).
-	// valid only when driver is coprocess.
+	// AuthSources contains authentication token sources (header, cookie, query).
+	// Valid only when driver is coprocess.
+	//
+	// Tyk classic API definition: `auth_configs["coprocess"]`.
 	AuthSources `bson:",inline" json:",inline"`
 }
 
@@ -731,14 +824,28 @@ func (c *CustomPluginAuthentication) ExtractTo(api *apidef.APIDefinition) {
 // AuthenticationPlugin holds the configuration for custom authentication plugin.
 type AuthenticationPlugin struct {
 	// Enabled activates custom authentication plugin.
+	//
+	// Tyk classic API definition: `custom_middleware.auth_check.disabled` (negated).
 	Enabled bool `bson:"enabled" json:"enabled"` // required.
 	// FunctionName is the name of authentication method.
+	//
+	// Tyk classic API definition: `custom_middleware.auth_check.name`.
 	FunctionName string `bson:"functionName" json:"functionName"` // required.
 	// Path is the path to shared object file in case of goplugin mode or path to JS code in case of otto auth plugin.
+	//
+	// Tyk classic API definition: `custom_middleware.auth_check.path`.
 	Path string `bson:"path" json:"path"`
 	// RawBodyOnly if set to true, do not fill body in request or response object.
+	//
+	// Tyk classic API definition: `custom_middleware.auth_check.raw_body_only`.
 	RawBodyOnly bool `bson:"rawBodyOnly,omitempty" json:"rawBodyOnly,omitempty"`
+	// RequireSession passes down the session information for plugins after authentication.
+	//
+	// Tyk classic API definition: `custom_middleware.auth_check.require_session`.
+	RequireSession bool `bson:"requireSession,omitempty" json:"requireSession,omitempty"`
 	// IDExtractor configures ID extractor with coprocess custom authentication.
+	//
+	// Tyk classic API definition: `custom_middleware.id_extractor`.
 	IDExtractor *IDExtractor `bson:"idExtractor,omitempty" json:"idExtractor,omitempty"`
 }
 
@@ -746,6 +853,7 @@ func (ap *AuthenticationPlugin) Fill(api apidef.APIDefinition) {
 	ap.FunctionName = api.CustomMiddleware.AuthCheck.Name
 	ap.Path = api.CustomMiddleware.AuthCheck.Path
 	ap.RawBodyOnly = api.CustomMiddleware.AuthCheck.RawBodyOnly
+	ap.RequireSession = api.CustomMiddleware.AuthCheck.RequireSession
 	ap.Enabled = !api.CustomMiddleware.AuthCheck.Disabled
 	if ap.IDExtractor == nil {
 		ap.IDExtractor = &IDExtractor{}
@@ -762,6 +870,7 @@ func (ap *AuthenticationPlugin) ExtractTo(api *apidef.APIDefinition) {
 	api.CustomMiddleware.AuthCheck.Name = ap.FunctionName
 	api.CustomMiddleware.AuthCheck.Path = ap.Path
 	api.CustomMiddleware.AuthCheck.RawBodyOnly = ap.RawBodyOnly
+	api.CustomMiddleware.AuthCheck.RequireSession = ap.RequireSession
 
 	if ap.IDExtractor == nil {
 		ap.IDExtractor = &IDExtractor{}
@@ -776,15 +885,30 @@ func (ap *AuthenticationPlugin) ExtractTo(api *apidef.APIDefinition) {
 // IDExtractorConfig specifies the configuration for ID extractor.
 type IDExtractorConfig struct {
 	// HeaderName is the header name to extract ID from.
+	// Used when Source is set to "header" and With is set to "value".
+	//
+	// Tyk classic API definition: `custom_middleware.id_extractor.extractor_config.header_name`.
 	HeaderName string `bson:"headerName,omitempty" json:"headerName,omitempty"`
 	// FormParamName is the form parameter name to extract ID from.
+	// Used when Source is set to "form" and With is set to "value".
+	//
+	// Tyk classic API definition: `custom_middleware.id_extractor.extractor_config.form_param_name`.
 	FormParamName string `bson:"formParamName,omitempty" json:"formParamName,omitempty"`
 	// Regexp is the regular expression to match ID.
+	// Used when With is set to "regex".
+	//
+	// Tyk classic API definition: `custom_middleware.id_extractor.extractor_config.regex_expression`.
 	Regexp string `bson:"regexp,omitempty" json:"regexp,omitempty"`
 	// RegexpMatchIndex is the index from which ID to be extracted after a match.
 	// Default value is 0, ie if regexpMatchIndex is not provided ID is matched from index 0.
+	// Used when With is set to "regex".
+	//
+	// Tyk classic API definition: `custom_middleware.id_extractor.extractor_config.regex_match_index`.
 	RegexpMatchIndex int `bson:"regexpMatchIndex,omitempty" json:"regexpMatchIndex,omitempty"`
 	// XPathExp is the xpath expression to match ID.
+	// Used when With is set to "xpath".
+	//
+	// Tyk classic API definition: `custom_middleware.id_extractor.extractor_config.xpath_expression`.
 	XPathExp string `bson:"xPathExp,omitempty" json:"xPathExp,omitempty"`
 }
 
@@ -838,12 +962,28 @@ func (id *IDExtractorConfig) ExtractTo(api *apidef.APIDefinition) {
 // IDExtractor configures ID Extractor.
 type IDExtractor struct {
 	// Enabled activates ID extractor with coprocess authentication.
+	//
+	// Tyk classic API definition: `custom_middleware.id_extractor.disabled` (negated).
 	Enabled bool `bson:"enabled" json:"enabled"` // required
 	// Source is the source from which ID to be extracted from.
+	// Valid values are:
+	// - `header` - Extract ID from a header
+	// - `form` - Extract ID from a form parameter
+	// - `body` - Extract ID from the request body
+	//
+	// Tyk classic API definition: `custom_middleware.id_extractor.extract_from`.
 	Source apidef.IdExtractorSource `bson:"source" json:"source"` // required
 	// With is the type of ID extractor to be used.
+	// Valid values are:
+	// - `value` - Extract ID from a value
+	// - `xpath` - Extract ID using an XPath expression
+	// - `regex` - Extract ID using a regular expression
+	//
+	// Tyk classic API definition: `custom_middleware.id_extractor.extract_with`.
 	With apidef.IdExtractorType `bson:"with" json:"with"` // required
 	// Config holds the configuration specific to ID extractor type mentioned via With.
+	//
+	// Tyk classic API definition: `custom_middleware.id_extractor.extractor_config`.
 	Config *IDExtractorConfig `bson:"config" json:"config"` // required
 }
 

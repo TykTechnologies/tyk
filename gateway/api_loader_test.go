@@ -10,15 +10,17 @@ import (
 	"path"
 	_ "path"
 	"reflect"
+	"strings"
 	"sync/atomic"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 
 	persistentmodel "github.com/TykTechnologies/storage/persistent/model"
+
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/apidef/oas"
 	"github.com/TykTechnologies/tyk/config"
-	"github.com/TykTechnologies/tyk/internal/uuid"
 	"github.com/TykTechnologies/tyk/test"
 	"github.com/TykTechnologies/tyk/trace"
 	"github.com/TykTechnologies/tyk/user"
@@ -268,78 +270,6 @@ func TestGraphQLPlayground(t *testing.T) {
 
 		})
 	}
-}
-
-func TestCORS(t *testing.T) {
-	g := StartTest(nil)
-	defer g.Close()
-
-	api1ID := uuid.New()
-	api2ID := uuid.New()
-
-	apis := g.Gw.BuildAndLoadAPI(func(spec *APISpec) {
-		spec.Name = "CORS test API"
-		spec.APIID = api1ID
-		spec.Proxy.ListenPath = "/cors-api/"
-		spec.CORS.Enable = false
-		spec.CORS.ExposedHeaders = []string{"Custom-Header"}
-		spec.CORS.AllowedOrigins = []string{"*"}
-	}, func(spec *APISpec) {
-		spec.Name = "Another API"
-		spec.APIID = api2ID
-		spec.Proxy.ListenPath = "/another-api/"
-		spec.CORS.ExposedHeaders = []string{"Custom-Header"}
-		spec.CORS.AllowedOrigins = []string{"*"}
-	})
-
-	headers := map[string]string{
-		"Origin": "my-custom-origin",
-	}
-
-	headersMatch := map[string]string{
-		"Access-Control-Allow-Origin":   "*",
-		"Access-Control-Expose-Headers": "Custom-Header",
-	}
-
-	t.Run("CORS disabled", func(t *testing.T) {
-		_, _ = g.Run(t, []test.TestCase{
-			{Path: "/cors-api/", Headers: headers, HeadersNotMatch: headersMatch, Code: http.StatusOK},
-		}...)
-	})
-
-	t.Run("CORS enabled", func(t *testing.T) {
-		apis[0].CORS.Enable = true
-		g.Gw.LoadAPI(apis...)
-
-		_, _ = g.Run(t, []test.TestCase{
-			{Path: "/cors-api/", Headers: headers, HeadersMatch: headersMatch, Code: http.StatusOK},
-			{Path: "/another-api/", Headers: headers, HeadersNotMatch: headersMatch, Code: http.StatusOK},
-			{Path: "/" + api1ID + "/", Headers: headers, HeadersMatch: headersMatch, Code: http.StatusOK},
-			{Path: "/" + api2ID + "/", Headers: headers, HeadersNotMatch: headersMatch, Code: http.StatusOK},
-		}...)
-	})
-
-	t.Run("oauth endpoints", func(t *testing.T) {
-		apis[0].UseOauth2 = true
-		apis[0].CORS.Enable = false
-
-		g.Gw.LoadAPI(apis...)
-
-		t.Run("CORS disabled", func(t *testing.T) {
-			_, _ = g.Run(t, []test.TestCase{
-				{Path: "/cors-api/oauth/token", Headers: headers, HeadersNotMatch: headersMatch, Code: http.StatusForbidden},
-			}...)
-		})
-
-		t.Run("CORS enabled", func(t *testing.T) {
-			apis[0].CORS.Enable = true
-			g.Gw.LoadAPI(apis...)
-
-			_, _ = g.Run(t, []test.TestCase{
-				{Path: "/cors-api/oauth/token", Headers: headers, HeadersMatch: headersMatch, Code: http.StatusForbidden},
-			}...)
-		})
-	})
 }
 
 func TestTykRateLimitsStatusOfAPI(t *testing.T) {
@@ -9516,4 +9446,203 @@ func TestAPILoaderValidation(t *testing.T) {
 			},
 		)
 	})
+}
+
+func TestSortSpecsByListenPath(t *testing.T) {
+	createSpec := func(listenPath string) *APISpec {
+		return &APISpec{
+			APIDefinition: &apidef.APIDefinition{
+				Proxy: apidef.ProxyConfig{
+					ListenPath: listenPath,
+				},
+			},
+		}
+	}
+
+	tests := []struct {
+		name     string
+		specs    []*APISpec
+		expected []string
+	}{
+		{
+			name: "Basic Parameter vs Static Path",
+			specs: []*APISpec{
+				createSpec("/foo"),
+				createSpec("/foo-bar"),
+				createSpec("/foo-bar-baz"),
+				createSpec("/foo"),
+				createSpec("/bar"),
+				createSpec("/bar/{id}"),
+				createSpec("/bar/{id}/baz"),
+				createSpec("/bar/id/baz"),
+				createSpec("/bar/{id}/baz/{id}"),
+				createSpec("/path/{param}/endpoint"),
+				createSpec("/path/specific/endpoint"),
+			},
+			expected: []string{
+				"/path/specific/endpoint",
+				"/path/{param}/endpoint",
+				"/foo-bar-baz",
+				"/bar/id/baz",
+				"/bar/{id}/baz/{id}",
+				"/bar/{id}/baz",
+				"/foo-bar",
+				"/bar/{id}",
+				"/foo",
+				"/foo",
+				"/bar",
+			},
+		},
+		{
+			name: "Multiple Parameters vs Longer Static Path",
+			specs: []*APISpec{
+				createSpec("/api/{param1}/{param2}/resource"),
+				createSpec("/api/specific/path/resource"),
+			},
+			expected: []string{
+				"/api/specific/path/resource",
+				"/api/{param1}/{param2}/resource",
+			},
+		},
+		{
+			name: "Identical Paths Except for Parameter",
+			specs: []*APISpec{
+				createSpec("/users/{id}/profile"),
+				createSpec("/users/settings/profile"),
+			},
+			expected: []string{
+				"/users/settings/profile",
+				"/users/{id}/profile",
+			},
+		},
+		{
+			name: "Customer Reported Case",
+			specs: []*APISpec{
+				createSpec("/information-concept/something/{thisisalongidname}/stuff"),
+				createSpec("/information-concept/something/ted/stuff/things"),
+			},
+			expected: []string{
+				"/information-concept/something/ted/stuff/things",
+				"/information-concept/something/{thisisalongidname}/stuff",
+			},
+		},
+		{
+			name: "Parameter at Different Position",
+			specs: []*APISpec{
+				createSpec("/products/{category}/items"),
+				createSpec("/products/featured/items/{id}"),
+			},
+			expected: []string{
+				"/products/featured/items/{id}",
+				"/products/{category}/items",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			sortSpecsByListenPath(tt.specs)
+
+			var sortedPaths []string
+			for _, spec := range tt.specs {
+				sortedPaths = append(sortedPaths, spec.Proxy.ListenPath)
+			}
+
+			if !reflect.DeepEqual(sortedPaths, tt.expected) {
+				t.Errorf("Expected %v, but got %v", tt.expected, sortedPaths)
+			}
+		})
+	}
+}
+
+func TestRecoverFromLoadApiPanic(t *testing.T) {
+	tests := []struct {
+		name     string
+		spec     *APISpec
+		err      any
+		expected string
+	}{
+		{
+			name: "invalid OAS api",
+			spec: &APISpec{
+				APIDefinition: &apidef.APIDefinition{
+					APIID: "test-api",
+					IsOAS: true,
+				},
+				OAS: oas.OAS{},
+			},
+			err:      "test error",
+			expected: "trying to import invalid OAS api test-api, skipping",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := recoverFromLoadApiPanic(tt.spec, tt.err)
+			if err == nil {
+				t.Fatal("expected error, got nil")
+			}
+			if !strings.Contains(err.Error(), tt.expected) {
+				t.Errorf("expected error to contain %q, got %q", tt.expected, err.Error())
+			}
+		})
+	}
+}
+
+func TestEnforceOrgDataAgeIfQuotasEnabled(t *testing.T) {
+	type testCase struct {
+		name                      string
+		enforceOrgQuotas          bool
+		enforceOrgDataAge         bool
+		expectedEnforceOrgDataAge bool
+	}
+
+	tests := []testCase{
+		{
+			name:                      "should not set org data age if quotas are disabled",
+			enforceOrgQuotas:          false,
+			enforceOrgDataAge:         false,
+			expectedEnforceOrgDataAge: false,
+		},
+		{
+			name:                      "should keep org data age if quotas are disabled",
+			enforceOrgQuotas:          false,
+			enforceOrgDataAge:         true,
+			expectedEnforceOrgDataAge: true,
+		},
+		{
+			name:                      "should enforce org data age if quotas are enabled",
+			enforceOrgQuotas:          true,
+			enforceOrgDataAge:         false,
+			expectedEnforceOrgDataAge: true,
+		},
+		{
+			name:                      "should keep org data age enabled if quotas are enabled",
+			enforceOrgQuotas:          true,
+			enforceOrgDataAge:         true,
+			expectedEnforceOrgDataAge: true,
+		},
+	}
+
+	for _, tc := range tests {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			ts := StartTest(func(globalConf *config.Config) {
+				globalConf.EnforceOrgQuotas = tc.enforceOrgQuotas
+				globalConf.EnforceOrgDataAge = tc.enforceOrgDataAge
+			})
+			t.Cleanup(ts.Close)
+
+			spec := &APISpec{
+				GlobalConfig: config.Config{
+					EnforceOrgDataAge: tc.enforceOrgDataAge,
+				},
+			}
+			ts.Gw.enforceOrgDataAgeIfQuotasEnabled(spec)
+
+			gwConf := ts.Gw.GetConfig()
+			assert.Equal(t, tc.expectedEnforceOrgDataAge, gwConf.EnforceOrgDataAge)
+			assert.Equal(t, tc.expectedEnforceOrgDataAge, spec.GlobalConfig.EnforceOrgDataAge)
+		})
+	}
 }

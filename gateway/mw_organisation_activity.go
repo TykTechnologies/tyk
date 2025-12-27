@@ -5,6 +5,8 @@ import (
 	"net/http"
 	"sync"
 
+	"golang.org/x/sync/singleflight"
+
 	"github.com/TykTechnologies/tyk/ctx"
 	"github.com/TykTechnologies/tyk/request"
 	"github.com/TykTechnologies/tyk/user"
@@ -17,6 +19,7 @@ type orgChanMapMu struct {
 
 var orgChanMap = orgChanMapMu{channels: map[string](chan bool){}}
 var orgActiveMap sync.Map
+var orgSessionFetchGroup singleflight.Group
 
 // RateLimitAndQuotaCheck will check the incoming request and key whether it is within it's quota and
 // within it's rate limit, it makes use of the SessionLimiter object to do this
@@ -75,21 +78,45 @@ func (k *OrganizationMonitor) ProcessRequest(w http.ResponseWriter, r *http.Requ
 	// try to get from Redis
 	if !found {
 		// not found in in-app cache, let's read from Redis
+		// RPC mode: start background fetch and allow request to proceed
+		if k.Spec.GlobalConfig.SlaveOptions.UseRPC {
+			go k.refreshOrgSession(k.Spec.OrgID)
+
+			return nil, http.StatusOK
+		}
+
+		// Non-RPC mode: synchronous fetch
 		orgSession, found = k.OrgSession(k.Spec.OrgID)
 		if !found {
 			// prevent reads from in-app cache and from Redis for next runs
 			k.setOrgHasNoSession(true)
-			// No organisation session has not been created, should not be a pre-requisite in site setups, so we pass the request on
 			return nil, http.StatusOK
 		}
 	}
 	clone := orgSession.Clone()
 	if k.Spec.GlobalConfig.ExperimentalProcessOrgOffThread {
-		// Make a copy of request before before sending to goroutine
+		// Make a copy of request before sending to goroutine
 		r2 := r.WithContext(r.Context())
 		return k.ProcessRequestOffThread(r2, &clone)
 	}
 	return k.ProcessRequestLive(r, &clone)
+}
+
+func (k *OrganizationMonitor) refreshOrgSession(orgID string) {
+	orgSessionFetchGroup.Do(orgID, func() (interface{}, error) {
+		session, found := k.OrgSession(orgID)
+		if found && !k.Spec.GlobalConfig.LocalSessionCache.DisableCacheSessionState {
+			sessionLifeTime := session.Lifetime(k.Spec.GetSessionLifetimeRespectsKeyExpiration(), k.Spec.SessionLifetime, k.Gw.GetConfig().ForceGlobalSessionLifetime, k.Gw.GetConfig().GlobalSessionLifetime)
+
+			k.Gw.SessionCache.Set(orgID, session.Clone(), sessionLifeTime)
+			k.Logger().Debug("Background org session fetch completed for: ", orgID)
+			return session, nil
+		}
+		if !found {
+			k.setOrgHasNoSession(true)
+		}
+		return nil, nil
+	})
 }
 
 // ProcessRequest will run any checks on the request on the way through the system, return an error to have the chain fail
@@ -102,14 +129,12 @@ func (k *OrganizationMonitor) ProcessRequestLive(r *http.Request, orgSession *us
 		return errors.New("this organisation access has been disabled, please contact your API administrator"), http.StatusForbidden
 	}
 
-	customQuotaKey := ""
-
 	// We found a session, apply the quota and rate limiter
 	reason := k.Gw.SessionLimiter.ForwardMessage(
 		r,
 		orgSession,
 		k.Spec.OrgID,
-		customQuotaKey,
+		"",
 		k.Spec.OrgSessionManager.Store(),
 		orgSession.Per > 0 && orgSession.Rate > 0,
 		true,

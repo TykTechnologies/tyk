@@ -14,13 +14,22 @@ type Header struct {
 type Headers []Header
 
 // Map transforms Headers into a map.
-func (hs Headers) Map() map[string]string {
-	var headersMap = make(map[string]string, len(hs))
-	for _, h := range hs {
+func (hs *Headers) Map() map[string]string {
+	if hs == nil {
+		return map[string]string{}
+	}
+
+	var headersMap = make(map[string]string, len(*hs))
+	for _, h := range *hs {
 		headersMap[h.Name] = h.Value
 	}
 
 	return headersMap
+}
+
+// Add new header entry.
+func (hs *Headers) Add(hdr, value string) {
+	*hs = append(*hs, Header{Name: hdr, Value: value})
 }
 
 // NewHeaders creates Headers from in map.

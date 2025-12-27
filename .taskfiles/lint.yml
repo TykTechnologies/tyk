@@ -2,36 +2,39 @@
 version: "3"
 
 vars:
-  golangci: '--max-same-issues=0 --max-issues-per-linter=0'
   root:
     sh: git rev-parse --show-toplevel
-  package:
-    sh: go mod edit -json | jq .Module.Path -r
 
 tasks:
-  default:
-    desc: "Run linters"
+  tidy:
+    desc: "Run go mod tidy with caching"
+    sources:
+      - go.mod
+      - go.sum
+    generates:
+      - .task-tidy-cache
     cmds:
-      - task: vet
-      - task: golangci-lint
-        vars:
-          args: "{{.golangci}} --new-from-rev=origin/master"
-      - task: x-tyk-gateway
+      - go mod tidy
+      - touch .task-tidy-cache
 
-  all:
-    desc: "Run linters (full source)"
+  run:
+    desc: "Run linters (golangci-lint handles fmt and vet)"
     cmds:
-      - task: vet
-      - task: golangci-lint
-        vars:
-          args: "{{.golangci}}"
-      - task: x-tyk-gateway
+      - task: tidy
+      - task: check
+      - golangci-lint run --new-from-rev=origin/{{ .BASE_BRANCH }} --issues-exit-code=1 --fix ./...
 
-  x-tyk-gateway:
-    desc: "Lint x-tyk-gateway schema"
-    dir: '{{.root}}'
+  basic:
+    desc: "Run basic checks without golangci-lint"
     cmds:
-      - go test -run=TestXTykGateway_Lint -v ./apidef/oas/
+      - task: tidy
+      - task: check
+
+  fmt:
+    desc: "Run typical code cleanup steps"
+    cmds:
+      - go fmt ./...
+      - task: tidy
 
   vet:
     desc: "Run go vet"
@@ -39,31 +42,106 @@ tasks:
     cmds:
       - go vet ./...
 
+  # this has manual use
   golangci-lint:
-    desc: "Run golangci-lint"
-    dir: '{{.root}}'
-    require: [args]
+    desc: "Run golangci-lint for json summaries"
     cmds:
-      - golangci-lint run {{.args}} -v ./...
+      - golangci-lint run --out-format json ./... | summary golangcilint > golangci-lint.json
+      - golangci-lint run --out-format json --config .golangci.dev.yml ./... | summary golangcilint > golangci-lint-dev.json
 
-  goimports:
-    desc: "Run goimports"
-    dir: '{{.root}}'
+  golangci-lint:fix:
+    desc: "Run golangci-lint w fixing"
     cmds:
-      - goimports -local {{.package | dir}},{{.package}}/internal -w .
+      - golangci-lint run --config .golangci.dev.yml --fix ./...
 
-  gofmt:
-    desc: "Run gofmt"
-    dir: '{{.root}}'
+  golangci-lint:diff:
+    desc: "Print changes from dev -> CI"
     cmds:
-      - gofmt -w .
+      - dyff between -i .golangci.dev.yml .golangci.yml
 
-  simple-build:
+  build:
     desc: "Run go build for sanity check"
+    dir: '{{.root}}'
     cmds:
       - go build .
 
-  compile-tests:
+  build-test:
     desc: "Compile go tests for sanity check"
+    dir: '{{.root}}'
     cmds:
       - cd gateway && go test -c .
+
+  check:
+    desc: "Run repository specific checks"
+    cmds:
+      - task: check:x-tyk-gateway
+      - task: check:imports
+      - task: check:config
+
+  check:imports:
+    desc: "go-fsck lint import paths"
+    dir: '{{.root}}'
+    sources:
+      - '**/*.go'
+      - '.go-fsck.yml'
+    generates:
+      - .task-check-imports-cache
+    cmds:
+      - go-fsck lint
+      - touch .task-check-imports-cache
+
+  check:config:
+    internal: true
+    desc: "lint config schema"
+    dir: '{{.root}}'
+    sources:
+      - 'cli/linter/**/*.go'
+      - 'config/**/*.go'
+    generates:
+      - .task-check-config-cache
+    cmds:
+      - |
+        changed=$(git diff --name-only origin/{{.BASE_BRANCH}}...HEAD 2>/dev/null | grep -E "^(cli/linter|config)/" || true)
+        if [ -z "$changed" ]; then
+          echo "✓ No config files changed vs origin/{{.BASE_BRANCH}} - skipping config check"
+          touch .task-check-config-cache
+          exit 0
+        fi
+        echo "Config files changed, running check..."
+        go test -count 1 ./cli/linter/...
+        touch .task-check-config-cache
+
+  check:x-tyk-gateway:
+    desc: "Lint x-tyk-gateway schema"
+    dir: '{{.root}}'
+    sources:
+      - 'apidef/oas/**/*.go'
+    generates:
+      - .task-check-x-tyk-gateway-cache
+    cmds:
+      - |
+        changed=$(git diff --name-only origin/{{.BASE_BRANCH}}...HEAD 2>/dev/null | grep -E "^apidef/oas/" || true)
+        if [ -z "$changed" ]; then
+          echo "✓ No apidef/oas files changed vs origin/{{.BASE_BRANCH}} - skipping x-tyk-gateway check"
+          touch .task-check-x-tyk-gateway-cache
+          exit 0
+        fi
+        echo "OAS schema files changed, running check..."
+        go test -count 1 -run=TestXTykGateway_Lint ./apidef/oas/
+        touch .task-check-x-tyk-gateway-cache
+
+  check-git-state:
+    desc: "Check if git working tree is clean using git status --porcelain"
+    dir: '{{.root}}'
+    vars:
+      message: '{{.MESSAGE | default "task made git state dirty, please run task locally and update PR"}}'
+    cmds:
+      - |
+        if [ -n "$(git status --porcelain)" ]; then
+          echo "{{.message}}"
+          echo
+          git status --short
+          git diff
+          exit 1
+        fi
+

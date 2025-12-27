@@ -7,7 +7,9 @@ import (
 	"io"
 	"net/http"
 	"testing"
+	"time"
 
+	"github.com/TykTechnologies/gorpc"
 	"github.com/TykTechnologies/tyk/internal/model"
 	"github.com/TykTechnologies/tyk/rpc"
 
@@ -689,4 +691,326 @@ func TestDeleteUsingTokenID(t *testing.T) {
 		assert.Nil(t, err)
 		assert.Equal(t, 404, status)
 	})
+}
+
+func TestProcessKeySpaceChanges_UserKeyReset(t *testing.T) {
+	oldKey := "old-api-key"
+	newKey := "new-api-key"
+
+	dispatcher := gorpc.NewDispatcher()
+	dispatcher.AddFunc("Login", func(_, _ string) bool {
+		return true
+	})
+	dispatcher.AddFunc("Disconnect", func(_ string, _ *model.GroupLoginRequest) error {
+		return nil
+	})
+	dispatcher.AddFunc("GetKeySpaceUpdate", func(_, _ string) ([]string, error) {
+		return []string{}, nil
+	})
+	dispatcher.AddFunc("GetGroupKeySpaceUpdate", func(_ string, _ string) ([]string, error) {
+		return []string{}, nil
+	})
+
+	rpcMock, connectionString := startRPCMock(dispatcher)
+	defer stopRPCMock(rpcMock)
+
+	g := StartTest(func(globalConf *config.Config) {
+		globalConf.SlaveOptions.UseRPC = true
+		globalConf.SlaveOptions.RPCKey = "test_org"
+		globalConf.SlaveOptions.APIKey = oldKey
+		globalConf.SlaveOptions.ConnectionString = connectionString
+		globalConf.SlaveOptions.CallTimeout = 1
+		globalConf.SlaveOptions.RPCPoolSize = 2
+		globalConf.SlaveOptions.DisableKeySpaceSync = true
+	})
+	defer g.Close()
+
+	time.Sleep(100 * time.Millisecond)
+
+	rpcListener := RPCStorageHandler{
+		KeyPrefix:        "rpc.listener.",
+		SuppressRegister: true,
+		HashKeys:         false,
+		Gw:               g.Gw,
+	}
+
+	connected := rpcListener.Connect()
+	if !connected {
+		t.Fatal("Failed to connect to RPC server")
+	}
+
+	testCases := []struct {
+		name     string
+		keys     []string
+		expected string
+	}{
+		{
+			name:     "Valid key reset",
+			keys:     []string{fmt.Sprintf("%s.%s:UserKeyReset", oldKey, newKey)},
+			expected: newKey,
+		},
+		{
+			name:     "Invalid key format - no action",
+			keys:     []string{"invalid-format"},
+			expected: oldKey,
+		},
+		{
+			name:     "Invalid key format - wrong separator",
+			keys:     []string{"invalid-format:UserKeyReset"},
+			expected: oldKey,
+		},
+		{
+			name:     "Multiple keys with reset",
+			keys:     []string{fmt.Sprintf("%s.%s:UserKeyReset", oldKey, newKey), "other-key:action"},
+			expected: newKey,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			// Reset config before each test
+			config := g.Gw.GetConfig()
+			config.SlaveOptions.APIKey = oldKey
+			g.Gw.SetConfig(config)
+
+			rpcListener.ProcessKeySpaceChanges(tc.keys, DefaultOrg)
+			updatedConfig := g.Gw.GetConfig()
+			assert.Equal(t, tc.expected, updatedConfig.SlaveOptions.APIKey)
+		})
+	}
+}
+
+func TestGetApiDefinitions_Fails_With_Timeout(t *testing.T) {
+	wait := make(chan struct{})
+	defer func() {
+		close(wait)
+	}()
+
+	dispatcher := gorpc.NewDispatcher()
+	dispatcher.AddFunc("Login", func(_, _ string) bool {
+		return true
+	})
+	dispatcher.AddFunc("Disconnect", func(_ string, _ *model.GroupLoginRequest) error {
+		return nil
+	})
+	dispatcher.AddFunc("GetApiDefinitions", func(_ string, _ interface{}) (string, error) {
+		<-wait // wait until the defer method is called
+		return "sample-response", nil
+	})
+
+	rpcMock, connectionString := startRPCMock(dispatcher)
+	defer stopRPCMock(rpcMock)
+
+	g := StartTest(func(globalConf *config.Config) {
+		globalConf.SlaveOptions.UseRPC = true
+		globalConf.SlaveOptions.RPCKey = "test_org"
+		globalConf.SlaveOptions.APIKey = "key"
+		globalConf.SlaveOptions.ConnectionString = connectionString
+		globalConf.SlaveOptions.CallTimeout = 1
+		globalConf.SlaveOptions.RPCPoolSize = 2
+		globalConf.SlaveOptions.DisableKeySpaceSync = true
+	})
+	g.Gw.afterConfSetup() // sets SlaveOptions.CallTimeout to GlobalRPCCallTimeout
+
+	defer g.Close()
+
+	time.Sleep(100 * time.Millisecond)
+
+	rpcListener := RPCStorageHandler{
+		KeyPrefix:        "rpc.listener.",
+		SuppressRegister: true,
+		HashKeys:         false,
+		Gw:               g.Gw,
+	}
+
+	connected := rpcListener.Connect()
+	if !connected {
+		t.Fatal("Failed to connect to RPC server")
+	}
+	// GetApiDefinitions calls rpc.FuncClientSingleton with a backoff algorithm.
+	// The algorithm tries to call the RPC method 3 times with a 10-millisecond interval.
+	// So the "GetApiDefinitions" method will be called 4 times, including the first try.
+	// It should return an empty string instead of "sample-response".
+	assert.Equal(t, "", rpcListener.GetApiDefinitions("test_org", nil))
+}
+
+func TestGetApiDefinitions(t *testing.T) {
+	var GetApiDefinitionsResponse = "sample-response"
+
+	dispatcher := gorpc.NewDispatcher()
+	dispatcher.AddFunc("Login", func(_, _ string) bool {
+		return true
+	})
+	dispatcher.AddFunc("Disconnect", func(_ string, _ *model.GroupLoginRequest) error {
+		return nil
+	})
+	dispatcher.AddFunc("GetApiDefinitions", func(_ string, _ interface{}) (string, error) {
+		return GetApiDefinitionsResponse, nil
+	})
+
+	rpcMock, connectionString := startRPCMock(dispatcher)
+	defer stopRPCMock(rpcMock)
+
+	g := StartTest(func(globalConf *config.Config) {
+		globalConf.SlaveOptions.UseRPC = true
+		globalConf.SlaveOptions.RPCKey = "test_org"
+		globalConf.SlaveOptions.APIKey = "key"
+		globalConf.SlaveOptions.ConnectionString = connectionString
+		globalConf.SlaveOptions.CallTimeout = 1
+		globalConf.SlaveOptions.RPCPoolSize = 2
+		globalConf.SlaveOptions.DisableKeySpaceSync = true
+	})
+	g.Gw.afterConfSetup() // sets SlaveOptions.CallTimeout to GlobalRPCCallTimeout
+
+	defer g.Close()
+
+	time.Sleep(100 * time.Millisecond)
+
+	rpcListener := RPCStorageHandler{
+		KeyPrefix:        "rpc.listener.",
+		SuppressRegister: true,
+		HashKeys:         false,
+		Gw:               g.Gw,
+	}
+
+	connected := rpcListener.Connect()
+	if !connected {
+		t.Fatal("Failed to connect to RPC server")
+	}
+	assert.Equal(t, GetApiDefinitionsResponse, rpcListener.GetApiDefinitions("test_org", nil))
+}
+
+func TestGetPolicies(t *testing.T) {
+	var GetPoliciesResponse = "sample-response"
+
+	dispatcher := gorpc.NewDispatcher()
+	dispatcher.AddFunc("Login", func(_, _ string) bool {
+		return true
+	})
+	dispatcher.AddFunc("Disconnect", func(_ string, _ *model.GroupLoginRequest) error {
+		return nil
+	})
+	dispatcher.AddFunc("GetPolicies", func(_ string, _ interface{}) (string, error) {
+		return GetPoliciesResponse, nil
+	})
+
+	rpcMock, connectionString := startRPCMock(dispatcher)
+	defer stopRPCMock(rpcMock)
+
+	g := StartTest(func(globalConf *config.Config) {
+		globalConf.SlaveOptions.UseRPC = true
+		globalConf.SlaveOptions.RPCKey = "test_org"
+		globalConf.SlaveOptions.APIKey = "key"
+		globalConf.SlaveOptions.ConnectionString = connectionString
+		globalConf.SlaveOptions.CallTimeout = 1
+		globalConf.SlaveOptions.RPCPoolSize = 2
+		globalConf.SlaveOptions.DisableKeySpaceSync = true
+	})
+	g.Gw.afterConfSetup() // sets SlaveOptions.CallTimeout to GlobalRPCCallTimeout
+
+	defer g.Close()
+
+	time.Sleep(100 * time.Millisecond)
+
+	rpcListener := RPCStorageHandler{
+		KeyPrefix:        "rpc.listener.",
+		SuppressRegister: true,
+		HashKeys:         false,
+		Gw:               g.Gw,
+	}
+
+	connected := rpcListener.Connect()
+	if !connected {
+		t.Fatal("Failed to connect to RPC server")
+	}
+	assert.Equal(t, GetPoliciesResponse, rpcListener.GetPolicies("test_org"))
+}
+
+func TestGetPolicies_Fails_With_Timeout(t *testing.T) {
+	wait := make(chan struct{})
+	defer func() {
+		close(wait)
+	}()
+
+	dispatcher := gorpc.NewDispatcher()
+	dispatcher.AddFunc("Login", func(_, _ string) bool {
+		return true
+	})
+	dispatcher.AddFunc("Disconnect", func(_ string, _ *model.GroupLoginRequest) error {
+		return nil
+	})
+	dispatcher.AddFunc("GetPolicies", func(_ string, _ interface{}) (string, error) {
+		<-wait // wait until the defer method is called
+		return "sample-response", nil
+	})
+
+	rpcMock, connectionString := startRPCMock(dispatcher)
+	defer stopRPCMock(rpcMock)
+
+	g := StartTest(func(globalConf *config.Config) {
+		globalConf.SlaveOptions.UseRPC = true
+		globalConf.SlaveOptions.RPCKey = "test_org"
+		globalConf.SlaveOptions.APIKey = "key"
+		globalConf.SlaveOptions.ConnectionString = connectionString
+		globalConf.SlaveOptions.CallTimeout = 1
+		globalConf.SlaveOptions.RPCPoolSize = 2
+		globalConf.SlaveOptions.DisableKeySpaceSync = true
+	})
+	g.Gw.afterConfSetup() // sets SlaveOptions.CallTimeout to GlobalRPCCallTimeout
+
+	defer g.Close()
+
+	time.Sleep(100 * time.Millisecond)
+
+	rpcListener := RPCStorageHandler{
+		KeyPrefix:        "rpc.listener.",
+		SuppressRegister: true,
+		HashKeys:         false,
+		Gw:               g.Gw,
+	}
+
+	connected := rpcListener.Connect()
+	if !connected {
+		t.Fatal("Failed to connect to RPC server")
+	}
+	// GetPolicies calls rpc.FuncClientSingleton with a backoff algorithm.
+	// The algorithm tries to call the RPC method 3 times with a 10-millisecond interval.
+	// So the "GetPolicies" method will be called 4 times, including the first try.
+	// It should return an empty string instead of "sample-response".
+	assert.Equal(t, "", rpcListener.GetPolicies("test_org"))
+}
+
+func TestIsRetriableError(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	rpcHandler := RPCStorageHandler{
+		KeyPrefix:        "rpc.listener.",
+		SuppressRegister: true,
+		Gw:               ts.Gw,
+	}
+
+	testCases := []struct {
+		name     string
+		err      error
+		expected bool
+	}{
+		{
+			name:     "Access Denied error is retriable",
+			err:      errors.New("Access Denied"),
+			expected: true,
+		},
+		{
+			name:     "Timeout error is retriable",
+			err:      errors.New("Cannot obtain response during timeout=30s"),
+			expected: true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			result := rpcHandler.IsRetriableError(tc.err)
+			assert.Equal(t, tc.expected, result, "IsRetriableError(%v) should return %v", tc.err, tc.expected)
+		})
+	}
 }

@@ -5,6 +5,9 @@ info:
     name: Tyk Technologies
     url: https://tyk.io/contact
   description: |+
+    <img src="https://tyk.io/docs/img/swagger_gateway_image.png" width="963" height="250">
+    <img src="https://tyk.io/docs/img/swagger_gateway_direction_image.png" width="946" height="392">
+    
     The Tyk Gateway API is the primary means for integrating your application with the Tyk API Gateway system. This API is very small, and has no granular permissions system. It is intended to be used purely for internal automation and integration.
 
     **Warning: Under no circumstances should outside parties be granted access to this API.**
@@ -30,7 +33,7 @@ info:
     name: Mozilla Public License Version 2.0
     url: https://github.com/TykTechnologies/tyk/blob/master/LICENSE.md
   title: Tyk Gateway API
-  version: 5.7.1
+  version: 5.11.0
 servers:
 - url: https://{tenant}
   variables:
@@ -745,7 +748,7 @@ paths:
                 items:
                   allOf:
                   - $ref: https://raw.githubusercontent.com/TykTechnologies/tyk/refs/heads/master/apidef/oas/schema/3.0.json
-                  - $ref: '#/components/schemas/XTykAPIGateway'
+                  - $ref: '#/components/schemas/TykVendorExtension'
                 type: array
           description: List of API definitions in Tyk OAS format.
         "403":
@@ -846,7 +849,7 @@ paths:
             schema:
               allOf:
               - $ref: https://raw.githubusercontent.com/TykTechnologies/tyk/refs/heads/master/apidef/oas/schema/3.0.json
-              - $ref: '#/components/schemas/XTykAPIGateway'
+              - $ref: '#/components/schemas/TykVendorExtension'
       responses:
         "200":
           content:
@@ -984,7 +987,7 @@ paths:
               schema:
                 allOf:
                 - $ref: https://raw.githubusercontent.com/TykTechnologies/tyk/refs/heads/master/apidef/oas/schema/3.0.json
-                - $ref: '#/components/schemas/XTykAPIGateway'
+                - $ref: '#/components/schemas/TykVendorExtension'
           description: OK
           headers:
             x-tyk-base-api-id:
@@ -1207,7 +1210,7 @@ paths:
             schema:
               allOf:
               - $ref: https://raw.githubusercontent.com/TykTechnologies/tyk/refs/heads/master/apidef/oas/schema/3.0.json
-              - $ref: '#/components/schemas/XTykAPIGateway'
+              - $ref: '#/components/schemas/TykVendorExtension'
       responses:
         "200":
           content:
@@ -1600,6 +1603,66 @@ paths:
       summary: Invalidate cache.
       tags:
       - Cache Invalidation
+  /tyk/cache/jwks/{apiID}:
+    delete:
+      description: Invalidate JWK cache for the given API.
+      operationId: invalidateJWKCache
+      parameters:
+        - description: The API ID.
+          example: ae67bb862a3241a49117508e0f9ee839
+          in: path
+          name: apiID
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              example:
+                message: cache invalidated
+                status: ok
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Cache invalidated.
+        "403":
+          content:
+            application/json:
+              example:
+                message: Attempted administrative access with invalid or missing key!
+                status: error
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Forbidden
+      summary: Invalidate cache for given API ID.
+      tags:
+        - JWK cache invalidation
+  /tyk/cache/jwks:
+    delete:
+      description: Invalidate JWK cache for all APIs.
+      operationId: invalidateJWKCacheForAllAPIs
+      responses:
+        "200":
+          content:
+            application/json:
+              example:
+                message: cache invalidated
+                status: ok
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Cache invalidated.
+        "403":
+          content:
+            application/json:
+              example:
+                message: Attempted administrative access with invalid or missing key!
+                status: error
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Forbidden
+      summary: Invalidate JWK cache for all APIs
+      tags:
+        - JWK cache invalidation
   /tyk/certs:
     get:
       description: List all certificates in the Tyk Gateway.
@@ -1787,7 +1850,7 @@ paths:
       summary: Return one certificate or list multiple certificates in the Tyk Gateway
         given a comma separated list of cert IDs.
       tags:
-      - CertsTag
+      - Certs
   /tyk/debug:
     post:
       description: Used to test API definition by sending sample request and analysing
@@ -1796,29 +1859,71 @@ paths:
       requestBody:
         content:
           application/json:
-            example:
-              request:
-                method: GET
-                path: /update-listen-path
-              spec:
-                api_id: b84fe1a04e5648927971c0557971565c
-                auth:
-                  auth_header_name: authorization
-                definition:
-                  key: version
-                  location: header
-                name: Tyk Test API
-                org_id: 664a14650619d40001f1f00f
-                proxy:
-                  listen_path: /tyk-api-test/
-                  strip_listen_path: true
-                  target_url: https://httpbin.org
-                use_oauth2: true
-                version_data:
-                  not_versioned: true
-                  versions:
-                    Default:
-                      name: Default
+            examples:
+              apiDefinition:
+                summary: Calling debug endpoint with classic API definition.
+                value:
+                  request:
+                    method: GET
+                    path: /update-listen-path
+                  spec:
+                    api_id: b84fe1a04e5648927971c0557971565c
+                    auth:
+                      auth_header_name: authorization
+                    definition:
+                      key: version
+                      location: header
+                    name: Tyk Test API
+                    org_id: 664a14650619d40001f1f00f
+                    proxy:
+                      listen_path: /tyk-api-test/
+                      strip_listen_path: true
+                      target_url: https://httpbin.org
+                    use_oauth2: true
+                    version_data:
+                      not_versioned: true
+                      versions:
+                        Default:
+                          name: Default
+              oasApiDefinition:
+                summary: Calling debug endpoint with Tyk OAS API definition.
+                value:
+                  request:
+                    method: GET
+                    path: /get
+                    oas:
+                      info:
+                        title: testdebug
+                        version: 1.0.0
+                      openapi: 3.0.3
+                      servers:
+                      - url: http://localhost:8181/testdebug/
+                      security: []
+                      paths: {}
+                      components:
+                        securitySchemes: {}
+                      x-tyk-api-gateway:
+                        info:
+                          dbId: 67a25ff65b60081c8731464f
+                          id: d37ea0e360c245cf406d640f1dbf788d
+                          orgId: 645b3db586341f751f4258aa
+                          name: testdebug
+                          state:
+                            active: true
+                            internal: false
+                        middleware:
+                          global:
+                            contextVariables:
+                              enabled: true
+                            trafficLogs:
+                              enabled: true
+                        server:
+                          listenPath:
+                            strip: true
+                            value: "/testdebug/"
+                        upstream:
+                          url: http://httpbin.org/
+                
             schema:
               $ref: '#/components/schemas/TraceRequest'
       responses:
@@ -1861,7 +1966,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
           description: Internal server error.
-      summary: Test an an API definition.
+      summary: Test a Tyk Classic or Tyk OAS API definition.
       tags:
       - Debug
   /tyk/keys:
@@ -1904,9 +2009,6 @@ paths:
         name: hashed
         required: false
         schema:
-          enum:
-          - true
-          - false
           type: boolean
       requestBody:
         content:
@@ -2009,9 +2111,6 @@ paths:
         name: hashed
         required: false
         schema:
-          enum:
-          - true
-          - false
           type: boolean
       - description: The key ID.
         example: 5e9d9544a1dcd60001d0ed20e7f75f9e03534825b7aef9df749582e5
@@ -2072,9 +2171,6 @@ paths:
         name: hashed
         required: false
         schema:
-          enum:
-          - true
-          - false
           type: boolean
       - description: The key ID.
         example: 5e9d9544a1dcd60001d0ed20e7f75f9e03534825b7aef9df749582e5
@@ -2188,9 +2284,6 @@ paths:
         name: hashed
         required: false
         schema:
-          enum:
-          - true
-          - false
           type: boolean
       - description: Name to give the custom key.
         example: customKey
@@ -2315,9 +2408,6 @@ paths:
         name: hashed
         required: false
         schema:
-          enum:
-          - true
-          - false
           type: boolean
       - description: ID of the key you want to update.
         example: 5e9d9544a1dcd60001d0ed20766d9a6ec6b4403b93a554feefef4708
@@ -4356,9 +4446,6 @@ paths:
         name: block
         required: false
         schema:
-          enum:
-          - true
-          - false
           type: boolean
       responses:
         "200":
@@ -5574,9 +5661,6 @@ components:
           type: string
       type: object
     BooleanQueryParam:
-      enum:
-      - true
-      - false
       example: true
       type: boolean
     CORS:
@@ -6277,6 +6361,7 @@ components:
           - executionEngine
           - subgraph
           - supergraph
+          - ""  # Allow empty string
           type: string
         introspection:
           $ref: '#/components/schemas/GraphQLIntrospectionConfig'
@@ -6301,9 +6386,9 @@ components:
           type: array
         version:
           enum:
-          - ''''
           - "1"
           - "2"
+          - ""  # Allow empty string
           type: string
       type: object
     GraphQLEngineConfig:
@@ -7265,6 +7350,7 @@ components:
         trigger:
           type: number
       type: object
+      nullable: true
     RateLimitType2:
       properties:
         per:
@@ -7718,12 +7804,19 @@ components:
           type: string
       type: object
     TraceRequest:
+      type: object
       properties:
         request:
           $ref: '#/components/schemas/TraceHttpRequest'
         spec:
           $ref: '#/components/schemas/APIDefinition'
-      type: object
+        oas:
+          oneOf:
+            - $ref: 'https://raw.githubusercontent.com/TykTechnologies/tyk/refs/heads/master/apidef/oas/schema/3.0.json'
+            - $ref: '#/components/schemas/TykVendorExtension'
+      oneOf:
+        - required: [oas]
+        - required: [spec]
     TraceResponse:
       properties:
         logs:
@@ -8136,6 +8229,11 @@ components:
           $ref: '#/components/schemas/Server'
         upstream:
           $ref: '#/components/schemas/Upstream'
+      type: object
+    TykVendorExtension:
+      properties:
+        x-tyk-api-gateway:
+          $ref: '#/components/schemas/XTykAPIGateway'
       type: object
   securitySchemes:
     api_key:

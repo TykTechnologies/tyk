@@ -7,20 +7,31 @@ import (
 	"golang.org/x/oauth2"
 )
 
-func (cache *ClientCredentialsClient) ObtainToken(ctx context.Context) (*oauth2.Token, error) {
-	cfg := newOAuth2ClientCredentialsConfig(cache.mw)
+func (client *ClientCredentialsClient) ObtainToken(ctx context.Context) (*oauth2.Token, error) {
+	cfg := newOAuth2ClientCredentialsConfig(client.mw)
+
+	// Use external services HTTP client if configured
+	if httpClient := client.getHTTPClient(); httpClient != nil {
+		ctx = context.WithValue(ctx, oauth2.HTTPClient, httpClient)
+	}
+
 	tokenSource := cfg.TokenSource(ctx)
 	return tokenSource.Token()
 }
 
-func (cache *ClientCredentialsClient) GetToken(r *http.Request) (string, error) {
-	cacheKey := generateClientCredentialsCacheKey(cache.mw.Spec.UpstreamAuth.OAuth, cache.mw.Spec.APIID)
-	secret := cache.mw.Gw.GetConfig().Secret
-	extraMetadata := cache.mw.Spec.UpstreamAuth.OAuth.ClientCredentials.ExtraMetadata
+func (client *ClientCredentialsClient) GetToken(r *http.Request) (string, error) {
+	cacheKey := generateClientCredentialsCacheKey(client.mw.Spec.UpstreamAuth.OAuth, client.mw.Spec.APIID)
+	secret := client.mw.Gw.GetConfig().Secret
+	extraMetadata := client.mw.Spec.UpstreamAuth.OAuth.ClientCredentials.ExtraMetadata
 
 	obtainTokenFunc := func(ctx context.Context) (*oauth2.Token, error) {
-		return cache.ObtainToken(ctx)
+		return client.ObtainToken(ctx)
 	}
 
-	return getToken(r, cacheKey, obtainTokenFunc, secret, extraMetadata, cache.mw.clientCredentialsStorageHandler)
+	return getToken(r, cacheKey, obtainTokenFunc, secret, extraMetadata, client.mw.clientCredentialsStorageHandler)
+}
+
+// getHTTPClient creates an HTTP client with external services configuration if available
+func (client *ClientCredentialsClient) getHTTPClient() *http.Client {
+	return createOAuthHTTPClient(client.mw)
 }

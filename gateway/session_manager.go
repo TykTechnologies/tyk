@@ -65,7 +65,7 @@ type SessionLimiter struct {
 // configured, then redis will be used. If local storage is configured, then
 // in-memory counters will be used. If no storage is configured, it falls
 // back onto the default gateway storage configuration.
-func NewSessionLimiter(ctx context.Context, conf *config.Config, drlManager *drl.DRL) SessionLimiter {
+func NewSessionLimiter(ctx context.Context, conf *config.Config, drlManager *drl.DRL, externalServicesConfig *config.ExternalServiceConfig) SessionLimiter {
 	sessionLimiter := SessionLimiter{
 		ctx:         ctx,
 		drlManager:  drlManager,
@@ -79,7 +79,7 @@ func NewSessionLimiter(ctx context.Context, conf *config.Config, drlManager *drl
 
 	switch storageConf.Type {
 	case "redis":
-		sessionLimiter.limiterStorage = rate.NewStorage(storageConf)
+		sessionLimiter.limiterStorage = rate.NewStorage(storageConf, externalServicesConfig)
 	}
 
 	sessionLimiter.smoothing = rate.NewSmoothing(sessionLimiter.limiterStorage)
@@ -278,7 +278,16 @@ func (l *SessionLimiter) RateLimitInfo(r *http.Request, api *APISpec, endpoints 
 // sessionFailReason if session limits have been exceeded.
 // Key values to manage rate are Rate and Per, e.g. Rate of 10 messages
 // Per 10 seconds
-func (l *SessionLimiter) ForwardMessage(r *http.Request, session *user.SessionState, rateLimitKey string, quotaKey string, store storage.Handler, enableRL, enableQ bool, api *APISpec, dryRun bool) sessionFailReason {
+func (l *SessionLimiter) ForwardMessage(
+	r *http.Request,
+	session *user.SessionState,
+	rateLimitKey string,
+	quotaKey string,
+	store storage.Handler,
+	enableRL, enableQ bool,
+	api *APISpec,
+	dryRun bool,
+) sessionFailReason {
 	// check for limit on API level (set to session by ApplyPolicies)
 	accessDef, allowanceScope, err := GetAccessDefinitionByAPIIDOrSession(session, api)
 	if err != nil {
@@ -376,7 +385,6 @@ func (l *SessionLimiter) ForwardMessage(r *http.Request, session *user.SessionSt
 	}
 
 	return sessionFailNone
-
 }
 
 // RedisQuotaExceeded returns true if the request should be blocked as over quota.

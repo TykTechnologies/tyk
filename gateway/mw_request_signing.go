@@ -91,7 +91,7 @@ func (s *RequestSigning) getRequestPath(r *http.Request) string {
 }
 
 func (s *RequestSigning) ProcessRequest(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
-	if (s.Spec.RequestSigning.Secret == "" && s.Spec.RequestSigning.CertificateId == "") || s.Spec.RequestSigning.KeyId == "" || s.Spec.RequestSigning.Algorithm == "" {
+	if !s.isRequestSigningConfigValid() {
 		log.Error("Fields required for signing the request are missing")
 		return errors.New("Fields required for signing the request are missing"), http.StatusInternalServerError
 	}
@@ -178,6 +178,23 @@ func (s *RequestSigning) ProcessRequest(w http.ResponseWriter, r *http.Request, 
 	}
 
 	return nil, http.StatusOK
+}
+
+func (s *RequestSigning) isRequestSigningConfigValid() bool {
+	if s.Spec.RequestSigning.KeyId == "" || s.Spec.RequestSigning.Algorithm == "" {
+		return false
+	}
+
+	isRSAAlgorithm := strings.HasPrefix(s.Spec.RequestSigning.Algorithm, "rsa")
+	if isRSAAlgorithm && s.Spec.RequestSigning.CertificateId == "" {
+		return false
+	}
+
+	if !isRSAAlgorithm && s.Spec.RequestSigning.Secret == "" {
+		return false
+	}
+
+	return true
 }
 
 func generateRSAEncodedSignature(signatureString string, privateKey *rsa.PrivateKey, algorithm string) (string, error) {

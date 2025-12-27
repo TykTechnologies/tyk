@@ -16,9 +16,8 @@ vars:
     sh: git rev-parse --show-toplevel
   product: 'gateway'
   tags: '{{ .tags | default "goplugin dev" }}'
-  args: '{{ .args | default "-timeout=15m" }}'
   buildArgs: -cover -tags "{{.tags}}"
-  testArgs: -coverpkg=github.com/TykTechnologies/tyk/...,./... {{.buildArgs}}
+  testArgs: -timeout 15m -coverpkg=github.com/TykTechnologies/tyk/...,./... {{.buildArgs}}
   python:
     sh: python3 -c 'import sys; print("%d.%d" % (sys.version_info[0], sys.version_info[1]))'
 
@@ -52,7 +51,7 @@ tasks:
         cmd: |-
           gotestsum --no-color=false --hide-summary=skipped \
           --jsonfile coverage/{{.product}}-{{.package | replace "." "gateway" | replace "/" "-"}}.json \
-          --raw-command go test -p 1 -parallel 1 -json {{.testArgs}} {{.args}} -count=1 -v \
+          --raw-command go test -p 1 -parallel 1 -json {{.testArgs}} -count=1 -v \
           -coverprofile=coverage/{{.package | replace "." "gateway" | replace "/" "-"}}.cov {{.package}} | head -n -2
 
   integration-combined:
@@ -67,7 +66,7 @@ tasks:
       - defer: { task: services:down }
       - defer: { task: report }
       - rm -rf coverage && mkdir -p coverage
-      - go test -p 1 -parallel 1 -json {{.testArgs}} {{.args}} -coverprofile=coverage/{{.product}}-all.cov -count=1 -v ./... > coverage/{{.product}}-all.json
+      - go test -p 1 -parallel 1 -json {{.testArgs}} -coverprofile=coverage/{{.product}}-all.cov -count=1 -v ./... > coverage/{{.product}}-all.json
 
   plugin:race:
     dir: '{{.dir}}'
