@@ -47,19 +47,20 @@ func (gw *Gateway) LoadDefinitionsFromRPCBackup() ([]*APISpec, error) {
 
 	decrypted := crypto.Decrypt([]byte(secret), cryptoText)
 
-	// Detect format using JSON validation
+	// Detect format using Zstd magic bytes
 	var apiList string
-	if json.Valid([]byte(decrypted)) {
-		// Uncompressed format
-		apiList = decrypted
-		log.Debug("[RPC] --> Loaded uncompressed API definitions from backup")
-	} else {
-		// Compressed format
+	if isZstdCompressed([]byte(decrypted)) {
+		// Compressed format, decompress it
 		decompressed, err := decompressData([]byte(decrypted))
 		if err != nil {
 			return nil, errors.New("[RPC] --> Failed to decompress backup: " + err.Error())
 		}
 		apiList = string(decompressed)
+		log.Debug("[RPC] --> Loaded compressed API definitions from backup")
+	} else {
+		// Uncompressed format, use as is
+		apiList = decrypted
+		log.Debug("[RPC] --> Loaded uncompressed API definitions from backup")
 	}
 
 	a := APIDefinitionLoader{Gw: gw}
@@ -206,4 +207,16 @@ func decompressData(data []byte) ([]byte, error) {
 
 	log.WithField("decompressed_size", len(decompressed)).Debug("Data decompressed with Zstd")
 	return decompressed, nil
+}
+
+// isZstdCompressed checks if data is Zstd-compressed by examining the magic bytes.
+// Zstd frames start with a 4-byte magic number: 0x28, 0xB5, 0x2F, 0xFD
+// This is more reliable than JSON validation as it explicitly identifies the compression format.
+func isZstdCompressed(data []byte) bool {
+	// Zstd magic number (little-endian): 0xFD2FB528
+	// As bytes: 0x28, 0xB5, 0x2F, 0xFD
+	if len(data) < 4 {
+		return false
+	}
+	return data[0] == 0x28 && data[1] == 0xB5 && data[2] == 0x2F && data[3] == 0xFD
 }

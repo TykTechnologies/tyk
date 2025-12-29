@@ -234,3 +234,71 @@ func TestCompressionRatio(t *testing.T) {
 		t.Logf("Compression ratio is low (%.2f%%)", ratio)
 	}
 }
+
+func TestIsZstdCompressed(t *testing.T) {
+	tests := []struct {
+		name     string
+		data     []byte
+		expected bool
+	}{
+		{
+			name:     "Empty data",
+			data:     []byte{},
+			expected: false,
+		},
+		{
+			name:     "Too short (less than 4 bytes)",
+			data:     []byte{0x28, 0xB5, 0x2F},
+			expected: false,
+		},
+		{
+			name:     "Valid Zstd magic bytes",
+			data:     []byte{0x28, 0xB5, 0x2F, 0xFD, 0x00, 0x01},
+			expected: true,
+		},
+		{
+			name:     "JSON data (not compressed)",
+			data:     []byte(`{"key":"value"}`),
+			expected: false,
+		},
+		{
+			name:     "Random data",
+			data:     []byte{0x00, 0x01, 0x02, 0x03},
+			expected: false,
+		},
+		{
+			name:     "Partial magic bytes",
+			data:     []byte{0x28, 0xB5, 0x00, 0x00},
+			expected: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := isZstdCompressed(tt.data)
+			if result != tt.expected {
+				t.Errorf("got %v, want %v", result, tt.expected)
+			}
+		})
+	}
+}
+
+func TestIsZstdCompressed_WithRealCompression(t *testing.T) {
+	// Test with actual compressed data
+	original := []byte(`{"api_id":"test","name":"Test API"}`)
+
+	compressed, err := compressData(original)
+	if err != nil {
+		t.Fatalf("compressData failed: %v", err)
+	}
+
+	// Compressed data should be detected as Zstd
+	if !isZstdCompressed(compressed) {
+		t.Error("Real compressed data not detected as Zstd")
+	}
+
+	// Original data should not be detected as Zstd
+	if isZstdCompressed(original) {
+		t.Error("Uncompressed JSON incorrectly detected as Zstd")
+	}
+}
