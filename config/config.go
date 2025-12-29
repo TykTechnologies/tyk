@@ -188,6 +188,11 @@ type StorageOptionsConf struct {
 	// Options: ["1.0", "1.1", "1.2", "1.3"].
 	// Defaults to "1.2".
 	TLSMinVersion string `json:"tls_min_version"`
+	// Enables Zstd compression of API definitions stored in Redis backups.
+	// When enabled, API definitions are compressed before encryption, reducing Redis storage.
+	// The Gateway can read both compressed and uncompressed formats for backward compatibility.
+	// Defaults to false.
+	CompressAPIDefinitions bool `json:"compress_api_definitions"`
 }
 
 type NormalisedURLConfig struct {
