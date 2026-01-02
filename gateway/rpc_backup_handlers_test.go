@@ -60,59 +60,46 @@ func TestSaveRPCDefinitionsBackup(t *testing.T) {
 	}
 }
 
-func TestFormatDetection(t *testing.T) {
+func TestCompressionRoundTrip(t *testing.T) {
 	tests := []struct {
-		name           string
-		setupData      func() []byte
-		shouldCompress bool
+		name  string
+		input string
 	}{
 		{
-			name: "Compressed format",
-			setupData: func() []byte {
-				originalJSON := `[{"api_id":"test","name":"Test API"}]`
-				compressed, _ := compression.CompressZstd([]byte(originalJSON))
-				return compressed
-			},
-			shouldCompress: true,
+			name:  "Simple JSON",
+			input: `[{"api_id":"test","name":"Test API"}]`,
 		},
 		{
-			name: "Uncompressed format",
-			setupData: func() []byte {
-				return []byte(`[{"api_id":"test","name":"Test API"}]`)
-			},
-			shouldCompress: false,
+			name:  "Complex JSON",
+			input: `[{"api_id":"test","name":"Test API","proxy":{"listen_path":"/test","target_url":"http://example.com"},"version_data":{"versions":{"v1":{"name":"v1"}}}}]`,
+		},
+		{
+			name:  "Empty array",
+			input: `[]`,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			data := tt.setupData()
+			// Compress
+			compressed, err := compression.CompressZstd([]byte(tt.input))
+			if err != nil {
+				t.Fatalf("Failed to compress: %v", err)
+			}
 
-			if tt.shouldCompress {
-				// Should be detected as Zstd
-				if !compression.IsZstdCompressed(data) {
-					t.Error("Compressed data not detected as Zstd")
-				}
+			// Decompress
+			decompressed, err := compression.DecompressZstd(compressed)
+			if err != nil {
+				t.Fatalf("Failed to decompress: %v", err)
+			}
 
-				// Should decompress successfully
-				decompressed, err := compression.DecompressZstd(data)
-				if err != nil {
-					t.Fatalf("Failed to decompress: %v", err)
-				}
+			// Verify
+			if string(decompressed) != tt.input {
+				t.Errorf("Round trip failed: got %q, want %q", string(decompressed), tt.input)
+			}
 
-				if !json.Valid(decompressed) {
-					t.Error("Decompressed data is not valid JSON")
-				}
-			} else {
-				// Should not be detected as Zstd
-				if compression.IsZstdCompressed(data) {
-					t.Error("Plain JSON incorrectly detected as Zstd compressed")
-				}
-
-				// Original data should be valid JSON
-				if !json.Valid(data) {
-					t.Error("Plain JSON should be valid")
-				}
+			if !json.Valid(decompressed) {
+				t.Error("Decompressed data is not valid JSON")
 			}
 		})
 	}

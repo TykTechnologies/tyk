@@ -49,13 +49,3 @@ func DecompressZstd(data []byte) ([]byte, error) {
 	log.WithField("decompressed_size", len(decompressed)).Debug("Data decompressed with Zstd")
 	return decompressed, nil
 }
-
-// IsZstdCompressed checks if data is Zstd-compressed by examining the magic bytes.
-// Zstd frames start with a 4-byte magic number: 0x28, 0xB5, 0x2F, 0xFD
-// This is more reliable than JSON validation as it explicitly identifies the compression format.
-func IsZstdCompressed(data []byte) bool {
-	if len(data) < 4 {
-		return false
-	}
-	return data[0] == 0x28 && data[1] == 0xB5 && data[2] == 0x2F && data[3] == 0xFD
-}
