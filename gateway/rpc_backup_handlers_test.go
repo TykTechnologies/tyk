@@ -1,7 +1,6 @@
 package gateway
 
 import (
-	"encoding/base64"
 	"encoding/json"
 	"testing"
 
@@ -64,22 +63,22 @@ func TestSaveRPCDefinitionsBackup(t *testing.T) {
 func TestFormatDetection(t *testing.T) {
 	tests := []struct {
 		name           string
-		setupData      func() string
+		setupData      func() []byte
 		shouldCompress bool
 	}{
 		{
 			name: "Compressed format",
-			setupData: func() string {
+			setupData: func() []byte {
 				originalJSON := `[{"api_id":"test","name":"Test API"}]`
 				compressed, _ := compression.CompressZstd([]byte(originalJSON))
-				return base64.StdEncoding.EncodeToString(compressed)
+				return compressed
 			},
 			shouldCompress: true,
 		},
 		{
 			name: "Uncompressed format",
-			setupData: func() string {
-				return `[{"api_id":"test","name":"Test API"}]`
+			setupData: func() []byte {
+				return []byte(`[{"api_id":"test","name":"Test API"}]`)
 			},
 			shouldCompress: false,
 		},
@@ -89,20 +88,14 @@ func TestFormatDetection(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			data := tt.setupData()
 
-			decoded, err := base64.StdEncoding.DecodeString(data)
-
 			if tt.shouldCompress {
-				// Should decode successfully and be detected as Zstd
-				if err != nil {
-					t.Fatalf("Failed to decode: %v", err)
-				}
-
-				if !compression.IsZstdCompressed(decoded) {
+				// Should be detected as Zstd
+				if !compression.IsZstdCompressed(data) {
 					t.Error("Compressed data not detected as Zstd")
 				}
 
 				// Should decompress successfully
-				decompressed, err := compression.DecompressZstd(decoded)
+				decompressed, err := compression.DecompressZstd(data)
 				if err != nil {
 					t.Fatalf("Failed to decompress: %v", err)
 				}
@@ -111,13 +104,13 @@ func TestFormatDetection(t *testing.T) {
 					t.Error("Decompressed data is not valid JSON")
 				}
 			} else {
-				// Either decode fails, or if it succeeds, it shouldn't be Zstd
-				if err == nil && compression.IsZstdCompressed(decoded) {
+				// Should not be detected as Zstd
+				if compression.IsZstdCompressed(data) {
 					t.Error("Plain JSON incorrectly detected as Zstd compressed")
 				}
 
 				// Original data should be valid JSON
-				if !json.Valid([]byte(data)) {
+				if !json.Valid(data) {
 					t.Error("Plain JSON should be valid")
 				}
 			}
