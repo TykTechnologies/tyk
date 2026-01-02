@@ -191,6 +191,7 @@ type StorageOptionsConf struct {
 	// Enables Zstd compression of API definitions stored in Redis backups.
 	// When enabled, API definitions are compressed before encryption, reducing Redis storage.
 	// The Gateway can read both compressed and uncompressed formats for backward compatibility.
+	// Note: Decompression has a 100MB memory limit.
 	// Defaults to false.
 	CompressAPIDefinitions bool `json:"compress_api_definitions"`
 }
