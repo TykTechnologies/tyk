@@ -1,6 +1,7 @@
 package gateway
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"strings"
@@ -47,18 +48,21 @@ func (gw *Gateway) LoadDefinitionsFromRPCBackup() ([]*APISpec, error) {
 
 	decrypted := crypto.Decrypt([]byte(secret), cryptoText)
 
-	// Detect format using Zstd magic bytes
+	// Detect format - check for compression first
 	var apiList string
-	if isZstdCompressed([]byte(decrypted)) {
-		// Compressed format, decompress it
-		decompressed, err := decompressData([]byte(decrypted))
+
+	// Try to detect if it's compressed by checking for base64 + Zstd magic bytes
+	decoded, err := base64.StdEncoding.DecodeString(decrypted)
+	if err == nil && isZstdCompressed(decoded) {
+		// It's compressed - decompress it
+		decompressed, err := decompressData(decoded)
 		if err != nil {
 			return nil, errors.New("[RPC] --> Failed to decompress backup: " + err.Error())
 		}
 		apiList = string(decompressed)
 		log.Debug("[RPC] --> Loaded compressed API definitions from backup")
 	} else {
-		// Uncompressed format, use as is
+		// It's uncompressed - use as-is
 		apiList = decrypted
 		log.Debug("[RPC] --> Loaded uncompressed API definitions from backup")
 	}
@@ -96,7 +100,9 @@ func (gw *Gateway) saveRPCDefinitionsBackup(list string) error {
 			log.WithError(err).Warning("[RPC] --> Failed to compress API definitions, falling back to uncompressed")
 			dataToEncrypt = list
 		} else {
-			dataToEncrypt = string(compressed)
+			// Base64 encode the compressed binary data so it's safe to encrypt as a string
+			dataToEncrypt = base64.StdEncoding.EncodeToString(compressed)
+			log.Debug("[RPC] --> API definitions compressed and base64-encoded")
 		}
 	} else {
 		// No compression
@@ -104,7 +110,7 @@ func (gw *Gateway) saveRPCDefinitionsBackup(list string) error {
 		log.Debug("[RPC] --> API definition compression disabled")
 	}
 
-	cryptoText := crypto.Encrypt(secret, dataToEncrypt)
+	cryptoText := crypto.Encrypt([]byte(secret), dataToEncrypt)
 	if err := store.SetKey(BackupApiKeyBase+tagList, cryptoText, -1); err != nil {
 		return errors.New("Failed to store node backup: " + err.Error())
 	}
@@ -127,11 +133,11 @@ func (gw *Gateway) LoadPoliciesFromRPCBackup() (map[string]user.Policy, error) {
 
 	secret := crypto.GetPaddedString(gw.GetConfig().Secret)
 	cryptoText, err := store.GetKey(checkKey)
-	listAsString := crypto.Decrypt([]byte(secret), cryptoText)
-
 	if err != nil {
 		return nil, errors.New("[RPC] --> Failed to get node policy backup (" + checkKey + "): " + err.Error())
 	}
+
+	listAsString := crypto.Decrypt([]byte(secret), cryptoText)
 
 	if policies, err := parsePoliciesFromRPC(listAsString); err != nil {
 		log.WithFields(logrus.Fields{
@@ -162,7 +168,8 @@ func (gw *Gateway) saveRPCPoliciesBackup(list string) error {
 		return errors.New("--> RPC Backup save failed: redis connection failed")
 	}
 
-	cryptoText := crypto.Encrypt(crypto.GetPaddedString(gw.GetConfig().Secret), list)
+	secret := crypto.GetPaddedString(gw.GetConfig().Secret)
+	cryptoText := crypto.Encrypt([]byte(secret), list)
 	err := store.SetKey(BackupPolicyKeyBase+tagList, cryptoText, -1)
 	if err != nil {
 		return errors.New("Failed to store node backup: " + err.Error())
@@ -182,7 +189,10 @@ func compressData(data []byte) ([]byte, error) {
 
 	compressed := encoder.EncodeAll(data, make([]byte, 0, len(data)))
 
-	compressionRatio := float64(len(data)-len(compressed)) / float64(len(data)) * 100
+	var compressionRatio float64
+	if len(data) > 0 {
+		compressionRatio = float64(len(data)-len(compressed)) / float64(len(data)) * 100
+	}
 	log.WithFields(logrus.Fields{
 		"original_size":     len(data),
 		"compressed_size":   len(compressed),
@@ -213,8 +223,6 @@ func decompressData(data []byte) ([]byte, error) {
 // Zstd frames start with a 4-byte magic number: 0x28, 0xB5, 0x2F, 0xFD
 // This is more reliable than JSON validation as it explicitly identifies the compression format.
 func isZstdCompressed(data []byte) bool {
-	// Zstd magic number (little-endian): 0xFD2FB528
-	// As bytes: 0x28, 0xB5, 0x2F, 0xFD
 	if len(data) < 4 {
 		return false
 	}
