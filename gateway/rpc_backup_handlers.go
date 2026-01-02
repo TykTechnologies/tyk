@@ -6,9 +6,9 @@ import (
 	"errors"
 	"strings"
 
-	"github.com/klauspost/compress/zstd"
 	"github.com/sirupsen/logrus"
 
+	"github.com/TykTechnologies/tyk/internal/compression"
 	"github.com/TykTechnologies/tyk/internal/crypto"
 	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/user"
@@ -53,9 +53,9 @@ func (gw *Gateway) LoadDefinitionsFromRPCBackup() ([]*APISpec, error) {
 
 	// Try to detect if it's compressed by checking for base64 + Zstd magic bytes
 	decoded, err := base64.StdEncoding.DecodeString(decrypted)
-	if err == nil && isZstdCompressed(decoded) {
+	if err == nil && compression.IsZstdCompressed(decoded) {
 		// It's compressed - decompress it
-		decompressed, err := decompressData(decoded)
+		decompressed, err := compression.DecompressZstd(decoded)
 		if err != nil {
 			return nil, errors.New("[RPC] --> Failed to decompress backup: " + err.Error())
 		}
@@ -95,7 +95,7 @@ func (gw *Gateway) saveRPCDefinitionsBackup(list string) error {
 	// Check API definition compression is enabled
 	var dataToEncrypt string
 	if gw.GetConfig().Storage.CompressAPIDefinitions {
-		compressed, err := compressData([]byte(list))
+		compressed, err := compression.CompressZstd([]byte(list))
 		if err != nil {
 			log.WithError(err).Warning("[RPC] --> Failed to compress API definitions, falling back to uncompressed")
 			dataToEncrypt = list
@@ -176,55 +176,4 @@ func (gw *Gateway) saveRPCPoliciesBackup(list string) error {
 	}
 
 	return nil
-}
-
-// compressData compresses data using Zstd compression
-// Returns the compressed data and logs compression statistics
-func compressData(data []byte) ([]byte, error) {
-	encoder, err := zstd.NewWriter(nil)
-	if err != nil {
-		return nil, err
-	}
-	defer encoder.Close()
-
-	compressed := encoder.EncodeAll(data, make([]byte, 0, len(data)))
-
-	var compressionRatio float64
-	if len(data) > 0 {
-		compressionRatio = float64(len(data)-len(compressed)) / float64(len(data)) * 100
-	}
-	log.WithFields(logrus.Fields{
-		"original_size":     len(data),
-		"compressed_size":   len(compressed),
-		"compression_ratio": compressionRatio,
-	}).Debug("Data compressed with Zstd")
-
-	return compressed, nil
-}
-
-// decompressData decompresses Zstd-compressed data
-func decompressData(data []byte) ([]byte, error) {
-	decoder, err := zstd.NewReader(nil)
-	if err != nil {
-		return nil, err
-	}
-	defer decoder.Close()
-
-	decompressed, err := decoder.DecodeAll(data, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	log.WithField("decompressed_size", len(decompressed)).Debug("Data decompressed with Zstd")
-	return decompressed, nil
-}
-
-// isZstdCompressed checks if data is Zstd-compressed by examining the magic bytes.
-// Zstd frames start with a 4-byte magic number: 0x28, 0xB5, 0x2F, 0xFD
-// This is more reliable than JSON validation as it explicitly identifies the compression format.
-func isZstdCompressed(data []byte) bool {
-	if len(data) < 4 {
-		return false
-	}
-	return data[0] == 0x28 && data[1] == 0xB5 && data[2] == 0x2F && data[3] == 0xFD
 }

@@ -1,10 +1,8 @@
-package gateway
+package compression
 
 import (
 	"encoding/json"
 	"testing"
-
-	"github.com/TykTechnologies/tyk/internal/compression"
 )
 
 func TestCompressZstd(t *testing.T) {
@@ -37,7 +35,7 @@ func TestCompressZstd(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			compressed, err := compression.CompressZstd([]byte(tt.input))
+			compressed, err := CompressZstd([]byte(tt.input))
 
 			if (err != nil) != tt.wantErr {
 				t.Errorf("got %v, wantErr %v", err, tt.wantErr)
@@ -56,7 +54,7 @@ func TestCompressZstd(t *testing.T) {
 
 			// Verify compressed data is not empty for non-empty input
 			if len(compressed) == 0 {
-				t.Error("compressData returned empty data for non-empty input")
+				t.Error("CompressZstd returned empty data for non-empty input")
 			}
 
 			// Verify compression actually happened (compressed should be different from input)
@@ -92,12 +90,12 @@ func TestDecompressZstd(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			compressed, err := compression.CompressZstd([]byte(tt.input))
+			compressed, err := CompressZstd([]byte(tt.input))
 			if err != nil {
 				t.Fatalf("CompressZstd failed: %v", err)
 			}
 
-			decompressed, err := compression.DecompressZstd(compressed)
+			decompressed, err := DecompressZstd(compressed)
 
 			if (err != nil) != tt.wantErr {
 				t.Errorf("got %v, wantErr %v", err, tt.wantErr)
@@ -136,7 +134,7 @@ func TestDecompressZstd_InvalidData(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, err := compression.DecompressZstd(tt.input)
+			_, err := DecompressZstd(tt.input)
 
 			if (err != nil) != tt.wantErr {
 				t.Errorf("got %v, wantErr %v", err, tt.wantErr)
@@ -173,7 +171,7 @@ func TestCompressDecompressRoundTrip(t *testing.T) {
 	}
 
 	// Compress
-	compressed, err := compression.CompressZstd(jsonData)
+	compressed, err := CompressZstd(jsonData)
 	if err != nil {
 		t.Fatalf("CompressZstd failed: %v", err)
 	}
@@ -183,7 +181,7 @@ func TestCompressDecompressRoundTrip(t *testing.T) {
 		t.Logf("Compressed size (%d) >= original size (%d)", len(compressed), len(jsonData))
 	}
 
-	decompressed, err := compression.DecompressZstd(compressed)
+	decompressed, err := DecompressZstd(compressed)
 	if err != nil {
 		t.Fatalf("DecompressZstd failed: %v", err)
 	}
@@ -218,7 +216,7 @@ func TestCompressionRatio(t *testing.T) {
 		}
 	}`
 
-	compressed, err := compression.CompressZstd([]byte(largeJSON))
+	compressed, err := CompressZstd([]byte(largeJSON))
 	if err != nil {
 		t.Fatalf("CompressZstd failed: %v", err)
 	}
@@ -277,7 +275,7 @@ func TestIsZstdCompressed(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := compression.IsZstdCompressed(tt.data)
+			result := IsZstdCompressed(tt.data)
 			if result != tt.expected {
 				t.Errorf("got %v, want %v", result, tt.expected)
 			}
@@ -289,18 +287,16 @@ func TestIsZstdCompressed_WithRealCompression(t *testing.T) {
 	// Test with actual compressed data
 	original := []byte(`{"api_id":"test","name":"Test API"}`)
 
-	compressed, err := compression.CompressZstd(original)
+	compressed, err := CompressZstd(original)
 	if err != nil {
 		t.Fatalf("CompressZstd failed: %v", err)
 	}
 
-	// Compressed data should be detected as Zstd
-	if !compression.IsZstdCompressed(compressed) {
+	if !IsZstdCompressed(compressed) {
 		t.Error("Real compressed data not detected as Zstd")
 	}
 
-	// Original data should not be detected as Zstd
-	if compression.IsZstdCompressed(original) {
+	if IsZstdCompressed(original) {
 		t.Error("Uncompressed JSON incorrectly detected as Zstd")
 	}
 }
