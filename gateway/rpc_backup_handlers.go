@@ -48,13 +48,12 @@ func (gw *Gateway) LoadDefinitionsFromRPCBackup() ([]*APISpec, error) {
 
 	decrypted := crypto.Decrypt([]byte(secret), cryptoText)
 
-	// Detect format - check for compression first
 	var apiList string
 
-	// Try to detect if it's compressed by checking for base64 + Zstd magic bytes
+	// Check for compression
 	decoded, err := base64.StdEncoding.DecodeString(decrypted)
 	if err == nil && compression.IsZstdCompressed(decoded) {
-		// It's compressed - decompress it
+		// Compressed
 		decompressed, err := compression.DecompressZstd(decoded)
 		if err != nil {
 			return nil, errors.New("[RPC] --> Failed to decompress backup: " + err.Error())
@@ -62,7 +61,7 @@ func (gw *Gateway) LoadDefinitionsFromRPCBackup() ([]*APISpec, error) {
 		apiList = string(decompressed)
 		log.Debug("[RPC] --> Loaded compressed API definitions from backup")
 	} else {
-		// It's uncompressed - use as-is
+		// Uncompressed
 		apiList = decrypted
 		log.Debug("[RPC] --> Loaded uncompressed API definitions from backup")
 	}

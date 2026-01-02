@@ -1,306 +1,234 @@
 package gateway
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"testing"
 
+	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/internal/compression"
 )
 
-func TestCompressZstd(t *testing.T) {
+func TestSaveRPCDefinitionsBackup(t *testing.T) {
 	tests := []struct {
-		name    string
-		input   string
-		wantErr bool
+		name        string
+		input       string
+		wantErr     bool
+		expectedErr string
 	}{
 		{
-			name:    "Empty data",
-			input:   "",
+			name:        "Invalid JSON",
+			input:       `{"invalid json`,
+			wantErr:     true,
+			expectedErr: "--> RPC Backup save failure: wrong format, skipping.",
+		},
+		{
+			name:    "Valid JSON array",
+			input:   `[{"api_id":"test","name":"Test API"}]`,
 			wantErr: false,
 		},
 		{
-			name:    "Small JSON",
-			input:   `{"key":"value"}`,
+			name:    "Empty array",
+			input:   `[]`,
 			wantErr: false,
 		},
 		{
-			name:    "Large JSON",
-			input:   `{"api_id":"test","name":"Test API","proxy":{"listen_path":"/test","target_url":"http://example.com"},"version_data":{"versions":{"v1":{"name":"v1"}}}}`,
-			wantErr: false,
-		},
-		{
-			name:    "Non-JSON data",
-			input:   "This is just plain text that should still compress",
+			name:    "Valid JSON object",
+			input:   `{"api_id":"test","name":"Test API"}`,
 			wantErr: false,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			compressed, err := compression.CompressZstd([]byte(tt.input))
+			ts := StartTest(nil)
+			defer ts.Close()
 
-			if (err != nil) != tt.wantErr {
-				t.Errorf("got %v, wantErr %v", err, tt.wantErr)
-				return
-			}
+			err := ts.Gw.saveRPCDefinitionsBackup(tt.input)
 
-			if err != nil {
-				return
-			}
-
-			// For empty input, compressed data might also be empty or very small
-			if len(tt.input) == 0 {
-				// Empty input is valid, skip further checks
-				return
-			}
-
-			// Verify compressed data is not empty for non-empty input
-			if len(compressed) == 0 {
-				t.Error("compressData returned empty data for non-empty input")
-			}
-
-			// Verify compression actually happened (compressed should be different from input)
-			if string(compressed) == tt.input {
-				t.Error("CompressZstd did not compress the data")
+			if tt.wantErr {
+				if err == nil {
+					t.Error("Expected error, got nil")
+				} else if tt.expectedErr != "" && err.Error() != tt.expectedErr {
+					t.Errorf("Expected error %q, got %q", tt.expectedErr, err.Error())
+				}
+			} else {
+				if err != nil {
+					t.Errorf("Expected no error, got: %v", err)
+				}
 			}
 		})
 	}
 }
 
-func TestDecompressZstd(t *testing.T) {
+func TestFormatDetection(t *testing.T) {
 	tests := []struct {
-		name    string
-		input   string
-		wantErr bool
+		name           string
+		setupData      func() string
+		shouldCompress bool
 	}{
 		{
-			name:    "Empty data",
-			input:   "",
-			wantErr: false,
-		},
-		{
-			name:    "Small JSON",
-			input:   `{"key":"value"}`,
-			wantErr: false,
-		},
-		{
-			name:    "Large JSON",
-			input:   `{"api_id":"test","name":"Test API","proxy":{"listen_path":"/test","target_url":"http://example.com"},"version_data":{"versions":{"v1":{"name":"v1"}}}}`,
-			wantErr: false,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			compressed, err := compression.CompressZstd([]byte(tt.input))
-			if err != nil {
-				t.Fatalf("CompressZstd failed: %v", err)
-			}
-
-			decompressed, err := compression.DecompressZstd(compressed)
-
-			if (err != nil) != tt.wantErr {
-				t.Errorf("got %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-
-			if err != nil {
-				return
-			}
-
-			// Verify decompressed data matches original
-			if string(decompressed) != tt.input {
-				t.Errorf("got %v, want %v", string(decompressed), tt.input)
-			}
-		})
-	}
-}
-
-func TestDecompressZstd_InvalidData(t *testing.T) {
-	tests := []struct {
-		name    string
-		input   []byte
-		wantErr bool
-	}{
-		{
-			name:    "Invalid compressed data",
-			input:   []byte("this is not compressed data"),
-			wantErr: true,
-		},
-		{
-			name:    "Corrupted data",
-			input:   []byte{0x00, 0x01, 0x02, 0x03},
-			wantErr: true,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			_, err := compression.DecompressZstd(tt.input)
-
-			if (err != nil) != tt.wantErr {
-				t.Errorf("got %v, wantErr %v", err, tt.wantErr)
-			}
-		})
-	}
-}
-
-func TestCompressDecompressRoundTrip(t *testing.T) {
-	// Test with realistic API definition data
-	apiDef := map[string]interface{}{
-		"api_id": "test-api-123",
-		"name":   "Test API",
-		"proxy": map[string]interface{}{
-			"listen_path": "/test",
-			"target_url":  "http://example.com",
-		},
-		"version_data": map[string]interface{}{
-			"versions": map[string]interface{}{
-				"v1": map[string]interface{}{
-					"name": "v1",
-				},
+			name: "Compressed format",
+			setupData: func() string {
+				originalJSON := `[{"api_id":"test","name":"Test API"}]`
+				compressed, _ := compression.CompressZstd([]byte(originalJSON))
+				return base64.StdEncoding.EncodeToString(compressed)
 			},
-		},
-		"auth": map[string]interface{}{
-			"auth_header_name": "Authorization",
-		},
-	}
-
-	// Marshal to JSON
-	jsonData, err := json.Marshal(apiDef)
-	if err != nil {
-		t.Fatalf("Failed to marshal test data: %v", err)
-	}
-
-	// Compress
-	compressed, err := compression.CompressZstd(jsonData)
-	if err != nil {
-		t.Fatalf("CompressZstd failed: %v", err)
-	}
-
-	// Verify compression reduced size
-	if len(compressed) >= len(jsonData) {
-		t.Logf("Compressed size (%d) >= original size (%d)", len(compressed), len(jsonData))
-	}
-
-	decompressed, err := compression.DecompressZstd(compressed)
-	if err != nil {
-		t.Fatalf("DecompressZstd failed: %v", err)
-	}
-
-	// Verify data integrity
-	if string(decompressed) != string(jsonData) {
-		t.Error("Decompressed data does not match original")
-	}
-
-	// Verify JSON is still valid
-	var result map[string]interface{}
-	if err := json.Unmarshal(decompressed, &result); err != nil {
-		t.Errorf("Decompressed data is not valid JSON: %v", err)
-	}
-}
-
-func TestCompressionRatio(t *testing.T) {
-	// Test with a large, repetitive JSON structure (should compress well)
-	largeJSON := `{
-		"api_id": "test-api-123",
-		"name": "Test API with lots of repetitive data",
-		"proxy": {
-			"listen_path": "/test",
-			"target_url": "http://example.com"
-		},
-		"version_data": {
-			"versions": {
-				"v1": {"name": "v1", "expires": "", "paths": {"ignored": [], "white_list": [], "black_list": []}},
-				"v2": {"name": "v2", "expires": "", "paths": {"ignored": [], "white_list": [], "black_list": []}},
-				"v3": {"name": "v3", "expires": "", "paths": {"ignored": [], "white_list": [], "black_list": []}}
-			}
-		}
-	}`
-
-	compressed, err := compression.CompressZstd([]byte(largeJSON))
-	if err != nil {
-		t.Fatalf("CompressZstd failed: %v", err)
-	}
-
-	originalSize := len(largeJSON)
-	compressedSize := len(compressed)
-	ratio := float64(originalSize-compressedSize) / float64(originalSize) * 100
-
-	t.Logf("Original size: %d bytes", originalSize)
-	t.Logf("Compressed size: %d bytes", compressedSize)
-	t.Logf("Compression ratio: %.2f%%", ratio)
-
-	// Verify we got some compression (at least 10% for this repetitive data)
-	if ratio < 10 {
-		t.Logf("Compression ratio is low (%.2f%%)", ratio)
-	}
-}
-
-func TestIsZstdCompressed(t *testing.T) {
-	tests := []struct {
-		name     string
-		data     []byte
-		expected bool
-	}{
-		{
-			name:     "Empty data",
-			data:     []byte{},
-			expected: false,
+			shouldCompress: true,
 		},
 		{
-			name:     "Too short (less than 4 bytes)",
-			data:     []byte{0x28, 0xB5, 0x2F},
-			expected: false,
-		},
-		{
-			name:     "Valid Zstd magic bytes",
-			data:     []byte{0x28, 0xB5, 0x2F, 0xFD, 0x00, 0x01},
-			expected: true,
-		},
-		{
-			name:     "JSON data (not compressed)",
-			data:     []byte(`{"key":"value"}`),
-			expected: false,
-		},
-		{
-			name:     "Random data",
-			data:     []byte{0x00, 0x01, 0x02, 0x03},
-			expected: false,
-		},
-		{
-			name:     "Partial magic bytes",
-			data:     []byte{0x28, 0xB5, 0x00, 0x00},
-			expected: false,
+			name: "Uncompressed format",
+			setupData: func() string {
+				return `[{"api_id":"test","name":"Test API"}]`
+			},
+			shouldCompress: false,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := compression.IsZstdCompressed(tt.data)
-			if result != tt.expected {
-				t.Errorf("got %v, want %v", result, tt.expected)
+			data := tt.setupData()
+
+			decoded, err := base64.StdEncoding.DecodeString(data)
+
+			if tt.shouldCompress {
+				// Should decode successfully and be detected as Zstd
+				if err != nil {
+					t.Fatalf("Failed to decode: %v", err)
+				}
+
+				if !compression.IsZstdCompressed(decoded) {
+					t.Error("Compressed data not detected as Zstd")
+				}
+
+				// Should decompress successfully
+				decompressed, err := compression.DecompressZstd(decoded)
+				if err != nil {
+					t.Fatalf("Failed to decompress: %v", err)
+				}
+
+				if !json.Valid(decompressed) {
+					t.Error("Decompressed data is not valid JSON")
+				}
+			} else {
+				// Either decode fails, or if it succeeds, it shouldn't be Zstd
+				if err == nil && compression.IsZstdCompressed(decoded) {
+					t.Error("Plain JSON incorrectly detected as Zstd compressed")
+				}
+
+				// Original data should be valid JSON
+				if !json.Valid([]byte(data)) {
+					t.Error("Plain JSON should be valid")
+				}
 			}
 		})
 	}
 }
 
-func TestIsZstdCompressed_WithRealCompression(t *testing.T) {
-	// Test with actual compressed data
-	original := []byte(`{"api_id":"test","name":"Test API"}`)
-
-	compressed, err := compression.CompressZstd(original)
-	if err != nil {
-		t.Fatalf("CompressZstd failed: %v", err)
+func TestRoundTripSaveAndLoad(t *testing.T) {
+	tests := []struct {
+		name               string
+		compressionEnabled bool
+		apiID              string
+		inputJSON          string
+	}{
+		{
+			name:               "With compression enabled",
+			compressionEnabled: true,
+			apiID:              "test-compressed",
+			inputJSON:          `[{"api_id":"test-compressed","name":"Test API","proxy":{"listen_path":"/test","target_url":"http://example.com"}}]`,
+		},
+		{
+			name:               "With compression disabled",
+			compressionEnabled: false,
+			apiID:              "test-uncompressed",
+			inputJSON:          `[{"api_id":"test-uncompressed","name":"Test API","proxy":{"listen_path":"/test","target_url":"http://example.com"}}]`,
+		},
 	}
 
-	// Compressed data should be detected as Zstd
-	if !compression.IsZstdCompressed(compressed) {
-		t.Error("Real compressed data not detected as Zstd")
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ts := StartTest(func(globalConf *config.Config) {
+				globalConf.Storage.CompressAPIDefinitions = tt.compressionEnabled
+			})
+			defer ts.Close()
+
+			err := ts.Gw.saveRPCDefinitionsBackup(tt.inputJSON)
+			if err != nil {
+				t.Fatalf("Failed to save backup: %v", err)
+			}
+
+			specs, err := ts.Gw.LoadDefinitionsFromRPCBackup()
+			if err != nil {
+				t.Fatalf("Failed to load backup: %v", err)
+			}
+
+			if len(specs) != 1 {
+				t.Errorf("Expected 1 API spec, got %d", len(specs))
+			}
+
+			if len(specs) > 0 && specs[0].APIID != tt.apiID {
+				t.Errorf("Expected API ID %q, got %q", tt.apiID, specs[0].APIID)
+			}
+		})
+	}
+}
+
+func TestBackwardCompatibility(t *testing.T) {
+	tests := []struct {
+		name            string
+		saveCompression bool
+		loadCompression bool
+		apiID           string
+		inputJSON       string
+	}{
+		{
+			name:            "Load uncompressed with compression enabled",
+			saveCompression: false,
+			loadCompression: true,
+			apiID:           "test-backward",
+			inputJSON:       `[{"api_id":"test-backward","name":"Test API","proxy":{"listen_path":"/test","target_url":"http://example.com"}}]`,
+		},
+		{
+			name:            "Load compressed with compression disabled",
+			saveCompression: true,
+			loadCompression: false,
+			apiID:           "test-forward",
+			inputJSON:       `[{"api_id":"test-forward","name":"Test API","proxy":{"listen_path":"/test","target_url":"http://example.com"}}]`,
+		},
 	}
 
-	// Original data should not be detected as Zstd
-	if compression.IsZstdCompressed(original) {
-		t.Error("Uncompressed JSON incorrectly detected as Zstd")
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Save with first configuration
+			ts1 := StartTest(func(globalConf *config.Config) {
+				globalConf.Storage.CompressAPIDefinitions = tt.saveCompression
+			})
+			defer ts1.Close()
+
+			err := ts1.Gw.saveRPCDefinitionsBackup(tt.inputJSON)
+			if err != nil {
+				t.Fatalf("Failed to save backup: %v", err)
+			}
+
+			// Load with second configuration
+			ts2 := StartTest(func(globalConf *config.Config) {
+				globalConf.Storage.CompressAPIDefinitions = tt.loadCompression
+			})
+			defer ts2.Close()
+
+			specs, err := ts2.Gw.LoadDefinitionsFromRPCBackup()
+			if err != nil {
+				t.Fatalf("Failed to load backup: %v", err)
+			}
+
+			if len(specs) != 1 {
+				t.Errorf("Expected 1 API spec, got %d", len(specs))
+			}
+
+			if len(specs) > 0 && specs[0].APIID != tt.apiID {
+				t.Errorf("Expected API ID %q, got %q", tt.apiID, specs[0].APIID)
+			}
+		})
 	}
 }
