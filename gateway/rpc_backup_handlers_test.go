@@ -15,7 +15,7 @@ func TestSaveRPCDefinitionsBackup(t *testing.T) {
 	}{
 		{
 			name:        "Invalid JSON",
-			input:       `{"invalid json`,
+			input:       `not json at all`,
 			wantErr:     true,
 			expectedErr: "--> RPC Backup save failure: wrong format, skipping.",
 		},
