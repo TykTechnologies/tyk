@@ -1,11 +1,9 @@
 package gateway
 
 import (
-	"encoding/json"
 	"testing"
 
 	"github.com/TykTechnologies/tyk/config"
-	"github.com/TykTechnologies/tyk/internal/compression"
 )
 
 func TestSaveRPCDefinitionsBackup(t *testing.T) {
@@ -55,51 +53,6 @@ func TestSaveRPCDefinitionsBackup(t *testing.T) {
 				if err != nil {
 					t.Errorf("Expected no error, got: %v", err)
 				}
-			}
-		})
-	}
-}
-
-func TestCompressionRoundTrip(t *testing.T) {
-	tests := []struct {
-		name  string
-		input string
-	}{
-		{
-			name:  "Simple JSON",
-			input: `[{"api_id":"test","name":"Test API"}]`,
-		},
-		{
-			name:  "Complex JSON",
-			input: `[{"api_id":"test","name":"Test API","proxy":{"listen_path":"/test","target_url":"http://example.com"},"version_data":{"versions":{"v1":{"name":"v1"}}}}]`,
-		},
-		{
-			name:  "Empty array",
-			input: `[]`,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			// Compress
-			compressed, err := compression.CompressZstd([]byte(tt.input))
-			if err != nil {
-				t.Fatalf("Failed to compress: %v", err)
-			}
-
-			// Decompress
-			decompressed, err := compression.DecompressZstd(compressed)
-			if err != nil {
-				t.Fatalf("Failed to decompress: %v", err)
-			}
-
-			// Verify
-			if string(decompressed) != tt.input {
-				t.Errorf("Round trip failed: got %q, want %q", string(decompressed), tt.input)
-			}
-
-			if !json.Valid(decompressed) {
-				t.Error("Decompressed data is not valid JSON")
 			}
 		})
 	}

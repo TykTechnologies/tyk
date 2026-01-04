@@ -46,7 +46,7 @@ func (gw *Gateway) LoadDefinitionsFromRPCBackup() ([]*APISpec, error) {
 		return nil, errors.New("[RPC] --> Failed to get node backup (" + checkKey + "): " + err.Error())
 	}
 
-	decrypted := crypto.Decrypt([]byte(secret), cryptoText)
+	decrypted := crypto.Decrypt(secret, cryptoText)
 
 	apiList, err := gw.decodeAPIBackup(decrypted)
 	if err != nil {
@@ -79,7 +79,7 @@ func (gw *Gateway) saveRPCDefinitionsBackup(list string) error {
 	secret := crypto.GetPaddedString(gw.GetConfig().Secret)
 	dataToEncrypt := gw.encodeAPIBackup(list)
 
-	cryptoText := crypto.Encrypt([]byte(secret), dataToEncrypt)
+	cryptoText := crypto.Encrypt(secret, dataToEncrypt)
 	if err := store.SetKey(BackupApiKeyBase+tagList, cryptoText, -1); err != nil {
 		return errors.New("Failed to store node backup: " + err.Error())
 	}
@@ -149,7 +149,7 @@ func (gw *Gateway) LoadPoliciesFromRPCBackup() (map[string]user.Policy, error) {
 		return nil, errors.New("[RPC] --> Failed to get node policy backup (" + checkKey + "): " + err.Error())
 	}
 
-	listAsString := crypto.Decrypt([]byte(secret), cryptoText)
+	listAsString := crypto.Decrypt(secret, cryptoText)
 
 	if policies, err := parsePoliciesFromRPC(listAsString); err != nil {
 		log.WithFields(logrus.Fields{
@@ -181,7 +181,7 @@ func (gw *Gateway) saveRPCPoliciesBackup(list string) error {
 	}
 
 	secret := crypto.GetPaddedString(gw.GetConfig().Secret)
-	cryptoText := crypto.Encrypt([]byte(secret), list)
+	cryptoText := crypto.Encrypt(secret, list)
 	err := store.SetKey(BackupPolicyKeyBase+tagList, cryptoText, -1)
 	if err != nil {
 		return errors.New("Failed to store node backup: " + err.Error())
