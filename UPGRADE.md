@@ -229,8 +229,8 @@ This single constant change fixes all failing TLS certificate validation tests.
 | Issue | Status | Commit |
 |-------|--------|--------|
 | Fix TLS test error assertions | ✅ **FIXED** | e121255 |
+| Update CI matrix to Go 1.25.x | ✅ **FIXED** | 39e93ed |
 | Update Docker base images to Go 1.25 | ⏳ Pending | Requires tykio/golang-cross:1.25-bullseye |
-| Verify all workflows use Go 1.25 | ⏳ Pending | Blocked by Docker images |
 
 ---
 
