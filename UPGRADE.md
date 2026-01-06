@@ -197,9 +197,16 @@ FAIL: TestAPIMutualTLS/Announce_ClientCA/SNI_and_domain_per_API/MutualTLSCertifi
 ```
 
 **Root Cause:**
-Go 1.25 changed TLS error messages for certificate validation failures:
-- **Go 1.24:** Returns `"tls: bad certificate"`
-- **Go 1.25:** Returns `"tls: handshake failure"`
+Go 1.25 commit [`fd605450`](https://go.googlesource.com/go/+/fd605450a7be429efe68aed2271fbd3d40818f8e) changed TLS alert selection for TLS < 1.3 when client certificate is required but not provided:
+
+- **Go 1.24 and earlier:** Sends Alert 42 (`bad_certificate`)
+  - Error message: `"tls: bad certificate"`
+- **Go 1.25:** Sends Alert 40 (`handshake_failure`)
+  - Error message: `"tls: handshake failure"`
+
+**Why the change:** RFC 5246 §7.4.6 specifies that when the server requires a client certificate and the client doesn't send one, "the server MAY respond with a fatal handshake_failure alert." Go 1.25's "stricter" TLS implementation now follows this RFC recommendation.
+
+**Additional change:** Go 1.25 commit [`4635ad04`](https://go.googlesource.com/go/+/4635ad047a426f43a4b70cd11ce52b062d0da34f) also changed malformed certificate handling to send `decode_error` instead of `bad_certificate`, aligning with BoringSSL behavior.
 
 **Affected Tests:**
 1. `TestAPIMutualTLS/Announce_ClientCA/*` - 6 test cases
