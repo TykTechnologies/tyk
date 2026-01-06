@@ -40,7 +40,7 @@ import (
 
 const (
 	internalTLSErr          = "tls: unrecognized name"
-	badcertErr              = "tls: handshake failure" // Go 1.25+ RFC 5246 compliant (Alert 40)
+	badcertErr              = "tls: bad certificate" // Custom VerifyPeerCertificate callback (unchanged in Go 1.25)
 	certNotMatchErr         = "Client TLS certificate is required"
 	unknownCertAuthorityErr = "unknown certificate authority"
 )
