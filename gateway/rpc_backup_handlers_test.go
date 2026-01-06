@@ -165,3 +165,175 @@ func TestBackwardCompatibility(t *testing.T) {
 		})
 	}
 }
+
+// generateAPIDefinition creates an API definition JSON of specified size
+func generateAPIDefinition(apiID string, targetSizeKB int) string {
+	// Base API definition structure
+	base := `{"api_id":"` + apiID + `","name":"Benchmark API","proxy":{"listen_path":"/bench","target_url":"http://example.com"},"version_data":{"versions":{"v1":{"name":"v1"}}},"description":"`
+
+	// Calculate padding needed to reach target size
+	baseSize := len(base) + len(`"}}}`)
+	paddingSize := (targetSizeKB * 1024) - baseSize
+
+	if paddingSize < 0 {
+		paddingSize = 0
+	}
+
+	// Generate padding string
+	padding := ""
+	for i := 0; i < paddingSize; i++ {
+		padding += "x"
+	}
+
+	return base + padding + `"}}`
+}
+
+// BenchmarkSaveRPCDefinitionsBackup benchmarks the save operation with various sizes
+func BenchmarkSaveRPCDefinitionsBackup(b *testing.B) {
+	benchmarks := []struct {
+		name               string
+		sizeKB             int
+		compressionEnabled bool
+	}{
+		{"Small_10KB_Uncompressed", 10, false},
+		{"Small_10KB_Compressed", 10, true},
+		{"Medium_100KB_Uncompressed", 100, false},
+		{"Medium_100KB_Compressed", 100, true},
+		{"Large_1MB_Uncompressed", 1024, false},
+		{"Large_1MB_Compressed", 1024, true},
+		{"ExtraLarge_5MB_Uncompressed", 5120, false},
+		{"ExtraLarge_5MB_Compressed", 5120, true},
+	}
+
+	for _, bm := range benchmarks {
+		b.Run(bm.name, func(b *testing.B) {
+			ts := StartTest(func(globalConf *config.Config) {
+				globalConf.Storage.CompressAPIDefinitions = bm.compressionEnabled
+			})
+			defer ts.Close()
+
+			// Generate test data
+			apiDef := generateAPIDefinition("bench-api", bm.sizeKB)
+			inputJSON := `[` + apiDef + `]`
+
+			b.ResetTimer()
+			b.ReportAllocs()
+
+			for i := 0; i < b.N; i++ {
+				err := ts.Gw.saveRPCDefinitionsBackup(inputJSON)
+				if err != nil {
+					b.Fatalf("Failed to save backup: %v", err)
+				}
+			}
+
+			// Report size metrics
+			b.ReportMetric(float64(len(inputJSON))/1024, "input_KB")
+		})
+	}
+}
+
+// BenchmarkLoadDefinitionsFromRPCBackup benchmarks the load operation with various sizes
+func BenchmarkLoadDefinitionsFromRPCBackup(b *testing.B) {
+	benchmarks := []struct {
+		name               string
+		sizeKB             int
+		compressionEnabled bool
+	}{
+		{"Small_10KB_Uncompressed", 10, false},
+		{"Small_10KB_Compressed", 10, true},
+		{"Medium_100KB_Uncompressed", 100, false},
+		{"Medium_100KB_Compressed", 100, true},
+		{"Large_1MB_Uncompressed", 1024, false},
+		{"Large_1MB_Compressed", 1024, true},
+		{"ExtraLarge_5MB_Uncompressed", 5120, false},
+		{"ExtraLarge_5MB_Compressed", 5120, true},
+	}
+
+	for _, bm := range benchmarks {
+		b.Run(bm.name, func(b *testing.B) {
+			ts := StartTest(func(globalConf *config.Config) {
+				globalConf.Storage.CompressAPIDefinitions = bm.compressionEnabled
+			})
+			defer ts.Close()
+
+			// Generate and save test data
+			apiDef := generateAPIDefinition("bench-api", bm.sizeKB)
+			inputJSON := `[` + apiDef + `]`
+
+			err := ts.Gw.saveRPCDefinitionsBackup(inputJSON)
+			if err != nil {
+				b.Fatalf("Failed to save backup: %v", err)
+			}
+
+			b.ResetTimer()
+			b.ReportAllocs()
+
+			for i := 0; i < b.N; i++ {
+				specs, err := ts.Gw.LoadDefinitionsFromRPCBackup()
+				if err != nil {
+					b.Fatalf("Failed to load backup: %v", err)
+				}
+				if len(specs) != 1 {
+					b.Fatalf("Expected 1 spec, got %d", len(specs))
+				}
+			}
+
+			// Report size metrics
+			b.ReportMetric(float64(len(inputJSON))/1024, "input_KB")
+		})
+	}
+}
+
+// BenchmarkRoundTrip benchmarks the complete save and load cycle
+func BenchmarkRoundTrip(b *testing.B) {
+	benchmarks := []struct {
+		name               string
+		sizeKB             int
+		compressionEnabled bool
+	}{
+		{"Small_10KB_Uncompressed", 10, false},
+		{"Small_10KB_Compressed", 10, true},
+		{"Medium_100KB_Uncompressed", 100, false},
+		{"Medium_100KB_Compressed", 100, true},
+		{"Large_1MB_Uncompressed", 1024, false},
+		{"Large_1MB_Compressed", 1024, true},
+		{"ExtraLarge_5MB_Uncompressed", 5120, false},
+		{"ExtraLarge_5MB_Compressed", 5120, true},
+	}
+
+	for _, bm := range benchmarks {
+		b.Run(bm.name, func(b *testing.B) {
+			ts := StartTest(func(globalConf *config.Config) {
+				globalConf.Storage.CompressAPIDefinitions = bm.compressionEnabled
+			})
+			defer ts.Close()
+
+			// Generate test data
+			apiDef := generateAPIDefinition("bench-api", bm.sizeKB)
+			inputJSON := `[` + apiDef + `]`
+
+			b.ResetTimer()
+			b.ReportAllocs()
+
+			for i := 0; i < b.N; i++ {
+				// Save
+				err := ts.Gw.saveRPCDefinitionsBackup(inputJSON)
+				if err != nil {
+					b.Fatalf("Failed to save backup: %v", err)
+				}
+
+				// Load
+				specs, err := ts.Gw.LoadDefinitionsFromRPCBackup()
+				if err != nil {
+					b.Fatalf("Failed to load backup: %v", err)
+				}
+				if len(specs) != 1 {
+					b.Fatalf("Expected 1 spec, got %d", len(specs))
+				}
+			}
+
+			// Report size metrics
+			b.ReportMetric(float64(len(inputJSON))/1024, "input_KB")
+		})
+	}
+}
