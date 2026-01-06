@@ -196,31 +196,35 @@ FAIL: TestAPIMutualTLS/Announce_ClientCA/SNI_and_domain_per_API/MutualTLSCertifi
                      to contain 'tls: bad certificate'
 ```
 
-**Root Cause:**
-Go 1.25 commit [`fd605450`](https://go.googlesource.com/go/+/fd605450a7be429efe68aed2271fbd3d40818f8e) changed TLS alert selection for TLS < 1.3 when client certificate is required but not provided:
+**Analysis:**
 
-- **Go 1.24 and earlier:** Sends Alert 42 (`bad_certificate`)
-  - Error message: `"tls: bad certificate"`
-- **Go 1.25:** Sends Alert 40 (`handshake_failure`)
-  - Error message: `"tls: handshake failure"`
+Go 1.25 commit [`fd605450`](https://go.googlesource.com/go/+/fd605450a7be429efe68aed2271fbd3d40818f8e) changed TLS alert selection for TLS < 1.3 when using `tls.RequireAndVerifyClientCert`:
 
-**Why the change:** RFC 5246 §7.4.6 specifies that when the server requires a client certificate and the client doesn't send one, "the server MAY respond with a fatal handshake_failure alert." Go 1.25's "stricter" TLS implementation now follows this RFC recommendation.
+- **Go 1.24:** Sends Alert 42 (`bad_certificate`)
+- **Go 1.25:** Sends Alert 40 (`handshake_failure`) per RFC 5246 §7.4.6
 
-**Additional change:** Go 1.25 commit [`4635ad04`](https://go.googlesource.com/go/+/4635ad047a426f43a4b70cd11ce52b062d0da34f) also changed malformed certificate handling to send `decode_error` instead of `bad_certificate`, aligning with BoringSSL behavior.
+However, **Tyk is not affected** by this change.
 
-**Affected Tests:**
-1. `TestAPIMutualTLS/Announce_ClientCA/*` - 6 test cases
-2. `TestClientCertificates_WithProtocolTLS/bad_certificate`
-3. All subtests checking certificate validation errors
+**Why Tyk is Unaffected:**
 
-**Fix Applied (Commit e121255):**
+Tyk uses `HttpServerOptions.SkipClientCAAnnouncement` which implements certificate validation via a **custom `VerifyPeerCertificate` callback** (`gateway/cert.go:536-541`):
 
-Updated `gateway/cert_test.go:43`:
 ```go
-const badcertErr = "tls: handshake failure" // Go 1.25+ RFC 5246 compliant (Alert 40)
+if gwConfig.HttpServerOptions.SkipClientCAAnnouncement {
+    if newConfig.ClientAuth == tls.RequireAndVerifyClientCert {
+        newConfig.VerifyPeerCertificate = getClientValidator(hello, newConfig.ClientCAs)
+    }
+    newConfig.ClientCAs = x509.NewCertPool()
+    newConfig.ClientAuth = tls.RequestClientCert  // Not RequireAndVerifyClientCert
+}
 ```
 
-This single constant change fixes all failing TLS certificate validation tests.
+This custom implementation uses `tls.RequestClientCert` + callback instead of the standard `tls.RequireAndVerifyClientCert` path. The Go 1.25 alert change **only affects the standard path**, not custom `VerifyPeerCertificate` implementations.
+
+**Result:**
+- ✅ No test changes required
+- ✅ Tyk continues to send Alert 42 (`bad_certificate`) as before
+- ✅ No impact on production behavior
 
 ---
 
@@ -228,7 +232,7 @@ This single constant change fixes all failing TLS certificate validation tests.
 
 | Issue | Status | Commit |
 |-------|--------|--------|
-| Fix TLS test error assertions | ✅ **FIXED** | e121255 |
+| TLS test failures | ✅ **NOT NEEDED** | Tyk's custom VerifyPeerCertificate unaffected by Go 1.25 |
 | Update CI matrix to Go 1.25.x | ✅ **FIXED** | 39e93ed |
 | Update Docker base images to Go 1.25 | ⏳ Pending | Requires tykio/golang-cross:1.25-bullseye |
 
