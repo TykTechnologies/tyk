@@ -213,40 +213,24 @@ Go 1.25 commit [`fd605450`](https://go.googlesource.com/go/+/fd605450a7be429efe6
 2. `TestClientCertificates_WithProtocolTLS/bad_certificate`
 3. All subtests checking certificate validation errors
 
-**Fix Options:**
+**Fix Applied (Commit e121255):**
 
-**Option A: Update test assertions (Recommended)**
+Updated `gateway/cert_test.go:43`:
 ```go
-// Before (Go 1.24)
-assert.Contains(t, err.Error(), "tls: bad certificate")
-
-// After (Go 1.25)
-assert.Contains(t, err.Error(), "tls: handshake failure")
+const badcertErr = "tls: handshake failure" // Go 1.25+ RFC 5246 compliant (Alert 40)
 ```
 
-**Option B: Accept either error message**
-```go
-errStr := err.Error()
-assert.True(t,
-    strings.Contains(errStr, "tls: bad certificate") ||
-    strings.Contains(errStr, "tls: handshake failure"),
-    "Expected TLS certificate error")
-```
-
-**Affected Files:**
-- `gateway/cert_test.go` (lines 467, 631, 748, 842, etc.)
+This single constant change fixes all failing TLS certificate validation tests.
 
 ---
 
-#### Summary of CI Fixes Required
+#### Summary of CI Fixes
 
-| Issue | Priority | Estimated Effort | Blocking |
-|-------|----------|------------------|----------|
-| Update Docker base images to Go 1.25 | **HIGH** | 1-2 hours | ✅ Yes |
-| Fix TLS test error assertions | **MEDIUM** | 2-3 hours | ✅ Yes |
-| Verify all workflows use Go 1.25 | **HIGH** | 1 hour | ✅ Yes |
-
-**Total Estimated Effort:** 4-6 hours
+| Issue | Status | Commit |
+|-------|--------|--------|
+| Fix TLS test error assertions | ✅ **FIXED** | e121255 |
+| Update Docker base images to Go 1.25 | ⏳ Pending | Requires tykio/golang-cross:1.25-bullseye |
+| Verify all workflows use Go 1.25 | ⏳ Pending | Blocked by Docker images |
 
 ---
 
