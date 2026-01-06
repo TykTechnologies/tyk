@@ -147,6 +147,102 @@ if err != nil || !parsedURL.IsAbs() {  // ❌ WILL PANIC if err != nil
 - False positives (safe code): 9
 - **Status:** Fixes implemented in this PR
 
+---
+
+### CI/CD Failures Observed ⚠️ **BLOCKING**
+
+**PR:** [#7658](https://github.com/TykTechnologies/tyk/pull/7658)
+**Status:** Multiple CI failures blocking merge
+
+#### Failure #1: Docker Build - Go Version Mismatch
+
+**Jobs affected:**
+- `docker-build` (Plugin compiler)
+- `1.24-bullseye` (Release workflow)
+
+**Error:**
+```
+ERROR: go: go.mod requires go >= 1.25.5 (running go 1.24.11; GOTOOLCHAIN=local)
+```
+
+**Root Cause:**
+- CI workflows use base image `tykio/golang-cross:1.24-bullseye`
+- Code now requires Go 1.25.5 in go.mod
+- Docker builds fail at `go mod download` step
+
+**Fix Required:**
+1. Update plugin compiler workflow to use Go 1.25 base image
+2. Update release workflow to use Go 1.25
+3. Either:
+   - Wait for `tykio/golang-cross:1.25-bullseye` image
+   - OR use official `golang:1.25-bullseye` temporarily
+
+**Affected Files:**
+- `.github/workflows/plugin-compiler.yml`
+- `.github/workflows/release.yml`
+
+---
+
+#### Failure #2: TLS Test Failures - Error Message Changes
+
+**Jobs affected:**
+- `Go 1.24.x Redis 7` (CI tests)
+- `Unit Tests & Linting`
+
+**Error:**
+```
+FAIL: TestAPIMutualTLS/Announce_ClientCA/SNI_and_domain_per_API/MutualTLSCertificate_not_set
+  cert_test.go:467: Expect error 'remote error: tls: handshake failure'
+                     to contain 'tls: bad certificate'
+```
+
+**Root Cause:**
+Go 1.25 changed TLS error messages for certificate validation failures:
+- **Go 1.24:** Returns `"tls: bad certificate"`
+- **Go 1.25:** Returns `"tls: handshake failure"`
+
+**Affected Tests:**
+1. `TestAPIMutualTLS/Announce_ClientCA/*` - 6 test cases
+2. `TestClientCertificates_WithProtocolTLS/bad_certificate`
+3. All subtests checking certificate validation errors
+
+**Fix Options:**
+
+**Option A: Update test assertions (Recommended)**
+```go
+// Before (Go 1.24)
+assert.Contains(t, err.Error(), "tls: bad certificate")
+
+// After (Go 1.25)
+assert.Contains(t, err.Error(), "tls: handshake failure")
+```
+
+**Option B: Accept either error message**
+```go
+errStr := err.Error()
+assert.True(t,
+    strings.Contains(errStr, "tls: bad certificate") ||
+    strings.Contains(errStr, "tls: handshake failure"),
+    "Expected TLS certificate error")
+```
+
+**Affected Files:**
+- `gateway/cert_test.go` (lines 467, 631, 748, 842, etc.)
+
+---
+
+#### Summary of CI Fixes Required
+
+| Issue | Priority | Estimated Effort | Blocking |
+|-------|----------|------------------|----------|
+| Update Docker base images to Go 1.25 | **HIGH** | 1-2 hours | ✅ Yes |
+| Fix TLS test error assertions | **MEDIUM** | 2-3 hours | ✅ Yes |
+| Verify all workflows use Go 1.25 | **HIGH** | 1 hour | ✅ Yes |
+
+**Total Estimated Effort:** 4-6 hours
+
+---
+
 ## Important Considerations
 
 **We should be mindful that we might have functionality that is not tested which might be impacted by:**
