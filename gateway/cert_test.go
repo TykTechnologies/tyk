@@ -1989,7 +1989,8 @@ func TestClientCertificates_WithProtocolTLS(t *testing.T) {
 	// client
 	t.Run("bad certificate", func(t *testing.T) {
 		_, err := tls.Dial("tcp", apiAddr, mTLSConfig)
-		assert.ErrorContains(t, err, badcertErr)
+		// Go 1.25 standard path (SkipClientCAAnnouncement=false by default)
+		assert.ErrorContains(t, err, "tls: handshake failure")
 	})
 
 	t.Run("correct certificate", func(t *testing.T) {
