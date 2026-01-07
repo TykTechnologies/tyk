@@ -238,9 +238,15 @@ if skipCAAnnounce {
 
 | Issue | Status | Commit |
 |-------|--------|--------|
-| TLS test failures | ✅ **FIXED** | 84f9209 |
+| TLS test failures | ✅ **FIXED** | 84f9209, b2ad9b9, 99664c1 |
 | Update CI matrix to Go 1.25.x | ✅ **FIXED** | 39e93ed |
 | Update Docker base images to Go 1.25 | ⏳ Pending | Requires tykio/golang-cross:1.25-bullseye |
+
+**CI Status:**
+- ✅ Go 1.25.x Redis 7: PASS (all tests passing)
+- ✅ Unit Tests & Linting: PASS
+- ❌ docker-build: Blocked (needs golang-cross:1.25)
+- ❌ 1.24-bullseye: Blocked (needs golang-cross:1.25)
 
 ---
 
