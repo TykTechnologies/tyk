@@ -1,4 +1,4 @@
-# Go 1.25.5 Upgrade Guide
+# Upgrade to go 1.25.5 analysis
 
 Go 1.25.5 introduces several important changes that may affect Tyk projects. This guide provides concrete upgrade steps and documents all breaking changes discovered during the Tyk Gateway upgrade.
 
