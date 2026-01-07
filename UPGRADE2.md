@@ -1,6 +1,6 @@
 # Go 1.25.5 Upgrade Guide
 
-This document provides a concise, actionable guide for upgrading any Go project from version 1.24.x to 1.25.5.
+This document provides a concise, actionable guide for upgrading Tyk projects from version 1.24.x to 1.25.5.
 
 ## What's Inside
 
@@ -19,7 +19,7 @@ This document provides a concise, actionable guide for upgrading any Go project 
 
 ### 1. SHA-1 Certificates Disabled in TLS 1.2
 
-**Release Notes:** [crypto/tls - SHA-1 disabled](https://go.dev/doc/go1.25#crypto/tls)
+**Release Notes:** [crypto/tls - SHA-1 disabled](https://tip.golang.org/doc/go1.25#crypto/tls)
 
 **What Changed:**
 - Go 1.25 disallows SHA-1 signature algorithms in TLS 1.2 handshakes per RFC 9155
@@ -42,8 +42,8 @@ server.ListenAndServeTLS("", "") // ❌ Handshake fails
 ```
 
 **Workaround:**
-```bash
-# Temporary: Add GODEBUG to go.mod
+```
+# Add to go.mod after the go version line
 godebug (
     tlssha1=1
 )
@@ -57,7 +57,7 @@ godebug (
 
 ### 2. Nil-Pointer Compiler Bug Fixed
 
-**Release Notes:** [Compiler - Nil check ordering](https://go.dev/doc/go1.25#compiler)
+**Release Notes:** [Compiler - Nil check ordering](https://tip.golang.org/doc/go1.25#compiler)
 
 **What Changed:**
 - Go 1.24 compiler incorrectly allowed using return values before checking errors
@@ -96,7 +96,7 @@ value := result.Field    // ✅ Safe: error checked first
 
 ### 3. TLS Alert Codes Changed
 
-**Release Notes:** [crypto/tls - Stricter compliance](https://go.dev/doc/go1.25#crypto/tls) | [Go commit fd605450](https://github.com/golang/go/commit/fd605450)
+**Release Notes:** [crypto/tls - Stricter compliance](https://tip.golang.org/doc/go1.25#crypto/tls) | [Go commit fd605450](https://github.com/golang/go/commit/fd605450)
 
 **What Changed:**
 - Go 1.25 changed TLS alert selection for client certificate validation failures
@@ -152,7 +152,7 @@ if !strings.Contains(err.Error(), "tls: handshake failure") { // ✅ Go 1.25
 
 ### 4. GOMAXPROCS Container-Aware (Linux)
 
-**Release Notes:** [Runtime - GOMAXPROCS](https://go.dev/doc/go1.25#runtime)
+**Release Notes:** [Runtime - GOMAXPROCS](https://tip.golang.org/doc/go1.25#runtime)
 
 **What Changed:**
 - Runtime now considers cgroup CPU bandwidth limits
@@ -282,9 +282,8 @@ git commit -m "Update TLS test for Go 1.25 alert behavior"
 **If production uses SHA-1 certificates in TLS:**
 
 ```bash
-# Add to go.mod
+# Add to go.mod after the go version line
 cat >> go.mod <<'EOF'
-
 godebug (
     tlssha1=1
 )
