@@ -4,7 +4,7 @@ Go 1.25.5 introduces several important changes that may affect Tyk projects. Thi
 
 The upgrade process involves updating version files, fixing nil-pointer bugs exposed by compiler improvements, and addressing TLS-related test failures. Most changes are straightforward, but understanding the breaking changes will help you identify potential issues in your codebase.
 
-This document contains detailed analysis of what breaks and why, along with bash commands to perform the upgrade and validate your changes.
+This document contains detailed analysis of what breaks and why, along with concrete steps to perform the upgrade and validate your changes.
 
 ## Potentially Breaking Changes
 
