@@ -1795,6 +1795,10 @@ func (gw *Gateway) keyHandler(w http.ResponseWriter, r *http.Request) {
 				obj, code = gw.handleGetAllKeys(r.Context(), "", apiID, true)
 			} else {
 				filter := r.URL.Query().Get("filter")
+				if apiID != "" && filter == "" {
+					doJSONWrite(w, http.StatusBadRequest, apiError("The 'filter' parameter (Org ID) is required when filtering by 'api_id' in legacy mode"))
+					return
+				}
 				obj, code = gw.handleGetAllKeys(r.Context(), filter, apiID, false)
 			}
 		}
