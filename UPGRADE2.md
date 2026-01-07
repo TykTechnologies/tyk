@@ -1,7 +1,21 @@
 # Go 1.25.5 Upgrade Guide
 
-**Prerequisite:** Read [Go 1.25 Release Notes](https://go.dev/doc/go1.25)
-**Applies to:** Any Go project
+This document provides a concise, actionable guide for upgrading any Go project from version 1.24.x to 1.25.5.
+
+## What's Inside
+
+**Breaking Changes** - Detailed descriptions of what will break and why
+**Upgrade Steps** - Concrete bash commands to perform the upgrade
+**Validation** - How to test and verify the upgrade succeeded
+
+## Who Should Read This
+
+Engineers upgrading Go projects who have already read the [Go 1.25 Release Notes](https://go.dev/doc/go1.25) and want concrete implementation steps.
+
+## Related Documentation
+
+- **UPGRADE.md** - Process methodology for any Go version upgrade
+- **UPGRADE2.md** (this file) - Go 1.25.5 specific breaking changes and steps
 
 ---
 
