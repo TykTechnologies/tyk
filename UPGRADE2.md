@@ -271,38 +271,3 @@ go test ./... -v -race
 git push
 ```
 
----
-
-## Quick Commands
-
-```bash
-# All updates in one go
-sed -i 's/go 1\.24\.[0-9]/go 1.25.5/' go.mod && \
-go mod tidy && \
-[ -f .go-version ] && echo "1.25" > .go-version && \
-find . -name "Dockerfile*" -exec sed -i 's/GO_VERSION=1\.24/GO_VERSION=1.25/g' {} \; && \
-find .github/workflows -name "*.yml" -exec sed -i \
-  -e 's/go-version: \[1\.24\.x\]/go-version: [1.25.x]/g' \
-  -e 's/go-version: 1\.24\.x/go-version: 1.25.x/g' \
-  -e 's/go-version: "1\.24"/go-version: "1.25"/g' \
-  {} \; && \
-git add -A && \
-git commit -m "Upgrade to Go 1.25.5"
-```
-
----
-
-## Validation Checklist
-
-- [ ] go.mod updated to 1.25.5
-- [ ] .go-version updated (if exists)
-- [ ] Dockerfile(s) updated
-- [ ] CI workflow files updated
-- [ ] Nil-pointer bugs fixed
-- [ ] TLS tests updated (if needed)
-- [ ] All tests passing
-- [ ] Changes committed and pushed
-
----
-
-**Last Updated:** 2026-01-07
