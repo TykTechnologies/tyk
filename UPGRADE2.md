@@ -218,7 +218,16 @@ go test ./... -v
 
 ---
 
-## Step 7: Fix TLS Test Failures
+## Step 7: Analyze and Fix Tests
+
+**Analyze test failures:**
+
+Review any test failures from Step 6. Common issues:
+
+1. **TLS error message changes**: Tests checking exact TLS error strings may fail
+2. **Nil-pointer panics**: Tests exercising code with nil-pointer bugs will panic
+
+**Fix TLS test failures:**
 
 **If tests fail with:**
 ```
