@@ -91,9 +91,10 @@ value := result.Field    // ✅ Safe: error checked first
 - Change implements RFC 5246 §7.4.6 correctly
 
 **Impact:**
-- **MEDIUM** - Test assertions expecting specific error messages will fail
+- **MEDIUM** - Only affects code that validates TLS error message strings
 - **NONE** to application logic - both alerts indicate certificate validation failure
-- Only affects code checking exact error message strings
+- This change caused gateway mTLS tests to fail (tests were checking exact error messages)
+- Most applications won't be affected unless they validate specific TLS error text
 
 **When It Breaks:**
 ```go
