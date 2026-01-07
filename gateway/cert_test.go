@@ -1989,7 +1989,7 @@ func TestClientCertificates_WithProtocolTLS(t *testing.T) {
 	// client
 	t.Run("bad certificate", func(t *testing.T) {
 		_, err := tls.Dial("tcp", apiAddr, mTLSConfig)
-		assert.ErrorContains(t, err, certRequiredErr)
+		assert.ErrorContains(t, err, badcertErr)
 	})
 
 	t.Run("correct certificate", func(t *testing.T) {
