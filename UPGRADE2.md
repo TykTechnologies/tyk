@@ -271,3 +271,16 @@ go test ./... -v -race
 git push
 ```
 
+---
+
+## Validation Checklist
+
+- [ ] go.mod updated to 1.25.5
+- [ ] .go-version updated (if exists)
+- [ ] Dockerfile(s) updated
+- [ ] CI workflow files updated
+- [ ] Nil-pointer bugs fixed
+- [ ] TLS tests updated (if needed)
+- [ ] All tests passing
+- [ ] Changes committed and pushed
+
