@@ -379,8 +379,10 @@ func testAPIMutualTLSHelper(t *testing.T, skipCAAnnounce bool) {
 	certID, _, _ := certs.GetCertIDAndChainPEM(combinedPEM, "")
 
 	expectedCertErr := unknownCertAuthorityErr
+	certRequiredErr := "tls: handshake failure" // Go 1.25 standard path (RFC 5246 Alert 40)
 	if skipCAAnnounce {
 		expectedCertErr = badcertErr
+		certRequiredErr = badcertErr // Custom VerifyPeerCertificate callback (Alert 42)
 	}
 
 	conf := func(globalConf *config.Config) {
@@ -465,7 +467,7 @@ func testAPIMutualTLSHelper(t *testing.T, skipCAAnnounce bool) {
 			})
 
 			_, _ = ts.Run(t, test.TestCase{
-				ErrorMatch: badcertErr,
+				ErrorMatch: certRequiredErr,
 				Client:     client,
 				Domain:     "localhost",
 			})
@@ -633,13 +635,13 @@ func testAPIMutualTLSHelper(t *testing.T, skipCAAnnounce bool) {
 						Path:       "/with_mutual",
 						Client:     clientWithoutCert,
 						Domain:     domain,
-						ErrorMatch: badcertErr,
+						ErrorMatch: certRequiredErr,
 					},
 					{
 						Path:       "/with_mutual_2",
 						Client:     clientWithoutCert,
 						Domain:     domain,
-						ErrorMatch: badcertErr,
+						ErrorMatch: certRequiredErr,
 					},
 				}...)
 			})
@@ -749,7 +751,7 @@ func testAPIMutualTLSHelper(t *testing.T, skipCAAnnounce bool) {
 						Path:       "/with_mutual",
 						Client:     clientWithoutCert,
 						Domain:     domain,
-						ErrorMatch: badcertErr,
+						ErrorMatch: certRequiredErr,
 					})
 				}
 
@@ -842,7 +844,7 @@ func testAPIMutualTLSHelper(t *testing.T, skipCAAnnounce bool) {
 					_, _ = ts.Run(t, test.TestCase{
 						Path:       "/with_mutual",
 						Client:     clientWithoutCert,
-						ErrorMatch: badcertErr,
+						ErrorMatch: certRequiredErr,
 					})
 				}
 
@@ -1987,7 +1989,7 @@ func TestClientCertificates_WithProtocolTLS(t *testing.T) {
 	// client
 	t.Run("bad certificate", func(t *testing.T) {
 		_, err := tls.Dial("tcp", apiAddr, mTLSConfig)
-		assert.ErrorContains(t, err, badcertErr)
+		assert.ErrorContains(t, err, certRequiredErr)
 	})
 
 	t.Run("correct certificate", func(t *testing.T) {
