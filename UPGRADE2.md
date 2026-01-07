@@ -2,19 +2,6 @@
 
 This document provides a concise, actionable guide for upgrading Tyk projects from version 1.24.x to 1.25.5.
 
-## What's Inside
-
-**Breaking Changes** - Detailed descriptions of what will break and why
-**Upgrade Steps** - Concrete bash commands to perform the upgrade
-**Validation** - How to test and verify the upgrade succeeded
-
-## Related Documentation
-
-- **UPGRADE.md** - Process methodology for any Go version upgrade
-- **UPGRADE2.md** (this file) - Go 1.25.5 specific breaking changes and steps
-
----
-
 ## Potentially Breaking Changes
 
 ### 1. SHA-1 Certificates Disabled in TLS 1.2
