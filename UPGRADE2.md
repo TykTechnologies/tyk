@@ -8,10 +8,6 @@ This document provides a concise, actionable guide for upgrading any Go project 
 **Upgrade Steps** - Concrete bash commands to perform the upgrade
 **Validation** - How to test and verify the upgrade succeeded
 
-## Who Should Read This
-
-Engineers upgrading Go projects who have already read the [Go 1.25 Release Notes](https://go.dev/doc/go1.25) and want concrete implementation steps.
-
 ## Related Documentation
 
 - **UPGRADE.md** - Process methodology for any Go version upgrade
@@ -22,6 +18,8 @@ Engineers upgrading Go projects who have already read the [Go 1.25 Release Notes
 ## Potentially Breaking Changes
 
 ### 1. SHA-1 Certificates Disabled in TLS 1.2
+
+**Release Notes:** [crypto/tls - SHA-1 disabled](https://go.dev/doc/go1.25#crypto/tls)
 
 **What Changed:**
 - Go 1.25 disallows SHA-1 signature algorithms in TLS 1.2 handshakes per RFC 9155
@@ -59,6 +57,8 @@ godebug (
 
 ### 2. Nil-Pointer Compiler Bug Fixed
 
+**Release Notes:** [Compiler - Nil check ordering](https://go.dev/doc/go1.25#compiler)
+
 **What Changed:**
 - Go 1.24 compiler incorrectly allowed using return values before checking errors
 - Go 1.25 correctly enforces nil checks per Go specification
@@ -95,6 +95,8 @@ value := result.Field    // ✅ Safe: error checked first
 ---
 
 ### 3. TLS Alert Codes Changed
+
+**Release Notes:** [crypto/tls - Stricter compliance](https://go.dev/doc/go1.25#crypto/tls) | [Go commit fd605450](https://github.com/golang/go/commit/fd605450)
 
 **What Changed:**
 - Go 1.25 changed TLS alert selection for client certificate validation failures
@@ -149,6 +151,8 @@ if !strings.Contains(err.Error(), "tls: handshake failure") { // ✅ Go 1.25
 ## Non-Breaking Changes
 
 ### 4. GOMAXPROCS Container-Aware (Linux)
+
+**Release Notes:** [Runtime - GOMAXPROCS](https://go.dev/doc/go1.25#runtime)
 
 **What Changed:**
 - Runtime now considers cgroup CPU bandwidth limits
