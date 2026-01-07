@@ -203,28 +203,34 @@ Go 1.25 commit [`fd605450`](https://go.googlesource.com/go/+/fd605450a7be429efe6
 - **Go 1.24:** Sends Alert 42 (`bad_certificate`)
 - **Go 1.25:** Sends Alert 40 (`handshake_failure`) per RFC 5246 §7.4.6
 
-However, **Tyk is not affected** by this change.
+**Tyk Supports Both Modes:**
 
-**Why Tyk is Unaffected:**
+Tyk has TWO client certificate validation modes with different behavior:
 
-Tyk uses `HttpServerOptions.SkipClientCAAnnouncement` which implements certificate validation via a **custom `VerifyPeerCertificate` callback** (`gateway/cert.go:536-541`):
+**Mode 1: Standard Path** (`SkipClientCAAnnouncement=false`, default)
+- Uses `tls.RequireAndVerifyClientCert`
+- ✅ **Affected by Go 1.25 change**
+- Sends Alert 40 (`handshake_failure`) in Go 1.25
 
+**Mode 2: Custom Callback** (`SkipClientCAAnnouncement=true`)
+- Uses `tls.RequestClientCert` + custom `VerifyPeerCertificate` callback
+- ❌ **NOT affected by Go 1.25 change**
+- Still sends Alert 42 (`bad_certificate`)
+
+**Fix Applied (Commit 84f9209):**
+
+Updated tests to expect different errors based on verification mode:
 ```go
-if gwConfig.HttpServerOptions.SkipClientCAAnnouncement {
-    if newConfig.ClientAuth == tls.RequireAndVerifyClientCert {
-        newConfig.VerifyPeerCertificate = getClientValidator(hello, newConfig.ClientCAs)
-    }
-    newConfig.ClientCAs = x509.NewCertPool()
-    newConfig.ClientAuth = tls.RequestClientCert  // Not RequireAndVerifyClientCert
+certRequiredErr := "tls: handshake failure" // Standard path
+if skipCAAnnounce {
+    certRequiredErr = badcertErr // Custom callback path
 }
 ```
 
-This custom implementation uses `tls.RequestClientCert` + callback instead of the standard `tls.RequireAndVerifyClientCert` path. The Go 1.25 alert change **only affects the standard path**, not custom `VerifyPeerCertificate` implementations.
-
 **Result:**
-- ✅ No test changes required
-- ✅ Tyk continues to send Alert 42 (`bad_certificate`) as before
-- ✅ No impact on production behavior
+- ✅ Tests updated to handle both verification modes
+- ✅ Production behavior unchanged (configuration-dependent)
+- ✅ Both modes work correctly in Go 1.25
 
 ---
 
@@ -232,7 +238,7 @@ This custom implementation uses `tls.RequestClientCert` + callback instead of th
 
 | Issue | Status | Commit |
 |-------|--------|--------|
-| TLS test failures | ✅ **NOT NEEDED** | Tyk's custom VerifyPeerCertificate unaffected by Go 1.25 |
+| TLS test failures | ✅ **FIXED** | 84f9209 |
 | Update CI matrix to Go 1.25.x | ✅ **FIXED** | 39e93ed |
 | Update Docker base images to Go 1.25 | ⏳ Pending | Requires tykio/golang-cross:1.25-bullseye |
 
