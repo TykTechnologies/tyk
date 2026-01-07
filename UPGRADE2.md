@@ -1,6 +1,10 @@
 # Go 1.25.5 Upgrade Guide
 
-This document provides a concise, actionable guide for upgrading Tyk projects from version 1.24.x to 1.25.5.
+Go 1.25.5 introduces several important changes that may affect Tyk projects. This guide provides concrete upgrade steps and documents all breaking changes discovered during the Tyk Gateway upgrade.
+
+The upgrade process involves updating version files, fixing nil-pointer bugs exposed by compiler improvements, and addressing TLS-related test failures. Most changes are straightforward, but understanding the breaking changes will help you identify potential issues in your codebase.
+
+This document contains detailed descriptions of what breaks and why, along with bash commands to perform the upgrade and validate your changes.
 
 ## Potentially Breaking Changes
 
