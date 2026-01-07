@@ -138,30 +138,6 @@ if !strings.Contains(err.Error(), "tls: handshake failure") { // ✅ Go 1.25
 
 ---
 
-## Non-Breaking Changes
-
-### 4. GOMAXPROCS Container-Aware (Linux)
-
-**Release Notes:** [Runtime - GOMAXPROCS](https://tip.golang.org/doc/go1.25#runtime)
-
-**What Changed:**
-- Runtime now considers cgroup CPU bandwidth limits
-- `GOMAXPROCS` defaults to min(CPU cores, cgroup limit)
-
-**Impact:**
-- **POSITIVE** - Better container resource handling
-- Reduces CPU throttling in Kubernetes/containerized environments
-- More predictable performance under resource limits
-
-**Example:**
-```bash
-# Container with 8 cores but CPU limit of 2
-# Go 1.24: GOMAXPROCS=8 (ignores limit, causes throttling)
-# Go 1.25: GOMAXPROCS=2 (respects limit, no throttling)
-```
-
----
-
 ## Step 1: Update go.mod
 
 ```bash
