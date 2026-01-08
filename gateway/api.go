@@ -46,6 +46,7 @@ import (
 	"time"
 
 	"github.com/TykTechnologies/tyk/internal/httpctx"
+	"github.com/TykTechnologies/tyk/internal/model"
 	"github.com/getkin/kin-openapi/openapi3"
 
 	gqlv2 "github.com/TykTechnologies/graphql-go-tools/v2/pkg/graphql"
@@ -244,12 +245,14 @@ func (gw *Gateway) getApisIdsForOrg(orgID string) []string {
 	return result
 }
 
-func (gw *Gateway) checkAndApplyTrialPeriod(keyName string, newSession *user.SessionState, isHashed bool) {
+func (gw *Gateway) checkAndApplyTrialPeriod(
+	keyName string,
+	newSession *user.SessionState,
+	isHashed bool,
+) {
 	// Check the policies to see if we are forcing an expiry on the key
 	for _, polID := range newSession.PolicyIDs() {
-		gw.policiesMu.RLock()
-		policy, ok := gw.policiesByID[polID]
-		gw.policiesMu.RUnlock()
+		policy, ok := gw.policies.PolicyByID(polID)
 		if !ok {
 			continue
 		}
@@ -1010,23 +1013,18 @@ func (gw *Gateway) handleGetPolicy(polID string) (interface{}, int) {
 		return pol, http.StatusOK
 	}
 
-	log.WithFields(logrus.Fields{
-		"prefix": "policy",
-		"polID":  polID,
-	}).Error("Policy doesn't exist.")
+	log.
+		WithFields(logrus.Fields{
+			"prefix": "policy",
+			"polID":  polID,
+		}).
+		Error("Policy doesn't exist.")
+
 	return apiError("Policy not found"), http.StatusNotFound
 }
 
 func (gw *Gateway) handleGetPolicyList() (interface{}, int) {
-	gw.policiesMu.RLock()
-	defer gw.policiesMu.RUnlock()
-	polIDList := make([]user.Policy, len(gw.policiesByID))
-	c := 0
-	for _, pol := range gw.policiesByID {
-		polIDList[c] = pol
-		c++
-	}
-	return polIDList, http.StatusOK
+	return gw.policies.AsSlice(), http.StatusOK
 }
 
 func (gw *Gateway) newPolicyPathRoot() (*osutil.Root, error) {
@@ -1056,7 +1054,7 @@ func (gw *Gateway) handleAddOrUpdatePolicy(polID string, r *http.Request) (inter
 		return apiError("Request ID does not match that in policy! For Update operations these must match."), http.StatusBadRequest
 	}
 
-	if !ensurePolicyId(newPol) {
+	if !model.EnsurePolicyId(newPol) {
 		const errMsg = "Unable to create policy without id."
 		log.Error(errMsg)
 		return apiError(errMsg), http.StatusBadRequest
@@ -1852,10 +1850,11 @@ func (gw *Gateway) policyUpdateHandler(w http.ResponseWriter, r *http.Request) {
 
 func (gw *Gateway) handleUpdateHashedKey(keyName string, applyPolicies []string) (interface{}, int) {
 	var orgID string
+
 	if len(applyPolicies) != 0 {
-		gw.policiesMu.RLock()
-		orgID = gw.policiesByID[applyPolicies[0]].OrgID
-		gw.policiesMu.RUnlock()
+		if pol, ok := gw.policies.PolicyByID(applyPolicies[0]); ok {
+			orgID = pol.OrgID
+		}
 	}
 
 	sess, ok := gw.GlobalSessionManager.SessionDetail(orgID, keyName, true)
@@ -2357,9 +2356,7 @@ func (gw *Gateway) createOauthClient(w http.ResponseWriter, r *http.Request) {
 		}
 	} else {
 		// set client for all APIs from the given policy
-		gw.policiesMu.RLock()
-		policy, ok := gw.policiesByID[newClient.PolicyID]
-		gw.policiesMu.RUnlock()
+		policy, ok := gw.policies.PolicyByID(newClient.PolicyID)
 		if !ok {
 			log.WithFields(logrus.Fields{
 				"prefix":   "api",
@@ -2524,9 +2521,7 @@ func (gw *Gateway) updateOauthClient(keyName, apiID string, r *http.Request) (in
 
 	// check policy
 	if updateClientData.PolicyID != "" {
-		gw.policiesMu.RLock()
-		policy, ok := gw.policiesByID[updateClientData.PolicyID]
-		gw.policiesMu.RUnlock()
+		policy, ok := gw.policies.PolicyByID(updateClientData.PolicyID)
 		if !ok {
 			return apiError("Policy doesn't exist"), http.StatusNotFound
 		}
