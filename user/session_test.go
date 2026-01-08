@@ -1168,18 +1168,18 @@ func TestSessionState_EmptyCollectionsOmitted(t *testing.T) {
 		Rate:          100,
 		Per:           60,
 		OrgID:         "test-org",
-		Tags:          []string{},                    // Empty slice
-		MetaData:      map[string]interface{}{},      // Empty map
-		ApplyPolicies: []string{},                    // Empty slice
-		OauthKeys:     map[string]string{},           // Empty map
+		Tags:          []string{},               // Empty slice
+		MetaData:      map[string]interface{}{}, // Empty map
+		ApplyPolicies: []string{},               // Empty slice
+		OauthKeys:     map[string]string{},      // Empty map
 		AccessRights: map[string]AccessDefinition{
 			"api1": {
 				APIID:             "api1",
-				Versions:          []string{},         // Empty slice in nested struct
-				RestrictedTypes:   nil,                // Nil slice (also should be omitted)
-				AllowedTypes:      []graphql.Type{},   // Empty slice (from external package)
+				Versions:          []string{},                // Empty slice in nested struct
+				RestrictedTypes:   nil,                       // Nil slice (also should be omitted)
+				AllowedTypes:      []graphql.Type{},          // Empty slice (from external package)
 				FieldAccessRights: []FieldAccessDefinition{}, // Empty slice
-				AllowedURLs:       []AccessSpec{},     // Empty slice
+				AllowedURLs:       []AccessSpec{},            // Empty slice
 			},
 		},
 		Smoothing: &apidef.RateLimitSmoothing{
@@ -1201,16 +1201,16 @@ func TestSessionState_EmptyCollectionsOmitted(t *testing.T) {
 
 	// These fields should NOT appear when they are empty
 	shouldNotAppear := []string{
-		`"tags"`,              // Empty slice should be omitted
-		`"meta_data"`,         // Empty map should be omitted
-		`"apply_policies"`,    // Empty slice should be omitted
-		`"oauth_keys"`,        // Empty map should be omitted
-		`"restricted_types"`,  // Empty/nil slice in AccessDefinition
-		`"allowed_types"`,     // Empty slice in AccessDefinition
+		`"tags"`,                // Empty slice should be omitted
+		`"meta_data"`,           // Empty map should be omitted
+		`"apply_policies"`,      // Empty slice should be omitted
+		`"oauth_keys"`,          // Empty map should be omitted
+		`"restricted_types"`,    // Empty/nil slice in AccessDefinition
+		`"allowed_types"`,       // Empty slice in AccessDefinition
 		`"field_access_rights"`, // Empty slice in AccessDefinition
-		`"allowed_urls"`,      // Empty slice in AccessDefinition
-		`"versions"`,          // Empty slice in nested AccessDefinition
-		`"smoothing"`,         // Should be omitted when Enabled=false
+		`"allowed_urls"`,        // Empty slice in AccessDefinition
+		`"versions"`,            // Empty slice in nested AccessDefinition
+		`"smoothing"`,           // Should be omitted when Enabled=false
 	}
 
 	for _, field := range shouldNotAppear {
@@ -1241,11 +1241,11 @@ func TestAccessDefinition_EmptyFieldsOmitted(t *testing.T) {
 	ad := AccessDefinition{
 		APIID:             "api123",
 		APIName:           "Test API",
-		Versions:          []string{}, // Empty
-		RestrictedTypes:   nil,        // Nil
-		AllowedTypes:      []graphql.Type{}, // Empty
+		Versions:          []string{},                // Empty
+		RestrictedTypes:   nil,                       // Nil
+		AllowedTypes:      []graphql.Type{},          // Empty
 		FieldAccessRights: []FieldAccessDefinition{}, // Empty
-		AllowedURLs:       []AccessSpec{}, // Empty
+		AllowedURLs:       []AccessSpec{},            // Empty
 	}
 
 	data, err := json.Marshal(ad)
