@@ -3151,26 +3151,6 @@ func TestJWTRSAInvalidPublickKey(t *testing.T) {
 	})
 }
 
-func createExpiringPolicy(pGen ...func(p *user.Policy)) string {
-	ts := StartTest(nil)
-	defer ts.Close()
-
-	pID := ts.Gw.keyGen.GenerateAuthKey("")
-	pol := CreateStandardPolicy()
-	pol.ID = pID
-	pol.KeyExpiresIn = 1
-
-	if len(pGen) > 0 {
-		pGen[0](pol)
-	}
-
-	ts.Gw.policiesMu.Lock()
-	ts.Gw.policiesByID[pID] = *pol
-	ts.Gw.policiesMu.Unlock()
-
-	return pID
-}
-
 func TestJWTExpOverride(t *testing.T) {
 	test.Flaky(t) // TODO: TT-5257
 
