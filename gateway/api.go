@@ -748,8 +748,8 @@ func (gw *Gateway) filterKeysByAPIID(c context.Context, keys []string, filter, a
 	var wg sync.WaitGroup
 	var mu sync.Mutex
 
+	wg.Add(KeyListingWorkerCount)
 	for w := 0; w < KeyListingWorkerCount; w++ {
-		wg.Add(1)
 		go func() {
 			defer wg.Done()
 			localMatches := make([]string, 0)
