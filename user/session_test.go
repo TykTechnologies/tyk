@@ -8,6 +8,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/TykTechnologies/graphql-go-tools/pkg/graphql"
+
 	"github.com/TykTechnologies/tyk/apidef"
 
 	"github.com/stretchr/testify/assert"
@@ -1153,6 +1155,179 @@ func createComplexSession() *SessionState {
 				},
 			},
 		},
+	}
+}
+
+// TestSessionState_EmptyCollectionsOmitted verifies that empty slices, empty maps,
+// and non-enabled smoothing are properly omitted from JSON serialization.
+// This addresses the QA-reported issue where empty arrays like "restricted_types": []
+// and empty objects like "meta_data": {} were appearing in Redis keys.
+func TestSessionState_EmptyCollectionsOmitted(t *testing.T) {
+	// Create a session with empty (not nil) slices and maps
+	session := &SessionState{
+		Rate:          100,
+		Per:           60,
+		OrgID:         "test-org",
+		Tags:          []string{},                    // Empty slice
+		MetaData:      map[string]interface{}{},      // Empty map
+		ApplyPolicies: []string{},                    // Empty slice
+		OauthKeys:     map[string]string{},           // Empty map
+		AccessRights: map[string]AccessDefinition{
+			"api1": {
+				APIID:             "api1",
+				Versions:          []string{},         // Empty slice in nested struct
+				RestrictedTypes:   nil,                // Nil slice (also should be omitted)
+				AllowedTypes:      []graphql.Type{},   // Empty slice (from external package)
+				FieldAccessRights: []FieldAccessDefinition{}, // Empty slice
+				AllowedURLs:       []AccessSpec{},     // Empty slice
+			},
+		},
+		Smoothing: &apidef.RateLimitSmoothing{
+			Enabled:   false, // Disabled - should be omitted
+			Threshold: 500,
+			Trigger:   0.8,
+			Step:      100,
+			Delay:     30,
+		},
+	}
+
+	data, err := json.Marshal(session)
+	if err != nil {
+		t.Fatalf("Failed to marshal session: %v", err)
+	}
+
+	jsonStr := string(data)
+	t.Logf("Serialized JSON: %s", jsonStr)
+
+	// These fields should NOT appear when they are empty
+	shouldNotAppear := []string{
+		`"tags"`,              // Empty slice should be omitted
+		`"meta_data"`,         // Empty map should be omitted
+		`"apply_policies"`,    // Empty slice should be omitted
+		`"oauth_keys"`,        // Empty map should be omitted
+		`"restricted_types"`,  // Empty/nil slice in AccessDefinition
+		`"allowed_types"`,     // Empty slice in AccessDefinition
+		`"field_access_rights"`, // Empty slice in AccessDefinition
+		`"allowed_urls"`,      // Empty slice in AccessDefinition
+		`"versions"`,          // Empty slice in nested AccessDefinition
+		`"smoothing"`,         // Should be omitted when Enabled=false
+	}
+
+	for _, field := range shouldNotAppear {
+		if strings.Contains(jsonStr, field) {
+			t.Errorf("JSON should not contain %s for empty/disabled field, got: %s", field, jsonStr)
+		}
+	}
+
+	// These fields MUST still appear (non-empty values)
+	mustAppear := []string{
+		`"rate":100`,
+		`"per":60`,
+		`"org_id":"test-org"`,
+		`"access_rights"`,
+		`"api_id":"api1"`,
+	}
+
+	for _, field := range mustAppear {
+		if !strings.Contains(jsonStr, field) {
+			t.Errorf("JSON should contain %s, got: %s", field, jsonStr)
+		}
+	}
+}
+
+// TestAccessDefinition_EmptyFieldsOmitted verifies that empty fields in AccessDefinition
+// are properly omitted from JSON serialization.
+func TestAccessDefinition_EmptyFieldsOmitted(t *testing.T) {
+	ad := AccessDefinition{
+		APIID:             "api123",
+		APIName:           "Test API",
+		Versions:          []string{}, // Empty
+		RestrictedTypes:   nil,        // Nil
+		AllowedTypes:      []graphql.Type{}, // Empty
+		FieldAccessRights: []FieldAccessDefinition{}, // Empty
+		AllowedURLs:       []AccessSpec{}, // Empty
+	}
+
+	data, err := json.Marshal(ad)
+	if err != nil {
+		t.Fatalf("Failed to marshal AccessDefinition: %v", err)
+	}
+
+	jsonStr := string(data)
+	t.Logf("Serialized AccessDefinition: %s", jsonStr)
+
+	// Empty collections should not appear
+	shouldNotAppear := []string{
+		`"versions"`,
+		`"restricted_types"`,
+		`"allowed_types"`,
+		`"field_access_rights"`,
+		`"allowed_urls"`,
+	}
+
+	for _, field := range shouldNotAppear {
+		if strings.Contains(jsonStr, field) {
+			t.Errorf("JSON should not contain %s for empty field, got: %s", field, jsonStr)
+		}
+	}
+
+	// Required fields must appear
+	if !strings.Contains(jsonStr, `"api_id":"api123"`) {
+		t.Errorf("JSON should contain api_id, got: %s", jsonStr)
+	}
+	if !strings.Contains(jsonStr, `"api_name":"Test API"`) {
+		t.Errorf("JSON should contain api_name, got: %s", jsonStr)
+	}
+}
+
+// TestRateLimitSmoothing_IsZero verifies that RateLimitSmoothing.IsZero() works correctly.
+func TestRateLimitSmoothing_IsZero(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    *apidef.RateLimitSmoothing
+		expected bool
+	}{
+		{
+			name:     "nil pointer",
+			input:    nil,
+			expected: true,
+		},
+		{
+			name: "enabled=false",
+			input: &apidef.RateLimitSmoothing{
+				Enabled:   false,
+				Threshold: 500,
+				Trigger:   0.8,
+				Step:      100,
+				Delay:     30,
+			},
+			expected: true,
+		},
+		{
+			name: "enabled=true",
+			input: &apidef.RateLimitSmoothing{
+				Enabled:   true,
+				Threshold: 500,
+				Trigger:   0.8,
+				Step:      100,
+				Delay:     30,
+			},
+			expected: false,
+		},
+		{
+			name:     "zero struct",
+			input:    &apidef.RateLimitSmoothing{},
+			expected: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := tt.input.IsZero()
+			if result != tt.expected {
+				t.Errorf("IsZero() = %v, expected %v", result, tt.expected)
+			}
+		})
 	}
 }
 
