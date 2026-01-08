@@ -1104,7 +1104,7 @@ func TestLoadPoliciesFromRPC(t *testing.T) {
 		assert.NoError(t, err)
 
 		assert.Len(t, respondedPolicies, 1, "returns one policy like returned store")
-		assert.Equal(t, mid.Hex(), respondedPolicies[mid.Hex()].ID, "ensures ID from MID ID is empty") // temporary solution can be removed in a while
+		assert.Equal(t, mid.Hex(), respondedPolicies[0].ID, "ensures ID from MID ID is empty") // temporary solution can be removed in a while
 	})
 
 	t.Run("returns error if invalid policy received from rpc storage", func(t *testing.T) {

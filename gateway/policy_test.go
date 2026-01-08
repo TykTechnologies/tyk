@@ -49,7 +49,6 @@ func TestApplyPoliciesQuotaAPILimit(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
 
-	ts.Gw.policiesMu.RLock()
 	policy := user.Policy{
 		ID:               "two_of_three_with_api_limit",
 		Per:              1,
@@ -91,10 +90,7 @@ func TestApplyPoliciesQuotaAPILimit(t *testing.T) {
 			},
 		},
 	}
-	ts.Gw.policiesByID = map[string]user.Policy{
-		"two_of_three_with_api_limit": policy,
-	}
-	ts.Gw.policiesMu.RUnlock()
+	ts.Gw.policies.Load(policy)
 
 	// load APIs
 	ts.Gw.BuildAndLoadAPI(
@@ -336,12 +332,7 @@ func TestApplyMultiPolicies(t *testing.T) {
 
 	assert.True(t, !policy2.APILimit().IsEmpty())
 
-	ts.Gw.policiesMu.Lock()
-	ts.Gw.policiesByID = map[string]user.Policy{
-		"policy1": policy1,
-		"policy2": policy2,
-	}
-	ts.Gw.policiesMu.Unlock()
+	ts.Gw.policies.Load(policy1, policy2)
 
 	// load APIs
 	ts.Gw.BuildAndLoadAPI(
@@ -502,15 +493,10 @@ func TestApplyMultiPolicies(t *testing.T) {
 		}...)
 	})
 
-	ts.Gw.policiesMu.RLock()
 	policy1.Rate = 1
 	policy1.LastUpdated = strconv.Itoa(int(time.Now().Unix() + 1))
 
-	ts.Gw.policiesByID = map[string]user.Policy{
-		"policy1": policy1,
-		"policy2": policy2,
-	}
-	ts.Gw.policiesMu.RUnlock()
+	ts.Gw.policies.Load(policy1, policy2)
 
 	// Rate limits after policy update
 	t.Run("Rate limits after policy update", func(t *testing.T) {
@@ -526,7 +512,6 @@ func TestPerAPIPolicyUpdate(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
 
-	ts.Gw.policiesMu.RLock()
 	policy := user.Policy{
 		ID:    "per_api_policy_with_two_apis",
 		OrgID: "default",
@@ -545,10 +530,8 @@ func TestPerAPIPolicyUpdate(t *testing.T) {
 			},
 		},
 	}
-	ts.Gw.policiesByID = map[string]user.Policy{
-		"per_api_policy_with_two_apis": policy,
-	}
-	ts.Gw.policiesMu.RUnlock()
+
+	ts.Gw.policies.Load(policy)
 
 	// load APIs
 	ts.Gw.BuildAndLoadAPI(
@@ -620,8 +603,6 @@ func TestPerAPIPolicyUpdate(t *testing.T) {
 		},
 	}...)
 
-	//Update policy
-	ts.Gw.policiesMu.RLock()
 	policy = user.Policy{
 		ID:    "per_api_policy_with_two_apis",
 		OrgID: "default",
@@ -637,10 +618,7 @@ func TestPerAPIPolicyUpdate(t *testing.T) {
 			},
 		},
 	}
-	ts.Gw.policiesByID = map[string]user.Policy{
-		"per_api_policy_with_two_apis": policy,
-	}
-	ts.Gw.policiesMu.RUnlock()
+	ts.Gw.policies.Load(policy)
 
 	ts.Run(t, []test.TestCase{
 		{
@@ -1410,57 +1388,6 @@ func TestLoadPoliciesFromDashboardLoadBalancerDrain(t *testing.T) {
 			assert.NotNil(t, policyMap, tc.description+" - should return policies")
 			assert.Equal(t, 2, requestCount, tc.description+" - should retry after failure")
 			assert.GreaterOrEqual(t, registrationCount, 1, tc.description+" - should re-register")
-		})
-	}
-}
-
-func Test_ensurePolicyId(t *testing.T) {
-	objectId := persistentmodel.NewObjectID()
-
-	for _, tc := range []struct {
-		name           string
-		input          *user.Policy
-		expectedResult bool
-		expectedId     string
-	}{
-		{
-			name:           "skips if id is provided and MID is invalid",
-			input:          &user.Policy{ID: "my-custom-id"},
-			expectedResult: true,
-			expectedId:     "my-custom-id",
-		},
-		{
-			name:           "skips if id is provided and MID is valid",
-			input:          &user.Policy{MID: objectId, ID: "my-custom-id"},
-			expectedResult: true,
-			expectedId:     "my-custom-id",
-		},
-		{
-			name:           "returns false if is is not provided and MID is invalid",
-			input:          &user.Policy{ID: "", MID: "invalid"},
-			expectedResult: false,
-			expectedId:     "",
-		},
-		{
-			name:           "returns true and sets id if ID is not defined and MID is valid",
-			input:          &user.Policy{ID: "", MID: objectId},
-			expectedResult: true,
-			expectedId:     objectId.Hex(),
-		},
-		{
-			name:           "returns false if provided policy is nil",
-			input:          nil,
-			expectedResult: false,
-			expectedId:     "",
-		},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			res := ensurePolicyId(tc.input)
-			assert.Equal(t, tc.expectedResult, res)
-
-			if tc.input != nil {
-				assert.Equal(t, tc.expectedId, tc.input.ID)
-			}
 		})
 	}
 }

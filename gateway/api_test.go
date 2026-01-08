@@ -296,9 +296,7 @@ func TestKeyHandler(t *testing.T) {
 	}}
 	withAccessJSON := test.MarshalJSON(t)(withAccess)
 
-	// with policy
-	ts.Gw.policiesMu.Lock()
-	ts.Gw.policiesByID["abc_policy"] = user.Policy{
+	ts.Gw.policies.Load(user.Policy{
 		Active:           true,
 		QuotaMax:         5,
 		QuotaRenewalRate: 300,
@@ -306,8 +304,9 @@ func TestKeyHandler(t *testing.T) {
 			APIID: "test", Versions: []string{"v1"},
 		}},
 		OrgID: "default",
-	}
-	ts.Gw.policiesMu.Unlock()
+		ID:    "abc_policy",
+	})
+
 	withPolicy := CreateStandardSession()
 	withoutPolicyJSON := test.MarshalJSON(t)(withPolicy)
 
