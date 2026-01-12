@@ -689,13 +689,6 @@ type SecurityConfig struct {
 
 	// CertificateExpiryMonitor configures the certificate expiry monitoring and notification feature
 	CertificateExpiryMonitor CertificateExpiryMonitorConfig `json:"certificate_expiry_monitor"`
-
-	// DisableCertificateTokenBinding enables certificate-token binding for static mTLS authentication.
-	// When enabled, access tokens will be linked (bound) to one or more client certificates during creation or update.
-	// Any subsequent request with that token must present one of the bound certificates, otherwise the request will be rejected.
-	// This provides protection against token theft and misuse in mTLS environments.
-	// Environment variable: TYK_GW_SECURITY_ENABLECERTIFICATETOKENBINDING
-	DisableCertificateTokenBinding bool `json:"disable_certificate_token_binding"`
 }
 
 type NewRelicConfig struct {

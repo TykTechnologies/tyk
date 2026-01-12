@@ -138,11 +138,10 @@ func (k *AuthKey) ProcessRequest(_ http.ResponseWriter, r *http.Request, _ inter
 
 	// Validate certificate binding or legacy certificate auth
 	// Certificate binding validation runs when:
-	// 1. Certificate binding is globally enabled AND the session has certificate bindings, OR
+	// 1. The session has certificate bindings (static mTLS with certificate-token binding), OR
 	// 2. UseCertificate is explicitly set for this API (legacy dynamic mTLS mode)
-	bindingEnabled := !k.Gw.GetConfig().Security.DisableCertificateTokenBinding
 	hasBindings := len(session.MtlsStaticCertificateBindings) > 0
-	if authConfig.UseCertificate || (bindingEnabled && hasBindings) {
+	if authConfig.UseCertificate || hasBindings {
 		if code, err := k.validateCertificate(r, key, &session, &certHash, &updateSession); err != nil {
 			return err, code
 		}
@@ -295,13 +294,10 @@ func (k *AuthKey) validateWithTLSCertificate(r *http.Request, key string, sessio
 	// Compute cert hash for comparison
 	*certHash = k.computeCertHash(r, *certHash)
 
-	// Use binding mode only if:
-	// 1. Certificate binding is enabled globally, AND
-	// 2. The session has static certificate bindings configured
+	// Use binding mode if the session has static certificate bindings configured
 	// Otherwise, use legacy mode for backward compatibility with dynamic mTLS
-	bindingEnabled := !k.Gw.GetConfig().Security.DisableCertificateTokenBinding
 	hasBindings := len(session.MtlsStaticCertificateBindings) > 0
-	if bindingEnabled && hasBindings {
+	if hasBindings {
 		return k.validateCertificateBinding(r, key, session, *certHash)
 	}
 	return k.validateLegacyMode(r, session, *certHash, updateSession)
@@ -309,14 +305,11 @@ func (k *AuthKey) validateWithTLSCertificate(r *http.Request, key string, sessio
 
 // validateWithoutTLSCertificate handles validation when no TLS client certificate is provided
 func (k *AuthKey) validateWithoutTLSCertificate(r *http.Request, key string, session *user.SessionState) (int, error) {
-	// Use binding mode only if:
-	// 1. Certificate binding is enabled globally, AND
-	// 2. The session has static certificate bindings configured
+	// Use binding mode if the session has static certificate bindings configured
 	// Otherwise, use legacy mode for backward compatibility with dynamic mTLS
-	bindingEnabled := !k.Gw.GetConfig().Security.DisableCertificateTokenBinding
 	hasBindings := len(session.MtlsStaticCertificateBindings) > 0
 
-	if bindingEnabled && hasBindings {
+	if hasBindings {
 		return k.validateBindingWithoutCert(r, key, session)
 	}
 	return k.validateLegacyWithoutCert(r, session)

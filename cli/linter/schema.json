@@ -1166,9 +1166,6 @@
               "default": 86400
             }
           }
-        },
-        "disable_certificate_token_binding": {
-          "type": "boolean"
         }
       }
     },
