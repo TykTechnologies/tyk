@@ -1,9 +1,12 @@
 package model
 
 import (
+	"fmt"
 	"net/http"
 
 	"github.com/sirupsen/logrus"
+
+	pesistentmodel "github.com/TykTechnologies/storage/persistent/model"
 
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/user"
@@ -45,8 +48,8 @@ type ConfigProvider interface {
 // PolicyProvider is a storage interface encapsulating policy retrieval.
 type PolicyProvider interface {
 	PolicyCount() int
-	PolicyIDs() []string
-	PolicyByID(string) (user.Policy, bool)
+	PolicyIDs() []PolicyID
+	PolicyByID(PolicyID) (user.Policy, bool)
 }
 
 // These are utility methods without any real data model design around them.
@@ -65,3 +68,72 @@ type (
 	// StripListenPathFunc is the function signature for StripListenPath.
 	StripListenPathFunc func(string) string
 )
+
+// PolicyID sealed interface
+type PolicyID interface {
+	fmt.Stringer
+	IsIdentifierOf(user.Policy) bool
+	markerAnyPolicyId()
+}
+
+func PolicyIdFromPolicy(pol user.Policy) PolicyID {
+	return PolicyDbId(pol.MID)
+}
+
+var (
+	_ PolicyID = PolicyDbId("")
+	_ PolicyID = AnyPolicyId{}
+)
+
+// NewAnyPolicyId creates custom policy identifier
+func NewAnyPolicyId(orgId, idOrCustomId string) AnyPolicyId {
+	return AnyPolicyId{
+		orgId: orgId,
+		id:    idOrCustomId,
+	}
+}
+
+// AnyPolicyId represents any policy identifier (database and custom)
+type AnyPolicyId struct {
+	orgId string
+	id    string
+}
+
+func (c AnyPolicyId) IsIdentifierOf(pol user.Policy) bool {
+	return pol.OrgID == c.orgId && c.id == pol.ID
+}
+
+func (c AnyPolicyId) OrgId() string {
+	return c.orgId
+}
+
+func (c AnyPolicyId) Id() string {
+	return c.id
+}
+
+func (c AnyPolicyId) String() string {
+	return c.id
+}
+
+func (c AnyPolicyId) customKey() customKey {
+	return customKey(c)
+}
+
+func (c AnyPolicyId) markerAnyPolicyId() {}
+
+// PolicyDbId database policy identifier
+type PolicyDbId pesistentmodel.ObjectID
+
+func (c PolicyDbId) objectID() pesistentmodel.ObjectID {
+	return pesistentmodel.ObjectID(c)
+}
+
+func (c PolicyDbId) IsIdentifierOf(pol user.Policy) bool {
+	return c.objectID() == pol.MID
+}
+
+func (c PolicyDbId) String() string {
+	return c.objectID().Hex()
+}
+
+func (c PolicyDbId) markerAnyPolicyId() {}

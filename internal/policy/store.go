@@ -1,6 +1,9 @@
 package policy
 
 import (
+	"github.com/samber/lo"
+
+	"github.com/TykTechnologies/tyk/internal/model"
 	"github.com/TykTechnologies/tyk/user"
 )
 
@@ -20,22 +23,20 @@ func NewStore(policies []user.Policy) *Store {
 
 // PolicyIDs returns a list policy IDs in the store.
 // It will return nil if no policies exist.
-func (s *Store) PolicyIDs() []string {
+func (s *Store) PolicyIDs() []model.PolicyID {
 	if len(s.policies) == 0 {
 		return nil
 	}
 
-	policyIDs := make([]string, 0, len(s.policies))
-	for _, val := range s.policies {
-		policyIDs = append(policyIDs, val.ID)
-	}
-	return policyIDs
+	return lo.Map(s.policies, func(pol user.Policy, _ int) model.PolicyID {
+		return model.PolicyIdFromPolicy(pol)
+	})
 }
 
 // PolicyByID returns a policy by ID.
-func (s *Store) PolicyByID(id string) (user.Policy, bool) {
+func (s *Store) PolicyByID(id model.PolicyID) (user.Policy, bool) {
 	for _, pol := range s.policies {
-		if pol.ID == id {
+		if id.IsIdentifierOf(pol) {
 			return pol, true
 		}
 	}

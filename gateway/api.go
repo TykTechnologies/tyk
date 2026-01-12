@@ -51,8 +51,6 @@ import (
 
 	gqlv2 "github.com/TykTechnologies/graphql-go-tools/v2/pkg/graphql"
 
-	"github.com/TykTechnologies/tyk/config"
-
 	"github.com/TykTechnologies/tyk/internal/osutil"
 	"github.com/TykTechnologies/tyk/internal/otel"
 	"github.com/TykTechnologies/tyk/internal/redis"
@@ -252,7 +250,7 @@ func (gw *Gateway) checkAndApplyTrialPeriod(
 ) {
 	// Check the policies to see if we are forcing an expiry on the key
 	for _, polID := range newSession.PolicyIDs() {
-		policy, ok := gw.policies.PolicyByID(polID)
+		policy, ok := gw.policies.PolicyByID(model.NewAnyPolicyId(newSession.OrgID, polID))
 		if !ok {
 			continue
 		}
@@ -1009,7 +1007,8 @@ func (gw *Gateway) handleRemoveSortedSetRange(keyName, scoreFrom, scoreTo string
 }
 
 func (gw *Gateway) handleGetPolicy(polID string) (interface{}, int) {
-	if pol, ok := gw.PolicyByID(polID); ok && pol.ID != "" {
+	// todo: extract org id !!!!!
+	if pol, ok := gw.policies.PolicyByID(model.PolicyDbId(polID)); ok && pol.ID != "" {
 		return pol, http.StatusOK
 	}
 
@@ -1852,7 +1851,7 @@ func (gw *Gateway) handleUpdateHashedKey(keyName string, applyPolicies []string)
 	var orgID string
 
 	if len(applyPolicies) != 0 {
-		if pol, ok := gw.policies.PolicyByID(applyPolicies[0]); ok {
+		if pol, ok := gw.policies.PolicyByID(model.PolicyDbId(applyPolicies[0])); ok {
 			orgID = pol.OrgID
 		}
 	}
@@ -2356,7 +2355,7 @@ func (gw *Gateway) createOauthClient(w http.ResponseWriter, r *http.Request) {
 		}
 	} else {
 		// set client for all APIs from the given policy
-		policy, ok := gw.policies.PolicyByID(newClient.PolicyID)
+		policy, ok := gw.policies.PolicyByID(model.PolicyDbId(newClient.PolicyID))
 		if !ok {
 			log.WithFields(logrus.Fields{
 				"prefix":   "api",
@@ -2521,7 +2520,7 @@ func (gw *Gateway) updateOauthClient(keyName, apiID string, r *http.Request) (in
 
 	// check policy
 	if updateClientData.PolicyID != "" {
-		policy, ok := gw.policies.PolicyByID(updateClientData.PolicyID)
+		policy, ok := gw.policies.PolicyByID(model.NewAnyPolicyId(apiSpec.OrgID, updateClientData.PolicyID))
 		if !ok {
 			return apiError("Policy doesn't exist"), http.StatusNotFound
 		}
@@ -3616,14 +3615,4 @@ func validateAPIDef(apiDef *apidef.APIDefinition) *apiStatusMessage {
 	}
 
 	return nil
-}
-
-func updateOASServers(spec *APISpec, conf config.Config, apiDef *apidef.APIDefinition, oasObj *oas.OAS) {
-	var oldAPIURL string
-	if spec != nil && spec.OAS.Servers != nil {
-		oldAPIURL = spec.OAS.Servers[0].URL
-	}
-
-	newAPIURL := getAPIURL(*apiDef, conf)
-	oasObj.UpdateServers(newAPIURL, oldAPIURL)
 }

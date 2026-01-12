@@ -178,7 +178,7 @@ func (r *RPCStorageHandler) buildNodeInfo() []byte {
 		Health:          r.Gw.getHealthCheckInfo(),
 		Stats: model.GWStats{
 			APIsCount:     r.Gw.apisByIDLen(),
-			PoliciesCount: r.Gw.PolicyCount(),
+			PoliciesCount: r.Gw.policies.PolicyCount(),
 		},
 		HostDetails: model.HostDetails{
 			Hostname: r.Gw.hostDetails.Hostname,

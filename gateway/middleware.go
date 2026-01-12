@@ -435,7 +435,7 @@ func (t *BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 	if t.Spec != nil {
 		orgID = &t.Spec.OrgID
 	}
-	store := policy.New(orgID, t.Gw, log)
+	store := policy.New(orgID, t.Gw.policies, log)
 	return store.Apply(session)
 }
 

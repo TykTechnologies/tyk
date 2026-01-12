@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/samber/lo"
 	"github.com/sirupsen/logrus"
 
 	"github.com/TykTechnologies/tyk/internal/model"
@@ -38,7 +39,7 @@ func (t *Service) ClearSession(session *user.SessionState) error {
 	policies := session.PolicyIDs()
 
 	for _, polID := range policies {
-		policy, ok := t.storage.PolicyByID(polID)
+		policy, ok := t.storage.PolicyByID(model.NewAnyPolicyId(session.OrgID, polID))
 		if !ok {
 			return fmt.Errorf("policy not found: %s", polID)
 		}
@@ -107,7 +108,9 @@ func (t *Service) Apply(session *user.SessionState) error {
 		policyIDs = session.PolicyIDs()
 	} else {
 		storage = NewStore(customPolicies)
-		policyIDs = storage.PolicyIDs()
+		policyIDs = lo.Map(storage.PolicyIDs(), func(policyID model.PolicyID, _ int) string {
+			return policyID.String()
+		})
 	}
 
 	// Only the status of policies applied to a key should determine the validity of the key.
@@ -119,7 +122,7 @@ func (t *Service) Apply(session *user.SessionState) error {
 	}
 
 	for _, polID := range policyIDs {
-		policy, ok := storage.PolicyByID(polID)
+		policy, ok := storage.PolicyByID(model.NewAnyPolicyId(session.OrgID, polID))
 		if !ok {
 			err := fmt.Errorf("policy not found: %q", polID)
 			t.Logger().Error(err)
