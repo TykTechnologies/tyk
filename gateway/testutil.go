@@ -902,7 +902,7 @@ func (s *Test) CreatePolicy(pGen ...func(p *user.Policy)) string {
 	return pol.ID
 }
 
-func (s *Test) DeletePolicy(policyID string) {
+func (s *Test) DeletePolicy(policyID model.PolicyID) {
 	s.Gw.policies.DeleteById(policyID)
 }
 

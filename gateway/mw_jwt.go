@@ -15,20 +15,20 @@ import (
 	"sync"
 	"time"
 
+	"github.com/go-jose/go-jose/v3"
+	"github.com/golang-jwt/jwt/v4"
 	"github.com/google/go-cmp/cmp"
 	"github.com/gorilla/mux"
+	"github.com/lonelycode/osin"
 	"github.com/ohler55/ojg/jp"
 	"github.com/tidwall/gjson"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/apidef/oas"
+	"github.com/TykTechnologies/tyk/internal/cache"
+	"github.com/TykTechnologies/tyk/internal/model"
 	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/user"
-	"github.com/go-jose/go-jose/v3"
-	"github.com/golang-jwt/jwt/v4"
-	"github.com/lonelycode/osin"
-
-	"github.com/TykTechnologies/tyk/internal/cache"
 )
 
 type JWTMiddleware struct {
@@ -798,7 +798,7 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 		var policy user.Policy
 		var ok bool
 		if basePolicyID != "" {
-			policy, ok = k.Gw.policies.PolicyByID(basePolicyID)
+			policy, ok = k.Gw.policies.PolicyByID(model.NewAnyPolicyId(k.Spec.OrgID, basePolicyID))
 			if !ok {
 				k.reportLoginFailure(baseFieldData, r)
 				k.Logger().Error("Policy ID found is invalid!")
@@ -1410,7 +1410,7 @@ func ctxSetJWTContextVars(s *APISpec, r *http.Request, token *jwt.Token) {
 }
 
 func (gw *Gateway) generateSessionFromPolicy(policyID, orgID string, enforceOrg bool) (user.SessionState, error) {
-	policy, ok := gw.policies.PolicyByID(policyID)
+	policy, ok := gw.policies.PolicyByID(model.NewAnyPolicyId(orgID, policyID))
 	session := user.SessionState{}
 
 	if !ok {
