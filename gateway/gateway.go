@@ -3,15 +3,9 @@ package gateway
 import (
 	"github.com/TykTechnologies/tyk/internal/model"
 	"github.com/TykTechnologies/tyk/user"
+	"github.com/samber/lo"
 )
 
-// Gateway implements the Repository interface.
-var _ model.Gateway = new(Gateway)
-
-// PolicyIDs returns a list of IDs for each policy loaded in the gateway.
-func (gw *Gateway) PolicyIDs() []string {
-	return gw.policies.PolicyIDs()
-}
 
 // GetLoadedAPIIDs returns a list of all loaded API IDs with metadata.
 // This is used for reporting loaded resources to MDCB.
@@ -31,26 +25,11 @@ func (gw *Gateway) GetLoadedAPIIDs() []model.LoadedAPIInfo {
 // GetLoadedPolicyIDs returns a list of all loaded policy IDs with metadata.
 // This is used for reporting loaded resources to MDCB.
 func (gw *Gateway) GetLoadedPolicyIDs() []model.LoadedPolicyInfo {
-	gw.policiesMu.RLock()
-	defer gw.policiesMu.RUnlock()
-
-	policies := make([]model.LoadedPolicyInfo, 0, len(gw.policiesByID))
-	for policyID := range gw.policiesByID {
-		policies = append(policies, model.LoadedPolicyInfo{
-			PolicyID: policyID,
-		})
-	}
-	return policies
-}
-
-// PolicyByID will return a Policy matching the passed Policy ID.
-func (gw *Gateway) PolicyByID(id string) (user.Policy, bool) {
-	return gw.policies.PolicyByID(id)
-}
-
-// PolicyCount will return the number of policies loaded in the gateway.
-func (gw *Gateway) PolicyCount() int {
-	return gw.policies.PolicyCount()
+	return lo.Map(gw.policies.AsSlice(), func(item user.Policy, _ int) model.LoadedPolicyInfo {
+		return model.LoadedPolicyInfo{
+			PolicyID: item.ID,
+		}
+	})
 }
 
 // SetPoliciesByID will update the internal policiesByID map with new policies.

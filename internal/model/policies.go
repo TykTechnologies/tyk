@@ -4,6 +4,7 @@ import (
 	"sync"
 
 	"github.com/TykTechnologies/tyk/user"
+	"github.com/samber/lo"
 	"golang.org/x/exp/maps"
 )
 
@@ -14,14 +15,14 @@ type (
 		PolicyProvider
 		Load(...user.Policy)
 		AsSlice() []user.Policy
-		DeleteById(id string) bool
+		DeleteById(PolicyID) bool
 	}
 
 	PolicySetOpt func(*policySet)
 
 	policySet struct {
 		mu                sync.RWMutex
-		policies          map[string]user.Policy
+		policies          map[PolicyDbId]user.Policy
 		policiesCustomKey map[customKey]user.Policy
 		onCollision       CollisionCb
 		onBrokenPolicy    BrokenPolicyCb
@@ -35,10 +36,16 @@ type (
 	}
 )
 
+var (
+	_ Policies = new(policySet)
+)
+
 func NewPolicies(opts ...PolicySetOpt) Policies {
 	var set = &policySet{
-		onCollision:    collisionNoop,
-		onBrokenPolicy: brokenPolicyNoop,
+		policies:          make(map[PolicyDbId]user.Policy),
+		policiesCustomKey: make(map[customKey]user.Policy),
+		onCollision:       collisionNoop,
+		onBrokenPolicy:    brokenPolicyNoop,
 	}
 
 	for _, apply := range opts {
@@ -66,33 +73,72 @@ func (p *policySet) AsSlice() []user.Policy {
 	return maps.Values(p.policies)
 }
 
-func (p *policySet) PolicyIDs() []string {
+func (p *policySet) PolicyIDs() []PolicyID {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
-	return maps.Keys(p.policies)
+
+	return lo.Map(maps.Keys(p.policies), func(pol PolicyDbId, _ int) PolicyID {
+		return pol
+	})
 }
 
-func (p *policySet) PolicyByID(id string) (user.Policy, bool) {
+func (p *policySet) PolicyByID(id PolicyID) (user.Policy, bool) {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
-	policy, ok := p.policies[id]
-	return policy, ok
+
+	switch id := id.(type) {
+	case AnyPolicyId:
+		if policy, ok := p.policiesCustomKey[id.customKey()]; ok {
+			return policy, true
+		}
+
+		// fallback strategy
+		dbId := PolicyDbId(id.id)
+
+		if !dbId.objectID().Valid() {
+			return user.Policy{}, false
+		}
+
+		if policy, ok := p.policies[dbId]; ok && policy.OrgID == id.orgId {
+			return policy, true
+		}
+
+		return user.Policy{}, false
+	case PolicyDbId:
+		policy, ok := p.policies[id]
+		return policy, ok
+
+	default:
+		panic("expected unreachable")
+	}
 }
 
-func (p *policySet) DeleteById(id string) bool {
+func (p *policySet) DeleteById(id PolicyID) bool {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
-	policy, ok := p.policies[id]
+	switch id := id.(type) {
+	case PolicyDbId:
+		pol, ok := p.policies[id]
 
-	if !ok {
-		return false
+		if ok {
+			delete(p.policies, id)
+			delete(p.policiesCustomKey, newCustomKey(&pol))
+		}
+
+		return ok
+	case AnyPolicyId:
+		pol, ok := p.policiesCustomKey[id.customKey()]
+
+		if ok {
+			delete(p.policiesCustomKey, id.customKey())
+			delete(p.policies, PolicyDbId(pol.MID))
+		}
+
+		return ok
+	default:
+		panic("expected unreachable")
 	}
-
-	delete(p.policies, id)
-	delete(p.policiesCustomKey, newCustomKey(&policy))
-
-	return true
 }
 
 func (p *policySet) Load(policies ...user.Policy) {
@@ -110,7 +156,8 @@ func (p *policySet) loadOne(pol *user.Policy) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
-	p.policies[pol.ID] = *pol
+	p.policies[PolicyDbId(pol.MID)] = *pol
+
 	key := newCustomKey(pol)
 	if oldPol, ok := p.policiesCustomKey[key]; ok {
 		if oldPol.MID != pol.MID {

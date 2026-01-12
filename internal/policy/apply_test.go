@@ -4,6 +4,7 @@ import (
 	"embed"
 	"encoding/json"
 	"fmt"
+	"maps"
 	"slices"
 	"sort"
 	"testing"
@@ -12,6 +13,8 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/TykTechnologies/graphql-go-tools/pkg/graphql"
+
+	"github.com/TykTechnologies/tyk/internal/model"
 	"github.com/TykTechnologies/tyk/internal/policy"
 	"github.com/TykTechnologies/tyk/user"
 )
@@ -241,7 +244,9 @@ func testPrepareApplyPolicies(tb testing.TB) (*policy.Service, []testApplyPolici
 	err = json.Unmarshal(f, &repoPols)
 	assert.NoError(tb, err)
 
-	store := policy.NewStoreMap(repoPols)
+	//store := policy.NewStoreMap(repoPols)
+	store := model.NewPolicies()
+	store.Load(slices.Collect(maps.Values(policies))...)
 	orgID := ""
 	service := policy.New(&orgID, store, logrus.StandardLogger())
 
@@ -753,7 +758,7 @@ func testPrepareApplyPolicies(tb testing.TB) (*policy.Service, []testApplyPolici
 					},
 				}
 
-				gotPolicy, ok := store.PolicyByID("per-path2")
+				gotPolicy, ok := store.PolicyByID(model.NewAnyPolicyId(orgID, "per-path2"))
 
 				assert.True(t, ok)
 				assert.Equal(t, user.AccessSpec{
