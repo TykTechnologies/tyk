@@ -40,7 +40,7 @@ import (
 
 const (
 	internalTLSErr          = "tls: unrecognized name"
-	badcertErr              = "tls: handshake failure"
+	badcertErr              = "tls: bad certificate"
 	certNotMatchErr         = "Client TLS certificate is required"
 	unknownCertAuthorityErr = "unknown certificate authority"
 )
@@ -1869,7 +1869,7 @@ func TestCipherSuites(t *testing.T) {
 			MaxVersion:         tls.VersionTLS12,
 		}}}
 
-		_, _ = ts.Run(t, test.TestCase{Client: client, Path: "/", ErrorMatch: "tls: handshake failure"})
+		_, _ = ts.Run(t, test.TestCase{Client: client, Path: "/", ErrorMatch: "tls: bad certificate"})
 	})
 }
 
