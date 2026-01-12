@@ -739,8 +739,14 @@ func (gw *Gateway) handleGetAllKeys(c context.Context, filter string, apiID stri
 // filterKeysByAPIID handles the concurrent processing of key permissions
 func (gw *Gateway) filterKeysByAPIID(c context.Context, keys []string, filter, apiID string, hashed bool) ([]string, error) {
 	numKeys := len(keys)
+	// the values for keyListingWorkerCount and keyListingBufferSize were averaged through profiling and benchmarking
 	keyListingWorkerCount := int(4 + math.Sqrt(float64(numKeys)))
+	if keyListingWorkerCount > 350 {
+		// the number 350 is based on the average of 10000 keys with minor contingency
+		keyListingWorkerCount = 350
+	}
 	keyListingBufferSize := keyListingWorkerCount * 100
+
 	jobs := make(chan string, keyListingBufferSize)
 	validSessions := make([]string, 0)
 	var wg sync.WaitGroup

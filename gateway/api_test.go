@@ -426,8 +426,8 @@ func TestKeyHandler(t *testing.T) {
 	t.Run("List keys", func(t *testing.T) {
 		_, _ = ts.Run(t, []test.TestCase{
 			{Method: "GET", Path: "/tyk/keys/", AdminAuth: true, Code: 200, BodyMatch: knownKey},
-			{Method: "GET", Path: "/tyk/keys/?api_id=test", AdminAuth: true, Code: 200, BodyMatch: knownKey},
-			{Method: "GET", Path: "/tyk/keys/?api_id=unknown", AdminAuth: true, Code: 200, BodyNotMatch: knownKey},
+			{Method: "GET", Path: "/tyk/keys/?api_id=test&filter=default", AdminAuth: true, Code: 200, BodyMatch: knownKey},
+			{Method: "GET", Path: "/tyk/keys/?api_id=test&filter=wrong_org", AdminAuth: true, Code: 200, BodyNotMatch: knownKey},
 		}...)
 
 		globalConf := ts.Gw.GetConfig()
