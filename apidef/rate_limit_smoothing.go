@@ -115,3 +115,9 @@ func (r *RateLimitSmoothing) Err() error {
 
 	return nil
 }
+
+// IsZero returns true if rate limit smoothing is not enabled (for omitzero support).
+// This allows the struct to be omitted from JSON when Enabled is false.
+func (r *RateLimitSmoothing) IsZero() bool {
+	return r == nil || !r.Enabled
+}
