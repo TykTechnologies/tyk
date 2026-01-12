@@ -7,6 +7,8 @@ import (
 
 var log = logrus.WithField("prefix", "compression")
 
+const maxDecompressedSize = 100 * 1024 * 1024
+
 // CompressZstd compresses data using Zstd compression
 // Returns the compressed data and logs compression statistics
 func CompressZstd(data []byte) ([]byte, error) {
@@ -33,8 +35,6 @@ func CompressZstd(data []byte) ([]byte, error) {
 
 // DecompressZstd decompresses Zstd-compressed data
 func DecompressZstd(data []byte) ([]byte, error) {
-	const maxDecompressedSize = 100 * 1024 * 1024 // 100MB
-
 	decoder, err := zstd.NewReader(nil, zstd.WithDecoderMaxMemory(maxDecompressedSize))
 	if err != nil {
 		return nil, err
