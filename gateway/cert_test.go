@@ -40,7 +40,7 @@ import (
 
 const (
 	internalTLSErr          = "tls: unrecognized name"
-	badcertErr              = "tls: bad certificate"
+	badcertErr              = "tls: handshake failure"
 	certNotMatchErr         = "Client TLS certificate is required"
 	unknownCertAuthorityErr = "unknown certificate authority"
 )
