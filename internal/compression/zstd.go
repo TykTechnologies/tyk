@@ -1,22 +1,37 @@
 package compression
 
 import (
+	"sync"
+
 	"github.com/klauspost/compress/zstd"
 	"github.com/sirupsen/logrus"
 )
 
-var log = logrus.WithField("prefix", "compression")
-
 const maxDecompressedSize = 100 * 1024 * 1024
+
+var (
+	log = logrus.WithField("prefix", "compression")
+
+	encoderPool = sync.Pool{
+		New: func() interface{} {
+			encoder, _ := zstd.NewWriter(nil)
+			return encoder
+		},
+	}
+
+	decoderPool = sync.Pool{
+		New: func() interface{} {
+			decoder, _ := zstd.NewReader(nil, zstd.WithDecoderMaxMemory(maxDecompressedSize))
+			return decoder
+		},
+	}
+)
 
 // CompressZstd compresses data using Zstd compression
 // Returns the compressed data and logs compression statistics
 func CompressZstd(data []byte) ([]byte, error) {
-	encoder, err := zstd.NewWriter(nil)
-	if err != nil {
-		return nil, err
-	}
-	defer encoder.Close()
+	encoder := encoderPool.Get().(*zstd.Encoder)
+	defer encoderPool.Put(encoder)
 
 	compressed := encoder.EncodeAll(data, make([]byte, 0, len(data)))
 
@@ -35,11 +50,8 @@ func CompressZstd(data []byte) ([]byte, error) {
 
 // DecompressZstd decompresses Zstd-compressed data
 func DecompressZstd(data []byte) ([]byte, error) {
-	decoder, err := zstd.NewReader(nil, zstd.WithDecoderMaxMemory(maxDecompressedSize))
-	if err != nil {
-		return nil, err
-	}
-	defer decoder.Close()
+	decoder := decoderPool.Get().(*zstd.Decoder)
+	defer decoderPool.Put(decoder)
 
 	decompressed, err := decoder.DecodeAll(data, nil)
 	if err != nil {
