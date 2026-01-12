@@ -105,7 +105,7 @@ func BenchmarkSaveRPCDefinitionsBackup(b *testing.B) {
 
 			// Generate test data
 			apiDef := generateAPIDefinition("bench-api", bm.sizeKB)
-			inputJSON := `[` + apiDef + `]`
+			inputJSON := `[{"api_definition":` + apiDef + `}]`
 
 			b.ResetTimer()
 			b.ReportAllocs()
