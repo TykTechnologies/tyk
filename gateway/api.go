@@ -34,6 +34,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"math"
 	"net/http"
 	"net/url"
 	"os"
@@ -77,12 +78,6 @@ import (
 
 const (
 	oAuthClientTokensKeyPattern = "oauth-data.*oauth-client-tokens.*"
-
-	// KeyListingWorkerCount defines how many parallel goroutines we use to fetch key details.
-	KeyListingWorkerCount = 20
-
-	// KeyListingBufferSize defines the channel buffer size.
-	KeyListingBufferSize = 100
 )
 
 var (
@@ -743,13 +738,16 @@ func (gw *Gateway) handleGetAllKeys(c context.Context, filter string, apiID stri
 
 // filterKeysByAPIID handles the concurrent processing of key permissions
 func (gw *Gateway) filterKeysByAPIID(c context.Context, keys []string, filter, apiID string, hashed bool) ([]string, error) {
-	jobs := make(chan string, KeyListingBufferSize)
+	numKeys := len(keys)
+	keyListingWorkerCount := int(4 + math.Sqrt(float64(numKeys)))
+	keyListingBufferSize := keyListingWorkerCount * 100
+	jobs := make(chan string, keyListingBufferSize)
 	validSessions := make([]string, 0)
 	var wg sync.WaitGroup
 	var mu sync.Mutex
 
-	wg.Add(KeyListingWorkerCount)
-	for w := 0; w < KeyListingWorkerCount; w++ {
+	wg.Add(keyListingWorkerCount)
+	for w := 0; w < keyListingWorkerCount; w++ {
 		go func() {
 			defer wg.Done()
 			localMatches := make([]string, 0)
