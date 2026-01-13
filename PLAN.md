@@ -119,6 +119,12 @@ Extend the existing certificate expiry monitoring system (currently limited to c
    - Added `CheckUpstreamCertificates()` method
    - Events fire with `certificate_type: "upstream"` and APIID populated
 
+6. **Performance Optimization** ✅
+   - Added dual method variants to avoid allocations
+   - `CheckServerCertificates([]tls.Certificate)` for value slices (no allocation)
+   - `CheckServerCertificatesPtr([]*tls.Certificate)` for pointer slices
+   - Eliminated heap allocation on file-based certificate loading path
+
 ### Files Modified
 
 **Code (6 files):**
