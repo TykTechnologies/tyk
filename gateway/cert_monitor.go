@@ -3,6 +3,7 @@ package gateway
 import (
 	"context"
 	"crypto/tls"
+	"sync"
 	"time"
 
 	"github.com/sirupsen/logrus"
@@ -24,6 +25,7 @@ type GlobalCertificateMonitor struct {
 	ctx               context.Context
 	cancelFunc        context.CancelFunc
 	logger            *logrus.Entry
+	wg                sync.WaitGroup
 }
 
 // NewGlobalCertificateMonitor creates a new global certificate monitor
@@ -99,9 +101,18 @@ func (m *GlobalCertificateMonitor) fireSystemEvent(name apidef.TykEvent, meta in
 func (m *GlobalCertificateMonitor) Start() {
 	m.logger.Info("Starting global certificate expiry monitoring")
 
-	// Start background batchers
-	go m.serverCertBatcher.RunInBackground(m.ctx)
-	go m.caCertBatcher.RunInBackground(m.ctx)
+	// Start background batchers with proper goroutine tracking
+	m.wg.Add(2)
+
+	go func() {
+		defer m.wg.Done()
+		m.serverCertBatcher.RunInBackground(m.ctx)
+	}()
+
+	go func() {
+		defer m.wg.Done()
+		m.caCertBatcher.RunInBackground(m.ctx)
+	}()
 }
 
 // Stop gracefully shuts down the monitor
@@ -111,6 +122,10 @@ func (m *GlobalCertificateMonitor) Stop() {
 	if m.cancelFunc != nil {
 		m.cancelFunc()
 	}
+
+	// Wait for all background goroutines to exit
+	m.wg.Wait()
+	m.logger.Debug("All certificate monitoring goroutines stopped")
 
 	// Note: We don't close m.store because it uses the Gateway's shared
 	// StorageConnectionHandler. The Gateway manages the connection lifecycle.
