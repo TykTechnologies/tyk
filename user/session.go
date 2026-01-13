@@ -102,12 +102,12 @@ func (r RateLimit) Duration() time.Duration {
 type AccessDefinition struct {
 	APIName              string                  `json:"api_name,omitzero" msg:"api_name"`
 	APIID                string                  `json:"api_id,omitzero" msg:"api_id"`
-	Versions             []string                `json:"versions,omitzero" msg:"versions"`
-	AllowedURLs          []AccessSpec            `json:"allowed_urls,omitzero" bson:"allowed_urls" msg:"allowed_urls"` // mapped string MUST be a valid regex
-	RestrictedTypes      []graphql.Type          `json:"restricted_types,omitzero" msg:"restricted_types"`
-	AllowedTypes         []graphql.Type          `json:"allowed_types,omitzero" msg:"allowed_types"`
+	Versions             []string                `json:"versions,omitempty" msg:"versions"`
+	AllowedURLs          []AccessSpec            `json:"allowed_urls,omitempty" bson:"allowed_urls" msg:"allowed_urls"` // mapped string MUST be a valid regex
+	RestrictedTypes      []graphql.Type          `json:"restricted_types,omitempty" msg:"restricted_types"`
+	AllowedTypes         []graphql.Type          `json:"allowed_types,omitempty" msg:"allowed_types"`
 	Limit                APILimit                `json:"limit,omitzero" msg:"limit"`
-	FieldAccessRights    []FieldAccessDefinition `json:"field_access_rights,omitzero" msg:"field_access_rights"`
+	FieldAccessRights    []FieldAccessDefinition `json:"field_access_rights,omitempty" msg:"field_access_rights"`
 	DisableIntrospection bool                    `json:"disable_introspection,omitzero" msg:"disable_introspection"`
 
 	AllowanceScope string `json:"allowance_scope,omitzero" msg:"allowance_scope"`
@@ -206,7 +206,7 @@ func (j JWTData) IsZero() bool {
 }
 
 type Monitor struct {
-	TriggerLimits []float64 `json:"trigger_limits,omitzero" msg:"trigger_limits"`
+	TriggerLimits []float64 `json:"trigger_limits,omitempty" msg:"trigger_limits"`
 }
 
 // IsZero returns true if Monitor is empty (for omitzero support).
@@ -290,10 +290,10 @@ type SessionState struct {
 	QuotaRenews                   int64                       `json:"quota_renews,omitzero" msg:"quota_renews"`
 	QuotaRemaining                int64                       `json:"quota_remaining,omitzero" msg:"quota_remaining"`
 	QuotaRenewalRate              int64                       `json:"quota_renewal_rate,omitzero" msg:"quota_renewal_rate"`
-	AccessRights                  map[string]AccessDefinition `json:"access_rights,omitzero" msg:"access_rights"`
+	AccessRights                  map[string]AccessDefinition `json:"access_rights,omitempty" msg:"access_rights"`
 	OrgID                         string                      `json:"org_id,omitzero" msg:"org_id"`
 	OauthClientID                 string                      `json:"oauth_client_id,omitzero" msg:"oauth_client_id"`
-	OauthKeys                     map[string]string           `json:"oauth_keys,omitzero" msg:"oauth_keys"`
+	OauthKeys                     map[string]string           `json:"oauth_keys,omitempty" msg:"oauth_keys"`
 	Certificate                   string                      `json:"certificate,omitzero" msg:"certificate"`
 	BasicAuthData                 BasicAuthData               `json:"basic_auth_data,omitzero" msg:"basic_auth_data"`
 	JWTData                       JWTData                     `json:"jwt_data,omitzero" msg:"jwt_data"`
@@ -303,15 +303,15 @@ type SessionState struct {
 	RSACertificateId              string                      `json:"rsa_certificate_id,omitzero" msg:"rsa_certificate_id"`
 	IsInactive                    bool                        `json:"is_inactive,omitzero" msg:"is_inactive"`
 	ApplyPolicyID                 string                      `json:"apply_policy_id,omitzero" msg:"apply_policy_id"`
-	ApplyPolicies                 []string                    `json:"apply_policies,omitzero" msg:"apply_policies"`
+	ApplyPolicies                 []string                    `json:"apply_policies,omitempty" msg:"apply_policies"`
 	DataExpires                   int64                       `json:"data_expires,omitzero" msg:"data_expires"`
 	Monitor                       Monitor                     `json:"monitor,omitzero" msg:"monitor"`
 	// Deprecated: EnableDetailRecording is deprecated. Use EnableDetailedRecording
 	// going forward instead
 	EnableDetailRecording   bool                   `json:"enable_detail_recording,omitzero" msg:"enable_detail_recording"`
 	EnableDetailedRecording bool                   `json:"enable_detailed_recording,omitzero" msg:"enable_detailed_recording"`
-	MetaData                map[string]interface{} `json:"meta_data,omitzero" msg:"meta_data"`
-	Tags                    []string               `json:"tags,omitzero" msg:"tags"`
+	MetaData                map[string]interface{} `json:"meta_data,omitempty" msg:"meta_data"`
+	Tags                    []string               `json:"tags,omitempty" msg:"tags"`
 	Alias                   string                 `json:"alias,omitzero" msg:"alias"`
 	LastUpdated             string                 `json:"last_updated,omitzero" msg:"last_updated"`
 	IdExtractorDeadline     int64                  `json:"id_extractor_deadline,omitzero" msg:"id_extractor_deadline"`
