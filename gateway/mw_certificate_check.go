@@ -243,7 +243,14 @@ func (m *CertificateCheckMW) CheckUpstreamCertificates() {
 	checked := 0
 	for _, cert := range certificates {
 		if certInfo, ok := m.extractCertInfo(cert); ok {
-			m.upstreamExpiryCheckBatcher.Add(certInfo)
+			if err := m.upstreamExpiryCheckBatcher.Add(certInfo); err != nil {
+				log.
+					WithField("api_id", m.Spec.APIID).
+					WithField("api_name", m.Spec.Name).
+					WithField("mw", m.Name()).
+					WithError(err).
+					Warning("Failed to add upstream certificate to expiry check batch")
+			}
 			checked++
 		}
 	}

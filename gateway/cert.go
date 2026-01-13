@@ -435,15 +435,6 @@ func (gw *Gateway) getTLSConfigForClient(baseConfig *tls.Config, listenPort int)
 			newConfig.ClientAuth = tls.RequireAndVerifyClientCert
 			newConfig.ClientCAs = gw.CertificateManager.CertPool(gwConfig.Security.Certificates.ControlAPI)
 
-			// Check expiry for Control API CA certificates
-			if gw.GlobalCertMonitor != nil && len(gwConfig.Security.Certificates.ControlAPI) > 0 {
-				controlCACerts := gw.CertificateManager.List(
-					gwConfig.Security.Certificates.ControlAPI,
-					certs.CertificatePublic,
-				)
-				gw.GlobalCertMonitor.CheckCACertificates(controlCACerts)
-			}
-
 			tlsConfigCache.Set(hello.ServerName, newConfig, cache.DefaultExpiration)
 			return newConfig, nil
 		}
@@ -488,11 +479,6 @@ func (gw *Gateway) getTLSConfigForClient(baseConfig *tls.Config, listenPort int)
 							crypto.AddCACertificatesFromChainToPool(newConfig.ClientCAs, cert)
 						}
 					}
-
-					// Check expiry for client verification CA certificates
-					if gw.GlobalCertMonitor != nil && len(clientCACerts) > 0 {
-						gw.GlobalCertMonitor.CheckCACertificates(clientCACerts)
-					}
 				}
 			case spec.Auth.UseCertificate, spec.AuthConfigs[apidef.AuthTokenType].UseCertificate:
 				// Dynamic certificate check required, falling back to HTTP level check
@@ -524,11 +510,6 @@ func (gw *Gateway) getTLSConfigForClient(baseConfig *tls.Config, listenPort int)
 					for _, san := range cert.Leaf.DNSNames {
 						newConfig.NameToCertificate[san] = cert
 					}
-				}
-
-				// Check expiry for API-specific server certificates
-				if gw.GlobalCertMonitor != nil && len(apiSpecificCerts) > 0 {
-					gw.GlobalCertMonitor.CheckServerCertificatesPtr(apiSpecificCerts)
 				}
 			}
 		}

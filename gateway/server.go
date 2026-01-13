@@ -1127,6 +1127,11 @@ func (gw *Gateway) DoReload() {
 
 	gw.loadGlobalApps()
 
+	// Check certificate expiry for all loaded APIs
+	if gw.GlobalCertMonitor != nil {
+		gw.GlobalCertMonitor.CheckAPICertificates()
+	}
+
 	gw.performedSuccessfulReload = true
 	mainLog.Info("API reload complete")
 }

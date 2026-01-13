@@ -8,6 +8,7 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/certs"
 	"github.com/TykTechnologies/tyk/internal/certcheck"
 	"github.com/TykTechnologies/tyk/internal/crypto"
 	"github.com/TykTechnologies/tyk/storage"
@@ -110,6 +111,9 @@ func (m *GlobalCertificateMonitor) Stop() {
 	if m.cancelFunc != nil {
 		m.cancelFunc()
 	}
+
+	// Note: We don't close m.store because it uses the Gateway's shared
+	// StorageConnectionHandler. The Gateway manages the connection lifecycle.
 }
 
 // CheckServerCertificates checks the expiry status of server certificates
@@ -121,7 +125,9 @@ func (m *GlobalCertificateMonitor) CheckServerCertificates(certificates []tls.Ce
 	checked := 0
 	for i := range certificates {
 		if certInfo, ok := m.extractCertInfo(&certificates[i], "server"); ok {
-			m.serverCertBatcher.Add(certInfo)
+			if err := m.serverCertBatcher.Add(certInfo); err != nil {
+				m.logger.WithError(err).Warning("Failed to add server certificate to expiry check batch")
+			}
 			checked++
 		}
 	}
@@ -140,7 +146,9 @@ func (m *GlobalCertificateMonitor) CheckServerCertificatesPtr(certificates []*tl
 	checked := 0
 	for _, cert := range certificates {
 		if certInfo, ok := m.extractCertInfo(cert, "server"); ok {
-			m.serverCertBatcher.Add(certInfo)
+			if err := m.serverCertBatcher.Add(certInfo); err != nil {
+				m.logger.WithError(err).Warning("Failed to add server certificate to expiry check batch")
+			}
 			checked++
 		}
 	}
@@ -159,13 +167,60 @@ func (m *GlobalCertificateMonitor) CheckCACertificates(certificates []*tls.Certi
 	checked := 0
 	for _, cert := range certificates {
 		if certInfo, ok := m.extractCertInfo(cert, "ca"); ok {
-			m.caCertBatcher.Add(certInfo)
+			if err := m.caCertBatcher.Add(certInfo); err != nil {
+				m.logger.WithError(err).Warning("Failed to add CA certificate to expiry check batch")
+			}
 			checked++
 		}
 	}
 
 	if checked > 0 {
 		m.logger.WithField("count", checked).Debug("Checked CA certificates for expiry")
+	}
+}
+
+// CheckAPICertificates checks certificates for all loaded APIs
+func (m *GlobalCertificateMonitor) CheckAPICertificates() {
+	if m.gw == nil {
+		return
+	}
+
+	gwConfig := m.gw.GetConfig()
+
+	// Check Control API CA certificates
+	if gwConfig.Security.ControlAPIUseMutualTLS && len(gwConfig.Security.Certificates.ControlAPI) > 0 {
+		controlCACerts := m.gw.CertificateManager.List(
+			gwConfig.Security.Certificates.ControlAPI,
+			certs.CertificatePublic,
+		)
+		if len(controlCACerts) > 0 {
+			m.CheckCACertificates(controlCACerts)
+		}
+	}
+
+	// Check certificates for all APIs
+	m.gw.apisMu.RLock()
+	defer m.gw.apisMu.RUnlock()
+
+	for _, spec := range m.gw.apiSpecs {
+		// Check client verification CA certificates
+		if spec.UseMutualTLSAuth {
+			certIDs := append(spec.ClientCertificates, gwConfig.Security.Certificates.API...)
+			if len(certIDs) > 0 {
+				clientCACerts := m.gw.CertificateManager.List(certIDs, certs.CertificatePublic)
+				if len(clientCACerts) > 0 {
+					m.CheckCACertificates(clientCACerts)
+				}
+			}
+		}
+
+		// Check API-specific server certificates
+		if len(spec.Certificates) > 0 && !spec.DomainDisabled {
+			apiServerCerts := m.gw.CertificateManager.List(spec.Certificates, certs.CertificatePrivate)
+			if len(apiServerCerts) > 0 {
+				m.CheckServerCertificatesPtr(apiServerCerts)
+			}
+		}
 	}
 }
 
