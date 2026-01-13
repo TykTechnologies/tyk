@@ -51,11 +51,12 @@ func (c CertInfo) DaysUntilExpiry() int {
 // EventCertificateExpiringSoonMeta is the metadata structure for certificate expiration events.
 type EventCertificateExpiringSoonMeta struct {
 	model.EventMetaDefault
-	CertID        string    `json:"cert_id"`
-	CertName      string    `json:"cert_name"`
-	ExpiresAt     time.Time `json:"expires_at"`
-	DaysRemaining int       `json:"days_remaining"`
-	APIID         string    `json:"api_id"`
+	CertID          string    `json:"cert_id"`
+	CertName        string    `json:"cert_name"`
+	ExpiresAt       time.Time `json:"expires_at"`
+	DaysRemaining   int       `json:"days_remaining"`
+	APIID           string    `json:"api_id"`
+	CertificateType string    `json:"certificate_type"` // Type: "server", "client", "ca", "upstream"
 }
 
 // EventCertificateExpiredMeta is the metadata structure for certificate expiration events.
@@ -66,4 +67,5 @@ type EventCertificateExpiredMeta struct {
 	ExpiredAt       time.Time `json:"expired_at"`
 	DaysSinceExpiry int       `json:"days_since_expiry"`
 	APIID           string    `json:"api_id"`
+	CertificateType string    `json:"certificate_type"` // Type: "server", "client", "ca", "upstream"
 }

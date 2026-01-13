@@ -95,10 +95,19 @@ type CertificateExpiryCheckBatcher struct {
 	fallbackCooldownCache CooldownCache
 	flushTicker           *time.Ticker
 	fireEvent             FireEventFunc
+	certificateType       string // Type of certificate: "server", "client", "ca", "upstream"
 }
 
 // NewCertificateExpiryCheckBatcher creates a new CertificateExpiryCheckBatcher.
+// This function maintains backward compatibility by defaulting to "client" certificate type.
+// For other certificate types, use NewCertificateExpiryCheckBatcherWithType.
 func NewCertificateExpiryCheckBatcher(logger *logrus.Entry, apiMetaData APIMetaData, cfg config.CertificateExpiryMonitorConfig, fallbackStorage storage.Handler, eventFunc FireEventFunc) (*CertificateExpiryCheckBatcher, error) {
+	return NewCertificateExpiryCheckBatcherWithType(logger, apiMetaData, cfg, fallbackStorage, eventFunc, "client")
+}
+
+// NewCertificateExpiryCheckBatcherWithType creates a new CertificateExpiryCheckBatcher with a specific certificate type.
+// The certificateType parameter specifies the type of certificates being monitored: "client", "server", "ca", or "upstream".
+func NewCertificateExpiryCheckBatcherWithType(logger *logrus.Entry, apiMetaData APIMetaData, cfg config.CertificateExpiryMonitorConfig, fallbackStorage storage.Handler, eventFunc FireEventFunc, certificateType string) (*CertificateExpiryCheckBatcher, error) {
 	inMemoryCache, err := NewInMemoryCooldownCache()
 	if err != nil {
 		return nil, err
@@ -122,6 +131,7 @@ func NewCertificateExpiryCheckBatcher(logger *logrus.Entry, apiMetaData APIMetaD
 		fallbackCooldownCache: fallbackCache,
 		flushTicker:           time.NewTicker(30 * time.Second),
 		fireEvent:             eventFunc,
+		certificateType:       certificateType,
 	}, nil
 }
 
@@ -295,6 +305,7 @@ func (c *CertificateExpiryCheckBatcher) handleEventForExpiredCertificate(certInf
 		ExpiredAt:       certInfo.NotAfter,
 		DaysSinceExpiry: daysSinceExpiry,
 		APIID:           c.apiMetaData.APIID,
+		CertificateType: c.certificateType,
 	}
 
 	c.fireEvent(event.CertificateExpired, eventMeta)
@@ -312,11 +323,12 @@ func (c *CertificateExpiryCheckBatcher) handleEventForSoonToExpireCertificate(ce
 		EventMetaDefault: model.EventMetaDefault{
 			Message: c.composeSoonToExpireMessage(certInfo, daysUntilExpiry, remainingHours),
 		},
-		CertID:        certInfo.ID,
-		CertName:      certInfo.CommonName,
-		ExpiresAt:     certInfo.NotAfter,
-		DaysRemaining: daysUntilExpiry,
-		APIID:         c.apiMetaData.APIID,
+		CertID:          certInfo.ID,
+		CertName:        certInfo.CommonName,
+		ExpiresAt:       certInfo.NotAfter,
+		DaysRemaining:   daysUntilExpiry,
+		APIID:           c.apiMetaData.APIID,
+		CertificateType: c.certificateType,
 	}
 
 	c.fireEvent(event.CertificateExpiringSoon, eventMeta)

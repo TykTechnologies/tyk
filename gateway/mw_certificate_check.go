@@ -15,10 +15,11 @@ import (
 // CertificateCheckMW is used if domain was not detected or multiple APIs bind on the same domain. In this case authentification check happens not on TLS side but on HTTP level using this middleware
 type CertificateCheckMW struct {
 	*BaseMiddleware
-	store                 storage.Handler // Redis storage for cooldowns
-	expiryCheckContext    context.Context
-	expiryCheckCancelFunc context.CancelFunc
-	expiryCheckBatcher    certcheck.BackgroundBatcher
+	store                      storage.Handler // Redis storage for cooldowns
+	expiryCheckContext         context.Context
+	expiryCheckCancelFunc      context.CancelFunc
+	expiryCheckBatcher         certcheck.BackgroundBatcher
+	upstreamExpiryCheckBatcher certcheck.BackgroundBatcher
 }
 
 func (m *CertificateCheckMW) Name() string {
@@ -80,6 +81,41 @@ func (m *CertificateCheckMW) Init() {
 
 	m.expiryCheckContext, m.expiryCheckCancelFunc = context.WithCancel(context.Background())
 	go m.expiryCheckBatcher.RunInBackground(m.expiryCheckContext)
+
+	// Initialize upstream certificate expiry check batcher
+	if m.upstreamExpiryCheckBatcher == nil && !m.Spec.UpstreamCertificatesDisabled {
+		log.
+			WithField("api_id", m.Spec.APIID).
+			WithField("api_name", m.Spec.Name).
+			WithField("mw", m.Name()).
+			Debug("Initializing upstream certificate expiry check batcher.")
+
+		apiData := certcheck.APIMetaData{
+			APIID:   m.Spec.APIID,
+			APIName: m.Spec.Name,
+		}
+
+		var err error
+		m.upstreamExpiryCheckBatcher, err = certcheck.NewCertificateExpiryCheckBatcherWithType(
+			m.logger,
+			apiData,
+			m.Gw.GetConfig().Security.CertificateExpiryMonitor,
+			m.store,
+			m.Spec.FireEvent,
+			"upstream",
+		)
+
+		if err != nil {
+			log.
+				WithField("api_id", m.Spec.APIID).
+				WithField("api_name", m.Spec.Name).
+				WithField("mw", m.Name()).
+				Error("Failed to initialize upstream certificate expiry check batcher.")
+		} else {
+			go m.upstreamExpiryCheckBatcher.RunInBackground(m.expiryCheckContext)
+			go m.CheckUpstreamCertificates() // Initial check
+		}
+	}
 }
 
 func (m *CertificateCheckMW) Unload() {
@@ -174,4 +210,50 @@ func (m *CertificateCheckMW) extractCertInfo(cert *tls.Certificate) (certInfo ce
 		NotAfter:    cert.Leaf.NotAfter,
 		UntilExpiry: time.Until(cert.Leaf.NotAfter),
 	}, true
+}
+
+// CheckUpstreamCertificates checks the expiry status of upstream certificates
+func (m *CertificateCheckMW) CheckUpstreamCertificates() {
+	if m.upstreamExpiryCheckBatcher == nil || m.Spec.UpstreamCertificatesDisabled {
+		return
+	}
+
+	// Collect certificate IDs from global and API-specific config
+	certIDs := []string{}
+	gwConfig := m.Gw.GetConfig()
+
+	// Add global upstream certificates (extract values from map)
+	for _, certID := range gwConfig.Security.Certificates.Upstream {
+		certIDs = append(certIDs, certID)
+	}
+
+	// Add API-specific upstream certificates (extract values from map)
+	if m.Spec.UpstreamCertificates != nil {
+		for _, certID := range m.Spec.UpstreamCertificates {
+			certIDs = append(certIDs, certID)
+		}
+	}
+
+	if len(certIDs) == 0 {
+		return
+	}
+
+	// Load and check certificates
+	certificates := m.Gw.CertificateManager.List(certIDs, certs.CertificatePrivate)
+	checked := 0
+	for _, cert := range certificates {
+		if certInfo, ok := m.extractCertInfo(cert); ok {
+			m.upstreamExpiryCheckBatcher.Add(certInfo)
+			checked++
+		}
+	}
+
+	if checked > 0 {
+		log.
+			WithField("api_id", m.Spec.APIID).
+			WithField("api_name", m.Spec.Name).
+			WithField("mw", m.Name()).
+			WithField("count", checked).
+			Debug("Checked upstream certificates for expiry")
+	}
 }

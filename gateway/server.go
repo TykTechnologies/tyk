@@ -126,6 +126,7 @@ type Gateway struct {
 	RPCListener          RPCStorageHandler
 	DashService          DashboardServiceSender
 	CertificateManager   certs.CertificateManager
+	GlobalCertMonitor    *GlobalCertificateMonitor
 	GlobalHostChecker    *HostCheckerManager
 	ConnectionWatcher    *httputil.ConnectionWatcher
 	HostCheckTicker      chan struct{}
@@ -530,6 +531,16 @@ func (gw *Gateway) setupGlobals() {
 			Gw:        gw,
 		}
 		gw.CertificateManager = certs.NewSlaveCertManager(storeCert, rpcStore, certificateSecret, log, !gw.GetConfig().Cloud)
+	}
+
+	// Initialize global certificate expiry monitor
+	certMonitor, err := NewGlobalCertificateMonitor(gw)
+	if err != nil {
+		mainLog.WithError(err).Error("Failed to initialize global certificate monitor")
+	} else {
+		gw.GlobalCertMonitor = certMonitor
+		gw.GlobalCertMonitor.Start()
+		mainLog.Info("Global certificate expiry monitoring initialized")
 	}
 
 	if gw.GetConfig().NewRelic.AppName != "" {
@@ -2247,6 +2258,12 @@ func (gw *Gateway) gracefulShutdown(ctx context.Context) error {
 
 	// Close all cache stores and other resources
 	mainLog.Info("Closing cache stores and other resources...")
+
+	// Stop global certificate monitor
+	if gw.GlobalCertMonitor != nil {
+		gw.GlobalCertMonitor.Stop()
+	}
+
 	gw.cacheClose()
 
 	// Check if there were any errors during shutdown

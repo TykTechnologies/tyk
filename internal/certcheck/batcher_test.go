@@ -577,6 +577,7 @@ func TestCertificateExpiryCheckBatcher(t *testing.T) {
 					ExpiredAt:       expiredSince,
 					DaysSinceExpiry: 2,
 					APIID:           "123abc",
+					CertificateType: "client",
 				}, actualEventMeta)
 			})
 
@@ -652,11 +653,12 @@ func TestCertificateExpiryCheckBatcher(t *testing.T) {
 					EventMetaDefault: model.EventMetaDefault{
 						Message: "Certificate test-cert is expiring in 2 days",
 					},
-					CertID:        "test-cert-id",
-					CertName:      "test-cert",
-					ExpiresAt:     expiry,
-					DaysRemaining: 2,
-					APIID:         "123abc",
+					CertID:          "test-cert-id",
+					CertName:        "test-cert",
+					ExpiresAt:       expiry,
+					DaysRemaining:   2,
+					APIID:           "123abc",
+					CertificateType: "client",
 				}, actualEventMeta)
 			})
 
@@ -732,11 +734,12 @@ func TestCertificateExpiryCheckBatcher(t *testing.T) {
 					EventMetaDefault: model.EventMetaDefault{
 						Message: "Certificate test-cert is expiring in 2 days",
 					},
-					CertID:        "test-cert-id",
-					CertName:      "test-cert",
-					ExpiresAt:     expiry,
-					DaysRemaining: 2,
-					APIID:         "123abc",
+					CertID:          "test-cert-id",
+					CertName:        "test-cert",
+					ExpiresAt:       expiry,
+					DaysRemaining:   2,
+					APIID:           "123abc",
+					CertificateType: "client",
 				}, actualEventMeta)
 			})
 		})

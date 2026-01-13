@@ -368,6 +368,15 @@ func (gw *Gateway) getTLSConfigForClient(baseConfig *tls.Config, listenPort int)
 		certNameMap[certData.Name] = &cert
 	}
 
+	// Check expiry for file-based server certificates
+	if gw.GlobalCertMonitor != nil && len(serverCerts) > 0 {
+		certsToCheck := make([]*tls.Certificate, len(serverCerts))
+		for i := range serverCerts {
+			certsToCheck[i] = &serverCerts[i]
+		}
+		gw.GlobalCertMonitor.CheckServerCertificates(certsToCheck)
+	}
+
 	if len(gwConfig.HttpServerOptions.SSLCertificates) > 0 {
 		var waitingRedisLog sync.Once
 		// ensure that we are connected to redis
@@ -382,10 +391,16 @@ func (gw *Gateway) getTLSConfigForClient(baseConfig *tls.Config, listenPort int)
 			time.Sleep(10 * time.Millisecond)
 		}
 	}
-	for _, cert := range gw.CertificateManager.List(gwConfig.HttpServerOptions.SSLCertificates, certs.CertificatePrivate) {
+	sslCertificates := gw.CertificateManager.List(gwConfig.HttpServerOptions.SSLCertificates, certs.CertificatePrivate)
+	for _, cert := range sslCertificates {
 		if cert != nil {
 			serverCerts = append(serverCerts, *cert)
 		}
+	}
+
+	// Check expiry for global server certificates from Certificate Store
+	if gw.GlobalCertMonitor != nil && len(sslCertificates) > 0 {
+		gw.GlobalCertMonitor.CheckServerCertificates(sslCertificates)
 	}
 
 	baseConfig.Certificates = serverCerts
@@ -423,6 +438,15 @@ func (gw *Gateway) getTLSConfigForClient(baseConfig *tls.Config, listenPort int)
 		if isControlAPI && gwConfig.Security.ControlAPIUseMutualTLS {
 			newConfig.ClientAuth = tls.RequireAndVerifyClientCert
 			newConfig.ClientCAs = gw.CertificateManager.CertPool(gwConfig.Security.Certificates.ControlAPI)
+
+			// Check expiry for Control API CA certificates
+			if gw.GlobalCertMonitor != nil && len(gwConfig.Security.Certificates.ControlAPI) > 0 {
+				controlCACerts := gw.CertificateManager.List(
+					gwConfig.Security.Certificates.ControlAPI,
+					certs.CertificatePublic,
+				)
+				gw.GlobalCertMonitor.CheckCACertificates(controlCACerts)
+			}
 
 			tlsConfigCache.Set(hello.ServerName, newConfig, cache.DefaultExpiration)
 			return newConfig, nil
@@ -462,10 +486,16 @@ func (gw *Gateway) getTLSConfigForClient(baseConfig *tls.Config, listenPort int)
 				if (!directMTLSDomainMatch && spec.Domain == "") || spec.Domain == hello.ServerName {
 					certIDs := append(spec.ClientCertificates, gwConfig.Security.Certificates.API...)
 
-					for _, cert := range gw.CertificateManager.List(certIDs, certs.CertificatePublic) {
+					clientCACerts := gw.CertificateManager.List(certIDs, certs.CertificatePublic)
+					for _, cert := range clientCACerts {
 						if cert != nil && !crypto.IsPublicKey(cert) {
 							crypto.AddCACertificatesFromChainToPool(newConfig.ClientCAs, cert)
 						}
+					}
+
+					// Check expiry for client verification CA certificates
+					if gw.GlobalCertMonitor != nil && len(clientCACerts) > 0 {
+						gw.GlobalCertMonitor.CheckCACertificates(clientCACerts)
 					}
 				}
 			case spec.Auth.UseCertificate, spec.AuthConfigs[apidef.AuthTokenType].UseCertificate:
@@ -485,7 +515,8 @@ func (gw *Gateway) getTLSConfigForClient(baseConfig *tls.Config, listenPort int)
 
 			// Dynamically add API specific certificates
 			if len(spec.Certificates) != 0 && !spec.DomainDisabled {
-				for _, cert := range gw.CertificateManager.List(spec.Certificates, certs.CertificatePrivate) {
+				apiSpecificCerts := gw.CertificateManager.List(spec.Certificates, certs.CertificatePrivate)
+				for _, cert := range apiSpecificCerts {
 					if cert == nil {
 						continue
 					}
@@ -497,6 +528,11 @@ func (gw *Gateway) getTLSConfigForClient(baseConfig *tls.Config, listenPort int)
 					for _, san := range cert.Leaf.DNSNames {
 						newConfig.NameToCertificate[san] = cert
 					}
+				}
+
+				// Check expiry for API-specific server certificates
+				if gw.GlobalCertMonitor != nil && len(apiSpecificCerts) > 0 {
+					gw.GlobalCertMonitor.CheckServerCertificates(apiSpecificCerts)
 				}
 			}
 		}
