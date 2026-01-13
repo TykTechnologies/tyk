@@ -39,10 +39,11 @@ import (
 )
 
 const (
-	internalTLSErr          = "tls: unrecognized name"
-	badcertErr              = "tls: bad certificate"
-	certNotMatchErr         = "Client TLS certificate is required"
-	unknownCertAuthorityErr = "unknown certificate authority"
+	internalTLSErr               = "tls: unrecognized name"
+	badcertErr                   = "tls: handshake failure" // When ClientCA is announced
+	badcertErrSkipClientCA       = "tls: bad certificate"    // When ClientCA announcement is skipped (Go 1.25+)
+	certNotMatchErr              = "Client TLS certificate is required"
+	unknownCertAuthorityErr      = "unknown certificate authority"
 )
 
 func TestGatewayTLS(t *testing.T) {
@@ -380,7 +381,7 @@ func testAPIMutualTLSHelper(t *testing.T, skipCAAnnounce bool) {
 
 	expectedCertErr := unknownCertAuthorityErr
 	if skipCAAnnounce {
-		expectedCertErr = badcertErr
+		expectedCertErr = badcertErrSkipClientCA
 	}
 
 	conf := func(globalConf *config.Config) {
@@ -1869,7 +1870,7 @@ func TestCipherSuites(t *testing.T) {
 			MaxVersion:         tls.VersionTLS12,
 		}}}
 
-		_, _ = ts.Run(t, test.TestCase{Client: client, Path: "/", ErrorMatch: "tls: bad certificate"})
+		_, _ = ts.Run(t, test.TestCase{Client: client, Path: "/", ErrorMatch: badcertErr})
 	})
 }
 
