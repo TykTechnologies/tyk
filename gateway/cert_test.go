@@ -466,7 +466,7 @@ func testAPIMutualTLSHelper(t *testing.T, skipCAAnnounce bool) {
 			})
 
 			_, _ = ts.Run(t, test.TestCase{
-				ErrorMatch: badcertErr,
+				ErrorMatch: expectedCertErr,
 				Client:     client,
 				Domain:     "localhost",
 			})
@@ -634,13 +634,13 @@ func testAPIMutualTLSHelper(t *testing.T, skipCAAnnounce bool) {
 						Path:       "/with_mutual",
 						Client:     clientWithoutCert,
 						Domain:     domain,
-						ErrorMatch: badcertErr,
+						ErrorMatch: expectedCertErr,
 					},
 					{
 						Path:       "/with_mutual_2",
 						Client:     clientWithoutCert,
 						Domain:     domain,
-						ErrorMatch: badcertErr,
+						ErrorMatch: expectedCertErr,
 					},
 				}...)
 			})
@@ -750,7 +750,7 @@ func testAPIMutualTLSHelper(t *testing.T, skipCAAnnounce bool) {
 						Path:       "/with_mutual",
 						Client:     clientWithoutCert,
 						Domain:     domain,
-						ErrorMatch: badcertErr,
+						ErrorMatch: expectedCertErr,
 					})
 				}
 
@@ -843,7 +843,7 @@ func testAPIMutualTLSHelper(t *testing.T, skipCAAnnounce bool) {
 					_, _ = ts.Run(t, test.TestCase{
 						Path:       "/with_mutual",
 						Client:     clientWithoutCert,
-						ErrorMatch: badcertErr,
+						ErrorMatch: expectedCertErr,
 					})
 				}
 
