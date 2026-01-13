@@ -113,7 +113,26 @@ func (m *GlobalCertificateMonitor) Stop() {
 }
 
 // CheckServerCertificates checks the expiry status of server certificates
-func (m *GlobalCertificateMonitor) CheckServerCertificates(certificates []*tls.Certificate) {
+func (m *GlobalCertificateMonitor) CheckServerCertificates(certificates []tls.Certificate) {
+	if m.serverCertBatcher == nil {
+		return
+	}
+
+	checked := 0
+	for i := range certificates {
+		if certInfo, ok := m.extractCertInfo(&certificates[i], "server"); ok {
+			m.serverCertBatcher.Add(certInfo)
+			checked++
+		}
+	}
+
+	if checked > 0 {
+		m.logger.WithField("count", checked).Debug("Checked server certificates for expiry")
+	}
+}
+
+// CheckServerCertificatesPtr checks the expiry status of server certificates (pointer slice variant)
+func (m *GlobalCertificateMonitor) CheckServerCertificatesPtr(certificates []*tls.Certificate) {
 	if m.serverCertBatcher == nil {
 		return
 	}
