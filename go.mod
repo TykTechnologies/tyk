@@ -95,7 +95,7 @@ require (
 	github.com/IBM/sarama v1.43.3
 	github.com/Jeffail/gabs/v2 v2.7.0
 	github.com/TykTechnologies/graphql-go-tools/v2 v2.0.0-20240509085643-e95cdc317e1d
-	github.com/TykTechnologies/kin-openapi v0.91.0
+	github.com/TykTechnologies/kin-openapi v0.92.1-0.20260113084950-4b6d5f63eee4
 	github.com/TykTechnologies/opentelemetry v0.0.22
 	github.com/alecthomas/kingpin/v2 v2.4.0
 	github.com/go-redis/redismock/v9 v9.2.0
@@ -329,5 +329,3 @@ require (
 )
 
 replace go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.54.0 => go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.49.0
-
-replace github.com/getkin/kin-openapi => github.com/TykTechnologies/kin-openapi v0.92.1-0.20251204121505-ff57f1dbe06b
