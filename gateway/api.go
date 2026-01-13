@@ -78,6 +78,9 @@ import (
 
 const (
 	oAuthClientTokensKeyPattern = "oauth-data.*oauth-client-tokens.*"
+	// KeyListingWorkerCountCap 350 is based on the average of 10000 keys with minor contingency
+	KeyListingWorkerCountCap      = 350
+	KeyListingWorkerEntriesPerKey = 100
 )
 
 var (
@@ -740,12 +743,8 @@ func (gw *Gateway) handleGetAllKeys(c context.Context, filter string, apiID stri
 func (gw *Gateway) filterKeysByAPIID(c context.Context, keys []string, filter, apiID string, hashed bool) ([]string, error) {
 	numKeys := len(keys)
 	// the values for keyListingWorkerCount and keyListingBufferSize were averaged through profiling and benchmarking
-	keyListingWorkerCount := int(4 + math.Sqrt(float64(numKeys)))
-	if keyListingWorkerCount > 350 {
-		// the number 350 is based on the average of 10000 keys with minor contingency
-		keyListingWorkerCount = 350
-	}
-	keyListingBufferSize := keyListingWorkerCount * 100
+	keyListingWorkerCount := min(int(4+math.Sqrt(float64(numKeys))), KeyListingWorkerCountCap)
+	keyListingBufferSize := keyListingWorkerCount * KeyListingWorkerEntriesPerKey
 
 	jobs := make(chan string, keyListingBufferSize)
 	validSessions := make([]string, 0)
