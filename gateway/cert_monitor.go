@@ -117,28 +117,7 @@ func (m *GlobalCertificateMonitor) Stop() {
 }
 
 // CheckServerCertificates checks the expiry status of server certificates
-func (m *GlobalCertificateMonitor) CheckServerCertificates(certificates []tls.Certificate) {
-	if m.serverCertBatcher == nil {
-		return
-	}
-
-	checked := 0
-	for i := range certificates {
-		if certInfo, ok := m.extractCertInfo(&certificates[i], "server"); ok {
-			if err := m.serverCertBatcher.Add(certInfo); err != nil {
-				m.logger.WithError(err).Warning("Failed to add server certificate to expiry check batch")
-			}
-			checked++
-		}
-	}
-
-	if checked > 0 {
-		m.logger.WithField("count", checked).Debug("Checked server certificates for expiry")
-	}
-}
-
-// CheckServerCertificatesPtr checks the expiry status of server certificates (pointer slice variant)
-func (m *GlobalCertificateMonitor) CheckServerCertificatesPtr(certificates []*tls.Certificate) {
+func (m *GlobalCertificateMonitor) CheckServerCertificates(certificates []*tls.Certificate) {
 	if m.serverCertBatcher == nil {
 		return
 	}
@@ -218,7 +197,7 @@ func (m *GlobalCertificateMonitor) CheckAPICertificates() {
 		if len(spec.Certificates) > 0 && !spec.DomainDisabled {
 			apiServerCerts := m.gw.CertificateManager.List(spec.Certificates, certs.CertificatePrivate)
 			if len(apiServerCerts) > 0 {
-				m.CheckServerCertificatesPtr(apiServerCerts)
+				m.CheckServerCertificates(apiServerCerts)
 			}
 		}
 	}

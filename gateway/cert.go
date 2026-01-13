@@ -370,7 +370,12 @@ func (gw *Gateway) getTLSConfigForClient(baseConfig *tls.Config, listenPort int)
 
 	// Check expiry for file-based server certificates
 	if gw.GlobalCertMonitor != nil && len(serverCerts) > 0 {
-		gw.GlobalCertMonitor.CheckServerCertificates(serverCerts)
+		// Convert to pointer slice for monitoring
+		certPtrs := make([]*tls.Certificate, len(serverCerts))
+		for i := range serverCerts {
+			certPtrs[i] = &serverCerts[i]
+		}
+		gw.GlobalCertMonitor.CheckServerCertificates(certPtrs)
 	}
 
 	if len(gwConfig.HttpServerOptions.SSLCertificates) > 0 {
@@ -396,7 +401,7 @@ func (gw *Gateway) getTLSConfigForClient(baseConfig *tls.Config, listenPort int)
 
 	// Check expiry for global server certificates from Certificate Store
 	if gw.GlobalCertMonitor != nil && len(sslCertificates) > 0 {
-		gw.GlobalCertMonitor.CheckServerCertificatesPtr(sslCertificates)
+		gw.GlobalCertMonitor.CheckServerCertificates(sslCertificates)
 	}
 
 	baseConfig.Certificates = serverCerts
