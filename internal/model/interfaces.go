@@ -77,6 +77,9 @@ type PolicyID interface {
 }
 
 func PolicyIdFromPolicy(pol user.Policy) PolicyID {
+	if pol.ID != "" {
+		return NewAnyPolicyId(pol.OrgID, pol.ID)
+	}
 	return PolicyDbId(pol.MID)
 }
 

@@ -4,7 +4,6 @@ import (
 	"embed"
 	"encoding/json"
 	"fmt"
-	"maps"
 	"slices"
 	"sort"
 	"testing"
@@ -122,7 +121,7 @@ func TestApplyRateLimits_PolicyLimits(t *testing.T) {
 }
 
 func TestApplyRateLimits_FromCustomPolicies(t *testing.T) {
-	svc := &policy.Service{}
+	svc := policy.New(nil, nil, logrus.StandardLogger())
 
 	session := &user.SessionState{}
 	session.SetCustomPolicies([]user.Policy{
@@ -150,7 +149,7 @@ func TestApplyRateLimits_FromCustomPolicies(t *testing.T) {
 }
 
 func TestApplyACL_FromCustomPolicies(t *testing.T) {
-	svc := &policy.Service{}
+	svc := policy.New(nil, nil, logrus.StandardLogger())
 
 	pol1 := user.Policy{
 		ID:         "pol1",
@@ -244,9 +243,7 @@ func testPrepareApplyPolicies(tb testing.TB) (*policy.Service, []testApplyPolici
 	err = json.Unmarshal(f, &repoPols)
 	assert.NoError(tb, err)
 
-	//store := policy.NewStoreMap(repoPols)
-	store := model.NewPolicies()
-	store.Load(slices.Collect(maps.Values(policies))...)
+	store := policy.NewStoreMap(repoPols)
 	orgID := ""
 	service := policy.New(&orgID, store, logrus.StandardLogger())
 
