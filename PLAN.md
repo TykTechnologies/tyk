@@ -99,6 +99,15 @@ Extend the existing certificate expiry monitoring system (currently limited to c
 - ✅ Performance optimized - no overhead on TLS handshake hot path
 - ✅ Comprehensive testing and documentation
 
+**Dashboard Integration:**
+- ✅ **No Dashboard changes required** - Events and logs are sufficient
+- ✅ Events trigger automatically via `FireSystemEvent()` and `spec.FireEvent()`
+- ✅ Application logs generated for all certificate expiry events
+- ✅ Dashboard receives events through existing event pipeline
+- ✅ Event metadata includes `CertificateType` field for filtering/grouping
+
+This implementation focuses on **Gateway-side event generation and logging**. The Dashboard will automatically receive and process these events through the existing event pipeline without requiring any code changes.
+
 ## 🎉 Implementation Summary
 
 **All phases completed successfully: 2026-01-13 to 2026-01-14**
@@ -251,6 +260,26 @@ Certificate expiry monitoring is **fully functional** but **only for client→ga
 3. Events for already-expired certificates → `CertificateExpired`
 4. Application log entries in same format as existing events
 5. Events for certificates in ANY transaction flow (server, client, CA, upstream)
+
+### Scope Clarification: Dashboard Integration
+
+**Important:** This implementation focuses exclusively on **Gateway-side event generation and logging**.
+
+**No Dashboard changes required because:**
+1. ✅ Events are automatically triggered via existing event pipeline
+2. ✅ Application logs are generated for all certificate expiry scenarios
+3. ✅ Event metadata includes `CertificateType` field for Dashboard filtering
+4. ✅ Dashboard receives events through `FireSystemEvent()` (global certs) and `spec.FireEvent()` (API-specific certs)
+5. ✅ Existing event handling infrastructure supports new certificate types without code changes
+
+**Event Flow:**
+```
+Gateway → FireSystemEvent()/spec.FireEvent() → Event Pipeline → Dashboard
+                                                     ↓
+                                              Application Logs
+```
+
+The Dashboard will automatically receive and can process these events without requiring any modifications to Dashboard code.
 
 ## Research Findings
 
