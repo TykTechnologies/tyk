@@ -73,20 +73,12 @@ type (
 type PolicyID interface {
 	fmt.Stringer
 	IsIdentifierOf(user.Policy) bool
-	markerAnyPolicyId()
+	markerPolicyId()
 }
 
-func PolicyIdFromPolicy(pol user.Policy) PolicyID {
-	if pol.ID != "" {
-		return NewScopedPolicyId(pol.OrgID, pol.ID)
-	}
+type BasePolicyId struct{}
 
-	if pol.MID.Valid() {
-		return NewScopedPolicyId(pol.OrgID, pol.ID)
-	}
-
-	return InvalidPolicyId{}
-}
+func (i BasePolicyId) markerPolicyId() {}
 
 var (
 	_ PolicyID = NonScopedPolicyId("")
@@ -103,6 +95,7 @@ func NewScopedPolicyId(orgId, idOrCustomId string) ScopedPolicyId {
 
 // ScopedPolicyId represents any policy identifier (database and custom)
 type ScopedPolicyId struct {
+	BasePolicyId
 	orgId string
 	id    string
 }
@@ -127,33 +120,28 @@ func (c ScopedPolicyId) customKey() customKey {
 	return customKey(c.id)
 }
 
-func (c ScopedPolicyId) markerAnyPolicyId() {}
+func (c ScopedPolicyId) markerPolicyId() {}
 
-// NonScopedPolicyId database policy identifier
 type NonScopedPolicyId string
 
-func (c NonScopedPolicyId) objectID() persistentmodel.ObjectID {
-	return persistentmodel.ObjectID(c)
-}
-
 func (c NonScopedPolicyId) IsIdentifierOf(pol user.Policy) bool {
-	return c.objectID() == pol.MID
+	return persistentmodel.ObjectID(c) == pol.MID || string(c) == pol.ID
 }
 
 func (c NonScopedPolicyId) String() string {
-	return string(c)
+	return persistentmodel.ObjectID(c).Hex()
 }
 
-func (c NonScopedPolicyId) markerAnyPolicyId() {}
+func (c NonScopedPolicyId) markerPolicyId() {}
 
-type InvalidPolicyId struct{}
+type InvalidPolicyId struct {
+	BasePolicyId
+}
 
 func (i InvalidPolicyId) String() string {
-	return "invalid"
+	return ""
 }
 
 func (i InvalidPolicyId) IsIdentifierOf(_ user.Policy) bool {
 	return false
 }
-
-func (i InvalidPolicyId) markerAnyPolicyId() {}

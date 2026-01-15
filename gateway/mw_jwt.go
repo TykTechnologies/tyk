@@ -1413,8 +1413,6 @@ func ctxSetJWTContextVars(s *APISpec, r *http.Request, token *jwt.Token) {
 }
 
 func (gw *Gateway) generateSessionFromPolicy(policyID, orgID string, enforceOrg bool) (user.SessionState, error) {
-
-	/// to może być zmienione
 	policy, ok := gw.policies.PolicyByID(model.NewScopedPolicyId(orgID, policyID))
 	session := user.SessionState{}
 

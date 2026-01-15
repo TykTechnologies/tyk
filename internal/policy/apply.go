@@ -97,20 +97,18 @@ func (t *Service) Apply(session *user.SessionState) error {
 	}
 
 	var (
-		err       error
 		policyIDs []string
 	)
 
 	storage := t.storage
 
-	customPolicies, err := session.GetCustomPolicies()
-	if err != nil {
-		policyIDs = session.PolicyIDs()
-	} else {
+	if customPolicies, err := session.GetCustomPolicies(); err == nil {
 		storage = NewStore(customPolicies)
 		policyIDs = lo.Map(storage.PolicyIDs(), func(policyID model.PolicyID, _ int) string {
 			return policyID.String()
 		})
+	} else {
+		policyIDs = session.PolicyIDs()
 	}
 
 	// Only the status of policies applied to a key should determine the validity of the key.
@@ -122,7 +120,13 @@ func (t *Service) Apply(session *user.SessionState) error {
 	}
 
 	for _, polID := range policyIDs {
-		policy, ok := storage.PolicyByID(model.NewScopedPolicyId(session.OrgID, polID))
+		var id model.PolicyID = model.NonScopedPolicyId(polID)
+
+		if t.orgID != nil {
+			id = model.NewScopedPolicyId(*t.orgID, polID)
+		}
+
+		policy, ok := storage.PolicyByID(id)
 		if !ok {
 			err := fmt.Errorf("policy not found: %q", polID)
 			t.Logger().Error(err)
