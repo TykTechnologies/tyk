@@ -114,7 +114,6 @@ func (m *CertificateCheckMW) Init() {
 				Error("Failed to initialize upstream certificate expiry check batcher.")
 		} else {
 			go m.upstreamExpiryCheckBatcher.RunInBackground(m.expiryCheckContext)
-			go m.periodicUpstreamCertificateCheck() // Start periodic checking
 		}
 	}
 }
@@ -155,6 +154,9 @@ func (m *CertificateCheckMW) ProcessRequest(w http.ResponseWriter, r *http.Reque
 
 		m.batchCertificatesExpirationCheck(apiCerts)
 	}
+
+	// Check upstream certificates during request processing
+	m.CheckUpstreamCertificates()
 
 	return nil, http.StatusOK
 }
@@ -263,48 +265,5 @@ func (m *CertificateCheckMW) CheckUpstreamCertificates() {
 			WithField("mw", m.Name()).
 			WithField("count", checked).
 			Debug("Checked upstream certificates for expiry")
-	}
-}
-
-// periodicUpstreamCertificateCheck starts periodic checking of upstream certificates
-func (m *CertificateCheckMW) periodicUpstreamCertificateCheck() {
-	// Check immediately on startup
-	m.CheckUpstreamCertificates()
-
-	// Use check cooldown interval for periodic checking
-	intervalSeconds := m.Gw.GetConfig().Security.CertificateExpiryMonitor.CheckCooldownSeconds
-
-	// If 0, disable periodic checking
-	if intervalSeconds <= 0 {
-		log.
-			WithField("api_id", m.Spec.APIID).
-			WithField("api_name", m.Spec.Name).
-			WithField("mw", m.Name()).
-			Info("Periodic upstream certificate checking disabled (check_cooldown_seconds = 0)")
-		return
-	}
-
-	log.
-		WithField("api_id", m.Spec.APIID).
-		WithField("api_name", m.Spec.Name).
-		WithField("mw", m.Name()).
-		WithField("interval_seconds", intervalSeconds).
-		Info("Starting periodic upstream certificate checking")
-
-	ticker := time.NewTicker(time.Duration(intervalSeconds) * time.Second)
-	defer ticker.Stop()
-
-	for {
-		select {
-		case <-m.expiryCheckContext.Done():
-			log.
-				WithField("api_id", m.Spec.APIID).
-				WithField("api_name", m.Spec.Name).
-				WithField("mw", m.Name()).
-				Debug("Periodic upstream certificate checking stopped")
-			return
-		case <-ticker.C:
-			m.CheckUpstreamCertificates()
-		}
 	}
 }
