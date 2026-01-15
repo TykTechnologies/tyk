@@ -39,6 +39,12 @@ var (
 )
 
 //go:generate mockgen -destination=./mock/mock.go -package=mock . CertificateManager
+
+// CertRegistry defines the interface for certificate requirement tracking
+type CertRegistry interface {
+	Required(certID string) bool
+}
+
 type CertificateManager interface {
 	List(certIDs []string, mode CertificateType) (out []*tls.Certificate)
 	ListPublicKeys(keyIDs []string) (out []string)
@@ -49,6 +55,7 @@ type CertificateManager interface {
 	Delete(certID string, orgID string)
 	CertPool(certIDs []string) *x509.CertPool
 	FlushCache()
+	SetRegistry(registry CertRegistry)
 }
 
 type certificateManager struct {
@@ -57,6 +64,8 @@ type certificateManager struct {
 	cache           cache.Repository
 	secret          string
 	migrateCertList bool
+	registry        CertRegistry
+	selectiveSync   bool
 }
 
 func NewCertificateManager(storage storage.Handler, secret string, logger *logrus.Logger, migrateCertList bool) *certificateManager {
@@ -101,7 +110,7 @@ func NewSlaveCertManager(localStorage, rpcStorage storage.Handler, secret string
 		return err
 	}
 
-	mdcbStorage := storage.NewMdcbStorage(localStorage, rpcStorage, log, callbackOnPullCertFromRPC)
+	mdcbStorage := storage.NewMdcbStorage(localStorage, rpcStorage, log, callbackOnPullCertFromRPC, nil, nil)
 	cm.storage = mdcbStorage
 	return cm
 }
@@ -413,7 +422,7 @@ func (c *certificateManager) List(certIDs []string, mode CertificateType) (out [
 			continue
 		}
 
-		val, err := c.storage.GetKey("raw-" + id)
+		val, err := c.GetRaw(id)
 		// fallback to file
 		if err != nil {
 			// Try read from file
@@ -555,7 +564,21 @@ func (c *certificateManager) ListAllIds(prefix string) (out []string) {
 }
 
 func (c *certificateManager) GetRaw(certID string) (string, error) {
+	// Check registry before accessing storage when selective sync is enabled
+	if c.selectiveSync && c.registry != nil && !c.registry.Required(certID) {
+		c.logger.WithField("cert_id", certID).
+			Info("BLOCKED: certificate not required by loaded APIs")
+		return "", errors.New("certificate not required by loaded APIs")
+	}
 	return c.storage.GetKey("raw-" + certID)
+}
+
+// SetRegistry configures the certificate registry for selective sync
+func (c *certificateManager) SetRegistry(registry CertRegistry) {
+	c.logger.Info("Setting certificate registry for selective sync")
+	c.registry = registry
+	c.selectiveSync = true
+	c.logger.WithField("selective_sync", c.selectiveSync).Info("Selective sync configured in CertificateManager")
 }
 
 func (c *certificateManager) Add(certData []byte, orgID string) (string, error) {

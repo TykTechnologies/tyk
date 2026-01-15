@@ -4,14 +4,23 @@ import (
 	"errors"
 	"strings"
 
+	"github.com/TykTechnologies/tyk/config"
 	"github.com/sirupsen/logrus"
 )
+
+// certUsageRegistry tracks which certificates are used by which APIs.
+type certUsageRegistry interface {
+	Required(certID string) bool
+	APIs(certID string) []string
+}
 
 type MdcbStorage struct {
 	local         Handler
 	rpc           Handler
 	logger        *logrus.Entry
 	OnRPCCertPull func(key string, val string) error
+	certUsage     certUsageRegistry
+	config        *config.Config
 }
 
 const (
@@ -21,12 +30,14 @@ const (
 	resourceKey         = "Key"
 )
 
-func NewMdcbStorage(local, rpc Handler, log *logrus.Entry, OnRPCCertPull func(key string, val string) error) *MdcbStorage {
+func NewMdcbStorage(local, rpc Handler, log *logrus.Entry, OnRPCCertPull func(key string, val string) error, certUsage certUsageRegistry, cfg *config.Config) *MdcbStorage {
 	return &MdcbStorage{
 		local:         local,
 		rpc:           rpc,
 		logger:        log,
 		OnRPCCertPull: OnRPCCertPull,
+		certUsage:     certUsage,
+		config:        cfg,
 	}
 }
 
@@ -37,6 +48,27 @@ func (m MdcbStorage) GetKey(key string) (string, error) {
 			return val, nil
 		}
 		m.logger.Debugf("Key not present locally, pulling from rpc layer: %v", err)
+	}
+
+	// Only filter in RPC mode when feature enabled
+	resourceType := getResourceType(key)
+	if resourceType == resourceCertificate &&
+		m.config != nil &&
+		m.config.SlaveOptions.UseRPC &&
+		m.config.SlaveOptions.SyncUsedCertsOnly &&
+		m.certUsage != nil {
+
+		certID := extractCertID(key)
+		if certID == "" {
+			m.logger.Debugf("Unable to extract cert ID from key: %v", key)
+			return m.getFromRPCAndCache(key)
+		}
+
+		if !m.certUsage.Required(certID) {
+			m.logger.WithField("cert_id", certID).
+				Debug("skipping certificate pull - not used by loaded APIs")
+			return "", errors.New("certificate not required")
+		}
 	}
 
 	return m.getFromRPCAndCache(key)
@@ -53,6 +85,18 @@ func getResourceType(key string) string {
 	default:
 		return resourceKey
 	}
+}
+
+// extractCertID extracts the certificate ID from a key in the format "raw-{orgID}{certID}"
+func extractCertID(key string) string {
+	// Remove "raw-" prefix
+	if !strings.HasPrefix(key, "raw-") {
+		return ""
+	}
+	// The key format is "raw-{orgID}{certID}" but we can't reliably separate them
+	// So we return the entire string after "raw-" as the cert ID
+	// The certRegistry should be registered with the same format
+	return strings.TrimPrefix(key, "raw-")
 }
 
 // GetMultiKey gets multiple keys from the MDCB layer

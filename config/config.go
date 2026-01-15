@@ -431,6 +431,15 @@ type SlaveOptionsConfig struct {
 
 	// DNSMonitor configures background DNS monitoring for proactive detection of MDCB DNS changes
 	DNSMonitor DNSMonitorConfig `json:"dns_monitor"`
+
+	// Set to true to sync only certificates used by loaded APIs.
+	// Only applies when use_rpc is true.
+	// Reduces memory usage and log noise in segmented deployments.
+	SyncUsedCertsOnly bool `json:"sync_used_certs_only"`
+
+	// Set to true to remove unused certificates on API reload.
+	// Only applies when use_rpc and sync_used_certs_only are both true.
+	CleanupCerts bool `json:"cleanup_certs"`
 }
 
 type LocalSessionCacheConf struct {

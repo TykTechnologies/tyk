@@ -42,7 +42,7 @@ func setupTest(t *testing.T) *testSetup {
 	ctrlRemote := gomock.NewController(t)
 	remote := mock.NewMockHandler(ctrlRemote)
 
-	mdcbStorage := NewMdcbStorage(local, remote, log, nil)
+	mdcbStorage := NewMdcbStorage(local, remote, log, nil, nil, nil)
 
 	cleanup := func() {
 		ctrlLocal.Finish()
@@ -100,7 +100,7 @@ func TestMdcbStorage_GetMultiKey(t *testing.T) {
 	logger.Out = io.Discard
 	log := logger.WithContext(context.Background())
 
-	mdcb := NewMdcbStorage(localHandler, rpcHandler, log, nil)
+	mdcb := NewMdcbStorage(localHandler, rpcHandler, log, nil, nil, nil)
 
 	testsCases := []struct {
 		name     string

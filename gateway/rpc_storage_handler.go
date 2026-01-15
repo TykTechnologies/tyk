@@ -1157,7 +1157,26 @@ func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string, orgId string) 
 	}
 
 	for _, certId := range CertificatesToAdd {
-		log.Debugf("Adding certificate: %v", certId)
+		// Only filter if feature enabled in RPC mode (backward compatible)
+		if r.Gw.GetConfig().SlaveOptions.UseRPC &&
+			r.Gw.GetConfig().SlaveOptions.SyncUsedCertsOnly {
+			if r.Gw.certRegistry != nil && !r.Gw.certRegistry.Required(certId) {
+				log.WithField("cert_id", certId).
+					Debug("skipping certificate - not used by loaded APIs")
+				continue
+			}
+
+			if r.Gw.certRegistry != nil {
+				apis := r.Gw.certRegistry.APIs(certId)
+				log.WithFields(logrus.Fields{
+					"cert_id": certId,
+					"apis":    apis,
+				}).Info("syncing required certificate")
+			}
+		} else {
+			log.Debugf("Adding certificate: %v", certId)
+		}
+
 		//If we are in a slave node, MDCB Storage GetRaw should get the certificate from MDCB and cache it locally
 		content, err := r.Gw.CertificateManager.GetRaw(certId)
 		if content == "" && err != nil {

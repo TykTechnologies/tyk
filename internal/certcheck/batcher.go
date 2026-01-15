@@ -17,6 +17,12 @@ import (
 	"github.com/TykTechnologies/tyk/storage"
 )
 
+// certUsageRegistry tracks which certificates are used by which APIs.
+type certUsageRegistry interface {
+	Required(certID string) bool
+	APIs(certID string) []string
+}
+
 var (
 	// ErrFallbackCooldownCheckFailed is returned when the fallback cache is used, and the check cooldown cannot be checked.
 	ErrFallbackCooldownCheckFailed = errors.New("failed to check cooldown in fallback cache")
@@ -95,10 +101,12 @@ type CertificateExpiryCheckBatcher struct {
 	fallbackCooldownCache CooldownCache
 	flushTicker           *time.Ticker
 	fireEvent             FireEventFunc
+	certUsage certUsageRegistry    // can be nil in non-RPC mode
+	gwConfig   *config.Config // can be nil
 }
 
 // NewCertificateExpiryCheckBatcher creates a new CertificateExpiryCheckBatcher.
-func NewCertificateExpiryCheckBatcher(logger *logrus.Entry, apiMetaData APIMetaData, cfg config.CertificateExpiryMonitorConfig, fallbackStorage storage.Handler, eventFunc FireEventFunc) (*CertificateExpiryCheckBatcher, error) {
+func NewCertificateExpiryCheckBatcher(logger *logrus.Entry, apiMetaData APIMetaData, cfg config.CertificateExpiryMonitorConfig, fallbackStorage storage.Handler, eventFunc FireEventFunc, certUsage certUsageRegistry, gwConfig *config.Config) (*CertificateExpiryCheckBatcher, error) {
 	inMemoryCache, err := NewInMemoryCooldownCache()
 	if err != nil {
 		return nil, err
@@ -122,6 +130,8 @@ func NewCertificateExpiryCheckBatcher(logger *logrus.Entry, apiMetaData APIMetaD
 		fallbackCooldownCache: fallbackCache,
 		flushTicker:           time.NewTicker(30 * time.Second),
 		fireEvent:             eventFunc,
+		certUsage:            certUsage,
+		gwConfig:              gwConfig,
 	}, nil
 }
 
@@ -140,11 +150,22 @@ func (c *CertificateExpiryCheckBatcher) RunInBackground(ctx context.Context) {
 
 		batchCopy := c.batch.CopyAndClear()
 		for _, certInfo := range batchCopy {
+			// ONLY filter in RPC mode when feature enabled
+			if c.gwConfig != nil &&
+				c.gwConfig.SlaveOptions.UseRPC &&
+				c.gwConfig.SlaveOptions.SyncUsedCertsOnly &&
+				c.certUsage != nil {
+
+				if !c.certUsage.Required(certInfo.ID) {
+					continue
+				}
+			}
+
 			existsInLocalCache := c.checkCooldownExistsInLocalCache(certInfo)
 			checkCooldownIsActive, err := c.isCheckCooldownActive(certInfo, existsInLocalCache)
 			if err != nil {
 				c.logger.
-					WithField("certID", certInfo.ID[:8]).
+					WithField("certID", certInfo.ID).
 					WithField("cooldown", "check").
 					WithError(err).
 					Error("Failed to check cooldown - skipping certificate")
@@ -183,7 +204,7 @@ func (c *CertificateExpiryCheckBatcher) checkCooldownExistsInLocalCache(certInfo
 	exists, err = c.inMemoryCooldownCache.HasCheckCooldown(certInfo.ID)
 	if err != nil {
 		c.logger.WithError(err).
-			WithField("certID", certInfo.ID[:8]).
+			WithField("certID", certInfo.ID).
 			WithField("cooldown", "check").
 			Error("Failed to check if check cooldown exists in in-memory cache")
 	}
@@ -200,7 +221,7 @@ func (c *CertificateExpiryCheckBatcher) isCheckCooldownActive(certInfo CertInfo,
 			fallback = true
 			c.logger.
 				WithError(err).
-				WithField("certID", certInfo.ID[:8]).
+				WithField("certID", certInfo.ID).
 				WithField("cooldown", "check").
 				Error("Failed to check if check cooldown is active in in-memory cache")
 		}
@@ -212,7 +233,7 @@ func (c *CertificateExpiryCheckBatcher) isCheckCooldownActive(certInfo CertInfo,
 		if err != nil {
 			c.logger.
 				WithError(err).
-				WithField("certID", certInfo.ID[:8]).
+				WithField("certID", certInfo.ID).
 				WithField("cooldown", "check").
 				Error("Failed to check if check cooldown is active in fallback cache")
 			return false, ErrFallbackCooldownCheckFailed
@@ -226,14 +247,14 @@ func (c *CertificateExpiryCheckBatcher) setCheckCooldown(certInfo CertInfo) {
 	err := c.inMemoryCooldownCache.SetCheckCooldown(certInfo.ID, int64(c.config.CheckCooldownSeconds))
 	if err != nil {
 		c.logger.WithError(err).
-			WithField("certID", certInfo.ID[:8]).
+			WithField("certID", certInfo.ID).
 			WithField("cooldown", "check").
 			Error("Failed to set check cooldown for certificate in in-memory cache")
 	}
 	err = c.fallbackCooldownCache.SetCheckCooldown(certInfo.ID, int64(c.config.CheckCooldownSeconds))
 	if err != nil {
 		c.logger.WithError(err).
-			WithField("certID", certInfo.ID[:8]).
+			WithField("certID", certInfo.ID).
 			WithField("cooldown", "check").
 			Error("Failed to set check cooldown for certificate in fallback cache")
 	}
@@ -261,7 +282,7 @@ func (c *CertificateExpiryCheckBatcher) handleEventForCertificate(certInfo CertI
 	isFireEventCooldownActive, err := c.isFireEventCooldownActive(certInfo, exists)
 	if err != nil {
 		c.logger.
-			WithField("certID", certInfo.ID[:8]).
+			WithField("certID", certInfo.ID).
 			WithField("cooldown", "fireEvent").
 			WithError(err).
 			Error("Failed to check cooldown - skipping certificate")
@@ -298,10 +319,24 @@ func (c *CertificateExpiryCheckBatcher) handleEventForExpiredCertificate(certInf
 	}
 
 	c.fireEvent(event.CertificateExpired, eventMeta)
-	c.logger.
-		WithField("cert_id", certInfo.ID[:8]).
-		WithField("event_type", string(event.CertificateExpired)).
-		Debugf("EXPIRY EVENT FIRED for certificate '%s' - expired since %d hours", certInfo.CommonName, certInfo.HoursUntilExpiry())
+
+	// Build log fields with full cert ID (always - improvement for all modes)
+	fields := logrus.Fields{
+		"cert_id":           certInfo.ID,
+		"cert_name":         certInfo.CommonName,
+		"days_since_expiry": daysSinceExpiry,
+		"event_type":        string(event.CertificateExpired),
+	}
+
+	// Add API info when in RPC mode with feature enabled
+	if c.gwConfig != nil &&
+		c.gwConfig.SlaveOptions.UseRPC &&
+		c.gwConfig.SlaveOptions.SyncUsedCertsOnly &&
+		c.certUsage != nil {
+		fields["apis"] = c.certUsage.APIs(certInfo.ID)
+	}
+
+	c.logger.WithFields(fields).Warn("certificate expired")
 }
 
 func (c *CertificateExpiryCheckBatcher) handleEventForSoonToExpireCertificate(certInfo CertInfo) {
@@ -320,10 +355,24 @@ func (c *CertificateExpiryCheckBatcher) handleEventForSoonToExpireCertificate(ce
 	}
 
 	c.fireEvent(event.CertificateExpiringSoon, eventMeta)
-	c.logger.
-		WithField("cert_id", certInfo.ID[:8]).
-		WithField("event_type", string(event.CertificateExpiringSoon)).
-		Debugf("EXPIRY EVENT FIRED for certificate '%s' - expires in %d hours", certInfo.CommonName, certInfo.HoursUntilExpiry())
+
+	// Build log fields with full cert ID (always - improvement for all modes)
+	fields := logrus.Fields{
+		"cert_id":        certInfo.ID,
+		"cert_name":      certInfo.CommonName,
+		"days_remaining": daysUntilExpiry,
+		"event_type":     string(event.CertificateExpiringSoon),
+	}
+
+	// Add API info when in RPC mode with feature enabled
+	if c.gwConfig != nil &&
+		c.gwConfig.SlaveOptions.UseRPC &&
+		c.gwConfig.SlaveOptions.SyncUsedCertsOnly &&
+		c.certUsage != nil {
+		fields["apis"] = c.certUsage.APIs(certInfo.ID)
+	}
+
+	c.logger.WithFields(fields).Warn("certificate expiring soon")
 }
 
 func (c *CertificateExpiryCheckBatcher) fireEventCooldownExistsInLocalCache(certInfo CertInfo) (exists bool) {
@@ -331,7 +380,7 @@ func (c *CertificateExpiryCheckBatcher) fireEventCooldownExistsInLocalCache(cert
 	exists, err = c.inMemoryCooldownCache.HasFireEventCooldown(certInfo.ID)
 	if err != nil {
 		c.logger.WithError(err).
-			WithField("certID", certInfo.ID[:8]).
+			WithField("certID", certInfo.ID).
 			WithField("cooldown", "fireEvent").
 			Error("failed to check if fire event cooldown exists in in-memory cache")
 	}
@@ -348,7 +397,7 @@ func (c *CertificateExpiryCheckBatcher) isFireEventCooldownActive(certInfo CertI
 		if err != nil {
 			c.logger.
 				WithError(err).
-				WithField("certID", certInfo.ID[:8]).
+				WithField("certID", certInfo.ID).
 				WithField("cooldown", "fireEvent").
 				Error("Failed to check if fire event cooldown is active in in-memory cache")
 			useFallback = true
@@ -361,7 +410,7 @@ func (c *CertificateExpiryCheckBatcher) isFireEventCooldownActive(certInfo CertI
 		if err != nil {
 			c.logger.
 				WithError(err).
-				WithField("certID", certInfo.ID[:8]).
+				WithField("certID", certInfo.ID).
 				WithField("cooldown", "fireEvent").
 				Error("Failed to check if fire event cooldown is active in fallback cache")
 
@@ -375,14 +424,14 @@ func (c *CertificateExpiryCheckBatcher) setFireEventCooldown(certInfo CertInfo) 
 	err := c.inMemoryCooldownCache.SetFireEventCooldown(certInfo.ID, int64(c.config.EventCooldownSeconds))
 	if err != nil {
 		c.logger.WithError(err).
-			WithField("certID", certInfo.ID[:8]).
+			WithField("certID", certInfo.ID).
 			WithField("cooldown", "fireEvent").
 			Error("Failed to set fire event cooldown for certificate in in-memory cache")
 	}
 	err = c.fallbackCooldownCache.SetFireEventCooldown(certInfo.ID, int64(c.config.EventCooldownSeconds))
 	if err != nil {
 		c.logger.WithError(err).
-			WithField("certID", certInfo.ID[:8]).
+			WithField("certID", certInfo.ID).
 			WithField("cooldown", "fireEvent").
 			Error("Failed to set fire event cooldown for certificate in fallback cache")
 	}
