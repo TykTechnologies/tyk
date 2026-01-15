@@ -368,14 +368,24 @@ func (gw *Gateway) getTLSConfigForClient(baseConfig *tls.Config, listenPort int)
 		certNameMap[certData.Name] = &cert
 	}
 
-	// Check expiry for file-based server certificates
-	if gw.GlobalCertMonitor != nil && len(serverCerts) > 0 {
-		// Convert to pointer slice for monitoring
-		certPtrs := make([]*tls.Certificate, len(serverCerts))
-		for i := range serverCerts {
-			certPtrs[i] = &serverCerts[i]
+	// Log file-based server certificate expiry info
+	for i := range serverCerts {
+		if len(serverCerts[i].Certificate) > 0 {
+			if cert, err := x509.ParseCertificate(serverCerts[i].Certificate[0]); err == nil {
+				daysUntilExpiry := int(time.Until(cert.NotAfter).Hours() / 24)
+				if daysUntilExpiry < 30 {
+					log.WithField("cert_name", cert.Subject.CommonName).
+						WithField("expires_at", cert.NotAfter).
+						WithField("days_remaining", daysUntilExpiry).
+						Warn("Server certificate expiring soon")
+				} else {
+					log.WithField("cert_name", cert.Subject.CommonName).
+						WithField("expires_at", cert.NotAfter).
+						WithField("days_remaining", daysUntilExpiry).
+						Debug("Loaded server certificate")
+				}
+			}
 		}
-		gw.GlobalCertMonitor.CheckServerCertificates(certPtrs)
 	}
 
 	if len(gwConfig.HttpServerOptions.SSLCertificates) > 0 {
@@ -399,9 +409,24 @@ func (gw *Gateway) getTLSConfigForClient(baseConfig *tls.Config, listenPort int)
 		}
 	}
 
-	// Check expiry for global server certificates from Certificate Store
-	if gw.GlobalCertMonitor != nil && len(sslCertificates) > 0 {
-		gw.GlobalCertMonitor.CheckServerCertificates(sslCertificates)
+	// Log Certificate Store server certificate expiry info
+	for _, cert := range sslCertificates {
+		if cert != nil && len(cert.Certificate) > 0 {
+			if parsedCert, err := x509.ParseCertificate(cert.Certificate[0]); err == nil {
+				daysUntilExpiry := int(time.Until(parsedCert.NotAfter).Hours() / 24)
+				if daysUntilExpiry < 30 {
+					log.WithField("cert_name", parsedCert.Subject.CommonName).
+						WithField("expires_at", parsedCert.NotAfter).
+						WithField("days_remaining", daysUntilExpiry).
+						Warn("Server certificate (from store) expiring soon")
+				} else {
+					log.WithField("cert_name", parsedCert.Subject.CommonName).
+						WithField("expires_at", parsedCert.NotAfter).
+						WithField("days_remaining", daysUntilExpiry).
+						Debug("Loaded server certificate from Certificate Store")
+				}
+			}
+		}
 	}
 
 	baseConfig.Certificates = serverCerts
