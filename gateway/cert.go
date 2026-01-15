@@ -369,11 +369,12 @@ func (gw *Gateway) getTLSConfigForClient(baseConfig *tls.Config, listenPort int)
 	}
 
 	// Log file-based server certificate expiry info
+	threshold := gwConfig.Security.CertificateExpiryMonitor.WarningThresholdDays
 	for i := range serverCerts {
 		if len(serverCerts[i].Certificate) > 0 {
 			if cert, err := x509.ParseCertificate(serverCerts[i].Certificate[0]); err == nil {
 				daysUntilExpiry := int(time.Until(cert.NotAfter).Hours() / 24)
-				if daysUntilExpiry < 30 {
+				if daysUntilExpiry < threshold {
 					log.WithField("cert_name", cert.Subject.CommonName).
 						WithField("expires_at", cert.NotAfter).
 						WithField("days_remaining", daysUntilExpiry).
@@ -414,7 +415,7 @@ func (gw *Gateway) getTLSConfigForClient(baseConfig *tls.Config, listenPort int)
 		if cert != nil && len(cert.Certificate) > 0 {
 			if parsedCert, err := x509.ParseCertificate(cert.Certificate[0]); err == nil {
 				daysUntilExpiry := int(time.Until(parsedCert.NotAfter).Hours() / 24)
-				if daysUntilExpiry < 30 {
+				if daysUntilExpiry < threshold {
 					log.WithField("cert_name", parsedCert.Subject.CommonName).
 						WithField("expires_at", parsedCert.NotAfter).
 						WithField("days_remaining", daysUntilExpiry).
