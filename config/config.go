@@ -690,6 +690,14 @@ type SecurityConfig struct {
 
 	// CertificateExpiryMonitor configures the certificate expiry monitoring and notification feature
 	CertificateExpiryMonitor CertificateExpiryMonitorConfig `json:"certificate_expiry_monitor"`
+
+	// AllowDynamicMTLSTokenAuth controls whether token-based authentication is allowed for APIs
+	// using dynamic client mTLS. When set to false (the default), requests to APIs with dynamic
+	// mTLS enabled must present a valid client certificate - token-only authentication will be
+	// rejected. This prevents bypassing mTLS by constructing tokens from publicly available
+	// certificate information. Set to true to restore the legacy behavior of allowing either
+	// certificate or token authentication.
+	AllowDynamicMTLSTokenAuth bool `json:"allow_dynamic_mtls_token_auth"`
 }
 
 type NewRelicConfig struct {
