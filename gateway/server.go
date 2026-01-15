@@ -160,7 +160,7 @@ type Gateway struct {
 	apisByID        map[string]*APISpec
 	apisHandlesByID *sync.Map
 
-	policies model.Policies
+	policies *model.Policies
 
 	dnsCacheManager dnscache.IDnsCacheManager
 

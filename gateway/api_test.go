@@ -4130,7 +4130,7 @@ func TestDeletionOfPoliciesThatFromAKeyDoesNotMakeTheAPIKeyless(t *testing.T) {
 	assert.NotNil(t, res)
 	assert.Nil(t, err)
 
-	ts.DeletePolicy(internalmodel.NewAnyPolicyId(orgId, policyForApi2))
+	ts.DeletePolicy(internalmodel.NewScopedPolicyId(orgId, policyForApi2))
 	res, err = ts.Run(t, []test.TestCase{
 		{Method: "GET", Path: "/api1", Headers: authHeaders, Code: 200},
 		{Method: "GET", Path: "/api2", Headers: authHeaders, Code: 403},
@@ -4138,7 +4138,7 @@ func TestDeletionOfPoliciesThatFromAKeyDoesNotMakeTheAPIKeyless(t *testing.T) {
 	assert.NotNil(t, res)
 	assert.Nil(t, err)
 
-	ts.DeletePolicy(internalmodel.NewAnyPolicyId(orgId, policyForApi1))
+	ts.DeletePolicy(internalmodel.NewScopedPolicyId(orgId, policyForApi1))
 	res, err = ts.Run(t, []test.TestCase{
 		{Method: "GET", Path: "/api1", Headers: authHeaders, Code: 403},
 		{Method: "GET", Path: "/api2", Headers: authHeaders, Code: 403},
