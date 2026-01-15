@@ -18,6 +18,7 @@ import (
 	"github.com/TykTechnologies/tyk/apidef/oas"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/ctx"
+	"github.com/TykTechnologies/tyk/internal/certcheck"
 	"github.com/TykTechnologies/tyk/internal/graphengine"
 )
 
@@ -63,6 +64,9 @@ type APISpec struct {
 	GraphEngine graphengine.Engine
 
 	oasRouter routers.Router
+
+	// UpstreamCertExpiryBatcher handles upstream certificate expiry checking
+	UpstreamCertExpiryBatcher certcheck.BackgroundBatcher
 }
 
 // CheckSpecMatchesStatus checks if a URL spec has a specific status.

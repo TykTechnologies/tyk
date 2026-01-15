@@ -39,6 +39,8 @@ import (
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/ctx"
 	"github.com/TykTechnologies/tyk/header"
+	"github.com/TykTechnologies/tyk/internal/certcheck"
+	"github.com/TykTechnologies/tyk/internal/crypto"
 	"github.com/TykTechnologies/tyk/internal/graphengine"
 	"github.com/TykTechnologies/tyk/internal/httputil"
 	"github.com/TykTechnologies/tyk/internal/otel"
@@ -1172,6 +1174,9 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 	if cert := p.Gw.getUpstreamCertificate(outreq.URL.Host, p.TykAPISpec); cert != nil {
 		p.logger.Debug("Found upstream mutual TLS certificate")
 		tlsCertificates = []tls.Certificate{*cert}
+
+		// Check upstream certificate expiry
+		p.checkUpstreamCertificateExpiry(cert)
 	}
 
 	p.TykAPISpec.Lock()
@@ -1904,5 +1909,36 @@ func (p *ReverseProxy) addAuthInfo(outReq, req *http.Request) {
 
 	if authProvider := core.GetUpstreamAuth(req); authProvider != nil {
 		authProvider.Fill(outReq)
+	}
+}
+
+// checkUpstreamCertificateExpiry checks the expiry of an upstream certificate using the APISpec's batcher
+func (p *ReverseProxy) checkUpstreamCertificateExpiry(cert *tls.Certificate) {
+	if p.TykAPISpec.UpstreamCertExpiryBatcher == nil {
+		return
+	}
+
+	if cert == nil || cert.Leaf == nil {
+		p.logger.Warning("Skipping upstream certificate expiry check: invalid certificate")
+		return
+	}
+
+	certID := crypto.HexSHA256(cert.Leaf.Raw)
+	if certID == "" {
+		p.logger.Warning("Skipping upstream certificate expiry check: empty certificate ID")
+		return
+	}
+
+	certInfo := certcheck.CertInfo{
+		ID:          certID,
+		CommonName:  cert.Leaf.Subject.CommonName,
+		NotAfter:    cert.Leaf.NotAfter,
+		UntilExpiry: time.Until(cert.Leaf.NotAfter),
+	}
+
+	if err := p.TykAPISpec.UpstreamCertExpiryBatcher.Add(certInfo); err != nil {
+		p.logger.
+			WithError(err).
+			Warning("Failed to add upstream certificate to expiry check batch")
 	}
 }

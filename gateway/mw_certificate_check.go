@@ -114,6 +114,8 @@ func (m *CertificateCheckMW) Init() {
 				Error("Failed to initialize upstream certificate expiry check batcher.")
 		} else {
 			go m.upstreamExpiryCheckBatcher.RunInBackground(m.expiryCheckContext)
+			// Store batcher in APISpec so reverse proxy can use it
+			m.Spec.UpstreamCertExpiryBatcher = m.upstreamExpiryCheckBatcher
 		}
 	}
 }
@@ -154,9 +156,6 @@ func (m *CertificateCheckMW) ProcessRequest(w http.ResponseWriter, r *http.Reque
 
 		m.batchCertificatesExpirationCheck(apiCerts)
 	}
-
-	// Check upstream certificates during request processing
-	m.CheckUpstreamCertificates()
 
 	return nil, http.StatusOK
 }
@@ -215,55 +214,3 @@ func (m *CertificateCheckMW) extractCertInfo(cert *tls.Certificate) (certInfo ce
 	}, true
 }
 
-// CheckUpstreamCertificates checks the expiry status of upstream certificates
-func (m *CertificateCheckMW) CheckUpstreamCertificates() {
-	if m.upstreamExpiryCheckBatcher == nil || m.Spec.UpstreamCertificatesDisabled {
-		return
-	}
-
-	// Collect certificate IDs from global and API-specific config
-	certIDs := []string{}
-	gwConfig := m.Gw.GetConfig()
-
-	// Add global upstream certificates (extract values from map)
-	for _, certID := range gwConfig.Security.Certificates.Upstream {
-		certIDs = append(certIDs, certID)
-	}
-
-	// Add API-specific upstream certificates (extract values from map)
-	if m.Spec.UpstreamCertificates != nil {
-		for _, certID := range m.Spec.UpstreamCertificates {
-			certIDs = append(certIDs, certID)
-		}
-	}
-
-	if len(certIDs) == 0 {
-		return
-	}
-
-	// Load and check certificates
-	certificates := m.Gw.CertificateManager.List(certIDs, certs.CertificatePrivate)
-	checked := 0
-	for _, cert := range certificates {
-		if certInfo, ok := m.extractCertInfo(cert); ok {
-			if err := m.upstreamExpiryCheckBatcher.Add(certInfo); err != nil {
-				log.
-					WithField("api_id", m.Spec.APIID).
-					WithField("api_name", m.Spec.Name).
-					WithField("mw", m.Name()).
-					WithError(err).
-					Warning("Failed to add upstream certificate to expiry check batch")
-			}
-			checked++
-		}
-	}
-
-	if checked > 0 {
-		log.
-			WithField("api_id", m.Spec.APIID).
-			WithField("api_name", m.Spec.Name).
-			WithField("mw", m.Name()).
-			WithField("count", checked).
-			Debug("Checked upstream certificates for expiry")
-	}
-}
