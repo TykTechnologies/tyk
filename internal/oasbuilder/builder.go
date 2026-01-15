@@ -60,7 +60,7 @@ func New() Builder {
 		Title:   "Test API entity",
 		Version: "1.0.0",
 	}
-	oasDef.Paths = openapi3.Paths{}
+	oasDef.Paths = openapi3.NewPaths()
 
 	xTykAPIGateway := oas.XTykAPIGateway{
 		Info: oas.Info{},
@@ -342,27 +342,27 @@ func (eb *EndpointBuilder) build(builder *Builder) {
 
 	if currentPath == nil {
 		currentPath = &openapi3.PathItem{}
-		builder.oas.Paths[eb.path] = currentPath
+		builder.oas.Paths.Set(eb.path, currentPath)
 	}
 
 	emptyDescription := ""
 	responses := openapi3.NewResponses()
-	delete(responses, "default")
-	responses["200"] = &openapi3.ResponseRef{
+	responses.Delete("default")
+	responses.Set("200", &openapi3.ResponseRef{
 		Value: &openapi3.Response{
 			Description: &emptyDescription,
 			Content: openapi3.Content{
 				tykheaders.ApplicationJSON: &openapi3.MediaType{},
 			},
 		},
-	}
+	})
 
 	currentPath.SetOperation(eb.method, &openapi3.Operation{
 		OperationID: eb.operationId(),
 		Responses:   responses,
 	})
 
-	builder.oas.Paths[eb.path] = currentPath
+	builder.oas.Paths.Set(eb.path, currentPath)
 }
 
 func base64Encode(str string) ([]byte, error) {
