@@ -65,7 +65,7 @@ func (m *CertificateCheckMW) Init() {
 			apiData,
 			m.Gw.GetConfig().Security.CertificateExpiryMonitor,
 			m.store,
-			m.Gw.FireSystemEvent,
+			m.Spec.FireEvent,
 			"client",
 		)
 
