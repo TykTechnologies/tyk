@@ -904,7 +904,7 @@ func (gw *Gateway) handleGetPolicy(polID string) (interface{}, int) {
 				"prefix": "policy",
 				"polID":  polID,
 			}).
-			Error("Policy doesn't exist.")
+			Error("Failed to fetch policy.")
 	}
 
 	switch {
