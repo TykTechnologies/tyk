@@ -271,19 +271,16 @@ func (m *CertificateCheckMW) periodicUpstreamCertificateCheck() {
 	// Check immediately on startup
 	m.CheckUpstreamCertificates()
 
-	// Get the periodic check interval from config
-	intervalSeconds := m.Gw.GetConfig().Security.CertificateExpiryMonitor.CheckIntervalSeconds
-	if intervalSeconds <= 0 {
-		intervalSeconds = m.Gw.GetConfig().Security.CertificateExpiryMonitor.CheckCooldownSeconds
-	}
+	// Use check cooldown interval for periodic checking
+	intervalSeconds := m.Gw.GetConfig().Security.CertificateExpiryMonitor.CheckCooldownSeconds
 
-	// If still 0, disable periodic checking
+	// If 0, disable periodic checking
 	if intervalSeconds <= 0 {
 		log.
 			WithField("api_id", m.Spec.APIID).
 			WithField("api_name", m.Spec.Name).
 			WithField("mw", m.Name()).
-			Info("Periodic upstream certificate checking disabled (check_interval_seconds = 0)")
+			Info("Periodic upstream certificate checking disabled (check_cooldown_seconds = 0)")
 		return
 	}
 
