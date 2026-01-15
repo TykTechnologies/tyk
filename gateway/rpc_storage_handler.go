@@ -1161,7 +1161,7 @@ func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string, orgId string) 
 		if r.Gw.GetConfig().SlaveOptions.UseRPC &&
 			r.Gw.GetConfig().SlaveOptions.SyncUsedCertsOnly {
 			if r.Gw.certRegistry != nil && !r.Gw.certRegistry.Required(certId) {
-				log.WithField("cert_id", certId).
+				log.WithField("cert_id", maskCertID(certId)).
 					Debug("skipping certificate - not used by loaded APIs")
 				continue
 			}
@@ -1169,7 +1169,7 @@ func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string, orgId string) 
 			if r.Gw.certRegistry != nil {
 				apis := r.Gw.certRegistry.APIs(certId)
 				log.WithFields(logrus.Fields{
-					"cert_id": certId,
+					"cert_id": maskCertID(certId),
 					"apis":    apis,
 				}).Info("syncing required certificate")
 			}

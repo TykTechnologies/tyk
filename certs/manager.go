@@ -13,6 +13,7 @@ import (
 	"encoding/pem"
 	"errors"
 	"io/ioutil"
+	"strconv"
 	"strings"
 	"time"
 
@@ -563,10 +564,20 @@ func (c *certificateManager) ListAllIds(prefix string) (out []string) {
 	return out
 }
 
+// maskCertID masks certificate ID for logging to avoid exposing sensitive data.
+// Certificate IDs can be derived from API keys/auth tokens and should not be logged in clear text.
+// Returns first 8 characters plus length for debugging while protecting sensitive data.
+func maskCertID(certID string) string {
+	if len(certID) <= 8 {
+		return certID
+	}
+	return certID[:8] + "***[len=" + strconv.Itoa(len(certID)) + "]"
+}
+
 func (c *certificateManager) GetRaw(certID string) (string, error) {
 	// Check registry before accessing storage when selective sync is enabled
 	if c.selectiveSync && c.registry != nil && !c.registry.Required(certID) {
-		c.logger.WithField("cert_id", certID).
+		c.logger.WithField("cert_id", maskCertID(certID)).
 			Info("BLOCKED: certificate not required by loaded APIs")
 		return "", errors.New("certificate not required by loaded APIs")
 	}

@@ -2,6 +2,7 @@ package storage
 
 import (
 	"errors"
+	"strconv"
 	"strings"
 
 	"github.com/TykTechnologies/tyk/config"
@@ -65,7 +66,7 @@ func (m MdcbStorage) GetKey(key string) (string, error) {
 		}
 
 		if !m.certUsage.Required(certID) {
-			m.logger.WithField("cert_id", certID).
+			m.logger.WithField("cert_id", maskCertID(certID)).
 				Debug("skipping certificate pull - not used by loaded APIs")
 			return "", errors.New("certificate not required")
 		}
@@ -97,6 +98,16 @@ func extractCertID(key string) string {
 	// So we return the entire string after "raw-" as the cert ID
 	// The certRegistry should be registered with the same format
 	return strings.TrimPrefix(key, "raw-")
+}
+
+// maskCertID masks certificate ID for logging to avoid exposing sensitive data.
+// Certificate IDs can be derived from API keys/auth tokens and should not be logged in clear text.
+// Returns first 8 characters plus length for debugging while protecting sensitive data.
+func maskCertID(certID string) string {
+	if len(certID) <= 8 {
+		return certID
+	}
+	return certID[:8] + "***[len=" + strconv.Itoa(len(certID)) + "]"
 }
 
 // GetMultiKey gets multiple keys from the MDCB layer
