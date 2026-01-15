@@ -41,6 +41,7 @@ import (
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/header"
+	"github.com/TykTechnologies/tyk/internal/certcheck"
 	"github.com/TykTechnologies/tyk/internal/model"
 	"github.com/TykTechnologies/tyk/regexp"
 	"github.com/TykTechnologies/tyk/rpc"
@@ -1362,6 +1363,68 @@ func (a *APISpec) Init(authStore, sessionStore, healthStore, orgStore storage.Ha
 	a.AuthManager.Init(authStore)
 	a.Health.Init(healthStore)
 	a.OrgSessionManager.Init(orgStore)
+}
+
+func (a *APISpec) InitUpstreamCertMonitoring(gw *Gateway, logger *logrus.Entry) {
+	// Skip if upstream certificates are disabled
+	if a.UpstreamCertificatesDisabled {
+		return
+	}
+
+	// Check if there are any upstream certificates configured
+	hasUpstreamCerts := len(a.UpstreamCertificates) > 0 || len(a.GlobalConfig.Security.Certificates.Upstream) > 0
+	if !hasUpstreamCerts {
+		return
+	}
+
+	logger.
+		WithField("api_id", a.APIID).
+		WithField("api_name", a.Name).
+		Debug("Initializing upstream certificate expiry check batcher")
+
+	// Initialize Redis store for cooldowns
+	store := &storage.RedisCluster{
+		KeyPrefix:         "cert-cooldown:",
+		ConnectionHandler: gw.StorageConnectionHandler,
+	}
+	store.Connect()
+
+	apiData := certcheck.APIMetaData{
+		APIID:   a.APIID,
+		APIName: a.Name,
+	}
+
+	var err error
+	a.UpstreamCertExpiryBatcher, err = certcheck.NewCertificateExpiryCheckBatcherWithRole(
+		logger,
+		apiData,
+		gw.GetConfig().Security.CertificateExpiryMonitor,
+		store,
+		gw.FireSystemEvent,
+		"upstream",
+	)
+
+	if err != nil {
+		logger.
+			WithField("api_id", a.APIID).
+			WithField("api_name", a.Name).
+			Error("Failed to initialize upstream certificate expiry check batcher")
+		return
+	}
+
+	a.upstreamCertExpiryCheckContext, a.upstreamCertExpiryCancelFunc = context.WithCancel(context.Background())
+	go a.UpstreamCertExpiryBatcher.RunInBackground(a.upstreamCertExpiryCheckContext)
+}
+
+func (a *APISpec) UnloadUpstreamCertMonitoring(logger *logrus.Entry) {
+	if a.upstreamCertExpiryCancelFunc != nil {
+		logger.
+			WithField("api_id", a.APIID).
+			WithField("api_name", a.Name).
+			Debug("Stopping upstream certificate expiry check batcher")
+
+		a.upstreamCertExpiryCancelFunc()
+	}
 }
 
 func (a *APISpec) StopSessionManagerPool() {

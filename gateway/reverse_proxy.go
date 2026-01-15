@@ -1913,63 +1913,63 @@ func (p *ReverseProxy) addAuthInfo(outReq, req *http.Request) {
 	}
 }
 
-// initUpstreamCertBatcher initializes the upstream certificate expiry batcher on first use
+// initUpstreamCertBatcher initializes the upstream certificate expiry batcher (called lazily via sync.Once)
 func (p *ReverseProxy) initUpstreamCertBatcher() {
-	p.TykAPISpec.upstreamCertBatcherOnce.Do(func() {
-		// Skip if upstream certificates are disabled
-		if p.TykAPISpec.UpstreamCertificatesDisabled {
-			return
-		}
+	// Skip if upstream certificates are disabled
+	if p.TykAPISpec.UpstreamCertificatesDisabled {
+		return
+	}
 
-		// Initialize Redis store for cooldowns
-		store := &storage.RedisCluster{
-			KeyPrefix:         "cert-cooldown:",
-			ConnectionHandler: p.Gw.StorageConnectionHandler,
-		}
-		store.Connect()
+	// Check if there are any upstream certificates configured
+	hasUpstreamCerts := len(p.TykAPISpec.UpstreamCertificates) > 0 ||
+		len(p.TykAPISpec.GlobalConfig.Security.Certificates.Upstream) > 0
+	if !hasUpstreamCerts {
+		return
+	}
 
-		// Create upstream certificate expiry check batcher
-		apiData := certcheck.APIMetaData{
-			APIID:   p.TykAPISpec.APIID,
-			APIName: p.TykAPISpec.Name,
-		}
+	p.logger.
+		WithField("api_id", p.TykAPISpec.APIID).
+		WithField("api_name", p.TykAPISpec.Name).
+		Debug("Initializing upstream certificate expiry check batcher")
 
-		batcher, err := certcheck.NewCertificateExpiryCheckBatcherWithRole(
-			p.logger,
-			apiData,
-			p.Gw.GetConfig().Security.CertificateExpiryMonitor,
-			store,
-			p.Gw.FireSystemEvent,
-			"upstream",
-		)
+	// Initialize Redis store for cooldowns
+	store := &storage.RedisCluster{
+		KeyPrefix:         "cert-cooldown:",
+		ConnectionHandler: p.Gw.StorageConnectionHandler,
+	}
+	store.Connect()
 
-		if err != nil {
-			p.logger.
-				WithField("api_id", p.TykAPISpec.APIID).
-				WithField("api_name", p.TykAPISpec.Name).
-				WithError(err).
-				Error("Failed to initialize upstream certificate expiry check batcher")
-			return
-		}
+	apiData := certcheck.APIMetaData{
+		APIID:   p.TykAPISpec.APIID,
+		APIName: p.TykAPISpec.Name,
+	}
 
-		// Start the batcher in background
-		ctx := context.Background()
-		go batcher.RunInBackground(ctx)
+	var err error
+	p.TykAPISpec.UpstreamCertExpiryBatcher, err = certcheck.NewCertificateExpiryCheckBatcherWithRole(
+		p.logger,
+		apiData,
+		p.Gw.GetConfig().Security.CertificateExpiryMonitor,
+		store,
+		p.TykAPISpec.FireEvent,
+		"upstream",
+	)
 
-		// Store batcher in APISpec
-		p.TykAPISpec.UpstreamCertExpiryBatcher = batcher
-
+	if err != nil {
 		p.logger.
 			WithField("api_id", p.TykAPISpec.APIID).
 			WithField("api_name", p.TykAPISpec.Name).
-			Debug("Initialized upstream certificate expiry monitoring")
-	})
+			Error("Failed to initialize upstream certificate expiry check batcher")
+		return
+	}
+
+	p.TykAPISpec.upstreamCertExpiryCheckContext, p.TykAPISpec.upstreamCertExpiryCancelFunc = context.WithCancel(context.Background())
+	go p.TykAPISpec.UpstreamCertExpiryBatcher.RunInBackground(p.TykAPISpec.upstreamCertExpiryCheckContext)
 }
 
 // checkUpstreamCertificateExpiry checks the expiry of an upstream certificate using the APISpec's batcher
 func (p *ReverseProxy) checkUpstreamCertificateExpiry(cert *tls.Certificate) {
-	// Lazy initialize batcher on first use
-	p.initUpstreamCertBatcher()
+	// Lazy initialization - only create batcher when first certificate is used
+	p.TykAPISpec.upstreamCertExpiryInitOnce.Do(p.initUpstreamCertBatcher)
 
 	if p.TykAPISpec.UpstreamCertExpiryBatcher == nil {
 		return
