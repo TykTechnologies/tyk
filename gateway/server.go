@@ -266,7 +266,7 @@ func (gw *Gateway) cacheCreate() {
 
 	var timeout = int64(conf.ServiceDiscovery.DefaultCacheTimeout)
 	if timeout <= 0 {
-		timeout = 120 // 2 minutes
+		timeout = 120 // 2 minutes x
 	}
 	gw.ServiceCache = cache.New(timeout, 15)
 
