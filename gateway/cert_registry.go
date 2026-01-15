@@ -6,16 +6,16 @@ import "sync"
 type certRegistry struct {
 	mu sync.RWMutex
 
-	required   map[string]bool                // certID -> is required
-	apisByCert map[string]map[string]bool     // certID -> set of API IDs using this cert
-	certsByAPI map[string]map[string]bool     // API ID -> set of cert IDs it uses
+	required   map[string]struct{}                // certID -> is required
+	apisByCert map[string]map[string]struct{}     // certID -> set of API IDs using this cert
+	certsByAPI map[string]map[string]struct{}     // API ID -> set of cert IDs it uses
 }
 
 func newCertRegistry() *certRegistry {
 	return &certRegistry{
-		required:   make(map[string]bool),
-		apisByCert: make(map[string]map[string]bool),
-		certsByAPI: make(map[string]map[string]bool),
+		required:   make(map[string]struct{}),
+		apisByCert: make(map[string]map[string]struct{}),
+		certsByAPI: make(map[string]map[string]struct{}),
 	}
 }
 
@@ -23,7 +23,8 @@ func newCertRegistry() *certRegistry {
 func (cr *certRegistry) Required(certID string) bool {
 	cr.mu.RLock()
 	defer cr.mu.RUnlock()
-	return cr.required[certID]
+	_, exists := cr.required[certID]
+	return exists
 }
 
 // APIs returns the IDs of APIs that use this certificate.
@@ -50,27 +51,27 @@ func (cr *certRegistry) Register(spec *APISpec) {
 	defer cr.mu.Unlock()
 
 	apiID := spec.APIID
-	certSet := make(map[string]bool)
+	certSet := make(map[string]struct{})
 
 	// Collect all certificate references (using set to auto-deduplicate)
 	for _, certID := range spec.Certificates {
 		if certID != "" {
-			certSet[certID] = true
+			certSet[certID] = struct{}{}
 		}
 	}
 	for _, certID := range spec.ClientCertificates {
 		if certID != "" {
-			certSet[certID] = true
+			certSet[certID] = struct{}{}
 		}
 	}
 	for _, certID := range spec.UpstreamCertificates {
 		if certID != "" {
-			certSet[certID] = true
+			certSet[certID] = struct{}{}
 		}
 	}
 	for _, certID := range spec.PinnedPublicKeys {
 		if certID != "" {
-			certSet[certID] = true
+			certSet[certID] = struct{}{}
 		}
 	}
 
@@ -78,13 +79,13 @@ func (cr *certRegistry) Register(spec *APISpec) {
 
 	// Mark each cert as required and track API association
 	for certID := range certSet {
-		cr.required[certID] = true
+		cr.required[certID] = struct{}{}
 
 		// Initialize the set if it doesn't exist
 		if cr.apisByCert[certID] == nil {
-			cr.apisByCert[certID] = make(map[string]bool)
+			cr.apisByCert[certID] = make(map[string]struct{})
 		}
-		cr.apisByCert[certID][apiID] = true
+		cr.apisByCert[certID][apiID] = struct{}{}
 	}
 }
 
@@ -100,13 +101,13 @@ func (cr *certRegistry) RegisterServerCerts(certIDs []string) {
 			continue
 		}
 
-		cr.required[certID] = true
+		cr.required[certID] = struct{}{}
 
 		// Initialize the set if it doesn't exist
 		if cr.apisByCert[certID] == nil {
-			cr.apisByCert[certID] = make(map[string]bool)
+			cr.apisByCert[certID] = make(map[string]struct{})
 		}
-		cr.apisByCert[certID][serverAPI] = true
+		cr.apisByCert[certID][serverAPI] = struct{}{}
 	}
 }
 
