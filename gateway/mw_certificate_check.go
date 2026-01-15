@@ -27,7 +27,7 @@ func (m *CertificateCheckMW) Name() string {
 }
 
 func (m *CertificateCheckMW) EnabledForSpec() bool {
-	return m.Spec.UseMutualTLSAuth
+	return m.Spec.UseMutualTLSAuth || !m.Spec.UpstreamCertificatesDisabled
 }
 
 func (m *CertificateCheckMW) Init() {
@@ -61,12 +61,13 @@ func (m *CertificateCheckMW) Init() {
 		}
 
 		var err error
-		m.expiryCheckBatcher, err = certcheck.NewCertificateExpiryCheckBatcher(
+		m.expiryCheckBatcher, err = certcheck.NewCertificateExpiryCheckBatcherWithRole(
 			m.logger,
 			apiData,
 			m.Gw.GetConfig().Security.CertificateExpiryMonitor,
 			m.store,
-			m.Spec.FireEvent,
+			m.Gw.FireSystemEvent,
+			"client",
 		)
 
 		if err != nil {
@@ -96,12 +97,12 @@ func (m *CertificateCheckMW) Init() {
 		}
 
 		var err error
-		m.upstreamExpiryCheckBatcher, err = certcheck.NewCertificateExpiryCheckBatcherWithType(
+		m.upstreamExpiryCheckBatcher, err = certcheck.NewCertificateExpiryCheckBatcherWithRole(
 			m.logger,
 			apiData,
 			m.Gw.GetConfig().Security.CertificateExpiryMonitor,
 			m.store,
-			m.Spec.FireEvent,
+			m.Gw.FireSystemEvent,
 			"upstream",
 		)
 
@@ -113,7 +114,7 @@ func (m *CertificateCheckMW) Init() {
 				Error("Failed to initialize upstream certificate expiry check batcher.")
 		} else {
 			go m.upstreamExpiryCheckBatcher.RunInBackground(m.expiryCheckContext)
-			go m.CheckUpstreamCertificates() // Initial check
+			go m.periodicUpstreamCertificateCheck() // Start periodic checking
 		}
 	}
 }
@@ -262,5 +263,51 @@ func (m *CertificateCheckMW) CheckUpstreamCertificates() {
 			WithField("mw", m.Name()).
 			WithField("count", checked).
 			Debug("Checked upstream certificates for expiry")
+	}
+}
+
+// periodicUpstreamCertificateCheck starts periodic checking of upstream certificates
+func (m *CertificateCheckMW) periodicUpstreamCertificateCheck() {
+	// Check immediately on startup
+	m.CheckUpstreamCertificates()
+
+	// Get the periodic check interval from config
+	intervalSeconds := m.Gw.GetConfig().Security.CertificateExpiryMonitor.CheckIntervalSeconds
+	if intervalSeconds <= 0 {
+		intervalSeconds = m.Gw.GetConfig().Security.CertificateExpiryMonitor.CheckCooldownSeconds
+	}
+
+	// If still 0, disable periodic checking
+	if intervalSeconds <= 0 {
+		log.
+			WithField("api_id", m.Spec.APIID).
+			WithField("api_name", m.Spec.Name).
+			WithField("mw", m.Name()).
+			Info("Periodic upstream certificate checking disabled (check_interval_seconds = 0)")
+		return
+	}
+
+	log.
+		WithField("api_id", m.Spec.APIID).
+		WithField("api_name", m.Spec.Name).
+		WithField("mw", m.Name()).
+		WithField("interval_seconds", intervalSeconds).
+		Info("Starting periodic upstream certificate checking")
+
+	ticker := time.NewTicker(time.Duration(intervalSeconds) * time.Second)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-m.expiryCheckContext.Done():
+			log.
+				WithField("api_id", m.Spec.APIID).
+				WithField("api_name", m.Spec.Name).
+				WithField("mw", m.Name()).
+				Debug("Periodic upstream certificate checking stopped")
+			return
+		case <-ticker.C:
+			m.CheckUpstreamCertificates()
+		}
 	}
 }

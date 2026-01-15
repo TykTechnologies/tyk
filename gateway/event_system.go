@@ -159,6 +159,8 @@ func (gw *Gateway) EventHandlerByName(handlerConf apidef.EventHandlerTriggerConf
 
 func fireEvent(name apidef.TykEvent, meta interface{}, handlers map[apidef.TykEvent][]config.TykEventHandler) {
 	log.Debug("EVENT FIRED: ", name)
+	log.Debugf("EVENT TRIGGERS MAP SIZE: %d", len(handlers))
+	log.Debugf("EVENT TRIGGERS MAP KEYS: %+v", handlers)
 	if handlers, e := handlers[name]; e {
 		log.Debugf("FOUND %d EVENT HANDLERS", len(handlers))
 		eventMessage := config.EventMessage{

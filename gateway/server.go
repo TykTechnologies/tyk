@@ -1105,6 +1105,9 @@ func (gw *Gateway) DoReload() {
 		gw.GlobalEventsJSVM.Init(nil, logrus.NewEntry(log), gw)
 	}
 
+	// Re-initialize global event handlers to ensure they persist across reloads
+	gw.initGenericEventHandlers()
+
 	// Load the API Policies
 	if _, err := syncResourcesWithReload("policies", gw.GetConfig(), gw.syncPolicies); err != nil {
 		mainLog.Error("Error during syncing policies")

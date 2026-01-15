@@ -3,6 +3,7 @@ package gateway
 import (
 	"context"
 	"crypto/tls"
+	"crypto/x509"
 	"sync"
 	"time"
 
@@ -58,7 +59,7 @@ func NewGlobalCertificateMonitor(gw *Gateway) (*GlobalCertificateMonitor, error)
 
 	cfg := gw.GetConfig().Security.CertificateExpiryMonitor
 
-	serverBatcher, err := certcheck.NewCertificateExpiryCheckBatcherWithType(
+	serverBatcher, err := certcheck.NewCertificateExpiryCheckBatcherWithRole(
 		logger,
 		apiData,
 		cfg,
@@ -74,7 +75,7 @@ func NewGlobalCertificateMonitor(gw *Gateway) (*GlobalCertificateMonitor, error)
 	monitor.serverCertBatcher = serverBatcher
 
 	// Initialize CA certificate batcher
-	caBatcher, err := certcheck.NewCertificateExpiryCheckBatcherWithType(
+	caBatcher, err := certcheck.NewCertificateExpiryCheckBatcherWithRole(
 		logger,
 		apiData,
 		cfg,
@@ -102,7 +103,7 @@ func (m *GlobalCertificateMonitor) Start() {
 	m.logger.Info("Starting global certificate expiry monitoring")
 
 	// Start background batchers with proper goroutine tracking
-	m.wg.Add(2)
+	m.wg.Add(3)
 
 	go func() {
 		defer m.wg.Done()
@@ -113,6 +114,79 @@ func (m *GlobalCertificateMonitor) Start() {
 		defer m.wg.Done()
 		m.caCertBatcher.RunInBackground(m.ctx)
 	}()
+
+	// Periodic certificate checking
+	go func() {
+		defer m.wg.Done()
+
+		// Check immediately on startup
+		m.periodicCertificateCheck()
+
+		// Get the periodic check interval from config
+		gwConfig := m.gw.GetConfig()
+		intervalSeconds := gwConfig.Security.CertificateExpiryMonitor.CheckIntervalSeconds
+		if intervalSeconds <= 0 {
+			intervalSeconds = gwConfig.Security.CertificateExpiryMonitor.CheckCooldownSeconds
+		}
+
+		// If still 0, disable periodic checking
+		if intervalSeconds <= 0 {
+			m.logger.Info("Periodic certificate checking disabled (check_interval_seconds = 0)")
+			return
+		}
+
+		m.logger.
+			WithField("interval_seconds", intervalSeconds).
+			Info("Starting periodic certificate checking")
+
+		ticker := time.NewTicker(time.Duration(intervalSeconds) * time.Second)
+		defer ticker.Stop()
+
+		for {
+			select {
+			case <-m.ctx.Done():
+				m.logger.Debug("Periodic certificate checking stopped")
+				return
+			case <-ticker.C:
+				m.periodicCertificateCheck()
+			}
+		}
+	}()
+}
+
+// periodicCertificateCheck performs a full check of all certificates
+func (m *GlobalCertificateMonitor) periodicCertificateCheck() {
+	gwConfig := m.gw.GetConfig()
+
+	m.logger.
+		WithField("check_interval_seconds", gwConfig.Security.CertificateExpiryMonitor.CheckIntervalSeconds).
+		Debug("Running periodic certificate check")
+
+	// Check file-based server certificates
+	serverCerts := []*tls.Certificate{}
+	for _, certData := range gwConfig.HttpServerOptions.Certificates {
+		cert, err := tls.LoadX509KeyPair(certData.CertFile, certData.KeyFile)
+		if err != nil {
+			m.logger.WithError(err).Errorf("Failed to load server certificate from files: %s, %s", certData.CertFile, certData.KeyFile)
+			continue
+		}
+		serverCerts = append(serverCerts, &cert)
+	}
+
+	if len(serverCerts) > 0 {
+		m.CheckServerCertificates(serverCerts)
+	}
+
+	// Check certificate store-based server certificates
+	if len(gwConfig.HttpServerOptions.SSLCertificates) > 0 {
+		sslCertificates := m.gw.CertificateManager.List(gwConfig.HttpServerOptions.SSLCertificates, certs.CertificatePrivate)
+		if len(sslCertificates) > 0 {
+			m.CheckServerCertificates(sslCertificates)
+		}
+	}
+
+	// Check API certificates (CA and server certs)
+	m.CheckAPICertificates()
 }
 
 // Stop gracefully shuts down the monitor
@@ -220,7 +294,27 @@ func (m *GlobalCertificateMonitor) CheckAPICertificates() {
 
 // extractCertInfo validates the certificate and extracts basic information
 func (m *GlobalCertificateMonitor) extractCertInfo(cert *tls.Certificate, certType string) (certInfo certcheck.CertInfo, ok bool) {
-	if cert == nil || cert.Leaf == nil {
+	if cert == nil {
+		m.logger.
+			WithField("cert_type", certType).
+			Warning("Extract Cert Info: Skipping nil certificate")
+		return certcheck.CertInfo{}, false
+	}
+
+	// Parse Leaf if not already parsed (tls.LoadX509KeyPair doesn't populate Leaf)
+	if cert.Leaf == nil && len(cert.Certificate) > 0 {
+		var err error
+		cert.Leaf, err = x509.ParseCertificate(cert.Certificate[0])
+		if err != nil {
+			m.logger.
+				WithField("cert_type", certType).
+				WithError(err).
+				Warning("Extract Cert Info: Failed to parse certificate")
+			return certcheck.CertInfo{}, false
+		}
+	}
+
+	if cert.Leaf == nil {
 		m.logger.
 			WithField("cert_type", certType).
 			Warning("Extract Cert Info: Skipping invalid certificate")
