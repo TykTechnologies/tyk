@@ -6,15 +6,15 @@ import "sync"
 type certRegistry struct {
 	mu sync.RWMutex
 
-	required   map[string]bool     // certID -> is required
-	apisByCert map[string][]string // certID -> API IDs using this cert
-	certsByAPI map[string][]string // API ID -> cert IDs it uses
+	required   map[string]bool                // certID -> is required
+	apisByCert map[string]map[string]bool     // certID -> set of API IDs using this cert
+	certsByAPI map[string][]string            // API ID -> cert IDs it uses
 }
 
 func newCertRegistry() *certRegistry {
 	return &certRegistry{
 		required:   make(map[string]bool),
-		apisByCert: make(map[string][]string),
+		apisByCert: make(map[string]map[string]bool),
 		certsByAPI: make(map[string][]string),
 	}
 }
@@ -31,13 +31,16 @@ func (cr *certRegistry) APIs(certID string) []string {
 	cr.mu.RLock()
 	defer cr.mu.RUnlock()
 
-	apis := cr.apisByCert[certID]
-	if apis == nil {
+	apiSet := cr.apisByCert[certID]
+	if apiSet == nil {
 		return nil
 	}
 
-	result := make([]string, len(apis))
-	copy(result, apis)
+	// Convert set to slice
+	result := make([]string, 0, len(apiSet))
+	for apiID := range apiSet {
+		result = append(result, apiID)
+	}
 	return result
 }
 
@@ -70,9 +73,11 @@ func (cr *certRegistry) Register(spec *APISpec) {
 
 		cr.required[certID] = true
 
-		if !contains(cr.apisByCert[certID], apiID) {
-			cr.apisByCert[certID] = append(cr.apisByCert[certID], apiID)
+		// Initialize the set if it doesn't exist
+		if cr.apisByCert[certID] == nil {
+			cr.apisByCert[certID] = make(map[string]bool)
 		}
+		cr.apisByCert[certID][apiID] = true
 	}
 }
 
@@ -90,9 +95,11 @@ func (cr *certRegistry) RegisterServerCerts(certIDs []string) {
 
 		cr.required[certID] = true
 
-		if !contains(cr.apisByCert[certID], serverAPI) {
-			cr.apisByCert[certID] = append(cr.apisByCert[certID], serverAPI)
+		// Initialize the set if it doesn't exist
+		if cr.apisByCert[certID] == nil {
+			cr.apisByCert[certID] = make(map[string]bool)
 		}
+		cr.apisByCert[certID][serverAPI] = true
 	}
 }
 
