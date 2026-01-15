@@ -65,7 +65,6 @@ var (
 				WarningThresholdDays: DefaultWarningThresholdDays,
 				CheckCooldownSeconds: DefaultCheckCooldownSeconds,
 				EventCooldownSeconds: DefaultEventCooldownSeconds,
-				CheckIntervalSeconds: DefaultCheckIntervalSeconds,
 			},
 		},
 	}
@@ -81,9 +80,6 @@ const (
 
 	// DefaultEventCooldownSeconds is the minimum time in seconds that the Gateway will leave between firing an event for an expiring or expired certificate; this default will be applied as a floor value to protect the system from misconfiguration, but can be overridden by setting a longer cooldown in the CertificateExpiryMonitorConfig
 	DefaultEventCooldownSeconds = 86400 // 24 hours
-
-	// DefaultCheckIntervalSeconds is the interval in seconds at which the Gateway will proactively check all configured certificates (server, CA, upstream) for expiry - this enables regular monitoring even when certificates are not being actively used
-	DefaultCheckIntervalSeconds = 3600 // 1 hour
 )
 
 const (
@@ -679,8 +675,8 @@ type CertificateExpiryMonitorConfig struct {
 	// Default: DefaultEventCooldownSeconds (86400 seconds = 24 hours)
 	EventCooldownSeconds int `json:"event_cooldown_seconds"`
 
-	// CheckIntervalSeconds specifies the interval in seconds at which the Gateway will proactively check all configured certificates (server, CA, upstream) for expiry - this enables regular monitoring even when certificates are not being actively used
-	// Default: DefaultCheckCooldownSeconds (3600 seconds = 1 hour)
+	// CheckIntervalSeconds specifies the interval in seconds at which the Gateway will proactively check upstream certificates for expiry - this enables regular monitoring even when certificates are not being actively used
+	// Default: 0 (periodic checking disabled, falls back to CheckCooldownSeconds for initial check only)
 	CheckIntervalSeconds int `json:"check_interval_seconds"`
 }
 
