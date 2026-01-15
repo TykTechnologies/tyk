@@ -24,6 +24,10 @@ func NewStore(policies []user.Policy) *Store {
 // PolicyIDs returns a list policy IDs in the store.
 // It will return nil if no policies exist.
 func (s *Store) PolicyIDs() []model.PolicyID {
+	if s.policies == nil {
+		return nil
+	}
+	
 	return lo.Map(s.policies, func(pol user.Policy, _ int) model.PolicyID {
 		if pol.ID != "" {
 			return model.NewScopedPolicyId(pol.OrgID, pol.ID)
