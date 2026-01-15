@@ -97,18 +97,16 @@ func (t *Service) Apply(session *user.SessionState) error {
 	}
 
 	var (
-		policyIDs []string
+		policyIDs []model.PolicyID
 	)
 
 	storage := t.storage
 
 	if customPolicies, err := session.GetCustomPolicies(); err == nil {
 		storage = NewStore(customPolicies)
-		policyIDs = lo.Map(storage.PolicyIDs(), func(policyID model.PolicyID, _ int) string {
-			return policyID.String()
-		})
+		policyIDs = storage.PolicyIDs()
 	} else {
-		policyIDs = session.PolicyIDs()
+		policyIDs = t.policyIds(session)
 	}
 
 	// Only the status of policies applied to a key should determine the validity of the key.
@@ -120,13 +118,7 @@ func (t *Service) Apply(session *user.SessionState) error {
 	}
 
 	for _, polID := range policyIDs {
-		var id model.PolicyID = model.NonScopedPolicyId(polID)
-
-		if t.orgID != nil {
-			id = model.NewScopedPolicyId(*t.orgID, polID)
-		}
-
-		policy, ok := storage.PolicyByID(id)
+		policy, ok := storage.PolicyByID(polID)
 		if !ok {
 			err := fmt.Errorf("policy not found: %q", polID)
 			t.Logger().Error(err)
@@ -354,6 +346,24 @@ func (t *Service) applyPerAPI(policy user.Policy, session *user.SessionState, ri
 	}
 
 	return nil
+}
+
+func (t *Service) policyIds(session *user.SessionState) []model.PolicyID {
+	ids := session.PolicyIDs()
+
+	switch {
+	case ids == nil:
+		return nil
+	case t.orgID == nil:
+		return lo.Map(session.PolicyIDs(), func(item string, _ int) model.PolicyID {
+			return model.NonScopedPolicyId(item)
+		})
+	default:
+		orgId := *t.orgID
+		return lo.Map(session.PolicyIDs(), func(item string, _ int) model.PolicyID {
+			return model.NewScopedPolicyId(orgId, item)
+		})
+	}
 }
 
 func (t *Service) applyPartitions(policy user.Policy, session *user.SessionState, rights map[string]user.AccessDefinition,
