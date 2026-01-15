@@ -39,7 +39,7 @@ func (t *Service) ClearSession(session *user.SessionState) error {
 	policies := session.PolicyIDs()
 
 	for _, polID := range policies {
-		policy, ok := t.storage.PolicyByID(model.NewAnyPolicyId(session.OrgID, polID))
+		policy, ok := t.storage.PolicyByID(model.NewScopedPolicyId(session.OrgID, polID))
 		if !ok {
 			return fmt.Errorf("policy not found: %s", polID)
 		}
@@ -122,7 +122,7 @@ func (t *Service) Apply(session *user.SessionState) error {
 	}
 
 	for _, polID := range policyIDs {
-		policy, ok := storage.PolicyByID(model.NewAnyPolicyId(session.OrgID, polID))
+		policy, ok := storage.PolicyByID(model.NewScopedPolicyId(session.OrgID, polID))
 		if !ok {
 			err := fmt.Errorf("policy not found: %q", polID)
 			t.Logger().Error(err)

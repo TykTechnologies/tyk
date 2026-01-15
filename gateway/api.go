@@ -244,7 +244,7 @@ func (gw *Gateway) checkAndApplyTrialPeriod(
 ) {
 	// Check the policies to see if we are forcing an expiry on the key
 	for _, polID := range newSession.PolicyIDs() {
-		policy, ok := gw.policies.PolicyByID(model.NewAnyPolicyId(newSession.OrgID, polID))
+		policy, ok := gw.policies.PolicyByID(model.NewScopedPolicyId(newSession.OrgID, polID))
 		if !ok {
 			continue
 		}
@@ -895,19 +895,28 @@ func (gw *Gateway) handleRemoveSortedSetRange(keyName, scoreFrom, scoreTo string
 }
 
 func (gw *Gateway) handleGetPolicy(polID string) (interface{}, int) {
-	// todo: extract org id !!!!!
-	if pol, ok := gw.policies.PolicyByID(model.PolicyDbId(polID)); ok && pol.ID != "" {
-		return pol, http.StatusOK
+	pol, err := gw.policies.PolicyByIdExtended(model.NonScopedPolicyId(polID))
+
+	if err != nil {
+		log.
+			WithError(err).
+			WithFields(logrus.Fields{
+				"prefix": "policy",
+				"polID":  polID,
+			}).
+			Error("Policy doesn't exist.")
 	}
 
-	log.
-		WithFields(logrus.Fields{
-			"prefix": "policy",
-			"polID":  polID,
-		}).
-		Error("Policy doesn't exist.")
-
-	return apiError("Policy not found"), http.StatusNotFound
+	switch {
+	case err == nil:
+		return pol, http.StatusOK
+	case errors.Is(err, model.ErrPolicyNotFound):
+		return apiError("Policy not found"), http.StatusNotFound
+	case errors.Is(err, model.ErrAmbiguousState):
+		return apiError("Ambiguous state. Unable to extract policy by custom identifier."), http.StatusConflict
+	default:
+		return apiError(http.StatusText(http.StatusInternalServerError)), http.StatusInternalServerError
+	}
 }
 
 func (gw *Gateway) handleGetPolicyList() (interface{}, int) {
@@ -1741,7 +1750,7 @@ func (gw *Gateway) handleUpdateHashedKey(keyName string, applyPolicies []string)
 	var orgID string
 
 	if len(applyPolicies) != 0 {
-		if pol, ok := gw.policies.PolicyByID(model.PolicyDbId(applyPolicies[0])); ok {
+		if pol, ok := gw.policies.PolicyByID(model.NonScopedPolicyId(applyPolicies[0])); ok {
 			orgID = pol.OrgID
 		}
 	}
@@ -2245,7 +2254,7 @@ func (gw *Gateway) createOauthClient(w http.ResponseWriter, r *http.Request) {
 		}
 	} else {
 		// set client for all APIs from the given policy
-		policy, ok := gw.policies.PolicyByID(model.PolicyDbId(newClient.PolicyID))
+		policy, ok := gw.policies.PolicyByID(model.NonScopedPolicyId(newClient.PolicyID))
 		if !ok {
 			log.WithFields(logrus.Fields{
 				"prefix":   "api",
@@ -2410,7 +2419,7 @@ func (gw *Gateway) updateOauthClient(keyName, apiID string, r *http.Request) (in
 
 	// check policy
 	if updateClientData.PolicyID != "" {
-		policy, ok := gw.policies.PolicyByID(model.NewAnyPolicyId(apiSpec.OrgID, updateClientData.PolicyID))
+		policy, ok := gw.policies.PolicyByID(model.NewScopedPolicyId(apiSpec.OrgID, updateClientData.PolicyID))
 		if !ok {
 			return apiError("Policy doesn't exist"), http.StatusNotFound
 		}

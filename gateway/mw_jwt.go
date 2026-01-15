@@ -798,7 +798,7 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 		var policy user.Policy
 		var ok bool
 		if basePolicyID != "" {
-			policy, ok = k.Gw.policies.PolicyByID(model.NewAnyPolicyId(k.Spec.OrgID, basePolicyID))
+			policy, ok = k.Gw.policies.PolicyByID(model.NewScopedPolicyId(k.Spec.OrgID, basePolicyID))
 			if !ok {
 				k.reportLoginFailure(baseFieldData, r)
 				k.Logger().Error("Policy ID found is invalid!")
@@ -1410,7 +1410,9 @@ func ctxSetJWTContextVars(s *APISpec, r *http.Request, token *jwt.Token) {
 }
 
 func (gw *Gateway) generateSessionFromPolicy(policyID, orgID string, enforceOrg bool) (user.SessionState, error) {
-	policy, ok := gw.policies.PolicyByID(model.NewAnyPolicyId(orgID, policyID))
+
+	/// to może być zmienione
+	policy, ok := gw.policies.PolicyByID(model.NewScopedPolicyId(orgID, policyID))
 	session := user.SessionState{}
 
 	if !ok {
