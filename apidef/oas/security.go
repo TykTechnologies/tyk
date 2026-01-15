@@ -3,7 +3,7 @@ package oas
 import (
 	"github.com/lonelycode/osin"
 
-	"github.com/TykTechnologies/kin-openapi/openapi3"
+	"github.com/getkin/kin-openapi/openapi3"
 
 	"github.com/TykTechnologies/tyk/apidef"
 )

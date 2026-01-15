@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/TykTechnologies/kin-openapi/openapi3"
+	"github.com/getkin/kin-openapi/openapi3"
 )
 
 //go:embed testdata/*-oas-template.json
@@ -30,19 +30,23 @@ func TestValidateOASObject(t *testing.T) {
 		openapi3.T{
 			OpenAPI: "3.0.3",
 			Info:    &openapi3.Info{},
-			Paths: map[string]*openapi3.PathItem{
-				"/pets": {
+			Paths: func() *openapi3.Paths {
+				paths := openapi3.NewPaths()
+				paths.Set("/pets", &openapi3.PathItem{
 					Get: &openapi3.Operation{
-						Responses: openapi3.Responses{
-							"200": &openapi3.ResponseRef{
+						Responses: func() *openapi3.Responses {
+							responses := openapi3.NewResponses()
+							responses.Set("200", &openapi3.ResponseRef{
 								Value: &openapi3.Response{
 									Description: getStrPointer("A paged array of pets"),
 								},
-							},
-						},
+							})
+							return responses
+						}(),
 					},
-				},
-			},
+				})
+				return paths
+			}(),
 		},
 	}
 
@@ -78,7 +82,8 @@ func TestValidateOASObject(t *testing.T) {
 	invalidXTykAPIGateway.Info = Info{}
 	invalidXTykAPIGateway.Server.GatewayTags = &GatewayTags{Enabled: true, Tags: []string{}}
 	invalidOASObject.SetTykExtension(&invalidXTykAPIGateway)
-	invalidOASObject.Paths["/pets"].Get.Responses["200"].Value.Description = nil
+	pathsMap := invalidOASObject.Paths.Map()
+	pathsMap["/pets"].Get.Responses.Map()["200"].Value.Description = nil
 	invalidOAS3Definition, _ := invalidOASObject.MarshalJSON()
 
 	t.Run("invalid OAS object", func(t *testing.T) {

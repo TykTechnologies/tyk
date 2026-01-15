@@ -24,9 +24,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/TykTechnologies/kin-openapi/openapi3"
 	"github.com/TykTechnologies/storage/persistent/model"
 	temporalmodel "github.com/TykTechnologies/storage/temporal/model"
+	"github.com/getkin/kin-openapi/openapi3"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/apidef/oas"
@@ -2293,7 +2293,7 @@ func TestHandleAddOASApi_AddVersionAtomically(t *testing.T) {
 				Title:   "oas doc",
 				Version: "1",
 			},
-			Paths: make(openapi3.Paths),
+			Paths: openapi3.NewPaths(),
 		},
 	}
 
@@ -2434,7 +2434,7 @@ func TestHandleDeleteOASAPI_RemoveVersionAtomically(t *testing.T) {
 				Title:   "oas doc",
 				Version: "1",
 			},
-			Paths: make(openapi3.Paths),
+			Paths: openapi3.NewPaths(),
 		},
 	}
 
@@ -2671,7 +2671,7 @@ func TestOAS(t *testing.T) {
 			Title:   "oas doc",
 			Version: "1",
 		},
-		Paths: make(openapi3.Paths),
+		Paths: openapi3.NewPaths(),
 	}
 
 	oasAPI.Extensions = map[string]interface{}{
@@ -2695,7 +2695,7 @@ func TestOAS(t *testing.T) {
 	assert.NotNil(t, createdOldAPI)
 
 	t.Run("OAS validation - should fail without x-tyk-api-gateway", func(t *testing.T) {
-		oasAPI.Paths = make(openapi3.Paths)
+		oasAPI.Paths = openapi3.NewPaths()
 		delete(oasAPI.Extensions, oas.ExtensionTykAPIGateway)
 		_, _ = ts.Run(t, []test.TestCase{
 			{AdminAuth: true, Method: http.MethodPost, Path: "/tyk/apis/oas/", Data: &oasAPI,
@@ -2718,7 +2718,7 @@ func TestOAS(t *testing.T) {
 		})
 	})
 
-	oasAPI.Paths = make(openapi3.Paths)
+	oasAPI.Paths = openapi3.NewPaths()
 
 	t.Run("get old api in OAS format - should fail", func(t *testing.T) {
 		_, _ = ts.Run(t, test.TestCase{AdminAuth: true, Method: http.MethodGet, Path: oasBasePath + "/" + oldAPIID,
@@ -2788,7 +2788,7 @@ func TestOAS(t *testing.T) {
 				oldAPIInOAS.GetTykExtension().Upstream.MutualTLS = nil
 				oldAPIInOAS.GetTykExtension().Upstream.CertificatePinning = nil
 
-				oldAPIInOAS.Paths = make(openapi3.Paths)
+				oldAPIInOAS.Paths = openapi3.NewPaths()
 				updatePath := "/tyk/apis/oas/" + apiID
 
 				_, _ = ts.Run(t, []test.TestCase{
@@ -2835,7 +2835,7 @@ func TestOAS(t *testing.T) {
 					},
 				}
 
-				oasAPIInOAS.Paths = make(openapi3.Paths)
+				oasAPIInOAS.Paths = openapi3.NewPaths()
 
 				oasAPIInOAS.Info.Title = "oas-updated oas doc"
 				testUpdateAPI(t, ts, &oasAPIInOAS, apiID, true)
@@ -2866,7 +2866,7 @@ func TestOAS(t *testing.T) {
 					},
 				}
 
-				oasAPIInOAS.Paths = make(openapi3.Paths)
+				oasAPIInOAS.Paths = openapi3.NewPaths()
 
 				oasAPIInOAS.Info.Title = "oas-updated oas doc"
 				testUpdateAPI(t, ts, &oasAPIInOAS, apiID, true)
@@ -2978,22 +2978,23 @@ func TestOAS(t *testing.T) {
 		}
 
 		fillPaths := func(oasAPI *oas.OAS) {
-			oasAPI.Paths = openapi3.Paths{
-				"/pets": {
-					Get: &openapi3.Operation{
-						Summary: "get pets",
-						Responses: openapi3.Responses{
-							"200": {
-								Value: &openapi3.Response{
-									Description: getStrPointer("200 response"),
-									Content: openapi3.Content{
-										"application/json": {
-											Schema: &openapi3.SchemaRef{
-												Value: &openapi3.Schema{
-													Properties: openapi3.Schemas{
-														"value": &openapi3.SchemaRef{
-															Value: &openapi3.Schema{Type: openapi3.TypeBoolean},
-														},
+			paths := openapi3.NewPaths()
+
+			paths.Set("/pets", &openapi3.PathItem{
+				Get: &openapi3.Operation{
+					Summary: "get pets",
+					Responses: func() *openapi3.Responses {
+						r := openapi3.NewResponses()
+						r.Set("200", &openapi3.ResponseRef{
+							Value: &openapi3.Response{
+								Description: getStrPointer("200 response"),
+								Content: openapi3.Content{
+									"application/json": {
+										Schema: &openapi3.SchemaRef{
+											Value: &openapi3.Schema{
+												Properties: openapi3.Schemas{
+													"value": &openapi3.SchemaRef{
+														Value: &openapi3.Schema{Type: &openapi3.Types{openapi3.TypeBoolean}},
 													},
 												},
 											},
@@ -3001,32 +3002,38 @@ func TestOAS(t *testing.T) {
 									},
 								},
 							},
-						},
-					},
-					Post: &openapi3.Operation{
-						Responses: openapi3.Responses{
-							"200": {
-								Value: &openapi3.Response{
-									Description: getStrPointer("200 response"),
-									Content: openapi3.Content{
-										"application/json": {
-											Schema: &openapi3.SchemaRef{
-												Value: &openapi3.Schema{
-													Properties: openapi3.Schemas{
-														"added": &openapi3.SchemaRef{
-															Value: &openapi3.Schema{Type: openapi3.TypeBoolean},
-														},
-													},
-												},
-											},
-										},
-									},
-								},
-							},
-						},
-					},
+						})
+						return r
+					}(),
 				},
-			}
+				Post: &openapi3.Operation{
+					Summary: "post pets",
+					Responses: func() *openapi3.Responses {
+						r := openapi3.NewResponses()
+						r.Set("200", &openapi3.ResponseRef{
+							Value: &openapi3.Response{
+								Description: getStrPointer("200 response"),
+								Content: openapi3.Content{
+									"application/json": {
+										Schema: &openapi3.SchemaRef{
+											Value: &openapi3.Schema{
+												Properties: openapi3.Schemas{
+													"added": &openapi3.SchemaRef{
+														Value: &openapi3.Schema{Type: &openapi3.Types{openapi3.TypeBoolean}},
+													},
+												},
+											},
+										},
+									},
+								},
+							},
+						})
+						return r
+					}(),
+				},
+			})
+
+			oasAPI.Paths = paths
 		}
 
 		fillReqBody := func(oasDef *oas.OAS, path, method string) {
@@ -3038,7 +3045,7 @@ func TestOAS(t *testing.T) {
 			valueSchema.Properties = openapi3.Schemas{
 				"value": {
 					Value: &openapi3.Schema{
-						Type: openapi3.TypeBoolean,
+						Type: &openapi3.Types{openapi3.TypeBoolean},
 					},
 				},
 			}
@@ -3515,7 +3522,7 @@ func TestOAS(t *testing.T) {
 					Title:   "example oas doc",
 					Version: "1",
 				},
-				Paths: openapi3.Paths{},
+				Paths: openapi3.NewPaths(),
 				Servers: openapi3.Servers{
 					&openapi3.Server{
 						URL:         "http://upstream.example.com",
@@ -3782,7 +3789,7 @@ func TestGetOASAPI_WithVersionBaseID(t *testing.T) {
 				Title:   "oas doc",
 				Version: "1",
 			},
-			Paths: make(openapi3.Paths),
+			Paths: openapi3.NewPaths(),
 		},
 	}
 

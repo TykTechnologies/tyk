@@ -10,7 +10,7 @@ import (
 	"sort"
 	"strconv"
 
-	"github.com/TykTechnologies/kin-openapi/openapi3"
+	"github.com/getkin/kin-openapi/openapi3"
 
 	"github.com/TykTechnologies/tyk/apidef/oas"
 	"github.com/TykTechnologies/tyk/common/option"
@@ -179,8 +179,8 @@ func mockFromOAS(r *http.Request, operation *openapi3.Operation, fromOASExamples
 		contentType = headerContentType
 	}
 
-	response, ok := operation.Responses[strconv.Itoa(code)]
-	if !ok {
+	response := operation.Responses.Value(strconv.Itoa(code))
+	if response == nil {
 		return http.StatusNotFound, "", nil, nil, fmt.Errorf("there is no example response for the code: %d", code)
 	}
 
