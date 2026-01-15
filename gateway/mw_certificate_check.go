@@ -15,11 +15,10 @@ import (
 // CertificateCheckMW is used if domain was not detected or multiple APIs bind on the same domain. In this case authentification check happens not on TLS side but on HTTP level using this middleware
 type CertificateCheckMW struct {
 	*BaseMiddleware
-	store                      storage.Handler // Redis storage for cooldowns
-	expiryCheckContext         context.Context
-	expiryCheckCancelFunc      context.CancelFunc
-	expiryCheckBatcher         certcheck.BackgroundBatcher
-	upstreamExpiryCheckBatcher certcheck.BackgroundBatcher
+	store                 storage.Handler // Redis storage for cooldowns
+	expiryCheckContext    context.Context
+	expiryCheckCancelFunc context.CancelFunc
+	expiryCheckBatcher    certcheck.BackgroundBatcher
 }
 
 func (m *CertificateCheckMW) Name() string {
@@ -27,7 +26,7 @@ func (m *CertificateCheckMW) Name() string {
 }
 
 func (m *CertificateCheckMW) EnabledForSpec() bool {
-	return m.Spec.UseMutualTLSAuth || !m.Spec.UpstreamCertificatesDisabled
+	return m.Spec.UseMutualTLSAuth
 }
 
 func (m *CertificateCheckMW) Init() {
@@ -82,42 +81,6 @@ func (m *CertificateCheckMW) Init() {
 
 	m.expiryCheckContext, m.expiryCheckCancelFunc = context.WithCancel(context.Background())
 	go m.expiryCheckBatcher.RunInBackground(m.expiryCheckContext)
-
-	// Initialize upstream certificate expiry check batcher
-	if m.upstreamExpiryCheckBatcher == nil && !m.Spec.UpstreamCertificatesDisabled {
-		log.
-			WithField("api_id", m.Spec.APIID).
-			WithField("api_name", m.Spec.Name).
-			WithField("mw", m.Name()).
-			Debug("Initializing upstream certificate expiry check batcher.")
-
-		apiData := certcheck.APIMetaData{
-			APIID:   m.Spec.APIID,
-			APIName: m.Spec.Name,
-		}
-
-		var err error
-		m.upstreamExpiryCheckBatcher, err = certcheck.NewCertificateExpiryCheckBatcherWithRole(
-			m.logger,
-			apiData,
-			m.Gw.GetConfig().Security.CertificateExpiryMonitor,
-			m.store,
-			m.Gw.FireSystemEvent,
-			"upstream",
-		)
-
-		if err != nil {
-			log.
-				WithField("api_id", m.Spec.APIID).
-				WithField("api_name", m.Spec.Name).
-				WithField("mw", m.Name()).
-				Error("Failed to initialize upstream certificate expiry check batcher.")
-		} else {
-			go m.upstreamExpiryCheckBatcher.RunInBackground(m.expiryCheckContext)
-			// Store batcher in APISpec so reverse proxy can use it
-			m.Spec.UpstreamCertExpiryBatcher = m.upstreamExpiryCheckBatcher
-		}
-	}
 }
 
 func (m *CertificateCheckMW) Unload() {
