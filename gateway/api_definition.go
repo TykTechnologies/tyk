@@ -1337,7 +1337,7 @@ func (a APIDefinitionLoader) compileOASValidateRequestPathSpec(apiSpec *APISpec,
 
 		newSpec := URLSpec{
 			OASValidateRequestMeta: operation.ValidateRequest,
-			OASMethod:              method,
+			OASMethod:              strings.ToUpper(method),
 			OASPath:                path,
 		}
 
@@ -1382,7 +1382,7 @@ func (a APIDefinitionLoader) compileOASMockResponsePathSpec(apiSpec *APISpec, co
 
 		newSpec := URLSpec{
 			OASMockResponseMeta: operation.MockResponse,
-			OASMethod:           method,
+			OASMethod:           strings.ToUpper(method),
 			OASPath:             path,
 		}
 
