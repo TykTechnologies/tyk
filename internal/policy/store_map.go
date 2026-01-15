@@ -40,7 +40,7 @@ func (s *StoreMap) PolicyIDs() []model.PolicyID {
 func (s *StoreMap) PolicyByID(id model.PolicyID) (user.Policy, bool) {
 	switch id := id.(type) {
 	case model.NonScopedPolicyId:
-		v, ok := s.policies[id.String()]
+		v, ok := s.policies[string(id)]
 		return v, ok
 	case model.ScopedPolicyId:
 		v, ok := s.policies[id.Id()]

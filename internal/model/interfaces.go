@@ -1,7 +1,6 @@
 package model
 
 import (
-	"fmt"
 	"net/http"
 
 	"github.com/sirupsen/logrus"
@@ -71,7 +70,6 @@ type (
 
 // PolicyID sealed interface
 type PolicyID interface {
-	fmt.Stringer
 	IsIdentifierOf(user.Policy) bool
 	markerPolicyId()
 }
@@ -112,10 +110,6 @@ func (c ScopedPolicyId) Id() string {
 	return c.id
 }
 
-func (c ScopedPolicyId) String() string {
-	return c.id
-}
-
 func (c ScopedPolicyId) customKey() customKey {
 	return customKey(c.id)
 }
@@ -125,21 +119,14 @@ func (c ScopedPolicyId) markerPolicyId() {}
 type NonScopedPolicyId string
 
 func (c NonScopedPolicyId) IsIdentifierOf(pol user.Policy) bool {
-	return persistentmodel.ObjectID(c) == pol.MID || string(c) == pol.ID
-}
-
-func (c NonScopedPolicyId) String() string {
-	return persistentmodel.ObjectID(c).Hex()
+	oid := persistentmodel.ObjectID(c)
+	return (pol.ID != "" && string(c) == pol.ID) || (oid.Valid() && oid == pol.MID)
 }
 
 func (c NonScopedPolicyId) markerPolicyId() {}
 
 type InvalidPolicyId struct {
 	BasePolicyId
-}
-
-func (i InvalidPolicyId) String() string {
-	return ""
 }
 
 func (i InvalidPolicyId) IsIdentifierOf(_ user.Policy) bool {
