@@ -46,6 +46,7 @@ import (
 	"github.com/TykTechnologies/tyk/internal/otel"
 	"github.com/TykTechnologies/tyk/internal/service/core"
 	"github.com/TykTechnologies/tyk/regexp"
+	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/trace"
 	"github.com/TykTechnologies/tyk/user"
 )
@@ -1912,8 +1913,64 @@ func (p *ReverseProxy) addAuthInfo(outReq, req *http.Request) {
 	}
 }
 
+// initUpstreamCertBatcher initializes the upstream certificate expiry batcher on first use
+func (p *ReverseProxy) initUpstreamCertBatcher() {
+	p.TykAPISpec.upstreamCertBatcherOnce.Do(func() {
+		// Skip if upstream certificates are disabled
+		if p.TykAPISpec.UpstreamCertificatesDisabled {
+			return
+		}
+
+		// Initialize Redis store for cooldowns
+		store := &storage.RedisCluster{
+			KeyPrefix:         "cert-cooldown:",
+			ConnectionHandler: p.Gw.StorageConnectionHandler,
+		}
+		store.Connect()
+
+		// Create upstream certificate expiry check batcher
+		apiData := certcheck.APIMetaData{
+			APIID:   p.TykAPISpec.APIID,
+			APIName: p.TykAPISpec.Name,
+		}
+
+		batcher, err := certcheck.NewCertificateExpiryCheckBatcherWithRole(
+			p.logger,
+			apiData,
+			p.Gw.GetConfig().Security.CertificateExpiryMonitor,
+			store,
+			p.Gw.FireSystemEvent,
+			"upstream",
+		)
+
+		if err != nil {
+			p.logger.
+				WithField("api_id", p.TykAPISpec.APIID).
+				WithField("api_name", p.TykAPISpec.Name).
+				WithError(err).
+				Error("Failed to initialize upstream certificate expiry check batcher")
+			return
+		}
+
+		// Start the batcher in background
+		ctx := context.Background()
+		go batcher.RunInBackground(ctx)
+
+		// Store batcher in APISpec
+		p.TykAPISpec.UpstreamCertExpiryBatcher = batcher
+
+		p.logger.
+			WithField("api_id", p.TykAPISpec.APIID).
+			WithField("api_name", p.TykAPISpec.Name).
+			Debug("Initialized upstream certificate expiry monitoring")
+	})
+}
+
 // checkUpstreamCertificateExpiry checks the expiry of an upstream certificate using the APISpec's batcher
 func (p *ReverseProxy) checkUpstreamCertificateExpiry(cert *tls.Certificate) {
+	// Lazy initialize batcher on first use
+	p.initUpstreamCertBatcher()
+
 	if p.TykAPISpec.UpstreamCertExpiryBatcher == nil {
 		return
 	}

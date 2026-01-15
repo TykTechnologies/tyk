@@ -67,6 +67,7 @@ type APISpec struct {
 
 	// UpstreamCertExpiryBatcher handles upstream certificate expiry checking
 	UpstreamCertExpiryBatcher certcheck.BackgroundBatcher
+	upstreamCertBatcherOnce   sync.Once
 }
 
 // CheckSpecMatchesStatus checks if a URL spec has a specific status.
