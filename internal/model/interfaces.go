@@ -6,7 +6,7 @@ import (
 
 	"github.com/sirupsen/logrus"
 
-	pesistentmodel "github.com/TykTechnologies/storage/persistent/model"
+	persistentmodel "github.com/TykTechnologies/storage/persistent/model"
 
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/user"
@@ -78,65 +78,82 @@ type PolicyID interface {
 
 func PolicyIdFromPolicy(pol user.Policy) PolicyID {
 	if pol.ID != "" {
-		return NewAnyPolicyId(pol.OrgID, pol.ID)
+		return NewScopedPolicyId(pol.OrgID, pol.ID)
 	}
-	return PolicyDbId(pol.MID)
+
+	if pol.MID.Valid() {
+		return NewScopedPolicyId(pol.OrgID, pol.ID)
+	}
+
+	return InvalidPolicyId{}
 }
 
 var (
-	_ PolicyID = PolicyDbId("")
-	_ PolicyID = AnyPolicyId{}
+	_ PolicyID = NonScopedPolicyId("")
+	_ PolicyID = ScopedPolicyId{}
 )
 
-// NewAnyPolicyId creates custom policy identifier
-func NewAnyPolicyId(orgId, idOrCustomId string) AnyPolicyId {
-	return AnyPolicyId{
+// NewScopedPolicyId creates custom policy identifier
+func NewScopedPolicyId(orgId, idOrCustomId string) ScopedPolicyId {
+	return ScopedPolicyId{
 		orgId: orgId,
 		id:    idOrCustomId,
 	}
 }
 
-// AnyPolicyId represents any policy identifier (database and custom)
-type AnyPolicyId struct {
+// ScopedPolicyId represents any policy identifier (database and custom)
+type ScopedPolicyId struct {
 	orgId string
 	id    string
 }
 
-func (c AnyPolicyId) IsIdentifierOf(pol user.Policy) bool {
+func (c ScopedPolicyId) IsIdentifierOf(pol user.Policy) bool {
 	return pol.OrgID == c.orgId && c.id == pol.ID
 }
 
-func (c AnyPolicyId) OrgId() string {
+func (c ScopedPolicyId) OrgId() string {
 	return c.orgId
 }
 
-func (c AnyPolicyId) Id() string {
+func (c ScopedPolicyId) Id() string {
 	return c.id
 }
 
-func (c AnyPolicyId) String() string {
+func (c ScopedPolicyId) String() string {
 	return c.id
 }
 
-func (c AnyPolicyId) customKey() customKey {
-	return customKey(c)
+func (c ScopedPolicyId) customKey() customKey {
+	return customKey(c.id)
 }
 
-func (c AnyPolicyId) markerAnyPolicyId() {}
+func (c ScopedPolicyId) markerAnyPolicyId() {}
 
-// PolicyDbId database policy identifier
-type PolicyDbId pesistentmodel.ObjectID
+// NonScopedPolicyId database policy identifier
+type NonScopedPolicyId string
 
-func (c PolicyDbId) objectID() pesistentmodel.ObjectID {
-	return pesistentmodel.ObjectID(c)
+func (c NonScopedPolicyId) objectID() persistentmodel.ObjectID {
+	return persistentmodel.ObjectID(c)
 }
 
-func (c PolicyDbId) IsIdentifierOf(pol user.Policy) bool {
+func (c NonScopedPolicyId) IsIdentifierOf(pol user.Policy) bool {
 	return c.objectID() == pol.MID
 }
 
-func (c PolicyDbId) String() string {
-	return c.objectID().Hex()
+func (c NonScopedPolicyId) String() string {
+	return string(c)
 }
 
-func (c PolicyDbId) markerAnyPolicyId() {}
+func (c NonScopedPolicyId) markerAnyPolicyId() {}
+
+type InvalidPolicyId struct{}
+
+func (i InvalidPolicyId) String() string {
+	return "invalid"
+}
+
+func (i InvalidPolicyId) IsIdentifierOf(_ user.Policy) bool {
+	return false
+}
+
+func (i InvalidPolicyId) markerAnyPolicyId() {}

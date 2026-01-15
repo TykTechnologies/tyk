@@ -32,17 +32,17 @@ func NewStoreMap(policies map[string]user.Policy) *StoreMap {
 // It will return nil if no policies exist.
 func (s *StoreMap) PolicyIDs() []model.PolicyID {
 	return lo.Map(slices.Collect(maps.Values(s.policies)), func(pol user.Policy, _ int) model.PolicyID {
-		return model.NewAnyPolicyId(pol.OrgID, pol.ID)
+		return model.NewScopedPolicyId(pol.OrgID, pol.ID)
 	})
 }
 
 // PolicyByID returns a policy by ID.
 func (s *StoreMap) PolicyByID(id model.PolicyID) (user.Policy, bool) {
 	switch id := id.(type) {
-	case model.PolicyDbId:
+	case model.NonScopedPolicyId:
 		v, ok := s.policies[id.String()]
 		return v, ok
-	case model.AnyPolicyId:
+	case model.ScopedPolicyId:
 		v, ok := s.policies[id.Id()]
 		return v, ok
 	default:
