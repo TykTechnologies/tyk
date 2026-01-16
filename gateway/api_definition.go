@@ -369,6 +369,11 @@ func (a APIDefinitionLoader) MakeSpec(def *model.MergedAPI, logger *logrus.Entry
 		}
 
 		spec.OAS = *def.OAS
+
+		// Eagerly initialize all OAS security schemes and extensions to prevent
+		// race conditions caused by lazy-initialization during request processing.
+		// See: https://github.com/TykTechnologies/tyk/issues/7573
+		spec.OAS.Initialize()
 	}
 
 	if err := httputil.ValidatePath(spec.Proxy.ListenPath); err != nil {

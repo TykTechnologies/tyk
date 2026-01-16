@@ -249,10 +249,6 @@ func determineHosts(apiData *apidef.APIDefinition, config ServerRegenerationConf
 // determineHostsWithEdgeSupport determines hosts based on edge endpoints and API tags.
 func determineHostsWithEdgeSupport(apiData *apidef.APIDefinition, config ServerRegenerationConfig) []string {
 	if apiData.TagsDisabled {
-		return []string{""}
-	}
-
-	if len(config.EdgeEndpoints) == 0 {
 		if config.HybridEnabled {
 			return []string{""}
 		}
@@ -264,6 +260,10 @@ func determineHostsWithEdgeSupport(apiData *apidef.APIDefinition, config ServerR
 			return []string{""}
 		}
 		return []string{config.DefaultHost}
+	}
+
+	if len(config.EdgeEndpoints) == 0 {
+		return []string{""}
 	}
 
 	matchingHosts := findEndpointsMatchingTags(apiData.Tags, config.EdgeEndpoints)

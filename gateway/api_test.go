@@ -3340,7 +3340,7 @@ func TestOAS(t *testing.T) {
 				testPatchOAS(t, ts, apiInOAS, nil, apiID)
 				patchedOASObj := testGetOASAPI(t, ts, apiID, tykExt.Info.Name, apiInOAS.T.Info.Title)
 
-				require.Len(t, patchedOASObj.Servers, 3)
+				require.Len(t, patchedOASObj.Servers, 4)
 				assert.EqualValues(t, serverURL1, patchedOASObj.Servers[0].URL)
 
 				foundServer2 := false

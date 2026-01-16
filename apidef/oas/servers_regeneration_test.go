@@ -301,7 +301,7 @@ func TestDetermineHosts(t *testing.T) {
 			expected: []string{""},
 		},
 		{
-			name: "gateway tags disabled with tags and edge endpoints → relative path only",
+			name: "gateway tags disabled with tags and edge endpoints → default host + relative path",
 			apiData: &apidef.APIDefinition{
 				TagsDisabled: true,
 				Tags:         []string{"prod"},
@@ -313,10 +313,10 @@ func TestDetermineHosts(t *testing.T) {
 					{Endpoint: "http://edge2.example.com", Tags: []string{"prod"}},
 				},
 			},
-			expected: []string{""},
+			expected: []string{"localhost:8080", ""},
 		},
 		{
-			name: "gateway tags disabled without tags but with edge endpoints → relative path only",
+			name: "gateway tags disabled without tags but with edge endpoints → default host + relative path",
 			apiData: &apidef.APIDefinition{
 				TagsDisabled: true,
 				Tags:         []string{},
@@ -327,10 +327,10 @@ func TestDetermineHosts(t *testing.T) {
 					{Endpoint: "http://edge1.example.com", Tags: []string{"prod"}},
 				},
 			},
-			expected: []string{""},
+			expected: []string{"localhost:8080", ""},
 		},
 		{
-			name: "gateway tags disabled without edge endpoints → relative path only",
+			name: "gateway tags disabled without edge endpoints → default host + relative path",
 			apiData: &apidef.APIDefinition{
 				TagsDisabled: true,
 				Tags:         []string{"prod"},
@@ -339,7 +339,7 @@ func TestDetermineHosts(t *testing.T) {
 				DefaultHost:   "localhost:8080",
 				EdgeEndpoints: []EdgeEndpoint{},
 			},
-			expected: []string{""},
+			expected: []string{"localhost:8080", ""},
 		},
 	}
 
@@ -815,7 +815,7 @@ func TestRegenerateServers(t *testing.T) {
 		assert.Equal(t, "/api", oas.Servers[1].URL)
 	})
 
-	t.Run("gateway tags disabled removes edge endpoint URLs", func(t *testing.T) {
+	t.Run("gateway tags disabled falls back to default host", func(t *testing.T) {
 		t.Parallel()
 
 		oldAPI := &apidef.APIDefinition{
@@ -859,13 +859,14 @@ func TestRegenerateServers(t *testing.T) {
 		err := oas.RegenerateServers(newAPI, oldAPI, nil, nil, config, "")
 		require.NoError(t, err)
 
-		assert.Equal(t, 2, len(oas.Servers))
+		assert.Equal(t, 3, len(oas.Servers))
 
 		urls := make([]string, len(oas.Servers))
 		for i, server := range oas.Servers {
 			urls[i] = server.URL
 		}
 
+		assert.Contains(t, urls, "http://localhost:8080/api", "Should have default host URL")
 		assert.Contains(t, urls, "/api", "Should have relative path URL")
 		assert.Contains(t, urls, "https://user-custom.example.com", "Should preserve user server")
 		assert.NotContains(t, urls, "http://edge1.example.com/api", "Should remove edge endpoint URL 1")
