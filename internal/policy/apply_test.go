@@ -755,7 +755,7 @@ func testPrepareApplyPolicies(tb testing.TB) (*policy.Service, []testApplyPolici
 					},
 				}
 
-				gotPolicy, ok := store.PolicyByID(model.NewScopedPolicyId(orgID, "per-path2"))
+				gotPolicy, ok := store.PolicyByID(model.NewScopedCustomPolicyId(orgID, "per-path2"))
 
 				assert.True(t, ok)
 				assert.Equal(t, user.AccessSpec{

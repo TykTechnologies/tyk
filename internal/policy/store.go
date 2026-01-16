@@ -14,6 +14,19 @@ type Store struct {
 	policies []user.Policy
 }
 
+type aclPolId struct {
+	model.BasePolicyId
+	pol *user.Policy
+}
+
+func (a aclPolId) String() string {
+	return a.pol.ID
+}
+
+func (a aclPolId) IsIdentifierOf(_ user.Policy) bool {
+	return false
+}
+
 // NewStore returns a new policy.Store.
 func NewStore(policies []user.Policy) *Store {
 	return &Store{
@@ -29,24 +42,16 @@ func (s *Store) PolicyIDs() []model.PolicyID {
 	}
 
 	return lo.Map(s.policies, func(pol user.Policy, _ int) model.PolicyID {
-		if pol.ID != "" {
-			return model.NewScopedPolicyId(pol.OrgID, pol.ID)
+		return aclPolId{
+			pol: &pol,
 		}
-
-		if pol.MID.Valid() {
-			return model.NewScopedPolicyId(pol.OrgID, pol.MID.Hex())
-		}
-
-		return model.InvalidPolicyId{}
 	})
 }
 
 // PolicyByID returns a policy by ID.
 func (s *Store) PolicyByID(id model.PolicyID) (user.Policy, bool) {
-	for _, pol := range s.policies {
-		if id.IsIdentifierOf(pol) {
-			return pol, true
-		}
+	if cast, ok := id.(aclPolId); ok {
+		return *cast.pol, true
 	}
 	return user.Policy{}, false
 }
