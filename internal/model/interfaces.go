@@ -1,11 +1,10 @@
 package model
 
 import (
+	"fmt"
 	"net/http"
 
 	"github.com/sirupsen/logrus"
-
-	persistentmodel "github.com/TykTechnologies/storage/persistent/model"
 
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/user"
@@ -70,65 +69,6 @@ type (
 
 // PolicyID sealed interface
 type PolicyID interface {
-	IsIdentifierOf(user.Policy) bool
+	fmt.Stringer
 	markerPolicyId()
-}
-
-type basePolicyId struct{}
-
-func (i basePolicyId) markerPolicyId() {}
-
-var (
-	_ PolicyID = NonScopedPolicyId("")
-	_ PolicyID = ScopedPolicyId{}
-)
-
-// NewScopedPolicyId creates custom policy identifier
-func NewScopedPolicyId(orgId, idOrCustomId string) ScopedPolicyId {
-	return ScopedPolicyId{
-		orgId: orgId,
-		id:    idOrCustomId,
-	}
-}
-
-// ScopedPolicyId represents any policy identifier (database and custom)
-type ScopedPolicyId struct {
-	basePolicyId // nolint:unused
-	orgId        string
-	id           string
-}
-
-func (c ScopedPolicyId) IsIdentifierOf(pol user.Policy) bool {
-	return pol.OrgID == c.orgId && c.id == pol.ID
-}
-
-func (c ScopedPolicyId) OrgId() string {
-	return c.orgId
-}
-
-func (c ScopedPolicyId) Id() string {
-	return c.id
-}
-
-func (c ScopedPolicyId) customKey() customKey {
-	return customKey(c.id)
-}
-
-func (c ScopedPolicyId) markerPolicyId() {}
-
-type NonScopedPolicyId string
-
-func (c NonScopedPolicyId) IsIdentifierOf(pol user.Policy) bool {
-	oid := persistentmodel.ObjectID(c)
-	return (pol.ID != "" && string(c) == pol.ID) || (oid.Valid() && oid == pol.MID)
-}
-
-func (c NonScopedPolicyId) markerPolicyId() {}
-
-type InvalidPolicyId struct {
-	basePolicyId
-}
-
-func (i InvalidPolicyId) IsIdentifierOf(_ user.Policy) bool {
-	return false
 }
