@@ -93,12 +93,7 @@ func (gw *Gateway) compressAPIBackup(list string) string {
 		return list
 	}
 
-	compressed, err := compression.CompressZstd([]byte(list))
-	if err != nil {
-		log.WithError(err).Warning("[RPC] --> Failed to compress API definitions, falling back to uncompressed")
-		return list
-	}
-
+	compressed := compression.CompressZstd([]byte(list))
 	log.Debug("[RPC] --> API definitions compressed with Zstd")
 	return string(compressed)
 }

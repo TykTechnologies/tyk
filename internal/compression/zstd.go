@@ -19,14 +19,20 @@ var (
 
 	encoderPool = sync.Pool{
 		New: func() interface{} {
-			encoder, _ := zstd.NewWriter(nil)
+			encoder, err := zstd.NewWriter(nil)
+			if err != nil {
+				log.WithError(err).Panic("Failed to create Zstd encoder")
+			}
 			return encoder
 		},
 	}
 
 	decoderPool = sync.Pool{
 		New: func() interface{} {
-			decoder, _ := zstd.NewReader(nil, zstd.WithDecoderMaxMemory(maxDecompressedSize))
+			decoder, err := zstd.NewReader(nil, zstd.WithDecoderMaxMemory(maxDecompressedSize))
+			if err != nil {
+				log.WithError(err).Panic("Failed to create Zstd decoder")
+			}
 			return decoder
 		},
 	}
@@ -34,7 +40,7 @@ var (
 
 // CompressZstd compresses data using Zstd compression
 // Returns the compressed data and logs compression statistics
-func CompressZstd(data []byte) ([]byte, error) {
+func CompressZstd(data []byte) []byte {
 	encoder := encoderPool.Get().(*zstd.Encoder)
 	defer encoderPool.Put(encoder)
 
@@ -50,7 +56,7 @@ func CompressZstd(data []byte) ([]byte, error) {
 		"compression_ratio": compressionRatio,
 	}).Debug("Data compressed with Zstd")
 
-	return compressed, nil
+	return compressed
 }
 
 // DecompressZstd decompresses Zstd-compressed data
