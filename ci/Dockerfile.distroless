@@ -10,7 +10,7 @@ ENV DEBIAN_FRONTEND=noninteractive
 COPY ${BUILD_PACKAGE_NAME}_*${TARGETARCH}.deb /
 RUN dpkg -i /${BUILD_PACKAGE_NAME}_*${TARGETARCH}.deb && rm /*.deb
 
-FROM gcr.io/distroless/base-debian12:latest
+FROM tykio/dhi-debian-base:trixie-debian13-fips
 
 COPY --from=deb /opt/tyk-gateway /opt/tyk-gateway
 
