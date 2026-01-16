@@ -1,8 +1,0 @@
-flowchart LR
-    CP["Control Plane<br/>(Redis Storage)"]
-    MDCB["MDCB Server"]
-    DP["Data Plane Gateway"]
-
-    CP -->|"Stores all certificates"| MDCB
-    MDCB -->|"Keyspace sync<br/>(cert-* keys)"| DP
-    DP -->|"Downloads ALL certificates<br/>regardless of usage"| Store["Local Storage<br/>(all certs)"]
