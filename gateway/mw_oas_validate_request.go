@@ -22,7 +22,6 @@ var (
 		header.TransferEncoding: true,
 		header.Host:             true,
 	}
-
 )
 
 func init() {
@@ -108,6 +107,8 @@ func (k *ValidateRequest) ProcessRequest(w http.ResponseWriter, r *http.Request,
 	if validateRequest.ErrorResponseCode != 0 {
 		errResponseCode = validateRequest.ErrorResponseCode
 	}
+
+	normalizeHeaders(r.Header)
 
 	// Find the route using the OAS path from URLSpec, not the actual request path.
 	// This allows prefix/suffix matching to work: request to /anything/abc can be
