@@ -47,19 +47,15 @@ func NewScopedCustomPolicyId(orgId, customId string) ScopedCustomPolicyId {
 func (c ScopedCustomPolicyId) OrgId() string {
 	return c.orgId
 }
-
 func (c ScopedCustomPolicyId) Id() string {
 	return c.id
 }
-
 func (c ScopedCustomPolicyId) String() string {
 	return c.id
 }
-
 func (c ScopedCustomPolicyId) customKey() customKey {
 	return customKey(c.id)
 }
-
 func (c ScopedCustomPolicyId) markerPolicyId() {}
 
 func (c NonScopedPolicyId) String() string {

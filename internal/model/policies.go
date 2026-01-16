@@ -36,11 +36,13 @@ type (
 		policiesCustomKeyToObjectID map[customKey]persistentmodel.ObjectID
 		onCollision                 CollisionCb
 		onBrokenPolicy              BrokenPolicyCb
+		onMultiTenantCollision      MultiTenantCollisionCb
 		once                        sync.Once
 	}
 
-	CollisionCb    func(oldEntry, newEntry *user.Policy)
-	BrokenPolicyCb func(*user.Policy)
+	CollisionCb            func(oldEntry, newEntry *user.Policy)
+	BrokenPolicyCb         func(*user.Policy)
+	MultiTenantCollisionCb func(customId string, dbIds []persistentmodel.ObjectID)
 
 	customKey string
 	orgId     string
@@ -48,12 +50,21 @@ type (
 
 func (p *Policies) init() {
 	p.once.Do(func() {
-		p.policies = make(map[persistentmodel.ObjectID]user.Policy)
-		p.policiesCustomKey = make(map[customKey]map[orgId]user.Policy)
-		p.policiesCustomKeyToObjectID = make(map[customKey]persistentmodel.ObjectID)
-		p.onCollision = collisionNoop
-		p.onBrokenPolicy = brokenPolicyNoop
+		p.reset()
+		p.initDefaultCallbacks()
 	})
+}
+
+func (p *Policies) initDefaultCallbacks() {
+	p.onCollision = collisionNoop
+	p.onBrokenPolicy = brokenPolicyNoop
+	p.onMultiTenantCollision = multiTenantCollisionNoop
+}
+
+func (p *Policies) reset() {
+	p.policies = make(map[persistentmodel.ObjectID]user.Policy)
+	p.policiesCustomKey = make(map[customKey]map[orgId]user.Policy)
+	p.policiesCustomKeyToObjectID = make(map[customKey]persistentmodel.ObjectID)
 }
 
 func NewPolicies(opts ...PolicySetOpt) *Policies {
@@ -67,9 +78,29 @@ func NewPolicies(opts ...PolicySetOpt) *Policies {
 	return &set
 }
 
+func WithCombined(opts ...PolicySetOpt) PolicySetOpt {
+	return func(s *Policies) {
+		for _, apply := range opts {
+			apply(s)
+		}
+	}
+}
+
 func WithCollisionCb(cb CollisionCb) PolicySetOpt {
 	return func(s *Policies) {
 		s.onCollision = cb
+	}
+}
+
+func WithLoadFail(cb BrokenPolicyCb) PolicySetOpt {
+	return func(s *Policies) {
+		s.onBrokenPolicy = cb
+	}
+}
+
+func WithCollisionMultiTenant(cb MultiTenantCollisionCb) PolicySetOpt {
+	return func(s *Policies) {
+		s.onMultiTenantCollision = cb
 	}
 }
 
@@ -124,14 +155,38 @@ func (p *Policies) DeleteById(id PolicyID) bool {
 		return false
 	}
 
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
 	p.unloadOne(&pol)
 	return true
 }
 
 func (p *Policies) Load(policies ...user.Policy) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.reset()
+
 	for _, pol := range policies {
-		p.unloadOne(&pol)
 		p.loadOne(&pol)
+	}
+
+	p.emitMultiTenancyCollisions()
+
+}
+
+func (p *Policies) emitMultiTenancyCollisions() {
+	for id, set := range p.policiesCustomKey {
+		if len(set) == 1 {
+			continue
+		}
+
+		p.onMultiTenantCollision(
+			string(id),
+			lo.Map(lo.Values(set), func(item user.Policy, _ int) persistentmodel.ObjectID {
+				return item.MID
+			}),
+		)
 	}
 }
 
@@ -189,8 +244,6 @@ func (p *Policies) policyByIdExtended(id PolicyID) (user.Policy, error) {
 }
 
 func (p *Policies) unloadOne(pol *user.Policy) {
-	p.mu.Lock()
-	defer p.mu.Unlock()
 	delete(p.policies, pol.MID)
 	ckSet, ok := p.policiesCustomKey[customKey(pol.ID)]
 
@@ -213,9 +266,6 @@ func (p *Policies) loadOne(pol *user.Policy) {
 		return
 	}
 
-	p.mu.Lock()
-	defer p.mu.Unlock()
-
 	p.policies[pol.MID] = *pol
 	key := customKey(pol.ID)
 
@@ -236,6 +286,8 @@ func (p *Policies) loadOne(pol *user.Policy) {
 func collisionNoop(_, _ *user.Policy) {}
 
 func brokenPolicyNoop(_ *user.Policy) {}
+
+func multiTenantCollisionNoop(_ string, _ []persistentmodel.ObjectID) {}
 
 // EnsurePolicyId ensures ID field exists
 // should be removed after migrate
