@@ -1413,14 +1413,21 @@ func ctxSetJWTContextVars(s *APISpec, r *http.Request, token *jwt.Token) {
 }
 
 func (gw *Gateway) generateSessionFromPolicy(policyID, orgID string, enforceOrg bool) (user.SessionState, error) {
-	policy, ok := gw.policies.PolicyByID(model.NewScopedPolicyId(orgID, policyID))
+
+	var polId model.PolicyID
+
+	if enforceOrg {
+		polId = model.NewScopedPolicyId(orgID, policyID)
+	} else {
+		polId = model.NonScopedPolicyId(policyID)
+	}
+
+	policy, err := gw.policies.PolicyByIdExtended(polId)
 	session := user.SessionState{}
 
-	if !ok {
-		return session.Clone(), errors.New("Policy not found")
+	if err != nil {
+		return session, err
 	}
-	// Check ownership, policy org owner must be the same as API,
-	// otherwise you could overwrite a session key with a policy from a different org!
 
 	if enforceOrg {
 		if policy.OrgID != orgID {

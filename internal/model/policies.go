@@ -1,6 +1,7 @@
 package model
 
 import (
+	"fmt"
 	"sync"
 
 	persistentmodel "github.com/TykTechnologies/storage/persistent/model"
@@ -112,6 +113,23 @@ func (p *Policies) PolicyByIdExtended(id PolicyID) (user.Policy, error) {
 	return p.policyByIdExtended(id)
 }
 
+func (p *Policies) DeleteById(id PolicyID) bool {
+	p.init()
+	pol, err := p.PolicyByIdExtended(id)
+	if err != nil {
+		return false
+	}
+
+	p.unloadOne(&pol)
+	return true
+}
+
+func (p *Policies) Load(policies ...user.Policy) {
+	for _, pol := range policies {
+		p.loadOne(&pol)
+	}
+}
+
 func (p *Policies) policyByIdExtended(id PolicyID) (user.Policy, error) {
 	switch id := id.(type) {
 	case ScopedPolicyId:
@@ -125,12 +143,12 @@ func (p *Policies) policyByIdExtended(id PolicyID) (user.Policy, error) {
 		}
 
 		// fallback strategy
-		dbId := persistentmodel.ObjectID(id.id)
-		if !dbId.Valid() {
+		oid := persistentmodel.ObjectID(id.id)
+		if !oid.Valid() {
 			return user.Policy{}, ErrPolicyNotFound
 		}
 
-		if policy, ok := p.policies[dbId]; ok && policy.OrgID == id.orgId {
+		if policy, ok := p.policies[oid]; ok && policy.OrgID == id.orgId {
 			return policy, nil
 		}
 
@@ -150,33 +168,19 @@ func (p *Policies) policyByIdExtended(id PolicyID) (user.Policy, error) {
 		case len(ckSet) == 1:
 			return lo.FirstOrEmpty(maps.Values(ckSet)), nil
 		default:
-			return user.Policy{}, ErrAmbiguousState
+			return user.Policy{}, fmt.Errorf(
+				"more than one policct with id %s was found: %w",
+				id, ErrAmbiguousState,
+			)
 		}
 	default:
 		return user.Policy{}, ErrUnreachable
 	}
 }
 
-func (p *Policies) DeleteById(id PolicyID) bool {
-	pol, err := p.PolicyByIdExtended(id)
-	if err != nil {
-		return false
-	}
-
-	p.unloadOne(&pol)
-	return true
-}
-
-func (p *Policies) Load(policies ...user.Policy) {
-	for _, pol := range policies {
-		p.loadOne(&pol)
-	}
-}
-
 func (p *Policies) unloadOne(pol *user.Policy) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
-
 	delete(p.policies, pol.MID)
 	ckSet, ok := p.policiesCustomKey[customKey(pol.ID)]
 
