@@ -707,28 +707,28 @@ Blackbox testing validates the selective certificate synchronization feature thr
 
 #### Test Coverage Requirements
 
-**1. Initial Synchronization**
+**Initial Synchronization**
 - Data plane starting with selective sync enabled syncs only certificates referenced in loaded API specs
 - Control plane has many certificates, data plane has few APIs
 - Observable: Data plane storage contains only required certificates (97-98% reduction)
 - Observable: Logs indicate selective sync is enabled with certificate and API counts
 - Observable: APIs function correctly with synced certificates
 
-**2. Live Sync Filtering**
+**Live Sync Filtering**
 - Data plane ignores certificate updates for certificates not used by loaded APIs
 - Certificate updated on control plane that is not referenced by any data plane API
 - Observable: Updated certificate does not appear in data plane storage
 - Observable: Debug log indicates certificate was skipped
 - Observable: Data plane continues normal operation
 
-**3. Required Certificate Sync**
+**Required Certificate Sync**
 - Data plane syncs certificate updates for certificates used by loaded APIs
 - Certificate updated on control plane that is referenced by data plane API
 - Observable: Updated certificate appears in data plane storage with new content
 - Observable: Info log indicates certificate was synced with list of APIs using it
 - Observable: APIs using certificate continue to function with updated version
 
-**4. Certificate Cleanup**
+**Certificate Cleanup**
 - Data plane removes unused certificates when APIs are reloaded
 - API references to certificates removed, then API reload triggered
 - Observable: Previously synced certificates no longer in data plane storage
@@ -736,14 +736,14 @@ Blackbox testing validates the selective certificate synchronization feature thr
 - Observable: Still-referenced certificates remain in storage
 - Observable: APIs continue to function with remaining certificates
 
-**5. Access Control**
+**Access Control**
 - Application layer blocks access to certificates not required by loaded APIs
 - Certificate exists in storage but is not registered in certificate registry
 - Observable: Certificate access attempts fail
 - Observable: Blocked access attempts logged with masked certificate ID
 - Observable: Storage layer contains certificate but application denies access
 
-**6. Certificate Sharing**
+**Certificate Sharing**
 - Certificates referenced by multiple APIs are tracked correctly
 - Multiple APIs reference the same certificate
 - Observable: Certificate synced once and stored once
@@ -751,14 +751,14 @@ Blackbox testing validates the selective certificate synchronization feature thr
 - Observable: Removing one API does not remove certificate if still used by others
 - Observable: Certificate removed only when no APIs reference it
 
-**7. Deduplication**
+**Deduplication**
 - Duplicate certificate references within same API spec are deduplicated
 - API spec references same certificate in multiple fields
 - Observable: Certificate stored once, not multiple times
 - Observable: Registry tracks single reference despite multiple spec fields
 - Observable: Single sync operation for the certificate
 
-**8. Backward Compatibility**
+**Backward Compatibility**
 - Feature disabled (default configuration) produces original behavior
 - Both selective sync and cleanup flags disabled
 - Observable: All certificates from control plane synced to data plane
@@ -766,14 +766,14 @@ Blackbox testing validates the selective certificate synchronization feature thr
 - Observable: Certificate count matches control plane
 - Observable: Behavior identical to implementation without feature
 
-**9. Segmented Deployment**
+**Segmented Deployment**
 - Selective sync works correctly with API group binding
 - Data plane bound to specific API group, control plane has multiple groups
 - Observable: Data plane syncs only certificates for APIs in assigned group
 - Observable: Certificates for other groups not present in data plane storage
 - Observable: Certificate count reflects group isolation
 
-**10. Certificate Rotation**
+**Certificate Rotation**
 - Certificate updates propagate correctly with selective sync enabled
 - Certificate updated on control plane that is currently in use by data plane
 - Observable: Updated certificate content appears in data plane storage
