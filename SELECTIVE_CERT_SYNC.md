@@ -708,78 +708,98 @@ Blackbox testing validates the selective certificate synchronization feature thr
 #### Test Coverage Requirements
 
 **Initial Synchronization**
-- Data plane starting with selective sync enabled syncs only certificates referenced in loaded API specs
-- Control plane has many certificates, data plane has few APIs
-- Observable: Data plane storage contains only required certificates (97-98% reduction)
-- Observable: Logs indicate selective sync is enabled with certificate and API counts
-- Observable: APIs function correctly with synced certificates
+
+Data plane starting with selective sync enabled syncs only certificates referenced in loaded API specs. Control plane has many certificates, data plane has few APIs.
+
+Expected observable behavior:
+- Data plane storage contains only required certificates (97-98% reduction)
+- Logs indicate selective sync is enabled with certificate and API counts
+- APIs function correctly with synced certificates
 
 **Live Sync Filtering**
-- Data plane ignores certificate updates for certificates not used by loaded APIs
-- Certificate updated on control plane that is not referenced by any data plane API
-- Observable: Updated certificate does not appear in data plane storage
-- Observable: Debug log indicates certificate was skipped
-- Observable: Data plane continues normal operation
+
+Data plane ignores certificate updates for certificates not used by loaded APIs. Certificate updated on control plane that is not referenced by any data plane API.
+
+Expected observable behavior:
+- Updated certificate does not appear in data plane storage
+- Debug log indicates certificate was skipped
+- Data plane continues normal operation
 
 **Required Certificate Sync**
-- Data plane syncs certificate updates for certificates used by loaded APIs
-- Certificate updated on control plane that is referenced by data plane API
-- Observable: Updated certificate appears in data plane storage with new content
-- Observable: Info log indicates certificate was synced with list of APIs using it
-- Observable: APIs using certificate continue to function with updated version
+
+Data plane syncs certificate updates for certificates used by loaded APIs. Certificate updated on control plane that is referenced by data plane API.
+
+Expected observable behavior:
+- Updated certificate appears in data plane storage with new content
+- Info log indicates certificate was synced with list of APIs using it
+- APIs using certificate continue to function with updated version
 
 **Certificate Cleanup**
-- Data plane removes unused certificates when APIs are reloaded
-- API references to certificates removed, then API reload triggered
-- Observable: Previously synced certificates no longer in data plane storage
-- Observable: Logs indicate cleanup operation with count of removed certificates
-- Observable: Still-referenced certificates remain in storage
-- Observable: APIs continue to function with remaining certificates
+
+Data plane removes unused certificates when APIs are reloaded. API references to certificates removed, then API reload triggered.
+
+Expected observable behavior:
+- Previously synced certificates no longer in data plane storage
+- Logs indicate cleanup operation with count of removed certificates
+- Still-referenced certificates remain in storage
+- APIs continue to function with remaining certificates
 
 **Access Control**
-- Application layer blocks access to certificates not required by loaded APIs
-- Certificate exists in storage but is not registered in certificate registry
-- Observable: Certificate access attempts fail
-- Observable: Blocked access attempts logged with masked certificate ID
-- Observable: Storage layer contains certificate but application denies access
+
+Application layer blocks access to certificates not required by loaded APIs. Certificate exists in storage but is not registered in certificate registry.
+
+Expected observable behavior:
+- Certificate access attempts fail
+- Blocked access attempts logged with masked certificate ID
+- Storage layer contains certificate but application denies access
 
 **Certificate Sharing**
-- Certificates referenced by multiple APIs are tracked correctly
-- Multiple APIs reference the same certificate
-- Observable: Certificate synced once and stored once
-- Observable: Logs show which APIs use the certificate
-- Observable: Removing one API does not remove certificate if still used by others
-- Observable: Certificate removed only when no APIs reference it
+
+Certificates referenced by multiple APIs are tracked correctly. Multiple APIs reference the same certificate.
+
+Expected observable behavior:
+- Certificate synced once and stored once
+- Logs show which APIs use the certificate
+- Removing one API does not remove certificate if still used by others
+- Certificate removed only when no APIs reference it
 
 **Deduplication**
-- Duplicate certificate references within same API spec are deduplicated
-- API spec references same certificate in multiple fields
-- Observable: Certificate stored once, not multiple times
-- Observable: Registry tracks single reference despite multiple spec fields
-- Observable: Single sync operation for the certificate
+
+Duplicate certificate references within same API spec are deduplicated. API spec references same certificate in multiple fields.
+
+Expected observable behavior:
+- Certificate stored once, not multiple times
+- Registry tracks single reference despite multiple spec fields
+- Single sync operation for the certificate
 
 **Backward Compatibility**
-- Feature disabled (default configuration) produces original behavior
-- Both selective sync and cleanup flags disabled
-- Observable: All certificates from control plane synced to data plane
-- Observable: No selective sync log messages
-- Observable: Certificate count matches control plane
-- Observable: Behavior identical to implementation without feature
+
+Feature disabled (default configuration) produces original behavior. Both selective sync and cleanup flags disabled.
+
+Expected observable behavior:
+- All certificates from control plane synced to data plane
+- No selective sync log messages
+- Certificate count matches control plane
+- Behavior identical to implementation without feature
 
 **Segmented Deployment**
-- Selective sync works correctly with API group binding
-- Data plane bound to specific API group, control plane has multiple groups
-- Observable: Data plane syncs only certificates for APIs in assigned group
-- Observable: Certificates for other groups not present in data plane storage
-- Observable: Certificate count reflects group isolation
+
+Selective sync works correctly with API group binding. Data plane bound to specific API group, control plane has multiple groups.
+
+Expected observable behavior:
+- Data plane syncs only certificates for APIs in assigned group
+- Certificates for other groups not present in data plane storage
+- Certificate count reflects group isolation
 
 **Certificate Rotation**
-- Certificate updates propagate correctly with selective sync enabled
-- Certificate updated on control plane that is currently in use by data plane
-- Observable: Updated certificate content appears in data plane storage
-- Observable: Keyspace event triggers sync of updated certificate
-- Observable: APIs automatically use new certificate version
-- Observable: No service interruption during rotation
+
+Certificate updates propagate correctly with selective sync enabled. Certificate updated on control plane that is currently in use by data plane.
+
+Expected observable behavior:
+- Updated certificate content appears in data plane storage
+- Keyspace event triggers sync of updated certificate
+- APIs automatically use new certificate version
+- No service interruption during rotation
 
 #### Validation Methods
 
