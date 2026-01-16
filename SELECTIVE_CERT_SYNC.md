@@ -15,41 +15,22 @@ This feature implements selective certificate synchronization for Tyk Gateway da
 
 ### Component Overview
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                        Control Plane                             │
-│  ┌────────────────────────────────────────────────────────┐    │
-│  │  Certificate Storage (Redis)                           │    │
-│  │  • All organization certificates                       │    │
-│  │  • 100+ certificates across multiple APIs              │    │
-│  └────────────────────────────────────────────────────────┘    │
-└─────────────────────────────────────────────────────────────────┘
-                              │
-                              │ RPC/MDCB
-                              ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                         Data Plane                               │
-│  ┌────────────────────────────────────────────────────────┐    │
-│  │  Certificate Registry                                   │    │
-│  │  • Tracks which certs are used by loaded APIs          │    │
-│  │  • O(1) lookup with map[string]struct{}                │    │
-│  │  • Bidirectional mapping: API↔Cert                     │    │
-│  └────────────────────────────────────────────────────────┘    │
-│                              │                                   │
-│                              ▼                                   │
-│  ┌────────────────────────────────────────────────────────┐    │
-│  │  Certificate Manager                                    │    │
-│  │  • Access control layer                                 │    │
-│  │  • Blocks access to non-required certificates          │    │
-│  └────────────────────────────────────────────────────────┘    │
-│                              │                                   │
-│                              ▼                                   │
-│  ┌────────────────────────────────────────────────────────┐    │
-│  │  Local Certificate Storage                              │    │
-│  │  • Only 2-3 certificates (from 100+)                    │    │
-│  │  • Cleaned up on API reload                             │    │
-│  └────────────────────────────────────────────────────────┘    │
-└─────────────────────────────────────────────────────────────────┘
+```mermaid
+graph TB
+    subgraph CP["Control Plane"]
+        CS["Certificate Storage (Redis)<br/>• All organization certificates<br/>• 100+ certificates across multiple APIs"]
+    end
+
+    subgraph DP["Data Plane"]
+        CR["Certificate Registry<br/>• Tracks which certs are used by loaded APIs<br/>• O(1) lookup with map[string]struct{}<br/>• Bidirectional mapping: API↔Cert"]
+        CM["Certificate Manager<br/>• Access control layer<br/>• Blocks access to non-required certificates"]
+        LCS["Local Certificate Storage<br/>• Only 2-3 certificates (from 100+)<br/>• Cleaned up on API reload"]
+
+        CR --> CM
+        CM --> LCS
+    end
+
+    CS -->|"RPC/MDCB"| CR
 ```
 
 ### Key Components
@@ -348,106 +329,82 @@ The registry tracks certificates from multiple API spec fields:
 
 ### Registration Flow
 
-```
-API Spec Loaded
-      │
-      ▼
-┌──────────────────────┐
-│ Extract Cert Refs    │
-│ from all fields      │
-└──────────────────────┘
-      │
-      ▼
-┌──────────────────────┐
-│ Deduplicate with     │
-│ map[string]struct{}  │
-└──────────────────────┘
-      │
-      ▼
-┌──────────────────────┐
-│ Register in          │
-│ certsByAPI           │
-└──────────────────────┘
-      │
-      ▼
-┌──────────────────────┐
-│ Mark as required     │
-│ in registry          │
-└──────────────────────┘
-      │
-      ▼
-┌──────────────────────┐
-│ Track API→Cert       │
-│ in apisByCert        │
-└──────────────────────┘
+```mermaid
+flowchart TD
+    Start["API Spec Loaded"]
+    Extract["Extract Cert Refs<br/>from all fields"]
+    Dedup["Deduplicate with<br/>map[string]struct{}"]
+    Register["Register in<br/>certsByAPI"]
+    MarkReq["Mark as required<br/>in registry"]
+    Track["Track API→Cert<br/>in apisByCert"]
+
+    Start --> Extract
+    Extract --> Dedup
+    Dedup --> Register
+    Register --> MarkReq
+    MarkReq --> Track
 ```
 
 ## Synchronization Flow
 
 ### Initial Sync
 
-```
-1. Data plane starts
-   │
-   ▼
-2. Connect to control plane via RPC
-   │
-   ▼
-3. Load API specs from control plane
-   │
-   ▼
-4. Register certificates from API specs
-   │
-   ▼
-5. Sync only required certificates
-   │
-   ▼
-6. Data plane ready with minimal certs
+```mermaid
+flowchart TD
+    Start["Data plane starts"]
+    Connect["Connect to control plane via RPC"]
+    Load["Load API specs from control plane"]
+    Register["Register certificates from API specs"]
+    Sync["Sync only required certificates"]
+    Ready["Data plane ready with minimal certs"]
+
+    Start --> Connect
+    Connect --> Load
+    Load --> Register
+    Register --> Sync
+    Sync --> Ready
 ```
 
 ### Live Sync (Keyspace Changes)
 
-```
-1. Control plane detects certificate update
-   │
-   ▼
-2. Publish keyspace change event
-   │
-   ▼
-3. Data plane receives event
-   │
-   ▼
-4. Check if cert is required (registry.Required())
-   │
-   ├─ Yes ──▶ Sync certificate
-   │
-   └─ No ───▶ Skip (log debug message)
+```mermaid
+flowchart TD
+    Detect["Control plane detects certificate update"]
+    Publish["Publish keyspace change event"]
+    Receive["Data plane receives event"]
+    Check{"Check if cert is required<br/>registry.Required()"}
+    SyncCert["Sync certificate"]
+    Skip["Skip (log debug message)"]
+
+    Detect --> Publish
+    Publish --> Receive
+    Receive --> Check
+    Check -->|Yes| SyncCert
+    Check -->|No| Skip
 ```
 
 ### API Reload
 
-```
-1. API spec updated
-   │
-   ▼
-2. Gateway reloads APIs
-   │
-   ▼
-3. Reset certificate registry
-   │
-   ▼
-4. Re-register certificates from new specs
-   │
-   ▼
-5. Cleanup unused certificates (if enabled)
-   │
-   ├─ List all local certificates
-   │
-   ├─ Check each against registry
-   │
-   ├─ Delete certificates not in registry
-   │
-   └─ Log cleanup summary
+```mermaid
+flowchart TD
+    Update["API spec updated"]
+    Reload["Gateway reloads APIs"]
+    Reset["Reset certificate registry"]
+    ReRegister["Re-register certificates from new specs"]
+    Cleanup["Cleanup unused certificates (if enabled)"]
+    List["List all local certificates"]
+    Check["Check each against registry"]
+    Delete["Delete certificates not in registry"]
+    Log["Log cleanup summary"]
+
+    Update --> Reload
+    Reload --> Reset
+    Reset --> ReRegister
+    ReRegister --> Cleanup
+    Cleanup --> List
+    List --> Check
+    Check --> Delete
+    Delete --> Log
 ```
 
 ## Performance Optimizations
