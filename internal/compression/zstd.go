@@ -1,6 +1,7 @@
 package compression
 
 import (
+	"bytes"
 	"sync"
 
 	"github.com/klauspost/compress/zstd"
@@ -11,6 +12,10 @@ const maxDecompressedSize = 100 * 1024 * 1024
 
 var (
 	log = logrus.WithField("prefix", "compression")
+
+	// zstdMagicBytes are the magic bytes that identify a Zstd frame
+	// See: https://github.com/facebook/zstd/blob/dev/doc/zstd_compression_format.md#zstandard-frames
+	zstdMagicBytes = []byte{0x28, 0xB5, 0x2F, 0xFD}
 
 	encoderPool = sync.Pool{
 		New: func() interface{} {
@@ -60,4 +65,9 @@ func DecompressZstd(data []byte) ([]byte, error) {
 
 	log.WithField("decompressed_size", len(decompressed)).Debug("Data decompressed with Zstd")
 	return decompressed, nil
+}
+
+// IsZstdCompressed checks if the data starts with Zstd magic bytes
+func IsZstdCompressed(data []byte) bool {
+	return len(data) >= 4 && bytes.Equal(data[:4], zstdMagicBytes)
 }

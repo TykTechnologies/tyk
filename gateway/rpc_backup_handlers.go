@@ -1,7 +1,6 @@
 package gateway
 
 import (
-	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"strings"
@@ -48,7 +47,7 @@ func (gw *Gateway) LoadDefinitionsFromRPCBackup() ([]*APISpec, error) {
 
 	decrypted := crypto.Decrypt([]byte(secret), cryptoText)
 
-	apiList, err := gw.decodeAPIBackup(decrypted)
+	apiList, err := gw.decompressAPIBackup(decrypted)
 	if err != nil {
 		return nil, err
 	}
@@ -77,7 +76,7 @@ func (gw *Gateway) saveRPCDefinitionsBackup(list string) error {
 	}
 
 	secret := crypto.GetPaddedString(gw.GetConfig().Secret)
-	dataToEncrypt := gw.encodeAPIBackup(list)
+	dataToEncrypt := gw.compressAPIBackup(list)
 
 	cryptoText := crypto.Encrypt([]byte(secret), dataToEncrypt)
 	if err := store.SetKey(BackupApiKeyBase+tagList, cryptoText, -1); err != nil {
@@ -87,8 +86,8 @@ func (gw *Gateway) saveRPCDefinitionsBackup(list string) error {
 	return nil
 }
 
-// encodeAPIBackup compresses and encodes API backup data if compression is enabled
-func (gw *Gateway) encodeAPIBackup(list string) string {
+// compressAPIBackup compresses API backup data if compression is enabled
+func (gw *Gateway) compressAPIBackup(list string) string {
 	if !gw.GetConfig().Storage.CompressAPIDefinitions {
 		log.Debug("[RPC] --> API definition compression disabled")
 		return list
@@ -100,32 +99,25 @@ func (gw *Gateway) encodeAPIBackup(list string) string {
 		return list
 	}
 
-	encoded := base64.StdEncoding.EncodeToString(compressed)
-	log.Debug("[RPC] --> API definitions compressed and base64-encoded")
-	return "zstd::" + encoded
+	log.Debug("[RPC] --> API definitions compressed with Zstd")
+	return string(compressed)
 }
 
-// decodeAPIBackup decodes and decompresses API backup data
-func (gw *Gateway) decodeAPIBackup(decrypted string) (string, error) {
-	// Check for new format with prefix
-	if strings.HasPrefix(decrypted, "zstd::") {
-		encoded := strings.TrimPrefix(decrypted, "zstd::")
-		decoded, err := base64.StdEncoding.DecodeString(encoded)
-		if err != nil {
-			return "", errors.New("[RPC] --> Failed to decode compressed backup: " + err.Error())
-		}
+// decompressAPIBackup decompresses API backup data if it's compressed
+func (gw *Gateway) decompressAPIBackup(decrypted string) (string, error) {
+	data := []byte(decrypted)
 
-		decompressed, err := compression.DecompressZstd(decoded)
+	if compression.IsZstdCompressed(data) {
+		decompressed, err := compression.DecompressZstd(data)
 		if err != nil {
 			return "", errors.New("[RPC] --> Failed to decompress backup: " + err.Error())
 		}
 
 		log.Debug("[RPC] --> Loaded compressed API definitions from backup")
-
 		return string(decompressed), nil
 	}
 
-	// Uncompressed
+	// Uncompressed JSON
 	log.Debug("[RPC] --> Loaded uncompressed API definitions from backup")
 	return decrypted, nil
 }

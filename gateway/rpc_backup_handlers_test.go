@@ -123,7 +123,7 @@ func BenchmarkSaveRPCDefinitionsBackup(b *testing.B) {
 	}
 }
 
-func TestDecodeAPIBackup(t *testing.T) {
+func TestDecompressAPIBackup(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
 
@@ -147,22 +147,16 @@ func TestDecodeAPIBackup(t *testing.T) {
 			expected: `[]`,
 		},
 		{
-			name:        "Invalid base64 in compressed data",
-			input:       "zstd::invalid-base64!!!",
-			wantErr:     true,
-			expectedErr: "[RPC] --> Failed to decode compressed backup:",
-		},
-		{
-			name:        "Invalid zstd data",
-			input:       "zstd::aGVsbG8=", // "hello" in base64, not valid zstd
-			wantErr:     true,
-			expectedErr: "[RPC] --> Failed to decompress backup:",
+			name:     "Invalid zstd data (wrong magic bytes)",
+			input:    "hello", // Plain text, not valid zstd
+			wantErr:  false,   // Should be treated as uncompressed JSON
+			expected: "hello",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result, err := ts.Gw.decodeAPIBackup(tt.input)
+			result, err := ts.Gw.decompressAPIBackup(tt.input)
 
 			if tt.wantErr {
 				if err == nil {
@@ -189,23 +183,31 @@ func TestDecodeAPIBackup(t *testing.T) {
 
 		original := `[{"api_id":"test","name":"Test API","description":"This is a test"}]`
 
-		// Encode the data
-		encoded := ts.Gw.encodeAPIBackup(original)
+		// Compress the data
+		compressed := ts.Gw.compressAPIBackup(original)
 
-		// Verify it has the zstd prefix
-		if !strings.HasPrefix(encoded, "zstd::") {
-			t.Errorf("Expected encoded data to have zstd:: prefix, got: %s", encoded[:20])
+		// Verify it has Zstd magic bytes
+		compressedBytes := []byte(compressed)
+		if len(compressedBytes) < 4 {
+			t.Fatalf("Compressed data is too short: %d bytes", len(compressedBytes))
 		}
 
-		// Decode it back
-		decoded, err := ts.Gw.decodeAPIBackup(encoded)
+		expectedMagic := []byte{0x28, 0xB5, 0x2F, 0xFD}
+		for i := 0; i < 4; i++ {
+			if compressedBytes[i] != expectedMagic[i] {
+				t.Errorf("Magic byte at position %d: got 0x%02X, want 0x%02X", i, compressedBytes[i], expectedMagic[i])
+			}
+		}
+
+		// Decompress it back
+		decompressed, err := ts.Gw.decompressAPIBackup(compressed)
 		if err != nil {
-			t.Fatalf("Failed to decode: %v", err)
+			t.Fatalf("Failed to decompress: %v", err)
 		}
 
 		// Verify it matches the original
-		if decoded != original {
-			t.Errorf("Round-trip failed. Expected %q, got %q", original, decoded)
+		if decompressed != original {
+			t.Errorf("Round-trip failed. Expected %q, got %q", original, decompressed)
 		}
 	})
 }
