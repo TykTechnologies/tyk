@@ -37,7 +37,6 @@ var (
 func CompressZstd(data []byte) ([]byte, error) {
 	encoder := encoderPool.Get().(*zstd.Encoder)
 	defer encoderPool.Put(encoder)
-	encoder.Close()
 
 	compressed := encoder.EncodeAll(data, make([]byte, 0, len(data)))
 
