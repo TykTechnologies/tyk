@@ -46,7 +46,7 @@ func (s *StoreMap) PolicyByID(id model.PolicyID) (user.Policy, bool) {
 		v, ok := s.policies[id.Id()]
 		return v, ok
 	default:
-		panic("unexpected sealed type")
+		return user.Policy{}, false
 	}
 }
 

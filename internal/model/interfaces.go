@@ -74,9 +74,9 @@ type PolicyID interface {
 	markerPolicyId()
 }
 
-type BasePolicyId struct{}
+type basePolicyId struct{}
 
-func (i BasePolicyId) markerPolicyId() {}
+func (i basePolicyId) markerPolicyId() {}
 
 var (
 	_ PolicyID = NonScopedPolicyId("")
@@ -93,9 +93,9 @@ func NewScopedPolicyId(orgId, idOrCustomId string) ScopedPolicyId {
 
 // ScopedPolicyId represents any policy identifier (database and custom)
 type ScopedPolicyId struct {
-	BasePolicyId
-	orgId string
-	id    string
+	basePolicyId // nolint:unused
+	orgId        string
+	id           string
 }
 
 func (c ScopedPolicyId) IsIdentifierOf(pol user.Policy) bool {
@@ -126,7 +126,7 @@ func (c NonScopedPolicyId) IsIdentifierOf(pol user.Policy) bool {
 func (c NonScopedPolicyId) markerPolicyId() {}
 
 type InvalidPolicyId struct {
-	BasePolicyId
+	basePolicyId
 }
 
 func (i InvalidPolicyId) IsIdentifierOf(_ user.Policy) bool {
