@@ -703,503 +703,111 @@ See `MDCB.md` for step-by-step manual testing procedures including:
 
 ### Blackbox Testing
 
-Blackbox testing validates the selective certificate synchronization feature from an external perspective, without requiring knowledge of internal implementation details. These tests verify observable behavior through logs, storage, and API functionality.
-
-#### Test Environment Setup
-
-**Prerequisites**:
-- Control plane gateway running with Redis storage
-- Data plane gateway(s) connected via MDCB/RPC
-- Access to both control plane and data plane Redis instances
-- Admin API credentials for both gateways
-
-**Test Data**:
-- Many test certificates uploaded to control plane (simulate realistic scale)
-- Few test APIs configured on data plane using specific certificates
-- API specs referencing certificates in various fields (Certificates, ClientCertificates, UpstreamCertificates, PinnedPublicKeys)
-
-#### Test Scenario 1: Initial Sync Verification
-
-**Objective**: Verify that data plane only syncs certificates used by loaded APIs on startup
-
-**Setup**:
-1. Upload many certificates to control plane Redis (e.g., cert-1 through cert-100)
-2. Configure data plane with 1 API using only 2 certificates (cert-1, cert-2)
-3. Enable selective sync in data plane config:
-   ```json
-   {
-     "slave_options": {
-       "use_rpc": true,
-       "sync_used_certs_only": true
-     }
-   }
-   ```
-
-**Test Steps**:
-1. Start data plane gateway (or restart if already running)
-2. Wait for initial sync to complete (check logs for "sync used certs only enabled")
-3. Query data plane Redis for certificate keys
-
-**Expected Results**:
-```bash
-# Control plane Redis should have all certificates
-redis-cli -h control-plane-redis keys "cert-*" | wc -l
-# Expected output: many certificates
-
-# Data plane Redis should have only required certificates
-redis-cli -h data-plane-redis keys "cert-*" | wc -l
-# Expected output: 2 certificates (or however many APIs require)
-```
-
-**Log Verification**:
-```
-# Data plane logs should show:
-info msg="sync used certs only enabled" cert_count=2 api_count=1
-```
-
-**Success Criteria**:
-- Data plane Redis contains only certificates referenced in loaded API specs
-- Certificate count matches expected usage (97-98% reduction)
-- No error messages in data plane logs
-- APIs function correctly with synced certificates
-
-#### Test Scenario 2: Live Sync Filtering
-
-**Objective**: Verify that data plane ignores certificate updates for unused certificates
-
-**Setup**:
-1. Data plane running with selective sync enabled and APIs loaded
-2. Identify a certificate NOT used by data plane APIs (e.g., cert-50)
-
-**Test Steps**:
-1. On control plane, update an unused certificate:
-   ```bash
-   curl -X POST http://control-plane:8080/tyk/certs \
-     -H "X-Tyk-Authorization: {secret}" \
-     -F "cert-50=@/path/to/new-cert.pem"
-   ```
-2. Monitor data plane logs for sync messages
-3. Check data plane Redis for the certificate key
-
-**Expected Results**:
-```bash
-# Data plane Redis should NOT have the unused certificate
-redis-cli -h data-plane-redis get "cert-raw-50"
-# Expected output: (nil)
-```
-
-**Log Verification**:
-```
-# Data plane logs should show (at DEBUG level):
-debug msg="skipping certificate - not used by loaded APIs" cert_id=cert-50***[len=XX]
-```
-
-**Success Criteria**:
-- Unused certificate is NOT synced to data plane
-- Debug log confirms certificate was filtered
-- No errors or warnings in logs
-- Data plane continues to function normally
-
-#### Test Scenario 3: Used Certificate Sync
-
-**Objective**: Verify that data plane DOES sync certificates that are required by loaded APIs
-
-**Setup**:
-1. Data plane running with selective sync enabled
-2. Identify a certificate USED by data plane APIs (e.g., cert-1)
-
-**Test Steps**:
-1. On control plane, update a used certificate:
-   ```bash
-   curl -X POST http://control-plane:8080/tyk/certs \
-     -H "X-Tyk-Authorization: {secret}" \
-     -F "cert-1=@/path/to/updated-cert.pem"
-   ```
-2. Monitor data plane logs for sync messages
-3. Check data plane Redis for updated certificate
-4. Verify certificate content matches the update
-
-**Expected Results**:
-```bash
-# Data plane Redis should have the updated certificate
-redis-cli -h data-plane-redis get "cert-raw-cert-1"
-# Expected output: {updated certificate content}
-```
-
-**Log Verification**:
-```
-# Data plane logs should show (at INFO level):
-info msg="syncing required certificate" cert_id=cert-1***[len=XX] apis=["api-123"]
-```
-
-**Success Criteria**:
-- Used certificate IS synced to data plane
-- Certificate content is updated in data plane Redis
-- Info log confirms certificate was synced with API list
-- APIs using this certificate continue to function with updated cert
-
-#### Test Scenario 4: Certificate Cleanup on API Reload
-
-**Objective**: Verify that unused certificates are removed when APIs are reloaded
-
-**Setup**:
-1. Data plane running with both selective sync and cleanup enabled:
-   ```json
-   {
-     "slave_options": {
-       "use_rpc": true,
-       "sync_used_certs_only": true,
-       "cleanup_certs": true
-     }
-   }
-   ```
-2. Load API that uses cert-1 and cert-2
-3. Verify both certificates are synced
-
-**Test Steps**:
-1. Count certificates before API change:
-   ```bash
-   redis-cli -h data-plane-redis keys "cert-*" | wc -l
-   # Expected: 2 certificates
-   ```
-2. Update API to only use cert-1 (remove cert-2 from spec)
-3. Reload APIs on data plane:
-   ```bash
-   curl -X POST http://data-plane:8080/tyk/reload/ \
-     -H "X-Tyk-Authorization: {secret}"
-   ```
-4. Wait for reload to complete
-5. Count certificates after reload:
-   ```bash
-   redis-cli -h data-plane-redis keys "cert-*" | wc -l
-   # Expected: 1 certificate
-   ```
-
-**Expected Results**:
-- Before reload: 2 certificates in data plane Redis
-- After reload: 1 certificate in data plane Redis
-- cert-2 is removed (no longer referenced by any API)
-- cert-1 remains (still referenced by API)
-
-**Log Verification**:
-```
-# Data plane logs should show:
-debug msg="removing unused certificate" cert_id=cert-2***[len=XX]
-info msg="cleaned up unused certificates" count=1
-```
-
-**Success Criteria**:
-- Unused certificates are automatically removed from storage
-- Certificate count decreases by expected amount
-- Cleanup summary logged with correct count
-- APIs continue to function with remaining certificates
-
-#### Test Scenario 5: Access Control Enforcement
-
-**Objective**: Verify that CertificateManager blocks access to non-required certificates
-
-**Setup**:
-1. Data plane running with selective sync enabled
-2. Upload cert-99 to control plane but DON'T reference it in any data plane API
-3. Manually add cert-99 to data plane Redis (simulating a cert that was previously required):
-   ```bash
-   # Copy from control plane to data plane (bypass sync)
-   CERT_DATA=$(redis-cli -h control-plane-redis get "cert-raw-cert-99")
-   redis-cli -h data-plane-redis set "cert-raw-cert-99" "$CERT_DATA"
-   ```
-
-**Test Steps**:
-1. Verify cert-99 exists in data plane Redis but is NOT in registry
-2. Attempt to use cert-99 in an API request (if applicable) or trigger cert access through API
-3. Monitor data plane logs for access control messages
-
-**Expected Results**:
-- Certificate exists in storage but is not accessible through CertificateManager
-- Access attempts are blocked and logged
-
-**Log Verification**:
-```
-# Data plane logs should show:
-info msg="BLOCKED: certificate not required by loaded APIs" cert_id=cert-99***[len=XX]
-```
-
-**Success Criteria**:
-- CertificateManager blocks access to non-required certificates
-- Blocked attempts are logged with masked certificate ID
-- Error returned to caller (certificate not found or access denied)
-- Storage contains cert but application layer enforces access control
-
-#### Test Scenario 6: Multi-API Certificate Sharing
-
-**Objective**: Verify that certificates shared by multiple APIs are tracked correctly
-
-**Setup**:
-1. Load 3 APIs on data plane
-2. Configure APIs to share certificates:
-   - API-1 uses cert-1, cert-2
-   - API-2 uses cert-2, cert-3
-   - API-3 uses cert-1, cert-3
-
-**Test Steps**:
-1. Load all 3 APIs and verify initial sync
-2. Check that all 3 certificates are synced (cert-1, cert-2, cert-3)
-3. Remove API-1 and reload
-4. Verify cert-2 and cert-3 remain (still used by API-2 and API-3)
-5. Verify cert-1 is removed OR remains (depending on if API-3 still uses it)
-
-**Expected Results**:
-```bash
-# After loading all APIs
-redis-cli -h data-plane-redis keys "cert-*" | wc -l
-# Expected: 3 certificates
-
-# After removing API-1 (cert-1 still used by API-3)
-redis-cli -h data-plane-redis keys "cert-*" | wc -l
-# Expected: 3 certificates (all still needed)
-```
-
-**Log Verification**:
-```
-# When syncing shared certificate:
-info msg="syncing required certificate" cert_id=cert-2***[len=XX] apis=["api-1","api-2"]
-```
-
-**Success Criteria**:
-- Shared certificates are synced once and tracked for all APIs
-- Removing one API doesn't remove cert if still used by others
-- Certificate is only removed when NO APIs reference it
-- API list in logs shows all APIs using each certificate
-
-#### Test Scenario 7: Certificate Deduplication
-
-**Objective**: Verify that duplicate certificate references within same API are deduplicated
-
-**Setup**:
-1. Create API spec that references same certificate in multiple fields:
-   ```json
-   {
-     "api_id": "duplicate-test",
-     "certificates": ["cert-1"],
-     "client_certificates": ["cert-1"],
-     "upstream_certificates": {"*": "cert-1"}
-   }
-   ```
-
-**Test Steps**:
-1. Load API on data plane
-2. Check logs for certificate registration
-3. Verify cert-1 is synced only once
-4. Check data plane Redis for certificate count
-
-**Expected Results**:
-```bash
-# Only one instance of cert-1 in storage
-redis-cli -h data-plane-redis keys "cert-raw-cert-1"
-# Expected: 1 result (not 3)
-```
-
-**Log Verification**:
-```
-# Certificate registered once despite multiple references
-info msg="sync used certs only enabled" cert_count=1 api_count=1
-```
-
-**Success Criteria**:
-- Certificate referenced multiple times is only stored once
-- Registry deduplicates certificate references
-- Single sync operation for the certificate
-- No duplicate entries in storage or registry
-
-#### Test Scenario 8: Backward Compatibility (Feature Disabled)
-
-**Objective**: Verify that with feature disabled, behavior matches original implementation
-
-**Setup**:
-1. Configure data plane with feature DISABLED (default):
-   ```json
-   {
-     "slave_options": {
-       "use_rpc": true,
-       "sync_used_certs_only": false,
-       "cleanup_certs": false
-     }
-   }
-   ```
-2. Upload many certificates to control plane
-
-**Test Steps**:
-1. Start data plane and wait for sync
-2. Count certificates in data plane Redis
-3. Check logs for selective sync messages
-
-**Expected Results**:
-```bash
-# Data plane Redis should have ALL certificates (same as control plane)
-redis-cli -h data-plane-redis keys "cert-*" | wc -l
-# Expected: same count as control plane
-```
-
-**Log Verification**:
-```
-# Should NOT see selective sync messages
-# (no "sync used certs only enabled" message)
-```
-
-**Success Criteria**:
-- All certificates from control plane are synced to data plane
-- No selective filtering occurs
-- No selective sync log messages
-- Behavior identical to pre-feature implementation
-- No errors or warnings
-
-#### Test Scenario 9: Segmented Deployment (Group ID)
-
-**Objective**: Verify selective sync in segmented deployment with API groups
-
-**Setup**:
-1. Control plane with 2 API groups: "group-a" and "group-b"
-2. Upload many certificates, some for group-a, some for group-b
-3. Configure data plane to bind to "group-a":
-   ```json
-   {
-     "slave_options": {
-       "use_rpc": true,
-       "sync_used_certs_only": true,
-       "bind_to_slugs": true,
-       "group_id": "group-a"
-     }
-   }
-   ```
-
-**Test Steps**:
-1. Start data plane bound to "group-a"
-2. Verify only APIs from "group-a" are loaded
-3. Verify only certificates used by "group-a" APIs are synced
-4. Count certificates and compare to total
-
-**Expected Results**:
-```bash
-# Data plane should only have certificates for group-a APIs
-redis-cli -h data-plane-redis keys "cert-*" | wc -l
-# Expected: small number (only group-a certs)
-
-# Control plane has all certificates
-redis-cli -h control-plane-redis keys "cert-*" | wc -l
-# Expected: large number (all groups)
-```
-
-**Success Criteria**:
-- Data plane loads only APIs from assigned group
-- Data plane syncs only certificates for those APIs
-- Certificates for other groups are NOT synced
-- Significant reduction in certificate storage (group isolation)
-
-#### Test Scenario 10: Certificate Rotation
-
-**Objective**: Verify that certificate rotation works correctly with selective sync
-
-**Setup**:
-1. Data plane with API using cert-1
-2. Prepare new version of cert-1 for rotation
-
-**Test Steps**:
-1. Update cert-1 on control plane with new certificate:
-   ```bash
-   curl -X POST http://control-plane:8080/tyk/certs \
-     -H "X-Tyk-Authorization: {secret}" \
-     -F "cert-1=@/path/to/rotated-cert.pem"
-   ```
-2. Wait for keyspace event propagation
-3. Verify cert-1 is synced to data plane
-4. Check that certificate content is updated
-5. Test API functionality with new certificate
-
-**Expected Results**:
-- Updated certificate synced to data plane immediately
-- Old certificate content replaced with new
-- APIs using cert-1 automatically use new certificate
-- No service interruption
-
-**Success Criteria**:
-- Certificate rotation detected via keyspace event
-- Data plane syncs updated certificate (because it's required)
-- Certificate content matches new version
-- APIs continue to function with rotated certificate
-- No manual intervention required
-
-#### Verification Tools
-
-**Redis Inspection**:
-```bash
-# List all certificates in storage
-redis-cli -h {host} keys "cert-*"
-
-# Count certificates
-redis-cli -h {host} keys "cert-*" | wc -l
-
-# Get specific certificate
-redis-cli -h {host} get "cert-raw-{cert-id}"
-
-# Compare control plane vs data plane counts
-diff <(redis-cli -h control-plane keys "cert-*" | sort) \
-     <(redis-cli -h data-plane keys "cert-*" | sort)
-```
-
-**Log Analysis**:
-```bash
-# Filter for selective sync messages
-docker logs tyk-gateway-data-plane 2>&1 | grep "sync used certs only"
-
-# Filter for certificate sync operations
-docker logs tyk-gateway-data-plane 2>&1 | grep "syncing required certificate"
-
-# Filter for blocked access attempts
-docker logs tyk-gateway-data-plane 2>&1 | grep "BLOCKED"
-
-# Filter for cleanup operations
-docker logs tyk-gateway-data-plane 2>&1 | grep "cleaned up unused certificates"
-```
-
-**API Testing**:
-```bash
-# Verify API works with synced certificates
-curl -v https://data-plane:8443/api-path \
-  --cert /path/to/client-cert.pem \
-  --key /path/to/client-key.pem
-
-# Check API response for certificate validation
-curl -v https://data-plane:8443/api-path
-```
-
-#### Common Test Assertions
-
-For all blackbox tests, verify:
-
-1. **Storage Consistency**:
-   - Required certificates exist in data plane Redis
-   - Non-required certificates do NOT exist in data plane Redis
-   - Certificate content matches control plane
-
-2. **Log Evidence**:
-   - Appropriate log messages at INFO and DEBUG levels
-   - Certificate IDs are masked in logs (format: `a1b2c3d4***[len=XX]`)
-   - No unexpected errors or warnings
-
-3. **Functional Correctness**:
-   - APIs using synced certificates function correctly
-   - mTLS handshakes succeed with client certificates
-   - Upstream connections work with upstream certificates
-   - Public key pinning validates correctly
-
-4. **Performance Indicators**:
-   - Certificate count reduction (97-98% in segmented deployments)
-   - Faster sync times (fewer certificates to transfer)
-   - Lower memory footprint (proportional to certificate reduction)
-
-5. **Security Validation**:
-   - Access to non-required certificates is blocked
-   - Blocked access attempts are logged
-   - Certificate IDs are never logged in clear text
+Blackbox testing validates the selective certificate synchronization feature through observable behavior without requiring knowledge of internal implementation. Tests verify behavior through storage state, log output, and API functionality.
+
+#### Test Coverage Requirements
+
+**1. Initial Synchronization**
+- Data plane starting with selective sync enabled syncs only certificates referenced in loaded API specs
+- Control plane has many certificates, data plane has few APIs
+- Observable: Data plane storage contains only required certificates (97-98% reduction)
+- Observable: Logs indicate selective sync is enabled with certificate and API counts
+- Observable: APIs function correctly with synced certificates
+
+**2. Live Sync Filtering**
+- Data plane ignores certificate updates for certificates not used by loaded APIs
+- Certificate updated on control plane that is not referenced by any data plane API
+- Observable: Updated certificate does not appear in data plane storage
+- Observable: Debug log indicates certificate was skipped
+- Observable: Data plane continues normal operation
+
+**3. Required Certificate Sync**
+- Data plane syncs certificate updates for certificates used by loaded APIs
+- Certificate updated on control plane that is referenced by data plane API
+- Observable: Updated certificate appears in data plane storage with new content
+- Observable: Info log indicates certificate was synced with list of APIs using it
+- Observable: APIs using certificate continue to function with updated version
+
+**4. Certificate Cleanup**
+- Data plane removes unused certificates when APIs are reloaded
+- API references to certificates removed, then API reload triggered
+- Observable: Previously synced certificates no longer in data plane storage
+- Observable: Logs indicate cleanup operation with count of removed certificates
+- Observable: Still-referenced certificates remain in storage
+- Observable: APIs continue to function with remaining certificates
+
+**5. Access Control**
+- Application layer blocks access to certificates not required by loaded APIs
+- Certificate exists in storage but is not registered in certificate registry
+- Observable: Certificate access attempts fail
+- Observable: Blocked access attempts logged with masked certificate ID
+- Observable: Storage layer contains certificate but application denies access
+
+**6. Certificate Sharing**
+- Certificates referenced by multiple APIs are tracked correctly
+- Multiple APIs reference the same certificate
+- Observable: Certificate synced once and stored once
+- Observable: Logs show which APIs use the certificate
+- Observable: Removing one API does not remove certificate if still used by others
+- Observable: Certificate removed only when no APIs reference it
+
+**7. Deduplication**
+- Duplicate certificate references within same API spec are deduplicated
+- API spec references same certificate in multiple fields
+- Observable: Certificate stored once, not multiple times
+- Observable: Registry tracks single reference despite multiple spec fields
+- Observable: Single sync operation for the certificate
+
+**8. Backward Compatibility**
+- Feature disabled (default configuration) produces original behavior
+- Both selective sync and cleanup flags disabled
+- Observable: All certificates from control plane synced to data plane
+- Observable: No selective sync log messages
+- Observable: Certificate count matches control plane
+- Observable: Behavior identical to implementation without feature
+
+**9. Segmented Deployment**
+- Selective sync works correctly with API group binding
+- Data plane bound to specific API group, control plane has multiple groups
+- Observable: Data plane syncs only certificates for APIs in assigned group
+- Observable: Certificates for other groups not present in data plane storage
+- Observable: Certificate count reflects group isolation
+
+**10. Certificate Rotation**
+- Certificate updates propagate correctly with selective sync enabled
+- Certificate updated on control plane that is currently in use by data plane
+- Observable: Updated certificate content appears in data plane storage
+- Observable: Keyspace event triggers sync of updated certificate
+- Observable: APIs automatically use new certificate version
+- Observable: No service interruption during rotation
+
+#### Validation Methods
+
+Tests validate behavior through:
+
+**Storage State**:
+- Certificate presence/absence in data plane Redis
+- Certificate count comparisons between control and data planes
+- Certificate content verification
+
+**Log Output**:
+- Selective sync enablement messages
+- Certificate sync operations with API lists
+- Certificate skip/filter messages
+- Cleanup operation summaries
+- Access control blocks
+- Certificate ID masking format
+
+**API Functionality**:
+- mTLS handshake success with client certificates
+- Upstream connection establishment with upstream certificates
+- Public key pinning validation
+- Custom domain certificate usage
+
+**Performance Metrics**:
+- Certificate count reduction percentage
+- Sync operation timing
+- Memory footprint changes
 
 ## Monitoring and Observability
 
