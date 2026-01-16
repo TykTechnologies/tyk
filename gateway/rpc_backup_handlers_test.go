@@ -234,16 +234,14 @@ func TestLoadRPCDefinitionsBackup(t *testing.T) {
 		}
 
 		if len(specs) != 1 {
-			t.Errorf("Expected 1 spec, got %d", len(specs))
+			t.Fatalf("Expected 1 spec, got %d", len(specs))
 		}
 
-		if len(specs) > 0 {
-			if specs[0].APIID != "test-api" {
-				t.Errorf("Expected APIID 'test-api', got %q", specs[0].APIID)
-			}
-			if specs[0].Name != "Test API" {
-				t.Errorf("Expected Name 'Test API', got %q", specs[0].Name)
-			}
+		if specs[0].APIID != "test-api" {
+			t.Errorf("Expected APIID 'test-api', got %q", specs[0].APIID)
+		}
+		if specs[0].Name != "Test API" {
+			t.Errorf("Expected Name 'Test API', got %q", specs[0].Name)
 		}
 	})
 
@@ -270,16 +268,14 @@ func TestLoadRPCDefinitionsBackup(t *testing.T) {
 		}
 
 		if len(specs) != 1 {
-			t.Errorf("Expected 1 spec, got %d", len(specs))
+			t.Fatalf("Expected 1 spec, got %d", len(specs))
 		}
 
-		if len(specs) > 0 {
-			if specs[0].APIID != "compressed-api" {
-				t.Errorf("Expected APIID 'compressed-api', got %q", specs[0].APIID)
-			}
-			if specs[0].Name != "Compressed API" {
-				t.Errorf("Expected Name 'Compressed API', got %q", specs[0].Name)
-			}
+		if specs[0].APIID != "compressed-api" {
+			t.Errorf("Expected APIID 'compressed-api', got %q", specs[0].APIID)
+		}
+		if specs[0].Name != "Compressed API" {
+			t.Errorf("Expected Name 'Compressed API', got %q", specs[0].Name)
 		}
 	})
 
