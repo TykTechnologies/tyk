@@ -277,36 +277,36 @@ type EndpointMethod struct {
 //
 // swagger:model
 type SessionState struct {
-	LastCheck                     int64                       `json:"last_check" msg:"last_check"`
-	Allowance                     float64                     `json:"allowance" msg:"allowance"`
-	Rate                          float64                     `json:"rate" msg:"rate"`
-	Per                           float64                     `json:"per" msg:"per"`
-	ThrottleInterval              float64                     `json:"throttle_interval" msg:"throttle_interval"`
-	ThrottleRetryLimit            int                         `json:"throttle_retry_limit" msg:"throttle_retry_limit"`
-	MaxQueryDepth                 int                         `json:"max_query_depth" msg:"max_query_depth"`
-	DateCreated                   time.Time                   `json:"date_created" msg:"date_created"`
-	Expires                       int64                       `json:"expires" msg:"expires"`
-	QuotaMax                      int64                       `json:"quota_max" msg:"quota_max"`
-	QuotaRenews                   int64                       `json:"quota_renews" msg:"quota_renews"`
-	QuotaRemaining                int64                       `json:"quota_remaining" msg:"quota_remaining"`
-	QuotaRenewalRate              int64                       `json:"quota_renewal_rate" msg:"quota_renewal_rate"`
-	AccessRights                  map[string]AccessDefinition `json:"access_rights" msg:"access_rights"`
-	OrgID                         string                      `json:"org_id" msg:"org_id"`
-	OauthClientID                 string                      `json:"oauth_client_id" msg:"oauth_client_id"`
-	OauthKeys                     map[string]string           `json:"oauth_keys" msg:"oauth_keys"`
-	Certificate                   string                      `json:"certificate" msg:"certificate"`
-	MtlsStaticCertificateBindings []string                    `json:"mtls_static_certificate_bindings" msg:"mtls_static_certificate_bindings"`
-	BasicAuthData                 BasicAuthData               `json:"basic_auth_data" msg:"basic_auth_data"`
-	JWTData                       JWTData                     `json:"jwt_data" msg:"jwt_data"`
-	HMACEnabled                   bool                        `json:"hmac_enabled" msg:"hmac_enabled"`
-	EnableHTTPSignatureValidation bool                        `json:"enable_http_signature_validation" msg:"enable_http_signature_validation"`
-	HmacSecret                    string                      `json:"hmac_string" msg:"hmac_string"`
-	RSACertificateId              string                      `json:"rsa_certificate_id" msg:"rsa_certificate_id"`
-	IsInactive                    bool                        `json:"is_inactive" msg:"is_inactive"`
-	ApplyPolicyID                 string                      `json:"apply_policy_id" msg:"apply_policy_id"`
-	ApplyPolicies                 []string                    `json:"apply_policies" msg:"apply_policies"`
-	DataExpires                   int64                       `json:"data_expires" msg:"data_expires"`
-	Monitor                       Monitor                     `json:"monitor" msg:"monitor"`
+	LastCheck                     int64                       `json:"last_check,omitzero" msg:"last_check"`
+	Allowance                     float64                     `json:"allowance,omitzero" msg:"allowance"`
+	Rate                          float64                     `json:"rate,omitzero" msg:"rate"`
+	Per                           float64                     `json:"per,omitzero" msg:"per"`
+	ThrottleInterval              float64                     `json:"throttle_interval,omitzero" msg:"throttle_interval"`
+	ThrottleRetryLimit            int                         `json:"throttle_retry_limit,omitzero" msg:"throttle_retry_limit"`
+	MaxQueryDepth                 int                         `json:"max_query_depth,omitzero" msg:"max_query_depth"`
+	DateCreated                   time.Time                   `json:"date_created,omitzero" msg:"date_created"`
+	Expires                       int64                       `json:"expires,omitzero" msg:"expires"`
+	QuotaMax                      int64                       `json:"quota_max,omitzero" msg:"quota_max"`
+	QuotaRenews                   int64                       `json:"quota_renews,omitzero" msg:"quota_renews"`
+	QuotaRemaining                int64                       `json:"quota_remaining,omitzero" msg:"quota_remaining"`
+	QuotaRenewalRate              int64                       `json:"quota_renewal_rate,omitzero" msg:"quota_renewal_rate"`
+	AccessRights                  map[string]AccessDefinition `json:"access_rights,omitempty" msg:"access_rights"`
+	OrgID                         string                      `json:"org_id,omitzero" msg:"org_id"`
+	OauthClientID                 string                      `json:"oauth_client_id,omitzero" msg:"oauth_client_id"`
+	OauthKeys                     map[string]string           `json:"oauth_keys,omitempty" msg:"oauth_keys"`
+	Certificate                   string                      `json:"certificate,omitzero" msg:"certificate"`
+	MtlsStaticCertificateBindings []string                    `json:"mtls_static_certificate_bindings,omitempty" msg:"mtls_static_certificate_bindings"`
+	BasicAuthData                 BasicAuthData               `json:"basic_auth_data,omitzero" msg:"basic_auth_data"`
+	JWTData                       JWTData                     `json:"jwt_data,omitzero" msg:"jwt_data"`
+	HMACEnabled                   bool                        `json:"hmac_enabled,omitzero" msg:"hmac_enabled"`
+	EnableHTTPSignatureValidation bool                        `json:"enable_http_signature_validation,omitzero" msg:"enable_http_signature_validation"`
+	HmacSecret                    string                      `json:"hmac_string,omitzero" msg:"hmac_string"`
+	RSACertificateId              string                      `json:"rsa_certificate_id,omitzero" msg:"rsa_certificate_id"`
+	IsInactive                    bool                        `json:"is_inactive,omitzero" msg:"is_inactive"`
+	ApplyPolicyID                 string                      `json:"apply_policy_id,omitzero" msg:"apply_policy_id"`
+	ApplyPolicies                 []string                    `json:"apply_policies,omitempty" msg:"apply_policies"`
+	DataExpires                   int64                       `json:"data_expires,omitzero" msg:"data_expires"`
+	Monitor                       Monitor                     `json:"monitor,omitzero" msg:"monitor"`
 	// Deprecated: EnableDetailRecording is deprecated. Use EnableDetailedRecording
 	// going forward instead
 	EnableDetailRecording   bool                   `json:"enable_detail_recording,omitzero" msg:"enable_detail_recording"`
