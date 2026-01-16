@@ -2,18 +2,231 @@
 
 ## Overview
 
-This feature implements selective certificate synchronization for Tyk Gateway data planes in MDCB (Multi Data Center Bridge) deployments. Instead of syncing all certificates from the control plane, data planes now only sync certificates that are actually used by their loaded APIs.
+This design proposes selective certificate synchronization for Tyk Gateway data planes in MDCB (Multi Data Center Bridge) deployments. Instead of syncing all certificates from the control plane, data planes will only sync certificates that are actually used by their loaded APIs.
 
-**Benefits**:
+**Expected Benefits**:
 - **97-98% reduction** in certificate storage on data planes
 - **Reduced memory footprint** in segmented deployments
 - **Faster synchronization** with fewer certificates to transfer
 - **Improved security** with masked certificate IDs in logs
 - **O(1) lookup performance** with optimized data structures
 
-## Architecture
+## Current State: How MDCB Synchronization Works
 
-### Component Overview
+### Overview of MDCB Architecture
+
+MDCB (Multi Data Center Bridge) enables a distributed Tyk deployment with a centralized control plane and multiple data plane gateways. The control plane manages all configuration, policies, and certificates, while data planes handle API traffic.
+
+### Current Certificate Synchronization Behavior
+
+In the current implementation, certificate synchronization works as follows:
+
+```mermaid
+flowchart TD
+    CP["Control Plane<br/>(Redis Storage)"]
+    MDCB["MDCB Server"]
+    DP["Data Plane Gateway"]
+
+    CP -->|"Stores all certificates<br/>(100+ certs)"| MDCB
+    MDCB -->|"Keyspace sync<br/>(cert-* keys)"| DP
+    DP -->|"Downloads ALL certificates<br/>regardless of usage"| Store["Local Storage<br/>(100+ certs)"]
+```
+
+#### Synchronization Mechanisms
+
+**1. Keyspace Monitoring**
+
+The data plane monitors Redis keyspace events from the control plane:
+
+```go
+// In gateway/rpc_storage_handler.go
+func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string, orgId string) {
+    for _, key := range keys {
+        // Process ALL certificate changes, no filtering
+        if strings.HasPrefix(key, "cert-") {
+            // Sync this certificate
+            r.syncCertificate(key)
+        }
+    }
+}
+```
+
+- Control plane publishes Redis keyspace notifications for certificate changes
+- Data planes subscribe to keyspace events via RPC
+- When **any** `cert-*` key changes, **all** data planes receive a notification
+- Each data plane syncs the certificate regardless of whether it needs it
+
+**2. Certificate Pull (Current Flow)**
+
+```mermaid
+sequenceDiagram
+    participant CP as Control Plane<br/>Redis
+    participant MDCB as MDCB Server
+    participant DP as Data Plane
+    participant DPRedis as Data Plane<br/>Redis
+
+    CP->>MDCB: Keyspace event: cert-raw-{certID}
+    MDCB->>DP: RPC notification
+    DP->>MDCB: GetKey("cert-raw-{certID}")
+    MDCB->>CP: Fetch cert from Redis
+    CP-->>MDCB: Certificate data
+    MDCB-->>DP: Certificate data
+    DP->>DPRedis: Store certificate
+    Note over DP: No check if cert is needed!
+```
+
+Current code in `storage/mdcb_storage.go`:
+```go
+func (m MdcbStorage) GetKey(key string) (string, error) {
+    // Direct RPC call - no filtering logic
+    return m.getFromRPCAndCache(key)
+}
+```
+
+**3. Certificate Access (Current Flow)**
+
+When gateway code needs a certificate:
+
+```go
+// In certs/manager.go (BEFORE changes)
+func (c *certificateManager) GetRaw(certID string) (string, error) {
+    // Direct storage access - no usage check
+    return c.storage.GetKey("raw-" + certID)
+}
+```
+
+The flow:
+1. API handler calls `CertificateManager.GetRaw(certID)`
+2. Certificate manager directly queries storage
+3. If cert exists in local Redis, return it
+4. If not in local Redis, fetch from MDCB via RPC
+5. **No validation** that this certificate is actually used by any loaded API
+
+**4. Initial Sync (Data Plane Startup)**
+
+When data plane starts:
+
+```mermaid
+sequenceDiagram
+    participant DP as Data Plane
+    participant MDCB as MDCB
+    participant CP as Control Plane
+
+    DP->>MDCB: Connect via RPC
+    DP->>MDCB: FetchAPIs() - Get API specs
+    MDCB->>CP: Query API definitions
+    CP-->>MDCB: API specs
+    MDCB-->>DP: API specs
+
+    Note over DP: Load APIs into memory
+    Note over DP: APIs reference cert IDs in specs
+
+    CP->>MDCB: Keyspace events (all certs)
+    MDCB->>DP: Certificate sync events
+    DP->>DP: Sync ALL certificates
+    Note over DP: No filtering by API usage
+```
+
+API specs reference certificates in multiple fields:
+```go
+type APISpec struct {
+    Certificates         []string            // Server certs for custom domains
+    ClientCertificates   []string            // Client certs for mTLS
+    UpstreamCertificates map[string]string   // Upstream connection certs
+    PinnedPublicKeys     map[string]string   // Public key pins
+}
+```
+
+**Current behavior**: Even though the API spec contains the cert IDs needed, the gateway:
+- Does NOT extract or track these cert IDs
+- Does NOT filter sync based on these IDs
+- Syncs ALL certificates from control plane regardless of API needs
+
+**5. Certificate Lifecycle (Current)**
+
+```mermaid
+stateDiagram-v2
+    [*] --> Added: Admin adds cert to control plane
+    Added --> Synced: Keyspace event triggers sync
+    Synced --> Synced: Cert updates sync automatically
+    Synced --> [*]: Manual deletion only
+
+    note right of Synced
+        Cert stays in data plane storage
+        forever, even if:
+        - API is deleted
+        - API no longer uses cert
+        - Cert expires
+    end note
+```
+
+**Problems**:
+- Certificates are never automatically removed from data planes
+- No cleanup mechanism when APIs change or are deleted
+- No lifecycle management tied to actual usage
+
+### The Problem
+
+**In segmented deployments** (where different data planes serve different API groups):
+
+- **Control Plane**: Stores 100+ certificates across all organizations and APIs
+- **Data Plane A**: Serves 2 APIs requiring 2 certificates
+  - **Currently syncs**: All 100+ certificates (98% unnecessary)
+  - **Storage waste**: ~98 unused certificates
+  - **Memory overhead**: Maps, caches, and tracking for unused certs
+
+- **Data Plane B**: Serves 3 APIs requiring 3 certificates
+  - **Currently syncs**: All 100+ certificates (97% unnecessary)
+  - **Storage waste**: ~97 unused certificates
+
+### Why This Happens
+
+```mermaid
+flowchart LR
+    subgraph "Control Plane"
+        AllCerts["All Certificates<br/>• Org A: 50 certs<br/>• Org B: 30 certs<br/>• Org C: 20 certs"]
+    end
+
+    subgraph "Data Plane (Org A only)"
+        APIs["APIs<br/>• API 1 (Org A)<br/>• API 2 (Org A)"]
+        Synced["Synced Certs<br/>❌ All 100 certs<br/>✅ Should be 2 certs"]
+    end
+
+    AllCerts -->|"Indiscriminate sync"| Synced
+    APIs -.->|"Only uses 2 certs"| Synced
+```
+
+**Root Causes**:
+
+1. **No usage tracking**: Data planes don't track which certificates are actually needed by loaded APIs
+2. **No filter mechanism**: Certificate sync logic lacks a way to filter based on API requirements
+3. **No cleanup**: Once synced, certificates remain indefinitely even if APIs are removed
+4. **Broadcast sync**: Keyspace changes are broadcast to all data planes regardless of relevance
+
+### Impact
+
+**Storage Impact**:
+- Data plane with 2 APIs stores 100+ certificates instead of 2
+- 50x storage overhead for certificates alone
+- Additional memory for certificate metadata, caches, and indices
+
+**Performance Impact**:
+- Certificate expiry monitoring checks ALL certificates, including unused ones
+- Larger memory footprint affects overall gateway performance
+- Slower startup/reload times due to processing unused certificates
+
+**Operational Impact**:
+- Log noise from certificate operations on unused certs
+- Difficulty troubleshooting cert issues when logs contain irrelevant certs
+- Security concern: data planes have access to certificates they don't need
+
+## Proposed Solution: Selective Certificate Synchronization
+
+This design addresses the above problems by implementing selective certificate synchronization.
+
+### Architecture
+
+#### Component Overview
 
 ```mermaid
 graph TB
@@ -22,9 +235,9 @@ graph TB
     end
 
     subgraph DP["Data Plane"]
-        CR["Certificate Registry<br/>• Tracks which certs are used by loaded APIs<br/>• O(1) lookup with map[string]struct{}<br/>• Bidirectional mapping: API↔Cert"]
-        CM["Certificate Manager<br/>• Access control layer<br/>• Blocks access to non-required certificates"]
-        LCS["Local Certificate Storage<br/>• Only 2-3 certificates (from 100+)<br/>• Cleaned up on API reload"]
+        CR["Certificate Registry<br/>• Will track which certs are used by loaded APIs<br/>• O(1) lookup with map[string]struct{}<br/>• Bidirectional mapping: API↔Cert"]
+        CM["Certificate Manager<br/>• Access control layer<br/>• Will block access to non-required certificates"]
+        LCS["Local Certificate Storage<br/>• Only 2-3 certificates (from 100+)<br/>• Will be cleaned up on API reload"]
 
         CR --> CM
         CM --> LCS
@@ -33,11 +246,11 @@ graph TB
     CS -->|"RPC/MDCB"| CR
 ```
 
-### Key Components
+#### Key Components
 
 #### 1. Certificate Registry (`gateway/cert_registry.go`)
 
-The certificate registry is the core component that tracks which certificates are required by loaded APIs.
+The certificate registry will be the core component that tracks which certificates are required by loaded APIs.
 
 **Data Structures**:
 ```go
@@ -63,7 +276,7 @@ type certRegistry struct {
 
 #### 2. Certificate Manager (`certs/manager.go`)
 
-Enhanced with selective sync support to enforce access control at the application layer.
+Will be enhanced with selective sync support to provide access control at the application layer.
 
 **Key Changes**:
 ```go
@@ -93,7 +306,7 @@ func (c *certificateManager) GetRaw(certID string) (string, error) {
 
 #### 3. RPC Storage Handler (`gateway/rpc_storage_handler.go`)
 
-Filters certificate synchronization during keyspace changes.
+Will filter certificate synchronization during keyspace changes.
 
 **Implementation**:
 ```go
@@ -125,7 +338,7 @@ func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string, orgId string) 
 
 #### 4. MDCB Storage Layer (`storage/mdcb_storage.go`)
 
-Filters certificate pulls from MDCB based on registry.
+Will filter certificate pulls from MDCB based on registry.
 
 **Implementation**:
 ```go
@@ -157,7 +370,7 @@ func (m MdcbStorage) GetKey(key string) (string, error) {
 
 #### 5. Certificate Cleanup (`gateway/cert.go`)
 
-Removes unused certificates after API reload.
+Will remove unused certificates after API reload.
 
 **Implementation**:
 ```go
@@ -205,7 +418,7 @@ func (gw *Gateway) cleanupUnusedCerts() {
 
 #### 6. API Loader (`gateway/api_loader.go`)
 
-Registers API certificates with the registry after loading APIs.
+Will register API certificates with the registry after loading APIs.
 
 **Implementation**:
 ```go
@@ -320,7 +533,7 @@ Two new configuration flags in `SlaveOptionsConfig`:
 
 ### Certificate Sources
 
-The registry tracks certificates from multiple API spec fields:
+The registry will track certificates from multiple API spec fields:
 
 1. **`Certificates`** - Server certificates for custom domains
 2. **`ClientCertificates`** - Client certificates for mutual TLS
@@ -494,7 +707,7 @@ log.WithField("cert_id", maskCertID(certID)).
 
 ### Access Control
 
-The CertificateManager enforces access control at the application layer:
+The CertificateManager will enforce access control at the application layer:
 
 1. **Registry Check**: Before accessing any certificate, check if it's required
 2. **Block Non-Required**: Return error if certificate is not in registry
