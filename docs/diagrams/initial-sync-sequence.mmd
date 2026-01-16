@@ -1,0 +1,18 @@
+sequenceDiagram
+    participant DP as Data Plane
+    participant MDCB as MDCB
+    participant CP as Control Plane
+
+    DP->>MDCB: Connect via RPC
+    DP->>MDCB: FetchAPIs() - Get API specs
+    MDCB->>CP: Query API definitions
+    CP-->>MDCB: API specs
+    MDCB-->>DP: API specs
+
+    Note over DP: Load APIs into memory
+    Note over DP: APIs reference cert IDs in specs
+
+    CP->>MDCB: Keyspace events (all certs)
+    MDCB->>DP: Certificate sync events
+    DP->>DP: Sync ALL certificates
+    Note over DP: No filtering by API usage

@@ -1,0 +1,19 @@
+flowchart TD
+    Update["API spec updated"]
+    Reload["Gateway reloads APIs"]
+    Reset["Reset certificate registry"]
+    ReRegister["Re-register certificates from new specs"]
+    Cleanup["Cleanup unused certificates (if enabled)"]
+    List["List all local certificates"]
+    Check["Check each against registry"]
+    Delete["Delete certificates not in registry"]
+    Log["Log cleanup summary"]
+
+    Update --> Reload
+    Reload --> Reset
+    Reset --> ReRegister
+    ReRegister --> Cleanup
+    Cleanup --> List
+    List --> Check
+    Check --> Delete
+    Delete --> Log

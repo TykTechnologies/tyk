@@ -1,0 +1,13 @@
+flowchart TD
+    Start["Data plane starts"]
+    Connect["Connect to control plane via RPC"]
+    Load["Load API specs from control plane"]
+    Register["Register certificates from API specs"]
+    Sync["Sync only required certificates"]
+    Ready["Data plane ready with minimal certs"]
+
+    Start --> Connect
+    Connect --> Load
+    Load --> Register
+    Register --> Sync
+    Sync --> Ready

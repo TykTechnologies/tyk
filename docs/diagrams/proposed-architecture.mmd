@@ -1,0 +1,15 @@
+graph TB
+    subgraph CP["Control Plane"]
+        CS["Certificate Storage (Redis)<br/>• All organization certificates<br/>• Many certificates across multiple APIs"]
+    end
+
+    subgraph DP["Data Plane"]
+        CR["Certificate Registry<br/>• Will track which certs are used by loaded APIs<br/>• O(1) lookup with map[string]struct{}<br/>• Bidirectional mapping: API↔Cert"]
+        CM["Certificate Manager<br/>• Access control layer<br/>• Will block access to non-required certificates"]
+        LCS["Local Certificate Storage<br/>• Only certificates used by loaded APIs<br/>• Will be cleaned up on API reload"]
+
+        CR --> CM
+        CM --> LCS
+    end
+
+    CS -->|"RPC/MDCB"| CR

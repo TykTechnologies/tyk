@@ -21,16 +21,7 @@ MDCB (Multi Data Center Bridge) enables a distributed Tyk deployment with a cent
 
 In the current implementation, certificate synchronization works as follows:
 
-```mermaid
-flowchart TD
-    CP["Control Plane<br/>(Redis Storage)"]
-    MDCB["MDCB Server"]
-    DP["Data Plane Gateway"]
-
-    CP -->|"Stores all certificates<br/>(100+ certs)"| MDCB
-    MDCB -->|"Keyspace sync<br/>(cert-* keys)"| DP
-    DP -->|"Downloads ALL certificates<br/>regardless of usage"| Store["Local Storage<br/>(100+ certs)"]
-```
+![Current Certificate Synchronization Flow](docs/diagrams/current-cert-sync-flow.png)
 
 #### Synchronization Mechanisms
 
@@ -58,22 +49,7 @@ func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string, orgId string) 
 
 **2. Certificate Pull (Current Flow)**
 
-```mermaid
-sequenceDiagram
-    participant CP as Control Plane<br/>Redis
-    participant MDCB as MDCB Server
-    participant DP as Data Plane
-    participant DPRedis as Data Plane<br/>Redis
-
-    CP->>MDCB: Keyspace event: cert-raw-{certID}
-    MDCB->>DP: RPC notification
-    DP->>MDCB: GetKey("cert-raw-{certID}")
-    MDCB->>CP: Fetch cert from Redis
-    CP-->>MDCB: Certificate data
-    MDCB-->>DP: Certificate data
-    DP->>DPRedis: Store certificate
-    Note over DP: No check if cert is needed!
-```
+![Certificate Pull Sequence](docs/diagrams/cert-pull-sequence.png)
 
 Current code in `storage/mdcb_storage.go`:
 ```go
@@ -106,26 +82,7 @@ The flow:
 
 When data plane starts:
 
-```mermaid
-sequenceDiagram
-    participant DP as Data Plane
-    participant MDCB as MDCB
-    participant CP as Control Plane
-
-    DP->>MDCB: Connect via RPC
-    DP->>MDCB: FetchAPIs() - Get API specs
-    MDCB->>CP: Query API definitions
-    CP-->>MDCB: API specs
-    MDCB-->>DP: API specs
-
-    Note over DP: Load APIs into memory
-    Note over DP: APIs reference cert IDs in specs
-
-    CP->>MDCB: Keyspace events (all certs)
-    MDCB->>DP: Certificate sync events
-    DP->>DP: Sync ALL certificates
-    Note over DP: No filtering by API usage
-```
+![Initial Sync Sequence](docs/diagrams/initial-sync-sequence.png)
 
 API specs reference certificates in multiple fields:
 ```go
@@ -144,21 +101,7 @@ type APISpec struct {
 
 **5. Certificate Lifecycle (Current)**
 
-```mermaid
-stateDiagram-v2
-    [*] --> Added: Admin adds cert to control plane
-    Added --> Synced: Keyspace event triggers sync
-    Synced --> Synced: Cert updates sync automatically
-    Synced --> [*]: Manual deletion only
-
-    note right of Synced
-        Cert stays in data plane storage
-        forever, even if:
-        - API is deleted
-        - API no longer uses cert
-        - Cert expires
-    end note
-```
+![Certificate Lifecycle State](docs/diagrams/cert-lifecycle-state.png)
 
 **Problems**:
 - Certificates are never automatically removed from data planes
@@ -181,20 +124,7 @@ stateDiagram-v2
 
 ### Why This Happens
 
-```mermaid
-flowchart LR
-    subgraph "Control Plane"
-        AllCerts["All Certificates<br/>• Org A: 50 certs<br/>• Org B: 30 certs<br/>• Org C: 20 certs"]
-    end
-
-    subgraph "Data Plane (Org A only)"
-        APIs["APIs<br/>• API 1 (Org A)<br/>• API 2 (Org A)"]
-        Synced["Synced Certs<br/>❌ All 100 certs<br/>✅ Should be 2 certs"]
-    end
-
-    AllCerts -->|"Indiscriminate sync"| Synced
-    APIs -.->|"Only uses 2 certs"| Synced
-```
+![Segmented Deployment Problem](docs/diagrams/segmented-deployment-problem.png)
 
 **Root Causes**:
 
@@ -228,23 +158,7 @@ This design addresses the above problems by implementing selective certificate s
 
 #### Component Overview
 
-```mermaid
-graph TB
-    subgraph CP["Control Plane"]
-        CS["Certificate Storage (Redis)<br/>• All organization certificates<br/>• 100+ certificates across multiple APIs"]
-    end
-
-    subgraph DP["Data Plane"]
-        CR["Certificate Registry<br/>• Will track which certs are used by loaded APIs<br/>• O(1) lookup with map[string]struct{}<br/>• Bidirectional mapping: API↔Cert"]
-        CM["Certificate Manager<br/>• Access control layer<br/>• Will block access to non-required certificates"]
-        LCS["Local Certificate Storage<br/>• Only 2-3 certificates (from 100+)<br/>• Will be cleaned up on API reload"]
-
-        CR --> CM
-        CM --> LCS
-    end
-
-    CS -->|"RPC/MDCB"| CR
-```
+![Proposed Architecture](docs/diagrams/proposed-architecture.png)
 
 #### Key Components
 
@@ -542,83 +456,21 @@ The registry will track certificates from multiple API spec fields:
 
 ### Registration Flow
 
-```mermaid
-flowchart TD
-    Start["API Spec Loaded"]
-    Extract["Extract Cert Refs<br/>from all fields"]
-    Dedup["Deduplicate with<br/>map[string]struct{}"]
-    Register["Register in<br/>certsByAPI"]
-    MarkReq["Mark as required<br/>in registry"]
-    Track["Track API→Cert<br/>in apisByCert"]
-
-    Start --> Extract
-    Extract --> Dedup
-    Dedup --> Register
-    Register --> MarkReq
-    MarkReq --> Track
-```
+![Certificate Registration Flow](docs/diagrams/registration-flow.png)
 
 ## Synchronization Flow
 
 ### Initial Sync
 
-```mermaid
-flowchart TD
-    Start["Data plane starts"]
-    Connect["Connect to control plane via RPC"]
-    Load["Load API specs from control plane"]
-    Register["Register certificates from API specs"]
-    Sync["Sync only required certificates"]
-    Ready["Data plane ready with minimal certs"]
-
-    Start --> Connect
-    Connect --> Load
-    Load --> Register
-    Register --> Sync
-    Sync --> Ready
-```
+![Initial Sync Flow](docs/diagrams/initial-sync-flow.png)
 
 ### Live Sync (Keyspace Changes)
 
-```mermaid
-flowchart TD
-    Detect["Control plane detects certificate update"]
-    Publish["Publish keyspace change event"]
-    Receive["Data plane receives event"]
-    Check{"Check if cert is required<br/>registry.Required()"}
-    SyncCert["Sync certificate"]
-    Skip["Skip (log debug message)"]
-
-    Detect --> Publish
-    Publish --> Receive
-    Receive --> Check
-    Check -->|Yes| SyncCert
-    Check -->|No| Skip
-```
+![Live Sync Flow](docs/diagrams/live-sync-flow.png)
 
 ### API Reload
 
-```mermaid
-flowchart TD
-    Update["API spec updated"]
-    Reload["Gateway reloads APIs"]
-    Reset["Reset certificate registry"]
-    ReRegister["Re-register certificates from new specs"]
-    Cleanup["Cleanup unused certificates (if enabled)"]
-    List["List all local certificates"]
-    Check["Check each against registry"]
-    Delete["Delete certificates not in registry"]
-    Log["Log cleanup summary"]
-
-    Update --> Reload
-    Reload --> Reset
-    Reset --> ReRegister
-    ReRegister --> Cleanup
-    Cleanup --> List
-    List --> Check
-    Check --> Delete
-    Delete --> Log
-```
+![API Reload Flow](docs/diagrams/api-reload-flow.png)
 
 ## Performance Optimizations
 
