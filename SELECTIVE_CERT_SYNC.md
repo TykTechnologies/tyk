@@ -723,7 +723,6 @@ Data plane ignores certificate updates for certificates not used by loaded APIs.
 Expected behavior:
 - Updated certificate does not appear in data plane storage
 - Debug log indicates certificate was skipped
-- Data plane continues normal operation
 
 **Required Certificate Sync**
 
@@ -732,7 +731,7 @@ Data plane syncs certificate updates for certificates used by loaded APIs. Certi
 Expected behavior:
 - Updated certificate appears in data plane storage with new content
 - Info log indicates certificate was synced with list of APIs using it
-- APIs using certificate continue to function with updated version
+- APIs using certificate continue to function
 
 **Certificate Cleanup**
 
@@ -742,23 +741,20 @@ Expected behavior:
 - Previously synced certificates no longer in data plane storage
 - Logs indicate cleanup operation with count of removed certificates
 - Still-referenced certificates remain in storage
-- APIs continue to function with remaining certificates
 
 **Access Control**
 
-Application layer blocks access to certificates not required by loaded APIs. Certificate exists in storage but is not registered in certificate registry.
+Application layer blocks access to certificates not required by loaded APIs. Certificate exists in storage but is not referenced by loaded APIs.
 
 Expected behavior:
-- Certificate access attempts fail
 - Blocked access attempts logged with masked certificate ID
-- Storage layer contains certificate but application denies access
 
 **Certificate Sharing**
 
 Certificates referenced by multiple APIs are tracked correctly. Multiple APIs reference the same certificate.
 
 Expected behavior:
-- Certificate synced once and stored once
+- Certificate appears once in storage
 - Logs show which APIs use the certificate
 - Removing one API does not remove certificate if still used by others
 - Certificate removed only when no APIs reference it
@@ -768,28 +764,25 @@ Expected behavior:
 Duplicate certificate references within same API spec are deduplicated. API spec references same certificate in multiple fields.
 
 Expected behavior:
-- Certificate stored once, not multiple times
-- Registry tracks single reference despite multiple spec fields
-- Single sync operation for the certificate
+- Certificate appears once in storage
+- Logs show certificate count equals unique certificates
 
 **Backward Compatibility**
 
 Feature disabled (default configuration) produces original behavior. Both selective sync and cleanup flags disabled.
 
 Expected behavior:
-- All certificates from control plane synced to data plane
+- All certificates from control plane appear in data plane storage
 - No selective sync log messages
 - Certificate count matches control plane
-- Behavior identical to implementation without feature
 
 **Segmented Deployment**
 
 Selective sync works correctly with API group binding. Data plane bound to specific API group, control plane has multiple groups.
 
 Expected behavior:
-- Data plane syncs only certificates for APIs in assigned group
+- Data plane storage contains only certificates for APIs in assigned group
 - Certificates for other groups not present in data plane storage
-- Certificate count reflects group isolation
 
 **Certificate Rotation**
 
@@ -797,9 +790,7 @@ Certificate updates propagate correctly with selective sync enabled. Certificate
 
 Expected behavior:
 - Updated certificate content appears in data plane storage
-- Keyspace event triggers sync of updated certificate
-- APIs automatically use new certificate version
-- No service interruption during rotation
+- APIs continue to function with updated certificate
 
 #### Validation Methods
 
