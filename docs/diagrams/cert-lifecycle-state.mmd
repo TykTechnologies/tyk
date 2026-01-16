@@ -1,4 +1,5 @@
 stateDiagram-v2
+    direction LR
     [*] --> Added: Admin adds cert to control plane
     Added --> Synced: Keyspace event triggers sync
     Synced --> Synced: Cert updates sync automatically
