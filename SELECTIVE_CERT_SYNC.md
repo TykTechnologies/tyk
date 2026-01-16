@@ -152,7 +152,98 @@ type APISpec struct {
 
 ## Proposed Solution: Selective Certificate Synchronization
 
-This design addresses the above problems by implementing selective certificate synchronization.
+### Overview
+
+This design proposes a **usage-aware certificate synchronization system** where data planes only sync and store certificates that are actually required by their loaded APIs. Instead of blindly syncing all certificates from the control plane, each data plane will:
+
+1. **Track certificate usage** by analyzing loaded API specifications
+2. **Filter synchronization** to only pull required certificates
+3. **Enforce access control** to block access to non-required certificates
+4. **Clean up automatically** when APIs are removed or changed
+
+### How It Addresses Current Problems
+
+| Problem | Current State | Proposed Solution |
+|---------|--------------|-------------------|
+| **No usage tracking** | Data planes don't know which certs are needed | Certificate Registry tracks all cert references from loaded APIs |
+| **No filter mechanism** | All certificates are synced indiscriminately | Sync logic checks registry before pulling certificates |
+| **No cleanup** | Certificates accumulate indefinitely | Automatic cleanup on API reload removes unused certs |
+| **Broadcast sync** | All data planes receive all cert updates | Data planes ignore cert changes for unused certificates |
+| **Access control** | Any code can access any synced certificate | Certificate Manager blocks access to non-required certs |
+
+### Design Principles
+
+1. **Opt-in and Backward Compatible**
+   - Feature disabled by default via config flags
+   - Existing deployments continue to work unchanged
+   - Gradual rollout per data plane
+
+2. **Application-Layer Enforcement**
+   - Access control implemented in CertificateManager, not storage layer
+   - Proper separation of concerns
+   - Easy to test and maintain
+
+3. **Performance First**
+   - O(1) lookup performance using map-based sets
+   - Zero-size `struct{}` values for minimal memory overhead
+   - Efficient bidirectional tracking (API→Cert and Cert→API)
+
+4. **Security by Default**
+   - Certificate IDs masked in all logs to prevent information leakage
+   - Access attempts to non-required certificates are blocked and logged
+   - Principle of least privilege: data planes only access what they need
+
+5. **Observable and Debuggable**
+   - Clear log messages at INFO, DEBUG, and WARN levels
+   - Metrics on certificate count and cleanup operations
+   - Detailed audit trail of certificate access attempts
+
+### Expected Outcomes
+
+**Before (Current State)**:
+```
+Control Plane: 100 certificates across all organizations
+Data Plane A: Serves 2 APIs
+  → Syncs: 100 certificates
+  → Uses: 2 certificates (2%)
+  → Waste: 98 certificates
+```
+
+**After (With Selective Sync)**:
+```
+Control Plane: 100 certificates across all organizations
+Data Plane A: Serves 2 APIs
+  → Syncs: 2 certificates (filtered by registry)
+  → Uses: 2 certificates (100%)
+  → Waste: 0 certificates
+  → Reduction: 98% fewer certificates stored
+```
+
+**Benefits Summary**:
+- **Storage**: 90-98% reduction in certificate storage on data planes
+- **Memory**: Proportional reduction in memory for cert metadata and caches
+- **Performance**: Faster startup, reload, and expiry checking
+- **Security**: Data planes only access certificates they actually need
+- **Operations**: Cleaner logs, easier troubleshooting
+
+### High-Level Flow
+
+The solution introduces three main mechanisms:
+
+**1. Certificate Registration (at API load time)**
+```
+API Spec → Extract Cert IDs → Register in Registry → Mark as Required
+```
+
+**2. Selective Synchronization (at sync time)**
+```
+Keyspace Event → Check Registry → If Required: Sync | If Not: Skip
+```
+
+**3. Automatic Cleanup (at API reload time)**
+```
+API Reload → Reset Registry → Re-register Certs → Delete Unused Certs
+```
 
 ### Architecture
 
