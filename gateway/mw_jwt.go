@@ -799,7 +799,7 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 		var policy user.Policy
 		var ok bool
 		if basePolicyID != "" {
-			policy, ok = k.Gw.policies.PolicyByID(model.NewScopedPolicyId(k.Spec.OrgID, basePolicyID))
+			policy, ok = k.Gw.policies.PolicyByID(model.NewScopedCustomPolicyId(k.Spec.OrgID, basePolicyID))
 			if !ok {
 				k.reportLoginFailure(baseFieldData, r)
 				k.Logger().Error("Policy ID found is invalid!")
@@ -1413,22 +1413,22 @@ func ctxSetJWTContextVars(s *APISpec, r *http.Request, token *jwt.Token) {
 }
 
 func (gw *Gateway) generateSessionFromPolicy(policyID, orgID string, enforceOrg bool) (user.SessionState, error) {
-
 	var polId model.PolicyID
 
 	if enforceOrg {
-		polId = model.NewScopedPolicyId(orgID, policyID)
+		polId = model.NewScopedCustomPolicyId(orgID, policyID)
 	} else {
-		polId = model.NonScopedPolicyId(policyID)
+		polId = model.NonScopedLastInsertedPolicyId(policyID)
 	}
 
-	policy, err := gw.policies.PolicyByIdExtended(polId)
+	policy, ok := gw.policies.PolicyByID(polId)
 	session := user.SessionState{}
 
-	if err != nil {
-		return session, err
+	if !ok {
+		return session.Clone(), errors.New("Policy not found")
 	}
-
+	// Check ownership, policy org owner must be the same as API,
+	// otherwise you could overwrite a session key with a policy from a different org!
 	if enforceOrg {
 		if policy.OrgID != orgID {
 			log.Error("Attempting to apply policy from different organisation to key, skipping")

@@ -31,9 +31,12 @@ type (
 		mu                sync.RWMutex
 		policies          map[persistentmodel.ObjectID]user.Policy
 		policiesCustomKey map[customKey]map[orgId]user.Policy
-		onCollision       CollisionCb
-		onBrokenPolicy    BrokenPolicyCb
-		once              sync.Once
+		// Bad old approach. better to get rid of it, because of it provide UB
+		// It's left here just for backward compatibility
+		policiesCustomKeyToObjectID map[customKey]persistentmodel.ObjectID
+		onCollision                 CollisionCb
+		onBrokenPolicy              BrokenPolicyCb
+		once                        sync.Once
 	}
 
 	CollisionCb    func(oldEntry, newEntry *user.Policy)
@@ -47,6 +50,7 @@ func (p *Policies) init() {
 	p.once.Do(func() {
 		p.policies = make(map[persistentmodel.ObjectID]user.Policy)
 		p.policiesCustomKey = make(map[customKey]map[orgId]user.Policy)
+		p.policiesCustomKeyToObjectID = make(map[customKey]persistentmodel.ObjectID)
 		p.onCollision = collisionNoop
 		p.onBrokenPolicy = brokenPolicyNoop
 	})
@@ -88,8 +92,8 @@ func (p *Policies) PolicyIDs() []PolicyID {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
 
-	return lo.Map(maps.Keys(p.policies), func(oid persistentmodel.ObjectID, _ int) PolicyID {
-		return NonScopedPolicyId(oid.Hex())
+	return lo.MapToSlice(p.policies, func(_ persistentmodel.ObjectID, pol user.Policy) PolicyID {
+		return NewScopedCustomPolicyId(pol.OrgID, pol.ID)
 	})
 }
 
@@ -126,13 +130,14 @@ func (p *Policies) DeleteById(id PolicyID) bool {
 
 func (p *Policies) Load(policies ...user.Policy) {
 	for _, pol := range policies {
+		p.unloadOne(&pol)
 		p.loadOne(&pol)
 	}
 }
 
 func (p *Policies) policyByIdExtended(id PolicyID) (user.Policy, error) {
 	switch id := id.(type) {
-	case ScopedPolicyId:
+	case ScopedCustomPolicyId:
 		polMap, ok := p.policiesCustomKey[id.customKey()]
 		if !ok {
 			return user.Policy{}, ErrPolicyNotFound
@@ -140,16 +145,6 @@ func (p *Policies) policyByIdExtended(id PolicyID) (user.Policy, error) {
 
 		if pol, ok := polMap[orgId(id.orgId)]; ok {
 			return pol, nil
-		}
-
-		// fallback strategy
-		oid := persistentmodel.ObjectID(id.id)
-		if !oid.Valid() {
-			return user.Policy{}, ErrPolicyNotFound
-		}
-
-		if policy, ok := p.policies[oid]; ok && policy.OrgID == id.orgId {
-			return policy, nil
 		}
 
 		return user.Policy{}, ErrPolicyNotFound
@@ -173,6 +168,21 @@ func (p *Policies) policyByIdExtended(id PolicyID) (user.Policy, error) {
 				id, ErrAmbiguousState,
 			)
 		}
+	case NonScopedLastInsertedPolicyId:
+		oid, ok := p.policiesCustomKeyToObjectID[customKey(id)]
+
+		if !ok {
+			return user.Policy{}, ErrPolicyNotFound
+		}
+
+		pol, ok := p.policies[oid]
+
+		if !ok {
+			return user.Policy{}, ErrPolicyNotFound
+		}
+
+		return pol, nil
+
 	default:
 		return user.Policy{}, ErrUnreachable
 	}
@@ -193,6 +203,8 @@ func (p *Policies) unloadOne(pol *user.Policy) {
 	if len(ckSet) == 0 {
 		delete(p.policiesCustomKey, customKey(pol.ID))
 	}
+
+	delete(p.policiesCustomKeyToObjectID, customKey(pol.ID))
 }
 
 func (p *Policies) loadOne(pol *user.Policy) {
@@ -218,6 +230,7 @@ func (p *Policies) loadOne(pol *user.Policy) {
 
 	set[orgId(pol.OrgID)] = *pol
 	p.policiesCustomKey[key] = set
+	p.policiesCustomKeyToObjectID[customKey(pol.ID)] = pol.MID
 }
 
 func collisionNoop(_, _ *user.Policy) {}

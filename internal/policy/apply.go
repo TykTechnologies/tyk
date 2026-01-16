@@ -39,7 +39,7 @@ func (t *Service) ClearSession(session *user.SessionState) error {
 	policies := session.PolicyIDs()
 
 	for _, polID := range policies {
-		policy, ok := t.storage.PolicyByID(model.NewScopedPolicyId(session.OrgID, polID))
+		policy, ok := t.storage.PolicyByID(model.NewScopedCustomPolicyId(session.OrgID, polID))
 		if !ok {
 			return fmt.Errorf("policy not found: %s", polID)
 		}
@@ -356,12 +356,12 @@ func (t *Service) policyIds(session *user.SessionState) []model.PolicyID {
 		return nil
 	case t.orgID == nil:
 		return lo.Map(session.PolicyIDs(), func(item string, _ int) model.PolicyID {
-			return model.NonScopedPolicyId(item)
+			return model.NonScopedLastInsertedPolicyId(item)
 		})
 	default:
 		orgId := *t.orgID
 		return lo.Map(session.PolicyIDs(), func(item string, _ int) model.PolicyID {
-			return model.NewScopedPolicyId(orgId, item)
+			return model.NewScopedCustomPolicyId(orgId, item)
 		})
 	}
 }
