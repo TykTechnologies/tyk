@@ -2,15 +2,16 @@ package gateway
 
 import (
 	"context"
-	"github.com/TykTechnologies/tyk/header"
-	"github.com/TykTechnologies/tyk/internal/errors"
-	"github.com/TykTechnologies/tyk/user"
 	"net/http"
 	"net/url"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/TykTechnologies/tyk/header"
+	"github.com/TykTechnologies/tyk/internal/errors"
+	"github.com/TykTechnologies/tyk/user"
 
 	"github.com/getkin/kin-openapi/routers"
 
@@ -19,8 +20,8 @@ import (
 	"github.com/TykTechnologies/tyk/apidef/oas"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/ctx"
-	"github.com/TykTechnologies/tyk/internal/certcheck"
 	"github.com/TykTechnologies/tyk/header"
+	"github.com/TykTechnologies/tyk/internal/certcheck"
 	"github.com/TykTechnologies/tyk/internal/errors"
 	"github.com/TykTechnologies/tyk/internal/graphengine"
 	"github.com/TykTechnologies/tyk/internal/httputil"
@@ -71,10 +72,10 @@ type APISpec struct {
 	oasRouter routers.Router
 
 	// UpstreamCertExpiryBatcher handles upstream certificate expiry checking
-	UpstreamCertExpiryBatcher       certcheck.BackgroundBatcher
-	upstreamCertExpiryCheckContext  context.Context
-	upstreamCertExpiryCancelFunc    context.CancelFunc
-	upstreamCertExpiryInitOnce      sync.Once
+	UpstreamCertExpiryBatcher      certcheck.BackgroundBatcher
+	upstreamCertExpiryCheckContext context.Context
+	upstreamCertExpiryCancelFunc   context.CancelFunc
+	upstreamCertExpiryInitOnce     sync.Once
 }
 
 // CheckSpecMatchesStatus checks if a URL spec has a specific status.

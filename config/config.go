@@ -667,7 +667,7 @@ type CertificateExpiryMonitorConfig struct {
 	// Default: DefaultWarningThresholdDays (30 days)
 	WarningThresholdDays int `json:"warning_threshold_days"`
 
-	// CheckCooldownSeconds specifies the minimum time in seconds that the Gateway will leave between checking for the expiry of a certificate when it is used in an API request - if a certificate is used repeatedly this prevents unnecessary expiry checks. Also used as the interval for periodic upstream certificate checking.
+	// CheckCooldownSeconds specifies the minimum time in seconds that the Gateway will leave between checking for the expiry of a certificate when it is used in an API request - if a certificate is used repeatedly this prevents unnecessary expiry checks
 	// Default: DefaultCheckCooldownSeconds (3600 seconds = 1 hour)
 	CheckCooldownSeconds int `json:"check_cooldown_seconds"`
 

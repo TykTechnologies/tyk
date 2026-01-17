@@ -66,7 +66,7 @@ func (m *CertificateCheckMW) Init() {
 			m.Gw.GetConfig().Security.CertificateExpiryMonitor,
 			m.store,
 			m.Spec.FireEvent,
-			"client",
+			certcheck.CertRoleClient,
 		)
 
 		if err != nil {
@@ -176,4 +176,3 @@ func (m *CertificateCheckMW) extractCertInfo(cert *tls.Certificate) (certInfo ce
 		UntilExpiry: time.Until(cert.Leaf.NotAfter),
 	}, true
 }
-

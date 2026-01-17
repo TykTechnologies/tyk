@@ -7,6 +7,16 @@ import (
 	"github.com/TykTechnologies/tyk/internal/model"
 )
 
+const (
+	// CertRoleClient represents client certificates used for mTLS authentication
+	CertRoleClient = "client"
+	// CertRoleUpstream represents upstream certificates used for Gateway→Backend mTLS
+	CertRoleUpstream = "upstream"
+
+	// CertCooldownKeyPrefix is the Redis key prefix for certificate cooldowns
+	CertCooldownKeyPrefix = "cert-cooldown:"
+)
+
 // FireEventFunc is a function that fires an event.
 type FireEventFunc func(name apidef.TykEvent, meta interface{})
 
@@ -56,7 +66,7 @@ type EventCertificateExpiringSoonMeta struct {
 	ExpiresAt     time.Time `json:"expires_at"`
 	DaysRemaining int       `json:"days_remaining"`
 	APIID         string    `json:"api_id,omitempty"`
-	CertRole      string    `json:"cert_role"` // Role: "server", "client", "ca", "upstream"
+	CertRole      string    `json:"cert_role"` // Role: CertRoleClient or CertRoleUpstream
 }
 
 // EventCertificateExpiredMeta is the metadata structure for certificate expiration events.
@@ -67,5 +77,5 @@ type EventCertificateExpiredMeta struct {
 	ExpiredAt       time.Time `json:"expired_at"`
 	DaysSinceExpiry int       `json:"days_since_expiry"`
 	APIID           string    `json:"api_id,omitempty"`
-	CertRole        string    `json:"cert_role"` // Role: "server", "client", "ca", "upstream"
+	CertRole        string    `json:"cert_role"` // Role: CertRoleClient or CertRoleUpstream
 }

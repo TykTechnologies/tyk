@@ -27,23 +27,13 @@ func TestNewCertificateExpiryCheckBatcherWithRole_RoleParameter(t *testing.T) {
 	}{
 		{
 			name:         "client role",
-			role:         "client",
-			expectedRole: "client",
+			role:         CertRoleClient,
+			expectedRole: CertRoleClient,
 		},
 		{
 			name:         "upstream role",
-			role:         "upstream",
-			expectedRole: "upstream",
-		},
-		{
-			name:         "server role",
-			role:         "server",
-			expectedRole: "server",
-		},
-		{
-			name:         "ca role",
-			role:         "ca",
-			expectedRole: "ca",
+			role:         CertRoleUpstream,
+			expectedRole: CertRoleUpstream,
 		},
 	}
 
@@ -87,7 +77,7 @@ func TestNewCertificateExpiryCheckBatcher_DefaultsToClientRole(t *testing.T) {
 	)
 
 	require.NoError(t, err)
-	assert.Equal(t, "client", batcher.certificateRole, "Default constructor should set role to 'client' for backward compatibility")
+	assert.Equal(t, CertRoleClient, batcher.certificateRole, "Default constructor should set role to 'client' for backward compatibility")
 }
 
 // TestCertificateExpiryCheckBatcher_RoleInExpiredEvent tests that expired events include cert_role
@@ -99,23 +89,13 @@ func TestCertificateExpiryCheckBatcher_RoleInExpiredEvent(t *testing.T) {
 	}{
 		{
 			name:         "client certificate expired event",
-			role:         "client",
-			expectedRole: "client",
+			role:         CertRoleClient,
+			expectedRole: CertRoleClient,
 		},
 		{
 			name:         "upstream certificate expired event",
-			role:         "upstream",
-			expectedRole: "upstream",
-		},
-		{
-			name:         "server certificate expired event",
-			role:         "server",
-			expectedRole: "server",
-		},
-		{
-			name:         "ca certificate expired event",
-			role:         "ca",
-			expectedRole: "ca",
+			role:         CertRoleUpstream,
+			expectedRole: CertRoleUpstream,
 		},
 	}
 
@@ -198,23 +178,13 @@ func TestCertificateExpiryCheckBatcher_RoleInExpiringSoonEvent(t *testing.T) {
 	}{
 		{
 			name:         "client certificate expiring soon event",
-			role:         "client",
-			expectedRole: "client",
+			role:         CertRoleClient,
+			expectedRole: CertRoleClient,
 		},
 		{
 			name:         "upstream certificate expiring soon event",
-			role:         "upstream",
-			expectedRole: "upstream",
-		},
-		{
-			name:         "server certificate expiring soon event",
-			role:         "server",
-			expectedRole: "server",
-		},
-		{
-			name:         "ca certificate expiring soon event",
-			role:         "ca",
-			expectedRole: "ca",
+			role:         CertRoleUpstream,
+			expectedRole: CertRoleUpstream,
 		},
 	}
 
@@ -313,7 +283,7 @@ func TestCertificateExpiryCheckBatcher_RolePreservedThroughCooldowns(t *testing.
 		expiryCheckConfig,
 		batcherMocks.redisStorageMock,
 		fireEvent,
-		"upstream", // Test with upstream role
+		CertRoleUpstream, // Test with upstream role
 	)
 	require.NoError(t, err)
 
@@ -354,7 +324,7 @@ func TestCertificateExpiryCheckBatcher_RolePreservedThroughCooldowns(t *testing.
 
 	// Verify only one event fired (due to event cooldown)
 	assert.Equal(t, 1, eventCount, "Only one event should fire due to event cooldown")
-	assert.Equal(t, "upstream", lastEventMeta.CertRole, "Role should be preserved as 'upstream'")
+	assert.Equal(t, CertRoleUpstream, lastEventMeta.CertRole, "Role should be preserved as 'upstream'")
 	assert.Equal(t, "upstream-test-cert", lastEventMeta.CertName)
 }
 
@@ -380,7 +350,7 @@ func TestCertificateExpiryCheckBatcher_RoleWithCacheErrors(t *testing.T) {
 		expiryCheckConfig,
 		batcherMocks.redisStorageMock,
 		fireEvent,
-		"upstream",
+		CertRoleUpstream,
 	)
 	require.NoError(t, err)
 
@@ -415,6 +385,6 @@ func TestCertificateExpiryCheckBatcher_RoleWithCacheErrors(t *testing.T) {
 	cancel()
 
 	// Verify event still fires with correct role despite cache errors
-	assert.Equal(t, "upstream", actualEventMeta.CertRole, "Role should be 'upstream' even with cache errors")
+	assert.Equal(t, CertRoleUpstream, actualEventMeta.CertRole, "Role should be 'upstream' even with cache errors")
 	assert.Equal(t, "test-cert-id", actualEventMeta.CertID)
 }

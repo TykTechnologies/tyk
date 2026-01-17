@@ -1934,7 +1934,7 @@ func (p *ReverseProxy) initUpstreamCertBatcher() {
 
 	// Initialize Redis store for cooldowns
 	store := &storage.RedisCluster{
-		KeyPrefix:         "cert-cooldown:",
+		KeyPrefix:         certcheck.CertCooldownKeyPrefix,
 		ConnectionHandler: p.Gw.StorageConnectionHandler,
 	}
 	store.Connect()
@@ -1951,7 +1951,7 @@ func (p *ReverseProxy) initUpstreamCertBatcher() {
 		p.Gw.GetConfig().Security.CertificateExpiryMonitor,
 		store,
 		p.TykAPISpec.FireEvent,
-		"upstream",
+		certcheck.CertRoleUpstream,
 	)
 
 	if err != nil {
