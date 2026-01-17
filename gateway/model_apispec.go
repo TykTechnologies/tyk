@@ -20,7 +20,11 @@ import (
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/ctx"
 	"github.com/TykTechnologies/tyk/internal/certcheck"
+	"github.com/TykTechnologies/tyk/header"
+	"github.com/TykTechnologies/tyk/internal/errors"
 	"github.com/TykTechnologies/tyk/internal/graphengine"
+	"github.com/TykTechnologies/tyk/internal/httputil"
+	"github.com/TykTechnologies/tyk/user"
 )
 
 // APISpec represents a path specification for an API, to avoid enumerating multiple nested lists, a single
@@ -198,6 +202,75 @@ func (a *APISpec) findOperation(r *http.Request) *Operation {
 		route:      route,
 		pathParams: pathParams,
 	}
+}
+
+// findRouteForOASPath finds the OAS route using the OAS path pattern (e.g., "/users/{id}")
+// and method, rather than the actual request path. This is used when gateway path matching
+// (prefix/suffix) matches a broader pattern than the exact OAS path.
+// The actualPath parameter is the request path stripped of the listen path.
+// The fullRequestPath is the original request path (used for regexp listen paths).
+func (a *APISpec) findRouteForOASPath(oasPath, method, actualPath, fullRequestPath string) (*routers.Route, map[string]string, error) {
+	if a.oasRouter == nil {
+		return nil, nil, errors.New("OAS router not initialized")
+	}
+
+	// For listen paths with mux-style variables (regexp), we need to use the actual
+	// request path because the OAS router's server URL contains the variable pattern.
+	// For regular listen paths, we build a synthetic path.
+	var routePath string
+	if httputil.IsMuxTemplate(a.Proxy.ListenPath) {
+		// For regexp listen paths like /product-regexp1/{name:.*}
+		// Use the full request path as the OAS router expects actual values
+		routePath = fullRequestPath
+	} else {
+		// For regular listen paths, combine listen path + OAS path
+		routePath = strings.TrimSuffix(a.Proxy.ListenPath, "/") + oasPath
+	}
+
+	syntheticURL, err := url.Parse(routePath)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	syntheticReq := &http.Request{
+		Method: method,
+		URL:    syntheticURL,
+	}
+
+	route, _, err := a.oasRouter.FindRoute(syntheticReq)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	// Extract path parameters from the actual request path by matching against
+	// the OAS path pattern. This handles cases where the OAS path has parameters
+	// like /users/{id} and we need to extract the actual id value from the request.
+	pathParams := extractPathParams(oasPath, actualPath)
+
+	return route, pathParams, nil
+}
+
+// extractPathParams extracts path parameter values from actualPath based on the
+// OAS path pattern. For example, if oasPath is "/users/{id}" and actualPath is
+// "/users/123", it returns map[string]string{"id": "123"}.
+func extractPathParams(oasPath, actualPath string) map[string]string {
+	params := make(map[string]string)
+
+	oasParts := strings.Split(strings.Trim(oasPath, "/"), "/")
+	actualParts := strings.Split(strings.Trim(actualPath, "/"), "/")
+
+	for i, oasPart := range oasParts {
+		if i >= len(actualParts) {
+			break
+		}
+		// Check if this is a path parameter (wrapped in {})
+		if strings.HasPrefix(oasPart, "{") && strings.HasSuffix(oasPart, "}") {
+			paramName := oasPart[1 : len(oasPart)-1]
+			params[paramName] = actualParts[i]
+		}
+	}
+
+	return params
 }
 
 func (a *APISpec) sendRateLimitHeaders(session *user.SessionState, dest *http.Response) {
