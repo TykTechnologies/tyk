@@ -10,7 +10,10 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
+	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/certs"
+	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/internal/certcheck"
 	"github.com/TykTechnologies/tyk/internal/event"
 	"github.com/TykTechnologies/tyk/test"
 )
@@ -66,7 +69,6 @@ func TestUpstreamCertificateExpiryInReverseProxy(t *testing.T) {
 		spec.UpstreamCertificatesDisabled = false
 
 		// Enable certificate expiry monitoring
-		spec.GlobalConfig.Security.CertificateExpiryMonitor.Enabled = true
 		spec.GlobalConfig.Security.CertificateExpiryMonitor.WarningThresholdDays = 30
 		spec.GlobalConfig.Security.CertificateExpiryMonitor.CheckCooldownSeconds = 1
 		spec.GlobalConfig.Security.CertificateExpiryMonitor.EventCooldownSeconds = 0 // No cooldown for testing
@@ -144,7 +146,6 @@ func TestUpstreamCertificateExpiryEventCooldown(t *testing.T) {
 			upstream.Listener.Addr().String(): certID,
 		}
 
-		spec.GlobalConfig.Security.CertificateExpiryMonitor.Enabled = true
 		spec.GlobalConfig.Security.CertificateExpiryMonitor.WarningThresholdDays = 30
 		spec.GlobalConfig.Security.CertificateExpiryMonitor.EventCooldownSeconds = 3600 // 1 hour cooldown
 
