@@ -352,6 +352,39 @@ func getClientValidator(helloInfo *tls.ClientHelloInfo, certPool *x509.CertPool)
 	}
 }
 
+// logServerCertificateExpiry logs certificate expiry information for server certificates.
+// It parses the certificate and logs a warning if expiring soon, or debug otherwise.
+// The source parameter differentiates the certificate origin (e.g., "file" or "store").
+func logServerCertificateExpiry(cert *tls.Certificate, threshold int, source string) {
+	if cert == nil || len(cert.Certificate) == 0 {
+		return
+	}
+
+	parsedCert, err := x509.ParseCertificate(cert.Certificate[0])
+	if err != nil {
+		return
+	}
+
+	daysUntilExpiry := int(time.Until(parsedCert.NotAfter).Hours() / 24)
+	fields := log.WithField("cert_name", parsedCert.Subject.CommonName).
+		WithField("expires_at", parsedCert.NotAfter).
+		WithField("days_remaining", daysUntilExpiry)
+
+	if daysUntilExpiry < threshold {
+		if source == "store" {
+			fields.Warn("Server certificate (from store) expiring soon")
+		} else {
+			fields.Warn("Server certificate expiring soon")
+		}
+	} else {
+		if source == "store" {
+			fields.Debug("Loaded server certificate from Certificate Store")
+		} else {
+			fields.Debug("Loaded server certificate")
+		}
+	}
+}
+
 func (gw *Gateway) getTLSConfigForClient(baseConfig *tls.Config, listenPort int) func(hello *tls.ClientHelloInfo) (*tls.Config, error) {
 	gwConfig := gw.GetConfig()
 	// Supporting legacy certificate configuration
@@ -371,22 +404,7 @@ func (gw *Gateway) getTLSConfigForClient(baseConfig *tls.Config, listenPort int)
 	// Log file-based server certificate expiry info
 	threshold := gwConfig.Security.CertificateExpiryMonitor.WarningThresholdDays
 	for i := range serverCerts {
-		if len(serverCerts[i].Certificate) > 0 {
-			if cert, err := x509.ParseCertificate(serverCerts[i].Certificate[0]); err == nil {
-				daysUntilExpiry := int(time.Until(cert.NotAfter).Hours() / 24)
-				if daysUntilExpiry < threshold {
-					log.WithField("cert_name", cert.Subject.CommonName).
-						WithField("expires_at", cert.NotAfter).
-						WithField("days_remaining", daysUntilExpiry).
-						Warn("Server certificate expiring soon")
-				} else {
-					log.WithField("cert_name", cert.Subject.CommonName).
-						WithField("expires_at", cert.NotAfter).
-						WithField("days_remaining", daysUntilExpiry).
-						Debug("Loaded server certificate")
-				}
-			}
-		}
+		logServerCertificateExpiry(&serverCerts[i], threshold, "file")
 	}
 
 	if len(gwConfig.HttpServerOptions.SSLCertificates) > 0 {
@@ -412,21 +430,8 @@ func (gw *Gateway) getTLSConfigForClient(baseConfig *tls.Config, listenPort int)
 
 	// Log Certificate Store server certificate expiry info
 	for _, cert := range sslCertificates {
-		if cert != nil && len(cert.Certificate) > 0 {
-			if parsedCert, err := x509.ParseCertificate(cert.Certificate[0]); err == nil {
-				daysUntilExpiry := int(time.Until(parsedCert.NotAfter).Hours() / 24)
-				if daysUntilExpiry < threshold {
-					log.WithField("cert_name", parsedCert.Subject.CommonName).
-						WithField("expires_at", parsedCert.NotAfter).
-						WithField("days_remaining", daysUntilExpiry).
-						Warn("Server certificate (from store) expiring soon")
-				} else {
-					log.WithField("cert_name", parsedCert.Subject.CommonName).
-						WithField("expires_at", parsedCert.NotAfter).
-						WithField("days_remaining", daysUntilExpiry).
-						Debug("Loaded server certificate from Certificate Store")
-				}
-			}
+		if cert != nil {
+			logServerCertificateExpiry(cert, threshold, "store")
 		}
 	}
 

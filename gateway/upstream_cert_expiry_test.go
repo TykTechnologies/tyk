@@ -30,12 +30,14 @@ func TestUpstreamCertificateExpiryInReverseProxy(t *testing.T) {
 		NotAfter:  time.Now().Add(15 * 24 * time.Hour), // Expires in 15 days
 	}
 	_, _, combinedPEM, tlsCert := certs.GenCertificate(expiringCert, false)
-	tlsCert.Leaf, _ = x509.ParseCertificate(tlsCert.Certificate[0])
+	var err error
+	tlsCert.Leaf, err = x509.ParseCertificate(tlsCert.Certificate[0])
+	assert.NoError(t, err, "Failed to parse certificate")
 
 	// Create upstream server that requires mTLS
-	upstream := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	upstream := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"status":"ok"}`))
+		_, _ = w.Write([]byte(`{"status":"ok"}`))
 	}))
 
 	pool := x509.NewCertPool()
@@ -81,7 +83,7 @@ func TestUpstreamCertificateExpiryInReverseProxy(t *testing.T) {
 	})[0]
 
 	// Make request that triggers upstream connection
-	_, err := ts.Run(t, test.TestCase{
+	_, err = ts.Run(t, test.TestCase{
 		Path: "/test/",
 		Code: http.StatusOK,
 	})
@@ -115,10 +117,12 @@ func TestUpstreamCertificateExpiryEventCooldown(t *testing.T) {
 		NotAfter:  time.Now().Add(15 * 24 * time.Hour),
 	}
 	_, _, combinedPEM, tlsCert := certs.GenCertificate(expiringCert, false)
-	tlsCert.Leaf, _ = x509.ParseCertificate(tlsCert.Certificate[0])
+	var err error
+	tlsCert.Leaf, err = x509.ParseCertificate(tlsCert.Certificate[0])
+	assert.NoError(t, err, "Failed to parse certificate")
 
 	// Create upstream server
-	upstream := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	upstream := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	}))
 
