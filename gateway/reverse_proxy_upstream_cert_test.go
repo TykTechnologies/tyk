@@ -15,11 +15,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
 
-	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/internal/certcheck"
 	"github.com/TykTechnologies/tyk/internal/crypto"
-	"github.com/TykTechnologies/tyk/internal/event"
 )
 
 // TestReverseProxy_initUpstreamCertBatcher tests lazy initialization of upstream cert batcher
@@ -311,7 +309,7 @@ func TestReverseProxy_checkUpstreamCertificateExpiry(t *testing.T) {
 		found := false
 		for _, entry := range hook.Entries {
 			if entry.Level == logrus.WarnLevel &&
-			   entry.Message == "Skipping upstream certificate expiry check: invalid certificate" {
+				entry.Message == "Skipping upstream certificate expiry check: invalid certificate" {
 				found = true
 				break
 			}
@@ -361,7 +359,7 @@ func TestReverseProxy_checkUpstreamCertificateExpiry(t *testing.T) {
 		found := false
 		for _, entry := range hook.Entries {
 			if entry.Level == logrus.WarnLevel &&
-			   entry.Message == "Skipping upstream certificate expiry check: invalid certificate" {
+				entry.Message == "Skipping upstream certificate expiry check: invalid certificate" {
 				found = true
 				break
 			}
@@ -432,4 +430,3 @@ func TestReverseProxy_checkUpstreamCertificateExpiry(t *testing.T) {
 		proxy.checkUpstreamCertificateExpiry(&tlsCert)
 	})
 }
-
