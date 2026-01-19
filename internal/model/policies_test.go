@@ -61,5 +61,5 @@ func Test_EnsurePolicyId(t *testing.T) {
 }
 
 func Test_Policies(t *testing.T) {
-	model.NewPolicies()
+	// todo: write tests for policies
 }

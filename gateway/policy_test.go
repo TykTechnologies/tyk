@@ -90,7 +90,7 @@ func TestApplyPoliciesQuotaAPILimit(t *testing.T) {
 			},
 		},
 	}
-	ts.Gw.policies.Load(policy)
+	ts.Gw.policies.Reload(policy)
 
 	// load APIs
 	ts.Gw.BuildAndLoadAPI(
@@ -332,7 +332,7 @@ func TestApplyMultiPolicies(t *testing.T) {
 
 	assert.True(t, !policy2.APILimit().IsEmpty())
 
-	ts.Gw.policies.Load(policy1, policy2)
+	ts.Gw.policies.Reload(policy1, policy2)
 
 	// load APIs
 	ts.Gw.BuildAndLoadAPI(
@@ -496,7 +496,7 @@ func TestApplyMultiPolicies(t *testing.T) {
 	policy1.Rate = 1
 	policy1.LastUpdated = strconv.Itoa(int(time.Now().Unix() + 1))
 
-	ts.Gw.policies.Load(policy1, policy2)
+	ts.Gw.policies.Reload(policy1, policy2)
 
 	// Rate limits after policy update
 	t.Run("Rate limits after policy update", func(t *testing.T) {
@@ -531,7 +531,7 @@ func TestPerAPIPolicyUpdate(t *testing.T) {
 		},
 	}
 
-	ts.Gw.policies.Load(policy)
+	ts.Gw.policies.Reload(policy)
 
 	// load APIs
 	ts.Gw.BuildAndLoadAPI(
@@ -618,7 +618,7 @@ func TestPerAPIPolicyUpdate(t *testing.T) {
 			},
 		},
 	}
-	ts.Gw.policies.Load(policy)
+	ts.Gw.policies.Reload(policy)
 
 	ts.Run(t, []test.TestCase{
 		{

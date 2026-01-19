@@ -28,16 +28,12 @@ type (
 	PolicySetOpt func(*Policies)
 
 	Policies struct {
-		mu                sync.RWMutex
-		policies          map[persistentmodel.ObjectID]user.Policy
-		policiesCustomKey map[customKey]map[orgId]user.Policy
-		// Bad old approach. better to get rid of it, because of it provide UB
-		// It's left here just for backward compatibility
-		policiesCustomKeyToObjectID map[customKey]persistentmodel.ObjectID
-		onCollision                 CollisionCb
-		onBrokenPolicy              BrokenPolicyCb
-		onMultiTenantCollision      MultiTenantCollisionCb
-		once                        sync.Once
+		policySet
+		mu                     sync.RWMutex
+		once                   sync.Once
+		onCollision            CollisionCb
+		onBrokenPolicy         BrokenPolicyCb
+		onMultiTenantCollision MultiTenantCollisionCb
 	}
 
 	CollisionCb            func(oldEntry, newEntry *user.Policy)
@@ -46,11 +42,17 @@ type (
 
 	customKey string
 	orgId     string
+
+	policySet struct {
+		policies                    map[persistentmodel.ObjectID]user.Policy
+		policiesCustomKey           map[customKey]map[orgId]user.Policy
+		policiesCustomKeyToObjectID map[customKey]persistentmodel.ObjectID
+	}
 )
 
 func (p *Policies) init() {
 	p.once.Do(func() {
-		p.reset()
+		p.policySet = newPolicySet()
 		p.initDefaultCallbacks()
 	})
 }
@@ -59,12 +61,6 @@ func (p *Policies) initDefaultCallbacks() {
 	p.onCollision = collisionNoop
 	p.onBrokenPolicy = brokenPolicyNoop
 	p.onMultiTenantCollision = multiTenantCollisionNoop
-}
-
-func (p *Policies) reset() {
-	p.policies = make(map[persistentmodel.ObjectID]user.Policy)
-	p.policiesCustomKey = make(map[customKey]map[orgId]user.Policy)
-	p.policiesCustomKeyToObjectID = make(map[customKey]persistentmodel.ObjectID)
 }
 
 func NewPolicies(opts ...PolicySetOpt) *Policies {
@@ -162,17 +158,17 @@ func (p *Policies) DeleteById(id PolicyID) bool {
 	return true
 }
 
-func (p *Policies) Load(policies ...user.Policy) {
-	p.mu.Lock()
-	defer p.mu.Unlock()
-	p.reset()
-
+func (p *Policies) Reload(policies ...user.Policy) {
+	set := newPolicySet()
 	for _, pol := range policies {
-		p.loadOne(&pol)
+		set.loadOne(&pol, p.onBrokenPolicy, p.onCollision)
 	}
 
-	p.emitMultiTenancyCollisions()
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.policySet = set
 
+	p.emitMultiTenancyCollisions()
 }
 
 func (p *Policies) emitMultiTenancyCollisions() {
@@ -260,29 +256,6 @@ func (p *Policies) unloadOne(pol *user.Policy) {
 	delete(p.policiesCustomKeyToObjectID, customKey(pol.ID))
 }
 
-func (p *Policies) loadOne(pol *user.Policy) {
-	if !EnsurePolicyId(pol) {
-		p.onBrokenPolicy(pol)
-		return
-	}
-
-	p.policies[pol.MID] = *pol
-	key := customKey(pol.ID)
-
-	set, ok := p.policiesCustomKey[key]
-	if !ok {
-		set = make(map[orgId]user.Policy)
-	}
-
-	if existent, ok := set[orgId(pol.OrgID)]; ok && existent.ID != pol.ID {
-		p.onCollision(&existent, pol)
-	}
-
-	set[orgId(pol.OrgID)] = *pol
-	p.policiesCustomKey[key] = set
-	p.policiesCustomKeyToObjectID[customKey(pol.ID)] = pol.MID
-}
-
 func collisionNoop(_, _ *user.Policy) {}
 
 func brokenPolicyNoop(_ *user.Policy) {}
@@ -306,4 +279,39 @@ func EnsurePolicyId(policy *user.Policy) bool {
 
 	policy.ID = policy.MID.Hex()
 	return true
+}
+
+func newPolicySet() policySet {
+	return policySet{
+		policies:                    make(map[persistentmodel.ObjectID]user.Policy),
+		policiesCustomKey:           make(map[customKey]map[orgId]user.Policy),
+		policiesCustomKeyToObjectID: make(map[customKey]persistentmodel.ObjectID),
+	}
+}
+
+func (p *policySet) loadOne(
+	pol *user.Policy,
+	onBrokenPolicy BrokenPolicyCb,
+	onCollision CollisionCb,
+) {
+	if !EnsurePolicyId(pol) {
+		onBrokenPolicy(pol)
+		return
+	}
+
+	p.policies[pol.MID] = *pol
+	key := customKey(pol.ID)
+
+	set, ok := p.policiesCustomKey[key]
+	if !ok {
+		set = make(map[orgId]user.Policy)
+	}
+
+	if existent, ok := set[orgId(pol.OrgID)]; ok && existent.ID != pol.ID {
+		onCollision(&existent, pol)
+	}
+
+	set[orgId(pol.OrgID)] = *pol
+	p.policiesCustomKey[key] = set
+	p.policiesCustomKeyToObjectID[customKey(pol.ID)] = pol.MID
 }

@@ -660,7 +660,7 @@ func (gw *Gateway) syncPolicies() (count int, err error) {
 		return len(pols), err
 	}
 
-	gw.policies.Load(pols...)
+	gw.policies.Reload(pols...)
 
 	return len(pols), nil
 }
