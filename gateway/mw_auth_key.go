@@ -28,10 +28,14 @@ const (
 	ErrAuthCertNotFound              = "auth.cert_not_found"
 	ErrAuthCertExpired               = "auth.cert_expired"
 	ErrAuthKeyIsInvalid              = "auth.key_is_invalid"
+	ErrAuthCertRequired              = "auth.cert_required"
+	ErrAuthCertMismatch              = "auth.cert_mismatch"
 
-	MsgNonExistentKey  = "Attempted access with non-existent key."
-	MsgNonExistentCert = "Attempted access with non-existent cert."
-	MsgInvalidKey      = "Attempted access with invalid key."
+	MsgNonExistentKey    = "Attempted access with non-existent key."
+	MsgNonExistentCert   = "Attempted access with non-existent cert."
+	MsgInvalidKey        = "Attempted access with invalid key."
+	MsgCertificateNeeded = "Client certificate is required."
+	MsgCertificateBad    = "Client certificate mismatch."
 )
 
 func initAuthKeyErrors() {
@@ -57,6 +61,16 @@ func initAuthKeyErrors() {
 
 	TykErrors[ErrAuthCertExpired] = config.TykError{
 		Message: MsgCertificateExpired,
+		Code:    http.StatusForbidden,
+	}
+
+	TykErrors[ErrAuthCertRequired] = config.TykError{
+		Message: MsgCertificateNeeded,
+		Code:    http.StatusForbidden,
+	}
+
+	TykErrors[ErrAuthCertMismatch] = config.TykError{
+		Message: MsgCertificateBad,
 		Code:    http.StatusForbidden,
 	}
 }
@@ -101,18 +115,28 @@ func (k *AuthKey) ProcessRequest(_ http.ResponseWriter, r *http.Request, _ inter
 	key, authConfig := k.getAuthToken(k.getAuthType(), r)
 	var certHash string
 
+	// When UseCertificate is enabled, a valid TLS client certificate is ALWAYS required.
+	// This prevents bypass attacks where an attacker uses only the API key without a certificate.
+	if authConfig.UseCertificate {
+		if r.TLS == nil || len(r.TLS.PeerCertificates) == 0 {
+			k.Logger().Info(MsgCertificateNeeded)
+			return errorAndStatusCode(ErrAuthCertRequired)
+		}
+
+		if time.Now().After(r.TLS.PeerCertificates[0].NotAfter) {
+			return errorAndStatusCode(ErrAuthCertExpired)
+		}
+
+		certHash = k.Spec.OrgID + crypto.HexSHA256(r.TLS.PeerCertificates[0].Raw)
+	}
+
 	keyExists := false
 	var session user.SessionState
 	updateSession := false
 	if key != "" {
 		key = stripBearer(key)
-	} else if authConfig.UseCertificate && key == "" && r.TLS != nil && len(r.TLS.PeerCertificates) > 0 {
+	} else if authConfig.UseCertificate && certHash != "" {
 		log.Debug("Trying to find key by client certificate")
-		certHash = k.Spec.OrgID + crypto.HexSHA256(r.TLS.PeerCertificates[0].Raw)
-		if time.Now().After(r.TLS.PeerCertificates[0].NotAfter) {
-			return errorAndStatusCode(ErrAuthCertExpired)
-		}
-
 		key = k.Gw.generateToken(k.Spec.OrgID, certHash)
 	} else {
 		k.Logger().Info("Attempted access with malformed header, no auth header found.")
@@ -130,18 +154,29 @@ func (k *AuthKey) ProcessRequest(_ http.ResponseWriter, r *http.Request, _ inter
 	}
 
 	if authConfig.UseCertificate {
-		certLookup := session.Certificate
+		// At this point, we know a valid TLS certificate was presented (checked above).
+		// Now verify:
+		// 1. The certificate exists in the certificate manager
+		// 2. If the session has a bound certificate, the presented certificate must match
 
-		if r.TLS != nil && len(r.TLS.PeerCertificates) > 0 {
-			certLookup = certHash
-			if session.Certificate != certHash {
-				session.Certificate = certHash
-				updateSession = true
-			}
+		// Check that the presented certificate is registered in the certificate manager
+		if _, err := k.Gw.CertificateManager.GetRaw(certHash); err != nil {
+			return k.reportInvalidKey(key, r, MsgNonExistentCert, ErrAuthCertNotFound)
 		}
 
-		if _, err := k.Gw.CertificateManager.GetRaw(certLookup); err != nil {
-			return k.reportInvalidKey(key, r, MsgNonExistentCert, ErrAuthCertNotFound)
+		// If the session already has a certificate bound to it, verify it matches the presented one.
+		// This prevents one valid certificate holder from impersonating another.
+		if session.Certificate != "" && session.Certificate != certHash {
+			k.Logger().WithField("expected", k.Gw.obfuscateKey(session.Certificate)).
+				WithField("got", k.Gw.obfuscateKey(certHash)).
+				Info(MsgCertificateBad)
+			return errorAndStatusCode(ErrAuthCertMismatch)
+		}
+
+		// Update session certificate if not set (first-time binding)
+		if session.Certificate != certHash {
+			session.Certificate = certHash
+			updateSession = true
 		}
 	}
 

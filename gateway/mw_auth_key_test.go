@@ -669,3 +669,121 @@ func TestDynamicMTLS(t *testing.T) {
 		})
 	})
 }
+
+// TestDynamicMTLSBypassPrevention tests that the dynamic mTLS bypass vulnerability
+// described in TT-16050 and TT-13208 is properly prevented.
+// The vulnerability allowed clients to bypass mTLS requirements by:
+// 1. Using only an API key without presenting a TLS certificate
+// 2. Using a different certificate than the one bound to the session
+func TestDynamicMTLSBypassPrevention(t *testing.T) {
+	serverCertPem, _, combinedPEM, _ := certs.GenServerCertificate()
+	certID, _, _ := certs.GetCertIDAndChainPEM(combinedPEM, "")
+
+	conf := func(globalConf *config.Config) {
+		globalConf.Security.ControlAPIUseMutualTLS = false
+		globalConf.HttpServerOptions.UseSSL = true
+		globalConf.HttpServerOptions.SSLInsecureSkipVerify = true
+		globalConf.HttpServerOptions.SSLCertificates = []string{"default" + certID}
+	}
+	ts := StartTest(conf)
+	defer ts.Close()
+
+	certID, err := ts.Gw.CertificateManager.Add(combinedPEM, "default")
+	assert.NoError(t, err)
+	defer ts.Gw.CertificateManager.Delete(certID, "default")
+	ts.ReloadGatewayProxy()
+
+	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		spec.APIID = "apiID-bypass-test"
+		spec.UseStandardAuth = true
+		spec.UseKeylessAccess = false
+		authConf := apidef.AuthConfig{
+			Name:           "authToken",
+			UseCertificate: true,
+			AuthHeaderName: "Authorization",
+		}
+		spec.AuthConfigs = map[string]apidef.AuthConfig{
+			"authToken": authConf,
+		}
+		spec.Auth = authConf
+		spec.Proxy.ListenPath = "/dynamic-mtls-bypass-test"
+	})
+
+	// Generate legitimate client certificate
+	clientCertPem, _, _, clientCert := certs.GenCertificate(&x509.Certificate{}, false)
+	clientCertID, err := ts.Gw.CertificateManager.Add(clientCertPem, "default")
+	assert.NoError(t, err)
+	defer ts.Gw.CertificateManager.Delete(clientCertID, "default")
+
+	// Generate a different (attacker's) certificate that is also registered
+	attackerCertPem, _, _, attackerCert := certs.GenCertificate(&x509.Certificate{}, false)
+	attackerCertID, err := ts.Gw.CertificateManager.Add(attackerCertPem, "default")
+	assert.NoError(t, err)
+	defer ts.Gw.CertificateManager.Delete(attackerCertID, "default")
+
+	// Create a session bound to the legitimate client certificate
+	session, apiKey := ts.CreateSession(func(s *user.SessionState) {
+		s.AccessRights = map[string]user.AccessDefinition{"apiID-bypass-test": {
+			APIID: "apiID-bypass-test",
+		}}
+		s.Certificate = clientCertID
+	})
+	_ = session
+
+	t.Run("TT-16050: bypass attempt with API key but no certificate should fail", func(t *testing.T) {
+		// This test reproduces the vulnerability where an attacker with the API key
+		// (which could be derived from orgID + cert hash) attempts to bypass mTLS
+		// by not presenting any TLS client certificate.
+		clientWithoutCert := GetTLSClient(nil, serverCertPem)
+
+		_, _ = ts.Run(t, test.TestCase{
+			Domain:    "localhost",
+			Client:    clientWithoutCert,
+			Path:      "/dynamic-mtls-bypass-test",
+			Headers:   map[string]string{"Authorization": apiKey},
+			Code:      http.StatusForbidden,
+			BodyMatch: MsgCertificateNeeded,
+		})
+	})
+
+	t.Run("TT-13208: attacker with different valid cert trying to use victim's session should fail", func(t *testing.T) {
+		// This test verifies that even if an attacker has a valid certificate registered
+		// in the system, they cannot use it to access another user's session.
+		attackerClient := GetTLSClient(&attackerCert, serverCertPem)
+
+		_, _ = ts.Run(t, test.TestCase{
+			Domain:    "localhost",
+			Client:    attackerClient,
+			Path:      "/dynamic-mtls-bypass-test",
+			Headers:   map[string]string{"Authorization": apiKey},
+			Code:      http.StatusForbidden,
+			BodyMatch: MsgCertificateBad,
+		})
+	})
+
+	t.Run("legitimate client with correct certificate should succeed", func(t *testing.T) {
+		// Verify that the legitimate client with the correct certificate still works
+		validClient := GetTLSClient(&clientCert, serverCertPem)
+
+		_, _ = ts.Run(t, test.TestCase{
+			Domain: "localhost",
+			Client: validClient,
+			Path:   "/dynamic-mtls-bypass-test",
+			Code:   http.StatusOK,
+		})
+	})
+
+	t.Run("attacker with unregistered certificate should fail", func(t *testing.T) {
+		// Test that certificates not registered in the system are rejected
+		_, _, _, unregisteredCert := certs.GenCertificate(&x509.Certificate{}, false)
+		unregisteredClient := GetTLSClient(&unregisteredCert, serverCertPem)
+
+		_, _ = ts.Run(t, test.TestCase{
+			Domain:    "localhost",
+			Client:    unregisteredClient,
+			Path:      "/dynamic-mtls-bypass-test",
+			Code:      http.StatusForbidden,
+			BodyMatch: MsgApiAccessDisallowed,
+		})
+	})
+}
