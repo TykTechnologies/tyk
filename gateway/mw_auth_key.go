@@ -138,11 +138,19 @@ func (k *AuthKey) ProcessRequest(_ http.ResponseWriter, r *http.Request, _ inter
 
 	// Validate certificate binding or legacy certificate auth
 	// Certificate binding validation runs when:
-	// 1. The session has certificate bindings (static mTLS with certificate-token binding), OR
+	// 1. The session has certificate bindings AND static mTLS is enabled (certificate-token binding), OR
 	// 2. UseCertificate is explicitly set for this API (legacy dynamic mTLS mode)
-	hasBindings := len(session.MtlsStaticCertificateBindings) > 0
-	if authConfig.UseCertificate || hasBindings {
-		if code, err := k.validateCertificate(r, key, &session, &certHash, &updateSession); err != nil {
+	useCertBinding := k.shouldValidateCertificateBinding(&session)
+	if authConfig.UseCertificate || useCertBinding {
+		ctx := &certValidationContext{
+			request:        r,
+			key:            key,
+			session:        &session,
+			certHash:       &certHash,
+			updateSession:  &updateSession,
+			useCertBinding: useCertBinding,
+		}
+		if code, err := k.validateCertificate(ctx); err != nil {
 			return err, code
 		}
 	}
@@ -195,6 +203,22 @@ func (k *AuthKey) reportInvalidKey(key string, r *http.Request, msg string, errM
 	reportHealthValue(k.Spec, KeyFailure, "1")
 
 	return errorAndStatusCode(errMsg)
+}
+
+// certValidationContext holds all the context needed for certificate validation
+type certValidationContext struct {
+	request        *http.Request
+	key            string
+	session        *user.SessionState
+	certHash       *string
+	updateSession  *bool
+	useCertBinding bool
+}
+
+// shouldValidateCertificateBinding determines if certificate-token binding should be enforced.
+// Certificate binding only applies when static mTLS is enabled at the API level.
+func (k *AuthKey) shouldValidateCertificateBinding(session *user.SessionState) bool {
+	return len(session.MtlsStaticCertificateBindings) > 0 && k.Spec.UseMutualTLSAuth
 }
 
 func (k *AuthKey) validateSignature(r *http.Request, key string) (error, int) {
@@ -277,42 +301,42 @@ func AuthFailed(m TykMiddleware, r *http.Request, token string) {
 
 // validateCertificate performs certificate validation for UseCertificate authentication
 // It handles both certificate binding mode and legacy auto-update mode
-func (k *AuthKey) validateCertificate(r *http.Request, key string, session *user.SessionState, certHash *string, updateSession *bool) (int, error) {
-	if r.TLS != nil && len(r.TLS.PeerCertificates) > 0 {
-		return k.validateWithTLSCertificate(r, key, session, certHash, updateSession)
+func (k *AuthKey) validateCertificate(ctx *certValidationContext) (int, error) {
+	if ctx.request.TLS != nil && len(ctx.request.TLS.PeerCertificates) > 0 {
+		return k.validateWithTLSCertificate(ctx)
 	}
-	return k.validateWithoutTLSCertificate(r, key, session)
+
+	return k.validateWithoutTLSCertificate(ctx)
 }
 
 // validateWithTLSCertificate handles validation when a TLS client certificate is provided
-func (k *AuthKey) validateWithTLSCertificate(r *http.Request, key string, session *user.SessionState, certHash *string, updateSession *bool) (int, error) {
+func (k *AuthKey) validateWithTLSCertificate(ctx *certValidationContext) (int, error) {
 	// Check certificate expiry when a token is provided (not checked earlier in the flow)
-	if code, err := k.checkCertificateExpiry(r, key); err != nil {
+	if code, err := k.checkCertificateExpiry(ctx.request, ctx.key); err != nil {
 		return code, err
 	}
 
 	// Compute cert hash for comparison
-	*certHash = k.computeCertHash(r, *certHash)
+	*ctx.certHash = k.computeCertHash(ctx.request, *ctx.certHash)
 
 	// Use binding mode if the session has static certificate bindings configured
 	// Otherwise, use legacy mode for backward compatibility with dynamic mTLS
-	hasBindings := len(session.MtlsStaticCertificateBindings) > 0
-	if hasBindings {
-		return k.validateCertificateBinding(r, key, session, *certHash)
+	if ctx.useCertBinding {
+		return k.validateCertificateBinding(ctx.request, ctx.key, ctx.session, *ctx.certHash)
 	}
-	return k.validateLegacyMode(r, session, *certHash, updateSession)
+
+	return k.validateLegacyMode(ctx.request, ctx.session, *ctx.certHash, ctx.updateSession)
 }
 
 // validateWithoutTLSCertificate handles validation when no TLS client certificate is provided
-func (k *AuthKey) validateWithoutTLSCertificate(r *http.Request, key string, session *user.SessionState) (int, error) {
+func (k *AuthKey) validateWithoutTLSCertificate(ctx *certValidationContext) (int, error) {
 	// Use binding mode if the session has static certificate bindings configured
 	// Otherwise, use legacy mode for backward compatibility with dynamic mTLS
-	hasBindings := len(session.MtlsStaticCertificateBindings) > 0
-
-	if hasBindings {
-		return k.validateBindingWithoutCert(r, key, session)
+	if ctx.useCertBinding {
+		return k.validateBindingWithoutCert(ctx.request, ctx.key, ctx.session)
 	}
-	return k.validateLegacyWithoutCert(r, session)
+
+	return k.validateLegacyWithoutCert(ctx.request, ctx.session)
 }
 
 // checkCertificateExpiry validates that the certificate hasn't expired

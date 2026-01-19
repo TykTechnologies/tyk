@@ -107,13 +107,6 @@ func (m *CertificateCheckMW) ProcessRequest(w http.ResponseWriter, r *http.Reque
 		certIDs := append(m.Spec.ClientCertificates, m.Spec.GlobalConfig.Security.Certificates.API...)
 		apiCerts := m.Gw.CertificateManager.List(certIDs, certs.CertificatePublic)
 		if err := crypto.ValidateRequestCerts(r, apiCerts); err != nil {
-			// Certificate not in static whitelist, check if it's bound to a token
-			if m.validateCertificateFromToken(r) {
-				// Certificate is valid through token binding
-				m.batchCertificatesExpirationCheck(apiCerts)
-				return nil, http.StatusOK
-			}
-
 			log.
 				WithField("api_id", m.Spec.APIID).
 				WithField("api_name", m.Spec.Name).
@@ -127,55 +120,6 @@ func (m *CertificateCheckMW) ProcessRequest(w http.ResponseWriter, r *http.Reque
 	}
 
 	return nil, http.StatusOK
-}
-
-// validateCertificateFromToken checks if the presented certificate is bound to a token in the request
-func (m *CertificateCheckMW) validateCertificateFromToken(r *http.Request) bool {
-	if r.TLS == nil || len(r.TLS.PeerCertificates) == 0 {
-		return false
-	}
-
-	// Get the auth token from the request
-	_, authConfig := m.getAuthToken(m.getAuthType(), r)
-	key, _ := m.getAuthToken(m.getAuthType(), r)
-	if key == "" {
-		return false
-	}
-
-	key = stripBearer(key)
-
-	// Look up the session for this token
-	session, keyExists := m.CheckSessionAndIdentityForValidKey(key, r)
-	if !keyExists {
-		return false
-	}
-
-	// Compute the certificate hash from the request
-	certHash := m.Spec.OrgID + crypto.HexSHA256(r.TLS.PeerCertificates[0].Raw)
-
-	// Check if the certificate matches the session's certificate field (dynamic mTLS)
-	if authConfig.UseCertificate && session.Certificate == certHash {
-		log.
-			WithField("api_id", m.Spec.APIID).
-			WithField("api_name", m.Spec.Name).
-			WithField("mw", m.Name()).
-			Debug("Certificate validated through dynamic mTLS (session.Certificate)")
-		return true
-	}
-
-	// Check if the certificate matches any of the static certificate bindings
-	for _, boundCert := range session.MtlsStaticCertificateBindings {
-		if certHash == boundCert {
-			log.
-				WithField("api_id", m.Spec.APIID).
-				WithField("api_name", m.Spec.Name).
-				WithField("mw", m.Name()).
-				Debug("Certificate validated through static certificate binding")
-			return true
-		}
-	}
-
-	return false
 }
 
 // batchCertificatesExpirationCheck batches certificates for expiry checking using the configured BackgroundBatcher.

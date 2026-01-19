@@ -347,10 +347,10 @@ func TestStaticAndDynamicMTLS(t *testing.T) {
 	})
 }
 
-// TestCertificateCheckMW_ValidateCertificateFromToken tests the fallback path in CertificateCheckMW
-// where a certificate not in the static allowlist is validated through token binding.
-// This covers the code path at gateway/mw_certificate_check.go:111
-func TestCertificateCheckMW_ValidateCertificateFromToken(t *testing.T) {
+// TestCertificateCheckMW_StrictAllowlistValidation tests that the CertificateCheckMW
+// strictly validates against the static allowlist without any fallback to token binding.
+// Certificates not in the allowlist will fail regardless of token binding.
+func TestCertificateCheckMW_StrictAllowlistValidation(t *testing.T) {
 	// Setup server certificate
 	serverCertPem, _, combinedPEM, _ := certs.GenServerCertificate()
 	certID, _, _ := certs.GetCertIDAndChainPEM(combinedPEM, "")
@@ -384,9 +384,9 @@ func TestCertificateCheckMW_ValidateCertificateFromToken(t *testing.T) {
 	certHash2 := "default" + certs.HexSHA256(clientCert2.Certificate[0])
 
 	// Create API with static mTLS that only allows cert1
-	// Cert2 is NOT in the allowlist but can be validated via token binding
+	// Cert2 is NOT in the allowlist and will be rejected by CertificateCheckMW
 	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
-		spec.APIID = "token-binding-fallback-api"
+		spec.APIID = "strict-allowlist-api"
 		spec.OrgID = "default"
 		// Enable static mTLS with allowlist containing only cert1
 		spec.UseMutualTLSAuth = true
@@ -403,38 +403,39 @@ func TestCertificateCheckMW_ValidateCertificateFromToken(t *testing.T) {
 			"authToken": authConf,
 		}
 		spec.Auth = authConf
-		spec.Proxy.ListenPath = "/token-binding-fallback"
+		spec.Proxy.ListenPath = "/strict-allowlist"
 	})
 
-	t.Run("Certificate validated through static certificate bindings", func(t *testing.T) {
+	t.Run("Certificate not in allowlist fails regardless of token binding", func(t *testing.T) {
 		// Create session with cert2 bound via MtlsStaticCertificateBindings
-		// Cert2 is NOT in the static allowlist, but should pass via token binding
+		// Cert2 is NOT in the static allowlist, so it should fail at CertificateCheckMW
 		key := CreateSession(ts.Gw, func(s *user.SessionState) {
-			s.AccessRights = map[string]user.AccessDefinition{"token-binding-fallback-api": {
-				APIID: "token-binding-fallback-api",
+			s.AccessRights = map[string]user.AccessDefinition{"strict-allowlist-api": {
+				APIID: "strict-allowlist-api",
 			}}
 			s.MtlsStaticCertificateBindings = []string{certHash2} // Static binding to cert2
 		})
 
 		assert.NotEmpty(t, key, "Should create key with static certificate binding")
 
-		// Request with cert2 (NOT in allowlist but statically bound) should succeed
-		// This triggers validateCertificateFromToken fallback path
+		// Request with cert2 (NOT in allowlist) should fail at CertificateCheckMW
+		// Token binding does not bypass the static allowlist validation
 		client2 := GetTLSClient(&clientCert2, serverCertPem)
 		_, _ = ts.Run(t, test.TestCase{
-			Domain:  "localhost",
-			Client:  client2,
-			Path:    "/token-binding-fallback",
-			Headers: map[string]string{"Authorization": key},
-			Code:    http.StatusOK,
+			Domain:    "localhost",
+			Client:    client2,
+			Path:      "/strict-allowlist",
+			Headers:   map[string]string{"Authorization": key},
+			Code:      http.StatusForbidden,
+			BodyMatch: "not allowed",
 		})
 	})
 
 	t.Run("Allowlisted certificate still works", func(t *testing.T) {
 		// Create session with cert1 (which is in the allowlist)
 		key := CreateSession(ts.Gw, func(s *user.SessionState) {
-			s.AccessRights = map[string]user.AccessDefinition{"token-binding-fallback-api": {
-				APIID: "token-binding-fallback-api",
+			s.AccessRights = map[string]user.AccessDefinition{"strict-allowlist-api": {
+				APIID: "strict-allowlist-api",
 			}}
 			s.Certificate = clientCertID1
 		})
@@ -446,7 +447,7 @@ func TestCertificateCheckMW_ValidateCertificateFromToken(t *testing.T) {
 		_, _ = ts.Run(t, test.TestCase{
 			Domain:  "localhost",
 			Client:  client1,
-			Path:    "/token-binding-fallback",
+			Path:    "/strict-allowlist",
 			Headers: map[string]string{"Authorization": key},
 			Code:    http.StatusOK,
 		})
@@ -455,8 +456,8 @@ func TestCertificateCheckMW_ValidateCertificateFromToken(t *testing.T) {
 	t.Run("Unbound certificate fails", func(t *testing.T) {
 		// Create session without any certificate binding
 		key := CreateSession(ts.Gw, func(s *user.SessionState) {
-			s.AccessRights = map[string]user.AccessDefinition{"token-binding-fallback-api": {
-				APIID: "token-binding-fallback-api",
+			s.AccessRights = map[string]user.AccessDefinition{"strict-allowlist-api": {
+				APIID: "strict-allowlist-api",
 			}}
 			// No certificate binding
 		})
@@ -468,7 +469,7 @@ func TestCertificateCheckMW_ValidateCertificateFromToken(t *testing.T) {
 		_, _ = ts.Run(t, test.TestCase{
 			Domain:    "localhost",
 			Client:    client2,
-			Path:      "/token-binding-fallback",
+			Path:      "/strict-allowlist",
 			Headers:   map[string]string{"Authorization": key},
 			Code:      http.StatusForbidden,
 			BodyMatch: "not allowed",
@@ -482,7 +483,7 @@ func TestCertificateCheckMW_ValidateCertificateFromToken(t *testing.T) {
 		_, _ = ts.Run(t, test.TestCase{
 			Domain:    "localhost",
 			Client:    client2,
-			Path:      "/token-binding-fallback",
+			Path:      "/strict-allowlist",
 			Code:      http.StatusForbidden,
 			BodyMatch: "not allowed",
 		})
@@ -495,7 +496,7 @@ func TestCertificateCheckMW_ValidateCertificateFromToken(t *testing.T) {
 		_, _ = ts.Run(t, test.TestCase{
 			Domain:    "localhost",
 			Client:    client2,
-			Path:      "/token-binding-fallback",
+			Path:      "/strict-allowlist",
 			Headers:   map[string]string{"Authorization": "invalid-token"},
 			Code:      http.StatusForbidden,
 			BodyMatch: "not allowed",
