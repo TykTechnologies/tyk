@@ -15,10 +15,9 @@ import (
 
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/header"
+	"github.com/TykTechnologies/tyk/internal/uuid"
 	"github.com/TykTechnologies/tyk/test"
 	"github.com/TykTechnologies/tyk/user"
-
-	"github.com/TykTechnologies/tyk/internal/uuid"
 )
 
 func TestLoadPoliciesFromDashboardReLogin(t *testing.T) {
@@ -415,7 +414,8 @@ func TestApplyMultiPolicies(t *testing.T) {
 				Code:      http.StatusOK,
 				BodyMatchFunc: func(data []byte) bool {
 					sessionData := user.SessionState{}
-					json.Unmarshal(data, &sessionData)
+					err := json.Unmarshal(data, &sessionData)
+					assert.NoError(t, err)
 
 					policy1Expected := user.APILimit{
 						RateLimit: user.RateLimit{
