@@ -606,6 +606,98 @@ func TestStaticAndDynamicMTLS_ExpiredCertificate(t *testing.T) {
 	})
 }
 
+// TestDynamicMTLS_InvalidCertificateInSession tests validateLegacyWithoutCert
+// when the session has a certificate ID that doesn't exist in the cert manager
+func TestDynamicMTLS_InvalidCertificateInSession(t *testing.T) {
+	// Setup server certificate
+	serverCertPem, _, combinedPEM, _ := certs.GenServerCertificate()
+	certID, _, _ := certs.GetCertIDAndChainPEM(combinedPEM, "")
+
+	conf := func(globalConf *config.Config) {
+		globalConf.Security.ControlAPIUseMutualTLS = false
+		globalConf.HttpServerOptions.UseSSL = true
+		globalConf.HttpServerOptions.SSLInsecureSkipVerify = true
+		globalConf.HttpServerOptions.SSLCertificates = []string{"default" + certID}
+	}
+	ts := StartTest(conf)
+	defer ts.Close()
+
+	certID, err := ts.Gw.CertificateManager.Add(combinedPEM, "default")
+	assert.NoError(t, err)
+	defer ts.Gw.CertificateManager.Delete(certID, "default")
+	ts.ReloadGatewayProxy()
+
+	// Create API with dynamic mTLS only (no static mTLS)
+	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		spec.APIID = "dynamic-mtls-invalid-cert"
+		spec.OrgID = "default"
+		// NO static mTLS - so CertificateCheckMW won't block requests without certs
+		spec.UseMutualTLSAuth = false
+		// Enable dynamic mTLS (token-certificate binding)
+		spec.UseStandardAuth = true
+		spec.UseKeylessAccess = false
+		authConf := apidef.AuthConfig{
+			Name:           "authToken",
+			UseCertificate: true, // This enables dynamic mTLS
+			AuthHeaderName: "Authorization",
+		}
+		spec.AuthConfigs = map[string]apidef.AuthConfig{
+			"authToken": authConf,
+		}
+		spec.Auth = authConf
+		spec.Proxy.ListenPath = "/dynamic-invalid-cert"
+	})
+
+	t.Run("Session with non-existent certificate fails when no TLS cert provided", func(t *testing.T) {
+		// Create session with a certificate ID that doesn't exist in cert manager
+		// This simulates corrupted data or a cert that was deleted
+		nonExistentCertID := "nonexistent-cert-id"
+		key := CreateSession(ts.Gw, func(s *user.SessionState) {
+			s.AccessRights = map[string]user.AccessDefinition{"dynamic-mtls-invalid-cert": {
+				APIID: "dynamic-mtls-invalid-cert",
+			}}
+			s.Certificate = nonExistentCertID // Reference to non-existent cert
+		})
+
+		assert.NotEmpty(t, key, "Should create key with certificate reference")
+
+		// Request WITHOUT a TLS client certificate
+		// This triggers validateLegacyWithoutCert which checks if session.Certificate exists in cert manager
+		clientNoCert := GetTLSClient(nil, serverCertPem)
+		_, _ = ts.Run(t, test.TestCase{
+			Domain:    "localhost",
+			Client:    clientNoCert,
+			Path:      "/dynamic-invalid-cert",
+			Headers:   map[string]string{"Authorization": key},
+			Code:      http.StatusForbidden,
+			BodyMatch: MsgApiAccessDisallowed, // ErrAuthCertNotFound maps to this message
+		})
+	})
+
+	t.Run("Session with empty certificate succeeds when no TLS cert provided", func(t *testing.T) {
+		// Create session without any certificate binding
+		key := CreateSession(ts.Gw, func(s *user.SessionState) {
+			s.AccessRights = map[string]user.AccessDefinition{"dynamic-mtls-invalid-cert": {
+				APIID: "dynamic-mtls-invalid-cert",
+			}}
+			// Leave Certificate empty
+		})
+
+		assert.NotEmpty(t, key, "Should create key without certificate")
+
+		// Request WITHOUT a TLS client certificate should succeed
+		// validateLegacyWithoutCert returns OK when session.Certificate is empty
+		clientNoCert := GetTLSClient(nil, serverCertPem)
+		_, _ = ts.Run(t, test.TestCase{
+			Domain:  "localhost",
+			Client:  clientNoCert,
+			Path:    "/dynamic-invalid-cert",
+			Headers: map[string]string{"Authorization": key},
+			Code:    http.StatusOK,
+		})
+	})
+}
+
 // TestMultipleCertificateBindings tests scenarios with multiple certificates bound to a token
 func TestMultipleCertificateBindings(t *testing.T) {
 	// Setup server certificate

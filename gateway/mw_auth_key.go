@@ -306,7 +306,9 @@ func (k *AuthKey) validateCertificate(ctx *certValidationContext) (int, error) {
 		return k.validateWithTLSCertificate(ctx)
 	}
 
-	return k.validateWithoutTLSCertificate(ctx)
+	// Certificate binding validation is not needed here because CertificateCheckMW
+	// rejects requests without certificates before reaching this code when UseMutualTLSAuth=true
+	return k.validateLegacyWithoutCert(ctx.request, ctx.session)
 }
 
 // validateWithTLSCertificate handles validation when a TLS client certificate is provided
@@ -326,17 +328,6 @@ func (k *AuthKey) validateWithTLSCertificate(ctx *certValidationContext) (int, e
 	}
 
 	return k.validateLegacyMode(ctx.request, ctx.session, *ctx.certHash, ctx.updateSession)
-}
-
-// validateWithoutTLSCertificate handles validation when no TLS client certificate is provided
-func (k *AuthKey) validateWithoutTLSCertificate(ctx *certValidationContext) (int, error) {
-	// Use binding mode if the session has static certificate bindings configured
-	// Otherwise, use legacy mode for backward compatibility with dynamic mTLS
-	if ctx.useCertBinding {
-		return k.validateBindingWithoutCert(ctx.request, ctx.key, ctx.session)
-	}
-
-	return k.validateLegacyWithoutCert(ctx.request, ctx.session)
 }
 
 // checkCertificateExpiry validates that the certificate hasn't expired
@@ -393,18 +384,6 @@ func (k *AuthKey) validateLegacyMode(r *http.Request, session *user.SessionState
 	// Validate the certificate exists in cert manager
 	if _, err := k.Gw.CertificateManager.GetRaw(certHash); err != nil {
 		err, code := k.reportInvalidKey("", r, MsgNonExistentCert, ErrAuthCertNotFound)
-		return code, err
-	}
-
-	return http.StatusOK, nil
-}
-
-// validateBindingWithoutCert validates when binding is enabled but no certificate is provided
-// Rejects only if the session has a certificate bound to it
-func (k *AuthKey) validateBindingWithoutCert(r *http.Request, key string, session *user.SessionState) (int, error) {
-	if len(session.MtlsStaticCertificateBindings) > 0 {
-		k.Logger().WithField("key", k.Gw.obfuscateKey(key)).Warn("Certificate required but not provided")
-		err, code := k.reportInvalidKey(key, r, MsgCertificateMismatch, ErrAuthCertMismatch)
 		return code, err
 	}
 
