@@ -28,10 +28,12 @@ const (
 	ErrAuthCertNotFound              = "auth.cert_not_found"
 	ErrAuthCertExpired               = "auth.cert_expired"
 	ErrAuthKeyIsInvalid              = "auth.key_is_invalid"
+	ErrAuthCertRequired              = "auth.cert_required"
 
-	MsgNonExistentKey  = "Attempted access with non-existent key."
-	MsgNonExistentCert = "Attempted access with non-existent cert."
-	MsgInvalidKey      = "Attempted access with invalid key."
+	MsgNonExistentKey      = "Attempted access with non-existent key."
+	MsgNonExistentCert     = "Attempted access with non-existent cert."
+	MsgInvalidKey          = "Attempted access with invalid key."
+	MsgCertificateRequired = "Client certificate required for this API."
 )
 
 func initAuthKeyErrors() {
@@ -57,6 +59,11 @@ func initAuthKeyErrors() {
 
 	TykErrors[ErrAuthCertExpired] = config.TykError{
 		Message: MsgCertificateExpired,
+		Code:    http.StatusForbidden,
+	}
+
+	TykErrors[ErrAuthCertRequired] = config.TykError{
+		Message: MsgCertificateRequired,
 		Code:    http.StatusForbidden,
 	}
 }
@@ -100,12 +107,16 @@ func (k *AuthKey) ProcessRequest(_ http.ResponseWriter, r *http.Request, _ inter
 
 	key, authConfig := k.getAuthToken(k.getAuthType(), r)
 	var certHash string
+	// tokenFromHeader tracks whether the auth token came from request header/params (true)
+	// or was derived from a client certificate (false)
+	tokenFromHeader := false
 
 	keyExists := false
 	var session user.SessionState
 	updateSession := false
 	if key != "" {
 		key = stripBearer(key)
+		tokenFromHeader = true
 	} else if authConfig.UseCertificate && key == "" && r.TLS != nil && len(r.TLS.PeerCertificates) > 0 {
 		log.Debug("Trying to find key by client certificate")
 		certHash = k.Spec.OrgID + crypto.HexSHA256(r.TLS.PeerCertificates[0].Raw)
@@ -117,6 +128,21 @@ func (k *AuthKey) ProcessRequest(_ http.ResponseWriter, r *http.Request, _ inter
 	} else {
 		k.Logger().Info("Attempted access with malformed header, no auth header found.")
 		return errorAndStatusCode(ErrAuthAuthorizationFieldMissing)
+	}
+
+	// When dynamic mTLS is enabled (UseCertificate=true), by default we require that
+	// authentication happens via a client certificate, not just a token. This prevents
+	// bypassing mTLS by constructing tokens from publicly available certificate info.
+	// The gateway config flag AllowDynamicMTLSTokenAuth can be set to true to restore
+	// the legacy behavior of allowing token-only auth.
+	if authConfig.UseCertificate && tokenFromHeader {
+		if !k.Gw.GetConfig().Security.AllowDynamicMTLSTokenAuth {
+			// Token was provided but no client certificate was presented in the TLS handshake
+			if r.TLS == nil || len(r.TLS.PeerCertificates) == 0 {
+				k.Logger().Info("Token-based auth rejected for dynamic mTLS API - client certificate required")
+				return errorAndStatusCode(ErrAuthCertRequired)
+			}
+		}
 	}
 
 	session, keyExists = k.CheckSessionAndIdentityForValidKey(key, r)
