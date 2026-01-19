@@ -31,12 +31,9 @@ type (
 		policySet
 		mu                     sync.RWMutex
 		once                   sync.Once
-		onCollision            CollisionCb
 		onBrokenPolicy         BrokenPolicyCb
 		onMultiTenantCollision MultiTenantCollisionCb
 	}
-
-	CollisionCb            func(oldEntry, newEntry *user.Policy)
 	BrokenPolicyCb         func(*user.Policy)
 	MultiTenantCollisionCb func(customId string, dbIds []persistentmodel.ObjectID)
 
@@ -58,7 +55,6 @@ func (p *Policies) init() {
 }
 
 func (p *Policies) initDefaultCallbacks() {
-	p.onCollision = collisionNoop
 	p.onBrokenPolicy = brokenPolicyNoop
 	p.onMultiTenantCollision = multiTenantCollisionNoop
 }
@@ -82,11 +78,8 @@ func WithCombined(opts ...PolicySetOpt) PolicySetOpt {
 	}
 }
 
-func WithCollisionCb(cb CollisionCb) PolicySetOpt {
-	return func(s *Policies) {
-		s.onCollision = cb
-	}
-}
+// WithLoadFail sets callback for invalid policies.
+// Callback will be called when found invalid policy to load.
 
 func WithLoadFail(cb BrokenPolicyCb) PolicySetOpt {
 	return func(s *Policies) {
@@ -159,31 +152,17 @@ func (p *Policies) DeleteById(id PolicyID) bool {
 }
 
 func (p *Policies) Reload(policies ...user.Policy) {
+	p.init()
+
 	set := newPolicySet()
 	for _, pol := range policies {
-		set.loadOne(&pol, p.onBrokenPolicy, p.onCollision)
+		set.loadOne(&pol, p)
 	}
+	set.emitMultiTenancyCollisions(p)
 
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	p.policySet = set
-
-	p.emitMultiTenancyCollisions()
-}
-
-func (p *Policies) emitMultiTenancyCollisions() {
-	for id, set := range p.policiesCustomKey {
-		if len(set) == 1 {
-			continue
-		}
-
-		p.onMultiTenantCollision(
-			string(id),
-			lo.Map(lo.Values(set), func(item user.Policy, _ int) persistentmodel.ObjectID {
-				return item.MID
-			}),
-		)
-	}
 }
 
 func (p *Policies) policyByIdExtended(id PolicyID) (user.Policy, error) {
@@ -239,23 +218,6 @@ func (p *Policies) policyByIdExtended(id PolicyID) (user.Policy, error) {
 	}
 }
 
-func (p *Policies) unloadOne(pol *user.Policy) {
-	delete(p.policies, pol.MID)
-	ckSet, ok := p.policiesCustomKey[customKey(pol.ID)]
-
-	if !ok {
-		return
-	}
-
-	delete(ckSet, orgId(pol.OrgID))
-
-	if len(ckSet) == 0 {
-		delete(p.policiesCustomKey, customKey(pol.ID))
-	}
-
-	delete(p.policiesCustomKeyToObjectID, customKey(pol.ID))
-}
-
 func collisionNoop(_, _ *user.Policy) {}
 
 func brokenPolicyNoop(_ *user.Policy) {}
@@ -289,13 +251,27 @@ func newPolicySet() policySet {
 	}
 }
 
+func (p *policySet) emitMultiTenancyCollisions(policies *Policies) {
+	for id, set := range p.policiesCustomKey {
+		if len(set) == 1 {
+			continue
+		}
+
+		policies.onMultiTenantCollision(
+			string(id),
+			lo.Map(lo.Values(set), func(item user.Policy, _ int) persistentmodel.ObjectID {
+				return item.MID
+			}),
+		)
+	}
+}
+
 func (p *policySet) loadOne(
 	pol *user.Policy,
-	onBrokenPolicy BrokenPolicyCb,
-	onCollision CollisionCb,
+	policies *Policies,
 ) {
 	if !EnsurePolicyId(pol) {
-		onBrokenPolicy(pol)
+		policies.onBrokenPolicy(pol)
 		return
 	}
 
@@ -307,11 +283,24 @@ func (p *policySet) loadOne(
 		set = make(map[orgId]user.Policy)
 	}
 
-	if existent, ok := set[orgId(pol.OrgID)]; ok && existent.ID != pol.ID {
-		onCollision(&existent, pol)
-	}
-
 	set[orgId(pol.OrgID)] = *pol
 	p.policiesCustomKey[key] = set
 	p.policiesCustomKeyToObjectID[customKey(pol.ID)] = pol.MID
+}
+
+func (p *policySet) unloadOne(pol *user.Policy) {
+	delete(p.policies, pol.MID)
+	ckSet, ok := p.policiesCustomKey[customKey(pol.ID)]
+
+	if !ok {
+		return
+	}
+
+	delete(ckSet, orgId(pol.OrgID))
+
+	if len(ckSet) == 0 {
+		delete(p.policiesCustomKey, customKey(pol.ID))
+	}
+
+	delete(p.policiesCustomKeyToObjectID, customKey(pol.ID))
 }
