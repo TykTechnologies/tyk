@@ -897,7 +897,7 @@ func (s *Test) CreatePolicy(pGen ...func(p *user.Policy)) string {
 		pGen[0](pol)
 	}
 
-	s.Gw.policies.Reload(*pol)
+	s.Gw.policies.Add(*pol)
 
 	return pol.ID
 }
