@@ -297,7 +297,7 @@ func TestKeyHandler(t *testing.T) {
 	}}
 	withAccessJSON := test.MarshalJSON(t)(withAccess)
 
-	ts.Gw.policies.Reload(user.Policy{
+	ts.Gw.policies.Add(user.Policy{
 		Active:           true,
 		QuotaMax:         5,
 		QuotaRenewalRate: 300,

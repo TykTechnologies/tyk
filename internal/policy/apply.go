@@ -36,10 +36,10 @@ func New(orgID *string, storage model.PolicyProvider, logger *logrus.Logger) *Se
 // ClearSession clears the quota, rate limit and complexity values so that partitioned policies can apply their values.
 // Otherwise, if the session has already a higher value, an applied policy will not win, and its values will be ignored.
 func (t *Service) ClearSession(session *user.SessionState) error {
-	policies := session.PolicyIDs()
 
-	for _, polID := range policies {
-		policy, ok := t.storage.PolicyByID(model.NewScopedCustomPolicyId(session.OrgID, polID))
+	for _, polID := range t.policyIds(session) {
+		policy, ok := t.storage.PolicyByID(polID)
+
 		if !ok {
 			return fmt.Errorf("policy not found: %s", polID)
 		}
@@ -101,7 +101,6 @@ func (t *Service) Apply(session *user.SessionState) error {
 	)
 
 	storage := t.storage
-
 	if customPolicies, err := session.GetCustomPolicies(); err == nil {
 		storage = NewStore(customPolicies)
 		policyIDs = storage.PolicyIDs()
@@ -119,6 +118,7 @@ func (t *Service) Apply(session *user.SessionState) error {
 
 	for _, polID := range policyIDs {
 		policy, ok := storage.PolicyByID(polID)
+
 		if !ok {
 			err := fmt.Errorf("policy not found: %q", polID)
 			t.Logger().Error(err)

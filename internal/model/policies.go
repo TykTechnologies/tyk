@@ -49,7 +49,7 @@ type (
 
 func (p *Policies) init() {
 	p.once.Do(func() {
-		p.policySet = newPolicySet()
+		p.policySet = newPolicySet(0)
 		p.initDefaultCallbacks()
 	})
 }
@@ -150,13 +150,23 @@ func (p *Policies) DeleteById(id PolicyID) bool {
 	return true
 }
 
+func (p *Policies) Add(policies ...user.Policy) {
+	p.init()
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	for _, pol := range policies {
+		p.loadOne(&pol, p)
+	}
+}
+
 func (p *Policies) Reload(policies ...user.Policy) {
 	p.init()
 
-	set := newPolicySet()
+	set := newPolicySet(len(policies))
 	for _, pol := range policies {
 		set.loadOne(&pol, p)
 	}
+
 	set.emitMultiTenancyCollisions(p)
 
 	p.mu.Lock()
@@ -240,11 +250,13 @@ func EnsurePolicyId(policy *user.Policy) bool {
 	return true
 }
 
-func newPolicySet() policySet {
+func newPolicySet(
+	capacity int,
+) policySet {
 	return policySet{
-		policies:                    make(map[persistentmodel.ObjectID]user.Policy),
-		policiesCustomKey:           make(map[customKey]map[orgId]user.Policy),
-		policiesCustomKeyToObjectID: make(map[customKey]persistentmodel.ObjectID),
+		policies:                    make(map[persistentmodel.ObjectID]user.Policy, capacity),
+		policiesCustomKey:           make(map[customKey]map[orgId]user.Policy, capacity),
+		policiesCustomKeyToObjectID: make(map[customKey]persistentmodel.ObjectID, capacity),
 	}
 }
 
