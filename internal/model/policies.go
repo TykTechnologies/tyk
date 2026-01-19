@@ -80,7 +80,6 @@ func WithCombined(opts ...PolicySetOpt) PolicySetOpt {
 
 // WithLoadFail sets callback for invalid policies.
 // Callback will be called when found invalid policy to load.
-
 func WithLoadFail(cb BrokenPolicyCb) PolicySetOpt {
 	return func(s *Policies) {
 		s.onBrokenPolicy = cb
