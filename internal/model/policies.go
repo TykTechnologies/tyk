@@ -217,8 +217,6 @@ func (p *Policies) policyByIdExtended(id PolicyID) (user.Policy, error) {
 	}
 }
 
-func collisionNoop(_, _ *user.Policy) {}
-
 func brokenPolicyNoop(_ *user.Policy) {}
 
 func multiTenantCollisionNoop(_ string, _ []persistentmodel.ObjectID) {}

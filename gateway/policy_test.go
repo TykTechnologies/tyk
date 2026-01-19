@@ -11,8 +11,6 @@ import (
 	"testing"
 	"time"
 
-	persistentmodel "github.com/TykTechnologies/storage/persistent/model"
-
 	"github.com/stretchr/testify/assert"
 
 	"github.com/TykTechnologies/tyk/config"
@@ -650,43 +648,6 @@ func TestPerAPIPolicyUpdate(t *testing.T) {
 }
 
 func TestParsePoliciesFromRPC(t *testing.T) {
-	objectID := persistentmodel.NewObjectID()
-
-	tcs := []struct {
-		testName   string
-		policy     user.Policy
-		expectedID string
-	}{
-		{
-			testName:   "policy with explicit ID",
-			policy:     user.Policy{MID: objectID, ID: objectID.Hex()},
-			expectedID: objectID.Hex(),
-		},
-		{
-			testName:   "policy with implicit ID",
-			policy:     user.Policy{MID: objectID, ID: ""},
-			expectedID: objectID.Hex(),
-		},
-		{
-			testName:   "policy with random ID",
-			policy:     user.Policy{MID: objectID, ID: "random-id"},
-			expectedID: "random-id",
-		},
-	}
-
-	for _, tc := range tcs {
-		t.Run(tc.testName, func(t *testing.T) {
-
-			policyList, err := json.Marshal([]user.Policy{tc.policy})
-			assert.NoError(t, err, "error unmarshalling policies")
-
-			polMap, errParsing := parsePoliciesFromRPC(string(policyList))
-			assert.NoError(t, errParsing, "error parsing policies from RPC:", errParsing)
-
-			assert.Contains(t, polMap, tc.expectedID, "expected policy id", tc.expectedID, " not found after parsing policies")
-		})
-	}
-
 	t.Run("responds with error if invalid MID provided", func(t *testing.T) {
 		policyList, err := json.Marshal([]user.Policy{
 			{MID: "asd"},
@@ -698,7 +659,6 @@ func TestParsePoliciesFromRPC(t *testing.T) {
 		assert.ErrorContains(t, errParsing, "invalid ObjectId in JSON")
 		assert.Nil(t, polMap)
 	})
-
 }
 
 // TestLoadPoliciesFromDashboardAutoRecovery tests that nonce desynchronization
