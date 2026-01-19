@@ -43,7 +43,7 @@ type (
 	policySet struct {
 		policies                    map[persistentmodel.ObjectID]user.Policy
 		policiesCustomKey           map[customKey]map[orgId]user.Policy
-		policiesCustomKeyToObjectID map[customKey]persistentmodel.ObjectID
+		policiesCustomKeyToObjectID map[customKey]user.Policy
 	}
 )
 
@@ -208,13 +208,7 @@ func (p *Policies) policyByIdExtended(id PolicyID) (user.Policy, error) {
 			)
 		}
 	case NonScopedLastInsertedPolicyId:
-		oid, ok := p.policiesCustomKeyToObjectID[customKey(id)]
-
-		if !ok {
-			return user.Policy{}, ErrPolicyNotFound
-		}
-
-		pol, ok := p.policies[oid]
+		pol, ok := p.policiesCustomKeyToObjectID[customKey(id)]
 
 		if !ok {
 			return user.Policy{}, ErrPolicyNotFound
@@ -256,7 +250,7 @@ func newPolicySet(
 	return policySet{
 		policies:                    make(map[persistentmodel.ObjectID]user.Policy, capacity),
 		policiesCustomKey:           make(map[customKey]map[orgId]user.Policy, capacity),
-		policiesCustomKeyToObjectID: make(map[customKey]persistentmodel.ObjectID, capacity),
+		policiesCustomKeyToObjectID: make(map[customKey]user.Policy, capacity),
 	}
 }
 
@@ -294,7 +288,7 @@ func (p *policySet) loadOne(
 
 	set[orgId(pol.OrgID)] = *pol
 	p.policiesCustomKey[key] = set
-	p.policiesCustomKeyToObjectID[customKey(pol.ID)] = pol.MID
+	p.policiesCustomKeyToObjectID[customKey(pol.ID)] = *pol
 }
 
 func (p *policySet) unloadOne(pol *user.Policy) {
