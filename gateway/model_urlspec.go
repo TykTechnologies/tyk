@@ -2,6 +2,7 @@ package gateway
 
 import (
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/apidef/oas"
 	"github.com/TykTechnologies/tyk/regexp"
 )
 
@@ -37,8 +38,16 @@ type URLSpec struct {
 	GoPluginMeta              GoPluginMiddleware
 	PersistGraphQL            apidef.PersistGraphQLMeta
 	RateLimit                 apidef.RateLimitMeta
+	OASValidateRequestMeta    *oas.ValidateRequest
+	OASMockResponseMeta       *oas.MockResponse
 
 	IgnoreCase bool
+	// OASMethod stores the HTTP method for OAS-specific middleware
+	// This is needed because OAS operations are method-specific
+	OASMethod string
+	// OASPath stores the original OAS path pattern (e.g., "/users/{id}")
+	// This is used for matching against the OAS router when needed
+	OASPath string
 }
 
 // modeSpecificSpec returns the respective field of URLSpec if it matches the given mode.
@@ -85,6 +94,10 @@ func (u *URLSpec) modeSpecificSpec(mode URLStatus) (interface{}, bool) {
 		return &u.GoPluginMeta, true
 	case PersistGraphQL:
 		return &u.PersistGraphQL, true
+	case OASValidateRequest:
+		return u.OASValidateRequestMeta, true
+	case OASMockResponse:
+		return u.OASMockResponseMeta, true
 	default:
 		return nil, false
 	}
@@ -135,6 +148,9 @@ func (u *URLSpec) matchesMethod(method string) bool {
 		return method == u.PersistGraphQL.Method
 	case RateLimit:
 		return method == u.RateLimit.Method
+	case OASValidateRequest, OASMockResponse:
+		// OAS middleware is method-specific, check against stored method
+		return method == u.OASMethod
 	default:
 		return false
 	}
