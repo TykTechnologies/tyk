@@ -3,6 +3,7 @@ package gateway
 import (
 	"errors"
 	"net/http"
+	"slices"
 	"strings"
 	"time"
 
@@ -136,10 +137,10 @@ func (k *AuthKey) ProcessRequest(_ http.ResponseWriter, r *http.Request, _ inter
 		}
 	}
 
-	// Validate certificate binding or legacy certificate auth
+	// Validate certificate binding or dynamic mTLS
 	// Certificate binding validation runs when:
 	// 1. The session has certificate bindings AND static mTLS is enabled (certificate-token binding), OR
-	// 2. UseCertificate is explicitly set for this API (legacy dynamic mTLS mode)
+	// 2. UseCertificate is explicitly set for this API (dynamic mTLS mode)
 	useCertBinding := k.shouldValidateCertificateBinding(&session)
 	if authConfig.UseCertificate || useCertBinding {
 		ctx := &certValidationContext{
@@ -299,8 +300,7 @@ func AuthFailed(m TykMiddleware, r *http.Request, token string) {
 	})
 }
 
-// validateCertificate performs certificate validation for UseCertificate authentication
-// It handles both certificate binding mode and legacy auto-update mode
+// validateCertificate performs certificate validation for both certificate binding and dynamic mTLS
 func (k *AuthKey) validateCertificate(ctx *certValidationContext) (int, error) {
 	if ctx.request.TLS != nil && len(ctx.request.TLS.PeerCertificates) > 0 {
 		return k.validateWithTLSCertificate(ctx)
@@ -345,6 +345,7 @@ func (k *AuthKey) checkCertificateExpiry(r *http.Request, key string) (int, erro
 		err, code := errorAndStatusCode(ErrAuthCertExpired)
 		return code, err
 	}
+
 	return http.StatusOK, nil
 }
 
@@ -353,6 +354,7 @@ func (k *AuthKey) computeCertHash(r *http.Request, existingHash string) string {
 	if existingHash == "" {
 		return k.Spec.OrgID + crypto.HexSHA256(r.TLS.PeerCertificates[0].Raw)
 	}
+
 	return existingHash
 }
 
@@ -365,13 +367,7 @@ func (k *AuthKey) validateCertificateBinding(r *http.Request, key string, sessio
 	}
 
 	// Check if the presented certificate hash matches any of the bound certificates
-	certMatched := false
-	for _, boundCert := range session.MtlsStaticCertificateBindings {
-		if certHash == boundCert {
-			certMatched = true
-			break
-		}
-	}
+	certMatched := slices.Contains(session.MtlsStaticCertificateBindings, certHash)
 
 	// If certificates don't match, reject the request
 	if !certMatched {
@@ -386,8 +382,7 @@ func (k *AuthKey) validateCertificateBinding(r *http.Request, key string, sessio
 	return http.StatusOK, nil
 }
 
-// validateLegacyMode handles the legacy auto-update behavior
-// Updates session certificate with current cert hash and validates whitelist
+// validateLegacyMode handles the dynamic mtls behavior
 func (k *AuthKey) validateLegacyMode(r *http.Request, session *user.SessionState, certHash string, updateSession *bool) (int, error) {
 	// Auto-update session certificate with current cert hash
 	if session.Certificate != certHash {
@@ -395,7 +390,7 @@ func (k *AuthKey) validateLegacyMode(r *http.Request, session *user.SessionState
 		*updateSession = true
 	}
 
-	// Validate the certificate exists in cert manager (whitelist check)
+	// Validate the certificate exists in cert manager
 	if _, err := k.Gw.CertificateManager.GetRaw(certHash); err != nil {
 		err, code := k.reportInvalidKey("", r, MsgNonExistentCert, ErrAuthCertNotFound)
 		return code, err
@@ -412,10 +407,11 @@ func (k *AuthKey) validateBindingWithoutCert(r *http.Request, key string, sessio
 		err, code := k.reportInvalidKey(key, r, MsgCertificateMismatch, ErrAuthCertMismatch)
 		return code, err
 	}
+
 	return http.StatusOK, nil
 }
 
-// validateLegacyWithoutCert validates session certificate in legacy mode when no TLS cert is provided
+// validateLegacyWithoutCert validates session certificate in dynamic mTLS mode when no TLS cert is provided
 // Checks if stored certificate exists in cert manager to catch corrupted data
 func (k *AuthKey) validateLegacyWithoutCert(r *http.Request, session *user.SessionState) (int, error) {
 	if session.Certificate != "" {
@@ -424,5 +420,6 @@ func (k *AuthKey) validateLegacyWithoutCert(r *http.Request, session *user.Sessi
 			return code, err
 		}
 	}
+
 	return http.StatusOK, nil
 }
