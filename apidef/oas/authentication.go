@@ -7,9 +7,8 @@ import (
 	"sort"
 	"time"
 
-	"github.com/mitchellh/mapstructure"
-
 	"github.com/getkin/kin-openapi/openapi3"
+	"github.com/mitchellh/mapstructure"
 
 	"github.com/TykTechnologies/tyk/apidef"
 )
