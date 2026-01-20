@@ -3,6 +3,7 @@ package gateway
 import (
 	"context"
 	"crypto/tls"
+	"errors"
 	"fmt"
 	"net"
 	"net/http"
@@ -189,9 +190,10 @@ func (m *proxyMux) setRouter(port int, protocol string, router *mux.Router, conf
 	p := m.getProxy(port, conf)
 	if p == nil {
 		p = &proxy{
-			port:     port,
-			protocol: protocol,
-			router:   router,
+			port:             port,
+			protocol:         protocol,
+			router:           router,
+			useProxyProtocol: conf.EnableProxyProtocolHTTP,
 		}
 		m.proxies = append(m.proxies, p)
 	} else {
@@ -436,43 +438,24 @@ func (m *proxyMux) serve(gw *Gateway) {
 		case "tcp", "tls":
 			mainLog.Warning("Starting TCP server on:", p.listener.Addr().String())
 			go p.tcpProxy.Serve(p.getListener())
-		case "http", "https", "h2c":
-			mainLog.Warning("Starting HTTP server on:", p.listener.Addr().String())
-			readTimeout := 120 * time.Second
-			writeTimeout := 120 * time.Second
-
-			if conf.HttpServerOptions.ReadTimeout > 0 {
-				readTimeout = time.Duration(conf.HttpServerOptions.ReadTimeout) * time.Second
-			}
-
-			if conf.HttpServerOptions.WriteTimeout > 0 {
-				writeTimeout = time.Duration(conf.HttpServerOptions.WriteTimeout) * time.Second
-			}
-
-			h := &handleWrapper{
-				router:             p.router,
-				maxRequestBodySize: conf.HttpServerOptions.MaxRequestBodySize,
-			}
-
-			// by default enabling h2c by wrapping handler in h2c. This ensures all features including tracing work
-			// in h2c services.
-			h2s := &http2.Server{}
-			handler := &h2cWrapper{
-				w: h,
-				h: h2c.NewHandler(h, h2s),
-			}
-
-			addr := conf.ListenAddress + ":" + strconv.Itoa(p.port)
-			p.httpServer = &http.Server{
-				Addr:         addr,
-				ReadTimeout:  readTimeout,
-				WriteTimeout: writeTimeout,
-				Handler:      handler,
+		case "https", "h2c":
+			mainLog.Warning("Starting HTTPS server on:", p.listener.Addr().String())
+			p.SetupServer(gw)
+			listener, err := UpgradeHTTPListenerToHTTPS(p.port, p.getListener(), gw)
+			if err != nil {
+				mainLog.WithError(err).Error("Can't start listener")
+				continue
 			}
 			if gw.ConnectionWatcher != nil {
 				p.httpServer.ConnState = gw.ConnectionWatcher.OnStateChange
 			}
-
+			if conf.CloseConnections {
+				p.httpServer.SetKeepAlivesEnabled(false)
+			}
+			go p.httpServer.Serve(listener)
+		case "http":
+			mainLog.Warning("Starting HTTP server on:", p.listener.Addr().String())
+			p.SetupServer(gw)
 			if conf.CloseConnections {
 				p.httpServer.SetKeepAlivesEnabled(false)
 			}
@@ -513,26 +496,10 @@ func (m *proxyMux) generateListener(listenPort int, protocol string, gw *Gateway
 		return ls, nil
 	}
 	switch protocol {
-	case "https", "tls":
+	case "tls":
 		mainLog.Infof("--> Using TLS (%s)", protocol)
-		httpServerOptions := conf.HttpServerOptions
-
-		tlsConfig := tls.Config{
-			GetCertificate:     dummyGetCertificate,
-			ServerName:         httpServerOptions.ServerName,
-			MinVersion:         httpServerOptions.MinVersion,
-			MaxVersion:         httpServerOptions.MaxVersion,
-			ClientAuth:         tls.NoClientCert,
-			InsecureSkipVerify: httpServerOptions.SSLInsecureSkipVerify,
-			CipherSuites:       getCipherAliases(httpServerOptions.Ciphers),
-		}
-
-		if httpServerOptions.EnableHttp2 {
-			tlsConfig.NextProtos = append(tlsConfig.NextProtos, http2.NextProtoTLS)
-		}
-
-		tlsConfig.GetConfigForClient = gw.getTLSConfigForClient(&tlsConfig, listenPort)
-		l, err = tls.Listen("tcp", targetPort, &tlsConfig)
+		tlsConfig := GetDefaultTlsConfig(listenPort, gw)
+		l, err = tls.Listen("tcp", targetPort, tlsConfig)
 
 	default:
 		mainLog.WithField("port", targetPort).Infof("--> Standard listener (%s)", protocol)
@@ -545,4 +512,80 @@ func (m *proxyMux) generateListener(listenPort int, protocol string, gw *Gateway
 		return nil, err
 	}
 	return l, nil
+}
+
+func (p *proxy) SetupServer(gw *Gateway) {
+	conf := gw.GetConfig()
+
+	readTimeout := 120 * time.Second
+	writeTimeout := 120 * time.Second
+
+	if conf.HttpServerOptions.ReadTimeout > 0 {
+		readTimeout = time.Duration(conf.HttpServerOptions.ReadTimeout) * time.Second
+	}
+
+	if conf.HttpServerOptions.WriteTimeout > 0 {
+		writeTimeout = time.Duration(conf.HttpServerOptions.WriteTimeout) * time.Second
+	}
+
+	h := &handleWrapper{
+		router:             p.router,
+		maxRequestBodySize: conf.HttpServerOptions.MaxRequestBodySize,
+	}
+
+	// by default enabling h2c by wrapping handler in h2c. This ensures all features including tracing work
+	// in h2c services.
+	h2s := &http2.Server{}
+	handler := &h2cWrapper{
+		w: h,
+		h: h2c.NewHandler(h, h2s),
+	}
+
+	addr := conf.ListenAddress + ":" + strconv.Itoa(p.port)
+	p.httpServer = &http.Server{
+		Addr:         addr,
+		ReadTimeout:  readTimeout,
+		WriteTimeout: writeTimeout,
+		Handler:      handler,
+	}
+
+	if conf.CloseConnections {
+		p.httpServer.SetKeepAlivesEnabled(false)
+	}
+}
+
+func GetDefaultTlsConfig(port int, gw *Gateway) *tls.Config {
+	conf := gw.GetConfig()
+
+	httpServerOptions := conf.HttpServerOptions
+
+	tlsConfig := &tls.Config{
+		GetCertificate:     dummyGetCertificate,
+		ServerName:         httpServerOptions.ServerName,
+		MinVersion:         httpServerOptions.MinVersion,
+		MaxVersion:         httpServerOptions.MaxVersion,
+		ClientAuth:         tls.NoClientCert,
+		InsecureSkipVerify: httpServerOptions.SSLInsecureSkipVerify,
+		CipherSuites:       getCipherAliases(httpServerOptions.Ciphers),
+	}
+
+	if httpServerOptions.EnableHttp2 {
+		tlsConfig.NextProtos = append(tlsConfig.NextProtos, http2.NextProtoTLS)
+	}
+
+	tlsConfig.GetConfigForClient = gw.getTLSConfigForClient(tlsConfig, port)
+
+	return tlsConfig
+}
+
+func UpgradeHTTPListenerToHTTPS(port int, listener net.Listener, gw *Gateway) (net.Listener, error) {
+	mainLog.Infof("--> Upgrade to TLS")
+
+	tlsConfig := GetDefaultTlsConfig(port, gw)
+	if tlsConfig == nil || len(tlsConfig.Certificates) == 0 &&
+		tlsConfig.GetCertificate == nil && tlsConfig.GetConfigForClient == nil {
+		return nil, errors.New("tls: neither Certificates, GetCertificate, nor GetConfigForClient set in Config")
+	}
+
+	return tls.NewListener(listener, tlsConfig), nil
 }
