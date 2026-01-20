@@ -20,9 +20,9 @@ import (
 	"github.com/TykTechnologies/tyk/internal/crypto"
 )
 
-// TestReverseProxy_initUpstreamCertBatcher tests lazy initialization of upstream cert batcher
-func TestReverseProxy_initUpstreamCertBatcher(t *testing.T) {
-	t.Run("should initialize batcher when upstream certs are configured", func(t *testing.T) {
+// TestReverseProxy_initUpstreamCertBatcher_WithCerts tests initialization when upstream certs are configured
+func TestReverseProxy_initUpstreamCertBatcher_WithCerts(t *testing.T) {
+	{
 		logger, _ := logrustest.NewNullLogger()
 
 		ts := StartTest(nil)
@@ -57,9 +57,12 @@ func TestReverseProxy_initUpstreamCertBatcher(t *testing.T) {
 		if spec.upstreamCertExpiryCancelFunc != nil {
 			spec.upstreamCertExpiryCancelFunc()
 		}
-	})
+	}
+}
 
-	t.Run("should not initialize when upstream certs are disabled", func(t *testing.T) {
+// TestReverseProxy_initUpstreamCertBatcher_Disabled tests that batcher is not initialized when disabled
+func TestReverseProxy_initUpstreamCertBatcher_Disabled(t *testing.T) {
+	{
 		logger, _ := logrustest.NewNullLogger()
 
 		ts := StartTest(nil)
@@ -88,9 +91,12 @@ func TestReverseProxy_initUpstreamCertBatcher(t *testing.T) {
 
 		// Verify batcher was NOT created
 		assert.Nil(t, spec.UpstreamCertExpiryBatcher, "Batcher should not be initialized when disabled")
-	})
+	}
+}
 
-	t.Run("should not initialize when no upstream certs are configured", func(t *testing.T) {
+// TestReverseProxy_initUpstreamCertBatcher_NoCerts tests that batcher is not initialized when no certs configured
+func TestReverseProxy_initUpstreamCertBatcher_NoCerts(t *testing.T) {
+	{
 		logger, _ := logrustest.NewNullLogger()
 
 		ts := StartTest(nil)
@@ -116,34 +122,27 @@ func TestReverseProxy_initUpstreamCertBatcher(t *testing.T) {
 
 		// Verify batcher was NOT created
 		assert.Nil(t, spec.UpstreamCertExpiryBatcher, "Batcher should not be initialized when no certs configured")
-	})
+	}
+}
 
-	t.Run("should initialize when global upstream certs are configured", func(t *testing.T) {
+// TestReverseProxy_initUpstreamCertBatcher_GlobalCerts tests initialization with global upstream certs
+func TestReverseProxy_initUpstreamCertBatcher_GlobalCerts(t *testing.T) {
+	{
 		logger, _ := logrustest.NewNullLogger()
 
-		globalConf := config.Config{
-			Security: config.SecurityConfig{
-				Certificates: config.CertificatesConfig{
-					Upstream: map[string]string{
-						"*.global-upstream.com": "global-cert-id",
-					},
-				},
-			},
-		}
-
 		ts := StartTest(func(c *config.Config) {
-			*c = globalConf
+			c.Security.Certificates.Upstream = map[string]string{
+				"*.global-upstream.com": "global-cert-id",
+			}
 		})
 		defer ts.Close()
 
-		spec := BuildAPI(func(spec *APISpec) {
+		spec := ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 			spec.APIID = "test-api"
 			spec.Name = "Test API"
 			spec.Proxy.ListenPath = "/test/"
 			// No API-specific certs, but global certs exist
 		})[0]
-
-		ts.Gw.LoadAPI(spec)
 
 		proxy := &ReverseProxy{
 			TykAPISpec: spec,
@@ -161,7 +160,7 @@ func TestReverseProxy_initUpstreamCertBatcher(t *testing.T) {
 		if spec.upstreamCertExpiryCancelFunc != nil {
 			spec.upstreamCertExpiryCancelFunc()
 		}
-	})
+	}
 }
 
 // TestReverseProxy_checkUpstreamCertificateExpiry tests certificate expiry checking
