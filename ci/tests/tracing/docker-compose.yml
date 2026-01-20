@@ -44,7 +44,7 @@ services:
 
   queue:
     image: rabbitmq:3.8-management
-    platform: linux/arm64
+    platform: linux/amd64
     healthcheck:
       test:
         - CMD-SHELL
