@@ -13,12 +13,6 @@ type (
 		id           string
 	}
 
-	// NonScopedPolicyId
-	// Has to be used to retried policy by id non scoped.
-	// Does not return eny policy and error if ambiguous state occurs.
-	// Represents more propert behaviour than NonScopedLastInsertedPolicyId.
-	NonScopedPolicyId string
-
 	// NonScopedLastInsertedPolicyId
 	// Retrieves lastly inserted policy by custom id.
 	// This strategy is created to support backward compatibility.
@@ -31,7 +25,6 @@ type (
 func (i BasePolicyId) markerPolicyId() {}
 
 var (
-	_ PolicyID = NonScopedPolicyId("")
 	_ PolicyID = ScopedCustomPolicyId{}
 	_ PolicyID = NonScopedLastInsertedPolicyId("")
 )
@@ -53,15 +46,7 @@ func (c ScopedCustomPolicyId) Id() string {
 func (c ScopedCustomPolicyId) String() string {
 	return c.id
 }
-func (c ScopedCustomPolicyId) customKey() customKey {
-	return customKey(c.id)
-}
 func (c ScopedCustomPolicyId) markerPolicyId() {}
-
-func (c NonScopedPolicyId) String() string {
-	return string(c)
-}
-func (c NonScopedPolicyId) markerPolicyId() {}
 
 func (c NonScopedLastInsertedPolicyId) String() string {
 	return string(c)

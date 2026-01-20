@@ -66,8 +66,8 @@ func Test_Policies(t *testing.T) {
 		t.Run("returns number of uniq policies", func(t *testing.T) {
 			pols := model.NewPolicies()
 			pols.Reload([]user.Policy{
-				{MID: persistentmodel.NewObjectID(), ID: "my-custom-id"},
-				{MID: persistentmodel.NewObjectID(), ID: "my-custom-id"},
+				{MID: persistentmodel.NewObjectID(), ID: "my-custom-id", OrgID: "org1"},
+				{MID: persistentmodel.NewObjectID(), ID: "my-custom-id", OrgID: "org2"},
 			}...)
 
 			require.Equal(t, 2, pols.PolicyCount())
@@ -88,7 +88,8 @@ func Test_Policies(t *testing.T) {
 
 			require.Equal(t, 1, pols.PolicyCount())
 			require.Equal(t, 1, len(pols.AsSlice()))
-			pol, err := pols.PolicyByIdExtended(model.NonScopedPolicyId("my-custom-id3"))
+
+			pol, err := pols.PolicyByIdExtended(model.NonScopedLastInsertedPolicyId("my-custom-id3"))
 			require.NoError(t, err)
 			require.Equal(t, "my-custom-id3", pol.ID)
 		})
@@ -107,8 +108,8 @@ func Test_Policies(t *testing.T) {
 			require.Equal(t, 2, pols.PolicyCount())
 
 			for _, id := range []model.PolicyID{
-				model.NonScopedPolicyId("valid"),
-				model.NonScopedPolicyId("pol1"),
+				model.NonScopedLastInsertedPolicyId("valid"),
+				model.NonScopedLastInsertedPolicyId("pol1"),
 			} {
 				_, err := pols.PolicyByIdExtended(id)
 				require.NoError(t, err)
@@ -143,24 +144,6 @@ func Test_Policies(t *testing.T) {
 				require.ErrorIs(t, err, model.ErrPolicyNotFound)
 
 				_, ok := pols.PolicyByID(model.NonScopedLastInsertedPolicyId("non-existent"))
-				require.False(t, ok)
-			})
-		})
-
-		t.Run("NonScopedPolicyId", func(t *testing.T) {
-			t.Run("returns ambiguity error", func(t *testing.T) {
-				_, err := pols.PolicyByIdExtended(model.NonScopedPolicyId("pol1"))
-				require.ErrorIs(t, err, model.ErrAmbiguousState)
-
-				_, ok := pols.PolicyByID(model.NonScopedPolicyId("pol1"))
-				require.False(t, ok)
-			})
-
-			t.Run("does not return policy if not exists", func(t *testing.T) {
-				_, err := pols.PolicyByIdExtended(model.NonScopedPolicyId("non-existent"))
-				require.ErrorIs(t, err, model.ErrPolicyNotFound)
-
-				_, ok := pols.PolicyByID(model.NonScopedPolicyId("non-existent"))
 				require.False(t, ok)
 			})
 		})
@@ -265,14 +248,14 @@ func Test_Policies(t *testing.T) {
 			})
 		})
 
-		t.Run("WithCollisionMultiTenant", func(t *testing.T) {
+		t.Run("WithInternalCollision", func(t *testing.T) {
 			type collision struct {
 				customId string
 				dbIds    []persistentmodel.ObjectID
 			}
 
 			var collisions []collision
-			pols := model.NewPolicies(model.WithCollisionMultiTenant(func(customId string, dbIds []persistentmodel.ObjectID) {
+			pols := model.NewPolicies(model.WithInternalCollision(func(customId string, dbIds []persistentmodel.ObjectID) {
 				collisions = append(collisions, collision{
 					customId: customId,
 					dbIds:    dbIds,
@@ -282,10 +265,10 @@ func Test_Policies(t *testing.T) {
 			pols.Reload([]user.Policy{
 				// collision1
 				{MID: persistentmodel.NewObjectID(), ID: "collision1", OrgID: "org1"},
-				{MID: persistentmodel.NewObjectID(), ID: "collision1", OrgID: "org2"},
-				{MID: persistentmodel.NewObjectID(), ID: "collision1", OrgID: "org3"},
+				{MID: persistentmodel.NewObjectID(), ID: "collision1", OrgID: "org1"},
+				{MID: persistentmodel.NewObjectID(), ID: "collision1", OrgID: "org1"},
 				// collision2
-				{MID: persistentmodel.NewObjectID(), ID: "collision2", OrgID: "org1"},
+				{MID: persistentmodel.NewObjectID(), ID: "collision2", OrgID: "org2"},
 				{MID: persistentmodel.NewObjectID(), ID: "collision2", OrgID: "org2"},
 				// non-collision
 				{MID: persistentmodel.NewObjectID(), ID: "pol1", OrgID: "org1"},
