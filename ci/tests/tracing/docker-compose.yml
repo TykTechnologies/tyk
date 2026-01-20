@@ -44,7 +44,7 @@ services:
 
   queue:
     image: rabbitmq:3.8-management
-    platform: linux/amd64
+    platform: linux/arm64
     healthcheck:
       test:
         - CMD-SHELL
@@ -55,7 +55,7 @@ services:
     restart: unless-stopped
 
   tracetest:
-    image: kubeshop/tracetest:v1.0.0
+    image: kubeshop/tracetest:v1.7.1
     platform: linux/amd64
     command:
       - --provisioning-file
@@ -97,6 +97,7 @@ services:
       - ./configs/tyk.env
     volumes:
       - ./apps:/opt/tyk-gateway/apps
+      - ./policies:/opt/tyk-gateway/policies
     depends_on:
       - redis
 
