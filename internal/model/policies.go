@@ -1,7 +1,6 @@
 package model
 
 import (
-	"fmt"
 	"sync"
 
 	persistentmodel "github.com/TykTechnologies/storage/persistent/model"
@@ -17,9 +16,6 @@ var (
 	// ErrPolicyNotFound unable to find policy with given id
 	ErrPolicyNotFound = errpack.New("policy not found", errpack.WithType(errpack.TypeNotFound))
 
-	// ErrAmbiguousState represents error when org_id is required to determinate policy
-	ErrAmbiguousState = errpack.New("ambiguous state", errpack.WithType(errpack.TypeNotFound))
-
 	// ErrUnreachable represents unreachable case
 	ErrUnreachable = errpack.New("unreachable", errpack.WithType(errpack.BrokenInvariant))
 )
@@ -29,34 +25,46 @@ type (
 
 	Policies struct {
 		policySet
-		mu                     sync.RWMutex
-		once                   sync.Once
-		onBrokenPolicy         BrokenPolicyCb
-		onMultiTenantCollision MultiTenantCollisionCb
+		callbacks
+		mu   sync.RWMutex
+		once sync.Once
 	}
-	BrokenPolicyCb         func(*user.Policy)
-	MultiTenantCollisionCb func(customId string, dbIds []persistentmodel.ObjectID)
+	BrokenPolicyCb      func(*user.Policy)
+	InternalCollisionCb func(_ string, ids []persistentmodel.ObjectID)
 
-	customKey string
-	orgId     string
+	customKey       string
+	scopedCustomKey struct {
+		id  string
+		org string
+	}
+
+	callbacks struct {
+		onBrokenPolicy      BrokenPolicyCb
+		onInternalCollision InternalCollisionCb
+	}
 
 	policySet struct {
-		policies                    map[persistentmodel.ObjectID]user.Policy
-		policiesCustomKey           map[customKey]map[orgId]user.Policy
-		policiesCustomKeyToObjectID map[customKey]user.Policy
+		callbacks
+		policiesScoped map[scopedCustomKey]user.Policy
+		policies       map[customKey]user.Policy
+	}
+
+	policyCollisions struct {
+		data map[customKey]map[persistentmodel.ObjectID]struct{}
+		once sync.Once
 	}
 )
 
 func (p *Policies) init() {
 	p.once.Do(func() {
-		p.policySet = newPolicySet(0)
 		p.initDefaultCallbacks()
+		p.policySet = newPolicySet(0, p.callbacks)
 	})
 }
 
 func (p *Policies) initDefaultCallbacks() {
 	p.onBrokenPolicy = brokenPolicyNoop
-	p.onMultiTenantCollision = multiTenantCollisionNoop
+	p.onInternalCollision = internalCollisionCb
 }
 
 func NewPolicies(opts ...PolicySetOpt) *Policies {
@@ -86,9 +94,9 @@ func WithLoadFail(cb BrokenPolicyCb) PolicySetOpt {
 	}
 }
 
-func WithCollisionMultiTenant(cb MultiTenantCollisionCb) PolicySetOpt {
+func WithInternalCollision(cb InternalCollisionCb) PolicySetOpt {
 	return func(s *Policies) {
-		s.onMultiTenantCollision = cb
+		s.onInternalCollision = cb
 	}
 }
 
@@ -96,14 +104,14 @@ func (p *Policies) PolicyCount() int {
 	p.init()
 	p.mu.RLock()
 	defer p.mu.RUnlock()
-	return len(p.policies)
+	return len(p.policiesScoped)
 }
 
 func (p *Policies) AsSlice() []user.Policy {
 	p.init()
 	p.mu.RLock()
 	defer p.mu.RUnlock()
-	return maps.Values(p.policies)
+	return maps.Values(p.policiesScoped)
 }
 
 func (p *Policies) PolicyIDs() []PolicyID {
@@ -111,7 +119,7 @@ func (p *Policies) PolicyIDs() []PolicyID {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
 
-	return lo.MapToSlice(p.policies, func(_ persistentmodel.ObjectID, pol user.Policy) PolicyID {
+	return lo.MapToSlice(p.policiesScoped, func(_ scopedCustomKey, pol user.Policy) PolicyID {
 		return NewScopedCustomPolicyId(pol.OrgID, pol.ID)
 	})
 }
@@ -154,20 +162,27 @@ func (p *Policies) Add(policies ...user.Policy) {
 	p.init()
 	p.mu.Lock()
 	defer p.mu.Unlock()
+
+	var collision policyCollisions
+
 	for _, pol := range policies {
-		p.loadOne(&pol, p)
+		p.loadOne(&pol, &collision)
 	}
+
+	collision.Emit(p.onInternalCollision)
 }
 
 func (p *Policies) Reload(policies ...user.Policy) {
 	p.init()
 
-	set := newPolicySet(len(policies))
+	set := newPolicySet(len(policies), p.callbacks)
+	var collision policyCollisions
+
 	for _, pol := range policies {
-		set.loadOne(&pol, p)
+		set.loadOne(&pol, &collision)
 	}
 
-	set.emitMultiTenancyCollisions(p)
+	collision.Emit(p.onInternalCollision)
 
 	p.mu.Lock()
 	defer p.mu.Unlock()
@@ -177,38 +192,13 @@ func (p *Policies) Reload(policies ...user.Policy) {
 func (p *Policies) policyByIdExtended(id PolicyID) (user.Policy, error) {
 	switch id := id.(type) {
 	case ScopedCustomPolicyId:
-		polMap, ok := p.policiesCustomKey[id.customKey()]
-		if !ok {
-			return user.Policy{}, ErrPolicyNotFound
-		}
-
-		if pol, ok := polMap[orgId(id.orgId)]; ok {
+		if pol, ok := p.policiesScoped[scopedCustomKey{id: id.id, org: id.orgId}]; ok {
 			return pol, nil
 		}
 
 		return user.Policy{}, ErrPolicyNotFound
-
-	case NonScopedPolicyId:
-		ckSet, ok := p.policiesCustomKey[customKey(id)]
-		switch {
-		case !ok:
-			if pol, ok := p.policies[persistentmodel.ObjectID(id)]; ok {
-				return pol, nil
-			}
-
-			return user.Policy{}, ErrPolicyNotFound
-		case len(ckSet) == 0:
-			return user.Policy{}, ErrUnreachable
-		case len(ckSet) == 1:
-			return lo.FirstOrEmpty(maps.Values(ckSet)), nil
-		default:
-			return user.Policy{}, fmt.Errorf(
-				"more than one policct with id %s was found: %w",
-				id, ErrAmbiguousState,
-			)
-		}
 	case NonScopedLastInsertedPolicyId:
-		pol, ok := p.policiesCustomKeyToObjectID[customKey(id)]
+		pol, ok := p.policies[customKey(id)]
 
 		if !ok {
 			return user.Policy{}, ErrPolicyNotFound
@@ -223,7 +213,7 @@ func (p *Policies) policyByIdExtended(id PolicyID) (user.Policy, error) {
 
 func brokenPolicyNoop(_ *user.Policy) {}
 
-func multiTenantCollisionNoop(_ string, _ []persistentmodel.ObjectID) {}
+func internalCollisionCb(_ string, _ []persistentmodel.ObjectID) {}
 
 // EnsurePolicyId ensures ID field exists
 // should be removed after migrate
@@ -246,64 +236,62 @@ func EnsurePolicyId(policy *user.Policy) bool {
 
 func newPolicySet(
 	capacity int,
+	callbacksSet callbacks,
 ) policySet {
 	return policySet{
-		policies:                    make(map[persistentmodel.ObjectID]user.Policy, capacity),
-		policiesCustomKey:           make(map[customKey]map[orgId]user.Policy, capacity),
-		policiesCustomKeyToObjectID: make(map[customKey]user.Policy, capacity),
-	}
-}
-
-func (p *policySet) emitMultiTenancyCollisions(policies *Policies) {
-	for id, set := range p.policiesCustomKey {
-		if len(set) == 1 {
-			continue
-		}
-
-		policies.onMultiTenantCollision(
-			string(id),
-			lo.Map(lo.Values(set), func(item user.Policy, _ int) persistentmodel.ObjectID {
-				return item.MID
-			}),
-		)
+		callbacks:      callbacksSet,
+		policies:       make(map[customKey]user.Policy, capacity),
+		policiesScoped: make(map[scopedCustomKey]user.Policy, capacity),
 	}
 }
 
 func (p *policySet) loadOne(
 	pol *user.Policy,
-	policies *Policies,
+	collisions *policyCollisions,
 ) {
 	if !EnsurePolicyId(pol) {
-		policies.onBrokenPolicy(pol)
+		p.onBrokenPolicy(pol)
 		return
 	}
 
-	p.policies[pol.MID] = *pol
-	key := customKey(pol.ID)
-
-	set, ok := p.policiesCustomKey[key]
-	if !ok {
-		set = make(map[orgId]user.Policy)
+	sck := scopedCustomKey{id: pol.ID, org: pol.OrgID}
+	ck := customKey(pol.ID)
+	if old, ok := p.policiesScoped[sck]; ok && old.MID != pol.MID {
+		collisions.Add(ck, old.MID)
+		collisions.Add(ck, pol.MID)
 	}
 
-	set[orgId(pol.OrgID)] = *pol
-	p.policiesCustomKey[key] = set
-	p.policiesCustomKeyToObjectID[customKey(pol.ID)] = *pol
+	p.policiesScoped[sck] = *pol
+	p.policies[ck] = *pol
 }
 
 func (p *policySet) unloadOne(pol *user.Policy) {
-	delete(p.policies, pol.MID)
-	ckSet, ok := p.policiesCustomKey[customKey(pol.ID)]
+	delete(p.policiesScoped, scopedCustomKey{id: pol.ID, org: pol.OrgID})
+	delete(p.policies, customKey(pol.ID))
+}
 
+func (pc *policyCollisions) init() {
+	pc.once.Do(func() {
+		pc.data = make(map[customKey]map[persistentmodel.ObjectID]struct{})
+	})
+}
+
+func (pc *policyCollisions) Emit(emitter InternalCollisionCb) {
+	pc.init()
+
+	for key, dbIdsSet := range pc.data {
+		emitter(string(key), maps.Keys(dbIdsSet))
+	}
+}
+
+func (pc *policyCollisions) Add(key customKey, dbId persistentmodel.ObjectID) {
+	pc.init()
+
+	set, ok := pc.data[key]
 	if !ok {
-		return
+		set = make(map[persistentmodel.ObjectID]struct{})
 	}
 
-	delete(ckSet, orgId(pol.OrgID))
-
-	if len(ckSet) == 0 {
-		delete(p.policiesCustomKey, customKey(pol.ID))
-	}
-
-	delete(p.policiesCustomKeyToObjectID, customKey(pol.ID))
+	set[dbId] = struct{}{}
+	pc.data[key] = set
 }
