@@ -119,9 +119,17 @@ func apiError(msg string) apiStatusMessage {
 // validateMtlsStaticCertificateBindings validates that all certificate IDs in the
 // mtls_static_certificate_bindings array exist in the certificate manager.
 // Returns an error with the specific certificate ID if validation fails.
-func (gw *Gateway) validateMtlsStaticCertificateBindings(certIDs []string) error {
+func (gw *Gateway) validateMtlsStaticCertificateBindings(certIDs []string, orgID string) error {
 	if len(certIDs) == 0 {
 		return nil
+	}
+
+	// Validate certificate IDs start with orgID prefix to prevent path traversal attacks
+	// Certificate IDs follow the pattern: orgID + sha256hash
+	for _, certID := range certIDs {
+		if orgID != "" && !strings.HasPrefix(certID, orgID) {
+			return fmt.Errorf("Invalid certificate ID: %s", certID)
+		}
 	}
 
 	// Use List() for efficient batch validation - single storage operation
@@ -576,7 +584,7 @@ func (gw *Gateway) handleAddOrUpdate(keyName string, r *http.Request, isHashed b
 	// For POST: validates all certificates (originalKey is empty)
 	// For PUT: validates only NEW certificates (using originalKey data)
 	certsToValidate := getNewCertIDs(originalKey.MtlsStaticCertificateBindings, newSession.MtlsStaticCertificateBindings)
-	if err := gw.validateMtlsStaticCertificateBindings(certsToValidate); err != nil {
+	if err := gw.validateMtlsStaticCertificateBindings(certsToValidate, newSession.OrgID); err != nil {
 		log.Error("Invalid certificate in mtls_static_certificate_bindings: ", err)
 		return apiError(err.Error()), http.StatusBadRequest
 	}
@@ -2192,7 +2200,7 @@ func (gw *Gateway) createKeyHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Validate mtls_static_certificate_bindings
-	if err := gw.validateMtlsStaticCertificateBindings(newSession.MtlsStaticCertificateBindings); err != nil {
+	if err := gw.validateMtlsStaticCertificateBindings(newSession.MtlsStaticCertificateBindings, newSession.OrgID); err != nil {
 		doJSONWrite(w, http.StatusBadRequest, apiError(err.Error()))
 		return
 	}

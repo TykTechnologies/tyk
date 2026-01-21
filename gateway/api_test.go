@@ -4370,49 +4370,84 @@ func TestValidateMtlsStaticCertificateBindings(t *testing.T) {
 
 	t.Run("Valid single certificate", func(t *testing.T) {
 		clientCertPem, _, _, _ := certs.GenCertificate(&x509.Certificate{}, false)
-		certID, _ := ts.Gw.CertificateManager.Add(clientCertPem, "")
+		certID, err := ts.Gw.CertificateManager.Add(clientCertPem, "")
+		require.NoError(t, err)
 		defer ts.Gw.CertificateManager.Delete(certID, "")
 
-		err := ts.Gw.validateMtlsStaticCertificateBindings([]string{certID})
+		err = ts.Gw.validateMtlsStaticCertificateBindings([]string{certID}, "")
 		assert.NoError(t, err)
 	})
 
 	t.Run("Valid multiple certificates", func(t *testing.T) {
 		cert1Pem, _, _, _ := certs.GenCertificate(&x509.Certificate{}, false)
-		cert1ID, _ := ts.Gw.CertificateManager.Add(cert1Pem, "")
+		cert1ID, err := ts.Gw.CertificateManager.Add(cert1Pem, "")
+		require.NoError(t, err)
 		defer ts.Gw.CertificateManager.Delete(cert1ID, "")
 
 		cert2Pem, _, _, _ := certs.GenCertificate(&x509.Certificate{}, false)
-		cert2ID, _ := ts.Gw.CertificateManager.Add(cert2Pem, "")
+		cert2ID, err := ts.Gw.CertificateManager.Add(cert2Pem, "")
+		require.NoError(t, err)
 		defer ts.Gw.CertificateManager.Delete(cert2ID, "")
 
-		err := ts.Gw.validateMtlsStaticCertificateBindings([]string{cert1ID, cert2ID})
+		err = ts.Gw.validateMtlsStaticCertificateBindings([]string{cert1ID, cert2ID}, "")
 		assert.NoError(t, err)
 	})
 
+	t.Run("Valid certificate with orgID prefix", func(t *testing.T) {
+		orgID := "test-org-123"
+		clientCertPem, _, _, _ := certs.GenCertificate(&x509.Certificate{}, false)
+		certID, err := ts.Gw.CertificateManager.Add(clientCertPem, orgID)
+		require.NoError(t, err)
+		defer ts.Gw.CertificateManager.Delete(certID, orgID)
+
+		err = ts.Gw.validateMtlsStaticCertificateBindings([]string{certID}, orgID)
+		assert.NoError(t, err)
+	})
+
+	t.Run("Invalid certificate - wrong orgID prefix", func(t *testing.T) {
+		orgID := "test-org-123"
+		clientCertPem, _, _, _ := certs.GenCertificate(&x509.Certificate{}, false)
+		certID, err := ts.Gw.CertificateManager.Add(clientCertPem, orgID)
+		require.NoError(t, err)
+		defer ts.Gw.CertificateManager.Delete(certID, orgID)
+
+		// Try to validate with wrong orgID
+		err = ts.Gw.validateMtlsStaticCertificateBindings([]string{certID}, "wrong-org-456")
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "Invalid certificate ID")
+	})
+
+	t.Run("Invalid certificate - path traversal attempt", func(t *testing.T) {
+		orgID := "test-org-123"
+		err := ts.Gw.validateMtlsStaticCertificateBindings([]string{"../../../../etc/passwd"}, orgID)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "Invalid certificate ID")
+	})
+
 	t.Run("Invalid single certificate", func(t *testing.T) {
-		err := ts.Gw.validateMtlsStaticCertificateBindings([]string{"invalid-cert-id"})
+		err := ts.Gw.validateMtlsStaticCertificateBindings([]string{"invalid-cert-id"}, "")
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "Certificate not found: invalid-cert-id")
 	})
 
 	t.Run("Invalid certificate in list", func(t *testing.T) {
 		clientCertPem, _, _, _ := certs.GenCertificate(&x509.Certificate{}, false)
-		certID, _ := ts.Gw.CertificateManager.Add(clientCertPem, "")
+		certID, err := ts.Gw.CertificateManager.Add(clientCertPem, "")
+		require.NoError(t, err)
 		defer ts.Gw.CertificateManager.Delete(certID, "")
 
-		err := ts.Gw.validateMtlsStaticCertificateBindings([]string{certID, "invalid-cert"})
+		err = ts.Gw.validateMtlsStaticCertificateBindings([]string{certID, "invalid-cert"}, "")
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "Certificate not found: invalid-cert")
 	})
 
 	t.Run("Empty array", func(t *testing.T) {
-		err := ts.Gw.validateMtlsStaticCertificateBindings([]string{})
+		err := ts.Gw.validateMtlsStaticCertificateBindings([]string{}, "")
 		assert.NoError(t, err)
 	})
 
 	t.Run("Nil array", func(t *testing.T) {
-		err := ts.Gw.validateMtlsStaticCertificateBindings(nil)
+		err := ts.Gw.validateMtlsStaticCertificateBindings(nil, "")
 		assert.NoError(t, err)
 	})
 }
@@ -4429,12 +4464,14 @@ func TestCreateKeyWithMtlsStaticCertificateBindings(t *testing.T) {
 	})
 
 	t.Run("Create key with valid bindings", func(t *testing.T) {
+		orgID := "default"
 		clientCertPem, _, _, _ := certs.GenCertificate(&x509.Certificate{}, false)
-		certID, _ := ts.Gw.CertificateManager.Add(clientCertPem, "")
-		defer ts.Gw.CertificateManager.Delete(certID, "")
+		certID, err := ts.Gw.CertificateManager.Add(clientCertPem, orgID)
+		require.NoError(t, err)
+		defer ts.Gw.CertificateManager.Delete(certID, orgID)
 
 		session := user.SessionState{
-			OrgID:                         "default",
+			OrgID:                         orgID,
 			MtlsStaticCertificateBindings: []string{certID},
 			AccessRights: map[string]user.AccessDefinition{
 				apiId: {APIID: apiId, Versions: []string{"v1"}},
@@ -4505,7 +4542,8 @@ func TestUpdateKeyWithMtlsStaticCertificateBindings(t *testing.T) {
 
 	t.Run("POST with valid bindings", func(t *testing.T) {
 		clientCertPem, _, _, _ := certs.GenCertificate(&x509.Certificate{}, false)
-		certID, _ := ts.Gw.CertificateManager.Add(clientCertPem, "")
+		certID, err := ts.Gw.CertificateManager.Add(clientCertPem, "")
+		require.NoError(t, err)
 		defer ts.Gw.CertificateManager.Delete(certID, "")
 
 		session := user.SessionState{
@@ -4524,7 +4562,8 @@ func TestUpdateKeyWithMtlsStaticCertificateBindings(t *testing.T) {
 
 	t.Run("PUT with valid bindings", func(t *testing.T) {
 		clientCertPem, _, _, _ := certs.GenCertificate(&x509.Certificate{}, false)
-		certID, _ := ts.Gw.CertificateManager.Add(clientCertPem, "")
+		certID, err := ts.Gw.CertificateManager.Add(clientCertPem, "")
+		require.NoError(t, err)
 		defer ts.Gw.CertificateManager.Delete(certID, "")
 
 		session, key := ts.CreateSession(func(s *user.SessionState) {
@@ -4577,11 +4616,13 @@ func TestUpdateKeyWithMtlsStaticCertificateBindings(t *testing.T) {
 
 	t.Run("PUT with existing certs + new valid cert", func(t *testing.T) {
 		cert1Pem, _, _, _ := certs.GenCertificate(&x509.Certificate{}, false)
-		cert1ID, _ := ts.Gw.CertificateManager.Add(cert1Pem, "")
+		cert1ID, err := ts.Gw.CertificateManager.Add(cert1Pem, "")
+		require.NoError(t, err)
 		defer ts.Gw.CertificateManager.Delete(cert1ID, "")
 
 		cert2Pem, _, _, _ := certs.GenCertificate(&x509.Certificate{}, false)
-		cert2ID, _ := ts.Gw.CertificateManager.Add(cert2Pem, "")
+		cert2ID, err := ts.Gw.CertificateManager.Add(cert2Pem, "")
+		require.NoError(t, err)
 		defer ts.Gw.CertificateManager.Delete(cert2ID, "")
 
 		session, key := ts.CreateSession(func(s *user.SessionState) {
@@ -4604,7 +4645,8 @@ func TestUpdateKeyWithMtlsStaticCertificateBindings(t *testing.T) {
 
 	t.Run("PUT with existing certs + new invalid cert", func(t *testing.T) {
 		clientCertPem, _, _, _ := certs.GenCertificate(&x509.Certificate{}, false)
-		certID, _ := ts.Gw.CertificateManager.Add(clientCertPem, "")
+		certID, err := ts.Gw.CertificateManager.Add(clientCertPem, "")
+		require.NoError(t, err)
 		defer ts.Gw.CertificateManager.Delete(certID, "")
 
 		session, key := ts.CreateSession(func(s *user.SessionState) {
@@ -4627,7 +4669,8 @@ func TestUpdateKeyWithMtlsStaticCertificateBindings(t *testing.T) {
 
 	t.Run("PUT with only existing certs (no new certs)", func(t *testing.T) {
 		clientCertPem, _, _, _ := certs.GenCertificate(&x509.Certificate{}, false)
-		certID, _ := ts.Gw.CertificateManager.Add(clientCertPem, "")
+		certID, err := ts.Gw.CertificateManager.Add(clientCertPem, "")
+		require.NoError(t, err)
 		defer ts.Gw.CertificateManager.Delete(certID, "")
 
 		session, key := ts.CreateSession(func(s *user.SessionState) {
@@ -4650,11 +4693,13 @@ func TestUpdateKeyWithMtlsStaticCertificateBindings(t *testing.T) {
 
 	t.Run("PUT removing a cert from bindings", func(t *testing.T) {
 		cert1Pem, _, _, _ := certs.GenCertificate(&x509.Certificate{}, false)
-		cert1ID, _ := ts.Gw.CertificateManager.Add(cert1Pem, "")
+		cert1ID, err := ts.Gw.CertificateManager.Add(cert1Pem, "")
+		require.NoError(t, err)
 		defer ts.Gw.CertificateManager.Delete(cert1ID, "")
 
 		cert2Pem, _, _, _ := certs.GenCertificate(&x509.Certificate{}, false)
-		cert2ID, _ := ts.Gw.CertificateManager.Add(cert2Pem, "")
+		cert2ID, err := ts.Gw.CertificateManager.Add(cert2Pem, "")
+		require.NoError(t, err)
 		defer ts.Gw.CertificateManager.Delete(cert2ID, "")
 
 		session, key := ts.CreateSession(func(s *user.SessionState) {
