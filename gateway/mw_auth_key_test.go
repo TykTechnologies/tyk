@@ -4,12 +4,13 @@ import (
 	"crypto/x509"
 	"encoding/hex"
 	"fmt"
-	"github.com/TykTechnologies/tyk/internal/crypto"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"testing"
 	"time"
+
+	"github.com/TykTechnologies/tyk/internal/crypto"
 
 	"github.com/justinas/alice"
 	"github.com/stretchr/testify/assert"
@@ -198,7 +199,7 @@ func TestSignatureValidation(t *testing.T) {
 		ts.Gw.LoadAPI(api)
 
 		key := CreateSession(ts.Gw, func(s *user.SessionState) {
-			s.MetaData = map[string]interface{}{
+			s.MetaData = map[string]any{
 				"signature_secret": "foobar",
 			}
 		})
@@ -240,7 +241,7 @@ func TestSignatureValidation(t *testing.T) {
 		session.AccessRights = map[string]user.AccessDefinition{"test": {
 			APIID: "test", Versions: []string{"v1"},
 		}}
-		session.MetaData = map[string]interface{}{
+		session.MetaData = map[string]any{
 			"signature_secret": secret,
 		}
 
@@ -394,7 +395,7 @@ func BenchmarkBearerTokenAuthKeySession(b *testing.B) {
 
 	chain := getAuthKeyChain(spec, ts)
 
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		chain.ServeHTTP(recorder, req)
 		if recorder.Code != 200 {
 			b.Error("Initial request failed with non-200 code, should have gone through!: \n", recorder.Code)
@@ -454,7 +455,7 @@ func BenchmarkMultiAuthBackwardsCompatibleSession(b *testing.B) {
 
 	chain := getAuthKeyChain(spec, ts)
 
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		chain.ServeHTTP(recorder, req)
 		if recorder.Code != 200 {
 			b.Error("Initial request failed with non-200 code, should have gone through!: \n", recorder.Code)
@@ -591,12 +592,96 @@ func TestStripBearer(t *testing.T) {
 func BenchmarkStripBearer(b *testing.B) {
 	b.ReportAllocs()
 
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		_ = stripBearer("Bearer abcdefghijklmnopqrstuvwxyz12345678910")
 	}
 }
 
-func TestDynamicMTLS(t *testing.T) {
+func TestDynamicMTLSInsecure(t *testing.T) {
+	serverCertPem, _, combinedPEM, _ := certs.GenServerCertificate()
+	certID, _, _ := certs.GetCertIDAndChainPEM(combinedPEM, "")
+
+	conf := func(globalConf *config.Config) {
+		globalConf.Security.ControlAPIUseMutualTLS = false
+		globalConf.Security.AllowUnsafeDynamicMTLSToken = true // Insecure behavior for this test
+		globalConf.HttpServerOptions.UseSSL = true
+		globalConf.HttpServerOptions.SSLInsecureSkipVerify = true
+		globalConf.HttpServerOptions.SSLCertificates = []string{"default" + certID}
+	}
+	ts := StartTest(conf)
+	defer ts.Close()
+
+	certID, err := ts.Gw.CertificateManager.Add(combinedPEM, "default")
+	assert.NoError(t, err)
+	defer ts.Gw.CertificateManager.Delete(certID, "default")
+	ts.ReloadGatewayProxy()
+
+	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		spec.APIID = "apiID-1"
+		spec.UseStandardAuth = true
+		spec.UseKeylessAccess = false
+		authConf := apidef.AuthConfig{
+			Name:           "authToken",
+			UseCertificate: true,
+			AuthHeaderName: "Authorization",
+		}
+		spec.AuthConfigs = map[string]apidef.AuthConfig{
+			"authToken": authConf,
+		}
+		spec.Auth = authConf
+		spec.Proxy.ListenPath = "/dynamic-mtls"
+	})
+
+	// Initialize client certificates
+	clientCertPem, _, _, clientCert := certs.GenCertificate(&x509.Certificate{}, false)
+
+	clientCertID, err := ts.Gw.CertificateManager.Add(clientCertPem, "default")
+	assert.NoError(t, err)
+	certHash := "default" + crypto.HexSHA256(clientCert.Certificate[0])
+
+	_, keyHash := ts.CreateSession(func(s *user.SessionState) {
+		s.AccessRights = map[string]user.AccessDefinition{"apiID-1": {
+			APIID: "apiID-1",
+		}}
+		s.Certificate = clientCertID
+	})
+
+	t.Run("valid certificate provided", func(t *testing.T) {
+		validCertClient := GetTLSClient(&clientCert, serverCertPem)
+		_, _ = ts.Run(t, test.TestCase{
+			Domain: "localhost",
+			Client: validCertClient,
+			Path:   "/dynamic-mtls",
+			Code:   http.StatusOK,
+		})
+	})
+
+	t.Run("missing cert with generated cert hash and allow unsafe - should be accepted", func(t *testing.T) {
+		certClient := GetTLSClient(nil, serverCertPem)
+		_, _ = ts.Run(t, test.TestCase{
+			Path:   "/dynamic-mtls",
+			Code:   http.StatusOK,
+			Client: certClient,
+			Headers: map[string]string{
+				"Authorization": certHash,
+			},
+		})
+	})
+
+	t.Run("missing cert with generated key and allow unsafe - should be accepted", func(t *testing.T) {
+		certClient := GetTLSClient(nil, serverCertPem)
+		_, _ = ts.Run(t, test.TestCase{
+			Path:   "/dynamic-mtls",
+			Code:   http.StatusOK,
+			Client: certClient,
+			Headers: map[string]string{
+				"Authorization": keyHash,
+			},
+		})
+	})
+}
+
+func TestDynamicMTLSSecure(t *testing.T) {
 	serverCertPem, _, combinedPEM, _ := certs.GenServerCertificate()
 	certID, _, _ := certs.GetCertIDAndChainPEM(combinedPEM, "")
 
@@ -679,7 +764,7 @@ func TestDynamicMTLS(t *testing.T) {
 		})
 	})
 
-	t.Run("missing cert with generated cert - should be rejected by default", func(t *testing.T) {
+	t.Run("missing cert with generated cert hash - should be rejected by default", func(t *testing.T) {
 		certClient := GetTLSClient(nil, serverCertPem)
 		_, _ = ts.Run(t, test.TestCase{
 			Path:      "/dynamic-mtls",
@@ -708,7 +793,6 @@ func TestDynamicMTLS(t *testing.T) {
 		})
 	})
 
-	// KOFO: you are here, trying to make this test pass by rejecting the request if the certificate does not match
 	t.Run("non-matching certificate - should be rejected", func(t *testing.T) {
 		differentClientPem, _, _, differentClientCert := certs.GenCertificate(&x509.Certificate{}, false)
 		_, err := ts.Gw.CertificateManager.Add(differentClientPem, "default")
@@ -718,38 +802,8 @@ func TestDynamicMTLS(t *testing.T) {
 		_, _ = ts.Run(t, test.TestCase{
 			Client:    differentCertClient,
 			Path:      "/dynamic-mtls",
-			Code:      http.StatusForbidden,
+			Code:      http.StatusUnauthorized,
 			BodyMatch: MsgApiAccessDisallowed,
 		})
-	})
-
-	t.Run("with AllowUnsafeDynamicMTLSToken=true", func(t *testing.T) {
-		// Change the configuration to allow token auth without certificates
-		gatewayConfig := ts.Gw.GetConfig()
-		gatewayConfig.Security.AllowUnsafeDynamicMTLSToken = true
-		ts.Gw.SetConfig(gatewayConfig)
-		ts.ReloadGatewayProxy()
-
-		// Create a new token for testing with the relaxed setting
-		tokenID := CreateSession(ts.Gw, func(s *user.SessionState) {
-			s.AccessRights = map[string]user.AccessDefinition{"apiID-1": {
-				APIID: "apiID-1",
-			}}
-		})
-
-		// Test without certificate - should succeed with relaxed setting
-		_, _ = ts.Run(t, test.TestCase{
-			Headers: map[string]string{
-				"Authorization": tokenID,
-			},
-			Path: "/dynamic-mtls",
-			Code: http.StatusOK,
-		})
-
-		// Reset back to secure mode
-		gatewayConfig = ts.Gw.GetConfig()
-		gatewayConfig.Security.AllowUnsafeDynamicMTLSToken = false
-		ts.Gw.SetConfig(gatewayConfig)
-		ts.ReloadGatewayProxy()
 	})
 }

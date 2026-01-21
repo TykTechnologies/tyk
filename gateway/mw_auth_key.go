@@ -73,11 +73,6 @@ func initAuthKeyErrors() {
 		Message: MsgApiAccessDisallowed,
 		Code:    http.StatusUnauthorized,
 	}
-
-	TykErrors[ErrAuthCertMismatch] = config.TykError{
-		Message: MsgApiAccessDisallowed,
-		Code:    http.StatusForbidden,
-	}
 }
 
 // KeyExists will check if the key being used to access the API is in the request data,
@@ -138,6 +133,9 @@ func (k *AuthKey) ProcessRequest(_ http.ResponseWriter, r *http.Request, _ inter
 			}
 			key = k.Gw.generateToken(k.Spec.OrgID, certHash)
 			session, keyExists = k.CheckSessionAndIdentityForValidKey(key, r)
+			if !keyExists {
+				return errorAndStatusCode(ErrAuthCertMismatch)
+			}
 		} else {
 			if key != "" {
 				session, keyExists = k.CheckSessionAndIdentityForValidKey(key, r)
