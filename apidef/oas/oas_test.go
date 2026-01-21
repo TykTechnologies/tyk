@@ -11,8 +11,8 @@ import (
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/internal/event"
-	"github.com/getkin/kin-openapi/openapi3"
 
+	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/oasdiff/yaml"
 	"github.com/stretchr/testify/assert"
 )
