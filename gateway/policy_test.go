@@ -1454,7 +1454,7 @@ func TestOrganizationScopedPolicies(t *testing.T) {
 			Method:  http.MethodGet,
 			Path:    "/api2",
 			Headers: authHeaders2,
-			Code:    http.StatusForbidden,
+			Code:    http.StatusOK,
 		})
 
 		deleted := ts.Gw.policies.DeleteById(model.NewScopedCustomPolicyId(org1, sharedPolicyID))

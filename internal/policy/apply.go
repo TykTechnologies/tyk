@@ -354,8 +354,14 @@ func (t *Service) policyIds(session *user.SessionState) []model.PolicyID {
 	if ids == nil {
 		return nil
 	} else {
+		orgID := session.OrgID
+		if orgID == "" && t.orgID != nil {
+			// Use the API spec's organization ID if the session's organization ID is empty
+			orgID = *t.orgID
+		}
+
 		return lo.Map(session.PolicyIDs(), func(item string, _ int) model.PolicyID {
-			return model.NewScopedCustomPolicyId(session.OrgID, item)
+			return model.NewScopedCustomPolicyId(orgID, item)
 		})
 	}
 }
