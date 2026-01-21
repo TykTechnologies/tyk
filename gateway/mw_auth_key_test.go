@@ -4,6 +4,7 @@ import (
 	"crypto/x509"
 	"encoding/hex"
 	"fmt"
+	"github.com/TykTechnologies/tyk/internal/crypto"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -601,6 +602,7 @@ func TestDynamicMTLS(t *testing.T) {
 
 	conf := func(globalConf *config.Config) {
 		globalConf.Security.ControlAPIUseMutualTLS = false
+		globalConf.Security.AllowUnsafeDynamicMTLSToken = false // Default secure behavior
 		globalConf.HttpServerOptions.UseSSL = true
 		globalConf.HttpServerOptions.SSLInsecureSkipVerify = true
 		globalConf.HttpServerOptions.SSLCertificates = []string{"default" + certID}
@@ -634,8 +636,9 @@ func TestDynamicMTLS(t *testing.T) {
 
 	clientCertID, err := ts.Gw.CertificateManager.Add(clientCertPem, "default")
 	assert.NoError(t, err)
+	certHash := "default" + crypto.HexSHA256(clientCert.Certificate[0])
 
-	ts.CreateSession(func(s *user.SessionState) {
+	_, keyHash := ts.CreateSession(func(s *user.SessionState) {
 		s.AccessRights = map[string]user.AccessDefinition{"apiID-1": {
 			APIID: "apiID-1",
 		}}
@@ -650,7 +653,43 @@ func TestDynamicMTLS(t *testing.T) {
 			Path:   "/dynamic-mtls",
 			Code:   http.StatusOK,
 		})
+	})
 
+	t.Run("missing certificate - should be rejected by default", func(t *testing.T) {
+		// client that only checks server ca
+		certClient := GetTLSClient(nil, serverCertPem)
+		_, _ = ts.Run(t, test.TestCase{
+			Path:      "/dynamic-mtls",
+			Code:      http.StatusUnauthorized,
+			BodyMatch: MsgAuthCertRequired,
+			Client:    certClient,
+		})
+	})
+
+	t.Run("missing cert with generated key - should be rejected by default", func(t *testing.T) {
+		certClient := GetTLSClient(nil, serverCertPem)
+		_, _ = ts.Run(t, test.TestCase{
+			Path:      "/dynamic-mtls",
+			Code:      http.StatusUnauthorized,
+			BodyMatch: MsgAuthCertRequired,
+			Client:    certClient,
+			Headers: map[string]string{
+				"Authorization": keyHash,
+			},
+		})
+	})
+
+	t.Run("missing cert with generated cert - should be rejected by default", func(t *testing.T) {
+		certClient := GetTLSClient(nil, serverCertPem)
+		_, _ = ts.Run(t, test.TestCase{
+			Path:      "/dynamic-mtls",
+			Code:      http.StatusUnauthorized,
+			BodyMatch: MsgAuthCertRequired,
+			Client:    certClient,
+			Headers: map[string]string{
+				"Authorization": certHash,
+			},
+		})
 	})
 
 	t.Run("expired client cert", func(t *testing.T) {
@@ -667,5 +706,50 @@ func TestDynamicMTLS(t *testing.T) {
 			Code:      http.StatusForbidden,
 			BodyMatch: MsgCertificateExpired,
 		})
+	})
+
+	// KOFO: you are here, trying to make this test pass by rejecting the request if the certificate does not match
+	t.Run("non-matching certificate - should be rejected", func(t *testing.T) {
+		differentClientPem, _, _, differentClientCert := certs.GenCertificate(&x509.Certificate{}, false)
+		_, err := ts.Gw.CertificateManager.Add(differentClientPem, "default")
+		assert.NoError(t, err)
+
+		differentCertClient := GetTLSClient(&differentClientCert, serverCertPem)
+		_, _ = ts.Run(t, test.TestCase{
+			Client:    differentCertClient,
+			Path:      "/dynamic-mtls",
+			Code:      http.StatusForbidden,
+			BodyMatch: MsgApiAccessDisallowed,
+		})
+	})
+
+	t.Run("with AllowUnsafeDynamicMTLSToken=true", func(t *testing.T) {
+		// Change the configuration to allow token auth without certificates
+		gatewayConfig := ts.Gw.GetConfig()
+		gatewayConfig.Security.AllowUnsafeDynamicMTLSToken = true
+		ts.Gw.SetConfig(gatewayConfig)
+		ts.ReloadGatewayProxy()
+
+		// Create a new token for testing with the relaxed setting
+		tokenID := CreateSession(ts.Gw, func(s *user.SessionState) {
+			s.AccessRights = map[string]user.AccessDefinition{"apiID-1": {
+				APIID: "apiID-1",
+			}}
+		})
+
+		// Test without certificate - should succeed with relaxed setting
+		_, _ = ts.Run(t, test.TestCase{
+			Headers: map[string]string{
+				"Authorization": tokenID,
+			},
+			Path: "/dynamic-mtls",
+			Code: http.StatusOK,
+		})
+
+		// Reset back to secure mode
+		gatewayConfig = ts.Gw.GetConfig()
+		gatewayConfig.Security.AllowUnsafeDynamicMTLSToken = false
+		ts.Gw.SetConfig(gatewayConfig)
+		ts.ReloadGatewayProxy()
 	})
 }

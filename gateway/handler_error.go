@@ -28,6 +28,7 @@ const (
 
 	MsgAuthFieldMissing                        = "Authorization field missing"
 	MsgApiAccessDisallowed                     = "Access to this API has been disallowed"
+	MsgAuthCertRequired                        = "Client certificate required"
 	MsgBearerMailformed                        = "Bearer token malformed"
 	MsgKeyNotAuthorized                        = "Key not authorised"
 	MsgOauthClientRevoked                      = "Key not authorised. OAuth client access was revoked"

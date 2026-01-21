@@ -28,8 +28,9 @@ const (
 	ErrAuthKeyNotFound               = "auth.key_not_found"
 	ErrAuthCertNotFound              = "auth.cert_not_found"
 	ErrAuthCertExpired               = "auth.cert_expired"
-	ErrAuthCertMismatch              = "auth.cert_mismatch"
 	ErrAuthKeyIsInvalid              = "auth.key_is_invalid"
+	ErrAuthCertRequired              = "auth.cert_required"
+	ErrAuthCertMismatch              = "auth.cert_mismatch"
 
 	MsgNonExistentKey      = "Attempted access with non-existent key."
 	MsgNonExistentCert     = "Attempted access with non-existent cert."
@@ -61,6 +62,16 @@ func initAuthKeyErrors() {
 	TykErrors[ErrAuthCertExpired] = config.TykError{
 		Message: MsgCertificateExpired,
 		Code:    http.StatusForbidden,
+	}
+
+	TykErrors[ErrAuthCertRequired] = config.TykError{
+		Message: MsgAuthCertRequired,
+		Code:    http.StatusUnauthorized,
+	}
+
+	TykErrors[ErrAuthCertMismatch] = config.TykError{
+		Message: MsgApiAccessDisallowed,
+		Code:    http.StatusUnauthorized,
 	}
 
 	TykErrors[ErrAuthCertMismatch] = config.TykError{
@@ -107,33 +118,37 @@ func (k *AuthKey) ProcessRequest(_ http.ResponseWriter, r *http.Request, _ inter
 	}
 
 	key, authConfig := k.getAuthToken(k.getAuthType(), r)
-	var certHash string
-
-	keyExists := false
-	var session user.SessionState
-	updateSession := false
-	if key != "" {
+	if key == "" {
 		key = stripBearer(key)
-	} else if authConfig.UseCertificate && key == "" && r.TLS != nil && len(r.TLS.PeerCertificates) > 0 {
-		log.Debug("Trying to find key by client certificate")
-		certHash = k.Spec.OrgID + crypto.HexSHA256(r.TLS.PeerCertificates[0].Raw)
-		if time.Now().After(r.TLS.PeerCertificates[0].NotAfter) {
-			return errorAndStatusCode(ErrAuthCertExpired)
+	}
+	var keyExists, updateSession bool
+	var certHash string
+	var session user.SessionState
+	if authConfig.UseCertificate && r.TLS != nil {
+		if len(r.TLS.PeerCertificates) > 0 {
+			if time.Now().After(r.TLS.PeerCertificates[0].NotAfter) {
+				return errorAndStatusCode(ErrAuthCertExpired)
+			}
+			certHash = k.Spec.OrgID + crypto.HexSHA256(r.TLS.PeerCertificates[0].Raw)
 		}
 
-		key = k.Gw.generateToken(k.Spec.OrgID, certHash)
-	} else {
-		k.Logger().Info("Attempted access with malformed header, no auth header found.")
-		return errorAndStatusCode(ErrAuthAuthorizationFieldMissing)
-	}
-
-	session, keyExists = k.CheckSessionAndIdentityForValidKey(key, r)
-	key = session.KeyID
-	if !keyExists {
-		// fallback to search by cert
-		session, keyExists = k.CheckSessionAndIdentityForValidKey(certHash, r)
-		if !keyExists {
-			return k.reportInvalidKey(key, r, MsgNonExistentKey, ErrAuthKeyNotFound)
+		if !k.Gw.GetConfig().Security.AllowUnsafeDynamicMTLSToken {
+			if certHash == "" {
+				return errorAndStatusCode(ErrAuthCertRequired)
+			}
+			key = k.Gw.generateToken(k.Spec.OrgID, certHash)
+			session, keyExists = k.CheckSessionAndIdentityForValidKey(key, r)
+		} else {
+			if key != "" {
+				session, keyExists = k.CheckSessionAndIdentityForValidKey(key, r)
+				key = session.KeyID
+				if !keyExists {
+					session, keyExists = k.CheckSessionAndIdentityForValidKey(certHash, r)
+					if !keyExists {
+						return k.reportInvalidKey(key, r, MsgNonExistentKey, ErrAuthKeyNotFound)
+					}
+				}
+			}
 		}
 	}
 
