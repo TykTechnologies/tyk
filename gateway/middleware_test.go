@@ -371,6 +371,118 @@ func TestSessionLimiter_RedisQuotaExceeded_PerAPI(t *testing.T) {
 	})
 }
 
+func TestSessionLimiter_RedisQuotaExceeded_ExpiredAtReset(t *testing.T) {
+	g := StartTest(nil)
+	defer g.Close()
+
+	g.Gw.GlobalSessionManager.Store().DeleteAllKeys()
+	defer g.Gw.GlobalSessionManager.Store().DeleteAllKeys()
+
+	t.Run("expiredAt is set to now.Add(quotaRenewalRate) when lock succeeds", func(t *testing.T) {
+		quotaKey := "test-quota-key-expired-at"
+		quotaRenewalRate := int64(3600)
+		quotaMax := int64(100)
+		expectedTTL := time.Duration(quotaRenewalRate) * time.Second
+
+		limiter := g.Gw.SessionLimiter
+
+		session := &user.SessionState{
+			KeyID: "test-key-expired-at",
+			AccessRights: map[string]user.AccessDefinition{
+				"api1": {
+					Limit: user.APILimit{
+						QuotaMax:         quotaMax,
+						QuotaRenewalRate: quotaRenewalRate,
+					},
+					AllowanceScope: "",
+				},
+			},
+		}
+
+		req := &http.Request{}
+
+		rawKey := QuotaKeyPrefix + quotaKey
+		g.Gw.GlobalSessionManager.Store().DeleteRawKey(rawKey)
+
+		limit := &user.APILimit{
+			QuotaMax:         quotaMax,
+			QuotaRenewalRate: quotaRenewalRate,
+		}
+
+		beforeTime := time.Now()
+		blocked := limiter.RedisQuotaExceeded(req, session, quotaKey, "", limit, g.Gw.GlobalSessionManager.Store(), false)
+		afterTime := time.Now()
+
+		assert.Equal(t, quotaMax-1, session.QuotaRemaining, "Quota remaining should be quotaMax - 1 after increment")
+		assert.Greater(t, session.QuotaRenews, int64(0), "QuotaRenews should be set to a future timestamp")
+
+		expectedRenewTimeMin := beforeTime.Add(expectedTTL).Unix()
+		expectedRenewTimeMax := afterTime.Add(expectedTTL).Unix()
+		assert.GreaterOrEqual(t, session.QuotaRenews, expectedRenewTimeMin,
+			"QuotaRenews should be >= beforeTime + quotaRenewalRate (verifies line 510: expiredAt = now.Add(quotaRenewalRate))")
+		assert.LessOrEqual(t, session.QuotaRenews, expectedRenewTimeMax,
+			"QuotaRenews should be <= afterTime + quotaRenewalRate (verifies line 510: expiredAt = now.Add(quotaRenewalRate))")
+
+		ttl, err := g.Gw.GlobalSessionManager.Store().GetExp(rawKey)
+		if err == nil && ttl > 0 {
+			assert.InDelta(t, int64(expectedTTL.Seconds()), ttl, 5,
+				"Key TTL should be approximately quotaRenewalRate (verifies line 509: Set(rawKey, 0, quotaRenewalRate))")
+		}
+
+		assert.False(t, blocked, "Request should not be blocked when quota is not exceeded")
+	})
+
+	t.Run("expiredAt is set correctly for scoped quota", func(t *testing.T) {
+		quotaKey := "test-quota-key-scoped-expired-at"
+		scope := "scope1"
+		quotaRenewalRate := int64(1800)
+		quotaMax := int64(50)
+		expectedTTL := time.Duration(quotaRenewalRate) * time.Second
+
+		limiter := g.Gw.SessionLimiter
+
+		session := &user.SessionState{
+			KeyID: "test-key-scoped-expired-at",
+			AccessRights: map[string]user.AccessDefinition{
+				"api1": {
+					Limit: user.APILimit{
+						QuotaMax:         quotaMax,
+						QuotaRenewalRate: quotaRenewalRate,
+					},
+					AllowanceScope: scope,
+				},
+			},
+		}
+
+		req := &http.Request{}
+
+		rawKey := QuotaKeyPrefix + scope + "-" + quotaKey
+		g.Gw.GlobalSessionManager.Store().DeleteRawKey(rawKey)
+
+		limit := &user.APILimit{
+			QuotaMax:         quotaMax,
+			QuotaRenewalRate: quotaRenewalRate,
+		}
+
+		beforeTime := time.Now()
+		blocked := limiter.RedisQuotaExceeded(req, session, quotaKey, scope, limit, g.Gw.GlobalSessionManager.Store(), false)
+		afterTime := time.Now()
+
+		accessDef := session.AccessRights["api1"]
+		assert.Equal(t, quotaMax-1, accessDef.Limit.QuotaRemaining, "Quota remaining should be quotaMax - 1 after increment")
+		assert.Greater(t, accessDef.Limit.QuotaRenews, int64(0), "QuotaRenews should be set to a future timestamp")
+
+		expectedRenewTimeMin := beforeTime.Add(expectedTTL).Unix()
+		expectedRenewTimeMax := afterTime.Add(expectedTTL).Unix()
+		assert.GreaterOrEqual(t, accessDef.Limit.QuotaRenews, expectedRenewTimeMin,
+			"QuotaRenews should be >= beforeTime + quotaRenewalRate (verifies line 510: expiredAt = now.Add(quotaRenewalRate))")
+		assert.LessOrEqual(t, accessDef.Limit.QuotaRenews, expectedRenewTimeMax,
+			"QuotaRenews should be <= afterTime + quotaRenewalRate (verifies line 510: expiredAt = now.Add(quotaRenewalRate))")
+
+		assert.False(t, blocked, "Request should not be blocked when quota is not exceeded")
+	})
+}
+
 func TestCopyAllowedURLs(t *testing.T) {
 	testCases := []struct {
 		name  string
