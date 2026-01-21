@@ -4319,3 +4319,359 @@ func TestKeyHandler_ContextCancellation(t *testing.T) {
 	assert.Equal(t, http.StatusGatewayTimeout, rec.Code)
 	assert.Contains(t, rec.Body.String(), "Request timeout")
 }
+
+func TestGetNewCertIDs(t *testing.T) {
+	t.Run("Empty original, non-empty new", func(t *testing.T) {
+		original := []string{}
+		new := []string{"cert1", "cert2", "cert3"}
+		result := getNewCertIDs(original, new)
+		assert.Equal(t, []string{"cert1", "cert2", "cert3"}, result)
+	})
+
+	t.Run("Nil original, non-empty new", func(t *testing.T) {
+		var original []string
+		new := []string{"cert1", "cert2"}
+		result := getNewCertIDs(original, new)
+		assert.Equal(t, []string{"cert1", "cert2"}, result)
+	})
+
+	t.Run("Some overlap", func(t *testing.T) {
+		original := []string{"cert1", "cert2"}
+		new := []string{"cert1", "cert2", "cert3", "cert4"}
+		result := getNewCertIDs(original, new)
+		assert.Equal(t, []string{"cert3", "cert4"}, result)
+	})
+
+	t.Run("All existing", func(t *testing.T) {
+		original := []string{"cert1", "cert2", "cert3"}
+		new := []string{"cert1", "cert2", "cert3"}
+		result := getNewCertIDs(original, new)
+		assert.Empty(t, result)
+	})
+
+	t.Run("No overlap", func(t *testing.T) {
+		original := []string{"cert1", "cert2"}
+		new := []string{"cert3", "cert4"}
+		result := getNewCertIDs(original, new)
+		assert.Equal(t, []string{"cert3", "cert4"}, result)
+	})
+
+	t.Run("Empty both", func(t *testing.T) {
+		original := []string{}
+		new := []string{}
+		result := getNewCertIDs(original, new)
+		assert.Empty(t, result)
+	})
+}
+
+func TestValidateMtlsStaticCertificateBindings(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	t.Run("Valid single certificate", func(t *testing.T) {
+		clientCertPem, _, _, _ := certs.GenCertificate(&x509.Certificate{}, false)
+		certID, _ := ts.Gw.CertificateManager.Add(clientCertPem, "")
+		defer ts.Gw.CertificateManager.Delete(certID, "")
+
+		err := ts.Gw.validateMtlsStaticCertificateBindings([]string{certID})
+		assert.NoError(t, err)
+	})
+
+	t.Run("Valid multiple certificates", func(t *testing.T) {
+		cert1Pem, _, _, _ := certs.GenCertificate(&x509.Certificate{}, false)
+		cert1ID, _ := ts.Gw.CertificateManager.Add(cert1Pem, "")
+		defer ts.Gw.CertificateManager.Delete(cert1ID, "")
+
+		cert2Pem, _, _, _ := certs.GenCertificate(&x509.Certificate{}, false)
+		cert2ID, _ := ts.Gw.CertificateManager.Add(cert2Pem, "")
+		defer ts.Gw.CertificateManager.Delete(cert2ID, "")
+
+		err := ts.Gw.validateMtlsStaticCertificateBindings([]string{cert1ID, cert2ID})
+		assert.NoError(t, err)
+	})
+
+	t.Run("Invalid single certificate", func(t *testing.T) {
+		err := ts.Gw.validateMtlsStaticCertificateBindings([]string{"invalid-cert-id"})
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "Certificate not found: invalid-cert-id")
+	})
+
+	t.Run("Invalid certificate in list", func(t *testing.T) {
+		clientCertPem, _, _, _ := certs.GenCertificate(&x509.Certificate{}, false)
+		certID, _ := ts.Gw.CertificateManager.Add(clientCertPem, "")
+		defer ts.Gw.CertificateManager.Delete(certID, "")
+
+		err := ts.Gw.validateMtlsStaticCertificateBindings([]string{certID, "invalid-cert"})
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "Certificate not found: invalid-cert")
+	})
+
+	t.Run("Empty array", func(t *testing.T) {
+		err := ts.Gw.validateMtlsStaticCertificateBindings([]string{})
+		assert.NoError(t, err)
+	})
+
+	t.Run("Nil array", func(t *testing.T) {
+		err := ts.Gw.validateMtlsStaticCertificateBindings(nil)
+		assert.NoError(t, err)
+	})
+}
+
+func TestCreateKeyWithMtlsStaticCertificateBindings(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	apiId := "test-api"
+	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		spec.APIID = apiId
+		spec.UseKeylessAccess = false
+		spec.OrgID = "default"
+	})
+
+	t.Run("Create key with valid bindings", func(t *testing.T) {
+		clientCertPem, _, _, _ := certs.GenCertificate(&x509.Certificate{}, false)
+		certID, _ := ts.Gw.CertificateManager.Add(clientCertPem, "")
+		defer ts.Gw.CertificateManager.Delete(certID, "")
+
+		session := user.SessionState{
+			OrgID:                         "default",
+			MtlsStaticCertificateBindings: []string{certID},
+			AccessRights: map[string]user.AccessDefinition{
+				apiId: {APIID: apiId, Versions: []string{"v1"}},
+			},
+		}
+		sessionData := test.MarshalJSON(t)(session)
+
+		_, _ = ts.Run(t, []test.TestCase{
+			{Method: http.MethodPost, Path: "/tyk/keys/create", Data: sessionData, AdminAuth: true, Code: 200},
+		}...)
+	})
+
+	t.Run("Create key with invalid cert in bindings", func(t *testing.T) {
+		session := user.SessionState{
+			OrgID:                         "default",
+			MtlsStaticCertificateBindings: []string{"nonexistent-cert-id"},
+			AccessRights: map[string]user.AccessDefinition{
+				apiId: {APIID: apiId, Versions: []string{"v1"}},
+			},
+		}
+		sessionData := test.MarshalJSON(t)(session)
+
+		_, _ = ts.Run(t, []test.TestCase{
+			{Method: http.MethodPost, Path: "/tyk/keys/create", Data: sessionData, AdminAuth: true, Code: 400},
+		}...)
+	})
+
+	t.Run("Create key without the field", func(t *testing.T) {
+		session := user.SessionState{
+			OrgID: "default",
+			AccessRights: map[string]user.AccessDefinition{
+				apiId: {APIID: apiId, Versions: []string{"v1"}},
+			},
+		}
+		sessionData := test.MarshalJSON(t)(session)
+
+		_, _ = ts.Run(t, []test.TestCase{
+			{Method: http.MethodPost, Path: "/tyk/keys/create", Data: sessionData, AdminAuth: true, Code: 200},
+		}...)
+	})
+
+	t.Run("Create key with empty array", func(t *testing.T) {
+		session := user.SessionState{
+			OrgID:                         "default",
+			MtlsStaticCertificateBindings: []string{},
+			AccessRights: map[string]user.AccessDefinition{
+				apiId: {APIID: apiId, Versions: []string{"v1"}},
+			},
+		}
+		sessionData := test.MarshalJSON(t)(session)
+
+		_, _ = ts.Run(t, []test.TestCase{
+			{Method: http.MethodPost, Path: "/tyk/keys/create", Data: sessionData, AdminAuth: true, Code: 200},
+		}...)
+	})
+}
+
+func TestUpdateKeyWithMtlsStaticCertificateBindings(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	apiId := "test-api"
+	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		spec.APIID = apiId
+		spec.UseKeylessAccess = false
+		spec.OrgID = "default"
+	})
+
+	t.Run("POST with valid bindings", func(t *testing.T) {
+		clientCertPem, _, _, _ := certs.GenCertificate(&x509.Certificate{}, false)
+		certID, _ := ts.Gw.CertificateManager.Add(clientCertPem, "")
+		defer ts.Gw.CertificateManager.Delete(certID, "")
+
+		session := user.SessionState{
+			OrgID:                         "default",
+			MtlsStaticCertificateBindings: []string{certID},
+			AccessRights: map[string]user.AccessDefinition{
+				apiId: {APIID: apiId, Versions: []string{"v1"}},
+			},
+		}
+		sessionData := test.MarshalJSON(t)(session)
+
+		_, _ = ts.Run(t, []test.TestCase{
+			{Method: http.MethodPost, Path: "/tyk/keys/custom-key-id", Data: sessionData, AdminAuth: true, Code: 200},
+		}...)
+	})
+
+	t.Run("PUT with valid bindings", func(t *testing.T) {
+		clientCertPem, _, _, _ := certs.GenCertificate(&x509.Certificate{}, false)
+		certID, _ := ts.Gw.CertificateManager.Add(clientCertPem, "")
+		defer ts.Gw.CertificateManager.Delete(certID, "")
+
+		session, key := ts.CreateSession(func(s *user.SessionState) {
+			s.OrgID = "default"
+			s.AccessRights = map[string]user.AccessDefinition{
+				apiId: {APIID: apiId, Versions: []string{"v1"}},
+			}
+		})
+
+		session.MtlsStaticCertificateBindings = []string{certID}
+		sessionData := test.MarshalJSON(t)(session)
+
+		path := fmt.Sprintf("/tyk/keys/%s", key)
+		_, _ = ts.Run(t, []test.TestCase{
+			{Method: http.MethodPut, Path: path, Data: sessionData, AdminAuth: true, Code: 200},
+		}...)
+	})
+
+	t.Run("POST with invalid cert in bindings", func(t *testing.T) {
+		session := user.SessionState{
+			OrgID:                         "default",
+			MtlsStaticCertificateBindings: []string{"invalid-cert"},
+			AccessRights: map[string]user.AccessDefinition{
+				apiId: {APIID: apiId, Versions: []string{"v1"}},
+			},
+		}
+		sessionData := test.MarshalJSON(t)(session)
+
+		_, _ = ts.Run(t, []test.TestCase{
+			{Method: http.MethodPost, Path: "/tyk/keys/custom-key-id-2", Data: sessionData, AdminAuth: true, Code: 400},
+		}...)
+	})
+
+	t.Run("PUT with invalid cert in bindings", func(t *testing.T) {
+		session, key := ts.CreateSession(func(s *user.SessionState) {
+			s.OrgID = "default"
+			s.AccessRights = map[string]user.AccessDefinition{
+				apiId: {APIID: apiId, Versions: []string{"v1"}},
+			}
+		})
+
+		session.MtlsStaticCertificateBindings = []string{"invalid-cert"}
+		sessionData := test.MarshalJSON(t)(session)
+
+		path := fmt.Sprintf("/tyk/keys/%s", key)
+		_, _ = ts.Run(t, []test.TestCase{
+			{Method: http.MethodPut, Path: path, Data: sessionData, AdminAuth: true, Code: 400},
+		}...)
+	})
+
+	t.Run("PUT with existing certs + new valid cert", func(t *testing.T) {
+		cert1Pem, _, _, _ := certs.GenCertificate(&x509.Certificate{}, false)
+		cert1ID, _ := ts.Gw.CertificateManager.Add(cert1Pem, "")
+		defer ts.Gw.CertificateManager.Delete(cert1ID, "")
+
+		cert2Pem, _, _, _ := certs.GenCertificate(&x509.Certificate{}, false)
+		cert2ID, _ := ts.Gw.CertificateManager.Add(cert2Pem, "")
+		defer ts.Gw.CertificateManager.Delete(cert2ID, "")
+
+		session, key := ts.CreateSession(func(s *user.SessionState) {
+			s.OrgID = "default"
+			s.MtlsStaticCertificateBindings = []string{cert1ID}
+			s.AccessRights = map[string]user.AccessDefinition{
+				apiId: {APIID: apiId, Versions: []string{"v1"}},
+			}
+		})
+
+		// Add new cert to existing bindings
+		session.MtlsStaticCertificateBindings = []string{cert1ID, cert2ID}
+		sessionData := test.MarshalJSON(t)(session)
+
+		path := fmt.Sprintf("/tyk/keys/%s", key)
+		_, _ = ts.Run(t, []test.TestCase{
+			{Method: http.MethodPut, Path: path, Data: sessionData, AdminAuth: true, Code: 200},
+		}...)
+	})
+
+	t.Run("PUT with existing certs + new invalid cert", func(t *testing.T) {
+		clientCertPem, _, _, _ := certs.GenCertificate(&x509.Certificate{}, false)
+		certID, _ := ts.Gw.CertificateManager.Add(clientCertPem, "")
+		defer ts.Gw.CertificateManager.Delete(certID, "")
+
+		session, key := ts.CreateSession(func(s *user.SessionState) {
+			s.OrgID = "default"
+			s.MtlsStaticCertificateBindings = []string{certID}
+			s.AccessRights = map[string]user.AccessDefinition{
+				apiId: {APIID: apiId, Versions: []string{"v1"}},
+			}
+		})
+
+		// Add invalid cert to existing bindings
+		session.MtlsStaticCertificateBindings = []string{certID, "invalid-new-cert"}
+		sessionData := test.MarshalJSON(t)(session)
+
+		path := fmt.Sprintf("/tyk/keys/%s", key)
+		_, _ = ts.Run(t, []test.TestCase{
+			{Method: http.MethodPut, Path: path, Data: sessionData, AdminAuth: true, Code: 400},
+		}...)
+	})
+
+	t.Run("PUT with only existing certs (no new certs)", func(t *testing.T) {
+		clientCertPem, _, _, _ := certs.GenCertificate(&x509.Certificate{}, false)
+		certID, _ := ts.Gw.CertificateManager.Add(clientCertPem, "")
+		defer ts.Gw.CertificateManager.Delete(certID, "")
+
+		session, key := ts.CreateSession(func(s *user.SessionState) {
+			s.OrgID = "default"
+			s.MtlsStaticCertificateBindings = []string{certID}
+			s.AccessRights = map[string]user.AccessDefinition{
+				apiId: {APIID: apiId, Versions: []string{"v1"}},
+			}
+		})
+
+		// No changes to bindings
+		session.MtlsStaticCertificateBindings = []string{certID}
+		sessionData := test.MarshalJSON(t)(session)
+
+		path := fmt.Sprintf("/tyk/keys/%s", key)
+		_, _ = ts.Run(t, []test.TestCase{
+			{Method: http.MethodPut, Path: path, Data: sessionData, AdminAuth: true, Code: 200},
+		}...)
+	})
+
+	t.Run("PUT removing a cert from bindings", func(t *testing.T) {
+		cert1Pem, _, _, _ := certs.GenCertificate(&x509.Certificate{}, false)
+		cert1ID, _ := ts.Gw.CertificateManager.Add(cert1Pem, "")
+		defer ts.Gw.CertificateManager.Delete(cert1ID, "")
+
+		cert2Pem, _, _, _ := certs.GenCertificate(&x509.Certificate{}, false)
+		cert2ID, _ := ts.Gw.CertificateManager.Add(cert2Pem, "")
+		defer ts.Gw.CertificateManager.Delete(cert2ID, "")
+
+		session, key := ts.CreateSession(func(s *user.SessionState) {
+			s.OrgID = "default"
+			s.MtlsStaticCertificateBindings = []string{cert1ID, cert2ID}
+			s.AccessRights = map[string]user.AccessDefinition{
+				apiId: {APIID: apiId, Versions: []string{"v1"}},
+			}
+		})
+
+		// Remove one cert from bindings
+		session.MtlsStaticCertificateBindings = []string{cert1ID}
+		sessionData := test.MarshalJSON(t)(session)
+
+		path := fmt.Sprintf("/tyk/keys/%s", key)
+		_, _ = ts.Run(t, []test.TestCase{
+			{Method: http.MethodPut, Path: path, Data: sessionData, AdminAuth: true, Code: 200},
+		}...)
+	})
+}
