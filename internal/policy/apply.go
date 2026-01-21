@@ -351,17 +351,11 @@ func (t *Service) applyPerAPI(policy user.Policy, session *user.SessionState, ri
 func (t *Service) policyIds(session *user.SessionState) []model.PolicyID {
 	ids := session.PolicyIDs()
 
-	switch {
-	case ids == nil:
+	if ids == nil {
 		return nil
-	case t.orgID == nil:
+	} else {
 		return lo.Map(session.PolicyIDs(), func(item string, _ int) model.PolicyID {
-			return model.NonScopedLastInsertedPolicyId(item)
-		})
-	default:
-		orgId := *t.orgID
-		return lo.Map(session.PolicyIDs(), func(item string, _ int) model.PolicyID {
-			return model.NewScopedCustomPolicyId(orgId, item)
+			return model.NewScopedCustomPolicyId(session.OrgID, item)
 		})
 	}
 }
