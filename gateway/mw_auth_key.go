@@ -71,7 +71,7 @@ func initAuthKeyErrors() {
 
 	TykErrors[ErrAuthCertMismatch] = config.TykError{
 		Message: MsgApiAccessDisallowed,
-		Code:    http.StatusUnauthorized,
+		Code:    http.StatusForbidden,
 	}
 }
 
@@ -119,6 +119,8 @@ func (k *AuthKey) ProcessRequest(_ http.ResponseWriter, r *http.Request, _ inter
 	var keyExists, updateSession bool
 	var certHash string
 	var session user.SessionState
+
+	session, keyExists = k.CheckSessionAndIdentityForValidKey(key, r)
 	if authConfig.UseCertificate && r.TLS != nil {
 		if len(r.TLS.PeerCertificates) > 0 {
 			if time.Now().After(r.TLS.PeerCertificates[0].NotAfter) {
