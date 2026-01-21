@@ -12,9 +12,11 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/header"
+	"github.com/TykTechnologies/tyk/internal/model"
 	"github.com/TykTechnologies/tyk/internal/uuid"
 	"github.com/TykTechnologies/tyk/test"
 	"github.com/TykTechnologies/tyk/user"
@@ -1350,4 +1352,134 @@ func TestLoadPoliciesFromDashboardLoadBalancerDrain(t *testing.T) {
 			assert.GreaterOrEqual(t, registrationCount, 1, tc.description+" - should re-register")
 		})
 	}
+}
+
+func TestOrganizationScopedPolicies(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	t.Run("Same policy ID in different organizations", func(t *testing.T) {
+		apiID1 := "api1"
+		apiID2 := "api2"
+
+		org1 := "org1"
+		org2 := "org2"
+
+		ts.Gw.BuildAndLoadAPI(
+			func(spec *APISpec) {
+				spec.APIID = apiID1
+				spec.UseKeylessAccess = false
+				spec.OrgID = org1
+				spec.Proxy.ListenPath = "/api1"
+			},
+			func(spec *APISpec) {
+				spec.APIID = apiID2
+				spec.UseKeylessAccess = false
+				spec.OrgID = org2
+				spec.Proxy.ListenPath = "/api2"
+			},
+		)
+
+		const sharedPolicyID = "shared-policy-id"
+
+		policy1 := user.Policy{
+			ID:    sharedPolicyID,
+			OrgID: org1,
+			AccessRights: map[string]user.AccessDefinition{
+				apiID1: {
+					APIID:    apiID1,
+					Versions: []string{"Default"},
+				},
+			},
+		}
+
+		policy2 := user.Policy{
+			ID:    sharedPolicyID,
+			OrgID: org2,
+			AccessRights: map[string]user.AccessDefinition{
+				apiID2: {
+					APIID:    apiID2,
+					Versions: []string{"Default"},
+				},
+			},
+		}
+
+		ts.Gw.policies.Add(policy1, policy2)
+
+		retrievedPolicy1, found1 := ts.Gw.policies.PolicyByID(model.NewScopedCustomPolicyId(org1, sharedPolicyID))
+		require.True(t, found1, "Policy for org1 should exist")
+		assert.Equal(t, org1, retrievedPolicy1.OrgID, "Policy should have correct org ID")
+		assert.Contains(t, retrievedPolicy1.AccessRights, apiID1, "Policy should have access to API 1")
+
+		retrievedPolicy2, found2 := ts.Gw.policies.PolicyByID(model.NewScopedCustomPolicyId(org2, sharedPolicyID))
+		require.True(t, found2, "Policy for org2 should exist")
+		assert.Equal(t, org2, retrievedPolicy2.OrgID, "Policy should have correct org ID")
+		assert.Contains(t, retrievedPolicy2.AccessRights, apiID2, "Policy should have access to API 2")
+
+		_, key1 := ts.CreateSession(func(s *user.SessionState) {
+			s.OrgID = org1
+			s.ApplyPolicies = []string{sharedPolicyID}
+		})
+
+		_, key2 := ts.CreateSession(func(s *user.SessionState) {
+			s.OrgID = org2
+			s.ApplyPolicies = []string{sharedPolicyID}
+		})
+
+		authHeaders1 := map[string]string{"authorization": key1}
+		authHeaders2 := map[string]string{"authorization": key2}
+
+		_, _ = ts.Run(t, test.TestCase{
+			Method:  http.MethodGet,
+			Path:    "/api1",
+			Headers: authHeaders1,
+			Code:    http.StatusOK,
+		})
+
+		_, _ = ts.Run(t, test.TestCase{
+			Method:  http.MethodGet,
+			Path:    "/api2",
+			Headers: authHeaders1,
+			Code:    http.StatusForbidden,
+		})
+
+		_, _ = ts.Run(t, test.TestCase{
+			Method:  http.MethodGet,
+			Path:    "/api1",
+			Headers: authHeaders2,
+			Code:    http.StatusForbidden,
+		})
+
+		_, _ = ts.Run(t, test.TestCase{
+			Method:  http.MethodGet,
+			Path:    "/api2",
+			Headers: authHeaders2,
+			Code:    http.StatusForbidden,
+		})
+
+		deleted := ts.Gw.policies.DeleteById(model.NewScopedCustomPolicyId(org1, sharedPolicyID))
+		assert.True(t, deleted, "Policy deletion should succeed")
+
+		_, found1 = ts.Gw.policies.PolicyByID(model.NewScopedCustomPolicyId(org1, sharedPolicyID))
+		assert.False(t, found1, "Policy for org1 should no longer exist")
+
+		_, found2 = ts.Gw.policies.PolicyByID(model.NewScopedCustomPolicyId(org2, sharedPolicyID))
+		assert.True(t, found2, "Policy for org2 should still exist")
+
+		// key 1 should no longer have access to API 1
+		_, _ = ts.Run(t, test.TestCase{
+			Method:  http.MethodGet,
+			Path:    "/api1",
+			Headers: authHeaders1,
+			Code:    http.StatusForbidden,
+		})
+
+		// key 2 should still have access to API 2
+		_, _ = ts.Run(t, test.TestCase{
+			Method:  http.MethodGet,
+			Path:    "/api2",
+			Headers: authHeaders2,
+			Code:    http.StatusOK,
+		})
+	})
 }
