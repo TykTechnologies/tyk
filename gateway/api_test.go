@@ -4414,20 +4414,20 @@ func TestValidateMtlsStaticCertificateBindings(t *testing.T) {
 		// Try to validate with wrong orgID
 		err = ts.Gw.validateMtlsStaticCertificateBindings([]string{certID}, "wrong-org-456")
 		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "Invalid certificate ID")
+		assert.Contains(t, err.Error(), "invalid certificate ID")
 	})
 
 	t.Run("Invalid certificate - path traversal attempt", func(t *testing.T) {
 		orgID := "test-org-123"
 		err := ts.Gw.validateMtlsStaticCertificateBindings([]string{"../../../../etc/passwd"}, orgID)
 		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "Invalid certificate ID")
+		assert.Contains(t, err.Error(), "invalid certificate ID")
 	})
 
 	t.Run("Invalid single certificate", func(t *testing.T) {
 		err := ts.Gw.validateMtlsStaticCertificateBindings([]string{"invalid-cert-id"}, "")
 		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "Certificate not found: invalid-cert-id")
+		assert.Contains(t, err.Error(), "certificate not found: invalid-cert-id")
 	})
 
 	t.Run("Invalid certificate in list", func(t *testing.T) {
@@ -4438,7 +4438,7 @@ func TestValidateMtlsStaticCertificateBindings(t *testing.T) {
 
 		err = ts.Gw.validateMtlsStaticCertificateBindings([]string{certID, "invalid-cert"}, "")
 		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "Certificate not found: invalid-cert")
+		assert.Contains(t, err.Error(), "certificate not found: invalid-cert")
 	})
 
 	t.Run("Empty array", func(t *testing.T) {
