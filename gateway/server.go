@@ -26,35 +26,24 @@ import (
 	texttemplate "text/template"
 	"time"
 
-	"github.com/rs/cors"
-	"github.com/samber/lo"
-
-	"github.com/TykTechnologies/tyk/tcp"
-	"github.com/TykTechnologies/tyk/trace"
-
 	logstashhook "github.com/bshuster-repo/logrus-logstash-hook"
 	logrussentry "github.com/evalphobia/logrus_sentry"
 	grayloghook "github.com/gemnasium/logrus-graylog-hook"
 	"github.com/gorilla/mux"
 	"github.com/lonelycode/osin"
+	"github.com/rs/cors"
+	"github.com/samber/lo"
 	"github.com/sirupsen/logrus"
 	logrussyslog "github.com/sirupsen/logrus/hooks/syslog"
-
-	"github.com/TykTechnologies/tyk/internal/crypto"
-	"github.com/TykTechnologies/tyk/internal/httputil"
-	"github.com/TykTechnologies/tyk/internal/otel"
-	"github.com/TykTechnologies/tyk/internal/scheduler"
-	"github.com/TykTechnologies/tyk/test"
-
-	"github.com/TykTechnologies/tyk/internal/uuid"
 
 	"github.com/TykTechnologies/again"
 	"github.com/TykTechnologies/drl"
 	gas "github.com/TykTechnologies/goautosocket"
 	"github.com/TykTechnologies/gorpc"
 	"github.com/TykTechnologies/goverify"
-	"github.com/TykTechnologies/tyk-pump/serializer"
+	persistentmodel "github.com/TykTechnologies/storage/persistent/model"
 
+	"github.com/TykTechnologies/tyk-pump/serializer"
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/certs"
 	"github.com/TykTechnologies/tyk/checkup"
@@ -62,18 +51,25 @@ import (
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/dnscache"
 	"github.com/TykTechnologies/tyk/header"
+	"github.com/TykTechnologies/tyk/internal/cache"
+	"github.com/TykTechnologies/tyk/internal/crypto"
+	"github.com/TykTechnologies/tyk/internal/httputil"
+	"github.com/TykTechnologies/tyk/internal/model"
+	"github.com/TykTechnologies/tyk/internal/netutil"
+	"github.com/TykTechnologies/tyk/internal/otel"
+	"github.com/TykTechnologies/tyk/internal/scheduler"
+	"github.com/TykTechnologies/tyk/internal/service/newrelic"
+	"github.com/TykTechnologies/tyk/internal/uuid"
 	logger "github.com/TykTechnologies/tyk/log"
 	"github.com/TykTechnologies/tyk/regexp"
+	"github.com/TykTechnologies/tyk/request"
 	"github.com/TykTechnologies/tyk/rpc"
 	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/storage/kv"
+	"github.com/TykTechnologies/tyk/tcp"
+	"github.com/TykTechnologies/tyk/test"
+	"github.com/TykTechnologies/tyk/trace"
 	"github.com/TykTechnologies/tyk/user"
-
-	"github.com/TykTechnologies/tyk/internal/cache"
-	"github.com/TykTechnologies/tyk/internal/model"
-	"github.com/TykTechnologies/tyk/internal/netutil"
-	"github.com/TykTechnologies/tyk/internal/service/newrelic"
-	"github.com/TykTechnologies/tyk/request"
 )
 
 var (
@@ -160,8 +156,7 @@ type Gateway struct {
 	apisByID        map[string]*APISpec
 	apisHandlesByID *sync.Map
 
-	policiesMu   sync.RWMutex
-	policiesByID map[string]user.Policy
+	policies *model.Policies
 
 	dnsCacheManager dnscache.IDnsCacheManager
 
@@ -240,7 +235,15 @@ func NewGateway(config config.Config, ctx context.Context) *Gateway {
 	gw.apisByID = map[string]*APISpec{}
 	gw.apisHandlesByID = new(sync.Map)
 
-	gw.policiesByID = make(map[string]user.Policy)
+	gw.policies = model.NewPolicies(
+		model.WithInternalCollision(func(customId string, ids []persistentmodel.ObjectID) {
+			log.Warnf(
+				"Policies should not share the same ID. %q is used for multiple policies: %q.",
+				customId,
+				ids,
+			)
+		}),
+	)
 
 	// reload
 	gw.reloadQueue = make(chan func())
@@ -617,12 +620,12 @@ func (gw *Gateway) syncAPISpecs() (int, error) {
 }
 
 func (gw *Gateway) syncPolicies() (count int, err error) {
-	var pols map[string]user.Policy
+	var pols []user.Policy
 
 	mainLog.Info("Loading policies")
 
 	switch gw.GetConfig().Policies.PolicySource {
-	case "service":
+	case config.PolicySourceService:
 		if gw.GetConfig().Policies.PolicyConnectionString == "" {
 			mainLog.Fatal("No connection string or node ID present. Failing.")
 		}
@@ -632,7 +635,7 @@ func (gw *Gateway) syncPolicies() (count int, err error) {
 		mainLog.Info("Using Policies from Dashboard Service")
 
 		pols, err = gw.LoadPoliciesFromDashboard(connStr, gw.GetConfig().NodeSecret)
-	case "rpc":
+	case config.PolicySourceRpc:
 		mainLog.Debug("Using Policies from RPC")
 		dataLoader := &RPCStorageHandler{
 			Gw:       gw,
@@ -643,7 +646,6 @@ func (gw *Gateway) syncPolicies() (count int, err error) {
 		//if policy path defined we want to allow use of the REST API
 		if gw.GetConfig().Policies.PolicyPath != "" {
 			pols, err = LoadPoliciesFromDir(gw.GetConfig().Policies.PolicyPath)
-
 		} else if gw.GetConfig().Policies.PolicyRecordName == "" {
 			// old way of doing things before REST Api added
 			// this is the only case now where we need a policy record name
@@ -654,17 +656,15 @@ func (gw *Gateway) syncPolicies() (count int, err error) {
 		}
 	}
 	mainLog.Infof("Policies found (%d total):", len(pols))
-	for id := range pols {
-		mainLog.Debugf(" - %s", id)
+	for _, pol := range pols {
+		mainLog.Debugf(" - %s", pol.ID)
 	}
 
 	if err != nil {
 		return len(pols), err
 	}
 
-	gw.policiesMu.Lock()
-	defer gw.policiesMu.Unlock()
-	gw.policiesByID = pols
+	gw.policies.Reload(pols...)
 
 	return len(pols), nil
 }

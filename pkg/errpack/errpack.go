@@ -8,6 +8,7 @@ var (
 	TypeApp            = Type{typ: "app"}
 	TypeInfrastructure = Type{typ: "infrastructure"}
 	TypeNotFound       = Type{typ: "notfound"}
+	BrokenInvariant    = Type{typ: "broken-invariant"}
 )
 
 var (
