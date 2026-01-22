@@ -2,6 +2,7 @@ package compression
 
 import (
 	"bytes"
+	"errors"
 	"sync"
 
 	"github.com/klauspost/compress/zstd"
@@ -21,7 +22,8 @@ var (
 		New: func() interface{} {
 			encoder, err := zstd.NewWriter(nil)
 			if err != nil {
-				log.WithError(err).Panic("Failed to create Zstd encoder")
+				log.WithError(err).Error("Failed to create Zstd encoder")
+				return nil
 			}
 			return encoder
 		},
@@ -31,7 +33,8 @@ var (
 		New: func() interface{} {
 			decoder, err := zstd.NewReader(nil, zstd.WithDecoderMaxMemory(maxDecompressedSize))
 			if err != nil {
-				log.WithError(err).Panic("Failed to create Zstd decoder")
+				log.WithError(err).Error("Failed to create Zstd decoder")
+				return nil
 			}
 			return decoder
 		},
@@ -39,9 +42,17 @@ var (
 )
 
 // CompressZstd compresses data using Zstd compression
-// Returns the compressed data and logs compression statistics
-func CompressZstd(data []byte) []byte {
-	encoder := encoderPool.Get().(*zstd.Encoder)
+// Returns the compressed data and an error if compression fails
+func CompressZstd(data []byte) ([]byte, error) {
+	encoderInterface := encoderPool.Get()
+	if encoderInterface == nil {
+		return nil, errors.New("failed to get Zstd encoder from pool")
+	}
+
+	encoder, ok := encoderInterface.(*zstd.Encoder)
+	if !ok {
+		return nil, errors.New("invalid encoder type in pool")
+	}
 	defer encoderPool.Put(encoder)
 
 	compressed := encoder.EncodeAll(data, make([]byte, 0, len(data)))
@@ -56,12 +67,20 @@ func CompressZstd(data []byte) []byte {
 		"compression_ratio": compressionRatio,
 	}).Debug("Data compressed with Zstd")
 
-	return compressed
+	return compressed, nil
 }
 
 // DecompressZstd decompresses Zstd-compressed data
 func DecompressZstd(data []byte) ([]byte, error) {
-	decoder := decoderPool.Get().(*zstd.Decoder)
+	decoderInterface := decoderPool.Get()
+	if decoderInterface == nil {
+		return nil, errors.New("failed to get Zstd decoder from pool")
+	}
+
+	decoder, ok := decoderInterface.(*zstd.Decoder)
+	if !ok {
+		return nil, errors.New("invalid decoder type in pool")
+	}
 	defer decoderPool.Put(decoder)
 
 	decompressed, err := decoder.DecodeAll(data, nil)

@@ -4,9 +4,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/TykTechnologies/tyk/config"
-
 	persistentmodel "github.com/TykTechnologies/storage/persistent/model"
+
+	"github.com/TykTechnologies/tyk/config"
 )
 
 func TestSaveRPCDefinitionsBackup(t *testing.T) {

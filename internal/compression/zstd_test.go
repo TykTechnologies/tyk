@@ -35,7 +35,16 @@ func TestCompressZstd(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			compressed := CompressZstd([]byte(tt.input))
+			compressed, err := CompressZstd([]byte(tt.input))
+
+			if (err != nil) != tt.wantErr {
+				t.Errorf("CompressZstd() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+
+			if err != nil {
+				return
+			}
 
 			// For empty input, compressed data might also be empty or very small
 			if len(tt.input) == 0 {
@@ -81,7 +90,10 @@ func TestDecompressZstd(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			compressed := CompressZstd([]byte(tt.input))
+			compressed, err := CompressZstd([]byte(tt.input))
+			if err != nil {
+				t.Fatalf("CompressZstd failed: %v", err)
+			}
 
 			decompressed, err := DecompressZstd(compressed)
 
@@ -159,7 +171,10 @@ func TestCompressDecompressRoundTrip(t *testing.T) {
 	}
 
 	// Compress
-	compressed := CompressZstd(jsonData)
+	compressed, err := CompressZstd(jsonData)
+	if err != nil {
+		t.Fatalf("CompressZstd failed: %v", err)
+	}
 
 	// Verify compression reduced size
 	if len(compressed) >= len(jsonData) {
@@ -201,7 +216,10 @@ func TestCompressionRatio(t *testing.T) {
 		}
 	}`
 
-	compressed := CompressZstd([]byte(largeJSON))
+	compressed, err := CompressZstd([]byte(largeJSON))
+	if err != nil {
+		t.Fatalf("CompressZstd failed: %v", err)
+	}
 
 	originalSize := len(largeJSON)
 	compressedSize := len(compressed)
@@ -268,7 +286,10 @@ func TestIsZstdCompressed(t *testing.T) {
 func TestIsZstdCompressed_WithActualCompressedData(t *testing.T) {
 	// Test with actual compressed data
 	original := []byte(`{"api_id":"test","name":"Test API"}`)
-	compressed := CompressZstd(original)
+	compressed, err := CompressZstd(original)
+	if err != nil {
+		t.Fatalf("CompressZstd failed: %v", err)
+	}
 
 	// Verify compressed data has magic bytes
 	if !IsZstdCompressed(compressed) {
