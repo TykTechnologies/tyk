@@ -128,7 +128,7 @@ func (gw *Gateway) validateMtlsStaticCertificateBindings(certIDs []string, orgID
 	// Certificate IDs follow the pattern: orgID + sha256hash
 	for _, certID := range certIDs {
 		if orgID != "" && !strings.HasPrefix(certID, orgID) {
-			return fmt.Errorf("Invalid certificate ID: %s", certID)
+			return fmt.Errorf("invalid certificate ID: %s", certID)
 		}
 	}
 
@@ -140,7 +140,7 @@ func (gw *Gateway) validateMtlsStaticCertificateBindings(certIDs []string, orgID
 	// Pattern from cert.go:607-612
 	for i, cert := range certificates {
 		if cert == nil {
-			return fmt.Errorf("Certificate not found: %s", certIDs[i])
+			return fmt.Errorf("certificate not found: %s", certIDs[i])
 		}
 	}
 
