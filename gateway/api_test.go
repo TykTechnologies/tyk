@@ -4542,9 +4542,9 @@ func TestUpdateKeyWithMtlsStaticCertificateBindings(t *testing.T) {
 
 	t.Run("POST with valid bindings", func(t *testing.T) {
 		clientCertPem, _, _, _ := certs.GenCertificate(&x509.Certificate{}, false)
-		certID, err := ts.Gw.CertificateManager.Add(clientCertPem, "")
+		certID, err := ts.Gw.CertificateManager.Add(clientCertPem, "default")
 		require.NoError(t, err)
-		defer ts.Gw.CertificateManager.Delete(certID, "")
+		defer ts.Gw.CertificateManager.Delete(certID, "default")
 
 		session := user.SessionState{
 			OrgID:                         "default",
@@ -4562,9 +4562,9 @@ func TestUpdateKeyWithMtlsStaticCertificateBindings(t *testing.T) {
 
 	t.Run("PUT with valid bindings", func(t *testing.T) {
 		clientCertPem, _, _, _ := certs.GenCertificate(&x509.Certificate{}, false)
-		certID, err := ts.Gw.CertificateManager.Add(clientCertPem, "")
+		certID, err := ts.Gw.CertificateManager.Add(clientCertPem, "default")
 		require.NoError(t, err)
-		defer ts.Gw.CertificateManager.Delete(certID, "")
+		defer ts.Gw.CertificateManager.Delete(certID, "default")
 
 		session, key := ts.CreateSession(func(s *user.SessionState) {
 			s.OrgID = "default"
@@ -4616,14 +4616,14 @@ func TestUpdateKeyWithMtlsStaticCertificateBindings(t *testing.T) {
 
 	t.Run("PUT with existing certs + new valid cert", func(t *testing.T) {
 		cert1Pem, _, _, _ := certs.GenCertificate(&x509.Certificate{}, false)
-		cert1ID, err := ts.Gw.CertificateManager.Add(cert1Pem, "")
+		cert1ID, err := ts.Gw.CertificateManager.Add(cert1Pem, "default")
 		require.NoError(t, err)
-		defer ts.Gw.CertificateManager.Delete(cert1ID, "")
+		defer ts.Gw.CertificateManager.Delete(cert1ID, "default")
 
 		cert2Pem, _, _, _ := certs.GenCertificate(&x509.Certificate{}, false)
-		cert2ID, err := ts.Gw.CertificateManager.Add(cert2Pem, "")
+		cert2ID, err := ts.Gw.CertificateManager.Add(cert2Pem, "default")
 		require.NoError(t, err)
-		defer ts.Gw.CertificateManager.Delete(cert2ID, "")
+		defer ts.Gw.CertificateManager.Delete(cert2ID, "default")
 
 		session, key := ts.CreateSession(func(s *user.SessionState) {
 			s.OrgID = "default"
@@ -4645,9 +4645,9 @@ func TestUpdateKeyWithMtlsStaticCertificateBindings(t *testing.T) {
 
 	t.Run("PUT with existing certs + new invalid cert", func(t *testing.T) {
 		clientCertPem, _, _, _ := certs.GenCertificate(&x509.Certificate{}, false)
-		certID, err := ts.Gw.CertificateManager.Add(clientCertPem, "")
+		certID, err := ts.Gw.CertificateManager.Add(clientCertPem, "default")
 		require.NoError(t, err)
-		defer ts.Gw.CertificateManager.Delete(certID, "")
+		defer ts.Gw.CertificateManager.Delete(certID, "default")
 
 		session, key := ts.CreateSession(func(s *user.SessionState) {
 			s.OrgID = "default"
@@ -4669,9 +4669,9 @@ func TestUpdateKeyWithMtlsStaticCertificateBindings(t *testing.T) {
 
 	t.Run("PUT with only existing certs (no new certs)", func(t *testing.T) {
 		clientCertPem, _, _, _ := certs.GenCertificate(&x509.Certificate{}, false)
-		certID, err := ts.Gw.CertificateManager.Add(clientCertPem, "")
+		certID, err := ts.Gw.CertificateManager.Add(clientCertPem, "default")
 		require.NoError(t, err)
-		defer ts.Gw.CertificateManager.Delete(certID, "")
+		defer ts.Gw.CertificateManager.Delete(certID, "default")
 
 		session, key := ts.CreateSession(func(s *user.SessionState) {
 			s.OrgID = "default"
@@ -4693,14 +4693,14 @@ func TestUpdateKeyWithMtlsStaticCertificateBindings(t *testing.T) {
 
 	t.Run("PUT removing a cert from bindings", func(t *testing.T) {
 		cert1Pem, _, _, _ := certs.GenCertificate(&x509.Certificate{}, false)
-		cert1ID, err := ts.Gw.CertificateManager.Add(cert1Pem, "")
+		cert1ID, err := ts.Gw.CertificateManager.Add(cert1Pem, "default")
 		require.NoError(t, err)
-		defer ts.Gw.CertificateManager.Delete(cert1ID, "")
+		defer ts.Gw.CertificateManager.Delete(cert1ID, "default")
 
 		cert2Pem, _, _, _ := certs.GenCertificate(&x509.Certificate{}, false)
-		cert2ID, err := ts.Gw.CertificateManager.Add(cert2Pem, "")
+		cert2ID, err := ts.Gw.CertificateManager.Add(cert2Pem, "default")
 		require.NoError(t, err)
-		defer ts.Gw.CertificateManager.Delete(cert2ID, "")
+		defer ts.Gw.CertificateManager.Delete(cert2ID, "default")
 
 		session, key := ts.CreateSession(func(s *user.SessionState) {
 			s.OrgID = "default"
