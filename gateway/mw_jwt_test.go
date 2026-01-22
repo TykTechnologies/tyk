@@ -2386,7 +2386,7 @@ func TestJWKSCache_InvalidateCacheForAPI(t *testing.T) {
 	})
 
 	// The previous request fills the cache with some entries
-	jwkCache := loadOrCreateJWKCacheByApiID(spec.APIID)
+	jwkCache := ts.Gw.loadOrCreateJWKCacheByApiID(spec.APIID)
 	assert.True(t, jwkCache.Count() > 0)
 
 	ts.Run(t, test.TestCase{
@@ -2396,7 +2396,7 @@ func TestJWKSCache_InvalidateCacheForAPI(t *testing.T) {
 		Code:      http.StatusOK,
 	})
 
-	jwkCache = loadOrCreateJWKCacheByApiID(spec.APIID)
+	jwkCache = ts.Gw.loadOrCreateJWKCacheByApiID(spec.APIID)
 	assert.Equal(t, 0, jwkCache.Count())
 }
 
@@ -2415,7 +2415,7 @@ func TestJWKSCache_InvalidateJWKSCache(t *testing.T) {
 	})
 
 	// The previous request populates the cache with some entries
-	jwkCache := loadOrCreateJWKCacheByApiID(spec.APIID)
+	jwkCache := ts.Gw.loadOrCreateJWKCacheByApiID(spec.APIID)
 	assert.True(t, jwkCache.Count() > 0)
 
 	ts.Run(t, test.TestCase{
@@ -2425,7 +2425,7 @@ func TestJWKSCache_InvalidateJWKSCache(t *testing.T) {
 		Code:      http.StatusOK,
 	})
 
-	jwkCache = loadOrCreateJWKCacheByApiID(spec.APIID)
+	jwkCache = ts.Gw.loadOrCreateJWKCacheByApiID(spec.APIID)
 	assert.Equal(t, 0, jwkCache.Count())
 }
 
@@ -2447,7 +2447,7 @@ func Test_NoticeInvalidateJWKSCacheForAPI(t *testing.T) {
 	assert.Nil(t, err)
 
 	// The previous request should have filled the cache with some entries
-	jwkCache := loadOrCreateJWKCacheByApiID(spec.APIID)
+	jwkCache := ts.Gw.loadOrCreateJWKCacheByApiID(spec.APIID)
 	assert.True(t, jwkCache.Count() > 0)
 
 	// Emit event
@@ -2459,7 +2459,7 @@ func Test_NoticeInvalidateJWKSCacheForAPI(t *testing.T) {
 	ts.Gw.MainNotifier.Notify(n)
 
 	require.Eventuallyf(t, func() bool {
-		jwkCache = loadOrCreateJWKCacheByApiID(spec.APIID)
+		jwkCache = ts.Gw.loadOrCreateJWKCacheByApiID(spec.APIID)
 		return jwkCache.Count() == 0
 	}, 5*time.Second, 100*time.Millisecond, "JWKS cache could not be flushed")
 }
@@ -2488,7 +2488,7 @@ func Test_NoticeInvalidateJWKSCacheForAPI_With_RPC_Listener(t *testing.T) {
 	assert.Nil(t, err)
 
 	// The previous request should have filled the cache with some entries
-	jwkCache := loadOrCreateJWKCacheByApiID(spec.APIID)
+	jwkCache := ts.Gw.loadOrCreateJWKCacheByApiID(spec.APIID)
 	assert.True(t, jwkCache.Count() > 0)
 
 	jwksFlushEventBuilder := func(apiID string) string {
@@ -2499,7 +2499,7 @@ func Test_NoticeInvalidateJWKSCacheForAPI_With_RPC_Listener(t *testing.T) {
 
 	// Should be empty after the event
 	require.Eventuallyf(t, func() bool {
-		jwkCache = loadOrCreateJWKCacheByApiID(spec.APIID)
+		jwkCache = ts.Gw.loadOrCreateJWKCacheByApiID(spec.APIID)
 		return jwkCache.Count() == 0
 	}, 5*time.Second, 100*time.Millisecond, "JWKS cache could not be flushed")
 }
@@ -2512,7 +2512,7 @@ func TestJWTSessionRSAWithEncodedJWK(t *testing.T) {
 
 	authHeaders := map[string]string{"authorization": jwtToken}
 	flush := func() {
-		JWKCaches.Delete(spec.APIID)
+		ts.Gw.apiJWKCaches.Delete(spec.APIID)
 	}
 	t.Run("Direct JWK URL", func(t *testing.T) {
 		spec.JWTSource = testHttpJWK
@@ -3678,7 +3678,7 @@ func TestJWTMiddleware_InitThenUnload(t *testing.T) {
 	m.Init()
 	var numberOfCachedJWKItems = 0
 	for i := 0; i < 10; i++ {
-		jwkCache := loadOrCreateJWKCacheByApiID(api.APIID)
+		jwkCache := ts.Gw.loadOrCreateJWKCacheByApiID(api.APIID)
 		numberOfCachedJWKItems = jwkCache.Count()
 		if numberOfCachedJWKItems == 1 {
 			break
@@ -3694,7 +3694,7 @@ func TestJWTMiddleware_InitThenUnload(t *testing.T) {
 	// the cache when an API is removed.
 	t.Run("Unload", func(t *testing.T) {
 		m.Unload()
-		jwkCache := loadOrCreateJWKCacheByApiID(api.APIID)
+		jwkCache := ts.Gw.loadOrCreateJWKCacheByApiID(api.APIID)
 		assert.Equal(t, 0, jwkCache.Count())
 	})
 }
@@ -3795,7 +3795,7 @@ func TestGetSecretFromMultipleJWKURIs(t *testing.T) {
 					}, nil
 				}
 
-				jwkCache := loadOrCreateJWKCacheByApiID(api.APIID)
+				jwkCache := gw.loadOrCreateJWKCacheByApiID(api.APIID)
 				jwkCache.Set(cacheKey, &apidef.APIDefinition{
 					APIID:       testAPIID,
 					JWTJwksURIs: []apidef.JWK{{URL: testJWKURL}},
@@ -3826,7 +3826,7 @@ func TestGetSecretFromMultipleJWKURIs(t *testing.T) {
 					}, nil
 				}
 
-				jwkCache := loadOrCreateJWKCacheByApiID(api.APIID)
+				jwkCache := gw.loadOrCreateJWKCacheByApiID(api.APIID)
 				jwkCache.Set(testAPIID, "invalid-format", cache.DefaultExpiration)
 				jwkCache.Set(cacheKey, &apidef.APIDefinition{
 					APIID:       testAPIID,
@@ -3844,7 +3844,7 @@ func TestGetSecretFromMultipleJWKURIs(t *testing.T) {
 			setup: func(isOas bool) {
 				api.IsOAS = isOas
 
-				jwkCache := loadOrCreateJWKCacheByApiID(api.APIID)
+				jwkCache := gw.loadOrCreateJWKCacheByApiID(api.APIID)
 				jwkCache.Set(cacheKey, &apidef.APIDefinition{
 					APIID:     testAPIID,
 					JWTSource: "not-valid-base-64!!",
@@ -3870,7 +3870,7 @@ func TestGetSecretFromMultipleJWKURIs(t *testing.T) {
 					}, nil
 				}
 
-				jwkCache := loadOrCreateJWKCacheByApiID(api.APIID)
+				jwkCache := gw.loadOrCreateJWKCacheByApiID(api.APIID)
 				jwkCache.Set(cacheKey, &apidef.APIDefinition{
 					APIID: testAPIID,
 					JWTJwksURIs: []apidef.JWK{
@@ -3914,7 +3914,7 @@ func TestGetSecretFromMultipleJWKURIs(t *testing.T) {
 					return nil, errors.New("failed to fetch JWK")
 				}
 
-				jwkCache := loadOrCreateJWKCacheByApiID(api.APIID)
+				jwkCache := gw.loadOrCreateJWKCacheByApiID(api.APIID)
 				jwkCache.Set(cacheKey, &apidef.APIDefinition{
 					APIID: testAPIID,
 					JWTJwksURIs: []apidef.JWK{
@@ -3939,7 +3939,7 @@ func TestGetSecretFromMultipleJWKURIs(t *testing.T) {
 					return nil, errors.New("failed to fetch JWK")
 				}
 
-				jwkCache := loadOrCreateJWKCacheByApiID(api.APIID)
+				jwkCache := gw.loadOrCreateJWKCacheByApiID(api.APIID)
 				jwkCache.Set(cacheKey, &apidef.APIDefinition{
 					APIID:     testAPIID,
 					JWTSource: encodedTestJWKURL,
@@ -3980,7 +3980,7 @@ func TestGetSecretFromMultipleJWKURIs(t *testing.T) {
 						},
 					}, nil
 				}
-				jwkCache := loadOrCreateJWKCacheByApiID(api.APIID)
+				jwkCache := gw.loadOrCreateJWKCacheByApiID(api.APIID)
 				jwkCache.Set(testAPIID, "invalid-format", cache.DefaultExpiration)
 				jwkCache.Set(cacheKey, &apidef.APIDefinition{
 					APIID:       testAPIID,

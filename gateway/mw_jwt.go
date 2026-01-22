@@ -12,7 +12,6 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/google/go-cmp/cmp"
@@ -34,8 +33,6 @@ import (
 type JWTMiddleware struct {
 	*BaseMiddleware
 }
-
-var JWKCaches = sync.Map{}
 
 const (
 	KID       = "kid"
@@ -76,8 +73,8 @@ func (k *JWTMiddleware) Init() {
 		go func() {
 			k.Logger().Debug("Pre-fetching JWKs asynchronously")
 			// Drop the previous cache for the API ID
-			JWKCaches.Delete(k.Spec.APIID)
-			jwkCache := loadOrCreateJWKCacheByApiID(k.Spec.APIID)
+			k.Gw.apiJWKCaches.Delete(k.Spec.APIID)
+			jwkCache := k.Gw.loadOrCreateJWKCacheByApiID(k.Spec.APIID)
 
 			// Create client factory for JWK fetching
 			clientFactory := NewExternalHTTPClientFactory(k.Gw)
@@ -114,7 +111,7 @@ func (k *JWTMiddleware) Unload() {
 	spec := k.Gw.getApiSpec(k.Spec.APIID)
 	if spec == nil {
 		// Drop the cache for API ID if it's removed from Tyk
-		JWKCaches.Delete(k.Spec.APIID)
+		k.Gw.apiJWKCaches.Delete(k.Spec.APIID)
 	}
 }
 
@@ -123,17 +120,7 @@ func (k *JWTMiddleware) EnabledForSpec() bool {
 }
 
 func (k *JWTMiddleware) loadOrCreateJWKCache() cache.Repository {
-	return loadOrCreateJWKCacheByApiID(k.Spec.APIID)
-}
-
-func loadOrCreateJWKCacheByApiID(apiID string) cache.Repository {
-	raw, _ := JWKCaches.LoadOrStore(apiID, cache.New(240, 30))
-	jwkCache, ok := raw.(cache.Repository)
-	if !ok {
-		// This should not be possible
-		panic("JWKCache instance must implement cache.Repository")
-	}
-	return jwkCache
+	return k.Gw.loadOrCreateJWKCacheByApiID(k.Spec.APIID)
 }
 
 type JWK struct {
@@ -1596,8 +1583,8 @@ func getUserIDFromClaim(claims jwt.MapClaims, identityBaseField string, shouldFa
 	return "", ErrNoSuitableUserIDClaimFound
 }
 
-func invalidateJWKSCacheByAPIID(apiID string) {
-	raw, ok := JWKCaches.Load(apiID)
+func (gw *Gateway) invalidateJWKSCacheByAPIID(apiID string) {
+	raw, ok := gw.apiJWKCaches.Load(apiID)
 	if ok {
 		jwkCache, interfaceOK := raw.(cache.Repository)
 		if !interfaceOK {
@@ -1610,14 +1597,27 @@ func invalidateJWKSCacheByAPIID(apiID string) {
 
 func (gw *Gateway) invalidateJWKSCacheForAPIID(w http.ResponseWriter, r *http.Request) {
 	apiID := mux.Vars(r)["apiID"]
-	invalidateJWKSCacheByAPIID(apiID)
+	gw.invalidateJWKSCacheByAPIID(apiID)
 	// Cache invalidation is idempotent: calling it ensures the key is absent,
 	// regardless of whether it was cached before or not.
 	doJSONWrite(w, http.StatusOK, apiOk("cache invalidated"))
 }
 
 func (gw *Gateway) invalidateJWKSCacheForAllAPIs(w http.ResponseWriter, _ *http.Request) {
-	JWKCaches.Clear()
+	gw.apiJWKCaches.Clear()
 
 	doJSONWrite(w, http.StatusOK, apiOk("cache invalidated"))
+}
+
+func (gw *Gateway) loadOrCreateJWKCacheByApiID(apiID string) cache.Repository {
+	//
+
+	raw, _ := gw.apiJWKCaches.LoadOrStore(apiID, buildJWKSCache(gw.GetConfig()))
+
+	jwkCache, ok := raw.(cache.Repository)
+	if !ok {
+		// This should not be possible
+		panic("JWKCache instance must implement cache.Repository")
+	}
+	return jwkCache
 }
