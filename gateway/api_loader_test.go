@@ -11,9 +11,13 @@ import (
 	_ "path"
 	"reflect"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"testing"
+	"time"
 
+	"github.com/gorilla/mux"
+	nr "github.com/newrelic/go-agent/v3/newrelic"
 	"github.com/stretchr/testify/assert"
 
 	persistentmodel "github.com/TykTechnologies/storage/persistent/model"
@@ -9645,4 +9649,83 @@ func TestEnforceOrgDataAgeIfQuotasEnabled(t *testing.T) {
 			assert.Equal(t, tc.expectedEnforceOrgDataAge, spec.GlobalConfig.EnforceOrgDataAge)
 		})
 	}
+}
+
+func TestNewRelicMounting(t *testing.T) {
+	mwExecuted := make(chan bool, 1)
+
+	dummyHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		txn := nr.FromContext(r.Context())
+		if txn != nil {
+			mwExecuted <- true
+		} else {
+			mwExecuted <- false
+		}
+		w.WriteHeader(http.StatusOK)
+	})
+
+	muxer := &proxyMux{}
+
+	conf := &config.Config{
+		ListenPort: 8080,
+		HttpServerOptions: config.HttpServerOptionsConfig{
+			EnableStrictRoutes: false,
+		},
+	}
+
+	cleanRouter := mux.NewRouter()
+
+	muxer.setRouter(8080, "http", cleanRouter, *conf)
+
+	gw := &Gateway{
+		apisByID:        make(map[string]*APISpec),
+		apisHandlesByID: new(sync.Map),
+		DefaultProxyMux: muxer,
+	}
+
+	gw.config.Store(*conf)
+
+	app, err := nr.NewApplication(
+		nr.ConfigAppName("TestApp"),
+		nr.ConfigLicense("1234567890123456789012345678901234567890"),
+		nr.ConfigDistributedTracerEnabled(true),
+		nr.ConfigEnabled(false),
+	)
+	assert.NoError(t, err)
+	gw.NewRelicApplication = app
+
+	spec := &APISpec{
+		APIDefinition: &apidef.APIDefinition{
+			APIID:            "test-fix",
+			Name:             "Fix Test",
+			Protocol:         "http",
+			Active:           true,
+			UseKeylessAccess: true,
+			Proxy: apidef.ProxyConfig{
+				ListenPath: "/fix-test/",
+				TargetURL:  "http://mock",
+			},
+		},
+	}
+	gw.apisByID[spec.APIID] = spec
+	gw.apisHandlesByID.Store(spec.APIID, &ChainObject{
+		ThisHandler: dummyHandler,
+	})
+
+	_, err = gw.loadHTTPService(spec, map[string]int{}, nil, muxer)
+	assert.NoError(t, err)
+
+	t.Run("Reused Router should have New Relic Middleware", func(t *testing.T) {
+		req := httptest.NewRequest("GET", "/fix-test/", nil)
+		w := httptest.NewRecorder()
+
+		cleanRouter.ServeHTTP(w, req)
+
+		select {
+		case success := <-mwExecuted:
+			assert.True(t, success, "FAILURE: New Relic middleware was NOT added to the reused router")
+		case <-time.After(1 * time.Second):
+			t.Fatal("FAILURE: Timeout - Middleware did not execute")
+		}
+	})
 }
