@@ -17,6 +17,105 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+// createBaseOAS creates a minimal valid OAS object with specified version
+func createBaseOAS(version string, title string) *OAS {
+	return &OAS{
+		T: openapi3.T{
+			OpenAPI: version,
+			Info: &openapi3.Info{
+				Title:   title,
+				Version: "1.0.0",
+			},
+			Paths: openapi3.NewPaths(),
+		},
+	}
+}
+
+// addPostOperationWithRequestBodySchema adds a POST operation with a request body containing a specific schema
+func addPostOperationWithRequestBodySchema(oas *OAS, path string, schema *openapi3.Schema) {
+	if oas.Paths == nil {
+		oas.Paths = openapi3.NewPaths()
+	}
+
+	pathItem := &openapi3.PathItem{
+		Post: &openapi3.Operation{
+			OperationID: "testOperation",
+			RequestBody: &openapi3.RequestBodyRef{
+				Value: &openapi3.RequestBody{
+					Required: true,
+					Content: openapi3.Content{
+						"application/json": &openapi3.MediaType{
+							Schema: &openapi3.SchemaRef{
+								Value: schema,
+							},
+						},
+					},
+				},
+			},
+			Responses: openapi3.NewResponses(),
+		},
+	}
+
+	// Add a minimal valid response
+	pathItem.Post.Responses.Set("200", &openapi3.ResponseRef{
+		Value: &openapi3.Response{
+			Description: getStrPointer("Success"),
+		},
+	})
+
+	oas.Paths.Set(path, pathItem)
+}
+
+// addGetOperationWithResponseSchema adds a GET operation with a response body containing a specific schema
+func addGetOperationWithResponseSchema(oas *OAS, path string, schema *openapi3.Schema) {
+	if oas.Paths == nil {
+		oas.Paths = openapi3.NewPaths()
+	}
+
+	pathItem := &openapi3.PathItem{
+		Get: &openapi3.Operation{
+			OperationID: "getOperation",
+			Responses:   openapi3.NewResponses(),
+		},
+	}
+
+	pathItem.Get.Responses.Set("200", &openapi3.ResponseRef{
+		Value: &openapi3.Response{
+			Description: getStrPointer("Success"),
+			Content: openapi3.Content{
+				"application/json": &openapi3.MediaType{
+					Schema: &openapi3.SchemaRef{
+						Value: schema,
+					},
+				},
+			},
+		},
+	})
+
+	oas.Paths.Set(path, pathItem)
+}
+
+// addMinimalTykExtension adds required x-tyk-api-gateway extension for a valid OAS document
+func addMinimalTykExtension(oas *OAS) {
+	xTykAPIGateway := &XTykAPIGateway{
+		Info: Info{
+			Name: "test-api",
+			State: State{
+				Active: true,
+			},
+		},
+		Server: Server{
+			ListenPath: ListenPath{
+				Value: "/test",
+			},
+		},
+		Upstream: Upstream{
+			URL: "http://upstream.test",
+		},
+	}
+	oas.SetTykExtension(xTykAPIGateway)
+}
+
 func TestOAS(t *testing.T) {
 	t.Parallel()
 
