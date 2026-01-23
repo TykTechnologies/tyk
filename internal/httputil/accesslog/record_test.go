@@ -53,3 +53,30 @@ func TestRecord(t *testing.T) {
 
 	assert.Equal(t, want, got)
 }
+
+func TestWithTraceID(t *testing.T) {
+	tests := []struct {
+		name          string
+		setupRequest  func() *http.Request
+		expectTraceID bool
+	}{
+		{
+			name: "no trace context - field not added",
+			setupRequest: func() *http.Request {
+				return httptest.NewRequest(http.MethodGet, "http://example.com/path", nil)
+			},
+			expectTraceID: false,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			req := tc.setupRequest()
+			record := accesslog.NewRecord().WithTraceID(req)
+			fields := record.Fields(nil)
+
+			_, exists := fields["trace_id"]
+			assert.Equal(t, tc.expectTraceID, exists)
+		})
+	}
+}
