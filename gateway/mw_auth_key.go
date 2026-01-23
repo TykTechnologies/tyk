@@ -71,7 +71,7 @@ func initAuthKeyErrors() {
 
 	TykErrors[ErrAuthCertMismatch] = config.TykError{
 		Message: MsgApiAccessDisallowed,
-		Code:    http.StatusForbidden,
+		Code:    http.StatusUnauthorized,
 	}
 }
 
@@ -113,7 +113,7 @@ func (k *AuthKey) ProcessRequest(_ http.ResponseWriter, r *http.Request, _ inter
 	}
 
 	key, authConfig := k.getAuthToken(k.getAuthType(), r)
-	if key == "" {
+	if key != "" {
 		key = stripBearer(key)
 	}
 	var keyExists, updateSession bool
@@ -145,12 +145,21 @@ func (k *AuthKey) ProcessRequest(_ http.ResponseWriter, r *http.Request, _ inter
 			key = k.Gw.generateToken(k.Spec.OrgID, certHash)
 			session, keyExists = k.CheckSessionAndIdentityForValidKey(key, r)
 			if !keyExists {
-				return errorAndStatusCode(ErrAuthCertMismatch)
+				session, keyExists = k.CheckSessionAndIdentityForValidKey(certHash, r)
+				if !keyExists {
+					return k.reportInvalidKey(key, r, MsgNonExistentKey, ErrAuthKeyNotFound)
+				}
 			}
 		} else {
+			if certHash != "" {
+				certKey := k.Gw.generateToken(k.Spec.OrgID, certHash)
+				session, keyExists = k.CheckSessionAndIdentityForValidKey(certKey, r)
+				if !keyExists {
+					session, keyExists = k.CheckSessionAndIdentityForValidKey(certHash, r)
+				}
+			}
 			if key != "" {
 				session, keyExists = k.CheckSessionAndIdentityForValidKey(key, r)
-				key = session.KeyID
 				if !keyExists {
 					session, keyExists = k.CheckSessionAndIdentityForValidKey(certHash, r)
 					if !keyExists {

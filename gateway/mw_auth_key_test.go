@@ -802,7 +802,7 @@ func TestDynamicMTLSSecure(t *testing.T) {
 		_, _ = ts.Run(t, test.TestCase{
 			Client:    differentCertClient,
 			Path:      "/dynamic-mtls",
-			Code:      http.StatusUnauthorized,
+			Code:      http.StatusForbidden,
 			BodyMatch: MsgApiAccessDisallowed,
 		})
 	})
