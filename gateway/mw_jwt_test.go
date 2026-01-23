@@ -5167,3 +5167,25 @@ func TestJWTMiddleware_ErrorLogging(t *testing.T) {
 		})
 	}
 }
+
+func Test_buildJWKSCache(t *testing.T) {
+	type testCase struct {
+		name            string
+		expectedTimeout int64
+		cfg             config.Config
+	}
+
+	for _, tt := range []testCase{
+		{"default timeout is 240", 240, config.Config{}},
+		{"invalid value is set to 240", 240, config.Config{JWKS: config.JWKSConfig{Cache: config.JWKSCacheConfig{Timeout: -1}}}},
+		{"fetches value from config", 500, config.Config{JWKS: config.JWKSConfig{Cache: config.JWKSCacheConfig{Timeout: 500}}}},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			cacheInstance := buildJWKSCache(tt.cfg)
+			casted, ok := cacheInstance.(cache.Detailer)
+
+			assert.True(t, ok)
+			assert.Equal(t, tt.expectedTimeout, casted.Details().DefaultExpiration)
+		})
+	}
+}
