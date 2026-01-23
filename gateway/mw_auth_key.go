@@ -121,6 +121,15 @@ func (k *AuthKey) ProcessRequest(_ http.ResponseWriter, r *http.Request, _ inter
 	var session user.SessionState
 
 	session, keyExists = k.CheckSessionAndIdentityForValidKey(key, r)
+	if !authConfig.UseCertificate {
+		if key == "" {
+			k.Logger().Info("Attempted access with malformed header, no auth header found.")
+			return errorAndStatusCode(ErrAuthAuthorizationFieldMissing)
+		}
+		if !keyExists {
+			return k.reportInvalidKey(key, r, MsgNonExistentKey, ErrAuthKeyNotFound)
+		}
+	}
 	if authConfig.UseCertificate && r.TLS != nil {
 		if len(r.TLS.PeerCertificates) > 0 {
 			if time.Now().After(r.TLS.PeerCertificates[0].NotAfter) {
