@@ -536,9 +536,16 @@ func (s *OAS) ReplaceServers(apiURLs, oldAPIURLs []string) {
 	s.Servers = append(newServers, userAddedServers...)
 }
 
-// Validate validates OAS document by calling openapi3.T.Validate() function. In addition, it validates Security
-// Requirement section and it's requirements by calling OAS.validateSecurity() function.
+// Validate validates OAS document by calling openapi3.T.Validate() function.
+// For OAS 3.1+ documents, JSON Schema 2020-12 validation is automatically enabled.
+// In addition, it validates Security Requirement section and its requirements by
+// calling OAS.validateSecurity() function.
 func (s *OAS) Validate(ctx context.Context, opts ...openapi3.ValidationOption) error {
+	// Automatically enable JSON Schema 2020 validation for OAS 3.1+
+	if s.T.IsOpenAPI3_1() {
+		opts = append(opts, openapi3.EnableJSONSchema2020Validation())
+	}
+
 	validationErr := s.T.Validate(ctx, opts...)
 	securityErr := s.validateSecurity()
 	compliantModeErr := s.validateCompliantModeAuthentication()

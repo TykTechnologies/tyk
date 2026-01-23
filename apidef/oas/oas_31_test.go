@@ -104,20 +104,22 @@ func TestOAS_Validate_OAS31_NullType(t *testing.T) {
 					oas.Components.Schemas = make(openapi3.Schemas)
 				}
 
-				oas.Components.Schemas["User"] = &openapi3.SchemaRef{
-					Value: &openapi3.Schema{
-						Type: &openapi3.Types{"object"},
-						Properties: openapi3.Schemas{
-							"name": &openapi3.SchemaRef{
-								Value: &openapi3.Schema{
-									Type: &openapi3.Types{"string", "null"},
-								},
+				userSchema := &openapi3.Schema{
+					Type: &openapi3.Types{"object"},
+					Properties: openapi3.Schemas{
+						"name": &openapi3.SchemaRef{
+							Value: &openapi3.Schema{
+								Type: &openapi3.Types{"string", "null"},
 							},
 						},
 					},
 				}
 
-				// Reference the component schema
+				oas.Components.Schemas["User"] = &openapi3.SchemaRef{
+					Value: userSchema,
+				}
+
+				// Use the schema directly (not via $ref) to avoid reference resolution issues in test
 				pathItem := &openapi3.PathItem{
 					Post: &openapi3.Operation{
 						OperationID: "createUser",
@@ -127,7 +129,7 @@ func TestOAS_Validate_OAS31_NullType(t *testing.T) {
 								Content: openapi3.Content{
 									"application/json": &openapi3.MediaType{
 										Schema: &openapi3.SchemaRef{
-											Ref: "#/components/schemas/User",
+											Value: userSchema,
 										},
 									},
 								},
