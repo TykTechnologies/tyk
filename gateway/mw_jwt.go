@@ -1610,8 +1610,6 @@ func (gw *Gateway) invalidateJWKSCacheForAllAPIs(w http.ResponseWriter, _ *http.
 }
 
 func (gw *Gateway) loadOrCreateJWKCacheByApiID(apiID string) cache.Repository {
-	//
-
 	raw, _ := gw.apiJWKCaches.LoadOrStore(apiID, buildJWKSCache(gw.GetConfig()))
 
 	jwkCache, ok := raw.(cache.Repository)

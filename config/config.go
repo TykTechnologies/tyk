@@ -1298,7 +1298,7 @@ type Config struct {
 	Labs LabsConfig `json:"labs"`
 
 	// JWKS
-	JWKS JWKSConfig
+	JWKS JWKSConfig `json:"jwks"`
 }
 
 // LabsConfig include config for streaming
