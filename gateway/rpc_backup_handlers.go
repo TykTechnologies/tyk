@@ -5,10 +5,10 @@ import (
 	"errors"
 	"strings"
 
-	"github.com/TykTechnologies/tyk/internal/crypto"
-
 	"github.com/sirupsen/logrus"
 
+	"github.com/TykTechnologies/tyk/internal/compression"
+	"github.com/TykTechnologies/tyk/internal/crypto"
 	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/user"
 )
@@ -45,10 +45,15 @@ func (gw *Gateway) LoadDefinitionsFromRPCBackup() ([]*APISpec, error) {
 		return nil, errors.New("[RPC] --> Failed to get node backup (" + checkKey + "): " + err.Error())
 	}
 
-	apiListAsString := crypto.Decrypt([]byte(secret), cryptoText)
+	decrypted := crypto.Decrypt(secret, cryptoText)
+
+	apiList, err := gw.decompressAPIBackup(decrypted)
+	if err != nil {
+		return nil, err
+	}
 
 	a := APIDefinitionLoader{Gw: gw}
-	return a.processRPCDefinitions(apiListAsString, gw)
+	return a.processRPCDefinitions(apiList, gw)
 }
 
 func (gw *Gateway) saveRPCDefinitionsBackup(list string) error {
@@ -71,13 +76,49 @@ func (gw *Gateway) saveRPCDefinitionsBackup(list string) error {
 	}
 
 	secret := crypto.GetPaddedString(gw.GetConfig().Secret)
-	cryptoText := crypto.Encrypt([]byte(secret), list)
-	err := store.SetKey(BackupApiKeyBase+tagList, cryptoText, -1)
-	if err != nil {
+	dataToEncrypt := gw.compressAPIBackup(list)
+
+	cryptoText := crypto.Encrypt(secret, dataToEncrypt)
+	if err := store.SetKey(BackupApiKeyBase+tagList, cryptoText, -1); err != nil {
 		return errors.New("Failed to store node backup: " + err.Error())
 	}
 
 	return nil
+}
+
+// compressAPIBackup compresses API backup data if compression is enabled
+func (gw *Gateway) compressAPIBackup(list string) string {
+	if !gw.GetConfig().Storage.CompressAPIDefinitions {
+		log.Debug("[RPC] --> API definition compression disabled")
+		return list
+	}
+
+	compressed, err := compression.CompressZstd([]byte(list))
+	if err != nil {
+		log.WithError(err).Error("[RPC] --> Failed to compress API definitions, storing uncompressed")
+		return list
+	}
+	log.Debug("[RPC] --> API definitions compressed with Zstd")
+	return string(compressed)
+}
+
+// decompressAPIBackup decompresses API backup data if it's compressed
+func (gw *Gateway) decompressAPIBackup(decrypted string) (string, error) {
+	data := []byte(decrypted)
+
+	if compression.IsZstdCompressed(data) {
+		decompressed, err := compression.DecompressZstd(data)
+		if err != nil {
+			return "", errors.New("[RPC] --> Failed to decompress backup: " + err.Error())
+		}
+
+		log.Debug("[RPC] --> Loaded compressed API definitions from backup")
+		return string(decompressed), nil
+	}
+
+	// Uncompressed JSON
+	log.Debug("[RPC] --> Loaded uncompressed API definitions from backup")
+	return decrypted, nil
 }
 
 func (gw *Gateway) LoadPoliciesFromRPCBackup() (map[string]user.Policy, error) {
@@ -95,11 +136,11 @@ func (gw *Gateway) LoadPoliciesFromRPCBackup() (map[string]user.Policy, error) {
 
 	secret := crypto.GetPaddedString(gw.GetConfig().Secret)
 	cryptoText, err := store.GetKey(checkKey)
-	listAsString := crypto.Decrypt([]byte(secret), cryptoText)
-
 	if err != nil {
 		return nil, errors.New("[RPC] --> Failed to get node policy backup (" + checkKey + "): " + err.Error())
 	}
+
+	listAsString := crypto.Decrypt(secret, cryptoText)
 
 	if policies, err := parsePoliciesFromRPC(listAsString); err != nil {
 		log.WithFields(logrus.Fields{
@@ -130,7 +171,8 @@ func (gw *Gateway) saveRPCPoliciesBackup(list string) error {
 		return errors.New("--> RPC Backup save failed: redis connection failed")
 	}
 
-	cryptoText := crypto.Encrypt(crypto.GetPaddedString(gw.GetConfig().Secret), list)
+	secret := crypto.GetPaddedString(gw.GetConfig().Secret)
+	cryptoText := crypto.Encrypt(secret, list)
 	err := store.SetKey(BackupPolicyKeyBase+tagList, cryptoText, -1)
 	if err != nil {
 		return errors.New("Failed to store node backup: " + err.Error())
