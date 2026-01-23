@@ -856,7 +856,10 @@ func (gw *Gateway) loadHTTPService(spec *APISpec, apisByListen map[string]int, g
 		router = mux.NewRouter()
 		muxer.setRouter(port, spec.Protocol, router, gwConfig)
 	}
-	newrelic.Mount(router, gw.NewRelicApplication)
+
+	if muxer.checkAndMarkInstrumented(router) {
+		newrelic.Mount(router, gw.NewRelicApplication)
+	}
 
 	hostname := gwConfig.HostName
 	if gwConfig.EnableCustomDomains && spec.Domain != "" {

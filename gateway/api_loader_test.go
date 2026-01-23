@@ -9656,11 +9656,7 @@ func TestNewRelicMounting(t *testing.T) {
 
 	dummyHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		txn := nr.FromContext(r.Context())
-		if txn != nil {
-			mwExecuted <- true
-		} else {
-			mwExecuted <- false
-		}
+		mwExecuted <- txn != nil
 		w.WriteHeader(http.StatusOK)
 	})
 
@@ -9715,7 +9711,10 @@ func TestNewRelicMounting(t *testing.T) {
 	_, err = gw.loadHTTPService(spec, map[string]int{}, nil, muxer)
 	assert.NoError(t, err)
 
-	t.Run("Reused Router should have New Relic Middleware", func(t *testing.T) {
+	_, err = gw.loadHTTPService(spec, map[string]int{}, nil, muxer)
+	assert.NoError(t, err)
+
+	t.Run("Router should have New Relic Middleware", func(t *testing.T) {
 		req := httptest.NewRequest("GET", "/fix-test/", nil)
 		w := httptest.NewRecorder()
 
@@ -9723,7 +9722,7 @@ func TestNewRelicMounting(t *testing.T) {
 
 		select {
 		case success := <-mwExecuted:
-			assert.True(t, success, "FAILURE: New Relic middleware was NOT added to the reused router")
+			assert.True(t, success, "FAILURE: New Relic middleware was not present")
 		case <-time.After(1 * time.Second):
 			t.Fatal("FAILURE: Timeout - Middleware did not execute")
 		}
