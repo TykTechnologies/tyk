@@ -27,6 +27,7 @@ var schemaDir embed.FS
 const (
 	keyStreams                  = "streams"
 	keyDefinitions              = "definitions"
+	keyDefs                     = "$defs" // For OAS 3.1+ (JSON Schema 2020-12)
 	keyProperties               = "properties"
 	keyRequired                 = "required"
 	oasSchemaVersionNotFoundFmt = "schema not found for version %q"
@@ -82,6 +83,9 @@ func loadSchemas() error {
 				return err
 			}
 
+			// Detect which definitions key this schema uses
+			defsKey := oas.GetDefinitionsKey(data)
+
 			data, err = jsonparser.Set(data, xTykStreamingSchemaWithoutDefs, keyProperties, oas.ExtensionTykStreaming)
 			if err != nil {
 				return err
@@ -93,7 +97,7 @@ func loadSchemas() error {
 			}
 
 			err = jsonparser.ObjectEach(xTykStreamingSchema, func(key []byte, value []byte, dataType jsonparser.ValueType, offset int) error {
-				data, err = jsonparser.Set(data, value, keyDefinitions, string(key))
+				data, err = jsonparser.Set(data, value, defsKey, string(key))
 				return err
 			}, keyDefinitions)
 			if err != nil {
@@ -101,7 +105,7 @@ func loadSchemas() error {
 			}
 
 			err = jsonparser.ObjectEach(xTykApiGatewaySchema, func(key []byte, value []byte, dataType jsonparser.ValueType, offset int) error {
-				data, err = jsonparser.Set(data, value, keyDefinitions, string(key))
+				data, err = jsonparser.Set(data, value, defsKey, string(key))
 				return err
 			}, keyDefinitions)
 			if err != nil {
@@ -230,7 +234,10 @@ func ValidateOASTemplateWithBentoValidator(documentBody []byte, oasVersion strin
 	oasSchema = jsonparser.Delete(oasSchema, keyProperties, oas.ExtensionTykStreaming, keyRequired)
 	oasSchema = jsonparser.Delete(oasSchema, keyProperties, oas.ExtensionTykAPIGateway, keyRequired)
 
-	definitions, _, _, err := jsonparser.Get(oasSchema, keyDefinitions)
+	// Detect which definitions key this schema uses
+	defsKey := oas.GetDefinitionsKey(oasSchema)
+
+	definitions, _, _, err := jsonparser.Get(oasSchema, defsKey)
 	if err != nil {
 		return err
 	}
@@ -247,7 +254,7 @@ func ValidateOASTemplateWithBentoValidator(documentBody []byte, oasVersion strin
 		definitions = jsonparser.Delete(definitions, path, keyRequired)
 	}
 
-	oasSchema, err = jsonparser.Set(oasSchema, definitions, keyDefinitions)
+	oasSchema, err = jsonparser.Set(oasSchema, definitions, defsKey)
 	if err != nil {
 		return err
 	}
@@ -297,7 +304,15 @@ func setDefaultVersion() {
 		versions = append(versions, k)
 	}
 
-	defaultVersion = findDefaultVersion(versions)
+	latestVersion := findDefaultVersion(versions)
+
+	// Override: Keep 3.0 as default until 3.1 implementation is stable across all products
+	// TODO: Remove this override when 3.1 implementation is stable
+	if latestVersion == "3.1" {
+		defaultVersion = "3.0"
+	} else {
+		defaultVersion = latestVersion
+	}
 }
 
 func getMinorVersion(version string) (string, error) {
