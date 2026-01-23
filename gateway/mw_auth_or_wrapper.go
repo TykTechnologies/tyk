@@ -327,26 +327,24 @@ func (a *AuthORWrapper) initCustomPluginMiddleware() {
 	switch spec.CustomMiddleware.Driver {
 	case apidef.OttoDriver:
 		mw = &DynamicMiddleware{BaseMiddleware: a.BaseMiddleware.Copy()}
-		dynamicMw := mw.(*DynamicMiddleware)
+		dynamicMw, _ := mw.(*DynamicMiddleware)
 		dynamicMw.MiddlewareClassName = spec.CustomMiddleware.AuthCheck.Name
 		dynamicMw.Auth = true
 	case apidef.GoPluginDriver:
 		mw = &GoPluginMiddleware{BaseMiddleware: a.BaseMiddleware.Copy()}
-		goPluginMw := mw.(*GoPluginMiddleware)
+		goPluginMw, _ := mw.(*GoPluginMiddleware)
 		goPluginMw.Path = spec.CustomMiddleware.AuthCheck.Path
 		goPluginMw.SymbolName = spec.CustomMiddleware.AuthCheck.Name
 		goPluginMw.APILevel = true
 	default:
 		mw = &CoProcessMiddleware{BaseMiddleware: a.BaseMiddleware.Copy()}
-		coProcessMw := mw.(*CoProcessMiddleware)
+		coProcessMw, _ := mw.(*CoProcessMiddleware)
 		coProcessMw.HookType = coprocess.HookType_CustomKeyCheck
 		coProcessMw.HookName = spec.CustomMiddleware.AuthCheck.Name
 		coProcessMw.MiddlewareDriver = spec.CustomMiddleware.Driver
 		coProcessMw.RawBodyOnly = spec.CustomMiddleware.AuthCheck.RawBodyOnly
 	}
 
-	mw.Base().Spec = spec
-	mw.Base().Gw = a.Gw
 	mw.Init()
 
 	if goPluginMw, ok := mw.(*GoPluginMiddleware); ok {
