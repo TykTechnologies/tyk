@@ -1492,7 +1492,14 @@ func TestKeyWithCertificateTLS(t *testing.T) {
 					TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 				},
 			}
+			globalConf := ts.Gw.GetConfig()
+			globalConf.Security.AllowUnsafeDynamicMTLSToken = true
+			ts.Gw.SetConfig(globalConf)
 			_, _ = ts.Run(t, test.TestCase{Path: "/test1", Headers: header, Code: http.StatusOK, Domain: "localhost", Client: client})
+
+			globalConf = ts.Gw.GetConfig()
+			globalConf.Security.AllowUnsafeDynamicMTLSToken = false
+			ts.Gw.SetConfig(globalConf)
 		})
 	})
 
@@ -1579,6 +1586,16 @@ func TestKeyWithCertificateTLS(t *testing.T) {
 
 	// check that key has been updated with wrong certificate
 	t.Run("Key has been updated with wrong certificate key", func(t *testing.T) {
+		globalConf := ts.Gw.GetConfig()
+		globalConf.Security.AllowUnsafeDynamicMTLSToken = true
+		ts.Gw.SetConfig(globalConf)
+
+		defer func() {
+			globalConf = ts.Gw.GetConfig()
+			globalConf.Security.AllowUnsafeDynamicMTLSToken = false
+			ts.Gw.SetConfig(globalConf)
+		}()
+
 		clientPEM, _, _, clientCert := crypto.GenCertificate(&x509.Certificate{}, false)
 		clientCertID, err := ts.Gw.CertificateManager.Add(clientPEM, orgId)
 
