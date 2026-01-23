@@ -343,9 +343,9 @@ func TestAddTraceID(t *testing.T) {
 	})
 }
 
-func TestAccessLogWithTraceID(t *testing.T) {
-	// Import accesslog inline to avoid circular dependencies
-	// This test verifies integration between otel and accesslog packages
+// TestExtractTraceID_WithRequest verifies ExtractTraceID correctly extracts
+// trace IDs from request contexts in various scenarios.
+func TestExtractTraceID_WithRequest(t *testing.T) {
 
 	tests := []struct {
 		name          string

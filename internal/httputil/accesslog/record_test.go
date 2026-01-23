@@ -1,6 +1,7 @@
 package accesslog_test
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -9,6 +10,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/TykTechnologies/tyk/internal/httputil/accesslog"
+	"github.com/TykTechnologies/tyk/internal/otel"
 	"github.com/TykTechnologies/tyk/request"
 
 	"github.com/TykTechnologies/tyk-pump/analytics"
@@ -57,21 +59,47 @@ func TestRecord(t *testing.T) {
 func TestWithTraceID(t *testing.T) {
 	tests := []struct {
 		name          string
-		setupRequest  func() *http.Request
+		setupRequest  func(t *testing.T) *http.Request
 		expectTraceID bool
 	}{
 		{
 			name: "no trace context - field not added",
-			setupRequest: func() *http.Request {
+			setupRequest: func(_ *testing.T) *http.Request {
 				return httptest.NewRequest(http.MethodGet, "http://example.com/path", nil)
 			},
 			expectTraceID: false,
+		},
+		{
+			name: "valid trace context - field added",
+			setupRequest: func(t *testing.T) *http.Request {
+				// Create OTel provider with HTTP exporter
+				srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+					w.WriteHeader(http.StatusOK)
+				}))
+				t.Cleanup(srv.Close)
+
+				cfg := &otel.OpenTelemetry{
+					Enabled:  true,
+					Exporter: "http",
+					Endpoint: srv.URL,
+				}
+				provider := otel.InitOpenTelemetry(context.Background(), logrus.New(), cfg, "test", "v1", false, "", false, nil)
+
+				// Create a span with trace context
+				_, span := provider.Tracer().Start(context.Background(), "test-span")
+				t.Cleanup(func() { span.End() })
+
+				req := httptest.NewRequest(http.MethodGet, "http://example.com/path", nil)
+				ctx := otel.ContextWithSpan(req.Context(), span)
+				return req.WithContext(ctx)
+			},
+			expectTraceID: true,
 		},
 	}
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			req := tc.setupRequest()
+			req := tc.setupRequest(t)
 			record := accesslog.NewRecord().WithTraceID(req)
 			fields := record.Fields(nil)
 
