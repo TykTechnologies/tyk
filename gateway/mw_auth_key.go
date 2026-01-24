@@ -157,16 +157,16 @@ func (k *AuthKey) ProcessRequest(_ http.ResponseWriter, r *http.Request, _ inter
 			if key != "" {
 				session, keyExists = k.CheckSessionAndIdentityForValidKey(key, r)
 				if !keyExists {
-					session, keyExists = k.CheckSessionAndIdentityForValidKey(certHash, r)
-					if !keyExists {
-						return k.reportInvalidKey(key, r, MsgNonExistentKey, ErrAuthKeyNotFound)
-					}
+					return k.reportInvalidKey(key, r, MsgNonExistentKey, ErrAuthKeyNotFound)
 				}
-			} else if certHash != "" {
+			} else {
 				certKey := k.Gw.generateToken(k.Spec.OrgID, certHash)
 				session, keyExists = k.CheckSessionAndIdentityForValidKey(certKey, r)
 				if !keyExists {
 					session, keyExists = k.CheckSessionAndIdentityForValidKey(certHash, r)
+					if !keyExists {
+						return k.reportInvalidKey(key, r, MsgNonExistentKey, ErrAuthKeyNotFound)
+					}
 				}
 			}
 		}

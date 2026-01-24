@@ -246,7 +246,7 @@ func TestStaticAndDynamicMTLS(t *testing.T) {
 			Client:    client1,
 			Path:      "/combined-mtls",
 			Headers:   map[string]string{"Authorization": key},
-			Code:      http.StatusForbidden,
+			Code:      http.StatusUnauthorized,
 			BodyMatch: MsgApiAccessDisallowed,
 		})
 	})
@@ -374,6 +374,7 @@ func TestCertificateCheckMW_StrictAllowlistValidation(t *testing.T) {
 		globalConf.HttpServerOptions.UseSSL = true
 		globalConf.HttpServerOptions.SSLInsecureSkipVerify = true
 		globalConf.HttpServerOptions.SSLCertificates = []string{"default" + certID}
+		globalConf.Security.AllowUnsafeDynamicMTLSToken = true
 	}
 	ts := StartTest(conf)
 	defer ts.Close()
@@ -531,6 +532,7 @@ func TestStaticAndDynamicMTLS_ExpiredCertificate(t *testing.T) {
 		globalConf.HttpServerOptions.UseSSL = true
 		globalConf.HttpServerOptions.SSLInsecureSkipVerify = true
 		globalConf.HttpServerOptions.SSLCertificates = []string{"default" + certID}
+		globalConf.Security.AllowUnsafeDynamicMTLSToken = true
 	}
 	ts := StartTest(conf)
 	defer ts.Close()
@@ -632,6 +634,7 @@ func TestDynamicMTLS_InvalidCertificateInSession(t *testing.T) {
 		globalConf.HttpServerOptions.UseSSL = true
 		globalConf.HttpServerOptions.SSLInsecureSkipVerify = true
 		globalConf.HttpServerOptions.SSLCertificates = []string{"default" + certID}
+		globalConf.Security.AllowUnsafeDynamicMTLSToken = true
 	}
 	ts := StartTest(conf)
 	defer ts.Close()
@@ -683,7 +686,7 @@ func TestDynamicMTLS_InvalidCertificateInSession(t *testing.T) {
 			Client:    clientNoCert,
 			Path:      "/dynamic-invalid-cert",
 			Headers:   map[string]string{"Authorization": key},
-			Code:      http.StatusUnauthorized,
+			Code:      http.StatusForbidden,
 			BodyMatch: MsgApiAccessDisallowed, // ErrAuthCertNotFound maps to this message
 		})
 	})
@@ -723,6 +726,7 @@ func TestMultipleCertificateBindings(t *testing.T) {
 		globalConf.HttpServerOptions.UseSSL = true
 		globalConf.HttpServerOptions.SSLInsecureSkipVerify = true
 		globalConf.HttpServerOptions.SSLCertificates = []string{"default" + certID}
+		globalConf.Security.AllowUnsafeDynamicMTLSToken = true
 	}
 	ts := StartTest(conf)
 	defer ts.Close()
