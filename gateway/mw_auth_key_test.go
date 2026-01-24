@@ -10,20 +10,18 @@ import (
 	"testing"
 	"time"
 
-	"github.com/TykTechnologies/tyk/internal/crypto"
-
 	"github.com/justinas/alice"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/certs"
 	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/internal/crypto"
+	"github.com/TykTechnologies/tyk/internal/uuid"
 	signaturevalidator "github.com/TykTechnologies/tyk/signature_validator"
 	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/test"
 	"github.com/TykTechnologies/tyk/user"
-
-	"github.com/TykTechnologies/tyk/internal/uuid"
 )
 
 func TestMurmur3CharBug(t *testing.T) {
@@ -683,7 +681,8 @@ func TestDynamicMTLSInsecure(t *testing.T) {
 
 func TestDynamicMTLSSecure(t *testing.T) {
 	serverCertPem, _, combinedPEM, _ := certs.GenServerCertificate()
-	certID, _, _ := certs.GetCertIDAndChainPEM(combinedPEM, "")
+	certID, _, err := certs.GetCertIDAndChainPEM(combinedPEM, "")
+	assert.NoError(t, err)
 
 	conf := func(globalConf *config.Config) {
 		globalConf.Security.ControlAPIUseMutualTLS = false
@@ -695,7 +694,7 @@ func TestDynamicMTLSSecure(t *testing.T) {
 	ts := StartTest(conf)
 	defer ts.Close()
 
-	certID, err := ts.Gw.CertificateManager.Add(combinedPEM, "default")
+	certID, err = ts.Gw.CertificateManager.Add(combinedPEM, "default")
 	assert.NoError(t, err)
 	defer ts.Gw.CertificateManager.Delete(certID, "default")
 	ts.ReloadGatewayProxy()
@@ -755,8 +754,8 @@ func TestDynamicMTLSSecure(t *testing.T) {
 		certClient := GetTLSClient(nil, serverCertPem)
 		_, _ = ts.Run(t, test.TestCase{
 			Path:      "/dynamic-mtls",
-			Code:      http.StatusUnauthorized,
-			BodyMatch: MsgAuthCertRequired,
+			Code:      http.StatusForbidden,
+			BodyMatch: MsgApiAccessDisallowed,
 			Client:    certClient,
 			Headers: map[string]string{
 				"Authorization": keyHash,
@@ -768,8 +767,8 @@ func TestDynamicMTLSSecure(t *testing.T) {
 		certClient := GetTLSClient(nil, serverCertPem)
 		_, _ = ts.Run(t, test.TestCase{
 			Path:      "/dynamic-mtls",
-			Code:      http.StatusUnauthorized,
-			BodyMatch: MsgAuthCertRequired,
+			Code:      http.StatusForbidden,
+			BodyMatch: MsgApiAccessDisallowed,
 			Client:    certClient,
 			Headers: map[string]string{
 				"Authorization": certHash,
