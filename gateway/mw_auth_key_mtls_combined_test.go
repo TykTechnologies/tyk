@@ -31,6 +31,7 @@ func TestStaticAndDynamicMTLS(t *testing.T) {
 		globalConf.HttpServerOptions.UseSSL = true
 		globalConf.HttpServerOptions.SSLInsecureSkipVerify = true
 		globalConf.HttpServerOptions.SSLCertificates = []string{"default" + certID}
+		globalConf.Security.AllowUnsafeDynamicMTLSToken = true
 	}
 	ts := StartTest(conf)
 	defer ts.Close()
@@ -119,6 +120,18 @@ func TestStaticAndDynamicMTLS(t *testing.T) {
 			s.Certificate = clientCertID1 // Will be auto-updated to cert2's hash
 		})
 
+		//// Allow insecure mode for dynamic MTLs, which allows use of key to fetch token,
+		////if a different client cert is used
+		//cfg := ts.Gw.GetConfig()
+		//cfg.Security.AllowUnsafeDynamicMTLSToken = true
+		//ts.Gw.SetConfig(cfg)
+		//
+		//t.Cleanup(func() {
+		//	cfg := ts.Gw.GetConfig()
+		//	cfg.Security.AllowUnsafeDynamicMTLSToken = false
+		//	ts.Gw.SetConfig(cfg)
+		//})
+
 		assert.NotEmpty(t, key, "Should create key with certificate binding")
 
 		// Request with cert2 (in allowlist) will succeed and auto-update session to cert2
@@ -181,6 +194,7 @@ func TestStaticAndDynamicMTLS(t *testing.T) {
 
 	t.Run("Fail: invalid auth token with valid cert", func(t *testing.T) {
 		// Request with valid cert but invalid token
+		// should the token still be validated if the cert is passed
 		client1 := GetTLSClient(&clientCert1, serverCertPem)
 		_, _ = ts.Run(t, test.TestCase{
 			Domain:    "localhost",
@@ -669,7 +683,7 @@ func TestDynamicMTLS_InvalidCertificateInSession(t *testing.T) {
 			Client:    clientNoCert,
 			Path:      "/dynamic-invalid-cert",
 			Headers:   map[string]string{"Authorization": key},
-			Code:      http.StatusForbidden,
+			Code:      http.StatusUnauthorized,
 			BodyMatch: MsgApiAccessDisallowed, // ErrAuthCertNotFound maps to this message
 		})
 	})
