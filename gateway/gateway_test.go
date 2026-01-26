@@ -1921,6 +1921,10 @@ func TestOverrideErrors(t *testing.T) {
 	const code5 = 905
 	const message6 = "Message6"
 	const code6 = 906
+	const message7 = "Message7"
+	const code7 = 907
+	const message8 = "Message8"
+	const code8 = 908
 
 	testConf := ts.Gw.GetConfig()
 
@@ -1949,6 +1953,14 @@ func TestOverrideErrors(t *testing.T) {
 			Message: message6,
 			Code:    code6,
 		},
+		ErrJWTAuthorizationFieldMissing: {
+			Message: message7,
+			Code:    code7,
+		},
+		ErrJWTKeyNotAuthorized: {
+			Message: message8,
+			Code:    code8,
+		},
 	}
 	ts.Gw.SetConfig(testConf)
 
@@ -1971,6 +1983,12 @@ func TestOverrideErrors(t *testing.T) {
 
 	e, i = errorAndStatusCode(ErrAuthKeyNotFound)
 	assert(message6, code6, e, i)
+
+	e, i = errorAndStatusCode(ErrJWTAuthorizationFieldMissing)
+	assert(message7, code7, e, i)
+
+	e, i = errorAndStatusCode(ErrJWTKeyNotAuthorized)
+	assert(message8, code8, e, i)
 
 	t.Run("Partial override", func(t *testing.T) {
 		testConf.OverrideMessages = map[string]config.TykError{

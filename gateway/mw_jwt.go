@@ -25,6 +25,7 @@ import (
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/apidef/oas"
+	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/internal/cache"
 	"github.com/TykTechnologies/tyk/internal/otel"
 	"github.com/TykTechnologies/tyk/storage"
@@ -51,6 +52,11 @@ const (
 const UnexpectedSigningMethod = "Unexpected signing method"
 const JWKsAPIDef = "jwks_api_def_"
 
+const (
+	ErrJWTAuthorizationFieldMissing = "jwt.auth_field_missing"
+	ErrJWTKeyNotAuthorized          = "jwt.key_not_authorized"
+)
+
 var (
 	// List of common OAuth Client ID claims used by IDPs:
 	oauthClientIDClaims = []string{
@@ -63,6 +69,18 @@ var (
 	ErrEmptyUserIDInSubClaim      = errors.New("found an empty user ID in sub claim")
 	ErrEmptyUserIDInClaim         = errors.New("found an empty user ID in predefined base claim")
 )
+
+func initJWTErrors() {
+	TykErrors[ErrJWTAuthorizationFieldMissing] = config.TykError{
+		Message: MsgAuthFieldMissing,
+		Code:    http.StatusBadRequest,
+	}
+
+	TykErrors[ErrJWTKeyNotAuthorized] = config.TykError{
+		Message: MsgKeyNotAuthorized,
+		Code:    http.StatusForbidden,
+	}
+}
 
 func (k *JWTMiddleware) Name() string {
 	return "JWTMiddleware"
@@ -1081,7 +1099,7 @@ func (k *JWTMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, _
 		log.Debug("Headers are: ", r.Header)
 
 		k.reportLoginFailure(tykId, r)
-		return errors.New("Authorization field missing"), http.StatusBadRequest
+		return errorAndStatusCode(ErrJWTAuthorizationFieldMissing)
 	}
 
 	// enable bearer token format
@@ -1134,7 +1152,7 @@ func (k *JWTMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, _
 			return errors.New(MsgKeyNotAuthorizedUnexpectedSigningMethod), http.StatusForbidden
 		}
 	}
-	return errors.New("Key not authorized"), http.StatusForbidden
+	return errorAndStatusCode(ErrJWTKeyNotAuthorized)
 }
 
 func ParseRSAPublicKey(data []byte) (interface{}, error) {
