@@ -15,6 +15,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/go-jose/go-jose/v3"
+	"github.com/golang-jwt/jwt/v4"
 	"github.com/google/go-cmp/cmp"
 	"github.com/gorilla/mux"
 	"github.com/lonelycode/osin"
@@ -25,6 +27,7 @@ import (
 	"github.com/TykTechnologies/tyk/apidef/oas"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/internal/cache"
+	"github.com/TykTechnologies/tyk/internal/otel"
 	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/user"
 )
@@ -1018,6 +1021,7 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 		if updateSession {
 			k.Gw.SessionCache.Set(session.KeyHash(), session.Clone(), cache.DefaultExpiration)
 		}
+		ctxSetSpanAttributes(r, k.Name(), otel.APIKeyAliasAttribute(session.Alias))
 	}
 	ctxSetJWTContextVars(k.Spec, r, token)
 
@@ -1066,6 +1070,7 @@ func (k *JWTMiddleware) processOneToOneTokenMap(r *http.Request, token *jwt.Toke
 
 	k.Logger().Debug("Raw key ID found.")
 	ctxSetSession(r, &session, false, k.Gw.GetConfig().HashKeys)
+	ctxSetSpanAttributes(r, k.Name(), otel.APIKeyAliasAttribute(session.Alias))
 	ctxSetJWTContextVars(k.Spec, r, token)
 	return nil, http.StatusOK
 }
