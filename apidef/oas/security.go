@@ -34,6 +34,7 @@ type Token struct {
 	AuthSources `bson:",inline" json:",inline"`
 
 	// EnableClientCertificate allows to create dynamic keys based on certificates.
+	// Deprecated: Use the dedicated CertificateAuth security scheme instead.
 	//
 	// Tyk classic API definition: `auth_configs["authToken"].use_certificate`
 	EnableClientCertificate bool `bson:"enableClientCertificate,omitempty" json:"enableClientCertificate,omitempty"`
@@ -42,6 +43,21 @@ type Token struct {
 	//
 	// Tyk classic API definition: `auth_configs["authToken"].use_certificate`
 	Signature *Signature `bson:"signatureValidation,omitempty" json:"signatureValidation,omitempty"`
+}
+
+// CertificateAuth represents certificate-based authentication configuration.
+//
+// Tyk classic API definition: `auth_configs["authToken"].use_certificate`
+type CertificateAuth struct {
+	// Enabled activates the certificate-based authentication mode.
+	//
+	// Tyk classic API definition: `auth_configs["authToken"].use_certificate`
+	Enabled bool `bson:"enabled" json:"enabled"`
+}
+
+// Import populates *CertificateAuth from argument values.
+func (c *CertificateAuth) Import(enable bool) {
+	c.Enabled = enable
 }
 
 // Import populates *Token from argument values.
@@ -61,7 +77,10 @@ func (s *OAS) fillToken(api apidef.APIDefinition) {
 	token := &Token{}
 	token.Enabled = &api.UseStandardAuth
 	token.AuthSources.Fill(authConfig)
+
+	// Set the deprecated field
 	token.EnableClientCertificate = authConfig.UseCertificate
+
 	if token.Signature == nil {
 		token.Signature = &Signature{}
 	}
@@ -87,7 +106,10 @@ func (s *OAS) extractTokenTo(api *apidef.APIDefinition, name string) {
 		if token.Enabled != nil {
 			enabled = *token.Enabled
 		}
+
+		// Extract the deprecated field
 		authConfig.UseCertificate = token.EnableClientCertificate
+
 		token.AuthSources.ExtractTo(&authConfig)
 		if token.Signature != nil {
 			token.Signature.ExtractTo(&authConfig)
@@ -1023,7 +1045,7 @@ func (s *OAS) isInOASComponents(schemeName string) bool {
 // isProprietarySchemeType checks if a SecurityScheme type is proprietary
 func (s *OAS) isProprietarySchemeType(scheme interface{}) bool {
 	switch scheme.(type) {
-	case *JWT, *Token, *Basic, *OAuth, *ExternalOAuth:
+	case *JWT, *Token, *Basic, *OAuth, *ExternalOAuth, *CertificateAuth:
 		return false // Standard OAS types
 	case *CustomPluginAuthentication:
 		return true // Proprietary
@@ -1032,11 +1054,84 @@ func (s *OAS) isProprietarySchemeType(scheme interface{}) bool {
 	}
 }
 
+func (s *OAS) fillCertificateAuth(api apidef.APIDefinition) {
+	authConfig, ok := api.AuthConfigs[apidef.AuthTokenType]
+	if !ok || !authConfig.UseCertificate {
+		return
+	}
+
+	certAuth := &CertificateAuth{}
+	certAuth.Import(authConfig.UseCertificate)
+
+	s.getTykSecuritySchemes()["certificateAuth"] = certAuth
+
+	if ShouldOmit(certAuth) {
+		delete(s.getTykSecuritySchemes(), "certificateAuth")
+	}
+}
+
+func (s *OAS) extractCertificateAuthTo(api *apidef.APIDefinition) {
+	certAuth := s.getTykCertificateAuth("certificateAuth")
+	if certAuth == nil || !certAuth.Enabled {
+		return
+	}
+
+	// Get the existing authToken config or create a new one
+	authConfig, ok := api.AuthConfigs[apidef.AuthTokenType]
+	if !ok {
+		authConfig = apidef.AuthConfig{
+			Name: apidef.AuthTokenType,
+		}
+	}
+
+	// Set the certificate flag
+	authConfig.UseCertificate = certAuth.Enabled
+
+	// Update the authToken config
+	api.AuthConfigs[apidef.AuthTokenType] = authConfig
+}
+
+// Helper to get the certificate auth configuration
+func (s *OAS) getTykCertificateAuth(name string) *CertificateAuth {
+	if s.Components == nil || s.Components.Extensions == nil {
+		return nil
+	}
+
+	tykSecuritySchemes := s.getTykSecuritySchemes()
+	if tykSecuritySchemes == nil {
+		return nil
+	}
+
+	scheme, ok := tykSecuritySchemes[name]
+	if !ok {
+		return nil
+	}
+
+	certAuth, ok := scheme.(*CertificateAuth)
+	if !ok {
+		return nil
+	}
+
+	return certAuth
+}
+
+// Returns true if this is a certificate auth scheme
+func (s *OAS) isCertificateAuthScheme(schemeName string) bool {
+	return schemeName == "certificateAuth"
+}
+
 func (s *OAS) fillSecurity(api apidef.APIDefinition) {
+	s.fillCertificateAuth(api)
 	tykAuthentication := s.GetTykExtension().Server.Authentication
 	if tykAuthentication == nil {
 		tykAuthentication = &Authentication{}
 		s.GetTykExtension().Server.Authentication = tykAuthentication
+	}
+
+	// Add certificate auth to security requirements if enabled
+	authConfig, authOk := api.AuthConfigs[apidef.AuthTokenType]
+	if authOk && authConfig.UseCertificate {
+		s.appendSecurity("certificateAuth")
 	}
 
 	if tykAuthentication.SecuritySchemes == nil {
@@ -1173,11 +1268,33 @@ func (s *OAS) fillSecurity(api apidef.APIDefinition) {
 }
 
 func (s *OAS) extractSecurityTo(api *apidef.APIDefinition) {
+	s.extractCertificateAuthTo(api)
 	if s.getTykAuthentication() == nil {
 		s.GetTykExtension().Server.Authentication = &Authentication{}
 		defer func() {
-			s.GetTykExtension().Server.Authentication = nil
+			if ShouldOmit(s.GetTykExtension().Server.Authentication) {
+				s.GetTykExtension().Server.Authentication = nil
+			}
 		}()
+	}
+
+	// Check for certificate auth in security requirements
+	for _, secReq := range s.Security {
+		for secName := range secReq {
+			if s.isCertificateAuthScheme(secName) {
+				certAuth := s.getTykCertificateAuth(secName)
+				if certAuth != nil && certAuth.Enabled {
+					// Certificate auth is enabled in security requirements
+					if api.AuthConfigs == nil {
+						api.AuthConfigs = make(map[string]apidef.AuthConfig)
+					}
+					authConfig := api.AuthConfigs[apidef.AuthTokenType]
+					authConfig.Name = apidef.AuthTokenType
+					authConfig.UseCertificate = true
+					api.AuthConfigs[apidef.AuthTokenType] = authConfig
+				}
+			}
+		}
 	}
 
 	resetSecuritySchemes(api)
