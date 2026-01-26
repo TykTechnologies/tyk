@@ -8,6 +8,7 @@ import (
 
 	"github.com/TykTechnologies/tyk/ctx"
 	"github.com/TykTechnologies/tyk/internal/crypto"
+	"github.com/TykTechnologies/tyk/internal/otel"
 	"github.com/TykTechnologies/tyk/request"
 
 	"github.com/TykTechnologies/tyk-pump/analytics"
@@ -66,6 +67,16 @@ func (a *Record) WithRequest(req *http.Request, latency analytics.Latency) *Reco
 // WithResponse fills response details into the log fields.
 func (a *Record) WithResponse(resp *http.Response) *Record {
 	a.fields["status"] = resp.StatusCode
+	return a
+}
+
+// WithTraceID adds the OpenTelemetry trace ID to the access log record.
+// The trace ID is only added if a trace context exists in the request.
+func (a *Record) WithTraceID(req *http.Request) *Record {
+	traceID := otel.ExtractTraceID(req.Context())
+	if traceID != "" {
+		a.fields["trace_id"] = traceID
+	}
 	return a
 }
 
