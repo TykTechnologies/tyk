@@ -1341,6 +1341,9 @@ type VaultConfig struct {
 	// serer occurs
 	MaxRetries int `json:"max_retries"`
 
+	// Vault Namespace to use, leave blank if Vault Namespace is not used.
+	Namespace string `json:"namespace"`
+
 	Timeout time.Duration `json:"timeout"`
 
 	// Token is the vault root token

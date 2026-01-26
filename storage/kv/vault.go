@@ -132,6 +132,10 @@ func newVault(conf config.VaultConfig) (Store, error) {
 		return nil, err
 	}
 
+	if conf.Namespace != "" {
+		client.SetNamespace(conf.Namespace)
+	}
+
 	client.SetToken(conf.Token)
 
 	var v2 bool
