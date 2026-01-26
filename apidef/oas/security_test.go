@@ -227,74 +227,201 @@ func TestOAS_ApiKeyScheme(t *testing.T) {
 	})
 }
 
-func TestOAS_CertificateAuth(t *testing.T) {
-	const securityName = "custom"
-
-	oas := OAS{
-		T: openapi3.T{
-			Components: &openapi3.Components{
-				SecuritySchemes: openapi3.SecuritySchemes{
-					securityName: {
-						Value: &openapi3.SecurityScheme{
-							Type: typeCertificate,
-						},
-					},
-				},
-			},
-			Security: openapi3.SecurityRequirements{
-				{
-					securityName: []string{},
-				},
-			},
-		},
-	}
-
-	setCertAuth := func(certAuth CertificateAuth) {
-		oas.Extensions = map[string]interface{}{
-			ExtensionTykAPIGateway: &XTykAPIGateway{
-				Server: Server{
-					Authentication: &Authentication{
-						SecuritySchemes: SecuritySchemes{
-							securityName: &certAuth,
-						},
-					},
-				},
-			},
-		}
-	}
-
-	convertAPI := func() OAS {
-		var api apidef.APIDefinition
+func TestOAS_CertificateAuthWithTokenAuth(t *testing.T) {
+	t.Run("both schemes enabled", func(t *testing.T) {
+		// Create API with UseCertificate = true
+		api := apidef.APIDefinition{}
 		api.AuthConfigs = make(map[string]apidef.AuthConfig)
-		oas.extractCertificateAuthTo(&api, securityName)
-
-		var convertedOAS OAS
-		convertedOAS.Components = &openapi3.Components{
-			SecuritySchemes: oas.Components.SecuritySchemes,
+		api.UseStandardAuth = true
+		api.AuthConfigs[apidef.AuthTokenType] = apidef.AuthConfig{
+			Name:           apidef.AuthTokenType,
+			UseCertificate: true,
+			AuthHeaderName: "Authorization",
 		}
 
-		convertedOAS.SetTykExtension(&XTykAPIGateway{Server: Server{Authentication: &Authentication{SecuritySchemes: SecuritySchemes{}}}})
-		convertedOAS.fillCertificateAuth(api)
-		return convertedOAS
-	}
+		// Convert to OAS
+		oas := OAS{}
+		oas.Components = &openapi3.Components{
+			SecuritySchemes: make(openapi3.SecuritySchemes),
+		}
+		oas.SetTykExtension(&XTykAPIGateway{Server: Server{Authentication: &Authentication{SecuritySchemes: SecuritySchemes{}}}})
+		oas.fillSecurity(api)
 
-	t.Run("enabled", func(t *testing.T) {
-		var certAuth CertificateAuth
-		Fill(t, &certAuth, 0)
+		// Verify both security schemes exist in Tyk extensions
+		tokenScheme := oas.getTykSecuritySchemes()[apidef.AuthTokenType]
+		certScheme := oas.getTykSecuritySchemes()[apidef.CertificateAuthType]
 
-		setCertAuth(certAuth)
-		convertedOAS := convertAPI()
+		assert.NotNil(t, tokenScheme)
+		assert.NotNil(t, certScheme)
 
-		assert.Equal(t, oas, convertedOAS)
+		// Verify both schemes in OpenAPI components
+		tokenComponent := oas.Components.SecuritySchemes[apidef.AuthTokenType]
+		certComponent := oas.Components.SecuritySchemes[apidef.CertificateAuthType]
+
+		assert.NotNil(t, tokenComponent)
+		assert.NotNil(t, certComponent)
+		assert.Equal(t, typeAPIKey, tokenComponent.Value.Type)
+		assert.Equal(t, typeCertificate, certComponent.Value.Type)
+
+		// Verify both in security requirements
+		securityReqs := oas.Security
+		assert.GreaterOrEqual(t, len(securityReqs), 1)
+
+		// Security requirements should contain both schemes
+		foundToken := false
+		foundCert := false
+		for _, req := range securityReqs {
+			if _, exists := req[apidef.AuthTokenType]; exists {
+				foundToken = true
+			}
+			if _, exists := req[apidef.CertificateAuthType]; exists {
+				foundCert = true
+			}
+		}
+		assert.True(t, foundToken, "Token auth should be in security requirements")
+		assert.True(t, foundCert, "Certificate auth should be in security requirements")
+
+		// Convert back to API definition
+		var convertedAPI apidef.APIDefinition
+		convertedAPI.AuthConfigs = make(map[string]apidef.AuthConfig)
+		oas.extractSecurityTo(&convertedAPI)
+
+		// Verify UseCertificate is preserved
+		authConfig, ok := convertedAPI.AuthConfigs[apidef.AuthTokenType]
+		assert.True(t, ok)
+		assert.True(t, authConfig.UseCertificate)
 	})
 
-	t.Run("disabled", func(t *testing.T) {
-		var certAuth CertificateAuth
+	t.Run("certificate auth disabled", func(t *testing.T) {
+		// Create API with UseCertificate = false
+		api := apidef.APIDefinition{}
+		api.AuthConfigs = make(map[string]apidef.AuthConfig)
+		api.UseStandardAuth = true
+		api.AuthConfigs[apidef.AuthTokenType] = apidef.AuthConfig{
+			Name:           apidef.AuthTokenType,
+			UseCertificate: false,
+			AuthHeaderName: "Authorization",
+		}
 
-		setCertAuth(certAuth)
-		convertedOAS := convertAPI()
+		// Convert to OAS
+		oas := OAS{}
+		oas.Components = &openapi3.Components{
+			SecuritySchemes: make(openapi3.SecuritySchemes),
+		}
+		oas.SetTykExtension(&XTykAPIGateway{Server: Server{Authentication: &Authentication{SecuritySchemes: SecuritySchemes{}}}})
+		oas.fillSecurity(api)
 
-		assert.Nil(t, convertedOAS.getTykSecuritySchemes()[securityName])
+		// Verify only token scheme exists in Tyk extensions
+		tokenScheme := oas.getTykSecuritySchemes()[apidef.AuthTokenType]
+		certScheme := oas.getTykSecuritySchemes()[apidef.CertificateAuthType]
+
+		assert.NotNil(t, tokenScheme)
+		assert.Nil(t, certScheme)
+
+		// Verify only token scheme in OpenAPI components
+		tokenComponent := oas.Components.SecuritySchemes[apidef.AuthTokenType]
+		certComponent := oas.Components.SecuritySchemes[apidef.CertificateAuthType]
+
+		assert.NotNil(t, tokenComponent)
+		assert.Nil(t, certComponent)
+
+		// Verify only token auth in security requirements
+		securityReqs := oas.Security
+		assert.GreaterOrEqual(t, len(securityReqs), 1)
+
+		// Security requirements should contain only token scheme
+		foundToken := false
+		foundCert := false
+		for _, req := range securityReqs {
+			if _, exists := req[apidef.AuthTokenType]; exists {
+				foundToken = true
+			}
+			if _, exists := req[apidef.CertificateAuthType]; exists {
+				foundCert = true
+			}
+		}
+		assert.True(t, foundToken, "Token auth should be in security requirements")
+		assert.False(t, foundCert, "Certificate auth should not be in security requirements")
+	})
+
+	t.Run("priority of certificate auth scheme over deprecated field", func(t *testing.T) {
+		// Create API for initial conversion
+		api := apidef.APIDefinition{}
+		api.AuthConfigs = make(map[string]apidef.AuthConfig)
+		api.UseStandardAuth = true
+		api.AuthConfigs[apidef.AuthTokenType] = apidef.AuthConfig{
+			Name:           apidef.AuthTokenType,
+			UseCertificate: true,
+			AuthHeaderName: "Authorization",
+		}
+
+		// Convert to OAS
+		oas := OAS{}
+		oas.Components = &openapi3.Components{
+			SecuritySchemes: make(openapi3.SecuritySchemes),
+		}
+		oas.SetTykExtension(&XTykAPIGateway{Server: Server{Authentication: &Authentication{SecuritySchemes: SecuritySchemes{}}}})
+		oas.fillSecurity(api)
+
+		// Get the token scheme and modify the deprecated field to have a different value
+		tokenScheme := oas.getTykSecuritySchemes()[apidef.AuthTokenType]
+		if tokenVal, ok := tokenScheme.(*Token); ok {
+			// Set deprecated field to false while cert auth scheme has true
+			tokenVal.EnableClientCertificate = false
+			oas.getTykSecuritySchemes()[apidef.AuthTokenType] = tokenVal
+		}
+
+		// Convert back to API definition
+		var convertedAPI apidef.APIDefinition
+		convertedAPI.AuthConfigs = make(map[string]apidef.AuthConfig)
+		oas.extractSecurityTo(&convertedAPI)
+
+		// Verify UseCertificate matches the certificate auth scheme (true)
+		// not the deprecated field (false)
+		authConfig, ok := convertedAPI.AuthConfigs[apidef.AuthTokenType]
+		assert.True(t, ok)
+		assert.True(t, authConfig.UseCertificate, "Certificate auth scheme should take precedence over deprecated field")
+	})
+
+	t.Run("fallback to deprecated field when no certificate scheme", func(t *testing.T) {
+		// Create API for initial conversion
+		api := apidef.APIDefinition{}
+		api.AuthConfigs = make(map[string]apidef.AuthConfig)
+		api.UseStandardAuth = true
+		api.AuthConfigs[apidef.AuthTokenType] = apidef.AuthConfig{
+			Name:           apidef.AuthTokenType,
+			UseCertificate: false, // No certificate auth
+			AuthHeaderName: "Authorization",
+		}
+
+		// Convert to OAS
+		oas := OAS{}
+		oas.Components = &openapi3.Components{
+			SecuritySchemes: make(openapi3.SecuritySchemes),
+		}
+		oas.SetTykExtension(&XTykAPIGateway{Server: Server{Authentication: &Authentication{SecuritySchemes: SecuritySchemes{}}}})
+		oas.fillSecurity(api)
+
+		// Get the token scheme and modify the deprecated field
+		tokenScheme := oas.getTykSecuritySchemes()[apidef.AuthTokenType]
+		if tokenVal, ok := tokenScheme.(*Token); ok {
+			// Set deprecated field to true
+			tokenVal.EnableClientCertificate = true
+			oas.getTykSecuritySchemes()[apidef.AuthTokenType] = tokenVal
+		}
+
+		// Verify no certificate auth scheme exists
+		assert.Nil(t, oas.getTykSecuritySchemes()[apidef.CertificateAuthType])
+
+		// Convert back to API definition
+		var convertedAPI apidef.APIDefinition
+		convertedAPI.AuthConfigs = make(map[string]apidef.AuthConfig)
+		oas.extractSecurityTo(&convertedAPI)
+
+		// Verify UseCertificate falls back to the deprecated field value (true)
+		authConfig, ok := convertedAPI.AuthConfigs[apidef.AuthTokenType]
+		assert.True(t, ok)
+		assert.True(t, authConfig.UseCertificate, "Should fall back to deprecated field when no certificate scheme exists")
 	})
 }
 
