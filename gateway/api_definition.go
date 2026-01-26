@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	vaultapi "github.com/hashicorp/vault/api"
 	"io"
 	"net/http"
 	"net/url"
@@ -491,12 +492,13 @@ func (a APIDefinitionLoader) FromDashboardService(endpoint string) ([]*APISpec, 
 var envRegex = regexp.MustCompile(`env://([^"]+)`)
 
 const (
-	prefixEnv       = "env://"
-	prefixSecrets   = "secrets://"
-	prefixConsul    = "consul://"
-	prefixVault     = "vault://"
-	prefixKeys      = "tyk-apis"
-	vaultSecretPath = "secret/data/"
+	prefixEnv               = "env://"
+	prefixSecrets           = "secrets://"
+	prefixConsul            = "consul://"
+	prefixVault             = "vault://"
+	prefixKeys              = "tyk-apis"
+	vaultSecretDataPath     = "secret/data/"
+	vaultSecretMetadataPath = "secret/metadata/"
 )
 
 func (a APIDefinitionLoader) replaceSecrets(in []byte) []byte {
@@ -558,30 +560,77 @@ func (a APIDefinitionLoader) replaceConsulSecrets(input *string) error {
 }
 
 func (a APIDefinitionLoader) replaceVaultSecrets(input *string) error {
-	if err := a.Gw.setUpVault(); err != nil {
-		return err
-	}
+	client := a.Gw.vaultKVStore.(*kv.Vault).Client()
 
-	secret, err := a.Gw.vaultKVStore.(*kv.Vault).Client().Logical().Read(vaultSecretPath + prefixKeys)
+	paths, err := getRecursivePaths(client, "")
 	if err != nil {
 		return err
 	}
+	// Adds base tyk-apis
+	paths = append(paths, "")
 
-	pairs, ok := secret.Data["data"]
-	if !ok {
-		return errors.New("no data returned")
+	pathToSecret := make(map[string]map[string]interface{})
+	for _, path := range paths {
+		secret, err := client.Logical().Read(vaultSecretDataPath + prefixKeys + path)
+		if err != nil {
+			return err
+		}
+
+		pairs, ok := secret.Data["data"]
+		if !ok {
+			return errors.New("no data returned")
+		}
+
+		pairsMap, ok := pairs.(map[string]interface{})
+		if !ok {
+			return errors.New("data is not in the map format")
+		}
+
+		pathToSecret[path] = pairsMap
 	}
 
-	pairsMap, ok := pairs.(map[string]interface{})
-	if !ok {
-		return errors.New("data is not in the map format")
-	}
-
-	for k, v := range pairsMap {
-		*input = strings.Replace(*input, prefixVault+k, fmt.Sprintf("%v", v), -1)
+	for path, pairsMap := range pathToSecret {
+		for k, v := range pairsMap {
+			var matching string
+			if strings.HasPrefix(path, "/") {
+				matching = prefixVault + path[1:] + "." + k
+			} else {
+				matching = prefixVault + k
+			}
+			*input = strings.Replace(*input, matching, fmt.Sprintf("%v", v), -1)
+		}
 	}
 
 	return nil
+}
+
+func getRecursivePaths(client *vaultapi.Client, path string) ([]string, error) {
+	var secretsPaths []string
+	secrets, err := client.Logical().List(vaultSecretMetadataPath + prefixKeys + path)
+	if err != nil {
+		return nil, err
+	}
+
+	keys, ok := secrets.Data["keys"]
+	if !ok {
+		return nil, errors.New("no keys returned")
+	}
+
+	for _, key := range keys.([]interface{}) {
+		keyString := key.(string)
+
+		if strings.HasSuffix(keyString, "/") {
+			paths, err := getRecursivePaths(client, path+"/"+keyString)
+			if err != nil {
+				return nil, err
+			}
+			secretsPaths = append(secretsPaths, paths...)
+		} else {
+			secretsPaths = append(secretsPaths, path+keyString)
+		}
+	}
+
+	return secretsPaths, nil
 }
 
 // FromCloud will connect and download ApiDefintions from a Mongo DB instance.
