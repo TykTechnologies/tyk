@@ -536,8 +536,11 @@ func (gw *Gateway) getTLSConfigForClient(baseConfig *tls.Config, listenPort int)
 			if newConfig.ClientAuth == tls.RequireAndVerifyClientCert {
 				newConfig.VerifyPeerCertificate = getClientValidator(hello, newConfig.ClientCAs)
 			}
-			newConfig.ClientCAs = x509.NewCertPool()
-			newConfig.ClientAuth = tls.RequestClientCert
+
+			if newConfig.ClientAuth >= tls.RequestClientCert {
+				newConfig.ClientCAs = x509.NewCertPool()
+				newConfig.ClientAuth = tls.RequestClientCert
+			}
 		}
 
 		if newConfig.ClientAuth == tls.RequireAndVerifyClientCert && isControlAPI && !gwConfig.Security.ControlAPIUseMutualTLS {
