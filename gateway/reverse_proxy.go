@@ -1975,6 +1975,11 @@ func (p *ReverseProxy) checkUpstreamCertificateExpiry(cert *tls.Certificate) {
 		return
 	}
 
+	// Check if the API is being unloaded - if context is cancelled, don't add new certificates
+	if p.TykAPISpec.upstreamCertExpiryCheckContext != nil && p.TykAPISpec.upstreamCertExpiryCheckContext.Err() != nil {
+		return
+	}
+
 	if cert == nil || cert.Leaf == nil {
 		p.logger.Warning("Skipping upstream certificate expiry check: invalid certificate")
 		return
