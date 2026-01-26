@@ -1502,28 +1502,28 @@ func (gw *Gateway) polHandler(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case http.MethodGet:
 		if polID != "" {
-			log.Debug("Requesting policy for", polID)
+			log.Debugf("Requesting policy for %v", polID)
 			obj, code = gw.handleGetPolicy(polID)
 		} else {
 			log.Debug("Requesting Policy list")
 			obj, code = gw.handleGetPolicyList()
 		}
 	case http.MethodPost:
-		log.Debug("Creating new definition file")
+		log.Debug("Creating a new policy")
 		obj, code = gw.handleAddOrUpdatePolicy(polID, r)
 	case http.MethodPut:
 		if polID != "" {
-			log.Debug("Updating existing Policy: ", polID)
+			log.Debugf("Updating existing policy %v", polID)
 			obj, code = gw.handleAddOrUpdatePolicy(polID, r)
 		} else {
-			obj, code = apiError("Must specify an apiID to update"), http.StatusBadRequest
+			obj, code = apiError("Must specify a polID to update"), http.StatusBadRequest
 		}
 	case http.MethodDelete:
 		if polID != "" {
-			log.Debug("Deleting policy for: ", polID)
+			log.Debugf("Deleting a policy for %v", polID)
 			obj, code = gw.handleDeletePolicy(polID)
 		} else {
-			obj, code = apiError("Must specify an apiID to delete"), http.StatusBadRequest
+			obj, code = apiError("Must specify a polID to delete"), http.StatusBadRequest
 		}
 	}
 
