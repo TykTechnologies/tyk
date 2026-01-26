@@ -3650,14 +3650,13 @@ func TestJWTMiddleware_InitThenUnload(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
 
-	gw := &Gateway{}
-	gw.SetConfig(config.Config{
+	ts.Gw.SetConfig(config.Config{
 		JWTSSLInsecureSkipVerify: true,
 	})
 
 	m := JWTMiddleware{
 		BaseMiddleware: &BaseMiddleware{
-			Gw: gw,
+			Gw: ts.Gw,
 		},
 	}
 
