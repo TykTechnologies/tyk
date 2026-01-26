@@ -5175,8 +5175,8 @@ func Test_buildJWKSCache(t *testing.T) {
 	}
 
 	for _, tt := range []testCase{
-		{"default timeout is 240", 240, config.Config{}},
-		{"invalid value is set to 240", 240, config.Config{JWKS: config.JWKSConfig{Cache: config.JWKSCacheConfig{Timeout: -1}}}},
+		{"default timeout if not provided", externalOAuthJWKCacheExpiration, config.Config{}},
+		{"invalid value is set to default", externalOAuthJWKCacheExpiration, config.Config{JWKS: config.JWKSConfig{Cache: config.JWKSCacheConfig{Timeout: -1}}}},
 		{"fetches value from config", 500, config.Config{JWKS: config.JWKSConfig{Cache: config.JWKSCacheConfig{Timeout: 500}}}},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
