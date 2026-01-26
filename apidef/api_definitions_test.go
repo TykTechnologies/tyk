@@ -131,7 +131,7 @@ func TestAPIDefinition_SetProtocol(t *testing.T) {
 
 	t.Run("overwrites existing values", func(t *testing.T) {
 		api := APIDefinition{
-			JsonRpcVersion:        "1.0",
+			JsonRpcVersion:      "1.0",
 			ApplicationProtocol: "old",
 		}
 
@@ -176,7 +176,7 @@ func TestAPIDefinition_MarkAsMCP(t *testing.T) {
 
 	t.Run("overwrites existing values", func(t *testing.T) {
 		api := APIDefinition{
-			JsonRpcVersion:        "1.0",
+			JsonRpcVersion:      "1.0",
 			ApplicationProtocol: "old",
 		}
 
