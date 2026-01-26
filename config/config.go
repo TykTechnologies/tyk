@@ -309,7 +309,7 @@ type AccessLogsConfig struct {
 }
 
 type HealthCheckConfig struct {
-	// Setting this value to `true` will enable the health-check endpoint on /Tyk/health.
+	// **Deprecated**. Setting this value to `true` will enable the health-check endpoint on /Tyk/health.
 	EnableHealthChecks bool `json:"enable_health_checks"`
 
 	// This setting defaults to 60 seconds. This is the time window that Tyk uses to sample health-check data.
