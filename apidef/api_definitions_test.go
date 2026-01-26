@@ -11,10 +11,10 @@ import (
 	"github.com/TykTechnologies/tyk/internal/service/gojsonschema"
 )
 
-func TestAPIDefinition_JsonProtocol(t *testing.T) {
-	t.Run("json protocol field marshaling", func(t *testing.T) {
+func TestAPIDefinition_JsonRpcVersion(t *testing.T) {
+	t.Run("json-rpc version field marshaling", func(t *testing.T) {
 		api := APIDefinition{
-			JsonProtocol: "2.0",
+			JsonRpcVersion: "2.0",
 		}
 
 		data, err := json.Marshal(api)
@@ -24,12 +24,12 @@ func TestAPIDefinition_JsonProtocol(t *testing.T) {
 		err = json.Unmarshal(data, &result)
 		assert.NoError(t, err)
 
-		assert.Equal(t, "2.0", result.JsonProtocol)
+		assert.Equal(t, "2.0", result.JsonRpcVersion)
 	})
 
-	t.Run("empty json protocol omitted", func(t *testing.T) {
+	t.Run("empty json-rpc version omitted", func(t *testing.T) {
 		api := APIDefinition{
-			JsonProtocol: "",
+			JsonRpcVersion: "",
 		}
 
 		data, err := json.Marshal(api)
@@ -38,15 +38,15 @@ func TestAPIDefinition_JsonProtocol(t *testing.T) {
 		assert.NotContains(t, string(data), "json_protocol")
 	})
 
-	t.Run("json protocol persists through encode/decode", func(t *testing.T) {
+	t.Run("json-rpc version persists through encode/decode", func(t *testing.T) {
 		api := APIDefinition{
-			JsonProtocol: "2.0",
+			JsonRpcVersion: "2.0",
 		}
 
 		api.EncodeForDB()
 		api.DecodeFromDB()
 
-		assert.Equal(t, "2.0", api.JsonProtocol)
+		assert.Equal(t, "2.0", api.JsonRpcVersion)
 	})
 }
 
@@ -111,7 +111,7 @@ func TestAPIDefinition_SetProtocol(t *testing.T) {
 
 		api.SetProtocol(JsonRPC20, AppProtocolMCP)
 
-		assert.Equal(t, JsonRPC20, api.JsonProtocol)
+		assert.Equal(t, JsonRPC20, api.JsonRpcVersion)
 		assert.Equal(t, AppProtocolMCP, api.ApplicationProtocol)
 		assert.True(t, api.IsMCP())
 	})
@@ -131,13 +131,13 @@ func TestAPIDefinition_SetProtocol(t *testing.T) {
 
 	t.Run("overwrites existing values", func(t *testing.T) {
 		api := APIDefinition{
-			JsonProtocol:        "1.0",
+			JsonRpcVersion:        "1.0",
 			ApplicationProtocol: "old",
 		}
 
 		api.SetProtocol(JsonRPC20, AppProtocolMCP)
 
-		assert.Equal(t, JsonRPC20, api.JsonProtocol)
+		assert.Equal(t, JsonRPC20, api.JsonRpcVersion)
 		assert.Equal(t, AppProtocolMCP, api.ApplicationProtocol)
 		assert.True(t, api.IsMCP())
 	})
@@ -147,7 +147,7 @@ func TestAPIDefinition_SetProtocol(t *testing.T) {
 
 		api.SetProtocol(JsonRPC20, "")
 
-		assert.Equal(t, JsonRPC20, api.JsonProtocol)
+		assert.Equal(t, JsonRPC20, api.JsonRpcVersion)
 		assert.Equal(t, "", api.ApplicationProtocol)
 		assert.False(t, api.IsMCP())
 	})
@@ -157,7 +157,7 @@ func TestAPIDefinition_SetProtocol(t *testing.T) {
 
 		api.SetProtocol("", "custom")
 
-		assert.Equal(t, "", api.JsonProtocol)
+		assert.Equal(t, "", api.JsonRpcVersion)
 		assert.Equal(t, "custom", api.ApplicationProtocol)
 		assert.False(t, api.IsMCP())
 	})
@@ -169,20 +169,20 @@ func TestAPIDefinition_MarkAsMCP(t *testing.T) {
 
 		api.MarkAsMCP()
 
-		assert.Equal(t, JsonRPC20, api.JsonProtocol)
+		assert.Equal(t, JsonRPC20, api.JsonRpcVersion)
 		assert.Equal(t, AppProtocolMCP, api.ApplicationProtocol)
 		assert.True(t, api.IsMCP())
 	})
 
 	t.Run("overwrites existing values", func(t *testing.T) {
 		api := APIDefinition{
-			JsonProtocol:        "1.0",
+			JsonRpcVersion:        "1.0",
 			ApplicationProtocol: "old",
 		}
 
 		api.MarkAsMCP()
 
-		assert.Equal(t, JsonRPC20, api.JsonProtocol)
+		assert.Equal(t, JsonRPC20, api.JsonRpcVersion)
 		assert.Equal(t, AppProtocolMCP, api.ApplicationProtocol)
 		assert.True(t, api.IsMCP())
 	})
@@ -194,7 +194,7 @@ func TestAPIDefinition_MarkAsMCP(t *testing.T) {
 		api.MarkAsMCP()
 		api.MarkAsMCP()
 
-		assert.Equal(t, JsonRPC20, api.JsonProtocol)
+		assert.Equal(t, JsonRPC20, api.JsonRpcVersion)
 		assert.Equal(t, AppProtocolMCP, api.ApplicationProtocol)
 		assert.True(t, api.IsMCP())
 	})
@@ -211,7 +211,7 @@ func TestAPIDefinition_MarkAsMCP(t *testing.T) {
 		assert.Equal(t, "test-api", api.Name)
 		assert.Equal(t, "123", api.APIID)
 		assert.Equal(t, "test", api.Slug)
-		assert.Equal(t, JsonRPC20, api.JsonProtocol)
+		assert.Equal(t, JsonRPC20, api.JsonRpcVersion)
 		assert.Equal(t, AppProtocolMCP, api.ApplicationProtocol)
 		assert.True(t, api.IsMCP())
 	})
@@ -225,7 +225,7 @@ func TestAPIDefinition_MarkAsMCP(t *testing.T) {
 		expected := APIDefinition{}
 		expected.SetProtocol(JsonRPC20, AppProtocolMCP)
 
-		assert.Equal(t, expected.JsonProtocol, api.JsonProtocol)
+		assert.Equal(t, expected.JsonRpcVersion, api.JsonRpcVersion)
 		assert.Equal(t, expected.ApplicationProtocol, api.ApplicationProtocol)
 		assert.Equal(t, expected.IsMCP(), api.IsMCP())
 	})

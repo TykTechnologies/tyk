@@ -171,7 +171,7 @@ func TestMiddleware_ExtractTo_MCPDetection(t *testing.T) {
 		api.SetDisabledFlags()
 		middleware.ExtractTo(&api)
 
-		assert.Equal(t, apidef.JsonRPC20, api.JsonProtocol)
+		assert.Equal(t, apidef.JsonRPC20, api.JsonRpcVersion)
 		assert.Equal(t, apidef.AppProtocolMCP, api.ApplicationProtocol)
 		assert.True(t, api.IsMCP())
 	})
@@ -189,7 +189,7 @@ func TestMiddleware_ExtractTo_MCPDetection(t *testing.T) {
 		api.SetDisabledFlags()
 		middleware.ExtractTo(&api)
 
-		assert.Equal(t, apidef.JsonRPC20, api.JsonProtocol)
+		assert.Equal(t, apidef.JsonRPC20, api.JsonRpcVersion)
 		assert.Equal(t, apidef.AppProtocolMCP, api.ApplicationProtocol)
 		assert.True(t, api.IsMCP())
 	})
@@ -207,7 +207,7 @@ func TestMiddleware_ExtractTo_MCPDetection(t *testing.T) {
 		api.SetDisabledFlags()
 		middleware.ExtractTo(&api)
 
-		assert.Equal(t, apidef.JsonRPC20, api.JsonProtocol)
+		assert.Equal(t, apidef.JsonRPC20, api.JsonRpcVersion)
 		assert.Equal(t, apidef.AppProtocolMCP, api.ApplicationProtocol)
 		assert.True(t, api.IsMCP())
 	})
@@ -229,7 +229,7 @@ func TestMiddleware_ExtractTo_MCPDetection(t *testing.T) {
 		api.SetDisabledFlags()
 		middleware.ExtractTo(&api)
 
-		assert.Equal(t, apidef.JsonRPC20, api.JsonProtocol)
+		assert.Equal(t, apidef.JsonRPC20, api.JsonRpcVersion)
 		assert.Equal(t, apidef.AppProtocolMCP, api.ApplicationProtocol)
 		assert.True(t, api.IsMCP())
 	})
@@ -245,7 +245,7 @@ func TestMiddleware_ExtractTo_MCPDetection(t *testing.T) {
 		api.SetDisabledFlags()
 		middleware.ExtractTo(&api)
 
-		assert.Empty(t, api.JsonProtocol)
+		assert.Empty(t, api.JsonRpcVersion)
 		assert.False(t, api.IsMCP())
 	})
 
@@ -260,7 +260,7 @@ func TestMiddleware_ExtractTo_MCPDetection(t *testing.T) {
 		api.SetDisabledFlags()
 		middleware.ExtractTo(&api)
 
-		assert.Empty(t, api.JsonProtocol)
+		assert.Empty(t, api.JsonRpcVersion)
 		assert.False(t, api.IsMCP())
 	})
 }
@@ -268,7 +268,7 @@ func TestMiddleware_ExtractTo_MCPDetection(t *testing.T) {
 func TestMiddleware_Fill_MCP(t *testing.T) {
 	t.Run("does not populate MCP fields when API is not MCP", func(t *testing.T) {
 		api := apidef.APIDefinition{
-			JsonProtocol:        "",
+			JsonRpcVersion:        "",
 			ApplicationProtocol: "",
 		}
 		api.SetDisabledFlags()
@@ -281,9 +281,9 @@ func TestMiddleware_Fill_MCP(t *testing.T) {
 		assert.Nil(t, middleware.McpPrompts)
 	})
 
-	t.Run("does not populate MCP fields when JsonProtocol is empty", func(t *testing.T) {
+	t.Run("does not populate MCP fields when JsonRpcVersion is empty", func(t *testing.T) {
 		api := apidef.APIDefinition{
-			JsonProtocol:        "",
+			JsonRpcVersion:        "",
 			ApplicationProtocol: apidef.AppProtocolMCP,
 		}
 		api.SetDisabledFlags()
@@ -298,7 +298,7 @@ func TestMiddleware_Fill_MCP(t *testing.T) {
 
 	t.Run("does not populate MCP fields when ApplicationProtocol is not MCP", func(t *testing.T) {
 		api := apidef.APIDefinition{
-			JsonProtocol:        apidef.JsonRPC20,
+			JsonRpcVersion:        apidef.JsonRPC20,
 			ApplicationProtocol: "a2a",
 		}
 		api.SetDisabledFlags()

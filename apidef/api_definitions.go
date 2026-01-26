@@ -672,7 +672,7 @@ type APIDefinition struct {
 	ListenPort          int            `bson:"listen_port" json:"listen_port"`
 	Protocol            string         `bson:"protocol" json:"protocol"`
 	EnableProxyProtocol bool           `bson:"enable_proxy_protocol" json:"enable_proxy_protocol"`
-	JsonProtocol        string         `bson:"json_protocol,omitempty" json:"json_protocol,omitempty"`
+	JsonRpcVersion      string         `bson:"json_protocol,omitempty" json:"json_protocol,omitempty"`
 	ApplicationProtocol string         `bson:"application_protocol,omitempty" json:"application_protocol,omitempty"`
 	APIID               string         `bson:"api_id" json:"api_id"`
 	OrgID               string         `bson:"org_id" json:"org_id"`
@@ -1440,7 +1440,7 @@ func (a *APIDefinition) GetAPIDomain() string {
 
 // SetProtocol configures the transport and application protocol for the API.
 func (a *APIDefinition) SetProtocol(transport, application string) {
-	a.JsonProtocol = transport
+	a.JsonRpcVersion = transport
 	a.ApplicationProtocol = application
 }
 
