@@ -189,6 +189,14 @@ func TestCertificateStorage(t *testing.T) {
 			t.Error("Wrong cert", leafSubjectName(certs[0]))
 		}
 	})
+
+	t.Run("Any certificates", func(t *testing.T) {
+		certs := m.ListAny([]string{certPath, storageCertID, privateCertID})
+
+		if len(certs) != 3 {
+			t.Error("Should return all certificates")
+		}
+	})
 }
 
 func TestStorageIndex(t *testing.T) {
