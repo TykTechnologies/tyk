@@ -171,7 +171,8 @@ func TestMiddleware_ExtractTo_MCPDetection(t *testing.T) {
 		api.SetDisabledFlags()
 		middleware.ExtractTo(&api)
 
-		assert.Equal(t, "2.0", api.JsonProtocol)
+		assert.Equal(t, apidef.JsonRPC20, api.JsonProtocol)
+		assert.Equal(t, apidef.AppProtocolMCP, api.ApplicationProtocol)
 		assert.True(t, api.IsMCP)
 	})
 
@@ -188,7 +189,8 @@ func TestMiddleware_ExtractTo_MCPDetection(t *testing.T) {
 		api.SetDisabledFlags()
 		middleware.ExtractTo(&api)
 
-		assert.Equal(t, "2.0", api.JsonProtocol)
+		assert.Equal(t, apidef.JsonRPC20, api.JsonProtocol)
+		assert.Equal(t, apidef.AppProtocolMCP, api.ApplicationProtocol)
 		assert.True(t, api.IsMCP)
 	})
 
@@ -205,7 +207,8 @@ func TestMiddleware_ExtractTo_MCPDetection(t *testing.T) {
 		api.SetDisabledFlags()
 		middleware.ExtractTo(&api)
 
-		assert.Equal(t, "2.0", api.JsonProtocol)
+		assert.Equal(t, apidef.JsonRPC20, api.JsonProtocol)
+		assert.Equal(t, apidef.AppProtocolMCP, api.ApplicationProtocol)
 		assert.True(t, api.IsMCP)
 	})
 
@@ -226,7 +229,8 @@ func TestMiddleware_ExtractTo_MCPDetection(t *testing.T) {
 		api.SetDisabledFlags()
 		middleware.ExtractTo(&api)
 
-		assert.Equal(t, "2.0", api.JsonProtocol)
+		assert.Equal(t, apidef.JsonRPC20, api.JsonProtocol)
+		assert.Equal(t, apidef.AppProtocolMCP, api.ApplicationProtocol)
 		assert.True(t, api.IsMCP)
 	})
 
