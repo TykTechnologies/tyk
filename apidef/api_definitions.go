@@ -672,7 +672,7 @@ type APIDefinition struct {
 	ListenPort          int            `bson:"listen_port" json:"listen_port"`
 	Protocol            string         `bson:"protocol" json:"protocol"`
 	EnableProxyProtocol bool           `bson:"enable_proxy_protocol" json:"enable_proxy_protocol"`
-	JsonRpcVersion      string         `bson:"json_protocol,omitempty" json:"json_protocol,omitempty"`
+	JsonRpcVersion      string         `bson:"json_rpc_version,omitempty" json:"json_rpc_version,omitempty"`
 	ApplicationProtocol string         `bson:"application_protocol,omitempty" json:"application_protocol,omitempty"`
 	APIID               string         `bson:"api_id" json:"api_id"`
 	OrgID               string         `bson:"org_id" json:"org_id"`

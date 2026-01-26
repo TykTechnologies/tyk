@@ -35,7 +35,7 @@ func TestAPIDefinition_JsonRpcVersion(t *testing.T) {
 		data, err := json.Marshal(api)
 		assert.NoError(t, err)
 
-		assert.NotContains(t, string(data), "json_protocol")
+		assert.NotContains(t, string(data), "json_rpc_version")
 	})
 
 	t.Run("json-rpc version persists through encode/decode", func(t *testing.T) {
