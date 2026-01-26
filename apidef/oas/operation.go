@@ -31,6 +31,9 @@ type Operation struct {
 	// Tyk classic API definition: version_data.versions..extended_paths.ignored[].
 	IgnoreAuthentication *Allowance `bson:"ignoreAuthentication,omitempty" json:"ignoreAuthentication,omitempty"`
 
+	// TrafficShaping contains configuration for traffic control and gradual rollouts.
+	TrafficShaping *TrafficShaping `bson:"trafficShaping,omitempty" json:"trafficShaping,omitempty"`
+
 	// Internal makes the endpoint only respond to internal requests.
 	Internal *Internal `bson:"internal,omitempty" json:"internal,omitempty"`
 

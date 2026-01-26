@@ -8,6 +8,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/TykTechnologies/tyk/internal/errors"
+
 	"github.com/getkin/kin-openapi/routers"
 
 	"github.com/TykTechnologies/tyk-pump/analytics"
@@ -152,6 +154,20 @@ func (a *APISpec) injectIntoReqContext(req *http.Request) {
 	} else {
 		ctx.SetDefinition(req, a.APIDefinition)
 	}
+}
+
+// GetTykExtension returns the Tyk extension from the OAS definition
+func (a *APISpec) GetTykExtension() *oas.XTykAPIGateway {
+	if !a.IsOAS {
+		return nil
+	}
+}
+
+func (a *APISpec) GetTykExtension() *oas.XTykAPIGateway {
+	if !a.IsOAS {
+		return nil
+	}
+	return a.OAS.GetTykExtension()
 }
 
 func (a *APISpec) findOperation(r *http.Request) *Operation {
