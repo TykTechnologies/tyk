@@ -37,6 +37,10 @@ func (t *RequestSizeLimitMiddleware) Name() string {
 }
 
 func (t *RequestSizeLimitMiddleware) EnabledForSpec() bool {
+	if t.Spec.GlobalConfig.HttpServerOptions.MaxRequestBodySize > 0 {
+		return true
+	}
+
 	for _, version := range t.Spec.VersionData.Versions {
 		if len(version.ExtendedPaths.SizeLimit) > 0 ||
 			(!version.GlobalSizeLimitDisabled && version.GlobalSizeLimit > 0) {
@@ -81,6 +85,18 @@ func (t *RequestSizeLimitMiddleware) ProcessRequest(w http.ResponseWriter, r *ht
 	logger.Debug("Request size limiter active")
 
 	vInfo, _ := t.Spec.Version(r)
+
+	globalConfigMaxRequestBodySize := t.Spec.GlobalConfig.HttpServerOptions.MaxRequestBodySize
+	logger.Debug("Global config max request body size limit is: ", globalConfigMaxRequestBodySize)
+	// Check global config max request body size first
+	if globalConfigMaxRequestBodySize > 0 {
+		logger.Debug("Checking global max request body size limit")
+		err, code := t.checkRequestLimit(r, globalConfigMaxRequestBodySize)
+		// If not OK, block
+		if code != http.StatusOK {
+			return err, code
+		}
+	}
 
 	logger.Debug("Global limit is: ", vInfo.GlobalSizeLimit)
 	// Manage global headers first
