@@ -1,0 +1,44 @@
+version: api.keploy.io/v1beta1
+kind: Http
+name: test-1
+spec:
+    metadata: {}
+    req:
+        method: GET
+        proto_major: 1
+        proto_minor: 1
+        url: http://localhost:8080/keyless-test/get
+        header:
+            Accept: '*/*'
+            Host: localhost:8080
+            User-Agent: curl/7.81.0
+        body: ""
+        timestamp: 2024-04-01T06:22:36.807182172Z
+    resp:
+        status_code: 200
+        header:
+            Access-Control-Allow-Credentials: "true"
+            Access-Control-Allow-Origin: '*'
+            Content-Length: "291"
+            Content-Type: application/json
+            Date: Mon, 01 Apr 2024 06:22:39 GMT
+            Server: gunicorn/19.9.0
+            X-Ratelimit-Limit: "0"
+            X-Ratelimit-Remaining: "0"
+            X-Ratelimit-Reset: "0"
+        body: "{\n  \"args\": {}, \n  \"headers\": {\n    \"Accept\": \"*/*\", \n    \"Accept-Encoding\": \"gzip\", \n    \"Host\": \"httpbin.org\", \n    \"User-Agent\": \"curl/7.81.0\", \n    \"X-Amzn-Trace-Id\": \"Root=1-660a52af-64e761a76dbd3535409013a4\"\n  }, \n  \"origin\": \"::1, 152.58.242.19\", \n  \"url\": \"http://httpbin.org/get\"\n}\n"
+        status_message: OK
+        proto_major: 0
+        proto_minor: 0
+        timestamp: 2024-04-01T06:22:41.41418356Z
+    objects: []
+    assertions:
+        noise:
+            header.Date: []
+    created: 1711952561
+curl: |
+    curl --request GET \
+      --url http://localhost:8080/keyless-test/get \
+      --header 'User-Agent: curl/7.81.0' \
+      --header 'Accept: */*' \
+      --header 'Host: localhost:8080' \
