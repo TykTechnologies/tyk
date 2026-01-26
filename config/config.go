@@ -526,7 +526,7 @@ type HttpServerOptionsConfig struct {
 	// Disable TLS verification. Required if you are using self-signed certificates.
 	SSLInsecureSkipVerify bool `json:"ssl_insecure_skip_verify"`
 
-	// Enabled WebSockets and server side events support
+	// Enabled WebSockets and server-sent events support
 	EnableWebSockets bool `json:"enable_websockets"`
 
 	// Deprecated: Use `ssl_certificates`instead.
@@ -553,7 +553,7 @@ type HttpServerOptionsConfig struct {
 	SkipClientCAAnnouncement bool `json:"skip_client_ca_announcement"`
 
 	// Set this to the number of seconds that Tyk uses to flush content from the proxied upstream connection to the open downstream connection.
-	// This option needed be set for streaming protocols like Server Side Events, or gRPC streaming.
+	// This option needed be set for streaming protocols like server-sent events, or gRPC streaming.
 	FlushInterval int `json:"flush_interval"`
 
 	// Allow the use of a double slash in a URL path. This can be useful if you need to pass raw URLs to your API endpoints.
