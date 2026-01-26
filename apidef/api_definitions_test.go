@@ -11,6 +11,134 @@ import (
 	"github.com/TykTechnologies/tyk/internal/service/gojsonschema"
 )
 
+func TestAPIDefinition_JsonProtocol(t *testing.T) {
+	t.Run("json protocol field marshaling", func(t *testing.T) {
+		api := APIDefinition{
+			JsonProtocol: "2.0",
+		}
+
+		data, err := json.Marshal(api)
+		assert.NoError(t, err)
+
+		var result APIDefinition
+		err = json.Unmarshal(data, &result)
+		assert.NoError(t, err)
+
+		assert.Equal(t, "2.0", result.JsonProtocol)
+	})
+
+	t.Run("empty json protocol omitted", func(t *testing.T) {
+		api := APIDefinition{
+			JsonProtocol: "",
+		}
+
+		data, err := json.Marshal(api)
+		assert.NoError(t, err)
+
+		assert.NotContains(t, string(data), "json_protocol")
+	})
+
+	t.Run("json protocol persists through encode/decode", func(t *testing.T) {
+		api := APIDefinition{
+			JsonProtocol: "2.0",
+		}
+
+		api.EncodeForDB()
+		api.DecodeFromDB()
+
+		assert.Equal(t, "2.0", api.JsonProtocol)
+	})
+}
+
+func TestAPIDefinition_MarkAsMCP(t *testing.T) {
+	t.Run("marks API as MCP", func(t *testing.T) {
+		api := APIDefinition{}
+
+		api.MarkAsMCP()
+
+		assert.Equal(t, "2.0", api.JsonProtocol)
+		assert.True(t, api.IsMCP)
+	})
+
+	t.Run("overwrites existing values", func(t *testing.T) {
+		api := APIDefinition{
+			JsonProtocol: "1.0",
+			IsMCP:        false,
+		}
+
+		api.MarkAsMCP()
+
+		assert.Equal(t, "2.0", api.JsonProtocol)
+		assert.True(t, api.IsMCP)
+	})
+
+	t.Run("is idempotent", func(t *testing.T) {
+		api := APIDefinition{}
+
+		api.MarkAsMCP()
+		api.MarkAsMCP()
+		api.MarkAsMCP()
+
+		assert.Equal(t, "2.0", api.JsonProtocol)
+		assert.True(t, api.IsMCP)
+	})
+
+	t.Run("does not affect other fields", func(t *testing.T) {
+		api := APIDefinition{
+			Name:  "test-api",
+			APIID: "123",
+			Slug:  "test",
+		}
+
+		api.MarkAsMCP()
+
+		assert.Equal(t, "test-api", api.Name)
+		assert.Equal(t, "123", api.APIID)
+		assert.Equal(t, "test", api.Slug)
+		assert.Equal(t, "2.0", api.JsonProtocol)
+		assert.True(t, api.IsMCP)
+	})
+}
+
+func TestAPIDefinition_IsMCP(t *testing.T) {
+	t.Run("is mcp field marshaling", func(t *testing.T) {
+		api := APIDefinition{
+			IsMCP: true,
+		}
+
+		data, err := json.Marshal(api)
+		assert.NoError(t, err)
+
+		var result APIDefinition
+		err = json.Unmarshal(data, &result)
+		assert.NoError(t, err)
+
+		assert.True(t, result.IsMCP)
+	})
+
+	t.Run("false is mcp omitted", func(t *testing.T) {
+		api := APIDefinition{
+			IsMCP: false,
+		}
+
+		data, err := json.Marshal(api)
+		assert.NoError(t, err)
+
+		assert.NotContains(t, string(data), "is_mcp")
+	})
+
+	t.Run("is mcp persists through encode/decode", func(t *testing.T) {
+		api := APIDefinition{
+			IsMCP: true,
+		}
+
+		api.EncodeForDB()
+		api.DecodeFromDB()
+
+		assert.True(t, api.IsMCP)
+	})
+}
+
 func TestSchema(t *testing.T) {
 	schemaLoader := gojsonschema.NewBytesLoader([]byte(Schema))
 

@@ -666,6 +666,8 @@ type APIDefinition struct {
 	ListenPort          int            `bson:"listen_port" json:"listen_port"`
 	Protocol            string         `bson:"protocol" json:"protocol"`
 	EnableProxyProtocol bool           `bson:"enable_proxy_protocol" json:"enable_proxy_protocol"`
+	JsonProtocol        string         `bson:"json_protocol,omitempty" json:"json_protocol,omitempty"`
+	IsMCP               bool           `bson:"is_mcp,omitempty" json:"is_mcp,omitempty"`
 	APIID               string         `bson:"api_id" json:"api_id"`
 	OrgID               string         `bson:"org_id" json:"org_id"`
 	UseKeylessAccess    bool           `bson:"use_keyless" json:"use_keyless"`
@@ -1428,6 +1430,12 @@ func (a *APIDefinition) GetAPIDomain() string {
 		return ""
 	}
 	return a.Domain
+}
+
+// MarkAsMCP configures the API definition as a Model Context Protocol (MCP) API.
+func (a *APIDefinition) MarkAsMCP() {
+	a.JsonProtocol = "2.0"
+	a.IsMCP = true
 }
 
 // IsChildAPI returns true if this API is a child API in a versioning hierarchy.
