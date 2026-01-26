@@ -2,7 +2,7 @@ openapi: 3.0.3
 info:
   contact:
     email: support@tyk.io
-    name: Tyk Technologies
+    name: Tyk Technologies 
     url: https://tyk.io/contact
   description: |+
     <img src="https://tyk.io/docs/img/swagger_gateway_image.png" width="963" height="250">
