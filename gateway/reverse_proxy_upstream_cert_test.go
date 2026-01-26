@@ -382,7 +382,7 @@ func TestReverseProxy_checkUpstreamCertificateExpiry(t *testing.T) {
 		ts := StartTest(nil)
 		defer ts.Close()
 
-		spec := BuildAPI(func(spec *APISpec) {
+		spec := ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 			spec.APIID = "test-api"
 			spec.Name = "Test API"
 			spec.Proxy.ListenPath = "/test/"
@@ -391,12 +391,12 @@ func TestReverseProxy_checkUpstreamCertificateExpiry(t *testing.T) {
 			}
 		})[0]
 
-		// Inject mock batcher
+		// Inject mock batcher after API is loaded
 		spec.UpstreamCertExpiryBatcher = mockBatcher
 		spec.upstreamCertExpiryCheckContext = context.Background()
 		spec.upstreamCertExpiryCancelFunc = func() {}
-
-		ts.Gw.LoadAPI(spec)
+		// Mark sync.Once as done so it doesn't try to initialize again
+		spec.upstreamCertExpiryInitOnce.Do(func() {})
 
 		proxy := &ReverseProxy{
 			TykAPISpec: spec,
