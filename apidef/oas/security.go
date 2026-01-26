@@ -10,6 +10,7 @@ import (
 
 const (
 	typeAPIKey      = "apiKey"
+	typeCertificate = "certificate"
 	typeHTTP        = "http"
 	typeOAuth2      = "oauth2"
 	schemeBearer    = "bearer"
@@ -53,11 +54,6 @@ type CertificateAuth struct {
 	//
 	// Tyk classic API definition: `auth_configs["authToken"].use_certificate`
 	Enabled bool `bson:"enabled" json:"enabled"`
-}
-
-// Import populates *CertificateAuth from argument values.
-func (c *CertificateAuth) Import(enable bool) {
-	c.Enabled = enable
 }
 
 // Import populates *Token from argument values.
@@ -1060,58 +1056,45 @@ func (s *OAS) fillCertificateAuth(api apidef.APIDefinition) {
 		return
 	}
 
-	certAuth := &CertificateAuth{}
-	certAuth.Import(authConfig.UseCertificate)
+	s.appendSecurity(authConfig.Name)
 
-	s.getTykSecuritySchemes()["certificateAuth"] = certAuth
+	certAuth := &CertificateAuth{}
+	certAuth.Enabled = authConfig.UseCertificate
+
+	s.getTykSecuritySchemes()[authConfig.Name] = certAuth
 
 	if ShouldOmit(certAuth) {
-		delete(s.getTykSecuritySchemes(), "certificateAuth")
+		delete(s.getTykSecuritySchemes(), apidef.CertificateAuthType)
 	}
 }
 
-func (s *OAS) extractCertificateAuthTo(api *apidef.APIDefinition) {
-	certAuth := s.getTykCertificateAuth("certificateAuth")
-	if certAuth == nil || !certAuth.Enabled {
-		return
+func (s *OAS) extractCertificateAuthTo(api *apidef.APIDefinition, name string) {
+	authConfig := apidef.AuthConfig{DisableHeader: true}
+	authConfig.Name = name
+	certAuth := s.getTykCertificateAuth(name)
+
+	if certAuth != nil {
+		authConfig.UseCertificate = certAuth.Enabled
 	}
 
-	// Get the existing authToken config or create a new one
-	authConfig, ok := api.AuthConfigs[apidef.AuthTokenType]
-	if !ok {
-		authConfig = apidef.AuthConfig{
-			Name: apidef.AuthTokenType,
-		}
-	}
-
-	// Set the certificate flag
-	authConfig.UseCertificate = certAuth.Enabled
-
-	// Update the authToken config
 	api.AuthConfigs[apidef.AuthTokenType] = authConfig
 }
 
 // Helper to get the certificate auth configuration
 func (s *OAS) getTykCertificateAuth(name string) *CertificateAuth {
-	if s.Components == nil || s.Components.Extensions == nil {
+	securityScheme := s.getTykSecuritySchemes()[name]
+	if securityScheme == nil {
 		return nil
 	}
 
-	tykSecuritySchemes := s.getTykSecuritySchemes()
-	if tykSecuritySchemes == nil {
-		return nil
+	certAuth := &CertificateAuth{}
+	if certVal, ok := securityScheme.(*CertificateAuth); ok {
+		certAuth = certVal
+	} else {
+		if toStructIfMap(securityScheme, certAuth) {
+			s.getTykSecuritySchemes()[name] = certAuth
+		}
 	}
-
-	scheme, ok := tykSecuritySchemes[name]
-	if !ok {
-		return nil
-	}
-
-	certAuth, ok := scheme.(*CertificateAuth)
-	if !ok {
-		return nil
-	}
-
 	return certAuth
 }
 
@@ -1121,7 +1104,6 @@ func (s *OAS) isCertificateAuthScheme(schemeName string) bool {
 }
 
 func (s *OAS) fillSecurity(api apidef.APIDefinition) {
-	s.fillCertificateAuth(api)
 	tykAuthentication := s.GetTykExtension().Server.Authentication
 	if tykAuthentication == nil {
 		tykAuthentication = &Authentication{}
@@ -1145,6 +1127,7 @@ func (s *OAS) fillSecurity(api apidef.APIDefinition) {
 	}
 
 	s.fillToken(api)
+	s.fillCertificateAuth(api)
 	s.fillJWT(api)
 	s.fillBasic(api)
 	s.fillOAuth(api)
@@ -1268,33 +1251,8 @@ func (s *OAS) fillSecurity(api apidef.APIDefinition) {
 }
 
 func (s *OAS) extractSecurityTo(api *apidef.APIDefinition) {
-	s.extractCertificateAuthTo(api)
 	if s.getTykAuthentication() == nil {
 		s.GetTykExtension().Server.Authentication = &Authentication{}
-		defer func() {
-			if ShouldOmit(s.GetTykExtension().Server.Authentication) {
-				s.GetTykExtension().Server.Authentication = nil
-			}
-		}()
-	}
-
-	// Check for certificate auth in security requirements
-	for _, secReq := range s.Security {
-		for secName := range secReq {
-			if s.isCertificateAuthScheme(secName) {
-				certAuth := s.getTykCertificateAuth(secName)
-				if certAuth != nil && certAuth.Enabled {
-					// Certificate auth is enabled in security requirements
-					if api.AuthConfigs == nil {
-						api.AuthConfigs = make(map[string]apidef.AuthConfig)
-					}
-					authConfig := api.AuthConfigs[apidef.AuthTokenType]
-					authConfig.Name = apidef.AuthTokenType
-					authConfig.UseCertificate = true
-					api.AuthConfigs[apidef.AuthTokenType] = authConfig
-				}
-			}
-		}
 	}
 
 	resetSecuritySchemes(api)

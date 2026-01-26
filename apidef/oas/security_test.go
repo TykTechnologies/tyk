@@ -227,6 +227,77 @@ func TestOAS_ApiKeyScheme(t *testing.T) {
 	})
 }
 
+func TestOAS_CertificateAuth(t *testing.T) {
+	const securityName = "custom"
+
+	oas := OAS{
+		T: openapi3.T{
+			Components: &openapi3.Components{
+				SecuritySchemes: openapi3.SecuritySchemes{
+					securityName: {
+						Value: &openapi3.SecurityScheme{
+							Type: typeCertificate,
+						},
+					},
+				},
+			},
+			Security: openapi3.SecurityRequirements{
+				{
+					securityName: []string{},
+				},
+			},
+		},
+	}
+
+	setCertAuth := func(certAuth CertificateAuth) {
+		oas.Extensions = map[string]interface{}{
+			ExtensionTykAPIGateway: &XTykAPIGateway{
+				Server: Server{
+					Authentication: &Authentication{
+						SecuritySchemes: SecuritySchemes{
+							securityName: &certAuth,
+						},
+					},
+				},
+			},
+		}
+	}
+
+	convertAPI := func() OAS {
+		var api apidef.APIDefinition
+		api.AuthConfigs = make(map[string]apidef.AuthConfig)
+		oas.extractCertificateAuthTo(&api, securityName)
+
+		var convertedOAS OAS
+		convertedOAS.Components = &openapi3.Components{
+			SecuritySchemes: oas.Components.SecuritySchemes,
+		}
+
+		convertedOAS.SetTykExtension(&XTykAPIGateway{Server: Server{Authentication: &Authentication{SecuritySchemes: SecuritySchemes{}}}})
+		convertedOAS.fillCertificateAuth(api)
+		return convertedOAS
+	}
+
+	t.Run("enabled", func(t *testing.T) {
+		var certAuth CertificateAuth
+		Fill(t, &certAuth, 0)
+
+		setCertAuth(certAuth)
+		convertedOAS := convertAPI()
+
+		assert.Equal(t, oas, convertedOAS)
+	})
+
+	t.Run("disabled", func(t *testing.T) {
+		var certAuth CertificateAuth
+
+		setCertAuth(certAuth)
+		convertedOAS := convertAPI()
+
+		assert.Nil(t, convertedOAS.getTykSecuritySchemes()[securityName])
+	})
+}
+
 func TestOAS_Token(t *testing.T) {
 	const securityName = "custom"
 
