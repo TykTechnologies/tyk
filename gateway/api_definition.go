@@ -562,7 +562,13 @@ func (a APIDefinitionLoader) replaceVaultSecrets(input *string) error {
 		return err
 	}
 
-	secret, err := a.Gw.vaultKVStore.(*kv.Vault).Client().Logical().Read(vaultSecretPath + prefixKeys)
+	vault, ok := a.Gw.vaultKVStore.(kv.SecretReader)
+	if !ok {
+		log.Errorf("KV store %T does not implement SecretReader", a.Gw.vaultKVStore)
+		return errors.New("could not read secrets")
+	}
+
+	secret, err := vault.ReadSecret(vaultSecretPath + prefixKeys)
 	if err != nil {
 		return err
 	}
