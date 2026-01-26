@@ -2670,7 +2670,7 @@
           "type": "string"
         },
         "weight": {
-          "type": "number"
+          "type": "numbe"
         }
       },
       "required": [
