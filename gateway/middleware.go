@@ -458,6 +458,11 @@ func (t *BaseMiddleware) RecordAccessLog(req *http.Request, resp *http.Response,
 	accessLog.WithRequest(req, latency)
 	accessLog.WithResponse(resp)
 
+	// Only include trace_id when OpenTelemetry is enabled
+	if gwConfig.OpenTelemetry.Enabled {
+		accessLog.WithTraceID(req)
+	}
+
 	logFields := accessLog.Fields(allowedFields)
 
 	t.Logger().WithFields(logFields).Info()
