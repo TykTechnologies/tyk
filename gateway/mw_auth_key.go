@@ -195,7 +195,10 @@ func (k *AuthKey) ProcessRequest(_ http.ResponseWriter, r *http.Request, _ inter
 }
 
 func (k *AuthKey) reportInvalidKey(key string, r *http.Request, msg string, errMsg string) (error, int) {
-	k.Logger().WithField("key", k.Gw.obfuscateKey(key)).Info(msg)
+	k.Logger().
+		WithField("key", k.Gw.obfuscateKey(key)).
+		WithField("key_hashed", storage.HashKey(key, k.Gw.GetConfig().HashKeys)).
+		Info(msg)
 
 	// Fire Authfailed Event
 	AuthFailed(k, r, key)
@@ -223,7 +226,6 @@ func (k *AuthKey) shouldValidateCertificateBinding(session *user.SessionState) b
 }
 
 func (k *AuthKey) validateSignature(r *http.Request, key string) (error, int) {
-
 	_, authConfig := k.getAuthToken(k.getAuthType(), r)
 	logger := k.Logger().WithField("key", k.Gw.obfuscateKey(key))
 
