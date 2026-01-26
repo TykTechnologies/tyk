@@ -28,6 +28,7 @@ const (
 	cacheCleanInterval = 600 // 10 minutes.
 )
 
+// test
 var (
 	CertManagerLogPrefix = "cert_storage"
 )
