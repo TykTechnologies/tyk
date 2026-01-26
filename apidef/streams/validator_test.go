@@ -8,10 +8,9 @@ import (
 	"testing"
 
 	"github.com/buger/jsonparser"
+	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
-	"github.com/TykTechnologies/kin-openapi/openapi3"
 
 	"github.com/TykTechnologies/tyk/apidef/oas"
 
@@ -28,7 +27,7 @@ func TestValidateTykStreamsOASObject(t *testing.T) {
 		T: openapi3.T{
 			OpenAPI:    "3.0.3",
 			Info:       &openapi3.Info{},
-			Paths:      map[string]*openapi3.PathItem{},
+			Paths:      openapi3.NewPaths(),
 			Extensions: map[string]interface{}{},
 		},
 	}
