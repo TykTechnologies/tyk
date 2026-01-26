@@ -113,34 +113,33 @@ func TestAPIDefinition_SetProtocol(t *testing.T) {
 
 		assert.Equal(t, JsonRPC20, api.JsonProtocol)
 		assert.Equal(t, AppProtocolMCP, api.ApplicationProtocol)
-		assert.True(t, api.IsMCP)
+		assert.True(t, api.IsMCP())
 	})
 
-	t.Run("syncs IsMCP field with MCP application protocol", func(t *testing.T) {
+	t.Run("IsMCP method returns correct value based on application protocol", func(t *testing.T) {
 		api := APIDefinition{}
 
 		api.SetProtocol(JsonRPC20, AppProtocolMCP)
-		assert.True(t, api.IsMCP)
+		assert.True(t, api.IsMCP())
 
 		api.SetProtocol(JsonRPC20, "a2a")
-		assert.False(t, api.IsMCP)
+		assert.False(t, api.IsMCP())
 
 		api.SetProtocol(JsonRPC20, AppProtocolMCP)
-		assert.True(t, api.IsMCP)
+		assert.True(t, api.IsMCP())
 	})
 
 	t.Run("overwrites existing values", func(t *testing.T) {
 		api := APIDefinition{
 			JsonProtocol:        "1.0",
 			ApplicationProtocol: "old",
-			IsMCP:               false,
 		}
 
 		api.SetProtocol(JsonRPC20, AppProtocolMCP)
 
 		assert.Equal(t, JsonRPC20, api.JsonProtocol)
 		assert.Equal(t, AppProtocolMCP, api.ApplicationProtocol)
-		assert.True(t, api.IsMCP)
+		assert.True(t, api.IsMCP())
 	})
 
 	t.Run("allows empty application protocol", func(t *testing.T) {
@@ -150,7 +149,7 @@ func TestAPIDefinition_SetProtocol(t *testing.T) {
 
 		assert.Equal(t, JsonRPC20, api.JsonProtocol)
 		assert.Equal(t, "", api.ApplicationProtocol)
-		assert.False(t, api.IsMCP)
+		assert.False(t, api.IsMCP())
 	})
 
 	t.Run("allows empty transport protocol", func(t *testing.T) {
@@ -160,7 +159,7 @@ func TestAPIDefinition_SetProtocol(t *testing.T) {
 
 		assert.Equal(t, "", api.JsonProtocol)
 		assert.Equal(t, "custom", api.ApplicationProtocol)
-		assert.False(t, api.IsMCP)
+		assert.False(t, api.IsMCP())
 	})
 }
 
@@ -172,21 +171,20 @@ func TestAPIDefinition_MarkAsMCP(t *testing.T) {
 
 		assert.Equal(t, JsonRPC20, api.JsonProtocol)
 		assert.Equal(t, AppProtocolMCP, api.ApplicationProtocol)
-		assert.True(t, api.IsMCP)
+		assert.True(t, api.IsMCP())
 	})
 
 	t.Run("overwrites existing values", func(t *testing.T) {
 		api := APIDefinition{
 			JsonProtocol:        "1.0",
 			ApplicationProtocol: "old",
-			IsMCP:               false,
 		}
 
 		api.MarkAsMCP()
 
 		assert.Equal(t, JsonRPC20, api.JsonProtocol)
 		assert.Equal(t, AppProtocolMCP, api.ApplicationProtocol)
-		assert.True(t, api.IsMCP)
+		assert.True(t, api.IsMCP())
 	})
 
 	t.Run("is idempotent", func(t *testing.T) {
@@ -198,7 +196,7 @@ func TestAPIDefinition_MarkAsMCP(t *testing.T) {
 
 		assert.Equal(t, JsonRPC20, api.JsonProtocol)
 		assert.Equal(t, AppProtocolMCP, api.ApplicationProtocol)
-		assert.True(t, api.IsMCP)
+		assert.True(t, api.IsMCP())
 	})
 
 	t.Run("does not affect other fields", func(t *testing.T) {
@@ -215,7 +213,7 @@ func TestAPIDefinition_MarkAsMCP(t *testing.T) {
 		assert.Equal(t, "test", api.Slug)
 		assert.Equal(t, JsonRPC20, api.JsonProtocol)
 		assert.Equal(t, AppProtocolMCP, api.ApplicationProtocol)
-		assert.True(t, api.IsMCP)
+		assert.True(t, api.IsMCP())
 	})
 
 	t.Run("uses SetProtocol internally", func(t *testing.T) {
@@ -229,46 +227,7 @@ func TestAPIDefinition_MarkAsMCP(t *testing.T) {
 
 		assert.Equal(t, expected.JsonProtocol, api.JsonProtocol)
 		assert.Equal(t, expected.ApplicationProtocol, api.ApplicationProtocol)
-		assert.Equal(t, expected.IsMCP, api.IsMCP)
-	})
-}
-
-func TestAPIDefinition_IsMCP(t *testing.T) {
-	t.Run("is mcp field marshaling", func(t *testing.T) {
-		api := APIDefinition{
-			IsMCP: true,
-		}
-
-		data, err := json.Marshal(api)
-		assert.NoError(t, err)
-
-		var result APIDefinition
-		err = json.Unmarshal(data, &result)
-		assert.NoError(t, err)
-
-		assert.True(t, result.IsMCP)
-	})
-
-	t.Run("false is mcp omitted", func(t *testing.T) {
-		api := APIDefinition{
-			IsMCP: false,
-		}
-
-		data, err := json.Marshal(api)
-		assert.NoError(t, err)
-
-		assert.NotContains(t, string(data), "is_mcp")
-	})
-
-	t.Run("is mcp persists through encode/decode", func(t *testing.T) {
-		api := APIDefinition{
-			IsMCP: true,
-		}
-
-		api.EncodeForDB()
-		api.DecodeFromDB()
-
-		assert.True(t, api.IsMCP)
+		assert.Equal(t, expected.IsMCP(), api.IsMCP())
 	})
 }
 

@@ -674,7 +674,6 @@ type APIDefinition struct {
 	EnableProxyProtocol bool           `bson:"enable_proxy_protocol" json:"enable_proxy_protocol"`
 	JsonProtocol        string         `bson:"json_protocol,omitempty" json:"json_protocol,omitempty"`
 	ApplicationProtocol string         `bson:"application_protocol,omitempty" json:"application_protocol,omitempty"`
-	IsMCP               bool           `bson:"is_mcp,omitempty" json:"is_mcp,omitempty"`
 	APIID               string         `bson:"api_id" json:"api_id"`
 	OrgID               string         `bson:"org_id" json:"org_id"`
 	UseKeylessAccess    bool           `bson:"use_keyless" json:"use_keyless"`
@@ -1443,7 +1442,11 @@ func (a *APIDefinition) GetAPIDomain() string {
 func (a *APIDefinition) SetProtocol(transport, application string) {
 	a.JsonProtocol = transport
 	a.ApplicationProtocol = application
-	a.IsMCP = (application == AppProtocolMCP)
+}
+
+// IsMCP returns true if this API uses the Model Context Protocol.
+func (a *APIDefinition) IsMCP() bool {
+	return a.ApplicationProtocol == AppProtocolMCP
 }
 
 // MarkAsMCP configures the API definition as a Model Context Protocol (MCP) API.
