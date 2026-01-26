@@ -43,9 +43,25 @@ type NodeData struct {
 	HostDetails     HostDetails                `json:"host_details"`
 }
 
+// LoadedAPIInfo represents a loaded API with extensible metadata.
+// The struct-based format enables future extensions like checksums.
+type LoadedAPIInfo struct {
+	APIID string `json:"api_id"`
+	// Future: Checksum string `json:"checksum,omitempty"`
+}
+
+// LoadedPolicyInfo represents a loaded policy with extensible metadata.
+// The struct-based format enables future extensions like checksums.
+type LoadedPolicyInfo struct {
+	PolicyID string `json:"policy_id"`
+	// Future: Checksum string `json:"checksum,omitempty"`
+}
+
 type GWStats struct {
-	APIsCount     int `json:"apis_count"`
-	PoliciesCount int `json:"policies_count"`
+	APIsCount      int                `json:"apis_count"`
+	PoliciesCount  int                `json:"policies_count"`
+	LoadedAPIs     []LoadedAPIInfo    `json:"loaded_apis,omitempty"`
+	LoadedPolicies []LoadedPolicyInfo `json:"loaded_policies,omitempty"`
 }
 
 type GroupKeySpaceRequest struct {
