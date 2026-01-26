@@ -426,8 +426,8 @@ func TestKeyHandler(t *testing.T) {
 	t.Run("List keys", func(t *testing.T) {
 		_, _ = ts.Run(t, []test.TestCase{
 			{Method: "GET", Path: "/tyk/keys/", AdminAuth: true, Code: 200, BodyMatch: knownKey},
-			{Method: "GET", Path: "/tyk/keys/?api_id=test", AdminAuth: true, Code: 200, BodyMatch: knownKey},
-			{Method: "GET", Path: "/tyk/keys/?api_id=unknown", AdminAuth: true, Code: 200, BodyMatch: knownKey},
+			{Method: "GET", Path: "/tyk/keys/?api_id=test&filter=default", AdminAuth: true, Code: 200, BodyMatch: knownKey},
+			{Method: "GET", Path: "/tyk/keys/?api_id=test&filter=wrong_org", AdminAuth: true, Code: 200, BodyNotMatch: knownKey},
 		}...)
 
 		globalConf := ts.Gw.GetConfig()
@@ -1227,6 +1227,15 @@ func (ts *Test) testHashKeyHandlerHelper(t *testing.T, expectedHashSize int) {
 				Data:      string(withAccessJSON),
 				AdminAuth: true,
 				Code:      200,
+			},
+			// get list of keys' hashes, Wrong API specified (should filter out)
+			{
+				Method:       "GET",
+				Path:         "/tyk/keys?api_id=wrong-api-id",
+				Data:         string(withAccessJSON),
+				AdminAuth:    true,
+				Code:         200,
+				BodyNotMatch: myKeyHash,
 			},
 			// get one key by hash value without specifying hashed=true
 			{
@@ -4202,4 +4211,111 @@ func TestPurgeOAuthClientTokensEndpoint(t *testing.T) {
 		assertTokensLen(t, storageManager, storageKey1, 0)
 		assertTokensLen(t, storageManager, storageKey2, 0)
 	})
+}
+
+func TestKeyHandler_BatchFiltering_Integration(t *testing.T) {
+	ts := StartTest(func(globalConf *config.Config) {
+		globalConf.HashKeys = true
+		globalConf.EnableHashedKeysListing = true
+		globalConf.AllowMasterKeys = true
+	})
+	defer ts.Close()
+
+	keyA := "key-access-api-one"
+	sessionA := CreateStandardSession()
+	sessionA.AccessRights = map[string]user.AccessDefinition{
+		"api-one": {APIID: "api-one", Versions: []string{"Default"}},
+	}
+	err := ts.Gw.GlobalSessionManager.UpdateSession(keyA, sessionA, 100, false)
+	assert.NoError(t, err)
+
+	keyB := "key-access-api-two"
+	sessionB := CreateStandardSession()
+	sessionB.AccessRights = map[string]user.AccessDefinition{
+		"api-two": {APIID: "api-two", Versions: []string{"Default"}},
+	}
+	err = ts.Gw.GlobalSessionManager.UpdateSession(keyB, sessionB, 100, false)
+	assert.NoError(t, err)
+
+	keyC := "key-master"
+	sessionC := CreateStandardSession()
+	sessionC.AccessRights = map[string]user.AccessDefinition{}
+	err = ts.Gw.GlobalSessionManager.UpdateSession(keyC, sessionC, 100, false)
+	assert.NoError(t, err)
+
+	hashA := storage.HashKey(keyA, true)
+	hashB := storage.HashKey(keyB, true)
+	hashC := storage.HashKey(keyC, true)
+
+	t.Run("Filter API One", func(t *testing.T) {
+		uri := "/tyk/keys/?api_id=api-one"
+		req := ts.withAuth(TestReq(t, "GET", uri, nil))
+		rec := httptest.NewRecorder()
+		ts.mainRouter().ServeHTTP(rec, req)
+
+		assert.Equal(t, http.StatusOK, rec.Code)
+		body := rec.Body.String()
+
+		assert.Contains(t, body, hashA, "Should contain Key A Hash")
+		assert.Contains(t, body, hashC, "Should contain Key C Hash")
+		assert.NotContains(t, body, hashB, "Should NOT contain Key B Hash")
+	})
+
+	t.Run("Filter API Two", func(t *testing.T) {
+		uri := "/tyk/keys/?api_id=api-two"
+		req := ts.withAuth(TestReq(t, "GET", uri, nil))
+		rec := httptest.NewRecorder()
+		ts.mainRouter().ServeHTTP(rec, req)
+
+		assert.Equal(t, http.StatusOK, rec.Code)
+		body := rec.Body.String()
+
+		assert.Contains(t, body, hashB, "Should contain Key B Hash")
+		assert.Contains(t, body, hashC, "Should contain Key C Hash")
+		assert.NotContains(t, body, hashA, "Should NOT contain Key A Hash")
+	})
+
+	t.Run("Filter Unknown API", func(t *testing.T) {
+		uri := "/tyk/keys/?api_id=unknown-api"
+		req := ts.withAuth(TestReq(t, "GET", uri, nil))
+		rec := httptest.NewRecorder()
+		ts.mainRouter().ServeHTTP(rec, req)
+
+		assert.Equal(t, http.StatusOK, rec.Code)
+		body := rec.Body.String()
+
+		assert.Contains(t, body, hashC, "Should contain Key C Hash (Master)")
+		assert.NotContains(t, body, hashA, "Should NOT contain Key A Hash")
+		assert.NotContains(t, body, hashB, "Should NOT contain Key B Hash")
+	})
+}
+
+func TestKeyHandler_ContextCancellation(t *testing.T) {
+	ts := StartTest(func(globalConf *config.Config) {
+		globalConf.HashKeys = true
+		globalConf.EnableHashedKeysListing = true
+		globalConf.AllowMasterKeys = true
+	})
+	defer ts.Close()
+
+	keyA := "key-slow"
+	sessionA := CreateStandardSession()
+	sessionA.AccessRights = map[string]user.AccessDefinition{
+		"api-one": {APIID: "api-one", Versions: []string{"Default"}},
+	}
+	err := ts.Gw.GlobalSessionManager.UpdateSession(keyA, sessionA, 100, false)
+	assert.NoError(t, err)
+
+	uri := "/tyk/keys/?api_id=api-one"
+	req := ts.withAuth(TestReq(t, "GET", uri, nil))
+
+	ctx, cancel := context.WithCancel(req.Context())
+	cancel()
+	req = req.WithContext(ctx)
+
+	rec := httptest.NewRecorder()
+	ts.mainRouter().ServeHTTP(rec, req)
+
+	assert.Equal(t, http.StatusGatewayTimeout, rec.Code)
+	assert.Contains(t, rec.Body.String(), "Request timeout")
 }
