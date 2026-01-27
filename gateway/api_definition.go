@@ -20,7 +20,6 @@ import (
 	"github.com/TykTechnologies/tyk/ee/middleware/streams"
 	"github.com/TykTechnologies/tyk/storage/kv"
 
-	"github.com/TykTechnologies/tyk/internal/httpctx"
 	"github.com/TykTechnologies/tyk/internal/httputil"
 
 	"github.com/getkin/kin-openapi/routers/gorillamux"
@@ -89,7 +88,6 @@ const (
 	PersistGraphQL
 	RateLimit
 	OASMockResponse
-	MCPPrimitive
 )
 
 // RequestStatus is a custom type to avoid collisions
@@ -131,7 +129,9 @@ const (
 	StatusGoPlugin                        RequestStatus = "Go plugin"
 	StatusPersistGraphQL                  RequestStatus = "Persist GraphQL"
 	StatusRateLimit                       RequestStatus = "Rate Limited"
-	StatusMCPPrimitive                    RequestStatus = "MCP Primitive"
+	// MCPPrimitiveNotFound is returned when a primitive VEM is accessed directly (not via JSON-RPC routing).
+	// It intentionally maps to HTTP 404 to avoid exposing internal-only endpoints.
+	MCPPrimitiveNotFound RequestStatus = "MCP Primitive Not Found"
 )
 
 type EndPointCacheMeta struct {
@@ -1548,8 +1548,6 @@ func (a *APISpec) getURLStatus(stat URLStatus) RequestStatus {
 		return StatusPersistGraphQL
 	case RateLimit:
 		return StatusRateLimit
-	case MCPPrimitive:
-		return StatusMCPPrimitive
 	default:
 		log.Error("URL Status was not one of Ignored, Blacklist or WhiteList! Blocking.")
 		return EndPointNotAllowed
@@ -1564,11 +1562,13 @@ func (a *APISpec) URLAllowedAndIgnored(r *http.Request, rxPaths []URLSpec, white
 		}
 
 		if r.Method == rxPaths[i].Internal.Method && rxPaths[i].Status == Internal && !ctxLoopingEnabled(r) {
-			return EndPointNotAllowed, nil
-		}
-
-		// Block direct access to MCP primitive VEMs - only allow via JSON-RPC routing
-		if rxPaths[i].Status == MCPPrimitive && r.Method == rxPaths[i].MCPPrimitiveMeta.Method && !httpctx.IsMCPRouting(r) {
+			// If this internal endpoint is an MCP primitive VEM, return 404-ish status.
+			// This keeps the "never expose VEMs" invariant while reusing internal endpoint handling.
+			if strings.HasPrefix(rxPaths[i].Internal.Path, "/mcp-tool:") ||
+				strings.HasPrefix(rxPaths[i].Internal.Path, "/mcp-resource:") ||
+				strings.HasPrefix(rxPaths[i].Internal.Path, "/mcp-prompt:") {
+				return MCPPrimitiveNotFound, nil
+			}
 			return EndPointNotAllowed, nil
 		}
 	}
@@ -1773,6 +1773,8 @@ func (a *APISpec) RequestValid(r *http.Request) (bool, RequestStatus) {
 	status, _ = a.URLAllowedAndIgnored(r, versionPaths, whiteListStatus)
 	switch status {
 	case EndPointNotAllowed:
+		return false, status
+	case MCPPrimitiveNotFound:
 		return false, status
 	case StatusRedirectFlowByReply:
 		return true, status
