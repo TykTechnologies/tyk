@@ -6,6 +6,19 @@ import (
 	"github.com/TykTechnologies/tyk/regexp"
 )
 
+// MCPPrimitiveMeta contains metadata for MCP primitive endpoints (tools, resources, prompts).
+// These endpoints are internal-only and accessible via JSON-RPC routing.
+type MCPPrimitiveMeta struct {
+	// Name is the primitive name (e.g., "get-weather" for tools, "file:///repo/*" for resources)
+	Name string
+	// Type is the primitive type: "tool", "resource", or "prompt"
+	Type string
+	// Method is the HTTP method (POST for JSON-RPC)
+	Method string
+	// Operation contains the middleware configuration from OAS
+	Operation *oas.Operation
+}
+
 // URLSpec represents a flattened specification for URLs, used to check if a proxy URL
 // path is on any of the white, black or ignored lists. This is generated as part of the
 // configuration init
@@ -40,6 +53,7 @@ type URLSpec struct {
 	RateLimit                 apidef.RateLimitMeta
 	OASValidateRequestMeta    *oas.ValidateRequest
 	OASMockResponseMeta       *oas.MockResponse
+	MCPPrimitiveMeta          MCPPrimitiveMeta
 
 	IgnoreCase bool
 	// OASMethod stores the HTTP method for OAS-specific middleware
@@ -98,6 +112,8 @@ func (u *URLSpec) modeSpecificSpec(mode URLStatus) (interface{}, bool) {
 		return u.OASValidateRequestMeta, true
 	case OASMockResponse:
 		return u.OASMockResponseMeta, true
+	case MCPPrimitive:
+		return &u.MCPPrimitiveMeta, true
 	default:
 		return nil, false
 	}
@@ -151,6 +167,8 @@ func (u *URLSpec) matchesMethod(method string) bool {
 	case OASValidateRequest, OASMockResponse:
 		// OAS middleware is method-specific, check against stored method
 		return method == u.OASMethod
+	case MCPPrimitive:
+		return method == u.MCPPrimitiveMeta.Method
 	default:
 		return false
 	}

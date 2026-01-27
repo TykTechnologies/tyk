@@ -3470,6 +3470,24 @@ func ctxLoopingEnabled(r *http.Request) bool {
 	return ctxLoopLevel(r) > 0
 }
 
+// ctxSetMCPRouting sets the MCP routing flag in the request context.
+// This is used by the JSON-RPC router to indicate that a request is being
+// routed internally to an MCP primitive VEM.
+func ctxSetMCPRouting(r *http.Request, enabled bool) {
+	setCtxValue(r, ctx.MCPRouting, enabled)
+}
+
+// ctxMCPRoutingEnabled returns true if the request came via MCP JSON-RPC routing.
+// This is checked by the access control logic to allow internal VEM access.
+func ctxMCPRoutingEnabled(r *http.Request) bool {
+	if v := r.Context().Value(ctx.MCPRouting); v != nil {
+		if boolVal, ok := v.(bool); ok {
+			return boolVal
+		}
+	}
+	return false
+}
+
 func ctxLoopLevel(r *http.Request) int {
 	if v := r.Context().Value(ctx.LoopLevel); v != nil {
 		if intVal, ok := v.(int); ok {

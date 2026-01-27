@@ -88,6 +88,7 @@ const (
 	PersistGraphQL
 	RateLimit
 	OASMockResponse
+	MCPPrimitive
 )
 
 // RequestStatus is a custom type to avoid collisions
@@ -129,6 +130,7 @@ const (
 	StatusGoPlugin                        RequestStatus = "Go plugin"
 	StatusPersistGraphQL                  RequestStatus = "Persist GraphQL"
 	StatusRateLimit                       RequestStatus = "Rate Limited"
+	StatusMCPPrimitive                    RequestStatus = "MCP Primitive"
 )
 
 type EndPointCacheMeta struct {
@@ -205,6 +207,9 @@ func (s *APISpec) Unload() {
 		hook()
 	}
 	s.unloadHooks = nil
+
+	// Clear MCP primitives map
+	s.MCPPrimitives = nil
 }
 
 // Validate returns nil if s is a valid spec and an error stating why the spec is not valid.
@@ -1445,6 +1450,9 @@ func (a APIDefinitionLoader) getExtendedPathSpecs(apiVersionDef apidef.VersionIn
 	oasValidateRequestPaths := a.compileOASValidateRequestPathSpec(apiSpec, conf)
 	oasMockResponsePaths := a.compileOASMockResponsePathSpec(apiSpec, conf)
 
+	// MCP VEM generation - creates internal endpoints for MCP primitives (tools, resources, prompts)
+	mcpVEMs := a.generateMCPVEMs(apiSpec, conf)
+
 	combinedPath := []URLSpec{}
 	combinedPath = append(combinedPath, mockResponsePaths...)
 	combinedPath = append(combinedPath, ignoredPaths...)
@@ -1472,6 +1480,7 @@ func (a APIDefinitionLoader) getExtendedPathSpecs(apiVersionDef apidef.VersionIn
 	combinedPath = append(combinedPath, rateLimitPaths...)
 	combinedPath = append(combinedPath, oasValidateRequestPaths...)
 	combinedPath = append(combinedPath, oasMockResponsePaths...)
+	combinedPath = append(combinedPath, mcpVEMs...)
 
 	return combinedPath, len(whiteListPaths) > 0
 }
@@ -1538,6 +1547,8 @@ func (a *APISpec) getURLStatus(stat URLStatus) RequestStatus {
 		return StatusPersistGraphQL
 	case RateLimit:
 		return StatusRateLimit
+	case MCPPrimitive:
+		return StatusMCPPrimitive
 	default:
 		log.Error("URL Status was not one of Ignored, Blacklist or WhiteList! Blocking.")
 		return EndPointNotAllowed
@@ -1552,6 +1563,11 @@ func (a *APISpec) URLAllowedAndIgnored(r *http.Request, rxPaths []URLSpec, white
 		}
 
 		if r.Method == rxPaths[i].Internal.Method && rxPaths[i].Status == Internal && !ctxLoopingEnabled(r) {
+			return EndPointNotAllowed, nil
+		}
+
+		// Block direct access to MCP primitive VEMs - only allow via JSON-RPC routing
+		if rxPaths[i].Status == MCPPrimitive && r.Method == rxPaths[i].MCPPrimitiveMeta.Method && !ctxMCPRoutingEnabled(r) {
 			return EndPointNotAllowed, nil
 		}
 	}
