@@ -326,6 +326,8 @@ func TestOAS_ExtractTo_ResetAPIDefinition(t *testing.T) {
 	expectedFields := []string{
 		"APIDefinition.Slug",
 		"APIDefinition.EnableProxyProtocol",
+		"APIDefinition.JsonRpcVersion",
+		"APIDefinition.ApplicationProtocol",
 		"APIDefinition.VersionData.Versions[0].ExtendedPaths.TransformJQ[0].Filter",
 		"APIDefinition.VersionData.Versions[0].ExtendedPaths.TransformJQ[0].Path",
 		"APIDefinition.VersionData.Versions[0].ExtendedPaths.TransformJQ[0].Method",

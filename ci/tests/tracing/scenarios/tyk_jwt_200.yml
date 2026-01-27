@@ -1,0 +1,29 @@
+type: Test
+spec:
+  id: jwtTest200
+  name: JWT API - verify alias in span attributes
+  trigger:
+    type: http
+    httpRequest:
+      url: tyk:8080/test-jwt/ip
+      method: GET
+      headers:
+      - key: Content-Type
+        value: application/json
+      - key: Authorization
+        value: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ0ZXN0LXVzZXItYWxpYXMiLCJpYXQiOjE3MDAwMDAwMDAsImV4cCI6MzI1MDM2ODAwMDB9.E8aStwqiSQPAvQN80UboJBEWsSazDU_gEMqHNqeXPbc
+  specs:
+  - name: Test main span attributes
+    selector: span[tracetest.span.type="http" name="GET /test-jwt/ip" http.method="GET"]
+    assertions:
+    - attr:http.method = "GET"
+    - attr:http.status_code = 200
+    - attr:tyk.api.id = "jwt-test-api"
+    - attr:tyk.api.name = "JWTTestAPI"
+    - attr:tyk.api.orgid = "default"
+    - attr:tyk.api.path = "/test-jwt/"
+  - name: Verify JWTMiddleware span has alias attribute
+    selector: span[tracetest.span.type="general" name="JWTMiddleware"]
+    assertions:
+    - attr:name = "JWTMiddleware"
+    - attr:tyk.api.apikey.alias = "test-user-alias"

@@ -24,7 +24,7 @@ tasks:
       - type tracetest
     platforms: [darwin]
     cmds:
-      - brew install kubeshop/tracetest/tracetest@{{.version}}
+      - brew install kubeshop/tracetest/tracetest
 
   install:linux:
     internal: true
