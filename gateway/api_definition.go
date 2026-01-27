@@ -21,6 +21,7 @@ import (
 	"github.com/TykTechnologies/tyk/storage/kv"
 
 	"github.com/TykTechnologies/tyk/internal/httputil"
+	"github.com/TykTechnologies/tyk/internal/mcp"
 
 	"github.com/getkin/kin-openapi/routers/gorillamux"
 
@@ -1562,11 +1563,8 @@ func (a *APISpec) URLAllowedAndIgnored(r *http.Request, rxPaths []URLSpec, white
 		}
 
 		if r.Method == rxPaths[i].Internal.Method && rxPaths[i].Status == Internal && !ctxLoopingEnabled(r) {
-			// If this internal endpoint is an MCP primitive VEM, return 404-ish status.
-			// This keeps the "never expose VEMs" invariant while reusing internal endpoint handling.
-			if strings.HasPrefix(rxPaths[i].Internal.Path, "/mcp-tool:") ||
-				strings.HasPrefix(rxPaths[i].Internal.Path, "/mcp-resource:") ||
-				strings.HasPrefix(rxPaths[i].Internal.Path, "/mcp-prompt:") {
+			// MCP primitive VEMs return 404 to avoid exposing internal-only endpoints.
+			if mcp.IsPrimitiveVEMPath(rxPaths[i].Internal.Path) {
 				return MCPPrimitiveNotFound, nil
 			}
 			return EndPointNotAllowed, nil
