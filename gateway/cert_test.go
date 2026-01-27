@@ -1387,7 +1387,7 @@ func TestKeyWithCertificateTLS(t *testing.T) {
 		client := GetTLSClient(&clientCert, nil)
 
 		t.Run("Cert unknown", func(t *testing.T) {
-			_, _ = ts.Run(t, test.TestCase{Code: 403, Client: client})
+			_, _ = ts.Run(t, test.TestCase{Code: 401, Client: client})
 		})
 
 		t.Run("Cert known", func(t *testing.T) {
@@ -1451,7 +1451,7 @@ func TestKeyWithCertificateTLS(t *testing.T) {
 		t.Run("Cert unknown", func(t *testing.T) {
 			_, _ = ts.Run(t,
 				test.TestCase{Code: 404, Path: "/test1", Client: client},
-				test.TestCase{Code: 403, Path: "/test1", Domain: "localhost", Client: client},
+				test.TestCase{Code: 401, Path: "/test1", Domain: "localhost", Client: client},
 			)
 		})
 
@@ -1533,8 +1533,8 @@ func TestKeyWithCertificateTLS(t *testing.T) {
 
 		_, _ = ts.Run(t, []test.TestCase{
 			{Code: http.StatusNotFound, Path: "/test1", Client: client},
-			{Code: http.StatusForbidden, Path: "/test1", Domain: "host1", Client: client},
-			{Code: http.StatusForbidden, Path: "/test1", Domain: "host2", Client: client},
+			{Code: http.StatusUnauthorized, Path: "/test1", Domain: "host1", Client: client},
+			{Code: http.StatusUnauthorized, Path: "/test1", Domain: "host2", Client: client},
 		}...)
 
 		_, _ = ts.CreateSession(func(s *user.SessionState) {

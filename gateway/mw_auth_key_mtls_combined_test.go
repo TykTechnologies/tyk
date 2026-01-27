@@ -112,7 +112,6 @@ func TestStaticAndDynamicMTLS(t *testing.T) {
 	t.Run("Legacy dynamic mTLS auto-updates session certificate", func(t *testing.T) {
 		// In legacy mode (using session.Certificate without MtlsStaticCertificateBindings),
 		// the session certificate gets auto-updated with the current cert hash.
-		// This means ANY allowlisted certificate will work - no strict binding enforcement.
 		key := CreateSession(ts.Gw, func(s *user.SessionState) {
 			s.AccessRights = map[string]user.AccessDefinition{"combined-mtls-api": {
 				APIID: "combined-mtls-api",
@@ -120,29 +119,16 @@ func TestStaticAndDynamicMTLS(t *testing.T) {
 			s.Certificate = clientCertID1 // Will be auto-updated to cert2's hash
 		})
 
-		//// Allow insecure mode for dynamic MTLs, which allows use of key to fetch token,
-		////if a different client cert is used
-		//cfg := ts.Gw.GetConfig()
-		//cfg.Security.AllowUnsafeDynamicMTLSToken = true
-		//ts.Gw.SetConfig(cfg)
-		//
-		//t.Cleanup(func() {
-		//	cfg := ts.Gw.GetConfig()
-		//	cfg.Security.AllowUnsafeDynamicMTLSToken = false
-		//	ts.Gw.SetConfig(cfg)
-		//})
-
 		assert.NotEmpty(t, key, "Should create key with certificate binding")
 
-		// Request with cert2 (in allowlist) will succeed and auto-update session to cert2
-		// This is the legacy behavior - no strict binding enforcement
+		// Request will fail because client2 is invalid and is being used to access the api
 		client2 := GetTLSClient(&clientCert2, serverCertPem)
 		_, _ = ts.Run(t, test.TestCase{
 			Domain:  "localhost",
 			Client:  client2,
 			Path:    "/combined-mtls",
 			Headers: map[string]string{"Authorization": key},
-			Code:    http.StatusOK, // Passes in legacy mode
+			Code:    http.StatusUnauthorized, // Passes in legacy mode
 		})
 	})
 
@@ -195,6 +181,7 @@ func TestStaticAndDynamicMTLS(t *testing.T) {
 	t.Run("Fail: invalid auth token with valid cert", func(t *testing.T) {
 		// Request with valid cert but invalid token
 		// should the token still be validated if the cert is passed
+		// disable insecure
 		client1 := GetTLSClient(&clientCert1, serverCertPem)
 		_, _ = ts.Run(t, test.TestCase{
 			Domain:    "localhost",
@@ -293,15 +280,14 @@ func TestStaticAndDynamicMTLS(t *testing.T) {
 		})
 
 		t.Run("different certificate auto-updates session in legacy mode", func(t *testing.T) {
-			// In legacy dynamic mTLS mode, the session.Certificate gets auto-updated
-			// So using a different certificate will succeed and update the session
+			// should fail, certificate is invalid
 			wrongCertClient := GetTLSClient(&clientCert2, serverCertPem)
 			_, _ = ts.Run(t, test.TestCase{
 				Domain:  "localhost",
 				Client:  wrongCertClient,
 				Path:    "/dynamic-only",
 				Headers: map[string]string{"Authorization": key},
-				Code:    http.StatusOK, // Legacy mode allows any valid cert
+				Code:    http.StatusUnauthorized, // Legacy mode allows any valid cert
 			})
 		})
 	})
@@ -775,8 +761,17 @@ func TestMultipleCertificateBindings(t *testing.T) {
 			s.AccessRights = map[string]user.AccessDefinition{"multi-binding-api": {
 				APIID: "multi-binding-api",
 			}}
+			s.Certificate = certHash1
 			// Bind multiple certificates to the same token
 			s.MtlsStaticCertificateBindings = []string{certHash1, certHash2}
+		})
+
+		key2 := CreateSession(ts.Gw, func(s *user.SessionState) {
+			s.AccessRights = map[string]user.AccessDefinition{"multi-binding-api": {
+				APIID: "multi-binding-api",
+			}}
+			s.Certificate = certHash2
+			s.MtlsStaticCertificateBindings = []string{certHash2, certHash1}
 		})
 
 		assert.NotEmpty(t, key, "Should create key with multiple certificate bindings")
@@ -796,7 +791,7 @@ func TestMultipleCertificateBindings(t *testing.T) {
 			Domain:  "localhost",
 			Client:  client2,
 			Path:    "/multi-binding",
-			Headers: map[string]string{"Authorization": key},
+			Headers: map[string]string{"Authorization": key2},
 			Code:    http.StatusOK,
 		})
 	})
