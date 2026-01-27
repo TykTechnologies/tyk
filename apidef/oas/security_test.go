@@ -423,6 +423,92 @@ func TestOAS_CertificateAuthWithTokenAuth(t *testing.T) {
 		assert.True(t, ok)
 		assert.True(t, authConfig.UseCertificate, "Should fall back to deprecated field when no certificate scheme exists")
 	})
+
+	t.Run("only certificate auth scheme present", func(t *testing.T) {
+		// Create OAS with only certificateAuth scheme (no authToken)
+		oas := OAS{}
+		oas.Components = &openapi3.Components{
+			SecuritySchemes: make(openapi3.SecuritySchemes),
+		}
+		oas.SetTykExtension(&XTykAPIGateway{Server: Server{Authentication: &Authentication{SecuritySchemes: SecuritySchemes{}}}})
+
+		// Manually add certificateAuth scheme
+		certAuth := &CertificateAuth{Enabled: true}
+		oas.getTykSecuritySchemes()[apidef.CertificateAuthType] = certAuth
+
+		// Add to OpenAPI components
+		certRef := &openapi3.SecuritySchemeRef{
+			Value: openapi3.NewSecurityScheme().WithType(typeCertificate),
+		}
+		oas.Components.SecuritySchemes[apidef.CertificateAuthType] = certRef
+
+		// Add to security requirements
+		oas.Security = openapi3.SecurityRequirements{
+			{apidef.CertificateAuthType: []string{}},
+		}
+
+		// Convert to API definition
+		var convertedAPI apidef.APIDefinition
+		convertedAPI.AuthConfigs = make(map[string]apidef.AuthConfig)
+		oas.extractSecurityTo(&convertedAPI)
+
+		// Verify authConfig was created with UseCertificate = true
+		authConfig, ok := convertedAPI.AuthConfigs[apidef.AuthTokenType]
+		assert.True(t, ok, "authConfig should be created")
+		assert.True(t, authConfig.UseCertificate, "UseCertificate should be true")
+		assert.True(t, convertedAPI.UseStandardAuth, "UseStandardAuth should be true")
+		assert.Equal(t, apidef.AuthTokenType, authConfig.Name, "authConfig name should be authToken")
+	})
+
+	t.Run("only certificate auth scheme, then convert back to OAS", func(t *testing.T) {
+		// Start with classic API with UseCertificate = true
+		api := apidef.APIDefinition{}
+		api.AuthConfigs = make(map[string]apidef.AuthConfig)
+		api.UseStandardAuth = true
+		api.AuthConfigs[apidef.AuthTokenType] = apidef.AuthConfig{
+			Name:           apidef.AuthTokenType,
+			UseCertificate: true,
+			AuthHeaderName: "Authorization",
+		}
+
+		// Convert to OAS
+		oas := OAS{}
+		oas.Components = &openapi3.Components{
+			SecuritySchemes: make(openapi3.SecuritySchemes),
+		}
+		oas.SetTykExtension(&XTykAPIGateway{Server: Server{Authentication: &Authentication{SecuritySchemes: SecuritySchemes{}}}})
+		oas.fillSecurity(api)
+
+		// Remove the authToken scheme to simulate having only certificateAuth
+		delete(oas.getTykSecuritySchemes(), apidef.AuthTokenType)
+		delete(oas.Components.SecuritySchemes, apidef.AuthTokenType)
+
+		// Remove authToken from security requirements
+		newSecurity := openapi3.SecurityRequirements{}
+		for _, req := range oas.Security {
+			newReq := openapi3.NewSecurityRequirement()
+			for key, val := range req {
+				if key != apidef.AuthTokenType {
+					newReq[key] = val
+				}
+			}
+			if len(newReq) > 0 {
+				newSecurity = append(newSecurity, newReq)
+			}
+		}
+		oas.Security = newSecurity
+
+		// Convert back to API definition
+		var convertedAPI apidef.APIDefinition
+		convertedAPI.AuthConfigs = make(map[string]apidef.AuthConfig)
+		oas.extractSecurityTo(&convertedAPI)
+
+		// Verify UseCertificate is preserved
+		authConfig, ok := convertedAPI.AuthConfigs[apidef.AuthTokenType]
+		assert.True(t, ok, "authConfig should be created")
+		assert.True(t, authConfig.UseCertificate, "UseCertificate should be true")
+		assert.True(t, convertedAPI.UseStandardAuth, "UseStandardAuth should be true")
+	})
 }
 
 func TestOAS_Token(t *testing.T) {

@@ -128,6 +128,34 @@ func (s *OAS) extractTokenTo(api *apidef.APIDefinition, name string) {
 	api.AuthConfigs[apidef.AuthTokenType] = authConfig
 }
 
+func (s *OAS) extractCertificateAuthTo(api *apidef.APIDefinition, name string) {
+	// Check if authConfig already exists (might have been created by extractTokenTo)
+	authConfig, exists := api.AuthConfigs[apidef.AuthTokenType]
+	if !exists {
+		// Create new authConfig with defaults
+		authConfig = apidef.AuthConfig{
+			Name:          apidef.AuthTokenType,
+			DisableHeader: true,
+		}
+	}
+
+	// Get the certificate auth scheme
+	certAuth := s.getTykSecuritySchemes()[apidef.CertificateAuthType]
+	if certAuth != nil {
+		if certAuthVal, ok := certAuth.(*CertificateAuth); ok {
+			authConfig.UseCertificate = certAuthVal.Enabled
+		}
+	}
+
+	// If authConfig didn't exist before, we need to set UseStandardAuth
+	// Certificate auth is a form of token authentication
+	if !exists {
+		api.UseStandardAuth = true
+	}
+
+	api.AuthConfigs[apidef.AuthTokenType] = authConfig
+}
+
 // JWK represents a JSON Web Key Set containing configuration for the JWKS endpoint and its cache timeout.
 type JWK struct {
 	// URL is the JWKS endpoint.
@@ -1371,6 +1399,8 @@ func (s *OAS) extractSecurityTo(api *apidef.APIDefinition) {
 						s.extractJWTTo(api, schemeName)
 					case v.Type == typeHTTP && v.Scheme == schemeBasic:
 						s.extractBasicTo(api, schemeName)
+					case v.Type == typeCertificate:
+						s.extractCertificateAuthTo(api, schemeName)
 					case v.Type == typeOAuth2:
 						securityScheme := s.getTykSecurityScheme(schemeName)
 						if securityScheme == nil {
