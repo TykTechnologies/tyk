@@ -2424,9 +2424,6 @@ func (m *mockVaultSecretReader) ReadSecret(_ string) (*vaultapi.Secret, error) {
 	return m.secret, m.err
 }
 
-// TODO: A path traversal vulnerability exists when resolving vault:// references.
-// The key name is appended to the base Vault path without sanitization. This
-// should be addressed in a separate ticket.
 func (m *mockVaultSecretReader) Get(_ string) (string, error) { return "", nil }
 func (m *mockVaultSecretReader) Put(_, _ string) error        { return nil }
 
