@@ -128,7 +128,7 @@ func (s *OAS) extractTokenTo(api *apidef.APIDefinition, name string) {
 	api.AuthConfigs[apidef.AuthTokenType] = authConfig
 }
 
-func (s *OAS) extractCertificateAuthTo(api *apidef.APIDefinition, name string) {
+func (s *OAS) extractCertificateAuthTo(api *apidef.APIDefinition) {
 	// Check if authConfig already exists (might have been created by extractTokenTo)
 	authConfig, exists := api.AuthConfigs[apidef.AuthTokenType]
 	if !exists {
@@ -1400,7 +1400,7 @@ func (s *OAS) extractSecurityTo(api *apidef.APIDefinition) {
 					case v.Type == typeHTTP && v.Scheme == schemeBasic:
 						s.extractBasicTo(api, schemeName)
 					case v.Type == typeCertificate:
-						s.extractCertificateAuthTo(api, schemeName)
+						s.extractCertificateAuthTo(api)
 					case v.Type == typeOAuth2:
 						securityScheme := s.getTykSecurityScheme(schemeName)
 						if securityScheme == nil {
