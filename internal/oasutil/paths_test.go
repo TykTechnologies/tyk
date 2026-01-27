@@ -3,17 +3,16 @@ package oasutil
 import (
 	"testing"
 
+	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/stretchr/testify/assert"
-
-	"github.com/TykTechnologies/kin-openapi/openapi3"
 )
 
 func testOASPaths(paths []string) openapi3.Paths {
-	result := openapi3.Paths{}
+	result := openapi3.NewPaths()
 	for _, p := range paths {
-		result[p] = nil
+		result.Set(p, nil)
 	}
-	return result
+	return *result
 }
 
 // TestSortByPathLength tests our custom sorting for the OAS paths.

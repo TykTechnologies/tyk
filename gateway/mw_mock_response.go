@@ -10,7 +10,7 @@ import (
 	"sort"
 	"strconv"
 
-	"github.com/TykTechnologies/kin-openapi/openapi3"
+	"github.com/getkin/kin-openapi/openapi3"
 
 	"github.com/TykTechnologies/tyk/apidef/oas"
 	"github.com/TykTechnologies/tyk/common/option"
@@ -179,8 +179,8 @@ func mockFromOAS(r *http.Request, operation *openapi3.Operation, fromOASExamples
 		contentType = headerContentType
 	}
 
-	response, ok := operation.Responses[strconv.Itoa(code)]
-	if !ok {
+	response := operation.Responses.Value(strconv.Itoa(code))
+	if response == nil {
 		return http.StatusNotFound, "", nil, nil, fmt.Errorf("there is no example response for the code: %d", code)
 	}
 
@@ -205,21 +205,34 @@ func mockFromOAS(r *http.Request, operation *openapi3.Operation, fromOASExamples
 	// 2. Named example from Examples map (media.Examples) - if name provided, use it; otherwise, pick first by sorted key
 	// If none found, return fallback solution
 	var example interface{}
+
+	// 1. Direct example on the media type
 	if media.Example != nil {
 		example = media.Example
 	}
 
-	if len(media.Examples) > 0 {
+	// 2. Named or first example from Examples map (only if no direct example)
+	if example == nil && len(media.Examples) > 0 {
 		if exampleName != "" {
-			if exampleRef, ok := media.Examples[exampleName]; !ok {
+			// Use the named example if it exists
+			exampleRef, ok := media.Examples[exampleName]
+			if !ok || exampleRef == nil || exampleRef.Value == nil {
 				return http.StatusNotFound, "", nil, nil, errors.New("there is no example response for the example name: " + exampleName)
-			} else {
-				example = exampleRef.Value.Value
 			}
+			example = exampleRef.Value.Value
 		} else {
-			for _, iterExample := range media.Examples {
-				example = iterExample.Value.Value
-				break
+			// Deterministically select the first example by sorted key
+			keys := make([]string, 0, len(media.Examples))
+			for k := range media.Examples {
+				keys = append(keys, k)
+			}
+			sort.Strings(keys)
+			for _, k := range keys {
+				ex := media.Examples[k]
+				if ex != nil && ex.Value != nil {
+					example = ex.Value.Value
+					break
+				}
 			}
 		}
 	}
@@ -229,6 +242,7 @@ func mockFromOAS(r *http.Request, operation *openapi3.Operation, fromOASExamples
 		example = oas.ExampleExtractor(media.Schema)
 	}
 
+	// Marshal the example to JSON for the response body
 	body, err := json.Marshal(example)
 	if err != nil {
 		return http.StatusForbidden, "", nil, nil, err
