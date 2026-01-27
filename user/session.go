@@ -295,6 +295,7 @@ type SessionState struct {
 	OauthClientID                 string                      `json:"oauth_client_id,omitzero" msg:"oauth_client_id"`
 	OauthKeys                     map[string]string           `json:"oauth_keys,omitempty" msg:"oauth_keys"`
 	Certificate                   string                      `json:"certificate,omitzero" msg:"certificate"`
+	MtlsStaticCertificateBindings []string                    `json:"mtls_static_certificate_bindings,omitempty" msg:"mtls_static_certificate_bindings"`
 	BasicAuthData                 BasicAuthData               `json:"basic_auth_data,omitzero" msg:"basic_auth_data"`
 	JWTData                       JWTData                     `json:"jwt_data,omitzero" msg:"jwt_data"`
 	HMACEnabled                   bool                        `json:"hmac_enabled,omitzero" msg:"hmac_enabled"`

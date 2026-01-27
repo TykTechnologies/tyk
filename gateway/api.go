@@ -27,54 +27,55 @@ package gateway
 
 import (
 	"bytes"
+	"context"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
+	"math"
 	"net/http"
 	"net/url"
 	"os"
 	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
 
-	"github.com/TykTechnologies/tyk/internal/httpctx"
 	"github.com/getkin/kin-openapi/openapi3"
-
-	gqlv2 "github.com/TykTechnologies/graphql-go-tools/v2/pkg/graphql"
-
-	"github.com/TykTechnologies/tyk/config"
-
-	"github.com/TykTechnologies/tyk/internal/osutil"
-	"github.com/TykTechnologies/tyk/internal/otel"
-	"github.com/TykTechnologies/tyk/internal/redis"
-	"github.com/TykTechnologies/tyk/internal/uuid"
-
-	"github.com/TykTechnologies/tyk/apidef/oas"
-
 	"github.com/gorilla/mux"
 	"github.com/lonelycode/osin"
-
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/afero"
 	"golang.org/x/crypto/bcrypt"
 
+	gql "github.com/TykTechnologies/graphql-go-tools/pkg/graphql"
+	gqlv2 "github.com/TykTechnologies/graphql-go-tools/v2/pkg/graphql"
+
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/apidef/oas"
+	"github.com/TykTechnologies/tyk/certs"
+	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/ctx"
 	"github.com/TykTechnologies/tyk/header"
+	"github.com/TykTechnologies/tyk/internal/httpctx"
+	"github.com/TykTechnologies/tyk/internal/osutil"
+	"github.com/TykTechnologies/tyk/internal/otel"
+	"github.com/TykTechnologies/tyk/internal/redis"
+	"github.com/TykTechnologies/tyk/internal/uuid"
+	lib "github.com/TykTechnologies/tyk/lib/apidef"
 	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/user"
-
-	gql "github.com/TykTechnologies/graphql-go-tools/pkg/graphql"
-	lib "github.com/TykTechnologies/tyk/lib/apidef"
 )
 
 const (
 	oAuthClientTokensKeyPattern = "oauth-data.*oauth-client-tokens.*"
+	// KeyListingWorkerCountCap 350 is based on the average of 10000 keys with minor contingency
+	KeyListingWorkerCountCap      = 350
+	KeyListingWorkerEntriesPerKey = 100
 )
 
 var (
@@ -107,6 +108,61 @@ func apiOk(msg string) apiStatusMessage {
 
 func apiError(msg string) apiStatusMessage {
 	return apiStatusMessage{"error", msg}
+}
+
+// validateMtlsStaticCertificateBindings validates that all certificate IDs in the
+// mtls_static_certificate_bindings array exist in the certificate manager.
+// Returns an error with the specific certificate ID if validation fails.
+func (gw *Gateway) validateMtlsStaticCertificateBindings(certIDs []string, orgID string) error {
+	if len(certIDs) == 0 {
+		return nil
+	}
+
+	// Validate certificate IDs start with orgID prefix to prevent path traversal attacks
+	// Certificate IDs follow the pattern: orgID + sha256hash
+	for _, certID := range certIDs {
+		if orgID != "" && !strings.HasPrefix(certID, orgID) {
+			return fmt.Errorf("invalid certificate ID: %s", certID)
+		}
+	}
+
+	// Use List() for efficient batch validation - single storage operation
+	// Pattern from cert.go:594-595
+	certificates := gw.CertificateManager.List(certIDs, certs.CertificateAny)
+
+	// Check if any certificates were not found (List returns nil for missing certs)
+	// Pattern from cert.go:607-612
+	for i, cert := range certificates {
+		if cert == nil {
+			return fmt.Errorf("certificate not found: %s", certIDs[i])
+		}
+	}
+
+	return nil
+}
+
+// getNewCertIDs returns only the certificate IDs that are in newCerts but not in originalCerts.
+// Used for optimizing updates to only validate newly added certificates.
+func getNewCertIDs(originalCerts, newCerts []string) []string {
+	if len(originalCerts) == 0 {
+		return newCerts
+	}
+
+	// Build map of existing certificates for O(1) lookup
+	existingCerts := make(map[string]struct{}, len(originalCerts))
+	for _, certID := range originalCerts {
+		existingCerts[certID] = struct{}{}
+	}
+
+	// Filter to only NEW certificates
+	var newCertIDs []string
+	for _, certID := range newCerts {
+		if _, exists := existingCerts[certID]; !exists {
+			newCertIDs = append(newCertIDs, certID)
+		}
+	}
+
+	return newCertIDs
 }
 
 // paginationStatus provides more information about a paginated data set
@@ -518,6 +574,15 @@ func (gw *Gateway) handleAddOrUpdate(keyName string, r *http.Request, isHashed b
 		newSession.Expires = originalKey.Expires
 	}
 
+	// Validate mtls_static_certificate_bindings
+	// For POST: validates all certificates (originalKey is empty)
+	// For PUT: validates only NEW certificates (using originalKey data)
+	certsToValidate := getNewCertIDs(originalKey.MtlsStaticCertificateBindings, newSession.MtlsStaticCertificateBindings)
+	if err := gw.validateMtlsStaticCertificateBindings(certsToValidate, newSession.OrgID); err != nil {
+		log.Error("Invalid certificate in mtls_static_certificate_bindings: ", err)
+		return apiError(err.Error()), http.StatusBadRequest
+	}
+
 	// Update our session object (create it)
 	if newSession.IsBasicAuth() {
 		// If we are using a basic auth user, then we need to make the keyname explicit against the OrgId in order to differentiate it
@@ -702,36 +767,142 @@ type apiAllKeys struct {
 	APIKeys []string `json:"keys"`
 }
 
-func (gw *Gateway) handleGetAllKeys(filter string) (interface{}, int) {
-	sessions := gw.GlobalSessionManager.Sessions(filter)
-	if filter != "" {
-		filterB64 := base64.StdEncoding.WithPadding(base64.NoPadding).EncodeToString([]byte(fmt.Sprintf(`{"org":"%s"`, filter)))
-		// Remove last 2 digits to look exact match
-		filterB64 = filterB64[0 : len(filterB64)-2]
-		orgIDB64Sessions := gw.GlobalSessionManager.Sessions(filterB64)
-		sessions = append(sessions, orgIDB64Sessions...)
-	}
+// handleGetAllKeys retrieves keys and filters them by API ID using a Worker Pool.
+func (gw *Gateway) handleGetAllKeys(c context.Context, filter string, apiID string, hashed bool) (interface{}, int) {
+	keys := gw.getAllSessionKeys(filter)
 
-	fixedSessions := make([]string, 0)
-	for _, s := range sessions {
-		if !strings.HasPrefix(s, QuotaKeyPrefix) && !strings.HasPrefix(s, RateLimitKeyPrefix) {
-			fixedSessions = append(fixedSessions, s)
+	if apiID == "" {
+		validSessions := make([]string, 0, len(keys))
+		for _, k := range keys {
+			if !strings.HasPrefix(k, QuotaKeyPrefix) && !strings.HasPrefix(k, RateLimitKeyPrefix) {
+				validSessions = append(validSessions, k)
+			}
 		}
+		return apiAllKeys{validSessions}, http.StatusOK
 	}
 
-	sessionsObj := apiAllKeys{fixedSessions}
+	validSessions, err := gw.filterKeysByAPIID(c, keys, filter, apiID, hashed)
+	if err != nil {
+		log.WithError(err).Warn("Request timeout while processing keys")
+		return apiError("Request timeout while processing keys"), http.StatusGatewayTimeout
+	}
+
+	sort.Strings(validSessions)
 
 	log.WithFields(logrus.Fields{
 		"prefix": "api",
 		"status": "ok",
+		"count":  len(validSessions),
 	}).Info("Retrieved key list.")
 
-	return sessionsObj, http.StatusOK
+	return apiAllKeys{validSessions}, http.StatusOK
+}
+
+// filterKeysByAPIID handles the concurrent processing of key permissions
+func (gw *Gateway) filterKeysByAPIID(c context.Context, keys []string, filter, apiID string, hashed bool) ([]string, error) {
+	numKeys := len(keys)
+	// the values for keyListingWorkerCount and keyListingBufferSize were averaged through profiling and benchmarking
+	keyListingWorkerCount := min(int(4+math.Sqrt(float64(numKeys))), KeyListingWorkerCountCap)
+	keyListingBufferSize := keyListingWorkerCount * KeyListingWorkerEntriesPerKey
+
+	jobs := make(chan string, keyListingBufferSize)
+	validSessions := make([]string, 0)
+	var wg sync.WaitGroup
+	var mu sync.Mutex
+
+	wg.Add(keyListingWorkerCount)
+	for w := 0; w < keyListingWorkerCount; w++ {
+		go func() {
+			defer wg.Done()
+			localMatches := make([]string, 0)
+
+			for {
+				select {
+				case <-c.Done():
+					return
+				case keyName, ok := <-jobs:
+					if !ok {
+						if len(localMatches) > 0 {
+							mu.Lock()
+							validSessions = append(validSessions, localMatches...)
+							mu.Unlock()
+						}
+						return
+					}
+
+					if gw.keyHasAccess(filter, keyName, apiID, hashed) {
+						localMatches = append(localMatches, keyName)
+					}
+				}
+			}
+		}()
+	}
+
+	go gw.feedKeyListingWorkers(c, keys, jobs)
+
+	wg.Wait()
+
+	if c.Err() != nil {
+		return nil, c.Err()
+	}
+
+	return validSessions, nil
+}
+
+// getAllSessionKeys handles the retrieval of raw keys from the session manager,
+// including the legacy base64 filter logic.
+func (gw *Gateway) getAllSessionKeys(filter string) []string {
+	keys := gw.GlobalSessionManager.Sessions(filter)
+	if filter != "" {
+		filterB64 := base64.StdEncoding.WithPadding(base64.NoPadding).EncodeToString([]byte(fmt.Sprintf(`{"org":"%s"`, filter)))
+		filterB64 = filterB64[0 : len(filterB64)-2]
+		orgIDB64Sessions := gw.GlobalSessionManager.Sessions(filterB64)
+		keys = append(keys, orgIDB64Sessions...)
+	}
+	return keys
+}
+
+// keyHasAccess checks if a specific key has access to the requested API ID.
+func (gw *Gateway) keyHasAccess(filter, keyName, apiID string, hashed bool) bool {
+	session, found := gw.GlobalSessionManager.SessionDetail(filter, keyName, hashed)
+	if !found {
+		return false
+	}
+
+	if _, ok := session.AccessRights[apiID]; ok {
+		return true
+	}
+
+	if len(session.AccessRights) == 0 && gw.GetConfig().AllowMasterKeys {
+		return true
+	}
+
+	return false
+}
+
+// feedKeyListingWorkers pushes keys into the job channel while filtering out internal system keys.
+func (gw *Gateway) feedKeyListingWorkers(c context.Context, keys []string, jobs chan<- string) {
+	defer close(jobs)
+	for _, k := range keys {
+		if strings.HasPrefix(k, QuotaKeyPrefix) || strings.HasPrefix(k, RateLimitKeyPrefix) {
+			continue
+		}
+
+		select {
+		case <-c.Done():
+			return
+		case jobs <- k:
+		}
+	}
 }
 
 func (gw *Gateway) handleAddKey(keyName, sessionString, orgId string) {
 	sess := &user.SessionState{}
-	json.Unmarshal([]byte(sessionString), sess)
+	err := json.Unmarshal([]byte(sessionString), sess)
+	if err != nil {
+		log.WithError(err).WithField("keyName", keyName).Error("Failed to unmarshal session state during key update")
+		return
+	}
 	sess.LastUpdated = strconv.Itoa(int(time.Now().Unix()))
 
 	if sess.OrgID != orgId {
@@ -739,7 +910,7 @@ func (gw *Gateway) handleAddKey(keyName, sessionString, orgId string) {
 	}
 
 	lifetime := gw.ApplyLifetime(sess, nil)
-	err := gw.GlobalSessionManager.UpdateSession(keyName, sess, lifetime, gw.GetConfig().HashKeys)
+	err = gw.GlobalSessionManager.UpdateSession(keyName, sess, lifetime, gw.GetConfig().HashKeys)
 	if err != nil {
 		log.WithFields(logrus.Fields{
 			"prefix": "api",
@@ -1680,19 +1851,17 @@ func (gw *Gateway) keyHandler(w http.ResponseWriter, r *http.Request) {
 			if gwConfig.HashKeys {
 				// get all keys is disabled by default
 				if !gwConfig.EnableHashedKeysListing {
-					doJSONWrite(
-						w,
-						http.StatusNotFound,
-						apiError("Hashed key listing is disabled in config (enable_hashed_keys_listing)"),
-					)
+					doJSONWrite(w, http.StatusNotFound, apiError("Hashed key listing is disabled in config (enable_hashed_keys_listing)"))
 					return
 				}
-
-				// we don't use filter for hashed keys
-				obj, code = gw.handleGetAllKeys("")
+				obj, code = gw.handleGetAllKeys(r.Context(), "", apiID, true)
 			} else {
 				filter := r.URL.Query().Get("filter")
-				obj, code = gw.handleGetAllKeys(filter)
+				if apiID != "" && filter == "" {
+					doJSONWrite(w, http.StatusBadRequest, apiError("The 'filter' parameter (Org ID) is required when filtering by 'api_id' in legacy mode"))
+					return
+				}
+				obj, code = gw.handleGetAllKeys(r.Context(), filter, apiID, false)
 			}
 		}
 
@@ -2022,6 +2191,12 @@ func (gw *Gateway) createKeyHandler(w http.ResponseWriter, r *http.Request) {
 			doJSONWrite(w, http.StatusInternalServerError, apiError("Failed to create key - Key with given certificate already found:"+newKey))
 			return
 		}
+	}
+
+	// Validate mtls_static_certificate_bindings
+	if err := gw.validateMtlsStaticCertificateBindings(newSession.MtlsStaticCertificateBindings, newSession.OrgID); err != nil {
+		doJSONWrite(w, http.StatusBadRequest, apiError(err.Error()))
+		return
 	}
 
 	newSession.LastUpdated = strconv.Itoa(int(time.Now().Unix()))

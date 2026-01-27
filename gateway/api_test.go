@@ -426,8 +426,8 @@ func TestKeyHandler(t *testing.T) {
 	t.Run("List keys", func(t *testing.T) {
 		_, _ = ts.Run(t, []test.TestCase{
 			{Method: "GET", Path: "/tyk/keys/", AdminAuth: true, Code: 200, BodyMatch: knownKey},
-			{Method: "GET", Path: "/tyk/keys/?api_id=test", AdminAuth: true, Code: 200, BodyMatch: knownKey},
-			{Method: "GET", Path: "/tyk/keys/?api_id=unknown", AdminAuth: true, Code: 200, BodyMatch: knownKey},
+			{Method: "GET", Path: "/tyk/keys/?api_id=test&filter=default", AdminAuth: true, Code: 200, BodyMatch: knownKey},
+			{Method: "GET", Path: "/tyk/keys/?api_id=test&filter=wrong_org", AdminAuth: true, Code: 200, BodyNotMatch: knownKey},
 		}...)
 
 		globalConf := ts.Gw.GetConfig()
@@ -1227,6 +1227,15 @@ func (ts *Test) testHashKeyHandlerHelper(t *testing.T, expectedHashSize int) {
 				Data:      string(withAccessJSON),
 				AdminAuth: true,
 				Code:      200,
+			},
+			// get list of keys' hashes, Wrong API specified (should filter out)
+			{
+				Method:       "GET",
+				Path:         "/tyk/keys?api_id=wrong-api-id",
+				Data:         string(withAccessJSON),
+				AdminAuth:    true,
+				Code:         200,
+				BodyNotMatch: myKeyHash,
 			},
 			// get one key by hash value without specifying hashed=true
 			{
@@ -4201,5 +4210,513 @@ func TestPurgeOAuthClientTokensEndpoint(t *testing.T) {
 
 		assertTokensLen(t, storageManager, storageKey1, 0)
 		assertTokensLen(t, storageManager, storageKey2, 0)
+	})
+}
+
+func TestKeyHandler_BatchFiltering_Integration(t *testing.T) {
+	ts := StartTest(func(globalConf *config.Config) {
+		globalConf.HashKeys = true
+		globalConf.EnableHashedKeysListing = true
+		globalConf.AllowMasterKeys = true
+	})
+	defer ts.Close()
+
+	keyA := "key-access-api-one"
+	sessionA := CreateStandardSession()
+	sessionA.AccessRights = map[string]user.AccessDefinition{
+		"api-one": {APIID: "api-one", Versions: []string{"Default"}},
+	}
+	err := ts.Gw.GlobalSessionManager.UpdateSession(keyA, sessionA, 100, false)
+	assert.NoError(t, err)
+
+	keyB := "key-access-api-two"
+	sessionB := CreateStandardSession()
+	sessionB.AccessRights = map[string]user.AccessDefinition{
+		"api-two": {APIID: "api-two", Versions: []string{"Default"}},
+	}
+	err = ts.Gw.GlobalSessionManager.UpdateSession(keyB, sessionB, 100, false)
+	assert.NoError(t, err)
+
+	keyC := "key-master"
+	sessionC := CreateStandardSession()
+	sessionC.AccessRights = map[string]user.AccessDefinition{}
+	err = ts.Gw.GlobalSessionManager.UpdateSession(keyC, sessionC, 100, false)
+	assert.NoError(t, err)
+
+	hashA := storage.HashKey(keyA, true)
+	hashB := storage.HashKey(keyB, true)
+	hashC := storage.HashKey(keyC, true)
+
+	t.Run("Filter API One", func(t *testing.T) {
+		uri := "/tyk/keys/?api_id=api-one"
+		req := ts.withAuth(TestReq(t, "GET", uri, nil))
+		rec := httptest.NewRecorder()
+		ts.mainRouter().ServeHTTP(rec, req)
+
+		assert.Equal(t, http.StatusOK, rec.Code)
+		body := rec.Body.String()
+
+		assert.Contains(t, body, hashA, "Should contain Key A Hash")
+		assert.Contains(t, body, hashC, "Should contain Key C Hash")
+		assert.NotContains(t, body, hashB, "Should NOT contain Key B Hash")
+	})
+
+	t.Run("Filter API Two", func(t *testing.T) {
+		uri := "/tyk/keys/?api_id=api-two"
+		req := ts.withAuth(TestReq(t, "GET", uri, nil))
+		rec := httptest.NewRecorder()
+		ts.mainRouter().ServeHTTP(rec, req)
+
+		assert.Equal(t, http.StatusOK, rec.Code)
+		body := rec.Body.String()
+
+		assert.Contains(t, body, hashB, "Should contain Key B Hash")
+		assert.Contains(t, body, hashC, "Should contain Key C Hash")
+		assert.NotContains(t, body, hashA, "Should NOT contain Key A Hash")
+	})
+
+	t.Run("Filter Unknown API", func(t *testing.T) {
+		uri := "/tyk/keys/?api_id=unknown-api"
+		req := ts.withAuth(TestReq(t, "GET", uri, nil))
+		rec := httptest.NewRecorder()
+		ts.mainRouter().ServeHTTP(rec, req)
+
+		assert.Equal(t, http.StatusOK, rec.Code)
+		body := rec.Body.String()
+
+		assert.Contains(t, body, hashC, "Should contain Key C Hash (Master)")
+		assert.NotContains(t, body, hashA, "Should NOT contain Key A Hash")
+		assert.NotContains(t, body, hashB, "Should NOT contain Key B Hash")
+	})
+}
+
+func TestKeyHandler_ContextCancellation(t *testing.T) {
+	ts := StartTest(func(globalConf *config.Config) {
+		globalConf.HashKeys = true
+		globalConf.EnableHashedKeysListing = true
+		globalConf.AllowMasterKeys = true
+	})
+	defer ts.Close()
+
+	keyA := "key-slow"
+	sessionA := CreateStandardSession()
+	sessionA.AccessRights = map[string]user.AccessDefinition{
+		"api-one": {APIID: "api-one", Versions: []string{"Default"}},
+	}
+	err := ts.Gw.GlobalSessionManager.UpdateSession(keyA, sessionA, 100, false)
+	assert.NoError(t, err)
+
+	uri := "/tyk/keys/?api_id=api-one"
+	req := ts.withAuth(TestReq(t, "GET", uri, nil))
+
+	ctx, cancel := context.WithCancel(req.Context())
+	cancel()
+	req = req.WithContext(ctx)
+
+	rec := httptest.NewRecorder()
+	ts.mainRouter().ServeHTTP(rec, req)
+
+	assert.Equal(t, http.StatusGatewayTimeout, rec.Code)
+	assert.Contains(t, rec.Body.String(), "Request timeout")
+}
+
+func TestGetNewCertIDs(t *testing.T) {
+	t.Run("Empty original, non-empty new", func(t *testing.T) {
+		original := []string{}
+		new := []string{"cert1", "cert2", "cert3"}
+		result := getNewCertIDs(original, new)
+		assert.Equal(t, []string{"cert1", "cert2", "cert3"}, result)
+	})
+
+	t.Run("Nil original, non-empty new", func(t *testing.T) {
+		var original []string
+		new := []string{"cert1", "cert2"}
+		result := getNewCertIDs(original, new)
+		assert.Equal(t, []string{"cert1", "cert2"}, result)
+	})
+
+	t.Run("Some overlap", func(t *testing.T) {
+		original := []string{"cert1", "cert2"}
+		new := []string{"cert1", "cert2", "cert3", "cert4"}
+		result := getNewCertIDs(original, new)
+		assert.Equal(t, []string{"cert3", "cert4"}, result)
+	})
+
+	t.Run("All existing", func(t *testing.T) {
+		original := []string{"cert1", "cert2", "cert3"}
+		new := []string{"cert1", "cert2", "cert3"}
+		result := getNewCertIDs(original, new)
+		assert.Empty(t, result)
+	})
+
+	t.Run("No overlap", func(t *testing.T) {
+		original := []string{"cert1", "cert2"}
+		new := []string{"cert3", "cert4"}
+		result := getNewCertIDs(original, new)
+		assert.Equal(t, []string{"cert3", "cert4"}, result)
+	})
+
+	t.Run("Empty both", func(t *testing.T) {
+		original := []string{}
+		new := []string{}
+		result := getNewCertIDs(original, new)
+		assert.Empty(t, result)
+	})
+}
+
+func TestValidateMtlsStaticCertificateBindings(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	t.Run("Valid single certificate", func(t *testing.T) {
+		clientCertPem, _, _, _ := certs.GenCertificate(&x509.Certificate{}, false)
+		certID, err := ts.Gw.CertificateManager.Add(clientCertPem, "")
+		require.NoError(t, err)
+		defer ts.Gw.CertificateManager.Delete(certID, "")
+
+		err = ts.Gw.validateMtlsStaticCertificateBindings([]string{certID}, "")
+		assert.NoError(t, err)
+	})
+
+	t.Run("Valid multiple certificates", func(t *testing.T) {
+		cert1Pem, _, _, _ := certs.GenCertificate(&x509.Certificate{}, false)
+		cert1ID, err := ts.Gw.CertificateManager.Add(cert1Pem, "")
+		require.NoError(t, err)
+		defer ts.Gw.CertificateManager.Delete(cert1ID, "")
+
+		cert2Pem, _, _, _ := certs.GenCertificate(&x509.Certificate{}, false)
+		cert2ID, err := ts.Gw.CertificateManager.Add(cert2Pem, "")
+		require.NoError(t, err)
+		defer ts.Gw.CertificateManager.Delete(cert2ID, "")
+
+		err = ts.Gw.validateMtlsStaticCertificateBindings([]string{cert1ID, cert2ID}, "")
+		assert.NoError(t, err)
+	})
+
+	t.Run("Valid certificate with orgID prefix", func(t *testing.T) {
+		orgID := "test-org-123"
+		clientCertPem, _, _, _ := certs.GenCertificate(&x509.Certificate{}, false)
+		certID, err := ts.Gw.CertificateManager.Add(clientCertPem, orgID)
+		require.NoError(t, err)
+		defer ts.Gw.CertificateManager.Delete(certID, orgID)
+
+		err = ts.Gw.validateMtlsStaticCertificateBindings([]string{certID}, orgID)
+		assert.NoError(t, err)
+	})
+
+	t.Run("Invalid certificate - wrong orgID prefix", func(t *testing.T) {
+		orgID := "test-org-123"
+		clientCertPem, _, _, _ := certs.GenCertificate(&x509.Certificate{}, false)
+		certID, err := ts.Gw.CertificateManager.Add(clientCertPem, orgID)
+		require.NoError(t, err)
+		defer ts.Gw.CertificateManager.Delete(certID, orgID)
+
+		// Try to validate with wrong orgID
+		err = ts.Gw.validateMtlsStaticCertificateBindings([]string{certID}, "wrong-org-456")
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "invalid certificate ID")
+	})
+
+	t.Run("Invalid certificate - path traversal attempt", func(t *testing.T) {
+		orgID := "test-org-123"
+		err := ts.Gw.validateMtlsStaticCertificateBindings([]string{"../../../../etc/passwd"}, orgID)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "invalid certificate ID")
+	})
+
+	t.Run("Invalid single certificate", func(t *testing.T) {
+		err := ts.Gw.validateMtlsStaticCertificateBindings([]string{"invalid-cert-id"}, "")
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "certificate not found: invalid-cert-id")
+	})
+
+	t.Run("Invalid certificate in list", func(t *testing.T) {
+		clientCertPem, _, _, _ := certs.GenCertificate(&x509.Certificate{}, false)
+		certID, err := ts.Gw.CertificateManager.Add(clientCertPem, "")
+		require.NoError(t, err)
+		defer ts.Gw.CertificateManager.Delete(certID, "")
+
+		err = ts.Gw.validateMtlsStaticCertificateBindings([]string{certID, "invalid-cert"}, "")
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "certificate not found: invalid-cert")
+	})
+
+	t.Run("Empty array", func(t *testing.T) {
+		err := ts.Gw.validateMtlsStaticCertificateBindings([]string{}, "")
+		assert.NoError(t, err)
+	})
+
+	t.Run("Nil array", func(t *testing.T) {
+		err := ts.Gw.validateMtlsStaticCertificateBindings(nil, "")
+		assert.NoError(t, err)
+	})
+}
+
+func TestCreateKeyWithMtlsStaticCertificateBindings(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	apiId := "test-api"
+	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		spec.APIID = apiId
+		spec.UseKeylessAccess = false
+		spec.OrgID = "default"
+	})
+
+	t.Run("Create key with valid bindings", func(t *testing.T) {
+		orgID := "default"
+		clientCertPem, _, _, _ := certs.GenCertificate(&x509.Certificate{}, false)
+		certID, err := ts.Gw.CertificateManager.Add(clientCertPem, orgID)
+		require.NoError(t, err)
+		defer ts.Gw.CertificateManager.Delete(certID, orgID)
+
+		session := user.SessionState{
+			OrgID:                         orgID,
+			MtlsStaticCertificateBindings: []string{certID},
+			AccessRights: map[string]user.AccessDefinition{
+				apiId: {APIID: apiId, Versions: []string{"v1"}},
+			},
+		}
+		sessionData := test.MarshalJSON(t)(session)
+
+		_, _ = ts.Run(t, []test.TestCase{
+			{Method: http.MethodPost, Path: "/tyk/keys/create", Data: sessionData, AdminAuth: true, Code: 200},
+		}...)
+	})
+
+	t.Run("Create key with invalid cert in bindings", func(t *testing.T) {
+		session := user.SessionState{
+			OrgID:                         "default",
+			MtlsStaticCertificateBindings: []string{"nonexistent-cert-id"},
+			AccessRights: map[string]user.AccessDefinition{
+				apiId: {APIID: apiId, Versions: []string{"v1"}},
+			},
+		}
+		sessionData := test.MarshalJSON(t)(session)
+
+		_, _ = ts.Run(t, []test.TestCase{
+			{Method: http.MethodPost, Path: "/tyk/keys/create", Data: sessionData, AdminAuth: true, Code: 400},
+		}...)
+	})
+
+	t.Run("Create key without the field", func(t *testing.T) {
+		session := user.SessionState{
+			OrgID: "default",
+			AccessRights: map[string]user.AccessDefinition{
+				apiId: {APIID: apiId, Versions: []string{"v1"}},
+			},
+		}
+		sessionData := test.MarshalJSON(t)(session)
+
+		_, _ = ts.Run(t, []test.TestCase{
+			{Method: http.MethodPost, Path: "/tyk/keys/create", Data: sessionData, AdminAuth: true, Code: 200},
+		}...)
+	})
+
+	t.Run("Create key with empty array", func(t *testing.T) {
+		session := user.SessionState{
+			OrgID:                         "default",
+			MtlsStaticCertificateBindings: []string{},
+			AccessRights: map[string]user.AccessDefinition{
+				apiId: {APIID: apiId, Versions: []string{"v1"}},
+			},
+		}
+		sessionData := test.MarshalJSON(t)(session)
+
+		_, _ = ts.Run(t, []test.TestCase{
+			{Method: http.MethodPost, Path: "/tyk/keys/create", Data: sessionData, AdminAuth: true, Code: 200},
+		}...)
+	})
+}
+
+func TestUpdateKeyWithMtlsStaticCertificateBindings(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	apiId := "test-api"
+	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		spec.APIID = apiId
+		spec.UseKeylessAccess = false
+		spec.OrgID = "default"
+	})
+
+	t.Run("POST with valid bindings", func(t *testing.T) {
+		clientCertPem, _, _, _ := certs.GenCertificate(&x509.Certificate{}, false)
+		certID, err := ts.Gw.CertificateManager.Add(clientCertPem, "default")
+		require.NoError(t, err)
+		defer ts.Gw.CertificateManager.Delete(certID, "default")
+
+		session := user.SessionState{
+			OrgID:                         "default",
+			MtlsStaticCertificateBindings: []string{certID},
+			AccessRights: map[string]user.AccessDefinition{
+				apiId: {APIID: apiId, Versions: []string{"v1"}},
+			},
+		}
+		sessionData := test.MarshalJSON(t)(session)
+
+		_, _ = ts.Run(t, []test.TestCase{
+			{Method: http.MethodPost, Path: "/tyk/keys/custom-key-id", Data: sessionData, AdminAuth: true, Code: 200},
+		}...)
+	})
+
+	t.Run("PUT with valid bindings", func(t *testing.T) {
+		clientCertPem, _, _, _ := certs.GenCertificate(&x509.Certificate{}, false)
+		certID, err := ts.Gw.CertificateManager.Add(clientCertPem, "default")
+		require.NoError(t, err)
+		defer ts.Gw.CertificateManager.Delete(certID, "default")
+
+		session, key := ts.CreateSession(func(s *user.SessionState) {
+			s.OrgID = "default"
+			s.AccessRights = map[string]user.AccessDefinition{
+				apiId: {APIID: apiId, Versions: []string{"v1"}},
+			}
+		})
+
+		session.MtlsStaticCertificateBindings = []string{certID}
+		sessionData := test.MarshalJSON(t)(session)
+
+		path := fmt.Sprintf("/tyk/keys/%s", key)
+		_, _ = ts.Run(t, []test.TestCase{
+			{Method: http.MethodPut, Path: path, Data: sessionData, AdminAuth: true, Code: 200},
+		}...)
+	})
+
+	t.Run("POST with invalid cert in bindings", func(t *testing.T) {
+		session := user.SessionState{
+			OrgID:                         "default",
+			MtlsStaticCertificateBindings: []string{"invalid-cert"},
+			AccessRights: map[string]user.AccessDefinition{
+				apiId: {APIID: apiId, Versions: []string{"v1"}},
+			},
+		}
+		sessionData := test.MarshalJSON(t)(session)
+
+		_, _ = ts.Run(t, []test.TestCase{
+			{Method: http.MethodPost, Path: "/tyk/keys/custom-key-id-2", Data: sessionData, AdminAuth: true, Code: 400},
+		}...)
+	})
+
+	t.Run("PUT with invalid cert in bindings", func(t *testing.T) {
+		session, key := ts.CreateSession(func(s *user.SessionState) {
+			s.OrgID = "default"
+			s.AccessRights = map[string]user.AccessDefinition{
+				apiId: {APIID: apiId, Versions: []string{"v1"}},
+			}
+		})
+
+		session.MtlsStaticCertificateBindings = []string{"invalid-cert"}
+		sessionData := test.MarshalJSON(t)(session)
+
+		path := fmt.Sprintf("/tyk/keys/%s", key)
+		_, _ = ts.Run(t, []test.TestCase{
+			{Method: http.MethodPut, Path: path, Data: sessionData, AdminAuth: true, Code: 400},
+		}...)
+	})
+
+	t.Run("PUT with existing certs + new valid cert", func(t *testing.T) {
+		cert1Pem, _, _, _ := certs.GenCertificate(&x509.Certificate{}, false)
+		cert1ID, err := ts.Gw.CertificateManager.Add(cert1Pem, "default")
+		require.NoError(t, err)
+		defer ts.Gw.CertificateManager.Delete(cert1ID, "default")
+
+		cert2Pem, _, _, _ := certs.GenCertificate(&x509.Certificate{}, false)
+		cert2ID, err := ts.Gw.CertificateManager.Add(cert2Pem, "default")
+		require.NoError(t, err)
+		defer ts.Gw.CertificateManager.Delete(cert2ID, "default")
+
+		session, key := ts.CreateSession(func(s *user.SessionState) {
+			s.OrgID = "default"
+			s.MtlsStaticCertificateBindings = []string{cert1ID}
+			s.AccessRights = map[string]user.AccessDefinition{
+				apiId: {APIID: apiId, Versions: []string{"v1"}},
+			}
+		})
+
+		// Add new cert to existing bindings
+		session.MtlsStaticCertificateBindings = []string{cert1ID, cert2ID}
+		sessionData := test.MarshalJSON(t)(session)
+
+		path := fmt.Sprintf("/tyk/keys/%s", key)
+		_, _ = ts.Run(t, []test.TestCase{
+			{Method: http.MethodPut, Path: path, Data: sessionData, AdminAuth: true, Code: 200},
+		}...)
+	})
+
+	t.Run("PUT with existing certs + new invalid cert", func(t *testing.T) {
+		clientCertPem, _, _, _ := certs.GenCertificate(&x509.Certificate{}, false)
+		certID, err := ts.Gw.CertificateManager.Add(clientCertPem, "default")
+		require.NoError(t, err)
+		defer ts.Gw.CertificateManager.Delete(certID, "default")
+
+		session, key := ts.CreateSession(func(s *user.SessionState) {
+			s.OrgID = "default"
+			s.MtlsStaticCertificateBindings = []string{certID}
+			s.AccessRights = map[string]user.AccessDefinition{
+				apiId: {APIID: apiId, Versions: []string{"v1"}},
+			}
+		})
+
+		// Add invalid cert to existing bindings
+		session.MtlsStaticCertificateBindings = []string{certID, "invalid-new-cert"}
+		sessionData := test.MarshalJSON(t)(session)
+
+		path := fmt.Sprintf("/tyk/keys/%s", key)
+		_, _ = ts.Run(t, []test.TestCase{
+			{Method: http.MethodPut, Path: path, Data: sessionData, AdminAuth: true, Code: 400},
+		}...)
+	})
+
+	t.Run("PUT with only existing certs (no new certs)", func(t *testing.T) {
+		clientCertPem, _, _, _ := certs.GenCertificate(&x509.Certificate{}, false)
+		certID, err := ts.Gw.CertificateManager.Add(clientCertPem, "default")
+		require.NoError(t, err)
+		defer ts.Gw.CertificateManager.Delete(certID, "default")
+
+		session, key := ts.CreateSession(func(s *user.SessionState) {
+			s.OrgID = "default"
+			s.MtlsStaticCertificateBindings = []string{certID}
+			s.AccessRights = map[string]user.AccessDefinition{
+				apiId: {APIID: apiId, Versions: []string{"v1"}},
+			}
+		})
+
+		// No changes to bindings
+		session.MtlsStaticCertificateBindings = []string{certID}
+		sessionData := test.MarshalJSON(t)(session)
+
+		path := fmt.Sprintf("/tyk/keys/%s", key)
+		_, _ = ts.Run(t, []test.TestCase{
+			{Method: http.MethodPut, Path: path, Data: sessionData, AdminAuth: true, Code: 200},
+		}...)
+	})
+
+	t.Run("PUT removing a cert from bindings", func(t *testing.T) {
+		cert1Pem, _, _, _ := certs.GenCertificate(&x509.Certificate{}, false)
+		cert1ID, err := ts.Gw.CertificateManager.Add(cert1Pem, "default")
+		require.NoError(t, err)
+		defer ts.Gw.CertificateManager.Delete(cert1ID, "default")
+
+		cert2Pem, _, _, _ := certs.GenCertificate(&x509.Certificate{}, false)
+		cert2ID, err := ts.Gw.CertificateManager.Add(cert2Pem, "default")
+		require.NoError(t, err)
+		defer ts.Gw.CertificateManager.Delete(cert2ID, "default")
+
+		session, key := ts.CreateSession(func(s *user.SessionState) {
+			s.OrgID = "default"
+			s.MtlsStaticCertificateBindings = []string{cert1ID, cert2ID}
+			s.AccessRights = map[string]user.AccessDefinition{
+				apiId: {APIID: apiId, Versions: []string{"v1"}},
+			}
+		})
+
+		// Remove one cert from bindings
+		session.MtlsStaticCertificateBindings = []string{cert1ID}
+		sessionData := test.MarshalJSON(t)(session)
+
+		path := fmt.Sprintf("/tyk/keys/%s", key)
+		_, _ = ts.Run(t, []test.TestCase{
+			{Method: http.MethodPut, Path: path, Data: sessionData, AdminAuth: true, Code: 200},
+		}...)
 	})
 }

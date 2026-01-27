@@ -90,14 +90,19 @@ func (m *mockResponseMiddleware) ProcessRequest(rw http.ResponseWriter, r *http.
 }
 
 func (m *mockResponseMiddleware) mockResponse(r *http.Request) (*http.Response, error) {
-	// if response is nil we go further
-	operation := m.Spec.findOperation(r)
+	// Use FindSpecMatchesStatus to check if this path should be mocked
+	// This ensures the standard regex-based path matching is used, respecting gateway configurations
+	versionInfo, _ := m.Spec.Version(r)
+	versionPaths := m.Spec.RxPaths[versionInfo.Name]
 
-	if operation == nil {
+	urlSpec, found := m.Spec.FindSpecMatchesStatus(r, versionPaths, OASMockResponse)
+
+	if !found || urlSpec == nil {
+		// No mock response configured for this path
 		return nil, nil
 	}
 
-	mockResponse := operation.MockResponse
+	mockResponse := urlSpec.OASMockResponseMeta
 	if mockResponse == nil || !mockResponse.Enabled {
 		return nil, nil
 	}
@@ -111,7 +116,15 @@ func (m *mockResponseMiddleware) mockResponse(r *http.Request) (*http.Response, 
 	var err error
 
 	if mockResponse.FromOASExamples != nil && mockResponse.FromOASExamples.Enabled {
-		code, contentType, body, headers, err = mockFromOAS(r, operation.route.Operation, mockResponse.FromOASExamples)
+		// Find the route using the OAS path from URLSpec, not the actual request path.
+		// This allows prefix/suffix matching to work correctly.
+		strippedPath := m.Spec.StripListenPath(r.URL.Path)
+		route, _, routeErr := m.Spec.findRouteForOASPath(urlSpec.OASPath, urlSpec.OASMethod, strippedPath, r.URL.Path)
+		if routeErr != nil || route == nil {
+			log.Tracef("URL spec matched for mock response but route not found for OAS path %s: %v", urlSpec.OASPath, routeErr)
+			return nil, nil
+		}
+		code, contentType, body, headers, err = mockFromOAS(r, route.Operation, mockResponse.FromOASExamples)
 		res.StatusCode = code
 		if err != nil {
 			err = fmt.Errorf("mock: %w", err)
