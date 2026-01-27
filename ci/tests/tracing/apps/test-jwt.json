@@ -1,0 +1,38 @@
+{
+    "name": "JWTTestAPI",
+    "api_id": "jwt-test-api",
+    "org_id": "default",
+    "definition": {
+        "location": "header",
+        "key": "version"
+    },
+    "auth": {
+        "auth_header_name": "Authorization"
+    },
+    "version_data": {
+        "not_versioned": true,
+        "versions": {
+            "Default": {
+                "name": "Default",
+                "expires": "3000-01-02 15:04",
+                "use_extended_paths": true,
+                "extended_paths": {
+                    "ignored": [],
+                    "white_list": [],
+                    "black_list": []
+                }
+            }
+        }
+    },
+    "proxy": {
+        "listen_path": "/test-jwt/",
+        "target_url": "http://httpbin:80/",
+        "strip_listen_path": true
+    },
+    "enable_jwt": true,
+    "jwt_signing_method": "hmac",
+    "jwt_source": "dHlrLWp3dC10ZXN0LXNlY3JldA==",
+    "jwt_identity_base_field": "sub",
+    "jwt_default_policies": ["jwt-test-policy"],
+    "detailed_tracing": true
+}

@@ -17,6 +17,15 @@ type Middleware struct {
 
 	// Operations contains configuration for middleware that can be applied to individual endpoints within the API (per-endpoint).
 	Operations Operations `bson:"operations,omitempty" json:"operations,omitempty"`
+
+	// McpTools contains configuration for middleware that can be applied to MCP tools.
+	McpTools map[string]*Operation `bson:"mcpTools,omitempty" json:"mcpTools,omitempty"`
+
+	// McpResources contains configuration for middleware that can be applied to MCP resources.
+	McpResources map[string]*Operation `bson:"mcpResources,omitempty" json:"mcpResources,omitempty"`
+
+	// McpPrompts contains configuration for middleware that can be applied to MCP prompts.
+	McpPrompts map[string]*Operation `bson:"mcpPrompts,omitempty" json:"mcpPrompts,omitempty"`
 }
 
 // Fill fills *Middleware from apidef.APIDefinition.
@@ -41,6 +50,10 @@ func (m *Middleware) ExtractTo(api *apidef.APIDefinition) {
 	}
 
 	m.Global.ExtractTo(api)
+
+	if len(m.McpTools) > 0 || len(m.McpResources) > 0 || len(m.McpPrompts) > 0 {
+		api.MarkAsMCP()
+	}
 }
 
 // Global contains configuration that affects the whole API (all endpoints).

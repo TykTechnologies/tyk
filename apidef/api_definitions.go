@@ -134,6 +134,12 @@ const (
 	OAuthAuthorizationTypeClientCredentials = "clientCredentials"
 	// OAuthAuthorizationTypePassword is the authorization type for password flow.
 	OAuthAuthorizationTypePassword = "password"
+
+	// JSON-RPC protocol versions
+	JsonRPC20 = "2.0"
+
+	// Application protocols
+	AppProtocolMCP = "mcp"
 )
 
 var (
@@ -666,6 +672,8 @@ type APIDefinition struct {
 	ListenPort          int            `bson:"listen_port" json:"listen_port"`
 	Protocol            string         `bson:"protocol" json:"protocol"`
 	EnableProxyProtocol bool           `bson:"enable_proxy_protocol" json:"enable_proxy_protocol"`
+	JsonRpcVersion      string         `bson:"json_rpc_version,omitempty" json:"json_rpc_version,omitempty"`
+	ApplicationProtocol string         `bson:"application_protocol,omitempty" json:"application_protocol,omitempty"`
 	APIID               string         `bson:"api_id" json:"api_id"`
 	OrgID               string         `bson:"org_id" json:"org_id"`
 	UseKeylessAccess    bool           `bson:"use_keyless" json:"use_keyless"`
@@ -1428,6 +1436,22 @@ func (a *APIDefinition) GetAPIDomain() string {
 		return ""
 	}
 	return a.Domain
+}
+
+// SetProtocol configures the transport and application protocol for the API.
+func (a *APIDefinition) SetProtocol(transport, application string) {
+	a.JsonRpcVersion = transport
+	a.ApplicationProtocol = application
+}
+
+// IsMCP returns true if this API uses the Model Context Protocol.
+func (a *APIDefinition) IsMCP() bool {
+	return a.ApplicationProtocol == AppProtocolMCP
+}
+
+// MarkAsMCP configures the API definition as a Model Context Protocol (MCP) API.
+func (a *APIDefinition) MarkAsMCP() {
+	a.SetProtocol(JsonRPC20, AppProtocolMCP)
 }
 
 // IsChildAPI returns true if this API is a child API in a versioning hierarchy.

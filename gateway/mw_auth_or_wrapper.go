@@ -5,7 +5,9 @@ import (
 	"net/http"
 	"net/http/httptest"
 
+	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/apidef/oas"
+	"github.com/TykTechnologies/tyk/coprocess"
 )
 
 // OpenAPI security scheme constants
@@ -176,17 +178,9 @@ func (a *AuthORWrapper) getMiddlewareForScheme(schemeName string) TykMiddleware 
 						return a.findMiddlewareByType(&OpenIDMW{})
 					}
 
-					customPluginAuthEnabled := a.Spec.CustomPluginAuthEnabled || a.Spec.UseGoPluginAuth || a.Spec.EnableCoProcessAuth
-					if customPluginAuthEnabled {
-						if mw := a.findMiddlewareByType(&GoPluginMiddleware{}); mw != nil {
-							return mw
-						}
-						if mw := a.findMiddlewareByType(&CoProcessMiddleware{}); mw != nil {
-							return mw
-						}
-						if mw := a.findMiddlewareByType(&DynamicMiddleware{}); mw != nil {
-							return mw
-						}
+					middleware := a.findCustomPluginMiddleware()
+					if middleware != nil {
+						return middleware
 					}
 				}
 			}
@@ -204,17 +198,9 @@ func (a *AuthORWrapper) getMiddlewareForScheme(schemeName string) TykMiddleware 
 				}
 			case securitySchemeNameCustom:
 				if auth.Custom != nil && auth.Custom.Enabled {
-					customPluginAuthEnabled := a.Spec.CustomPluginAuthEnabled || a.Spec.UseGoPluginAuth || a.Spec.EnableCoProcessAuth
-					if customPluginAuthEnabled {
-						if mw := a.findMiddlewareByType(&GoPluginMiddleware{}); mw != nil {
-							return mw
-						}
-						if mw := a.findMiddlewareByType(&CoProcessMiddleware{}); mw != nil {
-							return mw
-						}
-						if mw := a.findMiddlewareByType(&DynamicMiddleware{}); mw != nil {
-							return mw
-						}
+					middleware := a.findCustomPluginMiddleware()
+					if middleware != nil {
+						return middleware
 					}
 				}
 			}
@@ -222,6 +208,26 @@ func (a *AuthORWrapper) getMiddlewareForScheme(schemeName string) TykMiddleware 
 	}
 
 	return nil
+}
+
+func (a *AuthORWrapper) findCustomPluginMiddleware() TykMiddleware {
+	if a.isPluginAuthEnabled() {
+		if mw := a.findMiddlewareByType(&GoPluginMiddleware{}); mw != nil {
+			return mw
+		}
+		if mw := a.findMiddlewareByType(&CoProcessMiddleware{}); mw != nil {
+			return mw
+		}
+		if mw := a.findMiddlewareByType(&DynamicMiddleware{}); mw != nil {
+			return mw
+		}
+	}
+
+	return nil
+}
+
+func (a *AuthORWrapper) isPluginAuthEnabled() bool {
+	return a.Spec.CustomPluginAuthEnabled || a.Spec.UseGoPluginAuth || a.Spec.EnableCoProcessAuth
 }
 
 func (a *AuthORWrapper) findMiddlewareByType(example TykMiddleware) TykMiddleware {
@@ -301,29 +307,8 @@ func (a *AuthORWrapper) Init() {
 		a.authMiddlewares = append(a.authMiddlewares, openIDMw)
 	}
 
-	// Custom plugin middlewares
-	if spec.UseGoPluginAuth {
-		goPluginMw := &GoPluginMiddleware{BaseMiddleware: a.BaseMiddleware.Copy()}
-		goPluginMw.Spec = spec
-		goPluginMw.Gw = a.Gw
-		goPluginMw.Init()
-		a.authMiddlewares = append(a.authMiddlewares, goPluginMw)
-	}
-
-	if spec.EnableCoProcessAuth {
-		coProcessMw := &CoProcessMiddleware{BaseMiddleware: a.BaseMiddleware.Copy()}
-		coProcessMw.Spec = spec
-		coProcessMw.Gw = a.Gw
-		coProcessMw.Init()
-		a.authMiddlewares = append(a.authMiddlewares, coProcessMw)
-	}
-
-	if spec.CustomPluginAuthEnabled {
-		dynamicMw := &DynamicMiddleware{BaseMiddleware: a.BaseMiddleware.Copy()}
-		dynamicMw.Spec = spec
-		dynamicMw.Gw = a.Gw
-		dynamicMw.Init()
-		a.authMiddlewares = append(a.authMiddlewares, dynamicMw)
+	if a.isPluginAuthEnabled() {
+		a.initCustomPluginMiddleware()
 	}
 
 	if spec.UseStandardAuth || len(a.authMiddlewares) == 0 {
@@ -333,5 +318,38 @@ func (a *AuthORWrapper) Init() {
 		authKeyMw.Init()
 		a.authMiddlewares = append(a.authMiddlewares, authKeyMw)
 	}
+}
 
+func (a *AuthORWrapper) initCustomPluginMiddleware() {
+	spec := a.Spec
+	var mw TykMiddleware
+
+	switch spec.CustomMiddleware.Driver {
+	case apidef.OttoDriver:
+		dynamicMw := &DynamicMiddleware{BaseMiddleware: a.BaseMiddleware.Copy()}
+		dynamicMw.MiddlewareClassName = spec.CustomMiddleware.AuthCheck.Name
+		dynamicMw.Auth = true
+		mw = dynamicMw
+	case apidef.GoPluginDriver:
+		goPluginMw := &GoPluginMiddleware{BaseMiddleware: a.BaseMiddleware.Copy()}
+		goPluginMw.Path = spec.CustomMiddleware.AuthCheck.Path
+		goPluginMw.SymbolName = spec.CustomMiddleware.AuthCheck.Name
+		goPluginMw.APILevel = true
+		mw = goPluginMw
+	default:
+		coProcessMw := &CoProcessMiddleware{BaseMiddleware: a.BaseMiddleware.Copy()}
+		coProcessMw.HookType = coprocess.HookType_CustomKeyCheck
+		coProcessMw.HookName = spec.CustomMiddleware.AuthCheck.Name
+		coProcessMw.MiddlewareDriver = spec.CustomMiddleware.Driver
+		coProcessMw.RawBodyOnly = spec.CustomMiddleware.AuthCheck.RawBodyOnly
+		mw = coProcessMw
+	}
+
+	mw.Init()
+
+	if goPluginMw, ok := mw.(*GoPluginMiddleware); ok {
+		goPluginMw.loadPlugin()
+	}
+
+	a.authMiddlewares = append(a.authMiddlewares, mw)
 }

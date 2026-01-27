@@ -1,22 +1,26 @@
 package gateway
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"net/http/httptest"
 	"testing"
 	"time"
 
+	logrustest "github.com/sirupsen/logrus/hooks/test"
 	"github.com/stretchr/testify/assert"
 
+	"github.com/TykTechnologies/tyk-pump/analytics"
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/config"
 	headers2 "github.com/TykTechnologies/tyk/header"
 	"github.com/TykTechnologies/tyk/internal/cache"
+	"github.com/TykTechnologies/tyk/internal/otel"
 	"github.com/TykTechnologies/tyk/internal/uuid"
 	"github.com/TykTechnologies/tyk/test"
-
-	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/user"
 )
 
@@ -599,4 +603,101 @@ func TestQuotaNotAppliedWithURLRewrite(t *testing.T) {
 			Code:    http.StatusForbidden,
 		},
 	}...)
+}
+
+func TestRecordAccessLog_TraceID(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	tests := []struct {
+		name          string
+		otelEnabled   bool
+		hasTraceCtx   bool
+		expectTraceID bool
+	}{
+		{
+			name:          "OTel disabled - no trace_id field",
+			otelEnabled:   false,
+			hasTraceCtx:   false,
+			expectTraceID: false,
+		},
+		{
+			name:          "OTel enabled, no trace context - no trace_id field",
+			otelEnabled:   true,
+			hasTraceCtx:   false,
+			expectTraceID: false,
+		},
+		{
+			name:          "OTel enabled, valid trace context - trace_id present",
+			otelEnabled:   true,
+			hasTraceCtx:   true,
+			expectTraceID: true,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			logger, hook := logrustest.NewNullLogger()
+
+			gwConfig := ts.Gw.GetConfig()
+			gwConfig.AccessLogs.Enabled = true
+			gwConfig.OpenTelemetry.Enabled = tc.otelEnabled
+			ts.Gw.SetConfig(gwConfig)
+
+			spec := &APISpec{
+				APIDefinition: &apidef.APIDefinition{},
+				GlobalConfig:  gwConfig,
+			}
+
+			baseMw := &BaseMiddleware{
+				Spec:   spec,
+				Gw:     ts.Gw,
+				logger: logger.WithField("prefix", "test"),
+			}
+
+			req := httptest.NewRequest(http.MethodGet, "http://example.com/path", nil)
+
+			// Add trace context if needed
+			if tc.hasTraceCtx && tc.otelEnabled {
+				// Create a real OTel provider and span
+				otelCfg := &otel.OpenTelemetry{
+					Enabled:  true,
+					Exporter: "http",
+					Endpoint: "http://localhost:4318", // Won't actually connect
+				}
+				provider := otel.InitOpenTelemetry(context.Background(), logger, otelCfg, "test-gw", "v1.0.0", false, "", false, nil)
+				_, span := provider.Tracer().Start(context.Background(), "test-span")
+				defer span.End()
+
+				ctx := otel.ContextWithSpan(req.Context(), span)
+				req = req.WithContext(ctx)
+			}
+
+			resp := &http.Response{
+				StatusCode: http.StatusOK,
+			}
+
+			latency := analytics.Latency{
+				Total:    100,
+				Upstream: 80,
+				Gateway:  20,
+			}
+
+			baseMw.RecordAccessLog(req, resp, latency)
+
+			// Check the logged fields
+			assert.NotEmpty(t, hook.Entries, "Expected a log entry")
+			lastEntry := hook.LastEntry()
+
+			_, hasTraceID := lastEntry.Data["trace_id"]
+			assert.Equal(t, tc.expectTraceID, hasTraceID, "trace_id field presence mismatch")
+
+			if tc.expectTraceID {
+				traceID := lastEntry.Data["trace_id"].(string)
+				assert.NotEmpty(t, traceID, "trace_id should not be empty when present")
+			}
+
+			hook.Reset()
+		})
+	}
 }
