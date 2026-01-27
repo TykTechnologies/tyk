@@ -2420,12 +2420,15 @@ type mockVaultSecretReader struct {
 	err    error
 }
 
-func (m *mockVaultSecretReader) ReadSecret(path string) (*vaultapi.Secret, error) {
+func (m *mockVaultSecretReader) ReadSecret(_ string) (*vaultapi.Secret, error) {
 	return m.secret, m.err
 }
 
-func (m *mockVaultSecretReader) Get(key string) (string, error) { return "", nil }
-func (m *mockVaultSecretReader) Put(key, val string) error      { return nil }
+// TODO: A path traversal vulnerability exists when resolving vault:// references.
+// The key name is appended to the base Vault path without sanitization. This
+// should be addressed in a separate ticket.
+func (m *mockVaultSecretReader) Get(_ string) (string, error) { return "", nil }
+func (m *mockVaultSecretReader) Put(_, _ string) error        { return nil }
 
 // TT-14791: A non-existent Vault path caused a panic due to nil secret.
 func TestReplaceVaultSecrets(t *testing.T) {
