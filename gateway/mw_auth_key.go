@@ -139,9 +139,6 @@ func (k *AuthKey) ProcessRequest(_ http.ResponseWriter, r *http.Request, _ inter
 		}
 
 		if !k.Gw.GetConfig().Security.AllowUnsafeDynamicMTLSToken {
-			if key != "" {
-				return errorAndStatusCode(ErrAuthKeyIsInvalid)
-			}
 			if certHash == "" {
 				return errorAndStatusCode(ErrAuthCertRequired)
 			}
@@ -150,24 +147,33 @@ func (k *AuthKey) ProcessRequest(_ http.ResponseWriter, r *http.Request, _ inter
 			if !keyExists {
 				session, keyExists = k.CheckSessionAndIdentityForValidKey(certHash, r)
 				if !keyExists {
-					return k.reportInvalidKey(key, r, MsgNonExistentKey, ErrAuthKeyNotFound)
+					return errorAndStatusCode(ErrAuthCertMismatch)
 				}
 			}
 		} else {
-			if key != "" {
-				session, keyExists = k.CheckSessionAndIdentityForValidKey(key, r)
-				if !keyExists {
-					return k.reportInvalidKey(key, r, MsgNonExistentKey, ErrAuthKeyNotFound)
-				}
-			} else {
+			if certHash != "" {
 				certKey := k.Gw.generateToken(k.Spec.OrgID, certHash)
 				session, keyExists = k.CheckSessionAndIdentityForValidKey(certKey, r)
 				if !keyExists {
 					session, keyExists = k.CheckSessionAndIdentityForValidKey(certHash, r)
 					if !keyExists {
-						return k.reportInvalidKey(key, r, MsgNonExistentKey, ErrAuthKeyNotFound)
+						return errorAndStatusCode(ErrAuthCertMismatch)
 					}
 				}
+			}
+			if key != "" {
+				session, keyExists = k.CheckSessionAndIdentityForValidKey(key, r)
+				if !keyExists {
+					return k.reportInvalidKey(key, r, MsgNonExistentKey, ErrAuthKeyNotFound)
+				}
+			}
+		}
+	} else {
+		if !keyExists {
+			// fallback to search by cert
+			session, keyExists = k.CheckSessionAndIdentityForValidKey(certHash, r)
+			if !keyExists {
+				return k.reportInvalidKey(key, r, MsgNonExistentKey, ErrAuthKeyNotFound)
 			}
 		}
 	}

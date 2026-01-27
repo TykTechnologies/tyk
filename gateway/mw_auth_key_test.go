@@ -754,8 +754,8 @@ func TestDynamicMTLSSecure(t *testing.T) {
 		certClient := GetTLSClient(nil, serverCertPem)
 		_, _ = ts.Run(t, test.TestCase{
 			Path:      "/dynamic-mtls",
-			Code:      http.StatusForbidden,
-			BodyMatch: MsgApiAccessDisallowed,
+			Code:      http.StatusUnauthorized,
+			BodyMatch: MsgAuthCertRequired,
 			Client:    certClient,
 			Headers: map[string]string{
 				"Authorization": keyHash,
@@ -767,8 +767,8 @@ func TestDynamicMTLSSecure(t *testing.T) {
 		certClient := GetTLSClient(nil, serverCertPem)
 		_, _ = ts.Run(t, test.TestCase{
 			Path:      "/dynamic-mtls",
-			Code:      http.StatusForbidden,
-			BodyMatch: MsgApiAccessDisallowed,
+			Code:      http.StatusUnauthorized,
+			BodyMatch: MsgAuthCertRequired,
 			Client:    certClient,
 			Headers: map[string]string{
 				"Authorization": certHash,
@@ -801,7 +801,7 @@ func TestDynamicMTLSSecure(t *testing.T) {
 		_, _ = ts.Run(t, test.TestCase{
 			Client:    differentCertClient,
 			Path:      "/dynamic-mtls",
-			Code:      http.StatusForbidden,
+			Code:      http.StatusUnauthorized,
 			BodyMatch: MsgApiAccessDisallowed,
 		})
 	})
