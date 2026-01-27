@@ -58,7 +58,11 @@ func (a APIDefinitionLoader) generateMCPVEMs(apiSpec *APISpec, conf config.Confi
 
 // buildMCPPrimitiveSpec creates the base URLSpec entry for an MCP primitive VEM.
 // This is used for access control (blocking direct external access).
-func (a APIDefinitionLoader) buildMCPPrimitiveSpec(name, primType, path string) []URLSpec {
+//
+// Parameters name and primType are currently unused but retained in the signature
+// for future use (e.g., logging, metrics, or extended metadata). Use blank identifiers
+// to satisfy the linter until needed.
+func (a APIDefinitionLoader) buildMCPPrimitiveSpec(_, _, path string) []URLSpec {
 	spec := URLSpec{
 		Status: Internal,
 		Internal: apidef.InternalMeta{
