@@ -20,6 +20,7 @@ import (
 	"github.com/TykTechnologies/tyk/ee/middleware/streams"
 	"github.com/TykTechnologies/tyk/storage/kv"
 
+	"github.com/TykTechnologies/tyk/internal/httpctx"
 	"github.com/TykTechnologies/tyk/internal/httputil"
 
 	"github.com/getkin/kin-openapi/routers/gorillamux"
@@ -1567,7 +1568,7 @@ func (a *APISpec) URLAllowedAndIgnored(r *http.Request, rxPaths []URLSpec, white
 		}
 
 		// Block direct access to MCP primitive VEMs - only allow via JSON-RPC routing
-		if rxPaths[i].Status == MCPPrimitive && r.Method == rxPaths[i].MCPPrimitiveMeta.Method && !ctxMCPRoutingEnabled(r) {
+		if rxPaths[i].Status == MCPPrimitive && r.Method == rxPaths[i].MCPPrimitiveMeta.Method && !httpctx.IsMCPRouting(r) {
 			return EndPointNotAllowed, nil
 		}
 	}

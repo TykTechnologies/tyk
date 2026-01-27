@@ -11,7 +11,8 @@ import (
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/apidef/oas"
 	"github.com/TykTechnologies/tyk/config"
-	"github.com/TykTechnologies/tyk/ctx"
+	"github.com/TykTechnologies/tyk/internal/httpctx"
+	"github.com/TykTechnologies/tyk/internal/mcp"
 	"github.com/TykTechnologies/tyk/regexp"
 )
 
@@ -55,7 +56,7 @@ func Test_sanitizeMCPName(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := sanitizeMCPName(tt.input)
+			result := mcp.SanitizeName(tt.input)
 			assert.Equal(t, tt.expected, result)
 		})
 	}
@@ -296,7 +297,7 @@ func Test_buildMCPPrimitiveSpec(t *testing.T) {
 		Allow: &oas.Allowance{Enabled: true},
 	}
 
-	spec := loader.buildMCPPrimitiveSpec("test-tool", "tool", MCPToolPrefix, op, config.Config{})
+	spec := loader.buildMCPPrimitiveSpec("test-tool", "tool", mcp.ToolPrefix, op, config.Config{})
 
 	assert.Equal(t, MCPPrimitive, spec.Status)
 	assert.Equal(t, "test-tool", spec.MCPPrimitiveMeta.Name)
@@ -340,20 +341,20 @@ func Test_URLSpec_modeSpecificSpec_MCPPrimitive(t *testing.T) {
 func Test_ctxMCPRouting(t *testing.T) {
 	t.Run("default is false", func(t *testing.T) {
 		r := httptest.NewRequest("POST", "/test", nil)
-		assert.False(t, ctxMCPRoutingEnabled(r))
+		assert.False(t, httpctx.IsMCPRouting(r))
 	})
 
 	t.Run("set to true", func(t *testing.T) {
 		r := httptest.NewRequest("POST", "/test", nil)
-		ctxSetMCPRouting(r, true)
-		assert.True(t, ctxMCPRoutingEnabled(r))
+		httpctx.SetMCPRouting(r, true)
+		assert.True(t, httpctx.IsMCPRouting(r))
 	})
 
 	t.Run("set to false explicitly", func(t *testing.T) {
 		r := httptest.NewRequest("POST", "/test", nil)
-		ctxSetMCPRouting(r, true)
-		ctxSetMCPRouting(r, false)
-		assert.False(t, ctxMCPRoutingEnabled(r))
+		httpctx.SetMCPRouting(r, true)
+		httpctx.SetMCPRouting(r, false)
+		assert.False(t, httpctx.IsMCPRouting(r))
 	})
 }
 
@@ -426,7 +427,7 @@ func Test_URLAllowedAndIgnored_MCPPrimitive_MCPRouting(t *testing.T) {
 
 	// Create request with MCP routing context
 	r := httptest.NewRequest("POST", "/mcp-tool:get-weather", nil)
-	ctxSetMCPRouting(r, true)
+	httpctx.SetMCPRouting(r, true)
 
 	// Execute
 	status, _ := apiSpec.URLAllowedAndIgnored(r, rxPaths, false)
@@ -493,9 +494,6 @@ func mustCompileRegex(pattern string) *regexp.Regexp {
 	return r
 }
 
-// Ensure ctx package is imported for context key reference
-var _ = ctx.MCPRouting
-
 // === EDGE CASE TESTS ===
 
 func Test_sanitizeMCPName_EdgeCases(t *testing.T) {
@@ -558,7 +556,7 @@ func Test_sanitizeMCPName_EdgeCases(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := sanitizeMCPName(tt.input)
+			result := mcp.SanitizeName(tt.input)
 			assert.Equal(t, tt.expected, result)
 		})
 	}
@@ -734,8 +732,8 @@ func Test_generateMCPVEMs_SpecialRegexCharactersInName(t *testing.T) {
 	tykExt := &oas.XTykAPIGateway{
 		Middleware: &oas.Middleware{
 			McpTools: map[string]*oas.Operation{
-				"tool.with.dots":       {Allow: &oas.Allowance{Enabled: true}},
-				"tool-with-hyphens":    {Allow: &oas.Allowance{Enabled: true}},
+				"tool.with.dots":        {Allow: &oas.Allowance{Enabled: true}},
+				"tool-with-hyphens":     {Allow: &oas.Allowance{Enabled: true}},
 				"tool_with_underscores": {Allow: &oas.Allowance{Enabled: true}},
 			},
 		},
@@ -901,4 +899,3 @@ func Test_URLAllowedAndIgnored_MultipleMCPPrimitives(t *testing.T) {
 	// Should be blocked (direct access to MCP primitive)
 	assert.Equal(t, EndPointNotAllowed, status)
 }
-
