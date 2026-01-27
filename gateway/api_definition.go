@@ -577,6 +577,10 @@ func (a APIDefinitionLoader) replaceVaultSecrets(input *string) error {
 		return fmt.Errorf("vault path does not exist: %s%s; vault references in API definitions will not be resolved", vaultSecretPath, prefixKeys)
 	}
 
+	if secret.Data == nil {
+		return fmt.Errorf("vault path contains no data: %s%s; vault references in API definitions will not be resolved", vaultSecretPath, prefixKeys)
+	}
+
 	pairs, ok := secret.Data["data"]
 	if !ok {
 		return errors.New("no data returned")

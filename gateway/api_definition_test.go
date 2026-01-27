@@ -2432,7 +2432,7 @@ func (m *mockVaultSecretReader) Put(_, _ string) error        { return nil }
 
 // TT-14791: A non-existent Vault path caused a panic due to nil secret.
 func TestReplaceVaultSecrets(t *testing.T) {
-	t.Run("vault path does not exist", func(t *testing.T) {
+	t.Run("vault path does not exist - nil secret", func(t *testing.T) {
 		ts := StartTest(nil, TestConfig{
 			Delay: 10 * time.Millisecond,
 		})
@@ -2447,6 +2447,26 @@ func TestReplaceVaultSecrets(t *testing.T) {
 
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "vault path does not exist")
+	})
+
+	t.Run("vault path contains no data", func(t *testing.T) {
+		ts := StartTest(nil, TestConfig{
+			Delay: 10 * time.Millisecond,
+		})
+		defer ts.Close()
+
+		// non-nil secret but nil Data simulates empty/deleted secret
+		ts.Gw.vaultKVStore = &mockVaultSecretReader{
+			secret: &vaultapi.Secret{Data: nil},
+			err:    nil,
+		}
+
+		l := APIDefinitionLoader{Gw: ts.Gw}
+		input := "some-api-key: vault://secret-key"
+		err := l.replaceVaultSecrets(&input)
+
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "vault path contains no data")
 	})
 
 	t.Run("vault secrets replaced successfully", func(t *testing.T) {
