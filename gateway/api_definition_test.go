@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -2427,8 +2428,30 @@ func (m *mockVaultSecretReader) ReadSecret(_ string) (*vaultapi.Secret, error) {
 func (m *mockVaultSecretReader) Get(_ string) (string, error) { return "", nil }
 func (m *mockVaultSecretReader) Put(_, _ string) error        { return nil }
 
+// mockKVStoreWithoutSecretReader implements kv.Store but NOT kv.SecretReader.
+type mockKVStoreWithoutSecretReader struct{}
+
+func (m *mockKVStoreWithoutSecretReader) Get(_ string) (string, error) { return "", nil }
+func (m *mockKVStoreWithoutSecretReader) Put(_, _ string) error        { return nil }
+
 // TT-14791: A non-existent Vault path caused a panic due to nil secret.
 func TestReplaceVaultSecrets(t *testing.T) {
+	t.Run("vault store does not implement SecretReader", func(t *testing.T) {
+		ts := StartTest(nil, TestConfig{
+			Delay: 10 * time.Millisecond,
+		})
+		defer ts.Close()
+
+		ts.Gw.vaultKVStore = &mockKVStoreWithoutSecretReader{}
+
+		l := APIDefinitionLoader{Gw: ts.Gw}
+		input := "some-api-key: vault://secret-key"
+		err := l.replaceVaultSecrets(&input)
+
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "could not read secrets")
+	})
+
 	t.Run("vault path does not exist - nil secret", func(t *testing.T) {
 		ts := StartTest(nil, TestConfig{
 			Delay: 10 * time.Millisecond,
@@ -2464,6 +2487,71 @@ func TestReplaceVaultSecrets(t *testing.T) {
 
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "vault path contains no data")
+	})
+
+	t.Run("vault ReadSecret returns error", func(t *testing.T) {
+		ts := StartTest(nil, TestConfig{
+			Delay: 10 * time.Millisecond,
+		})
+		defer ts.Close()
+
+		ts.Gw.vaultKVStore = &mockVaultSecretReader{
+			secret: nil,
+			err:    errors.New("vault server unavailable"),
+		}
+
+		l := APIDefinitionLoader{Gw: ts.Gw}
+		input := "some-api-key: vault://secret-key"
+		err := l.replaceVaultSecrets(&input)
+
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "vault server unavailable")
+	})
+
+	t.Run("vault secret missing data key", func(t *testing.T) {
+		ts := StartTest(nil, TestConfig{
+			Delay: 10 * time.Millisecond,
+		})
+		defer ts.Close()
+
+		// secret.Data exists but doesn't have "data" key
+		ts.Gw.vaultKVStore = &mockVaultSecretReader{
+			secret: &vaultapi.Secret{
+				Data: map[string]interface{}{
+					"other-key": "some-value",
+				},
+			},
+		}
+
+		l := APIDefinitionLoader{Gw: ts.Gw}
+		input := "some-api-key: vault://secret-key"
+		err := l.replaceVaultSecrets(&input)
+
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "no data returned")
+	})
+
+	t.Run("vault secret data is wrong type", func(t *testing.T) {
+		ts := StartTest(nil, TestConfig{
+			Delay: 10 * time.Millisecond,
+		})
+		defer ts.Close()
+
+		// secret.Data["data"] exists but is not a map
+		ts.Gw.vaultKVStore = &mockVaultSecretReader{
+			secret: &vaultapi.Secret{
+				Data: map[string]interface{}{
+					"data": "not-a-map",
+				},
+			},
+		}
+
+		l := APIDefinitionLoader{Gw: ts.Gw}
+		input := "some-api-key: vault://secret-key"
+		err := l.replaceVaultSecrets(&input)
+
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "data is not in the map format")
 	})
 
 	t.Run("vault secrets replaced successfully", func(t *testing.T) {
