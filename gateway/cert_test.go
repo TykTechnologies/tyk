@@ -25,6 +25,7 @@ import (
 
 	"github.com/TykTechnologies/tyk/certs/mock"
 
+	"github.com/TykTechnologies/tyk/internal/cache"
 	"github.com/TykTechnologies/tyk/internal/crypto"
 
 	"github.com/TykTechnologies/tyk/header"
@@ -2324,5 +2325,334 @@ func TestStaticMTLSAPI(t *testing.T) {
 			// Should fail because the client cert is signed by a different CA
 			assert.ErrorContains(t, err, "tls: failed to verify certificate")
 		})
+	})
+}
+func TestGateway_cleanupUnusedCerts(t *testing.T) {
+	// Helper to create cert ID with orgID prefix
+	makeCertID := func(orgID, hash string) string {
+		return orgID + hash
+	}
+
+	// Valid 64-character SHA256 hashes (must be exactly 64 hex chars)
+	hash1 := "c39e4fe697b07d0fe9a736040be03c09d772e852a33f1658e40281851bc15043"
+	hash2 := "27d76de70d66bf4f87d5153fc6c658e505dcd89cbcd9f1d4db31ee750dd23f6b"
+	hash3 := "36343db6cee404e07fbd04f80707cffd30fe1ede15520bebab4bf204e4258d6f"
+	hash4 := "7434143e7d50cc6a6065b6187c08dba7858b8cc007cb6fc492c92531dbef6491"
+	hash5 := "1cd3aff11052664a41bf894df7a34d7f864eb2cc929fb9239964ebbc0a459d72"
+
+	// Use hash1 as default
+	validHash := hash1
+
+	t.Run("nil registry - no cleanup", func(t *testing.T) {
+		// Setup Gateway without certRegistry
+		gw := &Gateway{}
+		gw.certRegistry = nil
+
+		// Should return early without panicking
+		gw.cleanupUnusedCerts()
+		// No assertions needed - test passes if no panic
+	})
+
+	t.Run("UseRPC disabled - no cleanup", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+
+		mockCertMgr := mock.NewMockCertificateManager(ctrl)
+
+		gw := &Gateway{
+			CertificateManager: mockCertMgr,
+			certRegistry:       newCertRegistry(),
+		}
+
+		cfg := &config.Config{
+			SlaveOptions: config.SlaveOptionsConfig{
+				UseRPC:            false, // Disabled
+				SyncUsedCertsOnly: true,
+				CleanupCerts:      true,
+			},
+		}
+		gw.SetConfig(*cfg)
+
+		// Should return early - no calls expected
+		gw.cleanupUnusedCerts()
+	})
+
+	t.Run("SyncUsedCertsOnly disabled - no cleanup", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+
+		mockCertMgr := mock.NewMockCertificateManager(ctrl)
+
+		gw := &Gateway{
+			CertificateManager: mockCertMgr,
+			certRegistry:       newCertRegistry(),
+		}
+
+		cfg := &config.Config{
+			SlaveOptions: config.SlaveOptionsConfig{
+				UseRPC:            true,
+				SyncUsedCertsOnly: false, // Disabled
+				CleanupCerts:      true,
+			},
+		}
+		gw.SetConfig(*cfg)
+
+		// Should return early - no calls expected
+		gw.cleanupUnusedCerts()
+	})
+
+	t.Run("CleanupCerts disabled - no cleanup", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+
+		mockCertMgr := mock.NewMockCertificateManager(ctrl)
+
+		gw := &Gateway{
+			CertificateManager: mockCertMgr,
+			certRegistry:       newCertRegistry(),
+		}
+
+		cfg := &config.Config{
+			SlaveOptions: config.SlaveOptionsConfig{
+				UseRPC:            true,
+				SyncUsedCertsOnly: true,
+				CleanupCerts:      false, // Disabled
+			},
+		}
+		gw.SetConfig(*cfg)
+
+		// Should return early - no calls expected
+		gw.cleanupUnusedCerts()
+	})
+
+	t.Run("all features enabled - no certificates to cleanup", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+
+		mockCertMgr := mock.NewMockCertificateManager(ctrl)
+
+		registry := newCertRegistry()
+		certID := makeCertID("org1", validHash)
+		registry.required[certID] = struct{}{}
+
+		gw := &Gateway{
+			CertificateManager: mockCertMgr,
+			certRegistry:       registry,
+			RPCCertCache:       cache.New(60, 15),
+		}
+
+		cfg := &config.Config{
+			SlaveOptions: config.SlaveOptionsConfig{
+				UseRPC:            true,
+				SyncUsedCertsOnly: true,
+				CleanupCerts:      true,
+			},
+		}
+		gw.SetConfig(*cfg)
+
+		// All certificates are required
+		mockCertMgr.EXPECT().ListAllIds("").Return([]string{certID})
+
+		// No Delete calls expected
+		gw.cleanupUnusedCerts()
+	})
+
+	t.Run("all features enabled - cleanup unused certificates", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+
+		mockCertMgr := mock.NewMockCertificateManager(ctrl)
+
+		registry := newCertRegistry()
+		requiredCert := makeCertID("org1", hash1)
+		unusedCert1 := makeCertID("org2", hash2)
+		unusedCert2 := makeCertID("org3", hash3)
+
+		// Only mark one as required
+		registry.required[requiredCert] = struct{}{}
+
+		mockCache := cache.New(60, 15)
+
+		gw := &Gateway{
+			CertificateManager: mockCertMgr,
+			certRegistry:       registry,
+			RPCCertCache:       mockCache,
+		}
+
+		cfg := &config.Config{
+			SlaveOptions: config.SlaveOptionsConfig{
+				UseRPC:            true,
+				SyncUsedCertsOnly: true,
+				CleanupCerts:      true,
+			},
+		}
+		gw.SetConfig(*cfg)
+
+		// Return all three certificates
+		mockCertMgr.EXPECT().ListAllIds("").Return([]string{requiredCert, unusedCert1, unusedCert2})
+
+		// Expect Delete calls for unused certificates only
+		mockCertMgr.EXPECT().Delete(unusedCert1, "org2")
+		mockCertMgr.EXPECT().Delete(unusedCert2, "org3")
+
+		gw.cleanupUnusedCerts()
+	})
+
+	t.Run("extract orgID correctly from certID", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+
+		mockCertMgr := mock.NewMockCertificateManager(ctrl)
+
+		registry := newCertRegistry()
+		// Certificate with orgID prefix
+		unusedCert := makeCertID("myorg123", validHash)
+
+		mockCache := cache.New(60, 15)
+
+		gw := &Gateway{
+			CertificateManager: mockCertMgr,
+			certRegistry:       registry,
+			RPCCertCache:       mockCache,
+		}
+
+		cfg := &config.Config{
+			SlaveOptions: config.SlaveOptionsConfig{
+				UseRPC:            true,
+				SyncUsedCertsOnly: true,
+				CleanupCerts:      true,
+			},
+		}
+		gw.SetConfig(*cfg)
+
+		mockCertMgr.EXPECT().ListAllIds("").Return([]string{unusedCert})
+
+		// Verify correct orgID extraction (myorg123)
+		mockCertMgr.EXPECT().Delete(unusedCert, "myorg123")
+
+		gw.cleanupUnusedCerts()
+	})
+
+	t.Run("handle certificate without orgID prefix", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+
+		mockCertMgr := mock.NewMockCertificateManager(ctrl)
+
+		registry := newCertRegistry()
+		// Certificate that is exactly 64 characters (no orgID prefix)
+		unusedCert := validHash
+
+		mockCache := cache.New(60, 15)
+
+		gw := &Gateway{
+			CertificateManager: mockCertMgr,
+			certRegistry:       registry,
+			RPCCertCache:       mockCache,
+		}
+
+		cfg := &config.Config{
+			SlaveOptions: config.SlaveOptionsConfig{
+				UseRPC:            true,
+				SyncUsedCertsOnly: true,
+				CleanupCerts:      true,
+			},
+		}
+		gw.SetConfig(*cfg)
+
+		mockCertMgr.EXPECT().ListAllIds("").Return([]string{unusedCert})
+
+		// Expect Delete with empty orgID
+		mockCertMgr.EXPECT().Delete(unusedCert, "")
+
+		gw.cleanupUnusedCerts()
+	})
+
+	t.Run("cleanup removes from RPCCertCache", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+
+		mockCertMgr := mock.NewMockCertificateManager(ctrl)
+
+		registry := newCertRegistry()
+		unusedCert := makeCertID("org1", validHash)
+
+		mockCache := cache.New(60, 15)
+		// Pre-populate cache
+		mockCache.Set("cert-raw-"+unusedCert, "cached-cert-data", 60)
+
+		gw := &Gateway{
+			CertificateManager: mockCertMgr,
+			certRegistry:       registry,
+			RPCCertCache:       mockCache,
+		}
+
+		cfg := &config.Config{
+			SlaveOptions: config.SlaveOptionsConfig{
+				UseRPC:            true,
+				SyncUsedCertsOnly: true,
+				CleanupCerts:      true,
+			},
+		}
+		gw.SetConfig(*cfg)
+
+		mockCertMgr.EXPECT().ListAllIds("").Return([]string{unusedCert})
+		mockCertMgr.EXPECT().Delete(unusedCert, "org1")
+
+		// Verify cache entry exists before cleanup
+		_, found := mockCache.Get("cert-raw-" + unusedCert)
+		assert.True(t, found, "Cache should contain cert before cleanup")
+
+		gw.cleanupUnusedCerts()
+
+		// Verify cache entry was removed
+		_, found = mockCache.Get("cert-raw-" + unusedCert)
+		assert.False(t, found, "Cache should not contain cert after cleanup")
+	})
+
+	t.Run("mixed required and unused certificates", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+
+		mockCertMgr := mock.NewMockCertificateManager(ctrl)
+
+		registry := newCertRegistry()
+
+		// Mix of required and unused certs
+		required1 := makeCertID("org1", hash1)
+		required2 := makeCertID("org2", hash2)
+		unused1 := makeCertID("org3", hash3)
+		unused2 := makeCertID("org4", hash4)
+		required3 := makeCertID("org5", hash5)
+
+		registry.required[required1] = struct{}{}
+		registry.required[required2] = struct{}{}
+		registry.required[required3] = struct{}{}
+
+		mockCache := cache.New(60, 15)
+
+		gw := &Gateway{
+			CertificateManager: mockCertMgr,
+			certRegistry:       registry,
+			RPCCertCache:       mockCache,
+		}
+
+		cfg := &config.Config{
+			SlaveOptions: config.SlaveOptionsConfig{
+				UseRPC:            true,
+				SyncUsedCertsOnly: true,
+				CleanupCerts:      true,
+			},
+		}
+		gw.SetConfig(*cfg)
+
+		allCerts := []string{required1, unused1, required2, unused2, required3}
+		mockCertMgr.EXPECT().ListAllIds("").Return(allCerts)
+
+		// Only unused certs should be deleted
+		mockCertMgr.EXPECT().Delete(unused1, "org3")
+		mockCertMgr.EXPECT().Delete(unused2, "org4")
+
+		gw.cleanupUnusedCerts()
 	})
 }

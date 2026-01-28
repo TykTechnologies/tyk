@@ -636,3 +636,55 @@ func getCipherAliases(ciphers []string) (cipherCodes []uint16) {
 	}
 	return cipherCodes
 }
+
+// maskCertID masks certificate ID for logging to avoid exposing sensitive data.
+// Certificate IDs can be derived from API keys/auth tokens and should not be logged in clear text.
+// Returns first 8 characters plus length for debugging while protecting sensitive data.
+func maskCertID(certID string) string {
+	if len(certID) <= 8 {
+		return certID
+	}
+	return certID[:8] + "***[len=" + strconv.Itoa(len(certID)) + "]"
+}
+
+// cleanupUnusedCerts removes certificates not referenced by any loaded API.
+func (gw *Gateway) cleanupUnusedCerts() {
+	// Registry only exists in RPC mode
+	if gw.certRegistry == nil {
+		return
+	}
+
+	// All three flags required (RPC mode + both features enabled)
+	if !gw.GetConfig().SlaveOptions.UseRPC ||
+		!gw.GetConfig().SlaveOptions.SyncUsedCertsOnly ||
+		!gw.GetConfig().SlaveOptions.CleanupCerts {
+		return
+	}
+
+	// List all certificates (empty prefix lists all)
+	allCerts := gw.CertificateManager.ListAllIds("")
+
+	var removed int
+	for _, certID := range allCerts {
+		if gw.certRegistry.Required(certID) {
+			continue
+		}
+
+		// Extract orgID from certID (format: {orgID}{sha256hash})
+		// The hash is always 64 characters (sha256.Size * 2)
+		var orgID string
+		if len(certID) > sha256.Size*2 {
+			orgID = certID[:len(certID)-sha256.Size*2]
+		}
+
+		log.WithField("cert_id", maskCertID(certID)).Debug("removing unused certificate")
+
+		gw.CertificateManager.Delete(certID, orgID)
+		gw.RPCCertCache.Delete("cert-raw-" + certID)
+		removed++
+	}
+
+	if removed > 0 {
+		log.WithField("count", removed).Info("cleaned up unused certificates")
+	}
+}

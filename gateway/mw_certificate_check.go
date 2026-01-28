@@ -60,12 +60,15 @@ func (m *CertificateCheckMW) Init() {
 		}
 
 		var err error
+		cfg := m.Gw.GetConfig()
 		m.expiryCheckBatcher, err = certcheck.NewCertificateExpiryCheckBatcher(
 			m.logger,
 			apiData,
-			m.Gw.GetConfig().Security.CertificateExpiryMonitor,
+			cfg.Security.CertificateExpiryMonitor,
 			m.store,
 			m.Spec.FireEvent,
+			m.Gw.certRegistry,
+			&cfg,
 		)
 
 		if err != nil {

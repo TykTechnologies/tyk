@@ -163,6 +163,8 @@ type Gateway struct {
 	policiesMu   sync.RWMutex
 	policiesByID map[string]user.Policy
 
+	certRegistry *certRegistry // nil in non-RPC mode
+
 	dnsCacheManager dnscache.IDnsCacheManager
 
 	consulKVStore kv.Store
@@ -252,6 +254,11 @@ func NewGateway(config config.Config, ctx context.Context) *Gateway {
 
 	gw.SetNodeID("solo-" + uuid.New())
 	gw.SessionID = uuid.New()
+
+	// Only create registry in RPC mode
+	if config.SlaveOptions.UseRPC {
+		gw.certRegistry = newCertRegistry()
+	}
 
 	return gw
 }
@@ -530,6 +537,11 @@ func (gw *Gateway) setupGlobals() {
 			Gw:        gw,
 		}
 		gw.CertificateManager = certs.NewSlaveCertManager(storeCert, rpcStore, certificateSecret, log, !gw.GetConfig().Cloud)
+
+		// Wire certificate registry for selective sync
+		if gw.GetConfig().SlaveOptions.SyncUsedCertsOnly && gw.certRegistry != nil {
+			gw.CertificateManager.SetRegistry(gw.certRegistry)
+		}
 	}
 
 	if gw.GetConfig().NewRelic.AppName != "" {
@@ -612,6 +624,9 @@ func (gw *Gateway) syncAPISpecs() (int, error) {
 	apiLen := len(gw.apiSpecs)
 	tlsConfigCache.Flush()
 	gw.apisMu.Unlock()
+
+	// Cleanup unused certificates after successful sync
+	gw.cleanupUnusedCerts()
 
 	return apiLen, nil
 }
@@ -1761,6 +1776,7 @@ func (gw *Gateway) getGlobalMDCBStorageHandler(keyPrefix string, hashKeys bool) 
 	logger := logrus.New().WithFields(logrus.Fields{"prefix": "mdcb-storage-handler"})
 
 	if gw.GetConfig().SlaveOptions.UseRPC {
+		cfg := gw.GetConfig()
 		return storage.NewMdcbStorage(
 			localStorage,
 			&RPCStorageHandler{
@@ -1770,6 +1786,8 @@ func (gw *Gateway) getGlobalMDCBStorageHandler(keyPrefix string, hashKeys bool) 
 			},
 			logger,
 			nil,
+			gw.certRegistry,
+			&cfg,
 		)
 	}
 	return localStorage

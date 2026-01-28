@@ -165,3 +165,15 @@ func (mr *MockCertificateManagerMockRecorder) ListRawPublicKey(keyID any) *gomoc
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListRawPublicKey", reflect.TypeOf((*MockCertificateManager)(nil).ListRawPublicKey), keyID)
 }
+
+// SetRegistry mocks base method.
+func (m *MockCertificateManager) SetRegistry(registry certs.CertRegistry) {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "SetRegistry", registry)
+}
+
+// SetRegistry indicates an expected call of SetRegistry.
+func (mr *MockCertificateManagerMockRecorder) SetRegistry(registry any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetRegistry", reflect.TypeOf((*MockCertificateManager)(nil).SetRegistry), registry)
+}
