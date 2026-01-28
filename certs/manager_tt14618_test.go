@@ -625,3 +625,128 @@ func TestTT14618_ScaleWith1000Certs(t *testing.T) {
 	t.Logf("With optimization: took %.3f seconds", duration.Seconds())
 	t.Log("SUCCESS: 1000 certificates loaded efficiently with single backoff!")
 }
+
+// Benchmark certificate loading with skipBackoff optimization
+func BenchmarkTT14618_CertificateLoading(b *testing.B) {
+	certPEM := loadTestCert(&testing.T{})
+
+	benchmarks := []struct {
+		name      string
+		certCount int
+		failures  int
+	}{
+		{"1cert_3failures", 1, 3},
+		{"10certs_3failures", 10, 3},
+		{"100certs_5failures", 100, 5},
+		{"1000certs_5failures", 1000, 5},
+	}
+
+	for _, bm := range benchmarks {
+		b.Run(bm.name, func(b *testing.B) {
+			// Generate certificate IDs
+			certIDs := make([]string, bm.certCount)
+			for i := 0; i < bm.certCount; i++ {
+				certIDs[i] = fmt.Sprintf("cert-%04d", i)
+			}
+
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				// Create fresh mock for each iteration
+				mockStorage := &MockMDCBStorage{
+					clearAfter: bm.failures,
+					certData:   certPEM,
+					t:          &testing.T{}, // Dummy for benchmark
+				}
+
+				handler := NewCertificateManager(mockStorage, "secret", nil, false)
+				certs := handler.List(certIDs, CertificatePrivate)
+
+				if len(certs) != bm.certCount {
+					b.Fatalf("Expected %d certificates, got %d", bm.certCount, len(certs))
+				}
+			}
+		})
+	}
+}
+
+// Benchmark to compare optimized vs unoptimized behavior
+func BenchmarkTT14618_OptimizedVsUnoptimized(b *testing.B) {
+	certPEM := loadTestCert(&testing.T{})
+	certCount := 100
+	failures := 3
+
+	// Generate certificate IDs
+	certIDs := make([]string, certCount)
+	for i := 0; i < certCount; i++ {
+		certIDs[i] = fmt.Sprintf("cert-%04d", i)
+	}
+
+	b.Run("optimized_with_skipBackoff", func(b *testing.B) {
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			mockStorage := &MockMDCBStorage{
+				clearAfter: failures,
+				certData:   certPEM,
+				t:          &testing.T{},
+			}
+
+			handler := NewCertificateManager(mockStorage, "secret", nil, false)
+			certs := handler.List(certIDs, CertificatePrivate)
+
+			if len(certs) != certCount {
+				b.Fatalf("Expected %d certificates, got %d", certCount, len(certs))
+			}
+		}
+	})
+
+	b.Run("unoptimized_without_skipBackoff", func(b *testing.B) {
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			mockStorage := &MockMDCBStorage{
+				clearAfter: failures,
+				certData:   certPEM,
+				t:          &testing.T{},
+			}
+
+			handler := NewCertificateManager(mockStorage, "secret", nil, false)
+
+			// Simulate unoptimized behavior: each cert does full backoff
+			// Load certificates one at a time (no skipBackoff benefit)
+			loadedCount := 0
+			for _, id := range certIDs {
+				singleCert := handler.List([]string{id}, CertificatePrivate)
+				if len(singleCert) > 0 {
+					loadedCount++
+				}
+			}
+
+			if loadedCount != certCount {
+				b.Fatalf("Expected %d certificates, got %d", certCount, loadedCount)
+			}
+		}
+	})
+}
+
+// Benchmark cache hit performance (no MDCB calls)
+func BenchmarkTT14618_CacheHit(b *testing.B) {
+	certPEM := loadTestCert(&testing.T{})
+	mockStorage := &MockMDCBStorage{
+		clearAfter: 0,
+		certData:   certPEM,
+		t:          &testing.T{},
+	}
+
+	handler := NewCertificateManager(mockStorage, "secret", nil, false)
+
+	// Pre-load certificates into cache
+	certIDs := []string{"cert-1", "cert-2", "cert-3", "cert-4", "cert-5"}
+	handler.List(certIDs, CertificatePrivate)
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		certs := handler.List(certIDs, CertificatePrivate)
+		if len(certs) != len(certIDs) {
+			b.Fatalf("Expected %d certificates, got %d", len(certIDs), len(certs))
+		}
+	}
+}
