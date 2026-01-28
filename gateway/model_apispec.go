@@ -64,6 +64,11 @@ type APISpec struct {
 	GraphEngine graphengine.Engine
 
 	oasRouter routers.Router
+
+	// MCPPrimitives maps primitive identifiers to their VEM paths for JSON-RPC routing.
+	// Key format: "tool:{name}", "resource:{pattern}", "prompt:{name}"
+	// Value: VEM path (e.g., "/mcp-tool:get-weather")
+	MCPPrimitives map[string]string
 }
 
 // CheckSpecMatchesStatus checks if a URL spec has a specific status.

@@ -88,6 +88,37 @@ type Operation struct {
 	RateLimit *RateLimitEndpoint `bson:"rateLimit,omitempty" json:"rateLimit,omitempty"`
 }
 
+// ExtractToExtendedPaths extracts operation-level middleware configuration into a classic
+// `apidef.ExtendedPathsSet` for the given `path` and `method`.
+//
+// This enables reusing the existing classic middleware compilation pipeline for
+// non-OAS routing constructs (e.g., MCP primitive VEMs).
+func (o *Operation) ExtractToExtendedPaths(ep *apidef.ExtendedPathsSet, path string, method string) {
+	if ep == nil || o == nil {
+		return
+	}
+
+	o.extractAllowanceTo(ep, path, method, allow)
+	o.extractAllowanceTo(ep, path, method, block)
+	o.extractAllowanceTo(ep, path, method, ignoreAuthentication)
+	o.extractInternalTo(ep, path, method)
+	o.extractTransformRequestMethodTo(ep, path, method)
+	o.extractTransformRequestBodyTo(ep, path, method)
+	o.extractTransformResponseBodyTo(ep, path, method)
+	o.extractTransformRequestHeadersTo(ep, path, method)
+	o.extractTransformResponseHeadersTo(ep, path, method)
+	o.extractURLRewriteTo(ep, path, method)
+	o.extractCacheTo(ep, path, method)
+	o.extractEnforceTimeoutTo(ep, path, method)
+	o.extractVirtualEndpointTo(ep, path, method)
+	o.extractEndpointPostPluginTo(ep, path, method)
+	o.extractCircuitBreakerTo(ep, path, method)
+	o.extractTrackEndpointTo(ep, path, method)
+	o.extractDoNotTrackEndpointTo(ep, path, method)
+	o.extractRequestSizeLimitTo(ep, path, method)
+	o.extractRateLimitEndpointTo(ep, path, method)
+}
+
 // AllowanceType holds the valid allowance types values.
 type AllowanceType int
 

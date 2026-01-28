@@ -21,6 +21,7 @@ import (
 	"github.com/TykTechnologies/tyk/storage/kv"
 
 	"github.com/TykTechnologies/tyk/internal/httputil"
+	"github.com/TykTechnologies/tyk/internal/mcp"
 
 	"github.com/getkin/kin-openapi/routers/gorillamux"
 
@@ -129,6 +130,9 @@ const (
 	StatusGoPlugin                        RequestStatus = "Go plugin"
 	StatusPersistGraphQL                  RequestStatus = "Persist GraphQL"
 	StatusRateLimit                       RequestStatus = "Rate Limited"
+	// MCPPrimitiveNotFound is returned when a primitive VEM is accessed directly (not via JSON-RPC routing).
+	// It intentionally maps to HTTP 404 to avoid exposing internal-only endpoints.
+	MCPPrimitiveNotFound RequestStatus = "MCP Primitive Not Found"
 )
 
 type EndPointCacheMeta struct {
@@ -205,6 +209,9 @@ func (s *APISpec) Unload() {
 		hook()
 	}
 	s.unloadHooks = nil
+
+	// Clear MCP primitives map
+	s.MCPPrimitives = nil
 }
 
 // Validate returns nil if s is a valid spec and an error stating why the spec is not valid.
@@ -1445,6 +1452,9 @@ func (a APIDefinitionLoader) getExtendedPathSpecs(apiVersionDef apidef.VersionIn
 	oasValidateRequestPaths := a.compileOASValidateRequestPathSpec(apiSpec, conf)
 	oasMockResponsePaths := a.compileOASMockResponsePathSpec(apiSpec, conf)
 
+	// MCP VEM generation - creates internal endpoints for MCP primitives (tools, resources, prompts)
+	mcpVEMs := a.generateMCPVEMs(apiSpec, conf)
+
 	combinedPath := []URLSpec{}
 	combinedPath = append(combinedPath, mockResponsePaths...)
 	combinedPath = append(combinedPath, ignoredPaths...)
@@ -1472,6 +1482,7 @@ func (a APIDefinitionLoader) getExtendedPathSpecs(apiVersionDef apidef.VersionIn
 	combinedPath = append(combinedPath, rateLimitPaths...)
 	combinedPath = append(combinedPath, oasValidateRequestPaths...)
 	combinedPath = append(combinedPath, oasMockResponsePaths...)
+	combinedPath = append(combinedPath, mcpVEMs...)
 
 	return combinedPath, len(whiteListPaths) > 0
 }
@@ -1552,6 +1563,10 @@ func (a *APISpec) URLAllowedAndIgnored(r *http.Request, rxPaths []URLSpec, white
 		}
 
 		if r.Method == rxPaths[i].Internal.Method && rxPaths[i].Status == Internal && !ctxLoopingEnabled(r) {
+			// MCP primitive VEMs return 404 to avoid exposing internal-only endpoints.
+			if mcp.IsPrimitiveVEMPath(rxPaths[i].Internal.Path) {
+				return MCPPrimitiveNotFound, nil
+			}
 			return EndPointNotAllowed, nil
 		}
 	}
@@ -1756,6 +1771,8 @@ func (a *APISpec) RequestValid(r *http.Request) (bool, RequestStatus) {
 	status, _ = a.URLAllowedAndIgnored(r, versionPaths, whiteListStatus)
 	switch status {
 	case EndPointNotAllowed:
+		return false, status
+	case MCPPrimitiveNotFound:
 		return false, status
 	case StatusRedirectFlowByReply:
 		return true, status
