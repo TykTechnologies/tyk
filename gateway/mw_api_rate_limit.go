@@ -1,6 +1,7 @@
 package gateway
 
 import (
+	"fmt"
 	"net/http"
 
 	"strconv"
@@ -11,13 +12,14 @@ import (
 	"github.com/TykTechnologies/tyk/user"
 )
 
-// RateLimitAndQuotaCheck will check the incoming request and key whether it is within it's quota and
+// RateLimitForAPI will check the incoming request and key whether it is within it's quota and
 // within it's rate limit, it makes use of the SessionLimiter object to do this
 type RateLimitForAPI struct {
 	*BaseMiddleware
 
-	keyName string
-	apiSess *user.SessionState
+	keyName  string
+	quotaKey string
+	apiSess  *user.SessionState
 }
 
 func (k *RateLimitForAPI) Name() string {
@@ -54,7 +56,7 @@ func (k *RateLimitForAPI) getSession(r *http.Request) *user.SessionState {
 	if ok {
 		if limits := spec.RateLimit; limits.Valid() {
 			// track per-endpoint with a hash of the path
-			keyname := k.keyName + "-" + storage.HashStr(limits.Path)
+			keyname := k.keyName + "-" + storage.HashStr(fmt.Sprintf("%s:%s", limits.Method, limits.Path))
 
 			session := &user.SessionState{
 				Rate:        limits.Rate,
@@ -90,20 +92,19 @@ func (k *RateLimitForAPI) EnabledForSpec() bool {
 }
 
 // ProcessRequest will run any checks on the request on the way through the system, return an error to have the chain fail
-func (k *RateLimitForAPI) ProcessRequest(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
+func (k *RateLimitForAPI) ProcessRequest(_ http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
 	// Skip rate limiting and quotas for looping
 	if !ctxCheckLimits(r) {
 		return nil, http.StatusOK
 	}
 
 	storeRef := k.Gw.GlobalSessionManager.Store()
-	customQuotaKey := ""
 
 	reason := k.Gw.SessionLimiter.ForwardMessage(
 		r,
 		k.getSession(r),
 		k.keyName,
-		customQuotaKey,
+		k.quotaKey,
 		storeRef,
 		true,
 		false,

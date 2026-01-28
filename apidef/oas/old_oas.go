@@ -2,13 +2,11 @@ package oas
 
 import (
 	"github.com/getkin/kin-openapi/openapi3"
-
-	openapifork "github.com/TykTechnologies/kin-openapi/openapi3"
 )
 
 // OldOAS serves for data model migration/conversion purposes (gorm).
 type OldOAS struct {
-	openapifork.T
+	openapi3.T
 }
 
 // ConvertToNewerOAS converts a deprecated OldOAS object to the newer OAS representation.

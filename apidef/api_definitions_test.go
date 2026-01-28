@@ -8,15 +8,235 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	schema "github.com/xeipuuv/gojsonschema"
+	"github.com/TykTechnologies/tyk/internal/service/gojsonschema"
 )
 
+func TestAPIDefinition_JsonRpcVersion(t *testing.T) {
+	t.Run("json-rpc version field marshaling", func(t *testing.T) {
+		api := APIDefinition{
+			JsonRpcVersion: "2.0",
+		}
+
+		data, err := json.Marshal(api)
+		assert.NoError(t, err)
+
+		var result APIDefinition
+		err = json.Unmarshal(data, &result)
+		assert.NoError(t, err)
+
+		assert.Equal(t, "2.0", result.JsonRpcVersion)
+	})
+
+	t.Run("empty json-rpc version omitted", func(t *testing.T) {
+		api := APIDefinition{
+			JsonRpcVersion: "",
+		}
+
+		data, err := json.Marshal(api)
+		assert.NoError(t, err)
+
+		assert.NotContains(t, string(data), "json_rpc_version")
+	})
+
+	t.Run("json-rpc version persists through encode/decode", func(t *testing.T) {
+		api := APIDefinition{
+			JsonRpcVersion: "2.0",
+		}
+
+		api.EncodeForDB()
+		api.DecodeFromDB()
+
+		assert.Equal(t, "2.0", api.JsonRpcVersion)
+	})
+}
+
+func TestAPIDefinition_ApplicationProtocol(t *testing.T) {
+	t.Run("application protocol field marshaling", func(t *testing.T) {
+		api := APIDefinition{
+			ApplicationProtocol: AppProtocolMCP,
+		}
+
+		data, err := json.Marshal(api)
+		assert.NoError(t, err)
+
+		var result APIDefinition
+		err = json.Unmarshal(data, &result)
+		assert.NoError(t, err)
+
+		assert.Equal(t, AppProtocolMCP, result.ApplicationProtocol)
+	})
+
+	t.Run("empty application protocol omitted", func(t *testing.T) {
+		api := APIDefinition{
+			ApplicationProtocol: "",
+		}
+
+		data, err := json.Marshal(api)
+		assert.NoError(t, err)
+
+		assert.NotContains(t, string(data), "application_protocol")
+	})
+
+	t.Run("application protocol persists through encode/decode", func(t *testing.T) {
+		api := APIDefinition{
+			ApplicationProtocol: AppProtocolMCP,
+		}
+
+		api.EncodeForDB()
+		api.DecodeFromDB()
+
+		assert.Equal(t, AppProtocolMCP, api.ApplicationProtocol)
+	})
+
+	t.Run("supports custom protocols", func(t *testing.T) {
+		customProtocol := "a2a"
+		api := APIDefinition{
+			ApplicationProtocol: customProtocol,
+		}
+
+		data, err := json.Marshal(api)
+		assert.NoError(t, err)
+
+		var result APIDefinition
+		err = json.Unmarshal(data, &result)
+		assert.NoError(t, err)
+
+		assert.Equal(t, customProtocol, result.ApplicationProtocol)
+	})
+}
+
+func TestAPIDefinition_SetProtocol(t *testing.T) {
+	t.Run("sets transport and application protocol", func(t *testing.T) {
+		api := APIDefinition{}
+
+		api.SetProtocol(JsonRPC20, AppProtocolMCP)
+
+		assert.Equal(t, JsonRPC20, api.JsonRpcVersion)
+		assert.Equal(t, AppProtocolMCP, api.ApplicationProtocol)
+		assert.True(t, api.IsMCP())
+	})
+
+	t.Run("IsMCP method returns correct value based on application protocol", func(t *testing.T) {
+		api := APIDefinition{}
+
+		api.SetProtocol(JsonRPC20, AppProtocolMCP)
+		assert.True(t, api.IsMCP())
+
+		api.SetProtocol(JsonRPC20, "a2a")
+		assert.False(t, api.IsMCP())
+
+		api.SetProtocol(JsonRPC20, AppProtocolMCP)
+		assert.True(t, api.IsMCP())
+	})
+
+	t.Run("overwrites existing values", func(t *testing.T) {
+		api := APIDefinition{
+			JsonRpcVersion:      "1.0",
+			ApplicationProtocol: "old",
+		}
+
+		api.SetProtocol(JsonRPC20, AppProtocolMCP)
+
+		assert.Equal(t, JsonRPC20, api.JsonRpcVersion)
+		assert.Equal(t, AppProtocolMCP, api.ApplicationProtocol)
+		assert.True(t, api.IsMCP())
+	})
+
+	t.Run("allows empty application protocol", func(t *testing.T) {
+		api := APIDefinition{}
+
+		api.SetProtocol(JsonRPC20, "")
+
+		assert.Equal(t, JsonRPC20, api.JsonRpcVersion)
+		assert.Equal(t, "", api.ApplicationProtocol)
+		assert.False(t, api.IsMCP())
+	})
+
+	t.Run("allows empty transport protocol", func(t *testing.T) {
+		api := APIDefinition{}
+
+		api.SetProtocol("", "custom")
+
+		assert.Equal(t, "", api.JsonRpcVersion)
+		assert.Equal(t, "custom", api.ApplicationProtocol)
+		assert.False(t, api.IsMCP())
+	})
+}
+
+func TestAPIDefinition_MarkAsMCP(t *testing.T) {
+	t.Run("marks API as MCP", func(t *testing.T) {
+		api := APIDefinition{}
+
+		api.MarkAsMCP()
+
+		assert.Equal(t, JsonRPC20, api.JsonRpcVersion)
+		assert.Equal(t, AppProtocolMCP, api.ApplicationProtocol)
+		assert.True(t, api.IsMCP())
+	})
+
+	t.Run("overwrites existing values", func(t *testing.T) {
+		api := APIDefinition{
+			JsonRpcVersion:      "1.0",
+			ApplicationProtocol: "old",
+		}
+
+		api.MarkAsMCP()
+
+		assert.Equal(t, JsonRPC20, api.JsonRpcVersion)
+		assert.Equal(t, AppProtocolMCP, api.ApplicationProtocol)
+		assert.True(t, api.IsMCP())
+	})
+
+	t.Run("is idempotent", func(t *testing.T) {
+		api := APIDefinition{}
+
+		api.MarkAsMCP()
+		api.MarkAsMCP()
+		api.MarkAsMCP()
+
+		assert.Equal(t, JsonRPC20, api.JsonRpcVersion)
+		assert.Equal(t, AppProtocolMCP, api.ApplicationProtocol)
+		assert.True(t, api.IsMCP())
+	})
+
+	t.Run("does not affect other fields", func(t *testing.T) {
+		api := APIDefinition{
+			Name:  "test-api",
+			APIID: "123",
+			Slug:  "test",
+		}
+
+		api.MarkAsMCP()
+
+		assert.Equal(t, "test-api", api.Name)
+		assert.Equal(t, "123", api.APIID)
+		assert.Equal(t, "test", api.Slug)
+		assert.Equal(t, JsonRPC20, api.JsonRpcVersion)
+		assert.Equal(t, AppProtocolMCP, api.ApplicationProtocol)
+		assert.True(t, api.IsMCP())
+	})
+
+	t.Run("uses SetProtocol internally", func(t *testing.T) {
+		api := APIDefinition{}
+
+		api.MarkAsMCP()
+
+		// Verify it's equivalent to calling SetProtocol with MCP constants
+		expected := APIDefinition{}
+		expected.SetProtocol(JsonRPC20, AppProtocolMCP)
+
+		assert.Equal(t, expected.JsonRpcVersion, api.JsonRpcVersion)
+		assert.Equal(t, expected.ApplicationProtocol, api.ApplicationProtocol)
+		assert.Equal(t, expected.IsMCP(), api.IsMCP())
+	})
+}
+
 func TestSchema(t *testing.T) {
-	schemaLoader := schema.NewBytesLoader([]byte(Schema))
+	schemaLoader := gojsonschema.NewBytesLoader([]byte(Schema))
 
 	spec := DummyAPI()
-	goLoader := schema.NewGoLoader(spec)
-	result, err := schema.Validate(schemaLoader, goLoader)
+	goLoader := gojsonschema.NewGoLoader(spec)
+	result, err := gojsonschema.Validate(schemaLoader, goLoader)
 	if err != nil {
 		t.Error(err)
 	}
@@ -97,14 +317,14 @@ func TestDecodeFromDB(t *testing.T) {
 }
 
 func TestSchemaGraphqlConfig(t *testing.T) {
-	schemaLoader := schema.NewBytesLoader([]byte(Schema))
+	schemaLoader := gojsonschema.NewBytesLoader([]byte(Schema))
 
 	spec := DummyAPI()
 	spec.GraphQL.ExecutionMode = ""
 
-	goLoader := schema.NewGoLoader(spec)
+	goLoader := gojsonschema.NewGoLoader(spec)
 
-	result, err := schema.Validate(schemaLoader, goLoader)
+	result, err := gojsonschema.Validate(schemaLoader, goLoader)
 	if err != nil {
 		t.Error(err)
 	}
@@ -323,4 +543,321 @@ func TestAPIDefinition_GetScopeToPolicyMapping(t *testing.T) {
 		})
 	}
 
+}
+
+func TestJSVMEventHandlerConf_Scan(t *testing.T) {
+	jsvmEventMeta := map[string]any{
+		"disabled": true,
+		"id":       "1234",
+		"name":     "myMethod",
+		"path":     "my_script.js",
+	}
+
+	expected := JSVMEventHandlerConf{
+		Disabled:   true,
+		ID:         "1234",
+		MethodName: "myMethod",
+		Path:       "my_script.js",
+	}
+
+	var jsvmEventConf JSVMEventHandlerConf
+	err := jsvmEventConf.Scan(jsvmEventMeta)
+
+	assert.NoError(t, err)
+	assert.Equal(t, expected, jsvmEventConf)
+}
+
+func TestLogEventHandlerConf_Scan(t *testing.T) {
+	logEventMeta := map[string]any{
+		"disabled": true,
+		"prefix":   "AuthFailureEvent",
+	}
+
+	expected := LogEventHandlerConf{
+		Disabled: true,
+		Prefix:   "AuthFailureEvent",
+	}
+
+	var logEventConf LogEventHandlerConf
+	err := logEventConf.Scan(logEventMeta)
+
+	assert.NoError(t, err)
+	assert.Equal(t, expected, logEventConf)
+}
+
+func TestAPIDefinition_IsChildAPI(t *testing.T) {
+	tests := []struct {
+		name     string
+		api      APIDefinition
+		expected bool
+	}{
+		{
+			name: "child API - BaseID set and different from APIID",
+			api: APIDefinition{
+				APIID: "child-api-123",
+				VersionDefinition: VersionDefinition{
+					BaseID: "base-api-456",
+				},
+			},
+			expected: true,
+		},
+		{
+			name: "not a child - BaseID empty",
+			api: APIDefinition{
+				APIID: "standalone-api-123",
+				VersionDefinition: VersionDefinition{
+					BaseID: "",
+				},
+			},
+			expected: false,
+		},
+		{
+			name: "not a child - BaseID equals APIID (base API)",
+			api: APIDefinition{
+				APIID: "base-api-123",
+				VersionDefinition: VersionDefinition{
+					BaseID: "base-api-123",
+				},
+			},
+			expected: false,
+		},
+		{
+			name: "not a child - no version definition",
+			api: APIDefinition{
+				APIID:             "api-123",
+				VersionDefinition: VersionDefinition{},
+			},
+			expected: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := tt.api.IsChildAPI()
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+func TestAPIDefinition_IsBaseAPI(t *testing.T) {
+	tests := []struct {
+		name     string
+		api      APIDefinition
+		expected bool
+	}{
+		{
+			name: "base API - has versions and no BaseID",
+			api: APIDefinition{
+				APIID: "base-api-123",
+				VersionDefinition: VersionDefinition{
+					BaseID: "",
+					Versions: map[string]string{
+						"v1": "child-api-1",
+						"v2": "child-api-2",
+					},
+				},
+			},
+			expected: true,
+		},
+		{
+			name: "base API - has versions and BaseID equals APIID",
+			api: APIDefinition{
+				APIID: "base-api-123",
+				VersionDefinition: VersionDefinition{
+					BaseID: "base-api-123",
+					Versions: map[string]string{
+						"v1": "child-api-1",
+						"v2": "child-api-2",
+					},
+				},
+			},
+			expected: true,
+		},
+		{
+			name: "not a base API - no versions",
+			api: APIDefinition{
+				APIID: "api-123",
+				VersionDefinition: VersionDefinition{
+					BaseID:   "",
+					Versions: map[string]string{},
+				},
+			},
+			expected: false,
+		},
+		{
+			name: "not a base API - is a child (BaseID different from APIID)",
+			api: APIDefinition{
+				APIID: "child-api-123",
+				VersionDefinition: VersionDefinition{
+					BaseID: "base-api-456",
+					Versions: map[string]string{
+						"v1": "child-api-123",
+					},
+				},
+			},
+			expected: false,
+		},
+		{
+			name: "not a base API - nil versions",
+			api: APIDefinition{
+				APIID: "api-123",
+				VersionDefinition: VersionDefinition{
+					BaseID:   "",
+					Versions: nil,
+				},
+			},
+			expected: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := tt.api.IsBaseAPI()
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+func TestAPIDefinition_IsBaseAPIWithVersioning(t *testing.T) {
+	tests := []struct {
+		name     string
+		api      APIDefinition
+		expected bool
+	}{
+		{
+			name: "base API with versioning - all conditions met",
+			api: APIDefinition{
+				APIID: "base-api-123",
+				VersionDefinition: VersionDefinition{
+					Enabled: true,
+					Name:    "v1",
+					BaseID:  "",
+				},
+			},
+			expected: true,
+		},
+		{
+			name: "base API with versioning - BaseID equals APIID",
+			api: APIDefinition{
+				APIID: "base-api-123",
+				VersionDefinition: VersionDefinition{
+					Enabled: true,
+					Name:    "v1",
+					BaseID:  "base-api-123",
+				},
+			},
+			expected: true,
+		},
+		{
+			name: "not versioned - Enabled is false",
+			api: APIDefinition{
+				APIID: "api-123",
+				VersionDefinition: VersionDefinition{
+					Enabled: false,
+					Name:    "v1",
+					BaseID:  "",
+				},
+			},
+			expected: false,
+		},
+		{
+			name: "not versioned - Name is empty",
+			api: APIDefinition{
+				APIID: "api-123",
+				VersionDefinition: VersionDefinition{
+					Enabled: true,
+					Name:    "",
+					BaseID:  "",
+				},
+			},
+			expected: false,
+		},
+		{
+			name: "is a child API - BaseID different from APIID",
+			api: APIDefinition{
+				APIID: "child-api-123",
+				VersionDefinition: VersionDefinition{
+					Enabled: true,
+					Name:    "v2",
+					BaseID:  "base-api-456",
+				},
+			},
+			expected: false,
+		},
+		{
+			name: "not versioned - all fields false/empty",
+			api: APIDefinition{
+				APIID: "api-123",
+				VersionDefinition: VersionDefinition{
+					Enabled: false,
+					Name:    "",
+					BaseID:  "",
+				},
+			},
+			expected: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := tt.api.IsBaseAPIWithVersioning()
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+func TestVersionDefinition_ResolvedDefault(t *testing.T) {
+	tests := []struct {
+		name     string
+		vd       VersionDefinition
+		expected string
+	}{
+		{
+			name: "resolves 'self' to actual version name",
+			vd: VersionDefinition{
+				Name:    "v1",
+				Default: Self,
+			},
+			expected: "v1",
+		},
+		{
+			name: "keeps specific version unchanged",
+			vd: VersionDefinition{
+				Name:    "v1",
+				Default: "v2",
+			},
+			expected: "v2",
+		},
+		{
+			name: "handles empty default",
+			vd: VersionDefinition{
+				Name:    "v1",
+				Default: "",
+			},
+			expected: "",
+		},
+		{
+			name: "handles empty name with self",
+			vd: VersionDefinition{
+				Name:    "",
+				Default: Self,
+			},
+			expected: "",
+		},
+		{
+			name: "handles both empty",
+			vd: VersionDefinition{
+				Name:    "",
+				Default: "",
+			},
+			expected: "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := tt.vd.ResolvedDefault()
+			assert.Equal(t, tt.expected, result)
+		})
+	}
 }

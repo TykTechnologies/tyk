@@ -23,16 +23,7 @@ func Flaky(t *testing.T, fake ...func() (bool, func(...interface{}))) {
 
 // Racy skips a racy test in a CI environment
 func Racy(t *testing.T, fake ...func() (bool, func(...interface{}))) {
-	skipCI(t, "Skipping Racy test", fake...)
-}
-
-// Exclusive uses a lock to gate only a single test running.
-func Exclusive(t *testing.T) {
-	t.Log("# Test marked as exclusive")
-	exclusiveTestMu.Lock()
-	t.Cleanup(func() {
-		exclusiveTestMu.Unlock()
-	})
+	skipCI(t, "Skipping racy test", fake...)
 }
 
 func skipCI(t *testing.T, message string, fake ...func() (bool, func(...interface{}))) {

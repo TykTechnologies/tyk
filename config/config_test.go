@@ -53,6 +53,21 @@ func TestDefaultValueAndWriteDefaultConf(t *testing.T) {
 			NoCacheStrategy,
 			RandomStrategy,
 		},
+		{
+			"CertificateExpiryMonitorWarningThresholdDays", "TYK_GW_SECURITY_CERTIFICATEEXPIRYMONITOR_WARNINGTHRESHOLDDAYS",
+			func(c *Config) interface{} { return c.Security.CertificateExpiryMonitor.WarningThresholdDays },
+			int(30), int(15),
+		},
+		{
+			"CertificateExpiryMonitorCheckCooldownSeconds", "TYK_GW_SECURITY_CERTIFICATEEXPIRYMONITOR_CHECKCOOLDOWNSECONDS",
+			func(c *Config) interface{} { return c.Security.CertificateExpiryMonitor.CheckCooldownSeconds },
+			int(3600), int(1800),
+		},
+		{
+			"CertificateExpiryMonitorEventCooldownSeconds", "TYK_GW_SECURITY_CERTIFICATEEXPIRYMONITOR_EVENTCOOLDOWNSECONDS",
+			func(c *Config) interface{} { return c.Security.CertificateExpiryMonitor.EventCooldownSeconds },
+			86400, 43200,
+		},
 	}
 
 	for _, tc := range cases {
@@ -67,7 +82,7 @@ func TestDefaultValueAndWriteDefaultConf(t *testing.T) {
 				t.Fatalf("Expected %v to be set to its default %v, but got %v", tc.FieldName, tc.defaultValue, tc.FieldGetter(conf))
 			}
 			expectedValue := fmt.Sprint(tc.expectedValue)
-			os.Setenv(tc.EnvVarName, expectedValue)
+			t.Setenv(tc.EnvVarName, expectedValue)
 			defer func() {
 				os.Unsetenv(tc.EnvVarName)
 			}()
@@ -254,7 +269,7 @@ func TestLoad_tracing(t *testing.T) {
 		for _, v := range sample {
 			t.Run(v.file, func(t *testing.T) {
 				for _, e := range v.env {
-					os.Setenv(e.name, e.value)
+					t.Setenv(e.name, e.value)
 				}
 				defer func() {
 					for _, e := range v.env {
@@ -291,7 +306,7 @@ func TestLoad_tracing(t *testing.T) {
 
 func TestCustomCertsDataDecoder(t *testing.T) {
 	var c Config
-	os.Setenv("TYK_GW_HTTPSERVEROPTIONS_CERTIFICATES", "[{\"domain_name\":\"testCerts\"}]")
+	t.Setenv("TYK_GW_HTTPSERVEROPTIONS_CERTIFICATES", "[{\"domain_name\":\"testCerts\"}]")
 	err := envconfig.Process("TYK_GW", &c)
 	if err != nil {
 		t.Fatal(err)
@@ -299,15 +314,32 @@ func TestCustomCertsDataDecoder(t *testing.T) {
 
 	assert.Len(t, c.HttpServerOptions.Certificates, 1, "TYK_GW_HTTPSERVEROPTIONS_CERTIFICATES should have len 1")
 	assert.Equal(t, "testCerts", c.HttpServerOptions.Certificates[0].Name, "TYK_GW_HTTPSERVEROPTIONS_CERTIFICATES domain_name should be equals to testCerts")
+}
 
+// TestSecretsDecoder tests env variable decoding for TYK_GW_SECRETS.
+// It confirms that key pairs should be provided as a comma separated
+// list of keys and values, additionally separated by `:` (colon).
+func TestSecretsDecoder(t *testing.T) {
+	var c Config
+	t.Setenv("TYK_GW_SECRETS", "key:value,key2:/value2")
+	err := envconfig.Process("TYK_GW", &c)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	want := map[string]string{
+		"key":  "value",
+		"key2": "/value2",
+	}
+
+	assert.Equal(t, want, c.Secrets)
 }
 
 func TestPortsWhiteListDecoder(t *testing.T) {
 	var c Config
 
 	//testing invalid value
-	err := os.Setenv("TYK_GW_PORTWHITELIST", "invalid-value")
-	assert.NoError(t, err)
+	t.Setenv("TYK_GW_PORTWHITELIST", "invalid-value")
 
 	httpWhiteList, ok := c.PortWhiteList["http"]
 	assert.False(t, ok)
@@ -318,8 +350,7 @@ func TestPortsWhiteListDecoder(t *testing.T) {
 	assert.Empty(t, tlsWhiteList)
 
 	//testing empty value
-	err = os.Setenv("TYK_GW_PORTWHITELIST", "")
-	assert.NoError(t, err)
+	t.Setenv("TYK_GW_PORTWHITELIST", "")
 
 	httpWhiteList, ok = c.PortWhiteList["http"]
 	assert.False(t, ok)
@@ -330,10 +361,9 @@ func TestPortsWhiteListDecoder(t *testing.T) {
 	assert.Empty(t, tlsWhiteList)
 
 	//testing real value
-	err = os.Setenv("TYK_GW_PORTWHITELIST", "{\"http\":{\"ranges\":[{\"from\":8000,\"to\":9000}]},\"tls\":{\"ports\":[6000,6015]}}")
-	assert.NoError(t, err)
+	t.Setenv("TYK_GW_PORTWHITELIST", "{\"http\":{\"ranges\":[{\"from\":8000,\"to\":9000}]},\"tls\":{\"ports\":[6000,6015]}}")
 
-	err = envconfig.Process("TYK_GW", &c)
+	err := envconfig.Process("TYK_GW", &c)
 	assert.NoError(t, err)
 
 	httpWhiteList, ok = c.PortWhiteList["http"]
@@ -352,4 +382,135 @@ func TestPortsWhiteListDecoder(t *testing.T) {
 
 	assert.Contains(t, tlsWhiteList.Ports, 6000, "tls should have 6000 port")
 	assert.Contains(t, tlsWhiteList.Ports, 6015, "tls should have 6015 port")
+}
+
+func TestCertificateExpiryMonitorConfig(t *testing.T) {
+	dir, err := ioutil.TempDir("", "tyk")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(dir)
+
+	t.Run("Read and write config with certificate expiry monitor", func(t *testing.T) {
+		// Test different configuration scenarios with descriptive file names:
+		// - warning_1day_check_1sec_event_1sec_minimal: edge cases with minimum allowed values
+		// Note: Reduced test files to essential scenarios only
+		files := []string{
+			"testdata/cert_monitor_warning_1day_check_1sec_event_1sec_minimal.json",
+		}
+		for _, f := range files {
+			t.Run(f, func(t *testing.T) {
+				var c Config
+				err = Load([]string{f}, &c)
+				if err != nil {
+					t.Fatal(err)
+				}
+				o := filepath.Join(
+					filepath.Dir(f),
+					"expect."+filepath.Base(f),
+				)
+				expect, err := ioutil.ReadFile(o)
+				if err != nil {
+					t.Fatal(err)
+				}
+
+				got, err := json.MarshalIndent(c.Security.CertificateExpiryMonitor, "", "    ")
+				if err != nil {
+					t.Fatal(err)
+				}
+
+				diff, s := jsondiff.Compare(expect, got, &jsondiff.Options{
+					PrintTypes: true,
+				})
+
+				if diff == jsondiff.NoMatch {
+					t.Error(s)
+				}
+			})
+		}
+	})
+
+	t.Run("Environment variable override", func(t *testing.T) {
+		// Test environment variable overrides for certificate expiry monitor configuration
+		// This verifies that environment variables take precedence over config file values
+		// File contains default values that will be overridden by environment variables
+		files := []string{"testdata/cert_monitor_defaults_with_env_overrides.json"}
+		for _, f := range files {
+			t.Run(f, func(t *testing.T) {
+				// Set environment variables
+				os.Setenv("TYK_GW_SECURITY_CERTIFICATEEXPIRYMONITOR_WARNINGTHRESHOLDDAYS", "7")
+				os.Setenv("TYK_GW_SECURITY_CERTIFICATEEXPIRYMONITOR_CHECKCOOLDOWNSECONDS", "900")
+				os.Setenv("TYK_GW_SECURITY_CERTIFICATEEXPIRYMONITOR_EVENTCOOLDOWNSECONDS", "21600")
+
+				defer func() {
+					os.Unsetenv("TYK_GW_SECURITY_CERTIFICATEEXPIRYMONITOR_WARNINGTHRESHOLDDAYS")
+					os.Unsetenv("TYK_GW_SECURITY_CERTIFICATEEXPIRYMONITOR_CHECKCOOLDOWNSECONDS")
+					os.Unsetenv("TYK_GW_SECURITY_CERTIFICATEEXPIRYMONITOR_EVENTCOOLDOWNSECONDS")
+
+				}()
+
+				var c Config
+
+				err = Load([]string{f}, &c)
+				if err != nil {
+					t.Fatal(err)
+				}
+
+				o := filepath.Join(
+					filepath.Dir(f),
+					"expect."+filepath.Base(f),
+				)
+
+				expect, err := ioutil.ReadFile(o)
+				if err != nil {
+					t.Fatal(err)
+				}
+
+				got, err := json.MarshalIndent(c.Security.CertificateExpiryMonitor, "", "    ")
+				if err != nil {
+					t.Fatal(err)
+				}
+
+				diff, s := jsondiff.Compare(expect, got, &jsondiff.Options{
+					PrintTypes: true,
+				})
+
+				if diff == jsondiff.NoMatch {
+					t.Error(s)
+				}
+			})
+		}
+	})
+
+	t.Run("Default values when no configuration provided", func(t *testing.T) {
+		// Initialize with default values
+		c := Default
+
+		// Process environment variables (but don't override our defaults in this test)
+		if err := FillEnv(&c); err != nil {
+			t.Fatal(err)
+		}
+
+		// Verify default values are set correctly
+		expected := CertificateExpiryMonitorConfig{
+			WarningThresholdDays: 30,
+			CheckCooldownSeconds: 3600,
+			EventCooldownSeconds: 86400,
+		}
+
+		if c.Security.CertificateExpiryMonitor.WarningThresholdDays != expected.WarningThresholdDays {
+			t.Errorf("Expected WarningThresholdDays to be %d, got %d",
+				expected.WarningThresholdDays, c.Security.CertificateExpiryMonitor.WarningThresholdDays)
+		}
+
+		if c.Security.CertificateExpiryMonitor.CheckCooldownSeconds != expected.CheckCooldownSeconds {
+			t.Errorf("Expected CheckCooldownSeconds to be %d, got %d",
+				expected.CheckCooldownSeconds, c.Security.CertificateExpiryMonitor.CheckCooldownSeconds)
+		}
+
+		if c.Security.CertificateExpiryMonitor.EventCooldownSeconds != expected.EventCooldownSeconds {
+			t.Errorf("Expected EventCooldownSeconds to be %d, got %d",
+				expected.EventCooldownSeconds, c.Security.CertificateExpiryMonitor.EventCooldownSeconds)
+		}
+	})
 }

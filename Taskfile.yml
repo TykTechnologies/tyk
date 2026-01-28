@@ -3,7 +3,9 @@ version: "3"
 
 includes:
   test: .taskfiles/test.yml
-  deps: .taskfiles/deps/Taskfile.yml
+  deps: .taskfiles/deps.yml
+  lint: .taskfiles/lint.yml
+  hooks: .taskfiles/hooks.yml
   opentelemetry:
     taskfile: ci/tests/tracing/Taskfile.yml
     dir: ci/tests/tracing/
@@ -20,11 +22,52 @@ includes:
     taskfile: apidef/oas/Taskfile.yml
     dir: apidef/oas/
 
+vars:
+  path: ./...
+  # BASE_BRANCH: Determines the base branch for diff-based operations (linting, codegen)
+  # This variable is inherited by all included taskfiles.
+  #
+  # Detection logic:
+  # 1. If BASE_BRANCH env var is set, use it
+  # 2. If current branch follows release bot naming convention (merge/release-X.X/*),
+  #    extract and use the release branch (e.g., merge/release-5.8/foo -> release-5.8)
+  # 3. Otherwise, default to master
+  #
+  # This ensures git hooks and linting compare against the correct baseline branch.
+  BASE_BRANCH:
+    sh: |
+      if [ -n "${BASE_BRANCH}" ]; then
+        echo "${BASE_BRANCH}"
+      else
+        current_branch=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "")
+        case "$current_branch" in
+          merge/release-*/*)
+            echo "$current_branch" | sed -n 's|^merge/\(release-[^/]*\)/.*|\1|p'
+            ;;
+          *)
+            echo "master"
+            ;;
+        esac
+      fi
+
 tasks:
+  build:
+    desc: "Build tyk gateway"
+    sources:
+      - '**/*.go'
+      - 'go.mod'
+      - 'go.sum'
+    generates:
+      - '.task-build-cache'
+    cmds:
+      - go build .
+      - cd gateway && go test -c . && cd ..
+      - touch .task-build-cache
+
   docker:
     desc: "build Tyk gateway internal/tyk-gateway"
     cmds:
-      - docker build --platform "linux/amd64" --rm -t internal/tyk-gateway .
+      - docker build --build-arg GO_VERSION="$(go mod edit -json | jq .Go -r)" --platform "linux/amd64" --rm -t internal/tyk-gateway .
     sources:
       - go.mod
       - go.sum
@@ -54,44 +97,91 @@ tasks:
         yq -i ".dockers[4].extra_files |= [\"$replacement\"]" ci/goreleaser/goreleaser.yml
       - echo goreleaser release --clean --snapshot -f ci/goreleaser/goreleaser.yml
 
+  codegen:
+    deps: [deps]
+    desc: "Run code generation steps"
+    cmds:
+      - go generate ./...
+
+  codegen:smart:
+    deps: [deps:mockgen]
+    desc: "Run code generation only if files with go:generate changed vs base branch"
+    sources:
+      - '**/*.go'
+    generates:
+      - .task-codegen-cache
+    cmds:
+      - |
+        # Only check files that changed vs base branch, avoiding grep on unchanged files
+        changed=$(git diff --name-only origin/{{.BASE_BRANCH}}...HEAD -- '*.go' 2>/dev/null || true)
+        if [ -z "$changed" ]; then
+          echo "✓ No Go files changed vs origin/{{.BASE_BRANCH}} - skipping codegen"
+          touch .task-codegen-cache
+          exit 0
+        fi
+        # Only grep in changed files for go:generate directive
+        files_with_generate=$(echo "$changed" | xargs grep -l "//go:generate" 2>/dev/null || true)
+        if [ -z "$files_with_generate" ]; then
+          echo "✓ No files with go:generate changed vs origin/{{.BASE_BRANCH}} - skipping codegen"
+          touch .task-codegen-cache
+          exit 0
+        fi
+        echo "Files with go:generate changed: $(echo $files_with_generate | tr '\n' ' ')"
+        go generate ./...
+        touch .task-codegen-cache
+
   # Used in CI
   lint:
     desc: "Tidy the codebase"
     cmds:
-      - task: lint:tidy
-      - task: lint:all
+      - task: codegen:smart
+      - task: lint:run
+      - task: lint:extras
 
-  lint:tidy:
-    desc: "Run typical code cleanup steps"
-    aliases: [fmt]
+  tidy:
+    desc: "Tidy the codebase without auto-fixing"
     cmds:
-      - gofmt -w .
-      - go generate ./...
-      - go fmt ./...
-      - go mod tidy
-      - goimports -local github.com/TykTechnologies,github.com/TykTechnologies/tyk/internal -w .
-      - go mod tidy
+      - task: codegen:smart
+      - task: lint:basic
+      - task: lint:extras
 
-  lint:all:
-    internal: true
+  lint:extras:
+    desc: "Run more specific linters"
     deps:
-      - lint:config
-      - lint:imports
-      - lint:x-tyk-gateway
-      - coprocess:lint
-      - apidef-oas:lint
+      - task: coprocess:lint
+      - task: apidef-oas:lint
 
-  lint:imports:
-    internal: true
+  # Used in CI by hooks, lint.
+  fmt:
+    desc: "Reformat import groups"
     cmds:
-      - go-fsck lint
+      - task: lint:fmt
 
-  lint:config:
-    internal: true
+  # This reformats imports using golangci-lint fmt with gci formatter
+  #
+  # To limit reformatting scope to packages or files, set `path`:
+  #
+  # - `task fmt:imports path="./ctx ./rpc"`
+  #
+  # Uses gci formatter configured in .golangci.yml with Tyk import ordering
+  fmt:imports:
+    desc: "Format imports using golangci-lint fmt"
     cmds:
-      - go test -count 1 -v ./cli/linter/...
+      - golangci-lint fmt {{.path | default "./..."}}
 
-  lint:x-tyk-gateway:
-    internal: true
+  setup:
+    desc: "Setup the project including dependencies and git hooks using lefthooks"
     cmds:
-      - go test -count 1 -v -run=TestXTykGateway_Lint ./apidef/oas/
+      - task: deps:default
+      - lefthook install
+
+  clean:
+    desc: "Clean test files"
+    cmds:
+      - find -name '*.so' -delete -print
+      - find -name '*.test' -delete -print
+
+  generate-bento-config-validator-schema:
+    desc: "Generate Bento Config Validator Schema"
+    cmds:
+      - go run apidef/streams/bento/schema/generate_bento_config_schema.go -o apidef/streams/bento/schema/bento-config-schema.json

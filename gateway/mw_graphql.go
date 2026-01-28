@@ -83,17 +83,15 @@ func (m *GraphQLMiddleware) Init() {
 			},
 		})
 	} else if m.Spec.GraphQL.Version == apidef.GraphQLConfigVersion2 {
+		httpClient := &http.Client{
+			Transport: &http.Transport{TLSClientConfig: tlsClientConfig(m.Spec, nil)},
+		}
 		m.Spec.GraphEngine, err = graphengine.NewEngineV2(graphengine.EngineV2Options{
-			Logger:        log,
-			Schema:        schema,
-			ApiDefinition: m.Spec.APIDefinition,
-			HttpClient: &http.Client{
-				Transport: &http.Transport{TLSClientConfig: tlsClientConfig(m.Spec, nil)},
-			},
-			StreamingClient: &http.Client{
-				Timeout:   0,
-				Transport: &http.Transport{TLSClientConfig: tlsClientConfig(m.Spec, nil)},
-			},
+			Logger:          log,
+			Schema:          schema,
+			ApiDefinition:   m.Spec.APIDefinition,
+			HttpClient:      httpClient,
+			StreamingClient: httpClient,
 			OpenTelemetry: graphengine.EngineV2OTelConfig{
 				Enabled:        m.Gw.GetConfig().OpenTelemetry.Enabled,
 				TracerProvider: m.Gw.TracerProvider,
@@ -116,7 +114,7 @@ func (m *GraphQLMiddleware) Init() {
 					}
 					return body, nil
 				},
-				TykVariableReplacer: m.Gw.replaceTykVariables,
+				TykVariableReplacer: m.Gw.ReplaceTykVariables,
 			},
 		})
 	} else if m.Spec.GraphQL.Version == apidef.GraphQLConfigVersion3Preview {
@@ -153,7 +151,7 @@ func (m *GraphQLMiddleware) Init() {
 					}
 					return body, nil
 				},
-				TykVariableReplacer: m.Gw.replaceTykVariables,
+				TykVariableReplacer: m.Gw.ReplaceTykVariables,
 			},
 		})
 		if err != nil {

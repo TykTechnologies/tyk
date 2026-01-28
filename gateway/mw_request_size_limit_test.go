@@ -1,9 +1,16 @@
 package gateway
 
 import (
+	"bytes"
+	"context"
 	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
+
+	logrus "github.com/sirupsen/logrus/hooks/test"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/test"
@@ -49,6 +56,87 @@ func TestRequestSizeLimit(t *testing.T) {
 			_, _ = ts.Run(t, []test.TestCase{
 				{Method: http.MethodPost, Path: "/sample/get", Data: strings.Repeat("a", 513), Code: http.StatusOK},
 			}...)
+		})
+	})
+
+	t.Run("should not break the request, if the method is skipped", func(t *testing.T) {
+		// GET, DELETE, TRACE, OPTIONS and HEAD
+		for method := range skippedMethods {
+			_, _ = ts.Run(t, []test.TestCase{
+				{Method: method, Path: "/sample/", Code: http.StatusOK},
+			}...)
+		}
+	})
+
+	t.Run("should break the request, if content-length is missing", func(t *testing.T) {
+		// Golang's HTTP client automatically adds Content-Length to the request for POST, PUT and PATCH methods.
+		logger, _ := logrus.NewNullLogger()
+		spec := ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+			UpdateAPIVersion(spec, "v1", func(v *apidef.VersionInfo) {
+				v.GlobalSizeLimit = 1024
+			})
+		})[0]
+		baseMid := &BaseMiddleware{
+			Spec:   spec,
+			logger: logger.WithContext(context.Background()),
+		}
+		reqSizeLimitMiddleware := &RequestSizeLimitMiddleware{baseMid}
+
+		for _, method := range []string{http.MethodPost, http.MethodPut, http.MethodPatch} {
+			// Content-Length is missing in this request.
+			body := bytes.NewBufferString(strings.Repeat("a", 3))
+			r := httptest.NewRequest(method, "/sample", body)
+
+			rw := httptest.NewRecorder()
+			err, code := reqSizeLimitMiddleware.ProcessRequest(rw, r, nil)
+			require.Equal(t, http.StatusLengthRequired, code)
+			require.Errorf(t, err, "Content length is required for this request")
+		}
+	})
+
+	t.Run("check enabled for spec", func(t *testing.T) {
+		createMiddleware := func(versionInfoUpdater func(*apidef.VersionInfo)) *RequestSizeLimitMiddleware {
+			logger, _ := logrus.NewNullLogger()
+			spec := ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+				UpdateAPIVersion(spec, "v1", versionInfoUpdater)
+			})[0]
+			baseMid := &BaseMiddleware{
+				Spec:   spec,
+				logger: logger.WithContext(context.Background()),
+			}
+			return &RequestSizeLimitMiddleware{baseMid}
+		}
+
+		t.Run("request size limit set to 0 (disabled)", func(t *testing.T) {
+			mw := createMiddleware(func(v *apidef.VersionInfo) {
+				v.GlobalSizeLimit = 0
+				v.GlobalSizeLimitDisabled = false
+			})
+			assert.False(t, mw.EnabledForSpec())
+		})
+
+		t.Run("request size limit set to value but disabled", func(t *testing.T) {
+			mw := createMiddleware(func(v *apidef.VersionInfo) {
+				v.GlobalSizeLimit = 5000
+				v.GlobalSizeLimitDisabled = true
+			})
+			assert.False(t, mw.EnabledForSpec())
+		})
+
+		t.Run("request size limit set to 0 and disabled", func(t *testing.T) {
+			mw := createMiddleware(func(v *apidef.VersionInfo) {
+				v.GlobalSizeLimit = 0
+				v.GlobalSizeLimitDisabled = true
+			})
+			assert.False(t, mw.EnabledForSpec())
+		})
+
+		t.Run("request size limit set to value and enabled", func(t *testing.T) {
+			mw := createMiddleware(func(v *apidef.VersionInfo) {
+				v.GlobalSizeLimit = 5000
+				v.GlobalSizeLimitDisabled = false
+			})
+			assert.True(t, mw.EnabledForSpec())
 		})
 	})
 }

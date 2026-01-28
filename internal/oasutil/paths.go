@@ -23,9 +23,10 @@ var pathParamRegex = regexp.MustCompile(`\{[^}]+\}`)
 func ExtractPaths(in openapi3.Paths, order []string) []PathItem {
 	// collect url and pathItem
 	result := []PathItem{}
+	pathsMap := in.Map()
 	for _, v := range order {
 		value := PathItem{
-			PathItem: in[v],
+			PathItem: pathsMap[v],
 			Path:     v,
 		}
 		result = append(result, value)
@@ -43,7 +44,8 @@ func ExtractPaths(in openapi3.Paths, order []string) []PathItem {
 func SortByPathLength(in openapi3.Paths) []PathItem {
 	// get urls
 	paths := []string{}
-	for k := range in {
+	pathsMap := in.Map()
+	for k := range pathsMap {
 		paths = append(paths, k)
 	}
 

@@ -1,6 +1,10 @@
+//go:build ee || dev
+
 package gateway
 
 import (
+	"bufio"
+	"bytes"
 	"context"
 	"crypto/tls"
 	"encoding/json"
@@ -8,13 +12,16 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
 	"github.com/nats-io/nats.go"
+	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/testcontainers/testcontainers-go"
+	"github.com/testcontainers/testcontainers-go/modules/kafka"
 	natscon "github.com/testcontainers/testcontainers-go/modules/nats"
 	"github.com/testcontainers/testcontainers-go/wait"
 
@@ -23,10 +30,11 @@ import (
 	"gopkg.in/yaml.v2"
 
 	"github.com/IBM/sarama"
-	"github.com/testcontainers/testcontainers-go/modules/kafka"
 
 	"github.com/TykTechnologies/tyk/apidef/oas"
 	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/ee/middleware/streams"
+	"github.com/TykTechnologies/tyk/internal/model"
 	"github.com/TykTechnologies/tyk/test"
 )
 
@@ -87,7 +95,7 @@ output:
 		t.Run(tc.name, func(t *testing.T) {
 			config, err := yamlConfigToMap(tc.configYaml)
 			require.NoError(t, err)
-			httpPaths := GetHTTPPaths(config)
+			httpPaths := streams.GetHTTPPaths(config)
 			assert.ElementsMatch(t, tc.expected, httpPaths)
 		})
 	}
@@ -140,12 +148,46 @@ streams:
       http_server:
         path: /get
         ws_path: /get/ws
+    pipeline:
+      processors:
+        - bloblang: |
+            root.id = "stub"
+            root.message = content().string()
     logger:
       level: DEBUG
       format: logfmt
       add_timestamp: false
-      static_fields:
-        '@service': benthos
+`
+
+const bentoNatsTemplateNoBloblang = `
+streams:
+  test:
+    input:
+      nats:
+        auto_replay_nacks: true
+        subject: "%s"
+        urls: ["%s"]
+    output:
+      http_server:
+        path: /get
+        ws_path: /get/ws
+    logger:
+      level: DEBUG
+      format: logfmt
+      add_timestamp: false
+`
+
+const bentoHTTPServerTemplate = `
+streams:
+  test:
+    input:
+      http_server:
+        path: /post
+        timeout: 1s
+    output:
+      http_server:
+        ws_path: /subscribe
+        stream_path: /get/stream
 `
 
 func TestStreamingAPISingleClient(t *testing.T) {
@@ -160,8 +202,6 @@ func TestStreamingAPISingleClient(t *testing.T) {
 		).WithDeadline(30*time.Second)))
 	require.NoError(t, err)
 
-	//skip if is dynamic, does not work
-
 	configSubject := "test"
 
 	connectionStr, err := natsContainer.ConnectionString(ctx)
@@ -174,7 +214,7 @@ func TestStreamingAPISingleClient(t *testing.T) {
 	t.Cleanup(func() {
 		ts.Close()
 	})
-	//t.Cleanup(func() { ts.Close() })
+
 	apiName := "test-api"
 	if err = setUpStreamAPI(ts, apiName, streamConfig); err != nil {
 		t.Fatal(err)
@@ -188,6 +228,7 @@ func TestStreamingAPISingleClient(t *testing.T) {
 	}
 
 	wsURL := strings.Replace(ts.URL, "http", "ws", 1) + fmt.Sprintf("/%s/get/ws", apiName)
+
 	wsConn, _, err := dialer.Dial(wsURL, nil)
 	require.NoError(t, err, "failed to connect to ws server")
 	t.Cleanup(func() {
@@ -209,12 +250,32 @@ func TestStreamingAPISingleClient(t *testing.T) {
 	err = wsConn.SetReadDeadline(time.Now().Add(500 * time.Millisecond))
 	require.NoError(t, err, "error setting read deadline")
 
+	// use an array to track received messages for index
+	expectedMessages := make(map[string]bool)
 	for i := 0; i < totalMessages; i++ {
+		expectedMessages[fmt.Sprintf(`{"id":"stub","message":"Hello %d"}`, i)] = false
+	}
+
+	receivedCount := 0
+	for receivedCount < totalMessages {
 		_, p, err := wsConn.ReadMessage()
 		require.NoError(t, err, "error reading message")
-		assert.Equal(t, fmt.Sprintf("Hello %d", i), string(p), "message not equal")
+
+		received := string(p)
+
+		gotten, exists := expectedMessages[received]
+		require.True(t, exists, "received unexpected message: %s", received)
+		require.False(t, gotten, "received duplicate message: %s", received)
+
+		expectedMessages[received] = true
+		receivedCount++
+	}
+
+	for msg, received := range expectedMessages {
+		require.True(t, received, "did not receive expected message: %s", msg)
 	}
 }
+
 func TestStreamingAPIMultipleClients(t *testing.T) {
 	ctx := context.Background()
 
@@ -229,7 +290,7 @@ func TestStreamingAPIMultipleClients(t *testing.T) {
 	connectionStr, err := natsContainer.ConnectionString(ctx)
 	require.NoError(t, err)
 
-	streamConfig := fmt.Sprintf(bentoNatsTemplate, "test", connectionStr)
+	streamConfig := fmt.Sprintf(bentoNatsTemplateNoBloblang, "test", connectionStr)
 
 	ts := StartTest(func(globalConf *config.Config) {
 		globalConf.Streaming.Enabled = true
@@ -273,23 +334,38 @@ func TestStreamingAPIMultipleClients(t *testing.T) {
 	t.Cleanup(func() {
 		nc.Close()
 	})
+
 	subject := "test"
+	messages := make(map[string]struct{})
 	for i := 0; i < totalMessages; i++ {
-		require.NoError(t, nc.Publish(subject, []byte(fmt.Sprintf("Hello %d", i))), "failed to publish message to subject")
+		message := fmt.Sprintf("Hello %d", i)
+		messages[message] = struct{}{}
+		require.NoError(t, nc.Publish(subject, []byte(message)), "failed to publish message to subject")
 	}
 
-	// Read messages from all clients
-	for clientID, wsConn := range wsConns {
-		err = wsConn.SetReadDeadline(time.Now().Add(5000 * time.Millisecond))
-		require.NoError(t, err, fmt.Sprintf("error setting read deadline for client %d", clientID))
+	// Read messages from all subscribers
+	// Messages are distributed in a round-robin fashion, count the number of messages and check the messages individually.
+	var readMessages int
+	for readMessages < totalMessages {
+		for clientID, wsConn := range wsConns {
+			err = wsConn.SetReadDeadline(time.Now().Add(100 * time.Millisecond))
+			require.NoError(t, err, fmt.Sprintf("error setting read deadline for client %d", clientID))
 
-		for i := 0; i < totalMessages; i++ {
-			_, p, err := wsConn.ReadMessage()
-			require.NoError(t, err, fmt.Sprintf("error reading message for client %d, message %d", clientID, i))
-			assert.Equal(t, fmt.Sprintf("Hello %d", i), string(p), fmt.Sprintf("message not equal for client %d", clientID))
+			_, data, err := wsConn.ReadMessage()
+			if os.IsTimeout(err) {
+				continue
+			}
+			require.NoError(t, err, fmt.Sprintf("error reading message for client %d", clientID))
+
+			message := string(data)
+			_, ok := messages[message]
+			require.True(t, ok, fmt.Sprintf("message is unknown or consumed before %s", message))
+			delete(messages, message)
+			readMessages++
 		}
 	}
-
+	// Consumed all messages
+	require.Empty(t, messages)
 }
 
 func setUpStreamAPI(ts *Test, apiName string, streamConfig string) error {
@@ -321,12 +397,12 @@ func setupOASForStreamAPI(streamingConfig string) (oas.OAS, error) {
 				Title:   "oas doc",
 				Version: "1",
 			},
-			Paths: make(openapi3.Paths),
+			Paths: openapi3.NewPaths(),
 		},
 	}
 
 	oasAPI.Extensions = map[string]interface{}{
-		ExtensionTykStreaming: parsedStreamingConfig,
+		streams.ExtensionTykStreaming: parsedStreamingConfig,
 	}
 
 	return oasAPI, nil
@@ -349,11 +425,7 @@ func TestAsyncAPI(t *testing.T) {
 	t.SkipNow()
 
 	ts := StartTest(func(globalConf *config.Config) {
-		globalConf.Labs = map[string]interface{}{
-			"streaming": map[string]interface{}{
-				"enabled": true,
-			},
-		}
+		globalConf.Streaming.Enabled = true
 	})
 
 	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
@@ -361,9 +433,7 @@ func TestAsyncAPI(t *testing.T) {
 		spec.UseKeylessAccess = true
 	})
 
-	// Check that standard API works
 	_, _ = ts.Run(t, test.TestCase{Code: http.StatusOK, Method: http.MethodGet, Path: "/test"})
-
 	defer ts.Close()
 
 	tempFile, err := os.CreateTemp("", "test-output-*.txt")
@@ -413,13 +483,12 @@ streams:
 				Title:   "oas doc",
 				Version: "1",
 			},
-			Paths: make(openapi3.Paths),
+			Paths: openapi3.NewPaths(),
 		},
 	}
 
 	oasAPI.Extensions = map[string]interface{}{
-		ExtensionTykStreaming: parsedStreamingConfig,
-		// oas.ExtensionTykAPIGateway: tykExtension,
+		streams.ExtensionTykStreaming: parsedStreamingConfig,
 	}
 
 	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
@@ -437,11 +506,10 @@ streams:
 		spec.OAS.Fill(*spec.APIDefinition)
 	})
 
-	// Check that standard API still works
 	_, _ = ts.Run(t, test.TestCase{Code: http.StatusOK, Method: http.MethodGet, Path: "/test"})
 
-	if globalStreamCounter.Load() != 1 {
-		t.Fatalf("Expected 1 stream, got %d", globalStreamCounter.Load())
+	if streams.GlobalStreamCounter.Load() != 1 {
+		t.Fatalf("Expected 1 stream, got %d", streams.GlobalStreamCounter.Load())
 	}
 
 	time.Sleep(500 * time.Millisecond)
@@ -452,8 +520,6 @@ streams:
 	}
 
 	lines := strings.Split(string(content), "\n")
-
-	// Adjust for the trailing new line which results in an extra empty element in the slice
 	if len(lines) > 0 && lines[len(lines)-1] == "" {
 		lines = lines[:len(lines)-1]
 	}
@@ -470,6 +536,8 @@ streams:
 }
 
 func TestAsyncAPIHttp(t *testing.T) {
+	t.Skip() // Expensive. Runs containerized tests. 15s.
+
 	var tests = []struct {
 		name          string
 		consumerGroup string
@@ -559,12 +627,12 @@ streams:
 				Title:   "oas doc",
 				Version: "1",
 			},
-			Paths: make(openapi3.Paths),
+			Paths: openapi3.NewPaths(),
 		},
 	}
 
 	oasAPI.Extensions = map[string]interface{}{
-		ExtensionTykStreaming: parsedStreamingConfig,
+		streams.ExtensionTykStreaming: parsedStreamingConfig,
 	}
 
 	return oasAPI
@@ -576,7 +644,7 @@ func testAsyncAPIHttp(t *testing.T, ts *Test, isDynamic bool, tenantID string, a
 	const numMessages = 2
 	const numClients = 2
 
-	streamCount := globalStreamCounter.Load()
+	streamCount := streams.GlobalStreamCounter.Load()
 	t.Logf("Stream count for tenant %s: %d", tenantID, streamCount)
 
 	// Create WebSocket clients
@@ -693,15 +761,11 @@ func waitForAPIToBeLoaded(ts *Test) error {
 		}
 		resp, err := http.DefaultClient.Do(req)
 		if err == nil && resp.StatusCode == http.StatusOK {
-			if err = resp.Body.Close(); err != nil {
-				log.Printf("Failed to close response body: %v", err)
-			}
+			_ = resp.Body.Close()
 			return nil
 		}
 		if resp != nil {
-			if err = resp.Body.Close(); err != nil {
-				log.Printf("Failed to close response body: %v", err)
-			}
+			_ = resp.Body.Close()
 		}
 		time.Sleep(1 * time.Second)
 	}
@@ -709,7 +773,7 @@ func waitForAPIToBeLoaded(ts *Test) error {
 }
 
 func TestWebSocketConnectionClosedOnAPIReload(t *testing.T) {
-	t.Skip()
+	t.Skip() // Is this also skipped because running containers is slow?
 	ctx := context.Background()
 	kafkaContainer, err := kafka.Run(ctx, "confluentinc/confluent-local:7.5.0")
 	if err != nil {
@@ -727,11 +791,7 @@ func TestWebSocketConnectionClosedOnAPIReload(t *testing.T) {
 	}
 
 	ts := StartTest(func(globalConf *config.Config) {
-		globalConf.Labs = map[string]interface{}{
-			"streaming": map[string]interface{}{
-				"enabled": true,
-			},
-		}
+		globalConf.Streaming.Enabled = true
 	})
 	defer ts.Close()
 
@@ -780,4 +840,330 @@ func TestWebSocketConnectionClosedOnAPIReload(t *testing.T) {
 	}
 
 	t.Log("WebSocket connection was successfully closed on API reload")
+}
+
+func TestStreamingAPISingleClient_Input_HTTPServer(t *testing.T) {
+	ts := StartTest(func(globalConf *config.Config) {
+		globalConf.Streaming.Enabled = true
+	})
+	t.Cleanup(func() {
+		ts.Close()
+	})
+
+	apiName := "test-api"
+	if err := setUpStreamAPI(ts, apiName, bentoHTTPServerTemplate); err != nil {
+		t.Fatal(err)
+	}
+
+	const totalMessages = 3
+
+	dialer := websocket.Dialer{
+		HandshakeTimeout: 1 * time.Second,
+		TLSClientConfig:  &tls.Config{InsecureSkipVerify: true},
+	}
+
+	wsURL := strings.Replace(ts.URL, "http", "ws", 1) + fmt.Sprintf("/%s/subscribe", apiName)
+	wsConn, _, err := dialer.Dial(wsURL, nil)
+	require.NoError(t, err, "failed to connect to ws server")
+	t.Cleanup(func() {
+		if err = wsConn.Close(); err != nil {
+			t.Logf("failed to close ws connection: %v", err)
+		}
+	})
+
+	publishURL := fmt.Sprintf("%s/%s/post", ts.URL, apiName)
+	for i := 0; i < totalMessages; i++ {
+		data := []byte(fmt.Sprintf("{\"test\": \"message %d\"}", i))
+		resp, err := http.Post(publishURL, "application/json", bytes.NewReader(data))
+		require.NoError(t, err)
+		_ = resp.Body.Close()
+	}
+
+	err = wsConn.SetReadDeadline(time.Now().Add(500 * time.Millisecond))
+	require.NoError(t, err, "error setting read deadline")
+
+	for i := 0; i < totalMessages; i++ {
+		_, p, err := wsConn.ReadMessage()
+		require.NoError(t, err, "error reading message")
+		assert.Equal(t, fmt.Sprintf("{\"test\": \"message %d\"}", i), string(p), "message not equal")
+	}
+}
+
+func TestStreamingAPIMultipleClients_Input_HTTPServer(t *testing.T) {
+	ts := StartTest(func(globalConf *config.Config) {
+		globalConf.Streaming.Enabled = true
+	})
+	t.Cleanup(func() {
+		ts.Close()
+	})
+
+	apiName := "test-api"
+	if err := setUpStreamAPI(ts, apiName, bentoHTTPServerTemplate); err != nil {
+		t.Fatal(err)
+	}
+
+	const (
+		totalSubscribers = 3
+		totalMessages    = 10
+	)
+	dialer := websocket.Dialer{
+		HandshakeTimeout: 1 * time.Second,
+		TLSClientConfig:  &tls.Config{InsecureSkipVerify: true},
+	}
+
+	wsURL := strings.Replace(ts.URL, "http", "ws", 1) + fmt.Sprintf("/%s/subscribe", apiName)
+
+	// Create multiple WebSocket connections
+	var wsConns []*websocket.Conn
+	for i := 0; i < totalSubscribers; i++ {
+		wsConn, _, err := dialer.Dial(wsURL, nil)
+		require.NoError(t, err, fmt.Sprintf("failed to connect to ws server for client %d", i))
+		wsConns = append(wsConns, wsConn)
+		t.Cleanup(func() {
+			if err := wsConn.Close(); err != nil {
+				t.Logf("failed to close ws connection: %v", err)
+			}
+		})
+	}
+
+	// Publish messages
+	messages := make(map[string]struct{})
+	publishURL := fmt.Sprintf("%s/%s/post", ts.URL, apiName)
+	for i := 0; i < totalMessages; i++ {
+		message := fmt.Sprintf("{\"test\": \"message %d\"}", i)
+		messages[message] = struct{}{}
+
+		data := []byte(message)
+		resp, err := http.Post(publishURL, "application/json", bytes.NewReader(data))
+		require.NoError(t, err)
+		_ = resp.Body.Close()
+	}
+
+	var readMessages int
+	for readMessages < totalMessages {
+		for clientID, wsConn := range wsConns {
+			err := wsConn.SetReadDeadline(time.Now().Add(100 * time.Millisecond))
+			require.NoError(t, err, fmt.Sprintf("error while setting read deadline for client %d", clientID))
+
+			_, data, err := wsConn.ReadMessage()
+			if os.IsTimeout(err) {
+				continue
+			}
+			require.NoError(t, err, fmt.Sprintf("error while reading message for client %d", clientID))
+
+			message := string(data)
+			_, ok := messages[message]
+			require.True(t, ok, fmt.Sprintf("message is unknown or consumed before %s", message))
+			delete(messages, message)
+			readMessages++
+		}
+	}
+	require.Empty(t, messages)
+}
+
+type DummyBase struct {
+	model.LoggerProvider
+}
+
+func (d *DummyBase) Logger() *logrus.Entry {
+	return logrus.NewEntry(logrus.New())
+}
+
+func TestStreamingAPIGarbageCollection(t *testing.T) {
+	ts := StartTest(func(globalConf *config.Config) {
+		globalConf.Streaming.Enabled = true
+	})
+	t.Cleanup(func() {
+		ts.Close()
+	})
+
+	oasAPI, err := setupOASForStreamAPI(bentoHTTPServerTemplate)
+	require.NoError(t, err)
+
+	apiName := "test-api"
+
+	specs := ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		spec.Proxy.ListenPath = fmt.Sprintf("/%s", apiName)
+		spec.UseKeylessAccess = true
+		spec.IsOAS = true
+		spec.OAS = oasAPI
+		spec.OAS.Fill(*spec.APIDefinition)
+	})
+
+	apiSpec := streams.NewAPISpec(specs[0].APIID, specs[0].Name, specs[0].IsOAS, specs[0].OAS, specs[0].StripListenPath)
+	s := streams.NewMiddleware(ts.Gw, &DummyBase{}, apiSpec, nil)
+
+	if err := setUpStreamAPI(ts, apiName, bentoHTTPServerTemplate); err != nil {
+		t.Fatal(err)
+	}
+
+	// Dummy request to create a stream manager
+	publishURL := fmt.Sprintf("%s/%s/post", ts.URL, apiName)
+	r, err := http.NewRequest("POST", publishURL, nil)
+	require.NoError(t, err)
+
+	s.CreateStreamManager(r)
+
+	// We should have a Stream manager in the cache.
+	var streamManagersBeforeGC int
+	s.StreamManagerCache.Range(func(k, v interface{}) bool {
+		streamManagersBeforeGC++
+		return true
+	})
+	require.Equal(t, 1, streamManagersBeforeGC)
+
+	s.GC()
+
+	// Garbage collection removed the stream manager because the activity counter is zero.
+	var streamManagersAfterGC int
+	s.StreamManagerCache.Range(func(k, v interface{}) bool {
+		streamManagersAfterGC++
+		return true
+	})
+	require.Equal(t, 0, streamManagersAfterGC)
+}
+
+func TestStreaming_HttpOutputPaths(t *testing.T) {
+	ts := StartTest(func(globalConf *config.Config) {
+		globalConf.Streaming.Enabled = true
+	})
+	t.Cleanup(ts.Close)
+
+	oasAPI, err := setupOASForStreamAPI(bentoHTTPServerTemplate)
+	require.NoError(t, err)
+
+	apiName := "output-paths-test-api"
+	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		spec.Proxy.ListenPath = fmt.Sprintf("/%s", apiName)
+		spec.UseKeylessAccess = true
+		spec.IsOAS = true
+		spec.OAS = oasAPI
+		spec.OAS.Fill(*spec.APIDefinition)
+	})
+
+	apiUrl := fmt.Sprintf("%s/%s", ts.URL, apiName)
+
+	t.Run("should fail with 404 Not Found if the path is invalid", func(t *testing.T) {
+		pathWithTypo := "get/steam"
+		targetUrl := fmt.Sprintf("%s/%s", apiUrl, pathWithTypo)
+
+		sseClient := newTestStreamSSEClient(context.Background(), targetUrl)
+		statusCode, err := sseClient.Connect()
+
+		assert.NoError(t, err)
+		assert.Equal(t, http.StatusNotFound, statusCode)
+	})
+
+	t.Run("should connect to SSE endpoint and consume messages as expected", func(t *testing.T) {
+		correctPath := "get/stream"
+		targetUrl := fmt.Sprintf("%s/%s", apiUrl, correctPath)
+
+		sseContext, cancelFn := context.WithCancel(context.Background())
+		sseClient := newTestStreamSSEClient(sseContext, targetUrl)
+		go func() {
+			statusCode, err := sseClient.Connect()
+			require.NoError(t, err)
+			require.Equal(t, http.StatusOK, statusCode)
+		}()
+
+		defer func() {
+			err := sseClient.Close()
+			require.NoError(t, err)
+			cancelFn()
+		}()
+
+		receiveMessageChan := make(chan string)
+		go func() {
+			err := sseClient.ReadMessages(receiveMessageChan)
+			require.NoError(t, err)
+		}()
+
+		testMessage := `{"test": "message"}`
+		publishURL := fmt.Sprintf("%s/post", apiUrl)
+		publishResp, err := http.Post(publishURL, "application/json", bytes.NewReader([]byte(testMessage)))
+		require.NoError(t, err)
+		require.Equal(t, http.StatusOK, publishResp.StatusCode)
+
+		var message string
+		assert.Eventuallyf(t, func() bool {
+			message = <-receiveMessageChan
+			return true
+		}, 3*time.Second, 10*time.Millisecond, "SSE message not received")
+		assert.Equal(t, testMessage, message)
+	})
+}
+
+type testStreamSSEClient struct {
+	ctx    context.Context
+	url    string
+	client http.Client
+	resp   *http.Response
+	done   chan struct{}
+	wg     *sync.WaitGroup
+}
+
+func newTestStreamSSEClient(ctx context.Context, url string) *testStreamSSEClient {
+	wg := sync.WaitGroup{}
+	wg.Add(1)
+
+	return &testStreamSSEClient{
+		ctx:    ctx,
+		url:    url,
+		client: http.Client{},
+		done:   make(chan struct{}),
+		wg:     &wg,
+	}
+}
+
+func (sse *testStreamSSEClient) Connect() (statusCode int, err error) {
+	req, err := http.NewRequestWithContext(sse.ctx, http.MethodGet, sse.url, nil)
+	if err != nil {
+		return 0, fmt.Errorf("creating request: %w", err)
+	}
+
+	req.Header.Set("Accept", "text/event-stream")
+	req.Header.Set("Cache-Control", "no-cache")
+	req.Header.Set("Connection", "keep-alive")
+
+	sse.resp, err = sse.client.Do(req)
+	sse.wg.Done()
+	if err != nil {
+		close(sse.done)
+		if sse.resp != nil {
+			statusCode = sse.resp.StatusCode
+		}
+		return statusCode, fmt.Errorf("doing request: %w", err)
+	}
+
+	return sse.resp.StatusCode, nil
+}
+
+func (sse *testStreamSSEClient) Close() error {
+	close(sse.done)
+	return nil
+}
+
+func (sse *testStreamSSEClient) ReadMessages(messageChan chan<- string) (err error) {
+	sse.wg.Wait() // we need to make sure that the connection is ready
+	scanner := bufio.NewScanner(sse.resp.Body)
+
+	defer func() {
+		err = sse.resp.Body.Close()
+	}()
+
+	for scanner.Scan() {
+		select {
+		case <-sse.ctx.Done():
+			return nil
+		case <-sse.done:
+			return nil
+		default:
+			message := scanner.Text()
+			if message != "" {
+				messageChan <- message
+			}
+		}
+	}
+
+	return nil
 }

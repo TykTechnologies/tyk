@@ -8,7 +8,7 @@ import (
 )
 
 // URLRewrite configures URL rewriting.
-// Tyk classic API definition: `version_data.versions[].extended_paths.url_rewrite`.
+// Tyk classic API definition: `version_data.versions..extended_paths.url_rewrite`.
 type URLRewrite struct {
 	// Enabled activates URL rewriting if set to true.
 	Enabled bool `bson:"enabled" json:"enabled"`
@@ -26,6 +26,7 @@ type URLRewrite struct {
 }
 
 // URLRewriteInput defines the input for an URL rewrite rule.
+// Tyk classic API definition: Input source for URL rewrite rules in `version_data.versions..extended_paths.url_rewrite[].triggers[].options`.
 //
 // The following values are valid:
 //
@@ -41,6 +42,7 @@ type URLRewrite struct {
 type URLRewriteInput string
 
 // URLRewriteCondition defines the matching mode for an URL rewrite rules.
+// Tyk classic API definition: Matching condition in `version_data.versions..extended_paths.url_rewrite[].triggers[].on`.
 //
 // - Value `any` means any of the defined trigger rules may match.
 // - Value `all` means all the defined trigger rules must match.
@@ -78,6 +80,7 @@ var (
 )
 
 // URLRewriteTrigger represents a set of matching rules for a rewrite.
+// Tyk classic API definition: `version_data.versions..extended_paths.url_rewrite[].triggers`.
 type URLRewriteTrigger struct {
 	// Condition indicates the logical combination that will be applied to the rules for an advanced trigger.
 	Condition URLRewriteCondition `bson:"condition" json:"condition"`
@@ -93,6 +96,7 @@ type URLRewriteTrigger struct {
 }
 
 // URLRewriteRule represents a rewrite matching rules.
+// Tyk classic API definition: `version_data.versions..extended_paths.url_rewrite[].triggers[].options`.
 type URLRewriteRule struct {
 	// In specifies one of the valid inputs for URL rewriting.
 	In URLRewriteInput `bson:"in" json:"in"`
@@ -154,6 +158,12 @@ func (v *URLRewrite) Sort() {
 		rules := t.Rules
 
 		sort.Slice(rules, func(i, j int) bool {
+			// if the cardinal index is equal, the sorting will fall back
+			// to the Name, otherwise it will be non-deterministic.
+			if rules[i].In.Index() == rules[j].In.Index() {
+				return rules[i].Name < rules[j].Name
+			}
+
 			return rules[i].In.Index() < rules[j].In.Index()
 		})
 	}

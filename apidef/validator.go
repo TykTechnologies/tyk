@@ -57,6 +57,8 @@ var DefaultValidationRuleSet = ValidationRuleSet{
 	&RuleAtLeastEnableOneAuthSource{},
 	&RuleValidateIPList{},
 	&RuleValidateEnforceTimeout{},
+	&RuleUpstreamAuth{},
+	&RuleLoadBalancingTargets{},
 }
 
 func Validate(definition *APIDefinition, ruleSet ValidationRuleSet) ValidationResult {
@@ -197,5 +199,74 @@ func (r *RuleValidateEnforceTimeout) Validate(apiDef *APIDefinition, validationR
 				}
 			}
 		}
+	}
+}
+
+var (
+	// ErrMultipleUpstreamAuthEnabled is the error to be returned when multiple upstream authentication modes are configured.
+	ErrMultipleUpstreamAuthEnabled = errors.New("multiple upstream authentication modes not allowed")
+	// ErrMultipleUpstreamOAuthAuthorizationType is the error to return when multiple OAuth authorization types are configured.
+	ErrMultipleUpstreamOAuthAuthorizationType = errors.New("multiple upstream OAuth authorization type not allowed")
+	// ErrUpstreamOAuthAuthorizationTypeRequired is the error to return when OAuth authorization type is not specified.
+	ErrUpstreamOAuthAuthorizationTypeRequired = errors.New("upstream OAuth authorization type is required")
+	// ErrInvalidUpstreamOAuthAuthorizationType is the error to return when configured OAuth authorization type is invalid.
+	ErrInvalidUpstreamOAuthAuthorizationType = errors.New("invalid OAuth authorization type")
+	// ErrAllLoadBalancingTargetsZeroWeight is the error to return when all load balancing targets have weight 0.
+	ErrAllLoadBalancingTargetsZeroWeight = errors.New("all load balancing targets have weight 0, at least one target must have weight > 0")
+)
+
+// RuleUpstreamAuth implements validations for upstream authentication configurations.
+type RuleUpstreamAuth struct{}
+
+// Validate validates api definition upstream authentication configurations.
+func (r *RuleUpstreamAuth) Validate(apiDef *APIDefinition, validationResult *ValidationResult) {
+	upstreamAuth := apiDef.UpstreamAuth
+
+	if !upstreamAuth.IsEnabled() {
+		return
+	}
+
+	if upstreamAuth.BasicAuth.Enabled && upstreamAuth.OAuth.Enabled {
+		validationResult.IsValid = false
+		validationResult.AppendError(ErrMultipleUpstreamAuthEnabled)
+	}
+
+	upstreamOAuth := upstreamAuth.OAuth
+	// only OAuth checks moving forward
+	if !upstreamOAuth.IsEnabled() {
+		return
+	}
+
+	if len(upstreamOAuth.AllowedAuthorizeTypes) == 0 {
+		validationResult.IsValid = false
+		validationResult.AppendError(ErrUpstreamOAuthAuthorizationTypeRequired)
+		return
+	}
+
+	if len(upstreamAuth.OAuth.AllowedAuthorizeTypes) > 1 {
+		validationResult.IsValid = false
+		validationResult.AppendError(ErrMultipleUpstreamOAuthAuthorizationType)
+	}
+
+	if authType := upstreamAuth.OAuth.AllowedAuthorizeTypes[0]; authType != OAuthAuthorizationTypeClientCredentials && authType != OAuthAuthorizationTypePassword {
+		validationResult.IsValid = false
+		validationResult.AppendError(ErrInvalidUpstreamOAuthAuthorizationType)
+	}
+}
+
+// RuleLoadBalancingTargets implements validations for load balancing target configurations.
+type RuleLoadBalancingTargets struct{}
+
+// Validate validates that when load balancing is enabled, at least one target has weight > 0.
+func (r *RuleLoadBalancingTargets) Validate(apiDef *APIDefinition, validationResult *ValidationResult) {
+	if !apiDef.Proxy.EnableLoadBalancing {
+		return
+	}
+
+	// In Tyk's internal representation, targets with weight N are repeated N times in Proxy.Targets
+	// If all weights are 0, the targets list will be empty, which is invalid for load balancing
+	if len(apiDef.Proxy.Targets) == 0 {
+		validationResult.IsValid = false
+		validationResult.AppendError(ErrAllLoadBalancingTargetsZeroWeight)
 	}
 }

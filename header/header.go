@@ -14,6 +14,10 @@ const (
 	Expires                 = "Expires"
 	Connection              = "Connection"
 	WWWAuthenticate         = "WWW-Authenticate"
+	SetCookie               = "Set-Cookie"
+	Cookie                  = "Cookie"
+	TransferEncoding        = "Transfer-Encoding"
+	Host                    = "Host"
 )
 
 const (
@@ -25,21 +29,23 @@ const (
 )
 
 const (
-	XRealIP             = "X-Real-IP"
-	XForwardFor         = "X-Forwarded-For"
-	XAuthResult         = "X-Auth-Result"
-	XSessionAlias       = "X-Session-Alias"
-	XInitialURI         = "X-Initial-URI"
-	XForwardProto       = "X-Forwarded-Proto"
-	XContentTypeOptions = "X-Content-Type-Options"
-	XXSSProtection      = "X-XSS-Protection"
-	XFrameOptions       = "X-Frame-Options"
-	XTykNodeID          = "x-tyk-nodeid"
-	XTykSessionID       = "x-tyk-session-id"
-	XTykNonce           = "x-tyk-nonce"
-	XTykHostname        = "x-tyk-hostname"
-	XGenerator          = "X-Generator"
-	XTykAuthorization   = "X-Tyk-Authorization"
+	XRealIP               = "X-Real-IP"
+	XForwardFor           = "X-Forwarded-For"
+	XAuthResult           = "X-Auth-Result"
+	XSessionAlias         = "X-Session-Alias"
+	XInitialURI           = "X-Initial-URI"
+	XForwardProto         = "X-Forwarded-Proto"
+	XContentTypeOptions   = "X-Content-Type-Options"
+	XXSSProtection        = "X-XSS-Protection"
+	XFrameOptions         = "X-Frame-Options"
+	XTykNodeID            = "x-tyk-nodeid"
+	XTykSessionID         = "x-tyk-session-id"
+	XTykNonce             = "x-tyk-nonce"
+	XTykHostname          = "x-tyk-hostname"
+	XGenerator            = "X-Generator"
+	XTykAuthorization     = "X-Tyk-Authorization"
+	XTykAcceptExampleName = "X-Tyk-Accept-Example-Name"
+	XTykAcceptExampleCode = "X-Tyk-Accept-Example-Code"
 )
 
 // upgrade and websocket

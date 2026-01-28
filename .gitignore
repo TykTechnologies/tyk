@@ -3,8 +3,10 @@
 .vagrant/
 .venv/
 .vscode/
+.air.toml
 coverage/
 temp/
+/tmp
 /middleware/bundles
 testapps/
 
@@ -21,6 +23,13 @@ testapps/
 /*.conf
 /*.json
 /*.bak
+/.air.toml
+/go.work
+/go.work.sum
+
+/go.work
+/go.work.sum
+
 
 /tyk
 logs/
@@ -48,8 +57,10 @@ petstore.json
 coprocess_gen_test.go
 session_state_gen_test.go
 __pycache__/
-tyk.test
+*.test
+*.test.log
 tyk-gateway.pid
+tests/pkgs.*
 
 tyk_linux_*
 .aider*
@@ -61,3 +72,20 @@ tyk_linux_*
 *.test
 
 main
+
+/coprocess/*.pb.go-e
+ci/tests/specs/tmp
+ci/tests/specs/node_modules
+ci/tests/specs/package-lock.json
+ci/tests/specs/gateway.collection.postman.json
+ci/tests/specs/.env
+ci/tests/specs/apps
+ci/tests/specs/policies
+
+# Task cache files
+.task-build-cache
+.task-tidy-cache
+.task-check-imports-cache
+.task-check-config-cache
+.task-check-x-tyk-gateway-cache
+.task-codegen-cache

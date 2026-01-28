@@ -12,9 +12,9 @@ import (
 	"github.com/buger/jsonparser"
 	"github.com/hashicorp/go-multierror"
 	pkgver "github.com/hashicorp/go-version"
-	"github.com/xeipuuv/gojsonschema"
 
 	tykerrors "github.com/TykTechnologies/tyk/internal/errors"
+	"github.com/TykTechnologies/tyk/internal/service/gojsonschema"
 	logger "github.com/TykTechnologies/tyk/log"
 )
 
@@ -23,8 +23,10 @@ var schemaDir embed.FS
 
 const (
 	keyDefinitions              = "definitions"
+	keyDefs                     = "$defs" // For OAS 3.1+ (JSON Schema 2020-12)
 	keyProperties               = "properties"
 	keyRequired                 = "required"
+	keyAnyOf                    = "anyOf"
 	oasSchemaVersionNotFoundFmt = "Schema not found for version %q"
 )
 
@@ -38,6 +40,18 @@ var (
 	defaultVersion string
 )
 
+// GetDefinitionsKey returns the key used for definitions in the schema.
+// OAS 3.0 uses "definitions", OAS 3.1+ uses "$defs" (JSON Schema 2020-12).
+// Falls back to "definitions" if neither key is found.
+func GetDefinitionsKey(schemaData []byte) string {
+	// Try to find "$defs" first (OAS 3.1+)
+	if _, _, _, err := jsonparser.Get(schemaData, keyDefs); err == nil {
+		return keyDefs
+	}
+	// Fall back to "definitions" (OAS 3.0 or unknown)
+	return keyDefinitions
+}
+
 func loadOASSchema() error {
 	load := func() error {
 		xTykAPIGwSchema, err := schemaDir.ReadFile(fmt.Sprintf("schema/%s.json", ExtensionTykAPIGateway))
@@ -46,6 +60,7 @@ func loadOASSchema() error {
 		}
 
 		xTykAPIGwSchemaWithoutDefs := jsonparser.Delete(xTykAPIGwSchema, keyDefinitions)
+
 		oasJSONSchemas = make(map[string][]byte)
 		members, err := schemaDir.ReadDir("schema")
 		for _, member := range members {
@@ -61,6 +76,9 @@ func loadOASSchema() error {
 			if strings.HasSuffix(fileName, fmt.Sprintf("%s.json", ExtensionTykAPIGateway)) {
 				continue
 			}
+			if strings.HasSuffix(fileName, fmt.Sprintf("%s.strict.json", ExtensionTykAPIGateway)) {
+				continue
+			}
 
 			var data []byte
 			data, err = schemaDir.ReadFile(filepath.Join("schema/", fileName))
@@ -68,13 +86,16 @@ func loadOASSchema() error {
 				return err
 			}
 
+			// Detect which definitions key this schema uses
+			defsKey := GetDefinitionsKey(data)
+
 			data, err = jsonparser.Set(data, xTykAPIGwSchemaWithoutDefs, keyProperties, ExtensionTykAPIGateway)
 			if err != nil {
 				return err
 			}
 
 			err = jsonparser.ObjectEach(xTykAPIGwSchema, func(key []byte, value []byte, dataType jsonparser.ValueType, offset int) error {
-				data, err = jsonparser.Set(data, value, keyDefinitions, string(key))
+				data, err = jsonparser.Set(data, value, defsKey, string(key))
 				return err
 			}, keyDefinitions)
 			if err != nil {
@@ -141,7 +162,10 @@ func ValidateOASTemplate(documentBody []byte, oasVersion string) error {
 
 	oasSchema = jsonparser.Delete(oasSchema, keyProperties, ExtensionTykAPIGateway, keyRequired)
 
-	definitions, _, _, err := jsonparser.Get(oasSchema, keyDefinitions)
+	// Detect which definitions key this schema uses
+	defsKey := GetDefinitionsKey(oasSchema)
+
+	definitions, _, _, err := jsonparser.Get(oasSchema, defsKey)
 	if err != nil {
 		return err
 	}
@@ -158,7 +182,15 @@ func ValidateOASTemplate(documentBody []byte, oasVersion string) error {
 		definitions = jsonparser.Delete(definitions, path, keyRequired)
 	}
 
-	oasSchema, err = jsonparser.Set(oasSchema, definitions, keyDefinitions)
+	unsetAnyOfFieldsPaths := []string{
+		"X-Tyk-Upstream",
+	}
+
+	for _, path := range unsetAnyOfFieldsPaths {
+		definitions = jsonparser.Delete(definitions, path, keyAnyOf)
+	}
+
+	oasSchema, err = jsonparser.Set(oasSchema, definitions, defsKey)
 	if err != nil {
 		return err
 	}
@@ -208,7 +240,15 @@ func setDefaultVersion() {
 		versions = append(versions, k)
 	}
 
-	defaultVersion = findDefaultVersion(versions)
+	latestVersion := findDefaultVersion(versions)
+
+	// Override: Keep 3.0 as default until 3.1 implementation is stable across all products
+	// TODO: Remove this override when 3.1 implementation is stable
+	if latestVersion == "3.1" {
+		defaultVersion = "3.0"
+	} else {
+		defaultVersion = latestVersion
+	}
 }
 
 func getMinorVersion(version string) (string, error) {

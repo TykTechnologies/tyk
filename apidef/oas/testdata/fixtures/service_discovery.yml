@@ -1,0 +1,81 @@
+---
+name: "Service Discovery"
+tests:
+  - source: oas
+    desc: |
+      From OAS, enabling service discovery should fill expected classic fields.
+    input:
+      x-tyk-api-gateway:
+        upstream:
+          serviceDiscovery:
+            enabled: true
+    output:
+      proxy:
+        service_discovery:
+          use_discovery_service: true
+          cache_disabled: true
+          cache_timeout: 0
+  - source: classic
+    desc: |
+      If service discovery is enabled, cache is not disabled, carry the settings to OAS.
+    errors:
+      desc: "Errors are checked and wanted (general OAS validation)"
+      enabled: true
+      want: true
+    input:
+      name: "Name"
+      proxy:
+        service_discovery:
+          use_discovery_service: true
+          cache_disabled: false
+          cache_timeout: 10
+    output:
+      info:
+        title: "Name"
+      x-tyk-api-gateway:
+        upstream:
+          serviceDiscovery:
+            enabled: true
+            cache:
+              enabled: true
+              timeout: 10
+  - source: classic
+    desc: |
+      If service discovery is disabled but cache is enabled, we consider the cache flag
+      reset to false. As the timeout is non-empty, we fill the OAS structure.
+    errors:
+      desc: "Errors are checked and wanted (general OAS validation)"
+      enabled: true
+      want: true
+    input:
+      name: "Name"
+      proxy:
+        service_discovery:
+          use_discovery_service: false
+          cache_disabled: true
+          cache_timeout: 10
+    output:
+      info:
+        title: "Name"
+      x-tyk-api-gateway:
+        upstream:
+          serviceDiscovery: "<nil>"
+  - source: classic
+    desc: |
+      If service discovery is disabled (unconfigured) then honor cache_disabled=false as being still disabled.
+    errors:
+      desc: "Errors are checked and wanted (general OAS validation)"
+      enabled: true
+      want: true
+    input:
+      name: "Name"
+      proxy:
+        service_discovery:
+          use_discovery_service: false
+          cache_disabled: false
+    output:
+      info:
+        title: "Name"
+      x-tyk-api-gateway:
+        upstream:
+          serviceDiscovery: "<nil>"

@@ -2,6 +2,7 @@ package gateway
 
 import (
 	"archive/zip"
+	"bufio"
 	"bytes"
 	"compress/gzip"
 	"context"
@@ -26,6 +27,7 @@ import (
 	"time"
 
 	"github.com/getkin/kin-openapi/openapi3"
+	"github.com/stretchr/testify/assert"
 
 	"github.com/TykTechnologies/tyk/apidef/oas"
 
@@ -37,7 +39,9 @@ import (
 	"github.com/gorilla/websocket"
 
 	"github.com/TykTechnologies/tyk/internal/httputil"
+	"github.com/TykTechnologies/tyk/internal/model"
 	"github.com/TykTechnologies/tyk/internal/otel"
+	"github.com/TykTechnologies/tyk/internal/reflect"
 	"github.com/TykTechnologies/tyk/internal/uuid"
 
 	"github.com/TykTechnologies/graphql-go-tools/pkg/execution/datasource"
@@ -62,7 +66,6 @@ var (
 	// Used to store the test bundles:
 	testMiddlewarePath, _ = ioutil.TempDir("", "tyk-middleware-path")
 
-	defaultTestConfig config.Config
 	EnableTestDNSMock = false
 	MockHandle        *test.DnsMockHandle
 )
@@ -260,9 +263,12 @@ func InitTestMain(ctx context.Context, m *testing.M) int {
 // TestBrokenClients
 // TestGRPC_TokenBasedAuthentication
 
-// ResetTestConfig resets the config for the global gateway
+// Deprecated: ResetTestConfig resets the config for the global gateway.
+//
+// The function does nothing, the correct way is to reuse StartTest(), filling
+// the config from the provided callback. Usage impacts a few tests (small).
+// See TestCustomDomain for an updated test.
 func (s *Test) ResetTestConfig() {
-	s.Gw.SetConfig(defaultTestConfig)
 }
 
 // simulate reloads in the background, i.e. writes to
@@ -275,11 +281,17 @@ func (s *Test) reloadSimulation(ctx context.Context, gw *Gateway) {
 			return
 		default:
 			gw.policiesMu.Lock()
+			if gw.policiesByID == nil {
+				gw.policiesByID = make(map[string]user.Policy)
+			}
 			gw.policiesByID["_"] = user.Policy{}
 			delete(gw.policiesByID, "_")
 			gw.policiesMu.Unlock()
 
 			gw.apisMu.Lock()
+			if gw.apisByID == nil {
+				gw.apisByID = make(map[string]*APISpec)
+			}
 			gw.apisByID["_"] = nil
 			delete(gw.apisByID, "_")
 			gw.apisMu.Unlock()
@@ -627,13 +639,27 @@ func graphqlProxyUpstreamHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	w.WriteHeader(responseCode)
-	_, _ = w.Write([]byte(`{
+	response := []byte(`{
 		"data": {
 			"hello": "` + name + `",
 			"httpMethod": "` + r.Method + `",
 		}
-	}`))
+	}`)
+
+	// Only supports GZIP for testing purposes
+	acceptEncodingHeader := r.Header.Get("Accept-Encoding")
+	if acceptEncodingHeader != "" && strings.Contains(acceptEncodingHeader, "gzip") {
+		w.Header().Set("Content-Encoding", "gzip")
+		gz := gzip.NewWriter(w)
+		defer func() {
+			_ = gz.Close()
+		}()
+		w.WriteHeader(responseCode)
+		_, _ = gz.Write(response)
+		return
+	}
+	w.WriteHeader(responseCode)
+	_, _ = w.Write(response)
 }
 
 func graphqlDataSourceHandler(w http.ResponseWriter, r *http.Request) {
@@ -887,6 +913,12 @@ func (s *Test) CreatePolicy(pGen ...func(p *user.Policy)) string {
 	return pol.ID
 }
 
+func (s *Test) DeletePolicy(policyID string) {
+	s.Gw.policiesMu.Lock()
+	delete(s.Gw.policiesByID, policyID)
+	s.Gw.policiesMu.Unlock()
+}
+
 func CreateJWKToken(jGen ...func(*jwt.Token)) string {
 	// Create the token
 	token := jwt.New(jwt.GetSigningMethod("RS512"))
@@ -971,7 +1003,7 @@ func TestReq(t testing.TB, method, urlStr string, body interface{}) *http.Reques
 func (gw *Gateway) CreateDefinitionFromString(defStr string) *APISpec {
 	loader := APIDefinitionLoader{Gw: gw}
 	def := loader.ParseDefinition(strings.NewReader(defStr))
-	spec, _ := loader.MakeSpec(&nestedApiDefinition{APIDefinition: &def}, nil)
+	spec, _ := loader.MakeSpec(&model.MergedAPI{APIDefinition: &def}, nil)
 	return spec
 }
 
@@ -1101,6 +1133,18 @@ func (s *Test) AddDynamicHandler(path string, handlerFunc http.HandlerFunc) {
 	s.dynamicHandlers[path] = handlerFunc
 }
 
+// setTestScopeConfig overrides config in scope of test case.
+func (s *Test) setTestScopeConfig(t *testing.T, apply func(cnf *config.Config)) {
+	t.Helper()
+	cnf := s.Gw.GetConfig()
+	newCnf := reflect.Clone(cnf)
+	apply(&newCnf)
+	s.Gw.SetConfig(newCnf)
+	t.Cleanup(func() {
+		s.Gw.SetConfig(cnf)
+	})
+}
+
 func (s *Test) newGateway(genConf func(globalConf *config.Config)) *Gateway {
 	var gwConfig config.Config
 	if err := config.WriteDefault("", &gwConfig); err != nil {
@@ -1140,6 +1184,7 @@ func (s *Test) newGateway(genConf func(globalConf *config.Config)) *Gateway {
 	gatewayPath := filepath.Dir(b)
 	rootPath := filepath.Dir(gatewayPath)
 
+	gwConfig.TemplatePath = filepath.Join(rootPath, "templates")
 	gwConfig.AnalyticsConfig.GeoIPDBLocation = filepath.Join(rootPath, "testdata", "MaxMind-DB-test-ipv4-24.mmdb")
 	gwConfig.EnableJSVM = true
 	gwConfig.HashKeyFunction = storage.HashMurmur64
@@ -1151,6 +1196,10 @@ func (s *Test) newGateway(genConf func(globalConf *config.Config)) *Gateway {
 	gwConfig.EnableBundleDownloader = true
 	gwConfig.BundleBaseURL = testHttpBundles
 	gwConfig.MiddlewarePath = testMiddlewarePath
+
+	if err := config.FillEnv(&gwConfig); err != nil {
+		log.WithError(err).Error("error filling test config from env")
+	}
 
 	// force ipv4 for now, to work around the docker bug affecting
 	// Go 1.8 and earlier
@@ -1182,7 +1231,6 @@ func (s *Test) newGateway(genConf func(globalConf *config.Config)) *Gateway {
 	gw.CoProcessInit()
 	gw.afterConfSetup()
 
-	defaultTestConfig = gwConfig
 	gw.SetConfig(gwConfig)
 
 	cli.Init(confPaths)
@@ -1275,9 +1323,10 @@ func (s *Test) Close() {
 		}
 	}
 
+	gwConfig := s.Gw.GetConfig()
+
 	s.Gw.DefaultProxyMux.swap(&proxyMux{}, s.Gw)
 	if s.config.SeparateControlAPI {
-		gwConfig := s.Gw.GetConfig()
 		gwConfig.ControlAPIPort = 0
 		s.Gw.SetConfig(gwConfig)
 	}
@@ -1300,11 +1349,14 @@ func (s *Test) Close() {
 	s.Gw.Analytics.Stop()
 	s.Gw.ReloadTestCase.StopTicker()
 	s.Gw.GlobalHostChecker.StopPoller()
+	s.Gw.NewRelicApplication.Shutdown(5 * time.Second)
 
 	err = s.RemoveApis()
 	if err != nil {
 		log.Error("could not remove apis")
 	}
+
+	s.Gw.cacheClose()
 }
 
 // RemoveApis clean all the apis from a living gw
@@ -1761,7 +1813,7 @@ func getSampleOASAPI() oas.OAS {
 				Title:   "oas doc",
 				Version: "1",
 			},
-			Paths: make(openapi3.Paths),
+			Paths: openapi3.NewPaths(),
 		}}
 
 	oasAPI.SetTykExtension(tykExtension)
@@ -1789,9 +1841,13 @@ func BuildAPI(apiGens ...func(spec *APISpec)) (specs []*APISpec) {
 }
 
 func (gw *Gateway) LoadAPI(specs ...*APISpec) (out []*APISpec) {
+	var err error
 	gwConf := gw.GetConfig()
 	oldPath := gwConf.AppPath
-	gwConf.AppPath, _ = ioutil.TempDir("", "apps")
+	gwConf.AppPath, err = ioutil.TempDir("", "apps")
+	if err != nil {
+		log.WithError(err).Errorf("loadapi: failed to create temp dir")
+	}
 	gw.SetConfig(gwConf, true)
 	defer func() {
 		globalConf := gw.GetConfig()
@@ -1894,7 +1950,6 @@ func (p *httpProxyHandler) handleHTTP(w http.ResponseWriter, req *http.Request) 
 }
 
 func (p *httpProxyHandler) Stop(s *Test) error {
-	s.ResetTestConfig()
 	return p.server.Close()
 }
 
@@ -2029,4 +2084,101 @@ func (m *testMessageAdapter) Channel() (string, error) {
 // Payload returns the message payload.
 func (m *testMessageAdapter) Payload() (string, error) {
 	return m.Msg, nil
+}
+
+func TestHelperSSEServer(tb testing.TB) *httptest.Server {
+	tb.Helper()
+	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "text/event-stream")
+		w.Header().Set("Connection", "keep-alive")
+
+		flusher, ok := w.(http.Flusher)
+		assert.True(tb, ok)
+		for i := 0; i < 5; i++ {
+			fmt.Fprintf(w, "data: %d\n", i)
+			flusher.Flush()
+			time.Sleep(50 * time.Millisecond)
+		}
+	}))
+}
+func TestHelperSSEStreamClient(tb testing.TB, ts *Test, enableWebSockets bool) error {
+	tb.Helper()
+
+	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, ts.URL, nil)
+	assert.NoError(tb, err)
+	req.Header.Set("Accept", "text/event-stream")
+	client := http.Client{}
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+
+	globalConf := ts.Gw.GetConfig()
+	globalConf.HttpServerOptions.EnableWebSockets = enableWebSockets
+	ts.Gw.SetConfig(globalConf)
+
+	res, err := client.Do(req)
+	assert.NoError(tb, err)
+
+	reader := bufio.NewReader(res.Body)
+	defer res.Body.Close()
+
+	i := 0
+	okChan := make(chan error)
+
+	go func() {
+		for {
+			line, err := reader.ReadBytes('\n')
+			if err != nil && assert.ErrorContains(tb, err, io.EOF.Error()) {
+				err = nil
+			}
+
+			assert.NoError(tb, err)
+
+			if len(line) == 0 {
+				break
+			}
+
+			assert.Equal(tb, fmt.Sprintf("data: %v\n", i), string(line))
+			i++
+		}
+		close(okChan)
+	}()
+
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-okChan:
+	}
+	assert.Equal(tb, i, 5)
+	return nil
+}
+
+// MockErrorReader is a mock io.Reader that returns an error on Read
+type MockErrorReader struct {
+	ReturnError error
+}
+
+func (e *MockErrorReader) Read(_ []byte) (n int, err error) {
+	return 0, e.ReturnError
+}
+
+type MockReadCloser struct {
+	Reader      io.Reader
+	CloseError  error
+	CloseCalled bool
+}
+
+func (m *MockReadCloser) Read(p []byte) (n int, err error) {
+	return m.Reader.Read(p)
+}
+
+func (m *MockReadCloser) Close() error {
+	m.CloseCalled = true
+
+	return m.CloseError
+}
+
+func createMockReadCloserWithError(err error) *MockReadCloser {
+	return &MockReadCloser{
+		Reader: &MockErrorReader{err},
+	}
 }

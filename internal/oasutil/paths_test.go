@@ -8,11 +8,11 @@ import (
 )
 
 func testOASPaths(paths []string) openapi3.Paths {
-	result := openapi3.Paths{}
+	result := openapi3.NewPaths()
 	for _, p := range paths {
-		result[p] = nil
+		result.Set(p, nil)
 	}
-	return result
+	return *result
 }
 
 // TestSortByPathLength tests our custom sorting for the OAS paths.

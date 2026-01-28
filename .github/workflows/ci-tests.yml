@@ -24,44 +24,28 @@ concurrency:
 env:
   PYTHON_VERSION: "3.11"
   PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION: python
+  BRANCH_NAME: ${{ github.base_ref || github.ref_name }} # base_ref for PRs is 'master', but merges read in ref_name
 
 jobs:
-  test:
-    name: Go ${{ matrix.go-version }} Redis ${{ matrix.redis-version }}
+  lint:
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: true
-      # This workflow isn't designed to be run as a pipeline, several issues:
-      #
-      # - contains golangci-lint jobs, sonarcloud (would duplicate)
-      # - cache config not suitable for multiple pipelines
-      # - python tests should be separate job, or no job
-      #
-      # Keep it to a single job run from the matrix as configured
-      # until we get a chance to redesign the pipeline properly.
-      matrix:
-        redis-version: [7]
-        python-version: ["3.11"]
-        go-version: [1.22.x]
-
-    env:
-      REDIS_IMAGE: redis:${{ matrix.redis-version }}
-
+    if: ${{ !github.event.pull_request.draft }}
     steps:
-      - name: Checkout Tyk
-        uses: actions/checkout@v4
+      - name: "Checkout PR"
+        uses: TykTechnologies/github-actions/.github/actions/checkout-pr@main
         with:
-          ref: ${{ github.event.pull_request.head.ref }}
+          token: ${{ secrets.ORG_GH_TOKEN }}
+
+      - name: "Get base ref"
+        run: |
+          git fetch origin ${{ env.BRANCH_NAME }}
+          git rev-parse origin/${{ env.BRANCH_NAME }}
 
       - name: Setup Golang
-        uses: actions/setup-go@v2
+        uses: actions/setup-go@v5
         with:
-          go-version: ${{ matrix.go-version }}
-
-      - name: Setup Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: ${{ matrix.python-version }}
+          go-version-file: go.mod
+          cache-dependency-path: go.sum
 
       - name: Setup CI Tooling
         uses: shrink/actions-docker-extract@v3
@@ -70,18 +54,91 @@ jobs:
           path: /usr/local/bin/.
           destination: /usr/local/bin
 
-      - name: Cache
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.cache/go-build
-            ~/go/pkg/mod
-          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
-          restore-keys: |
-            ${{ runner.os }}-${{ hashFiles('**/go.sum') }}
+      - name: Run codegen and tidy
+        if: github.event_name == 'pull_request'
+        env:
+          BASE_BRANCH: ${{ github.base_ref || 'master' }}
+        run: |
+          # Run linting without auto-fixing
+          task tidy
+          task --exit-code lint:check-git-state MESSAGE="task tidy made git state dirty, please run task lint locally and update PR"
 
-      - name: Install Dependencies and basic hygiene test
-        id: hygiene
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v8
+        timeout-minutes: 20
+        with:
+          version: v2.5.0
+          only-new-issues: ${{ github.event_name == 'pull_request' }}
+          # Output formats configured in .golangci.yml (v2 approach)
+          # Generates: text to stdout + checkstyle JSON for SonarQube
+          args: --issues-exit-code=0 -v ./...
+          skip-cache: false
+          skip-save-cache: false
+
+      - uses: actions/upload-artifact@v4
+        if: ${{ always() }}
+        with:
+          name: golangcilint
+          retention-days: 1
+          path: |
+            golangci-lint-report.json
+
+  test:
+    name: Go ${{ matrix.go-version }} Redis ${{ matrix.redis-version }}
+    if: ${{ !github.event.pull_request.draft }}
+    needs: lint
+    # Runs on is pinned to a version that provides python 3.10.
+    # See: https://github.com/actions/runner-images?tab=readme-ov-file#available-images
+    # Avoid using ubuntu-latest as it would upgrade python unattended.
+    runs-on: ubuntu-22.04
+    strategy:
+      fail-fast: false
+      matrix:
+        redis-version: [7]
+        go-version: [1.24.x]
+
+    env:
+      REDIS_IMAGE: redis:${{ matrix.redis-version }}
+
+    steps:
+      - name: Checkout Tyk
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref }}
+
+      - name: "Get base ref"
+        run: |
+          git fetch origin ${{ env.BRANCH_NAME }}
+          git rev-parse origin/${{ env.BRANCH_NAME }}
+
+      # Regardless that the base image provides a python release, we need
+      # setup-python so it properly configures the python3-venv.
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Print runtime python version
+        run: python3 -c 'import sys; print("%d.%d" % (sys.version_info[0], sys.version_info[1]))'
+
+      - name: Print runtime pip version
+        run: pip -V && pip3 -V
+
+      - name: Setup CI Tooling
+        uses: shrink/actions-docker-extract@v3
+        with:
+          image: tykio/ci-tools:latest
+          path: /usr/local/bin/.
+          destination: /usr/local/bin
+
+      - name: Setup Golang
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: go.sum
+
+      - name: Install Dependencies
+        id: dependencies
         run: |
           sudo apt-get install libluajit-5.1-dev
 
@@ -90,34 +147,12 @@ jobs:
           pip install google
           pip install 'protobuf==4.24.4'
 
-          task --version
-          task lint
+      - name: Bring up test services
+        run: task services:up
 
-          git add --all
-          git diff HEAD > git-state.log
-          git_state_count=$(wc -l < git-state.log)
-
-          if [[ $git_state_count -ne 0 ]]
-          then
-            echo "git-state<<EOF" >> $GITHUB_OUTPUT
-            cat git-state.log >> $GITHUB_OUTPUT
-            echo "EOF" >> $GITHUB_OUTPUT
-
-            echo "task lint made git state dirty, please run task lint locally and update PR"
-            echo
-            cat git-state.log
-            exit 1
-          fi
-
-      - name: Fetch base branch
-        if: ${{ github.event_name == 'pull_request' }}
-        run: git fetch origin ${{ github.base_ref }}
-
-      - name: Print CPU info
-        run: grep '^model name' /proc/cpuinfo
-
-      - name: Print Go env
-        run: go env
+      - name: Preflight Python tests
+        if: runner.debug == '1'
+        run: TYK_LOGLEVEL=debug go test -p 1 -parallel 1 -race -v ./dlpython ./coprocess/...
 
       - name: Run Gateway Tests
         id: ci-tests
@@ -125,32 +160,110 @@ jobs:
           task test:e2e-combined args="-race -timeout=15m"
           task test:coverage
 
-      # golangci-lint actions *require* issues-exit-code=0 to pass data along to sonarcloud
-      # rather than erroring out on github issues directly with out-format github.
-      - name: golangci-lint
-        if: ${{ github.event_name == 'pull_request' }}
-        run: |
-          golangci-lint run --out-format checkstyle --issues-exit-code=0 --new-from-rev=origin/${{ github.base_ref }} ./... > golanglint.xml
-
-      - name: golangci-lint-on-push
-        if: ${{ github.event_name == 'push' }}
-        run: |
-          golangci-lint run --out-format checkstyle --issues-exit-code=0 ./... > golanglint.xml
-
-      - name: SonarCloud Scan
-        if: always()
-        uses: sonarsource/sonarcloud-github-action@master
+      - uses: actions/upload-artifact@v4
+        if: ${{ always() }}
         with:
-          args: >
-            -Dsonar.organization=tyktechnologies
-            -Dsonar.projectKey=TykTechnologies_tyk
-            -Dsonar.sources=.
-            -Dsonar.exclusions=**/testdata/*,test/**,coprocess/**/*,ci/**,smoke-tests/**,apidef/oas/schema/schema.gen.go
-            -Dsonar.coverage.exclusions=**/*_test.go,**/mock/*
-            -Dsonar.test.inclusions=**/*_test.go
-            -Dsonar.tests=.
-            -Dsonar.go.coverage.reportPaths=coverage/gateway-all.cov
-            -Dsonar.go.golangci-lint.reportPaths=golanglint.xml
+          name: coverage
+          retention-days: 1
+          path: coverage/gateway-all.cov
+
+      - uses: actions/upload-artifact@v4
+        if: ${{ always() }}
+        with:
+          name: testjson
+          retention-days: 1
+          path: coverage/gateway-all.json
+
+  sonar-cloud-analysis:
+    runs-on: ubuntu-latest
+    if: ${{ !github.event.pull_request.draft }}
+    needs: [test, lint]
+    steps:
+      - name: "Checkout repository"
+        uses: TykTechnologies/github-actions/.github/actions/checkout-pr@main
+        with:
+          token: ${{ secrets.ORG_GH_TOKEN }}
+
+      - name: Download coverage artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: coverage
+
+      - name: Download golangcilint artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: golangcilint
+
+      - name: Check reports existence
+        id: check_files
+        uses: andstor/file-existence-action@v3
+        with:
+          files: 'gateway-all.cov, golangci-lint-report.json'
+          fail: true
+
+      - name: Set SonarCloud parameters
+        id: sonar_params
+        run: |
+          # Common parameters for both PR and push
+          SONAR_ARGS="-Dsonar.organization=tyktechnologies \
+          -Dsonar.projectKey=TykTechnologies_tyk \
+          -Dsonar.sources=. \
+          -Dsonar.exclusions=**/testdata/*,test/**,tests/**,coprocess/**/*,ci/**,templates/**,**/*.pb.go,internal/graphengine/gomock_reflect_3503306920/*,**/*.gen.go \
+          -Dsonar.coverage.exclusions=**/*_test.go,**/*_mock.go,**/mock/*,tests/**,swagger*.yml,**/*.pb.go,internal/graphengine/gomock_reflect_3503306920/* \
+          -Dsonar.test.inclusions=**/*_test.go,tests/** \
+          -Dsonar.tests=. \
+          -Dsonar.go.coverage.reportPaths=gateway-all.cov \
+          -Dsonar.go.golangci-lint.reportPaths=golangci-lint-report.json"
+          
+          # Add PR-specific parameters if this is a pull request
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            SONAR_ARGS="$SONAR_ARGS \
+            -Dsonar.pullrequest.key=${{ github.event.pull_request.number }} \
+            -Dsonar.pullrequest.branch=${{ github.head_ref }} \
+            -Dsonar.pullrequest.base=${{ github.base_ref }}"
+            echo "Running SonarCloud in pull request mode"
+          else
+            echo "Running SonarCloud in full analysis mode"
+          fi
+          
+          echo "sonar_args=$SONAR_ARGS" >> $GITHUB_OUTPUT
+
+      - name: Scan
+        if: always()
+        uses: sonarsource/sonarqube-scan-action@master
+        with:
+          args: ${{ steps.sonar_params.outputs.sonar_args }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+
+
+  aggregator-ci-test:
+    name: Unit Tests & Linting
+    runs-on: ubuntu-latest
+    if: ${{ always() && github.event_name == 'pull_request' }}
+    needs: [ test ]
+    steps:
+      - name: Aggregate results
+        run: |
+          failed=()
+          # Get the needs context as JSON once
+          needs_json='${{ toJSON(needs) }}'
+          
+          # Loop through all jobs in the needs context
+          for job in $(echo "$needs_json" | jq -r 'keys[]'); do
+            job_result=$(echo "$needs_json" | jq -r --arg job "$job" '.[$job].result')
+          
+            if [[ "$job_result" != "success" ]]; then
+              failed+=("$job")
+            fi
+          done
+          
+          if (( ${#failed[@]} )); then
+            # Join the failed job names with commas
+            failed_jobs=$(IFS=", "; echo "${failed[*]}")
+            echo "❌ Failed jobs ----- : $failed_jobs"
+            exit 1
+          fi
+          
+          echo "✅ All required jobs succeeded"

@@ -3,6 +3,7 @@ package oas
 import (
 	"encoding/json"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 
@@ -44,6 +45,9 @@ func TestMiddleware(t *testing.T) {
 				ResponsePlugin: &ResponsePlugin{
 					Plugins: customPlugins,
 				},
+				TrafficLogs: &TrafficLogs{
+					Plugins: CustomAnalyticsPlugins(customPlugins),
+				},
 			},
 		}
 
@@ -58,6 +62,7 @@ func TestMiddleware(t *testing.T) {
 				PostAuthenticationPlugin: &PostAuthenticationPlugin{},
 				PostPlugin:               &PostPlugin{},
 				ResponsePlugin:           &ResponsePlugin{},
+				TrafficLogs:              &TrafficLogs{},
 			},
 		}
 		resultMiddleware.Fill(convertedAPI)
@@ -68,6 +73,9 @@ func TestMiddleware(t *testing.T) {
 				PostAuthenticationPlugins: customPlugins,
 				PostPlugins:               customPlugins,
 				ResponsePlugins:           customPlugins,
+				TrafficLogs: &TrafficLogs{
+					Plugins: CustomAnalyticsPlugins(customPlugins),
+				},
 			},
 		}
 		assert.Equal(t, expectedMW, resultMiddleware)
@@ -172,6 +180,144 @@ func TestGlobal(t *testing.T) {
 		assert.NotNil(t, updatedGlobal.PostPlugins)
 		assert.Nil(t, updatedGlobal.ResponsePlugin)
 		assert.NotNil(t, updatedGlobal.ResponsePlugins)
+	})
+
+	t.Run("skips", func(t *testing.T) {
+		t.Run("fill", func(t *testing.T) {
+			api := apidef.APIDefinition{
+				DisableRateLimit:      true,
+				DisableQuota:          true,
+				DontSetQuotasOnCreate: true,
+			}
+
+			expectedGlobal := Global{
+				SkipRateLimit:  true,
+				SkipQuota:      true,
+				SkipQuotaReset: true,
+			}
+
+			actualGlobal := Global{}
+			actualGlobal.Fill(api)
+
+			assert.Equal(t, expectedGlobal.SkipRateLimit, actualGlobal.SkipRateLimit)
+			assert.Equal(t, expectedGlobal.SkipQuota, actualGlobal.SkipQuota)
+			assert.Equal(t, expectedGlobal.SkipQuotaReset, actualGlobal.SkipQuotaReset)
+		})
+
+		t.Run("extractTo", func(t *testing.T) {
+			global := Global{
+				SkipRateLimit:  true,
+				SkipQuota:      true,
+				SkipQuotaReset: true,
+			}
+
+			expectedApi := apidef.APIDefinition{
+				DisableRateLimit:      true,
+				DisableQuota:          true,
+				DontSetQuotasOnCreate: true,
+			}
+
+			actualApi := apidef.APIDefinition{}
+			global.ExtractTo(&actualApi)
+
+			assert.Equal(t, expectedApi.DisableRateLimit, actualApi.DisableRateLimit)
+			assert.Equal(t, expectedApi.DisableQuota, actualApi.DisableQuota)
+			assert.Equal(t, expectedApi.DontSetQuotasOnCreate, actualApi.DontSetQuotasOnCreate)
+		})
+	})
+}
+
+func TestTrafficLogs(t *testing.T) {
+	t.Run("empty", func(t *testing.T) {
+
+		var emptyTrafficLogs TrafficLogs
+		var convertedAPI apidef.APIDefinition
+		var resultTrafficLogs TrafficLogs
+
+		convertedAPI.SetDisabledFlags()
+		emptyTrafficLogs.ExtractTo(&convertedAPI)
+
+		resultTrafficLogs.Fill(convertedAPI)
+
+		assert.Equal(t, emptyTrafficLogs, resultTrafficLogs)
+	})
+
+	t.Run("enabled with tag header", func(t *testing.T) {
+		var convertedAPI apidef.APIDefinition
+		var resultTrafficLogs TrafficLogs
+		trafficLogs := TrafficLogs{
+			Enabled:    true,
+			TagHeaders: []string{"X-Team-Name"},
+		}
+
+		convertedAPI.SetDisabledFlags()
+		trafficLogs.ExtractTo(&convertedAPI)
+
+		assert.Equal(t, trafficLogs.TagHeaders, convertedAPI.TagHeaders)
+		assert.False(t, convertedAPI.DoNotTrack)
+
+		resultTrafficLogs.Fill(convertedAPI)
+
+		assert.Equal(t, trafficLogs, resultTrafficLogs)
+	})
+
+	t.Run("enabled with no tag header", func(t *testing.T) {
+		trafficLogs := TrafficLogs{
+			Enabled:    true,
+			TagHeaders: []string{},
+		}
+		var convertedAPI apidef.APIDefinition
+		convertedAPI.SetDisabledFlags()
+		trafficLogs.ExtractTo(&convertedAPI)
+		assert.Empty(t, convertedAPI.TagHeaders)
+	})
+
+	t.Run("enable with retention period", func(t *testing.T) {
+		var convertedAPI apidef.APIDefinition
+		var resultTrafficLogs TrafficLogs
+		trafficLogs := TrafficLogs{
+			Enabled: true,
+			// add 50 milliseconds tp make sure the duration is floored
+			CustomRetentionPeriod: ReadableDuration(time.Minute*2 + time.Millisecond*50),
+		}
+
+		convertedAPI.SetDisabledFlags()
+		trafficLogs.ExtractTo(&convertedAPI)
+
+		assert.Equal(t, int64(120), convertedAPI.ExpireAnalyticsAfter)
+
+		resultTrafficLogs.Fill(convertedAPI)
+		// change customretentionPeriod back to 2 minutes for comparison
+		trafficLogs.CustomRetentionPeriod = ReadableDuration(time.Minute * 2)
+
+		assert.Equal(t, trafficLogs, resultTrafficLogs)
+	})
+
+	t.Run("with custom analytics plugin", func(t *testing.T) {
+		t.Parallel()
+		expectedTrafficLogsPlugin := TrafficLogs{
+			Enabled:    true,
+			TagHeaders: []string{},
+			Plugins: CustomAnalyticsPlugins{
+				{
+					Enabled:      true,
+					FunctionName: "CustomAnalyticsPlugin",
+					Path:         "/path/to/plugin",
+				},
+			},
+		}
+
+		api := apidef.APIDefinition{}
+		api.SetDisabledFlags()
+		expectedTrafficLogsPlugin.ExtractTo(&api)
+
+		assert.Equal(t, expectedTrafficLogsPlugin.Plugins[0].FunctionName, api.AnalyticsPlugin.FuncName)
+		assert.Equal(t, true, api.AnalyticsPlugin.Enabled)
+		assert.Equal(t, expectedTrafficLogsPlugin.Plugins[0].Path, api.AnalyticsPlugin.PluginPath)
+
+		actualTrafficLogsPlugin := TrafficLogs{}
+		actualTrafficLogsPlugin.Fill(api)
+		assert.Equal(t, expectedTrafficLogsPlugin, actualTrafficLogsPlugin)
 	})
 }
 
@@ -1038,5 +1184,273 @@ func TestContextVariables(t *testing.T) {
 				assert.Equal(t, tc.expected, apiDef.EnableContextVars)
 			})
 		}
+	})
+}
+
+func TestGlobalRequestSizeLimit(t *testing.T) {
+	t.Parallel()
+	t.Run("fill", func(t *testing.T) {
+		t.Parallel()
+		testcases := []struct {
+			title    string
+			input    apidef.APIDefinition
+			expected *GlobalRequestSizeLimit
+		}{
+			{
+				title:    "no versions",
+				input:    apidef.APIDefinition{},
+				expected: nil,
+			},
+			{
+				title: "no main version",
+				input: apidef.APIDefinition{
+					VersionData: apidef.VersionData{
+						Versions: map[string]apidef.VersionInfo{
+							"NotMain": {},
+						},
+					},
+				},
+				expected: nil,
+			},
+			{
+				title: "request size limit set to 0 (disabled)",
+				input: apidef.APIDefinition{
+					VersionData: apidef.VersionData{
+						Versions: map[string]apidef.VersionInfo{
+							Main: {
+								GlobalSizeLimit:         0,
+								GlobalSizeLimitDisabled: false,
+							},
+						},
+					},
+				},
+				expected: nil,
+			},
+			{
+				title: "request size limit set to some value (enabled)",
+				input: apidef.APIDefinition{
+					VersionData: apidef.VersionData{
+						Versions: map[string]apidef.VersionInfo{
+							Main: {
+								GlobalSizeLimit:         5000,
+								GlobalSizeLimitDisabled: false,
+							},
+						},
+					},
+				},
+				expected: &GlobalRequestSizeLimit{
+					Enabled: true,
+					Value:   5000,
+				},
+			},
+			{
+				title: "request size limit set to some value but disabled",
+				input: apidef.APIDefinition{
+					VersionData: apidef.VersionData{
+						Versions: map[string]apidef.VersionInfo{
+							Main: {
+								GlobalSizeLimit:         5000,
+								GlobalSizeLimitDisabled: true,
+							},
+						},
+					},
+				},
+				expected: &GlobalRequestSizeLimit{
+					Enabled: false,
+					Value:   5000,
+				},
+			},
+		}
+
+		for _, tc := range testcases {
+			tc := tc
+			t.Run(tc.title, func(t *testing.T) {
+				t.Parallel()
+
+				g := new(Global)
+				g.Fill(tc.input)
+
+				assert.Equal(t, tc.expected, g.RequestSizeLimit)
+			})
+		}
+	})
+
+	t.Run("extractTo", func(t *testing.T) {
+		t.Parallel()
+
+		testcases := []struct {
+			title                                  string
+			input                                  *GlobalRequestSizeLimit
+			expectedGlobalRequestSizeLimit         int64
+			expectedGlobalRequestSizeLimitDisabled bool
+		}{
+			{
+				title: "request size limit set to 0 (disabled)",
+				input: &GlobalRequestSizeLimit{
+					Enabled: true,
+					Value:   0,
+				},
+				expectedGlobalRequestSizeLimit:         0,
+				expectedGlobalRequestSizeLimitDisabled: true,
+			},
+			{
+				title: "request size limit set to a value (enabled)",
+				input: &GlobalRequestSizeLimit{
+					Enabled: true,
+					Value:   5000,
+				},
+				expectedGlobalRequestSizeLimit:         5000,
+				expectedGlobalRequestSizeLimitDisabled: false,
+			},
+			{
+				title: "request size limit set to a value and disabled",
+				input: &GlobalRequestSizeLimit{
+					Enabled: false,
+					Value:   5000,
+				},
+				expectedGlobalRequestSizeLimit:         5000,
+				expectedGlobalRequestSizeLimitDisabled: true,
+			},
+		}
+
+		for _, tc := range testcases {
+			tc := tc // Creating a new 'tc' scoped to the loop
+			t.Run(tc.title, func(t *testing.T) {
+				t.Parallel()
+
+				g := new(Global)
+				g.RequestSizeLimit = tc.input
+
+				var apiDef apidef.APIDefinition
+				g.ExtractTo(&apiDef)
+
+				assert.Equal(t, tc.expectedGlobalRequestSizeLimit, apiDef.VersionData.Versions[Main].GlobalSizeLimit)
+				assert.Equal(t, tc.expectedGlobalRequestSizeLimitDisabled, apiDef.VersionData.Versions[Main].GlobalSizeLimitDisabled)
+			})
+		}
+	})
+}
+
+func TestCachePlugin_Fill(t *testing.T) {
+	t.Run("should fill cache plugin with provided values", func(t *testing.T) {
+		cacheMeta := apidef.CacheMeta{
+			Disabled:               false,
+			CacheKeyRegex:          "test-regex",
+			CacheOnlyResponseCodes: []int{200, 201},
+			Timeout:                60,
+		}
+
+		cachePlugin := &CachePlugin{}
+		cachePlugin.Fill(cacheMeta)
+
+		assert.True(t, cachePlugin.Enabled)
+		assert.Equal(t, "test-regex", cachePlugin.CacheByRegex)
+		assert.Equal(t, []int{200, 201}, cachePlugin.CacheResponseCodes)
+		assert.Equal(t, int64(60), cachePlugin.Timeout)
+	})
+
+	t.Run("should apply default timeout when enabled but no timeout specified", func(t *testing.T) {
+		cacheMeta := apidef.CacheMeta{
+			Disabled:               false,
+			CacheKeyRegex:          "test-regex",
+			CacheOnlyResponseCodes: []int{200},
+			Timeout:                0,
+		}
+
+		cachePlugin := &CachePlugin{}
+		cachePlugin.Fill(cacheMeta)
+
+		assert.True(t, cachePlugin.Enabled)
+		assert.Equal(t, apidef.DefaultCacheTimeout, cachePlugin.Timeout)
+	})
+
+	t.Run("should not apply default timeout when disabled", func(t *testing.T) {
+		cacheMeta := apidef.CacheMeta{
+			Disabled: true,
+			Timeout:  0,
+		}
+
+		cachePlugin := &CachePlugin{}
+		cachePlugin.Fill(cacheMeta)
+
+		assert.False(t, cachePlugin.Enabled)
+		assert.Equal(t, int64(0), cachePlugin.Timeout)
+	})
+
+	t.Run("should handle empty response codes", func(t *testing.T) {
+		cacheMeta := apidef.CacheMeta{
+			Disabled:               false,
+			CacheKeyRegex:          "test-regex",
+			CacheOnlyResponseCodes: []int{},
+			Timeout:                60,
+		}
+
+		cachePlugin := &CachePlugin{}
+		cachePlugin.Fill(cacheMeta)
+
+		assert.True(t, cachePlugin.Enabled)
+		assert.Empty(t, cachePlugin.CacheResponseCodes)
+	})
+
+	t.Run("should handle empty regex", func(t *testing.T) {
+		cacheMeta := apidef.CacheMeta{
+			Disabled:               false,
+			CacheKeyRegex:          "",
+			CacheOnlyResponseCodes: []int{200},
+			Timeout:                60,
+		}
+
+		cachePlugin := &CachePlugin{}
+		cachePlugin.Fill(cacheMeta)
+
+		assert.True(t, cachePlugin.Enabled)
+		assert.Empty(t, cachePlugin.CacheByRegex)
+	})
+
+	t.Run("should handle negative timeout", func(t *testing.T) {
+		cacheMeta := apidef.CacheMeta{
+			Disabled:               false,
+			CacheKeyRegex:          "test-regex",
+			CacheOnlyResponseCodes: []int{200},
+			Timeout:                -1,
+		}
+
+		cachePlugin := &CachePlugin{}
+		cachePlugin.Fill(cacheMeta)
+
+		assert.True(t, cachePlugin.Enabled)
+		assert.Equal(t, int64(-1), cachePlugin.Timeout)
+	})
+
+	t.Run("should handle nil response codes", func(t *testing.T) {
+		cacheMeta := apidef.CacheMeta{
+			Disabled:               false,
+			CacheKeyRegex:          "test-regex",
+			CacheOnlyResponseCodes: nil,
+			Timeout:                60,
+		}
+
+		cachePlugin := &CachePlugin{}
+		cachePlugin.Fill(cacheMeta)
+
+		assert.True(t, cachePlugin.Enabled)
+		assert.Nil(t, cachePlugin.CacheResponseCodes)
+	})
+
+	t.Run("should preserve zero values when disabled", func(t *testing.T) {
+		cacheMeta := apidef.CacheMeta{
+			Disabled:               true,
+			CacheKeyRegex:          "test-regex",
+			CacheOnlyResponseCodes: []int{200, 201},
+			Timeout:                60,
+		}
+
+		cachePlugin := &CachePlugin{}
+		cachePlugin.Fill(cacheMeta)
+
+		assert.False(t, cachePlugin.Enabled)
+		assert.Equal(t, "test-regex", cachePlugin.CacheByRegex)
+		assert.Equal(t, []int{200, 201}, cachePlugin.CacheResponseCodes)
+		assert.Equal(t, int64(60), cachePlugin.Timeout)
 	})
 }

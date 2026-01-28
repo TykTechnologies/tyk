@@ -18,6 +18,7 @@ import (
 	proxyproto "github.com/pires/go-proxyproto"
 
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/internal/httpclient"
 )
 
 const (
@@ -295,16 +296,43 @@ func (h *HostUptimeChecker) CheckHost(toCheck HostData) {
 			setCustomHeader(req.Header, headerName, headerValue, ignoreCanonical)
 		}
 		req.Header.Set("Connection", "close")
-		h.Gw.HostCheckerClient.Transport = &http.Transport{
-			TLSClientConfig: &tls.Config{
-				InsecureSkipVerify: h.Gw.GetConfig().ProxySSLInsecureSkipVerify,
-				MaxVersion:         h.Gw.GetConfig().ProxySSLMaxVersion,
-			},
+
+		// Try to use HTTP client factory for health check service
+		clientFactory := NewExternalHTTPClientFactory(h.Gw)
+		client, clientErr := clientFactory.CreateHealthCheckClient()
+		if clientErr != nil {
+			// Check if mTLS is explicitly enabled and error is certificate-related - if so, don't fallback as it would bypass security
+			gwConfig := h.Gw.GetConfig()
+			if gwConfig.ExternalServices.Health.MTLS.Enabled && httpclient.IsMTLSError(clientErr) {
+				log.WithError(clientErr).Error("mTLS configuration failed for health checks. Health check will be marked as failed to maintain security.")
+				// Mark health check as failed when mTLS is misconfigured
+				report.IsTCPError = true
+				break
+			} else {
+				// For other errors (not configured, proxy config), fallback to default client
+				log.WithError(clientErr).Debug("Failed to create health check HTTP client, falling back to default")
+				log.Debug("[ExternalServices] Falling back to legacy host checker client due to factory error")
+				// Fallback to original HostCheckerClient
+				h.Gw.HostCheckerClient.Transport = &http.Transport{
+					TLSClientConfig: &tls.Config{
+						InsecureSkipVerify: h.Gw.GetConfig().ProxySSLInsecureSkipVerify,
+						MaxVersion:         h.Gw.GetConfig().ProxySSLMaxVersion,
+					},
+				}
+				if toCheck.Timeout != 0 {
+					h.Gw.HostCheckerClient.Timeout = toCheck.Timeout
+				}
+				client = h.Gw.HostCheckerClient
+			}
+		} else {
+			log.Debugf("[ExternalServices] Using external services health check client for URL: %s", toCheck.CheckURL)
+			// Set the timeout for the factory-created client if specified
+			if toCheck.Timeout != 0 {
+				client.Timeout = toCheck.Timeout
+			}
 		}
-		if toCheck.Timeout != 0 {
-			h.Gw.HostCheckerClient.Timeout = toCheck.Timeout
-		}
-		response, err := h.Gw.HostCheckerClient.Do(req)
+
+		response, err := client.Do(req)
 		if err != nil {
 			report.IsTCPError = true
 			break
@@ -398,6 +426,10 @@ func eraseSyncMap(m *sync.Map) {
 }
 
 func (h *HostUptimeChecker) Stop() {
+	if h == nil {
+		return
+	}
+
 	was := atomic.SwapInt32(&h.isClosed, CLOSED)
 	if was == OPEN {
 		eraseSyncMap(h.samples)

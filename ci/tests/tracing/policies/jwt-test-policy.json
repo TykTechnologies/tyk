@@ -1,0 +1,17 @@
+{
+    "id": "jwt-test-policy",
+    "name": "JWT Test Policy",
+    "org_id": "default",
+    "rate": 1000,
+    "per": 60,
+    "quota_max": -1,
+    "state": "active",
+    "access_rights": {
+        "jwt-test-api": {
+            "api_id": "jwt-test-api",
+            "api_name": "JWTTestAPI",
+            "versions": ["Default"]
+        }
+    },
+    "active": true
+}

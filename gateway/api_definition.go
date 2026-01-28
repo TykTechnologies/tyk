@@ -8,22 +8,18 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
-	"sync"
 	"sync/atomic"
 	texttemplate "text/template"
 	"time"
 
+	"github.com/TykTechnologies/tyk/ee/middleware/streams"
 	"github.com/TykTechnologies/tyk/storage/kv"
 
-	"github.com/getkin/kin-openapi/routers"
-
-	"github.com/TykTechnologies/tyk/internal/graphengine"
 	"github.com/TykTechnologies/tyk/internal/httputil"
 
 	"github.com/getkin/kin-openapi/routers/gorillamux"
@@ -34,19 +30,18 @@ import (
 
 	"github.com/cenk/backoff"
 
-	sprig "github.com/Masterminds/sprig/v3"
+	"github.com/Masterminds/sprig/v3"
 
 	"github.com/sirupsen/logrus"
 
 	circuit "github.com/TykTechnologies/circuitbreaker"
 
-	"github.com/TykTechnologies/gojsonschema"
-
-	"github.com/TykTechnologies/tyk-pump/analytics"
+	"github.com/TykTechnologies/tyk/internal/service/gojsonschema"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/header"
+	"github.com/TykTechnologies/tyk/internal/model"
 	"github.com/TykTechnologies/tyk/regexp"
 	"github.com/TykTechnologies/tyk/rpc"
 	"github.com/TykTechnologies/tyk/storage"
@@ -87,10 +82,12 @@ const (
 	RequestTracked
 	RequestNotTracked
 	ValidateJSONRequest
+	OASValidateRequest
 	Internal
 	GoPlugin
 	PersistGraphQL
 	RateLimit
+	OASMockResponse
 )
 
 // RequestStatus is a custom type to avoid collisions
@@ -98,73 +95,41 @@ type RequestStatus string
 
 // Statuses of the request, all are false-y except StatusOk and StatusOkAndIgnore
 const (
-	VersionNotFound                RequestStatus = "Version information not found"
-	VersionDoesNotExist            RequestStatus = "This API version does not seem to exist"
-	VersionWhiteListStatusNotFound RequestStatus = "WhiteListStatus for path not found"
-	VersionExpired                 RequestStatus = "Api Version has expired, please check documentation or contact administrator"
-	APIExpired                     RequestStatus = "API has expired, please check documentation or contact administrator"
-	EndPointNotAllowed             RequestStatus = "Requested endpoint is forbidden"
-	StatusOkAndIgnore              RequestStatus = "Everything OK, passing and not filtering"
-	StatusOk                       RequestStatus = "Everything OK, passing"
-	StatusCached                   RequestStatus = "Cached path"
-	StatusTransform                RequestStatus = "Transformed path"
-	StatusTransformResponse        RequestStatus = "Transformed response"
-	StatusTransformJQ              RequestStatus = "Transformed path with JQ"
-	StatusTransformJQResponse      RequestStatus = "Transformed response with JQ"
-	StatusHeaderInjected           RequestStatus = "Header injected"
-	StatusMethodTransformed        RequestStatus = "Method Transformed"
-	StatusHeaderInjectedResponse   RequestStatus = "Header injected on response"
-	StatusRedirectFlowByReply      RequestStatus = "Exceptional action requested, redirecting flow!"
-	StatusHardTimeout              RequestStatus = "Hard Timeout enforced on path"
-	StatusCircuitBreaker           RequestStatus = "Circuit breaker enforced"
-	StatusURLRewrite               RequestStatus = "URL Rewritten"
-	StatusVirtualPath              RequestStatus = "Virtual Endpoint"
-	StatusRequestSizeControlled    RequestStatus = "Request Size Limited"
-	StatusRequestTracked           RequestStatus = "Request Tracked"
-	StatusRequestNotTracked        RequestStatus = "Request Not Tracked"
-	StatusValidateJSON             RequestStatus = "Validate JSON"
-	StatusValidateRequest          RequestStatus = "Validate Request"
-	StatusInternal                 RequestStatus = "Internal path"
-	StatusGoPlugin                 RequestStatus = "Go plugin"
-	StatusPersistGraphQL           RequestStatus = "Persist GraphQL"
-	StatusRateLimit                RequestStatus = "Rate Limited"
+	VersionNotFound                       RequestStatus = "Version information not found"
+	VersionDoesNotExist                   RequestStatus = "This API version does not seem to exist"
+	VersionWhiteListStatusNotFound        RequestStatus = "WhiteListStatus for path not found"
+	VersionExpired                        RequestStatus = "Api Version has expired, please check documentation or contact administrator"
+	VersionDefaultForNotVersionedNotFound RequestStatus = "No default API version for this non-versioned API found"
+	VersionAmbiguousDefault               RequestStatus = "Ambiguous default API version for this non-versioned API"
+	APIExpired                            RequestStatus = "API has expired, please check documentation or contact administrator"
+	EndPointNotAllowed                    RequestStatus = "Requested endpoint is forbidden"
+	StatusOkAndIgnore                     RequestStatus = "Everything OK, passing and not filtering"
+	StatusOk                              RequestStatus = "Everything OK, passing"
+	StatusCached                          RequestStatus = "Cached path"
+	StatusTransform                       RequestStatus = "Transformed path"
+	StatusTransformResponse               RequestStatus = "Transformed response"
+	StatusTransformJQ                     RequestStatus = "Transformed path with JQ"
+	StatusTransformJQResponse             RequestStatus = "Transformed response with JQ"
+	StatusHeaderInjected                  RequestStatus = "Header injected"
+	StatusMethodTransformed               RequestStatus = "Method Transformed"
+	StatusHeaderInjectedResponse          RequestStatus = "Header injected on response"
+	StatusRedirectFlowByReply             RequestStatus = "Exceptional action requested, redirecting flow!"
+	StatusHardTimeout                     RequestStatus = "Hard Timeout enforced on path"
+	StatusCircuitBreaker                  RequestStatus = "Circuit breaker enforced"
+	StatusURLRewrite                      RequestStatus = "URL Rewritten"
+	StatusVirtualPath                     RequestStatus = "Virtual Endpoint"
+	StatusRequestSizeControlled           RequestStatus = "Request Size Limited"
+	StatusRequestTracked                  RequestStatus = "Request Tracked"
+	StatusRequestNotTracked               RequestStatus = "Request Not Tracked"
+	StatusValidateJSON                    RequestStatus = "Validate JSON"
+	StatusValidateRequest                 RequestStatus = "Validate Request"
+	StatusOASValidateRequest              RequestStatus = "OAS Validate Request"
+	StatusOASMockResponse                 RequestStatus = "OAS Mock Response"
+	StatusInternal                        RequestStatus = "Internal path"
+	StatusGoPlugin                        RequestStatus = "Go plugin"
+	StatusPersistGraphQL                  RequestStatus = "Persist GraphQL"
+	StatusRateLimit                       RequestStatus = "Rate Limited"
 )
-
-// URLSpec represents a flattened specification for URLs, used to check if a proxy URL
-// path is on any of the white, black or ignored lists. This is generated as part of the
-// configuration init
-type URLSpec struct {
-	spec *regexp.Regexp
-
-	Status                    URLStatus
-	MethodActions             map[string]apidef.EndpointMethodMeta
-	Whitelist                 apidef.EndPointMeta
-	Blacklist                 apidef.EndPointMeta
-	Ignored                   apidef.EndPointMeta
-	MockResponse              apidef.MockResponseMeta
-	CacheConfig               EndPointCacheMeta
-	TransformAction           TransformSpec
-	TransformResponseAction   TransformSpec
-	TransformJQAction         TransformJQSpec
-	TransformJQResponseAction TransformJQSpec
-	InjectHeaders             apidef.HeaderInjectionMeta
-	InjectHeadersResponse     apidef.HeaderInjectionMeta
-	HardTimeout               apidef.HardTimeoutMeta
-	CircuitBreaker            ExtendedCircuitBreakerMeta
-	URLRewrite                *apidef.URLRewriteMeta
-	VirtualPathSpec           apidef.VirtualMeta
-	RequestSize               apidef.RequestSizeMeta
-	MethodTransform           apidef.MethodTransformMeta
-	TrackEndpoint             apidef.TrackEndpointMeta
-	DoNotTrackEndpoint        apidef.TrackEndpointMeta
-	ValidatePathMeta          apidef.ValidatePathMeta
-	Internal                  apidef.InternalMeta
-	GoPluginMeta              GoPluginMiddleware
-	PersistGraphQL            apidef.PersistGraphQLMeta
-	RateLimit                 apidef.RateLimitMeta
-
-	IgnoreCase bool
-}
 
 type EndPointCacheMeta struct {
 	Method                 string
@@ -183,49 +148,8 @@ type ExtendedCircuitBreakerMeta struct {
 	CB *circuit.Breaker `json:"-"`
 }
 
-// APISpec represents a path specification for an API, to avoid enumerating multiple nested lists, a single
-// flattened URL list is checked for matching paths and then it's status evaluated if found.
-type APISpec struct {
-	*apidef.APIDefinition
-	OAS oas.OAS
-	sync.RWMutex
-
-	Checksum                 string
-	RxPaths                  map[string][]URLSpec
-	WhiteListEnabled         map[string]bool
-	target                   *url.URL
-	AuthManager              SessionHandler
-	OAuthManager             *OAuthManager
-	OrgSessionManager        SessionHandler
-	EventPaths               map[apidef.TykEvent][]config.TykEventHandler
-	Health                   HealthChecker
-	JSVM                     JSVM
-	ResponseChain            []TykResponseHandler
-	RoundRobin               RoundRobin
-	URLRewriteEnabled        bool
-	CircuitBreakerEnabled    bool
-	EnforcedTimeoutEnabled   bool
-	LastGoodHostList         *apidef.HostList
-	HasRun                   bool
-	ServiceRefreshInProgress bool
-	HTTPTransport            *TykRoundTripper
-	HTTPTransportCreated     time.Time
-	WSTransport              http.RoundTripper
-	WSTransportCreated       time.Time
-	GlobalConfig             config.Config
-	OrgHasNoSession          bool
-	AnalyticsPluginConfig    *GoAnalyticsPlugin
-
-	middlewareChain *ChainObject
-	unloadHooks     []func()
-
-	network analytics.NetworkStats
-
-	GraphEngine graphengine.Engine
-
-	HasMock            bool
-	HasValidateRequest bool
-	OASRouter          routers.Router
+type OAuthManagerInterface interface {
+	Storage() ExtendedOsinStorageInterface
 }
 
 // GetSessionLifetimeRespectsKeyExpiration returns a boolean to tell whether session lifetime should respect to key expiration or not.
@@ -313,6 +237,15 @@ func (s *APISpec) validateHTTP() error {
 	return nil
 }
 
+func (s *APISpec) isStreamingAPI() bool {
+	if s.OAS.T.Extensions == nil {
+		return false
+	}
+
+	_, ok := s.OAS.T.Extensions[streams.ExtensionTykStreaming]
+	return ok
+}
+
 // APIDefinitionLoader will load an Api definition from a storage
 // system.
 type APIDefinitionLoader struct {
@@ -321,11 +254,19 @@ type APIDefinitionLoader struct {
 
 // MakeSpec will generate a flattened URLSpec from and APIDefinitions' VersionInfo data. paths are
 // keyed to the Api version name, which is determined during routing to speed up lookups
-func (a APIDefinitionLoader) MakeSpec(def *nestedApiDefinition, logger *logrus.Entry) (*APISpec, error) {
+func (a APIDefinitionLoader) MakeSpec(def *model.MergedAPI, logger *logrus.Entry) (*APISpec, error) {
+	if logger == nil {
+		logger = logrus.NewEntry(log).WithFields(logrus.Fields{
+			"api_id": def.APIID,
+			"org_id": def.OrgID,
+			"name":   def.Name,
+		})
+	}
+
 	spec := &APISpec{}
 	apiString, err := json.Marshal(def)
 	if err != nil {
-		logger.WithError(err).WithField("name", def.Name).Error("Failed to JSON marshal API definition")
+		logger.WithError(err).Error("Failed to JSON marshal API definition")
 		return nil, err
 	}
 
@@ -339,15 +280,10 @@ func (a APIDefinitionLoader) MakeSpec(def *nestedApiDefinition, logger *logrus.E
 		return currSpec, nil
 	}
 
-	if logger == nil {
-		logger = logrus.NewEntry(log)
-	}
-
 	// new expiration feature
 	if def.Expiration != "" {
 		if t, err := time.Parse(apidef.ExpirationTimeFormat, def.Expiration); err != nil {
-			logger.WithError(err).WithField("name", def.Name).WithField("Expiration", def.Expiration).
-				Error("Could not parse expiration date for API")
+			logger.WithError(err).WithField("Expiration", def.Expiration).Error("Could not parse expiration date for API")
 		} else {
 			def.ExpirationTs = t
 		}
@@ -361,7 +297,7 @@ func (a APIDefinitionLoader) MakeSpec(def *nestedApiDefinition, logger *logrus.E
 		}
 		// calculate the time
 		if t, err := time.Parse(apidef.ExpirationTimeFormat, ver.Expires); err != nil {
-			logger.WithError(err).WithField("Expires", ver.Expires).Error("Could not parse expiry date for API")
+			logger.WithError(err).WithField("expires", ver.Expires).Error("Could not parse expiry date for API")
 		} else {
 			ver.ExpiresTs = t
 			def.VersionData.Versions[key] = ver
@@ -413,6 +349,22 @@ func (a APIDefinitionLoader) MakeSpec(def *nestedApiDefinition, logger *logrus.E
 		}
 	}
 
+	// Initialize OAS before compiling path specs, as OAS middleware compilation
+	// needs access to the initialized OAS structure
+	if spec.IsOAS && def.OAS != nil {
+		loader := openapi3.NewLoader()
+		if err := loader.ResolveRefsIn(&def.OAS.T, nil); err != nil {
+			logger.WithError(err).Errorf("Dashboard loaded API's OAS reference resolve failed: %s", def.APIID)
+		}
+
+		spec.OAS = *def.OAS
+
+		// Eagerly initialize all OAS security schemes and extensions to prevent
+		// race conditions caused by lazy-initialization during request processing.
+		// See: https://github.com/TykTechnologies/tyk/issues/7573
+		spec.OAS.Initialize()
+	}
+
 	spec.RxPaths = make(map[string][]URLSpec, len(def.VersionData.Versions))
 	spec.WhiteListEnabled = make(map[string]bool, len(def.VersionData.Versions))
 	for _, v := range def.VersionData.Versions {
@@ -430,13 +382,9 @@ func (a APIDefinitionLoader) MakeSpec(def *nestedApiDefinition, logger *logrus.E
 		spec.WhiteListEnabled[v.Name] = whiteListSpecs
 	}
 
-	if spec.IsOAS && def.OAS != nil {
-		loader := openapi3.NewLoader()
-		if err := loader.ResolveRefsIn(&def.OAS.T, nil); err != nil {
-			log.WithError(err).Errorf("Dashboard loaded API's OAS reference resolve failed: %s", def.APIID)
-		}
-
-		spec.OAS = *def.OAS
+	if err := httputil.ValidatePath(spec.Proxy.ListenPath); err != nil {
+		logger.WithError(err).Error("Invalid listen path when creating router")
+		return nil, err
 	}
 
 	oasSpec := spec.OAS.T
@@ -444,105 +392,74 @@ func (a APIDefinitionLoader) MakeSpec(def *nestedApiDefinition, logger *logrus.E
 		{URL: spec.Proxy.ListenPath},
 	}
 
-	spec.OASRouter, err = gorillamux.NewRouter(&oasSpec)
+	spec.oasRouter, err = gorillamux.NewRouter(&oasSpec)
 	if err != nil {
-		log.WithError(err).Error("Could not create OAS router")
+		logger.WithError(err).Error("Could not create OAS router")
 	}
-
-	spec.setHasMock()
 
 	return spec, nil
-}
-
-// nestedApiDefinitionList is the response body for FromDashboardService
-type nestedApiDefinitionList struct {
-	Message []nestedApiDefinition
-	Nonce   string
-}
-
-type nestedApiDefinition struct {
-	*apidef.APIDefinition `json:"api_definition,inline"`
-	OAS                   *oas.OAS `json:"oas"`
-}
-
-func (f *nestedApiDefinitionList) set(defs []*apidef.APIDefinition) {
-	for _, def := range defs {
-		f.Message = append(f.Message, nestedApiDefinition{APIDefinition: def})
-	}
-}
-
-func (f *nestedApiDefinitionList) filter(enabled bool, tags ...string) []nestedApiDefinition {
-	if !enabled {
-		return f.Message
-	}
-
-	if len(tags) == 0 {
-		return nil
-	}
-
-	tagMap := map[string]bool{}
-	for _, tag := range tags {
-		tagMap[tag] = true
-	}
-
-	result := make([]nestedApiDefinition, 0, len(f.Message))
-	for _, v := range f.Message {
-		if v.TagsDisabled {
-			continue
-		}
-		for _, tag := range v.Tags {
-			if ok := tagMap[tag]; ok {
-				result = append(result, nestedApiDefinition{v.APIDefinition, v.OAS})
-				break
-			}
-		}
-	}
-	return result
 }
 
 // FromDashboardService will connect and download ApiDefintions from a Tyk Dashboard instance.
 func (a APIDefinitionLoader) FromDashboardService(endpoint string) ([]*APISpec, error) {
 	// Get the definitions
 	log.Debug("Calling: ", endpoint)
-	newRequest, err := http.NewRequest("GET", endpoint, nil)
-	if err != nil {
-		log.Error("Failed to create request: ", err)
+
+	// Build request function for recovery helper
+	buildReq := func() (*http.Request, error) {
+		newRequest, err := http.NewRequest("GET", endpoint, nil)
+		if err != nil {
+			log.Error("Failed to create request: ", err)
+			return nil, err
+		}
+
+		gwConfig := a.Gw.GetConfig()
+		newRequest.Header.Set("authorization", gwConfig.NodeSecret)
+		log.Debug("Using: NodeID: ", a.Gw.GetNodeID())
+		newRequest.Header.Set(header.XTykNodeID, a.Gw.GetNodeID())
+
+		a.Gw.ServiceNonceMutex.RLock()
+		newRequest.Header.Set(header.XTykNonce, a.Gw.ServiceNonce)
+		a.Gw.ServiceNonceMutex.RUnlock()
+
+		newRequest.Header.Set(header.XTykSessionID, a.Gw.SessionID)
+
+		return newRequest, nil
 	}
 
-	gwConfig := a.Gw.GetConfig()
-
-	newRequest.Header.Set("authorization", gwConfig.NodeSecret)
-	log.Debug("Using: NodeID: ", a.Gw.GetNodeID())
-	newRequest.Header.Set(header.XTykNodeID, a.Gw.GetNodeID())
-
-	a.Gw.ServiceNonceMutex.RLock()
-	newRequest.Header.Set(header.XTykNonce, a.Gw.ServiceNonce)
-	a.Gw.ServiceNonceMutex.RUnlock()
-
-	c := a.Gw.initialiseClient()
-	resp, err := c.Do(newRequest)
+	// Execute request with automatic recovery
+	resp, err := a.Gw.executeDashboardRequestWithRecovery(buildReq, "API definitions fetch")
 	if err != nil {
 		return nil, err
 	}
 	defer resp.Body.Close()
 
+	// Handle 403 responses (auth errors already logged by helper)
 	if resp.StatusCode == http.StatusForbidden {
-		body, _ := ioutil.ReadAll(resp.Body)
-		a.Gw.reLogin()
+		body, err := io.ReadAll(resp.Body)
+		if err != nil {
+			body = []byte("failed to read response body")
+		}
 		return nil, fmt.Errorf("login failure, Response was: %v", string(body))
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		body, _ := ioutil.ReadAll(resp.Body)
-		a.Gw.reLogin()
+		body, err := io.ReadAll(resp.Body)
+		if err != nil {
+			body = []byte("failed to read response body")
+		}
 		return nil, fmt.Errorf("dashboard API error, response was: %v", string(body))
 	}
 
 	// Extract tagged APIs#
-	list := &nestedApiDefinitionList{}
+	list := model.NewMergedAPIList()
 	inBytes, err := io.ReadAll(resp.Body)
 	if err != nil {
 		log.Error("Couldn't read api definition list")
+		// Check if this is a recoverable read error and retry if needed
+		if a.Gw.HandleDashboardResponseReadError(err, "API definitions read") {
+			return a.FromDashboardService(endpoint)
+		}
 		return nil, err
 	}
 
@@ -551,11 +468,13 @@ func (a APIDefinitionLoader) FromDashboardService(endpoint string) ([]*APISpec, 
 	err = json.Unmarshal(inBytes, &list)
 	if err != nil {
 		log.Error("Couldn't unmarshal api definition list")
+		// JSON unmarshal errors are not network errors, so don't retry
 		return nil, err
 	}
 
 	// Extract tagged entries only
-	apiDefs := list.filter(gwConfig.DBAppConfOptions.NodeIsSegmented, gwConfig.DBAppConfOptions.Tags...)
+	gwConfig := a.Gw.GetConfig()
+	apiDefs := list.Filter(gwConfig.DBAppConfOptions.NodeIsSegmented, gwConfig.DBAppConfOptions.Tags...)
 
 	// Process
 	specs := a.prepareSpecs(apiDefs, gwConfig, false)
@@ -697,27 +616,24 @@ func (a APIDefinitionLoader) FromRPC(store RPCDataLoader, orgId string, gw *Gate
 }
 
 func (a APIDefinitionLoader) processRPCDefinitions(apiCollection string, gw *Gateway) ([]*APISpec, error) {
-
-	var payload []nestedApiDefinition
+	var payload []model.MergedAPI
 	if err := json.Unmarshal([]byte(apiCollection), &payload); err != nil {
 		return nil, err
 	}
 
-	list := &nestedApiDefinitionList{
-		Message: payload,
-	}
+	list := model.NewMergedAPIList(payload...)
 
 	gwConfig := a.Gw.GetConfig()
 
 	// Extract tagged entries only
-	apiDefs := list.filter(gwConfig.DBAppConfOptions.NodeIsSegmented, gwConfig.DBAppConfOptions.Tags...)
+	apiDefs := list.Filter(gwConfig.DBAppConfOptions.NodeIsSegmented, gwConfig.DBAppConfOptions.Tags...)
 
 	specs := a.prepareSpecs(apiDefs, gwConfig, true)
 
 	return specs, nil
 }
 
-func (a APIDefinitionLoader) prepareSpecs(apiDefs []nestedApiDefinition, gwConfig config.Config, fromRPC bool) []*APISpec {
+func (a APIDefinitionLoader) prepareSpecs(apiDefs []model.MergedAPI, gwConfig config.Config, fromRPC bool) []*APISpec {
 	var specs []*APISpec
 
 	for _, def := range apiDefs {
@@ -805,7 +721,7 @@ func (a APIDefinitionLoader) loadDefFromFilePath(filePath string) (*APISpec, err
 		return nil, err
 	}
 
-	nestDef := nestedApiDefinition{APIDefinition: &def}
+	nestDef := model.MergedAPI{APIDefinition: &def}
 	if def.IsOAS {
 		loader := openapi3.NewLoader()
 		// use openapi3.ReadFromFile as ReadFromURIFunc since the default implementation cache spec based on file path.
@@ -1391,6 +1307,111 @@ func (a APIDefinitionLoader) compileRateLimitPathsSpec(paths []apidef.RateLimitM
 	return urlSpec
 }
 
+// compileOASValidateRequestPathSpec extracts ValidateRequest operations from OAS middleware
+// and converts them to URLSpec entries that use the standard regex-based path matching algorithm.
+// This ensures OAS validateRequest middleware respects gateway configurations like
+// EnablePathPrefixMatching, EnablePathSuffixMatching, and IgnoreEndpointCase.
+func (a APIDefinitionLoader) compileOASValidateRequestPathSpec(apiSpec *APISpec, conf config.Config) []URLSpec {
+	if !apiSpec.IsOAS {
+		return nil
+	}
+
+	middleware := apiSpec.OAS.GetTykMiddleware()
+	if middleware == nil || len(middleware.Operations) == 0 {
+		return nil
+	}
+
+	urlSpec := []URLSpec{}
+
+	// Iterate through all OAS operations and find those with ValidateRequest enabled
+	for operationID, operation := range middleware.Operations {
+		if operation.ValidateRequest == nil || !operation.ValidateRequest.Enabled {
+			continue
+		}
+
+		// Find the path and method for this operation
+		path, method := a.findPathAndMethodForOperation(apiSpec, operationID)
+		if path == "" || method == "" {
+			continue
+		}
+
+		newSpec := URLSpec{
+			OASValidateRequestMeta: operation.ValidateRequest,
+			OASMethod:              strings.ToUpper(method),
+			OASPath:                path,
+		}
+
+		// The path in OAS is relative to the server URL (listenPath)
+		// For regex matching, we don't prepend listenPath because URLSpec.matchesPath
+		// will strip the listenPath before matching
+		// Use standard regex generation with gateway config
+		a.generateRegex(path, &newSpec, OASValidateRequest, conf)
+		urlSpec = append(urlSpec, newSpec)
+	}
+
+	return urlSpec
+}
+
+// compileOASMockResponsePathSpec extracts MockResponse operations from OAS middleware
+// and converts them to URLSpec entries that use the standard regex-based path matching algorithm.
+// This ensures OAS mockResponse middleware respects gateway configurations like
+// EnablePathPrefixMatching, EnablePathSuffixMatching, and IgnoreEndpointCase.
+func (a APIDefinitionLoader) compileOASMockResponsePathSpec(apiSpec *APISpec, conf config.Config) []URLSpec {
+	if !apiSpec.IsOAS {
+		return nil
+	}
+
+	middleware := apiSpec.OAS.GetTykMiddleware()
+	if middleware == nil || len(middleware.Operations) == 0 {
+		return nil
+	}
+
+	urlSpec := []URLSpec{}
+
+	// Iterate through all OAS operations and find those with MockResponse enabled
+	for operationID, operation := range middleware.Operations {
+		if operation.MockResponse == nil || !operation.MockResponse.Enabled {
+			continue
+		}
+
+		// Find the path and method for this operation
+		path, method := a.findPathAndMethodForOperation(apiSpec, operationID)
+		if path == "" || method == "" {
+			continue
+		}
+
+		newSpec := URLSpec{
+			OASMockResponseMeta: operation.MockResponse,
+			OASMethod:           strings.ToUpper(method),
+			OASPath:             path,
+		}
+
+		// Use standard regex generation with gateway config
+		a.generateRegex(path, &newSpec, OASMockResponse, conf)
+		urlSpec = append(urlSpec, newSpec)
+	}
+
+	return urlSpec
+}
+
+// findPathAndMethodForOperation finds the path and method for a given operation ID
+// by searching through the OAS paths.
+func (a APIDefinitionLoader) findPathAndMethodForOperation(apiSpec *APISpec, operationID string) (string, string) {
+	if apiSpec.OAS.Paths == nil {
+		return "", ""
+	}
+
+	for path, pathItem := range apiSpec.OAS.Paths.Map() {
+		for method, operation := range pathItem.Operations() {
+			if operation.OperationID == operationID {
+				return path, method
+			}
+		}
+	}
+
+	return "", ""
+}
+
 func (a APIDefinitionLoader) getExtendedPathSpecs(apiVersionDef apidef.VersionInfo, apiSpec *APISpec, conf config.Config) ([]URLSpec, bool) {
 	// TODO: New compiler here, needs to put data into a different structure
 
@@ -1419,6 +1440,11 @@ func (a APIDefinitionLoader) getExtendedPathSpecs(apiVersionDef apidef.VersionIn
 	persistGraphQL := a.compilePersistGraphQLPathSpec(apiVersionDef.ExtendedPaths.PersistGraphQL, PersistGraphQL, apiSpec, conf)
 	rateLimitPaths := a.compileRateLimitPathsSpec(apiVersionDef.ExtendedPaths.RateLimit, RateLimit, conf)
 
+	// OAS-specific middleware paths - compiled alongside Classic middleware
+	// The compile functions handle nil/empty OAS gracefully by returning empty slices
+	oasValidateRequestPaths := a.compileOASValidateRequestPathSpec(apiSpec, conf)
+	oasMockResponsePaths := a.compileOASMockResponsePathSpec(apiSpec, conf)
+
 	combinedPath := []URLSpec{}
 	combinedPath = append(combinedPath, mockResponsePaths...)
 	combinedPath = append(combinedPath, ignoredPaths...)
@@ -1444,6 +1470,8 @@ func (a APIDefinitionLoader) getExtendedPathSpecs(apiVersionDef apidef.VersionIn
 	combinedPath = append(combinedPath, validateJSON...)
 	combinedPath = append(combinedPath, internalPaths...)
 	combinedPath = append(combinedPath, rateLimitPaths...)
+	combinedPath = append(combinedPath, oasValidateRequestPaths...)
+	combinedPath = append(combinedPath, oasMockResponsePaths...)
 
 	return combinedPath, len(whiteListPaths) > 0
 }
@@ -1498,6 +1526,10 @@ func (a *APISpec) getURLStatus(stat URLStatus) RequestStatus {
 		return StatusRequestNotTracked
 	case ValidateJSONRequest:
 		return StatusValidateJSON
+	case OASValidateRequest:
+		return StatusOASValidateRequest
+	case OASMockResponse:
+		return StatusOASMockResponse
 	case Internal:
 		return StatusInternal
 	case GoPlugin:
@@ -1761,10 +1793,15 @@ func (a *APISpec) Version(r *http.Request) (*apidef.VersionInfo, RequestStatus) 
 	} else {
 		// Are we versioned?
 		if a.VersionData.NotVersioned {
-			// Get the first one in the list
-			for _, v := range a.VersionData.Versions {
-				version = v
-				break
+			ambiguous := a.CheckForAmbiguousDefaultVersions()
+			if ambiguous {
+				return nil, VersionAmbiguousDefault
+			}
+
+			ok := false
+			version, ok = a.GetSingleOrDefaultVersion()
+			if !ok {
+				return nil, VersionDefaultForNotVersionedNotFound
 			}
 		} else {
 			// Extract Version Info
@@ -1796,6 +1833,57 @@ func (a *APISpec) Version(r *http.Request) (*apidef.VersionInfo, RequestStatus) 
 	}
 
 	return &version, StatusOk
+}
+
+// GetSingleOrDefaultVersion determines and returns a single version or the default version if only one or a default exists.
+// Returns versionInfo and a boolean indicating success or failure.
+func (a *APISpec) GetSingleOrDefaultVersion() (versionInfo apidef.VersionInfo, ok bool) {
+	// If only one version exists, we can safely return this one
+	if len(a.VersionData.Versions) == 1 {
+		for _, v := range a.VersionData.Versions {
+			return v, true
+		}
+	}
+
+	// Now we check if a default version is defined and will look for it, when NotVersioned is set to false.
+	// Otherwise, we skip this check.
+	if !a.VersionData.NotVersioned && a.VersionData.DefaultVersion != "" {
+		versionInfo, ok = a.VersionData.Versions[a.VersionData.DefaultVersion]
+		return versionInfo, ok
+	}
+
+	// If no default version is defined, we try to find one named "Default", "default" or ""
+	if versionInfo, ok = a.VersionData.Versions["Default"]; ok {
+		return versionInfo, ok
+	}
+
+	if versionInfo, ok = a.VersionData.Versions["default"]; ok {
+		return versionInfo, ok
+	}
+
+	if versionInfo, ok = a.VersionData.Versions[""]; ok {
+		return versionInfo, ok
+	}
+
+	// If we reach this point, we tried everything to find a default version and failed
+	return apidef.VersionInfo{}, false
+}
+
+// CheckForAmbiguousDefaultVersions checks if there are multiple ambiguous default versions in the version data.
+func (a *APISpec) CheckForAmbiguousDefaultVersions() bool {
+	foundDefaultVersions := 0
+	for key := range a.VersionData.Versions {
+		switch key {
+		case "Default":
+			fallthrough
+		case "default":
+			fallthrough
+		case "":
+			foundDefaultVersions++
+		}
+	}
+
+	return foundDefaultVersions > 1
 }
 
 // StripListenPath will strip the listen path from the URL, keeping version in tact.
@@ -1841,21 +1929,32 @@ func (a *APISpec) SanitizeProxyPaths(r *http.Request) {
 	log.Debug("Upstream path is: ", r.URL.Path)
 }
 
-func (a *APISpec) setHasMock() {
+func (a *APISpec) getRedirectTargetUrl(inputUrl *url.URL) (*url.URL, error) {
+	if inputUrl == nil {
+		return nil, errors.New("input url is nil")
+	}
+
+	cloneUrl := *inputUrl
+	newPath, err := url.JoinPath("/", a.target.Host, a.StripListenPath(cloneUrl.Path))
+
+	if err != nil {
+		return nil, err
+	}
+
+	cloneUrl.Path = newPath
+	cloneUrl.RawPath = newPath
+	return &cloneUrl, nil
+}
+
+// hasActiveMock checks if specification has at least one active mock.
+func (a *APISpec) hasActiveMock() bool {
 	if !a.IsOAS {
-		a.HasMock = false
-		return
+		return false
 	}
 
 	middleware := a.OAS.GetTykMiddleware()
 	if middleware == nil {
-		a.HasMock = false
-		return
-	}
-
-	if len(middleware.Operations) == 0 {
-		a.HasMock = false
-		return
+		return false
 	}
 
 	for _, operation := range middleware.Operations {
@@ -1864,12 +1963,32 @@ func (a *APISpec) setHasMock() {
 		}
 
 		if operation.MockResponse.Enabled {
-			a.HasMock = true
-			return
+			return true
 		}
 	}
 
-	a.HasMock = false
+	return false
+}
+
+func (a *APISpec) hasVirtualEndpoint() bool {
+	for _, version := range a.VersionData.Versions {
+		for _, virtual := range version.ExtendedPaths.Virtual {
+			if !virtual.Disabled {
+				return true
+			}
+		}
+	}
+
+	return false
+}
+
+// isListeningOnPort checks whether the API listens on the given port.
+func (a *APISpec) isListeningOnPort(port int, gwConfig *config.Config) bool {
+	if a.ListenPort == 0 {
+		return gwConfig.ListenPort == port
+	}
+
+	return a.ListenPort == port
 }
 
 type RoundRobin struct {
@@ -1883,25 +2002,4 @@ func (r *RoundRobin) WithLen(len int) int {
 	// -1 to start at 0, not 1
 	cur := atomic.AddUint32(&r.pos, 1) - 1
 	return int(cur) % len
-}
-
-func (s *APISpec) hasVirtualEndpoint() bool {
-	for _, version := range s.VersionData.Versions {
-		for _, virtual := range version.ExtendedPaths.Virtual {
-			if !virtual.Disabled {
-				return true
-			}
-		}
-	}
-
-	return false
-}
-
-// isListeningOnPort checks whether the API listens on the given port.
-func (s *APISpec) isListeningOnPort(port int, gwConfig *config.Config) bool {
-	if s.ListenPort == 0 {
-		return gwConfig.ListenPort == port
-	}
-
-	return s.ListenPort == port
 }

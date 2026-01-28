@@ -174,6 +174,66 @@
           "type": "array"
         }
       }
+    },
+    "ServiceConfig": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "properties": {
+        "proxy": {
+          "type": ["object", "null"],
+          "additionalProperties": false,
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "http_proxy": {
+              "type": "string"
+            },
+            "https_proxy": {
+              "type": "string"
+            },
+            "bypass_proxy": {
+              "type": "string"
+            }
+          }
+        },
+        "mtls": {
+          "type": ["object", "null"],
+          "additionalProperties": false,
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "cert_file": {
+              "type": "string"
+            },
+            "key_file": {
+              "type": "string"
+            },
+            "ca_file": {
+              "type": "string"
+            },
+            "cert_id": {
+              "type": "string"
+            },
+            "ca_cert_ids": {
+              "type": ["array", "null"],
+              "items": {
+                "type": "string"
+              }
+            },
+            "insecure_skip_verify": {
+              "type": "boolean"
+            },
+            "tls_max_version": {
+              "type": "string"
+            },
+            "tls_min_version": {
+              "type": "string"
+            }
+          }
+        }
+      }
     }
   },
   "properties": {
@@ -326,6 +386,9 @@
         },
         "grpc_authority": {
           "type": "string"
+        },
+        "grpc_round_robin_load_balancing": {
+          "type": "boolean"
         },
         "enable_coprocess": {
           "type": "boolean"
@@ -626,6 +689,12 @@
         },
         "max_request_body_size": {
           "type": "integer"
+        },
+        "max_response_body_size": {
+          "type": "integer"
+        },
+        "xff_depth": {
+          "type": "integer"
         }
       }
     },
@@ -661,6 +730,18 @@
     "log_format": {
       "type": "string",
       "enum": ["", "standard", "json"]
+    },
+    "access_logs": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "template": {
+          "type": ["object", "null"]
+        }
+      }
     },
     "enable_http_profiler": {
       "type": "boolean"
@@ -921,6 +1002,18 @@
         },
         "synchroniser_enabled": {
           "type": "boolean"
+        },
+        "dns_monitor": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "check_interval": {
+              "type": "integer"
+            }
+          }
         }
       }
     },
@@ -1052,6 +1145,69 @@
               }
             }
           }
+        },
+        "certificate_expiry_monitor": {
+          "type": ["object", "null"],
+          "additionalProperties": false,
+          "properties": {
+            "warning_threshold_days": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 30
+            },
+            "check_cooldown_seconds": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 3600
+            },
+            "event_cooldown_seconds": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 86400
+            }
+          }
+        }
+      }
+    },
+    "external_services": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "properties": {
+        "global": {
+          "type": ["object", "null"],
+          "additionalProperties": false,
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "http_proxy": {
+              "type": "string"
+            },
+            "https_proxy": {
+              "type": "string"
+            },
+            "bypass_proxy": {
+              "type": "string"
+            }
+          }
+        },
+        "oauth": {
+          "$ref": "#/definitions/ServiceConfig"
+        },
+        "analytics": {
+          "$ref": "#/definitions/ServiceConfig"
+        },
+        "storage": {
+          "$ref": "#/definitions/ServiceConfig"
+        },
+        "webhooks": {
+          "$ref": "#/definitions/ServiceConfig"
+        },
+        "health": {
+          "$ref": "#/definitions/ServiceConfig"
+        },
+        "discovery": {
+          "$ref": "#/definitions/ServiceConfig"
         }
       }
     },
@@ -1090,6 +1246,12 @@
     },
     "health_check_endpoint_name": {
       "type": "string"
+    },
+    "readiness_check_endpoint_name": {
+      "type": "string"
+    },
+    "graceful_shutdown_timeout_duration": {
+      "type": "integer"
     },
     "ssl_force_common_name_check": {
       "type": "boolean"
@@ -1176,9 +1338,6 @@
     },
     "secrets": {
       "type": ["array", "null"]
-    },
-    "enable_http_profiler": {
-      "type": "boolean"
     },
     "liveness_check": {
       "type": ["object", "null"],

@@ -12,7 +12,7 @@ type TransformHeaders struct {
 }
 
 func (t *TransformHeaders) Name() string {
-	return "TransformHeaders"
+	return "RequestHeaderInjector"
 }
 
 func (t *TransformHeaders) EnabledForSpec() bool {
@@ -33,18 +33,19 @@ func (t *TransformHeaders) ProcessRequest(w http.ResponseWriter, r *http.Request
 	vInfo, _ := t.Spec.Version(r)
 
 	ignoreCanonical := t.Gw.GetConfig().IgnoreCanonicalMIMEHeaderKey
+	logger := t.Logger()
 
 	// Manage global headers first - remove
 	if !vInfo.GlobalHeadersDisabled {
 		for _, gdKey := range vInfo.GlobalHeadersRemove {
-			t.Logger().Debug("Removing: ", gdKey)
+			logger.Debugf("Removing global: %s", gdKey)
 			r.Header.Del(gdKey)
 		}
 
 		// Add
 		for nKey, nVal := range vInfo.GlobalHeaders {
-			t.Logger().Debug("Adding: ", nKey)
-			setCustomHeader(r.Header, nKey, t.Gw.replaceTykVariables(r, nVal, false), ignoreCanonical)
+			logger.Debugf("Adding global: %s: %s", nKey, nVal)
+			setCustomHeader(r.Header, nKey, t.Gw.ReplaceTykVariables(r, nVal, false), ignoreCanonical)
 		}
 	}
 
@@ -54,9 +55,11 @@ func (t *TransformHeaders) ProcessRequest(w http.ResponseWriter, r *http.Request
 		hmeta := meta.(*apidef.HeaderInjectionMeta)
 		for _, dKey := range hmeta.DeleteHeaders {
 			r.Header.Del(dKey)
+			logger.Debugf("Removing: %s", dKey)
 		}
 		for nKey, nVal := range hmeta.AddHeaders {
-			setCustomHeader(r.Header, nKey, t.Gw.replaceTykVariables(r, nVal, false), ignoreCanonical)
+			setCustomHeader(r.Header, nKey, t.Gw.ReplaceTykVariables(r, nVal, false), ignoreCanonical)
+			logger.Debugf("Adding: %s: %s", nKey, nVal)
 		}
 	}
 

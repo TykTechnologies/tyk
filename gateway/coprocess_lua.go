@@ -67,6 +67,7 @@ static void LuaDispatchEvent(char* event_json) {
 import "C"
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"io/ioutil"
@@ -124,6 +125,10 @@ func (d *LuaDispatcher) NativeDispatch(objectPtr unsafe.Pointer, newObjectPtr un
 }
 
 func (d *LuaDispatcher) Dispatch(object *coprocess.Object) (*coprocess.Object, error) {
+	return d.DispatchWithContext(context.Background(), object)
+}
+
+func (d *LuaDispatcher) DispatchWithContext(ctx context.Context, object *coprocess.Object) (*coprocess.Object, error) {
 	objectMsg, err := json.Marshal(object)
 	if err != nil {
 		return nil, err

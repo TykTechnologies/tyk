@@ -42,11 +42,14 @@ func (f *JSONFormatter) Format(entry *logrus.Entry) ([]byte, error) {
 		data = newData
 	}
 
-	if len(entry.Data) > 0 {
-		if err, ok := entry.Data[logrus.ErrorKey]; ok {
-			data[logrus.FieldKeyLogrusError] = err
+	if v, ok := entry.Data[logrus.ErrorKey]; ok {
+		if e, ok := v.(error); ok {
+			data[logrus.FieldKeyLogrusError] = e.Error()
+		} else {
+			data[logrus.FieldKeyLogrusError] = v
 		}
 	}
+
 	if !f.DisableTimestamp {
 		data[logrus.FieldKeyTime] = entry.Time.Format(f.TimestampFormat)
 	}

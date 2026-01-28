@@ -16,6 +16,8 @@ func testPrepareResponseHeaderInjection(ts *Test) {
 		spec.UseKeylessAccess = true
 		spec.Proxy.ListenPath = "/"
 		spec.OrgID = "default"
+		spec.DisableRateLimit = true
+		spec.DisableQuota = true
 		UpdateAPIVersion(spec, "v1", func(v *apidef.VersionInfo) {
 			v.UseExtendedPaths = true
 			json.Unmarshal([]byte(`[
@@ -136,10 +138,6 @@ func BenchmarkResponseHeaderInjection(b *testing.B) {
 	}
 
 	deleteHeaders := map[string]string{
-		"X-Tyk-Test":         "1",
-		cachedResponseHeader: "1",
-	}
-	deleteHeadersCached := map[string]string{
 		"X-Tyk-Test": "1",
 	}
 
@@ -151,9 +149,12 @@ func BenchmarkResponseHeaderInjection(b *testing.B) {
 			{Method: "GET", Path: "/test-with-slash", HeadersMatch: addHeaders, HeadersNotMatch: deleteHeaders},
 			{Method: "GET", Path: "/test-no-slash", HeadersMatch: addHeaders, HeadersNotMatch: deleteHeaders},
 			{Method: "GET", Path: "/rewrite-test", HeadersMatch: addHeaders, HeadersNotMatch: deleteHeaders, BodyMatch: `"Url":"/newpath"`},
-			{Method: "GET", Path: "/rewrite-test", HeadersMatch: addHeadersCached, HeadersNotMatch: deleteHeadersCached, BodyMatch: `"X-I-Am":"Request"`},
-			{Method: "GET", Path: "/rewrite-test", HeadersMatch: addHeadersCached, HeadersNotMatch: deleteHeadersCached, BodyMatch: userAgent},
+			{Method: "GET", Path: "/rewrite-test", HeadersMatch: addHeadersCached, HeadersNotMatch: deleteHeaders, BodyMatch: `"X-I-Am":"Request"`},
+			{Method: "GET", Path: "/rewrite-test", HeadersMatch: addHeadersCached, HeadersNotMatch: deleteHeaders, BodyMatch: userAgent},
 		}...)
+
+		// It's a loop, first time won't be cached.
+		addHeaders[cachedResponseHeader] = "1"
 	}
 }
 

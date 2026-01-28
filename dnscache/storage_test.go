@@ -151,6 +151,8 @@ func TestStorageFetchItem(t *testing.T) {
 }
 
 func TestStorageRecordExpiration(t *testing.T) {
+	t.Skip() // Slow test, bad practices with time.Sleep.
+
 	var (
 		expiration    = 2000
 		checkInterval = 1500

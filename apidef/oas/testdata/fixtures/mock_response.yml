@@ -1,0 +1,388 @@
+---
+name: "Mock Response"
+tests:
+  - desc: "basic mock response"
+    source: oas
+    input:
+      paths:
+        /test:
+          get:
+            operationId: "getTest200"
+            responses:
+              "200":
+                description: "OK"
+                content:
+                  application/json:
+                    schema:
+                      type: object
+                    example:
+                      message: "success"
+      x-tyk-api-gateway:
+        middleware:
+          operations:
+            getTest200:
+              mockResponse:
+                enabled: true
+                code: 200
+                body: '{"message": "success"}'
+                headers:
+                  - name: "Content-Type"
+                    value: "application/json"
+    output:
+      version_data:
+        versions:
+          "":
+            extended_paths:
+              mock_response: <nil>
+              white_list: <nil>
+  - desc: "multiple methods on same path"
+    source: oas
+    input:
+      paths:
+        /test:
+          get:
+            operationId: "getTest200"
+            responses:
+              "200":
+                description: "OK"
+                content:
+                  application/json:
+                    schema:
+                      type: object
+                    example:
+                      status: "ok"
+          post:
+            operationId: "postTest201"
+            responses:
+              "201":
+                description: "Created"
+                content:
+                  application/json:
+                    schema:
+                      type: object
+                    example:
+                      id: "123"
+      x-tyk-api-gateway:
+        middleware:
+          operations:
+            getTest200:
+              mockResponse:
+                enabled: true
+                code: 200
+                body: '{"status": "ok"}'
+                headers:
+                  - name: "Content-Type"
+                    value: "application/json"
+            postTest201:
+              mockResponse:
+                enabled: true
+                code: 201
+                body: '{"id": "123"}'
+                headers:
+                  - name: "Content-Type"
+                    value: "application/json"
+                  - name: "Location"
+                    value: "/test/123"
+    output:
+      version_data:
+        versions:
+          "":
+            extended_paths:
+              mock_response: <nil>
+              white_list: <nil>
+  - desc: "disabled mock response"
+    source: oas
+    input:
+      paths:
+        /test:
+          get:
+            operationId: "getTest404"
+            responses:
+              "404":
+                description: "Not Found"
+                content:
+                  application/json:
+                    schema:
+                      type: object
+                    example:
+                      error: "not found"
+      x-tyk-api-gateway:
+        middleware:
+          operations:
+            getTest404:
+              mockResponse:
+                enabled: false
+                code: 404
+                body: '{"error": "not found"}'
+                headers:
+                  - name: "Content-Type"
+                    value: "application/json"
+    output:
+      version_data:
+        versions:
+          "":
+            extended_paths:
+              mock_response: <nil>
+              white_list: <nil>
+  - desc: "basic mock response - classic"
+    source: "classic"
+    input:
+      version_data:
+        versions:
+          "":
+            extended_paths:
+              white_list:
+                - path: "/test"
+                  method: ""
+                  ignore_case: false
+                  disabled: false
+                  method_actions:
+                    GET:
+                      action: "reply"
+                      code: 200
+                      headers:
+                        Content-Type: "application/json"
+                      data: '{"message": "success"}'
+    output:
+      paths:
+        /test:
+          get:
+            operationId: testGET
+            responses:
+              "200":
+                description: ''
+      x-tyk-api-gateway:
+        middleware:
+          operations:
+            testGET:
+              block: <nil>
+              allow:
+                enabled: true
+              mockResponse:
+                enabled: true
+                code: 200
+                body: '{"message": "success"}'
+                headers:
+                  - name: Content-Type
+                    value: application/json
+              ignoreAuthentication:
+                enabled: true
+  - desc: "multiple methods on same path - classic"
+    source: "classic"
+    input:
+      version_data:
+        versions:
+          "":
+            extended_paths:
+              white_list:
+                - path: "/test"
+                  method: ""
+                  ignore_case: false
+                  disabled: false
+                  method_actions:
+                    GET:
+                      action: "reply"
+                      code: 200
+                      headers:
+                        Content-Type: "application/json"
+                      data: '{"status": "ok"}'
+                    POST:
+                      action: "reply"
+                      code: 201
+                      headers:
+                        Content-Type: "application/json"
+                        Location: "/test/123"
+                      data: '{"id": "123"}'
+    output:
+      paths:
+        /test:
+          get:
+            operationId: testGET
+            responses:
+              "200":
+                description: ''
+          post:
+            operationId: testPOST
+            responses:
+              "201":
+                description: ''
+      x-tyk-api-gateway:
+        middleware:
+          operations:
+            testGET:
+              block: <nil>
+              allow:
+                enabled: true
+              mockResponse:
+                enabled: true
+                code: 200
+                body: '{"status": "ok"}'
+                headers:
+                  - name: Content-Type
+                    value: application/json
+              ignoreAuthentication:
+                enabled: true
+            testPOST:
+              allow:
+                enabled: true
+              mockResponse:
+                enabled: true
+                code: 201
+                body: '{"id": "123"}'
+                headers:
+                  - name: Content-Type
+                    value: application/json
+                  - name: Location
+                    value: /test/123
+              ignoreAuthentication:
+                enabled: true
+  - desc: "disabled mock response - classic"
+    source: "classic"
+    input:
+      version_data:
+        versions:
+          "":
+            extended_paths:
+              white_list:
+                - path: "/test"
+                  method: ""
+                  ignore_case: false
+                  disabled: true
+                  method_actions:
+                    GET:
+                      action: "reply"
+                      code: 404
+                      headers:
+                        Content-Type: "application/json"
+                      data: '{"error": "not found"}'
+    output:
+      paths:
+        /test:
+          get:
+            operationId: testGET
+            responses:
+              "404":
+                description: ''
+      x-tyk-api-gateway:
+        middleware:
+          operations:
+            testGET:
+              block: <nil>
+              allow:
+                enabled: false
+              mockResponse:
+                enabled: false
+                code: 404
+                body: '{"error": "not found"}'
+              ignoreAuthentication:
+                enabled: true
+  - desc: "empty mock response section - classic"
+    source: "classic"
+    input:
+      version_data:
+        versions:
+          "":
+            extended_paths:
+              white_list: []
+    output:
+      paths: {}
+      x-tyk-api-gateway:
+        middleware:
+          operations: {}
+  - desc: "no mock response section - classic"
+    source: "classic"
+    input:
+      version_data:
+        versions:
+          "":
+            extended_paths: {}
+    output:
+      paths: {}
+      x-tyk-api-gateway:
+        middleware:
+          operations: {}
+  - desc: "block list - classic"
+    source: "classic"
+    input:
+      version_data:
+        versions:
+          "":
+            extended_paths:
+              black_list:
+                - path: "/test"
+                  method: ""
+                  ignore_case: false
+                  disabled: false
+                  method_actions:
+                    GET:
+                      action: "reply"
+                      code: 200
+                      headers:
+                        Content-Type: "application/json"
+                      data: '{"message": "success"}'
+    output:
+      paths:
+        /test:
+          get:
+            operationId: testGET
+            responses:
+              "200":
+                description: ''
+      x-tyk-api-gateway:
+        middleware:
+          operations:
+            testGET:
+              allow: <nil>
+              block:
+                enabled: true
+              mockResponse:
+                enabled: true
+                code: 200
+                body: '{"message": "success"}'
+                headers:
+                  - name: Content-Type
+                    value: application/json
+              ignoreAuthentication:
+                enabled: true
+  - desc: "basic mock response - classic"
+    source: "classic"
+    input:
+      version_data:
+        versions:
+          "":
+            extended_paths:
+              ignored:
+                - path: "/test"
+                  method: ""
+                  ignore_case: false
+                  disabled: false
+                  method_actions:
+                    GET:
+                      action: "reply"
+                      code: 200
+                      headers:
+                        Content-Type: "application/json"
+                      data: '{"message": "success"}'
+    output:
+      paths:
+        /test:
+          get:
+            operationId: testGET
+            responses:
+              "200":
+                description: ''
+      x-tyk-api-gateway:
+        middleware:
+          operations:
+            testGET:
+              allow: <nil>
+              block: <nil>
+              mockResponse:
+                enabled: true
+                code: 200
+                body: '{"message": "success"}'
+                headers:
+                  - name: Content-Type
+                    value: application/json
+              ignoreAuthentication:
+                enabled: true

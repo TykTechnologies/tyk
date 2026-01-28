@@ -11,11 +11,11 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"github.com/TykTechnologies/drl"
-	"github.com/TykTechnologies/leakybucket"
-	"github.com/TykTechnologies/leakybucket/memorycache"
 
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/internal/httputil"
+	"github.com/TykTechnologies/tyk/internal/memorycache"
+	"github.com/TykTechnologies/tyk/internal/model"
 	"github.com/TykTechnologies/tyk/internal/rate"
 	"github.com/TykTechnologies/tyk/internal/rate/limiter"
 	"github.com/TykTechnologies/tyk/internal/redis"
@@ -53,7 +53,7 @@ type SessionLimiter struct {
 	ctx            context.Context
 	drlManager     *drl.DRL
 	config         *config.Config
-	bucketStore    leakybucket.Storage
+	bucketStore    model.BucketStorage
 	limiterStorage redis.UniversalClient
 	smoothing      *rate.Smoothing
 }
@@ -65,12 +65,12 @@ type SessionLimiter struct {
 // configured, then redis will be used. If local storage is configured, then
 // in-memory counters will be used. If no storage is configured, it falls
 // back onto the default gateway storage configuration.
-func NewSessionLimiter(ctx context.Context, conf *config.Config, drlManager *drl.DRL) SessionLimiter {
+func NewSessionLimiter(ctx context.Context, conf *config.Config, drlManager *drl.DRL, externalServicesConfig *config.ExternalServiceConfig) SessionLimiter {
 	sessionLimiter := SessionLimiter{
 		ctx:         ctx,
 		drlManager:  drlManager,
 		config:      conf,
-		bucketStore: memorycache.New(),
+		bucketStore: memorycache.New(ctx),
 	}
 
 	log.Infof("[RATELIMIT] %s", conf.RateLimit.String())
@@ -79,7 +79,7 @@ func NewSessionLimiter(ctx context.Context, conf *config.Config, drlManager *drl
 
 	switch storageConf.Type {
 	case "redis":
-		sessionLimiter.limiterStorage = rate.NewStorage(storageConf)
+		sessionLimiter.limiterStorage = rate.NewStorage(storageConf, externalServicesConfig)
 	}
 
 	sessionLimiter.smoothing = rate.NewSmoothing(sessionLimiter.limiterStorage)
@@ -278,7 +278,16 @@ func (l *SessionLimiter) RateLimitInfo(r *http.Request, api *APISpec, endpoints 
 // sessionFailReason if session limits have been exceeded.
 // Key values to manage rate are Rate and Per, e.g. Rate of 10 messages
 // Per 10 seconds
-func (l *SessionLimiter) ForwardMessage(r *http.Request, session *user.SessionState, rateLimitKey string, quotaKey string, store storage.Handler, enableRL, enableQ bool, api *APISpec, dryRun bool) sessionFailReason {
+func (l *SessionLimiter) ForwardMessage(
+	r *http.Request,
+	session *user.SessionState,
+	rateLimitKey string,
+	quotaKey string,
+	store storage.Handler,
+	enableRL, enableQ bool,
+	api *APISpec,
+	dryRun bool,
+) sessionFailReason {
 	// check for limit on API level (set to session by ApplyPolicies)
 	accessDef, allowanceScope, err := GetAccessDefinitionByAPIIDOrSession(session, api)
 	if err != nil {
@@ -376,7 +385,6 @@ func (l *SessionLimiter) ForwardMessage(r *http.Request, session *user.SessionSt
 	}
 
 	return sessionFailNone
-
 }
 
 // RedisQuotaExceeded returns true if the request should be blocked as over quota.
@@ -499,6 +507,7 @@ func (l *SessionLimiter) RedisQuotaExceeded(r *http.Request, session *user.Sessi
 
 	// locked: reset quota + increment
 	conn.Set(ctx, rawKey, 0, quotaRenewalRate)
+	expiredAt = now.Add(quotaRenewalRate)
 	return increment()
 }
 

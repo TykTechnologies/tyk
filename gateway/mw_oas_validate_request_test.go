@@ -10,6 +10,7 @@ import (
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/apidef/oas"
+	"github.com/TykTechnologies/tyk/header"
 	"github.com/TykTechnologies/tyk/test"
 )
 
@@ -86,6 +87,34 @@ const testOASForValidateRequest = `{
           }
         }
       }
+    },
+    "/test": {
+      "get": {
+        "operationId": "testget",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "test",
+            "required": true,
+            "schema": {
+              "items": {
+                "maxLength": 5,
+                "minLength": 1,
+                "pattern": "^[A-Za-z]+$",
+                "type": "string"
+              },
+              "maxItems": 999,
+              "minItems": 1,
+              "type": "array"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        }
+      }
     }
   },
   "servers": [
@@ -100,6 +129,7 @@ func TestValidateRequest(t *testing.T) {
 	defer ts.Close()
 
 	const operationID = "postpost"
+	const getOperationID = "testget"
 
 	oasDoc, err := openapi3.NewLoader().LoadFromData([]byte(testOASForValidateRequest))
 	assert.NoError(t, err)
@@ -110,6 +140,12 @@ func TestValidateRequest(t *testing.T) {
 				operationID: {
 					ValidateRequest: &oas.ValidateRequest{
 						Enabled: true,
+					},
+				},
+				getOperationID: {
+					ValidateRequest: &oas.ValidateRequest{
+						Enabled:           true,
+						ErrorResponseCode: http.StatusUnprocessableEntity,
 					},
 				},
 			},
@@ -146,9 +182,10 @@ func TestValidateRequest(t *testing.T) {
 			spec.IsOAS = true
 			spec.Proxy.ListenPath = "/product-regexp2/{name:.*}/suffix"
 			spec.UseKeylessAccess = true
-		})
+		},
+	)
 
-	headers := map[string]string{"Content-Type": "application/json"}
+	headers := map[string]string{}
 
 	t.Run("default error response code", func(t *testing.T) {
 		check := func(t *testing.T) {
@@ -218,6 +255,21 @@ func TestValidateRequest(t *testing.T) {
 			{Data: `{"name": 123}`, Code: http.StatusTeapot, Method: http.MethodPost, Headers: headers, Path: "/product/post"},
 		}...)
 	})
+
+	t.Run("multiple headers with the same name", func(t *testing.T) {
+		headerName := "test"
+
+		validHeader := map[string][]string{headerName: {"y", "x"}}
+		invalidHeader1 := map[string][]string{headerName: {"y", "toolong"}}
+		invalidHeader2 := map[string][]string{headerName: {"toolong", "x"}}
+
+		path := "/product/test"
+		_, _ = ts.Run(t, []test.TestCase{
+			{Code: http.StatusOK, Method: http.MethodGet, HeadersArray: validHeader, Path: path},
+			{Code: http.StatusUnprocessableEntity, Method: http.MethodGet, HeadersArray: invalidHeader1, Path: path},
+			{Code: http.StatusUnprocessableEntity, Method: http.MethodGet, HeadersArray: invalidHeader2, Path: path},
+		}...)
+	})
 }
 
 func TestValidateRequest_AfterMigration(t *testing.T) {
@@ -234,7 +286,6 @@ func TestValidateRequest_AfterMigration(t *testing.T) {
 					Method: http.MethodPost,
 					Path:   "/post",
 					Schema: map[string]interface{}{
-
 						"required": []string{"name"},
 					},
 					ErrorResponseCode: http.StatusTeapot,
@@ -259,4 +310,454 @@ func TestValidateRequest_AfterMigration(t *testing.T) {
 		{Method: http.MethodPost, Path: "/listen/post", Data: `{"age":27}`, Code: http.StatusTeapot},
 		{Method: http.MethodPost, Path: "/listen/post", Data: `{"name":"Furkan"}`, Code: http.StatusOK},
 	}...)
+}
+
+// TestValidateRequest_PrefixMatching verifies that OAS validateRequest middleware
+// respects gateway-level EnablePathPrefixMatching configuration.
+// When prefix matching is enabled, a request to /anything/extra should be validated
+// against the /anything operation.
+func TestValidateRequest_PrefixMatching(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	// Enable prefix matching at gateway level
+	conf := ts.Gw.GetConfig()
+	conf.HttpServerOptions.EnablePathPrefixMatching = true
+	conf.HttpServerOptions.EnablePathSuffixMatching = false
+	ts.Gw.SetConfig(conf)
+
+	// Create OAS spec with required header parameter on /anything
+	const oasSpec = `{
+		"openapi": "3.0.0",
+		"info": {"title": "Prefix Match Test", "version": "1.0.0"},
+		"paths": {
+			"/anything": {
+				"get": {
+					"operationId": "getanything",
+					"parameters": [{
+						"name": "X-Required-Header",
+						"in": "header",
+						"required": true,
+						"schema": {"type": "string"}
+					}],
+					"responses": {"200": {"description": "OK"}}
+				}
+			}
+		}
+	}`
+
+	oasDoc, err := openapi3.NewLoader().LoadFromData([]byte(oasSpec))
+	assert.NoError(t, err)
+
+	oasAPI := oas.OAS{T: *oasDoc}
+	oasAPI.SetTykExtension(&oas.XTykAPIGateway{
+		Middleware: &oas.Middleware{
+			Operations: oas.Operations{
+				"getanything": {
+					ValidateRequest: &oas.ValidateRequest{
+						Enabled:           true,
+						ErrorResponseCode: http.StatusUnprocessableEntity,
+					},
+				},
+			},
+		},
+	})
+
+	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		spec.Name = "Prefix Match Validate Test"
+		spec.APIID = "prefix-validate-test"
+		spec.Proxy.ListenPath = "/api/"
+		spec.UseKeylessAccess = true
+		spec.IsOAS = true
+		spec.OAS = oasAPI
+	})
+
+	_, _ = ts.Run(t, []test.TestCase{
+		// Exact path match - should validate and fail (missing header)
+		{
+			Method:    http.MethodGet,
+			Path:      "/api/anything",
+			Code:      http.StatusUnprocessableEntity,
+			BodyMatch: `X-Required-Header`,
+		},
+		// Exact path match - should validate and pass (header present)
+		{
+			Method:  http.MethodGet,
+			Path:    "/api/anything",
+			Headers: map[string]string{"X-Required-Header": "test"},
+			Code:    http.StatusOK,
+		},
+		// Prefix match - request to /anything/extra should validate against /anything
+		{
+			Method:    http.MethodGet,
+			Path:      "/api/anything/extra",
+			Code:      http.StatusUnprocessableEntity,
+			BodyMatch: `X-Required-Header`,
+		},
+		// Prefix match - should pass when header is provided
+		{
+			Method:  http.MethodGet,
+			Path:    "/api/anything/extra",
+			Headers: map[string]string{"X-Required-Header": "test"},
+			Code:    http.StatusOK,
+		},
+		// Deeper prefix match
+		{
+			Method:    http.MethodGet,
+			Path:      "/api/anything/extra/deep/path",
+			Code:      http.StatusUnprocessableEntity,
+			BodyMatch: `X-Required-Header`,
+		},
+	}...)
+}
+
+// TestValidateRequest_SuffixMatching verifies that OAS validateRequest middleware
+// respects gateway-level EnablePathSuffixMatching configuration.
+func TestValidateRequest_SuffixMatching(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	// Enable suffix matching at gateway level
+	conf := ts.Gw.GetConfig()
+	conf.HttpServerOptions.EnablePathPrefixMatching = false
+	conf.HttpServerOptions.EnablePathSuffixMatching = true
+	ts.Gw.SetConfig(conf)
+
+	// Create OAS spec with required header parameter
+	const oasSpec = `{
+		"openapi": "3.0.0",
+		"info": {"title": "Suffix Match Test", "version": "1.0.0"},
+		"paths": {
+			"/users": {
+				"get": {
+					"operationId": "getusers",
+					"parameters": [{
+						"name": "X-Auth",
+						"in": "header",
+						"required": true,
+						"schema": {"type": "string"}
+					}],
+					"responses": {"200": {"description": "OK"}}
+				}
+			}
+		}
+	}`
+
+	oasDoc, err := openapi3.NewLoader().LoadFromData([]byte(oasSpec))
+	assert.NoError(t, err)
+
+	oasAPI := oas.OAS{T: *oasDoc}
+	oasAPI.SetTykExtension(&oas.XTykAPIGateway{
+		Middleware: &oas.Middleware{
+			Operations: oas.Operations{
+				"getusers": {
+					ValidateRequest: &oas.ValidateRequest{
+						Enabled:           true,
+						ErrorResponseCode: http.StatusUnprocessableEntity,
+					},
+				},
+			},
+		},
+	})
+
+	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		spec.Name = "Suffix Match Validate Test"
+		spec.APIID = "suffix-validate-test"
+		spec.Proxy.ListenPath = "/api/"
+		spec.UseKeylessAccess = true
+		spec.IsOAS = true
+		spec.OAS = oasAPI
+	})
+
+	_, _ = ts.Run(t, []test.TestCase{
+		// Exact path match - should validate
+		{
+			Method:    http.MethodGet,
+			Path:      "/api/users",
+			Code:      http.StatusUnprocessableEntity,
+			BodyMatch: `X-Auth`,
+		},
+		// Suffix match - /prefix/users should match /users
+		{
+			Method:    http.MethodGet,
+			Path:      "/api/v1/users",
+			Code:      http.StatusUnprocessableEntity,
+			BodyMatch: `X-Auth`,
+		},
+		// Should pass with header
+		{
+			Method:  http.MethodGet,
+			Path:    "/api/v1/users",
+			Headers: map[string]string{"X-Auth": "token"},
+			Code:    http.StatusOK,
+		},
+	}...)
+}
+
+// TestValidateRequest_BothMatchingEnabled verifies that when both prefix and suffix
+// matching are enabled, the regex becomes ^/path$ (exact match).
+func TestValidateRequest_BothMatchingEnabled(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	// Enable both prefix and suffix matching - this creates ^/path$ regex (exact match)
+	conf := ts.Gw.GetConfig()
+	conf.HttpServerOptions.EnablePathPrefixMatching = true
+	conf.HttpServerOptions.EnablePathSuffixMatching = true
+	ts.Gw.SetConfig(conf)
+
+	const oasSpec = `{
+		"openapi": "3.0.0",
+		"info": {"title": "Exact Match Test", "version": "1.0.0"},
+		"paths": {
+			"/items": {
+				"get": {
+					"operationId": "getitems",
+					"parameters": [{
+						"name": "X-Token",
+						"in": "header",
+						"required": true,
+						"schema": {"type": "string"}
+					}],
+					"responses": {"200": {"description": "OK"}}
+				}
+			}
+		}
+	}`
+
+	oasDoc, err := openapi3.NewLoader().LoadFromData([]byte(oasSpec))
+	assert.NoError(t, err)
+
+	oasAPI := oas.OAS{T: *oasDoc}
+	oasAPI.SetTykExtension(&oas.XTykAPIGateway{
+		Middleware: &oas.Middleware{
+			Operations: oas.Operations{
+				"getitems": {
+					ValidateRequest: &oas.ValidateRequest{
+						Enabled:           true,
+						ErrorResponseCode: http.StatusUnprocessableEntity,
+					},
+				},
+			},
+		},
+	})
+
+	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		spec.Name = "Both Matching Validate Test"
+		spec.APIID = "both-validate-test"
+		spec.Proxy.ListenPath = "/api/"
+		spec.UseKeylessAccess = true
+		spec.IsOAS = true
+		spec.OAS = oasAPI
+	})
+
+	_, _ = ts.Run(t, []test.TestCase{
+		// Exact path match - should validate and fail
+		{
+			Method:    http.MethodGet,
+			Path:      "/api/items",
+			Code:      http.StatusUnprocessableEntity,
+			BodyMatch: `X-Token`,
+		},
+		// Exact path match with header - should pass
+		{
+			Method:  http.MethodGet,
+			Path:    "/api/items",
+			Headers: map[string]string{"X-Token": "valid"},
+			Code:    http.StatusOK,
+		},
+		// Non-exact path - should NOT validate (exact match with ^/items$)
+		{
+			Method: http.MethodGet,
+			Path:   "/api/items/123",
+			Code:   http.StatusOK,
+		},
+		// Non-exact path with prefix - should NOT validate
+		{
+			Method: http.MethodGet,
+			Path:   "/api/v1/items",
+			Code:   http.StatusOK,
+		},
+	}...)
+}
+
+// TestValidateRequest_PathParameters verifies that OAS validateRequest works
+// correctly with path parameters.
+func TestValidateRequest_PathParameters(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	const oasSpec = `{
+		"openapi": "3.0.0",
+		"info": {"title": "Path Params Test", "version": "1.0.0"},
+		"paths": {
+			"/users/{id}": {
+				"get": {
+					"operationId": "getuser",
+					"parameters": [
+						{
+							"name": "id",
+							"in": "path",
+							"required": true,
+							"schema": {"type": "integer"}
+						},
+						{
+							"name": "X-Request-ID",
+							"in": "header",
+							"required": true,
+							"schema": {"type": "string"}
+						}
+					],
+					"responses": {"200": {"description": "OK"}}
+				}
+			}
+		}
+	}`
+
+	oasDoc, err := openapi3.NewLoader().LoadFromData([]byte(oasSpec))
+	assert.NoError(t, err)
+
+	oasAPI := oas.OAS{T: *oasDoc}
+	oasAPI.SetTykExtension(&oas.XTykAPIGateway{
+		Middleware: &oas.Middleware{
+			Operations: oas.Operations{
+				"getuser": {
+					ValidateRequest: &oas.ValidateRequest{
+						Enabled:           true,
+						ErrorResponseCode: http.StatusUnprocessableEntity,
+					},
+				},
+			},
+		},
+	})
+
+	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		spec.Name = "Path Params Validate Test"
+		spec.APIID = "pathparams-validate-test"
+		spec.Proxy.ListenPath = "/api/"
+		spec.UseKeylessAccess = true
+		spec.IsOAS = true
+		spec.OAS = oasAPI
+	})
+
+	_, _ = ts.Run(t, []test.TestCase{
+		// Valid path parameter, missing header
+		{
+			Method:    http.MethodGet,
+			Path:      "/api/users/123",
+			Code:      http.StatusUnprocessableEntity,
+			BodyMatch: `X-Request-ID`,
+		},
+		// Valid path parameter, header present
+		{
+			Method:  http.MethodGet,
+			Path:    "/api/users/123",
+			Headers: map[string]string{"X-Request-ID": "req-123"},
+			Code:    http.StatusOK,
+		},
+		// Invalid path parameter type (string instead of integer)
+		{
+			Method:    http.MethodGet,
+			Path:      "/api/users/abc",
+			Headers:   map[string]string{"X-Request-ID": "req-123"},
+			Code:      http.StatusUnprocessableEntity,
+			BodyMatch: `id`,
+		},
+	}...)
+}
+
+func TestValidateRequest_NormalizeHeaders(t *testing.T) {
+	customHeader := "X-Custom"
+	tests := []struct {
+		name     string
+		input    http.Header
+		expected http.Header
+	}{
+		{
+			name: "Single value headers remain unchanged",
+			input: http.Header{
+				header.Accept:      []string{"application/json"},
+				header.ContentType: []string{"application/json"},
+				header.UserAgent:   []string{"Tyk-Test"},
+			},
+			expected: http.Header{
+				header.Accept:      []string{"application/json"},
+				header.ContentType: []string{"application/json"},
+				header.UserAgent:   []string{"Tyk-Test"},
+			},
+		},
+		{
+			name: "Multiple value headers are joined with commas",
+			input: http.Header{
+				header.Accept:    []string{"application/json", "text/html"},
+				customHeader:     []string{"value1", "value2", "value3"},
+				header.UserAgent: []string{"Tyk-Test"},
+			},
+			expected: http.Header{
+				header.Accept:    []string{"application/json,text/html"},
+				customHeader:     []string{"value1,value2,value3"},
+				header.UserAgent: []string{"Tyk-Test"},
+			},
+		},
+		{
+			name: "Excluded headers remain unchanged even with multiple values",
+			input: http.Header{
+				header.SetCookie:        []string{"cookie1=value1", "cookie2=value2"},
+				header.ContentLength:    []string{"100", "200"},
+				header.TransferEncoding: []string{"chunked", "gzip"},
+				header.Host:             []string{"example.com", "test.com"},
+			},
+			expected: http.Header{
+				header.SetCookie:        []string{"cookie1=value1", "cookie2=value2"},
+				header.ContentLength:    []string{"100", "200"},
+				header.TransferEncoding: []string{"chunked", "gzip"},
+				header.Host:             []string{"example.com", "test.com"},
+			},
+		},
+		{
+			name: "Mixed regular and excluded headers",
+			input: http.Header{
+				header.Accept:           []string{"application/json", "text/html"},
+				header.SetCookie:        []string{"cookie1=value1", "cookie2=value2"},
+				header.Cookie:           []string{"cookie1=value1", "cookie2=value2"},
+				customHeader:            []string{"value1", "value2", "value3"},
+				header.ContentLength:    []string{"100"},
+				header.TransferEncoding: []string{"chunked"},
+				header.Host:             []string{"example.com"},
+			},
+			expected: http.Header{
+				header.Accept:           []string{"application/json,text/html"},
+				header.SetCookie:        []string{"cookie1=value1", "cookie2=value2"},
+				header.Cookie:           []string{"cookie1=value1; cookie2=value2"},
+				customHeader:            []string{"value1,value2,value3"},
+				header.ContentLength:    []string{"100"},
+				header.TransferEncoding: []string{"chunked"},
+				header.Host:             []string{"example.com"},
+			},
+		},
+		{
+			name:     "Empty headers remain empty",
+			input:    http.Header{},
+			expected: http.Header{},
+		},
+		{
+			name: "Headers with empty values",
+			input: http.Header{
+				"X-Empty":  []string{""},
+				"X-Empty2": []string{"", ""},
+			},
+			expected: http.Header{
+				"X-Empty":  []string{""},
+				"X-Empty2": []string{","},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			normalizeHeaders(tt.input)
+
+			assert.Equal(t, tt.expected, tt.input)
+		})
+	}
 }

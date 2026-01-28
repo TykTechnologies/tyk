@@ -9,6 +9,30 @@ import (
 	"github.com/TykTechnologies/tyk/internal/httputil"
 )
 
+// TestValidatePath tests mux routes to avoid panics.
+// Routes must start with `/` which is an easy check.
+func TestValidatePath(t *testing.T) {
+	// invalid, paths must start with /
+	assert.Error(t, httputil.ValidatePath("{/foo}"))
+	assert.Error(t, httputil.ValidatePath("{foo}"))
+	assert.Error(t, httputil.ValidatePath("foo"))
+	assert.Error(t, httputil.ValidatePath("foo{/foo}"))
+
+	// strange but valid params (basically wildcard?)
+	assert.NoError(t, httputil.ValidatePath("/foo/{a!}"))
+	assert.NoError(t, httputil.ValidatePath("/foo/{.*}"))
+	assert.NoError(t, httputil.ValidatePath("/foo/{*}"))
+	assert.NoError(t, httputil.ValidatePath("/foo/{*.}"))
+
+	// invalid regexp in param
+	assert.Error(t, httputil.ValidatePath("/foo/{id:*.}"))
+
+	// green path: valid path, param, and param with regexp
+	assert.NoError(t, httputil.ValidatePath("/foo"))
+	assert.NoError(t, httputil.ValidatePath("/{foo}"))
+	assert.NoError(t, httputil.ValidatePath("/{foo:[a-zA-Z0-9]+}"))
+}
+
 func pathRegexp(tb testing.TB, in string, want string) string {
 	tb.Helper()
 

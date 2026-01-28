@@ -24,7 +24,7 @@ func (h *HeaderInjector) Base() *BaseTykResponseHandler {
 }
 
 func (*HeaderInjector) Name() string {
-	return "HeaderInjector"
+	return "ResponseHeaderInjector"
 }
 
 func (h *HeaderInjector) Enabled() bool {
@@ -58,32 +58,38 @@ func (h *HeaderInjector) HandleResponse(rw http.ResponseWriter, res *http.Respon
 	found, meta := h.Spec.CheckSpecMatchesStatus(req, versionPaths, HeaderInjectedResponse)
 	if found {
 		hmeta := meta.(*apidef.HeaderInjectionMeta)
+
 		for _, dKey := range hmeta.DeleteHeaders {
+			h.logger().Debug("Removing: ", dKey)
 			res.Header.Del(dKey)
 		}
 		for nKey, nVal := range hmeta.AddHeaders {
-			setCustomHeader(res.Header, nKey, h.Gw.replaceTykVariables(req, nVal, false), ignoreCanonical)
+			h.logger().Debugf("Adding: %v: %v", nKey, nVal)
+			setCustomHeader(res.Header, nKey, h.Gw.ReplaceTykVariables(req, nVal, false), ignoreCanonical)
 		}
 	}
 
 	// Manage global response header options with versionInfo
 	if !vInfo.GlobalResponseHeadersDisabled {
 		for _, key := range vInfo.GlobalResponseHeadersRemove {
-			log.Debug("Removing: ", key)
+			h.logger().Debug("Removing: ", key)
 			res.Header.Del(key)
 		}
 
 		for key, val := range vInfo.GlobalResponseHeaders {
-			log.Debug("Adding: ", key)
-			setCustomHeader(res.Header, key, h.Gw.replaceTykVariables(req, val, false), ignoreCanonical)
+			h.logger().Debug("Adding: ", key)
+			setCustomHeader(res.Header, key, h.Gw.ReplaceTykVariables(req, val, false), ignoreCanonical)
 		}
 
 		// Manage global response header options with response_processors
 		for _, n := range h.config.RemoveHeaders {
+			h.logger().Debug("Removing global: ", n)
 			res.Header.Del(n)
 		}
+
 		for header, v := range h.config.AddHeaders {
-			setCustomHeader(res.Header, header, h.Gw.replaceTykVariables(req, v, false), ignoreCanonical)
+			h.logger().Debug("Adding global: ", header)
+			setCustomHeader(res.Header, header, h.Gw.ReplaceTykVariables(req, v, false), ignoreCanonical)
 		}
 	}
 

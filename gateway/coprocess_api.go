@@ -16,13 +16,15 @@ import (
 // CoProcessDefaultKeyPrefix is used as a key prefix for this CP.
 const CoProcessDefaultKeyPrefix = "coprocess-data:"
 
-func getStorageForPython(ctx context.Context) storage.RedisCluster {
+func getStorageForPython(ctx context.Context) *storage.RedisCluster {
 	rc := storage.NewConnectionHandler(ctx)
 
 	go rc.Connect(ctx, nil, &config.Config{})
 	rc.WaitConnect(ctx)
 
-	return storage.RedisCluster{KeyPrefix: CoProcessDefaultKeyPrefix, ConnectionHandler: rc}
+	handler := &storage.RedisCluster{KeyPrefix: CoProcessDefaultKeyPrefix, ConnectionHandler: rc}
+	handler.Connect()
+	return handler
 }
 
 // TykStoreData is a CoProcess API function for storing data.

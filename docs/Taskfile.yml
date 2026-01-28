@@ -1,0 +1,11 @@
+---
+version: "3"
+
+# Running this taskfile ensures that markdowns are
+# consistently formatted according to mdox rules.
+
+tasks:
+  default:
+    desc: "Run mdox to format markdowns"
+    cmds:
+      - mdox fmt --no-soft-wraps $(find -name '*.md')

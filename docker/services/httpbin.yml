@@ -2,6 +2,7 @@
 services:
   httpbin:
     image: tykio/ci-tools:latest
+    platform: linux/amd64
     networks:
       - proxy
     ports:

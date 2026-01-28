@@ -1,9 +1,5 @@
 package apidef
 
-import (
-	internalmodel "github.com/TykTechnologies/tyk/internal/model"
-)
-
 type InboundData struct {
 	KeyName      string
 	Value        string
@@ -26,6 +22,14 @@ type GroupLoginRequest struct {
 	Node      []byte
 }
 
+// HostDetails contains information about a host machine,
+// including its hostname, process ID (PID), and IP address.
+type HostDetails struct {
+	Hostname string
+	PID      int
+	Address  string
+}
+
 type NodeData struct {
 	NodeID          string                     `json:"node_id"`
 	APIKey          string                     `json:"api_key"`
@@ -36,12 +40,24 @@ type NodeData struct {
 	Tags            []string                   `json:"tags"`
 	Health          map[string]HealthCheckItem `json:"health"`
 	Stats           GWStats                    `json:"stats"`
-	HostDetails     internalmodel.HostDetails  `json:"host_details"`
+	HostDetails     HostDetails                `json:"host_details"`
+}
+
+// LoadedAPIInfo represents a loaded API with its metadata.
+type LoadedAPIInfo struct {
+	APIID string `json:"api_id"`
+}
+
+// LoadedPolicyInfo represents a loaded policy with its metadata.
+type LoadedPolicyInfo struct {
+	PolicyID string `json:"policy_id"`
 }
 
 type GWStats struct {
-	APIsCount     int `json:"apis_count"`
-	PoliciesCount int `json:"policies_count"`
+	APIsCount      int                `json:"apis_count"`
+	PoliciesCount  int                `json:"policies_count"`
+	LoadedAPIs     []LoadedAPIInfo    `json:"loaded_apis,omitempty"`
+	LoadedPolicies []LoadedPolicyInfo `json:"loaded_policies,omitempty"`
 }
 
 type GroupKeySpaceRequest struct {

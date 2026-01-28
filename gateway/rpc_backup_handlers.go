@@ -1,17 +1,14 @@
 package gateway
 
 import (
-	"crypto/aes"
-	"crypto/cipher"
-	cryptorand "crypto/rand"
-	"encoding/base64"
 	"encoding/json"
 	"errors"
-	"io"
 	"strings"
 
 	"github.com/sirupsen/logrus"
 
+	"github.com/TykTechnologies/tyk/internal/compression"
+	"github.com/TykTechnologies/tyk/internal/crypto"
 	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/user"
 )
@@ -33,24 +30,30 @@ func (gw *Gateway) LoadDefinitionsFromRPCBackup() ([]*APISpec, error) {
 	tagList := getTagListAsString(gw.GetConfig().DBAppConfOptions.Tags)
 	checkKey := BackupApiKeyBase + tagList
 
-	store := storage.RedisCluster{KeyPrefix: RPCKeyPrefix, ConnectionHandler: gw.StorageConnectionHandler}
+	store := &storage.RedisCluster{KeyPrefix: RPCKeyPrefix, ConnectionHandler: gw.StorageConnectionHandler}
 	connected := store.Connect()
+
 	log.Info("[RPC] --> Loading API definitions from backup")
 
 	if !connected {
 		return nil, errors.New("[RPC] --> RPC Backup recovery failed: redis connection failed")
 	}
 
-	secret := rightPad2Len(gw.GetConfig().Secret, "=", 32)
+	secret := crypto.GetPaddedString(gw.GetConfig().Secret)
 	cryptoText, err := store.GetKey(checkKey)
 	if err != nil {
 		return nil, errors.New("[RPC] --> Failed to get node backup (" + checkKey + "): " + err.Error())
 	}
 
-	apiListAsString := decrypt([]byte(secret), cryptoText)
+	decrypted := crypto.Decrypt(secret, cryptoText)
+
+	apiList, err := gw.decompressAPIBackup(decrypted)
+	if err != nil {
+		return nil, err
+	}
 
 	a := APIDefinitionLoader{Gw: gw}
-	return a.processRPCDefinitions(apiListAsString, gw)
+	return a.processRPCDefinitions(apiList, gw)
 }
 
 func (gw *Gateway) saveRPCDefinitionsBackup(list string) error {
@@ -63,7 +66,7 @@ func (gw *Gateway) saveRPCDefinitionsBackup(list string) error {
 
 	log.Info("--> Connecting to DB")
 
-	store := storage.RedisCluster{KeyPrefix: RPCKeyPrefix, ConnectionHandler: gw.StorageConnectionHandler}
+	store := &storage.RedisCluster{KeyPrefix: RPCKeyPrefix, ConnectionHandler: gw.StorageConnectionHandler}
 	connected := store.Connect()
 
 	log.Info("--> Connected to DB")
@@ -72,38 +75,74 @@ func (gw *Gateway) saveRPCDefinitionsBackup(list string) error {
 		return errors.New("--> RPC Backup save failed: redis connection failed")
 	}
 
-	secret := rightPad2Len(gw.GetConfig().Secret, "=", 32)
-	cryptoText := encrypt([]byte(secret), list)
-	err := store.SetKey(BackupApiKeyBase+tagList, cryptoText, -1)
-	if err != nil {
+	secret := crypto.GetPaddedString(gw.GetConfig().Secret)
+	dataToEncrypt := gw.compressAPIBackup(list)
+
+	cryptoText := crypto.Encrypt(secret, dataToEncrypt)
+	if err := store.SetKey(BackupApiKeyBase+tagList, cryptoText, -1); err != nil {
 		return errors.New("Failed to store node backup: " + err.Error())
 	}
 
 	return nil
 }
 
+// compressAPIBackup compresses API backup data if compression is enabled
+func (gw *Gateway) compressAPIBackup(list string) string {
+	if !gw.GetConfig().Storage.CompressAPIDefinitions {
+		log.Debug("[RPC] --> API definition compression disabled")
+		return list
+	}
+
+	compressed, err := compression.CompressZstd([]byte(list))
+	if err != nil {
+		log.WithError(err).Error("[RPC] --> Failed to compress API definitions, storing uncompressed")
+		return list
+	}
+	log.Debug("[RPC] --> API definitions compressed with Zstd")
+	return string(compressed)
+}
+
+// decompressAPIBackup decompresses API backup data if it's compressed
+func (gw *Gateway) decompressAPIBackup(decrypted string) (string, error) {
+	data := []byte(decrypted)
+
+	if compression.IsZstdCompressed(data) {
+		decompressed, err := compression.DecompressZstd(data)
+		if err != nil {
+			return "", errors.New("[RPC] --> Failed to decompress backup: " + err.Error())
+		}
+
+		log.Debug("[RPC] --> Loaded compressed API definitions from backup")
+		return string(decompressed), nil
+	}
+
+	// Uncompressed JSON
+	log.Debug("[RPC] --> Loaded uncompressed API definitions from backup")
+	return decrypted, nil
+}
+
 func (gw *Gateway) LoadPoliciesFromRPCBackup() (map[string]user.Policy, error) {
 	tagList := getTagListAsString(gw.GetConfig().DBAppConfOptions.Tags)
 	checkKey := BackupPolicyKeyBase + tagList
 
-	store := storage.RedisCluster{KeyPrefix: RPCKeyPrefix, ConnectionHandler: gw.StorageConnectionHandler}
-
+	store := &storage.RedisCluster{KeyPrefix: RPCKeyPrefix, ConnectionHandler: gw.StorageConnectionHandler}
 	connected := store.Connect()
+
 	log.Info("[RPC] Loading Policies from backup")
 
 	if !connected {
 		return nil, errors.New("[RPC] --> RPC Policy Backup recovery failed: redis connection failed")
 	}
 
-	secret := rightPad2Len(gw.GetConfig().Secret, "=", 32)
+	secret := crypto.GetPaddedString(gw.GetConfig().Secret)
 	cryptoText, err := store.GetKey(checkKey)
-	listAsString := decrypt([]byte(secret), cryptoText)
-
 	if err != nil {
 		return nil, errors.New("[RPC] --> Failed to get node policy backup (" + checkKey + "): " + err.Error())
 	}
 
-	if policies, err := parsePoliciesFromRPC(listAsString, gw.GetConfig().Policies.AllowExplicitPolicyID); err != nil {
+	listAsString := crypto.Decrypt(secret, cryptoText)
+
+	if policies, err := parsePoliciesFromRPC(listAsString); err != nil {
 		log.WithFields(logrus.Fields{
 			"prefix": "policy",
 		}).Error("Failed decode: ", err)
@@ -132,71 +171,12 @@ func (gw *Gateway) saveRPCPoliciesBackup(list string) error {
 		return errors.New("--> RPC Backup save failed: redis connection failed")
 	}
 
-	secret := rightPad2Len(gw.GetConfig().Secret, "=", 32)
-	cryptoText := encrypt([]byte(secret), list)
+	secret := crypto.GetPaddedString(gw.GetConfig().Secret)
+	cryptoText := crypto.Encrypt(secret, list)
 	err := store.SetKey(BackupPolicyKeyBase+tagList, cryptoText, -1)
 	if err != nil {
 		return errors.New("Failed to store node backup: " + err.Error())
 	}
 
 	return nil
-}
-
-// encrypt string to base64 crypto using AES
-func encrypt(key []byte, text string) string {
-	plaintext := []byte(text)
-
-	block, err := aes.NewCipher(key)
-	if err != nil {
-		log.Error(err)
-		return ""
-	}
-
-	// The IV needs to be unique, but not secure. Therefore it's common to
-	// include it at the beginning of the ciphertext.
-	ciphertext := make([]byte, aes.BlockSize+len(plaintext))
-	iv := ciphertext[:aes.BlockSize]
-	if _, err := io.ReadFull(cryptorand.Reader, iv); err != nil {
-		log.Error(err)
-		return ""
-	}
-
-	stream := cipher.NewCFBEncrypter(block, iv)
-	stream.XORKeyStream(ciphertext[aes.BlockSize:], plaintext)
-
-	// convert to base64
-	return base64.URLEncoding.EncodeToString(ciphertext)
-}
-
-// decrypt from base64 to decrypted string
-func decrypt(key []byte, cryptoText string) string {
-	ciphertext, _ := base64.URLEncoding.DecodeString(cryptoText)
-
-	block, err := aes.NewCipher(key)
-	if err != nil {
-		log.Error(err)
-		return ""
-	}
-
-	// The IV needs to be unique, but not secure. Therefore it's common to
-	// include it at the beginning of the ciphertext.
-	if len(ciphertext) < aes.BlockSize {
-		log.Error("ciphertext too short")
-		return ""
-	}
-	iv := ciphertext[:aes.BlockSize]
-	ciphertext = ciphertext[aes.BlockSize:]
-
-	stream := cipher.NewCFBDecrypter(block, iv)
-
-	// XORKeyStream can work in-place if the two arguments are the same.
-	stream.XORKeyStream(ciphertext, ciphertext)
-
-	return string(ciphertext)
-}
-
-func rightPad2Len(s, padStr string, overallLen int) string {
-	padCountInt := 1 + (overallLen-len(padStr))/len(padStr)
-	retStr := s + strings.Repeat(padStr, padCountInt)
-	return retStr[:overallLen]
 }

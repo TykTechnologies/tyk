@@ -1,5 +1,55 @@
 package gateway
 
+import (
+	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/apidef/oas"
+	"github.com/TykTechnologies/tyk/regexp"
+)
+
+// URLSpec represents a flattened specification for URLs, used to check if a proxy URL
+// path is on any of the white, black or ignored lists. This is generated as part of the
+// configuration init
+type URLSpec struct {
+	spec *regexp.Regexp
+
+	Status                    URLStatus
+	MethodActions             map[string]apidef.EndpointMethodMeta
+	Whitelist                 apidef.EndPointMeta
+	Blacklist                 apidef.EndPointMeta
+	Ignored                   apidef.EndPointMeta
+	MockResponse              apidef.MockResponseMeta
+	CacheConfig               EndPointCacheMeta
+	TransformAction           TransformSpec
+	TransformResponseAction   TransformSpec
+	TransformJQAction         TransformJQSpec
+	TransformJQResponseAction TransformJQSpec
+	InjectHeaders             apidef.HeaderInjectionMeta
+	InjectHeadersResponse     apidef.HeaderInjectionMeta
+	HardTimeout               apidef.HardTimeoutMeta
+	CircuitBreaker            ExtendedCircuitBreakerMeta
+	URLRewrite                *apidef.URLRewriteMeta
+	VirtualPathSpec           apidef.VirtualMeta
+	RequestSize               apidef.RequestSizeMeta
+	MethodTransform           apidef.MethodTransformMeta
+	TrackEndpoint             apidef.TrackEndpointMeta
+	DoNotTrackEndpoint        apidef.TrackEndpointMeta
+	ValidatePathMeta          apidef.ValidatePathMeta
+	Internal                  apidef.InternalMeta
+	GoPluginMeta              GoPluginMiddleware
+	PersistGraphQL            apidef.PersistGraphQLMeta
+	RateLimit                 apidef.RateLimitMeta
+	OASValidateRequestMeta    *oas.ValidateRequest
+	OASMockResponseMeta       *oas.MockResponse
+
+	IgnoreCase bool
+	// OASMethod stores the HTTP method for OAS-specific middleware
+	// This is needed because OAS operations are method-specific
+	OASMethod string
+	// OASPath stores the original OAS path pattern (e.g., "/users/{id}")
+	// This is used for matching against the OAS router when needed
+	OASPath string
+}
+
 // modeSpecificSpec returns the respective field of URLSpec if it matches the given mode.
 // Deprecated: Usage should not increase.
 func (u *URLSpec) modeSpecificSpec(mode URLStatus) (interface{}, bool) {
@@ -44,6 +94,10 @@ func (u *URLSpec) modeSpecificSpec(mode URLStatus) (interface{}, bool) {
 		return &u.GoPluginMeta, true
 	case PersistGraphQL:
 		return &u.PersistGraphQL, true
+	case OASValidateRequest:
+		return u.OASValidateRequestMeta, true
+	case OASMockResponse:
+		return u.OASMockResponseMeta, true
 	default:
 		return nil, false
 	}
@@ -94,6 +148,9 @@ func (u *URLSpec) matchesMethod(method string) bool {
 		return method == u.PersistGraphQL.Method
 	case RateLimit:
 		return method == u.RateLimit.Method
+	case OASValidateRequest, OASMockResponse:
+		// OAS middleware is method-specific, check against stored method
+		return method == u.OASMethod
 	default:
 		return false
 	}

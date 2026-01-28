@@ -3,6 +3,7 @@ package oas
 import (
 	"encoding/json"
 
+	"github.com/TykTechnologies/tyk/apidef"
 	internalreflect "github.com/TykTechnologies/tyk/internal/reflect"
 )
 
@@ -27,3 +28,21 @@ func toStructIfMap(input interface{}, val interface{}) bool {
 
 // ShouldOmit is a compatibility alias. It may be removed in the future.
 var ShouldOmit = internalreflect.IsEmpty
+
+func requireMainVersion(api *apidef.APIDefinition) apidef.VersionInfo {
+	if len(api.VersionData.Versions) == 0 {
+		api.VersionData.Versions = map[string]apidef.VersionInfo{
+			Main: {},
+		}
+	}
+
+	if _, ok := api.VersionData.Versions[Main]; !ok {
+		api.VersionData.Versions[Main] = apidef.VersionInfo{}
+	}
+
+	return api.VersionData.Versions[Main]
+}
+
+func updateMainVersion(api *apidef.APIDefinition, updatedMainVersion apidef.VersionInfo) {
+	api.VersionData.Versions[Main] = updatedMainVersion
+}

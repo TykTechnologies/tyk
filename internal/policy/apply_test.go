@@ -9,11 +9,9 @@ import (
 	"testing"
 
 	"github.com/sirupsen/logrus"
-
-	"github.com/TykTechnologies/graphql-go-tools/pkg/graphql"
-
 	"github.com/stretchr/testify/assert"
 
+	"github.com/TykTechnologies/graphql-go-tools/pkg/graphql"
 	"github.com/TykTechnologies/tyk/internal/policy"
 	"github.com/TykTechnologies/tyk/user"
 )
@@ -22,9 +20,9 @@ import (
 var testDataFS embed.FS
 
 func TestApplyRateLimits_PolicyLimits(t *testing.T) {
-	svc := &policy.Service{}
-
 	t.Run("policy limits unset", func(t *testing.T) {
+		svc := &policy.Service{}
+
 		session := &user.SessionState{
 			Rate: 5,
 			Per:  10,
@@ -44,6 +42,8 @@ func TestApplyRateLimits_PolicyLimits(t *testing.T) {
 	})
 
 	t.Run("policy limits apply all", func(t *testing.T) {
+		svc := &policy.Service{}
+
 		session := &user.SessionState{
 			Rate: 5,
 			Per:  10,
@@ -69,6 +69,8 @@ func TestApplyRateLimits_PolicyLimits(t *testing.T) {
 	// changes are applied to api limits, but skipped on
 	// the session as the session has a higher allowance.
 	t.Run("policy limits apply per-api", func(t *testing.T) {
+		svc := &policy.Service{}
+
 		session := &user.SessionState{
 			Rate: 15,
 			Per:  10,
@@ -93,6 +95,8 @@ func TestApplyRateLimits_PolicyLimits(t *testing.T) {
 	// As the policy defined a lower rate than apiLimits,
 	// no changes to api limits are applied.
 	t.Run("policy limits skip", func(t *testing.T) {
+		svc := &policy.Service{}
+
 		session := &user.SessionState{
 			Rate: 5,
 			Per:  10,
@@ -117,28 +121,75 @@ func TestApplyRateLimits_PolicyLimits(t *testing.T) {
 func TestApplyRateLimits_FromCustomPolicies(t *testing.T) {
 	svc := &policy.Service{}
 
-	t.Run("Custom policies", func(t *testing.T) {
+	session := &user.SessionState{}
+	session.SetCustomPolicies([]user.Policy{
+		{
+			ID: "pol1",
+			Partitions: user.PolicyPartitions{
+				RateLimit: true,
+				Acl:       true,
+			},
+			Rate:         8,
+			Per:          1,
+			AccessRights: map[string]user.AccessDefinition{"a": {}},
+		},
+		{
+			ID:           "pol2",
+			Partitions:   user.PolicyPartitions{RateLimit: true},
+			Rate:         10,
+			Per:          1,
+			AccessRights: map[string]user.AccessDefinition{"a": {}},
+		},
+	})
+
+	assert.NoError(t, svc.Apply(session))
+	assert.Equal(t, 10, int(session.Rate))
+}
+
+func TestApplyACL_FromCustomPolicies(t *testing.T) {
+	svc := &policy.Service{}
+
+	pol1 := user.Policy{
+		ID:         "pol1",
+		Partitions: user.PolicyPartitions{RateLimit: true},
+		Rate:       8,
+		Per:        1,
+		AccessRights: map[string]user.AccessDefinition{
+			"a": {},
+		},
+	}
+
+	pol2 := user.Policy{
+		ID:         "pol2",
+		Partitions: user.PolicyPartitions{Acl: true},
+		Rate:       10,
+		Per:        1,
+		AccessRights: map[string]user.AccessDefinition{
+			"a": {
+				AllowedURLs: []user.AccessSpec{
+					{URL: "/user", Methods: []string{"GET", "POST"}},
+					{URL: "/companies", Methods: []string{"GET", "POST"}},
+				},
+			},
+		},
+	}
+
+	t.Run("RateLimit first", func(t *testing.T) {
 		session := &user.SessionState{}
-		session.SetCustomPolicies([]user.Policy{
-			{
-				ID:           "pol1",
-				Partitions:   user.PolicyPartitions{RateLimit: true},
-				Rate:         8,
-				Per:          1,
-				AccessRights: map[string]user.AccessDefinition{"a": {}},
-			},
-			{
-				ID:           "pol2",
-				Partitions:   user.PolicyPartitions{RateLimit: true},
-				Rate:         10,
-				Per:          1,
-				AccessRights: map[string]user.AccessDefinition{"a": {}},
-			},
-		})
+		session.SetCustomPolicies([]user.Policy{pol1, pol2})
 
-		svc.Apply(session)
+		assert.NoError(t, svc.Apply(session))
+		assert.Equal(t, pol2.AccessRights["a"].AllowedURLs, session.AccessRights["a"].AllowedURLs)
+		assert.Equal(t, 8, int(session.Rate))
+	})
 
-		assert.Equal(t, 10, int(session.Rate))
+	t.Run("ACL first", func(t *testing.T) {
+		session := &user.SessionState{}
+		session.SetCustomPolicies([]user.Policy{pol2, pol1})
+
+		assert.NoError(t, svc.Apply(session))
+		assert.Equal(t, pol2.AccessRights["a"].AllowedURLs, session.AccessRights["a"].AllowedURLs)
+		assert.Equal(t, 8, int(session.Rate))
 	})
 }
 
@@ -190,7 +241,7 @@ func testPrepareApplyPolicies(tb testing.TB) (*policy.Service, []testApplyPolici
 	err = json.Unmarshal(f, &repoPols)
 	assert.NoError(tb, err)
 
-	store := policy.NewStore(repoPols)
+	store := policy.NewStoreMap(repoPols)
 	orgID := ""
 	service := policy.New(&orgID, store, logrus.StandardLogger())
 
@@ -454,6 +505,17 @@ func testPrepareApplyPolicies(tb testing.TB) (*policy.Service, []testApplyPolici
 
 	inactiveTCs := []testApplyPoliciesData{
 		{
+			"InactiveNoPolicies", []string{},
+			"", func(t *testing.T, s *user.SessionState) {
+				t.Helper()
+				if !s.IsInactive {
+					t.Fatalf("key without policies should preserve IsInactive=true from session")
+				}
+			}, &user.SessionState{
+				IsInactive: true,
+			}, false,
+		},
+		{
 			"InactiveMergeOne", []string{"tags1", "inactive1"},
 			"", func(t *testing.T, s *user.SessionState) {
 				t.Helper()
@@ -475,8 +537,8 @@ func testPrepareApplyPolicies(tb testing.TB) (*policy.Service, []testApplyPolici
 			"InactiveWithSession", []string{"tags1", "tags2"},
 			"", func(t *testing.T, s *user.SessionState) {
 				t.Helper()
-				if !s.IsInactive {
-					t.Fatalf("want IsInactive to be true")
+				if s.IsInactive {
+					t.Fatalf("both policies are active so we expect IsInactive to be false")
 				}
 			}, &user.SessionState{
 				IsInactive: true,
@@ -708,10 +770,10 @@ func testPrepareApplyPolicies(tb testing.TB) (*policy.Service, []testApplyPolici
 				t.Helper()
 
 				want := map[string]user.AccessDefinition{
-					"a": { // It should get intersection of restricted types.
+					"a": {
 						RestrictedTypes: []graphql.Type{
-							{Name: "Country", Fields: []string{"code"}},
-							{Name: "Person", Fields: []string{"name"}},
+							{Name: "Country", Fields: []string{"code", "name", "phone"}},
+							{Name: "Person", Fields: []string{"name", "height", "mass"}},
 						},
 						Limit: user.APILimit{},
 					},
@@ -727,10 +789,14 @@ func testPrepareApplyPolicies(tb testing.TB) (*policy.Service, []testApplyPolici
 				t.Helper()
 
 				want := map[string]user.AccessDefinition{
-					"a": { // It should get intersection of restricted types.
+					"a": {
 						AllowedTypes: []graphql.Type{
-							{Name: "Country", Fields: []string{"code"}},
-							{Name: "Person", Fields: []string{"name"}},
+							{Name: "Country", Fields: []string{"code", "name", "phone"}},
+							{Name: "Person", Fields: []string{"name", "height", "mass"}},
+						},
+						RestrictedTypes: []graphql.Type{
+							{Name: "Dog", Fields: []string{"name", "breed", "country"}},
+							{Name: "Cat", Fields: []string{"name", "country"}},
 						},
 						Limit: user.APILimit{},
 					},
@@ -1236,7 +1302,12 @@ func TestService_Apply(t *testing.T) {
 				}
 				sess.SetPolicies(policies...)
 				if err := service.Apply(sess); err != nil {
-					assert.ErrorContains(t, err, tc.errMatch)
+					if tc.errMatch != "" {
+						assert.ErrorContains(t, err, tc.errMatch)
+					} else {
+						t.Fail()
+					}
+
 					return
 				}
 

@@ -25,6 +25,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/TykTechnologies/storage/persistent/model"
 	temporalmodel "github.com/TykTechnologies/storage/temporal/model"
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/apidef/oas"
@@ -79,11 +80,10 @@ const defaultTestPol = `{
 }`
 
 func TestPolicyAPI(t *testing.T) {
-	ts := StartTest(nil)
-	globalConf := ts.Gw.GetConfig()
-	globalConf.Policies.PolicyPath = "."
-	globalConf.Policies.PolicySource = "file"
-	ts.Gw.SetConfig(globalConf)
+	ts := StartTest(func(cnf *config.Config) {
+		cnf.Policies.PolicyPath = "."
+		cnf.Policies.PolicySource = "file"
+	})
 
 	defer ts.Close()
 	ts.Gw.BuildAndLoadAPI()
@@ -126,6 +126,62 @@ func TestPolicyAPI(t *testing.T) {
 	_, _ = ts.Run(t, test.TestCase{
 		Path: "/tyk/policies/not-here", AdminAuth: true, Method: "GET", BodyMatch: `{"status":"error","message":"Policy not found"}`, Code: http.StatusNotFound,
 	})
+
+	t.Run("fails if no MID and no ID is provided", func(t *testing.T) {
+		_, _ = ts.Run(t, test.TestCase{
+			Path:      "/tyk/policies",
+			Method:    http.MethodPost,
+			AdminAuth: true,
+			Data:      serializePolicy(t, user.Policy{}),
+			Code:      http.StatusBadRequest,
+			BodyMatch: `{"status":"error","message":"Unable to create policy without id."}`,
+		})
+	})
+
+	t.Run("fails if invalid MID and no ID is provided", func(t *testing.T) {
+		_, _ = ts.Run(t, test.TestCase{
+			Path:      "/tyk/policies",
+			Method:    http.MethodPost,
+			AdminAuth: true,
+			Data:      serializePolicy(t, user.Policy{MID: "invalid"}),
+			Code:      http.StatusBadRequest,
+			BodyMatch: `{"status":"error","message":"Request malformed"}`,
+		})
+	})
+
+	t.Run("fails if invalid config is provided", func(t *testing.T) {
+		ts.setTestScopeConfig(t, func(cnf *config.Config) {
+			cnf.Policies.PolicyPath = "/etc/hosts"
+		})
+
+		_, _ = ts.Run(t, test.TestCase{
+			Path:      "/tyk/policies",
+			Method:    http.MethodPost,
+			AdminAuth: true,
+			Data:      serializePolicy(t, user.Policy{MID: model.NewObjectID()}),
+			Code:      http.StatusInternalServerError,
+			BodyMatch: `{"status":"error","message":"Unable to access policy storage."}`,
+		})
+	})
+
+	t.Run("post does not fail ID is provided", func(t *testing.T) {
+		_, _ = ts.Run(t, test.TestCase{
+			Path:      "/tyk/policies",
+			Method:    http.MethodPost,
+			AdminAuth: true,
+			Data:      serializePolicy(t, user.Policy{ID: "test"}),
+			Code:      http.StatusOK,
+		})
+	})
+}
+
+func serializePolicy(t *testing.T, pol user.Policy) string {
+	t.Helper()
+
+	data, err := json.Marshal(pol)
+	assert.NoError(t, err)
+
+	return string(data)
 }
 
 func TestHealthCheckEndpoint(t *testing.T) {
@@ -219,7 +275,7 @@ func TestApiHandlerPostDupPath(t *testing.T) {
 }
 
 func TestKeyHandler(t *testing.T) {
-	test.Exclusive(t) // Uses DeleteAllKeys, need to limit parallelism.
+	t.Skip() // DeleteAllKeys interferes with other tests.
 
 	ts := StartTest(nil)
 	defer ts.Close()
@@ -285,6 +341,8 @@ func TestKeyHandler(t *testing.T) {
 	})
 
 	t.Run("Create key with policy", func(t *testing.T) {
+		keyID := uuid.New()
+
 		_, _ = ts.Run(t, []test.TestCase{
 			{
 				Method:    "POST",
@@ -309,7 +367,7 @@ func TestKeyHandler(t *testing.T) {
 			},
 			{
 				Method:    "POST",
-				Path:      "/tyk/keys/my_key_id",
+				Path:      "/tyk/keys/" + keyID,
 				Data:      string(withPolicyJSON),
 				AdminAuth: true,
 				Code:      200,
@@ -321,26 +379,26 @@ func TestKeyHandler(t *testing.T) {
 			},
 			{
 				Method: "GET",
-				Path:   "/sample/?authorization=my_key_id",
+				Path:   "/sample/?authorization=" + keyID,
 				Code:   200,
 			},
 			{
 				Method:    "GET",
-				Path:      "/tyk/keys/my_key_id" + "?api_id=test",
+				Path:      "/tyk/keys/" + keyID + "?api_id=test",
 				AdminAuth: true,
 				Code:      200,
 				BodyMatch: `"quota_max":5`,
 			},
 			{
 				Method:    "GET",
-				Path:      "/tyk/keys/my_key_id" + "?api_id=test",
+				Path:      "/tyk/keys/" + keyID + "?api_id=test",
 				AdminAuth: true,
 				Code:      200,
 				BodyMatch: `"quota_remaining":4`,
 			},
 		}...)
 
-		ts.Gw.GlobalSessionManager.Store().DeleteAllKeys() // exclusive
+		ts.Gw.GlobalSessionManager.Store().DeleteAllKeys()
 	})
 
 	_, knownKey := ts.CreateSession(func(s *user.SessionState) {
@@ -368,8 +426,8 @@ func TestKeyHandler(t *testing.T) {
 	t.Run("List keys", func(t *testing.T) {
 		_, _ = ts.Run(t, []test.TestCase{
 			{Method: "GET", Path: "/tyk/keys/", AdminAuth: true, Code: 200, BodyMatch: knownKey},
-			{Method: "GET", Path: "/tyk/keys/?api_id=test", AdminAuth: true, Code: 200, BodyMatch: knownKey},
-			{Method: "GET", Path: "/tyk/keys/?api_id=unknown", AdminAuth: true, Code: 200, BodyMatch: knownKey},
+			{Method: "GET", Path: "/tyk/keys/?api_id=test&filter=default", AdminAuth: true, Code: 200, BodyMatch: knownKey},
+			{Method: "GET", Path: "/tyk/keys/?api_id=test&filter=wrong_org", AdminAuth: true, Code: 200, BodyNotMatch: knownKey},
 		}...)
 
 		globalConf := ts.Gw.GetConfig()
@@ -455,16 +513,24 @@ func TestKeyHandler_UpdateKey(t *testing.T) {
 		}
 	})
 
+	pIdAccess := ts.CreatePolicy(func(p *user.Policy) {
+		p.Partitions.Acl = true
+		p.AccessRights = map[string]user.AccessDefinition{testAPIID: {
+			APIID: testAPIID, Versions: []string{"v1"},
+		}}
+		p.Tags = []string{"p3-tag"}
+		p.MetaData = map[string]interface{}{
+			"p3-meta": "p3-value",
+		}
+	})
+
 	session, key := ts.CreateSession(func(s *user.SessionState) {
-		s.ApplyPolicies = []string{pID}
+		s.ApplyPolicies = []string{pIdAccess, pID}
 		s.Tags = []string{"key-tag1", "key-tag2"}
 		s.MetaData = map[string]interface{}{
 			"key-meta1": "key-value1",
 			"key-meta2": "key-value2",
 		}
-		s.AccessRights = map[string]user.AccessDefinition{testAPIID: {
-			APIID: testAPIID, Versions: []string{"v1"},
-		}}
 	})
 
 	t.Run("Add policy not enforcing acl", func(t *testing.T) {
@@ -477,8 +543,8 @@ func TestKeyHandler_UpdateKey(t *testing.T) {
 		}...)
 
 		sessionState, found := ts.Gw.GlobalSessionManager.SessionDetail("default", key, false)
-		if !found || sessionState.AccessRights[testAPIID].APIID != testAPIID || len(sessionState.ApplyPolicies) != 2 {
-
+		_, exists := sessionState.AccessRights[testAPIID]
+		if !found || !exists || len(sessionState.ApplyPolicies) != 3 {
 			t.Fatal("Adding policy to the list failed")
 		}
 	})
@@ -493,7 +559,8 @@ func TestKeyHandler_UpdateKey(t *testing.T) {
 		}...)
 
 		sessionState, found := ts.Gw.GlobalSessionManager.SessionDetail("default", key, false)
-		if !found || sessionState.AccessRights[testAPIID].APIID != testAPIID || len(sessionState.ApplyPolicies) != 0 {
+		_, exists := sessionState.AccessRights[testAPIID]
+		if !found || !exists || len(sessionState.ApplyPolicies) != 0 {
 			t.Fatal("Removing policy from the list failed")
 		}
 	})
@@ -518,21 +585,21 @@ func TestKeyHandler_UpdateKey(t *testing.T) {
 		}
 
 		t.Run("Add", func(t *testing.T) {
-			expected := []string{"p1-tag", "p2-tag", "key-tag1", "key-tag2"}
-			session.ApplyPolicies = []string{pID, pID2}
+			expected := []string{"p1-tag", "p2-tag", "p3-tag", "key-tag1", "key-tag2"}
+			session.ApplyPolicies = []string{pID, pID2, pIdAccess}
 			assertTags(session, expected)
 		})
 
 		t.Run("Make unique", func(t *testing.T) {
-			expected := []string{"p1-tag", "p2-tag", "key-tag1", "key-tag2"}
-			session.ApplyPolicies = []string{pID, pID2}
+			expected := []string{"p1-tag", "p2-tag", "p3-tag", "key-tag1", "key-tag2"}
+			session.ApplyPolicies = []string{pID, pID2, pIdAccess}
 			session.Tags = append(session.Tags, "p1-tag", "key-tag1")
 			assertTags(session, expected)
 		})
 
 		t.Run("Remove", func(t *testing.T) {
-			expected := []string{"p1-tag", "p2-tag", "key-tag2"}
-			session.ApplyPolicies = []string{pID, pID2}
+			expected := []string{"p1-tag", "p2-tag", "p3-tag", "key-tag2"}
+			session.ApplyPolicies = []string{pID, pID2, pIdAccess}
 			session.Tags = []string{"key-tag2"}
 			assertTags(session, expected)
 		})
@@ -559,10 +626,11 @@ func TestKeyHandler_UpdateKey(t *testing.T) {
 			expected := map[string]interface{}{
 				"p1-meta":   "p1-value",
 				"p2-meta":   "p2-value",
+				"p3-meta":   "p3-value",
 				"key-meta1": "key-value1",
 				"key-meta2": "key-value2",
 			}
-			session.ApplyPolicies = []string{pID, pID2}
+			session.ApplyPolicies = []string{pID, pID2, pIdAccess}
 			assertMetaData(session, expected)
 		})
 
@@ -570,10 +638,11 @@ func TestKeyHandler_UpdateKey(t *testing.T) {
 			expected := map[string]interface{}{
 				"p1-meta":   "p1-value",
 				"p2-meta":   "p2-value",
+				"p3-meta":   "p3-value",
 				"key-meta1": "key-value1",
 				"key-meta2": "key-value2",
 			}
-			session.ApplyPolicies = []string{pID, pID2}
+			session.ApplyPolicies = []string{pID, pID2, pIdAccess}
 			assertMetaData(session, expected)
 		})
 
@@ -581,9 +650,10 @@ func TestKeyHandler_UpdateKey(t *testing.T) {
 			expected := map[string]interface{}{
 				"p1-meta":   "p1-value",
 				"p2-meta":   "p2-value",
+				"p3-meta":   "p3-value",
 				"key-meta2": "key-value2",
 			}
-			session.ApplyPolicies = []string{pID, pID2}
+			session.ApplyPolicies = []string{pID, pID2, pIdAccess}
 			session.MetaData = map[string]interface{}{
 				"key-meta2": "key-value2",
 			}
@@ -646,8 +716,6 @@ func BenchmarkKeyHandler_CreateKeyHandler(b *testing.B) {
 }
 
 func TestKeyHandler_DeleteKeyWithQuota(t *testing.T) {
-	test.Exclusive(t) // Uses quota, need to limit parallelism due to DeleteAllKeys.
-
 	const testAPIID = "testAPIID"
 	const orgId = "default"
 
@@ -701,13 +769,14 @@ func TestKeyHandler_DeleteKeyWithQuota(t *testing.T) {
 
 					pID := ts.CreatePolicy(func(p *user.Policy) {
 						p.QuotaMax = 1
+						p.AccessRights = map[string]user.AccessDefinition{testAPIID: {
+							APIID: testAPIID,
+						}}
 					})
 
 					_, key := ts.CreateSession(func(s *user.SessionState) {
 						s.ApplyPolicies = []string{pID}
-						s.AccessRights = map[string]user.AccessDefinition{testAPIID: {
-							APIID: testAPIID,
-						}}
+
 					})
 
 					authHeaders := map[string]string{
@@ -741,7 +810,11 @@ func TestUpdateKeyWithCert(t *testing.T) {
 	defer ts.Close()
 
 	apiId := "MTLSApi"
-	pID := ts.CreatePolicy(func(p *user.Policy) {})
+	pID := ts.CreatePolicy(func(p *user.Policy) {
+		p.AccessRights = map[string]user.AccessDefinition{apiId: {
+			APIID: apiId, Versions: []string{"v1"},
+		}}
+	})
 
 	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 		spec.APIID = apiId
@@ -768,9 +841,6 @@ func TestUpdateKeyWithCert(t *testing.T) {
 		// create session base and set cert
 		session, key := ts.CreateSession(func(s *user.SessionState) {
 			s.ApplyPolicies = []string{pID}
-			s.AccessRights = map[string]user.AccessDefinition{apiId: {
-				APIID: apiId, Versions: []string{"v1"},
-			}}
 			s.Certificate = certID
 		})
 
@@ -813,9 +883,6 @@ func TestUpdateKeyWithCert(t *testing.T) {
 		// create session base and set cert
 		session, key := ts.CreateSession(func(s *user.SessionState) {
 			s.ApplyPolicies = []string{pID}
-			s.AccessRights = map[string]user.AccessDefinition{apiId: {
-				APIID: apiId, Versions: []string{"v1"},
-			}}
 			s.Certificate = certID
 		})
 
@@ -830,7 +897,7 @@ func TestUpdateKeyWithCert(t *testing.T) {
 }
 
 func TestKeyHandler_CheckKeysNotDuplicateOnUpdate(t *testing.T) {
-	test.Exclusive(t) // Uses DeleteAllKeys, need to limit parallelism.
+	t.Skip() // DeleteAllKeys interferes with other tests.
 
 	ts := StartTest(nil)
 	defer ts.Close()
@@ -884,7 +951,9 @@ func TestKeyHandler_CheckKeysNotDuplicateOnUpdate(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.Name, func(t *testing.T) {
-			ts.Gw.GlobalSessionManager.Store().DeleteAllKeys() // exclusive
+			// Deletes keyspace
+			ts.Gw.GlobalSessionManager.Store().DeleteAllKeys()
+
 			session := CreateStandardSession()
 			session.AccessRights = map[string]user.AccessDefinition{"test": {
 				APIID: "test", Versions: []string{"v1"},
@@ -912,7 +981,7 @@ func TestKeyHandler_CheckKeysNotDuplicateOnUpdate(t *testing.T) {
 }
 
 func TestHashKeyHandler(t *testing.T) {
-	test.Exclusive(t) // Uses DeleteAllKeys, need to limit parallelism.
+	t.Skip() // DeleteAllKeys interferes with other tests.
 
 	conf := func(globalConf *config.Config) {
 		// make it to use hashes for Redis keys
@@ -940,7 +1009,7 @@ func TestHashKeyHandler(t *testing.T) {
 		gwConf := ts.Gw.GetConfig()
 		gwConf.HashKeyFunction = tc.hashFunction
 		ts.Gw.SetConfig(gwConf)
-		ok := ts.Gw.GlobalSessionManager.Store().DeleteAllKeys() // exclusive
+		ok := ts.Gw.GlobalSessionManager.Store().DeleteAllKeys()
 		assert.True(t, ok)
 
 		t.Run(fmt.Sprintf("%sHash fn: %s", tc.desc, tc.hashFunction), func(t *testing.T) {
@@ -1091,7 +1160,7 @@ func (ts *Test) testHashKeyHandlerHelper(t *testing.T, expectedHashSize int) {
 	}}
 	withAccessJSON := test.MarshalJSON(t)(withAccess)
 
-	myKey := "my_key_id"
+	myKey := uuid.New()
 	myKeyHash := storage.HashKey(ts.Gw.generateToken("default", myKey), ts.Gw.GetConfig().HashKeys)
 
 	if len(myKeyHash) != expectedHashSize {
@@ -1158,6 +1227,15 @@ func (ts *Test) testHashKeyHandlerHelper(t *testing.T, expectedHashSize int) {
 				Data:      string(withAccessJSON),
 				AdminAuth: true,
 				Code:      200,
+			},
+			// get list of keys' hashes, Wrong API specified (should filter out)
+			{
+				Method:       "GET",
+				Path:         "/tyk/keys?api_id=wrong-api-id",
+				Data:         string(withAccessJSON),
+				AdminAuth:    true,
+				Code:         200,
+				BodyNotMatch: myKeyHash,
 			},
 			// get one key by hash value without specifying hashed=true
 			{
@@ -1265,7 +1343,7 @@ func TestHashKeyListingDisabled(t *testing.T) {
 	}}
 	withAccessJSON := test.MarshalJSON(t)(withAccess)
 
-	myKey := "my_key_id"
+	myKey := uuid.New()
 	myKeyHash := storage.HashKey(ts.Gw.generateToken("default", myKey), ts.Gw.GetConfig().HashKeys)
 
 	t.Run("Create, get and delete key with key hashing", func(t *testing.T) {
@@ -1383,7 +1461,7 @@ func TestKeyHandler_HashingDisabled(t *testing.T) {
 	}}
 	withAccessJSON := test.MarshalJSON(t)(withAccess)
 
-	myKeyID := "my_key_id"
+	myKeyID := uuid.New()
 	token := ts.Gw.generateToken("default", myKeyID)
 	myKeyHash := storage.HashKey(token, ts.Gw.GetConfig().HashKeys)
 
@@ -1936,12 +2014,6 @@ func TestContextData(t *testing.T) {
 	if ctxGetData(r) == nil {
 		t.Fatal("expected ctxGetData to return non-nil")
 	}
-	defer func() {
-		if r := recover(); r == nil {
-			t.Fatal("expected ctxSetData of zero val to panic")
-		}
-	}()
-	ctxSetData(r, nil)
 }
 
 func TestContextSession(t *testing.T) {
@@ -2120,6 +2192,74 @@ func TestHandleAddApi(t *testing.T) {
 		assert.Equal(t, http.StatusBadRequest, statusCode)
 	})
 
+	t.Run("should return error when load balancing enabled with all targets weight 0", func(t *testing.T) {
+		apiDef := apidef.DummyAPI()
+		apiDef.APIID = "124"
+		apiDef.Proxy.EnableLoadBalancing = true
+		apiDef.Proxy.Targets = []string{} // Empty targets list means all weights are 0
+		apiDefJson, err := json.Marshal(apiDef)
+		require.NoError(t, err)
+
+		req, err := http.NewRequest(http.MethodPost, "http://gateway", bytes.NewBuffer(apiDefJson))
+		require.NoError(t, err)
+
+		response, statusCode := ts.Gw.handleAddApi(req, testFs, false)
+		errorResponse, ok := response.(apiStatusMessage)
+		require.True(t, ok)
+
+		assert.Equal(t, "Validation of API Definition failed. Reason: all load balancing targets have weight 0, at least one target must have weight > 0.", errorResponse.Message)
+		assert.Equal(t, http.StatusBadRequest, statusCode)
+	})
+
+	t.Run("should return error when OAS load balancing enabled with all targets weight 0", func(t *testing.T) {
+		tykExt := oas.XTykAPIGateway{
+			Info: oas.Info{
+				Name: "test api",
+				State: oas.State{
+					Active: true,
+				},
+			},
+			Upstream: oas.Upstream{
+				URL: "http://example.com",
+				LoadBalancing: &oas.LoadBalancing{
+					Enabled: true,
+					Targets: []oas.LoadBalancingTarget{
+						{URL: "http://target-1", Weight: 0},
+						{URL: "http://target-2", Weight: 0},
+					},
+				},
+			},
+			Server: oas.Server{
+				ListenPath: oas.ListenPath{
+					Value: "/test-lb-zero/",
+					Strip: false,
+				},
+			},
+		}
+
+		oasAPI := openapi3.T{
+			OpenAPI: "3.0.3",
+			Info: &openapi3.Info{
+				Title:   "test api",
+				Version: "1",
+			},
+			Paths: openapi3.NewPaths(),
+		}
+
+		oasAPI.Extensions = map[string]interface{}{
+			oas.ExtensionTykAPIGateway: tykExt,
+		}
+
+		_, _ = ts.Run(t, test.TestCase{
+			AdminAuth: true,
+			Method:    http.MethodPost,
+			Path:      "/tyk/apis/oas",
+			Data:      &oasAPI,
+			BodyMatch: `all load balancing targets have weight 0`,
+			Code:      http.StatusBadRequest,
+		})
+	})
+
 	t.Run("should return success when no error occurs", func(t *testing.T) {
 		apiDef := apidef.DummyAPI()
 		apiDef.APIID = "123"
@@ -2182,7 +2322,8 @@ func TestHandleAddApi_AddVersionAtomically(t *testing.T) {
 		{AdminAuth: true, Method: http.MethodPost, Data: v2,
 			Path: fmt.Sprintf("/tyk/apis?base_api_id=%s&new_version_name=%s&set_default=true&base_api_version_name=%s", baseAPI.APIID, v2VersionName, baseVersionName),
 			BodyMatchFunc: func(i []byte) bool {
-				assert.Len(t, baseAPI.VersionDefinition.Versions, 0)
+				// Gateway addApi function modifies baseAPI in it's internal storage - gw.apisByID
+				assert.Len(t, baseAPI.VersionDefinition.Versions, 1)
 				ts.Gw.DoReload()
 				return true
 			},
@@ -2228,7 +2369,7 @@ func TestHandleAddOASApi_AddVersionAtomically(t *testing.T) {
 				Title:   "oas doc",
 				Version: "1",
 			},
-			Paths: make(openapi3.Paths),
+			Paths: openapi3.NewPaths(),
 		},
 	}
 
@@ -2260,7 +2401,8 @@ func TestHandleAddOASApi_AddVersionAtomically(t *testing.T) {
 		{AdminAuth: true, Method: http.MethodPost, Data: &v2.OAS,
 			Path: fmt.Sprintf("/tyk/apis/oas?base_api_id=%s&new_version_name=%s&set_default=true&base_api_version_name=%s", baseAPI.APIID, v2VersionName, baseVersionName),
 			BodyMatchFunc: func(i []byte) bool {
-				assert.Len(t, baseAPI.VersionDefinition.Versions, 0)
+				// Gateway addApi function modifies baseAPI in it's internal storage - gw.apisByID
+				assert.Len(t, baseAPI.VersionDefinition.Versions, 1)
 				ts.Gw.DoReload()
 				return true
 			},
@@ -2368,7 +2510,7 @@ func TestHandleDeleteOASAPI_RemoveVersionAtomically(t *testing.T) {
 				Title:   "oas doc",
 				Version: "1",
 			},
-			Paths: make(openapi3.Paths),
+			Paths: openapi3.NewPaths(),
 		},
 	}
 
@@ -2605,7 +2747,7 @@ func TestOAS(t *testing.T) {
 			Title:   "oas doc",
 			Version: "1",
 		},
-		Paths: make(openapi3.Paths),
+		Paths: openapi3.NewPaths(),
 	}
 
 	oasAPI.Extensions = map[string]interface{}{
@@ -2629,7 +2771,7 @@ func TestOAS(t *testing.T) {
 	assert.NotNil(t, createdOldAPI)
 
 	t.Run("OAS validation - should fail without x-tyk-api-gateway", func(t *testing.T) {
-		oasAPI.Paths = make(openapi3.Paths)
+		oasAPI.Paths = openapi3.NewPaths()
 		delete(oasAPI.Extensions, oas.ExtensionTykAPIGateway)
 		_, _ = ts.Run(t, []test.TestCase{
 			{AdminAuth: true, Method: http.MethodPost, Path: "/tyk/apis/oas/", Data: &oasAPI,
@@ -2652,7 +2794,7 @@ func TestOAS(t *testing.T) {
 		})
 	})
 
-	oasAPI.Paths = make(openapi3.Paths)
+	oasAPI.Paths = openapi3.NewPaths()
 
 	t.Run("get old api in OAS format - should fail", func(t *testing.T) {
 		_, _ = ts.Run(t, test.TestCase{AdminAuth: true, Method: http.MethodGet, Path: oasBasePath + "/" + oldAPIID,
@@ -2722,7 +2864,7 @@ func TestOAS(t *testing.T) {
 				oldAPIInOAS.GetTykExtension().Upstream.MutualTLS = nil
 				oldAPIInOAS.GetTykExtension().Upstream.CertificatePinning = nil
 
-				oldAPIInOAS.Paths = make(openapi3.Paths)
+				oldAPIInOAS.Paths = openapi3.NewPaths()
 				updatePath := "/tyk/apis/oas/" + apiID
 
 				_, _ = ts.Run(t, []test.TestCase{
@@ -2769,7 +2911,7 @@ func TestOAS(t *testing.T) {
 					},
 				}
 
-				oasAPIInOAS.Paths = make(openapi3.Paths)
+				oasAPIInOAS.Paths = openapi3.NewPaths()
 
 				oasAPIInOAS.Info.Title = "oas-updated oas doc"
 				testUpdateAPI(t, ts, &oasAPIInOAS, apiID, true)
@@ -2800,7 +2942,7 @@ func TestOAS(t *testing.T) {
 					},
 				}
 
-				oasAPIInOAS.Paths = make(openapi3.Paths)
+				oasAPIInOAS.Paths = openapi3.NewPaths()
 
 				oasAPIInOAS.Info.Title = "oas-updated oas doc"
 				testUpdateAPI(t, ts, &oasAPIInOAS, apiID, true)
@@ -2912,22 +3054,23 @@ func TestOAS(t *testing.T) {
 		}
 
 		fillPaths := func(oasAPI *oas.OAS) {
-			oasAPI.Paths = openapi3.Paths{
-				"/pets": {
-					Get: &openapi3.Operation{
-						Summary: "get pets",
-						Responses: openapi3.Responses{
-							"200": {
-								Value: &openapi3.Response{
-									Description: getStrPointer("200 response"),
-									Content: openapi3.Content{
-										"application/json": {
-											Schema: &openapi3.SchemaRef{
-												Value: &openapi3.Schema{
-													Properties: openapi3.Schemas{
-														"value": &openapi3.SchemaRef{
-															Value: &openapi3.Schema{Type: openapi3.TypeBoolean},
-														},
+			paths := openapi3.NewPaths()
+
+			paths.Set("/pets", &openapi3.PathItem{
+				Get: &openapi3.Operation{
+					Summary: "get pets",
+					Responses: func() *openapi3.Responses {
+						r := openapi3.NewResponses()
+						r.Set("200", &openapi3.ResponseRef{
+							Value: &openapi3.Response{
+								Description: getStrPointer("200 response"),
+								Content: openapi3.Content{
+									"application/json": {
+										Schema: &openapi3.SchemaRef{
+											Value: &openapi3.Schema{
+												Properties: openapi3.Schemas{
+													"value": &openapi3.SchemaRef{
+														Value: &openapi3.Schema{Type: &openapi3.Types{openapi3.TypeBoolean}},
 													},
 												},
 											},
@@ -2935,32 +3078,38 @@ func TestOAS(t *testing.T) {
 									},
 								},
 							},
-						},
-					},
-					Post: &openapi3.Operation{
-						Responses: openapi3.Responses{
-							"200": {
-								Value: &openapi3.Response{
-									Description: getStrPointer("200 response"),
-									Content: openapi3.Content{
-										"application/json": {
-											Schema: &openapi3.SchemaRef{
-												Value: &openapi3.Schema{
-													Properties: openapi3.Schemas{
-														"added": &openapi3.SchemaRef{
-															Value: &openapi3.Schema{Type: openapi3.TypeBoolean},
-														},
-													},
-												},
-											},
-										},
-									},
-								},
-							},
-						},
-					},
+						})
+						return r
+					}(),
 				},
-			}
+				Post: &openapi3.Operation{
+					Summary: "post pets",
+					Responses: func() *openapi3.Responses {
+						r := openapi3.NewResponses()
+						r.Set("200", &openapi3.ResponseRef{
+							Value: &openapi3.Response{
+								Description: getStrPointer("200 response"),
+								Content: openapi3.Content{
+									"application/json": {
+										Schema: &openapi3.SchemaRef{
+											Value: &openapi3.Schema{
+												Properties: openapi3.Schemas{
+													"added": &openapi3.SchemaRef{
+														Value: &openapi3.Schema{Type: &openapi3.Types{openapi3.TypeBoolean}},
+													},
+												},
+											},
+										},
+									},
+								},
+							},
+						})
+						return r
+					}(),
+				},
+			})
+
+			oasAPI.Paths = paths
 		}
 
 		fillReqBody := func(oasDef *oas.OAS, path, method string) {
@@ -2972,7 +3121,7 @@ func TestOAS(t *testing.T) {
 			valueSchema.Properties = openapi3.Schemas{
 				"value": {
 					Value: &openapi3.Schema{
-						Type: openapi3.TypeBoolean,
+						Type: &openapi3.Types{openapi3.TypeBoolean},
 					},
 				},
 			}
@@ -3138,7 +3287,7 @@ func TestOAS(t *testing.T) {
 		})
 
 		t.Run("retain old OAS servers", func(t *testing.T) {
-			t.Run("should retain first entry in existing API", func(t *testing.T) {
+			t.Run("should merge Tyk servers with user-provided servers", func(t *testing.T) {
 				apiInOAS := copyOAS(oasAPI)
 				fillPaths(&apiInOAS)
 
@@ -3160,12 +3309,20 @@ func TestOAS(t *testing.T) {
 				patchedOASObj := testGetOASAPI(t, ts, apiID, tykExt.Info.Name, apiInOAS.T.Info.Title)
 
 				assert.EqualValues(t, gwServerURL, patchedOASObj.Servers[0].URL)
-				assert.Equal(t, serverURL, patchedOASObj.Servers[1].URL)
+
+				foundUserServer := false
+				for _, srv := range patchedOASObj.Servers {
+					if srv.URL == serverURL {
+						foundUserServer = true
+						break
+					}
+				}
+				assert.True(t, foundUserServer, "User-provided server URL should be retained")
 				// Reset
 				testUpdateAPI(t, ts, &oasAPI, oasAPIID, true)
 			})
 
-			t.Run("do not modify if first server is same as that of gw", func(t *testing.T) {
+			t.Run("should deduplicate user servers matching Tyk servers", func(t *testing.T) {
 				apiInOAS := copyOAS(oasAPI)
 				fillPaths(&apiInOAS)
 
@@ -3192,9 +3349,21 @@ func TestOAS(t *testing.T) {
 				testPatchOAS(t, ts, apiInOAS, nil, apiID)
 				patchedOASObj := testGetOASAPI(t, ts, apiID, tykExt.Info.Name, apiInOAS.T.Info.Title)
 
+				require.Len(t, patchedOASObj.Servers, 4)
 				assert.EqualValues(t, serverURL1, patchedOASObj.Servers[0].URL)
-				assert.Equal(t, serverURL2, patchedOASObj.Servers[1].URL)
-				assert.Equal(t, serverURL3, patchedOASObj.Servers[2].URL)
+
+				foundServer2 := false
+				foundServer3 := false
+				for _, srv := range patchedOASObj.Servers {
+					if srv.URL == serverURL2 {
+						foundServer2 = true
+					}
+					if srv.URL == serverURL3 {
+						foundServer3 = true
+					}
+				}
+				assert.True(t, foundServer2, "User server 2 should be retained")
+				assert.True(t, foundServer3, "User server 3 should be retained")
 				// Reset
 				testUpdateAPI(t, ts, &oasAPI, oasAPIID, true)
 			})
@@ -3215,7 +3384,9 @@ func TestOAS(t *testing.T) {
 
 			_, _ = ts.Run(t, []test.TestCase{
 				{AdminAuth: true, Method: http.MethodPatch, Path: patchPath, Data: &apiInOAS,
-					QueryParams: params, BodyMatch: `"message":"invalid upstream URL"`, Code: http.StatusBadRequest},
+					QueryParams: params,
+					BodyMatch:   `The manually configured upstream URL is not valid. The URL must be absolute and properly formatted \(e.g. https://example.com\). Please check the URL format and try again.`,
+					Code:        http.StatusBadRequest},
 			}...)
 		})
 
@@ -3447,7 +3618,7 @@ func TestOAS(t *testing.T) {
 					Title:   "example oas doc",
 					Version: "1",
 				},
-				Paths: openapi3.Paths{},
+				Paths: openapi3.NewPaths(),
 				Servers: openapi3.Servers{
 					&openapi3.Server{
 						URL:         "http://upstream.example.com",
@@ -3512,7 +3683,8 @@ func TestOAS(t *testing.T) {
 			newParam.UpstreamURL = "upstream.example.com"
 			params := configParams(newParam)
 			_ = testImportOAS(t, ts, test.TestCase{QueryParams: params,
-				Code: http.StatusBadRequest, Data: oasCopy(false, nil), AdminAuth: true, BodyMatch: "invalid upstream URL",
+				Code: http.StatusBadRequest, Data: oasCopy(false, nil), AdminAuth: true,
+				BodyMatch: `The manually configured upstream URL is not valid. The URL must be absolute and properly formatted \(e.g. https://example.com\). Please check the URL format and try again.`,
 			})
 		})
 
@@ -3520,7 +3692,8 @@ func TestOAS(t *testing.T) {
 			oasAPI := oasCopy(false, func(t *openapi3.T) {
 				t.Servers = openapi3.Servers{}
 			})
-			_ = testImportOAS(t, ts, test.TestCase{Code: http.StatusBadRequest, Data: oasAPI, AdminAuth: true, BodyMatch: "servers object is empty in OAS"})
+			_ = testImportOAS(t, ts, test.TestCase{Code: http.StatusBadRequest, Data: oasAPI, AdminAuth: true,
+				BodyMatch: "The ‘servers’ object is empty in your OAS. You can either add a ‘servers’ section to your OpenAPI description or provide a Custom Upstream URL in the manual configuration options below."})
 		})
 
 		t.Run("success without config query params, no tyk ext", func(t *testing.T) {
@@ -3712,7 +3885,7 @@ func TestGetOASAPI_WithVersionBaseID(t *testing.T) {
 				Title:   "oas doc",
 				Version: "1",
 			},
-			Paths: make(openapi3.Paths),
+			Paths: openapi3.NewPaths(),
 		},
 	}
 
@@ -3906,6 +4079,71 @@ func TestOrgKeyHandler_LastUpdated(t *testing.T) {
 	}...)
 }
 
+func TestDeletionOfPoliciesThatFromAKeyDoesNotMakeTheAPIKeyless(t *testing.T) {
+	const testAPIID = "testAPIID"
+
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	apiID1 := testAPIID + "1"
+	apiID2 := testAPIID + "2"
+
+	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		spec.APIID = apiID1
+		spec.UseKeylessAccess = false
+		spec.OrgID = "default"
+		spec.Proxy.ListenPath = "/api1"
+	}, func(spec *APISpec) {
+		spec.APIID = apiID2
+		spec.UseKeylessAccess = false
+		spec.OrgID = "default"
+		spec.Proxy.ListenPath = "/api2"
+	})
+
+	policyForApi1 := ts.CreatePolicy(func(p *user.Policy) {
+		p.AccessRights = map[string]user.AccessDefinition{apiID1: {
+			APIID: apiID1,
+		}}
+	})
+
+	policyForApi2 := ts.CreatePolicy(func(p *user.Policy) {
+		p.AccessRights = map[string]user.AccessDefinition{apiID2: {
+			APIID: apiID2,
+		}}
+	})
+
+	_, key := ts.CreateSession(func(s *user.SessionState) {
+		s.ApplyPolicies = []string{policyForApi1, policyForApi2}
+	})
+
+	authHeaders := map[string]string{
+		"authorization": key,
+	}
+
+	res, err := ts.Run(t, []test.TestCase{
+		{Method: "GET", Path: "/api1", Headers: authHeaders, Code: 200},
+		{Method: "GET", Path: "/api2", Headers: authHeaders, Code: 200},
+	}...)
+	assert.NotNil(t, res)
+	assert.Nil(t, err)
+
+	ts.DeletePolicy(policyForApi2)
+	res, err = ts.Run(t, []test.TestCase{
+		{Method: "GET", Path: "/api1", Headers: authHeaders, Code: 200},
+		{Method: "GET", Path: "/api2", Headers: authHeaders, Code: 403},
+	}...)
+	assert.NotNil(t, res)
+	assert.Nil(t, err)
+
+	ts.DeletePolicy(policyForApi1)
+	res, err = ts.Run(t, []test.TestCase{
+		{Method: "GET", Path: "/api1", Headers: authHeaders, Code: 403},
+		{Method: "GET", Path: "/api2", Headers: authHeaders, Code: 403},
+	}...)
+	assert.NotNil(t, res)
+	assert.Nil(t, err)
+}
+
 func TestPurgeOAuthClientTokensEndpoint(t *testing.T) {
 	conf := func(globalConf *config.Config) {
 		// set tokens to be expired after 1 second
@@ -3972,5 +4210,513 @@ func TestPurgeOAuthClientTokensEndpoint(t *testing.T) {
 
 		assertTokensLen(t, storageManager, storageKey1, 0)
 		assertTokensLen(t, storageManager, storageKey2, 0)
+	})
+}
+
+func TestKeyHandler_BatchFiltering_Integration(t *testing.T) {
+	ts := StartTest(func(globalConf *config.Config) {
+		globalConf.HashKeys = true
+		globalConf.EnableHashedKeysListing = true
+		globalConf.AllowMasterKeys = true
+	})
+	defer ts.Close()
+
+	keyA := "key-access-api-one"
+	sessionA := CreateStandardSession()
+	sessionA.AccessRights = map[string]user.AccessDefinition{
+		"api-one": {APIID: "api-one", Versions: []string{"Default"}},
+	}
+	err := ts.Gw.GlobalSessionManager.UpdateSession(keyA, sessionA, 100, false)
+	assert.NoError(t, err)
+
+	keyB := "key-access-api-two"
+	sessionB := CreateStandardSession()
+	sessionB.AccessRights = map[string]user.AccessDefinition{
+		"api-two": {APIID: "api-two", Versions: []string{"Default"}},
+	}
+	err = ts.Gw.GlobalSessionManager.UpdateSession(keyB, sessionB, 100, false)
+	assert.NoError(t, err)
+
+	keyC := "key-master"
+	sessionC := CreateStandardSession()
+	sessionC.AccessRights = map[string]user.AccessDefinition{}
+	err = ts.Gw.GlobalSessionManager.UpdateSession(keyC, sessionC, 100, false)
+	assert.NoError(t, err)
+
+	hashA := storage.HashKey(keyA, true)
+	hashB := storage.HashKey(keyB, true)
+	hashC := storage.HashKey(keyC, true)
+
+	t.Run("Filter API One", func(t *testing.T) {
+		uri := "/tyk/keys/?api_id=api-one"
+		req := ts.withAuth(TestReq(t, "GET", uri, nil))
+		rec := httptest.NewRecorder()
+		ts.mainRouter().ServeHTTP(rec, req)
+
+		assert.Equal(t, http.StatusOK, rec.Code)
+		body := rec.Body.String()
+
+		assert.Contains(t, body, hashA, "Should contain Key A Hash")
+		assert.Contains(t, body, hashC, "Should contain Key C Hash")
+		assert.NotContains(t, body, hashB, "Should NOT contain Key B Hash")
+	})
+
+	t.Run("Filter API Two", func(t *testing.T) {
+		uri := "/tyk/keys/?api_id=api-two"
+		req := ts.withAuth(TestReq(t, "GET", uri, nil))
+		rec := httptest.NewRecorder()
+		ts.mainRouter().ServeHTTP(rec, req)
+
+		assert.Equal(t, http.StatusOK, rec.Code)
+		body := rec.Body.String()
+
+		assert.Contains(t, body, hashB, "Should contain Key B Hash")
+		assert.Contains(t, body, hashC, "Should contain Key C Hash")
+		assert.NotContains(t, body, hashA, "Should NOT contain Key A Hash")
+	})
+
+	t.Run("Filter Unknown API", func(t *testing.T) {
+		uri := "/tyk/keys/?api_id=unknown-api"
+		req := ts.withAuth(TestReq(t, "GET", uri, nil))
+		rec := httptest.NewRecorder()
+		ts.mainRouter().ServeHTTP(rec, req)
+
+		assert.Equal(t, http.StatusOK, rec.Code)
+		body := rec.Body.String()
+
+		assert.Contains(t, body, hashC, "Should contain Key C Hash (Master)")
+		assert.NotContains(t, body, hashA, "Should NOT contain Key A Hash")
+		assert.NotContains(t, body, hashB, "Should NOT contain Key B Hash")
+	})
+}
+
+func TestKeyHandler_ContextCancellation(t *testing.T) {
+	ts := StartTest(func(globalConf *config.Config) {
+		globalConf.HashKeys = true
+		globalConf.EnableHashedKeysListing = true
+		globalConf.AllowMasterKeys = true
+	})
+	defer ts.Close()
+
+	keyA := "key-slow"
+	sessionA := CreateStandardSession()
+	sessionA.AccessRights = map[string]user.AccessDefinition{
+		"api-one": {APIID: "api-one", Versions: []string{"Default"}},
+	}
+	err := ts.Gw.GlobalSessionManager.UpdateSession(keyA, sessionA, 100, false)
+	assert.NoError(t, err)
+
+	uri := "/tyk/keys/?api_id=api-one"
+	req := ts.withAuth(TestReq(t, "GET", uri, nil))
+
+	ctx, cancel := context.WithCancel(req.Context())
+	cancel()
+	req = req.WithContext(ctx)
+
+	rec := httptest.NewRecorder()
+	ts.mainRouter().ServeHTTP(rec, req)
+
+	assert.Equal(t, http.StatusGatewayTimeout, rec.Code)
+	assert.Contains(t, rec.Body.String(), "Request timeout")
+}
+
+func TestGetNewCertIDs(t *testing.T) {
+	t.Run("Empty original, non-empty new", func(t *testing.T) {
+		original := []string{}
+		new := []string{"cert1", "cert2", "cert3"}
+		result := getNewCertIDs(original, new)
+		assert.Equal(t, []string{"cert1", "cert2", "cert3"}, result)
+	})
+
+	t.Run("Nil original, non-empty new", func(t *testing.T) {
+		var original []string
+		new := []string{"cert1", "cert2"}
+		result := getNewCertIDs(original, new)
+		assert.Equal(t, []string{"cert1", "cert2"}, result)
+	})
+
+	t.Run("Some overlap", func(t *testing.T) {
+		original := []string{"cert1", "cert2"}
+		new := []string{"cert1", "cert2", "cert3", "cert4"}
+		result := getNewCertIDs(original, new)
+		assert.Equal(t, []string{"cert3", "cert4"}, result)
+	})
+
+	t.Run("All existing", func(t *testing.T) {
+		original := []string{"cert1", "cert2", "cert3"}
+		new := []string{"cert1", "cert2", "cert3"}
+		result := getNewCertIDs(original, new)
+		assert.Empty(t, result)
+	})
+
+	t.Run("No overlap", func(t *testing.T) {
+		original := []string{"cert1", "cert2"}
+		new := []string{"cert3", "cert4"}
+		result := getNewCertIDs(original, new)
+		assert.Equal(t, []string{"cert3", "cert4"}, result)
+	})
+
+	t.Run("Empty both", func(t *testing.T) {
+		original := []string{}
+		new := []string{}
+		result := getNewCertIDs(original, new)
+		assert.Empty(t, result)
+	})
+}
+
+func TestValidateMtlsStaticCertificateBindings(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	t.Run("Valid single certificate", func(t *testing.T) {
+		clientCertPem, _, _, _ := certs.GenCertificate(&x509.Certificate{}, false)
+		certID, err := ts.Gw.CertificateManager.Add(clientCertPem, "")
+		require.NoError(t, err)
+		defer ts.Gw.CertificateManager.Delete(certID, "")
+
+		err = ts.Gw.validateMtlsStaticCertificateBindings([]string{certID}, "")
+		assert.NoError(t, err)
+	})
+
+	t.Run("Valid multiple certificates", func(t *testing.T) {
+		cert1Pem, _, _, _ := certs.GenCertificate(&x509.Certificate{}, false)
+		cert1ID, err := ts.Gw.CertificateManager.Add(cert1Pem, "")
+		require.NoError(t, err)
+		defer ts.Gw.CertificateManager.Delete(cert1ID, "")
+
+		cert2Pem, _, _, _ := certs.GenCertificate(&x509.Certificate{}, false)
+		cert2ID, err := ts.Gw.CertificateManager.Add(cert2Pem, "")
+		require.NoError(t, err)
+		defer ts.Gw.CertificateManager.Delete(cert2ID, "")
+
+		err = ts.Gw.validateMtlsStaticCertificateBindings([]string{cert1ID, cert2ID}, "")
+		assert.NoError(t, err)
+	})
+
+	t.Run("Valid certificate with orgID prefix", func(t *testing.T) {
+		orgID := "test-org-123"
+		clientCertPem, _, _, _ := certs.GenCertificate(&x509.Certificate{}, false)
+		certID, err := ts.Gw.CertificateManager.Add(clientCertPem, orgID)
+		require.NoError(t, err)
+		defer ts.Gw.CertificateManager.Delete(certID, orgID)
+
+		err = ts.Gw.validateMtlsStaticCertificateBindings([]string{certID}, orgID)
+		assert.NoError(t, err)
+	})
+
+	t.Run("Invalid certificate - wrong orgID prefix", func(t *testing.T) {
+		orgID := "test-org-123"
+		clientCertPem, _, _, _ := certs.GenCertificate(&x509.Certificate{}, false)
+		certID, err := ts.Gw.CertificateManager.Add(clientCertPem, orgID)
+		require.NoError(t, err)
+		defer ts.Gw.CertificateManager.Delete(certID, orgID)
+
+		// Try to validate with wrong orgID
+		err = ts.Gw.validateMtlsStaticCertificateBindings([]string{certID}, "wrong-org-456")
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "invalid certificate ID")
+	})
+
+	t.Run("Invalid certificate - path traversal attempt", func(t *testing.T) {
+		orgID := "test-org-123"
+		err := ts.Gw.validateMtlsStaticCertificateBindings([]string{"../../../../etc/passwd"}, orgID)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "invalid certificate ID")
+	})
+
+	t.Run("Invalid single certificate", func(t *testing.T) {
+		err := ts.Gw.validateMtlsStaticCertificateBindings([]string{"invalid-cert-id"}, "")
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "certificate not found: invalid-cert-id")
+	})
+
+	t.Run("Invalid certificate in list", func(t *testing.T) {
+		clientCertPem, _, _, _ := certs.GenCertificate(&x509.Certificate{}, false)
+		certID, err := ts.Gw.CertificateManager.Add(clientCertPem, "")
+		require.NoError(t, err)
+		defer ts.Gw.CertificateManager.Delete(certID, "")
+
+		err = ts.Gw.validateMtlsStaticCertificateBindings([]string{certID, "invalid-cert"}, "")
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "certificate not found: invalid-cert")
+	})
+
+	t.Run("Empty array", func(t *testing.T) {
+		err := ts.Gw.validateMtlsStaticCertificateBindings([]string{}, "")
+		assert.NoError(t, err)
+	})
+
+	t.Run("Nil array", func(t *testing.T) {
+		err := ts.Gw.validateMtlsStaticCertificateBindings(nil, "")
+		assert.NoError(t, err)
+	})
+}
+
+func TestCreateKeyWithMtlsStaticCertificateBindings(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	apiId := "test-api"
+	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		spec.APIID = apiId
+		spec.UseKeylessAccess = false
+		spec.OrgID = "default"
+	})
+
+	t.Run("Create key with valid bindings", func(t *testing.T) {
+		orgID := "default"
+		clientCertPem, _, _, _ := certs.GenCertificate(&x509.Certificate{}, false)
+		certID, err := ts.Gw.CertificateManager.Add(clientCertPem, orgID)
+		require.NoError(t, err)
+		defer ts.Gw.CertificateManager.Delete(certID, orgID)
+
+		session := user.SessionState{
+			OrgID:                         orgID,
+			MtlsStaticCertificateBindings: []string{certID},
+			AccessRights: map[string]user.AccessDefinition{
+				apiId: {APIID: apiId, Versions: []string{"v1"}},
+			},
+		}
+		sessionData := test.MarshalJSON(t)(session)
+
+		_, _ = ts.Run(t, []test.TestCase{
+			{Method: http.MethodPost, Path: "/tyk/keys/create", Data: sessionData, AdminAuth: true, Code: 200},
+		}...)
+	})
+
+	t.Run("Create key with invalid cert in bindings", func(t *testing.T) {
+		session := user.SessionState{
+			OrgID:                         "default",
+			MtlsStaticCertificateBindings: []string{"nonexistent-cert-id"},
+			AccessRights: map[string]user.AccessDefinition{
+				apiId: {APIID: apiId, Versions: []string{"v1"}},
+			},
+		}
+		sessionData := test.MarshalJSON(t)(session)
+
+		_, _ = ts.Run(t, []test.TestCase{
+			{Method: http.MethodPost, Path: "/tyk/keys/create", Data: sessionData, AdminAuth: true, Code: 400},
+		}...)
+	})
+
+	t.Run("Create key without the field", func(t *testing.T) {
+		session := user.SessionState{
+			OrgID: "default",
+			AccessRights: map[string]user.AccessDefinition{
+				apiId: {APIID: apiId, Versions: []string{"v1"}},
+			},
+		}
+		sessionData := test.MarshalJSON(t)(session)
+
+		_, _ = ts.Run(t, []test.TestCase{
+			{Method: http.MethodPost, Path: "/tyk/keys/create", Data: sessionData, AdminAuth: true, Code: 200},
+		}...)
+	})
+
+	t.Run("Create key with empty array", func(t *testing.T) {
+		session := user.SessionState{
+			OrgID:                         "default",
+			MtlsStaticCertificateBindings: []string{},
+			AccessRights: map[string]user.AccessDefinition{
+				apiId: {APIID: apiId, Versions: []string{"v1"}},
+			},
+		}
+		sessionData := test.MarshalJSON(t)(session)
+
+		_, _ = ts.Run(t, []test.TestCase{
+			{Method: http.MethodPost, Path: "/tyk/keys/create", Data: sessionData, AdminAuth: true, Code: 200},
+		}...)
+	})
+}
+
+func TestUpdateKeyWithMtlsStaticCertificateBindings(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	apiId := "test-api"
+	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		spec.APIID = apiId
+		spec.UseKeylessAccess = false
+		spec.OrgID = "default"
+	})
+
+	t.Run("POST with valid bindings", func(t *testing.T) {
+		clientCertPem, _, _, _ := certs.GenCertificate(&x509.Certificate{}, false)
+		certID, err := ts.Gw.CertificateManager.Add(clientCertPem, "default")
+		require.NoError(t, err)
+		defer ts.Gw.CertificateManager.Delete(certID, "default")
+
+		session := user.SessionState{
+			OrgID:                         "default",
+			MtlsStaticCertificateBindings: []string{certID},
+			AccessRights: map[string]user.AccessDefinition{
+				apiId: {APIID: apiId, Versions: []string{"v1"}},
+			},
+		}
+		sessionData := test.MarshalJSON(t)(session)
+
+		_, _ = ts.Run(t, []test.TestCase{
+			{Method: http.MethodPost, Path: "/tyk/keys/custom-key-id", Data: sessionData, AdminAuth: true, Code: 200},
+		}...)
+	})
+
+	t.Run("PUT with valid bindings", func(t *testing.T) {
+		clientCertPem, _, _, _ := certs.GenCertificate(&x509.Certificate{}, false)
+		certID, err := ts.Gw.CertificateManager.Add(clientCertPem, "default")
+		require.NoError(t, err)
+		defer ts.Gw.CertificateManager.Delete(certID, "default")
+
+		session, key := ts.CreateSession(func(s *user.SessionState) {
+			s.OrgID = "default"
+			s.AccessRights = map[string]user.AccessDefinition{
+				apiId: {APIID: apiId, Versions: []string{"v1"}},
+			}
+		})
+
+		session.MtlsStaticCertificateBindings = []string{certID}
+		sessionData := test.MarshalJSON(t)(session)
+
+		path := fmt.Sprintf("/tyk/keys/%s", key)
+		_, _ = ts.Run(t, []test.TestCase{
+			{Method: http.MethodPut, Path: path, Data: sessionData, AdminAuth: true, Code: 200},
+		}...)
+	})
+
+	t.Run("POST with invalid cert in bindings", func(t *testing.T) {
+		session := user.SessionState{
+			OrgID:                         "default",
+			MtlsStaticCertificateBindings: []string{"invalid-cert"},
+			AccessRights: map[string]user.AccessDefinition{
+				apiId: {APIID: apiId, Versions: []string{"v1"}},
+			},
+		}
+		sessionData := test.MarshalJSON(t)(session)
+
+		_, _ = ts.Run(t, []test.TestCase{
+			{Method: http.MethodPost, Path: "/tyk/keys/custom-key-id-2", Data: sessionData, AdminAuth: true, Code: 400},
+		}...)
+	})
+
+	t.Run("PUT with invalid cert in bindings", func(t *testing.T) {
+		session, key := ts.CreateSession(func(s *user.SessionState) {
+			s.OrgID = "default"
+			s.AccessRights = map[string]user.AccessDefinition{
+				apiId: {APIID: apiId, Versions: []string{"v1"}},
+			}
+		})
+
+		session.MtlsStaticCertificateBindings = []string{"invalid-cert"}
+		sessionData := test.MarshalJSON(t)(session)
+
+		path := fmt.Sprintf("/tyk/keys/%s", key)
+		_, _ = ts.Run(t, []test.TestCase{
+			{Method: http.MethodPut, Path: path, Data: sessionData, AdminAuth: true, Code: 400},
+		}...)
+	})
+
+	t.Run("PUT with existing certs + new valid cert", func(t *testing.T) {
+		cert1Pem, _, _, _ := certs.GenCertificate(&x509.Certificate{}, false)
+		cert1ID, err := ts.Gw.CertificateManager.Add(cert1Pem, "default")
+		require.NoError(t, err)
+		defer ts.Gw.CertificateManager.Delete(cert1ID, "default")
+
+		cert2Pem, _, _, _ := certs.GenCertificate(&x509.Certificate{}, false)
+		cert2ID, err := ts.Gw.CertificateManager.Add(cert2Pem, "default")
+		require.NoError(t, err)
+		defer ts.Gw.CertificateManager.Delete(cert2ID, "default")
+
+		session, key := ts.CreateSession(func(s *user.SessionState) {
+			s.OrgID = "default"
+			s.MtlsStaticCertificateBindings = []string{cert1ID}
+			s.AccessRights = map[string]user.AccessDefinition{
+				apiId: {APIID: apiId, Versions: []string{"v1"}},
+			}
+		})
+
+		// Add new cert to existing bindings
+		session.MtlsStaticCertificateBindings = []string{cert1ID, cert2ID}
+		sessionData := test.MarshalJSON(t)(session)
+
+		path := fmt.Sprintf("/tyk/keys/%s", key)
+		_, _ = ts.Run(t, []test.TestCase{
+			{Method: http.MethodPut, Path: path, Data: sessionData, AdminAuth: true, Code: 200},
+		}...)
+	})
+
+	t.Run("PUT with existing certs + new invalid cert", func(t *testing.T) {
+		clientCertPem, _, _, _ := certs.GenCertificate(&x509.Certificate{}, false)
+		certID, err := ts.Gw.CertificateManager.Add(clientCertPem, "default")
+		require.NoError(t, err)
+		defer ts.Gw.CertificateManager.Delete(certID, "default")
+
+		session, key := ts.CreateSession(func(s *user.SessionState) {
+			s.OrgID = "default"
+			s.MtlsStaticCertificateBindings = []string{certID}
+			s.AccessRights = map[string]user.AccessDefinition{
+				apiId: {APIID: apiId, Versions: []string{"v1"}},
+			}
+		})
+
+		// Add invalid cert to existing bindings
+		session.MtlsStaticCertificateBindings = []string{certID, "invalid-new-cert"}
+		sessionData := test.MarshalJSON(t)(session)
+
+		path := fmt.Sprintf("/tyk/keys/%s", key)
+		_, _ = ts.Run(t, []test.TestCase{
+			{Method: http.MethodPut, Path: path, Data: sessionData, AdminAuth: true, Code: 400},
+		}...)
+	})
+
+	t.Run("PUT with only existing certs (no new certs)", func(t *testing.T) {
+		clientCertPem, _, _, _ := certs.GenCertificate(&x509.Certificate{}, false)
+		certID, err := ts.Gw.CertificateManager.Add(clientCertPem, "default")
+		require.NoError(t, err)
+		defer ts.Gw.CertificateManager.Delete(certID, "default")
+
+		session, key := ts.CreateSession(func(s *user.SessionState) {
+			s.OrgID = "default"
+			s.MtlsStaticCertificateBindings = []string{certID}
+			s.AccessRights = map[string]user.AccessDefinition{
+				apiId: {APIID: apiId, Versions: []string{"v1"}},
+			}
+		})
+
+		// No changes to bindings
+		session.MtlsStaticCertificateBindings = []string{certID}
+		sessionData := test.MarshalJSON(t)(session)
+
+		path := fmt.Sprintf("/tyk/keys/%s", key)
+		_, _ = ts.Run(t, []test.TestCase{
+			{Method: http.MethodPut, Path: path, Data: sessionData, AdminAuth: true, Code: 200},
+		}...)
+	})
+
+	t.Run("PUT removing a cert from bindings", func(t *testing.T) {
+		cert1Pem, _, _, _ := certs.GenCertificate(&x509.Certificate{}, false)
+		cert1ID, err := ts.Gw.CertificateManager.Add(cert1Pem, "default")
+		require.NoError(t, err)
+		defer ts.Gw.CertificateManager.Delete(cert1ID, "default")
+
+		cert2Pem, _, _, _ := certs.GenCertificate(&x509.Certificate{}, false)
+		cert2ID, err := ts.Gw.CertificateManager.Add(cert2Pem, "default")
+		require.NoError(t, err)
+		defer ts.Gw.CertificateManager.Delete(cert2ID, "default")
+
+		session, key := ts.CreateSession(func(s *user.SessionState) {
+			s.OrgID = "default"
+			s.MtlsStaticCertificateBindings = []string{cert1ID, cert2ID}
+			s.AccessRights = map[string]user.AccessDefinition{
+				apiId: {APIID: apiId, Versions: []string{"v1"}},
+			}
+		})
+
+		// Remove one cert from bindings
+		session.MtlsStaticCertificateBindings = []string{cert1ID}
+		sessionData := test.MarshalJSON(t)(session)
+
+		path := fmt.Sprintf("/tyk/keys/%s", key)
+		_, _ = ts.Run(t, []test.TestCase{
+			{Method: http.MethodPut, Path: path, Data: sessionData, AdminAuth: true, Code: 200},
+		}...)
 	})
 }

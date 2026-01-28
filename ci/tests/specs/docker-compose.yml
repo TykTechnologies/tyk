@@ -1,0 +1,26 @@
+name: open-api-specification-contract-tests
+
+include:
+  - ../../../docker/services/redis.yml
+  - ../../../docker/services/httpbin.yml
+
+services:
+  tyk:
+    image: ${GATEWAY_IMAGE}
+    networks: [ proxy ]
+    build: ../../../.
+    depends_on:
+      - redis
+    volumes:
+      - ./policies:/opt/tyk-gateway/policies
+      - ./apps:/opt/tyk-gateway/apps
+      -  ./config/tyk.standalone.conf:/opt/tyk-gateway/tyk.conf
+    ports:
+      - "8080:8080"
+    environment:
+      - TYK_LOGLEVEL=debug
+
+networks:
+  proxy:
+    name: proxy
+    driver: bridge

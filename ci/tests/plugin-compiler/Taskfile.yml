@@ -1,3 +1,4 @@
+# yamllint disable rule:line-length
 ---
 version: "3"
 
@@ -82,7 +83,6 @@ tasks:
     internal: true
     cmds:
 
-
   test:basic-plugin:
     desc: "Test plugin compiler (basic-plugin)"
     vars:
@@ -93,6 +93,20 @@ tasks:
       - rm -f {{.plugin_path}}/*.so
       - docker run {{.args}} {{.image}} plugin.so
       - cp -f {{.plugin_path}}/*.so {{.plugin_path}}/plugin.so
+      - docker run {{.args}} --entrypoint=/usr/local/bin/tyk {{.image}} plugin load -f plugin.so -s {{.symbol}}
+      - strings {{.plugin_path}}/plugin.so | grep test_goplugin.go
+
+  test:qa-plugin:
+    desc: "Test plugin compiler (qa-plugin) amd64 e2e + arm64 build"
+    vars:
+      plugin_path: '{{.root}}/ci/tests/plugin-compiler/testdata/qa-plugin'
+      symbol: AuthCheck
+      args: --rm -e DEBUG=1 -v {{.plugin_path}}:/plugin-source -w /plugin-source
+    cmds:
+      - rm -f {{.plugin_path}}/*.so
+      - docker run {{.args}} {{.image}} plugin.so
+      - cp -f {{.plugin_path}}/*.so {{.plugin_path}}/plugin.so
+      - docker run -e GOARCH=arm64 {{.args}} {{.image}} plugin.so
       - docker run {{.args}} --entrypoint=/usr/local/bin/tyk {{.image}} plugin load -f plugin.so -s {{.symbol}}
       - strings {{.plugin_path}}/plugin.so | grep test_goplugin.go
 
@@ -136,4 +150,3 @@ tasks:
       - cp -f {{.plugin_path}}/*.so {{.plugin_path}}/plugin.so
       - docker run {{.args}} --entrypoint=/usr/local/bin/tyk {{.image}} plugin load -f plugin.so -s {{.symbol}}
       - strings {{.plugin_path}}/plugin.so | grep main.go
-

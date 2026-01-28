@@ -15,11 +15,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/TykTechnologies/tyk/apidef"
-
 	"github.com/robertkrimen/otto"
 	_ "github.com/robertkrimen/otto/underscore"
 
+	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/internal/middleware"
 	"github.com/TykTechnologies/tyk/user"
 
 	"github.com/sirupsen/logrus"
@@ -298,7 +298,7 @@ func (d *DynamicMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 		}
 
 		d.Gw.forceResponse(w, r, &responseObject, d.Spec, session, d.Pre, logger)
-		return nil, mwStatusRespond
+		return nil, middleware.StatusRespond
 	}
 
 	if d.Auth {

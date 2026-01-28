@@ -63,6 +63,9 @@ func (h *handleWrapper) handleRequestLimits(w http.ResponseWriter, r *http.Reque
 }
 
 func (h *handleWrapper) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	// Store request start time for accurate latency measurement including all middlewares
+	ctxSetRequestStartTime(r, time.Now())
+
 	if r.Body != nil {
 		if !h.handleRequestLimits(w, r) {
 			return
@@ -95,12 +98,6 @@ func (h *handleWrapper) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if NewRelicApplication != nil {
-		txn := NewRelicApplication.StartTransaction(r.URL.Path, w, r)
-		defer txn.End()
-		h.router.ServeHTTP(txn, r)
-		return
-	}
 	h.router.ServeHTTP(w, r)
 }
 
@@ -134,9 +131,10 @@ func (p proxy) getListener() net.Listener {
 
 type proxyMux struct {
 	sync.RWMutex
-	proxies      []*proxy
-	again        again.Again
-	track404Logs bool
+	proxies             []*proxy
+	again               again.Again
+	track404Logs        bool
+	instrumentedRouters map[*mux.Router]bool
 }
 
 func (m *proxyMux) getProxy(listenPort int, conf config.Config) *proxy {
@@ -378,6 +376,10 @@ func (m *proxyMux) swap(new *proxyMux, gw *Gateway) {
 		if match == nil || match.protocol != curP.protocol {
 			mainLog.Infof("Found unused listener at port %d, shutting down", curP.port)
 
+			if m.instrumentedRouters != nil && curP.router != nil {
+				delete(m.instrumentedRouters, curP.router)
+			}
+
 			if curP.httpServer != nil {
 				ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 				curP.httpServer.Shutdown(ctx)
@@ -548,4 +550,22 @@ func (m *proxyMux) generateListener(listenPort int, protocol string, gw *Gateway
 		return nil, err
 	}
 	return l, nil
+}
+
+// CheckAndMarkInstrumented returns true if the router was not instrumented yet.
+// It marks it as instrumented for future calls.
+func (p *proxyMux) checkAndMarkInstrumented(r *mux.Router) bool {
+	p.Lock()
+	defer p.Unlock()
+
+	if p.instrumentedRouters == nil {
+		p.instrumentedRouters = make(map[*mux.Router]bool)
+	}
+
+	if p.instrumentedRouters[r] {
+		return false
+	}
+
+	p.instrumentedRouters[r] = true
+	return true
 }

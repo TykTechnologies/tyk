@@ -1,0 +1,362 @@
+{
+  "version": 1.0,
+  "$schema": "https://raw.githubusercontent.com/apideck-libraries/portman/main/src/utils/portman-config-schema.json",
+  "tests": {
+    "contractTests": [
+      {
+        "openApiOperation": "*::/*",
+        "excludeForOperations": [
+          "batch"
+        ],
+        "statusSuccess": {
+          "enabled": true
+        }
+      },
+      {
+        "openApiOperation": "*::/*",
+        "excludeForOperations": [
+          "batch"
+        ],
+        "responseTime": {
+          "enabled": false,
+          "maxMs": 300
+        }
+      },
+      {
+        "openApiOperation": "*::/*",
+        "excludeForOperations": [
+          "batch"
+        ],
+        "contentType": {
+          "enabled": true
+        }
+      },
+      {
+        "openApiOperation": "*::/*",
+        "excludeForOperations": [
+          "batch"
+        ],
+        "jsonBody": {
+          "enabled": true
+        }
+      },
+      {
+        "openApiOperation": "*::/*",
+        "excludeForOperations": [
+          "validateAKeyDefinition",
+          "listCerts",
+          "batch"
+        ],
+        "schemaValidation": {
+          "enabled": true
+        }
+      },
+      {
+        "openApiOperation": "*::/*",
+        "headersPresent": {
+          "enabled": true
+        }
+      }
+    ],
+    "contentTests": [],
+    "extendTests": [
+    ],
+    "variationTests": []
+  },
+  "assignVariables": [
+    {
+      "openApiOperationIds": [
+        "addPolicy"
+      ],
+      "collectionVariables": [
+        {
+          "responseBodyProp": "key",
+          "name": "addPolicy.ID"
+        }
+      ]
+    },
+    {
+      "openApiOperationIds": [
+        "addCert"
+      ],
+      "collectionVariables": [
+        {
+          "responseBodyProp": "id",
+          "name": "addCert.id"
+        }
+      ]
+    },
+    {
+      "openApiOperationIds": [
+        "addKey"
+      ],
+      "collectionVariables": [
+        {
+          "responseBodyProp": "key_hash",
+          "name": "addKey.key_hash"
+        },
+        {
+          "responseBodyProp": "key",
+          "name": "addKey.key"
+        }
+      ]
+    },
+    {
+      "openApiOperationIds": [
+        "createApiOAS"
+      ],
+      "collectionVariables": [
+        {
+          "responseBodyProp": "key",
+          "name": "createApiOAS.apiID"
+        }
+      ]
+    },
+    {
+      "openApiOperationIds": [
+        "createApi"
+      ],
+      "collectionVariables": [
+        {
+          "responseBodyProp": "key",
+          "name": "createApi.apiID"
+        }
+      ]
+    }
+  ],
+  "operationPreRequestScripts": [
+    {
+      "openApiOperationIds": [
+        "addCert"
+      ],
+      "scripts": [
+        "file:config/certs.js"
+      ]
+    },
+    {
+      "openApiOperationIds": [
+        "updateApi",
+        "deleteApi",
+        "getApi",
+        "updateApi",
+        "listApiVersions",
+        "deleteOASApi",
+        "getOASApi",
+        "patchApiOAS",
+        "updateApiOAS",
+        "downloadApiOASPublic",
+        "getPolicy"
+      ],
+      "scripts": [
+        "file:config/prescript.js"
+      ]
+    }
+  ],
+  "overwrites": [
+    {
+      "openApiOperationIds": [
+        "getPolicy",
+        "deletePolicy",
+        "updatePolicy"
+      ],
+      "overwriteRequestPathVariables": [
+        {
+          "value": "{{addPolicy.ID}}",
+          "key": "polID",
+          "overwrite": true
+        }
+      ]
+    },
+    {
+      "openApiOperationIds": [
+        "listOASApiVersions",
+        "deleteOASApi",
+        "getOASApi",
+        "patchApiOAS",
+        "updateApiOAS",
+        "downloadApiOASPublic",
+        "invalidateJWKCache"
+      ],
+      "overwriteRequestPathVariables": [
+        {
+          "value": "{{createApiOAS.apiID}}",
+          "overwrite": true,
+          "key": "apiID"
+        }
+      ]
+    },
+    {
+      "openApiOperationIds": [
+        "batch"
+      ],
+      "overwriteRequestPathVariables": [
+        {
+          "key": "listen_path",
+          "value": "tyk-keyless-api",
+          "overwrite": true
+        }
+      ]
+    },
+    {
+      "openApiOperationIds": [
+        "deleteCerts",
+        "listCertsWithIDs"
+      ],
+      "overwriteRequestPathVariables": [
+        {
+          "key": "certID",
+          "value": "{{addCert.id}}",
+          "overwrite": true
+        }
+      ]
+    },
+    {
+      "openApiOperationIds": [
+        "getKey",
+        "updateKey",
+        "deleteKey"
+      ],
+      "overwriteRequestPathVariables": [
+        {
+          "key": "keyID",
+          "value": "{{addKey.key}}",
+          "overwrite": true
+        }
+      ]
+    },
+    {
+      "openApiOperationIds": [
+        "invalidateOAuthRefresh"
+      ],
+      "overwriteRequestQueryParams": [
+        {
+          "key": "api_id",
+          "value": "f84ve1a04e5648c2797170567971565n"
+        }
+      ]
+    },
+    {
+      "openApiOperationIds": [
+        "getApisForOauthApp"
+      ],
+      "overwriteRequestQueryParams": [
+        {
+          "key": "orgID",
+          "value": ""
+        }
+      ]
+    },
+    {
+      "openApiOperationIds": [
+        "listOAuthClients",
+        "getOAuthClient",
+        "getOAuthClientTokens",
+        "updateOAuthClient",
+        "rotateOauthClient",
+        "deleteOAuthClient"
+      ],
+      "overwriteRequestPathVariables": [
+        {
+          "key": "apiID",
+          "value": "f84ve1a04e5648c2797170567971565n",
+          "overwrite": true
+        }
+      ]
+    },
+    {
+      "openApiOperationIds": [
+        "createOAuthClient"
+      ],
+      "overwriteRequestBody": [
+        {
+          "key": "api_id",
+          "value": "f84ve1a04e5648c2797170567971565n",
+          "overwrite": true
+        }
+      ]
+    },
+    {
+      "openApiOperationIds": [
+        "addKey",
+        "createCustomKey",
+        "createKey",
+        "updateKey"
+      ],
+      "overwriteRequestBody": [
+        {
+          "key": "apply_policies",
+          "overwrite": true,
+          "value": [
+            "46ad120575961080181867e"
+          ]
+        }
+      ]
+    },
+    {
+      "openApiOperationIds": [
+        "updateApiOAS",
+        "patchApiOAS"
+      ],
+      "overwriteRequestBody": [
+        {
+          "overwrite": true,
+          "key": "x-tyk-api-gateway.info.id",
+          "value": "{{createApiOAS.apiID}}"
+        }
+      ]
+    },
+    {
+      "openApiOperationIds": [
+        "setPoliciesToHashedKey"
+      ],
+      "overwriteRequestPathVariables": [
+        {
+          "key": "keyID",
+          "value": "{{addKey.key_hash}}",
+          "overwrite": true
+        }
+      ]
+    },
+    {
+      "openApiOperationIds": [
+        "deleteApi",
+        "getApi",
+        "updateApi",
+        "listApiVersions"
+      ],
+      "overwriteRequestPathVariables": [
+        {
+          "key": "apiID",
+          "value": "{{createApi.apiID}}",
+          "overwrite": true
+        }
+      ]
+    },
+    {
+      "openApiOperationIds": [
+        "updateApi"
+      ],
+      "overwriteRequestBody": [
+        {
+          "key": "api_id",
+          "value": "{{createApi.apiID}}",
+          "overwrite": true
+        }
+      ]
+    }
+  ],
+  "globals": {
+    "collectionPreRequestScripts": [
+    ],
+    "keyValueReplacements": {},
+    "valueReplacements": {},
+    "rawReplacements": [],
+    "orderOfOperations": [
+      "POST::/*",
+      "GET::/*",
+      "PUT::/*",
+      "PATCH::/*",
+      "DELETE::/*"
+    ]
+  }
+}

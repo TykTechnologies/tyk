@@ -2,24 +2,24 @@ package gateway
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
+	"errors"
+	"fmt"
+	"io/ioutil"
+	"net/http"
 	"net/url"
 	"reflect"
 	"strings"
 	"time"
 	"unicode/utf8"
 
-	"github.com/sirupsen/logrus"
-
 	"github.com/TykTechnologies/tyk-pump/analytics"
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/coprocess"
+	"github.com/TykTechnologies/tyk/internal/middleware"
 	"github.com/TykTechnologies/tyk/user"
-
-	"errors"
-	"fmt"
-	"io/ioutil"
-	"net/http"
+	"github.com/sirupsen/logrus"
 )
 
 var (
@@ -50,7 +50,7 @@ func CreateCoProcessMiddleware(hookName string, hookType coprocess.HookType, mwD
 		HookType:         hookType,
 		HookName:         hookName,
 		MiddlewareDriver: mwDriver,
-		successHandler:   &SuccessHandler{baseMid},
+		successHandler:   &SuccessHandler{baseMid.Copy()},
 	}
 
 	return baseMid.Gw.createMiddleware(dMiddleware)
@@ -276,7 +276,6 @@ func (gw *Gateway) CoProcessInit() {
 
 // EnabledForSpec checks if this middleware should be enabled for a given API.
 func (m *CoProcessMiddleware) EnabledForSpec() bool {
-
 	if !m.Gw.GetConfig().CoProcessOptions.EnableCoProcess {
 		log.WithFields(logrus.Fields{
 			"prefix": "coprocess",
@@ -284,36 +283,20 @@ func (m *CoProcessMiddleware) EnabledForSpec() bool {
 		return false
 	}
 
-	var supported bool
-	for _, driver := range supportedDrivers {
-		if m.Spec.CustomMiddleware.Driver == driver {
-			supported = true
-		}
-	}
-
-	if !supported {
-		log.WithFields(logrus.Fields{
-			"prefix": "coprocess",
-		}).Errorf("Unsupported driver '%s'", m.Spec.CustomMiddleware.Driver)
-		return false
-	}
-
-	if d, _ := loadedDrivers[m.Spec.CustomMiddleware.Driver]; d == nil {
-		log.WithFields(logrus.Fields{
-			"prefix": "coprocess",
-		}).Errorf("Driver '%s' isn't loaded", m.Spec.CustomMiddleware.Driver)
-		return false
-	}
-
 	log.WithFields(logrus.Fields{
 		"prefix": "coprocess",
 	}).Debug("Enabling CP middleware.")
-	m.successHandler = &SuccessHandler{m.BaseMiddleware}
+	m.successHandler = &SuccessHandler{m.BaseMiddleware.Copy()}
 	return true
 }
 
 // ProcessRequest will run any checks on the request on the way through the system, return an error to have the chain fail
 func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
+	errorCode, err := m.validateDriver()
+	if err != nil {
+		return err, errorCode
+	}
+
 	if m.HookType == coprocess.HookType_CustomKeyCheck {
 		if ctxGetRequestStatus(r) == StatusOkAndIgnore {
 			return nil, http.StatusOK
@@ -365,7 +348,7 @@ func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 	}
 
 	t1 := time.Now()
-	returnObject, err := coProcessor.Dispatch(object)
+	returnObject, err := coProcessor.Dispatch(r.Context(), object)
 	ms := DurationToMillisecond(time.Since(t1))
 
 	if err != nil {
@@ -445,8 +428,8 @@ func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 			ReadSeeker: strings.NewReader(returnObject.Request.ReturnOverrides.ResponseBody),
 		}
 		res.ContentLength = int64(len(returnObject.Request.ReturnOverrides.ResponseBody))
-		m.successHandler.RecordHit(r, analytics.Latency(analytics.Latency{Total: int64(ms)}), int(returnObject.Request.ReturnOverrides.ResponseCode), res, false)
-		return nil, mwStatusRespond
+		m.successHandler.RecordHit(r, analytics.Latency{Total: int64(ms), Upstream: 0, Gateway: int64(ms)}, int(returnObject.Request.ReturnOverrides.ResponseCode), res, false)
+		return nil, middleware.StatusRespond
 	}
 
 	// Is this a CP authentication middleware?
@@ -512,6 +495,38 @@ func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 	return nil, http.StatusOK
 }
 
+func (m *CoProcessMiddleware) validateDriver() (int, error) {
+	if !m.isDriverSupported() {
+		log.WithFields(logrus.Fields{
+			"prefix": "coprocess",
+		}).Errorf("Unsupported driver '%s'", m.Spec.CustomMiddleware.Driver)
+		respCode := http.StatusInternalServerError
+
+		return respCode, errors.New(http.StatusText(respCode))
+	}
+
+	if d := loadedDrivers[m.Spec.CustomMiddleware.Driver]; d == nil {
+		log.WithFields(logrus.Fields{
+			"prefix": "coprocess",
+		}).Errorf("Driver '%s' isn't loaded", m.Spec.CustomMiddleware.Driver)
+		respCode := http.StatusInternalServerError
+
+		return respCode, errors.New(http.StatusText(respCode))
+	}
+
+	return http.StatusOK, nil
+}
+
+func (m *CoProcessMiddleware) isDriverSupported() bool {
+	for _, driver := range supportedDrivers {
+		if m.Spec.CustomMiddleware.Driver == driver {
+			return true
+		}
+	}
+
+	return false
+}
+
 type CustomMiddlewareResponseHook struct {
 	BaseTykResponseHandler
 	mw *CoProcessMiddleware
@@ -547,33 +562,35 @@ func (h *CustomMiddlewareResponseHook) Name() string {
 }
 
 func (h *CustomMiddlewareResponseHook) HandleError(rw http.ResponseWriter, req *http.Request) {
-	handler := ErrorHandler{h.mw.BaseMiddleware}
+	handler := ErrorHandler{h.mw.BaseMiddleware.Copy()}
 	handler.HandleError(rw, req, "Middleware error", http.StatusInternalServerError, true)
 }
 
 func (h *CustomMiddlewareResponseHook) HandleResponse(rw http.ResponseWriter, res *http.Response, req *http.Request, ses *user.SessionState) error {
-	log.WithFields(logrus.Fields{
+
+	h.logger().WithFields(logrus.Fields{
 		"prefix": "coprocess",
 	}).Debugf("Response hook '%s' is called", h.mw.Name())
+
 	coProcessor := CoProcessor{
 		Middleware: h.mw,
 	}
 
 	object, err := coProcessor.BuildObject(req, res, h.mw.Spec)
 	if err != nil {
-		log.WithError(err).Debug("Couldn't build request object")
+		h.logger().WithError(err).Debug("Couldn't build request object")
 		return errors.New("Middleware error")
 	}
 	object.Session = ProtoSessionState(ses)
 
-	retObject, err := coProcessor.Dispatch(object)
+	retObject, err := coProcessor.Dispatch(req.Context(), object)
 	if err != nil {
-		log.WithError(err).Debug("Couldn't dispatch request object")
+		h.logger().WithError(err).Debug("Couldn't dispatch request object")
 		return errors.New("Middleware error")
 	}
 
 	if retObject.Response == nil {
-		log.WithError(err).Debug("No response object returned by response hook")
+		h.logger().WithError(err).Debug("No response object returned by response hook")
 		return errors.New("Middleware error")
 	}
 
@@ -598,6 +615,12 @@ func (h *CustomMiddlewareResponseHook) HandleResponse(rw http.ResponseWriter, re
 	bodyBuf := bytes.NewBuffer(retObject.Response.RawBody)
 	res.Body = ioutil.NopCloser(bodyBuf)
 
+	//set response body length with the size of response body returned from the hook
+	//so that it is updated accordingly in the response object
+	responseBodyLen := len(retObject.Response.RawBody)
+	res.ContentLength = int64(responseBodyLen)
+	res.Header.Set("Content-Length", fmt.Sprintf("%d", responseBodyLen))
+
 	res.StatusCode = int(retObject.Response.StatusCode)
 	return nil
 }
@@ -605,6 +628,7 @@ func (h *CustomMiddlewareResponseHook) HandleResponse(rw http.ResponseWriter, re
 // syncHeadersAndMultiValueHeaders synchronizes the content of 'headers' and 'multiValueHeaders'.
 // If a key is updated or added in 'headers', the corresponding key in 'multiValueHeaders' is also updated or added.
 // If a key is removed from 'headers', the corresponding key in 'multiValueHeaders' is also removed.
+// If multiValuesHeaders contains a key with multiple values and the same key is present in headers, the first value in multiValuesHeaders is updated with the value from headers, while the remaining values remain unchanged.
 func syncHeadersAndMultiValueHeaders(headers map[string]string, multiValueHeaders []*coprocess.Header) []*coprocess.Header {
 	updatedMultiValueHeaders := []*coprocess.Header{}
 
@@ -613,7 +637,12 @@ func syncHeadersAndMultiValueHeaders(headers map[string]string, multiValueHeader
 		for _, header := range multiValueHeaders {
 			if header.Key == k {
 				found = true
-				header.Values = []string{v}
+
+				// if the key is present in multiValueHeaders, update the first value with the value from headers
+				if len(header.Values) > 0 {
+					header.Values[0] = v
+				}
+
 				break
 			}
 		}
@@ -637,13 +666,13 @@ func syncHeadersAndMultiValueHeaders(headers map[string]string, multiValueHeader
 	return updatedMultiValueHeaders
 }
 
-func (c *CoProcessor) Dispatch(object *coprocess.Object) (*coprocess.Object, error) {
+func (c *CoProcessor) Dispatch(ctx context.Context, object *coprocess.Object) (*coprocess.Object, error) {
 	dispatcher := loadedDrivers[c.Middleware.MiddlewareDriver]
 	if dispatcher == nil {
 		err := fmt.Errorf("Couldn't dispatch request, driver '%s' isn't available", c.Middleware.MiddlewareDriver)
 		return nil, err
 	}
-	newObject, err := dispatcher.Dispatch(object)
+	newObject, err := dispatcher.DispatchWithContext(ctx, object)
 	if err != nil {
 		return nil, err
 	}

@@ -303,7 +303,7 @@
   "proxy": {
     "preserve_host_header": false,
     "listen_path": "/test-graphql-tracing-invalid/",
-    "target_url": "https://httpbin.com",
+    "target_url": "http://httpbin:80/status/404",
     "disable_strip_slash": true,
     "strip_listen_path": true,
     "enable_load_balancing": false,
