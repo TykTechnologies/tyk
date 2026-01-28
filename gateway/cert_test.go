@@ -1387,7 +1387,7 @@ func TestKeyWithCertificateTLS(t *testing.T) {
 		client := GetTLSClient(&clientCert, nil)
 
 		t.Run("Cert unknown", func(t *testing.T) {
-			_, _ = ts.Run(t, test.TestCase{Code: 403, Client: client})
+			_, _ = ts.Run(t, test.TestCase{Code: 401, Client: client})
 		})
 
 		t.Run("Cert known", func(t *testing.T) {
@@ -1451,7 +1451,7 @@ func TestKeyWithCertificateTLS(t *testing.T) {
 		t.Run("Cert unknown", func(t *testing.T) {
 			_, _ = ts.Run(t,
 				test.TestCase{Code: 404, Path: "/test1", Client: client},
-				test.TestCase{Code: 403, Path: "/test1", Domain: "localhost", Client: client},
+				test.TestCase{Code: 401, Path: "/test1", Domain: "localhost", Client: client},
 			)
 		})
 
@@ -1492,7 +1492,14 @@ func TestKeyWithCertificateTLS(t *testing.T) {
 					TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 				},
 			}
+			globalConf := ts.Gw.GetConfig()
+			globalConf.Security.AllowUnsafeDynamicMTLSToken = true
+			ts.Gw.SetConfig(globalConf)
 			_, _ = ts.Run(t, test.TestCase{Path: "/test1", Headers: header, Code: http.StatusOK, Domain: "localhost", Client: client})
+
+			globalConf = ts.Gw.GetConfig()
+			globalConf.Security.AllowUnsafeDynamicMTLSToken = false
+			ts.Gw.SetConfig(globalConf)
 		})
 	})
 
@@ -1526,8 +1533,8 @@ func TestKeyWithCertificateTLS(t *testing.T) {
 
 		_, _ = ts.Run(t, []test.TestCase{
 			{Code: http.StatusNotFound, Path: "/test1", Client: client},
-			{Code: http.StatusForbidden, Path: "/test1", Domain: "host1", Client: client},
-			{Code: http.StatusForbidden, Path: "/test1", Domain: "host2", Client: client},
+			{Code: http.StatusUnauthorized, Path: "/test1", Domain: "host1", Client: client},
+			{Code: http.StatusUnauthorized, Path: "/test1", Domain: "host2", Client: client},
 		}...)
 
 		_, _ = ts.CreateSession(func(s *user.SessionState) {
@@ -1579,6 +1586,16 @@ func TestKeyWithCertificateTLS(t *testing.T) {
 
 	// check that key has been updated with wrong certificate
 	t.Run("Key has been updated with wrong certificate key", func(t *testing.T) {
+		globalConf := ts.Gw.GetConfig()
+		globalConf.Security.AllowUnsafeDynamicMTLSToken = true
+		ts.Gw.SetConfig(globalConf)
+
+		defer func() {
+			globalConf = ts.Gw.GetConfig()
+			globalConf.Security.AllowUnsafeDynamicMTLSToken = false
+			ts.Gw.SetConfig(globalConf)
+		}()
+
 		clientPEM, _, _, clientCert := crypto.GenCertificate(&x509.Certificate{}, false)
 		clientCertID, err := ts.Gw.CertificateManager.Add(clientPEM, orgId)
 

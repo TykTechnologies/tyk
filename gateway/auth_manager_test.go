@@ -247,7 +247,7 @@ func TestHashKeyFunctionChanged(t *testing.T) {
 			Data: session, Client: client, Code: http.StatusOK})
 
 		client = GetTLSClient(&clientCert, nil)
-		testChangeHashFunc(t, nil, client, http.StatusForbidden)
+		testChangeHashFunc(t, nil, client, http.StatusUnauthorized)
 	})
 
 }
