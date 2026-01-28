@@ -405,7 +405,7 @@ func GetCertIDAndChainPEM(certData []byte, secret string) (string, []byte, error
 func (c *certificateManager) List(certIDs []string, mode CertificateType) (out []*tls.Certificate) {
 	var cert *tls.Certificate
 	var rawCert []byte
-	var mdcbVerified bool // Track if MDCB connection already verified in this batch
+	var skipBackoff bool // Skip full exponential backoff after first successful MDCB verification
 
 	for _, id := range certIDs {
 		if cert, found := c.cache.Get(id); found {
@@ -418,7 +418,7 @@ func (c *certificateManager) List(certIDs []string, mode CertificateType) (out [
 		val, err := c.storage.GetKey("raw-" + id)
 		// TT-14618: Retry on MDCB connection lost (emergency mode during startup)
 		if err != nil && errors.Is(err, storage.ErrMDCBConnectionLost) {
-			if !mdcbVerified {
+			if !skipBackoff {
 				// First MDCB error - perform full exponential backoff
 				c.logger.Debug("MDCB not ready for certificate fetch, retrying with exponential backoff...")
 
@@ -439,10 +439,10 @@ func (c *certificateManager) List(certIDs []string, mode CertificateType) (out [
 					c.logger.Warn("Timeout waiting for MDCB connection for certificate:", id)
 				} else {
 					// MDCB is now ready, skip full backoff for remaining certificates
-					mdcbVerified = true
+					skipBackoff = true
 				}
 			} else {
-				// MDCB was previously verified but failed again (flaky connection)
+				// Already verified MDCB in this batch but failed again (flaky connection)
 				// Perform a single quick retry without exponential backoff
 				c.logger.Warn("MDCB connection issue after previous success, performing quick retry for certificate:", id)
 				time.Sleep(100 * time.Millisecond)
