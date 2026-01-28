@@ -63,7 +63,8 @@ func TestUpstreamCertificateExpiryInReverseProxy(t *testing.T) {
 	defer upstream.Close()
 
 	// Add certificate to CertificateManager
-	certID, _ := ts.Gw.CertificateManager.Add(combinedPEM, "")
+	certID, err := ts.Gw.CertificateManager.Add(combinedPEM, "")
+	require.NoError(t, err, "Failed to add certificate to manager")
 	defer ts.Gw.CertificateManager.Delete(certID, "")
 
 	// Track events
@@ -158,7 +159,8 @@ func TestUpstreamCertificateExpiryEventCooldown(t *testing.T) {
 	upstream.StartTLS()
 	defer upstream.Close()
 
-	certID, _ := ts.Gw.CertificateManager.Add(combinedPEM, "")
+	certID, err := ts.Gw.CertificateManager.Add(combinedPEM, "")
+	require.NoError(t, err, "Failed to add certificate to manager")
 	defer ts.Gw.CertificateManager.Delete(certID, "")
 
 	eventTracker := &MockEventTracker{}
