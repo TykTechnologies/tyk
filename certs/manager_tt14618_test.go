@@ -2,6 +2,7 @@ package certs
 
 import (
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -552,4 +553,75 @@ func TestTT14618_ScaleWith100Certs(t *testing.T) {
 	improvement := float64(worstCase) / float64(duration)
 	t.Logf("Performance improvement: %.0fx faster than unoptimized approach", improvement)
 	t.Log("SUCCESS: 100 certificates loaded efficiently with single backoff!")
+}
+
+// TestTT14618_ScaleWith1000Certs tests enterprise-scale scenario with 1000 certificates
+func TestTT14618_ScaleWith1000Certs(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping large scale test in short mode")
+	}
+
+	certPEM := loadTestCert(t)
+
+	// Simulate MDCB down for first 5 attempts (~1 second of retries)
+	mockStorage := &MockMDCBStorage{
+		clearAfter: 5,
+		certData:   certPEM,
+		t:          t,
+	}
+
+	handler := NewCertificateManager(mockStorage, "secret", nil, false)
+
+	// Generate 1000 certificate IDs
+	certIDs := make([]string, 1000)
+	for i := 0; i < 1000; i++ {
+		certIDs[i] = fmt.Sprintf("cert-%04d", i)
+	}
+
+	t.Log("LARGE SCALE TEST: Loading 1000 certificates with MDCB failing 5 times before ready")
+	startTime := time.Now()
+	certs := handler.List(certIDs, CertificatePrivate)
+	duration := time.Since(startTime)
+
+	t.Logf("Total time: %.3f seconds", duration.Seconds())
+	t.Logf("Total GetKey calls: %d", mockStorage.callCount)
+	t.Logf("Average time per cert: %.1f ms", duration.Seconds()*1000/1000)
+
+	// Expected calls: 6 attempts for first cert + 999 successful calls = 1005
+	expectedCalls := 6 + 999
+	if mockStorage.callCount != expectedCalls {
+		t.Errorf("Expected %d GetKey calls, got %d", expectedCalls, mockStorage.callCount)
+	}
+
+	// Verify all 1000 certificates loaded
+	if len(certs) != 1000 {
+		t.Errorf("Expected 1000 certificates, got %d", len(certs))
+	}
+	nilCount := 0
+	for _, cert := range certs {
+		if cert == nil {
+			nilCount++
+		}
+	}
+	if nilCount > 0 {
+		t.Errorf("%d out of 1000 certificates are nil", nilCount)
+	}
+
+	// Performance validation
+	// Without optimization: 1000 certs × ~1s backoff = ~1000 seconds (~16 minutes!)
+	// With optimization: single backoff (~1s) + 1000 GetKey calls (~instant) = ~1-3 seconds
+	maxExpectedTime := 5 * time.Second
+	if duration > maxExpectedTime {
+		t.Errorf("PERFORMANCE ISSUE: Expected < %v with single backoff for 1000 certs, took %v",
+			maxExpectedTime, duration)
+		t.Errorf("This suggests compounded retries (would be ~1000s without optimization)")
+	}
+
+	// Calculate theoretical worst case without optimization
+	worstCase := 1000 * time.Second // If each cert retried independently (~16 minutes)
+	improvement := float64(worstCase) / float64(duration)
+	t.Logf("Performance improvement: %.0fx faster than unoptimized approach", improvement)
+	t.Logf("Without optimization: would take ~%.1f minutes", worstCase.Minutes())
+	t.Logf("With optimization: took %.3f seconds", duration.Seconds())
+	t.Log("SUCCESS: 1000 certificates loaded efficiently with single backoff!")
 }
