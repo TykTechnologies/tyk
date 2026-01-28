@@ -1633,11 +1633,14 @@ func (gw *Gateway) invalidateJWKSCacheForAPIID(w http.ResponseWriter, r *http.Re
 }
 
 func (gw *Gateway) invalidateJWKSCacheForAllAPIs(w http.ResponseWriter, _ *http.Request) {
-	JWKCaches.Range(func(_ any, value any) bool {
-		value.(cache.Repository).Close()
+	JWKCaches.Range(func(key, value any) bool {
+		// Atomically delete the key. Future requests will create a new cache.
+		JWKCaches.Delete(key)
+		if repo, ok := value.(cache.Repository); ok {
+			repo.Close()
+		}
 		return true
 	})
-	JWKCaches.Clear()
 
 	doJSONWrite(w, http.StatusOK, apiOk("cache invalidated"))
 }
