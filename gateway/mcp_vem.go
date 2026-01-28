@@ -53,14 +53,6 @@ func (a APIDefinitionLoader) generateMCPVEMs(apiSpec *APISpec, conf config.Confi
 		apiSpec.MCPPrimitives["prompt:"+name] = vemPath
 	}
 
-	// Generate operation VEMs (tools/list, resources/list, initialize, etc.)
-	for method, op := range middleware.McpOperations {
-		vemPath := mcp.OperationPrefix + mcp.SanitizeMethodForPath(method)
-		specs = append(specs, a.buildMCPPrimitiveSpec(method, "operation", vemPath)...)
-		specs = append(specs, a.compileMCPPrimitiveMiddlewareSpecs(op, vemPath, apiSpec, conf)...)
-		apiSpec.MCPPrimitives["operation:"+method] = vemPath
-	}
-
 	return specs
 }
 

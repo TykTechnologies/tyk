@@ -998,6 +998,7 @@ func TestMCPJSONRPCMiddleware_RateLimitEnforcedOnVEM(t *testing.T) {
 	def.UseKeylessAccess = true
 	def.Proxy.ListenPath = "/mcp"
 	def.GlobalRateLimit = apidef.GlobalRateLimit{Rate: 100, Per: 1}
+	def.MarkAsMCP()
 
 	spec := &APISpec{APIDefinition: &def, OAS: oasAPI}
 	ts.Gw.LoadAPI(spec)

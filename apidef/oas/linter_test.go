@@ -67,13 +67,6 @@ func fixOperationsForValidation(operations map[string]*Operation) {
 	}
 }
 
-// fixMCPPrimitivesForValidation fixes operation fields in an MCPPrimitives map to pass schema validation.
-func fixMCPPrimitivesForValidation(primitives map[string]*MCPPrimitive) {
-	for _, prim := range primitives {
-		fixSingleOperation(&prim.Operation)
-	}
-}
-
 func TestXTykGateway_Lint(t *testing.T) {
 	var err error
 

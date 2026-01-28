@@ -179,8 +179,7 @@ func (m *MCPJSONRPCMiddleware) mcpAllowListEnabled() bool {
 
 	return m.mcpAllowListEnabledForPrimitives(mw.McpTools) ||
 		m.mcpAllowListEnabledForPrimitives(mw.McpResources) ||
-		m.mcpAllowListEnabledForPrimitives(mw.McpPrompts) ||
-		m.mcpAllowListEnabledForPrimitives(mw.McpOperations)
+		m.mcpAllowListEnabledForPrimitives(mw.McpPrompts)
 }
 
 func (m *MCPJSONRPCMiddleware) mcpAllowListEnabledForPrimitives(primitives oas.MCPPrimitives) bool {

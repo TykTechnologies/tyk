@@ -255,10 +255,6 @@ func TestMCPPrimitive_DisabledMiddleware(t *testing.T) {
 		primitive.TransformResponseBody = &TransformBody{Enabled: true}
 
 		var ep apidef.ExtendedPathsSet
-		primitive.extractTransformRequestHeadersTo(&ep, "/test", "POST")
-		primitive.extractTransformResponseBodyTo(&ep, "/test", "POST")
-
-		assert.Len(t, ep.TransformHeader, 1)
 		primitive.ExtractToExtendedPaths(&ep, "/test", "POST")
 
 		// Request headers transformation works
