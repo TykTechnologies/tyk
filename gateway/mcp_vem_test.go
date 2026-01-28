@@ -26,8 +26,8 @@ func Test_generateMCPVEMs_NonMCPAPI(t *testing.T) {
 
 	tykExt := &oas.XTykAPIGateway{
 		Middleware: &oas.Middleware{
-			McpTools: map[string]*oas.Operation{
-				"get-weather": {Allow: &oas.Allowance{Enabled: true}},
+			McpTools: oas.MCPPrimitives{
+				"get-weather": {Operation: oas.Operation{Allow: &oas.Allowance{Enabled: true}}},
 			},
 		},
 	}
@@ -50,8 +50,8 @@ func Test_generateMCPVEMs_RequiresJSONRPC20(t *testing.T) {
 
 	tykExt := &oas.XTykAPIGateway{
 		Middleware: &oas.Middleware{
-			McpTools: map[string]*oas.Operation{
-				"get-weather": {Allow: &oas.Allowance{Enabled: true}},
+			McpTools: oas.MCPPrimitives{
+				"get-weather": {Operation: oas.Operation{Allow: &oas.Allowance{Enabled: true}}},
 			},
 		},
 	}
@@ -92,14 +92,14 @@ func Test_generateMCPVEMs_GeneratesVEMsAndMiddlewareSpecs(t *testing.T) {
 
 	tykExt := &oas.XTykAPIGateway{
 		Middleware: &oas.Middleware{
-			McpTools: map[string]*oas.Operation{
-				"get-weather": {RateLimit: &oas.RateLimitEndpoint{Enabled: true, Rate: 100, Per: oas.ReadableDuration(time.Minute)}},
+			McpTools: oas.MCPPrimitives{
+				"get-weather": {Operation: oas.Operation{RateLimit: &oas.RateLimitEndpoint{Enabled: true, Rate: 100, Per: oas.ReadableDuration(time.Minute)}}},
 			},
-			McpResources: map[string]*oas.Operation{
-				"file:///repo/*": {Allow: &oas.Allowance{Enabled: true}},
+			McpResources: oas.MCPPrimitives{
+				"file:///repo/*": {Operation: oas.Operation{Allow: &oas.Allowance{Enabled: true}}},
 			},
-			McpPrompts: map[string]*oas.Operation{
-				"code-review": {Allow: &oas.Allowance{Enabled: true}},
+			McpPrompts: oas.MCPPrimitives{
+				"code-review": {Operation: oas.Operation{Allow: &oas.Allowance{Enabled: true}}},
 			},
 		},
 	}
