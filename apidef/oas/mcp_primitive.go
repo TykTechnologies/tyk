@@ -14,7 +14,6 @@ type MCPPrimitive struct {
 //nolint:unused,revive,unparam
 func (m *MCPPrimitive) extractTransformResponseBodyTo(ep *apidef.ExtendedPathsSet, path string, method string) {
 	// Intentionally empty - MCP primitives don't support response body transformation
-	return
 }
 
 // MCPPrimitives maps primitive names to their middleware configurations.
