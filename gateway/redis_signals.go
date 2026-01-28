@@ -159,7 +159,7 @@ func (gw *Gateway) handleRedisEvent(v interface{}, handled func(NotificationComm
 			log.WithError(err).Errorf("cache invalidation failed for: %s", notif.Payload)
 		}
 	case NoticeInvalidateJWKSCacheForAPI:
-		invalidateJWKSCacheByAPIID(notif.Payload)
+		gw.invalidateJWKSCacheByAPIID(notif.Payload)
 	case NoticeUserKeyReset:
 		gw.handleUserKeyReset(notif.Payload)
 	default:

@@ -219,18 +219,13 @@ func TestExternalOAuth_JWT(t *testing.T) {
 		})
 
 		authHeaders := map[string]string{"authorization": jwtToken}
-		flush := func() {
-			if externalOAuthJWKCache != nil {
-				externalOAuthJWKCache.Flush()
-			}
-		}
 
 		t.Run("Direct JWK URL", func(t *testing.T) {
 			t.Run("valid jwk url", func(t *testing.T) {
 				spec.ExternalOAuth.Providers[0].JWT.Source = testHttpJWK
 				_ = ts.Gw.LoadAPI(spec)
 				t.Run("empty cache", func(t *testing.T) {
-					flush()
+					ts.Gw.jwkCache.Flush()
 					_, _ = ts.Run(t, test.TestCase{
 						Headers: authHeaders, Code: http.StatusOK,
 					})
@@ -425,9 +420,7 @@ func TestGetSecretFromJWKURL_FetchError_LogsError(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
 
-	if externalOAuthJWKCache != nil {
-		externalOAuthJWKCache.Flush()
-	}
+	ts.Gw.jwkCache.Flush()
 
 	logger, hook := logrustest.NewNullLogger()
 

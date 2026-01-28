@@ -74,3 +74,21 @@ func (r *repository) Flush() {
 func (r *repository) Close() {
 	r.cache.Close()
 }
+
+// Details
+// backdoor for testing
+type Details struct {
+	DefaultExpiration int64
+	CleanupInterval   int64
+}
+
+type Detailer interface {
+	Details() Details
+}
+
+func (r *repository) Details() Details {
+	return Details{
+		CleanupInterval:   r.cleanupInterval,
+		DefaultExpiration: r.defaultExpiration,
+	}
+}
