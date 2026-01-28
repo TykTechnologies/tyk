@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"net/http/httptest"
 	"reflect"
 	"sort"
 	"testing"
@@ -20,6 +21,8 @@ import (
 	"github.com/TykTechnologies/tyk/user"
 	"github.com/go-jose/go-jose/v3"
 	"github.com/golang-jwt/jwt/v4"
+	"github.com/sirupsen/logrus"
+	logrustest "github.com/sirupsen/logrus/hooks/test"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -5021,4 +5024,113 @@ func TestJWT_TraditionalAuth_ExistingSessionNoPolicyInToken(t *testing.T) {
 			BodyMatch: `key not authorized: no matching policy found`,
 		})
 	})
+}
+
+func TestJWTMiddleware_ErrorLogging(t *testing.T) {
+	invalidJSONHandler := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		_, err := w.Write([]byte("this-is-not-json"))
+		assert.NoError(t, err)
+	})
+
+	tests := []struct {
+		name             string
+		mockHandler      http.Handler
+		configureSpec    func(*APISpec)
+		action           func(*JWTMiddleware, string) error
+		expectedLogParts []string
+	}{
+		{
+			name:        "Legacy GetSecret Invalid JSON",
+			mockHandler: invalidJSONHandler,
+			action: func(m *JWTMiddleware, serverURL string) error {
+				_, err := m.legacyGetSecretFromURL(serverURL, "kid", "RS256")
+				return err
+			},
+			expectedLogParts: []string{"Invalid JWKS retrieved from endpoint"},
+		},
+		{
+			name: "Legacy GetSecret Network Error",
+			action: func(m *JWTMiddleware, _ string) error {
+				_, err := m.legacyGetSecretFromURL("http://[::1]:namedport", "kid", "RS256")
+				return err
+			},
+			expectedLogParts: []string{"JWKS endpoint resolution failed"},
+		},
+		{
+			name: "VerifySignature Invalid Base64 Source",
+			configureSpec: func(s *APISpec) {
+				s.JWTSource = "this-is-not-base64!"
+			},
+			action: func(m *JWTMiddleware, _ string) error {
+				token := &jwt.Token{Header: map[string]interface{}{"kid": "123"}}
+				_, err := m.getSecretToVerifySignature(nil, token)
+				return err
+			},
+			expectedLogParts: []string{"JWKS source decode failed", "not a base64 string"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var serverURL string
+			if tt.mockHandler != nil {
+				ts := httptest.NewServer(tt.mockHandler)
+				defer ts.Close()
+				serverURL = ts.URL
+			}
+
+			logger, hook := logrustest.NewNullLogger()
+
+			gw := &Gateway{}
+			gw.SetConfig(config.Config{JWTSSLInsecureSkipVerify: true})
+
+			spec := &APISpec{
+				APIDefinition: &apidef.APIDefinition{
+					APIID: "test-api-" + tt.name,
+				},
+			}
+			if tt.configureSpec != nil {
+				tt.configureSpec(spec)
+			}
+
+			m := JWTMiddleware{BaseMiddleware: &BaseMiddleware{
+				Gw:     gw,
+				logger: logger.WithField("mw", "JWTMiddleware"),
+			}}
+			m.Spec = spec
+
+			err := tt.action(&m, serverURL)
+
+			assert.Error(t, err)
+
+			require.NotEmpty(t, hook.Entries, "Expected log entries but found none")
+			lastLog := hook.LastEntry()
+
+			assert.Equal(t, logrus.ErrorLevel, lastLog.Level)
+			for _, part := range tt.expectedLogParts {
+				assert.Contains(t, lastLog.Message, part)
+			}
+		})
+	}
+}
+
+func TestDeleteJWKCacheByAPIID(t *testing.T) {
+	apiID := "test-api-" + uuid.NewHex()
+
+	// Create and populate a cache
+	jwkCache := loadOrCreateJWKCacheByApiID(apiID)
+	jwkCache.Set("test-key", "test-value", 0)
+
+	// Verify the cache has items before deletion
+	assert.Equal(t, 1, jwkCache.Count())
+
+	deleteJWKCacheByAPIID(apiID)
+
+	// Verify cache is removed from the JWKCaches map
+	_, exists := JWKCaches.Load(apiID)
+	assert.False(t, exists, "cache should be removed from JWKCaches")
+
+	// Verify cache contents are flushed (Close calls Flush)
+	assert.Equal(t, 0, jwkCache.Count(), "cache items should be flushed after Close()")
 }
