@@ -27,6 +27,7 @@ import (
 
 	"github.com/TykTechnologies/storage/persistent/model"
 	temporalmodel "github.com/TykTechnologies/storage/temporal/model"
+
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/apidef/oas"
 	"github.com/TykTechnologies/tyk/certs"
@@ -4318,6 +4319,1142 @@ func TestKeyHandler_ContextCancellation(t *testing.T) {
 
 	assert.Equal(t, http.StatusGatewayTimeout, rec.Code)
 	assert.Contains(t, rec.Body.String(), "Request timeout")
+}
+
+func TestAPIMCPListing(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	allAPIs := ts.Gw.BuildAndLoadAPI(
+		func(spec *APISpec) {
+			spec.APIID = "mcp-api-1"
+			spec.Name = "MCP API 1"
+			spec.MarkAsMCP()
+		},
+		func(spec *APISpec) {
+			spec.APIID = "mcp-api-2"
+			spec.Name = "MCP API 2"
+			spec.MarkAsMCP()
+		},
+		func(spec *APISpec) {
+			spec.APIID = "api-1"
+			spec.Name = "Regular API 1"
+		},
+		func(spec *APISpec) {
+			spec.APIID = "api-2"
+			spec.Name = "Regular API 2"
+		},
+	)
+
+	require.Len(t, allAPIs, 4)
+
+	mcpAPI1 := allAPIs[0]
+	mcpAPI2 := allAPIs[1]
+	regularAPI1 := allAPIs[2]
+	regularAPI2 := allAPIs[3]
+
+	t.Run("/tyk/apis excludes MCP APIs by default", func(t *testing.T) {
+		req := TestReq(t, "GET", "/tyk/apis/", nil)
+		req = ts.withAuth(req)
+		rec := httptest.NewRecorder()
+		ts.mainRouter().ServeHTTP(rec, req)
+
+		assert.Equal(t, http.StatusOK, rec.Code)
+
+		var apis []*apidef.APIDefinition
+		err := json.Unmarshal(rec.Body.Bytes(), &apis)
+		assert.NoError(t, err)
+		assert.Len(t, apis, 2)
+
+		for _, api := range apis {
+			assert.False(t, api.IsMCP())
+			assert.NotEqual(t, "mcp-api-1", api.APIID)
+			assert.NotEqual(t, "mcp-api-2", api.APIID)
+		}
+
+		apiIDs := make([]string, len(apis))
+		for i, api := range apis {
+			apiIDs[i] = api.APIID
+		}
+		assert.Contains(t, apiIDs, regularAPI1.APIID)
+		assert.Contains(t, apiIDs, regularAPI2.APIID)
+	})
+
+	t.Run("/tyk/mcps returns only MCP APIs", func(t *testing.T) {
+		req := TestReq(t, "GET", "/tyk/mcps/", nil)
+		req = ts.withAuth(req)
+		rec := httptest.NewRecorder()
+		ts.mainRouter().ServeHTTP(rec, req)
+
+		assert.Equal(t, http.StatusOK, rec.Code)
+
+		var response []interface{}
+		err := json.Unmarshal(rec.Body.Bytes(), &response)
+		assert.NoError(t, err)
+		assert.Len(t, response, 2)
+
+		mcpAPI1Spec := ts.Gw.getApiSpec(mcpAPI1.APIID)
+		assert.NotNil(t, mcpAPI1Spec)
+		assert.True(t, mcpAPI1Spec.IsMCP())
+
+		mcpAPI2Spec := ts.Gw.getApiSpec(mcpAPI2.APIID)
+		assert.NotNil(t, mcpAPI2Spec)
+		assert.True(t, mcpAPI2Spec.IsMCP())
+	})
+
+	t.Run("GET /tyk/mcps/{apiID} returns MCP API", func(t *testing.T) {
+		req := TestReq(t, "GET", "/tyk/mcps/"+mcpAPI1.APIID, nil)
+		req = ts.withAuth(req)
+		rec := httptest.NewRecorder()
+		ts.mainRouter().ServeHTTP(rec, req)
+
+		assert.Equal(t, http.StatusOK, rec.Code)
+
+		var response map[string]interface{}
+		err := json.Unmarshal(rec.Body.Bytes(), &response)
+		assert.NoError(t, err)
+		assert.NotNil(t, response)
+	})
+
+	t.Run("GET /tyk/mcps/{apiID} returns 404 for non-MCP API", func(t *testing.T) {
+		req := TestReq(t, "GET", "/tyk/mcps/"+regularAPI1.APIID, nil)
+		req = ts.withAuth(req)
+		rec := httptest.NewRecorder()
+		ts.mainRouter().ServeHTTP(rec, req)
+
+		assert.Equal(t, http.StatusNotFound, rec.Code)
+		assert.Contains(t, rec.Body.String(), "is not an MCP API")
+	})
+
+	t.Run("GET /tyk/mcps/{apiID} returns 404 for non-existent API", func(t *testing.T) {
+		req := TestReq(t, "GET", "/tyk/mcps/non-existent-api", nil)
+		req = ts.withAuth(req)
+		rec := httptest.NewRecorder()
+		ts.mainRouter().ServeHTTP(rec, req)
+
+		assert.Equal(t, http.StatusNotFound, rec.Code)
+	})
+
+	t.Run("POST /tyk/mcps creates MCP API", func(t *testing.T) {
+		tykExt := oas.XTykAPIGateway{
+			Info: oas.Info{
+				Name: "New MCP API",
+				ID:   "new-mcp-api",
+				State: oas.State{
+					Active: true,
+				},
+			},
+			Upstream: oas.Upstream{
+				URL: TestHttpAny,
+			},
+			Server: oas.Server{
+				ListenPath: oas.ListenPath{
+					Value: "/new-mcp/",
+					Strip: false,
+				},
+			},
+		}
+
+		oasAPI := openapi3.T{
+			OpenAPI: "3.0.3",
+			Info: &openapi3.Info{
+				Title:   "New MCP",
+				Version: "1",
+			},
+			Paths: openapi3.NewPaths(),
+		}
+
+		oasAPI.Extensions = map[string]interface{}{
+			oas.ExtensionTykAPIGateway: tykExt,
+		}
+
+		req := TestReq(t, "POST", "/tyk/mcps", &oasAPI)
+		req = ts.withAuth(req)
+		rec := httptest.NewRecorder()
+		ts.mainRouter().ServeHTTP(rec, req)
+
+		assert.Equal(t, http.StatusOK, rec.Code)
+
+		var response apiModifyKeySuccess
+		err := json.Unmarshal(rec.Body.Bytes(), &response)
+		assert.NoError(t, err)
+		assert.Equal(t, "new-mcp-api", response.Key)
+		assert.Equal(t, "added", response.Action)
+
+		ts.Gw.DoReload()
+
+		api := ts.Gw.getApiSpec("new-mcp-api")
+		assert.NotNil(t, api)
+		assert.True(t, api.IsMCP())
+		assert.Equal(t, "New MCP API", api.Name)
+	})
+
+	t.Run("POST /tyk/mcps generates API ID if not provided", func(t *testing.T) {
+		tykExt := oas.XTykAPIGateway{
+			Info: oas.Info{
+				Name: "Auto ID MCP",
+				State: oas.State{
+					Active: true,
+				},
+			},
+			Upstream: oas.Upstream{
+				URL: TestHttpAny,
+			},
+			Server: oas.Server{
+				ListenPath: oas.ListenPath{
+					Value: "/auto-id-mcp/",
+					Strip: false,
+				},
+			},
+		}
+
+		oasAPI := openapi3.T{
+			OpenAPI: "3.0.3",
+			Info: &openapi3.Info{
+				Title:   "Auto ID MCP",
+				Version: "1",
+			},
+			Paths: openapi3.NewPaths(),
+		}
+
+		oasAPI.Extensions = map[string]interface{}{
+			oas.ExtensionTykAPIGateway: tykExt,
+		}
+
+		req := TestReq(t, "POST", "/tyk/mcps", &oasAPI)
+		req = ts.withAuth(req)
+		rec := httptest.NewRecorder()
+		ts.mainRouter().ServeHTTP(rec, req)
+
+		assert.Equal(t, http.StatusOK, rec.Code)
+
+		var response apiModifyKeySuccess
+		err := json.Unmarshal(rec.Body.Bytes(), &response)
+		assert.NoError(t, err)
+		assert.NotEmpty(t, response.Key)
+		assert.Equal(t, "added", response.Action)
+
+		ts.Gw.DoReload()
+
+		api := ts.Gw.getApiSpec(response.Key)
+		assert.NotNil(t, api)
+		assert.True(t, api.IsMCP())
+	})
+
+	t.Run("POST /tyk/mcps succeeds without primitives", func(t *testing.T) {
+		tykExt := oas.XTykAPIGateway{
+			Info: oas.Info{
+				Name: "MCP Without Primitives",
+				ID:   "mcp-no-primitives",
+				State: oas.State{
+					Active: true,
+				},
+			},
+			Upstream: oas.Upstream{
+				URL: TestHttpAny,
+			},
+			Server: oas.Server{
+				ListenPath: oas.ListenPath{
+					Value: "/mcp-no-primitives/",
+					Strip: false,
+				},
+			},
+		}
+
+		oasAPI := openapi3.T{
+			OpenAPI: "3.0.3",
+			Info: &openapi3.Info{
+				Title:   "MCP Without Primitives",
+				Version: "1",
+			},
+			Paths: openapi3.NewPaths(),
+		}
+
+		oasAPI.Extensions = map[string]interface{}{
+			oas.ExtensionTykAPIGateway: tykExt,
+		}
+
+		req := TestReq(t, "POST", "/tyk/mcps", &oasAPI)
+		req = ts.withAuth(req)
+		rec := httptest.NewRecorder()
+		ts.mainRouter().ServeHTTP(rec, req)
+
+		assert.Equal(t, http.StatusOK, rec.Code)
+
+		var response apiModifyKeySuccess
+		err := json.Unmarshal(rec.Body.Bytes(), &response)
+		assert.NoError(t, err)
+		assert.Equal(t, "mcp-no-primitives", response.Key)
+
+		ts.Gw.DoReload()
+
+		api := ts.Gw.getApiSpec("mcp-no-primitives")
+		assert.NotNil(t, api)
+		assert.True(t, api.IsMCP())
+	})
+
+	t.Run("POST /tyk/mcps succeeds with valid primitives", func(t *testing.T) {
+		tykExt := oas.XTykAPIGateway{
+			Info: oas.Info{
+				Name: "MCP With Primitives",
+				ID:   "mcp-with-primitives",
+				State: oas.State{
+					Active: true,
+				},
+			},
+			Upstream: oas.Upstream{
+				URL: TestHttpAny,
+			},
+			Server: oas.Server{
+				ListenPath: oas.ListenPath{
+					Value: "/mcp-with-primitives/",
+					Strip: false,
+				},
+			},
+			Middleware: &oas.Middleware{
+				McpTools: map[string]*oas.MCPPrimitive{
+					"getTool1": {
+						Operation: oas.Operation{
+							Allow: &oas.Allowance{
+								Enabled: true,
+							},
+						},
+					},
+				},
+				McpResources: map[string]*oas.MCPPrimitive{
+					"getResource1": {
+						Operation: oas.Operation{
+							Allow: &oas.Allowance{
+								Enabled: true,
+							},
+						},
+					},
+				},
+				McpPrompts: map[string]*oas.MCPPrimitive{
+					"getPrompt1": {
+						Operation: oas.Operation{
+							Allow: &oas.Allowance{
+								Enabled: true,
+							},
+						},
+					},
+				},
+			},
+		}
+
+		oasAPI := openapi3.T{
+			OpenAPI: "3.0.3",
+			Info: &openapi3.Info{
+				Title:   "MCP With Primitives",
+				Version: "1",
+			},
+			Paths: openapi3.NewPaths(),
+		}
+
+		oasAPI.Extensions = map[string]interface{}{
+			oas.ExtensionTykAPIGateway: tykExt,
+		}
+
+		req := TestReq(t, "POST", "/tyk/mcps", &oasAPI)
+		req = ts.withAuth(req)
+		rec := httptest.NewRecorder()
+		ts.mainRouter().ServeHTTP(rec, req)
+
+		assert.Equal(t, http.StatusOK, rec.Code)
+
+		var response apiModifyKeySuccess
+		err := json.Unmarshal(rec.Body.Bytes(), &response)
+		assert.NoError(t, err)
+		assert.Equal(t, "mcp-with-primitives", response.Key)
+
+		ts.Gw.DoReload()
+
+		api := ts.Gw.getApiSpec("mcp-with-primitives")
+		assert.NotNil(t, api)
+		assert.True(t, api.IsMCP())
+	})
+
+	t.Run("PUT /tyk/mcps/{apiID} updates MCP API", func(t *testing.T) {
+		createTykExt := oas.XTykAPIGateway{
+			Info: oas.Info{
+				Name: "Original MCP",
+				ID:   "update-test-api",
+				State: oas.State{
+					Active: true,
+				},
+			},
+			Upstream: oas.Upstream{
+				URL: TestHttpAny,
+			},
+			Server: oas.Server{
+				ListenPath: oas.ListenPath{
+					Value: "/original-mcp/",
+					Strip: false,
+				},
+			},
+		}
+
+		createOasAPI := openapi3.T{
+			OpenAPI: "3.0.3",
+			Info: &openapi3.Info{
+				Title:   "Original MCP",
+				Version: "1",
+			},
+			Paths: openapi3.NewPaths(),
+		}
+
+		createOasAPI.Extensions = map[string]interface{}{
+			oas.ExtensionTykAPIGateway: createTykExt,
+		}
+
+		req := TestReq(t, "POST", "/tyk/mcps", &createOasAPI)
+		req = ts.withAuth(req)
+		rec := httptest.NewRecorder()
+		ts.mainRouter().ServeHTTP(rec, req)
+
+		assert.Equal(t, http.StatusOK, rec.Code)
+
+		ts.Gw.DoReload()
+
+		updateTykExt := oas.XTykAPIGateway{
+			Info: oas.Info{
+				Name: "Updated MCP API",
+				ID:   "update-test-api",
+				State: oas.State{
+					Active: true,
+				},
+			},
+			Upstream: oas.Upstream{
+				URL: "http://updated-upstream.com",
+			},
+			Server: oas.Server{
+				ListenPath: oas.ListenPath{
+					Value: "/updated-mcp/",
+					Strip: false,
+				},
+			},
+		}
+
+		updateOasAPI := openapi3.T{
+			OpenAPI: "3.0.3",
+			Info: &openapi3.Info{
+				Title:   "Updated MCP",
+				Version: "1",
+			},
+			Paths: openapi3.NewPaths(),
+		}
+
+		updateOasAPI.Extensions = map[string]interface{}{
+			oas.ExtensionTykAPIGateway: updateTykExt,
+		}
+
+		req = TestReq(t, "PUT", "/tyk/mcps/update-test-api", &updateOasAPI)
+		req = ts.withAuth(req)
+		rec = httptest.NewRecorder()
+		ts.mainRouter().ServeHTTP(rec, req)
+
+		assert.Equal(t, http.StatusOK, rec.Code)
+
+		var response apiModifyKeySuccess
+		err := json.Unmarshal(rec.Body.Bytes(), &response)
+		assert.NoError(t, err)
+		assert.Equal(t, "update-test-api", response.Key)
+		assert.Equal(t, "modified", response.Action)
+
+		ts.Gw.DoReload()
+
+		api := ts.Gw.getApiSpec("update-test-api")
+		assert.NotNil(t, api)
+		assert.True(t, api.IsMCP())
+		assert.Equal(t, "Updated MCP API", api.Name)
+		assert.Equal(t, "http://updated-upstream.com", api.Proxy.TargetURL)
+	})
+
+	t.Run("PUT /tyk/mcps/{apiID} fails with mismatched API ID", func(t *testing.T) {
+		createTykExt := oas.XTykAPIGateway{
+			Info: oas.Info{
+				Name: "Test MCP",
+				ID:   "mismatch-test-api",
+				State: oas.State{
+					Active: true,
+				},
+			},
+			Upstream: oas.Upstream{
+				URL: TestHttpAny,
+			},
+			Server: oas.Server{
+				ListenPath: oas.ListenPath{
+					Value: "/mismatch-test/",
+					Strip: false,
+				},
+			},
+		}
+
+		createOasAPI := openapi3.T{
+			OpenAPI: "3.0.3",
+			Info: &openapi3.Info{
+				Title:   "Test MCP",
+				Version: "1",
+			},
+			Paths: openapi3.NewPaths(),
+		}
+
+		createOasAPI.Extensions = map[string]interface{}{
+			oas.ExtensionTykAPIGateway: createTykExt,
+		}
+
+		req := TestReq(t, "POST", "/tyk/mcps", &createOasAPI)
+		req = ts.withAuth(req)
+		rec := httptest.NewRecorder()
+		ts.mainRouter().ServeHTTP(rec, req)
+
+		assert.Equal(t, http.StatusOK, rec.Code)
+
+		ts.Gw.DoReload()
+
+		updateTykExt := oas.XTykAPIGateway{
+			Info: oas.Info{
+				Name: "Wrong ID MCP",
+				ID:   "wrong-id",
+				State: oas.State{
+					Active: true,
+				},
+			},
+			Upstream: oas.Upstream{
+				URL: TestHttpAny,
+			},
+			Server: oas.Server{
+				ListenPath: oas.ListenPath{
+					Value: "/wrong-id/",
+					Strip: false,
+				},
+			},
+		}
+
+		updateOasAPI := openapi3.T{
+			OpenAPI: "3.0.3",
+			Info: &openapi3.Info{
+				Title:   "Wrong ID",
+				Version: "1",
+			},
+			Paths: openapi3.NewPaths(),
+		}
+
+		updateOasAPI.Extensions = map[string]interface{}{
+			oas.ExtensionTykAPIGateway: updateTykExt,
+		}
+
+		req = TestReq(t, "PUT", "/tyk/mcps/mismatch-test-api", &updateOasAPI)
+		req = ts.withAuth(req)
+		rec = httptest.NewRecorder()
+		ts.mainRouter().ServeHTTP(rec, req)
+
+		assert.Equal(t, http.StatusBadRequest, rec.Code)
+		assert.Contains(t, rec.Body.String(), "does not match")
+	})
+
+	t.Run("PUT /tyk/mcps/{apiID} fails for non-MCP API", func(t *testing.T) {
+		regularSpec := BuildAPI(func(spec *APISpec) {
+			spec.SetDisabledFlags()
+			spec.APIID = "regular-for-put-test"
+			spec.Name = "Regular API"
+			spec.Proxy.ListenPath = "/regular-put-test/"
+			spec.IsOAS = true
+			spec.OAS = oas.OAS{
+				T: openapi3.T{
+					OpenAPI: "3.0.3",
+					Info: &openapi3.Info{
+						Title:   "Regular API",
+						Version: "1",
+					},
+					Paths: openapi3.NewPaths(),
+				},
+			}
+			spec.OAS.Fill(*spec.APIDefinition)
+		})[0]
+
+		_, _ = ts.Run(t, test.TestCase{AdminAuth: true, Method: http.MethodPost, Path: "/tyk/apis/oas", Data: &regularSpec.OAS, Code: http.StatusOK})
+
+		ts.Gw.DoReload()
+
+		tykExt := oas.XTykAPIGateway{
+			Info: oas.Info{
+				Name: "Update Regular API",
+				ID:   "regular-for-put-test",
+				State: oas.State{
+					Active: true,
+				},
+			},
+			Upstream: oas.Upstream{
+				URL: TestHttpAny,
+			},
+			Server: oas.Server{
+				ListenPath: oas.ListenPath{
+					Value: "/updated-regular/",
+					Strip: false,
+				},
+			},
+		}
+
+		oasAPI := openapi3.T{
+			OpenAPI: "3.0.3",
+			Info: &openapi3.Info{
+				Title:   "Update Regular",
+				Version: "1",
+			},
+			Paths: openapi3.NewPaths(),
+		}
+
+		oasAPI.Extensions = map[string]interface{}{
+			oas.ExtensionTykAPIGateway: tykExt,
+		}
+
+		req := TestReq(t, "PUT", "/tyk/mcps/regular-for-put-test", &oasAPI)
+		req = ts.withAuth(req)
+		rec := httptest.NewRecorder()
+		ts.mainRouter().ServeHTTP(rec, req)
+
+		assert.Equal(t, http.StatusNotFound, rec.Code)
+		assert.Contains(t, rec.Body.String(), "is not an MCP API")
+	})
+
+	t.Run("PUT /tyk/mcps/{apiID} fails for non-existent API", func(t *testing.T) {
+		tykExt := oas.XTykAPIGateway{
+			Info: oas.Info{
+				Name: "Non Existent",
+				ID:   "non-existent",
+				State: oas.State{
+					Active: true,
+				},
+			},
+			Upstream: oas.Upstream{
+				URL: TestHttpAny,
+			},
+			Server: oas.Server{
+				ListenPath: oas.ListenPath{
+					Value: "/non-existent/",
+					Strip: false,
+				},
+			},
+		}
+
+		oasAPI := openapi3.T{
+			OpenAPI: "3.0.3",
+			Info: &openapi3.Info{
+				Title:   "Non Existent",
+				Version: "1",
+			},
+			Paths: openapi3.NewPaths(),
+		}
+
+		oasAPI.Extensions = map[string]interface{}{
+			oas.ExtensionTykAPIGateway: tykExt,
+		}
+
+		req := TestReq(t, "PUT", "/tyk/mcps/non-existent", &oasAPI)
+		req = ts.withAuth(req)
+		rec := httptest.NewRecorder()
+		ts.mainRouter().ServeHTTP(rec, req)
+
+		assert.Equal(t, http.StatusNotFound, rec.Code)
+		assert.Contains(t, rec.Body.String(), "API not found")
+	})
+
+	t.Run("PUT /tyk/mcps/{apiID} updates primitives", func(t *testing.T) {
+		createTykExt := oas.XTykAPIGateway{
+			Info: oas.Info{
+				Name: "Original Primitives",
+				ID:   "primitives-test-api",
+				State: oas.State{
+					Active: true,
+				},
+			},
+			Upstream: oas.Upstream{
+				URL: TestHttpAny,
+			},
+			Server: oas.Server{
+				ListenPath: oas.ListenPath{
+					Value: "/primitives-test/",
+					Strip: false,
+				},
+			},
+		}
+
+		createOasAPI := openapi3.T{
+			OpenAPI: "3.0.3",
+			Info: &openapi3.Info{
+				Title:   "Original Primitives",
+				Version: "1",
+			},
+			Paths: openapi3.NewPaths(),
+		}
+
+		createOasAPI.Extensions = map[string]interface{}{
+			oas.ExtensionTykAPIGateway: createTykExt,
+		}
+
+		req := TestReq(t, "POST", "/tyk/mcps", &createOasAPI)
+		req = ts.withAuth(req)
+		rec := httptest.NewRecorder()
+		ts.mainRouter().ServeHTTP(rec, req)
+
+		assert.Equal(t, http.StatusOK, rec.Code)
+
+		ts.Gw.DoReload()
+
+		updateTykExt := oas.XTykAPIGateway{
+			Info: oas.Info{
+				Name: "Updated Primitives",
+				ID:   "primitives-test-api",
+				State: oas.State{
+					Active: true,
+				},
+			},
+			Upstream: oas.Upstream{
+				URL: TestHttpAny,
+			},
+			Server: oas.Server{
+				ListenPath: oas.ListenPath{
+					Value: "/updated-primitives/",
+					Strip: false,
+				},
+			},
+			Middleware: &oas.Middleware{
+				McpTools: map[string]*oas.MCPPrimitive{
+					"updatedTool": {
+						Operation: oas.Operation{
+							Allow: &oas.Allowance{
+								Enabled: true,
+							},
+						},
+					},
+				},
+			},
+		}
+
+		updateOasAPI := openapi3.T{
+			OpenAPI: "3.0.3",
+			Info: &openapi3.Info{
+				Title:   "Updated Primitives",
+				Version: "1",
+			},
+			Paths: openapi3.NewPaths(),
+		}
+
+		updateOasAPI.Extensions = map[string]interface{}{
+			oas.ExtensionTykAPIGateway: updateTykExt,
+		}
+
+		req = TestReq(t, "PUT", "/tyk/mcps/primitives-test-api", &updateOasAPI)
+		req = ts.withAuth(req)
+		rec = httptest.NewRecorder()
+		ts.mainRouter().ServeHTTP(rec, req)
+
+		assert.Equal(t, http.StatusOK, rec.Code)
+
+		var response apiModifyKeySuccess
+		err := json.Unmarshal(rec.Body.Bytes(), &response)
+		assert.NoError(t, err)
+		assert.Equal(t, "primitives-test-api", response.Key)
+		assert.Equal(t, "modified", response.Action)
+	})
+
+	t.Run("DELETE /tyk/mcps/{apiID} deletes MCP API and files", func(t *testing.T) {
+		tykExt := oas.XTykAPIGateway{
+			Info: oas.Info{
+				Name: "Delete Test MCP",
+				ID:   "delete-test-api",
+				State: oas.State{
+					Active: true,
+				},
+			},
+			Upstream: oas.Upstream{
+				URL: TestHttpAny,
+			},
+			Server: oas.Server{
+				ListenPath: oas.ListenPath{
+					Value: "/delete-test/",
+					Strip: false,
+				},
+			},
+		}
+
+		oasAPI := openapi3.T{
+			OpenAPI: "3.0.3",
+			Info: &openapi3.Info{
+				Title:   "Delete Test",
+				Version: "1",
+			},
+			Paths: openapi3.NewPaths(),
+		}
+
+		oasAPI.Extensions = map[string]interface{}{
+			oas.ExtensionTykAPIGateway: tykExt,
+		}
+
+		req := TestReq(t, "POST", "/tyk/mcps", &oasAPI)
+		req = ts.withAuth(req)
+		rec := httptest.NewRecorder()
+		ts.mainRouter().ServeHTTP(rec, req)
+
+		assert.Equal(t, http.StatusOK, rec.Code)
+
+		ts.Gw.DoReload()
+
+		api := ts.Gw.getApiSpec("delete-test-api")
+		assert.NotNil(t, api)
+		assert.True(t, api.IsMCP())
+
+		defFilePath := filepath.Join(ts.Gw.GetConfig().AppPath, "delete-test-api.json")
+		defMCPFilePath := filepath.Join(ts.Gw.GetConfig().AppPath, "delete-test-api-mcp.json")
+
+		_, err := os.Stat(defFilePath)
+		assert.NoError(t, err, "API definition file should exist")
+
+		_, err = os.Stat(defMCPFilePath)
+		assert.NoError(t, err, "MCP file should exist")
+
+		req = TestReq(t, "DELETE", "/tyk/mcps/delete-test-api", nil)
+		req = ts.withAuth(req)
+		rec = httptest.NewRecorder()
+		ts.mainRouter().ServeHTTP(rec, req)
+
+		assert.Equal(t, http.StatusOK, rec.Code)
+
+		var response apiModifyKeySuccess
+		err = json.Unmarshal(rec.Body.Bytes(), &response)
+		assert.NoError(t, err)
+		assert.Equal(t, "delete-test-api", response.Key)
+		assert.Equal(t, "deleted", response.Action)
+
+		ts.Gw.DoReload()
+
+		api = ts.Gw.getApiSpec("delete-test-api")
+		assert.Nil(t, api)
+
+		_, err = os.Stat(defFilePath)
+		assert.Error(t, err, "API definition file should be deleted")
+
+		_, err = os.Stat(defMCPFilePath)
+		assert.Error(t, err, "MCP file should be deleted")
+	})
+
+	t.Run("DELETE /tyk/mcps/{apiID} fails for non-MCP API", func(t *testing.T) {
+		regularSpec := BuildAPI(func(spec *APISpec) {
+			spec.SetDisabledFlags()
+			spec.APIID = "regular-for-delete-test"
+			spec.Name = "Regular API"
+			spec.Proxy.ListenPath = "/regular-delete-test/"
+			spec.IsOAS = true
+			spec.OAS = oas.OAS{
+				T: openapi3.T{
+					OpenAPI: "3.0.3",
+					Info: &openapi3.Info{
+						Title:   "Regular API",
+						Version: "1",
+					},
+					Paths: openapi3.NewPaths(),
+				},
+			}
+			spec.OAS.Fill(*spec.APIDefinition)
+		})[0]
+
+		_, _ = ts.Run(t, test.TestCase{AdminAuth: true, Method: http.MethodPost, Path: "/tyk/apis/oas", Data: &regularSpec.OAS, Code: http.StatusOK})
+
+		ts.Gw.DoReload()
+
+		req := TestReq(t, "DELETE", "/tyk/mcps/regular-for-delete-test", nil)
+		req = ts.withAuth(req)
+		rec := httptest.NewRecorder()
+		ts.mainRouter().ServeHTTP(rec, req)
+
+		assert.Equal(t, http.StatusNotFound, rec.Code)
+		assert.Contains(t, rec.Body.String(), "is not an MCP API")
+	})
+
+	t.Run("DELETE /tyk/mcps/{apiID} fails for non-existent API", func(t *testing.T) {
+		req := TestReq(t, "DELETE", "/tyk/mcps/non-existent-api", nil)
+		req = ts.withAuth(req)
+		rec := httptest.NewRecorder()
+		ts.mainRouter().ServeHTTP(rec, req)
+
+		assert.Equal(t, http.StatusNotFound, rec.Code)
+		assert.Contains(t, rec.Body.String(), "API not found")
+	})
+}
+
+func TestOASEndpoint_RejectsMCPFields(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	t.Run("POST /tyk/apis/oas with MCP fields creates regular OAS API, not MCP", func(t *testing.T) {
+		tykExt := oas.XTykAPIGateway{
+			Info: oas.Info{
+				Name: "Should Not Be MCP",
+				ID:   "oas-with-mcp-fields",
+				State: oas.State{
+					Active: true,
+				},
+			},
+			Upstream: oas.Upstream{
+				URL: TestHttpAny,
+			},
+			Server: oas.Server{
+				ListenPath: oas.ListenPath{
+					Value: "/oas-test/",
+					Strip: false,
+				},
+			},
+			Middleware: &oas.Middleware{
+				McpTools: map[string]*oas.MCPPrimitive{
+					"test-tool": {
+						Operation: oas.Operation{
+							Allow: &oas.Allowance{Enabled: true},
+						},
+					},
+				},
+				McpResources: map[string]*oas.MCPPrimitive{
+					"test-resource": {
+						Operation: oas.Operation{
+							Allow: &oas.Allowance{Enabled: true},
+						},
+					},
+				},
+				McpPrompts: map[string]*oas.MCPPrimitive{
+					"test-prompt": {
+						Operation: oas.Operation{
+							Allow: &oas.Allowance{Enabled: true},
+						},
+					},
+				},
+			},
+		}
+
+		oasAPI := openapi3.T{
+			OpenAPI: "3.0.3",
+			Info: &openapi3.Info{
+				Title:   "Should Not Be MCP",
+				Version: "1",
+			},
+			Paths: openapi3.NewPaths(),
+		}
+
+		oasAPI.Extensions = map[string]interface{}{
+			oas.ExtensionTykAPIGateway: tykExt,
+		}
+
+		req := TestReq(t, "POST", "/tyk/apis/oas", &oasAPI)
+		req = ts.withAuth(req)
+		rec := httptest.NewRecorder()
+		ts.mainRouter().ServeHTTP(rec, req)
+
+		assert.Equal(t, http.StatusOK, rec.Code)
+
+		var response apiModifyKeySuccess
+		err := json.Unmarshal(rec.Body.Bytes(), &response)
+		assert.NoError(t, err)
+		assert.Equal(t, "added", response.Action)
+
+		ts.Gw.DoReload()
+
+		api := ts.Gw.getApiSpec(response.Key)
+		assert.NotNil(t, api)
+		assert.False(t, api.IsMCP(), "API created via OAS endpoint should NOT be marked as MCP")
+		assert.True(t, api.IsOAS, "API should be marked as OAS")
+
+		fs := afero.NewOsFs()
+		defFilePath := filepath.Join(ts.Gw.GetConfig().AppPath, response.Key+".json")
+		oasFilePath := filepath.Join(ts.Gw.GetConfig().AppPath, response.Key+"-oas.json")
+		mcpFilePath := filepath.Join(ts.Gw.GetConfig().AppPath, response.Key+"-mcp.json")
+
+		defExists, err := afero.Exists(fs, defFilePath)
+		assert.NoError(t, err)
+		assert.True(t, defExists, "API definition file should exist")
+
+		oasExists, err := afero.Exists(fs, oasFilePath)
+		assert.NoError(t, err)
+		assert.True(t, oasExists, "OAS file (-oas.json) should exist")
+
+		mcpExists, err := afero.Exists(fs, mcpFilePath)
+		assert.NoError(t, err)
+		assert.False(t, mcpExists, "MCP file (-mcp.json) should NOT exist")
+	})
+
+	t.Run("GET /tyk/mcps should not return OAS APIs with MCP fields", func(t *testing.T) {
+		req := TestReq(t, "GET", "/tyk/mcps", nil)
+		req = ts.withAuth(req)
+		rec := httptest.NewRecorder()
+		ts.mainRouter().ServeHTTP(rec, req)
+
+		assert.Equal(t, http.StatusOK, rec.Code)
+
+		var mcpList []oas.OAS
+		err := json.Unmarshal(rec.Body.Bytes(), &mcpList)
+		assert.NoError(t, err)
+
+		for _, mcpAPI := range mcpList {
+			apiID := mcpAPI.GetTykExtension().Info.ID
+			assert.NotEqual(t, "oas-with-mcp-fields", apiID, "OAS API should not appear in MCP list")
+		}
+	})
+}
+
+func TestHandleDeleteMCPAPI_RemoveVersionAtomically(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	const (
+		v1VersionName = "v1-version-name"
+		v2VersionName = "v2-version-name"
+	)
+
+	baseOAS := oas.OAS{
+		T: openapi3.T{
+			OpenAPI: "3.0.3",
+			Info: &openapi3.Info{
+				Title:   "mcp base doc",
+				Version: "1",
+			},
+			Paths: openapi3.NewPaths(),
+		},
+	}
+
+	v1 := BuildAPI(func(a *APISpec) {
+		a.SetDisabledFlags()
+		a.Name = "MCP v1"
+		a.APIID = "mcp-v1"
+		a.VersionDefinition.Location = ""
+		a.VersionDefinition.Key = ""
+		a.MarkAsMCP()
+
+		a.IsOAS = true
+		a.OAS = baseOAS
+		a.OAS.SetTykExtension(&oas.XTykAPIGateway{
+			Info: oas.Info{
+				Name: "MCP v1",
+				ID:   "mcp-v1",
+				State: oas.State{
+					Active: true,
+				},
+			},
+			Upstream: oas.Upstream{
+				URL: TestHttpAny,
+			},
+			Server: oas.Server{
+				ListenPath: oas.ListenPath{
+					Value: "/mcp-v1/",
+					Strip: false,
+				},
+			},
+		})
+		a.OAS.Fill(*a.APIDefinition)
+	})[0]
+
+	v2 := BuildAPI(func(a *APISpec) {
+		a.SetDisabledFlags()
+		a.Name = "MCP v2"
+		a.APIID = "mcp-v2"
+		a.VersionDefinition.Location = ""
+		a.VersionDefinition.Key = ""
+		a.MarkAsMCP()
+
+		a.IsOAS = true
+		a.OAS = baseOAS
+		a.OAS.SetTykExtension(&oas.XTykAPIGateway{
+			Info: oas.Info{
+				Name: "MCP v2",
+				ID:   "mcp-v2",
+				State: oas.State{
+					Active: true,
+				},
+			},
+			Upstream: oas.Upstream{
+				URL: TestHttpAny,
+			},
+			Server: oas.Server{
+				ListenPath: oas.ListenPath{
+					Value: "/mcp-v2/",
+					Strip: false,
+				},
+			},
+		})
+		a.OAS.Fill(*a.APIDefinition)
+	})[0]
+
+	baseAPI := BuildAPI(func(a *APISpec) {
+		a.SetDisabledFlags()
+		a.Name = "MCP Base"
+		a.APIID = "mcp-base"
+		a.VersionDefinition.Versions = map[string]string{
+			v1VersionName: v1.APIID,
+			v2VersionName: v2.APIID,
+		}
+		a.VersionDefinition.Default = v1VersionName
+		a.VersionDefinition.Name = v2VersionName
+		a.VersionDefinition.Location = apidef.HeaderLocation
+		a.VersionDefinition.Key = apidef.DefaultAPIVersionKey
+		a.MarkAsMCP()
+
+		a.IsOAS = true
+		a.OAS = baseOAS
+		a.OAS.SetTykExtension(&oas.XTykAPIGateway{
+			Info: oas.Info{
+				Name: "MCP Base",
+				ID:   "mcp-base",
+				State: oas.State{
+					Active: true,
+				},
+			},
+			Upstream: oas.Upstream{
+				URL: TestHttpAny,
+			},
+			Server: oas.Server{
+				ListenPath: oas.ListenPath{
+					Value: "/mcp-base/",
+					Strip: false,
+				},
+			},
+		})
+		a.OAS.Fill(*a.APIDefinition)
+	})[0]
+
+	_, _ = ts.Run(t, []test.TestCase{
+		{AdminAuth: true, Method: http.MethodPost, Path: "/tyk/mcps", Data: &v1.OAS, Code: http.StatusOK},
+		{AdminAuth: true, Method: http.MethodPost, Path: "/tyk/mcps", Data: &v2.OAS, Code: http.StatusOK},
+		{AdminAuth: true, Method: http.MethodPost, Path: "/tyk/mcps", Data: &baseAPI.OAS, Code: http.StatusOK},
+	}...)
+
+	ts.Gw.DoReload()
+
+	_, _ = ts.Run(t, []test.TestCase{
+		{AdminAuth: true, Path: "/tyk/mcps/" + v1.APIID, HeadersMatch: baseAPIHeader(baseAPI.APIID), Code: http.StatusOK},
+		{AdminAuth: true, Path: "/tyk/mcps/" + v2.APIID, HeadersMatch: baseAPIHeader(baseAPI.APIID), Code: http.StatusOK},
+		{AdminAuth: true, Method: http.MethodDelete, Path: "/tyk/mcps/" + v1.APIID, Code: http.StatusOK},
+	}...)
+
+	ts.Gw.DoReload()
+
+	_, _ = ts.Run(t, []test.TestCase{
+		{AdminAuth: true, Path: "/tyk/mcps/" + v1.APIID, BodyMatch: "API not found", Code: http.StatusNotFound},
+		{AdminAuth: true, Path: "/tyk/mcps/" + v2.APIID, HeadersMatch: baseAPIHeader(baseAPI.APIID), Code: http.StatusOK},
+		{AdminAuth: true, Path: "/tyk/mcps/" + baseAPI.APIID, BodyMatchFunc: func(bytes []byte) bool {
+			var base oas.OAS
+			err := json.Unmarshal(bytes, &base)
+			assert.NoError(t, err)
+
+			var baseDef apidef.APIDefinition
+			base.ExtractTo(&baseDef)
+
+			expectedVersions := map[string]string{
+				v2VersionName: v2.APIID,
+			}
+
+			assert.Equal(t, expectedVersions, baseDef.VersionDefinition.Versions)
+			assert.Equal(t, v2VersionName, baseDef.VersionDefinition.Default)
+
+			return true
+		}, Code: http.StatusOK},
+	}...)
 }
 
 func TestGetNewCertIDs(t *testing.T) {

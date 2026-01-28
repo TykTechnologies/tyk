@@ -65,6 +65,7 @@ import (
 	"github.com/TykTechnologies/tyk/internal/osutil"
 	"github.com/TykTechnologies/tyk/internal/otel"
 	"github.com/TykTechnologies/tyk/internal/redis"
+	"github.com/TykTechnologies/tyk/internal/sanitize"
 	"github.com/TykTechnologies/tyk/internal/uuid"
 	lib "github.com/TykTechnologies/tyk/lib/apidef"
 	"github.com/TykTechnologies/tyk/storage"
@@ -453,11 +454,6 @@ func (gw *Gateway) doAddOrUpdate(keyName string, newSession *user.SessionState, 
 	return nil
 }
 
-// ---- TODO: This changes the URL structure of the API completely ----
-// ISSUE: If Session stores are stored with API specs, then managing keys will need to be done per store, i.e. add to all stores,
-// remove from all stores, update to all stores, stores handle quotas separately though because they are localised! Keys will
-// need to be managed by API, but only for GetDetail, GetList, UpdateKey and DeleteKey
-
 func (gw *Gateway) setBasicAuthSessionPassword(session *user.SessionState) {
 	basicAuthHashAlgo := gw.basicAuthHashAlgo()
 
@@ -509,9 +505,7 @@ func (gw *Gateway) handleAddOrUpdate(keyName string, r *http.Request, isHashed b
 	}
 
 	mw := &BaseMiddleware{Gw: gw}
-	// TODO: handle apply policies error
 	mw.ApplyPolicies(newSession)
-	// DO ADD OR UPDATE
 
 	// get original session in case of update and preserve fields that SHOULD NOT be updated
 	originalKey := user.SessionState{}
@@ -678,7 +672,6 @@ func (gw *Gateway) handleGetDetail(sessionKey, apiID, orgID string, byHash bool)
 	}
 
 	mw := &BaseMiddleware{Spec: spec, Gw: gw}
-	// TODO: handle apply policies error
 	mw.ApplyPolicies(&session)
 
 	if session.QuotaMax != -1 {
@@ -1185,32 +1178,17 @@ func (gw *Gateway) handleDeletePolicy(polID string) (interface{}, int) {
 func (gw *Gateway) handleGetAPIList() (interface{}, int) {
 	gw.apisMu.RLock()
 	defer gw.apisMu.RUnlock()
-	apiIDList := make([]*apidef.APIDefinition, len(gw.apisByID))
-	c := 0
+	apiIDList := make([]*apidef.APIDefinition, 0, len(gw.apisByID))
 	for _, apiSpec := range gw.apisByID {
-		apiIDList[c] = apiSpec.APIDefinition
-		c++
+		if !apiSpec.IsMCP() {
+			apiIDList = append(apiIDList, apiSpec.APIDefinition)
+		}
 	}
 	return apiIDList, http.StatusOK
 }
 
 func (gw *Gateway) handleGetAPIListOAS(modePublic bool) (interface{}, int) {
-	gw.apisMu.RLock()
-	defer gw.apisMu.RUnlock()
-
-	apisList := []oas.OAS{}
-
-	for _, apiSpec := range gw.apisByID {
-		if apiSpec.IsOAS {
-			apiSpec.OAS.Fill(*apiSpec.APIDefinition)
-			if modePublic {
-				apiSpec.OAS.RemoveTykExtension()
-			}
-			apisList = append(apisList, apiSpec.OAS)
-		}
-	}
-
-	return apisList, http.StatusOK
+	return gw.handleGetOASList(isOASNotMCP, modePublic)
 }
 
 func (gw *Gateway) handleGetAPI(apiID string, oasEndpoint bool) (interface{}, int) {
@@ -1295,6 +1273,11 @@ func (gw *Gateway) handleAddApi(r *http.Request, fs afero.Fs, oasEndpoint bool) 
 		newDef.GenerateAPIID()
 	}
 
+	if err := sanitize.ValidatePathComponent(newDef.APIID); err != nil {
+		log.Errorf("Invalid API ID %q: %v", newDef.APIID, err)
+		return apiError("Invalid API ID"), http.StatusBadRequest
+	}
+
 	if oasEndpoint {
 		versioningParams := extractVersioningParams(
 			versionParams.Get(lib.BaseAPIID),
@@ -1322,33 +1305,10 @@ func (gw *Gateway) handleAddApi(r *http.Request, fs afero.Fs, oasEndpoint bool) 
 	}
 
 	if !versionParams.IsEmpty(lib.BaseAPIID) {
-		baseAPI := gw.getApiSpec(versionParams.Get(lib.BaseAPIID))
-
-		// Capture the old default version BEFORE updating the base API
-		oldDefaultVersion := baseAPI.VersionDefinition.Default
-
-		baseAPI.VersionDefinition = lib.ConfigureVersionDefinition(baseAPI.VersionDefinition, versionParams, newDef.APIID)
-
-		if baseAPI.IsOAS {
-			baseAPI.OAS.Fill(*baseAPI.APIDefinition)
-			err, _ := gw.writeOASAndAPIDefToFile(fs, baseAPI.APIDefinition, &baseAPI.OAS)
-			if err != nil {
-				log.WithError(err).Errorf("Error occurred while updating base OAS API with id: %s", baseAPI.APIID)
-			}
-		} else {
-			err, _ := gw.writeToFile(fs, baseAPI.APIDefinition, baseAPI.APIID)
-			if err != nil {
-				log.WithError(err).Errorf("Error occurred while updating base API with id: %s", baseAPI.APIID)
-			}
-		}
-
-		// Update old default child's servers if needed (removes fallback URL)
-		setDefault := !versionParams.IsEmpty(lib.SetDefault) && versionParams.Get(lib.SetDefault) == "true"
-		if oas.ShouldUpdateOldDefaultChild(setDefault, oldDefaultVersion, baseAPI.VersionDefinition.Default) {
-			if err := gw.updateOldDefaultChildServersGW(oldDefaultVersion, baseAPI, fs); err != nil {
-				log.WithError(err).Warn("Failed to update old default child API servers")
-				// Don't fail the whole operation if child update fails
-			}
+		baseAPIID := versionParams.Get(lib.BaseAPIID)
+		if err := gw.updateBaseAPIWithNewVersion(baseAPIID, versionParams, newDef.APIID, fs); err != nil {
+			log.WithError(err).Error("Failed to update base API")
+			// Log but don't fail the whole operation
 		}
 	}
 
@@ -1362,6 +1322,11 @@ func (gw *Gateway) handleAddApi(r *http.Request, fs afero.Fs, oasEndpoint bool) 
 }
 
 func (gw *Gateway) handleUpdateApi(apiID string, r *http.Request, fs afero.Fs, oasEndpoint bool) (interface{}, int) {
+	if err := sanitize.ValidatePathComponent(apiID); err != nil {
+		log.Errorf("Invalid API ID %q: %v", apiID, err)
+		return apiError("Invalid API ID"), http.StatusBadRequest
+	}
+
 	spec := gw.getApiSpec(apiID)
 	if spec == nil {
 		return apiError(apidef.ErrAPINotFound.Error()), http.StatusNotFound
@@ -1441,7 +1406,12 @@ func (gw *Gateway) writeOASAndAPIDefToFile(fs afero.Fs, apiDef *apidef.APIDefini
 		return
 	}
 
-	err, errCode = gw.writeToFile(fs, oasObj, apiDef.APIID+"-oas")
+	suffix := "-oas"
+	if apiDef.IsMCP() {
+		suffix = "-mcp"
+	}
+
+	err, errCode = gw.writeToFile(fs, oasObj, apiDef.APIID+suffix)
 	if err != nil {
 		return
 	}
@@ -1450,6 +1420,11 @@ func (gw *Gateway) writeOASAndAPIDefToFile(fs afero.Fs, apiDef *apidef.APIDefini
 }
 
 func (gw *Gateway) writeToFile(fs afero.Fs, newDef interface{}, filename string) (err error, errCode int) {
+	if err := sanitize.ValidatePathComponent(filename); err != nil {
+		log.Errorf("Invalid filename %q: %v", filename, err)
+		return errors.New("invalid API ID"), http.StatusBadRequest
+	}
+
 	// Create a filename
 	defFilePath := filepath.Join(gw.GetConfig().AppPath, filename+".json")
 
@@ -1467,7 +1442,7 @@ func (gw *Gateway) writeToFile(fs afero.Fs, newDef interface{}, filename string)
 		return errors.New("marshalling failed"), http.StatusInternalServerError
 	}
 
-	if err := ioutil.WriteFile(defFilePath, asByte, 0644); err != nil {
+	if err := afero.WriteFile(fs, defFilePath, asByte, 0644); err != nil {
 		log.Infof("EL file path: %v", defFilePath)
 		log.Error("Failed to create file! - ", err)
 		return errors.New("file object creation failed, write error"), http.StatusInternalServerError
@@ -1477,6 +1452,11 @@ func (gw *Gateway) writeToFile(fs afero.Fs, newDef interface{}, filename string)
 }
 
 func (gw *Gateway) handleDeleteAPI(apiID string) (interface{}, int) {
+	if err := sanitize.ValidatePathComponent(apiID); err != nil {
+		log.Errorf("Invalid API ID %q: %v", apiID, err)
+		return apiError("Invalid API ID"), http.StatusBadRequest
+	}
+
 	spec := gw.getApiSpec(apiID)
 	if spec == nil {
 		return apiError(apidef.ErrAPINotFound.Error()), http.StatusNotFound
@@ -1499,47 +1479,22 @@ func (gw *Gateway) handleDeleteAPI(apiID string) (interface{}, int) {
 		return apiError("Delete failed"), http.StatusInternalServerError
 	}
 
-	os.Remove(defFilePath)
+	if err := os.Remove(defFilePath); err != nil {
+		log.WithError(err).Errorf("Failed to delete API file: %s", defFilePath)
+		return apiError("Delete failed"), http.StatusInternalServerError
+	}
 	if spec.IsOAS {
-		os.Remove(defOASFilePath)
+		if err := os.Remove(defOASFilePath); err != nil {
+			log.WithError(err).Errorf("Failed to delete OAS file: %s", defOASFilePath)
+			return apiError("Delete failed"), http.StatusInternalServerError
+		}
 	}
 
 	if spec.VersionDefinition.BaseID != "" {
-		baseAPIPtr := gw.getApiSpec(spec.VersionDefinition.BaseID)
-		apiInBytes, err := json.Marshal(baseAPIPtr)
-		if err != nil {
-			log.WithError(err).Error("Couldn't marshal API spec")
-		}
-
-		var baseAPI APISpec
-		err = json.Unmarshal(apiInBytes, &baseAPI)
-		if err != nil {
-			log.WithError(err).Error("Couldn't unmarshal API spec")
-		}
-
-		for versionName, versionAPIID := range baseAPI.VersionDefinition.Versions {
-			if apiID == versionAPIID {
-				delete(baseAPI.VersionDefinition.Versions, versionName)
-				if baseAPI.VersionDefinition.Default == versionName {
-					baseAPI.VersionDefinition.Default = baseAPI.VersionDefinition.Name
-				}
-
-				break
-			}
-		}
-
 		fs := afero.NewOsFs()
-		if baseAPI.IsOAS {
-			baseAPI.OAS.Fill(*baseAPI.APIDefinition)
-			err, _ := gw.writeOASAndAPIDefToFile(fs, baseAPI.APIDefinition, &baseAPI.OAS)
-			if err != nil {
-				log.WithError(err).Errorf("Error occurred while updating base OAS API with id: %s", baseAPI.APIID)
-			}
-		} else {
-			err, _ := gw.writeToFile(fs, baseAPI.APIDefinition, baseAPI.APIID)
-			if err != nil {
-				log.WithError(err).Errorf("Error occurred while updating base API with id: %s", baseAPI.APIID)
-			}
+		if err := gw.removeAPIFromBaseVersion(apiID, spec.VersionDefinition.BaseID, fs); err != nil {
+			log.WithError(err).Error("Failed to update base API after delete")
+			// Don't fail the delete operation if base API update fails
 		}
 	}
 
@@ -1763,7 +1718,6 @@ func (gw *Gateway) apiOASPatchHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	// Update middlewares even when no query params are provided.
 	oasObjToPatch.ImportMiddlewares(oas.TykExtensionConfigParams{})
 
 	oasAPIInBytes, err := oasObjToPatch.MarshalJSON()
@@ -2327,7 +2281,6 @@ func (gw *Gateway) previewKeyHandler(w http.ResponseWriter, r *http.Request) {
 	newSession.DateCreated = time.Now()
 
 	mw := &BaseMiddleware{Gw: gw}
-	// TODO: handle apply policies error
 	mw.ApplyPolicies(newSession)
 
 	doJSONWrite(w, http.StatusOK, newSession)
