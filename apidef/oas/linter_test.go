@@ -14,51 +14,63 @@ import (
 	"github.com/TykTechnologies/tyk/internal/time"
 )
 
-// fixOperationsForValidation fixes operation fields to pass schema validation.
+// fixSingleOperation fixes a single operation's fields to pass schema validation.
 // This is needed because Fill() populates fields with random test data that may not
 // conform to schema constraints (e.g., duration formats, enum values).
+func fixSingleOperation(op *Operation) {
+	if op.TransformRequestBody != nil {
+		op.TransformRequestBody.Format = "json"
+	}
+	if op.TransformResponseBody != nil {
+		op.TransformResponseBody.Format = "json"
+	}
+	if op.RateLimit != nil {
+		op.RateLimit.Per = ReadableDuration(time.Minute)
+	}
+	if op.URLRewrite != nil {
+		triggers := []*URLRewriteTrigger{}
+		for _, cond := range URLRewriteConditions {
+			trigger := &URLRewriteTrigger{
+				Condition: cond,
+				Rules:     []*URLRewriteRule{},
+			}
+			for _, in := range URLRewriteInputs {
+				var rule URLRewriteRule
+				if in == InputRequestBody {
+					rule = URLRewriteRule{
+						In:      in,
+						Pattern: ".*",
+					}
+				} else {
+					rule = URLRewriteRule{
+						In:      in,
+						Name:    "test",
+						Pattern: ".*",
+					}
+				}
+
+				trigger.Rules = append(trigger.Rules, &rule)
+			}
+			triggers = append(triggers, trigger)
+		}
+		op.URLRewrite.Triggers = triggers
+	}
+	if op.CircuitBreaker != nil {
+		op.CircuitBreaker.Threshold = 0.5
+	}
+}
+
+// fixOperationsForValidation fixes operation fields in an Operations map to pass schema validation.
 func fixOperationsForValidation(operations map[string]*Operation) {
 	for _, op := range operations {
-		if op.TransformRequestBody != nil {
-			op.TransformRequestBody.Format = "json"
-		}
-		if op.TransformResponseBody != nil {
-			op.TransformResponseBody.Format = "json"
-		}
-		if op.RateLimit != nil {
-			op.RateLimit.Per = ReadableDuration(time.Minute)
-		}
-		if op.URLRewrite != nil {
-			triggers := []*URLRewriteTrigger{}
-			for _, cond := range URLRewriteConditions {
-				trigger := &URLRewriteTrigger{
-					Condition: cond,
-					Rules:     []*URLRewriteRule{},
-				}
-				for _, in := range URLRewriteInputs {
-					var rule URLRewriteRule
-					if in == InputRequestBody {
-						rule = URLRewriteRule{
-							In:      in,
-							Pattern: ".*",
-						}
-					} else {
-						rule = URLRewriteRule{
-							In:      in,
-							Name:    "test",
-							Pattern: ".*",
-						}
-					}
+		fixSingleOperation(op)
+	}
+}
 
-					trigger.Rules = append(trigger.Rules, &rule)
-				}
-				triggers = append(triggers, trigger)
-			}
-			op.URLRewrite.Triggers = triggers
-		}
-		if op.CircuitBreaker != nil {
-			op.CircuitBreaker.Threshold = 0.5
-		}
+// fixMCPPrimitivesForValidation fixes operation fields in an MCPPrimitives map to pass schema validation.
+func fixMCPPrimitivesForValidation(primitives map[string]*MCPPrimitive) {
+	for _, prim := range primitives {
+		fixSingleOperation(&prim.Operation)
 	}
 }
 
@@ -74,9 +86,9 @@ func TestXTykGateway_Lint(t *testing.T) {
 	{
 		settings.Middleware.Global.PluginConfig.Driver = "goplugin"
 		fixOperationsForValidation(settings.Middleware.Operations)
-		fixOperationsForValidation(settings.Middleware.McpTools)
-		fixOperationsForValidation(settings.Middleware.McpResources)
-		fixOperationsForValidation(settings.Middleware.McpPrompts)
+		fixMCPPrimitivesForValidation(settings.Middleware.McpTools)
+		fixMCPPrimitivesForValidation(settings.Middleware.McpResources)
+		fixMCPPrimitivesForValidation(settings.Middleware.McpPrompts)
 
 		settings.Server.Authentication.BaseIdentityProvider = ""
 		settings.Server.Authentication.SecurityProcessingMode = SecurityProcessingModeLegacy
