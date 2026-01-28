@@ -6,8 +6,10 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/TykTechnologies/tyk/config"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
+	"github.com/TykTechnologies/tyk/config"
 )
 
 func TestVaultPut(t *testing.T) {
@@ -149,7 +151,7 @@ func TestVaultReadSecret(t *testing.T) {
 				},
 			}
 			w.Header().Set("Content-Type", "application/json")
-			json.NewEncoder(w).Encode(response)
+			require.NoError(t, json.NewEncoder(w).Encode(response))
 		}))
 		defer mockVault.Close()
 
@@ -169,7 +171,7 @@ func TestVaultReadSecret(t *testing.T) {
 	})
 
 	t.Run("ReadSecret returns nil for non-existent path", func(t *testing.T) {
-		mockVault := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mockVault := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 			w.WriteHeader(http.StatusNotFound)
 		}))
 		defer mockVault.Close()
@@ -189,7 +191,7 @@ func TestVaultReadSecret(t *testing.T) {
 	})
 
 	t.Run("ReadSecret returns error on server error", func(t *testing.T) {
-		mockVault := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mockVault := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 			w.WriteHeader(http.StatusInternalServerError)
 		}))
 		defer mockVault.Close()
