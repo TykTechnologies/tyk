@@ -26,7 +26,7 @@ const (
 	keyDefs                     = "$defs" // For OAS 3.1+ (JSON Schema 2020-12)
 	keyProperties               = "properties"
 	keyRequired                 = "required"
-	mcpSchemaVersionNotFoundFmt = "Schema not found for version %q"
+	mcpSchemaVersionNotFoundFmt = "schema not found for version %q"
 	ExtensionTykAPIGateway      = "x-tyk-api-gateway"
 	ExtensionTykMCP             = "x-tyk-mcp"
 )
@@ -117,7 +117,7 @@ func loadMCPSchema() error {
 			}
 
 			// Merge x-tyk-api-gateway definitions into schema
-			err = jsonparser.ObjectEach(xTykAPIGwSchema, func(key []byte, value []byte, dataType jsonparser.ValueType, offset int) error {
+			err = jsonparser.ObjectEach(xTykAPIGwSchema, func(key []byte, value []byte, _ jsonparser.ValueType, _ int) error {
 				data, err = jsonparser.Set(data, value, defsKey, string(key))
 				return err
 			}, keyDefinitions)
@@ -126,7 +126,7 @@ func loadMCPSchema() error {
 			}
 
 			// Merge x-tyk-mcp definitions into schema
-			err = jsonparser.ObjectEach(xTykMCPSchema, func(key []byte, value []byte, dataType jsonparser.ValueType, offset int) error {
+			err = jsonparser.ObjectEach(xTykMCPSchema, func(key []byte, value []byte, _ jsonparser.ValueType, _ int) error {
 				data, err = jsonparser.Set(data, value, defsKey, string(key))
 				return err
 			}, keyDefinitions)
@@ -208,15 +208,27 @@ func GetMCPSchema(version string) ([]byte, error) {
 }
 
 func findDefaultVersion(rawVersions []string) string {
-	versions := make([]*pkgver.Version, len(rawVersions))
-	for i, raw := range rawVersions {
-		v, _ := pkgver.NewVersion(raw)
-		versions[i] = v
+	versions := make([]*pkgver.Version, 0, len(rawVersions))
+	for _, raw := range rawVersions {
+		v, err := pkgver.NewVersion(raw)
+		if err != nil {
+			log.Errorf("failed to parse version %q: %v", raw, err)
+			continue
+		}
+		versions = append(versions, v)
+	}
+
+	if len(versions) == 0 {
+		return ""
 	}
 
 	sort.Sort(pkgver.Collection(versions))
-	latestVersion := versions[len(rawVersions)-1].String()
-	latestMinor, _ := getMinorVersion(latestVersion)
+	latestVersion := versions[len(versions)-1].String()
+	latestMinor, err := getMinorVersion(latestVersion)
+	if err != nil {
+		log.Errorf("failed to get minor version from %q: %v", latestVersion, err)
+		return ""
+	}
 	return latestMinor
 }
 

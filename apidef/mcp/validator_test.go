@@ -54,7 +54,10 @@ func TestValidateMCPObject(t *testing.T) {
 	}
 
 	validOASObject.SetTykExtension(&validXTykAPIGateway)
-	validMCP3Definition, _ := validOASObject.MarshalJSON()
+	validMCP3Definition, err := validOASObject.MarshalJSON()
+	if err != nil {
+		t.Fatalf("failed to marshal valid OAS object: %v", err)
+	}
 
 	t.Run("valid MCP object", func(t *testing.T) {
 		t.Parallel()
@@ -76,9 +79,12 @@ func TestValidateMCPObject(t *testing.T) {
 			},
 		}
 		mcpWithResources.SetTykExtension(&extWithResources)
-		definition, _ := mcpWithResources.MarshalJSON()
+		definition, err := mcpWithResources.MarshalJSON()
+		if err != nil {
+			t.Fatalf("failed to marshal MCP with resources: %v", err)
+		}
 
-		err := ValidateMCPObject(definition, "3.0.3")
+		err = ValidateMCPObject(definition, "3.0.3")
 		assert.Nil(t, err)
 	})
 
@@ -96,9 +102,12 @@ func TestValidateMCPObject(t *testing.T) {
 			},
 		}
 		mcpWithPrompts.SetTykExtension(&extWithPrompts)
-		definition, _ := mcpWithPrompts.MarshalJSON()
+		definition, err := mcpWithPrompts.MarshalJSON()
+		if err != nil {
+			t.Fatalf("failed to marshal MCP with prompts: %v", err)
+		}
 
-		err := ValidateMCPObject(definition, "3.0.3")
+		err = ValidateMCPObject(definition, "3.0.3")
 		assert.Nil(t, err)
 	})
 
@@ -124,9 +133,12 @@ func TestValidateMCPObject(t *testing.T) {
 			},
 		}
 		mcpWithAll.SetTykExtension(&extWithAll)
-		definition, _ := mcpWithAll.MarshalJSON()
+		definition, err := mcpWithAll.MarshalJSON()
+		if err != nil {
+			t.Fatalf("failed to marshal MCP with all fields: %v", err)
+		}
 
-		err := ValidateMCPObject(definition, "3.0.3")
+		err = ValidateMCPObject(definition, "3.0.3")
 		assert.Nil(t, err)
 	})
 
@@ -135,7 +147,10 @@ func TestValidateMCPObject(t *testing.T) {
 	invalidXTykAPIGateway.Info = oas.Info{} // Empty name should fail
 	invalidXTykAPIGateway.Server.GatewayTags = &oas.GatewayTags{Enabled: true, Tags: []string{}}
 	invalidOASObject.SetTykExtension(&invalidXTykAPIGateway)
-	invalidMCP3Definition, _ := invalidOASObject.MarshalJSON()
+	invalidMCP3Definition, err := invalidOASObject.MarshalJSON()
+	if err != nil {
+		t.Fatalf("failed to marshal invalid OAS object: %v", err)
+	}
 
 	t.Run("invalid MCP object", func(t *testing.T) {
 		t.Parallel()
