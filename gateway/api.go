@@ -45,9 +45,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/TykTechnologies/tyk/internal/model"
 	"github.com/getkin/kin-openapi/openapi3"
-
 	"github.com/gorilla/mux"
 	"github.com/lonelycode/osin"
 	"github.com/sirupsen/logrus"
@@ -63,6 +61,7 @@ import (
 	"github.com/TykTechnologies/tyk/ctx"
 	"github.com/TykTechnologies/tyk/header"
 	"github.com/TykTechnologies/tyk/internal/httpctx"
+	"github.com/TykTechnologies/tyk/internal/model"
 	"github.com/TykTechnologies/tyk/internal/osutil"
 	"github.com/TykTechnologies/tyk/internal/otel"
 	"github.com/TykTechnologies/tyk/internal/redis"

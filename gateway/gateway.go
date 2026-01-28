@@ -1,11 +1,11 @@
 package gateway
 
 import (
+	"github.com/samber/lo"
+
 	"github.com/TykTechnologies/tyk/internal/model"
 	"github.com/TykTechnologies/tyk/user"
-	"github.com/samber/lo"
 )
-
 
 // GetLoadedAPIIDs returns a list of all loaded API IDs with metadata.
 // This is used for reporting loaded resources to MDCB.
