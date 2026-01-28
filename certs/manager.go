@@ -16,6 +16,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/cenkalti/backoff/v4"
 	"github.com/sirupsen/logrus"
 
 	"github.com/TykTechnologies/tyk/internal/cache"
@@ -404,6 +405,7 @@ func GetCertIDAndChainPEM(certData []byte, secret string) (string, []byte, error
 func (c *certificateManager) List(certIDs []string, mode CertificateType) (out []*tls.Certificate) {
 	var cert *tls.Certificate
 	var rawCert []byte
+	var mdcbVerified bool // Track if MDCB connection already verified in this batch
 
 	for _, id := range certIDs {
 		if cert, found := c.cache.Get(id); found {
@@ -414,6 +416,43 @@ func (c *certificateManager) List(certIDs []string, mode CertificateType) (out [
 		}
 
 		val, err := c.storage.GetKey("raw-" + id)
+		// TT-14618: Retry on MDCB connection lost (emergency mode during startup)
+		if err != nil && errors.Is(err, storage.ErrMDCBConnectionLost) {
+			if !mdcbVerified {
+				// First MDCB error - perform full exponential backoff
+				c.logger.Debug("MDCB not ready for certificate fetch, retrying with exponential backoff...")
+
+				operation := func() error {
+					val, err = c.storage.GetKey("raw-" + id)
+					if errors.Is(err, storage.ErrMDCBConnectionLost) {
+						return err  // Retry
+					}
+					return nil  // Success or non-retryable error
+				}
+
+				expBackoff := backoff.NewExponentialBackOff()
+				expBackoff.MaxElapsedTime = 30 * time.Second
+				expBackoff.InitialInterval = 100 * time.Millisecond
+				expBackoff.MaxInterval = 2 * time.Second
+
+				if retryErr := backoff.Retry(operation, expBackoff); retryErr != nil {
+					c.logger.Warn("Timeout waiting for MDCB connection for certificate:", id)
+				} else {
+					// MDCB is now ready, skip full backoff for remaining certificates
+					mdcbVerified = true
+				}
+			} else {
+				// MDCB was previously verified but failed again (flaky connection)
+				// Perform a single quick retry without exponential backoff
+				c.logger.Warn("MDCB connection issue after previous success, performing quick retry for certificate:", id)
+				time.Sleep(100 * time.Millisecond)
+				val, err = c.storage.GetKey("raw-" + id)
+				if err != nil && errors.Is(err, storage.ErrMDCBConnectionLost) {
+					c.logger.Warn("MDCB connection still failing for certificate:", id)
+				}
+			}
+		}
+
 		// fallback to file
 		if err != nil {
 			// Try read from file

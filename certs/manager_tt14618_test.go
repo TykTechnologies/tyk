@@ -1,0 +1,555 @@
+package certs
+
+import (
+	"errors"
+	"os"
+	"path/filepath"
+	"testing"
+	"time"
+
+	"github.com/TykTechnologies/tyk/storage"
+)
+
+// MockStorage simulates emergency mode clearing after a delay
+type MockMDCBStorage struct {
+	callCount    int
+	clearAfter   int // Clear emergency mode after N calls
+	certData     string
+	t            *testing.T
+}
+
+func (m *MockMDCBStorage) GetKey(key string) (string, error) {
+	m.callCount++
+	m.t.Logf("  [Attempt %d] GetKey called for: %s at %s",
+		m.callCount, key, time.Now().Format("15:04:05.000"))
+
+	// Simulate emergency mode for first N calls
+	if m.callCount <= m.clearAfter {
+		m.t.Logf("  [Attempt %d] FAIL: Returning ErrMDCBConnectionLost (simulating emergency mode)", m.callCount)
+		return "", storage.ErrMDCBConnectionLost
+	}
+
+	// After clearAfter attempts, RPC is "ready"
+	m.t.Logf("  [Attempt %d] SUCCESS: Returning certificate (RPC ready)", m.callCount)
+	return m.certData, nil
+}
+
+func (m *MockMDCBStorage) GetMultiKey(keys []string) ([]string, error) {
+	return nil, errors.New("not implemented")
+}
+
+func (m *MockMDCBStorage) SetKey(key, value string, timeout int64) error {
+	return nil
+}
+
+func (m *MockMDCBStorage) GetRawKey(key string) (string, error) {
+	return m.GetKey(key)
+}
+
+func (m *MockMDCBStorage) SetRawKey(key, value string, timeout int64) error {
+	return nil
+}
+
+func (m *MockMDCBStorage) GetExp(key string) (int64, error) {
+	return -1, nil
+}
+
+func (m *MockMDCBStorage) SetExp(key string, timeout int64) error {
+	return nil
+}
+
+func (m *MockMDCBStorage) DeleteKey(key string) bool {
+	return true
+}
+
+func (m *MockMDCBStorage) DeleteRawKey(key string) bool {
+	return true
+}
+
+func (m *MockMDCBStorage) DeleteRawKeys(keys []string) bool {
+	return true
+}
+
+func (m *MockMDCBStorage) Connect() bool {
+	return true
+}
+
+func (m *MockMDCBStorage) Exists(key string) (bool, error) {
+	return false, nil
+}
+
+func (m *MockMDCBStorage) GetKeys(pattern string) []string {
+	return []string{}
+}
+
+func (m *MockMDCBStorage) GetKeysAndValues() map[string]string {
+	return map[string]string{}
+}
+
+func (m *MockMDCBStorage) GetKeysAndValuesWithFilter(filter string) map[string]string {
+	return map[string]string{}
+}
+
+func (m *MockMDCBStorage) DeleteKeys(keys []string) bool {
+	return true
+}
+
+func (m *MockMDCBStorage) Decrement(key string) {}
+
+func (m *MockMDCBStorage) IncrememntWithExpire(key string, timeout int64) int64 {
+	return 0
+}
+
+func (m *MockMDCBStorage) SetRollingWindow(key string, per int64, val string, pipeline bool) (int, []interface{}) {
+	return 0, nil
+}
+
+func (m *MockMDCBStorage) GetRollingWindow(key string, per int64, pipeline bool) (int, []interface{}) {
+	return 0, nil
+}
+
+func (m *MockMDCBStorage) GetSet(key string) (map[string]string, error) {
+	return nil, errors.New("not implemented")
+}
+
+func (m *MockMDCBStorage) AddToSet(key, value string) {}
+
+func (m *MockMDCBStorage) GetAndDeleteSet(key string) []interface{} {
+	return nil
+}
+
+func (m *MockMDCBStorage) RemoveFromSet(key, value string) {}
+
+func (m *MockMDCBStorage) DeleteScanMatch(pattern string) bool {
+	return true
+}
+
+func (m *MockMDCBStorage) DeleteAllKeys() bool {
+	return true
+}
+
+func (m *MockMDCBStorage) GetKeyPrefix() string {
+	return ""
+}
+
+func (m *MockMDCBStorage) AddToSortedSet(key, value string, score float64) {}
+
+func (m *MockMDCBStorage) GetSortedSetRange(key, scoreFrom, scoreTo string) ([]string, []float64, error) {
+	return nil, nil, errors.New("not implemented")
+}
+
+func (m *MockMDCBStorage) RemoveSortedSetRange(key, scoreFrom, scoreTo string) error {
+	return errors.New("not implemented")
+}
+
+func (m *MockMDCBStorage) GetListRange(key string, from, to int64) ([]string, error) {
+	return nil, errors.New("not implemented")
+}
+
+func (m *MockMDCBStorage) RemoveFromList(key, value string) error {
+	return errors.New("not implemented")
+}
+
+func (m *MockMDCBStorage) AppendToSet(key, value string) {}
+
+// loadTestCert loads the test certificate from testdata
+func loadTestCert(t *testing.T) string {
+	t.Helper()
+	certPath := filepath.Join("testdata", "test-cert.pem")
+	certData, err := os.ReadFile(certPath)
+	if err != nil {
+		t.Fatalf("Failed to read test certificate: %v", err)
+	}
+	return string(certData)
+}
+
+// TestTT14618_BackoffRetry demonstrates the fix for TT-14618
+func TestTT14618_BackoffRetry(t *testing.T) {
+	certPEM := loadTestCert(t)
+
+	tests := []struct {
+		name              string
+		failureCount      int
+		expectedAttempts  int
+		expectSuccess     bool
+		expectCertificate bool
+	}{
+		{
+			name:              "immediate_success",
+			failureCount:      0,
+			expectedAttempts:  1,
+			expectSuccess:     true,
+			expectCertificate: true,
+		},
+		{
+			name:              "retry_once",
+			failureCount:      1,
+			expectedAttempts:  2,
+			expectSuccess:     true,
+			expectCertificate: true,
+		},
+		{
+			name:              "retry_multiple_times",
+			failureCount:      5,
+			expectedAttempts:  6,
+			expectSuccess:     true,
+			expectCertificate: true,
+		},
+		{
+			name:              "retry_many_times",
+			failureCount:      10,
+			expectedAttempts:  11,
+			expectSuccess:     true,
+			expectCertificate: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mockStorage := &MockMDCBStorage{
+				clearAfter: tt.failureCount,
+				certData:   certPEM,
+				t:          t,
+			}
+
+			handler := NewCertificateManager(mockStorage, "secret", nil, false)
+
+			t.Logf("Scenario: MDCB fails %d times before succeeding", tt.failureCount)
+
+			startTime := time.Now()
+			certs := handler.List([]string{"test-cert-id"}, CertificatePrivate)
+			duration := time.Since(startTime)
+
+			t.Logf("Total time: %.3f seconds", duration.Seconds())
+			t.Logf("Total attempts: %d", mockStorage.callCount)
+
+			// Verify attempt count
+			if mockStorage.callCount != tt.expectedAttempts {
+				t.Errorf("Expected %d attempts, got %d", tt.expectedAttempts, mockStorage.callCount)
+			}
+
+			// Verify certificate loaded
+			if tt.expectCertificate {
+				if len(certs) != 1 {
+					t.Errorf("Expected 1 certificate, got %d", len(certs))
+				}
+				if len(certs) > 0 && certs[0] == nil {
+					t.Error("Expected valid certificate, got nil")
+				}
+			}
+
+			// Verify exponential backoff timing (only for cases with measurable backoff)
+			// Backoff config: InitialInterval=100ms, multiplier=1.5 (default), MaxInterval=2s
+			// For cases with >= 3 retries, backoff delays are more reliable to measure
+			if tt.failureCount >= 3 {
+				// Intervals: 100ms, 150ms, 225ms, 337ms, 506ms, 759ms, 1139ms, 1708ms, 2000ms (capped), ...
+				minExpectedTime := 100 * time.Millisecond // At least the initial interval
+				if duration < minExpectedTime {
+					t.Errorf("Expected at least %v delay for backoff with %d failures, but completed in %v",
+						minExpectedTime, tt.failureCount, duration)
+				}
+			}
+		})
+	}
+}
+
+// MockFlakyCertificates simulates flaky MDCB connection
+type MockFlakyMDCBStorage struct {
+	callCount int
+	certData  string
+	t         *testing.T
+}
+
+func (m *MockFlakyMDCBStorage) GetKey(key string) (string, error) {
+	m.callCount++
+	m.t.Logf("  [Attempt %d] GetKey called for: %s at %s",
+		m.callCount, key, time.Now().Format("15:04:05.000"))
+
+	// Simulate flaky connection: succeeds on first cert attempt, fails on second
+	// cert-1: attempts 1 (fail), 2 (fail), 3 (success)
+	// cert-2: attempt 4 (fail - flaky!), attempt 5 (success after quick retry)
+	// cert-3: attempt 6 (success)
+	if (m.callCount <= 2) || (m.callCount == 4) {
+		m.t.Logf("  [Attempt %d] FAIL: Simulating connection issue", m.callCount)
+		return "", storage.ErrMDCBConnectionLost
+	}
+
+	m.t.Logf("  [Attempt %d] SUCCESS: Returning certificate", m.callCount)
+	return m.certData, nil
+}
+
+func (m *MockFlakyMDCBStorage) GetMultiKey(keys []string) ([]string, error) {
+	return nil, errors.New("not implemented")
+}
+
+func (m *MockFlakyMDCBStorage) SetKey(key, value string, timeout int64) error {
+	return nil
+}
+
+func (m *MockFlakyMDCBStorage) GetRawKey(key string) (string, error) {
+	return m.GetKey(key)
+}
+
+func (m *MockFlakyMDCBStorage) SetRawKey(key, value string, timeout int64) error {
+	return nil
+}
+
+func (m *MockFlakyMDCBStorage) GetExp(key string) (int64, error) {
+	return -1, nil
+}
+
+func (m *MockFlakyMDCBStorage) SetExp(key string, timeout int64) error {
+	return nil
+}
+
+func (m *MockFlakyMDCBStorage) DeleteKey(key string) bool {
+	return true
+}
+
+func (m *MockFlakyMDCBStorage) DeleteRawKey(key string) bool {
+	return true
+}
+
+func (m *MockFlakyMDCBStorage) DeleteRawKeys(keys []string) bool {
+	return true
+}
+
+func (m *MockFlakyMDCBStorage) Connect() bool {
+	return true
+}
+
+func (m *MockFlakyMDCBStorage) Exists(key string) (bool, error) {
+	return false, nil
+}
+
+func (m *MockFlakyMDCBStorage) GetKeys(pattern string) []string {
+	return []string{}
+}
+
+func (m *MockFlakyMDCBStorage) GetKeysAndValues() map[string]string {
+	return map[string]string{}
+}
+
+func (m *MockFlakyMDCBStorage) GetKeysAndValuesWithFilter(filter string) map[string]string {
+	return map[string]string{}
+}
+
+func (m *MockFlakyMDCBStorage) DeleteKeys(keys []string) bool {
+	return true
+}
+
+func (m *MockFlakyMDCBStorage) Decrement(key string) {}
+
+func (m *MockFlakyMDCBStorage) IncrememntWithExpire(key string, timeout int64) int64 {
+	return 0
+}
+
+func (m *MockFlakyMDCBStorage) SetRollingWindow(key string, per int64, val string, pipeline bool) (int, []interface{}) {
+	return 0, nil
+}
+
+func (m *MockFlakyMDCBStorage) GetRollingWindow(key string, per int64, pipeline bool) (int, []interface{}) {
+	return 0, nil
+}
+
+func (m *MockFlakyMDCBStorage) GetSet(key string) (map[string]string, error) {
+	return nil, errors.New("not implemented")
+}
+
+func (m *MockFlakyMDCBStorage) AddToSet(key, value string) {}
+
+func (m *MockFlakyMDCBStorage) GetAndDeleteSet(key string) []interface{} {
+	return nil
+}
+
+func (m *MockFlakyMDCBStorage) RemoveFromSet(key, value string) {}
+
+func (m *MockFlakyMDCBStorage) DeleteScanMatch(pattern string) bool {
+	return true
+}
+
+func (m *MockFlakyMDCBStorage) DeleteAllKeys() bool {
+	return true
+}
+
+func (m *MockFlakyMDCBStorage) GetKeyPrefix() string {
+	return ""
+}
+
+func (m *MockFlakyMDCBStorage) AddToSortedSet(key, value string, score float64) {}
+
+func (m *MockFlakyMDCBStorage) GetSortedSetRange(key, scoreFrom, scoreTo string) ([]string, []float64, error) {
+	return nil, nil, errors.New("not implemented")
+}
+
+func (m *MockFlakyMDCBStorage) RemoveSortedSetRange(key, scoreFrom, scoreTo string) error {
+	return errors.New("not implemented")
+}
+
+func (m *MockFlakyMDCBStorage) GetListRange(key string, from, to int64) ([]string, error) {
+	return nil, errors.New("not implemented")
+}
+
+func (m *MockFlakyMDCBStorage) RemoveFromList(key, value string) error {
+	return errors.New("not implemented")
+}
+
+func (m *MockFlakyMDCBStorage) AppendToSet(key, value string) {}
+
+// TestTT14618_FlakyConnection tests handling of intermittent MDCB failures
+func TestTT14618_FlakyConnection(t *testing.T) {
+	certPEM := loadTestCert(t)
+
+	mockStorage := &MockFlakyMDCBStorage{
+		certData: certPEM,
+		t:        t,
+	}
+
+	handler := NewCertificateManager(mockStorage, "secret", nil, false)
+
+	certIDs := []string{"cert-1", "cert-2", "cert-3"}
+
+	t.Log("Testing flaky MDCB connection (success → failure → success)")
+	certs := handler.List(certIDs, CertificatePrivate)
+
+	t.Logf("Total GetKey calls: %d", mockStorage.callCount)
+
+	// Expected: 3 attempts for cert-1, then 2 for cert-2 (fail + quick retry), then 1 for cert-3
+	// Total: 3 + 2 + 1 = 6 calls
+	if mockStorage.callCount != 6 {
+		t.Errorf("Expected 6 GetKey calls (with flaky connection handling), got %d", mockStorage.callCount)
+	}
+
+	// All certificates should still load successfully despite the flaky connection
+	if len(certs) != 3 {
+		t.Errorf("Expected 3 certificates, got %d", len(certs))
+	}
+	for i, cert := range certs {
+		if cert == nil {
+			t.Errorf("Certificate %d is nil (flaky connection not handled properly)", i+1)
+		}
+	}
+
+	t.Log("SUCCESS: Flaky MDCB connection handled gracefully with quick retry")
+}
+
+// TestTT14618_MultipleCertificates verifies backoff only happens once for multiple certificates
+func TestTT14618_MultipleCertificates(t *testing.T) {
+	certPEM := loadTestCert(t)
+
+	// Simulate MDCB failing 3 times before becoming ready
+	mockStorage := &MockMDCBStorage{
+		clearAfter: 3,
+		certData:   certPEM,
+		t:          t,
+	}
+
+	handler := NewCertificateManager(mockStorage, "secret", nil, false)
+
+	// Request 5 certificates
+	certIDs := []string{"cert-1", "cert-2", "cert-3", "cert-4", "cert-5"}
+
+	t.Log("Loading 5 certificates with MDCB failing 3 times before ready")
+	startTime := time.Now()
+	certs := handler.List(certIDs, CertificatePrivate)
+	duration := time.Since(startTime)
+
+	t.Logf("Total time: %.3f seconds", duration.Seconds())
+	t.Logf("Total GetKey calls: %d", mockStorage.callCount)
+
+	// Without optimization: 5 certs × 4 attempts each = 20 calls
+	// With optimization: 4 attempts (first cert) + 4 successful calls (remaining certs) = 8 calls
+	expectedCalls := 4 + 4 // 4 retry attempts for first cert, then 4 more for remaining certs
+	if mockStorage.callCount != expectedCalls {
+		t.Errorf("Expected %d GetKey calls (backoff only for first cert), got %d", expectedCalls, mockStorage.callCount)
+	}
+
+	// Verify all certificates loaded successfully
+	if len(certs) != 5 {
+		t.Errorf("Expected 5 certificates, got %d", len(certs))
+	}
+	for i, cert := range certs {
+		if cert == nil {
+			t.Errorf("Certificate %d is nil", i+1)
+		}
+	}
+
+	// Verify timing is reasonable (not compounded)
+	// With compounded backoff: ~4 seconds (5 × ~0.8s)
+	// With single backoff: ~0.8 seconds
+	maxExpectedTime := 2 * time.Second // Should complete well under 2s
+	if duration > maxExpectedTime {
+		t.Errorf("Expected completion under %v with single backoff, took %v (possible compounded retry issue)", maxExpectedTime, duration)
+	}
+
+	t.Log("SUCCESS: Multiple certificates loaded with single backoff sequence")
+}
+
+// TestTT14618_ScaleWith100Certs tests production-scale scenario with 100 certificates
+func TestTT14618_ScaleWith100Certs(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping scale test in short mode")
+	}
+
+	certPEM := loadTestCert(t)
+
+	// Simulate MDCB down for first 5 attempts (~1 second of retries)
+	mockStorage := &MockMDCBStorage{
+		clearAfter: 5,
+		certData:   certPEM,
+		t:          t,
+	}
+
+	handler := NewCertificateManager(mockStorage, "secret", nil, false)
+
+	// Generate 100 certificate IDs
+	certIDs := make([]string, 100)
+	for i := 0; i < 100; i++ {
+		certIDs[i] = "cert-" + string(rune('A'+i%26)) + string(rune('0'+i/26))
+	}
+
+	t.Log("SCALE TEST: Loading 100 certificates with MDCB failing 5 times before ready")
+	startTime := time.Now()
+	certs := handler.List(certIDs, CertificatePrivate)
+	duration := time.Since(startTime)
+
+	t.Logf("Total time: %.3f seconds", duration.Seconds())
+	t.Logf("Total GetKey calls: %d", mockStorage.callCount)
+	t.Logf("Average time per cert: %.1f ms", duration.Seconds()*1000/100)
+
+	// Expected calls: 6 attempts for first cert + 99 successful calls = 105
+	expectedCalls := 6 + 99
+	if mockStorage.callCount != expectedCalls {
+		t.Errorf("Expected %d GetKey calls, got %d", expectedCalls, mockStorage.callCount)
+	}
+
+	// Verify all 100 certificates loaded
+	if len(certs) != 100 {
+		t.Errorf("Expected 100 certificates, got %d", len(certs))
+	}
+	nilCount := 0
+	for _, cert := range certs {
+		if cert == nil {
+			nilCount++
+		}
+	}
+	if nilCount > 0 {
+		t.Errorf("%d out of 100 certificates are nil", nilCount)
+	}
+
+	// Performance validation
+	// Without optimization: 100 certs × ~1s backoff = ~100 seconds
+	// With optimization: single backoff (~1s) + 100 GetKey calls (~instant) = ~1-2 seconds
+	maxExpectedTime := 3 * time.Second
+	if duration > maxExpectedTime {
+		t.Errorf("PERFORMANCE ISSUE: Expected < %v with single backoff for 100 certs, took %v",
+			maxExpectedTime, duration)
+		t.Errorf("This suggests compounded retries (would be ~100s without optimization)")
+	}
+
+	// Calculate theoretical worst case without optimization
+	worstCase := 100 * time.Second // If each cert retried independently
+	improvement := float64(worstCase) / float64(duration)
+	t.Logf("Performance improvement: %.0fx faster than unoptimized approach", improvement)
+	t.Log("SUCCESS: 100 certificates loaded efficiently with single backoff!")
+}
