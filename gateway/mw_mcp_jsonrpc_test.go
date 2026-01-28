@@ -7,13 +7,16 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/apidef/oas"
 	"github.com/TykTechnologies/tyk/internal/httpctx"
 	"github.com/TykTechnologies/tyk/internal/mcp"
+	"github.com/TykTechnologies/tyk/test"
 )
 
 func TestMCPJSONRPCMiddleware_EnabledForSpec(t *testing.T) {
@@ -256,6 +259,50 @@ func TestMCPJSONRPCMiddleware_ProcessRequest_ToolsCall_NotFound(t *testing.T) {
 	r.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
 
+	err, code := m.ProcessRequest(w, r, nil)
+	assert.Nil(t, err)
+	assert.Equal(t, http.StatusOK, code)
+	assert.Equal(t, "/", r.URL.Path)
+	assert.False(t, httpctx.IsMCPRouting(r))
+	assert.Nil(t, httpctx.GetJSONRPCRequest(r))
+	assert.Equal(t, 0, w.Body.Len())
+}
+
+func TestMCPJSONRPCMiddleware_ProcessRequest_ToolsCall_NotFound_WithAllowList(t *testing.T) {
+	spec := &APISpec{
+		APIDefinition: &apidef.APIDefinition{
+			ApplicationProtocol: apidef.AppProtocolMCP,
+			JsonRpcVersion:      apidef.JsonRPC20,
+		},
+		MCPPrimitives: map[string]string{
+			"tool:get-weather": "/mcp-tool:get-weather",
+		},
+	}
+
+	spec.OAS.SetTykExtension(&oas.XTykAPIGateway{
+		Middleware: &oas.Middleware{
+			McpTools: oas.MCPPrimitives{
+				"get-weather": &oas.MCPPrimitive{Operation: oas.Operation{Allow: &oas.Allowance{Enabled: true}}},
+			},
+		},
+	})
+
+	m := &MCPJSONRPCMiddleware{
+		BaseMiddleware: &BaseMiddleware{Spec: spec},
+	}
+
+	payload := map[string]interface{}{
+		"jsonrpc": "2.0",
+		"method":  "tools/call",
+		"params":  map[string]interface{}{"name": "unknown-tool"},
+		"id":      1,
+	}
+	body, _ := json.Marshal(payload)
+
+	r := httptest.NewRequest(http.MethodPost, "/", bytes.NewReader(body))
+	r.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+
 	_, _ = m.ProcessRequest(w, r, nil)
 
 	var resp JSONRPCErrorResponse
@@ -333,6 +380,77 @@ func TestMCPJSONRPCMiddleware_ProcessRequest_ResourcesRead_WildcardMatch(t *test
 	assert.Nil(t, err)
 	assert.Equal(t, http.StatusOK, code)
 	assert.Equal(t, "/mcp-resource:file:///repo/*", r.URL.Path)
+}
+
+func TestMCPJSONRPCMiddleware_ProcessRequest_ResourcesRead_ExactBeatsWildcard(t *testing.T) {
+	spec := &APISpec{
+		APIDefinition: &apidef.APIDefinition{
+			ApplicationProtocol: apidef.AppProtocolMCP,
+			JsonRpcVersion:      apidef.JsonRPC20,
+		},
+		MCPPrimitives: map[string]string{
+			"resource:file:///repo/*":           "/mcp-resource:file:///repo/*",
+			"resource:file:///repo/README.md":   "/mcp-resource:file:///repo/README.md",
+			"resource:file:///repo/README.txt":  "/mcp-resource:file:///repo/README.txt",
+			"resource:file:///repo/README.mdx":  "/mcp-resource:file:///repo/README.mdx",
+			"resource:file:///repo/README.json": "/mcp-resource:file:///repo/README.json",
+		},
+	}
+
+	m := &MCPJSONRPCMiddleware{
+		BaseMiddleware: &BaseMiddleware{Spec: spec},
+	}
+
+	payload := map[string]interface{}{
+		"jsonrpc": "2.0",
+		"method":  "resources/read",
+		"params":  map[string]interface{}{"uri": "file:///repo/README.md"},
+		"id":      1,
+	}
+	body, _ := json.Marshal(payload)
+
+	r := httptest.NewRequest(http.MethodPost, "/", bytes.NewReader(body))
+	r.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+
+	err, code := m.ProcessRequest(w, r, nil)
+	assert.Nil(t, err)
+	assert.Equal(t, http.StatusOK, code)
+	assert.Equal(t, "/mcp-resource:file:///repo/README.md", r.URL.Path)
+}
+
+func TestMCPJSONRPCMiddleware_ProcessRequest_ResourcesRead_MostSpecificWildcard(t *testing.T) {
+	spec := &APISpec{
+		APIDefinition: &apidef.APIDefinition{
+			ApplicationProtocol: apidef.AppProtocolMCP,
+			JsonRpcVersion:      apidef.JsonRPC20,
+		},
+		MCPPrimitives: map[string]string{
+			"resource:file:///repo/*":      "/mcp-resource:file:///repo/*",
+			"resource:file:///repo/docs/*": "/mcp-resource:file:///repo/docs/*",
+		},
+	}
+
+	m := &MCPJSONRPCMiddleware{
+		BaseMiddleware: &BaseMiddleware{Spec: spec},
+	}
+
+	payload := map[string]interface{}{
+		"jsonrpc": "2.0",
+		"method":  "resources/read",
+		"params":  map[string]interface{}{"uri": "file:///repo/docs/README.md"},
+		"id":      1,
+	}
+	body, _ := json.Marshal(payload)
+
+	r := httptest.NewRequest(http.MethodPost, "/", bytes.NewReader(body))
+	r.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+
+	err, code := m.ProcessRequest(w, r, nil)
+	assert.Nil(t, err)
+	assert.Equal(t, http.StatusOK, code)
+	assert.Equal(t, "/mcp-resource:file:///repo/docs/*", r.URL.Path)
 }
 
 func TestMCPJSONRPCMiddleware_ProcessRequest_PromptsGet(t *testing.T) {
@@ -466,6 +584,43 @@ func TestMCPJSONRPCMiddleware_ProcessRequest_NotificationsPassthrough(t *testing
 	err, code := m.ProcessRequest(w, r, nil)
 	assert.Nil(t, err)
 	assert.Equal(t, http.StatusOK, code)
+	assert.Equal(t, "/", r.URL.Path)
+	assert.False(t, httpctx.IsMCPRouting(r))
+	assert.Nil(t, httpctx.GetJSONRPCRequest(r))
+	assert.Equal(t, 0, w.Body.Len())
+}
+
+func TestMCPJSONRPCMiddleware_ProcessRequest_UnmatchedMethodPassthrough(t *testing.T) {
+	spec := &APISpec{
+		APIDefinition: &apidef.APIDefinition{
+			ApplicationProtocol: apidef.AppProtocolMCP,
+			JsonRpcVersion:      apidef.JsonRPC20,
+		},
+		MCPPrimitives: map[string]string{},
+	}
+
+	m := &MCPJSONRPCMiddleware{
+		BaseMiddleware: &BaseMiddleware{Spec: spec},
+	}
+
+	payload := map[string]interface{}{
+		"jsonrpc": "2.0",
+		"method":  "custom/op",
+		"id":      1,
+	}
+	body, _ := json.Marshal(payload)
+
+	r := httptest.NewRequest(http.MethodPost, "/original", bytes.NewReader(body))
+	r.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+
+	err, code := m.ProcessRequest(w, r, nil)
+	assert.Nil(t, err)
+	assert.Equal(t, http.StatusOK, code)
+	assert.Equal(t, "/original", r.URL.Path)
+	assert.False(t, httpctx.IsMCPRouting(r))
+	assert.Nil(t, httpctx.GetJSONRPCRequest(r))
+	assert.Equal(t, 0, w.Body.Len())
 }
 
 func TestMCPJSONRPCMiddleware_ProcessRequest_BodyRestored(t *testing.T) {
@@ -516,8 +671,8 @@ func TestMCPJSONRPCMiddleware_ProcessRequest_NullID(t *testing.T) {
 		BaseMiddleware: &BaseMiddleware{Spec: spec},
 	}
 
-	// JSON with null ID
-	body := []byte(`{"jsonrpc":"2.0","method":"tools/call","params":{"name":"unknown"},"id":null}`)
+	// JSON with null ID and invalid params
+	body := []byte(`{"jsonrpc":"2.0","method":"tools/call","params":{"arguments":{}},"id":null}`)
 
 	r := httptest.NewRequest(http.MethodPost, "/", bytes.NewReader(body))
 	r.Header.Set("Content-Type", "application/json")
@@ -528,7 +683,7 @@ func TestMCPJSONRPCMiddleware_ProcessRequest_NullID(t *testing.T) {
 	var resp JSONRPCErrorResponse
 	err := json.NewDecoder(w.Body).Decode(&resp)
 	require.NoError(t, err)
-	assert.Equal(t, mcp.JSONRPCMethodNotFound, resp.Error.Code)
+	assert.Equal(t, mcp.JSONRPCInvalidParams, resp.Error.Code)
 	assert.Nil(t, resp.ID) // ID should be preserved as null
 }
 
@@ -738,5 +893,154 @@ func TestMCPJSONRPCMiddleware_ToolsCall_MissingParamsName(t *testing.T) {
 	var resp JSONRPCErrorResponse
 	err := json.NewDecoder(w.Body).Decode(&resp)
 	require.NoError(t, err)
-	assert.Equal(t, mcp.JSONRPCMethodNotFound, resp.Error.Code)
+	assert.Equal(t, mcp.JSONRPCInvalidParams, resp.Error.Code)
+}
+
+func TestMCPJSONRPCMiddleware_ToolsCall_NonStringName_InvalidParams(t *testing.T) {
+	spec := &APISpec{
+		APIDefinition: &apidef.APIDefinition{
+			ApplicationProtocol: apidef.AppProtocolMCP,
+			JsonRpcVersion:      apidef.JsonRPC20,
+		},
+		MCPPrimitives: map[string]string{
+			"tool:test": "/mcp-tool:test",
+		},
+	}
+
+	m := &MCPJSONRPCMiddleware{
+		BaseMiddleware: &BaseMiddleware{Spec: spec},
+	}
+
+	payload := map[string]interface{}{
+		"jsonrpc": "2.0",
+		"method":  "tools/call",
+		"params":  map[string]interface{}{"name": 123},
+		"id":      1,
+	}
+	body, _ := json.Marshal(payload)
+
+	r := httptest.NewRequest(http.MethodPost, "/", bytes.NewReader(body))
+	r.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+
+	_, _ = m.ProcessRequest(w, r, nil)
+
+	var resp JSONRPCErrorResponse
+	err := json.NewDecoder(w.Body).Decode(&resp)
+	require.NoError(t, err)
+	assert.Equal(t, mcp.JSONRPCInvalidParams, resp.Error.Code)
+}
+
+func TestMCPJSONRPCMiddleware_ResourcesRead_MissingParamsURI_InvalidParams(t *testing.T) {
+	spec := &APISpec{
+		APIDefinition: &apidef.APIDefinition{
+			ApplicationProtocol: apidef.AppProtocolMCP,
+			JsonRpcVersion:      apidef.JsonRPC20,
+		},
+		MCPPrimitives: map[string]string{
+			"resource:file:///repo/*": "/mcp-resource:file:///repo/*",
+		},
+	}
+
+	m := &MCPJSONRPCMiddleware{
+		BaseMiddleware: &BaseMiddleware{Spec: spec},
+	}
+
+	payload := map[string]interface{}{
+		"jsonrpc": "2.0",
+		"method":  "resources/read",
+		"params":  map[string]interface{}{"name": "missing-uri"},
+		"id":      1,
+	}
+	body, _ := json.Marshal(payload)
+
+	r := httptest.NewRequest(http.MethodPost, "/", bytes.NewReader(body))
+	r.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+
+	_, _ = m.ProcessRequest(w, r, nil)
+
+	var resp JSONRPCErrorResponse
+	err := json.NewDecoder(w.Body).Decode(&resp)
+	require.NoError(t, err)
+	assert.Equal(t, mcp.JSONRPCInvalidParams, resp.Error.Code)
+}
+
+func TestMCPJSONRPCMiddleware_RateLimitEnforcedOnVEM(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	oasAPI := getSampleOASAPI()
+	tykExt := oasAPI.GetTykExtension()
+	tykExt.Server.ListenPath = oas.ListenPath{
+		Value: "/mcp",
+		Strip: false,
+	}
+	tykExt.Middleware = &oas.Middleware{
+		McpTools: oas.MCPPrimitives{
+			"get-weather": &oas.MCPPrimitive{
+				Operation: oas.Operation{
+					RateLimit: &oas.RateLimitEndpoint{
+						Enabled: true,
+						Rate:    1,
+						Per:     oas.ReadableDuration(time.Second),
+					},
+				},
+			},
+			"get-forecast": &oas.MCPPrimitive{},
+		},
+	}
+	oasAPI.SetTykExtension(tykExt)
+
+	var def apidef.APIDefinition
+	oasAPI.ExtractTo(&def)
+	def.IsOAS = true
+	def.UseKeylessAccess = true
+	def.Proxy.ListenPath = "/mcp"
+	def.GlobalRateLimit = apidef.GlobalRateLimit{Rate: 100, Per: 1}
+
+	spec := &APISpec{APIDefinition: &def, OAS: oasAPI}
+	ts.Gw.LoadAPI(spec)
+
+	loaded := ts.Gw.getApiSpec(def.APIID)
+	require.NotNil(t, loaded)
+	assert.True(t, loaded.IsMCP())
+	assert.Equal(t, apidef.JsonRPC20, loaded.JsonRpcVersion)
+	require.NotEmpty(t, loaded.MCPPrimitives)
+
+	mw := loaded.OAS.GetTykMiddleware()
+	require.NotNil(t, mw)
+	require.Len(t, mw.McpTools, 2)
+
+	req := httptest.NewRequest(http.MethodPost, "/mcp-tool:get-weather", nil)
+	var rxPaths []URLSpec
+	for _, paths := range loaded.RxPaths {
+		rxPaths = paths
+		break
+	}
+	require.NotNil(t, rxPaths)
+	_, ok := loaded.FindSpecMatchesStatus(req, rxPaths, RateLimit)
+	require.True(t, ok)
+
+	rl := &RateLimitForAPI{BaseMiddleware: &BaseMiddleware{Spec: loaded, Gw: ts.Gw}}
+	assert.True(t, rl.EnabledForSpec())
+
+	payload := map[string]interface{}{
+		"jsonrpc": "2.0",
+		"method":  "tools/call",
+		"params":  map[string]interface{}{"name": "get-weather", "arguments": map[string]string{"city": "London"}},
+		"id":      1,
+	}
+	otherPayload := map[string]interface{}{
+		"jsonrpc": "2.0",
+		"method":  "tools/call",
+		"params":  map[string]interface{}{"name": "get-forecast", "arguments": map[string]string{"city": "London"}},
+		"id":      2,
+	}
+
+	_, _ = ts.Run(t, []test.TestCase{
+		{Method: http.MethodPost, Path: "/mcp", Data: payload, Code: http.StatusOK},
+		{Method: http.MethodPost, Path: "/mcp", Data: payload, Code: http.StatusTooManyRequests},
+		{Method: http.MethodPost, Path: "/mcp", Data: otherPayload, Code: http.StatusOK},
+	}...)
 }

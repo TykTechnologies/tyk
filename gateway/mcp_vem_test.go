@@ -129,6 +129,39 @@ func Test_generateMCPVEMs_GeneratesVEMsAndMiddlewareSpecs(t *testing.T) {
 	assert.Equal(t, 60.0, rl.RateLimit.Per)
 }
 
+func Test_generateMCPVEMs_RateLimitedToolVEM(t *testing.T) {
+	apiSpec := &APISpec{
+		APIDefinition: &apidef.APIDefinition{
+			ApplicationProtocol: apidef.AppProtocolMCP,
+			JsonRpcVersion:      apidef.JsonRPC20,
+			Proxy: apidef.ProxyConfig{
+				ListenPath: "/",
+			},
+		},
+		OAS: oas.OAS{},
+	}
+
+	tykExt := &oas.XTykAPIGateway{
+		Middleware: &oas.Middleware{
+			McpTools: oas.MCPPrimitives{
+				"get-weather": {Operation: oas.Operation{RateLimit: &oas.RateLimitEndpoint{Enabled: true, Rate: 5, Per: oas.ReadableDuration(10 * time.Second)}}},
+			},
+		},
+	}
+	apiSpec.OAS.SetTykExtension(tykExt)
+
+	loader := APIDefinitionLoader{}
+	specs := loader.generateMCPVEMs(apiSpec, config.Config{})
+	require.NotEmpty(t, specs)
+
+	r := httptest.NewRequest(http.MethodPost, "/mcp-tool:get-weather", nil)
+	rl, ok := apiSpec.FindSpecMatchesStatus(r, specs, RateLimit)
+	require.True(t, ok)
+	assert.Equal(t, http.MethodPost, rl.RateLimit.Method)
+	assert.Equal(t, 5.0, rl.RateLimit.Rate)
+	assert.Equal(t, 10.0, rl.RateLimit.Per)
+}
+
 func Test_URLAllowedAndIgnored_MCPPrimitive_DirectAccess_ReturnsNotFoundStatus(t *testing.T) {
 	apiSpec := &APISpec{
 		APIDefinition: &apidef.APIDefinition{

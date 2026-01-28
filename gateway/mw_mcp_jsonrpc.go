@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/apidef/oas"
 	"github.com/TykTechnologies/tyk/internal/httpctx"
 	"github.com/TykTechnologies/tyk/internal/mcp"
 	"github.com/TykTechnologies/tyk/internal/middleware"
@@ -87,15 +88,24 @@ func (m *MCPJSONRPCMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 		return nil, middleware.StatusRespond
 	}
 
+	// Notifications are observational and should pass through unchanged.
+	if m.shouldPassthrough(rpcReq.Method) {
+		return nil, http.StatusOK
+	}
+
 	// Route based on method
-	vemPath, primitive, found := m.routeRequest(&rpcReq)
-	if !found {
-		// Check if this is a discovery/lifecycle operation that should pass through
-		if m.shouldPassthrough(rpcReq.Method) {
-			return nil, http.StatusOK
-		}
-		m.writeJSONRPCError(w, rpcReq.ID, mcp.JSONRPCMethodNotFound, "Method not found", nil)
+	vemPath, primitive, found, invalidParams := m.routeRequest(&rpcReq)
+	if invalidParams {
+		m.writeJSONRPCError(w, rpcReq.ID, mcp.JSONRPCInvalidParams, "Invalid params", nil)
 		return nil, middleware.StatusRespond
+	}
+	if !found {
+		if m.mcpAllowListEnabled() {
+			m.writeJSONRPCError(w, rpcReq.ID, mcp.JSONRPCMethodNotFound, "Method not found", nil)
+			return nil, middleware.StatusRespond
+		}
+		// Passthrough for unmatched primitives/operations.
+		return nil, http.StatusOK
 	}
 
 	// Store parsed data in context
@@ -112,6 +122,8 @@ func (m *MCPJSONRPCMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 
 	// Set loop level to enable internal routing
 	ctxSetLoopLevel(r, 1)
+	// Ensure limits and quotas apply to MCP routed requests
+	ctxSetCheckLoopLimits(r, true)
 
 	// Rewrite URL path to VEM path
 	r.URL.Path = vemPath
@@ -120,8 +132,8 @@ func (m *MCPJSONRPCMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 }
 
 // routeRequest determines the VEM path for a JSON-RPC request based on its method.
-// Returns the VEM path, primitive name, and whether a matching VEM was found.
-func (m *MCPJSONRPCMiddleware) routeRequest(rpcReq *JSONRPCRequest) (vemPath string, primitive string, found bool) {
+// Returns the VEM path, primitive name, match status, and invalid params flag.
+func (m *MCPJSONRPCMiddleware) routeRequest(rpcReq *JSONRPCRequest) (vemPath string, primitive string, found bool, invalidParams bool) {
 	primitives := m.Spec.MCPPrimitives
 
 	switch rpcReq.Method {
@@ -129,34 +141,57 @@ func (m *MCPJSONRPCMiddleware) routeRequest(rpcReq *JSONRPCRequest) (vemPath str
 		// Extract tool name from params.name
 		name := m.extractParamString(rpcReq.Params, "name")
 		if name == "" {
-			return "", "", false
+			return "", "", false, true
 		}
 		vemPath, found = primitives["tool:"+name]
-		return vemPath, name, found
+		return vemPath, name, found, false
 
 	case mcp.MethodResourcesRead, mcp.MethodResourcesSubscribe, mcp.MethodResourcesUnsubscribe:
 		// Extract resource URI from params.uri
 		uri := m.extractParamString(rpcReq.Params, "uri")
 		if uri == "" {
-			return "", "", false
+			return "", "", false, true
 		}
 		vemPath, found = m.matchResourceURI(uri, primitives)
-		return vemPath, uri, found
+		return vemPath, uri, found, false
 
 	case mcp.MethodPromptsGet:
 		// Extract prompt name from params.name
 		name := m.extractParamString(rpcReq.Params, "name")
 		if name == "" {
-			return "", "", false
+			return "", "", false, true
 		}
 		vemPath, found = primitives["prompt:"+name]
-		return vemPath, name, found
+		return vemPath, name, found, false
 
 	default:
 		// Check for operation-level VEMs (tools/list, initialize, etc.)
 		vemPath, found = primitives["operation:"+rpcReq.Method]
-		return vemPath, rpcReq.Method, found
+		return vemPath, rpcReq.Method, found, false
 	}
+}
+
+func (m *MCPJSONRPCMiddleware) mcpAllowListEnabled() bool {
+	mw := m.Spec.OAS.GetTykMiddleware()
+	if mw == nil {
+		return false
+	}
+
+	return m.mcpAllowListEnabledForPrimitives(mw.McpTools) ||
+		m.mcpAllowListEnabledForPrimitives(mw.McpResources) ||
+		m.mcpAllowListEnabledForPrimitives(mw.McpPrompts) ||
+		m.mcpAllowListEnabledForPrimitives(mw.McpOperations)
+}
+
+func (m *MCPJSONRPCMiddleware) mcpAllowListEnabledForPrimitives(primitives oas.MCPPrimitives) bool {
+	for _, primitive := range primitives {
+		if primitive == nil || primitive.Allow == nil || !primitive.Allow.Enabled {
+			continue
+		}
+		return true
+	}
+
+	return false
 }
 
 // extractParamString extracts a string parameter from JSON-RPC params.
@@ -184,15 +219,32 @@ func (m *MCPJSONRPCMiddleware) matchResourceURI(uri string, primitives map[strin
 		return path, true
 	}
 
-	// Wildcard matching
+	// Wildcard matching with deterministic precedence.
+	var bestPattern string
+	var bestPath string
+	bestPrefixLen := -1
+
 	for key, path := range primitives {
 		if !strings.HasPrefix(key, "resource:") {
 			continue
 		}
 		pattern := strings.TrimPrefix(key, "resource:")
 		if m.matchesWildcard(pattern, uri) {
-			return path, true
+			prefixLen := len(pattern)
+			if strings.HasSuffix(pattern, "/*") {
+				prefixLen = len(strings.TrimSuffix(pattern, "*"))
+			}
+
+			if prefixLen > bestPrefixLen || (prefixLen == bestPrefixLen && pattern < bestPattern) {
+				bestPattern = pattern
+				bestPath = path
+				bestPrefixLen = prefixLen
+			}
 		}
+	}
+
+	if bestPrefixLen >= 0 {
+		return bestPath, true
 	}
 
 	return "", false
@@ -211,19 +263,8 @@ func (m *MCPJSONRPCMiddleware) matchesWildcard(pattern, uri string) bool {
 // shouldPassthrough returns true if the method should be passed through to upstream
 // without requiring a configured VEM (e.g., discovery operations, notifications).
 func (m *MCPJSONRPCMiddleware) shouldPassthrough(method string) bool {
-	// Notifications are observational and don't require policy enforcement
-	if strings.HasPrefix(method, "notifications/") {
-		return true
-	}
-
-	// Discovery operations without configured VEMs pass through to upstream
-	switch method {
-	case mcp.MethodToolsList, mcp.MethodResourcesList, mcp.MethodPromptsList,
-		mcp.MethodInitialize, mcp.MethodPing:
-		return true
-	}
-
-	return false
+	// Notifications are observational and don't require policy enforcement.
+	return strings.HasPrefix(method, "notifications/")
 }
 
 // writeJSONRPCError writes a JSON-RPC 2.0 error response.
