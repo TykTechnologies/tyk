@@ -1,6 +1,9 @@
 package kv
 
 import (
+	"encoding/json"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 
 	"github.com/TykTechnologies/tyk/config"
@@ -131,4 +134,77 @@ func TestConsulPut(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestVaultReadSecret(t *testing.T) {
+	t.Run("ReadSecret returns secret from Vault", func(t *testing.T) {
+		mockVault := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			assert.Equal(t, "/v1/secret/data/tyk-apis", r.URL.Path)
+
+			response := map[string]interface{}{
+				"data": map[string]interface{}{
+					"data": map[string]interface{}{
+						"api-key": "secret-value",
+					},
+				},
+			}
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode(response)
+		}))
+		defer mockVault.Close()
+
+		v, err := NewVault(config.VaultConfig{
+			Address:   mockVault.URL,
+			Token:     "test-token",
+			KVVersion: 2,
+		})
+		assert.NoError(t, err)
+
+		vault := v.(*Vault)
+		secret, err := vault.ReadSecret("secret/data/tyk-apis")
+
+		assert.NoError(t, err)
+		assert.NotNil(t, secret)
+		assert.NotNil(t, secret.Data["data"])
+	})
+
+	t.Run("ReadSecret returns nil for non-existent path", func(t *testing.T) {
+		mockVault := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusNotFound)
+		}))
+		defer mockVault.Close()
+
+		v, err := NewVault(config.VaultConfig{
+			Address:   mockVault.URL,
+			Token:     "test-token",
+			KVVersion: 2,
+		})
+		assert.NoError(t, err)
+
+		vault := v.(*Vault)
+		secret, err := vault.ReadSecret("secret/data/non-existent")
+
+		assert.NoError(t, err)
+		assert.Nil(t, secret)
+	})
+
+	t.Run("ReadSecret returns error on server error", func(t *testing.T) {
+		mockVault := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusInternalServerError)
+		}))
+		defer mockVault.Close()
+
+		v, err := NewVault(config.VaultConfig{
+			Address:   mockVault.URL,
+			Token:     "test-token",
+			KVVersion: 2,
+		})
+		assert.NoError(t, err)
+
+		vault := v.(*Vault)
+		secret, err := vault.ReadSecret("secret/data/tyk-apis")
+
+		assert.Error(t, err)
+		assert.Nil(t, secret)
+	})
 }
