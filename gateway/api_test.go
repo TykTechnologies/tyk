@@ -4353,7 +4353,7 @@ func TestAPIMCPListing(t *testing.T) {
 	regularAPI1 := allAPIs[2]
 	regularAPI2 := allAPIs[3]
 
-	t.Run("/tyk/apis excludes MCP APIs by default", func(t *testing.T) {
+	t.Run("/tyk/apis includes all APIs by default", func(t *testing.T) {
 		req := TestReq(t, "GET", "/tyk/apis/", nil)
 		req = ts.withAuth(req)
 		rec := httptest.NewRecorder()
@@ -4364,18 +4364,14 @@ func TestAPIMCPListing(t *testing.T) {
 		var apis []*apidef.APIDefinition
 		err := json.Unmarshal(rec.Body.Bytes(), &apis)
 		assert.NoError(t, err)
-		assert.Len(t, apis, 2)
-
-		for _, api := range apis {
-			assert.False(t, api.IsMCP())
-			assert.NotEqual(t, "mcp-api-1", api.APIID)
-			assert.NotEqual(t, "mcp-api-2", api.APIID)
-		}
+		assert.Len(t, apis, 4)
 
 		apiIDs := make([]string, len(apis))
 		for i, api := range apis {
 			apiIDs[i] = api.APIID
 		}
+		assert.Contains(t, apiIDs, mcpAPI1.APIID)
+		assert.Contains(t, apiIDs, mcpAPI2.APIID)
 		assert.Contains(t, apiIDs, regularAPI1.APIID)
 		assert.Contains(t, apiIDs, regularAPI2.APIID)
 	})
@@ -5855,5 +5851,101 @@ func TestUpdateKeyWithMtlsStaticCertificateBindings(t *testing.T) {
 		_, _ = ts.Run(t, []test.TestCase{
 			{Method: http.MethodPut, Path: path, Data: sessionData, AdminAuth: true, Code: 200},
 		}...)
+	})
+}
+
+func TestAPIListFilter_ExcludeMCP(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	// Create all APIs using BuildAndLoadAPI
+	allAPIs := ts.Gw.BuildAndLoadAPI(
+		func(spec *APISpec) {
+			spec.Name = "classic-api-1"
+			spec.APIID = "classic123"
+			spec.Proxy.ListenPath = "/classic1/"
+		},
+		func(spec *APISpec) {
+			spec.Name = "classic-api-2"
+			spec.APIID = "classic456"
+			spec.Proxy.ListenPath = "/classic2/"
+		},
+		func(spec *APISpec) {
+			spec.Name = "mcp-api"
+			spec.APIID = "mcp789"
+			spec.Proxy.ListenPath = "/mcp/"
+			spec.MarkAsMCP()
+		},
+	)
+
+	require.Len(t, allAPIs, 3)
+
+	t.Run("no filter returns all APIs", func(t *testing.T) {
+		resp, _ := ts.Run(t, test.TestCase{
+			Path:      "/tyk/apis/",
+			Method:    http.MethodGet,
+			AdminAuth: true,
+			Code:      http.StatusOK,
+		})
+
+		bodyBytes, err := ioutil.ReadAll(resp.Body)
+		require.NoError(t, err)
+
+		var apis []*apidef.APIDefinition
+		err = json.Unmarshal(bodyBytes, &apis)
+		require.NoError(t, err)
+
+		t.Logf("Without filter: found %d APIs", len(apis))
+		for _, api := range apis {
+			t.Logf("  - %s (ID: %s, IsOAS: %v, IsMCP: %v)", api.Name, api.APIID, api.IsOAS, api.IsMCP())
+		}
+
+		assert.Equal(t, 3, len(apis), "Should return all 3 APIs")
+
+		// Check each API is present
+		apiIDs := make(map[string]bool)
+		for _, api := range apis {
+			apiIDs[api.APIID] = true
+		}
+		assert.True(t, apiIDs["classic123"], "Should have classic API 1")
+		assert.True(t, apiIDs["classic456"], "Should have classic API 2")
+		assert.True(t, apiIDs["mcp789"], "Should have MCP API")
+	})
+
+	t.Run("exclude_api_types=mcp excludes MCP APIs", func(t *testing.T) {
+		resp, _ := ts.Run(t, test.TestCase{
+			Path:      "/tyk/apis/?exclude_api_types=mcp",
+			Method:    http.MethodGet,
+			AdminAuth: true,
+			Code:      http.StatusOK,
+		})
+
+		bodyBytes, err := ioutil.ReadAll(resp.Body)
+		require.NoError(t, err)
+
+		var apis []*apidef.APIDefinition
+		err = json.Unmarshal(bodyBytes, &apis)
+		require.NoError(t, err)
+
+		t.Logf("With exclude_api_types=mcp: found %d APIs", len(apis))
+		for _, api := range apis {
+			t.Logf("  - %s (ID: %s, IsOAS: %v, IsMCP: %v)", api.Name, api.APIID, api.IsOAS, api.IsMCP())
+		}
+
+		assert.Equal(t, 2, len(apis), "Should return only 2 APIs (excluding MCP)")
+
+		// Check MCP is excluded
+		for _, api := range apis {
+			assert.NotEqual(t, "mcp789", api.APIID, "MCP API should be excluded")
+			assert.False(t, api.IsMCP(), "No MCP APIs should be in response")
+		}
+
+		// Check other APIs are present
+		apiIDs := make(map[string]bool)
+		for _, api := range apis {
+			apiIDs[api.APIID] = true
+		}
+		assert.True(t, apiIDs["classic123"], "Should have classic API 1")
+		assert.True(t, apiIDs["classic456"], "Should have classic API 2")
 	})
 }

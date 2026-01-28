@@ -1175,16 +1175,36 @@ func (gw *Gateway) handleDeletePolicy(polID string) (interface{}, int) {
 	return response, http.StatusOK
 }
 
-func (gw *Gateway) handleGetAPIList() (interface{}, int) {
+func (gw *Gateway) handleGetAPIList(r *http.Request) (interface{}, int) {
+	excludeAPITypes := r.URL.Query().Get("exclude_api_types")
+
 	gw.apisMu.RLock()
 	defer gw.apisMu.RUnlock()
 	apiIDList := make([]*apidef.APIDefinition, 0, len(gw.apisByID))
+
 	for _, apiSpec := range gw.apisByID {
-		if !apiSpec.IsMCP() {
-			apiIDList = append(apiIDList, apiSpec.APIDefinition)
+		if shouldExcludeAPI(apiSpec, excludeAPITypes) {
+			continue
 		}
+		apiIDList = append(apiIDList, apiSpec.APIDefinition)
 	}
 	return apiIDList, http.StatusOK
+}
+
+// shouldExcludeAPI checks if an API should be excluded based on the comma-separated list of types
+func shouldExcludeAPI(apiSpec *APISpec, excludeAPITypes string) bool {
+	if excludeAPITypes == "" {
+		return false
+	}
+
+	types := strings.Split(excludeAPITypes, ",")
+	for _, t := range types {
+		t = strings.TrimSpace(t)
+		if t == "mcp" && apiSpec.IsMCP() {
+			return true
+		}
+	}
+	return false
 }
 
 func (gw *Gateway) handleGetAPIListOAS(modePublic bool) (interface{}, int) {
@@ -1557,7 +1577,7 @@ func (gw *Gateway) apiHandler(w http.ResponseWriter, r *http.Request) {
 			obj, code = gw.handleGetAPI(apiID, false)
 		} else {
 			log.Debug("Requesting API list")
-			obj, code = gw.handleGetAPIList()
+			obj, code = gw.handleGetAPIList(r)
 		}
 
 		if api, ok := obj.(*apidef.APIDefinition); ok {
