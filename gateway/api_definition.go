@@ -20,6 +20,7 @@ import (
 	"github.com/TykTechnologies/tyk/ee/middleware/streams"
 	"github.com/TykTechnologies/tyk/storage/kv"
 
+	"github.com/TykTechnologies/tyk/internal/httpctx"
 	"github.com/TykTechnologies/tyk/internal/httputil"
 	"github.com/TykTechnologies/tyk/internal/mcp"
 
@@ -1562,7 +1563,8 @@ func (a *APISpec) URLAllowedAndIgnored(r *http.Request, rxPaths []URLSpec, white
 			continue
 		}
 
-		if r.Method == rxPaths[i].Internal.Method && rxPaths[i].Status == Internal && !ctxLoopingEnabled(r) {
+		if r.Method == rxPaths[i].Internal.Method && rxPaths[i].Status == Internal &&
+			!ctxLoopingEnabled(r) && !httpctx.IsMCPRouting(r) {
 			// MCP primitive VEMs return 404 to avoid exposing internal-only endpoints.
 			if mcp.IsPrimitiveVEMPath(rxPaths[i].Internal.Path) {
 				return MCPPrimitiveNotFound, nil

@@ -53,6 +53,14 @@ func (a APIDefinitionLoader) generateMCPVEMs(apiSpec *APISpec, conf config.Confi
 		apiSpec.MCPPrimitives["prompt:"+name] = vemPath
 	}
 
+	// Generate operation VEMs (tools/list, resources/list, initialize, etc.)
+	for method, op := range middleware.McpOperations {
+		vemPath := mcp.OperationPrefix + mcp.SanitizeMethodForPath(method)
+		specs = append(specs, a.buildMCPPrimitiveSpec(method, "operation", vemPath)...)
+		specs = append(specs, a.compileMCPPrimitiveMiddlewareSpecs(op, vemPath, apiSpec, conf)...)
+		apiSpec.MCPPrimitives["operation:"+method] = vemPath
+	}
+
 	return specs
 }
 
@@ -80,13 +88,13 @@ func (a APIDefinitionLoader) buildMCPPrimitiveSpec(_, _, path string) []URLSpec 
 	return []URLSpec{spec}
 }
 
-func (a APIDefinitionLoader) compileMCPPrimitiveMiddlewareSpecs(op *oas.Operation, path string, apiSpec *APISpec, conf config.Config) []URLSpec {
-	if op == nil {
+func (a APIDefinitionLoader) compileMCPPrimitiveMiddlewareSpecs(primitive *oas.MCPPrimitive, path string, apiSpec *APISpec, conf config.Config) []URLSpec {
+	if primitive == nil {
 		return nil
 	}
 
 	var ep apidef.ExtendedPathsSet
-	op.ExtractToExtendedPaths(&ep, path, http.MethodPost)
+	primitive.ExtractToExtendedPaths(&ep, path, http.MethodPost)
 
 	// Reuse the classic middleware compilation pipeline for per-path middleware.
 	specs := []URLSpec{}

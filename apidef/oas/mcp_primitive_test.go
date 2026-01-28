@@ -221,7 +221,7 @@ func TestMCPPrimitives_MapOperations(t *testing.T) {
 }
 
 func TestMCPPrimitive_DisabledMiddleware(t *testing.T) {
-	t.Run("response transformation disabled for MCP", func(t *testing.T) {
+	t.Run("response transformation disabled for MCP via ExtractToExtendedPaths", func(t *testing.T) {
 		primitive := &MCPPrimitive{}
 		primitive.TransformResponseBody = &TransformBody{
 			Enabled: true,
@@ -239,14 +239,18 @@ func TestMCPPrimitive_DisabledMiddleware(t *testing.T) {
 		vemPath := "/mcp-tool:test"
 		var mcpEP, opEP apidef.ExtendedPathsSet
 
-		primitive.extractTransformResponseBodyTo(&mcpEP, vemPath, "POST")
-		operation.extractTransformResponseBodyTo(&opEP, vemPath, "POST")
+		// Use the public ExtractToExtendedPaths method which properly handles
+		// the response body transform exclusion
+		primitive.ExtractToExtendedPaths(&mcpEP, vemPath, "POST")
+		operation.ExtractToExtendedPaths(&opEP, vemPath, "POST")
 
+		// MCPPrimitive should skip response transformation
 		assert.Empty(t, mcpEP.TransformResponse)
+		// Regular Operation includes response transformation
 		assert.Len(t, opEP.TransformResponse, 1)
 	})
 
-	t.Run("request transformations still work", func(t *testing.T) {
+	t.Run("request transformations still work via ExtractToExtendedPaths", func(t *testing.T) {
 		primitive := &MCPPrimitive{}
 		primitive.TransformRequestHeaders = &TransformHeaders{
 			Enabled: true,
@@ -255,10 +259,11 @@ func TestMCPPrimitive_DisabledMiddleware(t *testing.T) {
 		primitive.TransformResponseBody = &TransformBody{Enabled: true}
 
 		var ep apidef.ExtendedPathsSet
-		primitive.extractTransformRequestHeadersTo(&ep, "/test", "POST")
-		primitive.extractTransformResponseBodyTo(&ep, "/test", "POST")
+		primitive.ExtractToExtendedPaths(&ep, "/test", "POST")
 
+		// Request headers transformation works
 		assert.Len(t, ep.TransformHeader, 1)
+		// Response body transformation is skipped for MCPPrimitive
 		assert.Empty(t, ep.TransformResponse)
 	})
 }

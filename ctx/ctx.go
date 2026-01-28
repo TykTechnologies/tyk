@@ -57,6 +57,8 @@ const (
 	RequestStartTime
 	// MCPRouting indicates the request came via MCP JSON-RPC routing
 	MCPRouting
+	// JSONRPCRequest stores parsed JSON-RPC request data for MCP routing
+	JSONRPCRequest
 )
 
 func ctxSetSession(r *http.Request, s *user.SessionState, scheduleUpdate bool, hashKey bool) {
