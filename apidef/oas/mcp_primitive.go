@@ -8,6 +8,13 @@ type MCPPrimitive struct {
 	Operation
 }
 
+// extractTransformResponseBodyTo overrides Operation to disable response body transformation.
+// MCP responses must be returned as-is to maintain JSON-RPC protocol compliance.
+//
+//nolint:unused,revive,unparam
+func (m *MCPPrimitive) extractTransformResponseBodyTo(ep *apidef.ExtendedPathsSet, path string, method string) {
+	// Intentionally empty - MCP primitives don't support response body transformation
+}
 // ExtractToExtendedPaths extracts middleware config, delegating to embedded Operation
 // but allowing MCPPrimitive-specific overrides. Notably, response body transformation
 // is disabled for MCP primitives to maintain JSON-RPC protocol compliance.

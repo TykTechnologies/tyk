@@ -81,14 +81,11 @@ func TestXTykGateway_Lint(t *testing.T) {
 	settings := XTykAPIGateway{}
 	securityScheme := &Basic{}
 
-	Fill(t, &settings, 0)
+	FillWithContext(t, &settings, 0, FillContextOAS)
 	Fill(t, &securityScheme, 0)
 	{
 		settings.Middleware.Global.PluginConfig.Driver = "goplugin"
 		fixOperationsForValidation(settings.Middleware.Operations)
-		fixMCPPrimitivesForValidation(settings.Middleware.McpTools)
-		fixMCPPrimitivesForValidation(settings.Middleware.McpResources)
-		fixMCPPrimitivesForValidation(settings.Middleware.McpPrompts)
 
 		settings.Server.Authentication.BaseIdentityProvider = ""
 		settings.Server.Authentication.SecurityProcessingMode = SecurityProcessingModeLegacy

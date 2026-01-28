@@ -26,10 +26,6 @@ type Middleware struct {
 
 	// McpPrompts contains configuration for middleware that can be applied to MCP prompts.
 	McpPrompts MCPPrimitives `bson:"mcpPrompts,omitempty" json:"mcpPrompts,omitempty"`
-
-	// McpOperations contains configuration for middleware that can be applied to MCP operations
-	// (e.g., tools/list, resources/list, prompts/list, initialize, ping).
-	McpOperations MCPPrimitives `bson:"mcpOperations,omitempty" json:"mcpOperations,omitempty"`
 }
 
 // Fill fills *Middleware from apidef.APIDefinition.
@@ -54,10 +50,6 @@ func (m *Middleware) ExtractTo(api *apidef.APIDefinition) {
 	}
 
 	m.Global.ExtractTo(api)
-
-	if len(m.McpTools) > 0 || len(m.McpResources) > 0 || len(m.McpPrompts) > 0 || len(m.McpOperations) > 0 {
-		api.MarkAsMCP()
-	}
 }
 
 // Global contains configuration that affects the whole API (all endpoints).
