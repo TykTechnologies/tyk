@@ -13,10 +13,12 @@ import (
 func TestMiddleware_MCPTools(t *testing.T) {
 	t.Run("mcpTools field marshaling", func(t *testing.T) {
 		middleware := Middleware{
-			McpTools: map[string]*Operation{
+			McpTools: MCPPrimitives{
 				"get-weather": {
-					Allow: &Allowance{
-						Enabled: true,
+					Operation: Operation{
+						Allow: &Allowance{
+							Enabled: true,
+						},
 					},
 				},
 			},
@@ -38,7 +40,7 @@ func TestMiddleware_MCPTools(t *testing.T) {
 
 	t.Run("empty mcpTools omitted in JSON", func(t *testing.T) {
 		middleware := Middleware{
-			McpTools: map[string]*Operation{},
+			McpTools: MCPPrimitives{},
 		}
 
 		data, err := json.Marshal(middleware)
@@ -62,10 +64,12 @@ func TestMiddleware_MCPTools(t *testing.T) {
 func TestMiddleware_MCPResources(t *testing.T) {
 	t.Run("mcpResources field marshaling", func(t *testing.T) {
 		middleware := Middleware{
-			McpResources: map[string]*Operation{
+			McpResources: MCPPrimitives{
 				"file:///repo/*": {
-					Allow: &Allowance{
-						Enabled: true,
+					Operation: Operation{
+						Allow: &Allowance{
+							Enabled: true,
+						},
 					},
 				},
 			},
@@ -87,7 +91,7 @@ func TestMiddleware_MCPResources(t *testing.T) {
 
 	t.Run("empty mcpResources omitted in JSON", func(t *testing.T) {
 		middleware := Middleware{
-			McpResources: map[string]*Operation{},
+			McpResources: MCPPrimitives{},
 		}
 
 		data, err := json.Marshal(middleware)
@@ -111,10 +115,12 @@ func TestMiddleware_MCPResources(t *testing.T) {
 func TestMiddleware_MCPPrompts(t *testing.T) {
 	t.Run("mcpPrompts field marshaling", func(t *testing.T) {
 		middleware := Middleware{
-			McpPrompts: map[string]*Operation{
+			McpPrompts: MCPPrimitives{
 				"code-review": {
-					Allow: &Allowance{
-						Enabled: true,
+					Operation: Operation{
+						Allow: &Allowance{
+							Enabled: true,
+						},
 					},
 				},
 			},
@@ -136,7 +142,7 @@ func TestMiddleware_MCPPrompts(t *testing.T) {
 
 	t.Run("empty mcpPrompts omitted in JSON", func(t *testing.T) {
 		middleware := Middleware{
-			McpPrompts: map[string]*Operation{},
+			McpPrompts: MCPPrimitives{},
 		}
 
 		data, err := json.Marshal(middleware)
@@ -160,9 +166,11 @@ func TestMiddleware_MCPPrompts(t *testing.T) {
 func TestMiddleware_ExtractTo_MCPDetection(t *testing.T) {
 	t.Run("sets protocol flags when mcpTools present", func(t *testing.T) {
 		middleware := Middleware{
-			McpTools: map[string]*Operation{
+			McpTools: MCPPrimitives{
 				"get-weather": {
-					Allow: &Allowance{Enabled: true},
+					Operation: Operation{
+						Allow: &Allowance{Enabled: true},
+					},
 				},
 			},
 		}
@@ -178,9 +186,11 @@ func TestMiddleware_ExtractTo_MCPDetection(t *testing.T) {
 
 	t.Run("sets protocol flags when mcpResources present", func(t *testing.T) {
 		middleware := Middleware{
-			McpResources: map[string]*Operation{
+			McpResources: MCPPrimitives{
 				"file:///repo/*": {
-					Allow: &Allowance{Enabled: true},
+					Operation: Operation{
+						Allow: &Allowance{Enabled: true},
+					},
 				},
 			},
 		}
@@ -196,9 +206,11 @@ func TestMiddleware_ExtractTo_MCPDetection(t *testing.T) {
 
 	t.Run("sets protocol flags when mcpPrompts present", func(t *testing.T) {
 		middleware := Middleware{
-			McpPrompts: map[string]*Operation{
+			McpPrompts: MCPPrimitives{
 				"code-review": {
-					Allow: &Allowance{Enabled: true},
+					Operation: Operation{
+						Allow: &Allowance{Enabled: true},
+					},
 				},
 			},
 		}
@@ -214,14 +226,26 @@ func TestMiddleware_ExtractTo_MCPDetection(t *testing.T) {
 
 	t.Run("sets protocol flags when multiple MCP sections present", func(t *testing.T) {
 		middleware := Middleware{
-			McpTools: map[string]*Operation{
-				"get-weather": {Allow: &Allowance{Enabled: true}},
+			McpTools: MCPPrimitives{
+				"get-weather": {
+					Operation: Operation{
+						Allow: &Allowance{Enabled: true},
+					},
+				},
 			},
-			McpResources: map[string]*Operation{
-				"file:///repo/*": {Allow: &Allowance{Enabled: true}},
+			McpResources: MCPPrimitives{
+				"file:///repo/*": {
+					Operation: Operation{
+						Allow: &Allowance{Enabled: true},
+					},
+				},
 			},
-			McpPrompts: map[string]*Operation{
-				"code-review": {Allow: &Allowance{Enabled: true}},
+			McpPrompts: MCPPrimitives{
+				"code-review": {
+					Operation: Operation{
+						Allow: &Allowance{Enabled: true},
+					},
+				},
 			},
 		}
 
@@ -251,9 +275,9 @@ func TestMiddleware_ExtractTo_MCPDetection(t *testing.T) {
 
 	t.Run("does not set protocol flags when MCP sections are empty maps", func(t *testing.T) {
 		middleware := Middleware{
-			McpTools:     map[string]*Operation{},
-			McpResources: map[string]*Operation{},
-			McpPrompts:   map[string]*Operation{},
+			McpTools:     MCPPrimitives{},
+			McpResources: MCPPrimitives{},
+			McpPrompts:   MCPPrimitives{},
 		}
 
 		var api apidef.APIDefinition
