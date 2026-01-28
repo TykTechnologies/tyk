@@ -5022,3 +5022,23 @@ func TestJWT_TraditionalAuth_ExistingSessionNoPolicyInToken(t *testing.T) {
 		})
 	})
 }
+
+func TestDeleteJWKCacheByAPIID(t *testing.T) {
+	apiID := "test-api-" + uuid.NewHex()
+
+	// Create and populate a cache
+	jwkCache := loadOrCreateJWKCacheByApiID(apiID)
+	jwkCache.Set("test-key", "test-value", 0)
+
+	// Verify the cache has items before deletion
+	assert.Equal(t, 1, jwkCache.Count())
+
+	deleteJWKCacheByAPIID(apiID)
+
+	// Verify cache is removed from the JWKCaches map
+	_, exists := JWKCaches.Load(apiID)
+	assert.False(t, exists, "cache should be removed from JWKCaches")
+
+	// Verify cache contents are flushed (Close calls Flush)
+	assert.Equal(t, 0, jwkCache.Count(), "cache items should be flushed after Close()")
+}
