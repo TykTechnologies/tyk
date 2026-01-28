@@ -216,10 +216,7 @@ func (gw *Gateway) mcpGetHandler(w http.ResponseWriter, r *http.Request) {
 
 	if code == http.StatusOK {
 		if oasAPI, ok := obj.(*oas.OAS); ok {
-			api := gw.getApiSpec(oasAPI.GetTykExtension().Info.ID)
-			if api != nil && api.VersionDefinition.BaseID != "" {
-				w.Header().Set(apidef.HeaderBaseAPIID, api.VersionDefinition.BaseID)
-			}
+			gw.setBaseAPIIDHeader(w, oasAPI)
 		}
 	}
 

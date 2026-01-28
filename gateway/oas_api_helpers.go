@@ -34,7 +34,22 @@ var (
 	mcpTypeCheck = typeCheckFunc("MCP", (*APISpec).IsMCP)
 )
 
-// ensureAndValidateAPIID generates an API ID if empty and validates it.
+func (gw *Gateway) setBaseAPIIDHeader(w http.ResponseWriter, oasObj *oas.OAS) {
+	if oasObj == nil {
+		return
+	}
+
+	tykExt := oasObj.GetTykExtension()
+	if tykExt == nil {
+		return
+	}
+
+	api := gw.getApiSpec(tykExt.Info.ID)
+	if api != nil && api.VersionDefinition.BaseID != "" {
+		w.Header().Set(apidef.HeaderBaseAPIID, api.VersionDefinition.BaseID)
+	}
+}
+
 func ensureAndValidateAPIID(apiDef *apidef.APIDefinition) (interface{}, int) {
 	if apiDef.APIID == "" {
 		apiDef.GenerateAPIID()
@@ -48,8 +63,6 @@ func ensureAndValidateAPIID(apiDef *apidef.APIDefinition) (interface{}, int) {
 	return nil, 0
 }
 
-// handleGetOASList returns OAS APIs matching the filter predicate.
-// Thread-safe: acquires read lock.
 func (gw *Gateway) handleGetOASList(filter apiFilterFunc, modePublic bool) (interface{}, int) {
 	gw.apisMu.RLock()
 	defer gw.apisMu.RUnlock()

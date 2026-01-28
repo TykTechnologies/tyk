@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"net/http/httptest"
 	"net/url"
 	"os"
 	"strings"
@@ -609,7 +610,115 @@ func (s *slowFS) OpenFile(name string, flag int, perm os.FileMode) (afero.File, 
 // Ensure slowFS implements afero.Fs
 var _ afero.Fs = (*slowFS)(nil)
 
-// TestEnsureAndValidateAPIID tests API ID generation and validation
+func TestSetBaseAPIIDHeader(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	// Create a base API with a versioned child
+	baseAPI := &APISpec{
+		APIDefinition: &apidef.APIDefinition{
+			APIID:  "base-api",
+			OrgID:  "test-org",
+			IsOAS:  true,
+			Active: true,
+			VersionDefinition: apidef.VersionDefinition{
+				Enabled: true,
+				Name:    "v1",
+				Default: "v1",
+				Versions: map[string]string{
+					"v1": "base-api",
+					"v2": "child-api",
+				},
+			},
+		},
+		OAS: oas.OAS{},
+	}
+	baseAPI.OAS.SetTykExtension(&oas.XTykAPIGateway{
+		Info: oas.Info{
+			ID:   "base-api",
+			Name: "Base API",
+		},
+	})
+	baseAPI.OAS.Fill(*baseAPI.APIDefinition)
+
+	childAPI := &APISpec{
+		APIDefinition: &apidef.APIDefinition{
+			APIID:  "child-api",
+			OrgID:  "test-org",
+			IsOAS:  true,
+			Active: true,
+			VersionDefinition: apidef.VersionDefinition{
+				Enabled: true,
+				Name:    "v2",
+				BaseID:  "base-api",
+			},
+		},
+		OAS: oas.OAS{},
+	}
+	childAPI.OAS.SetTykExtension(&oas.XTykAPIGateway{
+		Info: oas.Info{
+			ID:   "child-api",
+			Name: "Child API",
+		},
+	})
+	childAPI.OAS.Fill(*childAPI.APIDefinition)
+
+	// Load APIs into gateway
+	ts.Gw.apisMu.Lock()
+	ts.Gw.apisByID["base-api"] = baseAPI
+	ts.Gw.apisByID["child-api"] = childAPI
+	ts.Gw.apisMu.Unlock()
+
+	t.Run("sets header for versioned child API", func(t *testing.T) {
+		w := httptest.NewRecorder()
+		ts.Gw.setBaseAPIIDHeader(w, &childAPI.OAS)
+
+		baseIDHeader := w.Header().Get(apidef.HeaderBaseAPIID)
+		assert.Equal(t, "base-api", baseIDHeader, "Should set base API ID header")
+	})
+
+	t.Run("does not set header for base API", func(t *testing.T) {
+		w := httptest.NewRecorder()
+		ts.Gw.setBaseAPIIDHeader(w, &baseAPI.OAS)
+
+		baseIDHeader := w.Header().Get(apidef.HeaderBaseAPIID)
+		assert.Empty(t, baseIDHeader, "Should not set header for base API")
+	})
+
+	t.Run("handles nil OAS object", func(t *testing.T) {
+		w := httptest.NewRecorder()
+		ts.Gw.setBaseAPIIDHeader(w, nil)
+
+		baseIDHeader := w.Header().Get(apidef.HeaderBaseAPIID)
+		assert.Empty(t, baseIDHeader, "Should not set header for nil OAS")
+	})
+
+	t.Run("handles OAS without Tyk extension", func(t *testing.T) {
+		w := httptest.NewRecorder()
+		oasWithoutExt := &oas.OAS{}
+		ts.Gw.setBaseAPIIDHeader(w, oasWithoutExt)
+
+		baseIDHeader := w.Header().Get(apidef.HeaderBaseAPIID)
+		assert.Empty(t, baseIDHeader, "Should not set header when no extension")
+	})
+
+	t.Run("handles API not found in gateway", func(t *testing.T) {
+		w := httptest.NewRecorder()
+		unknownOAS := &oas.OAS{}
+		unknownOAS.SetTykExtension(&oas.XTykAPIGateway{
+			Info: oas.Info{
+				ID:   "unknown-api",
+				Name: "Unknown API",
+			},
+		})
+
+		ts.Gw.setBaseAPIIDHeader(w, unknownOAS)
+
+		baseIDHeader := w.Header().Get(apidef.HeaderBaseAPIID)
+		assert.Empty(t, baseIDHeader, "Should not set header when API not found")
+	})
+}
+
 func TestEnsureAndValidateAPIID(t *testing.T) {
 	t.Run("generates API ID if empty", func(t *testing.T) {
 		apiDef := &apidef.APIDefinition{
