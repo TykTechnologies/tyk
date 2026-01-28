@@ -25,4 +25,8 @@ func ensureNotBypassingOverride(v interface{}) {
 	}
 }
 
+// MCPPrimitives maps primitive names to their middleware configurations.
+// For tools: key is tool name (e.g., "get-weather").
+// For resources: key is resource URI pattern (e.g., "file:///repo/*").
+// For prompts: key is prompt name (e.g., "code-review").
 type MCPPrimitives map[string]*MCPPrimitive
