@@ -17,14 +17,6 @@ func (m *MCPPrimitive) extractTransformResponseBodyTo(ep *apidef.ExtendedPathsSe
 	return
 }
 
-// ensureNotBypassingOverride validates that the caller passed *MCPPrimitive and not *Operation.
-// This development helper catches accidental usage of &primitive.Operation which would bypass overrides.
-func ensureNotBypassingOverride(v interface{}) {
-	if _, ok := v.(*Operation); ok {
-		panic("BUG: Extracting Operation directly instead of MCPPrimitive - bypasses overrides!")
-	}
-}
-
 // MCPPrimitives maps primitive names to their middleware configurations.
 // For tools: key is tool name (e.g., "get-weather").
 // For resources: key is resource URI pattern (e.g., "file:///repo/*").
