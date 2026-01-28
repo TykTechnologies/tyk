@@ -20,6 +20,36 @@ func (gw *Gateway) PolicyIDs() []string {
 	return result
 }
 
+// GetLoadedAPIIDs returns a list of all loaded API IDs with metadata.
+// This is used for reporting loaded resources to MDCB.
+func (gw *Gateway) GetLoadedAPIIDs() []model.LoadedAPIInfo {
+	gw.apisMu.RLock()
+	defer gw.apisMu.RUnlock()
+
+	apis := make([]model.LoadedAPIInfo, 0, len(gw.apisByID))
+	for apiID := range gw.apisByID {
+		apis = append(apis, model.LoadedAPIInfo{
+			APIID: apiID,
+		})
+	}
+	return apis
+}
+
+// GetLoadedPolicyIDs returns a list of all loaded policy IDs with metadata.
+// This is used for reporting loaded resources to MDCB.
+func (gw *Gateway) GetLoadedPolicyIDs() []model.LoadedPolicyInfo {
+	gw.policiesMu.RLock()
+	defer gw.policiesMu.RUnlock()
+
+	policies := make([]model.LoadedPolicyInfo, 0, len(gw.policiesByID))
+	for policyID := range gw.policiesByID {
+		policies = append(policies, model.LoadedPolicyInfo{
+			PolicyID: policyID,
+		})
+	}
+	return policies
+}
+
 // PolicyByID will return a Policy matching the passed Policy ID.
 func (gw *Gateway) PolicyByID(id string) (user.Policy, bool) {
 	gw.policiesMu.RLock()

@@ -1077,6 +1077,15 @@
         },
         "operations": {
           "$ref": "#/definitions/X-Tyk-Operations"
+        },
+        "mcpTools": {
+          "$ref": "#/definitions/X-Tyk-Operations"
+        },
+        "mcpResources": {
+          "$ref": "#/definitions/X-Tyk-Operations"
+        },
+        "mcpPrompts": {
+          "$ref": "#/definitions/X-Tyk-Operations"
         }
       }
     },
