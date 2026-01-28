@@ -112,12 +112,13 @@ const (
 	DefaultAPIVersionKey = "x-api-version"
 	HeaderBaseAPIID      = "x-tyk-base-api-id"
 
-	AuthTokenType = "authToken"
-	JWTType       = "jwt"
-	HMACType      = "hmac"
-	BasicType     = "basic"
-	CoprocessType = "coprocess"
-	OAuthType     = "oauth"
+	AuthTokenType       = "authToken"
+	CertificateAuthType = "certificateAuth"
+	JWTType             = "jwt"
+	HMACType            = "hmac"
+	BasicType           = "basic"
+	CoprocessType       = "coprocess"
+	OAuthType           = "oauth"
 	// ExternalOAuthType holds configuration for an external OAuth provider.
 	// Deprecated: ExternalOAuth support was deprecated in Tyk 5.7.0.
 	// To avoid any disruptions, we recommend that you use JSON Web Token (JWT) instead,

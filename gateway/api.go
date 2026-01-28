@@ -45,35 +45,30 @@ import (
 	"sync"
 	"time"
 
-	"github.com/TykTechnologies/tyk/internal/httpctx"
 	"github.com/getkin/kin-openapi/openapi3"
-
-	gqlv2 "github.com/TykTechnologies/graphql-go-tools/v2/pkg/graphql"
-
-	"github.com/TykTechnologies/tyk/config"
-
-	"github.com/TykTechnologies/tyk/internal/osutil"
-	"github.com/TykTechnologies/tyk/internal/otel"
-	"github.com/TykTechnologies/tyk/internal/redis"
-	"github.com/TykTechnologies/tyk/internal/uuid"
-
-	"github.com/TykTechnologies/tyk/apidef/oas"
-
 	"github.com/gorilla/mux"
 	"github.com/lonelycode/osin"
-
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/afero"
 	"golang.org/x/crypto/bcrypt"
 
+	gql "github.com/TykTechnologies/graphql-go-tools/pkg/graphql"
+	gqlv2 "github.com/TykTechnologies/graphql-go-tools/v2/pkg/graphql"
+
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/apidef/oas"
+	"github.com/TykTechnologies/tyk/certs"
+	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/ctx"
 	"github.com/TykTechnologies/tyk/header"
+	"github.com/TykTechnologies/tyk/internal/httpctx"
+	"github.com/TykTechnologies/tyk/internal/osutil"
+	"github.com/TykTechnologies/tyk/internal/otel"
+	"github.com/TykTechnologies/tyk/internal/redis"
+	"github.com/TykTechnologies/tyk/internal/uuid"
+	lib "github.com/TykTechnologies/tyk/lib/apidef"
 	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/user"
-
-	gql "github.com/TykTechnologies/graphql-go-tools/pkg/graphql"
-	lib "github.com/TykTechnologies/tyk/lib/apidef"
 )
 
 const (
@@ -113,6 +108,61 @@ func apiOk(msg string) apiStatusMessage {
 
 func apiError(msg string) apiStatusMessage {
 	return apiStatusMessage{"error", msg}
+}
+
+// validateMtlsStaticCertificateBindings validates that all certificate IDs in the
+// mtls_static_certificate_bindings array exist in the certificate manager.
+// Returns an error with the specific certificate ID if validation fails.
+func (gw *Gateway) validateMtlsStaticCertificateBindings(certIDs []string, orgID string) error {
+	if len(certIDs) == 0 {
+		return nil
+	}
+
+	// Validate certificate IDs start with orgID prefix to prevent path traversal attacks
+	// Certificate IDs follow the pattern: orgID + sha256hash
+	for _, certID := range certIDs {
+		if orgID != "" && !strings.HasPrefix(certID, orgID) {
+			return fmt.Errorf("invalid certificate ID: %s", certID)
+		}
+	}
+
+	// Use List() for efficient batch validation - single storage operation
+	// Pattern from cert.go:594-595
+	certificates := gw.CertificateManager.List(certIDs, certs.CertificateAny)
+
+	// Check if any certificates were not found (List returns nil for missing certs)
+	// Pattern from cert.go:607-612
+	for i, cert := range certificates {
+		if cert == nil {
+			return fmt.Errorf("certificate not found: %s", certIDs[i])
+		}
+	}
+
+	return nil
+}
+
+// getNewCertIDs returns only the certificate IDs that are in newCerts but not in originalCerts.
+// Used for optimizing updates to only validate newly added certificates.
+func getNewCertIDs(originalCerts, newCerts []string) []string {
+	if len(originalCerts) == 0 {
+		return newCerts
+	}
+
+	// Build map of existing certificates for O(1) lookup
+	existingCerts := make(map[string]struct{}, len(originalCerts))
+	for _, certID := range originalCerts {
+		existingCerts[certID] = struct{}{}
+	}
+
+	// Filter to only NEW certificates
+	var newCertIDs []string
+	for _, certID := range newCerts {
+		if _, exists := existingCerts[certID]; !exists {
+			newCertIDs = append(newCertIDs, certID)
+		}
+	}
+
+	return newCertIDs
 }
 
 // paginationStatus provides more information about a paginated data set
@@ -522,6 +572,15 @@ func (gw *Gateway) handleAddOrUpdate(keyName string, r *http.Request, isHashed b
 	//set the original expiry if the content in payload is a past time
 	if time.Now().After(time.Unix(newSession.Expires, 0)) && newSession.Expires > 1 {
 		newSession.Expires = originalKey.Expires
+	}
+
+	// Validate mtls_static_certificate_bindings
+	// For POST: validates all certificates (originalKey is empty)
+	// For PUT: validates only NEW certificates (using originalKey data)
+	certsToValidate := getNewCertIDs(originalKey.MtlsStaticCertificateBindings, newSession.MtlsStaticCertificateBindings)
+	if err := gw.validateMtlsStaticCertificateBindings(certsToValidate, newSession.OrgID); err != nil {
+		log.Error("Invalid certificate in mtls_static_certificate_bindings: ", err)
+		return apiError(err.Error()), http.StatusBadRequest
 	}
 
 	// Update our session object (create it)
@@ -2132,6 +2191,12 @@ func (gw *Gateway) createKeyHandler(w http.ResponseWriter, r *http.Request) {
 			doJSONWrite(w, http.StatusInternalServerError, apiError("Failed to create key - Key with given certificate already found:"+newKey))
 			return
 		}
+	}
+
+	// Validate mtls_static_certificate_bindings
+	if err := gw.validateMtlsStaticCertificateBindings(newSession.MtlsStaticCertificateBindings, newSession.OrgID); err != nil {
+		doJSONWrite(w, http.StatusBadRequest, apiError(err.Error()))
+		return
 	}
 
 	newSession.LastUpdated = strconv.Itoa(int(time.Now().Unix()))
