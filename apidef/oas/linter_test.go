@@ -67,13 +67,6 @@ func fixOperationsForValidation(operations map[string]*Operation) {
 	}
 }
 
-// fixMCPPrimitivesForValidation fixes operation fields in an MCPPrimitives map to pass schema validation.
-func fixMCPPrimitivesForValidation(primitives map[string]*MCPPrimitive) {
-	for _, prim := range primitives {
-		fixSingleOperation(&prim.Operation)
-	}
-}
-
 func TestXTykGateway_Lint(t *testing.T) {
 	var err error
 
@@ -81,14 +74,11 @@ func TestXTykGateway_Lint(t *testing.T) {
 	settings := XTykAPIGateway{}
 	securityScheme := &Basic{}
 
-	Fill(t, &settings, 0)
+	FillWithContext(t, &settings, 0, FillContextOAS)
 	Fill(t, &securityScheme, 0)
 	{
 		settings.Middleware.Global.PluginConfig.Driver = "goplugin"
 		fixOperationsForValidation(settings.Middleware.Operations)
-		fixMCPPrimitivesForValidation(settings.Middleware.McpTools)
-		fixMCPPrimitivesForValidation(settings.Middleware.McpResources)
-		fixMCPPrimitivesForValidation(settings.Middleware.McpPrompts)
 
 		settings.Server.Authentication.BaseIdentityProvider = ""
 		settings.Server.Authentication.SecurityProcessingMode = SecurityProcessingModeLegacy

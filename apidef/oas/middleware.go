@@ -50,10 +50,6 @@ func (m *Middleware) ExtractTo(api *apidef.APIDefinition) {
 	}
 
 	m.Global.ExtractTo(api)
-
-	if len(m.McpTools) > 0 || len(m.McpResources) > 0 || len(m.McpPrompts) > 0 {
-		api.MarkAsMCP()
-	}
 }
 
 // Global contains configuration that affects the whole API (all endpoints).
