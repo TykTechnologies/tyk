@@ -173,6 +173,51 @@ func TestPolicyAPI(t *testing.T) {
 			Code:      http.StatusOK,
 		})
 	})
+
+	t.Run("fails if ID contains invalid characters", func(t *testing.T) {
+		invalidURLID := "invalid@id"
+
+		ts.Run(t, test.TestCase{
+			Path:      "/tyk/policies/" + invalidURLID,
+			Method:    http.MethodGet,
+			AdminAuth: true,
+			Code:      http.StatusBadRequest,
+			BodyMatch: `Invalid Policy ID`,
+		})
+
+		invalidBodyPol := user.Policy{
+			ID:           "invalid/id",
+			Rate:         100,
+			Per:          1,
+			OrgID:        "54de205930c55e15bd000001",
+			AccessRights: make(map[string]user.AccessDefinition),
+			MetaData:     nil,
+			Tags:         nil,
+		}
+
+		ts.Run(t, test.TestCase{
+			Path:      "/tyk/policies",
+			Method:    http.MethodPost,
+			AdminAuth: true,
+			Data:      serializePolicy(t, invalidBodyPol),
+			Code:      http.StatusBadRequest,
+			BodyMatch: `Invalid Policy ID in body`,
+		})
+
+		validID := "valid-id"
+		ts.Gw.policiesMu.Lock()
+		ts.Gw.policiesByID[validID] = invalidBodyPol
+		ts.Gw.policiesMu.Unlock()
+
+		ts.Run(t, test.TestCase{
+			Path:      "/tyk/policies/" + validID,
+			Method:    http.MethodPut,
+			AdminAuth: true,
+			Data:      serializePolicy(t, invalidBodyPol),
+			Code:      http.StatusBadRequest,
+			BodyMatch: `Invalid Policy ID in body`,
+		})
+	})
 }
 
 func serializePolicy(t *testing.T, pol user.Policy) string {
