@@ -1,6 +1,7 @@
 package gateway
 
 import (
+	"context"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -16,6 +17,7 @@ import (
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/ctx"
 	"github.com/TykTechnologies/tyk/header"
+	"github.com/TykTechnologies/tyk/internal/certcheck"
 	"github.com/TykTechnologies/tyk/internal/errors"
 	"github.com/TykTechnologies/tyk/internal/graphengine"
 	"github.com/TykTechnologies/tyk/internal/httputil"
@@ -64,6 +66,12 @@ type APISpec struct {
 	GraphEngine graphengine.Engine
 
 	oasRouter routers.Router
+
+	// UpstreamCertExpiryBatcher handles upstream certificate expiry checking
+	UpstreamCertExpiryBatcher      certcheck.BackgroundBatcher
+	upstreamCertExpiryCheckContext context.Context
+	upstreamCertExpiryCancelFunc   context.CancelFunc
+	upstreamCertExpiryInitOnce     sync.Once
 }
 
 // CheckSpecMatchesStatus checks if a URL spec has a specific status.

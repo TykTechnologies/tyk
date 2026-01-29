@@ -205,6 +205,9 @@ func (s *APISpec) Unload() {
 		hook()
 	}
 	s.unloadHooks = nil
+
+	// stop upstream certificate monitoring goroutine (after all hooks to ensure middleware cleanup completes first)
+	s.UnloadUpstreamCertMonitoring()
 }
 
 // Validate returns nil if s is a valid spec and an error stating why the spec is not valid.
@@ -1480,6 +1483,17 @@ func (a *APISpec) Init(authStore, sessionStore, healthStore, orgStore storage.Ha
 	a.AuthManager.Init(authStore)
 	a.Health.Init(healthStore)
 	a.OrgSessionManager.Init(orgStore)
+}
+
+func (a *APISpec) UnloadUpstreamCertMonitoring() {
+	if a.upstreamCertExpiryCancelFunc != nil {
+		log.
+			WithField("api_id", a.APIID).
+			WithField("api_name", a.Name).
+			Debug("Stopping upstream certificate expiry check batcher")
+
+		a.upstreamCertExpiryCancelFunc()
+	}
 }
 
 func (a *APISpec) StopSessionManagerPool() {

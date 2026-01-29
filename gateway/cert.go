@@ -352,6 +352,39 @@ func getClientValidator(helloInfo *tls.ClientHelloInfo, certPool *x509.CertPool)
 	}
 }
 
+// logServerCertificateExpiry logs certificate expiry information for server certificates.
+// It parses the certificate and logs a warning if expiring soon, or debug otherwise.
+// The source parameter differentiates the certificate origin (e.g., "file" or "store").
+func logServerCertificateExpiry(cert *tls.Certificate, threshold int, source string) {
+	if cert == nil || len(cert.Certificate) == 0 {
+		return
+	}
+
+	parsedCert, err := x509.ParseCertificate(cert.Certificate[0])
+	if err != nil {
+		return
+	}
+
+	daysUntilExpiry := int(time.Until(parsedCert.NotAfter).Hours() / 24)
+	fields := log.WithField("cert_name", parsedCert.Subject.CommonName).
+		WithField("expires_at", parsedCert.NotAfter).
+		WithField("days_remaining", daysUntilExpiry)
+
+	if daysUntilExpiry < threshold {
+		if source == "store" {
+			fields.Warn("Server certificate (from store) expiring soon")
+		} else {
+			fields.Warn("Server certificate expiring soon")
+		}
+	} else {
+		if source == "store" {
+			fields.Debug("Loaded server certificate from Certificate Store")
+		} else {
+			fields.Debug("Loaded server certificate")
+		}
+	}
+}
+
 func (gw *Gateway) getTLSConfigForClient(baseConfig *tls.Config, listenPort int) func(hello *tls.ClientHelloInfo) (*tls.Config, error) {
 	gwConfig := gw.GetConfig()
 	// Supporting legacy certificate configuration
@@ -368,6 +401,12 @@ func (gw *Gateway) getTLSConfigForClient(baseConfig *tls.Config, listenPort int)
 		certNameMap[certData.Name] = &cert
 	}
 
+	// Log file-based server certificate expiry info
+	threshold := gwConfig.Security.CertificateExpiryMonitor.WarningThresholdDays
+	for i := range serverCerts {
+		logServerCertificateExpiry(&serverCerts[i], threshold, "file")
+	}
+
 	if len(gwConfig.HttpServerOptions.SSLCertificates) > 0 {
 		var waitingRedisLog sync.Once
 		// ensure that we are connected to redis
@@ -382,9 +421,17 @@ func (gw *Gateway) getTLSConfigForClient(baseConfig *tls.Config, listenPort int)
 			time.Sleep(10 * time.Millisecond)
 		}
 	}
-	for _, cert := range gw.CertificateManager.List(gwConfig.HttpServerOptions.SSLCertificates, certs.CertificatePrivate) {
+	sslCertificates := gw.CertificateManager.List(gwConfig.HttpServerOptions.SSLCertificates, certs.CertificatePrivate)
+	for _, cert := range sslCertificates {
 		if cert != nil {
 			serverCerts = append(serverCerts, *cert)
+		}
+	}
+
+	// Log Certificate Store server certificate expiry info
+	for _, cert := range sslCertificates {
+		if cert != nil {
+			logServerCertificateExpiry(cert, threshold, "store")
 		}
 	}
 
@@ -462,7 +509,8 @@ func (gw *Gateway) getTLSConfigForClient(baseConfig *tls.Config, listenPort int)
 				if (!directMTLSDomainMatch && spec.Domain == "") || spec.Domain == hello.ServerName {
 					certIDs := append(spec.ClientCertificates, gwConfig.Security.Certificates.API...)
 
-					for _, cert := range gw.CertificateManager.List(certIDs, certs.CertificatePublic) {
+					clientCACerts := gw.CertificateManager.List(certIDs, certs.CertificatePublic)
+					for _, cert := range clientCACerts {
 						if cert != nil && !crypto.IsPublicKey(cert) {
 							crypto.AddCACertificatesFromChainToPool(newConfig.ClientCAs, cert)
 						}
@@ -485,7 +533,8 @@ func (gw *Gateway) getTLSConfigForClient(baseConfig *tls.Config, listenPort int)
 
 			// Dynamically add API specific certificates
 			if len(spec.Certificates) != 0 && !spec.DomainDisabled {
-				for _, cert := range gw.CertificateManager.List(spec.Certificates, certs.CertificatePrivate) {
+				apiSpecificCerts := gw.CertificateManager.List(spec.Certificates, certs.CertificatePrivate)
+				for _, cert := range apiSpecificCerts {
 					if cert == nil {
 						continue
 					}

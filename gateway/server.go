@@ -1094,6 +1094,9 @@ func (gw *Gateway) DoReload() {
 		gw.GlobalEventsJSVM.Init(nil, logrus.NewEntry(log), gw)
 	}
 
+	// Re-initialize global event handlers to ensure they persist across reloads
+	gw.initGenericEventHandlers()
+
 	// Load the API Policies
 	if _, err := syncResourcesWithReload("policies", gw.GetConfig(), gw.syncPolicies); err != nil {
 		mainLog.Error("Error during syncing policies")
@@ -2247,6 +2250,7 @@ func (gw *Gateway) gracefulShutdown(ctx context.Context) error {
 
 	// Close all cache stores and other resources
 	mainLog.Info("Closing cache stores and other resources...")
+
 	gw.cacheClose()
 
 	// Check if there were any errors during shutdown
