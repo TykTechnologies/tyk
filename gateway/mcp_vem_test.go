@@ -190,7 +190,7 @@ func Test_URLAllowedAndIgnored_MCPPrimitive_MCPRouting_Allows(t *testing.T) {
 	rxPaths := loader.buildPrimitiveSpec("get-weather", "tool", "/mcp-tool:get-weather")
 
 	r := httptest.NewRequest(http.MethodPost, "/mcp-tool:get-weather", nil)
-	httpctx.SetMCPRouting(r, true)
+	httpctx.SetJsonRPCRouting(r, true)
 	status, _ := apiSpec.URLAllowedAndIgnored(r, rxPaths, false)
 	assert.NotEqual(t, MCPPrimitiveNotFound, status)
 }
@@ -432,7 +432,7 @@ func Test_generateMCPVEMs_SetsMCPAllowListEnabled(t *testing.T) {
 
 func Test_URLAllowedAndIgnored_MCPPrimitive_LoopingAlone_DoesNotAllow(t *testing.T) {
 	// Verifies that generic looping (ctxLoopLevel > 0) does NOT grant access to MCP primitives.
-	// MCP primitives specifically require httpctx.IsMCPRouting to be set.
+	// MCP primitives specifically require httpctx.IsJsonRPCRouting to be set.
 	apiSpec := &APISpec{
 		APIDefinition: &apidef.APIDefinition{
 			Proxy: apidef.ProxyConfig{ListenPath: "/"},
@@ -511,7 +511,7 @@ func Test_URLAllowedAndIgnored_MCPPrimitive_WhitelistMode_MCPRouting_Allows(t *t
 	rxPaths := loader.buildPrimitiveSpec("get-weather", "tool", "/mcp-tool:get-weather")
 
 	r := httptest.NewRequest(http.MethodPost, "/mcp-tool:get-weather", nil)
-	httpctx.SetMCPRouting(r, true)
+	httpctx.SetJsonRPCRouting(r, true)
 	status, _ := apiSpec.URLAllowedAndIgnored(r, rxPaths, true) // whiteListStatus = true
 	assert.Equal(t, StatusInternal, status, "MCP primitive should be allowed in whitelist mode with MCPRouting")
 }
@@ -576,19 +576,19 @@ func Test_URLAllowedAndIgnored_RegularInternal_WhitelistMode_Looping_Allows(t *t
 }
 
 func Test_MCPRoutingContext_SetAndGet(t *testing.T) {
-	// Verifies the httpctx.SetMCPRouting and IsMCPRouting functions work correctly.
+	// Verifies the httpctx.SetJsonRPCRouting and IsJsonRPCRouting functions work correctly.
 	r := httptest.NewRequest(http.MethodPost, "/test", nil)
 
 	// Initially should be false
-	assert.False(t, httpctx.IsMCPRouting(r), "MCPRouting should be false by default")
+	assert.False(t, httpctx.IsJsonRPCRouting(r), "MCPRouting should be false by default")
 
 	// Set to true
-	httpctx.SetMCPRouting(r, true)
-	assert.True(t, httpctx.IsMCPRouting(r), "MCPRouting should be true after setting")
+	httpctx.SetJsonRPCRouting(r, true)
+	assert.True(t, httpctx.IsJsonRPCRouting(r), "MCPRouting should be true after setting")
 
 	// Set to false
-	httpctx.SetMCPRouting(r, false)
-	assert.False(t, httpctx.IsMCPRouting(r), "MCPRouting should be false after unsetting")
+	httpctx.SetJsonRPCRouting(r, false)
+	assert.False(t, httpctx.IsJsonRPCRouting(r), "MCPRouting should be false after unsetting")
 }
 
 func Test_URLAllowedAndIgnored_AllMCPPrimitiveTypes(t *testing.T) {
@@ -621,7 +621,7 @@ func Test_URLAllowedAndIgnored_AllMCPPrimitiveTypes(t *testing.T) {
 
 			// With MCPRouting - should allow
 			r = httptest.NewRequest(http.MethodPost, path, nil)
-			httpctx.SetMCPRouting(r, true)
+			httpctx.SetJsonRPCRouting(r, true)
 			status, _ = apiSpec.URLAllowedAndIgnored(r, rxPaths, false)
 			assert.NotEqual(t, MCPPrimitiveNotFound, status, "%s primitive should be allowed with MCPRouting", tt.name)
 		})

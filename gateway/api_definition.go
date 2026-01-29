@@ -20,9 +20,9 @@ import (
 	"github.com/TykTechnologies/tyk/ee/middleware/streams"
 	"github.com/TykTechnologies/tyk/storage/kv"
 
-	"github.com/TykTechnologies/tyk/internal/agentprotocol"
 	"github.com/TykTechnologies/tyk/internal/httpctx"
 	"github.com/TykTechnologies/tyk/internal/httputil"
+	"github.com/TykTechnologies/tyk/internal/mcp"
 
 	"github.com/getkin/kin-openapi/routers/gorillamux"
 
@@ -1563,12 +1563,17 @@ func (a *APISpec) URLAllowedAndIgnored(r *http.Request, rxPaths []URLSpec, white
 			continue
 		}
 
-		if r.Method == rxPaths[i].Internal.Method && rxPaths[i].Status == Internal && !ctxLoopingEnabled(r) {
+		if r.Method == rxPaths[i].Internal.Method && rxPaths[i].Status == Internal {
 			// MCP primitive VEMs return 404 to avoid exposing internal-only endpoints.
+			// They can only be accessed via JSON-RPC routing (MCP, A2A, etc.), not via generic looping.
 			if mcp.IsPrimitiveVEMPath(rxPaths[i].Internal.Path) {
-				return MCPPrimitiveNotFound, nil
+				if !httpctx.IsJsonRPCRouting(r) {
+					return MCPPrimitiveNotFound, nil
+				}
+			} else if !ctxLoopingEnabled(r) {
+				// Regular internal endpoints require looping to be enabled.
+				return EndPointNotAllowed, nil
 			}
-			return EndPointNotAllowed, nil
 		}
 	}
 
@@ -1640,7 +1645,7 @@ func (a *APISpec) URLAllowedAndIgnored(r *http.Request, rxPaths []URLSpec, white
 				if rxPaths[i].Status == Internal && r.Method == rxPaths[i].Internal.Method {
 					// MCP primitive VEMs require explicit MCP routing context.
 					if mcp.IsPrimitiveVEMPath(rxPaths[i].Internal.Path) {
-						if httpctx.IsMCPRouting(r) {
+						if httpctx.IsJsonRPCRouting(r) {
 							return a.getURLStatus(rxPaths[i].Status), nil
 						}
 					} else if ctxLoopingEnabled(r) {
