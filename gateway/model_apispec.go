@@ -71,6 +71,11 @@ type APISpec struct {
 	// Key format: "tool:{name}", "resource:{pattern}", "prompt:{name}"
 	// Value: VEM path (e.g., "/mcp-tool:get-weather")
 	MCPPrimitives map[string]string
+
+	// MCPAllowListEnabled is true if any MCP primitive (tool, resource, prompt) has an
+	// allow rule enabled. Pre-calculated during API loading to avoid iterating through
+	// all primitives on every JSON-RPC request that doesn't match a VEM.
+	MCPAllowListEnabled bool
 }
 
 // CheckSpecMatchesStatus checks if a URL spec has a specific status.

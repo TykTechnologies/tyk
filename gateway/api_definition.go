@@ -1563,10 +1563,9 @@ func (a *APISpec) URLAllowedAndIgnored(r *http.Request, rxPaths []URLSpec, white
 			continue
 		}
 
-		if r.Method == rxPaths[i].Internal.Method && rxPaths[i].Status == Internal &&
-			!ctxLoopingEnabled(r) && !httpctx.IsJsonRPCRouting(r) {
-			// Protocol VEMs (MCP, A2A, etc.) return 404 to avoid exposing internal-only endpoints.
-			if agentprotocol.IsProtocolVEMPath(rxPaths[i].Internal.Path) {
+		if r.Method == rxPaths[i].Internal.Method && rxPaths[i].Status == Internal && !ctxLoopingEnabled(r) {
+			// MCP primitive VEMs return 404 to avoid exposing internal-only endpoints.
+			if mcp.IsPrimitiveVEMPath(rxPaths[i].Internal.Path) {
 				return MCPPrimitiveNotFound, nil
 			}
 			return EndPointNotAllowed, nil
@@ -1638,11 +1637,18 @@ func (a *APISpec) URLAllowedAndIgnored(r *http.Request, rxPaths []URLSpec, white
 			switch rxPaths[i].Status {
 			case WhiteList, BlackList, Ignored:
 			default:
-				if rxPaths[i].Status == Internal && r.Method == rxPaths[i].Internal.Method && ctxLoopingEnabled(r) {
-					return a.getURLStatus(rxPaths[i].Status), nil
-				} else {
-					return EndPointNotAllowed, nil
+				if rxPaths[i].Status == Internal && r.Method == rxPaths[i].Internal.Method {
+					// MCP primitive VEMs require explicit MCP routing context.
+					if mcp.IsPrimitiveVEMPath(rxPaths[i].Internal.Path) {
+						if httpctx.IsMCPRouting(r) {
+							return a.getURLStatus(rxPaths[i].Status), nil
+						}
+					} else if ctxLoopingEnabled(r) {
+						// Other internal endpoints use generic looping check.
+						return a.getURLStatus(rxPaths[i].Status), nil
+					}
 				}
+				return EndPointNotAllowed, nil
 			}
 		}
 

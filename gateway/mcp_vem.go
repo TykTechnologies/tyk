@@ -50,6 +50,7 @@ func (a APIDefinitionLoader) generateJSONRPCVEMs(
 
 // generateMCPVEMs generates URLSpec entries for MCP primitives (tools, resources, prompts).
 // These VEMs are internal-only endpoints accessible via JSON-RPC routing.
+// It also pre-calculates MCPAllowListEnabled to avoid iterating through primitives on each request.
 func (a APIDefinitionLoader) generateMCPVEMs(apiSpec *APISpec, conf config.Config) []URLSpec {
 	if !apiSpec.IsMCP() {
 		return nil
@@ -69,7 +70,23 @@ func (a APIDefinitionLoader) generateMCPVEMs(apiSpec *APISpec, conf config.Confi
 		{Prefix: mcp.PromptPrefix, TypeName: "prompt", Primitives: middleware.McpPrompts},
 	}
 
+	// Pre-calculate whether any MCP primitive has an allow rule enabled.
+	// This avoids iterating through all primitives on every JSON-RPC request.
+	apiSpec.MCPAllowListEnabled = hasMCPAllowListEnabled(categories)
+
 	return a.generateJSONRPCVEMs(apiSpec, conf, categories, apiSpec.MCPPrimitives)
+}
+
+// hasMCPAllowListEnabled checks if any MCP primitive has an allow rule enabled.
+func hasMCPAllowListEnabled(categories []PrimitiveCategory) bool {
+	for _, cat := range categories {
+		for _, primitive := range cat.Primitives {
+			if primitive != nil && primitive.Allow != nil && primitive.Allow.Enabled {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 // buildPrimitiveSpec creates the base URLSpec entry for a JSON-RPC primitive VEM.
