@@ -73,7 +73,7 @@ func ClassifyUpstreamError(err error, target string) *ErrorClassification {
 
 	// Check for timeout errors (net.Error interface)
 	var netErr net.Error
-	if errors.As(err, &netErr) {
+	if As(err, &netErr) {
 		return NewErrorClassification(URT, "request_timeout").
 			WithSource(sourceReverseProxy).
 			WithTarget(target)
@@ -159,12 +159,6 @@ func classifySyscallError(err error, target string) *ErrorClassification {
 	// Handle both direct syscall.Errno and wrapped errors
 	var errno syscall.Errno
 	if As(err, &errno) {
-		return classifyErrno(errno, target)
-	}
-
-	// Also check if the error is directly a syscall.Errno
-	var errno syscall.Errno
-	if errors.As(err, &errno) {
 		return classifyErrno(errno, target)
 	}
 

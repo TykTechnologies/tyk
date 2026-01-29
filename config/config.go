@@ -293,18 +293,29 @@ type AccessLogsConfig struct {
 	//
 	// Template Options:
 	//
-	// - `api_key` will include they obfuscated or hashed key.
-	// - `client_ip` will include the ip of the request.
+	// - `api_key` will include the obfuscated or hashed key.
+	// - `circuit_breaker_state` will include the circuit breaker state when applicable.
+	// - `client_ip` will include the IP of the request.
+	// - `error_source` will include the source of an error (e.g., ReverseProxy).
+	// - `error_target` will include the target that caused an error.
 	// - `host` will include the host of the request.
+	// - `latency_gateway` will include the gateway processing latency.
+	// - `latency_total` will include the total latency of the request.
 	// - `method` will include the request method.
+	// - `org_id` will include the organization ID.
 	// - `path` will include the path of the request.
 	// - `protocol` will include the protocol of the request.
 	// - `remote_addr` will include the remote address of the request.
-	// - `upstream_addr` will include the upstream address (scheme, host and path)
-	// - `upstream_latency` will include the upstream latency of the request.
-	// - `latency_total` will include the total latency of the request.
-	// - `user_agent` will include the user agent of the request.
+	// - `response_code_details` will include detailed error description for 5XX responses.
+	// - `response_flag` will include the error classification flag (e.g., URT, UCF, TLE).
 	// - `status` will include the response status code.
+	// - `tls_cert_expiry` will include the TLS certificate expiry date when applicable.
+	// - `tls_cert_subject` will include the TLS certificate subject when applicable.
+	// - `trace_id` will include the OpenTelemetry trace ID when tracing is enabled.
+	// - `upstream_addr` will include the upstream address (scheme, host and path).
+	// - `upstream_latency` will include the upstream latency of the request.
+	// - `upstream_status` will include the upstream response status code for 5XX responses.
+	// - `user_agent` will include the user agent of the request.
 	Template []string `json:"template"`
 }
 
