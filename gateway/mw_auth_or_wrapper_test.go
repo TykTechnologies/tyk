@@ -4358,6 +4358,9 @@ func TestAuthORWrapper_getMiddlewareForScheme(t *testing.T) {
 			setupSpec: func(spec *APISpec) {
 				spec.UseGoPluginAuth = true
 				spec.IsOAS = true
+				spec.CustomMiddleware = apidef.MiddlewareSection{
+					Driver: apidef.GoPluginDriver,
+				}
 
 				tykExt := &oas.XTykAPIGateway{
 					Server: oas.Server{
@@ -4402,6 +4405,9 @@ func TestAuthORWrapper_getMiddlewareForScheme(t *testing.T) {
 			setupSpec: func(spec *APISpec) {
 				spec.CustomPluginAuthEnabled = true
 				spec.IsOAS = true
+				spec.CustomMiddleware = apidef.MiddlewareSection{
+					Driver: apidef.OttoDriver,
+				}
 
 				tykExt := &oas.XTykAPIGateway{
 					Server: oas.Server{
