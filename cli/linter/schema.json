@@ -123,6 +123,9 @@
         "context_propagation": {
           "type": "string"
         },
+        "custom_trace_header": {
+          "type": "string"
+        },
         "headers": {
           "type": ["array", "null"]
         },
