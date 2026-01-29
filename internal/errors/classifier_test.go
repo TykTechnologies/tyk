@@ -278,18 +278,11 @@ func TestClassifyUpstreamError_StringFallback(t *testing.T) {
 			expectedFlag:   URT,
 			expectedDetail: "response_headers_timeout",
 		},
-		{
-			name:           "context deadline string in error",
-			err:            errors.New("context deadline exceeded"),
-			expectedFlag:   URT,
-			expectedDetail: "context_deadline_exceeded",
-		},
-		{
-			name:           "context canceled string in error",
-			err:            errors.New("context canceled"),
-			expectedFlag:   CDC,
-			expectedDetail: "client_disconnected",
-		},
+		// Note: "context deadline exceeded" and "context canceled" string-based checks were removed
+		// because they are redundant - these errors are already handled by type-based checks
+		// using errors.Is(err, context.DeadlineExceeded) and errors.Is(err, context.Canceled)
+		// at the start of ClassifyUpstreamError. In practice, context errors are always passed
+		// as the actual context sentinel errors, not as plain string errors.
 		{
 			name:           "no such host string in error",
 			err:            errors.New("dial tcp: lookup unknown.host: no such host"),

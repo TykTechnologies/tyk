@@ -1267,7 +1267,7 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 	if breakerEnforced {
 		if !breakerConf.CB.Ready() {
 			p.logger.Debug("ON REQUEST: Circuit Breaker is in OPEN state")
-			errClass := tykerrors.ClassifyCircuitBreakerError(outreq.URL.String(), "OPEN")
+			errClass := tykerrors.ClassifyCircuitBreakerError(outreq.URL.Host+outreq.URL.Path, "OPEN")
 			ctx.SetErrorClassification(logreq, errClass)
 			p.ErrorHandler.HandleError(rw, logreq, "Service temporarily unavailable.", 503, true)
 			return ProxyResponse{}
@@ -1286,7 +1286,7 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 
 	if err != nil {
 		// Classify the upstream error for structured access logs
-		errClass := tykerrors.ClassifyUpstreamError(err, outreq.URL.String())
+		errClass := tykerrors.ClassifyUpstreamError(err, outreq.URL.Host+outreq.URL.Path)
 		ctx.SetErrorClassification(logreq, errClass)
 
 		token := ctxGetAuthToken(req)

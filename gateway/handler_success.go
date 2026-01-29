@@ -378,6 +378,19 @@ func recordDetailUnsafe(r *http.Request, spec *APISpec) bool {
 	return spec.GraphQL.Enabled || spec.GlobalConfig.AnalyticsConfig.EnableDetailedRecording
 }
 
+// classifyUpstreamError classifies upstream responses for structured access logs.
+// Currently handles 5XX status codes; can be extended for other error classifications.
+func (s *SuccessHandler) classifyUpstreamError(r *http.Request, statusCode int) {
+	if statusCode >= 500 {
+		target := r.URL.Host
+		if target == "" && s.Spec.target != nil {
+			target = s.Spec.target.Host
+		}
+		errClass := tykerrors.ClassifyUpstreamResponse(statusCode, target)
+		ctx.SetErrorClassification(r, errClass)
+	}
+}
+
 // ServeHTTP will store the request details in the analytics store if necessary and proxy the request to it's
 // final destination, this is invoked by the ProxyHandler or right at the start of a request chain if the URL
 // Spec states the path is Ignored
@@ -419,18 +432,7 @@ func (s *SuccessHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) *http
 			Gateway:  totalMs - upstreamMs,
 		}
 
-		// Classify 5XX upstream responses for structured access logs.
-		// This must be done here (not in reverse_proxy.go) because reverse_proxy
-		// operates on a copy of the request (logreq), but access logs read from
-		// the original request context.
-		if resp.Response.StatusCode >= 500 {
-			target := r.URL.Host
-			if target == "" && s.Spec.target != nil {
-				target = s.Spec.target.Host
-			}
-			errClass := tykerrors.ClassifyUpstreamResponse(resp.Response.StatusCode, target)
-			ctx.SetErrorClassification(r, errClass)
-		}
+		s.classifyUpstreamError(r, resp.Response.StatusCode)
 
 		s.RecordHit(r, latency, resp.Response.StatusCode, resp.Response, false)
 		s.RecordAccessLog(r, resp.Response, latency)
@@ -476,18 +478,7 @@ func (s *SuccessHandler) ServeHTTPWithCache(w http.ResponseWriter, r *http.Reque
 			Gateway:  totalMs - upstreamMs,
 		}
 
-		// Classify 5XX upstream responses for structured access logs.
-		// This must be done here (not in reverse_proxy.go) because reverse_proxy
-		// operates on a copy of the request (logreq), but access logs read from
-		// the original request context.
-		if inRes.Response.StatusCode >= 500 {
-			target := r.URL.Host
-			if target == "" && s.Spec.target != nil {
-				target = s.Spec.target.Host
-			}
-			errClass := tykerrors.ClassifyUpstreamResponse(inRes.Response.StatusCode, target)
-			ctx.SetErrorClassification(r, errClass)
-		}
+		s.classifyUpstreamError(r, inRes.Response.StatusCode)
 
 		s.RecordHit(r, latency, inRes.Response.StatusCode, inRes.Response, false)
 	}

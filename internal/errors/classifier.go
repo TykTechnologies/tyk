@@ -235,19 +235,6 @@ func classifyByErrorString(err error, target string) *ErrorClassification {
 			WithTarget(target)
 	}
 
-	if strings.Contains(errStr, "context deadline exceeded") {
-		return NewErrorClassification(URT, "context_deadline_exceeded").
-			WithSource(sourceReverseProxy).
-			WithTarget(target)
-	}
-
-	// Check for client disconnection
-	if strings.Contains(errStr, "context canceled") {
-		return NewErrorClassification(CDC, "client_disconnected").
-			WithSource(sourceReverseProxy).
-			WithTarget(target)
-	}
-
 	// Check for DNS patterns
 	if strings.Contains(errStr, "no such host") {
 		return NewErrorClassification(DNS, "dns_not_found").
