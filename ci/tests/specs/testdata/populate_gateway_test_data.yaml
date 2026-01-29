@@ -163,11 +163,11 @@ testcases:
         assertions:
           - result.statuscode ShouldEqual 200
 
-  - name: Reload  gateway
+  - name: Reload gateway
     steps:
       - type: http
         method: GET
-        url: http://localhost:8080/tyk/reload
+        url: http://localhost:8080/tyk/reload?block=true
         headers:
           X-Tyk-Authorization: {{ .bearerToken }}
         assertions:
