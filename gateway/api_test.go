@@ -31,6 +31,7 @@ import (
 	"github.com/TykTechnologies/tyk/apidef/oas"
 	"github.com/TykTechnologies/tyk/certs"
 	"github.com/TykTechnologies/tyk/config"
+	internalmodel "github.com/TykTechnologies/tyk/internal/model"
 	"github.com/TykTechnologies/tyk/internal/uuid"
 	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/test"
@@ -296,9 +297,7 @@ func TestKeyHandler(t *testing.T) {
 	}}
 	withAccessJSON := test.MarshalJSON(t)(withAccess)
 
-	// with policy
-	ts.Gw.policiesMu.Lock()
-	ts.Gw.policiesByID["abc_policy"] = user.Policy{
+	ts.Gw.policies.Add(user.Policy{
 		Active:           true,
 		QuotaMax:         5,
 		QuotaRenewalRate: 300,
@@ -306,8 +305,9 @@ func TestKeyHandler(t *testing.T) {
 			APIID: "test", Versions: []string{"v1"},
 		}},
 		OrgID: "default",
-	}
-	ts.Gw.policiesMu.Unlock()
+		ID:    "abc_policy",
+	})
+
 	withPolicy := CreateStandardSession()
 	withoutPolicyJSON := test.MarshalJSON(t)(withPolicy)
 
@@ -4087,26 +4087,29 @@ func TestDeletionOfPoliciesThatFromAKeyDoesNotMakeTheAPIKeyless(t *testing.T) {
 
 	apiID1 := testAPIID + "1"
 	apiID2 := testAPIID + "2"
+	orgId := "default"
 
 	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 		spec.APIID = apiID1
 		spec.UseKeylessAccess = false
-		spec.OrgID = "default"
+		spec.OrgID = orgId
 		spec.Proxy.ListenPath = "/api1"
 	}, func(spec *APISpec) {
 		spec.APIID = apiID2
 		spec.UseKeylessAccess = false
-		spec.OrgID = "default"
+		spec.OrgID = orgId
 		spec.Proxy.ListenPath = "/api2"
 	})
 
 	policyForApi1 := ts.CreatePolicy(func(p *user.Policy) {
+		p.OrgID = orgId
 		p.AccessRights = map[string]user.AccessDefinition{apiID1: {
 			APIID: apiID1,
 		}}
 	})
 
 	policyForApi2 := ts.CreatePolicy(func(p *user.Policy) {
+		p.OrgID = orgId
 		p.AccessRights = map[string]user.AccessDefinition{apiID2: {
 			APIID: apiID2,
 		}}
@@ -4127,7 +4130,7 @@ func TestDeletionOfPoliciesThatFromAKeyDoesNotMakeTheAPIKeyless(t *testing.T) {
 	assert.NotNil(t, res)
 	assert.Nil(t, err)
 
-	ts.DeletePolicy(policyForApi2)
+	ts.DeletePolicy(internalmodel.NewScopedCustomPolicyId(orgId, policyForApi2))
 	res, err = ts.Run(t, []test.TestCase{
 		{Method: "GET", Path: "/api1", Headers: authHeaders, Code: 200},
 		{Method: "GET", Path: "/api2", Headers: authHeaders, Code: 403},
@@ -4135,7 +4138,7 @@ func TestDeletionOfPoliciesThatFromAKeyDoesNotMakeTheAPIKeyless(t *testing.T) {
 	assert.NotNil(t, res)
 	assert.Nil(t, err)
 
-	ts.DeletePolicy(policyForApi1)
+	ts.DeletePolicy(internalmodel.NewScopedCustomPolicyId(orgId, policyForApi1))
 	res, err = ts.Run(t, []test.TestCase{
 		{Method: "GET", Path: "/api1", Headers: authHeaders, Code: 403},
 		{Method: "GET", Path: "/api2", Headers: authHeaders, Code: 403},
