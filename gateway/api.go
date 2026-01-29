@@ -39,6 +39,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -76,10 +77,12 @@ const (
 	// KeyListingWorkerCountCap 350 is based on the average of 10000 keys with minor contingency
 	KeyListingWorkerCountCap      = 350
 	KeyListingWorkerEntriesPerKey = 100
+	errMsgInvalidPolicyID         = "Invalid Policy ID. Allowed characters: a-z, A-Z, 0-9, ., _, -, ~"
 )
 
 var (
 	ErrRequestMalformed = errors.New("request malformed")
+	validPolicyIDRegex  = regexp.MustCompile(`^[a-zA-Z0-9.\-_~]+$`)
 )
 
 // apiModifyKeySuccess represents when a Key modification was successful
@@ -1104,6 +1107,11 @@ func (gw *Gateway) handleAddOrUpdatePolicy(polID string, r *http.Request) (inter
 		return apiError("Request malformed"), http.StatusBadRequest
 	}
 
+	if newPol.ID != "" && !isValidPolicyID(newPol.ID) {
+		log.WithField("id", newPol.ID).Error("Policy ID contains invalid characters")
+		return apiError(errMsgInvalidPolicyID), http.StatusBadRequest
+	}
+
 	if polID != "" && newPol.ID != polID && r.Method == http.MethodPut {
 		log.Error("PUT operation on different IDs")
 		return apiError("Request ID does not match that in policy! For Update operations these must match."), http.StatusBadRequest
@@ -1549,6 +1557,12 @@ func (gw *Gateway) handleDeleteAPI(apiID string) (interface{}, int) {
 func (gw *Gateway) polHandler(w http.ResponseWriter, r *http.Request) {
 	polID := mux.Vars(r)["polID"]
 
+	if polID != "" && !isValidPolicyID(polID) {
+		log.WithField("id", polID).Error("Policy ID contains invalid characters")
+		doJSONWrite(w, http.StatusBadRequest, apiError(errMsgInvalidPolicyID))
+		return
+	}
+
 	var obj interface{}
 	var code int
 
@@ -1581,6 +1595,10 @@ func (gw *Gateway) polHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	doJSONWrite(w, code, obj)
+}
+
+func isValidPolicyID(id string) bool {
+	return validPolicyIDRegex.MatchString(id)
 }
 
 func (gw *Gateway) apiHandler(w http.ResponseWriter, r *http.Request) {
