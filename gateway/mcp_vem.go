@@ -11,11 +11,47 @@ import (
 	tykregexp "github.com/TykTechnologies/tyk/regexp"
 )
 
+// PrimitiveCategory defines a category of JSON-RPC primitives to generate VEMs for.
+// This allows different protocols (MCP, A2A) to share the same VEM generation logic.
+type PrimitiveCategory struct {
+	// Prefix is the VEM path prefix (e.g., "/mcp-tool:").
+	Prefix string
+	// TypeName is the type identifier used for primitive map keys (e.g., "tool").
+	TypeName string
+	// Primitives maps primitive names to their middleware configurations.
+	Primitives oas.MCPPrimitives
+}
+
+// generateJSONRPCVEMs generates URLSpec entries for JSON-RPC primitives.
+// This is a generic function usable for MCP, A2A, or other JSON-RPC protocols.
+// It requires JSON-RPC 2.0 and populates primitivesMap with generated VEM paths.
+func (a APIDefinitionLoader) generateJSONRPCVEMs(
+	apiSpec *APISpec,
+	conf config.Config,
+	categories []PrimitiveCategory,
+	primitivesMap map[string]string,
+) []URLSpec {
+	if apiSpec.JsonRpcVersion != apidef.JsonRPC20 {
+		return nil
+	}
+
+	var specs []URLSpec
+	for _, cat := range categories {
+		for name, op := range cat.Primitives {
+			vemPath := cat.Prefix + name
+			specs = append(specs, a.buildPrimitiveSpec(name, cat.TypeName, vemPath)...)
+			specs = append(specs, a.compilePrimitiveMiddlewareSpecs(op, vemPath, apiSpec, conf)...)
+			primitivesMap[cat.TypeName+":"+name] = vemPath
+		}
+	}
+
+	return specs
+}
+
 // generateMCPVEMs generates URLSpec entries for MCP primitives (tools, resources, prompts).
 // These VEMs are internal-only endpoints accessible via JSON-RPC routing.
 func (a APIDefinitionLoader) generateMCPVEMs(apiSpec *APISpec, conf config.Config) []URLSpec {
-	// MCP definition detection: require BOTH application protocol and JSON-RPC 2.0.
-	if !apiSpec.IsMCP() || apiSpec.JsonRpcVersion != apidef.JsonRPC20 {
+	if !apiSpec.IsMCP() {
 		return nil
 	}
 
@@ -24,45 +60,25 @@ func (a APIDefinitionLoader) generateMCPVEMs(apiSpec *APISpec, conf config.Confi
 		return nil
 	}
 
-	var specs []URLSpec
-
 	// Always re-init MCPPrimitives on load to avoid stale entries on reload.
 	apiSpec.MCPPrimitives = make(map[string]string)
 
-	// Generate tool VEMs
-	for name, op := range middleware.McpTools {
-		vemPath := mcp.ToolPrefix + name
-		specs = append(specs, a.buildMCPPrimitiveSpec(name, "tool", vemPath)...)
-		specs = append(specs, a.compileMCPPrimitiveMiddlewareSpecs(op, vemPath, apiSpec, conf)...)
-		apiSpec.MCPPrimitives["tool:"+name] = vemPath
+	categories := []PrimitiveCategory{
+		{Prefix: mcp.ToolPrefix, TypeName: "tool", Primitives: middleware.McpTools},
+		{Prefix: mcp.ResourcePrefix, TypeName: "resource", Primitives: middleware.McpResources},
+		{Prefix: mcp.PromptPrefix, TypeName: "prompt", Primitives: middleware.McpPrompts},
 	}
 
-	// Generate resource VEMs
-	for pattern, op := range middleware.McpResources {
-		vemPath := mcp.ResourcePrefix + pattern
-		specs = append(specs, a.buildMCPPrimitiveSpec(pattern, "resource", vemPath)...)
-		specs = append(specs, a.compileMCPPrimitiveMiddlewareSpecs(op, vemPath, apiSpec, conf)...)
-		apiSpec.MCPPrimitives["resource:"+pattern] = vemPath
-	}
-
-	// Generate prompt VEMs
-	for name, op := range middleware.McpPrompts {
-		vemPath := mcp.PromptPrefix + name
-		specs = append(specs, a.buildMCPPrimitiveSpec(name, "prompt", vemPath)...)
-		specs = append(specs, a.compileMCPPrimitiveMiddlewareSpecs(op, vemPath, apiSpec, conf)...)
-		apiSpec.MCPPrimitives["prompt:"+name] = vemPath
-	}
-
-	return specs
+	return a.generateJSONRPCVEMs(apiSpec, conf, categories, apiSpec.MCPPrimitives)
 }
 
-// buildMCPPrimitiveSpec creates the base URLSpec entry for an MCP primitive VEM.
+// buildPrimitiveSpec creates the base URLSpec entry for a JSON-RPC primitive VEM.
 // This is used for access control (blocking direct external access).
 //
 // Parameters name and primType are currently unused but retained in the signature
 // for future use (e.g., logging, metrics, or extended metadata). Use blank identifiers
 // to satisfy the linter until needed.
-func (a APIDefinitionLoader) buildMCPPrimitiveSpec(_, _, path string) []URLSpec {
+func (a APIDefinitionLoader) buildPrimitiveSpec(_, _, path string) []URLSpec {
 	spec := URLSpec{
 		Status: Internal,
 		Internal: apidef.InternalMeta{
@@ -80,7 +96,7 @@ func (a APIDefinitionLoader) buildMCPPrimitiveSpec(_, _, path string) []URLSpec 
 	return []URLSpec{spec}
 }
 
-func (a APIDefinitionLoader) compileMCPPrimitiveMiddlewareSpecs(primitive *oas.MCPPrimitive, path string, apiSpec *APISpec, conf config.Config) []URLSpec {
+func (a APIDefinitionLoader) compilePrimitiveMiddlewareSpecs(primitive *oas.MCPPrimitive, path string, apiSpec *APISpec, conf config.Config) []URLSpec {
 	if primitive == nil {
 		return nil
 	}
