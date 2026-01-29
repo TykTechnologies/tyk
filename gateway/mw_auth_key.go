@@ -102,6 +102,17 @@ func (k *AuthKey) getAuthType() string {
 	return apidef.AuthTokenType
 }
 
+// checkSessionWithCertFallback attempts to find a session using a generated token from certHash,
+// falling back to checking with the certHash directly if the token lookup fails.
+func (k *AuthKey) checkSessionWithCertFallback(r *http.Request, certHash string) (user.SessionState, bool) {
+	key := k.Gw.generateToken(k.Spec.OrgID, certHash)
+	session, keyExists := k.CheckSessionAndIdentityForValidKey(key, r)
+	if !keyExists {
+		session, keyExists = k.CheckSessionAndIdentityForValidKey(certHash, r)
+	}
+	return session, keyExists
+}
+
 func (k *AuthKey) ProcessRequest(_ http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
 	if ctxGetRequestStatus(r) == StatusOkAndIgnore {
 		return nil, http.StatusOK
@@ -142,23 +153,15 @@ func (k *AuthKey) ProcessRequest(_ http.ResponseWriter, r *http.Request, _ inter
 			if certHash == "" {
 				return errorAndStatusCode(ErrAuthCertRequired)
 			}
-			key = k.Gw.generateToken(k.Spec.OrgID, certHash)
-			session, keyExists = k.CheckSessionAndIdentityForValidKey(key, r)
+			session, keyExists = k.checkSessionWithCertFallback(r, certHash)
 			if !keyExists {
-				session, keyExists = k.CheckSessionAndIdentityForValidKey(certHash, r)
-				if !keyExists {
-					return errorAndStatusCode(ErrAuthCertMismatch)
-				}
+				return errorAndStatusCode(ErrAuthCertMismatch)
 			}
 		} else {
 			if certHash != "" {
-				certKey := k.Gw.generateToken(k.Spec.OrgID, certHash)
-				session, keyExists = k.CheckSessionAndIdentityForValidKey(certKey, r)
+				session, keyExists = k.checkSessionWithCertFallback(r, certHash)
 				if !keyExists {
-					session, keyExists = k.CheckSessionAndIdentityForValidKey(certHash, r)
-					if !keyExists {
-						return errorAndStatusCode(ErrAuthCertMismatch)
-					}
+					return errorAndStatusCode(ErrAuthCertMismatch)
 				}
 			}
 			if key != "" {
@@ -355,17 +358,17 @@ func (k *AuthKey) validateCertificate(ctx *certValidationContext) (int, error) {
 
 // validateWithTLSCertificate handles validation when a TLS client certificate is provided
 func (k *AuthKey) validateWithTLSCertificate(ctx *certValidationContext) (int, error) {
-	// Check certificate expiry when a token is provided (not checked earlier in the flow)
-	if code, err := k.checkCertificateExpiry(ctx.request, ctx.key); err != nil {
-		return code, err
-	}
-
 	// Compute cert hash for comparison
 	*ctx.certHash = k.computeCertHash(ctx.request, *ctx.certHash)
 
 	// Use binding mode if the session has static certificate bindings configured
 	// Otherwise, use legacy mode for backward compatibility with dynamic mTLS
 	if ctx.useCertBinding {
+		// Check certificate expiry for cert binding mode
+		// (not checked earlier in the flow, unlike when authConfig.UseCertificate is true)
+		if code, err := k.checkCertificateExpiry(ctx.request, ctx.key); err != nil {
+			return code, err
+		}
 		return k.validateCertificateBinding(ctx.request, ctx.key, ctx.session, *ctx.certHash)
 	}
 
