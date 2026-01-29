@@ -89,9 +89,3 @@ ci/tests/specs/policies
 .task-check-config-cache
 .task-check-x-tyk-gateway-cache
 .task-codegen-cache
-
-# Local documentation (not for commit)
-SELECTIVE_CERT_SYNC.md
-MDCB.md
-PLAN.md
-docs/diagrams/
