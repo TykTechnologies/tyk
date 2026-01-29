@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/samber/lo"
 	"github.com/sirupsen/logrus"
 
 	"github.com/TykTechnologies/tyk/internal/model"
@@ -35,10 +36,10 @@ func New(orgID *string, storage model.PolicyProvider, logger *logrus.Logger) *Se
 // ClearSession clears the quota, rate limit and complexity values so that partitioned policies can apply their values.
 // Otherwise, if the session has already a higher value, an applied policy will not win, and its values will be ignored.
 func (t *Service) ClearSession(session *user.SessionState) error {
-	policies := session.PolicyIDs()
 
-	for _, polID := range policies {
+	for _, polID := range t.policyIds(session) {
 		policy, ok := t.storage.PolicyByID(polID)
+
 		if !ok {
 			return fmt.Errorf("policy not found: %s", polID)
 		}
@@ -96,18 +97,15 @@ func (t *Service) Apply(session *user.SessionState) error {
 	}
 
 	var (
-		err       error
-		policyIDs []string
+		policyIDs []model.PolicyID
 	)
 
 	storage := t.storage
-
-	customPolicies, err := session.GetCustomPolicies()
-	if err != nil {
-		policyIDs = session.PolicyIDs()
-	} else {
+	if customPolicies, err := session.GetCustomPolicies(); err == nil {
 		storage = NewStore(customPolicies)
 		policyIDs = storage.PolicyIDs()
+	} else {
+		policyIDs = t.policyIds(session)
 	}
 
 	// Only the status of policies applied to a key should determine the validity of the key.
@@ -120,6 +118,7 @@ func (t *Service) Apply(session *user.SessionState) error {
 
 	for _, polID := range policyIDs {
 		policy, ok := storage.PolicyByID(polID)
+
 		if !ok {
 			err := fmt.Errorf("policy not found: %q", polID)
 			t.Logger().Error(err)
@@ -347,6 +346,24 @@ func (t *Service) applyPerAPI(policy user.Policy, session *user.SessionState, ri
 	}
 
 	return nil
+}
+
+func (t *Service) policyIds(session *user.SessionState) []model.PolicyID {
+	ids := session.PolicyIDs()
+
+	if ids == nil {
+		return nil
+	} else {
+		orgID := session.OrgID
+		if orgID == "" && t.orgID != nil {
+			// Use the API spec's organization ID if the session's organization ID is empty
+			orgID = *t.orgID
+		}
+
+		return lo.Map(session.PolicyIDs(), func(item string, _ int) model.PolicyID {
+			return model.NewScopedCustomPolicyId(orgID, item)
+		})
+	}
 }
 
 func (t *Service) applyPartitions(policy user.Policy, session *user.SessionState, rights map[string]user.AccessDefinition,
