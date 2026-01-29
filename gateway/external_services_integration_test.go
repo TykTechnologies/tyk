@@ -77,7 +77,7 @@ func (m *mockIntegrationCertificateManager) CertPool(certIDs []string) *x509.Cer
 
 func (m *mockIntegrationCertificateManager) FlushCache() {}
 
-func (m *mockIntegrationCertificateManager) SetRegistry(_ certs.CertRegistry) {}
+func (m *mockIntegrationCertificateManager) SetRegistry(_ certs.CertUsageTracker) {}
 
 func TestExternalServices_ProxyIntegration(t *testing.T) {
 	ts := StartTest(nil)

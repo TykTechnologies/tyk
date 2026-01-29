@@ -163,7 +163,7 @@ type Gateway struct {
 	policiesMu   sync.RWMutex
 	policiesByID map[string]user.Policy
 
-	certRegistry *certRegistry // nil in non-RPC mode
+	certUsageTracker *certUsageTracker // nil in non-RPC mode
 
 	dnsCacheManager dnscache.IDnsCacheManager
 
@@ -257,7 +257,7 @@ func NewGateway(config config.Config, ctx context.Context) *Gateway {
 
 	// Only create registry in RPC mode
 	if config.SlaveOptions.UseRPC {
-		gw.certRegistry = newCertRegistry()
+		gw.certUsageTracker = newCertUsageTracker()
 	}
 
 	return gw
@@ -539,8 +539,8 @@ func (gw *Gateway) setupGlobals() {
 		gw.CertificateManager = certs.NewSlaveCertManager(storeCert, rpcStore, certificateSecret, log, !gw.GetConfig().Cloud)
 
 		// Wire certificate registry for selective sync
-		if gw.GetConfig().SlaveOptions.SyncUsedCertsOnly && gw.certRegistry != nil {
-			gw.CertificateManager.SetRegistry(gw.certRegistry)
+		if gw.GetConfig().SlaveOptions.SyncUsedCertsOnly && gw.certUsageTracker != nil {
+			gw.CertificateManager.SetRegistry(gw.certUsageTracker)
 		}
 	}
 
@@ -1783,7 +1783,7 @@ func (gw *Gateway) getGlobalMDCBStorageHandler(keyPrefix string, hashKeys bool) 
 			},
 			logger,
 			nil,
-			gw.certRegistry,
+			gw.certUsageTracker,
 			&cfg,
 		)
 	}

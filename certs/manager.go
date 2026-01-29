@@ -41,8 +41,8 @@ var (
 
 //go:generate mockgen -destination=./mock/mock.go -package=mock . CertificateManager
 
-// CertRegistry defines the interface for certificate requirement tracking
-type CertRegistry interface {
+// CertUsageTracker defines the interface for certificate requirement tracking
+type CertUsageTracker interface {
 	Required(certID string) bool
 }
 
@@ -56,7 +56,7 @@ type CertificateManager interface {
 	Delete(certID string, orgID string)
 	CertPool(certIDs []string) *x509.CertPool
 	FlushCache()
-	SetRegistry(registry CertRegistry)
+	SetRegistry(registry CertUsageTracker)
 }
 
 type certificateManager struct {
@@ -65,7 +65,7 @@ type certificateManager struct {
 	cache           cache.Repository
 	secret          string
 	migrateCertList bool
-	registry        CertRegistry
+	registry        CertUsageTracker
 	selectiveSync   bool
 }
 
@@ -585,7 +585,7 @@ func (c *certificateManager) GetRaw(certID string) (string, error) {
 }
 
 // SetRegistry configures the certificate registry for selective sync
-func (c *certificateManager) SetRegistry(registry CertRegistry) {
+func (c *certificateManager) SetRegistry(registry CertUsageTracker) {
 	c.logger.Info("Setting certificate registry for selective sync")
 	c.registry = registry
 	c.selectiveSync = true

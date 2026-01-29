@@ -1051,23 +1051,23 @@ func (gw *Gateway) loadApps(specs []*APISpec) {
 	mainLog.Info("Loading API configurations.")
 
 	// Only build registry in RPC mode (when it exists)
-	if gw.certRegistry != nil {
-		gw.certRegistry.Reset()
+	if gw.certUsageTracker != nil {
+		gw.certUsageTracker.Reset()
 
 		// Register gateway server certificates
-		gw.certRegistry.RegisterServerCerts(
+		gw.certUsageTracker.RegisterServerCerts(
 			gw.GetConfig().HttpServerOptions.SSLCertificates,
 		)
 
 		// Register certificates from each API
 		for _, spec := range specs {
-			gw.certRegistry.Register(spec)
+			gw.certUsageTracker.Register(spec)
 		}
 
 		// Log when feature is enabled
 		if gw.GetConfig().SlaveOptions.SyncUsedCertsOnly {
 			mainLog.WithFields(logrus.Fields{
-				"cert_count": gw.certRegistry.Len(),
+				"cert_count": gw.certUsageTracker.Len(),
 				"api_count":  len(specs),
 			}).Info("sync used certs only enabled")
 		}

@@ -67,7 +67,7 @@ func (m *CertificateCheckMW) Init() {
 			cfg.Security.CertificateExpiryMonitor,
 			m.store,
 			m.Spec.FireEvent,
-			m.Gw.certRegistry,
+			m.Gw.certUsageTracker,
 			&cfg,
 		)
 

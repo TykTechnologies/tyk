@@ -2,37 +2,33 @@ package gateway
 
 import "sync"
 
-// certRegistry tracks which certificates are required by loaded APIs.
-type certRegistry struct {
+// certUsageTracker tracks which certificates are required by loaded APIs.
+type certUsageTracker struct {
 	mu sync.RWMutex
 
-	required   map[string]struct{}                // certID -> is required
-	apisByCert map[string]map[string]struct{}     // certID -> set of API IDs using this cert
-	certsByAPI map[string]map[string]struct{}     // API ID -> set of cert IDs it uses
+	apis map[string]map[string]struct{} // certID -> set of API IDs using this cert
 }
 
-func newCertRegistry() *certRegistry {
-	return &certRegistry{
-		required:   make(map[string]struct{}),
-		apisByCert: make(map[string]map[string]struct{}),
-		certsByAPI: make(map[string]map[string]struct{}),
+func newCertUsageTracker() *certUsageTracker {
+	return &certUsageTracker{
+		apis: make(map[string]map[string]struct{}),
 	}
 }
 
 // Required returns true if the certificate is used by any loaded API.
-func (cr *certRegistry) Required(certID string) bool {
+func (cr *certUsageTracker) Required(certID string) bool {
 	cr.mu.RLock()
 	defer cr.mu.RUnlock()
-	_, exists := cr.required[certID]
+	_, exists := cr.apis[certID]
 	return exists
 }
 
 // APIs returns the IDs of APIs that use this certificate.
-func (cr *certRegistry) APIs(certID string) []string {
+func (cr *certUsageTracker) APIs(certID string) []string {
 	cr.mu.RLock()
 	defer cr.mu.RUnlock()
 
-	apiSet := cr.apisByCert[certID]
+	apiSet := cr.apis[certID]
 	if apiSet == nil {
 		return nil
 	}
@@ -46,7 +42,7 @@ func (cr *certRegistry) APIs(certID string) []string {
 }
 
 // Register extracts and tracks all certificates from an API spec.
-func (cr *certRegistry) Register(spec *APISpec) {
+func (cr *certUsageTracker) Register(spec *APISpec) {
 	cr.mu.Lock()
 	defer cr.mu.Unlock()
 
@@ -75,22 +71,18 @@ func (cr *certRegistry) Register(spec *APISpec) {
 		}
 	}
 
-	cr.certsByAPI[apiID] = certSet
-
-	// Mark each cert as required and track API association
+	// Track API association for each cert
 	for certID := range certSet {
-		cr.required[certID] = struct{}{}
-
 		// Initialize the set if it doesn't exist
-		if cr.apisByCert[certID] == nil {
-			cr.apisByCert[certID] = make(map[string]struct{})
+		if cr.apis[certID] == nil {
+			cr.apis[certID] = make(map[string]struct{})
 		}
-		cr.apisByCert[certID][apiID] = struct{}{}
+		cr.apis[certID][apiID] = struct{}{}
 	}
 }
 
 // RegisterServerCerts tracks gateway server certificates.
-func (cr *certRegistry) RegisterServerCerts(certIDs []string) {
+func (cr *certUsageTracker) RegisterServerCerts(certIDs []string) {
 	cr.mu.Lock()
 	defer cr.mu.Unlock()
 
@@ -101,46 +93,38 @@ func (cr *certRegistry) RegisterServerCerts(certIDs []string) {
 			continue
 		}
 
-		cr.required[certID] = struct{}{}
-
 		// Initialize the set if it doesn't exist
-		if cr.apisByCert[certID] == nil {
-			cr.apisByCert[certID] = make(map[string]struct{})
+		if cr.apis[certID] == nil {
+			cr.apis[certID] = make(map[string]struct{})
 		}
-		cr.apisByCert[certID][serverAPI] = struct{}{}
+		cr.apis[certID][serverAPI] = struct{}{}
 	}
 }
 
 // Reset clears all tracked certificates.
-func (cr *certRegistry) Reset() {
+func (cr *certUsageTracker) Reset() {
 	cr.mu.Lock()
 	defer cr.mu.Unlock()
 
-	for k := range cr.required {
-		delete(cr.required, k)
-	}
-	for k := range cr.apisByCert {
-		delete(cr.apisByCert, k)
-	}
-	for k := range cr.certsByAPI {
-		delete(cr.certsByAPI, k)
+	for k := range cr.apis {
+		delete(cr.apis, k)
 	}
 }
 
 // Len returns the number of required certificates.
-func (cr *certRegistry) Len() int {
+func (cr *certUsageTracker) Len() int {
 	cr.mu.RLock()
 	defer cr.mu.RUnlock()
-	return len(cr.required)
+	return len(cr.apis)
 }
 
 // Certs returns all required certificate IDs.
-func (cr *certRegistry) Certs() []string {
+func (cr *certUsageTracker) Certs() []string {
 	cr.mu.RLock()
 	defer cr.mu.RUnlock()
 
-	ids := make([]string, 0, len(cr.required))
-	for id := range cr.required {
+	ids := make([]string, 0, len(cr.apis))
+	for id := range cr.apis {
 		ids = append(ids, id)
 	}
 	return ids

@@ -17,8 +17,8 @@ import (
 	"github.com/TykTechnologies/tyk/storage"
 )
 
-// certUsageRegistry tracks which certificates are used by which APIs.
-type certUsageRegistry interface {
+// certUsageTracker tracks which certificates are used by which APIs.
+type certUsageTracker interface {
 	Required(certID string) bool
 	APIs(certID string) []string
 }
@@ -101,12 +101,12 @@ type CertificateExpiryCheckBatcher struct {
 	fallbackCooldownCache CooldownCache
 	flushTicker           *time.Ticker
 	fireEvent             FireEventFunc
-	certUsage certUsageRegistry    // can be nil in non-RPC mode
+	certUsage certUsageTracker    // can be nil in non-RPC mode
 	gwConfig   *config.Config // can be nil
 }
 
 // NewCertificateExpiryCheckBatcher creates a new CertificateExpiryCheckBatcher.
-func NewCertificateExpiryCheckBatcher(logger *logrus.Entry, apiMetaData APIMetaData, cfg config.CertificateExpiryMonitorConfig, fallbackStorage storage.Handler, eventFunc FireEventFunc, certUsage certUsageRegistry, gwConfig *config.Config) (*CertificateExpiryCheckBatcher, error) {
+func NewCertificateExpiryCheckBatcher(logger *logrus.Entry, apiMetaData APIMetaData, cfg config.CertificateExpiryMonitorConfig, fallbackStorage storage.Handler, eventFunc FireEventFunc, certUsage certUsageTracker, gwConfig *config.Config) (*CertificateExpiryCheckBatcher, error) {
 	inMemoryCache, err := NewInMemoryCooldownCache()
 	if err != nil {
 		return nil, err

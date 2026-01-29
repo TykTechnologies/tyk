@@ -167,7 +167,7 @@ func (mr *MockCertificateManagerMockRecorder) ListRawPublicKey(keyID any) *gomoc
 }
 
 // SetRegistry mocks base method.
-func (m *MockCertificateManager) SetRegistry(registry certs.CertRegistry) {
+func (m *MockCertificateManager) SetRegistry(registry certs.CertUsageTracker) {
 	m.ctrl.T.Helper()
 	m.ctrl.Call(m, "SetRegistry", registry)
 }

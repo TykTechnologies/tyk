@@ -22,19 +22,17 @@ func createTestAPISpec(apiID string, certs, clientCerts []string, upstreamCerts,
 	}
 }
 
-func TestNewCertRegistry(t *testing.T) {
-	cr := newCertRegistry()
+func TestNewCertUsageTracker(t *testing.T) {
+	cr := newCertUsageTracker()
 
 	assert.NotNil(t, cr)
-	assert.NotNil(t, cr.required)
-	assert.NotNil(t, cr.apisByCert)
-	assert.NotNil(t, cr.certsByAPI)
+	assert.NotNil(t, cr.apis)
 	assert.Equal(t, 0, cr.Len())
 }
 
-func TestCertRegistry_Register(t *testing.T) {
+func TestCertUsageTracker_Register(t *testing.T) {
 	t.Run("single API with single certificate type", func(t *testing.T) {
-		cr := newCertRegistry()
+		cr := newCertUsageTracker()
 		spec := createTestAPISpec("api1", []string{"cert1", "cert2"}, nil, nil, nil)
 
 		cr.Register(spec)
@@ -46,7 +44,7 @@ func TestCertRegistry_Register(t *testing.T) {
 	})
 
 	t.Run("single API with multiple certificate types", func(t *testing.T) {
-		cr := newCertRegistry()
+		cr := newCertUsageTracker()
 		spec := createTestAPISpec("api1",
 			[]string{"cert1"},
 			[]string{"cert2"},
@@ -63,7 +61,7 @@ func TestCertRegistry_Register(t *testing.T) {
 	})
 
 	t.Run("multiple APIs sharing same certificate", func(t *testing.T) {
-		cr := newCertRegistry()
+		cr := newCertUsageTracker()
 
 		spec1 := createTestAPISpec("api1", []string{"cert1", "shared-cert"}, nil, nil, nil)
 		spec2 := createTestAPISpec("api2", []string{"cert2", "shared-cert"}, nil, nil, nil)
@@ -84,7 +82,7 @@ func TestCertRegistry_Register(t *testing.T) {
 	})
 
 	t.Run("empty certificate IDs are ignored", func(t *testing.T) {
-		cr := newCertRegistry()
+		cr := newCertUsageTracker()
 		spec := createTestAPISpec("api1", []string{"cert1", "", "cert2"}, nil, nil, nil)
 
 		cr.Register(spec)
@@ -95,7 +93,7 @@ func TestCertRegistry_Register(t *testing.T) {
 	})
 
 	t.Run("duplicate certificates within same API are deduplicated", func(t *testing.T) {
-		cr := newCertRegistry()
+		cr := newCertUsageTracker()
 		spec := createTestAPISpec("api1",
 			[]string{"cert1"},
 			[]string{"cert1"}, // duplicate
@@ -110,9 +108,9 @@ func TestCertRegistry_Register(t *testing.T) {
 	})
 }
 
-func TestCertRegistry_RegisterServerCerts(t *testing.T) {
+func TestCertUsageTracker_RegisterServerCerts(t *testing.T) {
 	t.Run("register server certificates", func(t *testing.T) {
-		cr := newCertRegistry()
+		cr := newCertUsageTracker()
 
 		cr.RegisterServerCerts([]string{"server-cert1", "server-cert2"})
 
@@ -127,7 +125,7 @@ func TestCertRegistry_RegisterServerCerts(t *testing.T) {
 	})
 
 	t.Run("empty certificate IDs are ignored", func(t *testing.T) {
-		cr := newCertRegistry()
+		cr := newCertUsageTracker()
 
 		cr.RegisterServerCerts([]string{"server-cert1", "", "server-cert2"})
 
@@ -137,7 +135,7 @@ func TestCertRegistry_RegisterServerCerts(t *testing.T) {
 	})
 
 	t.Run("server certs combined with API certs", func(t *testing.T) {
-		cr := newCertRegistry()
+		cr := newCertUsageTracker()
 
 		spec := createTestAPISpec("api1", []string{"cert1"}, nil, nil, nil)
 		cr.Register(spec)
@@ -159,9 +157,9 @@ func TestCertRegistry_RegisterServerCerts(t *testing.T) {
 	})
 }
 
-func TestCertRegistry_Required(t *testing.T) {
+func TestCertUsageTracker_Required(t *testing.T) {
 	t.Run("required certificate", func(t *testing.T) {
-		cr := newCertRegistry()
+		cr := newCertUsageTracker()
 		spec := createTestAPISpec("api1", []string{"cert1"}, nil, nil, nil)
 		cr.Register(spec)
 
@@ -169,13 +167,13 @@ func TestCertRegistry_Required(t *testing.T) {
 	})
 
 	t.Run("non-existent certificate", func(t *testing.T) {
-		cr := newCertRegistry()
+		cr := newCertUsageTracker()
 
 		assert.False(t, cr.Required("non-existent"))
 	})
 
 	t.Run("certificate after reset", func(t *testing.T) {
-		cr := newCertRegistry()
+		cr := newCertUsageTracker()
 		spec := createTestAPISpec("api1", []string{"cert1"}, nil, nil, nil)
 		cr.Register(spec)
 		cr.Reset()
@@ -184,9 +182,9 @@ func TestCertRegistry_Required(t *testing.T) {
 	})
 }
 
-func TestCertRegistry_APIs(t *testing.T) {
+func TestCertUsageTracker_APIs(t *testing.T) {
 	t.Run("certificate used by single API", func(t *testing.T) {
-		cr := newCertRegistry()
+		cr := newCertUsageTracker()
 		spec := createTestAPISpec("api1", []string{"cert1"}, nil, nil, nil)
 		cr.Register(spec)
 
@@ -196,7 +194,7 @@ func TestCertRegistry_APIs(t *testing.T) {
 	})
 
 	t.Run("certificate used by multiple APIs", func(t *testing.T) {
-		cr := newCertRegistry()
+		cr := newCertUsageTracker()
 
 		spec1 := createTestAPISpec("api1", []string{"shared-cert"}, nil, nil, nil)
 		spec2 := createTestAPISpec("api2", []string{"shared-cert"}, nil, nil, nil)
@@ -214,14 +212,14 @@ func TestCertRegistry_APIs(t *testing.T) {
 	})
 
 	t.Run("non-existent certificate", func(t *testing.T) {
-		cr := newCertRegistry()
+		cr := newCertUsageTracker()
 
 		apis := cr.APIs("non-existent")
 		assert.Nil(t, apis)
 	})
 
 	t.Run("certificate after reset", func(t *testing.T) {
-		cr := newCertRegistry()
+		cr := newCertUsageTracker()
 		spec := createTestAPISpec("api1", []string{"cert1"}, nil, nil, nil)
 		cr.Register(spec)
 		cr.Reset()
@@ -231,9 +229,9 @@ func TestCertRegistry_APIs(t *testing.T) {
 	})
 }
 
-func TestCertRegistry_Reset(t *testing.T) {
+func TestCertUsageTracker_Reset(t *testing.T) {
 	t.Run("reset clears all data", func(t *testing.T) {
-		cr := newCertRegistry()
+		cr := newCertUsageTracker()
 
 		spec := createTestAPISpec("api1",
 			[]string{"cert1"},
@@ -256,7 +254,7 @@ func TestCertRegistry_Reset(t *testing.T) {
 	})
 
 	t.Run("reset on empty registry", func(t *testing.T) {
-		cr := newCertRegistry()
+		cr := newCertUsageTracker()
 
 		cr.Reset()
 
@@ -264,7 +262,7 @@ func TestCertRegistry_Reset(t *testing.T) {
 	})
 
 	t.Run("register after reset", func(t *testing.T) {
-		cr := newCertRegistry()
+		cr := newCertUsageTracker()
 
 		spec1 := createTestAPISpec("api1", []string{"cert1"}, nil, nil, nil)
 		cr.Register(spec1)
@@ -279,9 +277,9 @@ func TestCertRegistry_Reset(t *testing.T) {
 	})
 }
 
-func TestCertRegistry_Len(t *testing.T) {
+func TestCertUsageTracker_Len(t *testing.T) {
 	t.Run("length reflects unique certificates", func(t *testing.T) {
-		cr := newCertRegistry()
+		cr := newCertUsageTracker()
 
 		assert.Equal(t, 0, cr.Len())
 
@@ -298,9 +296,9 @@ func TestCertRegistry_Len(t *testing.T) {
 	})
 }
 
-func TestCertRegistry_Certs(t *testing.T) {
+func TestCertUsageTracker_Certs(t *testing.T) {
 	t.Run("get all certificate IDs", func(t *testing.T) {
-		cr := newCertRegistry()
+		cr := newCertUsageTracker()
 
 		spec := createTestAPISpec("api1",
 			[]string{"cert1"},
@@ -317,14 +315,14 @@ func TestCertRegistry_Certs(t *testing.T) {
 	})
 
 	t.Run("empty registry", func(t *testing.T) {
-		cr := newCertRegistry()
+		cr := newCertUsageTracker()
 
 		certs := cr.Certs()
 		assert.Empty(t, certs)
 	})
 
 	t.Run("after reset", func(t *testing.T) {
-		cr := newCertRegistry()
+		cr := newCertUsageTracker()
 
 		spec := createTestAPISpec("api1", []string{"cert1"}, nil, nil, nil)
 		cr.Register(spec)
@@ -335,9 +333,9 @@ func TestCertRegistry_Certs(t *testing.T) {
 	})
 }
 
-func TestCertRegistry_ConcurrentAccess(t *testing.T) {
+func TestCertUsageTracker_ConcurrentAccess(t *testing.T) {
 	t.Run("concurrent registration", func(t *testing.T) {
-		cr := newCertRegistry()
+		cr := newCertUsageTracker()
 		var wg sync.WaitGroup
 
 		// Register 100 APIs concurrently
@@ -357,7 +355,7 @@ func TestCertRegistry_ConcurrentAccess(t *testing.T) {
 	})
 
 	t.Run("concurrent reads and writes", func(t *testing.T) {
-		cr := newCertRegistry()
+		cr := newCertUsageTracker()
 		var wg sync.WaitGroup
 
 		// Pre-register some certificates
@@ -396,7 +394,7 @@ func TestCertRegistry_ConcurrentAccess(t *testing.T) {
 	})
 
 	t.Run("concurrent reset and register", func(t *testing.T) {
-		cr := newCertRegistry()
+		cr := newCertUsageTracker()
 		var wg sync.WaitGroup
 
 		// Pre-register some certificates

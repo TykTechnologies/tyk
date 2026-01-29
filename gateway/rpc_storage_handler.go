@@ -1162,14 +1162,14 @@ func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string, orgId string) 
 		// Only filter if feature enabled in RPC mode (backward compatible)
 		if r.Gw.GetConfig().SlaveOptions.UseRPC &&
 			r.Gw.GetConfig().SlaveOptions.SyncUsedCertsOnly {
-			if r.Gw.certRegistry != nil && !r.Gw.certRegistry.Required(certId) {
+			if r.Gw.certUsageTracker != nil && !r.Gw.certUsageTracker.Required(certId) {
 				log.WithField("cert_id", maskCertID(certId)).
 					Debug("skipping certificate - not used by loaded APIs")
 				continue
 			}
 
-			if r.Gw.certRegistry != nil {
-				apis := r.Gw.certRegistry.APIs(certId)
+			if r.Gw.certUsageTracker != nil {
+				apis := r.Gw.certUsageTracker.APIs(certId)
 				log.WithFields(logrus.Fields{
 					"cert_id": maskCertID(certId),
 					"apis":    apis,

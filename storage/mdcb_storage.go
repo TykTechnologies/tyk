@@ -9,8 +9,8 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-// certUsageRegistry tracks which certificates are used by which APIs.
-type certUsageRegistry interface {
+// certUsageTracker tracks which certificates are used by which APIs.
+type certUsageTracker interface {
 	Required(certID string) bool
 	APIs(certID string) []string
 }
@@ -20,7 +20,7 @@ type MdcbStorage struct {
 	rpc           Handler
 	logger        *logrus.Entry
 	OnRPCCertPull func(key string, val string) error
-	certUsage     certUsageRegistry
+	certUsage     certUsageTracker
 	config        *config.Config
 }
 
@@ -31,7 +31,7 @@ const (
 	resourceKey         = "Key"
 )
 
-func NewMdcbStorage(local, rpc Handler, log *logrus.Entry, OnRPCCertPull func(key string, val string) error, certUsage certUsageRegistry, cfg *config.Config) *MdcbStorage {
+func NewMdcbStorage(local, rpc Handler, log *logrus.Entry, OnRPCCertPull func(key string, val string) error, certUsage certUsageTracker, cfg *config.Config) *MdcbStorage {
 	return &MdcbStorage{
 		local:         local,
 		rpc:           rpc,
@@ -96,7 +96,7 @@ func extractCertID(key string) string {
 	}
 	// The key format is "raw-{orgID}{certID}" but we can't reliably separate them
 	// So we return the entire string after "raw-" as the cert ID
-	// The certRegistry should be registered with the same format
+	// The certUsageTracker should be registered with the same format
 	return strings.TrimPrefix(key, "raw-")
 }
 
