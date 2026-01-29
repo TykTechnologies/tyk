@@ -19,6 +19,7 @@ import (
 	"github.com/TykTechnologies/tyk/internal/errors"
 	"github.com/TykTechnologies/tyk/internal/graphengine"
 	"github.com/TykTechnologies/tyk/internal/httputil"
+	"github.com/TykTechnologies/tyk/internal/mcp"
 	"github.com/TykTechnologies/tyk/user"
 )
 
@@ -140,7 +141,7 @@ func (a *APISpec) getMatchPathAndMethod(r *http.Request, mode URLStatus) (string
 		}
 	}
 
-	if a.Proxy.ListenPath != "/" {
+	if a.Proxy.ListenPath != "/" && !mcp.IsPrimitiveVEMPath(matchPath) {
 		matchPath = a.StripListenPath(matchPath)
 	}
 

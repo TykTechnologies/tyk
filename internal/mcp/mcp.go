@@ -4,6 +4,7 @@ package mcp
 import "strings"
 
 // VEM path prefixes for different MCP primitive types.
+// MCP defines three core primitives: Tools, Resources, and Prompts.
 const (
 	ToolPrefix     = "/mcp-tool:"
 	ResourcePrefix = "/mcp-resource:"
