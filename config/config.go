@@ -98,9 +98,17 @@ const (
 	DefaultOTelResourceName = "tyk-gateway"
 )
 
+type PolicySource string
+
+const (
+	PolicySourceService PolicySource = "service"
+	PolicySourceRpc     PolicySource = "rpc"
+	PolicySourceFile    PolicySource = "file"
+)
+
 type PoliciesConfig struct {
 	// Set this value to `file` to look in the file system for a definition file. Set to `service` to use the Dashboard service.
-	PolicySource string `json:"policy_source"`
+	PolicySource PolicySource `json:"policy_source"`
 
 	// This option is required if `policies.policy_source` is set to `service`.
 	// Set this to the URL of your Tyk Dashboard installation. The URL needs to be formatted as: http://dashboard_host:port.

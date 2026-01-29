@@ -3,6 +3,7 @@ package policy_test
 import (
 	"testing"
 
+	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/TykTechnologies/tyk/internal/policy"
@@ -10,7 +11,7 @@ import (
 )
 
 func TestMergeAllowedURLs(t *testing.T) {
-	svc := &policy.Service{}
+	svc := policy.New(nil, nil, logrus.New())
 
 	session := &user.SessionState{}
 	policies := []user.Policy{

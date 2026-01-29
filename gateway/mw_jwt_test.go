@@ -3151,26 +3151,6 @@ func TestJWTRSAInvalidPublickKey(t *testing.T) {
 	})
 }
 
-func createExpiringPolicy(pGen ...func(p *user.Policy)) string {
-	ts := StartTest(nil)
-	defer ts.Close()
-
-	pID := ts.Gw.keyGen.GenerateAuthKey("")
-	pol := CreateStandardPolicy()
-	pol.ID = pID
-	pol.KeyExpiresIn = 1
-
-	if len(pGen) > 0 {
-		pGen[0](pol)
-	}
-
-	ts.Gw.policiesMu.Lock()
-	ts.Gw.policiesByID[pID] = *pol
-	ts.Gw.policiesMu.Unlock()
-
-	return pID
-}
-
 func TestJWTExpOverride(t *testing.T) {
 	test.Flaky(t) // TODO: TT-5257
 
@@ -5166,4 +5146,24 @@ func TestJWTMiddleware_ErrorLogging(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestDeleteJWKCacheByAPIID(t *testing.T) {
+	apiID := "test-api-" + uuid.NewHex()
+
+	// Create and populate a cache
+	jwkCache := loadOrCreateJWKCacheByApiID(apiID)
+	jwkCache.Set("test-key", "test-value", 0)
+
+	// Verify the cache has items before deletion
+	assert.Equal(t, 1, jwkCache.Count())
+
+	deleteJWKCacheByAPIID(apiID)
+
+	// Verify cache is removed from the JWKCaches map
+	_, exists := JWKCaches.Load(apiID)
+	assert.False(t, exists, "cache should be removed from JWKCaches")
+
+	// Verify cache contents are flushed (Close calls Flush)
+	assert.Equal(t, 0, jwkCache.Count(), "cache items should be flushed after Close()")
 }

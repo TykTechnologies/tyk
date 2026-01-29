@@ -524,6 +524,11 @@ func TestRPCStorageHandler_BuildNodeInfo(t *testing.T) {
 				}
 			}
 
+			// Populate LoadedAPIs and LoadedPolicies from actual Gateway state
+			// since policy IDs are auto-generated and cannot be predicted
+			tc.expectedNodeInfo.Stats.LoadedAPIs = ts.Gw.GetLoadedAPIIDs()
+			tc.expectedNodeInfo.Stats.LoadedPolicies = ts.Gw.GetLoadedPolicyIDs()
+
 			expected, err := json.Marshal(tc.expectedNodeInfo)
 			assert.Nil(t, err)
 
@@ -545,6 +550,58 @@ func TestRPCStorageHandler_Disconnect(t *testing.T) {
 		expectedErr := errors.New("RPCStorageHandler: rpc is either down or was not configured")
 		assert.EqualError(t, err, expectedErr.Error())
 	})
+}
+
+func TestRPCStorageHandler_BuildNodeInfo_LoadedResources(t *testing.T) {
+	ts := StartTest(func(globalConf *config.Config) {
+		globalConf.SlaveOptions.GroupID = "group"
+		globalConf.DBAppConfOptions.Tags = []string{"tag1"}
+		globalConf.LivenessCheck.CheckDuration = 1000000000
+	})
+	defer ts.Close()
+
+	ts.Gw.BuildAndLoadAPI(
+		func(spec *APISpec) {
+			spec.APIID = "api-001"
+			spec.UseKeylessAccess = true
+			spec.OrgID = "default"
+			spec.Proxy.ListenPath = "/api1/"
+		},
+		func(spec *APISpec) {
+			spec.APIID = "api-002"
+			spec.UseKeylessAccess = true
+			spec.OrgID = "default"
+			spec.Proxy.ListenPath = "/api2/"
+		},
+	)
+
+	ts.CreatePolicy(func(p *user.Policy) {
+		p.ID = "policy-001"
+	})
+
+	r := &RPCStorageHandler{Gw: ts.Gw}
+	result := r.buildNodeInfo()
+
+	var actualNodeInfo model.NodeData
+	err := json.Unmarshal(result, &actualNodeInfo)
+	assert.NoError(t, err)
+
+	// Verify counts
+	assert.Equal(t, 2, actualNodeInfo.Stats.APIsCount)
+	assert.Equal(t, 1, actualNodeInfo.Stats.PoliciesCount)
+
+	// Verify LoadedAPIs
+	assert.Len(t, actualNodeInfo.Stats.LoadedAPIs, 2)
+	apiIDs := make(map[string]bool)
+	for _, api := range actualNodeInfo.Stats.LoadedAPIs {
+		apiIDs[api.APIID] = true
+	}
+	assert.True(t, apiIDs["api-001"], "Expected API ID api-001 not found")
+	assert.True(t, apiIDs["api-002"], "Expected API ID api-002 not found")
+
+	// Verify LoadedPolicies
+	assert.Len(t, actualNodeInfo.Stats.LoadedPolicies, 1)
+	assert.Equal(t, "policy-001", actualNodeInfo.Stats.LoadedPolicies[0].PolicyID)
 }
 
 func TestGetRawKey(t *testing.T) {
