@@ -28,7 +28,7 @@ func TestUpstreamCertificateExpiryInReverseProxy(t *testing.T) {
 		c.ProxySSLInsecureSkipVerify = true
 		c.Security.CertificateExpiryMonitor.WarningThresholdDays = 30
 		c.Security.CertificateExpiryMonitor.CheckCooldownSeconds = 0 // No check cooldown
-		c.Security.CertificateExpiryMonitor.EventCooldownSeconds = 1  // 1 second event cooldown
+		c.Security.CertificateExpiryMonitor.EventCooldownSeconds = 1 // 1 second event cooldown
 	})
 	defer ts.Close()
 
@@ -48,7 +48,9 @@ func TestUpstreamCertificateExpiryInReverseProxy(t *testing.T) {
 	// Create upstream server that requires mTLS
 	upstream := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte(`{"status":"ok"}`))
+		if _, err := w.Write([]byte(`{"status":"ok"}`)); err != nil {
+			// Ignore write errors in test server
+		}
 	}))
 
 	pool := x509.NewCertPool()
