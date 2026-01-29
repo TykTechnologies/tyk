@@ -49,7 +49,7 @@ func TestUpstreamCertificateExpiryInReverseProxy(t *testing.T) {
 	upstream := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		if _, err := w.Write([]byte(`{"status":"ok"}`)); err != nil {
-			// Ignore write errors in test server
+			t.Errorf("Failed to write response in test server: %v", err)
 		}
 	}))
 

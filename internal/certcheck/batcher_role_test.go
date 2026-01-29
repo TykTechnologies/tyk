@@ -263,7 +263,7 @@ func TestCertificateExpiryCheckBatcher_RoleInExpiringSoonEvent(t *testing.T) {
 func TestCertificateExpiryCheckBatcher_RolePreservedThroughCooldowns(t *testing.T) {
 	var eventCount int
 	var lastEventMeta EventCertificateExpiringSoonMeta
-	fireEvent := func(evt event.Event, meta any) {
+	fireEvent := func(_ event.Event, meta any) {
 		eventCount++
 		lastEventMeta = meta.(EventCertificateExpiringSoonMeta)
 	}
@@ -331,7 +331,7 @@ func TestCertificateExpiryCheckBatcher_RolePreservedThroughCooldowns(t *testing.
 // TestCertificateExpiryCheckBatcher_RoleWithCacheErrors tests that role is maintained even when cache operations fail
 func TestCertificateExpiryCheckBatcher_RoleWithCacheErrors(t *testing.T) {
 	var actualEventMeta EventCertificateExpiredMeta
-	fireEvent := func(evt event.Event, meta any) {
+	fireEvent := func(_ event.Event, meta any) {
 		actualEventMeta = meta.(EventCertificateExpiredMeta)
 	}
 
