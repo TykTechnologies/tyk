@@ -11,16 +11,14 @@ import (
 	"strings"
 	"time"
 
-	graphqlinternal "github.com/TykTechnologies/tyk/internal/graphql"
-
 	"github.com/TykTechnologies/tyk-pump/analytics"
-
 	"github.com/TykTechnologies/tyk/apidef"
-	"github.com/TykTechnologies/tyk/internal/httputil"
-
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/ctx"
 	"github.com/TykTechnologies/tyk/header"
+	tykerrors "github.com/TykTechnologies/tyk/internal/errors"
+	graphqlinternal "github.com/TykTechnologies/tyk/internal/graphql"
+	"github.com/TykTechnologies/tyk/internal/httputil"
 	"github.com/TykTechnologies/tyk/internal/otel"
 	"github.com/TykTechnologies/tyk/request"
 	"github.com/TykTechnologies/tyk/user"
@@ -420,6 +418,20 @@ func (s *SuccessHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) *http
 			Upstream: upstreamMs,
 			Gateway:  totalMs - upstreamMs,
 		}
+
+		// Classify 5XX upstream responses for structured access logs.
+		// This must be done here (not in reverse_proxy.go) because reverse_proxy
+		// operates on a copy of the request (logreq), but access logs read from
+		// the original request context.
+		if resp.Response.StatusCode >= 500 {
+			target := r.URL.Host
+			if target == "" && s.Spec.target != nil {
+				target = s.Spec.target.Host
+			}
+			errClass := tykerrors.ClassifyUpstreamResponse(resp.Response.StatusCode, target)
+			ctx.SetErrorClassification(r, errClass)
+		}
+
 		s.RecordHit(r, latency, resp.Response.StatusCode, resp.Response, false)
 		s.RecordAccessLog(r, resp.Response, latency)
 	}
@@ -463,6 +475,20 @@ func (s *SuccessHandler) ServeHTTPWithCache(w http.ResponseWriter, r *http.Reque
 			Upstream: upstreamMs,
 			Gateway:  totalMs - upstreamMs,
 		}
+
+		// Classify 5XX upstream responses for structured access logs.
+		// This must be done here (not in reverse_proxy.go) because reverse_proxy
+		// operates on a copy of the request (logreq), but access logs read from
+		// the original request context.
+		if inRes.Response.StatusCode >= 500 {
+			target := r.URL.Host
+			if target == "" && s.Spec.target != nil {
+				target = s.Spec.target.Host
+			}
+			errClass := tykerrors.ClassifyUpstreamResponse(inRes.Response.StatusCode, target)
+			ctx.SetErrorClassification(r, errClass)
+		}
+
 		s.RecordHit(r, latency, inRes.Response.StatusCode, inRes.Response, false)
 	}
 

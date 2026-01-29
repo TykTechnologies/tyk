@@ -23,6 +23,7 @@ import (
 	"golang.org/x/sync/singleflight"
 
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/ctx"
 	"github.com/TykTechnologies/tyk/header"
 	"github.com/TykTechnologies/tyk/internal/cache"
 	"github.com/TykTechnologies/tyk/internal/event"
@@ -454,9 +455,15 @@ func (t *BaseMiddleware) RecordAccessLog(req *http.Request, resp *http.Response,
 
 	// Set the access log fields
 	accessLog := accesslog.NewRecord()
+	accessLog.WithAPIID(t.Spec.APIID, t.Spec.Name, t.Spec.OrgID)
 	accessLog.WithApiKey(req, hashKeys, gw.obfuscateKey)
 	accessLog.WithRequest(req, latency)
 	accessLog.WithResponse(resp)
+
+	// Add error classification if present (only on error requests)
+	if errClass := ctx.GetErrorClassification(req); errClass != nil {
+		accessLog.WithErrorClassification(errClass)
+	}
 
 	// Only include trace_id when OpenTelemetry is enabled
 	if gwConfig.OpenTelemetry.Enabled {

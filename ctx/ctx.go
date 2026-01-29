@@ -8,6 +8,7 @@ import (
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/apidef/oas"
 	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/internal/errors"
 	"github.com/TykTechnologies/tyk/internal/reflect"
 	"github.com/TykTechnologies/tyk/internal/service/core"
 	"github.com/TykTechnologies/tyk/storage"
@@ -55,6 +56,8 @@ const (
 	SelfLooping
 	// RequestStartTime holds the time when the request entered the middleware chain
 	RequestStartTime
+	// ErrorClassification holds structured error information for access logs
+	ErrorClassification
 )
 
 func ctxSetSession(r *http.Request, s *user.SessionState, scheduleUpdate bool, hashKey bool) {
@@ -150,5 +153,24 @@ func GetOASDefinition(r *http.Request) *oas.OAS {
 		}
 	}
 
+	return nil
+}
+
+// SetErrorClassification sets the error classification for the request context.
+// This is used to store structured error information for access logs.
+func SetErrorClassification(r *http.Request, ec *errors.ErrorClassification) {
+	ctx := r.Context()
+	ctx = context.WithValue(ctx, ErrorClassification, ec)
+	core.SetContext(r, ctx)
+}
+
+// GetErrorClassification retrieves the error classification from the request context.
+// Returns nil if no error classification has been set.
+func GetErrorClassification(r *http.Request) *errors.ErrorClassification {
+	if v := r.Context().Value(ErrorClassification); v != nil {
+		if val, ok := v.(*errors.ErrorClassification); ok {
+			return val
+		}
+	}
 	return nil
 }
