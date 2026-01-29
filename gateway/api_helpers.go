@@ -167,6 +167,62 @@ func copyOASForPersistence(oasObj *oas.OAS) (*oas.OAS, error) {
 	return deepCopyViaJSON(oasObj)
 }
 
+// copyBaseAPIForPersistence creates copies of the API definition and OAS (if applicable) for persistence.
+// It returns the copies and any error encountered during the copy process.
+func copyBaseAPIForPersistence(baseAPI *APISpec) (*apidef.APIDefinition, *oas.OAS, error) {
+	apiDefCopy, err := copyAPIDefForPersistence(baseAPI.APIDefinition)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	var oasCopy *oas.OAS
+	if baseAPI.IsOAS {
+		oasCopy, err = copyOASForPersistence(&baseAPI.OAS)
+		if err != nil {
+			return nil, nil, err
+		}
+	}
+
+	return apiDefCopy, oasCopy, nil
+}
+
+// persistBaseAPI writes the base API to file, handling both OAS and non-OAS cases.
+func (gw *Gateway) persistBaseAPI(fs afero.Fs, apiDefCopy *apidef.APIDefinition, oasCopy *oas.OAS, isOAS bool, apiID string) {
+	if isOAS {
+		if err, _ := gw.writeOASAndAPIDefToFile(fs, apiDefCopy, oasCopy); err != nil {
+			log.WithError(err).Errorf("Error occurred while updating base OAS API with id: %s", apiID)
+		}
+	} else {
+		if err, _ := gw.writeToFile(fs, apiDefCopy, apiID); err != nil {
+			log.WithError(err).Errorf("Error occurred while updating base API with id: %s", apiID)
+		}
+	}
+}
+
+// updateOldDefaultIfNeeded updates the old default child API if needed based on version parameters.
+func (gw *Gateway) updateOldDefaultIfNeeded(
+	versionParams *lib.VersionQueryParameters,
+	baseAPIID string,
+	oldDefaultVersion string,
+	newDefaultVersion string,
+	fs afero.Fs,
+) {
+	setDefault := !versionParams.IsEmpty(lib.SetDefault) && versionParams.Get(lib.SetDefault) == "true"
+	if !oas.ShouldUpdateOldDefaultChild(setDefault, oldDefaultVersion, newDefaultVersion) {
+		return
+	}
+
+	gw.apisMu.RLock()
+	baseAPI := gw.apisByID[baseAPIID]
+	gw.apisMu.RUnlock()
+
+	if baseAPI != nil {
+		if err := gw.updateOldDefaultChildServersGW(oldDefaultVersion, baseAPI, fs); err != nil {
+			log.WithError(err).Warn("Failed to update old default child API servers")
+		}
+	}
+}
+
 func (gw *Gateway) updateBaseAPIWithNewVersion(
 	baseAPIID string,
 	versionParams *lib.VersionQueryParameters,
@@ -189,11 +245,7 @@ func (gw *Gateway) updateBaseAPIWithNewVersion(
 		baseAPI.OAS.Fill(*baseAPI.APIDefinition)
 	}
 
-	apiDefCopy, copyErr := copyAPIDefForPersistence(baseAPI.APIDefinition)
-	var oasCopy *oas.OAS
-	if baseAPI.IsOAS && copyErr == nil {
-		oasCopy, copyErr = copyOASForPersistence(&baseAPI.OAS)
-	}
+	apiDefCopy, oasCopy, copyErr := copyBaseAPIForPersistence(baseAPI)
 
 	isOAS := baseAPI.IsOAS
 	apiID := baseAPI.APIID
@@ -206,31 +258,41 @@ func (gw *Gateway) updateBaseAPIWithNewVersion(
 		return copyErr
 	}
 
+	gw.persistBaseAPI(fs, apiDefCopy, oasCopy, isOAS, apiID)
+	gw.updateOldDefaultIfNeeded(versionParams, baseAPIID, oldDefaultVersion, newDefaultVersion, fs)
+
+	return nil
+}
+
+// removeVersionFromDefinition removes an API version from the version definition.
+// If the removed version was the default, it resets the default to the base version name.
+func removeVersionFromDefinition(versionDef *apidef.VersionDefinition, apiID string) {
+	for versionName, versionAPIID := range versionDef.Versions {
+		if apiID == versionAPIID {
+			delete(versionDef.Versions, versionName)
+			if versionDef.Default == versionName {
+				versionDef.Default = versionDef.Name
+			}
+			break
+		}
+	}
+}
+
+// persistBaseAPIWithError writes the base API to file and returns any errors encountered.
+func (gw *Gateway) persistBaseAPIWithError(fs afero.Fs, apiDefCopy *apidef.APIDefinition, oasCopy *oas.OAS, isOAS bool, apiID string) error {
 	if isOAS {
 		err, _ := gw.writeOASAndAPIDefToFile(fs, apiDefCopy, oasCopy)
 		if err != nil {
 			log.WithError(err).Errorf("Error occurred while updating base OAS API with id: %s", apiID)
+			return err
 		}
 	} else {
 		err, _ := gw.writeToFile(fs, apiDefCopy, apiID)
 		if err != nil {
 			log.WithError(err).Errorf("Error occurred while updating base API with id: %s", apiID)
+			return err
 		}
 	}
-
-	setDefault := !versionParams.IsEmpty(lib.SetDefault) && versionParams.Get(lib.SetDefault) == "true"
-	if oas.ShouldUpdateOldDefaultChild(setDefault, oldDefaultVersion, newDefaultVersion) {
-		gw.apisMu.RLock()
-		baseAPI = gw.apisByID[baseAPIID]
-		gw.apisMu.RUnlock()
-
-		if baseAPI != nil {
-			if err := gw.updateOldDefaultChildServersGW(oldDefaultVersion, baseAPI, fs); err != nil {
-				log.WithError(err).Warn("Failed to update old default child API servers")
-			}
-		}
-	}
-
 	return nil
 }
 
@@ -244,25 +306,13 @@ func (gw *Gateway) removeAPIFromBaseVersion(apiID string, baseAPIID string, fs a
 		return errors.New("base API not found")
 	}
 
-	for versionName, versionAPIID := range baseAPI.VersionDefinition.Versions {
-		if apiID == versionAPIID {
-			delete(baseAPI.VersionDefinition.Versions, versionName)
-			if baseAPI.VersionDefinition.Default == versionName {
-				baseAPI.VersionDefinition.Default = baseAPI.VersionDefinition.Name
-			}
-			break
-		}
-	}
+	removeVersionFromDefinition(&baseAPI.VersionDefinition, apiID)
 
 	if baseAPI.IsOAS {
 		baseAPI.OAS.Fill(*baseAPI.APIDefinition)
 	}
 
-	apiDefCopy, copyErr := copyAPIDefForPersistence(baseAPI.APIDefinition)
-	var oasCopy *oas.OAS
-	if baseAPI.IsOAS && copyErr == nil {
-		oasCopy, copyErr = copyOASForPersistence(&baseAPI.OAS)
-	}
+	apiDefCopy, oasCopy, copyErr := copyBaseAPIForPersistence(baseAPI)
 
 	isOAS := baseAPI.IsOAS
 	apiIDStr := baseAPI.APIID
@@ -274,21 +324,7 @@ func (gw *Gateway) removeAPIFromBaseVersion(apiID string, baseAPIID string, fs a
 		return copyErr
 	}
 
-	if isOAS {
-		err, _ := gw.writeOASAndAPIDefToFile(fs, apiDefCopy, oasCopy)
-		if err != nil {
-			log.WithError(err).Errorf("Error occurred while updating base OAS API with id: %s", apiIDStr)
-			return err
-		}
-	} else {
-		err, _ := gw.writeToFile(fs, apiDefCopy, apiIDStr)
-		if err != nil {
-			log.WithError(err).Errorf("Error occurred while updating base API with id: %s", apiIDStr)
-			return err
-		}
-	}
-
-	return nil
+	return gw.persistBaseAPIWithError(fs, apiDefCopy, oasCopy, isOAS, apiIDStr)
 }
 
 func buildSuccessResponse(apiID, action string) (interface{}, int) {

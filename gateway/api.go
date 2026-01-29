@@ -77,6 +77,8 @@ const (
 	// KeyListingWorkerCountCap 350 is based on the average of 10000 keys with minor contingency
 	KeyListingWorkerCountCap      = 350
 	KeyListingWorkerEntriesPerKey = 100
+	errInvalidAPIID               = "Invalid API ID"
+	errInvalidAPIIDFmt            = errInvalidAPIID + " %q: %v"
 )
 
 var (
@@ -1294,8 +1296,8 @@ func (gw *Gateway) handleAddApi(r *http.Request, fs afero.Fs, oasEndpoint bool) 
 	}
 
 	if err := sanitize.ValidatePathComponent(newDef.APIID); err != nil {
-		log.Errorf("Invalid API ID %q: %v", newDef.APIID, err)
-		return apiError("Invalid API ID"), http.StatusBadRequest
+		log.Errorf(errInvalidAPIIDFmt, newDef.APIID, err)
+		return apiError(errInvalidAPIID), http.StatusBadRequest
 	}
 
 	if oasEndpoint {
@@ -1336,8 +1338,8 @@ func (gw *Gateway) handleAddApi(r *http.Request, fs afero.Fs, oasEndpoint bool) 
 
 func (gw *Gateway) handleUpdateApi(apiID string, r *http.Request, fs afero.Fs, oasEndpoint bool) (interface{}, int) {
 	if err := sanitize.ValidatePathComponent(apiID); err != nil {
-		log.Errorf("Invalid API ID %q: %v", apiID, err)
-		return apiError("Invalid API ID"), http.StatusBadRequest
+		log.Errorf(errInvalidAPIIDFmt, apiID, err)
+		return apiError(errInvalidAPIID), http.StatusBadRequest
 	}
 
 	spec := gw.getApiSpec(apiID)
@@ -1459,8 +1461,8 @@ func (gw *Gateway) writeToFile(fs afero.Fs, newDef interface{}, filename string)
 
 func (gw *Gateway) handleDeleteAPI(apiID string) (interface{}, int) {
 	if err := sanitize.ValidatePathComponent(apiID); err != nil {
-		log.Errorf("Invalid API ID %q: %v", apiID, err)
-		return apiError("Invalid API ID"), http.StatusBadRequest
+		log.Errorf(errInvalidAPIIDFmt, apiID, err)
+		return apiError(errInvalidAPIID), http.StatusBadRequest
 	}
 
 	spec := gw.getApiSpec(apiID)

@@ -785,10 +785,12 @@ func TestDeleteAPIFiles(t *testing.T) {
 
 		assert.NoError(t, err)
 
-		exists, _ := afero.Exists(fs, mainFile)
+		exists, err := afero.Exists(fs, mainFile)
+		assert.NoError(t, err)
 		assert.False(t, exists)
 
-		exists, _ = afero.Exists(fs, oasFile)
+		exists, err = afero.Exists(fs, oasFile)
+		assert.NoError(t, err)
 		assert.False(t, exists)
 	})
 
