@@ -94,7 +94,7 @@ func deleteAPIFiles(apiID, suffix, appPath string, fs afero.Fs) error {
 
 func validateSpecExists(spec *APISpec) (interface{}, int) {
 	if spec == nil {
-		return apiError(apidef.ErrAPINotFound.Error()), 404
+		return apiError(apidef.ErrAPINotFound.Error()), http.StatusNotFound
 	}
 	return nil, 0
 }
@@ -102,7 +102,7 @@ func validateSpecExists(spec *APISpec) (interface{}, int) {
 func validateAPIIDMatch(pathAPIID, requestAPIID string) (interface{}, int) {
 	if pathAPIID != "" && requestAPIID != pathAPIID {
 		log.Error("PUT operation on different APIIDs")
-		return apiError("Request APIID does not match that in Definition! For Update operations these must match."), 400
+		return apiError("Request APIID does not match that in Definition! For Update operations these must match."), http.StatusBadRequest
 	}
 	return nil, 0
 }
@@ -129,16 +129,16 @@ func (gw *Gateway) handleGetOASList(filter apiFilterFunc, modePublic bool) (inte
 func (gw *Gateway) handleGetOASByID(apiID string, typeCheck apiTypeCheck) (interface{}, int) {
 	if err := sanitize.ValidatePathComponent(apiID); err != nil {
 		log.Errorf("Invalid API ID %q: %v", apiID, err)
-		return apiStatusMessage{Status: "error", Message: "Invalid API ID"}, http.StatusBadRequest
+		return apiError("Invalid API ID"), http.StatusBadRequest
 	}
 
 	api := gw.getApiSpec(apiID)
 	if api == nil {
-		return apiStatusMessage{Status: "error", Message: "API not found"}, http.StatusNotFound
+		return apiError("API not found"), http.StatusNotFound
 	}
 
 	if err := typeCheck(api); err != nil {
-		return apiStatusMessage{Status: "error", Message: err.Error()}, http.StatusNotFound
+		return apiError(err.Error()), http.StatusNotFound
 	}
 
 	api.OAS.Fill(*api.APIDefinition)
@@ -188,15 +188,7 @@ func copyBaseAPIForPersistence(baseAPI *APISpec) (*apidef.APIDefinition, *oas.OA
 
 // persistBaseAPI writes the base API to file, handling both OAS and non-OAS cases.
 func (gw *Gateway) persistBaseAPI(fs afero.Fs, apiDefCopy *apidef.APIDefinition, oasCopy *oas.OAS, isOAS bool, apiID string) {
-	if isOAS {
-		if err, _ := gw.writeOASAndAPIDefToFile(fs, apiDefCopy, oasCopy); err != nil {
-			log.WithError(err).Errorf("Error occurred while updating base OAS API with id: %s", apiID)
-		}
-	} else {
-		if err, _ := gw.writeToFile(fs, apiDefCopy, apiID); err != nil {
-			log.WithError(err).Errorf("Error occurred while updating base API with id: %s", apiID)
-		}
-	}
+	_ = gw.persistBaseAPIWithError(fs, apiDefCopy, oasCopy, isOAS, apiID)
 }
 
 // updateOldDefaultIfNeeded updates the old default child API if needed based on version parameters.

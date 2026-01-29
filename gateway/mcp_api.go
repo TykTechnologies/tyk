@@ -225,7 +225,7 @@ func (gw *Gateway) mcpUpdateHandler(w http.ResponseWriter, r *http.Request) {
 func (gw *Gateway) handleDeleteMCP(apiID string, fs afero.Fs) (interface{}, int) {
 	if err := sanitize.ValidatePathComponent(apiID); err != nil {
 		log.Errorf("Invalid API ID %q: %v", apiID, err)
-		return apiStatusMessage{Status: "error", Message: "Invalid API ID"}, http.StatusBadRequest
+		return apiError("Invalid API ID"), http.StatusBadRequest
 	}
 
 	spec := gw.getApiSpec(apiID)
@@ -234,12 +234,12 @@ func (gw *Gateway) handleDeleteMCP(apiID string, fs afero.Fs) (interface{}, int)
 	}
 
 	if !spec.IsMCP() {
-		return apiStatusMessage{Status: "error", Message: "API is not an MCP API"}, http.StatusNotFound
+		return apiError("API is not an MCP API"), http.StatusNotFound
 	}
 
 	if err := deleteAPIFiles(apiID, "mcp", gw.GetConfig().AppPath, fs); err != nil {
 		log.Warning("Delete failed: ", err)
-		return apiStatusMessage{Status: "error", Message: errMsgDeleteFailed}, http.StatusInternalServerError
+		return apiError(errMsgDeleteFailed), http.StatusInternalServerError
 	}
 
 	handleBaseVersionCleanup(gw, spec, apiID, fs)
