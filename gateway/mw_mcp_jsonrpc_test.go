@@ -226,7 +226,7 @@ func TestMCPJSONRPCMiddleware_ProcessRequest_ToolsCall_RoutesToVEM(t *testing.T)
 	assert.Nil(t, err)
 	assert.Equal(t, http.StatusOK, code)
 	assert.Equal(t, "/mcp-tool:get-weather", r.URL.Path)
-	assert.True(t, httpctx.IsMCPRouting(r))
+	assert.True(t, httpctx.IsJsonRPCRouting(r))
 
 	rpcData := httpctx.GetJSONRPCRequest(r)
 	require.NotNil(t, rpcData)
@@ -263,7 +263,7 @@ func TestMCPJSONRPCMiddleware_ProcessRequest_ToolsCall_NotFound(t *testing.T) {
 	assert.Nil(t, err)
 	assert.Equal(t, http.StatusOK, code)
 	assert.Equal(t, "/", r.URL.Path)
-	assert.False(t, httpctx.IsMCPRouting(r))
+	assert.False(t, httpctx.IsJsonRPCRouting(r))
 	assert.Nil(t, httpctx.GetJSONRPCRequest(r))
 	assert.Equal(t, 0, w.Body.Len())
 }
@@ -552,7 +552,7 @@ func TestMCPJSONRPCMiddleware_ProcessRequest_DiscoveryPassthrough(t *testing.T) 
 			assert.Equal(t, http.StatusOK, code)
 			// Path should not be rewritten for passthrough
 			assert.Equal(t, "/original-path", r.URL.Path)
-			assert.False(t, httpctx.IsMCPRouting(r))
+			assert.False(t, httpctx.IsJsonRPCRouting(r))
 		})
 	}
 }
@@ -585,7 +585,7 @@ func TestMCPJSONRPCMiddleware_ProcessRequest_NotificationsPassthrough(t *testing
 	assert.Nil(t, err)
 	assert.Equal(t, http.StatusOK, code)
 	assert.Equal(t, "/", r.URL.Path)
-	assert.False(t, httpctx.IsMCPRouting(r))
+	assert.False(t, httpctx.IsJsonRPCRouting(r))
 	assert.Nil(t, httpctx.GetJSONRPCRequest(r))
 	assert.Equal(t, 0, w.Body.Len())
 }
@@ -618,7 +618,7 @@ func TestMCPJSONRPCMiddleware_ProcessRequest_UnmatchedMethodPassthrough(t *testi
 	assert.Nil(t, err)
 	assert.Equal(t, http.StatusOK, code)
 	assert.Equal(t, "/original", r.URL.Path)
-	assert.False(t, httpctx.IsMCPRouting(r))
+	assert.False(t, httpctx.IsJsonRPCRouting(r))
 	assert.Nil(t, httpctx.GetJSONRPCRequest(r))
 	assert.Equal(t, 0, w.Body.Len())
 }

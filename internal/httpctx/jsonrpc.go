@@ -7,7 +7,7 @@ import (
 	"github.com/TykTechnologies/tyk/ctx"
 )
 
-// JSONRPCRequestData holds parsed JSON-RPC request information for MCP routing.
+// JSONRPCRequestData holds parsed JSON-RPC request information for protocol routing (MCP, A2A, etc.).
 type JSONRPCRequestData struct {
 	// Method is the JSON-RPC method name (e.g., "tools/call", "resources/read").
 	Method string
@@ -32,4 +32,19 @@ func SetJSONRPCRequest(r *http.Request, data *JSONRPCRequestData) {
 // Returns nil if no JSON-RPC data has been stored.
 func GetJSONRPCRequest(r *http.Request) *JSONRPCRequestData {
 	return jsonrpcRequestValue.Get(r)
+}
+
+var jsonrpcRoutingValue = NewValue[bool](ctx.JsonRPCRouting)
+
+// SetJsonRPCRouting sets the JSON-RPC routing flag in the request context.
+// This is used by JSON-RPC routers (MCP, A2A, etc.) to indicate that a request
+// is being routed internally to a protocol-specific endpoint.
+func SetJsonRPCRouting(r *http.Request, enabled bool) {
+	jsonrpcRoutingValue.Set(r, enabled)
+}
+
+// IsJsonRPCRouting returns true if the request came via JSON-RPC routing.
+// This is checked by the access control logic to allow internal endpoint access.
+func IsJsonRPCRouting(r *http.Request) bool {
+	return jsonrpcRoutingValue.Get(r)
 }

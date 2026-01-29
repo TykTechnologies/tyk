@@ -16,10 +16,11 @@ import (
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/ctx"
 	"github.com/TykTechnologies/tyk/header"
+	"github.com/TykTechnologies/tyk/internal/agentprotocol"
 	"github.com/TykTechnologies/tyk/internal/errors"
 	"github.com/TykTechnologies/tyk/internal/graphengine"
 	"github.com/TykTechnologies/tyk/internal/httputil"
-	"github.com/TykTechnologies/tyk/internal/mcp"
+	_ "github.com/TykTechnologies/tyk/internal/mcp" // registers MCP VEM prefixes
 	"github.com/TykTechnologies/tyk/user"
 )
 
@@ -141,7 +142,7 @@ func (a *APISpec) getMatchPathAndMethod(r *http.Request, mode URLStatus) (string
 		}
 	}
 
-	if a.Proxy.ListenPath != "/" && !mcp.IsPrimitiveVEMPath(matchPath) {
+	if a.Proxy.ListenPath != "/" && !agentprotocol.IsProtocolVEMPath(matchPath) {
 		matchPath = a.StripListenPath(matchPath)
 	}
 

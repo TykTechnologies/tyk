@@ -20,9 +20,9 @@ import (
 	"github.com/TykTechnologies/tyk/ee/middleware/streams"
 	"github.com/TykTechnologies/tyk/storage/kv"
 
+	"github.com/TykTechnologies/tyk/internal/agentprotocol"
 	"github.com/TykTechnologies/tyk/internal/httpctx"
 	"github.com/TykTechnologies/tyk/internal/httputil"
-	"github.com/TykTechnologies/tyk/internal/mcp"
 
 	"github.com/getkin/kin-openapi/routers/gorillamux"
 
@@ -1564,9 +1564,9 @@ func (a *APISpec) URLAllowedAndIgnored(r *http.Request, rxPaths []URLSpec, white
 		}
 
 		if r.Method == rxPaths[i].Internal.Method && rxPaths[i].Status == Internal &&
-			!ctxLoopingEnabled(r) && !httpctx.IsMCPRouting(r) {
-			// MCP primitive VEMs return 404 to avoid exposing internal-only endpoints.
-			if mcp.IsPrimitiveVEMPath(rxPaths[i].Internal.Path) {
+			!ctxLoopingEnabled(r) && !httpctx.IsJsonRPCRouting(r) {
+			// Protocol VEMs (MCP, A2A, etc.) return 404 to avoid exposing internal-only endpoints.
+			if agentprotocol.IsProtocolVEMPath(rxPaths[i].Internal.Path) {
 				return MCPPrimitiveNotFound, nil
 			}
 			return EndPointNotAllowed, nil

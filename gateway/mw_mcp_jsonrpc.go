@@ -83,7 +83,7 @@ func (m *MCPJSONRPCMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 	}
 
 	// Validate JSON-RPC 2.0 structure
-	if rpcReq.JSONRPC != "2.0" || rpcReq.Method == "" {
+	if rpcReq.JSONRPC != apidef.JsonRPC20 || rpcReq.Method == "" {
 		m.writeJSONRPCError(w, rpcReq.ID, mcp.JSONRPCInvalidRequest, "Invalid Request", nil)
 		return nil, middleware.StatusRespond
 	}
@@ -117,8 +117,8 @@ func (m *MCPJSONRPCMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 		Primitive: primitive,
 	})
 
-	// Enable MCP routing (allows access to internal VEM endpoints)
-	httpctx.SetMCPRouting(r, true)
+	// Enable JSON-RPC routing (allows access to internal VEM endpoints)
+	httpctx.SetJsonRPCRouting(r, true)
 
 	// Set loop level to enable internal routing
 	ctxSetLoopLevel(r, 1)
@@ -269,7 +269,7 @@ func (m *MCPJSONRPCMiddleware) shouldPassthrough(method string) bool {
 // writeJSONRPCError writes a JSON-RPC 2.0 error response.
 func (m *MCPJSONRPCMiddleware) writeJSONRPCError(w http.ResponseWriter, id interface{}, code int, message string, data interface{}) {
 	response := JSONRPCErrorResponse{
-		JSONRPC: "2.0",
+		JSONRPC: apidef.JsonRPC20,
 		Error: JSONRPCError{
 			Code:    code,
 			Message: message,
