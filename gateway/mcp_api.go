@@ -7,7 +7,6 @@ import (
 	"io"
 	"io/ioutil"
 	"net/http"
-	"path/filepath"
 
 	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/gorilla/mux"
@@ -125,19 +124,11 @@ func (gw *Gateway) handleAddMCP(r *http.Request, fs afero.Fs) (interface{}, int)
 		return apiError(err.Error()), errCode
 	}
 
-	if !versionParams.IsEmpty(lib.BaseAPIID) {
-		baseAPIID := versionParams.Get(lib.BaseAPIID)
-		if err := gw.updateBaseAPIWithNewVersion(baseAPIID, versionParams, newDef.APIID, fs); err != nil {
-			log.WithError(err).Error("Failed to update base API")
-			return apiError("Failed to update base API"), http.StatusInternalServerError
-		}
+	if resp, code := handleBaseVersionUpdate(gw, versionParams, newDef.APIID, fs); resp != nil {
+		return resp, code
 	}
 
-	return apiModifyKeySuccess{
-		Key:    newDef.APIID,
-		Status: "ok",
-		Action: "added",
-	}, http.StatusOK
+	return buildSuccessResponse(newDef.APIID, "added")
 }
 
 func (gw *Gateway) handleUpdateMCP(apiID string, r *http.Request, fs afero.Fs) (interface{}, int) {
@@ -152,8 +143,8 @@ func (gw *Gateway) handleUpdateMCP(apiID string, r *http.Request, fs afero.Fs) (
 	}
 
 	spec := gw.getApiSpec(apiID)
-	if spec == nil {
-		return apiError("API not found"), http.StatusNotFound
+	if resp, code := validateSpecExists(spec, apiID); resp != nil {
+		return resp, code
 	}
 
 	if !spec.IsMCP() {
@@ -172,9 +163,8 @@ func (gw *Gateway) handleUpdateMCP(apiID string, r *http.Request, fs afero.Fs) (
 		return *validationErr, http.StatusBadRequest
 	}
 
-	if apiID != "" && newDef.APIID != apiID {
-		log.Error("PUT operation on different APIIDs")
-		return apiError("Request APIID does not match that in Definition! For Update operations these must match."), http.StatusBadRequest
+	if resp, code := validateAPIIDMatch(apiID, newDef.APIID); resp != nil {
+		return resp, code
 	}
 
 	if err := gw.handleOASServersForUpdate(spec, &newDef, &oasObj); err != nil {
@@ -187,11 +177,7 @@ func (gw *Gateway) handleUpdateMCP(apiID string, r *http.Request, fs afero.Fs) (
 		return apiError(err.Error()), errCode
 	}
 
-	return apiModifyKeySuccess{
-		Key:    newDef.APIID,
-		Status: "ok",
-		Action: "modified",
-	}, http.StatusOK
+	return buildSuccessResponse(newDef.APIID, "modified")
 }
 
 func (gw *Gateway) handleGetMCPListOAS() (interface{}, int) {
@@ -243,52 +229,22 @@ func (gw *Gateway) handleDeleteMCP(apiID string, fs afero.Fs) (interface{}, int)
 	}
 
 	spec := gw.getApiSpec(apiID)
-	if spec == nil {
-		return apiStatusMessage{Status: "error", Message: "API not found"}, http.StatusNotFound
+	if resp, code := validateSpecExists(spec, apiID); resp != nil {
+		return resp, code
 	}
 
 	if !spec.IsMCP() {
 		return apiStatusMessage{Status: "error", Message: "API is not an MCP API"}, http.StatusNotFound
 	}
 
-	defFilePath := filepath.Join(gw.GetConfig().AppPath, apiID+".json")
-	defFilePath = filepath.Clean(defFilePath)
-	defMCPFilePath := filepath.Join(gw.GetConfig().AppPath, apiID+"-mcp.json")
-	defMCPFilePath = filepath.Clean(defMCPFilePath)
-
-	if _, err := fs.Stat(defFilePath); err != nil {
-		log.Warning("File does not exist! ", err)
+	if err := deleteAPIFiles(apiID, "mcp", gw.GetConfig().AppPath, fs); err != nil {
+		log.Warning("Delete failed: ", err)
 		return apiStatusMessage{Status: "error", Message: errMsgDeleteFailed}, http.StatusInternalServerError
 	}
 
-	if _, err := fs.Stat(defMCPFilePath); err != nil {
-		log.Warning("MCP file does not exist! ", err)
-		return apiStatusMessage{Status: "error", Message: errMsgDeleteFailed}, http.StatusInternalServerError
-	}
+	handleBaseVersionCleanup(gw, spec, apiID, fs)
 
-	if err := fs.Remove(defFilePath); err != nil {
-		log.WithError(err).Errorf("Failed to delete API file: %s", defFilePath)
-		return apiStatusMessage{Status: "error", Message: errMsgDeleteFailed}, http.StatusInternalServerError
-	}
-	if err := fs.Remove(defMCPFilePath); err != nil {
-		log.WithError(err).Errorf("Failed to delete MCP file: %s", defMCPFilePath)
-		return apiStatusMessage{Status: "error", Message: errMsgDeleteFailed}, http.StatusInternalServerError
-	}
-
-	if spec.VersionDefinition.BaseID != "" {
-		if err := gw.removeAPIFromBaseVersion(apiID, spec.VersionDefinition.BaseID, fs); err != nil {
-			log.WithError(err).Error("Failed to update base API after delete")
-			// Don't fail the delete operation if base API update fails
-		}
-	}
-
-	response := apiModifyKeySuccess{
-		Key:    apiID,
-		Status: "ok",
-		Action: "deleted",
-	}
-
-	return response, http.StatusOK
+	return buildSuccessResponse(apiID, "deleted")
 }
 
 func (gw *Gateway) mcpDeleteHandler(w http.ResponseWriter, r *http.Request) {

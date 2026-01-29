@@ -3,7 +3,9 @@ package gateway
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
+	"path/filepath"
 
 	"github.com/spf13/afero"
 
@@ -63,6 +65,48 @@ func ensureAndValidateAPIID(apiDef *apidef.APIDefinition) (interface{}, int) {
 	return nil, 0
 }
 
+func deleteAPIFiles(apiID, suffix, appPath string, fs afero.Fs) error {
+	defFilePath := filepath.Join(appPath, apiID+".json")
+	defFilePath = filepath.Clean(defFilePath)
+	defOASFilePath := filepath.Join(appPath, apiID+"-"+suffix+".json")
+	defOASFilePath = filepath.Clean(defOASFilePath)
+
+	if _, err := fs.Stat(defFilePath); err != nil {
+		return fmt.Errorf("main API definition file not found: %w", err)
+	}
+
+	if _, err := fs.Stat(defOASFilePath); err != nil {
+		return fmt.Errorf("OAS file not found: %w", err)
+	}
+
+	if err := fs.Remove(defFilePath); err != nil {
+		log.WithError(err).Errorf("Failed to delete API file: %s", defFilePath)
+		return fmt.Errorf("failed to delete main API file: %w", err)
+	}
+
+	if err := fs.Remove(defOASFilePath); err != nil {
+		log.WithError(err).Errorf("Failed to delete OAS file: %s", defOASFilePath)
+		return fmt.Errorf("failed to delete OAS file: %w", err)
+	}
+
+	return nil
+}
+
+func validateSpecExists(spec *APISpec, apiID string) (interface{}, int) {
+	if spec == nil {
+		return apiError(apidef.ErrAPINotFound.Error()), 404
+	}
+	return nil, 0
+}
+
+func validateAPIIDMatch(pathAPIID, requestAPIID string) (interface{}, int) {
+	if pathAPIID != "" && requestAPIID != pathAPIID {
+		log.Error("PUT operation on different APIIDs")
+		return apiError("Request APIID does not match that in Definition! For Update operations these must match."), 400
+	}
+	return nil, 0
+}
+
 func (gw *Gateway) handleGetOASList(filter apiFilterFunc, modePublic bool) (interface{}, int) {
 	gw.apisMu.RLock()
 	defer gw.apisMu.RUnlock()
@@ -101,7 +145,6 @@ func (gw *Gateway) handleGetOASByID(apiID string, typeCheck apiTypeCheck) (inter
 	return &api.OAS, http.StatusOK
 }
 
-// deepCopyViaJSON creates a deep copy of any type using JSON marshaling for safe I/O outside locks.
 func deepCopyViaJSON[T any](src *T) (*T, error) {
 	data, err := json.Marshal(src)
 	if err != nil {
@@ -116,18 +159,14 @@ func deepCopyViaJSON[T any](src *T) (*T, error) {
 	return &copy, nil
 }
 
-// copyAPIDefForPersistence creates a deep copy of an APIDefinition for safe I/O outside locks.
 func copyAPIDefForPersistence(apiDef *apidef.APIDefinition) (*apidef.APIDefinition, error) {
 	return deepCopyViaJSON(apiDef)
 }
 
-// copyOASForPersistence creates a deep copy of an OAS object for safe I/O outside locks.
 func copyOASForPersistence(oasObj *oas.OAS) (*oas.OAS, error) {
 	return deepCopyViaJSON(oasObj)
 }
 
-// updateBaseAPIWithNewVersion updates a base API's version definition when adding a new versioned child API.
-// Minimizes lock duration by performing file I/O outside the lock.
 func (gw *Gateway) updateBaseAPIWithNewVersion(
 	baseAPIID string,
 	versionParams *lib.VersionQueryParameters,
@@ -195,8 +234,6 @@ func (gw *Gateway) updateBaseAPIWithNewVersion(
 	return nil
 }
 
-// removeAPIFromBaseVersion removes a deleted API from its base API's version list.
-// Minimizes lock duration by performing file I/O outside the lock.
 func (gw *Gateway) removeAPIFromBaseVersion(apiID string, baseAPIID string, fs afero.Fs) error {
 	gw.apisMu.Lock()
 
@@ -252,4 +289,31 @@ func (gw *Gateway) removeAPIFromBaseVersion(apiID string, baseAPIID string, fs a
 	}
 
 	return nil
+}
+
+func buildSuccessResponse(apiID, action string) (interface{}, int) {
+	return apiModifyKeySuccess{
+		Key:    apiID,
+		Status: "ok",
+		Action: action,
+	}, http.StatusOK
+}
+
+func handleBaseVersionCleanup(gw *Gateway, spec *APISpec, apiID string, fs afero.Fs) {
+	if spec.VersionDefinition.BaseID != "" {
+		if err := gw.removeAPIFromBaseVersion(apiID, spec.VersionDefinition.BaseID, fs); err != nil {
+			log.WithError(err).Error("Failed to update base API after delete")
+		}
+	}
+}
+
+func handleBaseVersionUpdate(gw *Gateway, versionParams *lib.VersionQueryParameters, newAPIID string, fs afero.Fs) (interface{}, int) {
+	if !versionParams.IsEmpty(lib.BaseAPIID) {
+		baseAPIID := versionParams.Get(lib.BaseAPIID)
+		if err := gw.updateBaseAPIWithNewVersion(baseAPIID, versionParams, newAPIID, fs); err != nil {
+			log.WithError(err).Error("Failed to update base API")
+			return apiError("Failed to update base API"), http.StatusInternalServerError
+		}
+	}
+	return nil, 0
 }

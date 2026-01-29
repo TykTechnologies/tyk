@@ -1328,17 +1328,10 @@ func (gw *Gateway) handleAddApi(r *http.Request, fs afero.Fs, oasEndpoint bool) 
 		baseAPIID := versionParams.Get(lib.BaseAPIID)
 		if err := gw.updateBaseAPIWithNewVersion(baseAPIID, versionParams, newDef.APIID, fs); err != nil {
 			log.WithError(err).Error("Failed to update base API")
-			// Log but don't fail the whole operation
 		}
 	}
 
-	response := apiModifyKeySuccess{
-		Key:    newDef.APIID,
-		Status: "ok",
-		Action: "added",
-	}
-
-	return response, http.StatusOK
+	return buildSuccessResponse(newDef.APIID, "added")
 }
 
 func (gw *Gateway) handleUpdateApi(apiID string, r *http.Request, fs afero.Fs, oasEndpoint bool) (interface{}, int) {
@@ -1348,8 +1341,8 @@ func (gw *Gateway) handleUpdateApi(apiID string, r *http.Request, fs afero.Fs, o
 	}
 
 	spec := gw.getApiSpec(apiID)
-	if spec == nil {
-		return apiError(apidef.ErrAPINotFound.Error()), http.StatusNotFound
+	if resp, code := validateSpecExists(spec, apiID); resp != nil {
+		return resp, code
 	}
 
 	var (
@@ -1380,9 +1373,8 @@ func (gw *Gateway) handleUpdateApi(apiID string, r *http.Request, fs afero.Fs, o
 
 	}
 
-	if apiID != "" && newDef.APIID != apiID {
-		log.Error("PUT operation on different APIIDs")
-		return apiError("Request APIID does not match that in Definition! For Update operations these must match."), http.StatusBadRequest
+	if resp, code := validateAPIIDMatch(apiID, newDef.APIID); resp != nil {
+		return resp, code
 	}
 
 	if validationErr := validateAPIDef(&newDef); validationErr != nil {
@@ -1411,13 +1403,7 @@ func (gw *Gateway) handleUpdateApi(apiID string, r *http.Request, fs afero.Fs, o
 		}
 	}
 
-	response := apiModifyKeySuccess{
-		Key:    newDef.APIID,
-		Status: "ok",
-		Action: "modified",
-	}
-
-	return response, http.StatusOK
+	return buildSuccessResponse(newDef.APIID, "modified")
 }
 
 func (gw *Gateway) writeOASAndAPIDefToFile(fs afero.Fs, apiDef *apidef.APIDefinition, oasObj *oas.OAS) (err error, errCode int) {
@@ -1478,53 +1464,34 @@ func (gw *Gateway) handleDeleteAPI(apiID string) (interface{}, int) {
 	}
 
 	spec := gw.getApiSpec(apiID)
-	if spec == nil {
-		return apiError(apidef.ErrAPINotFound.Error()), http.StatusNotFound
+	if resp, code := validateSpecExists(spec, apiID); resp != nil {
+		return resp, code
 	}
 
-	// Generate a filename
-	defFilePath := filepath.Join(gw.GetConfig().AppPath, apiID+".json")
-	defFilePath = filepath.Clean(defFilePath)
-	defOASFilePath := filepath.Join(gw.GetConfig().AppPath, apiID+"-oas.json")
-	defOASFilePath = filepath.Clean(defOASFilePath)
+	fs := afero.NewOsFs()
 
-	// If it exists, delete it
-	if _, err := os.Stat(defFilePath); err != nil {
-		log.Warning("File does not exist! ", err)
-		return apiError("Delete failed"), http.StatusInternalServerError
-	}
-
-	if _, err := os.Stat(defFilePath); spec.IsOAS && err != nil {
-		log.Warning("File does not exist! ", err)
-		return apiError("Delete failed"), http.StatusInternalServerError
-	}
-
-	if err := os.Remove(defFilePath); err != nil {
-		log.WithError(err).Errorf("Failed to delete API file: %s", defFilePath)
-		return apiError("Delete failed"), http.StatusInternalServerError
-	}
 	if spec.IsOAS {
-		if err := os.Remove(defOASFilePath); err != nil {
-			log.WithError(err).Errorf("Failed to delete OAS file: %s", defOASFilePath)
+		if err := deleteAPIFiles(apiID, "oas", gw.GetConfig().AppPath, fs); err != nil {
+			log.Warning("Delete failed: ", err)
+			return apiError("Delete failed"), http.StatusInternalServerError
+		}
+	} else {
+		defFilePath := filepath.Join(gw.GetConfig().AppPath, apiID+".json")
+		defFilePath = filepath.Clean(defFilePath)
+
+		if _, err := os.Stat(defFilePath); err != nil {
+			log.Warning("File does not exist! ", err)
+			return apiError("Delete failed"), http.StatusInternalServerError
+		}
+
+		if err := os.Remove(defFilePath); err != nil {
+			log.WithError(err).Errorf("Failed to delete API file: %s", defFilePath)
 			return apiError("Delete failed"), http.StatusInternalServerError
 		}
 	}
 
-	if spec.VersionDefinition.BaseID != "" {
-		fs := afero.NewOsFs()
-		if err := gw.removeAPIFromBaseVersion(apiID, spec.VersionDefinition.BaseID, fs); err != nil {
-			log.WithError(err).Error("Failed to update base API after delete")
-			// Don't fail the delete operation if base API update fails
-		}
-	}
-
-	response := apiModifyKeySuccess{
-		Key:    apiID,
-		Status: "ok",
-		Action: "deleted",
-	}
-
-	return response, http.StatusOK
+	handleBaseVersionCleanup(gw, spec, apiID, fs)
+	return buildSuccessResponse(apiID, "deleted")
 }
 
 func (gw *Gateway) polHandler(w http.ResponseWriter, r *http.Request) {

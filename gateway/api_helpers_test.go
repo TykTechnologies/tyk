@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"testing"
@@ -764,5 +765,303 @@ func TestEnsureAndValidateAPIID(t *testing.T) {
 
 		assert.NotNil(t, errResp)
 		assert.Equal(t, http.StatusBadRequest, errCode)
+	})
+}
+
+func TestDeleteAPIFiles(t *testing.T) {
+	t.Run("deletes both main and OAS files successfully", func(t *testing.T) {
+		fs := afero.NewMemMapFs()
+		appPath := "/app"
+		apiID := "test-api"
+		suffix := "oas"
+
+		mainFile := filepath.Join(appPath, apiID+".json")
+		oasFile := filepath.Join(appPath, apiID+"-"+suffix+".json")
+
+		afero.WriteFile(fs, mainFile, []byte("{}"), 0644)
+		afero.WriteFile(fs, oasFile, []byte("{}"), 0644)
+
+		err := deleteAPIFiles(apiID, suffix, appPath, fs)
+
+		assert.NoError(t, err)
+
+		exists, _ := afero.Exists(fs, mainFile)
+		assert.False(t, exists)
+
+		exists, _ = afero.Exists(fs, oasFile)
+		assert.False(t, exists)
+	})
+
+	t.Run("returns error when main file does not exist", func(t *testing.T) {
+		fs := afero.NewMemMapFs()
+		appPath := "/app"
+		apiID := "test-api"
+		suffix := "oas"
+
+		err := deleteAPIFiles(apiID, suffix, appPath, fs)
+
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "main API definition file not found")
+	})
+
+	t.Run("returns error when OAS file does not exist", func(t *testing.T) {
+		fs := afero.NewMemMapFs()
+		appPath := "/app"
+		apiID := "test-api"
+		suffix := "oas"
+
+		mainFile := filepath.Join(appPath, apiID+".json")
+		afero.WriteFile(fs, mainFile, []byte("{}"), 0644)
+
+		err := deleteAPIFiles(apiID, suffix, appPath, fs)
+
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "OAS file not found")
+	})
+
+	t.Run("returns error when main file deletion fails", func(t *testing.T) {
+		fs := &failingFs{
+			Fs:        afero.NewMemMapFs(),
+			failOnOp:  "Remove",
+			failPath:  "test-api.json",
+			failError: assert.AnError,
+		}
+		appPath := "/app"
+		apiID := "test-api"
+		suffix := "oas"
+
+		mainFile := filepath.Join(appPath, apiID+".json")
+		oasFile := filepath.Join(appPath, apiID+"-"+suffix+".json")
+
+		afero.WriteFile(fs, mainFile, []byte("{}"), 0644)
+		afero.WriteFile(fs, oasFile, []byte("{}"), 0644)
+
+		err := deleteAPIFiles(apiID, suffix, appPath, fs)
+
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to delete main API file")
+	})
+
+	t.Run("returns error when OAS file deletion fails", func(t *testing.T) {
+		fs := &failingFs{
+			Fs:        afero.NewMemMapFs(),
+			failOnOp:  "Remove",
+			failPath:  "test-api-oas.json",
+			failError: assert.AnError,
+		}
+		appPath := "/app"
+		apiID := "test-api"
+		suffix := "oas"
+
+		mainFile := filepath.Join(appPath, apiID+".json")
+		oasFile := filepath.Join(appPath, apiID+"-"+suffix+".json")
+
+		afero.WriteFile(fs, mainFile, []byte("{}"), 0644)
+		afero.WriteFile(fs, oasFile, []byte("{}"), 0644)
+
+		err := deleteAPIFiles(apiID, suffix, appPath, fs)
+
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to delete OAS file")
+	})
+}
+
+func TestValidateSpecExists(t *testing.T) {
+	t.Run("returns nil when spec exists", func(t *testing.T) {
+		spec := &APISpec{
+			APIDefinition: &apidef.APIDefinition{
+				APIID: "test-api",
+			},
+		}
+
+		resp, code := validateSpecExists(spec, "test-api")
+
+		assert.Nil(t, resp)
+		assert.Equal(t, 0, code)
+	})
+
+	t.Run("returns error when spec is nil", func(t *testing.T) {
+		resp, code := validateSpecExists(nil, "test-api")
+
+		assert.NotNil(t, resp)
+		assert.Equal(t, 404, code)
+		apiError, ok := resp.(apiStatusMessage)
+		assert.True(t, ok)
+		assert.Equal(t, "error", apiError.Status)
+		assert.Contains(t, apiError.Message, "API not found")
+	})
+}
+
+func TestValidateAPIIDMatch(t *testing.T) {
+	t.Run("returns nil when IDs match", func(t *testing.T) {
+		resp, code := validateAPIIDMatch("api-123", "api-123")
+
+		assert.Nil(t, resp)
+		assert.Equal(t, 0, code)
+	})
+
+	t.Run("returns nil when path APIID is empty", func(t *testing.T) {
+		resp, code := validateAPIIDMatch("", "api-123")
+
+		assert.Nil(t, resp)
+		assert.Equal(t, 0, code)
+	})
+
+	t.Run("returns error when IDs do not match", func(t *testing.T) {
+		resp, code := validateAPIIDMatch("api-123", "api-456")
+
+		assert.NotNil(t, resp)
+		assert.Equal(t, 400, code)
+		apiError, ok := resp.(apiStatusMessage)
+		assert.True(t, ok)
+		assert.Contains(t, apiError.Message, "Request APIID does not match")
+	})
+}
+
+type failingFs struct {
+	afero.Fs
+	failOnOp  string
+	failPath  string
+	failError error
+}
+
+func (f *failingFs) Remove(name string) error {
+	if f.failOnOp == "Remove" && filepath.Base(name) == f.failPath {
+		return f.failError
+	}
+	return f.Fs.Remove(name)
+}
+
+func TestBuildSuccessResponse(t *testing.T) {
+	t.Run("builds added response", func(t *testing.T) {
+		resp, code := buildSuccessResponse("api-123", "added")
+
+		assert.Equal(t, 200, code)
+		success, ok := resp.(apiModifyKeySuccess)
+		assert.True(t, ok)
+		assert.Equal(t, "api-123", success.Key)
+		assert.Equal(t, "ok", success.Status)
+		assert.Equal(t, "added", success.Action)
+	})
+
+	t.Run("builds modified response", func(t *testing.T) {
+		resp, code := buildSuccessResponse("api-456", "modified")
+
+		assert.Equal(t, 200, code)
+		success, ok := resp.(apiModifyKeySuccess)
+		assert.True(t, ok)
+		assert.Equal(t, "api-456", success.Key)
+		assert.Equal(t, "ok", success.Status)
+		assert.Equal(t, "modified", success.Action)
+	})
+
+	t.Run("builds deleted response", func(t *testing.T) {
+		resp, code := buildSuccessResponse("api-789", "deleted")
+
+		assert.Equal(t, 200, code)
+		success, ok := resp.(apiModifyKeySuccess)
+		assert.True(t, ok)
+		assert.Equal(t, "api-789", success.Key)
+		assert.Equal(t, "ok", success.Status)
+		assert.Equal(t, "deleted", success.Action)
+	})
+}
+
+func TestHandleBaseVersionCleanup(t *testing.T) {
+	t.Run("does nothing when baseID is empty", func(t *testing.T) {
+		gw := &Gateway{}
+		spec := &APISpec{
+			APIDefinition: &apidef.APIDefinition{
+				VersionDefinition: apidef.VersionDefinition{
+					BaseID: "",
+				},
+			},
+		}
+		fs := afero.NewMemMapFs()
+
+		handleBaseVersionCleanup(gw, spec, "api-123", fs)
+	})
+
+	t.Run("calls removeAPIFromBaseVersion when baseID exists", func(t *testing.T) {
+		ts := StartTest(nil)
+		defer ts.Close()
+
+		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+			spec.APIID = "base-api"
+			spec.Name = "Base API"
+			spec.VersionDefinition.Name = "v1"
+			spec.VersionDefinition.Versions = map[string]string{
+				"v2": "child-api",
+			}
+		})
+
+		childSpec := &APISpec{
+			APIDefinition: &apidef.APIDefinition{
+				APIID: "child-api",
+				VersionDefinition: apidef.VersionDefinition{
+					BaseID: "base-api",
+				},
+			},
+		}
+
+		fs := afero.NewMemMapFs()
+		baseFile := ts.Gw.GetConfig().AppPath + "/base-api.json"
+		afero.WriteFile(fs, baseFile, []byte(`{"api_id":"base-api"}`), 0644)
+
+		handleBaseVersionCleanup(ts.Gw, childSpec, "child-api", fs)
+	})
+}
+
+func TestHandleBaseVersionUpdate(t *testing.T) {
+	t.Run("returns nil when baseAPIID is empty", func(t *testing.T) {
+		gw := &Gateway{}
+		versionParams := lib.NewVersionQueryParameters(url.Values{})
+		fs := afero.NewMemMapFs()
+
+		resp, code := handleBaseVersionUpdate(gw, versionParams, "new-api", fs)
+
+		assert.Nil(t, resp)
+		assert.Equal(t, 0, code)
+	})
+
+	t.Run("returns error when updateBaseAPIWithNewVersion fails", func(t *testing.T) {
+		gw := &Gateway{}
+		values := url.Values{}
+		values.Set("base_api_id", "non-existent")
+		versionParams := lib.NewVersionQueryParameters(values)
+		fs := afero.NewMemMapFs()
+
+		resp, code := handleBaseVersionUpdate(gw, versionParams, "new-api", fs)
+
+		assert.NotNil(t, resp)
+		assert.Equal(t, 500, code)
+		apiErr, ok := resp.(apiStatusMessage)
+		assert.True(t, ok)
+		assert.Contains(t, apiErr.Message, "Failed to update base API")
+	})
+
+	t.Run("succeeds when base API exists", func(t *testing.T) {
+		ts := StartTest(nil)
+		defer ts.Close()
+
+		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+			spec.APIID = "base-api"
+			spec.Name = "Base API"
+			spec.VersionDefinition.Name = "v1"
+		})
+
+		values := url.Values{}
+		values.Set("base_api_id", "base-api")
+		values.Set("new_version_name", "v2")
+		versionParams := lib.NewVersionQueryParameters(values)
+		fs := afero.NewMemMapFs()
+		
+		baseFile := ts.Gw.GetConfig().AppPath + "/base-api.json"
+		afero.WriteFile(fs, baseFile, []byte(`{"api_id":"base-api"}`), 0644)
+
+		resp, code := handleBaseVersionUpdate(ts.Gw, versionParams, "new-api", fs)
+
+		assert.Nil(t, resp)
+		assert.Equal(t, 0, code)
 	})
 }
