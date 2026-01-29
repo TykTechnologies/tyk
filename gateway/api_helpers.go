@@ -187,10 +187,6 @@ func copyBaseAPIForPersistence(baseAPI *APISpec) (*apidef.APIDefinition, *oas.OA
 }
 
 // persistBaseAPI writes the base API to file, handling both OAS and non-OAS cases.
-func (gw *Gateway) persistBaseAPI(fs afero.Fs, apiDefCopy *apidef.APIDefinition, oasCopy *oas.OAS, isOAS bool, apiID string) {
-	_ = gw.persistBaseAPIWithError(fs, apiDefCopy, oasCopy, isOAS, apiID)
-}
-
 // updateOldDefaultIfNeeded updates the old default child API if needed based on version parameters.
 func (gw *Gateway) updateOldDefaultIfNeeded(
 	versionParams *lib.VersionQueryParameters,
@@ -250,7 +246,9 @@ func (gw *Gateway) updateBaseAPIWithNewVersion(
 		return copyErr
 	}
 
-	gw.persistBaseAPI(fs, apiDefCopy, oasCopy, isOAS, apiID)
+	if err := gw.persistBaseAPIWithError(fs, apiDefCopy, oasCopy, isOAS, apiID); err != nil {
+		return err
+	}
 	gw.updateOldDefaultIfNeeded(versionParams, baseAPIID, oldDefaultVersion, newDefaultVersion, fs)
 
 	return nil
