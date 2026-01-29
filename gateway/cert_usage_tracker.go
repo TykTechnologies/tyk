@@ -9,7 +9,7 @@ type certUsageTracker struct {
 	apis map[string]map[string]struct{} // certID -> set of API IDs using this cert
 }
 
-func newCertUsageTracker() *certUsageTracker {
+func newUsageTracker() *certUsageTracker {
 	return &certUsageTracker{
 		apis: make(map[string]map[string]struct{}),
 	}

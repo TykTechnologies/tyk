@@ -9,19 +9,19 @@ import (
 	"github.com/TykTechnologies/tyk/storage"
 )
 
-// mockCertUsageTracker implements CertUsageTracker for testing
-type mockCertUsageTracker struct {
+// mockUsageTracker implements UsageTracker for testing
+type mockUsageTracker struct {
 	requiredCerts map[string]bool
 }
 
-func (m *mockCertUsageTracker) Required(certID string) bool {
+func (m *mockUsageTracker) Required(certID string) bool {
 	if m.requiredCerts == nil {
 		return false
 	}
 	return m.requiredCerts[certID]
 }
 
-func (m *mockCertUsageTracker) APIs(certID string) []string {
+func (m *mockUsageTracker) APIs(certID string) []string {
 	return nil
 }
 
@@ -48,7 +48,7 @@ func TestCertificateManager_GetRaw_AccessControl(t *testing.T) {
 			secret:        "test",
 			logger:        logger,
 			selectiveSync: true,
-			registry: &mockCertUsageTracker{
+			registry: &mockUsageTracker{
 				requiredCerts: map[string]bool{
 					"cert1": true,
 				},
@@ -70,7 +70,7 @@ func TestCertificateManager_GetRaw_AccessControl(t *testing.T) {
 			secret:        "test",
 			logger:        logger,
 			selectiveSync: true,
-			registry: &mockCertUsageTracker{
+			registry: &mockUsageTracker{
 				requiredCerts: map[string]bool{
 					"cert2": true, // cert1 not in required list
 				},
@@ -114,7 +114,7 @@ func TestCertificateManager_GetRaw_AccessControl(t *testing.T) {
 			secret:        "test",
 			logger:        logger,
 			selectiveSync: true,
-			registry: &mockCertUsageTracker{
+			registry: &mockUsageTracker{
 				requiredCerts: map[string]bool{
 					"cert1": true,
 					"cert3": true,
@@ -140,7 +140,7 @@ func TestCertificateManager_GetRaw_AccessControl(t *testing.T) {
 	})
 }
 
-func TestCertificateManager_SetRegistry(t *testing.T) {
+func TestCertificateManager_SetUsageTracker(t *testing.T) {
 	t.Run("set registry successfully", func(t *testing.T) {
 		storage := storage.NewDummyStorage()
 		logger := logrus.NewEntry(logrus.New())
@@ -150,13 +150,13 @@ func TestCertificateManager_SetRegistry(t *testing.T) {
 			logger:  logger,
 		}
 
-		registry := &mockCertUsageTracker{
+		registry := &mockUsageTracker{
 			requiredCerts: map[string]bool{
 				"cert1": true,
 			},
 		}
 
-		manager.SetRegistry(registry)
+		manager.SetUsageTracker(registry, nil)
 
 		assert.NotNil(t, manager.registry)
 		assert.True(t, manager.selectiveSync)
@@ -171,7 +171,7 @@ func TestCertificateManager_SetRegistry(t *testing.T) {
 			logger:  logger,
 		}
 
-		manager.SetRegistry(nil)
+		manager.SetUsageTracker(nil, nil)
 
 		assert.Nil(t, manager.registry)
 		assert.True(t, manager.selectiveSync)

@@ -15,6 +15,7 @@ import (
 	reflect "reflect"
 
 	certs "github.com/TykTechnologies/tyk/certs"
+	config "github.com/TykTechnologies/tyk/config"
 	gomock "go.uber.org/mock/gomock"
 )
 
@@ -166,14 +167,14 @@ func (mr *MockCertificateManagerMockRecorder) ListRawPublicKey(keyID any) *gomoc
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListRawPublicKey", reflect.TypeOf((*MockCertificateManager)(nil).ListRawPublicKey), keyID)
 }
 
-// SetRegistry mocks base method.
-func (m *MockCertificateManager) SetRegistry(registry certs.CertUsageTracker) {
+// SetUsageTracker mocks base method.
+func (m *MockCertificateManager) SetUsageTracker(registry certs.UsageTracker, cfg *config.Config) {
 	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "SetRegistry", registry)
+	m.ctrl.Call(m, "SetUsageTracker", registry, cfg)
 }
 
-// SetRegistry indicates an expected call of SetRegistry.
-func (mr *MockCertificateManagerMockRecorder) SetRegistry(registry any) *gomock.Call {
+// SetUsageTracker indicates an expected call of SetUsageTracker.
+func (mr *MockCertificateManagerMockRecorder) SetUsageTracker(registry, cfg any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetRegistry", reflect.TypeOf((*MockCertificateManager)(nil).SetRegistry), registry)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetUsageTracker", reflect.TypeOf((*MockCertificateManager)(nil).SetUsageTracker), registry, cfg)
 }

@@ -80,7 +80,7 @@ func (m *mockE2ECertificateManager) CertPool(certIDs []string) *x509.CertPool {
 
 func (m *mockE2ECertificateManager) FlushCache() {}
 
-func (m *mockE2ECertificateManager) SetRegistry(_ certs.CertUsageTracker) {}
+func (m *mockE2ECertificateManager) SetUsageTracker(_ certs.UsageTracker, _ *config.Config) {}
 
 func TestE2E_OAuthFlowWithProxyAndmTLS(t *testing.T) {
 	ts := StartTest(nil)

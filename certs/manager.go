@@ -19,6 +19,7 @@ import (
 
 	"github.com/sirupsen/logrus"
 
+	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/internal/cache"
 	tykcrypto "github.com/TykTechnologies/tyk/internal/crypto"
 	"github.com/TykTechnologies/tyk/storage"
@@ -41,9 +42,10 @@ var (
 
 //go:generate mockgen -destination=./mock/mock.go -package=mock . CertificateManager
 
-// CertUsageTracker defines the interface for certificate requirement tracking
-type CertUsageTracker interface {
+// UsageTracker defines the interface for certificate requirement tracking
+type UsageTracker interface {
 	Required(certID string) bool
+	APIs(certID string) []string
 }
 
 type CertificateManager interface {
@@ -56,7 +58,7 @@ type CertificateManager interface {
 	Delete(certID string, orgID string)
 	CertPool(certIDs []string) *x509.CertPool
 	FlushCache()
-	SetRegistry(registry CertUsageTracker)
+	SetUsageTracker(registry UsageTracker, cfg *config.Config)
 }
 
 type certificateManager struct {
@@ -65,7 +67,7 @@ type certificateManager struct {
 	cache           cache.Repository
 	secret          string
 	migrateCertList bool
-	registry        CertUsageTracker
+	registry        UsageTracker
 	selectiveSync   bool
 }
 
@@ -584,11 +586,18 @@ func (c *certificateManager) GetRaw(certID string) (string, error) {
 	return c.storage.GetKey("raw-" + certID)
 }
 
-// SetRegistry configures the certificate registry for selective sync
-func (c *certificateManager) SetRegistry(registry CertUsageTracker) {
+// SetUsageTracker configures the certificate registry for selective sync
+func (c *certificateManager) SetUsageTracker(registry UsageTracker, cfg *config.Config) {
 	c.logger.Info("Setting certificate registry for selective sync")
 	c.registry = registry
 	c.selectiveSync = true
+
+	// Propagate to underlying MdcbStorage for storage-layer filtering
+	if mdcbStorage, ok := c.storage.(*storage.MdcbStorage); ok {
+		mdcbStorage.SetCertUsageConfig(registry, cfg)
+		c.logger.Info("Storage-layer certificate filtering enabled")
+	}
+
 	c.logger.WithField("selective_sync", c.selectiveSync).Info("Selective sync configured in CertificateManager")
 }
 

@@ -256,7 +256,7 @@ func NewGateway(config config.Config, ctx context.Context) *Gateway {
 
 	// Only create registry in RPC mode
 	if config.SlaveOptions.UseRPC {
-		gw.certUsageTracker = newCertUsageTracker()
+		gw.certUsageTracker = newUsageTracker()
 	}
 
 	return gw
@@ -539,7 +539,8 @@ func (gw *Gateway) setupGlobals() {
 
 		// Wire certificate registry for selective sync
 		if gw.GetConfig().SlaveOptions.SyncUsedCertsOnly && gw.certUsageTracker != nil {
-			gw.CertificateManager.SetRegistry(gw.certUsageTracker)
+			cfg := gw.GetConfig()
+			gw.CertificateManager.SetUsageTracker(gw.certUsageTracker, &cfg)
 		}
 	}
 

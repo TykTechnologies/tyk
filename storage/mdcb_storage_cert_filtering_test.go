@@ -11,19 +11,19 @@ import (
 	"github.com/TykTechnologies/tyk/storage/mock"
 )
 
-// mockCertUsageTracker implements certUsageTracker for testing
-type mockCertUsageTracker struct {
+// mockUsageTracker implements certUsageTracker for testing
+type mockUsageTracker struct {
 	requiredCerts map[string]bool
 }
 
-func (m *mockCertUsageTracker) Required(certID string) bool {
+func (m *mockUsageTracker) Required(certID string) bool {
 	if m.requiredCerts == nil {
 		return false
 	}
 	return m.requiredCerts[certID]
 }
 
-func (m *mockCertUsageTracker) APIs(certID string) []string {
+func (m *mockUsageTracker) APIs(certID string) []string {
 	return nil
 }
 
@@ -68,7 +68,7 @@ func TestMdcbStorage_GetKey_CertificateFiltering(t *testing.T) {
 			},
 		}
 
-		registry := &mockCertUsageTracker{
+		registry := &mockUsageTracker{
 			requiredCerts: map[string]bool{
 				"cert123": true,
 			},
@@ -99,7 +99,7 @@ func TestMdcbStorage_GetKey_CertificateFiltering(t *testing.T) {
 			},
 		}
 
-		registry := &mockCertUsageTracker{
+		registry := &mockUsageTracker{
 			requiredCerts: map[string]bool{
 				"cert456": true, // cert123 not in required list
 			},
@@ -156,7 +156,7 @@ func TestMdcbStorage_GetKey_CertificateFiltering(t *testing.T) {
 			},
 		}
 
-		registry := &mockCertUsageTracker{
+		registry := &mockUsageTracker{
 			requiredCerts: map[string]bool{}, // Empty - no certs required
 		}
 
@@ -186,7 +186,7 @@ func TestMdcbStorage_GetKey_CertificateFiltering(t *testing.T) {
 			},
 		}
 
-		registry := &mockCertUsageTracker{
+		registry := &mockUsageTracker{
 			requiredCerts: map[string]bool{}, // Empty - no certs required
 		}
 

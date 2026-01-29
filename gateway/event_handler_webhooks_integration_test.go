@@ -77,7 +77,7 @@ func (m *mockWebhookCertificateManager) CertPool(certIDs []string) *x509.CertPoo
 
 func (m *mockWebhookCertificateManager) FlushCache() {}
 
-func (m *mockWebhookCertificateManager) SetRegistry(_ certs.CertUsageTracker) {}
+func (m *mockWebhookCertificateManager) SetUsageTracker(_ certs.UsageTracker, _ *config.Config) {}
 
 func TestWebHookHandler_ProxyIntegration(t *testing.T) {
 	ts := StartTest(nil)
