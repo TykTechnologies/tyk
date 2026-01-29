@@ -101,14 +101,14 @@ func (gw *Gateway) handleGetOASByID(apiID string, typeCheck apiTypeCheck) (inter
 	return &api.OAS, http.StatusOK
 }
 
-// copyAPIDefForPersistence creates a deep copy of an APIDefinition for safe I/O outside locks.
-func copyAPIDefForPersistence(apiDef *apidef.APIDefinition) (*apidef.APIDefinition, error) {
-	data, err := json.Marshal(apiDef)
+// deepCopyViaJSON creates a deep copy of any type using JSON marshaling for safe I/O outside locks.
+func deepCopyViaJSON[T any](src *T) (*T, error) {
+	data, err := json.Marshal(src)
 	if err != nil {
 		return nil, err
 	}
 
-	var copy apidef.APIDefinition
+	var copy T
 	if err := json.Unmarshal(data, &copy); err != nil {
 		return nil, err
 	}
@@ -116,19 +116,14 @@ func copyAPIDefForPersistence(apiDef *apidef.APIDefinition) (*apidef.APIDefiniti
 	return &copy, nil
 }
 
+// copyAPIDefForPersistence creates a deep copy of an APIDefinition for safe I/O outside locks.
+func copyAPIDefForPersistence(apiDef *apidef.APIDefinition) (*apidef.APIDefinition, error) {
+	return deepCopyViaJSON(apiDef)
+}
+
 // copyOASForPersistence creates a deep copy of an OAS object for safe I/O outside locks.
 func copyOASForPersistence(oasObj *oas.OAS) (*oas.OAS, error) {
-	data, err := json.Marshal(oasObj)
-	if err != nil {
-		return nil, err
-	}
-
-	var copy oas.OAS
-	if err := json.Unmarshal(data, &copy); err != nil {
-		return nil, err
-	}
-
-	return &copy, nil
+	return deepCopyViaJSON(oasObj)
 }
 
 // updateBaseAPIWithNewVersion updates a base API's version definition when adding a new versioned child API.
