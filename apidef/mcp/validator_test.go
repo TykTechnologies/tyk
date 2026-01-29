@@ -43,10 +43,12 @@ func TestValidateMCPObject(t *testing.T) {
 			URL: "http://upstream.url",
 		},
 		Middleware: &oas.Middleware{
-			McpTools: map[string]*oas.Operation{
+			McpTools: map[string]*oas.MCPPrimitive{
 				"test-tool": {
-					Allow: &oas.Allowance{
-						Enabled: true,
+					Operation: oas.Operation{
+						Allow: &oas.Allowance{
+							Enabled: true,
+						},
 					},
 				},
 			},
@@ -70,10 +72,12 @@ func TestValidateMCPObject(t *testing.T) {
 		mcpWithResources := validOASObject
 		extWithResources := validXTykAPIGateway
 		extWithResources.Middleware = &oas.Middleware{
-			McpResources: map[string]*oas.Operation{
+			McpResources: map[string]*oas.MCPPrimitive{
 				"test-resource": {
-					Allow: &oas.Allowance{
-						Enabled: true,
+					Operation: oas.Operation{
+						Allow: &oas.Allowance{
+							Enabled: true,
+						},
 					},
 				},
 			},
@@ -93,10 +97,12 @@ func TestValidateMCPObject(t *testing.T) {
 		mcpWithPrompts := validOASObject
 		extWithPrompts := validXTykAPIGateway
 		extWithPrompts.Middleware = &oas.Middleware{
-			McpPrompts: map[string]*oas.Operation{
+			McpPrompts: map[string]*oas.MCPPrimitive{
 				"test-prompt": {
-					Allow: &oas.Allowance{
-						Enabled: true,
+					Operation: oas.Operation{
+						Allow: &oas.Allowance{
+							Enabled: true,
+						},
 					},
 				},
 			},
@@ -116,19 +122,25 @@ func TestValidateMCPObject(t *testing.T) {
 		mcpWithAll := validOASObject
 		extWithAll := validXTykAPIGateway
 		extWithAll.Middleware = &oas.Middleware{
-			McpTools: map[string]*oas.Operation{
+			McpTools: map[string]*oas.MCPPrimitive{
 				"tool1": {
-					Allow: &oas.Allowance{Enabled: true},
+					Operation: oas.Operation{
+						Allow: &oas.Allowance{Enabled: true},
+					},
 				},
 			},
-			McpResources: map[string]*oas.Operation{
+			McpResources: map[string]*oas.MCPPrimitive{
 				"resource1": {
-					Allow: &oas.Allowance{Enabled: true},
+					Operation: oas.Operation{
+						Allow: &oas.Allowance{Enabled: true},
+					},
 				},
 			},
-			McpPrompts: map[string]*oas.Operation{
+			McpPrompts: map[string]*oas.MCPPrimitive{
 				"prompt1": {
-					Allow: &oas.Allowance{Enabled: true},
+					Operation: oas.Operation{
+						Allow: &oas.Allowance{Enabled: true},
+					},
 				},
 			},
 		}
