@@ -237,14 +237,14 @@ func TestWithErrorClassification(t *testing.T) {
 		{
 			name: "upstream response includes status",
 			classification: errors.NewErrorClassification(errors.URS, "upstream_response_503").
-				WithSource("ReverseProxy").
+				WithSource("Upstream"). // Upstream responded with error, not a proxy error
 				WithTarget("api.backend.com:443").
 				WithUpstreamStatus(503),
 			expectedFields: logrus.Fields{
 				"prefix":                "access-log",
 				"response_flag":         "URS",
 				"response_code_details": "upstream_response_503",
-				"error_source":          "ReverseProxy",
+				"error_source":          "Upstream",
 				"error_target":          "api.backend.com:443",
 				"upstream_status":       503,
 			},

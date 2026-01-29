@@ -10,7 +10,10 @@ import (
 	"syscall"
 )
 
-const sourceReverseProxy = "ReverseProxy"
+const (
+	sourceReverseProxy = "ReverseProxy"
+	sourceUpstream     = "Upstream"
+)
 
 // ClassifyUpstreamError analyzes an error from an upstream request and returns
 // a structured ErrorClassification. Returns nil if err is nil.
@@ -311,9 +314,10 @@ func ClassifyNoHealthyUpstreamsError(target string) *ErrorClassification {
 }
 
 // ClassifyUpstreamResponse creates an error classification for 5XX upstream responses.
+// Unlike connection errors, the upstream received the request and responded with an error.
 func ClassifyUpstreamResponse(statusCode int, target string) *ErrorClassification {
 	return NewErrorClassification(URS, "upstream_response_5xx").
-		WithSource(sourceReverseProxy).
+		WithSource(sourceUpstream).
 		WithTarget(target).
 		WithUpstreamStatus(statusCode)
 }

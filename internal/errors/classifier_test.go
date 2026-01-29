@@ -383,7 +383,7 @@ func TestClassifyUpstreamResponse(t *testing.T) {
 			require.NotNil(t, result)
 			assert.Equal(t, URS, result.Flag)
 			assert.Equal(t, "upstream_response_5xx", result.Details)
-			assert.Equal(t, "ReverseProxy", result.Source)
+			assert.Equal(t, "Upstream", result.Source) // Upstream responded with error, not a proxy error
 			assert.Equal(t, target, result.Target)
 			assert.Equal(t, tc.statusCode, result.UpstreamStatus)
 		})
