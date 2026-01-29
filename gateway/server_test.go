@@ -20,6 +20,7 @@ import (
 	"github.com/TykTechnologies/storage/persistent/model"
 
 	"github.com/TykTechnologies/tyk/config"
+	internalmodel "github.com/TykTechnologies/tyk/internal/model"
 	"github.com/TykTechnologies/tyk/internal/netutil"
 	"github.com/TykTechnologies/tyk/internal/otel"
 	"github.com/TykTechnologies/tyk/internal/policy"
@@ -166,7 +167,7 @@ func TestGateway_policiesByIDLen(t *testing.T) {
 				})
 			}
 
-			actual := ts.Gw.PolicyCount()
+			actual := ts.Gw.policies.PolicyCount()
 
 			assert.Equal(t, tc.expected, actual)
 		})
@@ -1086,15 +1087,14 @@ func TestLoadPoliciesFromRPC(t *testing.T) {
 
 	t.Run("returns policies from rpc", func(t *testing.T) {
 		mid := model.NewObjectID()
+		orgId := "org123"
 
 		var policies = []user.Policy{
-			{MID: mid},
+			{MID: mid, OrgID: orgId},
 		}
 
 		marshaledPolicies, err := json.Marshal(policies)
 		assert.NoError(t, err)
-
-		orgId := "org123"
 
 		store := policy.NewMockRPCDataLoader(gomock.NewController(t))
 		store.EXPECT().Connect().Return(true)
@@ -1104,7 +1104,9 @@ func TestLoadPoliciesFromRPC(t *testing.T) {
 		assert.NoError(t, err)
 
 		assert.Len(t, respondedPolicies, 1, "returns one policy like returned store")
-		assert.Equal(t, mid.Hex(), respondedPolicies[mid.Hex()].ID, "ensures ID from MID ID is empty") // temporary solution can be removed in a while
+		ts.Gw.policies.Reload(respondedPolicies...)
+		_, ok := ts.Gw.policies.PolicyByID(internalmodel.NewScopedCustomPolicyId(orgId, mid.Hex()))
+		assert.True(t, ok, "adds missing information")
 	})
 
 	t.Run("returns error if invalid policy received from rpc storage", func(t *testing.T) {
