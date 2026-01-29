@@ -22,6 +22,10 @@ type (
 	HostDetails = apidef.HostDetails
 	NodeData    = apidef.NodeData
 	GWStats     = apidef.GWStats
+
+	// Loaded resource info types
+	LoadedAPIInfo    = apidef.LoadedAPIInfo
+	LoadedPolicyInfo = apidef.LoadedPolicyInfo
 )
 
 // Other.

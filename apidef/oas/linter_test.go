@@ -14,6 +14,59 @@ import (
 	"github.com/TykTechnologies/tyk/internal/time"
 )
 
+// fixSingleOperation fixes a single operation's fields to pass schema validation.
+// This is needed because Fill() populates fields with random test data that may not
+// conform to schema constraints (e.g., duration formats, enum values).
+func fixSingleOperation(op *Operation) {
+	if op.TransformRequestBody != nil {
+		op.TransformRequestBody.Format = "json"
+	}
+	if op.TransformResponseBody != nil {
+		op.TransformResponseBody.Format = "json"
+	}
+	if op.RateLimit != nil {
+		op.RateLimit.Per = ReadableDuration(time.Minute)
+	}
+	if op.URLRewrite != nil {
+		triggers := []*URLRewriteTrigger{}
+		for _, cond := range URLRewriteConditions {
+			trigger := &URLRewriteTrigger{
+				Condition: cond,
+				Rules:     []*URLRewriteRule{},
+			}
+			for _, in := range URLRewriteInputs {
+				var rule URLRewriteRule
+				if in == InputRequestBody {
+					rule = URLRewriteRule{
+						In:      in,
+						Pattern: ".*",
+					}
+				} else {
+					rule = URLRewriteRule{
+						In:      in,
+						Name:    "test",
+						Pattern: ".*",
+					}
+				}
+
+				trigger.Rules = append(trigger.Rules, &rule)
+			}
+			triggers = append(triggers, trigger)
+		}
+		op.URLRewrite.Triggers = triggers
+	}
+	if op.CircuitBreaker != nil {
+		op.CircuitBreaker.Threshold = 0.5
+	}
+}
+
+// fixOperationsForValidation fixes operation fields in an Operations map to pass schema validation.
+func fixOperationsForValidation(operations map[string]*Operation) {
+	for _, op := range operations {
+		fixSingleOperation(op)
+	}
+}
+
 func TestXTykGateway_Lint(t *testing.T) {
 	var err error
 
@@ -21,49 +74,12 @@ func TestXTykGateway_Lint(t *testing.T) {
 	settings := XTykAPIGateway{}
 	securityScheme := &Basic{}
 
-	Fill(t, &settings, 0)
+	FillWithContext(t, &settings, 0, FillContextOAS)
 	Fill(t, &securityScheme, 0)
 	{
 		settings.Middleware.Global.PluginConfig.Driver = "goplugin"
-		for _, op := range settings.Middleware.Operations {
-			if op.TransformRequestBody != nil {
-				op.TransformRequestBody.Format = "json"
-			}
-			if op.TransformResponseBody != nil {
-				op.TransformResponseBody.Format = "json"
-			}
-			if op.RateLimit != nil {
-				op.RateLimit.Per = ReadableDuration(time.Minute)
-			}
-			if op.URLRewrite != nil {
-				triggers := []*URLRewriteTrigger{}
-				for _, cond := range URLRewriteConditions {
-					trigger := &URLRewriteTrigger{
-						Condition: cond,
-						Rules:     []*URLRewriteRule{},
-					}
-					for _, in := range URLRewriteInputs {
-						var rule URLRewriteRule
-						if in == InputRequestBody {
-							rule = URLRewriteRule{
-								In:      in,
-								Pattern: ".*",
-							}
-						} else {
-							rule = URLRewriteRule{
-								In:      in,
-								Name:    "test",
-								Pattern: ".*",
-							}
-						}
+		fixOperationsForValidation(settings.Middleware.Operations)
 
-						trigger.Rules = append(trigger.Rules, &rule)
-					}
-					triggers = append(triggers, trigger)
-				}
-				op.URLRewrite.Triggers = triggers
-			}
-		}
 		settings.Server.Authentication.BaseIdentityProvider = ""
 		settings.Server.Authentication.SecurityProcessingMode = SecurityProcessingModeLegacy
 		settings.Server.Authentication.Custom.Config.IDExtractor.Source = "body"
@@ -78,10 +94,6 @@ func TestXTykGateway_Lint(t *testing.T) {
 			settings.Server.EventHandlers[i].Webhook.Method = http.MethodPost
 			settings.Server.EventHandlers[i].Trigger = event.QuotaExceeded
 			settings.Server.EventHandlers[i].Webhook.CoolDownPeriod = ReadableDuration(time.Second * 20)
-		}
-
-		for idx := range settings.Middleware.Operations {
-			settings.Middleware.Operations[idx].CircuitBreaker.Threshold = 0.5
 		}
 
 		settings.Upstream.RateLimit.Per = ReadableDuration(10 * time.Second)

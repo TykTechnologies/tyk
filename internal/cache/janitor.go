@@ -1,20 +1,22 @@
 package cache
 
 import (
+	"sync"
 	"time"
 )
 
 // Janitor is responsible for performing periodic cleanup operations.
 type Janitor struct {
 	Interval time.Duration
-	stop     chan bool
+	stop     chan struct{}
+	once     sync.Once
 }
 
 // NewJanitor returns a new Janitor that performs cleanup at the specified interval.
 func NewJanitor(interval time.Duration, cleanup func()) *Janitor {
 	janitor := &Janitor{
 		Interval: interval,
-		stop:     make(chan bool, 1),
+		stop:     make(chan struct{}),
 	}
 
 	go janitor.Run(cleanup)
@@ -32,13 +34,15 @@ func (j *Janitor) Run(cleanup func()) {
 		case <-ticker.C:
 			cleanup()
 		case <-j.stop:
-			close(j.stop)
 			return
 		}
 	}
 }
 
 // Close stops the janitor from performing further cleanup operations.
+// It is safe to call Close multiple times.
 func (j *Janitor) Close() {
-	j.stop <- true
+	j.once.Do(func() {
+		close(j.stop)
+	})
 }
