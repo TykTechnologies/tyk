@@ -58,10 +58,10 @@ import (
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/apidef/oas"
 	"github.com/TykTechnologies/tyk/certs"
-	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/ctx"
 	"github.com/TykTechnologies/tyk/header"
 	"github.com/TykTechnologies/tyk/internal/httpctx"
+	"github.com/TykTechnologies/tyk/internal/model"
 	"github.com/TykTechnologies/tyk/internal/osutil"
 	"github.com/TykTechnologies/tyk/internal/otel"
 	"github.com/TykTechnologies/tyk/internal/redis"
@@ -294,12 +294,14 @@ func (gw *Gateway) getApisIdsForOrg(orgID string) []string {
 	return result
 }
 
-func (gw *Gateway) checkAndApplyTrialPeriod(keyName string, newSession *user.SessionState, isHashed bool) {
+func (gw *Gateway) checkAndApplyTrialPeriod(
+	keyName string,
+	newSession *user.SessionState,
+	isHashed bool,
+) {
 	// Check the policies to see if we are forcing an expiry on the key
 	for _, polID := range newSession.PolicyIDs() {
-		gw.policiesMu.RLock()
-		policy, ok := gw.policiesByID[polID]
-		gw.policiesMu.RUnlock()
+		policy, ok := gw.policies.PolicyByID(model.NewScopedCustomPolicyId(newSession.OrgID, polID))
 		if !ok {
 			continue
 		}
@@ -1065,7 +1067,7 @@ func (gw *Gateway) handleRemoveSortedSetRange(keyName, scoreFrom, scoreTo string
 }
 
 func (gw *Gateway) handleGetPolicy(polID string) (interface{}, int) {
-	if pol, ok := gw.PolicyByID(polID); ok && pol.ID != "" {
+	if pol, ok := gw.policies.PolicyByID(model.NonScopedLastInsertedPolicyId(polID)); ok && pol.ID != "" {
 		return pol, http.StatusOK
 	}
 
@@ -1077,15 +1079,7 @@ func (gw *Gateway) handleGetPolicy(polID string) (interface{}, int) {
 }
 
 func (gw *Gateway) handleGetPolicyList() (interface{}, int) {
-	gw.policiesMu.RLock()
-	defer gw.policiesMu.RUnlock()
-	polIDList := make([]user.Policy, len(gw.policiesByID))
-	c := 0
-	for _, pol := range gw.policiesByID {
-		polIDList[c] = pol
-		c++
-	}
-	return polIDList, http.StatusOK
+	return gw.policies.AsSlice(), http.StatusOK
 }
 
 func (gw *Gateway) newPolicyPathRoot() (*osutil.Root, error) {
@@ -1115,7 +1109,7 @@ func (gw *Gateway) handleAddOrUpdatePolicy(polID string, r *http.Request) (inter
 		return apiError("Request ID does not match that in policy! For Update operations these must match."), http.StatusBadRequest
 	}
 
-	if !ensurePolicyId(newPol) {
+	if !model.EnsurePolicyId(newPol) {
 		const errMsg = "Unable to create policy without id."
 		log.Error(errMsg)
 		return apiError(errMsg), http.StatusBadRequest
@@ -1911,10 +1905,11 @@ func (gw *Gateway) policyUpdateHandler(w http.ResponseWriter, r *http.Request) {
 
 func (gw *Gateway) handleUpdateHashedKey(keyName string, applyPolicies []string) (interface{}, int) {
 	var orgID string
+
 	if len(applyPolicies) != 0 {
-		gw.policiesMu.RLock()
-		orgID = gw.policiesByID[applyPolicies[0]].OrgID
-		gw.policiesMu.RUnlock()
+		if pol, ok := gw.policies.PolicyByID(model.NonScopedLastInsertedPolicyId(applyPolicies[0])); ok {
+			orgID = pol.OrgID
+		}
 	}
 
 	sess, ok := gw.GlobalSessionManager.SessionDetail(orgID, keyName, true)
@@ -2422,9 +2417,7 @@ func (gw *Gateway) createOauthClient(w http.ResponseWriter, r *http.Request) {
 		}
 	} else {
 		// set client for all APIs from the given policy
-		gw.policiesMu.RLock()
-		policy, ok := gw.policiesByID[newClient.PolicyID]
-		gw.policiesMu.RUnlock()
+		policy, ok := gw.policies.PolicyByID(model.NonScopedLastInsertedPolicyId(newClient.PolicyID))
 		if !ok {
 			log.WithFields(logrus.Fields{
 				"prefix":   "api",
@@ -2589,9 +2582,7 @@ func (gw *Gateway) updateOauthClient(keyName, apiID string, r *http.Request) (in
 
 	// check policy
 	if updateClientData.PolicyID != "" {
-		gw.policiesMu.RLock()
-		policy, ok := gw.policiesByID[updateClientData.PolicyID]
-		gw.policiesMu.RUnlock()
+		policy, ok := gw.policies.PolicyByID(model.NewScopedCustomPolicyId(apiSpec.OrgID, updateClientData.PolicyID))
 		if !ok {
 			return apiError("Policy doesn't exist"), http.StatusNotFound
 		}
@@ -3686,14 +3677,4 @@ func validateAPIDef(apiDef *apidef.APIDefinition) *apiStatusMessage {
 	}
 
 	return nil
-}
-
-func updateOASServers(spec *APISpec, conf config.Config, apiDef *apidef.APIDefinition, oasObj *oas.OAS) {
-	var oldAPIURL string
-	if spec != nil && spec.OAS.Servers != nil {
-		oldAPIURL = spec.OAS.Servers[0].URL
-	}
-
-	newAPIURL := getAPIURL(*apiDef, conf)
-	oasObj.UpdateServers(newAPIURL, oldAPIURL)
 }

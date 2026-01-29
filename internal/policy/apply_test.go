@@ -12,6 +12,8 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/TykTechnologies/graphql-go-tools/pkg/graphql"
+
+	"github.com/TykTechnologies/tyk/internal/model"
 	"github.com/TykTechnologies/tyk/internal/policy"
 	"github.com/TykTechnologies/tyk/user"
 )
@@ -119,7 +121,7 @@ func TestApplyRateLimits_PolicyLimits(t *testing.T) {
 }
 
 func TestApplyRateLimits_FromCustomPolicies(t *testing.T) {
-	svc := &policy.Service{}
+	svc := policy.New(nil, nil, logrus.StandardLogger())
 
 	session := &user.SessionState{}
 	session.SetCustomPolicies([]user.Policy{
@@ -147,7 +149,7 @@ func TestApplyRateLimits_FromCustomPolicies(t *testing.T) {
 }
 
 func TestApplyACL_FromCustomPolicies(t *testing.T) {
-	svc := &policy.Service{}
+	svc := policy.New(nil, nil, logrus.StandardLogger())
 
 	pol1 := user.Policy{
 		ID:         "pol1",
@@ -753,7 +755,7 @@ func testPrepareApplyPolicies(tb testing.TB) (*policy.Service, []testApplyPolici
 					},
 				}
 
-				gotPolicy, ok := store.PolicyByID("per-path2")
+				gotPolicy, ok := store.PolicyByID(model.NewScopedCustomPolicyId(orgID, "per-path2"))
 
 				assert.True(t, ok)
 				assert.Equal(t, user.AccessSpec{

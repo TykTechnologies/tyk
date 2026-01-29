@@ -26,6 +26,7 @@ import (
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/apidef/oas"
 	"github.com/TykTechnologies/tyk/internal/cache"
+	"github.com/TykTechnologies/tyk/internal/model"
 	"github.com/TykTechnologies/tyk/internal/otel"
 	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/user"
@@ -819,9 +820,7 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 		var policy user.Policy
 		var ok bool
 		if basePolicyID != "" {
-			k.Gw.policiesMu.RLock()
-			policy, ok = k.Gw.policiesByID[basePolicyID]
-			k.Gw.policiesMu.RUnlock()
+			policy, ok = k.Gw.policies.PolicyByID(model.NewScopedCustomPolicyId(k.Spec.OrgID, basePolicyID))
 			if !ok {
 				k.reportLoginFailure(baseFieldData, r)
 				k.Logger().Error("Policy ID found is invalid!")
@@ -1435,9 +1434,15 @@ func ctxSetJWTContextVars(s *APISpec, r *http.Request, token *jwt.Token) {
 }
 
 func (gw *Gateway) generateSessionFromPolicy(policyID, orgID string, enforceOrg bool) (user.SessionState, error) {
-	gw.policiesMu.RLock()
-	policy, ok := gw.policiesByID[policyID]
-	gw.policiesMu.RUnlock()
+	var polId model.PolicyID
+
+	if enforceOrg {
+		polId = model.NewScopedCustomPolicyId(orgID, policyID)
+	} else {
+		polId = model.NonScopedLastInsertedPolicyId(policyID)
+	}
+
+	policy, ok := gw.policies.PolicyByID(polId)
 	session := user.SessionState{}
 
 	if !ok {
@@ -1445,7 +1450,6 @@ func (gw *Gateway) generateSessionFromPolicy(policyID, orgID string, enforceOrg 
 	}
 	// Check ownership, policy org owner must be the same as API,
 	// otherwise you could overwrite a session key with a policy from a different org!
-
 	if enforceOrg {
 		if policy.OrgID != orgID {
 			log.Error("Attempting to apply policy from different organisation to key, skipping")

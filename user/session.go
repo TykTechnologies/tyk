@@ -3,6 +3,8 @@ package user
 import (
 	"crypto/md5"
 	"fmt"
+	"maps"
+	"slices"
 	"sort"
 	"strings"
 	"time"
@@ -370,66 +372,13 @@ func (s *SessionState) IsModified() bool {
 func (s SessionState) Clone() SessionState {
 	// Simple vales are cloned by value
 	newSession := s
-	newSession.AccessRights = cloneAccess(s.AccessRights)
-	newSession.OauthKeys = cloneKeys(s.OauthKeys)
-	newSession.ApplyPolicies = cloneSlice(s.ApplyPolicies)
-	newSession.MetaData = cloneMetadata(s.MetaData)
-	newSession.Tags = cloneSlice(s.Tags)
+	newSession.AccessRights = maps.Clone(s.AccessRights)
+	newSession.OauthKeys = maps.Clone(s.OauthKeys)
+	newSession.ApplyPolicies = slices.Clone(s.ApplyPolicies)
+	newSession.MetaData = maps.Clone(s.MetaData)
+	newSession.Tags = slices.Clone(s.Tags)
 
 	return newSession
-}
-
-func cloneSlice(s []string) []string {
-	if s == nil {
-		return nil
-	}
-	if len(s) == 0 {
-		return []string{}
-	}
-	x := make([]string, len(s))
-	copy(x, s)
-	return x
-}
-
-func cloneMetadata(m map[string]interface{}) map[string]interface{} {
-	if m == nil {
-		return nil
-	}
-	if len(m) == 0 {
-		return map[string]interface{}{}
-	}
-	x := make(map[string]interface{})
-	for k, v := range m {
-		x[k] = v
-	}
-	return x
-}
-
-func cloneKeys(m map[string]string) map[string]string {
-	if m == nil {
-		return nil
-	}
-	if len(m) == 0 {
-		return map[string]string{}
-	}
-	x := make(map[string]string)
-	for k, v := range m {
-		x[k] = v
-	}
-	return x
-}
-func cloneAccess(m map[string]AccessDefinition) map[string]AccessDefinition {
-	if m == nil {
-		return nil
-	}
-	if len(m) == 0 {
-		return map[string]AccessDefinition{}
-	}
-	x := make(map[string]AccessDefinition)
-	for k, v := range m {
-		x[k] = v
-	}
-	return x
 }
 
 func (s *SessionState) MD5Hash() string {

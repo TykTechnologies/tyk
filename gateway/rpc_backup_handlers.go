@@ -121,7 +121,7 @@ func (gw *Gateway) decompressAPIBackup(decrypted string) (string, error) {
 	return decrypted, nil
 }
 
-func (gw *Gateway) LoadPoliciesFromRPCBackup() (map[string]user.Policy, error) {
+func (gw *Gateway) LoadPoliciesFromRPCBackup() ([]user.Policy, error) {
 	tagList := getTagListAsString(gw.GetConfig().DBAppConfOptions.Tags)
 	checkKey := BackupPolicyKeyBase + tagList
 
