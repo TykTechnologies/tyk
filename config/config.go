@@ -440,12 +440,11 @@ type SlaveOptionsConfig struct {
 
 	// Set to true to sync only certificates used by loaded APIs.
 	// Only applies when use_rpc is true.
+	// Prevents proactive sync of unused certificates from control plane.
+	// Certificates are fetched on-demand via RPC and cached locally.
+	// Note: Certificates accumulate over time as they are used; they are not removed when APIs are deleted.
 	// Reduces memory usage and log noise in segmented deployments.
 	SyncUsedCertsOnly bool `json:"sync_used_certs_only"`
-
-	// Set to true to remove unused certificates on API reload.
-	// Only applies when use_rpc and sync_used_certs_only are both true.
-	CleanupCerts bool `json:"cleanup_certs"`
 }
 
 type LocalSessionCacheConf struct {

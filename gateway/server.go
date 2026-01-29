@@ -625,9 +625,6 @@ func (gw *Gateway) syncAPISpecs() (int, error) {
 	tlsConfigCache.Flush()
 	gw.apisMu.Unlock()
 
-	// Cleanup unused certificates after successful sync
-	gw.cleanupUnusedCerts()
-
 	return apiLen, nil
 }
 
