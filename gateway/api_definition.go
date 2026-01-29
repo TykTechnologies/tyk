@@ -20,6 +20,7 @@ import (
 	"github.com/TykTechnologies/tyk/ee/middleware/streams"
 	"github.com/TykTechnologies/tyk/storage/kv"
 
+	"github.com/TykTechnologies/tyk/internal/httpctx"
 	"github.com/TykTechnologies/tyk/internal/httputil"
 	"github.com/TykTechnologies/tyk/internal/mcp"
 
@@ -1562,12 +1563,16 @@ func (a *APISpec) URLAllowedAndIgnored(r *http.Request, rxPaths []URLSpec, white
 			continue
 		}
 
-		if r.Method == rxPaths[i].Internal.Method && rxPaths[i].Status == Internal && !ctxLoopingEnabled(r) {
-			// MCP primitive VEMs return 404 to avoid exposing internal-only endpoints.
+		if r.Method == rxPaths[i].Internal.Method && rxPaths[i].Status == Internal {
+			// MCP primitive VEMs require explicit MCP routing context.
 			if mcp.IsPrimitiveVEMPath(rxPaths[i].Internal.Path) {
-				return MCPPrimitiveNotFound, nil
+				if !httpctx.IsMCPRouting(r) {
+					return MCPPrimitiveNotFound, nil
+				}
+			} else if !ctxLoopingEnabled(r) {
+				// Other internal endpoints use generic looping check.
+				return EndPointNotAllowed, nil
 			}
-			return EndPointNotAllowed, nil
 		}
 	}
 
@@ -1636,11 +1641,18 @@ func (a *APISpec) URLAllowedAndIgnored(r *http.Request, rxPaths []URLSpec, white
 			switch rxPaths[i].Status {
 			case WhiteList, BlackList, Ignored:
 			default:
-				if rxPaths[i].Status == Internal && r.Method == rxPaths[i].Internal.Method && ctxLoopingEnabled(r) {
-					return a.getURLStatus(rxPaths[i].Status), nil
-				} else {
-					return EndPointNotAllowed, nil
+				if rxPaths[i].Status == Internal && r.Method == rxPaths[i].Internal.Method {
+					// MCP primitive VEMs require explicit MCP routing context.
+					if mcp.IsPrimitiveVEMPath(rxPaths[i].Internal.Path) {
+						if httpctx.IsMCPRouting(r) {
+							return a.getURLStatus(rxPaths[i].Status), nil
+						}
+					} else if ctxLoopingEnabled(r) {
+						// Other internal endpoints use generic looping check.
+						return a.getURLStatus(rxPaths[i].Status), nil
+					}
 				}
+				return EndPointNotAllowed, nil
 			}
 		}
 
