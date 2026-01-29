@@ -93,3 +93,4 @@ ci/tests/specs/policies
 # unknown json files
 /gateway/test.json
 /gateway/child-v1.json
+tyk-operator/
