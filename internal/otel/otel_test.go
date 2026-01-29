@@ -342,3 +342,55 @@ func TestAddTraceID(t *testing.T) {
 		assert.Equal(t, span.SpanContext().TraceID().String(), h)
 	})
 }
+
+// TestExtractTraceID_WithRequest verifies ExtractTraceID correctly extracts
+// trace IDs from request contexts in various scenarios.
+func TestExtractTraceID_WithRequest(t *testing.T) {
+
+	tests := []struct {
+		name          string
+		setupContext  func(provider tyktrace.Provider) (context.Context, tyktrace.Span)
+		expectTraceID bool
+	}{
+		{
+			name: "empty context - no trace ID",
+			setupContext: func(_ tyktrace.Provider) (context.Context, tyktrace.Span) {
+				return context.Background(), nil
+			},
+			expectTraceID: false,
+		},
+		{
+			name: "valid span context - trace ID present",
+			setupContext: func(provider tyktrace.Provider) (context.Context, tyktrace.Span) {
+				ctx := context.Background()
+				_, span := provider.Tracer().Start(ctx, "access-log-test")
+				ctx = ContextWithSpan(ctx, span)
+				return ctx, span
+			},
+			expectTraceID: true,
+		},
+	}
+
+	provider := makeProviderHTTP(t)
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx, span := tc.setupContext(provider)
+			if span != nil {
+				defer span.End()
+			}
+
+			// Test ExtractTraceID directly with request context
+			req := httptest.NewRequest(http.MethodGet, "http://example.com/path", nil)
+			req = req.WithContext(ctx)
+
+			traceID := ExtractTraceID(req.Context())
+			hasTraceID := traceID != ""
+			assert.Equal(t, tc.expectTraceID, hasTraceID)
+
+			if tc.expectTraceID && span != nil {
+				assert.Equal(t, span.SpanContext().TraceID().String(), traceID)
+			}
+		})
+	}
+}

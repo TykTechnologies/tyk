@@ -15,20 +15,20 @@ import (
 	"sync"
 	"time"
 
+	"github.com/go-jose/go-jose/v3"
+	"github.com/golang-jwt/jwt/v4"
 	"github.com/google/go-cmp/cmp"
 	"github.com/gorilla/mux"
+	"github.com/lonelycode/osin"
 	"github.com/ohler55/ojg/jp"
 	"github.com/tidwall/gjson"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/apidef/oas"
+	"github.com/TykTechnologies/tyk/internal/cache"
+	"github.com/TykTechnologies/tyk/internal/otel"
 	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/user"
-	"github.com/go-jose/go-jose/v3"
-	"github.com/golang-jwt/jwt/v4"
-	"github.com/lonelycode/osin"
-
-	"github.com/TykTechnologies/tyk/internal/cache"
 )
 
 type JWTMiddleware struct {
@@ -76,7 +76,8 @@ func (k *JWTMiddleware) Init() {
 		go func() {
 			k.Logger().Debug("Pre-fetching JWKs asynchronously")
 			// Drop the previous cache for the API ID
-			JWKCaches.Delete(k.Spec.APIID)
+			deleteJWKCacheByAPIID(k.Spec.APIID)
+
 			jwkCache := loadOrCreateJWKCacheByApiID(k.Spec.APIID)
 
 			// Create client factory for JWK fetching
@@ -113,8 +114,16 @@ func (k *JWTMiddleware) Unload() {
 	// Init tries to clean the cache for the API ID when it starts
 	spec := k.Gw.getApiSpec(k.Spec.APIID)
 	if spec == nil {
-		// Drop the cache for API ID if it's removed from Tyk
-		JWKCaches.Delete(k.Spec.APIID)
+		// delete the cache from the global map and stop its janitor.
+		deleteJWKCacheByAPIID(k.Spec.APIID)
+	}
+}
+
+func deleteJWKCacheByAPIID(apiID string) {
+	if existing, ok := JWKCaches.LoadAndDelete(apiID); ok {
+		if repo, ok := existing.(cache.Repository); ok {
+			repo.Close()
+		}
 	}
 }
 
@@ -127,10 +136,22 @@ func (k *JWTMiddleware) loadOrCreateJWKCache() cache.Repository {
 }
 
 func loadOrCreateJWKCacheByApiID(apiID string) cache.Repository {
-	raw, _ := JWKCaches.LoadOrStore(apiID, cache.New(240, 30))
+	if raw, ok := JWKCaches.Load(apiID); ok {
+		if jwkCache, ok := raw.(cache.Repository); ok {
+			return jwkCache
+		}
+	}
+
+	newCache := cache.New(240, 30)
+	raw, loaded := JWKCaches.LoadOrStore(apiID, newCache)
+
+	// If another goroutine won the race, close the unused cache
+	if loaded {
+		newCache.Close()
+	}
+
 	jwkCache, ok := raw.(cache.Repository)
 	if !ok {
-		// This should not be possible
 		panic("JWKCache instance must implement cache.Repository")
 	}
 	return jwkCache
@@ -1003,6 +1024,7 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 		if updateSession {
 			k.Gw.SessionCache.Set(session.KeyHash(), session.Clone(), cache.DefaultExpiration)
 		}
+		ctxSetSpanAttributes(r, k.Name(), otel.APIKeyAliasAttribute(session.Alias))
 	}
 	ctxSetJWTContextVars(k.Spec, r, token)
 
@@ -1051,6 +1073,7 @@ func (k *JWTMiddleware) processOneToOneTokenMap(r *http.Request, token *jwt.Toke
 
 	k.Logger().Debug("Raw key ID found.")
 	ctxSetSession(r, &session, false, k.Gw.GetConfig().HashKeys)
+	ctxSetSpanAttributes(r, k.Name(), otel.APIKeyAliasAttribute(session.Alias))
 	ctxSetJWTContextVars(k.Spec, r, token)
 	return nil, http.StatusOK
 }
@@ -1597,15 +1620,8 @@ func getUserIDFromClaim(claims jwt.MapClaims, identityBaseField string, shouldFa
 }
 
 func invalidateJWKSCacheByAPIID(apiID string) {
-	raw, ok := JWKCaches.Load(apiID)
-	if ok {
-		jwkCache, interfaceOK := raw.(cache.Repository)
-		if !interfaceOK {
-			panic("JWKCache must implement cache.Repository")
-		}
-		jwkCache.Flush()
-		mainLog.Debugf("JWKS cache for API: %s has been flushed", apiID)
-	}
+	deleteJWKCacheByAPIID(apiID)
+	mainLog.Debugf("JWKS cache for API: %s has been invalidated", apiID)
 }
 
 func (gw *Gateway) invalidateJWKSCacheForAPIID(w http.ResponseWriter, r *http.Request) {
@@ -1617,7 +1633,13 @@ func (gw *Gateway) invalidateJWKSCacheForAPIID(w http.ResponseWriter, r *http.Re
 }
 
 func (gw *Gateway) invalidateJWKSCacheForAllAPIs(w http.ResponseWriter, _ *http.Request) {
-	JWKCaches.Clear()
+	JWKCaches.Range(func(key, _ any) bool {
+		apiID, ok := key.(string)
+		if ok {
+			deleteJWKCacheByAPIID(apiID)
+		}
+		return true
+	})
 
 	doJSONWrite(w, http.StatusOK, apiOk("cache invalidated"))
 }

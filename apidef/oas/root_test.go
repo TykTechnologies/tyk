@@ -212,10 +212,30 @@ func TestState(t *testing.T) {
 	assert.Equal(t, emptyState, resultState)
 }
 
-// Fill populates the given input with non-default values. Index is where to start incrementing values.
+type FillContext string
+
+const (
+	FillContextOAS FillContext = "oas"
+	FillContextMCP FillContext = "mcp"
+)
+
+var mcpOnlyFields = map[string]bool{
+	"McpTools":     true,
+	"McpResources": true,
+	"McpPrompts":   true,
+}
+
+func FillWithContext(t *testing.T, input interface{}, index int, ctx FillContext) {
+	t.Helper()
+	fillValue(reflect.ValueOf(input).Elem(), index, ctx, t)
+}
+
 func Fill(t *testing.T, input interface{}, index int) {
 	t.Helper()
-	v := reflect.ValueOf(input).Elem()
+	FillWithContext(t, input, index, FillContextMCP)
+}
+
+func fillValue(v reflect.Value, index int, ctx FillContext, t *testing.T) {
 
 	switch kind := v.Type().Kind(); kind {
 	case reflect.String:
@@ -236,7 +256,7 @@ func Fill(t *testing.T, input interface{}, index int) {
 
 			for i := 0; i < 3; i++ {
 				newValue := reflect.New(v.Type().Elem()).Elem()
-				Fill(t, newValue.Addr().Interface(), index+i)
+				fillValue(newValue, index+i, ctx, t)
 				newSlice.Index(i).Set(newValue)
 			}
 
@@ -252,10 +272,10 @@ func Fill(t *testing.T, input interface{}, index int) {
 			newMap := reflect.MakeMapWithSize(v.Type(), 0)
 			for i := 0; i < 3; i++ {
 				newKey := reflect.New(v.Type().Key()).Elem()
-				Fill(t, newKey.Addr().Interface(), index+i)
+				fillValue(newKey, index+i, ctx, t)
 
 				newValue := reflect.New(v.Type().Elem()).Elem()
-				Fill(t, newValue.Addr().Interface(), index+i)
+				fillValue(newValue, index+i, ctx, t)
 
 				newMap.SetMapIndex(newKey, newValue)
 			}
@@ -267,21 +287,33 @@ func Fill(t *testing.T, input interface{}, index int) {
 			v.Set(reflect.ValueOf(FillTestVersionData(t, index)))
 		} else {
 			for i := 0; i < v.NumField(); i++ {
+				field := v.Type().Field(i)
 				fv := v.Field(i)
-				if v.Type().Field(i).Tag.Get("json") == "-" || v.Type().Field(i).Tag.Get("json") == "" {
+				if field.Tag.Get("json") == "-" || field.Tag.Get("json") == "" {
 					continue
 				}
 
-				Fill(t, fv.Addr().Interface(), index+i+1)
+				if shouldSkipField(field, ctx) {
+					continue
+				}
+
+				fillValue(fv, index+i+1, ctx, t)
 			}
 		}
 	case reflect.Ptr:
 		newValue := reflect.New(v.Type().Elem()).Elem()
-		Fill(t, newValue.Addr().Interface(), index)
+		fillValue(newValue, index, ctx, t)
 		v.Set(newValue.Addr())
 	default:
 		t.Fatalf("uncovered kind in API definition: %s", kind.String())
 	}
+}
+
+func shouldSkipField(field reflect.StructField, ctx FillContext) bool {
+	if ctx == FillContextOAS && mcpOnlyFields[field.Name] {
+		return true
+	}
+	return false
 }
 
 // getNonEmptyFields returns non-empty fields inside a struct.
@@ -494,4 +526,46 @@ func TestXTykAPIGateway_enableTrafficLogsIfEmpty(t *testing.T) {
 			assert.EqualExportedValues(t, tc.expect, tc.in)
 		})
 	}
+}
+func TestFillWithContext(t *testing.T) {
+	t.Run("FillContextMCP fills MCP fields", func(t *testing.T) {
+		m := &Middleware{}
+		FillWithContext(t, m, 0, FillContextMCP)
+
+		assert.NotNil(t, m.McpTools)
+		assert.NotNil(t, m.McpResources)
+		assert.NotNil(t, m.McpPrompts)
+		assert.NotNil(t, m.Global)
+	})
+
+	t.Run("FillContextOAS skips MCP fields", func(t *testing.T) {
+		m := &Middleware{}
+		FillWithContext(t, m, 0, FillContextOAS)
+
+		assert.Nil(t, m.McpTools)
+		assert.Nil(t, m.McpResources)
+		assert.Nil(t, m.McpPrompts)
+		assert.NotNil(t, m.Global)
+	})
+
+
+	t.Run("backward compatible Fill uses MCP context", func(t *testing.T) {
+		m := &Middleware{}
+		Fill(t, m, 0)
+
+		assert.NotNil(t, m.McpTools)
+		assert.NotNil(t, m.McpResources)
+		assert.NotNil(t, m.McpPrompts)
+		assert.NotNil(t, m.Global)
+	})
+
+	t.Run("nested structs respect context", func(t *testing.T) {
+		gw := &XTykAPIGateway{}
+		FillWithContext(t, gw, 0, FillContextOAS)
+
+		assert.NotNil(t, gw.Middleware)
+		assert.Nil(t, gw.Middleware.McpTools)
+		assert.Nil(t, gw.Middleware.McpResources)
+		assert.Nil(t, gw.Middleware.McpPrompts)
+	})
 }
