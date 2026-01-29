@@ -101,7 +101,7 @@ func TestErrorClassificationBuilderChaining(t *testing.T) {
 	})
 
 	t.Run("WithUpstreamStatus sets status", func(t *testing.T) {
-		ec := NewErrorClassification(URS, "upstream_response_503")
+		ec := NewErrorClassification(URS, "upstream_response_5xx")
 		result := ec.WithUpstreamStatus(503)
 		assert.Same(t, ec, result)
 		assert.Equal(t, 503, ec.UpstreamStatus)

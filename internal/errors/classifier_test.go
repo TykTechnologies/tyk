@@ -363,29 +363,24 @@ func TestClassifyUpstreamResponse(t *testing.T) {
 	target := "api.backend.com:443"
 
 	tests := []struct {
-		name           string
-		statusCode     int
-		expectedDetail string
+		name       string
+		statusCode int
 	}{
 		{
-			name:           "500 Internal Server Error",
-			statusCode:     500,
-			expectedDetail: "upstream_response_500",
+			name:       "500 Internal Server Error",
+			statusCode: 500,
 		},
 		{
-			name:           "502 Bad Gateway",
-			statusCode:     502,
-			expectedDetail: "upstream_response_502",
+			name:       "502 Bad Gateway",
+			statusCode: 502,
 		},
 		{
-			name:           "503 Service Unavailable",
-			statusCode:     503,
-			expectedDetail: "upstream_response_503",
+			name:       "503 Service Unavailable",
+			statusCode: 503,
 		},
 		{
-			name:           "504 Gateway Timeout",
-			statusCode:     504,
-			expectedDetail: "upstream_response_504",
+			name:       "504 Gateway Timeout",
+			statusCode: 504,
 		},
 	}
 
@@ -394,7 +389,7 @@ func TestClassifyUpstreamResponse(t *testing.T) {
 			result := ClassifyUpstreamResponse(tc.statusCode, target)
 			require.NotNil(t, result)
 			assert.Equal(t, URS, result.Flag)
-			assert.Equal(t, tc.expectedDetail, result.Details)
+			assert.Equal(t, "upstream_response_5xx", result.Details)
 			assert.Equal(t, "ReverseProxy", result.Source)
 			assert.Equal(t, target, result.Target)
 			assert.Equal(t, tc.statusCode, result.UpstreamStatus)
@@ -693,8 +688,7 @@ func TestClassifyUpstreamError_EdgeCases(t *testing.T) {
 		err := errors.New("write tcp: broken pipe")
 		result := ClassifyUpstreamError(err, "api.backend.com:443")
 		require.NotNil(t, result)
-		// Falls through to generic since "broken pipe" is not in string patterns
-		// This tests that unknown patterns fall back to UPE
-		assert.Equal(t, UPE, result.Flag)
+		assert.Equal(t, EPI, result.Flag)
+		assert.Equal(t, "broken_pipe", result.Details)
 	})
 }

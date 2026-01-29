@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/tls"
 	"crypto/x509"
-	"fmt"
 	"net"
 	"net/url"
 	"strings"
@@ -269,6 +268,12 @@ func classifyByErrorString(err error, target string) *ErrorClassification {
 			WithTarget(target)
 	}
 
+	if strings.Contains(errStr, "broken pipe") {
+		return NewErrorClassification(EPI, "broken_pipe").
+			WithSource(sourceReverseProxy).
+			WithTarget(target)
+	}
+
 	// TLS protocol/version errors (checked first - more specific)
 	// Error: "remote error: tls: protocol version not supported"
 	// Note: Go's internal tls.alert type cannot be matched with errors.As(tls.AlertError)
@@ -320,7 +325,7 @@ func ClassifyNoHealthyUpstreamsError(target string) *ErrorClassification {
 
 // ClassifyUpstreamResponse creates an error classification for 5XX upstream responses.
 func ClassifyUpstreamResponse(statusCode int, target string) *ErrorClassification {
-	return NewErrorClassification(URS, fmt.Sprintf("upstream_response_%d", statusCode)).
+	return NewErrorClassification(URS, "upstream_response_5xx").
 		WithSource(sourceReverseProxy).
 		WithTarget(target).
 		WithUpstreamStatus(statusCode)
