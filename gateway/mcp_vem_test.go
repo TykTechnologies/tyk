@@ -170,7 +170,7 @@ func Test_URLAllowedAndIgnored_MCPPrimitive_DirectAccess_ReturnsNotFoundStatus(t
 	}
 
 	loader := APIDefinitionLoader{}
-	rxPaths := loader.buildMCPPrimitiveSpec("get-weather", "tool", "/mcp-tool:get-weather")
+	rxPaths := loader.buildPrimitiveSpec("get-weather", "tool", "/mcp-tool:get-weather")
 
 	r := httptest.NewRequest(http.MethodPost, "/mcp-tool:get-weather", nil)
 	status, _ := apiSpec.URLAllowedAndIgnored(r, rxPaths, false)
@@ -185,7 +185,7 @@ func Test_URLAllowedAndIgnored_MCPPrimitive_Looping_Allows(t *testing.T) {
 	}
 
 	loader := APIDefinitionLoader{}
-	rxPaths := loader.buildMCPPrimitiveSpec("get-weather", "tool", "/mcp-tool:get-weather")
+	rxPaths := loader.buildPrimitiveSpec("get-weather", "tool", "/mcp-tool:get-weather")
 
 	r := httptest.NewRequest(http.MethodPost, "/mcp-tool:get-weather", nil)
 	ctxSetLoopLevel(r, 1)
@@ -209,7 +209,7 @@ func Test_VersionCheck_MCPPrimitiveDirectAccess_Returns404(t *testing.T) {
 	}
 
 	loader := APIDefinitionLoader{}
-	spec.RxPaths["Default"] = loader.buildMCPPrimitiveSpec("get-weather", "tool", "/mcp-tool:get-weather")
+	spec.RxPaths["Default"] = loader.buildPrimitiveSpec("get-weather", "tool", "/mcp-tool:get-weather")
 	spec.WhiteListEnabled["Default"] = false
 
 	r := httptest.NewRequest(http.MethodPost, "/mcp-tool:get-weather", nil)
@@ -227,14 +227,14 @@ func Test_MCPPrimitiveRegex_IsLiteral(t *testing.T) {
 	loader := APIDefinitionLoader{}
 
 	tool := "/mcp-tool:tool.with.dots"
-	toolSpecs := loader.buildMCPPrimitiveSpec("tool.with.dots", "tool", tool)
+	toolSpecs := loader.buildPrimitiveSpec("tool.with.dots", "tool", tool)
 	require.Len(t, toolSpecs, 1)
 	require.NotNil(t, toolSpecs[0].spec)
 	assert.True(t, toolSpecs[0].spec.MatchString(tool))
 	assert.False(t, toolSpecs[0].spec.MatchString("/mcp-tool:toolXwithXdots"))
 
 	resPath := "/mcp-resource:file:///repo/*"
-	resSpecs := loader.buildMCPPrimitiveSpec("file:///repo/*", "resource", resPath)
+	resSpecs := loader.buildPrimitiveSpec("file:///repo/*", "resource", resPath)
 	require.Len(t, resSpecs, 1)
 	require.NotNil(t, resSpecs[0].spec)
 	assert.True(t, resSpecs[0].spec.MatchString(resPath))
