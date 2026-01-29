@@ -12,6 +12,7 @@ import (
 	"syscall"
 	"testing"
 
+	"github.com/TykTechnologies/tyk/internal/otel"
 	"github.com/sirupsen/logrus"
 	"github.com/sirupsen/logrus/hooks/test"
 	"github.com/stretchr/testify/assert"
@@ -247,4 +248,132 @@ func TestGatewayLogJWKError(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestGetLogEntryForRequest_TraceID(t *testing.T) {
+	tests := []struct {
+		name          string
+		otelEnabled   bool
+		hasTraceCtx   bool
+		expectTraceID bool
+	}{
+		{
+			name:          "OTel enabled with trace context",
+			otelEnabled:   true,
+			hasTraceCtx:   true,
+			expectTraceID: true,
+		},
+		{
+			name:          "OTel enabled without trace context",
+			otelEnabled:   true,
+			hasTraceCtx:   false,
+			expectTraceID: false,
+		},
+		{
+			name:          "OTel disabled with trace context",
+			otelEnabled:   false,
+			hasTraceCtx:   true,
+			expectTraceID: false,
+		},
+		{
+			name:          "OTel disabled without trace context",
+			otelEnabled:   false,
+			hasTraceCtx:   false,
+			expectTraceID: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ts := StartTest(nil)
+			defer ts.Close()
+
+			// Setup gateway with OTel config
+			globalConf := ts.Gw.GetConfig()
+			globalConf.OpenTelemetry.Enabled = tt.otelEnabled
+			ts.Gw.SetConfig(globalConf)
+
+			// Create request with or without trace context
+			req := httptest.NewRequest("GET", "http://tyk.io/test", nil)
+			req.RemoteAddr = "127.0.0.1:80"
+
+			if tt.hasTraceCtx {
+				// Initialize OpenTelemetry and create trace context
+				globalConf.OpenTelemetry.Exporter = "grpc"
+				globalConf.OpenTelemetry.Endpoint = "localhost:4317"
+				ts.Gw.SetConfig(globalConf)
+
+				ts.Gw.TracerProvider = otel.InitOpenTelemetry(
+					ts.Gw.ctx,
+					log,
+					&globalConf.OpenTelemetry,
+					"test-gateway",
+					"1.0.0",
+					false,
+					"",
+					false,
+					nil,
+				)
+
+				ctx, span := ts.Gw.TracerProvider.Tracer().Start(ts.Gw.ctx, "test-span")
+				defer span.End()
+				req = req.WithContext(ctx)
+			}
+
+			// Get log entry
+			entry := ts.Gw.getLogEntryForRequest(nil, req, "", nil)
+
+			// Verify trace_id presence
+			_, hasTraceID := entry.Data["trace_id"]
+			if hasTraceID != tt.expectTraceID {
+				t.Errorf("trace_id presence = %v, want %v", hasTraceID, tt.expectTraceID)
+			}
+
+			// Verify trace_id format if present
+			if hasTraceID {
+				traceID, ok := entry.Data["trace_id"].(string)
+				assert.True(t, ok, "trace_id should be a string")
+				assert.Len(t, traceID, 32, "trace_id should be 32 characters long")
+			}
+		})
+	}
+}
+
+func TestGetLogEntryForRequest_TraceIDConsistency(t *testing.T) {
+	// Verify trace_id matches otel.ExtractTraceID()
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	globalConf := ts.Gw.GetConfig()
+	globalConf.OpenTelemetry.Enabled = true
+	globalConf.OpenTelemetry.Exporter = "grpc"
+	globalConf.OpenTelemetry.Endpoint = "localhost:4317"
+	ts.Gw.SetConfig(globalConf)
+
+	ts.Gw.TracerProvider = otel.InitOpenTelemetry(
+		ts.Gw.ctx,
+		log,
+		&globalConf.OpenTelemetry,
+		"test-gateway",
+		"1.0.0",
+		false,
+		"",
+		false,
+		nil,
+	)
+
+	req := httptest.NewRequest("GET", "http://tyk.io/test", nil)
+	req.RemoteAddr = "127.0.0.1:80"
+
+	ctx, span := ts.Gw.TracerProvider.Tracer().Start(ts.Gw.ctx, "test-span")
+	defer span.End()
+	req = req.WithContext(ctx)
+
+	expectedTraceID := otel.ExtractTraceID(req.Context())
+
+	entry := ts.Gw.getLogEntryForRequest(nil, req, "", nil)
+
+	actualTraceID, ok := entry.Data["trace_id"].(string)
+	assert.True(t, ok, "trace_id should be a string")
+	assert.Equal(t, expectedTraceID, actualTraceID, "trace_id should match otel.ExtractTraceID()")
 }

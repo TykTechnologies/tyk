@@ -13,6 +13,7 @@ import (
 
 	"github.com/sirupsen/logrus"
 
+	"github.com/TykTechnologies/tyk/internal/otel"
 	"github.com/TykTechnologies/tyk/request"
 )
 
@@ -40,6 +41,14 @@ func (gw *Gateway) getLogEntryForRequest(logger *logrus.Entry, r *http.Request, 
 		"path":   r.URL.Path,
 		"origin": request.RealIP(r),
 	}
+
+	// add trace_id when OpenTelemetry is enabled and trace context exists
+	if gw.GetConfig().OpenTelemetry.Enabled {
+		if traceID := otel.ExtractTraceID(r.Context()); traceID != "" {
+			fields["trace_id"] = traceID
+		}
+	}
+
 	// add key to log if configured to do so
 	if key != "" {
 		fields["key"] = key
