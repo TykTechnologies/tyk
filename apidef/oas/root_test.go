@@ -548,7 +548,6 @@ func TestFillWithContext(t *testing.T) {
 		assert.NotNil(t, m.Global)
 	})
 
-
 	t.Run("backward compatible Fill uses MCP context", func(t *testing.T) {
 		m := &Middleware{}
 		Fill(t, m, 0)

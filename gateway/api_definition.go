@@ -682,6 +682,10 @@ func (a APIDefinitionLoader) GetOASFilepath(path string) string {
 	return strings.TrimSuffix(path, ".json") + "-oas.json"
 }
 
+func (a APIDefinitionLoader) GetMCPFilepath(path string) string {
+	return strings.TrimSuffix(path, ".json") + "-mcp.json"
+}
+
 // FromDir will load APIDefinitions from a directory on the filesystem. Definitions need
 // to be the JSON representation of APIDefinition object
 func (a APIDefinitionLoader) FromDir(dir string) []*APISpec {
@@ -689,7 +693,8 @@ func (a APIDefinitionLoader) FromDir(dir string) []*APISpec {
 	// Grab json files from directory
 	paths, _ := filepath.Glob(filepath.Join(dir, "*.json"))
 	for _, path := range paths {
-		if strings.HasSuffix(path, "-oas.json") {
+		// Skip companion files (loaded separately)
+		if strings.HasSuffix(path, "-oas.json") || strings.HasSuffix(path, "-mcp.json") {
 			continue
 		}
 
@@ -726,7 +731,15 @@ func (a APIDefinitionLoader) loadDefFromFilePath(filePath string) (*APISpec, err
 		loader := openapi3.NewLoader()
 		// use openapi3.ReadFromFile as ReadFromURIFunc since the default implementation cache spec based on file path.
 		loader.ReadFromURIFunc = openapi3.ReadFromFile
-		oasDoc, err := loader.LoadFromFile(a.GetOASFilepath(filePath))
+
+		var oasFilepath string
+		if def.IsMCP() {
+			oasFilepath = a.GetMCPFilepath(filePath)
+		} else {
+			oasFilepath = a.GetOASFilepath(filePath)
+		}
+
+		oasDoc, err := loader.LoadFromFile(oasFilepath)
 		if err == nil {
 			nestDef.OAS = &oas.OAS{T: *oasDoc}
 		}

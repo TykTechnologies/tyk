@@ -765,6 +765,13 @@ func (gw *Gateway) loadControlAPIEndpoints(muxer *mux.Router) {
 		r.HandleFunc("/apis/oas/{apiID}", gw.blockInDashboardMode(gw.apiHandler)).Methods(http.MethodDelete)
 		r.HandleFunc("/apis/oas/{apiID}/versions", versionsHandler.ServeHTTP).Methods(http.MethodGet)
 		r.HandleFunc("/apis/oas/{apiID}/export", gw.apiOASExportHandler).Methods("GET")
+
+		// MCP API routes
+		r.HandleFunc("/mcps", gw.mcpListHandler).Methods(http.MethodGet)
+		r.HandleFunc("/mcps", gw.validateMCP(gw.mcpCreateHandler)).Methods(http.MethodPost)
+		r.HandleFunc("/mcps/{apiID}", gw.mcpGetHandler).Methods(http.MethodGet)
+		r.HandleFunc("/mcps/{apiID}", gw.validateMCP(gw.mcpUpdateHandler)).Methods(http.MethodPut)
+		r.HandleFunc("/mcps/{apiID}", gw.mcpDeleteHandler).Methods(http.MethodDelete)
 		r.HandleFunc("/health", gw.healthCheckhandler).Methods("GET")
 		r.HandleFunc("/policies", gw.polHandler).Methods("GET", "POST", "PUT", "DELETE")
 		r.HandleFunc("/policies/{polID}", gw.polHandler).Methods("GET", "POST", "PUT", "DELETE")

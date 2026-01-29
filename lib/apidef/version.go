@@ -3,9 +3,10 @@ package apidef
 import (
 	"errors"
 	"fmt"
+	"net/url"
+
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/common/option"
-	"net/url"
 )
 
 const (
