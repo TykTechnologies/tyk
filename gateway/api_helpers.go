@@ -92,7 +92,7 @@ func deleteAPIFiles(apiID, suffix, appPath string, fs afero.Fs) error {
 	return nil
 }
 
-func validateSpecExists(spec *APISpec, apiID string) (interface{}, int) {
+func validateSpecExists(spec *APISpec) (interface{}, int) {
 	if spec == nil {
 		return apiError(apidef.ErrAPINotFound.Error()), 404
 	}

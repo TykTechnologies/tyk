@@ -778,8 +778,8 @@ func TestDeleteAPIFiles(t *testing.T) {
 		mainFile := filepath.Join(appPath, apiID+".json")
 		oasFile := filepath.Join(appPath, apiID+"-"+suffix+".json")
 
-		afero.WriteFile(fs, mainFile, []byte("{}"), 0644)
-		afero.WriteFile(fs, oasFile, []byte("{}"), 0644)
+		require.NoError(t, afero.WriteFile(fs, mainFile, []byte("{}"), 0644))
+		require.NoError(t, afero.WriteFile(fs, oasFile, []byte("{}"), 0644))
 
 		err := deleteAPIFiles(apiID, suffix, appPath, fs)
 
@@ -811,7 +811,7 @@ func TestDeleteAPIFiles(t *testing.T) {
 		suffix := "oas"
 
 		mainFile := filepath.Join(appPath, apiID+".json")
-		afero.WriteFile(fs, mainFile, []byte("{}"), 0644)
+		require.NoError(t, afero.WriteFile(fs, mainFile, []byte("{}"), 0644))
 
 		err := deleteAPIFiles(apiID, suffix, appPath, fs)
 
@@ -833,8 +833,8 @@ func TestDeleteAPIFiles(t *testing.T) {
 		mainFile := filepath.Join(appPath, apiID+".json")
 		oasFile := filepath.Join(appPath, apiID+"-"+suffix+".json")
 
-		afero.WriteFile(fs, mainFile, []byte("{}"), 0644)
-		afero.WriteFile(fs, oasFile, []byte("{}"), 0644)
+		require.NoError(t, afero.WriteFile(fs, mainFile, []byte("{}"), 0644))
+		require.NoError(t, afero.WriteFile(fs, oasFile, []byte("{}"), 0644))
 
 		err := deleteAPIFiles(apiID, suffix, appPath, fs)
 
@@ -856,8 +856,8 @@ func TestDeleteAPIFiles(t *testing.T) {
 		mainFile := filepath.Join(appPath, apiID+".json")
 		oasFile := filepath.Join(appPath, apiID+"-"+suffix+".json")
 
-		afero.WriteFile(fs, mainFile, []byte("{}"), 0644)
-		afero.WriteFile(fs, oasFile, []byte("{}"), 0644)
+		require.NoError(t, afero.WriteFile(fs, mainFile, []byte("{}"), 0644))
+		require.NoError(t, afero.WriteFile(fs, oasFile, []byte("{}"), 0644))
 
 		err := deleteAPIFiles(apiID, suffix, appPath, fs)
 
@@ -874,14 +874,14 @@ func TestValidateSpecExists(t *testing.T) {
 			},
 		}
 
-		resp, code := validateSpecExists(spec, "test-api")
+		resp, code := validateSpecExists(spec)
 
 		assert.Nil(t, resp)
 		assert.Equal(t, 0, code)
 	})
 
 	t.Run("returns error when spec is nil", func(t *testing.T) {
-		resp, code := validateSpecExists(nil, "test-api")
+		resp, code := validateSpecExists(nil)
 
 		assert.NotNil(t, resp)
 		assert.Equal(t, 404, code)
@@ -968,7 +968,7 @@ func TestBuildSuccessResponse(t *testing.T) {
 }
 
 func TestHandleBaseVersionCleanup(t *testing.T) {
-	t.Run("does nothing when baseID is empty", func(t *testing.T) {
+	t.Run("does nothing when baseID is empty", func(_ *testing.T) {
 		gw := &Gateway{}
 		spec := &APISpec{
 			APIDefinition: &apidef.APIDefinition{
@@ -1006,7 +1006,7 @@ func TestHandleBaseVersionCleanup(t *testing.T) {
 
 		fs := afero.NewMemMapFs()
 		baseFile := ts.Gw.GetConfig().AppPath + "/base-api.json"
-		afero.WriteFile(fs, baseFile, []byte(`{"api_id":"base-api"}`), 0644)
+		require.NoError(t, afero.WriteFile(fs, baseFile, []byte(`{"api_id":"base-api"}`), 0644))
 
 		handleBaseVersionCleanup(ts.Gw, childSpec, "child-api", fs)
 	})
@@ -1055,9 +1055,9 @@ func TestHandleBaseVersionUpdate(t *testing.T) {
 		values.Set("new_version_name", "v2")
 		versionParams := lib.NewVersionQueryParameters(values)
 		fs := afero.NewMemMapFs()
-		
+
 		baseFile := ts.Gw.GetConfig().AppPath + "/base-api.json"
-		afero.WriteFile(fs, baseFile, []byte(`{"api_id":"base-api"}`), 0644)
+		require.NoError(t, afero.WriteFile(fs, baseFile, []byte(`{"api_id":"base-api"}`), 0644))
 
 		resp, code := handleBaseVersionUpdate(ts.Gw, versionParams, "new-api", fs)
 

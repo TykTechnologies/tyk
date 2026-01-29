@@ -1341,7 +1341,7 @@ func (gw *Gateway) handleUpdateApi(apiID string, r *http.Request, fs afero.Fs, o
 	}
 
 	spec := gw.getApiSpec(apiID)
-	if resp, code := validateSpecExists(spec, apiID); resp != nil {
+	if resp, code := validateSpecExists(spec); resp != nil {
 		return resp, code
 	}
 
@@ -1464,7 +1464,7 @@ func (gw *Gateway) handleDeleteAPI(apiID string) (interface{}, int) {
 	}
 
 	spec := gw.getApiSpec(apiID)
-	if resp, code := validateSpecExists(spec, apiID); resp != nil {
+	if resp, code := validateSpecExists(spec); resp != nil {
 		return resp, code
 	}
 
