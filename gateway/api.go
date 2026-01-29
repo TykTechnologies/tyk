@@ -77,6 +77,7 @@ const (
 	// KeyListingWorkerCountCap 350 is based on the average of 10000 keys with minor contingency
 	KeyListingWorkerCountCap      = 350
 	KeyListingWorkerEntriesPerKey = 100
+	errMsgInvalidPolicyID         = "Invalid Policy ID. Allowed characters: a-z, A-Z, 0-9, ., _, -, ~"
 )
 
 var (
@@ -1114,7 +1115,7 @@ func (gw *Gateway) handleAddOrUpdatePolicy(polID string, r *http.Request) (inter
 
 	if newPol.ID != "" && !isValidPolicyID(newPol.ID) {
 		log.WithField("id", newPol.ID).Error("Policy ID contains invalid characters")
-		return apiError("Invalid Policy ID in body. Allowed characters: a-z, A-Z, 0-9, ., _, -"), http.StatusBadRequest
+		return apiError(errMsgInvalidPolicyID), http.StatusBadRequest
 	}
 
 	if polID != "" && newPol.ID != polID && r.Method == http.MethodPut {
@@ -1564,7 +1565,7 @@ func (gw *Gateway) polHandler(w http.ResponseWriter, r *http.Request) {
 
 	if polID != "" && !isValidPolicyID(polID) {
 		log.WithField("id", polID).Error("Policy ID contains invalid characters")
-		doJSONWrite(w, http.StatusBadRequest, apiError("Invalid Policy ID. Allowed characters: a-z, A-Z, 0-9, ., _, -"))
+		doJSONWrite(w, http.StatusBadRequest, apiError(errMsgInvalidPolicyID))
 		return
 	}
 
@@ -1603,9 +1604,6 @@ func (gw *Gateway) polHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func isValidPolicyID(id string) bool {
-	if id == "" {
-		return true
-	}
 	return validPolicyIDRegex.MatchString(id)
 }
 
