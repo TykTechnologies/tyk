@@ -3176,6 +3176,21 @@ func ctxGetRequestStartTime(r *http.Request) time.Time {
 	return time.Time{}
 }
 
+// ctxSetCacheHit sets the cache hit flag in the request context
+func ctxSetCacheHit(r *http.Request, hit bool) {
+	setCtxValue(r, ctx.CacheHit, hit)
+}
+
+// ctxGetCacheHit returns the cache hit flag from the request context
+func ctxGetCacheHit(r *http.Request) bool {
+	if v := r.Context().Value(ctx.CacheHit); v != nil {
+		if hit, ok := v.(bool); ok {
+			return hit
+		}
+	}
+	return false
+}
+
 func ctxGetVersionInfo(r *http.Request) *apidef.VersionInfo {
 	if v := r.Context().Value(ctx.VersionData); v != nil {
 		return v.(*apidef.VersionInfo)

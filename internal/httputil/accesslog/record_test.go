@@ -53,3 +53,82 @@ func TestRecord(t *testing.T) {
 
 	assert.Equal(t, want, got)
 }
+
+func TestRecord_WithCacheHit(t *testing.T) {
+	testCases := []struct {
+		name     string
+		cacheHit bool
+		want     bool
+	}{
+		{
+			name:     "cache hit is true when response served from cache",
+			cacheHit: true,
+			want:     true,
+		},
+		{
+			name:     "cache hit is false when response not served from cache",
+			cacheHit: false,
+			want:     false,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			record := accesslog.NewRecord()
+			record.WithCacheHit(tc.cacheHit)
+
+			got := record.Fields(nil)
+
+			assert.Equal(t, tc.want, got["cache_hit"])
+		})
+	}
+}
+
+func TestRecord_WithCacheHit_FullRecord(t *testing.T) {
+	testCases := []struct {
+		name     string
+		cacheHit bool
+	}{
+		{
+			name:     "full record with cache hit true",
+			cacheHit: true,
+		},
+		{
+			name:     "full record with cache hit false",
+			cacheHit: false,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			latency := analytics.Latency{
+				Total:    100,
+				Upstream: 80,
+				Gateway:  20,
+			}
+
+			req := httptest.NewRequest(http.MethodGet, "http://example.com/api/v1/resource", nil)
+			req.RemoteAddr = "192.168.1.1"
+			req.Header.Set("User-Agent", "test-agent")
+
+			resp := &http.Response{
+				StatusCode: http.StatusOK,
+			}
+
+			record := accesslog.NewRecord()
+			record.WithRequest(req, latency)
+			record.WithResponse(resp)
+			record.WithCacheHit(tc.cacheHit)
+
+			got := record.Fields(nil)
+
+			// Verify cache_hit field is present and has correct value
+			assert.Equal(t, tc.cacheHit, got["cache_hit"])
+
+			// Verify other fields are still present
+			assert.Equal(t, http.MethodGet, got["method"])
+			assert.Equal(t, "/api/v1/resource", got["path"])
+			assert.Equal(t, http.StatusOK, got["status"])
+		})
+	}
+}

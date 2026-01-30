@@ -265,11 +265,18 @@ func (m *RedisCacheMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 		m.Proxy.CopyResponse(w, newRes.Body, 0)
 	}
 
+	// Set cache hit flag for access logging
+	ctxSetCacheHit(r, true)
+
 	// Record analytics
+	ms := DurationToMillisecond(time.Since(t1))
+	latency := analytics.Latency{Total: int64(ms), Upstream: 0, Gateway: int64(ms)}
 	if !m.Spec.DoNotTrack {
-		ms := DurationToMillisecond(time.Since(t1))
-		m.sh.RecordHit(r, analytics.Latency{Total: int64(ms), Upstream: 0, Gateway: int64(ms)}, newRes.StatusCode, newRes, true)
+		m.sh.RecordHit(r, latency, newRes.StatusCode, newRes, true)
 	}
+
+	// Record access log for cached response
+	m.sh.RecordAccessLog(r, newRes, latency)
 
 	// Stop any further execution after we wrote cache out
 	return nil, middleware.StatusRespond

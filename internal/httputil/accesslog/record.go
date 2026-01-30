@@ -69,6 +69,12 @@ func (a *Record) WithResponse(resp *http.Response) *Record {
 	return a
 }
 
+// WithCacheHit sets the cache_hit field indicating if the response was served from cache.
+func (a *Record) WithCacheHit(hit bool) *Record {
+	a.fields["cache_hit"] = hit
+	return a
+}
+
 // Fields returns a logrus.Fields intended for logging.
 func (a *Record) Fields(allowedKeys []string) logrus.Fields {
 	return Filter(a.fields, allowedKeys)

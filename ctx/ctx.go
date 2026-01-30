@@ -55,6 +55,8 @@ const (
 	SelfLooping
 	// RequestStartTime holds the time when the request entered the middleware chain
 	RequestStartTime
+	// CacheHit indicates whether the response was served from the cache
+	CacheHit
 )
 
 func ctxSetSession(r *http.Request, s *user.SessionState, scheduleUpdate bool, hashKey bool) {
