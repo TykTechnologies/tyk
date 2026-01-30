@@ -1596,15 +1596,15 @@ func (gw *Gateway) afterConfSetup() {
 		}
 
 		if conf.SlaveOptions.RPCCertFetchMaxElapsedTime <= 0 {
-			conf.SlaveOptions.RPCCertFetchMaxElapsedTime = 30
+			conf.SlaveOptions.RPCCertFetchMaxElapsedTime = float32(certs.DefaultRPCCertFetchMaxElapsedTime.Seconds())
 		}
 
 		if conf.SlaveOptions.RPCCertFetchInitialInterval <= 0 {
-			conf.SlaveOptions.RPCCertFetchInitialInterval = 0.1
+			conf.SlaveOptions.RPCCertFetchInitialInterval = float32(certs.DefaultRPCCertFetchInitialInterval.Seconds())
 		}
 
 		if conf.SlaveOptions.RPCCertFetchMaxInterval <= 0 {
-			conf.SlaveOptions.RPCCertFetchMaxInterval = 2
+			conf.SlaveOptions.RPCCertFetchMaxInterval = float32(certs.DefaultRPCCertFetchMaxInterval.Seconds())
 		}
 
 		// Default RPCCertFetchRetryEnabled if not explicitly set
