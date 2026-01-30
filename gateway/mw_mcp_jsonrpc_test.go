@@ -1033,6 +1033,7 @@ func TestMCPJSONRPCMiddleware_RateLimitEnforcedOnVEM(t *testing.T) {
 	require.Len(t, mw.McpTools, 2)
 
 	req := httptest.NewRequest(http.MethodPost, "/mcp-tool:get-weather", nil)
+	httpctx.SetJsonRPCRouting(req, true) // Simulate JSON-RPC routing context
 	var rxPaths []URLSpec
 	for _, paths := range loaded.RxPaths {
 		rxPaths = paths

@@ -21,6 +21,7 @@ import (
 	"github.com/TykTechnologies/tyk/internal/certcheck"
 	"github.com/TykTechnologies/tyk/internal/errors"
 	"github.com/TykTechnologies/tyk/internal/graphengine"
+	"github.com/TykTechnologies/tyk/internal/httpctx"
 	"github.com/TykTechnologies/tyk/internal/httputil"
 	"github.com/TykTechnologies/tyk/user"
 
@@ -141,6 +142,13 @@ func (a *APISpec) FindSpecMatchesStatus(r *http.Request, rxPaths []URLSpec, mode
 	return nil, false
 }
 
+// isJSONRPCVEMPath returns true if the request is a JSON-RPC routed request
+// targeting a protocol VEM path. In this case, the listen path should not be
+// stripped as the VEM path is already in its final form.
+func isJSONRPCVEMPath(r *http.Request, path string) bool {
+	return httpctx.IsJsonRPCRouting(r) && agentprotocol.IsProtocolVEMPath(path)
+}
+
 // getMatchPathAndMethod retrieves the match path and method from the request based on the mode.
 func (a *APISpec) getMatchPathAndMethod(r *http.Request, mode URLStatus) (string, string) {
 	var (
@@ -156,7 +164,7 @@ func (a *APISpec) getMatchPathAndMethod(r *http.Request, mode URLStatus) (string
 		}
 	}
 
-	if a.Proxy.ListenPath != "/" && !agentprotocol.IsProtocolVEMPath(matchPath) {
+	if a.Proxy.ListenPath != "/" && !isJSONRPCVEMPath(r, matchPath) {
 		matchPath = a.StripListenPath(matchPath)
 	}
 
