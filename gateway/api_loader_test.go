@@ -9728,3 +9728,84 @@ func TestNewRelicMounting(t *testing.T) {
 		}
 	})
 }
+
+func TestListenPathConflictWhenCustomDomainIsDisabled(t *testing.T) {
+	ts := StartTest(nil)
+	t.Cleanup(ts.Close)
+
+	localClient := test.NewClientLocal()
+
+	mockServerA := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`{"match":"serverA"}`))
+	}))
+	defer mockServerA.Close()
+
+	mockServerB := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`{"match":"serverB"}`))
+	}))
+	defer mockServerB.Close()
+
+	mockServerC := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`{"match":"serverC"}`))
+	}))
+	defer mockServerB.Close()
+
+	mockServerD := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`{"match":"serverD"}`))
+	}))
+	defer mockServerB.Close()
+
+	t.Run("all true except custom domain", func(t *testing.T) {
+		globalConf := ts.Gw.GetConfig()
+		globalConf.EnableCustomDomains = false
+		globalConf.HttpServerOptions.EnableStrictRoutes = true
+		globalConf.HttpServerOptions.EnablePathSuffixMatching = true
+		globalConf.HttpServerOptions.EnablePathPrefixMatching = true
+
+		ts.Gw.SetConfig(globalConf)
+		defer ts.ResetTestConfig()
+
+		ts.Gw.BuildAndLoadAPI(
+			func(spec *APISpec) {
+				spec.APIID = "api-a"
+				spec.Proxy.ListenPath = "/caa"
+				spec.IsOAS = false
+				spec.Proxy.TargetURL = mockServerA.URL
+				spec.Proxy.DisableStripSlash = true
+				spec.Proxy.StripListenPath = true
+			},
+			func(spec *APISpec) {
+				spec.APIID = "api-b"
+				spec.Proxy.ListenPath = "/caas2itsamu0456n07gfe"
+				spec.Proxy.TargetURL = mockServerB.URL
+				spec.Proxy.DisableStripSlash = true
+				spec.Proxy.StripListenPath = true
+			},
+			func(spec *APISpec) {
+				spec.APIID = "api-c"
+				spec.Proxy.ListenPath = "/caas2itsamu04567m9pxl"
+				spec.Proxy.TargetURL = mockServerC.URL
+				spec.Proxy.DisableStripSlash = true
+				spec.Proxy.StripListenPath = true
+			},
+			func(spec *APISpec) {
+				spec.APIID = "api-d"
+				spec.Proxy.ListenPath = "/caas2itsamu0456qnu2sj"
+				spec.Proxy.TargetURL = mockServerD.URL
+				spec.Proxy.DisableStripSlash = true
+				spec.Proxy.StripListenPath = true
+			},
+		)
+
+		_, _ = ts.Run(t, []test.TestCase{
+			{Client: localClient, Code: 200, Path: "/caa", BodyMatch: `{"match":"serverA"}`},
+			{Client: localClient, Code: 200, Path: "/caas2itsamu0456n07gfe", BodyMatch: `{"match":"serverB"}`},
+			{Client: localClient, Code: 200, Path: "/caas2itsamu04567m9pxl", BodyMatch: `{"match":"serverC"}`},
+			{Client: localClient, Code: 200, Path: "/caas2itsamu0456qnu2sj", BodyMatch: `{"match":"serverD"}`},
+		}...)
+	})
+}
