@@ -172,7 +172,11 @@ func (m *MCPJSONRPCMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 	}
 	if !found || vemPath == "" {
 		// Unregistered primitives or operations (notifications, discovery, etc.)
-		// passthrough to upstream unchanged. The upstream MCP server will handle them.
+		// passthrough to upstream unchanged per MCP specification.
+		// - Discovery operations (tools/list, resources/list) allow clients to discover capabilities
+		// - Notifications are observational and don't require policy enforcement
+		// - Operations can be optionally configured with operation-level VEMs if needed
+		// The upstream MCP server is responsible for handling these requests.
 		return nil, http.StatusOK
 	}
 
@@ -275,6 +279,10 @@ func (m *MCPJSONRPCMiddleware) matchResourceURI(uri string, primitives map[strin
 	}
 
 	// Wildcard matching with deterministic precedence.
+	// Precedence rules:
+	// 1. Longer prefix matches beat shorter ones
+	// 2. For equal-length prefixes, lexicographically smaller pattern wins
+	// Example: "file:///repo/src/*" beats "file:///repo/*" for "file:///repo/src/main.go"
 	var bestMatchPattern string
 	var bestMatchVEMPath string
 	bestMatchPrefixLength := -1
