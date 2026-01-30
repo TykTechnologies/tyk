@@ -3,6 +3,7 @@ package gateway
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"strings"
@@ -82,25 +83,30 @@ func (m *MCPJSONRPCMiddleware) getMaxRequestBodySize() int64 {
 	return defaultJSONRPCRequestSize
 }
 
-// ProcessRequest handles JSON-RPC request detection and routing.
-//
-//nolint:staticcheck // ST1008: middleware interface requires (error, int) return order
-func (m *MCPJSONRPCMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
+// validateJSONRPCRequest checks if the request is a valid POST with JSON content type.
+// Returns true if valid, false if the request should be passed through.
+func (m *MCPJSONRPCMiddleware) validateJSONRPCRequest(r *http.Request) bool {
 	// Only process POST requests with JSON content type
 	if r.Method != http.MethodPost {
-		return nil, http.StatusOK
+		return false
 	}
 
 	contentType := r.Header.Get(headerContentType)
 	if !strings.HasPrefix(contentType, contentTypeJSON) {
-		return nil, http.StatusOK
+		return false
 	}
 
+	return true
+}
+
+// readAndParseJSONRPC reads the request body and parses it as JSON-RPC 2.0.
+// Returns the parsed request or writes an error response and returns nil.
+func (m *MCPJSONRPCMiddleware) readAndParseJSONRPC(w http.ResponseWriter, r *http.Request) (*JSONRPCRequest, error) {
 	// Read and parse the request body with size limit to prevent DoS
 	body, err := io.ReadAll(io.LimitReader(r.Body, m.getMaxRequestBodySize()))
 	if err != nil {
 		m.writeJSONRPCError(w, nil, mcp.JSONRPCParseError, mcp.ErrMsgParseError, nil)
-		return nil, middleware.StatusRespond //nolint:nilerr // error handled via JSON-RPC response
+		return nil, err
 	}
 	// Restore body for upstream
 	r.Body = io.NopCloser(bytes.NewReader(body))
@@ -108,27 +114,20 @@ func (m *MCPJSONRPCMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 	var rpcReq JSONRPCRequest
 	if err := json.Unmarshal(body, &rpcReq); err != nil {
 		m.writeJSONRPCError(w, nil, mcp.JSONRPCParseError, mcp.ErrMsgParseError, nil)
-		return nil, middleware.StatusRespond //nolint:nilerr // error handled via JSON-RPC response
+		return nil, err
 	}
 
 	// Validate JSON-RPC 2.0 structure
 	if rpcReq.JSONRPC != apidef.JsonRPC20 || rpcReq.Method == "" {
 		m.writeJSONRPCError(w, rpcReq.ID, mcp.JSONRPCInvalidRequest, mcp.ErrMsgInvalidRequest, nil)
-		return nil, middleware.StatusRespond
+		return nil, fmt.Errorf("invalid JSON-RPC request")
 	}
 
-	// Route based on method
-	vemPath, primitive, found, invalidParams := m.routeRequest(&rpcReq)
-	if invalidParams {
-		m.writeJSONRPCError(w, rpcReq.ID, mcp.JSONRPCInvalidParams, mcp.ErrMsgInvalidParams, nil)
-		return nil, middleware.StatusRespond
-	}
-	if !found || vemPath == "" {
-		// Unregistered primitives or operations (notifications, discovery, etc.)
-		// passthrough to upstream unchanged. The upstream MCP server will handle them.
-		return nil, http.StatusOK
-	}
+	return &rpcReq, nil
+}
 
+// setupJSONRPCRouting stores routing data in context and enables JSON-RPC routing.
+func (m *MCPJSONRPCMiddleware) setupJSONRPCRouting(r *http.Request, rpcReq *JSONRPCRequest, vemPath, primitive string) {
 	// Store parsed data in context
 	httpctx.SetJSONRPCRequest(r, &httpctx.JSONRPCRequestData{
 		Method:    rpcReq.Method,
@@ -148,6 +147,37 @@ func (m *MCPJSONRPCMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 
 	// Rewrite URL path to VEM path
 	r.URL.Path = vemPath
+}
+
+// ProcessRequest handles JSON-RPC request detection and routing.
+//
+//nolint:staticcheck // ST1008: middleware interface requires (error, int) return order
+func (m *MCPJSONRPCMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
+	// Validate request type
+	if !m.validateJSONRPCRequest(r) {
+		return nil, http.StatusOK
+	}
+
+	// Parse JSON-RPC request
+	rpcReq, err := m.readAndParseJSONRPC(w, r)
+	if err != nil {
+		return nil, middleware.StatusRespond
+	}
+
+	// Route based on method
+	vemPath, primitive, found, invalidParams := m.routeRequest(rpcReq)
+	if invalidParams {
+		m.writeJSONRPCError(w, rpcReq.ID, mcp.JSONRPCInvalidParams, mcp.ErrMsgInvalidParams, nil)
+		return nil, middleware.StatusRespond
+	}
+	if !found || vemPath == "" {
+		// Unregistered primitives or operations (notifications, discovery, etc.)
+		// passthrough to upstream unchanged. The upstream MCP server will handle them.
+		return nil, http.StatusOK
+	}
+
+	// Set up routing context
+	m.setupJSONRPCRouting(r, rpcReq, vemPath, primitive)
 
 	return nil, http.StatusOK
 }
@@ -245,31 +275,31 @@ func (m *MCPJSONRPCMiddleware) matchResourceURI(uri string, primitives map[strin
 	}
 
 	// Wildcard matching with deterministic precedence.
-	var bestPattern string
-	var bestPath string
-	bestPrefixLen := -1
+	var bestMatchPattern string
+	var bestMatchVEMPath string
+	bestMatchPrefixLength := -1
 
-	for key, path := range primitives {
-		if !strings.HasPrefix(key, mcp.PrimitiveKeyResource) {
+	for primitiveKey, vemPath := range primitives {
+		if !strings.HasPrefix(primitiveKey, mcp.PrimitiveKeyResource) {
 			continue
 		}
-		pattern := strings.TrimPrefix(key, mcp.PrimitiveKeyResource)
+		pattern := strings.TrimPrefix(primitiveKey, mcp.PrimitiveKeyResource)
 		if m.matchesWildcard(pattern, uri) {
 			prefixLen := len(pattern)
 			if strings.HasSuffix(pattern, resourceWildcardSuffix) {
 				prefixLen = len(strings.TrimSuffix(pattern, "*"))
 			}
 
-			if prefixLen > bestPrefixLen || (prefixLen == bestPrefixLen && pattern < bestPattern) {
-				bestPattern = pattern
-				bestPath = path
-				bestPrefixLen = prefixLen
+			if prefixLen > bestMatchPrefixLength || (prefixLen == bestMatchPrefixLength && pattern < bestMatchPattern) {
+				bestMatchPattern = pattern
+				bestMatchVEMPath = vemPath
+				bestMatchPrefixLength = prefixLen
 			}
 		}
 	}
 
-	if bestPrefixLen >= 0 {
-		return bestPath, true
+	if bestMatchPrefixLength >= 0 {
+		return bestMatchVEMPath, true
 	}
 
 	return "", false
