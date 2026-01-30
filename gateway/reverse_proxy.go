@@ -39,11 +39,14 @@ import (
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/ctx"
 	"github.com/TykTechnologies/tyk/header"
+	"github.com/TykTechnologies/tyk/internal/certcheck"
+	"github.com/TykTechnologies/tyk/internal/crypto"
 	"github.com/TykTechnologies/tyk/internal/graphengine"
 	"github.com/TykTechnologies/tyk/internal/httputil"
 	"github.com/TykTechnologies/tyk/internal/otel"
 	"github.com/TykTechnologies/tyk/internal/service/core"
 	"github.com/TykTechnologies/tyk/regexp"
+	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/trace"
 	"github.com/TykTechnologies/tyk/user"
 )
@@ -1172,6 +1175,9 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 	if cert := p.Gw.getUpstreamCertificate(outreq.URL.Host, p.TykAPISpec); cert != nil {
 		p.logger.Debug("Found upstream mutual TLS certificate")
 		tlsCertificates = []tls.Certificate{*cert}
+
+		// Check upstream certificate expiry
+		p.checkUpstreamCertificateExpiry(cert)
 	}
 
 	p.TykAPISpec.Lock()
@@ -1904,5 +1910,97 @@ func (p *ReverseProxy) addAuthInfo(outReq, req *http.Request) {
 
 	if authProvider := core.GetUpstreamAuth(req); authProvider != nil {
 		authProvider.Fill(outReq)
+	}
+}
+
+// initUpstreamCertBatcher initializes the upstream certificate expiry batcher (called lazily via sync.Once)
+func (p *ReverseProxy) initUpstreamCertBatcher() {
+	// Skip if upstream certificates are disabled
+	if p.TykAPISpec.UpstreamCertificatesDisabled {
+		return
+	}
+
+	// Check if there are any upstream certificates configured
+	hasUpstreamCerts := len(p.TykAPISpec.UpstreamCertificates) > 0 ||
+		len(p.TykAPISpec.GlobalConfig.Security.Certificates.Upstream) > 0
+	if !hasUpstreamCerts {
+		return
+	}
+
+	p.logger.
+		WithField("api_id", p.TykAPISpec.APIID).
+		WithField("api_name", p.TykAPISpec.Name).
+		Debug("Initializing upstream certificate expiry check batcher")
+
+	// Initialize Redis store for cooldowns
+	store := &storage.RedisCluster{
+		KeyPrefix:         certcheck.CertCooldownKeyPrefix,
+		ConnectionHandler: p.Gw.StorageConnectionHandler,
+	}
+	store.Connect()
+
+	apiData := certcheck.APIMetaData{
+		APIID:   p.TykAPISpec.APIID,
+		APIName: p.TykAPISpec.Name,
+	}
+
+	var err error
+	p.TykAPISpec.UpstreamCertExpiryBatcher, err = certcheck.NewCertificateExpiryCheckBatcherWithRole(
+		p.logger,
+		apiData,
+		p.Gw.GetConfig().Security.CertificateExpiryMonitor,
+		store,
+		p.TykAPISpec.FireEvent,
+		certcheck.CertRoleUpstream,
+	)
+
+	if err != nil {
+		p.logger.
+			WithField("api_id", p.TykAPISpec.APIID).
+			WithField("api_name", p.TykAPISpec.Name).
+			Error("Failed to initialize upstream certificate expiry check batcher")
+		return
+	}
+
+	p.TykAPISpec.upstreamCertExpiryCheckContext, p.TykAPISpec.upstreamCertExpiryCancelFunc = context.WithCancel(context.Background())
+	go p.TykAPISpec.UpstreamCertExpiryBatcher.RunInBackground(p.TykAPISpec.upstreamCertExpiryCheckContext)
+}
+
+// checkUpstreamCertificateExpiry checks the expiry of an upstream certificate using the APISpec's batcher
+func (p *ReverseProxy) checkUpstreamCertificateExpiry(cert *tls.Certificate) {
+	// Lazy initialization - only create batcher when first certificate is used
+	p.TykAPISpec.upstreamCertExpiryInitOnce.Do(p.initUpstreamCertBatcher)
+
+	if p.TykAPISpec.UpstreamCertExpiryBatcher == nil {
+		return
+	}
+
+	// Check if the API is being unloaded - if context is cancelled, don't add new certificates
+	if p.TykAPISpec.upstreamCertExpiryCheckContext != nil && p.TykAPISpec.upstreamCertExpiryCheckContext.Err() != nil {
+		return
+	}
+
+	if cert == nil || cert.Leaf == nil {
+		p.logger.Warning("Skipping upstream certificate expiry check: invalid certificate")
+		return
+	}
+
+	certID := crypto.HexSHA256(cert.Leaf.Raw)
+	if certID == "" {
+		p.logger.Warning("Skipping upstream certificate expiry check: empty certificate ID")
+		return
+	}
+
+	certInfo := certcheck.CertInfo{
+		ID:          certID,
+		CommonName:  cert.Leaf.Subject.CommonName,
+		NotAfter:    cert.Leaf.NotAfter,
+		UntilExpiry: time.Until(cert.Leaf.NotAfter),
+	}
+
+	if err := p.TykAPISpec.UpstreamCertExpiryBatcher.Add(certInfo); err != nil {
+		p.logger.
+			WithError(err).
+			Warning("Failed to add upstream certificate to expiry check batch")
 	}
 }
