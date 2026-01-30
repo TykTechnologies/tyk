@@ -57,7 +57,7 @@ func TestGateway_afterConfSetup(t *testing.T) {
 					RPCCertFetchInitialInterval:   0.1,
 					RPCCertFetchMaxInterval:       2,
 					RPCCertFetchRetryEnabled:      func() *bool { b := true; return &b }(),
-					RPCCertFetchMaxRetries:        func() *int { i := 3; return &i }(),
+					RPCCertFetchMaxRetries:        func() *int { i := 5; return &i }(),
 				},
 				AnalyticsConfig: config.AnalyticsConfigConfig{
 					PurgeInterval: 10,

@@ -946,7 +946,7 @@ func TestConfigDefaults(t *testing.T) {
 		time.Millisecond*100,              // initialInterval
 		time.Millisecond*500,              // maxInterval
 		DefaultRPCCertFetchRetryEnabled,   // Should be true
-		DefaultRPCCertFetchMaxRetries,     // Should be 3
+		DefaultRPCCertFetchMaxRetries,     // Should be 5
 	)
 
 	certIDs := []string{"test-cert-id"}

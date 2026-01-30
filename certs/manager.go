@@ -40,7 +40,7 @@ const (
 	//
 	// DefaultRPCCertFetchInitialInterval: Starting delay for exponential backoff (100ms)
 	//   - First retry happens after 100ms
-	//   - Each subsequent retry multiplies by 1.5: 100ms → 150ms → 225ms → 337ms → ... → 2000ms (capped)
+	//   - Each subsequent retry doubles: 100ms → 200ms → 400ms → 800ms → 1600ms → 2000ms (capped)
 	//
 	// DefaultRPCCertFetchMaxInterval: Maximum delay between retry attempts (2 seconds)
 	//   - Caps exponential growth to prevent excessively long waits
@@ -52,10 +52,10 @@ const (
 	// DefaultRPCCertFetchRetryEnabled: Enable retry by default (true)
 	DefaultRPCCertFetchRetryEnabled = true
 
-	// DefaultRPCCertFetchMaxRetries: Maximum number of retry attempts (3)
+	// DefaultRPCCertFetchMaxRetries: Maximum number of retry attempts (5)
 	//   - 0 means unlimited (time-based only)
-	//   - Default of 3 provides reasonable retry attempts with exponential backoff
-	DefaultRPCCertFetchMaxRetries = 3
+	//   - Default of 5 provides reasonable retry attempts with exponential backoff
+	DefaultRPCCertFetchMaxRetries = 5
 )
 
 var (
@@ -488,6 +488,7 @@ func (c *certificateManager) List(certIDs []string, mode CertificateType) (out [
 			expBackoff.MaxElapsedTime = c.certFetchMaxElapsedTime
 			expBackoff.InitialInterval = c.certFetchInitialInterval
 			expBackoff.MaxInterval = c.certFetchMaxInterval
+			expBackoff.Multiplier = 2.0
 
 			// Apply max retries limit if configured (0 = unlimited, time-based only)
 			var backoffStrategy backoff.BackOff = expBackoff
