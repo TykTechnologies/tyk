@@ -14,9 +14,9 @@ import (
 	"github.com/TykTechnologies/tyk/internal/middleware"
 )
 
-// maxJSONRPCRequestSize is the maximum allowed size for JSON-RPC request bodies.
-// This limit protects against DoS attacks when the global MaxRequestBodySize is not configured.
-const maxJSONRPCRequestSize = 1 << 20 // 1MB
+// defaultJSONRPCRequestSize is the default maximum size for JSON-RPC request bodies (1MB).
+// Used when no gateway-level MaxRequestBodySize is configured.
+const defaultJSONRPCRequestSize int64 = 1 << 20
 
 // MCPJSONRPCMiddleware handles JSON-RPC 2.0 request detection and routing for MCP APIs.
 // When a client sends a JSON-RPC request to an MCP endpoint, the middleware detects it,
@@ -59,6 +59,17 @@ func (m *MCPJSONRPCMiddleware) EnabledForSpec() bool {
 	return m.Spec.IsMCP() && m.Spec.JsonRpcVersion == apidef.JsonRPC20
 }
 
+// getMaxRequestBodySize returns the maximum allowed request body size.
+// It uses the gateway-level MaxRequestBodySize if configured, otherwise falls back to the default.
+func (m *MCPJSONRPCMiddleware) getMaxRequestBodySize() int64 {
+	if m.Gw != nil {
+		if maxSize := m.Gw.GetConfig().HttpServerOptions.MaxRequestBodySize; maxSize > 0 {
+			return maxSize
+		}
+	}
+	return defaultJSONRPCRequestSize
+}
+
 // ProcessRequest handles JSON-RPC request detection and routing.
 //
 //nolint:staticcheck // ST1008: middleware interface requires (error, int) return order
@@ -74,7 +85,7 @@ func (m *MCPJSONRPCMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 	}
 
 	// Read and parse the request body with size limit to prevent DoS
-	body, err := io.ReadAll(io.LimitReader(r.Body, maxJSONRPCRequestSize))
+	body, err := io.ReadAll(io.LimitReader(r.Body, m.getMaxRequestBodySize()))
 	if err != nil {
 		m.writeJSONRPCError(w, nil, mcp.JSONRPCParseError, "Parse error", nil)
 		return nil, middleware.StatusRespond //nolint:nilerr // error handled via JSON-RPC response
