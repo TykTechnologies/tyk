@@ -441,6 +441,12 @@ type SlaveOptionsConfig struct {
 	// RPCCertFetchMaxInterval sets the maximum retry interval in seconds for certificate fetch backoff (default: 2)
 	RPCCertFetchMaxInterval float32 `json:"rpc_cert_fetch_max_interval"`
 
+	// RPCCertFetchRetryEnabled enables exponential backoff retry for certificate fetch from MDCB during startup (default: true)
+	RPCCertFetchRetryEnabled *bool `json:"rpc_cert_fetch_retry_enabled"`
+
+	// RPCCertFetchMaxRetries sets the maximum number of retry attempts for certificate fetch. 0 means unlimited (time-based only) (default: 3)
+	RPCCertFetchMaxRetries *int `json:"rpc_cert_fetch_max_retries"`
+
 	// SynchroniserEnabled enable this config if MDCB has enabled the synchoniser. If disabled then it will ignore signals to synchonise recources
 	SynchroniserEnabled bool `json:"synchroniser_enabled"`
 

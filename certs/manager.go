@@ -48,6 +48,14 @@ const (
 	DefaultRPCCertFetchMaxElapsedTime  = 30 * time.Second
 	DefaultRPCCertFetchInitialInterval = 100 * time.Millisecond
 	DefaultRPCCertFetchMaxInterval     = 2 * time.Second
+
+	// DefaultRPCCertFetchRetryEnabled: Enable retry by default (true)
+	DefaultRPCCertFetchRetryEnabled = true
+
+	// DefaultRPCCertFetchMaxRetries: Maximum number of retry attempts (3)
+	//   - 0 means unlimited (time-based only)
+	//   - Default of 3 provides reasonable retry attempts with exponential backoff
+	DefaultRPCCertFetchMaxRetries = 3
 )
 
 var (
@@ -82,9 +90,11 @@ type certificateManager struct {
 	certFetchMaxElapsedTime    time.Duration
 	certFetchInitialInterval   time.Duration
 	certFetchMaxInterval       time.Duration
+	certFetchRetryEnabled      bool
+	certFetchMaxRetries        int
 }
 
-func NewCertificateManager(storage storage.Handler, secret string, logger *logrus.Logger, migrateCertList bool, certFetchMaxElapsedTime, certFetchInitialInterval, certFetchMaxInterval time.Duration) *certificateManager {
+func NewCertificateManager(storage storage.Handler, secret string, logger *logrus.Logger, migrateCertList bool, certFetchMaxElapsedTime, certFetchInitialInterval, certFetchMaxInterval time.Duration, certFetchRetryEnabled bool, certFetchMaxRetries int) *certificateManager {
 	if logger == nil {
 		logger = logrus.New()
 	}
@@ -109,6 +119,8 @@ func NewCertificateManager(storage storage.Handler, secret string, logger *logru
 		certFetchMaxElapsedTime:  certFetchMaxElapsedTime,
 		certFetchInitialInterval: certFetchInitialInterval,
 		certFetchMaxInterval:     certFetchMaxInterval,
+		certFetchRetryEnabled:    certFetchRetryEnabled,
+		certFetchMaxRetries:      certFetchMaxRetries,
 	}
 }
 
@@ -458,7 +470,7 @@ func (c *certificateManager) List(certIDs []string, mode CertificateType) (out [
 		//
 		// During gateway startup, MDCB RPC connection may still be initializing when
 		// SSL certificates are loaded. The retry logic waits for MDCB to become ready.
-		if err != nil && errors.Is(err, storage.ErrMDCBConnectionLost) {
+		if err != nil && errors.Is(err, storage.ErrMDCBConnectionLost) && c.certFetchRetryEnabled {
 			c.logger.Debug("MDCB not ready for certificate fetch, retrying with exponential backoff...")
 
 			operation := func() error {
@@ -474,7 +486,13 @@ func (c *certificateManager) List(certIDs []string, mode CertificateType) (out [
 			expBackoff.InitialInterval = c.certFetchInitialInterval
 			expBackoff.MaxInterval = c.certFetchMaxInterval
 
-			if retryErr := backoff.Retry(operation, expBackoff); retryErr != nil {
+			// Apply max retries limit if configured (0 = unlimited, time-based only)
+			var backoffStrategy backoff.BackOff = expBackoff
+			if c.certFetchMaxRetries > 0 {
+				backoffStrategy = backoff.WithMaxRetries(expBackoff, uint64(c.certFetchMaxRetries))
+			}
+
+			if retryErr := backoff.Retry(operation, backoffStrategy); retryErr != nil {
 				c.logger.Warn("Timeout waiting for MDCB connection for certificate:", id)
 			}
 		}

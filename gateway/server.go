@@ -530,6 +530,8 @@ func (gw *Gateway) setupGlobals() {
 		time.Duration(conf.SlaveOptions.RPCCertFetchMaxElapsedTime*1000)*time.Millisecond,
 		time.Duration(conf.SlaveOptions.RPCCertFetchInitialInterval*1000)*time.Millisecond,
 		time.Duration(conf.SlaveOptions.RPCCertFetchMaxInterval*1000)*time.Millisecond,
+		*conf.SlaveOptions.RPCCertFetchRetryEnabled,
+		*conf.SlaveOptions.RPCCertFetchMaxRetries,
 	)
 
 	if gw.GetConfig().SlaveOptions.UseRPC {
@@ -1597,6 +1599,21 @@ func (gw *Gateway) afterConfSetup() {
 
 		if conf.SlaveOptions.RPCCertFetchMaxInterval <= 0 {
 			conf.SlaveOptions.RPCCertFetchMaxInterval = 2
+		}
+
+		// Default RPCCertFetchRetryEnabled if not explicitly set
+		if conf.SlaveOptions.RPCCertFetchRetryEnabled == nil {
+			enabled := certs.DefaultRPCCertFetchRetryEnabled
+			conf.SlaveOptions.RPCCertFetchRetryEnabled = &enabled
+		}
+
+		// Default RPCCertFetchMaxRetries if not explicitly set (0 = unlimited, negative values default to constant)
+		if conf.SlaveOptions.RPCCertFetchMaxRetries == nil {
+			maxRetries := certs.DefaultRPCCertFetchMaxRetries
+			conf.SlaveOptions.RPCCertFetchMaxRetries = &maxRetries
+		} else if *conf.SlaveOptions.RPCCertFetchMaxRetries < 0 {
+			maxRetries := certs.DefaultRPCCertFetchMaxRetries
+			conf.SlaveOptions.RPCCertFetchMaxRetries = &maxRetries
 		}
 	}
 
