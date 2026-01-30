@@ -909,14 +909,16 @@ func TestMCPJSONRPCMiddleware_ResourcesSubscribe(t *testing.T) {
 	body, err := json.Marshal(payload)
 	require.NoError(t, err)
 
-	r := httptest.NewRequest(http.MethodPost, "/", bytes.NewReader(body))
+	r := httptest.NewRequest(http.MethodPost, "/original-path", bytes.NewReader(body))
 	r.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
 
 	err, code := m.ProcessRequest(w, r, nil)
 	assert.Nil(t, err)
 	assert.Equal(t, http.StatusOK, code)
-	assert.Equal(t, "/mcp-resource:events://*", r.URL.Path)
+	// resources/subscribe now passthroughs to upstream by default
+	assert.Equal(t, "/original-path", r.URL.Path)
+	assert.False(t, httpctx.IsJsonRPCRouting(r))
 }
 
 func TestMCPJSONRPCMiddleware_ResourcesUnsubscribe(t *testing.T) {
@@ -943,14 +945,16 @@ func TestMCPJSONRPCMiddleware_ResourcesUnsubscribe(t *testing.T) {
 	body, err := json.Marshal(payload)
 	require.NoError(t, err)
 
-	r := httptest.NewRequest(http.MethodPost, "/", bytes.NewReader(body))
+	r := httptest.NewRequest(http.MethodPost, "/original-path", bytes.NewReader(body))
 	r.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
 
 	err, code := m.ProcessRequest(w, r, nil)
 	assert.Nil(t, err)
 	assert.Equal(t, http.StatusOK, code)
-	assert.Equal(t, "/mcp-resource:events://topic", r.URL.Path)
+	// resources/unsubscribe now passthroughs to upstream by default
+	assert.Equal(t, "/original-path", r.URL.Path)
+	assert.False(t, httpctx.IsJsonRPCRouting(r))
 }
 
 func TestMCPJSONRPCMiddleware_ToolsCall_MissingParamsName(t *testing.T) {

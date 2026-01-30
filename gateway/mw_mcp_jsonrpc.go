@@ -145,7 +145,7 @@ func (m *MCPJSONRPCMiddleware) buildUnregisteredVEMPath(rpcReq *JSONRPCRequest, 
 	switch rpcReq.Method {
 	case mcp.MethodToolsCall:
 		return mcp.ToolPrefix + primitive
-	case mcp.MethodResourcesRead, mcp.MethodResourcesSubscribe, mcp.MethodResourcesUnsubscribe:
+	case mcp.MethodResourcesRead:
 		return mcp.ResourcePrefix + primitive
 	case mcp.MethodPromptsGet:
 		return mcp.PromptPrefix + primitive
@@ -169,7 +169,7 @@ func (m *MCPJSONRPCMiddleware) routeRequest(rpcReq *JSONRPCRequest) (vemPath str
 		vemPath, found = primitives["tool:"+name]
 		primitive = name
 
-	case mcp.MethodResourcesRead, mcp.MethodResourcesSubscribe, mcp.MethodResourcesUnsubscribe:
+	case mcp.MethodResourcesRead:
 		// Extract resource URI from params.uri
 		uri := m.extractParamString(rpcReq.Params, "uri")
 		if uri == "" {
