@@ -134,7 +134,7 @@ func TestMCPJSONRPCMiddleware_ProcessRequest_InvalidJSON(t *testing.T) {
 	r.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
 
-	_, _ = m.ProcessRequest(w, r, nil)
+	_, _ = m.ProcessRequest(w, r, nil) //nolint:errcheck // error handled via JSON-RPC response
 
 	var resp JSONRPCErrorResponse
 	err := json.NewDecoder(w.Body).Decode(&resp)
@@ -180,15 +180,16 @@ func TestMCPJSONRPCMiddleware_ProcessRequest_InvalidRequest(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			body, _ := json.Marshal(tt.payload)
+			body, err := json.Marshal(tt.payload)
+			require.NoError(t, err)
 			r := httptest.NewRequest(http.MethodPost, "/", bytes.NewReader(body))
 			r.Header.Set("Content-Type", "application/json")
 			w := httptest.NewRecorder()
 
-			_, _ = m.ProcessRequest(w, r, nil)
+			_, _ = m.ProcessRequest(w, r, nil) //nolint:errcheck // error handled via JSON-RPC response
 
 			var resp JSONRPCErrorResponse
-			err := json.NewDecoder(w.Body).Decode(&resp)
+			err = json.NewDecoder(w.Body).Decode(&resp)
 			require.NoError(t, err)
 			assert.Equal(t, mcp.JSONRPCInvalidRequest, resp.Error.Code)
 		})
@@ -216,7 +217,8 @@ func TestMCPJSONRPCMiddleware_ProcessRequest_ToolsCall_RoutesToVEM(t *testing.T)
 		"params":  map[string]interface{}{"name": "get-weather", "arguments": map[string]string{"city": "London"}},
 		"id":      1,
 	}
-	body, _ := json.Marshal(payload)
+	body, err := json.Marshal(payload)
+	require.NoError(t, err)
 
 	r := httptest.NewRequest(http.MethodPost, "/", bytes.NewReader(body))
 	r.Header.Set("Content-Type", "application/json")
@@ -253,7 +255,8 @@ func TestMCPJSONRPCMiddleware_ProcessRequest_ToolsCall_NotFound(t *testing.T) {
 		"params":  map[string]interface{}{"name": "unknown-tool"},
 		"id":      1,
 	}
-	body, _ := json.Marshal(payload)
+	body, err := json.Marshal(payload)
+	require.NoError(t, err)
 
 	r := httptest.NewRequest(http.MethodPost, "/", bytes.NewReader(body))
 	r.Header.Set("Content-Type", "application/json")
@@ -297,16 +300,17 @@ func TestMCPJSONRPCMiddleware_ProcessRequest_ToolsCall_NotFound_WithAllowList(t 
 		"params":  map[string]interface{}{"name": "unknown-tool"},
 		"id":      1,
 	}
-	body, _ := json.Marshal(payload)
+	body, err := json.Marshal(payload)
+	require.NoError(t, err)
 
 	r := httptest.NewRequest(http.MethodPost, "/", bytes.NewReader(body))
 	r.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
 
-	_, _ = m.ProcessRequest(w, r, nil)
+	_, _ = m.ProcessRequest(w, r, nil) //nolint:errcheck // error handled via JSON-RPC response
 
 	var resp JSONRPCErrorResponse
-	err := json.NewDecoder(w.Body).Decode(&resp)
+	err = json.NewDecoder(w.Body).Decode(&resp)
 	require.NoError(t, err)
 	assert.Equal(t, mcp.JSONRPCMethodNotFound, resp.Error.Code)
 	assert.Equal(t, 1.0, resp.ID) // JSON numbers decode as float64
@@ -333,7 +337,8 @@ func TestMCPJSONRPCMiddleware_ProcessRequest_ResourcesRead_ExactMatch(t *testing
 		"params":  map[string]interface{}{"uri": "file:///config.json"},
 		"id":      "req-1",
 	}
-	body, _ := json.Marshal(payload)
+	body, err := json.Marshal(payload)
+	require.NoError(t, err)
 
 	r := httptest.NewRequest(http.MethodPost, "/", bytes.NewReader(body))
 	r.Header.Set("Content-Type", "application/json")
@@ -370,7 +375,8 @@ func TestMCPJSONRPCMiddleware_ProcessRequest_ResourcesRead_WildcardMatch(t *test
 		"params":  map[string]interface{}{"uri": "file:///repo/README.md"},
 		"id":      1,
 	}
-	body, _ := json.Marshal(payload)
+	body, err := json.Marshal(payload)
+	require.NoError(t, err)
 
 	r := httptest.NewRequest(http.MethodPost, "/", bytes.NewReader(body))
 	r.Header.Set("Content-Type", "application/json")
@@ -407,7 +413,8 @@ func TestMCPJSONRPCMiddleware_ProcessRequest_ResourcesRead_ExactBeatsWildcard(t 
 		"params":  map[string]interface{}{"uri": "file:///repo/README.md"},
 		"id":      1,
 	}
-	body, _ := json.Marshal(payload)
+	body, err := json.Marshal(payload)
+	require.NoError(t, err)
 
 	r := httptest.NewRequest(http.MethodPost, "/", bytes.NewReader(body))
 	r.Header.Set("Content-Type", "application/json")
@@ -441,7 +448,8 @@ func TestMCPJSONRPCMiddleware_ProcessRequest_ResourcesRead_MostSpecificWildcard(
 		"params":  map[string]interface{}{"uri": "file:///repo/docs/README.md"},
 		"id":      1,
 	}
-	body, _ := json.Marshal(payload)
+	body, err := json.Marshal(payload)
+	require.NoError(t, err)
 
 	r := httptest.NewRequest(http.MethodPost, "/", bytes.NewReader(body))
 	r.Header.Set("Content-Type", "application/json")
@@ -474,7 +482,8 @@ func TestMCPJSONRPCMiddleware_ProcessRequest_PromptsGet(t *testing.T) {
 		"params":  map[string]interface{}{"name": "code-review"},
 		"id":      1,
 	}
-	body, _ := json.Marshal(payload)
+	body, err := json.Marshal(payload)
+	require.NoError(t, err)
 
 	r := httptest.NewRequest(http.MethodPost, "/", bytes.NewReader(body))
 	r.Header.Set("Content-Type", "application/json")
@@ -506,7 +515,8 @@ func TestMCPJSONRPCMiddleware_ProcessRequest_OperationVEM(t *testing.T) {
 		"method":  "tools/list",
 		"id":      1,
 	}
-	body, _ := json.Marshal(payload)
+	body, err := json.Marshal(payload)
+	require.NoError(t, err)
 
 	r := httptest.NewRequest(http.MethodPost, "/", bytes.NewReader(body))
 	r.Header.Set("Content-Type", "application/json")
@@ -541,7 +551,8 @@ func TestMCPJSONRPCMiddleware_ProcessRequest_DiscoveryPassthrough(t *testing.T) 
 				"method":  method,
 				"id":      1,
 			}
-			body, _ := json.Marshal(payload)
+			body, err := json.Marshal(payload)
+			require.NoError(t, err)
 
 			r := httptest.NewRequest(http.MethodPost, "/original-path", bytes.NewReader(body))
 			r.Header.Set("Content-Type", "application/json")
@@ -575,7 +586,8 @@ func TestMCPJSONRPCMiddleware_ProcessRequest_NotificationsPassthrough(t *testing
 		"method":  "notifications/progress",
 		// No ID - notifications don't have IDs
 	}
-	body, _ := json.Marshal(payload)
+	body, err := json.Marshal(payload)
+	require.NoError(t, err)
 
 	r := httptest.NewRequest(http.MethodPost, "/", bytes.NewReader(body))
 	r.Header.Set("Content-Type", "application/json")
@@ -608,7 +620,8 @@ func TestMCPJSONRPCMiddleware_ProcessRequest_UnmatchedMethodPassthrough(t *testi
 		"method":  "custom/op",
 		"id":      1,
 	}
-	body, _ := json.Marshal(payload)
+	body, err := json.Marshal(payload)
+	require.NoError(t, err)
 
 	r := httptest.NewRequest(http.MethodPost, "/original", bytes.NewReader(body))
 	r.Header.Set("Content-Type", "application/json")
@@ -644,13 +657,14 @@ func TestMCPJSONRPCMiddleware_ProcessRequest_BodyRestored(t *testing.T) {
 		"params":  map[string]interface{}{"name": "test", "arguments": map[string]string{"key": "value"}},
 		"id":      1,
 	}
-	originalBody, _ := json.Marshal(originalPayload)
+	originalBody, err := json.Marshal(originalPayload)
+	require.NoError(t, err)
 
 	r := httptest.NewRequest(http.MethodPost, "/", bytes.NewReader(originalBody))
 	r.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
 
-	_, _ = m.ProcessRequest(w, r, nil)
+	_, _ = m.ProcessRequest(w, r, nil) //nolint:errcheck // testing body restoration
 
 	// Body should be restored for upstream
 	restoredBody, err := io.ReadAll(r.Body)
@@ -678,7 +692,7 @@ func TestMCPJSONRPCMiddleware_ProcessRequest_NullID(t *testing.T) {
 	r.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
 
-	_, _ = m.ProcessRequest(w, r, nil)
+	_, _ = m.ProcessRequest(w, r, nil) //nolint:errcheck // error handled via JSON-RPC response
 
 	var resp JSONRPCErrorResponse
 	err := json.NewDecoder(w.Body).Decode(&resp)
@@ -815,7 +829,8 @@ func TestMCPJSONRPCMiddleware_ResourcesSubscribe(t *testing.T) {
 		"params":  map[string]interface{}{"uri": "events://updates"},
 		"id":      1,
 	}
-	body, _ := json.Marshal(payload)
+	body, err := json.Marshal(payload)
+	require.NoError(t, err)
 
 	r := httptest.NewRequest(http.MethodPost, "/", bytes.NewReader(body))
 	r.Header.Set("Content-Type", "application/json")
@@ -848,7 +863,8 @@ func TestMCPJSONRPCMiddleware_ResourcesUnsubscribe(t *testing.T) {
 		"params":  map[string]interface{}{"uri": "events://topic"},
 		"id":      1,
 	}
-	body, _ := json.Marshal(payload)
+	body, err := json.Marshal(payload)
+	require.NoError(t, err)
 
 	r := httptest.NewRequest(http.MethodPost, "/", bytes.NewReader(body))
 	r.Header.Set("Content-Type", "application/json")
@@ -882,16 +898,17 @@ func TestMCPJSONRPCMiddleware_ToolsCall_MissingParamsName(t *testing.T) {
 		"params":  map[string]interface{}{"arguments": map[string]string{}},
 		"id":      1,
 	}
-	body, _ := json.Marshal(payload)
+	body, err := json.Marshal(payload)
+	require.NoError(t, err)
 
 	r := httptest.NewRequest(http.MethodPost, "/", bytes.NewReader(body))
 	r.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
 
-	_, _ = m.ProcessRequest(w, r, nil)
+	_, _ = m.ProcessRequest(w, r, nil) //nolint:errcheck // error handled via JSON-RPC response
 
 	var resp JSONRPCErrorResponse
-	err := json.NewDecoder(w.Body).Decode(&resp)
+	err = json.NewDecoder(w.Body).Decode(&resp)
 	require.NoError(t, err)
 	assert.Equal(t, mcp.JSONRPCInvalidParams, resp.Error.Code)
 }
@@ -917,16 +934,17 @@ func TestMCPJSONRPCMiddleware_ToolsCall_NonStringName_InvalidParams(t *testing.T
 		"params":  map[string]interface{}{"name": 123},
 		"id":      1,
 	}
-	body, _ := json.Marshal(payload)
+	body, err := json.Marshal(payload)
+	require.NoError(t, err)
 
 	r := httptest.NewRequest(http.MethodPost, "/", bytes.NewReader(body))
 	r.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
 
-	_, _ = m.ProcessRequest(w, r, nil)
+	_, _ = m.ProcessRequest(w, r, nil) //nolint:errcheck // error handled via JSON-RPC response
 
 	var resp JSONRPCErrorResponse
-	err := json.NewDecoder(w.Body).Decode(&resp)
+	err = json.NewDecoder(w.Body).Decode(&resp)
 	require.NoError(t, err)
 	assert.Equal(t, mcp.JSONRPCInvalidParams, resp.Error.Code)
 }
@@ -952,16 +970,17 @@ func TestMCPJSONRPCMiddleware_ResourcesRead_MissingParamsURI_InvalidParams(t *te
 		"params":  map[string]interface{}{"name": "missing-uri"},
 		"id":      1,
 	}
-	body, _ := json.Marshal(payload)
+	body, err := json.Marshal(payload)
+	require.NoError(t, err)
 
 	r := httptest.NewRequest(http.MethodPost, "/", bytes.NewReader(body))
 	r.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
 
-	_, _ = m.ProcessRequest(w, r, nil)
+	_, _ = m.ProcessRequest(w, r, nil) //nolint:errcheck // error handled via JSON-RPC response
 
 	var resp JSONRPCErrorResponse
-	err := json.NewDecoder(w.Body).Decode(&resp)
+	err = json.NewDecoder(w.Body).Decode(&resp)
 	require.NoError(t, err)
 	assert.Equal(t, mcp.JSONRPCInvalidParams, resp.Error.Code)
 }

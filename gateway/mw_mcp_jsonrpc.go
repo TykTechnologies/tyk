@@ -60,6 +60,8 @@ func (m *MCPJSONRPCMiddleware) EnabledForSpec() bool {
 }
 
 // ProcessRequest handles JSON-RPC request detection and routing.
+//
+//nolint:staticcheck // ST1008: middleware interface requires (error, int) return order
 func (m *MCPJSONRPCMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
 	// Only process POST requests with JSON content type
 	if r.Method != http.MethodPost {
@@ -75,7 +77,7 @@ func (m *MCPJSONRPCMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 	body, err := io.ReadAll(io.LimitReader(r.Body, maxJSONRPCRequestSize))
 	if err != nil {
 		m.writeJSONRPCError(w, nil, mcp.JSONRPCParseError, "Parse error", nil)
-		return nil, middleware.StatusRespond
+		return nil, middleware.StatusRespond //nolint:nilerr // error handled via JSON-RPC response
 	}
 	// Restore body for upstream
 	r.Body = io.NopCloser(bytes.NewReader(body))
@@ -83,7 +85,7 @@ func (m *MCPJSONRPCMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 	var rpcReq JSONRPCRequest
 	if err := json.Unmarshal(body, &rpcReq); err != nil {
 		m.writeJSONRPCError(w, nil, mcp.JSONRPCParseError, "Parse error", nil)
-		return nil, middleware.StatusRespond
+		return nil, middleware.StatusRespond //nolint:nilerr // error handled via JSON-RPC response
 	}
 
 	// Validate JSON-RPC 2.0 structure

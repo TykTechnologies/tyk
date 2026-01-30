@@ -56,6 +56,9 @@ func (a APIDefinitionLoader) generateMCPVEMs(apiSpec *APISpec, conf config.Confi
 		return nil
 	}
 
+	// Ensure MCP VEM prefixes are registered with the agent protocol registry.
+	mcp.RegisterVEMPrefixes()
+
 	middleware := apiSpec.OAS.GetTykMiddleware()
 	if middleware == nil {
 		return nil

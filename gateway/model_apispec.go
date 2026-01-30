@@ -22,8 +22,9 @@ import (
 	"github.com/TykTechnologies/tyk/internal/errors"
 	"github.com/TykTechnologies/tyk/internal/graphengine"
 	"github.com/TykTechnologies/tyk/internal/httputil"
-	_ "github.com/TykTechnologies/tyk/internal/mcp" // registers MCP VEM prefixes
 	"github.com/TykTechnologies/tyk/user"
+
+	_ "github.com/TykTechnologies/tyk/internal/mcp" // registers MCP VEM prefixes
 )
 
 // APISpec represents a path specification for an API, to avoid enumerating multiple nested lists, a single
