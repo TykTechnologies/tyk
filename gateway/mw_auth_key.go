@@ -28,8 +28,9 @@ const (
 	ErrAuthKeyNotFound               = "auth.key_not_found"
 	ErrAuthCertNotFound              = "auth.cert_not_found"
 	ErrAuthCertExpired               = "auth.cert_expired"
-	ErrAuthCertMismatch              = "auth.cert_mismatch"
 	ErrAuthKeyIsInvalid              = "auth.key_is_invalid"
+	ErrAuthCertRequired              = "auth.cert_required"
+	ErrAuthCertMismatch              = "auth.cert_mismatch"
 
 	MsgNonExistentKey      = "Attempted access with non-existent key."
 	MsgNonExistentCert     = "Attempted access with non-existent cert."
@@ -63,9 +64,14 @@ func initAuthKeyErrors() {
 		Code:    http.StatusForbidden,
 	}
 
+	TykErrors[ErrAuthCertRequired] = config.TykError{
+		Message: MsgAuthCertRequired,
+		Code:    http.StatusUnauthorized,
+	}
+
 	TykErrors[ErrAuthCertMismatch] = config.TykError{
 		Message: MsgApiAccessDisallowed,
-		Code:    http.StatusForbidden,
+		Code:    http.StatusUnauthorized,
 	}
 }
 
@@ -96,6 +102,17 @@ func (k *AuthKey) getAuthType() string {
 	return apidef.AuthTokenType
 }
 
+// checkSessionWithCertFallback attempts to find a session using a generated token from certHash,
+// falling back to checking with the certHash directly if the token lookup fails.
+func (k *AuthKey) checkSessionWithCertFallback(r *http.Request, certHash string) (user.SessionState, bool) {
+	key := k.Gw.generateToken(k.Spec.OrgID, certHash)
+	session, keyExists := k.CheckSessionAndIdentityForValidKey(key, r)
+	if !keyExists {
+		session, keyExists = k.CheckSessionAndIdentityForValidKey(certHash, r)
+	}
+	return session, keyExists
+}
+
 func (k *AuthKey) ProcessRequest(_ http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
 	if ctxGetRequestStatus(r) == StatusOkAndIgnore {
 		return nil, http.StatusOK
@@ -107,35 +124,63 @@ func (k *AuthKey) ProcessRequest(_ http.ResponseWriter, r *http.Request, _ inter
 	}
 
 	key, authConfig := k.getAuthToken(k.getAuthType(), r)
-	var certHash string
-
-	keyExists := false
-	var session user.SessionState
-	updateSession := false
 	if key != "" {
 		key = stripBearer(key)
-	} else if authConfig.UseCertificate && key == "" && r.TLS != nil && len(r.TLS.PeerCertificates) > 0 {
-		log.Debug("Trying to find key by client certificate")
-		certHash = k.Spec.OrgID + crypto.HexSHA256(r.TLS.PeerCertificates[0].Raw)
-		if time.Now().After(r.TLS.PeerCertificates[0].NotAfter) {
-			return errorAndStatusCode(ErrAuthCertExpired)
-		}
-
-		key = k.Gw.generateToken(k.Spec.OrgID, certHash)
-	} else {
-		k.Logger().Info("Attempted access with malformed header, no auth header found.")
-		return errorAndStatusCode(ErrAuthAuthorizationFieldMissing)
 	}
+	var keyExists, updateSession bool
+	var certHash string
+	var session user.SessionState
 
 	session, keyExists = k.CheckSessionAndIdentityForValidKey(key, r)
-	key = session.KeyID
-	if !keyExists {
-		// fallback to search by cert
-		session, keyExists = k.CheckSessionAndIdentityForValidKey(certHash, r)
+	if !authConfig.UseCertificate {
+		if key == "" {
+			k.Logger().Info("Attempted access with malformed header, no auth header found.")
+			return errorAndStatusCode(ErrAuthAuthorizationFieldMissing)
+		}
 		if !keyExists {
 			return k.reportInvalidKey(key, r, MsgNonExistentKey, ErrAuthKeyNotFound)
 		}
 	}
+	if authConfig.UseCertificate && r.TLS != nil {
+		if len(r.TLS.PeerCertificates) > 0 {
+			if time.Now().After(r.TLS.PeerCertificates[0].NotAfter) {
+				return errorAndStatusCode(ErrAuthCertExpired)
+			}
+			certHash = k.Spec.OrgID + crypto.HexSHA256(r.TLS.PeerCertificates[0].Raw)
+		}
+
+		if !k.Gw.GetConfig().Security.AllowUnsafeDynamicMTLSToken {
+			if certHash == "" {
+				return errorAndStatusCode(ErrAuthCertRequired)
+			}
+			session, keyExists = k.checkSessionWithCertFallback(r, certHash)
+			if !keyExists {
+				return errorAndStatusCode(ErrAuthCertMismatch)
+			}
+		} else {
+			if certHash != "" {
+				session, keyExists = k.checkSessionWithCertFallback(r, certHash)
+				if !keyExists {
+					return errorAndStatusCode(ErrAuthCertMismatch)
+				}
+			}
+			if key != "" {
+				session, keyExists = k.CheckSessionAndIdentityForValidKey(key, r)
+				if !keyExists {
+					return k.reportInvalidKey(key, r, MsgNonExistentKey, ErrAuthKeyNotFound)
+				}
+			}
+		}
+	} else {
+		if !keyExists {
+			// fallback to search by cert
+			session, keyExists = k.CheckSessionAndIdentityForValidKey(certHash, r)
+			if !keyExists {
+				return k.reportInvalidKey(key, r, MsgNonExistentKey, ErrAuthKeyNotFound)
+			}
+		}
+	}
+	key = session.KeyID
 
 	// Validate certificate binding or dynamic mTLS
 	// Certificate binding validation runs when:
@@ -313,17 +358,17 @@ func (k *AuthKey) validateCertificate(ctx *certValidationContext) (int, error) {
 
 // validateWithTLSCertificate handles validation when a TLS client certificate is provided
 func (k *AuthKey) validateWithTLSCertificate(ctx *certValidationContext) (int, error) {
-	// Check certificate expiry when a token is provided (not checked earlier in the flow)
-	if code, err := k.checkCertificateExpiry(ctx.request, ctx.key); err != nil {
-		return code, err
-	}
-
 	// Compute cert hash for comparison
 	*ctx.certHash = k.computeCertHash(ctx.request, *ctx.certHash)
 
 	// Use binding mode if the session has static certificate bindings configured
 	// Otherwise, use legacy mode for backward compatibility with dynamic mTLS
 	if ctx.useCertBinding {
+		// Check certificate expiry for cert binding mode
+		// (not checked earlier in the flow, unlike when authConfig.UseCertificate is true)
+		if code, err := k.checkCertificateExpiry(ctx.request, ctx.key); err != nil {
+			return code, err
+		}
 		return k.validateCertificateBinding(ctx.request, ctx.key, ctx.session, *ctx.certHash)
 	}
 
