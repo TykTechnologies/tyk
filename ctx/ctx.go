@@ -58,6 +58,8 @@ const (
 	RequestStartTime
 	// ErrorClassification holds structured error information for access logs
 	ErrorClassification
+	// MCPRouting indicates the request came via MCP JSON-RPC routing
+	MCPRouting
 )
 
 func ctxSetSession(r *http.Request, s *user.SessionState, scheduleUpdate bool, hashKey bool) {
