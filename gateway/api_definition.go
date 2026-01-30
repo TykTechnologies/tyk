@@ -20,7 +20,9 @@ import (
 	"github.com/TykTechnologies/tyk/ee/middleware/streams"
 	"github.com/TykTechnologies/tyk/storage/kv"
 
+	"github.com/TykTechnologies/tyk/internal/httpctx"
 	"github.com/TykTechnologies/tyk/internal/httputil"
+	"github.com/TykTechnologies/tyk/internal/mcp"
 
 	"github.com/getkin/kin-openapi/routers/gorillamux"
 
@@ -129,6 +131,9 @@ const (
 	StatusGoPlugin                        RequestStatus = "Go plugin"
 	StatusPersistGraphQL                  RequestStatus = "Persist GraphQL"
 	StatusRateLimit                       RequestStatus = "Rate Limited"
+	// MCPPrimitiveNotFound is returned when a primitive VEM is accessed directly (not via JSON-RPC routing).
+	// It intentionally maps to HTTP 404 to avoid exposing internal-only endpoints.
+	MCPPrimitiveNotFound RequestStatus = "MCP Primitive Not Found"
 )
 
 type EndPointCacheMeta struct {
@@ -205,6 +210,12 @@ func (s *APISpec) Unload() {
 		hook()
 	}
 	s.unloadHooks = nil
+
+	// stop upstream certificate monitoring goroutine (after all hooks to ensure middleware cleanup completes first)
+	s.UnloadUpstreamCertMonitoring()
+
+	// Clear MCP primitives map
+	s.MCPPrimitives = nil
 }
 
 // Validate returns nil if s is a valid spec and an error stating why the spec is not valid.
@@ -1445,6 +1456,9 @@ func (a APIDefinitionLoader) getExtendedPathSpecs(apiVersionDef apidef.VersionIn
 	oasValidateRequestPaths := a.compileOASValidateRequestPathSpec(apiSpec, conf)
 	oasMockResponsePaths := a.compileOASMockResponsePathSpec(apiSpec, conf)
 
+	// MCP VEM generation - creates internal endpoints for MCP primitives (tools, resources, prompts)
+	mcpVEMs := a.generateMCPVEMs(apiSpec, conf)
+
 	combinedPath := []URLSpec{}
 	combinedPath = append(combinedPath, mockResponsePaths...)
 	combinedPath = append(combinedPath, ignoredPaths...)
@@ -1472,6 +1486,7 @@ func (a APIDefinitionLoader) getExtendedPathSpecs(apiVersionDef apidef.VersionIn
 	combinedPath = append(combinedPath, rateLimitPaths...)
 	combinedPath = append(combinedPath, oasValidateRequestPaths...)
 	combinedPath = append(combinedPath, oasMockResponsePaths...)
+	combinedPath = append(combinedPath, mcpVEMs...)
 
 	return combinedPath, len(whiteListPaths) > 0
 }
@@ -1480,6 +1495,17 @@ func (a *APISpec) Init(authStore, sessionStore, healthStore, orgStore storage.Ha
 	a.AuthManager.Init(authStore)
 	a.Health.Init(healthStore)
 	a.OrgSessionManager.Init(orgStore)
+}
+
+func (a *APISpec) UnloadUpstreamCertMonitoring() {
+	if a.upstreamCertExpiryCancelFunc != nil {
+		log.
+			WithField("api_id", a.APIID).
+			WithField("api_name", a.Name).
+			Debug("Stopping upstream certificate expiry check batcher")
+
+		a.upstreamCertExpiryCancelFunc()
+	}
 }
 
 func (a *APISpec) StopSessionManagerPool() {
@@ -1551,8 +1577,16 @@ func (a *APISpec) URLAllowedAndIgnored(r *http.Request, rxPaths []URLSpec, white
 			continue
 		}
 
-		if r.Method == rxPaths[i].Internal.Method && rxPaths[i].Status == Internal && !ctxLoopingEnabled(r) {
-			return EndPointNotAllowed, nil
+		if r.Method == rxPaths[i].Internal.Method && rxPaths[i].Status == Internal {
+			// MCP primitive VEMs require explicit MCP routing context.
+			if mcp.IsPrimitiveVEMPath(rxPaths[i].Internal.Path) {
+				if !httpctx.IsMCPRouting(r) {
+					return MCPPrimitiveNotFound, nil
+				}
+			} else if !ctxLoopingEnabled(r) {
+				// Other internal endpoints use generic looping check.
+				return EndPointNotAllowed, nil
+			}
 		}
 	}
 
@@ -1621,11 +1655,18 @@ func (a *APISpec) URLAllowedAndIgnored(r *http.Request, rxPaths []URLSpec, white
 			switch rxPaths[i].Status {
 			case WhiteList, BlackList, Ignored:
 			default:
-				if rxPaths[i].Status == Internal && r.Method == rxPaths[i].Internal.Method && ctxLoopingEnabled(r) {
-					return a.getURLStatus(rxPaths[i].Status), nil
-				} else {
-					return EndPointNotAllowed, nil
+				if rxPaths[i].Status == Internal && r.Method == rxPaths[i].Internal.Method {
+					// MCP primitive VEMs require explicit MCP routing context.
+					if mcp.IsPrimitiveVEMPath(rxPaths[i].Internal.Path) {
+						if httpctx.IsMCPRouting(r) {
+							return a.getURLStatus(rxPaths[i].Status), nil
+						}
+					} else if ctxLoopingEnabled(r) {
+						// Other internal endpoints use generic looping check.
+						return a.getURLStatus(rxPaths[i].Status), nil
+					}
 				}
+				return EndPointNotAllowed, nil
 			}
 		}
 
@@ -1756,6 +1797,8 @@ func (a *APISpec) RequestValid(r *http.Request) (bool, RequestStatus) {
 	status, _ = a.URLAllowedAndIgnored(r, versionPaths, whiteListStatus)
 	switch status {
 	case EndPointNotAllowed:
+		return false, status
+	case MCPPrimitiveNotFound:
 		return false, status
 	case StatusRedirectFlowByReply:
 		return true, status
