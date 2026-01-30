@@ -150,14 +150,8 @@ func (a *APISpec) FindAllVEMChainSpecs(r *http.Request, rxPaths []URLSpec, mode 
 	// Check if this is a JSON-RPC routed request with a VEM chain
 	rpcData := httpctx.GetJSONRPCRequest(r)
 
-	log.Infof("[DEBUG] FindAllVEMChainSpecs: mode=%v, path=%s, hasRPCData=%v", mode, r.URL.Path, rpcData != nil)
-	if rpcData != nil {
-		log.Infof("[DEBUG] FindAllVEMChainSpecs: VEMChain=%v, VEMPath=%s", rpcData.VEMChain, rpcData.VEMPath)
-	}
-
 	if rpcData == nil || len(rpcData.VEMChain) == 0 {
 		// Not a JSON-RPC request, use normal logic
-		log.Infof("[DEBUG] FindAllVEMChainSpecs: No VEM chain, using normal logic")
 		if spec, ok := a.FindSpecMatchesStatus(r, rxPaths, mode); ok {
 			return []*URLSpec{spec}
 		}
@@ -168,9 +162,7 @@ func (a *APISpec) FindAllVEMChainSpecs(r *http.Request, rxPaths []URLSpec, mode 
 	method := http.MethodPost // JSON-RPC always uses POST
 	var specs []*URLSpec
 
-	log.Infof("[DEBUG] FindAllVEMChainSpecs: Checking %d VEMs in chain", len(rpcData.VEMChain))
 	for _, vemPath := range rpcData.VEMChain {
-		log.Infof("[DEBUG] FindAllVEMChainSpecs: Looking for specs matching VEM: %s", vemPath)
 		for i := range rxPaths {
 			if rxPaths[i].Status != mode {
 				continue
@@ -183,14 +175,12 @@ func (a *APISpec) FindAllVEMChainSpecs(r *http.Request, rxPaths []URLSpec, mode 
 			// We need to get the path from the spec based on the mode
 			specPath, specMethod := a.getSpecPathAndMethod(&rxPaths[i], mode)
 			if specPath == vemPath && specMethod == method {
-				log.Infof("[DEBUG] FindAllVEMChainSpecs: Found matching spec at path=%s", specPath)
 				specs = append(specs, &rxPaths[i])
 				break // Found spec for this VEM, move to next
 			}
 		}
 	}
 
-	log.Infof("[DEBUG] FindAllVEMChainSpecs: Returning %d specs", len(specs))
 	return specs
 }
 
