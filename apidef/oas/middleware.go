@@ -17,6 +17,15 @@ type Middleware struct {
 
 	// Operations contains configuration for middleware that can be applied to individual endpoints within the API (per-endpoint).
 	Operations Operations `bson:"operations,omitempty" json:"operations,omitempty"`
+
+	// McpTools contains configuration for middleware that can be applied to MCP tools.
+	McpTools MCPPrimitives `bson:"mcpTools,omitempty" json:"mcpTools,omitempty"`
+
+	// McpResources contains configuration for middleware that can be applied to MCP resources.
+	McpResources MCPPrimitives `bson:"mcpResources,omitempty" json:"mcpResources,omitempty"`
+
+	// McpPrompts contains configuration for middleware that can be applied to MCP prompts.
+	McpPrompts MCPPrimitives `bson:"mcpPrompts,omitempty" json:"mcpPrompts,omitempty"`
 }
 
 // Fill fills *Middleware from apidef.APIDefinition.
