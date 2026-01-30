@@ -135,7 +135,6 @@ testcases:
             "active": true,
             "hmac_enabled": false,
             "id": "46ad120575961080181867e",
-            "org_id": "664a14650619d40001f1f00f",
             "is_inactive": false,
             "key_expires_in": 2592000,
             "max_query_depth": -1,
@@ -164,11 +163,11 @@ testcases:
         assertions:
           - result.statuscode ShouldEqual 200
 
-  - name: Reload gateway
+  - name: Reload  gateway
     steps:
       - type: http
         method: GET
-        url: http://localhost:8080/tyk/reload?block=true
+        url: http://localhost:8080/tyk/reload
         headers:
           X-Tyk-Authorization: {{ .bearerToken }}
         assertions:
