@@ -39,7 +39,7 @@ func (m *MockMDCBStorage) GetMultiKey(_ []string) ([]string, error) {
 	return nil, errors.New("not implemented")
 }
 
-func (m *MockMDCBStorage) SetKey(key, value string, timeout int64) error {
+func (m *MockMDCBStorage) SetKey(_, _ string, _ int64) error {
 	return nil
 }
 
@@ -47,7 +47,7 @@ func (m *MockMDCBStorage) GetRawKey(key string) (string, error) {
 	return m.GetKey(key)
 }
 
-func (m *MockMDCBStorage) SetRawKey(key, value string, timeout int64) error {
+func (m *MockMDCBStorage) SetRawKey(_, _ string, _ int64) error {
 	return nil
 }
 
@@ -55,7 +55,7 @@ func (m *MockMDCBStorage) GetExp(_ string) (int64, error) {
 	return -1, nil
 }
 
-func (m *MockMDCBStorage) SetExp(_ string, timeout int64) error {
+func (m *MockMDCBStorage) SetExp(_ string, _ int64) error {
 	return nil
 }
 
@@ -67,7 +67,7 @@ func (m *MockMDCBStorage) DeleteRawKey(_ string) bool {
 	return true
 }
 
-func (m *MockMDCBStorage) DeleteRawKeys(keys []string) bool {
+func (m *MockMDCBStorage) DeleteRawKeys(_ []string) bool {
 	return true
 }
 
@@ -283,7 +283,7 @@ func (m *MockFlakyMDCBStorage) GetMultiKey(_ []string) ([]string, error) {
 	return nil, errors.New("not implemented")
 }
 
-func (m *MockFlakyMDCBStorage) SetKey(key, value string, timeout int64) error {
+func (m *MockFlakyMDCBStorage) SetKey(_, _ string, _ int64) error {
 	return nil
 }
 
@@ -291,7 +291,7 @@ func (m *MockFlakyMDCBStorage) GetRawKey(key string) (string, error) {
 	return m.GetKey(key)
 }
 
-func (m *MockFlakyMDCBStorage) SetRawKey(key, value string, timeout int64) error {
+func (m *MockFlakyMDCBStorage) SetRawKey(_, _ string, _ int64) error {
 	return nil
 }
 
