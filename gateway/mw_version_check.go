@@ -98,6 +98,10 @@ outside:
 	// Check versioning, blacklist, whitelist and ignored status
 	requestValid, stat := v.Spec.RequestValid(r)
 	if !requestValid {
+		if stat == MCPPrimitiveNotFound {
+			return errors.New(http.StatusText(http.StatusNotFound)), http.StatusNotFound
+		}
+
 		// Fire a versioning failure event
 		v.FireEvent(EventVersionFailure, EventVersionFailureMeta{
 			EventMetaDefault: EventMetaDefault{

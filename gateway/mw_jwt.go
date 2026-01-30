@@ -26,6 +26,7 @@ import (
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/apidef/oas"
 	"github.com/TykTechnologies/tyk/internal/cache"
+	"github.com/TykTechnologies/tyk/internal/model"
 	"github.com/TykTechnologies/tyk/internal/otel"
 	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/user"
@@ -76,7 +77,8 @@ func (k *JWTMiddleware) Init() {
 		go func() {
 			k.Logger().Debug("Pre-fetching JWKs asynchronously")
 			// Drop the previous cache for the API ID
-			JWKCaches.Delete(k.Spec.APIID)
+			deleteJWKCacheByAPIID(k.Spec.APIID)
+
 			jwkCache := loadOrCreateJWKCacheByApiID(k.Spec.APIID)
 
 			// Create client factory for JWK fetching
@@ -113,8 +115,16 @@ func (k *JWTMiddleware) Unload() {
 	// Init tries to clean the cache for the API ID when it starts
 	spec := k.Gw.getApiSpec(k.Spec.APIID)
 	if spec == nil {
-		// Drop the cache for API ID if it's removed from Tyk
-		JWKCaches.Delete(k.Spec.APIID)
+		// delete the cache from the global map and stop its janitor.
+		deleteJWKCacheByAPIID(k.Spec.APIID)
+	}
+}
+
+func deleteJWKCacheByAPIID(apiID string) {
+	if existing, ok := JWKCaches.LoadAndDelete(apiID); ok {
+		if repo, ok := existing.(cache.Repository); ok {
+			repo.Close()
+		}
 	}
 }
 
@@ -127,10 +137,22 @@ func (k *JWTMiddleware) loadOrCreateJWKCache() cache.Repository {
 }
 
 func loadOrCreateJWKCacheByApiID(apiID string) cache.Repository {
-	raw, _ := JWKCaches.LoadOrStore(apiID, cache.New(240, 30))
+	if raw, ok := JWKCaches.Load(apiID); ok {
+		if jwkCache, ok := raw.(cache.Repository); ok {
+			return jwkCache
+		}
+	}
+
+	newCache := cache.New(240, 30)
+	raw, loaded := JWKCaches.LoadOrStore(apiID, newCache)
+
+	// If another goroutine won the race, close the unused cache
+	if loaded {
+		newCache.Close()
+	}
+
 	jwkCache, ok := raw.(cache.Repository)
 	if !ok {
-		// This should not be possible
 		panic("JWKCache instance must implement cache.Repository")
 	}
 	return jwkCache
@@ -798,9 +820,7 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 		var policy user.Policy
 		var ok bool
 		if basePolicyID != "" {
-			k.Gw.policiesMu.RLock()
-			policy, ok = k.Gw.policiesByID[basePolicyID]
-			k.Gw.policiesMu.RUnlock()
+			policy, ok = k.Gw.policies.PolicyByID(model.NewScopedCustomPolicyId(k.Spec.OrgID, basePolicyID))
 			if !ok {
 				k.reportLoginFailure(baseFieldData, r)
 				k.Logger().Error("Policy ID found is invalid!")
@@ -1414,9 +1434,15 @@ func ctxSetJWTContextVars(s *APISpec, r *http.Request, token *jwt.Token) {
 }
 
 func (gw *Gateway) generateSessionFromPolicy(policyID, orgID string, enforceOrg bool) (user.SessionState, error) {
-	gw.policiesMu.RLock()
-	policy, ok := gw.policiesByID[policyID]
-	gw.policiesMu.RUnlock()
+	var polId model.PolicyID
+
+	if enforceOrg {
+		polId = model.NewScopedCustomPolicyId(orgID, policyID)
+	} else {
+		polId = model.NonScopedLastInsertedPolicyId(policyID)
+	}
+
+	policy, ok := gw.policies.PolicyByID(polId)
 	session := user.SessionState{}
 
 	if !ok {
@@ -1424,7 +1450,6 @@ func (gw *Gateway) generateSessionFromPolicy(policyID, orgID string, enforceOrg 
 	}
 	// Check ownership, policy org owner must be the same as API,
 	// otherwise you could overwrite a session key with a policy from a different org!
-
 	if enforceOrg {
 		if policy.OrgID != orgID {
 			log.Error("Attempting to apply policy from different organisation to key, skipping")
@@ -1599,15 +1624,8 @@ func getUserIDFromClaim(claims jwt.MapClaims, identityBaseField string, shouldFa
 }
 
 func invalidateJWKSCacheByAPIID(apiID string) {
-	raw, ok := JWKCaches.Load(apiID)
-	if ok {
-		jwkCache, interfaceOK := raw.(cache.Repository)
-		if !interfaceOK {
-			panic("JWKCache must implement cache.Repository")
-		}
-		jwkCache.Flush()
-		mainLog.Debugf("JWKS cache for API: %s has been flushed", apiID)
-	}
+	deleteJWKCacheByAPIID(apiID)
+	mainLog.Debugf("JWKS cache for API: %s has been invalidated", apiID)
 }
 
 func (gw *Gateway) invalidateJWKSCacheForAPIID(w http.ResponseWriter, r *http.Request) {
@@ -1619,7 +1637,13 @@ func (gw *Gateway) invalidateJWKSCacheForAPIID(w http.ResponseWriter, r *http.Re
 }
 
 func (gw *Gateway) invalidateJWKSCacheForAllAPIs(w http.ResponseWriter, _ *http.Request) {
-	JWKCaches.Clear()
+	JWKCaches.Range(func(key, _ any) bool {
+		apiID, ok := key.(string)
+		if ok {
+			deleteJWKCacheByAPIID(apiID)
+		}
+		return true
+	})
 
 	doJSONWrite(w, http.StatusOK, apiOk("cache invalidated"))
 }
