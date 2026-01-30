@@ -623,7 +623,7 @@ func TestCertificateLoadingScale1000(t *testing.T) {
 }
 
 // Benchmark certificate loading with skipBackoff optimization
-func BenchmarkTT14618_CertificateLoading(b *testing.B) {
+func BenchmarkCertificateLoadingPerformance(b *testing.B) {
 	certPEM := loadTestCert(&testing.T{})
 
 	benchmarks := []struct {
@@ -666,7 +666,7 @@ func BenchmarkTT14618_CertificateLoading(b *testing.B) {
 }
 
 // Benchmark to compare optimized vs unoptimized behavior
-func BenchmarkTT14618_OptimizedVsUnoptimized(b *testing.B) {
+func BenchmarkSkipBackoffOptimization(b *testing.B) {
 	certPEM := loadTestCert(&testing.T{})
 	certCount := 100
 	failures := 3
@@ -724,7 +724,7 @@ func BenchmarkTT14618_OptimizedVsUnoptimized(b *testing.B) {
 }
 
 // Benchmark cache hit performance (no MDCB calls)
-func BenchmarkTT14618_CacheHit(b *testing.B) {
+func BenchmarkCertificateCacheHit(b *testing.B) {
 	certPEM := loadTestCert(&testing.T{})
 	mockStorage := &MockMDCBStorage{
 		clearAfter: 0,
