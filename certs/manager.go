@@ -82,16 +82,16 @@ type CertificateManager interface {
 }
 
 type certificateManager struct {
-	storage                    storage.Handler
-	logger                     *logrus.Entry
-	cache                      cache.Repository
-	secret                     string
-	migrateCertList            bool
-	certFetchMaxElapsedTime    time.Duration
-	certFetchInitialInterval   time.Duration
-	certFetchMaxInterval       time.Duration
-	certFetchRetryEnabled      bool
-	certFetchMaxRetries        int
+	storage                  storage.Handler
+	logger                   *logrus.Entry
+	cache                    cache.Repository
+	secret                   string
+	migrateCertList          bool
+	certFetchMaxElapsedTime  time.Duration
+	certFetchInitialInterval time.Duration
+	certFetchMaxInterval     time.Duration
+	certFetchRetryEnabled    bool
+	certFetchMaxRetries      int
 }
 
 func NewCertificateManager(storageHandler storage.Handler, secret string, logger *logrus.Logger, migrateCertList bool, certFetchMaxElapsedTime, certFetchInitialInterval, certFetchMaxInterval time.Duration, certFetchRetryEnabled bool, certFetchMaxRetries int) *certificateManager {
