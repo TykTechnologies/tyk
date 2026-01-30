@@ -13,10 +13,10 @@ import (
 
 // MockStorage simulates emergency mode clearing after a delay
 type MockMDCBStorage struct {
-	callCount    int
-	clearAfter   int // Clear emergency mode after N calls
-	certData     string
-	t            *testing.T
+	callCount  int
+	clearAfter int // Clear emergency mode after N calls
+	certData   string
+	t          *testing.T
 }
 
 func (m *MockMDCBStorage) GetKey(key string) (string, error) {
@@ -35,7 +35,7 @@ func (m *MockMDCBStorage) GetKey(key string) (string, error) {
 	return m.certData, nil
 }
 
-func (m *MockMDCBStorage) GetMultiKey(keys []string) ([]string, error) {
+func (m *MockMDCBStorage) GetMultiKey(_ []string) ([]string, error) {
 	return nil, errors.New("not implemented")
 }
 
@@ -279,7 +279,7 @@ func (m *MockFlakyMDCBStorage) GetKey(key string) (string, error) {
 	return m.certData, nil
 }
 
-func (m *MockFlakyMDCBStorage) GetMultiKey(keys []string) ([]string, error) {
+func (m *MockFlakyMDCBStorage) GetMultiKey(_ []string) ([]string, error) {
 	return nil, errors.New("not implemented")
 }
 
