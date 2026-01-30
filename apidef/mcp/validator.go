@@ -28,7 +28,6 @@ const (
 	keyRequired                 = "required"
 	mcpSchemaVersionNotFoundFmt = "schema not found for version %q"
 	ExtensionTykAPIGateway      = "x-tyk-api-gateway"
-	ExtensionTykMCP             = "x-tyk-mcp"
 )
 
 var (
@@ -63,14 +62,6 @@ func loadMCPSchema() error {
 
 		xTykAPIGwSchemaWithoutDefs := jsonparser.Delete(xTykAPIGwSchema, keyDefinitions)
 
-		// Load x-tyk-mcp extension schema
-		xTykMCPSchema, err := schemaDir.ReadFile(fmt.Sprintf("schema/%s.json", ExtensionTykMCP))
-		if err != nil {
-			return fmt.Errorf("%s loading failed: %w", ExtensionTykMCP, err)
-		}
-
-		xTykMCPSchemaWithoutDefs := jsonparser.Delete(xTykMCPSchema, keyDefinitions)
-
 		mcpJSONSchemas = make(map[string][]byte)
 		members, err := schemaDir.ReadDir("schema")
 		if err != nil {
@@ -91,9 +82,6 @@ func loadMCPSchema() error {
 			if strings.HasSuffix(fileName, fmt.Sprintf("%s.json", ExtensionTykAPIGateway)) {
 				continue
 			}
-			if strings.HasSuffix(fileName, fmt.Sprintf("%s.json", ExtensionTykMCP)) {
-				continue
-			}
 
 			var data []byte
 			data, err = schemaDir.ReadFile(filepath.Join("schema/", fileName))
@@ -110,23 +98,8 @@ func loadMCPSchema() error {
 				return err
 			}
 
-			// Inject x-tyk-mcp extension as property
-			data, err = jsonparser.Set(data, xTykMCPSchemaWithoutDefs, keyProperties, ExtensionTykMCP)
-			if err != nil {
-				return err
-			}
-
 			// Merge x-tyk-api-gateway definitions into schema
 			err = jsonparser.ObjectEach(xTykAPIGwSchema, func(key []byte, value []byte, _ jsonparser.ValueType, _ int) error {
-				data, err = jsonparser.Set(data, value, defsKey, string(key))
-				return err
-			}, keyDefinitions)
-			if err != nil {
-				return err
-			}
-
-			// Merge x-tyk-mcp definitions into schema
-			err = jsonparser.ObjectEach(xTykMCPSchema, func(key []byte, value []byte, _ jsonparser.ValueType, _ int) error {
 				data, err = jsonparser.Set(data, value, defsKey, string(key))
 				return err
 			}, keyDefinitions)
@@ -173,8 +146,8 @@ func validateJSON(schema, document []byte) error {
 	return combinedErr.ErrorOrNil()
 }
 
-// ValidateMCPObject validates an MCP API document against a particular OAS version.
-// MCP APIs are OAS-based but with stricter requirements for MCP-specific fields.
+// ValidateMCPObject validates an MCP Proxy document against a particular OAS version.
+// MCP Proxies are OAS-based but with stricter requirements for MCP-specific fields.
 func ValidateMCPObject(documentBody []byte, oasVersion string) error {
 	mcpSchema, err := GetMCPSchema(oasVersion)
 	if err != nil {
