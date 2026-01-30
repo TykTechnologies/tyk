@@ -898,9 +898,10 @@ func (gw *Gateway) loadHTTPService(spec *APISpec, apisByListen map[string]int, g
 
 		if gwConfig.HttpServerOptions.EnableStrictRoutes && !strings.HasSuffix(prefix, "/") &&
 			!strings.Contains(prefix, "{") && !strings.Contains(prefix, "}") {
+			prefixWithSlash := prefix + "/"
 			// Matcher should only match the exact path or paths that start with prefix/
 			exactMatcher := func(r *http.Request, rm *mux.RouteMatch) bool {
-				return r.URL.Path == prefix || strings.HasPrefix(r.URL.Path, prefix+"/")
+				return r.URL.Path == prefix || strings.HasPrefix(r.URL.Path, prefixWithSlash)
 			}
 
 			subrouter = router.NewRoute().MatcherFunc(exactMatcher).Subrouter()
