@@ -761,6 +761,13 @@ func (gw *Gateway) loadControlAPIEndpoints(muxer *mux.Router) {
 		r.HandleFunc("/apis/oas/{apiID}", gw.blockInDashboardMode(gw.apiHandler)).Methods(http.MethodDelete)
 		r.HandleFunc("/apis/oas/{apiID}/versions", versionsHandler.ServeHTTP).Methods(http.MethodGet)
 		r.HandleFunc("/apis/oas/{apiID}/export", gw.apiOASExportHandler).Methods("GET")
+
+		// MCP Proxy routes
+		r.HandleFunc("/mcps", gw.mcpListHandler).Methods(http.MethodGet)
+		r.HandleFunc("/mcps", gw.validateMCP(gw.mcpCreateHandler)).Methods(http.MethodPost)
+		r.HandleFunc("/mcps/{apiID}", gw.mcpGetHandler).Methods(http.MethodGet)
+		r.HandleFunc("/mcps/{apiID}", gw.validateMCP(gw.mcpUpdateHandler)).Methods(http.MethodPut)
+		r.HandleFunc("/mcps/{apiID}", gw.mcpDeleteHandler).Methods(http.MethodDelete)
 		r.HandleFunc("/health", gw.healthCheckhandler).Methods("GET")
 		r.HandleFunc("/policies", gw.polHandler).Methods("GET", "POST", "PUT", "DELETE")
 		r.HandleFunc("/policies/{polID}", gw.polHandler).Methods("GET", "POST", "PUT", "DELETE")
@@ -1089,6 +1096,9 @@ func (gw *Gateway) DoReload() {
 		gw.GlobalEventsJSVM.DeInit()
 		gw.GlobalEventsJSVM.Init(nil, logrus.NewEntry(log), gw)
 	}
+
+	// Re-initialize global event handlers to ensure they persist across reloads
+	gw.initGenericEventHandlers()
 
 	// Load the API Policies
 	if _, err := syncResourcesWithReload("policies", gw.GetConfig(), gw.syncPolicies); err != nil {
@@ -2243,6 +2253,7 @@ func (gw *Gateway) gracefulShutdown(ctx context.Context) error {
 
 	// Close all cache stores and other resources
 	mainLog.Info("Closing cache stores and other resources...")
+
 	gw.cacheClose()
 
 	// Check if there were any errors during shutdown

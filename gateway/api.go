@@ -65,6 +65,7 @@ import (
 	"github.com/TykTechnologies/tyk/internal/osutil"
 	"github.com/TykTechnologies/tyk/internal/otel"
 	"github.com/TykTechnologies/tyk/internal/redis"
+	"github.com/TykTechnologies/tyk/internal/sanitize"
 	"github.com/TykTechnologies/tyk/internal/uuid"
 	lib "github.com/TykTechnologies/tyk/lib/apidef"
 	"github.com/TykTechnologies/tyk/storage"
@@ -76,6 +77,8 @@ const (
 	// KeyListingWorkerCountCap 350 is based on the average of 10000 keys with minor contingency
 	KeyListingWorkerCountCap      = 350
 	KeyListingWorkerEntriesPerKey = 100
+	errInvalidAPIID               = "Invalid API ID"
+	errInvalidAPIIDFmt            = errInvalidAPIID + " %q: %v"
 )
 
 var (
@@ -455,11 +458,6 @@ func (gw *Gateway) doAddOrUpdate(keyName string, newSession *user.SessionState, 
 	return nil
 }
 
-// ---- TODO: This changes the URL structure of the API completely ----
-// ISSUE: If Session stores are stored with API specs, then managing keys will need to be done per store, i.e. add to all stores,
-// remove from all stores, update to all stores, stores handle quotas separately though because they are localised! Keys will
-// need to be managed by API, but only for GetDetail, GetList, UpdateKey and DeleteKey
-
 func (gw *Gateway) setBasicAuthSessionPassword(session *user.SessionState) {
 	basicAuthHashAlgo := gw.basicAuthHashAlgo()
 
@@ -511,9 +509,7 @@ func (gw *Gateway) handleAddOrUpdate(keyName string, r *http.Request, isHashed b
 	}
 
 	mw := &BaseMiddleware{Gw: gw}
-	// TODO: handle apply policies error
 	mw.ApplyPolicies(newSession)
-	// DO ADD OR UPDATE
 
 	// get original session in case of update and preserve fields that SHOULD NOT be updated
 	originalKey := user.SessionState{}
@@ -680,7 +676,6 @@ func (gw *Gateway) handleGetDetail(sessionKey, apiID, orgID string, byHash bool)
 	}
 
 	mw := &BaseMiddleware{Spec: spec, Gw: gw}
-	// TODO: handle apply policies error
 	mw.ApplyPolicies(&session)
 
 	if session.QuotaMax != -1 {
@@ -1176,35 +1171,40 @@ func (gw *Gateway) handleDeletePolicy(polID string) (interface{}, int) {
 	return response, http.StatusOK
 }
 
-func (gw *Gateway) handleGetAPIList() (interface{}, int) {
+func (gw *Gateway) handleGetAPIList(r *http.Request) (interface{}, int) {
+	excludeAPITypes := r.URL.Query().Get("exclude_api_types")
+
 	gw.apisMu.RLock()
 	defer gw.apisMu.RUnlock()
-	apiIDList := make([]*apidef.APIDefinition, len(gw.apisByID))
-	c := 0
+	apiIDList := make([]*apidef.APIDefinition, 0, len(gw.apisByID))
+
 	for _, apiSpec := range gw.apisByID {
-		apiIDList[c] = apiSpec.APIDefinition
-		c++
+		if shouldExcludeAPI(apiSpec, excludeAPITypes) {
+			continue
+		}
+		apiIDList = append(apiIDList, apiSpec.APIDefinition)
 	}
 	return apiIDList, http.StatusOK
 }
 
-func (gw *Gateway) handleGetAPIListOAS(modePublic bool) (interface{}, int) {
-	gw.apisMu.RLock()
-	defer gw.apisMu.RUnlock()
-
-	apisList := []oas.OAS{}
-
-	for _, apiSpec := range gw.apisByID {
-		if apiSpec.IsOAS {
-			apiSpec.OAS.Fill(*apiSpec.APIDefinition)
-			if modePublic {
-				apiSpec.OAS.RemoveTykExtension()
-			}
-			apisList = append(apisList, apiSpec.OAS)
-		}
+// shouldExcludeAPI checks if an API should be excluded based on the comma-separated list of types
+func shouldExcludeAPI(apiSpec *APISpec, excludeAPITypes string) bool {
+	if excludeAPITypes == "" {
+		return false
 	}
 
-	return apisList, http.StatusOK
+	types := strings.Split(excludeAPITypes, ",")
+	for _, t := range types {
+		t = strings.TrimSpace(t)
+		if t == "mcp" && apiSpec.IsMCP() {
+			return true
+		}
+	}
+	return false
+}
+
+func (gw *Gateway) handleGetAPIListOAS(modePublic bool) (interface{}, int) {
+	return gw.handleGetOASList(isOASNotMCP, modePublic)
 }
 
 func (gw *Gateway) handleGetAPI(apiID string, oasEndpoint bool) (interface{}, int) {
@@ -1289,6 +1289,11 @@ func (gw *Gateway) handleAddApi(r *http.Request, fs afero.Fs, oasEndpoint bool) 
 		newDef.GenerateAPIID()
 	}
 
+	if err := sanitize.ValidatePathComponent(newDef.APIID); err != nil {
+		log.Errorf(errInvalidAPIIDFmt, newDef.APIID, err)
+		return apiError(errInvalidAPIID), http.StatusBadRequest
+	}
+
 	if oasEndpoint {
 		versioningParams := extractVersioningParams(
 			versionParams.Get(lib.BaseAPIID),
@@ -1316,49 +1321,24 @@ func (gw *Gateway) handleAddApi(r *http.Request, fs afero.Fs, oasEndpoint bool) 
 	}
 
 	if !versionParams.IsEmpty(lib.BaseAPIID) {
-		baseAPI := gw.getApiSpec(versionParams.Get(lib.BaseAPIID))
-
-		// Capture the old default version BEFORE updating the base API
-		oldDefaultVersion := baseAPI.VersionDefinition.Default
-
-		baseAPI.VersionDefinition = lib.ConfigureVersionDefinition(baseAPI.VersionDefinition, versionParams, newDef.APIID)
-
-		if baseAPI.IsOAS {
-			baseAPI.OAS.Fill(*baseAPI.APIDefinition)
-			err, _ := gw.writeOASAndAPIDefToFile(fs, baseAPI.APIDefinition, &baseAPI.OAS)
-			if err != nil {
-				log.WithError(err).Errorf("Error occurred while updating base OAS API with id: %s", baseAPI.APIID)
-			}
-		} else {
-			err, _ := gw.writeToFile(fs, baseAPI.APIDefinition, baseAPI.APIID)
-			if err != nil {
-				log.WithError(err).Errorf("Error occurred while updating base API with id: %s", baseAPI.APIID)
-			}
-		}
-
-		// Update old default child's servers if needed (removes fallback URL)
-		setDefault := !versionParams.IsEmpty(lib.SetDefault) && versionParams.Get(lib.SetDefault) == "true"
-		if oas.ShouldUpdateOldDefaultChild(setDefault, oldDefaultVersion, baseAPI.VersionDefinition.Default) {
-			if err := gw.updateOldDefaultChildServersGW(oldDefaultVersion, baseAPI, fs); err != nil {
-				log.WithError(err).Warn("Failed to update old default child API servers")
-				// Don't fail the whole operation if child update fails
-			}
+		baseAPIID := versionParams.Get(lib.BaseAPIID)
+		if err := gw.updateBaseAPIWithNewVersion(baseAPIID, versionParams, newDef.APIID, fs); err != nil {
+			log.WithError(err).Error("Failed to update base API")
 		}
 	}
 
-	response := apiModifyKeySuccess{
-		Key:    newDef.APIID,
-		Status: "ok",
-		Action: "added",
-	}
-
-	return response, http.StatusOK
+	return buildSuccessResponse(newDef.APIID, "added")
 }
 
 func (gw *Gateway) handleUpdateApi(apiID string, r *http.Request, fs afero.Fs, oasEndpoint bool) (interface{}, int) {
+	if err := sanitize.ValidatePathComponent(apiID); err != nil {
+		log.Errorf(errInvalidAPIIDFmt, apiID, err)
+		return apiError(errInvalidAPIID), http.StatusBadRequest
+	}
+
 	spec := gw.getApiSpec(apiID)
-	if spec == nil {
-		return apiError(apidef.ErrAPINotFound.Error()), http.StatusNotFound
+	if resp, code := validateSpecExists(spec); resp != nil {
+		return resp, code
 	}
 
 	var (
@@ -1389,9 +1369,8 @@ func (gw *Gateway) handleUpdateApi(apiID string, r *http.Request, fs afero.Fs, o
 
 	}
 
-	if apiID != "" && newDef.APIID != apiID {
-		log.Error("PUT operation on different APIIDs")
-		return apiError("Request APIID does not match that in Definition! For Update operations these must match."), http.StatusBadRequest
+	if resp, code := validateAPIIDMatch(apiID, newDef.APIID); resp != nil {
+		return resp, code
 	}
 
 	if validationErr := validateAPIDef(&newDef); validationErr != nil {
@@ -1420,13 +1399,7 @@ func (gw *Gateway) handleUpdateApi(apiID string, r *http.Request, fs afero.Fs, o
 		}
 	}
 
-	response := apiModifyKeySuccess{
-		Key:    newDef.APIID,
-		Status: "ok",
-		Action: "modified",
-	}
-
-	return response, http.StatusOK
+	return buildSuccessResponse(newDef.APIID, "modified")
 }
 
 func (gw *Gateway) writeOASAndAPIDefToFile(fs afero.Fs, apiDef *apidef.APIDefinition, oasObj *oas.OAS) (err error, errCode int) {
@@ -1435,7 +1408,12 @@ func (gw *Gateway) writeOASAndAPIDefToFile(fs afero.Fs, apiDef *apidef.APIDefini
 		return
 	}
 
-	err, errCode = gw.writeToFile(fs, oasObj, apiDef.APIID+"-oas")
+	suffix := "-oas"
+	if apiDef.IsMCP() {
+		suffix = "-mcp"
+	}
+
+	err, errCode = gw.writeToFile(fs, oasObj, apiDef.APIID+suffix)
 	if err != nil {
 		return
 	}
@@ -1444,6 +1422,11 @@ func (gw *Gateway) writeOASAndAPIDefToFile(fs afero.Fs, apiDef *apidef.APIDefini
 }
 
 func (gw *Gateway) writeToFile(fs afero.Fs, newDef interface{}, filename string) (err error, errCode int) {
+	if err := sanitize.ValidatePathComponent(filename); err != nil {
+		log.Errorf("Invalid filename %q: %v", filename, err)
+		return errors.New("invalid API ID"), http.StatusBadRequest
+	}
+
 	// Create a filename
 	defFilePath := filepath.Join(gw.GetConfig().AppPath, filename+".json")
 
@@ -1461,7 +1444,7 @@ func (gw *Gateway) writeToFile(fs afero.Fs, newDef interface{}, filename string)
 		return errors.New("marshalling failed"), http.StatusInternalServerError
 	}
 
-	if err := ioutil.WriteFile(defFilePath, asByte, 0644); err != nil {
+	if err := afero.WriteFile(fs, defFilePath, asByte, 0644); err != nil {
 		log.Infof("EL file path: %v", defFilePath)
 		log.Error("Failed to create file! - ", err)
 		return errors.New("file object creation failed, write error"), http.StatusInternalServerError
@@ -1471,79 +1454,40 @@ func (gw *Gateway) writeToFile(fs afero.Fs, newDef interface{}, filename string)
 }
 
 func (gw *Gateway) handleDeleteAPI(apiID string) (interface{}, int) {
+	if err := sanitize.ValidatePathComponent(apiID); err != nil {
+		log.Errorf(errInvalidAPIIDFmt, apiID, err)
+		return apiError(errInvalidAPIID), http.StatusBadRequest
+	}
+
 	spec := gw.getApiSpec(apiID)
-	if spec == nil {
-		return apiError(apidef.ErrAPINotFound.Error()), http.StatusNotFound
+	if resp, code := validateSpecExists(spec); resp != nil {
+		return resp, code
 	}
 
-	// Generate a filename
-	defFilePath := filepath.Join(gw.GetConfig().AppPath, apiID+".json")
-	defFilePath = filepath.Clean(defFilePath)
-	defOASFilePath := filepath.Join(gw.GetConfig().AppPath, apiID+"-oas.json")
-	defOASFilePath = filepath.Clean(defOASFilePath)
+	fs := afero.NewOsFs()
 
-	// If it exists, delete it
-	if _, err := os.Stat(defFilePath); err != nil {
-		log.Warning("File does not exist! ", err)
-		return apiError("Delete failed"), http.StatusInternalServerError
-	}
-
-	if _, err := os.Stat(defFilePath); spec.IsOAS && err != nil {
-		log.Warning("File does not exist! ", err)
-		return apiError("Delete failed"), http.StatusInternalServerError
-	}
-
-	os.Remove(defFilePath)
 	if spec.IsOAS {
-		os.Remove(defOASFilePath)
-	}
+		if err := deleteAPIFiles(apiID, "oas", gw.GetConfig().AppPath, fs); err != nil {
+			log.Warning("Delete failed: ", err)
+			return apiError("Delete failed"), http.StatusInternalServerError
+		}
+	} else {
+		defFilePath := filepath.Join(gw.GetConfig().AppPath, apiID+".json")
+		defFilePath = filepath.Clean(defFilePath)
 
-	if spec.VersionDefinition.BaseID != "" {
-		baseAPIPtr := gw.getApiSpec(spec.VersionDefinition.BaseID)
-		apiInBytes, err := json.Marshal(baseAPIPtr)
-		if err != nil {
-			log.WithError(err).Error("Couldn't marshal API spec")
+		if _, err := os.Stat(defFilePath); err != nil {
+			log.Warning("File does not exist! ", err)
+			return apiError("Delete failed"), http.StatusInternalServerError
 		}
 
-		var baseAPI APISpec
-		err = json.Unmarshal(apiInBytes, &baseAPI)
-		if err != nil {
-			log.WithError(err).Error("Couldn't unmarshal API spec")
-		}
-
-		for versionName, versionAPIID := range baseAPI.VersionDefinition.Versions {
-			if apiID == versionAPIID {
-				delete(baseAPI.VersionDefinition.Versions, versionName)
-				if baseAPI.VersionDefinition.Default == versionName {
-					baseAPI.VersionDefinition.Default = baseAPI.VersionDefinition.Name
-				}
-
-				break
-			}
-		}
-
-		fs := afero.NewOsFs()
-		if baseAPI.IsOAS {
-			baseAPI.OAS.Fill(*baseAPI.APIDefinition)
-			err, _ := gw.writeOASAndAPIDefToFile(fs, baseAPI.APIDefinition, &baseAPI.OAS)
-			if err != nil {
-				log.WithError(err).Errorf("Error occurred while updating base OAS API with id: %s", baseAPI.APIID)
-			}
-		} else {
-			err, _ := gw.writeToFile(fs, baseAPI.APIDefinition, baseAPI.APIID)
-			if err != nil {
-				log.WithError(err).Errorf("Error occurred while updating base API with id: %s", baseAPI.APIID)
-			}
+		if err := os.Remove(defFilePath); err != nil {
+			log.WithError(err).Errorf("Failed to delete API file: %s", defFilePath)
+			return apiError("Delete failed"), http.StatusInternalServerError
 		}
 	}
 
-	response := apiModifyKeySuccess{
-		Key:    apiID,
-		Status: "ok",
-		Action: "deleted",
-	}
-
-	return response, http.StatusOK
+	handleBaseVersionCleanup(gw, spec, apiID, fs)
+	return buildSuccessResponse(apiID, "deleted")
 }
 
 func (gw *Gateway) polHandler(w http.ResponseWriter, r *http.Request) {
@@ -1596,7 +1540,7 @@ func (gw *Gateway) apiHandler(w http.ResponseWriter, r *http.Request) {
 			obj, code = gw.handleGetAPI(apiID, false)
 		} else {
 			log.Debug("Requesting API list")
-			obj, code = gw.handleGetAPIList()
+			obj, code = gw.handleGetAPIList(r)
 		}
 
 		if api, ok := obj.(*apidef.APIDefinition); ok {
@@ -1641,10 +1585,7 @@ func (gw *Gateway) apiOASGetHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if oasAPI, ok := obj.(*oas.OAS); ok {
-		api := gw.getApiSpec(oasAPI.GetTykExtension().Info.ID)
-		if api != nil && api.VersionDefinition.BaseID != "" {
-			w.Header().Set(apidef.HeaderBaseAPIID, api.VersionDefinition.BaseID)
-		}
+		gw.setBaseAPIIDHeader(w, oasAPI)
 	}
 
 	doJSONWrite(w, code, obj)
@@ -1757,7 +1698,6 @@ func (gw *Gateway) apiOASPatchHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	// Update middlewares even when no query params are provided.
 	oasObjToPatch.ImportMiddlewares(oas.TykExtensionConfigParams{})
 
 	oasAPIInBytes, err := oasObjToPatch.MarshalJSON()
@@ -2322,7 +2262,6 @@ func (gw *Gateway) previewKeyHandler(w http.ResponseWriter, r *http.Request) {
 	newSession.DateCreated = time.Now()
 
 	mw := &BaseMiddleware{Gw: gw}
-	// TODO: handle apply policies error
 	mw.ApplyPolicies(newSession)
 
 	doJSONWrite(w, http.StatusOK, newSession)
