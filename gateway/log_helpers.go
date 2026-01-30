@@ -42,10 +42,13 @@ func (gw *Gateway) getLogEntryForRequest(logger *logrus.Entry, r *http.Request, 
 		"origin": request.RealIP(r),
 	}
 
-	// add trace_id when OpenTelemetry is enabled and trace context exists
+	// add trace_id and span_id when OpenTelemetry is enabled and trace context exists
 	if gw.GetConfig().OpenTelemetry.Enabled {
 		if traceID := otel.ExtractTraceID(r.Context()); traceID != "" {
 			fields["trace_id"] = traceID
+		}
+		if spanID := otel.ExtractSpanID(r.Context()); spanID != "" {
+			fields["span_id"] = spanID
 		}
 	}
 
