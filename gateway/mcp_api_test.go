@@ -538,7 +538,7 @@ func TestHandleGetMCPListOAS(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
 
-	// Create multiple MCP APIs
+	// Create multiple MCP Proxies
 	ts.Gw.BuildAndLoadAPI(
 		func(spec *APISpec) {
 			spec.APIID = "mcp-1"
@@ -557,17 +557,17 @@ func TestHandleGetMCPListOAS(t *testing.T) {
 		},
 	)
 
-	t.Run("returns only MCP APIs", func(t *testing.T) {
+	t.Run("returns only MCP Proxies", func(t *testing.T) {
 		obj, code := ts.Gw.handleGetMCPListOAS()
 
 		assert.Equal(t, http.StatusOK, code)
 		apisList, ok := obj.([]oas.OAS)
 		require.True(t, ok, "Expected []oas.OAS type")
-		assert.Len(t, apisList, 2, "Should return exactly 2 MCP APIs")
+		assert.Len(t, apisList, 2, "Should return exactly 2 MCP Proxies")
 	})
 
-	t.Run("returns empty list when no MCP APIs exist", func(t *testing.T) {
-		// Create a new gateway with no MCP APIs
+	t.Run("returns empty list when no MCP Proxies exist", func(t *testing.T) {
+		// Create a new gateway with no MCP Proxies
 		ts2 := StartTest(nil)
 		defer ts2.Close()
 
@@ -592,7 +592,7 @@ func TestMCPListHandler(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
 
-	// Create test MCP APIs
+	// Create test MCP Proxies
 	ts.Gw.BuildAndLoadAPI(
 		func(spec *APISpec) {
 			spec.APIID = "mcp-test-1"
@@ -617,7 +617,7 @@ func TestMCPUpdateHandler(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
 
-	// Create a test MCP API
+	// Create a test MCP Proxy
 	ts.Gw.BuildAndLoadAPI(
 		func(spec *APISpec) {
 			spec.APIID = "mcp-update-test"
@@ -661,7 +661,7 @@ func TestMCPUpdateHandler(t *testing.T) {
 		}
 	}`
 
-	t.Run("updates MCP API successfully", func(t *testing.T) {
+	t.Run("updates MCP Proxy successfully", func(t *testing.T) {
 		req := httptest.NewRequest(http.MethodPut, "/tyk/mcps/mcp-update-test", strings.NewReader(validMCPUpdate))
 		w := httptest.NewRecorder()
 
@@ -691,7 +691,7 @@ func TestMCPDeleteHandler(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
 
-	t.Run("deletes MCP API successfully", func(t *testing.T) {
+	t.Run("deletes MCP Proxy successfully", func(t *testing.T) {
 		req := httptest.NewRequest(http.MethodDelete, "/tyk/mcps/test-api", nil)
 		w := httptest.NewRecorder()
 

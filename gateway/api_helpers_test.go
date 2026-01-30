@@ -45,13 +45,13 @@ func TestHandleGetOASList(t *testing.T) {
 		},
 	)
 
-	t.Run("Filter returns only MCP APIs", func(t *testing.T) {
+	t.Run("Filter returns only MCP Proxies", func(t *testing.T) {
 		obj, code := ts.Gw.handleGetOASList((*APISpec).IsMCP, false)
 
 		assert.Equal(t, http.StatusOK, code)
 		apisList, ok := obj.([]oas.OAS)
 		require.True(t, ok, "Expected []oas.OAS type")
-		assert.Len(t, apisList, 2, "Should return exactly 2 MCP APIs")
+		assert.Len(t, apisList, 2, "Should return exactly 2 MCP Proxies")
 
 		// Verify the right APIs are returned
 		apiIDs := make(map[string]bool)
@@ -66,7 +66,7 @@ func TestHandleGetOASList(t *testing.T) {
 		assert.False(t, apiIDs["regular-api-1"], "Should not contain regular-api-1")
 	})
 
-	t.Run("Filter excludes MCP APIs", func(t *testing.T) {
+	t.Run("Filter excludes MCP Proxies", func(t *testing.T) {
 		// Use a filter that simply excludes MCPs (without requiring IsOAS flag)
 		obj, code := ts.Gw.handleGetOASList(func(spec *APISpec) bool {
 			return !spec.IsMCP()
@@ -75,9 +75,9 @@ func TestHandleGetOASList(t *testing.T) {
 		assert.Equal(t, http.StatusOK, code)
 		apisList, ok := obj.([]oas.OAS)
 		require.True(t, ok, "Expected []oas.OAS type")
-		assert.Len(t, apisList, 1, "Should return exactly 1 non-MCP API")
+		assert.Len(t, apisList, 1, "Should return exactly 1 non-MCP Proxy")
 
-		// Verify MCP APIs are not in the results
+		// Verify MCP Proxies are not in the results
 		for _, api := range apisList {
 			tykExt := api.GetTykExtension()
 			if tykExt != nil {
@@ -153,7 +153,7 @@ func TestHandleGetOASByID(t *testing.T) {
 		},
 	)
 
-	t.Run("Returns MCP API when type check passes", func(t *testing.T) {
+	t.Run("Returns MCP Proxy when type check passes", func(t *testing.T) {
 		obj, code := ts.Gw.handleGetOASByID("mcp-test-api", mcpTypeCheck)
 
 		assert.Equal(t, http.StatusOK, code)
@@ -181,7 +181,7 @@ func TestHandleGetOASByID(t *testing.T) {
 		assert.Equal(t, http.StatusNotFound, code)
 		msg, ok := obj.(apiStatusMessage)
 		require.True(t, ok)
-		assert.Contains(t, msg.Message, "MCP API")
+		assert.Contains(t, msg.Message, "MCP Proxy")
 	})
 
 	t.Run("Custom type check error message", func(t *testing.T) {
@@ -224,7 +224,7 @@ func TestHandleGetOASByID(t *testing.T) {
 
 // TestFilterFunctions tests the individual filter functions
 func TestFilterFunctions(t *testing.T) {
-	t.Run("IsMCP identifies MCP APIs", func(t *testing.T) {
+	t.Run("IsMCP identifies MCP Proxies", func(t *testing.T) {
 		mcpSpec := BuildAPI(func(spec *APISpec) {
 			spec.APIID = "test-mcp"
 			spec.MarkAsMCP()
@@ -237,8 +237,8 @@ func TestFilterFunctions(t *testing.T) {
 		assert.False(t, regularSpec.IsMCP())
 	})
 
-	t.Run("isOASNotMCP identifies OAS non-MCP APIs", func(t *testing.T) {
-		// MCP API should be excluded
+	t.Run("isOASNotMCP identifies OAS non-MCP Proxies", func(t *testing.T) {
+		// MCP Proxy should be excluded
 		mcpSpec := BuildAPI(func(spec *APISpec) {
 			spec.APIID = "test-mcp"
 			spec.IsOAS = true

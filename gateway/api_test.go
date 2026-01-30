@@ -4379,7 +4379,7 @@ func TestAPIMCPListing(t *testing.T) {
 		assert.Contains(t, apiIDs, regularAPI2.APIID)
 	})
 
-	t.Run("/tyk/mcps returns only MCP APIs", func(t *testing.T) {
+	t.Run("/tyk/mcps returns only MCP Proxies", func(t *testing.T) {
 		req := TestReq(t, "GET", "/tyk/mcps/", nil)
 		req = ts.withAuth(req)
 		rec := httptest.NewRecorder()
@@ -4401,7 +4401,7 @@ func TestAPIMCPListing(t *testing.T) {
 		assert.True(t, mcpAPI2Spec.IsMCP())
 	})
 
-	t.Run("GET /tyk/mcps/{apiID} returns MCP API", func(t *testing.T) {
+	t.Run("GET /tyk/mcps/{apiID} returns MCP Proxy", func(t *testing.T) {
 		req := TestReq(t, "GET", "/tyk/mcps/"+mcpAPI1.APIID, nil)
 		req = ts.withAuth(req)
 		rec := httptest.NewRecorder()
@@ -4415,14 +4415,14 @@ func TestAPIMCPListing(t *testing.T) {
 		assert.NotNil(t, response)
 	})
 
-	t.Run("GET /tyk/mcps/{apiID} returns 404 for non-MCP API", func(t *testing.T) {
+	t.Run("GET /tyk/mcps/{apiID} returns 404 for non-MCP Proxy", func(t *testing.T) {
 		req := TestReq(t, "GET", "/tyk/mcps/"+regularAPI1.APIID, nil)
 		req = ts.withAuth(req)
 		rec := httptest.NewRecorder()
 		ts.mainRouter().ServeHTTP(rec, req)
 
 		assert.Equal(t, http.StatusNotFound, rec.Code)
-		assert.Contains(t, rec.Body.String(), "is not an MCP API")
+		assert.Contains(t, rec.Body.String(), "is not an MCP Proxy")
 	})
 
 	t.Run("GET /tyk/mcps/{apiID} returns 404 for non-existent API", func(t *testing.T) {
@@ -4434,7 +4434,7 @@ func TestAPIMCPListing(t *testing.T) {
 		assert.Equal(t, http.StatusNotFound, rec.Code)
 	})
 
-	t.Run("POST /tyk/mcps creates MCP API", func(t *testing.T) {
+	t.Run("POST /tyk/mcps creates MCP Proxy", func(t *testing.T) {
 		tykExt := oas.XTykAPIGateway{
 			Info: oas.Info{
 				Name: "New MCP API",
@@ -4673,7 +4673,7 @@ func TestAPIMCPListing(t *testing.T) {
 		assert.True(t, api.IsMCP())
 	})
 
-	t.Run("PUT /tyk/mcps/{apiID} updates MCP API", func(t *testing.T) {
+	t.Run("PUT /tyk/mcps/{apiID} updates MCP Proxy", func(t *testing.T) {
 		createTykExt := oas.XTykAPIGateway{
 			Info: oas.Info{
 				Name: "Original MCP",
@@ -4852,7 +4852,7 @@ func TestAPIMCPListing(t *testing.T) {
 		assert.Contains(t, rec.Body.String(), "does not match")
 	})
 
-	t.Run("PUT /tyk/mcps/{apiID} fails for non-MCP API", func(t *testing.T) {
+	t.Run("PUT /tyk/mcps/{apiID} fails for non-MCP Proxy", func(t *testing.T) {
 		regularSpec := BuildAPI(func(spec *APISpec) {
 			spec.SetDisabledFlags()
 			spec.APIID = "regular-for-put-test"
@@ -4914,7 +4914,7 @@ func TestAPIMCPListing(t *testing.T) {
 		ts.mainRouter().ServeHTTP(rec, req)
 
 		assert.Equal(t, http.StatusNotFound, rec.Code)
-		assert.Contains(t, rec.Body.String(), "is not an MCP API")
+		assert.Contains(t, rec.Body.String(), "is not an MCP Proxy")
 	})
 
 	t.Run("PUT /tyk/mcps/{apiID} fails for non-existent API", func(t *testing.T) {
@@ -5058,7 +5058,7 @@ func TestAPIMCPListing(t *testing.T) {
 		assert.Equal(t, "modified", response.Action)
 	})
 
-	t.Run("DELETE /tyk/mcps/{apiID} deletes MCP API and files", func(t *testing.T) {
+	t.Run("DELETE /tyk/mcps/{apiID} deletes MCP Proxy and files", func(t *testing.T) {
 		tykExt := oas.XTykAPIGateway{
 			Info: oas.Info{
 				Name: "Delete Test MCP",
@@ -5138,7 +5138,7 @@ func TestAPIMCPListing(t *testing.T) {
 		assert.Error(t, err, "MCP file should be deleted")
 	})
 
-	t.Run("DELETE /tyk/mcps/{apiID} fails for non-MCP API", func(t *testing.T) {
+	t.Run("DELETE /tyk/mcps/{apiID} fails for non-MCP Proxy", func(t *testing.T) {
 		regularSpec := BuildAPI(func(spec *APISpec) {
 			spec.SetDisabledFlags()
 			spec.APIID = "regular-for-delete-test"
@@ -5168,7 +5168,7 @@ func TestAPIMCPListing(t *testing.T) {
 		ts.mainRouter().ServeHTTP(rec, req)
 
 		assert.Equal(t, http.StatusNotFound, rec.Code)
-		assert.Contains(t, rec.Body.String(), "is not an MCP API")
+		assert.Contains(t, rec.Body.String(), "is not an MCP Proxy")
 	})
 
 	t.Run("DELETE /tyk/mcps/{apiID} fails for non-existent API", func(t *testing.T) {
@@ -5915,7 +5915,7 @@ func TestAPIListFilter_ExcludeMCP(t *testing.T) {
 		assert.True(t, apiIDs["mcp789"], "Should have MCP API")
 	})
 
-	t.Run("exclude_api_types=mcp excludes MCP APIs", func(t *testing.T) {
+	t.Run("exclude_api_types=mcp excludes MCP Proxies", func(t *testing.T) {
 		resp, _ := ts.Run(t, test.TestCase{
 			Path:      "/tyk/apis/?exclude_api_types=mcp",
 			Method:    http.MethodGet,

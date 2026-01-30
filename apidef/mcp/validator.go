@@ -146,8 +146,8 @@ func validateJSON(schema, document []byte) error {
 	return combinedErr.ErrorOrNil()
 }
 
-// ValidateMCPObject validates an MCP API document against a particular OAS version.
-// MCP APIs are OAS-based but with stricter requirements for MCP-specific fields.
+// ValidateMCPObject validates an MCP Proxy document against a particular OAS version.
+// MCP Proxies are OAS-based but with stricter requirements for MCP-specific fields.
 func ValidateMCPObject(documentBody []byte, oasVersion string) error {
 	mcpSchema, err := GetMCPSchema(oasVersion)
 	if err != nil {

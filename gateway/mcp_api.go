@@ -21,7 +21,7 @@ import (
 
 const errMsgDeleteFailed = "Delete failed"
 
-// extractMCPObjFromReq extracts and parses MCP API definition from request body.
+// extractMCPObjFromReq extracts and parses MCP Proxy definition from request body.
 func extractMCPObjFromReq(reqBody io.Reader) ([]byte, *oas.OAS, error) {
 	var mcpObj oas.OAS
 	reqBodyInBytes, err := ioutil.ReadAll(reqBody)
@@ -148,7 +148,7 @@ func (gw *Gateway) handleUpdateMCP(apiID string, r *http.Request, fs afero.Fs) (
 	}
 
 	if !spec.IsMCP() {
-		return apiError("API is not an MCP API"), http.StatusNotFound
+		return apiError("API is not an MCP Proxy"), http.StatusNotFound
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(&oasObj); err != nil {
@@ -210,14 +210,14 @@ func (gw *Gateway) mcpGetHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func (gw *Gateway) mcpCreateHandler(w http.ResponseWriter, r *http.Request) {
-	log.Debug("Creating MCP API")
+	log.Debug("Creating MCP Proxy")
 	obj, code := gw.handleAddMCP(r, afero.NewOsFs())
 	doJSONWrite(w, code, obj)
 }
 
 func (gw *Gateway) mcpUpdateHandler(w http.ResponseWriter, r *http.Request) {
 	apiID := mux.Vars(r)["apiID"]
-	log.Debugf("Updating MCP API: %q", apiID)
+	log.Debugf("Updating MCP Proxy: %q", apiID)
 	obj, code := gw.handleUpdateMCP(apiID, r, afero.NewOsFs())
 	doJSONWrite(w, code, obj)
 }
@@ -234,7 +234,7 @@ func (gw *Gateway) handleDeleteMCP(apiID string, fs afero.Fs) (interface{}, int)
 	}
 
 	if !spec.IsMCP() {
-		return apiError("API is not an MCP API"), http.StatusNotFound
+		return apiError("API is not an MCP Proxy"), http.StatusNotFound
 	}
 
 	if err := deleteAPIFiles(apiID, "mcp", gw.GetConfig().AppPath, fs); err != nil {
@@ -249,7 +249,7 @@ func (gw *Gateway) handleDeleteMCP(apiID string, fs afero.Fs) (interface{}, int)
 
 func (gw *Gateway) mcpDeleteHandler(w http.ResponseWriter, r *http.Request) {
 	apiID := mux.Vars(r)["apiID"]
-	log.Debugf("Deleting MCP API: %q", apiID)
+	log.Debugf("Deleting MCP Proxy: %q", apiID)
 	obj, code := gw.handleDeleteMCP(apiID, afero.NewOsFs())
 	doJSONWrite(w, code, obj)
 }

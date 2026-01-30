@@ -18,7 +18,7 @@ import (
 	"github.com/TykTechnologies/tyk/apidef/oas"
 )
 
-// TestMCPVersioning_CreateStandalone tests creating an MCP API without versioning
+// TestMCPVersioning_CreateStandalone tests creating an MCP Proxy without versioning
 func TestMCPVersioning_CreateStandalone(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
@@ -50,12 +50,12 @@ func TestMCPVersioning_CreateStandalone(t *testing.T) {
 	assert.True(t, exists, "MCP OAS file should exist")
 }
 
-// TestMCPVersioning_CreateAsVersion tests creating an MCP API as a version of existing base
+// TestMCPVersioning_CreateAsVersion tests creating an MCP Proxy as a version of existing base
 func TestMCPVersioning_CreateAsVersion(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
 
-	// Create base MCP API first using handler and mock FS
+	// Create base MCP Proxy first using handler and mock FS
 	fs := afero.NewMemMapFs()
 	baseOAS := buildMinimalMCPOAS(t, "base-mcp", "Base MCP")
 	basePayload, err := json.Marshal(baseOAS)
@@ -129,7 +129,7 @@ func TestMCPVersioning_CreateAsVersionAndSetDefault(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
 
-	// Create base MCP API using handler
+	// Create base MCP Proxy using handler
 	fs := afero.NewMemMapFs()
 	baseOAS := buildMinimalMCPOAS(t, "base-mcp", "Base MCP")
 	basePayload, err := json.Marshal(baseOAS)
@@ -229,7 +229,7 @@ func TestMCPVersioning_CreateWithoutVersionName(t *testing.T) {
 	assert.Equal(t, http.StatusUnprocessableEntity, w.Code)
 }
 
-// TestMCPVersioning_UpdateStandalone tests updating a standalone MCP API
+// TestMCPVersioning_UpdateStandalone tests updating a standalone MCP Proxy
 func TestMCPVersioning_UpdateStandalone(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
@@ -282,7 +282,7 @@ func TestMCPVersioning_UpdateVersionedChild(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
 
-	// Create base MCP API
+	// Create base MCP Proxy
 	fs := afero.NewMemMapFs()
 	baseOAS := buildMinimalMCPOAS(t, "base-mcp", "Base MCP")
 	basePayload, err := json.Marshal(baseOAS)
@@ -369,7 +369,7 @@ func TestMCPVersioning_GetReturnsBaseIDHeader(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
 
-	// Create base MCP API
+	// Create base MCP Proxy
 	fs := afero.NewMemMapFs()
 	baseOAS := buildMinimalMCPOAS(t, "base-mcp", "Base MCP")
 	basePayload, err := json.Marshal(baseOAS)
@@ -476,7 +476,7 @@ func TestMCPVersioning_ConcurrentVersionCreation(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
 
-	// Create base MCP API
+	// Create base MCP Proxy
 	fs := afero.NewMemMapFs()
 	baseOAS := buildMinimalMCPOAS(t, "base-mcp", "Base MCP")
 	basePayload, err := json.Marshal(baseOAS)
