@@ -94,7 +94,7 @@ type certificateManager struct {
 	certFetchMaxRetries        int
 }
 
-func NewCertificateManager(storage storage.Handler, secret string, logger *logrus.Logger, migrateCertList bool, certFetchMaxElapsedTime, certFetchInitialInterval, certFetchMaxInterval time.Duration, certFetchRetryEnabled bool, certFetchMaxRetries int) *certificateManager {
+func NewCertificateManager(storageHandler storage.Handler, secret string, logger *logrus.Logger, migrateCertList bool, certFetchMaxElapsedTime, certFetchInitialInterval, certFetchMaxInterval time.Duration, certFetchRetryEnabled bool, certFetchMaxRetries int) *certificateManager {
 	if logger == nil {
 		logger = logrus.New()
 	}
@@ -111,7 +111,7 @@ func NewCertificateManager(storage storage.Handler, secret string, logger *logru
 	}
 
 	return &certificateManager{
-		storage:                  storage,
+		storage:                  storageHandler,
 		logger:                   logger.WithFields(logrus.Fields{"prefix": CertManagerLogPrefix}),
 		cache:                    cache.New(cacheDefaultTTL, cacheCleanInterval),
 		secret:                   secret,
