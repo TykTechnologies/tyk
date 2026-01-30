@@ -164,40 +164,36 @@ func loadTestCert(t *testing.T) string {
 	return string(certData)
 }
 
-// TestTT14618_BackoffRetry demonstrates the fix for TT-14618
-func TestTT14618_BackoffRetry(t *testing.T) {
+// TestCertificateLoadingWithRetry verifies the exponential backoff retry mechanism
+// for certificate loading when storage is temporarily unavailable (TT-14618).
+func TestCertificateLoadingWithRetry(t *testing.T) {
 	certPEM := loadTestCert(t)
 
-	tests := []struct {
-		name              string
+	tests := map[string]struct {
 		failureCount      int
 		expectedAttempts  int
 		expectSuccess     bool
 		expectCertificate bool
 	}{
-		{
-			name:              "immediate_success",
+		"immediate_success": {
 			failureCount:      0,
 			expectedAttempts:  1,
 			expectSuccess:     true,
 			expectCertificate: true,
 		},
-		{
-			name:              "retry_once",
+		"retry_once": {
 			failureCount:      1,
 			expectedAttempts:  2,
 			expectSuccess:     true,
 			expectCertificate: true,
 		},
-		{
-			name:              "retry_multiple_times",
+		"retry_multiple_times": {
 			failureCount:      5,
 			expectedAttempts:  6,
 			expectSuccess:     true,
 			expectCertificate: true,
 		},
-		{
-			name:              "retry_many_times",
+		"retry_many_times": {
 			failureCount:      10,
 			expectedAttempts:  11,
 			expectSuccess:     true,
@@ -205,8 +201,8 @@ func TestTT14618_BackoffRetry(t *testing.T) {
 		},
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
 			mockStorage := &MockMDCBStorage{
 				clearAfter: tt.failureCount,
 				certData:   certPEM,
@@ -398,7 +394,7 @@ func (m *MockFlakyMDCBStorage) RemoveFromList(_, _ string) error {
 func (m *MockFlakyMDCBStorage) AppendToSet(_, _ string) {}
 
 // TestTT14618_FlakyConnection tests handling of intermittent MDCB failures
-func TestTT14618_FlakyConnection(t *testing.T) {
+func TestCertificateLoadingWithFlakyConnection(t *testing.T) {
 	certPEM := loadTestCert(t)
 
 	mockStorage := &MockFlakyMDCBStorage{
@@ -435,7 +431,7 @@ func TestTT14618_FlakyConnection(t *testing.T) {
 }
 
 // TestTT14618_MultipleCertificates verifies backoff only happens once for multiple certificates
-func TestTT14618_MultipleCertificates(t *testing.T) {
+func TestMultipleCertificatesLoading(t *testing.T) {
 	certPEM := loadTestCert(t)
 
 	// Simulate MDCB failing 3 times before becoming ready
@@ -487,7 +483,7 @@ func TestTT14618_MultipleCertificates(t *testing.T) {
 }
 
 // TestTT14618_ScaleWith100Certs tests production-scale scenario with 100 certificates
-func TestTT14618_ScaleWith100Certs(t *testing.T) {
+func TestCertificateLoadingScale100(t *testing.T) {
 	if testing.Short() {
 		t.Skip("Skipping scale test in short mode")
 	}
@@ -556,7 +552,7 @@ func TestTT14618_ScaleWith100Certs(t *testing.T) {
 }
 
 // TestTT14618_ScaleWith1000Certs tests enterprise-scale scenario with 1000 certificates
-func TestTT14618_ScaleWith1000Certs(t *testing.T) {
+func TestCertificateLoadingScale1000(t *testing.T) {
 	if testing.Short() {
 		t.Skip("Skipping large scale test in short mode")
 	}
