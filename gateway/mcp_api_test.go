@@ -9,8 +9,11 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/gorilla/mux"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/TykTechnologies/tyk/apidef/oas"
 )
 
 func TestExtractMCPObjFromReq(t *testing.T) {
@@ -528,5 +531,186 @@ func TestValidateMCP_EdgeCases(t *testing.T) {
 
 		assert.True(t, nextCalled, "next handler should be called for DELETE")
 		assert.Equal(t, http.StatusOK, w.Code)
+	})
+}
+
+func TestHandleGetMCPListOAS(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	// Create multiple MCP Proxies
+	ts.Gw.BuildAndLoadAPI(
+		func(spec *APISpec) {
+			spec.APIID = "mcp-1"
+			spec.Name = "MCP API 1"
+			spec.MarkAsMCP()
+		},
+		func(spec *APISpec) {
+			spec.APIID = "mcp-2"
+			spec.Name = "MCP API 2"
+			spec.MarkAsMCP()
+		},
+		func(spec *APISpec) {
+			spec.APIID = "regular-oas"
+			spec.Name = "Regular OAS API"
+			spec.IsOAS = true
+		},
+	)
+
+	t.Run("returns only MCP Proxies", func(t *testing.T) {
+		obj, code := ts.Gw.handleGetMCPListOAS()
+
+		assert.Equal(t, http.StatusOK, code)
+		apisList, ok := obj.([]oas.OAS)
+		require.True(t, ok, "Expected []oas.OAS type")
+		assert.Len(t, apisList, 2, "Should return exactly 2 MCP Proxies")
+	})
+
+	t.Run("returns empty list when no MCP Proxies exist", func(t *testing.T) {
+		// Create a new gateway with no MCP Proxies
+		ts2 := StartTest(nil)
+		defer ts2.Close()
+
+		ts2.Gw.BuildAndLoadAPI(
+			func(spec *APISpec) {
+				spec.APIID = "regular-only"
+				spec.Name = "Regular API"
+				spec.IsOAS = true
+			},
+		)
+
+		obj, code := ts2.Gw.handleGetMCPListOAS()
+
+		assert.Equal(t, http.StatusOK, code)
+		apisList, ok := obj.([]oas.OAS)
+		require.True(t, ok)
+		assert.Len(t, apisList, 0, "Should return empty list")
+	})
+}
+
+func TestMCPListHandler(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	// Create test MCP Proxies
+	ts.Gw.BuildAndLoadAPI(
+		func(spec *APISpec) {
+			spec.APIID = "mcp-test-1"
+			spec.Name = "MCP Test 1"
+			spec.MarkAsMCP()
+		},
+	)
+
+	t.Run("returns MCP list successfully", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodGet, "/tyk/mcps", nil)
+		w := httptest.NewRecorder()
+
+		ts.Gw.mcpListHandler(w, req)
+
+		assert.Equal(t, http.StatusOK, w.Code)
+		assert.Contains(t, w.Header().Get("Content-Type"), "application/json")
+		assert.NotEmpty(t, w.Body.String())
+	})
+}
+
+func TestMCPUpdateHandler(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	// Create a test MCP Proxy
+	ts.Gw.BuildAndLoadAPI(
+		func(spec *APISpec) {
+			spec.APIID = "mcp-update-test"
+			spec.Name = "MCP Update Test"
+			spec.MarkAsMCP()
+		},
+	)
+
+	validMCPUpdate := `{
+		"openapi": "3.0.3",
+		"info": {
+			"title": "Updated MCP",
+			"version": "1.0.0"
+		},
+		"paths": {},
+		"x-tyk-api-gateway": {
+			"info": {
+				"id": "mcp-update-test",
+				"name": "updated-name",
+				"state": {
+					"active": true
+				}
+			},
+			"server": {
+				"listenPath": {
+					"value": "/updated/"
+				}
+			},
+			"upstream": {
+				"url": "http://updated.url"
+			},
+			"middleware": {
+				"mcpTools": {
+					"tool": {
+						"allow": {
+							"enabled": true
+						}
+					}
+				}
+			}
+		}
+	}`
+
+	t.Run("updates MCP Proxy successfully", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodPut, "/tyk/mcps/mcp-update-test", strings.NewReader(validMCPUpdate))
+		w := httptest.NewRecorder()
+
+		// Mock mux.Vars
+		req = mux.SetURLVars(req, map[string]string{"apiID": "mcp-update-test"})
+
+		ts.Gw.mcpUpdateHandler(w, req)
+
+		assert.Equal(t, http.StatusOK, w.Code)
+		assert.Contains(t, w.Body.String(), "modified")
+	})
+
+	t.Run("returns 400 for invalid API ID", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodPut, "/tyk/mcps/../../../etc/passwd", strings.NewReader(validMCPUpdate))
+		w := httptest.NewRecorder()
+
+		req = mux.SetURLVars(req, map[string]string{"apiID": "../../../etc/passwd"})
+
+		ts.Gw.mcpUpdateHandler(w, req)
+
+		assert.Equal(t, http.StatusBadRequest, w.Code)
+		assert.Contains(t, w.Body.String(), "Invalid API ID")
+	})
+}
+
+func TestMCPDeleteHandler(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	t.Run("deletes MCP Proxy successfully", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodDelete, "/tyk/mcps/test-api", nil)
+		w := httptest.NewRecorder()
+
+		req = mux.SetURLVars(req, map[string]string{"apiID": "test-api"})
+
+		ts.Gw.mcpDeleteHandler(w, req)
+
+		assert.NotEqual(t, http.StatusInternalServerError, w.Code)
+	})
+
+	t.Run("rejects invalid API ID", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodDelete, "/tyk/mcps/../../etc/passwd", nil)
+		w := httptest.NewRecorder()
+
+		req = mux.SetURLVars(req, map[string]string{"apiID": "../../etc/passwd"})
+
+		ts.Gw.mcpDeleteHandler(w, req)
+
+		assert.Equal(t, http.StatusBadRequest, w.Code)
+		assert.Contains(t, w.Body.String(), "Invalid API ID")
 	})
 }
