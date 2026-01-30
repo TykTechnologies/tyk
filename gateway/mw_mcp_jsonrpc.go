@@ -14,6 +14,10 @@ import (
 	"github.com/TykTechnologies/tyk/internal/middleware"
 )
 
+// maxJSONRPCRequestSize is the maximum allowed size for JSON-RPC request bodies.
+// This limit protects against DoS attacks when the global MaxRequestBodySize is not configured.
+const maxJSONRPCRequestSize = 1 << 20 // 1MB
+
 // MCPJSONRPCMiddleware handles JSON-RPC 2.0 request detection and routing for MCP APIs.
 // When a client sends a JSON-RPC request to an MCP endpoint, the middleware detects it,
 // extracts the method and primitive name, routes to the correct VEM, and enables
@@ -67,8 +71,8 @@ func (m *MCPJSONRPCMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 		return nil, http.StatusOK
 	}
 
-	// Read and parse the request body
-	body, err := io.ReadAll(r.Body)
+	// Read and parse the request body with size limit to prevent DoS
+	body, err := io.ReadAll(io.LimitReader(r.Body, maxJSONRPCRequestSize))
 	if err != nil {
 		m.writeJSONRPCError(w, nil, mcp.JSONRPCParseError, "Parse error", nil)
 		return nil, middleware.StatusRespond
