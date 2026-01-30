@@ -277,30 +277,50 @@ func (s *OAS) extractPathsAndOperations(ep *apidef.ExtendedPathsSet) {
 		return
 	}
 
+	// For MCP APIs, determine if we should use listenPath for operation-level middleware
+	// An API is MCP if it has MCP primitives (tools, resources, or prompts) defined
+	tykExt := s.GetTykExtension()
+	middleware := tykExt.Middleware
+	isMCP := middleware != nil && (len(middleware.McpTools) > 0 || len(middleware.McpResources) > 0 || len(middleware.McpPrompts) > 0)
+	listenPath := ""
+	if isMCP && tykExt.Server.ListenPath.Value != "" {
+		listenPath = tykExt.Server.ListenPath.Value
+	}
+
 	for _, pathItem := range oasutil.SortByPathLength(*s.Paths) {
 		for id, tykOp := range tykOperations {
 			path := pathItem.Path
 			for method, operation := range pathItem.Operations() {
 				if id == operation.OperationID {
-					tykOp.extractAllowanceTo(ep, path, method, allow)
-					tykOp.extractAllowanceTo(ep, path, method, block)
-					tykOp.extractAllowanceTo(ep, path, method, ignoreAuthentication)
-					tykOp.extractInternalTo(ep, path, method)
-					tykOp.extractTransformRequestMethodTo(ep, path, method)
-					tykOp.extractTransformRequestBodyTo(ep, path, method)
-					tykOp.extractTransformResponseBodyTo(ep, path, method)
-					tykOp.extractTransformRequestHeadersTo(ep, path, method)
-					tykOp.extractTransformResponseHeadersTo(ep, path, method)
-					tykOp.extractURLRewriteTo(ep, path, method)
-					tykOp.extractCacheTo(ep, path, method)
-					tykOp.extractEnforceTimeoutTo(ep, path, method)
-					tykOp.extractVirtualEndpointTo(ep, path, method)
-					tykOp.extractEndpointPostPluginTo(ep, path, method)
-					tykOp.extractCircuitBreakerTo(ep, path, method)
-					tykOp.extractTrackEndpointTo(ep, path, method)
-					tykOp.extractDoNotTrackEndpointTo(ep, path, method)
-					tykOp.extractRequestSizeLimitTo(ep, path, method)
-					tykOp.extractRateLimitEndpointTo(ep, path, method)
+					// For MCP APIs, use listenPath and POST method for operation-level middleware
+					// since all MCP requests arrive at the listenPath as POST requests,
+					// not at the OpenAPI operation paths
+					extractPath := path
+					extractMethod := method
+					if isMCP && listenPath != "" {
+						extractPath = listenPath
+						extractMethod = "POST"
+					}
+
+					tykOp.extractAllowanceTo(ep, extractPath, extractMethod, allow)
+					tykOp.extractAllowanceTo(ep, extractPath, extractMethod, block)
+					tykOp.extractAllowanceTo(ep, extractPath, extractMethod, ignoreAuthentication)
+					tykOp.extractInternalTo(ep, extractPath, extractMethod)
+					tykOp.extractTransformRequestMethodTo(ep, extractPath, extractMethod)
+					tykOp.extractTransformRequestBodyTo(ep, extractPath, extractMethod)
+					tykOp.extractTransformResponseBodyTo(ep, extractPath, extractMethod)
+					tykOp.extractTransformRequestHeadersTo(ep, extractPath, extractMethod)
+					tykOp.extractTransformResponseHeadersTo(ep, extractPath, extractMethod)
+					tykOp.extractURLRewriteTo(ep, extractPath, extractMethod)
+					tykOp.extractCacheTo(ep, extractPath, extractMethod)
+					tykOp.extractEnforceTimeoutTo(ep, extractPath, extractMethod)
+					tykOp.extractVirtualEndpointTo(ep, extractPath, extractMethod)
+					tykOp.extractEndpointPostPluginTo(ep, extractPath, extractMethod)
+					tykOp.extractCircuitBreakerTo(ep, extractPath, extractMethod)
+					tykOp.extractTrackEndpointTo(ep, extractPath, extractMethod)
+					tykOp.extractDoNotTrackEndpointTo(ep, extractPath, extractMethod)
+					tykOp.extractRequestSizeLimitTo(ep, extractPath, extractMethod)
+					tykOp.extractRateLimitEndpointTo(ep, extractPath, extractMethod)
 					break
 				}
 			}

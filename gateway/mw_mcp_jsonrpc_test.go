@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -1240,4 +1241,403 @@ func TestMCPJSONRPCMiddleware_RateLimitEnforcedOnVEM(t *testing.T) {
 		{Method: http.MethodPost, Path: "/mcp", Data: payload, Code: http.StatusTooManyRequests},
 		{Method: http.MethodPost, Path: "/mcp", Data: otherPayload, Code: http.StatusOK},
 	}...)
+}
+
+// TestMCPJSONRPCMiddleware_OperationRateLimitNotEnforced demonstrates a bug where
+// operation-level rate limits are not enforced when MCP JSON-RPC routing occurs.
+// This test should FAIL until the bug is fixed.
+//
+// Bug: When an API has both:
+// 1. MCP tools with tool-level rate limits (generous: 100 req/min)
+// 2. Global API rate limit (strict: 1 req/20s)
+//
+// The tool-level rate limits are enforced correctly on the VEM paths, but the
+// global API rate limit should also apply to the original endpoint. However, after
+// JSON-RPC routing to VEMs, the global rate limit is bypassed.
+func TestMCPJSONRPCMiddleware_OperationRateLimitNotEnforced(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	oasAPI := getSampleOASAPI()
+	tykExt := oasAPI.GetTykExtension()
+	tykExt.Info.State.Active = true
+	tykExt.Server.ListenPath = oas.ListenPath{
+		Value: "/mcp",
+		Strip: false,
+	}
+
+	// Set up MCP middleware with a tool that has a generous rate limit (100 req/min)
+	// This should NOT be the limiting factor
+	tykExt.Middleware = &oas.Middleware{
+		McpTools: oas.MCPPrimitives{
+			"get-weather": &oas.MCPPrimitive{
+				Operation: oas.Operation{
+					RateLimit: &oas.RateLimitEndpoint{
+						Enabled: true,
+						Rate:    100,
+						Per:     oas.ReadableDuration(time.Minute),
+					},
+				},
+			},
+		},
+	}
+
+	oasAPI.SetTykExtension(tykExt)
+
+	var def apidef.APIDefinition
+	oasAPI.ExtractTo(&def)
+	def.IsOAS = true
+	def.UseKeylessAccess = true
+	def.Proxy.ListenPath = "/mcp"
+	// Set strict global rate limit: 1 req/20s
+	// This should be the limiting factor, blocking the second request
+	def.GlobalRateLimit = apidef.GlobalRateLimit{Rate: 1, Per: 20}
+	def.MarkAsMCP()
+
+	spec := &APISpec{APIDefinition: &def, OAS: oasAPI}
+	loadedSpecs := ts.Gw.LoadAPI(spec)
+	require.Len(t, loadedSpecs, 1, "Should load 1 API")
+
+	loaded := loadedSpecs[0]
+	require.NotNil(t, loaded, "API should be loaded")
+	assert.True(t, loaded.IsMCP())
+
+	payload := map[string]interface{}{
+		"jsonrpc": "2.0",
+		"method":  "tools/call",
+		"params":  map[string]interface{}{"name": "get-weather", "arguments": map[string]string{"city": "London"}},
+		"id":      1,
+	}
+
+	// First request should succeed (within both rate limits)
+	_, _ = ts.Run(t, test.TestCase{
+		Method: http.MethodPost,
+		Path:   "/mcp",
+		Data:   payload,
+		Code:   http.StatusOK,
+	})
+
+	// Second request should be rate limited by global API rate limit (1 req/20s)
+	// BUG: This test will FAIL because the global rate limit is not enforced after JSON-RPC routing
+	// The tool-level rate limit (100 req/min) allows this request, but
+	// the global API rate limit (1 req/20s) should block it
+	_, _ = ts.Run(t, test.TestCase{
+		Method: http.MethodPost,
+		Path:   "/mcp",
+		Data:   payload,
+		Code:   http.StatusTooManyRequests, // Expected: 429, Actual: 200 (BUG!)
+	})
+}
+
+// TestMCPJSONRPCMiddleware_OperationRateLimitNotEnforced_ExactUserScenario demonstrates
+// the exact bug reported where operation-level rate limits defined in middleware.operations
+// are not enforced when MCP JSON-RPC routing occurs.
+// This test matches the user's exact API configuration and should FAIL until the bug is fixed.
+//
+// Bug: When an API has:
+// 1. An OpenAPI operation (/tools/call GET with operationId "testget")
+// 2. MCP tool (weather.getForecast) with rate limit: 1 req/20s
+// 3. Operation middleware (testget) with rate limit: 1 req/20s
+//
+// The tool-level rate limit (mcpTools.weather.getForecast.rateLimit) IS enforced.
+// The operation-level rate limit (operations.testget.rateLimit) is NOT enforced (BUG!).
+func TestMCPJSONRPCMiddleware_OperationRateLimitNotEnforced_ExactUserScenario(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	// Create OAS API matching the user's exact configuration
+	oasAPI := oas.OAS{
+		T: openapi3.T{
+			OpenAPI: "3.0.3",
+			Info: &openapi3.Info{
+				Title:   "mcp andrei",
+				Version: "1.0.0",
+			},
+			Paths: openapi3.NewPaths(),
+		},
+	}
+
+	// Add the /tools/call GET operation with operationId "testget"
+	desc := ""
+	oasAPI.Paths.Set("/tools/call", &openapi3.PathItem{
+		Get: &openapi3.Operation{
+			OperationID: "testget",
+			Responses: openapi3.NewResponses(
+				openapi3.WithStatus(200, &openapi3.ResponseRef{
+					Value: &openapi3.Response{
+						Description: &desc,
+					},
+				}),
+			),
+		},
+	})
+
+	// Configure x-tyk-api-gateway extension
+	tykExt := &oas.XTykAPIGateway{
+		Info: oas.Info{
+			Name: "mcp andrei",
+			ID:   randStringBytes(8),
+			State: oas.State{
+				Active: true,
+			},
+		},
+		Upstream: oas.Upstream{
+			URL: TestHttpAny,
+		},
+		Server: oas.Server{
+			ListenPath: oas.ListenPath{
+				Value: "/prct",
+				Strip: true,
+			},
+		},
+		Middleware: &oas.Middleware{
+			Global: &oas.Global{
+				ContextVariables: &oas.ContextVariables{
+					Enabled: true,
+				},
+				TrafficLogs: &oas.TrafficLogs{
+					Enabled: true,
+				},
+			},
+			// MCP tool with rate limit 1 req/20s (THIS WORKS)
+			McpTools: oas.MCPPrimitives{
+				"weather.getForecast": &oas.MCPPrimitive{
+					Operation: oas.Operation{
+						Allow: &oas.Allowance{
+							Enabled: true,
+						},
+						RateLimit: &oas.RateLimitEndpoint{
+							Enabled: true,
+							Rate:    1,
+							Per:     oas.ReadableDuration(20 * time.Second),
+						},
+					},
+				},
+			},
+			// Operation-level rate limit 1 req/20s (THIS DOESN'T WORK - BUG!)
+			Operations: oas.Operations{
+				"testget": &oas.Operation{
+					RateLimit: &oas.RateLimitEndpoint{
+						Enabled: true,
+						Rate:    1,
+						Per:     oas.ReadableDuration(20 * time.Second),
+					},
+				},
+			},
+		},
+	}
+
+	oasAPI.SetTykExtension(tykExt)
+
+	var def apidef.APIDefinition
+	oasAPI.ExtractTo(&def)
+	def.IsOAS = true
+	def.UseKeylessAccess = true
+	def.Proxy.ListenPath = "/prct"
+	def.GlobalRateLimit = apidef.GlobalRateLimit{Rate: 100, Per: 1}
+	def.MarkAsMCP()
+
+	spec := &APISpec{APIDefinition: &def, OAS: oasAPI}
+	loadedSpecs := ts.Gw.LoadAPI(spec)
+	require.Len(t, loadedSpecs, 1, "Should load 1 API")
+
+	loaded := loadedSpecs[0]
+	require.NotNil(t, loaded, "API should be loaded")
+	assert.True(t, loaded.IsMCP())
+
+	// JSON-RPC request to call weather.getForecast tool
+	payload := map[string]interface{}{
+		"jsonrpc": "2.0",
+		"method":  "tools/call",
+		"params":  map[string]interface{}{"name": "weather.getForecast", "arguments": map[string]string{"location": "London"}},
+		"id":      1,
+	}
+
+	// First request should succeed (within all rate limits)
+	_, _ = ts.Run(t, test.TestCase{
+		Method: http.MethodPost,
+		Path:   "/prct",
+		Data:   payload,
+		Code:   http.StatusOK,
+	})
+
+	// Second request should be blocked by BOTH:
+	// 1. Tool-level rate limit (mcpTools.weather.getForecast.rateLimit: 1 req/20s) - THIS WORKS
+	// 2. Operation-level rate limit (operations.testget.rateLimit: 1 req/20s) - THIS DOESN'T WORK (BUG!)
+	//
+	// Currently, only the tool-level rate limit is enforced.
+	// The operation-level rate limit is ignored, which is the bug.
+	//
+	// BUG: This test will FAIL because it expects 429 but gets 429 for the wrong reason.
+	// The 429 is coming from the tool-level rate limit, not the operation-level rate limit.
+	// To properly test this bug, we would need to increase the tool-level rate limit
+	// to 100 req/min and keep the operation-level at 1 req/20s, then verify the second
+	// request returns 200 instead of 429 (demonstrating the operation limit isn't applied).
+	_, _ = ts.Run(t, test.TestCase{
+		Method: http.MethodPost,
+		Path:   "/prct",
+		Data:   payload,
+		Code:   http.StatusTooManyRequests, // This will pass, but for the wrong reason
+	})
+
+	// To truly demonstrate the bug, let's test with a different tool that has generous limits
+	oasAPI2 := getSampleOASAPI()
+	tykExt2 := oasAPI2.GetTykExtension()
+	tykExt2.Info.State.Active = true
+	tykExt2.Server.ListenPath = oas.ListenPath{
+		Value: "/prct2",
+		Strip: true,
+	}
+
+	// Add the /tools/call GET operation
+	desc2 := ""
+	oasAPI2.Paths.Set("/tools/call", &openapi3.PathItem{
+		Get: &openapi3.Operation{
+			OperationID: "testget2",
+			Responses: openapi3.NewResponses(
+				openapi3.WithStatus(200, &openapi3.ResponseRef{
+					Value: &openapi3.Response{
+						Description: &desc2,
+					},
+				}),
+			),
+		},
+	})
+
+	tykExt2.Middleware = &oas.Middleware{
+		// MCP tool with GENEROUS rate limit (100 req/min) - should NOT block
+		McpTools: oas.MCPPrimitives{
+			"weather.getForecast": &oas.MCPPrimitive{
+				Operation: oas.Operation{
+					RateLimit: &oas.RateLimitEndpoint{
+						Enabled: true,
+						Rate:    100,
+						Per:     oas.ReadableDuration(time.Minute),
+					},
+				},
+			},
+		},
+		// Operation-level STRICT rate limit (1 req/20s) - SHOULD block but DOESN'T (BUG!)
+		Operations: oas.Operations{
+			"testget2": &oas.Operation{
+				RateLimit: &oas.RateLimitEndpoint{
+					Enabled: true,
+					Rate:    1,
+					Per:     oas.ReadableDuration(20 * time.Second),
+				},
+			},
+		},
+	}
+
+	oasAPI2.SetTykExtension(tykExt2)
+
+	var def2 apidef.APIDefinition
+	oasAPI2.ExtractTo(&def2)
+	def2.IsOAS = true
+	def2.UseKeylessAccess = true
+	def2.Proxy.ListenPath = "/prct2"
+	def2.GlobalRateLimit = apidef.GlobalRateLimit{Rate: 100, Per: 1}
+	def2.MarkAsMCP()
+
+	spec2 := &APISpec{APIDefinition: &def2, OAS: oasAPI2}
+	loadedSpecs2 := ts.Gw.LoadAPI(spec2)
+	require.Len(t, loadedSpecs2, 1, "Should load second API")
+
+	loaded2 := loadedSpecs2[0]
+	require.NotNil(t, loaded2, "Second API should be loaded")
+
+	// First request to second API should succeed
+	_, _ = ts.Run(t, test.TestCase{
+		Method: http.MethodPost,
+		Path:   "/prct2",
+		Data:   payload,
+		Code:   http.StatusOK,
+	})
+
+	// Second request should be blocked by operation-level rate limit (1 req/20s)
+	// but tool-level rate limit (100 req/min) allows it
+	// BUG: This test will FAIL - expects 429 but gets 200
+	// This demonstrates that operation-level rate limits are NOT enforced
+	_, _ = ts.Run(t, test.TestCase{
+		Method: http.MethodPost,
+		Path:   "/prct2",
+		Data:   payload,
+		Code:   http.StatusTooManyRequests, // Expected: 429, Actual: 200 (BUG!)
+	})
+}
+
+// TestMCPJSONRPCMiddleware_GlobalRateLimitDebug is a debug test to understand
+// why global rate limits are not being enforced.
+func TestMCPJSONRPCMiddleware_GlobalRateLimitDebug(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	oasAPI := getSampleOASAPI()
+	tykExt := oasAPI.GetTykExtension()
+	tykExt.Info.State.Active = true
+	tykExt.Server.ListenPath = oas.ListenPath{
+		Value: "/mcp",
+		Strip: false,
+	}
+
+	// Set up MCP middleware WITHOUT tool-level rate limits
+	// so we can isolate the global rate limit issue
+	tykExt.Middleware = &oas.Middleware{
+		McpTools: oas.MCPPrimitives{
+			"get-weather": &oas.MCPPrimitive{},
+		},
+	}
+
+	oasAPI.SetTykExtension(tykExt)
+
+	var def apidef.APIDefinition
+	oasAPI.ExtractTo(&def)
+	def.IsOAS = true
+	def.UseKeylessAccess = true
+	def.Proxy.ListenPath = "/mcp"
+	// Set strict global rate limit: 1 req/20s
+	def.GlobalRateLimit = apidef.GlobalRateLimit{Rate: 1, Per: 20}
+	def.MarkAsMCP()
+
+	spec := &APISpec{APIDefinition: &def, OAS: oasAPI}
+	loadedSpecs := ts.Gw.LoadAPI(spec)
+	require.Len(t, loadedSpecs, 1, "Should load 1 API")
+
+	loaded := loadedSpecs[0]
+	require.NotNil(t, loaded, "API should be loaded")
+	assert.True(t, loaded.IsMCP())
+
+	// Check that global rate limit is configured
+	t.Logf("Global rate limit: Rate=%f, Per=%f, Disabled=%v",
+		loaded.GlobalRateLimit.Rate, loaded.GlobalRateLimit.Per, loaded.GlobalRateLimit.Disabled)
+	assert.Equal(t, float64(1), loaded.GlobalRateLimit.Rate)
+	assert.Equal(t, float64(20), loaded.GlobalRateLimit.Per)
+	assert.False(t, loaded.GlobalRateLimit.Disabled)
+
+	payload := map[string]interface{}{
+		"jsonrpc": "2.0",
+		"method":  "tools/call",
+		"params":  map[string]interface{}{"name": "get-weather", "arguments": map[string]string{"city": "London"}},
+		"id":      1,
+	}
+
+	// First request should succeed
+	t.Log("Making first request...")
+	resp1, _ := ts.Run(t, test.TestCase{
+		Method: http.MethodPost,
+		Path:   "/mcp",
+		Data:   payload,
+		Code:   http.StatusOK,
+	})
+	t.Logf("First request response: %+v", resp1)
+
+	// Second request should be rate limited
+	t.Log("Making second request (should be rate limited)...")
+	resp2, _ := ts.Run(t, test.TestCase{
+		Method: http.MethodPost,
+		Path:   "/mcp",
+		Data:   payload,
+		Code:   http.StatusTooManyRequests, // Expected: 429, Actual: 200 (BUG!)
+	})
+	t.Logf("Second request response: %+v", resp2)
 }

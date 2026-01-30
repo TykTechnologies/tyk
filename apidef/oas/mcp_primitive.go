@@ -20,6 +20,8 @@ func (m *MCPPrimitive) extractTransformResponseBodyTo(_ *apidef.ExtendedPathsSet
 // but allowing MCPPrimitive-specific overrides. Methods without overrides are promoted
 // to Operation. Methods with empty overrides (like extractTransformResponseBodyTo) are
 // effectively disabled for MCP primitives.
+//
+//nolint:dupl // Intentional similarity to Operation.ExtractToExtendedPaths with MCP-specific behavior
 func (m *MCPPrimitive) ExtractToExtendedPaths(ep *apidef.ExtendedPathsSet, path string, method string) {
 	if ep == nil || m == nil {
 		return

@@ -92,11 +92,7 @@ func (m *MCPJSONRPCMiddleware) validateJSONRPCRequest(r *http.Request) bool {
 	}
 
 	contentType := r.Header.Get(headerContentType)
-	if !strings.HasPrefix(contentType, contentTypeJSON) {
-		return false
-	}
-
-	return true
+	return strings.HasPrefix(contentType, contentTypeJSON)
 }
 
 // readAndParseJSONRPC reads the request body and parses it as JSON-RPC 2.0.
@@ -161,7 +157,8 @@ func (m *MCPJSONRPCMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 	// Parse JSON-RPC request
 	rpcReq, err := m.readAndParseJSONRPC(w, r)
 	if err != nil {
-		return nil, middleware.StatusRespond
+		// Error response already written by readAndParseJSONRPC
+		return nil, middleware.StatusRespond //nolint:nilerr
 	}
 
 	// Route based on method
