@@ -34,20 +34,20 @@ const (
 	// RPC connection is established. During this period, certificate fetches from MDCB
 	// will fail with ErrMDCBConnectionLost. These constants control the retry behavior:
 	//
-	// backoffMaxElapsedTime: Maximum time to wait for MDCB to become ready (30 seconds)
+	// DefaultRPCCertFetchMaxElapsedTime: Maximum time to wait for MDCB to become ready (30 seconds)
 	//   - If MDCB doesn't respond within this window, we give up and fall back to local files
 	//   - This prevents indefinite blocking during gateway startup
 	//
-	// backoffInitialInterval: Starting delay for exponential backoff (100ms)
+	// DefaultRPCCertFetchInitialInterval: Starting delay for exponential backoff (100ms)
 	//   - First retry happens after 100ms
 	//   - Each subsequent retry doubles: 100ms → 200ms → 400ms → 800ms → 1600ms → 2000ms
 	//
-	// backoffMaxInterval: Maximum delay between retry attempts (2 seconds)
+	// DefaultRPCCertFetchMaxInterval: Maximum delay between retry attempts (2 seconds)
 	//   - Caps exponential growth to prevent excessively long waits
 	//   - Ensures we check MDCB at least every 2 seconds
-	backoffMaxElapsedTime  = 30 * time.Second
-	backoffInitialInterval = 100 * time.Millisecond
-	backoffMaxInterval     = 2 * time.Second
+	DefaultRPCCertFetchMaxElapsedTime  = 30 * time.Second
+	DefaultRPCCertFetchInitialInterval = 100 * time.Millisecond
+	DefaultRPCCertFetchMaxInterval     = 2 * time.Second
 )
 
 var (
