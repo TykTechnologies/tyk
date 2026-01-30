@@ -27,6 +27,33 @@ import (
 const (
 	cacheDefaultTTL    = 300 // 5 minutes.
 	cacheCleanInterval = 600 // 10 minutes.
+
+	// TT-14618: MDCB retry configuration for certificate loading during startup.
+	//
+	// When the gateway starts with MDCB configured, it enters emergency mode until the
+	// RPC connection is established. During this period, certificate fetches from MDCB
+	// will fail with ErrMDCBConnectionLost. These constants control the retry behavior:
+	//
+	// backoffMaxElapsedTime: Maximum time to wait for MDCB to become ready (30 seconds)
+	//   - If MDCB doesn't respond within this window, we give up and fall back to local files
+	//   - This prevents indefinite blocking during gateway startup
+	//
+	// backoffInitialInterval: Starting delay for exponential backoff (100ms)
+	//   - First retry happens after 100ms
+	//   - Each subsequent retry doubles: 100ms → 200ms → 400ms → 800ms → 1600ms → 2000ms
+	//
+	// backoffMaxInterval: Maximum delay between retry attempts (2 seconds)
+	//   - Caps exponential growth to prevent excessively long waits
+	//   - Ensures we check MDCB at least every 2 seconds
+	//
+	// quickRetryDelay: Retry delay for transient failures after MDCB is verified (500ms)
+	//   - Used when MDCB was working but a single fetch fails (flaky connection)
+	//   - Faster than full backoff since we know MDCB is generally available
+	//   - Gives connection pool time to recover from temporary issues
+	backoffMaxElapsedTime  = 30 * time.Second
+	backoffInitialInterval = 100 * time.Millisecond
+	backoffMaxInterval     = 2 * time.Second
+	quickRetryDelay        = 500 * time.Millisecond
 )
 
 var (
@@ -405,7 +432,24 @@ func GetCertIDAndChainPEM(certData []byte, secret string) (string, []byte, error
 func (c *certificateManager) List(certIDs []string, mode CertificateType) (out []*tls.Certificate) {
 	var cert *tls.Certificate
 	var rawCert []byte
-	var skipBackoff bool // Skip full exponential backoff after first successful MDCB verification
+
+	// TT-14618: skipBackoff optimization prevents compounded delays when loading multiple certificates.
+	//
+	// Without this flag:
+	//   - Loading 100 certs with MDCB down would retry each cert independently
+	//   - Each cert waits up to 30s → 100 certs = 50+ minutes total
+	//
+	// With this flag:
+	//   - First cert performs full exponential backoff to wait for MDCB (up to 30s)
+	//   - Once MDCB responds successfully, skipBackoff is set to true
+	//   - Remaining 99 certs skip the backoff and fetch immediately
+	//   - Total time: ~30s + 99 * 1ms = ~30s instead of 50+ minutes
+	//
+	// This is safe because:
+	//   - Each List() call starts fresh (skipBackoff is local, not shared across calls)
+	//   - If MDCB fails mid-batch after being verified, we perform a quick 500ms retry
+	//   - This handles transient network issues without blocking for the full backoff period
+	var skipBackoff bool
 
 	for _, id := range certIDs {
 		if cert, found := c.cache.Get(id); found {
@@ -416,36 +460,74 @@ func (c *certificateManager) List(certIDs []string, mode CertificateType) (out [
 		}
 
 		val, err := c.storage.GetKey("raw-" + id)
-		// TT-14618: Retry on MDCB connection lost (emergency mode during startup)
+
+		// TT-14618: Two-tier retry strategy for MDCB connection failures during startup.
+		//
+		// Scenario 1: Initial MDCB unavailability (emergency mode at startup)
+		//   - Gateway starts and immediately tries to load SSL certificates
+		//   - MDCB RPC connection is still initializing (takes ~1-8 seconds typically)
+		//   - All GetKey() calls return ErrMDCBConnectionLost
+		//   - Solution: Exponential backoff to wait for MDCB to become ready
+		//
+		// Scenario 2: Transient failures after MDCB is verified
+		//   - MDCB was working (skipBackoff = true)
+		//   - Single certificate fetch fails (network blip, connection pool issue)
+		//   - Don't want to trigger full 30s backoff for a transient issue
+		//   - Solution: Quick 500ms retry before falling back to file
 		if err != nil && errors.Is(err, storage.ErrMDCBConnectionLost) {
 			if !skipBackoff {
-				// First MDCB error - perform full exponential backoff
+				// TIER 1: Full exponential backoff for initial MDCB unavailability
+				//
+				// This is the first certificate that failed to load from MDCB.
+				// MDCB is likely still initializing, so we perform exponential backoff:
+				//   - Retry 1: 100ms delay
+				//   - Retry 2: 200ms delay
+				//   - Retry 3: 400ms delay
+				//   - Retry 4: 800ms delay
+				//   - Retry 5+: 1600ms, 2000ms (capped), 2000ms...
+				//   - Give up after 30 seconds total
+				//
+				// Once any certificate succeeds, skipBackoff is set to true and
+				// remaining certificates bypass this expensive retry logic.
 				c.logger.Debug("MDCB not ready for certificate fetch, retrying with exponential backoff...")
 
 				operation := func() error {
 					val, err = c.storage.GetKey("raw-" + id)
 					if errors.Is(err, storage.ErrMDCBConnectionLost) {
-						return err  // Retry
+						return err // Retryable error
 					}
-					return nil  // Success or non-retryable error
+					return nil // Success or non-retryable error
 				}
 
 				expBackoff := backoff.NewExponentialBackOff()
-				expBackoff.MaxElapsedTime = 30 * time.Second
-				expBackoff.InitialInterval = 100 * time.Millisecond
-				expBackoff.MaxInterval = 2 * time.Second
+				expBackoff.MaxElapsedTime = backoffMaxElapsedTime
+				expBackoff.InitialInterval = backoffInitialInterval
+				expBackoff.MaxInterval = backoffMaxInterval
 
 				if retryErr := backoff.Retry(operation, expBackoff); retryErr != nil {
 					c.logger.Warn("Timeout waiting for MDCB connection for certificate:", id)
 				} else {
-					// MDCB is now ready, skip full backoff for remaining certificates
+					// Success! MDCB is now verified as ready.
+					// Set skipBackoff to true so remaining certificates skip exponential backoff
+					// and fetch directly (they'll use Tier 2 quick retry if they fail).
 					skipBackoff = true
 				}
 			} else {
-				// Already verified MDCB in this batch but failed again (flaky connection)
-				// Perform a single quick retry without exponential backoff
+				// TIER 2: Quick retry for transient failures after MDCB verification
+				//
+				// MDCB was previously working (we successfully loaded at least one certificate),
+				// but this specific certificate fetch failed. This is likely a transient issue:
+				//   - Network packet loss
+				//   - Connection pool exhaustion/reset
+				//   - Temporary MDCB load spike
+				//
+				// We don't want to wait 30 seconds for what's probably a transient issue,
+				// so we do a single quick retry with a 500ms delay. This gives the connection
+				// pool time to recover or the network to stabilize.
+				//
+				// If it still fails, we fall back to local file (next section handles this).
 				c.logger.Warn("MDCB connection issue after previous success, performing quick retry for certificate:", id)
-				time.Sleep(100 * time.Millisecond)
+				time.Sleep(quickRetryDelay)
 				val, err = c.storage.GetKey("raw-" + id)
 				if err != nil && errors.Is(err, storage.ErrMDCBConnectionLost) {
 					c.logger.Warn("MDCB connection still failing for certificate:", id)

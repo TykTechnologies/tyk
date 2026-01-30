@@ -51,19 +51,19 @@ func (m *MockMDCBStorage) SetRawKey(key, value string, timeout int64) error {
 	return nil
 }
 
-func (m *MockMDCBStorage) GetExp(key string) (int64, error) {
+func (m *MockMDCBStorage) GetExp(_ string) (int64, error) {
 	return -1, nil
 }
 
-func (m *MockMDCBStorage) SetExp(key string, timeout int64) error {
+func (m *MockMDCBStorage) SetExp(_ string, timeout int64) error {
 	return nil
 }
 
-func (m *MockMDCBStorage) DeleteKey(key string) bool {
+func (m *MockMDCBStorage) DeleteKey(_ string) bool {
 	return true
 }
 
-func (m *MockMDCBStorage) DeleteRawKey(key string) bool {
+func (m *MockMDCBStorage) DeleteRawKey(_ string) bool {
 	return true
 }
 
@@ -75,11 +75,11 @@ func (m *MockMDCBStorage) Connect() bool {
 	return true
 }
 
-func (m *MockMDCBStorage) Exists(key string) (bool, error) {
+func (m *MockMDCBStorage) Exists(_ string) (bool, error) {
 	return false, nil
 }
 
-func (m *MockMDCBStorage) GetKeys(pattern string) []string {
+func (m *MockMDCBStorage) GetKeys(_ string) []string {
 	return []string{}
 }
 
@@ -87,41 +87,41 @@ func (m *MockMDCBStorage) GetKeysAndValues() map[string]string {
 	return map[string]string{}
 }
 
-func (m *MockMDCBStorage) GetKeysAndValuesWithFilter(filter string) map[string]string {
+func (m *MockMDCBStorage) GetKeysAndValuesWithFilter(_ string) map[string]string {
 	return map[string]string{}
 }
 
-func (m *MockMDCBStorage) DeleteKeys(keys []string) bool {
+func (m *MockMDCBStorage) DeleteKeys(_ []string) bool {
 	return true
 }
 
-func (m *MockMDCBStorage) Decrement(key string) {}
+func (m *MockMDCBStorage) Decrement(_ string) {}
 
-func (m *MockMDCBStorage) IncrememntWithExpire(key string, timeout int64) int64 {
+func (m *MockMDCBStorage) IncrememntWithExpire(_ string, _ int64) int64 {
 	return 0
 }
 
-func (m *MockMDCBStorage) SetRollingWindow(key string, per int64, val string, pipeline bool) (int, []interface{}) {
+func (m *MockMDCBStorage) SetRollingWindow(_ string, _ int64, _ string, _ bool) (int, []interface{}) {
 	return 0, nil
 }
 
-func (m *MockMDCBStorage) GetRollingWindow(key string, per int64, pipeline bool) (int, []interface{}) {
+func (m *MockMDCBStorage) GetRollingWindow(_ string, _ int64, _ bool) (int, []interface{}) {
 	return 0, nil
 }
 
-func (m *MockMDCBStorage) GetSet(key string) (map[string]string, error) {
+func (m *MockMDCBStorage) GetSet(_ string) (map[string]string, error) {
 	return nil, errors.New("not implemented")
 }
 
-func (m *MockMDCBStorage) AddToSet(key, value string) {}
+func (m *MockMDCBStorage) AddToSet(_, _ string) {}
 
-func (m *MockMDCBStorage) GetAndDeleteSet(key string) []interface{} {
+func (m *MockMDCBStorage) GetAndDeleteSet(_ string) []interface{} {
 	return nil
 }
 
-func (m *MockMDCBStorage) RemoveFromSet(key, value string) {}
+func (m *MockMDCBStorage) RemoveFromSet(_, _ string) {}
 
-func (m *MockMDCBStorage) DeleteScanMatch(pattern string) bool {
+func (m *MockMDCBStorage) DeleteScanMatch(_ string) bool {
 	return true
 }
 
@@ -133,25 +133,25 @@ func (m *MockMDCBStorage) GetKeyPrefix() string {
 	return ""
 }
 
-func (m *MockMDCBStorage) AddToSortedSet(key, value string, score float64) {}
+func (m *MockMDCBStorage) AddToSortedSet(_, _ string, _ float64) {}
 
-func (m *MockMDCBStorage) GetSortedSetRange(key, scoreFrom, scoreTo string) ([]string, []float64, error) {
+func (m *MockMDCBStorage) GetSortedSetRange(_, _, _ string) ([]string, []float64, error) {
 	return nil, nil, errors.New("not implemented")
 }
 
-func (m *MockMDCBStorage) RemoveSortedSetRange(key, scoreFrom, scoreTo string) error {
+func (m *MockMDCBStorage) RemoveSortedSetRange(_, _, _ string) error {
 	return errors.New("not implemented")
 }
 
-func (m *MockMDCBStorage) GetListRange(key string, from, to int64) ([]string, error) {
+func (m *MockMDCBStorage) GetListRange(_ string, _, _ int64) ([]string, error) {
 	return nil, errors.New("not implemented")
 }
 
-func (m *MockMDCBStorage) RemoveFromList(key, value string) error {
+func (m *MockMDCBStorage) RemoveFromList(_, _ string) error {
 	return errors.New("not implemented")
 }
 
-func (m *MockMDCBStorage) AppendToSet(key, value string) {}
+func (m *MockMDCBStorage) AppendToSet(_, _ string) {}
 
 // loadTestCert loads the test certificate from testdata
 func loadTestCert(t *testing.T) string {
@@ -295,23 +295,23 @@ func (m *MockFlakyMDCBStorage) SetRawKey(key, value string, timeout int64) error
 	return nil
 }
 
-func (m *MockFlakyMDCBStorage) GetExp(key string) (int64, error) {
+func (m *MockFlakyMDCBStorage) GetExp(_ string) (int64, error) {
 	return -1, nil
 }
 
-func (m *MockFlakyMDCBStorage) SetExp(key string, timeout int64) error {
+func (m *MockFlakyMDCBStorage) SetExp(_ string, _ int64) error {
 	return nil
 }
 
-func (m *MockFlakyMDCBStorage) DeleteKey(key string) bool {
+func (m *MockFlakyMDCBStorage) DeleteKey(_ string) bool {
 	return true
 }
 
-func (m *MockFlakyMDCBStorage) DeleteRawKey(key string) bool {
+func (m *MockFlakyMDCBStorage) DeleteRawKey(_ string) bool {
 	return true
 }
 
-func (m *MockFlakyMDCBStorage) DeleteRawKeys(keys []string) bool {
+func (m *MockFlakyMDCBStorage) DeleteRawKeys(_ []string) bool {
 	return true
 }
 
@@ -319,11 +319,11 @@ func (m *MockFlakyMDCBStorage) Connect() bool {
 	return true
 }
 
-func (m *MockFlakyMDCBStorage) Exists(key string) (bool, error) {
+func (m *MockFlakyMDCBStorage) Exists(_ string) (bool, error) {
 	return false, nil
 }
 
-func (m *MockFlakyMDCBStorage) GetKeys(pattern string) []string {
+func (m *MockFlakyMDCBStorage) GetKeys(_ string) []string {
 	return []string{}
 }
 
@@ -331,41 +331,41 @@ func (m *MockFlakyMDCBStorage) GetKeysAndValues() map[string]string {
 	return map[string]string{}
 }
 
-func (m *MockFlakyMDCBStorage) GetKeysAndValuesWithFilter(filter string) map[string]string {
+func (m *MockFlakyMDCBStorage) GetKeysAndValuesWithFilter(_ string) map[string]string {
 	return map[string]string{}
 }
 
-func (m *MockFlakyMDCBStorage) DeleteKeys(keys []string) bool {
+func (m *MockFlakyMDCBStorage) DeleteKeys(_ []string) bool {
 	return true
 }
 
-func (m *MockFlakyMDCBStorage) Decrement(key string) {}
+func (m *MockFlakyMDCBStorage) Decrement(_ string) {}
 
-func (m *MockFlakyMDCBStorage) IncrememntWithExpire(key string, timeout int64) int64 {
+func (m *MockFlakyMDCBStorage) IncrememntWithExpire(_ string, _ int64) int64 {
 	return 0
 }
 
-func (m *MockFlakyMDCBStorage) SetRollingWindow(key string, per int64, val string, pipeline bool) (int, []interface{}) {
+func (m *MockFlakyMDCBStorage) SetRollingWindow(_ string, _ int64, _ string, _ bool) (int, []interface{}) {
 	return 0, nil
 }
 
-func (m *MockFlakyMDCBStorage) GetRollingWindow(key string, per int64, pipeline bool) (int, []interface{}) {
+func (m *MockFlakyMDCBStorage) GetRollingWindow(_ string, _ int64, _ bool) (int, []interface{}) {
 	return 0, nil
 }
 
-func (m *MockFlakyMDCBStorage) GetSet(key string) (map[string]string, error) {
+func (m *MockFlakyMDCBStorage) GetSet(_ string) (map[string]string, error) {
 	return nil, errors.New("not implemented")
 }
 
-func (m *MockFlakyMDCBStorage) AddToSet(key, value string) {}
+func (m *MockFlakyMDCBStorage) AddToSet(_, _ string) {}
 
-func (m *MockFlakyMDCBStorage) GetAndDeleteSet(key string) []interface{} {
+func (m *MockFlakyMDCBStorage) GetAndDeleteSet(_ string) []interface{} {
 	return nil
 }
 
-func (m *MockFlakyMDCBStorage) RemoveFromSet(key, value string) {}
+func (m *MockFlakyMDCBStorage) RemoveFromSet(_, _ string) {}
 
-func (m *MockFlakyMDCBStorage) DeleteScanMatch(pattern string) bool {
+func (m *MockFlakyMDCBStorage) DeleteScanMatch(_ string) bool {
 	return true
 }
 
@@ -377,25 +377,25 @@ func (m *MockFlakyMDCBStorage) GetKeyPrefix() string {
 	return ""
 }
 
-func (m *MockFlakyMDCBStorage) AddToSortedSet(key, value string, score float64) {}
+func (m *MockFlakyMDCBStorage) AddToSortedSet(_, _ string, _ float64) {}
 
-func (m *MockFlakyMDCBStorage) GetSortedSetRange(key, scoreFrom, scoreTo string) ([]string, []float64, error) {
+func (m *MockFlakyMDCBStorage) GetSortedSetRange(_, _, _ string) ([]string, []float64, error) {
 	return nil, nil, errors.New("not implemented")
 }
 
-func (m *MockFlakyMDCBStorage) RemoveSortedSetRange(key, scoreFrom, scoreTo string) error {
+func (m *MockFlakyMDCBStorage) RemoveSortedSetRange(_, _, _ string) error {
 	return errors.New("not implemented")
 }
 
-func (m *MockFlakyMDCBStorage) GetListRange(key string, from, to int64) ([]string, error) {
+func (m *MockFlakyMDCBStorage) GetListRange(_ string, _, _ int64) ([]string, error) {
 	return nil, errors.New("not implemented")
 }
 
-func (m *MockFlakyMDCBStorage) RemoveFromList(key, value string) error {
+func (m *MockFlakyMDCBStorage) RemoveFromList(_, _ string) error {
 	return errors.New("not implemented")
 }
 
-func (m *MockFlakyMDCBStorage) AppendToSet(key, value string) {}
+func (m *MockFlakyMDCBStorage) AppendToSet(_, _ string) {}
 
 // TestTT14618_FlakyConnection tests handling of intermittent MDCB failures
 func TestTT14618_FlakyConnection(t *testing.T) {
