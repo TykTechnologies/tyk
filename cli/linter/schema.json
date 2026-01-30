@@ -126,9 +126,6 @@
         "headers": {
           "type": ["array", "null"]
         },
-        "custom_trace_header": {
-          "type": "string"
-        },
         "sampling": {
           "type": "object",
           "sampling_type": {
