@@ -1858,7 +1858,13 @@ func (gw *Gateway) LoadAPI(specs ...*APISpec) (out []*APISpec) {
 			panic(err)
 		}
 
-		oasSpecFilePath := filepath.Join(gwConf.AppPath, spec.APIID+strconv.Itoa(i)+"-oas.json")
+		// Use -mcp.json for MCP APIs, -oas.json for regular OAS APIs
+		var oasSpecFilePath string
+		if spec.IsMCP() {
+			oasSpecFilePath = filepath.Join(gwConf.AppPath, spec.APIID+strconv.Itoa(i)+"-mcp.json")
+		} else {
+			oasSpecFilePath = filepath.Join(gwConf.AppPath, spec.APIID+strconv.Itoa(i)+"-oas.json")
+		}
 		if err := ioutil.WriteFile(oasSpecFilePath, oasSpecBytes, 0644); err != nil {
 			panic(err)
 		}

@@ -55,8 +55,10 @@ const (
 	SelfLooping
 	// RequestStartTime holds the time when the request entered the middleware chain
 	RequestStartTime
-	// MCPRouting indicates the request came via MCP JSON-RPC routing
-	MCPRouting
+	// JsonRPCRouting indicates the request came via JSON-RPC routing (MCP, A2A, etc.)
+	JsonRPCRouting
+	// JSONRPCRequest stores parsed JSON-RPC request data for protocol routing (MCP, A2A, etc.)
+	JSONRPCRequest
 )
 
 func ctxSetSession(r *http.Request, s *user.SessionState, scheduleUpdate bool, hashKey bool) {

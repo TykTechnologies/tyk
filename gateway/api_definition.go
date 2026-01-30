@@ -1501,7 +1501,12 @@ func (a APIDefinitionLoader) getExtendedPathSpecs(apiVersionDef apidef.VersionIn
 	combinedPath = append(combinedPath, oasMockResponsePaths...)
 	combinedPath = append(combinedPath, mcpVEMs...)
 
-	return combinedPath, len(whiteListPaths) > 0
+	// Enable whitelist mode if there are whitelist paths.
+	// Note: MCP allow list uses explicit BlackList entries for primitives without Allow,
+	// rather than relying on whitelist mode, so unregistered primitives can passthrough.
+	whiteListEnabled := len(whiteListPaths) > 0
+
+	return combinedPath, whiteListEnabled
 }
 
 func (a *APISpec) Init(authStore, sessionStore, healthStore, orgStore storage.Handler) {
@@ -1591,13 +1596,14 @@ func (a *APISpec) URLAllowedAndIgnored(r *http.Request, rxPaths []URLSpec, white
 		}
 
 		if r.Method == rxPaths[i].Internal.Method && rxPaths[i].Status == Internal {
-			// MCP primitive VEMs require explicit MCP routing context.
+			// MCP primitive VEMs return 404 to avoid exposing internal-only endpoints.
+			// They can only be accessed via JSON-RPC routing (MCP, A2A, etc.), not via generic looping.
 			if mcp.IsPrimitiveVEMPath(rxPaths[i].Internal.Path) {
-				if !httpctx.IsMCPRouting(r) {
+				if !httpctx.IsJsonRPCRouting(r) {
 					return MCPPrimitiveNotFound, nil
 				}
 			} else if !ctxLoopingEnabled(r) {
-				// Other internal endpoints use generic looping check.
+				// Regular internal endpoints require looping to be enabled.
 				return EndPointNotAllowed, nil
 			}
 		}
@@ -1663,22 +1669,30 @@ func (a *APISpec) URLAllowedAndIgnored(r *http.Request, rxPaths []URLSpec, white
 			}
 		}
 
+		// MCP primitive VEMs: continue checking for BlackList even outside whitelist mode.
+		// This allows explicit BlackList entries to block primitives without Allow.
+		if rxPaths[i].Status == Internal && r.Method == rxPaths[i].Internal.Method {
+			if mcp.IsPrimitiveVEMPath(rxPaths[i].Internal.Path) {
+				if httpctx.IsJsonRPCRouting(r) {
+					continue // Keep looking for WhiteList/BlackList
+				}
+			}
+		}
+
 		if whiteListStatus {
 			// We have a whitelist, nothing gets through unless specifically defined
 			switch rxPaths[i].Status {
 			case WhiteList, BlackList, Ignored:
-			default:
-				if rxPaths[i].Status == Internal && r.Method == rxPaths[i].Internal.Method {
-					// MCP primitive VEMs require explicit MCP routing context.
-					if mcp.IsPrimitiveVEMPath(rxPaths[i].Internal.Path) {
-						if httpctx.IsMCPRouting(r) {
-							return a.getURLStatus(rxPaths[i].Status), nil
-						}
-					} else if ctxLoopingEnabled(r) {
-						// Other internal endpoints use generic looping check.
+				// These are handled in the switch above, continue to process them
+			case Internal:
+				if r.Method == rxPaths[i].Internal.Method {
+					if ctxLoopingEnabled(r) {
+						// Regular internal endpoints use generic looping check.
 						return a.getURLStatus(rxPaths[i].Status), nil
 					}
 				}
+				return EndPointNotAllowed, nil
+			default:
 				return EndPointNotAllowed, nil
 			}
 		}
