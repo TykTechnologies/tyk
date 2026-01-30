@@ -236,10 +236,10 @@ func TestCertificateLoadingWithRetry(t *testing.T) {
 			}
 
 			// Verify exponential backoff timing (only for cases with measurable backoff)
-			// Backoff config: InitialInterval=100ms, multiplier=1.5 (default), MaxInterval=2s
+			// Backoff config: InitialInterval=100ms, multiplier=2.0, MaxInterval=2s
 			// For cases with >= 3 retries, backoff delays are more reliable to measure
 			if tt.failureCount >= 3 {
-				// Intervals: 100ms, 150ms, 225ms, 337ms, 506ms, 759ms, 1139ms, 1708ms, 2000ms (capped), ...
+				// Intervals: 100ms, 200ms, 400ms, 800ms, 1600ms, 2000ms (capped), ...
 				minExpectedTime := 100 * time.Millisecond // At least the initial interval
 				if duration < minExpectedTime {
 					t.Errorf("Expected at least %v delay for backoff with %d failures, but completed in %v",
