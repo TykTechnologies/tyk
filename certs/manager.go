@@ -40,7 +40,7 @@ const (
 	//
 	// DefaultRPCCertFetchInitialInterval: Starting delay for exponential backoff (100ms)
 	//   - First retry happens after 100ms
-	//   - Each subsequent retry doubles: 100ms → 200ms → 400ms → 800ms → 1600ms → 2000ms
+	//   - Each subsequent retry multiplies by 1.5: 100ms → 150ms → 225ms → 337ms → ... → 2000ms (capped)
 	//
 	// DefaultRPCCertFetchMaxInterval: Maximum delay between retry attempts (2 seconds)
 	//   - Caps exponential growth to prevent excessively long waits
