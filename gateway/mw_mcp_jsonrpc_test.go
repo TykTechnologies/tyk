@@ -141,7 +141,7 @@ func TestMCPJSONRPCMiddleware_ProcessRequest_InvalidJSON(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "2.0", resp.JSONRPC)
 	assert.Equal(t, mcp.JSONRPCParseError, resp.Error.Code)
-	assert.Equal(t, "Parse error", resp.Error.Message)
+	assert.Equal(t, mcp.ErrMsgParseError, resp.Error.Message)
 }
 
 func TestMCPJSONRPCMiddleware_ProcessRequest_InvalidRequest(t *testing.T) {

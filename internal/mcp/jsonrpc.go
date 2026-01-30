@@ -26,3 +26,24 @@ const (
 	// Prompt methods
 	MethodPromptsGet = "prompts/get"
 )
+
+// JSON-RPC parameter keys used across MCP methods
+const (
+	ParamKeyName = "name" // Used by tools/call and prompts/get
+	ParamKeyURI  = "uri"  // Used by resources/* methods
+)
+
+// Primitive type key prefixes for primitives map lookups
+const (
+	PrimitiveKeyTool      = "tool:"
+	PrimitiveKeyResource  = "resource:"
+	PrimitiveKeyPrompt    = "prompt:"
+	PrimitiveKeyOperation = "operation:"
+)
+
+// Error messages for JSON-RPC responses
+const (
+	ErrMsgParseError     = "Parse Error"
+	ErrMsgInvalidRequest = "Invalid Request"
+	ErrMsgInvalidParams  = "Invalid Params"
+)

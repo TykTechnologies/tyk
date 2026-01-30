@@ -51,7 +51,9 @@ func (a APIDefinitionLoader) generateJSONRPCVEMs(
 			// 2. Catch-all BlackList blocks anything without a WhiteList match
 			specs = append(specs, a.buildPrimitiveSpec(name, cat.TypeName, vemPath)...)
 			specs = append(specs, a.compilePrimitiveMiddlewareSpecs(op, vemPath, apiSpec, conf)...)
-			primitivesMap[cat.TypeName+":"+name] = vemPath
+			// Use consistent key format
+			primitiveKey := cat.TypeName + ":" + name
+			primitivesMap[primitiveKey] = vemPath
 		}
 	}
 

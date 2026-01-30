@@ -17,6 +17,12 @@ import (
 // Used when no gateway-level MaxRequestBodySize is configured.
 const defaultJSONRPCRequestSize int64 = 1 << 20
 
+const (
+	contentTypeJSON        = "application/json"
+	headerContentType      = "Content-Type"
+	resourceWildcardSuffix = "/*"
+)
+
 // MCPJSONRPCMiddleware handles JSON-RPC 2.0 request detection and routing for MCP APIs.
 // When a client sends a JSON-RPC request to an MCP endpoint, the middleware detects it,
 // extracts the method and primitive name, routes to the correct VEM, and enables
@@ -78,15 +84,15 @@ func (m *MCPJSONRPCMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 		return nil, http.StatusOK
 	}
 
-	contentType := r.Header.Get("Content-Type")
-	if !strings.HasPrefix(contentType, "application/json") {
+	contentType := r.Header.Get(headerContentType)
+	if !strings.HasPrefix(contentType, contentTypeJSON) {
 		return nil, http.StatusOK
 	}
 
 	// Read and parse the request body with size limit to prevent DoS
 	body, err := io.ReadAll(io.LimitReader(r.Body, m.getMaxRequestBodySize()))
 	if err != nil {
-		m.writeJSONRPCError(w, nil, mcp.JSONRPCParseError, "Parse error", nil)
+		m.writeJSONRPCError(w, nil, mcp.JSONRPCParseError, mcp.ErrMsgParseError, nil)
 		return nil, middleware.StatusRespond //nolint:nilerr // error handled via JSON-RPC response
 	}
 	// Restore body for upstream
@@ -94,20 +100,20 @@ func (m *MCPJSONRPCMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 
 	var rpcReq JSONRPCRequest
 	if err := json.Unmarshal(body, &rpcReq); err != nil {
-		m.writeJSONRPCError(w, nil, mcp.JSONRPCParseError, "Parse error", nil)
+		m.writeJSONRPCError(w, nil, mcp.JSONRPCParseError, mcp.ErrMsgParseError, nil)
 		return nil, middleware.StatusRespond //nolint:nilerr // error handled via JSON-RPC response
 	}
 
 	// Validate JSON-RPC 2.0 structure
 	if rpcReq.JSONRPC != apidef.JsonRPC20 || rpcReq.Method == "" {
-		m.writeJSONRPCError(w, rpcReq.ID, mcp.JSONRPCInvalidRequest, "Invalid Request", nil)
+		m.writeJSONRPCError(w, rpcReq.ID, mcp.JSONRPCInvalidRequest, mcp.ErrMsgInvalidRequest, nil)
 		return nil, middleware.StatusRespond
 	}
 
 	// Route based on method
 	vemPath, primitive, found, invalidParams := m.routeRequest(&rpcReq)
 	if invalidParams {
-		m.writeJSONRPCError(w, rpcReq.ID, mcp.JSONRPCInvalidParams, "Invalid params", nil)
+		m.writeJSONRPCError(w, rpcReq.ID, mcp.JSONRPCInvalidParams, mcp.ErrMsgInvalidParams, nil)
 		return nil, middleware.StatusRespond
 	}
 	if !found || vemPath == "" {
@@ -162,16 +168,16 @@ func (m *MCPJSONRPCMiddleware) routeRequest(rpcReq *JSONRPCRequest) (vemPath str
 	switch rpcReq.Method {
 	case mcp.MethodToolsCall:
 		// Extract tool name from params.name
-		name := m.extractParamString(rpcReq.Params, "name")
+		name := m.extractParamString(rpcReq.Params, mcp.ParamKeyName)
 		if name == "" {
 			return "", "", false, true
 		}
-		vemPath, found = primitives["tool:"+name]
+		vemPath, found = primitives[mcp.PrimitiveKeyTool+name]
 		primitive = name
 
 	case mcp.MethodResourcesRead:
 		// Extract resource URI from params.uri
-		uri := m.extractParamString(rpcReq.Params, "uri")
+		uri := m.extractParamString(rpcReq.Params, mcp.ParamKeyURI)
 		if uri == "" {
 			return "", "", false, true
 		}
@@ -180,16 +186,16 @@ func (m *MCPJSONRPCMiddleware) routeRequest(rpcReq *JSONRPCRequest) (vemPath str
 
 	case mcp.MethodPromptsGet:
 		// Extract prompt name from params.name
-		name := m.extractParamString(rpcReq.Params, "name")
+		name := m.extractParamString(rpcReq.Params, mcp.ParamKeyName)
 		if name == "" {
 			return "", "", false, true
 		}
-		vemPath, found = primitives["prompt:"+name]
+		vemPath, found = primitives[mcp.PrimitiveKeyPrompt+name]
 		primitive = name
 
 	default:
 		// Check for operation-level VEMs (tools/list, initialize, etc.)
-		vemPath, found = primitives["operation:"+rpcReq.Method]
+		vemPath, found = primitives[mcp.PrimitiveKeyOperation+rpcReq.Method]
 		primitive = rpcReq.Method
 	}
 
@@ -223,7 +229,7 @@ func (m *MCPJSONRPCMiddleware) extractParamString(params json.RawMessage, key st
 // It first tries an exact match, then falls back to wildcard matching.
 func (m *MCPJSONRPCMiddleware) matchResourceURI(uri string, primitives map[string]string) (vemPath string, found bool) {
 	// Exact match first
-	if path, ok := primitives["resource:"+uri]; ok {
+	if path, ok := primitives[mcp.PrimitiveKeyResource+uri]; ok {
 		return path, true
 	}
 
@@ -233,13 +239,13 @@ func (m *MCPJSONRPCMiddleware) matchResourceURI(uri string, primitives map[strin
 	bestPrefixLen := -1
 
 	for key, path := range primitives {
-		if !strings.HasPrefix(key, "resource:") {
+		if !strings.HasPrefix(key, mcp.PrimitiveKeyResource) {
 			continue
 		}
-		pattern := strings.TrimPrefix(key, "resource:")
+		pattern := strings.TrimPrefix(key, mcp.PrimitiveKeyResource)
 		if m.matchesWildcard(pattern, uri) {
 			prefixLen := len(pattern)
-			if strings.HasSuffix(pattern, "/*") {
+			if strings.HasSuffix(pattern, resourceWildcardSuffix) {
 				prefixLen = len(strings.TrimSuffix(pattern, "*"))
 			}
 
@@ -261,7 +267,7 @@ func (m *MCPJSONRPCMiddleware) matchResourceURI(uri string, primitives map[strin
 // matchesWildcard checks if a URI matches a wildcard pattern.
 // Supports suffix wildcards: "file:///repo/*" matches "file:///repo/README.md"
 func (m *MCPJSONRPCMiddleware) matchesWildcard(pattern, uri string) bool {
-	if strings.HasSuffix(pattern, "/*") {
+	if strings.HasSuffix(pattern, resourceWildcardSuffix) {
 		prefix := strings.TrimSuffix(pattern, "*")
 		return strings.HasPrefix(uri, prefix)
 	}
@@ -282,7 +288,7 @@ func (m *MCPJSONRPCMiddleware) writeJSONRPCError(w http.ResponseWriter, id inter
 
 	httpCode := m.mapJSONRPCErrorToHTTP(code)
 
-	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set(headerContentType, contentTypeJSON)
 	w.WriteHeader(httpCode)
 	json.NewEncoder(w).Encode(response) //nolint:errcheck
 }
