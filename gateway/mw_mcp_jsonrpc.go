@@ -23,6 +23,13 @@ const (
 	resourceWildcardSuffix = "/*"
 )
 
+// methodPrefixMap maps JSON-RPC methods to their corresponding VEM prefixes
+var methodPrefixMap = map[string]string{
+	mcp.MethodToolsCall:     mcp.ToolPrefix,
+	mcp.MethodResourcesRead: mcp.ResourcePrefix,
+	mcp.MethodPromptsGet:    mcp.PromptPrefix,
+}
+
 // MCPJSONRPCMiddleware handles JSON-RPC 2.0 request detection and routing for MCP APIs.
 // When a client sends a JSON-RPC request to an MCP endpoint, the middleware detects it,
 // extracts the method and primitive name, routes to the correct VEM, and enables
@@ -148,16 +155,10 @@ func (m *MCPJSONRPCMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 // buildUnregisteredVEMPath constructs a VEM path for an unregistered primitive.
 // This path will be caught by the catch-all BlackList VEM when allow list is enabled.
 func (m *MCPJSONRPCMiddleware) buildUnregisteredVEMPath(rpcReq *JSONRPCRequest, primitive string) string {
-	switch rpcReq.Method {
-	case mcp.MethodToolsCall:
-		return mcp.ToolPrefix + primitive
-	case mcp.MethodResourcesRead:
-		return mcp.ResourcePrefix + primitive
-	case mcp.MethodPromptsGet:
-		return mcp.PromptPrefix + primitive
-	default:
-		return ""
+	if prefix, ok := methodPrefixMap[rpcReq.Method]; ok {
+		return prefix + primitive
 	}
+	return ""
 }
 
 // routeRequest determines the VEM path for a JSON-RPC request based on its method.
@@ -168,8 +169,8 @@ func (m *MCPJSONRPCMiddleware) routeRequest(rpcReq *JSONRPCRequest) (vemPath str
 	switch rpcReq.Method {
 	case mcp.MethodToolsCall:
 		// Extract tool name from params.name
-		name := m.extractParamString(rpcReq.Params, mcp.ParamKeyName)
-		if name == "" {
+		name, invalidParams := m.extractAndValidateParam(rpcReq.Params, mcp.ParamKeyName)
+		if invalidParams {
 			return "", "", false, true
 		}
 		vemPath, found = primitives[mcp.PrimitiveKeyTool+name]
@@ -177,8 +178,8 @@ func (m *MCPJSONRPCMiddleware) routeRequest(rpcReq *JSONRPCRequest) (vemPath str
 
 	case mcp.MethodResourcesRead:
 		// Extract resource URI from params.uri
-		uri := m.extractParamString(rpcReq.Params, mcp.ParamKeyURI)
-		if uri == "" {
+		uri, invalidParams := m.extractAndValidateParam(rpcReq.Params, mcp.ParamKeyURI)
+		if invalidParams {
 			return "", "", false, true
 		}
 		vemPath, found = m.matchResourceURI(uri, primitives)
@@ -186,8 +187,8 @@ func (m *MCPJSONRPCMiddleware) routeRequest(rpcReq *JSONRPCRequest) (vemPath str
 
 	case mcp.MethodPromptsGet:
 		// Extract prompt name from params.name
-		name := m.extractParamString(rpcReq.Params, mcp.ParamKeyName)
-		if name == "" {
+		name, invalidParams := m.extractAndValidateParam(rpcReq.Params, mcp.ParamKeyName)
+		if invalidParams {
 			return "", "", false, true
 		}
 		vemPath, found = primitives[mcp.PrimitiveKeyPrompt+name]
@@ -223,6 +224,16 @@ func (m *MCPJSONRPCMiddleware) extractParamString(params json.RawMessage, key st
 		return val
 	}
 	return ""
+}
+
+// extractAndValidateParam extracts a parameter from JSON-RPC params and validates it's not empty.
+// Returns the parameter value and a flag indicating if the parameter is invalid.
+func (m *MCPJSONRPCMiddleware) extractAndValidateParam(params json.RawMessage, key string) (value string, invalidParams bool) {
+	value = m.extractParamString(params, key)
+	if value == "" {
+		return "", true
+	}
+	return value, false
 }
 
 // matchResourceURI matches a resource URI against configured patterns.
