@@ -26,14 +26,14 @@ func isOASNotMCP(spec *APISpec) bool {
 func typeCheckFunc(name string, predicate apiFilterFunc) apiTypeCheck {
 	return func(spec *APISpec) error {
 		if !predicate(spec) {
-			return errors.New("API is not an " + name + " API")
+			return errors.New("API is not an " + name)
 		}
 		return nil
 	}
 }
 
 var (
-	mcpTypeCheck = typeCheckFunc("MCP", (*APISpec).IsMCP)
+	mcpTypeCheck = typeCheckFunc("MCP Proxy", (*APISpec).IsMCP)
 )
 
 func (gw *Gateway) setBaseAPIIDHeader(w http.ResponseWriter, oasObj *oas.OAS) {
