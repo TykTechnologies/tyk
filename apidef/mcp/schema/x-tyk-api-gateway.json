@@ -1069,6 +1069,21 @@
         }
       }
     },
+    "X-Tyk-MCPPrimitive": {
+      "allOf": [
+        {
+          "$ref": "#/definitions/X-Tyk-Operation"
+        }
+      ]
+    },
+    "X-Tyk-MCPPrimitives": {
+      "type": "object",
+      "patternProperties": {
+        "\\S+": {
+          "$ref": "#/definitions/X-Tyk-MCPPrimitive"
+        }
+      }
+    },
     "X-Tyk-Middleware": {
       "type": "object",
       "properties": {
@@ -1079,13 +1094,13 @@
           "$ref": "#/definitions/X-Tyk-Operations"
         },
         "mcpTools": {
-          "$ref": "#/definitions/X-Tyk-Operations"
+          "$ref": "#/definitions/X-Tyk-MCPPrimitives"
         },
         "mcpResources": {
-          "$ref": "#/definitions/X-Tyk-Operations"
+          "$ref": "#/definitions/X-Tyk-MCPPrimitives"
         },
         "mcpPrompts": {
-          "$ref": "#/definitions/X-Tyk-Operations"
+          "$ref": "#/definitions/X-Tyk-MCPPrimitives"
         }
       }
     },

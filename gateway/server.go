@@ -160,8 +160,7 @@ type Gateway struct {
 	apisByID        map[string]*APISpec
 	apisHandlesByID *sync.Map
 
-	policiesMu   sync.RWMutex
-	policiesByID map[string]user.Policy
+	policies *model.Policies
 
 	dnsCacheManager dnscache.IDnsCacheManager
 
@@ -240,7 +239,7 @@ func NewGateway(config config.Config, ctx context.Context) *Gateway {
 	gw.apisByID = map[string]*APISpec{}
 	gw.apisHandlesByID = new(sync.Map)
 
-	gw.policiesByID = make(map[string]user.Policy)
+	gw.policies = model.NewPolicies()
 
 	// reload
 	gw.reloadQueue = make(chan func())
@@ -628,12 +627,12 @@ func (gw *Gateway) syncAPISpecs() (int, error) {
 }
 
 func (gw *Gateway) syncPolicies() (count int, err error) {
-	var pols map[string]user.Policy
+	var pols []user.Policy
 
 	mainLog.Info("Loading policies")
 
 	switch gw.GetConfig().Policies.PolicySource {
-	case "service":
+	case config.PolicySourceService:
 		if gw.GetConfig().Policies.PolicyConnectionString == "" {
 			mainLog.Fatal("No connection string or node ID present. Failing.")
 		}
@@ -643,7 +642,7 @@ func (gw *Gateway) syncPolicies() (count int, err error) {
 		mainLog.Info("Using Policies from Dashboard Service")
 
 		pols, err = gw.LoadPoliciesFromDashboard(connStr, gw.GetConfig().NodeSecret)
-	case "rpc":
+	case config.PolicySourceRpc:
 		mainLog.Debug("Using Policies from RPC")
 		dataLoader := &RPCStorageHandler{
 			Gw:       gw,
@@ -654,7 +653,6 @@ func (gw *Gateway) syncPolicies() (count int, err error) {
 		//if policy path defined we want to allow use of the REST API
 		if gw.GetConfig().Policies.PolicyPath != "" {
 			pols, err = LoadPoliciesFromDir(gw.GetConfig().Policies.PolicyPath)
-
 		} else if gw.GetConfig().Policies.PolicyRecordName == "" {
 			// old way of doing things before REST Api added
 			// this is the only case now where we need a policy record name
@@ -665,17 +663,15 @@ func (gw *Gateway) syncPolicies() (count int, err error) {
 		}
 	}
 	mainLog.Infof("Policies found (%d total):", len(pols))
-	for id := range pols {
-		mainLog.Debugf(" - %s", id)
+	for _, pol := range pols {
+		mainLog.Debugf(" - %s", pol.ID)
 	}
 
 	if err != nil {
 		return len(pols), err
 	}
 
-	gw.policiesMu.Lock()
-	defer gw.policiesMu.Unlock()
-	gw.policiesByID = pols
+	gw.policies.Reload(pols...)
 
 	return len(pols), nil
 }
@@ -776,6 +772,13 @@ func (gw *Gateway) loadControlAPIEndpoints(muxer *mux.Router) {
 		r.HandleFunc("/apis/oas/{apiID}", gw.blockInDashboardMode(gw.apiHandler)).Methods(http.MethodDelete)
 		r.HandleFunc("/apis/oas/{apiID}/versions", versionsHandler.ServeHTTP).Methods(http.MethodGet)
 		r.HandleFunc("/apis/oas/{apiID}/export", gw.apiOASExportHandler).Methods("GET")
+
+		// MCP Proxy routes
+		r.HandleFunc("/mcps", gw.mcpListHandler).Methods(http.MethodGet)
+		r.HandleFunc("/mcps", gw.validateMCP(gw.mcpCreateHandler)).Methods(http.MethodPost)
+		r.HandleFunc("/mcps/{apiID}", gw.mcpGetHandler).Methods(http.MethodGet)
+		r.HandleFunc("/mcps/{apiID}", gw.validateMCP(gw.mcpUpdateHandler)).Methods(http.MethodPut)
+		r.HandleFunc("/mcps/{apiID}", gw.mcpDeleteHandler).Methods(http.MethodDelete)
 		r.HandleFunc("/health", gw.healthCheckhandler).Methods("GET")
 		r.HandleFunc("/policies", gw.polHandler).Methods("GET", "POST", "PUT", "DELETE")
 		r.HandleFunc("/policies/{polID}", gw.polHandler).Methods("GET", "POST", "PUT", "DELETE")
@@ -1104,6 +1107,9 @@ func (gw *Gateway) DoReload() {
 		gw.GlobalEventsJSVM.DeInit()
 		gw.GlobalEventsJSVM.Init(nil, logrus.NewEntry(log), gw)
 	}
+
+	// Re-initialize global event handlers to ensure they persist across reloads
+	gw.initGenericEventHandlers()
 
 	// Load the API Policies
 	if _, err := syncResourcesWithReload("policies", gw.GetConfig(), gw.syncPolicies); err != nil {
@@ -2285,6 +2291,7 @@ func (gw *Gateway) gracefulShutdown(ctx context.Context) error {
 
 	// Close all cache stores and other resources
 	mainLog.Info("Closing cache stores and other resources...")
+
 	gw.cacheClose()
 
 	// Check if there were any errors during shutdown
