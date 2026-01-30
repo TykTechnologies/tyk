@@ -95,7 +95,10 @@ func Test_generateMCPVEMs_GeneratesVEMsAndMiddlewareSpecs(t *testing.T) {
 	tykExt := &oas.XTykAPIGateway{
 		Middleware: &oas.Middleware{
 			McpTools: oas.MCPPrimitives{
-				"get-weather": {Operation: oas.Operation{RateLimit: &oas.RateLimitEndpoint{Enabled: true, Rate: 100, Per: oas.ReadableDuration(time.Minute)}}},
+				"get-weather": {Operation: oas.Operation{
+					Allow:     &oas.Allowance{Enabled: true},
+					RateLimit: &oas.RateLimitEndpoint{Enabled: true, Rate: 100, Per: oas.ReadableDuration(time.Minute)},
+				}},
 			},
 			McpResources: oas.MCPPrimitives{
 				"file:///repo/*": {Operation: oas.Operation{Allow: &oas.Allowance{Enabled: true}}},
@@ -108,7 +111,13 @@ func Test_generateMCPVEMs_GeneratesVEMsAndMiddlewareSpecs(t *testing.T) {
 	apiSpec.OAS.SetTykExtension(tykExt)
 
 	loader := APIDefinitionLoader{}
-	specs := loader.generateMCPVEMs(apiSpec, config.Config{})
+	conf := config.Config{
+		HttpServerOptions: config.HttpServerOptionsConfig{
+			EnablePathPrefixMatching: true,
+			EnablePathSuffixMatching: true,
+		},
+	}
+	specs := loader.generateMCPVEMs(apiSpec, conf)
 	require.NotEmpty(t, specs)
 
 	// Registry contains raw VEM paths (no sanitization).
@@ -247,6 +256,96 @@ func Test_MCPPrefixes_NotEmpty(t *testing.T) {
 	if mcp.ToolPrefix == "" || mcp.ResourcePrefix == "" || mcp.PromptPrefix == "" {
 		t.Fatalf("mcp prefixes must not be empty")
 	}
+}
+
+func Test_MCPWhiteListMatching(t *testing.T) {
+	// Debug test to verify WhiteList matching for MCP VEM paths
+	apiSpec := &APISpec{
+		APIDefinition: &apidef.APIDefinition{
+			Proxy: apidef.ProxyConfig{ListenPath: "/"},
+		},
+	}
+
+	loader := APIDefinitionLoader{}
+
+	// Create a WhiteList entry for /mcp-tool:tool-allowed
+	whiteList := loader.compileExtendedPathSpec(false, []apidef.EndPointMeta{
+		{Path: "/mcp-tool:tool-allowed", Method: http.MethodPost, Disabled: false},
+	}, WhiteList, config.Config{})
+
+	require.Len(t, whiteList, 1, "should have 1 WhiteList entry")
+	t.Logf("WhiteList spec: %+v", whiteList[0])
+	t.Logf("WhiteList regex pattern: %v", whiteList[0].spec)
+
+	r := httptest.NewRequest(http.MethodPost, "/mcp-tool:tool-allowed", nil)
+	status, _ := apiSpec.URLAllowedAndIgnored(r, whiteList, true)
+	assert.Equal(t, StatusOk, status, "WhiteList should match and return StatusOk")
+}
+
+func Test_MCPAllowListWithCatchAll(t *testing.T) {
+	// Test that catch-all BlackList works correctly with WhiteList entries.
+	// When MCPAllowListEnabled is true:
+	// - tool-allowed has Internal + WhiteList entry → WhiteList grants access → passes
+	// - tool-not-allowed has Internal but NO WhiteList → caught by catch-all → blocked
+	// - unregistered-tool has no entries → caught by catch-all → blocked
+
+	apiSpec := &APISpec{
+		APIDefinition: &apidef.APIDefinition{
+			Proxy: apidef.ProxyConfig{ListenPath: "/"},
+		},
+		MCPAllowListEnabled: true,
+	}
+
+	conf := config.Config{
+		HttpServerOptions: config.HttpServerOptionsConfig{
+			EnablePathPrefixMatching: true,
+			EnablePathSuffixMatching: true,
+		},
+	}
+	loader := APIDefinitionLoader{}
+
+	// Build specs for tool-allowed (with Allow) - gets Internal + WhiteList
+	allowedInternal := loader.buildPrimitiveSpec("tool-allowed", "tool", "/mcp-tool:tool-allowed")
+	allowedWhiteList := loader.compileExtendedPathSpec(false, []apidef.EndPointMeta{
+		{Path: "/mcp-tool:tool-allowed", Method: http.MethodPost, Disabled: false},
+	}, WhiteList, conf)
+
+	// tool-not-allowed (without Allow) gets NO Internal entry when allowListEnabled
+	// It will be caught by the catch-all BlackList
+
+	// Build catch-all BlackList
+	catchAll := loader.buildMCPCatchAllSpecs(conf)
+
+	// Combine in order: specific entries first, catch-all last
+	rxPaths := []URLSpec{}
+	rxPaths = append(rxPaths, allowedInternal...)
+	rxPaths = append(rxPaths, allowedWhiteList...)
+	// No notAllowedInternal - that's the key change!
+	rxPaths = append(rxPaths, catchAll...)
+
+	t.Run("tool-allowed with WhiteList passes", func(t *testing.T) {
+		r := httptest.NewRequest(http.MethodPost, "/mcp-tool:tool-allowed", nil)
+		httpctx.SetJsonRPCRouting(r, true)
+		status, _ := apiSpec.URLAllowedAndIgnored(r, rxPaths, true)
+		// Internal entry allows routing, WhiteList entry grants access
+		assert.Equal(t, StatusOk, status)
+	})
+
+	t.Run("tool-not-allowed without WhiteList blocked by catch-all", func(t *testing.T) {
+		r := httptest.NewRequest(http.MethodPost, "/mcp-tool:tool-not-allowed", nil)
+		httpctx.SetJsonRPCRouting(r, true)
+		status, _ := apiSpec.URLAllowedAndIgnored(r, rxPaths, true)
+		// No Internal entry, caught by catch-all BlackList
+		assert.Equal(t, EndPointNotAllowed, status)
+	})
+
+	t.Run("unregistered-tool blocked by catch-all", func(t *testing.T) {
+		r := httptest.NewRequest(http.MethodPost, "/mcp-tool:unregistered", nil)
+		httpctx.SetJsonRPCRouting(r, true)
+		status, _ := apiSpec.URLAllowedAndIgnored(r, rxPaths, true)
+		// Should be blocked by catch-all BlackList (returns EndPointNotAllowed)
+		assert.Equal(t, EndPointNotAllowed, status)
+	})
 }
 
 func Test_hasMCPAllowListEnabled(t *testing.T) {
@@ -499,8 +598,9 @@ func Test_URLAllowedAndIgnored_RegularInternal_NoLooping_Blocks(t *testing.T) {
 	assert.Equal(t, EndPointNotAllowed, status, "Regular internal endpoint should be blocked without looping")
 }
 
-func Test_URLAllowedAndIgnored_MCPPrimitive_WhitelistMode_MCPRouting_Allows(t *testing.T) {
-	// Verifies MCP primitives are allowed in whitelist mode when MCPRouting is set.
+func Test_URLAllowedAndIgnored_MCPPrimitive_WhitelistMode_MCPRouting_WithoutWhiteList_Blocks(t *testing.T) {
+	// Verifies MCP primitives with only Internal entry (no WhiteList) are blocked in whitelist mode.
+	// In allow list mode, having Internal entry allows routing but not access - you need WhiteList for access.
 	apiSpec := &APISpec{
 		APIDefinition: &apidef.APIDefinition{
 			Proxy: apidef.ProxyConfig{ListenPath: "/"},
@@ -513,7 +613,8 @@ func Test_URLAllowedAndIgnored_MCPPrimitive_WhitelistMode_MCPRouting_Allows(t *t
 	r := httptest.NewRequest(http.MethodPost, "/mcp-tool:get-weather", nil)
 	httpctx.SetJsonRPCRouting(r, true)
 	status, _ := apiSpec.URLAllowedAndIgnored(r, rxPaths, true) // whiteListStatus = true
-	assert.Equal(t, StatusInternal, status, "MCP primitive should be allowed in whitelist mode with MCPRouting")
+	// No WhiteList entry means blocked in whitelist mode (endpoint not allowed at end of loop)
+	assert.Equal(t, EndPointNotAllowed, status, "MCP primitive without WhiteList should be blocked in whitelist mode")
 }
 
 func Test_URLAllowedAndIgnored_MCPPrimitive_WhitelistMode_NoMCPRouting_Blocks(t *testing.T) {

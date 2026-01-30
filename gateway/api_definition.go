@@ -1488,7 +1488,11 @@ func (a APIDefinitionLoader) getExtendedPathSpecs(apiVersionDef apidef.VersionIn
 	combinedPath = append(combinedPath, oasMockResponsePaths...)
 	combinedPath = append(combinedPath, mcpVEMs...)
 
-	return combinedPath, len(whiteListPaths) > 0
+	// Enable whitelist mode if there are whitelist paths OR if MCP allow list is enabled.
+	// MCP allow list mode adds catch-all BlackList VEMs that require whitelist processing.
+	whiteListEnabled := len(whiteListPaths) > 0 || apiSpec.MCPAllowListEnabled
+
+	return combinedPath, whiteListEnabled
 }
 
 func (a *APISpec) Init(authStore, sessionStore, healthStore, orgStore storage.Handler) {
@@ -1655,18 +1659,22 @@ func (a *APISpec) URLAllowedAndIgnored(r *http.Request, rxPaths []URLSpec, white
 			// We have a whitelist, nothing gets through unless specifically defined
 			switch rxPaths[i].Status {
 			case WhiteList, BlackList, Ignored:
-			default:
-				if rxPaths[i].Status == Internal && r.Method == rxPaths[i].Internal.Method {
+				// These are handled in the switch above, continue to process them
+			case Internal:
+				if r.Method == rxPaths[i].Internal.Method {
 					// MCP primitive VEMs require explicit MCP routing context.
+					// In whitelist mode, continue to look for WhiteList/BlackList match.
 					if mcp.IsPrimitiveVEMPath(rxPaths[i].Internal.Path) {
 						if httpctx.IsJsonRPCRouting(r) {
-							return a.getURLStatus(rxPaths[i].Status), nil
+							continue // Keep looking for WhiteList/BlackList
 						}
 					} else if ctxLoopingEnabled(r) {
 						// Other internal endpoints use generic looping check.
 						return a.getURLStatus(rxPaths[i].Status), nil
 					}
 				}
+				return EndPointNotAllowed, nil
+			default:
 				return EndPointNotAllowed, nil
 			}
 		}

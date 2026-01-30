@@ -8,7 +8,6 @@ import (
 	"strings"
 
 	"github.com/TykTechnologies/tyk/apidef"
-	"github.com/TykTechnologies/tyk/apidef/oas"
 	"github.com/TykTechnologies/tyk/internal/httpctx"
 	"github.com/TykTechnologies/tyk/internal/mcp"
 	"github.com/TykTechnologies/tyk/internal/middleware"
@@ -117,12 +116,19 @@ func (m *MCPJSONRPCMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 		return nil, middleware.StatusRespond
 	}
 	if !found {
-		if m.mcpAllowListEnabled() {
-			m.writeJSONRPCError(w, rpcReq.ID, mcp.JSONRPCMethodNotFound, "Method not found", nil)
-			return nil, middleware.StatusRespond
+		if m.Spec.MCPAllowListEnabled {
+			// Route to a VEM path that will be caught by the catch-all BlackList.
+			// This allows the standard middleware chain to handle the blocking.
+			vemPath = m.buildUnregisteredVEMPath(&rpcReq, primitive)
+			if vemPath == "" {
+				// Unknown method type, reject directly
+				m.writeJSONRPCError(w, rpcReq.ID, mcp.JSONRPCMethodNotFound, "Method not found", nil)
+				return nil, middleware.StatusRespond
+			}
+		} else {
+			// Passthrough for unmatched primitives/operations when allow list is not active.
+			return nil, http.StatusOK
 		}
-		// Passthrough for unmatched primitives/operations.
-		return nil, http.StatusOK
 	}
 
 	// Store parsed data in context
@@ -146,6 +152,21 @@ func (m *MCPJSONRPCMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 	r.URL.Path = vemPath
 
 	return nil, http.StatusOK
+}
+
+// buildUnregisteredVEMPath constructs a VEM path for an unregistered primitive.
+// This path will be caught by the catch-all BlackList VEM when allow list is enabled.
+func (m *MCPJSONRPCMiddleware) buildUnregisteredVEMPath(rpcReq *JSONRPCRequest, primitive string) string {
+	switch rpcReq.Method {
+	case mcp.MethodToolsCall:
+		return mcp.ToolPrefix + primitive
+	case mcp.MethodResourcesRead, mcp.MethodResourcesSubscribe, mcp.MethodResourcesUnsubscribe:
+		return mcp.ResourcePrefix + primitive
+	case mcp.MethodPromptsGet:
+		return mcp.PromptPrefix + primitive
+	default:
+		return ""
+	}
 }
 
 // routeRequest determines the VEM path for a JSON-RPC request based on its method.
@@ -186,28 +207,6 @@ func (m *MCPJSONRPCMiddleware) routeRequest(rpcReq *JSONRPCRequest) (vemPath str
 		vemPath, found = primitives["operation:"+rpcReq.Method]
 		return vemPath, rpcReq.Method, found, false
 	}
-}
-
-func (m *MCPJSONRPCMiddleware) mcpAllowListEnabled() bool {
-	mw := m.Spec.OAS.GetTykMiddleware()
-	if mw == nil {
-		return false
-	}
-
-	return m.mcpAllowListEnabledForPrimitives(mw.McpTools) ||
-		m.mcpAllowListEnabledForPrimitives(mw.McpResources) ||
-		m.mcpAllowListEnabledForPrimitives(mw.McpPrompts)
-}
-
-func (m *MCPJSONRPCMiddleware) mcpAllowListEnabledForPrimitives(primitives oas.MCPPrimitives) bool {
-	for _, primitive := range primitives {
-		if primitive == nil || primitive.Allow == nil || !primitive.Allow.Enabled {
-			continue
-		}
-		return true
-	}
-
-	return false
 }
 
 // extractParamString extracts a string parameter from JSON-RPC params.

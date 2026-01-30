@@ -301,9 +301,12 @@ func (gw *Gateway) processSpec(
 		logger.Info("Checking security policy: Open")
 	}
 
+	// MCPJSONRPCMiddleware must run before VersionCheck for MCP APIs.
+	// It parses JSON-RPC payloads, rewrites URL paths to VEM paths, and sets
+	// the routing context that VersionCheck uses for whitelist/blacklist validation.
+	gw.mwAppendEnabled(&chainArray, &MCPJSONRPCMiddleware{BaseMiddleware: baseMid.Copy()})
 	gw.mwAppendEnabled(&chainArray, &VersionCheck{BaseMiddleware: baseMid.Copy()})
 	gw.mwAppendEnabled(&chainArray, &CORSMiddleware{BaseMiddleware: baseMid.Copy()})
-	gw.mwAppendEnabled(&chainArray, &MCPJSONRPCMiddleware{BaseMiddleware: baseMid.Copy()})
 
 	for _, obj := range mwPreFuncs {
 		if mwDriver == apidef.GoPluginDriver {

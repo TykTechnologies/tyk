@@ -272,6 +272,9 @@ func TestMCPJSONRPCMiddleware_ProcessRequest_ToolsCall_NotFound(t *testing.T) {
 }
 
 func TestMCPJSONRPCMiddleware_ProcessRequest_ToolsCall_NotFound_WithAllowList(t *testing.T) {
+	// When MCPAllowListEnabled is true, unknown tools are routed to a VEM path
+	// that will be caught by the catch-all BlackList middleware.
+	// The blocking happens at the BlackList/VersionCheck middleware level, not here.
 	spec := &APISpec{
 		APIDefinition: &apidef.APIDefinition{
 			ApplicationProtocol: apidef.AppProtocolMCP,
@@ -280,15 +283,8 @@ func TestMCPJSONRPCMiddleware_ProcessRequest_ToolsCall_NotFound_WithAllowList(t 
 		MCPPrimitives: map[string]string{
 			"tool:get-weather": "/mcp-tool:get-weather",
 		},
+		MCPAllowListEnabled: true,
 	}
-
-	spec.OAS.SetTykExtension(&oas.XTykAPIGateway{
-		Middleware: &oas.Middleware{
-			McpTools: oas.MCPPrimitives{
-				"get-weather": &oas.MCPPrimitive{Operation: oas.Operation{Allow: &oas.Allowance{Enabled: true}}},
-			},
-		},
-	})
 
 	m := &MCPJSONRPCMiddleware{
 		BaseMiddleware: &BaseMiddleware{Spec: spec},
@@ -307,13 +303,94 @@ func TestMCPJSONRPCMiddleware_ProcessRequest_ToolsCall_NotFound_WithAllowList(t 
 	r.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
 
-	_, _ = m.ProcessRequest(w, r, nil) //nolint:errcheck // error handled via JSON-RPC response
+	err, code := m.ProcessRequest(w, r, nil)
+	assert.Nil(t, err)
+	assert.Equal(t, http.StatusOK, code)
+	// Request is routed to catch-all VEM path for blocking by BlackList middleware
+	assert.Equal(t, "/mcp-tool:unknown-tool", r.URL.Path)
+	assert.True(t, httpctx.IsJsonRPCRouting(r))
+	rpcData := httpctx.GetJSONRPCRequest(r)
+	require.NotNil(t, rpcData)
+	assert.Equal(t, "unknown-tool", rpcData.Primitive)
+	assert.Equal(t, 0, w.Body.Len(), "no error response should be written by middleware")
+}
 
-	var resp JSONRPCErrorResponse
-	err = json.NewDecoder(w.Body).Decode(&resp)
-	require.NoError(t, err)
-	assert.Equal(t, mcp.JSONRPCMethodNotFound, resp.Error.Code)
-	assert.Equal(t, 1.0, resp.ID) // JSON numbers decode as float64
+func TestMCPJSONRPCMiddleware_ProcessRequest_AllowListBehavior(t *testing.T) {
+	// Scenario: MCP API with 2 registered VEMs and 1 unregistered primitive.
+	// - "tool-with-allow": registered with Allow enabled
+	// - "tool-without-allow": registered but without Allow
+	// - "unregistered-tool": not registered
+	//
+	// When MCPAllowListEnabled is true (because at least one primitive has Allow):
+	// - Registered primitives route to their VEMs (middleware chain decides access)
+	// - Unregistered primitives route to catch-all VEM path (blocked by catch-all BlackList)
+
+	spec := &APISpec{
+		APIDefinition: &apidef.APIDefinition{
+			ApplicationProtocol: apidef.AppProtocolMCP,
+			JsonRpcVersion:      apidef.JsonRPC20,
+		},
+		MCPPrimitives: map[string]string{
+			"tool:tool-with-allow":    "/mcp-tool:tool-with-allow",
+			"tool:tool-without-allow": "/mcp-tool:tool-without-allow",
+			// "unregistered-tool" is intentionally NOT in the map
+		},
+		MCPAllowListEnabled: true, // Set because at least one primitive has Allow enabled
+	}
+
+	m := &MCPJSONRPCMiddleware{
+		BaseMiddleware: &BaseMiddleware{Spec: spec},
+	}
+
+	tests := []struct {
+		name        string
+		toolName    string
+		expectedVEM string // expected VEM path (always routed when MCPAllowListEnabled)
+	}{
+		{
+			name:        "registered tool with allow - routes to VEM",
+			toolName:    "tool-with-allow",
+			expectedVEM: "/mcp-tool:tool-with-allow",
+		},
+		{
+			name:        "registered tool without allow - routes to VEM",
+			toolName:    "tool-without-allow",
+			expectedVEM: "/mcp-tool:tool-without-allow",
+		},
+		{
+			name:        "unregistered tool - routes to catch-all VEM",
+			toolName:    "unregistered-tool",
+			expectedVEM: "/mcp-tool:unregistered-tool", // Will be caught by catch-all BlackList VEM
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			payload := map[string]any{
+				"jsonrpc": "2.0",
+				"method":  "tools/call",
+				"params":  map[string]any{"name": tt.toolName},
+				"id":      1,
+			}
+			body, err := json.Marshal(payload)
+			require.NoError(t, err)
+
+			r := httptest.NewRequest(http.MethodPost, "/", bytes.NewReader(body))
+			r.Header.Set("Content-Type", "application/json")
+			w := httptest.NewRecorder()
+
+			_, _ = m.ProcessRequest(w, r, nil) //nolint:errcheck
+
+			// All requests should be routed to VEM when MCPAllowListEnabled
+			assert.Equal(t, tt.expectedVEM, r.URL.Path, "request should be routed to VEM path")
+			rpcData := httpctx.GetJSONRPCRequest(r)
+			require.NotNil(t, rpcData, "JSON-RPC context should be set")
+			assert.Equal(t, tt.expectedVEM, rpcData.VEMPath)
+			assert.Equal(t, tt.toolName, rpcData.Primitive)
+			assert.True(t, httpctx.IsJsonRPCRouting(r), "JSON-RPC routing flag should be set")
+			assert.Equal(t, 0, w.Body.Len(), "no error response should be written")
+		})
+	}
 }
 
 func TestMCPJSONRPCMiddleware_ProcessRequest_ResourcesRead_ExactMatch(t *testing.T) {
@@ -983,6 +1060,101 @@ func TestMCPJSONRPCMiddleware_ResourcesRead_MissingParamsURI_InvalidParams(t *te
 	err = json.NewDecoder(w.Body).Decode(&resp)
 	require.NoError(t, err)
 	assert.Equal(t, mcp.JSONRPCInvalidParams, resp.Error.Code)
+}
+
+func TestMCPJSONRPCMiddleware_AllowListEnforcedOnVEM(t *testing.T) {
+	// Scenario: MCP API with 2 registered tools and 1 unregistered.
+	// - "tool-allowed": has Allow.Enabled = true
+	// - "tool-not-allowed": registered but no Allow
+	// - "unregistered-tool": not registered at all
+	//
+	// Expected behavior:
+	// - tool-allowed: routed to VEM, Allow middleware permits → 200 OK
+	// - tool-not-allowed: routed to VEM, but no Allow entry → blocked by Allow middleware
+	// - unregistered-tool: rejected at JSON-RPC middleware with "Method not found"
+
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	oasAPI := getSampleOASAPI()
+	tykExt := oasAPI.GetTykExtension()
+	tykExt.Server.ListenPath = oas.ListenPath{
+		Value: "/mcp",
+		Strip: false,
+	}
+	tykExt.Middleware = &oas.Middleware{
+		McpTools: oas.MCPPrimitives{
+			"tool-allowed": &oas.MCPPrimitive{
+				Operation: oas.Operation{
+					Allow: &oas.Allowance{Enabled: true},
+				},
+			},
+			"tool-not-allowed": &oas.MCPPrimitive{
+				// No Allow configured - should be blocked when allow list is active
+			},
+		},
+	}
+	oasAPI.SetTykExtension(tykExt)
+
+	var def apidef.APIDefinition
+	oasAPI.ExtractTo(&def)
+	def.IsOAS = true
+	def.UseKeylessAccess = true
+	def.Proxy.ListenPath = "/mcp"
+	def.MarkAsMCP()
+
+	spec := &APISpec{APIDefinition: &def, OAS: oasAPI}
+	ts.Gw.LoadAPI(spec)
+
+	loaded := ts.Gw.getApiSpec(def.APIID)
+	require.NotNil(t, loaded)
+	assert.True(t, loaded.IsMCP())
+	assert.True(t, loaded.MCPAllowListEnabled, "MCPAllowListEnabled should be true when any primitive has Allow")
+
+	// Debug: Print rxPaths to understand what specs are being generated
+	for versionName, rxPaths := range loaded.RxPaths {
+		t.Logf("Version %s has %d rxPaths, WhiteListEnabled: %v", versionName, len(rxPaths), loaded.WhiteListEnabled[versionName])
+		for i, spec := range rxPaths {
+			t.Logf("  [%d] Status=%d, Path regex=%v", i, spec.Status, spec.spec)
+			if spec.Status == WhiteList {
+				t.Logf("       WhiteList: Path=%s, Method=%s", spec.Whitelist.Path, spec.Whitelist.Method)
+			}
+			if spec.Status == BlackList {
+				t.Logf("       BlackList: Path=%s, Method=%s", spec.Blacklist.Path, spec.Blacklist.Method)
+			}
+			if spec.Status == Internal {
+				t.Logf("       Internal: Path=%s, Method=%s", spec.Internal.Path, spec.Internal.Method)
+			}
+		}
+	}
+
+	allowedPayload := map[string]any{
+		"jsonrpc": "2.0",
+		"method":  "tools/call",
+		"params":  map[string]any{"name": "tool-allowed"},
+		"id":      1,
+	}
+	notAllowedPayload := map[string]any{
+		"jsonrpc": "2.0",
+		"method":  "tools/call",
+		"params":  map[string]any{"name": "tool-not-allowed"},
+		"id":      2,
+	}
+	unregisteredPayload := map[string]any{
+		"jsonrpc": "2.0",
+		"method":  "tools/call",
+		"params":  map[string]any{"name": "unregistered-tool"},
+		"id":      3,
+	}
+
+	_, _ = ts.Run(t, []test.TestCase{
+		// tool-allowed: should pass (has Allow.Enabled, gets Internal + WhiteList)
+		{Method: http.MethodPost, Path: "/mcp", Data: allowedPayload, Code: http.StatusOK},
+		// tool-not-allowed: blocked by catch-all BlackList (no Internal entry when allowList enabled)
+		{Method: http.MethodPost, Path: "/mcp", Data: notAllowedPayload, Code: http.StatusForbidden},
+		// unregistered-tool: blocked by catch-all BlackList (routed via buildUnregisteredVEMPath)
+		{Method: http.MethodPost, Path: "/mcp", Data: unregisteredPayload, Code: http.StatusForbidden},
+	}...)
 }
 
 func TestMCPJSONRPCMiddleware_RateLimitEnforcedOnVEM(t *testing.T) {

@@ -25,11 +25,16 @@ type PrimitiveCategory struct {
 // generateJSONRPCVEMs generates URLSpec entries for JSON-RPC primitives.
 // This is a generic function usable for MCP, A2A, or other JSON-RPC protocols.
 // It requires JSON-RPC 2.0 and populates primitivesMap with generated VEM paths.
+//
+// All registered primitives get Internal entries (required for JSON-RPC routing).
+// When allowListEnabled is true, primitives with Allow.Enabled also get WhiteList entries.
+// Primitives without Allow are blocked by the catch-all BlackList in whitelist mode.
 func (a APIDefinitionLoader) generateJSONRPCVEMs(
 	apiSpec *APISpec,
 	conf config.Config,
 	categories []PrimitiveCategory,
 	primitivesMap map[string]string,
+	_ bool, // allowListEnabled - kept for signature compatibility, not used for Internal generation
 ) []URLSpec {
 	if apiSpec.JsonRpcVersion != apidef.JsonRPC20 {
 		return nil
@@ -39,6 +44,11 @@ func (a APIDefinitionLoader) generateJSONRPCVEMs(
 	for _, cat := range categories {
 		for name, op := range cat.Primitives {
 			vemPath := cat.Prefix + name
+
+			// All registered primitives get Internal entries for JSON-RPC routing.
+			// The blocking logic for primitives without Allow happens via:
+			// 1. No WhiteList entry generated (extractAllowanceTo skips if Allow is nil)
+			// 2. Catch-all BlackList blocks anything without a WhiteList match
 			specs = append(specs, a.buildPrimitiveSpec(name, cat.TypeName, vemPath)...)
 			specs = append(specs, a.compilePrimitiveMiddlewareSpecs(op, vemPath, apiSpec, conf)...)
 			primitivesMap[cat.TypeName+":"+name] = vemPath
@@ -51,6 +61,10 @@ func (a APIDefinitionLoader) generateJSONRPCVEMs(
 // generateMCPVEMs generates URLSpec entries for MCP primitives (tools, resources, prompts).
 // These VEMs are internal-only endpoints accessible via JSON-RPC routing.
 // It also pre-calculates MCPAllowListEnabled to avoid iterating through primitives on each request.
+//
+// When MCPAllowListEnabled is true (at least one primitive has Allow.Enabled), this function
+// also generates catch-all BlackList VEMs for each primitive type. These catch-alls block
+// any MCP primitive that doesn't have an explicit Allow entry, enabling proper whitelist behavior.
 func (a APIDefinitionLoader) generateMCPVEMs(apiSpec *APISpec, conf config.Config) []URLSpec {
 	if !apiSpec.IsMCP() {
 		return nil
@@ -77,7 +91,37 @@ func (a APIDefinitionLoader) generateMCPVEMs(apiSpec *APISpec, conf config.Confi
 	// This avoids iterating through all primitives on every JSON-RPC request.
 	apiSpec.MCPAllowListEnabled = hasMCPAllowListEnabled(categories)
 
-	return a.generateJSONRPCVEMs(apiSpec, conf, categories, apiSpec.MCPPrimitives)
+	specs := a.generateJSONRPCVEMs(apiSpec, conf, categories, apiSpec.MCPPrimitives, apiSpec.MCPAllowListEnabled)
+	if specs == nil {
+		return nil
+	}
+
+	// When allow list is enabled, add catch-all BlackList VEMs for each primitive type.
+	// These block any primitive that doesn't have an explicit Allow entry.
+	if apiSpec.MCPAllowListEnabled {
+		specs = append(specs, a.buildMCPCatchAllSpecs(conf)...)
+	}
+
+	return specs
+}
+
+// buildMCPCatchAllSpecs creates catch-all BlackList VEMs for each MCP primitive type.
+// These are matched after specific primitive VEMs and block any unregistered or non-allowed primitives.
+// Uses the standard compileExtendedPathSpec to ensure consistent regex generation with other path specs.
+func (a APIDefinitionLoader) buildMCPCatchAllSpecs(conf config.Config) []URLSpec {
+	prefixes := []string{mcp.ToolPrefix, mcp.ResourcePrefix, mcp.PromptPrefix}
+	var blacklistPaths []apidef.EndPointMeta
+
+	for _, prefix := range prefixes {
+		// Use wildcard pattern that will be processed by the standard regex generation.
+		// The "/*" suffix is handled by PreparePathRegexp to create ".*" patterns.
+		blacklistPaths = append(blacklistPaths, apidef.EndPointMeta{
+			Path:   prefix + "*",
+			Method: http.MethodPost,
+		})
+	}
+
+	return a.compileExtendedPathSpec(false, blacklistPaths, BlackList, conf)
 }
 
 // hasMCPAllowListEnabled checks if any MCP primitive has an allow rule enabled.
@@ -94,6 +138,11 @@ func hasMCPAllowListEnabled(categories []PrimitiveCategory) bool {
 
 // buildPrimitiveSpec creates the base URLSpec entry for a JSON-RPC primitive VEM.
 // This is used for access control (blocking direct external access).
+//
+// Note: This uses manual regex creation with QuoteMeta because MCP VEM paths must
+// be matched literally. Unlike OAS paths which may contain mux templates ({id}) or
+// wildcards (/*), MCP primitive names/URIs can contain regex metacharacters (., *)
+// that should be treated as literals.
 //
 // Parameters name and primType are currently unused but retained in the signature
 // for future use (e.g., logging, metrics, or extended metadata). Use blank identifiers
