@@ -1,6 +1,7 @@
 package gateway
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -1070,4 +1071,31 @@ func TestIsRetriableError(t *testing.T) {
 			assert.Equal(t, tc.expected, result, "IsRetriableError(%v) should return %v", tc.err, tc.expected)
 		})
 	}
+}
+
+// TestSelectiveCertificateSync_Config tests the configuration for selective certificate sync
+func TestSelectiveCertificateSync_Config(t *testing.T) {
+	t.Run("config flag SyncUsedCertsOnly", func(t *testing.T) {
+		globalConf := config.Config{}
+		globalConf.SlaveOptions.UseRPC = true
+		globalConf.SlaveOptions.SyncUsedCertsOnly = true
+
+		assert.True(t, globalConf.SlaveOptions.UseRPC)
+		assert.True(t, globalConf.SlaveOptions.SyncUsedCertsOnly)
+	})
+
+	t.Run("certUsageTracker initialized only in RPC mode", func(t *testing.T) {
+		// Non-RPC mode
+		conf1 := config.Config{}
+		conf1.SlaveOptions.UseRPC = false
+		ctx := context.Background()
+		gw1 := NewGateway(conf1, ctx)
+		assert.Nil(t, gw1.certUsageTracker, "certUsageTracker should be nil in non-RPC mode")
+
+		// RPC mode
+		conf2 := config.Config{}
+		conf2.SlaveOptions.UseRPC = true
+		gw2 := NewGateway(conf2, ctx)
+		assert.NotNil(t, gw2.certUsageTracker, "certUsageTracker should be initialized in RPC mode")
+	})
 }

@@ -42,7 +42,7 @@ func setupTest(t *testing.T) *testSetup {
 	ctrlRemote := gomock.NewController(t)
 	remote := mock.NewMockHandler(ctrlRemote)
 
-	mdcbStorage := NewMdcbStorage(local, remote, log, nil)
+	mdcbStorage := NewMdcbStorage(local, remote, log, nil, nil, nil)
 
 	cleanup := func() {
 		ctrlLocal.Finish()
@@ -100,7 +100,7 @@ func TestMdcbStorage_GetMultiKey(t *testing.T) {
 	logger.Out = io.Discard
 	log := logger.WithContext(context.Background())
 
-	mdcb := NewMdcbStorage(localHandler, rpcHandler, log, nil)
+	mdcb := NewMdcbStorage(localHandler, rpcHandler, log, nil, nil, nil)
 
 	testsCases := []struct {
 		name     string
@@ -404,6 +404,52 @@ func TestCacheCertificate(t *testing.T) {
 				assert.False(t, callbackCalled, "Callback should not have been called")
 			}
 
+		})
+	}
+}
+
+func TestExtractCertID(t *testing.T) {
+	tests := []struct {
+		name     string
+		key      string
+		expected string
+	}{
+		{
+			name:     "Full cert ID with orgID prefix",
+			key:      "raw-org1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890",
+			expected: "abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890",
+		},
+		{
+			name:     "Minimal org ID with full SHA256",
+			key:      "raw-org9876543210abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
+			expected: "9876543210abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
+		},
+		{
+			name:     "No orgID prefix (just SHA256)",
+			key:      "raw-1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
+			expected: "1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
+		},
+		{
+			name:     "Short cert ID (less than 64 chars, test or non-standard)",
+			key:      "raw-shortid",
+			expected: "shortid",
+		},
+		{
+			name:     "Empty cert ID after prefix",
+			key:      "raw-",
+			expected: "",
+		},
+		{
+			name:     "No raw- prefix",
+			key:      "certID",
+			expected: "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := extractCertID(tt.key)
+			assert.Equal(t, tt.expected, got)
 		})
 	}
 }

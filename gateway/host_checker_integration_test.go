@@ -76,6 +76,8 @@ func (m *mockHostCheckerCertificateManager) CertPool(certIDs []string) *x509.Cer
 
 func (m *mockHostCheckerCertificateManager) FlushCache() {}
 
+func (m *mockHostCheckerCertificateManager) SetUsageTracker(_ certs.UsageTracker, _ *config.Config) {}
+
 func TestHostChecker_ProxyIntegration(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()

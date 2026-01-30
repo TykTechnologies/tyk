@@ -4,14 +4,25 @@ import (
 	"errors"
 	"strings"
 
+	"github.com/TykTechnologies/tyk/config"
 	"github.com/sirupsen/logrus"
 )
+
+// certUsageTracker tracks which certificates are used by which APIs.
+// This interface duplicates certs.UsageTracker to avoid circular dependency
+// (storage -> certs -> storage).
+type certUsageTracker interface {
+	Required(certID string) bool
+	APIs(certID string) []string
+}
 
 type MdcbStorage struct {
 	local         Handler
 	rpc           Handler
 	logger        *logrus.Entry
 	OnRPCCertPull func(key string, val string) error
+	certUsage     certUsageTracker
+	config        *config.Config
 }
 
 const (
@@ -21,12 +32,14 @@ const (
 	resourceKey         = "Key"
 )
 
-func NewMdcbStorage(local, rpc Handler, log *logrus.Entry, OnRPCCertPull func(key string, val string) error) *MdcbStorage {
+func NewMdcbStorage(local, rpc Handler, log *logrus.Entry, OnRPCCertPull func(key string, val string) error, certUsage certUsageTracker, cfg *config.Config) *MdcbStorage {
 	return &MdcbStorage{
 		local:         local,
 		rpc:           rpc,
 		logger:        log,
 		OnRPCCertPull: OnRPCCertPull,
+		certUsage:     certUsage,
+		config:        cfg,
 	}
 }
 
@@ -37,6 +50,27 @@ func (m MdcbStorage) GetKey(key string) (string, error) {
 			return val, nil
 		}
 		m.logger.Debugf("Key not present locally, pulling from rpc layer: %v", err)
+	}
+
+	// Only filter in RPC mode when feature enabled
+	resourceType := getResourceType(key)
+	if resourceType == resourceCertificate &&
+		m.config != nil &&
+		m.config.SlaveOptions.UseRPC &&
+		m.config.SlaveOptions.SyncUsedCertsOnly &&
+		m.certUsage != nil {
+
+		certID := extractCertID(key)
+		if certID == "" {
+			m.logger.Debugf("Unable to extract cert ID from key: %v", key)
+			return m.getFromRPCAndCache(key)
+		}
+
+		if !m.certUsage.Required(certID) {
+			m.logger.WithField("cert_id", certID).
+				Debug("skipping certificate pull - not used by loaded APIs")
+			return "", errors.New("certificate not required")
+		}
 	}
 
 	return m.getFromRPCAndCache(key)
@@ -53,6 +87,29 @@ func getResourceType(key string) string {
 	default:
 		return resourceKey
 	}
+}
+
+// extractCertID extracts the certificate ID from a key in the format "raw-{orgID}{certID}"
+// Certificate IDs in API definitions are SHA256 hashes (64 hex characters).
+// Storage keys are "raw-{orgID}{certID}", so we extract the last 64 characters.
+func extractCertID(key string) string {
+	// Remove "raw-" prefix
+	if !strings.HasPrefix(key, "raw-") {
+		return ""
+	}
+
+	withoutPrefix := strings.TrimPrefix(key, "raw-")
+
+	// SHA256 hash is 32 bytes = 64 hex characters
+	const sha256HexLen = 64
+
+	// If the string is shorter than a SHA256 hash, return as-is (might be a test or non-standard cert ID)
+	if len(withoutPrefix) < sha256HexLen {
+		return withoutPrefix
+	}
+
+	// Extract the last 64 characters (the SHA256 hash part)
+	return withoutPrefix[len(withoutPrefix)-sha256HexLen:]
 }
 
 // GetMultiKey gets multiple keys from the MDCB layer
@@ -288,4 +345,10 @@ func (m MdcbStorage) getFromRPCAndCache(key string) (string, error) {
 // getFromLocal get a key from local storage
 func (m MdcbStorage) getFromLocal(key string) (string, error) {
 	return m.local.GetKey(key)
+}
+
+// SetCertUsageConfig updates the certificate usage tracker and config for selective sync
+func (m *MdcbStorage) SetCertUsageConfig(certUsage certUsageTracker, cfg *config.Config) {
+	m.certUsage = certUsage
+	m.config = cfg
 }
