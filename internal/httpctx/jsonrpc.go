@@ -15,10 +15,13 @@ type JSONRPCRequestData struct {
 	Params json.RawMessage
 	// ID is the JSON-RPC request ID (can be string, number, or null).
 	ID interface{}
-	// VEMPath is the internal VEM path used for routing.
+	// VEMPath is the internal VEM path used for routing (final destination).
 	VEMPath string
 	// Primitive is the name of the tool/resource/prompt being accessed.
 	Primitive string
+	// VEMChain contains all VEM paths in the routing chain (operation VEM → tool VEM).
+	// Middleware should check all paths in this chain to apply middleware at each stage.
+	VEMChain []string
 }
 
 var jsonrpcRequestValue = NewValue[*JSONRPCRequestData](ctx.JSONRPCRequest)

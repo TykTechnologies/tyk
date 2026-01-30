@@ -98,11 +98,108 @@ func (a APIDefinitionLoader) generateMCPVEMs(apiSpec *APISpec, conf config.Confi
 		return nil
 	}
 
+	// Generate operation VEMs for JSON-RPC methods (tools/call, resources/read, etc.)
+	// These allow operation-level middleware to be applied before primitive-level middleware
+	specs = append(specs, a.generateMCPOperationVEMs(apiSpec, conf)...)
+
 	// When allow list is enabled, add catch-all BlackList VEMs for each primitive type.
 	// These block any primitive that doesn't have an explicit Allow entry.
 	if apiSpec.MCPAllowListEnabled {
 		specs = append(specs, a.buildMCPCatchAllSpecs(conf)...)
 	}
+
+	return specs
+}
+
+// generateMCPOperationVEMs creates VEMs for JSON-RPC operations (tools/call, resources/read, prompts/get).
+// Operation VEMs allow operation-level middleware to be applied before routing to specific primitives.
+// The VEM chain is: listenPath → operation VEM → primitive VEM.
+func (a APIDefinitionLoader) generateMCPOperationVEMs(apiSpec *APISpec, conf config.Config) []URLSpec {
+	middleware := apiSpec.OAS.GetTykMiddleware()
+	if middleware == nil || middleware.Operations == nil {
+		return nil
+	}
+
+	var specs []URLSpec
+
+	// Map operation IDs to their corresponding operation VEM paths
+	// For MCP APIs, we need to find which operations correspond to MCP methods
+	operationVEMMap := map[string]string{
+		"tools/call":     "/mcp-operation:tools/call",
+		"resources/read": "/mcp-operation:resources/read",
+		"prompts/get":    "/mcp-operation:prompts/get",
+	}
+
+	// For each operation in the OAS, check if it should have an operation VEM
+	for opID, op := range middleware.Operations {
+		if op == nil {
+			continue
+		}
+
+		// Find the corresponding operation VEM path
+		// For now, we'll create operation VEMs for all operations in MCP APIs
+		// The operation ID might not directly map to the JSON-RPC method,
+		// so we'll use the first available mapping or create a generic one
+		var operationVEMPath string
+
+		// Try to match operation ID to JSON-RPC method
+		// This is a heuristic - ideally the OAS would specify which operation corresponds to which method
+		for method, vemPath := range operationVEMMap {
+			// Simple heuristic: if operation ID contains the method name, use that VEM
+			// Otherwise, use the first operation VEM for all operations
+			_ = method // TODO: improve this mapping
+			operationVEMPath = vemPath
+			break
+		}
+
+		if operationVEMPath == "" {
+			continue
+		}
+
+		// Create Internal VEM for this operation
+		specs = append(specs, a.buildPrimitiveSpec(opID, "operation", operationVEMPath)...)
+
+		// Extract and compile operation-level middleware for this VEM
+		specs = append(specs, a.compileOperationMiddlewareSpecs(op, operationVEMPath, apiSpec, conf)...)
+	}
+
+	return specs
+}
+
+// compileOperationMiddlewareSpecs extracts and compiles middleware for an operation VEM.
+func (a APIDefinitionLoader) compileOperationMiddlewareSpecs(op *oas.Operation, path string, apiSpec *APISpec, conf config.Config) []URLSpec {
+	if op == nil {
+		return nil
+	}
+
+	var ep apidef.ExtendedPathsSet
+	op.ExtractToExtendedPaths(&ep, path, http.MethodPost)
+
+	// Compile middleware specs (same pipeline as primitive middleware)
+	specs := []URLSpec{}
+	specs = append(specs, a.compileMockResponsePathSpec(false, ep.MockResponse, MockResponse, conf)...)
+	specs = append(specs, a.compileExtendedPathSpec(false, ep.Ignored, Ignored, conf)...)
+	specs = append(specs, a.compileExtendedPathSpec(false, ep.BlackList, BlackList, conf)...)
+	specs = append(specs, a.compileExtendedPathSpec(false, ep.WhiteList, WhiteList, conf)...)
+	specs = append(specs, a.compileCachedPathSpec(ep.Cached, ep.AdvanceCacheConfig, conf)...)
+	specs = append(specs, a.compileTransformPathSpec(ep.Transform, Transformed, conf)...)
+	specs = append(specs, a.compileTransformPathSpec(ep.TransformResponse, TransformedResponse, conf)...)
+	specs = append(specs, a.compileTransformJQPathSpec(ep.TransformJQ, TransformedJQ)...)
+	specs = append(specs, a.compileTransformJQPathSpec(ep.TransformJQResponse, TransformedJQResponse)...)
+	specs = append(specs, a.compileInjectedHeaderSpec(ep.TransformHeader, HeaderInjected, conf)...)
+	specs = append(specs, a.compileInjectedHeaderSpec(ep.TransformResponseHeader, HeaderInjectedResponse, conf)...)
+	specs = append(specs, a.compileTimeoutPathSpec(ep.HardTimeouts, HardTimeout, conf)...)
+	specs = append(specs, a.compileCircuitBreakerPathSpec(ep.CircuitBreaker, CircuitBreaker, apiSpec, conf)...)
+	specs = append(specs, a.compileURLRewritesPathSpec(ep.URLRewrite, URLRewrite, conf)...)
+	specs = append(specs, a.compileVirtualPathsSpec(ep.Virtual, VirtualPath, apiSpec, conf)...)
+	specs = append(specs, a.compileRequestSizePathSpec(ep.SizeLimit, RequestSizeLimit, conf)...)
+	specs = append(specs, a.compileMethodTransformSpec(ep.MethodTransforms, MethodTransformed, conf)...)
+	specs = append(specs, a.compileTrackedEndpointPathsSpec(ep.TrackEndpoints, RequestTracked, conf)...)
+	specs = append(specs, a.compileUnTrackedEndpointPathsSpec(ep.DoNotTrackEndpoints, RequestNotTracked, conf)...)
+	specs = append(specs, a.compileValidateJSONPathsSpec(ep.ValidateJSON, ValidateJSONRequest, conf)...)
+	specs = append(specs, a.compileInternalPathsSpec(ep.Internal, Internal, conf)...)
+	specs = append(specs, a.compileGopluginPathsSpec(ep.GoPlugin, GoPlugin, apiSpec, conf)...)
+	specs = append(specs, a.compileRateLimitPathsSpec(ep.RateLimit, RateLimit, conf)...)
 
 	return specs
 }

@@ -73,35 +73,36 @@ func (k *RateLimitForAPI) getSession(r *http.Request) *user.SessionState {
 	return k.apiSess
 }
 
-// getOriginalPathSession returns the rate limit session for the original request path
-// (before JSON-RPC routing). This is used for MCP APIs to check operation-level rate limits
-// on the original endpoint in addition to tool-level rate limits on VEM paths.
-// If no operation-level rate limit is found, it falls back to the global API rate limit.
-func (k *RateLimitForAPI) getOriginalPathSession(r *http.Request) *user.SessionState {
-	// Get the original path from JSON-RPC context if available
+// getAllVEMChainSessions returns rate limit sessions for all paths in the VEM chain.
+// For MCP APIs with JSON-RPC routing, this checks operation-level and tool-level rate limits sequentially.
+func (k *RateLimitForAPI) getAllVEMChainSessions(r *http.Request) []*user.SessionState {
+	// Check if this is a JSON-RPC routed request with a VEM chain
 	rpcData := httpctx.GetJSONRPCRequest(r)
-	if rpcData == nil || rpcData.VEMPath == "" {
-		return nil // Not a JSON-RPC routed request
+	if rpcData == nil || len(rpcData.VEMChain) == 0 {
+		// Not a JSON-RPC request or no VEM chain, use normal logic
+		return []*user.SessionState{k.getSession(r)}
 	}
 
-	// If we're at a VEM path (routed), check for rate limits on the listen path
-	// The listen path is where the original request arrived
+	// Check rate limits for each VEM in the chain
 	versionInfo, _ := k.Spec.Version(r)
 	versionPaths := k.Spec.RxPaths[versionInfo.Name]
+	method := http.MethodPost // JSON-RPC always uses POST
 
-	// Look for rate limits matching the listenPath with POST method
-	listenPath := k.Spec.Proxy.ListenPath
-	if listenPath == "" {
-		return nil
-	}
+	var sessions []*user.SessionState
+	for _, vemPath := range rpcData.VEMChain {
+		// Find rate limit for this VEM path
+		for i := range versionPaths {
+			if versionPaths[i].Status != RateLimit {
+				continue
+			}
+			if !versionPaths[i].matchesMethod(method) {
+				continue
+			}
 
-	// Search for a rate limit that matches the listen path (operation-level)
-	for _, vPath := range versionPaths {
-		if vPath.RateLimit.Path == listenPath && vPath.RateLimit.Method == "POST" {
-			limits := vPath.RateLimit
-			if limits.Valid() {
-				// track per-endpoint with a hash of the path
-				keyname := k.keyName + "-original-" + storage.HashStr(fmt.Sprintf("%s:%s", limits.Method, limits.Path))
+			limits := versionPaths[i].RateLimit
+			if limits.Path == vemPath && limits.Method == method && limits.Valid() {
+				// Create session for this rate limit
+				keyname := k.keyName + "-" + storage.HashStr(fmt.Sprintf("%s:%s", limits.Method, limits.Path))
 
 				session := &user.SessionState{
 					Rate:        limits.Rate,
@@ -110,14 +111,21 @@ func (k *RateLimitForAPI) getOriginalPathSession(r *http.Request) *user.SessionS
 				}
 				session.SetKeyHash(storage.HashKey(keyname, k.Gw.GetConfig().HashKeys))
 
-				return session
+				sessions = append(sessions, session)
+				break // Found rate limit for this VEM, move to next
 			}
 		}
 	}
 
-	// If no operation-level rate limit found, return the global API rate limit
-	// This ensures that global rate limits are enforced even when tool-level limits exist
-	return k.apiSess
+	// Always check global API rate limit if it's enabled
+	// This ensures the global rate limit is enforced even when VEM-specific limits exist
+	if k.apiSess.Rate > 0 {
+		sessions = append(sessions, k.apiSess)
+	}
+
+	// If no sessions at all (no VEM limits and no global limit), return empty slice
+	// which will skip rate limiting
+	return sessions
 }
 
 func (k *RateLimitForAPI) EnabledForSpec() bool {
@@ -148,50 +156,31 @@ func (k *RateLimitForAPI) ProcessRequest(_ http.ResponseWriter, r *http.Request,
 
 	storeRef := k.Gw.GlobalSessionManager.Store()
 
-	// Check rate limit for the current path (VEM path after routing, or original path if no routing)
-	currentSession := k.getSession(r)
-	reason := k.Gw.SessionLimiter.ForwardMessage(
-		r,
-		currentSession,
-		k.keyName,
-		k.quotaKey,
-		storeRef,
-		true,
-		false,
-		k.Spec,
-		false,
-	)
+	// For MCP APIs, check all rate limits in the VEM chain (operation-level + tool-level)
+	// For non-MCP APIs, check only the current path rate limit
+	sessions := k.getAllVEMChainSessions(r)
+	for i, session := range sessions {
+		keyName := k.keyName
+		if i > 0 {
+			keyName = fmt.Sprintf("%s-chain-%d", k.keyName, i)
+		}
 
-	k.emitRateLimitEvents(r, k.keyName)
+		reason := k.Gw.SessionLimiter.ForwardMessage(
+			r,
+			session,
+			keyName,
+			k.quotaKey,
+			storeRef,
+			true,
+			false,
+			k.Spec,
+			false,
+		)
 
-	if reason == sessionFailRateLimit {
-		return k.handleRateLimitFailure(r, event.RateLimitExceeded, "API Rate Limit Exceeded", k.keyName)
-	}
+		k.emitRateLimitEvents(r, keyName)
 
-	// For MCP APIs with JSON-RPC routing, also check rate limit on the original path
-	// (before routing). This ensures operation-level rate limits are enforced in addition
-	// to tool-level rate limits. Only do this if the current session is NOT the global session
-	// (i.e., there's a tool-level rate limit being used).
-	if currentSession != k.apiSess {
-		if origSession := k.getOriginalPathSession(r); origSession != nil {
-			origKeyName := k.keyName + "-original"
-			reason := k.Gw.SessionLimiter.ForwardMessage(
-				r,
-				origSession,
-				origKeyName,
-				k.quotaKey,
-				storeRef,
-				true,
-				false,
-				k.Spec,
-				false,
-			)
-
-			k.emitRateLimitEvents(r, origKeyName)
-
-			if reason == sessionFailRateLimit {
-				return k.handleRateLimitFailure(r, event.RateLimitExceeded, "API Rate Limit Exceeded", origKeyName)
-			}
+		if reason == sessionFailRateLimit {
+			return k.handleRateLimitFailure(r, event.RateLimitExceeded, "API Rate Limit Exceeded", keyName)
 		}
 	}
 

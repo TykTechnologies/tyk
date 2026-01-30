@@ -123,7 +123,14 @@ func (m *MCPJSONRPCMiddleware) readAndParseJSONRPC(w http.ResponseWriter, r *htt
 }
 
 // setupJSONRPCRouting stores routing data in context and enables JSON-RPC routing.
+// It builds a VEM chain: operation VEM → primitive VEM, allowing middleware to be
+// applied at each stage (operation-level middleware, then tool-level middleware).
 func (m *MCPJSONRPCMiddleware) setupJSONRPCRouting(r *http.Request, rpcReq *JSONRPCRequest, vemPath, primitive string) {
+	// Build VEM chain: [operation VEM, primitive VEM]
+	// Operation VEM represents the JSON-RPC method (e.g., "tools/call")
+	// Primitive VEM represents the specific tool/resource/prompt
+	vemChain := m.buildVEMChain(rpcReq.Method, vemPath)
+
 	// Store parsed data in context
 	httpctx.SetJSONRPCRequest(r, &httpctx.JSONRPCRequestData{
 		Method:    rpcReq.Method,
@@ -131,6 +138,7 @@ func (m *MCPJSONRPCMiddleware) setupJSONRPCRouting(r *http.Request, rpcReq *JSON
 		ID:        rpcReq.ID,
 		VEMPath:   vemPath,
 		Primitive: primitive,
+		VEMChain:  vemChain,
 	})
 
 	// Enable JSON-RPC routing (allows access to internal VEM endpoints)
@@ -141,8 +149,40 @@ func (m *MCPJSONRPCMiddleware) setupJSONRPCRouting(r *http.Request, rpcReq *JSON
 	// Ensure limits and quotas apply to MCP routed requests
 	ctxSetCheckLoopLimits(r, true)
 
-	// Rewrite URL path to VEM path
+	// Rewrite URL path to VEM path (final destination)
 	r.URL.Path = vemPath
+}
+
+// buildVEMChain constructs the chain of VEM paths for middleware application.
+// Returns [operation VEM, primitive VEM] to enable sequential middleware application.
+func (m *MCPJSONRPCMiddleware) buildVEMChain(method, primitiveVEM string) []string {
+	// Build operation VEM based on JSON-RPC method
+	operationVEM := m.buildOperationVEM(method)
+	if operationVEM == "" {
+		// If no operation VEM, just return the primitive VEM
+		return []string{primitiveVEM}
+	}
+
+	// Return chain: operation first, then primitive
+	return []string{operationVEM, primitiveVEM}
+}
+
+// buildOperationVEM constructs the operation VEM path for a JSON-RPC method.
+// Operation VEMs represent the JSON-RPC operation itself (e.g., "tools/call"),
+// distinct from the specific primitive being accessed.
+func (m *MCPJSONRPCMiddleware) buildOperationVEM(method string) string {
+	// Map JSON-RPC methods to operation VEM paths
+	// Format: /mcp-operation:{method}
+	switch method {
+	case mcp.MethodToolsCall:
+		return "/mcp-operation:tools/call"
+	case mcp.MethodResourcesRead:
+		return "/mcp-operation:resources/read"
+	case mcp.MethodPromptsGet:
+		return "/mcp-operation:prompts/get"
+	default:
+		return ""
+	}
 }
 
 // ProcessRequest handles JSON-RPC request detection and routing.
