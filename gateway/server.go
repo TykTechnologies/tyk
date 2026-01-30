@@ -521,7 +521,16 @@ func (gw *Gateway) setupGlobals() {
 	storeCert := &storage.RedisCluster{KeyPrefix: "cert-", HashKeys: false, ConnectionHandler: gw.StorageConnectionHandler}
 	storeCert.Connect()
 
-	gw.CertificateManager = certs.NewCertificateManager(storeCert, certificateSecret, log, !gw.GetConfig().Cloud)
+	conf := gw.GetConfig()
+	gw.CertificateManager = certs.NewCertificateManager(
+		storeCert,
+		certificateSecret,
+		log,
+		!conf.Cloud,
+		time.Duration(conf.SlaveOptions.RPCCertFetchMaxElapsedTime*1000)*time.Millisecond,
+		time.Duration(conf.SlaveOptions.RPCCertFetchInitialInterval*1000)*time.Millisecond,
+		time.Duration(conf.SlaveOptions.RPCCertFetchMaxInterval*1000)*time.Millisecond,
+	)
 
 	if gw.GetConfig().SlaveOptions.UseRPC {
 		rpcStore := &RPCStorageHandler{
@@ -1576,6 +1585,18 @@ func (gw *Gateway) afterConfSetup() {
 
 		if conf.SlaveOptions.RPCGlobalCacheExpiration == 0 {
 			conf.SlaveOptions.RPCGlobalCacheExpiration = 30
+		}
+
+		if conf.SlaveOptions.RPCCertFetchMaxElapsedTime == 0 {
+			conf.SlaveOptions.RPCCertFetchMaxElapsedTime = 30
+		}
+
+		if conf.SlaveOptions.RPCCertFetchInitialInterval == 0 {
+			conf.SlaveOptions.RPCCertFetchInitialInterval = 0.1
+		}
+
+		if conf.SlaveOptions.RPCCertFetchMaxInterval == 0 {
+			conf.SlaveOptions.RPCCertFetchMaxInterval = 2
 		}
 	}
 

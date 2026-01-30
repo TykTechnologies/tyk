@@ -80,24 +80,41 @@ type CertificateManager interface {
 }
 
 type certificateManager struct {
-	storage         storage.Handler
-	logger          *logrus.Entry
-	cache           cache.Repository
-	secret          string
-	migrateCertList bool
+	storage                    storage.Handler
+	logger                     *logrus.Entry
+	cache                      cache.Repository
+	secret                     string
+	migrateCertList            bool
+	certFetchMaxElapsedTime    time.Duration
+	certFetchInitialInterval   time.Duration
+	certFetchMaxInterval       time.Duration
 }
 
-func NewCertificateManager(storage storage.Handler, secret string, logger *logrus.Logger, migrateCertList bool) *certificateManager {
+func NewCertificateManager(storage storage.Handler, secret string, logger *logrus.Logger, migrateCertList bool, certFetchMaxElapsedTime, certFetchInitialInterval, certFetchMaxInterval time.Duration) *certificateManager {
 	if logger == nil {
 		logger = logrus.New()
 	}
 
+	// Set default backoff values if not provided
+	if certFetchMaxElapsedTime == 0 {
+		certFetchMaxElapsedTime = 30 * time.Second
+	}
+	if certFetchInitialInterval == 0 {
+		certFetchInitialInterval = 100 * time.Millisecond
+	}
+	if certFetchMaxInterval == 0 {
+		certFetchMaxInterval = 2 * time.Second
+	}
+
 	return &certificateManager{
-		storage:         storage,
-		logger:          logger.WithFields(logrus.Fields{"prefix": CertManagerLogPrefix}),
-		cache:           cache.New(cacheDefaultTTL, cacheCleanInterval),
-		secret:          secret,
-		migrateCertList: migrateCertList,
+		storage:                  storage,
+		logger:                   logger.WithFields(logrus.Fields{"prefix": CertManagerLogPrefix}),
+		cache:                    cache.New(cacheDefaultTTL, cacheCleanInterval),
+		secret:                   secret,
+		migrateCertList:          migrateCertList,
+		certFetchMaxElapsedTime:  certFetchMaxElapsedTime,
+		certFetchInitialInterval: certFetchInitialInterval,
+		certFetchMaxInterval:     certFetchMaxInterval,
 	}
 }
 
@@ -500,9 +517,9 @@ func (c *certificateManager) List(certIDs []string, mode CertificateType) (out [
 				}
 
 				expBackoff := backoff.NewExponentialBackOff()
-				expBackoff.MaxElapsedTime = backoffMaxElapsedTime
-				expBackoff.InitialInterval = backoffInitialInterval
-				expBackoff.MaxInterval = backoffMaxInterval
+				expBackoff.MaxElapsedTime = c.certFetchMaxElapsedTime
+				expBackoff.InitialInterval = c.certFetchInitialInterval
+				expBackoff.MaxInterval = c.certFetchMaxInterval
 
 				if retryErr := backoff.Retry(operation, expBackoff); retryErr != nil {
 					c.logger.Warn("Timeout waiting for MDCB connection for certificate:", id)
