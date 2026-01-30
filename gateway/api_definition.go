@@ -1488,9 +1488,10 @@ func (a APIDefinitionLoader) getExtendedPathSpecs(apiVersionDef apidef.VersionIn
 	combinedPath = append(combinedPath, oasMockResponsePaths...)
 	combinedPath = append(combinedPath, mcpVEMs...)
 
-	// Enable whitelist mode if there are whitelist paths OR if MCP allow list is enabled.
-	// MCP allow list mode adds catch-all BlackList VEMs that require whitelist processing.
-	whiteListEnabled := len(whiteListPaths) > 0 || apiSpec.MCPAllowListEnabled
+	// Enable whitelist mode if there are whitelist paths.
+	// Note: MCP allow list uses explicit BlackList entries for primitives without Allow,
+	// rather than relying on whitelist mode, so unregistered primitives can passthrough.
+	whiteListEnabled := len(whiteListPaths) > 0
 
 	return combinedPath, whiteListEnabled
 }
@@ -1655,6 +1656,16 @@ func (a *APISpec) URLAllowedAndIgnored(r *http.Request, rxPaths []URLSpec, white
 			}
 		}
 
+		// MCP primitive VEMs: continue checking for BlackList even outside whitelist mode.
+		// This allows explicit BlackList entries to block primitives without Allow.
+		if rxPaths[i].Status == Internal && r.Method == rxPaths[i].Internal.Method {
+			if mcp.IsPrimitiveVEMPath(rxPaths[i].Internal.Path) {
+				if httpctx.IsJsonRPCRouting(r) {
+					continue // Keep looking for WhiteList/BlackList
+				}
+			}
+		}
+
 		if whiteListStatus {
 			// We have a whitelist, nothing gets through unless specifically defined
 			switch rxPaths[i].Status {
@@ -1662,14 +1673,8 @@ func (a *APISpec) URLAllowedAndIgnored(r *http.Request, rxPaths []URLSpec, white
 				// These are handled in the switch above, continue to process them
 			case Internal:
 				if r.Method == rxPaths[i].Internal.Method {
-					// MCP primitive VEMs require explicit MCP routing context.
-					// In whitelist mode, continue to look for WhiteList/BlackList match.
-					if mcp.IsPrimitiveVEMPath(rxPaths[i].Internal.Path) {
-						if httpctx.IsJsonRPCRouting(r) {
-							continue // Keep looking for WhiteList/BlackList
-						}
-					} else if ctxLoopingEnabled(r) {
-						// Other internal endpoints use generic looping check.
+					if ctxLoopingEnabled(r) {
+						// Regular internal endpoints use generic looping check.
 						return a.getURLStatus(rxPaths[i].Status), nil
 					}
 				}

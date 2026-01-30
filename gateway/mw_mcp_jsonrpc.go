@@ -104,31 +104,16 @@ func (m *MCPJSONRPCMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 		return nil, middleware.StatusRespond
 	}
 
-	// Notifications are observational and should pass through unchanged.
-	if m.shouldPassthrough(rpcReq.Method) {
-		return nil, http.StatusOK
-	}
-
 	// Route based on method
 	vemPath, primitive, found, invalidParams := m.routeRequest(&rpcReq)
 	if invalidParams {
 		m.writeJSONRPCError(w, rpcReq.ID, mcp.JSONRPCInvalidParams, "Invalid params", nil)
 		return nil, middleware.StatusRespond
 	}
-	if !found {
-		if m.Spec.MCPAllowListEnabled {
-			// Route to a VEM path that will be caught by the catch-all BlackList.
-			// This allows the standard middleware chain to handle the blocking.
-			vemPath = m.buildUnregisteredVEMPath(&rpcReq, primitive)
-			if vemPath == "" {
-				// Unknown method type, reject directly
-				m.writeJSONRPCError(w, rpcReq.ID, mcp.JSONRPCMethodNotFound, "Method not found", nil)
-				return nil, middleware.StatusRespond
-			}
-		} else {
-			// Passthrough for unmatched primitives/operations when allow list is not active.
-			return nil, http.StatusOK
-		}
+	if !found || vemPath == "" {
+		// Unregistered primitives or operations (notifications, discovery, etc.)
+		// passthrough to upstream unchanged. The upstream MCP server will handle them.
+		return nil, http.StatusOK
 	}
 
 	// Store parsed data in context
@@ -182,7 +167,7 @@ func (m *MCPJSONRPCMiddleware) routeRequest(rpcReq *JSONRPCRequest) (vemPath str
 			return "", "", false, true
 		}
 		vemPath, found = primitives["tool:"+name]
-		return vemPath, name, found, false
+		primitive = name
 
 	case mcp.MethodResourcesRead, mcp.MethodResourcesSubscribe, mcp.MethodResourcesUnsubscribe:
 		// Extract resource URI from params.uri
@@ -191,7 +176,7 @@ func (m *MCPJSONRPCMiddleware) routeRequest(rpcReq *JSONRPCRequest) (vemPath str
 			return "", "", false, true
 		}
 		vemPath, found = m.matchResourceURI(uri, primitives)
-		return vemPath, uri, found, false
+		primitive = uri
 
 	case mcp.MethodPromptsGet:
 		// Extract prompt name from params.name
@@ -200,13 +185,21 @@ func (m *MCPJSONRPCMiddleware) routeRequest(rpcReq *JSONRPCRequest) (vemPath str
 			return "", "", false, true
 		}
 		vemPath, found = primitives["prompt:"+name]
-		return vemPath, name, found, false
+		primitive = name
 
 	default:
 		// Check for operation-level VEMs (tools/list, initialize, etc.)
 		vemPath, found = primitives["operation:"+rpcReq.Method]
-		return vemPath, rpcReq.Method, found, false
+		primitive = rpcReq.Method
 	}
+
+	// When allowlist is enabled and primitive not found, route to catch-all VEM
+	if !found && m.Spec.MCPAllowListEnabled {
+		vemPath = m.buildUnregisteredVEMPath(rpcReq, primitive)
+		found = true
+	}
+
+	return vemPath, primitive, found, false
 }
 
 // extractParamString extracts a string parameter from JSON-RPC params.
@@ -273,13 +266,6 @@ func (m *MCPJSONRPCMiddleware) matchesWildcard(pattern, uri string) bool {
 		return strings.HasPrefix(uri, prefix)
 	}
 	return pattern == uri
-}
-
-// shouldPassthrough returns true if the method should be passed through to upstream
-// without requiring a configured VEM (e.g., discovery operations, notifications).
-func (m *MCPJSONRPCMiddleware) shouldPassthrough(method string) bool {
-	// Notifications are observational and don't require policy enforcement.
-	return strings.HasPrefix(method, "notifications/")
 }
 
 // writeJSONRPCError writes a JSON-RPC 2.0 error response.
