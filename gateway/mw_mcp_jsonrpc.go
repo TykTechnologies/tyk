@@ -202,9 +202,9 @@ func (m *MCPJSONRPCMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 	}
 
 	// Route based on method
-	vemPath, primitive, found, invalidParams := m.routeRequest(rpcReq)
+	vemPath, primitive, found, invalidParams, errMsg := m.routeRequest(rpcReq)
 	if invalidParams {
-		m.writeJSONRPCError(w, rpcReq.ID, mcp.JSONRPCInvalidParams, mcp.ErrMsgInvalidParams, nil)
+		m.writeJSONRPCError(w, rpcReq.ID, mcp.JSONRPCInvalidParams, errMsg, nil)
 		return nil, middleware.StatusRespond
 	}
 	if !found || vemPath == "" {
@@ -233,34 +233,34 @@ func (m *MCPJSONRPCMiddleware) buildUnregisteredVEMPath(rpcReq *JSONRPCRequest, 
 }
 
 // routeRequest determines the VEM path for a JSON-RPC request based on its method.
-// Returns the VEM path, primitive name, match status, and invalid params flag.
-func (m *MCPJSONRPCMiddleware) routeRequest(rpcReq *JSONRPCRequest) (vemPath string, primitive string, found bool, invalidParams bool) {
+// Returns the VEM path, primitive name, match status, invalid params flag, and error message.
+func (m *MCPJSONRPCMiddleware) routeRequest(rpcReq *JSONRPCRequest) (vemPath string, primitive string, found bool, invalidParams bool, errMsg string) {
 	primitives := m.Spec.MCPPrimitives
 
 	switch rpcReq.Method {
 	case mcp.MethodToolsCall:
 		// Extract tool name from params.name
-		name, invalidParams := m.extractAndValidateParam(rpcReq.Params, mcp.ParamKeyName)
-		if invalidParams {
-			return "", "", false, true
+		name, invalid, msg := m.extractAndValidateParam(rpcReq.Params, mcp.ParamKeyName)
+		if invalid {
+			return "", "", false, true, msg
 		}
 		vemPath, found = primitives[mcp.PrimitiveKeyTool+name]
 		primitive = name
 
 	case mcp.MethodResourcesRead:
 		// Extract resource URI from params.uri
-		uri, invalidParams := m.extractAndValidateParam(rpcReq.Params, mcp.ParamKeyURI)
-		if invalidParams {
-			return "", "", false, true
+		uri, invalid, msg := m.extractAndValidateParam(rpcReq.Params, mcp.ParamKeyURI)
+		if invalid {
+			return "", "", false, true, msg
 		}
 		vemPath, found = m.matchResourceURI(uri, primitives)
 		primitive = uri
 
 	case mcp.MethodPromptsGet:
 		// Extract prompt name from params.name
-		name, invalidParams := m.extractAndValidateParam(rpcReq.Params, mcp.ParamKeyName)
-		if invalidParams {
-			return "", "", false, true
+		name, invalid, msg := m.extractAndValidateParam(rpcReq.Params, mcp.ParamKeyName)
+		if invalid {
+			return "", "", false, true, msg
 		}
 		vemPath, found = primitives[mcp.PrimitiveKeyPrompt+name]
 		primitive = name
@@ -277,34 +277,88 @@ func (m *MCPJSONRPCMiddleware) routeRequest(rpcReq *JSONRPCRequest) (vemPath str
 		found = true
 	}
 
-	return vemPath, primitive, found, false
+	return vemPath, primitive, found, false, ""
 }
 
-// extractParamString extracts a string parameter from JSON-RPC params.
-func (m *MCPJSONRPCMiddleware) extractParamString(params json.RawMessage, key string) string {
+// ParamExtractionResult represents the result of extracting a parameter from JSON-RPC params.
+type ParamExtractionResult struct {
+	Value        string
+	ErrorMessage string
+	IsValid      bool
+}
+
+// extractParamWithDetails extracts a string parameter from JSON-RPC params with detailed error info.
+// Returns the extraction result with specific error messages for different failure scenarios.
+func (m *MCPJSONRPCMiddleware) extractParamWithDetails(params json.RawMessage, key string) ParamExtractionResult {
 	if len(params) == 0 {
-		return ""
+		return ParamExtractionResult{
+			ErrorMessage: mcp.ErrMsgMissingParams,
+			IsValid:      false,
+		}
 	}
 
 	var paramsMap map[string]interface{}
 	if err := json.Unmarshal(params, &paramsMap); err != nil {
-		return ""
+		return ParamExtractionResult{
+			ErrorMessage: mcp.ErrMsgInvalidParamsType,
+			IsValid:      false,
+		}
 	}
 
-	if val, ok := paramsMap[key].(string); ok {
-		return val
+	val, exists := paramsMap[key]
+	if !exists {
+		// Key is missing from params
+		errMsg := mcp.ErrMsgInvalidParams
+		switch key {
+		case mcp.ParamKeyName:
+			errMsg = mcp.ErrMsgMissingParamName
+		case mcp.ParamKeyURI:
+			errMsg = mcp.ErrMsgMissingParamURI
+		}
+		return ParamExtractionResult{
+			ErrorMessage: errMsg,
+			IsValid:      false,
+		}
 	}
-	return ""
+
+	strVal, ok := val.(string)
+	if !ok {
+		// Value is not a string
+		return ParamExtractionResult{
+			ErrorMessage: mcp.ErrMsgInvalidParams,
+			IsValid:      false,
+		}
+	}
+
+	if strVal == "" {
+		// Value is an empty string
+		errMsg := mcp.ErrMsgInvalidParams
+		switch key {
+		case mcp.ParamKeyName:
+			errMsg = mcp.ErrMsgEmptyParamName
+		case mcp.ParamKeyURI:
+			errMsg = mcp.ErrMsgEmptyParamURI
+		}
+		return ParamExtractionResult{
+			ErrorMessage: errMsg,
+			IsValid:      false,
+		}
+	}
+
+	return ParamExtractionResult{
+		Value:   strVal,
+		IsValid: true,
+	}
 }
 
-// extractAndValidateParam extracts a parameter from JSON-RPC params and validates it's not empty.
-// Returns the parameter value and a flag indicating if the parameter is invalid.
-func (m *MCPJSONRPCMiddleware) extractAndValidateParam(params json.RawMessage, key string) (value string, invalidParams bool) {
-	value = m.extractParamString(params, key)
-	if value == "" {
-		return "", true
+// extractAndValidateParam extracts a parameter from JSON-RPC params and validates it.
+// Returns the parameter value, a flag indicating if the parameter is invalid, and an error message.
+func (m *MCPJSONRPCMiddleware) extractAndValidateParam(params json.RawMessage, key string) (value string, invalidParams bool, errMsg string) {
+	result := m.extractParamWithDetails(params, key)
+	if !result.IsValid {
+		return "", true, result.ErrorMessage
 	}
-	return value, false
+	return result.Value, false, ""
 }
 
 // matchResourceURI matches a resource URI against configured patterns.

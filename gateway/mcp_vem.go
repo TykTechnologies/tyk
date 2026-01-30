@@ -3,6 +3,9 @@ package gateway
 import (
 	"net/http"
 	"regexp"
+	"strings"
+
+	"github.com/getkin/kin-openapi/openapi3"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/apidef/oas"
@@ -27,14 +30,13 @@ type PrimitiveCategory struct {
 // It requires JSON-RPC 2.0 and populates primitivesMap with generated VEM paths.
 //
 // All registered primitives get Internal entries (required for JSON-RPC routing).
-// When allowListEnabled is true, primitives with Allow.Enabled also get WhiteList entries.
+// Primitives with Allow.Enabled also get WhiteList entries via extractAllowanceTo.
 // Primitives without Allow are blocked by the catch-all BlackList in whitelist mode.
 func (a APIDefinitionLoader) generateJSONRPCVEMs(
 	apiSpec *APISpec,
 	conf config.Config,
 	categories []PrimitiveCategory,
 	primitivesMap map[string]string,
-	_ bool, // allowListEnabled - kept for signature compatibility, not used for Internal generation
 ) []URLSpec {
 	if apiSpec.JsonRpcVersion != apidef.JsonRPC20 {
 		return nil
@@ -93,7 +95,7 @@ func (a APIDefinitionLoader) generateMCPVEMs(apiSpec *APISpec, conf config.Confi
 	// This avoids iterating through all primitives on every JSON-RPC request.
 	apiSpec.MCPAllowListEnabled = hasMCPAllowListEnabled(categories)
 
-	specs := a.generateJSONRPCVEMs(apiSpec, conf, categories, apiSpec.MCPPrimitives, apiSpec.MCPAllowListEnabled)
+	specs := a.generateJSONRPCVEMs(apiSpec, conf, categories, apiSpec.MCPPrimitives)
 	if specs == nil {
 		return nil
 	}
@@ -111,48 +113,56 @@ func (a APIDefinitionLoader) generateMCPVEMs(apiSpec *APISpec, conf config.Confi
 	return specs
 }
 
+// mcpOperationVEMPaths maps JSON-RPC method names to their operation VEM paths.
+// These are used both for VEM generation and for building the VEM chain at runtime.
+var mcpOperationVEMPaths = map[string]string{
+	mcp.MethodToolsCall:     "/mcp-operation:tools/call",
+	mcp.MethodResourcesRead: "/mcp-operation:resources/read",
+	mcp.MethodPromptsGet:    "/mcp-operation:prompts/get",
+}
+
 // generateMCPOperationVEMs creates VEMs for JSON-RPC operations (tools/call, resources/read, prompts/get).
 // Operation VEMs allow operation-level middleware to be applied before routing to specific primitives.
 // The VEM chain is: listenPath → operation VEM → primitive VEM.
+//
+// Path matching: The OAS path (e.g., "/tools/call") is matched against JSON-RPC method names.
+// For each matching path, the operation's middleware is compiled for the corresponding operation VEM.
 func (a APIDefinitionLoader) generateMCPOperationVEMs(apiSpec *APISpec, conf config.Config) []URLSpec {
 	middleware := apiSpec.OAS.GetTykMiddleware()
 	if middleware == nil || middleware.Operations == nil {
 		return nil
 	}
 
-	var specs []URLSpec
-
-	// Map operation IDs to their corresponding operation VEM paths
-	// For MCP APIs, we need to find which operations correspond to MCP methods
-	operationVEMMap := map[string]string{
-		"tools/call":     "/mcp-operation:tools/call",
-		"resources/read": "/mcp-operation:resources/read",
-		"prompts/get":    "/mcp-operation:prompts/get",
+	// Check if the OAS has paths defined
+	if apiSpec.OAS.Paths == nil {
+		return nil
 	}
 
-	// For each operation in the OAS, check if it should have an operation VEM
-	for opID, op := range middleware.Operations {
-		if op == nil {
+	var specs []URLSpec
+
+	// Iterate over OAS paths to find ones that match JSON-RPC method names
+	for path, pathItem := range apiSpec.OAS.Paths.Map() {
+		if pathItem == nil {
 			continue
 		}
 
-		// Find the corresponding operation VEM path
-		// For now, we'll create operation VEMs for all operations in MCP APIs
-		// The operation ID might not directly map to the JSON-RPC method,
-		// so we'll use the first available mapping or create a generic one
-		var operationVEMPath string
-
-		// Try to match operation ID to JSON-RPC method
-		// This is a heuristic - ideally the OAS would specify which operation corresponds to which method
-		for method, vemPath := range operationVEMMap {
-			// Simple heuristic: if operation ID contains the method name, use that VEM
-			// Otherwise, use the first operation VEM for all operations
-			_ = method // TODO: improve this mapping
-			operationVEMPath = vemPath
-			break
+		// Check if the path matches a known JSON-RPC method
+		// Remove leading slash from path for comparison (e.g., "/tools/call" -> "tools/call")
+		methodName := strings.TrimPrefix(path, "/")
+		operationVEMPath, ok := mcpOperationVEMPaths[methodName]
+		if !ok {
+			continue
 		}
 
-		if operationVEMPath == "" {
+		// Find the operation ID for this path (check all HTTP methods)
+		opID := findOperationID(pathItem)
+		if opID == "" {
+			continue
+		}
+
+		// Get the operation middleware config
+		op := middleware.Operations[opID]
+		if op == nil {
 			continue
 		}
 
@@ -164,6 +174,28 @@ func (a APIDefinitionLoader) generateMCPOperationVEMs(apiSpec *APISpec, conf con
 	}
 
 	return specs
+}
+
+// findOperationID extracts the operation ID from a PathItem.
+// It checks all HTTP methods and returns the first non-empty operation ID found.
+func findOperationID(pathItem *openapi3.PathItem) string {
+	operations := []*openapi3.Operation{
+		pathItem.Get,
+		pathItem.Post,
+		pathItem.Put,
+		pathItem.Patch,
+		pathItem.Delete,
+		pathItem.Head,
+		pathItem.Options,
+		pathItem.Trace,
+	}
+
+	for _, op := range operations {
+		if op != nil && op.OperationID != "" {
+			return op.OperationID
+		}
+	}
+	return ""
 }
 
 // compileOperationMiddlewareSpecs extracts and compiles middleware for an operation VEM.

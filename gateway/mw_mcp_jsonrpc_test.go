@@ -805,57 +805,97 @@ func TestMCPJSONRPCMiddleware_MatchesWildcard(t *testing.T) {
 	}
 }
 
-func TestMCPJSONRPCMiddleware_ExtractParamString(t *testing.T) {
+func TestMCPJSONRPCMiddleware_ExtractParamWithDetails(t *testing.T) {
 	m := &MCPJSONRPCMiddleware{}
 
 	tests := []struct {
-		name     string
-		params   json.RawMessage
-		key      string
-		expected string
+		name            string
+		params          json.RawMessage
+		key             string
+		expectedValue   string
+		expectedIsValid bool
+		expectedErrMsg  string
 	}{
 		{
-			name:     "extract name",
-			params:   json.RawMessage(`{"name":"test-tool","arguments":{}}`),
-			key:      "name",
-			expected: "test-tool",
+			name:            "extract name successfully",
+			params:          json.RawMessage(`{"name":"test-tool","arguments":{}}`),
+			key:             "name",
+			expectedValue:   "test-tool",
+			expectedIsValid: true,
+			expectedErrMsg:  "",
 		},
 		{
-			name:     "extract uri",
-			params:   json.RawMessage(`{"uri":"file:///test.txt"}`),
-			key:      "uri",
-			expected: "file:///test.txt",
+			name:            "extract uri successfully",
+			params:          json.RawMessage(`{"uri":"file:///test.txt"}`),
+			key:             "uri",
+			expectedValue:   "file:///test.txt",
+			expectedIsValid: true,
+			expectedErrMsg:  "",
 		},
 		{
-			name:     "missing key",
-			params:   json.RawMessage(`{"other":"value"}`),
-			key:      "name",
-			expected: "",
+			name:            "missing name key",
+			params:          json.RawMessage(`{"other":"value"}`),
+			key:             "name",
+			expectedValue:   "",
+			expectedIsValid: false,
+			expectedErrMsg:  mcp.ErrMsgMissingParamName,
 		},
 		{
-			name:     "empty params",
-			params:   json.RawMessage(``),
-			key:      "name",
-			expected: "",
+			name:            "missing uri key",
+			params:          json.RawMessage(`{"other":"value"}`),
+			key:             "uri",
+			expectedValue:   "",
+			expectedIsValid: false,
+			expectedErrMsg:  mcp.ErrMsgMissingParamURI,
 		},
 		{
-			name:     "invalid json",
-			params:   json.RawMessage(`not json`),
-			key:      "name",
-			expected: "",
+			name:            "empty params",
+			params:          json.RawMessage(``),
+			key:             "name",
+			expectedValue:   "",
+			expectedIsValid: false,
+			expectedErrMsg:  mcp.ErrMsgMissingParams,
 		},
 		{
-			name:     "non-string value",
-			params:   json.RawMessage(`{"name":123}`),
-			key:      "name",
-			expected: "",
+			name:            "invalid json",
+			params:          json.RawMessage(`not json`),
+			key:             "name",
+			expectedValue:   "",
+			expectedIsValid: false,
+			expectedErrMsg:  mcp.ErrMsgInvalidParamsType,
+		},
+		{
+			name:            "non-string value",
+			params:          json.RawMessage(`{"name":123}`),
+			key:             "name",
+			expectedValue:   "",
+			expectedIsValid: false,
+			expectedErrMsg:  mcp.ErrMsgInvalidParams,
+		},
+		{
+			name:            "empty name value",
+			params:          json.RawMessage(`{"name":""}`),
+			key:             "name",
+			expectedValue:   "",
+			expectedIsValid: false,
+			expectedErrMsg:  mcp.ErrMsgEmptyParamName,
+		},
+		{
+			name:            "empty uri value",
+			params:          json.RawMessage(`{"uri":""}`),
+			key:             "uri",
+			expectedValue:   "",
+			expectedIsValid: false,
+			expectedErrMsg:  mcp.ErrMsgEmptyParamURI,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := m.extractParamString(tt.params, tt.key)
-			assert.Equal(t, tt.expected, result)
+			result := m.extractParamWithDetails(tt.params, tt.key)
+			assert.Equal(t, tt.expectedValue, result.Value)
+			assert.Equal(t, tt.expectedIsValid, result.IsValid)
+			assert.Equal(t, tt.expectedErrMsg, result.ErrorMessage)
 		})
 	}
 }
@@ -1640,4 +1680,162 @@ func TestMCPJSONRPCMiddleware_GlobalRateLimitDebug(t *testing.T) {
 		Code:   http.StatusTooManyRequests, // Expected: 429, Actual: 200 (BUG!)
 	})
 	t.Logf("Second request response: %+v", resp2)
+}
+
+// TestMCPJSONRPCMiddleware_OperationHeaderInjection tests that headers from both
+// operation-level and tool-level middleware are injected in the VEM chain.
+func TestMCPJSONRPCMiddleware_OperationHeaderInjection(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	// Create OAS API with /tools/call path
+	oasAPI := oas.OAS{
+		T: openapi3.T{
+			OpenAPI: "3.0.3",
+			Info: &openapi3.Info{
+				Title:   "MCP Header Test",
+				Version: "1.0.0",
+			},
+			Paths: openapi3.NewPaths(),
+		},
+	}
+
+	// Add /tools/call path with operationId "testget"
+	desc := ""
+	oasAPI.Paths.Set("/tools/call", &openapi3.PathItem{
+		Get: &openapi3.Operation{
+			OperationID: "testget",
+			Responses: openapi3.NewResponses(
+				openapi3.WithStatus(200, &openapi3.ResponseRef{
+					Value: &openapi3.Response{
+						Description: &desc,
+					},
+				}),
+			),
+		},
+	})
+
+	// Configure x-tyk-api-gateway extension
+	tykExt := &oas.XTykAPIGateway{
+		Info: oas.Info{
+			Name: "MCP Header Test",
+			ID:   randStringBytes(8),
+			State: oas.State{
+				Active: true,
+			},
+		},
+		Upstream: oas.Upstream{
+			URL: TestHttpAny,
+		},
+		Server: oas.Server{
+			ListenPath: oas.ListenPath{
+				Value: "/prct",
+				Strip: true,
+			},
+		},
+		Middleware: &oas.Middleware{
+			// MCP tool with header injection
+			McpTools: oas.MCPPrimitives{
+				"weather.getForecast": &oas.MCPPrimitive{
+					Operation: oas.Operation{
+						Allow: &oas.Allowance{
+							Enabled: true,
+						},
+						TransformRequestHeaders: &oas.TransformHeaders{
+							Enabled: true,
+							Add: []oas.Header{
+								{Name: "X-Tool-Header", Value: "tool-value"},
+							},
+						},
+					},
+				},
+			},
+			// Operation-level header injection
+			Operations: oas.Operations{
+				"testget": &oas.Operation{
+					TransformRequestHeaders: &oas.TransformHeaders{
+						Enabled: true,
+						Add: []oas.Header{
+							{Name: "X-Operation-Header", Value: "operation-value"},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	oasAPI.SetTykExtension(tykExt)
+
+	var def apidef.APIDefinition
+	oasAPI.ExtractTo(&def)
+	def.IsOAS = true
+	def.UseKeylessAccess = true
+	def.Proxy.ListenPath = "/prct"
+	def.MarkAsMCP()
+
+	spec := &APISpec{APIDefinition: &def, OAS: oasAPI}
+	loadedSpecs := ts.Gw.LoadAPI(spec)
+	require.Len(t, loadedSpecs, 1, "Should load 1 API")
+
+	loaded := loadedSpecs[0]
+	require.NotNil(t, loaded, "API should be loaded")
+	assert.True(t, loaded.IsMCP())
+
+	// Debug: Print all generated rxPaths
+	for versionName, rxPaths := range loaded.RxPaths {
+		t.Logf("Version %s has %d rxPaths:", versionName, len(rxPaths))
+		for i, rxPath := range rxPaths {
+			t.Logf("  [%d] Status=%d", i, rxPath.Status)
+			if rxPath.Status == HeaderInjected {
+				t.Logf("      HeaderInjected: Path=%s, Method=%s, Add=%v",
+					rxPath.InjectHeaders.Path, rxPath.InjectHeaders.Method, rxPath.InjectHeaders.AddHeaders)
+			}
+			if rxPath.Status == Internal {
+				t.Logf("      Internal: Path=%s", rxPath.Internal.Path)
+			}
+		}
+	}
+
+	// JSON-RPC request to call weather.getForecast tool
+	payload := map[string]interface{}{
+		"jsonrpc": "2.0",
+		"method":  "tools/call",
+		"params":  map[string]interface{}{"name": "weather.getForecast", "arguments": map[string]string{"location": "London"}},
+		"id":      1,
+	}
+
+	resp, _ := ts.Run(t, test.TestCase{
+		Method: http.MethodPost,
+		Path:   "/prct",
+		Data:   payload,
+		Code:   http.StatusOK,
+	})
+
+	// Parse response body to check headers
+	bodyBytes, err := io.ReadAll(resp.Body)
+	require.NoError(t, err, "Should read response body")
+	resp.Body.Close()
+
+	var respBody map[string]interface{}
+	err = json.Unmarshal(bodyBytes, &respBody)
+	require.NoError(t, err, "Response should be valid JSON")
+
+	t.Logf("Response body: %s", string(bodyBytes))
+
+	// Check that both headers are present in the upstream request
+	headers, ok := respBody["Headers"].(map[string]interface{})
+	require.True(t, ok, "Response should have Headers field")
+
+	// Check for tool-level header
+	assert.Contains(t, headers, "X-Tool-Header", "Should have tool-level header")
+	if toolHeader, ok := headers["X-Tool-Header"].(string); ok {
+		assert.Equal(t, "tool-value", toolHeader)
+	}
+
+	// Check for operation-level header
+	// BUG: This will fail if operation-level headers are not being injected
+	assert.Contains(t, headers, "X-Operation-Header", "Should have operation-level header")
+	if opHeader, ok := headers["X-Operation-Header"].(string); ok {
+		assert.Equal(t, "operation-value", opHeader)
+	}
 }

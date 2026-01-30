@@ -47,3 +47,13 @@ const (
 	ErrMsgInvalidRequest = "Invalid Request"
 	ErrMsgInvalidParams  = "Invalid Params"
 )
+
+// Detailed error messages for invalid params scenarios
+const (
+	ErrMsgMissingParams     = "Missing required params object"
+	ErrMsgMissingParamName  = "Missing required parameter: name"
+	ErrMsgMissingParamURI   = "Missing required parameter: uri"
+	ErrMsgEmptyParamName    = "Parameter 'name' cannot be empty"
+	ErrMsgEmptyParamURI     = "Parameter 'uri' cannot be empty"
+	ErrMsgInvalidParamsType = "Invalid params: expected object"
+)

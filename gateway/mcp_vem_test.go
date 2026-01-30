@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -727,4 +728,187 @@ func Test_URLAllowedAndIgnored_AllMCPPrimitiveTypes(t *testing.T) {
 			assert.NotEqual(t, MCPPrimitiveNotFound, status, "%s primitive should be allowed with MCPRouting", tt.name)
 		})
 	}
+}
+
+func Test_findOperationID(t *testing.T) {
+	tests := []struct {
+		name       string
+		pathItem   *openapi3.PathItem
+		expectedID string
+	}{
+		{
+			name: "GET operation",
+			pathItem: &openapi3.PathItem{
+				Get: &openapi3.Operation{OperationID: "getOperation"},
+			},
+			expectedID: "getOperation",
+		},
+		{
+			name: "POST operation",
+			pathItem: &openapi3.PathItem{
+				Post: &openapi3.Operation{OperationID: "postOperation"},
+			},
+			expectedID: "postOperation",
+		},
+		{
+			name: "multiple operations - returns first",
+			pathItem: &openapi3.PathItem{
+				Get:  &openapi3.Operation{OperationID: "getOp"},
+				Post: &openapi3.Operation{OperationID: "postOp"},
+			},
+			expectedID: "getOp", // GET is checked first
+		},
+		{
+			name: "operation without ID",
+			pathItem: &openapi3.PathItem{
+				Get: &openapi3.Operation{OperationID: ""},
+			},
+			expectedID: "",
+		},
+		{
+			name:       "nil pathItem",
+			pathItem:   nil,
+			expectedID: "",
+		},
+		{
+			name:       "empty pathItem",
+			pathItem:   &openapi3.PathItem{},
+			expectedID: "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if tt.pathItem == nil {
+				// Skip nil test as the function requires non-nil input
+				return
+			}
+			result := findOperationID(tt.pathItem)
+			assert.Equal(t, tt.expectedID, result)
+		})
+	}
+}
+
+func Test_generateMCPOperationVEMs_PathMatching(t *testing.T) {
+	// Test that operation VEMs are generated based on OAS path matching
+	apiSpec := &APISpec{
+		APIDefinition: &apidef.APIDefinition{
+			ApplicationProtocol: apidef.AppProtocolMCP,
+			JsonRpcVersion:      apidef.JsonRPC20,
+			Proxy: apidef.ProxyConfig{
+				ListenPath: "/mcp",
+			},
+		},
+		OAS: oas.OAS{
+			T: openapi3.T{
+				Paths: func() *openapi3.Paths {
+					paths := openapi3.NewPaths()
+					paths.Set("/tools/call", &openapi3.PathItem{
+						Get: &openapi3.Operation{OperationID: "myToolsCallOp"},
+					})
+					return paths
+				}(),
+			},
+		},
+	}
+
+	tykExt := &oas.XTykAPIGateway{
+		Middleware: &oas.Middleware{
+			Operations: map[string]*oas.Operation{
+				"myToolsCallOp": {
+					RateLimit: &oas.RateLimitEndpoint{Enabled: true, Rate: 10, Per: oas.ReadableDuration(time.Minute)},
+				},
+			},
+		},
+	}
+	apiSpec.OAS.SetTykExtension(tykExt)
+
+	loader := APIDefinitionLoader{}
+	specs := loader.generateMCPOperationVEMs(apiSpec, config.Config{})
+
+	// Should generate specs for the /tools/call path
+	require.NotEmpty(t, specs)
+
+	// Find the rate limit spec
+	var foundRateLimit bool
+	for _, spec := range specs {
+		if spec.Status == RateLimit && spec.RateLimit.Path == "/mcp-operation:tools/call" {
+			foundRateLimit = true
+			assert.Equal(t, 10.0, spec.RateLimit.Rate)
+			break
+		}
+	}
+	assert.True(t, foundRateLimit, "should generate rate limit spec for operation VEM")
+}
+
+func Test_generateMCPOperationVEMs_HeaderInjection(t *testing.T) {
+	// Test that operation VEMs generate header injection specs correctly
+	apiSpec := &APISpec{
+		APIDefinition: &apidef.APIDefinition{
+			ApplicationProtocol: apidef.AppProtocolMCP,
+			JsonRpcVersion:      apidef.JsonRPC20,
+			Proxy: apidef.ProxyConfig{
+				ListenPath: "/mcp",
+			},
+		},
+		OAS: oas.OAS{
+			T: openapi3.T{
+				Paths: func() *openapi3.Paths {
+					paths := openapi3.NewPaths()
+					paths.Set("/tools/call", &openapi3.PathItem{
+						Get: &openapi3.Operation{OperationID: "testget"},
+					})
+					return paths
+				}(),
+			},
+		},
+	}
+
+	tykExt := &oas.XTykAPIGateway{
+		Middleware: &oas.Middleware{
+			Operations: map[string]*oas.Operation{
+				"testget": {
+					TransformRequestHeaders: &oas.TransformHeaders{
+						Enabled: true,
+						Add: []oas.Header{
+							{Name: "X-Operation-Header", Value: "operation-value"},
+						},
+					},
+				},
+			},
+		},
+	}
+	apiSpec.OAS.SetTykExtension(tykExt)
+
+	loader := APIDefinitionLoader{}
+	specs := loader.generateMCPOperationVEMs(apiSpec, config.Config{})
+
+	// Should generate specs for the /tools/call path
+	require.NotEmpty(t, specs, "should generate VEM specs")
+
+	// Debug: print all specs
+	t.Logf("Generated %d specs:", len(specs))
+	for i, spec := range specs {
+		t.Logf("  [%d] Status=%d", i, spec.Status)
+		if spec.Status == HeaderInjected {
+			t.Logf("      HeaderInjected: Path=%s, Method=%s, Add=%v",
+				spec.InjectHeaders.Path, spec.InjectHeaders.Method, spec.InjectHeaders.AddHeaders)
+		}
+		if spec.Status == Internal {
+			t.Logf("      Internal: Path=%s, Method=%s", spec.Internal.Path, spec.Internal.Method)
+		}
+	}
+
+	// Find the header injection spec
+	var foundHeaderInjected bool
+	for _, spec := range specs {
+		if spec.Status == HeaderInjected && spec.InjectHeaders.Path == "/mcp-operation:tools/call" {
+			foundHeaderInjected = true
+			assert.Equal(t, http.MethodPost, spec.InjectHeaders.Method)
+			assert.Contains(t, spec.InjectHeaders.AddHeaders, "X-Operation-Header")
+			assert.Equal(t, "operation-value", spec.InjectHeaders.AddHeaders["X-Operation-Header"])
+			break
+		}
+	}
+	assert.True(t, foundHeaderInjected, "should generate header injection spec for operation VEM")
 }
