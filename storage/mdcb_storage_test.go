@@ -407,3 +407,49 @@ func TestCacheCertificate(t *testing.T) {
 		})
 	}
 }
+
+func TestExtractCertID(t *testing.T) {
+	tests := []struct {
+		name     string
+		key      string
+		expected string
+	}{
+		{
+			name:     "Full cert ID with orgID prefix",
+			key:      "raw-org1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890",
+			expected: "abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890",
+		},
+		{
+			name:     "Minimal org ID with full SHA256",
+			key:      "raw-org9876543210abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
+			expected: "9876543210abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
+		},
+		{
+			name:     "No orgID prefix (just SHA256)",
+			key:      "raw-1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
+			expected: "1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
+		},
+		{
+			name:     "Short cert ID (less than 64 chars, test or non-standard)",
+			key:      "raw-shortid",
+			expected: "shortid",
+		},
+		{
+			name:     "Empty cert ID after prefix",
+			key:      "raw-",
+			expected: "",
+		},
+		{
+			name:     "No raw- prefix",
+			key:      "certID",
+			expected: "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := extractCertID(tt.key)
+			assert.Equal(t, tt.expected, got)
+		})
+	}
+}

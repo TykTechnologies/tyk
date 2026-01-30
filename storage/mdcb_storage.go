@@ -88,15 +88,26 @@ func getResourceType(key string) string {
 }
 
 // extractCertID extracts the certificate ID from a key in the format "raw-{orgID}{certID}"
+// Certificate IDs in API definitions are SHA256 hashes (64 hex characters).
+// Storage keys are "raw-{orgID}{certID}", so we extract the last 64 characters.
 func extractCertID(key string) string {
 	// Remove "raw-" prefix
 	if !strings.HasPrefix(key, "raw-") {
 		return ""
 	}
-	// The key format is "raw-{orgID}{certID}" but we can't reliably separate them
-	// So we return the entire string after "raw-" as the cert ID
-	// The certUsageTracker should be registered with the same format
-	return strings.TrimPrefix(key, "raw-")
+
+	withoutPrefix := strings.TrimPrefix(key, "raw-")
+
+	// SHA256 hash is 32 bytes = 64 hex characters
+	const sha256HexLen = 64
+
+	// If the string is shorter than a SHA256 hash, return as-is (might be a test or non-standard cert ID)
+	if len(withoutPrefix) < sha256HexLen {
+		return withoutPrefix
+	}
+
+	// Extract the last 64 characters (the SHA256 hash part)
+	return withoutPrefix[len(withoutPrefix)-sha256HexLen:]
 }
 
 // GetMultiKey gets multiple keys from the MDCB layer
