@@ -8,6 +8,7 @@ import (
 
 	"github.com/TykTechnologies/tyk/ctx"
 	"github.com/TykTechnologies/tyk/internal/crypto"
+	"github.com/TykTechnologies/tyk/internal/errors"
 	"github.com/TykTechnologies/tyk/internal/otel"
 	"github.com/TykTechnologies/tyk/request"
 
@@ -77,6 +78,62 @@ func (a *Record) WithTraceID(req *http.Request) *Record {
 	if traceID != "" {
 		a.fields["trace_id"] = traceID
 	}
+	return a
+}
+
+// WithAPIID adds API identification fields to the access log record.
+func (a *Record) WithAPIID(apiID, apiName, orgID string) *Record {
+	if apiID != "" {
+		a.fields["api_id"] = apiID
+	}
+	if apiName != "" {
+		a.fields["api_name"] = apiName
+	}
+	if orgID != "" {
+		a.fields["org_id"] = orgID
+	}
+	return a
+}
+
+// WithErrorClassification adds structured error classification fields to the access log record.
+// Fields are only added when the classification is non-nil and individual fields are non-empty/non-zero.
+// This enables operators to distinguish between error types (TLS expired, connection refused, timeout, etc.)
+// directly in access logs.
+func (a *Record) WithErrorClassification(ec *errors.ErrorClassification) *Record {
+	if ec == nil {
+		return a
+	}
+
+	// Always add the core classification fields
+	a.fields["response_flag"] = ec.Flag.String()
+	a.fields["response_code_details"] = ec.Details
+
+	// Add optional fields only when non-empty
+	if ec.Source != "" {
+		a.fields["error_source"] = ec.Source
+	}
+	if ec.Target != "" {
+		a.fields["error_target"] = ec.Target
+	}
+
+	// Add upstream status only for non-zero values
+	if ec.UpstreamStatus != 0 {
+		a.fields["upstream_status"] = ec.UpstreamStatus
+	}
+
+	// Add TLS cert info only when present
+	if !ec.TLSCertExpiry.IsZero() {
+		a.fields["tls_cert_expiry"] = ec.TLSCertExpiry.Format("2006-01-02T15:04:05Z07:00")
+	}
+	if ec.TLSCertSubject != "" {
+		a.fields["tls_cert_subject"] = ec.TLSCertSubject
+	}
+
+	// Add circuit breaker state only when present
+	if ec.CircuitBreakerState != "" {
+		a.fields["circuit_breaker_state"] = ec.CircuitBreakerState
+	}
+
 	return a
 }
 

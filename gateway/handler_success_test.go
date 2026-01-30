@@ -3,6 +3,7 @@ package gateway
 import (
 	"context"
 	"net/http"
+	"net/url"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -423,6 +424,154 @@ func TestSuccessHandler_addTraceIDTag(t *testing.T) {
 
 			if diff := cmp.Diff(tags, want); diff != "" {
 				t.Fatalf("tags mismatch (-got +want):\n%s", diff)
+			}
+		})
+	}
+}
+
+func TestSuccessHandler_classifyUpstreamError(t *testing.T) {
+	tests := []struct {
+		name           string
+		statusCode     int
+		urlHost        string
+		specTargetHost string
+		wantClassified bool
+		wantTarget     string
+	}{
+		{
+			name:           "500 Internal Server Error with URL host",
+			statusCode:     500,
+			urlHost:        "api.example.com",
+			specTargetHost: "",
+			wantClassified: true,
+			wantTarget:     "api.example.com",
+		},
+		{
+			name:           "502 Bad Gateway with URL host",
+			statusCode:     502,
+			urlHost:        "backend.example.com",
+			specTargetHost: "",
+			wantClassified: true,
+			wantTarget:     "backend.example.com",
+		},
+		{
+			name:           "503 Service Unavailable with URL host",
+			statusCode:     503,
+			urlHost:        "service.example.com",
+			specTargetHost: "",
+			wantClassified: true,
+			wantTarget:     "service.example.com",
+		},
+		{
+			name:           "504 Gateway Timeout with URL host",
+			statusCode:     504,
+			urlHost:        "upstream.example.com",
+			specTargetHost: "",
+			wantClassified: true,
+			wantTarget:     "upstream.example.com",
+		},
+		{
+			name:           "500 with empty URL host falls back to spec target",
+			statusCode:     500,
+			urlHost:        "",
+			specTargetHost: "fallback.example.com",
+			wantClassified: true,
+			wantTarget:     "fallback.example.com",
+		},
+		{
+			name:           "500 with empty URL host and no spec target",
+			statusCode:     500,
+			urlHost:        "",
+			specTargetHost: "",
+			wantClassified: true,
+			wantTarget:     "",
+		},
+		{
+			name:           "200 OK should not be classified",
+			statusCode:     200,
+			urlHost:        "api.example.com",
+			specTargetHost: "",
+			wantClassified: false,
+			wantTarget:     "",
+		},
+		{
+			name:           "201 Created should not be classified",
+			statusCode:     201,
+			urlHost:        "api.example.com",
+			specTargetHost: "",
+			wantClassified: false,
+			wantTarget:     "",
+		},
+		{
+			name:           "400 Bad Request should not be classified",
+			statusCode:     400,
+			urlHost:        "api.example.com",
+			specTargetHost: "",
+			wantClassified: false,
+			wantTarget:     "",
+		},
+		{
+			name:           "404 Not Found should not be classified",
+			statusCode:     404,
+			urlHost:        "api.example.com",
+			specTargetHost: "",
+			wantClassified: false,
+			wantTarget:     "",
+		},
+		{
+			name:           "499 (boundary) should not be classified",
+			statusCode:     499,
+			urlHost:        "api.example.com",
+			specTargetHost: "",
+			wantClassified: false,
+			wantTarget:     "",
+		},
+		{
+			name:           "599 (max 5xx) should be classified",
+			statusCode:     599,
+			urlHost:        "api.example.com",
+			specTargetHost: "",
+			wantClassified: true,
+			wantTarget:     "api.example.com",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			// Create request with URL
+			req, err := http.NewRequest("GET", "/test", nil)
+			assert.NoError(t, err)
+
+			req.URL.Host = tc.urlHost
+
+			// Create spec with optional target
+			spec := &APISpec{
+				APIDefinition: &apidef.APIDefinition{},
+			}
+			if tc.specTargetHost != "" {
+				spec.target = &url.URL{Host: tc.specTargetHost}
+			}
+
+			// Create handler
+			handler := &SuccessHandler{
+				BaseMiddleware: &BaseMiddleware{
+					Spec: spec,
+				},
+			}
+
+			// Call the method
+			handler.classifyUpstreamError(req, tc.statusCode)
+
+			// Verify the result
+			errClass := ctxpkg.GetErrorClassification(req)
+
+			if tc.wantClassified {
+				assert.NotNil(t, errClass, "expected error classification to be set")
+				if errClass != nil {
+					assert.Equal(t, tc.wantTarget, errClass.Target, "target mismatch")
+				}
+			} else {
+				assert.Nil(t, errClass, "expected no error classification")
 			}
 		})
 	}

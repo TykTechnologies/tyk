@@ -5,15 +5,16 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 
+	"github.com/TykTechnologies/tyk-pump/analytics"
+	"github.com/TykTechnologies/tyk/internal/errors"
 	"github.com/TykTechnologies/tyk/internal/httputil/accesslog"
 	"github.com/TykTechnologies/tyk/internal/otel"
 	"github.com/TykTechnologies/tyk/request"
-
-	"github.com/TykTechnologies/tyk-pump/analytics"
 )
 
 func TestRecord(t *testing.T) {
@@ -107,4 +108,177 @@ func TestWithTraceID(t *testing.T) {
 			assert.Equal(t, tc.expectTraceID, exists)
 		})
 	}
+}
+
+func TestWithAPIID(t *testing.T) {
+	tests := []struct {
+		name           string
+		apiID          string
+		apiName        string
+		orgID          string
+		expectedFields logrus.Fields
+	}{
+		{
+			name:    "all fields populated",
+			apiID:   "api-123",
+			apiName: "Test API",
+			orgID:   "org-456",
+			expectedFields: logrus.Fields{
+				"prefix":   "access-log",
+				"api_id":   "api-123",
+				"api_name": "Test API",
+				"org_id":   "org-456",
+			},
+		},
+		{
+			name:    "empty fields omitted",
+			apiID:   "api-123",
+			apiName: "",
+			orgID:   "",
+			expectedFields: logrus.Fields{
+				"prefix": "access-log",
+				"api_id": "api-123",
+			},
+		},
+		{
+			name:    "all fields empty",
+			apiID:   "",
+			apiName: "",
+			orgID:   "",
+			expectedFields: logrus.Fields{
+				"prefix": "access-log",
+			},
+		},
+		{
+			name:    "only org_id populated",
+			apiID:   "",
+			apiName: "",
+			orgID:   "org-789",
+			expectedFields: logrus.Fields{
+				"prefix": "access-log",
+				"org_id": "org-789",
+			},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			record := accesslog.NewRecord().WithAPIID(tc.apiID, tc.apiName, tc.orgID)
+			fields := record.Fields(nil)
+			assert.Equal(t, tc.expectedFields, fields)
+		})
+	}
+}
+
+func TestWithAPIID_BuilderChaining(t *testing.T) {
+	record := accesslog.NewRecord()
+	result := record.WithAPIID("api-123", "Test API", "org-456")
+
+	assert.Same(t, record, result, "WithAPIID should return the same Record for chaining")
+}
+
+func TestWithErrorClassification(t *testing.T) {
+	tests := []struct {
+		name           string
+		classification *errors.ErrorClassification
+		expectedFields logrus.Fields
+	}{
+		{
+			name:           "nil classification adds no fields",
+			classification: nil,
+			expectedFields: logrus.Fields{
+				"prefix": "access-log",
+			},
+		},
+		{
+			name: "basic classification adds core fields",
+			classification: errors.NewErrorClassification(errors.UCF, "connection_refused").
+				WithSource("ReverseProxy").
+				WithTarget("api.backend.com:443"),
+			expectedFields: logrus.Fields{
+				"prefix":                "access-log",
+				"response_flag":         "UCF",
+				"response_code_details": "connection_refused",
+				"error_source":          "ReverseProxy",
+				"error_target":          "api.backend.com:443",
+			},
+		},
+		{
+			name: "TLS error includes cert info",
+			classification: errors.NewErrorClassification(errors.TLE, "tls_certificate_expired").
+				WithSource("ReverseProxy").
+				WithTarget("api.backend.com:443").
+				WithTLSInfo(time.Date(2024, 1, 15, 0, 0, 0, 0, time.UTC), "CN=api.backend.com"),
+			expectedFields: logrus.Fields{
+				"prefix":                "access-log",
+				"response_flag":         "TLE",
+				"response_code_details": "tls_certificate_expired",
+				"error_source":          "ReverseProxy",
+				"error_target":          "api.backend.com:443",
+				"tls_cert_expiry":       "2024-01-15T00:00:00Z",
+				"tls_cert_subject":      "CN=api.backend.com",
+			},
+		},
+		{
+			name: "circuit breaker includes state",
+			classification: errors.NewErrorClassification(errors.CBO, "circuit_breaker_open").
+				WithSource("ReverseProxy").
+				WithTarget("api.backend.com:443").
+				WithCircuitBreakerState("OPEN"),
+			expectedFields: logrus.Fields{
+				"prefix":                "access-log",
+				"response_flag":         "CBO",
+				"response_code_details": "circuit_breaker_open",
+				"error_source":          "ReverseProxy",
+				"error_target":          "api.backend.com:443",
+				"circuit_breaker_state": "OPEN",
+			},
+		},
+		{
+			name: "upstream response includes status",
+			classification: errors.NewErrorClassification(errors.URS, "upstream_response_503").
+				WithSource("Upstream"). // Upstream responded with error, not a proxy error
+				WithTarget("api.backend.com:443").
+				WithUpstreamStatus(503),
+			expectedFields: logrus.Fields{
+				"prefix":                "access-log",
+				"response_flag":         "URS",
+				"response_code_details": "upstream_response_503",
+				"error_source":          "Upstream",
+				"error_target":          "api.backend.com:443",
+				"upstream_status":       503,
+			},
+		},
+		{
+			name: "empty optional fields omitted",
+			classification: errors.NewErrorClassification(errors.UCF, "connection_refused").
+				WithSource("ReverseProxy").
+				WithTarget(""),
+			expectedFields: logrus.Fields{
+				"prefix":                "access-log",
+				"response_flag":         "UCF",
+				"response_code_details": "connection_refused",
+				"error_source":          "ReverseProxy",
+			},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			record := accesslog.NewRecord().WithErrorClassification(tc.classification)
+			fields := record.Fields(nil)
+			assert.Equal(t, tc.expectedFields, fields)
+		})
+	}
+}
+
+func TestWithErrorClassification_BuilderChaining(t *testing.T) {
+	ec := errors.NewErrorClassification(errors.UCF, "connection_refused").
+		WithSource("ReverseProxy").
+		WithTarget("api.backend.com:443")
+
+	record := accesslog.NewRecord()
+	result := record.WithErrorClassification(ec)
+
+	assert.Same(t, record, result, "WithErrorClassification should return the same Record for chaining")
 }
