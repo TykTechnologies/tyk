@@ -1945,13 +1945,16 @@ func (p *ReverseProxy) initUpstreamCertBatcher() {
 	}
 
 	var err error
+	cfg := p.Gw.GetConfig()
 	p.TykAPISpec.UpstreamCertExpiryBatcher, err = certcheck.NewCertificateExpiryCheckBatcherWithRole(
 		p.logger,
 		apiData,
-		p.Gw.GetConfig().Security.CertificateExpiryMonitor,
+		cfg.Security.CertificateExpiryMonitor,
 		store,
 		p.TykAPISpec.FireEvent,
 		certcheck.CertRoleUpstream,
+		nil, // Upstream certs don't use selective sync
+		nil,
 	)
 
 	if err != nil {
