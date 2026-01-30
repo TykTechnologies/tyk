@@ -45,6 +45,10 @@ type Bundle struct {
 }
 
 // Verify performs signature verification on the bundle file.
+// When signature verification is disabled (no PublicKeyPath configured), this function
+// uses a memory-efficient streaming approach that computes the checksum without loading
+// all bundle files into memory. When signature verification is enabled, the full bundle
+// data must be buffered since goverify requires the complete data as a byte slice.
 func (b *Bundle) Verify(bundleFs afero.Fs) error {
 	log.WithFields(logrus.Fields{
 		"prefix": "main",
@@ -52,27 +56,62 @@ func (b *Bundle) Verify(bundleFs afero.Fs) error {
 
 	var useSignature = b.Gw.GetConfig().PublicKeyPath != ""
 
-	var (
-		verifier goverify.Verifier
-		err      error
-	)
-
 	if useSignature {
-		// Perform signature verification if a public key path is set:
-		if b.Manifest.Signature == "" {
-			// Error: A public key is set, but the bundle isn't signed.
-			return errors.New("Bundle isn't signed")
+		return b.verifyWithSignature(bundleFs)
+	}
+
+	return b.verifyChecksumOnly(bundleFs)
+}
+
+// verifyChecksumOnly performs a memory-efficient checksum verification by streaming
+// file contents directly into the hash function without buffering the entire bundle.
+func (b *Bundle) verifyChecksumOnly(bundleFs afero.Fs) error {
+	hasher := md5.New()
+
+	for _, fileName := range b.Manifest.FileList {
+		extractedPath := filepath.Join(b.Path, fileName)
+
+		f, err := bundleFs.Open(extractedPath)
+		if err != nil {
+			return err
 		}
-		verifier, err = b.Gw.SignatureVerifier()
+
+		_, err = io.Copy(hasher, f)
+		f.Close()
 		if err != nil {
 			return err
 		}
 	}
 
+	checksum := fmt.Sprintf("%x", hasher.Sum(nil))
+	if checksum != b.Manifest.Checksum {
+		return errors.New("Invalid checksum")
+	}
+
+	return nil
+}
+
+// verifyWithSignature performs both checksum and signature verification.
+// This requires buffering the entire bundle data since goverify.Verify needs
+// the complete data as a byte slice.
+func (b *Bundle) verifyWithSignature(bundleFs afero.Fs) error {
+	// Perform signature verification if a public key path is set:
+	if b.Manifest.Signature == "" {
+		// Error: A public key is set, but the bundle isn't signed.
+		return errors.New("Bundle isn't signed")
+	}
+
+	var verifier goverify.Verifier
+	var err error
+	verifier, err = b.Gw.SignatureVerifier()
+	if err != nil {
+		return err
+	}
+
 	var bundleData bytes.Buffer
 
-	for _, f := range b.Manifest.FileList {
-		extractedPath := filepath.Join(b.Path, f)
+	for _, fileName := range b.Manifest.FileList {
+		extractedPath := filepath.Join(b.Path, fileName)
 
 		f, err := bundleFs.Open(extractedPath)
 		if err != nil {
@@ -90,14 +129,11 @@ func (b *Bundle) Verify(bundleFs afero.Fs) error {
 		return errors.New("Invalid checksum")
 	}
 
-	if useSignature {
-		signed, err := base64.StdEncoding.DecodeString(b.Manifest.Signature)
-		if err != nil {
-			return err
-		}
-		return verifier.Verify(bundleData.Bytes(), signed)
+	signed, err := base64.StdEncoding.DecodeString(b.Manifest.Signature)
+	if err != nil {
+		return err
 	}
-	return nil
+	return verifier.Verify(bundleData.Bytes(), signed)
 }
 
 // AddToSpec attaches the custom middleware settings to an API definition.
