@@ -120,6 +120,21 @@
         "span_processor_type": {
           "type": "string"
         },
+        "span_batch_config": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "max_queue_size": {
+              "type": "integer"
+            },
+            "max_export_batch_size": {
+              "type": "integer"
+            },
+            "batch_timeout": {
+              "type": "integer"
+            }
+          }
+        },
         "context_propagation": {
           "type": "string"
         },
