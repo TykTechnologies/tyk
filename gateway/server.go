@@ -1587,15 +1587,15 @@ func (gw *Gateway) afterConfSetup() {
 			conf.SlaveOptions.RPCGlobalCacheExpiration = 30
 		}
 
-		if conf.SlaveOptions.RPCCertFetchMaxElapsedTime == 0 {
+		if conf.SlaveOptions.RPCCertFetchMaxElapsedTime <= 0 {
 			conf.SlaveOptions.RPCCertFetchMaxElapsedTime = 30
 		}
 
-		if conf.SlaveOptions.RPCCertFetchInitialInterval == 0 {
+		if conf.SlaveOptions.RPCCertFetchInitialInterval <= 0 {
 			conf.SlaveOptions.RPCCertFetchInitialInterval = 0.1
 		}
 
-		if conf.SlaveOptions.RPCCertFetchMaxInterval == 0 {
+		if conf.SlaveOptions.RPCCertFetchMaxInterval <= 0 {
 			conf.SlaveOptions.RPCCertFetchMaxInterval = 2
 		}
 	}
