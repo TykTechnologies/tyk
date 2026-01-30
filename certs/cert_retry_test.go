@@ -746,3 +746,222 @@ func BenchmarkCertificateCacheHit(b *testing.B) {
 		}
 	}
 }
+
+// TestMaxRetriesLimit verifies that the maxRetries configuration limits retry attempts correctly
+func TestMaxRetriesLimit(t *testing.T) {
+	certPEM := loadTestCert(t)
+
+	testCases := []struct {
+		name           string
+		maxRetries     int
+		failureCount   int // How many times to fail before succeeding
+		expectedCalls  int // Expected total GetKey calls
+		shouldSucceed  bool
+	}{
+		{
+			name:          "maxRetries=3 with 2 failures - should succeed on 3rd attempt",
+			maxRetries:    3,
+			failureCount:  2,
+			expectedCalls: 3, // Initial + 2 retries = 3 total
+			shouldSucceed: true,
+		},
+		{
+			name:          "maxRetries=3 with 3 failures - should succeed on 4th attempt",
+			maxRetries:    3,
+			failureCount:  3,
+			expectedCalls: 4, // Initial + 3 retries = 4 total
+			shouldSucceed: true,
+		},
+		{
+			name:          "maxRetries=3 with 4 failures - should fail (exceeds limit)",
+			maxRetries:    3,
+			failureCount:  4,
+			expectedCalls: 4, // Initial + 3 retries = 4 total, then stops
+			shouldSucceed: false,
+		},
+		{
+			name:          "maxRetries=1 with 1 failure - should succeed on 2nd attempt",
+			maxRetries:    1,
+			failureCount:  1,
+			expectedCalls: 2, // Initial + 1 retry = 2 total
+			shouldSucceed: true,
+		},
+		{
+			name:          "maxRetries=1 with 2 failures - should fail (exceeds limit)",
+			maxRetries:    1,
+			failureCount:  2,
+			expectedCalls: 2, // Initial + 1 retry = 2 total, then stops
+			shouldSucceed: false,
+		},
+		{
+			name:          "maxRetries=0 (unlimited) with many failures - should eventually succeed",
+			maxRetries:    0,
+			failureCount:  10,
+			expectedCalls: 11, // All attempts until success
+			shouldSucceed: true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			mockStorage := &MockMDCBStorage{
+				clearAfter: tc.failureCount,
+				certData:   certPEM,
+				t:          t,
+			}
+
+			// Set short intervals for faster test execution
+			handler := NewCertificateManager(
+				mockStorage,
+				"secret",
+				nil,
+				false,
+				time.Second*2,        // maxElapsedTime - short but enough for retries
+				time.Millisecond*50,  // initialInterval
+				time.Millisecond*100, // maxInterval
+				true,                 // retryEnabled
+				tc.maxRetries,        // maxRetries
+			)
+
+			certIDs := []string{"test-cert-id"}
+			certs := handler.List(certIDs, CertificatePrivate)
+
+			t.Logf("Total GetKey calls: %d (expected: %d)", mockStorage.callCount, tc.expectedCalls)
+
+			// Verify call count
+			if mockStorage.callCount != tc.expectedCalls {
+				t.Errorf("Expected %d GetKey calls, got %d", tc.expectedCalls, mockStorage.callCount)
+			}
+
+			// Verify success/failure
+			if tc.shouldSucceed {
+				if len(certs) != 1 || certs[0] == nil {
+					t.Errorf("Expected certificate to be loaded successfully")
+				}
+			} else {
+				if len(certs) == 1 && certs[0] != nil {
+					t.Errorf("Expected certificate loading to fail (exceed maxRetries)")
+				}
+			}
+		})
+	}
+}
+
+// TestRetryEnabledFlag verifies that retry can be disabled via the retryEnabled flag
+func TestRetryEnabledFlag(t *testing.T) {
+	certPEM := loadTestCert(t)
+
+	testCases := []struct {
+		name          string
+		retryEnabled  bool
+		failureCount  int
+		expectedCalls int
+		shouldSucceed bool
+	}{
+		{
+			name:          "retry enabled - should retry and succeed",
+			retryEnabled:  true,
+			failureCount:  3,
+			expectedCalls: 4, // Initial + 3 retries
+			shouldSucceed: true,
+		},
+		{
+			name:          "retry disabled - should fail immediately on first error",
+			retryEnabled:  false,
+			failureCount:  1,
+			expectedCalls: 1, // Only initial attempt, no retries
+			shouldSucceed: false,
+		},
+		{
+			name:          "retry disabled with immediate success - should succeed",
+			retryEnabled:  false,
+			failureCount:  0,
+			expectedCalls: 1, // Only initial attempt
+			shouldSucceed: true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			mockStorage := &MockMDCBStorage{
+				clearAfter: tc.failureCount,
+				certData:   certPEM,
+				t:          t,
+			}
+
+			handler := NewCertificateManager(
+				mockStorage,
+				"secret",
+				nil,
+				false,
+				time.Second*2,        // maxElapsedTime
+				time.Millisecond*50,  // initialInterval
+				time.Millisecond*100, // maxInterval
+				tc.retryEnabled,      // retryEnabled
+				3,                    // maxRetries (doesn't matter if retry disabled)
+			)
+
+			certIDs := []string{"test-cert-id"}
+			certs := handler.List(certIDs, CertificatePrivate)
+
+			t.Logf("Total GetKey calls: %d (expected: %d)", mockStorage.callCount, tc.expectedCalls)
+
+			// Verify call count
+			if mockStorage.callCount != tc.expectedCalls {
+				t.Errorf("Expected %d GetKey calls, got %d", tc.expectedCalls, mockStorage.callCount)
+			}
+
+			// Verify success/failure
+			if tc.shouldSucceed {
+				if len(certs) != 1 || certs[0] == nil {
+					t.Errorf("Expected certificate to be loaded successfully")
+				}
+			} else {
+				if len(certs) == 1 && certs[0] != nil {
+					t.Errorf("Expected certificate loading to fail (retry disabled)")
+				}
+			}
+		})
+	}
+}
+
+// TestConfigDefaults verifies that default values are used correctly
+func TestConfigDefaults(t *testing.T) {
+	certPEM := loadTestCert(t)
+
+	// Test with defaults (should behave like maxRetries=3)
+	mockStorage := &MockMDCBStorage{
+		clearAfter: 2,
+		certData:   certPEM,
+		t:          t,
+	}
+
+	// Use the default values from constants
+	handler := NewCertificateManager(
+		mockStorage,
+		"secret",
+		nil,
+		false,
+		time.Second*10,                    // maxElapsedTime
+		time.Millisecond*100,              // initialInterval
+		time.Millisecond*500,              // maxInterval
+		DefaultRPCCertFetchRetryEnabled,   // Should be true
+		DefaultRPCCertFetchMaxRetries,     // Should be 3
+	)
+
+	certIDs := []string{"test-cert-id"}
+	certs := handler.List(certIDs, CertificatePrivate)
+
+	// Should succeed after 3 attempts (2 failures + 1 success)
+	if len(certs) != 1 || certs[0] == nil {
+		t.Errorf("Expected certificate to be loaded successfully with defaults")
+	}
+
+	expectedCalls := 3
+	if mockStorage.callCount != expectedCalls {
+		t.Errorf("Expected %d GetKey calls with defaults, got %d", expectedCalls, mockStorage.callCount)
+	}
+
+	t.Logf("SUCCESS: Default config values work correctly (retryEnabled=%v, maxRetries=%d)",
+		DefaultRPCCertFetchRetryEnabled, DefaultRPCCertFetchMaxRetries)
+}

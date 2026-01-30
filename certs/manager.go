@@ -464,15 +464,18 @@ func (c *certificateManager) List(certIDs []string, mode CertificateType) (out [
 			continue
 		}
 
-		val, err := c.storage.GetKey("raw-" + id)
-
 		// TT-14618: Retry with exponential backoff when MDCB connection is not ready.
 		//
 		// During gateway startup, MDCB RPC connection may still be initializing when
 		// SSL certificates are loaded. The retry logic waits for MDCB to become ready.
-		if err != nil && errors.Is(err, storage.ErrMDCBConnectionLost) && c.certFetchRetryEnabled {
-			c.logger.Debug("MDCB not ready for certificate fetch, retrying with exponential backoff...")
+		var val string
+		var err error
 
+		// Handle simple case first: retry disabled
+		if !c.certFetchRetryEnabled {
+			val, err = c.storage.GetKey("raw-" + id)
+		} else {
+			// Retry enabled - use exponential backoff
 			operation := func() error {
 				val, err = c.storage.GetKey("raw-" + id)
 				if errors.Is(err, storage.ErrMDCBConnectionLost) {
@@ -493,7 +496,9 @@ func (c *certificateManager) List(certIDs []string, mode CertificateType) (out [
 			}
 
 			if retryErr := backoff.Retry(operation, backoffStrategy); retryErr != nil {
-				c.logger.Warn("Timeout waiting for MDCB connection for certificate:", id)
+				if errors.Is(err, storage.ErrMDCBConnectionLost) {
+					c.logger.Warn("Timeout waiting for MDCB connection for certificate:", id)
+				}
 			}
 		}
 
