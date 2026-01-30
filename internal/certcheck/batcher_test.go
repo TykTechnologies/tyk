@@ -577,6 +577,7 @@ func TestCertificateExpiryCheckBatcher(t *testing.T) {
 					ExpiredAt:       expiredSince,
 					DaysSinceExpiry: 2,
 					APIID:           "123abc",
+					CertRole:        CertRoleClient,
 				}, actualEventMeta)
 			})
 
@@ -657,6 +658,7 @@ func TestCertificateExpiryCheckBatcher(t *testing.T) {
 					ExpiresAt:     expiry,
 					DaysRemaining: 2,
 					APIID:         "123abc",
+					CertRole:      CertRoleClient,
 				}, actualEventMeta)
 			})
 
@@ -737,6 +739,7 @@ func TestCertificateExpiryCheckBatcher(t *testing.T) {
 					ExpiresAt:     expiry,
 					DaysRemaining: 2,
 					APIID:         "123abc",
+					CertRole:      CertRoleClient,
 				}, actualEventMeta)
 			})
 		})

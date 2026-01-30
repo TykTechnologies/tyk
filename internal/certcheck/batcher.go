@@ -101,12 +101,21 @@ type CertificateExpiryCheckBatcher struct {
 	fallbackCooldownCache CooldownCache
 	flushTicker           *time.Ticker
 	fireEvent             FireEventFunc
-	certUsage certUsageTracker    // can be nil in non-RPC mode
-	gwConfig   *config.Config // can be nil
+	certificateRole       string             // Role of certificate: "server", "client", "ca", "upstream"
+	certUsage             certUsageTracker   // can be nil in non-RPC mode
+	gwConfig              *config.Config     // can be nil
 }
 
 // NewCertificateExpiryCheckBatcher creates a new CertificateExpiryCheckBatcher.
-func NewCertificateExpiryCheckBatcher(logger *logrus.Entry, apiMetaData APIMetaData, cfg config.CertificateExpiryMonitorConfig, fallbackStorage storage.Handler, eventFunc FireEventFunc, certUsage certUsageTracker, gwConfig *config.Config) (*CertificateExpiryCheckBatcher, error) {
+// This function maintains backward compatibility by defaulting to "client" certificate role.
+// For other certificate roles, use NewCertificateExpiryCheckBatcherWithRole.
+func NewCertificateExpiryCheckBatcher(logger *logrus.Entry, apiMetaData APIMetaData, cfg config.CertificateExpiryMonitorConfig, fallbackStorage storage.Handler, eventFunc FireEventFunc) (*CertificateExpiryCheckBatcher, error) {
+	return NewCertificateExpiryCheckBatcherWithRole(logger, apiMetaData, cfg, fallbackStorage, eventFunc, CertRoleClient, nil, nil)
+}
+
+// NewCertificateExpiryCheckBatcherWithRole creates a new CertificateExpiryCheckBatcher with a specific certificate role.
+// The certificateRole parameter specifies the role of certificates being monitored: "client", "server", "ca", or "upstream".
+func NewCertificateExpiryCheckBatcherWithRole(logger *logrus.Entry, apiMetaData APIMetaData, cfg config.CertificateExpiryMonitorConfig, fallbackStorage storage.Handler, eventFunc FireEventFunc, certificateRole string, certUsage certUsageTracker, gwConfig *config.Config) (*CertificateExpiryCheckBatcher, error) {
 	inMemoryCache, err := NewInMemoryCooldownCache()
 	if err != nil {
 		return nil, err
@@ -130,7 +139,8 @@ func NewCertificateExpiryCheckBatcher(logger *logrus.Entry, apiMetaData APIMetaD
 		fallbackCooldownCache: fallbackCache,
 		flushTicker:           time.NewTicker(30 * time.Second),
 		fireEvent:             eventFunc,
-		certUsage:            certUsage,
+		certificateRole:       certificateRole,
+		certUsage:             certUsage,
 		gwConfig:              gwConfig,
 	}, nil
 }
@@ -316,6 +326,7 @@ func (c *CertificateExpiryCheckBatcher) handleEventForExpiredCertificate(certInf
 		ExpiredAt:       certInfo.NotAfter,
 		DaysSinceExpiry: daysSinceExpiry,
 		APIID:           c.apiMetaData.APIID,
+		CertRole:        c.certificateRole,
 	}
 
 	c.fireEvent(event.CertificateExpired, eventMeta)
@@ -352,6 +363,7 @@ func (c *CertificateExpiryCheckBatcher) handleEventForSoonToExpireCertificate(ce
 		ExpiresAt:     certInfo.NotAfter,
 		DaysRemaining: daysUntilExpiry,
 		APIID:         c.apiMetaData.APIID,
+		CertRole:      c.certificateRole,
 	}
 
 	c.fireEvent(event.CertificateExpiringSoon, eventMeta)
