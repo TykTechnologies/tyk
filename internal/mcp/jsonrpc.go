@@ -13,26 +13,16 @@ const (
 	// JSONRPCInternalError indicates an internal JSON-RPC error.
 	JSONRPCInternalError = -32603
 	// JSONRPCServerError is the base code for server errors (-32000 to -32099).
-	JSONRPCServerError = -32000
 )
 
 // MCP JSON-RPC method names as defined in the Model Context Protocol specification.
 const (
 	// Tool methods
 	MethodToolsCall = "tools/call"
-	MethodToolsList = "tools/list"
 
 	// Resource methods
-	MethodResourcesRead        = "resources/read"
-	MethodResourcesList        = "resources/list"
-	MethodResourcesSubscribe   = "resources/subscribe"
-	MethodResourcesUnsubscribe = "resources/unsubscribe"
+	MethodResourcesRead = "resources/read"
 
 	// Prompt methods
-	MethodPromptsGet  = "prompts/get"
-	MethodPromptsList = "prompts/list"
-
-	// Lifecycle methods
-	MethodInitialize = "initialize"
-	MethodPing       = "ping"
+	MethodPromptsGet = "prompts/get"
 )
