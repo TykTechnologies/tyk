@@ -10,6 +10,7 @@ import (
 	"time"
 
 	temporalmodel "github.com/TykTechnologies/storage/temporal/model"
+	"github.com/TykTechnologies/tyk/certs"
 	"github.com/TykTechnologies/tyk/internal/cache"
 	"github.com/TykTechnologies/tyk/internal/model"
 	"github.com/TykTechnologies/tyk/rpc"
@@ -1163,7 +1164,7 @@ func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string, orgId string) 
 		if r.Gw.GetConfig().SlaveOptions.UseRPC &&
 			r.Gw.GetConfig().SlaveOptions.SyncUsedCertsOnly {
 			if r.Gw.certUsageTracker != nil && !r.Gw.certUsageTracker.Required(certId) {
-				log.WithField("cert_id", maskCertID(certId)).
+				log.WithField("cert_id", certs.MaskCertID(certId)).
 					Debug("skipping certificate - not used by loaded APIs")
 				continue
 			}
@@ -1171,7 +1172,7 @@ func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string, orgId string) 
 			if r.Gw.certUsageTracker != nil {
 				apis := r.Gw.certUsageTracker.APIs(certId)
 				log.WithFields(logrus.Fields{
-					"cert_id": maskCertID(certId),
+					"cert_id": certs.MaskCertID(certId),
 					"apis":    apis,
 				}).Info("syncing required certificate")
 			}

@@ -689,9 +689,3 @@ func getCipherAliases(ciphers []string) (cipherCodes []uint16) {
 // maskCertID masks certificate ID for logging to avoid exposing sensitive data.
 // Certificate IDs can be derived from API keys/auth tokens and should not be logged in clear text.
 // Returns first 8 characters plus length for debugging while protecting sensitive data.
-func maskCertID(certID string) string {
-	if len(certID) <= 8 {
-		return certID
-	}
-	return certID[:8] + "***[len=" + strconv.Itoa(len(certID)) + "]"
-}
