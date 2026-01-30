@@ -43,10 +43,12 @@ func TestValidateMCPObject(t *testing.T) {
 			URL: "http://upstream.url",
 		},
 		Middleware: &oas.Middleware{
-			McpTools: map[string]*oas.Operation{
+			McpTools: map[string]*oas.MCPPrimitive{
 				"test-tool": {
-					Allow: &oas.Allowance{
-						Enabled: true,
+					Operation: oas.Operation{
+						Allow: &oas.Allowance{
+							Enabled: true,
+						},
 					},
 				},
 			},
@@ -70,10 +72,12 @@ func TestValidateMCPObject(t *testing.T) {
 		mcpWithResources := validOASObject
 		extWithResources := validXTykAPIGateway
 		extWithResources.Middleware = &oas.Middleware{
-			McpResources: map[string]*oas.Operation{
+			McpResources: map[string]*oas.MCPPrimitive{
 				"test-resource": {
-					Allow: &oas.Allowance{
-						Enabled: true,
+					Operation: oas.Operation{
+						Allow: &oas.Allowance{
+							Enabled: true,
+						},
 					},
 				},
 			},
@@ -93,10 +97,12 @@ func TestValidateMCPObject(t *testing.T) {
 		mcpWithPrompts := validOASObject
 		extWithPrompts := validXTykAPIGateway
 		extWithPrompts.Middleware = &oas.Middleware{
-			McpPrompts: map[string]*oas.Operation{
+			McpPrompts: map[string]*oas.MCPPrimitive{
 				"test-prompt": {
-					Allow: &oas.Allowance{
-						Enabled: true,
+					Operation: oas.Operation{
+						Allow: &oas.Allowance{
+							Enabled: true,
+						},
 					},
 				},
 			},
@@ -116,19 +122,25 @@ func TestValidateMCPObject(t *testing.T) {
 		mcpWithAll := validOASObject
 		extWithAll := validXTykAPIGateway
 		extWithAll.Middleware = &oas.Middleware{
-			McpTools: map[string]*oas.Operation{
+			McpTools: map[string]*oas.MCPPrimitive{
 				"tool1": {
-					Allow: &oas.Allowance{Enabled: true},
+					Operation: oas.Operation{
+						Allow: &oas.Allowance{Enabled: true},
+					},
 				},
 			},
-			McpResources: map[string]*oas.Operation{
+			McpResources: map[string]*oas.MCPPrimitive{
 				"resource1": {
-					Allow: &oas.Allowance{Enabled: true},
+					Operation: oas.Operation{
+						Allow: &oas.Allowance{Enabled: true},
+					},
 				},
 			},
-			McpPrompts: map[string]*oas.Operation{
+			McpPrompts: map[string]*oas.MCPPrimitive{
 				"prompt1": {
-					Allow: &oas.Allowance{Enabled: true},
+					Operation: oas.Operation{
+						Allow: &oas.Allowance{Enabled: true},
+					},
 				},
 			},
 		}
@@ -301,12 +313,6 @@ func Test_loadMCPSchema(t *testing.T) {
 			assert.NoError(t, err, "x-tyk-api-gateway should exist in properties for version %s", mcpVersion)
 			assert.NotNil(t, xTykAPIGateway, "x-tyk-api-gateway should not be nil for version %s", mcpVersion)
 
-			// Check x-tyk-mcp extension is in properties
-			var xTykMCP []byte
-			xTykMCP, _, _, err = jsonparser.Get(schemaData, keyProperties, ExtensionTykMCP)
-			assert.NoError(t, err, "x-tyk-mcp should exist in properties for version %s", mcpVersion)
-			assert.NotNil(t, xTykMCP, "x-tyk-mcp should not be nil for version %s", mcpVersion)
-
 			// Detect which definitions key this version uses
 			defsKey := GetDefinitionsKey(schemaData)
 
@@ -315,12 +321,6 @@ func Test_loadMCPSchema(t *testing.T) {
 			xTykServer, _, _, err = jsonparser.Get(schemaData, defsKey, "X-Tyk-Server")
 			assert.NoError(t, err, "X-Tyk-Server should exist in %s for version %s", defsKey, mcpVersion)
 			assert.NotNil(t, xTykServer, "X-Tyk-Server should not be nil for version %s", mcpVersion)
-
-			// Check X-Tyk-MCP-Tool is in the correct definitions location
-			var xTykMCPTool []byte
-			xTykMCPTool, _, _, err = jsonparser.Get(schemaData, defsKey, "X-Tyk-MCP-Tool")
-			assert.NoError(t, err, "X-Tyk-MCP-Tool should exist in %s for version %s", defsKey, mcpVersion)
-			assert.NotNil(t, xTykMCPTool, "X-Tyk-MCP-Tool should not be nil for version %s", mcpVersion)
 
 			// Verify the correct key is used based on version
 			if strings.HasPrefix(mcpVersion, "3.0") {
@@ -453,7 +453,7 @@ func TestGetMCPSchema_ContainsMCPExtensions(t *testing.T) {
 	err := loadMCPSchema()
 	assert.NoError(t, err)
 
-	t.Run("MCP schema contains both x-tyk-api-gateway and x-tyk-mcp extensions", func(t *testing.T) {
+	t.Run("MCP schema contains x-tyk-api-gateway extension", func(t *testing.T) {
 		t.Parallel()
 		schema, err := GetMCPSchema("3.0")
 		assert.NoError(t, err)
@@ -461,29 +461,5 @@ func TestGetMCPSchema_ContainsMCPExtensions(t *testing.T) {
 		// Verify x-tyk-api-gateway property exists
 		_, _, _, err = jsonparser.Get(schema, keyProperties, ExtensionTykAPIGateway)
 		assert.NoError(t, err, "x-tyk-api-gateway should be present in MCP schema")
-
-		// Verify x-tyk-mcp property exists
-		_, _, _, err = jsonparser.Get(schema, keyProperties, ExtensionTykMCP)
-		assert.NoError(t, err, "x-tyk-mcp should be present in MCP schema")
-
-		// Verify MCP-specific definitions exist
-		defsKey := GetDefinitionsKey(schema)
-		_, _, _, err = jsonparser.Get(schema, defsKey, "X-Tyk-MCP-Tools")
-		assert.NoError(t, err, "X-Tyk-MCP-Tools definition should exist")
-
-		_, _, _, err = jsonparser.Get(schema, defsKey, "X-Tyk-MCP-Tool")
-		assert.NoError(t, err, "X-Tyk-MCP-Tool definition should exist")
-
-		_, _, _, err = jsonparser.Get(schema, defsKey, "X-Tyk-MCP-Prompts")
-		assert.NoError(t, err, "X-Tyk-MCP-Prompts definition should exist")
-
-		_, _, _, err = jsonparser.Get(schema, defsKey, "X-Tyk-MCP-Prompt")
-		assert.NoError(t, err, "X-Tyk-MCP-Prompt definition should exist")
-
-		_, _, _, err = jsonparser.Get(schema, defsKey, "X-Tyk-MCP-Resources")
-		assert.NoError(t, err, "X-Tyk-MCP-Resources definition should exist")
-
-		_, _, _, err = jsonparser.Get(schema, defsKey, "X-Tyk-MCP-Resource")
-		assert.NoError(t, err, "X-Tyk-MCP-Resource definition should exist")
 	})
 }
