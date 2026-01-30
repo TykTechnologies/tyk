@@ -9,6 +9,8 @@ import (
 )
 
 // certUsageTracker tracks which certificates are used by which APIs.
+// This interface duplicates certs.UsageTracker to avoid circular dependency
+// (storage -> certs -> storage).
 type certUsageTracker interface {
 	Required(certID string) bool
 	APIs(certID string) []string
