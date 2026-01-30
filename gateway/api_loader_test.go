@@ -9728,3 +9728,67 @@ func TestNewRelicMounting(t *testing.T) {
 		}
 	})
 }
+
+func TestListenPathConflictWhenCustomDomainIsDisabled(t *testing.T) {
+	ts := StartTest(nil)
+	t.Cleanup(ts.Close)
+
+	localClient := test.NewClientLocal()
+	createNewMockedServer := func(name string) *httptest.Server {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusOK)
+			w.Write([]byte(name))
+		}))
+
+		return server
+	}
+
+	listenPaths := map[string]string{
+		"/caa":                   "",
+		"/caas2itsamu0456n07gfe": "",
+		"/caas2itsamu04567m9pxl": "",
+		"/caas2itsamu0456qnu2sj": "",
+	}
+
+	var mockedApis []func(spec *APISpec)
+
+	for listenPath := range listenPaths {
+		cutPrefix, _ := strings.CutPrefix(listenPath, "/")
+		mockedResponse := fmt.Sprintf("{\"match\":\"%s\"}", cutPrefix)
+
+		mockedServer := createNewMockedServer(mockedResponse)
+		defer mockedServer.Close()
+
+		mockedApis = append(mockedApis, func(spec *APISpec) {
+			spec.APIID = fmt.Sprintf("api-%s", cutPrefix)
+			spec.Proxy.ListenPath = listenPath
+			spec.IsOAS = false
+			spec.Proxy.TargetURL = mockedServer.URL
+			spec.Proxy.DisableStripSlash = true
+			spec.Proxy.StripListenPath = true
+		})
+
+		listenPaths[listenPath] = mockedResponse
+	}
+
+	t.Run("all true except custom domain", func(t *testing.T) {
+		globalConf := ts.Gw.GetConfig()
+		globalConf.EnableCustomDomains = false
+		globalConf.HttpServerOptions.EnableStrictRoutes = true
+		globalConf.HttpServerOptions.EnablePathSuffixMatching = true
+		globalConf.HttpServerOptions.EnablePathPrefixMatching = true
+
+		ts.Gw.SetConfig(globalConf)
+		defer ts.ResetTestConfig()
+
+		ts.Gw.BuildAndLoadAPI(mockedApis...)
+
+		var tcs []test.TestCase
+
+		for lp, resp := range listenPaths {
+			tcs = append(tcs, test.TestCase{Client: localClient, Code: 200, Path: lp, BodyMatch: resp})
+		}
+
+		_, _ = ts.Run(t, tcs...)
+	})
+}
