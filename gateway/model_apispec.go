@@ -142,6 +142,94 @@ func (a *APISpec) FindSpecMatchesStatus(r *http.Request, rxPaths []URLSpec, mode
 	return nil, false
 }
 
+// FindAllVEMChainSpecs returns all URLSpecs matching the given status from the VEM chain.
+// For MCP APIs with JSON-RPC routing, this returns specs from all VEMs in the chain
+// (operation VEM + tool VEM), allowing middleware to be applied at each stage.
+// For non-MCP APIs, it returns only the spec matching the current path.
+func (a *APISpec) FindAllVEMChainSpecs(r *http.Request, rxPaths []URLSpec, mode URLStatus) []*URLSpec {
+	// Check if this is a JSON-RPC routed request with a VEM chain
+	rpcData := httpctx.GetJSONRPCRequest(r)
+
+	log.Infof("[DEBUG] FindAllVEMChainSpecs: mode=%v, path=%s, hasRPCData=%v", mode, r.URL.Path, rpcData != nil)
+	if rpcData != nil {
+		log.Infof("[DEBUG] FindAllVEMChainSpecs: VEMChain=%v, VEMPath=%s", rpcData.VEMChain, rpcData.VEMPath)
+	}
+
+	if rpcData == nil || len(rpcData.VEMChain) == 0 {
+		// Not a JSON-RPC request, use normal logic
+		log.Infof("[DEBUG] FindAllVEMChainSpecs: No VEM chain, using normal logic")
+		if spec, ok := a.FindSpecMatchesStatus(r, rxPaths, mode); ok {
+			return []*URLSpec{spec}
+		}
+		return nil
+	}
+
+	// For JSON-RPC requests, find all specs matching VEMs in the chain
+	method := http.MethodPost // JSON-RPC always uses POST
+	var specs []*URLSpec
+
+	log.Infof("[DEBUG] FindAllVEMChainSpecs: Checking %d VEMs in chain", len(rpcData.VEMChain))
+	for _, vemPath := range rpcData.VEMChain {
+		log.Infof("[DEBUG] FindAllVEMChainSpecs: Looking for specs matching VEM: %s", vemPath)
+		for i := range rxPaths {
+			if rxPaths[i].Status != mode {
+				continue
+			}
+			if !rxPaths[i].matchesMethod(method) {
+				continue
+			}
+
+			// Check if this spec matches the VEM path
+			// We need to get the path from the spec based on the mode
+			specPath, specMethod := a.getSpecPathAndMethod(&rxPaths[i], mode)
+			if specPath == vemPath && specMethod == method {
+				log.Infof("[DEBUG] FindAllVEMChainSpecs: Found matching spec at path=%s", specPath)
+				specs = append(specs, &rxPaths[i])
+				break // Found spec for this VEM, move to next
+			}
+		}
+	}
+
+	log.Infof("[DEBUG] FindAllVEMChainSpecs: Returning %d specs", len(specs))
+	return specs
+}
+
+// getSpecPathAndMethod extracts the path and method from a URLSpec based on the mode.
+func (a *APISpec) getSpecPathAndMethod(spec *URLSpec, mode URLStatus) (string, string) {
+	switch mode {
+	case RateLimit:
+		return spec.RateLimit.Path, spec.RateLimit.Method
+	case HeaderInjected:
+		return spec.InjectHeaders.Path, spec.InjectHeaders.Method
+	case HeaderInjectedResponse:
+		return spec.InjectHeadersResponse.Path, spec.InjectHeadersResponse.Method
+	case Transformed:
+		return spec.TransformAction.Path, spec.TransformAction.Method
+	case TransformedResponse:
+		return spec.TransformResponseAction.Path, spec.TransformResponseAction.Method
+	case Cached:
+		if meta := spec.CacheConfig.CacheOnlyResponseCodes; len(meta) > 0 {
+			// CacheConfig doesn't have Path/Method, use the URLSpec's regex matcher instead
+			// This is a limitation - we can't directly get path from cache config
+			// For now, skip caching in VEM chain - it can be added later if needed
+		}
+		return "", ""
+	case CircuitBreaker:
+		return spec.CircuitBreaker.Path, spec.CircuitBreaker.Method
+	case URLRewrite:
+		if spec.URLRewrite != nil {
+			return spec.URLRewrite.Path, spec.URLRewrite.Method
+		}
+	case HardTimeout:
+		return spec.HardTimeout.Path, spec.HardTimeout.Method
+	case RequestSizeLimit:
+		return spec.RequestSize.Path, spec.RequestSize.Method
+	case VirtualPath:
+		return spec.VirtualPathSpec.Path, spec.VirtualPathSpec.Method
+	}
+	return "", ""
+}
+
 // isJSONRPCVEMPath returns true if the request is a JSON-RPC routed request
 // targeting a protocol VEM path. In this case, the listen path should not be
 // stripped as the VEM path is already in its final form.

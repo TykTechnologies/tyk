@@ -49,19 +49,35 @@ func (t *TransformHeaders) ProcessRequest(w http.ResponseWriter, r *http.Request
 		}
 	}
 
+	// Use generic VEM chain helper to get all matching header injection specs
+	// This works for both MCP APIs (checks all VEMs in chain) and non-MCP APIs (checks current path)
 	versionPaths := t.Spec.RxPaths[vInfo.Name]
-	found, meta := t.Spec.CheckSpecMatchesStatus(r, versionPaths, HeaderInjected)
-	if found {
-		hmeta := meta.(*apidef.HeaderInjectionMeta)
-		for _, dKey := range hmeta.DeleteHeaders {
-			r.Header.Del(dKey)
-			logger.Debugf("Removing: %s", dKey)
-		}
-		for nKey, nVal := range hmeta.AddHeaders {
-			setCustomHeader(r.Header, nKey, t.Gw.ReplaceTykVariables(r, nVal, false), ignoreCanonical)
-			logger.Debugf("Adding: %s: %s", nKey, nVal)
-		}
+	specs := t.Spec.FindAllVEMChainSpecs(r, versionPaths, HeaderInjected)
+
+	logger.Infof("[DEBUG] HeaderTransform: Found %d matching specs for path %s", len(specs), r.URL.Path)
+
+	// Apply headers from all matching specs sequentially
+	// For MCP: applies operation-level headers, then tool-level headers
+	// For non-MCP: applies only the matched path's headers
+	for i, spec := range specs {
+		logger.Infof("[DEBUG] HeaderTransform: Applying spec %d/%d - Path: %s, Method: %s, Headers: %+v",
+			i+1, len(specs), spec.InjectHeaders.Path, spec.InjectHeaders.Method, spec.InjectHeaders.AddHeaders)
+		t.applyHeaderMeta(r, &spec.InjectHeaders, ignoreCanonical)
 	}
 
 	return nil, http.StatusOK
+}
+
+// applyHeaderMeta applies header deletions and additions from a HeaderInjectionMeta.
+func (t *TransformHeaders) applyHeaderMeta(r *http.Request, hmeta *apidef.HeaderInjectionMeta, ignoreCanonical bool) {
+	logger := t.Logger()
+
+	for _, dKey := range hmeta.DeleteHeaders {
+		r.Header.Del(dKey)
+		logger.Debugf("Removing: %s", dKey)
+	}
+	for nKey, nVal := range hmeta.AddHeaders {
+		setCustomHeader(r.Header, nKey, t.Gw.ReplaceTykVariables(r, nVal, false), ignoreCanonical)
+		logger.Debugf("Adding: %s: %s", nKey, nVal)
+	}
 }
