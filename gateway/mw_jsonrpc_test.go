@@ -470,7 +470,7 @@ func TestJSONRPCMiddleware_ProcessRequest_ResourcesRead_ExactMatch(t *testing.T)
 	// Check routing state has NextVEM set to resource VEM
 	state := httpctx.GetJSONRPCRoutingState(r)
 	require.NotNil(t, state, "Routing state should be set")
-	assert.Equal(t, mcp.ResourcePrefix + "file:///config.json", state.NextVEM, "NextVEM should be resource VEM")
+	assert.Equal(t, mcp.ResourcePrefix+"file:///config.json", state.NextVEM, "NextVEM should be resource VEM")
 }
 
 func TestJSONRPCMiddleware_ProcessRequest_ResourcesRead_WildcardMatch(t *testing.T) {
@@ -514,7 +514,7 @@ func TestJSONRPCMiddleware_ProcessRequest_ResourcesRead_WildcardMatch(t *testing
 	// Check routing state has NextVEM set to resource VEM
 	state := httpctx.GetJSONRPCRoutingState(r)
 	require.NotNil(t, state)
-	assert.Equal(t, mcp.ResourcePrefix + "file:///repo/*", state.NextVEM)
+	assert.Equal(t, mcp.ResourcePrefix+"file:///repo/*", state.NextVEM)
 }
 
 func TestJSONRPCMiddleware_ProcessRequest_ResourcesRead_ExactBeatsWildcard(t *testing.T) {
@@ -562,7 +562,7 @@ func TestJSONRPCMiddleware_ProcessRequest_ResourcesRead_ExactBeatsWildcard(t *te
 	// Check routing state has NextVEM set to exact match resource VEM
 	state := httpctx.GetJSONRPCRoutingState(r)
 	require.NotNil(t, state)
-	assert.Equal(t, mcp.ResourcePrefix + "file:///repo/README.md", state.NextVEM)
+	assert.Equal(t, mcp.ResourcePrefix+"file:///repo/README.md", state.NextVEM)
 }
 
 func TestJSONRPCMiddleware_ProcessRequest_ResourcesRead_MostSpecificWildcard(t *testing.T) {
@@ -607,7 +607,7 @@ func TestJSONRPCMiddleware_ProcessRequest_ResourcesRead_MostSpecificWildcard(t *
 	// Check routing state has NextVEM set to most specific wildcard resource VEM
 	state := httpctx.GetJSONRPCRoutingState(r)
 	require.NotNil(t, state)
-	assert.Equal(t, mcp.ResourcePrefix + "file:///repo/docs/*", state.NextVEM)
+	assert.Equal(t, mcp.ResourcePrefix+"file:///repo/docs/*", state.NextVEM)
 }
 
 func TestJSONRPCMiddleware_ProcessRequest_PromptsGet(t *testing.T) {
@@ -651,7 +651,7 @@ func TestJSONRPCMiddleware_ProcessRequest_PromptsGet(t *testing.T) {
 	// Check routing state has NextVEM set to prompt VEM
 	state := httpctx.GetJSONRPCRoutingState(r)
 	require.NotNil(t, state)
-	assert.Equal(t, mcp.PromptPrefix + "code-review", state.NextVEM)
+	assert.Equal(t, mcp.PromptPrefix+"code-review", state.NextVEM)
 }
 
 func TestJSONRPCMiddleware_ProcessRequest_OperationVEM(t *testing.T) {
@@ -1241,7 +1241,7 @@ func TestJSONRPCMiddleware_RateLimitEnforcedOnVEM(t *testing.T) {
 	require.NotNil(t, mw)
 	require.Len(t, mw.McpTools, 2)
 
-	req := httptest.NewRequest(http.MethodPost, mcp.ToolPrefix + "get-weather", nil)
+	req := httptest.NewRequest(http.MethodPost, mcp.ToolPrefix+"get-weather", nil)
 	httpctx.SetJsonRPCRouting(req, true) // Simulate JSON-RPC routing context
 	var rxPaths []URLSpec
 	for _, paths := range loaded.RxPaths {

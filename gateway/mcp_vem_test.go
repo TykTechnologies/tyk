@@ -124,16 +124,16 @@ func Test_generateMCPVEMs_GeneratesVEMsAndMiddlewareSpecs(t *testing.T) {
 	require.NotEmpty(t, specs)
 
 	// Registry contains raw VEM paths (no sanitization).
-	assert.Equal(t, mcp.ToolPrefix + "get-weather", apiSpec.MCPPrimitives["tool:get-weather"])
-	assert.Equal(t, mcp.ResourcePrefix + "file:///repo/*", apiSpec.MCPPrimitives["resource:file:///repo/*"])
-	assert.Equal(t, mcp.PromptPrefix + "code-review", apiSpec.MCPPrimitives["prompt:code-review"])
+	assert.Equal(t, mcp.ToolPrefix+"get-weather", apiSpec.MCPPrimitives["tool:get-weather"])
+	assert.Equal(t, mcp.ResourcePrefix+"file:///repo/*", apiSpec.MCPPrimitives["resource:file:///repo/*"])
+	assert.Equal(t, mcp.PromptPrefix+"code-review", apiSpec.MCPPrimitives["prompt:code-review"])
 
 	// Base internal entry exists for access control.
-	r := httptest.NewRequest(http.MethodPost, mcp.ToolPrefix + "get-weather", nil)
+	r := httptest.NewRequest(http.MethodPost, mcp.ToolPrefix+"get-weather", nil)
 	base, ok := apiSpec.FindSpecMatchesStatus(r, specs, Internal)
 	require.True(t, ok)
 	assert.Equal(t, http.MethodPost, base.Internal.Method)
-	assert.Equal(t, mcp.ToolPrefix + "get-weather", base.Internal.Path)
+	assert.Equal(t, mcp.ToolPrefix+"get-weather", base.Internal.Path)
 
 	// RateLimit middleware spec exists for the VEM path.
 	rl, ok := apiSpec.FindSpecMatchesStatus(r, specs, RateLimit)
@@ -168,7 +168,7 @@ func Test_generateMCPVEMs_RateLimitedToolVEM(t *testing.T) {
 	specs := loader.generateMCPVEMs(apiSpec, config.Config{})
 	require.NotEmpty(t, specs)
 
-	r := httptest.NewRequest(http.MethodPost, mcp.ToolPrefix + "get-weather", nil)
+	r := httptest.NewRequest(http.MethodPost, mcp.ToolPrefix+"get-weather", nil)
 	rl, ok := apiSpec.FindSpecMatchesStatus(r, specs, RateLimit)
 	require.True(t, ok)
 	assert.Equal(t, http.MethodPost, rl.RateLimit.Method)
@@ -184,9 +184,9 @@ func Test_URLAllowedAndIgnored_MCPPrimitive_DirectAccess_ReturnsNotFoundStatus(t
 	}
 
 	loader := APIDefinitionLoader{}
-	rxPaths := loader.buildPrimitiveSpec("get-weather", "tool", mcp.ToolPrefix + "get-weather")
+	rxPaths := loader.buildPrimitiveSpec("get-weather", "tool", mcp.ToolPrefix+"get-weather")
 
-	r := httptest.NewRequest(http.MethodPost, mcp.ToolPrefix + "get-weather", nil)
+	r := httptest.NewRequest(http.MethodPost, mcp.ToolPrefix+"get-weather", nil)
 	status, _ := apiSpec.URLAllowedAndIgnored(r, rxPaths, false)
 	assert.Equal(t, MCPPrimitiveNotFound, status)
 }
@@ -199,9 +199,9 @@ func Test_URLAllowedAndIgnored_MCPPrimitive_MCPRouting_Allows(t *testing.T) {
 	}
 
 	loader := APIDefinitionLoader{}
-	rxPaths := loader.buildPrimitiveSpec("get-weather", "tool", mcp.ToolPrefix + "get-weather")
+	rxPaths := loader.buildPrimitiveSpec("get-weather", "tool", mcp.ToolPrefix+"get-weather")
 
-	r := httptest.NewRequest(http.MethodPost, mcp.ToolPrefix + "get-weather", nil)
+	r := httptest.NewRequest(http.MethodPost, mcp.ToolPrefix+"get-weather", nil)
 	httpctx.SetJsonRPCRouting(r, true)
 	status, _ := apiSpec.URLAllowedAndIgnored(r, rxPaths, false)
 	assert.NotEqual(t, MCPPrimitiveNotFound, status)
@@ -223,10 +223,10 @@ func Test_VersionCheck_MCPPrimitiveDirectAccess_Returns404(t *testing.T) {
 	}
 
 	loader := APIDefinitionLoader{}
-	spec.RxPaths["Default"] = loader.buildPrimitiveSpec("get-weather", "tool", mcp.ToolPrefix + "get-weather")
+	spec.RxPaths["Default"] = loader.buildPrimitiveSpec("get-weather", "tool", mcp.ToolPrefix+"get-weather")
 	spec.WhiteListEnabled["Default"] = false
 
-	r := httptest.NewRequest(http.MethodPost, mcp.ToolPrefix + "get-weather", nil)
+	r := httptest.NewRequest(http.MethodPost, mcp.ToolPrefix+"get-weather", nil)
 	ctxSetVersionInfo(r, &apidef.VersionInfo{Name: "Default"})
 
 	vc := &VersionCheck{BaseMiddleware: &BaseMiddleware{Spec: spec}}
@@ -245,14 +245,14 @@ func Test_MCPPrimitiveRegex_IsLiteral(t *testing.T) {
 	require.Len(t, toolSpecs, 1)
 	require.NotNil(t, toolSpecs[0].spec)
 	assert.True(t, toolSpecs[0].spec.MatchString(tool))
-	assert.False(t, toolSpecs[0].spec.MatchString(mcp.ToolPrefix + "toolXwithXdots"))
+	assert.False(t, toolSpecs[0].spec.MatchString(mcp.ToolPrefix+"toolXwithXdots"))
 
 	resPath := mcp.ResourcePrefix + "file:///repo/*"
 	resSpecs := loader.buildPrimitiveSpec("file:///repo/*", "resource", resPath)
 	require.Len(t, resSpecs, 1)
 	require.NotNil(t, resSpecs[0].spec)
 	assert.True(t, resSpecs[0].spec.MatchString(resPath))
-	assert.False(t, resSpecs[0].spec.MatchString(mcp.ResourcePrefix + "file:///repo/anything"))
+	assert.False(t, resSpecs[0].spec.MatchString(mcp.ResourcePrefix+"file:///repo/anything"))
 }
 
 func Test_MCPPrefixes_NotEmpty(t *testing.T) {
@@ -280,7 +280,7 @@ func Test_MCPWhiteListMatching(t *testing.T) {
 	t.Logf("WhiteList spec: %+v", whiteList[0])
 	t.Logf("WhiteList regex pattern: %v", whiteList[0].spec)
 
-	r := httptest.NewRequest(http.MethodPost, mcp.ToolPrefix + "tool-allowed", nil)
+	r := httptest.NewRequest(http.MethodPost, mcp.ToolPrefix+"tool-allowed", nil)
 	status, _ := apiSpec.URLAllowedAndIgnored(r, whiteList, true)
 	assert.Equal(t, StatusOk, status, "WhiteList should match and return StatusOk")
 }
@@ -307,7 +307,7 @@ func Test_MCPAllowListWithCatchAll(t *testing.T) {
 	loader := APIDefinitionLoader{}
 
 	// Build specs for tool-allowed (with Allow) - gets Internal + WhiteList
-	allowedInternal := loader.buildPrimitiveSpec("tool-allowed", "tool", mcp.ToolPrefix + "tool-allowed")
+	allowedInternal := loader.buildPrimitiveSpec("tool-allowed", "tool", mcp.ToolPrefix+"tool-allowed")
 	allowedWhiteList := loader.compileExtendedPathSpec(false, []apidef.EndPointMeta{
 		{Path: mcp.ToolPrefix + "tool-allowed", Method: http.MethodPost, Disabled: false},
 	}, WhiteList, conf)
@@ -318,21 +318,21 @@ func Test_MCPAllowListWithCatchAll(t *testing.T) {
 	rxPaths = append(rxPaths, allowedWhiteList...)
 
 	t.Run("tool-allowed with WhiteList passes", func(t *testing.T) {
-		r := httptest.NewRequest(http.MethodPost, mcp.ToolPrefix + "tool-allowed", nil)
+		r := httptest.NewRequest(http.MethodPost, mcp.ToolPrefix+"tool-allowed", nil)
 		httpctx.SetJsonRPCRouting(r, true)
 		status, _ := apiSpec.URLAllowedAndIgnored(r, rxPaths, true)
 		assert.Equal(t, StatusOk, status)
 	})
 
 	t.Run("tool-not-allowed returns EndPointNotAllowed", func(t *testing.T) {
-		r := httptest.NewRequest(http.MethodPost, mcp.ToolPrefix + "tool-not-allowed", nil)
+		r := httptest.NewRequest(http.MethodPost, mcp.ToolPrefix+"tool-not-allowed", nil)
 		httpctx.SetJsonRPCRouting(r, true)
 		status, _ := apiSpec.URLAllowedAndIgnored(r, rxPaths, true)
 		assert.Equal(t, EndPointNotAllowed, status)
 	})
 
 	t.Run("unregistered-tool returns EndPointNotAllowed", func(t *testing.T) {
-		r := httptest.NewRequest(http.MethodPost, mcp.ToolPrefix + "unregistered", nil)
+		r := httptest.NewRequest(http.MethodPost, mcp.ToolPrefix+"unregistered", nil)
 		httpctx.SetJsonRPCRouting(r, true)
 		status, _ := apiSpec.URLAllowedAndIgnored(r, rxPaths, true)
 		assert.Equal(t, EndPointNotAllowed, status)
@@ -593,9 +593,9 @@ func Test_URLAllowedAndIgnored_MCPPrimitive_LoopingAlone_DoesNotAllow(t *testing
 	}
 
 	loader := APIDefinitionLoader{}
-	rxPaths := loader.buildPrimitiveSpec("get-weather", "tool", mcp.ToolPrefix + "get-weather")
+	rxPaths := loader.buildPrimitiveSpec("get-weather", "tool", mcp.ToolPrefix+"get-weather")
 
-	r := httptest.NewRequest(http.MethodPost, mcp.ToolPrefix + "get-weather", nil)
+	r := httptest.NewRequest(http.MethodPost, mcp.ToolPrefix+"get-weather", nil)
 	ctxSetLoopLevel(r, 1) // Generic looping enabled, but NOT MCP routing
 	status, _ := apiSpec.URLAllowedAndIgnored(r, rxPaths, false)
 	assert.Equal(t, MCPPrimitiveNotFound, status, "MCP primitive should not be accessible via generic looping alone")
@@ -662,9 +662,9 @@ func Test_URLAllowedAndIgnored_MCPPrimitive_WhitelistMode_MCPRouting_WithoutWhit
 	}
 
 	loader := APIDefinitionLoader{}
-	rxPaths := loader.buildPrimitiveSpec("get-weather", "tool", mcp.ToolPrefix + "get-weather")
+	rxPaths := loader.buildPrimitiveSpec("get-weather", "tool", mcp.ToolPrefix+"get-weather")
 
-	r := httptest.NewRequest(http.MethodPost, mcp.ToolPrefix + "get-weather", nil)
+	r := httptest.NewRequest(http.MethodPost, mcp.ToolPrefix+"get-weather", nil)
 	httpctx.SetJsonRPCRouting(r, true)
 	status, _ := apiSpec.URLAllowedAndIgnored(r, rxPaths, true) // whiteListStatus = true
 	// No WhiteList entry means blocked in whitelist mode (endpoint not allowed at end of loop)
@@ -680,9 +680,9 @@ func Test_URLAllowedAndIgnored_MCPPrimitive_WhitelistMode_NoMCPRouting_Blocks(t 
 	}
 
 	loader := APIDefinitionLoader{}
-	rxPaths := loader.buildPrimitiveSpec("get-weather", "tool", mcp.ToolPrefix + "get-weather")
+	rxPaths := loader.buildPrimitiveSpec("get-weather", "tool", mcp.ToolPrefix+"get-weather")
 
-	r := httptest.NewRequest(http.MethodPost, mcp.ToolPrefix + "get-weather", nil)
+	r := httptest.NewRequest(http.MethodPost, mcp.ToolPrefix+"get-weather", nil)
 	// No MCPRouting set
 	status, _ := apiSpec.URLAllowedAndIgnored(r, rxPaths, true) // whiteListStatus = true
 	assert.Equal(t, MCPPrimitiveNotFound, status, "MCP primitive should return 404 in whitelist mode without MCPRouting")
@@ -697,9 +697,9 @@ func Test_URLAllowedAndIgnored_MCPPrimitive_WhitelistMode_LoopingAlone_Blocks(t 
 	}
 
 	loader := APIDefinitionLoader{}
-	rxPaths := loader.buildPrimitiveSpec("get-weather", "tool", mcp.ToolPrefix + "get-weather")
+	rxPaths := loader.buildPrimitiveSpec("get-weather", "tool", mcp.ToolPrefix+"get-weather")
 
-	r := httptest.NewRequest(http.MethodPost, mcp.ToolPrefix + "get-weather", nil)
+	r := httptest.NewRequest(http.MethodPost, mcp.ToolPrefix+"get-weather", nil)
 	ctxSetLoopLevel(r, 1)                                       // Generic looping but NOT MCPRouting
 	status, _ := apiSpec.URLAllowedAndIgnored(r, rxPaths, true) // whiteListStatus = true
 	assert.Equal(t, MCPPrimitiveNotFound, status, "MCP primitive should not be accessible via generic looping in whitelist mode")
