@@ -98,6 +98,9 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 		contentType = strings.Split(contentType, ";")[0]
 
 		switch contentType {
+		case header.ApplicationSoapXML:
+			templateExtension = "xml"
+			contentType = header.ApplicationSoapXML
 		case header.ApplicationXML:
 			templateExtension = "xml"
 			contentType = header.ApplicationXML
