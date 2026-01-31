@@ -1501,10 +1501,8 @@ func (a APIDefinitionLoader) getExtendedPathSpecs(apiVersionDef apidef.VersionIn
 	combinedPath = append(combinedPath, oasMockResponsePaths...)
 	combinedPath = append(combinedPath, mcpVEMs...)
 
-	// Enable whitelist mode if there are whitelist paths.
-	// Note: MCP allow list uses explicit BlackList entries for primitives without Allow,
-	// rather than relying on whitelist mode, so unregistered primitives can passthrough.
-	whiteListEnabled := len(whiteListPaths) > 0
+	// Enable whitelist mode if there are whitelist paths or operation-level allows
+	whiteListEnabled := len(whiteListPaths) > 0 || apiSpec.OperationsAllowListEnabled
 
 	return combinedPath, whiteListEnabled
 }

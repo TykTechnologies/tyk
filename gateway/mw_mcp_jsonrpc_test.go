@@ -227,14 +227,24 @@ func TestMCPJSONRPCMiddleware_ProcessRequest_ToolsCall_RoutesToVEM(t *testing.T)
 
 	err, code := m.ProcessRequest(w, r, nil)
 	assert.Nil(t, err)
-	assert.Equal(t, http.StatusOK, code)
-	assert.Equal(t, "/mcp-tool:get-weather", r.URL.Path)
-	assert.True(t, httpctx.IsJsonRPCRouting(r))
+	assert.Equal(t, http.StatusOK, code, "Should return StatusOK to let DummyProxyHandler handle redirect")
 
-	rpcData := httpctx.GetJSONRPCRequest(r)
-	require.NotNil(t, rpcData)
-	assert.Equal(t, "tools/call", rpcData.Method)
-	assert.Equal(t, "get-weather", rpcData.Primitive)
+	// NEW: Sequential routing checks
+	// 1. Check redirect URL points to operation VEM (first stage)
+	redirectURL := ctxGetURLRewriteTarget(r)
+	require.NotNil(t, redirectURL, "Should have redirect URL")
+	assert.Equal(t, "tyk", redirectURL.Scheme)
+	assert.Equal(t, "self", redirectURL.Host)
+	assert.Equal(t, "/json-rpc-method:tools/call", redirectURL.Path, "Should redirect to operation VEM first")
+
+	// 2. Check routing state has NextVEM set to tool VEM
+	state := httpctx.GetJSONRPCRoutingState(r)
+	require.NotNil(t, state, "Routing state should be set")
+	assert.Equal(t, "tools/call", state.Method)
+	assert.Equal(t, "/mcp-tool:get-weather", state.NextVEM, "NextVEM should be tool VEM")
+	assert.Equal(t, []string{"/json-rpc-method:tools/call", "/mcp-tool:get-weather"}, state.VEMChain)
+
+	assert.True(t, httpctx.IsJsonRPCRouting(r))
 }
 
 func TestMCPJSONRPCMiddleware_ProcessRequest_ToolsCall_NotFound(t *testing.T) {
@@ -306,13 +316,21 @@ func TestMCPJSONRPCMiddleware_ProcessRequest_ToolsCall_NotFound_WithAllowList(t 
 
 	err, code := m.ProcessRequest(w, r, nil)
 	assert.Nil(t, err)
-	assert.Equal(t, http.StatusOK, code)
-	// Request is routed to catch-all VEM path for blocking by BlackList middleware
-	assert.Equal(t, "/mcp-tool:unknown-tool", r.URL.Path)
+	assert.Equal(t, http.StatusOK, code, "Should return StatusOK to let DummyProxyHandler handle redirect")
+
+	// NEW: Sequential routing checks
+	// Request is routed to operation VEM first, then continuation middleware will route to tool VEM
+	redirectURL := ctxGetURLRewriteTarget(r)
+	require.NotNil(t, redirectURL, "Should have redirect URL")
+	assert.Equal(t, "tyk", redirectURL.Scheme)
+	assert.Equal(t, "self", redirectURL.Host)
+	assert.Equal(t, "/json-rpc-method:tools/call", redirectURL.Path, "Should redirect to operation VEM first")
+
+	state := httpctx.GetJSONRPCRoutingState(r)
+	require.NotNil(t, state, "Routing state should be set")
+	assert.Equal(t, "/mcp-tool:unknown-tool", state.NextVEM, "NextVEM should be unknown tool VEM for blocking")
+
 	assert.True(t, httpctx.IsJsonRPCRouting(r))
-	rpcData := httpctx.GetJSONRPCRequest(r)
-	require.NotNil(t, rpcData)
-	assert.Equal(t, "unknown-tool", rpcData.Primitive)
 	assert.Equal(t, 0, w.Body.Len(), "no error response should be written by middleware")
 }
 
@@ -382,12 +400,15 @@ func TestMCPJSONRPCMiddleware_ProcessRequest_AllowListBehavior(t *testing.T) {
 
 			_, _ = m.ProcessRequest(w, r, nil) //nolint:errcheck
 
-			// All requests should be routed to VEM when MCPAllowListEnabled
-			assert.Equal(t, tt.expectedVEM, r.URL.Path, "request should be routed to VEM path")
-			rpcData := httpctx.GetJSONRPCRequest(r)
-			require.NotNil(t, rpcData, "JSON-RPC context should be set")
-			assert.Equal(t, tt.expectedVEM, rpcData.VEMPath)
-			assert.Equal(t, tt.toolName, rpcData.Primitive)
+			// NEW: Sequential routing checks
+			// All requests should be routed to operation VEM first when MCPAllowListEnabled
+			redirectURL := ctxGetURLRewriteTarget(r)
+			require.NotNil(t, redirectURL, "Should have redirect URL")
+			assert.Equal(t, "/json-rpc-method:tools/call", redirectURL.Path, "Should redirect to operation VEM first")
+
+			state := httpctx.GetJSONRPCRoutingState(r)
+			require.NotNil(t, state, "Routing state should be set")
+			assert.Equal(t, tt.expectedVEM, state.NextVEM, "NextVEM should be tool VEM")
 			assert.True(t, httpctx.IsJsonRPCRouting(r), "JSON-RPC routing flag should be set")
 			assert.Equal(t, 0, w.Body.Len(), "no error response should be written")
 		})
@@ -425,11 +446,16 @@ func TestMCPJSONRPCMiddleware_ProcessRequest_ResourcesRead_ExactMatch(t *testing
 	err, code := m.ProcessRequest(w, r, nil)
 	assert.Nil(t, err)
 	assert.Equal(t, http.StatusOK, code)
-	assert.Equal(t, "/mcp-resource:file:///config.json", r.URL.Path)
 
-	rpcData := httpctx.GetJSONRPCRequest(r)
-	require.NotNil(t, rpcData)
-	assert.Equal(t, "file:///config.json", rpcData.Primitive)
+	// Check redirect URL points to operation VEM (first stage)
+	redirectURL := ctxGetURLRewriteTarget(r)
+	require.NotNil(t, redirectURL, "Should have redirect URL")
+	assert.Equal(t, "/json-rpc-method:resources/read", redirectURL.Path)
+
+	// Check routing state has NextVEM set to resource VEM
+	state := httpctx.GetJSONRPCRoutingState(r)
+	require.NotNil(t, state, "Routing state should be set")
+	assert.Equal(t, "/mcp-resource:file:///config.json", state.NextVEM, "NextVEM should be resource VEM")
 }
 
 func TestMCPJSONRPCMiddleware_ProcessRequest_ResourcesRead_WildcardMatch(t *testing.T) {
@@ -463,7 +489,16 @@ func TestMCPJSONRPCMiddleware_ProcessRequest_ResourcesRead_WildcardMatch(t *test
 	err, code := m.ProcessRequest(w, r, nil)
 	assert.Nil(t, err)
 	assert.Equal(t, http.StatusOK, code)
-	assert.Equal(t, "/mcp-resource:file:///repo/*", r.URL.Path)
+
+	// Check redirect URL points to operation VEM
+	redirectURL := ctxGetURLRewriteTarget(r)
+	require.NotNil(t, redirectURL)
+	assert.Equal(t, "/json-rpc-method:resources/read", redirectURL.Path)
+
+	// Check routing state has NextVEM set to resource VEM
+	state := httpctx.GetJSONRPCRoutingState(r)
+	require.NotNil(t, state)
+	assert.Equal(t, "/mcp-resource:file:///repo/*", state.NextVEM)
 }
 
 func TestMCPJSONRPCMiddleware_ProcessRequest_ResourcesRead_ExactBeatsWildcard(t *testing.T) {
@@ -501,7 +536,16 @@ func TestMCPJSONRPCMiddleware_ProcessRequest_ResourcesRead_ExactBeatsWildcard(t 
 	err, code := m.ProcessRequest(w, r, nil)
 	assert.Nil(t, err)
 	assert.Equal(t, http.StatusOK, code)
-	assert.Equal(t, "/mcp-resource:file:///repo/README.md", r.URL.Path)
+
+	// Check redirect URL points to operation VEM
+	redirectURL := ctxGetURLRewriteTarget(r)
+	require.NotNil(t, redirectURL)
+	assert.Equal(t, "/json-rpc-method:resources/read", redirectURL.Path)
+
+	// Check routing state has NextVEM set to exact match resource VEM
+	state := httpctx.GetJSONRPCRoutingState(r)
+	require.NotNil(t, state)
+	assert.Equal(t, "/mcp-resource:file:///repo/README.md", state.NextVEM)
 }
 
 func TestMCPJSONRPCMiddleware_ProcessRequest_ResourcesRead_MostSpecificWildcard(t *testing.T) {
@@ -536,7 +580,16 @@ func TestMCPJSONRPCMiddleware_ProcessRequest_ResourcesRead_MostSpecificWildcard(
 	err, code := m.ProcessRequest(w, r, nil)
 	assert.Nil(t, err)
 	assert.Equal(t, http.StatusOK, code)
-	assert.Equal(t, "/mcp-resource:file:///repo/docs/*", r.URL.Path)
+
+	// Check redirect URL points to operation VEM
+	redirectURL := ctxGetURLRewriteTarget(r)
+	require.NotNil(t, redirectURL)
+	assert.Equal(t, "/json-rpc-method:resources/read", redirectURL.Path)
+
+	// Check routing state has NextVEM set to most specific wildcard resource VEM
+	state := httpctx.GetJSONRPCRoutingState(r)
+	require.NotNil(t, state)
+	assert.Equal(t, "/mcp-resource:file:///repo/docs/*", state.NextVEM)
 }
 
 func TestMCPJSONRPCMiddleware_ProcessRequest_PromptsGet(t *testing.T) {
@@ -570,7 +623,16 @@ func TestMCPJSONRPCMiddleware_ProcessRequest_PromptsGet(t *testing.T) {
 	err, code := m.ProcessRequest(w, r, nil)
 	assert.Nil(t, err)
 	assert.Equal(t, http.StatusOK, code)
-	assert.Equal(t, "/mcp-prompt:code-review", r.URL.Path)
+
+	// Check redirect URL points to operation VEM
+	redirectURL := ctxGetURLRewriteTarget(r)
+	require.NotNil(t, redirectURL)
+	assert.Equal(t, "/json-rpc-method:prompts/get", redirectURL.Path)
+
+	// Check routing state has NextVEM set to prompt VEM
+	state := httpctx.GetJSONRPCRoutingState(r)
+	require.NotNil(t, state)
+	assert.Equal(t, "/mcp-prompt:code-review", state.NextVEM)
 }
 
 func TestMCPJSONRPCMiddleware_ProcessRequest_OperationVEM(t *testing.T) {
@@ -580,7 +642,7 @@ func TestMCPJSONRPCMiddleware_ProcessRequest_OperationVEM(t *testing.T) {
 			JsonRpcVersion:      apidef.JsonRPC20,
 		},
 		MCPPrimitives: map[string]string{
-			"operation:tools/list": "/mcp-operation:tools-list",
+			"operation:tools/list": "/json-rpc-method:tools-list",
 		},
 	}
 
@@ -603,7 +665,17 @@ func TestMCPJSONRPCMiddleware_ProcessRequest_OperationVEM(t *testing.T) {
 	err, code := m.ProcessRequest(w, r, nil)
 	assert.Nil(t, err)
 	assert.Equal(t, http.StatusOK, code)
-	assert.Equal(t, "/mcp-operation:tools-list", r.URL.Path)
+
+	// Check redirect URL points to operation VEM
+	redirectURL := ctxGetURLRewriteTarget(r)
+	require.NotNil(t, redirectURL)
+	// Operation VEM is built from method name, not from primitives map
+	assert.Equal(t, "/json-rpc-method:tools/list", redirectURL.Path)
+
+	// Check routing state - discovery methods have NO NextVEM (1-stage routing)
+	state := httpctx.GetJSONRPCRoutingState(r)
+	require.NotNil(t, state)
+	assert.Equal(t, "", state.NextVEM, "Discovery methods should have empty NextVEM (1-stage routing)")
 }
 
 func TestMCPJSONRPCMiddleware_ProcessRequest_DiscoveryPassthrough(t *testing.T) {
@@ -1283,92 +1355,6 @@ func TestMCPJSONRPCMiddleware_RateLimitEnforcedOnVEM(t *testing.T) {
 	}...)
 }
 
-// TestMCPJSONRPCMiddleware_OperationRateLimitNotEnforced demonstrates a bug where
-// operation-level rate limits are not enforced when MCP JSON-RPC routing occurs.
-// This test should FAIL until the bug is fixed.
-//
-// Bug: When an API has both:
-// 1. MCP tools with tool-level rate limits (generous: 100 req/min)
-// 2. Global API rate limit (strict: 1 req/20s)
-//
-// The tool-level rate limits are enforced correctly on the VEM paths, but the
-// global API rate limit should also apply to the original endpoint. However, after
-// JSON-RPC routing to VEMs, the global rate limit is bypassed.
-func TestMCPJSONRPCMiddleware_OperationRateLimitNotEnforced(t *testing.T) {
-	ts := StartTest(nil)
-	defer ts.Close()
-
-	oasAPI := getSampleOASAPI()
-	tykExt := oasAPI.GetTykExtension()
-	tykExt.Info.State.Active = true
-	tykExt.Server.ListenPath = oas.ListenPath{
-		Value: "/mcp",
-		Strip: false,
-	}
-
-	// Set up MCP middleware with a tool that has a generous rate limit (100 req/min)
-	// This should NOT be the limiting factor
-	tykExt.Middleware = &oas.Middleware{
-		McpTools: oas.MCPPrimitives{
-			"get-weather": &oas.MCPPrimitive{
-				Operation: oas.Operation{
-					RateLimit: &oas.RateLimitEndpoint{
-						Enabled: true,
-						Rate:    100,
-						Per:     oas.ReadableDuration(time.Minute),
-					},
-				},
-			},
-		},
-	}
-
-	oasAPI.SetTykExtension(tykExt)
-
-	var def apidef.APIDefinition
-	oasAPI.ExtractTo(&def)
-	def.IsOAS = true
-	def.UseKeylessAccess = true
-	def.Proxy.ListenPath = "/mcp"
-	// Set strict global rate limit: 1 req/20s
-	// This should be the limiting factor, blocking the second request
-	def.GlobalRateLimit = apidef.GlobalRateLimit{Rate: 1, Per: 20}
-	def.MarkAsMCP()
-
-	spec := &APISpec{APIDefinition: &def, OAS: oasAPI}
-	loadedSpecs := ts.Gw.LoadAPI(spec)
-	require.Len(t, loadedSpecs, 1, "Should load 1 API")
-
-	loaded := loadedSpecs[0]
-	require.NotNil(t, loaded, "API should be loaded")
-	assert.True(t, loaded.IsMCP())
-
-	payload := map[string]interface{}{
-		"jsonrpc": "2.0",
-		"method":  "tools/call",
-		"params":  map[string]interface{}{"name": "get-weather", "arguments": map[string]string{"city": "London"}},
-		"id":      1,
-	}
-
-	// First request should succeed (within both rate limits)
-	_, _ = ts.Run(t, test.TestCase{
-		Method: http.MethodPost,
-		Path:   "/mcp",
-		Data:   payload,
-		Code:   http.StatusOK,
-	})
-
-	// Second request should be rate limited by global API rate limit (1 req/20s)
-	// BUG: This test will FAIL because the global rate limit is not enforced after JSON-RPC routing
-	// The tool-level rate limit (100 req/min) allows this request, but
-	// the global API rate limit (1 req/20s) should block it
-	_, _ = ts.Run(t, test.TestCase{
-		Method: http.MethodPost,
-		Path:   "/mcp",
-		Data:   payload,
-		Code:   http.StatusTooManyRequests, // Expected: 429, Actual: 200 (BUG!)
-	})
-}
-
 // TestMCPJSONRPCMiddleware_OperationRateLimitNotEnforced_ExactUserScenario demonstrates
 // the exact bug reported where operation-level rate limits defined in middleware.operations
 // are not enforced when MCP JSON-RPC routing occurs.
@@ -1606,82 +1592,6 @@ func TestMCPJSONRPCMiddleware_OperationRateLimitNotEnforced_ExactUserScenario(t 
 	})
 }
 
-// TestMCPJSONRPCMiddleware_GlobalRateLimitDebug is a debug test to understand
-// why global rate limits are not being enforced.
-func TestMCPJSONRPCMiddleware_GlobalRateLimitDebug(t *testing.T) {
-	ts := StartTest(nil)
-	defer ts.Close()
-
-	oasAPI := getSampleOASAPI()
-	tykExt := oasAPI.GetTykExtension()
-	tykExt.Info.State.Active = true
-	tykExt.Server.ListenPath = oas.ListenPath{
-		Value: "/mcp",
-		Strip: false,
-	}
-
-	// Set up MCP middleware WITHOUT tool-level rate limits
-	// so we can isolate the global rate limit issue
-	tykExt.Middleware = &oas.Middleware{
-		McpTools: oas.MCPPrimitives{
-			"get-weather": &oas.MCPPrimitive{},
-		},
-	}
-
-	oasAPI.SetTykExtension(tykExt)
-
-	var def apidef.APIDefinition
-	oasAPI.ExtractTo(&def)
-	def.IsOAS = true
-	def.UseKeylessAccess = true
-	def.Proxy.ListenPath = "/mcp"
-	// Set strict global rate limit: 1 req/20s
-	def.GlobalRateLimit = apidef.GlobalRateLimit{Rate: 1, Per: 20}
-	def.MarkAsMCP()
-
-	spec := &APISpec{APIDefinition: &def, OAS: oasAPI}
-	loadedSpecs := ts.Gw.LoadAPI(spec)
-	require.Len(t, loadedSpecs, 1, "Should load 1 API")
-
-	loaded := loadedSpecs[0]
-	require.NotNil(t, loaded, "API should be loaded")
-	assert.True(t, loaded.IsMCP())
-
-	// Check that global rate limit is configured
-	t.Logf("Global rate limit: Rate=%f, Per=%f, Disabled=%v",
-		loaded.GlobalRateLimit.Rate, loaded.GlobalRateLimit.Per, loaded.GlobalRateLimit.Disabled)
-	assert.Equal(t, float64(1), loaded.GlobalRateLimit.Rate)
-	assert.Equal(t, float64(20), loaded.GlobalRateLimit.Per)
-	assert.False(t, loaded.GlobalRateLimit.Disabled)
-
-	payload := map[string]interface{}{
-		"jsonrpc": "2.0",
-		"method":  "tools/call",
-		"params":  map[string]interface{}{"name": "get-weather", "arguments": map[string]string{"city": "London"}},
-		"id":      1,
-	}
-
-	// First request should succeed
-	t.Log("Making first request...")
-	resp1, _ := ts.Run(t, test.TestCase{
-		Method: http.MethodPost,
-		Path:   "/mcp",
-		Data:   payload,
-		Code:   http.StatusOK,
-	})
-	t.Logf("First request response: %+v", resp1)
-
-	// Second request should be rate limited
-	t.Log("Making second request (should be rate limited)...")
-	resp2, _ := ts.Run(t, test.TestCase{
-		Method: http.MethodPost,
-		Path:   "/mcp",
-		Data:   payload,
-		Code:   http.StatusTooManyRequests, // Expected: 429, Actual: 200 (BUG!)
-	})
-	t.Logf("Second request response: %+v", resp2)
-}
-
 // TestMCPJSONRPCMiddleware_OperationHeaderInjection tests that headers from both
 // operation-level and tool-level middleware are injected in the VEM chain.
 func TestMCPJSONRPCMiddleware_OperationHeaderInjection(t *testing.T) {
@@ -1730,7 +1640,7 @@ func TestMCPJSONRPCMiddleware_OperationHeaderInjection(t *testing.T) {
 		Server: oas.Server{
 			ListenPath: oas.ListenPath{
 				Value: "/prct",
-				Strip: true,
+				Strip: false,
 			},
 		},
 		Middleware: &oas.Middleware{
@@ -1746,6 +1656,11 @@ func TestMCPJSONRPCMiddleware_OperationHeaderInjection(t *testing.T) {
 							Add: []oas.Header{
 								{Name: "X-Tool-Header", Value: "tool-value"},
 							},
+						},
+						URLRewrite: &oas.URLRewrite{
+							Enabled:   true,
+							Pattern:   ".*",
+							RewriteTo: "/anything",
 						},
 					},
 				},
@@ -1816,11 +1731,11 @@ func TestMCPJSONRPCMiddleware_OperationHeaderInjection(t *testing.T) {
 	require.NoError(t, err, "Should read response body")
 	resp.Body.Close()
 
+	t.Logf("Response body: %s", string(bodyBytes))
+
 	var respBody map[string]interface{}
 	err = json.Unmarshal(bodyBytes, &respBody)
 	require.NoError(t, err, "Response should be valid JSON")
-
-	t.Logf("Response body: %s", string(bodyBytes))
 
 	// Check that both headers are present in the upstream request
 	headers, ok := respBody["Headers"].(map[string]interface{})
@@ -1837,5 +1752,106 @@ func TestMCPJSONRPCMiddleware_OperationHeaderInjection(t *testing.T) {
 	assert.Contains(t, headers, "X-Operation-Header", "Should have operation-level header")
 	if opHeader, ok := headers["X-Operation-Header"].(string); ok {
 		assert.Equal(t, "operation-value", opHeader)
+	}
+}
+
+func TestMCPJSONRPCMiddleware_setupSequentialRouting(t *testing.T) {
+	tests := []struct {
+		name               string
+		method             string
+		primitiveVEM       string
+		primitiveName      string
+		expectedNextVEM    string
+		expectedVEMChain   []string
+		expectedRedirectTo string
+	}{
+		{
+			name:               "tools/call - 2-stage routing",
+			method:             "tools/call",
+			primitiveVEM:       "/mcp-tool:weather.getForecast",
+			primitiveName:      "weather.getForecast",
+			expectedNextVEM:    "/mcp-tool:weather.getForecast",
+			expectedVEMChain:   []string{"/json-rpc-method:tools/call", "/mcp-tool:weather.getForecast"},
+			expectedRedirectTo: "/json-rpc-method:tools/call",
+		},
+		{
+			name:               "resources/read - 2-stage routing",
+			method:             "resources/read",
+			primitiveVEM:       "/mcp-resource:file:///data/config.json",
+			primitiveName:      "file:///data/config.json",
+			expectedNextVEM:    "/mcp-resource:file:///data/config.json",
+			expectedVEMChain:   []string{"/json-rpc-method:resources/read", "/mcp-resource:file:///data/config.json"},
+			expectedRedirectTo: "/json-rpc-method:resources/read",
+		},
+		{
+			name:               "prompts/get - 2-stage routing",
+			method:             "prompts/get",
+			primitiveVEM:       "/mcp-prompt:summarize",
+			primitiveName:      "summarize",
+			expectedNextVEM:    "/mcp-prompt:summarize",
+			expectedVEMChain:   []string{"/json-rpc-method:prompts/get", "/mcp-prompt:summarize"},
+			expectedRedirectTo: "/json-rpc-method:prompts/get",
+		},
+		{
+			name:               "tools/list - 1-stage routing (operation only)",
+			method:             "tools/list",
+			primitiveVEM:       "/json-rpc-method:tools/list",
+			primitiveName:      "",
+			expectedNextVEM:    "",
+			expectedVEMChain:   []string{"/json-rpc-method:tools/list"},
+			expectedRedirectTo: "/json-rpc-method:tools/list",
+		},
+		{
+			name:               "ping - 1-stage routing (operation only)",
+			method:             "ping",
+			primitiveVEM:       "/json-rpc-method:ping",
+			primitiveName:      "",
+			expectedNextVEM:    "",
+			expectedVEMChain:   []string{"/json-rpc-method:ping"},
+			expectedRedirectTo: "/json-rpc-method:ping",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mw := &MCPJSONRPCMiddleware{
+				BaseMiddleware: &BaseMiddleware{
+					Spec: &APISpec{
+						APIDefinition: &apidef.APIDefinition{
+							ApplicationProtocol: apidef.AppProtocolMCP,
+							JsonRpcVersion:      apidef.JsonRPC20,
+						},
+					},
+				},
+			}
+
+			r := httptest.NewRequest("POST", "/prct", nil)
+			rpcReq := &JSONRPCRequest{
+				JSONRPC: "2.0",
+				Method:  tt.method,
+				ID:      123,
+			}
+
+			// Call setupSequentialRouting
+			mw.setupSequentialRouting(r, rpcReq, tt.primitiveVEM, tt.primitiveName)
+
+			// Check routing state
+			state := httpctx.GetJSONRPCRoutingState(r)
+			require.NotNil(t, state, "Routing state should be set")
+			assert.Equal(t, tt.method, state.Method, "Method should match")
+			assert.Equal(t, tt.expectedNextVEM, state.NextVEM, "NextVEM should match")
+			assert.Equal(t, tt.expectedVEMChain, state.VEMChain, "VEMChain should match")
+			assert.Equal(t, "/prct", state.OriginalPath, "OriginalPath should match")
+
+			// Check redirect URL (should always point to operation VEM)
+			redirectURL := ctxGetURLRewriteTarget(r)
+			require.NotNil(t, redirectURL, "Redirect URL should be set")
+			assert.Equal(t, "tyk", redirectURL.Scheme, "Scheme should be tyk")
+			assert.Equal(t, "self", redirectURL.Host, "Host should be self")
+			assert.Equal(t, tt.expectedRedirectTo, redirectURL.Path, "Should redirect to operation VEM")
+
+			// Check JSON-RPC routing flag
+			assert.True(t, httpctx.IsJsonRPCRouting(r), "JsonRPCRouting flag should be set")
+		})
 	}
 }

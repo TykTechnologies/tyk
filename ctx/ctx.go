@@ -59,6 +59,9 @@ const (
 	JsonRPCRouting
 	// JSONRPCRequest stores parsed JSON-RPC request data for protocol routing (MCP, A2A, etc.)
 	JSONRPCRequest
+	// JSONRPCRoutingState stores the routing state for sequential MCP VEM processing.
+	// Used by MCPJSONRPCMiddleware and MCPVEMContinuationMiddleware.
+	JSONRPCRoutingState
 )
 
 func ctxSetSession(r *http.Request, s *user.SessionState, scheduleUpdate bool, hashKey bool) {

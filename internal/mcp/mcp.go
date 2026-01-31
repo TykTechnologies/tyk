@@ -18,13 +18,16 @@ const (
 
 var registerOnce sync.Once
 
-// RegisterVEMPrefixes registers MCP VEM prefixes with the agent protocol registry.
+// RegisterVEMPrefixes registers MCP and JSON-RPC VEM prefixes with the agent protocol registry.
 // This is called automatically when needed via sync.Once.
 func RegisterVEMPrefixes() {
 	registerOnce.Do(func() {
+		// Register MCP-specific primitive VEM prefixes
 		agentprotocol.RegisterVEMPrefix(ToolPrefix)
 		agentprotocol.RegisterVEMPrefix(ResourcePrefix)
 		agentprotocol.RegisterVEMPrefix(PromptPrefix)
+		// Register generic JSON-RPC operation VEM prefix
+		agentprotocol.RegisterVEMPrefix("/json-rpc-method:")
 	})
 }
 

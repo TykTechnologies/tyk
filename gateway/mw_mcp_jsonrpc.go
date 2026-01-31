@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"strings"
 
 	"github.com/TykTechnologies/tyk/apidef"
@@ -64,6 +65,18 @@ type JSONRPCErrorResponse struct {
 // Name returns the middleware name.
 func (m *MCPJSONRPCMiddleware) Name() string {
 	return "MCPJSONRPCMiddleware"
+}
+
+// isAllowListEnabled returns true if either MCP primitive or operation allowlist is enabled.
+func (m *MCPJSONRPCMiddleware) isAllowListEnabled() bool {
+	return m.Spec.MCPAllowListEnabled || m.Spec.OperationsAllowListEnabled
+}
+
+// isPrimitiveInvokingMethod returns true if the method invokes an MCP primitive (tool, resource, or prompt).
+func isPrimitiveInvokingMethod(method string) bool {
+	return method == mcp.MethodToolsCall ||
+		method == mcp.MethodResourcesRead ||
+		method == mcp.MethodPromptsGet
 }
 
 // EnabledForSpec returns true if this middleware should be enabled for the API spec.
@@ -168,27 +181,76 @@ func (m *MCPJSONRPCMiddleware) buildVEMChain(method, primitiveVEM string) []stri
 }
 
 // buildOperationVEM constructs the operation VEM path for a JSON-RPC method.
-// Operation VEMs represent the JSON-RPC operation itself (e.g., "tools/call"),
-// distinct from the specific primitive being accessed.
+// Operation VEMs are JSON-RPC GENERIC - they represent the method name regardless of protocol.
+// Format: /json-rpc-method:{method} - works for any JSON-RPC protocol (MCP, A2A, custom, etc.)
 func (m *MCPJSONRPCMiddleware) buildOperationVEM(method string) string {
-	// Map JSON-RPC methods to operation VEM paths
-	// Format: /mcp-operation:{method}
-	switch method {
-	case mcp.MethodToolsCall:
-		return "/mcp-operation:tools/call"
-	case mcp.MethodResourcesRead:
-		return "/mcp-operation:resources/read"
-	case mcp.MethodPromptsGet:
-		return "/mcp-operation:prompts/get"
-	default:
-		return ""
+	// GENERIC: Operation VEM is simply the JSON-RPC method name
+	// Not MCP-specific - this works for any JSON-RPC protocol
+	return "/json-rpc-method:" + method
+}
+
+// setupSequentialRouting initializes sequential VEM routing for JSON-RPC requests.
+// MCP-SPECIFIC: Contains all MCP protocol knowledge about method types and routing strategy.
+//
+// Architecture:
+// - Operation VEM: JSON-RPC GENERIC (/json-rpc-method:{method}) - works for any JSON-RPC protocol
+// - Primitive VEM: MCP-SPECIFIC (/mcp-tool, /mcp-resource, /mcp-prompt) - MCP concepts only
+func (m *MCPJSONRPCMiddleware) setupSequentialRouting(r *http.Request, rpcReq *JSONRPCRequest, primitiveVEM, primitiveName string) {
+	method := rpcReq.Method
+
+	// Build GENERIC operation VEM: /json-rpc-method:{method}
+	// This is protocol-agnostic - works for MCP, A2A, custom JSON-RPC, etc.
+	operationVEM := m.buildOperationVEM(method)
+
+	// Determine if MCP primitive routing is needed (2-stage vs 1-stage routing)
+	var nextVEM string
+	var vemChain []string
+
+	if isPrimitiveInvokingMethod(method) {
+		// 2-stage routing: operation VEM → primitive VEM
+		nextVEM = primitiveVEM
+		vemChain = []string{operationVEM, primitiveVEM}
+	} else {
+		// 1-stage routing: operation VEM only
+		nextVEM = ""
+		vemChain = []string{operationVEM}
 	}
+
+	// Create generic routing state
+	state := &httpctx.JSONRPCRoutingState{
+		Method:       method,
+		Params:       rpcReq.Params,
+		ID:           rpcReq.ID,
+		NextVEM:      nextVEM, // What to route to after operation
+		OriginalPath: r.URL.Path,
+		VEMChain:     vemChain, // For telemetry/debugging
+		VisitedVEMs:  []string{},
+	}
+
+	httpctx.SetJSONRPCRoutingState(r, state)
+	httpctx.SetJsonRPCRouting(r, true)
+	ctxSetCheckLoopLimits(r, true)
+
+	// ALWAYS route to operation VEM first via internal redirect
+	// Pass check_limits=true to ensure rate limiting is applied at each VEM stage
+	ctxSetURLRewriteTarget(r, &url.URL{
+		Scheme:   "tyk",
+		Host:     "self",
+		Path:     operationVEM,
+		RawQuery: "check_limits=true",
+	})
 }
 
 // ProcessRequest handles JSON-RPC request detection and routing.
 //
 //nolint:staticcheck // ST1008: middleware interface requires (error, int) return order
 func (m *MCPJSONRPCMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
+	// Skip if routing already initialized (we're at a VEM path, not the listen path)
+	// This middleware should only run ONCE at the listen path to parse and route the request
+	if httpctx.GetJSONRPCRoutingState(r) != nil {
+		return nil, http.StatusOK
+	}
+
 	// Validate request type
 	if !m.validateJSONRPCRequest(r) {
 		return nil, http.StatusOK
@@ -208,18 +270,20 @@ func (m *MCPJSONRPCMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 		return nil, middleware.StatusRespond
 	}
 	if !found || vemPath == "" {
-		// Unregistered primitives or operations (notifications, discovery, etc.)
-		// passthrough to upstream unchanged per MCP specification.
-		// - Discovery operations (tools/list, resources/list) allow clients to discover capabilities
-		// - Notifications are observational and don't require policy enforcement
-		// - Operations can be optionally configured with operation-level VEMs if needed
-		// The upstream MCP server is responsible for handling these requests.
+		if m.isAllowListEnabled() && !isPrimitiveInvokingMethod(rpcReq.Method) {
+			// Route unregistered operations to operation VEM for allowlist enforcement
+			m.setupSequentialRouting(r, rpcReq, "", rpcReq.Method)
+			return nil, http.StatusOK
+		}
+
+		// Unregistered primitives or operations passthrough to upstream per MCP specification
 		return nil, http.StatusOK
 	}
 
 	// Set up routing context
-	m.setupJSONRPCRouting(r, rpcReq, vemPath, primitive)
+	m.setupSequentialRouting(r, rpcReq, vemPath, primitive)
 
+	// Return StatusOK to allow chain to continue to DummyProxyHandler, which will handle the redirect
 	return nil, http.StatusOK
 }
 
@@ -272,7 +336,7 @@ func (m *MCPJSONRPCMiddleware) routeRequest(rpcReq *JSONRPCRequest) (vemPath str
 	}
 
 	// When allowlist is enabled and primitive not found, route to catch-all VEM
-	if !found && m.Spec.MCPAllowListEnabled {
+	if !found && m.isAllowListEnabled() {
 		vemPath = m.buildUnregisteredVEMPath(rpcReq, primitive)
 		found = true
 	}

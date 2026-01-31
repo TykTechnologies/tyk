@@ -49,15 +49,10 @@ func (t *TransformHeaders) ProcessRequest(w http.ResponseWriter, r *http.Request
 		}
 	}
 
-	// Use generic VEM chain helper to get all matching header injection specs
-	// This works for both MCP APIs (checks all VEMs in chain) and non-MCP APIs (checks current path)
+	// Check for endpoint-specific header transformations
 	versionPaths := t.Spec.RxPaths[vInfo.Name]
-	specs := t.Spec.FindAllVEMChainSpecs(r, versionPaths, HeaderInjected)
-
-	// Apply headers from all matching specs sequentially
-	// For MCP: applies operation-level headers, then tool-level headers
-	// For non-MCP: applies only the matched path's headers
-	for _, spec := range specs {
+	spec, ok := t.Spec.FindSpecMatchesStatus(r, versionPaths, HeaderInjected)
+	if ok {
 		t.applyHeaderMeta(r, &spec.InjectHeaders, ignoreCanonical)
 	}
 

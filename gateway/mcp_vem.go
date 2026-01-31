@@ -91,9 +91,24 @@ func (a APIDefinitionLoader) generateMCPVEMs(apiSpec *APISpec, conf config.Confi
 		{Prefix: mcp.PromptPrefix, TypeName: "prompt", Primitives: middleware.McpPrompts},
 	}
 
-	// Pre-calculate whether any MCP primitive has an allow rule enabled.
-	// This avoids iterating through all primitives on every JSON-RPC request.
-	apiSpec.MCPAllowListEnabled = hasMCPAllowListEnabled(categories)
+	// Pre-calculate allowlist flags independently for each category.
+	// This provides granular control: operations, tools, resources, and prompts
+	// each have independent allowlist modes.
+	operations := oas.Operations{}
+	if middleware.Operations != nil {
+		operations = middleware.Operations
+	}
+
+	// Set independent flags per category
+	apiSpec.OperationsAllowListEnabled = hasOperationAllowEnabled(operations)
+	apiSpec.ToolsAllowListEnabled = hasPrimitiveAllowEnabled(middleware.McpTools)
+	apiSpec.ResourcesAllowListEnabled = hasPrimitiveAllowEnabled(middleware.McpResources)
+	apiSpec.PromptsAllowListEnabled = hasPrimitiveAllowEnabled(middleware.McpPrompts)
+
+	// MCPAllowListEnabled is a convenience flag that's true if ANY MCP primitive has allow enabled
+	apiSpec.MCPAllowListEnabled = apiSpec.ToolsAllowListEnabled ||
+		apiSpec.ResourcesAllowListEnabled ||
+		apiSpec.PromptsAllowListEnabled
 
 	specs := a.generateJSONRPCVEMs(apiSpec, conf, categories, apiSpec.MCPPrimitives)
 	if specs == nil {
@@ -104,10 +119,28 @@ func (a APIDefinitionLoader) generateMCPVEMs(apiSpec *APISpec, conf config.Confi
 	// These allow operation-level middleware to be applied before primitive-level middleware
 	specs = append(specs, a.generateMCPOperationVEMs(apiSpec, conf)...)
 
-	// When allow list is enabled, add catch-all BlackList VEMs for each primitive type.
-	// These block any primitive that doesn't have an explicit Allow entry.
-	if apiSpec.MCPAllowListEnabled {
-		specs = append(specs, a.buildMCPCatchAllSpecs(conf)...)
+	// Generate catch-all BlackList VEMs for categories that have allowlist enabled.
+	// This provides granular whitelist mode per category.
+	catchAllPrefixes := []string{}
+
+	// Use mux-style regex patterns to match everything after the prefix.
+	// Pattern: "/prefix{rest:.*}" where {rest:.*} matches any string including slashes
+	// This is converted by PreparePathRegexp into proper regex
+	if apiSpec.OperationsAllowListEnabled {
+		catchAllPrefixes = append(catchAllPrefixes, "/json-rpc-method:{rest:.*}")
+	}
+	if apiSpec.ToolsAllowListEnabled {
+		catchAllPrefixes = append(catchAllPrefixes, mcp.ToolPrefix+"{rest:.*}")
+	}
+	if apiSpec.ResourcesAllowListEnabled {
+		catchAllPrefixes = append(catchAllPrefixes, mcp.ResourcePrefix+"{rest:.*}")
+	}
+	if apiSpec.PromptsAllowListEnabled {
+		catchAllPrefixes = append(catchAllPrefixes, mcp.PromptPrefix+"{rest:.*}")
+	}
+
+	if len(catchAllPrefixes) > 0 {
+		specs = append(specs, a.buildCatchAllSpecs(catchAllPrefixes, conf)...)
 	}
 
 	return specs
@@ -115,10 +148,11 @@ func (a APIDefinitionLoader) generateMCPVEMs(apiSpec *APISpec, conf config.Confi
 
 // mcpOperationVEMPaths maps JSON-RPC method names to their operation VEM paths.
 // These are used both for VEM generation and for building the VEM chain at runtime.
+// Operation VEMs use generic JSON-RPC naming (/json-rpc-method:) not MCP-specific naming.
 var mcpOperationVEMPaths = map[string]string{
-	mcp.MethodToolsCall:     "/mcp-operation:tools/call",
-	mcp.MethodResourcesRead: "/mcp-operation:resources/read",
-	mcp.MethodPromptsGet:    "/mcp-operation:prompts/get",
+	mcp.MethodToolsCall:     "/json-rpc-method:tools/call",
+	mcp.MethodResourcesRead: "/json-rpc-method:resources/read",
+	mcp.MethodPromptsGet:    "/json-rpc-method:prompts/get",
 }
 
 // generateMCPOperationVEMs creates VEMs for JSON-RPC operations (tools/call, resources/read, prompts/get).
@@ -236,18 +270,18 @@ func (a APIDefinitionLoader) compileOperationMiddlewareSpecs(op *oas.Operation, 
 	return specs
 }
 
-// buildMCPCatchAllSpecs creates catch-all BlackList VEMs for each MCP primitive type.
-// These are matched after specific primitive VEMs and block any unregistered or non-allowed primitives.
-// Uses the standard compileExtendedPathSpec to ensure consistent regex generation with other path specs.
-func (a APIDefinitionLoader) buildMCPCatchAllSpecs(conf config.Config) []URLSpec {
-	prefixes := []string{mcp.ToolPrefix, mcp.ResourcePrefix, mcp.PromptPrefix}
+// buildCatchAllSpecs creates catch-all BlackList VEMs for the given prefixes.
+// When allowlist mode is active for a category, its catch-all blocks any endpoint
+// in that category without an explicit Allow entry.
+// Uses the standard compileExtendedPathSpec to ensure consistent regex generation.
+func (a APIDefinitionLoader) buildCatchAllSpecs(prefixes []string, conf config.Config) []URLSpec {
 	var blacklistPaths []apidef.EndPointMeta
 
 	for _, prefix := range prefixes {
-		// Use wildcard pattern that will be processed by the standard regex generation.
-		// The "/*" suffix is handled by PreparePathRegexp to create ".*" patterns.
+		// Use wildcard pattern "/*" which PreparePathRegexp converts to "/.*" regex.
+		// This matches any path starting with the prefix.
 		blacklistPaths = append(blacklistPaths, apidef.EndPointMeta{
-			Path:   prefix + "*",
+			Path:   prefix,
 			Method: http.MethodPost,
 		})
 	}
@@ -256,12 +290,11 @@ func (a APIDefinitionLoader) buildMCPCatchAllSpecs(conf config.Config) []URLSpec
 }
 
 // hasMCPAllowListEnabled checks if any MCP primitive has an allow rule enabled.
+// This is MCP-specific and delegates to the generic hasPrimitiveAllowEnabled utility.
 func hasMCPAllowListEnabled(categories []PrimitiveCategory) bool {
 	for _, cat := range categories {
-		for _, primitive := range cat.Primitives {
-			if primitive != nil && primitive.Allow != nil && primitive.Allow.Enabled {
-				return true
-			}
+		if hasPrimitiveAllowEnabled(cat.Primitives) {
+			return true
 		}
 	}
 	return false

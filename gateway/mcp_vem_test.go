@@ -3,6 +3,7 @@ package gateway
 import (
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -314,8 +315,14 @@ func Test_MCPAllowListWithCatchAll(t *testing.T) {
 	// tool-not-allowed (without Allow) gets NO Internal entry when allowListEnabled
 	// It will be caught by the catch-all BlackList
 
-	// Build catch-all BlackList
-	catchAll := loader.buildMCPCatchAllSpecs(conf)
+	// Build catch-all BlackList for all categories
+	catchAllPrefixes := []string{
+		"/json-rpc-method:/*",
+		mcp.ToolPrefix + "/*",
+		mcp.ResourcePrefix + "/*",
+		mcp.PromptPrefix + "/*",
+	}
+	catchAll := loader.buildCatchAllSpecs(catchAllPrefixes, conf)
 
 	// Combine in order: specific entries first, catch-all last
 	rxPaths := []URLSpec{}
@@ -439,6 +446,69 @@ func Test_hasMCPAllowListEnabled(t *testing.T) {
 			assert.Equal(t, tt.want, got)
 		})
 	}
+}
+
+func Test_generateMCPVEMs_SetsOperationsAllowListEnabled(t *testing.T) {
+	// Test that OperationsAllowListEnabled flag is set when operations have allow enabled
+	apiSpec := &APISpec{
+		APIDefinition: &apidef.APIDefinition{
+			ApplicationProtocol: apidef.AppProtocolMCP,
+			JsonRpcVersion:      apidef.JsonRPC20,
+			Proxy: apidef.ProxyConfig{
+				ListenPath: "/mcp",
+			},
+		},
+		OAS: oas.OAS{
+			T: openapi3.T{
+				Paths: func() *openapi3.Paths {
+					paths := openapi3.NewPaths()
+					paths.Set("/tools/call", &openapi3.PathItem{
+						Post: &openapi3.Operation{OperationID: "tools-call-op"},
+					})
+					return paths
+				}(),
+			},
+		},
+	}
+
+	tykExt := &oas.XTykAPIGateway{
+		Middleware: &oas.Middleware{
+			McpTools: oas.MCPPrimitives{
+				"dummy-tool": &oas.MCPPrimitive{},  // Need at least one primitive for MCP API
+			},
+			Operations: oas.Operations{
+				"tools-call-op": {
+					Allow: &oas.Allowance{Enabled: true},
+				},
+			},
+		},
+	}
+	apiSpec.OAS.SetTykExtension(tykExt)
+
+	loader := APIDefinitionLoader{}
+	specs := loader.generateMCPVEMs(apiSpec, config.Config{
+		HttpServerOptions: config.HttpServerOptionsConfig{
+			EnablePathPrefixMatching: true,
+			EnablePathSuffixMatching: true,
+		},
+	})
+
+	// Check flags are set correctly
+	assert.True(t, apiSpec.OperationsAllowListEnabled, "OperationsAllowListEnabled should be true when operation has allow")
+	assert.False(t, apiSpec.MCPAllowListEnabled, "MCPAllowListEnabled should be false when no primitive has allow")
+
+	// Check that catch-all BlackList VEM is generated for operations
+	foundCatchAll := false
+	for _, spec := range specs {
+		if spec.Status == BlackList && spec.spec != nil {
+			pattern := spec.spec.String()
+			if strings.Contains(pattern, "json-rpc-method") {
+				foundCatchAll = true
+				break
+			}
+		}
+	}
+	assert.True(t, foundCatchAll, "should generate catch-all BlackList VEM for operations when OperationsAllowListEnabled is true")
 }
 
 func Test_generateMCPVEMs_SetsMCPAllowListEnabled(t *testing.T) {
@@ -832,7 +902,7 @@ func Test_generateMCPOperationVEMs_PathMatching(t *testing.T) {
 	// Find the rate limit spec
 	var foundRateLimit bool
 	for _, spec := range specs {
-		if spec.Status == RateLimit && spec.RateLimit.Path == "/mcp-operation:tools/call" {
+		if spec.Status == RateLimit && spec.RateLimit.Path == "/json-rpc-method:tools/call" {
 			foundRateLimit = true
 			assert.Equal(t, 10.0, spec.RateLimit.Rate)
 			break
@@ -902,7 +972,7 @@ func Test_generateMCPOperationVEMs_HeaderInjection(t *testing.T) {
 	// Find the header injection spec
 	var foundHeaderInjected bool
 	for _, spec := range specs {
-		if spec.Status == HeaderInjected && spec.InjectHeaders.Path == "/mcp-operation:tools/call" {
+		if spec.Status == HeaderInjected && spec.InjectHeaders.Path == "/json-rpc-method:tools/call" {
 			foundHeaderInjected = true
 			assert.Equal(t, http.MethodPost, spec.InjectHeaders.Method)
 			assert.Contains(t, spec.InjectHeaders.AddHeaders, "X-Operation-Header")

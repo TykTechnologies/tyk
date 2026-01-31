@@ -82,9 +82,26 @@ type APISpec struct {
 	// Value: VEM path (e.g., "/mcp-tool:get-weather")
 	MCPPrimitives map[string]string
 
+	// OperationsAllowListEnabled is true if any JSON-RPC operation (method-level) has
+	// an allow rule enabled. Pre-calculated during API loading.
+	OperationsAllowListEnabled bool
+
+	// ToolsAllowListEnabled is true if any MCP tool has an allow rule enabled.
+	// Pre-calculated during API loading.
+	ToolsAllowListEnabled bool
+
+	// ResourcesAllowListEnabled is true if any MCP resource has an allow rule enabled.
+	// Pre-calculated during API loading.
+	ResourcesAllowListEnabled bool
+
+	// PromptsAllowListEnabled is true if any MCP prompt has an allow rule enabled.
+	// Pre-calculated during API loading.
+	PromptsAllowListEnabled bool
+
 	// MCPAllowListEnabled is true if any MCP primitive (tool, resource, prompt) has an
 	// allow rule enabled. Pre-calculated during API loading to avoid iterating through
 	// all primitives on every JSON-RPC request that doesn't match a VEM.
+	// This is a convenience flag that combines ToolsAllowListEnabled, ResourcesAllowListEnabled, and PromptsAllowListEnabled.
 	MCPAllowListEnabled bool
 }
 
@@ -146,6 +163,10 @@ func (a *APISpec) FindSpecMatchesStatus(r *http.Request, rxPaths []URLSpec, mode
 // For MCP APIs with JSON-RPC routing, this returns specs from all VEMs in the chain
 // (operation VEM + tool VEM), allowing middleware to be applied at each stage.
 // For non-MCP APIs, it returns only the spec matching the current path.
+//
+// Deprecated: With sequential VEM routing, middleware runs once per VEM stage, so
+// FindSpecMatchesStatus() should be used instead. Each middleware pass sees only ONE
+// VEM path (r.URL.Path), making VEM chain iteration unnecessary.
 func (a *APISpec) FindAllVEMChainSpecs(r *http.Request, rxPaths []URLSpec, mode URLStatus) []*URLSpec {
 	// Check if this is a JSON-RPC routed request with a VEM chain
 	rpcData := httpctx.GetJSONRPCRequest(r)
@@ -185,6 +206,9 @@ func (a *APISpec) FindAllVEMChainSpecs(r *http.Request, rxPaths []URLSpec, mode 
 }
 
 // getSpecPathAndMethod extracts the path and method from a URLSpec based on the mode.
+//
+// Deprecated: This method is only used by FindAllVEMChainSpecs, which is deprecated.
+// With sequential VEM routing, this helper method is no longer needed.
 func (a *APISpec) getSpecPathAndMethod(spec *URLSpec, mode URLStatus) (string, string) {
 	switch mode {
 	case RateLimit:
