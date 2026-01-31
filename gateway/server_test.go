@@ -12,13 +12,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/sirupsen/logrus"
-	"github.com/stretchr/testify/assert"
-	"go.uber.org/mock/gomock"
-
 	"github.com/TykTechnologies/again"
 	"github.com/TykTechnologies/storage/persistent/model"
-
 	"github.com/TykTechnologies/tyk/config"
 	internalmodel "github.com/TykTechnologies/tyk/internal/model"
 	"github.com/TykTechnologies/tyk/internal/netutil"
@@ -28,6 +23,9 @@ import (
 	"github.com/TykTechnologies/tyk/tcp"
 	"github.com/TykTechnologies/tyk/test"
 	"github.com/TykTechnologies/tyk/user"
+	"github.com/sirupsen/logrus"
+	"github.com/stretchr/testify/assert"
+	"go.uber.org/mock/gomock"
 )
 
 func TestGateway_afterConfSetup(t *testing.T) {
@@ -46,13 +44,18 @@ func TestGateway_afterConfSetup(t *testing.T) {
 			},
 			expectedConfig: config.Config{
 				SlaveOptions: config.SlaveOptionsConfig{
-					UseRPC:                   true,
-					GroupID:                  "ungrouped",
-					CallTimeout:              30,
-					PingTimeout:              60,
-					KeySpaceSyncInterval:     10,
-					RPCCertCacheExpiration:   3600,
-					RPCGlobalCacheExpiration: 30,
+					UseRPC:                      true,
+					GroupID:                     "ungrouped",
+					CallTimeout:                 30,
+					PingTimeout:                 60,
+					KeySpaceSyncInterval:        10,
+					RPCCertCacheExpiration:      3600,
+					RPCGlobalCacheExpiration:    30,
+					RPCCertFetchMaxElapsedTime:  30,
+					RPCCertFetchInitialInterval: 0.1,
+					RPCCertFetchMaxInterval:     2,
+					RPCCertFetchRetryEnabled:    func() *bool { b := true; return &b }(),
+					RPCCertFetchMaxRetries:      func() *int { i := 5; return &i }(),
 				},
 				AnalyticsConfig: config.AnalyticsConfigConfig{
 					PurgeInterval: 10,

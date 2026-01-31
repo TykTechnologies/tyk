@@ -16,6 +16,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/cenkalti/backoff/v4"
 	"github.com/sirupsen/logrus"
 
 	"github.com/TykTechnologies/tyk/internal/cache"
@@ -26,6 +27,35 @@ import (
 const (
 	cacheDefaultTTL    = 300 // 5 minutes.
 	cacheCleanInterval = 600 // 10 minutes.
+
+	// MDCB retry configuration for certificate loading during startup.
+	//
+	// When the gateway starts with MDCB configured, it enters emergency mode until the
+	// RPC connection is established. During this period, certificate fetches from MDCB
+	// will fail with ErrMDCBConnectionLost. These constants control the retry behavior:
+	//
+	// DefaultRPCCertFetchMaxElapsedTime: Maximum time to wait for MDCB to become ready (30 seconds)
+	//   - If MDCB doesn't respond within this window, we give up and fall back to local files
+	//   - This prevents indefinite blocking during gateway startup
+	//
+	// DefaultRPCCertFetchInitialInterval: Starting delay for exponential backoff (100ms)
+	//   - First retry happens after 100ms
+	//   - Each subsequent retry doubles: 100ms → 200ms → 400ms → 800ms → 1600ms → 2000ms (capped)
+	//
+	// DefaultRPCCertFetchMaxInterval: Maximum delay between retry attempts (2 seconds)
+	//   - Caps exponential growth to prevent excessively long waits
+	//   - Ensures we check MDCB at least every 2 seconds
+	DefaultRPCCertFetchMaxElapsedTime  = 30 * time.Second
+	DefaultRPCCertFetchInitialInterval = 100 * time.Millisecond
+	DefaultRPCCertFetchMaxInterval     = 2 * time.Second
+
+	// DefaultRPCCertFetchRetryEnabled: Enable retry by default (true)
+	DefaultRPCCertFetchRetryEnabled = true
+
+	// DefaultRPCCertFetchMaxRetries: Maximum number of retry attempts (5)
+	//   - 0 means unlimited (time-based only)
+	//   - Default of 5 provides reasonable retry attempts with exponential backoff
+	DefaultRPCCertFetchMaxRetries = 5
 )
 
 var (
@@ -52,24 +82,45 @@ type CertificateManager interface {
 }
 
 type certificateManager struct {
-	storage         storage.Handler
-	logger          *logrus.Entry
-	cache           cache.Repository
-	secret          string
-	migrateCertList bool
+	storage                  storage.Handler
+	logger                   *logrus.Entry
+	cache                    cache.Repository
+	secret                   string
+	migrateCertList          bool
+	certFetchMaxElapsedTime  time.Duration
+	certFetchInitialInterval time.Duration
+	certFetchMaxInterval     time.Duration
+	certFetchRetryEnabled    bool
+	certFetchMaxRetries      int
 }
 
-func NewCertificateManager(storage storage.Handler, secret string, logger *logrus.Logger, migrateCertList bool) *certificateManager {
+func NewCertificateManager(storageHandler storage.Handler, secret string, logger *logrus.Logger, migrateCertList bool, certFetchMaxElapsedTime, certFetchInitialInterval, certFetchMaxInterval time.Duration, certFetchRetryEnabled bool, certFetchMaxRetries int) *certificateManager {
 	if logger == nil {
 		logger = logrus.New()
 	}
 
+	// Set default backoff values if not provided
+	if certFetchMaxElapsedTime == 0 {
+		certFetchMaxElapsedTime = 30 * time.Second
+	}
+	if certFetchInitialInterval == 0 {
+		certFetchInitialInterval = 100 * time.Millisecond
+	}
+	if certFetchMaxInterval == 0 {
+		certFetchMaxInterval = 2 * time.Second
+	}
+
 	return &certificateManager{
-		storage:         storage,
-		logger:          logger.WithFields(logrus.Fields{"prefix": CertManagerLogPrefix}),
-		cache:           cache.New(cacheDefaultTTL, cacheCleanInterval),
-		secret:          secret,
-		migrateCertList: migrateCertList,
+		storage:                  storageHandler,
+		logger:                   logger.WithFields(logrus.Fields{"prefix": CertManagerLogPrefix}),
+		cache:                    cache.New(cacheDefaultTTL, cacheCleanInterval),
+		secret:                   secret,
+		migrateCertList:          migrateCertList,
+		certFetchMaxElapsedTime:  certFetchMaxElapsedTime,
+		certFetchInitialInterval: certFetchInitialInterval,
+		certFetchMaxInterval:     certFetchMaxInterval,
+		certFetchRetryEnabled:    certFetchRetryEnabled,
+		certFetchMaxRetries:      certFetchMaxRetries,
 	}
 }
 
@@ -413,7 +464,45 @@ func (c *certificateManager) List(certIDs []string, mode CertificateType) (out [
 			continue
 		}
 
-		val, err := c.storage.GetKey("raw-" + id)
+		// Retry with exponential backoff when MDCB connection is not ready.
+		//
+		// During gateway startup, MDCB RPC connection may still be initializing when
+		// SSL certificates are loaded. The retry logic waits for MDCB to become ready.
+		var val string
+		var err error
+
+		// Handle simple case first: retry disabled
+		if !c.certFetchRetryEnabled {
+			val, err = c.storage.GetKey("raw-" + id)
+		} else {
+			// Retry enabled - use exponential backoff
+			operation := func() error {
+				val, err = c.storage.GetKey("raw-" + id)
+				if errors.Is(err, storage.ErrMDCBConnectionLost) {
+					return err // Retryable error
+				}
+				return nil // Success or non-retryable error
+			}
+
+			expBackoff := backoff.NewExponentialBackOff()
+			expBackoff.MaxElapsedTime = c.certFetchMaxElapsedTime
+			expBackoff.InitialInterval = c.certFetchInitialInterval
+			expBackoff.MaxInterval = c.certFetchMaxInterval
+			expBackoff.Multiplier = 2.0
+
+			// Apply max retries limit if configured (0 = unlimited, time-based only)
+			var backoffStrategy backoff.BackOff = expBackoff
+			if c.certFetchMaxRetries > 0 {
+				backoffStrategy = backoff.WithMaxRetries(expBackoff, uint64(c.certFetchMaxRetries))
+			}
+
+			if retryErr := backoff.Retry(operation, backoffStrategy); retryErr != nil {
+				if errors.Is(err, storage.ErrMDCBConnectionLost) {
+					c.logger.Warn("Timeout waiting for MDCB connection for certificate:", id)
+				}
+			}
+		}
+
 		// fallback to file
 		if err != nil {
 			// Try read from file

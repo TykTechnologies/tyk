@@ -520,7 +520,21 @@ func (gw *Gateway) setupGlobals() {
 	storeCert := &storage.RedisCluster{KeyPrefix: "cert-", HashKeys: false, ConnectionHandler: gw.StorageConnectionHandler}
 	storeCert.Connect()
 
-	gw.CertificateManager = certs.NewCertificateManager(storeCert, certificateSecret, log, !gw.GetConfig().Cloud)
+	conf := gw.GetConfig()
+
+	// Note: afterConfSetup() must be called before setupGlobals() to ensure
+	// pointer fields (RPCCertFetchRetryEnabled, RPCCertFetchMaxRetries) are non-nil
+	gw.CertificateManager = certs.NewCertificateManager(
+		storeCert,
+		certificateSecret,
+		log,
+		!conf.Cloud,
+		time.Duration(conf.SlaveOptions.RPCCertFetchMaxElapsedTime)*time.Second,
+		time.Duration(conf.SlaveOptions.RPCCertFetchInitialInterval)*time.Second,
+		time.Duration(conf.SlaveOptions.RPCCertFetchMaxInterval)*time.Second,
+		*conf.SlaveOptions.RPCCertFetchRetryEnabled,
+		*conf.SlaveOptions.RPCCertFetchMaxRetries,
+	)
 
 	if gw.GetConfig().SlaveOptions.UseRPC {
 		rpcStore := &RPCStorageHandler{
@@ -1582,6 +1596,33 @@ func (gw *Gateway) afterConfSetup() {
 
 		if conf.SlaveOptions.RPCGlobalCacheExpiration == 0 {
 			conf.SlaveOptions.RPCGlobalCacheExpiration = 30
+		}
+
+		if conf.SlaveOptions.RPCCertFetchMaxElapsedTime <= 0 {
+			conf.SlaveOptions.RPCCertFetchMaxElapsedTime = float32(certs.DefaultRPCCertFetchMaxElapsedTime.Seconds())
+		}
+
+		if conf.SlaveOptions.RPCCertFetchInitialInterval <= 0 {
+			conf.SlaveOptions.RPCCertFetchInitialInterval = float32(certs.DefaultRPCCertFetchInitialInterval.Seconds())
+		}
+
+		if conf.SlaveOptions.RPCCertFetchMaxInterval <= 0 {
+			conf.SlaveOptions.RPCCertFetchMaxInterval = float32(certs.DefaultRPCCertFetchMaxInterval.Seconds())
+		}
+
+		// Default RPCCertFetchRetryEnabled if not explicitly set
+		if conf.SlaveOptions.RPCCertFetchRetryEnabled == nil {
+			enabled := certs.DefaultRPCCertFetchRetryEnabled
+			conf.SlaveOptions.RPCCertFetchRetryEnabled = &enabled
+		}
+
+		// Default RPCCertFetchMaxRetries if not explicitly set (0 = unlimited, negative values default to constant)
+		if conf.SlaveOptions.RPCCertFetchMaxRetries == nil {
+			maxRetries := certs.DefaultRPCCertFetchMaxRetries
+			conf.SlaveOptions.RPCCertFetchMaxRetries = &maxRetries
+		} else if *conf.SlaveOptions.RPCCertFetchMaxRetries < 0 {
+			maxRetries := certs.DefaultRPCCertFetchMaxRetries
+			conf.SlaveOptions.RPCCertFetchMaxRetries = &maxRetries
 		}
 	}
 
