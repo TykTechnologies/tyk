@@ -108,7 +108,7 @@ func TestMCPVEMContinuationMiddleware_ProcessRequest(t *testing.T) {
 			initialState: &httpctx.JSONRPCRoutingState{
 				Method:       "tools/call",
 				NextVEM:      "",
-				OriginalPath: "/prct",
+				OriginalPath: "/mcp",
 				VEMChain:     []string{"/json-rpc-method:tools/call", "/mcp-tool:weather.getForecast"},
 				VisitedVEMs:  []string{"/json-rpc-method:tools/call"},
 			},
@@ -130,7 +130,13 @@ func TestMCPVEMContinuationMiddleware_ProcessRequest(t *testing.T) {
 				},
 			}
 
-			r := httptest.NewRequest("POST", "/json-rpc-method:tools/call", nil)
+			// Set initial URL path based on test case
+			requestPath := "/json-rpc-method:tools/call"
+			if tt.initialState != nil && tt.initialState.NextVEM == "" {
+				// For complete routing test, start at the final VEM path
+				requestPath = "/mcp-tool:weather.getForecast"
+			}
+			r := httptest.NewRequest("POST", requestPath+"?check_limits=true", nil)
 			w := httptest.NewRecorder()
 
 			if tt.initialState != nil {
@@ -149,8 +155,14 @@ func TestMCPVEMContinuationMiddleware_ProcessRequest(t *testing.T) {
 				require.NotNil(t, finalState)
 				assert.Equal(t, tt.expectedNextVEM, finalState.NextVEM)
 
-				// Check VEM was recorded
-				assert.Contains(t, finalState.VisitedVEMs, r.URL.Path)
+				// Check VEM was recorded (use the original request path, not the restored path)
+				if !tt.expectsRedirect && tt.initialState.NextVEM == "" {
+					// When routing is complete, check the VEM path was recorded before restoration
+					assert.Contains(t, finalState.VisitedVEMs, "/mcp-tool:weather.getForecast")
+				} else if r.URL.Path != tt.initialState.OriginalPath {
+					// During routing, check current VEM was recorded
+					assert.Contains(t, finalState.VisitedVEMs, requestPath)
+				}
 			}
 
 			// Check redirect URL
@@ -162,6 +174,12 @@ func TestMCPVEMContinuationMiddleware_ProcessRequest(t *testing.T) {
 				assert.Equal(t, "/mcp-tool:weather.getForecast", redirectURL.Path)
 			} else {
 				assert.Nil(t, ctxGetURLRewriteTarget(r))
+
+				// When routing is complete, verify original path is restored
+				if tt.initialState != nil && tt.initialState.NextVEM == "" {
+					assert.Equal(t, tt.initialState.OriginalPath, r.URL.Path, "Original path should be restored when routing is complete")
+					assert.Empty(t, r.URL.RawQuery, "Query parameters should be cleared when routing is complete")
+				}
 			}
 		})
 	}

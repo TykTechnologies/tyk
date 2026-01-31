@@ -48,6 +48,10 @@ func (m *MCPVEMContinuationMiddleware) ProcessRequest(w http.ResponseWriter, r *
 
 	// Check if routing is complete (NextVEM is empty)
 	if httpctx.IsRoutingComplete(r) {
+		// Restore original path for upstream proxy
+		// VEM paths are virtual internal routes and should not be sent to upstream
+		r.URL.Path = state.OriginalPath
+		r.URL.RawQuery = "" // Clear internal routing query params
 		// No more routing needed, allow upstream
 		return nil, http.StatusOK
 	}
