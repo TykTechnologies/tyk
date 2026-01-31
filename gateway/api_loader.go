@@ -301,6 +301,10 @@ func (gw *Gateway) processSpec(
 		logger.Info("Checking security policy: Open")
 	}
 
+	// JSONRPCMiddleware must run before VersionCheck for JSON-RPC APIs.
+	// It parses JSON-RPC payloads, rewrites URL paths to VEM paths, and sets
+	// the routing context that VersionCheck uses for whitelist/blacklist validation.
+	gw.mwAppendEnabled(&chainArray, &JSONRPCMiddleware{BaseMiddleware: baseMid.Copy()})
 	gw.mwAppendEnabled(&chainArray, &VersionCheck{BaseMiddleware: baseMid.Copy()})
 	gw.mwAppendEnabled(&chainArray, &CORSMiddleware{BaseMiddleware: baseMid.Copy()})
 
@@ -547,6 +551,12 @@ func (gw *Gateway) processSpec(
 			chainArray = append(chainArray, gw.createDynamicMiddleware(obj.Name, false, obj.RequireSession, baseMid.Copy()))
 		}
 	}
+
+	// MCPVEMContinuationMiddleware must be the last middleware in the chain.
+	// After all VEM-specific middleware has been applied, it checks the routing state
+	// and either continues to the next VEM or allows the request to proceed to upstream.
+	gw.mwAppendEnabled(&chainArray, &MCPVEMContinuationMiddleware{BaseMiddleware: baseMid.Copy()})
+
 	chain = alice.New(chainArray...).Then(&DummyProxyHandler{SH: SuccessHandler{baseMid.Copy()}, Gw: gw})
 
 	if !spec.UseKeylessAccess {

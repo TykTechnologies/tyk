@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/internal/mcp"
 )
 
 func TestMCPPrimitive_Embedding(t *testing.T) {
@@ -236,7 +237,7 @@ func TestMCPPrimitive_DisabledMiddleware(t *testing.T) {
 			Body:    "transformed",
 		}
 
-		vemPath := "/mcp-tool:test"
+		vemPath := mcp.ToolPrefix + "test"
 		var mcpEP, opEP apidef.ExtendedPathsSet
 
 		primitive.extractTransformResponseBodyTo(&mcpEP, vemPath, "POST")
@@ -255,10 +256,11 @@ func TestMCPPrimitive_DisabledMiddleware(t *testing.T) {
 		primitive.TransformResponseBody = &TransformBody{Enabled: true}
 
 		var ep apidef.ExtendedPathsSet
-		primitive.extractTransformRequestHeadersTo(&ep, "/test", "POST")
-		primitive.extractTransformResponseBodyTo(&ep, "/test", "POST")
+		primitive.ExtractToExtendedPaths(&ep, "/test", "POST")
 
+		// Request headers transformation works
 		assert.Len(t, ep.TransformHeader, 1)
+		// Response body transformation is skipped for MCPPrimitive
 		assert.Empty(t, ep.TransformResponse)
 	})
 }
@@ -335,5 +337,71 @@ func TestMCPPrimitive_MultipleMiddlewareScenarios(t *testing.T) {
 
 		assert.Equal(t, int64(1048576), primitive.RequestSizeLimit.Value)
 		assert.Len(t, primitive.TransformRequestHeaders.Add, 1)
+	})
+}
+
+func TestOperation_ExtractToExtendedPaths_ValidateRequestAndMockResponse(t *testing.T) {
+	t.Run("extracts ValidateRequest middleware", func(t *testing.T) {
+		op := &Operation{
+			ValidateRequest: &ValidateRequest{
+				Enabled:           true,
+				ErrorResponseCode: 400,
+			},
+		}
+
+		var ep apidef.ExtendedPathsSet
+		op.ExtractToExtendedPaths(&ep, "/test", "POST")
+
+		assert.Len(t, ep.ValidateRequest, 1)
+		assert.Equal(t, "/test", ep.ValidateRequest[0].Path)
+		assert.Equal(t, "POST", ep.ValidateRequest[0].Method)
+		assert.True(t, ep.ValidateRequest[0].Enabled)
+		assert.Equal(t, 400, ep.ValidateRequest[0].ErrorResponseCode)
+	})
+
+	t.Run("extracts MockResponse middleware", func(t *testing.T) {
+		op := &Operation{
+			MockResponse: &MockResponse{
+				Enabled: true,
+				Code:    200,
+				Body:    `{"message": "mocked"}`,
+				Headers: Headers{{Name: "X-Mock", Value: "true"}},
+			},
+		}
+
+		var ep apidef.ExtendedPathsSet
+		op.ExtractToExtendedPaths(&ep, "/test", "GET")
+
+		assert.Len(t, ep.MockResponse, 1)
+		assert.Equal(t, "/test", ep.MockResponse[0].Path)
+		assert.Equal(t, "GET", ep.MockResponse[0].Method)
+		assert.False(t, ep.MockResponse[0].Disabled)
+		assert.Equal(t, 200, ep.MockResponse[0].Code)
+		assert.Equal(t, `{"message": "mocked"}`, ep.MockResponse[0].Body)
+		assert.Equal(t, "true", ep.MockResponse[0].Headers["X-Mock"])
+	})
+
+	t.Run("MCPPrimitive inherits extraction", func(t *testing.T) {
+		primitive := &MCPPrimitive{}
+		primitive.ValidateRequest = &ValidateRequest{
+			Enabled:           true,
+			ErrorResponseCode: 422,
+		}
+		primitive.MockResponse = &MockResponse{
+			Enabled: true,
+			Code:    404,
+			Body:    `{"error": "not found"}`,
+		}
+
+		var ep apidef.ExtendedPathsSet
+		primitive.ExtractToExtendedPaths(&ep, "/mcp/tool/test", "POST")
+
+		assert.Len(t, ep.ValidateRequest, 1)
+		assert.True(t, ep.ValidateRequest[0].Enabled)
+		assert.Equal(t, 422, ep.ValidateRequest[0].ErrorResponseCode)
+
+		assert.Len(t, ep.MockResponse, 1)
+		assert.False(t, ep.MockResponse[0].Disabled)
+		assert.Equal(t, 404, ep.MockResponse[0].Code)
 	})
 }

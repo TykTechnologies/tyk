@@ -1821,54 +1821,99 @@ func BuildAPI(apiGens ...func(spec *APISpec)) (specs []*APISpec) {
 }
 
 func (gw *Gateway) LoadAPI(specs ...*APISpec) (out []*APISpec) {
-	var err error
+	cleanup := gw.setupTempAppPath()
+	defer cleanup()
+
+	gwConf := gw.GetConfig()
+	gw.writeSpecFiles(specs, gwConf.AppPath)
+
+	gw.DoReload()
+	return gw.collectLoadedSpecs(specs)
+}
+
+// setupTempAppPath creates a temporary directory for API specs and returns a cleanup function.
+func (gw *Gateway) setupTempAppPath() func() {
 	gwConf := gw.GetConfig()
 	oldPath := gwConf.AppPath
-	gwConf.AppPath, err = ioutil.TempDir("", "apps")
+
+	tempPath, err := ioutil.TempDir("", "apps")
 	if err != nil {
 		log.WithError(err).Errorf("loadapi: failed to create temp dir")
 	}
+
+	gwConf.AppPath = tempPath
 	gw.SetConfig(gwConf, true)
-	defer func() {
+
+	return func() {
 		globalConf := gw.GetConfig()
 		os.RemoveAll(globalConf.AppPath)
 		globalConf.AppPath = oldPath
 		gw.SetConfig(globalConf, true)
-	}()
+	}
+}
 
+// writeSpecFiles writes API spec files to the specified directory.
+func (gw *Gateway) writeSpecFiles(specs []*APISpec, appPath string) {
 	for i, spec := range specs {
-		if spec.Name == "" {
-			spec.Name = randStringBytes(15)
-		}
+		gw.ensureSpecName(spec)
+		gw.writeAPIDefinitionFile(spec, i, appPath)
+		gw.writeOASFile(spec, i, appPath)
+	}
+}
 
-		specBytes, err := json.Marshal(spec.APIDefinition)
-		if err != nil {
-			log.WithError(err).Errorf("API Spec Marshal failed: %+v", spec)
-			panic(err)
-		}
+// ensureSpecName generates a random name if the spec doesn't have one.
+func (gw *Gateway) ensureSpecName(spec *APISpec) {
+	if spec.Name == "" {
+		spec.Name = randStringBytes(15)
+	}
+}
 
-		specFilePath := filepath.Join(gwConf.AppPath, spec.APIID+strconv.Itoa(i)+".json")
-		if err := ioutil.WriteFile(specFilePath, specBytes, 0644); err != nil {
-			panic(err)
-		}
-
-		oasSpecBytes, err := json.Marshal(&spec.OAS)
-		if err != nil {
-			log.WithError(err).Errorf("OAS Marshal failed: %+v", spec)
-			panic(err)
-		}
-
-		oasSpecFilePath := filepath.Join(gwConf.AppPath, spec.APIID+strconv.Itoa(i)+"-oas.json")
-		if err := ioutil.WriteFile(oasSpecFilePath, oasSpecBytes, 0644); err != nil {
-			panic(err)
-		}
+// writeAPIDefinitionFile marshals and writes the API definition to a file.
+func (gw *Gateway) writeAPIDefinitionFile(spec *APISpec, index int, appPath string) {
+	specBytes, err := json.Marshal(spec.APIDefinition)
+	if err != nil {
+		log.WithError(err).Errorf("API Spec Marshal failed: %+v", spec)
+		panic(err)
 	}
 
-	gw.DoReload()
+	specFilePath := filepath.Join(appPath, spec.APIID+strconv.Itoa(index)+".json")
+	if err := ioutil.WriteFile(specFilePath, specBytes, 0644); err != nil {
+		panic(err)
+	}
+}
+
+// writeOASFile marshals and writes the OAS spec to a file.
+// Uses -mcp.json suffix for MCP APIs, -oas.json for regular OAS APIs.
+func (gw *Gateway) writeOASFile(spec *APISpec, index int, appPath string) {
+	oasSpecBytes, err := json.Marshal(&spec.OAS)
+	if err != nil {
+		log.WithError(err).Errorf("OAS Marshal failed: %+v", spec)
+		panic(err)
+	}
+
+	oasSpecFilePath := gw.getOASFilePath(spec, index, appPath)
+	if err := ioutil.WriteFile(oasSpecFilePath, oasSpecBytes, 0644); err != nil {
+		panic(err)
+	}
+}
+
+// getOASFilePath returns the file path for an OAS spec.
+// Uses -mcp.json suffix for MCP APIs, -oas.json for regular OAS APIs.
+func (gw *Gateway) getOASFilePath(spec *APISpec, index int, appPath string) string {
+	baseName := spec.APIID + strconv.Itoa(index)
+	suffix := "-oas.json"
+	if spec.IsMCP() {
+		suffix = "-mcp.json"
+	}
+	return filepath.Join(appPath, baseName+suffix)
+}
+
+// collectLoadedSpecs retrieves the loaded API specs after reload.
+func (gw *Gateway) collectLoadedSpecs(specs []*APISpec) []*APISpec {
+	out := make([]*APISpec, 0, len(specs))
 	for _, spec := range specs {
 		out = append(out, gw.getApiSpec(spec.APIID))
 	}
-
 	return out
 }
 

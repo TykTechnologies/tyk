@@ -17,11 +17,16 @@ import (
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/ctx"
 	"github.com/TykTechnologies/tyk/header"
+	"github.com/TykTechnologies/tyk/internal/agentprotocol"
 	"github.com/TykTechnologies/tyk/internal/certcheck"
 	"github.com/TykTechnologies/tyk/internal/errors"
 	"github.com/TykTechnologies/tyk/internal/graphengine"
+	"github.com/TykTechnologies/tyk/internal/httpctx"
 	"github.com/TykTechnologies/tyk/internal/httputil"
+	"github.com/TykTechnologies/tyk/internal/jsonrpc"
 	"github.com/TykTechnologies/tyk/user"
+
+	_ "github.com/TykTechnologies/tyk/internal/mcp" // registers MCP VEM prefixes
 )
 
 // APISpec represents a path specification for an API, to avoid enumerating multiple nested lists, a single
@@ -78,9 +83,28 @@ type APISpec struct {
 	// Value: VEM path (e.g., "/mcp-tool:get-weather")
 	MCPPrimitives map[string]string
 
+	JSONRPCRouter jsonrpc.Router
+
+	// OperationsAllowListEnabled is true if any JSON-RPC operation (method-level) has
+	// an allow rule enabled. Pre-calculated during API loading.
+	OperationsAllowListEnabled bool
+
+	// ToolsAllowListEnabled is true if any MCP tool has an allow rule enabled.
+	// Pre-calculated during API loading.
+	ToolsAllowListEnabled bool
+
+	// ResourcesAllowListEnabled is true if any MCP resource has an allow rule enabled.
+	// Pre-calculated during API loading.
+	ResourcesAllowListEnabled bool
+
+	// PromptsAllowListEnabled is true if any MCP prompt has an allow rule enabled.
+	// Pre-calculated during API loading.
+	PromptsAllowListEnabled bool
+
 	// MCPAllowListEnabled is true if any MCP primitive (tool, resource, prompt) has an
 	// allow rule enabled. Pre-calculated during API loading to avoid iterating through
 	// all primitives on every JSON-RPC request that doesn't match a VEM.
+	// This is a convenience flag that combines ToolsAllowListEnabled, ResourcesAllowListEnabled, and PromptsAllowListEnabled.
 	MCPAllowListEnabled bool
 }
 
@@ -138,6 +162,13 @@ func (a *APISpec) FindSpecMatchesStatus(r *http.Request, rxPaths []URLSpec, mode
 	return nil, false
 }
 
+// isJSONRPCVEMPath returns true if the request is a JSON-RPC routed request
+// targeting a protocol VEM path. In this case, the listen path should not be
+// stripped as the VEM path is already in its final form.
+func isJSONRPCVEMPath(r *http.Request, path string) bool {
+	return httpctx.IsJsonRPCRouting(r) && agentprotocol.IsProtocolVEMPath(path)
+}
+
 // getMatchPathAndMethod retrieves the match path and method from the request based on the mode.
 func (a *APISpec) getMatchPathAndMethod(r *http.Request, mode URLStatus) (string, string) {
 	var (
@@ -153,7 +184,7 @@ func (a *APISpec) getMatchPathAndMethod(r *http.Request, mode URLStatus) (string
 		}
 	}
 
-	if a.Proxy.ListenPath != "/" {
+	if a.Proxy.ListenPath != "/" && !isJSONRPCVEMPath(r, matchPath) {
 		matchPath = a.StripListenPath(matchPath)
 	}
 

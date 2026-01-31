@@ -15,9 +15,9 @@ func TestIsPrimitiveVEMPath(t *testing.T) {
 		path     string
 		expected bool
 	}{
-		{"/mcp-tool:get-weather", true},
-		{"/mcp-resource:file:///repo/*", true},
-		{"/mcp-prompt:code-review", true},
+		{ToolPrefix + "get-weather", true},
+		{ResourcePrefix + "file:///repo/*", true},
+		{PromptPrefix + "code-review", true},
 		{"/api/v1/users", false},
 		{"/mcp-tools", false}, // missing colon
 		{"", false},
