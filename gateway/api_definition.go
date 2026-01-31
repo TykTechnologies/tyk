@@ -1472,6 +1472,10 @@ func (a APIDefinitionLoader) getExtendedPathSpecs(apiVersionDef apidef.VersionIn
 	// MCP VEM generation - creates internal endpoints for MCP primitives (tools, resources, prompts)
 	mcpVEMs := a.generateMCPVEMs(apiSpec, conf)
 
+	if apiSpec.IsMCP() && apiSpec.JsonRpcVersion == apidef.JsonRPC20 {
+		apiSpec.JSONRPCRouter = mcp.NewRouter(apiSpec.MCPAllowListEnabled)
+	}
+
 	combinedPath := []URLSpec{}
 	combinedPath = append(combinedPath, mockResponsePaths...)
 	combinedPath = append(combinedPath, ignoredPaths...)

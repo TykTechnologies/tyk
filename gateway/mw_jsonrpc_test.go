@@ -20,7 +20,7 @@ import (
 	"github.com/TykTechnologies/tyk/test"
 )
 
-func TestMCPJSONRPCMiddleware_EnabledForSpec(t *testing.T) {
+func TestJSONRPCMiddleware_EnabledForSpec(t *testing.T) {
 	tests := []struct {
 		name     string
 		spec     *APISpec
@@ -70,7 +70,7 @@ func TestMCPJSONRPCMiddleware_EnabledForSpec(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			m := &MCPJSONRPCMiddleware{
+			m := &JSONRPCMiddleware{
 				BaseMiddleware: &BaseMiddleware{Spec: tt.spec},
 			}
 			assert.Equal(t, tt.expected, m.EnabledForSpec())
@@ -78,7 +78,7 @@ func TestMCPJSONRPCMiddleware_EnabledForSpec(t *testing.T) {
 	}
 }
 
-func TestMCPJSONRPCMiddleware_ProcessRequest_NonPostPassthrough(t *testing.T) {
+func TestJSONRPCMiddleware_ProcessRequest_NonPostPassthrough(t *testing.T) {
 	spec := &APISpec{
 		APIDefinition: &apidef.APIDefinition{
 			ApplicationProtocol: apidef.AppProtocolMCP,
@@ -86,7 +86,7 @@ func TestMCPJSONRPCMiddleware_ProcessRequest_NonPostPassthrough(t *testing.T) {
 		},
 	}
 
-	m := &MCPJSONRPCMiddleware{
+	m := &JSONRPCMiddleware{
 		BaseMiddleware: &BaseMiddleware{Spec: spec},
 	}
 
@@ -98,7 +98,7 @@ func TestMCPJSONRPCMiddleware_ProcessRequest_NonPostPassthrough(t *testing.T) {
 	assert.Equal(t, http.StatusOK, code)
 }
 
-func TestMCPJSONRPCMiddleware_ProcessRequest_NonJSONPassthrough(t *testing.T) {
+func TestJSONRPCMiddleware_ProcessRequest_NonJSONPassthrough(t *testing.T) {
 	spec := &APISpec{
 		APIDefinition: &apidef.APIDefinition{
 			ApplicationProtocol: apidef.AppProtocolMCP,
@@ -106,7 +106,7 @@ func TestMCPJSONRPCMiddleware_ProcessRequest_NonJSONPassthrough(t *testing.T) {
 		},
 	}
 
-	m := &MCPJSONRPCMiddleware{
+	m := &JSONRPCMiddleware{
 		BaseMiddleware: &BaseMiddleware{Spec: spec},
 	}
 
@@ -119,7 +119,7 @@ func TestMCPJSONRPCMiddleware_ProcessRequest_NonJSONPassthrough(t *testing.T) {
 	assert.Equal(t, http.StatusOK, code)
 }
 
-func TestMCPJSONRPCMiddleware_ProcessRequest_InvalidJSON(t *testing.T) {
+func TestJSONRPCMiddleware_ProcessRequest_InvalidJSON(t *testing.T) {
 	spec := &APISpec{
 		APIDefinition: &apidef.APIDefinition{
 			ApplicationProtocol: apidef.AppProtocolMCP,
@@ -127,7 +127,7 @@ func TestMCPJSONRPCMiddleware_ProcessRequest_InvalidJSON(t *testing.T) {
 		},
 	}
 
-	m := &MCPJSONRPCMiddleware{
+	m := &JSONRPCMiddleware{
 		BaseMiddleware: &BaseMiddleware{Spec: spec},
 	}
 
@@ -145,7 +145,7 @@ func TestMCPJSONRPCMiddleware_ProcessRequest_InvalidJSON(t *testing.T) {
 	assert.Equal(t, mcp.ErrMsgParseError, resp.Error.Message)
 }
 
-func TestMCPJSONRPCMiddleware_ProcessRequest_InvalidRequest(t *testing.T) {
+func TestJSONRPCMiddleware_ProcessRequest_InvalidRequest(t *testing.T) {
 	spec := &APISpec{
 		APIDefinition: &apidef.APIDefinition{
 			ApplicationProtocol: apidef.AppProtocolMCP,
@@ -153,7 +153,7 @@ func TestMCPJSONRPCMiddleware_ProcessRequest_InvalidRequest(t *testing.T) {
 		},
 	}
 
-	m := &MCPJSONRPCMiddleware{
+	m := &JSONRPCMiddleware{
 		BaseMiddleware: &BaseMiddleware{Spec: spec},
 	}
 
@@ -197,7 +197,7 @@ func TestMCPJSONRPCMiddleware_ProcessRequest_InvalidRequest(t *testing.T) {
 	}
 }
 
-func TestMCPJSONRPCMiddleware_ProcessRequest_ToolsCall_RoutesToVEM(t *testing.T) {
+func TestJSONRPCMiddleware_ProcessRequest_ToolsCall_RoutesToVEM(t *testing.T) {
 	spec := &APISpec{
 		APIDefinition: &apidef.APIDefinition{
 			ApplicationProtocol: apidef.AppProtocolMCP,
@@ -206,9 +206,10 @@ func TestMCPJSONRPCMiddleware_ProcessRequest_ToolsCall_RoutesToVEM(t *testing.T)
 		MCPPrimitives: map[string]string{
 			"tool:get-weather": "/mcp-tool:get-weather",
 		},
+		JSONRPCRouter: mcp.NewRouter(false),
 	}
 
-	m := &MCPJSONRPCMiddleware{
+	m := &JSONRPCMiddleware{
 		BaseMiddleware: &BaseMiddleware{Spec: spec},
 	}
 
@@ -247,16 +248,17 @@ func TestMCPJSONRPCMiddleware_ProcessRequest_ToolsCall_RoutesToVEM(t *testing.T)
 	assert.True(t, httpctx.IsJsonRPCRouting(r))
 }
 
-func TestMCPJSONRPCMiddleware_ProcessRequest_ToolsCall_NotFound(t *testing.T) {
+func TestJSONRPCMiddleware_ProcessRequest_ToolsCall_NotFound(t *testing.T) {
 	spec := &APISpec{
 		APIDefinition: &apidef.APIDefinition{
 			ApplicationProtocol: apidef.AppProtocolMCP,
 			JsonRpcVersion:      apidef.JsonRPC20,
 		},
 		MCPPrimitives: map[string]string{},
+		JSONRPCRouter: mcp.NewRouter(false),
 	}
 
-	m := &MCPJSONRPCMiddleware{
+	m := &JSONRPCMiddleware{
 		BaseMiddleware: &BaseMiddleware{Spec: spec},
 	}
 
@@ -282,7 +284,7 @@ func TestMCPJSONRPCMiddleware_ProcessRequest_ToolsCall_NotFound(t *testing.T) {
 	assert.Equal(t, 0, w.Body.Len())
 }
 
-func TestMCPJSONRPCMiddleware_ProcessRequest_ToolsCall_NotFound_WithAllowList(t *testing.T) {
+func TestJSONRPCMiddleware_ProcessRequest_ToolsCall_NotFound_WithAllowList(t *testing.T) {
 	// When MCPAllowListEnabled is true, unknown tools are routed to a VEM path
 	// that will be caught by the catch-all BlackList middleware.
 	// The blocking happens at the BlackList/VersionCheck middleware level, not here.
@@ -295,9 +297,10 @@ func TestMCPJSONRPCMiddleware_ProcessRequest_ToolsCall_NotFound_WithAllowList(t 
 			"tool:get-weather": "/mcp-tool:get-weather",
 		},
 		MCPAllowListEnabled: true,
+		JSONRPCRouter:       mcp.NewRouter(true),
 	}
 
-	m := &MCPJSONRPCMiddleware{
+	m := &JSONRPCMiddleware{
 		BaseMiddleware: &BaseMiddleware{Spec: spec},
 	}
 
@@ -334,7 +337,7 @@ func TestMCPJSONRPCMiddleware_ProcessRequest_ToolsCall_NotFound_WithAllowList(t 
 	assert.Equal(t, 0, w.Body.Len(), "no error response should be written by middleware")
 }
 
-func TestMCPJSONRPCMiddleware_ProcessRequest_AllowListBehavior(t *testing.T) {
+func TestJSONRPCMiddleware_ProcessRequest_AllowListBehavior(t *testing.T) {
 	// Scenario: MCP API with 2 registered VEMs and 1 unregistered primitive.
 	// - "tool-with-allow": registered with Allow enabled
 	// - "tool-without-allow": registered but without Allow
@@ -355,9 +358,10 @@ func TestMCPJSONRPCMiddleware_ProcessRequest_AllowListBehavior(t *testing.T) {
 			// "unregistered-tool" is intentionally NOT in the map
 		},
 		MCPAllowListEnabled: true, // Set because at least one primitive has Allow enabled
+		JSONRPCRouter:       mcp.NewRouter(true),
 	}
 
-	m := &MCPJSONRPCMiddleware{
+	m := &JSONRPCMiddleware{
 		BaseMiddleware: &BaseMiddleware{Spec: spec},
 	}
 
@@ -415,7 +419,7 @@ func TestMCPJSONRPCMiddleware_ProcessRequest_AllowListBehavior(t *testing.T) {
 	}
 }
 
-func TestMCPJSONRPCMiddleware_ProcessRequest_ResourcesRead_ExactMatch(t *testing.T) {
+func TestJSONRPCMiddleware_ProcessRequest_ResourcesRead_ExactMatch(t *testing.T) {
 	spec := &APISpec{
 		APIDefinition: &apidef.APIDefinition{
 			ApplicationProtocol: apidef.AppProtocolMCP,
@@ -424,9 +428,10 @@ func TestMCPJSONRPCMiddleware_ProcessRequest_ResourcesRead_ExactMatch(t *testing
 		MCPPrimitives: map[string]string{
 			"resource:file:///config.json": "/mcp-resource:file:///config.json",
 		},
+		JSONRPCRouter: mcp.NewRouter(false),
 	}
 
-	m := &MCPJSONRPCMiddleware{
+	m := &JSONRPCMiddleware{
 		BaseMiddleware: &BaseMiddleware{Spec: spec},
 	}
 
@@ -458,7 +463,7 @@ func TestMCPJSONRPCMiddleware_ProcessRequest_ResourcesRead_ExactMatch(t *testing
 	assert.Equal(t, "/mcp-resource:file:///config.json", state.NextVEM, "NextVEM should be resource VEM")
 }
 
-func TestMCPJSONRPCMiddleware_ProcessRequest_ResourcesRead_WildcardMatch(t *testing.T) {
+func TestJSONRPCMiddleware_ProcessRequest_ResourcesRead_WildcardMatch(t *testing.T) {
 	spec := &APISpec{
 		APIDefinition: &apidef.APIDefinition{
 			ApplicationProtocol: apidef.AppProtocolMCP,
@@ -467,9 +472,10 @@ func TestMCPJSONRPCMiddleware_ProcessRequest_ResourcesRead_WildcardMatch(t *test
 		MCPPrimitives: map[string]string{
 			"resource:file:///repo/*": "/mcp-resource:file:///repo/*",
 		},
+		JSONRPCRouter: mcp.NewRouter(false),
 	}
 
-	m := &MCPJSONRPCMiddleware{
+	m := &JSONRPCMiddleware{
 		BaseMiddleware: &BaseMiddleware{Spec: spec},
 	}
 
@@ -501,7 +507,7 @@ func TestMCPJSONRPCMiddleware_ProcessRequest_ResourcesRead_WildcardMatch(t *test
 	assert.Equal(t, "/mcp-resource:file:///repo/*", state.NextVEM)
 }
 
-func TestMCPJSONRPCMiddleware_ProcessRequest_ResourcesRead_ExactBeatsWildcard(t *testing.T) {
+func TestJSONRPCMiddleware_ProcessRequest_ResourcesRead_ExactBeatsWildcard(t *testing.T) {
 	spec := &APISpec{
 		APIDefinition: &apidef.APIDefinition{
 			ApplicationProtocol: apidef.AppProtocolMCP,
@@ -514,9 +520,10 @@ func TestMCPJSONRPCMiddleware_ProcessRequest_ResourcesRead_ExactBeatsWildcard(t 
 			"resource:file:///repo/README.mdx":  "/mcp-resource:file:///repo/README.mdx",
 			"resource:file:///repo/README.json": "/mcp-resource:file:///repo/README.json",
 		},
+		JSONRPCRouter: mcp.NewRouter(false),
 	}
 
-	m := &MCPJSONRPCMiddleware{
+	m := &JSONRPCMiddleware{
 		BaseMiddleware: &BaseMiddleware{Spec: spec},
 	}
 
@@ -548,7 +555,7 @@ func TestMCPJSONRPCMiddleware_ProcessRequest_ResourcesRead_ExactBeatsWildcard(t 
 	assert.Equal(t, "/mcp-resource:file:///repo/README.md", state.NextVEM)
 }
 
-func TestMCPJSONRPCMiddleware_ProcessRequest_ResourcesRead_MostSpecificWildcard(t *testing.T) {
+func TestJSONRPCMiddleware_ProcessRequest_ResourcesRead_MostSpecificWildcard(t *testing.T) {
 	spec := &APISpec{
 		APIDefinition: &apidef.APIDefinition{
 			ApplicationProtocol: apidef.AppProtocolMCP,
@@ -558,9 +565,10 @@ func TestMCPJSONRPCMiddleware_ProcessRequest_ResourcesRead_MostSpecificWildcard(
 			"resource:file:///repo/*":      "/mcp-resource:file:///repo/*",
 			"resource:file:///repo/docs/*": "/mcp-resource:file:///repo/docs/*",
 		},
+		JSONRPCRouter: mcp.NewRouter(false),
 	}
 
-	m := &MCPJSONRPCMiddleware{
+	m := &JSONRPCMiddleware{
 		BaseMiddleware: &BaseMiddleware{Spec: spec},
 	}
 
@@ -592,7 +600,7 @@ func TestMCPJSONRPCMiddleware_ProcessRequest_ResourcesRead_MostSpecificWildcard(
 	assert.Equal(t, "/mcp-resource:file:///repo/docs/*", state.NextVEM)
 }
 
-func TestMCPJSONRPCMiddleware_ProcessRequest_PromptsGet(t *testing.T) {
+func TestJSONRPCMiddleware_ProcessRequest_PromptsGet(t *testing.T) {
 	spec := &APISpec{
 		APIDefinition: &apidef.APIDefinition{
 			ApplicationProtocol: apidef.AppProtocolMCP,
@@ -601,9 +609,10 @@ func TestMCPJSONRPCMiddleware_ProcessRequest_PromptsGet(t *testing.T) {
 		MCPPrimitives: map[string]string{
 			"prompt:code-review": "/mcp-prompt:code-review",
 		},
+		JSONRPCRouter: mcp.NewRouter(false),
 	}
 
-	m := &MCPJSONRPCMiddleware{
+	m := &JSONRPCMiddleware{
 		BaseMiddleware: &BaseMiddleware{Spec: spec},
 	}
 
@@ -635,7 +644,7 @@ func TestMCPJSONRPCMiddleware_ProcessRequest_PromptsGet(t *testing.T) {
 	assert.Equal(t, "/mcp-prompt:code-review", state.NextVEM)
 }
 
-func TestMCPJSONRPCMiddleware_ProcessRequest_OperationVEM(t *testing.T) {
+func TestJSONRPCMiddleware_ProcessRequest_OperationVEM(t *testing.T) {
 	spec := &APISpec{
 		APIDefinition: &apidef.APIDefinition{
 			ApplicationProtocol: apidef.AppProtocolMCP,
@@ -644,9 +653,10 @@ func TestMCPJSONRPCMiddleware_ProcessRequest_OperationVEM(t *testing.T) {
 		MCPPrimitives: map[string]string{
 			"operation:tools/list": "/json-rpc-method:tools-list",
 		},
+		JSONRPCRouter: mcp.NewRouter(false),
 	}
 
-	m := &MCPJSONRPCMiddleware{
+	m := &JSONRPCMiddleware{
 		BaseMiddleware: &BaseMiddleware{Spec: spec},
 	}
 
@@ -669,8 +679,8 @@ func TestMCPJSONRPCMiddleware_ProcessRequest_OperationVEM(t *testing.T) {
 	// Check redirect URL points to operation VEM
 	redirectURL := ctxGetURLRewriteTarget(r)
 	require.NotNil(t, redirectURL)
-	// Operation VEM is built from method name, not from primitives map
-	assert.Equal(t, "/json-rpc-method:tools/list", redirectURL.Path)
+	// When an operation VEM is registered, use the registered path
+	assert.Equal(t, "/json-rpc-method:tools-list", redirectURL.Path)
 
 	// Check routing state - discovery methods have NO NextVEM (1-stage routing)
 	state := httpctx.GetJSONRPCRoutingState(r)
@@ -678,16 +688,17 @@ func TestMCPJSONRPCMiddleware_ProcessRequest_OperationVEM(t *testing.T) {
 	assert.Equal(t, "", state.NextVEM, "Discovery methods should have empty NextVEM (1-stage routing)")
 }
 
-func TestMCPJSONRPCMiddleware_ProcessRequest_DiscoveryPassthrough(t *testing.T) {
+func TestJSONRPCMiddleware_ProcessRequest_DiscoveryPassthrough(t *testing.T) {
 	spec := &APISpec{
 		APIDefinition: &apidef.APIDefinition{
 			ApplicationProtocol: apidef.AppProtocolMCP,
 			JsonRpcVersion:      apidef.JsonRPC20,
 		},
 		MCPPrimitives: map[string]string{}, // No configured VEMs
+		JSONRPCRouter: mcp.NewRouter(false),
 	}
 
-	m := &MCPJSONRPCMiddleware{
+	m := &JSONRPCMiddleware{
 		BaseMiddleware: &BaseMiddleware{Spec: spec},
 	}
 
@@ -718,16 +729,17 @@ func TestMCPJSONRPCMiddleware_ProcessRequest_DiscoveryPassthrough(t *testing.T) 
 	}
 }
 
-func TestMCPJSONRPCMiddleware_ProcessRequest_NotificationsPassthrough(t *testing.T) {
+func TestJSONRPCMiddleware_ProcessRequest_NotificationsPassthrough(t *testing.T) {
 	spec := &APISpec{
 		APIDefinition: &apidef.APIDefinition{
 			ApplicationProtocol: apidef.AppProtocolMCP,
 			JsonRpcVersion:      apidef.JsonRPC20,
 		},
 		MCPPrimitives: map[string]string{},
+		JSONRPCRouter: mcp.NewRouter(false),
 	}
 
-	m := &MCPJSONRPCMiddleware{
+	m := &JSONRPCMiddleware{
 		BaseMiddleware: &BaseMiddleware{Spec: spec},
 	}
 
@@ -752,16 +764,17 @@ func TestMCPJSONRPCMiddleware_ProcessRequest_NotificationsPassthrough(t *testing
 	assert.Equal(t, 0, w.Body.Len())
 }
 
-func TestMCPJSONRPCMiddleware_ProcessRequest_UnmatchedMethodPassthrough(t *testing.T) {
+func TestJSONRPCMiddleware_ProcessRequest_UnmatchedMethodPassthrough(t *testing.T) {
 	spec := &APISpec{
 		APIDefinition: &apidef.APIDefinition{
 			ApplicationProtocol: apidef.AppProtocolMCP,
 			JsonRpcVersion:      apidef.JsonRPC20,
 		},
 		MCPPrimitives: map[string]string{},
+		JSONRPCRouter: mcp.NewRouter(false),
 	}
 
-	m := &MCPJSONRPCMiddleware{
+	m := &JSONRPCMiddleware{
 		BaseMiddleware: &BaseMiddleware{Spec: spec},
 	}
 
@@ -786,7 +799,7 @@ func TestMCPJSONRPCMiddleware_ProcessRequest_UnmatchedMethodPassthrough(t *testi
 	assert.Equal(t, 0, w.Body.Len())
 }
 
-func TestMCPJSONRPCMiddleware_ProcessRequest_BodyRestored(t *testing.T) {
+func TestJSONRPCMiddleware_ProcessRequest_BodyRestored(t *testing.T) {
 	spec := &APISpec{
 		APIDefinition: &apidef.APIDefinition{
 			ApplicationProtocol: apidef.AppProtocolMCP,
@@ -795,9 +808,10 @@ func TestMCPJSONRPCMiddleware_ProcessRequest_BodyRestored(t *testing.T) {
 		MCPPrimitives: map[string]string{
 			"tool:test": "/mcp-tool:test",
 		},
+		JSONRPCRouter: mcp.NewRouter(false),
 	}
 
-	m := &MCPJSONRPCMiddleware{
+	m := &JSONRPCMiddleware{
 		BaseMiddleware: &BaseMiddleware{Spec: spec},
 	}
 
@@ -822,16 +836,17 @@ func TestMCPJSONRPCMiddleware_ProcessRequest_BodyRestored(t *testing.T) {
 	assert.Equal(t, originalBody, restoredBody)
 }
 
-func TestMCPJSONRPCMiddleware_ProcessRequest_NullID(t *testing.T) {
+func TestJSONRPCMiddleware_ProcessRequest_NullID(t *testing.T) {
 	spec := &APISpec{
 		APIDefinition: &apidef.APIDefinition{
 			ApplicationProtocol: apidef.AppProtocolMCP,
 			JsonRpcVersion:      apidef.JsonRPC20,
 		},
 		MCPPrimitives: map[string]string{},
+		JSONRPCRouter: mcp.NewRouter(false),
 	}
 
-	m := &MCPJSONRPCMiddleware{
+	m := &JSONRPCMiddleware{
 		BaseMiddleware: &BaseMiddleware{Spec: spec},
 	}
 
@@ -851,129 +866,8 @@ func TestMCPJSONRPCMiddleware_ProcessRequest_NullID(t *testing.T) {
 	assert.Nil(t, resp.ID) // ID should be preserved as null
 }
 
-func TestMCPJSONRPCMiddleware_MatchesWildcard(t *testing.T) {
-	m := &MCPJSONRPCMiddleware{}
-
-	tests := []struct {
-		pattern  string
-		uri      string
-		expected bool
-	}{
-		{"file:///repo/*", "file:///repo/README.md", true},
-		{"file:///repo/*", "file:///repo/src/main.go", true},
-		{"file:///repo/*", "file:///other/file.txt", false},
-		{"file:///exact.txt", "file:///exact.txt", true},
-		{"file:///exact.txt", "file:///other.txt", false},
-		{"http://api/*", "http://api/users/123", true},
-		{"http://api/*", "http://api/", true},
-		{"http://api/*", "http://other/", false},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.pattern+"_"+tt.uri, func(t *testing.T) {
-			result := m.matchesWildcard(tt.pattern, tt.uri)
-			assert.Equal(t, tt.expected, result)
-		})
-	}
-}
-
-func TestMCPJSONRPCMiddleware_ExtractParamWithDetails(t *testing.T) {
-	m := &MCPJSONRPCMiddleware{}
-
-	tests := []struct {
-		name            string
-		params          json.RawMessage
-		key             string
-		expectedValue   string
-		expectedIsValid bool
-		expectedErrMsg  string
-	}{
-		{
-			name:            "extract name successfully",
-			params:          json.RawMessage(`{"name":"test-tool","arguments":{}}`),
-			key:             "name",
-			expectedValue:   "test-tool",
-			expectedIsValid: true,
-			expectedErrMsg:  "",
-		},
-		{
-			name:            "extract uri successfully",
-			params:          json.RawMessage(`{"uri":"file:///test.txt"}`),
-			key:             "uri",
-			expectedValue:   "file:///test.txt",
-			expectedIsValid: true,
-			expectedErrMsg:  "",
-		},
-		{
-			name:            "missing name key",
-			params:          json.RawMessage(`{"other":"value"}`),
-			key:             "name",
-			expectedValue:   "",
-			expectedIsValid: false,
-			expectedErrMsg:  mcp.ErrMsgMissingParamName,
-		},
-		{
-			name:            "missing uri key",
-			params:          json.RawMessage(`{"other":"value"}`),
-			key:             "uri",
-			expectedValue:   "",
-			expectedIsValid: false,
-			expectedErrMsg:  mcp.ErrMsgMissingParamURI,
-		},
-		{
-			name:            "empty params",
-			params:          json.RawMessage(``),
-			key:             "name",
-			expectedValue:   "",
-			expectedIsValid: false,
-			expectedErrMsg:  mcp.ErrMsgMissingParams,
-		},
-		{
-			name:            "invalid json",
-			params:          json.RawMessage(`not json`),
-			key:             "name",
-			expectedValue:   "",
-			expectedIsValid: false,
-			expectedErrMsg:  mcp.ErrMsgInvalidParamsType,
-		},
-		{
-			name:            "non-string value",
-			params:          json.RawMessage(`{"name":123}`),
-			key:             "name",
-			expectedValue:   "",
-			expectedIsValid: false,
-			expectedErrMsg:  mcp.ErrMsgInvalidParams,
-		},
-		{
-			name:            "empty name value",
-			params:          json.RawMessage(`{"name":""}`),
-			key:             "name",
-			expectedValue:   "",
-			expectedIsValid: false,
-			expectedErrMsg:  mcp.ErrMsgEmptyParamName,
-		},
-		{
-			name:            "empty uri value",
-			params:          json.RawMessage(`{"uri":""}`),
-			key:             "uri",
-			expectedValue:   "",
-			expectedIsValid: false,
-			expectedErrMsg:  mcp.ErrMsgEmptyParamURI,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			result := m.extractParamWithDetails(tt.params, tt.key)
-			assert.Equal(t, tt.expectedValue, result.Value)
-			assert.Equal(t, tt.expectedIsValid, result.IsValid)
-			assert.Equal(t, tt.expectedErrMsg, result.ErrorMessage)
-		})
-	}
-}
-
-func TestMCPJSONRPCMiddleware_MapJSONRPCErrorToHTTP(t *testing.T) {
-	m := &MCPJSONRPCMiddleware{}
+func TestJSONRPCMiddleware_MapJSONRPCErrorToHTTP(t *testing.T) {
+	m := &JSONRPCMiddleware{}
 
 	tests := []struct {
 		code     int
@@ -998,7 +892,7 @@ func TestMCPJSONRPCMiddleware_MapJSONRPCErrorToHTTP(t *testing.T) {
 	}
 }
 
-func TestMCPJSONRPCMiddleware_ResourcesSubscribe(t *testing.T) {
+func TestJSONRPCMiddleware_ResourcesSubscribe(t *testing.T) {
 	spec := &APISpec{
 		APIDefinition: &apidef.APIDefinition{
 			ApplicationProtocol: apidef.AppProtocolMCP,
@@ -1007,9 +901,10 @@ func TestMCPJSONRPCMiddleware_ResourcesSubscribe(t *testing.T) {
 		MCPPrimitives: map[string]string{
 			"resource:events://*": "/mcp-resource:events://*",
 		},
+		JSONRPCRouter: mcp.NewRouter(false),
 	}
 
-	m := &MCPJSONRPCMiddleware{
+	m := &JSONRPCMiddleware{
 		BaseMiddleware: &BaseMiddleware{Spec: spec},
 	}
 
@@ -1034,7 +929,7 @@ func TestMCPJSONRPCMiddleware_ResourcesSubscribe(t *testing.T) {
 	assert.False(t, httpctx.IsJsonRPCRouting(r))
 }
 
-func TestMCPJSONRPCMiddleware_ResourcesUnsubscribe(t *testing.T) {
+func TestJSONRPCMiddleware_ResourcesUnsubscribe(t *testing.T) {
 	spec := &APISpec{
 		APIDefinition: &apidef.APIDefinition{
 			ApplicationProtocol: apidef.AppProtocolMCP,
@@ -1043,9 +938,10 @@ func TestMCPJSONRPCMiddleware_ResourcesUnsubscribe(t *testing.T) {
 		MCPPrimitives: map[string]string{
 			"resource:events://topic": "/mcp-resource:events://topic",
 		},
+		JSONRPCRouter: mcp.NewRouter(false),
 	}
 
-	m := &MCPJSONRPCMiddleware{
+	m := &JSONRPCMiddleware{
 		BaseMiddleware: &BaseMiddleware{Spec: spec},
 	}
 
@@ -1070,7 +966,7 @@ func TestMCPJSONRPCMiddleware_ResourcesUnsubscribe(t *testing.T) {
 	assert.False(t, httpctx.IsJsonRPCRouting(r))
 }
 
-func TestMCPJSONRPCMiddleware_ToolsCall_MissingParamsName(t *testing.T) {
+func TestJSONRPCMiddleware_ToolsCall_MissingParamsName(t *testing.T) {
 	spec := &APISpec{
 		APIDefinition: &apidef.APIDefinition{
 			ApplicationProtocol: apidef.AppProtocolMCP,
@@ -1079,9 +975,10 @@ func TestMCPJSONRPCMiddleware_ToolsCall_MissingParamsName(t *testing.T) {
 		MCPPrimitives: map[string]string{
 			"tool:test": "/mcp-tool:test",
 		},
+		JSONRPCRouter: mcp.NewRouter(false),
 	}
 
-	m := &MCPJSONRPCMiddleware{
+	m := &JSONRPCMiddleware{
 		BaseMiddleware: &BaseMiddleware{Spec: spec},
 	}
 
@@ -1107,7 +1004,7 @@ func TestMCPJSONRPCMiddleware_ToolsCall_MissingParamsName(t *testing.T) {
 	assert.Equal(t, mcp.JSONRPCInvalidParams, resp.Error.Code)
 }
 
-func TestMCPJSONRPCMiddleware_ToolsCall_NonStringName_InvalidParams(t *testing.T) {
+func TestJSONRPCMiddleware_ToolsCall_NonStringName_InvalidParams(t *testing.T) {
 	spec := &APISpec{
 		APIDefinition: &apidef.APIDefinition{
 			ApplicationProtocol: apidef.AppProtocolMCP,
@@ -1116,9 +1013,10 @@ func TestMCPJSONRPCMiddleware_ToolsCall_NonStringName_InvalidParams(t *testing.T
 		MCPPrimitives: map[string]string{
 			"tool:test": "/mcp-tool:test",
 		},
+		JSONRPCRouter: mcp.NewRouter(false),
 	}
 
-	m := &MCPJSONRPCMiddleware{
+	m := &JSONRPCMiddleware{
 		BaseMiddleware: &BaseMiddleware{Spec: spec},
 	}
 
@@ -1143,7 +1041,7 @@ func TestMCPJSONRPCMiddleware_ToolsCall_NonStringName_InvalidParams(t *testing.T
 	assert.Equal(t, mcp.JSONRPCInvalidParams, resp.Error.Code)
 }
 
-func TestMCPJSONRPCMiddleware_ResourcesRead_MissingParamsURI_InvalidParams(t *testing.T) {
+func TestJSONRPCMiddleware_ResourcesRead_MissingParamsURI_InvalidParams(t *testing.T) {
 	spec := &APISpec{
 		APIDefinition: &apidef.APIDefinition{
 			ApplicationProtocol: apidef.AppProtocolMCP,
@@ -1152,9 +1050,10 @@ func TestMCPJSONRPCMiddleware_ResourcesRead_MissingParamsURI_InvalidParams(t *te
 		MCPPrimitives: map[string]string{
 			"resource:file:///repo/*": "/mcp-resource:file:///repo/*",
 		},
+		JSONRPCRouter: mcp.NewRouter(false),
 	}
 
-	m := &MCPJSONRPCMiddleware{
+	m := &JSONRPCMiddleware{
 		BaseMiddleware: &BaseMiddleware{Spec: spec},
 	}
 
@@ -1179,7 +1078,7 @@ func TestMCPJSONRPCMiddleware_ResourcesRead_MissingParamsURI_InvalidParams(t *te
 	assert.Equal(t, mcp.JSONRPCInvalidParams, resp.Error.Code)
 }
 
-func TestMCPJSONRPCMiddleware_AllowListEnforcedOnVEM(t *testing.T) {
+func TestJSONRPCMiddleware_AllowListEnforcedOnVEM(t *testing.T) {
 	// Scenario: MCP API with 2 registered tools and 1 unregistered.
 	// - "tool-allowed": has Allow.Enabled = true
 	// - "tool-not-allowed": registered but no Allow
@@ -1274,7 +1173,7 @@ func TestMCPJSONRPCMiddleware_AllowListEnforcedOnVEM(t *testing.T) {
 	}...)
 }
 
-func TestMCPJSONRPCMiddleware_RateLimitEnforcedOnVEM(t *testing.T) {
+func TestJSONRPCMiddleware_RateLimitEnforcedOnVEM(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
 
@@ -1355,7 +1254,7 @@ func TestMCPJSONRPCMiddleware_RateLimitEnforcedOnVEM(t *testing.T) {
 	}...)
 }
 
-// TestMCPJSONRPCMiddleware_OperationRateLimitNotEnforced_ExactUserScenario demonstrates
+// TestJSONRPCMiddleware_OperationRateLimitNotEnforced_ExactUserScenario demonstrates
 // the exact bug reported where operation-level rate limits defined in middleware.operations
 // are not enforced when MCP JSON-RPC routing occurs.
 // This test matches the user's exact API configuration and should FAIL until the bug is fixed.
@@ -1367,7 +1266,7 @@ func TestMCPJSONRPCMiddleware_RateLimitEnforcedOnVEM(t *testing.T) {
 //
 // The tool-level rate limit (mcpTools.weather.getForecast.rateLimit) IS enforced.
 // The operation-level rate limit (operations.testget.rateLimit) is NOT enforced (BUG!).
-func TestMCPJSONRPCMiddleware_OperationRateLimitNotEnforced_ExactUserScenario(t *testing.T) {
+func TestJSONRPCMiddleware_OperationRateLimitNotEnforced_ExactUserScenario(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
 
@@ -1592,9 +1491,9 @@ func TestMCPJSONRPCMiddleware_OperationRateLimitNotEnforced_ExactUserScenario(t 
 	})
 }
 
-// TestMCPJSONRPCMiddleware_OperationHeaderInjection tests that headers from both
+// TestJSONRPCMiddleware_OperationHeaderInjection tests that headers from both
 // operation-level and tool-level middleware are injected in the VEM chain.
-func TestMCPJSONRPCMiddleware_OperationHeaderInjection(t *testing.T) {
+func TestJSONRPCMiddleware_OperationHeaderInjection(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
 
@@ -1755,12 +1654,10 @@ func TestMCPJSONRPCMiddleware_OperationHeaderInjection(t *testing.T) {
 	}
 }
 
-func TestMCPJSONRPCMiddleware_setupSequentialRouting(t *testing.T) {
+func TestJSONRPCMiddleware_setupSequentialRouting(t *testing.T) {
 	tests := []struct {
 		name               string
 		method             string
-		primitiveVEM       string
-		primitiveName      string
 		expectedNextVEM    string
 		expectedVEMChain   []string
 		expectedRedirectTo string
@@ -1768,8 +1665,6 @@ func TestMCPJSONRPCMiddleware_setupSequentialRouting(t *testing.T) {
 		{
 			name:               "tools/call - 2-stage routing",
 			method:             "tools/call",
-			primitiveVEM:       "/mcp-tool:weather.getForecast",
-			primitiveName:      "weather.getForecast",
 			expectedNextVEM:    "/mcp-tool:weather.getForecast",
 			expectedVEMChain:   []string{"/json-rpc-method:tools/call", "/mcp-tool:weather.getForecast"},
 			expectedRedirectTo: "/json-rpc-method:tools/call",
@@ -1777,8 +1672,6 @@ func TestMCPJSONRPCMiddleware_setupSequentialRouting(t *testing.T) {
 		{
 			name:               "resources/read - 2-stage routing",
 			method:             "resources/read",
-			primitiveVEM:       "/mcp-resource:file:///data/config.json",
-			primitiveName:      "file:///data/config.json",
 			expectedNextVEM:    "/mcp-resource:file:///data/config.json",
 			expectedVEMChain:   []string{"/json-rpc-method:resources/read", "/mcp-resource:file:///data/config.json"},
 			expectedRedirectTo: "/json-rpc-method:resources/read",
@@ -1786,8 +1679,6 @@ func TestMCPJSONRPCMiddleware_setupSequentialRouting(t *testing.T) {
 		{
 			name:               "prompts/get - 2-stage routing",
 			method:             "prompts/get",
-			primitiveVEM:       "/mcp-prompt:summarize",
-			primitiveName:      "summarize",
 			expectedNextVEM:    "/mcp-prompt:summarize",
 			expectedVEMChain:   []string{"/json-rpc-method:prompts/get", "/mcp-prompt:summarize"},
 			expectedRedirectTo: "/json-rpc-method:prompts/get",
@@ -1795,8 +1686,6 @@ func TestMCPJSONRPCMiddleware_setupSequentialRouting(t *testing.T) {
 		{
 			name:               "tools/list - 1-stage routing (operation only)",
 			method:             "tools/list",
-			primitiveVEM:       "/json-rpc-method:tools/list",
-			primitiveName:      "",
 			expectedNextVEM:    "",
 			expectedVEMChain:   []string{"/json-rpc-method:tools/list"},
 			expectedRedirectTo: "/json-rpc-method:tools/list",
@@ -1804,8 +1693,6 @@ func TestMCPJSONRPCMiddleware_setupSequentialRouting(t *testing.T) {
 		{
 			name:               "ping - 1-stage routing (operation only)",
 			method:             "ping",
-			primitiveVEM:       "/json-rpc-method:ping",
-			primitiveName:      "",
 			expectedNextVEM:    "",
 			expectedVEMChain:   []string{"/json-rpc-method:ping"},
 			expectedRedirectTo: "/json-rpc-method:ping",
@@ -1814,7 +1701,7 @@ func TestMCPJSONRPCMiddleware_setupSequentialRouting(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			mw := &MCPJSONRPCMiddleware{
+			mw := &JSONRPCMiddleware{
 				BaseMiddleware: &BaseMiddleware{
 					Spec: &APISpec{
 						APIDefinition: &apidef.APIDefinition{
@@ -1833,7 +1720,7 @@ func TestMCPJSONRPCMiddleware_setupSequentialRouting(t *testing.T) {
 			}
 
 			// Call setupSequentialRouting
-			mw.setupSequentialRouting(r, rpcReq, tt.primitiveVEM, tt.primitiveName)
+			mw.setupSequentialRouting(r, rpcReq, tt.expectedVEMChain)
 
 			// Check routing state
 			state := httpctx.GetJSONRPCRoutingState(r)

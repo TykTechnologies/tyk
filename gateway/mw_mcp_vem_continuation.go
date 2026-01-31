@@ -38,7 +38,7 @@ func (m *MCPVEMContinuationMiddleware) ProcessRequest(w http.ResponseWriter, r *
 	}
 
 	// Check if we're at the listen path (initial request before any VEM routing)
-	// If so, don't interfere - MCPJSONRPCMiddleware already set the rewrite target to the first VEM
+	// If so, don't interfere - JSONRPCMiddleware already set the rewrite target to the first VEM
 	if r.URL.Path == state.OriginalPath {
 		return nil, http.StatusOK
 	}

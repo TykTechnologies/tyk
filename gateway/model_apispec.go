@@ -23,6 +23,7 @@ import (
 	"github.com/TykTechnologies/tyk/internal/graphengine"
 	"github.com/TykTechnologies/tyk/internal/httpctx"
 	"github.com/TykTechnologies/tyk/internal/httputil"
+	"github.com/TykTechnologies/tyk/internal/jsonrpc"
 	"github.com/TykTechnologies/tyk/user"
 
 	_ "github.com/TykTechnologies/tyk/internal/mcp" // registers MCP VEM prefixes
@@ -81,6 +82,8 @@ type APISpec struct {
 	// Key format: "tool:{name}", "resource:{pattern}", "prompt:{name}"
 	// Value: VEM path (e.g., "/mcp-tool:get-weather")
 	MCPPrimitives map[string]string
+
+	JSONRPCRouter jsonrpc.Router
 
 	// OperationsAllowListEnabled is true if any JSON-RPC operation (method-level) has
 	// an allow rule enabled. Pre-calculated during API loading.
