@@ -1,10 +1,14 @@
 package certs
 
 import (
+	"crypto/rand"
+	"crypto/rsa"
+	"crypto/x509"
+	"crypto/x509/pkix"
+	"encoding/pem"
 	"errors"
 	"fmt"
-	"os"
-	"path/filepath"
+	"math/big"
 	"testing"
 	"time"
 
@@ -210,15 +214,50 @@ func WithFailOn(attempts ...int) MockStorageOption {
 	}
 }
 
-// loadTestCert loads the test certificate from testdata
-func loadTestCert(t *testing.T) string {
+// generateTestCert generates a self-signed certificate in memory for testing
+func generateTestCert(t *testing.T) string {
 	t.Helper()
-	certPath := filepath.Join("testdata", "test-cert.pem")
-	certData, err := os.ReadFile(certPath)
+
+	// Generate RSA private key
+	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
 	if err != nil {
-		t.Fatalf("Failed to read test certificate: %v", err)
+		t.Fatalf("Failed to generate private key: %v", err)
 	}
-	return string(certData)
+
+	// Create certificate template
+	template := &x509.Certificate{
+		SerialNumber: big.NewInt(1),
+		Subject: pkix.Name{
+			Organization: []string{"Test Org"},
+			CommonName:   "test.example.com",
+		},
+		NotBefore:             time.Now(),
+		NotAfter:              time.Now().Add(365 * 24 * time.Hour),
+		KeyUsage:              x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature,
+		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
+		BasicConstraintsValid: true,
+	}
+
+	// Create self-signed certificate
+	certDER, err := x509.CreateCertificate(rand.Reader, template, template, &privateKey.PublicKey, privateKey)
+	if err != nil {
+		t.Fatalf("Failed to create certificate: %v", err)
+	}
+
+	// Encode certificate to PEM
+	certPEM := pem.EncodeToMemory(&pem.Block{
+		Type:  "CERTIFICATE",
+		Bytes: certDER,
+	})
+
+	// Encode private key to PEM
+	privateKeyPEM := pem.EncodeToMemory(&pem.Block{
+		Type:  "RSA PRIVATE KEY",
+		Bytes: x509.MarshalPKCS1PrivateKey(privateKey),
+	})
+
+	// Return combined PEM (cert + key)
+	return string(certPEM) + string(privateKeyPEM)
 }
 
 // certMap creates a certificate map for the given cert IDs, all returning the same certData
@@ -233,7 +272,7 @@ func certMap(certData string, certIDs ...string) map[string]string {
 // TestCertificateLoadingWithRetry verifies the exponential backoff retry mechanism
 // for certificate loading when storage is temporarily unavailable (TT-14618).
 func TestCertificateLoadingWithRetry(t *testing.T) {
-	certPEM := loadTestCert(t)
+	certPEM := generateTestCert(t)
 
 	tests := map[string]struct {
 		failureCount      int
@@ -314,7 +353,7 @@ func TestCertificateLoadingWithRetry(t *testing.T) {
 
 // TestCertificateLoadingWithFlakyConnection tests handling of intermittent MDCB failures
 func TestCertificateLoadingWithFlakyConnection(t *testing.T) {
-	certPEM := loadTestCert(t)
+	certPEM := generateTestCert(t)
 
 	// Simulate flaky connection: fails on specific calls
 	// cert-1: attempts 1 (fail), 2 (fail), 3 (success)
@@ -351,7 +390,7 @@ func TestCertificateLoadingWithFlakyConnection(t *testing.T) {
 
 // TestTT14618_MultipleCertificates verifies backoff only happens once for multiple certificates
 func TestMultipleCertificatesLoading(t *testing.T) {
-	certPEM := loadTestCert(t)
+	certPEM := generateTestCert(t)
 
 	// Request 5 certificates
 	certIDs := []string{"cert-1", "cert-2", "cert-3", "cert-4", "cert-5"}
@@ -403,7 +442,7 @@ func TestCertificateLoadingScale100(t *testing.T) {
 		t.Skip("Skipping scale test in short mode")
 	}
 
-	certPEM := loadTestCert(t)
+	certPEM := generateTestCert(t)
 
 	// Generate 100 certificate IDs
 	certIDs := make([]string, 100)
@@ -468,7 +507,7 @@ func TestCertificateLoadingScale1000(t *testing.T) {
 		t.Skip("Skipping large scale test in short mode")
 	}
 
-	certPEM := loadTestCert(t)
+	certPEM := generateTestCert(t)
 
 	// Generate 1000 certificate IDs
 	certIDs := make([]string, 1000)
@@ -531,7 +570,7 @@ func TestCertificateLoadingScale1000(t *testing.T) {
 
 // Benchmark certificate loading with skipBackoff optimization
 func BenchmarkCertificateLoadingPerformance(b *testing.B) {
-	certPEM := loadTestCert(&testing.T{})
+	certPEM := generateTestCert(&testing.T{})
 
 	benchmarks := []struct {
 		name      string
@@ -570,7 +609,7 @@ func BenchmarkCertificateLoadingPerformance(b *testing.B) {
 
 // Benchmark to compare optimized vs unoptimized behavior
 func BenchmarkSkipBackoffOptimization(b *testing.B) {
-	certPEM := loadTestCert(&testing.T{})
+	certPEM := generateTestCert(&testing.T{})
 	certCount := 100
 	failures := 3
 
@@ -620,7 +659,7 @@ func BenchmarkSkipBackoffOptimization(b *testing.B) {
 
 // Benchmark cache hit performance (no MDCB calls)
 func BenchmarkCertificateCacheHit(b *testing.B) {
-	certPEM := loadTestCert(&testing.T{})
+	certPEM := generateTestCert(&testing.T{})
 
 	// Pre-load certificates into cache
 	certIDs := []string{"cert-1", "cert-2", "cert-3", "cert-4", "cert-5"}
@@ -640,7 +679,7 @@ func BenchmarkCertificateCacheHit(b *testing.B) {
 
 // TestMaxRetriesLimit verifies that the maxRetries configuration limits retry attempts correctly
 func TestMaxRetriesLimit(t *testing.T) {
-	certPEM := loadTestCert(t)
+	certPEM := generateTestCert(t)
 
 	testCases := []struct {
 		name          string
@@ -736,7 +775,7 @@ func TestMaxRetriesLimit(t *testing.T) {
 
 // TestRetryEnabledFlag verifies that retry can be disabled via the retryEnabled flag
 func TestRetryEnabledFlag(t *testing.T) {
-	certPEM := loadTestCert(t)
+	certPEM := generateTestCert(t)
 
 	testCases := []struct {
 		name          string
@@ -810,7 +849,7 @@ func TestRetryEnabledFlag(t *testing.T) {
 
 // TestConfigDefaults verifies that default values are used correctly
 func TestConfigDefaults(t *testing.T) {
-	certPEM := loadTestCert(t)
+	certPEM := generateTestCert(t)
 
 	// Test with defaults (should behave like maxRetries=3)
 	mockStorage := NewMockStorage(t, certMap(certPEM, "test-cert-id"), WithFailFirst(2))
