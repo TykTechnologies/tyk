@@ -49,6 +49,7 @@ func defaultTykErrors() {
 
 	initAuthKeyErrors()
 	initOauth2KeyExistsErrors()
+	initJWTErrors()
 }
 
 func overrideTykErrors(gw *Gateway) {
