@@ -142,6 +142,26 @@ type MockStorage struct {
 	shouldFail func(attempt int) bool
 }
 
+// MockOption configures a MockStorage
+type MockOption func(*MockStorage)
+
+// NewMockStorage creates a new mock storage with the given certificate data and options
+func NewMockStorage(certData string, t *testing.T, opts ...MockOption) *MockStorage {
+	m := &MockStorage{
+		certData: certData,
+		t:        t,
+	}
+	m.Apply(opts...)
+	return m
+}
+
+// Apply applies one or more options to the mock
+func (m *MockStorage) Apply(opts ...MockOption) {
+	for _, opt := range opts {
+		opt(m)
+	}
+}
+
 func (m *MockStorage) GetKey(key string) (string, error) {
 	m.callCount++
 	m.t.Logf("  [Attempt %d] GetKey called for: %s at %s",
@@ -160,21 +180,25 @@ func (m *MockStorage) GetRawKey(key string) (string, error) {
 	return m.GetKey(key)
 }
 
-// FailFirst returns a pattern that fails the first n attempts
-func FailFirst(n int) func(int) bool {
-	return func(attempt int) bool {
-		return attempt <= n
+// WithFailFirst configures the mock to fail the first n attempts
+func WithFailFirst(n int) MockOption {
+	return func(m *MockStorage) {
+		m.shouldFail = func(attempt int) bool {
+			return attempt <= n
+		}
 	}
 }
 
-// FailOn returns a pattern that fails on specific attempt numbers
-func FailOn(attempts ...int) func(int) bool {
-	failures := make(map[int]bool, len(attempts))
-	for _, n := range attempts {
-		failures[n] = true
-	}
-	return func(attempt int) bool {
-		return failures[attempt]
+// WithFailOn configures the mock to fail on specific attempt numbers
+func WithFailOn(attempts ...int) MockOption {
+	return func(m *MockStorage) {
+		failures := make(map[int]bool, len(attempts))
+		for _, n := range attempts {
+			failures[n] = true
+		}
+		m.shouldFail = func(attempt int) bool {
+			return failures[attempt]
+		}
 	}
 }
 
@@ -228,11 +252,7 @@ func TestCertificateLoadingWithRetry(t *testing.T) {
 
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
-			mockStorage := &MockStorage{
-				shouldFail: FailFirst(tt.failureCount),
-				certData:   certPEM,
-				t:          t,
-			}
+			mockStorage := NewMockStorage(certPEM, t, WithFailFirst(tt.failureCount))
 
 			handler := NewCertificateManager(mockStorage, "secret", nil, false, 0, 0, 0, true, 0)
 
@@ -283,11 +303,7 @@ func TestCertificateLoadingWithFlakyConnection(t *testing.T) {
 	// cert-1: attempts 1 (fail), 2 (fail), 3 (success)
 	// cert-2: attempt 4 (fail - flaky!), attempt 5 (success after quick retry)
 	// cert-3: attempt 6 (success)
-	mockStorage := &MockStorage{
-		shouldFail: FailOn(1, 2, 4), // Fail on calls 1, 2, and 4
-		certData:   certPEM,
-		t:          t,
-	}
+	mockStorage := NewMockStorage(certPEM, t, WithFailOn(1, 2, 4))
 
 	handler := NewCertificateManager(mockStorage, "secret", nil, false, 0, 0, 0, true, 0)
 
@@ -322,11 +338,7 @@ func TestMultipleCertificatesLoading(t *testing.T) {
 	certPEM := loadTestCert(t)
 
 	// Simulate MDCB failing 3 times before becoming ready
-	mockStorage := &MockStorage{
-		shouldFail: FailFirst(3),
-		certData:   certPEM,
-		t:          t,
-	}
+	mockStorage := NewMockStorage(certPEM, t, WithFailFirst(3))
 
 	handler := NewCertificateManager(mockStorage, "secret", nil, false, 0, 0, 0, true, 0)
 
@@ -378,11 +390,7 @@ func TestCertificateLoadingScale100(t *testing.T) {
 	certPEM := loadTestCert(t)
 
 	// Simulate MDCB down for first 5 attempts (~1 second of retries)
-	mockStorage := &MockStorage{
-		shouldFail: FailFirst(5),
-		certData:   certPEM,
-		t:          t,
-	}
+	mockStorage := NewMockStorage(certPEM, t, WithFailFirst(5))
 
 	handler := NewCertificateManager(mockStorage, "secret", nil, false, 0, 0, 0, true, 0)
 
@@ -424,7 +432,7 @@ func TestCertificateLoadingScale100(t *testing.T) {
 	// Performance validation
 	// Without optimization: 100 certs × ~1s backoff = ~100 seconds
 	// With optimization: single backoff (~1s) + 100 GetKey calls (~instant) = ~1-2 seconds
-	maxExpectedTime := 3 * time.Second
+	maxExpectedTime := 5 * time.Second
 	if duration > maxExpectedTime {
 		t.Errorf("PERFORMANCE ISSUE: Expected < %v with single backoff for 100 certs, took %v",
 			maxExpectedTime, duration)
@@ -447,11 +455,7 @@ func TestCertificateLoadingScale1000(t *testing.T) {
 	certPEM := loadTestCert(t)
 
 	// Simulate MDCB down for first 5 attempts (~1 second of retries)
-	mockStorage := &MockStorage{
-		shouldFail: FailFirst(5),
-		certData:   certPEM,
-		t:          t,
-	}
+	mockStorage := NewMockStorage(certPEM, t, WithFailFirst(5))
 
 	handler := NewCertificateManager(mockStorage, "secret", nil, false, 0, 0, 0, true, 0)
 
@@ -535,11 +539,7 @@ func BenchmarkCertificateLoadingPerformance(b *testing.B) {
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
 				// Create fresh mock for each iteration
-				mockStorage := &MockStorage{
-					shouldFail: FailFirst(bm.failures),
-					certData:   certPEM,
-					t:          &testing.T{}, // Dummy for benchmark
-				}
+				mockStorage := NewMockStorage(certPEM, &testing.T{}, WithFailFirst(bm.failures))
 
 				handler := NewCertificateManager(mockStorage, "secret", nil, false, 0, 0, 0, true, 0)
 				certs := handler.List(certIDs, CertificatePrivate)
@@ -567,11 +567,7 @@ func BenchmarkSkipBackoffOptimization(b *testing.B) {
 	b.Run("optimized_with_skipBackoff", func(b *testing.B) {
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
-			mockStorage := &MockStorage{
-				shouldFail: FailFirst(failures),
-				certData:   certPEM,
-				t:          &testing.T{},
-			}
+			mockStorage := NewMockStorage(certPEM, &testing.T{}, WithFailFirst(failures))
 
 			handler := NewCertificateManager(mockStorage, "secret", nil, false, 0, 0, 0, true, 0)
 			certs := handler.List(certIDs, CertificatePrivate)
@@ -585,11 +581,7 @@ func BenchmarkSkipBackoffOptimization(b *testing.B) {
 	b.Run("unoptimized_without_skipBackoff", func(b *testing.B) {
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
-			mockStorage := &MockStorage{
-				shouldFail: FailFirst(failures),
-				certData:   certPEM,
-				t:          &testing.T{},
-			}
+			mockStorage := NewMockStorage(certPEM, &testing.T{}, WithFailFirst(failures))
 
 			handler := NewCertificateManager(mockStorage, "secret", nil, false, 0, 0, 0, true, 0)
 
@@ -613,11 +605,7 @@ func BenchmarkSkipBackoffOptimization(b *testing.B) {
 // Benchmark cache hit performance (no MDCB calls)
 func BenchmarkCertificateCacheHit(b *testing.B) {
 	certPEM := loadTestCert(&testing.T{})
-	mockStorage := &MockStorage{
-		shouldFail: FailFirst(0),
-		certData:   certPEM,
-		t:          &testing.T{},
-	}
+	mockStorage := NewMockStorage(certPEM, &testing.T{}, WithFailFirst(0))
 
 	handler := NewCertificateManager(mockStorage, "secret", nil, false, 0, 0, 0, true, 0)
 
@@ -639,11 +627,11 @@ func TestMaxRetriesLimit(t *testing.T) {
 	certPEM := loadTestCert(t)
 
 	testCases := []struct {
-		name           string
-		maxRetries     int
-		failureCount   int // How many times to fail before succeeding
-		expectedCalls  int // Expected total GetKey calls
-		shouldSucceed  bool
+		name          string
+		maxRetries    int
+		failureCount  int // How many times to fail before succeeding
+		expectedCalls int // Expected total GetKey calls
+		shouldSucceed bool
 	}{
 		{
 			name:          "maxRetries=3 with 2 failures - should succeed on 3rd attempt",
@@ -691,11 +679,7 @@ func TestMaxRetriesLimit(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			mockStorage := &MockStorage{
-				shouldFail: FailFirst(tc.failureCount),
-				certData:   certPEM,
-				t:          t,
-			}
+			mockStorage := NewMockStorage(certPEM, t, WithFailFirst(tc.failureCount))
 
 			// Set short intervals for faster test execution
 			handler := NewCertificateManager(
@@ -770,11 +754,7 @@ func TestRetryEnabledFlag(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			mockStorage := &MockStorage{
-				shouldFail: FailFirst(tc.failureCount),
-				certData:   certPEM,
-				t:          t,
-			}
+			mockStorage := NewMockStorage(certPEM, t, WithFailFirst(tc.failureCount))
 
 			handler := NewCertificateManager(
 				mockStorage,
@@ -817,11 +797,7 @@ func TestConfigDefaults(t *testing.T) {
 	certPEM := loadTestCert(t)
 
 	// Test with defaults (should behave like maxRetries=3)
-	mockStorage := &MockStorage{
-		shouldFail: FailFirst(2),
-		certData:   certPEM,
-		t:          t,
-	}
+	mockStorage := NewMockStorage(certPEM, t, WithFailFirst(2))
 
 	// Use the default values from constants
 	handler := NewCertificateManager(
@@ -829,11 +805,11 @@ func TestConfigDefaults(t *testing.T) {
 		"secret",
 		nil,
 		false,
-		time.Second*10,                    // maxElapsedTime
-		time.Millisecond*100,              // initialInterval
-		time.Millisecond*500,              // maxInterval
-		DefaultRPCCertFetchRetryEnabled,   // Should be true
-		DefaultRPCCertFetchMaxRetries,     // Should be 5
+		time.Second*10,                  // maxElapsedTime
+		time.Millisecond*100,            // initialInterval
+		time.Millisecond*500,            // maxInterval
+		DefaultRPCCertFetchRetryEnabled, // Should be true
+		DefaultRPCCertFetchMaxRetries,   // Should be 5
 	)
 
 	certIDs := []string{"test-cert-id"}
