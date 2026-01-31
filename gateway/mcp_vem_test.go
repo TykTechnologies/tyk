@@ -474,7 +474,7 @@ func Test_generateMCPVEMs_SetsOperationsAllowListEnabled(t *testing.T) {
 	tykExt := &oas.XTykAPIGateway{
 		Middleware: &oas.Middleware{
 			McpTools: oas.MCPPrimitives{
-				"dummy-tool": &oas.MCPPrimitive{},  // Need at least one primitive for MCP API
+				"dummy-tool": &oas.MCPPrimitive{}, // Need at least one primitive for MCP API
 			},
 			Operations: oas.Operations{
 				"tools-call-op": {

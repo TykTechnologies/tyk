@@ -17,9 +17,9 @@ func TestHasOperationAllowEnabled(t *testing.T) {
 		expected   bool
 	}{
 		{
-			name: "no operations",
+			name:       "no operations",
 			operations: oas.Operations{},
-			expected: false,
+			expected:   false,
 		},
 		{
 			name: "operation without allow",

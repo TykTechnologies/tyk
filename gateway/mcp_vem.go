@@ -10,6 +10,7 @@ import (
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/apidef/oas"
 	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/internal/jsonrpc"
 	"github.com/TykTechnologies/tyk/internal/mcp"
 	tykregexp "github.com/TykTechnologies/tyk/regexp"
 )
@@ -127,7 +128,7 @@ func (a APIDefinitionLoader) generateMCPVEMs(apiSpec *APISpec, conf config.Confi
 	// Pattern: "/prefix{rest:.*}" where {rest:.*} matches any string including slashes
 	// This is converted by PreparePathRegexp into proper regex
 	if apiSpec.OperationsAllowListEnabled {
-		catchAllPrefixes = append(catchAllPrefixes, "/json-rpc-method:{rest:.*}")
+		catchAllPrefixes = append(catchAllPrefixes, jsonrpc.MethodVEMCatchAllPattern)
 	}
 	if apiSpec.ToolsAllowListEnabled {
 		catchAllPrefixes = append(catchAllPrefixes, mcp.ToolPrefix+"{rest:.*}")
@@ -150,9 +151,9 @@ func (a APIDefinitionLoader) generateMCPVEMs(apiSpec *APISpec, conf config.Confi
 // These are used both for VEM generation and for building the VEM chain at runtime.
 // Operation VEMs use generic JSON-RPC naming (/json-rpc-method:) not MCP-specific naming.
 var mcpOperationVEMPaths = map[string]string{
-	mcp.MethodToolsCall:     "/json-rpc-method:tools/call",
-	mcp.MethodResourcesRead: "/json-rpc-method:resources/read",
-	mcp.MethodPromptsGet:    "/json-rpc-method:prompts/get",
+	mcp.MethodToolsCall:     jsonrpc.MethodVEMPrefix + mcp.MethodToolsCall,
+	mcp.MethodResourcesRead: jsonrpc.MethodVEMPrefix + mcp.MethodResourcesRead,
+	mcp.MethodPromptsGet:    jsonrpc.MethodVEMPrefix + mcp.MethodPromptsGet,
 }
 
 // generateMCPOperationVEMs creates VEMs for JSON-RPC operations (tools/call, resources/read, prompts/get).

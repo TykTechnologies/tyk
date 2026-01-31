@@ -6,6 +6,7 @@ import (
 	"sync"
 
 	"github.com/TykTechnologies/tyk/internal/agentprotocol"
+	"github.com/TykTechnologies/tyk/internal/jsonrpc"
 )
 
 // VEM path prefixes for different MCP primitive types.
@@ -27,7 +28,7 @@ func RegisterVEMPrefixes() {
 		agentprotocol.RegisterVEMPrefix(ResourcePrefix)
 		agentprotocol.RegisterVEMPrefix(PromptPrefix)
 		// Register generic JSON-RPC operation VEM prefix
-		agentprotocol.RegisterVEMPrefix("/json-rpc-method:")
+		agentprotocol.RegisterVEMPrefix(jsonrpc.MethodVEMPrefix)
 	})
 }
 

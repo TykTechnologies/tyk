@@ -11,6 +11,7 @@ import (
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/internal/httpctx"
+	"github.com/TykTechnologies/tyk/internal/jsonrpc"
 	"github.com/TykTechnologies/tyk/internal/mcp"
 	"github.com/TykTechnologies/tyk/internal/middleware"
 )
@@ -186,7 +187,7 @@ func (m *MCPJSONRPCMiddleware) buildVEMChain(method, primitiveVEM string) []stri
 func (m *MCPJSONRPCMiddleware) buildOperationVEM(method string) string {
 	// GENERIC: Operation VEM is simply the JSON-RPC method name
 	// Not MCP-specific - this works for any JSON-RPC protocol
-	return "/json-rpc-method:" + method
+	return jsonrpc.MethodVEMPrefix + method
 }
 
 // setupSequentialRouting initializes sequential VEM routing for JSON-RPC requests.
