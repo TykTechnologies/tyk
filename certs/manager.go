@@ -28,7 +28,7 @@ const (
 	cacheDefaultTTL    = 300 // 5 minutes.
 	cacheCleanInterval = 600 // 10 minutes.
 
-	// TT-14618: MDCB retry configuration for certificate loading during startup.
+	// MDCB retry configuration for certificate loading during startup.
 	//
 	// When the gateway starts with MDCB configured, it enters emergency mode until the
 	// RPC connection is established. During this period, certificate fetches from MDCB
@@ -464,7 +464,7 @@ func (c *certificateManager) List(certIDs []string, mode CertificateType) (out [
 			continue
 		}
 
-		// TT-14618: Retry with exponential backoff when MDCB connection is not ready.
+		// Retry with exponential backoff when MDCB connection is not ready.
 		//
 		// During gateway startup, MDCB RPC connection may still be initializing when
 		// SSL certificates are loaded. The retry logic waits for MDCB to become ready.

@@ -270,7 +270,7 @@ func certMap(certData string, certIDs ...string) map[string]string {
 }
 
 // TestCertificateLoadingWithRetry verifies the exponential backoff retry mechanism
-// for certificate loading when storage is temporarily unavailable (TT-14618).
+// for certificate loading when storage is temporarily unavailable.
 func TestCertificateLoadingWithRetry(t *testing.T) {
 	certPEM := generateTestCert(t)
 
