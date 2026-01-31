@@ -3,12 +3,16 @@ package gateway
 import (
 	"errors"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/getkin/kin-openapi/routers"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/apidef/oas"
+	"github.com/TykTechnologies/tyk/internal/httpctx"
+	"github.com/TykTechnologies/tyk/internal/jsonrpc"
+	"github.com/TykTechnologies/tyk/internal/mcp"
 	"github.com/TykTechnologies/tyk/internal/middleware"
 	"github.com/TykTechnologies/tyk/internal/otel"
 	"github.com/TykTechnologies/tyk/request"
@@ -99,6 +103,20 @@ outside:
 	requestValid, stat := v.Spec.RequestValid(r)
 	if !requestValid {
 		if stat == MCPPrimitiveNotFound {
+			state := httpctx.GetJSONRPCRoutingState(r)
+			if state != nil {
+				allowListEnabled := v.getPrimitiveAllowListFlag(r.URL.Path)
+
+				if allowListEnabled {
+					return errors.New("Access to this resource has been disallowed"), http.StatusForbidden
+				}
+
+				state.NextVEM = ""
+				httpctx.SetJSONRPCRoutingState(r, state)
+				r.URL.Path = state.OriginalPath
+				r.URL.RawQuery = ""
+				return nil, http.StatusOK
+			}
 			return errors.New(http.StatusText(http.StatusNotFound)), http.StatusNotFound
 		}
 
@@ -112,11 +130,33 @@ outside:
 			Origin: request.RealIP(r),
 			Reason: string(stat),
 		})
-		return errors.New(string(stat)), http.StatusForbidden
+		return errors.New("Attempted access to disallowed version / path."), http.StatusForbidden
 	}
 
 	versionInfo, _ := v.Spec.Version(r)
 	versionPaths := v.Spec.RxPaths[versionInfo.Name]
+
+	// For MCP primitives with allowlist enabled: check if VEM has WhiteList entry
+	// If allowlist is on but VEM doesn't have a WhiteList entry → block
+	if httpctx.IsJsonRPCRouting(r) && mcp.IsPrimitiveVEMPath(r.URL.Path) {
+		allowListEnabled := v.getPrimitiveAllowListFlag(r.URL.Path)
+		if allowListEnabled {
+			if err := v.checkVEMWhiteListEntry(r.URL.Path, versionPaths, "Access to this resource has been disallowed"); err != nil {
+				return err, http.StatusForbidden
+			}
+		}
+	}
+
+	// For JSON-RPC operations with allowlist enabled: check if operation VEM has WhiteList entry
+	// If OperationsAllowListEnabled but operation doesn't have a WhiteList entry → block
+	if httpctx.IsJsonRPCRouting(r) && strings.HasPrefix(r.URL.Path, jsonrpc.MethodVEMPrefix) {
+		if v.Spec.OperationsAllowListEnabled {
+			if err := v.checkVEMWhiteListEntry(r.URL.Path, versionPaths, "Access to this operation has been disallowed"); err != nil {
+				return err, http.StatusForbidden
+			}
+		}
+	}
+
 	whiteListStatus := v.Spec.WhiteListEnabled[versionInfo.Name]
 
 	// We handle redirects before ignores in case we aren't using a whitelist
@@ -146,4 +186,27 @@ outside:
 	}
 
 	return nil, http.StatusOK
+}
+
+// getPrimitiveAllowListFlag returns the allowlist flag for a given MCP primitive VEM path.
+func (v *VersionCheck) getPrimitiveAllowListFlag(path string) bool {
+	if strings.HasPrefix(path, mcp.ToolPrefix) {
+		return v.Spec.ToolsAllowListEnabled
+	} else if strings.HasPrefix(path, mcp.ResourcePrefix) {
+		return v.Spec.ResourcesAllowListEnabled
+	} else if strings.HasPrefix(path, mcp.PromptPrefix) {
+		return v.Spec.PromptsAllowListEnabled
+	}
+	return false
+}
+
+// checkVEMWhiteListEntry checks if a VEM path has a WhiteList entry.
+// Returns an error if allowlist is active but no WhiteList entry is found.
+func (v *VersionCheck) checkVEMWhiteListEntry(path string, versionPaths []URLSpec, errorMessage string) error {
+	for i := range versionPaths {
+		if versionPaths[i].Status == WhiteList && versionPaths[i].matchesPath(path, v.Spec) {
+			return nil // WhiteList entry found
+		}
+	}
+	return errors.New(errorMessage) // No WhiteList entry found
 }

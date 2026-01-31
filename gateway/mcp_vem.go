@@ -120,30 +120,6 @@ func (a APIDefinitionLoader) generateMCPVEMs(apiSpec *APISpec, conf config.Confi
 	// These allow operation-level middleware to be applied before primitive-level middleware
 	specs = append(specs, a.generateMCPOperationVEMs(apiSpec, conf)...)
 
-	// Generate catch-all BlackList VEMs for categories that have allowlist enabled.
-	// This provides granular whitelist mode per category.
-	catchAllPrefixes := []string{}
-
-	// Use mux-style regex patterns to match everything after the prefix.
-	// Pattern: "/prefix{rest:.*}" where {rest:.*} matches any string including slashes
-	// This is converted by PreparePathRegexp into proper regex
-	if apiSpec.OperationsAllowListEnabled {
-		catchAllPrefixes = append(catchAllPrefixes, jsonrpc.MethodVEMCatchAllPattern)
-	}
-	if apiSpec.ToolsAllowListEnabled {
-		catchAllPrefixes = append(catchAllPrefixes, mcp.ToolCatchAllPattern)
-	}
-	if apiSpec.ResourcesAllowListEnabled {
-		catchAllPrefixes = append(catchAllPrefixes, mcp.ResourceCatchAllPattern)
-	}
-	if apiSpec.PromptsAllowListEnabled {
-		catchAllPrefixes = append(catchAllPrefixes, mcp.PromptCatchAllPattern)
-	}
-
-	if len(catchAllPrefixes) > 0 {
-		specs = append(specs, a.buildCatchAllSpecs(catchAllPrefixes, conf)...)
-	}
-
 	return specs
 }
 

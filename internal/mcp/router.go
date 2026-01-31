@@ -9,11 +9,10 @@ import (
 )
 
 type Router struct {
-	allowListEnabled bool
 }
 
-func NewRouter(allowListEnabled bool) jsonrpc.Router {
-	return &Router{allowListEnabled: allowListEnabled}
+func NewRouter() jsonrpc.Router {
+	return &Router{}
 }
 
 func (r *Router) RouteMethod(method string, params json.RawMessage, primitives map[string]string) (jsonrpc.RouteResult, error) {
@@ -35,22 +34,15 @@ func (r *Router) routeToolsCall(params json.RawMessage, primitives map[string]st
 		return jsonrpc.RouteResult{}, err
 	}
 
-	toolVEM, found := primitives[PrimitiveKeyTool+name]
-	if !found && r.allowListEnabled {
-		toolVEM = ToolPrefix + name
-		found = true
-	}
-
 	operationVEM := jsonrpc.MethodVEMPrefix + MethodToolsCall
-	vemChain := []string{operationVEM}
-	if found {
-		vemChain = append(vemChain, toolVEM)
+	toolVEM, found := primitives[PrimitiveKeyTool+name]
+	if !found {
+		toolVEM = ToolPrefix + name
 	}
 
 	return jsonrpc.RouteResult{
-		VEMChain:      vemChain,
+		VEMChain:      []string{operationVEM, toolVEM},
 		PrimitiveName: name,
-		Found:         found,
 	}, nil
 }
 
@@ -60,22 +52,15 @@ func (r *Router) routeResourcesRead(params json.RawMessage, primitives map[strin
 		return jsonrpc.RouteResult{}, err
 	}
 
-	resourceVEM, found := matchResourceURI(uri, primitives)
-	if !found && r.allowListEnabled {
-		resourceVEM = ResourcePrefix + uri
-		found = true
-	}
-
 	operationVEM := jsonrpc.MethodVEMPrefix + MethodResourcesRead
-	vemChain := []string{operationVEM}
-	if found {
-		vemChain = append(vemChain, resourceVEM)
+	resourceVEM, found := matchResourceURI(uri, primitives)
+	if !found {
+		resourceVEM = ResourcePrefix + uri
 	}
 
 	return jsonrpc.RouteResult{
-		VEMChain:      vemChain,
+		VEMChain:      []string{operationVEM, resourceVEM},
 		PrimitiveName: uri,
-		Found:         found,
 	}, nil
 }
 
@@ -85,22 +70,15 @@ func (r *Router) routePromptsGet(params json.RawMessage, primitives map[string]s
 		return jsonrpc.RouteResult{}, err
 	}
 
-	promptVEM, found := primitives[PrimitiveKeyPrompt+name]
-	if !found && r.allowListEnabled {
-		promptVEM = PromptPrefix + name
-		found = true
-	}
-
 	operationVEM := jsonrpc.MethodVEMPrefix + MethodPromptsGet
-	vemChain := []string{operationVEM}
-	if found {
-		vemChain = append(vemChain, promptVEM)
+	promptVEM, found := primitives[PrimitiveKeyPrompt+name]
+	if !found {
+		promptVEM = PromptPrefix + name
 	}
 
 	return jsonrpc.RouteResult{
-		VEMChain:      vemChain,
+		VEMChain:      []string{operationVEM, promptVEM},
 		PrimitiveName: name,
-		Found:         found,
 	}, nil
 }
 
@@ -108,15 +86,11 @@ func (r *Router) routeOperation(method string, primitives map[string]string) (js
 	operationVEM, found := primitives[PrimitiveKeyOperation+method]
 	if !found {
 		operationVEM = jsonrpc.MethodVEMPrefix + method
-		if r.allowListEnabled {
-			found = true
-		}
 	}
 
 	return jsonrpc.RouteResult{
 		VEMChain:      []string{operationVEM},
 		PrimitiveName: method,
-		Found:         found,
 	}, nil
 }
 

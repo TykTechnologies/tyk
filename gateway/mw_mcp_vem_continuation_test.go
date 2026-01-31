@@ -10,6 +10,8 @@ import (
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/internal/httpctx"
+	"github.com/TykTechnologies/tyk/internal/jsonrpc"
+	"github.com/TykTechnologies/tyk/internal/mcp"
 )
 
 func TestMCPVEMContinuationMiddleware_Name(t *testing.T) {
@@ -96,7 +98,7 @@ func TestMCPVEMContinuationMiddleware_ProcessRequest(t *testing.T) {
 				Method:       "tools/call",
 				NextVEM:      "/mcp-tool:weather.getForecast",
 				OriginalPath: "/prct",
-				VEMChain:     []string{"/json-rpc-method:tools/call", "/mcp-tool:weather.getForecast"},
+				VEMChain:     []string{jsonrpc.MethodVEMPrefix + "tools/call", mcp.ToolPrefix + "weather.getForecast"},
 				VisitedVEMs:  []string{},
 			},
 			expectedHTTPStatus: http.StatusOK,
@@ -109,8 +111,8 @@ func TestMCPVEMContinuationMiddleware_ProcessRequest(t *testing.T) {
 				Method:       "tools/call",
 				NextVEM:      "",
 				OriginalPath: "/mcp",
-				VEMChain:     []string{"/json-rpc-method:tools/call", "/mcp-tool:weather.getForecast"},
-				VisitedVEMs:  []string{"/json-rpc-method:tools/call"},
+				VEMChain:     []string{jsonrpc.MethodVEMPrefix + "tools/call", mcp.ToolPrefix + "weather.getForecast"},
+				VisitedVEMs:  []string{jsonrpc.MethodVEMPrefix + "tools/call"},
 			},
 			expectedHTTPStatus: http.StatusOK,
 			expectsRedirect:    false,
@@ -131,7 +133,7 @@ func TestMCPVEMContinuationMiddleware_ProcessRequest(t *testing.T) {
 			}
 
 			// Set initial URL path based on test case
-			requestPath := "/json-rpc-method:tools/call"
+			requestPath := jsonrpc.MethodVEMPrefix + "tools/call"
 			if tt.initialState != nil && tt.initialState.NextVEM == "" {
 				// For complete routing test, start at the final VEM path
 				requestPath = "/mcp-tool:weather.getForecast"

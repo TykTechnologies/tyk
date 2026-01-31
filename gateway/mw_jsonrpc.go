@@ -184,12 +184,6 @@ func (m *JSONRPCMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 		return nil, middleware.StatusRespond
 	}
 
-	if !result.Found {
-		// Unregistered methods passthrough to upstream
-		return nil, http.StatusOK
-	}
-
-	// Set up routing context
 	m.setupSequentialRouting(r, rpcReq, result.VEMChain)
 
 	// Return StatusOK to allow chain to continue to DummyProxyHandler, which will handle the redirect

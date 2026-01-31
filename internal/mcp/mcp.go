@@ -17,21 +17,24 @@ const (
 	PromptPrefix   = "/mcp-prompt:"
 )
 
+// WildcardPattern is the mux-style pattern for matching any remaining path segments.
+const WildcardPattern = "{rest:.*}"
+
 // Catch-all patterns for MCP primitive VEMs in allowlist mode.
 // Uses mux-style pattern matching: /prefix{rest:.*}
 // These patterns match any path starting with the primitive prefix.
 const (
 	// ToolCatchAllPattern matches all tool VEM paths.
 	// Format: /mcp-tool:{rest:.*}
-	ToolCatchAllPattern = ToolPrefix + "{rest:.*}"
+	ToolCatchAllPattern = ToolPrefix + WildcardPattern
 
 	// ResourceCatchAllPattern matches all resource VEM paths.
 	// Format: /mcp-resource:{rest:.*}
-	ResourceCatchAllPattern = ResourcePrefix + "{rest:.*}"
+	ResourceCatchAllPattern = ResourcePrefix + WildcardPattern
 
 	// PromptCatchAllPattern matches all prompt VEM paths.
 	// Format: /mcp-prompt:{rest:.*}
-	PromptCatchAllPattern = PromptPrefix + "{rest:.*}"
+	PromptCatchAllPattern = PromptPrefix + WildcardPattern
 )
 
 var registerOnce sync.Once

@@ -13,5 +13,5 @@ const (
 
 	// MethodVEMCatchAllPattern is the catch-all pattern for operation-level allowlist blocking.
 	// Uses mux-style pattern matching: /json-rpc-method:{rest:.*}
-	MethodVEMCatchAllPattern = "/json-rpc-method:{rest:.*}"
+	MethodVEMCatchAllPattern = MethodVEMPrefix + "{rest:.*}"
 )

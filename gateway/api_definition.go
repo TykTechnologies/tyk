@@ -1473,7 +1473,7 @@ func (a APIDefinitionLoader) getExtendedPathSpecs(apiVersionDef apidef.VersionIn
 	mcpVEMs := a.generateMCPVEMs(apiSpec, conf)
 
 	if apiSpec.IsMCP() && apiSpec.JsonRpcVersion == apidef.JsonRPC20 {
-		apiSpec.JSONRPCRouter = mcp.NewRouter(apiSpec.MCPAllowListEnabled)
+		apiSpec.JSONRPCRouter = mcp.NewRouter()
 	}
 
 	combinedPath := []URLSpec{}
@@ -1505,8 +1505,15 @@ func (a APIDefinitionLoader) getExtendedPathSpecs(apiVersionDef apidef.VersionIn
 	combinedPath = append(combinedPath, oasMockResponsePaths...)
 	combinedPath = append(combinedPath, mcpVEMs...)
 
-	// Enable whitelist mode if there are whitelist paths or operation-level allows
+	// Enable whitelist mode if there are whitelist paths or operation-level allows.
+	// For MCP APIs, don't enable global whitelist mode at all because:
+	// 1. It would block the listen path before JSON-RPC routing happens
+	// 2. Allowlist enforcement happens at the VEM level during sequential routing
+	// 3. VEM WhiteList entries are checked correctly in URLAllowedAndIgnored
 	whiteListEnabled := len(whiteListPaths) > 0 || apiSpec.OperationsAllowListEnabled
+	if apiSpec.IsMCP() {
+		whiteListEnabled = false
+	}
 
 	return combinedPath, whiteListEnabled
 }

@@ -7,6 +7,9 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/TykTechnologies/tyk/internal/jsonrpc"
+	"github.com/TykTechnologies/tyk/internal/mcp"
 )
 
 func TestJSONRPCRoutingState_SetAndGet(t *testing.T) {
@@ -22,7 +25,7 @@ func TestJSONRPCRoutingState_SetAndGet(t *testing.T) {
 		ID:           123,
 		NextVEM:      "/mcp-tool:weather.getForecast",
 		OriginalPath: "/api",
-		VEMChain:     []string{"/json-rpc-method:tools/call", "/mcp-tool:weather.getForecast"},
+		VEMChain:     []string{jsonrpc.MethodVEMPrefix + "tools/call", mcp.ToolPrefix + "weather.getForecast"},
 		VisitedVEMs:  []string{},
 	}
 	SetJSONRPCRoutingState(r, state)
@@ -101,12 +104,12 @@ func TestRecordVEMVisit(t *testing.T) {
 		VisitedVEMs: []string{},
 	}
 
-	RecordVEMVisit(state, "/json-rpc-method:tools/call")
-	assert.Equal(t, []string{"/json-rpc-method:tools/call"}, state.VisitedVEMs)
+	RecordVEMVisit(state, jsonrpc.MethodVEMPrefix+"tools/call")
+	assert.Equal(t, []string{jsonrpc.MethodVEMPrefix + "tools/call"}, state.VisitedVEMs)
 
 	RecordVEMVisit(state, "/mcp-tool:weather.getForecast")
 	assert.Equal(t, []string{
-		"/json-rpc-method:tools/call",
+		jsonrpc.MethodVEMPrefix + "tools/call",
 		"/mcp-tool:weather.getForecast",
 	}, state.VisitedVEMs)
 

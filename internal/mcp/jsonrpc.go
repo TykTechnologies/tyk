@@ -43,17 +43,17 @@ const (
 
 // Error messages for JSON-RPC responses
 const (
-	ErrMsgParseError     = "Parse Error"
-	ErrMsgInvalidRequest = "Invalid Request"
-	ErrMsgInvalidParams  = "Invalid Params"
+	ErrMsgParseError     = "parse error"
+	ErrMsgInvalidRequest = "invalid request"
+	ErrMsgInvalidParams  = "invalid params"
 )
 
 // Detailed error messages for invalid params scenarios
 const (
-	ErrMsgMissingParams     = "Missing required params object"
-	ErrMsgMissingParamName  = "Missing required parameter: name"
-	ErrMsgMissingParamURI   = "Missing required parameter: uri"
-	ErrMsgEmptyParamName    = "Parameter 'name' cannot be empty"
-	ErrMsgEmptyParamURI     = "Parameter 'uri' cannot be empty"
-	ErrMsgInvalidParamsType = "Invalid params: expected object"
+	ErrMsgMissingParams     = "missing required params object"
+	ErrMsgMissingParamName  = "missing required parameter: name"
+	ErrMsgMissingParamURI   = "missing required parameter: uri"
+	ErrMsgEmptyParamName    = "parameter 'name' cannot be empty"
+	ErrMsgEmptyParamURI     = "parameter 'uri' cannot be empty"
+	ErrMsgInvalidParamsType = "invalid params: expected object"
 )

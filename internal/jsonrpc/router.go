@@ -9,5 +9,4 @@ type Router interface {
 type RouteResult struct {
 	VEMChain      []string
 	PrimitiveName string
-	Found         bool
 }

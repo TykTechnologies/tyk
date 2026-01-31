@@ -16,6 +16,7 @@ import (
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/apidef/oas"
 	"github.com/TykTechnologies/tyk/internal/httpctx"
+	"github.com/TykTechnologies/tyk/internal/jsonrpc"
 	"github.com/TykTechnologies/tyk/internal/mcp"
 	"github.com/TykTechnologies/tyk/test"
 )
@@ -204,9 +205,9 @@ func TestJSONRPCMiddleware_ProcessRequest_ToolsCall_RoutesToVEM(t *testing.T) {
 			JsonRpcVersion:      apidef.JsonRPC20,
 		},
 		MCPPrimitives: map[string]string{
-			"tool:get-weather": "/mcp-tool:get-weather",
+			"tool:get-weather": mcp.ToolPrefix + "get-weather",
 		},
-		JSONRPCRouter: mcp.NewRouter(false),
+		JSONRPCRouter: mcp.NewRouter(),
 	}
 
 	m := &JSONRPCMiddleware{
@@ -236,14 +237,14 @@ func TestJSONRPCMiddleware_ProcessRequest_ToolsCall_RoutesToVEM(t *testing.T) {
 	require.NotNil(t, redirectURL, "Should have redirect URL")
 	assert.Equal(t, "tyk", redirectURL.Scheme)
 	assert.Equal(t, "self", redirectURL.Host)
-	assert.Equal(t, "/json-rpc-method:tools/call", redirectURL.Path, "Should redirect to operation VEM first")
+	assert.Equal(t, jsonrpc.MethodVEMPrefix+"tools/call", redirectURL.Path, "Should redirect to operation VEM first")
 
 	// 2. Check routing state has NextVEM set to tool VEM
 	state := httpctx.GetJSONRPCRoutingState(r)
 	require.NotNil(t, state, "Routing state should be set")
 	assert.Equal(t, "tools/call", state.Method)
-	assert.Equal(t, "/mcp-tool:get-weather", state.NextVEM, "NextVEM should be tool VEM")
-	assert.Equal(t, []string{"/json-rpc-method:tools/call", "/mcp-tool:get-weather"}, state.VEMChain)
+	assert.Equal(t, mcp.ToolPrefix+"get-weather", state.NextVEM, "NextVEM should be tool VEM")
+	assert.Equal(t, []string{jsonrpc.MethodVEMPrefix + "tools/call", mcp.ToolPrefix + "get-weather"}, state.VEMChain)
 
 	assert.True(t, httpctx.IsJsonRPCRouting(r))
 }
@@ -255,7 +256,7 @@ func TestJSONRPCMiddleware_ProcessRequest_ToolsCall_NotFound(t *testing.T) {
 			JsonRpcVersion:      apidef.JsonRPC20,
 		},
 		MCPPrimitives: map[string]string{},
-		JSONRPCRouter: mcp.NewRouter(false),
+		JSONRPCRouter: mcp.NewRouter(),
 	}
 
 	m := &JSONRPCMiddleware{
@@ -277,11 +278,20 @@ func TestJSONRPCMiddleware_ProcessRequest_ToolsCall_NotFound(t *testing.T) {
 
 	err, code := m.ProcessRequest(w, r, nil)
 	assert.Nil(t, err)
-	assert.Equal(t, http.StatusOK, code)
-	assert.Equal(t, "/", r.URL.Path)
-	assert.False(t, httpctx.IsJsonRPCRouting(r))
-	assert.Nil(t, httpctx.GetJSONRPCRequest(r))
-	assert.Equal(t, 0, w.Body.Len())
+	assert.Equal(t, http.StatusOK, code, "Should return StatusOK to let DummyProxyHandler handle redirect")
+
+	redirectURL := ctxGetURLRewriteTarget(r)
+	require.NotNil(t, redirectURL, "Should have redirect URL")
+	assert.Equal(t, "tyk", redirectURL.Scheme)
+	assert.Equal(t, "self", redirectURL.Host)
+	assert.Equal(t, jsonrpc.MethodVEMPrefix+"tools/call", redirectURL.Path, "Should redirect to operation VEM first")
+
+	state := httpctx.GetJSONRPCRoutingState(r)
+	require.NotNil(t, state, "Routing state should be set")
+	assert.Equal(t, mcp.ToolPrefix+"unknown-tool", state.NextVEM, "NextVEM should be tool VEM")
+
+	assert.True(t, httpctx.IsJsonRPCRouting(r))
+	assert.Equal(t, 0, w.Body.Len(), "no error response should be written by middleware")
 }
 
 func TestJSONRPCMiddleware_ProcessRequest_ToolsCall_NotFound_WithAllowList(t *testing.T) {
@@ -294,10 +304,10 @@ func TestJSONRPCMiddleware_ProcessRequest_ToolsCall_NotFound_WithAllowList(t *te
 			JsonRpcVersion:      apidef.JsonRPC20,
 		},
 		MCPPrimitives: map[string]string{
-			"tool:get-weather": "/mcp-tool:get-weather",
+			"tool:get-weather": mcp.ToolPrefix + "get-weather",
 		},
 		MCPAllowListEnabled: true,
-		JSONRPCRouter:       mcp.NewRouter(true),
+		JSONRPCRouter:       mcp.NewRouter(),
 	}
 
 	m := &JSONRPCMiddleware{
@@ -327,11 +337,11 @@ func TestJSONRPCMiddleware_ProcessRequest_ToolsCall_NotFound_WithAllowList(t *te
 	require.NotNil(t, redirectURL, "Should have redirect URL")
 	assert.Equal(t, "tyk", redirectURL.Scheme)
 	assert.Equal(t, "self", redirectURL.Host)
-	assert.Equal(t, "/json-rpc-method:tools/call", redirectURL.Path, "Should redirect to operation VEM first")
+	assert.Equal(t, jsonrpc.MethodVEMPrefix+"tools/call", redirectURL.Path, "Should redirect to operation VEM first")
 
 	state := httpctx.GetJSONRPCRoutingState(r)
 	require.NotNil(t, state, "Routing state should be set")
-	assert.Equal(t, "/mcp-tool:unknown-tool", state.NextVEM, "NextVEM should be unknown tool VEM for blocking")
+	assert.Equal(t, mcp.ToolPrefix+"unknown-tool", state.NextVEM, "NextVEM should be unknown tool VEM for blocking")
 
 	assert.True(t, httpctx.IsJsonRPCRouting(r))
 	assert.Equal(t, 0, w.Body.Len(), "no error response should be written by middleware")
@@ -353,12 +363,12 @@ func TestJSONRPCMiddleware_ProcessRequest_AllowListBehavior(t *testing.T) {
 			JsonRpcVersion:      apidef.JsonRPC20,
 		},
 		MCPPrimitives: map[string]string{
-			"tool:tool-with-allow":    "/mcp-tool:tool-with-allow",
-			"tool:tool-without-allow": "/mcp-tool:tool-without-allow",
+			"tool:tool-with-allow":    mcp.ToolPrefix + "tool-with-allow",
+			"tool:tool-without-allow": mcp.ToolPrefix + "tool-without-allow",
 			// "unregistered-tool" is intentionally NOT in the map
 		},
 		MCPAllowListEnabled: true, // Set because at least one primitive has Allow enabled
-		JSONRPCRouter:       mcp.NewRouter(true),
+		JSONRPCRouter:       mcp.NewRouter(),
 	}
 
 	m := &JSONRPCMiddleware{
@@ -373,17 +383,17 @@ func TestJSONRPCMiddleware_ProcessRequest_AllowListBehavior(t *testing.T) {
 		{
 			name:        "registered tool with allow - routes to VEM",
 			toolName:    "tool-with-allow",
-			expectedVEM: "/mcp-tool:tool-with-allow",
+			expectedVEM: mcp.ToolPrefix + "tool-with-allow",
 		},
 		{
 			name:        "registered tool without allow - routes to VEM",
 			toolName:    "tool-without-allow",
-			expectedVEM: "/mcp-tool:tool-without-allow",
+			expectedVEM: mcp.ToolPrefix + "tool-without-allow",
 		},
 		{
 			name:        "unregistered tool - routes to catch-all VEM",
 			toolName:    "unregistered-tool",
-			expectedVEM: "/mcp-tool:unregistered-tool", // Will be caught by catch-all BlackList VEM
+			expectedVEM: mcp.ToolPrefix + "unregistered-tool", // Will be caught by catch-all BlackList VEM
 		},
 	}
 
@@ -408,7 +418,7 @@ func TestJSONRPCMiddleware_ProcessRequest_AllowListBehavior(t *testing.T) {
 			// All requests should be routed to operation VEM first when MCPAllowListEnabled
 			redirectURL := ctxGetURLRewriteTarget(r)
 			require.NotNil(t, redirectURL, "Should have redirect URL")
-			assert.Equal(t, "/json-rpc-method:tools/call", redirectURL.Path, "Should redirect to operation VEM first")
+			assert.Equal(t, jsonrpc.MethodVEMPrefix+"tools/call", redirectURL.Path, "Should redirect to operation VEM first")
 
 			state := httpctx.GetJSONRPCRoutingState(r)
 			require.NotNil(t, state, "Routing state should be set")
@@ -426,9 +436,9 @@ func TestJSONRPCMiddleware_ProcessRequest_ResourcesRead_ExactMatch(t *testing.T)
 			JsonRpcVersion:      apidef.JsonRPC20,
 		},
 		MCPPrimitives: map[string]string{
-			"resource:file:///config.json": "/mcp-resource:file:///config.json",
+			"resource:file:///config.json": mcp.ResourcePrefix + "file:///config.json",
 		},
-		JSONRPCRouter: mcp.NewRouter(false),
+		JSONRPCRouter: mcp.NewRouter(),
 	}
 
 	m := &JSONRPCMiddleware{
@@ -455,12 +465,12 @@ func TestJSONRPCMiddleware_ProcessRequest_ResourcesRead_ExactMatch(t *testing.T)
 	// Check redirect URL points to operation VEM (first stage)
 	redirectURL := ctxGetURLRewriteTarget(r)
 	require.NotNil(t, redirectURL, "Should have redirect URL")
-	assert.Equal(t, "/json-rpc-method:resources/read", redirectURL.Path)
+	assert.Equal(t, jsonrpc.MethodVEMPrefix+"resources/read", redirectURL.Path)
 
 	// Check routing state has NextVEM set to resource VEM
 	state := httpctx.GetJSONRPCRoutingState(r)
 	require.NotNil(t, state, "Routing state should be set")
-	assert.Equal(t, "/mcp-resource:file:///config.json", state.NextVEM, "NextVEM should be resource VEM")
+	assert.Equal(t, mcp.ResourcePrefix + "file:///config.json", state.NextVEM, "NextVEM should be resource VEM")
 }
 
 func TestJSONRPCMiddleware_ProcessRequest_ResourcesRead_WildcardMatch(t *testing.T) {
@@ -470,9 +480,9 @@ func TestJSONRPCMiddleware_ProcessRequest_ResourcesRead_WildcardMatch(t *testing
 			JsonRpcVersion:      apidef.JsonRPC20,
 		},
 		MCPPrimitives: map[string]string{
-			"resource:file:///repo/*": "/mcp-resource:file:///repo/*",
+			"resource:file:///repo/*": mcp.ResourcePrefix + "file:///repo/*",
 		},
-		JSONRPCRouter: mcp.NewRouter(false),
+		JSONRPCRouter: mcp.NewRouter(),
 	}
 
 	m := &JSONRPCMiddleware{
@@ -499,12 +509,12 @@ func TestJSONRPCMiddleware_ProcessRequest_ResourcesRead_WildcardMatch(t *testing
 	// Check redirect URL points to operation VEM
 	redirectURL := ctxGetURLRewriteTarget(r)
 	require.NotNil(t, redirectURL)
-	assert.Equal(t, "/json-rpc-method:resources/read", redirectURL.Path)
+	assert.Equal(t, jsonrpc.MethodVEMPrefix+"resources/read", redirectURL.Path)
 
 	// Check routing state has NextVEM set to resource VEM
 	state := httpctx.GetJSONRPCRoutingState(r)
 	require.NotNil(t, state)
-	assert.Equal(t, "/mcp-resource:file:///repo/*", state.NextVEM)
+	assert.Equal(t, mcp.ResourcePrefix + "file:///repo/*", state.NextVEM)
 }
 
 func TestJSONRPCMiddleware_ProcessRequest_ResourcesRead_ExactBeatsWildcard(t *testing.T) {
@@ -514,13 +524,13 @@ func TestJSONRPCMiddleware_ProcessRequest_ResourcesRead_ExactBeatsWildcard(t *te
 			JsonRpcVersion:      apidef.JsonRPC20,
 		},
 		MCPPrimitives: map[string]string{
-			"resource:file:///repo/*":           "/mcp-resource:file:///repo/*",
-			"resource:file:///repo/README.md":   "/mcp-resource:file:///repo/README.md",
-			"resource:file:///repo/README.txt":  "/mcp-resource:file:///repo/README.txt",
-			"resource:file:///repo/README.mdx":  "/mcp-resource:file:///repo/README.mdx",
-			"resource:file:///repo/README.json": "/mcp-resource:file:///repo/README.json",
+			"resource:file:///repo/*":           mcp.ResourcePrefix + "file:///repo/*",
+			"resource:file:///repo/README.md":   mcp.ResourcePrefix + "file:///repo/README.md",
+			"resource:file:///repo/README.txt":  mcp.ResourcePrefix + "file:///repo/README.txt",
+			"resource:file:///repo/README.mdx":  mcp.ResourcePrefix + "file:///repo/README.mdx",
+			"resource:file:///repo/README.json": mcp.ResourcePrefix + "file:///repo/README.json",
 		},
-		JSONRPCRouter: mcp.NewRouter(false),
+		JSONRPCRouter: mcp.NewRouter(),
 	}
 
 	m := &JSONRPCMiddleware{
@@ -547,12 +557,12 @@ func TestJSONRPCMiddleware_ProcessRequest_ResourcesRead_ExactBeatsWildcard(t *te
 	// Check redirect URL points to operation VEM
 	redirectURL := ctxGetURLRewriteTarget(r)
 	require.NotNil(t, redirectURL)
-	assert.Equal(t, "/json-rpc-method:resources/read", redirectURL.Path)
+	assert.Equal(t, jsonrpc.MethodVEMPrefix+"resources/read", redirectURL.Path)
 
 	// Check routing state has NextVEM set to exact match resource VEM
 	state := httpctx.GetJSONRPCRoutingState(r)
 	require.NotNil(t, state)
-	assert.Equal(t, "/mcp-resource:file:///repo/README.md", state.NextVEM)
+	assert.Equal(t, mcp.ResourcePrefix + "file:///repo/README.md", state.NextVEM)
 }
 
 func TestJSONRPCMiddleware_ProcessRequest_ResourcesRead_MostSpecificWildcard(t *testing.T) {
@@ -562,10 +572,10 @@ func TestJSONRPCMiddleware_ProcessRequest_ResourcesRead_MostSpecificWildcard(t *
 			JsonRpcVersion:      apidef.JsonRPC20,
 		},
 		MCPPrimitives: map[string]string{
-			"resource:file:///repo/*":      "/mcp-resource:file:///repo/*",
-			"resource:file:///repo/docs/*": "/mcp-resource:file:///repo/docs/*",
+			"resource:file:///repo/*":      mcp.ResourcePrefix + "file:///repo/*",
+			"resource:file:///repo/docs/*": mcp.ResourcePrefix + "file:///repo/docs/*",
 		},
-		JSONRPCRouter: mcp.NewRouter(false),
+		JSONRPCRouter: mcp.NewRouter(),
 	}
 
 	m := &JSONRPCMiddleware{
@@ -592,12 +602,12 @@ func TestJSONRPCMiddleware_ProcessRequest_ResourcesRead_MostSpecificWildcard(t *
 	// Check redirect URL points to operation VEM
 	redirectURL := ctxGetURLRewriteTarget(r)
 	require.NotNil(t, redirectURL)
-	assert.Equal(t, "/json-rpc-method:resources/read", redirectURL.Path)
+	assert.Equal(t, jsonrpc.MethodVEMPrefix+"resources/read", redirectURL.Path)
 
 	// Check routing state has NextVEM set to most specific wildcard resource VEM
 	state := httpctx.GetJSONRPCRoutingState(r)
 	require.NotNil(t, state)
-	assert.Equal(t, "/mcp-resource:file:///repo/docs/*", state.NextVEM)
+	assert.Equal(t, mcp.ResourcePrefix + "file:///repo/docs/*", state.NextVEM)
 }
 
 func TestJSONRPCMiddleware_ProcessRequest_PromptsGet(t *testing.T) {
@@ -607,9 +617,9 @@ func TestJSONRPCMiddleware_ProcessRequest_PromptsGet(t *testing.T) {
 			JsonRpcVersion:      apidef.JsonRPC20,
 		},
 		MCPPrimitives: map[string]string{
-			"prompt:code-review": "/mcp-prompt:code-review",
+			"prompt:code-review": mcp.PromptPrefix + "code-review",
 		},
-		JSONRPCRouter: mcp.NewRouter(false),
+		JSONRPCRouter: mcp.NewRouter(),
 	}
 
 	m := &JSONRPCMiddleware{
@@ -636,12 +646,12 @@ func TestJSONRPCMiddleware_ProcessRequest_PromptsGet(t *testing.T) {
 	// Check redirect URL points to operation VEM
 	redirectURL := ctxGetURLRewriteTarget(r)
 	require.NotNil(t, redirectURL)
-	assert.Equal(t, "/json-rpc-method:prompts/get", redirectURL.Path)
+	assert.Equal(t, jsonrpc.MethodVEMPrefix+"prompts/get", redirectURL.Path)
 
 	// Check routing state has NextVEM set to prompt VEM
 	state := httpctx.GetJSONRPCRoutingState(r)
 	require.NotNil(t, state)
-	assert.Equal(t, "/mcp-prompt:code-review", state.NextVEM)
+	assert.Equal(t, mcp.PromptPrefix + "code-review", state.NextVEM)
 }
 
 func TestJSONRPCMiddleware_ProcessRequest_OperationVEM(t *testing.T) {
@@ -651,9 +661,9 @@ func TestJSONRPCMiddleware_ProcessRequest_OperationVEM(t *testing.T) {
 			JsonRpcVersion:      apidef.JsonRPC20,
 		},
 		MCPPrimitives: map[string]string{
-			"operation:tools/list": "/json-rpc-method:tools-list",
+			"operation:tools/list": jsonrpc.MethodVEMPrefix + "tools-list",
 		},
-		JSONRPCRouter: mcp.NewRouter(false),
+		JSONRPCRouter: mcp.NewRouter(),
 	}
 
 	m := &JSONRPCMiddleware{
@@ -680,7 +690,7 @@ func TestJSONRPCMiddleware_ProcessRequest_OperationVEM(t *testing.T) {
 	redirectURL := ctxGetURLRewriteTarget(r)
 	require.NotNil(t, redirectURL)
 	// When an operation VEM is registered, use the registered path
-	assert.Equal(t, "/json-rpc-method:tools-list", redirectURL.Path)
+	assert.Equal(t, jsonrpc.MethodVEMPrefix+"tools-list", redirectURL.Path)
 
 	// Check routing state - discovery methods have NO NextVEM (1-stage routing)
 	state := httpctx.GetJSONRPCRoutingState(r)
@@ -694,15 +704,14 @@ func TestJSONRPCMiddleware_ProcessRequest_DiscoveryPassthrough(t *testing.T) {
 			ApplicationProtocol: apidef.AppProtocolMCP,
 			JsonRpcVersion:      apidef.JsonRPC20,
 		},
-		MCPPrimitives: map[string]string{}, // No configured VEMs
-		JSONRPCRouter: mcp.NewRouter(false),
+		MCPPrimitives: map[string]string{},
+		JSONRPCRouter: mcp.NewRouter(),
 	}
 
 	m := &JSONRPCMiddleware{
 		BaseMiddleware: &BaseMiddleware{Spec: spec},
 	}
 
-	// Discovery operations should pass through when no VEM is configured
 	methods := []string{"tools/list", "resources/list", "prompts/list", "initialize", "ping"}
 
 	for _, method := range methods {
@@ -722,9 +731,12 @@ func TestJSONRPCMiddleware_ProcessRequest_DiscoveryPassthrough(t *testing.T) {
 			err, code := m.ProcessRequest(w, r, nil)
 			assert.Nil(t, err)
 			assert.Equal(t, http.StatusOK, code)
-			// Path should not be rewritten for passthrough
-			assert.Equal(t, "/original-path", r.URL.Path)
-			assert.False(t, httpctx.IsJsonRPCRouting(r))
+
+			redirectURL := ctxGetURLRewriteTarget(r)
+			require.NotNil(t, redirectURL, "Should have redirect URL")
+			assert.Equal(t, "tyk", redirectURL.Scheme)
+			assert.Equal(t, "self", redirectURL.Host)
+			assert.True(t, httpctx.IsJsonRPCRouting(r))
 		})
 	}
 }
@@ -736,7 +748,7 @@ func TestJSONRPCMiddleware_ProcessRequest_NotificationsPassthrough(t *testing.T)
 			JsonRpcVersion:      apidef.JsonRPC20,
 		},
 		MCPPrimitives: map[string]string{},
-		JSONRPCRouter: mcp.NewRouter(false),
+		JSONRPCRouter: mcp.NewRouter(),
 	}
 
 	m := &JSONRPCMiddleware{
@@ -758,9 +770,12 @@ func TestJSONRPCMiddleware_ProcessRequest_NotificationsPassthrough(t *testing.T)
 	err, code := m.ProcessRequest(w, r, nil)
 	assert.Nil(t, err)
 	assert.Equal(t, http.StatusOK, code)
-	assert.Equal(t, "/", r.URL.Path)
-	assert.False(t, httpctx.IsJsonRPCRouting(r))
-	assert.Nil(t, httpctx.GetJSONRPCRequest(r))
+
+	redirectURL := ctxGetURLRewriteTarget(r)
+	require.NotNil(t, redirectURL, "Should have redirect URL")
+	assert.Equal(t, "tyk", redirectURL.Scheme)
+	assert.Equal(t, "self", redirectURL.Host)
+	assert.True(t, httpctx.IsJsonRPCRouting(r))
 	assert.Equal(t, 0, w.Body.Len())
 }
 
@@ -771,7 +786,7 @@ func TestJSONRPCMiddleware_ProcessRequest_UnmatchedMethodPassthrough(t *testing.
 			JsonRpcVersion:      apidef.JsonRPC20,
 		},
 		MCPPrimitives: map[string]string{},
-		JSONRPCRouter: mcp.NewRouter(false),
+		JSONRPCRouter: mcp.NewRouter(),
 	}
 
 	m := &JSONRPCMiddleware{
@@ -793,9 +808,12 @@ func TestJSONRPCMiddleware_ProcessRequest_UnmatchedMethodPassthrough(t *testing.
 	err, code := m.ProcessRequest(w, r, nil)
 	assert.Nil(t, err)
 	assert.Equal(t, http.StatusOK, code)
-	assert.Equal(t, "/original", r.URL.Path)
-	assert.False(t, httpctx.IsJsonRPCRouting(r))
-	assert.Nil(t, httpctx.GetJSONRPCRequest(r))
+
+	redirectURL := ctxGetURLRewriteTarget(r)
+	require.NotNil(t, redirectURL, "Should have redirect URL")
+	assert.Equal(t, "tyk", redirectURL.Scheme)
+	assert.Equal(t, "self", redirectURL.Host)
+	assert.True(t, httpctx.IsJsonRPCRouting(r))
 	assert.Equal(t, 0, w.Body.Len())
 }
 
@@ -806,9 +824,9 @@ func TestJSONRPCMiddleware_ProcessRequest_BodyRestored(t *testing.T) {
 			JsonRpcVersion:      apidef.JsonRPC20,
 		},
 		MCPPrimitives: map[string]string{
-			"tool:test": "/mcp-tool:test",
+			"tool:test": mcp.ToolPrefix + "test",
 		},
-		JSONRPCRouter: mcp.NewRouter(false),
+		JSONRPCRouter: mcp.NewRouter(),
 	}
 
 	m := &JSONRPCMiddleware{
@@ -843,7 +861,7 @@ func TestJSONRPCMiddleware_ProcessRequest_NullID(t *testing.T) {
 			JsonRpcVersion:      apidef.JsonRPC20,
 		},
 		MCPPrimitives: map[string]string{},
-		JSONRPCRouter: mcp.NewRouter(false),
+		JSONRPCRouter: mcp.NewRouter(),
 	}
 
 	m := &JSONRPCMiddleware{
@@ -899,9 +917,9 @@ func TestJSONRPCMiddleware_ResourcesSubscribe(t *testing.T) {
 			JsonRpcVersion:      apidef.JsonRPC20,
 		},
 		MCPPrimitives: map[string]string{
-			"resource:events://*": "/mcp-resource:events://*",
+			"resource:events://*": mcp.ResourcePrefix + "events://*",
 		},
-		JSONRPCRouter: mcp.NewRouter(false),
+		JSONRPCRouter: mcp.NewRouter(),
 	}
 
 	m := &JSONRPCMiddleware{
@@ -924,9 +942,12 @@ func TestJSONRPCMiddleware_ResourcesSubscribe(t *testing.T) {
 	err, code := m.ProcessRequest(w, r, nil)
 	assert.Nil(t, err)
 	assert.Equal(t, http.StatusOK, code)
-	// resources/subscribe now passthroughs to upstream by default
-	assert.Equal(t, "/original-path", r.URL.Path)
-	assert.False(t, httpctx.IsJsonRPCRouting(r))
+
+	redirectURL := ctxGetURLRewriteTarget(r)
+	require.NotNil(t, redirectURL, "Should have redirect URL")
+	assert.Equal(t, "tyk", redirectURL.Scheme)
+	assert.Equal(t, "self", redirectURL.Host)
+	assert.True(t, httpctx.IsJsonRPCRouting(r))
 }
 
 func TestJSONRPCMiddleware_ResourcesUnsubscribe(t *testing.T) {
@@ -936,9 +957,9 @@ func TestJSONRPCMiddleware_ResourcesUnsubscribe(t *testing.T) {
 			JsonRpcVersion:      apidef.JsonRPC20,
 		},
 		MCPPrimitives: map[string]string{
-			"resource:events://topic": "/mcp-resource:events://topic",
+			"resource:events://topic": mcp.ResourcePrefix + "events://topic",
 		},
-		JSONRPCRouter: mcp.NewRouter(false),
+		JSONRPCRouter: mcp.NewRouter(),
 	}
 
 	m := &JSONRPCMiddleware{
@@ -961,9 +982,12 @@ func TestJSONRPCMiddleware_ResourcesUnsubscribe(t *testing.T) {
 	err, code := m.ProcessRequest(w, r, nil)
 	assert.Nil(t, err)
 	assert.Equal(t, http.StatusOK, code)
-	// resources/unsubscribe now passthroughs to upstream by default
-	assert.Equal(t, "/original-path", r.URL.Path)
-	assert.False(t, httpctx.IsJsonRPCRouting(r))
+
+	redirectURL := ctxGetURLRewriteTarget(r)
+	require.NotNil(t, redirectURL, "Should have redirect URL")
+	assert.Equal(t, "tyk", redirectURL.Scheme)
+	assert.Equal(t, "self", redirectURL.Host)
+	assert.True(t, httpctx.IsJsonRPCRouting(r))
 }
 
 func TestJSONRPCMiddleware_ToolsCall_MissingParamsName(t *testing.T) {
@@ -973,9 +997,9 @@ func TestJSONRPCMiddleware_ToolsCall_MissingParamsName(t *testing.T) {
 			JsonRpcVersion:      apidef.JsonRPC20,
 		},
 		MCPPrimitives: map[string]string{
-			"tool:test": "/mcp-tool:test",
+			"tool:test": mcp.ToolPrefix + "test",
 		},
-		JSONRPCRouter: mcp.NewRouter(false),
+		JSONRPCRouter: mcp.NewRouter(),
 	}
 
 	m := &JSONRPCMiddleware{
@@ -1011,9 +1035,9 @@ func TestJSONRPCMiddleware_ToolsCall_NonStringName_InvalidParams(t *testing.T) {
 			JsonRpcVersion:      apidef.JsonRPC20,
 		},
 		MCPPrimitives: map[string]string{
-			"tool:test": "/mcp-tool:test",
+			"tool:test": mcp.ToolPrefix + "test",
 		},
-		JSONRPCRouter: mcp.NewRouter(false),
+		JSONRPCRouter: mcp.NewRouter(),
 	}
 
 	m := &JSONRPCMiddleware{
@@ -1048,9 +1072,9 @@ func TestJSONRPCMiddleware_ResourcesRead_MissingParamsURI_InvalidParams(t *testi
 			JsonRpcVersion:      apidef.JsonRPC20,
 		},
 		MCPPrimitives: map[string]string{
-			"resource:file:///repo/*": "/mcp-resource:file:///repo/*",
+			"resource:file:///repo/*": mcp.ResourcePrefix + "file:///repo/*",
 		},
-		JSONRPCRouter: mcp.NewRouter(false),
+		JSONRPCRouter: mcp.NewRouter(),
 	}
 
 	m := &JSONRPCMiddleware{
@@ -1084,10 +1108,10 @@ func TestJSONRPCMiddleware_AllowListEnforcedOnVEM(t *testing.T) {
 	// - "tool-not-allowed": registered but no Allow
 	// - "unregistered-tool": not registered at all
 	//
-	// Expected behavior:
-	// - tool-allowed: routed to VEM, Allow middleware permits → 200 OK
-	// - tool-not-allowed: routed to VEM, but no Allow entry → blocked by Allow middleware
-	// - unregistered-tool: rejected at JSON-RPC middleware with "Method not found"
+	// Expected behavior with allowlist enabled:
+	// - tool-allowed: routed to VEM, has WhiteList entry → 200 OK
+	// - tool-not-allowed: routed to VEM, no WhiteList entry → blocked by whitelist mode → 403
+	// - unregistered-tool: VEM doesn't exist → MCPPrimitiveNotFound + allowlist active → 403
 
 	ts := StartTest(nil)
 	defer ts.Close()
@@ -1164,11 +1188,8 @@ func TestJSONRPCMiddleware_AllowListEnforcedOnVEM(t *testing.T) {
 	}
 
 	_, _ = ts.Run(t, []test.TestCase{
-		// tool-allowed: should pass (has Allow.Enabled, gets Internal + WhiteList)
 		{Method: http.MethodPost, Path: "/mcp", Data: allowedPayload, Code: http.StatusOK},
-		// tool-not-allowed: blocked by catch-all BlackList (no Internal entry when allowList enabled)
 		{Method: http.MethodPost, Path: "/mcp", Data: notAllowedPayload, Code: http.StatusForbidden},
-		// unregistered-tool: blocked by catch-all BlackList (routed via buildUnregisteredVEMPath)
 		{Method: http.MethodPost, Path: "/mcp", Data: unregisteredPayload, Code: http.StatusForbidden},
 	}...)
 }
@@ -1220,7 +1241,7 @@ func TestJSONRPCMiddleware_RateLimitEnforcedOnVEM(t *testing.T) {
 	require.NotNil(t, mw)
 	require.Len(t, mw.McpTools, 2)
 
-	req := httptest.NewRequest(http.MethodPost, "/mcp-tool:get-weather", nil)
+	req := httptest.NewRequest(http.MethodPost, mcp.ToolPrefix + "get-weather", nil)
 	httpctx.SetJsonRPCRouting(req, true) // Simulate JSON-RPC routing context
 	var rxPaths []URLSpec
 	for _, paths := range loaded.RxPaths {
@@ -1428,37 +1449,37 @@ func TestJSONRPCMiddleware_setupSequentialRouting(t *testing.T) {
 		{
 			name:               "tools/call - 2-stage routing",
 			method:             "tools/call",
-			expectedNextVEM:    "/mcp-tool:weather.getForecast",
-			expectedVEMChain:   []string{"/json-rpc-method:tools/call", "/mcp-tool:weather.getForecast"},
-			expectedRedirectTo: "/json-rpc-method:tools/call",
+			expectedNextVEM:    mcp.ToolPrefix + "weather.getForecast",
+			expectedVEMChain:   []string{jsonrpc.MethodVEMPrefix + "tools/call", mcp.ToolPrefix + "weather.getForecast"},
+			expectedRedirectTo: jsonrpc.MethodVEMPrefix + "tools/call",
 		},
 		{
 			name:               "resources/read - 2-stage routing",
 			method:             "resources/read",
-			expectedNextVEM:    "/mcp-resource:file:///data/config.json",
-			expectedVEMChain:   []string{"/json-rpc-method:resources/read", "/mcp-resource:file:///data/config.json"},
-			expectedRedirectTo: "/json-rpc-method:resources/read",
+			expectedNextVEM:    mcp.ResourcePrefix + "file:///data/config.json",
+			expectedVEMChain:   []string{jsonrpc.MethodVEMPrefix + "resources/read", mcp.ResourcePrefix + "file:///data/config.json"},
+			expectedRedirectTo: jsonrpc.MethodVEMPrefix + "resources/read",
 		},
 		{
 			name:               "prompts/get - 2-stage routing",
 			method:             "prompts/get",
-			expectedNextVEM:    "/mcp-prompt:summarize",
-			expectedVEMChain:   []string{"/json-rpc-method:prompts/get", "/mcp-prompt:summarize"},
-			expectedRedirectTo: "/json-rpc-method:prompts/get",
+			expectedNextVEM:    mcp.PromptPrefix + "summarize",
+			expectedVEMChain:   []string{jsonrpc.MethodVEMPrefix + "prompts/get", mcp.PromptPrefix + "summarize"},
+			expectedRedirectTo: jsonrpc.MethodVEMPrefix + "prompts/get",
 		},
 		{
 			name:               "tools/list - 1-stage routing (operation only)",
 			method:             "tools/list",
 			expectedNextVEM:    "",
-			expectedVEMChain:   []string{"/json-rpc-method:tools/list"},
-			expectedRedirectTo: "/json-rpc-method:tools/list",
+			expectedVEMChain:   []string{jsonrpc.MethodVEMPrefix + "tools/list"},
+			expectedRedirectTo: jsonrpc.MethodVEMPrefix + "tools/list",
 		},
 		{
 			name:               "ping - 1-stage routing (operation only)",
 			method:             "ping",
 			expectedNextVEM:    "",
-			expectedVEMChain:   []string{"/json-rpc-method:ping"},
-			expectedRedirectTo: "/json-rpc-method:ping",
+			expectedVEMChain:   []string{jsonrpc.MethodVEMPrefix + "ping"},
+			expectedRedirectTo: jsonrpc.MethodVEMPrefix + "ping",
 		},
 	}
 

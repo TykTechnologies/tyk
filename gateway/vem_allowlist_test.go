@@ -6,6 +6,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/TykTechnologies/tyk/apidef/oas"
+	"github.com/TykTechnologies/tyk/internal/mcp"
 )
 
 // TestHasOperationAllowEnabled tests detection of allow middleware in operations.
@@ -176,7 +177,7 @@ func TestHasAllowListEnabled(t *testing.T) {
 			operations: oas.Operations{},
 			categories: []PrimitiveCategory{
 				{
-					Prefix:   "/mcp-tool:",
+					Prefix:   mcp.ToolPrefix + "",
 					TypeName: "tool",
 					Primitives: oas.MCPPrimitives{
 						"tool-A": &oas.MCPPrimitive{
@@ -198,7 +199,7 @@ func TestHasAllowListEnabled(t *testing.T) {
 			},
 			categories: []PrimitiveCategory{
 				{
-					Prefix:   "/mcp-tool:",
+					Prefix:   mcp.ToolPrefix + "",
 					TypeName: "tool",
 					Primitives: oas.MCPPrimitives{
 						"tool-A": &oas.MCPPrimitive{
@@ -218,7 +219,7 @@ func TestHasAllowListEnabled(t *testing.T) {
 			},
 			categories: []PrimitiveCategory{
 				{
-					Prefix:   "/mcp-tool:",
+					Prefix:   mcp.ToolPrefix + "",
 					TypeName: "tool",
 					Primitives: oas.MCPPrimitives{
 						"tool-A": &oas.MCPPrimitive{},

@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/internal/mcp"
 )
 
 func TestMCPPrimitive_Embedding(t *testing.T) {
@@ -236,7 +237,7 @@ func TestMCPPrimitive_DisabledMiddleware(t *testing.T) {
 			Body:    "transformed",
 		}
 
-		vemPath := "/mcp-tool:test"
+		vemPath := mcp.ToolPrefix + "test"
 		var mcpEP, opEP apidef.ExtendedPathsSet
 
 		primitive.extractTransformResponseBodyTo(&mcpEP, vemPath, "POST")
