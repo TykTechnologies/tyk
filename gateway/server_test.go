@@ -14,10 +14,6 @@ import (
 
 	"github.com/TykTechnologies/again"
 	"github.com/TykTechnologies/storage/persistent/model"
-	"github.com/sirupsen/logrus"
-	"github.com/stretchr/testify/assert"
-	"go.uber.org/mock/gomock"
-
 	"github.com/TykTechnologies/tyk/config"
 	internalmodel "github.com/TykTechnologies/tyk/internal/model"
 	"github.com/TykTechnologies/tyk/internal/netutil"
@@ -27,6 +23,9 @@ import (
 	"github.com/TykTechnologies/tyk/tcp"
 	"github.com/TykTechnologies/tyk/test"
 	"github.com/TykTechnologies/tyk/user"
+	"github.com/sirupsen/logrus"
+	"github.com/stretchr/testify/assert"
+	"go.uber.org/mock/gomock"
 )
 
 func TestGateway_afterConfSetup(t *testing.T) {
