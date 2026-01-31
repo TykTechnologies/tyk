@@ -14,10 +14,11 @@ func TestRouter_ToolsCall_Found(t *testing.T) {
 		"tool:weather.getForecast": "/mcp-tool:weather.getForecast",
 	}
 
-	params, _ := json.Marshal(map[string]interface{}{
+	params, err := json.Marshal(map[string]interface{}{
 		"name":      "weather.getForecast",
 		"arguments": map[string]interface{}{},
 	})
+	require.NoError(t, err)
 
 	result, err := router.RouteMethod(MethodToolsCall, params, primitives)
 
@@ -34,10 +35,11 @@ func TestRouter_ToolsCall_NotFound(t *testing.T) {
 	router := NewRouter(false)
 	primitives := map[string]string{}
 
-	params, _ := json.Marshal(map[string]interface{}{
+	params, err := json.Marshal(map[string]interface{}{
 		"name":      "unknown-tool",
 		"arguments": map[string]interface{}{},
 	})
+	require.NoError(t, err)
 
 	result, err := router.RouteMethod(MethodToolsCall, params, primitives)
 
@@ -51,10 +53,11 @@ func TestRouter_ToolsCall_NotFound_AllowListEnabled(t *testing.T) {
 	router := NewRouter(true)
 	primitives := map[string]string{}
 
-	params, _ := json.Marshal(map[string]interface{}{
+	params, err := json.Marshal(map[string]interface{}{
 		"name":      "unknown-tool",
 		"arguments": map[string]interface{}{},
 	})
+	require.NoError(t, err)
 
 	result, err := router.RouteMethod(MethodToolsCall, params, primitives)
 
@@ -81,11 +84,12 @@ func TestRouter_ToolsCall_MissingName(t *testing.T) {
 	router := NewRouter(false)
 	primitives := map[string]string{}
 
-	params, _ := json.Marshal(map[string]interface{}{
+	params, err := json.Marshal(map[string]interface{}{
 		"arguments": map[string]interface{}{},
 	})
+	require.NoError(t, err)
 
-	_, err := router.RouteMethod(MethodToolsCall, params, primitives)
+	_, err = router.RouteMethod(MethodToolsCall, params, primitives)
 
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "name")
@@ -95,12 +99,13 @@ func TestRouter_ToolsCall_EmptyName(t *testing.T) {
 	router := NewRouter(false)
 	primitives := map[string]string{}
 
-	params, _ := json.Marshal(map[string]interface{}{
+	params, err := json.Marshal(map[string]interface{}{
 		"name":      "",
 		"arguments": map[string]interface{}{},
 	})
+	require.NoError(t, err)
 
-	_, err := router.RouteMethod(MethodToolsCall, params, primitives)
+	_, err = router.RouteMethod(MethodToolsCall, params, primitives)
 
 	require.Error(t, err)
 }
@@ -111,9 +116,10 @@ func TestRouter_ResourcesRead_Found(t *testing.T) {
 		"resource:file:///data/config.json": "/mcp-resource:file:///data/config.json",
 	}
 
-	params, _ := json.Marshal(map[string]interface{}{
+	params, err := json.Marshal(map[string]interface{}{
 		"uri": "file:///data/config.json",
 	})
+	require.NoError(t, err)
 
 	result, err := router.RouteMethod(MethodResourcesRead, params, primitives)
 
@@ -132,9 +138,10 @@ func TestRouter_ResourcesRead_WildcardMatch(t *testing.T) {
 		"resource:file:///data/*": "/mcp-resource:file:///data/*",
 	}
 
-	params, _ := json.Marshal(map[string]interface{}{
+	params, err := json.Marshal(map[string]interface{}{
 		"uri": "file:///data/config.json",
 	})
+	require.NoError(t, err)
 
 	result, err := router.RouteMethod(MethodResourcesRead, params, primitives)
 
@@ -154,9 +161,10 @@ func TestRouter_ResourcesRead_ExactMatchBeatsWildcard(t *testing.T) {
 		"resource:file:///data/config.json": "/mcp-resource:exact",
 	}
 
-	params, _ := json.Marshal(map[string]interface{}{
+	params, err := json.Marshal(map[string]interface{}{
 		"uri": "file:///data/config.json",
 	})
+	require.NoError(t, err)
 
 	result, err := router.RouteMethod(MethodResourcesRead, params, primitives)
 
@@ -172,9 +180,10 @@ func TestRouter_ResourcesRead_LongerPrefixWins(t *testing.T) {
 		"resource:file:///data/src/*": "/mcp-resource:long",
 	}
 
-	params, _ := json.Marshal(map[string]interface{}{
+	params, err := json.Marshal(map[string]interface{}{
 		"uri": "file:///data/src/main.go",
 	})
+	require.NoError(t, err)
 
 	result, err := router.RouteMethod(MethodResourcesRead, params, primitives)
 
@@ -187,9 +196,10 @@ func TestRouter_ResourcesRead_MissingURI(t *testing.T) {
 	router := NewRouter(false)
 	primitives := map[string]string{}
 
-	params, _ := json.Marshal(map[string]interface{}{})
+	params, err := json.Marshal(map[string]interface{}{})
+	require.NoError(t, err)
 
-	_, err := router.RouteMethod(MethodResourcesRead, params, primitives)
+	_, err = router.RouteMethod(MethodResourcesRead, params, primitives)
 
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "uri")
@@ -201,10 +211,11 @@ func TestRouter_PromptsGet_Found(t *testing.T) {
 		"prompt:summarize": "/mcp-prompt:summarize",
 	}
 
-	params, _ := json.Marshal(map[string]interface{}{
+	params, err := json.Marshal(map[string]interface{}{
 		"name":      "summarize",
 		"arguments": map[string]interface{}{},
 	})
+	require.NoError(t, err)
 
 	result, err := router.RouteMethod(MethodPromptsGet, params, primitives)
 

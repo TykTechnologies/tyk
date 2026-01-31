@@ -2,7 +2,7 @@ package mcp
 
 import (
 	"encoding/json"
-	"fmt"
+	"errors"
 	"strings"
 
 	"github.com/TykTechnologies/tyk/internal/jsonrpc"
@@ -122,29 +122,29 @@ func (r *Router) routeOperation(method string, primitives map[string]string) (js
 
 func extractStringParam(params json.RawMessage, key string) (string, error) {
 	if len(params) == 0 {
-		return "", fmt.Errorf(ErrMsgMissingParams)
+		return "", errors.New(ErrMsgMissingParams)
 	}
 
 	var paramsMap map[string]interface{}
-	if err := json.Unmarshal(params, &paramsMap); err != nil {
-		return "", fmt.Errorf(ErrMsgInvalidParamsType)
+	if json.Unmarshal(params, &paramsMap) != nil {
+		return "", errors.New(ErrMsgInvalidParamsType)
 	}
 
 	val, exists := paramsMap[key]
 	if !exists {
 		switch key {
 		case ParamKeyName:
-			return "", fmt.Errorf(ErrMsgMissingParamName)
+			return "", errors.New(ErrMsgMissingParamName)
 		case ParamKeyURI:
-			return "", fmt.Errorf(ErrMsgMissingParamURI)
+			return "", errors.New(ErrMsgMissingParamURI)
 		default:
-			return "", fmt.Errorf(ErrMsgInvalidParams)
+			return "", errors.New(ErrMsgInvalidParams)
 		}
 	}
 
 	strVal, ok := val.(string)
 	if !ok || strVal == "" {
-		return "", fmt.Errorf(ErrMsgInvalidParams)
+		return "", errors.New(ErrMsgInvalidParams)
 	}
 
 	return strVal, nil

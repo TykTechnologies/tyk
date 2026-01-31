@@ -17,6 +17,23 @@ const (
 	PromptPrefix   = "/mcp-prompt:"
 )
 
+// Catch-all patterns for MCP primitive VEMs in allowlist mode.
+// Uses mux-style pattern matching: /prefix{rest:.*}
+// These patterns match any path starting with the primitive prefix.
+const (
+	// ToolCatchAllPattern matches all tool VEM paths.
+	// Format: /mcp-tool:{rest:.*}
+	ToolCatchAllPattern = ToolPrefix + "{rest:.*}"
+
+	// ResourceCatchAllPattern matches all resource VEM paths.
+	// Format: /mcp-resource:{rest:.*}
+	ResourceCatchAllPattern = ResourcePrefix + "{rest:.*}"
+
+	// PromptCatchAllPattern matches all prompt VEM paths.
+	// Format: /mcp-prompt:{rest:.*}
+	PromptCatchAllPattern = PromptPrefix + "{rest:.*}"
+)
+
 var registerOnce sync.Once
 
 // RegisterVEMPrefixes registers MCP and JSON-RPC VEM prefixes with the agent protocol registry.

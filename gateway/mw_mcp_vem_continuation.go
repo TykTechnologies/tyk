@@ -30,7 +30,7 @@ func (m *MCPVEMContinuationMiddleware) EnabledForSpec() bool {
 // This is GENERIC routing - just follows the NextVEM chain, no protocol logic.
 //
 //nolint:staticcheck // ST1008: middleware interface requires (error, int) return order
-func (m *MCPVEMContinuationMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
+func (m *MCPVEMContinuationMiddleware) ProcessRequest(_ http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
 	state := httpctx.GetJSONRPCRoutingState(r)
 	if state == nil {
 		// Not an MCP JSON-RPC request or routing not initialized

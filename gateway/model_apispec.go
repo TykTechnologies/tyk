@@ -171,41 +171,59 @@ func (a *APISpec) FindSpecMatchesStatus(r *http.Request, rxPaths []URLSpec, mode
 // FindSpecMatchesStatus() should be used instead. Each middleware pass sees only ONE
 // VEM path (r.URL.Path), making VEM chain iteration unnecessary.
 func (a *APISpec) FindAllVEMChainSpecs(r *http.Request, rxPaths []URLSpec, mode URLStatus) []*URLSpec {
-	// Check if this is a JSON-RPC routed request with a VEM chain
 	rpcData := httpctx.GetJSONRPCRequest(r)
 
 	if rpcData == nil || len(rpcData.VEMChain) == 0 {
-		// Not a JSON-RPC request, use normal logic
-		if spec, ok := a.FindSpecMatchesStatus(r, rxPaths, mode); ok {
-			return []*URLSpec{spec}
-		}
-		return nil
+		return a.findNonJSONRPCSpec(r, rxPaths, mode)
 	}
 
-	// For JSON-RPC requests, find all specs matching VEMs in the chain
+	return a.findJSONRPCVEMChainSpecs(rpcData.VEMChain, rxPaths, mode)
+}
+
+// findNonJSONRPCSpec handles spec matching for non-JSON-RPC requests.
+func (a *APISpec) findNonJSONRPCSpec(r *http.Request, rxPaths []URLSpec, mode URLStatus) []*URLSpec {
+	if spec, ok := a.FindSpecMatchesStatus(r, rxPaths, mode); ok {
+		return []*URLSpec{spec}
+	}
+	return nil
+}
+
+// findJSONRPCVEMChainSpecs finds all specs matching VEMs in the chain for JSON-RPC requests.
+func (a *APISpec) findJSONRPCVEMChainSpecs(vemChain []string, rxPaths []URLSpec, mode URLStatus) []*URLSpec {
 	method := http.MethodPost // JSON-RPC always uses POST
 	var specs []*URLSpec
 
-	for _, vemPath := range rpcData.VEMChain {
-		for i := range rxPaths {
-			if rxPaths[i].Status != mode {
-				continue
-			}
-			if !rxPaths[i].matchesMethod(method) {
-				continue
-			}
-
-			// Check if this spec matches the VEM path
-			// We need to get the path from the spec based on the mode
-			specPath, specMethod := a.getSpecPathAndMethod(&rxPaths[i], mode)
-			if specPath == vemPath && specMethod == method {
-				specs = append(specs, &rxPaths[i])
-				break // Found spec for this VEM, move to next
-			}
+	for _, vemPath := range vemChain {
+		if spec := a.findSpecForVEMPath(vemPath, method, rxPaths, mode); spec != nil {
+			specs = append(specs, spec)
 		}
 	}
 
 	return specs
+}
+
+// findSpecForVEMPath finds a URLSpec matching the given VEM path, method, and mode.
+func (a *APISpec) findSpecForVEMPath(vemPath, method string, rxPaths []URLSpec, mode URLStatus) *URLSpec {
+	for i := range rxPaths {
+		if !a.specMatchesVEMPath(&rxPaths[i], vemPath, method, mode) {
+			continue
+		}
+		return &rxPaths[i]
+	}
+	return nil
+}
+
+// specMatchesVEMPath checks if a URLSpec matches the given VEM path, method, and mode.
+func (a *APISpec) specMatchesVEMPath(spec *URLSpec, vemPath, method string, mode URLStatus) bool {
+	if spec.Status != mode {
+		return false
+	}
+	if !spec.matchesMethod(method) {
+		return false
+	}
+
+	specPath, specMethod := a.getSpecPathAndMethod(spec, mode)
+	return specPath == vemPath && specMethod == method
 }
 
 // getSpecPathAndMethod extracts the path and method from a URLSpec based on the mode.

@@ -131,13 +131,13 @@ func (a APIDefinitionLoader) generateMCPVEMs(apiSpec *APISpec, conf config.Confi
 		catchAllPrefixes = append(catchAllPrefixes, jsonrpc.MethodVEMCatchAllPattern)
 	}
 	if apiSpec.ToolsAllowListEnabled {
-		catchAllPrefixes = append(catchAllPrefixes, mcp.ToolPrefix+"{rest:.*}")
+		catchAllPrefixes = append(catchAllPrefixes, mcp.ToolCatchAllPattern)
 	}
 	if apiSpec.ResourcesAllowListEnabled {
-		catchAllPrefixes = append(catchAllPrefixes, mcp.ResourcePrefix+"{rest:.*}")
+		catchAllPrefixes = append(catchAllPrefixes, mcp.ResourceCatchAllPattern)
 	}
 	if apiSpec.PromptsAllowListEnabled {
-		catchAllPrefixes = append(catchAllPrefixes, mcp.PromptPrefix+"{rest:.*}")
+		catchAllPrefixes = append(catchAllPrefixes, mcp.PromptCatchAllPattern)
 	}
 
 	if len(catchAllPrefixes) > 0 {
