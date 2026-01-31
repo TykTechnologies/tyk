@@ -965,3 +965,61 @@ func Test_generateMCPOperationVEMs_HeaderInjection(t *testing.T) {
 	}
 	assert.True(t, foundHeaderInjected, "should generate header injection spec for operation VEM")
 }
+
+// TestCompileOASMockResponseForVEM tests the OAS MockResponse compilation for VEM paths.
+// Both operations and primitives use OAS flow (OASMockResponse status).
+func TestCompileOASMockResponseForVEM(t *testing.T) {
+	loader := APIDefinitionLoader{}
+	conf := config.Config{}
+
+	t.Run("operation with mock response", func(t *testing.T) {
+		operation := &oas.Operation{
+			MockResponse: &oas.MockResponse{
+				Enabled: true,
+				Code:    200,
+				Body:    `{"test": "operation"}`,
+			},
+		}
+
+		specs := loader.compileOASMockResponseForVEM(operation.MockResponse, "/json-rpc-method:tools/call", conf)
+
+		assert.Len(t, specs, 1)
+		assert.NotNil(t, specs[0].OASMockResponseMeta)
+		assert.Equal(t, 200, specs[0].OASMockResponseMeta.Code)
+		assert.Equal(t, `{"test": "operation"}`, specs[0].OASMockResponseMeta.Body)
+		assert.Equal(t, OASMockResponse, specs[0].Status)
+		assert.Equal(t, "/json-rpc-method:tools/call", specs[0].OASPath)
+		assert.Equal(t, "POST", specs[0].OASMethod)
+	})
+
+	t.Run("primitive with mock response", func(t *testing.T) {
+		primitive := &oas.MCPPrimitive{}
+		primitive.MockResponse = &oas.MockResponse{
+			Enabled: true,
+			Code:    201,
+			Body:    `{"test": "primitive"}`,
+		}
+
+		specs := loader.compileOASMockResponseForVEM(primitive.MockResponse, "/mcp-tool:test", conf)
+
+		assert.Len(t, specs, 1)
+		assert.NotNil(t, specs[0].OASMockResponseMeta)
+		assert.Equal(t, 201, specs[0].OASMockResponseMeta.Code)
+		assert.Equal(t, `{"test": "primitive"}`, specs[0].OASMockResponseMeta.Body)
+		assert.Equal(t, OASMockResponse, specs[0].Status)
+	})
+
+	t.Run("nil mock response returns empty", func(t *testing.T) {
+		specs := loader.compileOASMockResponseForVEM(nil, "/test", conf)
+		assert.Empty(t, specs)
+	})
+
+	t.Run("disabled mock response returns empty", func(t *testing.T) {
+		mock := &oas.MockResponse{
+			Enabled: false,
+			Code:    200,
+		}
+		specs := loader.compileOASMockResponseForVEM(mock, "/test", conf)
+		assert.Empty(t, specs)
+	})
+}

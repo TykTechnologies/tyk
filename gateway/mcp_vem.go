@@ -218,9 +218,10 @@ func (a APIDefinitionLoader) compileOperationMiddlewareSpecs(op *oas.Operation, 
 	var ep apidef.ExtendedPathsSet
 	op.ExtractToExtendedPaths(&ep, path, http.MethodPost)
 
-	// Compile middleware specs (same pipeline as primitive middleware)
 	specs := []URLSpec{}
-	specs = append(specs, a.compileMockResponsePathSpec(false, ep.MockResponse, MockResponse, conf)...)
+	// Operations use OAS MockResponse flow for proper path matching
+	specs = append(specs, a.compileOASMockResponseForVEM(op.MockResponse, path, conf)...)
+
 	specs = append(specs, a.compileExtendedPathSpec(false, ep.Ignored, Ignored, conf)...)
 	specs = append(specs, a.compileExtendedPathSpec(false, ep.BlackList, BlackList, conf)...)
 	specs = append(specs, a.compileExtendedPathSpec(false, ep.WhiteList, WhiteList, conf)...)
@@ -314,9 +315,9 @@ func (a APIDefinitionLoader) compilePrimitiveMiddlewareSpecs(primitive *oas.MCPP
 	var ep apidef.ExtendedPathsSet
 	primitive.ExtractToExtendedPaths(&ep, path, http.MethodPost)
 
-	// Reuse the classic middleware compilation pipeline for per-path middleware.
 	specs := []URLSpec{}
-	specs = append(specs, a.compileMockResponsePathSpec(false, ep.MockResponse, MockResponse, conf)...)
+	// Primitives use OAS MockResponse flow (same as operations)
+	specs = append(specs, a.compileOASMockResponseForVEM(primitive.MockResponse, path, conf)...)
 	specs = append(specs, a.compileExtendedPathSpec(false, ep.Ignored, Ignored, conf)...)
 	specs = append(specs, a.compileExtendedPathSpec(false, ep.BlackList, BlackList, conf)...)
 	specs = append(specs, a.compileExtendedPathSpec(false, ep.WhiteList, WhiteList, conf)...)
@@ -341,4 +342,23 @@ func (a APIDefinitionLoader) compilePrimitiveMiddlewareSpecs(primitive *oas.MCPP
 	specs = append(specs, a.compileRateLimitPathsSpec(ep.RateLimit, RateLimit, conf)...)
 
 	return specs
+}
+
+// compileOASMockResponseForVEM compiles OAS MockResponse for VEM paths (operations and primitives).
+// Sets OASMockResponseMeta for the OAS MockResponse middleware flow.
+func (a APIDefinitionLoader) compileOASMockResponseForVEM(mockResp *oas.MockResponse, path string, conf config.Config) []URLSpec {
+	if mockResp == nil || !mockResp.Enabled {
+		return nil
+	}
+
+	newSpec := URLSpec{
+		OASMockResponseMeta: mockResp,
+		OASPath:             path,
+		OASMethod:           strings.ToUpper(http.MethodPost),
+	}
+
+	// Use standard regex generation with OASMockResponse status
+	a.generateRegex(path, &newSpec, OASMockResponse, conf)
+
+	return []URLSpec{newSpec}
 }

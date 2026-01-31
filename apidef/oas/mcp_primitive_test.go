@@ -339,3 +339,69 @@ func TestMCPPrimitive_MultipleMiddlewareScenarios(t *testing.T) {
 		assert.Len(t, primitive.TransformRequestHeaders.Add, 1)
 	})
 }
+
+func TestOperation_ExtractToExtendedPaths_ValidateRequestAndMockResponse(t *testing.T) {
+	t.Run("extracts ValidateRequest middleware", func(t *testing.T) {
+		op := &Operation{
+			ValidateRequest: &ValidateRequest{
+				Enabled:           true,
+				ErrorResponseCode: 400,
+			},
+		}
+
+		var ep apidef.ExtendedPathsSet
+		op.ExtractToExtendedPaths(&ep, "/test", "POST")
+
+		assert.Len(t, ep.ValidateRequest, 1)
+		assert.Equal(t, "/test", ep.ValidateRequest[0].Path)
+		assert.Equal(t, "POST", ep.ValidateRequest[0].Method)
+		assert.True(t, ep.ValidateRequest[0].Enabled)
+		assert.Equal(t, 400, ep.ValidateRequest[0].ErrorResponseCode)
+	})
+
+	t.Run("extracts MockResponse middleware", func(t *testing.T) {
+		op := &Operation{
+			MockResponse: &MockResponse{
+				Enabled: true,
+				Code:    200,
+				Body:    `{"message": "mocked"}`,
+				Headers: Headers{{Name: "X-Mock", Value: "true"}},
+			},
+		}
+
+		var ep apidef.ExtendedPathsSet
+		op.ExtractToExtendedPaths(&ep, "/test", "GET")
+
+		assert.Len(t, ep.MockResponse, 1)
+		assert.Equal(t, "/test", ep.MockResponse[0].Path)
+		assert.Equal(t, "GET", ep.MockResponse[0].Method)
+		assert.False(t, ep.MockResponse[0].Disabled)
+		assert.Equal(t, 200, ep.MockResponse[0].Code)
+		assert.Equal(t, `{"message": "mocked"}`, ep.MockResponse[0].Body)
+		assert.Equal(t, "true", ep.MockResponse[0].Headers["X-Mock"])
+	})
+
+	t.Run("MCPPrimitive inherits extraction", func(t *testing.T) {
+		primitive := &MCPPrimitive{}
+		primitive.ValidateRequest = &ValidateRequest{
+			Enabled:           true,
+			ErrorResponseCode: 422,
+		}
+		primitive.MockResponse = &MockResponse{
+			Enabled: true,
+			Code:    404,
+			Body:    `{"error": "not found"}`,
+		}
+
+		var ep apidef.ExtendedPathsSet
+		primitive.ExtractToExtendedPaths(&ep, "/mcp/tool/test", "POST")
+
+		assert.Len(t, ep.ValidateRequest, 1)
+		assert.True(t, ep.ValidateRequest[0].Enabled)
+		assert.Equal(t, 422, ep.ValidateRequest[0].ErrorResponseCode)
+
+		assert.Len(t, ep.MockResponse, 1)
+		assert.False(t, ep.MockResponse[0].Disabled)
+		assert.Equal(t, 404, ep.MockResponse[0].Code)
+	})
+}

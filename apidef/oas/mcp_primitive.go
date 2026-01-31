@@ -39,6 +39,8 @@ func (m *MCPPrimitive) ExtractToExtendedPaths(ep *apidef.ExtendedPathsSet, path 
 	m.extractURLRewriteTo(ep, path, method)
 	m.extractCacheTo(ep, path, method)
 	m.extractEnforceTimeoutTo(ep, path, method)
+	m.extractValidateRequestTo(ep, path, method)
+	m.extractMockResponseTo(ep, path, method)
 	m.extractVirtualEndpointTo(ep, path, method)
 	m.extractEndpointPostPluginTo(ep, path, method)
 	m.extractCircuitBreakerTo(ep, path, method)
