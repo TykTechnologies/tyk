@@ -130,7 +130,7 @@ outside:
 			Origin: request.RealIP(r),
 			Reason: string(stat),
 		})
-		return errors.New("Attempted access to disallowed version / path."), http.StatusForbidden
+		return errors.New(string(stat)), http.StatusForbidden
 	}
 
 	versionInfo, _ := v.Spec.Version(r)
