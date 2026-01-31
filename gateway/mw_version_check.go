@@ -108,7 +108,7 @@ outside:
 				allowListEnabled := v.getPrimitiveAllowListFlag(r.URL.Path)
 
 				if allowListEnabled {
-					return errors.New("Access to this resource has been disallowed"), http.StatusForbidden
+					return errors.New("access to this resource has been disallowed"), http.StatusForbidden
 				}
 
 				state.NextVEM = ""
@@ -141,7 +141,7 @@ outside:
 	if httpctx.IsJsonRPCRouting(r) && mcp.IsPrimitiveVEMPath(r.URL.Path) {
 		allowListEnabled := v.getPrimitiveAllowListFlag(r.URL.Path)
 		if allowListEnabled {
-			if err := v.checkVEMWhiteListEntry(r.URL.Path, versionPaths, "Access to this resource has been disallowed"); err != nil {
+			if err := v.checkVEMWhiteListEntry(r.URL.Path, versionPaths, "access to this resource has been disallowed"); err != nil {
 				return err, http.StatusForbidden
 			}
 		}

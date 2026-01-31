@@ -3372,7 +3372,9 @@ func ctxSetCheckLoopLimits(r *http.Request, b bool) {
 func ctxCheckLimits(r *http.Request) bool {
 	// Check explicit flag first - allows MCP sequential routing to opt into limits at each VEM stage
 	if v := r.Context().Value(ctx.CheckLoopLimits); v != nil {
-		return v.(bool)
+		if b, ok := v.(bool); ok {
+			return b
+		}
 	}
 
 	// If this is a self loop, do not need to check the limits and quotas.

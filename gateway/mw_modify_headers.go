@@ -49,26 +49,19 @@ func (t *TransformHeaders) ProcessRequest(w http.ResponseWriter, r *http.Request
 		}
 	}
 
-	// Check for endpoint-specific header transformations
 	versionPaths := t.Spec.RxPaths[vInfo.Name]
-	spec, ok := t.Spec.FindSpecMatchesStatus(r, versionPaths, HeaderInjected)
-	if ok {
-		t.applyHeaderMeta(r, &spec.InjectHeaders, ignoreCanonical)
+	found, meta := t.Spec.CheckSpecMatchesStatus(r, versionPaths, HeaderInjected)
+	if found {
+		hmeta := meta.(*apidef.HeaderInjectionMeta)
+		for _, dKey := range hmeta.DeleteHeaders {
+			r.Header.Del(dKey)
+			logger.Debugf("Removing: %s", dKey)
+		}
+		for nKey, nVal := range hmeta.AddHeaders {
+			setCustomHeader(r.Header, nKey, t.Gw.ReplaceTykVariables(r, nVal, false), ignoreCanonical)
+			logger.Debugf("Adding: %s: %s", nKey, nVal)
+		}
 	}
 
 	return nil, http.StatusOK
-}
-
-// applyHeaderMeta applies header deletions and additions from a HeaderInjectionMeta.
-func (t *TransformHeaders) applyHeaderMeta(r *http.Request, hmeta *apidef.HeaderInjectionMeta, ignoreCanonical bool) {
-	logger := t.Logger()
-
-	for _, dKey := range hmeta.DeleteHeaders {
-		r.Header.Del(dKey)
-		logger.Debugf("Removing: %s", dKey)
-	}
-	for nKey, nVal := range hmeta.AddHeaders {
-		setCustomHeader(r.Header, nKey, t.Gw.ReplaceTykVariables(r, nVal, false), ignoreCanonical)
-		logger.Debugf("Adding: %s: %s", nKey, nVal)
-	}
 }

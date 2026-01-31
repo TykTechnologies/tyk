@@ -15,10 +15,6 @@ import (
 	"github.com/TykTechnologies/tyk/internal/middleware"
 )
 
-// defaultJSONRPCRequestSize is the default maximum size for JSON-RPC request bodies (1MB).
-// Used when no gateway-level MaxRequestBodySize is configured.
-const defaultJSONRPCRequestSize int64 = 1 << 20
-
 const (
 	contentTypeJSON   = "application/json"
 	headerContentType = "Content-Type"
@@ -65,17 +61,6 @@ func (m *JSONRPCMiddleware) EnabledForSpec() bool {
 	return m.Spec.IsMCP() && m.Spec.JsonRpcVersion == apidef.JsonRPC20
 }
 
-// getMaxRequestBodySize returns the maximum allowed request body size.
-// It uses the gateway-level MaxRequestBodySize if configured, otherwise falls back to the default.
-func (m *JSONRPCMiddleware) getMaxRequestBodySize() int64 {
-	if m.Gw != nil {
-		if maxSize := m.Gw.GetConfig().HttpServerOptions.MaxRequestBodySize; maxSize > 0 {
-			return maxSize
-		}
-	}
-	return defaultJSONRPCRequestSize
-}
-
 // validateJSONRPCRequest checks if the request is a valid POST with JSON content type.
 // Returns true if valid, false if the request should be passed through.
 func (m *JSONRPCMiddleware) validateJSONRPCRequest(r *http.Request) bool {
@@ -90,9 +75,10 @@ func (m *JSONRPCMiddleware) validateJSONRPCRequest(r *http.Request) bool {
 
 // readAndParseJSONRPC reads the request body and parses it as JSON-RPC 2.0.
 // Returns the parsed request or writes an error response and returns nil.
+// Request body size limits are enforced at the gateway level (proxy_muxer).
 func (m *JSONRPCMiddleware) readAndParseJSONRPC(w http.ResponseWriter, r *http.Request) (*JSONRPCRequest, error) {
-	// Read and parse the request body with size limit to prevent DoS
-	body, err := io.ReadAll(io.LimitReader(r.Body, m.getMaxRequestBodySize()))
+	// Read the request body (already size-limited by gateway if configured)
+	body, err := io.ReadAll(r.Body)
 	if err != nil {
 		m.writeJSONRPCError(w, nil, mcp.JSONRPCParseError, mcp.ErrMsgParseError, nil)
 		return nil, err
