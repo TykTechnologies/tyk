@@ -142,11 +142,11 @@ type MockStorage struct {
 	shouldFail func(attempt int) bool
 }
 
-// MockOption configures a MockStorage
-type MockOption func(*MockStorage)
+// MockStorageOption configures a MockStorage
+type MockStorageOption func(*MockStorage)
 
 // NewMockStorage creates a new mock storage with the given certificate data and options
-func NewMockStorage(certData string, t *testing.T, opts ...MockOption) *MockStorage {
+func NewMockStorage(certData string, t *testing.T, opts ...MockStorageOption) *MockStorage {
 	m := &MockStorage{
 		certData: certData,
 		t:        t,
@@ -156,7 +156,7 @@ func NewMockStorage(certData string, t *testing.T, opts ...MockOption) *MockStor
 }
 
 // Apply applies one or more options to the mock
-func (m *MockStorage) Apply(opts ...MockOption) {
+func (m *MockStorage) Apply(opts ...MockStorageOption) {
 	for _, opt := range opts {
 		opt(m)
 	}
@@ -181,7 +181,7 @@ func (m *MockStorage) GetRawKey(key string) (string, error) {
 }
 
 // WithFailFirst configures the mock to fail the first n attempts
-func WithFailFirst(n int) MockOption {
+func WithFailFirst(n int) MockStorageOption {
 	return func(m *MockStorage) {
 		m.shouldFail = func(attempt int) bool {
 			return attempt <= n
@@ -190,7 +190,7 @@ func WithFailFirst(n int) MockOption {
 }
 
 // WithFailOn configures the mock to fail on specific attempt numbers
-func WithFailOn(attempts ...int) MockOption {
+func WithFailOn(attempts ...int) MockStorageOption {
 	return func(m *MockStorage) {
 		failures := make(map[int]bool, len(attempts))
 		for _, n := range attempts {
