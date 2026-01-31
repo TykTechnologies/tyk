@@ -133,33 +133,59 @@ func (b *baseMockStorage) RemoveFromList(_, _ string) error {
 
 func (b *baseMockStorage) AppendToSet(_, _ string) {}
 
-// MockMDCBStorage simulates emergency mode clearing after a delay
-type MockMDCBStorage struct {
+// ConfigurableMockStorage provides a flexible mock that can simulate various failure patterns
+type ConfigurableMockStorage struct {
 	baseMockStorage
 	callCount  int
-	clearAfter int // Clear emergency mode after N calls
 	certData   string
 	t          *testing.T
+	shouldFail func(callCount int) bool // Returns true if this call should fail
 }
 
-func (m *MockMDCBStorage) GetKey(key string) (string, error) {
+func (m *ConfigurableMockStorage) GetKey(key string) (string, error) {
 	m.callCount++
 	m.t.Logf("  [Attempt %d] GetKey called for: %s at %s",
 		m.callCount, key, time.Now().Format("15:04:05.000"))
 
-	// Simulate emergency mode for first N calls
-	if m.callCount <= m.clearAfter {
-		m.t.Logf("  [Attempt %d] FAIL: Returning ErrMDCBConnectionLost (simulating emergency mode)", m.callCount)
+	// Use configured failure logic
+	if m.shouldFail != nil && m.shouldFail(m.callCount) {
+		m.t.Logf("  [Attempt %d] FAIL: Returning ErrMDCBConnectionLost", m.callCount)
 		return "", storage.ErrMDCBConnectionLost
 	}
 
-	// After clearAfter attempts, RPC is "ready"
-	m.t.Logf("  [Attempt %d] SUCCESS: Returning certificate (RPC ready)", m.callCount)
+	m.t.Logf("  [Attempt %d] SUCCESS: Returning certificate", m.callCount)
 	return m.certData, nil
 }
 
-func (m *MockMDCBStorage) GetRawKey(key string) (string, error) {
+func (m *ConfigurableMockStorage) GetRawKey(key string) (string, error) {
 	return m.GetKey(key)
+}
+
+// Failure pattern helpers
+
+// FailFirstN returns a shouldFail function that fails the first N calls
+func FailFirstN(n int) func(int) bool {
+	return func(callCount int) bool {
+		return callCount <= n
+	}
+}
+
+// FailOnCalls returns a shouldFail function that fails on specific call numbers
+func FailOnCalls(calls ...int) func(int) bool {
+	failSet := make(map[int]bool)
+	for _, c := range calls {
+		failSet[c] = true
+	}
+	return func(callCount int) bool {
+		return failSet[callCount]
+	}
+}
+
+// NeverFail returns a shouldFail function that never fails
+func NeverFail() func(int) bool {
+	return func(callCount int) bool {
+		return false
+	}
 }
 
 // loadTestCert loads the test certificate from testdata
@@ -212,8 +238,8 @@ func TestCertificateLoadingWithRetry(t *testing.T) {
 
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
-			mockStorage := &MockMDCBStorage{
-				clearAfter: tt.failureCount,
+			mockStorage := &ConfigurableMockStorage{
+				shouldFail: FailFirstN(tt.failureCount),
 				certData:   certPEM,
 				t:          t,
 			}
@@ -259,43 +285,18 @@ func TestCertificateLoadingWithRetry(t *testing.T) {
 	}
 }
 
-// MockFlakyMDCBStorage simulates flaky MDCB connection
-type MockFlakyMDCBStorage struct {
-	baseMockStorage
-	callCount int
-	certData  string
-	t         *testing.T
-}
-
-func (m *MockFlakyMDCBStorage) GetKey(key string) (string, error) {
-	m.callCount++
-	m.t.Logf("  [Attempt %d] GetKey called for: %s at %s",
-		m.callCount, key, time.Now().Format("15:04:05.000"))
-
-	// Simulate flaky connection: succeeds on first cert attempt, fails on second
-	// cert-1: attempts 1 (fail), 2 (fail), 3 (success)
-	// cert-2: attempt 4 (fail - flaky!), attempt 5 (success after quick retry)
-	// cert-3: attempt 6 (success)
-	if (m.callCount <= 2) || (m.callCount == 4) {
-		m.t.Logf("  [Attempt %d] FAIL: Simulating connection issue", m.callCount)
-		return "", storage.ErrMDCBConnectionLost
-	}
-
-	m.t.Logf("  [Attempt %d] SUCCESS: Returning certificate", m.callCount)
-	return m.certData, nil
-}
-
-func (m *MockFlakyMDCBStorage) GetRawKey(key string) (string, error) {
-	return m.GetKey(key)
-}
-
-// TestTT14618_FlakyConnection tests handling of intermittent MDCB failures
+// TestCertificateLoadingWithFlakyConnection tests handling of intermittent MDCB failures
 func TestCertificateLoadingWithFlakyConnection(t *testing.T) {
 	certPEM := loadTestCert(t)
 
-	mockStorage := &MockFlakyMDCBStorage{
-		certData: certPEM,
-		t:        t,
+	// Simulate flaky connection: fails on specific calls
+	// cert-1: attempts 1 (fail), 2 (fail), 3 (success)
+	// cert-2: attempt 4 (fail - flaky!), attempt 5 (success after quick retry)
+	// cert-3: attempt 6 (success)
+	mockStorage := &ConfigurableMockStorage{
+		shouldFail: FailOnCalls(1, 2, 4), // Fail on calls 1, 2, and 4
+		certData:   certPEM,
+		t:          t,
 	}
 
 	handler := NewCertificateManager(mockStorage, "secret", nil, false, 0, 0, 0, true, 0)
@@ -331,8 +332,8 @@ func TestMultipleCertificatesLoading(t *testing.T) {
 	certPEM := loadTestCert(t)
 
 	// Simulate MDCB failing 3 times before becoming ready
-	mockStorage := &MockMDCBStorage{
-		clearAfter: 3,
+	mockStorage := &ConfigurableMockStorage{
+		shouldFail: FailFirstN(3),
 		certData:   certPEM,
 		t:          t,
 	}
@@ -387,8 +388,8 @@ func TestCertificateLoadingScale100(t *testing.T) {
 	certPEM := loadTestCert(t)
 
 	// Simulate MDCB down for first 5 attempts (~1 second of retries)
-	mockStorage := &MockMDCBStorage{
-		clearAfter: 5,
+	mockStorage := &ConfigurableMockStorage{
+		shouldFail: FailFirstN(5),
 		certData:   certPEM,
 		t:          t,
 	}
@@ -456,8 +457,8 @@ func TestCertificateLoadingScale1000(t *testing.T) {
 	certPEM := loadTestCert(t)
 
 	// Simulate MDCB down for first 5 attempts (~1 second of retries)
-	mockStorage := &MockMDCBStorage{
-		clearAfter: 5,
+	mockStorage := &ConfigurableMockStorage{
+		shouldFail: FailFirstN(5),
 		certData:   certPEM,
 		t:          t,
 	}
@@ -544,8 +545,8 @@ func BenchmarkCertificateLoadingPerformance(b *testing.B) {
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
 				// Create fresh mock for each iteration
-				mockStorage := &MockMDCBStorage{
-					clearAfter: bm.failures,
+				mockStorage := &ConfigurableMockStorage{
+					shouldFail: FailFirstN(bm.failures),
 					certData:   certPEM,
 					t:          &testing.T{}, // Dummy for benchmark
 				}
@@ -576,8 +577,8 @@ func BenchmarkSkipBackoffOptimization(b *testing.B) {
 	b.Run("optimized_with_skipBackoff", func(b *testing.B) {
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
-			mockStorage := &MockMDCBStorage{
-				clearAfter: failures,
+			mockStorage := &ConfigurableMockStorage{
+				shouldFail: FailFirstN(failures),
 				certData:   certPEM,
 				t:          &testing.T{},
 			}
@@ -594,8 +595,8 @@ func BenchmarkSkipBackoffOptimization(b *testing.B) {
 	b.Run("unoptimized_without_skipBackoff", func(b *testing.B) {
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
-			mockStorage := &MockMDCBStorage{
-				clearAfter: failures,
+			mockStorage := &ConfigurableMockStorage{
+				shouldFail: FailFirstN(failures),
 				certData:   certPEM,
 				t:          &testing.T{},
 			}
@@ -622,8 +623,8 @@ func BenchmarkSkipBackoffOptimization(b *testing.B) {
 // Benchmark cache hit performance (no MDCB calls)
 func BenchmarkCertificateCacheHit(b *testing.B) {
 	certPEM := loadTestCert(&testing.T{})
-	mockStorage := &MockMDCBStorage{
-		clearAfter: 0,
+	mockStorage := &ConfigurableMockStorage{
+		shouldFail: FailFirstN(0),
 		certData:   certPEM,
 		t:          &testing.T{},
 	}
@@ -700,8 +701,8 @@ func TestMaxRetriesLimit(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			mockStorage := &MockMDCBStorage{
-				clearAfter: tc.failureCount,
+			mockStorage := &ConfigurableMockStorage{
+				shouldFail: FailFirstN(tc.failureCount),
 				certData:   certPEM,
 				t:          t,
 			}
@@ -779,8 +780,8 @@ func TestRetryEnabledFlag(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			mockStorage := &MockMDCBStorage{
-				clearAfter: tc.failureCount,
+			mockStorage := &ConfigurableMockStorage{
+				shouldFail: FailFirstN(tc.failureCount),
 				certData:   certPEM,
 				t:          t,
 			}
@@ -826,8 +827,8 @@ func TestConfigDefaults(t *testing.T) {
 	certPEM := loadTestCert(t)
 
 	// Test with defaults (should behave like maxRetries=3)
-	mockStorage := &MockMDCBStorage{
-		clearAfter: 2,
+	mockStorage := &ConfigurableMockStorage{
+		shouldFail: FailFirstN(2),
 		certData:   certPEM,
 		t:          t,
 	}
