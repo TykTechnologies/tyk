@@ -18,6 +18,8 @@ import (
 	"github.com/TykTechnologies/tyk/config"
 
 	"github.com/TykTechnologies/tyk/header"
+	"github.com/TykTechnologies/tyk/internal/httpctx"
+	jsonrpcerrors "github.com/TykTechnologies/tyk/internal/jsonrpc/errors"
 	"github.com/TykTechnologies/tyk/request"
 )
 
@@ -91,6 +93,18 @@ type TemplateExecutor interface {
 func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMsg string, errCode int, writeResponse bool) {
 	defer e.Base().UpdateRequestSession(r)
 	response := &http.Response{}
+
+	// Check if this should be a JSON-RPC formatted error
+	if writeResponse && e.shouldWriteJSONRPCError(r) {
+		e.writeJSONRPCError(w, r, errMsg, errCode)
+		// Still record analytics for JSON-RPC errors
+		if !e.Spec.DoNotTrack && !ctxGetDoNotTrack(r) {
+			e.recordErrorAnalytics(r, errCode, errMsg)
+		}
+		e.RecordAccessLog(r, response, analytics.Latency{})
+		reportHealthValue(e.Spec, BlockedRequestLog, "-1")
+		return
+	}
 
 	if writeResponse {
 		var templateExtension string
@@ -316,4 +330,161 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 
 	// Report in health check
 	reportHealthValue(e.Spec, BlockedRequestLog, "-1")
+}
+
+// shouldWriteJSONRPCError determines if the error should be formatted as JSON-RPC 2.0.
+// It returns true only when:
+// 1. The API is configured with JsonRpcVersion "2.0"
+// 2. The request has JSON-RPC routing state (was parsed as a JSON-RPC request)
+func (e *ErrorHandler) shouldWriteJSONRPCError(r *http.Request) bool {
+	if e.Spec.JsonRpcVersion != apidef.JsonRPC20 {
+		return false
+	}
+
+	routingState := httpctx.GetJSONRPCRoutingState(r)
+	return routingState != nil
+}
+
+// writeJSONRPCError writes an error response in JSON-RPC 2.0 format.
+// It uses the internal jsonrpc/errors package to format the response according
+// to the JSON-RPC 2.0 specification, mapping HTTP status codes to appropriate
+// JSON-RPC error codes.
+func (e *ErrorHandler) writeJSONRPCError(w http.ResponseWriter, r *http.Request, errMsg string, httpCode int) {
+	var requestID interface{}
+	if state := httpctx.GetJSONRPCRoutingState(r); state != nil {
+		requestID = state.ID
+	}
+
+	jsonrpcerrors.WriteJSONRPCError(w, requestID, httpCode, errMsg)
+}
+
+// recordErrorAnalytics records analytics data for an error response.
+// This is extracted from HandleError to allow reuse for both JSON-RPC and standard errors.
+func (e *ErrorHandler) recordErrorAnalytics(r *http.Request, errCode int, errMsg string) {
+	token := ctxGetAuthToken(r)
+	var alias string
+	ip := request.RealIP(r)
+
+	if !e.Spec.GlobalConfig.StoreAnalytics(ip) {
+		return
+	}
+
+	t := time.Now()
+
+	version := e.Spec.getVersionFromRequest(r)
+	if version == "" {
+		version = "Non Versioned"
+	}
+
+	if e.Spec.Proxy.StripListenPath {
+		r.URL.Path = e.Spec.StripListenPath(r.URL.Path)
+	}
+
+	oauthClientID := ""
+	session := ctxGetSession(r)
+	tags := make([]string, 0, estimateTagsCapacity(session, e.Spec))
+
+	if session != nil {
+		oauthClientID = session.OauthClientID
+		alias = session.Alias
+		tags = append(tags, getSessionTags(session)...)
+	}
+
+	if len(e.Spec.TagHeaders) > 0 {
+		tags = tagHeaders(r, e.Spec.TagHeaders, tags)
+	}
+
+	if len(e.Spec.Tags) > 0 {
+		tags = append(tags, e.Spec.Tags...)
+	}
+
+	trackEP := false
+	trackedPath := r.URL.Path
+	if p := ctxGetTrackedPath(r); p != "" {
+		trackEP = true
+		trackedPath = p
+	}
+
+	host := r.URL.Host
+	if host == "" && e.Spec.target != nil {
+		host = e.Spec.target.Host
+	}
+
+	record := analytics.AnalyticsRecord{
+		Method:        r.Method,
+		Host:          host,
+		Path:          trackedPath,
+		RawPath:       r.URL.Path,
+		ContentLength: r.ContentLength,
+		UserAgent:     r.Header.Get(header.UserAgent),
+		Day:           t.Day(),
+		Month:         t.Month(),
+		Year:          t.Year(),
+		Hour:          t.Hour(),
+		ResponseCode:  errCode,
+		APIKey:        token,
+		TimeStamp:     t,
+		APIVersion:    version,
+		APIName:       e.Spec.Name,
+		APIID:         e.Spec.APIID,
+		OrgID:         e.Spec.OrgID,
+		OauthID:       oauthClientID,
+		RequestTime:   0,
+		Latency:       analytics.Latency{},
+		IPAddress:     ip,
+		Geo:           analytics.GeoData{},
+		Network:       analytics.NetworkStats{},
+		Tags:          tags,
+		Alias:         alias,
+		TrackPath:     trackEP,
+		ExpireAt:      t,
+	}
+
+	recordGraphDetails(&record, r, &http.Response{StatusCode: errCode}, e.Spec)
+
+	rawRequest := ""
+	rawResponse := ""
+	if recordDetail(r, e.Spec) {
+		var wireFormatReq bytes.Buffer
+		r.Write(&wireFormatReq)
+		rawRequest = base64.StdEncoding.EncodeToString(wireFormatReq.Bytes())
+
+		// For JSON-RPC errors, record the error message
+		rawResponse = base64.StdEncoding.EncodeToString([]byte(errMsg))
+	}
+
+	record.RawRequest = rawRequest
+	record.RawResponse = rawResponse
+
+	if e.Spec.GlobalConfig.AnalyticsConfig.EnableGeoIP {
+		record.GetGeo(ip, e.Gw.Analytics.GeoIPDB)
+	}
+
+	if e.Spec.GraphQL.Enabled && e.Spec.GraphQL.ExecutionMode != apidef.GraphQLExecutionModeSubgraph {
+		record.Tags = append(record.Tags, "tyk-graph-analytics")
+		record.ApiSchema = base64.StdEncoding.EncodeToString([]byte(e.Spec.GraphQL.Schema))
+	}
+
+	expiresAfter := e.Spec.ExpireAnalyticsAfter
+	if e.Spec.GlobalConfig.EnforceOrgDataAge {
+		orgExpireDataTime := e.OrgSessionExpiry(e.Spec.OrgID)
+		if orgExpireDataTime > 0 {
+			expiresAfter = orgExpireDataTime
+		}
+	}
+
+	record.SetExpiry(expiresAfter)
+
+	if e.Spec.GlobalConfig.AnalyticsConfig.NormaliseUrls.Enabled {
+		NormalisePath(&record, &e.Spec.GlobalConfig)
+	}
+
+	if e.Spec.AnalyticsPlugin.Enabled {
+		_ = e.Spec.AnalyticsPluginConfig.processRecord(&record)
+	}
+
+	err := e.Gw.Analytics.RecordHit(&record)
+	if err != nil {
+		log.WithError(err).Error("could not store analytic record")
+	}
 }
