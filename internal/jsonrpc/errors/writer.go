@@ -24,12 +24,13 @@ type JSONRPCErrorResponse struct {
 // WriteJSONRPCError writes a JSON-RPC 2.0 formatted error response.
 // The HTTP status code is mapped to an appropriate JSON-RPC error code,
 // and the original HTTP code is included in the data field for debugging.
-func WriteJSONRPCError(w http.ResponseWriter, requestID interface{}, httpCode int, message string) {
+// Returns the JSON response body for analytics recording.
+func WriteJSONRPCError(w http.ResponseWriter, requestID interface{}, httpCode int, message string) []byte {
 	rpcCode := MapHTTPStatusToJSONRPCCode(httpCode)
 
 	response := buildErrorResponse(requestID, rpcCode, message, httpCode)
 
-	writeJSONResponse(w, httpCode, response)
+	return writeJSONResponse(w, httpCode, response)
 }
 
 func buildErrorResponse(requestID interface{}, rpcCode int, message string, httpCode int) JSONRPCErrorResponse {
@@ -46,11 +47,16 @@ func buildErrorResponse(requestID interface{}, rpcCode int, message string, http
 	}
 }
 
-func writeJSONResponse(w http.ResponseWriter, httpCode int, response JSONRPCErrorResponse) {
+func writeJSONResponse(w http.ResponseWriter, httpCode int, response JSONRPCErrorResponse) []byte {
+	body, err := json.Marshal(response)
+	if err != nil {
+		// Fallback to basic error if marshaling fails
+		body = []byte(`{"jsonrpc":"2.0","error":{"code":-32603,"message":"Internal error"},"id":null}`)
+	}
+
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(httpCode)
+	w.Write(body)
 
-	// Encode response - errors are logged but not critical here
-	// as the error handler is already dealing with an error condition
-	_ = json.NewEncoder(w).Encode(response)
+	return body
 }

@@ -96,10 +96,10 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 
 	// Check if this should be a JSON-RPC formatted error
 	if writeResponse && e.shouldWriteJSONRPCError(r) {
-		e.writeJSONRPCError(w, r, errMsg, errCode)
-		// Still record analytics for JSON-RPC errors
+		responseBody := e.writeJSONRPCError(w, r, errMsg, errCode)
+		// Record analytics with full JSON-RPC response
 		if !e.Spec.DoNotTrack && !ctxGetDoNotTrack(r) {
-			e.recordErrorAnalytics(r, errCode, errMsg)
+			e.recordErrorAnalytics(r, errCode, responseBody)
 		}
 		e.RecordAccessLog(r, response, analytics.Latency{})
 		reportHealthValue(e.Spec, BlockedRequestLog, "-1")
@@ -342,18 +342,19 @@ func (e *ErrorHandler) shouldWriteJSONRPCError(r *http.Request) bool {
 	return routingState != nil
 }
 
-// writeJSONRPCError writes an error in JSON-RPC 2.0 format.
-func (e *ErrorHandler) writeJSONRPCError(w http.ResponseWriter, r *http.Request, errMsg string, httpCode int) {
+// writeJSONRPCError writes an error in JSON-RPC 2.0 format and returns the response body.
+func (e *ErrorHandler) writeJSONRPCError(w http.ResponseWriter, r *http.Request, errMsg string, httpCode int) []byte {
 	var requestID interface{}
 	if state := httpctx.GetJSONRPCRoutingState(r); state != nil {
 		requestID = state.ID
 	}
 
-	jsonrpcerrors.WriteJSONRPCError(w, requestID, httpCode, errMsg)
+	return jsonrpcerrors.WriteJSONRPCError(w, requestID, httpCode, errMsg)
 }
 
 // recordErrorAnalytics records analytics for errors (extracted for reuse).
-func (e *ErrorHandler) recordErrorAnalytics(r *http.Request, errCode int, errMsg string) {
+// responseBody should be the full response sent to the client (JSON-RPC or standard).
+func (e *ErrorHandler) recordErrorAnalytics(r *http.Request, errCode int, responseBody []byte) {
 	token := ctxGetAuthToken(r)
 	var alias string
 	ip := request.RealIP(r)
@@ -442,8 +443,8 @@ func (e *ErrorHandler) recordErrorAnalytics(r *http.Request, errCode int, errMsg
 		r.Write(&wireFormatReq)
 		rawRequest = base64.StdEncoding.EncodeToString(wireFormatReq.Bytes())
 
-		// For JSON-RPC errors, record the error message
-		rawResponse = base64.StdEncoding.EncodeToString([]byte(errMsg))
+		// Record full response body (JSON-RPC or standard error)
+		rawResponse = base64.StdEncoding.EncodeToString(responseBody)
 	}
 
 	record.RawRequest = rawRequest

@@ -152,3 +152,23 @@ func TestWriteJSONRPCError_DifferentIDTypes(t *testing.T) {
 		})
 	}
 }
+
+func TestWriteJSONRPCError_ReturnsResponseBody(t *testing.T) {
+	w := httptest.NewRecorder()
+	requestID := "test-123"
+	message := "Test error"
+
+	body := WriteJSONRPCError(w, requestID, http.StatusForbidden, message)
+
+	// Verify returned body matches what was written
+	assert.Equal(t, w.Body.Bytes(), body)
+
+	// Verify body is valid JSON-RPC response
+	var response JSONRPCErrorResponse
+	err := json.Unmarshal(body, &response)
+	require.NoError(t, err)
+
+	assert.Equal(t, apidef.JsonRPC20, response.JSONRPC)
+	assert.Equal(t, message, response.Error.Message)
+	assert.Equal(t, requestID, response.ID)
+}

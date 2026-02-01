@@ -139,6 +139,48 @@ func TestErrorHandler_HandleError_JSONRPCFormat(t *testing.T) {
 	}
 }
 
+func TestErrorHandler_writeJSONRPCError_ReturnsFullResponse(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	spec := &APISpec{
+		APIDefinition: &apidef.APIDefinition{
+			JsonRpcVersion: apidef.JsonRPC20,
+		},
+	}
+
+	handler := ErrorHandler{
+		BaseMiddleware: &BaseMiddleware{
+			Spec: spec,
+			Gw:   ts.Gw,
+		},
+	}
+
+	r := httptest.NewRequest(http.MethodPost, "/test", nil)
+	state := &httpctx.JSONRPCRoutingState{
+		ID: "test-123",
+	}
+	httpctx.SetJSONRPCRoutingState(r, state)
+
+	w := httptest.NewRecorder()
+
+	// Call writeJSONRPCError and capture returned body
+	body := handler.writeJSONRPCError(w, r, "Access denied", http.StatusForbidden)
+
+	// Verify returned body is valid JSON-RPC response
+	var response jsonrpcerrors.JSONRPCErrorResponse
+	err := json.Unmarshal(body, &response)
+	require.NoError(t, err)
+
+	assert.Equal(t, apidef.JsonRPC20, response.JSONRPC)
+	assert.Equal(t, jsonrpcerrors.CodeAccessDenied, response.Error.Code)
+	assert.Equal(t, "Access denied", response.Error.Message)
+	assert.Equal(t, "test-123", response.ID)
+
+	// Verify what was written to ResponseWriter matches returned body
+	assert.Equal(t, body, w.Body.Bytes())
+}
+
 func TestErrorHandler_shouldWriteJSONRPCError(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
