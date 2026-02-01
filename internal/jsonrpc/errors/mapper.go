@@ -26,29 +26,10 @@ const (
 	CodeIPBlocked = -32006
 )
 
-// MapHTTPStatusToJSONRPCCode maps HTTP status codes to JSON-RPC 2.0 error codes.
-// It follows the JSON-RPC 2.0 specification for standard error codes and uses
-// the server-defined range (-32000 to -32099) for HTTP-specific errors.
-//
-// Standard JSON-RPC codes (predefined):
-//
-//	-32700: Parse error
-//	-32600: Invalid Request
-//	-32601: Method not found
-//	-32602: Invalid params
-//	-32603: Internal error
-//
-// Custom codes (server-defined -32000 to -32099):
-//
-//	-32000: Generic server error
-//	-32001: Authentication required (401)
-//	-32002: Access denied (403)
-//	-32003: Rate limit exceeded (429)
-//	-32004: Upstream error (502, 503, 504)
-//	-32005: Quota exceeded
-//	-32006: IP blocked
-//
-// Returns 0 for success status codes (2xx, 3xx).
+// MapHTTPStatusToJSONRPCCode maps HTTP status codes to JSON-RPC error codes.
+// Uses standard JSON-RPC codes (-32700 to -32603) where appropriate, and
+// custom server codes (-32000 to -32099) for HTTP-specific errors like
+// auth failures, rate limits, and upstream issues.
 func MapHTTPStatusToJSONRPCCode(httpStatus int) int {
 	// Success statuses don't need JSON-RPC error codes
 	if httpStatus < 400 {

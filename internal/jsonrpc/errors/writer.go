@@ -21,18 +21,9 @@ type JSONRPCErrorResponse struct {
 	ID      interface{}  `json:"id"`
 }
 
-// WriteJSONRPCError writes a JSON-RPC 2.0 error response to the HTTP response writer.
-// It maps the HTTP status code to an appropriate JSON-RPC error code and formats
-// the response according to the JSON-RPC 2.0 specification.
-//
-// Parameters:
-//   - w: HTTP response writer
-//   - requestID: The JSON-RPC request ID (can be string, number, or null)
-//   - httpCode: HTTP status code to be mapped to JSON-RPC error code
-//   - message: Error message describing what went wrong
-//
-// The response will include the original HTTP status code in the error data field
-// for debugging purposes.
+// WriteJSONRPCError writes a JSON-RPC 2.0 formatted error response.
+// The HTTP status code is mapped to an appropriate JSON-RPC error code,
+// and the original HTTP code is included in the data field for debugging.
 func WriteJSONRPCError(w http.ResponseWriter, requestID interface{}, httpCode int, message string) {
 	rpcCode := MapHTTPStatusToJSONRPCCode(httpCode)
 
@@ -41,7 +32,6 @@ func WriteJSONRPCError(w http.ResponseWriter, requestID interface{}, httpCode in
 	writeJSONResponse(w, httpCode, response)
 }
 
-// buildErrorResponse constructs a JSON-RPC error response structure.
 func buildErrorResponse(requestID interface{}, rpcCode int, message string, httpCode int) JSONRPCErrorResponse {
 	return JSONRPCErrorResponse{
 		JSONRPC: apidef.JsonRPC20,
@@ -56,7 +46,6 @@ func buildErrorResponse(requestID interface{}, rpcCode int, message string, http
 	}
 }
 
-// writeJSONResponse writes the JSON-RPC response with appropriate headers.
 func writeJSONResponse(w http.ResponseWriter, httpCode int, response JSONRPCErrorResponse) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(httpCode)

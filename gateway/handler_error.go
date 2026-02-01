@@ -332,10 +332,7 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 	reportHealthValue(e.Spec, BlockedRequestLog, "-1")
 }
 
-// shouldWriteJSONRPCError determines if the error should be formatted as JSON-RPC 2.0.
-// It returns true only when:
-// 1. The API is configured with JsonRpcVersion "2.0"
-// 2. The request has JSON-RPC routing state (was parsed as a JSON-RPC request)
+// shouldWriteJSONRPCError returns true if this error should be formatted as JSON-RPC.
 func (e *ErrorHandler) shouldWriteJSONRPCError(r *http.Request) bool {
 	if e.Spec.JsonRpcVersion != apidef.JsonRPC20 {
 		return false
@@ -345,10 +342,7 @@ func (e *ErrorHandler) shouldWriteJSONRPCError(r *http.Request) bool {
 	return routingState != nil
 }
 
-// writeJSONRPCError writes an error response in JSON-RPC 2.0 format.
-// It uses the internal jsonrpc/errors package to format the response according
-// to the JSON-RPC 2.0 specification, mapping HTTP status codes to appropriate
-// JSON-RPC error codes.
+// writeJSONRPCError writes an error in JSON-RPC 2.0 format.
 func (e *ErrorHandler) writeJSONRPCError(w http.ResponseWriter, r *http.Request, errMsg string, httpCode int) {
 	var requestID interface{}
 	if state := httpctx.GetJSONRPCRoutingState(r); state != nil {
@@ -358,8 +352,7 @@ func (e *ErrorHandler) writeJSONRPCError(w http.ResponseWriter, r *http.Request,
 	jsonrpcerrors.WriteJSONRPCError(w, requestID, httpCode, errMsg)
 }
 
-// recordErrorAnalytics records analytics data for an error response.
-// This is extracted from HandleError to allow reuse for both JSON-RPC and standard errors.
+// recordErrorAnalytics records analytics for errors (extracted for reuse).
 func (e *ErrorHandler) recordErrorAnalytics(r *http.Request, errCode int, errMsg string) {
 	token := ctxGetAuthToken(r)
 	var alias string
