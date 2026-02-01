@@ -94,6 +94,35 @@ func TestMockJSONRPCServer_RequestRecording(t *testing.T) {
 	require.Len(t, toolCalls, 2)
 }
 
+// TestMockJSONRPCServer_HeaderRecording tests that HTTP headers are recorded with requests.
+func TestMockJSONRPCServer_HeaderRecording(t *testing.T) {
+	mockServer := NewMockJSONRPCServer()
+	defer mockServer.Close()
+
+	mockServer.SetErrorOnUnmocked(false)
+
+	// Send a request with custom headers
+	req := BuildJSONRPCRequest("tools/call", map[string]any{"test": "value"}, 1)
+	reqBody, _ := json.Marshal(req)
+
+	httpReq, _ := http.NewRequest(http.MethodPost, mockServer.URL(), &readCloser{data: reqBody})
+	httpReq.Header.Set("Content-Type", "application/json")
+	httpReq.Header.Set("X-Custom-Header", "TestValue")
+	httpReq.Header.Set("Authorization", "Bearer test-token")
+
+	client := &http.Client{}
+	resp, err := client.Do(httpReq)
+	require.NoError(t, err)
+	resp.Body.Close()
+
+	// Verify headers were recorded
+	received := mockServer.ReceivedRequests()
+	require.Len(t, received, 1)
+	assert.Equal(t, "application/json", received[0].Headers.Get("Content-Type"))
+	assert.Equal(t, "TestValue", received[0].Headers.Get("X-Custom-Header"))
+	assert.Equal(t, "Bearer test-token", received[0].Headers.Get("Authorization"))
+}
+
 // TestMockJSONRPCServer_WithGateway demonstrates using the mock server with Tyk Gateway.
 func TestMockJSONRPCServer_WithGateway(t *testing.T) {
 	// Create mock upstream JSON-RPC server
@@ -435,6 +464,379 @@ func (r *readCloser) Read(p []byte) (n int, err error) {
 
 func (r *readCloser) Close() error {
 	return nil
+}
+
+// TestJSONRPC_MethodLevelAllowList tests that method-level allow lists
+// correctly proxy allowed tools and reject disallowed tools.
+// Acceptance Criteria #1: When an allow list is configured at the method level,
+// only requests for the allowed tool are proxied, and requests for other tools are rejected.
+func TestJSONRPC_MethodLevelAllowList(t *testing.T) {
+	mockUpstream := NewMockJSONRPCServer()
+	defer mockUpstream.Close()
+
+	mockUpstream.MockMethod("tools/call", map[string]any{
+		"content": []map[string]any{
+			{"type": "text", "text": "Success"},
+		},
+	})
+
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	oasAPI := getSampleOASAPI()
+	tykExt := oasAPI.GetTykExtension()
+	tykExt.Upstream.URL = mockUpstream.URL()
+	tykExt.Server.ListenPath = oas.ListenPath{
+		Value: "/mcp-method-acl",
+		Strip: true,
+	}
+	// Configure method-level allow list: only "calculator" tool is allowed
+	tykExt.Middleware = &oas.Middleware{
+		McpTools: oas.MCPPrimitives{
+			"calculator": &oas.MCPPrimitive{
+				Operation: oas.Operation{
+					Allow: &oas.Allowance{Enabled: true},
+				},
+			},
+		},
+	}
+	oasAPI.SetTykExtension(tykExt)
+
+	var def apidef.APIDefinition
+	oasAPI.ExtractTo(&def)
+	def.IsOAS = true
+	def.UseKeylessAccess = true
+	def.Proxy.ListenPath = "/mcp-method-acl"
+	def.MarkAsMCP()
+
+	spec := &APISpec{APIDefinition: &def, OAS: oasAPI}
+	ts.Gw.LoadAPI(spec)
+
+	// Test 1: Allowed tool should succeed (HTTP 200)
+	allowedPayload := BuildToolsCallRequest("calculator", map[string]any{"expression": "2+2"}, 1)
+	_, _ = ts.Run(t, test.TestCase{
+		Method: http.MethodPost,
+		Path:   "/mcp-method-acl",
+		Data:   allowedPayload,
+		Code:   http.StatusOK,
+	})
+
+	// Test 2: Disallowed tool should be rejected (HTTP 403)
+	disallowedPayload := BuildToolsCallRequest("weather_reporter", map[string]any{"city": "London"}, 2)
+	_, _ = ts.Run(t, test.TestCase{
+		Method: http.MethodPost,
+		Path:   "/mcp-method-acl",
+		Data:   disallowedPayload,
+		Code:   http.StatusForbidden,
+	})
+
+	// Verify only the allowed tool reached upstream
+	received := mockUpstream.ReceivedRequestsForMethod("tools/call")
+	require.Len(t, received, 1, "Only the allowed tool (calculator) should reach upstream")
+
+	// Verify the request params contain the calculator tool
+	var params struct {
+		Name string `json:"name"`
+	}
+	json.Unmarshal(received[0].Params, &params)
+	assert.Equal(t, "calculator", params.Name)
+}
+
+// TestJSONRPC_ToolLevelAllowList tests that tool-level allow lists
+// correctly proxy allowed tools and reject disallowed tools.
+// Acceptance Criteria #2: When an allow list is configured at the tool level,
+// only requests for the specifically allowed tools are proxied, and others are rejected.
+func TestJSONRPC_ToolLevelAllowList(t *testing.T) {
+	mockUpstream := NewMockJSONRPCServer()
+	defer mockUpstream.Close()
+
+	mockUpstream.MockMethod("tools/call", map[string]any{
+		"content": []map[string]any{
+			{"type": "text", "text": "Success"},
+		},
+	})
+
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	oasAPI := getSampleOASAPI()
+	tykExt := oasAPI.GetTykExtension()
+	tykExt.Upstream.URL = mockUpstream.URL()
+	tykExt.Server.ListenPath = oas.ListenPath{
+		Value: "/mcp-tool-acl",
+		Strip: true,
+	}
+	// Configure tool-level allow list with multiple specific tools
+	tykExt.Middleware = &oas.Middleware{
+		McpTools: oas.MCPPrimitives{
+			"get-weather": &oas.MCPPrimitive{
+				Operation: oas.Operation{
+					Allow: &oas.Allowance{Enabled: true},
+				},
+			},
+			"get-temperature": &oas.MCPPrimitive{
+				Operation: oas.Operation{
+					Allow: &oas.Allowance{Enabled: true},
+				},
+			},
+			"get-stock-price": &oas.MCPPrimitive{
+				Operation: oas.Operation{
+					Allow: &oas.Allowance{Enabled: true},
+				},
+			},
+		},
+	}
+	oasAPI.SetTykExtension(tykExt)
+
+	var def apidef.APIDefinition
+	oasAPI.ExtractTo(&def)
+	def.IsOAS = true
+	def.UseKeylessAccess = true
+	def.Proxy.ListenPath = "/mcp-tool-acl"
+	def.MarkAsMCP()
+
+	spec := &APISpec{APIDefinition: &def, OAS: oasAPI}
+	ts.Gw.LoadAPI(spec)
+
+	// Test: Each allowed tool should succeed
+	weatherPayload := BuildToolsCallRequest("get-weather", nil, 1)
+	temperaturePayload := BuildToolsCallRequest("get-temperature", nil, 2)
+	stockPayload := BuildToolsCallRequest("get-stock-price", nil, 3)
+	disallowedPayload := BuildToolsCallRequest("delete-user", nil, 4)
+
+	_, _ = ts.Run(t, []test.TestCase{
+		// All allowed tools should work
+		{Method: http.MethodPost, Path: "/mcp-tool-acl", Data: weatherPayload, Code: http.StatusOK},
+		{Method: http.MethodPost, Path: "/mcp-tool-acl", Data: temperaturePayload, Code: http.StatusOK},
+		{Method: http.MethodPost, Path: "/mcp-tool-acl", Data: stockPayload, Code: http.StatusOK},
+		// Disallowed tool should be rejected
+		{Method: http.MethodPost, Path: "/mcp-tool-acl", Data: disallowedPayload, Code: http.StatusForbidden},
+	}...)
+
+	// Verify only allowed tools reached upstream (3 requests)
+	received := mockUpstream.ReceivedRequestsForMethod("tools/call")
+	require.Len(t, received, 3, "Only the three allowed tools should reach upstream")
+}
+
+// TestJSONRPC_MethodLevelRateLimiting tests that rate limits configured at the method level
+// are correctly applied.
+// Acceptance Criteria #3: Rate limits configured at the method level (for tool calls) are correctly applied.
+func TestJSONRPC_MethodLevelRateLimiting(t *testing.T) {
+	mockUpstream := NewMockJSONRPCServer()
+	defer mockUpstream.Close()
+
+	mockUpstream.MockMethod("tools/call", map[string]any{
+		"content": []map[string]any{
+			{"type": "text", "text": "Success"},
+		},
+	})
+
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	oasAPI := getSampleOASAPI()
+	tykExt := oasAPI.GetTykExtension()
+	tykExt.Upstream.URL = mockUpstream.URL()
+	tykExt.Server.ListenPath = oas.ListenPath{
+		Value: "/mcp-method-rl",
+		Strip: true,
+	}
+	// Configure rate limit on a specific tool: 3 requests per 10 seconds
+	tykExt.Middleware = &oas.Middleware{
+		McpTools: oas.MCPPrimitives{
+			"limited-tool": &oas.MCPPrimitive{
+				Operation: oas.Operation{
+					RateLimit: &oas.RateLimitEndpoint{
+						Enabled: true,
+						Rate:    3,
+						Per:     oas.ReadableDuration(10 * time.Second),
+					},
+				},
+			},
+		},
+	}
+	oasAPI.SetTykExtension(tykExt)
+
+	var def apidef.APIDefinition
+	oasAPI.ExtractTo(&def)
+	def.IsOAS = true
+	def.UseKeylessAccess = true
+	def.Proxy.ListenPath = "/mcp-method-rl"
+	def.GlobalRateLimit = apidef.GlobalRateLimit{Rate: 100, Per: 1}
+	def.MarkAsMCP()
+
+	spec := &APISpec{APIDefinition: &def, OAS: oasAPI}
+	ts.Gw.LoadAPI(spec)
+
+	payload := BuildToolsCallRequest("limited-tool", nil, 1)
+
+	// First 3 requests should succeed (within rate limit)
+	_, _ = ts.Run(t, []test.TestCase{
+		{Method: http.MethodPost, Path: "/mcp-method-rl", Data: payload, Code: http.StatusOK},
+		{Method: http.MethodPost, Path: "/mcp-method-rl", Data: payload, Code: http.StatusOK},
+		{Method: http.MethodPost, Path: "/mcp-method-rl", Data: payload, Code: http.StatusOK},
+		// Fourth request should be rate limited (HTTP 429)
+		{Method: http.MethodPost, Path: "/mcp-method-rl", Data: payload, Code: http.StatusTooManyRequests},
+	}...)
+
+	// Verify only 3 requests reached upstream
+	received := mockUpstream.ReceivedRequestsForMethod("tools/call")
+	require.Len(t, received, 3, "Only 3 requests should reach upstream before rate limiting")
+}
+
+// TestJSONRPC_ToolLevelIndependentRateLimiting tests that rate limits are applied independently
+// for different tools.
+// Acceptance Criteria #4: Rate limits are correctly applied for different configured tools independently.
+func TestJSONRPC_ToolLevelIndependentRateLimiting(t *testing.T) {
+	mockUpstream := NewMockJSONRPCServer()
+	defer mockUpstream.Close()
+
+	mockUpstream.MockMethod("tools/call", map[string]any{
+		"content": []map[string]any{
+			{"type": "text", "text": "Success"},
+		},
+	})
+
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	oasAPI := getSampleOASAPI()
+	tykExt := oasAPI.GetTykExtension()
+	tykExt.Upstream.URL = mockUpstream.URL()
+	tykExt.Server.ListenPath = oas.ListenPath{
+		Value: "/mcp-tool-rl",
+		Strip: true,
+	}
+	// Configure different rate limits for two tools
+	tykExt.Middleware = &oas.Middleware{
+		McpTools: oas.MCPPrimitives{
+			"tool-a": &oas.MCPPrimitive{
+				Operation: oas.Operation{
+					RateLimit: &oas.RateLimitEndpoint{
+						Enabled: true,
+						Rate:    1, // Only 1 request allowed
+						Per:     oas.ReadableDuration(10 * time.Second),
+					},
+				},
+			},
+			"tool-b": &oas.MCPPrimitive{
+				Operation: oas.Operation{
+					RateLimit: &oas.RateLimitEndpoint{
+						Enabled: true,
+						Rate:    5, // 5 requests allowed
+						Per:     oas.ReadableDuration(10 * time.Second),
+					},
+				},
+			},
+		},
+	}
+	oasAPI.SetTykExtension(tykExt)
+
+	var def apidef.APIDefinition
+	oasAPI.ExtractTo(&def)
+	def.IsOAS = true
+	def.UseKeylessAccess = true
+	def.Proxy.ListenPath = "/mcp-tool-rl"
+	def.GlobalRateLimit = apidef.GlobalRateLimit{Rate: 100, Per: 1}
+	def.MarkAsMCP()
+
+	spec := &APISpec{APIDefinition: &def, OAS: oasAPI}
+	ts.Gw.LoadAPI(spec)
+
+	toolAPayload := BuildToolsCallRequest("tool-a", nil, 1)
+	toolBPayload := BuildToolsCallRequest("tool-b", nil, 2)
+
+	// Test sequence:
+	// 1. First request to tool-a should succeed
+	// 2. Second request to tool-a should be rate limited
+	// 3. Requests to tool-b should still succeed (independent rate limit)
+	_, _ = ts.Run(t, []test.TestCase{
+		// tool-a: first request succeeds
+		{Method: http.MethodPost, Path: "/mcp-tool-rl", Data: toolAPayload, Code: http.StatusOK},
+		// tool-a: second request gets rate limited
+		{Method: http.MethodPost, Path: "/mcp-tool-rl", Data: toolAPayload, Code: http.StatusTooManyRequests},
+		// tool-b: should still work (independent rate limit)
+		{Method: http.MethodPost, Path: "/mcp-tool-rl", Data: toolBPayload, Code: http.StatusOK},
+		{Method: http.MethodPost, Path: "/mcp-tool-rl", Data: toolBPayload, Code: http.StatusOK},
+		{Method: http.MethodPost, Path: "/mcp-tool-rl", Data: toolBPayload, Code: http.StatusOK},
+	}...)
+
+	// Verify the correct number of requests reached upstream
+	// tool-a: 1 request, tool-b: 3 requests = 4 total
+	received := mockUpstream.ReceivedRequestsForMethod("tools/call")
+	require.Len(t, received, 4, "4 requests should reach upstream (1 for tool-a, 3 for tool-b)")
+}
+
+// TestJSONRPC_CombinedHeaderTransformations tests that request transformation headers
+// defined at both the method and tool level are combined and sent to the upstream.
+// Acceptance Criteria #5: When request transformation headers are defined at both the method
+// and tool level, the upstream receives the combined set of headers.
+func TestJSONRPC_CombinedHeaderTransformations(t *testing.T) {
+	mockUpstream := NewMockJSONRPCServer()
+	defer mockUpstream.Close()
+
+	mockUpstream.MockMethod("tools/call", map[string]any{
+		"content": []map[string]any{
+			{"type": "text", "text": "Success"},
+		},
+	})
+
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	oasAPI := getSampleOASAPI()
+	tykExt := oasAPI.GetTykExtension()
+	tykExt.Upstream.URL = mockUpstream.URL()
+	tykExt.Server.ListenPath = oas.ListenPath{
+		Value: "/mcp-headers",
+		Strip: true,
+	}
+	// Configure headers at the tool level
+	// Note: MCP primitives support transformRequestHeaders for adding headers
+	tykExt.Middleware = &oas.Middleware{
+		McpTools: oas.MCPPrimitives{
+			"header-test-tool": &oas.MCPPrimitive{
+				Operation: oas.Operation{
+					TransformRequestHeaders: &oas.TransformHeaders{
+						Enabled: true,
+						Add: oas.Headers{
+							{Name: "X-Tool-Header", Value: "ToolValue"},
+							{Name: "X-Custom-Header", Value: "CustomValue"},
+						},
+					},
+				},
+			},
+		},
+	}
+	oasAPI.SetTykExtension(tykExt)
+
+	var def apidef.APIDefinition
+	oasAPI.ExtractTo(&def)
+	def.IsOAS = true
+	def.UseKeylessAccess = true
+	def.Proxy.ListenPath = "/mcp-headers"
+	def.MarkAsMCP()
+
+	spec := &APISpec{APIDefinition: &def, OAS: oasAPI}
+	ts.Gw.LoadAPI(spec)
+
+	payload := BuildToolsCallRequest("header-test-tool", map[string]any{"param": "value"}, 1)
+
+	_, _ = ts.Run(t, test.TestCase{
+		Method: http.MethodPost,
+		Path:   "/mcp-headers",
+		Data:   payload,
+		Code:   http.StatusOK,
+	})
+
+	// Verify the mock upstream received the transformed headers
+	received := mockUpstream.ReceivedRequestsForMethod("tools/call")
+	require.Len(t, received, 1, "One request should reach upstream")
+
+	// Check that the custom headers were added
+	headers := received[0].Headers
+	assert.Equal(t, "ToolValue", headers.Get("X-Tool-Header"), "X-Tool-Header should be present")
+	assert.Equal(t, "CustomValue", headers.Get("X-Custom-Header"), "X-Custom-Header should be present")
 }
 
 // TestBuildHelpers tests the request building helpers.

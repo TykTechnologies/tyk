@@ -37,9 +37,10 @@ type JSONRPCHandler func(t *testing.T, method string, params json.RawMessage) (r
 
 // ReceivedJSONRPCRequest records a received JSON-RPC request for later assertions.
 type ReceivedJSONRPCRequest struct {
-	Method string
-	Params json.RawMessage
-	ID     any
+	Method  string
+	Params  json.RawMessage
+	ID      any
+	Headers http.Header // HTTP headers received with the request
 }
 
 // jsonRPCRequest represents a JSON-RPC 2.0 request.
@@ -172,12 +173,13 @@ func (m *MockJSONRPCServer) handleRequest(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	// Record the request
+	// Record the request with headers
 	m.mu.Lock()
 	m.receivedRequests = append(m.receivedRequests, ReceivedJSONRPCRequest{
-		Method: req.Method,
-		Params: req.Params,
-		ID:     req.ID,
+		Method:  req.Method,
+		Params:  req.Params,
+		ID:      req.ID,
+		Headers: r.Header.Clone(),
 	})
 	m.mu.Unlock()
 
