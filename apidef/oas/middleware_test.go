@@ -1454,3 +1454,95 @@ func TestCachePlugin_Fill(t *testing.T) {
 		assert.Equal(t, int64(60), cachePlugin.Timeout)
 	})
 }
+
+func TestMiddleware_HasMCPPrimitivesMocks(t *testing.T) {
+	t.Run("empty middleware returns false", func(t *testing.T) {
+		middleware := &Middleware{}
+		assert.False(t, middleware.HasMCPPrimitivesMocks())
+	})
+
+	t.Run("returns false when no mocks enabled", func(t *testing.T) {
+		middleware := &Middleware{
+			McpTools: MCPPrimitives{
+				"tool1": &MCPPrimitive{},
+			},
+			McpResources: MCPPrimitives{
+				"resource1": &MCPPrimitive{},
+			},
+			McpPrompts: MCPPrimitives{
+				"prompt1": &MCPPrimitive{},
+			},
+		}
+		assert.False(t, middleware.HasMCPPrimitivesMocks())
+	})
+
+	t.Run("returns false when mocks exist but disabled", func(t *testing.T) {
+		middleware := &Middleware{
+			McpTools: MCPPrimitives{
+				"tool1": &MCPPrimitive{
+					Operation: Operation{
+						MockResponse: &MockResponse{Enabled: false},
+					},
+				},
+			},
+		}
+		assert.False(t, middleware.HasMCPPrimitivesMocks())
+	})
+
+	t.Run("returns true when tool has enabled mock", func(t *testing.T) {
+		middleware := &Middleware{
+			McpTools: MCPPrimitives{
+				"tool1": &MCPPrimitive{
+					Operation: Operation{
+						MockResponse: &MockResponse{Enabled: true},
+					},
+				},
+			},
+		}
+		assert.True(t, middleware.HasMCPPrimitivesMocks())
+	})
+
+	t.Run("returns true when resource has enabled mock", func(t *testing.T) {
+		middleware := &Middleware{
+			McpResources: MCPPrimitives{
+				"resource1": &MCPPrimitive{
+					Operation: Operation{
+						MockResponse: &MockResponse{Enabled: true},
+					},
+				},
+			},
+		}
+		assert.True(t, middleware.HasMCPPrimitivesMocks())
+	})
+
+	t.Run("returns true when prompt has enabled mock", func(t *testing.T) {
+		middleware := &Middleware{
+			McpPrompts: MCPPrimitives{
+				"prompt1": &MCPPrimitive{
+					Operation: Operation{
+						MockResponse: &MockResponse{Enabled: true},
+					},
+				},
+			},
+		}
+		assert.True(t, middleware.HasMCPPrimitivesMocks())
+	})
+
+	t.Run("returns true when multiple primitives with one enabled", func(t *testing.T) {
+		middleware := &Middleware{
+			McpTools: MCPPrimitives{
+				"tool1": &MCPPrimitive{
+					Operation: Operation{
+						MockResponse: &MockResponse{Enabled: false},
+					},
+				},
+				"tool2": &MCPPrimitive{
+					Operation: Operation{
+						MockResponse: &MockResponse{Enabled: true},
+					},
+				},
+			},
+		}
+		assert.True(t, middleware.HasMCPPrimitivesMocks())
+	})
+}

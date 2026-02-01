@@ -1529,6 +1529,45 @@ func TestAPISpec_hasMock(t *testing.T) {
 
 	mock.Enabled = true
 	assert.True(t, s.hasActiveMock())
+
+	// Reset and test MCP tools
+	mock.Enabled = false
+	assert.False(t, s.hasActiveMock())
+
+	middleware.McpTools = oas.MCPPrimitives{
+		"get-weather": &oas.MCPPrimitive{
+			Operation: oas.Operation{
+				MockResponse: &oas.MockResponse{Enabled: true},
+			},
+		},
+	}
+	assert.True(t, s.hasActiveMock())
+
+	// Reset and test MCP resources
+	middleware.McpTools = nil
+	assert.False(t, s.hasActiveMock())
+
+	middleware.McpResources = oas.MCPPrimitives{
+		"file:///test": &oas.MCPPrimitive{
+			Operation: oas.Operation{
+				MockResponse: &oas.MockResponse{Enabled: true},
+			},
+		},
+	}
+	assert.True(t, s.hasActiveMock())
+
+	// Reset and test MCP prompts
+	middleware.McpResources = nil
+	assert.False(t, s.hasActiveMock())
+
+	middleware.McpPrompts = oas.MCPPrimitives{
+		"code-review": &oas.MCPPrimitive{
+			Operation: oas.Operation{
+				MockResponse: &oas.MockResponse{Enabled: true},
+			},
+		},
+	}
+	assert.True(t, s.hasActiveMock())
 }
 
 func TestAPISpec_isStreamingAPI(t *testing.T) {

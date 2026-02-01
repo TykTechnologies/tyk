@@ -52,6 +52,23 @@ func (m *Middleware) ExtractTo(api *apidef.APIDefinition) {
 	m.Global.ExtractTo(api)
 }
 
+// HasMCPPrimitivesMocks checks if any MCP primitives (tools, resources, prompts) have enabled mock responses.
+func (m *Middleware) HasMCPPrimitivesMocks() bool {
+	return hasMockInPrimitives(m.McpTools) ||
+		hasMockInPrimitives(m.McpResources) ||
+		hasMockInPrimitives(m.McpPrompts)
+}
+
+// hasMockInPrimitives checks if any primitive in the collection has an enabled mock response.
+func hasMockInPrimitives(primitives MCPPrimitives) bool {
+	for _, primitive := range primitives {
+		if primitive.MockResponse != nil && primitive.MockResponse.Enabled {
+			return true
+		}
+	}
+	return false
+}
+
 // Global contains configuration that affects the whole API (all endpoints).
 type Global struct {
 	// PluginConfig contains the common configuration for custom plugins.

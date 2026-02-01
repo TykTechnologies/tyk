@@ -2037,16 +2037,13 @@ func (a *APISpec) hasActiveMock() bool {
 	}
 
 	for _, operation := range middleware.Operations {
-		if operation.MockResponse == nil {
-			continue
-		}
-
-		if operation.MockResponse.Enabled {
+		if operation.MockResponse != nil && operation.MockResponse.Enabled {
 			return true
 		}
 	}
 
-	return false
+	// Check MCP primitives (tools, resources, prompts)
+	return middleware.HasMCPPrimitivesMocks()
 }
 
 func (a *APISpec) hasVirtualEndpoint() bool {
