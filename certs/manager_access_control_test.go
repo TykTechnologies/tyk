@@ -28,7 +28,7 @@ func (m *mockUsageTracker) APIs(certID string) []string {
 func TestCertificateManager_GetRaw_AccessControl(t *testing.T) {
 	t.Run("selective sync disabled - all certificates accessible", func(t *testing.T) {
 		storage := storage.NewDummyStorage()
-		storage.SetKey("raw-cert1", "cert-data-1", 0)
+		assert.NoError(t, storage.SetKey("raw-cert1", "cert-data-1", 0))
 
 		manager := NewCertificateManager(storage, "test", nil, false)
 
@@ -40,7 +40,7 @@ func TestCertificateManager_GetRaw_AccessControl(t *testing.T) {
 
 	t.Run("selective sync enabled - required certificate accessible", func(t *testing.T) {
 		storage := storage.NewDummyStorage()
-		storage.SetKey("raw-cert1", "cert-data-1", 0)
+		assert.NoError(t, storage.SetKey("raw-cert1", "cert-data-1", 0))
 
 		logger := logrus.NewEntry(logrus.New())
 		manager := &certificateManager{
@@ -62,7 +62,7 @@ func TestCertificateManager_GetRaw_AccessControl(t *testing.T) {
 
 	t.Run("selective sync enabled - non-required certificate blocked", func(t *testing.T) {
 		storage := storage.NewDummyStorage()
-		storage.SetKey("raw-cert1", "cert-data-1", 0)
+		assert.NoError(t, storage.SetKey("raw-cert1", "cert-data-1", 0))
 
 		logger := logrus.NewEntry(logrus.New())
 		manager := &certificateManager{
@@ -85,7 +85,7 @@ func TestCertificateManager_GetRaw_AccessControl(t *testing.T) {
 
 	t.Run("selective sync enabled - nil registry allows access", func(t *testing.T) {
 		storage := storage.NewDummyStorage()
-		storage.SetKey("raw-cert1", "cert-data-1", 0)
+		assert.NoError(t, storage.SetKey("raw-cert1", "cert-data-1", 0))
 
 		logger := logrus.NewEntry(logrus.New())
 		manager := &certificateManager{
@@ -104,9 +104,9 @@ func TestCertificateManager_GetRaw_AccessControl(t *testing.T) {
 
 	t.Run("selective sync enabled - multiple certificates", func(t *testing.T) {
 		storage := storage.NewDummyStorage()
-		storage.SetKey("raw-cert1", "cert-data-1", 0)
-		storage.SetKey("raw-cert2", "cert-data-2", 0)
-		storage.SetKey("raw-cert3", "cert-data-3", 0)
+		assert.NoError(t, storage.SetKey("raw-cert1", "cert-data-1", 0))
+		assert.NoError(t, storage.SetKey("raw-cert2", "cert-data-2", 0))
+		assert.NoError(t, storage.SetKey("raw-cert3", "cert-data-3", 0))
 
 		logger := logrus.NewEntry(logrus.New())
 		manager := &certificateManager{
