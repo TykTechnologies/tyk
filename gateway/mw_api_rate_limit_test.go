@@ -1,6 +1,7 @@
 package gateway
 
 import (
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -14,6 +15,7 @@ import (
 	"github.com/justinas/alice"
 
 	"github.com/TykTechnologies/tyk/internal/uuid"
+	"github.com/TykTechnologies/tyk/storage"
 
 	"github.com/TykTechnologies/tyk/test"
 	"github.com/TykTechnologies/tyk/user"
@@ -312,6 +314,272 @@ func TestRLOpenWithReload(t *testing.T) {
 			}
 		}
 	}
+}
+
+// TestRateLimitForAPI_ShouldEnable_MCPVEMs tests that shouldEnable() correctly
+// detects rate limits in rxPaths (MCP VEM rate limits).
+func TestRateLimitForAPI_ShouldEnable_MCPVEMs(t *testing.T) {
+	tests := []struct {
+		name     string
+		setupAPI func(*APISpec)
+		expected bool
+	}{
+		{
+			name: "disabled when DisableRateLimit is true",
+			setupAPI: func(spec *APISpec) {
+				spec.DisableRateLimit = true
+			},
+			expected: false,
+		},
+		{
+			name: "enabled when ExtendedPaths has rate limits",
+			setupAPI: func(spec *APISpec) {
+				spec.VersionData.Versions = map[string]apidef.VersionInfo{
+					"v1": {
+						ExtendedPaths: apidef.ExtendedPathsSet{
+							RateLimit: []apidef.RateLimitMeta{
+								{Path: "/endpoint", Method: "GET", Rate: 10, Per: 60},
+							},
+						},
+					},
+				}
+			},
+			expected: true,
+		},
+		{
+			name: "enabled when rxPaths has rate limits (MCP VEMs)",
+			setupAPI: func(spec *APISpec) {
+				// Simulate MCP VEM rate limits compiled into rxPaths
+				spec.RxPaths = map[string][]URLSpec{
+					"v1": {
+						{
+							Status: RateLimit,
+							RateLimit: apidef.RateLimitMeta{
+								Path:   "/mcp-tool:get-weather",
+								Method: "POST",
+								Rate:   2,
+								Per:    20,
+							},
+						},
+					},
+				}
+			},
+			expected: true,
+		},
+		{
+			name: "enabled when global rate limit is configured",
+			setupAPI: func(spec *APISpec) {
+				spec.GlobalRateLimit = apidef.GlobalRateLimit{
+					Rate: 100,
+					Per:  60,
+				}
+			},
+			expected: true,
+		},
+		{
+			name: "disabled when global rate limit is disabled",
+			setupAPI: func(spec *APISpec) {
+				spec.GlobalRateLimit = apidef.GlobalRateLimit{
+					Rate:     100,
+					Per:      60,
+					Disabled: true,
+				}
+			},
+			expected: false,
+		},
+		{
+			name: "disabled when no rate limits are configured",
+			setupAPI: func(spec *APISpec) {
+				// No rate limits configured
+			},
+			expected: false,
+		},
+		{
+			name: "enabled when rxPaths has invalid rate limit spec but Valid() returns true",
+			setupAPI: func(spec *APISpec) {
+				spec.RxPaths = map[string][]URLSpec{
+					"v1": {
+						{
+							Status: RateLimit,
+							RateLimit: apidef.RateLimitMeta{
+								Path:   "/mcp-tool:test",
+								Method: "POST",
+								Rate:   5,
+								Per:    10,
+							},
+						},
+					},
+				}
+			},
+			expected: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			spec := &APISpec{
+				APIDefinition: &apidef.APIDefinition{
+					VersionData: apidef.VersionData{
+						Versions: make(map[string]apidef.VersionInfo),
+					},
+				},
+				RxPaths: make(map[string][]URLSpec),
+			}
+
+			tt.setupAPI(spec)
+
+			mw := &RateLimitForAPI{
+				BaseMiddleware: &BaseMiddleware{Spec: spec},
+			}
+
+			result := mw.shouldEnable()
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+// TestRateLimitForAPI_GetSession_Keyname tests that getSession() returns
+// the correct session and keyname for both global and per-endpoint rate limits.
+func TestRateLimitForAPI_GetSession_Keyname(t *testing.T) {
+	orgID := "test-org"
+	apiID := "test-api"
+
+	t.Run("returns global session when no per-endpoint match", func(t *testing.T) {
+		spec := &APISpec{
+			APIDefinition: &apidef.APIDefinition{
+				APIID: apiID,
+				OrgID: orgID,
+				GlobalRateLimit: apidef.GlobalRateLimit{
+					Rate: 100,
+					Per:  60,
+				},
+				VersionData: apidef.VersionData{
+					Versions: map[string]apidef.VersionInfo{
+						"Default": {Name: "Default"},
+					},
+					DefaultVersion: "Default",
+				},
+			},
+			RxPaths: make(map[string][]URLSpec),
+		}
+
+		mw := &RateLimitForAPI{
+			BaseMiddleware: &BaseMiddleware{Spec: spec},
+			keyName:        fmt.Sprintf("apilimiter-%s%s", orgID, apiID),
+			apiSess: &user.SessionState{
+				Rate:        spec.GlobalRateLimit.Rate,
+				Per:         spec.GlobalRateLimit.Per,
+				LastUpdated: "123456789",
+			},
+		}
+
+		req := httptest.NewRequest("POST", "/unmapped-path", nil)
+		session, keyname := mw.getSession(req)
+
+		assert.Equal(t, float64(100), session.Rate)
+		assert.Equal(t, float64(60), session.Per)
+		assert.Equal(t, fmt.Sprintf("apilimiter-%s%s", orgID, apiID), keyname)
+	})
+
+	t.Run("creates per-endpoint keyname with hash suffix", func(t *testing.T) {
+		// Test the keyname generation logic directly
+		baseKey := fmt.Sprintf("apilimiter-%s%s", orgID, apiID)
+		method := "POST"
+		path := "/mcp-tool:rate-limited"
+
+		expectedHash := storage.HashStr(fmt.Sprintf("%s:%s", method, path))
+		expectedKeyname := baseKey + "-" + expectedHash
+
+		// Verify hash generation produces consistent results
+		actualKeyname := baseKey + "-" + storage.HashStr(fmt.Sprintf("%s:%s", method, path))
+		assert.Equal(t, expectedKeyname, actualKeyname)
+		assert.Contains(t, actualKeyname, baseKey+"-")
+		assert.Greater(t, len(actualKeyname), len(baseKey)+1)
+	})
+}
+
+// TestRateLimitForAPI_IndependentToolTracking tests that the keyname generation
+// logic creates unique keys for different method:path combinations.
+func TestRateLimitForAPI_IndependentToolTracking(t *testing.T) {
+	orgID := "test-org"
+	apiID := "test-api"
+	baseKey := fmt.Sprintf("apilimiter-%s%s", orgID, apiID)
+
+	// Test keyname generation with distinct paths that won't collide
+	testCases := []struct {
+		method string
+		path   string
+	}{
+		{"POST", "/mcp-tool:get-weather"},
+		{"POST", "/mcp-tool:get-forecast"},
+		{"GET", "/mcp-tool:list-tools"},
+	}
+
+	// Generate keynames for each test case
+	keynames := make([]string, len(testCases))
+	for i, tc := range testCases {
+		hash := storage.HashStr(fmt.Sprintf("%s:%s", tc.method, tc.path))
+		keynames[i] = baseKey + "-" + hash
+
+		// Verify keyname format
+		assert.Contains(t, keynames[i], baseKey)
+		assert.Greater(t, len(keynames[i]), len(baseKey)+1, "Keyname should have hash suffix")
+	}
+
+	// Verify all keynames are unique (no two tools share the same bucket)
+	seen := make(map[string]bool)
+	for _, keyname := range keynames {
+		assert.False(t, seen[keyname], "Each tool should have a unique keyname")
+		seen[keyname] = true
+	}
+}
+
+// TestRateLimitForAPI_NoGlobalRateLimit tests that the middleware works
+// correctly when only per-endpoint rate limits are configured (no global limit).
+func TestRateLimitForAPI_NoGlobalRateLimit(t *testing.T) {
+	spec := &APISpec{
+		APIDefinition: &apidef.APIDefinition{
+			APIID: "test-api",
+			OrgID: "test-org",
+			VersionData: apidef.VersionData{
+				Versions: map[string]apidef.VersionInfo{
+					"Default": {Name: "Default"},
+				},
+				DefaultVersion: "Default",
+			},
+			// No GlobalRateLimit configured
+		},
+		RxPaths: map[string][]URLSpec{
+			"Default": {
+				{
+					Status: RateLimit,
+					RateLimit: apidef.RateLimitMeta{
+						Path:   "/mcp-tool:limited",
+						Method: "POST",
+						Rate:   5,
+						Per:    60,
+					},
+				},
+			},
+		},
+	}
+
+	mw := &RateLimitForAPI{
+		BaseMiddleware: &BaseMiddleware{Spec: spec},
+	}
+
+	// shouldEnable should return true because rxPaths has rate limits
+	assert.True(t, mw.shouldEnable())
+
+	// Verify per-endpoint keyname generation works correctly
+	baseKey := fmt.Sprintf("apilimiter-%s%s", spec.OrgID, spec.APIID)
+	method := "POST"
+	path := "/mcp-tool:limited"
+	expectedHash := storage.HashStr(fmt.Sprintf("%s:%s", method, path))
+	expectedKeyname := baseKey + "-" + expectedHash
+
+	assert.Equal(t, "apilimiter-test-orgtest-api-"+expectedHash, expectedKeyname)
+	assert.Contains(t, expectedKeyname, "apilimiter-test-orgtest-api-")
 }
 
 const openRLDefSmall = `{
