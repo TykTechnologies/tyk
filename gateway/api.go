@@ -3238,6 +3238,27 @@ func ctxGetSession(r *http.Request) *user.SessionState {
 	return ctx.GetSession(r)
 }
 
+func ctxGetLLMResponseReporterInputTokens(r *http.Request) int {
+	if v := r.Context().Value(ctx.LLMResponseReporterInputTokens); v != nil {
+		return v.(int)
+	}
+	return 0
+}
+
+func ctxGetLLMResponseReporterOutputTokens(r *http.Request) int {
+	if v := r.Context().Value(ctx.LLMResponseReporterOutputTokens); v != nil {
+		return v.(int)
+	}
+	return 0
+}
+
+func ctxGetLLMResponseReporterTotalTokens(r *http.Request) int {
+	if v := r.Context().Value(ctx.LLMResponseReporterTotalTokens); v != nil {
+		return v.(int)
+	}
+	return 0
+}
+
 func ctxSetSession(r *http.Request, s *user.SessionState, scheduleUpdate bool, hashKey bool) {
 	ctx.SetSession(r, s, scheduleUpdate, hashKey)
 }

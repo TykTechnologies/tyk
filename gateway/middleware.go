@@ -735,6 +735,9 @@ func (gw *Gateway) responseProcessorByName(name string, baseHandler BaseTykRespo
 		return &CustomMiddlewareResponseHook{BaseTykResponseHandler: baseHandler}
 	case "goplugin_res_hook":
 		return &ResponseGoPluginMiddleware{BaseTykResponseHandler: baseHandler}
+	case "llm_reponse_reporter":
+		return &LLMResponseReporter{BaseTykResponseHandler: baseHandler}
+
 	}
 
 	return nil
