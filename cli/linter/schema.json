@@ -1134,6 +1134,9 @@
             "type": "object"
           }
         },
+        "allow_unsafe_dynamic_mtls_token": {
+          "type": "boolean"
+        },
         "certificates": {
           "type": ["object", "null"],
           "additionalProperties": false,
