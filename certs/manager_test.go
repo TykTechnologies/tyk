@@ -22,7 +22,7 @@ import (
 )
 
 func newManager() *certificateManager {
-	return NewCertificateManager(storage.NewDummyStorage(), "test", nil, false, 0, 0, 0, true, 3)
+	return NewCertificateManagerWithRetry(storage.NewDummyStorage(), "test", nil, false, 0, 0, 0, true, 3)
 }
 
 func genCertificate(template *x509.Certificate, isExpired bool) ([]byte, []byte) {

@@ -94,7 +94,25 @@ type certificateManager struct {
 	certFetchMaxRetries      int
 }
 
-func NewCertificateManager(storageHandler storage.Handler, secret string, logger *logrus.Logger, migrateCertList bool, certFetchMaxElapsedTime, certFetchInitialInterval, certFetchMaxInterval time.Duration, certFetchRetryEnabled bool, certFetchMaxRetries int) *certificateManager {
+// NewCertificateManager creates a certificate manager with default retry settings.
+// This maintains backward compatibility with existing code.
+func NewCertificateManager(storageHandler storage.Handler, secret string, logger *logrus.Logger, migrateCertList bool) *certificateManager {
+	return NewCertificateManagerWithRetry(
+		storageHandler,
+		secret,
+		logger,
+		migrateCertList,
+		DefaultRPCCertFetchMaxElapsedTime,
+		DefaultRPCCertFetchInitialInterval,
+		DefaultRPCCertFetchMaxInterval,
+		DefaultRPCCertFetchRetryEnabled,
+		DefaultRPCCertFetchMaxRetries,
+	)
+}
+
+// NewCertificateManagerWithRetry creates a certificate manager with configurable retry settings.
+// Use this when you need fine-grained control over MDCB certificate fetch retry behavior.
+func NewCertificateManagerWithRetry(storageHandler storage.Handler, secret string, logger *logrus.Logger, migrateCertList bool, certFetchMaxElapsedTime, certFetchInitialInterval, certFetchMaxInterval time.Duration, certFetchRetryEnabled bool, certFetchMaxRetries int) *certificateManager {
 	if logger == nil {
 		logger = logrus.New()
 	}

@@ -533,7 +533,7 @@ func (gw *Gateway) setupGlobals() {
 		maxRetries = *conf.SlaveOptions.RPCCertFetchMaxRetries
 	}
 
-	gw.CertificateManager = certs.NewCertificateManager(
+	gw.CertificateManager = certs.NewCertificateManagerWithRetry(
 		storeCert,
 		certificateSecret,
 		log,
