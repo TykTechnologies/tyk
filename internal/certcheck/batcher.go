@@ -323,7 +323,7 @@ func (c *CertificateExpiryCheckBatcher) handleEventForExpiredCertificate(certInf
 		EventMetaDefault: model.EventMetaDefault{
 			Message: c.composeExpiredMessage(certInfo, daysSinceExpiry, hoursSinceExpiry),
 		},
-		CertID:          certs.MaskCertID(certInfo.ID),
+		CertID:          certInfo.ID,
 		CertName:        certInfo.CommonName,
 		ExpiredAt:       certInfo.NotAfter,
 		DaysSinceExpiry: daysSinceExpiry,
@@ -360,7 +360,7 @@ func (c *CertificateExpiryCheckBatcher) handleEventForSoonToExpireCertificate(ce
 		EventMetaDefault: model.EventMetaDefault{
 			Message: c.composeSoonToExpireMessage(certInfo, daysUntilExpiry, remainingHours),
 		},
-		CertID:        certs.MaskCertID(certInfo.ID),
+		CertID:        certInfo.ID,
 		CertName:      certInfo.CommonName,
 		ExpiresAt:     certInfo.NotAfter,
 		DaysRemaining: daysUntilExpiry,
