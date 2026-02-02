@@ -730,6 +730,18 @@ func (gw *Gateway) loadControlAPIEndpoints(muxer *mux.Router) {
 		muxer.HandleFunc("/debug/pprof/{_:.*}", pprofhttp.Index)
 	}
 
+	// Config inspection endpoints (for troubleshooting)
+	if gw.GetConfig().EnableConfigInspection {
+		if gw.GetConfig().Secret == "" {
+			mainLog.Error("Cannot enable config inspection: secret not set")
+		} else {
+			// Register at root level (like MDCB) with auth middleware
+			muxer.Handle("/config", gw.checkIsAPIOwner(http.HandlerFunc(gw.configHandler)))
+			muxer.Handle("/env", gw.checkIsAPIOwner(http.HandlerFunc(gw.envHandler)))
+			mainLog.Info("Config inspection endpoints enabled: /config, /env")
+		}
+	}
+
 	r.MethodNotAllowedHandler = MethodNotAllowedHandler{}
 
 	mainLog.Info("Initialising Tyk REST API Endpoints")

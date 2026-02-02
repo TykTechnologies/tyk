@@ -491,6 +491,9 @@
     "bundle_insecure_skip_verify": {
       "type": "boolean"
     },
+    "enable_config_inspection": {
+      "type": "boolean"
+    },
     "enable_custom_domains": {
       "type": "boolean"
     },
