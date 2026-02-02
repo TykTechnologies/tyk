@@ -57,6 +57,7 @@ func (gw *Gateway) LoadDefinitionsFromRPCBackup() ([]*APISpec, error) {
 }
 
 func (gw *Gateway) saveRPCDefinitionsBackup(list string) error {
+	log.Debug("[RPC-DEBUG] ==> Entered saveRPCDefinitionsBackup")
 	if !json.Valid([]byte(list)) {
 		return errors.New("--> RPC Backup save failure: wrong format, skipping.")
 	}
@@ -76,6 +77,7 @@ func (gw *Gateway) saveRPCDefinitionsBackup(list string) error {
 	}
 
 	secret := crypto.GetPaddedString(gw.GetConfig().Secret)
+	log.Debugf("[RPC-DEBUG] ==> Calling compressAPIBackup with CompressAPIDefinitions flag set to: %v", gw.GetConfig().Storage.CompressAPIDefinitions)
 	dataToEncrypt := gw.compressAPIBackup(list)
 
 	cryptoText := crypto.Encrypt(secret, dataToEncrypt)
@@ -88,6 +90,7 @@ func (gw *Gateway) saveRPCDefinitionsBackup(list string) error {
 
 // compressAPIBackup compresses API backup data if compression is enabled
 func (gw *Gateway) compressAPIBackup(list string) string {
+	log.Debug("[RPC-DEBUG] ==> Entered compressAPIBackup")
 	if !gw.GetConfig().Storage.CompressAPIDefinitions {
 		log.Debug("[RPC] --> API definition compression disabled")
 		return list
