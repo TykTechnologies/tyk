@@ -70,53 +70,6 @@ func extractCertificatesFromSpec(spec *APISpec) map[string]struct{} {
 	return certSet
 }
 
-// Register extracts and tracks all certificates from an API spec.
-func (cr *certUsageTracker) Register(spec *APISpec) {
-	cr.mu.Lock()
-	defer cr.mu.Unlock()
-
-	apiID := spec.APIID
-	certSet := extractCertificatesFromSpec(spec)
-
-	// Track API association for each cert
-	for certID := range certSet {
-		// Initialize the set if it doesn't exist
-		if cr.apis[certID] == nil {
-			cr.apis[certID] = make(map[string]struct{})
-		}
-		cr.apis[certID][apiID] = struct{}{}
-	}
-}
-
-// RegisterServerCerts tracks gateway server certificates.
-func (cr *certUsageTracker) RegisterServerCerts(certIDs []string) {
-	cr.mu.Lock()
-	defer cr.mu.Unlock()
-
-	const serverAPI = "__server__"
-
-	for _, certID := range certIDs {
-		if certID == "" {
-			continue
-		}
-
-		// Initialize the set if it doesn't exist
-		if cr.apis[certID] == nil {
-			cr.apis[certID] = make(map[string]struct{})
-		}
-		cr.apis[certID][serverAPI] = struct{}{}
-	}
-}
-
-// Reset clears all tracked certificates.
-func (cr *certUsageTracker) Reset() {
-	cr.mu.Lock()
-	defer cr.mu.Unlock()
-
-	for k := range cr.apis {
-		delete(cr.apis, k)
-	}
-}
 
 // ReplaceAll atomically replaces the entire certificate usage map.
 // This method is thread-safe and ensures no partial state is visible to concurrent readers.
