@@ -554,73 +554,31 @@ func TestOTelConfig_BackwardCompatibility(t *testing.T) {
 	})
 }
 
-func TestExtractSpanID(t *testing.T) {
-	t.Run("returns empty when no span in context", func(t *testing.T) {
-		got := ExtractSpanID(context.Background())
-		assert.Equal(t, "", got)
+func TestExtractTraceAndSpanID(t *testing.T) {
+	t.Run("returns empty strings when no span in context", func(t *testing.T) {
+		traceID, spanID := ExtractTraceAndSpanID(context.Background())
+		assert.Equal(t, "", traceID)
+		assert.Equal(t, "", spanID)
 	})
 
-	t.Run("returns non-empty span id when span is present", func(t *testing.T) {
+	t.Run("returns both trace and span IDs when span is present", func(t *testing.T) {
 		provider := makeProviderHTTP(t)
 
 		ctx := context.Background()
-		_, span := provider.Tracer().Start(ctx, "extract-spanid-test")
+		_, span := provider.Tracer().Start(ctx, "extract-both-test")
 		defer span.End()
 
 		ctx = ContextWithSpan(ctx, span)
 
-		got := ExtractSpanID(ctx)
-		assert.NotEmpty(t, got, "expected non-empty span id")
-		assert.Equal(t, span.SpanContext().SpanID().String(), got)
-		assert.Len(t, got, 16, "span_id should be 16 characters long")
+		traceID, spanID := ExtractTraceAndSpanID(ctx)
+
+		assert.NotEmpty(t, traceID, "expected non-empty trace id")
+		assert.NotEmpty(t, spanID, "expected non-empty span id")
+
+		assert.Equal(t, span.SpanContext().TraceID().String(), traceID)
+		assert.Equal(t, span.SpanContext().SpanID().String(), spanID)
+
+		assert.Len(t, traceID, 32, "trace_id should be 32 characters long")
+		assert.Len(t, spanID, 16, "span_id should be 16 characters long")
 	})
-}
-
-func TestExtractSpanID_WithRequest(t *testing.T) {
-	tests := []struct {
-		name         string
-		setupContext func(provider tyktrace.Provider) (context.Context, tyktrace.Span)
-		expectSpanID bool
-	}{
-		{
-			name: "empty context - no span ID",
-			setupContext: func(_ tyktrace.Provider) (context.Context, tyktrace.Span) {
-				return context.Background(), nil
-			},
-			expectSpanID: false,
-		},
-		{
-			name: "valid span context - span ID present",
-			setupContext: func(provider tyktrace.Provider) (context.Context, tyktrace.Span) {
-				ctx := context.Background()
-				_, span := provider.Tracer().Start(ctx, "span-id-test")
-				ctx = ContextWithSpan(ctx, span)
-				return ctx, span
-			},
-			expectSpanID: true,
-		},
-	}
-
-	provider := makeProviderHTTP(t)
-
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			ctx, span := tc.setupContext(provider)
-			if span != nil {
-				defer span.End()
-			}
-
-			req := httptest.NewRequest(http.MethodGet, "http://example.com/path", nil)
-			req = req.WithContext(ctx)
-
-			spanID := ExtractSpanID(req.Context())
-			hasSpanID := spanID != ""
-			assert.Equal(t, tc.expectSpanID, hasSpanID)
-
-			if tc.expectSpanID && span != nil {
-				assert.Equal(t, span.SpanContext().SpanID().String(), spanID)
-				assert.Len(t, spanID, 16, "span_id should be 16 characters")
-			}
-		})
-	}
 }
