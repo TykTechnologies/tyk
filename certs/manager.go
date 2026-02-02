@@ -130,13 +130,15 @@ func WithBackoffIntervals(maxElapsed, initial, max time.Duration) CertificateMan
 // Maintains backward compatibility: calling without options uses defaults.
 //
 // Example with defaults (backward compatible):
-//   cm := NewCertificateManager(storage, secret, logger, true)
+//
+//	cm := NewCertificateManager(storage, secret, logger, true)
 //
 // Example with custom retry config:
-//   cm := NewCertificateManager(storage, secret, logger, true,
-//       WithRetryEnabled(true),
-//       WithMaxRetries(10),
-//       WithBackoffIntervals(60*time.Second, 200*time.Millisecond, 5*time.Second))
+//
+//	cm := NewCertificateManager(storage, secret, logger, true,
+//	    WithRetryEnabled(true),
+//	    WithMaxRetries(10),
+//	    WithBackoffIntervals(60*time.Second, 200*time.Millisecond, 5*time.Second))
 func NewCertificateManager(storageHandler storage.Handler, secret string, logger *logrus.Logger, migrateCertList bool, opts ...CertificateManagerOption) *certificateManager {
 	if logger == nil {
 		logger = logrus.New()
