@@ -88,8 +88,10 @@ const (
 
 // Error type constants for classifier functions.
 const (
+	// Generic error types (used by multiple auth methods)
+	ErrTypeAuthFieldMissing = "auth_field_missing"
+
 	// JWT error types
-	ErrTypeAuthFieldMissing        = "auth_field_missing"
 	ErrTypeClaimsInvalid           = "claims_invalid"
 	ErrTypeTokenInvalid            = "token_invalid"
 	ErrTypeUnexpectedSigningMethod = "unexpected_signing_method"
@@ -114,12 +116,12 @@ const (
 const (
 	// Auth details
 	detailAuthFieldMissing = "auth_field_missing"
-	detailKeyNotFound      = "key_not_found"
-	detailCertNotFound     = "cert_not_found"
-	detailKeyIsInvalid     = "key_is_invalid"
-	detailCertExpired      = "cert_expired"
-	detailCertRequired     = "cert_required"
-	detailCertMismatch     = "cert_mismatch"
+	detailAuthKeyNotFound  = "auth_key_not_found"
+	detailAuthCertNotFound = "auth_cert_not_found"
+	detailAuthKeyIsInvalid = "auth_key_is_invalid"
+	detailAuthCertExpired  = "auth_cert_expired"
+	detailAuthCertRequired = "auth_cert_required"
+	detailAuthCertMismatch = "auth_cert_mismatch"
 
 	// OAuth details
 	detailOAuthFieldMissing   = "oauth_field_missing"

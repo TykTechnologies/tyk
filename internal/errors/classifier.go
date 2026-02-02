@@ -330,23 +330,23 @@ func ClassifyAuthError(errorID string, source string) *ErrorClassification {
 	case ErrAuthAuthorizationFieldMissing:
 		return NewErrorClassification(AMF, detailAuthFieldMissing).WithSource(source)
 	case ErrAuthKeyNotFound:
-		return NewErrorClassification(AKI, detailKeyNotFound).WithSource(source)
+		return NewErrorClassification(AKI, detailAuthKeyNotFound).WithSource(source)
 	case ErrAuthCertNotFound:
-		return NewErrorClassification(AKI, detailCertNotFound).WithSource(source)
+		return NewErrorClassification(AKI, detailAuthCertNotFound).WithSource(source)
 	case ErrAuthKeyIsInvalid:
-		return NewErrorClassification(AKI, detailKeyIsInvalid).WithSource(source)
+		return NewErrorClassification(AKI, detailAuthKeyIsInvalid).WithSource(source)
 	case ErrAuthCertExpired:
-		return NewErrorClassification(TKE, detailCertExpired).WithSource(source)
+		return NewErrorClassification(TKE, detailAuthCertExpired).WithSource(source)
 	case ErrAuthCertRequired:
-		return NewErrorClassification(CRQ, detailCertRequired).WithSource(source)
+		return NewErrorClassification(CRQ, detailAuthCertRequired).WithSource(source)
 	case ErrAuthCertMismatch:
-		return NewErrorClassification(CMM, detailCertMismatch).WithSource(source)
+		return NewErrorClassification(CMM, detailAuthCertMismatch).WithSource(source)
 
 	// OAuth errors
 	case ErrOAuthAuthorizationFieldMissing:
 		return NewErrorClassification(AMF, detailOAuthFieldMissing).WithSource(source)
 	case ErrOAuthAuthorizationFieldMalformed:
-		return NewErrorClassification(BIV, detailOAuthFieldMalformed).WithSource(source)
+		return NewErrorClassification(IHD, detailOAuthFieldMalformed).WithSource(source)
 	case ErrOAuthKeyNotFound:
 		return NewErrorClassification(AKI, detailOAuthKeyNotFound).WithSource(source)
 	case ErrOAuthClientDeleted:
