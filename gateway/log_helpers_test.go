@@ -6,7 +6,6 @@ import (
 	"errors"
 	"io"
 	"net"
-	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"reflect"
@@ -304,14 +303,10 @@ func TestGetLogEntryForRequest_TraceAndSpanIDs(t *testing.T) {
 			req.RemoteAddr = "127.0.0.1:80"
 
 			// Setup trace context if needed
-			if tt.hasTraceCtx && tt.otelEnabled {
-				mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-					w.WriteHeader(http.StatusOK)
-				}))
-				defer mockServer.Close()
-
-				globalConf.OpenTelemetry.Exporter = "http"
-				globalConf.OpenTelemetry.Endpoint = mockServer.URL
+			if tt.hasTraceCtx {
+				// Initialize OpenTelemetry and create trace context
+				globalConf.OpenTelemetry.Exporter = "grpc"
+				globalConf.OpenTelemetry.Endpoint = "localhost:4317"
 				ts.Gw.SetConfig(globalConf)
 
 				ts.Gw.TracerProvider = otel.InitOpenTelemetry(
