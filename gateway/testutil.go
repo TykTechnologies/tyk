@@ -280,14 +280,6 @@ func (s *Test) reloadSimulation(ctx context.Context, gw *Gateway) {
 		case <-ctx.Done():
 			return
 		default:
-			gw.policiesMu.Lock()
-			if gw.policiesByID == nil {
-				gw.policiesByID = make(map[string]user.Policy)
-			}
-			gw.policiesByID["_"] = user.Policy{}
-			delete(gw.policiesByID, "_")
-			gw.policiesMu.Unlock()
-
 			gw.apisMu.Lock()
 			if gw.apisByID == nil {
 				gw.apisByID = make(map[string]*APISpec)
@@ -897,7 +889,6 @@ func CreateStandardPolicy() *user.Policy {
 }
 
 func (s *Test) CreatePolicy(pGen ...func(p *user.Policy)) string {
-
 	pID := s.Gw.keyGen.GenerateAuthKey("")
 	pol := CreateStandardPolicy()
 	pol.ID = pID
@@ -906,17 +897,13 @@ func (s *Test) CreatePolicy(pGen ...func(p *user.Policy)) string {
 		pGen[0](pol)
 	}
 
-	s.Gw.policiesMu.Lock()
-	s.Gw.policiesByID[pol.ID] = *pol
-	s.Gw.policiesMu.Unlock()
+	s.Gw.policies.Add(*pol)
 
 	return pol.ID
 }
 
-func (s *Test) DeletePolicy(policyID string) {
-	s.Gw.policiesMu.Lock()
-	delete(s.Gw.policiesByID, policyID)
-	s.Gw.policiesMu.Unlock()
+func (s *Test) DeletePolicy(policyID model.PolicyID) {
+	s.Gw.policies.DeleteById(policyID)
 }
 
 func CreateJWKToken(jGen ...func(*jwt.Token)) string {
@@ -1484,13 +1471,6 @@ func (s *Test) GetApiById(apiId string) *APISpec {
 
 func (s *Test) StopRPCClient() {
 	rpc.Reset()
-}
-
-func (s *Test) GetPolicyById(policyId string) (user.Policy, bool) {
-	s.Gw.policiesMu.Lock()
-	defer s.Gw.policiesMu.Unlock()
-	pol, found := s.Gw.policiesByID[policyId]
-	return pol, found
 }
 
 const sampleAPI = `{
