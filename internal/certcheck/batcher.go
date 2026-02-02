@@ -29,7 +29,6 @@ var (
 	ErrFallbackCooldownCheckFailed = errors.New("failed to check cooldown in fallback cache")
 )
 
-
 // Batch is a queue of certificates that are ready to be checked.
 type Batch struct {
 	lookupTable map[string]any
@@ -103,9 +102,9 @@ type CertificateExpiryCheckBatcher struct {
 	fallbackCooldownCache CooldownCache
 	flushTicker           *time.Ticker
 	fireEvent             FireEventFunc
-	certificateRole       string             // Role of certificate: "server", "client", "ca", "upstream"
-	certUsage             certUsageTracker   // can be nil in non-RPC mode
-	gwConfig              *config.Config     // can be nil
+	certificateRole       string           // Role of certificate: "server", "client", "ca", "upstream"
+	certUsage             certUsageTracker // can be nil in non-RPC mode
+	gwConfig              *config.Config   // can be nil
 }
 
 // NewCertificateExpiryCheckBatcher creates a new CertificateExpiryCheckBatcher.
