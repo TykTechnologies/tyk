@@ -357,9 +357,19 @@ func ClassifyAuthError(errorID string, source string) *ErrorClassification {
 	}
 }
 
-// ClassifyRateLimitError creates an error classification for rate limit events.
-func ClassifyRateLimitError(source string) *ErrorClassification {
-	return NewErrorClassification(RLT, detailRateLimited).WithSource(source)
+// ClassifyRateLimitError maps rate limit error types to ErrorClassification.
+// Returns nil for unknown error types.
+func ClassifyRateLimitError(errorType string, source string) *ErrorClassification {
+	switch errorType {
+	case ErrTypeSessionRateLimit:
+		return NewErrorClassification(RLT, detailSessionRateLimited).WithSource(source)
+	case ErrTypeAPIRateLimit:
+		return NewErrorClassification(RLT, detailAPIRateLimited).WithSource(source)
+	case ErrTypeOtherRateLimit:
+		return NewErrorClassification(RLT, detailGenericRateLimit).WithSource(source)
+	default:
+		return nil
+	}
 }
 
 // ClassifyQuotaExceededError creates an error classification for quota exceeded events.

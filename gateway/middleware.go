@@ -26,7 +26,6 @@ import (
 	"github.com/TykTechnologies/tyk/ctx"
 	"github.com/TykTechnologies/tyk/header"
 	"github.com/TykTechnologies/tyk/internal/cache"
-	tykerrors "github.com/TykTechnologies/tyk/internal/errors"
 	"github.com/TykTechnologies/tyk/internal/event"
 	"github.com/TykTechnologies/tyk/internal/middleware"
 	"github.com/TykTechnologies/tyk/internal/otel"
@@ -636,9 +635,6 @@ func (t *BaseMiddleware) emitRateLimitEvent(r *http.Request, e event.Event, mess
 
 // handleRateLimitFailure handles the actions to be taken when a rate limit failure occurs.
 func (t *BaseMiddleware) handleRateLimitFailure(r *http.Request, e event.Event, message string, rateLimitKey string) (error, int) {
-	// Set error classification for access logs
-	ctx.SetErrorClassification(r, tykerrors.ClassifyRateLimitError("RateLimitAndQuotaCheck"))
-
 	t.emitRateLimitEvent(r, e, message, rateLimitKey)
 
 	// Report in health check

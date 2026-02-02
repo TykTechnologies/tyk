@@ -107,6 +107,11 @@ const (
 	ErrTypeContentLengthMissing = "content_length_missing"
 	ErrTypeBodyTooLarge         = "body_too_large"
 
+	// Rate limit error types
+	ErrTypeSessionRateLimit = "session_rate_limit"
+	ErrTypeAPIRateLimit     = "api_rate_limit"
+	ErrTypeOtherRateLimit   = "generic_rate_limit_error"
+
 	// JSON validation error types
 	ErrTypeJSONParseError         = "json_parse_error"
 	ErrTypeSchemaValidationFailed = "schema_validation_failed"
@@ -130,8 +135,10 @@ const (
 	detailOAuthClientDeleted  = "oauth_client_deleted"
 
 	// Rate limit details
-	detailRateLimited   = "rate_limited"
-	detailQuotaExceeded = "quota_exceeded"
+	detailSessionRateLimited = "session_rate_limited"
+	detailAPIRateLimited     = "api_rate_limited"
+	detailQuotaExceeded      = "quota_exceeded"
+	detailGenericRateLimit   = "generic_rate_limit_error"
 
 	// JWT details
 	detailJWTFieldMissing            = "jwt_field_missing"

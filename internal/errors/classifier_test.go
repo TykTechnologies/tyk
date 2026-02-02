@@ -823,12 +823,50 @@ func TestClassifyAuthErrorUnknown(t *testing.T) {
 }
 
 func TestClassifyRateLimitError(t *testing.T) {
-	ec := ClassifyRateLimitError("RateLimitAndQuotaCheck")
+	testCases := []struct {
+		name         string
+		errorType    string
+		source       string
+		expectedFlag ResponseFlag
+		expectedDet  string
+	}{
+		{
+			name:         "session_rate_limit",
+			errorType:    ErrTypeSessionRateLimit,
+			source:       "RateLimitAndQuotaCheck",
+			expectedFlag: RLT,
+			expectedDet:  "session_rate_limited",
+		},
+		{
+			name:         "api_rate_limit",
+			errorType:    ErrTypeAPIRateLimit,
+			source:       "RateLimitForAPI",
+			expectedFlag: RLT,
+			expectedDet:  "api_rate_limited",
+		},
+		{
+			name:         "other_rate_limit",
+			errorType:    ErrTypeOtherRateLimit,
+			source:       "RateLimitAndQuotaCheck",
+			expectedFlag: RLT,
+			expectedDet:  "generic_rate_limit_error",
+		},
+	}
 
-	assert.NotNil(t, ec)
-	assert.Equal(t, RLT, ec.Flag)
-	assert.Equal(t, "rate_limited", ec.Details)
-	assert.Equal(t, "RateLimitAndQuotaCheck", ec.Source)
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			ec := ClassifyRateLimitError(tc.errorType, tc.source)
+			assert.NotNil(t, ec)
+			assert.Equal(t, tc.expectedFlag, ec.Flag)
+			assert.Equal(t, tc.expectedDet, ec.Details)
+			assert.Equal(t, tc.source, ec.Source)
+		})
+	}
+}
+
+func TestClassifyRateLimitErrorUnknown(t *testing.T) {
+	ec := ClassifyRateLimitError("unknown_type", "TestSource")
+	assert.Nil(t, ec)
 }
 
 func TestClassifyQuotaExceededError(t *testing.T) {
