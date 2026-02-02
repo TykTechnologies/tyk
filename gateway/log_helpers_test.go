@@ -251,84 +251,41 @@ func TestGatewayLogJWKError(t *testing.T) {
 	}
 }
 
-// setupOTelTestContext is a helper function that sets up OpenTelemetry for testing.
-func setupOTelTestContext(t *testing.T, ts *Test, otelEnabled bool, withTraceContext bool) (*http.Request, func()) {
-	t.Helper()
-
-	// Setup gateway with OTel config
-	globalConf := ts.Gw.GetConfig()
-	globalConf.OpenTelemetry.Enabled = otelEnabled
-	ts.Gw.SetConfig(globalConf)
-
-	// Create request
-	req := httptest.NewRequest("GET", "http://tyk.io/test", nil)
-	req.RemoteAddr = "127.0.0.1:80"
-
-	if withTraceContext && otelEnabled {
-		// Initialize OpenTelemetry and create trace context
-		mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			w.WriteHeader(http.StatusOK)
-		}))
-
-		globalConf.OpenTelemetry.Exporter = "http"
-		globalConf.OpenTelemetry.Endpoint = mockServer.URL
-		ts.Gw.SetConfig(globalConf)
-
-		ts.Gw.TracerProvider = otel.InitOpenTelemetry(
-			ts.Gw.ctx,
-			log,
-			&globalConf.OpenTelemetry,
-			"test-gateway",
-			"1.0.0",
-			false,
-			"",
-			false,
-			nil,
-		)
-
-		ctx, span := ts.Gw.TracerProvider.Tracer().Start(ts.Gw.ctx, "test-span")
-		req = req.WithContext(ctx)
-
-		cleanup := func() {
-			span.End()
-			mockServer.Close()
-		}
-		return req, cleanup
-	}
-
-	return req, func() {}
-}
-
-func TestGetLogEntryForRequest_TraceID(t *testing.T) {
+func TestGetLogEntryForRequest_TraceAndSpanIDs(t *testing.T) {
 	tests := []struct {
 		name          string
 		otelEnabled   bool
 		hasTraceCtx   bool
 		expectTraceID bool
+		expectSpanID  bool
 	}{
 		{
 			name:          "OTel enabled with trace context",
 			otelEnabled:   true,
 			hasTraceCtx:   true,
 			expectTraceID: true,
+			expectSpanID:  true,
 		},
 		{
 			name:          "OTel enabled without trace context",
 			otelEnabled:   true,
 			hasTraceCtx:   false,
 			expectTraceID: false,
+			expectSpanID:  false,
 		},
 		{
 			name:          "OTel disabled with trace context",
 			otelEnabled:   false,
 			hasTraceCtx:   true,
 			expectTraceID: false,
+			expectSpanID:  false,
 		},
 		{
 			name:          "OTel disabled without trace context",
 			otelEnabled:   false,
 			hasTraceCtx:   false,
 			expectTraceID: false,
+			expectSpanID:  false,
 		},
 	}
 
@@ -337,145 +294,78 @@ func TestGetLogEntryForRequest_TraceID(t *testing.T) {
 			ts := StartTest(nil)
 			defer ts.Close()
 
-			req, cleanup := setupOTelTestContext(t, ts, tt.otelEnabled, tt.hasTraceCtx)
-			defer cleanup()
+			// Setup gateway with OTel config
+			globalConf := ts.Gw.GetConfig()
+			globalConf.OpenTelemetry.Enabled = tt.otelEnabled
+			ts.Gw.SetConfig(globalConf)
 
-			// Get log entry
+			// Create request
+			req := httptest.NewRequest("GET", "http://tyk.io/test", nil)
+			req.RemoteAddr = "127.0.0.1:80"
+
+			// Setup trace context if needed
+			if tt.hasTraceCtx && tt.otelEnabled {
+				mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					w.WriteHeader(http.StatusOK)
+				}))
+				defer mockServer.Close()
+
+				globalConf.OpenTelemetry.Exporter = "http"
+				globalConf.OpenTelemetry.Endpoint = mockServer.URL
+				ts.Gw.SetConfig(globalConf)
+
+				ts.Gw.TracerProvider = otel.InitOpenTelemetry(
+					ts.Gw.ctx,
+					log,
+					&globalConf.OpenTelemetry,
+					"test-gateway",
+					"1.0.0",
+					false,
+					"",
+					false,
+					nil,
+				)
+
+				ctx, span := ts.Gw.TracerProvider.Tracer().Start(ts.Gw.ctx, "test-span")
+				defer span.End()
+				req = req.WithContext(ctx)
+			}
+
 			entry := ts.Gw.getLogEntryForRequest(nil, req, "", nil)
 
 			// Verify trace_id presence
-			_, hasTraceID := entry.Data["trace_id"]
-			if hasTraceID != tt.expectTraceID {
-				t.Errorf("trace_id presence = %v, want %v", hasTraceID, tt.expectTraceID)
-			}
-
-			// Verify trace_id format if present
-			if hasTraceID {
-				traceID, ok := entry.Data["trace_id"].(string)
-				assert.True(t, ok, "trace_id should be a string")
-				assert.Len(t, traceID, 32, "trace_id should be 32 characters long")
-			}
-		})
-	}
-}
-
-func TestGetLogEntryForRequest_TraceIDConsistency(t *testing.T) {
-	// Verify trace_id matches otel.ExtractTraceID()
-	ts := StartTest(nil)
-	defer ts.Close()
-
-	req, cleanup := setupOTelTestContext(t, ts, true, true)
-	defer cleanup()
-
-	expectedTraceID := otel.ExtractTraceID(req.Context())
-
-	entry := ts.Gw.getLogEntryForRequest(nil, req, "", nil)
-
-	actualTraceID, ok := entry.Data["trace_id"].(string)
-	assert.True(t, ok, "trace_id should be a string")
-	assert.Equal(t, expectedTraceID, actualTraceID, "trace_id should match otel.ExtractTraceID()")
-}
-
-func TestGetLogEntryForRequest_SpanID(t *testing.T) {
-	tests := []struct {
-		name         string
-		otelEnabled  bool
-		hasTraceCtx  bool
-		expectSpanID bool
-	}{
-		{
-			name:         "OTel enabled with trace context",
-			otelEnabled:  true,
-			hasTraceCtx:  true,
-			expectSpanID: true,
-		},
-		{
-			name:         "OTel enabled without trace context",
-			otelEnabled:  true,
-			hasTraceCtx:  false,
-			expectSpanID: false,
-		},
-		{
-			name:         "OTel disabled with trace context",
-			otelEnabled:  false,
-			hasTraceCtx:  true,
-			expectSpanID: false,
-		},
-		{
-			name:         "OTel disabled without trace context",
-			otelEnabled:  false,
-			hasTraceCtx:  false,
-			expectSpanID: false,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			ts := StartTest(nil)
-			defer ts.Close()
-
-			req, cleanup := setupOTelTestContext(t, ts, tt.otelEnabled, tt.hasTraceCtx)
-			defer cleanup()
-
-			// Get log entry
-			entry := ts.Gw.getLogEntryForRequest(nil, req, "", nil)
+			traceID, hasTraceID := entry.Data["trace_id"]
+			assert.Equal(t, tt.expectTraceID, hasTraceID, "trace_id presence mismatch")
 
 			// Verify span_id presence
-			_, hasSpanID := entry.Data["span_id"]
-			if hasSpanID != tt.expectSpanID {
-				t.Errorf("span_id presence = %v, want %v", hasSpanID, tt.expectSpanID)
-			}
+			spanID, hasSpanID := entry.Data["span_id"]
+			assert.Equal(t, tt.expectSpanID, hasSpanID, "span_id presence mismatch")
 
-			// Verify span_id format if present
-			if hasSpanID {
-				spanID, ok := entry.Data["span_id"].(string)
+			// For positive cases, verify format and consistency with extraction functions
+			if hasTraceID && hasSpanID {
+				// Verify types
+				traceIDStr, ok := traceID.(string)
+				assert.True(t, ok, "trace_id should be a string")
+				spanIDStr, ok := spanID.(string)
 				assert.True(t, ok, "span_id should be a string")
-				assert.Len(t, spanID, 16, "span_id should be 16 characters long")
+
+				// Verify formats
+				assert.Len(t, traceIDStr, 32, "trace_id should be 32 characters long")
+				assert.Len(t, spanIDStr, 16, "span_id should be 16 characters long")
+
+				// Verify consistency with extraction functions
+				expectedTraceID := otel.ExtractTraceID(req.Context())
+				assert.Equal(t, expectedTraceID, traceIDStr, "trace_id should match otel.ExtractTraceID()")
+
+				extractedTraceID, extractedSpanID := otel.ExtractTraceAndSpanID(req.Context())
+				assert.Equal(t, extractedTraceID, traceIDStr, "trace_id should match otel.ExtractTraceAndSpanID()")
+				assert.Equal(t, extractedSpanID, spanIDStr, "span_id should match otel.ExtractTraceAndSpanID()")
+
+				// Verify IDs match the span context
+				span := otel.SpanFromContext(req.Context())
+				assert.Equal(t, span.SpanContext().TraceID().String(), traceIDStr, "trace_id should match span context")
+				assert.Equal(t, span.SpanContext().SpanID().String(), spanIDStr, "span_id should match span context")
 			}
 		})
 	}
-}
-
-func TestGetLogEntryForRequest_SpanIDConsistency(t *testing.T) {
-	// Verify span_id matches otel.ExtractTraceAndSpanID()
-	ts := StartTest(nil)
-	defer ts.Close()
-
-	req, cleanup := setupOTelTestContext(t, ts, true, true)
-	defer cleanup()
-
-	_, expectedSpanID := otel.ExtractTraceAndSpanID(req.Context())
-
-	entry := ts.Gw.getLogEntryForRequest(nil, req, "", nil)
-
-	actualSpanID, ok := entry.Data["span_id"].(string)
-	assert.True(t, ok, "span_id should be a string")
-	assert.Equal(t, expectedSpanID, actualSpanID, "span_id should match otel.ExtractTraceAndSpanID()")
-}
-
-func TestGetLogEntryForRequest_TraceAndSpanIDTogether(t *testing.T) {
-	// Verify both trace_id and span_id are present together
-	ts := StartTest(nil)
-	defer ts.Close()
-
-	req, cleanup := setupOTelTestContext(t, ts, true, true)
-	defer cleanup()
-
-	entry := ts.Gw.getLogEntryForRequest(nil, req, "", nil)
-
-	// Both should be present
-	traceID, hasTraceID := entry.Data["trace_id"]
-	spanID, hasSpanID := entry.Data["span_id"]
-
-	assert.True(t, hasTraceID, "trace_id should be present")
-	assert.True(t, hasSpanID, "span_id should be present")
-
-	// Verify formats
-	assert.Len(t, traceID.(string), 32, "trace_id should be 32 characters")
-	assert.Len(t, spanID.(string), 16, "span_id should be 16 characters")
-
-	// Get span from request context to verify IDs match
-	span := otel.SpanFromContext(req.Context())
-	assert.Equal(t, span.SpanContext().TraceID().String(), traceID.(string))
-	assert.Equal(t, span.SpanContext().SpanID().String(), spanID.(string))
 }

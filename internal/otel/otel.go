@@ -159,11 +159,8 @@ func ExtractTraceAndSpanID(ctx context.Context) (traceID, spanID string) {
 	span := SpanFromContext(ctx)
 	spanCtx := span.SpanContext()
 
-	if spanCtx.HasTraceID() {
+	if spanCtx.IsValid() {
 		traceID = spanCtx.TraceID().String()
-	}
-
-	if spanCtx.HasSpanID() {
 		spanID = spanCtx.SpanID().String()
 	}
 
