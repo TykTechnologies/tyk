@@ -31,7 +31,18 @@ func (k *RateLimitForAPI) shouldEnable() bool {
 		return false
 	}
 
-	// Check for per-endpoint rate limits in ExtendedPaths (classic API definitions).
+	if k.hasPerEndpointRateLimits() {
+		return true
+	}
+
+	return k.hasValidGlobalRateLimit()
+}
+
+func (k *RateLimitForAPI) hasPerEndpointRateLimits() bool {
+	return k.hasPerEndpointRateLimitsInExtendedPaths() || k.hasPerEndpointRateLimitsInRxPaths()
+}
+
+func (k *RateLimitForAPI) hasPerEndpointRateLimitsInExtendedPaths() bool {
 	for _, version := range k.Spec.VersionData.Versions {
 		for _, v := range version.ExtendedPaths.RateLimit {
 			if !v.Disabled {
@@ -39,10 +50,11 @@ func (k *RateLimitForAPI) shouldEnable() bool {
 			}
 		}
 	}
+	return false
+}
 
-	// Check for per-endpoint rate limits in rxPaths (OAS/MCP VEM definitions).
-	// MCP VEM rate limits are compiled directly into rxPaths without being
-	// added to ExtendedPaths, so we must check rxPaths to detect them.
+// MCP VEM rate limits are compiled into rxPaths, not ExtendedPaths.
+func (k *RateLimitForAPI) hasPerEndpointRateLimitsInRxPaths() bool {
 	for _, rxPaths := range k.Spec.RxPaths {
 		for _, spec := range rxPaths {
 			if spec.Status == RateLimit && spec.RateLimit.Valid() {
@@ -50,13 +62,11 @@ func (k *RateLimitForAPI) shouldEnable() bool {
 			}
 		}
 	}
+	return false
+}
 
-	// Check for global API rate limit as fallback.
-	if k.Spec.GlobalRateLimit.Rate == 0 || k.Spec.GlobalRateLimit.Disabled {
-		return false
-	}
-
-	return true
+func (k *RateLimitForAPI) hasValidGlobalRateLimit() bool {
+	return k.Spec.GlobalRateLimit.Rate > 0 && !k.Spec.GlobalRateLimit.Disabled
 }
 
 // getSession returns the rate limit session and keyname for the request.

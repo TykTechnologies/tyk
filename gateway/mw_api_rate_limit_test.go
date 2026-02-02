@@ -389,7 +389,7 @@ func TestRateLimitForAPI_ShouldEnable_MCPVEMs(t *testing.T) {
 		},
 		{
 			name: "disabled when no rate limits are configured",
-			setupAPI: func(spec *APISpec) {
+			setupAPI: func(_ *APISpec) {
 				// No rate limits configured
 			},
 			expected: false,
