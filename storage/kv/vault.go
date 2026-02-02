@@ -9,7 +9,12 @@ import (
 	"github.com/TykTechnologies/tyk/config"
 )
 
-// Vault is an implementation of a KV store which uses Consul as it's backend
+// SecretReader allows mocking Vault in tests without a real instance.
+type SecretReader interface {
+	ReadSecret(path string) (*vaultapi.Secret, error)
+}
+
+// Vault is an implementation of a KV store which uses Vault as its backend
 type Vault struct {
 	client *vaultapi.Client
 	kvV2   bool
@@ -17,6 +22,10 @@ type Vault struct {
 
 func (v *Vault) Client() *vaultapi.Client {
 	return v.client
+}
+
+func (v *Vault) ReadSecret(path string) (*vaultapi.Secret, error) {
+	return v.client.Logical().Read(path)
 }
 
 // NewVault returns a configured vault KV store adapter
