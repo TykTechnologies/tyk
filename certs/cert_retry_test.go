@@ -27,7 +27,7 @@ func (b *baseMockStorage) SetKey(_, _ string, _ int64) error {
 	return nil
 }
 
-func (b *baseMockStorage) GetRawKey(key string) (string, error) {
+func (b *baseMockStorage) GetRawKey(_ string) (string, error) {
 	return "", errors.New("not implemented")
 }
 
