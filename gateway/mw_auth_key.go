@@ -137,7 +137,7 @@ func (k *AuthKey) ProcessRequest(_ http.ResponseWriter, r *http.Request, _ inter
 	if !authConfig.UseCertificate {
 		if key == "" {
 			k.Logger().Info("Attempted access with malformed header, no auth header found.")
-			ctx.SetErrorClassification(r, tykerrors.ClassifyAuthError(ErrAuthAuthorizationFieldMissing, k.Name()))
+			ctx.SetErrorClassification(r, tykerrors.ClassifyAuthError(tykerrors.ErrAuthAuthorizationFieldMissing, k.Name()))
 			return errorAndStatusCode(ErrAuthAuthorizationFieldMissing)
 		}
 		if !keyExists {
@@ -147,7 +147,7 @@ func (k *AuthKey) ProcessRequest(_ http.ResponseWriter, r *http.Request, _ inter
 	if authConfig.UseCertificate && r.TLS != nil {
 		if len(r.TLS.PeerCertificates) > 0 {
 			if time.Now().After(r.TLS.PeerCertificates[0].NotAfter) {
-				ctx.SetErrorClassification(r, tykerrors.ClassifyAuthError(ErrAuthCertExpired, k.Name()))
+				ctx.SetErrorClassification(r, tykerrors.ClassifyAuthError(tykerrors.ErrAuthCertExpired, k.Name()))
 				return errorAndStatusCode(ErrAuthCertExpired)
 			}
 			certHash = k.Spec.OrgID + crypto.HexSHA256(r.TLS.PeerCertificates[0].Raw)
@@ -155,19 +155,19 @@ func (k *AuthKey) ProcessRequest(_ http.ResponseWriter, r *http.Request, _ inter
 
 		if !k.Gw.GetConfig().Security.AllowUnsafeDynamicMTLSToken {
 			if certHash == "" {
-				ctx.SetErrorClassification(r, tykerrors.ClassifyAuthError(ErrAuthCertRequired, k.Name()))
+				ctx.SetErrorClassification(r, tykerrors.ClassifyAuthError(tykerrors.ErrAuthCertRequired, k.Name()))
 				return errorAndStatusCode(ErrAuthCertRequired)
 			}
 			session, keyExists = k.checkSessionWithCertFallback(r, certHash)
 			if !keyExists {
-				ctx.SetErrorClassification(r, tykerrors.ClassifyAuthError(ErrAuthCertMismatch, k.Name()))
+				ctx.SetErrorClassification(r, tykerrors.ClassifyAuthError(tykerrors.ErrAuthCertMismatch, k.Name()))
 				return errorAndStatusCode(ErrAuthCertMismatch)
 			}
 		} else {
 			if certHash != "" {
 				session, keyExists = k.checkSessionWithCertFallback(r, certHash)
 				if !keyExists {
-					ctx.SetErrorClassification(r, tykerrors.ClassifyAuthError(ErrAuthCertMismatch, k.Name()))
+					ctx.SetErrorClassification(r, tykerrors.ClassifyAuthError(tykerrors.ErrAuthCertMismatch, k.Name()))
 					return errorAndStatusCode(ErrAuthCertMismatch)
 				}
 			}
@@ -390,7 +390,7 @@ func (k *AuthKey) validateWithTLSCertificate(ctx *certValidationContext) (int, e
 // checkCertificateExpiry validates that the certificate hasn't expired
 func (k *AuthKey) checkCertificateExpiry(r *http.Request, key string) (int, error) {
 	if key != "" && time.Now().After(r.TLS.PeerCertificates[0].NotAfter) {
-		ctx.SetErrorClassification(r, tykerrors.ClassifyAuthError(ErrAuthCertExpired, k.Name()))
+		ctx.SetErrorClassification(r, tykerrors.ClassifyAuthError(tykerrors.ErrAuthCertExpired, k.Name()))
 		err, code := errorAndStatusCode(ErrAuthCertExpired)
 		return code, err
 	}
