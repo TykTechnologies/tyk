@@ -4,6 +4,7 @@ import (
 	"archive/zip"
 	"bytes"
 	"crypto/md5"
+	"crypto/sha256"
 	"crypto/tls"
 	"encoding/base64"
 	"encoding/json"
@@ -46,9 +47,9 @@ type Bundle struct {
 
 // Verify performs signature verification on the bundle file.
 func (b *Bundle) Verify(bundleFs afero.Fs) error {
-	log.WithFields(logrus.Fields{
+	/*log.WithFields(logrus.Fields{
 		"prefix": "main",
-	}).Info("----> Verifying bundle: ", b.Spec.CustomMiddlewareBundle)
+	}).Info("----> Verifying bundle: ", b.Spec.CustomMiddlewareBundle)*/
 
 	var useSignature = b.Gw.GetConfig().PublicKeyPath != ""
 
@@ -69,23 +70,28 @@ func (b *Bundle) Verify(bundleFs afero.Fs) error {
 		}
 	}
 
-	var bundleData bytes.Buffer
+	md5Hash := md5.New()
+	sha256Hash := sha256.New()
+
+	var w io.Writer = md5Hash
+	if useSignature {
+		w = io.MultiWriter(md5Hash, sha256Hash)
+	}
 
 	for _, f := range b.Manifest.FileList {
 		extractedPath := filepath.Join(b.Path, f)
-
-		f, err := bundleFs.Open(extractedPath)
+		file, err := bundleFs.Open(extractedPath)
 		if err != nil {
 			return err
 		}
-		_, err = io.Copy(&bundleData, f)
-		f.Close()
+		_, err = io.Copy(w, file)
+		file.Close()
 		if err != nil {
 			return err
 		}
 	}
 
-	checksum := fmt.Sprintf("%x", md5.Sum(bundleData.Bytes()))
+	checksum := fmt.Sprintf("%x", md5Hash.Sum(nil))
 	if checksum != b.Manifest.Checksum {
 		return errors.New("Invalid checksum")
 	}
@@ -95,7 +101,7 @@ func (b *Bundle) Verify(bundleFs afero.Fs) error {
 		if err != nil {
 			return err
 		}
-		return verifier.Verify(bundleData.Bytes(), signed)
+		return verifier.VerifyHash(sha256Hash.Sum(nil), signed)
 	}
 	return nil
 }
