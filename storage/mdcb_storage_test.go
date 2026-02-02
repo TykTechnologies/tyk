@@ -415,22 +415,32 @@ func TestExtractCertID(t *testing.T) {
 		expected string
 	}{
 		{
-			name:     "Full cert ID with orgID prefix",
-			key:      "raw-org1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890",
-			expected: "abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890",
-		},
-		{
-			name:     "Minimal org ID with full SHA256",
-			key:      "raw-org9876543210abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
-			expected: "9876543210abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
-		},
-		{
-			name:     "No orgID prefix (just SHA256)",
+			name:     "Full SHA256 cert ID without orgID",
 			key:      "raw-1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
 			expected: "1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
 		},
 		{
-			name:     "Short cert ID (less than 64 chars, test or non-standard)",
+			name:     "Single-char orgID + SHA256 fingerprint",
+			key:      "raw-1a1b2c3d4e5f6789abcdef1234567890abcdef1234567890abcdef1234567890ab",
+			expected: "1a1b2c3d4e5f6789abcdef1234567890abcdef1234567890abcdef1234567890ab",
+		},
+		{
+			name:     "Multi-char orgID 'default' + SHA256 fingerprint",
+			key:      "raw-defaulta1b2c3d4e5f6789abcdef1234567890abcdef1234567890abcdef123456789",
+			expected: "defaulta1b2c3d4e5f6789abcdef1234567890abcdef1234567890abcdef123456789",
+		},
+		{
+			name:     "OrgID 'org1' + SHA256 fingerprint",
+			key:      "raw-org1abc123def456789abcdef1234567890abcdef1234567890abcdef1234567890",
+			expected: "org1abc123def456789abcdef1234567890abcdef1234567890abcdef1234567890",
+		},
+		{
+			name:     "SHA256 with mixed case",
+			key:      "raw-ABCDEF1234567890abcdef1234567890abcdef1234567890abcdef1234567890",
+			expected: "ABCDEF1234567890abcdef1234567890abcdef1234567890abcdef1234567890",
+		},
+		{
+			name:     "Short cert ID (test or non-standard)",
 			key:      "raw-shortid",
 			expected: "shortid",
 		},
