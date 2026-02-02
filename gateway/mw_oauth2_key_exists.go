@@ -4,10 +4,11 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/TykTechnologies/tyk/config"
-	"github.com/TykTechnologies/tyk/internal/otel"
-
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/ctx"
+	tykerrors "github.com/TykTechnologies/tyk/internal/errors"
+	"github.com/TykTechnologies/tyk/internal/otel"
 )
 
 const (
@@ -76,13 +77,13 @@ func (k *Oauth2KeyExists) ProcessRequest(w http.ResponseWriter, r *http.Request,
 
 	if len(parts) < 2 {
 		logger.Info("Attempted access with malformed header, no auth header found.")
-
+		ctx.SetErrorClassification(r, tykerrors.ClassifyAuthError(ErrOAuthAuthorizationFieldMissing, k.Name()))
 		return errorAndStatusCode(ErrOAuthAuthorizationFieldMissing)
 	}
 
 	if strings.ToLower(parts[0]) != "bearer" {
 		logger.Info("Bearer token malformed")
-
+		ctx.SetErrorClassification(r, tykerrors.ClassifyAuthError(ErrOAuthAuthorizationFieldMalformed, k.Name()))
 		return errorAndStatusCode(ErrOAuthAuthorizationFieldMalformed)
 	}
 
@@ -95,6 +96,7 @@ func (k *Oauth2KeyExists) ProcessRequest(w http.ResponseWriter, r *http.Request,
 
 	if !keyExists {
 		logger.Warning("Attempted access with non-existent key.")
+		ctx.SetErrorClassification(r, tykerrors.ClassifyAuthError(ErrOAuthKeyNotFound, k.Name()))
 
 		// Fire Authfailed Event
 		AuthFailed(k, r, accessToken)
@@ -123,6 +125,7 @@ func (k *Oauth2KeyExists) ProcessRequest(w http.ResponseWriter, r *http.Request,
 	}
 	if oauthClientDeleted {
 		logger.WithField("oauthClientID", session.OauthClientID).Warning("Attempted access for deleted OAuth client.")
+		ctx.SetErrorClassification(r, tykerrors.ClassifyAuthError(ErrOAuthClientDeleted, k.Name()))
 		return errorAndStatusCode(ErrOAuthClientDeleted)
 	}
 

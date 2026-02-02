@@ -685,3 +685,363 @@ func TestClassifyUpstreamError_EdgeCases(t *testing.T) {
 		assert.Equal(t, "broken_pipe", result.Details)
 	})
 }
+
+// 4XX Error Classification Tests
+
+func TestResponseFlag4XXConstants(t *testing.T) {
+	testCases := []struct {
+		flag     ResponseFlag
+		expected string
+	}{
+		{RLT, "RLT"},
+		{QEX, "QEX"},
+		{AMF, "AMF"},
+		{AKI, "AKI"},
+		{TKE, "TKE"},
+		{TKI, "TKI"},
+		{TCV, "TCV"},
+		{EAD, "EAD"},
+		{BTL, "BTL"},
+		{CLM, "CLM"},
+		{BIV, "BIV"},
+		{IHD, "IHD"},
+		{CRQ, "CRQ"},
+		{CMM, "CMM"},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.expected, func(t *testing.T) {
+			assert.Equal(t, tc.expected, tc.flag.String())
+		})
+	}
+}
+
+func TestClassifyAuthError(t *testing.T) {
+	testCases := []struct {
+		name         string
+		errorID      string
+		source       string
+		expectedFlag ResponseFlag
+		expectedDet  string
+	}{
+		// Auth key errors
+		{
+			name:         "auth_field_missing",
+			errorID:      ErrAuthAuthorizationFieldMissing,
+			source:       "AuthKey",
+			expectedFlag: AMF,
+			expectedDet:  "auth_field_missing",
+		},
+		{
+			name:         "key_not_found",
+			errorID:      ErrAuthKeyNotFound,
+			source:       "AuthKey",
+			expectedFlag: AKI,
+			expectedDet:  "key_not_found",
+		},
+		{
+			name:         "cert_not_found",
+			errorID:      ErrAuthCertNotFound,
+			source:       "AuthKey",
+			expectedFlag: AKI,
+			expectedDet:  "cert_not_found",
+		},
+		{
+			name:         "key_is_invalid",
+			errorID:      ErrAuthKeyIsInvalid,
+			source:       "AuthKey",
+			expectedFlag: AKI,
+			expectedDet:  "key_is_invalid",
+		},
+		{
+			name:         "cert_expired",
+			errorID:      ErrAuthCertExpired,
+			source:       "AuthKey",
+			expectedFlag: TKE,
+			expectedDet:  "cert_expired",
+		},
+		{
+			name:         "cert_required",
+			errorID:      ErrAuthCertRequired,
+			source:       "AuthKey",
+			expectedFlag: CRQ,
+			expectedDet:  "cert_required",
+		},
+		{
+			name:         "cert_mismatch",
+			errorID:      ErrAuthCertMismatch,
+			source:       "AuthKey",
+			expectedFlag: CMM,
+			expectedDet:  "cert_mismatch",
+		},
+		// OAuth errors
+		{
+			name:         "oauth_field_missing",
+			errorID:      ErrOAuthAuthorizationFieldMissing,
+			source:       "Oauth2KeyExists",
+			expectedFlag: AMF,
+			expectedDet:  "oauth_field_missing",
+		},
+		{
+			name:         "oauth_field_malformed",
+			errorID:      ErrOAuthAuthorizationFieldMalformed,
+			source:       "Oauth2KeyExists",
+			expectedFlag: BIV,
+			expectedDet:  "oauth_field_malformed",
+		},
+		{
+			name:         "oauth_key_not_found",
+			errorID:      ErrOAuthKeyNotFound,
+			source:       "Oauth2KeyExists",
+			expectedFlag: AKI,
+			expectedDet:  "oauth_key_not_found",
+		},
+		{
+			name:         "oauth_client_deleted",
+			errorID:      ErrOAuthClientDeleted,
+			source:       "Oauth2KeyExists",
+			expectedFlag: EAD,
+			expectedDet:  "oauth_client_deleted",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			ec := ClassifyAuthError(tc.errorID, tc.source)
+
+			assert.NotNil(t, ec)
+			assert.Equal(t, tc.expectedFlag, ec.Flag)
+			assert.Equal(t, tc.expectedDet, ec.Details)
+			assert.Equal(t, tc.source, ec.Source)
+		})
+	}
+}
+
+func TestClassifyAuthErrorUnknown(t *testing.T) {
+	ec := ClassifyAuthError("unknown.error", "TestSource")
+	assert.Nil(t, ec)
+}
+
+func TestClassifyRateLimitError(t *testing.T) {
+	ec := ClassifyRateLimitError("RateLimitAndQuotaCheck")
+
+	assert.NotNil(t, ec)
+	assert.Equal(t, RLT, ec.Flag)
+	assert.Equal(t, "rate_limited", ec.Details)
+	assert.Equal(t, "RateLimitAndQuotaCheck", ec.Source)
+}
+
+func TestClassifyQuotaExceededError(t *testing.T) {
+	ec := ClassifyQuotaExceededError("RateLimitAndQuotaCheck")
+
+	assert.NotNil(t, ec)
+	assert.Equal(t, QEX, ec.Flag)
+	assert.Equal(t, "quota_exceeded", ec.Details)
+	assert.Equal(t, "RateLimitAndQuotaCheck", ec.Source)
+}
+
+func TestClassifyJWTError(t *testing.T) {
+	testCases := []struct {
+		name         string
+		errorType    string
+		source       string
+		expectedFlag ResponseFlag
+		expectedDet  string
+	}{
+		{
+			name:         "auth_field_missing",
+			errorType:    ErrTypeAuthFieldMissing,
+			source:       "JWTMiddleware",
+			expectedFlag: AMF,
+			expectedDet:  "jwt_field_missing",
+		},
+		{
+			name:         "claims_invalid",
+			errorType:    ErrTypeClaimsInvalid,
+			source:       "JWTMiddleware",
+			expectedFlag: TCV,
+			expectedDet:  "jwt_claims_invalid",
+		},
+		{
+			name:         "token_invalid",
+			errorType:    ErrTypeTokenInvalid,
+			source:       "JWTMiddleware",
+			expectedFlag: TKI,
+			expectedDet:  "jwt_token_invalid",
+		},
+		{
+			name:         "unexpected_signing_method",
+			errorType:    ErrTypeUnexpectedSigningMethod,
+			source:       "JWTMiddleware",
+			expectedFlag: TKI,
+			expectedDet:  "jwt_unexpected_signing_method",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			ec := ClassifyJWTError(tc.errorType, tc.source)
+
+			assert.NotNil(t, ec)
+			assert.Equal(t, tc.expectedFlag, ec.Flag)
+			assert.Equal(t, tc.expectedDet, ec.Details)
+			assert.Equal(t, tc.source, ec.Source)
+		})
+	}
+}
+
+func TestClassifyJWTErrorUnknown(t *testing.T) {
+	ec := ClassifyJWTError("unknown_error", "JWTMiddleware")
+	assert.Nil(t, ec)
+}
+
+func TestClassifyBasicAuthError(t *testing.T) {
+	testCases := []struct {
+		name         string
+		errorType    string
+		source       string
+		expectedFlag ResponseFlag
+		expectedDet  string
+	}{
+		{
+			name:         "auth_field_missing",
+			errorType:    ErrTypeAuthFieldMissing,
+			source:       "BasicAuthKeyIsValid",
+			expectedFlag: AMF,
+			expectedDet:  "basic_auth_field_missing",
+		},
+		{
+			name:         "header_malformed",
+			errorType:    ErrTypeHeaderMalformed,
+			source:       "BasicAuthKeyIsValid",
+			expectedFlag: IHD,
+			expectedDet:  "basic_auth_header_malformed",
+		},
+		{
+			name:         "encoding_invalid",
+			errorType:    ErrTypeEncodingInvalid,
+			source:       "BasicAuthKeyIsValid",
+			expectedFlag: IHD,
+			expectedDet:  "basic_auth_encoding_invalid",
+		},
+		{
+			name:         "values_malformed",
+			errorType:    ErrTypeValuesMalformed,
+			source:       "BasicAuthKeyIsValid",
+			expectedFlag: IHD,
+			expectedDet:  "basic_auth_values_malformed",
+		},
+		{
+			name:         "body_username_missing",
+			errorType:    ErrTypeBodyUsernameMissing,
+			source:       "BasicAuthKeyIsValid",
+			expectedFlag: BIV,
+			expectedDet:  "basic_auth_body_username_missing",
+		},
+		{
+			name:         "body_password_missing",
+			errorType:    ErrTypeBodyPasswordMissing,
+			source:       "BasicAuthKeyIsValid",
+			expectedFlag: BIV,
+			expectedDet:  "basic_auth_body_password_missing",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			ec := ClassifyBasicAuthError(tc.errorType, tc.source)
+
+			assert.NotNil(t, ec)
+			assert.Equal(t, tc.expectedFlag, ec.Flag)
+			assert.Equal(t, tc.expectedDet, ec.Details)
+			assert.Equal(t, tc.source, ec.Source)
+		})
+	}
+}
+
+func TestClassifyBasicAuthErrorUnknown(t *testing.T) {
+	ec := ClassifyBasicAuthError("unknown_error", "BasicAuthKeyIsValid")
+	assert.Nil(t, ec)
+}
+
+func TestClassifyRequestSizeError(t *testing.T) {
+	testCases := []struct {
+		name         string
+		errorType    string
+		source       string
+		expectedFlag ResponseFlag
+		expectedDet  string
+	}{
+		{
+			name:         "content_length_missing",
+			errorType:    ErrTypeContentLengthMissing,
+			source:       "RequestSizeLimitMiddleware",
+			expectedFlag: CLM,
+			expectedDet:  "content_length_missing",
+		},
+		{
+			name:         "body_too_large",
+			errorType:    ErrTypeBodyTooLarge,
+			source:       "RequestSizeLimitMiddleware",
+			expectedFlag: BTL,
+			expectedDet:  "body_too_large",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			ec := ClassifyRequestSizeError(tc.errorType, tc.source)
+
+			assert.NotNil(t, ec)
+			assert.Equal(t, tc.expectedFlag, ec.Flag)
+			assert.Equal(t, tc.expectedDet, ec.Details)
+			assert.Equal(t, tc.source, ec.Source)
+		})
+	}
+}
+
+func TestClassifyRequestSizeErrorUnknown(t *testing.T) {
+	ec := ClassifyRequestSizeError("unknown_error", "RequestSizeLimitMiddleware")
+	assert.Nil(t, ec)
+}
+
+func TestClassifyJSONValidationError(t *testing.T) {
+	testCases := []struct {
+		name         string
+		errorType    string
+		source       string
+		expectedFlag ResponseFlag
+		expectedDet  string
+	}{
+		{
+			name:         "json_parse_error",
+			errorType:    ErrTypeJSONParseError,
+			source:       "ValidateJSON",
+			expectedFlag: BIV,
+			expectedDet:  "json_parse_error",
+		},
+		{
+			name:         "schema_validation_failed",
+			errorType:    ErrTypeSchemaValidationFailed,
+			source:       "ValidateJSON",
+			expectedFlag: BIV,
+			expectedDet:  "schema_validation_failed",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			ec := ClassifyJSONValidationError(tc.errorType, tc.source)
+
+			assert.NotNil(t, ec)
+			assert.Equal(t, tc.expectedFlag, ec.Flag)
+			assert.Equal(t, tc.expectedDet, ec.Details)
+			assert.Equal(t, tc.source, ec.Source)
+		})
+	}
+}
+
+func TestClassifyJSONValidationErrorUnknown(t *testing.T) {
+	ec := ClassifyJSONValidationError("unknown_error", "ValidateJSON")
+	assert.Nil(t, ec)
+}

@@ -7,6 +7,8 @@ import (
 
 	"github.com/sirupsen/logrus"
 
+	"github.com/TykTechnologies/tyk/ctx"
+	tykerrors "github.com/TykTechnologies/tyk/internal/errors"
 	"github.com/TykTechnologies/tyk/internal/event"
 	"github.com/TykTechnologies/tyk/request"
 )
@@ -27,6 +29,9 @@ func (k *RateLimitAndQuotaCheck) EnabledForSpec() bool {
 
 func (k *RateLimitAndQuotaCheck) handleQuotaFailure(r *http.Request, token string) (error, int) {
 	k.Logger().WithField("key", k.Gw.obfuscateKey(token)).Info("Key quota limit exceeded.")
+
+	// Set error classification for access logs
+	ctx.SetErrorClassification(r, tykerrors.ClassifyQuotaExceededError(k.Name()))
 
 	// Fire a quota exceeded event
 	k.FireEvent(EventQuotaExceeded, EventKeyFailureMeta{
