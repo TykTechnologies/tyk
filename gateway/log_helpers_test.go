@@ -251,16 +251,14 @@ func TestGatewayLogJWKError(t *testing.T) {
 	}
 }
 
-// setupOTelTest is a helper function that creates a test environment with OpenTelemetry configured.
-// It returns the test server, a request with optional trace context, and a cleanup function.
-func setupOTelTest(t *testing.T, otelEnabled bool, withTraceContext bool) (*Test, *http.Request, func()) {
+// setupOTelTestContext is a helper function that sets up OpenTelemetry for testing.
+func setupOTelTestContext(t *testing.T, ts *Test, otelEnabled bool, withTraceContext bool) (*http.Request, func()) {
 	t.Helper()
-
-	ts := StartTest(nil)
 
 	// Setup gateway with OTel config
 	globalConf := ts.Gw.GetConfig()
 	globalConf.OpenTelemetry.Enabled = otelEnabled
+	ts.Gw.SetConfig(globalConf)
 
 	// Create request
 	req := httptest.NewRequest("GET", "http://tyk.io/test", nil)
@@ -268,8 +266,12 @@ func setupOTelTest(t *testing.T, otelEnabled bool, withTraceContext bool) (*Test
 
 	if withTraceContext && otelEnabled {
 		// Initialize OpenTelemetry and create trace context
-		globalConf.OpenTelemetry.Exporter = "grpc"
-		globalConf.OpenTelemetry.Endpoint = "localhost:4317"
+		mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusOK)
+		}))
+
+		globalConf.OpenTelemetry.Exporter = "http"
+		globalConf.OpenTelemetry.Endpoint = mockServer.URL
 		ts.Gw.SetConfig(globalConf)
 
 		ts.Gw.TracerProvider = otel.InitOpenTelemetry(
@@ -285,13 +287,16 @@ func setupOTelTest(t *testing.T, otelEnabled bool, withTraceContext bool) (*Test
 		)
 
 		ctx, span := ts.Gw.TracerProvider.Tracer().Start(ts.Gw.ctx, "test-span")
-		t.Cleanup(func() { span.End() })
 		req = req.WithContext(ctx)
-	} else {
-		ts.Gw.SetConfig(globalConf)
+
+		cleanup := func() {
+			span.End()
+			mockServer.Close()
+		}
+		return req, cleanup
 	}
 
-	return ts, req, ts.Close
+	return req, func() {}
 }
 
 func TestGetLogEntryForRequest_TraceID(t *testing.T) {
@@ -329,7 +334,10 @@ func TestGetLogEntryForRequest_TraceID(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ts, req, cleanup := setupOTelTest(t, tt.otelEnabled, tt.hasTraceCtx)
+			ts := StartTest(nil)
+			defer ts.Close()
+
+			req, cleanup := setupOTelTestContext(t, ts, tt.otelEnabled, tt.hasTraceCtx)
 			defer cleanup()
 
 			// Get log entry
@@ -353,7 +361,10 @@ func TestGetLogEntryForRequest_TraceID(t *testing.T) {
 
 func TestGetLogEntryForRequest_TraceIDConsistency(t *testing.T) {
 	// Verify trace_id matches otel.ExtractTraceID()
-	ts, req, cleanup := setupOTelTest(t, true, true)
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	req, cleanup := setupOTelTestContext(t, ts, true, true)
 	defer cleanup()
 
 	expectedTraceID := otel.ExtractTraceID(req.Context())
@@ -400,7 +411,10 @@ func TestGetLogEntryForRequest_SpanID(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ts, req, cleanup := setupOTelTest(t, tt.otelEnabled, tt.hasTraceCtx)
+			ts := StartTest(nil)
+			defer ts.Close()
+
+			req, cleanup := setupOTelTestContext(t, ts, tt.otelEnabled, tt.hasTraceCtx)
 			defer cleanup()
 
 			// Get log entry
@@ -424,7 +438,10 @@ func TestGetLogEntryForRequest_SpanID(t *testing.T) {
 
 func TestGetLogEntryForRequest_SpanIDConsistency(t *testing.T) {
 	// Verify span_id matches otel.ExtractTraceAndSpanID()
-	ts, req, cleanup := setupOTelTest(t, true, true)
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	req, cleanup := setupOTelTestContext(t, ts, true, true)
 	defer cleanup()
 
 	_, expectedSpanID := otel.ExtractTraceAndSpanID(req.Context())
@@ -438,7 +455,10 @@ func TestGetLogEntryForRequest_SpanIDConsistency(t *testing.T) {
 
 func TestGetLogEntryForRequest_TraceAndSpanIDTogether(t *testing.T) {
 	// Verify both trace_id and span_id are present together
-	ts, req, cleanup := setupOTelTest(t, true, true)
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	req, cleanup := setupOTelTestContext(t, ts, true, true)
 	defer cleanup()
 
 	entry := ts.Gw.getLogEntryForRequest(nil, req, "", nil)
