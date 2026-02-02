@@ -90,7 +90,7 @@ func TestNewCertificateExpiryCheckBatcher_Add(t *testing.T) {
 	ctrl, batcherMocks := createBatcherMocks(t)
 	t.Cleanup(ctrl.Finish)
 
-	batcher, err := NewCertificateExpiryCheckBatcher(batcherMocks.logger, testApiMetaData, config.CertificateExpiryMonitorConfig{}, batcherMocks.redisStorageMock, nil, nil, nil)
+	batcher, err := NewCertificateExpiryCheckBatcher(batcherMocks.logger, testApiMetaData, config.CertificateExpiryMonitorConfig{}, batcherMocks.redisStorageMock, nil)
 	require.NoError(t, err)
 	require.Equal(t, 0, batcher.batch.Size())
 
@@ -111,7 +111,7 @@ func TestCertificateExpiryCheckBatcher(t *testing.T) {
 				EventCooldownSeconds: 60,
 			}
 
-			batcher, err := NewCertificateExpiryCheckBatcher(batcherMocks.logger, testApiMetaData, expiryCheckConfig, batcherMocks.redisStorageMock, nil, nil, nil)
+			batcher, err := NewCertificateExpiryCheckBatcher(batcherMocks.logger, testApiMetaData, expiryCheckConfig, batcherMocks.redisStorageMock, nil)
 			require.NoError(t, err)
 
 			batcher.inMemoryCooldownCache = batcherMocks.localCacheMock
@@ -147,7 +147,7 @@ func TestCertificateExpiryCheckBatcher(t *testing.T) {
 				EventCooldownSeconds: 60,
 			}
 
-			batcher, err := NewCertificateExpiryCheckBatcher(batcherMocks.logger, testApiMetaData, expiryCheckConfig, batcherMocks.redisStorageMock, nil, nil, nil)
+			batcher, err := NewCertificateExpiryCheckBatcher(batcherMocks.logger, testApiMetaData, expiryCheckConfig, batcherMocks.redisStorageMock, nil)
 			require.NoError(t, err)
 
 			batcher.inMemoryCooldownCache = batcherMocks.localCacheMock
@@ -183,7 +183,7 @@ func TestCertificateExpiryCheckBatcher(t *testing.T) {
 				EventCooldownSeconds: 60,
 			}
 
-			batcher, err := NewCertificateExpiryCheckBatcher(batcherMocks.logger, testApiMetaData, expiryCheckConfig, batcherMocks.redisStorageMock, nil, nil, nil)
+			batcher, err := NewCertificateExpiryCheckBatcher(batcherMocks.logger, testApiMetaData, expiryCheckConfig, batcherMocks.redisStorageMock, nil)
 			require.NoError(t, err)
 
 			batcher.inMemoryCooldownCache = batcherMocks.localCacheMock
@@ -222,7 +222,7 @@ func TestCertificateExpiryCheckBatcher(t *testing.T) {
 				EventCooldownSeconds: 60,
 			}
 
-			batcher, err := NewCertificateExpiryCheckBatcher(batcherMocks.logger, testApiMetaData, expiryCheckConfig, batcherMocks.redisStorageMock, nil, nil, nil)
+			batcher, err := NewCertificateExpiryCheckBatcher(batcherMocks.logger, testApiMetaData, expiryCheckConfig, batcherMocks.redisStorageMock, nil)
 			require.NoError(t, err)
 
 			batcher.inMemoryCooldownCache = batcherMocks.localCacheMock
@@ -261,7 +261,7 @@ func TestCertificateExpiryCheckBatcher(t *testing.T) {
 					EventCooldownSeconds: 120,
 				}
 
-				batcher, err := NewCertificateExpiryCheckBatcher(batcherMocks.logger, testApiMetaData, expiryCheckConfig, batcherMocks.redisStorageMock, nil, nil, nil)
+				batcher, err := NewCertificateExpiryCheckBatcher(batcherMocks.logger, testApiMetaData, expiryCheckConfig, batcherMocks.redisStorageMock, nil)
 				require.NoError(t, err)
 
 				batcher.inMemoryCooldownCache = batcherMocks.localCacheMock
@@ -309,7 +309,7 @@ func TestCertificateExpiryCheckBatcher(t *testing.T) {
 					EventCooldownSeconds: 120,
 				}
 
-				batcher, err := NewCertificateExpiryCheckBatcher(batcherMocks.logger, testApiMetaData, expiryCheckConfig, batcherMocks.redisStorageMock, nil, nil, nil)
+				batcher, err := NewCertificateExpiryCheckBatcher(batcherMocks.logger, testApiMetaData, expiryCheckConfig, batcherMocks.redisStorageMock, nil)
 				require.NoError(t, err)
 
 				batcher.inMemoryCooldownCache = batcherMocks.localCacheMock
@@ -357,7 +357,7 @@ func TestCertificateExpiryCheckBatcher(t *testing.T) {
 					EventCooldownSeconds: 120,
 				}
 
-				batcher, err := NewCertificateExpiryCheckBatcher(batcherMocks.logger, testApiMetaData, expiryCheckConfig, batcherMocks.redisStorageMock, nil, nil, nil)
+				batcher, err := NewCertificateExpiryCheckBatcher(batcherMocks.logger, testApiMetaData, expiryCheckConfig, batcherMocks.redisStorageMock, nil)
 				require.NoError(t, err)
 
 				batcher.inMemoryCooldownCache = batcherMocks.localCacheMock
@@ -408,7 +408,7 @@ func TestCertificateExpiryCheckBatcher(t *testing.T) {
 					EventCooldownSeconds: 120,
 				}
 
-				batcher, err := NewCertificateExpiryCheckBatcher(batcherMocks.logger, testApiMetaData, expiryCheckConfig, batcherMocks.redisStorageMock, nil, nil, nil)
+				batcher, err := NewCertificateExpiryCheckBatcher(batcherMocks.logger, testApiMetaData, expiryCheckConfig, batcherMocks.redisStorageMock, nil)
 				require.NoError(t, err)
 
 				batcher.inMemoryCooldownCache = batcherMocks.localCacheMock
@@ -461,7 +461,7 @@ func TestCertificateExpiryCheckBatcher(t *testing.T) {
 					EventCooldownSeconds: 120,
 				}
 
-				batcher, err := NewCertificateExpiryCheckBatcher(batcherMocks.logger, testApiMetaData, expiryCheckConfig, batcherMocks.redisStorageMock, nil, nil, nil)
+				batcher, err := NewCertificateExpiryCheckBatcher(batcherMocks.logger, testApiMetaData, expiryCheckConfig, batcherMocks.redisStorageMock, nil)
 				require.NoError(t, err)
 
 				batcher.inMemoryCooldownCache = batcherMocks.localCacheMock
@@ -517,7 +517,7 @@ func TestCertificateExpiryCheckBatcher(t *testing.T) {
 					EventCooldownSeconds: 120,
 				}
 
-				batcher, err := NewCertificateExpiryCheckBatcher(batcherMocks.logger, testApiMetaData, expiryCheckConfig, batcherMocks.redisStorageMock, fireEvent, nil, nil)
+				batcher, err := NewCertificateExpiryCheckBatcher(batcherMocks.logger, testApiMetaData, expiryCheckConfig, batcherMocks.redisStorageMock, fireEvent)
 				require.NoError(t, err)
 
 				batcher.inMemoryCooldownCache = batcherMocks.localCacheMock
@@ -598,7 +598,7 @@ func TestCertificateExpiryCheckBatcher(t *testing.T) {
 					EventCooldownSeconds: 120,
 				}
 
-				batcher, err := NewCertificateExpiryCheckBatcher(batcherMocks.logger, testApiMetaData, expiryCheckConfig, batcherMocks.redisStorageMock, fireEvent, nil, nil)
+				batcher, err := NewCertificateExpiryCheckBatcher(batcherMocks.logger, testApiMetaData, expiryCheckConfig, batcherMocks.redisStorageMock, fireEvent)
 				require.NoError(t, err)
 
 				batcher.inMemoryCooldownCache = batcherMocks.localCacheMock
@@ -679,7 +679,7 @@ func TestCertificateExpiryCheckBatcher(t *testing.T) {
 					EventCooldownSeconds: 120,
 				}
 
-				batcher, err := NewCertificateExpiryCheckBatcher(batcherMocks.logger, testApiMetaData, expiryCheckConfig, batcherMocks.redisStorageMock, fireEvent, nil, nil)
+				batcher, err := NewCertificateExpiryCheckBatcher(batcherMocks.logger, testApiMetaData, expiryCheckConfig, batcherMocks.redisStorageMock, fireEvent)
 				require.NoError(t, err)
 
 				batcher.inMemoryCooldownCache = batcherMocks.localCacheMock

@@ -110,9 +110,7 @@ func setupCertificateCheckMWBenchmark(b *testing.B, useMutualTLS bool, certs []*
 		},
 		mw.Gw.GetConfig().Security.CertificateExpiryMonitor,
 		mw.store,
-		mw.Spec.FireEvent,
-		nil,
-		nil)
+		mw.Spec.FireEvent)
 
 	mw.expiryCheckBatcher.SetFlushInterval(10 * time.Millisecond)
 

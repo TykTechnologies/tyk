@@ -199,9 +199,7 @@ func setupCertificateCheckMWIntegrationWithEvents(t *testing.T, _ bool, certs []
 		},
 		mw.Gw.GetConfig().Security.CertificateExpiryMonitor,
 		mw.store,
-		mw.Spec.FireEvent,
-		nil,
-		nil)
+		mw.Spec.FireEvent)
 	require.NoError(t, err)
 
 	mw.expiryCheckBatcher.SetFlushInterval(10 * time.Millisecond)

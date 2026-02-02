@@ -51,6 +51,8 @@ func TestNewCertificateExpiryCheckBatcherWithRole_RoleParameter(t *testing.T) {
 				redisStorageMock,
 				nil,
 				tt.role,
+				nil,
+				nil,
 			)
 
 			require.NoError(t, err)
@@ -123,6 +125,8 @@ func TestCertificateExpiryCheckBatcher_RoleInExpiredEvent(t *testing.T) {
 				batcherMocks.redisStorageMock,
 				fireEvent,
 				tt.role,
+				nil,
+				nil,
 			)
 			require.NoError(t, err)
 
@@ -212,6 +216,8 @@ func TestCertificateExpiryCheckBatcher_RoleInExpiringSoonEvent(t *testing.T) {
 				batcherMocks.redisStorageMock,
 				fireEvent,
 				tt.role,
+				nil,
+				nil,
 			)
 			require.NoError(t, err)
 
@@ -282,7 +288,9 @@ func TestCertificateExpiryCheckBatcher_RolePreservedThroughCooldowns(t *testing.
 		expiryCheckConfig,
 		batcherMocks.redisStorageMock,
 		fireEvent,
-		CertRoleUpstream, // Test with upstream role
+		CertRoleUpstream,
+		nil,
+		nil, // Test with upstream role
 	)
 	require.NoError(t, err)
 
@@ -350,6 +358,8 @@ func TestCertificateExpiryCheckBatcher_RoleWithCacheErrors(t *testing.T) {
 		batcherMocks.redisStorageMock,
 		fireEvent,
 		CertRoleUpstream,
+		nil,
+		nil,
 	)
 	require.NoError(t, err)
 
