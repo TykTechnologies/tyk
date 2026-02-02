@@ -495,6 +495,25 @@ func (c *certificateManager) List(certIDs []string, mode CertificateType) (out [
 	var cert *tls.Certificate
 	var rawCert []byte
 
+	// Create backoff strategy once for all certificates in this List() call.
+	// This prevents exponential delay multiplication when loading multiple certificates.
+	// Without this, 100 certificates × 30s timeout = 50+ minutes startup delay!
+	var sharedBackoff backoff.BackOff
+	if c.certFetchRetryEnabled {
+		expBackoff := backoff.NewExponentialBackOff()
+		expBackoff.MaxElapsedTime = c.certFetchMaxElapsedTime
+		expBackoff.InitialInterval = c.certFetchInitialInterval
+		expBackoff.MaxInterval = c.certFetchMaxInterval
+		expBackoff.Multiplier = 2.0
+
+		// Apply max retries limit if configured (0 = unlimited, time-based only)
+		if c.certFetchMaxRetries > 0 {
+			sharedBackoff = backoff.WithMaxRetries(expBackoff, uint64(c.certFetchMaxRetries))
+		} else {
+			sharedBackoff = expBackoff
+		}
+	}
+
 	for _, id := range certIDs {
 		if cert, found := c.cache.Get(id); found {
 			if isCertCanBeListed(cert.(*tls.Certificate), mode) {
@@ -514,7 +533,7 @@ func (c *certificateManager) List(certIDs []string, mode CertificateType) (out [
 		if !c.certFetchRetryEnabled {
 			val, err = c.storage.GetKey("raw-" + id)
 		} else {
-			// Retry enabled - use exponential backoff
+			// Retry enabled - use shared exponential backoff
 			operation := func() error {
 				val, err = c.storage.GetKey("raw-" + id)
 				if errors.Is(err, storage.ErrMDCBConnectionLost) {
@@ -523,19 +542,7 @@ func (c *certificateManager) List(certIDs []string, mode CertificateType) (out [
 				return nil // Success or non-retryable error
 			}
 
-			expBackoff := backoff.NewExponentialBackOff()
-			expBackoff.MaxElapsedTime = c.certFetchMaxElapsedTime
-			expBackoff.InitialInterval = c.certFetchInitialInterval
-			expBackoff.MaxInterval = c.certFetchMaxInterval
-			expBackoff.Multiplier = 2.0
-
-			// Apply max retries limit if configured (0 = unlimited, time-based only)
-			var backoffStrategy backoff.BackOff = expBackoff
-			if c.certFetchMaxRetries > 0 {
-				backoffStrategy = backoff.WithMaxRetries(expBackoff, uint64(c.certFetchMaxRetries))
-			}
-
-			if retryErr := backoff.Retry(operation, backoffStrategy); retryErr != nil {
+			if retryErr := backoff.Retry(operation, sharedBackoff); retryErr != nil {
 				if errors.Is(err, storage.ErrMDCBConnectionLost) {
 					c.logger.Warn("Timeout waiting for MDCB connection for certificate:", id)
 				}
