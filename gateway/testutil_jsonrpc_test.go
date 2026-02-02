@@ -13,6 +13,7 @@ import (
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/apidef/oas"
+	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/test"
 )
 
@@ -137,7 +138,12 @@ func TestMockJSONRPCServer_WithGateway(t *testing.T) {
 	})
 
 	// Start Tyk Gateway test
-	ts := StartTest(nil)
+	ts := StartTest(func(globalConf *config.Config) {
+		globalConf.UseDBAppConfigs = false
+		globalConf.DisableDashboardZeroConf = true
+		globalConf.Policies.PolicySource = "file"
+		globalConf.Policies.PolicyRecordName = ""
+	})
 	defer ts.Close()
 
 	// Create OAS API definition pointing to mock server
@@ -179,6 +185,7 @@ func TestMockJSONRPCServer_WithGateway(t *testing.T) {
 
 	var def apidef.APIDefinition
 	oasAPI.ExtractTo(&def)
+	def.Active = true
 	def.IsOAS = true
 	def.UseKeylessAccess = true
 	def.Proxy.ListenPath = "/mcp-mock"
@@ -215,11 +222,17 @@ func TestJSONRPC_RateLimiting_WithMockUpstream(t *testing.T) {
 		},
 	})
 
-	ts := StartTest(nil)
+	ts := StartTest(func(globalConf *config.Config) {
+		globalConf.UseDBAppConfigs = false
+		globalConf.DisableDashboardZeroConf = true
+		globalConf.Policies.PolicySource = "file"
+		globalConf.Policies.PolicyRecordName = ""
+	})
 	defer ts.Close()
 
 	oasAPI := getSampleOASAPI()
 	tykExt := oasAPI.GetTykExtension()
+	tykExt.Info.State.Active = true
 	tykExt.Upstream.URL = mockUpstream.URL()
 	tykExt.Server.ListenPath = oas.ListenPath{
 		Value: "/mcp-rl",
@@ -243,6 +256,7 @@ func TestJSONRPC_RateLimiting_WithMockUpstream(t *testing.T) {
 
 	var def apidef.APIDefinition
 	oasAPI.ExtractTo(&def)
+	def.Active = true
 	def.IsOAS = true
 	def.UseKeylessAccess = true
 	def.Proxy.ListenPath = "/mcp-rl"
@@ -277,11 +291,17 @@ func TestJSONRPC_ACL_WithMockUpstream(t *testing.T) {
 		},
 	})
 
-	ts := StartTest(nil)
+	ts := StartTest(func(globalConf *config.Config) {
+		globalConf.UseDBAppConfigs = false
+		globalConf.DisableDashboardZeroConf = true
+		globalConf.Policies.PolicySource = "file"
+		globalConf.Policies.PolicyRecordName = ""
+	})
 	defer ts.Close()
 
 	oasAPI := getSampleOASAPI()
 	tykExt := oasAPI.GetTykExtension()
+	tykExt.Info.State.Active = true
 	tykExt.Upstream.URL = mockUpstream.URL()
 	tykExt.Server.ListenPath = oas.ListenPath{
 		Value: "/mcp-acl",
@@ -301,6 +321,7 @@ func TestJSONRPC_ACL_WithMockUpstream(t *testing.T) {
 
 	var def apidef.APIDefinition
 	oasAPI.ExtractTo(&def)
+	def.Active = true
 	def.IsOAS = true
 	def.UseKeylessAccess = true
 	def.Proxy.ListenPath = "/mcp-acl"
@@ -338,11 +359,17 @@ func TestJSONRPC_ResourceACL_WithMockUpstream(t *testing.T) {
 		},
 	})
 
-	ts := StartTest(nil)
+	ts := StartTest(func(globalConf *config.Config) {
+		globalConf.UseDBAppConfigs = false
+		globalConf.DisableDashboardZeroConf = true
+		globalConf.Policies.PolicySource = "file"
+		globalConf.Policies.PolicyRecordName = ""
+	})
 	defer ts.Close()
 
 	oasAPI := getSampleOASAPI()
 	tykExt := oasAPI.GetTykExtension()
+	tykExt.Info.State.Active = true
 	tykExt.Upstream.URL = mockUpstream.URL()
 	tykExt.Server.ListenPath = oas.ListenPath{
 		Value: "/mcp-resource-acl",
@@ -361,6 +388,7 @@ func TestJSONRPC_ResourceACL_WithMockUpstream(t *testing.T) {
 
 	var def apidef.APIDefinition
 	oasAPI.ExtractTo(&def)
+	def.Active = true
 	def.IsOAS = true
 	def.UseKeylessAccess = true
 	def.Proxy.ListenPath = "/mcp-resource-acl"
@@ -403,11 +431,17 @@ func TestJSONRPC_DynamicHandler(t *testing.T) {
 		}, 0, ""
 	})
 
-	ts := StartTest(nil)
+	ts := StartTest(func(globalConf *config.Config) {
+		globalConf.UseDBAppConfigs = false
+		globalConf.DisableDashboardZeroConf = true
+		globalConf.Policies.PolicySource = "file"
+		globalConf.Policies.PolicyRecordName = ""
+	})
 	defer ts.Close()
 
 	oasAPI := getSampleOASAPI()
 	tykExt := oasAPI.GetTykExtension()
+	tykExt.Info.State.Active = true
 	tykExt.Upstream.URL = mockUpstream.URL()
 	tykExt.Server.ListenPath = oas.ListenPath{
 		Value: "/mcp-handler",
@@ -422,6 +456,7 @@ func TestJSONRPC_DynamicHandler(t *testing.T) {
 
 	var def apidef.APIDefinition
 	oasAPI.ExtractTo(&def)
+	def.Active = true
 	def.IsOAS = true
 	def.UseKeylessAccess = true
 	def.Proxy.ListenPath = "/mcp-handler"
@@ -480,11 +515,17 @@ func TestJSONRPC_MethodLevelAllowList(t *testing.T) {
 		},
 	})
 
-	ts := StartTest(nil)
+	ts := StartTest(func(globalConf *config.Config) {
+		globalConf.UseDBAppConfigs = false
+		globalConf.DisableDashboardZeroConf = true
+		globalConf.Policies.PolicySource = "file"
+		globalConf.Policies.PolicyRecordName = ""
+	})
 	defer ts.Close()
 
 	oasAPI := getSampleOASAPI()
 	tykExt := oasAPI.GetTykExtension()
+	tykExt.Info.State.Active = true
 	tykExt.Upstream.URL = mockUpstream.URL()
 	tykExt.Server.ListenPath = oas.ListenPath{
 		Value: "/mcp-method-acl",
@@ -504,6 +545,7 @@ func TestJSONRPC_MethodLevelAllowList(t *testing.T) {
 
 	var def apidef.APIDefinition
 	oasAPI.ExtractTo(&def)
+	def.Active = true
 	def.IsOAS = true
 	def.UseKeylessAccess = true
 	def.Proxy.ListenPath = "/mcp-method-acl"
@@ -556,11 +598,17 @@ func TestJSONRPC_ToolLevelAllowList(t *testing.T) {
 		},
 	})
 
-	ts := StartTest(nil)
+	ts := StartTest(func(globalConf *config.Config) {
+		globalConf.UseDBAppConfigs = false
+		globalConf.DisableDashboardZeroConf = true
+		globalConf.Policies.PolicySource = "file"
+		globalConf.Policies.PolicyRecordName = ""
+	})
 	defer ts.Close()
 
 	oasAPI := getSampleOASAPI()
 	tykExt := oasAPI.GetTykExtension()
+	tykExt.Info.State.Active = true
 	tykExt.Upstream.URL = mockUpstream.URL()
 	tykExt.Server.ListenPath = oas.ListenPath{
 		Value: "/mcp-tool-acl",
@@ -590,6 +638,7 @@ func TestJSONRPC_ToolLevelAllowList(t *testing.T) {
 
 	var def apidef.APIDefinition
 	oasAPI.ExtractTo(&def)
+	def.Active = true
 	def.IsOAS = true
 	def.UseKeylessAccess = true
 	def.Proxy.ListenPath = "/mcp-tool-acl"
@@ -631,11 +680,17 @@ func TestJSONRPC_MethodLevelRateLimiting(t *testing.T) {
 		},
 	})
 
-	ts := StartTest(nil)
+	ts := StartTest(func(globalConf *config.Config) {
+		globalConf.UseDBAppConfigs = false
+		globalConf.DisableDashboardZeroConf = true
+		globalConf.Policies.PolicySource = "file"
+		globalConf.Policies.PolicyRecordName = ""
+	})
 	defer ts.Close()
 
 	oasAPI := getSampleOASAPI()
 	tykExt := oasAPI.GetTykExtension()
+	tykExt.Info.State.Active = true
 	tykExt.Upstream.URL = mockUpstream.URL()
 	tykExt.Server.ListenPath = oas.ListenPath{
 		Value: "/mcp-method-rl",
@@ -659,6 +714,7 @@ func TestJSONRPC_MethodLevelRateLimiting(t *testing.T) {
 
 	var def apidef.APIDefinition
 	oasAPI.ExtractTo(&def)
+	def.Active = true
 	def.IsOAS = true
 	def.UseKeylessAccess = true
 	def.Proxy.ListenPath = "/mcp-method-rl"
@@ -697,11 +753,17 @@ func TestJSONRPC_ToolLevelIndependentRateLimiting(t *testing.T) {
 		},
 	})
 
-	ts := StartTest(nil)
+	ts := StartTest(func(globalConf *config.Config) {
+		globalConf.UseDBAppConfigs = false
+		globalConf.DisableDashboardZeroConf = true
+		globalConf.Policies.PolicySource = "file"
+		globalConf.Policies.PolicyRecordName = ""
+	})
 	defer ts.Close()
 
 	oasAPI := getSampleOASAPI()
 	tykExt := oasAPI.GetTykExtension()
+	tykExt.Info.State.Active = true
 	tykExt.Upstream.URL = mockUpstream.URL()
 	tykExt.Server.ListenPath = oas.ListenPath{
 		Value: "/mcp-tool-rl",
@@ -734,6 +796,7 @@ func TestJSONRPC_ToolLevelIndependentRateLimiting(t *testing.T) {
 
 	var def apidef.APIDefinition
 	oasAPI.ExtractTo(&def)
+	def.Active = true
 	def.IsOAS = true
 	def.UseKeylessAccess = true
 	def.Proxy.ListenPath = "/mcp-tool-rl"
@@ -781,11 +844,17 @@ func TestJSONRPC_CombinedHeaderTransformations(t *testing.T) {
 		},
 	})
 
-	ts := StartTest(nil)
+	ts := StartTest(func(globalConf *config.Config) {
+		globalConf.UseDBAppConfigs = false
+		globalConf.DisableDashboardZeroConf = true
+		globalConf.Policies.PolicySource = "file"
+		globalConf.Policies.PolicyRecordName = ""
+	})
 	defer ts.Close()
 
 	oasAPI := getSampleOASAPI()
 	tykExt := oasAPI.GetTykExtension()
+	tykExt.Info.State.Active = true
 	tykExt.Upstream.URL = mockUpstream.URL()
 	tykExt.Server.ListenPath = oas.ListenPath{
 		Value: "/mcp-headers",
@@ -812,6 +881,7 @@ func TestJSONRPC_CombinedHeaderTransformations(t *testing.T) {
 
 	var def apidef.APIDefinition
 	oasAPI.ExtractTo(&def)
+	def.Active = true
 	def.IsOAS = true
 	def.UseKeylessAccess = true
 	def.Proxy.ListenPath = "/mcp-headers"
