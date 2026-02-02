@@ -481,6 +481,8 @@ func (s *SuccessHandler) ServeHTTPWithCache(w http.ResponseWriter, r *http.Reque
 		s.classifyUpstreamError(r, inRes.Response.StatusCode)
 
 		s.RecordHit(r, latency, inRes.Response.StatusCode, inRes.Response, false)
+		s.RecordAccessLog(r, inRes.Response, latency)
+
 	}
 
 	return inRes
