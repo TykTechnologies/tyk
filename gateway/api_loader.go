@@ -1050,19 +1050,14 @@ func listenPathLength(listenPath string) int {
 func (gw *Gateway) loadApps(specs []*APISpec) {
 	mainLog.Info("Loading API configurations.")
 
-	// Only build registry in RPC mode (when it exists)
+	// Only build usage map in RPC mode (when tracker exists)
 	if gw.certUsageTracker != nil {
-		gw.certUsageTracker.Reset()
+		// Build the complete usage map offline (no locks held during construction)
+		newUsageMap := BuildCertUsageMap(specs, gw.GetConfig().HttpServerOptions.SSLCertificates)
 
-		// Register gateway server certificates
-		gw.certUsageTracker.RegisterServerCerts(
-			gw.GetConfig().HttpServerOptions.SSLCertificates,
-		)
-
-		// Register certificates from each API
-		for _, spec := range specs {
-			gw.certUsageTracker.Register(spec)
-		}
+		// Atomically replace the old usage map with the new one
+		// This ensures no partial state is visible to concurrent readers
+		gw.certUsageTracker.ReplaceAll(newUsageMap)
 
 		// Log when feature is enabled
 		if gw.GetConfig().SlaveOptions.SyncUsedCertsOnly {

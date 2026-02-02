@@ -111,6 +111,71 @@ func (cr *certUsageTracker) Reset() {
 	}
 }
 
+// ReplaceAll atomically replaces the entire certificate usage map.
+// This method is thread-safe and ensures no partial state is visible to concurrent readers.
+func (cr *certUsageTracker) ReplaceAll(newApis map[string]map[string]struct{}) {
+	cr.mu.Lock()
+	defer cr.mu.Unlock()
+
+	cr.apis = newApis
+}
+
+// BuildCertUsageMap creates a new certificate usage map from API specs and server certs.
+// This is a helper function for building a complete usage map offline before atomic replacement.
+func BuildCertUsageMap(specs []*APISpec, serverCerts []string) map[string]map[string]struct{} {
+	usageMap := make(map[string]map[string]struct{})
+
+	// Register server certificates
+	const serverAPI = "__server__"
+	for _, certID := range serverCerts {
+		if certID == "" {
+			continue
+		}
+		if usageMap[certID] == nil {
+			usageMap[certID] = make(map[string]struct{})
+		}
+		usageMap[certID][serverAPI] = struct{}{}
+	}
+
+	// Register certificates from each API spec
+	for _, spec := range specs {
+		apiID := spec.APIID
+		certSet := make(map[string]struct{})
+
+		// Collect all certificate references
+		for _, certID := range spec.Certificates {
+			if certID != "" {
+				certSet[certID] = struct{}{}
+			}
+		}
+		for _, certID := range spec.ClientCertificates {
+			if certID != "" {
+				certSet[certID] = struct{}{}
+			}
+		}
+		for _, certID := range spec.UpstreamCertificates {
+			if certID != "" {
+				certSet[certID] = struct{}{}
+			}
+		}
+		for _, certID := range spec.PinnedPublicKeys {
+			if certID != "" {
+				certSet[certID] = struct{}{}
+			}
+		}
+
+		// Track API association for each cert
+		for certID := range certSet {
+			if usageMap[certID] == nil {
+				usageMap[certID] = make(map[string]struct{})
+			}
+			usageMap[certID][apiID] = struct{}{}
+		}
+	}
+
+	return usageMap
+}
+
 // Len returns the number of required certificates.
 func (cr *certUsageTracker) Len() int {
 	cr.mu.RLock()
