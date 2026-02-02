@@ -97,6 +97,7 @@ require (
 	github.com/Jeffail/gabs/v2 v2.7.0
 	github.com/TykTechnologies/graphql-go-tools/v2 v2.0.0-20250926102005-c54e73aae17d
 	github.com/TykTechnologies/opentelemetry v0.0.23-0.20260202143049-20d34f57165b
+	github.com/TykTechnologies/structviewer v1.2.0
 	github.com/alecthomas/kingpin/v2 v2.4.0
 	github.com/eclipse/paho.mqtt.golang v1.4.3
 	github.com/getkin/kin-openapi v0.133.0
