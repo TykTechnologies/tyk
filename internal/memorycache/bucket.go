@@ -7,6 +7,10 @@ import (
 	"github.com/TykTechnologies/tyk/internal/model"
 )
 
+var (
+	_ model.Bucket = new(Bucket)
+)
+
 type Bucket struct {
 	capacity  uint
 	remaining uint
@@ -42,4 +46,11 @@ func (b *Bucket) Add(amount uint) (model.BucketState, error) {
 	}
 	b.remaining -= amount
 	return model.BucketState{Capacity: b.capacity, Remaining: b.remaining, Reset: b.reset}, nil
+}
+
+// State returns bucket state.
+func (b *Bucket) State() model.BucketState {
+	b.mutex.Lock()
+	defer b.mutex.Unlock()
+	return model.BucketState{Capacity: b.capacity, Remaining: b.remaining, Reset: b.reset}
 }

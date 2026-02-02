@@ -26,6 +26,7 @@ import (
 	texttemplate "text/template"
 	"time"
 
+	"github.com/TykTechnologies/tyk/internal/rate"
 	logstashhook "github.com/bshuster-repo/logrus-logstash-hook"
 	logrussentry "github.com/evalphobia/logrus_sentry"
 	grayloghook "github.com/gemnasium/logrus-graylog-hook"
@@ -42,6 +43,7 @@ import (
 	"github.com/TykTechnologies/gorpc"
 	"github.com/TykTechnologies/goverify"
 	persistentmodel "github.com/TykTechnologies/storage/persistent/model"
+
 
 	"github.com/TykTechnologies/tyk-pump/serializer"
 	"github.com/TykTechnologies/tyk/apidef"
@@ -225,6 +227,8 @@ type Gateway struct {
 	// apiJWKCaches cache per api entity
 	apiJWKCaches sync.Map
 
+	limitHeaderSender rate.HeaderSender
+
 	BundleChecksumVerifier bundleChecksumVerifyFunction
 }
 
@@ -274,6 +278,9 @@ func NewGateway(config config.Config, ctx context.Context) *Gateway {
 
 	gw.SetNodeID("solo-" + uuid.New())
 	gw.SessionID = uuid.New()
+
+	// todo: extract from tests
+	gw.limitHeaderSender = rate.NewSender(rate.SourceQuota)
 
 	// Only create registry in RPC mode
 	if config.SlaveOptions.UseRPC {

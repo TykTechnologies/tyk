@@ -72,6 +72,26 @@ func (r *SlidingLog) execPipeline(ctx context.Context, pipeFn func(redis.Pipelin
 
 // SetCount returns the number of items in the current sliding log window, before adding a new item.
 // The sliding log is trimmed removing older items, and a `per` seconds expiration is set on the complete log.
+//
+// IMPORTANT IMPLEMENTATION NOTES:
+//
+//  1. This method always adds a new entry to the Redis sorted set regardless of whether the request
+//     will be processed or blocked. This means that even rejected requests contribute to the rate limit,
+//     which may not be the desired behavior in all cases. Consider refactoring to add entries only after
+//     determining if the request should be processed.
+//
+//  2. For a sliding window implementation, the TTL should ideally be calculated based on the rate limit (N)
+//     rather than just the window period. The earliest allowed timestamp in the window should be determined
+//     by finding the timestamp of the (total-N)th item (where total is the current count and N is the rate limit).
+//     This ensures that the window accurately represents the N most recent requests.
+//
+//     Currently, the TTL is set to the full window period (`per` seconds) which may not accurately reflect
+//     the actual sliding window behavior, especially in high-traffic scenarios where the window might
+//     effectively become smaller than intended.
+//
+// For a more accurate implementation:
+// - Consider adding entries only after determining if the request should be processed
+// - Calculate TTL based on the actual sliding window dynamics, considering both the window period and rate limit
 func (r *SlidingLog) SetCount(ctx context.Context, now time.Time, keyName string, per int64) (int64, error) {
 	onePeriodAgo := now.Add(time.Duration(-1*per) * time.Second)
 

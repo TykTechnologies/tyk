@@ -8,13 +8,13 @@ import (
 )
 
 // Limiter returns the appropriate rate limiter as configured by gateway.
-func Limiter(gwConfig *config.Config, redis redis.UniversalClient) limiter.LimiterFunc {
+func Limiter(gwConfig *config.Config, rClient redis.UniversalClient) limiter.Func {
 	name, ok := LimiterKind(gwConfig)
 	if !ok {
 		return nil
 	}
 
-	res := limiter.NewLimiter(redis)
+	res := limiter.NewLimiter(rClient)
 
 	switch name {
 	case LimitLeakyBucket:

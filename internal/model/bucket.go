@@ -11,6 +11,7 @@ var (
 )
 
 // Bucket interface for interacting with leaky buckets: https://en.wikipedia.org/wiki/Leaky_bucket
+// Underlying mechanism does not implement Leaky_bucket algorithm :'(
 type Bucket interface {
 	// Capacity of the bucket.
 	Capacity() uint
@@ -23,6 +24,9 @@ type Bucket interface {
 
 	// Add to the bucket. Returns bucket state after adding.
 	Add(uint) (BucketState, error)
+
+	// State returns bucket state.
+	State() BucketState
 }
 
 // BucketState is a snapshot of a bucket's properties.
