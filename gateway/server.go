@@ -533,16 +533,18 @@ func (gw *Gateway) setupGlobals() {
 		maxRetries = *conf.SlaveOptions.RPCCertFetchMaxRetries
 	}
 
-	gw.CertificateManager = certs.NewCertificateManagerWithRetry(
+	gw.CertificateManager = certs.NewCertificateManager(
 		storeCert,
 		certificateSecret,
 		log,
 		!conf.Cloud,
-		time.Duration(conf.SlaveOptions.RPCCertFetchMaxElapsedTime)*time.Second,
-		time.Duration(conf.SlaveOptions.RPCCertFetchInitialInterval)*time.Second,
-		time.Duration(conf.SlaveOptions.RPCCertFetchMaxInterval)*time.Second,
-		retryEnabled,
-		maxRetries,
+		certs.WithRetryEnabled(retryEnabled),
+		certs.WithMaxRetries(maxRetries),
+		certs.WithBackoffIntervals(
+			time.Duration(conf.SlaveOptions.RPCCertFetchMaxElapsedTime)*time.Second,
+			time.Duration(conf.SlaveOptions.RPCCertFetchInitialInterval)*time.Second,
+			time.Duration(conf.SlaveOptions.RPCCertFetchMaxInterval)*time.Second,
+		),
 	)
 
 	if gw.GetConfig().SlaveOptions.UseRPC {

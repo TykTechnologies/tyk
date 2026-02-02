@@ -94,52 +94,73 @@ type certificateManager struct {
 	certFetchMaxRetries      int
 }
 
-// NewCertificateManager creates a certificate manager with default retry settings.
-// This maintains backward compatibility with existing code.
-func NewCertificateManager(storageHandler storage.Handler, secret string, logger *logrus.Logger, migrateCertList bool) *certificateManager {
-	return NewCertificateManagerWithRetry(
-		storageHandler,
-		secret,
-		logger,
-		migrateCertList,
-		DefaultRPCCertFetchMaxElapsedTime,
-		DefaultRPCCertFetchInitialInterval,
-		DefaultRPCCertFetchMaxInterval,
-		DefaultRPCCertFetchRetryEnabled,
-		DefaultRPCCertFetchMaxRetries,
-	)
+// CertificateManagerOption is a functional option for configuring certificate manager.
+type CertificateManagerOption func(*certificateManager)
+
+// WithRetryEnabled enables or disables retry logic for MDCB certificate fetching.
+func WithRetryEnabled(enabled bool) CertificateManagerOption {
+	return func(cm *certificateManager) {
+		cm.certFetchRetryEnabled = enabled
+	}
 }
 
-// NewCertificateManagerWithRetry creates a certificate manager with configurable retry settings.
-// Use this when you need fine-grained control over MDCB certificate fetch retry behavior.
-func NewCertificateManagerWithRetry(storageHandler storage.Handler, secret string, logger *logrus.Logger, migrateCertList bool, certFetchMaxElapsedTime, certFetchInitialInterval, certFetchMaxInterval time.Duration, certFetchRetryEnabled bool, certFetchMaxRetries int) *certificateManager {
+// WithMaxRetries sets the maximum number of retry attempts (0 = unlimited, time-based only).
+func WithMaxRetries(maxRetries int) CertificateManagerOption {
+	return func(cm *certificateManager) {
+		cm.certFetchMaxRetries = maxRetries
+	}
+}
+
+// WithBackoffIntervals configures the exponential backoff intervals.
+func WithBackoffIntervals(maxElapsed, initial, max time.Duration) CertificateManagerOption {
+	return func(cm *certificateManager) {
+		if maxElapsed > 0 {
+			cm.certFetchMaxElapsedTime = maxElapsed
+		}
+		if initial > 0 {
+			cm.certFetchInitialInterval = initial
+		}
+		if max > 0 {
+			cm.certFetchMaxInterval = max
+		}
+	}
+}
+
+// NewCertificateManager creates a certificate manager with optional retry configuration.
+// Maintains backward compatibility: calling without options uses defaults.
+//
+// Example with defaults (backward compatible):
+//   cm := NewCertificateManager(storage, secret, logger, true)
+//
+// Example with custom retry config:
+//   cm := NewCertificateManager(storage, secret, logger, true,
+//       WithRetryEnabled(true),
+//       WithMaxRetries(10),
+//       WithBackoffIntervals(60*time.Second, 200*time.Millisecond, 5*time.Second))
+func NewCertificateManager(storageHandler storage.Handler, secret string, logger *logrus.Logger, migrateCertList bool, opts ...CertificateManagerOption) *certificateManager {
 	if logger == nil {
 		logger = logrus.New()
 	}
 
-	// Set default backoff values if not provided
-	if certFetchMaxElapsedTime == 0 {
-		certFetchMaxElapsedTime = 30 * time.Second
-	}
-	if certFetchInitialInterval == 0 {
-		certFetchInitialInterval = 100 * time.Millisecond
-	}
-	if certFetchMaxInterval == 0 {
-		certFetchMaxInterval = 2 * time.Second
-	}
-
-	return &certificateManager{
+	cm := &certificateManager{
 		storage:                  storageHandler,
 		logger:                   logger.WithFields(logrus.Fields{"prefix": CertManagerLogPrefix}),
 		cache:                    cache.New(cacheDefaultTTL, cacheCleanInterval),
 		secret:                   secret,
 		migrateCertList:          migrateCertList,
-		certFetchMaxElapsedTime:  certFetchMaxElapsedTime,
-		certFetchInitialInterval: certFetchInitialInterval,
-		certFetchMaxInterval:     certFetchMaxInterval,
-		certFetchRetryEnabled:    certFetchRetryEnabled,
-		certFetchMaxRetries:      certFetchMaxRetries,
+		certFetchMaxElapsedTime:  DefaultRPCCertFetchMaxElapsedTime,
+		certFetchInitialInterval: DefaultRPCCertFetchInitialInterval,
+		certFetchMaxInterval:     DefaultRPCCertFetchMaxInterval,
+		certFetchRetryEnabled:    DefaultRPCCertFetchRetryEnabled,
+		certFetchMaxRetries:      DefaultRPCCertFetchMaxRetries,
 	}
+
+	// Apply functional options
+	for _, opt := range opts {
+		opt(cm)
+	}
+
+	return cm
 }
 
 func getOrgFromKeyID(key, certID string) string {
