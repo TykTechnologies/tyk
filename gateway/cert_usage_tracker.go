@@ -41,12 +41,8 @@ func (cr *certUsageTracker) APIs(certID string) []string {
 	return result
 }
 
-// Register extracts and tracks all certificates from an API spec.
-func (cr *certUsageTracker) Register(spec *APISpec) {
-	cr.mu.Lock()
-	defer cr.mu.Unlock()
-
-	apiID := spec.APIID
+// extractCertificatesFromSpec collects all certificate IDs from an API spec.
+func extractCertificatesFromSpec(spec *APISpec) map[string]struct{} {
 	certSet := make(map[string]struct{})
 
 	// Collect all certificate references (using set to auto-deduplicate)
@@ -70,6 +66,17 @@ func (cr *certUsageTracker) Register(spec *APISpec) {
 			certSet[certID] = struct{}{}
 		}
 	}
+
+	return certSet
+}
+
+// Register extracts and tracks all certificates from an API spec.
+func (cr *certUsageTracker) Register(spec *APISpec) {
+	cr.mu.Lock()
+	defer cr.mu.Unlock()
+
+	apiID := spec.APIID
+	certSet := extractCertificatesFromSpec(spec)
 
 	// Track API association for each cert
 	for certID := range certSet {
@@ -140,29 +147,7 @@ func BuildCertUsageMap(specs []*APISpec, serverCerts []string) map[string]map[st
 	// Register certificates from each API spec
 	for _, spec := range specs {
 		apiID := spec.APIID
-		certSet := make(map[string]struct{})
-
-		// Collect all certificate references
-		for _, certID := range spec.Certificates {
-			if certID != "" {
-				certSet[certID] = struct{}{}
-			}
-		}
-		for _, certID := range spec.ClientCertificates {
-			if certID != "" {
-				certSet[certID] = struct{}{}
-			}
-		}
-		for _, certID := range spec.UpstreamCertificates {
-			if certID != "" {
-				certSet[certID] = struct{}{}
-			}
-		}
-		for _, certID := range spec.PinnedPublicKeys {
-			if certID != "" {
-				certSet[certID] = struct{}{}
-			}
-		}
+		certSet := extractCertificatesFromSpec(spec)
 
 		// Track API association for each cert
 		for certID := range certSet {
