@@ -6,6 +6,12 @@ import (
 	"github.com/TykTechnologies/structviewer"
 )
 
+// configViewerFactory is used to create config viewers.
+// It can be overridden in tests to simulate errors.
+var configViewerFactory = func(gw *Gateway) (*structviewer.Viewer, error) {
+	return gw.initConfigViewer()
+}
+
 // initConfigViewer creates a new structviewer.Viewer for the current gateway configuration.
 // A new viewer is created per-request to ensure hot-reloaded config is reflected immediately.
 func (gw *Gateway) initConfigViewer() (*structviewer.Viewer, error) {
@@ -21,7 +27,7 @@ func (gw *Gateway) initConfigViewer() (*structviewer.Viewer, error) {
 // Returns the full gateway configuration as JSON, or a specific field if ?field=<path> is provided.
 // Sensitive fields are automatically redacted based on structviewer:"obfuscate" tags.
 func (gw *Gateway) configHandler(w http.ResponseWriter, r *http.Request) {
-	viewer, err := gw.initConfigViewer()
+	viewer, err := configViewerFactory(gw)
 	if err != nil {
 		mainLog.WithError(err).Error("Failed to initialize config viewer")
 		doJSONWrite(w, http.StatusInternalServerError, apiError("Failed to initialize config viewer"))
@@ -34,7 +40,7 @@ func (gw *Gateway) configHandler(w http.ResponseWriter, r *http.Request) {
 // Returns all environment variable mappings, or a specific one if ?env=<ENV_VAR> is provided.
 // Sensitive fields are automatically redacted based on structviewer:"obfuscate" tags.
 func (gw *Gateway) envHandler(w http.ResponseWriter, r *http.Request) {
-	viewer, err := gw.initConfigViewer()
+	viewer, err := configViewerFactory(gw)
 	if err != nil {
 		mainLog.WithError(err).Error("Failed to initialize config viewer")
 		doJSONWrite(w, http.StatusInternalServerError, apiError("Failed to initialize config viewer"))

@@ -2,11 +2,13 @@ package gateway
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 
+	"github.com/TykTechnologies/structviewer"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/test"
 )
@@ -471,6 +473,72 @@ func TestConfigHandler_PolicyConnectionStringRedacted(t *testing.T) {
 			assert.Equal(t, true, fieldResp["obfuscated"])
 			// Value should NOT be the actual connection string
 			assert.NotEqual(t, "http://policy-server:3000", fieldResp["value"])
+			return true
+		},
+	})
+}
+
+func TestConfigHandler_ViewerInitError(t *testing.T) {
+	ts := StartTest(func(cnf *config.Config) {
+		cnf.EnableConfigInspection = true
+		cnf.Secret = "test-secret"
+	})
+	defer ts.Close()
+
+	// Override the factory to return an error
+	originalFactory := configViewerFactory
+	configViewerFactory = func(gw *Gateway) (*structviewer.Viewer, error) {
+		return nil, errors.New("simulated viewer initialization error")
+	}
+	defer func() {
+		configViewerFactory = originalFactory
+	}()
+
+	// /config should return 500 when viewer initialization fails
+	_, _ = ts.Run(t, test.TestCase{
+		Method:    http.MethodGet,
+		Path:      "/config",
+		AdminAuth: true,
+		Code:      http.StatusInternalServerError,
+		BodyMatchFunc: func(resp []byte) bool {
+			var errResp map[string]interface{}
+			err := json.Unmarshal(resp, &errResp)
+			assert.NoError(t, err)
+			assert.Equal(t, "error", errResp["status"])
+			assert.Equal(t, "Failed to initialize config viewer", errResp["message"])
+			return true
+		},
+	})
+}
+
+func TestEnvHandler_ViewerInitError(t *testing.T) {
+	ts := StartTest(func(cnf *config.Config) {
+		cnf.EnableConfigInspection = true
+		cnf.Secret = "test-secret"
+	})
+	defer ts.Close()
+
+	// Override the factory to return an error
+	originalFactory := configViewerFactory
+	configViewerFactory = func(gw *Gateway) (*structviewer.Viewer, error) {
+		return nil, errors.New("simulated viewer initialization error")
+	}
+	defer func() {
+		configViewerFactory = originalFactory
+	}()
+
+	// /env should return 500 when viewer initialization fails
+	_, _ = ts.Run(t, test.TestCase{
+		Method:    http.MethodGet,
+		Path:      "/env",
+		AdminAuth: true,
+		Code:      http.StatusInternalServerError,
+		BodyMatchFunc: func(resp []byte) bool {
+			var errResp map[string]interface{}
+			err := json.Unmarshal(resp, &errResp)
+			assert.NoError(t, err)
+			assert.Equal(t, "error", errResp["status"])
+			assert.Equal(t, "Failed to initialize config viewer", errResp["message"])
 			return true
 		},
 	})
