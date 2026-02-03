@@ -583,3 +583,293 @@ func createPEMFile(t *testing.T) *os.File {
 
 	return tmpfile
 }
+
+func TestBundle_VerifyStreamingChecksum(t *testing.T) {
+	// These tests do not require Redis or the full gateway infrastructure.
+	// They test the Bundle.Verify methods directly using in-memory filesystem.
+
+	t.Run("valid checksum without signature verification uses streaming", func(t *testing.T) {
+		// Set up an in-memory filesystem with bundle files
+		memFs := afero.NewMemMapFs()
+		bundlePath := "/bundles/test-bundle"
+		err := memFs.MkdirAll(bundlePath, 0755)
+		require.NoError(t, err)
+
+		// Create test files with known content
+		file1Content := []byte("test file 1 content")
+		file2Content := []byte("test file 2 content with more data")
+
+		err = afero.WriteFile(memFs, filepath.Join(bundlePath, "file1.txt"), file1Content, 0644)
+		require.NoError(t, err)
+		err = afero.WriteFile(memFs, filepath.Join(bundlePath, "file2.txt"), file2Content, 0644)
+		require.NoError(t, err)
+
+		// Calculate expected checksum (MD5 of concatenated file contents)
+		hasher := md5.New()
+		hasher.Write(file1Content)
+		hasher.Write(file2Content)
+		expectedChecksum := fmt.Sprintf("%x", hasher.Sum(nil))
+
+		// Create a minimal gateway with no PublicKeyPath (no signature verification)
+		gw := &Gateway{}
+		cfg := config.Config{}
+		cfg.PublicKeyPath = ""
+		gw.SetConfig(cfg)
+
+		bundle := Bundle{
+			Name: "test-bundle",
+			Path: bundlePath,
+			Spec: &APISpec{
+				APIDefinition: &apidef.APIDefinition{
+					CustomMiddlewareBundle: "test-bundle.zip",
+				},
+			},
+			Manifest: apidef.BundleManifest{
+				FileList: []string{"file1.txt", "file2.txt"},
+				Checksum: expectedChecksum,
+			},
+			Gw: gw,
+		}
+
+		err = bundle.Verify(memFs)
+		assert.NoError(t, err)
+	})
+
+	t.Run("invalid checksum without signature verification fails", func(t *testing.T) {
+		memFs := afero.NewMemMapFs()
+		bundlePath := "/bundles/test-bundle-invalid"
+		err := memFs.MkdirAll(bundlePath, 0755)
+		require.NoError(t, err)
+
+		// Create test files
+		file1Content := []byte("test file content")
+		err = afero.WriteFile(memFs, filepath.Join(bundlePath, "file1.txt"), file1Content, 0644)
+		require.NoError(t, err)
+
+		// Create a minimal gateway with no PublicKeyPath
+		gw := &Gateway{}
+		cfg := config.Config{}
+		cfg.PublicKeyPath = ""
+		gw.SetConfig(cfg)
+
+		bundle := Bundle{
+			Name: "test-bundle",
+			Path: bundlePath,
+			Spec: &APISpec{
+				APIDefinition: &apidef.APIDefinition{
+					CustomMiddlewareBundle: "test-bundle.zip",
+				},
+			},
+			Manifest: apidef.BundleManifest{
+				FileList: []string{"file1.txt"},
+				Checksum: "invalid-checksum-value",
+			},
+			Gw: gw,
+		}
+
+		err = bundle.Verify(memFs)
+		assert.ErrorContains(t, err, "Invalid checksum")
+	})
+
+	t.Run("missing file in bundle fails verification", func(t *testing.T) {
+		memFs := afero.NewMemMapFs()
+		bundlePath := "/bundles/test-bundle-missing"
+		err := memFs.MkdirAll(bundlePath, 0755)
+		require.NoError(t, err)
+
+		// Create a minimal gateway with no PublicKeyPath
+		gw := &Gateway{}
+		cfg := config.Config{}
+		cfg.PublicKeyPath = ""
+		gw.SetConfig(cfg)
+
+		bundle := Bundle{
+			Name: "test-bundle",
+			Path: bundlePath,
+			Spec: &APISpec{
+				APIDefinition: &apidef.APIDefinition{
+					CustomMiddlewareBundle: "test-bundle.zip",
+				},
+			},
+			Manifest: apidef.BundleManifest{
+				FileList: []string{"nonexistent.txt"},
+				Checksum: "any-checksum",
+			},
+			Gw: gw,
+		}
+
+		err = bundle.Verify(memFs)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "file does not exist")
+	})
+
+	t.Run("empty file list with correct checksum succeeds", func(t *testing.T) {
+		memFs := afero.NewMemMapFs()
+		bundlePath := "/bundles/test-bundle-empty"
+		err := memFs.MkdirAll(bundlePath, 0755)
+		require.NoError(t, err)
+
+		// MD5 of empty content
+		emptyChecksum := "d41d8cd98f00b204e9800998ecf8427e"
+
+		// Create a minimal gateway with no PublicKeyPath
+		gw := &Gateway{}
+		cfg := config.Config{}
+		cfg.PublicKeyPath = ""
+		gw.SetConfig(cfg)
+
+		bundle := Bundle{
+			Name: "test-bundle",
+			Path: bundlePath,
+			Spec: &APISpec{
+				APIDefinition: &apidef.APIDefinition{
+					CustomMiddlewareBundle: "test-bundle.zip",
+				},
+			},
+			Manifest: apidef.BundleManifest{
+				FileList: []string{},
+				Checksum: emptyChecksum,
+			},
+			Gw: gw,
+		}
+
+		err = bundle.Verify(memFs)
+		assert.NoError(t, err)
+	})
+
+	t.Run("signature verification requires signature in manifest", func(t *testing.T) {
+		memFs := afero.NewMemMapFs()
+		bundlePath := "/bundles/test-bundle-sig"
+		err := memFs.MkdirAll(bundlePath, 0755)
+		require.NoError(t, err)
+
+		// Create a PEM file for signature verification
+		pemfile := createPEMFile(t)
+		t.Cleanup(func() {
+			_ = pemfile.Close()
+			_ = os.Remove(pemfile.Name())
+		})
+
+		// Create a minimal gateway with PublicKeyPath set
+		gw := &Gateway{}
+		cfg := config.Config{}
+		cfg.PublicKeyPath = pemfile.Name()
+		gw.SetConfig(cfg)
+
+		bundle := Bundle{
+			Name: "test-bundle",
+			Path: bundlePath,
+			Spec: &APISpec{
+				APIDefinition: &apidef.APIDefinition{
+					CustomMiddlewareBundle: "test-bundle.zip",
+				},
+			},
+			Manifest: apidef.BundleManifest{
+				FileList:  []string{},
+				Checksum:  "d41d8cd98f00b204e9800998ecf8427e",
+				Signature: "", // No signature provided
+			},
+			Gw: gw,
+		}
+
+		err = bundle.Verify(memFs)
+		assert.ErrorContains(t, err, "Bundle isn't signed")
+	})
+
+	t.Run("signature verification with invalid signature fails", func(t *testing.T) {
+		memFs := afero.NewMemMapFs()
+		bundlePath := "/bundles/test-bundle-bad-sig"
+		err := memFs.MkdirAll(bundlePath, 0755)
+		require.NoError(t, err)
+
+		// Create test files
+		file1Content := []byte("test content")
+		err = afero.WriteFile(memFs, filepath.Join(bundlePath, "file1.txt"), file1Content, 0644)
+		require.NoError(t, err)
+
+		// Calculate correct checksum
+		hasher := md5.New()
+		hasher.Write(file1Content)
+		correctChecksum := fmt.Sprintf("%x", hasher.Sum(nil))
+
+		// Create a PEM file for signature verification
+		pemfile := createPEMFile(t)
+		t.Cleanup(func() {
+			_ = pemfile.Close()
+			_ = os.Remove(pemfile.Name())
+		})
+
+		// Create a minimal gateway with PublicKeyPath set
+		gw := &Gateway{}
+		cfg := config.Config{}
+		cfg.PublicKeyPath = pemfile.Name()
+		gw.SetConfig(cfg)
+
+		bundle := Bundle{
+			Name: "test-bundle",
+			Path: bundlePath,
+			Spec: &APISpec{
+				APIDefinition: &apidef.APIDefinition{
+					CustomMiddlewareBundle: "test-bundle.zip",
+				},
+			},
+			Manifest: apidef.BundleManifest{
+				FileList:  []string{"file1.txt"},
+				Checksum:  correctChecksum,
+				Signature: "aW52YWxpZC1zaWduYXR1cmU=", // base64 of "invalid-signature"
+			},
+			Gw: gw,
+		}
+
+		err = bundle.Verify(memFs)
+		assert.Error(t, err)
+		// The error could be about RSA verification or signature format
+		assert.True(t, err != nil)
+	})
+
+	t.Run("large file streaming verification", func(t *testing.T) {
+		// Test with a larger file to verify streaming works correctly
+		memFs := afero.NewMemMapFs()
+		bundlePath := "/bundles/test-bundle-large"
+		err := memFs.MkdirAll(bundlePath, 0755)
+		require.NoError(t, err)
+
+		// Create a larger test file (1MB)
+		largeContent := make([]byte, 1024*1024)
+		for i := range largeContent {
+			largeContent[i] = byte(i % 256)
+		}
+
+		err = afero.WriteFile(memFs, filepath.Join(bundlePath, "large.bin"), largeContent, 0644)
+		require.NoError(t, err)
+
+		// Calculate expected checksum
+		hasher := md5.New()
+		hasher.Write(largeContent)
+		expectedChecksum := fmt.Sprintf("%x", hasher.Sum(nil))
+
+		// Create a minimal gateway with no PublicKeyPath
+		gw := &Gateway{}
+		cfg := config.Config{}
+		cfg.PublicKeyPath = ""
+		gw.SetConfig(cfg)
+
+		bundle := Bundle{
+			Name: "test-bundle",
+			Path: bundlePath,
+			Spec: &APISpec{
+				APIDefinition: &apidef.APIDefinition{
+					CustomMiddlewareBundle: "test-bundle.zip",
+				},
+			},
+			Manifest: apidef.BundleManifest{
+				FileList: []string{"large.bin"},
+				Checksum: expectedChecksum,
+			},
+			Gw: gw,
+		}
+
+		err = bundle.Verify(memFs)
+		assert.NoError(t, err)
+	})
+}
