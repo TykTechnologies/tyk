@@ -9733,6 +9733,15 @@ func TestListenPathConflictWhenCustomDomainIsDisabled(t *testing.T) {
 	ts := StartTest(nil)
 	t.Cleanup(ts.Close)
 
+	globalConf := ts.Gw.GetConfig()
+	globalConf.EnableCustomDomains = false
+	globalConf.HttpServerOptions.EnableStrictRoutes = true
+	globalConf.HttpServerOptions.EnablePathSuffixMatching = true
+	globalConf.HttpServerOptions.EnablePathPrefixMatching = true
+
+	ts.Gw.SetConfig(globalConf)
+	defer ts.ResetTestConfig()
+
 	localClient := test.NewClientLocal()
 	createNewMockedServer := func(name string) *httptest.Server {
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -9744,7 +9753,6 @@ func TestListenPathConflictWhenCustomDomainIsDisabled(t *testing.T) {
 	}
 
 	listenPaths := map[string]string{
-		"/caa":                   "",
 		"/caas2itsamu0456n07gfe": "",
 		"/caas2itsamu04567m9pxl": "",
 		"/caas2itsamu0456qnu2sj": "",
@@ -9762,7 +9770,6 @@ func TestListenPathConflictWhenCustomDomainIsDisabled(t *testing.T) {
 		mockedApis = append(mockedApis, func(spec *APISpec) {
 			spec.APIID = fmt.Sprintf("api-%s", cutPrefix)
 			spec.Proxy.ListenPath = listenPath
-			spec.IsOAS = false
 			spec.Proxy.TargetURL = mockedServer.URL
 			spec.Proxy.DisableStripSlash = true
 			spec.Proxy.StripListenPath = true
@@ -9771,15 +9778,35 @@ func TestListenPathConflictWhenCustomDomainIsDisabled(t *testing.T) {
 		listenPaths[listenPath] = mockedResponse
 	}
 
-	t.Run("all true except custom domain", func(t *testing.T) {
-		globalConf := ts.Gw.GetConfig()
-		globalConf.EnableCustomDomains = false
-		globalConf.HttpServerOptions.EnableStrictRoutes = true
-		globalConf.HttpServerOptions.EnablePathSuffixMatching = true
-		globalConf.HttpServerOptions.EnablePathPrefixMatching = true
+	t.Run("conflicting api with custom domain enabled and set", func(t *testing.T) {
+		mockedApis = append(mockedApis, func(spec *APISpec) {
+			spec.APIID = "api-caa"
+			spec.DomainDisabled = false
+			spec.Domain = "test.com"
+			spec.Proxy.ListenPath = "/caa"
+			spec.Proxy.DisableStripSlash = true
+			spec.Proxy.StripListenPath = true
+		})
 
-		ts.Gw.SetConfig(globalConf)
-		defer ts.ResetTestConfig()
+		ts.Gw.BuildAndLoadAPI(mockedApis...)
+
+		var tcs []test.TestCase
+
+		for lp, resp := range listenPaths {
+			tcs = append(tcs, test.TestCase{Client: localClient, Code: 200, Path: lp, BodyMatch: resp})
+		}
+
+		_, _ = ts.Run(t, tcs...)
+	})
+
+	t.Run("conflicting api with custom domain disabled", func(t *testing.T) {
+		mockedApis = append(mockedApis, func(spec *APISpec) {
+			spec.APIID = "api-caa"
+			spec.DomainDisabled = true
+			spec.Proxy.ListenPath = "/caa"
+			spec.Proxy.DisableStripSlash = true
+			spec.Proxy.StripListenPath = true
+		})
 
 		ts.Gw.BuildAndLoadAPI(mockedApis...)
 
