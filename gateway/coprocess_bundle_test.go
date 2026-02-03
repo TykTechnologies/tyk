@@ -552,7 +552,7 @@ func TestBundle_Verify(t *testing.T) {
 					},
 				},
 				Manifest: apidef.BundleManifest{
-					Checksum: "d41d8cd98f00b204e9800998ecf8427e", // MD5 of empty string
+					Checksum: "d41d8cd98f00b204e9800998ecf8427e", // MD5 of the empty string
 					FileList: []string{},
 				},
 				Gw: &Gateway{},
@@ -615,8 +615,8 @@ func TestBundle_Verify(t *testing.T) {
 				Gw: &Gateway{},
 			},
 			setupFs: func(fs afero.Fs, bundlePath string) {
-				afero.WriteFile(fs, filepath.Join(bundlePath, "file1.py"), []byte("file1 content"), 0644)
-				afero.WriteFile(fs, filepath.Join(bundlePath, "file2.py"), []byte("file2 content"), 0644)
+				assert.NoError(t, afero.WriteFile(fs, filepath.Join(bundlePath, "file1.py"), []byte("file1 content"), 0644))
+				assert.NoError(t, afero.WriteFile(fs, filepath.Join(bundlePath, "file2.py"), []byte("file2 content"), 0644))
 			},
 			usePublicKey: false,
 			wantErr:      false,
@@ -707,23 +707,18 @@ func createPEMFile(t *testing.T) *os.File {
 	return tmpfile
 }
 
-// setupBenchmarkBundle creates a Bundle with the specified number of files and file size.
-// It writes the files to the provided filesystem and computes the correct MD5 checksum.
 func setupBenchmarkBundle(b *testing.B, fs afero.Fs, bundlePath string, fileSize, numFiles int) *Bundle {
 	b.Helper()
 
-	// Create bundle directory
 	if err := fs.MkdirAll(bundlePath, 0755); err != nil {
 		b.Fatalf("failed to create bundle directory: %v", err)
 	}
 
-	// Generate file content (deterministic: repeated 'A' bytes)
 	fileContent := make([]byte, fileSize)
 	for i := range fileContent {
 		fileContent[i] = 'A'
 	}
 
-	// Create files and build file list
 	fileList := make([]string, numFiles)
 	md5Hash := md5.New()
 
@@ -736,13 +731,11 @@ func setupBenchmarkBundle(b *testing.B, fs afero.Fs, bundlePath string, fileSize
 			b.Fatalf("failed to write file %s: %v", fileName, err)
 		}
 
-		// Add to hash (same order as Verify reads files)
 		md5Hash.Write(fileContent)
 	}
 
 	checksum := fmt.Sprintf("%x", md5Hash.Sum(nil))
 
-	// For empty file list, use MD5 of empty string
 	if numFiles == 0 {
 		checksum = "d41d8cd98f00b204e9800998ecf8427e"
 	}
@@ -782,7 +775,7 @@ func BenchmarkBundle_Verify(b *testing.B) {
 			bundlePath := "/test/bundles/benchmark-bundle"
 			bundle := setupBenchmarkBundle(b, fs, bundlePath, bm.fileSize, bm.numFiles)
 
-			// Configure gateway with no public key (no signature verification)
+			// Configure GW with no public key (no signature verification)
 			bundle.Gw.SetConfig(config.Config{})
 
 			b.ResetTimer()

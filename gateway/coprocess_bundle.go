@@ -17,6 +17,7 @@ import (
 	"path"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/cenk/backoff"
@@ -45,11 +46,18 @@ type Bundle struct {
 	Gw       *Gateway `json:"-"`
 }
 
+var bundleVerifyPool = sync.Pool{
+	New: func() interface{} {
+		buffer := make([]byte, 32*1024)
+		return &buffer
+	},
+}
+
 // Verify performs signature verification on the bundle file.
 func (b *Bundle) Verify(bundleFs afero.Fs) error {
-	/*log.WithFields(logrus.Fields{
+	log.WithFields(logrus.Fields{
 		"prefix": "main",
-	}).Info("----> Verifying bundle: ", b.Spec.CustomMiddlewareBundle)*/
+	}).Info("----> Verifying bundle: ", b.Spec.CustomMiddlewareBundle)
 
 	var useSignature = b.Gw.GetConfig().PublicKeyPath != ""
 
@@ -78,13 +86,16 @@ func (b *Bundle) Verify(bundleFs afero.Fs) error {
 		w = io.MultiWriter(md5Hash, sha256Hash)
 	}
 
+	buf := bundleVerifyPool.Get().(*[]byte)
+	defer bundleVerifyPool.Put(buf)
+
 	for _, f := range b.Manifest.FileList {
 		extractedPath := filepath.Join(b.Path, f)
 		file, err := bundleFs.Open(extractedPath)
 		if err != nil {
 			return err
 		}
-		_, err = io.Copy(w, file)
+		_, err = io.CopyBuffer(w, file, *buf)
 		file.Close()
 		if err != nil {
 			return err
@@ -432,7 +443,7 @@ func (gw *Gateway) loadBundleWithFs(spec *APISpec, bundleFs afero.Fs) error {
 			Gw:   gw,
 		}
 
-		err = loadBundleManifest(bundleFs, &bundle, spec, false)
+		err = loadBundleManifest(bundleFs, &bundle, spec, gw.GetConfig().SkipVerifyExistingPluginBundle)
 		if err != nil {
 			log.WithFields(logrus.Fields{
 				"prefix": "main",
