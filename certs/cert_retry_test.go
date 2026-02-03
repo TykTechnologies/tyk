@@ -310,7 +310,9 @@ func TestCertificateLoadingWithRetry(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			mockStorage := NewMockStorage(t, certMap(certPEM, "test-cert-id"), WithFailFirst(tt.failureCount))
 
-			handler := NewCertificateManager(mockStorage, "secret", nil, false, WithMaxRetries(0))
+			handler := NewCertificateManager(mockStorage, "secret", nil, false,
+				WithMaxRetries(0),
+				WithBackoffIntervals(3*time.Second, 10*time.Millisecond, 200*time.Millisecond))
 
 			t.Logf("Scenario: MDCB fails %d times before succeeding", tt.failureCount)
 
@@ -362,7 +364,7 @@ func TestCertificateLoadingWithFlakyConnection(t *testing.T) {
 	certIDs := []string{"cert-1", "cert-2", "cert-3"}
 	mockStorage := NewMockStorage(t, certMap(certPEM, certIDs...), WithFailOn(1, 2, 4))
 
-	handler := NewCertificateManager(mockStorage, "secret", nil, false, WithMaxRetries(0))
+	handler := NewCertificateManager(mockStorage, "secret", nil, false, WithMaxRetries(0), WithBackoffIntervals(3*time.Second, 10*time.Millisecond, 200*time.Millisecond))
 
 	t.Log("Testing flaky MDCB connection (success → failure → success)")
 	certs := handler.List(certIDs, CertificatePrivate)
@@ -398,7 +400,7 @@ func TestMultipleCertificatesLoading(t *testing.T) {
 	// Simulate MDCB failing 3 times before becoming ready
 	mockStorage := NewMockStorage(t, certMap(certPEM, certIDs...), WithFailFirst(3))
 
-	handler := NewCertificateManager(mockStorage, "secret", nil, false, WithMaxRetries(0))
+	handler := NewCertificateManager(mockStorage, "secret", nil, false, WithMaxRetries(0), WithBackoffIntervals(3*time.Second, 10*time.Millisecond, 200*time.Millisecond))
 
 	t.Log("Loading 5 certificates with MDCB failing 3 times before ready")
 	startTime := time.Now()
@@ -453,7 +455,7 @@ func TestCertificateLoadingScale100(t *testing.T) {
 	// Simulate MDCB down for first 5 attempts (~1 second of retries)
 	mockStorage := NewMockStorage(t, certMap(certPEM, certIDs...), WithFailFirst(5))
 
-	handler := NewCertificateManager(mockStorage, "secret", nil, false, WithMaxRetries(0))
+	handler := NewCertificateManager(mockStorage, "secret", nil, false, WithMaxRetries(0), WithBackoffIntervals(3*time.Second, 10*time.Millisecond, 200*time.Millisecond))
 
 	t.Log("SCALE TEST: Loading 100 certificates with MDCB failing 5 times before ready")
 	startTime := time.Now()
@@ -518,7 +520,7 @@ func TestCertificateLoadingScale1000(t *testing.T) {
 	// Simulate MDCB down for first 5 attempts (~1 second of retries)
 	mockStorage := NewMockStorage(t, certMap(certPEM, certIDs...), WithFailFirst(5))
 
-	handler := NewCertificateManager(mockStorage, "secret", nil, false, WithMaxRetries(0))
+	handler := NewCertificateManager(mockStorage, "secret", nil, false, WithMaxRetries(0), WithBackoffIntervals(3*time.Second, 10*time.Millisecond, 200*time.Millisecond))
 
 	t.Log("LARGE SCALE TEST: Loading 1000 certificates with MDCB failing 5 times before ready")
 	startTime := time.Now()
@@ -596,7 +598,7 @@ func BenchmarkCertificateLoadingPerformance(b *testing.B) {
 				// Create fresh mock for each iteration
 				mockStorage := NewMockStorage(&testing.T{}, certMap(certPEM, certIDs...), WithFailFirst(bm.failures))
 
-				handler := NewCertificateManager(mockStorage, "secret", nil, false, WithMaxRetries(0))
+				handler := NewCertificateManager(mockStorage, "secret", nil, false, WithMaxRetries(0), WithBackoffIntervals(3*time.Second, 10*time.Millisecond, 200*time.Millisecond))
 				certs := handler.List(certIDs, CertificatePrivate)
 
 				if len(certs) != bm.certCount {
@@ -624,7 +626,7 @@ func BenchmarkSkipBackoffOptimization(b *testing.B) {
 		for i := 0; i < b.N; i++ {
 			mockStorage := NewMockStorage(&testing.T{}, certMap(certPEM, certIDs...), WithFailFirst(failures))
 
-			handler := NewCertificateManager(mockStorage, "secret", nil, false, WithMaxRetries(0))
+			handler := NewCertificateManager(mockStorage, "secret", nil, false, WithMaxRetries(0), WithBackoffIntervals(3*time.Second, 10*time.Millisecond, 200*time.Millisecond))
 			certs := handler.List(certIDs, CertificatePrivate)
 
 			if len(certs) != certCount {
@@ -638,7 +640,7 @@ func BenchmarkSkipBackoffOptimization(b *testing.B) {
 		for i := 0; i < b.N; i++ {
 			mockStorage := NewMockStorage(&testing.T{}, certMap(certPEM, certIDs...), WithFailFirst(failures))
 
-			handler := NewCertificateManager(mockStorage, "secret", nil, false, WithMaxRetries(0))
+			handler := NewCertificateManager(mockStorage, "secret", nil, false, WithMaxRetries(0), WithBackoffIntervals(3*time.Second, 10*time.Millisecond, 200*time.Millisecond))
 
 			// Simulate unoptimized behavior: each cert does full backoff
 			// Load certificates one at a time (no skipBackoff benefit)
@@ -665,7 +667,7 @@ func BenchmarkCertificateCacheHit(b *testing.B) {
 	certIDs := []string{"cert-1", "cert-2", "cert-3", "cert-4", "cert-5"}
 	mockStorage := NewMockStorage(&testing.T{}, certMap(certPEM, certIDs...), WithFailFirst(0))
 
-	handler := NewCertificateManager(mockStorage, "secret", nil, false, WithMaxRetries(0))
+	handler := NewCertificateManager(mockStorage, "secret", nil, false, WithMaxRetries(0), WithBackoffIntervals(3*time.Second, 10*time.Millisecond, 200*time.Millisecond))
 	handler.List(certIDs, CertificatePrivate)
 
 	b.ResetTimer()
