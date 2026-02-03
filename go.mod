@@ -1,6 +1,6 @@
 module github.com/TykTechnologies/tyk
 
-go 1.25.5
+go 1.24.6
 
 godebug (
 	tls10server=1
