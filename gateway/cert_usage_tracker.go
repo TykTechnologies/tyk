@@ -80,9 +80,9 @@ func (cr *certUsageTracker) ReplaceAll(newApis map[string]map[string]struct{}) {
 	cr.apis = newApis
 }
 
-// BuildCertUsageMap creates a new certificate usage map from API specs and server certs.
+// CollectCertUsageMap creates a new certificate usage map from API specs and server certs.
 // This is a helper function for building a complete usage map offline before atomic replacement.
-func BuildCertUsageMap(specs []*APISpec, serverCerts []string) map[string]map[string]struct{} {
+func CollectCertUsageMap(specs []*APISpec, serverCerts []string) map[string]map[string]struct{} {
 	usageMap := make(map[string]map[string]struct{})
 
 	// Register server certificates

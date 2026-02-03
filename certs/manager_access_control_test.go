@@ -21,7 +21,7 @@ func (m *mockUsageTracker) Required(certID string) bool {
 	return m.requiredCerts[certID]
 }
 
-func (m *mockUsageTracker) APIs(certID string) []string {
+func (m *mockUsageTracker) APIs(_ string) []string {
 	return nil
 }
 

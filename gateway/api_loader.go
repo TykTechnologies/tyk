@@ -1053,7 +1053,7 @@ func (gw *Gateway) loadApps(specs []*APISpec) {
 	// Only build usage map in RPC mode (when tracker exists)
 	if gw.certUsageTracker != nil {
 		// Build the complete usage map offline (no locks held during construction)
-		newUsageMap := BuildCertUsageMap(specs, gw.GetConfig().HttpServerOptions.SSLCertificates)
+		newUsageMap := CollectCertUsageMap(specs, gw.GetConfig().HttpServerOptions.SSLCertificates)
 
 		// Atomically replace the old usage map with the new one
 		// This ensures no partial state is visible to concurrent readers

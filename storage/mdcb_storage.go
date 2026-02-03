@@ -4,8 +4,9 @@ import (
 	"errors"
 	"strings"
 
-	"github.com/TykTechnologies/tyk/config"
 	"github.com/sirupsen/logrus"
+
+	"github.com/TykTechnologies/tyk/config"
 )
 
 // certUsageTracker tracks which certificates are used by which APIs.

@@ -30,9 +30,9 @@ func TestNewUsageTracker(t *testing.T) {
 	assert.Equal(t, 0, cr.Len())
 }
 
-func TestBuildCertUsageMap(t *testing.T) {
+func TestCollectCertUsageMap(t *testing.T) {
 	t.Run("empty specs and no server certs", func(t *testing.T) {
-		usageMap := BuildCertUsageMap(nil, nil)
+		usageMap := CollectCertUsageMap(nil, nil)
 
 		assert.NotNil(t, usageMap)
 		assert.Empty(t, usageMap)
@@ -40,7 +40,7 @@ func TestBuildCertUsageMap(t *testing.T) {
 
 	t.Run("only server certs, no API specs", func(t *testing.T) {
 		serverCerts := []string{"server-cert1", "server-cert2"}
-		usageMap := BuildCertUsageMap(nil, serverCerts)
+		usageMap := CollectCertUsageMap(nil, serverCerts)
 
 		assert.Len(t, usageMap, 2)
 		assert.Contains(t, usageMap, "server-cert1")
@@ -56,7 +56,7 @@ func TestBuildCertUsageMap(t *testing.T) {
 			createTestAPISpec("api1", []string{"cert1", "cert2"}, nil, nil, nil),
 			createTestAPISpec("api2", []string{"cert3"}, nil, nil, nil),
 		}
-		usageMap := BuildCertUsageMap(specs, nil)
+		usageMap := CollectCertUsageMap(specs, nil)
 
 		assert.Len(t, usageMap, 3)
 		assert.Contains(t, usageMap, "cert1")
@@ -74,7 +74,7 @@ func TestBuildCertUsageMap(t *testing.T) {
 			createTestAPISpec("api1", []string{"cert1"}, nil, nil, nil),
 		}
 		serverCerts := []string{"server-cert1"}
-		usageMap := BuildCertUsageMap(specs, serverCerts)
+		usageMap := CollectCertUsageMap(specs, serverCerts)
 
 		assert.Len(t, usageMap, 2)
 		assert.Contains(t, usageMap, "cert1")
@@ -90,7 +90,7 @@ func TestBuildCertUsageMap(t *testing.T) {
 			createTestAPISpec("api2", []string{"shared-cert"}, nil, nil, nil),
 			createTestAPISpec("api3", []string{"shared-cert", "cert3"}, nil, nil, nil),
 		}
-		usageMap := BuildCertUsageMap(specs, nil)
+		usageMap := CollectCertUsageMap(specs, nil)
 
 		assert.Len(t, usageMap, 2)
 		assert.Contains(t, usageMap, "shared-cert")
@@ -115,7 +115,7 @@ func TestBuildCertUsageMap(t *testing.T) {
 				map[string]string{"upstream": "cert3"},
 				map[string]string{"pinned": "cert4"}),
 		}
-		usageMap := BuildCertUsageMap(specs, nil)
+		usageMap := CollectCertUsageMap(specs, nil)
 
 		assert.Len(t, usageMap, 4)
 		assert.Contains(t, usageMap, "cert1")
@@ -135,7 +135,7 @@ func TestBuildCertUsageMap(t *testing.T) {
 			createTestAPISpec("api1", []string{"cert1", "", "cert2"}, nil, nil, nil),
 		}
 		serverCerts := []string{"server-cert1", "", "server-cert2"}
-		usageMap := BuildCertUsageMap(specs, serverCerts)
+		usageMap := CollectCertUsageMap(specs, serverCerts)
 
 		assert.Len(t, usageMap, 4)
 		assert.Contains(t, usageMap, "cert1")
@@ -152,7 +152,7 @@ func TestBuildCertUsageMap(t *testing.T) {
 				map[string]string{"upstream": "cert2"},
 				nil),
 		}
-		usageMap := BuildCertUsageMap(specs, nil)
+		usageMap := CollectCertUsageMap(specs, nil)
 
 		assert.Len(t, usageMap, 2)
 		assert.Contains(t, usageMap, "cert1")
@@ -168,7 +168,7 @@ func TestBuildCertUsageMap(t *testing.T) {
 			createTestAPISpec("api1", []string{"shared-cert"}, nil, nil, nil),
 		}
 		serverCerts := []string{"shared-cert"}
-		usageMap := BuildCertUsageMap(specs, serverCerts)
+		usageMap := CollectCertUsageMap(specs, serverCerts)
 
 		assert.Len(t, usageMap, 1)
 		assert.Contains(t, usageMap, "shared-cert")
