@@ -9541,6 +9541,41 @@ func TestSortSpecsByListenPath(t *testing.T) {
 				"/products/{category}/items",
 			},
 		},
+		{
+			name: "TT-16219: Regex Path Prioritized Over Generic Root Path",
+			specs: []*APISpec{
+				createSpec("/"),
+				createSpec("/{param}"),
+			},
+			expected: []string{
+				"/{param}",
+				"/",
+			},
+		},
+		{
+			name: "TT-16219: Regex Path Prioritized Over Generic Root Path (Reverse Order)",
+			specs: []*APISpec{
+				createSpec("/{param}"),
+				createSpec("/"),
+			},
+			expected: []string{
+				"/{param}",
+				"/",
+			},
+		},
+		{
+			name: "TT-16219: Multiple Regex Paths vs Generic Root Path",
+			specs: []*APISpec{
+				createSpec("/"),
+				createSpec("/{id}"),
+				createSpec("/{category}/{id}"),
+			},
+			expected: []string{
+				"/{category}/{id}",
+				"/{id}",
+				"/",
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -9557,6 +9592,64 @@ func TestSortSpecsByListenPath(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestListenPathLength(t *testing.T) {
+	tests := []struct {
+		name       string
+		listenPath string
+		expected   int
+	}{
+		{
+			name:       "Root path",
+			listenPath: "/",
+			expected:   1,
+		},
+		{
+			name:       "Simple path",
+			listenPath: "/api",
+			expected:   4,
+		},
+		{
+			name:       "Path with single regex param",
+			listenPath: "/{param}",
+			expected:   2, // 1 (slash count) + 1 (regex bonus)
+		},
+		{
+			name:       "Path with regex and static segments",
+			listenPath: "/api/{id}/resource",
+			expected:   15, // 3 (slashes) + 3 (api) + 8 (resource) + 1 (regex bonus)
+		},
+		{
+			name:       "Path with multiple regex params",
+			listenPath: "/{category}/{id}",
+			expected:   3, // 2 (slashes) + 1 (regex bonus)
+		},
+		{
+			name:       "TT-16219: Regex path length greater than generic root",
+			listenPath: "/{param}",
+			expected:   2, // Must be > 1 (length of "/") to ensure regex is prioritized
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := listenPathLength(tt.listenPath)
+			if result != tt.expected {
+				t.Errorf("listenPathLength(%q) = %d, expected %d", tt.listenPath, result, tt.expected)
+			}
+		})
+	}
+
+	// Ensure regex path has higher score than root path for TT-16219
+	t.Run("TT-16219: Regex path must have higher score than root path", func(t *testing.T) {
+		rootLength := listenPathLength("/")
+		regexLength := listenPathLength("/{param}")
+		if regexLength <= rootLength {
+			t.Errorf("Regex path '/{param}' (length=%d) must have higher score than root path '/' (length=%d) to ensure proper routing priority",
+				regexLength, rootLength)
+		}
+	})
 }
 
 func TestRecoverFromLoadApiPanic(t *testing.T) {
