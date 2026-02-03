@@ -553,3 +553,32 @@ func TestOTelConfig_BackwardCompatibility(t *testing.T) {
 		assert.Equal(t, tyktrace.NOOP_PROVIDER, provider.Type())
 	})
 }
+
+func TestExtractTraceAndSpanID(t *testing.T) {
+	t.Run("returns empty strings when no span in context", func(t *testing.T) {
+		traceID, spanID := ExtractTraceAndSpanID(context.Background())
+		assert.Equal(t, "", traceID)
+		assert.Equal(t, "", spanID)
+	})
+
+	t.Run("returns both trace and span IDs when span is present", func(t *testing.T) {
+		provider := makeProviderHTTP(t)
+
+		ctx := context.Background()
+		_, span := provider.Tracer().Start(ctx, "extract-both-test")
+		defer span.End()
+
+		ctx = ContextWithSpan(ctx, span)
+
+		traceID, spanID := ExtractTraceAndSpanID(ctx)
+
+		assert.NotEmpty(t, traceID, "expected non-empty trace id")
+		assert.NotEmpty(t, spanID, "expected non-empty span id")
+
+		assert.Equal(t, span.SpanContext().TraceID().String(), traceID)
+		assert.Equal(t, span.SpanContext().SpanID().String(), spanID)
+
+		assert.Len(t, traceID, 32, "trace_id should be 32 characters long")
+		assert.Len(t, spanID, 16, "span_id should be 16 characters long")
+	})
+}
