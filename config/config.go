@@ -1128,6 +1128,9 @@ type Config struct {
 	// Disable TLS validation for bundle URLs
 	BundleInsecureSkipVerify bool `bson:"bundle_insecure_skip_verify" json:"bundle_insecure_skip_verify"`
 
+	// SkipVerifyExistingPluginBundle skips checksum verification for plugin bundles already on disk.
+	SkipVerifyExistingPluginBundle bool `bson:"skip_verify_existing_plugin_bundle" json:"skip_verify_existing_plugin_bundle"`
+
 	// Set to true if you are using JSVM custom middleware or virtual endpoints.
 	EnableJSVM bool `json:"enable_jsvm"`
 
