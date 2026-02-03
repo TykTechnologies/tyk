@@ -31,14 +31,7 @@ func (k *RateLimitForAPI) shouldEnable() bool {
 		return false
 	}
 
-	if k.hasPerEndpointRateLimits() {
-		return true
-	}
-
-	return k.hasValidGlobalRateLimit()
-}
-
-func (k *RateLimitForAPI) hasPerEndpointRateLimits() bool {
+	// per endpoint rate limits
 	for _, version := range k.Spec.VersionData.Versions {
 		for _, v := range version.ExtendedPaths.RateLimit {
 			if !v.Disabled {
@@ -46,27 +39,23 @@ func (k *RateLimitForAPI) hasPerEndpointRateLimits() bool {
 			}
 		}
 	}
-	return false
+
+	// global api rate limit
+	if k.Spec.GlobalRateLimit.Rate == 0 || k.Spec.GlobalRateLimit.Disabled {
+		return false
+	}
+
+	return true
 }
 
-func (k *RateLimitForAPI) hasValidGlobalRateLimit() bool {
-	return k.Spec.GlobalRateLimit.Rate > 0 && !k.Spec.GlobalRateLimit.Disabled
-}
-
-// getSession returns the rate limit session and keyname for the request.
-// If a per-endpoint rate limit matches the request path, it returns a session
-// with that limit and a unique keyname for independent tracking.
-// Otherwise, it returns the global API rate limit session and keyname.
-// Both return values must be used together to ensure correct rate limit tracking.
-func (k *RateLimitForAPI) getSession(r *http.Request) (*user.SessionState, string) {
+func (k *RateLimitForAPI) getSession(r *http.Request) *user.SessionState {
 	versionInfo, _ := k.Spec.Version(r)
 	versionPaths := k.Spec.RxPaths[versionInfo.Name]
 
 	spec, ok := k.Spec.FindSpecMatchesStatus(r, versionPaths, RateLimit)
 	if ok {
 		if limits := spec.RateLimit; limits.Valid() {
-			// Track per-endpoint rate limits with a unique key based on method:path hash.
-			// This ensures each endpoint has independent rate limit tracking in Redis.
+			// track per-endpoint with a hash of the path
 			keyname := k.keyName + "-" + storage.HashStr(fmt.Sprintf("%s:%s", limits.Method, limits.Path))
 
 			session := &user.SessionState{
@@ -76,12 +65,11 @@ func (k *RateLimitForAPI) getSession(r *http.Request) (*user.SessionState, strin
 			}
 			session.SetKeyHash(storage.HashKey(keyname, k.Gw.GetConfig().HashKeys))
 
-			return session, keyname
+			return session
 		}
 	}
 
-	// No per-endpoint limit found, use global API rate limit.
-	return k.apiSess, k.keyName
+	return k.apiSess
 }
 
 func (k *RateLimitForAPI) EnabledForSpec() bool {
@@ -106,21 +94,16 @@ func (k *RateLimitForAPI) EnabledForSpec() bool {
 // ProcessRequest will run any checks on the request on the way through the system, return an error to have the chain fail
 func (k *RateLimitForAPI) ProcessRequest(_ http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
 	// Skip rate limiting and quotas for looping
-	checkLimits := ctxCheckLimits(r)
-	if !checkLimits {
+	if !ctxCheckLimits(r) {
 		return nil, http.StatusOK
 	}
 
 	storeRef := k.Gw.GlobalSessionManager.Store()
 
-	// Get both the session and keyname - both are required for correct rate limit tracking.
-	// The keyname determines which Redis bucket is used for rate limiting.
-	session, keyName := k.getSession(r)
-
 	reason := k.Gw.SessionLimiter.ForwardMessage(
 		r,
-		session,
-		keyName,
+		k.getSession(r),
+		k.keyName,
 		k.quotaKey,
 		storeRef,
 		true,
@@ -129,10 +112,10 @@ func (k *RateLimitForAPI) ProcessRequest(_ http.ResponseWriter, r *http.Request,
 		false,
 	)
 
-	k.emitRateLimitEvents(r, keyName)
+	k.emitRateLimitEvents(r, k.keyName)
 
 	if reason == sessionFailRateLimit {
-		return k.handleRateLimitFailure(r, event.RateLimitExceeded, "API Rate Limit Exceeded", keyName)
+		return k.handleRateLimitFailure(r, event.RateLimitExceeded, "API Rate Limit Exceeded", k.keyName)
 	}
 
 	// Request is valid, carry on
