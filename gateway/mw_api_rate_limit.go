@@ -39,25 +39,9 @@ func (k *RateLimitForAPI) shouldEnable() bool {
 }
 
 func (k *RateLimitForAPI) hasPerEndpointRateLimits() bool {
-	return k.hasPerEndpointRateLimitsInExtendedPaths() || k.hasPerEndpointRateLimitsInRxPaths()
-}
-
-func (k *RateLimitForAPI) hasPerEndpointRateLimitsInExtendedPaths() bool {
 	for _, version := range k.Spec.VersionData.Versions {
 		for _, v := range version.ExtendedPaths.RateLimit {
 			if !v.Disabled {
-				return true
-			}
-		}
-	}
-	return false
-}
-
-// MCP VEM rate limits are compiled into rxPaths, not ExtendedPaths.
-func (k *RateLimitForAPI) hasPerEndpointRateLimitsInRxPaths() bool {
-	for _, rxPaths := range k.Spec.RxPaths {
-		for _, spec := range rxPaths {
-			if spec.Status == RateLimit && spec.RateLimit.Valid() {
 				return true
 			}
 		}
