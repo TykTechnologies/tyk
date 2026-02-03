@@ -15,6 +15,8 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/sirupsen/logrus/hooks/test"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/TykTechnologies/tyk/internal/otel"
 )
 
 func TestGetLogEntryForRequest(t *testing.T) {
@@ -244,6 +246,121 @@ func TestGatewayLogJWKError(t *testing.T) {
 			if assert.Len(t, hook.Entries, 1) {
 				assert.Equal(t, logrus.ErrorLevel, hook.LastEntry().Level)
 				assert.Equal(t, tc.expectedLog, hook.LastEntry().Message)
+			}
+		})
+	}
+}
+
+func TestGetLogEntryForRequest_TraceAndSpanIDs(t *testing.T) {
+	tests := []struct {
+		name          string
+		otelEnabled   bool
+		hasTraceCtx   bool
+		expectTraceID bool
+		expectSpanID  bool
+	}{
+		{
+			name:          "OTel enabled with trace context",
+			otelEnabled:   true,
+			hasTraceCtx:   true,
+			expectTraceID: true,
+			expectSpanID:  true,
+		},
+		{
+			name:          "OTel enabled without trace context",
+			otelEnabled:   true,
+			hasTraceCtx:   false,
+			expectTraceID: false,
+			expectSpanID:  false,
+		},
+		{
+			name:          "OTel disabled with trace context",
+			otelEnabled:   false,
+			hasTraceCtx:   true,
+			expectTraceID: false,
+			expectSpanID:  false,
+		},
+		{
+			name:          "OTel disabled without trace context",
+			otelEnabled:   false,
+			hasTraceCtx:   false,
+			expectTraceID: false,
+			expectSpanID:  false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ts := StartTest(nil)
+			defer ts.Close()
+
+			// Setup gateway with OTel config
+			globalConf := ts.Gw.GetConfig()
+			globalConf.OpenTelemetry.Enabled = tt.otelEnabled
+			ts.Gw.SetConfig(globalConf)
+
+			// Create request
+			req := httptest.NewRequest("GET", "http://tyk.io/test", nil)
+			req.RemoteAddr = "127.0.0.1:80"
+
+			// Setup trace context if needed
+			if tt.hasTraceCtx {
+				// Initialize OpenTelemetry and create trace context
+				globalConf.OpenTelemetry.Exporter = "grpc"
+				globalConf.OpenTelemetry.Endpoint = "localhost:4317"
+				ts.Gw.SetConfig(globalConf)
+
+				ts.Gw.TracerProvider = otel.InitOpenTelemetry(
+					ts.Gw.ctx,
+					log,
+					&globalConf.OpenTelemetry,
+					"test-gateway",
+					"1.0.0",
+					false,
+					"",
+					false,
+					nil,
+				)
+
+				ctx, span := ts.Gw.TracerProvider.Tracer().Start(ts.Gw.ctx, "test-span")
+				defer span.End()
+				req = req.WithContext(ctx)
+			}
+
+			entry := ts.Gw.getLogEntryForRequest(nil, req, "", nil)
+
+			// Verify trace_id presence
+			traceID, hasTraceID := entry.Data["trace_id"]
+			assert.Equal(t, tt.expectTraceID, hasTraceID, "trace_id presence mismatch")
+
+			// Verify span_id presence
+			spanID, hasSpanID := entry.Data["span_id"]
+			assert.Equal(t, tt.expectSpanID, hasSpanID, "span_id presence mismatch")
+
+			// For positive cases, verify format and consistency with extraction functions
+			if hasTraceID && hasSpanID {
+				// Verify types
+				traceIDStr, ok := traceID.(string)
+				assert.True(t, ok, "trace_id should be a string")
+				spanIDStr, ok := spanID.(string)
+				assert.True(t, ok, "span_id should be a string")
+
+				// Verify formats
+				assert.Len(t, traceIDStr, 32, "trace_id should be 32 characters long")
+				assert.Len(t, spanIDStr, 16, "span_id should be 16 characters long")
+
+				// Verify consistency with extraction functions
+				expectedTraceID := otel.ExtractTraceID(req.Context())
+				assert.Equal(t, expectedTraceID, traceIDStr, "trace_id should match otel.ExtractTraceID()")
+
+				extractedTraceID, extractedSpanID := otel.ExtractTraceAndSpanID(req.Context())
+				assert.Equal(t, extractedTraceID, traceIDStr, "trace_id should match otel.ExtractTraceAndSpanID()")
+				assert.Equal(t, extractedSpanID, spanIDStr, "span_id should match otel.ExtractTraceAndSpanID()")
+
+				// Verify IDs match the span context
+				span := otel.SpanFromContext(req.Context())
+				assert.Equal(t, span.SpanContext().TraceID().String(), traceIDStr, "trace_id should match span context")
+				assert.Equal(t, span.SpanContext().SpanID().String(), spanIDStr, "span_id should match span context")
 			}
 		})
 	}
