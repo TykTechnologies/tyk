@@ -6,6 +6,8 @@ import (
 	"github.com/TykTechnologies/structviewer"
 )
 
+const errMsgConfigViewerInit = "Failed to initialize config viewer"
+
 // configViewerFactory is used to create config viewers.
 // It can be overridden in tests to simulate errors.
 var configViewerFactory = func(gw *Gateway) (*structviewer.Viewer, error) {
@@ -29,8 +31,8 @@ func (gw *Gateway) initConfigViewer() (*structviewer.Viewer, error) {
 func (gw *Gateway) configHandler(w http.ResponseWriter, r *http.Request) {
 	viewer, err := configViewerFactory(gw)
 	if err != nil {
-		mainLog.WithError(err).Error("Failed to initialize config viewer")
-		doJSONWrite(w, http.StatusInternalServerError, apiError("Failed to initialize config viewer"))
+		mainLog.WithError(err).Error(errMsgConfigViewerInit)
+		doJSONWrite(w, http.StatusInternalServerError, apiError(errMsgConfigViewerInit))
 		return
 	}
 	viewer.ConfigHandler(w, r)
@@ -42,8 +44,8 @@ func (gw *Gateway) configHandler(w http.ResponseWriter, r *http.Request) {
 func (gw *Gateway) envHandler(w http.ResponseWriter, r *http.Request) {
 	viewer, err := configViewerFactory(gw)
 	if err != nil {
-		mainLog.WithError(err).Error("Failed to initialize config viewer")
-		doJSONWrite(w, http.StatusInternalServerError, apiError("Failed to initialize config viewer"))
+		mainLog.WithError(err).Error(errMsgConfigViewerInit)
+		doJSONWrite(w, http.StatusInternalServerError, apiError(errMsgConfigViewerInit))
 		return
 	}
 	viewer.EnvsHandler(w, r)
