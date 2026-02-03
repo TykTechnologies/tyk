@@ -9741,6 +9741,57 @@ func TestListenPathRoutingPrioritization(t *testing.T) {
 	}
 }
 
+// TestRegexPathPriorityOverCatchAll validates TT-16219: a regex-based path like /{foo}
+// should have higher priority than a catch-all root path /.
+// This test creates two APIs - one with "/" and one with "/{foo}" - and verifies that
+// requests to paths like /test are routed to the regex API, not the catch-all.
+func TestRegexPathPriorityOverCatchAll(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	// API with catch-all root path "/"
+	catchAllAPI := func(spec *APISpec) {
+		spec.APIID = "catch-all-api"
+		spec.Name = "Catch All API"
+		spec.Proxy.ListenPath = "/"
+		spec.UseKeylessAccess = true
+		UpdateAPIVersion(spec, "v1", func(v *apidef.VersionInfo) {
+			v.UseExtendedPaths = true
+			v.GlobalResponseHeaders = map[string]string{
+				"X-API-ID": "catch-all-api",
+			}
+		})
+	}
+
+	// API with regex-based path "/{foo}"
+	regexPathAPI := func(spec *APISpec) {
+		spec.APIID = "regex-path-api"
+		spec.Name = "Regex Path API"
+		spec.Proxy.ListenPath = "/{foo}"
+		spec.UseKeylessAccess = true
+		UpdateAPIVersion(spec, "v1", func(v *apidef.VersionInfo) {
+			v.UseExtendedPaths = true
+			v.GlobalResponseHeaders = map[string]string{
+				"X-API-ID": "regex-path-api",
+			}
+		})
+	}
+
+	// Load catch-all API first, then regex API - this is the order that would have
+	// caused issues before the TT-16219 fix since both paths had the same score
+	ts.Gw.BuildAndLoadAPI(catchAllAPI, regexPathAPI)
+
+	// Request to /test should route to regex API /{foo}, not catch-all /
+	// This confirms the regex path has higher priority than the catch-all
+	_, _ = ts.Run(t, test.TestCase{
+		Path: "/test",
+		Code: http.StatusOK,
+		HeadersMatch: map[string]string{
+			"X-API-ID": "regex-path-api",
+		},
+	})
+}
+
 func TestRecoverFromLoadApiPanic(t *testing.T) {
 	tests := []struct {
 		name     string
