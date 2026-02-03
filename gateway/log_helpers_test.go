@@ -12,10 +12,11 @@ import (
 	"syscall"
 	"testing"
 
-	"github.com/TykTechnologies/tyk/internal/otel"
 	"github.com/sirupsen/logrus"
 	"github.com/sirupsen/logrus/hooks/test"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/TykTechnologies/tyk/internal/otel"
 )
 
 func TestGetLogEntryForRequest(t *testing.T) {
