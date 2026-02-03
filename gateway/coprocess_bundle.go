@@ -4,6 +4,7 @@ import (
 	"archive/zip"
 	"bytes"
 	"crypto/md5"
+	"crypto/sha256"
 	"crypto/tls"
 	"encoding/base64"
 	"encoding/json"
@@ -16,6 +17,7 @@ import (
 	"path"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/cenk/backoff"
@@ -43,6 +45,13 @@ type Bundle struct {
 	Gw       *Gateway `json:"-"`
 }
 
+var bundleVerifyPool = sync.Pool{
+	New: func() interface{} {
+		buffer := make([]byte, 32*1024)
+		return &buffer
+	},
+}
+
 // Verify performs signature verification on the bundle file.
 func (b *Bundle) Verify(bundleFs afero.Fs) error {
 	log.WithFields(logrus.Fields{
@@ -68,23 +77,31 @@ func (b *Bundle) Verify(bundleFs afero.Fs) error {
 		}
 	}
 
-	var bundleData bytes.Buffer
+	md5Hash := md5.New()
+	sha256Hash := sha256.New()
+
+	var w io.Writer = md5Hash
+	if useSignature {
+		w = io.MultiWriter(md5Hash, sha256Hash)
+	}
+
+	buf := bundleVerifyPool.Get().(*[]byte)
+	defer bundleVerifyPool.Put(buf)
 
 	for _, f := range b.Manifest.FileList {
 		extractedPath := filepath.Join(b.Path, f)
-
-		f, err := bundleFs.Open(extractedPath)
+		file, err := bundleFs.Open(extractedPath)
 		if err != nil {
 			return err
 		}
-		_, err = io.Copy(&bundleData, f)
-		f.Close()
+		_, err = io.CopyBuffer(w, file, *buf)
+		file.Close()
 		if err != nil {
 			return err
 		}
 	}
 
-	checksum := fmt.Sprintf("%x", md5.Sum(bundleData.Bytes()))
+	checksum := fmt.Sprintf("%x", md5Hash.Sum(nil))
 	if checksum != b.Manifest.Checksum {
 		return errors.New("Invalid checksum")
 	}
@@ -94,7 +111,7 @@ func (b *Bundle) Verify(bundleFs afero.Fs) error {
 		if err != nil {
 			return err
 		}
-		return verifier.Verify(bundleData.Bytes(), signed)
+		return verifier.VerifyHash(sha256Hash.Sum(nil), signed)
 	}
 	return nil
 }
@@ -425,7 +442,7 @@ func (gw *Gateway) loadBundleWithFs(spec *APISpec, bundleFs afero.Fs) error {
 			Gw:   gw,
 		}
 
-		err = loadBundleManifest(bundleFs, &bundle, spec, false)
+		err = loadBundleManifest(bundleFs, &bundle, spec, gw.GetConfig().SkipVerifyExistingPluginBundle)
 		if err != nil {
 			log.WithFields(logrus.Fields{
 				"prefix": "main",
