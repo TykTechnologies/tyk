@@ -541,22 +541,46 @@ func (c *certificateManager) List(certIDs []string, mode CertificateType) (out [
 		var val string
 		var err error
 
+		// Log which code path we're taking
+		c.logger.WithFields(logrus.Fields{
+			"cert_id":       id,
+			"retry_enabled": c.certFetchRetryEnabled,
+		}).Debug("Certificate fetch starting")
+
 		// Handle simple case first: retry disabled
 		if !c.certFetchRetryEnabled {
+			c.logger.WithField("cert_id", id).Debug("Using non-retry path for certificate fetch")
 			val, err = c.storage.GetKey("raw-" + id)
 		} else {
 			// Retry enabled - use shared exponential backoff
+			attemptCount := 0
 			operation := func() error {
+				attemptCount++
+				if attemptCount == 1 {
+					c.logger.WithField("cert_id", id).Debug("Fetching certificate from MDCB (retry enabled)")
+				} else {
+					c.logger.WithFields(logrus.Fields{
+						"cert_id": id,
+						"attempt": attemptCount,
+					}).Debug("Retrying certificate fetch from MDCB")
+				}
 				val, err = c.storage.GetKey("raw-" + id)
 				if errors.Is(err, storage.ErrMDCBConnectionLost) {
+					c.logger.WithField("cert_id", id).Debug("Certificate fetch failed (MDCB not ready), will retry")
 					return err // Retryable error
+				}
+				if err == nil {
+					c.logger.WithFields(logrus.Fields{
+						"cert_id": id,
+						"attempt": attemptCount,
+					}).Debug("Certificate fetched successfully from MDCB")
 				}
 				return nil // Success or non-retryable error
 			}
 
 			if retryErr := backoff.Retry(operation, sharedBackoff); retryErr != nil {
 				if errors.Is(err, storage.ErrMDCBConnectionLost) {
-					c.logger.Warn("Timeout waiting for MDCB connection for certificate:", id)
+					c.logger.WithField("cert_id", id).Warn("Timeout waiting for MDCB connection for certificate")
 				}
 			}
 		}
