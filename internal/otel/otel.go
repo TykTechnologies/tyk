@@ -153,6 +153,20 @@ func ExtractTraceID(ctx context.Context) string {
 	return ""
 }
 
+// ExtractTraceAndSpanID extracts both trace ID and span ID from the context.
+// Returns empty strings if no valid span context exists.
+func ExtractTraceAndSpanID(ctx context.Context) (traceID, spanID string) {
+	span := SpanFromContext(ctx)
+	spanCtx := span.SpanContext()
+
+	if spanCtx.IsValid() {
+		traceID = spanCtx.TraceID().String()
+		spanID = spanCtx.SpanID().String()
+	}
+
+	return traceID, spanID
+}
+
 func addTraceIDToResponseHeader(w http.ResponseWriter, traceID string) {
 	w.Header().Set(TykTraceIDHeader, traceID)
 }
