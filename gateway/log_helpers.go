@@ -47,8 +47,6 @@ func (gw *Gateway) getLogEntryForRequest(logger *logrus.Entry, r *http.Request, 
 		traceID, spanID := otel.ExtractTraceAndSpanID(r.Context())
 		if traceID != "" {
 			fields["trace_id"] = traceID
-		}
-		if spanID != "" {
 			fields["span_id"] = spanID
 		}
 	}
