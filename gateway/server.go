@@ -694,6 +694,21 @@ func (gw *Gateway) controlAPICheckClientCertificate(certLevel string, next http.
 	})
 }
 
+// loadConfigInspectionEndpoints registers the /config and /env endpoints for troubleshooting.
+// These endpoints are only enabled when EnableConfigInspection is true and Secret is set.
+func (gw *Gateway) loadConfigInspectionEndpoints(muxer *mux.Router) {
+	if !gw.GetConfig().EnableConfigInspection {
+		return
+	}
+	if gw.GetConfig().Secret == "" {
+		mainLog.Error("Cannot enable config inspection: secret not set")
+		return
+	}
+	muxer.Handle("/config", gw.checkIsAPIOwner(http.HandlerFunc(gw.configHandler)))
+	muxer.Handle("/env", gw.checkIsAPIOwner(http.HandlerFunc(gw.envHandler)))
+	mainLog.Info("Config inspection endpoints enabled: /config, /env")
+}
+
 // loadControlAPIEndpoints loads the endpoints used for controlling the Gateway.
 func (gw *Gateway) loadControlAPIEndpoints(muxer *mux.Router) {
 	hostname := gw.GetConfig().HostName
@@ -730,17 +745,7 @@ func (gw *Gateway) loadControlAPIEndpoints(muxer *mux.Router) {
 		muxer.HandleFunc("/debug/pprof/{_:.*}", pprofhttp.Index)
 	}
 
-	// Config inspection endpoints (for troubleshooting)
-	if gw.GetConfig().EnableConfigInspection {
-		if gw.GetConfig().Secret == "" {
-			mainLog.Error("Cannot enable config inspection: secret not set")
-		} else {
-			// Register at root level (like MDCB) with auth middleware
-			muxer.Handle("/config", gw.checkIsAPIOwner(http.HandlerFunc(gw.configHandler)))
-			muxer.Handle("/env", gw.checkIsAPIOwner(http.HandlerFunc(gw.envHandler)))
-			mainLog.Info("Config inspection endpoints enabled: /config, /env")
-		}
-	}
+	gw.loadConfigInspectionEndpoints(muxer)
 
 	r.MethodNotAllowedHandler = MethodNotAllowedHandler{}
 

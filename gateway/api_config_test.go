@@ -487,7 +487,7 @@ func TestConfigHandler_ViewerInitError(t *testing.T) {
 
 	// Override the factory to return an error
 	originalFactory := configViewerFactory
-	configViewerFactory = func(gw *Gateway) (*structviewer.Viewer, error) {
+	configViewerFactory = func(_ *Gateway) (*structviewer.Viewer, error) {
 		return nil, errors.New("simulated viewer initialization error")
 	}
 	defer func() {
@@ -520,7 +520,7 @@ func TestEnvHandler_ViewerInitError(t *testing.T) {
 
 	// Override the factory to return an error
 	originalFactory := configViewerFactory
-	configViewerFactory = func(gw *Gateway) (*structviewer.Viewer, error) {
+	configViewerFactory = func(_ *Gateway) (*structviewer.Viewer, error) {
 		return nil, errors.New("simulated viewer initialization error")
 	}
 	defer func() {
