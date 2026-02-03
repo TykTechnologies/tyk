@@ -4,6 +4,12 @@ import (
 	"github.com/TykTechnologies/tyk/apidef/oas"
 )
 
+type PrimitiveCategory struct {
+	Prefix     string
+	TypeName   string
+	Primitives oas.MCPPrimitives
+}
+
 // hasOperationAllowEnabled checks if any operation has allow middleware enabled.
 // Operations are path-level configurations in OAS (e.g., operationId-based middleware).
 // This is generic JSON-RPC logic, not specific to MCP.

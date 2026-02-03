@@ -34,7 +34,11 @@ func (r *Router) routeToolsCall(params json.RawMessage, primitives map[string]st
 		return jsonrpc.RouteResult{}, err
 	}
 
-	operationVEM := jsonrpc.MethodVEMPrefix + MethodToolsCall
+	operationVEM, found := primitives[PrimitiveKeyOperation+MethodToolsCall]
+	if !found {
+		operationVEM = jsonrpc.MethodVEMPrefix + MethodToolsCall
+	}
+
 	toolVEM, found := primitives[PrimitiveKeyTool+name]
 	if !found {
 		toolVEM = ToolPrefix + name
@@ -52,7 +56,11 @@ func (r *Router) routeResourcesRead(params json.RawMessage, primitives map[strin
 		return jsonrpc.RouteResult{}, err
 	}
 
-	operationVEM := jsonrpc.MethodVEMPrefix + MethodResourcesRead
+	operationVEM, found := primitives[PrimitiveKeyOperation+MethodResourcesRead]
+	if !found {
+		operationVEM = jsonrpc.MethodVEMPrefix + MethodResourcesRead
+	}
+
 	resourceVEM, found := matchResourceURI(uri, primitives)
 	if !found {
 		resourceVEM = ResourcePrefix + uri
@@ -70,7 +78,11 @@ func (r *Router) routePromptsGet(params json.RawMessage, primitives map[string]s
 		return jsonrpc.RouteResult{}, err
 	}
 
-	operationVEM := jsonrpc.MethodVEMPrefix + MethodPromptsGet
+	operationVEM, found := primitives[PrimitiveKeyOperation+MethodPromptsGet]
+	if !found {
+		operationVEM = jsonrpc.MethodVEMPrefix + MethodPromptsGet
+	}
+
 	promptVEM, found := primitives[PrimitiveKeyPrompt+name]
 	if !found {
 		promptVEM = PromptPrefix + name

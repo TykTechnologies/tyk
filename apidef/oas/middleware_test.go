@@ -1546,3 +1546,111 @@ func TestMiddleware_HasMCPPrimitivesMocks(t *testing.T) {
 		assert.True(t, middleware.HasMCPPrimitivesMocks())
 	})
 }
+
+func TestMiddleware_ExtractPrimitivesToExtendedPaths(t *testing.T) {
+	t.Run("basic extraction", func(t *testing.T) {
+		middleware := &Middleware{
+			McpTools: MCPPrimitives{
+				"get_users": &MCPPrimitive{
+					Operation: Operation{
+						RateLimit: &RateLimitEndpoint{Enabled: true, Rate: 2, Per: 20},
+						TransformRequestHeaders: &TransformHeaders{
+							Enabled: true,
+							Add: Headers{
+								{Name: "X-Tool", Value: "test"},
+							},
+						},
+					},
+				},
+			},
+			McpResources: MCPPrimitives{
+				"file:///*": &MCPPrimitive{
+					Operation: Operation{
+						RateLimit: &RateLimitEndpoint{Enabled: true, Rate: 5, Per: 60},
+					},
+				},
+			},
+			McpPrompts: MCPPrimitives{
+				"code-review": &MCPPrimitive{
+					Operation: Operation{
+						MockResponse: &MockResponse{Enabled: true, Code: 200},
+					},
+				},
+			},
+		}
+
+		ep := &apidef.ExtendedPathsSet{}
+		middleware.ExtractPrimitivesToExtendedPaths(ep)
+
+		assert.Len(t, ep.RateLimit, 2)
+		assert.Equal(t, "/mcp-tool:get_users", ep.RateLimit[0].Path)
+		assert.Equal(t, 2.0, ep.RateLimit[0].Rate)
+
+		assert.Len(t, ep.TransformHeader, 1)
+		assert.Equal(t, "/mcp-tool:get_users", ep.TransformHeader[0].Path)
+
+		assert.Len(t, ep.Internal, 3)
+		assert.Equal(t, "/mcp-tool:get_users", ep.Internal[0].Path)
+		assert.Equal(t, "POST", ep.Internal[0].Method)
+		assert.False(t, ep.Internal[0].Disabled)
+
+		assert.Equal(t, "/mcp-resource:file:///*", ep.Internal[1].Path)
+		assert.Equal(t, "/mcp-prompt:code-review", ep.Internal[2].Path)
+	})
+
+	t.Run("no overwrite of operations", func(t *testing.T) {
+		ep := &apidef.ExtendedPathsSet{
+			RateLimit: []apidef.RateLimitMeta{
+				{Path: "/api/users", Method: "GET", Rate: 100},
+			},
+			Internal: []apidef.InternalMeta{
+				{Path: "/internal/health", Method: "GET"},
+			},
+		}
+
+		middleware := &Middleware{
+			McpTools: MCPPrimitives{
+				"get_users": &MCPPrimitive{
+					Operation: Operation{
+						RateLimit: &RateLimitEndpoint{Enabled: true, Rate: 2, Per: 20},
+					},
+				},
+			},
+		}
+
+		middleware.ExtractPrimitivesToExtendedPaths(ep)
+
+		assert.Len(t, ep.RateLimit, 2)
+		assert.Equal(t, "/api/users", ep.RateLimit[0].Path)
+		assert.Equal(t, "/mcp-tool:get_users", ep.RateLimit[1].Path)
+
+		assert.Len(t, ep.Internal, 2)
+		assert.Equal(t, "/internal/health", ep.Internal[0].Path)
+		assert.Equal(t, "/mcp-tool:get_users", ep.Internal[1].Path)
+	})
+
+	t.Run("empty primitives", func(t *testing.T) {
+		middleware := &Middleware{}
+		ep := &apidef.ExtendedPathsSet{}
+
+		middleware.ExtractPrimitivesToExtendedPaths(ep)
+
+		assert.Empty(t, ep.RateLimit)
+		assert.Empty(t, ep.Internal)
+	})
+
+	t.Run("VEM path format", func(t *testing.T) {
+		middleware := &Middleware{
+			McpTools:     MCPPrimitives{"tool-name": &MCPPrimitive{}},
+			McpResources: MCPPrimitives{"resource://path": &MCPPrimitive{}},
+			McpPrompts:   MCPPrimitives{"prompt-name": &MCPPrimitive{}},
+		}
+
+		ep := &apidef.ExtendedPathsSet{}
+		middleware.ExtractPrimitivesToExtendedPaths(ep)
+
+		assert.Equal(t, "/mcp-tool:tool-name", ep.Internal[0].Path)
+		assert.Equal(t, "/mcp-resource:resource://path", ep.Internal[1].Path)
+		assert.Equal(t, "/mcp-prompt:prompt-name", ep.Internal[2].Path)
+	})
+}

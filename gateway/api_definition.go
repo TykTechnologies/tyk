@@ -374,6 +374,35 @@ func (a APIDefinitionLoader) MakeSpec(def *model.MergedAPI, logger *logrus.Entry
 		// race conditions caused by lazy-initialization during request processing.
 		// See: https://github.com/TykTechnologies/tyk/issues/7573
 		spec.OAS.Initialize()
+
+		if spec.IsMCP() {
+			middleware := spec.OAS.GetTykMiddleware()
+			if middleware != nil {
+				for versionName := range def.VersionData.Versions {
+					versionInfo := def.VersionData.Versions[versionName]
+
+					middleware.ExtractPrimitivesToExtendedPaths(&versionInfo.ExtendedPaths)
+
+					builtInOperationPaths := []string{
+						"/" + mcp.MethodToolsCall,
+						"/" + mcp.MethodResourcesRead,
+						"/" + mcp.MethodPromptsGet,
+					}
+
+					for _, path := range builtInOperationPaths {
+						if spec.OAS.Paths != nil && spec.OAS.Paths.Find(path) != nil {
+							versionInfo.ExtendedPaths.Internal = append(versionInfo.ExtendedPaths.Internal, apidef.InternalMeta{
+								Path:     path,
+								Method:   http.MethodPost,
+								Disabled: false,
+							})
+						}
+					}
+
+					def.VersionData.Versions[versionName] = versionInfo
+				}
+			}
+		}
 	}
 
 	spec.RxPaths = make(map[string][]URLSpec, len(def.VersionData.Versions))
@@ -573,9 +602,23 @@ func (a APIDefinitionLoader) replaceVaultSecrets(input *string) error {
 		return err
 	}
 
-	secret, err := a.Gw.vaultKVStore.(*kv.Vault).Client().Logical().Read(vaultSecretPath + prefixKeys)
+	vault, ok := a.Gw.vaultKVStore.(kv.SecretReader)
+	if !ok {
+		log.Errorf("KV store %T does not implement SecretReader", a.Gw.vaultKVStore)
+		return errors.New("could not read secrets")
+	}
+
+	secret, err := vault.ReadSecret(vaultSecretPath + prefixKeys)
 	if err != nil {
 		return err
+	}
+
+	if secret == nil {
+		return fmt.Errorf("vault path does not exist: %s%s; vault references in API definitions will not be resolved", vaultSecretPath, prefixKeys)
+	}
+
+	if secret.Data == nil {
+		return fmt.Errorf("vault path contains no data: %s%s; vault references in API definitions will not be resolved", vaultSecretPath, prefixKeys)
 	}
 
 	pairs, ok := secret.Data["data"]
@@ -1469,11 +1512,14 @@ func (a APIDefinitionLoader) getExtendedPathSpecs(apiVersionDef apidef.VersionIn
 	oasValidateRequestPaths := a.compileOASValidateRequestPathSpec(apiSpec, conf)
 	oasMockResponsePaths := a.compileOASMockResponsePathSpec(apiSpec, conf)
 
-	// MCP VEM generation - creates internal endpoints for MCP primitives (tools, resources, prompts)
-	mcpVEMs := a.generateMCPVEMs(apiSpec, conf)
+	if apiSpec.IsMCP() {
+		mcp.RegisterVEMPrefixes()
+		a.populateMCPPrimitivesMap(apiSpec)
+		a.calculateMCPAllowlistFlags(apiSpec)
 
-	if apiSpec.IsMCP() && apiSpec.JsonRpcVersion == apidef.JsonRPC20 {
-		apiSpec.JSONRPCRouter = mcp.NewRouter()
+		if apiSpec.JsonRpcVersion == apidef.JsonRPC20 {
+			apiSpec.JSONRPCRouter = mcp.NewRouter()
+		}
 	}
 
 	combinedPath := []URLSpec{}
@@ -1503,7 +1549,6 @@ func (a APIDefinitionLoader) getExtendedPathSpecs(apiVersionDef apidef.VersionIn
 	combinedPath = append(combinedPath, rateLimitPaths...)
 	combinedPath = append(combinedPath, oasValidateRequestPaths...)
 	combinedPath = append(combinedPath, oasMockResponsePaths...)
-	combinedPath = append(combinedPath, mcpVEMs...)
 
 	// Enable whitelist mode if there are whitelist paths or operation-level allows.
 	// For MCP APIs, don't enable global whitelist mode at all because:
@@ -2078,4 +2123,62 @@ func (r *RoundRobin) WithLen(len int) int {
 	// -1 to start at 0, not 1
 	cur := atomic.AddUint32(&r.pos, 1) - 1
 	return int(cur) % len
+}
+
+func (a APIDefinitionLoader) populateMCPPrimitivesMap(spec *APISpec) {
+	if !spec.IsMCP() {
+		return
+	}
+
+	middleware := spec.OAS.GetTykMiddleware()
+	if middleware == nil {
+		return
+	}
+
+	spec.MCPPrimitives = make(map[string]string)
+
+	for name := range middleware.McpTools {
+		spec.MCPPrimitives["tool:"+name] = mcp.ToolPrefix + name
+	}
+
+	for name := range middleware.McpResources {
+		spec.MCPPrimitives["resource:"+name] = mcp.ResourcePrefix + name
+	}
+
+	for name := range middleware.McpPrompts {
+		spec.MCPPrimitives["prompt:"+name] = mcp.PromptPrefix + name
+	}
+
+	builtInOperations := map[string]string{
+		mcp.MethodToolsCall:     "/" + mcp.MethodToolsCall,
+		mcp.MethodResourcesRead: "/" + mcp.MethodResourcesRead,
+		mcp.MethodPromptsGet:    "/" + mcp.MethodPromptsGet,
+	}
+
+	for method, path := range builtInOperations {
+		if spec.OAS.Paths != nil && spec.OAS.Paths.Find(path) != nil {
+			spec.MCPPrimitives["operation:"+method] = path
+		}
+	}
+}
+
+func (a APIDefinitionLoader) calculateMCPAllowlistFlags(spec *APISpec) {
+	middleware := spec.OAS.GetTykMiddleware()
+	if middleware == nil {
+		return
+	}
+
+	operations := oas.Operations{}
+	if middleware.Operations != nil {
+		operations = middleware.Operations
+	}
+
+	spec.OperationsAllowListEnabled = hasOperationAllowEnabled(operations)
+	spec.ToolsAllowListEnabled = hasPrimitiveAllowEnabled(middleware.McpTools)
+	spec.ResourcesAllowListEnabled = hasPrimitiveAllowEnabled(middleware.McpResources)
+	spec.PromptsAllowListEnabled = hasPrimitiveAllowEnabled(middleware.McpPrompts)
+
+	spec.MCPAllowListEnabled = spec.ToolsAllowListEnabled ||
+		spec.ResourcesAllowListEnabled ||
+		spec.PromptsAllowListEnabled
 }
