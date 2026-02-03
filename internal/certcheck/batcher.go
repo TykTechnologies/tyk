@@ -13,16 +13,11 @@ import (
 
 	"github.com/TykTechnologies/tyk/certs"
 	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/internal/certusage"
 	"github.com/TykTechnologies/tyk/internal/event"
 	"github.com/TykTechnologies/tyk/internal/model"
 	"github.com/TykTechnologies/tyk/storage"
 )
-
-// certUsageTracker tracks which certificates are used by which APIs.
-type certUsageTracker interface {
-	Required(certID string) bool
-	APIs(certID string) []string
-}
 
 var (
 	// ErrFallbackCooldownCheckFailed is returned when the fallback cache is used, and the check cooldown cannot be checked.
@@ -102,9 +97,9 @@ type CertificateExpiryCheckBatcher struct {
 	fallbackCooldownCache CooldownCache
 	flushTicker           *time.Ticker
 	fireEvent             FireEventFunc
-	certificateRole       string           // Role of certificate: "server", "client", "ca", "upstream"
-	certUsage             certUsageTracker // can be nil in non-RPC mode
-	gwConfig              *config.Config   // can be nil
+	certificateRole       string             // Role of certificate: "server", "client", "ca", "upstream"
+	certUsage             certusage.Tracker  // can be nil in non-RPC mode
+	gwConfig              *config.Config     // can be nil
 }
 
 // NewCertificateExpiryCheckBatcher creates a new CertificateExpiryCheckBatcher.
@@ -116,7 +111,7 @@ func NewCertificateExpiryCheckBatcher(logger *logrus.Entry, apiMetaData APIMetaD
 
 // NewCertificateExpiryCheckBatcherWithRole creates a new CertificateExpiryCheckBatcher with a specific certificate role.
 // The certificateRole parameter specifies the role of certificates being monitored: "client", "server", "ca", or "upstream".
-func NewCertificateExpiryCheckBatcherWithRole(logger *logrus.Entry, apiMetaData APIMetaData, cfg config.CertificateExpiryMonitorConfig, fallbackStorage storage.Handler, eventFunc FireEventFunc, certificateRole string, certUsage certUsageTracker, gwConfig *config.Config) (*CertificateExpiryCheckBatcher, error) {
+func NewCertificateExpiryCheckBatcherWithRole(logger *logrus.Entry, apiMetaData APIMetaData, cfg config.CertificateExpiryMonitorConfig, fallbackStorage storage.Handler, eventFunc FireEventFunc, certificateRole string, certUsage certusage.Tracker, gwConfig *config.Config) (*CertificateExpiryCheckBatcher, error) {
 	inMemoryCache, err := NewInMemoryCooldownCache()
 	if err != nil {
 		return nil, err

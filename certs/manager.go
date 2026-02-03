@@ -21,6 +21,7 @@ import (
 
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/internal/cache"
+	"github.com/TykTechnologies/tyk/internal/certusage"
 	tykcrypto "github.com/TykTechnologies/tyk/internal/crypto"
 	"github.com/TykTechnologies/tyk/storage"
 )
@@ -42,11 +43,8 @@ var (
 
 //go:generate mockgen -destination=./mock/mock.go -package=mock . CertificateManager
 
-// UsageTracker defines the interface for certificate requirement tracking
-type UsageTracker interface {
-	Required(certID string) bool
-	APIs(certID string) []string
-}
+// UsageTracker is an alias for the certificate usage tracking interface.
+type UsageTracker = certusage.Tracker
 
 type CertificateManager interface {
 	List(certIDs []string, mode CertificateType) (out []*tls.Certificate)

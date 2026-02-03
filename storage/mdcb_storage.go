@@ -7,22 +7,15 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/internal/certusage"
 )
-
-// certUsageTracker tracks which certificates are used by which APIs.
-// This interface duplicates certs.UsageTracker to avoid circular dependency
-// (storage -> certs -> storage).
-type certUsageTracker interface {
-	Required(certID string) bool
-	APIs(certID string) []string
-}
 
 type MdcbStorage struct {
 	local         Handler
 	rpc           Handler
 	logger        *logrus.Entry
 	OnRPCCertPull func(key string, val string) error
-	certUsage     certUsageTracker
+	certUsage     certusage.Tracker
 	config        *config.Config
 }
 
@@ -33,7 +26,7 @@ const (
 	resourceKey         = "Key"
 )
 
-func NewMdcbStorage(local, rpc Handler, log *logrus.Entry, OnRPCCertPull func(key string, val string) error, certUsage certUsageTracker, cfg *config.Config) *MdcbStorage {
+func NewMdcbStorage(local, rpc Handler, log *logrus.Entry, OnRPCCertPull func(key string, val string) error, certUsage certusage.Tracker, cfg *config.Config) *MdcbStorage {
 	return &MdcbStorage{
 		local:         local,
 		rpc:           rpc,
@@ -349,7 +342,7 @@ func (m MdcbStorage) getFromLocal(key string) (string, error) {
 }
 
 // SetCertUsageConfig updates the certificate usage tracker and config for selective sync
-func (m *MdcbStorage) SetCertUsageConfig(certUsage certUsageTracker, cfg *config.Config) {
+func (m *MdcbStorage) SetCertUsageConfig(certUsage certusage.Tracker, cfg *config.Config) {
 	m.certUsage = certUsage
 	m.config = cfg
 }
