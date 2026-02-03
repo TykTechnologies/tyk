@@ -553,7 +553,20 @@ func (gw *Gateway) setupGlobals() {
 			HashKeys:  false,
 			Gw:        gw,
 		}
-		gw.CertificateManager = certs.NewSlaveCertManager(storeCert, rpcStore, certificateSecret, log, !gw.GetConfig().Cloud)
+		gw.CertificateManager = certs.NewSlaveCertManager(
+			storeCert,
+			rpcStore,
+			certificateSecret,
+			log,
+			!gw.GetConfig().Cloud,
+			certs.WithRetryEnabled(retryEnabled),
+			certs.WithMaxRetries(maxRetries),
+			certs.WithBackoffIntervals(
+				time.Duration(conf.SlaveOptions.RPCCertFetchMaxElapsedTime)*time.Second,
+				time.Duration(conf.SlaveOptions.RPCCertFetchInitialInterval)*time.Second,
+				time.Duration(conf.SlaveOptions.RPCCertFetchMaxInterval)*time.Second,
+			),
+		)
 	}
 
 	if gw.GetConfig().NewRelic.AppName != "" {

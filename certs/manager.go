@@ -171,17 +171,27 @@ func getOrgFromKeyID(key, certID string) string {
 	return orgId
 }
 
-func NewSlaveCertManager(localStorage, rpcStorage storage.Handler, secret string, logger *logrus.Logger, migrateCertList bool) *certificateManager {
+func NewSlaveCertManager(localStorage, rpcStorage storage.Handler, secret string, logger *logrus.Logger, migrateCertList bool, opts ...CertificateManagerOption) *certificateManager {
 	if logger == nil {
 		logger = logrus.New()
 	}
 	log := logger.WithFields(logrus.Fields{"prefix": CertManagerLogPrefix})
 
 	cm := &certificateManager{
-		logger:          log,
-		cache:           cache.New(cacheDefaultTTL, cacheCleanInterval),
-		secret:          secret,
-		migrateCertList: migrateCertList,
+		logger:                   log,
+		cache:                    cache.New(cacheDefaultTTL, cacheCleanInterval),
+		secret:                   secret,
+		migrateCertList:          migrateCertList,
+		certFetchMaxElapsedTime:  DefaultRPCCertFetchMaxElapsedTime,
+		certFetchInitialInterval: DefaultRPCCertFetchInitialInterval,
+		certFetchMaxInterval:     DefaultRPCCertFetchMaxInterval,
+		certFetchRetryEnabled:    DefaultRPCCertFetchRetryEnabled,
+		certFetchMaxRetries:      DefaultRPCCertFetchMaxRetries,
+	}
+
+	// Apply functional options
+	for _, opt := range opts {
+		opt(cm)
 	}
 
 	callbackOnPullCertFromRPC := func(key, val string) error {
