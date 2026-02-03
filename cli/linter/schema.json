@@ -413,6 +413,9 @@
     "bundle_insecure_skip_verify": {
       "type": "boolean"
     },
+    "skip_verify_existing_plugin_bundle": {
+      "type": "boolean"
+    },
     "enable_custom_domains": {
       "type": "boolean"
     },
