@@ -2617,3 +2617,174 @@ func TestReplaceVaultSecrets(t *testing.T) {
 		assert.Equal(t, "some-api-key: my-secret-value", input)
 	})
 }
+
+func TestPopulateMCPPrimitivesMap(t *testing.T) {
+	loader := APIDefinitionLoader{}
+
+	t.Run("non-MCP API", func(t *testing.T) {
+		spec := &APISpec{
+			APIDefinition: &apidef.APIDefinition{},
+		}
+		loader.populateMCPPrimitivesMap(spec)
+		assert.Nil(t, spec.MCPPrimitives)
+	})
+
+	t.Run("MCP API with primitives", func(t *testing.T) {
+		spec := &APISpec{
+			APIDefinition: &apidef.APIDefinition{
+				ApplicationProtocol: apidef.AppProtocolMCP,
+				JsonRpcVersion:      apidef.JsonRPC20,
+			},
+			OAS: oas.OAS{},
+		}
+
+		middleware := &oas.Middleware{
+			McpTools: oas.MCPPrimitives{
+				"get_users": &oas.MCPPrimitive{},
+			},
+			McpResources: oas.MCPPrimitives{
+				"file:///*": &oas.MCPPrimitive{},
+			},
+			McpPrompts: oas.MCPPrimitives{
+				"code-review": &oas.MCPPrimitive{},
+			},
+		}
+		spec.OAS.SetTykExtension(&oas.XTykAPIGateway{Middleware: middleware})
+
+		loader.populateMCPPrimitivesMap(spec)
+
+		assert.Len(t, spec.MCPPrimitives, 3)
+		assert.Equal(t, "/mcp-tool:get_users", spec.MCPPrimitives["tool:get_users"])
+		assert.Equal(t, "/mcp-resource:file:///*", spec.MCPPrimitives["resource:file:///*"])
+		assert.Equal(t, "/mcp-prompt:code-review", spec.MCPPrimitives["prompt:code-review"])
+	})
+
+	t.Run("MCP API without middleware", func(t *testing.T) {
+		spec := &APISpec{
+			APIDefinition: &apidef.APIDefinition{
+				ApplicationProtocol: apidef.AppProtocolMCP,
+			},
+			OAS: oas.OAS{},
+		}
+
+		loader.populateMCPPrimitivesMap(spec)
+		assert.Nil(t, spec.MCPPrimitives)
+	})
+
+	t.Run("MCP API with operations and primitives", func(t *testing.T) {
+		spec := &APISpec{
+			APIDefinition: &apidef.APIDefinition{
+				ApplicationProtocol: apidef.AppProtocolMCP,
+				JsonRpcVersion:      apidef.JsonRPC20,
+			},
+		}
+
+		spec.OAS.T.Paths = &openapi3.Paths{}
+		spec.OAS.Paths.Set("/tools/call", &openapi3.PathItem{})
+		spec.OAS.Paths.Set("/resources/read", &openapi3.PathItem{})
+
+		middleware := &oas.Middleware{
+			McpTools: oas.MCPPrimitives{
+				"get_users": &oas.MCPPrimitive{},
+			},
+		}
+		spec.OAS.SetTykExtension(&oas.XTykAPIGateway{Middleware: middleware})
+
+		loader.populateMCPPrimitivesMap(spec)
+
+		assert.Len(t, spec.MCPPrimitives, 3)
+		assert.Equal(t, "/mcp-tool:get_users", spec.MCPPrimitives["tool:get_users"])
+		assert.Equal(t, "/tools/call", spec.MCPPrimitives["operation:tools/call"])
+		assert.Equal(t, "/resources/read", spec.MCPPrimitives["operation:resources/read"])
+	})
+}
+
+func TestCalculateMCPAllowlistFlags(t *testing.T) {
+	loader := APIDefinitionLoader{}
+
+	t.Run("no middleware", func(t *testing.T) {
+		spec := &APISpec{
+			APIDefinition: &apidef.APIDefinition{},
+			OAS:           oas.OAS{},
+		}
+
+		loader.calculateMCPAllowlistFlags(spec)
+
+		assert.False(t, spec.OperationsAllowListEnabled)
+		assert.False(t, spec.ToolsAllowListEnabled)
+		assert.False(t, spec.ResourcesAllowListEnabled)
+		assert.False(t, spec.PromptsAllowListEnabled)
+		assert.False(t, spec.MCPAllowListEnabled)
+	})
+
+	t.Run("tools allow enabled", func(t *testing.T) {
+		spec := &APISpec{
+			APIDefinition: &apidef.APIDefinition{},
+			OAS:           oas.OAS{},
+		}
+
+		middleware := &oas.Middleware{
+			McpTools: oas.MCPPrimitives{
+				"tool1": &oas.MCPPrimitive{
+					Operation: oas.Operation{
+						Allow: &oas.Allowance{Enabled: true},
+					},
+				},
+			},
+		}
+		spec.OAS.SetTykExtension(&oas.XTykAPIGateway{Middleware: middleware})
+
+		loader.calculateMCPAllowlistFlags(spec)
+
+		assert.False(t, spec.OperationsAllowListEnabled)
+		assert.True(t, spec.ToolsAllowListEnabled)
+		assert.False(t, spec.ResourcesAllowListEnabled)
+		assert.False(t, spec.PromptsAllowListEnabled)
+		assert.True(t, spec.MCPAllowListEnabled)
+	})
+
+	t.Run("all categories enabled", func(t *testing.T) {
+		spec := &APISpec{
+			APIDefinition: &apidef.APIDefinition{},
+			OAS:           oas.OAS{},
+		}
+
+		middleware := &oas.Middleware{
+			Operations: oas.Operations{
+				"op1": &oas.Operation{
+					Allow: &oas.Allowance{Enabled: true},
+				},
+			},
+			McpTools: oas.MCPPrimitives{
+				"tool1": &oas.MCPPrimitive{
+					Operation: oas.Operation{
+						Allow: &oas.Allowance{Enabled: true},
+					},
+				},
+			},
+			McpResources: oas.MCPPrimitives{
+				"res1": &oas.MCPPrimitive{
+					Operation: oas.Operation{
+						Allow: &oas.Allowance{Enabled: true},
+					},
+				},
+			},
+			McpPrompts: oas.MCPPrimitives{
+				"prompt1": &oas.MCPPrimitive{
+					Operation: oas.Operation{
+						Allow: &oas.Allowance{Enabled: true},
+					},
+				},
+			},
+		}
+		spec.OAS.SetTykExtension(&oas.XTykAPIGateway{Middleware: middleware})
+
+		loader.calculateMCPAllowlistFlags(spec)
+
+		assert.True(t, spec.OperationsAllowListEnabled)
+		assert.True(t, spec.ToolsAllowListEnabled)
+		assert.True(t, spec.ResourcesAllowListEnabled)
+		assert.True(t, spec.PromptsAllowListEnabled)
+		assert.True(t, spec.MCPAllowListEnabled)
+	})
+}
