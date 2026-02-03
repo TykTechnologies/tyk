@@ -59,7 +59,6 @@ func TestCertificateTokenBinding(t *testing.T) {
 		spec.ClientCertificates = []string{clientCertID1, clientCertID2}
 		authConf := apidef.AuthConfig{
 			Name:           "authToken",
-			UseCertificate: true,
 			AuthHeaderName: "Authorization",
 		}
 		spec.AuthConfigs = map[string]apidef.AuthConfig{
@@ -112,7 +111,7 @@ func TestCertificateTokenBinding(t *testing.T) {
 			Client:    client2,
 			Path:      "/cert-binding",
 			Headers:   map[string]string{"Authorization": key},
-			Code:      http.StatusForbidden,
+			Code:      http.StatusUnauthorized,
 			BodyMatch: MsgApiAccessDisallowed,
 		})
 	})
