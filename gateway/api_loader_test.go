@@ -9652,6 +9652,95 @@ func TestListenPathLength(t *testing.T) {
 	})
 }
 
+// TestListenPathRoutingPrioritization is an integration test that validates the fix for TT-16219.
+// It ensures that requests are correctly routed to the regex-path API when it competes with a
+// catch-all root path '/', regardless of the order the APIs are loaded.
+func TestListenPathRoutingPrioritization(t *testing.T) {
+	// Test with both load orders to ensure routing is consistent
+	testCases := []struct {
+		name           string
+		loadRootFirst  bool
+		requestPath    string
+		expectedHeader string // Header value identifies which API handled the request
+	}{
+		{
+			name:           "TT-16219: Request to /bar should route to regex API when root API loaded first",
+			loadRootFirst:  true,
+			requestPath:    "/bar",
+			expectedHeader: "regex-api",
+		},
+		{
+			name:           "TT-16219: Request to /bar should route to regex API when regex API loaded first",
+			loadRootFirst:  false,
+			requestPath:    "/bar",
+			expectedHeader: "regex-api",
+		},
+		{
+			name:           "TT-16219: Request to /anything should route to regex API when root API loaded first",
+			loadRootFirst:  true,
+			requestPath:    "/anything",
+			expectedHeader: "regex-api",
+		},
+		{
+			name:           "TT-16219: Request to /test-path should route to regex API when regex API loaded first",
+			loadRootFirst:  false,
+			requestPath:    "/test-path",
+			expectedHeader: "regex-api",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			ts := StartTest(nil)
+			defer ts.Close()
+
+			// Create two APIs: one with root path "/" and one with regex path "/{foo}"
+			// Each API adds a unique response header to identify which one handled the request
+			rootAPI := func(spec *APISpec) {
+				spec.APIID = "root-api"
+				spec.Name = "Root API"
+				spec.Proxy.ListenPath = "/"
+				spec.UseKeylessAccess = true
+				UpdateAPIVersion(spec, "v1", func(v *apidef.VersionInfo) {
+					v.UseExtendedPaths = true
+					v.GlobalResponseHeaders = map[string]string{
+						"X-Handled-By": "root-api",
+					}
+				})
+			}
+
+			regexAPI := func(spec *APISpec) {
+				spec.APIID = "regex-api"
+				spec.Name = "Regex API"
+				spec.Proxy.ListenPath = "/{foo}"
+				spec.UseKeylessAccess = true
+				UpdateAPIVersion(spec, "v1", func(v *apidef.VersionInfo) {
+					v.UseExtendedPaths = true
+					v.GlobalResponseHeaders = map[string]string{
+						"X-Handled-By": "regex-api",
+					}
+				})
+			}
+
+			// Load APIs in the specified order
+			if tc.loadRootFirst {
+				ts.Gw.BuildAndLoadAPI(rootAPI, regexAPI)
+			} else {
+				ts.Gw.BuildAndLoadAPI(regexAPI, rootAPI)
+			}
+
+			// Make request and verify which API handled it
+			_, _ = ts.Run(t, test.TestCase{
+				Path: tc.requestPath,
+				Code: http.StatusOK,
+				HeadersMatch: map[string]string{
+					"X-Handled-By": tc.expectedHeader,
+				},
+			})
+		})
+	}
+}
+
 func TestRecoverFromLoadApiPanic(t *testing.T) {
 	tests := []struct {
 		name     string
