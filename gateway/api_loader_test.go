@@ -9687,6 +9687,18 @@ func TestListenPathRoutingPrioritization(t *testing.T) {
 			requestPath:    "/test-path",
 			expectedHeader: "regex-api",
 		},
+		{
+			name:           "TT-16219: Request to exact root path / should route to root API",
+			loadRootFirst:  true,
+			requestPath:    "/",
+			expectedHeader: "root-api",
+		},
+		{
+			name:           "TT-16219: Request to exact root path / should route to root API (reverse load order)",
+			loadRootFirst:  false,
+			requestPath:    "/",
+			expectedHeader: "root-api",
+		},
 	}
 
 	for _, tc := range testCases {
