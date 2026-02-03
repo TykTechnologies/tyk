@@ -1293,11 +1293,12 @@ func TestJSONRPCMiddleware_OperationHeaderInjection(t *testing.T) {
 		},
 	}
 
-	// Add /tools/call path with operationId "testget"
+	// Add /tools/call path with operationId "testpost"
+	// Use POST method since JSON-RPC requests are always POST
 	desc := ""
 	oasAPI.Paths.Set("/tools/call", &openapi3.PathItem{
-		Get: &openapi3.Operation{
-			OperationID: "testget",
+		Post: &openapi3.Operation{
+			OperationID: "testpost",
 			Responses: openapi3.NewResponses(
 				openapi3.WithStatus(200, &openapi3.ResponseRef{
 					Value: &openapi3.Response{
@@ -1350,7 +1351,7 @@ func TestJSONRPCMiddleware_OperationHeaderInjection(t *testing.T) {
 			},
 			// Operation-level header injection
 			Operations: oas.Operations{
-				"testget": &oas.Operation{
+				"testpost": &oas.Operation{
 					TransformRequestHeaders: &oas.TransformHeaders{
 						Enabled: true,
 						Add: []oas.Header{
