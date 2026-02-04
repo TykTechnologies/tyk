@@ -376,32 +376,8 @@ func (a APIDefinitionLoader) MakeSpec(def *model.MergedAPI, logger *logrus.Entry
 		spec.OAS.Initialize()
 
 		if spec.IsMCP() {
-			middleware := spec.OAS.GetTykMiddleware()
-			if middleware != nil {
-				for versionName := range def.VersionData.Versions {
-					versionInfo := def.VersionData.Versions[versionName]
-
-					middleware.ExtractPrimitivesToExtendedPaths(&versionInfo.ExtendedPaths)
-
-					builtInOperationPaths := []string{
-						"/" + mcp.MethodToolsCall,
-						"/" + mcp.MethodResourcesRead,
-						"/" + mcp.MethodPromptsGet,
-					}
-
-					for _, path := range builtInOperationPaths {
-						if spec.OAS.Paths != nil && spec.OAS.Paths.Find(path) != nil {
-							versionInfo.ExtendedPaths.Internal = append(versionInfo.ExtendedPaths.Internal, apidef.InternalMeta{
-								Path:     path,
-								Method:   http.MethodPost,
-								Disabled: false,
-							})
-						}
-					}
-
-					def.VersionData.Versions[versionName] = versionInfo
-				}
-			}
+			a.extractMCPPrimitivesToPaths(spec, def)
+			a.initMCPConfiguration(spec)
 		}
 	}
 
@@ -1479,6 +1455,61 @@ func (a APIDefinitionLoader) findPathAndMethodForOperation(apiSpec *APISpec, ope
 	return "", ""
 }
 
+// extractMCPPrimitivesToPaths extracts MCP primitives (tools, resources, prompts) from the OAS
+// definition and populates them into the ExtendedPaths structure for each API version.
+// It also adds built-in MCP operation paths (tools/call, resources/read, prompts/get) to
+// the Internal middleware configuration.
+func (a APIDefinitionLoader) extractMCPPrimitivesToPaths(spec *APISpec, def *model.MergedAPI) {
+	middleware := spec.OAS.GetTykMiddleware()
+	if middleware == nil {
+		return
+	}
+
+	for versionName := range def.VersionData.Versions {
+		versionInfo := def.VersionData.Versions[versionName]
+
+		// Extract MCP primitives to extended paths
+		middleware.ExtractPrimitivesToExtendedPaths(&versionInfo.ExtendedPaths)
+
+		// Add built-in MCP operation paths to Internal middleware
+		a.addInternalMWtoMCPOperations(spec, &versionInfo.ExtendedPaths)
+
+		def.VersionData.Versions[versionName] = versionInfo
+	}
+}
+
+// addInternalMWtoMCPOperations adds built-in MCP operation paths (tools/call, resources/read,
+// prompts/get) to the Internal middleware configuration if they exist in the OAS definition.
+func (a APIDefinitionLoader) addInternalMWtoMCPOperations(spec *APISpec, extendedPaths *apidef.ExtendedPathsSet) {
+	builtInOperationPaths := []string{
+		"/" + mcp.MethodToolsCall,
+		"/" + mcp.MethodResourcesRead,
+		"/" + mcp.MethodPromptsGet,
+	}
+
+	for _, path := range builtInOperationPaths {
+		if spec.OAS.Paths != nil && spec.OAS.Paths.Find(path) != nil {
+			extendedPaths.Internal = append(extendedPaths.Internal, apidef.InternalMeta{
+				Path:     path,
+				Method:   http.MethodPost,
+				Disabled: false,
+			})
+		}
+	}
+}
+
+// initMCPConfiguration initializes MCP-specific configuration for the API spec.
+// This includes populating the primitives map, calculating allow-list flags,
+// and setting up the JSON-RPC router if needed.
+func (a APIDefinitionLoader) initMCPConfiguration(spec *APISpec) {
+	a.populateMCPPrimitivesMap(spec)
+	a.calculateMCPAllowlistFlags(spec)
+
+	if spec.JsonRpcVersion == apidef.JsonRPC20 {
+		spec.JSONRPCRouter = mcp.NewRouter()
+	}
+}
+
 func (a APIDefinitionLoader) getExtendedPathSpecs(apiVersionDef apidef.VersionInfo, apiSpec *APISpec, conf config.Config) ([]URLSpec, bool) {
 	// TODO: New compiler here, needs to put data into a different structure
 
@@ -1512,16 +1543,6 @@ func (a APIDefinitionLoader) getExtendedPathSpecs(apiVersionDef apidef.VersionIn
 	oasValidateRequestPaths := a.compileOASValidateRequestPathSpec(apiSpec, conf)
 	oasMockResponsePaths := a.compileOASMockResponsePathSpec(apiSpec, conf)
 
-	if apiSpec.IsMCP() {
-		mcp.RegisterVEMPrefixes()
-		a.populateMCPPrimitivesMap(apiSpec)
-		a.calculateMCPAllowlistFlags(apiSpec)
-
-		if apiSpec.JsonRpcVersion == apidef.JsonRPC20 {
-			apiSpec.JSONRPCRouter = mcp.NewRouter()
-		}
-	}
-
 	combinedPath := []URLSpec{}
 	combinedPath = append(combinedPath, mockResponsePaths...)
 	combinedPath = append(combinedPath, ignoredPaths...)
@@ -1551,10 +1572,20 @@ func (a APIDefinitionLoader) getExtendedPathSpecs(apiVersionDef apidef.VersionIn
 	combinedPath = append(combinedPath, oasMockResponsePaths...)
 
 	// Enable whitelist mode if there are whitelist paths or operation-level allows.
-	// For MCP APIs, don't enable global whitelist mode at all because:
-	// 1. It would block the listen path before JSON-RPC routing happens
-	// 2. Allowlist enforcement happens at the VEM level during sequential routing
-	// 3. VEM WhiteList entries are checked correctly in URLAllowedAndIgnored
+	// For MCP APIs, we disable global whitelist mode here (whiteListEnabled = false), but this
+	// does NOT mean whitelisting is disabled for MCP APIs. Instead, MCP APIs use a more complex
+	// whitelist enforcement strategy that happens in the VersionCheck middleware:
+	// 1. Setting whiteListEnabled=false prevents blocking the main listen path before JSON-RPC
+	//    routing can parse the request and determine the target primitive/operation.
+	// 2. After JSON-RPC routing, allowlist enforcement happens at the VEM level during sequential
+	//    routing in VersionCheck middleware (see handleMCPPrimitiveNotFound and VEM WhiteList checks).
+	// 3. VEM WhiteList entries are checked in both URLAllowedAndIgnored and VersionCheck.ProcessRequest
+	//    to enforce access control on individual primitives (tools/resources/prompts) and operations.
+	//
+	// This two-phase approach ensures:
+	// - Initial JSON-RPC requests reach the middleware for parsing
+	// - Subsequent internal VEM requests are properly whitelisted/blacklisted
+	// - Allow-list configuration works correctly at the primitive/operation level
 	whiteListEnabled := len(whiteListPaths) > 0 || apiSpec.OperationsAllowListEnabled
 	if apiSpec.IsMCP() {
 		whiteListEnabled = false
@@ -1652,7 +1683,7 @@ func (a *APISpec) URLAllowedAndIgnored(r *http.Request, rxPaths []URLSpec, white
 		if r.Method == rxPaths[i].Internal.Method && rxPaths[i].Status == Internal {
 			// MCP primitive VEMs return 404 to avoid exposing internal-only endpoints.
 			// They can only be accessed via JSON-RPC routing (MCP, A2A, etc.), not via generic looping.
-			if mcp.IsPrimitiveVEMPath(rxPaths[i].Internal.Path) {
+			if a.IsMCP() && mcp.IsPrimitiveVEMPath(rxPaths[i].Internal.Path) {
 				if !httpctx.IsJsonRPCRouting(r) {
 					return MCPPrimitiveNotFound, nil
 				}
@@ -1726,7 +1757,7 @@ func (a *APISpec) URLAllowedAndIgnored(r *http.Request, rxPaths []URLSpec, white
 		// MCP primitive VEMs: continue checking for BlackList even outside whitelist mode.
 		// This allows explicit BlackList entries to block primitives without Allow.
 		if rxPaths[i].Status == Internal && r.Method == rxPaths[i].Internal.Method {
-			if mcp.IsPrimitiveVEMPath(rxPaths[i].Internal.Path) {
+			if a.IsMCP() && mcp.IsPrimitiveVEMPath(rxPaths[i].Internal.Path) {
 				if httpctx.IsJsonRPCRouting(r) {
 					continue // Keep looking for WhiteList/BlackList
 				}

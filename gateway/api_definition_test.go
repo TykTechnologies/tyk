@@ -2788,3 +2788,91 @@ func TestCalculateMCPAllowlistFlags(t *testing.T) {
 		assert.True(t, spec.MCPAllowListEnabled)
 	})
 }
+
+// TestExtractMCPPrimitivesToPaths tests the extraction of MCP primitives to ExtendedPaths.
+
+// TestAddInternalMWtoMCPOperations tests adding internal middleware for MCP operations.
+func TestAddInternalMWtoMCPOperations(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	loader := APIDefinitionLoader{Gw: ts.Gw}
+
+	t.Run("adds internal middleware for existing MCP operations", func(t *testing.T) {
+		oasDoc := &oas.OAS{
+			T: openapi3.T{
+				Paths: openapi3.NewPaths(),
+			},
+		}
+
+		oasDoc.Paths.Set("/tools/call", &openapi3.PathItem{
+			Post: &openapi3.Operation{OperationID: "toolsCall"},
+		})
+		oasDoc.Paths.Set("/resources/read", &openapi3.PathItem{
+			Post: &openapi3.Operation{OperationID: "resourcesRead"},
+		})
+		oasDoc.Paths.Set("/prompts/get", &openapi3.PathItem{
+			Post: &openapi3.Operation{OperationID: "promptsGet"},
+		})
+
+		spec := &APISpec{
+			OAS: *oasDoc,
+		}
+
+		extendedPaths := &apidef.ExtendedPathsSet{}
+
+		loader.addInternalMWtoMCPOperations(spec, extendedPaths)
+
+		assert.Len(t, extendedPaths.Internal, 3)
+
+		paths := make(map[string]bool)
+		for _, internal := range extendedPaths.Internal {
+			paths[internal.Path] = true
+			assert.Equal(t, http.MethodPost, internal.Method)
+			assert.False(t, internal.Disabled)
+		}
+
+		assert.True(t, paths["/tools/call"])
+		assert.True(t, paths["/resources/read"])
+		assert.True(t, paths["/prompts/get"])
+	})
+
+	t.Run("skips operations not in OAS", func(t *testing.T) {
+		oasDoc := &oas.OAS{
+			T: openapi3.T{
+				Paths: openapi3.NewPaths(),
+			},
+		}
+
+		oasDoc.Paths.Set("/tools/call", &openapi3.PathItem{
+			Post: &openapi3.Operation{OperationID: "toolsCall"},
+		})
+
+		spec := &APISpec{
+			OAS: *oasDoc,
+		}
+
+		extendedPaths := &apidef.ExtendedPathsSet{}
+
+		loader.addInternalMWtoMCPOperations(spec, extendedPaths)
+
+		assert.Len(t, extendedPaths.Internal, 1)
+		assert.Equal(t, "/tools/call", extendedPaths.Internal[0].Path)
+	})
+
+	t.Run("handles nil paths", func(t *testing.T) {
+		spec := &APISpec{
+			OAS: oas.OAS{
+				T: openapi3.T{
+					Paths: nil,
+				},
+			},
+		}
+
+		extendedPaths := &apidef.ExtendedPathsSet{}
+
+		loader.addInternalMWtoMCPOperations(spec, extendedPaths)
+
+		assert.Empty(t, extendedPaths.Internal)
+	})
+}

@@ -9728,3 +9728,63 @@ func TestNewRelicMounting(t *testing.T) {
 		}
 	})
 }
+
+// TestMCPRequestSizeLimit_Security tests that RequestSizeLimitMiddleware
+// runs before JSONRPCMiddleware for MCP APIs to prevent DoS attacks.
+func TestMCPRequestSizeLimit_Security(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	t.Run("MCP API rejects oversized requests", func(t *testing.T) {
+		// Create upstream server
+		upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusOK)
+			w.Write([]byte(`{"jsonrpc":"2.0","result":"success","id":1}`))
+		}))
+		defer upstream.Close()
+
+		// Create MCP API with size limit
+		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+			spec.Name = "MCP Size Test"
+			spec.APIID = "mcp-size-test"
+			spec.Proxy.ListenPath = "/mcp-test/"
+			spec.Proxy.TargetURL = upstream.URL
+			spec.ApplicationProtocol = apidef.AppProtocolMCP
+			spec.JsonRpcVersion = apidef.JsonRPC20
+
+			UpdateAPIVersion(spec, "v1", func(v *apidef.VersionInfo) {
+				v.GlobalSizeLimit = 512 // Small limit for testing
+			})
+		})
+
+		// Test oversized request (should be rejected)
+		largePayload := `{"jsonrpc":"2.0","method":"tools/call","params":{"data":"` + strings.Repeat("x", 600) + `"},"id":1}`
+
+		_, _ = ts.Run(t, test.TestCase{
+			Method: http.MethodPost,
+			Path:   "/mcp-test/",
+			Data:   largePayload,
+			Code:   http.StatusBadRequest, // Should reject oversized request
+			Headers: map[string]string{
+				"Content-Type": "application/json",
+			},
+		})
+	})
+
+	t.Run("Regular API unaffected", func(t *testing.T) {
+		// Create regular API with size limit
+		api := ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+			spec.Name = "Regular API"
+			spec.APIID = "regular-test"
+			spec.Proxy.ListenPath = "/regular/"
+			// ApplicationProtocol not set - regular HTTP API
+
+			UpdateAPIVersion(spec, "v1", func(v *apidef.VersionInfo) {
+				v.GlobalSizeLimit = 1024
+			})
+		})[0]
+
+		// Verify it's not MCP
+		assert.False(t, api.IsMCP(), "API should not be MCP")
+	})
+}

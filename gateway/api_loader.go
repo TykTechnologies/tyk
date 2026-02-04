@@ -301,6 +301,12 @@ func (gw *Gateway) processSpec(
 		logger.Info("Checking security policy: Open")
 	}
 
+	// For MCP/JSON-RPC APIs, add RequestSizeLimitMiddleware early to prevent DoS attacks.
+	// JSONRPCMiddleware reads the entire request body, so size must be validated first.
+	if spec.IsMCP() {
+		gw.mwAppendEnabled(&chainArray, &RequestSizeLimitMiddleware{baseMid.Copy()})
+	}
+
 	// JSONRPCMiddleware must run before VersionCheck for JSON-RPC APIs.
 	// It parses JSON-RPC payloads, rewrites URL paths to VEM paths, and sets
 	// the routing context that VersionCheck uses for whitelist/blacklist validation.
@@ -332,7 +338,13 @@ func (gw *Gateway) processSpec(
 	gw.mwAppendEnabled(&chainArray, &IPBlackListMiddleware{BaseMiddleware: baseMid.Copy()})
 	gw.mwAppendEnabled(&chainArray, &CertificateCheckMW{BaseMiddleware: baseMid.Copy()})
 	gw.mwAppendEnabled(&chainArray, &OrganizationMonitor{BaseMiddleware: baseMid.Copy(), mon: Monitor{Gw: gw}})
-	gw.mwAppendEnabled(&chainArray, &RequestSizeLimitMiddleware{baseMid.Copy()})
+
+	// For non-MCP APIs, add RequestSizeLimitMiddleware in its original position.
+	// For MCP APIs, it's already added earlier (before JSONRPCMiddleware) to prevent DoS.
+	if !spec.IsMCP() {
+		gw.mwAppendEnabled(&chainArray, &RequestSizeLimitMiddleware{baseMid.Copy()})
+	}
+
 	gw.mwAppendEnabled(&chainArray, &MiddlewareContextVars{BaseMiddleware: baseMid.Copy()})
 	gw.mwAppendEnabled(&chainArray, &TrackEndpointMiddleware{baseMid.Copy()})
 
