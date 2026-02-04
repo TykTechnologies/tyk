@@ -25,7 +25,9 @@ import (
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/apidef/oas"
+	"github.com/TykTechnologies/tyk/ctx"
 	"github.com/TykTechnologies/tyk/internal/cache"
+	tykerrors "github.com/TykTechnologies/tyk/internal/errors"
 	"github.com/TykTechnologies/tyk/internal/model"
 	"github.com/TykTechnologies/tyk/internal/otel"
 	"github.com/TykTechnologies/tyk/storage"
@@ -1100,6 +1102,7 @@ func (k *JWTMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, _
 		log.Debug("Raw data was: ", rawJWT)
 		log.Debug("Headers are: ", r.Header)
 
+		ctx.SetErrorClassification(r, tykerrors.ClassifyJWTError(tykerrors.ErrTypeAuthFieldMissing, k.Name()))
 		k.reportLoginFailure(tykId, r)
 		return errors.New("Authorization field missing"), http.StatusBadRequest
 	}
@@ -1128,6 +1131,7 @@ func (k *JWTMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, _
 
 	if err == nil && token.Valid {
 		if err := k.validateClaims(token); err != nil {
+			ctx.SetErrorClassification(r, tykerrors.ClassifyJWTError(tykerrors.ErrTypeClaimsInvalid, k.Name()))
 			return errors.New("Key not authorized: " + err.Error()), http.StatusUnauthorized
 		}
 
@@ -1151,9 +1155,11 @@ func (k *JWTMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, _
 		logger.WithError(err).Error("JWT validation error")
 		errorDetails := strings.Split(err.Error(), ":")
 		if errorDetails[0] == UnexpectedSigningMethod {
+			ctx.SetErrorClassification(r, tykerrors.ClassifyJWTError(tykerrors.ErrTypeUnexpectedSigningMethod, k.Name()))
 			return errors.New(MsgKeyNotAuthorizedUnexpectedSigningMethod), http.StatusForbidden
 		}
 	}
+	ctx.SetErrorClassification(r, tykerrors.ClassifyJWTError(tykerrors.ErrTypeTokenInvalid, k.Name()))
 	return errors.New("Key not authorized"), http.StatusForbidden
 }
 
