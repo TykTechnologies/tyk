@@ -2323,7 +2323,7 @@ func (gw *Gateway) gracefulShutdown(ctx context.Context) error {
 	return nil
 }
 
-func buildJWKSCache(cfg config.Config) cache.Repository {
+func buildJWKSCache(cfg config.Config) *cache.MemRepository {
 	var jwkCacheExpiration int64 = externalOAuthJWKCacheExpiration
 
 	if cfg.JWKS.Cache.Timeout > 0 {

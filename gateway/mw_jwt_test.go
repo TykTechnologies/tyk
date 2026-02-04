@@ -5161,10 +5161,8 @@ func Test_buildJWKSCache(t *testing.T) {
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			cacheInstance := buildJWKSCache(tt.cfg)
-			casted, ok := cacheInstance.(cache.Detailer)
-
-			assert.True(t, ok)
-			assert.Equal(t, tt.expectedTimeout, casted.Details().DefaultExpiration)
+			assert.Equal(t, tt.expectedTimeout, cacheInstance.DefaultExpiration())
+			assert.Equal(t, int64(externalOAuthJWKCacheCleanupInterval), cacheInstance.CleanupInterval())
 		})
 	}
 }

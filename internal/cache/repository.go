@@ -15,21 +15,25 @@ type Repository interface {
 	Close()
 }
 
+var (
+	_ Repository = new(MemRepository)
+)
+
 // New creates a new cache instance.
-func New(defaultExpiration, cleanupInterval int64) Repository {
+func New(defaultExpiration, cleanupInterval int64) *MemRepository {
 	var (
 		defaultExpirationDuration = time.Duration(defaultExpiration) * time.Second
 		cleanupIntervalDuration   = time.Duration(cleanupInterval) * time.Second
 	)
 
-	return &repository{
+	return &MemRepository{
 		defaultExpiration: defaultExpiration,
 		cleanupInterval:   cleanupInterval,
 		cache:             NewCache(defaultExpirationDuration, cleanupIntervalDuration),
 	}
 }
 
-type repository struct {
+type MemRepository struct {
 	// The underlying cache driver.
 	cache *Cache
 
@@ -41,13 +45,13 @@ type repository struct {
 }
 
 // Get retrieves a cache item by key.
-func (r *repository) Get(key string) (interface{}, bool) {
+func (r *MemRepository) Get(key string) (interface{}, bool) {
 	return r.cache.Get(key)
 }
 
 // Set writes a cache item with a timeout in seconds. If timeout is zero,
-// the default expiration for the repository instance will be used.
-func (r *repository) Set(key string, value interface{}, timeout int64) {
+// the default expiration for the MemRepository instance will be used.
+func (r *MemRepository) Set(key string, value interface{}, timeout int64) {
 	if timeout <= 0 {
 		timeout = r.defaultExpiration
 	}
@@ -55,40 +59,32 @@ func (r *repository) Set(key string, value interface{}, timeout int64) {
 }
 
 // Delete cache item by key.
-func (r *repository) Delete(key string) {
+func (r *MemRepository) Delete(key string) {
 	r.cache.Delete(key)
 }
 
 // Count returns number of items in the cache.
-func (r *repository) Count() int {
+func (r *MemRepository) Count() int {
 	return r.cache.Count()
 }
 
 // Flush flushes all the items from the cache.
-func (r *repository) Flush() {
+func (r *MemRepository) Flush() {
 	r.cache.Flush()
 }
 
 // Close will stop background cleanup and clear the cache for garbage collection.
 // Close also flushes the data in the cache.
-func (r *repository) Close() {
+func (r *MemRepository) Close() {
 	r.cache.Close()
 }
 
-// Details
-// backdoor for testing
-type Details struct {
-	DefaultExpiration int64
-	CleanupInterval   int64
+// DefaultExpiration returns default expiration in seconds
+func (r *MemRepository) DefaultExpiration() int64 {
+	return r.defaultExpiration
 }
 
-type Detailer interface {
-	Details() Details
-}
-
-func (r *repository) Details() Details {
-	return Details{
-		CleanupInterval:   r.cleanupInterval,
-		DefaultExpiration: r.defaultExpiration,
-	}
+// CleanupInterval returns cleanup interval in seconds
+func (r *MemRepository) CleanupInterval() int64 {
+	return r.cleanupInterval
 }
