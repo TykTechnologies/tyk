@@ -6,9 +6,9 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/TykTechnologies/structviewer"
 	"github.com/stretchr/testify/assert"
 
+	"github.com/TykTechnologies/structviewer"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/test"
 )
