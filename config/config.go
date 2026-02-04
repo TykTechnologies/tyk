@@ -722,6 +722,17 @@ type SecurityConfig struct {
 	CertificateExpiryMonitor CertificateExpiryMonitorConfig `json:"certificate_expiry_monitor"`
 }
 
+type JWKSConfig struct {
+	// Cache hodls configuration for JWKS caching
+	Cache JWKSCacheConfig `json:"cache"`
+}
+
+type JWKSCacheConfig struct {
+	// Timeout defines how long the JWKS will be kept in the cache before forcing a refresh from the JWKS endpoint.
+	// Default is 240 seconds (4 minutes). Set to 0 to use the default value.
+	Timeout int64 `json:"timeout"`
+}
+
 type NewRelicConfig struct {
 	// New Relic Application name
 	AppName string `json:"app_name"`
@@ -1318,6 +1329,9 @@ type Config struct {
 	Streaming StreamingConfig `json:"streaming"`
 
 	Labs LabsConfig `json:"labs"`
+
+	// JWKS holds the configuration for Tyk JWKS functionalities
+	JWKS JWKSConfig `json:"jwks"`
 }
 
 // LabsConfig include config for streaming
