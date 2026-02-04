@@ -1134,7 +1134,7 @@ func TestLoadPoliciesFromRPC(t *testing.T) {
 
 func TestPoliciesCollisionMessage(t *testing.T) {
 	ts := StartTest(nil)
-	defer ts.Close()
+	t.Cleanup(ts.Close)
 
 	type logMessage struct {
 		Level string    `json:"level"`
