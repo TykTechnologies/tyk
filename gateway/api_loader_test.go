@@ -9370,12 +9370,14 @@ func TestDifferentDomainsWithOneListenPathBeingASubstringOfTheOtherWithStripList
 
 func TestSortAPISpecs(t *testing.T) {
 	tests := []struct {
-		name     string
-		input    []*APISpec
-		expected []*APISpec
+		name                 string
+		customDomainsEnabled bool
+		input                []*APISpec
+		expected             []*APISpec
 	}{
 		{
-			name: "APIs should be sorted by listen path, however if the domain is empty they should sit at the end",
+			name:                 "APIs should be sorted by listen path, however if the domain is empty they should sit at the end when custom domains are enabled in global config",
+			customDomainsEnabled: true,
 			input: []*APISpec{
 				{APIDefinition: &apidef.APIDefinition{Domain: "{domains:tyk.io}", Proxy: apidef.ProxyConfig{ListenPath: "/path-longer"}}},
 				{APIDefinition: &apidef.APIDefinition{Domain: "tyk.io", Proxy: apidef.ProxyConfig{ListenPath: "/path-longer"}}},
@@ -9407,11 +9409,45 @@ func TestSortAPISpecs(t *testing.T) {
 				{APIDefinition: &apidef.APIDefinition{Domain: "", Proxy: apidef.ProxyConfig{ListenPath: "/aaaaaaaaaaaaaaaaaaaa"}}},
 			},
 		},
+		{
+			name:                 "APIs should be sorted only by listen path when custom domains are disabled in global config",
+			customDomainsEnabled: false,
+			input: []*APISpec{
+				{APIDefinition: &apidef.APIDefinition{Domain: "{domains:tyk.io}", Proxy: apidef.ProxyConfig{ListenPath: "/path-longer"}}},
+				{APIDefinition: &apidef.APIDefinition{Domain: "tyk.io", Proxy: apidef.ProxyConfig{ListenPath: "/path-longer"}}},
+				{APIDefinition: &apidef.APIDefinition{Domain: "tyk.io", Proxy: apidef.ProxyConfig{ListenPath: "/a"}}},
+				{APIDefinition: &apidef.APIDefinition{Domain: "abc.def.ghi", Proxy: apidef.ProxyConfig{ListenPath: "/b"}}},
+				{APIDefinition: &apidef.APIDefinition{Domain: "tyk.io", Proxy: apidef.ProxyConfig{ListenPath: "/longerpath"}}},
+				{APIDefinition: &apidef.APIDefinition{Domain: "tyk.io", Proxy: apidef.ProxyConfig{ListenPath: "/short"}}},
+				{APIDefinition: &apidef.APIDefinition{Domain: "samelength1.com", Proxy: apidef.ProxyConfig{ListenPath: "/a"}}},
+				{APIDefinition: &apidef.APIDefinition{Domain: "samelength2.com", Proxy: apidef.ProxyConfig{ListenPath: "/b"}}},
+				{APIDefinition: &apidef.APIDefinition{Domain: "tyk.io", Proxy: apidef.ProxyConfig{ListenPath: "/path"}}},
+				{APIDefinition: &apidef.APIDefinition{Domain: "", Proxy: apidef.ProxyConfig{ListenPath: "/aaaaaaaaaaaaaaaaaaaa"}}},
+				{APIDefinition: &apidef.APIDefinition{Domain: "tyk.io", Proxy: apidef.ProxyConfig{ListenPath: "/b"}}},
+				{APIDefinition: &apidef.APIDefinition{Domain: "{domains:tyk.io}", Proxy: apidef.ProxyConfig{ListenPath: "/path"}}},
+				{APIDefinition: &apidef.APIDefinition{Domain: "{domains:tyk.io|abc.def.ghi}", Proxy: apidef.ProxyConfig{ListenPath: "/path"}}},
+			},
+			expected: []*APISpec{
+				{APIDefinition: &apidef.APIDefinition{Domain: "", Proxy: apidef.ProxyConfig{ListenPath: "/aaaaaaaaaaaaaaaaaaaa"}}},
+				{APIDefinition: &apidef.APIDefinition{Domain: "tyk.io", Proxy: apidef.ProxyConfig{ListenPath: "/path-longer"}}},
+				{APIDefinition: &apidef.APIDefinition{Domain: "{domains:tyk.io}", Proxy: apidef.ProxyConfig{ListenPath: "/path-longer"}}},
+				{APIDefinition: &apidef.APIDefinition{Domain: "tyk.io", Proxy: apidef.ProxyConfig{ListenPath: "/longerpath"}}},
+				{APIDefinition: &apidef.APIDefinition{Domain: "tyk.io", Proxy: apidef.ProxyConfig{ListenPath: "/short"}}},
+				{APIDefinition: &apidef.APIDefinition{Domain: "tyk.io", Proxy: apidef.ProxyConfig{ListenPath: "/path"}}},
+				{APIDefinition: &apidef.APIDefinition{Domain: "{domains:tyk.io|abc.def.ghi}", Proxy: apidef.ProxyConfig{ListenPath: "/path"}}},
+				{APIDefinition: &apidef.APIDefinition{Domain: "{domains:tyk.io}", Proxy: apidef.ProxyConfig{ListenPath: "/path"}}},
+				{APIDefinition: &apidef.APIDefinition{Domain: "abc.def.ghi", Proxy: apidef.ProxyConfig{ListenPath: "/b"}}},
+				{APIDefinition: &apidef.APIDefinition{Domain: "samelength2.com", Proxy: apidef.ProxyConfig{ListenPath: "/b"}}},
+				{APIDefinition: &apidef.APIDefinition{Domain: "tyk.io", Proxy: apidef.ProxyConfig{ListenPath: "/b"}}},
+				{APIDefinition: &apidef.APIDefinition{Domain: "samelength1.com", Proxy: apidef.ProxyConfig{ListenPath: "/a"}}},
+				{APIDefinition: &apidef.APIDefinition{Domain: "tyk.io", Proxy: apidef.ProxyConfig{ListenPath: "/a"}}},
+			},
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			sortSpecsByListenPath(tt.input)
+			sortSpecsByListenPath(tt.input, tt.customDomainsEnabled)
 			for i, spec := range tt.input {
 				if spec.Domain != tt.expected[i].Domain {
 					t.Errorf("expected %v, got %v", tt.expected[i].Domain, spec.Domain)
@@ -9545,7 +9581,7 @@ func TestSortSpecsByListenPath(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			sortSpecsByListenPath(tt.specs)
+			sortSpecsByListenPath(tt.specs, true)
 
 			var sortedPaths []string
 			for _, spec := range tt.specs {

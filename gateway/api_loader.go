@@ -900,29 +900,15 @@ func (gw *Gateway) loadHTTPService(spec *APISpec, apisByListen map[string]int, g
 
 func (gw *Gateway) generateRoutesForPrefixes(spec *APISpec, prefixes []string, enabledStrictRoutes bool, router *mux.Router, chainObj *ChainObject) {
 	for _, prefix := range prefixes {
-		var subrouter *mux.Router
-		httpHandler := chainObj.ThisHandler
-
-		if enabledStrictRoutes && !strings.HasSuffix(prefix, "/") &&
-			!strings.Contains(prefix, "{") && !strings.Contains(prefix, "}") {
-			prefixWithSlash := prefix + "/"
-			// Matcher should only match the exact path or paths that start with prefix/
-			exactMatcher := func(r *http.Request, _ *mux.RouteMatch) bool {
-				return r.URL.Path == prefix || strings.HasPrefix(r.URL.Path, prefixWithSlash)
-			}
-
-			subrouter = router.NewRoute().MatcherFunc(exactMatcher).Subrouter()
-		} else {
-			// Use the standard PathPrefix for paths with trailing slashes or path parameters
-			subrouter = router.PathPrefix(prefix).Subrouter()
-			httpHandler = explicitRouteSubpaths(prefix, chainObj.ThisHandler, enabledStrictRoutes)
-		}
+		subrouter := router.PathPrefix(prefix).Subrouter()
 
 		gw.generateSubRoutes(spec, subrouter)
 
 		if !chainObj.Open {
 			subrouter.Handle(rateLimitEndpoint, chainObj.RateLimitChain)
 		}
+
+		httpHandler := explicitRouteSubpaths(prefix, chainObj.ThisHandler, enabledStrictRoutes)
 
 		// Attach handlers
 		subrouter.NewRoute().Handler(httpHandler)
@@ -1029,14 +1015,17 @@ func (gw *Gateway) loadGraphQLPlayground(spec *APISpec, subrouter *mux.Router) {
 	})
 }
 
-func sortSpecsByListenPath(specs []*APISpec) {
+func sortSpecsByListenPath(specs []*APISpec, enabledCustomDomain bool) {
 	// sort by listen path from longer to shorter, so that /foo
 	// doesn't break /foo-bar
 	sort.Slice(specs, func(i, j int) bool {
-		// we sort by the following rules:
+		// when custom domains are disabled in config we sort by the following rules:
+		// - decreasing order of listen path length
+
+		// when custom domains are enabled in config we sort by the following rules:
 		// - decreasing order of listen path length
 		// - if a domain is empty it should be at the end
-		if (specs[i].Domain == "") != (specs[j].Domain == "") {
+		if enabledCustomDomain && (specs[i].Domain == "") != (specs[j].Domain == "") {
 			return specs[i].Domain != ""
 		}
 
@@ -1071,7 +1060,7 @@ func (gw *Gateway) loadApps(specs []*APISpec) {
 	tmpSpecRegister := make(map[string]*APISpec)
 	tmpSpecHandles := new(sync.Map)
 
-	sortSpecsByListenPath(specs)
+	sortSpecsByListenPath(specs, gw.GetConfig().EnableCustomDomains)
 
 	// Create a new handler for each API spec
 	apisByListen := countApisByListenHash(specs)
