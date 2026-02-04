@@ -11,8 +11,10 @@ import (
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/internal/httpctx"
+	"github.com/TykTechnologies/tyk/internal/jsonrpc"
 	"github.com/TykTechnologies/tyk/internal/mcp"
 	"github.com/TykTechnologies/tyk/internal/middleware"
+	"github.com/TykTechnologies/tyk/internal/otel"
 )
 
 const (
@@ -170,10 +172,50 @@ func (m *JSONRPCMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 		return nil, middleware.StatusRespond
 	}
 
+	// Set MCP span attributes for OpenTelemetry tracing
+	m.setMCPSpanAttributes(r, rpcReq, result)
+
 	m.setupSequentialRouting(r, rpcReq, result.VEMChain)
 
 	// Return StatusOK to allow chain to continue to DummyProxyHandler, which will handle the redirect
 	return nil, http.StatusOK
+}
+
+// setMCPSpanAttributes sets MCP-specific OpenTelemetry span attributes
+// according to the OTel MCP Semantic Conventions.
+// Reference: https://opentelemetry.io/docs/specs/semconv/gen-ai/mcp/
+func (m *JSONRPCMiddleware) setMCPSpanAttributes(r *http.Request, rpcReq *JSONRPCRequest, result jsonrpc.RouteResult) {
+	attrs := []otel.SpanAttribute{
+		// Required: mcp.method.name
+		otel.MCPMethodNameAttribute(rpcReq.Method),
+		// Recommended: jsonrpc.protocol.version
+		otel.JSONRPCProtocolVersionAttribute(apidef.JsonRPC20),
+	}
+
+	// Conditionally required: jsonrpc.request.id
+	if rpcReq.ID != nil {
+		switch id := rpcReq.ID.(type) {
+		case string:
+			attrs = append(attrs, otel.JSONRPCRequestIDAttribute(id))
+		case float64:
+			attrs = append(attrs, otel.JSONRPCRequestIDIntAttribute(int64(id)))
+		}
+	}
+
+	// Method-specific attributes
+	switch rpcReq.Method {
+	case mcp.MethodToolsCall:
+		attrs = append(attrs,
+			otel.GenAIToolNameAttribute(result.PrimitiveName),
+			otel.GenAIOperationNameAttribute(otel.GenAIOperationExecuteTool),
+		)
+	case mcp.MethodResourcesRead:
+		attrs = append(attrs, otel.MCPResourceURIAttribute(result.PrimitiveName))
+	case mcp.MethodPromptsGet:
+		attrs = append(attrs, otel.GenAIPromptNameAttribute(result.PrimitiveName))
+	}
+
+	ctxSetSpanAttributes(r, m.Name(), attrs...)
 }
 
 // writeJSONRPCError writes a JSON-RPC 2.0 error response.
