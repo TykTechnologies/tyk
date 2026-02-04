@@ -26,35 +26,24 @@ import (
 	texttemplate "text/template"
 	"time"
 
-	"github.com/rs/cors"
-	"github.com/samber/lo"
-
-	"github.com/TykTechnologies/tyk/tcp"
-	"github.com/TykTechnologies/tyk/trace"
-
 	logstashhook "github.com/bshuster-repo/logrus-logstash-hook"
 	logrussentry "github.com/evalphobia/logrus_sentry"
 	grayloghook "github.com/gemnasium/logrus-graylog-hook"
 	"github.com/gorilla/mux"
 	"github.com/lonelycode/osin"
+	"github.com/rs/cors"
+	"github.com/samber/lo"
 	"github.com/sirupsen/logrus"
 	logrussyslog "github.com/sirupsen/logrus/hooks/syslog"
-
-	"github.com/TykTechnologies/tyk/internal/crypto"
-	"github.com/TykTechnologies/tyk/internal/httputil"
-	"github.com/TykTechnologies/tyk/internal/otel"
-	"github.com/TykTechnologies/tyk/internal/scheduler"
-	"github.com/TykTechnologies/tyk/test"
-
-	"github.com/TykTechnologies/tyk/internal/uuid"
 
 	"github.com/TykTechnologies/again"
 	"github.com/TykTechnologies/drl"
 	gas "github.com/TykTechnologies/goautosocket"
 	"github.com/TykTechnologies/gorpc"
 	"github.com/TykTechnologies/goverify"
-	"github.com/TykTechnologies/tyk-pump/serializer"
+	persistentmodel "github.com/TykTechnologies/storage/persistent/model"
 
+	"github.com/TykTechnologies/tyk-pump/serializer"
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/certs"
 	"github.com/TykTechnologies/tyk/checkup"
@@ -62,18 +51,25 @@ import (
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/dnscache"
 	"github.com/TykTechnologies/tyk/header"
+	"github.com/TykTechnologies/tyk/internal/cache"
+	"github.com/TykTechnologies/tyk/internal/crypto"
+	"github.com/TykTechnologies/tyk/internal/httputil"
+	"github.com/TykTechnologies/tyk/internal/model"
+	"github.com/TykTechnologies/tyk/internal/netutil"
+	"github.com/TykTechnologies/tyk/internal/otel"
+	"github.com/TykTechnologies/tyk/internal/scheduler"
+	"github.com/TykTechnologies/tyk/internal/service/newrelic"
+	"github.com/TykTechnologies/tyk/internal/uuid"
 	logger "github.com/TykTechnologies/tyk/log"
 	"github.com/TykTechnologies/tyk/regexp"
+	"github.com/TykTechnologies/tyk/request"
 	"github.com/TykTechnologies/tyk/rpc"
 	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/storage/kv"
+	"github.com/TykTechnologies/tyk/tcp"
+	"github.com/TykTechnologies/tyk/test"
+	"github.com/TykTechnologies/tyk/trace"
 	"github.com/TykTechnologies/tyk/user"
-
-	"github.com/TykTechnologies/tyk/internal/cache"
-	"github.com/TykTechnologies/tyk/internal/model"
-	"github.com/TykTechnologies/tyk/internal/netutil"
-	"github.com/TykTechnologies/tyk/internal/service/newrelic"
-	"github.com/TykTechnologies/tyk/request"
 )
 
 var (
@@ -239,7 +235,15 @@ func NewGateway(config config.Config, ctx context.Context) *Gateway {
 	gw.apisByID = map[string]*APISpec{}
 	gw.apisHandlesByID = new(sync.Map)
 
-	gw.policies = model.NewPolicies()
+	gw.policies = model.NewPolicies(
+		model.WithInternalCollision(func(customId string, ids []persistentmodel.ObjectID) {
+			log.Warnf(
+				"Policies should not share the same ID. %q is used for multiple policies: %q.",
+				customId,
+				ids,
+			)
+		}),
+	)
 
 	// reload
 	gw.reloadQueue = make(chan func())
