@@ -98,16 +98,12 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 	// Check if this should be a JSON-RPC formatted error
 	if writeResponse && e.shouldWriteJSONRPCError(r) {
 		responseBody := e.writeJSONRPCError(w, r, errMsg, errCode)
-		// Record analytics with full JSON-RPC response
-		if !e.Spec.DoNotTrack && !ctxGetDoNotTrack(r) {
-			e.recordErrorAnalytics(r, errCode, responseBody)
-		}
-		e.RecordAccessLog(r, response, analytics.Latency{})
-		reportHealthValue(e.Spec, BlockedRequestLog, "-1")
-		return
-	}
-
-	if writeResponse {
+		// Set up response for analytics (reuses existing analytics code below)
+		response.StatusCode = errCode
+		response.Header = http.Header{}
+		response.Header.Set(header.ContentType, header.ApplicationJSON)
+		response.Body = ioutil.NopCloser(bytes.NewReader(responseBody))
+	} else if writeResponse {
 		var templateExtension string
 		contentType := r.Header.Get(header.ContentType)
 		contentType = strings.Split(contentType, ";")[0]
@@ -353,133 +349,3 @@ func (e *ErrorHandler) writeJSONRPCError(w http.ResponseWriter, r *http.Request,
 	return jsonrpcerrors.WriteJSONRPCError(w, requestID, httpCode, errMsg)
 }
 
-// recordErrorAnalytics records analytics for errors (extracted for reuse).
-// responseBody should be the full response sent to the client (JSON-RPC or standard).
-func (e *ErrorHandler) recordErrorAnalytics(r *http.Request, errCode int, responseBody []byte) {
-	token := ctxGetAuthToken(r)
-	var alias string
-	ip := request.RealIP(r)
-
-	if !e.Spec.GlobalConfig.StoreAnalytics(ip) {
-		return
-	}
-
-	t := time.Now()
-
-	version := e.Spec.getVersionFromRequest(r)
-	if version == "" {
-		version = "Non Versioned"
-	}
-
-	if e.Spec.Proxy.StripListenPath {
-		r.URL.Path = e.Spec.StripListenPath(r.URL.Path)
-	}
-
-	oauthClientID := ""
-	session := ctxGetSession(r)
-	tags := make([]string, 0, estimateTagsCapacity(session, e.Spec))
-
-	if session != nil {
-		oauthClientID = session.OauthClientID
-		alias = session.Alias
-		tags = append(tags, getSessionTags(session)...)
-	}
-
-	if len(e.Spec.TagHeaders) > 0 {
-		tags = tagHeaders(r, e.Spec.TagHeaders, tags)
-	}
-
-	if len(e.Spec.Tags) > 0 {
-		tags = append(tags, e.Spec.Tags...)
-	}
-
-	trackEP := false
-	trackedPath := r.URL.Path
-	if p := ctxGetTrackedPath(r); p != "" {
-		trackEP = true
-		trackedPath = p
-	}
-
-	host := r.URL.Host
-	if host == "" && e.Spec.target != nil {
-		host = e.Spec.target.Host
-	}
-
-	record := analytics.AnalyticsRecord{
-		Method:        r.Method,
-		Host:          host,
-		Path:          trackedPath,
-		RawPath:       r.URL.Path,
-		ContentLength: r.ContentLength,
-		UserAgent:     r.Header.Get(header.UserAgent),
-		Day:           t.Day(),
-		Month:         t.Month(),
-		Year:          t.Year(),
-		Hour:          t.Hour(),
-		ResponseCode:  errCode,
-		APIKey:        token,
-		TimeStamp:     t,
-		APIVersion:    version,
-		APIName:       e.Spec.Name,
-		APIID:         e.Spec.APIID,
-		OrgID:         e.Spec.OrgID,
-		OauthID:       oauthClientID,
-		RequestTime:   0,
-		Latency:       analytics.Latency{},
-		IPAddress:     ip,
-		Geo:           analytics.GeoData{},
-		Network:       analytics.NetworkStats{},
-		Tags:          tags,
-		Alias:         alias,
-		TrackPath:     trackEP,
-		ExpireAt:      t,
-	}
-
-	recordGraphDetails(&record, r, &http.Response{StatusCode: errCode}, e.Spec)
-
-	rawRequest := ""
-	rawResponse := ""
-	if recordDetail(r, e.Spec) {
-		var wireFormatReq bytes.Buffer
-		r.Write(&wireFormatReq)
-		rawRequest = base64.StdEncoding.EncodeToString(wireFormatReq.Bytes())
-
-		// Record full response body (JSON-RPC or standard error)
-		rawResponse = base64.StdEncoding.EncodeToString(responseBody)
-	}
-
-	record.RawRequest = rawRequest
-	record.RawResponse = rawResponse
-
-	if e.Spec.GlobalConfig.AnalyticsConfig.EnableGeoIP {
-		record.GetGeo(ip, e.Gw.Analytics.GeoIPDB)
-	}
-
-	if e.Spec.GraphQL.Enabled && e.Spec.GraphQL.ExecutionMode != apidef.GraphQLExecutionModeSubgraph {
-		record.Tags = append(record.Tags, "tyk-graph-analytics")
-		record.ApiSchema = base64.StdEncoding.EncodeToString([]byte(e.Spec.GraphQL.Schema))
-	}
-
-	expiresAfter := e.Spec.ExpireAnalyticsAfter
-	if e.Spec.GlobalConfig.EnforceOrgDataAge {
-		orgExpireDataTime := e.OrgSessionExpiry(e.Spec.OrgID)
-		if orgExpireDataTime > 0 {
-			expiresAfter = orgExpireDataTime
-		}
-	}
-
-	record.SetExpiry(expiresAfter)
-
-	if e.Spec.GlobalConfig.AnalyticsConfig.NormaliseUrls.Enabled {
-		NormalisePath(&record, &e.Spec.GlobalConfig)
-	}
-
-	if e.Spec.AnalyticsPlugin.Enabled {
-		_ = e.Spec.AnalyticsPluginConfig.processRecord(&record)
-	}
-
-	err := e.Gw.Analytics.RecordHit(&record)
-	if err != nil {
-		log.WithError(err).Error("could not store analytic record")
-	}
-}
