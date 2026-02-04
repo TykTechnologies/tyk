@@ -9730,55 +9730,64 @@ func TestNewRelicMounting(t *testing.T) {
 }
 
 func TestListenPathConflictWhenCustomDomainIsDisabled(t *testing.T) {
-	ts := StartTest(nil)
+	ts := StartTest(func(globalConf *config.Config) {
+		globalConf.EnableCustomDomains = false
+		globalConf.HttpServerOptions.EnableStrictRoutes = true
+		globalConf.HttpServerOptions.EnablePathSuffixMatching = true
+		globalConf.HttpServerOptions.EnablePathPrefixMatching = true
+	})
 	t.Cleanup(ts.Close)
 
-	globalConf := ts.Gw.GetConfig()
-	globalConf.EnableCustomDomains = false
-	globalConf.HttpServerOptions.EnableStrictRoutes = true
-	globalConf.HttpServerOptions.EnablePathSuffixMatching = true
-	globalConf.HttpServerOptions.EnablePathPrefixMatching = true
-
-	ts.Gw.SetConfig(globalConf)
-	defer ts.ResetTestConfig()
-
 	localClient := test.NewClientLocal()
-	createNewMockedServer := func(name string) *httptest.Server {
-		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+
+	listenPathA := "/caas2itsamu0456n07gfe"
+	listenPathB := "/caas2itsamu04567m9pxl"
+	listenPathC := "/caas2itsamu0456qnu2sj"
+
+	createMockServer := func(listenPath string) *httptest.Server {
+		return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 			w.WriteHeader(http.StatusOK)
-			_, _ = w.Write([]byte(name))
+			_, _ = w.Write([]byte(listenPath))
 		}))
-
-		return server
 	}
 
-	listenPaths := map[string]string{
-		"/caas2itsamu0456n07gfe": "",
-		"/caas2itsamu04567m9pxl": "",
-		"/caas2itsamu0456qnu2sj": "",
-	}
+	mockServerA := createMockServer(listenPathA)
+	defer mockServerA.Close()
 
-	var mockedApis []func(spec *APISpec)
+	mockServerB := createMockServer(listenPathB)
+	defer mockServerB.Close()
 
-	for listenPath := range listenPaths {
-		cutPrefix, _ := strings.CutPrefix(listenPath, "/")
-		mockedResponse := fmt.Sprintf("{\"match\":\"%s\"}", cutPrefix)
+	mockServerC := createMockServer(listenPathC)
+	defer mockServerC.Close()
 
-		mockedServer := createNewMockedServer(mockedResponse)
-		defer mockedServer.Close()
-
-		mockedApis = append(mockedApis, func(spec *APISpec) {
-			spec.APIID = fmt.Sprintf("api-%s", cutPrefix)
-			spec.Proxy.ListenPath = listenPath
-			spec.Proxy.TargetURL = mockedServer.URL
-			spec.Proxy.DisableStripSlash = true
-			spec.Proxy.StripListenPath = true
-		})
-
-		listenPaths[listenPath] = mockedResponse
+	getMockedApis := func() []func(spec *APISpec) {
+		return []func(spec *APISpec){
+			func(spec *APISpec) {
+				spec.APIID = "api-A"
+				spec.Proxy.ListenPath = listenPathA
+				spec.Proxy.TargetURL = mockServerA.URL
+				spec.Proxy.DisableStripSlash = true
+				spec.Proxy.StripListenPath = true
+			},
+			func(spec *APISpec) {
+				spec.APIID = "api-B"
+				spec.Proxy.ListenPath = listenPathB
+				spec.Proxy.TargetURL = mockServerB.URL
+				spec.Proxy.DisableStripSlash = true
+				spec.Proxy.StripListenPath = true
+			},
+			func(spec *APISpec) {
+				spec.APIID = "api-C"
+				spec.Proxy.ListenPath = listenPathC
+				spec.Proxy.TargetURL = mockServerC.URL
+				spec.Proxy.DisableStripSlash = true
+				spec.Proxy.StripListenPath = true
+			},
+		}
 	}
 
 	t.Run("conflicting api with custom domain enabled and set", func(t *testing.T) {
+		mockedApis := getMockedApis()
 		mockedApis = append(mockedApis, func(spec *APISpec) {
 			spec.APIID = "api-caa"
 			spec.DomainDisabled = false
@@ -9792,14 +9801,15 @@ func TestListenPathConflictWhenCustomDomainIsDisabled(t *testing.T) {
 
 		var tcs []test.TestCase
 
-		for lp, resp := range listenPaths {
-			tcs = append(tcs, test.TestCase{Client: localClient, Code: 200, Path: lp, BodyMatch: resp})
+		for _, lp := range []string{listenPathA, listenPathB, listenPathC} {
+			tcs = append(tcs, test.TestCase{Client: localClient, Code: 200, Path: lp, BodyMatch: lp})
 		}
 
 		_, _ = ts.Run(t, tcs...)
 	})
 
 	t.Run("conflicting api with custom domain disabled", func(t *testing.T) {
+		mockedApis := getMockedApis()
 		mockedApis = append(mockedApis, func(spec *APISpec) {
 			spec.APIID = "api-caa"
 			spec.DomainDisabled = true
@@ -9812,8 +9822,8 @@ func TestListenPathConflictWhenCustomDomainIsDisabled(t *testing.T) {
 
 		var tcs []test.TestCase
 
-		for lp, resp := range listenPaths {
-			tcs = append(tcs, test.TestCase{Client: localClient, Code: 200, Path: lp, BodyMatch: resp})
+		for _, lp := range []string{listenPathA, listenPathB, listenPathC} {
+			tcs = append(tcs, test.TestCase{Client: localClient, Code: 200, Path: lp, BodyMatch: lp})
 		}
 
 		_, _ = ts.Run(t, tcs...)
