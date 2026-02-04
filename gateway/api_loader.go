@@ -893,14 +893,20 @@ func (gw *Gateway) loadHTTPService(spec *APISpec, apisByListen map[string]int, g
 	}
 
 	// Register routes for each prefix
+	gw.generateRoutesForPrefixes(spec, prefixes, gwConfig.HttpServerOptions.EnableStrictRoutes, router, chainObj)
+
+	return chainObj, nil
+}
+
+func (gw *Gateway) generateRoutesForPrefixes(spec *APISpec, prefixes []string, enabledStrictRoutes bool, router *mux.Router, chainObj *ChainObject) {
 	for _, prefix := range prefixes {
 		var subrouter *mux.Router
 
-		if gwConfig.HttpServerOptions.EnableStrictRoutes && !strings.HasSuffix(prefix, "/") &&
+		if enabledStrictRoutes && !strings.HasSuffix(prefix, "/") &&
 			!strings.Contains(prefix, "{") && !strings.Contains(prefix, "}") {
 			prefixWithSlash := prefix + "/"
 			// Matcher should only match the exact path or paths that start with prefix/
-			exactMatcher := func(r *http.Request, rm *mux.RouteMatch) bool {
+			exactMatcher := func(r *http.Request, _ *mux.RouteMatch) bool {
 				return r.URL.Path == prefix || strings.HasPrefix(r.URL.Path, prefixWithSlash)
 			}
 
@@ -916,13 +922,11 @@ func (gw *Gateway) loadHTTPService(spec *APISpec, apisByListen map[string]int, g
 			subrouter.Handle(rateLimitEndpoint, chainObj.RateLimitChain)
 		}
 
-		httpHandler := explicitRouteSubpaths(prefix, chainObj.ThisHandler, gwConfig.HttpServerOptions.EnableStrictRoutes)
+		httpHandler := explicitRouteSubpaths(prefix, chainObj.ThisHandler, enabledStrictRoutes)
 
 		// Attach handlers
 		subrouter.NewRoute().Handler(httpHandler)
 	}
-
-	return chainObj, nil
 }
 
 func (gw *Gateway) loadTCPService(spec *APISpec, gs *generalStores, muxer *proxyMux) {
