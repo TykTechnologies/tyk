@@ -1756,8 +1756,8 @@ func (a *APISpec) URLAllowedAndIgnored(r *http.Request, rxPaths []URLSpec, white
 
 		// MCP primitive VEMs: continue checking for BlackList even outside whitelist mode.
 		// This allows explicit BlackList entries to block primitives without Allow.
-		if rxPaths[i].Status == Internal && r.Method == rxPaths[i].Internal.Method {
-			if a.IsMCP() && mcp.IsPrimitiveVEMPath(rxPaths[i].Internal.Path) {
+		if a.IsMCP() && rxPaths[i].Status == Internal && r.Method == rxPaths[i].Internal.Method {
+			if mcp.IsPrimitiveVEMPath(rxPaths[i].Internal.Path) {
 				if httpctx.IsJsonRPCRouting(r) {
 					continue // Keep looking for WhiteList/BlackList
 				}

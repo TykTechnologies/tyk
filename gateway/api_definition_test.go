@@ -2679,7 +2679,7 @@ func TestPopulateMCPPrimitivesMap(t *testing.T) {
 			},
 		}
 
-		spec.OAS.T.Paths = &openapi3.Paths{}
+		spec.OAS.Paths = &openapi3.Paths{}
 		spec.OAS.Paths.Set("/tools/call", &openapi3.PathItem{})
 		spec.OAS.Paths.Set("/resources/read", &openapi3.PathItem{})
 
