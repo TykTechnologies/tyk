@@ -321,3 +321,120 @@ func ClassifyUpstreamResponse(statusCode int, target string) *ErrorClassificatio
 		WithTarget(target).
 		WithUpstreamStatus(statusCode)
 }
+
+// ClassifyAuthError maps TykError IDs to ErrorClassification for authentication errors.
+// Returns nil for unknown error IDs.
+func ClassifyAuthError(errorID string, source string) *ErrorClassification {
+	switch errorID {
+	// Auth key errors
+	case ErrAuthAuthorizationFieldMissing:
+		return NewErrorClassification(AMF, detailAuthFieldMissing).WithSource(source)
+	case ErrAuthKeyNotFound:
+		return NewErrorClassification(AKI, detailAuthKeyNotFound).WithSource(source)
+	case ErrAuthCertNotFound:
+		return NewErrorClassification(AKI, detailAuthCertNotFound).WithSource(source)
+	case ErrAuthKeyIsInvalid:
+		return NewErrorClassification(AKI, detailAuthKeyIsInvalid).WithSource(source)
+	case ErrAuthCertExpired:
+		return NewErrorClassification(TKE, detailAuthCertExpired).WithSource(source)
+	case ErrAuthCertRequired:
+		return NewErrorClassification(CRQ, detailAuthCertRequired).WithSource(source)
+	case ErrAuthCertMismatch:
+		return NewErrorClassification(CMM, detailAuthCertMismatch).WithSource(source)
+
+	// OAuth errors
+	case ErrOAuthAuthorizationFieldMissing:
+		return NewErrorClassification(AMF, detailOAuthFieldMissing).WithSource(source)
+	case ErrOAuthAuthorizationFieldMalformed:
+		return NewErrorClassification(IHD, detailOAuthFieldMalformed).WithSource(source)
+	case ErrOAuthKeyNotFound:
+		return NewErrorClassification(AKI, detailOAuthKeyNotFound).WithSource(source)
+	case ErrOAuthClientDeleted:
+		return NewErrorClassification(EAD, detailOAuthClientDeleted).WithSource(source)
+
+	default:
+		return nil
+	}
+}
+
+// ClassifyRateLimitError maps rate limit error types to ErrorClassification.
+// Returns nil for unknown error types.
+func ClassifyRateLimitError(errorType string, source string) *ErrorClassification {
+	switch errorType {
+	case ErrTypeSessionRateLimit:
+		return NewErrorClassification(RLT, detailSessionRateLimited).WithSource(source)
+	case ErrTypeAPIRateLimit:
+		return NewErrorClassification(RLT, detailAPIRateLimited).WithSource(source)
+	case ErrTypeOtherRateLimit:
+		return NewErrorClassification(RLT, detailGenericRateLimit).WithSource(source)
+	default:
+		return nil
+	}
+}
+
+// ClassifyQuotaExceededError creates an error classification for quota exceeded events.
+func ClassifyQuotaExceededError(source string) *ErrorClassification {
+	return NewErrorClassification(QEX, detailQuotaExceeded).WithSource(source)
+}
+
+// ClassifyJWTError maps JWT-specific error types to ErrorClassification.
+// Returns nil for unknown error types.
+func ClassifyJWTError(errorType string, source string) *ErrorClassification {
+	switch errorType {
+	case ErrTypeAuthFieldMissing:
+		return NewErrorClassification(AMF, detailJWTFieldMissing).WithSource(source)
+	case ErrTypeClaimsInvalid:
+		return NewErrorClassification(TCV, detailJWTClaimsInvalid).WithSource(source)
+	case ErrTypeTokenInvalid:
+		return NewErrorClassification(TKI, detailJWTTokenInvalid).WithSource(source)
+	case ErrTypeUnexpectedSigningMethod:
+		return NewErrorClassification(TKI, detailJWTUnexpectedSigningMethod).WithSource(source)
+	default:
+		return nil
+	}
+}
+
+// ClassifyBasicAuthError maps basic auth error types to ErrorClassification.
+// Returns nil for unknown error types.
+func ClassifyBasicAuthError(errorType string, source string) *ErrorClassification {
+	switch errorType {
+	case ErrTypeAuthFieldMissing:
+		return NewErrorClassification(AMF, detailBasicAuthFieldMissing).WithSource(source)
+	case ErrTypeHeaderMalformed:
+		return NewErrorClassification(IHD, detailBasicAuthHeaderMalformed).WithSource(source)
+	case ErrTypeEncodingInvalid:
+		return NewErrorClassification(IHD, detailBasicAuthEncodingInvalid).WithSource(source)
+	case ErrTypeValuesMalformed:
+		return NewErrorClassification(IHD, detailBasicAuthValuesMalformed).WithSource(source)
+	case ErrTypeBodyUsernameMissing:
+		return NewErrorClassification(BIV, detailBasicAuthBodyUsernameMissing).WithSource(source)
+	case ErrTypeBodyPasswordMissing:
+		return NewErrorClassification(BIV, detailBasicAuthBodyPasswordMissing).WithSource(source)
+	default:
+		return nil
+	}
+}
+
+// ClassifyRequestSizeError maps request size error types to ErrorClassification.
+func ClassifyRequestSizeError(errorType string, source string) *ErrorClassification {
+	switch errorType {
+	case ErrTypeContentLengthMissing:
+		return NewErrorClassification(CLM, detailContentLengthMissing).WithSource(source)
+	case ErrTypeBodyTooLarge:
+		return NewErrorClassification(BTL, detailBodyTooLarge).WithSource(source)
+	default:
+		return nil
+	}
+}
+
+// ClassifyJSONValidationError maps JSON validation error types to ErrorClassification.
+func ClassifyJSONValidationError(errorType string, source string) *ErrorClassification {
+	switch errorType {
+	case ErrTypeJSONParseError:
+		return NewErrorClassification(BIV, detailJSONParseError).WithSource(source)
+	case ErrTypeSchemaValidationFailed:
+		return NewErrorClassification(BIV, detailSchemaValidationFailed).WithSource(source)
+	default:
+		return nil
+	}
+}
