@@ -1227,7 +1227,7 @@ func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string, orgId string) 
 
 	for _, apiID := range apiIDsToInvalidateJWKSCache {
 		log.WithField("apiID", apiID).Debug("Received request to flush JWKS cache")
-		invalidateJWKSCacheByAPIID(apiID)
+		r.Gw.invalidateJWKSCacheByAPIID(apiID)
 	}
 
 	// Notify rest of gateways in cluster to flush cache
