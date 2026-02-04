@@ -137,6 +137,10 @@ func TestErrorHandler_LatencyRecording(t *testing.T) {
 		})
 		defer ts.Close()
 
+		// Clear any existing analytics records from previous tests
+		ts.Gw.Analytics.Flush()
+		ts.Gw.Analytics.Store.GetAndDeleteSet(analyticsKeyName)
+
 		// Use unreachable host to trigger ErrorHandler via connection refused
 		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 			spec.Proxy.ListenPath = "/"
@@ -178,6 +182,10 @@ func TestErrorHandler_LatencyRecording(t *testing.T) {
 			c.AnalyticsConfig.EnableDetailedRecording = true
 		})
 		defer ts.Close()
+
+		// Clear any existing analytics records from previous tests
+		ts.Gw.Analytics.Flush()
+		ts.Gw.Analytics.Store.GetAndDeleteSet(analyticsKeyName)
 
 		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 			spec.Proxy.ListenPath = "/"
