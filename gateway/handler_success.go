@@ -11,16 +11,14 @@ import (
 	"strings"
 	"time"
 
-	graphqlinternal "github.com/TykTechnologies/tyk/internal/graphql"
-
 	"github.com/TykTechnologies/tyk-pump/analytics"
-
 	"github.com/TykTechnologies/tyk/apidef"
-	"github.com/TykTechnologies/tyk/internal/httputil"
-
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/ctx"
 	"github.com/TykTechnologies/tyk/header"
+	tykerrors "github.com/TykTechnologies/tyk/internal/errors"
+	graphqlinternal "github.com/TykTechnologies/tyk/internal/graphql"
+	"github.com/TykTechnologies/tyk/internal/httputil"
 	"github.com/TykTechnologies/tyk/internal/otel"
 	"github.com/TykTechnologies/tyk/request"
 	"github.com/TykTechnologies/tyk/user"
@@ -380,6 +378,19 @@ func recordDetailUnsafe(r *http.Request, spec *APISpec) bool {
 	return spec.GraphQL.Enabled || spec.GlobalConfig.AnalyticsConfig.EnableDetailedRecording
 }
 
+// classifyUpstreamError classifies upstream responses for structured access logs.
+// Currently handles 5XX status codes; can be extended for other error classifications.
+func (s *SuccessHandler) classifyUpstreamError(r *http.Request, statusCode int) {
+	if statusCode >= 500 && statusCode <= 599 {
+		target := r.URL.Host
+		if target == "" && s.Spec.target != nil {
+			target = s.Spec.target.Host
+		}
+		errClass := tykerrors.ClassifyUpstreamResponse(statusCode, target)
+		ctx.SetErrorClassification(r, errClass)
+	}
+}
+
 // ServeHTTP will store the request details in the analytics store if necessary and proxy the request to it's
 // final destination, this is invoked by the ProxyHandler or right at the start of a request chain if the URL
 // Spec states the path is Ignored
@@ -420,6 +431,9 @@ func (s *SuccessHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) *http
 			Upstream: upstreamMs,
 			Gateway:  totalMs - upstreamMs,
 		}
+
+		s.classifyUpstreamError(r, resp.Response.StatusCode)
+
 		s.RecordHit(r, latency, resp.Response.StatusCode, resp.Response, false)
 		s.RecordAccessLog(r, resp.Response, latency)
 	}
@@ -463,7 +477,12 @@ func (s *SuccessHandler) ServeHTTPWithCache(w http.ResponseWriter, r *http.Reque
 			Upstream: upstreamMs,
 			Gateway:  totalMs - upstreamMs,
 		}
+
+		s.classifyUpstreamError(r, inRes.Response.StatusCode)
+
 		s.RecordHit(r, latency, inRes.Response.StatusCode, inRes.Response, false)
+		s.RecordAccessLog(r, inRes.Response, latency)
+
 	}
 
 	return inRes
