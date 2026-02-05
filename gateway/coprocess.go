@@ -298,7 +298,8 @@ func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 	// (e.g., VEM chain traversal, URL rewrites with tyk://self).
 	// CustomKeyCheck hooks must run on every request, so they're excluded from this check.
 	// Similar to auth middleware behavior (see mw_auth_key.go:124).
-	if m.HookType != coprocess.HookType_CustomKeyCheck && httpctx.IsSelfLooping(r) {
+	// Only applies to MCP proxies.
+	if m.Spec.IsMCP() && m.HookType != coprocess.HookType_CustomKeyCheck && httpctx.IsSelfLooping(r) {
 		return nil, http.StatusOK
 	}
 

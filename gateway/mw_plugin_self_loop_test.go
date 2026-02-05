@@ -19,27 +19,26 @@ import (
 // how authentication middleware behaves.
 func TestGoPluginMiddleware_SkipsOnSelfLoop(t *testing.T) {
 	t.Run("API-level plugin skips on self-loop", func(t *testing.T) {
-		// Arrange: Create an API-level Go plugin middleware
 		mw := &GoPluginMiddleware{
 			BaseMiddleware: &BaseMiddleware{
 				Spec: &APISpec{
-					APIDefinition: &apidef.APIDefinition{},
+					APIDefinition: &apidef.APIDefinition{
+						ApplicationProtocol: apidef.AppProtocolMCP,
+					},
 				},
 			},
-			APILevel: true, // Global plugin
+			APILevel: true,
 		}
 
 		r := httptest.NewRequest(http.MethodPost, "/mcp-tool:get-weather", nil)
 		w := httptest.NewRecorder()
 
-		// Simulate self-looping (internal VEM routing)
 		httpctx.SetSelfLooping(r, true)
 
-		// Act: Process the request
-		err, _ := mw.ProcessRequest(w, r, nil)
+		err, code := mw.ProcessRequest(w, r, nil)
 
-		// Assert: Should skip execution without error
 		assert.Nil(t, err, "Should not return error on self-loop")
+		assert.Equal(t, http.StatusOK, code)
 	})
 
 	t.Run("API-level plugin executes on initial request", func(t *testing.T) {
@@ -108,11 +107,12 @@ func TestGoPluginMiddleware_SkipsOnSelfLoop(t *testing.T) {
 // (Python, Ruby, etc.) skip execution on self-looped requests.
 func TestCoProcessMiddleware_SkipsOnSelfLoop(t *testing.T) {
 	t.Run("Global CoProcess plugin skips on self-loop", func(t *testing.T) {
-		// Arrange: Create a global CoProcess middleware
 		mw := &CoProcessMiddleware{
 			BaseMiddleware: &BaseMiddleware{
 				Spec: &APISpec{
-					APIDefinition: &apidef.APIDefinition{},
+					APIDefinition: &apidef.APIDefinition{
+						ApplicationProtocol: apidef.AppProtocolMCP,
+					},
 				},
 			},
 			HookName: "test_hook",
@@ -121,14 +121,12 @@ func TestCoProcessMiddleware_SkipsOnSelfLoop(t *testing.T) {
 		r := httptest.NewRequest(http.MethodPost, "/mcp-tool:get-weather", nil)
 		w := httptest.NewRecorder()
 
-		// Simulate self-looping (internal VEM routing)
 		httpctx.SetSelfLooping(r, true)
 
-		// Act: Process the request
-		err, _ := mw.ProcessRequest(w, r, nil)
+		err, code := mw.ProcessRequest(w, r, nil)
 
-		// Assert: Should skip execution without error
 		assert.Nil(t, err, "Should not return error on self-loop")
+		assert.Equal(t, http.StatusOK, code)
 	})
 
 	t.Run("Global CoProcess plugin executes on initial request", func(t *testing.T) {
@@ -151,10 +149,11 @@ func TestCoProcessMiddleware_SkipsOnSelfLoop(t *testing.T) {
 		// Act: Process the request
 		// Note: Will fail to dispatch since we don't have a real dispatcher set up,
 		// but that proves the middleware didn't skip
-		_, code := mw.ProcessRequest(w, r, nil)
+		err, code := mw.ProcessRequest(w, r, nil)
 
 		// Assert: Should attempt execution (may error due to no dispatcher)
 		// The important part is it didn't skip via self-loop check
+		assert.NotNil(t, err)
 		assert.NotEqual(t, http.StatusOK, code, "Should not skip on initial request")
 	})
 
@@ -177,10 +176,11 @@ func TestCoProcessMiddleware_SkipsOnSelfLoop(t *testing.T) {
 		httpctx.SetSelfLooping(r, true)
 
 		// Act: Process the request
-		_, code := mw.ProcessRequest(w, r, nil)
+		err, code := mw.ProcessRequest(w, r, nil)
 
 		// Assert: Custom key checks should NOT skip on self-loop
 		// (will error due to no dispatcher, but that proves it didn't skip)
+		assert.NotNil(t, err)
 		assert.NotEqual(t, http.StatusOK, code, "CustomKeyCheck should not skip on self-loop")
 	})
 }
@@ -189,28 +189,27 @@ func TestCoProcessMiddleware_SkipsOnSelfLoop(t *testing.T) {
 // skip execution on self-looped requests.
 func TestDynamicMiddleware_SkipsOnSelfLoop(t *testing.T) {
 	t.Run("Post-phase JS plugin skips on self-loop", func(t *testing.T) {
-		// Arrange: Create a post-phase (non-pre) JS middleware
 		mw := &DynamicMiddleware{
 			BaseMiddleware: &BaseMiddleware{
 				Spec: &APISpec{
-					APIDefinition: &apidef.APIDefinition{},
+					APIDefinition: &apidef.APIDefinition{
+						ApplicationProtocol: apidef.AppProtocolMCP,
+					},
 				},
 			},
 			MiddlewareClassName: "TestMiddleware",
-			Pre:                 false, // Post-phase plugin
+			Pre:                 false,
 		}
 
 		r := httptest.NewRequest(http.MethodPost, "/mcp-tool:get-weather", nil)
 		w := httptest.NewRecorder()
 
-		// Simulate self-looping (internal VEM routing)
 		httpctx.SetSelfLooping(r, true)
 
-		// Act: Process the request
-		err, _ := mw.ProcessRequest(w, r, nil)
+		err, code := mw.ProcessRequest(w, r, nil)
 
-		// Assert: Should skip execution without error
 		assert.Nil(t, err, "Should not return error on self-loop")
+		assert.Equal(t, http.StatusOK, code)
 	})
 
 	t.Run("Pre-phase JS plugin always executes", func(t *testing.T) {
@@ -232,11 +231,12 @@ func TestDynamicMiddleware_SkipsOnSelfLoop(t *testing.T) {
 		httpctx.SetSelfLooping(r, true)
 
 		// Act: Process the request
-		err, _ := mw.ProcessRequest(w, r, nil)
+		err, code := mw.ProcessRequest(w, r, nil)
 
 		// Assert: Pre-phase plugins should attempt execution regardless of self-loop
 		// (will fail due to no JSVM setup, but proves it didn't skip)
 		assert.NotNil(t, err, "Pre-phase plugin should attempt execution even on self-loop")
+		assert.NotEqual(t, http.StatusOK, code)
 	})
 
 	t.Run("Post-phase JS plugin executes on initial request", func(t *testing.T) {
@@ -258,10 +258,11 @@ func TestDynamicMiddleware_SkipsOnSelfLoop(t *testing.T) {
 		httpctx.SetSelfLooping(r, false)
 
 		// Act: Process the request
-		err, _ := mw.ProcessRequest(w, r, nil)
+		err, code := mw.ProcessRequest(w, r, nil)
 
 		// Assert: Should attempt execution
 		assert.NotNil(t, err, "Should attempt to execute plugin on initial request")
+		assert.NotEqual(t, http.StatusOK, code)
 	})
 }
 
@@ -296,10 +297,11 @@ func TestPluginSelfLoop_WithSession(t *testing.T) {
 		httpctx.SetSelfLooping(r, true)
 
 		// Act
-		err, _ := mw.ProcessRequest(w, r, nil)
+		err, code := mw.ProcessRequest(w, r, nil)
 
 		// Assert: Should skip
 		assert.Nil(t, err)
+		assert.Equal(t, http.StatusOK, code)
 	})
 }
 

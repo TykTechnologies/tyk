@@ -9737,9 +9737,9 @@ func TestMCPRequestSizeLimit_Security(t *testing.T) {
 
 	t.Run("MCP API rejects oversized requests", func(t *testing.T) {
 		// Create upstream server
-		upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 			w.WriteHeader(http.StatusOK)
-			w.Write([]byte(`{"jsonrpc":"2.0","result":"success","id":1}`))
+			_, _ = w.Write([]byte(`{"jsonrpc":"2.0","result":"success","id":1}`))
 		}))
 		defer upstream.Close()
 

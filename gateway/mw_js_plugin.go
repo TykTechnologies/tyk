@@ -121,7 +121,8 @@ func (d *DynamicMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 	// (e.g., VEM chain traversal, URL rewrites with tyk://self).
 	// Pre-phase plugins run before auth and should execute on every request.
 	// Similar to auth middleware behavior (see mw_auth_key.go:124).
-	if !d.Pre && httpctx.IsSelfLooping(r) {
+	// Only applies to MCP proxies.
+	if d.Spec.IsMCP() && !d.Pre && httpctx.IsSelfLooping(r) {
 		return nil, http.StatusOK
 	}
 
