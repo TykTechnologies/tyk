@@ -432,13 +432,16 @@ func (c *certificateManager) List(certIDs []string, mode CertificateType) (out [
 		if errors.Is(err, storage.ErrMDCBConnectionLost) {
 			c.logger.WithField("cert_id", id).Info("MDCB connection lost, waiting for emergency mode to exit before loading certificate")
 
-			// Wait for emergency mode to exit
-			<-c.emergencyModeExitCh
-
-			c.logger.WithField("cert_id", id).Info("Emergency mode exited, retrying certificate fetch from MDCB")
-
-			// Retry fetching from MDCB
-			val, err = c.storage.GetKey("raw-" + id)
+			// Wait for emergency mode to exit with timeout
+			select {
+			case <-c.emergencyModeExitCh:
+				c.logger.WithField("cert_id", id).Info("Emergency mode exited, retrying certificate fetch from MDCB")
+				// Retry fetching from MDCB
+				val, err = c.storage.GetKey("raw-" + id)
+			case <-time.After(30 * time.Second):
+				c.logger.WithField("cert_id", id).Warn("Timeout waiting for emergency mode to exit")
+				// Keep the ErrMDCBConnectionLost error to trigger file fallback
+			}
 		}
 
 		// fallback to file
@@ -446,7 +449,10 @@ func (c *certificateManager) List(certIDs []string, mode CertificateType) (out [
 			// Try read from file
 			rawCert, err = ioutil.ReadFile(id)
 			if err != nil {
-				c.logger.Warn("Can't retrieve certificate:", id, err)
+				c.logger.WithFields(logrus.Fields{
+					"cert_id": id,
+					"error":   err.Error(),
+				}).Warn("Can't retrieve certificate")
 				out = append(out, nil)
 				continue
 			}
