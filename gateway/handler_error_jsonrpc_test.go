@@ -24,10 +24,9 @@ func TestErrorHandler_HandleError_JSONRPCFormat(t *testing.T) {
 	defer ts.Close()
 
 	spec := &APISpec{
-		APIDefinition: &apidef.APIDefinition{
-			JsonRpcVersion: apidef.JsonRPC20,
-		},
+		APIDefinition: &apidef.APIDefinition{},
 	}
+	spec.MarkAsMCP()
 
 	handler := ErrorHandler{
 		BaseMiddleware: &BaseMiddleware{
@@ -101,7 +100,7 @@ func TestErrorHandler_HandleError_JSONRPCFormat(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Reset spec for each test
-			handler.Spec.JsonRpcVersion = apidef.JsonRPC20
+			handler.Spec.MarkAsMCP()
 
 			r := httptest.NewRequest(http.MethodPost, "/test", nil)
 			r.Header.Set("Content-Type", "application/json")
@@ -149,10 +148,9 @@ func TestErrorHandler_writeJSONRPCError_ReturnsFullResponse(t *testing.T) {
 	defer ts.Close()
 
 	spec := &APISpec{
-		APIDefinition: &apidef.APIDefinition{
-			JsonRpcVersion: apidef.JsonRPC20,
-		},
+		APIDefinition: &apidef.APIDefinition{},
 	}
+	spec.MarkAsMCP()
 
 	handler := ErrorHandler{
 		BaseMiddleware: &BaseMiddleware{
@@ -368,7 +366,7 @@ func TestErrorHandler_OverrideMessages_AppliedToJSONRPCErrors(t *testing.T) {
 				APIDefinition: &apidef.APIDefinition{},
 			}
 			if tt.expectJSONRPC {
-				spec.JsonRpcVersion = apidef.JsonRPC20
+				spec.MarkAsMCP()
 			}
 
 			handler := ErrorHandler{
@@ -446,10 +444,9 @@ func TestErrorHandler_OverrideMessages_ConsistentBehavior(t *testing.T) {
 
 	// Test JSON-RPC format
 	jsonRPCSpec := &APISpec{
-		APIDefinition: &apidef.APIDefinition{
-			JsonRpcVersion: apidef.JsonRPC20,
-		},
+		APIDefinition: &apidef.APIDefinition{},
 	}
+	jsonRPCSpec.MarkAsMCP()
 	jsonRPCHandler := ErrorHandler{
 		BaseMiddleware: &BaseMiddleware{
 			Spec: jsonRPCSpec,
@@ -520,13 +517,13 @@ func TestErrorHandler_JSONRPCError_AccessLogStatusCode(t *testing.T) {
 	// Setup JSON-RPC API spec
 	spec := &APISpec{
 		APIDefinition: &apidef.APIDefinition{
-			JsonRpcVersion: apidef.JsonRPC20,
-			APIID:          "test-api",
-			OrgID:          "test-org",
-			Name:           "Test API",
+			APIID: "test-api",
+			OrgID: "test-org",
+			Name:  "Test API",
 		},
 		GlobalConfig: gwConfig,
 	}
+	spec.MarkAsMCP()
 
 	handler := ErrorHandler{
 		BaseMiddleware: &BaseMiddleware{
@@ -743,7 +740,7 @@ func TestErrorHandler_JSONRPC_LatencyRecording(t *testing.T) {
 	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 		spec.Proxy.ListenPath = "/"
 		spec.Proxy.TargetURL = "http://localhost:66666"
-		spec.JsonRpcVersion = apidef.JsonRPC20
+		spec.MarkAsMCP()
 	})
 
 	_, _ = ts.Run(t, test.TestCase{
