@@ -293,13 +293,13 @@ func TestErrorHandler_OverrideMessages_AppliedToJSONRPCErrors(t *testing.T) {
 	}
 
 	tests := []struct {
-		name              string
-		errorID           string
-		expectJSONRPC     bool
-		setupRequest      func(*http.Request)
-		expectedMessage   string
-		expectedHTTPCode  int
-		expectedRPCCode   int
+		name             string
+		errorID          string
+		expectJSONRPC    bool
+		setupRequest     func(*http.Request)
+		expectedMessage  string
+		expectedHTTPCode int
+		expectedRPCCode  int
 	}{
 		{
 			name:    "JSON-RPC error uses overridden auth message",
@@ -536,10 +536,10 @@ func TestErrorHandler_JSONRPCError_AccessLogStatusCode(t *testing.T) {
 	}
 
 	tests := []struct {
-		name             string
-		httpCode         int
-		message          string
-		expectedRPCCode  int
+		name            string
+		httpCode        int
+		message         string
+		expectedRPCCode int
 	}{
 		{
 			name:            "403 Forbidden returns correct status in access log",
@@ -677,9 +677,9 @@ func TestErrorHandler_StandardError_StatusCodeAlwaysSet(t *testing.T) {
 	}
 
 	tests := []struct {
-		name     string
-		errCode  int
-		errMsg   string
+		name    string
+		errCode int
+		errMsg  string
 	}{
 		{
 			name:    "Standard error with template",
