@@ -645,3 +645,87 @@ func TestErrorHandler_StandardError_RecordsAnalytics(t *testing.T) {
 	// Verify the spec is not set to DoNotTrack
 	assert.False(t, spec.DoNotTrack, "Analytics should be enabled for this test")
 }
+
+// TestErrorHandler_StandardError_StatusCodeAlwaysSet verifies that response.StatusCode
+// is set correctly in all standard error paths, including custom body responses.
+func TestErrorHandler_StandardError_StatusCodeAlwaysSet(t *testing.T) {
+	logger, hook := logrustest.NewNullLogger()
+
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	// Enable access logs to verify status code is recorded
+	gwConfig := ts.Gw.GetConfig()
+	gwConfig.AccessLogs.Enabled = true
+	ts.Gw.SetConfig(gwConfig)
+
+	spec := &APISpec{
+		APIDefinition: &apidef.APIDefinition{
+			APIID: "test-api",
+			OrgID: "test-org",
+			Name:  "Test API",
+		},
+		GlobalConfig: gwConfig,
+	}
+
+	handler := ErrorHandler{
+		BaseMiddleware: &BaseMiddleware{
+			Spec:   spec,
+			Gw:     ts.Gw,
+			logger: logger.WithField("prefix", "test"),
+		},
+	}
+
+	tests := []struct {
+		name     string
+		errCode  int
+		errMsg   string
+	}{
+		{
+			name:    "Standard error with template",
+			errCode: http.StatusForbidden,
+			errMsg:  "Access forbidden",
+		},
+		{
+			name:    "Custom body error (errCustomBodyResponse)",
+			errCode: http.StatusInternalServerError,
+			errMsg:  "errCustomBodyResponse",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			hook.Reset()
+
+			r := httptest.NewRequest(http.MethodPost, "/test", nil)
+			r.Header.Set("Content-Type", "application/json")
+			w := httptest.NewRecorder()
+
+			// Call HandleError
+			handler.HandleError(w, r, tt.errMsg, tt.errCode, true)
+
+			// Find access log entry
+			require.NotEmpty(t, hook.Entries, "Access log should be written")
+
+			var accessLogEntry *logrus.Entry
+			for i := range hook.Entries {
+				if hook.Entries[i].Level == logrus.InfoLevel {
+					accessLogEntry = &hook.Entries[i]
+					break
+				}
+			}
+			require.NotNil(t, accessLogEntry, "Should find access log entry")
+
+			// Verify status code in access log
+			status, exists := accessLogEntry.Data["status"]
+			require.True(t, exists, "Access log should contain 'status' field")
+
+			statusInt, ok := status.(int)
+			require.True(t, ok, "Status should be an integer, got %T", status)
+
+			// CRITICAL: Status should match error code, not be zero
+			assert.NotEqual(t, 0, statusInt, "Access log status should NOT be zero")
+			assert.Equal(t, tt.errCode, statusInt, "Access log status should match error code")
+		})
+	}
+}

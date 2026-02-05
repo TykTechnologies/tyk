@@ -163,10 +163,12 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 
 		var responseBodyBytes []byte
 
+		// Set status code for analytics and access logs
+		response.StatusCode = errCode
+
 		// If error is not customized write error in default way
 		if errMsg != errCustomBodyResponse.Error() {
 			w.WriteHeader(errCode)
-			response.StatusCode = errCode
 			var tmplExecutor TemplateExecutor
 			tmplExecutor = tmpl
 
