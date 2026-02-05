@@ -74,7 +74,7 @@ func TestErrorHandler_HandleError_JSONRPCFormat(t *testing.T) {
 		},
 		{
 			name: "returns standard error when no routing state",
-			setupRequest: func(r *http.Request) {
+			setupRequest: func(_ *http.Request) {
 				// No routing state set
 			},
 			httpCode:      http.StatusForbidden,
@@ -318,7 +318,7 @@ func TestErrorHandler_OverrideMessages_AppliedToJSONRPCErrors(t *testing.T) {
 		{
 			name:    "Standard error uses same overridden auth message",
 			errorID: ErrAuthAuthorizationFieldMissing,
-			setupRequest: func(r *http.Request) {
+			setupRequest: func(_ *http.Request) {
 				// No routing state - standard error
 			},
 			expectJSONRPC:    false,
@@ -342,7 +342,7 @@ func TestErrorHandler_OverrideMessages_AppliedToJSONRPCErrors(t *testing.T) {
 		{
 			name:    "Standard error uses same overridden access denied message",
 			errorID: ErrAuthKeyNotFound,
-			setupRequest: func(r *http.Request) {
+			setupRequest: func(_ *http.Request) {
 				// No routing state - standard error
 			},
 			expectJSONRPC:    false,

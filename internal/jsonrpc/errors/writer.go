@@ -56,7 +56,7 @@ func writeJSONResponse(w http.ResponseWriter, httpCode int, response JSONRPCErro
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(httpCode)
-	w.Write(body)
+	_, _ = w.Write(body)
 
 	return body
 }
