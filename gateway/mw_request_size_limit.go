@@ -8,7 +8,9 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/ctx"
 	"github.com/TykTechnologies/tyk/header"
+	tykerrors "github.com/TykTechnologies/tyk/internal/errors"
 )
 
 // As for the HTTP methods spec:
@@ -49,6 +51,7 @@ func (t *RequestSizeLimitMiddleware) EnabledForSpec() bool {
 func (t *RequestSizeLimitMiddleware) checkRequestLimit(r *http.Request, sizeLimit int64) (error, int) {
 	statedCL := r.Header.Get(header.ContentLength)
 	if statedCL == "" {
+		ctx.SetErrorClassification(r, tykerrors.ClassifyRequestSizeError(tykerrors.ErrTypeContentLengthMissing, t.Name()))
 		return errors.New("Content length is required for this request"), 411
 	}
 
@@ -64,7 +67,7 @@ func (t *RequestSizeLimitMiddleware) checkRequestLimit(r *http.Request, sizeLimi
 	// Check stated size
 	if size > sizeLimit {
 		t.Logger().WithFields(logrus.Fields{"size": size, "limit": sizeLimit}).Info("Attempted access with large request size, blocked.")
-
+		ctx.SetErrorClassification(r, tykerrors.ClassifyRequestSizeError(tykerrors.ErrTypeBodyTooLarge, t.Name()))
 		return errors.New("Request is too large"), http.StatusBadRequest
 	}
 
