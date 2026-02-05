@@ -70,7 +70,6 @@ func extractCertificatesFromSpec(spec *APISpec) map[string]struct{} {
 	return certSet
 }
 
-
 // ReplaceAll atomically replaces the entire certificate usage map.
 // This method is thread-safe and ensures no partial state is visible to concurrent readers.
 func (cr *certUsageTracker) ReplaceAll(newApis map[string]map[string]struct{}) {
