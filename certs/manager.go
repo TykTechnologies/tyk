@@ -52,11 +52,12 @@ type CertificateManager interface {
 }
 
 type certificateManager struct {
-	storage         storage.Handler
-	logger          *logrus.Entry
-	cache           cache.Repository
-	secret          string
-	migrateCertList bool
+	storage             storage.Handler
+	logger              *logrus.Entry
+	cache               cache.Repository
+	secret              string
+	migrateCertList     bool
+	emergencyModeExitCh chan struct{}
 }
 
 func NewCertificateManager(storage storage.Handler, secret string, logger *logrus.Logger, migrateCertList bool) *certificateManager {
@@ -65,11 +66,12 @@ func NewCertificateManager(storage storage.Handler, secret string, logger *logru
 	}
 
 	return &certificateManager{
-		storage:         storage,
-		logger:          logger.WithFields(logrus.Fields{"prefix": CertManagerLogPrefix}),
-		cache:           cache.New(cacheDefaultTTL, cacheCleanInterval),
-		secret:          secret,
-		migrateCertList: migrateCertList,
+		storage:             storage,
+		logger:              logger.WithFields(logrus.Fields{"prefix": CertManagerLogPrefix}),
+		cache:               cache.New(cacheDefaultTTL, cacheCleanInterval),
+		secret:              secret,
+		migrateCertList:     migrateCertList,
+		emergencyModeExitCh: make(chan struct{}, 1),
 	}
 }
 
@@ -86,10 +88,11 @@ func NewSlaveCertManager(localStorage, rpcStorage storage.Handler, secret string
 	log := logger.WithFields(logrus.Fields{"prefix": CertManagerLogPrefix})
 
 	cm := &certificateManager{
-		logger:          log,
-		cache:           cache.New(cacheDefaultTTL, cacheCleanInterval),
-		secret:          secret,
-		migrateCertList: migrateCertList,
+		logger:              log,
+		cache:               cache.New(cacheDefaultTTL, cacheCleanInterval),
+		secret:              secret,
+		migrateCertList:     migrateCertList,
+		emergencyModeExitCh: make(chan struct{}, 1),
 	}
 
 	callbackOnPullCertFromRPC := func(key, val string) error {
@@ -104,6 +107,17 @@ func NewSlaveCertManager(localStorage, rpcStorage storage.Handler, secret string
 	mdcbStorage := storage.NewMdcbStorage(localStorage, rpcStorage, log, callbackOnPullCertFromRPC)
 	cm.storage = mdcbStorage
 	return cm
+}
+
+// NotifyEmergencyModeExit signals the certificate manager that emergency mode has exited
+// and it should retry loading certificates from MDCB
+func (c *certificateManager) NotifyEmergencyModeExit() {
+	select {
+	case c.emergencyModeExitCh <- struct{}{}:
+		c.logger.Debug("Emergency mode exit notification sent to certificate manager")
+	default:
+		// Channel already has a notification, don't block
+	}
 }
 
 // Extracted from: https://golang.org/src/crypto/tls/tls.go
@@ -414,6 +428,19 @@ func (c *certificateManager) List(certIDs []string, mode CertificateType) (out [
 		}
 
 		val, err := c.storage.GetKey("raw-" + id)
+		// Check if MDCB connection is lost (emergency mode)
+		if errors.Is(err, storage.ErrMDCBConnectionLost) {
+			c.logger.WithField("cert_id", id).Info("MDCB connection lost, waiting for emergency mode to exit before loading certificate")
+
+			// Wait for emergency mode to exit
+			<-c.emergencyModeExitCh
+
+			c.logger.WithField("cert_id", id).Info("Emergency mode exited, retrying certificate fetch from MDCB")
+
+			// Retry fetching from MDCB
+			val, err = c.storage.GetKey("raw-" + id)
+		}
+
 		// fallback to file
 		if err != nil {
 			// Try read from file
