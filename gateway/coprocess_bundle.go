@@ -4,12 +4,12 @@ import (
 	"archive/zip"
 	"bytes"
 	"crypto/md5"
-	"crypto/sha256"
 	"crypto/tls"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"hash"
 	"io"
 	"io/ioutil"
 	"net/http"
@@ -35,6 +35,39 @@ var (
 	bundleBackoffMultiplier float64 = 2
 	bundleMaxBackoffRetries uint64  = 4
 )
+
+type bundleVerifyFunction func(bundle *Bundle, bundleFs afero.Fs, useSignature bool) (sha256Hash hash.Hash, err error)
+
+func defaultBundleVerifyFunction(b *Bundle, bundleFs afero.Fs, useSignature bool) (sha256Hash hash.Hash, err error) {
+	md5Hash := md5.New()
+
+	var w io.Writer = md5Hash
+	if useSignature {
+		w = io.MultiWriter(md5Hash, sha256Hash)
+	}
+
+	buf := bundleVerifyPool.Get().(*[]byte)
+	defer bundleVerifyPool.Put(buf)
+
+	for _, f := range b.Manifest.FileList {
+		extractedPath := filepath.Join(b.Path, f)
+		file, err := bundleFs.Open(extractedPath)
+		if err != nil {
+			return nil, err
+		}
+		_, err = io.CopyBuffer(w, file, *buf)
+		file.Close()
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	checksum := fmt.Sprintf("%x", md5Hash.Sum(nil))
+	if checksum != b.Manifest.Checksum {
+		return nil, errors.New("invalid checksum")
+	}
+	return sha256Hash, nil
+}
 
 // Bundle is the basic bundle data structure, it holds the bundle name and the data.
 type Bundle struct {
@@ -78,33 +111,9 @@ func (b *Bundle) Verify(bundleFs afero.Fs) error {
 		}
 	}
 
-	md5Hash := md5.New()
-	sha256Hash := sha256.New()
-
-	var w io.Writer = md5Hash
-	if useSignature {
-		w = io.MultiWriter(md5Hash, sha256Hash)
-	}
-
-	buf := bundleVerifyPool.Get().(*[]byte)
-	defer bundleVerifyPool.Put(buf)
-
-	for _, f := range b.Manifest.FileList {
-		extractedPath := filepath.Join(b.Path, f)
-		file, err := bundleFs.Open(extractedPath)
-		if err != nil {
-			return err
-		}
-		_, err = io.CopyBuffer(w, file, *buf)
-		file.Close()
-		if err != nil {
-			return err
-		}
-	}
-
-	checksum := fmt.Sprintf("%x", md5Hash.Sum(nil))
-	if checksum != b.Manifest.Checksum {
-		return errors.New("Invalid checksum")
+	sha256Hash, err := b.verifyChecksum(bundleFs, useSignature)
+	if err != nil {
+		return err
 	}
 
 	if useSignature {
@@ -115,6 +124,10 @@ func (b *Bundle) Verify(bundleFs afero.Fs) error {
 		return verifier.VerifyHash(sha256Hash.Sum(nil), signed)
 	}
 	return nil
+}
+
+func (b *Bundle) verifyChecksum(bundleFs afero.Fs, useSignature bool) (hash.Hash, error) {
+	return b.Gw.bundleChecksumVerifier(b, bundleFs, useSignature)
 }
 
 // AddToSpec attaches the custom middleware settings to an API definition.
