@@ -1,6 +1,7 @@
 package accesslog
 
 import (
+	"fmt"
 	"net/http"
 	"net/url"
 
@@ -9,6 +10,8 @@ import (
 	"github.com/TykTechnologies/tyk/ctx"
 	"github.com/TykTechnologies/tyk/internal/crypto"
 	"github.com/TykTechnologies/tyk/internal/errors"
+	"github.com/TykTechnologies/tyk/internal/httpctx"
+	"github.com/TykTechnologies/tyk/internal/mcp"
 	"github.com/TykTechnologies/tyk/internal/otel"
 	"github.com/TykTechnologies/tyk/request"
 
@@ -132,6 +135,68 @@ func (a *Record) WithErrorClassification(ec *errors.ErrorClassification) *Record
 	// Add circuit breaker state only when present
 	if ec.CircuitBreakerState != "" {
 		a.fields["circuit_breaker_state"] = ec.CircuitBreakerState
+	}
+
+	return a
+}
+
+// WithJSONRPC adds JSON-RPC/MCP specific fields to the access log record.
+// Fields are only added when JSON-RPC request data is present in the request context.
+// This enables operators to track MCP API calls with method, tool, resource, and session info.
+func (a *Record) WithJSONRPC(req *http.Request) *Record {
+	rpcData := httpctx.GetJSONRPCRequest(req)
+	if rpcData == nil {
+		return a
+	}
+
+	if rpcData.Method != "" {
+		a.fields["jsonrpc_method"] = rpcData.Method
+	}
+
+	if rpcData.ID != nil {
+		switch id := rpcData.ID.(type) {
+		case string:
+			a.fields["jsonrpc_id"] = id
+		case float64:
+			a.fields["jsonrpc_id"] = fmt.Sprintf("%.0f", id)
+		default:
+			a.fields["jsonrpc_id"] = fmt.Sprintf("%v", id)
+		}
+	}
+
+	if rpcData.Primitive != "" {
+		switch rpcData.Method {
+		case mcp.MethodToolsCall:
+			a.fields["mcp_tool"] = rpcData.Primitive
+		case mcp.MethodResourcesRead:
+			a.fields["mcp_resource"] = rpcData.Primitive
+		case mcp.MethodPromptsGet:
+			a.fields["mcp_prompt"] = rpcData.Primitive
+		}
+	}
+
+	if sessionID := req.Header.Get("Mcp-Session-Id"); sessionID != "" {
+		a.fields["mcp_session_id"] = sessionID
+	}
+
+	return a
+}
+
+// WithJSONRPCError adds JSON-RPC error fields to the access log record.
+// Fields are only added when JSON-RPC error data is present in the request context
+// and the error code is non-zero (indicating an actual error occurred).
+// This enables operators to see the JSON-RPC error code and message when MCP requests fail.
+func (a *Record) WithJSONRPCError(req *http.Request) *Record {
+	errData := httpctx.GetJSONRPCError(req)
+	if errData == nil || errData.Code == 0 {
+		return a
+	}
+
+	a.fields["jsonrpc_error_code"] = errData.Code
+
+	// Add message only when non-empty
+	if errData.Message != "" {
+		a.fields["jsonrpc_error_message"] = errData.Message
 	}
 
 	return a

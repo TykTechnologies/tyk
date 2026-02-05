@@ -51,3 +51,24 @@ func SetJsonRPCRouting(r *http.Request, enabled bool) {
 func IsJsonRPCRouting(r *http.Request) bool {
 	return jsonrpcRoutingValue.Get(r)
 }
+
+// JSONRPCErrorData holds JSON-RPC error information for access logging.
+type JSONRPCErrorData struct {
+	// Code is the JSON-RPC error code (e.g., -32003 for rate limit exceeded).
+	Code int
+	// Message is the human-readable error message.
+	Message string
+}
+
+var jsonrpcErrorValue = NewValue[*JSONRPCErrorData](ctx.JSONRPCError)
+
+// SetJSONRPCError stores JSON-RPC error data in the request context for access logging.
+func SetJSONRPCError(r *http.Request, data *JSONRPCErrorData) {
+	jsonrpcErrorValue.Set(r, data)
+}
+
+// GetJSONRPCError retrieves JSON-RPC error data from the request context.
+// Returns nil if no JSON-RPC error has been stored.
+func GetJSONRPCError(r *http.Request) *JSONRPCErrorData {
+	return jsonrpcErrorValue.Get(r)
+}

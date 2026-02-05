@@ -12,7 +12,9 @@ import (
 
 	"github.com/TykTechnologies/tyk-pump/analytics"
 	"github.com/TykTechnologies/tyk/internal/errors"
+	"github.com/TykTechnologies/tyk/internal/httpctx"
 	"github.com/TykTechnologies/tyk/internal/httputil/accesslog"
+	"github.com/TykTechnologies/tyk/internal/mcp"
 	"github.com/TykTechnologies/tyk/internal/otel"
 	"github.com/TykTechnologies/tyk/request"
 )
@@ -281,4 +283,317 @@ func TestWithErrorClassification_BuilderChaining(t *testing.T) {
 	result := record.WithErrorClassification(ec)
 
 	assert.Same(t, record, result, "WithErrorClassification should return the same Record for chaining")
+}
+
+func TestWithJSONRPC(t *testing.T) {
+	tests := []struct {
+		name           string
+		setupRequest   func() *http.Request
+		expectedFields logrus.Fields
+	}{
+		{
+			name: "non-MCP request - no fields added",
+			setupRequest: func() *http.Request {
+				return httptest.NewRequest(http.MethodPost, "http://example.com/api", nil)
+			},
+			expectedFields: logrus.Fields{
+				"prefix": "access-log",
+			},
+		},
+		{
+			name: "tools/call with all fields",
+			setupRequest: func() *http.Request {
+				req := httptest.NewRequest(http.MethodPost, "http://example.com/mcp", nil)
+				req.Header.Set("Mcp-Session-Id", "session-123")
+				httpctx.SetJSONRPCRequest(req, &httpctx.JSONRPCRequestData{
+					Method:    mcp.MethodToolsCall,
+					ID:        "req-1",
+					Primitive: "get_anything",
+				})
+				return req
+			},
+			expectedFields: logrus.Fields{
+				"prefix":         "access-log",
+				"jsonrpc_method": "tools/call",
+				"jsonrpc_id":     "req-1",
+				"mcp_tool":       "get_anything",
+				"mcp_session_id": "session-123",
+			},
+		},
+		{
+			name: "resources/read request",
+			setupRequest: func() *http.Request {
+				req := httptest.NewRequest(http.MethodPost, "http://example.com/mcp", nil)
+				httpctx.SetJSONRPCRequest(req, &httpctx.JSONRPCRequestData{
+					Method:    mcp.MethodResourcesRead,
+					ID:        float64(42),
+					Primitive: "file://data.json",
+				})
+				return req
+			},
+			expectedFields: logrus.Fields{
+				"prefix":         "access-log",
+				"jsonrpc_method": "resources/read",
+				"jsonrpc_id":     "42",
+				"mcp_resource":   "file://data.json",
+			},
+		},
+		{
+			name: "prompts/get request",
+			setupRequest: func() *http.Request {
+				req := httptest.NewRequest(http.MethodPost, "http://example.com/mcp", nil)
+				httpctx.SetJSONRPCRequest(req, &httpctx.JSONRPCRequestData{
+					Method:    mcp.MethodPromptsGet,
+					ID:        "prompt-req",
+					Primitive: "greeting_prompt",
+				})
+				return req
+			},
+			expectedFields: logrus.Fields{
+				"prefix":         "access-log",
+				"jsonrpc_method": "prompts/get",
+				"jsonrpc_id":     "prompt-req",
+				"mcp_prompt":     "greeting_prompt",
+			},
+		},
+		{
+			name: "initialize method - no primitive",
+			setupRequest: func() *http.Request {
+				req := httptest.NewRequest(http.MethodPost, "http://example.com/mcp", nil)
+				httpctx.SetJSONRPCRequest(req, &httpctx.JSONRPCRequestData{
+					Method: "initialize",
+					ID:     float64(1),
+				})
+				return req
+			},
+			expectedFields: logrus.Fields{
+				"prefix":         "access-log",
+				"jsonrpc_method": "initialize",
+				"jsonrpc_id":     "1",
+			},
+		},
+		{
+			name: "null ID - no jsonrpc_id field",
+			setupRequest: func() *http.Request {
+				req := httptest.NewRequest(http.MethodPost, "http://example.com/mcp", nil)
+				httpctx.SetJSONRPCRequest(req, &httpctx.JSONRPCRequestData{
+					Method:    mcp.MethodToolsCall,
+					ID:        nil,
+					Primitive: "some_tool",
+				})
+				return req
+			},
+			expectedFields: logrus.Fields{
+				"prefix":         "access-log",
+				"jsonrpc_method": "tools/call",
+				"mcp_tool":       "some_tool",
+			},
+		},
+		{
+			name: "numeric ID as int type",
+			setupRequest: func() *http.Request {
+				req := httptest.NewRequest(http.MethodPost, "http://example.com/mcp", nil)
+				httpctx.SetJSONRPCRequest(req, &httpctx.JSONRPCRequestData{
+					Method: "tools/list",
+					ID:     int(99),
+				})
+				return req
+			},
+			expectedFields: logrus.Fields{
+				"prefix":         "access-log",
+				"jsonrpc_method": "tools/list",
+				"jsonrpc_id":     "99",
+			},
+		},
+		{
+			name: "session ID header only",
+			setupRequest: func() *http.Request {
+				req := httptest.NewRequest(http.MethodPost, "http://example.com/mcp", nil)
+				req.Header.Set("Mcp-Session-Id", "session-xyz")
+				httpctx.SetJSONRPCRequest(req, &httpctx.JSONRPCRequestData{
+					Method: "notifications/message",
+				})
+				return req
+			},
+			expectedFields: logrus.Fields{
+				"prefix":         "access-log",
+				"jsonrpc_method": "notifications/message",
+				"mcp_session_id": "session-xyz",
+			},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			req := tc.setupRequest()
+			record := accesslog.NewRecord().WithJSONRPC(req)
+			fields := record.Fields(nil)
+			assert.Equal(t, tc.expectedFields, fields)
+		})
+	}
+}
+
+func TestWithJSONRPC_BuilderChaining(t *testing.T) {
+	req := httptest.NewRequest(http.MethodPost, "http://example.com/mcp", nil)
+	httpctx.SetJSONRPCRequest(req, &httpctx.JSONRPCRequestData{
+		Method:    mcp.MethodToolsCall,
+		ID:        "1",
+		Primitive: "test_tool",
+	})
+
+	record := accesslog.NewRecord()
+	result := record.WithJSONRPC(req)
+
+	assert.Same(t, record, result, "WithJSONRPC should return the same Record for chaining")
+}
+
+func TestWithJSONRPCError(t *testing.T) {
+	tests := []struct {
+		name           string
+		setupRequest   func() *http.Request
+		expectedFields logrus.Fields
+	}{
+		{
+			name: "no error data - no fields added",
+			setupRequest: func() *http.Request {
+				return httptest.NewRequest(http.MethodPost, "http://example.com/mcp", nil)
+			},
+			expectedFields: logrus.Fields{
+				"prefix": "access-log",
+			},
+		},
+		{
+			name: "rate limit error with code and message",
+			setupRequest: func() *http.Request {
+				req := httptest.NewRequest(http.MethodPost, "http://example.com/mcp", nil)
+				httpctx.SetJSONRPCError(req, &httpctx.JSONRPCErrorData{
+					Code:    -32003,
+					Message: "Rate limit exceeded",
+				})
+				return req
+			},
+			expectedFields: logrus.Fields{
+				"prefix":                "access-log",
+				"jsonrpc_error_code":    -32003,
+				"jsonrpc_error_message": "Rate limit exceeded",
+			},
+		},
+		{
+			name: "auth error with code and message",
+			setupRequest: func() *http.Request {
+				req := httptest.NewRequest(http.MethodPost, "http://example.com/mcp", nil)
+				httpctx.SetJSONRPCError(req, &httpctx.JSONRPCErrorData{
+					Code:    -32001,
+					Message: "Authentication required",
+				})
+				return req
+			},
+			expectedFields: logrus.Fields{
+				"prefix":                "access-log",
+				"jsonrpc_error_code":    -32001,
+				"jsonrpc_error_message": "Authentication required",
+			},
+		},
+		{
+			name: "error with code only - no message field",
+			setupRequest: func() *http.Request {
+				req := httptest.NewRequest(http.MethodPost, "http://example.com/mcp", nil)
+				httpctx.SetJSONRPCError(req, &httpctx.JSONRPCErrorData{
+					Code:    -32603,
+					Message: "",
+				})
+				return req
+			},
+			expectedFields: logrus.Fields{
+				"prefix":             "access-log",
+				"jsonrpc_error_code": -32603,
+			},
+		},
+		{
+			name: "error data with zero code - no fields added",
+			setupRequest: func() *http.Request {
+				req := httptest.NewRequest(http.MethodPost, "http://example.com/mcp", nil)
+				httpctx.SetJSONRPCError(req, &httpctx.JSONRPCErrorData{
+					Code:    0,
+					Message: "Should not appear",
+				})
+				return req
+			},
+			expectedFields: logrus.Fields{
+				"prefix": "access-log",
+			},
+		},
+		{
+			name: "upstream error",
+			setupRequest: func() *http.Request {
+				req := httptest.NewRequest(http.MethodPost, "http://example.com/mcp", nil)
+				httpctx.SetJSONRPCError(req, &httpctx.JSONRPCErrorData{
+					Code:    -32004,
+					Message: "Backend service unavailable",
+				})
+				return req
+			},
+			expectedFields: logrus.Fields{
+				"prefix":                "access-log",
+				"jsonrpc_error_code":    -32004,
+				"jsonrpc_error_message": "Backend service unavailable",
+			},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			req := tc.setupRequest()
+			record := accesslog.NewRecord().WithJSONRPCError(req)
+			fields := record.Fields(nil)
+			assert.Equal(t, tc.expectedFields, fields)
+		})
+	}
+}
+
+func TestWithJSONRPCError_BuilderChaining(t *testing.T) {
+	req := httptest.NewRequest(http.MethodPost, "http://example.com/mcp", nil)
+	httpctx.SetJSONRPCError(req, &httpctx.JSONRPCErrorData{
+		Code:    -32003,
+		Message: "Rate limit exceeded",
+	})
+
+	record := accesslog.NewRecord()
+	result := record.WithJSONRPCError(req)
+
+	assert.Same(t, record, result, "WithJSONRPCError should return the same Record for chaining")
+}
+
+func TestWithJSONRPC_WithJSONRPCError_Combined(t *testing.T) {
+	// Test that both methods can be chained together (real-world scenario)
+	req := httptest.NewRequest(http.MethodPost, "http://example.com/mcp", nil)
+	req.Header.Set("Mcp-Session-Id", "session-123")
+
+	// Set request data
+	httpctx.SetJSONRPCRequest(req, &httpctx.JSONRPCRequestData{
+		Method:    mcp.MethodToolsCall,
+		ID:        "req-1",
+		Primitive: "get_anything",
+	})
+
+	// Set error data (simulating rate limit)
+	httpctx.SetJSONRPCError(req, &httpctx.JSONRPCErrorData{
+		Code:    -32003,
+		Message: "Rate limit exceeded",
+	})
+
+	record := accesslog.NewRecord().WithJSONRPC(req).WithJSONRPCError(req)
+	fields := record.Fields(nil)
+
+	expectedFields := logrus.Fields{
+		"prefix":                "access-log",
+		"jsonrpc_method":        "tools/call",
+		"jsonrpc_id":            "req-1",
+		"mcp_tool":              "get_anything",
+		"mcp_session_id":        "session-123",
+		"jsonrpc_error_code":    -32003,
+		"jsonrpc_error_message": "Rate limit exceeded",
+	}
+
+	assert.Equal(t, expectedFields, fields)
 }

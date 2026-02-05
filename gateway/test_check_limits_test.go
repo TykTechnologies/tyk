@@ -4,8 +4,9 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/TykTechnologies/tyk/internal/httpctx"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/TykTechnologies/tyk/internal/httpctx"
 )
 
 func TestCtxCheckLimits_ExplicitFlag(t *testing.T) {

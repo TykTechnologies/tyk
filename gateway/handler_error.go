@@ -12,11 +12,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/TykTechnologies/tyk/apidef"
-
 	"github.com/TykTechnologies/tyk-pump/analytics"
+	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
-
 	"github.com/TykTechnologies/tyk/header"
 	"github.com/TykTechnologies/tyk/internal/httpctx"
 	jsonrpcerrors "github.com/TykTechnologies/tyk/internal/jsonrpc/errors"
@@ -346,6 +344,12 @@ func (e *ErrorHandler) writeJSONRPCError(w http.ResponseWriter, r *http.Request,
 		requestID = state.ID
 	}
 
+	// Map HTTP code to JSON-RPC code and store for access logging
+	jsonrpcCode := jsonrpcerrors.MapHTTPStatusToJSONRPCCode(httpCode)
+	httpctx.SetJSONRPCError(r, &httpctx.JSONRPCErrorData{
+		Code:    jsonrpcCode,
+		Message: errMsg,
+	})
+
 	return jsonrpcerrors.WriteJSONRPCError(w, requestID, httpCode, errMsg)
 }
-

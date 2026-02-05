@@ -82,7 +82,7 @@ func (m *JSONRPCMiddleware) readAndParseJSONRPC(w http.ResponseWriter, r *http.R
 	// Read the request body (already size-limited by gateway if configured)
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
-		m.writeJSONRPCError(w, nil, mcp.JSONRPCParseError, mcp.ErrMsgParseError, nil)
+		m.writeJSONRPCError(w, r, nil, mcp.JSONRPCParseError, mcp.ErrMsgParseError, nil)
 		return nil, err
 	}
 	// Restore body for upstream
@@ -90,13 +90,13 @@ func (m *JSONRPCMiddleware) readAndParseJSONRPC(w http.ResponseWriter, r *http.R
 
 	var rpcReq JSONRPCRequest
 	if err := json.Unmarshal(body, &rpcReq); err != nil {
-		m.writeJSONRPCError(w, nil, mcp.JSONRPCParseError, mcp.ErrMsgParseError, nil)
+		m.writeJSONRPCError(w, r, nil, mcp.JSONRPCParseError, mcp.ErrMsgParseError, nil)
 		return nil, err
 	}
 
 	// Validate JSON-RPC 2.0 structure
 	if rpcReq.JSONRPC != apidef.JsonRPC20 || rpcReq.Method == "" {
-		m.writeJSONRPCError(w, rpcReq.ID, mcp.JSONRPCInvalidRequest, mcp.ErrMsgInvalidRequest, nil)
+		m.writeJSONRPCError(w, r, rpcReq.ID, mcp.JSONRPCInvalidRequest, mcp.ErrMsgInvalidRequest, nil)
 		return nil, fmt.Errorf("invalid JSON-RPC request")
 	}
 
@@ -168,9 +168,23 @@ func (m *JSONRPCMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 		m.Spec.MCPPrimitives,
 	)
 	if err != nil {
-		m.writeJSONRPCError(w, rpcReq.ID, mcp.JSONRPCInvalidParams, err.Error(), nil)
+		m.writeJSONRPCError(w, r, rpcReq.ID, mcp.JSONRPCInvalidParams, err.Error(), nil)
 		return nil, middleware.StatusRespond
 	}
+
+	// Store JSON-RPC request data for access logging
+	var vemPath string
+	if len(result.VEMChain) > 0 {
+		vemPath = result.VEMChain[len(result.VEMChain)-1] // Final destination VEM
+	}
+	httpctx.SetJSONRPCRequest(r, &httpctx.JSONRPCRequestData{
+		Method:    rpcReq.Method,
+		Params:    rpcReq.Params,
+		ID:        rpcReq.ID,
+		VEMPath:   vemPath,
+		Primitive: result.PrimitiveName,
+		VEMChain:  result.VEMChain,
+	})
 
 	// Set MCP span attributes for OpenTelemetry tracing
 	m.setMCPSpanAttributes(r, rpcReq, result)
@@ -219,7 +233,15 @@ func (m *JSONRPCMiddleware) setMCPSpanAttributes(r *http.Request, rpcReq *JSONRP
 }
 
 // writeJSONRPCError writes a JSON-RPC 2.0 error response.
-func (m *JSONRPCMiddleware) writeJSONRPCError(w http.ResponseWriter, id any, code int, message string, data any) {
+func (m *JSONRPCMiddleware) writeJSONRPCError(w http.ResponseWriter, r *http.Request, id any, code int, message string, data any) {
+	// Store error for access logging
+	if r != nil {
+		httpctx.SetJSONRPCError(r, &httpctx.JSONRPCErrorData{
+			Code:    code,
+			Message: message,
+		})
+	}
+
 	response := JSONRPCErrorResponse{
 		JSONRPC: apidef.JsonRPC20,
 		Error: JSONRPCError{

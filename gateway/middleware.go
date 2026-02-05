@@ -470,6 +470,12 @@ func (t *BaseMiddleware) RecordAccessLog(req *http.Request, resp *http.Response,
 		accessLog.WithTraceID(req)
 	}
 
+	// Add JSON-RPC/MCP specific fields when present
+	accessLog.WithJSONRPC(req)
+
+	// Add JSON-RPC error fields when present (only on error responses)
+	accessLog.WithJSONRPCError(req)
+
 	logFields := accessLog.Fields(allowedFields)
 
 	t.Logger().WithFields(logFields).Info()

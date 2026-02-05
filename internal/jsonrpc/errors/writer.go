@@ -56,6 +56,8 @@ func writeJSONResponse(w http.ResponseWriter, httpCode int, response JSONRPCErro
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(httpCode)
+
+	//nolint:errcheck
 	w.Write(body)
 
 	return body

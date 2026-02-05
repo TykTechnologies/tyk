@@ -70,7 +70,7 @@ func TestErrorHandler_HandleError_JSONRPCFormat(t *testing.T) {
 		},
 		{
 			name: "returns standard error when no routing state",
-			setupRequest: func(r *http.Request) {
+			setupRequest: func(_ *http.Request) {
 				// No routing state set
 			},
 			httpCode:      http.StatusForbidden,
