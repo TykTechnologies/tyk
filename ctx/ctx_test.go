@@ -85,6 +85,57 @@ func BenchmarkGetOASDefinition(b *testing.B) {
 	}
 }
 
+// TestContextKeyUniqueness verifies all context keys have unique values
+func TestContextKeyUniqueness(t *testing.T) {
+	keys := map[ctx.Key]string{
+		ctx.SessionData:               "SessionData",
+		ctx.UpdateSession:             "UpdateSession",
+		ctx.AuthToken:                 "AuthToken",
+		ctx.HashedAuthToken:           "HashedAuthToken",
+		ctx.VersionData:               "VersionData",
+		ctx.VersionName:               "VersionName",
+		ctx.VersionDefault:            "VersionDefault",
+		ctx.OrgSessionContext:         "OrgSessionContext",
+		ctx.ContextData:               "ContextData",
+		ctx.RetainHost:                "RetainHost",
+		ctx.TrackThisEndpoint:         "TrackThisEndpoint",
+		ctx.DoNotTrackThisEndpoint:    "DoNotTrackThisEndpoint",
+		ctx.UrlRewritePath:            "UrlRewritePath",
+		ctx.InternalRedirectTarget:    "InternalRedirectTarget",
+		ctx.RequestMethod:             "RequestMethod",
+		ctx.OrigRequestURL:            "OrigRequestURL",
+		ctx.LoopLevel:                 "LoopLevel",
+		ctx.LoopLevelLimit:            "LoopLevelLimit",
+		ctx.ThrottleLevel:             "ThrottleLevel",
+		ctx.ThrottleLevelLimit:        "ThrottleLevelLimit",
+		ctx.Trace:                     "Trace",
+		ctx.CheckLoopLimits:           "CheckLoopLimits",
+		ctx.UrlRewriteTarget:          "UrlRewriteTarget",
+		ctx.TransformedRequestMethod:  "TransformedRequestMethod",
+		ctx.Definition:                "Definition",
+		ctx.RequestStatus:             "RequestStatus",
+		ctx.GraphQLRequest:            "GraphQLRequest",
+		ctx.GraphQLIsWebSocketUpgrade: "GraphQLIsWebSocketUpgrade",
+		ctx.CacheOptions:              "CacheOptions",
+		ctx.OASDefinition:             "OASDefinition",
+		ctx.SelfLooping:               "SelfLooping",
+		ctx.RequestStartTime:          "RequestStartTime",
+		ctx.ErrorClassification:       "ErrorClassification",
+		ctx.JsonRPCRouting:            "JsonRPCRouting",
+		ctx.JSONRPCRequest:            "JSONRPCRequest",
+		ctx.JSONRPCRoutingState:       "JSONRPCRoutingState",
+		ctx.MCPRouting:                "MCPRouting",
+	}
+
+	seen := make(map[ctx.Key]bool)
+	for key, name := range keys {
+		if seen[key] {
+			t.Errorf("Duplicate context key value %d for %s", key, name)
+		}
+		seen[key] = true
+	}
+}
+
 // Test for GetErrorClassification
 func TestErrorClassificationContext(t *testing.T) {
 	t.Run("get returns nil when not set", func(t *testing.T) {

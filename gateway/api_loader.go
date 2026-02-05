@@ -301,6 +301,16 @@ func (gw *Gateway) processSpec(
 		logger.Info("Checking security policy: Open")
 	}
 
+	// For MCP/JSON-RPC APIs, add RequestSizeLimitMiddleware early to prevent DoS attacks.
+	// JSONRPCMiddleware reads the entire request body, so size must be validated first.
+	if spec.IsMCP() {
+		gw.mwAppendEnabled(&chainArray, &RequestSizeLimitMiddleware{baseMid.Copy()})
+	}
+
+	// JSONRPCMiddleware must run before VersionCheck for JSON-RPC APIs.
+	// It parses JSON-RPC payloads, rewrites URL paths to VEM paths, and sets
+	// the routing context that VersionCheck uses for whitelist/blacklist validation.
+	gw.mwAppendEnabled(&chainArray, &JSONRPCMiddleware{BaseMiddleware: baseMid.Copy()})
 	gw.mwAppendEnabled(&chainArray, &VersionCheck{BaseMiddleware: baseMid.Copy()})
 	gw.mwAppendEnabled(&chainArray, &CORSMiddleware{BaseMiddleware: baseMid.Copy()})
 
@@ -328,7 +338,13 @@ func (gw *Gateway) processSpec(
 	gw.mwAppendEnabled(&chainArray, &IPBlackListMiddleware{BaseMiddleware: baseMid.Copy()})
 	gw.mwAppendEnabled(&chainArray, &CertificateCheckMW{BaseMiddleware: baseMid.Copy()})
 	gw.mwAppendEnabled(&chainArray, &OrganizationMonitor{BaseMiddleware: baseMid.Copy(), mon: Monitor{Gw: gw}})
-	gw.mwAppendEnabled(&chainArray, &RequestSizeLimitMiddleware{baseMid.Copy()})
+
+	// For non-MCP APIs, add RequestSizeLimitMiddleware in its original position.
+	// For MCP APIs, it's already added earlier (before JSONRPCMiddleware) to prevent DoS.
+	if !spec.IsMCP() {
+		gw.mwAppendEnabled(&chainArray, &RequestSizeLimitMiddleware{baseMid.Copy()})
+	}
+
 	gw.mwAppendEnabled(&chainArray, &MiddlewareContextVars{BaseMiddleware: baseMid.Copy()})
 	gw.mwAppendEnabled(&chainArray, &TrackEndpointMiddleware{baseMid.Copy()})
 
@@ -547,6 +563,12 @@ func (gw *Gateway) processSpec(
 			chainArray = append(chainArray, gw.createDynamicMiddleware(obj.Name, false, obj.RequireSession, baseMid.Copy()))
 		}
 	}
+
+	// MCPVEMContinuationMiddleware must be the last middleware in the chain.
+	// After all VEM-specific middleware has been applied, it checks the routing state
+	// and either continues to the next VEM or allows the request to proceed to upstream.
+	gw.mwAppendEnabled(&chainArray, &MCPVEMContinuationMiddleware{BaseMiddleware: baseMid.Copy()})
+
 	chain = alice.New(chainArray...).Then(&DummyProxyHandler{SH: SuccessHandler{baseMid.Copy()}, Gw: gw})
 
 	if !spec.UseKeylessAccess {
