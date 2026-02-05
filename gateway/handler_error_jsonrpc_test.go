@@ -6,6 +6,8 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/sirupsen/logrus"
+	logrustest "github.com/sirupsen/logrus/hooks/test"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -496,4 +498,117 @@ func TestErrorHandler_OverrideMessages_ConsistentBehavior(t *testing.T) {
 
 	t.Logf("✓ Proof: Both JSON-RPC and standard errors use the same overridden message: '%s'", customMessage)
 	t.Logf("✓ Proof: Both use the same HTTP status code: %d", customCode)
+}
+
+// TestErrorHandler_JSONRPCError_AccessLogStatusCode verifies that access logs
+// for JSON-RPC errors contain the correct HTTP status code, not zero.
+func TestErrorHandler_JSONRPCError_AccessLogStatusCode(t *testing.T) {
+	// Setup test gateway
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	// Capture logs to verify access log entries
+	logger, hook := logrustest.NewNullLogger()
+
+	// Enable access logs
+	gwConfig := ts.Gw.GetConfig()
+	gwConfig.AccessLogs.Enabled = true
+	ts.Gw.SetConfig(gwConfig)
+
+	// Setup JSON-RPC API spec
+	spec := &APISpec{
+		APIDefinition: &apidef.APIDefinition{
+			JsonRpcVersion: apidef.JsonRPC20,
+			APIID:          "test-api",
+			OrgID:          "test-org",
+			Name:           "Test API",
+		},
+		GlobalConfig: gwConfig,
+	}
+
+	handler := ErrorHandler{
+		BaseMiddleware: &BaseMiddleware{
+			Spec:   spec,
+			Gw:     ts.Gw,
+			logger: logger.WithField("prefix", "test"),
+		},
+	}
+
+	tests := []struct {
+		name             string
+		httpCode         int
+		message          string
+		expectedRPCCode  int
+	}{
+		{
+			name:            "403 Forbidden returns correct status in access log",
+			httpCode:        http.StatusForbidden,
+			message:         "Access denied",
+			expectedRPCCode: jsonrpcerrors.CodeAccessDenied,
+		},
+		{
+			name:            "401 Unauthorized returns correct status in access log",
+			httpCode:        http.StatusUnauthorized,
+			message:         "Authentication required",
+			expectedRPCCode: jsonrpcerrors.CodeAuthRequired,
+		},
+		{
+			name:            "429 Too Many Requests returns correct status in access log",
+			httpCode:        http.StatusTooManyRequests,
+			message:         "Rate limit exceeded",
+			expectedRPCCode: jsonrpcerrors.CodeRateLimitExceeded,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Reset log entries for each test
+			hook.Reset()
+
+			// Setup request with JSON-RPC routing state
+			r := httptest.NewRequest(http.MethodPost, "/test", nil)
+			r.Header.Set("Content-Type", "application/json")
+			state := &httpctx.JSONRPCRoutingState{
+				ID: "test-123",
+			}
+			httpctx.SetJSONRPCRoutingState(r, state)
+
+			w := httptest.NewRecorder()
+
+			// Call HandleError (this should write access log)
+			handler.HandleError(w, r, tt.message, tt.httpCode, true)
+
+			// Verify HTTP response is correct
+			assert.Equal(t, tt.httpCode, w.Code, "HTTP status code should match")
+
+			// Verify JSON-RPC response format
+			var jsonRPCResp jsonrpcerrors.JSONRPCErrorResponse
+			err := json.Unmarshal(w.Body.Bytes(), &jsonRPCResp)
+			require.NoError(t, err, "Response should be valid JSON-RPC")
+			assert.Equal(t, tt.expectedRPCCode, jsonRPCResp.Error.Code, "JSON-RPC error code should match")
+
+			// Find the access log entry
+			require.NotEmpty(t, hook.Entries, "Access log should be written")
+
+			var accessLogEntry *logrus.Entry
+			for i := range hook.Entries {
+				// Access logs are Info level
+				if hook.Entries[i].Level == logrus.InfoLevel {
+					accessLogEntry = &hook.Entries[i]
+					break
+				}
+			}
+			require.NotNil(t, accessLogEntry, "Should find access log entry")
+
+			// CRITICAL ASSERTION: Verify status code in access log is NOT zero
+			status, exists := accessLogEntry.Data["status"]
+			require.True(t, exists, "Access log should contain 'status' field")
+
+			statusInt, ok := status.(int)
+			require.True(t, ok, "Status should be an integer, got %T", status)
+
+			assert.NotEqual(t, 0, statusInt, "Access log status should NOT be zero")
+			assert.Equal(t, tt.httpCode, statusInt, "Access log status should match HTTP error code")
+		})
+	}
 }

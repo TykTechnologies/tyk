@@ -102,6 +102,7 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 		if !e.Spec.DoNotTrack && !ctxGetDoNotTrack(r) {
 			e.recordErrorAnalytics(r, errCode, responseBody)
 		}
+		response.StatusCode = errCode
 		e.RecordAccessLog(r, response, analytics.Latency{})
 		reportHealthValue(e.Spec, BlockedRequestLog, "-1")
 		return
