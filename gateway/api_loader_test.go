@@ -9783,7 +9783,8 @@ func TestListenPathConflictWhenCustomDomainIsDisabled(t *testing.T) {
 	createMockServer := func(listenPath string) *httptest.Server {
 		return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 			w.WriteHeader(http.StatusOK)
-			_, _ = w.Write([]byte(listenPath))
+			_, err := w.Write([]byte(listenPath))
+			assert.Nil(t, err)
 		}))
 	}
 
