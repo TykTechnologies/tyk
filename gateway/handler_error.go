@@ -96,7 +96,7 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 	response := &http.Response{}
 
 	// Check if this should be a JSON-RPC formatted error
-	if writeResponse && e.shouldWriteJSONRPCError(r) {
+	if e.Spec.IsMCP() && writeResponse && e.shouldWriteJSONRPCError(r) {
 		responseBody := e.writeJSONRPCError(w, r, errMsg, errCode)
 		response.StatusCode = errCode
 		// Record analytics with full JSON-RPC response
