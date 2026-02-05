@@ -197,7 +197,18 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 		}
 	}
 
-	e.RecordAccessLog(r, response, analytics.Latency{})
+	// Calculate latency for error responses
+	var latency analytics.Latency
+	if requestStartTime := ctxGetRequestStartTime(r); !requestStartTime.IsZero() {
+		totalMs := int64(DurationToMillisecond(time.Since(requestStartTime)))
+		latency = analytics.Latency{
+			Total:    totalMs,
+			Upstream: 0,       // No successful upstream response for errors
+			Gateway:  totalMs, // All time is gateway time for errors
+		}
+	}
+
+	e.RecordAccessLog(r, response, latency)
 
 	// Report in health check
 	reportHealthValue(e.Spec, BlockedRequestLog, "-1")
