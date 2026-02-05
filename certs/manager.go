@@ -14,13 +14,13 @@ import (
 	"errors"
 	"io/ioutil"
 	"strings"
+	"sync"
 	"time"
-
-	"github.com/sirupsen/logrus"
 
 	"github.com/TykTechnologies/tyk/internal/cache"
 	tykcrypto "github.com/TykTechnologies/tyk/internal/crypto"
 	"github.com/TykTechnologies/tyk/storage"
+	"github.com/sirupsen/logrus"
 )
 
 const (
@@ -58,12 +58,14 @@ type CertificateManager interface {
 }
 
 type certificateManager struct {
-	storage             storage.Handler
-	logger              *logrus.Entry
-	cache               cache.Repository
-	secret              string
-	migrateCertList     bool
-	emergencyModeExitCh chan struct{}
+	storage               storage.Handler
+	logger                *logrus.Entry
+	cache                 cache.Repository
+	secret                string
+	migrateCertList       bool
+	emergencyModeExitMu   sync.Mutex
+	emergencyModeExitCond *sync.Cond
+	emergencyModeExited   bool
 }
 
 func NewCertificateManager(storage storage.Handler, secret string, logger *logrus.Logger, migrateCertList bool) *certificateManager {
@@ -71,14 +73,16 @@ func NewCertificateManager(storage storage.Handler, secret string, logger *logru
 		logger = logrus.New()
 	}
 
-	return &certificateManager{
-		storage:             storage,
-		logger:              logger.WithFields(logrus.Fields{"prefix": CertManagerLogPrefix}),
-		cache:               cache.New(cacheDefaultTTL, cacheCleanInterval),
-		secret:              secret,
-		migrateCertList:     migrateCertList,
-		emergencyModeExitCh: make(chan struct{}, 1),
+	cm := &certificateManager{
+		storage:         storage,
+		logger:          logger.WithFields(logrus.Fields{"prefix": CertManagerLogPrefix}),
+		cache:           cache.New(cacheDefaultTTL, cacheCleanInterval),
+		secret:          secret,
+		migrateCertList: migrateCertList,
 	}
+	cm.emergencyModeExitCond = sync.NewCond(&cm.emergencyModeExitMu)
+
+	return cm
 }
 
 func getOrgFromKeyID(key, certID string) string {
@@ -94,12 +98,12 @@ func NewSlaveCertManager(localStorage, rpcStorage storage.Handler, secret string
 	log := logger.WithFields(logrus.Fields{"prefix": CertManagerLogPrefix})
 
 	cm := &certificateManager{
-		logger:              log,
-		cache:               cache.New(cacheDefaultTTL, cacheCleanInterval),
-		secret:              secret,
-		migrateCertList:     migrateCertList,
-		emergencyModeExitCh: make(chan struct{}, 1),
+		logger:          log,
+		cache:           cache.New(cacheDefaultTTL, cacheCleanInterval),
+		secret:          secret,
+		migrateCertList: migrateCertList,
 	}
+	cm.emergencyModeExitCond = sync.NewCond(&cm.emergencyModeExitMu)
 
 	callbackOnPullCertFromRPC := func(key, val string) error {
 		// calculate the orgId from the keyId
@@ -116,13 +120,15 @@ func NewSlaveCertManager(localStorage, rpcStorage storage.Handler, secret string
 }
 
 // NotifyEmergencyModeExit signals the certificate manager that emergency mode has exited
-// and it should retry loading certificates from MDCB
+// and it should retry loading certificates from MDCB. This broadcasts to all waiting goroutines.
 func (c *certificateManager) NotifyEmergencyModeExit() {
-	select {
-	case c.emergencyModeExitCh <- struct{}{}:
-		c.logger.Debug("Emergency mode exit notification sent to certificate manager")
-	default:
-		// Channel already has a notification, don't block
+	c.emergencyModeExitMu.Lock()
+	defer c.emergencyModeExitMu.Unlock()
+
+	if !c.emergencyModeExited {
+		c.emergencyModeExited = true
+		c.logger.Debug("Emergency mode exit notification - broadcasting to all waiting certificate loaders")
+		c.emergencyModeExitCond.Broadcast()
 	}
 }
 
@@ -439,8 +445,19 @@ func (c *certificateManager) List(certIDs []string, mode CertificateType) (out [
 			c.logger.WithField("cert_id", id).Info("MDCB connection lost, waiting for emergency mode to exit before loading certificate")
 
 			// Wait for emergency mode to exit with timeout
+			done := make(chan struct{})
+			go func() {
+				c.emergencyModeExitMu.Lock()
+				defer c.emergencyModeExitMu.Unlock()
+
+				for !c.emergencyModeExited {
+					c.emergencyModeExitCond.Wait()
+				}
+				close(done)
+			}()
+
 			select {
-			case <-c.emergencyModeExitCh:
+			case <-done:
 				c.logger.WithField("cert_id", id).Info("Emergency mode exited, retrying certificate fetch from MDCB")
 				// Retry fetching from MDCB
 				val, err = c.storage.GetKey("raw-" + id)
