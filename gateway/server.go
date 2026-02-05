@@ -96,7 +96,15 @@ var (
 	ErrSyncResourceNotKnown = errors.New("unknown resource to sync")
 )
 
-const appName = "tyk-gateway"
+const (
+	appName = "tyk-gateway"
+
+	// externalOAuthJWKCacheExpiration
+	externalOAuthJWKCacheExpiration = 240
+
+	// externalOAuthJWKCacheCleanupInterval
+	externalOAuthJWKCacheCleanupInterval = 30
+)
 
 type Gateway struct {
 	DefaultProxyMux *proxyMux
@@ -207,6 +215,12 @@ type Gateway struct {
 	healthCheckInfo atomic.Value
 
 	dialCtxFn test.DialContext
+
+	// jwkCache cache
+	jwkCache cache.Repository
+
+	// apiJWKCaches cache per api entity
+	apiJWKCaches sync.Map
 }
 
 func NewGateway(config config.Config, ctx context.Context) *Gateway {
@@ -255,6 +269,8 @@ func NewGateway(config config.Config, ctx context.Context) *Gateway {
 
 	gw.SetNodeID("solo-" + uuid.New())
 	gw.SessionID = uuid.New()
+
+	gw.jwkCache = buildJWKSCache(config)
 
 	return gw
 }
@@ -2305,4 +2321,17 @@ func (gw *Gateway) gracefulShutdown(ctx context.Context) error {
 	}
 	mainLog.Info("Terminating.")
 	return nil
+}
+
+func buildJWKSCache(cfg config.Config) *cache.MemRepository {
+	var jwkCacheExpiration int64 = externalOAuthJWKCacheExpiration
+
+	if cfg.JWKS.Cache.Timeout > 0 {
+		jwkCacheExpiration = cfg.JWKS.Cache.Timeout
+	}
+
+	return cache.New(
+		jwkCacheExpiration,
+		externalOAuthJWKCacheCleanupInterval,
+	)
 }
