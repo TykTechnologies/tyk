@@ -18,6 +18,8 @@ import (
 	"github.com/TykTechnologies/tyk/config"
 
 	"github.com/TykTechnologies/tyk/header"
+	"github.com/TykTechnologies/tyk/internal/httpctx"
+	jsonrpcerrors "github.com/TykTechnologies/tyk/internal/jsonrpc/errors"
 	"github.com/TykTechnologies/tyk/request"
 )
 
@@ -93,7 +95,15 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 	defer e.Base().UpdateRequestSession(r)
 	response := &http.Response{}
 
-	if writeResponse {
+	// Check if this should be a JSON-RPC formatted error
+	if writeResponse && e.shouldWriteJSONRPCError(r) {
+		responseBody := e.writeJSONRPCError(w, r, errMsg, errCode)
+		// Set up response for analytics (reuses existing analytics code below)
+		response.StatusCode = errCode
+		response.Header = http.Header{}
+		response.Header.Set(header.ContentType, header.ApplicationJSON)
+		response.Body = ioutil.NopCloser(bytes.NewReader(responseBody))
+	} else if writeResponse {
 		var templateExtension string
 		contentType := r.Header.Get(header.ContentType)
 		contentType = strings.Split(contentType, ";")[0]
@@ -318,3 +328,24 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 	// Report in health check
 	reportHealthValue(e.Spec, BlockedRequestLog, "-1")
 }
+
+// shouldWriteJSONRPCError returns true if this error should be formatted as JSON-RPC.
+func (e *ErrorHandler) shouldWriteJSONRPCError(r *http.Request) bool {
+	if e.Spec.JsonRpcVersion != apidef.JsonRPC20 {
+		return false
+	}
+
+	routingState := httpctx.GetJSONRPCRoutingState(r)
+	return routingState != nil
+}
+
+// writeJSONRPCError writes an error in JSON-RPC 2.0 format and returns the response body.
+func (e *ErrorHandler) writeJSONRPCError(w http.ResponseWriter, r *http.Request, errMsg string, httpCode int) []byte {
+	var requestID interface{}
+	if state := httpctx.GetJSONRPCRoutingState(r); state != nil {
+		requestID = state.ID
+	}
+
+	return jsonrpcerrors.WriteJSONRPCError(w, requestID, httpCode, errMsg)
+}
+

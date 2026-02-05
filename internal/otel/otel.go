@@ -137,6 +137,37 @@ var APIKeyAliasAttribute = semconv.TykAPIKeyAlias
 
 var OAuthClientIDAttribute = semconv.TykOauthID
 
+// MCP span attributes
+// Reference: https://opentelemetry.io/docs/specs/semconv/gen-ai/mcp/
+var (
+	MCPMethodNameAttribute      = semconv.MCPMethodName
+	MCPProtocolVersionAttribute = semconv.MCPProtocolVersion
+	MCPSessionIDAttribute       = semconv.MCPSessionID
+	MCPResourceURIAttribute     = semconv.MCPResourceURI
+)
+
+// GenAI span attributes for MCP tool and prompt operations
+var (
+	GenAIToolNameAttribute      = semconv.GenAIToolName
+	GenAIPromptNameAttribute    = semconv.GenAIPromptName
+	GenAIOperationNameAttribute = semconv.GenAIOperationName
+)
+
+// JSON-RPC span attributes for MCP protocol communication
+var (
+	JSONRPCRequestIDAttribute       = semconv.JSONRPCRequestID
+	JSONRPCRequestIDIntAttribute    = semconv.JSONRPCRequestIDInt
+	JSONRPCProtocolVersionAttribute = semconv.JSONRPCProtocolVersion
+)
+
+// RPC span attributes
+var RPCResponseStatusCodeAttribute = semconv.RPCResponseStatusCode
+
+// MCP constants
+const (
+	GenAIOperationExecuteTool = semconv.GenAIOperationExecuteTool
+)
+
 const (
 	TykTraceIDHeader = "X-Tyk-Trace-Id"
 )
