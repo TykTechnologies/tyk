@@ -26,6 +26,12 @@ import (
 const (
 	cacheDefaultTTL    = 300 // 5 minutes.
 	cacheCleanInterval = 600 // 10 minutes.
+
+	// emergencyModeExitTimeout is the maximum time to wait for emergency mode to exit
+	// when fetching certificates from MDCB. This matches GlobalRPCCallTimeout (30s) from
+	// the RPC package and ensures gateway startup doesn't hang indefinitely if MDCB
+	// connection never establishes.
+	emergencyModeExitTimeout = 30 * time.Second
 )
 
 var (
@@ -438,7 +444,7 @@ func (c *certificateManager) List(certIDs []string, mode CertificateType) (out [
 				c.logger.WithField("cert_id", id).Info("Emergency mode exited, retrying certificate fetch from MDCB")
 				// Retry fetching from MDCB
 				val, err = c.storage.GetKey("raw-" + id)
-			case <-time.After(30 * time.Second):
+			case <-time.After(emergencyModeExitTimeout):
 				c.logger.WithField("cert_id", id).Warn("Timeout waiting for emergency mode to exit")
 				// Keep the ErrMDCBConnectionLost error to trigger file fallback
 			}
