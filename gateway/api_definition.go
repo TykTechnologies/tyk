@@ -1499,9 +1499,10 @@ func (a APIDefinitionLoader) addInternalMWtoMCPOperations(spec *APISpec, extende
 }
 
 // initMCPConfiguration initializes MCP-specific configuration for the API spec.
-// This includes populating the primitives map, calculating allow-list flags,
-// and setting up the JSON-RPC router if needed.
+// This includes registering VEM prefixes, populating the primitives map,
+// calculating allow-list flags, and setting up the JSON-RPC router if needed.
 func (a APIDefinitionLoader) initMCPConfiguration(spec *APISpec) {
+	mcp.RegisterVEMPrefixes()
 	a.populateMCPPrimitivesMap(spec)
 	a.calculateMCPAllowlistFlags(spec)
 

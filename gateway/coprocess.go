@@ -17,6 +17,7 @@ import (
 	"github.com/TykTechnologies/tyk-pump/analytics"
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/coprocess"
+	"github.com/TykTechnologies/tyk/internal/httpctx"
 	"github.com/TykTechnologies/tyk/internal/middleware"
 	"github.com/TykTechnologies/tyk/user"
 	"github.com/sirupsen/logrus"
@@ -292,6 +293,15 @@ func (m *CoProcessMiddleware) EnabledForSpec() bool {
 
 // ProcessRequest will run any checks on the request on the way through the system, return an error to have the chain fail
 func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
+	// Skip global CoProcess plugins on self-looped requests (internal redirects) BEFORE driver validation.
+	// This prevents the plugin from executing multiple times during internal routing
+	// (e.g., VEM chain traversal, URL rewrites with tyk://self).
+	// CustomKeyCheck hooks must run on every request, so they're excluded from this check.
+	// Similar to auth middleware behavior (see mw_auth_key.go:124).
+	if m.HookType != coprocess.HookType_CustomKeyCheck && httpctx.IsSelfLooping(r) {
+		return nil, http.StatusOK
+	}
+
 	errorCode, err := m.validateDriver()
 	if err != nil {
 		return err, errorCode

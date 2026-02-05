@@ -19,6 +19,7 @@ import (
 	_ "github.com/robertkrimen/otto/underscore"
 
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/internal/httpctx"
 	"github.com/TykTechnologies/tyk/internal/middleware"
 	"github.com/TykTechnologies/tyk/user"
 
@@ -115,6 +116,15 @@ func specToJson(spec *APISpec) string {
 
 // ProcessRequest will run any checks on the request on the way through the system, return an error to have the chain fail
 func (d *DynamicMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
+	// Skip post-phase JS plugins on self-looped requests (internal redirects).
+	// This prevents the plugin from executing multiple times during internal routing
+	// (e.g., VEM chain traversal, URL rewrites with tyk://self).
+	// Pre-phase plugins run before auth and should execute on every request.
+	// Similar to auth middleware behavior (see mw_auth_key.go:124).
+	if !d.Pre && httpctx.IsSelfLooping(r) {
+		return nil, http.StatusOK
+	}
+
 	t1 := time.Now().UnixNano()
 	logger := d.Logger()
 

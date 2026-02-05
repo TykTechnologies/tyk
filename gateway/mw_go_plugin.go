@@ -13,6 +13,7 @@ import (
 	"github.com/TykTechnologies/tyk-pump/analytics"
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/goplugin"
+	"github.com/TykTechnologies/tyk/internal/httpctx"
 	"github.com/TykTechnologies/tyk/internal/middleware"
 	"github.com/TykTechnologies/tyk/request"
 )
@@ -180,6 +181,7 @@ func (m *GoPluginMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reque
 	successHandler := m.successHandler
 
 	if !m.APILevel {
+		// Endpoint-level plugins: use path matching
 		// if a Go plugin is found for this path, override the base handler and logger
 		if pluginMw, found := m.goPluginFromRequest(r); found {
 			logger = pluginMw.logger
@@ -187,6 +189,14 @@ func (m *GoPluginMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reque
 			successHandler = &SuccessHandler{BaseMiddleware: m.BaseMiddleware.Copy()}
 		} else {
 			return nil, http.StatusOK // next middleware
+		}
+	} else {
+		// API-level (global) plugins: skip on self-looped requests (internal redirects)
+		// This prevents the plugin from executing multiple times during internal routing
+		// (e.g., VEM chain traversal, URL rewrites with tyk://self).
+		// Similar to auth middleware behavior (see mw_auth_key.go:124).
+		if httpctx.IsSelfLooping(r) {
+			return nil, http.StatusOK
 		}
 	}
 
