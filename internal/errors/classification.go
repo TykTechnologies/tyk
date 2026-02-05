@@ -44,12 +44,124 @@ const (
 
 	// Generic errors
 	UPE ResponseFlag = "UPE" // Upstream protocol error (generic fallback)
+
+	// 4XX Gateway Error Flags (client/auth errors)
+	RLT ResponseFlag = "RLT" // Rate limited (429)
+	QEX ResponseFlag = "QEX" // Quota exceeded (403)
+	AMF ResponseFlag = "AMF" // Auth field missing (400/401)
+	AKI ResponseFlag = "AKI" // API key invalid (403)
+	TKE ResponseFlag = "TKE" // Token/cert expired (403)
+	TKI ResponseFlag = "TKI" // Token invalid (403)
+	TCV ResponseFlag = "TCV" // Token claims invalid (401)
+	EAD ResponseFlag = "EAD" // External auth denied (403)
+	BTL ResponseFlag = "BTL" // Body too large (400)
+	CLM ResponseFlag = "CLM" // Content-Length missing (411)
+	BIV ResponseFlag = "BIV" // Body invalid (400/422)
+	IHD ResponseFlag = "IHD" // Invalid header (400)
+	CRQ ResponseFlag = "CRQ" // Cert required (401)
+	CMM ResponseFlag = "CMM" // Cert mismatch (401)
 )
 
 // String returns the string representation of the ResponseFlag.
 func (f ResponseFlag) String() string {
 	return string(f)
 }
+
+// TykError ID constants for authentication errors.
+// These match the error IDs defined in gateway middleware files.
+const (
+	// Auth key error IDs (from gateway/mw_auth_key.go)
+	ErrAuthAuthorizationFieldMissing = "auth.auth_field_missing"
+	ErrAuthKeyNotFound               = "auth.key_not_found"
+	ErrAuthCertNotFound              = "auth.cert_not_found"
+	ErrAuthKeyIsInvalid              = "auth.key_is_invalid"
+	ErrAuthCertExpired               = "auth.cert_expired"
+	ErrAuthCertRequired              = "auth.cert_required"
+	ErrAuthCertMismatch              = "auth.cert_mismatch"
+
+	// OAuth error IDs (from gateway/mw_oauth2_key_exists.go)
+	ErrOAuthAuthorizationFieldMissing   = "oauth.auth_field_missing"
+	ErrOAuthAuthorizationFieldMalformed = "oauth.auth_field_malformed"
+	ErrOAuthKeyNotFound                 = "oauth.key_not_found"
+	ErrOAuthClientDeleted               = "oauth.client_deleted"
+)
+
+// Error type constants for classifier functions.
+const (
+	// Generic error types (used by multiple auth methods)
+	ErrTypeAuthFieldMissing = "auth_field_missing"
+
+	// JWT error types
+	ErrTypeClaimsInvalid           = "claims_invalid"
+	ErrTypeTokenInvalid            = "token_invalid"
+	ErrTypeUnexpectedSigningMethod = "unexpected_signing_method"
+
+	// Basic auth error types
+	ErrTypeHeaderMalformed     = "header_malformed"
+	ErrTypeEncodingInvalid     = "encoding_invalid"
+	ErrTypeValuesMalformed     = "values_malformed"
+	ErrTypeBodyUsernameMissing = "body_username_missing"
+	ErrTypeBodyPasswordMissing = "body_password_missing"
+
+	// Request size error types
+	ErrTypeContentLengthMissing = "content_length_missing"
+	ErrTypeBodyTooLarge         = "body_too_large"
+
+	// Rate limit error types
+	ErrTypeSessionRateLimit = "session_rate_limit"
+	ErrTypeAPIRateLimit     = "api_rate_limit"
+	ErrTypeOtherRateLimit   = "generic_rate_limit_error"
+
+	// JSON validation error types
+	ErrTypeJSONParseError         = "json_parse_error"
+	ErrTypeSchemaValidationFailed = "schema_validation_failed"
+)
+
+// Error detail constants for access log output (snake_case).
+const (
+	// Auth details
+	detailAuthFieldMissing = "auth_field_missing"
+	detailAuthKeyNotFound  = "auth_key_not_found"
+	detailAuthCertNotFound = "auth_cert_not_found"
+	detailAuthKeyIsInvalid = "auth_key_is_invalid"
+	detailAuthCertExpired  = "auth_cert_expired"
+	detailAuthCertRequired = "auth_cert_required"
+	detailAuthCertMismatch = "auth_cert_mismatch"
+
+	// OAuth details
+	detailOAuthFieldMissing   = "oauth_field_missing"
+	detailOAuthFieldMalformed = "oauth_field_malformed"
+	detailOAuthKeyNotFound    = "oauth_key_not_found"
+	detailOAuthClientDeleted  = "oauth_client_deleted"
+
+	// Rate limit details
+	detailSessionRateLimited = "session_rate_limited"
+	detailAPIRateLimited     = "api_rate_limited"
+	detailQuotaExceeded      = "quota_exceeded"
+	detailGenericRateLimit   = "generic_rate_limit_error"
+
+	// JWT details
+	detailJWTFieldMissing            = "jwt_field_missing"
+	detailJWTClaimsInvalid           = "jwt_claims_invalid"
+	detailJWTTokenInvalid            = "jwt_token_invalid"
+	detailJWTUnexpectedSigningMethod = "jwt_unexpected_signing_method"
+
+	// Basic auth details
+	detailBasicAuthFieldMissing        = "basic_auth_field_missing"
+	detailBasicAuthHeaderMalformed     = "basic_auth_header_malformed"
+	detailBasicAuthEncodingInvalid     = "basic_auth_encoding_invalid"
+	detailBasicAuthValuesMalformed     = "basic_auth_values_malformed"
+	detailBasicAuthBodyUsernameMissing = "basic_auth_body_username_missing"
+	detailBasicAuthBodyPasswordMissing = "basic_auth_body_password_missing"
+
+	// Request size details
+	detailContentLengthMissing = "content_length_missing"
+	detailBodyTooLarge         = "body_too_large"
+
+	// JSON validation details
+	detailJSONParseError         = "json_parse_error"
+	detailSchemaValidationFailed = "schema_validation_failed"
+)
 
 // ErrorClassification contains structured error information for access logs.
 // Fields are only populated when applicable to the specific error type.
