@@ -171,7 +171,7 @@ func TestErrorHandler_LatencyRecording(t *testing.T) {
 	})
 
 	t.Run("504 timeout records timeout duration", func(t *testing.T) {
-		upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		upstream := httptest.NewServer(http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
 			time.Sleep(5 * time.Second)
 		}))
 		defer upstream.Close()
