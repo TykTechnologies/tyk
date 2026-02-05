@@ -110,6 +110,8 @@ func (o *Operation) ExtractToExtendedPaths(ep *apidef.ExtendedPathsSet, path str
 	o.extractURLRewriteTo(ep, path, method)
 	o.extractCacheTo(ep, path, method)
 	o.extractEnforceTimeoutTo(ep, path, method)
+	o.extractValidateRequestTo(ep, path, method)
+	o.extractMockResponseTo(ep, path, method)
 	o.extractVirtualEndpointTo(ep, path, method)
 	o.extractEndpointPostPluginTo(ep, path, method)
 	o.extractCircuitBreakerTo(ep, path, method)
@@ -576,6 +578,26 @@ func (o *Operation) extractRequestSizeLimitTo(ep *apidef.ExtendedPathsSet, path 
 	ep.SizeLimit = append(ep.SizeLimit, meta)
 }
 
+func (o *Operation) extractValidateRequestTo(ep *apidef.ExtendedPathsSet, path string, method string) {
+	if o.ValidateRequest == nil {
+		return
+	}
+
+	meta := apidef.ValidateRequestMeta{Path: path, Method: method}
+	o.ValidateRequest.ExtractTo(&meta)
+	ep.ValidateRequest = append(ep.ValidateRequest, meta)
+}
+
+func (o *Operation) extractMockResponseTo(ep *apidef.ExtendedPathsSet, path string, method string) {
+	if o.MockResponse == nil {
+		return
+	}
+
+	meta := apidef.MockResponseMeta{Path: path, Method: method}
+	o.MockResponse.ExtractTo(&meta)
+	ep.MockResponse = append(ep.MockResponse, meta)
+}
+
 // detect possible regex pattern:
 // - character match ([a-z])
 // - greedy match (.*)
@@ -761,6 +783,12 @@ type ValidateRequest struct {
 func (v *ValidateRequest) Fill(meta apidef.ValidatePathMeta) {
 	v.Enabled = !meta.Disabled
 	v.ErrorResponseCode = meta.ErrorResponseCode
+}
+
+// ExtractTo extracts *ValidateRequest into apidef.ValidateRequestMeta.
+func (v *ValidateRequest) ExtractTo(meta *apidef.ValidateRequestMeta) {
+	meta.Enabled = v.Enabled
+	meta.ErrorResponseCode = v.ErrorResponseCode
 }
 
 func (*ValidateRequest) shouldImport(operation *openapi3.Operation) bool {
