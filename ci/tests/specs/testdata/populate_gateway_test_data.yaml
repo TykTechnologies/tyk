@@ -115,7 +115,7 @@ testcases:
         body: |
           {
             "access_rights": {
-              "itachi-api": {
+              "f84ve1a04e5648c2797170567971565n": {
                 "allowed_urls": [
                   {
                     "methods": [
