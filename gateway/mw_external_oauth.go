@@ -22,7 +22,6 @@ import (
 )
 
 var (
-	externalOAuthJWKCache           cache.Repository = cache.New(240, 30)
 	externalOAuthIntrospectionCache *introspectionCache
 	ErrTokenValidationFailed        = errors.New("error happened during the access token validation")
 	ErrKIDNotAString                = errors.New("kid is not a string")
@@ -172,7 +171,7 @@ func (k *ExternalOAuthMiddleware) getSecretFromJWKURL(url string, kid interface{
 		err    error
 	)
 
-	cachedJWK, found := externalOAuthJWKCache.Get(k.Spec.APIID)
+	cachedJWK, found := k.Gw.jwkCache.Get(k.Spec.APIID)
 	if !found {
 		// Create HTTP client using factory for OAuth service
 		clientFactory := NewExternalHTTPClientFactory(k.Gw)
@@ -194,7 +193,7 @@ func (k *ExternalOAuthMiddleware) getSecretFromJWKURL(url string, kid interface{
 		}
 
 		k.Logger().Debug("Caching JWK")
-		externalOAuthJWKCache.Set(k.Spec.APIID, jwkSet, cache.DefaultExpiration)
+		k.Gw.jwkCache.Set(k.Spec.APIID, jwkSet, cache.DefaultExpiration)
 	} else {
 		jwkSet = cachedJWK.(*jose.JSONWebKeySet)
 	}

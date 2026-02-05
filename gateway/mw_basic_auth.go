@@ -14,12 +14,13 @@ import (
 
 	"github.com/TykTechnologies/murmur3"
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/ctx"
 	"github.com/TykTechnologies/tyk/header"
+	"github.com/TykTechnologies/tyk/internal/cache"
+	tykerrors "github.com/TykTechnologies/tyk/internal/errors"
 	"github.com/TykTechnologies/tyk/regexp"
 	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/user"
-
-	"github.com/TykTechnologies/tyk/internal/cache"
 )
 
 const defaultBasicAuthTTL int64 = 60
@@ -88,6 +89,7 @@ func (k *BasicAuthKeyIsValid) basicAuthHeaderCredentials(w http.ResponseWriter, 
 	logger := k.Logger().WithField("key", k.Gw.obfuscateKey(token))
 	if token == "" {
 		// No header value, fail
+		ctx.SetErrorClassification(r, tykerrors.ClassifyBasicAuthError(tykerrors.ErrTypeAuthFieldMissing, k.Name()))
 		err, code = k.requestForBasicAuth(w, "Authorization field missing")
 		return
 	}
@@ -96,7 +98,7 @@ func (k *BasicAuthKeyIsValid) basicAuthHeaderCredentials(w http.ResponseWriter, 
 	if len(bits) != 2 {
 		// Header malformed
 		logger.Info("Attempted access with malformed header, header not in basic auth format.")
-
+		ctx.SetErrorClassification(r, tykerrors.ClassifyBasicAuthError(tykerrors.ErrTypeHeaderMalformed, k.Name()))
 		err, code = errors.New("Attempted access with malformed header, header not in basic auth format"), http.StatusBadRequest
 		return
 	}
@@ -105,7 +107,7 @@ func (k *BasicAuthKeyIsValid) basicAuthHeaderCredentials(w http.ResponseWriter, 
 	authvaluesStr, err := base64.StdEncoding.DecodeString(bits[1])
 	if err != nil {
 		logger.Info("Base64 Decoding failed of basic auth data: ", err)
-
+		ctx.SetErrorClassification(r, tykerrors.ClassifyBasicAuthError(tykerrors.ErrTypeEncodingInvalid, k.Name()))
 		err, code = errors.New("Attempted access with malformed header, auth data not encoded correctly"), http.StatusBadRequest
 		return
 	}
@@ -114,7 +116,7 @@ func (k *BasicAuthKeyIsValid) basicAuthHeaderCredentials(w http.ResponseWriter, 
 	if len(authValues) != 2 {
 		// Header malformed
 		logger.Info("Attempted access with malformed header, values not in basic auth format.")
-
+		ctx.SetErrorClassification(r, tykerrors.ClassifyBasicAuthError(tykerrors.ErrTypeValuesMalformed, k.Name()))
 		err, code = errors.New("Attempted access with malformed header, values not in basic auth format"), http.StatusBadRequest
 		return
 	}
@@ -129,11 +131,13 @@ func (k *BasicAuthKeyIsValid) basicAuthBodyCredentials(w http.ResponseWriter, r 
 
 	userMatch := k.bodyUserRegexp.FindAllSubmatch(body, 1)
 	if len(userMatch) == 0 {
+		ctx.SetErrorClassification(r, tykerrors.ClassifyBasicAuthError(tykerrors.ErrTypeBodyUsernameMissing, k.Name()))
 		err, code = errors.New("Body do not contain username"), http.StatusBadRequest
 		return
 	}
 
 	if len(userMatch[0]) < 2 {
+		ctx.SetErrorClassification(r, tykerrors.ClassifyBasicAuthError(tykerrors.ErrTypeBodyUsernameMissing, k.Name()))
 		err, code = errors.New("username should be inside regexp match group"), http.StatusBadRequest
 		return
 	}
@@ -141,11 +145,13 @@ func (k *BasicAuthKeyIsValid) basicAuthBodyCredentials(w http.ResponseWriter, r 
 	passMatch := k.bodyPasswordRegexp.FindAllSubmatch(body, 1)
 
 	if len(passMatch) == 0 {
+		ctx.SetErrorClassification(r, tykerrors.ClassifyBasicAuthError(tykerrors.ErrTypeBodyPasswordMissing, k.Name()))
 		err, code = errors.New("Body do not contain password"), http.StatusBadRequest
 		return
 	}
 
 	if len(passMatch[0]) < 2 {
+		ctx.SetErrorClassification(r, tykerrors.ClassifyBasicAuthError(tykerrors.ErrTypeBodyPasswordMissing, k.Name()))
 		err, code = errors.New("password should be inside regexp match group"), http.StatusBadRequest
 		return
 	}
