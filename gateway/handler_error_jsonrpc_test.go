@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/internal/httpctx"
 	jsonrpcerrors "github.com/TykTechnologies/tyk/internal/jsonrpc/errors"
 )
@@ -244,4 +245,255 @@ func TestErrorHandler_shouldWriteJSONRPCError(t *testing.T) {
 			assert.Equal(t, tt.expected, result)
 		})
 	}
+}
+
+// TestErrorHandler_OverrideMessages_AppliedToJSONRPCErrors proves that OverrideMessages
+// configuration affects both JSON-RPC and standard error responses equally.
+// This test addresses the security concern that JSON-RPC errors might bypass error message sanitization.
+func TestErrorHandler_OverrideMessages_AppliedToJSONRPCErrors(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	// Setup: Configure OverrideMessages to sanitize auth errors
+	originalTykErrors := make(map[string]config.TykError)
+	for k, v := range TykErrors {
+		originalTykErrors[k] = v
+	}
+	t.Cleanup(func() {
+		// Restore original errors after test
+		TykErrors = originalTykErrors
+	})
+
+	// Simulate overrideTykErrors() being called with custom config
+	// This is what happens at gateway startup
+	overrideConfig := map[string]config.TykError{
+		ErrAuthAuthorizationFieldMissing: {
+			Message: "Custom sanitized auth message",
+			Code:    http.StatusUnauthorized,
+		},
+		ErrAuthKeyNotFound: {
+			Message: "Custom access denied message",
+			Code:    http.StatusForbidden,
+		},
+	}
+
+	// Apply overrides to TykErrors map (simulating gateway startup)
+	for id, override := range overrideConfig {
+		overriddenErr := TykErrors[id]
+		if override.Code != 0 {
+			overriddenErr.Code = override.Code
+		}
+		if override.Message != "" {
+			overriddenErr.Message = override.Message
+		}
+		TykErrors[id] = overriddenErr
+	}
+
+	tests := []struct {
+		name              string
+		errorID           string
+		expectJSONRPC     bool
+		setupRequest      func(*http.Request)
+		expectedMessage   string
+		expectedHTTPCode  int
+		expectedRPCCode   int
+	}{
+		{
+			name:    "JSON-RPC error uses overridden auth message",
+			errorID: ErrAuthAuthorizationFieldMissing,
+			setupRequest: func(r *http.Request) {
+				state := &httpctx.JSONRPCRoutingState{
+					ID: "test-123",
+				}
+				httpctx.SetJSONRPCRoutingState(r, state)
+			},
+			expectJSONRPC:    true,
+			expectedMessage:  "Custom sanitized auth message",
+			expectedHTTPCode: http.StatusUnauthorized,
+			expectedRPCCode:  jsonrpcerrors.CodeAuthRequired,
+		},
+		{
+			name:    "Standard error uses same overridden auth message",
+			errorID: ErrAuthAuthorizationFieldMissing,
+			setupRequest: func(r *http.Request) {
+				// No routing state - standard error
+			},
+			expectJSONRPC:    false,
+			expectedMessage:  "Custom sanitized auth message",
+			expectedHTTPCode: http.StatusUnauthorized,
+		},
+		{
+			name:    "JSON-RPC error uses overridden access denied message",
+			errorID: ErrAuthKeyNotFound,
+			setupRequest: func(r *http.Request) {
+				state := &httpctx.JSONRPCRoutingState{
+					ID: "test-456",
+				}
+				httpctx.SetJSONRPCRoutingState(r, state)
+			},
+			expectJSONRPC:    true,
+			expectedMessage:  "Custom access denied message",
+			expectedHTTPCode: http.StatusForbidden,
+			expectedRPCCode:  jsonrpcerrors.CodeAccessDenied,
+		},
+		{
+			name:    "Standard error uses same overridden access denied message",
+			errorID: ErrAuthKeyNotFound,
+			setupRequest: func(r *http.Request) {
+				// No routing state - standard error
+			},
+			expectJSONRPC:    false,
+			expectedMessage:  "Custom access denied message",
+			expectedHTTPCode: http.StatusForbidden,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Get error message from TykErrors (simulating middleware behavior)
+			err, code := errorAndStatusCode(tt.errorID)
+			require.NotNil(t, err, "errorAndStatusCode should return an error")
+			errMsg := err.Error()
+
+			// Verify the error message is already overridden
+			assert.Equal(t, tt.expectedMessage, errMsg, "Error message should be overridden before HandleError")
+			assert.Equal(t, tt.expectedHTTPCode, code, "Error code should be overridden before HandleError")
+
+			// Setup spec based on whether we want JSON-RPC or standard error
+			spec := &APISpec{
+				APIDefinition: &apidef.APIDefinition{},
+			}
+			if tt.expectJSONRPC {
+				spec.JsonRpcVersion = apidef.JsonRPC20
+			}
+
+			handler := ErrorHandler{
+				BaseMiddleware: &BaseMiddleware{
+					Spec: spec,
+					Gw:   ts.Gw,
+				},
+			}
+
+			r := httptest.NewRequest(http.MethodPost, "/test", nil)
+			r.Header.Set("Content-Type", "application/json")
+			tt.setupRequest(r)
+
+			w := httptest.NewRecorder()
+
+			// Call HandleError with the overridden message
+			handler.HandleError(w, r, errMsg, code, true)
+
+			// Verify the response contains the overridden message
+			if tt.expectJSONRPC {
+				// JSON-RPC response
+				var response jsonrpcerrors.JSONRPCErrorResponse
+				err := json.Unmarshal(w.Body.Bytes(), &response)
+				require.NoError(t, err, "JSON-RPC response should be valid JSON")
+
+				assert.Equal(t, apidef.JsonRPC20, response.JSONRPC)
+				assert.Equal(t, tt.expectedMessage, response.Error.Message, "JSON-RPC error should contain overridden message")
+				assert.Equal(t, tt.expectedRPCCode, response.Error.Code)
+				assert.Equal(t, tt.expectedHTTPCode, w.Code)
+			} else {
+				// Standard error response
+				var response map[string]interface{}
+				err := json.Unmarshal(w.Body.Bytes(), &response)
+				require.NoError(t, err, "Standard response should be valid JSON")
+
+				assert.Equal(t, tt.expectedHTTPCode, w.Code)
+				assert.Contains(t, response, "error")
+
+				// The template wraps the message in HTML, so check it contains the overridden message
+				errorField := response["error"].(string)
+				assert.Contains(t, errorField, tt.expectedMessage, "Standard error should contain overridden message")
+			}
+		})
+	}
+}
+
+// TestErrorHandler_OverrideMessages_ConsistentBehavior verifies that when the same error
+// is returned in both JSON-RPC and standard format, the message is identical.
+func TestErrorHandler_OverrideMessages_ConsistentBehavior(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	// Setup override configuration
+	originalTykErrors := make(map[string]config.TykError)
+	for k, v := range TykErrors {
+		originalTykErrors[k] = v
+	}
+	t.Cleanup(func() {
+		TykErrors = originalTykErrors
+	})
+
+	// Apply a custom override
+	customMessage := "Sanitized security message"
+	customCode := http.StatusForbidden
+
+	overriddenErr := TykErrors[ErrAuthKeyNotFound]
+	overriddenErr.Message = customMessage
+	overriddenErr.Code = customCode
+	TykErrors[ErrAuthKeyNotFound] = overriddenErr
+
+	// Get the error (simulating middleware)
+	err, code := errorAndStatusCode(ErrAuthKeyNotFound)
+	require.NotNil(t, err, "errorAndStatusCode should return an error")
+	errMsg := err.Error()
+
+	// Test JSON-RPC format
+	jsonRPCSpec := &APISpec{
+		APIDefinition: &apidef.APIDefinition{
+			JsonRpcVersion: apidef.JsonRPC20,
+		},
+	}
+	jsonRPCHandler := ErrorHandler{
+		BaseMiddleware: &BaseMiddleware{
+			Spec: jsonRPCSpec,
+			Gw:   ts.Gw,
+		},
+	}
+
+	r1 := httptest.NewRequest(http.MethodPost, "/test", nil)
+	r1.Header.Set("Content-Type", "application/json")
+	state := &httpctx.JSONRPCRoutingState{ID: "test"}
+	httpctx.SetJSONRPCRoutingState(r1, state)
+	w1 := httptest.NewRecorder()
+
+	jsonRPCHandler.HandleError(w1, r1, errMsg, code, true)
+
+	var jsonRPCResponse jsonrpcerrors.JSONRPCErrorResponse
+	err = json.Unmarshal(w1.Body.Bytes(), &jsonRPCResponse)
+	require.NoError(t, err)
+
+	// Test standard format
+	standardSpec := &APISpec{
+		APIDefinition: &apidef.APIDefinition{},
+	}
+	standardHandler := ErrorHandler{
+		BaseMiddleware: &BaseMiddleware{
+			Spec: standardSpec,
+			Gw:   ts.Gw,
+		},
+	}
+
+	r2 := httptest.NewRequest(http.MethodPost, "/test", nil)
+	r2.Header.Set("Content-Type", "application/json")
+	w2 := httptest.NewRecorder()
+
+	standardHandler.HandleError(w2, r2, errMsg, code, true)
+
+	var standardResponse map[string]interface{}
+	err = json.Unmarshal(w2.Body.Bytes(), &standardResponse)
+	require.NoError(t, err)
+
+	// Prove both responses contain the same overridden message
+	assert.Equal(t, customMessage, jsonRPCResponse.Error.Message, "JSON-RPC should use overridden message")
+	assert.Contains(t, standardResponse["error"].(string), customMessage, "Standard error should use overridden message")
+
+	// Both should have the same HTTP status code
+	assert.Equal(t, customCode, w1.Code, "JSON-RPC HTTP status should match override")
+	assert.Equal(t, customCode, w2.Code, "Standard HTTP status should match override")
+
+	t.Logf("✓ Proof: Both JSON-RPC and standard errors use the same overridden message: '%s'", customMessage)
+	t.Logf("✓ Proof: Both use the same HTTP status code: %d", customCode)
 }
