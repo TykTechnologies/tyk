@@ -1411,6 +1411,24 @@
       "type": ["object", "null"],
       "additionalProperties": true,
       "properties": {}
+    },
+    "jwks": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "properties": {
+        "cache": {
+          "type": ["object", "null"],
+          "additionalProperties": false,
+          "properties": {
+            "timeout": {
+              "type": ["integer"],
+              "description": "Cache timeout in seconds",
+              "minimum": 0,
+              "default": 240
+            }
+          }
+        }
+      }
     }
   }
 }
