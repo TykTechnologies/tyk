@@ -152,10 +152,7 @@ func (r *RPCStorageHandler) Connect() bool {
 		r.getGroupLoginCallback(r.Gw.GetConfig().SlaveOptions.SynchroniserEnabled),
 		func() {
 			r.Gw.reloadURLStructure(nil)
-			// Notify certificate manager that emergency mode has exited
-			if cm, ok := r.Gw.CertificateManager.(interface{ NotifyEmergencyModeExit() }); ok {
-				cm.NotifyEmergencyModeExit()
-			}
+			r.Gw.notifyCertManagerEmergencyModeExit()
 		},
 		r.DoReload,
 	)

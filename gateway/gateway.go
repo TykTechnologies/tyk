@@ -50,6 +50,17 @@ func (gw *Gateway) GetLoadedPolicyIDs() []model.LoadedPolicyInfo {
 	return policies
 }
 
+// notifyCertManagerEmergencyModeExit notifies the certificate manager that emergency mode has exited.
+// This is a no-op if the certificate manager doesn't support emergency mode notifications.
+func (gw *Gateway) notifyCertManagerEmergencyModeExit() {
+	type emergencyModeNotifier interface {
+		NotifyEmergencyModeExit()
+	}
+	if notifier, ok := gw.CertificateManager.(emergencyModeNotifier); ok {
+		notifier.NotifyEmergencyModeExit()
+	}
+}
+
 // PolicyByID will return a Policy matching the passed Policy ID.
 func (gw *Gateway) PolicyByID(id string) (user.Policy, bool) {
 	gw.policiesMu.RLock()
