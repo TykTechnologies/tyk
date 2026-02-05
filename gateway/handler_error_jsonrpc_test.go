@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/TykTechnologies/tyk-pump/analytics"
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/internal/httpctx"
@@ -728,4 +729,38 @@ func TestErrorHandler_StandardError_StatusCodeAlwaysSet(t *testing.T) {
 			assert.Equal(t, tt.errCode, statusInt, "Access log status should match error code")
 		})
 	}
+}
+
+func TestErrorHandler_JSONRPC_LatencyRecording(t *testing.T) {
+	ts := StartTest(func(globalConf *config.Config) {
+		globalConf.AnalyticsConfig.EnableDetailedRecording = true
+	})
+	defer ts.Close()
+
+	ts.Gw.Analytics.Flush()
+	ts.Gw.Analytics.Store.GetAndDeleteSet(analyticsKeyName)
+
+	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		spec.Proxy.ListenPath = "/"
+		spec.Proxy.TargetURL = "http://localhost:66666"
+		spec.JsonRpcVersion = apidef.JsonRPC20
+	})
+
+	_, _ = ts.Run(t, test.TestCase{
+		Path: "/",
+		Code: http.StatusInternalServerError,
+	})
+
+	ts.Gw.Analytics.Flush()
+
+	results := ts.Gw.Analytics.Store.GetAndDeleteSet(analyticsKeyName)
+	require.Len(t, results, 1)
+
+	var record analytics.AnalyticsRecord
+	err := ts.Gw.Analytics.analyticsSerializer.Decode([]byte(results[0].(string)), &record)
+	require.NoError(t, err)
+
+	assert.Equal(t, record.RequestTime, record.Latency.Total)
+	assert.Equal(t, record.Latency.Gateway, record.Latency.Total-record.Latency.Upstream)
+	assert.Zero(t, record.Latency.Upstream)
 }

@@ -95,15 +95,26 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 	defer e.Base().UpdateRequestSession(r)
 	response := &http.Response{}
 
+	// Calculate latency for error responses
+	var latency analytics.Latency
+	if requestStartTime := ctxGetRequestStartTime(r); !requestStartTime.IsZero() {
+		totalMs := int64(DurationToMillisecond(time.Since(requestStartTime)))
+		latency = analytics.Latency{
+			Total:    totalMs,
+			Upstream: 0,       // No successful upstream response for errors
+			Gateway:  totalMs, // All time is gateway time for errors
+		}
+	}
+
 	// Check if this should be a JSON-RPC formatted error
 	if e.Spec.IsMCP() && writeResponse && e.shouldWriteJSONRPCError(r) {
 		responseBody := e.writeJSONRPCError(w, r, errMsg, errCode)
 		response.StatusCode = errCode
 		// Record analytics with full JSON-RPC response
 		if !e.Spec.DoNotTrack && !ctxGetDoNotTrack(r) {
-			e.recordErrorAnalytics(r, response, responseBody)
+			e.recordErrorAnalytics(r, response, responseBody, latency)
 		}
-		e.RecordAccessLog(r, response, analytics.Latency{})
+		e.RecordAccessLog(r, response, latency)
 		reportHealthValue(e.Spec, BlockedRequestLog, "-1")
 		return
 	}
@@ -193,18 +204,7 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 		// Record analytics for standard error
 		if !e.Spec.DoNotTrack && !ctxGetDoNotTrack(r) {
 			addVersionHeader(w, r, e.Spec.GlobalConfig)
-			e.recordErrorAnalytics(r, response, responseBodyBytes)
-		}
-	}
-
-	// Calculate latency for error responses
-	var latency analytics.Latency
-	if requestStartTime := ctxGetRequestStartTime(r); !requestStartTime.IsZero() {
-		totalMs := int64(DurationToMillisecond(time.Since(requestStartTime)))
-		latency = analytics.Latency{
-			Total:    totalMs,
-			Upstream: 0,       // No successful upstream response for errors
-			Gateway:  totalMs, // All time is gateway time for errors
+			e.recordErrorAnalytics(r, response, responseBodyBytes, latency)
 		}
 	}
 
@@ -237,7 +237,8 @@ func (e *ErrorHandler) writeJSONRPCError(w http.ResponseWriter, r *http.Request,
 // recordErrorAnalytics records analytics for errors (extracted for reuse).
 // response should be the HTTP response object with StatusCode and headers set.
 // responseBody should be the full response body sent to the client (JSON-RPC or standard).
-func (e *ErrorHandler) recordErrorAnalytics(r *http.Request, response *http.Response, responseBody []byte) {
+// latency should contain the timing information for this error response.
+func (e *ErrorHandler) recordErrorAnalytics(r *http.Request, response *http.Response, responseBody []byte, latency analytics.Latency) {
 	token := ctxGetAuthToken(r)
 	var alias string
 	ip := request.RealIP(r)
@@ -306,8 +307,8 @@ func (e *ErrorHandler) recordErrorAnalytics(r *http.Request, response *http.Resp
 		APIID:         e.Spec.APIID,
 		OrgID:         e.Spec.OrgID,
 		OauthID:       oauthClientID,
-		RequestTime:   0,
-		Latency:       analytics.Latency{},
+		RequestTime:   latency.Total,
+		Latency:       latency,
 		IPAddress:     ip,
 		Geo:           analytics.GeoData{},
 		Network:       analytics.NetworkStats{},
