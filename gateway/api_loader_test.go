@@ -9739,7 +9739,9 @@ func TestMCPRequestSizeLimit_Security(t *testing.T) {
 		// Create upstream server
 		upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 			w.WriteHeader(http.StatusOK)
-			_, _ = w.Write([]byte(`{"jsonrpc":"2.0","result":"success","id":1}`))
+			if _, err := w.Write([]byte(`{"jsonrpc":"2.0","result":"success","id":1}`)); err != nil {
+				t.Errorf("failed to write response: %v", err)
+			}
 		}))
 		defer upstream.Close()
 
