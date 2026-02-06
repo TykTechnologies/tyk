@@ -362,14 +362,6 @@ func TestErrorHandler_BackwardCompatibility_AccessLogStatusCode(t *testing.T) {
 		},
 	}
 
-	t.Run("writeResponse=false results in StatusCode=0 for access log", func(t *testing.T) {
-		w := httptest.NewRecorder()
-		r := httptest.NewRequest(http.MethodGet, "/test", nil)
-		ctxSetRequestStartTime(r, time.Now())
-
-		handler.HandleError(w, r, "Test error", http.StatusForbidden, false)
-	})
-
 	t.Run("writeResponse=true results in StatusCode=errCode for access log", func(t *testing.T) {
 		w := httptest.NewRecorder()
 		r := httptest.NewRequest(http.MethodGet, "/test", nil)

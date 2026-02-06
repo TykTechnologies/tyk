@@ -157,7 +157,7 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 	ip := request.RealIP(r)
 	if e.Spec.GlobalConfig.StoreAnalytics(ip) {
 		addVersionHeader(w, r, e.Spec.GlobalConfig)
-		e.recordErrorAnalytics(r, response, responseBodyBytes, latency, errCode)
+		e.recordErrorAnalytics(r, response, latency, errCode)
 	}
 
 	e.RecordAccessLog(r, response, latency)
@@ -241,7 +241,7 @@ func (e *ErrorHandler) writeJSONRPCError(w http.ResponseWriter, r *http.Request,
 	return jsonrpcerrors.WriteJSONRPCError(w, requestID, httpCode, errMsg)
 }
 
-func (e *ErrorHandler) recordErrorAnalytics(r *http.Request, response *http.Response, responseBody []byte, latency analytics.Latency, errCode int) {
+func (e *ErrorHandler) recordErrorAnalytics(r *http.Request, response *http.Response, latency analytics.Latency, errCode int) {
 	token := ctxGetAuthToken(r)
 	var alias string
 	ip := request.RealIP(r)
