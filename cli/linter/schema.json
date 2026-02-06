@@ -1035,6 +1035,9 @@
               "type": "integer"
             }
           }
+        },
+        "sync_used_certs_only": {
+          "type": "boolean"
         }
       }
     },
