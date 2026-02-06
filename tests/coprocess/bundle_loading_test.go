@@ -1,6 +1,9 @@
 package coprocess_test
 
 import (
+	"github.com/spf13/afero"
+	"github.com/stretchr/testify/assert"
+	"hash"
 	"net/http"
 	"testing"
 
@@ -34,6 +37,21 @@ func TestBundleLoading(t *testing.T) {
 		ts.Run(t, []test.TestCase{
 			{Path: "/test/", Code: http.StatusOK, BodyMatch: `New Request body`},
 		}...)
+
+		t.Run("signed bundle should not verify checksum on reload", func(t *testing.T) {
+			cfg := ts.Gw.GetConfig()
+			cfg.SkipVerifyExistingPluginBundle = true
+			ts.Gw.SetConfig(cfg)
+
+			called := false
+			ts.Gw.BundleChecksumVerifier = func(bundle *gateway.Bundle, bundleFs afero.Fs, useSignature bool) (sha256Hash hash.Hash, err error) {
+				called = true
+				return sha256Hash, nil
+			}
+			ts.Gw.DoReload()
+			ts.Gw.LoadAPI(spec)
+			assert.False(t, called)
+		})
 	})
 
 	t.Run("Invalid bundle signature should error", func(t *testing.T) {
