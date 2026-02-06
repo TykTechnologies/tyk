@@ -54,7 +54,10 @@ func defaultBundleVerifyFunction(b *Bundle, bundleFs afero.Fs, skipSignature, sk
 	}
 
 	w := io.MultiWriter(writers...)
-	buf := bundleVerifyPool.Get().(*[]byte)
+	buf, ok := bundleVerifyPool.Get().(*[]byte)
+	if !ok {
+		return nil, errors.New("error verifying bundle, please try again")
+	}
 	defer bundleVerifyPool.Put(buf)
 
 	for _, f := range b.Manifest.FileList {
