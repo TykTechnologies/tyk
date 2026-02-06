@@ -171,6 +171,9 @@ func (gw *Gateway) createMiddleware(actualMW TykMiddleware) func(http.Handler) h
 
 			err, errCode := mw.ProcessRequest(w, r, mwConf)
 
+			// Refresh logger with current span
+			logger = mw.Base().SetRequestLogger(r)
+
 			if err != nil {
 				writeResponse := true
 				// Prevent double error write
