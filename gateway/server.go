@@ -276,7 +276,7 @@ func NewGateway(config config.Config, ctx context.Context) *Gateway {
 	if config.SlaveOptions.UseRPC {
 		gw.certUsageTracker = newUsageTracker()
 	}
-  
+
 	gw.jwkCache = buildJWKSCache(config)
 
 	return gw
