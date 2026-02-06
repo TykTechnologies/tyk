@@ -4,6 +4,7 @@ import (
 	"archive/zip"
 	"bytes"
 	"crypto/md5"
+	"crypto/sha256"
 	"crypto/tls"
 	"encoding/base64"
 	"encoding/json"
@@ -40,6 +41,7 @@ type bundleVerifyFunction func(bundle *Bundle, bundleFs afero.Fs, useSignature b
 
 func defaultBundleVerifyFunction(b *Bundle, bundleFs afero.Fs, useSignature bool) (sha256Hash hash.Hash, err error) {
 	md5Hash := md5.New()
+	sha256Hash = sha256.New()
 
 	var w io.Writer = md5Hash
 	if useSignature {
@@ -127,7 +129,7 @@ func (b *Bundle) Verify(bundleFs afero.Fs) error {
 }
 
 func (b *Bundle) verifyChecksum(bundleFs afero.Fs, useSignature bool) (hash.Hash, error) {
-	return b.Gw.bundleChecksumVerifier(b, bundleFs, useSignature)
+	return b.Gw.BundleChecksumVerifier(b, bundleFs, useSignature)
 }
 
 // AddToSpec attaches the custom middleware settings to an API definition.
