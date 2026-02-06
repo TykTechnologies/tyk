@@ -18,6 +18,8 @@ import (
 	"github.com/TykTechnologies/tyk/config"
 
 	"github.com/TykTechnologies/tyk/header"
+	"github.com/TykTechnologies/tyk/internal/httpctx"
+	jsonrpcerrors "github.com/TykTechnologies/tyk/internal/jsonrpc/errors"
 	"github.com/TykTechnologies/tyk/request"
 )
 
@@ -94,6 +96,19 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 	response := &http.Response{}
 
 	if writeResponse {
+		// Handle JSON-RPC error formatting for MCP APIs
+		if e.Spec.IsMCP() && e.shouldWriteJSONRPCError(r) {
+			response.StatusCode = errCode
+			response.Header = http.Header{}
+			response.Header.Set(header.ContentType, header.ApplicationJSON)
+
+			responseBody := e.writeJSONRPCError(w, r, errMsg, errCode)
+			response.Body = ioutil.NopCloser(bytes.NewReader(responseBody))
+
+			// Skip normal template-based error handling
+			goto skipNormalError
+		}
+
 		var templateExtension string
 		contentType := r.Header.Get(header.ContentType)
 		contentType = strings.Split(contentType, ";")[0]
@@ -171,6 +186,7 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 		}
 	}
 
+skipNormalError:
 	if e.Spec.DoNotTrack || ctxGetDoNotTrack(r) {
 		return
 	}
@@ -328,4 +344,26 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 
 	// Report in health check
 	reportHealthValue(e.Spec, BlockedRequestLog, "-1")
+}
+
+// shouldWriteJSONRPCError returns true if this error should be formatted as JSON-RPC.
+// This checks if the API is an MCP with JSON-RPC 2.0 enabled and if the request has JSON-RPC routing state.
+func (e *ErrorHandler) shouldWriteJSONRPCError(r *http.Request) bool {
+	if e.Spec.JsonRpcVersion != apidef.JsonRPC20 {
+		return false
+	}
+
+	routingState := httpctx.GetJSONRPCRoutingState(r)
+	return routingState != nil
+}
+
+// writeJSONRPCError writes an error in JSON-RPC 2.0 format and returns the response body.
+// It extracts the request ID from the routing state and delegates to the jsonrpc errors package.
+func (e *ErrorHandler) writeJSONRPCError(w http.ResponseWriter, r *http.Request, errMsg string, httpCode int) []byte {
+	var requestID interface{}
+	if state := httpctx.GetJSONRPCRoutingState(r); state != nil {
+		requestID = state.ID
+	}
+
+	return jsonrpcerrors.WriteJSONRPCError(w, requestID, httpCode, errMsg)
 }
