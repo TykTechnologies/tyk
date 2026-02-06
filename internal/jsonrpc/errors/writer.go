@@ -56,7 +56,7 @@ func writeJSONResponse(w http.ResponseWriter, httpCode int, response JSONRPCErro
 	body, err := json.Marshal(response)
 	if err != nil {
 		logger.WithError(err).WithField("request_id", response.ID).WithField("rpc_code", response.Error.Code).Error("Failed to marshal JSON-RPC error response")
-		body = []byte(`{"jsonrpc":"2.0","error":{"code":-32603,"message":"Internal error"},"id":null}`)
+		body = []byte(defaultInternalErrorResponse)
 	}
 
 	w.Header().Set("Content-Type", "application/json")
