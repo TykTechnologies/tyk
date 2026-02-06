@@ -7,7 +7,7 @@ import (
 	"github.com/TykTechnologies/exp/pkg/limiters"
 )
 
-func (l *Limiter) FixedWindow(ctx context.Context, key string, rate float64, per float64) error {
+func (l *Limiter) FixedWindow(ctx context.Context, key string, rate float64, per float64) (time.Duration, error) {
 	var (
 		storage limiters.FixedWindowIncrementer
 
@@ -24,6 +24,5 @@ func (l *Limiter) FixedWindow(ctx context.Context, key string, rate float64, per
 	limiter := limiters.NewFixedWindow(capacity, ttl, storage, l.clock)
 
 	// Rate limiter returns a zero duration and a possible ErrLimitExhausted when no tokens are available.
-	_, err := limiter.Limit(ctx)
-	return err
+	return limiter.Limit(ctx)
 }

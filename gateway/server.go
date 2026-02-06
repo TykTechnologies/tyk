@@ -57,6 +57,7 @@ import (
 	"github.com/TykTechnologies/tyk/internal/model"
 	"github.com/TykTechnologies/tyk/internal/netutil"
 	"github.com/TykTechnologies/tyk/internal/otel"
+	"github.com/TykTechnologies/tyk/internal/rate"
 	"github.com/TykTechnologies/tyk/internal/scheduler"
 	"github.com/TykTechnologies/tyk/internal/service/newrelic"
 	"github.com/TykTechnologies/tyk/internal/uuid"
@@ -223,6 +224,8 @@ type Gateway struct {
 
 	// apiJWKCaches cache per api entity
 	apiJWKCaches sync.Map
+
+	limitHeaderSender rate.HeaderSender
 }
 
 func NewGateway(config config.Config, ctx context.Context) *Gateway {
@@ -271,6 +274,9 @@ func NewGateway(config config.Config, ctx context.Context) *Gateway {
 
 	gw.SetNodeID("solo-" + uuid.New())
 	gw.SessionID = uuid.New()
+
+	// todo: extract from tests
+	gw.limitHeaderSender = rate.NewSender(rate.SourceQuota)
 
 	// Only create registry in RPC mode
 	if config.SlaveOptions.UseRPC {

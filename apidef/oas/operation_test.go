@@ -13,6 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/TykTechnologies/tyk/apidef"
+	tykheaders "github.com/TykTechnologies/tyk/header"
 	"github.com/TykTechnologies/tyk/internal/time"
 )
 
@@ -876,12 +877,12 @@ func TestOAS_MockResponse_fillMockResponsePaths(t *testing.T) {
 					Code:   200,
 					Body:   `{"data": "test"}`,
 					Headers: map[string]string{
-						"Content-Type":      "application/json",
-						"X-Custom-Header":   "custom-value",
-						"X-Request-ID":      "123",
-						"X-Correlation-ID":  "abc",
-						"Cache-Control":     "no-cache",
-						"X-RateLimit-Limit": "100",
+						"Content-Type":             "application/json",
+						"X-Custom-Header":          "custom-value",
+						"X-Request-ID":             "123",
+						"X-Correlation-ID":         "abc",
+						"Cache-Control":            "no-cache",
+						tykheaders.XRateLimitLimit: "100",
 					},
 				}},
 			},

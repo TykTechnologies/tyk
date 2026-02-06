@@ -153,7 +153,7 @@ func (k *OrganizationMonitor) ProcessRequestLive(r *http.Request, orgSession *us
 		logger.WithError(err).Error("Could not update org session")
 	}
 
-	switch reason {
+	switch reason.(type) {
 	case sessionFailNone:
 		// all good, keep org active
 	case sessionFailQuota:
@@ -288,7 +288,7 @@ func (k *OrganizationMonitor) AllowAccessNext(
 	}
 
 	isExceeded := false
-	switch reason {
+	switch reason.(type) {
 	case sessionFailNone:
 		// all good, keep org active
 	case sessionFailQuota:
