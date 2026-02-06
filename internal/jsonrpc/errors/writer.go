@@ -5,7 +5,12 @@ import (
 	"net/http"
 
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/log"
 )
+
+var logger = log.Get()
+
+const defaultInternalErrorResponse = `{"jsonrpc":"2.0","error":{"code":-32603,"message":"Internal error"},"id":null}`
 
 // JSONRPCError represents a JSON-RPC 2.0 error object as defined in the specification.
 type JSONRPCError struct {
@@ -50,13 +55,15 @@ func buildErrorResponse(requestID interface{}, rpcCode int, message string, http
 func writeJSONResponse(w http.ResponseWriter, httpCode int, response JSONRPCErrorResponse) []byte {
 	body, err := json.Marshal(response)
 	if err != nil {
-		// Fallback to basic error if marshaling fails
+		logger.WithError(err).WithField("request_id", response.ID).WithField("rpc_code", response.Error.Code).Error("Failed to marshal JSON-RPC error response")
 		body = []byte(`{"jsonrpc":"2.0","error":{"code":-32603,"message":"Internal error"},"id":null}`)
 	}
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(httpCode)
-	_, _ = w.Write(body)
+	if _, err := w.Write(body); err != nil {
+		logger.WithError(err).Error("Failed to write JSON-RPC error response to client")
+	}
 
 	return body
 }

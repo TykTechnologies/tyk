@@ -816,7 +816,11 @@ func TestErrorHandler_AccessLogAndHealthUnconditional(t *testing.T) {
 				if entry.Level == logrus.InfoLevel && entry.Data["status"] != nil {
 					accessLogFound = true
 					status := entry.Data["status"].(int)
-					assert.Equal(t, http.StatusForbidden, status, "Access log should record status code")
+					expectedStatus := 0
+					if tt.writeResponse {
+						expectedStatus = http.StatusForbidden
+					}
+					assert.Equal(t, expectedStatus, status, "Access log status should match master behavior")
 					break
 				}
 			}

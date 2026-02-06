@@ -2,6 +2,7 @@ package gateway
 
 import (
 	"bytes"
+	"encoding/base64"
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
@@ -15,8 +16,10 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/TykTechnologies/tyk-pump/analytics"
+	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/header"
+	"github.com/TykTechnologies/tyk/internal/httpctx"
 	"github.com/TykTechnologies/tyk/test"
 )
 
@@ -247,4 +250,289 @@ func TestErrorHandler_LatencyRecording(t *testing.T) {
 		// 3. Upstream is 0 for connection errors
 		assert.Zero(t, record.Latency.Upstream, "Upstream should be zero for connection errors")
 	})
+}
+
+func TestErrorHandler_BackwardCompatibility_WriteResponseTrue(t *testing.T) {
+	ts := StartTest(func(globalConf *config.Config) {
+		globalConf.AnalyticsConfig.EnableDetailedRecording = true
+	})
+	defer ts.Close()
+
+	ts.Gw.Analytics.Flush()
+	ts.Gw.Analytics.Store.GetAndDeleteSet(analyticsKeyName)
+
+	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		spec.Proxy.ListenPath = "/"
+		spec.Proxy.TargetURL = "http://localhost:66666"
+	})
+
+	_, _ = ts.Run(t, test.TestCase{
+		Path: "/",
+		Code: http.StatusInternalServerError,
+	})
+
+	ts.Gw.Analytics.Flush()
+
+	results := ts.Gw.Analytics.Store.GetAndDeleteSet(analyticsKeyName)
+	require.Len(t, results, 1)
+
+	var record analytics.AnalyticsRecord
+	err := ts.Gw.Analytics.analyticsSerializer.Decode([]byte(results[0].(string)), &record)
+	require.NoError(t, err)
+
+	assert.Equal(t, http.StatusInternalServerError, record.ResponseCode)
+	assert.NotEmpty(t, record.RawResponse)
+
+	decoded, err := base64.StdEncoding.DecodeString(record.RawResponse)
+	require.NoError(t, err)
+
+	rawResponse := string(decoded)
+	assert.Contains(t, rawResponse, "HTTP/")
+	assert.Contains(t, rawResponse, "500")
+	assert.Contains(t, rawResponse, "Content-Type")
+}
+
+func TestErrorHandler_BackwardCompatibility_WriteResponseFalse(t *testing.T) {
+	ts := StartTest(func(globalConf *config.Config) {
+		globalConf.AnalyticsConfig.EnableDetailedRecording = true
+	})
+	defer ts.Close()
+
+	spec := &APISpec{
+		APIDefinition: &apidef.APIDefinition{
+			APIID:  "test-api",
+			OrgID:  "test-org",
+			Name:   "Test API",
+			Proxy:  apidef.ProxyConfig{},
+			Domain: "",
+		},
+		GlobalConfig: ts.Gw.GetConfig(),
+	}
+
+	handler := ErrorHandler{
+		BaseMiddleware: &BaseMiddleware{
+			Spec: spec,
+			Gw:   ts.Gw,
+		},
+	}
+
+	ts.Gw.Analytics.Flush()
+	ts.Gw.Analytics.Store.GetAndDeleteSet(analyticsKeyName)
+
+	w := httptest.NewRecorder()
+	r := httptest.NewRequest(http.MethodGet, "/test", nil)
+	ctxSetRequestStartTime(r, time.Now())
+
+	handler.HandleError(w, r, "Test error", http.StatusForbidden, false)
+
+	ts.Gw.Analytics.Flush()
+
+	results := ts.Gw.Analytics.Store.GetAndDeleteSet(analyticsKeyName)
+	require.Len(t, results, 1, "Analytics must be recorded even when writeResponse=false")
+
+	var record analytics.AnalyticsRecord
+	err := ts.Gw.Analytics.analyticsSerializer.Decode([]byte(results[0].(string)), &record)
+	require.NoError(t, err)
+
+	assert.Equal(t, http.StatusForbidden, record.ResponseCode)
+	assert.Equal(t, "", w.Body.String(), "No response should be written when writeResponse=false")
+}
+
+func TestErrorHandler_BackwardCompatibility_AccessLogStatusCode(t *testing.T) {
+	ts := StartTest(func(globalConf *config.Config) {
+		globalConf.AccessLogs.Enabled = true
+	})
+	defer ts.Close()
+
+	spec := &APISpec{
+		APIDefinition: &apidef.APIDefinition{
+			APIID:  "test-api",
+			OrgID:  "test-org",
+			Name:   "Test API",
+			Proxy:  apidef.ProxyConfig{},
+			Domain: "",
+		},
+		GlobalConfig: ts.Gw.GetConfig(),
+	}
+
+	handler := ErrorHandler{
+		BaseMiddleware: &BaseMiddleware{
+			Spec: spec,
+			Gw:   ts.Gw,
+		},
+	}
+
+	t.Run("writeResponse=false results in StatusCode=0 for access log", func(t *testing.T) {
+		w := httptest.NewRecorder()
+		r := httptest.NewRequest(http.MethodGet, "/test", nil)
+		ctxSetRequestStartTime(r, time.Now())
+
+		handler.HandleError(w, r, "Test error", http.StatusForbidden, false)
+	})
+
+	t.Run("writeResponse=true results in StatusCode=errCode for access log", func(t *testing.T) {
+		w := httptest.NewRecorder()
+		r := httptest.NewRequest(http.MethodGet, "/test", nil)
+		ctxSetRequestStartTime(r, time.Now())
+
+		handler.HandleError(w, r, "Test error", http.StatusForbidden, true)
+
+		assert.Equal(t, http.StatusForbidden, w.Code)
+	})
+}
+
+func TestErrorHandler_BackwardCompatibility_MCPNonJSONRPC(t *testing.T) {
+	ts := StartTest(func(globalConf *config.Config) {
+		globalConf.AnalyticsConfig.EnableDetailedRecording = true
+	})
+	defer ts.Close()
+
+	spec := &APISpec{
+		APIDefinition: &apidef.APIDefinition{
+			APIID:  "test-api",
+			OrgID:  "test-org",
+			Name:   "Test API",
+			Proxy:  apidef.ProxyConfig{},
+			Domain: "",
+		},
+		GlobalConfig: ts.Gw.GetConfig(),
+	}
+	spec.MarkAsMCP()
+
+	handler := ErrorHandler{
+		BaseMiddleware: &BaseMiddleware{
+			Spec: spec,
+			Gw:   ts.Gw,
+		},
+	}
+
+	ts.Gw.Analytics.Flush()
+	ts.Gw.Analytics.Store.GetAndDeleteSet(analyticsKeyName)
+
+	w := httptest.NewRecorder()
+	r := httptest.NewRequest(http.MethodGet, "/test", nil)
+	ctxSetRequestStartTime(r, time.Now())
+
+	handler.HandleError(w, r, "Test error", http.StatusForbidden, true)
+
+	assert.Equal(t, http.StatusForbidden, w.Code)
+	assert.NotContains(t, w.Body.String(), "jsonrpc")
+	assert.Contains(t, w.Body.String(), "error")
+
+	ts.Gw.Analytics.Flush()
+
+	results := ts.Gw.Analytics.Store.GetAndDeleteSet(analyticsKeyName)
+	require.Len(t, results, 1)
+
+	var record analytics.AnalyticsRecord
+	err := ts.Gw.Analytics.analyticsSerializer.Decode([]byte(results[0].(string)), &record)
+	require.NoError(t, err)
+
+	assert.Equal(t, http.StatusForbidden, record.ResponseCode)
+}
+
+func TestErrorHandler_BackwardCompatibility_DoNotTrack(t *testing.T) {
+	ts := StartTest(func(globalConf *config.Config) {
+		globalConf.AnalyticsConfig.EnableDetailedRecording = true
+	})
+	defer ts.Close()
+
+	spec := &APISpec{
+		APIDefinition: &apidef.APIDefinition{
+			APIID:      "test-api",
+			OrgID:      "test-org",
+			Name:       "Test API",
+			Proxy:      apidef.ProxyConfig{},
+			Domain:     "",
+			DoNotTrack: true,
+		},
+		GlobalConfig: ts.Gw.GetConfig(),
+	}
+
+	handler := ErrorHandler{
+		BaseMiddleware: &BaseMiddleware{
+			Spec: spec,
+			Gw:   ts.Gw,
+		},
+	}
+
+	ts.Gw.Analytics.Flush()
+	ts.Gw.Analytics.Store.GetAndDeleteSet(analyticsKeyName)
+
+	w := httptest.NewRecorder()
+	r := httptest.NewRequest(http.MethodGet, "/test", nil)
+	ctxSetRequestStartTime(r, time.Now())
+
+	handler.HandleError(w, r, "Test error", http.StatusForbidden, true)
+
+	ts.Gw.Analytics.Flush()
+
+	results := ts.Gw.Analytics.Store.GetAndDeleteSet(analyticsKeyName)
+	assert.Len(t, results, 0, "No analytics should be recorded when DoNotTrack=true")
+}
+
+func TestErrorHandler_JSONRPCStillWorks(t *testing.T) {
+	ts := StartTest(func(globalConf *config.Config) {
+		globalConf.AnalyticsConfig.EnableDetailedRecording = true
+	})
+	defer ts.Close()
+
+	spec := &APISpec{
+		APIDefinition: &apidef.APIDefinition{
+			APIID:          "test-api",
+			OrgID:          "test-org",
+			Name:           "Test API",
+			Proxy:          apidef.ProxyConfig{},
+			Domain:         "",
+			JsonRpcVersion: apidef.JsonRPC20,
+		},
+		GlobalConfig: ts.Gw.GetConfig(),
+	}
+	spec.MarkAsMCP()
+
+	handler := ErrorHandler{
+		BaseMiddleware: &BaseMiddleware{
+			Spec: spec,
+			Gw:   ts.Gw,
+		},
+	}
+
+	ts.Gw.Analytics.Flush()
+	ts.Gw.Analytics.Store.GetAndDeleteSet(analyticsKeyName)
+
+	w := httptest.NewRecorder()
+	r := httptest.NewRequest(http.MethodPost, "/test", nil)
+	ctxSetRequestStartTime(r, time.Now())
+
+	state := &httpctx.JSONRPCRoutingState{
+		ID: "test-123",
+	}
+	httpctx.SetJSONRPCRoutingState(r, state)
+
+	handler.HandleError(w, r, "Access denied", http.StatusForbidden, true)
+
+	assert.Equal(t, http.StatusForbidden, w.Code)
+
+	body := w.Body.String()
+	assert.Contains(t, body, "jsonrpc")
+	assert.Contains(t, body, "2.0")
+	assert.Contains(t, body, "test-123")
+
+	ts.Gw.Analytics.Flush()
+
+	results := ts.Gw.Analytics.Store.GetAndDeleteSet(analyticsKeyName)
+	require.Len(t, results, 1)
+
+	var record analytics.AnalyticsRecord
+	err := ts.Gw.Analytics.analyticsSerializer.Decode([]byte(results[0].(string)), &record)
+	require.NoError(t, err)
+
+	assert.Equal(t, http.StatusForbidden, record.ResponseCode)
+
+	decoded, err := base64.StdEncoding.DecodeString(record.RawResponse)
+	require.NoError(t, err)
+
+	rawResponse := string(decoded)
+	assert.Contains(t, rawResponse, "HTTP/", "RawResponse should contain full HTTP response")
+	assert.True(t, strings.HasPrefix(rawResponse, "HTTP/"), "RawResponse should start with HTTP status line")
 }

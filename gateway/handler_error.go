@@ -93,20 +93,21 @@ type TemplateExecutor interface {
 // HandleError is the actual error handler and will store the error details in analytics if analytics processing is enabled.
 func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMsg string, errCode int, writeResponse bool) {
 	defer e.Base().UpdateRequestSession(r)
-	response := &http.Response{
-		StatusCode: errCode,
-	}
+	response := &http.Response{}
 
 	latency := e.calculateErrorLatency(r)
+	var responseBodyBytes []byte
 
-	// Check if this should be a JSON-RPC formatted error
 	if e.Spec.IsMCP() && writeResponse && e.shouldWriteJSONRPCError(r) {
-		responseBody := e.writeJSONRPCError(w, r, errMsg, errCode)
-		// Record analytics with full JSON-RPC response
-		if !e.Spec.DoNotTrack && !ctxGetDoNotTrack(r) {
-			e.recordErrorAnalytics(r, response, responseBody, latency)
-		}
+		response.StatusCode = errCode
+		response.Header = http.Header{}
+		response.Header.Set(header.ContentType, header.ApplicationJSON)
+
+		responseBodyBytes = e.writeJSONRPCError(w, r, errMsg, errCode)
+		response.Body = ioutil.NopCloser(bytes.NewReader(responseBodyBytes))
+
 	} else if writeResponse {
+		response.StatusCode = errCode
 		templateExtension, contentType := e.getTemplateExtensionAndContentType(r)
 		tmpl, templateName, finalContentType := e.findErrorTemplate(errCode, templateExtension, contentType)
 
@@ -114,22 +115,16 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 		response.Header = http.Header{}
 		response.Header.Set(header.ContentType, finalContentType)
 
-		//If the config option is not set or is false, add the header
 		if !e.Spec.GlobalConfig.HideGeneratorHeader {
 			w.Header().Add(header.XGenerator, "tyk.io")
 			response.Header.Add(header.XGenerator, "tyk.io")
 		}
 
-		// Close connections
 		if e.Spec.GlobalConfig.CloseConnections {
 			w.Header().Add(header.Connection, "close")
 			response.Header.Add(header.Connection, "close")
-
 		}
 
-		var responseBodyBytes []byte
-
-		// If error is not customized write error in default way
 		if errMsg != errCustomBodyResponse.Error() {
 			w.WriteHeader(errCode)
 			var tmplExecutor TemplateExecutor
@@ -140,7 +135,6 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 			if contentType == header.ApplicationXML || contentType == header.TextXML {
 				apiError.Message = htmltemplate.HTML(errMsg)
 
-				//we look up in the last defined templateName to obtain the template.
 				rawTmpl := e.Gw.templatesRaw.Lookup(templateName)
 				tmplExecutor = rawTmpl
 			}
@@ -152,17 +146,21 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 			response.Body = ioutil.NopCloser(&log)
 			responseBodyBytes = log.Bytes()
 		}
+	}
 
-		// Record analytics for standard error
-		if !e.Spec.DoNotTrack && !ctxGetDoNotTrack(r) {
-			addVersionHeader(w, r, e.Spec.GlobalConfig)
-			e.recordErrorAnalytics(r, response, responseBodyBytes, latency)
-		}
+	if e.Spec.DoNotTrack || ctxGetDoNotTrack(r) {
+		e.RecordAccessLog(r, response, latency)
+		reportHealthValue(e.Spec, BlockedRequestLog, "-1")
+		return
+	}
+
+	ip := request.RealIP(r)
+	if e.Spec.GlobalConfig.StoreAnalytics(ip) {
+		addVersionHeader(w, r, e.Spec.GlobalConfig)
+		e.recordErrorAnalytics(r, response, responseBodyBytes, latency, errCode)
 	}
 
 	e.RecordAccessLog(r, response, latency)
-
-	// Report in health check
 	reportHealthValue(e.Spec, BlockedRequestLog, "-1")
 }
 
@@ -243,11 +241,7 @@ func (e *ErrorHandler) writeJSONRPCError(w http.ResponseWriter, r *http.Request,
 	return jsonrpcerrors.WriteJSONRPCError(w, requestID, httpCode, errMsg)
 }
 
-// recordErrorAnalytics records analytics for errors (extracted for reuse).
-// response should be the HTTP response object with StatusCode and headers set.
-// responseBody should be the full response body sent to the client (JSON-RPC or standard).
-// latency should contain the timing information for this error response.
-func (e *ErrorHandler) recordErrorAnalytics(r *http.Request, response *http.Response, responseBody []byte, latency analytics.Latency) {
+func (e *ErrorHandler) recordErrorAnalytics(r *http.Request, response *http.Response, responseBody []byte, latency analytics.Latency, errCode int) {
 	token := ctxGetAuthToken(r)
 	var alias string
 	ip := request.RealIP(r)
@@ -308,7 +302,7 @@ func (e *ErrorHandler) recordErrorAnalytics(r *http.Request, response *http.Resp
 		Month:         t.Month(),
 		Year:          t.Year(),
 		Hour:          t.Hour(),
-		ResponseCode:  response.StatusCode,
+		ResponseCode:  errCode,
 		APIKey:        token,
 		TimeStamp:     t,
 		APIVersion:    version,
@@ -336,8 +330,9 @@ func (e *ErrorHandler) recordErrorAnalytics(r *http.Request, response *http.Resp
 		r.Write(&wireFormatReq)
 		rawRequest = base64.StdEncoding.EncodeToString(wireFormatReq.Bytes())
 
-		// Record full response body (JSON-RPC or standard error)
-		rawResponse = base64.StdEncoding.EncodeToString(responseBody)
+		var wireFormatRes bytes.Buffer
+		response.Write(&wireFormatRes)
+		rawResponse = base64.StdEncoding.EncodeToString(wireFormatRes.Bytes())
 	}
 
 	record.RawRequest = rawRequest
