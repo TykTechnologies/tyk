@@ -384,7 +384,7 @@ type WebHookHandlerConf struct {
 	// The template to load in order to format the request.
 	TemplatePath string `bson:"template_path" json:"template_path"`
 	// Headers to set when firing the webhook.
-	HeaderList map[string]string `bson:"header_map" json:"header_map"`
+	HeaderList map[string]string `bson:"header_map" json:"header_map" structviewer:"obfuscate"`
 	// The cool-down for the event so it does not trigger again (in seconds).
 	EventTimeout int64 `bson:"event_timeout" json:"event_timeout"`
 }
@@ -1222,7 +1222,7 @@ type Config struct {
 	// Enable Sentry logging
 	UseSentry bool `json:"use_sentry"`
 	// Sentry API code
-	SentryCode string `json:"sentry_code"`
+	SentryCode string `json:"sentry_code" structviewer:"obfuscate"`
 	// Log verbosity for Sentry logging
 	SentryLogLevel string `json:"sentry_log_level"`
 

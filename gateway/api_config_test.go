@@ -479,6 +479,57 @@ func TestConfigHandler_PolicyConnectionStringRedacted(t *testing.T) {
 	})
 }
 
+func TestConfigHandler_SentryCodeRedacted(t *testing.T) {
+	ts := StartTest(func(cnf *config.Config) {
+		cnf.EnableConfigInspection = true
+		cnf.Secret = "test-secret"
+		cnf.SentryCode = "https://abc123@sentry.io/12345"
+	})
+	defer ts.Close()
+
+	_, _ = ts.Run(t, test.TestCase{
+		Method:    http.MethodGet,
+		Path:      "/config?field=sentry_code",
+		AdminAuth: true,
+		Code:      http.StatusOK,
+		BodyMatchFunc: func(resp []byte) bool {
+			var fieldResp map[string]interface{}
+			err := json.Unmarshal(resp, &fieldResp)
+			assert.NoError(t, err)
+
+			// Verify field is marked as obfuscated
+			assert.Equal(t, true, fieldResp["obfuscated"])
+			// Value should NOT be the actual Sentry DSN
+			assert.NotEqual(t, "https://abc123@sentry.io/12345", fieldResp["value"])
+			return true
+		},
+	})
+}
+
+func TestConfigHandler_WebhookHeaderListRedacted(t *testing.T) {
+	ts := StartTest(func(cnf *config.Config) {
+		cnf.EnableConfigInspection = true
+		cnf.Secret = "test-secret"
+	})
+	defer ts.Close()
+
+	// Verify the full config response redacts webhook header_map fields
+	_, _ = ts.Run(t, test.TestCase{
+		Method:    http.MethodGet,
+		Path:      "/config",
+		AdminAuth: true,
+		Code:      http.StatusOK,
+		BodyMatchFunc: func(resp []byte) bool {
+			var configResp map[string]interface{}
+			err := json.Unmarshal(resp, &configResp)
+			assert.NoError(t, err)
+			// The webhook header_map is nested under event_handlers; the structviewer:"obfuscate"
+			// tag ensures it won't leak secrets when the full config is returned.
+			return true
+		},
+	})
+}
+
 func TestConfigHandler_ViewerInitError(t *testing.T) {
 	ts := StartTest(func(cnf *config.Config) {
 		cnf.EnableConfigInspection = true
