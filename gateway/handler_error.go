@@ -18,6 +18,8 @@ import (
 	"github.com/TykTechnologies/tyk/config"
 
 	"github.com/TykTechnologies/tyk/header"
+	"github.com/TykTechnologies/tyk/internal/httpctx"
+	jsonrpcerrors "github.com/TykTechnologies/tyk/internal/jsonrpc/errors"
 	"github.com/TykTechnologies/tyk/request"
 )
 
@@ -93,63 +95,38 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 	defer e.Base().UpdateRequestSession(r)
 	response := &http.Response{}
 
-	if writeResponse {
-		var templateExtension string
-		contentType := r.Header.Get(header.ContentType)
-		contentType = strings.Split(contentType, ";")[0]
+	latency := e.calculateErrorLatency(r)
+	var responseBodyBytes []byte
 
-		switch contentType {
-		case header.ApplicationXML:
-			templateExtension = "xml"
-			contentType = header.ApplicationXML
-		case header.TextXML:
-			templateExtension = "xml"
-			contentType = header.TextXML
-		default:
-			templateExtension = "json"
-			contentType = header.ApplicationJSON
-		}
-
-		w.Header().Set(header.ContentType, contentType)
+	if e.Spec.IsMCP() && writeResponse && e.shouldWriteJSONRPCError(r) {
+		response.StatusCode = errCode
 		response.Header = http.Header{}
-		response.Header.Set(header.ContentType, contentType)
-		templateName := "error_" + strconv.Itoa(errCode) + "." + templateExtension
+		response.Header.Set(header.ContentType, header.ApplicationJSON)
 
-		// Try to use an error template that matches the HTTP error code and the content type: 500.json, 400.xml, etc.
-		tmpl := e.Gw.templates.Lookup(templateName)
+		responseBodyBytes = e.writeJSONRPCError(w, r, errMsg, errCode)
+		response.Body = ioutil.NopCloser(bytes.NewReader(responseBodyBytes))
 
-		// Fallback to a generic error template, but match the content type: error.json, error.xml, etc.
-		if tmpl == nil {
-			templateName = defaultTemplateName + "." + templateExtension
-			tmpl = e.Gw.templates.Lookup(templateName)
-		}
+	} else if writeResponse {
+		response.StatusCode = errCode
+		templateExtension, contentType := e.getTemplateExtensionAndContentType(r)
+		tmpl, templateName, finalContentType := e.findErrorTemplate(errCode, templateExtension, contentType)
 
-		// If no template is available for this content type, fallback to "error.json".
-		if tmpl == nil {
-			templateName = defaultTemplateName + "." + defaultTemplateFormat
-			tmpl = e.Gw.templates.Lookup(templateName)
-			w.Header().Set(header.ContentType, defaultContentType)
-			response.Header.Set(header.ContentType, defaultContentType)
+		w.Header().Set(header.ContentType, finalContentType)
+		response.Header = http.Header{}
+		response.Header.Set(header.ContentType, finalContentType)
 
-		}
-
-		//If the config option is not set or is false, add the header
 		if !e.Spec.GlobalConfig.HideGeneratorHeader {
 			w.Header().Add(header.XGenerator, "tyk.io")
 			response.Header.Add(header.XGenerator, "tyk.io")
 		}
 
-		// Close connections
 		if e.Spec.GlobalConfig.CloseConnections {
 			w.Header().Add(header.Connection, "close")
 			response.Header.Add(header.Connection, "close")
-
 		}
 
-		// If error is not customized write error in default way
 		if errMsg != errCustomBodyResponse.Error() {
 			w.WriteHeader(errCode)
-			response.StatusCode = errCode
 			var tmplExecutor TemplateExecutor
 			tmplExecutor = tmpl
 
@@ -158,7 +135,6 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 			if contentType == header.ApplicationXML || contentType == header.TextXML {
 				apiError.Message = htmltemplate.HTML(errMsg)
 
-				//we look up in the last defined templateName to obtain the template.
 				rawTmpl := e.Gw.templatesRaw.Lookup(templateName)
 				tmplExecutor = rawTmpl
 			}
@@ -168,20 +144,39 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 			rsp := io.MultiWriter(w, &log)
 			tmplExecutor.Execute(rsp, &apiError)
 			response.Body = ioutil.NopCloser(&log)
+			responseBodyBytes = log.Bytes()
 		}
 	}
 
 	if e.Spec.DoNotTrack || ctxGetDoNotTrack(r) {
+		e.RecordAccessLog(r, response, latency)
+		reportHealthValue(e.Spec, BlockedRequestLog, "-1")
 		return
 	}
 
-	// Track the key ID if it exists
-	token := ctxGetAuthToken(r)
-	var alias string
-
 	ip := request.RealIP(r)
+	if e.Spec.GlobalConfig.StoreAnalytics(ip) {
+		addVersionHeader(w, r, e.Spec.GlobalConfig)
+		e.recordErrorAnalytics(r, response, latency, errCode)
+	}
 
-	// Calculate latency for error responses
+	e.RecordAccessLog(r, response, latency)
+	reportHealthValue(e.Spec, BlockedRequestLog, "-1")
+}
+
+// shouldWriteJSONRPCError returns true if this error should be formatted as JSON-RPC.
+func (e *ErrorHandler) shouldWriteJSONRPCError(r *http.Request) bool {
+	if e.Spec.JsonRpcVersion != apidef.JsonRPC20 {
+		return false
+	}
+
+	routingState := httpctx.GetJSONRPCRoutingState(r)
+	return routingState != nil
+}
+
+// calculateErrorLatency calculates latency for error responses.
+// For errors, upstream latency is 0 since no successful upstream response occurred.
+func (e *ErrorHandler) calculateErrorLatency(r *http.Request) analytics.Latency {
 	var latency analytics.Latency
 	if requestStartTime := ctxGetRequestStartTime(r); !requestStartTime.IsZero() {
 		totalMs := int64(DurationToMillisecond(time.Since(requestStartTime)))
@@ -191,141 +186,187 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 			Gateway:  totalMs, // All time is gateway time for errors
 		}
 	}
+	return latency
+}
 
-	if e.Spec.GlobalConfig.StoreAnalytics(ip) {
+// getTemplateExtensionAndContentType determines the template extension and content type
+// based on the request's Content-Type header.
+func (e *ErrorHandler) getTemplateExtensionAndContentType(r *http.Request) (string, string) {
+	contentType := r.Header.Get(header.ContentType)
+	contentType = strings.Split(contentType, ";")[0]
 
-		t := time.Now()
+	switch contentType {
+	case header.ApplicationXML:
+		return "xml", header.ApplicationXML
+	case header.TextXML:
+		return "xml", header.TextXML
+	default:
+		return "json", header.ApplicationJSON
+	}
+}
 
-		addVersionHeader(w, r, e.Spec.GlobalConfig)
+// findErrorTemplate finds an appropriate error template using a fallback chain:
+// 1. Try error_{code}.{ext} (e.g., error_500.json)
+// 2. Fallback to error.{ext} (e.g., error.json)
+// 3. Final fallback to error.json with default content type
+// Returns: (template, templateName, contentType)
+func (e *ErrorHandler) findErrorTemplate(errCode int, templateExtension string, contentType string) (*htmltemplate.Template, string, string) {
+	// Try to use an error template that matches the HTTP error code and the content type
+	templateName := "error_" + strconv.Itoa(errCode) + "." + templateExtension
+	tmpl := e.Gw.templates.Lookup(templateName)
 
-		version := e.Spec.getVersionFromRequest(r)
+	// Fallback to a generic error template, but match the content type
+	if tmpl == nil {
+		templateName = defaultTemplateName + "." + templateExtension
+		tmpl = e.Gw.templates.Lookup(templateName)
+	}
 
-		if version == "" {
-			version = "Non Versioned"
-		}
+	// If no template is available for this content type, fallback to error.json
+	if tmpl == nil {
+		templateName = defaultTemplateName + "." + defaultTemplateFormat
+		tmpl = e.Gw.templates.Lookup(templateName)
+		contentType = defaultContentType
+	}
 
-		if e.Spec.Proxy.StripListenPath {
-			r.URL.Path = e.Spec.StripListenPath(r.URL.Path)
-		}
+	return tmpl, templateName, contentType
+}
 
-		oauthClientID := ""
-		session := ctxGetSession(r)
-		tags := make([]string, 0, estimateTagsCapacity(session, e.Spec))
+// writeJSONRPCError writes an error in JSON-RPC 2.0 format and returns the response body.
+func (e *ErrorHandler) writeJSONRPCError(w http.ResponseWriter, r *http.Request, errMsg string, httpCode int) []byte {
+	var requestID interface{}
+	if state := httpctx.GetJSONRPCRoutingState(r); state != nil {
+		requestID = state.ID
+	}
 
-		if session != nil {
-			oauthClientID = session.OauthClientID
-			alias = session.Alias
-			tags = append(tags, getSessionTags(session)...)
-		}
+	return jsonrpcerrors.WriteJSONRPCError(w, requestID, httpCode, errMsg)
+}
 
-		if len(e.Spec.TagHeaders) > 0 {
-			tags = tagHeaders(r, e.Spec.TagHeaders, tags)
-		}
+func (e *ErrorHandler) recordErrorAnalytics(r *http.Request, response *http.Response, latency analytics.Latency, errCode int) {
+	token := ctxGetAuthToken(r)
+	var alias string
+	ip := request.RealIP(r)
 
-		if len(e.Spec.Tags) > 0 {
-			tags = append(tags, e.Spec.Tags...)
-		}
-		trackEP := false
-		trackedPath := r.URL.Path
+	if !e.Spec.GlobalConfig.StoreAnalytics(ip) {
+		return
+	}
 
-		if p := ctxGetTrackedPath(r); p != "" {
-			trackEP = true
-			trackedPath = p
-		}
+	t := time.Now()
 
-		host := r.URL.Host
+	version := e.Spec.getVersionFromRequest(r)
+	if version == "" {
+		version = "Non Versioned"
+	}
 
-		if host == "" && e.Spec.target != nil {
-			host = e.Spec.target.Host
-		}
+	if e.Spec.Proxy.StripListenPath {
+		r.URL.Path = e.Spec.StripListenPath(r.URL.Path)
+	}
 
-		record := analytics.AnalyticsRecord{
-			Method:        r.Method,
-			Host:          host,
-			Path:          trackedPath,
-			RawPath:       r.URL.Path,
-			ContentLength: r.ContentLength,
-			UserAgent:     r.Header.Get(header.UserAgent),
-			Day:           t.Day(),
-			Month:         t.Month(),
-			Year:          t.Year(),
-			Hour:          t.Hour(),
-			ResponseCode:  errCode,
-			APIKey:        token,
-			TimeStamp:     t,
-			APIVersion:    version,
-			APIName:       e.Spec.Name,
-			APIID:         e.Spec.APIID,
-			OrgID:         e.Spec.OrgID,
-			OauthID:       oauthClientID,
-			RequestTime:   latency.Total,
-			Latency:       latency,
-			IPAddress:     ip,
-			Geo:           analytics.GeoData{},
-			Network:       analytics.NetworkStats{},
-			Tags:          tags,
-			Alias:         alias,
-			TrackPath:     trackEP,
-			ExpireAt:      t,
-		}
-		recordGraphDetails(&record, r, response, e.Spec)
+	oauthClientID := ""
+	session := ctxGetSession(r)
+	tags := make([]string, 0, estimateTagsCapacity(session, e.Spec))
 
-		rawRequest := ""
-		rawResponse := ""
-		if recordDetail(r, e.Spec) {
+	if session != nil {
+		oauthClientID = session.OauthClientID
+		alias = session.Alias
+		tags = append(tags, getSessionTags(session)...)
+	}
 
-			// Get the wire format representation
+	if len(e.Spec.TagHeaders) > 0 {
+		tags = tagHeaders(r, e.Spec.TagHeaders, tags)
+	}
 
-			var wireFormatReq bytes.Buffer
-			r.Write(&wireFormatReq)
-			rawRequest = base64.StdEncoding.EncodeToString(wireFormatReq.Bytes())
+	if len(e.Spec.Tags) > 0 {
+		tags = append(tags, e.Spec.Tags...)
+	}
 
-			var wireFormatRes bytes.Buffer
-			response.Write(&wireFormatRes)
-			rawResponse = base64.StdEncoding.EncodeToString(wireFormatRes.Bytes())
+	trackEP := false
+	trackedPath := r.URL.Path
+	if p := ctxGetTrackedPath(r); p != "" {
+		trackEP = true
+		trackedPath = p
+	}
 
-		}
+	host := r.URL.Host
+	if host == "" && e.Spec.target != nil {
+		host = e.Spec.target.Host
+	}
 
-		record.RawRequest = rawRequest
-		record.RawResponse = rawResponse
+	record := analytics.AnalyticsRecord{
+		Method:        r.Method,
+		Host:          host,
+		Path:          trackedPath,
+		RawPath:       r.URL.Path,
+		ContentLength: r.ContentLength,
+		UserAgent:     r.Header.Get(header.UserAgent),
+		Day:           t.Day(),
+		Month:         t.Month(),
+		Year:          t.Year(),
+		Hour:          t.Hour(),
+		ResponseCode:  errCode,
+		APIKey:        token,
+		TimeStamp:     t,
+		APIVersion:    version,
+		APIName:       e.Spec.Name,
+		APIID:         e.Spec.APIID,
+		OrgID:         e.Spec.OrgID,
+		OauthID:       oauthClientID,
+		RequestTime:   latency.Total,
+		Latency:       latency,
+		IPAddress:     ip,
+		Geo:           analytics.GeoData{},
+		Network:       analytics.NetworkStats{},
+		Tags:          tags,
+		Alias:         alias,
+		TrackPath:     trackEP,
+		ExpireAt:      t,
+	}
 
-		if e.Spec.GlobalConfig.AnalyticsConfig.EnableGeoIP {
-			record.GetGeo(ip, e.Gw.Analytics.GeoIPDB)
-		}
-		if e.Spec.GraphQL.Enabled && e.Spec.GraphQL.ExecutionMode != apidef.GraphQLExecutionModeSubgraph {
-			record.Tags = append(record.Tags, "tyk-graph-analytics")
-			record.ApiSchema = base64.StdEncoding.EncodeToString([]byte(e.Spec.GraphQL.Schema))
-		}
+	recordGraphDetails(&record, r, response, e.Spec)
 
-		expiresAfter := e.Spec.ExpireAnalyticsAfter
+	rawRequest := ""
+	rawResponse := ""
+	if recordDetail(r, e.Spec) {
+		var wireFormatReq bytes.Buffer
+		r.Write(&wireFormatReq)
+		rawRequest = base64.StdEncoding.EncodeToString(wireFormatReq.Bytes())
 
-		if e.Spec.GlobalConfig.EnforceOrgDataAge {
-			orgExpireDataTime := e.OrgSessionExpiry(e.Spec.OrgID)
+		var wireFormatRes bytes.Buffer
+		response.Write(&wireFormatRes)
+		rawResponse = base64.StdEncoding.EncodeToString(wireFormatRes.Bytes())
+	}
 
-			if orgExpireDataTime > 0 {
-				expiresAfter = orgExpireDataTime
-			}
-		}
+	record.RawRequest = rawRequest
+	record.RawResponse = rawResponse
 
-		record.SetExpiry(expiresAfter)
+	if e.Spec.GlobalConfig.AnalyticsConfig.EnableGeoIP {
+		record.GetGeo(ip, e.Gw.Analytics.GeoIPDB)
+	}
 
-		if e.Spec.GlobalConfig.AnalyticsConfig.NormaliseUrls.Enabled {
-			NormalisePath(&record, &e.Spec.GlobalConfig)
-		}
+	if e.Spec.GraphQL.Enabled && e.Spec.GraphQL.ExecutionMode != apidef.GraphQLExecutionModeSubgraph {
+		record.Tags = append(record.Tags, "tyk-graph-analytics")
+		record.ApiSchema = base64.StdEncoding.EncodeToString([]byte(e.Spec.GraphQL.Schema))
+	}
 
-		if e.Spec.AnalyticsPlugin.Enabled {
-			_ = e.Spec.AnalyticsPluginConfig.processRecord(&record)
-		}
-
-		err := e.Gw.Analytics.RecordHit(&record)
-
-		if err != nil {
-			log.WithError(err).Error("could not store analytic record")
+	expiresAfter := e.Spec.ExpireAnalyticsAfter
+	if e.Spec.GlobalConfig.EnforceOrgDataAge {
+		orgExpireDataTime := e.OrgSessionExpiry(e.Spec.OrgID)
+		if orgExpireDataTime > 0 {
+			expiresAfter = orgExpireDataTime
 		}
 	}
 
-	e.RecordAccessLog(r, response, latency)
+	record.SetExpiry(expiresAfter)
 
-	// Report in health check
-	reportHealthValue(e.Spec, BlockedRequestLog, "-1")
+	if e.Spec.GlobalConfig.AnalyticsConfig.NormaliseUrls.Enabled {
+		NormalisePath(&record, &e.Spec.GlobalConfig)
+	}
+
+	if e.Spec.AnalyticsPlugin.Enabled {
+		_ = e.Spec.AnalyticsPluginConfig.processRecord(&record)
+	}
+
+	err := e.Gw.Analytics.RecordHit(&record)
+	if err != nil {
+		log.WithError(err).Error("could not store analytic record")
+	}
 }
