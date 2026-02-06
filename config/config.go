@@ -302,6 +302,7 @@ type AccessLogsConfig struct {
 	// Template Options:
 	//
 	// - `api_key` will include the obfuscated or hashed key.
+	// - `cache_hit` will include whether the response was served from cache (true/false).
 	// - `circuit_breaker_state` will include the circuit breaker state when applicable.
 	// - `client_ip` will include the IP of the request.
 	// - `error_source` will include the source of an error (e.g., ReverseProxy).

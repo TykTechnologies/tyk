@@ -3564,6 +3564,14 @@ func ctxGetRequestStatus(r *http.Request) (stat RequestStatus) {
 	return
 }
 
+func ctxSetCacheHit(r *http.Request, hit bool) {
+	ctx.WithCacheHit(r, hit)
+}
+
+func ctxGetCacheHit(r *http.Request) (bool, bool) {
+	return ctx.GetCacheHit(r)
+}
+
 var createOauthClientSecret = func() string {
 	secret := uuid.New()
 	return base64.StdEncoding.EncodeToString([]byte(secret))

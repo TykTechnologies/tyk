@@ -403,6 +403,13 @@ func (s *SuccessHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) *http
 
 	addVersionHeader(w, r, s.Spec.GlobalConfig)
 
+	// Set cache miss if caching is enabled and cache hit not already set
+	if s.Spec.CacheOptions.EnableCache {
+		if _, exists := ctxGetCacheHit(r); !exists {
+			ctxSetCacheHit(r, false)
+		}
+	}
+
 	t1 := time.Now()
 	resp := s.Proxy.ServeHTTP(w, r)
 
@@ -449,6 +456,13 @@ func (s *SuccessHandler) ServeHTTPWithCache(w http.ResponseWriter, r *http.Reque
 
 	// Make sure we get the correct target URL
 	s.Spec.SanitizeProxyPaths(r)
+
+	// Set cache miss if caching is enabled and cache hit not already set
+	if s.Spec.CacheOptions.EnableCache {
+		if _, exists := ctxGetCacheHit(r); !exists {
+			ctxSetCacheHit(r, false)
+		}
+	}
 
 	t1 := time.Now()
 	inRes := s.Proxy.ServeHTTPForCache(w, r)

@@ -137,6 +137,14 @@ func (a *Record) WithErrorClassification(ec *errors.ErrorClassification) *Record
 	return a
 }
 
+// WithCacheHit adds the cache_hit field to the access log record.
+func (a *Record) WithCacheHit(req *http.Request) *Record {
+	if hit, exists := ctx.GetCacheHit(req); exists {
+		a.fields["cache_hit"] = hit
+	}
+	return a
+}
+
 // Fields returns a logrus.Fields intended for logging.
 func (a *Record) Fields(allowedKeys []string) logrus.Fields {
 	return Filter(a.fields, allowedKeys)

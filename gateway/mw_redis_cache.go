@@ -250,6 +250,9 @@ func (m *RedisCacheMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 
 	newRes.Header.Set(cachedResponseHeader, "1")
 
+	// Set cache hit context for access logs
+	ctxSetCacheHit(r, true)
+
 	copyHeader(w.Header(), newRes.Header, m.Gw.GetConfig().IgnoreCanonicalMIMEHeaderKey)
 
 	if reqEtag := r.Header.Get("If-None-Match"); reqEtag != "" {

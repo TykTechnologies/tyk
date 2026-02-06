@@ -2042,6 +2042,30 @@ func TestContextSession(t *testing.T) {
 	ctxSetSession(r, nil, false, false)
 }
 
+func TestCtxCacheHit(t *testing.T) {
+	t.Run("set and get cache hit true", func(t *testing.T) {
+		r := httptest.NewRequest("GET", "/test", nil)
+		ctxSetCacheHit(r, true)
+		hit, exists := ctxGetCacheHit(r)
+		assert.True(t, exists)
+		assert.True(t, hit)
+	})
+
+	t.Run("set and get cache hit false", func(t *testing.T) {
+		r := httptest.NewRequest("GET", "/test", nil)
+		ctxSetCacheHit(r, false)
+		hit, exists := ctxGetCacheHit(r)
+		assert.True(t, exists)
+		assert.False(t, hit)
+	})
+
+	t.Run("get when not set", func(t *testing.T) {
+		r := httptest.NewRequest("GET", "/test", nil)
+		_, exists := ctxGetCacheHit(r)
+		assert.False(t, exists)
+	})
+}
+
 func TestRotateClientSecretHandler(t *testing.T) {
 
 	ts := StartTest(nil)

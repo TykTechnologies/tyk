@@ -465,6 +465,9 @@ func (t *BaseMiddleware) RecordAccessLog(req *http.Request, resp *http.Response,
 		accessLog.WithErrorClassification(errClass)
 	}
 
+	// Add cache hit/miss information if caching is enabled
+	accessLog.WithCacheHit(req)
+
 	// Only include trace_id when OpenTelemetry is enabled
 	if gwConfig.OpenTelemetry.Enabled {
 		accessLog.WithTraceID(req)

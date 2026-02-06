@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/TykTechnologies/tyk-pump/analytics"
+	"github.com/TykTechnologies/tyk/ctx"
 	"github.com/TykTechnologies/tyk/internal/errors"
 	"github.com/TykTechnologies/tyk/internal/httputil/accesslog"
 	"github.com/TykTechnologies/tyk/internal/otel"
@@ -91,8 +92,8 @@ func TestWithTraceID(t *testing.T) {
 				t.Cleanup(func() { span.End() })
 
 				req := httptest.NewRequest(http.MethodGet, "http://example.com/path", nil)
-				ctx := otel.ContextWithSpan(req.Context(), span)
-				return req.WithContext(ctx)
+				spanCtx := otel.ContextWithSpan(req.Context(), span)
+				return req.WithContext(spanCtx)
 			},
 			expectTraceID: true,
 		},
@@ -281,4 +282,76 @@ func TestWithErrorClassification_BuilderChaining(t *testing.T) {
 	result := record.WithErrorClassification(ec)
 
 	assert.Same(t, record, result, "WithErrorClassification should return the same Record for chaining")
+}
+
+func TestWithCacheHit(t *testing.T) {
+	tests := []struct {
+		name           string
+		setupRequest   func(t *testing.T) *http.Request
+		expectedFields logrus.Fields
+	}{
+		{
+			name: "cache hit true",
+			setupRequest: func(t *testing.T) *http.Request {
+				req := httptest.NewRequest(http.MethodGet, "http://example.com/path", nil)
+				ctx.WithCacheHit(req, true)
+				return req
+			},
+			expectedFields: logrus.Fields{
+				"prefix":    "access-log",
+				"cache_hit": true,
+			},
+		},
+		{
+			name: "cache hit false",
+			setupRequest: func(t *testing.T) *http.Request {
+				req := httptest.NewRequest(http.MethodGet, "http://example.com/path", nil)
+				ctx.WithCacheHit(req, false)
+				return req
+			},
+			expectedFields: logrus.Fields{
+				"prefix":    "access-log",
+				"cache_hit": false,
+			},
+		},
+		{
+			name: "cache hit not set - field omitted",
+			setupRequest: func(t *testing.T) *http.Request {
+				return httptest.NewRequest(http.MethodGet, "http://example.com/path", nil)
+			},
+			expectedFields: logrus.Fields{
+				"prefix": "access-log",
+			},
+		},
+		{
+			name: "cache hit wrong type - field omitted",
+			setupRequest: func(t *testing.T) *http.Request {
+				req := httptest.NewRequest(http.MethodGet, "http://example.com/path", nil)
+				reqCtx := context.WithValue(req.Context(), ctx.CacheHit, "not a bool")
+				return req.WithContext(reqCtx)
+			},
+			expectedFields: logrus.Fields{
+				"prefix": "access-log",
+			},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			req := tc.setupRequest(t)
+			record := accesslog.NewRecord().WithCacheHit(req)
+			fields := record.Fields(nil)
+			assert.Equal(t, tc.expectedFields, fields)
+		})
+	}
+}
+
+func TestWithCacheHit_BuilderChaining(t *testing.T) {
+	req := httptest.NewRequest(http.MethodGet, "http://example.com/path", nil)
+	ctx.WithCacheHit(req, true)
+
+	record := accesslog.NewRecord()
+	result := record.WithCacheHit(req)
+
+	assert.Same(t, record, result, "WithCacheHit should return the same Record for chaining")
 }

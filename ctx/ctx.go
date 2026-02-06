@@ -60,6 +60,8 @@ const (
 	ErrorClassification
 	// MCPRouting indicates the request came via MCP JSON-RPC routing
 	MCPRouting
+	// CacheHit indicates whether the response was served from cache (true) or upstream (false)
+	CacheHit
 )
 
 func ctxSetSession(r *http.Request, s *user.SessionState, scheduleUpdate bool, hashKey bool) {
@@ -175,4 +177,23 @@ func GetErrorClassification(r *http.Request) *errors.ErrorClassification {
 		}
 	}
 	return nil
+}
+
+// WithCacheHit sets the cache hit status in the request context.
+// This indicates whether the response was served from cache (true) or upstream (false).
+func WithCacheHit(r *http.Request, hit bool) {
+	ctx := r.Context()
+	ctx = context.WithValue(ctx, CacheHit, hit)
+	core.SetContext(r, ctx)
+}
+
+// GetCacheHit retrieves the cache hit status from the request context.
+// Returns the cache hit status and a boolean indicating if the value was set.
+func GetCacheHit(r *http.Request) (bool, bool) {
+	if v := r.Context().Value(CacheHit); v != nil {
+		if val, ok := v.(bool); ok {
+			return val, true
+		}
+	}
+	return false, false
 }
