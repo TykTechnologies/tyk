@@ -491,6 +491,9 @@
     "bundle_insecure_skip_verify": {
       "type": "boolean"
     },
+    "skip_verify_existing_plugin_bundle": {
+      "type": "boolean"
+    },
     "enable_custom_domains": {
       "type": "boolean"
     },
@@ -1131,6 +1134,9 @@
             "type": "object"
           }
         },
+        "allow_unsafe_dynamic_mtls_token": {
+          "type": "boolean"
+        },
         "certificates": {
           "type": ["object", "null"],
           "additionalProperties": false,
@@ -1390,6 +1396,24 @@
       "type": ["object", "null"],
       "additionalProperties": true,
       "properties": {}
+    },
+    "jwks": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "properties": {
+        "cache": {
+          "type": ["object", "null"],
+          "additionalProperties": false,
+          "properties": {
+            "timeout": {
+              "type": ["integer"],
+              "description": "Cache timeout in seconds",
+              "minimum": 0,
+              "default": 240
+            }
+          }
+        }
+      }
     }
   }
 }

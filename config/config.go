@@ -301,18 +301,29 @@ type AccessLogsConfig struct {
 	//
 	// Template Options:
 	//
-	// - `api_key` will include they obfuscated or hashed key.
-	// - `client_ip` will include the ip of the request.
+	// - `api_key` will include the obfuscated or hashed key.
+	// - `circuit_breaker_state` will include the circuit breaker state when applicable.
+	// - `client_ip` will include the IP of the request.
+	// - `error_source` will include the source of an error (e.g., ReverseProxy).
+	// - `error_target` will include the target that caused an error.
 	// - `host` will include the host of the request.
+	// - `latency_gateway` will include the gateway processing latency.
+	// - `latency_total` will include the total latency of the request.
 	// - `method` will include the request method.
+	// - `org_id` will include the organization ID.
 	// - `path` will include the path of the request.
 	// - `protocol` will include the protocol of the request.
 	// - `remote_addr` will include the remote address of the request.
-	// - `upstream_addr` will include the upstream address (scheme, host and path)
-	// - `upstream_latency` will include the upstream latency of the request.
-	// - `latency_total` will include the total latency of the request.
-	// - `user_agent` will include the user agent of the request.
+	// - `response_code_details` will include detailed error description for 5XX responses.
+	// - `response_flag` will include the error classification flag (e.g., URT, UCF, TLE).
 	// - `status` will include the response status code.
+	// - `tls_cert_expiry` will include the TLS certificate expiry date when applicable.
+	// - `tls_cert_subject` will include the TLS certificate subject when applicable.
+	// - `trace_id` will include the OpenTelemetry trace ID when tracing is enabled.
+	// - `upstream_addr` will include the upstream address (scheme, host and path).
+	// - `upstream_latency` will include the upstream latency of the request.
+	// - `upstream_status` will include the upstream response status code for 5XX responses.
+	// - `user_agent` will include the user agent of the request.
 	Template []string `json:"template"`
 }
 
@@ -700,10 +711,26 @@ type SecurityConfig struct {
 	// Specify public keys used for Certificate Pinning on global level.
 	PinnedPublicKeys map[string]string `json:"pinned_public_keys"`
 
+	// AllowUnsafeDynamicMTLSToken controls whether certificate presence is required for
+	// dynamic mTLS authentication. If set to false (default), requests with a token but
+	// no certificate will be rejected for APIs using dynamic mTLS.
+	AllowUnsafeDynamicMTLSToken bool `json:"allow_unsafe_dynamic_mtls_token"`
+
 	Certificates CertificatesConfig `json:"certificates"`
 
 	// CertificateExpiryMonitor configures the certificate expiry monitoring and notification feature
 	CertificateExpiryMonitor CertificateExpiryMonitorConfig `json:"certificate_expiry_monitor"`
+}
+
+type JWKSConfig struct {
+	// Cache hodls configuration for JWKS caching
+	Cache JWKSCacheConfig `json:"cache"`
+}
+
+type JWKSCacheConfig struct {
+	// Timeout defines how long the JWKS will be kept in the cache before forcing a refresh from the JWKS endpoint.
+	// Default is 240 seconds (4 minutes). Set to 0 to use the default value.
+	Timeout int64 `json:"timeout"`
 }
 
 type NewRelicConfig struct {
@@ -1112,6 +1139,9 @@ type Config struct {
 	// Disable TLS validation for bundle URLs
 	BundleInsecureSkipVerify bool `bson:"bundle_insecure_skip_verify" json:"bundle_insecure_skip_verify"`
 
+	// SkipVerifyExistingPluginBundle skips checksum verification for plugin bundles already on disk.
+	SkipVerifyExistingPluginBundle bool `bson:"skip_verify_existing_plugin_bundle" json:"skip_verify_existing_plugin_bundle"`
+
 	// Set to true if you are using JSVM custom middleware or virtual endpoints.
 	EnableJSVM bool `json:"enable_jsvm"`
 
@@ -1294,6 +1324,9 @@ type Config struct {
 	Streaming StreamingConfig `json:"streaming"`
 
 	Labs LabsConfig `json:"labs"`
+
+	// JWKS holds the configuration for Tyk JWKS functionalities
+	JWKS JWKSConfig `json:"jwks"`
 }
 
 // LabsConfig include config for streaming

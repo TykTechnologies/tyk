@@ -28,6 +28,7 @@ const (
 
 	MsgAuthFieldMissing                        = "Authorization field missing"
 	MsgApiAccessDisallowed                     = "Access to this API has been disallowed"
+	MsgAuthCertRequired                        = "Client certificate required"
 	MsgBearerMailformed                        = "Bearer token malformed"
 	MsgKeyNotAuthorized                        = "Key not authorised"
 	MsgOauthClientRevoked                      = "Key not authorised. OAuth client access was revoked"
@@ -180,6 +181,17 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 
 	ip := request.RealIP(r)
 
+	// Calculate latency for error responses
+	var latency analytics.Latency
+	if requestStartTime := ctxGetRequestStartTime(r); !requestStartTime.IsZero() {
+		totalMs := int64(DurationToMillisecond(time.Since(requestStartTime)))
+		latency = analytics.Latency{
+			Total:    totalMs,
+			Upstream: 0,       // No successful upstream response for errors
+			Gateway:  totalMs, // All time is gateway time for errors
+		}
+	}
+
 	if e.Spec.GlobalConfig.StoreAnalytics(ip) {
 
 		t := time.Now()
@@ -246,8 +258,8 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 			APIID:         e.Spec.APIID,
 			OrgID:         e.Spec.OrgID,
 			OauthID:       oauthClientID,
-			RequestTime:   0,
-			Latency:       analytics.Latency{},
+			RequestTime:   latency.Total,
+			Latency:       latency,
 			IPAddress:     ip,
 			Geo:           analytics.GeoData{},
 			Network:       analytics.NetworkStats{},
@@ -312,7 +324,7 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 		}
 	}
 
-	e.RecordAccessLog(r, response, analytics.Latency{})
+	e.RecordAccessLog(r, response, latency)
 
 	// Report in health check
 	reportHealthValue(e.Spec, BlockedRequestLog, "-1")

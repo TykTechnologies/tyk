@@ -3,6 +3,7 @@ package ctx_test
 import (
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/stretchr/testify/assert"
@@ -10,6 +11,7 @@ import (
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/apidef/oas"
 	"github.com/TykTechnologies/tyk/ctx"
+	"github.com/TykTechnologies/tyk/internal/errors"
 	"github.com/TykTechnologies/tyk/internal/uuid"
 )
 
@@ -81,4 +83,106 @@ func BenchmarkGetOASDefinition(b *testing.B) {
 		cloned := ctx.GetOASDefinition(req)
 		assert.Equal(b, oasDef, cloned)
 	}
+}
+
+// TestContextKeyUniqueness verifies all context keys have unique values
+func TestContextKeyUniqueness(t *testing.T) {
+	keys := map[ctx.Key]string{
+		ctx.SessionData:               "SessionData",
+		ctx.UpdateSession:             "UpdateSession",
+		ctx.AuthToken:                 "AuthToken",
+		ctx.HashedAuthToken:           "HashedAuthToken",
+		ctx.VersionData:               "VersionData",
+		ctx.VersionName:               "VersionName",
+		ctx.VersionDefault:            "VersionDefault",
+		ctx.OrgSessionContext:         "OrgSessionContext",
+		ctx.ContextData:               "ContextData",
+		ctx.RetainHost:                "RetainHost",
+		ctx.TrackThisEndpoint:         "TrackThisEndpoint",
+		ctx.DoNotTrackThisEndpoint:    "DoNotTrackThisEndpoint",
+		ctx.UrlRewritePath:            "UrlRewritePath",
+		ctx.InternalRedirectTarget:    "InternalRedirectTarget",
+		ctx.RequestMethod:             "RequestMethod",
+		ctx.OrigRequestURL:            "OrigRequestURL",
+		ctx.LoopLevel:                 "LoopLevel",
+		ctx.LoopLevelLimit:            "LoopLevelLimit",
+		ctx.ThrottleLevel:             "ThrottleLevel",
+		ctx.ThrottleLevelLimit:        "ThrottleLevelLimit",
+		ctx.Trace:                     "Trace",
+		ctx.CheckLoopLimits:           "CheckLoopLimits",
+		ctx.UrlRewriteTarget:          "UrlRewriteTarget",
+		ctx.TransformedRequestMethod:  "TransformedRequestMethod",
+		ctx.Definition:                "Definition",
+		ctx.RequestStatus:             "RequestStatus",
+		ctx.GraphQLRequest:            "GraphQLRequest",
+		ctx.GraphQLIsWebSocketUpgrade: "GraphQLIsWebSocketUpgrade",
+		ctx.CacheOptions:              "CacheOptions",
+		ctx.OASDefinition:             "OASDefinition",
+		ctx.SelfLooping:               "SelfLooping",
+		ctx.RequestStartTime:          "RequestStartTime",
+		ctx.ErrorClassification:       "ErrorClassification",
+		ctx.JsonRPCRouting:            "JsonRPCRouting",
+		ctx.JSONRPCRequest:            "JSONRPCRequest",
+		ctx.JSONRPCRoutingState:       "JSONRPCRoutingState",
+		ctx.MCPRouting:                "MCPRouting",
+	}
+
+	seen := make(map[ctx.Key]bool)
+	for key, name := range keys {
+		if seen[key] {
+			t.Errorf("Duplicate context key value %d for %s", key, name)
+		}
+		seen[key] = true
+	}
+}
+
+// Test for GetErrorClassification
+func TestErrorClassificationContext(t *testing.T) {
+	t.Run("get returns nil when not set", func(t *testing.T) {
+		req := httptest.NewRequest("GET", "http://example.com", nil)
+		assert.Nil(t, ctx.GetErrorClassification(req))
+	})
+
+	t.Run("get returns set value", func(t *testing.T) {
+		errClass := errors.NewErrorClassification(errors.UCF, "connection_refused").
+			WithSource("ReverseProxy").
+			WithTarget("api.backend.com:443")
+
+		req := httptest.NewRequest("GET", "http://example.com", nil)
+		ctx.SetErrorClassification(req, errClass)
+		result := ctx.GetErrorClassification(req)
+
+		assert.Equal(t, errClass, result)
+		assert.Equal(t, errors.UCF, result.Flag)
+		assert.Equal(t, "connection_refused", result.Details)
+		assert.Equal(t, "ReverseProxy", result.Source)
+		assert.Equal(t, "api.backend.com:443", result.Target)
+	})
+
+	t.Run("TLS error with cert info", func(t *testing.T) {
+		expiry := time.Date(2024, 1, 15, 0, 0, 0, 0, time.UTC)
+		errClass := errors.NewErrorClassification(errors.TLE, "tls_certificate_expired").
+			WithSource("ReverseProxy").
+			WithTarget("api.backend.com:443").
+			WithTLSInfo(expiry, "CN=api.backend.com")
+
+		req := httptest.NewRequest("GET", "http://example.com", nil)
+		ctx.SetErrorClassification(req, errClass)
+		result := ctx.GetErrorClassification(req)
+
+		assert.Equal(t, errors.TLE, result.Flag)
+		assert.Equal(t, expiry, result.TLSCertExpiry)
+		assert.Equal(t, "CN=api.backend.com", result.TLSCertSubject)
+	})
+}
+
+func TestErrorClassificationContext_NilSafe(t *testing.T) {
+	t.Run("set nil does not panic", func(t *testing.T) {
+		req := httptest.NewRequest("GET", "http://example.com", nil)
+		assert.NotPanics(t, func() {
+			ctx.SetErrorClassification(req, nil)
+		})
+		// After setting nil, get should return nil
+		assert.Nil(t, ctx.GetErrorClassification(req))
+	})
 }
