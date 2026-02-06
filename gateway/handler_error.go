@@ -93,71 +93,26 @@ type TemplateExecutor interface {
 // HandleError is the actual error handler and will store the error details in analytics if analytics processing is enabled.
 func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMsg string, errCode int, writeResponse bool) {
 	defer e.Base().UpdateRequestSession(r)
-	response := &http.Response{}
-
-	// Calculate latency for error responses
-	var latency analytics.Latency
-	if requestStartTime := ctxGetRequestStartTime(r); !requestStartTime.IsZero() {
-		totalMs := int64(DurationToMillisecond(time.Since(requestStartTime)))
-		latency = analytics.Latency{
-			Total:    totalMs,
-			Upstream: 0,       // No successful upstream response for errors
-			Gateway:  totalMs, // All time is gateway time for errors
-		}
+	response := &http.Response{
+		StatusCode: errCode,
 	}
+
+	latency := e.calculateErrorLatency(r)
 
 	// Check if this should be a JSON-RPC formatted error
 	if e.Spec.IsMCP() && writeResponse && e.shouldWriteJSONRPCError(r) {
 		responseBody := e.writeJSONRPCError(w, r, errMsg, errCode)
-		response.StatusCode = errCode
 		// Record analytics with full JSON-RPC response
 		if !e.Spec.DoNotTrack && !ctxGetDoNotTrack(r) {
 			e.recordErrorAnalytics(r, response, responseBody, latency)
 		}
-		e.RecordAccessLog(r, response, latency)
-		reportHealthValue(e.Spec, BlockedRequestLog, "-1")
-		return
-	}
+	} else if writeResponse {
+		templateExtension, contentType := e.getTemplateExtensionAndContentType(r)
+		tmpl, templateName, finalContentType := e.findErrorTemplate(errCode, templateExtension, contentType)
 
-	if writeResponse {
-		var templateExtension string
-		contentType := r.Header.Get(header.ContentType)
-		contentType = strings.Split(contentType, ";")[0]
-
-		switch contentType {
-		case header.ApplicationXML:
-			templateExtension = "xml"
-			contentType = header.ApplicationXML
-		case header.TextXML:
-			templateExtension = "xml"
-			contentType = header.TextXML
-		default:
-			templateExtension = "json"
-			contentType = header.ApplicationJSON
-		}
-
-		w.Header().Set(header.ContentType, contentType)
+		w.Header().Set(header.ContentType, finalContentType)
 		response.Header = http.Header{}
-		response.Header.Set(header.ContentType, contentType)
-		templateName := "error_" + strconv.Itoa(errCode) + "." + templateExtension
-
-		// Try to use an error template that matches the HTTP error code and the content type: 500.json, 400.xml, etc.
-		tmpl := e.Gw.templates.Lookup(templateName)
-
-		// Fallback to a generic error template, but match the content type: error.json, error.xml, etc.
-		if tmpl == nil {
-			templateName = defaultTemplateName + "." + templateExtension
-			tmpl = e.Gw.templates.Lookup(templateName)
-		}
-
-		// If no template is available for this content type, fallback to "error.json".
-		if tmpl == nil {
-			templateName = defaultTemplateName + "." + defaultTemplateFormat
-			tmpl = e.Gw.templates.Lookup(templateName)
-			w.Header().Set(header.ContentType, defaultContentType)
-			response.Header.Set(header.ContentType, defaultContentType)
-
-		}
+		response.Header.Set(header.ContentType, finalContentType)
 
 		//If the config option is not set or is false, add the header
 		if !e.Spec.GlobalConfig.HideGeneratorHeader {
@@ -173,9 +128,6 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 		}
 
 		var responseBodyBytes []byte
-
-		// Set status code for analytics and access logs
-		response.StatusCode = errCode
 
 		// If error is not customized write error in default way
 		if errMsg != errCustomBodyResponse.Error() {
@@ -222,6 +174,63 @@ func (e *ErrorHandler) shouldWriteJSONRPCError(r *http.Request) bool {
 
 	routingState := httpctx.GetJSONRPCRoutingState(r)
 	return routingState != nil
+}
+
+// calculateErrorLatency calculates latency for error responses.
+// For errors, upstream latency is 0 since no successful upstream response occurred.
+func (e *ErrorHandler) calculateErrorLatency(r *http.Request) analytics.Latency {
+	var latency analytics.Latency
+	if requestStartTime := ctxGetRequestStartTime(r); !requestStartTime.IsZero() {
+		totalMs := int64(DurationToMillisecond(time.Since(requestStartTime)))
+		latency = analytics.Latency{
+			Total:    totalMs,
+			Upstream: 0,       // No successful upstream response for errors
+			Gateway:  totalMs, // All time is gateway time for errors
+		}
+	}
+	return latency
+}
+
+// getTemplateExtensionAndContentType determines the template extension and content type
+// based on the request's Content-Type header.
+func (e *ErrorHandler) getTemplateExtensionAndContentType(r *http.Request) (string, string) {
+	contentType := r.Header.Get(header.ContentType)
+	contentType = strings.Split(contentType, ";")[0]
+
+	switch contentType {
+	case header.ApplicationXML:
+		return "xml", header.ApplicationXML
+	case header.TextXML:
+		return "xml", header.TextXML
+	default:
+		return "json", header.ApplicationJSON
+	}
+}
+
+// findErrorTemplate finds an appropriate error template using a fallback chain:
+// 1. Try error_{code}.{ext} (e.g., error_500.json)
+// 2. Fallback to error.{ext} (e.g., error.json)
+// 3. Final fallback to error.json with default content type
+// Returns: (template, templateName, contentType)
+func (e *ErrorHandler) findErrorTemplate(errCode int, templateExtension string, contentType string) (*htmltemplate.Template, string, string) {
+	// Try to use an error template that matches the HTTP error code and the content type
+	templateName := "error_" + strconv.Itoa(errCode) + "." + templateExtension
+	tmpl := e.Gw.templates.Lookup(templateName)
+
+	// Fallback to a generic error template, but match the content type
+	if tmpl == nil {
+		templateName = defaultTemplateName + "." + templateExtension
+		tmpl = e.Gw.templates.Lookup(templateName)
+	}
+
+	// If no template is available for this content type, fallback to error.json
+	if tmpl == nil {
+		templateName = defaultTemplateName + "." + defaultTemplateFormat
+		tmpl = e.Gw.templates.Lookup(templateName)
+		contentType = defaultContentType
+	}
+
+	return tmpl, templateName, contentType
 }
 
 // writeJSONRPCError writes an error in JSON-RPC 2.0 format and returns the response body.

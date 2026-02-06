@@ -761,3 +761,67 @@ func TestErrorHandler_JSONRPC_LatencyRecording(t *testing.T) {
 	assert.Equal(t, record.Latency.Gateway, record.Latency.Total-record.Latency.Upstream)
 	assert.Zero(t, record.Latency.Upstream)
 }
+
+func TestErrorHandler_AccessLogAndHealthUnconditional(t *testing.T) {
+	logger, hook := logrustest.NewNullLogger()
+
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	gwConfig := ts.Gw.GetConfig()
+	gwConfig.AccessLogs.Enabled = true
+	ts.Gw.SetConfig(gwConfig)
+
+	tests := []struct {
+		name          string
+		isMCP         bool
+		writeResponse bool
+	}{
+		{"MCP API with writeResponse=false", true, false},
+		{"MCP API with writeResponse=true", true, true},
+		{"Non-MCP API with writeResponse=false", false, false},
+		{"Non-MCP API with writeResponse=true", false, true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			hook.Reset()
+
+			spec := &APISpec{
+				APIDefinition: &apidef.APIDefinition{
+					APIID: "test-api",
+					OrgID: "test-org",
+				},
+				GlobalConfig: gwConfig,
+			}
+			if tt.isMCP {
+				spec.MarkAsMCP()
+			}
+
+			handler := ErrorHandler{
+				BaseMiddleware: &BaseMiddleware{
+					Spec:   spec,
+					Gw:     ts.Gw,
+					logger: logger.WithField("test", "true"),
+				},
+			}
+
+			r := httptest.NewRequest(http.MethodPost, "/test", nil)
+			w := httptest.NewRecorder()
+
+			handler.HandleError(w, r, "Test error", http.StatusForbidden, tt.writeResponse)
+
+			var accessLogFound bool
+			for _, entry := range hook.Entries {
+				if entry.Level == logrus.InfoLevel && entry.Data["status"] != nil {
+					accessLogFound = true
+					status := entry.Data["status"].(int)
+					assert.Equal(t, http.StatusForbidden, status, "Access log should record status code")
+					break
+				}
+			}
+
+			assert.True(t, accessLogFound, "Access log should be recorded regardless of writeResponse flag")
+		})
+	}
+}
