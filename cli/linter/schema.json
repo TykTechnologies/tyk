@@ -494,6 +494,9 @@
     "skip_verify_existing_plugin_bundle": {
       "type": "boolean"
     },
+    "enable_config_inspection": {
+      "type": "boolean"
+    },
     "enable_custom_domains": {
       "type": "boolean"
     },
