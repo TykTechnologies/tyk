@@ -660,6 +660,62 @@ func TestJWTSessionRSAWithRawSourceInvalidPolicyID(t *testing.T) {
 	})
 }
 
+// TestJWTWithScopedPolicyID verifies that when a JWT token claims a policy from a
+// different organization than the API's organization, the gateway correctly denies
+// access with a 403 Forbidden status instead of panicking. This test ensures the
+// multi-org policy scoping behavior introduced in TT-16260 works correctly.
+func TestJWTWithScopedPolicyID(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	const testAPIID = "test-api-id"
+	const org1 = "org1"
+	const org2 = "org2"
+
+	// API is in org1
+	spec := BuildAPI(func(spec *APISpec) {
+		spec.APIID = testAPIID
+		spec.OrgID = org1
+		spec.UseKeylessAccess = false
+		spec.EnableJWT = true
+		spec.JWTSigningMethod = RSASign
+		spec.JWTSource = base64.StdEncoding.EncodeToString([]byte(jwtRSAPubKey))
+		spec.JWTIdentityBaseField = "user_id"
+		spec.JWTPolicyFieldName = "policy_id"
+		spec.Proxy.ListenPath = "/"
+	})[0]
+
+	ts.Gw.LoadAPI(spec)
+
+	// Policy is in org2 (different org than the API)
+	policyIDInOrg2 := ts.CreatePolicy(func(p *user.Policy) {
+		p.OrgID = org2
+		p.AccessRights = map[string]user.AccessDefinition{
+			testAPIID: {
+				APIName: "test-api-name",
+				APIID:   testAPIID,
+			},
+		}
+	})
+
+	userID := uuid.New()
+	jwtToken := CreateJWKToken(func(t *jwt.Token) {
+		t.Header["kid"] = "12345"
+		t.Claims.(jwt.MapClaims)["user_id"] = userID
+		t.Claims.(jwt.MapClaims)["policy_id"] = policyIDInOrg2
+		t.Claims.(jwt.MapClaims)["exp"] = time.Now().Add(time.Hour * 72).Unix()
+	})
+
+	authHeaders := map[string]string{"authorization": jwtToken}
+	t.Run("Request with policy from different org should be forbidden and not panic", func(t *testing.T) {
+		ts.Run(t, test.TestCase{
+			Headers:   authHeaders,
+			Code:      http.StatusForbidden,
+			BodyMatch: "key not authorized: no matching policy",
+		})
+	})
+}
+
 func TestJWTSessionExpiresAtValidationConfigs(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
