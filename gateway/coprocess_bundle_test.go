@@ -601,7 +601,7 @@ func TestBundle_Verify(t *testing.T) {
 				},
 				Gw: &Gateway{},
 			},
-			setupFs:       func(fs afero.Fs, bundlePath string) {},
+			setupFs:       func(_ afero.Fs, _ string) {},
 			usePublicKey:  false,
 			partialVerify: false,
 			wantErr:       true,
@@ -824,7 +824,8 @@ func BenchmarkBundle_Verify(b *testing.B) {
 			b.ReportAllocs()
 
 			for i := 0; i < b.N; i++ {
-				_ = bundle.PartialVerify(fs, false)
+				err := bundle.PartialVerify(fs, false)
+				assert.NoError(b, err)
 			}
 		})
 	}
