@@ -224,7 +224,7 @@ type Gateway struct {
 	// apiJWKCaches cache per api entity
 	apiJWKCaches sync.Map
 
-	BundleChecksumVerifier bundleVerifyFunction
+	BundleChecksumVerifier bundleChecksumVerifyFunction
 }
 
 func NewGateway(config config.Config, ctx context.Context) *Gateway {

@@ -503,11 +503,13 @@ func TestBundle_Verify(t *testing.T) {
 		bundle         Bundle
 		setupFs        func(afero.Fs, string)
 		usePublicKey   bool
+		partialVerify  bool
+		skipVerifCheck bool
 		wantErr        bool
 		wantErrContain string
 	}{
 		{
-			name: "bundle with invalid public key path",
+			name: "bundle with invalid public key path using DeepVerify",
 			bundle: Bundle{
 				Name: "test",
 				Data: []byte("test"),
@@ -521,11 +523,12 @@ func TestBundle_Verify(t *testing.T) {
 				},
 				Gw: &Gateway{},
 			},
-			usePublicKey: true,
-			wantErr:      true,
+			usePublicKey:  true,
+			partialVerify: false,
+			wantErr:       true,
 		},
 		{
-			name: "bundle without signature",
+			name: "bundle without signature using DeepVerify",
 			bundle: Bundle{
 				Name: "test",
 				Data: []byte("test"),
@@ -539,11 +542,13 @@ func TestBundle_Verify(t *testing.T) {
 				},
 				Gw: &Gateway{},
 			},
-			usePublicKey: true,
-			wantErr:      true,
+			usePublicKey:   true,
+			partialVerify:  false,
+			wantErr:        true,
+			wantErrContain: "invalid checksum",
 		},
 		{
-			name: "valid checksum with empty file list",
+			name: "valid checksum with empty file list using DeepVerify",
 			bundle: Bundle{
 				Name: "test",
 				Spec: &APISpec{
@@ -557,11 +562,12 @@ func TestBundle_Verify(t *testing.T) {
 				},
 				Gw: &Gateway{},
 			},
-			usePublicKey: false,
-			wantErr:      false,
+			usePublicKey:  false,
+			partialVerify: false,
+			wantErr:       false,
 		},
 		{
-			name: "invalid checksum returns error",
+			name: "invalid checksum returns error using DeepVerify",
 			bundle: Bundle{
 				Name: "test",
 				Spec: &APISpec{
@@ -576,11 +582,12 @@ func TestBundle_Verify(t *testing.T) {
 				Gw: &Gateway{},
 			},
 			usePublicKey:   false,
+			partialVerify:  false,
 			wantErr:        true,
-			wantErrContain: "Invalid checksum",
+			wantErrContain: "invalid checksum",
 		},
 		{
-			name: "file not found in file list",
+			name: "file not found in file list using DeepVerify",
 			bundle: Bundle{
 				Name: "test",
 				Spec: &APISpec{
@@ -594,12 +601,13 @@ func TestBundle_Verify(t *testing.T) {
 				},
 				Gw: &Gateway{},
 			},
-			setupFs:      func(fs afero.Fs, bundlePath string) {},
-			usePublicKey: false,
-			wantErr:      true,
+			setupFs:       func(fs afero.Fs, bundlePath string) {},
+			usePublicKey:  false,
+			partialVerify: false,
+			wantErr:       true,
 		},
 		{
-			name: "valid checksum with multiple files",
+			name: "valid checksum with multiple files using DeepVerify",
 			bundle: Bundle{
 				Name: "test",
 				Spec: &APISpec{
@@ -618,11 +626,12 @@ func TestBundle_Verify(t *testing.T) {
 				assert.NoError(t, afero.WriteFile(fs, filepath.Join(bundlePath, "file1.py"), []byte("file1 content"), 0644))
 				assert.NoError(t, afero.WriteFile(fs, filepath.Join(bundlePath, "file2.py"), []byte("file2 content"), 0644))
 			},
-			usePublicKey: false,
-			wantErr:      false,
+			usePublicKey:  false,
+			partialVerify: false,
+			wantErr:       false,
 		},
 		{
-			name: "invalid base64 signature returns error",
+			name: "invalid base64 signature returns error using DeepVerify",
 			bundle: Bundle{
 				Name: "test",
 				Spec: &APISpec{
@@ -637,13 +646,37 @@ func TestBundle_Verify(t *testing.T) {
 				},
 				Gw: &Gateway{},
 			},
-			usePublicKey: true,
-			wantErr:      true,
+			usePublicKey:  true,
+			partialVerify: false,
+			wantErr:       true,
+		},
+		{
+			name: "partial verify skips checksum when specified",
+			bundle: Bundle{
+				Name: "test",
+				Spec: &APISpec{
+					APIDefinition: &apidef.APIDefinition{
+						CustomMiddlewareBundle: "test-mw-bundle",
+					},
+				},
+				Manifest: apidef.BundleManifest{
+					Checksum: "invalidchecksum",
+					FileList: []string{},
+				},
+				Gw: &Gateway{},
+			},
+			usePublicKey:   true,
+			partialVerify:  true,
+			skipVerifCheck: true,
+			wantErr:        false,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			b := tt.bundle
+
+			// Set up Gateway with BundleChecksumVerifier
+			b.Gw.BundleChecksumVerifier = defaultBundleVerifyFunction
 
 			globalConf := config.Config{}
 			if tt.usePublicKey {
@@ -668,7 +701,13 @@ func TestBundle_Verify(t *testing.T) {
 				tt.setupFs(fs, bundlePath)
 			}
 
-			err := b.Verify(fs)
+			var err error
+			if tt.partialVerify {
+				err = b.PartialVerify(fs, tt.skipVerifCheck)
+			} else {
+				err = b.DeepVerify(fs)
+			}
+
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Bundle.Verify() error = %v, wantErr %v", err, tt.wantErr)
 			}
@@ -778,11 +817,14 @@ func BenchmarkBundle_Verify(b *testing.B) {
 			// Configure GW with no public key (no signature verification)
 			bundle.Gw.SetConfig(config.Config{})
 
+			// Initialize BundleChecksumVerifier
+			bundle.Gw.BundleChecksumVerifier = defaultBundleVerifyFunction
+
 			b.ResetTimer()
 			b.ReportAllocs()
 
 			for i := 0; i < b.N; i++ {
-				_ = bundle.Verify(fs)
+				_ = bundle.PartialVerify(fs, false)
 			}
 		})
 	}
