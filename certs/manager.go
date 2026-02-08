@@ -503,6 +503,59 @@ func GetCertIDAndChainPEM(certData []byte, secret string) (string, []byte, error
 	return certID, certChainPEM, nil
 }
 
+// fetchCertificateWithRetry retrieves a certificate from storage with optional retry support.
+func (c *certificateManager) fetchCertificateWithRetry(id string, sharedBackoff backoff.BackOff) (string, error) {
+	c.logger.WithFields(logrus.Fields{
+		"cert_id":       id,
+		"retry_enabled": c.certFetchRetryEnabled,
+	}).Debug("Certificate fetch starting")
+
+	// Early return: retry disabled
+	if !c.certFetchRetryEnabled {
+		c.logger.WithField("cert_id", id).Debug("Using non-retry path for certificate fetch")
+		return c.storage.GetKey("raw-" + id)
+	}
+
+	// Retry enabled - use shared exponential backoff
+	var val string
+	var err error
+	attemptCount := 0
+
+	operation := func() error {
+		attemptCount++
+		logFields := logrus.Fields{"cert_id": id}
+
+		if attemptCount == 1 {
+			c.logger.WithFields(logFields).Debug("Fetching certificate from MDCB (retry enabled)")
+		} else {
+			logFields["attempt"] = attemptCount
+			c.logger.WithFields(logFields).Debug("Retrying certificate fetch from MDCB")
+		}
+
+		val, err = c.storage.GetKey("raw-" + id)
+
+		if errors.Is(err, storage.ErrMDCBConnectionLost) {
+			c.logger.WithField("cert_id", id).Debug("Certificate fetch failed (MDCB not ready), will retry")
+			return err // Retryable error
+		}
+
+		if err == nil {
+			logFields["attempt"] = attemptCount
+			c.logger.WithFields(logFields).Debug("Certificate fetched successfully from MDCB")
+		}
+
+		return nil // Success or non-retryable error
+	}
+
+	if retryErr := backoff.Retry(operation, sharedBackoff); retryErr != nil {
+		if errors.Is(err, storage.ErrMDCBConnectionLost) {
+			c.logger.WithField("cert_id", id).Warn("Timeout waiting for MDCB connection for certificate")
+		}
+	}
+
+	return val, err
+}
+
 func (c *certificateManager) List(certIDs []string, mode CertificateType) (out []*tls.Certificate) {
 	var cert *tls.Certificate
 	var rawCert []byte
@@ -534,56 +587,8 @@ func (c *certificateManager) List(certIDs []string, mode CertificateType) (out [
 			continue
 		}
 
-		// Retry with exponential backoff when MDCB connection is not ready.
-		//
-		// During gateway startup, MDCB RPC connection may still be initializing when
-		// SSL certificates are loaded. The retry logic waits for MDCB to become ready.
-		var val string
-		var err error
-
-		// Log which code path we're taking
-		c.logger.WithFields(logrus.Fields{
-			"cert_id":       id,
-			"retry_enabled": c.certFetchRetryEnabled,
-		}).Debug("Certificate fetch starting")
-
-		// Handle simple case first: retry disabled
-		if !c.certFetchRetryEnabled {
-			c.logger.WithField("cert_id", id).Debug("Using non-retry path for certificate fetch")
-			val, err = c.storage.GetKey("raw-" + id)
-		} else {
-			// Retry enabled - use shared exponential backoff
-			attemptCount := 0
-			operation := func() error {
-				attemptCount++
-				if attemptCount == 1 {
-					c.logger.WithField("cert_id", id).Debug("Fetching certificate from MDCB (retry enabled)")
-				} else {
-					c.logger.WithFields(logrus.Fields{
-						"cert_id": id,
-						"attempt": attemptCount,
-					}).Debug("Retrying certificate fetch from MDCB")
-				}
-				val, err = c.storage.GetKey("raw-" + id)
-				if errors.Is(err, storage.ErrMDCBConnectionLost) {
-					c.logger.WithField("cert_id", id).Debug("Certificate fetch failed (MDCB not ready), will retry")
-					return err // Retryable error
-				}
-				if err == nil {
-					c.logger.WithFields(logrus.Fields{
-						"cert_id": id,
-						"attempt": attemptCount,
-					}).Debug("Certificate fetched successfully from MDCB")
-				}
-				return nil // Success or non-retryable error
-			}
-
-			if retryErr := backoff.Retry(operation, sharedBackoff); retryErr != nil {
-				if errors.Is(err, storage.ErrMDCBConnectionLost) {
-					c.logger.WithField("cert_id", id).Warn("Timeout waiting for MDCB connection for certificate")
-				}
-			}
-		}
+		// Fetch certificate from storage with optional retry support
+		val, err := c.fetchCertificateWithRetry(id, sharedBackoff)
 
 		// fallback to file
 		if err != nil {
