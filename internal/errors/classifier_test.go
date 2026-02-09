@@ -67,7 +67,7 @@ func TestClassifyUpstreamError_TLSErrors(t *testing.T) {
 		{
 			name:           "unknown authority",
 			err:            x509.UnknownAuthorityError{},
-			expectedFlag:   TLI,
+			expectedFlag:   TLN,
 			expectedDetail: "tls_unknown_authority",
 		},
 		{
@@ -899,6 +899,13 @@ func TestClassifyJWTError(t *testing.T) {
 			source:       "JWTMiddleware",
 			expectedFlag: TCV,
 			expectedDet:  "jwt_claims_invalid",
+		},
+		{
+			name:         "token_expired",
+			errorType:    ErrTypeTokenExpired,
+			source:       "JWTMiddleware",
+			expectedFlag: TKE,
+			expectedDet:  "jwt_token_expired",
 		},
 		{
 			name:         "token_invalid",

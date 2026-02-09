@@ -1097,7 +1097,12 @@ func (k *JWTMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, _
 
 	if err == nil && token.Valid {
 		if err := k.validateClaims(token); err != nil {
-			ctx.SetErrorClassification(r, tykerrors.ClassifyJWTError(tykerrors.ErrTypeClaimsInvalid, k.Name()))
+			errType := tykerrors.ErrTypeClaimsInvalid
+			var vErr *jwt.ValidationError
+			if errors.As(err, &vErr) && vErr.Errors&jwt.ValidationErrorExpired != 0 {
+				errType = tykerrors.ErrTypeTokenExpired
+			}
+			ctx.SetErrorClassification(r, tykerrors.ClassifyJWTError(errType, k.Name()))
 			return errors.New("Key not authorized: " + err.Error()), http.StatusUnauthorized
 		}
 

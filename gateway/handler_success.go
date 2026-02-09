@@ -380,8 +380,14 @@ func recordDetailUnsafe(r *http.Request, spec *APISpec) bool {
 
 // classifyUpstreamError classifies upstream responses for structured access logs.
 // Currently handles 5XX status codes; can be extended for other error classifications.
+// If a classification was already set earlier in the request lifecycle (e.g. NHU from
+// the load balancer director), it is preserved.
 func (s *SuccessHandler) classifyUpstreamError(r *http.Request, statusCode int) {
 	if statusCode >= 500 && statusCode <= 599 {
+		// Don't overwrite a more specific classification set earlier (e.g. NHU).
+		if ctx.GetErrorClassification(r) != nil {
+			return
+		}
 		target := r.URL.Host
 		if target == "" && s.Spec.target != nil {
 			target = s.Spec.target.Host
