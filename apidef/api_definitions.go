@@ -1026,6 +1026,8 @@ type RequestSigningMeta struct {
 
 type ProxyConfig struct {
 	PreserveHostHeader          bool                          `bson:"preserve_host_header" json:"preserve_host_header"`
+	DisableChunkedEncoding      bool                          `bson:"disable_chunked_encoding" json:"disable_chunked_encoding"`
+	ChunkedEncodingMaxBodySize  int64                         `bson:"chunked_encoding_max_body_size" json:"chunked_encoding_max_body_size"`
 	ListenPath                  string                        `bson:"listen_path" json:"listen_path"`
 	TargetURL                   string                        `bson:"target_url" json:"target_url"`
 	DisableStripSlash           bool                          `bson:"disable_strip_slash" json:"disable_strip_slash"`
