@@ -644,7 +644,7 @@ func (l *SessionLimiter) extendContextWithLimits(
 
 	data := ctxGetOrCreateData(r)
 
-	data[ctxDataKeyRateLimitLimit] = int(frl.per)
+	data[ctxDataKeyRateLimitLimit] = int(frl.limit)
 	data[ctxDataKeyRateLimitRemaining] = 0
 	data[ctxDataKeyRateLimitReset] = int(frl.reset.Seconds())
 }
