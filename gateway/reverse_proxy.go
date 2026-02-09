@@ -41,6 +41,7 @@ import (
 	"github.com/TykTechnologies/tyk/header"
 	"github.com/TykTechnologies/tyk/internal/certcheck"
 	"github.com/TykTechnologies/tyk/internal/crypto"
+	tykerrors "github.com/TykTechnologies/tyk/internal/errors"
 	"github.com/TykTechnologies/tyk/internal/graphengine"
 	"github.com/TykTechnologies/tyk/internal/httputil"
 	"github.com/TykTechnologies/tyk/internal/otel"
@@ -1272,6 +1273,8 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 	if breakerEnforced {
 		if !breakerConf.CB.Ready() {
 			p.logger.Debug("ON REQUEST: Circuit Breaker is in OPEN state")
+			errClass := tykerrors.ClassifyCircuitBreakerError(outreq.URL.Host+outreq.URL.Path, "OPEN")
+			ctx.SetErrorClassification(logreq, errClass)
 			p.ErrorHandler.HandleError(rw, logreq, "Service temporarily unavailable.", 503, true)
 			return ProxyResponse{}
 		}
@@ -1288,6 +1291,10 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 	}
 
 	if err != nil {
+		// Classify the upstream error for structured access logs
+		errClass := tykerrors.ClassifyUpstreamError(err, outreq.URL.Host+outreq.URL.Path)
+		ctx.SetErrorClassification(logreq, errClass)
+
 		token := ctxGetAuthToken(req)
 
 		var alias string
@@ -1333,6 +1340,10 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 		return ProxyResponse{UpstreamLatency: upstreamLatency}
 
 	}
+
+	// Note: 5XX classification is handled in SuccessHandler.ServeHTTP() where it
+	// has access to the original request context. Setting classification here
+	// on logreq would be ineffective since access logs read from the original request.
 
 	if isHijacked {
 		return ProxyResponse{UpstreamLatency: upstreamLatency}
@@ -1945,13 +1956,16 @@ func (p *ReverseProxy) initUpstreamCertBatcher() {
 	}
 
 	var err error
+	cfg := p.Gw.GetConfig()
 	p.TykAPISpec.UpstreamCertExpiryBatcher, err = certcheck.NewCertificateExpiryCheckBatcherWithRole(
 		p.logger,
 		apiData,
-		p.Gw.GetConfig().Security.CertificateExpiryMonitor,
+		cfg.Security.CertificateExpiryMonitor,
 		store,
 		p.TykAPISpec.FireEvent,
 		certcheck.CertRoleUpstream,
+		nil, // Upstream certs don't use selective sync
+		nil,
 	)
 
 	if err != nil {

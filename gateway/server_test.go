@@ -1,19 +1,23 @@
 package gateway
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"net"
 	"net/http"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
 	"time"
 
+	"github.com/samber/lo"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 
 	"github.com/TykTechnologies/again"
@@ -1130,4 +1134,53 @@ func TestLoadPoliciesFromRPC(t *testing.T) {
 		_, err = ts.Gw.LoadPoliciesFromRPC(store, orgId)
 		assert.ErrorContains(t, err, "invalid ObjectId in JSON")
 	})
+}
+
+func TestPoliciesCollisionMessage(t *testing.T) {
+	ts := StartTest(nil)
+	t.Cleanup(ts.Close)
+
+	type logMessage struct {
+		Level string    `json:"level"`
+		Msg   string    `json:"msg"`
+		Time  time.Time `json:"time"`
+	}
+
+	var buf bytes.Buffer
+
+	mock := logrus.New()
+	mock.SetOutput(&buf)
+	mock.SetFormatter(&logrus.JSONFormatter{})
+	mock.SetLevel(logrus.WarnLevel)
+
+	originGlobalLogger := log
+	log = mock
+	t.Cleanup(func() {
+		log = originGlobalLogger
+	})
+
+	id1 := model.NewObjectID()
+	id2 := model.NewObjectID()
+	id3 := model.NewObjectID()
+
+	ts.Gw.policies.Reload(
+		user.Policy{MID: id1, ID: "duplicate_id", OrgID: "A"},
+		user.Policy{MID: id2, ID: "duplicate_id", OrgID: "A"},
+		user.Policy{MID: id3, ID: "duplicate_id", OrgID: "B"},
+	)
+
+	msgs := lo.Map(slices.Collect(strings.Lines(buf.String())), func(line string, _ int) logMessage {
+		var res logMessage
+		err := json.Unmarshal([]byte(line), &res)
+		assert.NoError(t, err)
+		return res
+	})
+
+	require.Len(t, msgs, 1)
+	msg := msgs[0]
+
+	assert.Contains(t, msg.Msg, "Policies should not share the same ID")
+	assert.Contains(t, msg.Msg, "duplicate_id")
+	assert.Contains(t, msg.Msg, id1.Hex())
+	assert.Contains(t, msg.Msg, id2.Hex())
 }
