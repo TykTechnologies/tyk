@@ -2,6 +2,7 @@ package gateway
 
 import (
 	"encoding/json"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -14,6 +15,7 @@ import (
 	"github.com/TykTechnologies/tyk-pump/analytics"
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/header"
 	"github.com/TykTechnologies/tyk/internal/httpctx"
 	jsonrpcerrors "github.com/TykTechnologies/tyk/internal/jsonrpc/errors"
 	"github.com/TykTechnologies/tyk/test"
@@ -143,7 +145,7 @@ func TestErrorHandler_HandleError_JSONRPCFormat(t *testing.T) {
 	}
 }
 
-func TestErrorHandler_writeJSONRPCError_ReturnsFullResponse(t *testing.T) {
+func TestErrorHandler_writeJSONRPCErrorResponse_ReturnsFullResponse(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
 
@@ -167,12 +169,19 @@ func TestErrorHandler_writeJSONRPCError_ReturnsFullResponse(t *testing.T) {
 
 	w := httptest.NewRecorder()
 
-	// Call writeJSONRPCError and capture returned body
-	body := handler.writeJSONRPCError(w, r, "Access denied", http.StatusForbidden)
+	// Call writeJSONRPCErrorResponse and capture returned response
+	resp := handler.writeJSONRPCErrorResponse(w, r, "Access denied", http.StatusForbidden)
+
+	// Verify response metadata
+	assert.Equal(t, http.StatusForbidden, resp.StatusCode)
+	assert.Equal(t, header.ApplicationJSON, resp.Header.Get(header.ContentType))
 
 	// Verify returned body is valid JSON-RPC response
+	body, err := io.ReadAll(resp.Body)
+	require.NoError(t, err)
+
 	var response jsonrpcerrors.JSONRPCErrorResponse
-	err := json.Unmarshal(body, &response)
+	err = json.Unmarshal(body, &response)
 	require.NoError(t, err)
 
 	assert.Equal(t, apidef.JsonRPC20, response.JSONRPC)

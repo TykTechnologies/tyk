@@ -98,95 +98,86 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 	if writeResponse {
 		// Handle JSON-RPC error formatting for MCP APIs
 		if e.Spec.IsMCP() && e.shouldWriteJSONRPCError(r) {
-			response.StatusCode = errCode
-			response.Header = http.Header{}
-			response.Header.Set(header.ContentType, header.ApplicationJSON)
+			response = e.writeJSONRPCErrorResponse(w, r, errMsg, errCode)
+		} else {
+			var templateExtension string
+			contentType := r.Header.Get(header.ContentType)
+			contentType = strings.Split(contentType, ";")[0]
 
-			responseBody := e.writeJSONRPCError(w, r, errMsg, errCode)
-			response.Body = ioutil.NopCloser(bytes.NewReader(responseBody))
-
-			// Skip normal template-based error handling
-			goto skipNormalError
-		}
-
-		var templateExtension string
-		contentType := r.Header.Get(header.ContentType)
-		contentType = strings.Split(contentType, ";")[0]
-
-		switch contentType {
-		case header.ApplicationXML:
-			templateExtension = "xml"
-			contentType = header.ApplicationXML
-		case header.TextXML:
-			templateExtension = "xml"
-			contentType = header.TextXML
-		default:
-			templateExtension = "json"
-			contentType = header.ApplicationJSON
-		}
-
-		w.Header().Set(header.ContentType, contentType)
-		response.Header = http.Header{}
-		response.Header.Set(header.ContentType, contentType)
-		templateName := "error_" + strconv.Itoa(errCode) + "." + templateExtension
-
-		// Try to use an error template that matches the HTTP error code and the content type: 500.json, 400.xml, etc.
-		tmpl := e.Gw.templates.Lookup(templateName)
-
-		// Fallback to a generic error template, but match the content type: error.json, error.xml, etc.
-		if tmpl == nil {
-			templateName = defaultTemplateName + "." + templateExtension
-			tmpl = e.Gw.templates.Lookup(templateName)
-		}
-
-		// If no template is available for this content type, fallback to "error.json".
-		if tmpl == nil {
-			templateName = defaultTemplateName + "." + defaultTemplateFormat
-			tmpl = e.Gw.templates.Lookup(templateName)
-			w.Header().Set(header.ContentType, defaultContentType)
-			response.Header.Set(header.ContentType, defaultContentType)
-
-		}
-
-		//If the config option is not set or is false, add the header
-		if !e.Spec.GlobalConfig.HideGeneratorHeader {
-			w.Header().Add(header.XGenerator, "tyk.io")
-			response.Header.Add(header.XGenerator, "tyk.io")
-		}
-
-		// Close connections
-		if e.Spec.GlobalConfig.CloseConnections {
-			w.Header().Add(header.Connection, "close")
-			response.Header.Add(header.Connection, "close")
-
-		}
-
-		// If error is not customized write error in default way
-		if errMsg != errCustomBodyResponse.Error() {
-			w.WriteHeader(errCode)
-			response.StatusCode = errCode
-			var tmplExecutor TemplateExecutor
-			tmplExecutor = tmpl
-
-			apiError := APIError{htmltemplate.HTML(htmltemplate.JSEscapeString(errMsg))}
-
-			if contentType == header.ApplicationXML || contentType == header.TextXML {
-				apiError.Message = htmltemplate.HTML(errMsg)
-
-				//we look up in the last defined templateName to obtain the template.
-				rawTmpl := e.Gw.templatesRaw.Lookup(templateName)
-				tmplExecutor = rawTmpl
+			switch contentType {
+			case header.ApplicationXML:
+				templateExtension = "xml"
+				contentType = header.ApplicationXML
+			case header.TextXML:
+				templateExtension = "xml"
+				contentType = header.TextXML
+			default:
+				templateExtension = "json"
+				contentType = header.ApplicationJSON
 			}
 
-			var log bytes.Buffer
+			w.Header().Set(header.ContentType, contentType)
+			response.Header = http.Header{}
+			response.Header.Set(header.ContentType, contentType)
+			templateName := "error_" + strconv.Itoa(errCode) + "." + templateExtension
 
-			rsp := io.MultiWriter(w, &log)
-			tmplExecutor.Execute(rsp, &apiError)
-			response.Body = ioutil.NopCloser(&log)
+			// Try to use an error template that matches the HTTP error code and the content type: 500.json, 400.xml, etc.
+			tmpl := e.Gw.templates.Lookup(templateName)
+
+			// Fallback to a generic error template, but match the content type: error.json, error.xml, etc.
+			if tmpl == nil {
+				templateName = defaultTemplateName + "." + templateExtension
+				tmpl = e.Gw.templates.Lookup(templateName)
+			}
+
+			// If no template is available for this content type, fallback to "error.json".
+			if tmpl == nil {
+				templateName = defaultTemplateName + "." + defaultTemplateFormat
+				tmpl = e.Gw.templates.Lookup(templateName)
+				w.Header().Set(header.ContentType, defaultContentType)
+				response.Header.Set(header.ContentType, defaultContentType)
+
+			}
+
+			//If the config option is not set or is false, add the header
+			if !e.Spec.GlobalConfig.HideGeneratorHeader {
+				w.Header().Add(header.XGenerator, "tyk.io")
+				response.Header.Add(header.XGenerator, "tyk.io")
+			}
+
+			// Close connections
+			if e.Spec.GlobalConfig.CloseConnections {
+				w.Header().Add(header.Connection, "close")
+				response.Header.Add(header.Connection, "close")
+
+			}
+
+			// If error is not customized write error in default way
+			if errMsg != errCustomBodyResponse.Error() {
+				w.WriteHeader(errCode)
+				response.StatusCode = errCode
+				var tmplExecutor TemplateExecutor
+				tmplExecutor = tmpl
+
+				apiError := APIError{htmltemplate.HTML(htmltemplate.JSEscapeString(errMsg))}
+
+				if contentType == header.ApplicationXML || contentType == header.TextXML {
+					apiError.Message = htmltemplate.HTML(errMsg)
+
+					//we look up in the last defined templateName to obtain the template.
+					rawTmpl := e.Gw.templatesRaw.Lookup(templateName)
+					tmplExecutor = rawTmpl
+				}
+
+				var log bytes.Buffer
+
+				rsp := io.MultiWriter(w, &log)
+				tmplExecutor.Execute(rsp, &apiError)
+				response.Body = ioutil.NopCloser(&log)
+			}
 		}
 	}
 
-skipNormalError:
 	if e.Spec.DoNotTrack || ctxGetDoNotTrack(r) {
 		return
 	}
@@ -357,13 +348,19 @@ func (e *ErrorHandler) shouldWriteJSONRPCError(r *http.Request) bool {
 	return routingState != nil
 }
 
-// writeJSONRPCError writes an error in JSON-RPC 2.0 format and returns the response body.
+// writeJSONRPCErrorResponse writes an error in JSON-RPC 2.0 format and returns the corresponding http.Response.
 // It extracts the request ID from the routing state and delegates to the jsonrpc errors package.
-func (e *ErrorHandler) writeJSONRPCError(w http.ResponseWriter, r *http.Request, errMsg string, httpCode int) []byte {
+func (e *ErrorHandler) writeJSONRPCErrorResponse(w http.ResponseWriter, r *http.Request, errMsg string, httpCode int) *http.Response {
 	var requestID interface{}
 	if state := httpctx.GetJSONRPCRoutingState(r); state != nil {
 		requestID = state.ID
 	}
 
-	return jsonrpcerrors.WriteJSONRPCError(w, requestID, httpCode, errMsg)
+	responseBody := jsonrpcerrors.WriteJSONRPCError(w, requestID, httpCode, errMsg)
+
+	return &http.Response{
+		StatusCode: httpCode,
+		Header:     http.Header{header.ContentType: []string{header.ApplicationJSON}},
+		Body:       io.NopCloser(bytes.NewReader(responseBody)),
+	}
 }
