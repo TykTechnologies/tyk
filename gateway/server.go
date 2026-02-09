@@ -108,8 +108,9 @@ const (
 
 type Gateway struct {
 	DefaultProxyMux *proxyMux
-	config          atomic.Value
-	configMu        sync.Mutex
+	config            atomic.Value
+	configMu          sync.Mutex
+	configViewerCache *configViewerCache
 
 	ctx context.Context
 
@@ -2208,6 +2209,12 @@ func (gw *Gateway) SetConfig(conf config.Config, skipReload ...bool) {
 	gw.configMu.Lock()
 	gw.config.Store(conf)
 	gw.configMu.Unlock()
+
+	// Invalidate cached config viewer so the next request rebuilds it
+	// with the updated configuration.
+	if gw.configViewerCache != nil {
+		gw.configViewerCache.invalidate()
+	}
 }
 
 // shutdownHTTPServer gracefully shuts down an HTTP server

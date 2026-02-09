@@ -1289,7 +1289,7 @@ type Config struct {
 	// In versions before gateway 5.3, only `listen_path` and `target_url` fields
 	// have had the secrets replaced.
 	// See more details https://tyk.io/docs/tyk-self-managed/#how-to-access-the-externally-stored-data
-	Secrets map[string]string `json:"secrets"`
+	Secrets map[string]string `json:"secrets" structviewer:"obfuscate"`
 
 	// Override the default error code and or message returned by middleware.
 	// The following message IDs can be used to override the message and error codes:

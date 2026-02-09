@@ -510,10 +510,14 @@ func TestConfigHandler_WebhookHeaderListRedacted(t *testing.T) {
 	ts := StartTest(func(cnf *config.Config) {
 		cnf.EnableConfigInspection = true
 		cnf.Secret = "test-secret"
+		cnf.Monitor.Config.HeaderList = map[string]string{
+			"Authorization": "Bearer super-secret-token",
+			"X-Api-Key":     "key-12345",
+		}
 	})
 	defer ts.Close()
 
-	// Verify the full config response redacts webhook header_map fields
+	// Verify the full config response redacts webhook header_map (map is zeroed out)
 	_, _ = ts.Run(t, test.TestCase{
 		Method:    http.MethodGet,
 		Path:      "/config",
@@ -523,8 +527,53 @@ func TestConfigHandler_WebhookHeaderListRedacted(t *testing.T) {
 			var configResp map[string]interface{}
 			err := json.Unmarshal(resp, &configResp)
 			assert.NoError(t, err)
-			// The webhook header_map is nested under event_handlers; the structviewer:"obfuscate"
-			// tag ensures it won't leak secrets when the full config is returned.
+
+			// Navigate to monitor.configuration.header_map
+			monitor, ok := configResp["monitor"].(map[string]interface{})
+			assert.True(t, ok, "monitor should be present")
+			configuration, ok := monitor["configuration"].(map[string]interface{})
+			assert.True(t, ok, "configuration should be present")
+			headerMap, ok := configuration["header_map"]
+			assert.True(t, ok, "header_map should be present")
+
+			// structviewer zeroes out obfuscated maps — the map should be empty or nil
+			if headerMap != nil {
+				hm, isMap := headerMap.(map[string]interface{})
+				if isMap {
+					assert.Empty(t, hm, "header_map should be empty after obfuscation")
+				}
+			}
+
+			// Ensure the actual secret values are NOT in the response
+			respStr := string(resp)
+			assert.NotContains(t, respStr, "super-secret-token")
+			assert.NotContains(t, respStr, "key-12345")
+			return true
+		},
+	})
+}
+
+func TestConfigHandler_SecretsRedacted(t *testing.T) {
+	ts := StartTest(func(cnf *config.Config) {
+		cnf.EnableConfigInspection = true
+		cnf.Secret = "test-secret"
+		cnf.Secrets = map[string]string{
+			"db_password":  "p@ssw0rd",
+			"external_key": "ext-secret-123",
+		}
+	})
+	defer ts.Close()
+
+	_, _ = ts.Run(t, test.TestCase{
+		Method:    http.MethodGet,
+		Path:      "/config",
+		AdminAuth: true,
+		Code:      http.StatusOK,
+		BodyMatchFunc: func(resp []byte) bool {
+			respStr := string(resp)
+			// Ensure the actual secret values are NOT in the response
+			assert.NotContains(t, respStr, "p@ssw0rd")
+			assert.NotContains(t, respStr, "ext-secret-123")
 			return true
 		},
 	})
