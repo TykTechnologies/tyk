@@ -137,7 +137,8 @@ func (b *Bundle) PartialVerify(bundleFs afero.Fs, skipVerifyChecksum bool) error
 		return nil
 	}
 
-	sha256Hash, err := b.Gw.BundleChecksumVerifier(b, bundleFs, false, true)
+	// Make a single call to compute both hashes if needed
+	sha256Hash, err := b.Gw.BundleChecksumVerifier(b, bundleFs, false, skipVerifyChecksum)
 	if err != nil {
 		return err
 	}
@@ -154,10 +155,6 @@ func (b *Bundle) PartialVerify(bundleFs afero.Fs, skipVerifyChecksum bool) error
 		return err
 	}
 
-	if !skipVerifyChecksum {
-		_, err = b.Gw.BundleChecksumVerifier(b, bundleFs, true, false)
-		return err
-	}
 	return nil
 }
 
