@@ -124,7 +124,7 @@ func classifyTLSError(err error, target string) *ErrorClassification {
 	// Check for unknown authority
 	var unknownAuthErr x509.UnknownAuthorityError
 	if As(err, &unknownAuthErr) {
-		return NewErrorClassification(TLI, "tls_unknown_authority").
+		return NewErrorClassification(TLN, "tls_unknown_authority").
 			WithSource(sourceReverseProxy).
 			WithTarget(target)
 	}
@@ -385,6 +385,8 @@ func ClassifyJWTError(errorType string, source string) *ErrorClassification {
 		return NewErrorClassification(AMF, detailJWTFieldMissing).WithSource(source)
 	case ErrTypeClaimsInvalid:
 		return NewErrorClassification(TCV, detailJWTClaimsInvalid).WithSource(source)
+	case ErrTypeTokenExpired:
+		return NewErrorClassification(TKE, detailJWTTokenExpired).WithSource(source)
 	case ErrTypeTokenInvalid:
 		return NewErrorClassification(TKI, detailJWTTokenInvalid).WithSource(source)
 	case ErrTypeUnexpectedSigningMethod:
