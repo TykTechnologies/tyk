@@ -1,7 +1,6 @@
 package coprocess_test
 
 import (
-	"crypto/sha256"
 	"hash"
 	"net/http"
 	"testing"
@@ -41,15 +40,14 @@ func TestBundleLoading(t *testing.T) {
 			cfg.SkipVerifyExistingPluginBundle = true
 			ts.Gw.SetConfig(cfg)
 
-			var conditionMet bool
-			ts.Gw.BundleChecksumVerifier = func(_ *gateway.Bundle, _ afero.Fs, skipSignature, skipChecksum bool) (sha256Hash hash.Hash, err error) {
-				conditionMet = !skipSignature && skipChecksum
-				sha256Hash = sha256.New()
+			var verifierCalled bool
+			ts.Gw.BundleChecksumVerifier = func(_ *gateway.Bundle, _ afero.Fs) (sha256Hash hash.Hash, err error) {
+				verifierCalled = true
 				return sha256Hash, nil
 			}
 			ts.Gw.DoReload()
 			ts.Gw.LoadAPI(spec)
-			assert.True(t, conditionMet)
+			assert.False(t, verifierCalled)
 		})
 	})
 

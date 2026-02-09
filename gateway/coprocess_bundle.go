@@ -35,25 +35,13 @@ var (
 	bundleMaxBackoffRetries uint64  = 4
 )
 
-type bundleChecksumVerifyFunction func(bundle *Bundle, bundleFs afero.Fs, skipSignature, skipChecksum bool) (sha256Hash hash.Hash, err error)
+type bundleChecksumVerifyFunction func(bundle *Bundle, bundleFs afero.Fs) (sha256Hash hash.Hash, err error)
 
-func defaultBundleVerifyFunction(b *Bundle, bundleFs afero.Fs, skipSignature, skipChecksum bool) (sha256Hash hash.Hash, err error) {
+func defaultBundleVerifyFunction(b *Bundle, bundleFs afero.Fs) (sha256Hash hash.Hash, err error) {
 	md5Hash := md5.New()
 	sha256Hash = sha256.New()
 
-	var writers []io.Writer
-	if !skipSignature {
-		writers = append(writers, sha256Hash)
-	}
-	if !skipChecksum {
-		writers = append(writers, md5Hash)
-	}
-
-	if len(writers) == 0 {
-		return sha256Hash, nil
-	}
-
-	w := io.MultiWriter(writers...)
+	w := io.MultiWriter(sha256Hash, md5Hash)
 	buf, ok := bundleVerifyPool.Get().(*[]byte)
 	if !ok {
 		return nil, errors.New("error verifying bundle, please try again")
@@ -73,12 +61,9 @@ func defaultBundleVerifyFunction(b *Bundle, bundleFs afero.Fs, skipSignature, sk
 		}
 	}
 
-	if !skipChecksum {
-		checksum := fmt.Sprintf("%x", md5Hash.Sum(nil))
-		if checksum != b.Manifest.Checksum {
-			return nil, errors.New("invalid checksum")
-		}
-		return sha256Hash, nil
+	checksum := fmt.Sprintf("%x", md5Hash.Sum(nil))
+	if checksum != b.Manifest.Checksum {
+		return nil, errors.New("invalid checksum")
 	}
 
 	return sha256Hash, nil
@@ -105,12 +90,16 @@ func (b *Bundle) DeepVerify(bundleFs afero.Fs) error {
 	hasKey := b.Gw.GetConfig().PublicKeyPath != ""
 	hasSignature := b.Manifest.Signature != ""
 
-	checkSignature := hasKey && hasSignature
-	sha256Hash, err := b.Gw.BundleChecksumVerifier(b, bundleFs, !checkSignature, false)
-	if err != nil {
-		return err
+	if hasKey && !hasSignature {
+		return errors.New("Bundle isn't signed")
 	}
+
+	checkSignature := hasKey && hasSignature
 	if checkSignature {
+		sha256Hash, err := b.Gw.BundleChecksumVerifier(b, bundleFs)
+		if err != nil {
+			return err
+		}
 		verifier, err := b.Gw.SignatureVerifier()
 		if err != nil {
 			return err
@@ -133,28 +122,28 @@ func (b *Bundle) PartialVerify(bundleFs afero.Fs, skipVerifyChecksum bool) error
 	}
 
 	hasSignature := b.Manifest.Signature != ""
-	if !hasSignature {
-		return nil
+	if !skipVerifyChecksum && !hasSignature {
+		return errors.New("Bundle isn't signed")
 	}
+	if !skipVerifyChecksum {
+		// Make a single call to compute both hashes if needed
+		sha256Hash, err := b.Gw.BundleChecksumVerifier(b, bundleFs)
+		if err != nil {
+			return err
+		}
 
-	// Make a single call to compute both hashes if needed
-	sha256Hash, err := b.Gw.BundleChecksumVerifier(b, bundleFs, false, skipVerifyChecksum)
-	if err != nil {
-		return err
+		verifier, err := b.Gw.SignatureVerifier()
+		if err != nil {
+			return err
+		}
+		signed, err := base64.StdEncoding.DecodeString(b.Manifest.Signature)
+		if err != nil {
+			return err
+		}
+		if err := verifier.VerifyHash(sha256Hash.Sum(nil), signed); err != nil {
+			return err
+		}
 	}
-
-	verifier, err := b.Gw.SignatureVerifier()
-	if err != nil {
-		return err
-	}
-	signed, err := base64.StdEncoding.DecodeString(b.Manifest.Signature)
-	if err != nil {
-		return err
-	}
-	if err := verifier.VerifyHash(sha256Hash.Sum(nil), signed); err != nil {
-		return err
-	}
-
 	return nil
 }
 
