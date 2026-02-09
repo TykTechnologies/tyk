@@ -3,18 +3,18 @@ package gateway
 import (
 	"encoding/json"
 	"errors"
-	"github.com/TykTechnologies/tyk/header"
 	"io/ioutil"
 	"net/http"
 	"os"
 	"path/filepath"
 
-	"github.com/TykTechnologies/graphql-go-tools/pkg/graphql"
-
-	"github.com/TykTechnologies/tyk/rpc"
-
+	"github.com/samber/lo"
 	"github.com/sirupsen/logrus"
 
+	"github.com/TykTechnologies/graphql-go-tools/pkg/graphql"
+
+	"github.com/TykTechnologies/tyk/header"
+	"github.com/TykTechnologies/tyk/rpc"
 	"github.com/TykTechnologies/tyk/user"
 )
 
@@ -71,7 +71,7 @@ func (d *DBPolicy) ToRegularPolicy() user.Policy {
 	return policy
 }
 
-func LoadPoliciesFromFile(filePath string) (map[string]user.Policy, error) {
+func LoadPoliciesFromFile(filePath string) ([]user.Policy, error) {
 	f, err := os.Open(filePath)
 	if err != nil {
 		log.WithFields(logrus.Fields{
@@ -88,11 +88,18 @@ func LoadPoliciesFromFile(filePath string) (map[string]user.Policy, error) {
 		}).Error("Couldn't unmarshal policies: ", err)
 		return nil, err
 	}
-	return policies, nil
+
+	var res = make([]user.Policy, 0, len(policies))
+	for id, pol := range policies {
+		pol.ID = lo.CoalesceOrEmpty(id, pol.ID) // prioritize id over ID in field or not?
+		res = append(res, pol)
+	}
+
+	return res, nil
 }
 
-func LoadPoliciesFromDir(dir string) (map[string]user.Policy, error) {
-	policies := make(map[string]user.Policy)
+func LoadPoliciesFromDir(dir string) ([]user.Policy, error) {
+	policies := make([]user.Policy, 0)
 	// Grab json files from directory
 	paths, err := filepath.Glob(filepath.Join(dir, "*.json"))
 	if err != nil {
@@ -112,13 +119,14 @@ func LoadPoliciesFromDir(dir string) (map[string]user.Policy, error) {
 			log.Errorf("Couldn't unmarshal policy configuration from dir: %v : %v", path, err)
 		}
 		f.Close()
-		policies[pol.ID] = *pol
+		policies = append(policies, *pol)
 	}
+
 	return policies, nil
 }
 
 // LoadPoliciesFromDashboard will connect and download Policies from a Tyk Dashboard instance.
-func (gw *Gateway) LoadPoliciesFromDashboard(endpoint, secret string, allowExplicit bool) (map[string]user.Policy, error) {
+func (gw *Gateway) LoadPoliciesFromDashboard(endpoint, secret string) ([]user.Policy, error) {
 	// Build request function for recovery mechanism
 	buildReq := func() (*http.Request, error) {
 		req, err := http.NewRequest("GET", endpoint, nil)
@@ -161,12 +169,12 @@ func (gw *Gateway) LoadPoliciesFromDashboard(endpoint, secret string, allowExpli
 		Message []DBPolicy
 		Nonce   string
 	}
-	if err := json.NewDecoder(resp.Body).Decode(&list); err != nil {
+	if err = json.NewDecoder(resp.Body).Decode(&list); err != nil {
 		log.Error("Failed to decode policy body: ", err)
 		// Check if we should retry after a network error during read
 		if gw.HandleDashboardResponseReadError(err, "policy fetch") {
 			// Retry the entire operation
-			return gw.LoadPoliciesFromDashboard(endpoint, secret, allowExplicit)
+			return gw.LoadPoliciesFromDashboard(endpoint, secret)
 		}
 		return nil, err
 	}
@@ -176,53 +184,20 @@ func (gw *Gateway) LoadPoliciesFromDashboard(endpoint, secret string, allowExpli
 	gw.ServiceNonceMutex.Unlock()
 	log.Debug("Loading Policies Finished: Nonce Set: ", list.Nonce)
 
-	policies := make(map[string]user.Policy, len(list.Message))
-
-	log.WithFields(logrus.Fields{
-		"prefix": "policy",
-	}).Info("Processing policy list")
-	for _, p := range list.Message {
-		id := p.MID.Hex()
-		if allowExplicit && p.ID != "" {
-			id = p.ID
-		}
-		p.ID = id
-		if _, ok := policies[id]; ok {
-			log.WithFields(logrus.Fields{
-				"prefix":   "policy",
-				"policyID": p.ID,
-				"OrgID":    p.OrgID,
-			}).Warning("--> Skipping policy, new item has a duplicate ID!")
-			continue
-		}
-		policies[id] = p.ToRegularPolicy()
-	}
-
-	return policies, err
+	return lo.Map(list.Message, func(item DBPolicy, _ int) user.Policy { return item.ToRegularPolicy() }), nil
 }
 
-func parsePoliciesFromRPC(list string, allowExplicit bool) (map[string]user.Policy, error) {
-	var dbPolicyList []user.Policy
+func parsePoliciesFromRPC(list string) ([]user.Policy, error) {
+	var policies []user.Policy
 
-	if err := json.Unmarshal([]byte(list), &dbPolicyList); err != nil {
+	if err := json.Unmarshal([]byte(list), &policies); err != nil {
 		return nil, err
-	}
-
-	policies := make(map[string]user.Policy, len(dbPolicyList))
-
-	for _, p := range dbPolicyList {
-		id := p.MID.Hex()
-		if allowExplicit && p.ID != "" {
-			id = p.ID
-		}
-		p.ID = id
-		policies[id] = p
 	}
 
 	return policies, nil
 }
 
-func (gw *Gateway) LoadPoliciesFromRPC(store RPCDataLoader, orgId string, allowExplicit bool) (map[string]user.Policy, error) {
+func (gw *Gateway) LoadPoliciesFromRPC(store RPCDataLoader, orgId string) ([]user.Policy, error) {
 	if rpc.IsEmergencyMode() {
 		return gw.LoadPoliciesFromRPCBackup()
 	}
@@ -236,7 +211,7 @@ func (gw *Gateway) LoadPoliciesFromRPC(store RPCDataLoader, orgId string, allowE
 		return nil, errors.New("failed to fetch policies from RPC store; connection may be down")
 	}
 
-	policies, err := parsePoliciesFromRPC(rpcPolicies, allowExplicit)
+	policies, err := parsePoliciesFromRPC(rpcPolicies)
 
 	if err != nil {
 		log.WithFields(logrus.Fields{

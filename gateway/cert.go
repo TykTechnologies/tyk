@@ -69,13 +69,25 @@ var cipherSuites = map[string]uint16{
 
 var certLog = log.WithField("prefix", "certs")
 
-func (gw *Gateway) getUpstreamCertificate(host string, spec *APISpec) (cert *tls.Certificate) {
+// getCertificateIDForHost returns the certificate ID that matches the given host from the provided certificate maps.
+// It tries multiple matching patterns to find the best match:
+// 1. Wildcard "*" - matches any host
+// 2. Wildcard subdomain patterns with port - "*.example.com:8443"
+// 3. Wildcard subdomain patterns without port - "*.example.com"
+// 4. Exact hostname match with port - "api.example.com:8443"
+// 5. Exact hostname match without port - "api.example.com"
+//
+// The function automatically handles hosts with ports by using net.SplitHostPort.
+// Certificate maps are checked in order, with later maps taking precedence (allowing spec config to override global config).
+func getCertificateIDForHost(host string, certMaps []map[string]string) string {
 	var certID string
 
-	certMaps := []map[string]string{gw.GetConfig().Security.Certificates.Upstream}
-
-	if spec != nil && !spec.UpstreamCertificatesDisabled && spec.UpstreamCertificates != nil {
-		certMaps = append(certMaps, spec.UpstreamCertificates)
+	// Strip port from host for certificate matching
+	// If host is "example.com:8443", hostWithoutPort becomes "example.com"
+	// If host has no port, hostWithoutPort equals host
+	hostWithoutPort := host
+	if h, _, err := net.SplitHostPort(host); err == nil {
+		hostWithoutPort = h
 	}
 
 	for _, m := range certMaps {
@@ -83,30 +95,62 @@ func (gw *Gateway) getUpstreamCertificate(host string, spec *APISpec) (cert *tls
 			continue
 		}
 
+		// Try wildcard match for any host
 		if id, ok := m["*"]; ok {
 			certID = id
 		}
 
-		hostParts := strings.SplitN(host, ".", 2)
+		// Try wildcard subdomain pattern matches
+		hostParts := strings.SplitN(hostWithoutPort, ".", 2)
 		if len(hostParts) > 1 {
+			// Try pattern without port first (less specific)
+			// e.g., "*.example.com" from config matches "api.example.com:8443" request
 			hostPattern := "*." + hostParts[1]
-
 			if id, ok := m[hostPattern]; ok {
 				certID = id
 			}
+
+			// Try pattern with original host (includes port if present) - higher priority
+			// e.g., "*.example.com:8443" from config matches "api.example.com:8443" request
+			// More specific patterns (with port) override less specific patterns (without port)
+			hostPartsWithPort := strings.SplitN(host, ".", 2)
+			if len(hostPartsWithPort) > 1 {
+				hostPatternWithPort := "*." + hostPartsWithPort[1]
+				if id, ok := m[hostPatternWithPort]; ok {
+					certID = id
+				}
+			}
 		}
 
+		// Try exact match without port first (most common case)
+		// This ensures "example.com" config matches "example.com:8443" request
+		if id, ok := m[hostWithoutPort]; ok {
+			certID = id
+		}
+
+		// Try exact match with original host (higher priority, more specific)
+		// This allows configs that include port to override more general configs
 		if id, ok := m[host]; ok {
 			certID = id
 		}
 	}
 
+	return certID
+}
+
+func (gw *Gateway) getUpstreamCertificate(host string, spec *APISpec) (cert *tls.Certificate) {
+	certMaps := []map[string]string{gw.GetConfig().Security.Certificates.Upstream}
+
+	if spec != nil && !spec.UpstreamCertificatesDisabled && spec.UpstreamCertificates != nil {
+		certMaps = append(certMaps, spec.UpstreamCertificates)
+	}
+
+	certID := getCertificateIDForHost(host, certMaps)
 	if certID == "" {
 		return nil
 	}
 
 	certs := gw.CertificateManager.List([]string{certID}, certs.CertificatePrivate)
-
 	if len(certs) == 0 {
 		return nil
 	}
@@ -308,6 +352,39 @@ func getClientValidator(helloInfo *tls.ClientHelloInfo, certPool *x509.CertPool)
 	}
 }
 
+// logServerCertificateExpiry logs certificate expiry information for server certificates.
+// It parses the certificate and logs a warning if expiring soon, or debug otherwise.
+// The source parameter differentiates the certificate origin (e.g., "file" or "store").
+func logServerCertificateExpiry(cert *tls.Certificate, threshold int, source string) {
+	if cert == nil || len(cert.Certificate) == 0 {
+		return
+	}
+
+	parsedCert, err := x509.ParseCertificate(cert.Certificate[0])
+	if err != nil {
+		return
+	}
+
+	daysUntilExpiry := int(time.Until(parsedCert.NotAfter).Hours() / 24)
+	fields := log.WithField("cert_name", parsedCert.Subject.CommonName).
+		WithField("expires_at", parsedCert.NotAfter).
+		WithField("days_remaining", daysUntilExpiry)
+
+	if daysUntilExpiry < threshold {
+		if source == "store" {
+			fields.Warn("Server certificate (from store) expiring soon")
+		} else {
+			fields.Warn("Server certificate expiring soon")
+		}
+	} else {
+		if source == "store" {
+			fields.Debug("Loaded server certificate from Certificate Store")
+		} else {
+			fields.Debug("Loaded server certificate")
+		}
+	}
+}
+
 func (gw *Gateway) getTLSConfigForClient(baseConfig *tls.Config, listenPort int) func(hello *tls.ClientHelloInfo) (*tls.Config, error) {
 	gwConfig := gw.GetConfig()
 	// Supporting legacy certificate configuration
@@ -324,6 +401,12 @@ func (gw *Gateway) getTLSConfigForClient(baseConfig *tls.Config, listenPort int)
 		certNameMap[certData.Name] = &cert
 	}
 
+	// Log file-based server certificate expiry info
+	threshold := gwConfig.Security.CertificateExpiryMonitor.WarningThresholdDays
+	for i := range serverCerts {
+		logServerCertificateExpiry(&serverCerts[i], threshold, "file")
+	}
+
 	if len(gwConfig.HttpServerOptions.SSLCertificates) > 0 {
 		var waitingRedisLog sync.Once
 		// ensure that we are connected to redis
@@ -338,9 +421,17 @@ func (gw *Gateway) getTLSConfigForClient(baseConfig *tls.Config, listenPort int)
 			time.Sleep(10 * time.Millisecond)
 		}
 	}
-	for _, cert := range gw.CertificateManager.List(gwConfig.HttpServerOptions.SSLCertificates, certs.CertificatePrivate) {
+	sslCertificates := gw.CertificateManager.List(gwConfig.HttpServerOptions.SSLCertificates, certs.CertificatePrivate)
+	for _, cert := range sslCertificates {
 		if cert != nil {
 			serverCerts = append(serverCerts, *cert)
+		}
+	}
+
+	// Log Certificate Store server certificate expiry info
+	for _, cert := range sslCertificates {
+		if cert != nil {
+			logServerCertificateExpiry(cert, threshold, "store")
 		}
 	}
 
@@ -418,9 +509,10 @@ func (gw *Gateway) getTLSConfigForClient(baseConfig *tls.Config, listenPort int)
 				if (!directMTLSDomainMatch && spec.Domain == "") || spec.Domain == hello.ServerName {
 					certIDs := append(spec.ClientCertificates, gwConfig.Security.Certificates.API...)
 
-					for _, cert := range gw.CertificateManager.List(certIDs, certs.CertificatePublic) {
+					clientCACerts := gw.CertificateManager.List(certIDs, certs.CertificatePublic)
+					for _, cert := range clientCACerts {
 						if cert != nil && !crypto.IsPublicKey(cert) {
-							newConfig.ClientCAs.AddCert(cert.Leaf)
+							crypto.AddCACertificatesFromChainToPool(newConfig.ClientCAs, cert)
 						}
 					}
 				}
@@ -441,7 +533,8 @@ func (gw *Gateway) getTLSConfigForClient(baseConfig *tls.Config, listenPort int)
 
 			// Dynamically add API specific certificates
 			if len(spec.Certificates) != 0 && !spec.DomainDisabled {
-				for _, cert := range gw.CertificateManager.List(spec.Certificates, certs.CertificatePrivate) {
+				apiSpecificCerts := gw.CertificateManager.List(spec.Certificates, certs.CertificatePrivate)
+				for _, cert := range apiSpecificCerts {
 					if cert == nil {
 						continue
 					}
@@ -592,3 +685,7 @@ func getCipherAliases(ciphers []string) (cipherCodes []uint16) {
 	}
 	return cipherCodes
 }
+
+// maskCertID masks certificate ID for logging to avoid exposing sensitive data.
+// Certificate IDs can be derived from API keys/auth tokens and should not be logged in clear text.
+// Returns first 8 characters plus length for debugging while protecting sensitive data.

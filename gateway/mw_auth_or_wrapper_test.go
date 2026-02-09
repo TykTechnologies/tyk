@@ -3381,7 +3381,7 @@ func TestVendorExtension_ComplexCombination_CompliantMode(t *testing.T) {
 			Headers: map[string]string{
 				"Authorization": "Bearer invalid-oauth",
 			},
-			Code: http.StatusForbidden,
+			Code: http.StatusBadRequest,
 		},
 
 		{
@@ -4358,6 +4358,9 @@ func TestAuthORWrapper_getMiddlewareForScheme(t *testing.T) {
 			setupSpec: func(spec *APISpec) {
 				spec.UseGoPluginAuth = true
 				spec.IsOAS = true
+				spec.CustomMiddleware = apidef.MiddlewareSection{
+					Driver: apidef.GoPluginDriver,
+				}
 
 				tykExt := &oas.XTykAPIGateway{
 					Server: oas.Server{
@@ -4402,6 +4405,9 @@ func TestAuthORWrapper_getMiddlewareForScheme(t *testing.T) {
 			setupSpec: func(spec *APISpec) {
 				spec.CustomPluginAuthEnabled = true
 				spec.IsOAS = true
+				spec.CustomMiddleware = apidef.MiddlewareSection{
+					Driver: apidef.OttoDriver,
+				}
 
 				tykExt := &oas.XTykAPIGateway{
 					Server: oas.Server{

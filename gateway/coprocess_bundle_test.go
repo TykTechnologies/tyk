@@ -15,7 +15,9 @@ import (
 	"runtime"
 	"testing"
 
+	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
@@ -163,35 +165,14 @@ func TestBundleLoader(t *testing.T) {
 	})
 
 	t.Run("Load bundle fails if public key path is set but signature verification fails", func(t *testing.T) {
-		privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
-		if err != nil {
-			t.Fatalf("rsa.GenerateKey() failed: %v", err)
-		}
-		publicKey := &privateKey.PublicKey
-
-		publicKeyDER, err := x509.MarshalPKIXPublicKey(publicKey)
-		if err != nil {
-			t.Fatalf("x509.MarshalPKIXPublicKey() failed: %v", err)
-		}
-
-		pemBlock := &pem.Block{
-			Type:  "PUBLIC KEY",
-			Bytes: publicKeyDER,
-		}
-
-		tmpfile, err := os.CreateTemp("", "example")
-		if err != nil {
-			t.Fatalf("os.CreateTemp() failed: %v", err)
-		}
-		defer tmpfile.Close()
-		defer os.Remove(tmpfile.Name())
-
-		if err := pem.Encode(tmpfile, pemBlock); err != nil {
-			t.Fatalf("pem.Encode() failed: %v", err)
-		}
+		pemfile := createPEMFile(t)
+		t.Cleanup(func() {
+			_ = pemfile.Close()
+			_ = os.Remove(pemfile.Name())
+		})
 
 		cfg := ts.Gw.GetConfig()
-		cfg.PublicKeyPath = tmpfile.Name()
+		cfg.PublicKeyPath = pemfile.Name()
 		ts.Gw.SetConfig(cfg)
 
 		spec := &APISpec{
@@ -199,9 +180,76 @@ func TestBundleLoader(t *testing.T) {
 				CustomMiddlewareBundle: badSignatureBundleID,
 			},
 		}
-		err = ts.Gw.loadBundle(spec)
+		err := ts.Gw.loadBundle(spec)
 
 		assert.ErrorContains(t, err, "crypto/rsa: verification error")
+	})
+
+	t.Run("should always validate manifest.json, even if it already exists on the filesystem", func(t *testing.T) {
+		pemfile := createPEMFile(t)
+		t.Cleanup(func() {
+			_ = pemfile.Close()
+			_ = os.Remove(pemfile.Name())
+		})
+
+		cfg := ts.Gw.GetConfig()
+		cfg.PublicKeyPath = pemfile.Name()
+		ts.Gw.SetConfig(cfg)
+
+		spec := &APISpec{
+			APIDefinition: &apidef.APIDefinition{
+				CustomMiddlewareBundle: "bundle-unverifiable.zip",
+			},
+		}
+
+		bundlePath := ts.Gw.getBundleDestPath(spec)
+
+		memFs := afero.NewMemMapFs()
+		err := memFs.MkdirAll(bundlePath, 0755)
+		require.NoError(t, err)
+
+		manifestFile, err := memFs.Create(filepath.Join(bundlePath, "manifest.json"))
+		require.NoError(t, err)
+		_, err = manifestFile.WriteString(`{
+		    "file_list": [
+				"plugin.py"
+			],
+		    "custom_middleware": {
+		        "driver": "python",
+		        "auth_check": {
+		            "name": "MyAuthHook"
+		        }
+		    },
+			"checksum": "d41d8cd98f00b204e9800998ecf8427e",
+			"signature": "dGVzdC1wdWJsaWMta2V5"
+		}`)
+		require.NoError(t, err)
+
+		_, err = memFs.Create(filepath.Join(bundlePath, "plugin.py"))
+		require.NoError(t, err)
+
+		err = ts.Gw.loadBundleWithFs(spec, memFs)
+		assert.ErrorContains(t, err, "crypto/rsa: verification error")
+	})
+
+	t.Run("load bundle fails if manifest can't be found locally", func(t *testing.T) {
+		spec := &APISpec{
+			APIDefinition: &apidef.APIDefinition{
+				CustomMiddlewareBundle: "bundle.zip",
+			},
+		}
+
+		bundlePath := ts.Gw.getBundleDestPath(spec)
+
+		memFS := afero.NewMemMapFs()
+		err := memFS.MkdirAll(bundlePath, 0755)
+		require.NoError(t, err)
+
+		_, err = memFS.Create(filepath.Join(bundlePath, "plugin.py"))
+		require.NoError(t, err)
+
+		err = ts.Gw.loadBundleWithFs(spec, memFS)
+		assert.ErrorContains(t, err, "manifest.json: file does not exist")
 	})
 }
 
@@ -450,18 +498,19 @@ func TestBundle_Pull(t *testing.T) {
 }
 
 func TestBundle_Verify(t *testing.T) {
-
 	tests := []struct {
-		name    string
-		bundle  Bundle
-		wantErr bool
+		name           string
+		bundle         Bundle
+		setupFs        func(afero.Fs, string)
+		usePublicKey   bool
+		wantErr        bool
+		wantErrContain string
 	}{
 		{
 			name: "bundle with invalid public key path",
 			bundle: Bundle{
 				Name: "test",
 				Data: []byte("test"),
-				Path: "/test/test.zip",
 				Spec: &APISpec{
 					APIDefinition: &apidef.APIDefinition{
 						CustomMiddlewareBundle: "test-mw-bundle",
@@ -472,14 +521,14 @@ func TestBundle_Verify(t *testing.T) {
 				},
 				Gw: &Gateway{},
 			},
-			wantErr: true,
+			usePublicKey: true,
+			wantErr:      true,
 		},
 		{
 			name: "bundle without signature",
 			bundle: Bundle{
 				Name: "test",
 				Data: []byte("test"),
-				Path: "/test/test.zip",
 				Spec: &APISpec{
 					APIDefinition: &apidef.APIDefinition{
 						CustomMiddlewareBundle: "test-mw-bundle",
@@ -490,7 +539,106 @@ func TestBundle_Verify(t *testing.T) {
 				},
 				Gw: &Gateway{},
 			},
-			wantErr: true,
+			usePublicKey: true,
+			wantErr:      true,
+		},
+		{
+			name: "valid checksum with empty file list",
+			bundle: Bundle{
+				Name: "test",
+				Spec: &APISpec{
+					APIDefinition: &apidef.APIDefinition{
+						CustomMiddlewareBundle: "test-mw-bundle",
+					},
+				},
+				Manifest: apidef.BundleManifest{
+					Checksum: "d41d8cd98f00b204e9800998ecf8427e", // MD5 of the empty string
+					FileList: []string{},
+				},
+				Gw: &Gateway{},
+			},
+			usePublicKey: false,
+			wantErr:      false,
+		},
+		{
+			name: "invalid checksum returns error",
+			bundle: Bundle{
+				Name: "test",
+				Spec: &APISpec{
+					APIDefinition: &apidef.APIDefinition{
+						CustomMiddlewareBundle: "test-mw-bundle",
+					},
+				},
+				Manifest: apidef.BundleManifest{
+					Checksum: "invalidchecksum123",
+					FileList: []string{},
+				},
+				Gw: &Gateway{},
+			},
+			usePublicKey:   false,
+			wantErr:        true,
+			wantErrContain: "Invalid checksum",
+		},
+		{
+			name: "file not found in file list",
+			bundle: Bundle{
+				Name: "test",
+				Spec: &APISpec{
+					APIDefinition: &apidef.APIDefinition{
+						CustomMiddlewareBundle: "test-mw-bundle",
+					},
+				},
+				Manifest: apidef.BundleManifest{
+					Checksum: "d41d8cd98f00b204e9800998ecf8427e",
+					FileList: []string{"nonexistent.py"},
+				},
+				Gw: &Gateway{},
+			},
+			setupFs:      func(fs afero.Fs, bundlePath string) {},
+			usePublicKey: false,
+			wantErr:      true,
+		},
+		{
+			name: "valid checksum with multiple files",
+			bundle: Bundle{
+				Name: "test",
+				Spec: &APISpec{
+					APIDefinition: &apidef.APIDefinition{
+						CustomMiddlewareBundle: "test-mw-bundle",
+					},
+				},
+				Manifest: apidef.BundleManifest{
+					// MD5 of "file1 contentfile2 content"
+					Checksum: "1510d0e71b31de1c78fd9e823a7c6de9",
+					FileList: []string{"file1.py", "file2.py"},
+				},
+				Gw: &Gateway{},
+			},
+			setupFs: func(fs afero.Fs, bundlePath string) {
+				assert.NoError(t, afero.WriteFile(fs, filepath.Join(bundlePath, "file1.py"), []byte("file1 content"), 0644))
+				assert.NoError(t, afero.WriteFile(fs, filepath.Join(bundlePath, "file2.py"), []byte("file2 content"), 0644))
+			},
+			usePublicKey: false,
+			wantErr:      false,
+		},
+		{
+			name: "invalid base64 signature returns error",
+			bundle: Bundle{
+				Name: "test",
+				Spec: &APISpec{
+					APIDefinition: &apidef.APIDefinition{
+						CustomMiddlewareBundle: "test-mw-bundle",
+					},
+				},
+				Manifest: apidef.BundleManifest{
+					Checksum:  "d41d8cd98f00b204e9800998ecf8427e",
+					FileList:  []string{},
+					Signature: "!!!invalid-base64!!!",
+				},
+				Gw: &Gateway{},
+			},
+			usePublicKey: true,
+			wantErr:      true,
 		},
 	}
 	for _, tt := range tests {
@@ -498,11 +646,143 @@ func TestBundle_Verify(t *testing.T) {
 			b := tt.bundle
 
 			globalConf := config.Config{}
-			globalConf.PublicKeyPath = "test"
+			if tt.usePublicKey {
+				pemfile := createPEMFile(t)
+				t.Cleanup(func() {
+					_ = pemfile.Close()
+					_ = os.Remove(pemfile.Name())
+				})
+				globalConf.PublicKeyPath = pemfile.Name()
+			}
 			b.Gw.SetConfig(globalConf)
 
-			if err := b.Verify(); (err != nil) != tt.wantErr {
+			fs := afero.NewMemMapFs()
+			bundlePath := "/test/bundles/test-bundle"
+			b.Path = bundlePath
+
+			if err := fs.MkdirAll(bundlePath, 0755); err != nil {
+				t.Fatalf("failed to create bundle directory: %v", err)
+			}
+
+			if tt.setupFs != nil {
+				tt.setupFs(fs, bundlePath)
+			}
+
+			err := b.Verify(fs)
+			if (err != nil) != tt.wantErr {
 				t.Errorf("Bundle.Verify() error = %v, wantErr %v", err, tt.wantErr)
+			}
+			if tt.wantErrContain != "" && err != nil {
+				assert.ErrorContains(t, err, tt.wantErrContain)
+			}
+		})
+	}
+}
+
+func createPEMFile(t *testing.T) *os.File {
+	t.Helper()
+
+	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		t.Fatalf("rsa.GenerateKey() failed: %v", err)
+	}
+	publicKey := &privateKey.PublicKey
+
+	publicKeyDER, err := x509.MarshalPKIXPublicKey(publicKey)
+	if err != nil {
+		t.Fatalf("x509.MarshalPKIXPublicKey() failed: %v", err)
+	}
+
+	pemBlock := &pem.Block{
+		Type:  "PUBLIC KEY",
+		Bytes: publicKeyDER,
+	}
+
+	tmpfile, err := os.CreateTemp("", "example")
+	require.NoError(t, err)
+
+	err = pem.Encode(tmpfile, pemBlock)
+	require.NoError(t, err)
+
+	return tmpfile
+}
+
+func setupBenchmarkBundle(b *testing.B, fs afero.Fs, bundlePath string, fileSize, numFiles int) *Bundle {
+	b.Helper()
+
+	if err := fs.MkdirAll(bundlePath, 0755); err != nil {
+		b.Fatalf("failed to create bundle directory: %v", err)
+	}
+
+	fileContent := make([]byte, fileSize)
+	for i := range fileContent {
+		fileContent[i] = 'A'
+	}
+
+	fileList := make([]string, numFiles)
+	md5Hash := md5.New()
+
+	for i := 0; i < numFiles; i++ {
+		fileName := fmt.Sprintf("file%d.py", i)
+		fileList[i] = fileName
+		filePath := filepath.Join(bundlePath, fileName)
+
+		if err := afero.WriteFile(fs, filePath, fileContent, 0644); err != nil {
+			b.Fatalf("failed to write file %s: %v", fileName, err)
+		}
+
+		md5Hash.Write(fileContent)
+	}
+
+	checksum := fmt.Sprintf("%x", md5Hash.Sum(nil))
+
+	if numFiles == 0 {
+		checksum = "d41d8cd98f00b204e9800998ecf8427e"
+	}
+
+	return &Bundle{
+		Name: "benchmark-bundle",
+		Path: bundlePath,
+		Spec: &APISpec{
+			APIDefinition: &apidef.APIDefinition{
+				CustomMiddlewareBundle: "benchmark-bundle.zip",
+			},
+		},
+		Manifest: apidef.BundleManifest{
+			Checksum: checksum,
+			FileList: fileList,
+		},
+		Gw: &Gateway{},
+	}
+}
+
+func BenchmarkBundle_Verify(b *testing.B) {
+	benchmarks := []struct {
+		name     string
+		fileSize int
+		numFiles int
+	}{
+		{"empty_file_list", 0, 0},
+		{"single_small_file_1KB", 1024, 1},
+		{"single_large_file_1MB", 1024 * 1024, 1},
+		{"multiple_files_10x10KB", 10 * 1024, 10},
+	}
+
+	for _, bm := range benchmarks {
+		b.Run(bm.name, func(b *testing.B) {
+			// Setup bundle and filesystem
+			fs := afero.NewMemMapFs()
+			bundlePath := "/test/bundles/benchmark-bundle"
+			bundle := setupBenchmarkBundle(b, fs, bundlePath, bm.fileSize, bm.numFiles)
+
+			// Configure GW with no public key (no signature verification)
+			bundle.Gw.SetConfig(config.Config{})
+
+			b.ResetTimer()
+			b.ReportAllocs()
+
+			for i := 0; i < b.N; i++ {
+				_ = bundle.Verify(fs)
 			}
 		})
 	}

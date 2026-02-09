@@ -10,6 +10,7 @@ import (
 
 const (
 	typeAPIKey      = "apiKey"
+	typeCertificate = "certificate"
 	typeHTTP        = "http"
 	typeOAuth2      = "oauth2"
 	schemeBearer    = "bearer"
@@ -34,14 +35,26 @@ type Token struct {
 	AuthSources `bson:",inline" json:",inline"`
 
 	// EnableClientCertificate allows to create dynamic keys based on certificates.
+	// Deprecated: Use the dedicated CertificateAuth security scheme instead.
 	//
 	// Tyk classic API definition: `auth_configs["authToken"].use_certificate`
+	// Deprecated: Use the dedicated CertificateAuth security scheme instead.
 	EnableClientCertificate bool `bson:"enableClientCertificate,omitempty" json:"enableClientCertificate,omitempty"`
 
 	// Signature holds the configuration for verifying the signature of the token.
 	//
 	// Tyk classic API definition: `auth_configs["authToken"].use_certificate`
 	Signature *Signature `bson:"signatureValidation,omitempty" json:"signatureValidation,omitempty"`
+}
+
+// CertificateAuth represents certificate-based authentication configuration.
+//
+// Tyk classic API definition: `auth_configs["authToken"].use_certificate`
+type CertificateAuth struct {
+	// Enabled activates the certificate-based authentication mode.
+	//
+	// Tyk classic API definition: `auth_configs["authToken"].use_certificate`
+	Enabled bool `bson:"enabled" json:"enabled"`
 }
 
 // Import populates *Token from argument values.
@@ -61,7 +74,10 @@ func (s *OAS) fillToken(api apidef.APIDefinition) {
 	token := &Token{}
 	token.Enabled = &api.UseStandardAuth
 	token.AuthSources.Fill(authConfig)
+
+	// Set the deprecated field
 	token.EnableClientCertificate = authConfig.UseCertificate
+
 	if token.Signature == nil {
 		token.Signature = &Signature{}
 	}
@@ -87,7 +103,19 @@ func (s *OAS) extractTokenTo(api *apidef.APIDefinition, name string) {
 		if token.Enabled != nil {
 			enabled = *token.Enabled
 		}
-		authConfig.UseCertificate = token.EnableClientCertificate
+
+		// First check for certificate auth in security schemes
+		certAuth := s.getTykSecuritySchemes()[apidef.CertificateAuthType]
+		if certAuth != nil {
+			// Use the dedicated security scheme if available
+			if certAuthVal, ok := certAuth.(*CertificateAuth); ok {
+				authConfig.UseCertificate = certAuthVal.Enabled
+			}
+		} else {
+			// Fall back to deprecated field if certificate auth scheme is not present
+			authConfig.UseCertificate = token.EnableClientCertificate
+		}
+
 		token.AuthSources.ExtractTo(&authConfig)
 		if token.Signature != nil {
 			token.Signature.ExtractTo(&authConfig)
@@ -96,6 +124,34 @@ func (s *OAS) extractTokenTo(api *apidef.APIDefinition, name string) {
 	api.UseStandardAuth = enabled
 
 	s.extractAPIKeySchemeTo(&authConfig, name)
+
+	api.AuthConfigs[apidef.AuthTokenType] = authConfig
+}
+
+func (s *OAS) extractCertificateAuthTo(api *apidef.APIDefinition) {
+	// Check if authConfig already exists (might have been created by extractTokenTo)
+	authConfig, exists := api.AuthConfigs[apidef.AuthTokenType]
+	if !exists {
+		// Create new authConfig with defaults
+		authConfig = apidef.AuthConfig{
+			Name:          apidef.AuthTokenType,
+			DisableHeader: true,
+		}
+	}
+
+	// Get the certificate auth scheme
+	certAuth := s.getTykSecuritySchemes()[apidef.CertificateAuthType]
+	if certAuth != nil {
+		if certAuthVal, ok := certAuth.(*CertificateAuth); ok {
+			authConfig.UseCertificate = certAuthVal.Enabled
+		}
+	}
+
+	// If authConfig didn't exist before, we need to set UseStandardAuth
+	// Certificate auth is a form of token authentication
+	if !exists {
+		api.UseStandardAuth = true
+	}
 
 	api.AuthConfigs[apidef.AuthTokenType] = authConfig
 }
@@ -217,9 +273,9 @@ type JWT struct {
 	// - "contains": for strings, must contain one of the values as substring; for arrays, must contain one of the values as element
 	//
 	// Examples:
-	// Basic validation: {"role": {"type": "exact_match", "allowedValues": ["admin", "user"]}}
-	// Nested claim: {"user.metadata.level": {"type": "contains", "allowedValues": ["gold", "silver"]}}
-	// Multiple rules: {"permissions": {"type": "contains", "allowedValues": ["read", "write"], "nonBlocking": true}}
+	// Basic validation: `{"role": {"type": "exact_match", "allowedValues": ["admin", "user"]}}`
+	// Nested claim: `{"user.metadata.level": {"type": "contains", "allowedValues": ["gold", "silver"]}}`
+	// Multiple rules: `{"permissions": {"type": "contains", "allowedValues": ["read", "write"], "nonBlocking": true}}`
 	//
 	// Claims can be of type string, number, boolean, or array. For arrays, the contains validation
 	// checks if any of the array elements exactly match any of the allowed values.
@@ -941,11 +997,142 @@ func isProprietaryAuth(authMethod string) bool {
 	return false
 }
 
+// isProprietaryAuthScheme checks if a security scheme name refers to Tyk proprietary auth.
+// It identifies proprietary schemes by checking:
+// 1. Known proprietary type names (hmac, custom, mtls, coprocess)
+// 2. Presence in vendor extension security without corresponding OAS Component
+// 3. Type inspection of SecuritySchemes entries
+func (s *OAS) isProprietaryAuthScheme(schemeName string) bool {
+	// Check known proprietary auth type names
+	if isProprietaryAuth(schemeName) {
+		return true
+	}
+
+	tykAuth := s.getTykAuthentication()
+	if tykAuth == nil {
+		return false
+	}
+
+	// Priority check: schemes in vendor extension security
+	if s.isInVendorSecurity(schemeName, tykAuth) {
+		return s.isProprietaryInVendor(schemeName, tykAuth)
+	}
+
+	// Fallback: check SecuritySchemes type
+	return s.isProprietaryInSecuritySchemes(schemeName, tykAuth)
+}
+
+// isInVendorSecurity checks if a scheme name appears in vendor extension security requirements
+func (s *OAS) isInVendorSecurity(schemeName string, tykAuth *Authentication) bool {
+	for _, vendorReq := range tykAuth.Security {
+		for _, vendorSchemeName := range vendorReq {
+			if vendorSchemeName == schemeName {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// isProprietaryInVendor determines if a scheme in vendor security is proprietary
+func (s *OAS) isProprietaryInVendor(schemeName string, tykAuth *Authentication) bool {
+	// If not in OAS Components, it's proprietary
+	if !s.isInOASComponents(schemeName) {
+		return true
+	}
+
+	// If in both vendor and OAS, check SecuritySchemes type
+	if tykAuth.SecuritySchemes != nil {
+		if scheme, exists := tykAuth.SecuritySchemes[schemeName]; exists {
+			return s.isProprietarySchemeType(scheme)
+		}
+	}
+
+	// In both but can't determine type, assume standard
+	return false
+}
+
+// isProprietaryInSecuritySchemes checks if a scheme in SecuritySchemes is proprietary
+func (s *OAS) isProprietaryInSecuritySchemes(schemeName string, tykAuth *Authentication) bool {
+	if tykAuth.SecuritySchemes == nil {
+		return false
+	}
+
+	scheme, exists := tykAuth.SecuritySchemes[schemeName]
+	if !exists {
+		return false
+	}
+
+	// Determine by type - standard types are not proprietary even if not in OAS Components yet
+	return s.isProprietarySchemeType(scheme)
+}
+
+// isInOASComponents checks if a scheme exists in OpenAPI Components
+func (s *OAS) isInOASComponents(schemeName string) bool {
+	if s.Components == nil || s.Components.SecuritySchemes == nil {
+		return false
+	}
+	_, exists := s.Components.SecuritySchemes[schemeName]
+	return exists
+}
+
+// isProprietarySchemeType checks if a SecurityScheme type is proprietary
+func (s *OAS) isProprietarySchemeType(scheme interface{}) bool {
+	switch scheme.(type) {
+	case *JWT, *Token, *Basic, *OAuth, *ExternalOAuth, *CertificateAuth:
+		return false // Standard OAS types
+	case *CustomPluginAuthentication:
+		return true // Proprietary
+	default:
+		return true // Unknown types treated as proprietary
+	}
+}
+
+func (s *OAS) fillCertificateAuth(api apidef.APIDefinition) {
+	authConfig, ok := api.AuthConfigs[apidef.AuthTokenType]
+	if !ok || !authConfig.UseCertificate {
+		return
+	}
+
+	s.appendSecurity(apidef.CertificateAuthType)
+
+	certAuth := &CertificateAuth{}
+	certAuth.Enabled = authConfig.UseCertificate
+
+	s.getTykSecuritySchemes()[apidef.CertificateAuthType] = certAuth
+
+	ss := s.Components.SecuritySchemes
+	if ss == nil {
+		ss = make(map[string]*openapi3.SecuritySchemeRef)
+		s.Components.SecuritySchemes = ss
+	}
+
+	ref, ok := ss[apidef.CertificateAuthType]
+	if !ok {
+		ref = &openapi3.SecuritySchemeRef{
+			Value: openapi3.NewSecurityScheme(),
+		}
+		ss[apidef.CertificateAuthType] = ref
+	}
+
+	ref.Value.WithType(typeCertificate)
+
+	if ShouldOmit(certAuth) {
+		delete(s.getTykSecuritySchemes(), apidef.CertificateAuthType)
+	}
+}
+
 func (s *OAS) fillSecurity(api apidef.APIDefinition) {
 	tykAuthentication := s.GetTykExtension().Server.Authentication
 	if tykAuthentication == nil {
 		tykAuthentication = &Authentication{}
 		s.GetTykExtension().Server.Authentication = tykAuthentication
+	}
+
+	// Add certificate auth to security requirements if enabled
+	authConfig, authOk := api.AuthConfigs[apidef.AuthTokenType]
+	if authOk && authConfig.UseCertificate {
+		s.appendSecurity(apidef.CertificateAuthType)
 	}
 
 	if tykAuthentication.SecuritySchemes == nil {
@@ -959,6 +1146,7 @@ func (s *OAS) fillSecurity(api apidef.APIDefinition) {
 	}
 
 	s.fillToken(api)
+	s.fillCertificateAuth(api)
 	s.fillJWT(api)
 	s.fillBasic(api)
 	s.fillOAuth(api)
@@ -972,6 +1160,10 @@ func (s *OAS) fillSecurity(api apidef.APIDefinition) {
 
 	if processingMode == SecurityProcessingModeCompliant {
 		// Compliant mode: separate OAS and vendor security
+		// Clear any auto-added security from individual fill methods (fillJWT, fillToken, etc.)
+		// as we'll rebuild it properly from SecurityRequirements
+		s.T.Security = nil
+
 		oasSecurity := make(openapi3.SecurityRequirements, 0)
 		vendorSecurity := [][]string{}
 
@@ -984,7 +1176,7 @@ func (s *OAS) fillSecurity(api apidef.APIDefinition) {
 
 				// First pass: check what types of auth we have
 				for _, schemeName := range requirement {
-					if isProprietaryAuth(schemeName) {
+					if s.isProprietaryAuthScheme(schemeName) {
 						hasProprietaryAuth = true
 						vendorReq = append(vendorReq, schemeName)
 					} else {
@@ -1009,7 +1201,7 @@ func (s *OAS) fillSecurity(api apidef.APIDefinition) {
 			// No explicit requirements, create from schemes
 			secReq := openapi3.NewSecurityRequirement()
 			for name := range tykAuthentication.SecuritySchemes {
-				if !isProprietaryAuth(name) {
+				if !s.isProprietaryAuthScheme(name) {
 					secReq[name] = []string{}
 				}
 			}
@@ -1023,21 +1215,44 @@ func (s *OAS) fillSecurity(api apidef.APIDefinition) {
 			tykAuthentication.Security = vendorSecurity
 		}
 	} else {
-		// Legacy mode: keep traditional behavior
+		// Legacy mode: filter proprietary auth even in legacy mode
+		// Legacy mode only affects PROCESSING (use first requirement), not STORAGE location
+		// Proprietary auth must never be in OAS security field
 		if len(api.SecurityRequirements) > 0 {
 			s.Security = make(openapi3.SecurityRequirements, 0, len(api.SecurityRequirements))
+			vendorSecurity := [][]string{}
+
 			for _, requirement := range api.SecurityRequirements {
 				secReq := openapi3.NewSecurityRequirement()
+				vendorReq := []string{}
+
 				for _, schemeName := range requirement {
-					// In legacy mode, don't separate vendor extensions
-					secReq[schemeName] = []string{}
+					if s.isProprietaryAuthScheme(schemeName) {
+						vendorReq = append(vendorReq, schemeName)
+					} else {
+						secReq[schemeName] = []string{}
+					}
 				}
-				s.Security = append(s.Security, secReq)
+
+				if len(secReq) > 0 {
+					s.Security = append(s.Security, secReq)
+				}
+				if len(vendorReq) > 0 {
+					vendorSecurity = append(vendorSecurity, vendorReq)
+				}
+			}
+
+			if len(vendorSecurity) > 0 {
+				tykAuthentication.Security = vendorSecurity
 			}
 		} else if len(tykAuthentication.SecuritySchemes) > 0 {
+			// When no explicit requirements, create from schemes
+			// Only add non-proprietary schemes to OAS security
 			secReq := openapi3.NewSecurityRequirement()
 			for name := range tykAuthentication.SecuritySchemes {
-				secReq[name] = []string{}
+				if !s.isProprietaryAuthScheme(name) {
+					secReq[name] = []string{}
+				}
 			}
 			if len(secReq) > 0 {
 				s.Security = openapi3.SecurityRequirements{secReq}
@@ -1070,14 +1285,19 @@ func (s *OAS) extractSecurityTo(api *apidef.APIDefinition) {
 		api.AuthConfigs = make(map[string]apidef.AuthConfig)
 	}
 
-	if len(s.Security) == 0 || s.Components == nil || len(s.Components.SecuritySchemes) == 0 {
-		return
-	}
-
 	// Extract security requirements based on processing mode (OAS-only feature)
 	processingMode := SecurityProcessingModeLegacy
-	if s.getTykAuthentication() != nil && s.getTykAuthentication().SecurityProcessingMode != "" {
-		processingMode = s.getTykAuthentication().SecurityProcessingMode
+	tykAuth := s.getTykAuthentication()
+	if tykAuth != nil && tykAuth.SecurityProcessingMode != "" {
+		processingMode = tykAuth.SecurityProcessingMode
+	}
+
+	// Check if we have any security to process (OAS or vendor extension)
+	hasOASSecurity := len(s.Security) > 0 && s.Components != nil && len(s.Components.SecuritySchemes) > 0
+	hasVendorSecurity := processingMode == SecurityProcessingModeCompliant && tykAuth != nil && len(tykAuth.Security) > 0
+
+	if !hasOASSecurity && !hasVendorSecurity {
+		return
 	}
 
 	// In compliant mode, extract all security requirements including vendor extension
@@ -1111,14 +1331,13 @@ func (s *OAS) extractSecurityTo(api *apidef.APIDefinition) {
 	// - Legacy mode: Process only the first requirement for backward compatibility
 	// BUT only if Tyk authentication is configured (don't auto-extract from bare OAS)
 	requirementsToProcess := []openapi3.SecurityRequirement{}
-	tykAuth := s.getTykAuthentication()
 	hasEnabledSchemes := false
 	if tykAuth != nil && tykAuth.SecuritySchemes != nil {
 		// Check if any security scheme is defined in Tyk extension
 		hasEnabledSchemes = len(tykAuth.SecuritySchemes) > 0
 	}
 
-	if processingMode == SecurityProcessingModeCompliant && len(s.Security) > 0 {
+	if processingMode == SecurityProcessingModeCompliant {
 		// Process all requirements in compliant mode
 		requirementsToProcess = s.Security
 
@@ -1143,8 +1362,10 @@ func (s *OAS) extractSecurityTo(api *apidef.APIDefinition) {
 		// For token auth, we need to prioritize enabled schemes since only one can be active
 		var tokenSchemes []string
 		for schemeName := range requirement {
-			if scheme, ok := s.Components.SecuritySchemes[schemeName]; ok && scheme.Value.Type == typeAPIKey {
-				tokenSchemes = append(tokenSchemes, schemeName)
+			if s.T.Components != nil && s.T.Components.SecuritySchemes != nil {
+				if scheme, ok := s.T.Components.SecuritySchemes[schemeName]; ok && scheme.Value.Type == typeAPIKey {
+					tokenSchemes = append(tokenSchemes, schemeName)
+				}
 			}
 		}
 
@@ -1165,35 +1386,39 @@ func (s *OAS) extractSecurityTo(api *apidef.APIDefinition) {
 
 		for schemeName := range requirement {
 			// Process the security scheme if it exists in the OpenAPI components
-			if scheme, ok := s.Components.SecuritySchemes[schemeName]; ok {
-				v := scheme.Value
-				switch {
-				case v.Type == typeAPIKey:
-					// Already handled above for multiple token schemes
-					if len(tokenSchemes) <= 1 {
-						s.extractTokenTo(api, schemeName)
-					}
-				case v.Type == typeHTTP && v.Scheme == schemeBearer && v.BearerFormat == bearerFormatJWT:
-					s.extractJWTTo(api, schemeName)
-				case v.Type == typeHTTP && v.Scheme == schemeBasic:
-					s.extractBasicTo(api, schemeName)
-				case v.Type == typeOAuth2:
-					securityScheme := s.getTykSecurityScheme(schemeName)
-					if securityScheme == nil {
-						continue
-					}
+			if s.T.Components != nil && s.T.Components.SecuritySchemes != nil {
+				if scheme, ok := s.T.Components.SecuritySchemes[schemeName]; ok {
+					v := scheme.Value
+					switch {
+					case v.Type == typeAPIKey:
+						// Already handled above for multiple token schemes
+						if len(tokenSchemes) <= 1 {
+							s.extractTokenTo(api, schemeName)
+						}
+					case v.Type == typeHTTP && v.Scheme == schemeBearer && v.BearerFormat == bearerFormatJWT:
+						s.extractJWTTo(api, schemeName)
+					case v.Type == typeHTTP && v.Scheme == schemeBasic:
+						s.extractBasicTo(api, schemeName)
+					case v.Type == typeCertificate:
+						s.extractCertificateAuthTo(api)
+					case v.Type == typeOAuth2:
+						securityScheme := s.getTykSecurityScheme(schemeName)
+						if securityScheme == nil {
+							continue
+						}
 
-					externalOAuth := &ExternalOAuth{}
-					if oauthVal, ok := securityScheme.(*ExternalOAuth); ok {
-						externalOAuth = oauthVal
-					} else {
-						toStructIfMap(securityScheme, externalOAuth)
-					}
+						externalOAuth := &ExternalOAuth{}
+						if oauthVal, ok := securityScheme.(*ExternalOAuth); ok {
+							externalOAuth = oauthVal
+						} else {
+							toStructIfMap(securityScheme, externalOAuth)
+						}
 
-					if len(externalOAuth.Providers) > 0 {
-						s.extractExternalOAuthTo(api, schemeName)
-					} else {
-						s.extractOAuthTo(api, schemeName)
+						if len(externalOAuth.Providers) > 0 {
+							s.extractExternalOAuthTo(api, schemeName)
+						} else {
+							s.extractOAuthTo(api, schemeName)
+						}
 					}
 				}
 			}

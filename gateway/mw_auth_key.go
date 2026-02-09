@@ -3,12 +3,15 @@ package gateway
 import (
 	"errors"
 	"net/http"
+	"slices"
 	"strings"
 	"time"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/ctx"
 	"github.com/TykTechnologies/tyk/internal/crypto"
+	tykerrors "github.com/TykTechnologies/tyk/internal/errors"
 	"github.com/TykTechnologies/tyk/internal/httpctx"
 	"github.com/TykTechnologies/tyk/internal/otel"
 	"github.com/TykTechnologies/tyk/request"
@@ -28,10 +31,13 @@ const (
 	ErrAuthCertNotFound              = "auth.cert_not_found"
 	ErrAuthCertExpired               = "auth.cert_expired"
 	ErrAuthKeyIsInvalid              = "auth.key_is_invalid"
+	ErrAuthCertRequired              = "auth.cert_required"
+	ErrAuthCertMismatch              = "auth.cert_mismatch"
 
-	MsgNonExistentKey  = "Attempted access with non-existent key."
-	MsgNonExistentCert = "Attempted access with non-existent cert."
-	MsgInvalidKey      = "Attempted access with invalid key."
+	MsgNonExistentKey      = "Attempted access with non-existent key."
+	MsgNonExistentCert     = "Attempted access with non-existent cert."
+	MsgCertificateMismatch = "Attempted access with incorrect certificate."
+	MsgInvalidKey          = "Attempted access with invalid key."
 )
 
 func initAuthKeyErrors() {
@@ -58,6 +64,16 @@ func initAuthKeyErrors() {
 	TykErrors[ErrAuthCertExpired] = config.TykError{
 		Message: MsgCertificateExpired,
 		Code:    http.StatusForbidden,
+	}
+
+	TykErrors[ErrAuthCertRequired] = config.TykError{
+		Message: MsgAuthCertRequired,
+		Code:    http.StatusUnauthorized,
+	}
+
+	TykErrors[ErrAuthCertMismatch] = config.TykError{
+		Message: MsgApiAccessDisallowed,
+		Code:    http.StatusUnauthorized,
 	}
 }
 
@@ -88,6 +104,17 @@ func (k *AuthKey) getAuthType() string {
 	return apidef.AuthTokenType
 }
 
+// checkSessionWithCertFallback attempts to find a session using a generated token from certHash,
+// falling back to checking with the certHash directly if the token lookup fails.
+func (k *AuthKey) checkSessionWithCertFallback(r *http.Request, certHash string) (user.SessionState, bool) {
+	key := k.Gw.generateToken(k.Spec.OrgID, certHash)
+	session, keyExists := k.CheckSessionAndIdentityForValidKey(key, r)
+	if !keyExists {
+		session, keyExists = k.CheckSessionAndIdentityForValidKey(certHash, r)
+	}
+	return session, keyExists
+}
+
 func (k *AuthKey) ProcessRequest(_ http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
 	if ctxGetRequestStatus(r) == StatusOkAndIgnore {
 		return nil, http.StatusOK
@@ -99,49 +126,85 @@ func (k *AuthKey) ProcessRequest(_ http.ResponseWriter, r *http.Request, _ inter
 	}
 
 	key, authConfig := k.getAuthToken(k.getAuthType(), r)
-	var certHash string
-
-	keyExists := false
-	var session user.SessionState
-	updateSession := false
 	if key != "" {
 		key = stripBearer(key)
-	} else if authConfig.UseCertificate && key == "" && r.TLS != nil && len(r.TLS.PeerCertificates) > 0 {
-		log.Debug("Trying to find key by client certificate")
-		certHash = k.Spec.OrgID + crypto.HexSHA256(r.TLS.PeerCertificates[0].Raw)
-		if time.Now().After(r.TLS.PeerCertificates[0].NotAfter) {
-			return errorAndStatusCode(ErrAuthCertExpired)
-		}
-
-		key = k.Gw.generateToken(k.Spec.OrgID, certHash)
-	} else {
-		k.Logger().Info("Attempted access with malformed header, no auth header found.")
-		return errorAndStatusCode(ErrAuthAuthorizationFieldMissing)
 	}
+	var keyExists, updateSession bool
+	var certHash string
+	var session user.SessionState
 
 	session, keyExists = k.CheckSessionAndIdentityForValidKey(key, r)
-	key = session.KeyID
-	if !keyExists {
-		// fallback to search by cert
-		session, keyExists = k.CheckSessionAndIdentityForValidKey(certHash, r)
+	if !authConfig.UseCertificate {
+		if key == "" {
+			k.Logger().Info("Attempted access with malformed header, no auth header found.")
+			ctx.SetErrorClassification(r, tykerrors.ClassifyAuthError(tykerrors.ErrAuthAuthorizationFieldMissing, k.Name()))
+			return errorAndStatusCode(ErrAuthAuthorizationFieldMissing)
+		}
 		if !keyExists {
 			return k.reportInvalidKey(key, r, MsgNonExistentKey, ErrAuthKeyNotFound)
 		}
 	}
-
-	if authConfig.UseCertificate {
-		certLookup := session.Certificate
-
-		if r.TLS != nil && len(r.TLS.PeerCertificates) > 0 {
-			certLookup = certHash
-			if session.Certificate != certHash {
-				session.Certificate = certHash
-				updateSession = true
+	if authConfig.UseCertificate && r.TLS != nil {
+		if len(r.TLS.PeerCertificates) > 0 {
+			if time.Now().After(r.TLS.PeerCertificates[0].NotAfter) {
+				ctx.SetErrorClassification(r, tykerrors.ClassifyAuthError(tykerrors.ErrAuthCertExpired, k.Name()))
+				return errorAndStatusCode(ErrAuthCertExpired)
 			}
+			certHash = k.Spec.OrgID + crypto.HexSHA256(r.TLS.PeerCertificates[0].Raw)
 		}
 
-		if _, err := k.Gw.CertificateManager.GetRaw(certLookup); err != nil {
-			return k.reportInvalidKey(key, r, MsgNonExistentCert, ErrAuthCertNotFound)
+		if !k.Gw.GetConfig().Security.AllowUnsafeDynamicMTLSToken {
+			if certHash == "" {
+				ctx.SetErrorClassification(r, tykerrors.ClassifyAuthError(tykerrors.ErrAuthCertRequired, k.Name()))
+				return errorAndStatusCode(ErrAuthCertRequired)
+			}
+			session, keyExists = k.checkSessionWithCertFallback(r, certHash)
+			if !keyExists {
+				ctx.SetErrorClassification(r, tykerrors.ClassifyAuthError(tykerrors.ErrAuthCertMismatch, k.Name()))
+				return errorAndStatusCode(ErrAuthCertMismatch)
+			}
+		} else {
+			if certHash != "" {
+				session, keyExists = k.checkSessionWithCertFallback(r, certHash)
+				if !keyExists {
+					ctx.SetErrorClassification(r, tykerrors.ClassifyAuthError(tykerrors.ErrAuthCertMismatch, k.Name()))
+					return errorAndStatusCode(ErrAuthCertMismatch)
+				}
+			}
+			if key != "" {
+				session, keyExists = k.CheckSessionAndIdentityForValidKey(key, r)
+				if !keyExists {
+					return k.reportInvalidKey(key, r, MsgNonExistentKey, ErrAuthKeyNotFound)
+				}
+			}
+		}
+	} else {
+		if !keyExists {
+			// fallback to search by cert
+			session, keyExists = k.CheckSessionAndIdentityForValidKey(certHash, r)
+			if !keyExists {
+				return k.reportInvalidKey(key, r, MsgNonExistentKey, ErrAuthKeyNotFound)
+			}
+		}
+	}
+	key = session.KeyID
+
+	// Validate certificate binding or dynamic mTLS
+	// Certificate binding validation runs when:
+	// 1. The session has certificate bindings AND static mTLS is enabled (certificate-token binding), OR
+	// 2. UseCertificate is explicitly set for this API (dynamic mTLS mode)
+	useCertBinding := k.shouldValidateCertificateBinding(&session)
+	if authConfig.UseCertificate || useCertBinding {
+		ctx := &certValidationContext{
+			request:        r,
+			key:            key,
+			session:        &session,
+			certHash:       &certHash,
+			updateSession:  &updateSession,
+			useCertBinding: useCertBinding,
+		}
+		if code, err := k.validateCertificate(ctx); err != nil {
+			return err, code
 		}
 	}
 
@@ -186,6 +249,11 @@ func (k *AuthKey) ProcessRequest(_ http.ResponseWriter, r *http.Request, _ inter
 func (k *AuthKey) reportInvalidKey(key string, r *http.Request, msg string, errMsg string) (error, int) {
 	k.Logger().WithField("key", k.Gw.obfuscateKey(key)).Info(msg)
 
+	// Set error classification for access logs
+	if ec := tykerrors.ClassifyAuthError(errMsg, k.Name()); ec != nil {
+		ctx.SetErrorClassification(r, ec)
+	}
+
 	// Fire Authfailed Event
 	AuthFailed(k, r, key)
 
@@ -193,6 +261,22 @@ func (k *AuthKey) reportInvalidKey(key string, r *http.Request, msg string, errM
 	reportHealthValue(k.Spec, KeyFailure, "1")
 
 	return errorAndStatusCode(errMsg)
+}
+
+// certValidationContext holds all the context needed for certificate validation
+type certValidationContext struct {
+	request        *http.Request
+	key            string
+	session        *user.SessionState
+	certHash       *string
+	updateSession  *bool
+	useCertBinding bool
+}
+
+// shouldValidateCertificateBinding determines if certificate-token binding should be enforced.
+// Certificate binding only applies when static mTLS is enabled at the API level.
+func (k *AuthKey) shouldValidateCertificateBinding(session *user.SessionState) bool {
+	return len(session.MtlsStaticCertificateBindings) > 0 && k.Spec.UseMutualTLSAuth
 }
 
 func (k *AuthKey) validateSignature(r *http.Request, key string) (error, int) {
@@ -271,4 +355,108 @@ func AuthFailed(m TykMiddleware, r *http.Request, token string) {
 		Origin:           request.RealIP(r),
 		Key:              token,
 	})
+}
+
+// validateCertificate performs certificate validation for both certificate binding and dynamic mTLS
+func (k *AuthKey) validateCertificate(ctx *certValidationContext) (int, error) {
+	if ctx.request.TLS != nil && len(ctx.request.TLS.PeerCertificates) > 0 {
+		return k.validateWithTLSCertificate(ctx)
+	}
+
+	// Certificate binding validation is not needed here because CertificateCheckMW
+	// rejects requests without certificates before reaching this code when UseMutualTLSAuth=true
+	return k.validateLegacyWithoutCert(ctx.request, ctx.session)
+}
+
+// validateWithTLSCertificate handles validation when a TLS client certificate is provided
+func (k *AuthKey) validateWithTLSCertificate(ctx *certValidationContext) (int, error) {
+	// Compute cert hash for comparison
+	*ctx.certHash = k.computeCertHash(ctx.request, *ctx.certHash)
+
+	// Use binding mode if the session has static certificate bindings configured
+	// Otherwise, use legacy mode for backward compatibility with dynamic mTLS
+	if ctx.useCertBinding {
+		// Check certificate expiry for cert binding mode
+		// (not checked earlier in the flow, unlike when authConfig.UseCertificate is true)
+		if code, err := k.checkCertificateExpiry(ctx.request, ctx.key); err != nil {
+			return code, err
+		}
+		return k.validateCertificateBinding(ctx.request, ctx.key, ctx.session, *ctx.certHash)
+	}
+
+	return k.validateLegacyMode(ctx.request, ctx.session, *ctx.certHash, ctx.updateSession)
+}
+
+// checkCertificateExpiry validates that the certificate hasn't expired
+func (k *AuthKey) checkCertificateExpiry(r *http.Request, key string) (int, error) {
+	if key != "" && time.Now().After(r.TLS.PeerCertificates[0].NotAfter) {
+		ctx.SetErrorClassification(r, tykerrors.ClassifyAuthError(tykerrors.ErrAuthCertExpired, k.Name()))
+		err, code := errorAndStatusCode(ErrAuthCertExpired)
+		return code, err
+	}
+
+	return http.StatusOK, nil
+}
+
+// computeCertHash computes the certificate hash if not already computed
+func (k *AuthKey) computeCertHash(r *http.Request, existingHash string) string {
+	if existingHash == "" {
+		return k.Spec.OrgID + crypto.HexSHA256(r.TLS.PeerCertificates[0].Raw)
+	}
+
+	return existingHash
+}
+
+// validateCertificateBinding validates certificate-to-token binding
+// This enforces that the presented certificate matches the one bound to the session
+func (k *AuthKey) validateCertificateBinding(r *http.Request, key string, session *user.SessionState, certHash string) (int, error) {
+	// Only validate if both token and session have certificate bindings
+	if key == "" || len(session.MtlsStaticCertificateBindings) == 0 {
+		return http.StatusOK, nil
+	}
+
+	// Check if the presented certificate hash matches any of the bound certificates
+	certMatched := slices.Contains(session.MtlsStaticCertificateBindings, certHash)
+
+	// If certificates don't match, reject the request
+	if !certMatched {
+		k.Logger().WithField("key", k.Gw.obfuscateKey(key)).Warn("Certificate mismatch detected for token")
+		err, code := k.reportInvalidKey(key, r, MsgCertificateMismatch, ErrAuthCertMismatch)
+		return code, err
+	}
+
+	// Note: In binding mode, certificate whitelist validation is performed at TLS handshake level (UseMutualTLSAuth)
+	// or by CertificateCheckMW middleware. We don't validate against cert manager here because
+	// MtlsStaticCertificateBindings contains hashes for binding, not cert IDs for whitelist lookup
+	return http.StatusOK, nil
+}
+
+// validateLegacyMode handles the dynamic mtls behavior
+func (k *AuthKey) validateLegacyMode(r *http.Request, session *user.SessionState, certHash string, updateSession *bool) (int, error) {
+	// Auto-update session certificate with current cert hash
+	if session.Certificate != certHash {
+		session.Certificate = certHash
+		*updateSession = true
+	}
+
+	// Validate the certificate exists in cert manager
+	if _, err := k.Gw.CertificateManager.GetRaw(certHash); err != nil {
+		err, code := k.reportInvalidKey("", r, MsgNonExistentCert, ErrAuthCertNotFound)
+		return code, err
+	}
+
+	return http.StatusOK, nil
+}
+
+// validateLegacyWithoutCert validates session certificate in dynamic mTLS mode when no TLS cert is provided
+// Checks if stored certificate exists in cert manager to catch corrupted data
+func (k *AuthKey) validateLegacyWithoutCert(r *http.Request, session *user.SessionState) (int, error) {
+	if session.Certificate != "" {
+		if _, err := k.Gw.CertificateManager.GetRaw(session.Certificate); err != nil {
+			err, code := k.reportInvalidKey("", r, MsgNonExistentCert, ErrAuthCertNotFound)
+			return code, err
+		}
+	}
+
+	return http.StatusOK, nil
 }

@@ -20,7 +20,9 @@ import (
 	"github.com/TykTechnologies/tyk/ee/middleware/streams"
 	"github.com/TykTechnologies/tyk/storage/kv"
 
+	"github.com/TykTechnologies/tyk/internal/httpctx"
 	"github.com/TykTechnologies/tyk/internal/httputil"
+	"github.com/TykTechnologies/tyk/internal/mcp"
 
 	"github.com/getkin/kin-openapi/routers/gorillamux"
 
@@ -82,10 +84,12 @@ const (
 	RequestTracked
 	RequestNotTracked
 	ValidateJSONRequest
+	OASValidateRequest
 	Internal
 	GoPlugin
 	PersistGraphQL
 	RateLimit
+	OASMockResponse
 )
 
 // RequestStatus is a custom type to avoid collisions
@@ -121,10 +125,15 @@ const (
 	StatusRequestNotTracked               RequestStatus = "Request Not Tracked"
 	StatusValidateJSON                    RequestStatus = "Validate JSON"
 	StatusValidateRequest                 RequestStatus = "Validate Request"
+	StatusOASValidateRequest              RequestStatus = "OAS Validate Request"
+	StatusOASMockResponse                 RequestStatus = "OAS Mock Response"
 	StatusInternal                        RequestStatus = "Internal path"
 	StatusGoPlugin                        RequestStatus = "Go plugin"
 	StatusPersistGraphQL                  RequestStatus = "Persist GraphQL"
 	StatusRateLimit                       RequestStatus = "Rate Limited"
+	// MCPPrimitiveNotFound is returned when a primitive VEM is accessed directly (not via JSON-RPC routing).
+	// It intentionally maps to HTTP 404 to avoid exposing internal-only endpoints.
+	MCPPrimitiveNotFound RequestStatus = "MCP Primitive Not Found"
 )
 
 type EndPointCacheMeta struct {
@@ -201,6 +210,12 @@ func (s *APISpec) Unload() {
 		hook()
 	}
 	s.unloadHooks = nil
+
+	// stop upstream certificate monitoring goroutine (after all hooks to ensure middleware cleanup completes first)
+	s.UnloadUpstreamCertMonitoring()
+
+	// Clear MCP primitives map
+	s.MCPPrimitives = nil
 }
 
 // Validate returns nil if s is a valid spec and an error stating why the spec is not valid.
@@ -345,6 +360,27 @@ func (a APIDefinitionLoader) MakeSpec(def *model.MergedAPI, logger *logrus.Entry
 		}
 	}
 
+	// Initialize OAS before compiling path specs, as OAS middleware compilation
+	// needs access to the initialized OAS structure
+	if spec.IsOAS && def.OAS != nil {
+		loader := openapi3.NewLoader()
+		if err := loader.ResolveRefsIn(&def.OAS.T, nil); err != nil {
+			logger.WithError(err).Errorf("Dashboard loaded API's OAS reference resolve failed: %s", def.APIID)
+		}
+
+		spec.OAS = *def.OAS
+
+		// Eagerly initialize all OAS security schemes and extensions to prevent
+		// race conditions caused by lazy-initialization during request processing.
+		// See: https://github.com/TykTechnologies/tyk/issues/7573
+		spec.OAS.Initialize()
+
+		if spec.IsMCP() {
+			a.extractMCPPrimitivesToPaths(spec, def)
+			a.initMCPConfiguration(spec)
+		}
+	}
+
 	spec.RxPaths = make(map[string][]URLSpec, len(def.VersionData.Versions))
 	spec.WhiteListEnabled = make(map[string]bool, len(def.VersionData.Versions))
 	for _, v := range def.VersionData.Versions {
@@ -360,15 +396,6 @@ func (a APIDefinitionLoader) MakeSpec(def *model.MergedAPI, logger *logrus.Entry
 		}
 		spec.RxPaths[v.Name] = pathSpecs
 		spec.WhiteListEnabled[v.Name] = whiteListSpecs
-	}
-
-	if spec.IsOAS && def.OAS != nil {
-		loader := openapi3.NewLoader()
-		if err := loader.ResolveRefsIn(&def.OAS.T, nil); err != nil {
-			logger.WithError(err).Errorf("Dashboard loaded API's OAS reference resolve failed: %s", def.APIID)
-		}
-
-		spec.OAS = *def.OAS
 	}
 
 	if err := httputil.ValidatePath(spec.Proxy.ListenPath); err != nil {
@@ -551,9 +578,23 @@ func (a APIDefinitionLoader) replaceVaultSecrets(input *string) error {
 		return err
 	}
 
-	secret, err := a.Gw.vaultKVStore.(*kv.Vault).Client().Logical().Read(vaultSecretPath + prefixKeys)
+	vault, ok := a.Gw.vaultKVStore.(kv.SecretReader)
+	if !ok {
+		log.Errorf("KV store %T does not implement SecretReader", a.Gw.vaultKVStore)
+		return errors.New("could not read secrets")
+	}
+
+	secret, err := vault.ReadSecret(vaultSecretPath + prefixKeys)
 	if err != nil {
 		return err
+	}
+
+	if secret == nil {
+		return fmt.Errorf("vault path does not exist: %s%s; vault references in API definitions will not be resolved", vaultSecretPath, prefixKeys)
+	}
+
+	if secret.Data == nil {
+		return fmt.Errorf("vault path contains no data: %s%s; vault references in API definitions will not be resolved", vaultSecretPath, prefixKeys)
 	}
 
 	pairs, ok := secret.Data["data"]
@@ -671,6 +712,10 @@ func (a APIDefinitionLoader) GetOASFilepath(path string) string {
 	return strings.TrimSuffix(path, ".json") + "-oas.json"
 }
 
+func (a APIDefinitionLoader) GetMCPFilepath(path string) string {
+	return strings.TrimSuffix(path, ".json") + "-mcp.json"
+}
+
 // FromDir will load APIDefinitions from a directory on the filesystem. Definitions need
 // to be the JSON representation of APIDefinition object
 func (a APIDefinitionLoader) FromDir(dir string) []*APISpec {
@@ -678,7 +723,8 @@ func (a APIDefinitionLoader) FromDir(dir string) []*APISpec {
 	// Grab json files from directory
 	paths, _ := filepath.Glob(filepath.Join(dir, "*.json"))
 	for _, path := range paths {
-		if strings.HasSuffix(path, "-oas.json") {
+		// Skip companion files (loaded separately)
+		if strings.HasSuffix(path, "-oas.json") || strings.HasSuffix(path, "-mcp.json") {
 			continue
 		}
 
@@ -715,7 +761,15 @@ func (a APIDefinitionLoader) loadDefFromFilePath(filePath string) (*APISpec, err
 		loader := openapi3.NewLoader()
 		// use openapi3.ReadFromFile as ReadFromURIFunc since the default implementation cache spec based on file path.
 		loader.ReadFromURIFunc = openapi3.ReadFromFile
-		oasDoc, err := loader.LoadFromFile(a.GetOASFilepath(filePath))
+
+		var oasFilepath string
+		if def.IsMCP() {
+			oasFilepath = a.GetMCPFilepath(filePath)
+		} else {
+			oasFilepath = a.GetOASFilepath(filePath)
+		}
+
+		oasDoc, err := loader.LoadFromFile(oasFilepath)
 		if err == nil {
 			nestDef.OAS = &oas.OAS{T: *oasDoc}
 		}
@@ -1296,6 +1350,167 @@ func (a APIDefinitionLoader) compileRateLimitPathsSpec(paths []apidef.RateLimitM
 	return urlSpec
 }
 
+// compileOASValidateRequestPathSpec extracts ValidateRequest operations from OAS middleware
+// and converts them to URLSpec entries that use the standard regex-based path matching algorithm.
+// This ensures OAS validateRequest middleware respects gateway configurations like
+// EnablePathPrefixMatching, EnablePathSuffixMatching, and IgnoreEndpointCase.
+func (a APIDefinitionLoader) compileOASValidateRequestPathSpec(apiSpec *APISpec, conf config.Config) []URLSpec {
+	if !apiSpec.IsOAS {
+		return nil
+	}
+
+	middleware := apiSpec.OAS.GetTykMiddleware()
+	if middleware == nil || len(middleware.Operations) == 0 {
+		return nil
+	}
+
+	urlSpec := []URLSpec{}
+
+	// Iterate through all OAS operations and find those with ValidateRequest enabled
+	for operationID, operation := range middleware.Operations {
+		if operation.ValidateRequest == nil || !operation.ValidateRequest.Enabled {
+			continue
+		}
+
+		// Find the path and method for this operation
+		path, method := a.findPathAndMethodForOperation(apiSpec, operationID)
+		if path == "" || method == "" {
+			continue
+		}
+
+		newSpec := URLSpec{
+			OASValidateRequestMeta: operation.ValidateRequest,
+			OASMethod:              strings.ToUpper(method),
+			OASPath:                path,
+		}
+
+		// The path in OAS is relative to the server URL (listenPath)
+		// For regex matching, we don't prepend listenPath because URLSpec.matchesPath
+		// will strip the listenPath before matching
+		// Use standard regex generation with gateway config
+		a.generateRegex(path, &newSpec, OASValidateRequest, conf)
+		urlSpec = append(urlSpec, newSpec)
+	}
+
+	return urlSpec
+}
+
+// compileOASMockResponsePathSpec extracts MockResponse operations from OAS middleware
+// and converts them to URLSpec entries that use the standard regex-based path matching algorithm.
+// This ensures OAS mockResponse middleware respects gateway configurations like
+// EnablePathPrefixMatching, EnablePathSuffixMatching, and IgnoreEndpointCase.
+func (a APIDefinitionLoader) compileOASMockResponsePathSpec(apiSpec *APISpec, conf config.Config) []URLSpec {
+	if !apiSpec.IsOAS {
+		return nil
+	}
+
+	middleware := apiSpec.OAS.GetTykMiddleware()
+	if middleware == nil || len(middleware.Operations) == 0 {
+		return nil
+	}
+
+	urlSpec := []URLSpec{}
+
+	// Iterate through all OAS operations and find those with MockResponse enabled
+	for operationID, operation := range middleware.Operations {
+		if operation.MockResponse == nil || !operation.MockResponse.Enabled {
+			continue
+		}
+
+		// Find the path and method for this operation
+		path, method := a.findPathAndMethodForOperation(apiSpec, operationID)
+		if path == "" || method == "" {
+			continue
+		}
+
+		newSpec := URLSpec{
+			OASMockResponseMeta: operation.MockResponse,
+			OASMethod:           strings.ToUpper(method),
+			OASPath:             path,
+		}
+
+		// Use standard regex generation with gateway config
+		a.generateRegex(path, &newSpec, OASMockResponse, conf)
+		urlSpec = append(urlSpec, newSpec)
+	}
+
+	return urlSpec
+}
+
+// findPathAndMethodForOperation finds the path and method for a given operation ID
+// by searching through the OAS paths.
+func (a APIDefinitionLoader) findPathAndMethodForOperation(apiSpec *APISpec, operationID string) (string, string) {
+	if apiSpec.OAS.Paths == nil {
+		return "", ""
+	}
+
+	for path, pathItem := range apiSpec.OAS.Paths.Map() {
+		for method, operation := range pathItem.Operations() {
+			if operation.OperationID == operationID {
+				return path, method
+			}
+		}
+	}
+
+	return "", ""
+}
+
+// extractMCPPrimitivesToPaths extracts MCP primitives (tools, resources, prompts) from the OAS
+// definition and populates them into the ExtendedPaths structure for each API version.
+// It also adds built-in MCP operation paths (tools/call, resources/read, prompts/get) to
+// the Internal middleware configuration.
+func (a APIDefinitionLoader) extractMCPPrimitivesToPaths(spec *APISpec, def *model.MergedAPI) {
+	middleware := spec.OAS.GetTykMiddleware()
+	if middleware == nil {
+		return
+	}
+
+	for versionName := range def.VersionData.Versions {
+		versionInfo := def.VersionData.Versions[versionName]
+
+		// Extract MCP primitives to extended paths
+		middleware.ExtractPrimitivesToExtendedPaths(&versionInfo.ExtendedPaths)
+
+		// Add built-in MCP operation paths to Internal middleware
+		a.addInternalMWtoMCPOperations(spec, &versionInfo.ExtendedPaths)
+
+		def.VersionData.Versions[versionName] = versionInfo
+	}
+}
+
+// addInternalMWtoMCPOperations adds built-in MCP operation paths (tools/call, resources/read,
+// prompts/get) to the Internal middleware configuration if they exist in the OAS definition.
+func (a APIDefinitionLoader) addInternalMWtoMCPOperations(spec *APISpec, extendedPaths *apidef.ExtendedPathsSet) {
+	builtInOperationPaths := []string{
+		"/" + mcp.MethodToolsCall,
+		"/" + mcp.MethodResourcesRead,
+		"/" + mcp.MethodPromptsGet,
+	}
+
+	for _, path := range builtInOperationPaths {
+		if spec.OAS.Paths != nil && spec.OAS.Paths.Find(path) != nil {
+			extendedPaths.Internal = append(extendedPaths.Internal, apidef.InternalMeta{
+				Path:     path,
+				Method:   http.MethodPost,
+				Disabled: false,
+			})
+		}
+	}
+}
+
+// initMCPConfiguration initializes MCP-specific configuration for the API spec.
+// This includes registering VEM prefixes, populating the primitives map,
+// calculating allow-list flags, and setting up the JSON-RPC router if needed.
+func (a APIDefinitionLoader) initMCPConfiguration(spec *APISpec) {
+	mcp.RegisterVEMPrefixes()
+	a.populateMCPPrimitivesMap(spec)
+	a.calculateMCPAllowlistFlags(spec)
+
+	if spec.JsonRpcVersion == apidef.JsonRPC20 {
+		spec.JSONRPCRouter = mcp.NewRouter()
+	}
+}
+
 func (a APIDefinitionLoader) getExtendedPathSpecs(apiVersionDef apidef.VersionInfo, apiSpec *APISpec, conf config.Config) ([]URLSpec, bool) {
 	// TODO: New compiler here, needs to put data into a different structure
 
@@ -1324,6 +1539,11 @@ func (a APIDefinitionLoader) getExtendedPathSpecs(apiVersionDef apidef.VersionIn
 	persistGraphQL := a.compilePersistGraphQLPathSpec(apiVersionDef.ExtendedPaths.PersistGraphQL, PersistGraphQL, apiSpec, conf)
 	rateLimitPaths := a.compileRateLimitPathsSpec(apiVersionDef.ExtendedPaths.RateLimit, RateLimit, conf)
 
+	// OAS-specific middleware paths - compiled alongside Classic middleware
+	// The compile functions handle nil/empty OAS gracefully by returning empty slices
+	oasValidateRequestPaths := a.compileOASValidateRequestPathSpec(apiSpec, conf)
+	oasMockResponsePaths := a.compileOASMockResponsePathSpec(apiSpec, conf)
+
 	combinedPath := []URLSpec{}
 	combinedPath = append(combinedPath, mockResponsePaths...)
 	combinedPath = append(combinedPath, ignoredPaths...)
@@ -1349,14 +1569,47 @@ func (a APIDefinitionLoader) getExtendedPathSpecs(apiVersionDef apidef.VersionIn
 	combinedPath = append(combinedPath, validateJSON...)
 	combinedPath = append(combinedPath, internalPaths...)
 	combinedPath = append(combinedPath, rateLimitPaths...)
+	combinedPath = append(combinedPath, oasValidateRequestPaths...)
+	combinedPath = append(combinedPath, oasMockResponsePaths...)
 
-	return combinedPath, len(whiteListPaths) > 0
+	// Enable whitelist mode if there are whitelist paths or operation-level allows.
+	// For MCP APIs, we disable global whitelist mode here (whiteListEnabled = false), but this
+	// does NOT mean whitelisting is disabled for MCP APIs. Instead, MCP APIs use a more complex
+	// whitelist enforcement strategy that happens in the VersionCheck middleware:
+	// 1. Setting whiteListEnabled=false prevents blocking the main listen path before JSON-RPC
+	//    routing can parse the request and determine the target primitive/operation.
+	// 2. After JSON-RPC routing, allowlist enforcement happens at the VEM level during sequential
+	//    routing in VersionCheck middleware (see handleMCPPrimitiveNotFound and VEM WhiteList checks).
+	// 3. VEM WhiteList entries are checked in both URLAllowedAndIgnored and VersionCheck.ProcessRequest
+	//    to enforce access control on individual primitives (tools/resources/prompts) and operations.
+	//
+	// This two-phase approach ensures:
+	// - Initial JSON-RPC requests reach the middleware for parsing
+	// - Subsequent internal VEM requests are properly whitelisted/blacklisted
+	// - Allow-list configuration works correctly at the primitive/operation level
+	whiteListEnabled := len(whiteListPaths) > 0 || apiSpec.OperationsAllowListEnabled
+	if apiSpec.IsMCP() {
+		whiteListEnabled = false
+	}
+
+	return combinedPath, whiteListEnabled
 }
 
 func (a *APISpec) Init(authStore, sessionStore, healthStore, orgStore storage.Handler) {
 	a.AuthManager.Init(authStore)
 	a.Health.Init(healthStore)
 	a.OrgSessionManager.Init(orgStore)
+}
+
+func (a *APISpec) UnloadUpstreamCertMonitoring() {
+	if a.upstreamCertExpiryCancelFunc != nil {
+		log.
+			WithField("api_id", a.APIID).
+			WithField("api_name", a.Name).
+			Debug("Stopping upstream certificate expiry check batcher")
+
+		a.upstreamCertExpiryCancelFunc()
+	}
 }
 
 func (a *APISpec) StopSessionManagerPool() {
@@ -1403,6 +1656,10 @@ func (a *APISpec) getURLStatus(stat URLStatus) RequestStatus {
 		return StatusRequestNotTracked
 	case ValidateJSONRequest:
 		return StatusValidateJSON
+	case OASValidateRequest:
+		return StatusOASValidateRequest
+	case OASMockResponse:
+		return StatusOASMockResponse
 	case Internal:
 		return StatusInternal
 	case GoPlugin:
@@ -1424,8 +1681,17 @@ func (a *APISpec) URLAllowedAndIgnored(r *http.Request, rxPaths []URLSpec, white
 			continue
 		}
 
-		if r.Method == rxPaths[i].Internal.Method && rxPaths[i].Status == Internal && !ctxLoopingEnabled(r) {
-			return EndPointNotAllowed, nil
+		if r.Method == rxPaths[i].Internal.Method && rxPaths[i].Status == Internal {
+			// MCP primitive VEMs return 404 to avoid exposing internal-only endpoints.
+			// They can only be accessed via JSON-RPC routing (MCP, A2A, etc.), not via generic looping.
+			if a.IsMCP() && mcp.IsPrimitiveVEMPath(rxPaths[i].Internal.Path) {
+				if !httpctx.IsJsonRPCRouting(r) {
+					return MCPPrimitiveNotFound, nil
+				}
+			} else if !ctxLoopingEnabled(r) {
+				// Regular internal endpoints require looping to be enabled.
+				return EndPointNotAllowed, nil
+			}
 		}
 	}
 
@@ -1489,16 +1755,31 @@ func (a *APISpec) URLAllowedAndIgnored(r *http.Request, rxPaths []URLSpec, white
 			}
 		}
 
+		// MCP primitive VEMs: continue checking for BlackList even outside whitelist mode.
+		// This allows explicit BlackList entries to block primitives without Allow.
+		if a.IsMCP() && rxPaths[i].Status == Internal && r.Method == rxPaths[i].Internal.Method {
+			if mcp.IsPrimitiveVEMPath(rxPaths[i].Internal.Path) {
+				if httpctx.IsJsonRPCRouting(r) {
+					continue // Keep looking for WhiteList/BlackList
+				}
+			}
+		}
+
 		if whiteListStatus {
 			// We have a whitelist, nothing gets through unless specifically defined
 			switch rxPaths[i].Status {
 			case WhiteList, BlackList, Ignored:
-			default:
-				if rxPaths[i].Status == Internal && r.Method == rxPaths[i].Internal.Method && ctxLoopingEnabled(r) {
-					return a.getURLStatus(rxPaths[i].Status), nil
-				} else {
-					return EndPointNotAllowed, nil
+				// These are handled in the switch above, continue to process them
+			case Internal:
+				if r.Method == rxPaths[i].Internal.Method {
+					if ctxLoopingEnabled(r) {
+						// Regular internal endpoints use generic looping check.
+						return a.getURLStatus(rxPaths[i].Status), nil
+					}
 				}
+				return EndPointNotAllowed, nil
+			default:
+				return EndPointNotAllowed, nil
 			}
 		}
 
@@ -1629,6 +1910,8 @@ func (a *APISpec) RequestValid(r *http.Request) (bool, RequestStatus) {
 	status, _ = a.URLAllowedAndIgnored(r, versionPaths, whiteListStatus)
 	switch status {
 	case EndPointNotAllowed:
+		return false, status
+	case MCPPrimitiveNotFound:
 		return false, status
 	case StatusRedirectFlowByReply:
 		return true, status
@@ -1831,16 +2114,13 @@ func (a *APISpec) hasActiveMock() bool {
 	}
 
 	for _, operation := range middleware.Operations {
-		if operation.MockResponse == nil {
-			continue
-		}
-
-		if operation.MockResponse.Enabled {
+		if operation.MockResponse != nil && operation.MockResponse.Enabled {
 			return true
 		}
 	}
 
-	return false
+	// Check MCP primitives (tools, resources, prompts)
+	return middleware.HasMCPPrimitivesMocks()
 }
 
 func (a *APISpec) hasVirtualEndpoint() bool {
@@ -1875,4 +2155,62 @@ func (r *RoundRobin) WithLen(len int) int {
 	// -1 to start at 0, not 1
 	cur := atomic.AddUint32(&r.pos, 1) - 1
 	return int(cur) % len
+}
+
+func (a APIDefinitionLoader) populateMCPPrimitivesMap(spec *APISpec) {
+	if !spec.IsMCP() {
+		return
+	}
+
+	middleware := spec.OAS.GetTykMiddleware()
+	if middleware == nil {
+		return
+	}
+
+	spec.MCPPrimitives = make(map[string]string)
+
+	for name := range middleware.McpTools {
+		spec.MCPPrimitives["tool:"+name] = mcp.ToolPrefix + name
+	}
+
+	for name := range middleware.McpResources {
+		spec.MCPPrimitives["resource:"+name] = mcp.ResourcePrefix + name
+	}
+
+	for name := range middleware.McpPrompts {
+		spec.MCPPrimitives["prompt:"+name] = mcp.PromptPrefix + name
+	}
+
+	builtInOperations := map[string]string{
+		mcp.MethodToolsCall:     "/" + mcp.MethodToolsCall,
+		mcp.MethodResourcesRead: "/" + mcp.MethodResourcesRead,
+		mcp.MethodPromptsGet:    "/" + mcp.MethodPromptsGet,
+	}
+
+	for method, path := range builtInOperations {
+		if spec.OAS.Paths != nil && spec.OAS.Paths.Find(path) != nil {
+			spec.MCPPrimitives["operation:"+method] = path
+		}
+	}
+}
+
+func (a APIDefinitionLoader) calculateMCPAllowlistFlags(spec *APISpec) {
+	middleware := spec.OAS.GetTykMiddleware()
+	if middleware == nil {
+		return
+	}
+
+	operations := oas.Operations{}
+	if middleware.Operations != nil {
+		operations = middleware.Operations
+	}
+
+	spec.OperationsAllowListEnabled = hasOperationAllowEnabled(operations)
+	spec.ToolsAllowListEnabled = hasPrimitiveAllowEnabled(middleware.McpTools)
+	spec.ResourcesAllowListEnabled = hasPrimitiveAllowEnabled(middleware.McpResources)
+	spec.PromptsAllowListEnabled = hasPrimitiveAllowEnabled(middleware.McpPrompts)
+
+	spec.MCPAllowListEnabled = spec.ToolsAllowListEnabled ||
+		spec.ResourcesAllowListEnabled ||
+		spec.PromptsAllowListEnabled
 }

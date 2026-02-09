@@ -7,24 +7,28 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"net/http/httptest"
 	"reflect"
 	"sort"
+	"strings"
 	"testing"
 	"time"
 
-	"github.com/TykTechnologies/tyk/apidef/oas"
-	tyktime "github.com/TykTechnologies/tyk/internal/time"
 	"github.com/go-jose/go-jose/v3"
 	"github.com/golang-jwt/jwt/v4"
+	"github.com/sirupsen/logrus"
+	logrustest "github.com/sirupsen/logrus/hooks/test"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/apidef/oas"
 	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/internal/cache"
+	tyktime "github.com/TykTechnologies/tyk/internal/time"
+	"github.com/TykTechnologies/tyk/internal/uuid"
 	"github.com/TykTechnologies/tyk/test"
 	"github.com/TykTechnologies/tyk/user"
-
-	"github.com/TykTechnologies/tyk/internal/cache"
-	"github.com/TykTechnologies/tyk/internal/uuid"
 )
 
 // openssl rsa -in app.rsa -pubout > app.rsa.pub
@@ -2382,7 +2386,7 @@ func TestJWKSCache_InvalidateCacheForAPI(t *testing.T) {
 	})
 
 	// The previous request fills the cache with some entries
-	jwkCache := loadOrCreateJWKCacheByApiID(spec.APIID)
+	jwkCache := ts.Gw.loadOrCreateJWKCacheByApiID(spec.APIID)
 	assert.True(t, jwkCache.Count() > 0)
 
 	ts.Run(t, test.TestCase{
@@ -2392,7 +2396,7 @@ func TestJWKSCache_InvalidateCacheForAPI(t *testing.T) {
 		Code:      http.StatusOK,
 	})
 
-	jwkCache = loadOrCreateJWKCacheByApiID(spec.APIID)
+	jwkCache = ts.Gw.loadOrCreateJWKCacheByApiID(spec.APIID)
 	assert.Equal(t, 0, jwkCache.Count())
 }
 
@@ -2411,7 +2415,7 @@ func TestJWKSCache_InvalidateJWKSCache(t *testing.T) {
 	})
 
 	// The previous request populates the cache with some entries
-	jwkCache := loadOrCreateJWKCacheByApiID(spec.APIID)
+	jwkCache := ts.Gw.loadOrCreateJWKCacheByApiID(spec.APIID)
 	assert.True(t, jwkCache.Count() > 0)
 
 	ts.Run(t, test.TestCase{
@@ -2421,8 +2425,83 @@ func TestJWKSCache_InvalidateJWKSCache(t *testing.T) {
 		Code:      http.StatusOK,
 	})
 
-	jwkCache = loadOrCreateJWKCacheByApiID(spec.APIID)
+	jwkCache = ts.Gw.loadOrCreateJWKCacheByApiID(spec.APIID)
 	assert.Equal(t, 0, jwkCache.Count())
+}
+
+func Test_NoticeInvalidateJWKSCacheForAPI(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	spec, jwtToken := ts.prepareJWTSessionRSAWithEncodedJWKWithAPIID(uuid.NewHex())
+
+	authHeaders := map[string]string{"authorization": jwtToken}
+
+	spec.JWTSource = testHttpJWK
+	ts.Gw.LoadAPI(spec)
+
+	// Fill the JWKS cache
+	_, err := ts.Run(t, test.TestCase{
+		Headers: authHeaders, Code: http.StatusOK,
+	})
+	assert.Nil(t, err)
+
+	// The previous request should have filled the cache with some entries
+	jwkCache := ts.Gw.loadOrCreateJWKCacheByApiID(spec.APIID)
+	assert.True(t, jwkCache.Count() > 0)
+
+	// Emit event
+	n := Notification{
+		Command: NoticeInvalidateJWKSCacheForAPI,
+		Payload: spec.APIID,
+		Gw:      ts.Gw,
+	}
+	ts.Gw.MainNotifier.Notify(n)
+
+	require.Eventuallyf(t, func() bool {
+		jwkCache = ts.Gw.loadOrCreateJWKCacheByApiID(spec.APIID)
+		return jwkCache.Count() == 0
+	}, 5*time.Second, 100*time.Millisecond, "JWKS cache could not be flushed")
+}
+
+func Test_NoticeInvalidateJWKSCacheForAPI_With_RPC_Listener(t *testing.T) {
+	ts := StartTest(nil)
+	t.Cleanup(ts.Close)
+
+	rpcListener := RPCStorageHandler{
+		KeyPrefix:        "rpc.listener.",
+		SuppressRegister: true,
+		Gw:               ts.Gw,
+	}
+
+	spec, jwtToken := ts.prepareJWTSessionRSAWithEncodedJWKWithAPIID(uuid.NewHex())
+
+	authHeaders := map[string]string{"authorization": jwtToken}
+
+	spec.JWTSource = testHttpJWK
+	ts.Gw.LoadAPI(spec)
+
+	// Fill the JWKS cache
+	_, err := ts.Run(t, test.TestCase{
+		Headers: authHeaders, Code: http.StatusOK,
+	})
+	assert.Nil(t, err)
+
+	// The previous request should have filled the cache with some entries
+	jwkCache := ts.Gw.loadOrCreateJWKCacheByApiID(spec.APIID)
+	assert.True(t, jwkCache.Count() > 0)
+
+	jwksFlushEventBuilder := func(apiID string) string {
+		return fmt.Sprintf("%s:%s", apiID, NoticeInvalidateJWKSCacheForAPI.String())
+	}
+
+	rpcListener.ProcessKeySpaceChanges([]string{jwksFlushEventBuilder(spec.APIID)}, spec.OrgID)
+
+	// Should be empty after the event
+	require.Eventuallyf(t, func() bool {
+		jwkCache = ts.Gw.loadOrCreateJWKCacheByApiID(spec.APIID)
+		return jwkCache.Count() == 0
+	}, 5*time.Second, 100*time.Millisecond, "JWKS cache could not be flushed")
 }
 
 func TestJWTSessionRSAWithEncodedJWK(t *testing.T) {
@@ -2433,7 +2512,7 @@ func TestJWTSessionRSAWithEncodedJWK(t *testing.T) {
 
 	authHeaders := map[string]string{"authorization": jwtToken}
 	flush := func() {
-		JWKCaches.Delete(spec.APIID)
+		ts.Gw.apiJWKCaches.Delete(spec.APIID)
 	}
 	t.Run("Direct JWK URL", func(t *testing.T) {
 		spec.JWTSource = testHttpJWK
@@ -3072,26 +3151,6 @@ func TestJWTRSAInvalidPublickKey(t *testing.T) {
 	})
 }
 
-func createExpiringPolicy(pGen ...func(p *user.Policy)) string {
-	ts := StartTest(nil)
-	defer ts.Close()
-
-	pID := ts.Gw.keyGen.GenerateAuthKey("")
-	pol := CreateStandardPolicy()
-	pol.ID = pID
-	pol.KeyExpiresIn = 1
-
-	if len(pGen) > 0 {
-		pGen[0](pol)
-	}
-
-	ts.Gw.policiesMu.Lock()
-	ts.Gw.policiesByID[pID] = *pol
-	ts.Gw.policiesMu.Unlock()
-
-	return pID
-}
-
 func TestJWTExpOverride(t *testing.T) {
 	test.Flaky(t) // TODO: TT-5257
 
@@ -3571,14 +3630,13 @@ func TestJWTMiddleware_InitThenUnload(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
 
-	gw := &Gateway{}
-	gw.SetConfig(config.Config{
+	ts.Gw.SetConfig(config.Config{
 		JWTSSLInsecureSkipVerify: true,
 	})
 
 	m := JWTMiddleware{
 		BaseMiddleware: &BaseMiddleware{
-			Gw: gw,
+			Gw: ts.Gw,
 		},
 	}
 
@@ -3599,7 +3657,7 @@ func TestJWTMiddleware_InitThenUnload(t *testing.T) {
 	m.Init()
 	var numberOfCachedJWKItems = 0
 	for i := 0; i < 10; i++ {
-		jwkCache := loadOrCreateJWKCacheByApiID(api.APIID)
+		jwkCache := ts.Gw.loadOrCreateJWKCacheByApiID(api.APIID)
 		numberOfCachedJWKItems = jwkCache.Count()
 		if numberOfCachedJWKItems == 1 {
 			break
@@ -3615,7 +3673,7 @@ func TestJWTMiddleware_InitThenUnload(t *testing.T) {
 	// the cache when an API is removed.
 	t.Run("Unload", func(t *testing.T) {
 		m.Unload()
-		jwkCache := loadOrCreateJWKCacheByApiID(api.APIID)
+		jwkCache := ts.Gw.loadOrCreateJWKCacheByApiID(api.APIID)
 		assert.Equal(t, 0, jwkCache.Count())
 	})
 }
@@ -3668,8 +3726,10 @@ func TestGetSecretFromMultipleJWKURIs(t *testing.T) {
 		kid                 interface{}
 		expectKey           interface{}
 		expectError         error
+		expectErrorType     interface{}
 		useGetSecretFromURL bool
 		isOas               bool
+		expectedLogPart     string
 	}{
 		{
 			name: "success with valid JWK URL and matching KID",
@@ -3714,7 +3774,7 @@ func TestGetSecretFromMultipleJWKURIs(t *testing.T) {
 					}, nil
 				}
 
-				jwkCache := loadOrCreateJWKCacheByApiID(api.APIID)
+				jwkCache := gw.loadOrCreateJWKCacheByApiID(api.APIID)
 				jwkCache.Set(cacheKey, &apidef.APIDefinition{
 					APIID:       testAPIID,
 					JWTJwksURIs: []apidef.JWK{{URL: testJWKURL}},
@@ -3745,7 +3805,7 @@ func TestGetSecretFromMultipleJWKURIs(t *testing.T) {
 					}, nil
 				}
 
-				jwkCache := loadOrCreateJWKCacheByApiID(api.APIID)
+				jwkCache := gw.loadOrCreateJWKCacheByApiID(api.APIID)
 				jwkCache.Set(testAPIID, "invalid-format", cache.DefaultExpiration)
 				jwkCache.Set(cacheKey, &apidef.APIDefinition{
 					APIID:       testAPIID,
@@ -3757,6 +3817,24 @@ func TestGetSecretFromMultipleJWKURIs(t *testing.T) {
 			expectKey:   "fresh-key",
 			expectError: nil,
 			isOas:       true,
+		},
+		{
+			name: "cached API definition has invalid base64 JWTSource",
+			setup: func(isOas bool) {
+				api.IsOAS = isOas
+
+				jwkCache := gw.loadOrCreateJWKCacheByApiID(api.APIID)
+				jwkCache.Set(cacheKey, &apidef.APIDefinition{
+					APIID:     testAPIID,
+					JWTSource: "not-valid-base-64!!",
+				}, cache.DefaultExpiration)
+			},
+			jwkURI:              apidef.JWK{URL: testJWKURL},
+			kid:                 "any-kid",
+			useGetSecretFromURL: true,
+			isOas:               true,
+			expectErrorType:     new(base64.CorruptInputError),
+			expectedLogPart:     "JWKS source decode failed",
 		},
 		{
 			name: "JWK URLs changed triggers refetch",
@@ -3771,7 +3849,7 @@ func TestGetSecretFromMultipleJWKURIs(t *testing.T) {
 					}, nil
 				}
 
-				jwkCache := loadOrCreateJWKCacheByApiID(api.APIID)
+				jwkCache := gw.loadOrCreateJWKCacheByApiID(api.APIID)
 				jwkCache.Set(cacheKey, &apidef.APIDefinition{
 					APIID: testAPIID,
 					JWTJwksURIs: []apidef.JWK{
@@ -3815,7 +3893,7 @@ func TestGetSecretFromMultipleJWKURIs(t *testing.T) {
 					return nil, errors.New("failed to fetch JWK")
 				}
 
-				jwkCache := loadOrCreateJWKCacheByApiID(api.APIID)
+				jwkCache := gw.loadOrCreateJWKCacheByApiID(api.APIID)
 				jwkCache.Set(cacheKey, &apidef.APIDefinition{
 					APIID: testAPIID,
 					JWTJwksURIs: []apidef.JWK{
@@ -3840,7 +3918,7 @@ func TestGetSecretFromMultipleJWKURIs(t *testing.T) {
 					return nil, errors.New("failed to fetch JWK")
 				}
 
-				jwkCache := loadOrCreateJWKCacheByApiID(api.APIID)
+				jwkCache := gw.loadOrCreateJWKCacheByApiID(api.APIID)
 				jwkCache.Set(cacheKey, &apidef.APIDefinition{
 					APIID:     testAPIID,
 					JWTSource: encodedTestJWKURL,
@@ -3856,6 +3934,20 @@ func TestGetSecretFromMultipleJWKURIs(t *testing.T) {
 			isOas:               true,
 		},
 		{
+			name: "Primary fetch fails (logs error), Legacy fallback fails",
+			setup: func(isOas bool) {
+				api.IsOAS = isOas
+				GetJWK = func(_ string, _ bool) (*jose.JSONWebKeySet, error) {
+					return nil, errors.New("factory client failed")
+				}
+			},
+			jwkURI:              apidef.JWK{URL: testJWKURL},
+			kid:                 "any-kid",
+			useGetSecretFromURL: true,
+			expectError:         errors.New("factory client failed"),
+			expectedLogPart:     "Failed to fetch or decode JWKs",
+		},
+		{
 			name: "ensure jwksURIs faeature works only with OAS",
 			setup: func(isOas bool) {
 				api.IsOAS = isOas
@@ -3867,7 +3959,7 @@ func TestGetSecretFromMultipleJWKURIs(t *testing.T) {
 						},
 					}, nil
 				}
-				jwkCache := loadOrCreateJWKCacheByApiID(api.APIID)
+				jwkCache := gw.loadOrCreateJWKCacheByApiID(api.APIID)
 				jwkCache.Set(testAPIID, "invalid-format", cache.DefaultExpiration)
 				jwkCache.Set(cacheKey, &apidef.APIDefinition{
 					APIID:       testAPIID,
@@ -3884,6 +3976,10 @@ func TestGetSecretFromMultipleJWKURIs(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			logger, hook := logrustest.NewNullLogger()
+
+			m.logger = logger.WithField("mw", "JWTMiddleware")
+
 			m.loadOrCreateJWKCache().Flush()
 
 			if tt.setup != nil {
@@ -3901,7 +3997,9 @@ func TestGetSecretFromMultipleJWKURIs(t *testing.T) {
 				key, err = mw.getSecretFromURL(tt.jwkURI.URL, tt.kid, "RS256")
 			}
 
-			if tt.expectError != nil {
+			if tt.expectErrorType != nil {
+				assert.ErrorAs(t, err, tt.expectErrorType)
+			} else if tt.expectError != nil {
 				assert.Error(t, err)
 				assert.Contains(t, err.Error(), tt.expectError.Error())
 			} else {
@@ -3909,6 +4007,18 @@ func TestGetSecretFromMultipleJWKURIs(t *testing.T) {
 			}
 
 			assert.Equal(t, tt.expectKey, key)
+
+			if tt.expectedLogPart != "" {
+				assert.NotEmpty(t, hook.Entries, "Expected log entries but found none")
+				found := false
+				for _, entry := range hook.Entries {
+					if strings.Contains(entry.Message, tt.expectedLogPart) {
+						found = true
+						break
+					}
+				}
+				assert.True(t, found, "Expected log message containing '%s', logs were: %v", tt.expectedLogPart, hook.Entries)
+			}
 		})
 	}
 }
@@ -4315,4 +4425,767 @@ func TestJWKReadableDurationConversionInRealFunctions(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestJWT_ScopeMappingOnly_NoDefaultPolicies tests that JWT authentication works
+// with only scope-to-policy mapping and NO default policies configured.
+// This is the main test case for the fix: making default policies optional.
+func TestJWT_ScopeMappingOnly_NoDefaultPolicies(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	// Create policies for scope mapping
+	premiumPolicyID := ts.CreatePolicy(func(p *user.Policy) {
+		p.ID = "premium"
+		p.AccessRights = map[string]user.AccessDefinition{
+			"api1": {
+				Limit: user.APILimit{
+					RateLimit: user.RateLimit{
+						Rate: 1000,
+						Per:  60,
+					},
+					QuotaMax: -1,
+				},
+			},
+		}
+		p.Partitions = user.PolicyPartitions{
+			PerAPI: true,
+		}
+	})
+
+	basicPolicyID := ts.CreatePolicy(func(p *user.Policy) {
+		p.ID = "basic"
+		p.AccessRights = map[string]user.AccessDefinition{
+			"api1": {
+				Limit: user.APILimit{
+					RateLimit: user.RateLimit{
+						Rate: 100,
+						Per:  60,
+					},
+					QuotaMax: -1,
+				},
+			},
+		}
+		p.Partitions = user.PolicyPartitions{
+			PerAPI: true,
+		}
+	})
+
+	// Build API with scope mapping but NO default policies
+	spec := BuildAPI(func(spec *APISpec) {
+		spec.APIID = "api1"
+		spec.UseKeylessAccess = false
+		spec.EnableJWT = true
+		spec.JWTSigningMethod = RSASign
+		spec.JWTSource = base64.StdEncoding.EncodeToString([]byte(jwtRSAPubKey))
+		spec.JWTIdentityBaseField = "user_id"
+		spec.JWTDefaultPolicies = []string{} // NO DEFAULT POLICIES - this is the key test!
+		spec.Scopes = apidef.Scopes{
+			JWT: apidef.ScopeClaim{
+				ScopeClaimName: "scope",
+				ScopeToPolicy: map[string]string{
+					"user:premium": premiumPolicyID,
+					"user:basic":   basicPolicyID,
+				},
+			},
+		}
+		spec.Proxy.ListenPath = "/api1"
+		spec.OrgID = "default"
+	})[0]
+
+	ts.Gw.LoadAPI(spec)
+
+	// Test 1: JWT with valid premium scope - should succeed
+	t.Run("Valid premium scope - should succeed", func(t *testing.T) {
+		userID := "user-premium-" + uuid.New()
+		jwtToken := CreateJWKToken(func(t *jwt.Token) {
+			t.Claims.(jwt.MapClaims)["user_id"] = userID
+			t.Claims.(jwt.MapClaims)["scope"] = "user:premium"
+			t.Claims.(jwt.MapClaims)["exp"] = time.Now().Add(time.Hour).Unix()
+		})
+
+		authHeaders := map[string]string{"authorization": jwtToken}
+		_, _ = ts.Run(t, test.TestCase{
+			Headers: authHeaders,
+			Path:    "/api1",
+			Code:    http.StatusOK,
+		})
+
+		// Verify the session has the premium policy applied
+		sessionID := ts.Gw.generateToken(spec.OrgID, fmt.Sprintf("%x", md5.Sum([]byte(userID))))
+		session, _ := ts.Gw.GlobalSessionManager.SessionDetail(spec.OrgID, sessionID, false)
+		policyIDs := session.PolicyIDs()
+		assert.Equal(t, []string{premiumPolicyID}, policyIDs, "Expected premium policy to be applied")
+	})
+
+	// Test 2: JWT with valid basic scope - should succeed
+	t.Run("Valid basic scope - should succeed", func(t *testing.T) {
+		userID := "user-basic-" + uuid.New()
+		jwtToken := CreateJWKToken(func(t *jwt.Token) {
+			t.Claims.(jwt.MapClaims)["user_id"] = userID
+			t.Claims.(jwt.MapClaims)["scope"] = "user:basic"
+			t.Claims.(jwt.MapClaims)["exp"] = time.Now().Add(time.Hour).Unix()
+		})
+
+		authHeaders := map[string]string{"authorization": jwtToken}
+		_, _ = ts.Run(t, test.TestCase{
+			Headers: authHeaders,
+			Path:    "/api1",
+			Code:    http.StatusOK,
+		})
+
+		// Verify the session has the basic policy applied
+		sessionID := ts.Gw.generateToken(spec.OrgID, fmt.Sprintf("%x", md5.Sum([]byte(userID))))
+		session, _ := ts.Gw.GlobalSessionManager.SessionDetail(spec.OrgID, sessionID, false)
+		policyIDs := session.PolicyIDs()
+		assert.Equal(t, []string{basicPolicyID}, policyIDs, "Expected basic policy to be applied")
+	})
+
+	// Test 3: JWT with invalid scope - should fail
+	t.Run("Invalid scope - should fail with 403", func(t *testing.T) {
+		userID := "user-invalid-" + uuid.New()
+		jwtToken := CreateJWKToken(func(t *jwt.Token) {
+			t.Claims.(jwt.MapClaims)["user_id"] = userID
+			t.Claims.(jwt.MapClaims)["scope"] = "user:invalid"
+			t.Claims.(jwt.MapClaims)["exp"] = time.Now().Add(time.Hour).Unix()
+		})
+
+		authHeaders := map[string]string{"authorization": jwtToken}
+		_, _ = ts.Run(t, test.TestCase{
+			Headers: authHeaders,
+			Path:    "/api1",
+			Code:    http.StatusForbidden,
+		})
+	})
+
+	// Test 4: JWT with no scope - should fail
+	t.Run("No scope - should fail with 403", func(t *testing.T) {
+		userID := "user-noscope-" + uuid.New()
+		jwtToken := CreateJWKToken(func(t *jwt.Token) {
+			t.Claims.(jwt.MapClaims)["user_id"] = userID
+			t.Claims.(jwt.MapClaims)["exp"] = time.Now().Add(time.Hour).Unix()
+			// NO scope claim
+		})
+
+		authHeaders := map[string]string{"authorization": jwtToken}
+		_, _ = ts.Run(t, test.TestCase{
+			Headers: authHeaders,
+			Path:    "/api1",
+			Code:    http.StatusForbidden,
+		})
+	})
+
+	// Test 5: JWT with multiple scopes - should get multiple policies
+	t.Run("Multiple scopes - should get multiple policies", func(t *testing.T) {
+		userID := "user-multi-" + uuid.New()
+		jwtToken := CreateJWKToken(func(t *jwt.Token) {
+			t.Claims.(jwt.MapClaims)["user_id"] = userID
+			t.Claims.(jwt.MapClaims)["scope"] = "user:premium user:basic"
+			t.Claims.(jwt.MapClaims)["exp"] = time.Now().Add(time.Hour).Unix()
+		})
+
+		authHeaders := map[string]string{"authorization": jwtToken}
+		_, _ = ts.Run(t, test.TestCase{
+			Headers: authHeaders,
+			Path:    "/api1",
+			Code:    http.StatusOK,
+		})
+
+		// Verify the session has both policies applied
+		sessionID := ts.Gw.generateToken(spec.OrgID, fmt.Sprintf("%x", md5.Sum([]byte(userID))))
+		session, _ := ts.Gw.GlobalSessionManager.SessionDetail(spec.OrgID, sessionID, false)
+		policyIDs := session.PolicyIDs()
+		sort.Strings(policyIDs)
+		expected := []string{basicPolicyID, premiumPolicyID}
+		sort.Strings(expected)
+		assert.Equal(t, expected, policyIDs, "Expected both policies to be applied")
+	})
+}
+
+// TestJWT_NoDefaultPolicies_NoScopeMapping_NoPolicyClaim tests that JWT authentication
+// properly rejects when NO policies can be determined (no defaults, no scope mapping, no policy claim).
+func TestJWT_NoDefaultPolicies_NoScopeMapping_NoPolicyClaim(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	// Build API with NO default policies and NO scope mapping
+	spec := BuildAPI(func(spec *APISpec) {
+		spec.APIID = "api1"
+		spec.UseKeylessAccess = false
+		spec.EnableJWT = true
+		spec.JWTSigningMethod = RSASign
+		spec.JWTSource = base64.StdEncoding.EncodeToString([]byte(jwtRSAPubKey))
+		spec.JWTIdentityBaseField = "user_id"
+		spec.JWTDefaultPolicies = []string{} // NO DEFAULT POLICIES
+		// NO scope mapping configured
+		spec.Proxy.ListenPath = "/api1"
+		spec.OrgID = "default"
+	})[0]
+
+	ts.Gw.LoadAPI(spec)
+
+	// Test: JWT with no policy claim - should fail with 403
+	t.Run("No policies configured anywhere - should fail with 403", func(t *testing.T) {
+		userID := "user-nopolicy-" + uuid.New()
+		jwtToken := CreateJWKToken(func(t *jwt.Token) {
+			t.Claims.(jwt.MapClaims)["user_id"] = userID
+			t.Claims.(jwt.MapClaims)["exp"] = time.Now().Add(time.Hour).Unix()
+			// NO policy claim, NO scope
+		})
+
+		authHeaders := map[string]string{"authorization": jwtToken}
+		_, _ = ts.Run(t, test.TestCase{
+			Headers: authHeaders,
+			Path:    "/api1",
+			Code:    http.StatusForbidden,
+		})
+	})
+}
+
+// TestJWT_ScopeMappingWithPartialMatch tests that JWT authentication works
+// when some scopes match and some don't (partial match scenario).
+func TestJWT_ScopeMappingWithPartialMatch(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	// Create policies for scope mapping
+	policy1ID := ts.CreatePolicy(func(p *user.Policy) {
+		p.ID = "policy1"
+		p.AccessRights = map[string]user.AccessDefinition{
+			"api1": {
+				Limit: user.APILimit{
+					RateLimit: user.RateLimit{
+						Rate: 100,
+						Per:  60,
+					},
+					QuotaMax: -1,
+				},
+			},
+		}
+		p.Partitions = user.PolicyPartitions{
+			PerAPI: true,
+		}
+	})
+
+	policy2ID := ts.CreatePolicy(func(p *user.Policy) {
+		p.ID = "policy2"
+		p.AccessRights = map[string]user.AccessDefinition{
+			"api1": {
+				Limit: user.APILimit{
+					RateLimit: user.RateLimit{
+						Rate: 200,
+						Per:  60,
+					},
+					QuotaMax: -1,
+				},
+			},
+		}
+		p.Partitions = user.PolicyPartitions{
+			PerAPI: true,
+		}
+	})
+
+	// Build API with scope mapping but NO default policies
+	spec := BuildAPI(func(spec *APISpec) {
+		spec.APIID = "api1"
+		spec.UseKeylessAccess = false
+		spec.EnableJWT = true
+		spec.JWTSigningMethod = RSASign
+		spec.JWTSource = base64.StdEncoding.EncodeToString([]byte(jwtRSAPubKey))
+		spec.JWTIdentityBaseField = "user_id"
+		spec.JWTDefaultPolicies = []string{} // NO DEFAULT POLICIES
+		spec.Scopes = apidef.Scopes{
+			JWT: apidef.ScopeClaim{
+				ScopeClaimName: "scope",
+				ScopeToPolicy: map[string]string{
+					"scope:a": policy1ID,
+					"scope:b": policy2ID,
+					// scope:c is NOT mapped
+				},
+			},
+		}
+		spec.Proxy.ListenPath = "/api1"
+		spec.OrgID = "default"
+	})[0]
+
+	ts.Gw.LoadAPI(spec)
+
+	// Test: JWT with partial match (A and C, where C doesn't exist)
+	// Should succeed with policy1 only
+	t.Run("Partial scope match - should succeed with matched policies", func(t *testing.T) {
+		userID := "user-partial-" + uuid.New()
+		jwtToken := CreateJWKToken(func(t *jwt.Token) {
+			t.Claims.(jwt.MapClaims)["user_id"] = userID
+			t.Claims.(jwt.MapClaims)["scope"] = "scope:a scope:c" // A exists, C doesn't
+			t.Claims.(jwt.MapClaims)["exp"] = time.Now().Add(time.Hour).Unix()
+		})
+
+		authHeaders := map[string]string{"authorization": jwtToken}
+		_, _ = ts.Run(t, test.TestCase{
+			Headers: authHeaders,
+			Path:    "/api1",
+			Code:    http.StatusOK,
+		})
+
+		// Verify only policy1 is applied (scope:a), scope:c is ignored
+		sessionID := ts.Gw.generateToken(spec.OrgID, fmt.Sprintf("%x", md5.Sum([]byte(userID))))
+		session, _ := ts.Gw.GlobalSessionManager.SessionDetail(spec.OrgID, sessionID, false)
+		policyIDs := session.PolicyIDs()
+		assert.Equal(t, []string{policy1ID}, policyIDs, "Expected only policy1 to be applied")
+	})
+}
+
+// TestJWT_BackwardCompatibility_DefaultPoliciesStillWork tests that the fix
+// doesn't break existing behavior when default policies ARE configured.
+func TestJWT_BackwardCompatibility_DefaultPoliciesStillWork(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	// Create default policy
+	defaultPolicyID := ts.CreatePolicy(func(p *user.Policy) {
+		p.ID = "default"
+		p.AccessRights = map[string]user.AccessDefinition{
+			"api1": {
+				Limit: user.APILimit{
+					RateLimit: user.RateLimit{
+						Rate: 50,
+						Per:  60,
+					},
+					QuotaMax: -1,
+				},
+			},
+		}
+		p.Partitions = user.PolicyPartitions{
+			PerAPI: true,
+		}
+	})
+
+	// Build API WITH default policies (old behavior)
+	spec := BuildAPI(func(spec *APISpec) {
+		spec.APIID = "api1"
+		spec.UseKeylessAccess = false
+		spec.EnableJWT = true
+		spec.JWTSigningMethod = RSASign
+		spec.JWTSource = base64.StdEncoding.EncodeToString([]byte(jwtRSAPubKey))
+		spec.JWTIdentityBaseField = "user_id"
+		spec.JWTDefaultPolicies = []string{defaultPolicyID} // DEFAULT POLICY CONFIGURED
+		spec.Proxy.ListenPath = "/api1"
+		spec.OrgID = "default"
+	})[0]
+
+	ts.Gw.LoadAPI(spec)
+
+	// Test 1: JWT with no policy claim, no scopes - should use default policy
+	t.Run("No policy claim, no scopes - should use default policy", func(t *testing.T) {
+		userID := "user-default-" + uuid.New()
+		jwtToken := CreateJWKToken(func(t *jwt.Token) {
+			t.Claims.(jwt.MapClaims)["user_id"] = userID
+			t.Claims.(jwt.MapClaims)["exp"] = time.Now().Add(time.Hour).Unix()
+		})
+
+		authHeaders := map[string]string{"authorization": jwtToken}
+		_, _ = ts.Run(t, test.TestCase{
+			Headers: authHeaders,
+			Path:    "/api1",
+			Code:    http.StatusOK,
+		})
+
+		// Verify default policy is applied
+		sessionID := ts.Gw.generateToken(spec.OrgID, fmt.Sprintf("%x", md5.Sum([]byte(userID))))
+		session, _ := ts.Gw.GlobalSessionManager.SessionDetail(spec.OrgID, sessionID, false)
+		policyIDs := session.PolicyIDs()
+		assert.Equal(t, []string{defaultPolicyID}, policyIDs, "Expected default policy to be applied")
+	})
+
+	// Test 2: Existing session should still work
+	t.Run("Existing session - should still work", func(t *testing.T) {
+		userID := "user-existing-" + uuid.New()
+		jwtToken := CreateJWKToken(func(t *jwt.Token) {
+			t.Claims.(jwt.MapClaims)["user_id"] = userID
+			t.Claims.(jwt.MapClaims)["exp"] = time.Now().Add(time.Hour).Unix()
+		})
+
+		authHeaders := map[string]string{"authorization": jwtToken}
+
+		// First request - creates session
+		_, _ = ts.Run(t, test.TestCase{
+			Headers: authHeaders,
+			Path:    "/api1",
+			Code:    http.StatusOK,
+		})
+
+		// Second request - uses existing session
+		_, _ = ts.Run(t, test.TestCase{
+			Headers: authHeaders,
+			Path:    "/api1",
+			Code:    http.StatusOK,
+		})
+
+		// Verify default policy is still applied
+		sessionID := ts.Gw.generateToken(spec.OrgID, fmt.Sprintf("%x", md5.Sum([]byte(userID))))
+		session, _ := ts.Gw.GlobalSessionManager.SessionDetail(spec.OrgID, sessionID, false)
+		policyIDs := session.PolicyIDs()
+		assert.Equal(t, []string{defaultPolicyID}, policyIDs, "Expected default policy to be applied")
+	})
+}
+
+// TestJWT_SecurityFix_ExistingSessionNoScopeNoPolicy tests the security fix for
+// existing sessions that should be rejected when presented with a token that has
+// no scopes and no base policy (prevents privilege escalation).
+func TestJWT_SecurityFix_ExistingSessionNoScopeNoPolicy(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	// Create policies for scope mapping
+	premiumPolicyID := ts.CreatePolicy(func(p *user.Policy) {
+		p.ID = "premium-security"
+		p.AccessRights = map[string]user.AccessDefinition{
+			"api1": {
+				Limit: user.APILimit{
+					RateLimit: user.RateLimit{
+						Rate: 1000,
+						Per:  60,
+					},
+					QuotaMax: -1,
+				},
+			},
+		}
+		p.Partitions = user.PolicyPartitions{
+			PerAPI: true,
+		}
+	})
+
+	// Build API with scope mapping but NO default policies
+	spec := BuildAPI(func(spec *APISpec) {
+		spec.APIID = "api1"
+		spec.UseKeylessAccess = false
+		spec.EnableJWT = true
+		spec.JWTSigningMethod = RSASign
+		spec.JWTSource = base64.StdEncoding.EncodeToString([]byte(jwtRSAPubKey))
+		spec.JWTIdentityBaseField = "user_id"
+		spec.JWTDefaultPolicies = []string{} // NO DEFAULT POLICIES
+		spec.Scopes = apidef.Scopes{
+			JWT: apidef.ScopeClaim{
+				ScopeClaimName: "scope",
+				ScopeToPolicy: map[string]string{
+					"user:premium": premiumPolicyID,
+				},
+			},
+		}
+		spec.Proxy.ListenPath = "/api1"
+		spec.OrgID = "default"
+	})[0]
+
+	ts.Gw.LoadAPI(spec)
+
+	userID := "security-test-user-" + uuid.New()
+
+	// Step 1: Create session with valid scope
+	t.Run("Step 1: Create session with premium scope", func(t *testing.T) {
+		jwtToken := CreateJWKToken(func(t *jwt.Token) {
+			t.Claims.(jwt.MapClaims)["user_id"] = userID
+			t.Claims.(jwt.MapClaims)["scope"] = "user:premium"
+			t.Claims.(jwt.MapClaims)["exp"] = time.Now().Add(time.Hour).Unix()
+		})
+
+		authHeaders := map[string]string{"authorization": jwtToken}
+		_, _ = ts.Run(t, test.TestCase{
+			Headers: authHeaders,
+			Path:    "/api1",
+			Code:    http.StatusOK,
+		})
+
+		// Verify session was created with premium policy
+		sessionID := ts.Gw.generateToken(spec.OrgID, fmt.Sprintf("%x", md5.Sum([]byte(userID))))
+		session, _ := ts.Gw.GlobalSessionManager.SessionDetail(spec.OrgID, sessionID, false)
+		policyIDs := session.PolicyIDs()
+		assert.Equal(t, []string{premiumPolicyID}, policyIDs, "Expected premium policy to be applied")
+	})
+
+	// Step 2: SECURITY TEST - Try to access with token that has NO scope and NO base policy
+	// This should be REJECTED to prevent privilege escalation
+	t.Run("Step 2: SECURITY - Reject token with no scope/policy for existing session", func(t *testing.T) {
+		jwtTokenNoScope := CreateJWKToken(func(t *jwt.Token) {
+			t.Claims.(jwt.MapClaims)["user_id"] = userID // Same user
+			// NO scope claim
+			// NO policy claim
+			t.Claims.(jwt.MapClaims)["exp"] = time.Now().Add(time.Hour).Unix()
+		})
+
+		authHeaders := map[string]string{"authorization": jwtTokenNoScope}
+		_, _ = ts.Run(t, test.TestCase{
+			Headers: authHeaders,
+			Path:    "/api1",
+			Code:    http.StatusForbidden, // Must be rejected!
+		})
+	})
+
+	// Step 3: Verify session can still be accessed with valid token
+	t.Run("Step 3: Valid token still works after rejection", func(t *testing.T) {
+		jwtToken := CreateJWKToken(func(t *jwt.Token) {
+			t.Claims.(jwt.MapClaims)["user_id"] = userID
+			t.Claims.(jwt.MapClaims)["scope"] = "user:premium"
+			t.Claims.(jwt.MapClaims)["exp"] = time.Now().Add(time.Hour).Unix()
+		})
+
+		authHeaders := map[string]string{"authorization": jwtToken}
+		_, _ = ts.Run(t, test.TestCase{
+			Headers: authHeaders,
+			Path:    "/api1",
+			Code:    http.StatusOK,
+		})
+	})
+}
+
+// TestJWT_TraditionalAuth_ExistingSessionNoPolicyInToken tests the traditional JWT
+// authentication flow (no scope mapping) where existing sessions should be rejected
+// when presented with a token that has no policy claim (prevents privilege escalation).
+// This test replicates the integration test scenario that was failing.
+func TestJWT_TraditionalAuth_ExistingSessionNoPolicyInToken(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	// Create a policy
+	policyID := ts.CreatePolicy(func(p *user.Policy) {
+		p.ID = "active-policy"
+		p.AccessRights = map[string]user.AccessDefinition{
+			"api1": {
+				Limit: user.APILimit{
+					RateLimit: user.RateLimit{
+						Rate: 1000,
+						Per:  60,
+					},
+					QuotaMax: -1,
+				},
+			},
+		}
+		p.Partitions = user.PolicyPartitions{
+			PerAPI: true,
+		}
+	})
+
+	// Build API with traditional JWT auth (NO scope mapping, NO default policies)
+	spec := BuildAPI(func(spec *APISpec) {
+		spec.APIID = "api1"
+		spec.UseKeylessAccess = false
+		spec.EnableJWT = true
+		spec.JWTSigningMethod = RSASign
+		spec.JWTSource = base64.StdEncoding.EncodeToString([]byte(jwtRSAPubKey))
+		spec.JWTIdentityBaseField = "sub"
+		spec.JWTPolicyFieldName = "pol"      // Traditional policy claim field
+		spec.JWTDefaultPolicies = []string{} // NO DEFAULT POLICIES
+		// NO scope mapping configured (traditional JWT)
+		spec.Proxy.ListenPath = "/api1"
+		spec.OrgID = "default"
+	})[0]
+
+	ts.Gw.LoadAPI(spec)
+
+	userID := "test-user-" + uuid.New()
+
+	// Step 1: Create session with valid policy in token
+	t.Run("Step 1: Create session with policy in token", func(t *testing.T) {
+		jwtToken := CreateJWKToken(func(t *jwt.Token) {
+			t.Claims.(jwt.MapClaims)["sub"] = userID
+			t.Claims.(jwt.MapClaims)["pol"] = policyID // Policy in token
+			t.Claims.(jwt.MapClaims)["exp"] = time.Now().Add(time.Hour).Unix()
+		})
+
+		authHeaders := map[string]string{"authorization": jwtToken}
+		_, _ = ts.Run(t, test.TestCase{
+			Headers: authHeaders,
+			Path:    "/api1",
+			Code:    http.StatusOK,
+		})
+
+		// Verify session was created with policy
+		sessionID := ts.Gw.generateToken(spec.OrgID, fmt.Sprintf("%x", md5.Sum([]byte(userID))))
+		session, _ := ts.Gw.GlobalSessionManager.SessionDetail(spec.OrgID, sessionID, false)
+		policyIDs := session.PolicyIDs()
+		assert.Equal(t, []string{policyID}, policyIDs, "Expected policy to be applied")
+	})
+
+	// Step 2: SECURITY TEST - Token without policy claim on existing session should be REJECTED
+	// This is the integration test scenario that was failing
+	t.Run("Step 2: SECURITY - Reject token without policy for existing session", func(t *testing.T) {
+		jwtTokenNoPolicy := CreateJWKToken(func(t *jwt.Token) {
+			t.Claims.(jwt.MapClaims)["sub"] = userID // Same user
+			// NO "pol" claim
+			t.Claims.(jwt.MapClaims)["exp"] = time.Now().Add(time.Hour).Unix()
+		})
+
+		authHeaders := map[string]string{"authorization": jwtTokenNoPolicy}
+		_, _ = ts.Run(t, test.TestCase{
+			Headers:   authHeaders,
+			Path:      "/api1",
+			Code:      http.StatusForbidden, // Must be rejected!
+			BodyMatch: `key not authorized: no matching policy found`,
+		})
+	})
+
+	// Step 3: Verify session can still be accessed with valid token (with policy)
+	t.Run("Step 3: Valid token with policy still works", func(t *testing.T) {
+		jwtToken := CreateJWKToken(func(t *jwt.Token) {
+			t.Claims.(jwt.MapClaims)["sub"] = userID
+			t.Claims.(jwt.MapClaims)["pol"] = policyID // Policy in token
+			t.Claims.(jwt.MapClaims)["exp"] = time.Now().Add(time.Hour).Unix()
+		})
+
+		authHeaders := map[string]string{"authorization": jwtToken}
+		_, _ = ts.Run(t, test.TestCase{
+			Headers: authHeaders,
+			Path:    "/api1",
+			Code:    http.StatusOK,
+		})
+	})
+
+	// Step 4: First-time request with no policy should also be rejected
+	t.Run("Step 4: New user with no policy in token is rejected", func(t *testing.T) {
+		newUserID := "new-user-" + uuid.New()
+		jwtTokenNoPolicy := CreateJWKToken(func(t *jwt.Token) {
+			t.Claims.(jwt.MapClaims)["sub"] = newUserID
+			// NO "pol" claim
+			t.Claims.(jwt.MapClaims)["exp"] = time.Now().Add(time.Hour).Unix()
+		})
+
+		authHeaders := map[string]string{"authorization": jwtTokenNoPolicy}
+		_, _ = ts.Run(t, test.TestCase{
+			Headers:   authHeaders,
+			Path:      "/api1",
+			Code:      http.StatusForbidden,
+			BodyMatch: `key not authorized: no matching policy found`,
+		})
+	})
+}
+
+func TestJWTMiddleware_ErrorLogging(t *testing.T) {
+	invalidJSONHandler := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		_, err := w.Write([]byte("this-is-not-json"))
+		assert.NoError(t, err)
+	})
+
+	tests := []struct {
+		name             string
+		mockHandler      http.Handler
+		configureSpec    func(*APISpec)
+		action           func(*JWTMiddleware, string) error
+		expectedLogParts []string
+	}{
+		{
+			name:        "Legacy GetSecret Invalid JSON",
+			mockHandler: invalidJSONHandler,
+			action: func(m *JWTMiddleware, serverURL string) error {
+				_, err := m.legacyGetSecretFromURL(serverURL, "kid", "RS256")
+				return err
+			},
+			expectedLogParts: []string{"Invalid JWKS retrieved from endpoint"},
+		},
+		{
+			name: "Legacy GetSecret Network Error",
+			action: func(m *JWTMiddleware, _ string) error {
+				_, err := m.legacyGetSecretFromURL("http://[::1]:namedport", "kid", "RS256")
+				return err
+			},
+			expectedLogParts: []string{"JWKS endpoint resolution failed"},
+		},
+		{
+			name: "VerifySignature Invalid Base64 Source",
+			configureSpec: func(s *APISpec) {
+				s.JWTSource = "this-is-not-base64!"
+			},
+			action: func(m *JWTMiddleware, _ string) error {
+				token := &jwt.Token{Header: map[string]interface{}{"kid": "123"}}
+				_, err := m.getSecretToVerifySignature(nil, token)
+				return err
+			},
+			expectedLogParts: []string{"JWKS source decode failed", "not a base64 string"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var serverURL string
+			if tt.mockHandler != nil {
+				ts := httptest.NewServer(tt.mockHandler)
+				defer ts.Close()
+				serverURL = ts.URL
+			}
+
+			logger, hook := logrustest.NewNullLogger()
+
+			gw := &Gateway{}
+			gw.SetConfig(config.Config{JWTSSLInsecureSkipVerify: true})
+
+			spec := &APISpec{
+				APIDefinition: &apidef.APIDefinition{
+					APIID: "test-api-" + tt.name,
+				},
+			}
+			if tt.configureSpec != nil {
+				tt.configureSpec(spec)
+			}
+
+			m := JWTMiddleware{BaseMiddleware: &BaseMiddleware{
+				Gw:     gw,
+				logger: logger.WithField("mw", "JWTMiddleware"),
+			}}
+			m.Spec = spec
+
+			err := tt.action(&m, serverURL)
+
+			assert.Error(t, err)
+
+			require.NotEmpty(t, hook.Entries, "Expected log entries but found none")
+			lastLog := hook.LastEntry()
+
+			assert.Equal(t, logrus.ErrorLevel, lastLog.Level)
+			for _, part := range tt.expectedLogParts {
+				assert.Contains(t, lastLog.Message, part)
+			}
+		})
+	}
+}
+
+func Test_buildJWKSCache(t *testing.T) {
+	type testCase struct {
+		name            string
+		expectedTimeout int64
+		cfg             config.Config
+	}
+
+	for _, tt := range []testCase{
+		{"default timeout if not provided", externalOAuthJWKCacheExpiration, config.Config{}},
+		{"invalid value is set to default", externalOAuthJWKCacheExpiration, config.Config{JWKS: config.JWKSConfig{Cache: config.JWKSCacheConfig{Timeout: -1}}}},
+		{"fetches value from config", 500, config.Config{JWKS: config.JWKSConfig{Cache: config.JWKSCacheConfig{Timeout: 500}}}},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			cacheInstance := buildJWKSCache(tt.cfg)
+			assert.Equal(t, tt.expectedTimeout, cacheInstance.DefaultExpiration())
+			assert.Equal(t, int64(externalOAuthJWKCacheCleanupInterval), cacheInstance.CleanupInterval())
+		})
+	}
+}
+
+func TestDeleteJWKCacheByAPIID(t *testing.T) {
+	ts := StartTest(nil)
+	t.Cleanup(ts.Close)
+
+	apiID := "test-api-" + uuid.NewHex()
+
+	// Create and populate a cache
+	jwkCache := ts.Gw.loadOrCreateJWKCacheByApiID(apiID)
+	jwkCache.Set("test-key", "test-value", 0)
+
+	// Verify the cache has items before deletion
+	assert.Equal(t, 1, jwkCache.Count())
+
+	ts.Gw.deleteJWKCacheByAPIID(apiID)
+
+	// Verify cache is removed from the JWKCaches map
+	_, exists := ts.Gw.apiJWKCaches.Load(apiID)
+	assert.False(t, exists, "cache should be removed from JWKCaches")
+
+	// Verify cache contents are flushed (Close calls Flush)
+	assert.Equal(t, 0, jwkCache.Count(), "cache items should be flushed after Close()")
 }

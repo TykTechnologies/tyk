@@ -629,6 +629,51 @@ func TestManagementNodeRedisEvents(t *testing.T) {
 	})
 }
 
+func TestDistributedRateLimiterDisabledRedisEvents(t *testing.T) {
+	ts := StartTest(nil)
+	t.Cleanup(ts.Close)
+
+	drlNotificationCommand := &testMessageAdapter{
+		Msg: `{"Command": "NoticeGatewayDRLNotification"}`,
+	}
+
+	shouldNotHandleNotification := func(NotificationCommand) {
+		assert.Fail(t, "should skip redis event")
+	}
+
+	globalConf := ts.Gw.GetConfig()
+
+	t.Run("enabled Sentinel Rate Limiter - should skip DRL updates", func(*testing.T) {
+		globalConf.EnableSentinelRateLimiter = true
+		ts.Gw.SetConfig(globalConf)
+
+		ts.Gw.handleRedisEvent(drlNotificationCommand, shouldNotHandleNotification, nil)
+
+		globalConf.EnableSentinelRateLimiter = false
+		ts.Gw.SetConfig(globalConf)
+	})
+
+	t.Run("enabled Redis Rolling Limiter - should skip DRL updates", func(*testing.T) {
+		globalConf.EnableRedisRollingLimiter = true
+		ts.Gw.SetConfig(globalConf)
+
+		ts.Gw.handleRedisEvent(drlNotificationCommand, shouldNotHandleNotification, nil)
+
+		globalConf.EnableRedisRollingLimiter = false
+		ts.Gw.SetConfig(globalConf)
+	})
+
+	t.Run("enabled Fixed Window Rate Limiter - should skip DRL updates", func(*testing.T) {
+		globalConf.EnableFixedWindowRateLimiter = true
+		ts.Gw.SetConfig(globalConf)
+
+		ts.Gw.handleRedisEvent(drlNotificationCommand, shouldNotHandleNotification, nil)
+
+		globalConf.EnableFixedWindowRateLimiter = false
+		ts.Gw.SetConfig(globalConf)
+	})
+}
+
 func TestListenPathTykPrefix(t *testing.T) {
 	ts := StartTest(nil)
 	t.Cleanup(ts.Close)
@@ -1948,4 +1993,102 @@ func TestOverrideErrors(t *testing.T) {
 		assert(message4, code2, e, i)
 	})
 
+}
+
+func TestGateway_GetLoadedAPIIDs(t *testing.T) {
+	t.Run("returns empty slice when no APIs loaded", func(t *testing.T) {
+		ts := StartTest(nil)
+		defer ts.Close()
+
+		result := ts.Gw.GetLoadedAPIIDs()
+		assert.NotNil(t, result)
+		assert.Empty(t, result)
+	})
+
+	t.Run("returns loaded API IDs", func(t *testing.T) {
+		ts := StartTest(nil)
+		defer ts.Close()
+
+		ts.Gw.BuildAndLoadAPI(
+			func(spec *APISpec) {
+				spec.APIID = "test-api-1"
+				spec.Proxy.ListenPath = "/api1/"
+			},
+			func(spec *APISpec) {
+				spec.APIID = "test-api-2"
+				spec.Proxy.ListenPath = "/api2/"
+			},
+		)
+
+		result := ts.Gw.GetLoadedAPIIDs()
+		assert.Len(t, result, 2)
+
+		// Collect API IDs for comparison (order may vary due to map iteration)
+		apiIDs := make(map[string]bool)
+		for _, info := range result {
+			apiIDs[info.APIID] = true
+		}
+		assert.True(t, apiIDs["test-api-1"])
+		assert.True(t, apiIDs["test-api-2"])
+	})
+
+	t.Run("returns correct struct type", func(t *testing.T) {
+		ts := StartTest(nil)
+		defer ts.Close()
+
+		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+			spec.APIID = "struct-test-api"
+		})
+
+		result := ts.Gw.GetLoadedAPIIDs()
+		assert.Len(t, result, 1)
+		assert.Equal(t, "struct-test-api", result[0].APIID)
+	})
+}
+
+func TestGateway_GetLoadedPolicyIDs(t *testing.T) {
+	t.Run("returns empty slice when no policies loaded", func(t *testing.T) {
+		ts := StartTest(nil)
+		defer ts.Close()
+
+		result := ts.Gw.GetLoadedPolicyIDs()
+		assert.NotNil(t, result)
+		assert.Empty(t, result)
+	})
+
+	t.Run("returns loaded policy IDs", func(t *testing.T) {
+		ts := StartTest(nil)
+		defer ts.Close()
+
+		ts.CreatePolicy(func(p *user.Policy) {
+			p.ID = "test-policy-1"
+		})
+		ts.CreatePolicy(func(p *user.Policy) {
+			p.ID = "test-policy-2"
+		})
+
+		result := ts.Gw.GetLoadedPolicyIDs()
+		assert.Len(t, result, 2)
+
+		// Collect policy IDs for comparison (order may vary)
+		policyIDs := make(map[string]bool)
+		for _, info := range result {
+			policyIDs[info.PolicyID] = true
+		}
+		assert.True(t, policyIDs["test-policy-1"])
+		assert.True(t, policyIDs["test-policy-2"])
+	})
+
+	t.Run("returns correct struct type", func(t *testing.T) {
+		ts := StartTest(nil)
+		defer ts.Close()
+
+		ts.CreatePolicy(func(p *user.Policy) {
+			p.ID = "struct-test-policy"
+		})
+
+		result := ts.Gw.GetLoadedPolicyIDs()
+		assert.Len(t, result, 1)
+		assert.Equal(t, "struct-test-policy", result[0].PolicyID)
+	})
 }

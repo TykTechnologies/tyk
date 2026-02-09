@@ -41,6 +41,7 @@ import (
 	"github.com/TykTechnologies/tyk/internal/httputil"
 	"github.com/TykTechnologies/tyk/internal/model"
 	"github.com/TykTechnologies/tyk/internal/otel"
+	"github.com/TykTechnologies/tyk/internal/reflect"
 	"github.com/TykTechnologies/tyk/internal/uuid"
 
 	"github.com/TykTechnologies/graphql-go-tools/pkg/execution/datasource"
@@ -279,14 +280,6 @@ func (s *Test) reloadSimulation(ctx context.Context, gw *Gateway) {
 		case <-ctx.Done():
 			return
 		default:
-			gw.policiesMu.Lock()
-			if gw.policiesByID == nil {
-				gw.policiesByID = make(map[string]user.Policy)
-			}
-			gw.policiesByID["_"] = user.Policy{}
-			delete(gw.policiesByID, "_")
-			gw.policiesMu.Unlock()
-
 			gw.apisMu.Lock()
 			if gw.apisByID == nil {
 				gw.apisByID = make(map[string]*APISpec)
@@ -896,7 +889,6 @@ func CreateStandardPolicy() *user.Policy {
 }
 
 func (s *Test) CreatePolicy(pGen ...func(p *user.Policy)) string {
-
 	pID := s.Gw.keyGen.GenerateAuthKey("")
 	pol := CreateStandardPolicy()
 	pol.ID = pID
@@ -905,17 +897,13 @@ func (s *Test) CreatePolicy(pGen ...func(p *user.Policy)) string {
 		pGen[0](pol)
 	}
 
-	s.Gw.policiesMu.Lock()
-	s.Gw.policiesByID[pol.ID] = *pol
-	s.Gw.policiesMu.Unlock()
+	s.Gw.policies.Add(*pol)
 
 	return pol.ID
 }
 
-func (s *Test) DeletePolicy(policyID string) {
-	s.Gw.policiesMu.Lock()
-	delete(s.Gw.policiesByID, policyID)
-	s.Gw.policiesMu.Unlock()
+func (s *Test) DeletePolicy(policyID model.PolicyID) {
+	s.Gw.policies.DeleteById(policyID)
 }
 
 func CreateJWKToken(jGen ...func(*jwt.Token)) string {
@@ -1130,6 +1118,18 @@ func (s *Test) start(genConf func(globalConf *config.Config)) *Gateway {
 func (s *Test) AddDynamicHandler(path string, handlerFunc http.HandlerFunc) {
 	path = strings.Trim(path, "/")
 	s.dynamicHandlers[path] = handlerFunc
+}
+
+// setTestScopeConfig overrides config in scope of test case.
+func (s *Test) setTestScopeConfig(t *testing.T, apply func(cnf *config.Config)) {
+	t.Helper()
+	cnf := s.Gw.GetConfig()
+	newCnf := reflect.Clone(cnf)
+	apply(&newCnf)
+	s.Gw.SetConfig(newCnf)
+	t.Cleanup(func() {
+		s.Gw.SetConfig(cnf)
+	})
 }
 
 func (s *Test) newGateway(genConf func(globalConf *config.Config)) *Gateway {
@@ -1471,13 +1471,6 @@ func (s *Test) GetApiById(apiId string) *APISpec {
 
 func (s *Test) StopRPCClient() {
 	rpc.Reset()
-}
-
-func (s *Test) GetPolicyById(policyId string) (user.Policy, bool) {
-	s.Gw.policiesMu.Lock()
-	defer s.Gw.policiesMu.Unlock()
-	pol, found := s.Gw.policiesByID[policyId]
-	return pol, found
 }
 
 const sampleAPI = `{
@@ -1828,54 +1821,99 @@ func BuildAPI(apiGens ...func(spec *APISpec)) (specs []*APISpec) {
 }
 
 func (gw *Gateway) LoadAPI(specs ...*APISpec) (out []*APISpec) {
-	var err error
+	cleanup := gw.setupTempAppPath()
+	defer cleanup()
+
+	gwConf := gw.GetConfig()
+	gw.writeSpecFiles(specs, gwConf.AppPath)
+
+	gw.DoReload()
+	return gw.collectLoadedSpecs(specs)
+}
+
+// setupTempAppPath creates a temporary directory for API specs and returns a cleanup function.
+func (gw *Gateway) setupTempAppPath() func() {
 	gwConf := gw.GetConfig()
 	oldPath := gwConf.AppPath
-	gwConf.AppPath, err = ioutil.TempDir("", "apps")
+
+	tempPath, err := ioutil.TempDir("", "apps")
 	if err != nil {
 		log.WithError(err).Errorf("loadapi: failed to create temp dir")
 	}
+
+	gwConf.AppPath = tempPath
 	gw.SetConfig(gwConf, true)
-	defer func() {
+
+	return func() {
 		globalConf := gw.GetConfig()
 		os.RemoveAll(globalConf.AppPath)
 		globalConf.AppPath = oldPath
 		gw.SetConfig(globalConf, true)
-	}()
+	}
+}
 
+// writeSpecFiles writes API spec files to the specified directory.
+func (gw *Gateway) writeSpecFiles(specs []*APISpec, appPath string) {
 	for i, spec := range specs {
-		if spec.Name == "" {
-			spec.Name = randStringBytes(15)
-		}
+		gw.ensureSpecName(spec)
+		gw.writeAPIDefinitionFile(spec, i, appPath)
+		gw.writeOASFile(spec, i, appPath)
+	}
+}
 
-		specBytes, err := json.Marshal(spec.APIDefinition)
-		if err != nil {
-			log.WithError(err).Errorf("API Spec Marshal failed: %+v", spec)
-			panic(err)
-		}
+// ensureSpecName generates a random name if the spec doesn't have one.
+func (gw *Gateway) ensureSpecName(spec *APISpec) {
+	if spec.Name == "" {
+		spec.Name = randStringBytes(15)
+	}
+}
 
-		specFilePath := filepath.Join(gwConf.AppPath, spec.APIID+strconv.Itoa(i)+".json")
-		if err := ioutil.WriteFile(specFilePath, specBytes, 0644); err != nil {
-			panic(err)
-		}
-
-		oasSpecBytes, err := json.Marshal(&spec.OAS)
-		if err != nil {
-			log.WithError(err).Errorf("OAS Marshal failed: %+v", spec)
-			panic(err)
-		}
-
-		oasSpecFilePath := filepath.Join(gwConf.AppPath, spec.APIID+strconv.Itoa(i)+"-oas.json")
-		if err := ioutil.WriteFile(oasSpecFilePath, oasSpecBytes, 0644); err != nil {
-			panic(err)
-		}
+// writeAPIDefinitionFile marshals and writes the API definition to a file.
+func (gw *Gateway) writeAPIDefinitionFile(spec *APISpec, index int, appPath string) {
+	specBytes, err := json.Marshal(spec.APIDefinition)
+	if err != nil {
+		log.WithError(err).Errorf("API Spec Marshal failed: %+v", spec)
+		panic(err)
 	}
 
-	gw.DoReload()
+	specFilePath := filepath.Join(appPath, spec.APIID+strconv.Itoa(index)+".json")
+	if err := ioutil.WriteFile(specFilePath, specBytes, 0644); err != nil {
+		panic(err)
+	}
+}
+
+// writeOASFile marshals and writes the OAS spec to a file.
+// Uses -mcp.json suffix for MCP APIs, -oas.json for regular OAS APIs.
+func (gw *Gateway) writeOASFile(spec *APISpec, index int, appPath string) {
+	oasSpecBytes, err := json.Marshal(&spec.OAS)
+	if err != nil {
+		log.WithError(err).Errorf("OAS Marshal failed: %+v", spec)
+		panic(err)
+	}
+
+	oasSpecFilePath := gw.getOASFilePath(spec, index, appPath)
+	if err := ioutil.WriteFile(oasSpecFilePath, oasSpecBytes, 0644); err != nil {
+		panic(err)
+	}
+}
+
+// getOASFilePath returns the file path for an OAS spec.
+// Uses -mcp.json suffix for MCP APIs, -oas.json for regular OAS APIs.
+func (gw *Gateway) getOASFilePath(spec *APISpec, index int, appPath string) string {
+	baseName := spec.APIID + strconv.Itoa(index)
+	suffix := "-oas.json"
+	if spec.IsMCP() {
+		suffix = "-mcp.json"
+	}
+	return filepath.Join(appPath, baseName+suffix)
+}
+
+// collectLoadedSpecs retrieves the loaded API specs after reload.
+func (gw *Gateway) collectLoadedSpecs(specs []*APISpec) []*APISpec {
+	out := make([]*APISpec, 0, len(specs))
 	for _, spec := range specs {
 		out = append(out, gw.getApiSpec(spec.APIID))
 	}
-
 	return out
 }
 

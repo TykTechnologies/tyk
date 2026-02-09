@@ -41,8 +41,9 @@ const (
 	KeySpaceUpdateNotification   NotificationCommand = "KeySpaceUpdateNotification"
 	OAuthPurgeLapsedTokens       NotificationCommand = "OAuthPurgeLapsedTokens"
 	// NoticeDeleteAPICache is the command with which event is emitted from dashboard to invalidate cache for an API.
-	NoticeDeleteAPICache NotificationCommand = "DeleteAPICache"
-	NoticeUserKeyReset   NotificationCommand = "UserKeyReset"
+	NoticeDeleteAPICache            NotificationCommand = "DeleteAPICache"
+	NoticeUserKeyReset              NotificationCommand = "UserKeyReset"
+	NoticeInvalidateJWKSCacheForAPI NotificationCommand = "InvalidateJWKSCacheForAPI"
 )
 
 // Notification is a type that encodes a message published to a pub sub channel (shared between implementations)
@@ -139,10 +140,8 @@ func (gw *Gateway) handleRedisEvent(v interface{}, handled func(NotificationComm
 	case NoticeDashboardConfigRequest:
 		gw.handleSendMiniConfig(notif.Payload)
 	case NoticeGatewayDRLNotification:
-		if gw.GetConfig().ManagementNode {
-			// DRL is not initialized, going through would
-			// be mostly harmless but would flood the log
-			// with warnings since DRLManager.Ready == false
+		if gw.isDRLDisabled() {
+			// DRL is disabled - other Rate Limiter is being used or this is a Management Node.
 			return
 		}
 		gw.onServerStatusReceivedHandler(notif.Payload)
@@ -159,6 +158,8 @@ func (gw *Gateway) handleRedisEvent(v interface{}, handled func(NotificationComm
 		if ok := gw.invalidateAPICache(notif.Payload); !ok {
 			log.WithError(err).Errorf("cache invalidation failed for: %s", notif.Payload)
 		}
+	case NoticeInvalidateJWKSCacheForAPI:
+		gw.invalidateJWKSCacheByAPIID(notif.Payload)
 	case NoticeUserKeyReset:
 		gw.handleUserKeyReset(notif.Payload)
 	default:

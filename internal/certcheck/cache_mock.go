@@ -19,6 +19,7 @@ import (
 type MockCooldownCache struct {
 	ctrl     *gomock.Controller
 	recorder *MockCooldownCacheMockRecorder
+	isgomock struct{}
 }
 
 // MockCooldownCacheMockRecorder is the mock recorder for MockCooldownCache.
@@ -39,89 +40,89 @@ func (m *MockCooldownCache) EXPECT() *MockCooldownCacheMockRecorder {
 }
 
 // HasCheckCooldown mocks base method.
-func (m *MockCooldownCache) HasCheckCooldown(arg0 string) (bool, error) {
+func (m *MockCooldownCache) HasCheckCooldown(certID string) (bool, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "HasCheckCooldown", arg0)
+	ret := m.ctrl.Call(m, "HasCheckCooldown", certID)
 	ret0, _ := ret[0].(bool)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // HasCheckCooldown indicates an expected call of HasCheckCooldown.
-func (mr *MockCooldownCacheMockRecorder) HasCheckCooldown(arg0 any) *gomock.Call {
+func (mr *MockCooldownCacheMockRecorder) HasCheckCooldown(certID any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "HasCheckCooldown", reflect.TypeOf((*MockCooldownCache)(nil).HasCheckCooldown), arg0)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "HasCheckCooldown", reflect.TypeOf((*MockCooldownCache)(nil).HasCheckCooldown), certID)
 }
 
 // HasFireEventCooldown mocks base method.
-func (m *MockCooldownCache) HasFireEventCooldown(arg0 string) (bool, error) {
+func (m *MockCooldownCache) HasFireEventCooldown(certID string) (bool, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "HasFireEventCooldown", arg0)
+	ret := m.ctrl.Call(m, "HasFireEventCooldown", certID)
 	ret0, _ := ret[0].(bool)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // HasFireEventCooldown indicates an expected call of HasFireEventCooldown.
-func (mr *MockCooldownCacheMockRecorder) HasFireEventCooldown(arg0 any) *gomock.Call {
+func (mr *MockCooldownCacheMockRecorder) HasFireEventCooldown(certID any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "HasFireEventCooldown", reflect.TypeOf((*MockCooldownCache)(nil).HasFireEventCooldown), arg0)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "HasFireEventCooldown", reflect.TypeOf((*MockCooldownCache)(nil).HasFireEventCooldown), certID)
 }
 
 // IsCheckCooldownActive mocks base method.
-func (m *MockCooldownCache) IsCheckCooldownActive(arg0 string) (bool, error) {
+func (m *MockCooldownCache) IsCheckCooldownActive(certID string) (bool, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "IsCheckCooldownActive", arg0)
+	ret := m.ctrl.Call(m, "IsCheckCooldownActive", certID)
 	ret0, _ := ret[0].(bool)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // IsCheckCooldownActive indicates an expected call of IsCheckCooldownActive.
-func (mr *MockCooldownCacheMockRecorder) IsCheckCooldownActive(arg0 any) *gomock.Call {
+func (mr *MockCooldownCacheMockRecorder) IsCheckCooldownActive(certID any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IsCheckCooldownActive", reflect.TypeOf((*MockCooldownCache)(nil).IsCheckCooldownActive), arg0)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IsCheckCooldownActive", reflect.TypeOf((*MockCooldownCache)(nil).IsCheckCooldownActive), certID)
 }
 
 // IsFireEventCooldownActive mocks base method.
-func (m *MockCooldownCache) IsFireEventCooldownActive(arg0 string) (bool, error) {
+func (m *MockCooldownCache) IsFireEventCooldownActive(certID string) (bool, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "IsFireEventCooldownActive", arg0)
+	ret := m.ctrl.Call(m, "IsFireEventCooldownActive", certID)
 	ret0, _ := ret[0].(bool)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // IsFireEventCooldownActive indicates an expected call of IsFireEventCooldownActive.
-func (mr *MockCooldownCacheMockRecorder) IsFireEventCooldownActive(arg0 any) *gomock.Call {
+func (mr *MockCooldownCacheMockRecorder) IsFireEventCooldownActive(certID any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IsFireEventCooldownActive", reflect.TypeOf((*MockCooldownCache)(nil).IsFireEventCooldownActive), arg0)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IsFireEventCooldownActive", reflect.TypeOf((*MockCooldownCache)(nil).IsFireEventCooldownActive), certID)
 }
 
 // SetCheckCooldown mocks base method.
-func (m *MockCooldownCache) SetCheckCooldown(arg0 string, arg1 int64) error {
+func (m *MockCooldownCache) SetCheckCooldown(certID string, checkCooldownInSeconds int64) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "SetCheckCooldown", arg0, arg1)
+	ret := m.ctrl.Call(m, "SetCheckCooldown", certID, checkCooldownInSeconds)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // SetCheckCooldown indicates an expected call of SetCheckCooldown.
-func (mr *MockCooldownCacheMockRecorder) SetCheckCooldown(arg0, arg1 any) *gomock.Call {
+func (mr *MockCooldownCacheMockRecorder) SetCheckCooldown(certID, checkCooldownInSeconds any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetCheckCooldown", reflect.TypeOf((*MockCooldownCache)(nil).SetCheckCooldown), arg0, arg1)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetCheckCooldown", reflect.TypeOf((*MockCooldownCache)(nil).SetCheckCooldown), certID, checkCooldownInSeconds)
 }
 
 // SetFireEventCooldown mocks base method.
-func (m *MockCooldownCache) SetFireEventCooldown(arg0 string, arg1 int64) error {
+func (m *MockCooldownCache) SetFireEventCooldown(certID string, fireEventCooldownInSeconds int64) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "SetFireEventCooldown", arg0, arg1)
+	ret := m.ctrl.Call(m, "SetFireEventCooldown", certID, fireEventCooldownInSeconds)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // SetFireEventCooldown indicates an expected call of SetFireEventCooldown.
-func (mr *MockCooldownCacheMockRecorder) SetFireEventCooldown(arg0, arg1 any) *gomock.Call {
+func (mr *MockCooldownCacheMockRecorder) SetFireEventCooldown(certID, fireEventCooldownInSeconds any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetFireEventCooldown", reflect.TypeOf((*MockCooldownCache)(nil).SetFireEventCooldown), arg0, arg1)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetFireEventCooldown", reflect.TypeOf((*MockCooldownCache)(nil).SetFireEventCooldown), certID, fireEventCooldownInSeconds)
 }

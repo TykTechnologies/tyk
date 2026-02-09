@@ -11,12 +11,17 @@ import (
 	_ "path"
 	"reflect"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"testing"
+	"time"
 
+	"github.com/gorilla/mux"
+	nr "github.com/newrelic/go-agent/v3/newrelic"
 	"github.com/stretchr/testify/assert"
 
 	persistentmodel "github.com/TykTechnologies/storage/persistent/model"
+
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/apidef/oas"
 	"github.com/TykTechnologies/tyk/config"
@@ -9586,4 +9591,202 @@ func TestRecoverFromLoadApiPanic(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestEnforceOrgDataAgeIfQuotasEnabled(t *testing.T) {
+	type testCase struct {
+		name                      string
+		enforceOrgQuotas          bool
+		enforceOrgDataAge         bool
+		expectedEnforceOrgDataAge bool
+	}
+
+	tests := []testCase{
+		{
+			name:                      "should not set org data age if quotas are disabled",
+			enforceOrgQuotas:          false,
+			enforceOrgDataAge:         false,
+			expectedEnforceOrgDataAge: false,
+		},
+		{
+			name:                      "should keep org data age if quotas are disabled",
+			enforceOrgQuotas:          false,
+			enforceOrgDataAge:         true,
+			expectedEnforceOrgDataAge: true,
+		},
+		{
+			name:                      "should enforce org data age if quotas are enabled",
+			enforceOrgQuotas:          true,
+			enforceOrgDataAge:         false,
+			expectedEnforceOrgDataAge: true,
+		},
+		{
+			name:                      "should keep org data age enabled if quotas are enabled",
+			enforceOrgQuotas:          true,
+			enforceOrgDataAge:         true,
+			expectedEnforceOrgDataAge: true,
+		},
+	}
+
+	for _, tc := range tests {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			ts := StartTest(func(globalConf *config.Config) {
+				globalConf.EnforceOrgQuotas = tc.enforceOrgQuotas
+				globalConf.EnforceOrgDataAge = tc.enforceOrgDataAge
+			})
+			t.Cleanup(ts.Close)
+
+			spec := &APISpec{
+				GlobalConfig: config.Config{
+					EnforceOrgDataAge: tc.enforceOrgDataAge,
+				},
+			}
+			ts.Gw.enforceOrgDataAgeIfQuotasEnabled(spec)
+
+			gwConf := ts.Gw.GetConfig()
+			assert.Equal(t, tc.expectedEnforceOrgDataAge, gwConf.EnforceOrgDataAge)
+			assert.Equal(t, tc.expectedEnforceOrgDataAge, spec.GlobalConfig.EnforceOrgDataAge)
+		})
+	}
+}
+
+func TestNewRelicMounting(t *testing.T) {
+	mwExecuted := make(chan bool, 1)
+
+	dummyHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		txn := nr.FromContext(r.Context())
+		mwExecuted <- txn != nil
+		w.WriteHeader(http.StatusOK)
+	})
+
+	muxer := &proxyMux{}
+
+	conf := &config.Config{
+		ListenPort: 8080,
+		HttpServerOptions: config.HttpServerOptionsConfig{
+			EnableStrictRoutes: false,
+		},
+	}
+
+	cleanRouter := mux.NewRouter()
+
+	muxer.setRouter(8080, "http", cleanRouter, *conf)
+
+	gw := &Gateway{
+		apisByID:        make(map[string]*APISpec),
+		apisHandlesByID: new(sync.Map),
+		DefaultProxyMux: muxer,
+	}
+
+	gw.config.Store(*conf)
+
+	app, err := nr.NewApplication(
+		nr.ConfigAppName("TestApp"),
+		nr.ConfigLicense("1234567890123456789012345678901234567890"),
+		nr.ConfigDistributedTracerEnabled(true),
+		nr.ConfigEnabled(false),
+	)
+	assert.NoError(t, err)
+	gw.NewRelicApplication = app
+
+	spec := &APISpec{
+		APIDefinition: &apidef.APIDefinition{
+			APIID:            "test-fix",
+			Name:             "Fix Test",
+			Protocol:         "http",
+			Active:           true,
+			UseKeylessAccess: true,
+			Proxy: apidef.ProxyConfig{
+				ListenPath: "/fix-test/",
+				TargetURL:  "http://mock",
+			},
+		},
+	}
+	gw.apisByID[spec.APIID] = spec
+	gw.apisHandlesByID.Store(spec.APIID, &ChainObject{
+		ThisHandler: dummyHandler,
+	})
+
+	_, err = gw.loadHTTPService(spec, map[string]int{}, nil, muxer)
+	assert.NoError(t, err)
+
+	_, err = gw.loadHTTPService(spec, map[string]int{}, nil, muxer)
+	assert.NoError(t, err)
+
+	t.Run("Router should have New Relic Middleware", func(t *testing.T) {
+		req := httptest.NewRequest("GET", "/fix-test/", nil)
+		w := httptest.NewRecorder()
+
+		cleanRouter.ServeHTTP(w, req)
+
+		select {
+		case success := <-mwExecuted:
+			assert.True(t, success, "FAILURE: New Relic middleware was not present")
+		case <-time.After(1 * time.Second):
+			t.Fatal("FAILURE: Timeout - Middleware did not execute")
+		}
+	})
+}
+
+// TestMCPRequestSizeLimit_Security tests that RequestSizeLimitMiddleware
+// runs before JSONRPCMiddleware for MCP APIs to prevent DoS attacks.
+func TestMCPRequestSizeLimit_Security(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	t.Run("MCP API rejects oversized requests", func(t *testing.T) {
+		// Create upstream server
+		upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			w.WriteHeader(http.StatusOK)
+			if _, err := w.Write([]byte(`{"jsonrpc":"2.0","result":"success","id":1}`)); err != nil {
+				t.Errorf("failed to write response: %v", err)
+			}
+		}))
+		defer upstream.Close()
+
+		// Create MCP API with size limit
+		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+			spec.Name = "MCP Size Test"
+			spec.APIID = "mcp-size-test"
+			spec.Proxy.ListenPath = "/mcp-test/"
+			spec.Proxy.TargetURL = upstream.URL
+			spec.ApplicationProtocol = apidef.AppProtocolMCP
+			spec.JsonRpcVersion = apidef.JsonRPC20
+
+			UpdateAPIVersion(spec, "v1", func(v *apidef.VersionInfo) {
+				v.GlobalSizeLimit = 512 // Small limit for testing
+			})
+		})
+
+		// Test oversized request (should be rejected)
+		largePayload := `{"jsonrpc":"2.0","method":"tools/call","params":{"data":"` + strings.Repeat("x", 600) + `"},"id":1}`
+
+		_, _ = ts.Run(t, test.TestCase{
+			Method: http.MethodPost,
+			Path:   "/mcp-test/",
+			Data:   largePayload,
+			Code:   http.StatusBadRequest, // Should reject oversized request
+			Headers: map[string]string{
+				"Content-Type": "application/json",
+			},
+		})
+	})
+
+	t.Run("Regular API unaffected", func(t *testing.T) {
+		// Create regular API with size limit
+		api := ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+			spec.Name = "Regular API"
+			spec.APIID = "regular-test"
+			spec.Proxy.ListenPath = "/regular/"
+			// ApplicationProtocol not set - regular HTTP API
+
+			UpdateAPIVersion(spec, "v1", func(v *apidef.VersionInfo) {
+				v.GlobalSizeLimit = 1024
+			})
+		})[0]
+
+		// Verify it's not MCP
+		assert.False(t, api.IsMCP(), "API should not be MCP")
+	})
 }

@@ -98,9 +98,17 @@ const (
 	DefaultOTelResourceName = "tyk-gateway"
 )
 
+type PolicySource string
+
+const (
+	PolicySourceService PolicySource = "service"
+	PolicySourceRpc     PolicySource = "rpc"
+	PolicySourceFile    PolicySource = "file"
+)
+
 type PoliciesConfig struct {
 	// Set this value to `file` to look in the file system for a definition file. Set to `service` to use the Dashboard service.
-	PolicySource string `json:"policy_source"`
+	PolicySource PolicySource `json:"policy_source"`
 
 	// This option is required if `policies.policy_source` is set to `service`.
 	// Set this to the URL of your Tyk Dashboard installation. The URL needs to be formatted as: http://dashboard_host:port.
@@ -117,6 +125,8 @@ type PoliciesConfig struct {
 	// If you set this value to `true`, then the id parameter in a stored policy (or imported policy using the Dashboard API), will be used instead of the internal ID.
 	//
 	// This option should only be used when moving an installation to a new database.
+	//
+	// Deprecated. Is not used in codebase.
 	AllowExplicitPolicyID bool `json:"allow_explicit_policy_id"`
 	// This option only applies in OSS deployment when the `policies.policy_source` is either set
 	// to `file` or an empty string. If `policies.policy_path` is set, then Tyk will load policies
@@ -186,6 +196,12 @@ type StorageOptionsConf struct {
 	// Options: ["1.0", "1.1", "1.2", "1.3"].
 	// Defaults to "1.2".
 	TLSMinVersion string `json:"tls_min_version"`
+	// Enables Zstd compression of API definitions stored in Redis backups.
+	// When enabled, API definitions are compressed before encryption, reducing Redis storage.
+	// The Gateway can read both compressed and uncompressed formats for backward compatibility.
+	// Note: Decompression has a 100MB memory limit.
+	// Defaults to false.
+	CompressAPIDefinitions bool `json:"compress_api_definitions"`
 }
 
 type NormalisedURLConfig struct {
@@ -285,18 +301,29 @@ type AccessLogsConfig struct {
 	//
 	// Template Options:
 	//
-	// - `api_key` will include they obfuscated or hashed key.
-	// - `client_ip` will include the ip of the request.
+	// - `api_key` will include the obfuscated or hashed key.
+	// - `circuit_breaker_state` will include the circuit breaker state when applicable.
+	// - `client_ip` will include the IP of the request.
+	// - `error_source` will include the source of an error (e.g., ReverseProxy).
+	// - `error_target` will include the target that caused an error.
 	// - `host` will include the host of the request.
+	// - `latency_gateway` will include the gateway processing latency.
+	// - `latency_total` will include the total latency of the request.
 	// - `method` will include the request method.
+	// - `org_id` will include the organization ID.
 	// - `path` will include the path of the request.
 	// - `protocol` will include the protocol of the request.
 	// - `remote_addr` will include the remote address of the request.
-	// - `upstream_addr` will include the upstream address (scheme, host and path)
-	// - `upstream_latency` will include the upstream latency of the request.
-	// - `latency_total` will include the total latency of the request.
-	// - `user_agent` will include the user agent of the request.
+	// - `response_code_details` will include detailed error description for 5XX responses.
+	// - `response_flag` will include the error classification flag (e.g., URT, UCF, TLE).
 	// - `status` will include the response status code.
+	// - `tls_cert_expiry` will include the TLS certificate expiry date when applicable.
+	// - `tls_cert_subject` will include the TLS certificate subject when applicable.
+	// - `trace_id` will include the OpenTelemetry trace ID when tracing is enabled.
+	// - `upstream_addr` will include the upstream address (scheme, host and path).
+	// - `upstream_latency` will include the upstream latency of the request.
+	// - `upstream_status` will include the upstream response status code for 5XX responses.
+	// - `user_agent` will include the user agent of the request.
 	Template []string `json:"template"`
 }
 
@@ -362,6 +389,14 @@ type WebHookHandlerConf struct {
 	EventTimeout int64 `bson:"event_timeout" json:"event_timeout"`
 }
 
+// DNSMonitorConfig configures the background DNS monitoring for worker gateways
+type DNSMonitorConfig struct {
+	// Enable background DNS monitoring for proactive detection of MDCB DNS changes
+	Enabled bool `json:"enabled"`
+	// Check interval in seconds for DNS monitoring (default: 30)
+	CheckInterval int `json:"check_interval"`
+}
+
 type SlaveOptionsConfig struct {
 	// Set to `true` to connect a worker Gateway using RPC.
 	UseRPC bool `json:"use_rpc"`
@@ -418,6 +453,17 @@ type SlaveOptionsConfig struct {
 
 	// SynchroniserEnabled enable this config if MDCB has enabled the synchoniser. If disabled then it will ignore signals to synchonise recources
 	SynchroniserEnabled bool `json:"synchroniser_enabled"`
+
+	// DNSMonitor configures background DNS monitoring for proactive detection of MDCB DNS changes
+	DNSMonitor DNSMonitorConfig `json:"dns_monitor"`
+
+	// Set to true to sync only certificates used by loaded APIs.
+	// Only applies when use_rpc is true.
+	// Prevents proactive sync of unused certificates from control plane.
+	// Certificates are fetched on-demand via RPC and cached locally.
+	// Note: Certificates accumulate over time as they are used; they are not removed when APIs are deleted.
+	// Reduces memory usage and log noise in segmented deployments.
+	SyncUsedCertsOnly bool `json:"sync_used_certs_only"`
 }
 
 type LocalSessionCacheConf struct {
@@ -446,6 +492,9 @@ type HttpServerOptionsConfig struct {
 	ReadTimeout int `json:"read_timeout"`
 
 	// API Consumer -> Gateway network write timeout. Not setting this config, or setting this to 0, defaults to 120 seconds
+	//
+	// Note:
+	//   If you set `proxy_default_timeout` to a value greater than 120 seconds, you must also increase [http_server_options.write_timeout](#http-server-options-write-timeout) to a value greater than `proxy_default_timeout`. The `write_timeout` setting defaults to 120 seconds and controls how long Tyk waits to write the response back to the client. If not adjusted, the client connection will be closed before the upstream response is received.
 	WriteTimeout int `json:"write_timeout"`
 
 	// Set to true to enable SSL connections
@@ -557,6 +606,21 @@ type HttpServerOptionsConfig struct {
 	// See more information about setting request size limits here:
 	// https://tyk.io/docs/api-management/traffic-transformation/#request-size-limits
 	MaxRequestBodySize int64 `json:"max_request_body_size"`
+
+	// XFFDepth controls which position in the X-Forwarded-For chain to use for determining client IP address.
+	// A value of 0 means using the first IP (default). this is way the Gateway has calculated the client IP historically,
+	// the most common case, and will be used when this config is not set.
+	// However, any non-zero value will use that position from the right in the X-Forwarded-For chain.
+	// This is a security feature to prevent against IP spoofing attacks, and is recommended to be set to a non-zero value.
+	// A value of 1 means using the last IP, 2 means second to last, and so on.
+	XFFDepth int `json:"xff_depth"`
+
+	// MaxResponseBodySize sets an upper limit on the response body (payload) size in bytes. It defaults to 0, which means there is no restriction on the response body size.
+	//
+	// The Gateway will return `HTTP 500 Response Body Too Large` if the response payload exceeds MaxResponseBodySize+1 bytes.
+	//
+	// **Note:** The limit is applied only when the [Response Body Transform middleware](/api-management/traffic-transformation/response-body) is enabled.
+	MaxResponseBodySize int64 `json:"max_response_body_size"`
 }
 
 type AuthOverrideConf struct {
@@ -655,10 +719,26 @@ type SecurityConfig struct {
 	// Specify public keys used for Certificate Pinning on global level.
 	PinnedPublicKeys map[string]string `json:"pinned_public_keys"`
 
+	// AllowUnsafeDynamicMTLSToken controls whether certificate presence is required for
+	// dynamic mTLS authentication. If set to false (default), requests with a token but
+	// no certificate will be rejected for APIs using dynamic mTLS.
+	AllowUnsafeDynamicMTLSToken bool `json:"allow_unsafe_dynamic_mtls_token"`
+
 	Certificates CertificatesConfig `json:"certificates"`
 
 	// CertificateExpiryMonitor configures the certificate expiry monitoring and notification feature
 	CertificateExpiryMonitor CertificateExpiryMonitorConfig `json:"certificate_expiry_monitor"`
+}
+
+type JWKSConfig struct {
+	// Cache hodls configuration for JWKS caching
+	Cache JWKSCacheConfig `json:"cache"`
+}
+
+type JWKSCacheConfig struct {
+	// Timeout defines how long the JWKS will be kept in the cache before forcing a refresh from the JWKS endpoint.
+	// Default is 240 seconds (4 minutes). Set to 0 to use the default value.
+	Timeout int64 `json:"timeout"`
 }
 
 type NewRelicConfig struct {
@@ -921,7 +1001,8 @@ type Config struct {
 
 	// Maximum idle connections, per API, between Tyk and Upstream. By default not limited.
 	MaxIdleConns int `bson:"max_idle_connections" json:"max_idle_connections"`
-	// Maximum idle connections, per API, per upstream, between Tyk and Upstream. Default:100
+	// Maximum idle connections, per API, per upstream, between Tyk and Upstream.
+	// A value of `0` will use the default from the Go standard library, which is 2 connections. Tyk recommends setting this value to `500` for production environments.
 	MaxIdleConnsPerHost int `bson:"max_idle_connections_per_host" json:"max_idle_connections_per_host"`
 	// Maximum connection time. If set it will force gateway reconnect to the upstream.
 	MaxConnTime int64 `json:"max_conn_time"`
@@ -956,6 +1037,9 @@ type Config struct {
 
 	// This can specify a default timeout in seconds for upstream API requests.
 	// Default: 30 seconds
+	//
+	// Note:
+	//   If you set `proxy_default_timeout` to a value greater than 120 seconds, you must also increase [http_server_options.write_timeout](#http-server-options-write-timeout) to a value greater than `proxy_default_timeout`. The `write_timeout` setting defaults to 120 seconds and controls how long Tyk waits to write the response back to the client. If not adjusted, the client connection will be closed before the upstream response is received.
 	ProxyDefaultTimeout float64 `json:"proxy_default_timeout"`
 
 	// Disable TLS renegotiation.
@@ -1063,6 +1147,9 @@ type Config struct {
 	// Disable TLS validation for bundle URLs
 	BundleInsecureSkipVerify bool `bson:"bundle_insecure_skip_verify" json:"bundle_insecure_skip_verify"`
 
+	// SkipVerifyExistingPluginBundle skips checksum verification for plugin bundles already on disk.
+	SkipVerifyExistingPluginBundle bool `bson:"skip_verify_existing_plugin_bundle" json:"skip_verify_existing_plugin_bundle"`
+
 	// Set to true if you are using JSVM custom middleware or virtual endpoints.
 	EnableJSVM bool `json:"enable_jsvm"`
 
@@ -1120,6 +1207,11 @@ type Config struct {
 	HTTPProfile bool `json:"enable_http_profiler"`
 
 	// Enables the real-time Gateway log view in the Dashboard.
+	//
+	// Note:
+	//   For logs to appear in the Tyk Dashboard, both the Gateway and the Dashboard must be configured to use the **same Redis instance**.
+	//   In deployments where the Data Plane (Gateway) and Control Plane (Dashboard) use separate Redis instances,
+	//   enabling this option on the Gateway will not make logs available in the Dashboard.
 	UseRedisLog bool `json:"use_redis_log"`
 
 	// Enable Sentry logging
@@ -1240,6 +1332,9 @@ type Config struct {
 	Streaming StreamingConfig `json:"streaming"`
 
 	Labs LabsConfig `json:"labs"`
+
+	// JWKS holds the configuration for Tyk JWKS functionalities
+	JWKS JWKSConfig `json:"jwks"`
 }
 
 // LabsConfig include config for streaming

@@ -10,6 +10,7 @@ import (
 	"time"
 
 	temporalmodel "github.com/TykTechnologies/storage/temporal/model"
+	"github.com/TykTechnologies/tyk/certs"
 	"github.com/TykTechnologies/tyk/internal/cache"
 	"github.com/TykTechnologies/tyk/internal/model"
 	"github.com/TykTechnologies/tyk/rpc"
@@ -118,6 +119,7 @@ type RPCStorageHandler struct {
 	Gw               *Gateway `json:"-"`
 }
 
+//go:generate mockgen -typed -source=$FILE -destination=../internal/policy/store_mock.gen.go -package policy . RPCDataLoader
 type RPCDataLoader interface {
 	Connect() bool
 	GetApiDefinitions(orgId string, tags []string) string
@@ -140,6 +142,8 @@ func (r *RPCStorageHandler) Connect() bool {
 		CallTimeout:           slaveOptions.CallTimeout,
 		PingTimeout:           slaveOptions.PingTimeout,
 		RPCPoolSize:           slaveOptions.RPCPoolSize,
+		DNSMonitorEnabled:     slaveOptions.DNSMonitor.Enabled,
+		DNSMonitorInterval:    slaveOptions.DNSMonitor.CheckInterval,
 	}
 
 	return rpc.Connect(
@@ -174,8 +178,10 @@ func (r *RPCStorageHandler) buildNodeInfo() []byte {
 		Tags:            config.DBAppConfOptions.Tags,
 		Health:          r.Gw.getHealthCheckInfo(),
 		Stats: model.GWStats{
-			APIsCount:     r.Gw.apisByIDLen(),
-			PoliciesCount: r.Gw.PolicyCount(),
+			APIsCount:      r.Gw.apisByIDLen(),
+			PoliciesCount:  r.Gw.policies.PolicyCount(),
+			LoadedAPIs:     r.Gw.GetLoadedAPIIDs(),
+			LoadedPolicies: r.Gw.GetLoadedPolicyIDs(),
 		},
 		HostDetails: model.HostDetails{
 			Hostname: r.Gw.hostDetails.Hostname,
@@ -751,13 +757,10 @@ func (r *RPCStorageHandler) GetApiDefinitions(orgId string, tags []string) strin
 				"tags":  strings.Join(tags, ","),
 			},
 		)
-
-		if r.IsRetriableError(err) {
-			if rpc.Login() {
-				return r.GetApiDefinitions(orgId, tags)
-			}
-		}
-
+		// FuncClientSingleton already tries to call GetApiDefinitions with backoff.
+		// Callers of the "RPCStorageHandler.GetApiDefinitions" method should switch to the fallback
+		// by enabling emergency mode. See syncResourcesWithReload in the server.go file.
+		log.Debugf("RPC Handler: GetApiDefinitions() returned %s, returning empty string", err)
 		return ""
 	}
 	log.Debug("API Definitions retrieved")
@@ -782,12 +785,10 @@ func (r *RPCStorageHandler) GetPolicies(orgId string) string {
 			},
 		)
 
-		if r.IsRetriableError(err) {
-			if rpc.Login() {
-				return r.GetPolicies(orgId)
-			}
-		}
-
+		// FuncClientSingleton already tries to call GetPolicies with backoff.
+		// Callers of the "RPCStorageHandler.GetPolicies" method should switch to the fallback
+		// by enabling emergency mode. See syncResourcesWithReload in the server.go file.
+		log.Debugf("RPC Handler: GetPolicies() returned %s, returning empty string", err)
 		return ""
 	}
 
@@ -1041,6 +1042,7 @@ func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string, orgId string) 
 	OauthClients := map[string]string{}
 	apiIDsToDeleteCache := make([]string, 0)
 	userKeyResets := make(map[string]string)
+	apiIDsToInvalidateJWKSCache := make([]string, 0)
 
 	for _, key := range keys {
 		splitKeys := strings.Split(key, ":")
@@ -1066,6 +1068,9 @@ func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string, orgId string) 
 				notRegularKeys[key] = true
 			case NoticeDeleteAPICache.String():
 				apiIDsToDeleteCache = append(apiIDsToDeleteCache, splitKeys[0])
+				notRegularKeys[key] = true
+			case NoticeInvalidateJWKSCacheForAPI.String():
+				apiIDsToInvalidateJWKSCache = append(apiIDsToInvalidateJWKSCache, splitKeys[0])
 				notRegularKeys[key] = true
 			case NoticeUserKeyReset.String():
 				keyParts := strings.Split(splitKeys[0], ".")
@@ -1155,7 +1160,26 @@ func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string, orgId string) 
 	}
 
 	for _, certId := range CertificatesToAdd {
-		log.Debugf("Adding certificate: %v", certId)
+		// Only filter if feature enabled in RPC mode (backward compatible)
+		if r.Gw.GetConfig().SlaveOptions.UseRPC &&
+			r.Gw.GetConfig().SlaveOptions.SyncUsedCertsOnly {
+			if r.Gw.certUsageTracker != nil && !r.Gw.certUsageTracker.Required(certId) {
+				log.WithField("cert_id", certs.MaskCertID(certId)).
+					Debug("skipping certificate - not used by loaded APIs")
+				continue
+			}
+
+			if r.Gw.certUsageTracker != nil {
+				apis := r.Gw.certUsageTracker.APIs(certId)
+				log.WithFields(logrus.Fields{
+					"cert_id": certs.MaskCertID(certId),
+					"apis":    apis,
+				}).Info("syncing required certificate")
+			}
+		} else {
+			log.Debugf("Adding certificate: %v", certId)
+		}
+
 		//If we are in a slave node, MDCB Storage GetRaw should get the certificate from MDCB and cache it locally
 		content, err := r.Gw.CertificateManager.GetRaw(certId)
 		if content == "" && err != nil {
@@ -1219,6 +1243,11 @@ func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string, orgId string) 
 		}
 
 		log.WithField("apiID", apiID).Error("cache invalidation failed")
+	}
+
+	for _, apiID := range apiIDsToInvalidateJWKSCache {
+		log.WithField("apiID", apiID).Debug("Received request to flush JWKS cache")
+		r.Gw.invalidateJWKSCacheByAPIID(apiID)
 	}
 
 	// Notify rest of gateways in cluster to flush cache

@@ -1,6 +1,6 @@
 module github.com/TykTechnologies/tyk
 
-go 1.24.0
+go 1.24.6
 
 godebug (
 	tls10server=1
@@ -24,13 +24,13 @@ require (
 	github.com/TykTechnologies/drl v0.0.0-20231218155806-88e4363884a2
 	github.com/TykTechnologies/goautosocket v0.0.0-20190430121222-97bfa5e7e481
 	github.com/TykTechnologies/gorpc v0.0.0-20250214161245-e9f3f088e8c6
-	github.com/TykTechnologies/goverify v0.0.0-20220808203004-1486f89e7708
-	github.com/TykTechnologies/graphql-go-tools v1.6.2-0.20250926102005-c54e73aae17d
+	github.com/TykTechnologies/goverify v0.0.0-20260203113354-7a104729566e
+	github.com/TykTechnologies/graphql-go-tools v1.6.2-0.20251104074758-abfe5c458f3b
 	github.com/TykTechnologies/graphql-translator v0.0.0-20250602105400-41c2e7514a36
 	github.com/TykTechnologies/murmur3 v0.0.0-20230310161213-aad17efd5632
 	github.com/TykTechnologies/openid2go v0.1.2
-	github.com/TykTechnologies/storage v1.2.2
-	github.com/TykTechnologies/tyk-pump v1.10.0
+	github.com/TykTechnologies/storage v1.3.0
+	github.com/TykTechnologies/tyk-pump v1.13.0-rc2.0.20251023125113-bc7641d42e63
 	github.com/akutz/memconn v0.1.0
 	github.com/bshuster-repo/logrus-logstash-hook v1.1.0
 	github.com/buger/jsonparser v1.1.1
@@ -74,12 +74,12 @@ require (
 	github.com/valyala/fasthttp v1.58.0 // test
 	github.com/vmihailenco/msgpack v4.0.4+incompatible
 	github.com/xeipuuv/gojsonschema v1.2.0
-	golang.org/x/crypto v0.38.0
-	golang.org/x/net v0.40.0
-	golang.org/x/sync v0.14.0
+	golang.org/x/crypto v0.45.0
+	golang.org/x/net v0.47.0
+	golang.org/x/sync v0.18.0
 	google.golang.org/grpc v1.70.0
 	google.golang.org/grpc/examples v0.0.0-20220317213542-f95b001a48df // test
-	google.golang.org/protobuf v1.36.4
+	google.golang.org/protobuf v1.36.5
 	gopkg.in/vmihailenco/msgpack.v2 v2.9.2
 	gopkg.in/xmlpath.v2 v2.0.0-20150820204837-860cbeca3ebc
 	gopkg.in/yaml.v3 v3.0.1
@@ -96,16 +96,17 @@ require (
 	github.com/IBM/sarama v1.43.3
 	github.com/Jeffail/gabs/v2 v2.7.0
 	github.com/TykTechnologies/graphql-go-tools/v2 v2.0.0-20250926102005-c54e73aae17d
-	github.com/TykTechnologies/opentelemetry v0.0.22
+	github.com/TykTechnologies/opentelemetry v0.0.23-0.20260206152457-b854bfb45f46
 	github.com/alecthomas/kingpin/v2 v2.4.0
-	github.com/eclipse/paho.mqtt.golang v1.4.3
-	github.com/getkin/kin-openapi v0.132.0
+	github.com/eclipse/paho.mqtt.golang v1.5.1
+	github.com/getkin/kin-openapi v0.133.0
 	github.com/go-redis/redismock/v9 v9.2.0
 	github.com/goccy/go-json v0.10.4
 	github.com/goccy/go-yaml v1.15.23
 	github.com/google/go-cmp v0.7.0
 	github.com/hashicorp/golang-lru/v2 v2.0.7
 	github.com/huandu/go-clone/generic v1.7.2
+	github.com/klauspost/compress v1.18.0
 	github.com/mccutchen/go-httpbin/v2 v2.18.2
 	github.com/nats-io/nats.go v1.38.0
 	github.com/newrelic/go-agent/v3 v3.35.1
@@ -121,9 +122,11 @@ require (
 	github.com/testcontainers/testcontainers-go/modules/rabbitmq v0.36.0
 	github.com/tidwall/gjson v1.17.1
 	github.com/warpstreamlabs/bento v1.7.1
+	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.54.0
 	go.opentelemetry.io/otel v1.36.0
 	go.opentelemetry.io/otel/trace v1.36.0
 	go.uber.org/mock v0.5.0
+	golang.org/x/exp v0.0.0-20250106191152-7588d65b2ba8
 	golang.org/x/oauth2 v0.27.0
 	gopkg.in/yaml.v2 v2.4.0
 )
@@ -215,10 +218,10 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/firehose v1.24.0 // indirect
 	github.com/aws/aws-sdk-go-v2/service/internal/accept-encoding v1.12.3 // indirect
 	github.com/aws/aws-sdk-go-v2/service/internal/checksum v1.3.7 // indirect
-	github.com/aws/aws-sdk-go-v2/service/internal/endpoint-discovery v1.8.11 // indirect
+	github.com/aws/aws-sdk-go-v2/service/internal/endpoint-discovery v1.9.19 // indirect
 	github.com/aws/aws-sdk-go-v2/service/internal/presigned-url v1.12.15 // indirect
 	github.com/aws/aws-sdk-go-v2/service/internal/s3shared v1.17.5 // indirect
-	github.com/aws/aws-sdk-go-v2/service/kinesis v1.24.7 // indirect
+	github.com/aws/aws-sdk-go-v2/service/kinesis v1.29.1 // indirect
 	github.com/aws/aws-sdk-go-v2/service/lambda v1.50.0 // indirect
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.53.1 // indirect
 	github.com/aws/aws-sdk-go-v2/service/secretsmanager v1.34.5 // indirect
@@ -280,7 +283,7 @@ require (
 	github.com/dop251/goja v0.0.0-20241024094426-79f3a7efcdbd // indirect
 	github.com/dop251/goja_nodejs v0.0.0-20240728170619-29b559befffc // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
-	github.com/dvsekhvalnov/jose2go v1.6.0 // indirect
+	github.com/dvsekhvalnov/jose2go v1.8.0 // indirect
 	github.com/eapache/go-resiliency v1.7.0 // indirect
 	github.com/eapache/go-xerial-snappy v0.0.0-20230731223053-c322873962e3 // indirect
 	github.com/eapache/queue v1.1.0 // indirect
@@ -384,7 +387,6 @@ require (
 	github.com/jmespath/go-jmespath v0.4.0 // indirect
 	github.com/josharian/intern v1.0.0 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
-	github.com/klauspost/compress v1.18.0 // indirect
 	github.com/klauspost/cpuid/v2 v2.2.9 // indirect
 	github.com/klauspost/pgzip v1.2.6 // indirect
 	github.com/kr/fs v0.1.0 // indirect
@@ -435,7 +437,7 @@ require (
 	github.com/olivere/elastic/v7 v7.0.32 // indirect
 	github.com/opencontainers/go-digest v1.0.0 // indirect
 	github.com/opencontainers/image-spec v1.1.1 // indirect
-	github.com/opencontainers/runc v1.1.14 // indirect
+	github.com/opencontainers/runc v1.3.3 // indirect
 	github.com/opensearch-project/opensearch-go/v4 v4.3.0 // indirect
 	github.com/orcaman/concurrent-map/v2 v2.0.1 // indirect
 	github.com/ory/dockertest/v3 v3.10.0 // indirect
@@ -472,6 +474,7 @@ require (
 	github.com/s2-streamstore/optr v1.1.0 // indirect
 	github.com/s2-streamstore/s2-sdk-go v0.6.0 // indirect
 	github.com/santhosh-tekuri/jsonschema/v5 v5.3.1 // indirect
+	github.com/santhosh-tekuri/jsonschema/v6 v6.0.2 // indirect
 	github.com/segmentio/asm v1.2.0 // indirect
 	github.com/segmentio/encoding v0.4.0 // indirect
 	github.com/segmentio/ksuid v1.0.4 // indirect
@@ -500,6 +503,7 @@ require (
 	github.com/valyala/bytebufferpool v1.0.0 // indirect
 	github.com/vmihailenco/msgpack/v5 v5.4.1 // indirect
 	github.com/vmihailenco/tagparser/v2 v2.0.0 // indirect
+	github.com/woodsbury/decimal128 v1.3.0 // indirect
 	github.com/xdg-go/pbkdf2 v1.0.0 // indirect
 	github.com/xdg-go/scram v1.1.2 // indirect
 	github.com/xdg-go/stringprep v1.0.4 // indirect
@@ -520,7 +524,6 @@ require (
 	go.opencensus.io v0.24.0 // indirect
 	go.opentelemetry.io/auto/sdk v1.1.0 // indirect
 	go.opentelemetry.io/contrib/detectors/gcp v1.32.0 // indirect
-	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.54.0 // indirect
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.54.0 // indirect
 	go.opentelemetry.io/contrib/propagators/b3 v1.17.0 // indirect
 	go.opentelemetry.io/otel/exporters/jaeger v1.17.0 // indirect
@@ -534,13 +537,13 @@ require (
 	go.uber.org/atomic v1.11.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	go.uber.org/zap v1.27.0 // indirect
-	golang.org/x/exp v0.0.0-20250106191152-7588d65b2ba8 // indirect
-	golang.org/x/mod v0.23.0 // indirect
-	golang.org/x/sys v0.33.0 // indirect
-	golang.org/x/term v0.32.0 // indirect
-	golang.org/x/text v0.25.0 // indirect
+	golang.org/x/mod v0.29.0 // indirect
+	golang.org/x/sys v0.38.0 // indirect
+	golang.org/x/telemetry v0.0.0-20251008203120-078029d740a8 // indirect
+	golang.org/x/term v0.37.0 // indirect
+	golang.org/x/text v0.31.0 // indirect
 	golang.org/x/time v0.9.0 // indirect
-	golang.org/x/tools v0.30.0 // indirect
+	golang.org/x/tools v0.38.0 // indirect
 	golang.org/x/xerrors v0.0.0-20240903120638-7835f813f4da // indirect
 	google.golang.org/api v0.203.0 // indirect
 	google.golang.org/appengine v1.6.8 // indirect
@@ -556,7 +559,7 @@ require (
 	gopkg.in/mgo.v2 v2.0.0-20190816093944-a6b53ec6cb22 // indirect
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1 // indirect
 	gopkg.in/sourcemap.v1 v1.0.5 // indirect
-	gorm.io/gorm v1.25.11 // indirect
+	gorm.io/gorm v1.30.1 // indirect
 	modernc.org/gc/v3 v3.0.0-20240107210532-573471604cb6 // indirect
 	modernc.org/libc v1.41.0 // indirect
 	modernc.org/mathutil v1.6.0 // indirect
@@ -567,3 +570,5 @@ require (
 )
 
 replace go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.54.0 => go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.49.0
+
+replace github.com/getkin/kin-openapi => github.com/TykTechnologies/kin-openapi v0.92.1-0.20260121113356-cca35373e785

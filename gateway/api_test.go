@@ -25,11 +25,14 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/TykTechnologies/storage/persistent/model"
 	temporalmodel "github.com/TykTechnologies/storage/temporal/model"
+
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/apidef/oas"
 	"github.com/TykTechnologies/tyk/certs"
 	"github.com/TykTechnologies/tyk/config"
+	internalmodel "github.com/TykTechnologies/tyk/internal/model"
 	"github.com/TykTechnologies/tyk/internal/uuid"
 	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/test"
@@ -79,11 +82,10 @@ const defaultTestPol = `{
 }`
 
 func TestPolicyAPI(t *testing.T) {
-	ts := StartTest(nil)
-	globalConf := ts.Gw.GetConfig()
-	globalConf.Policies.PolicyPath = "."
-	globalConf.Policies.PolicySource = "file"
-	ts.Gw.SetConfig(globalConf)
+	ts := StartTest(func(cnf *config.Config) {
+		cnf.Policies.PolicyPath = "."
+		cnf.Policies.PolicySource = "file"
+	})
 
 	defer ts.Close()
 	ts.Gw.BuildAndLoadAPI()
@@ -126,6 +128,62 @@ func TestPolicyAPI(t *testing.T) {
 	_, _ = ts.Run(t, test.TestCase{
 		Path: "/tyk/policies/not-here", AdminAuth: true, Method: "GET", BodyMatch: `{"status":"error","message":"Policy not found"}`, Code: http.StatusNotFound,
 	})
+
+	t.Run("fails if no MID and no ID is provided", func(t *testing.T) {
+		_, _ = ts.Run(t, test.TestCase{
+			Path:      "/tyk/policies",
+			Method:    http.MethodPost,
+			AdminAuth: true,
+			Data:      serializePolicy(t, user.Policy{}),
+			Code:      http.StatusBadRequest,
+			BodyMatch: `{"status":"error","message":"Unable to create policy without id."}`,
+		})
+	})
+
+	t.Run("fails if invalid MID and no ID is provided", func(t *testing.T) {
+		_, _ = ts.Run(t, test.TestCase{
+			Path:      "/tyk/policies",
+			Method:    http.MethodPost,
+			AdminAuth: true,
+			Data:      serializePolicy(t, user.Policy{MID: "invalid"}),
+			Code:      http.StatusBadRequest,
+			BodyMatch: `{"status":"error","message":"Request malformed"}`,
+		})
+	})
+
+	t.Run("fails if invalid config is provided", func(t *testing.T) {
+		ts.setTestScopeConfig(t, func(cnf *config.Config) {
+			cnf.Policies.PolicyPath = "/etc/hosts"
+		})
+
+		_, _ = ts.Run(t, test.TestCase{
+			Path:      "/tyk/policies",
+			Method:    http.MethodPost,
+			AdminAuth: true,
+			Data:      serializePolicy(t, user.Policy{MID: model.NewObjectID()}),
+			Code:      http.StatusInternalServerError,
+			BodyMatch: `{"status":"error","message":"Unable to access policy storage."}`,
+		})
+	})
+
+	t.Run("post does not fail ID is provided", func(t *testing.T) {
+		_, _ = ts.Run(t, test.TestCase{
+			Path:      "/tyk/policies",
+			Method:    http.MethodPost,
+			AdminAuth: true,
+			Data:      serializePolicy(t, user.Policy{ID: "test"}),
+			Code:      http.StatusOK,
+		})
+	})
+}
+
+func serializePolicy(t *testing.T, pol user.Policy) string {
+	t.Helper()
+
+	data, err := json.Marshal(pol)
+	assert.NoError(t, err)
+
+	return string(data)
 }
 
 func TestHealthCheckEndpoint(t *testing.T) {
@@ -240,9 +298,7 @@ func TestKeyHandler(t *testing.T) {
 	}}
 	withAccessJSON := test.MarshalJSON(t)(withAccess)
 
-	// with policy
-	ts.Gw.policiesMu.Lock()
-	ts.Gw.policiesByID["abc_policy"] = user.Policy{
+	ts.Gw.policies.Add(user.Policy{
 		Active:           true,
 		QuotaMax:         5,
 		QuotaRenewalRate: 300,
@@ -250,8 +306,9 @@ func TestKeyHandler(t *testing.T) {
 			APIID: "test", Versions: []string{"v1"},
 		}},
 		OrgID: "default",
-	}
-	ts.Gw.policiesMu.Unlock()
+		ID:    "abc_policy",
+	})
+
 	withPolicy := CreateStandardSession()
 	withoutPolicyJSON := test.MarshalJSON(t)(withPolicy)
 
@@ -370,8 +427,8 @@ func TestKeyHandler(t *testing.T) {
 	t.Run("List keys", func(t *testing.T) {
 		_, _ = ts.Run(t, []test.TestCase{
 			{Method: "GET", Path: "/tyk/keys/", AdminAuth: true, Code: 200, BodyMatch: knownKey},
-			{Method: "GET", Path: "/tyk/keys/?api_id=test", AdminAuth: true, Code: 200, BodyMatch: knownKey},
-			{Method: "GET", Path: "/tyk/keys/?api_id=unknown", AdminAuth: true, Code: 200, BodyMatch: knownKey},
+			{Method: "GET", Path: "/tyk/keys/?api_id=test&filter=default", AdminAuth: true, Code: 200, BodyMatch: knownKey},
+			{Method: "GET", Path: "/tyk/keys/?api_id=test&filter=wrong_org", AdminAuth: true, Code: 200, BodyNotMatch: knownKey},
 		}...)
 
 		globalConf := ts.Gw.GetConfig()
@@ -1171,6 +1228,15 @@ func (ts *Test) testHashKeyHandlerHelper(t *testing.T, expectedHashSize int) {
 				Data:      string(withAccessJSON),
 				AdminAuth: true,
 				Code:      200,
+			},
+			// get list of keys' hashes, Wrong API specified (should filter out)
+			{
+				Method:       "GET",
+				Path:         "/tyk/keys?api_id=wrong-api-id",
+				Data:         string(withAccessJSON),
+				AdminAuth:    true,
+				Code:         200,
+				BodyNotMatch: myKeyHash,
 			},
 			// get one key by hash value without specifying hashed=true
 			{
@@ -2125,6 +2191,74 @@ func TestHandleAddApi(t *testing.T) {
 
 		assert.Equal(t, "Validation of API Definition failed. Reason: duplicate data source names are not allowed.", errorResponse.Message)
 		assert.Equal(t, http.StatusBadRequest, statusCode)
+	})
+
+	t.Run("should return error when load balancing enabled with all targets weight 0", func(t *testing.T) {
+		apiDef := apidef.DummyAPI()
+		apiDef.APIID = "124"
+		apiDef.Proxy.EnableLoadBalancing = true
+		apiDef.Proxy.Targets = []string{} // Empty targets list means all weights are 0
+		apiDefJson, err := json.Marshal(apiDef)
+		require.NoError(t, err)
+
+		req, err := http.NewRequest(http.MethodPost, "http://gateway", bytes.NewBuffer(apiDefJson))
+		require.NoError(t, err)
+
+		response, statusCode := ts.Gw.handleAddApi(req, testFs, false)
+		errorResponse, ok := response.(apiStatusMessage)
+		require.True(t, ok)
+
+		assert.Equal(t, "Validation of API Definition failed. Reason: all load balancing targets have weight 0, at least one target must have weight > 0.", errorResponse.Message)
+		assert.Equal(t, http.StatusBadRequest, statusCode)
+	})
+
+	t.Run("should return error when OAS load balancing enabled with all targets weight 0", func(t *testing.T) {
+		tykExt := oas.XTykAPIGateway{
+			Info: oas.Info{
+				Name: "test api",
+				State: oas.State{
+					Active: true,
+				},
+			},
+			Upstream: oas.Upstream{
+				URL: "http://example.com",
+				LoadBalancing: &oas.LoadBalancing{
+					Enabled: true,
+					Targets: []oas.LoadBalancingTarget{
+						{URL: "http://target-1", Weight: 0},
+						{URL: "http://target-2", Weight: 0},
+					},
+				},
+			},
+			Server: oas.Server{
+				ListenPath: oas.ListenPath{
+					Value: "/test-lb-zero/",
+					Strip: false,
+				},
+			},
+		}
+
+		oasAPI := openapi3.T{
+			OpenAPI: "3.0.3",
+			Info: &openapi3.Info{
+				Title:   "test api",
+				Version: "1",
+			},
+			Paths: openapi3.NewPaths(),
+		}
+
+		oasAPI.Extensions = map[string]interface{}{
+			oas.ExtensionTykAPIGateway: tykExt,
+		}
+
+		_, _ = ts.Run(t, test.TestCase{
+			AdminAuth: true,
+			Method:    http.MethodPost,
+			Path:      "/tyk/apis/oas",
+			Data:      &oasAPI,
+			BodyMatch: `all load balancing targets have weight 0`,
+			Code:      http.StatusBadRequest,
+		})
 	})
 
 	t.Run("should return success when no error occurs", func(t *testing.T) {
@@ -3154,7 +3288,7 @@ func TestOAS(t *testing.T) {
 		})
 
 		t.Run("retain old OAS servers", func(t *testing.T) {
-			t.Run("should retain first entry in existing API", func(t *testing.T) {
+			t.Run("should merge Tyk servers with user-provided servers", func(t *testing.T) {
 				apiInOAS := copyOAS(oasAPI)
 				fillPaths(&apiInOAS)
 
@@ -3176,12 +3310,20 @@ func TestOAS(t *testing.T) {
 				patchedOASObj := testGetOASAPI(t, ts, apiID, tykExt.Info.Name, apiInOAS.T.Info.Title)
 
 				assert.EqualValues(t, gwServerURL, patchedOASObj.Servers[0].URL)
-				assert.Equal(t, serverURL, patchedOASObj.Servers[1].URL)
+
+				foundUserServer := false
+				for _, srv := range patchedOASObj.Servers {
+					if srv.URL == serverURL {
+						foundUserServer = true
+						break
+					}
+				}
+				assert.True(t, foundUserServer, "User-provided server URL should be retained")
 				// Reset
 				testUpdateAPI(t, ts, &oasAPI, oasAPIID, true)
 			})
 
-			t.Run("do not modify if first server is same as that of gw", func(t *testing.T) {
+			t.Run("should deduplicate user servers matching Tyk servers", func(t *testing.T) {
 				apiInOAS := copyOAS(oasAPI)
 				fillPaths(&apiInOAS)
 
@@ -3208,9 +3350,21 @@ func TestOAS(t *testing.T) {
 				testPatchOAS(t, ts, apiInOAS, nil, apiID)
 				patchedOASObj := testGetOASAPI(t, ts, apiID, tykExt.Info.Name, apiInOAS.T.Info.Title)
 
+				require.Len(t, patchedOASObj.Servers, 4)
 				assert.EqualValues(t, serverURL1, patchedOASObj.Servers[0].URL)
-				assert.Equal(t, serverURL2, patchedOASObj.Servers[1].URL)
-				assert.Equal(t, serverURL3, patchedOASObj.Servers[2].URL)
+
+				foundServer2 := false
+				foundServer3 := false
+				for _, srv := range patchedOASObj.Servers {
+					if srv.URL == serverURL2 {
+						foundServer2 = true
+					}
+					if srv.URL == serverURL3 {
+						foundServer3 = true
+					}
+				}
+				assert.True(t, foundServer2, "User server 2 should be retained")
+				assert.True(t, foundServer3, "User server 3 should be retained")
 				// Reset
 				testUpdateAPI(t, ts, &oasAPI, oasAPIID, true)
 			})
@@ -3934,26 +4088,29 @@ func TestDeletionOfPoliciesThatFromAKeyDoesNotMakeTheAPIKeyless(t *testing.T) {
 
 	apiID1 := testAPIID + "1"
 	apiID2 := testAPIID + "2"
+	orgId := "default"
 
 	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 		spec.APIID = apiID1
 		spec.UseKeylessAccess = false
-		spec.OrgID = "default"
+		spec.OrgID = orgId
 		spec.Proxy.ListenPath = "/api1"
 	}, func(spec *APISpec) {
 		spec.APIID = apiID2
 		spec.UseKeylessAccess = false
-		spec.OrgID = "default"
+		spec.OrgID = orgId
 		spec.Proxy.ListenPath = "/api2"
 	})
 
 	policyForApi1 := ts.CreatePolicy(func(p *user.Policy) {
+		p.OrgID = orgId
 		p.AccessRights = map[string]user.AccessDefinition{apiID1: {
 			APIID: apiID1,
 		}}
 	})
 
 	policyForApi2 := ts.CreatePolicy(func(p *user.Policy) {
+		p.OrgID = orgId
 		p.AccessRights = map[string]user.AccessDefinition{apiID2: {
 			APIID: apiID2,
 		}}
@@ -3974,7 +4131,7 @@ func TestDeletionOfPoliciesThatFromAKeyDoesNotMakeTheAPIKeyless(t *testing.T) {
 	assert.NotNil(t, res)
 	assert.Nil(t, err)
 
-	ts.DeletePolicy(policyForApi2)
+	ts.DeletePolicy(internalmodel.NewScopedCustomPolicyId(orgId, policyForApi2))
 	res, err = ts.Run(t, []test.TestCase{
 		{Method: "GET", Path: "/api1", Headers: authHeaders, Code: 200},
 		{Method: "GET", Path: "/api2", Headers: authHeaders, Code: 403},
@@ -3982,7 +4139,7 @@ func TestDeletionOfPoliciesThatFromAKeyDoesNotMakeTheAPIKeyless(t *testing.T) {
 	assert.NotNil(t, res)
 	assert.Nil(t, err)
 
-	ts.DeletePolicy(policyForApi1)
+	ts.DeletePolicy(internalmodel.NewScopedCustomPolicyId(orgId, policyForApi1))
 	res, err = ts.Run(t, []test.TestCase{
 		{Method: "GET", Path: "/api1", Headers: authHeaders, Code: 403},
 		{Method: "GET", Path: "/api2", Headers: authHeaders, Code: 403},
@@ -4057,5 +4214,1741 @@ func TestPurgeOAuthClientTokensEndpoint(t *testing.T) {
 
 		assertTokensLen(t, storageManager, storageKey1, 0)
 		assertTokensLen(t, storageManager, storageKey2, 0)
+	})
+}
+
+func TestKeyHandler_BatchFiltering_Integration(t *testing.T) {
+	ts := StartTest(func(globalConf *config.Config) {
+		globalConf.HashKeys = true
+		globalConf.EnableHashedKeysListing = true
+		globalConf.AllowMasterKeys = true
+	})
+	defer ts.Close()
+
+	keyA := "key-access-api-one"
+	sessionA := CreateStandardSession()
+	sessionA.AccessRights = map[string]user.AccessDefinition{
+		"api-one": {APIID: "api-one", Versions: []string{"Default"}},
+	}
+	err := ts.Gw.GlobalSessionManager.UpdateSession(keyA, sessionA, 100, false)
+	assert.NoError(t, err)
+
+	keyB := "key-access-api-two"
+	sessionB := CreateStandardSession()
+	sessionB.AccessRights = map[string]user.AccessDefinition{
+		"api-two": {APIID: "api-two", Versions: []string{"Default"}},
+	}
+	err = ts.Gw.GlobalSessionManager.UpdateSession(keyB, sessionB, 100, false)
+	assert.NoError(t, err)
+
+	keyC := "key-master"
+	sessionC := CreateStandardSession()
+	sessionC.AccessRights = map[string]user.AccessDefinition{}
+	err = ts.Gw.GlobalSessionManager.UpdateSession(keyC, sessionC, 100, false)
+	assert.NoError(t, err)
+
+	hashA := storage.HashKey(keyA, true)
+	hashB := storage.HashKey(keyB, true)
+	hashC := storage.HashKey(keyC, true)
+
+	t.Run("Filter API One", func(t *testing.T) {
+		uri := "/tyk/keys/?api_id=api-one"
+		req := ts.withAuth(TestReq(t, "GET", uri, nil))
+		rec := httptest.NewRecorder()
+		ts.mainRouter().ServeHTTP(rec, req)
+
+		assert.Equal(t, http.StatusOK, rec.Code)
+		body := rec.Body.String()
+
+		assert.Contains(t, body, hashA, "Should contain Key A Hash")
+		assert.Contains(t, body, hashC, "Should contain Key C Hash")
+		assert.NotContains(t, body, hashB, "Should NOT contain Key B Hash")
+	})
+
+	t.Run("Filter API Two", func(t *testing.T) {
+		uri := "/tyk/keys/?api_id=api-two"
+		req := ts.withAuth(TestReq(t, "GET", uri, nil))
+		rec := httptest.NewRecorder()
+		ts.mainRouter().ServeHTTP(rec, req)
+
+		assert.Equal(t, http.StatusOK, rec.Code)
+		body := rec.Body.String()
+
+		assert.Contains(t, body, hashB, "Should contain Key B Hash")
+		assert.Contains(t, body, hashC, "Should contain Key C Hash")
+		assert.NotContains(t, body, hashA, "Should NOT contain Key A Hash")
+	})
+
+	t.Run("Filter Unknown API", func(t *testing.T) {
+		uri := "/tyk/keys/?api_id=unknown-api"
+		req := ts.withAuth(TestReq(t, "GET", uri, nil))
+		rec := httptest.NewRecorder()
+		ts.mainRouter().ServeHTTP(rec, req)
+
+		assert.Equal(t, http.StatusOK, rec.Code)
+		body := rec.Body.String()
+
+		assert.Contains(t, body, hashC, "Should contain Key C Hash (Master)")
+		assert.NotContains(t, body, hashA, "Should NOT contain Key A Hash")
+		assert.NotContains(t, body, hashB, "Should NOT contain Key B Hash")
+	})
+}
+
+func TestKeyHandler_ContextCancellation(t *testing.T) {
+	ts := StartTest(func(globalConf *config.Config) {
+		globalConf.HashKeys = true
+		globalConf.EnableHashedKeysListing = true
+		globalConf.AllowMasterKeys = true
+	})
+	defer ts.Close()
+
+	keyA := "key-slow"
+	sessionA := CreateStandardSession()
+	sessionA.AccessRights = map[string]user.AccessDefinition{
+		"api-one": {APIID: "api-one", Versions: []string{"Default"}},
+	}
+	err := ts.Gw.GlobalSessionManager.UpdateSession(keyA, sessionA, 100, false)
+	assert.NoError(t, err)
+
+	uri := "/tyk/keys/?api_id=api-one"
+	req := ts.withAuth(TestReq(t, "GET", uri, nil))
+
+	ctx, cancel := context.WithCancel(req.Context())
+	cancel()
+	req = req.WithContext(ctx)
+
+	rec := httptest.NewRecorder()
+	ts.mainRouter().ServeHTTP(rec, req)
+
+	assert.Equal(t, http.StatusGatewayTimeout, rec.Code)
+	assert.Contains(t, rec.Body.String(), "Request timeout")
+}
+
+func TestAPIMCPListing(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	allAPIs := ts.Gw.BuildAndLoadAPI(
+		func(spec *APISpec) {
+			spec.APIID = "mcp-api-1"
+			spec.Name = "MCP API 1"
+			spec.MarkAsMCP()
+		},
+		func(spec *APISpec) {
+			spec.APIID = "mcp-api-2"
+			spec.Name = "MCP API 2"
+			spec.MarkAsMCP()
+		},
+		func(spec *APISpec) {
+			spec.APIID = "api-1"
+			spec.Name = "Regular API 1"
+		},
+		func(spec *APISpec) {
+			spec.APIID = "api-2"
+			spec.Name = "Regular API 2"
+		},
+	)
+
+	require.Len(t, allAPIs, 4)
+
+	mcpAPI1 := allAPIs[0]
+	mcpAPI2 := allAPIs[1]
+	regularAPI1 := allAPIs[2]
+	regularAPI2 := allAPIs[3]
+
+	t.Run("/tyk/apis includes all APIs by default", func(t *testing.T) {
+		req := TestReq(t, "GET", "/tyk/apis/", nil)
+		req = ts.withAuth(req)
+		rec := httptest.NewRecorder()
+		ts.mainRouter().ServeHTTP(rec, req)
+
+		assert.Equal(t, http.StatusOK, rec.Code)
+
+		var apis []*apidef.APIDefinition
+		err := json.Unmarshal(rec.Body.Bytes(), &apis)
+		assert.NoError(t, err)
+		assert.Len(t, apis, 4)
+
+		apiIDs := make([]string, len(apis))
+		for i, api := range apis {
+			apiIDs[i] = api.APIID
+		}
+		assert.Contains(t, apiIDs, mcpAPI1.APIID)
+		assert.Contains(t, apiIDs, mcpAPI2.APIID)
+		assert.Contains(t, apiIDs, regularAPI1.APIID)
+		assert.Contains(t, apiIDs, regularAPI2.APIID)
+	})
+
+	t.Run("/tyk/mcps returns only MCP Proxies", func(t *testing.T) {
+		req := TestReq(t, "GET", "/tyk/mcps/", nil)
+		req = ts.withAuth(req)
+		rec := httptest.NewRecorder()
+		ts.mainRouter().ServeHTTP(rec, req)
+
+		assert.Equal(t, http.StatusOK, rec.Code)
+
+		var response []interface{}
+		err := json.Unmarshal(rec.Body.Bytes(), &response)
+		assert.NoError(t, err)
+		assert.Len(t, response, 2)
+
+		mcpAPI1Spec := ts.Gw.getApiSpec(mcpAPI1.APIID)
+		assert.NotNil(t, mcpAPI1Spec)
+		assert.True(t, mcpAPI1Spec.IsMCP())
+
+		mcpAPI2Spec := ts.Gw.getApiSpec(mcpAPI2.APIID)
+		assert.NotNil(t, mcpAPI2Spec)
+		assert.True(t, mcpAPI2Spec.IsMCP())
+	})
+
+	t.Run("GET /tyk/mcps/{apiID} returns MCP Proxy", func(t *testing.T) {
+		req := TestReq(t, "GET", "/tyk/mcps/"+mcpAPI1.APIID, nil)
+		req = ts.withAuth(req)
+		rec := httptest.NewRecorder()
+		ts.mainRouter().ServeHTTP(rec, req)
+
+		assert.Equal(t, http.StatusOK, rec.Code)
+
+		var response map[string]interface{}
+		err := json.Unmarshal(rec.Body.Bytes(), &response)
+		assert.NoError(t, err)
+		assert.NotNil(t, response)
+	})
+
+	t.Run("GET /tyk/mcps/{apiID} returns 404 for non-MCP Proxy", func(t *testing.T) {
+		req := TestReq(t, "GET", "/tyk/mcps/"+regularAPI1.APIID, nil)
+		req = ts.withAuth(req)
+		rec := httptest.NewRecorder()
+		ts.mainRouter().ServeHTTP(rec, req)
+
+		assert.Equal(t, http.StatusNotFound, rec.Code)
+		assert.Contains(t, rec.Body.String(), "is not an MCP Proxy")
+	})
+
+	t.Run("GET /tyk/mcps/{apiID} returns 404 for non-existent API", func(t *testing.T) {
+		req := TestReq(t, "GET", "/tyk/mcps/non-existent-api", nil)
+		req = ts.withAuth(req)
+		rec := httptest.NewRecorder()
+		ts.mainRouter().ServeHTTP(rec, req)
+
+		assert.Equal(t, http.StatusNotFound, rec.Code)
+	})
+
+	t.Run("POST /tyk/mcps creates MCP Proxy", func(t *testing.T) {
+		tykExt := oas.XTykAPIGateway{
+			Info: oas.Info{
+				Name: "New MCP API",
+				ID:   "new-mcp-api",
+				State: oas.State{
+					Active: true,
+				},
+			},
+			Upstream: oas.Upstream{
+				URL: TestHttpAny,
+			},
+			Server: oas.Server{
+				ListenPath: oas.ListenPath{
+					Value: "/new-mcp/",
+					Strip: false,
+				},
+			},
+		}
+
+		oasAPI := openapi3.T{
+			OpenAPI: "3.0.3",
+			Info: &openapi3.Info{
+				Title:   "New MCP",
+				Version: "1",
+			},
+			Paths: openapi3.NewPaths(),
+		}
+
+		oasAPI.Extensions = map[string]interface{}{
+			oas.ExtensionTykAPIGateway: tykExt,
+		}
+
+		req := TestReq(t, "POST", "/tyk/mcps", &oasAPI)
+		req = ts.withAuth(req)
+		rec := httptest.NewRecorder()
+		ts.mainRouter().ServeHTTP(rec, req)
+
+		assert.Equal(t, http.StatusOK, rec.Code)
+
+		var response apiModifyKeySuccess
+		err := json.Unmarshal(rec.Body.Bytes(), &response)
+		assert.NoError(t, err)
+		assert.Equal(t, "new-mcp-api", response.Key)
+		assert.Equal(t, "added", response.Action)
+
+		ts.Gw.DoReload()
+
+		api := ts.Gw.getApiSpec("new-mcp-api")
+		assert.NotNil(t, api)
+		assert.True(t, api.IsMCP())
+		assert.Equal(t, "New MCP API", api.Name)
+	})
+
+	t.Run("POST /tyk/mcps generates API ID if not provided", func(t *testing.T) {
+		tykExt := oas.XTykAPIGateway{
+			Info: oas.Info{
+				Name: "Auto ID MCP",
+				State: oas.State{
+					Active: true,
+				},
+			},
+			Upstream: oas.Upstream{
+				URL: TestHttpAny,
+			},
+			Server: oas.Server{
+				ListenPath: oas.ListenPath{
+					Value: "/auto-id-mcp/",
+					Strip: false,
+				},
+			},
+		}
+
+		oasAPI := openapi3.T{
+			OpenAPI: "3.0.3",
+			Info: &openapi3.Info{
+				Title:   "Auto ID MCP",
+				Version: "1",
+			},
+			Paths: openapi3.NewPaths(),
+		}
+
+		oasAPI.Extensions = map[string]interface{}{
+			oas.ExtensionTykAPIGateway: tykExt,
+		}
+
+		req := TestReq(t, "POST", "/tyk/mcps", &oasAPI)
+		req = ts.withAuth(req)
+		rec := httptest.NewRecorder()
+		ts.mainRouter().ServeHTTP(rec, req)
+
+		assert.Equal(t, http.StatusOK, rec.Code)
+
+		var response apiModifyKeySuccess
+		err := json.Unmarshal(rec.Body.Bytes(), &response)
+		assert.NoError(t, err)
+		assert.NotEmpty(t, response.Key)
+		assert.Equal(t, "added", response.Action)
+
+		ts.Gw.DoReload()
+
+		api := ts.Gw.getApiSpec(response.Key)
+		assert.NotNil(t, api)
+		assert.True(t, api.IsMCP())
+	})
+
+	t.Run("POST /tyk/mcps succeeds without primitives", func(t *testing.T) {
+		tykExt := oas.XTykAPIGateway{
+			Info: oas.Info{
+				Name: "MCP Without Primitives",
+				ID:   "mcp-no-primitives",
+				State: oas.State{
+					Active: true,
+				},
+			},
+			Upstream: oas.Upstream{
+				URL: TestHttpAny,
+			},
+			Server: oas.Server{
+				ListenPath: oas.ListenPath{
+					Value: "/mcp-no-primitives/",
+					Strip: false,
+				},
+			},
+		}
+
+		oasAPI := openapi3.T{
+			OpenAPI: "3.0.3",
+			Info: &openapi3.Info{
+				Title:   "MCP Without Primitives",
+				Version: "1",
+			},
+			Paths: openapi3.NewPaths(),
+		}
+
+		oasAPI.Extensions = map[string]interface{}{
+			oas.ExtensionTykAPIGateway: tykExt,
+		}
+
+		req := TestReq(t, "POST", "/tyk/mcps", &oasAPI)
+		req = ts.withAuth(req)
+		rec := httptest.NewRecorder()
+		ts.mainRouter().ServeHTTP(rec, req)
+
+		assert.Equal(t, http.StatusOK, rec.Code)
+
+		var response apiModifyKeySuccess
+		err := json.Unmarshal(rec.Body.Bytes(), &response)
+		assert.NoError(t, err)
+		assert.Equal(t, "mcp-no-primitives", response.Key)
+
+		ts.Gw.DoReload()
+
+		api := ts.Gw.getApiSpec("mcp-no-primitives")
+		assert.NotNil(t, api)
+		assert.True(t, api.IsMCP())
+	})
+
+	t.Run("POST /tyk/mcps succeeds with valid primitives", func(t *testing.T) {
+		tykExt := oas.XTykAPIGateway{
+			Info: oas.Info{
+				Name: "MCP With Primitives",
+				ID:   "mcp-with-primitives",
+				State: oas.State{
+					Active: true,
+				},
+			},
+			Upstream: oas.Upstream{
+				URL: TestHttpAny,
+			},
+			Server: oas.Server{
+				ListenPath: oas.ListenPath{
+					Value: "/mcp-with-primitives/",
+					Strip: false,
+				},
+			},
+			Middleware: &oas.Middleware{
+				McpTools: map[string]*oas.MCPPrimitive{
+					"getTool1": {
+						Operation: oas.Operation{
+							Allow: &oas.Allowance{
+								Enabled: true,
+							},
+						},
+					},
+				},
+				McpResources: map[string]*oas.MCPPrimitive{
+					"getResource1": {
+						Operation: oas.Operation{
+							Allow: &oas.Allowance{
+								Enabled: true,
+							},
+						},
+					},
+				},
+				McpPrompts: map[string]*oas.MCPPrimitive{
+					"getPrompt1": {
+						Operation: oas.Operation{
+							Allow: &oas.Allowance{
+								Enabled: true,
+							},
+						},
+					},
+				},
+			},
+		}
+
+		oasAPI := openapi3.T{
+			OpenAPI: "3.0.3",
+			Info: &openapi3.Info{
+				Title:   "MCP With Primitives",
+				Version: "1",
+			},
+			Paths: openapi3.NewPaths(),
+		}
+
+		oasAPI.Extensions = map[string]interface{}{
+			oas.ExtensionTykAPIGateway: tykExt,
+		}
+
+		req := TestReq(t, "POST", "/tyk/mcps", &oasAPI)
+		req = ts.withAuth(req)
+		rec := httptest.NewRecorder()
+		ts.mainRouter().ServeHTTP(rec, req)
+
+		assert.Equal(t, http.StatusOK, rec.Code)
+
+		var response apiModifyKeySuccess
+		err := json.Unmarshal(rec.Body.Bytes(), &response)
+		assert.NoError(t, err)
+		assert.Equal(t, "mcp-with-primitives", response.Key)
+
+		ts.Gw.DoReload()
+
+		api := ts.Gw.getApiSpec("mcp-with-primitives")
+		assert.NotNil(t, api)
+		assert.True(t, api.IsMCP())
+	})
+
+	t.Run("PUT /tyk/mcps/{apiID} updates MCP Proxy", func(t *testing.T) {
+		createTykExt := oas.XTykAPIGateway{
+			Info: oas.Info{
+				Name: "Original MCP",
+				ID:   "update-test-api",
+				State: oas.State{
+					Active: true,
+				},
+			},
+			Upstream: oas.Upstream{
+				URL: TestHttpAny,
+			},
+			Server: oas.Server{
+				ListenPath: oas.ListenPath{
+					Value: "/original-mcp/",
+					Strip: false,
+				},
+			},
+		}
+
+		createOasAPI := openapi3.T{
+			OpenAPI: "3.0.3",
+			Info: &openapi3.Info{
+				Title:   "Original MCP",
+				Version: "1",
+			},
+			Paths: openapi3.NewPaths(),
+		}
+
+		createOasAPI.Extensions = map[string]interface{}{
+			oas.ExtensionTykAPIGateway: createTykExt,
+		}
+
+		req := TestReq(t, "POST", "/tyk/mcps", &createOasAPI)
+		req = ts.withAuth(req)
+		rec := httptest.NewRecorder()
+		ts.mainRouter().ServeHTTP(rec, req)
+
+		assert.Equal(t, http.StatusOK, rec.Code)
+
+		ts.Gw.DoReload()
+
+		updateTykExt := oas.XTykAPIGateway{
+			Info: oas.Info{
+				Name: "Updated MCP API",
+				ID:   "update-test-api",
+				State: oas.State{
+					Active: true,
+				},
+			},
+			Upstream: oas.Upstream{
+				URL: "http://updated-upstream.com",
+			},
+			Server: oas.Server{
+				ListenPath: oas.ListenPath{
+					Value: "/updated-mcp/",
+					Strip: false,
+				},
+			},
+		}
+
+		updateOasAPI := openapi3.T{
+			OpenAPI: "3.0.3",
+			Info: &openapi3.Info{
+				Title:   "Updated MCP",
+				Version: "1",
+			},
+			Paths: openapi3.NewPaths(),
+		}
+
+		updateOasAPI.Extensions = map[string]interface{}{
+			oas.ExtensionTykAPIGateway: updateTykExt,
+		}
+
+		req = TestReq(t, "PUT", "/tyk/mcps/update-test-api", &updateOasAPI)
+		req = ts.withAuth(req)
+		rec = httptest.NewRecorder()
+		ts.mainRouter().ServeHTTP(rec, req)
+
+		assert.Equal(t, http.StatusOK, rec.Code)
+
+		var response apiModifyKeySuccess
+		err := json.Unmarshal(rec.Body.Bytes(), &response)
+		assert.NoError(t, err)
+		assert.Equal(t, "update-test-api", response.Key)
+		assert.Equal(t, "modified", response.Action)
+
+		ts.Gw.DoReload()
+
+		api := ts.Gw.getApiSpec("update-test-api")
+		assert.NotNil(t, api)
+		assert.True(t, api.IsMCP())
+		assert.Equal(t, "Updated MCP API", api.Name)
+		assert.Equal(t, "http://updated-upstream.com", api.Proxy.TargetURL)
+	})
+
+	t.Run("PUT /tyk/mcps/{apiID} fails with mismatched API ID", func(t *testing.T) {
+		createTykExt := oas.XTykAPIGateway{
+			Info: oas.Info{
+				Name: "Test MCP",
+				ID:   "mismatch-test-api",
+				State: oas.State{
+					Active: true,
+				},
+			},
+			Upstream: oas.Upstream{
+				URL: TestHttpAny,
+			},
+			Server: oas.Server{
+				ListenPath: oas.ListenPath{
+					Value: "/mismatch-test/",
+					Strip: false,
+				},
+			},
+		}
+
+		createOasAPI := openapi3.T{
+			OpenAPI: "3.0.3",
+			Info: &openapi3.Info{
+				Title:   "Test MCP",
+				Version: "1",
+			},
+			Paths: openapi3.NewPaths(),
+		}
+
+		createOasAPI.Extensions = map[string]interface{}{
+			oas.ExtensionTykAPIGateway: createTykExt,
+		}
+
+		req := TestReq(t, "POST", "/tyk/mcps", &createOasAPI)
+		req = ts.withAuth(req)
+		rec := httptest.NewRecorder()
+		ts.mainRouter().ServeHTTP(rec, req)
+
+		assert.Equal(t, http.StatusOK, rec.Code)
+
+		ts.Gw.DoReload()
+
+		updateTykExt := oas.XTykAPIGateway{
+			Info: oas.Info{
+				Name: "Wrong ID MCP",
+				ID:   "wrong-id",
+				State: oas.State{
+					Active: true,
+				},
+			},
+			Upstream: oas.Upstream{
+				URL: TestHttpAny,
+			},
+			Server: oas.Server{
+				ListenPath: oas.ListenPath{
+					Value: "/wrong-id/",
+					Strip: false,
+				},
+			},
+		}
+
+		updateOasAPI := openapi3.T{
+			OpenAPI: "3.0.3",
+			Info: &openapi3.Info{
+				Title:   "Wrong ID",
+				Version: "1",
+			},
+			Paths: openapi3.NewPaths(),
+		}
+
+		updateOasAPI.Extensions = map[string]interface{}{
+			oas.ExtensionTykAPIGateway: updateTykExt,
+		}
+
+		req = TestReq(t, "PUT", "/tyk/mcps/mismatch-test-api", &updateOasAPI)
+		req = ts.withAuth(req)
+		rec = httptest.NewRecorder()
+		ts.mainRouter().ServeHTTP(rec, req)
+
+		assert.Equal(t, http.StatusBadRequest, rec.Code)
+		assert.Contains(t, rec.Body.String(), "does not match")
+	})
+
+	t.Run("PUT /tyk/mcps/{apiID} fails for non-MCP Proxy", func(t *testing.T) {
+		regularSpec := BuildAPI(func(spec *APISpec) {
+			spec.SetDisabledFlags()
+			spec.APIID = "regular-for-put-test"
+			spec.Name = "Regular API"
+			spec.Proxy.ListenPath = "/regular-put-test/"
+			spec.IsOAS = true
+			spec.OAS = oas.OAS{
+				T: openapi3.T{
+					OpenAPI: "3.0.3",
+					Info: &openapi3.Info{
+						Title:   "Regular API",
+						Version: "1",
+					},
+					Paths: openapi3.NewPaths(),
+				},
+			}
+			spec.OAS.Fill(*spec.APIDefinition)
+		})[0]
+
+		_, _ = ts.Run(t, test.TestCase{AdminAuth: true, Method: http.MethodPost, Path: "/tyk/apis/oas", Data: &regularSpec.OAS, Code: http.StatusOK})
+
+		ts.Gw.DoReload()
+
+		tykExt := oas.XTykAPIGateway{
+			Info: oas.Info{
+				Name: "Update Regular API",
+				ID:   "regular-for-put-test",
+				State: oas.State{
+					Active: true,
+				},
+			},
+			Upstream: oas.Upstream{
+				URL: TestHttpAny,
+			},
+			Server: oas.Server{
+				ListenPath: oas.ListenPath{
+					Value: "/updated-regular/",
+					Strip: false,
+				},
+			},
+		}
+
+		oasAPI := openapi3.T{
+			OpenAPI: "3.0.3",
+			Info: &openapi3.Info{
+				Title:   "Update Regular",
+				Version: "1",
+			},
+			Paths: openapi3.NewPaths(),
+		}
+
+		oasAPI.Extensions = map[string]interface{}{
+			oas.ExtensionTykAPIGateway: tykExt,
+		}
+
+		req := TestReq(t, "PUT", "/tyk/mcps/regular-for-put-test", &oasAPI)
+		req = ts.withAuth(req)
+		rec := httptest.NewRecorder()
+		ts.mainRouter().ServeHTTP(rec, req)
+
+		assert.Equal(t, http.StatusNotFound, rec.Code)
+		assert.Contains(t, rec.Body.String(), "is not an MCP Proxy")
+	})
+
+	t.Run("PUT /tyk/mcps/{apiID} fails for non-existent API", func(t *testing.T) {
+		tykExt := oas.XTykAPIGateway{
+			Info: oas.Info{
+				Name: "Non Existent",
+				ID:   "non-existent",
+				State: oas.State{
+					Active: true,
+				},
+			},
+			Upstream: oas.Upstream{
+				URL: TestHttpAny,
+			},
+			Server: oas.Server{
+				ListenPath: oas.ListenPath{
+					Value: "/non-existent/",
+					Strip: false,
+				},
+			},
+		}
+
+		oasAPI := openapi3.T{
+			OpenAPI: "3.0.3",
+			Info: &openapi3.Info{
+				Title:   "Non Existent",
+				Version: "1",
+			},
+			Paths: openapi3.NewPaths(),
+		}
+
+		oasAPI.Extensions = map[string]interface{}{
+			oas.ExtensionTykAPIGateway: tykExt,
+		}
+
+		req := TestReq(t, "PUT", "/tyk/mcps/non-existent", &oasAPI)
+		req = ts.withAuth(req)
+		rec := httptest.NewRecorder()
+		ts.mainRouter().ServeHTTP(rec, req)
+
+		assert.Equal(t, http.StatusNotFound, rec.Code)
+		assert.Contains(t, rec.Body.String(), "API not found")
+	})
+
+	t.Run("PUT /tyk/mcps/{apiID} updates primitives", func(t *testing.T) {
+		createTykExt := oas.XTykAPIGateway{
+			Info: oas.Info{
+				Name: "Original Primitives",
+				ID:   "primitives-test-api",
+				State: oas.State{
+					Active: true,
+				},
+			},
+			Upstream: oas.Upstream{
+				URL: TestHttpAny,
+			},
+			Server: oas.Server{
+				ListenPath: oas.ListenPath{
+					Value: "/primitives-test/",
+					Strip: false,
+				},
+			},
+		}
+
+		createOasAPI := openapi3.T{
+			OpenAPI: "3.0.3",
+			Info: &openapi3.Info{
+				Title:   "Original Primitives",
+				Version: "1",
+			},
+			Paths: openapi3.NewPaths(),
+		}
+
+		createOasAPI.Extensions = map[string]interface{}{
+			oas.ExtensionTykAPIGateway: createTykExt,
+		}
+
+		req := TestReq(t, "POST", "/tyk/mcps", &createOasAPI)
+		req = ts.withAuth(req)
+		rec := httptest.NewRecorder()
+		ts.mainRouter().ServeHTTP(rec, req)
+
+		assert.Equal(t, http.StatusOK, rec.Code)
+
+		ts.Gw.DoReload()
+
+		updateTykExt := oas.XTykAPIGateway{
+			Info: oas.Info{
+				Name: "Updated Primitives",
+				ID:   "primitives-test-api",
+				State: oas.State{
+					Active: true,
+				},
+			},
+			Upstream: oas.Upstream{
+				URL: TestHttpAny,
+			},
+			Server: oas.Server{
+				ListenPath: oas.ListenPath{
+					Value: "/updated-primitives/",
+					Strip: false,
+				},
+			},
+			Middleware: &oas.Middleware{
+				McpTools: map[string]*oas.MCPPrimitive{
+					"updatedTool": {
+						Operation: oas.Operation{
+							Allow: &oas.Allowance{
+								Enabled: true,
+							},
+						},
+					},
+				},
+			},
+		}
+
+		updateOasAPI := openapi3.T{
+			OpenAPI: "3.0.3",
+			Info: &openapi3.Info{
+				Title:   "Updated Primitives",
+				Version: "1",
+			},
+			Paths: openapi3.NewPaths(),
+		}
+
+		updateOasAPI.Extensions = map[string]interface{}{
+			oas.ExtensionTykAPIGateway: updateTykExt,
+		}
+
+		req = TestReq(t, "PUT", "/tyk/mcps/primitives-test-api", &updateOasAPI)
+		req = ts.withAuth(req)
+		rec = httptest.NewRecorder()
+		ts.mainRouter().ServeHTTP(rec, req)
+
+		assert.Equal(t, http.StatusOK, rec.Code)
+
+		var response apiModifyKeySuccess
+		err := json.Unmarshal(rec.Body.Bytes(), &response)
+		assert.NoError(t, err)
+		assert.Equal(t, "primitives-test-api", response.Key)
+		assert.Equal(t, "modified", response.Action)
+	})
+
+	t.Run("DELETE /tyk/mcps/{apiID} deletes MCP Proxy and files", func(t *testing.T) {
+		tykExt := oas.XTykAPIGateway{
+			Info: oas.Info{
+				Name: "Delete Test MCP",
+				ID:   "delete-test-api",
+				State: oas.State{
+					Active: true,
+				},
+			},
+			Upstream: oas.Upstream{
+				URL: TestHttpAny,
+			},
+			Server: oas.Server{
+				ListenPath: oas.ListenPath{
+					Value: "/delete-test/",
+					Strip: false,
+				},
+			},
+		}
+
+		oasAPI := openapi3.T{
+			OpenAPI: "3.0.3",
+			Info: &openapi3.Info{
+				Title:   "Delete Test",
+				Version: "1",
+			},
+			Paths: openapi3.NewPaths(),
+		}
+
+		oasAPI.Extensions = map[string]interface{}{
+			oas.ExtensionTykAPIGateway: tykExt,
+		}
+
+		req := TestReq(t, "POST", "/tyk/mcps", &oasAPI)
+		req = ts.withAuth(req)
+		rec := httptest.NewRecorder()
+		ts.mainRouter().ServeHTTP(rec, req)
+
+		assert.Equal(t, http.StatusOK, rec.Code)
+
+		ts.Gw.DoReload()
+
+		api := ts.Gw.getApiSpec("delete-test-api")
+		assert.NotNil(t, api)
+		assert.True(t, api.IsMCP())
+
+		defFilePath := filepath.Join(ts.Gw.GetConfig().AppPath, "delete-test-api.json")
+		defMCPFilePath := filepath.Join(ts.Gw.GetConfig().AppPath, "delete-test-api-mcp.json")
+
+		_, err := os.Stat(defFilePath)
+		assert.NoError(t, err, "API definition file should exist")
+
+		_, err = os.Stat(defMCPFilePath)
+		assert.NoError(t, err, "MCP file should exist")
+
+		req = TestReq(t, "DELETE", "/tyk/mcps/delete-test-api", nil)
+		req = ts.withAuth(req)
+		rec = httptest.NewRecorder()
+		ts.mainRouter().ServeHTTP(rec, req)
+
+		assert.Equal(t, http.StatusOK, rec.Code)
+
+		var response apiModifyKeySuccess
+		err = json.Unmarshal(rec.Body.Bytes(), &response)
+		assert.NoError(t, err)
+		assert.Equal(t, "delete-test-api", response.Key)
+		assert.Equal(t, "deleted", response.Action)
+
+		ts.Gw.DoReload()
+
+		api = ts.Gw.getApiSpec("delete-test-api")
+		assert.Nil(t, api)
+
+		_, err = os.Stat(defFilePath)
+		assert.Error(t, err, "API definition file should be deleted")
+
+		_, err = os.Stat(defMCPFilePath)
+		assert.Error(t, err, "MCP file should be deleted")
+	})
+
+	t.Run("DELETE /tyk/mcps/{apiID} fails for non-MCP Proxy", func(t *testing.T) {
+		regularSpec := BuildAPI(func(spec *APISpec) {
+			spec.SetDisabledFlags()
+			spec.APIID = "regular-for-delete-test"
+			spec.Name = "Regular API"
+			spec.Proxy.ListenPath = "/regular-delete-test/"
+			spec.IsOAS = true
+			spec.OAS = oas.OAS{
+				T: openapi3.T{
+					OpenAPI: "3.0.3",
+					Info: &openapi3.Info{
+						Title:   "Regular API",
+						Version: "1",
+					},
+					Paths: openapi3.NewPaths(),
+				},
+			}
+			spec.OAS.Fill(*spec.APIDefinition)
+		})[0]
+
+		_, _ = ts.Run(t, test.TestCase{AdminAuth: true, Method: http.MethodPost, Path: "/tyk/apis/oas", Data: &regularSpec.OAS, Code: http.StatusOK})
+
+		ts.Gw.DoReload()
+
+		req := TestReq(t, "DELETE", "/tyk/mcps/regular-for-delete-test", nil)
+		req = ts.withAuth(req)
+		rec := httptest.NewRecorder()
+		ts.mainRouter().ServeHTTP(rec, req)
+
+		assert.Equal(t, http.StatusNotFound, rec.Code)
+		assert.Contains(t, rec.Body.String(), "is not an MCP Proxy")
+	})
+
+	t.Run("DELETE /tyk/mcps/{apiID} fails for non-existent API", func(t *testing.T) {
+		req := TestReq(t, "DELETE", "/tyk/mcps/non-existent-api", nil)
+		req = ts.withAuth(req)
+		rec := httptest.NewRecorder()
+		ts.mainRouter().ServeHTTP(rec, req)
+
+		assert.Equal(t, http.StatusNotFound, rec.Code)
+		assert.Contains(t, rec.Body.String(), "API not found")
+	})
+}
+
+func TestOASEndpoint_RejectsMCPFields(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	t.Run("POST /tyk/apis/oas with MCP fields creates regular OAS API, not MCP", func(t *testing.T) {
+		tykExt := oas.XTykAPIGateway{
+			Info: oas.Info{
+				Name: "Should Not Be MCP",
+				ID:   "oas-with-mcp-fields",
+				State: oas.State{
+					Active: true,
+				},
+			},
+			Upstream: oas.Upstream{
+				URL: TestHttpAny,
+			},
+			Server: oas.Server{
+				ListenPath: oas.ListenPath{
+					Value: "/oas-test/",
+					Strip: false,
+				},
+			},
+			Middleware: &oas.Middleware{
+				McpTools: map[string]*oas.MCPPrimitive{
+					"test-tool": {
+						Operation: oas.Operation{
+							Allow: &oas.Allowance{Enabled: true},
+						},
+					},
+				},
+				McpResources: map[string]*oas.MCPPrimitive{
+					"test-resource": {
+						Operation: oas.Operation{
+							Allow: &oas.Allowance{Enabled: true},
+						},
+					},
+				},
+				McpPrompts: map[string]*oas.MCPPrimitive{
+					"test-prompt": {
+						Operation: oas.Operation{
+							Allow: &oas.Allowance{Enabled: true},
+						},
+					},
+				},
+			},
+		}
+
+		oasAPI := openapi3.T{
+			OpenAPI: "3.0.3",
+			Info: &openapi3.Info{
+				Title:   "Should Not Be MCP",
+				Version: "1",
+			},
+			Paths: openapi3.NewPaths(),
+		}
+
+		oasAPI.Extensions = map[string]interface{}{
+			oas.ExtensionTykAPIGateway: tykExt,
+		}
+
+		req := TestReq(t, "POST", "/tyk/apis/oas", &oasAPI)
+		req = ts.withAuth(req)
+		rec := httptest.NewRecorder()
+		ts.mainRouter().ServeHTTP(rec, req)
+
+		assert.Equal(t, http.StatusOK, rec.Code)
+
+		var response apiModifyKeySuccess
+		err := json.Unmarshal(rec.Body.Bytes(), &response)
+		assert.NoError(t, err)
+		assert.Equal(t, "added", response.Action)
+
+		ts.Gw.DoReload()
+
+		api := ts.Gw.getApiSpec(response.Key)
+		assert.NotNil(t, api)
+		assert.False(t, api.IsMCP(), "API created via OAS endpoint should NOT be marked as MCP")
+		assert.True(t, api.IsOAS, "API should be marked as OAS")
+
+		fs := afero.NewOsFs()
+		defFilePath := filepath.Join(ts.Gw.GetConfig().AppPath, response.Key+".json")
+		oasFilePath := filepath.Join(ts.Gw.GetConfig().AppPath, response.Key+"-oas.json")
+		mcpFilePath := filepath.Join(ts.Gw.GetConfig().AppPath, response.Key+"-mcp.json")
+
+		defExists, err := afero.Exists(fs, defFilePath)
+		assert.NoError(t, err)
+		assert.True(t, defExists, "API definition file should exist")
+
+		oasExists, err := afero.Exists(fs, oasFilePath)
+		assert.NoError(t, err)
+		assert.True(t, oasExists, "OAS file (-oas.json) should exist")
+
+		mcpExists, err := afero.Exists(fs, mcpFilePath)
+		assert.NoError(t, err)
+		assert.False(t, mcpExists, "MCP file (-mcp.json) should NOT exist")
+	})
+
+	t.Run("GET /tyk/mcps should not return OAS APIs with MCP fields", func(t *testing.T) {
+		req := TestReq(t, "GET", "/tyk/mcps", nil)
+		req = ts.withAuth(req)
+		rec := httptest.NewRecorder()
+		ts.mainRouter().ServeHTTP(rec, req)
+
+		assert.Equal(t, http.StatusOK, rec.Code)
+
+		var mcpList []oas.OAS
+		err := json.Unmarshal(rec.Body.Bytes(), &mcpList)
+		assert.NoError(t, err)
+
+		for _, mcpAPI := range mcpList {
+			apiID := mcpAPI.GetTykExtension().Info.ID
+			assert.NotEqual(t, "oas-with-mcp-fields", apiID, "OAS API should not appear in MCP list")
+		}
+	})
+}
+
+func TestHandleDeleteMCPAPI_RemoveVersionAtomically(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	const (
+		v1VersionName = "v1-version-name"
+		v2VersionName = "v2-version-name"
+	)
+
+	baseOAS := oas.OAS{
+		T: openapi3.T{
+			OpenAPI: "3.0.3",
+			Info: &openapi3.Info{
+				Title:   "mcp base doc",
+				Version: "1",
+			},
+			Paths: openapi3.NewPaths(),
+		},
+	}
+
+	v1 := BuildAPI(func(a *APISpec) {
+		a.SetDisabledFlags()
+		a.Name = "MCP v1"
+		a.APIID = "mcp-v1"
+		a.VersionDefinition.Location = ""
+		a.VersionDefinition.Key = ""
+		a.MarkAsMCP()
+
+		a.IsOAS = true
+		a.OAS = baseOAS
+		a.OAS.SetTykExtension(&oas.XTykAPIGateway{
+			Info: oas.Info{
+				Name: "MCP v1",
+				ID:   "mcp-v1",
+				State: oas.State{
+					Active: true,
+				},
+			},
+			Upstream: oas.Upstream{
+				URL: TestHttpAny,
+			},
+			Server: oas.Server{
+				ListenPath: oas.ListenPath{
+					Value: "/mcp-v1/",
+					Strip: false,
+				},
+			},
+		})
+		a.OAS.Fill(*a.APIDefinition)
+	})[0]
+
+	v2 := BuildAPI(func(a *APISpec) {
+		a.SetDisabledFlags()
+		a.Name = "MCP v2"
+		a.APIID = "mcp-v2"
+		a.VersionDefinition.Location = ""
+		a.VersionDefinition.Key = ""
+		a.MarkAsMCP()
+
+		a.IsOAS = true
+		a.OAS = baseOAS
+		a.OAS.SetTykExtension(&oas.XTykAPIGateway{
+			Info: oas.Info{
+				Name: "MCP v2",
+				ID:   "mcp-v2",
+				State: oas.State{
+					Active: true,
+				},
+			},
+			Upstream: oas.Upstream{
+				URL: TestHttpAny,
+			},
+			Server: oas.Server{
+				ListenPath: oas.ListenPath{
+					Value: "/mcp-v2/",
+					Strip: false,
+				},
+			},
+		})
+		a.OAS.Fill(*a.APIDefinition)
+	})[0]
+
+	baseAPI := BuildAPI(func(a *APISpec) {
+		a.SetDisabledFlags()
+		a.Name = "MCP Base"
+		a.APIID = "mcp-base"
+		a.VersionDefinition.Versions = map[string]string{
+			v1VersionName: v1.APIID,
+			v2VersionName: v2.APIID,
+		}
+		a.VersionDefinition.Default = v1VersionName
+		a.VersionDefinition.Name = v2VersionName
+		a.VersionDefinition.Location = apidef.HeaderLocation
+		a.VersionDefinition.Key = apidef.DefaultAPIVersionKey
+		a.MarkAsMCP()
+
+		a.IsOAS = true
+		a.OAS = baseOAS
+		a.OAS.SetTykExtension(&oas.XTykAPIGateway{
+			Info: oas.Info{
+				Name: "MCP Base",
+				ID:   "mcp-base",
+				State: oas.State{
+					Active: true,
+				},
+			},
+			Upstream: oas.Upstream{
+				URL: TestHttpAny,
+			},
+			Server: oas.Server{
+				ListenPath: oas.ListenPath{
+					Value: "/mcp-base/",
+					Strip: false,
+				},
+			},
+		})
+		a.OAS.Fill(*a.APIDefinition)
+	})[0]
+
+	_, _ = ts.Run(t, []test.TestCase{
+		{AdminAuth: true, Method: http.MethodPost, Path: "/tyk/mcps", Data: &v1.OAS, Code: http.StatusOK},
+		{AdminAuth: true, Method: http.MethodPost, Path: "/tyk/mcps", Data: &v2.OAS, Code: http.StatusOK},
+		{AdminAuth: true, Method: http.MethodPost, Path: "/tyk/mcps", Data: &baseAPI.OAS, Code: http.StatusOK},
+	}...)
+
+	ts.Gw.DoReload()
+
+	_, _ = ts.Run(t, []test.TestCase{
+		{AdminAuth: true, Path: "/tyk/mcps/" + v1.APIID, HeadersMatch: baseAPIHeader(baseAPI.APIID), Code: http.StatusOK},
+		{AdminAuth: true, Path: "/tyk/mcps/" + v2.APIID, HeadersMatch: baseAPIHeader(baseAPI.APIID), Code: http.StatusOK},
+		{AdminAuth: true, Method: http.MethodDelete, Path: "/tyk/mcps/" + v1.APIID, Code: http.StatusOK},
+	}...)
+
+	ts.Gw.DoReload()
+
+	_, _ = ts.Run(t, []test.TestCase{
+		{AdminAuth: true, Path: "/tyk/mcps/" + v1.APIID, BodyMatch: "API not found", Code: http.StatusNotFound},
+		{AdminAuth: true, Path: "/tyk/mcps/" + v2.APIID, HeadersMatch: baseAPIHeader(baseAPI.APIID), Code: http.StatusOK},
+		{AdminAuth: true, Path: "/tyk/mcps/" + baseAPI.APIID, BodyMatchFunc: func(bytes []byte) bool {
+			var base oas.OAS
+			err := json.Unmarshal(bytes, &base)
+			assert.NoError(t, err)
+
+			var baseDef apidef.APIDefinition
+			base.ExtractTo(&baseDef)
+
+			expectedVersions := map[string]string{
+				v2VersionName: v2.APIID,
+			}
+
+			assert.Equal(t, expectedVersions, baseDef.VersionDefinition.Versions)
+			assert.Equal(t, v2VersionName, baseDef.VersionDefinition.Default)
+
+			return true
+		}, Code: http.StatusOK},
+	}...)
+}
+
+func TestGetNewCertIDs(t *testing.T) {
+	t.Run("Empty original, non-empty new", func(t *testing.T) {
+		original := []string{}
+		new := []string{"cert1", "cert2", "cert3"}
+		result := getNewCertIDs(original, new)
+		assert.Equal(t, []string{"cert1", "cert2", "cert3"}, result)
+	})
+
+	t.Run("Nil original, non-empty new", func(t *testing.T) {
+		var original []string
+		new := []string{"cert1", "cert2"}
+		result := getNewCertIDs(original, new)
+		assert.Equal(t, []string{"cert1", "cert2"}, result)
+	})
+
+	t.Run("Some overlap", func(t *testing.T) {
+		original := []string{"cert1", "cert2"}
+		new := []string{"cert1", "cert2", "cert3", "cert4"}
+		result := getNewCertIDs(original, new)
+		assert.Equal(t, []string{"cert3", "cert4"}, result)
+	})
+
+	t.Run("All existing", func(t *testing.T) {
+		original := []string{"cert1", "cert2", "cert3"}
+		new := []string{"cert1", "cert2", "cert3"}
+		result := getNewCertIDs(original, new)
+		assert.Empty(t, result)
+	})
+
+	t.Run("No overlap", func(t *testing.T) {
+		original := []string{"cert1", "cert2"}
+		new := []string{"cert3", "cert4"}
+		result := getNewCertIDs(original, new)
+		assert.Equal(t, []string{"cert3", "cert4"}, result)
+	})
+
+	t.Run("Empty both", func(t *testing.T) {
+		original := []string{}
+		new := []string{}
+		result := getNewCertIDs(original, new)
+		assert.Empty(t, result)
+	})
+}
+
+func TestValidateMtlsStaticCertificateBindings(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	t.Run("Valid single certificate", func(t *testing.T) {
+		clientCertPem, _, _, _ := certs.GenCertificate(&x509.Certificate{}, false)
+		certID, err := ts.Gw.CertificateManager.Add(clientCertPem, "")
+		require.NoError(t, err)
+		defer ts.Gw.CertificateManager.Delete(certID, "")
+
+		err = ts.Gw.validateMtlsStaticCertificateBindings([]string{certID}, "")
+		assert.NoError(t, err)
+	})
+
+	t.Run("Valid multiple certificates", func(t *testing.T) {
+		cert1Pem, _, _, _ := certs.GenCertificate(&x509.Certificate{}, false)
+		cert1ID, err := ts.Gw.CertificateManager.Add(cert1Pem, "")
+		require.NoError(t, err)
+		defer ts.Gw.CertificateManager.Delete(cert1ID, "")
+
+		cert2Pem, _, _, _ := certs.GenCertificate(&x509.Certificate{}, false)
+		cert2ID, err := ts.Gw.CertificateManager.Add(cert2Pem, "")
+		require.NoError(t, err)
+		defer ts.Gw.CertificateManager.Delete(cert2ID, "")
+
+		err = ts.Gw.validateMtlsStaticCertificateBindings([]string{cert1ID, cert2ID}, "")
+		assert.NoError(t, err)
+	})
+
+	t.Run("Valid certificate with orgID prefix", func(t *testing.T) {
+		orgID := "test-org-123"
+		clientCertPem, _, _, _ := certs.GenCertificate(&x509.Certificate{}, false)
+		certID, err := ts.Gw.CertificateManager.Add(clientCertPem, orgID)
+		require.NoError(t, err)
+		defer ts.Gw.CertificateManager.Delete(certID, orgID)
+
+		err = ts.Gw.validateMtlsStaticCertificateBindings([]string{certID}, orgID)
+		assert.NoError(t, err)
+	})
+
+	t.Run("Invalid certificate - wrong orgID prefix", func(t *testing.T) {
+		orgID := "test-org-123"
+		clientCertPem, _, _, _ := certs.GenCertificate(&x509.Certificate{}, false)
+		certID, err := ts.Gw.CertificateManager.Add(clientCertPem, orgID)
+		require.NoError(t, err)
+		defer ts.Gw.CertificateManager.Delete(certID, orgID)
+
+		// Try to validate with wrong orgID
+		err = ts.Gw.validateMtlsStaticCertificateBindings([]string{certID}, "wrong-org-456")
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "invalid certificate ID")
+	})
+
+	t.Run("Invalid certificate - path traversal attempt", func(t *testing.T) {
+		orgID := "test-org-123"
+		err := ts.Gw.validateMtlsStaticCertificateBindings([]string{"../../../../etc/passwd"}, orgID)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "invalid certificate ID")
+	})
+
+	t.Run("Invalid single certificate", func(t *testing.T) {
+		err := ts.Gw.validateMtlsStaticCertificateBindings([]string{"invalid-cert-id"}, "")
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "certificate not found: invalid-cert-id")
+	})
+
+	t.Run("Invalid certificate in list", func(t *testing.T) {
+		clientCertPem, _, _, _ := certs.GenCertificate(&x509.Certificate{}, false)
+		certID, err := ts.Gw.CertificateManager.Add(clientCertPem, "")
+		require.NoError(t, err)
+		defer ts.Gw.CertificateManager.Delete(certID, "")
+
+		err = ts.Gw.validateMtlsStaticCertificateBindings([]string{certID, "invalid-cert"}, "")
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "certificate not found: invalid-cert")
+	})
+
+	t.Run("Empty array", func(t *testing.T) {
+		err := ts.Gw.validateMtlsStaticCertificateBindings([]string{}, "")
+		assert.NoError(t, err)
+	})
+
+	t.Run("Nil array", func(t *testing.T) {
+		err := ts.Gw.validateMtlsStaticCertificateBindings(nil, "")
+		assert.NoError(t, err)
+	})
+}
+
+func TestCreateKeyWithMtlsStaticCertificateBindings(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	apiId := "test-api"
+	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		spec.APIID = apiId
+		spec.UseKeylessAccess = false
+		spec.OrgID = "default"
+	})
+
+	t.Run("Create key with valid bindings", func(t *testing.T) {
+		orgID := "default"
+		clientCertPem, _, _, _ := certs.GenCertificate(&x509.Certificate{}, false)
+		certID, err := ts.Gw.CertificateManager.Add(clientCertPem, orgID)
+		require.NoError(t, err)
+		defer ts.Gw.CertificateManager.Delete(certID, orgID)
+
+		session := user.SessionState{
+			OrgID:                         orgID,
+			MtlsStaticCertificateBindings: []string{certID},
+			AccessRights: map[string]user.AccessDefinition{
+				apiId: {APIID: apiId, Versions: []string{"v1"}},
+			},
+		}
+		sessionData := test.MarshalJSON(t)(session)
+
+		_, _ = ts.Run(t, []test.TestCase{
+			{Method: http.MethodPost, Path: "/tyk/keys/create", Data: sessionData, AdminAuth: true, Code: 200},
+		}...)
+	})
+
+	t.Run("Create key with invalid cert in bindings", func(t *testing.T) {
+		session := user.SessionState{
+			OrgID:                         "default",
+			MtlsStaticCertificateBindings: []string{"nonexistent-cert-id"},
+			AccessRights: map[string]user.AccessDefinition{
+				apiId: {APIID: apiId, Versions: []string{"v1"}},
+			},
+		}
+		sessionData := test.MarshalJSON(t)(session)
+
+		_, _ = ts.Run(t, []test.TestCase{
+			{Method: http.MethodPost, Path: "/tyk/keys/create", Data: sessionData, AdminAuth: true, Code: 400},
+		}...)
+	})
+
+	t.Run("Create key without the field", func(t *testing.T) {
+		session := user.SessionState{
+			OrgID: "default",
+			AccessRights: map[string]user.AccessDefinition{
+				apiId: {APIID: apiId, Versions: []string{"v1"}},
+			},
+		}
+		sessionData := test.MarshalJSON(t)(session)
+
+		_, _ = ts.Run(t, []test.TestCase{
+			{Method: http.MethodPost, Path: "/tyk/keys/create", Data: sessionData, AdminAuth: true, Code: 200},
+		}...)
+	})
+
+	t.Run("Create key with empty array", func(t *testing.T) {
+		session := user.SessionState{
+			OrgID:                         "default",
+			MtlsStaticCertificateBindings: []string{},
+			AccessRights: map[string]user.AccessDefinition{
+				apiId: {APIID: apiId, Versions: []string{"v1"}},
+			},
+		}
+		sessionData := test.MarshalJSON(t)(session)
+
+		_, _ = ts.Run(t, []test.TestCase{
+			{Method: http.MethodPost, Path: "/tyk/keys/create", Data: sessionData, AdminAuth: true, Code: 200},
+		}...)
+	})
+}
+
+func TestUpdateKeyWithMtlsStaticCertificateBindings(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	apiId := "test-api"
+	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		spec.APIID = apiId
+		spec.UseKeylessAccess = false
+		spec.OrgID = "default"
+	})
+
+	t.Run("POST with valid bindings", func(t *testing.T) {
+		clientCertPem, _, _, _ := certs.GenCertificate(&x509.Certificate{}, false)
+		certID, err := ts.Gw.CertificateManager.Add(clientCertPem, "default")
+		require.NoError(t, err)
+		defer ts.Gw.CertificateManager.Delete(certID, "default")
+
+		session := user.SessionState{
+			OrgID:                         "default",
+			MtlsStaticCertificateBindings: []string{certID},
+			AccessRights: map[string]user.AccessDefinition{
+				apiId: {APIID: apiId, Versions: []string{"v1"}},
+			},
+		}
+		sessionData := test.MarshalJSON(t)(session)
+
+		_, _ = ts.Run(t, []test.TestCase{
+			{Method: http.MethodPost, Path: "/tyk/keys/custom-key-id", Data: sessionData, AdminAuth: true, Code: 200},
+		}...)
+	})
+
+	t.Run("PUT with valid bindings", func(t *testing.T) {
+		clientCertPem, _, _, _ := certs.GenCertificate(&x509.Certificate{}, false)
+		certID, err := ts.Gw.CertificateManager.Add(clientCertPem, "default")
+		require.NoError(t, err)
+		defer ts.Gw.CertificateManager.Delete(certID, "default")
+
+		session, key := ts.CreateSession(func(s *user.SessionState) {
+			s.OrgID = "default"
+			s.AccessRights = map[string]user.AccessDefinition{
+				apiId: {APIID: apiId, Versions: []string{"v1"}},
+			}
+		})
+
+		session.MtlsStaticCertificateBindings = []string{certID}
+		sessionData := test.MarshalJSON(t)(session)
+
+		path := fmt.Sprintf("/tyk/keys/%s", key)
+		_, _ = ts.Run(t, []test.TestCase{
+			{Method: http.MethodPut, Path: path, Data: sessionData, AdminAuth: true, Code: 200},
+		}...)
+	})
+
+	t.Run("POST with invalid cert in bindings", func(t *testing.T) {
+		session := user.SessionState{
+			OrgID:                         "default",
+			MtlsStaticCertificateBindings: []string{"invalid-cert"},
+			AccessRights: map[string]user.AccessDefinition{
+				apiId: {APIID: apiId, Versions: []string{"v1"}},
+			},
+		}
+		sessionData := test.MarshalJSON(t)(session)
+
+		_, _ = ts.Run(t, []test.TestCase{
+			{Method: http.MethodPost, Path: "/tyk/keys/custom-key-id-2", Data: sessionData, AdminAuth: true, Code: 400},
+		}...)
+	})
+
+	t.Run("PUT with invalid cert in bindings", func(t *testing.T) {
+		session, key := ts.CreateSession(func(s *user.SessionState) {
+			s.OrgID = "default"
+			s.AccessRights = map[string]user.AccessDefinition{
+				apiId: {APIID: apiId, Versions: []string{"v1"}},
+			}
+		})
+
+		session.MtlsStaticCertificateBindings = []string{"invalid-cert"}
+		sessionData := test.MarshalJSON(t)(session)
+
+		path := fmt.Sprintf("/tyk/keys/%s", key)
+		_, _ = ts.Run(t, []test.TestCase{
+			{Method: http.MethodPut, Path: path, Data: sessionData, AdminAuth: true, Code: 400},
+		}...)
+	})
+
+	t.Run("PUT with existing certs + new valid cert", func(t *testing.T) {
+		cert1Pem, _, _, _ := certs.GenCertificate(&x509.Certificate{}, false)
+		cert1ID, err := ts.Gw.CertificateManager.Add(cert1Pem, "default")
+		require.NoError(t, err)
+		defer ts.Gw.CertificateManager.Delete(cert1ID, "default")
+
+		cert2Pem, _, _, _ := certs.GenCertificate(&x509.Certificate{}, false)
+		cert2ID, err := ts.Gw.CertificateManager.Add(cert2Pem, "default")
+		require.NoError(t, err)
+		defer ts.Gw.CertificateManager.Delete(cert2ID, "default")
+
+		session, key := ts.CreateSession(func(s *user.SessionState) {
+			s.OrgID = "default"
+			s.MtlsStaticCertificateBindings = []string{cert1ID}
+			s.AccessRights = map[string]user.AccessDefinition{
+				apiId: {APIID: apiId, Versions: []string{"v1"}},
+			}
+		})
+
+		// Add new cert to existing bindings
+		session.MtlsStaticCertificateBindings = []string{cert1ID, cert2ID}
+		sessionData := test.MarshalJSON(t)(session)
+
+		path := fmt.Sprintf("/tyk/keys/%s", key)
+		_, _ = ts.Run(t, []test.TestCase{
+			{Method: http.MethodPut, Path: path, Data: sessionData, AdminAuth: true, Code: 200},
+		}...)
+	})
+
+	t.Run("PUT with existing certs + new invalid cert", func(t *testing.T) {
+		clientCertPem, _, _, _ := certs.GenCertificate(&x509.Certificate{}, false)
+		certID, err := ts.Gw.CertificateManager.Add(clientCertPem, "default")
+		require.NoError(t, err)
+		defer ts.Gw.CertificateManager.Delete(certID, "default")
+
+		session, key := ts.CreateSession(func(s *user.SessionState) {
+			s.OrgID = "default"
+			s.MtlsStaticCertificateBindings = []string{certID}
+			s.AccessRights = map[string]user.AccessDefinition{
+				apiId: {APIID: apiId, Versions: []string{"v1"}},
+			}
+		})
+
+		// Add invalid cert to existing bindings
+		session.MtlsStaticCertificateBindings = []string{certID, "invalid-new-cert"}
+		sessionData := test.MarshalJSON(t)(session)
+
+		path := fmt.Sprintf("/tyk/keys/%s", key)
+		_, _ = ts.Run(t, []test.TestCase{
+			{Method: http.MethodPut, Path: path, Data: sessionData, AdminAuth: true, Code: 400},
+		}...)
+	})
+
+	t.Run("PUT with only existing certs (no new certs)", func(t *testing.T) {
+		clientCertPem, _, _, _ := certs.GenCertificate(&x509.Certificate{}, false)
+		certID, err := ts.Gw.CertificateManager.Add(clientCertPem, "default")
+		require.NoError(t, err)
+		defer ts.Gw.CertificateManager.Delete(certID, "default")
+
+		session, key := ts.CreateSession(func(s *user.SessionState) {
+			s.OrgID = "default"
+			s.MtlsStaticCertificateBindings = []string{certID}
+			s.AccessRights = map[string]user.AccessDefinition{
+				apiId: {APIID: apiId, Versions: []string{"v1"}},
+			}
+		})
+
+		// No changes to bindings
+		session.MtlsStaticCertificateBindings = []string{certID}
+		sessionData := test.MarshalJSON(t)(session)
+
+		path := fmt.Sprintf("/tyk/keys/%s", key)
+		_, _ = ts.Run(t, []test.TestCase{
+			{Method: http.MethodPut, Path: path, Data: sessionData, AdminAuth: true, Code: 200},
+		}...)
+	})
+
+	t.Run("PUT removing a cert from bindings", func(t *testing.T) {
+		cert1Pem, _, _, _ := certs.GenCertificate(&x509.Certificate{}, false)
+		cert1ID, err := ts.Gw.CertificateManager.Add(cert1Pem, "default")
+		require.NoError(t, err)
+		defer ts.Gw.CertificateManager.Delete(cert1ID, "default")
+
+		cert2Pem, _, _, _ := certs.GenCertificate(&x509.Certificate{}, false)
+		cert2ID, err := ts.Gw.CertificateManager.Add(cert2Pem, "default")
+		require.NoError(t, err)
+		defer ts.Gw.CertificateManager.Delete(cert2ID, "default")
+
+		session, key := ts.CreateSession(func(s *user.SessionState) {
+			s.OrgID = "default"
+			s.MtlsStaticCertificateBindings = []string{cert1ID, cert2ID}
+			s.AccessRights = map[string]user.AccessDefinition{
+				apiId: {APIID: apiId, Versions: []string{"v1"}},
+			}
+		})
+
+		// Remove one cert from bindings
+		session.MtlsStaticCertificateBindings = []string{cert1ID}
+		sessionData := test.MarshalJSON(t)(session)
+
+		path := fmt.Sprintf("/tyk/keys/%s", key)
+		_, _ = ts.Run(t, []test.TestCase{
+			{Method: http.MethodPut, Path: path, Data: sessionData, AdminAuth: true, Code: 200},
+		}...)
+	})
+}
+
+func TestAPIListFilter_ExcludeMCP(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	// Create all APIs using BuildAndLoadAPI
+	allAPIs := ts.Gw.BuildAndLoadAPI(
+		func(spec *APISpec) {
+			spec.Name = "classic-api-1"
+			spec.APIID = "classic123"
+			spec.Proxy.ListenPath = "/classic1/"
+		},
+		func(spec *APISpec) {
+			spec.Name = "classic-api-2"
+			spec.APIID = "classic456"
+			spec.Proxy.ListenPath = "/classic2/"
+		},
+		func(spec *APISpec) {
+			spec.Name = "mcp-api"
+			spec.APIID = "mcp789"
+			spec.Proxy.ListenPath = "/mcp/"
+			spec.MarkAsMCP()
+		},
+	)
+
+	require.Len(t, allAPIs, 3)
+
+	t.Run("no filter returns all APIs", func(t *testing.T) {
+		resp, _ := ts.Run(t, test.TestCase{
+			Path:      "/tyk/apis/",
+			Method:    http.MethodGet,
+			AdminAuth: true,
+			Code:      http.StatusOK,
+		})
+
+		bodyBytes, err := ioutil.ReadAll(resp.Body)
+		require.NoError(t, err)
+
+		var apis []*apidef.APIDefinition
+		err = json.Unmarshal(bodyBytes, &apis)
+		require.NoError(t, err)
+
+		t.Logf("Without filter: found %d APIs", len(apis))
+		for _, api := range apis {
+			t.Logf("  - %s (ID: %s, IsOAS: %v, IsMCP: %v)", api.Name, api.APIID, api.IsOAS, api.IsMCP())
+		}
+
+		assert.Equal(t, 3, len(apis), "Should return all 3 APIs")
+
+		// Check each API is present
+		apiIDs := make(map[string]bool)
+		for _, api := range apis {
+			apiIDs[api.APIID] = true
+		}
+		assert.True(t, apiIDs["classic123"], "Should have classic API 1")
+		assert.True(t, apiIDs["classic456"], "Should have classic API 2")
+		assert.True(t, apiIDs["mcp789"], "Should have MCP API")
+	})
+
+	t.Run("exclude_api_types=mcp excludes MCP Proxies", func(t *testing.T) {
+		resp, _ := ts.Run(t, test.TestCase{
+			Path:      "/tyk/apis/?exclude_api_types=mcp",
+			Method:    http.MethodGet,
+			AdminAuth: true,
+			Code:      http.StatusOK,
+		})
+
+		bodyBytes, err := ioutil.ReadAll(resp.Body)
+		require.NoError(t, err)
+
+		var apis []*apidef.APIDefinition
+		err = json.Unmarshal(bodyBytes, &apis)
+		require.NoError(t, err)
+
+		t.Logf("With exclude_api_types=mcp: found %d APIs", len(apis))
+		for _, api := range apis {
+			t.Logf("  - %s (ID: %s, IsOAS: %v, IsMCP: %v)", api.Name, api.APIID, api.IsOAS, api.IsMCP())
+		}
+
+		assert.Equal(t, 2, len(apis), "Should return only 2 APIs (excluding MCP)")
+
+		// Check MCP is excluded
+		for _, api := range apis {
+			assert.NotEqual(t, "mcp789", api.APIID, "MCP API should be excluded")
+			assert.False(t, api.IsMCP(), "No MCP APIs should be in response")
+		}
+
+		// Check other APIs are present
+		apiIDs := make(map[string]bool)
+		for _, api := range apis {
+			apiIDs[api.APIID] = true
+		}
+		assert.True(t, apiIDs["classic123"], "Should have classic API 1")
+		assert.True(t, apiIDs["classic456"], "Should have classic API 2")
 	})
 }

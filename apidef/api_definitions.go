@@ -112,12 +112,13 @@ const (
 	DefaultAPIVersionKey = "x-api-version"
 	HeaderBaseAPIID      = "x-tyk-base-api-id"
 
-	AuthTokenType = "authToken"
-	JWTType       = "jwt"
-	HMACType      = "hmac"
-	BasicType     = "basic"
-	CoprocessType = "coprocess"
-	OAuthType     = "oauth"
+	AuthTokenType       = "authToken"
+	CertificateAuthType = "certificateAuth"
+	JWTType             = "jwt"
+	HMACType            = "hmac"
+	BasicType           = "basic"
+	CoprocessType       = "coprocess"
+	OAuthType           = "oauth"
 	// ExternalOAuthType holds configuration for an external OAuth provider.
 	// Deprecated: ExternalOAuth support was deprecated in Tyk 5.7.0.
 	// To avoid any disruptions, we recommend that you use JSON Web Token (JWT) instead,
@@ -134,6 +135,12 @@ const (
 	OAuthAuthorizationTypeClientCredentials = "clientCredentials"
 	// OAuthAuthorizationTypePassword is the authorization type for password flow.
 	OAuthAuthorizationTypePassword = "password"
+
+	// JSON-RPC protocol versions
+	JsonRPC20 = "2.0"
+
+	// Application protocols
+	AppProtocolMCP = "mcp"
 )
 
 var (
@@ -464,6 +471,13 @@ type VersionDefinition struct {
 	BaseID string `bson:"base_id" json:"-"` // json tag is `-` because we want this to be hidden to user
 }
 
+func (v *VersionDefinition) ResolvedDefault() string {
+	if v.Default == Self {
+		return v.Name
+	}
+	return v.Default
+}
+
 type VersionData struct {
 	NotVersioned   bool                   `bson:"not_versioned" json:"not_versioned"`
 	DefaultVersion string                 `bson:"default_version" json:"default_version"`
@@ -659,6 +673,8 @@ type APIDefinition struct {
 	ListenPort          int            `bson:"listen_port" json:"listen_port"`
 	Protocol            string         `bson:"protocol" json:"protocol"`
 	EnableProxyProtocol bool           `bson:"enable_proxy_protocol" json:"enable_proxy_protocol"`
+	JsonRpcVersion      string         `bson:"json_rpc_version,omitempty" json:"json_rpc_version,omitempty"`
+	ApplicationProtocol string         `bson:"application_protocol,omitempty" json:"application_protocol,omitempty"`
 	APIID               string         `bson:"api_id" json:"api_id"`
 	OrgID               string         `bson:"org_id" json:"org_id"`
 	UseKeylessAccess    bool           `bson:"use_keyless" json:"use_keyless"`
@@ -1421,6 +1437,43 @@ func (a *APIDefinition) GetAPIDomain() string {
 		return ""
 	}
 	return a.Domain
+}
+
+// SetProtocol configures the transport and application protocol for the API.
+func (a *APIDefinition) SetProtocol(transport, application string) {
+	a.JsonRpcVersion = transport
+	a.ApplicationProtocol = application
+}
+
+// IsMCP returns true if this API uses the Model Context Protocol.
+func (a *APIDefinition) IsMCP() bool {
+	return a.ApplicationProtocol == AppProtocolMCP
+}
+
+// MarkAsMCP configures the API definition as a Model Context Protocol (MCP) API.
+func (a *APIDefinition) MarkAsMCP() {
+	a.SetProtocol(JsonRPC20, AppProtocolMCP)
+}
+
+// IsChildAPI returns true if this API is a child API in a versioning hierarchy.
+// A child API is identified by having a BaseID that differs from its own APIID.
+func (a *APIDefinition) IsChildAPI() bool {
+	return a.VersionDefinition.BaseID != "" && a.VersionDefinition.BaseID != a.APIID
+}
+
+// IsBaseAPI returns true if this API is a base API with child versions.
+// A base API is identified by having versions defined and either no BaseID or BaseID equal to its own APIID.
+func (a *APIDefinition) IsBaseAPI() bool {
+	return len(a.VersionDefinition.Versions) > 0 &&
+		(a.VersionDefinition.BaseID == "" || a.VersionDefinition.BaseID == a.APIID)
+}
+
+// IsBaseAPIWithVersioning returns true if this API is a base API with versioning explicitly enabled.
+// This is similar to IsBaseAPI but additionally requires versioning to be enabled and have a version name.
+func (a *APIDefinition) IsBaseAPIWithVersioning() bool {
+	return a.VersionDefinition.Enabled &&
+		(a.VersionDefinition.BaseID == "" || a.VersionDefinition.BaseID == a.APIID) &&
+		a.VersionDefinition.Name != ""
 }
 
 func DummyAPI() APIDefinition {

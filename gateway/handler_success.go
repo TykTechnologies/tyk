@@ -11,16 +11,14 @@ import (
 	"strings"
 	"time"
 
-	graphqlinternal "github.com/TykTechnologies/tyk/internal/graphql"
-
 	"github.com/TykTechnologies/tyk-pump/analytics"
-
 	"github.com/TykTechnologies/tyk/apidef"
-	"github.com/TykTechnologies/tyk/internal/httputil"
-
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/ctx"
 	"github.com/TykTechnologies/tyk/header"
+	tykerrors "github.com/TykTechnologies/tyk/internal/errors"
+	graphqlinternal "github.com/TykTechnologies/tyk/internal/graphql"
+	"github.com/TykTechnologies/tyk/internal/httputil"
 	"github.com/TykTechnologies/tyk/internal/otel"
 	"github.com/TykTechnologies/tyk/request"
 	"github.com/TykTechnologies/tyk/user"
@@ -380,6 +378,25 @@ func recordDetailUnsafe(r *http.Request, spec *APISpec) bool {
 	return spec.GraphQL.Enabled || spec.GlobalConfig.AnalyticsConfig.EnableDetailedRecording
 }
 
+// classifyUpstreamError classifies upstream responses for structured access logs.
+// Currently handles 5XX status codes; can be extended for other error classifications.
+// If a classification was already set earlier in the request lifecycle (e.g. NHU from
+// the load balancer director), it is preserved.
+func (s *SuccessHandler) classifyUpstreamError(r *http.Request, statusCode int) {
+	if statusCode >= 500 && statusCode <= 599 {
+		// Don't overwrite a more specific classification set earlier (e.g. NHU).
+		if ctx.GetErrorClassification(r) != nil {
+			return
+		}
+		target := r.URL.Host
+		if target == "" && s.Spec.target != nil {
+			target = s.Spec.target.Host
+		}
+		errClass := tykerrors.ClassifyUpstreamResponse(statusCode, target)
+		ctx.SetErrorClassification(r, errClass)
+	}
+}
+
 // ServeHTTP will store the request details in the analytics store if necessary and proxy the request to it's
 // final destination, this is invoked by the ProxyHandler or right at the start of a request chain if the URL
 // Spec states the path is Ignored
@@ -395,14 +412,34 @@ func (s *SuccessHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) *http
 	t1 := time.Now()
 	resp := s.Proxy.ServeHTTP(w, r)
 
-	millisec := DurationToMillisecond(time.Since(t1))
+	t2 := time.Now()
+	proxyDuration := t2.Sub(t1)
+	millisec := DurationToMillisecond(proxyDuration)
 	log.Debug("Upstream request took (ms): ", millisec)
 
 	if resp.Response != nil {
-		latency := analytics.Latency{
-			Total:    int64(millisec),
-			Upstream: int64(DurationToMillisecond(resp.UpstreamLatency)),
+		upstreamMs := int64(DurationToMillisecond(resp.UpstreamLatency))
+
+		// Calculate total time including all middlewares
+		var totalMs int64
+		requestStartTime := ctxGetRequestStartTime(r)
+		if !requestStartTime.IsZero() {
+			totalMs = int64(DurationToMillisecond(t2.Sub(requestStartTime)))
+			log.Debugf("Request start time found (UTC): %s, total time: %dms", requestStartTime.UTC().Format(time.RFC3339), totalMs)
+		} else {
+			// Fallback to proxy duration if start time not set
+			totalMs = int64(millisec)
+			log.Debug("Request start time NOT found, using proxy duration as fallback")
 		}
+
+		latency := analytics.Latency{
+			Total:    totalMs,
+			Upstream: upstreamMs,
+			Gateway:  totalMs - upstreamMs,
+		}
+
+		s.classifyUpstreamError(r, resp.Response.StatusCode)
+
 		s.RecordHit(r, latency, resp.Response.StatusCode, resp.Response, false)
 		s.RecordAccessLog(r, resp.Response, latency)
 	}
@@ -421,18 +458,37 @@ func (s *SuccessHandler) ServeHTTPWithCache(w http.ResponseWriter, r *http.Reque
 
 	t1 := time.Now()
 	inRes := s.Proxy.ServeHTTPForCache(w, r)
-	millisec := DurationToMillisecond(time.Since(t1))
+	t2 := time.Now()
+	proxyDuration := t2.Sub(t1)
+	millisec := DurationToMillisecond(proxyDuration)
 
 	addVersionHeader(w, r, s.Spec.GlobalConfig)
 
 	log.Debug("Upstream request took (ms): ", millisec)
 
 	if inRes.Response != nil {
-		latency := analytics.Latency{
-			Total:    int64(millisec),
-			Upstream: int64(DurationToMillisecond(inRes.UpstreamLatency)),
+		upstreamMs := int64(DurationToMillisecond(inRes.UpstreamLatency))
+
+		// Calculate total time including all middlewares
+		var totalMs int64
+		if requestStartTime := ctxGetRequestStartTime(r); !requestStartTime.IsZero() {
+			totalMs = int64(DurationToMillisecond(t2.Sub(requestStartTime)))
+		} else {
+			// Fallback to proxy duration if start time not set
+			totalMs = int64(millisec)
 		}
+
+		latency := analytics.Latency{
+			Total:    totalMs,
+			Upstream: upstreamMs,
+			Gateway:  totalMs - upstreamMs,
+		}
+
+		s.classifyUpstreamError(r, inRes.Response.StatusCode)
+
 		s.RecordHit(r, latency, inRes.Response.StatusCode, inRes.Response, false)
+		s.RecordAccessLog(r, inRes.Response, latency)
+
 	}
 
 	return inRes

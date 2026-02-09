@@ -2,6 +2,7 @@ package gateway
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -16,6 +17,7 @@ import (
 	"github.com/TykTechnologies/tyk-pump/analytics"
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/coprocess"
+	"github.com/TykTechnologies/tyk/internal/httpctx"
 	"github.com/TykTechnologies/tyk/internal/middleware"
 	"github.com/TykTechnologies/tyk/user"
 	"github.com/sirupsen/logrus"
@@ -275,32 +277,10 @@ func (gw *Gateway) CoProcessInit() {
 
 // EnabledForSpec checks if this middleware should be enabled for a given API.
 func (m *CoProcessMiddleware) EnabledForSpec() bool {
-
 	if !m.Gw.GetConfig().CoProcessOptions.EnableCoProcess {
 		log.WithFields(logrus.Fields{
 			"prefix": "coprocess",
 		}).Error("Your API specifies a CP custom middleware, either Tyk wasn't build with CP support or CP is not enabled in your Tyk configuration file!")
-		return false
-	}
-
-	var supported bool
-	for _, driver := range supportedDrivers {
-		if m.Spec.CustomMiddleware.Driver == driver {
-			supported = true
-		}
-	}
-
-	if !supported {
-		log.WithFields(logrus.Fields{
-			"prefix": "coprocess",
-		}).Errorf("Unsupported driver '%s'", m.Spec.CustomMiddleware.Driver)
-		return false
-	}
-
-	if d, _ := loadedDrivers[m.Spec.CustomMiddleware.Driver]; d == nil {
-		log.WithFields(logrus.Fields{
-			"prefix": "coprocess",
-		}).Errorf("Driver '%s' isn't loaded", m.Spec.CustomMiddleware.Driver)
 		return false
 	}
 
@@ -313,6 +293,21 @@ func (m *CoProcessMiddleware) EnabledForSpec() bool {
 
 // ProcessRequest will run any checks on the request on the way through the system, return an error to have the chain fail
 func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
+	// Skip global CoProcess plugins on self-looped requests (internal redirects) BEFORE driver validation.
+	// This prevents the plugin from executing multiple times during internal routing
+	// (e.g., VEM chain traversal, URL rewrites with tyk://self).
+	// CustomKeyCheck hooks must run on every request, so they're excluded from this check.
+	// Similar to auth middleware behavior (see mw_auth_key.go:124).
+	// Only applies to MCP proxies.
+	if m.Spec.IsMCP() && m.HookType != coprocess.HookType_CustomKeyCheck && httpctx.IsSelfLooping(r) {
+		return nil, http.StatusOK
+	}
+
+	errorCode, err := m.validateDriver()
+	if err != nil {
+		return err, errorCode
+	}
+
 	if m.HookType == coprocess.HookType_CustomKeyCheck {
 		if ctxGetRequestStatus(r) == StatusOkAndIgnore {
 			return nil, http.StatusOK
@@ -364,7 +359,7 @@ func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 	}
 
 	t1 := time.Now()
-	returnObject, err := coProcessor.Dispatch(object)
+	returnObject, err := coProcessor.Dispatch(r.Context(), object)
 	ms := DurationToMillisecond(time.Since(t1))
 
 	if err != nil {
@@ -444,7 +439,7 @@ func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 			ReadSeeker: strings.NewReader(returnObject.Request.ReturnOverrides.ResponseBody),
 		}
 		res.ContentLength = int64(len(returnObject.Request.ReturnOverrides.ResponseBody))
-		m.successHandler.RecordHit(r, analytics.Latency(analytics.Latency{Total: int64(ms)}), int(returnObject.Request.ReturnOverrides.ResponseCode), res, false)
+		m.successHandler.RecordHit(r, analytics.Latency{Total: int64(ms), Upstream: 0, Gateway: int64(ms)}, int(returnObject.Request.ReturnOverrides.ResponseCode), res, false)
 		return nil, middleware.StatusRespond
 	}
 
@@ -511,6 +506,38 @@ func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 	return nil, http.StatusOK
 }
 
+func (m *CoProcessMiddleware) validateDriver() (int, error) {
+	if !m.isDriverSupported() {
+		log.WithFields(logrus.Fields{
+			"prefix": "coprocess",
+		}).Errorf("Unsupported driver '%s'", m.Spec.CustomMiddleware.Driver)
+		respCode := http.StatusInternalServerError
+
+		return respCode, errors.New(http.StatusText(respCode))
+	}
+
+	if d := loadedDrivers[m.Spec.CustomMiddleware.Driver]; d == nil {
+		log.WithFields(logrus.Fields{
+			"prefix": "coprocess",
+		}).Errorf("Driver '%s' isn't loaded", m.Spec.CustomMiddleware.Driver)
+		respCode := http.StatusInternalServerError
+
+		return respCode, errors.New(http.StatusText(respCode))
+	}
+
+	return http.StatusOK, nil
+}
+
+func (m *CoProcessMiddleware) isDriverSupported() bool {
+	for _, driver := range supportedDrivers {
+		if m.Spec.CustomMiddleware.Driver == driver {
+			return true
+		}
+	}
+
+	return false
+}
+
 type CustomMiddlewareResponseHook struct {
 	BaseTykResponseHandler
 	mw *CoProcessMiddleware
@@ -567,7 +594,7 @@ func (h *CustomMiddlewareResponseHook) HandleResponse(rw http.ResponseWriter, re
 	}
 	object.Session = ProtoSessionState(ses)
 
-	retObject, err := coProcessor.Dispatch(object)
+	retObject, err := coProcessor.Dispatch(req.Context(), object)
 	if err != nil {
 		h.logger().WithError(err).Debug("Couldn't dispatch request object")
 		return errors.New("Middleware error")
@@ -650,13 +677,13 @@ func syncHeadersAndMultiValueHeaders(headers map[string]string, multiValueHeader
 	return updatedMultiValueHeaders
 }
 
-func (c *CoProcessor) Dispatch(object *coprocess.Object) (*coprocess.Object, error) {
+func (c *CoProcessor) Dispatch(ctx context.Context, object *coprocess.Object) (*coprocess.Object, error) {
 	dispatcher := loadedDrivers[c.Middleware.MiddlewareDriver]
 	if dispatcher == nil {
 		err := fmt.Errorf("Couldn't dispatch request, driver '%s' isn't available", c.Middleware.MiddlewareDriver)
 		return nil, err
 	}
-	newObject, err := dispatcher.Dispatch(object)
+	newObject, err := dispatcher.DispatchWithContext(ctx, object)
 	if err != nil {
 		return nil, err
 	}

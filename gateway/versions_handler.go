@@ -66,7 +66,7 @@ func (h *VersionsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			VersionName:      name,
 			Internal:         currentAPI.Internal,
 			ExpirationDate:   currentAPI.Expiration,
-			IsDefaultVersion: baseAPI.VersionDefinition.Default == name,
+			IsDefaultVersion: baseAPI.VersionDefinition.ResolvedDefault() == name,
 		})
 	}
 
@@ -81,7 +81,7 @@ func (h *VersionsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			VersionName:      baseAPI.VersionDefinition.Name,
 			Internal:         baseAPI.Internal,
 			ExpirationDate:   baseAPI.Expiration,
-			IsDefaultVersion: baseAPI.VersionDefinition.Default == baseAPI.VersionDefinition.Name,
+			IsDefaultVersion: baseAPI.VersionDefinition.ResolvedDefault() == baseAPI.VersionDefinition.Name,
 		}}, versionMetas.Metas...)
 	}
 

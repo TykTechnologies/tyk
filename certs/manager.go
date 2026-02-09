@@ -13,12 +13,15 @@ import (
 	"encoding/pem"
 	"errors"
 	"io/ioutil"
+	"strconv"
 	"strings"
 	"time"
 
 	"github.com/sirupsen/logrus"
 
+	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/internal/cache"
+	"github.com/TykTechnologies/tyk/internal/certusage"
 	tykcrypto "github.com/TykTechnologies/tyk/internal/crypto"
 	"github.com/TykTechnologies/tyk/storage"
 )
@@ -39,6 +42,10 @@ var (
 )
 
 //go:generate mockgen -destination=./mock/mock.go -package=mock . CertificateManager
+
+// UsageTracker is an alias for the certificate usage tracking interface.
+type UsageTracker = certusage.Tracker
+
 type CertificateManager interface {
 	List(certIDs []string, mode CertificateType) (out []*tls.Certificate)
 	ListPublicKeys(keyIDs []string) (out []string)
@@ -49,6 +56,7 @@ type CertificateManager interface {
 	Delete(certID string, orgID string)
 	CertPool(certIDs []string) *x509.CertPool
 	FlushCache()
+	SetUsageTracker(registry UsageTracker, cfg *config.Config)
 }
 
 type certificateManager struct {
@@ -57,6 +65,8 @@ type certificateManager struct {
 	cache           cache.Repository
 	secret          string
 	migrateCertList bool
+	registry        UsageTracker
+	selectiveSync   bool
 }
 
 func NewCertificateManager(storage storage.Handler, secret string, logger *logrus.Logger, migrateCertList bool) *certificateManager {
@@ -101,7 +111,7 @@ func NewSlaveCertManager(localStorage, rpcStorage storage.Handler, secret string
 		return err
 	}
 
-	mdcbStorage := storage.NewMdcbStorage(localStorage, rpcStorage, log, callbackOnPullCertFromRPC)
+	mdcbStorage := storage.NewMdcbStorage(localStorage, rpcStorage, log, callbackOnPullCertFromRPC, nil, nil)
 	cm.storage = mdcbStorage
 	return cm
 }
@@ -413,7 +423,7 @@ func (c *certificateManager) List(certIDs []string, mode CertificateType) (out [
 			continue
 		}
 
-		val, err := c.storage.GetKey("raw-" + id)
+		val, err := c.GetRaw(id)
 		// fallback to file
 		if err != nil {
 			// Try read from file
@@ -554,8 +564,39 @@ func (c *certificateManager) ListAllIds(prefix string) (out []string) {
 	return out
 }
 
+// MaskCertID truncates certificate IDs for logging to prevent information leakage.
+// Certificate IDs can be derived from API keys/auth tokens and should not be logged in clear text.
+// Returns first 8 characters plus length for debugging while protecting sensitive data.
+func MaskCertID(certID string) string {
+	if len(certID) <= 8 {
+		return certID
+	}
+	return certID[:8] + "***[len=" + strconv.Itoa(len(certID)) + "]"
+}
+
 func (c *certificateManager) GetRaw(certID string) (string, error) {
+	// Check registry before accessing storage when selective sync is enabled
+	if c.selectiveSync && c.registry != nil && !c.registry.Required(certID) {
+		c.logger.WithField("cert_id", MaskCertID(certID)).
+			Info("BLOCKED: certificate not required by loaded APIs")
+		return "", errors.New("certificate not required by loaded APIs")
+	}
 	return c.storage.GetKey("raw-" + certID)
+}
+
+// SetUsageTracker configures the certificate registry for selective sync
+func (c *certificateManager) SetUsageTracker(registry UsageTracker, cfg *config.Config) {
+	c.logger.Info("Setting certificate registry for selective sync")
+	c.registry = registry
+	c.selectiveSync = true
+
+	// Propagate to underlying MdcbStorage for storage-layer filtering
+	if mdcbStorage, ok := c.storage.(*storage.MdcbStorage); ok {
+		mdcbStorage.SetCertUsageConfig(registry, cfg)
+		c.logger.Info("Storage-layer certificate filtering enabled")
+	}
+
+	c.logger.WithField("selective_sync", c.selectiveSync).Info("Selective sync configured in CertificateManager")
 }
 
 func (c *certificateManager) Add(certData []byte, orgID string) (string, error) {
@@ -598,7 +639,7 @@ func (c *certificateManager) CertPool(certIDs []string) *x509.CertPool {
 
 	for _, cert := range c.List(certIDs, CertificatePublic) {
 		if cert != nil && !tykcrypto.IsPublicKey(cert) {
-			pool.AddCert(cert.Leaf)
+			tykcrypto.AddCACertificatesFromChainToPool(pool, cert)
 		}
 	}
 

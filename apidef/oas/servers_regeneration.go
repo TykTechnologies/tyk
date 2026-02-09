@@ -1,0 +1,550 @@
+package oas
+
+import (
+	"fmt"
+	"net/url"
+	"path"
+	"strings"
+
+	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/getkin/kin-openapi/openapi3"
+)
+
+// ServerRegenerationConfig holds the configuration required for server URL regeneration.
+type ServerRegenerationConfig struct {
+	// Protocol is the URL scheme (http:// or https://).
+	Protocol string
+	// DefaultHost is the default gateway host (e.g., "localhost:8080").
+	DefaultHost string
+	// EdgeEndpoints contains edge gateway configurations.
+	EdgeEndpoints []EdgeEndpoint
+	// HybridEnabled indicates if the gateway is in MDCB/hybrid mode.
+	HybridEnabled bool
+}
+
+// EdgeEndpoint represents an edge gateway endpoint configuration.
+type EdgeEndpoint struct {
+	// Endpoint is the edge gateway URL (e.g., "http://edge1.example.com").
+	Endpoint string
+	// Tags are the tags associated with this edge gateway.
+	Tags []string
+}
+
+// serverInfo holds information about a server URL to be added to OAS.
+type serverInfo struct {
+	url         string
+	description string
+}
+
+// RegenerateServers updates the servers section of an OAS API definition
+//  1. Computes old Tyk-generated servers from oldAPIData state (if provided)
+//  2. Removes old Tyk servers from the OAS spec
+//  3. Generates new Tyk servers based on newAPIData configuration
+//  4. Merges them: Tyk servers first, then user servers
+//  5. Deduplicates by normalized URL
+func (s *OAS) RegenerateServers(
+	newAPIData *apidef.APIDefinition,
+	oldAPIData *apidef.APIDefinition,
+	newBaseAPI *apidef.APIDefinition,
+	oldBaseAPI *apidef.APIDefinition,
+	config ServerRegenerationConfig,
+	versionName string,
+) error {
+	// Step 1: Compute old Tyk URLs from old state (regenerate what they were)
+	var oldTykURLs []string
+	if oldAPIData != nil {
+		oldServerInfos := generateTykServers(oldAPIData, oldBaseAPI, config, versionName)
+		oldTykURLs = make([]string, len(oldServerInfos))
+		for i, info := range oldServerInfos {
+			oldTykURLs[i] = info.url
+		}
+	}
+
+	// Step 2: Remove old Tyk-generated servers (preserves user-provided servers)
+	userServers := removeTykGeneratedURLs(s.Servers, oldTykURLs)
+
+	// Step 3: Generate new Tyk servers
+	tykServerInfos := generateTykServers(newAPIData, newBaseAPI, config, versionName)
+
+	// Step 4: Add Tyk servers first
+	tykURLs := make([]string, len(tykServerInfos))
+	for i, info := range tykServerInfos {
+		tykURLs[i] = info.url
+	}
+
+	// Start with empty servers, then add Tyk servers
+	s.Servers = openapi3.Servers{}
+	if err := s.AddServers(tykURLs...); err != nil {
+		return fmt.Errorf("failed to add Tyk servers: %w", err)
+	}
+
+	// Step 5: Add user servers back, deduplicating by normalized URL
+	existingURLs := make(map[string]bool)
+	for _, server := range s.Servers {
+		existingURLs[normalizeServerURL(server.URL)] = true
+	}
+
+	// Add user servers that don't conflict with Tyk servers
+	for _, userServer := range userServers {
+		normalized := normalizeServerURL(userServer.URL)
+		if !existingURLs[normalized] {
+			s.Servers = append(s.Servers, userServer)
+			existingURLs[normalized] = true
+		}
+	}
+
+	return nil
+}
+
+// GenerateTykServers generates and returns only Tyk-managed server URLs for an API.
+// This is a convenience method that generates servers without modifying the OAS spec.
+// Unlike RegenerateServers, this does not include user-defined servers and does not
+// modify the OAS servers array.
+func (s *OAS) GenerateTykServers(
+	apiData *apidef.APIDefinition,
+	baseAPI *apidef.APIDefinition,
+	config ServerRegenerationConfig,
+	versionName string,
+) []*openapi3.Server {
+	serverInfos := generateTykServers(apiData, baseAPI, config, versionName)
+
+	servers := make([]*openapi3.Server, len(serverInfos))
+	for i, info := range serverInfos {
+		servers[i] = &openapi3.Server{
+			URL:         info.url,
+			Description: info.description,
+		}
+	}
+
+	return servers
+}
+
+// generateTykServers generates all Tyk-managed server URLs for an API.
+func generateTykServers(
+	apiData *apidef.APIDefinition,
+	baseAPI *apidef.APIDefinition,
+	config ServerRegenerationConfig,
+	versionName string,
+) []serverInfo {
+	isChildAPI := apiData.IsChildAPI() ||
+		(baseAPI != nil && baseAPI.APIID != apiData.APIID && baseAPI.VersionDefinition.Enabled)
+
+	if isChildAPI {
+		return generateVersionedServers(apiData, baseAPI, config, versionName)
+	}
+
+	if apiData.IsBaseAPIWithVersioning() {
+		return generateVersionedServers(apiData, apiData, config, apiData.VersionDefinition.Name)
+	}
+
+	return generateStandardServers(apiData, config)
+}
+
+// generateStandardServers generates server URLs for non-versioned APIs.
+func generateStandardServers(apiData *apidef.APIDefinition, config ServerRegenerationConfig) []serverInfo {
+	hosts := determineHosts(apiData, config)
+	servers := make([]serverInfo, 0, len(hosts))
+
+	for _, host := range hosts {
+		serverURL := buildServerURL(config.Protocol, host, apiData.Proxy.ListenPath)
+		servers = append(servers, serverInfo{
+			url:         serverURL,
+			description: "",
+		})
+	}
+
+	return servers
+}
+
+// generateVersionedServers generates server URLs for versioned child APIs.
+// It builds URLs according to the base API's versioning method.
+func generateVersionedServers(
+	apiData *apidef.APIDefinition,
+	baseAPI *apidef.APIDefinition,
+	config ServerRegenerationConfig,
+	versionName string,
+) []serverInfo {
+	// Use provided base API or fallback to generating as standard API
+	if baseAPI == nil {
+		return generateStandardServers(apiData, config)
+	}
+
+	if versionName == "" {
+		for name, versionID := range baseAPI.VersionDefinition.Versions {
+			if versionID == apiData.APIID {
+				versionName = name
+				break
+			}
+		}
+
+		if versionName == "" {
+			return generateStandardServers(apiData, config)
+		}
+	}
+
+	versionLocation := baseAPI.VersionDefinition.Location
+	versionKey := baseAPI.VersionDefinition.Key
+	baseListenPath := baseAPI.Proxy.ListenPath
+
+	hosts := determineHosts(apiData, config)
+	servers := make([]serverInfo, 0, len(hosts)*2) // *2 for potential direct access URLs
+
+	isBaseAPI := apiData.APIID == baseAPI.APIID
+
+	// Add fallback URL only for the default version when fallback is enabled
+	shouldAddFallbackURL := baseAPI.VersionDefinition.FallbackToDefault &&
+		baseAPI.VersionDefinition.Default != "" &&
+		baseAPI.VersionDefinition.Location != "header" &&
+		(versionName == baseAPI.VersionDefinition.Default ||
+			(baseAPI.VersionDefinition.Default == apidef.Self && isBaseAPI))
+
+	// Always add versioned URLs
+	for _, host := range hosts {
+		versionedURL, description := buildVersionedServerURL(
+			config.Protocol, host, baseListenPath,
+			versionLocation, versionKey, versionName,
+		)
+
+		servers = append(servers, serverInfo{
+			url:         versionedURL,
+			description: description,
+		})
+	}
+
+	// Add fallback URL for the default version
+	if shouldAddFallbackURL {
+		for _, host := range hosts {
+			fallbackURL := buildServerURL(config.Protocol, host, baseListenPath)
+			servers = append(servers, serverInfo{
+				url:         fallbackURL,
+				description: "",
+			})
+		}
+	}
+
+	// External child APIs get direct access URLs
+	if !apiData.Internal && !isBaseAPI {
+		for _, host := range hosts {
+			directURL := buildServerURL(config.Protocol, host, apiData.Proxy.ListenPath)
+			servers = append(servers, serverInfo{
+				url:         directURL,
+				description: "",
+			})
+		}
+	}
+
+	return servers
+}
+
+// determineHosts determines which hosts to use for server URL generation.
+func determineHosts(apiData *apidef.APIDefinition, config ServerRegenerationConfig) []string {
+	if domain := apiData.GetAPIDomain(); domain != "" {
+		return []string{domain}
+	}
+
+	hosts := determineHostsWithEdgeSupport(apiData, config)
+	return appendRelativePathIfNotPresent(hosts)
+}
+
+// determineHostsWithEdgeSupport determines hosts based on edge endpoints and API tags.
+func determineHostsWithEdgeSupport(apiData *apidef.APIDefinition, config ServerRegenerationConfig) []string {
+	if apiData.TagsDisabled {
+		if config.HybridEnabled {
+			return []string{""}
+		}
+		return []string{config.DefaultHost}
+	}
+
+	if len(apiData.Tags) == 0 {
+		if config.HybridEnabled {
+			return []string{""}
+		}
+		return []string{config.DefaultHost}
+	}
+
+	if len(config.EdgeEndpoints) == 0 {
+		return []string{""}
+	}
+
+	matchingHosts := findEndpointsMatchingTags(apiData.Tags, config.EdgeEndpoints)
+	if len(matchingHosts) == 0 {
+		return []string{""}
+	}
+
+	return appendRelativePathIfNotPresent(matchingHosts)
+}
+
+// findEndpointsMatchingTags returns edge endpoint URLs with at least one matching tag.
+func findEndpointsMatchingTags(apiTags []string, edgeEndpoints []EdgeEndpoint) []string {
+	var matchingHosts []string
+
+	for _, endpoint := range edgeEndpoints {
+		if hasAnyTagMatch(apiTags, endpoint.Tags) {
+			matchingHosts = append(matchingHosts, endpoint.Endpoint)
+		}
+	}
+
+	return matchingHosts
+}
+
+// buildTagSet creates a map for O(1) tag lookups.
+func buildTagSet(tags []string) map[string]bool {
+	tagSet := make(map[string]bool, len(tags))
+	for _, tag := range tags {
+		tagSet[tag] = true
+	}
+	return tagSet
+}
+
+// hasAnyTagMatch returns true if any API tag matches any endpoint tag.
+func hasAnyTagMatch(apiTags []string, endpointTags []string) bool {
+	tagSet := buildTagSet(endpointTags)
+	for _, apiTag := range apiTags {
+		if tagSet[apiTag] {
+			return true
+		}
+	}
+	return false
+}
+
+// appendRelativePathIfNotPresent adds a relative path (empty string) if not present.
+func appendRelativePathIfNotPresent(hosts []string) []string {
+	for _, host := range hosts {
+		if host == "" {
+			return hosts
+		}
+	}
+	return append(hosts, "")
+}
+
+// buildServerURL constructs a server URL. Returns relative path if host is empty.
+func buildServerURL(protocol, host, listenPath string) string {
+	if !strings.HasPrefix(listenPath, "/") {
+		listenPath = "/" + listenPath
+	}
+
+	// Empty host means relative path - return just the listen path
+	if host == "" {
+		return path.Clean(listenPath)
+	}
+
+	host = strings.TrimSuffix(host, "/")
+
+	// Clean the path to remove double slashes
+	listenPath = path.Clean(listenPath)
+
+	// Check if host already has a protocol (e.g., from edge endpoints)
+	if strings.HasPrefix(host, "http://") || strings.HasPrefix(host, "https://") {
+		return host + listenPath
+	}
+
+	return protocol + host + listenPath
+}
+
+// buildVersionedServerURL constructs a server URL for a versioned API
+// based on the versioning method (URL path, query param, or header).
+func buildVersionedServerURL(
+	protocol, host, listenPath string,
+	versionLocation, versionKey, versionName string,
+) (string, string) {
+	baseURL := buildServerURL(protocol, host, listenPath)
+	var description string
+
+	switch versionLocation {
+	case "url":
+		fallthrough
+	default:
+		if !strings.HasSuffix(baseURL, "/") {
+			baseURL += "/"
+		}
+		baseURL += versionName
+
+	case "url-param":
+		baseURL += "?" + versionKey + "=" + versionName
+
+	case "header":
+		return baseURL, description
+	}
+
+	return baseURL, description
+}
+
+// removeTykGeneratedURLs removes Tyk-generated server URLs from the servers list.
+// It uses URL normalization for robust matching and preserves all other servers.
+func removeTykGeneratedURLs(servers openapi3.Servers, tykURLs []string) openapi3.Servers {
+	if len(servers) == 0 || len(tykURLs) == 0 {
+		return servers
+	}
+
+	// Build a map of normalized Tyk URLs for fast lookup
+	tykURLMap := make(map[string]bool, len(tykURLs))
+	for _, tykURL := range tykURLs {
+		normalized := normalizeServerURL(tykURL)
+		tykURLMap[normalized] = true
+	}
+
+	// Keep only servers that aren't in the Tyk URL list
+	userServers := make(openapi3.Servers, 0, len(servers))
+	for _, server := range servers {
+		normalized := normalizeServerURL(server.URL)
+		if !tykURLMap[normalized] {
+			userServers = append(userServers, server)
+		}
+	}
+
+	return userServers
+}
+
+// normalizeServerURL normalizes a server URL for comparison.
+// This handles trailing slashes, double slashes, and other URL inconsistencies.
+func normalizeServerURL(rawURL string) string {
+	u, err := url.Parse(rawURL)
+	if err != nil {
+		// If we can't parse it, try basic string normalization
+		return strings.TrimSuffix(rawURL, "/")
+	}
+
+	// Clean and normalize the path
+	u.Path = strings.TrimSuffix(path.Clean(u.Path), "/")
+	if u.Path == "" || u.Path == "." {
+		u.Path = "/"
+	}
+
+	return u.String()
+}
+
+// containsString checks if a string slice contains a specific string.
+func containsString(slice []string, item string) bool {
+	for _, s := range slice {
+		if s == item {
+			return true
+		}
+	}
+	return false
+}
+
+// ShouldUpdateChildAPIs checks if child APIs need server updates after a base API change.
+//
+// Configuration changes that trigger child API updates:
+// - Versioning method changed (url/url-param/header)
+// - Versioning key changed (parameter/header name)
+// - Base API's listen path changed
+// - FallbackToDefault setting changed (affects fallback URL generation)
+// - Default version changed (affects which child is the default)
+func ShouldUpdateChildAPIs(newAPI, oldAPI *apidef.APIDefinition) bool {
+	if newAPI == nil {
+		return false
+	}
+
+	if !newAPI.IsBaseAPI() {
+		return false
+	}
+
+	// If oldAPI is nil, this is a new API, no children exist yet
+	if oldAPI == nil {
+		return false
+	}
+
+	// 1. Versioning method changed (url/url-param/header)
+	if oldAPI.VersionDefinition.Location != newAPI.VersionDefinition.Location {
+		return true
+	}
+
+	// 2. Versioning key changed (parameter/header name)
+	if oldAPI.VersionDefinition.Key != newAPI.VersionDefinition.Key {
+		return true
+	}
+
+	// 3. Base API's listen path changed (child versioned URLs use base's path)
+	if oldAPI.Proxy.ListenPath != newAPI.Proxy.ListenPath {
+		return true
+	}
+
+	// 4. FallbackToDefault changed - affects which child APIs get fallback URLs
+	if oldAPI.VersionDefinition.FallbackToDefault != newAPI.VersionDefinition.FallbackToDefault {
+		return true
+	}
+
+	// 5. Default version changed - affects which child API is the "default"
+	if oldAPI.VersionDefinition.Default != newAPI.VersionDefinition.Default {
+		return true
+	}
+
+	return false
+}
+
+// ShouldUpdateOldDefaultChild determines if the old default child API needs server regeneration
+// when creating a new child version with set_default=true. This is necessary to remove the
+// fallback URL from the old default child since it's no longer the default.
+//
+// Returns true when:
+// - A new version is being set as default (setDefault=true)
+// - There was a previous default version
+// - The default version actually changed
+// - The old default wasn't the base API itself ("Self")
+func ShouldUpdateOldDefaultChild(
+	setDefault bool,
+	oldDefaultVersion string,
+	newDefaultVersion string,
+) bool {
+	// Only update if set_default=true was explicitly passed
+	if !setDefault {
+		return false
+	}
+
+	// Only update if there was a previous default
+	if oldDefaultVersion == "" {
+		return false
+	}
+
+	// Only update if the default actually changed
+	if oldDefaultVersion == newDefaultVersion {
+		return false
+	}
+
+	// Don't try to update if the old default was the base API itself (special case)
+	if oldDefaultVersion == apidef.Self {
+		return false
+	}
+
+	return true
+}
+
+// ExtractUserServers extracts user provided servers from an existing OAS API
+// by regenerating what the Tyk servers should be and filtering them out.
+func ExtractUserServers(
+	existingServers openapi3.Servers,
+	apiDef *apidef.APIDefinition,
+	baseAPI *apidef.APIDefinition,
+	config ServerRegenerationConfig,
+	versionName string,
+) (openapi3.Servers, error) {
+	if len(existingServers) == 0 {
+		return openapi3.Servers{}, nil
+	}
+
+	tempOAS := &OAS{T: openapi3.T{Servers: openapi3.Servers{}}}
+
+	err := tempOAS.RegenerateServers(apiDef, nil, baseAPI, nil, config, versionName)
+	if err != nil {
+		return nil, fmt.Errorf("failed to regenerate servers for user server extraction: %w", err)
+	}
+
+	// Build a map of normalized Tyk URLs for fast lookup
+	tykURLMap := make(map[string]bool, len(tempOAS.Servers))
+	for _, server := range tempOAS.Servers {
+		normalized := normalizeServerURL(server.URL)
+		tykURLMap[normalized] = true
+	}
+
+	// Filter existing servers to keep only user provided ones and not Tyk generated
+	userServers := make(openapi3.Servers, 0, len(existingServers))
+	for _, server := range existingServers {
+		normalized := normalizeServerURL(server.URL)
+		if !tykURLMap[normalized] {
+			userServers = append(userServers, server)
+		}
+	}
+
+	return userServers, nil
+}

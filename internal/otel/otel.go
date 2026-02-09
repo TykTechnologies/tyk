@@ -54,9 +54,13 @@ func InitOpenTelemetry(ctx context.Context, logger *logrus.Logger, gwConfig *Ope
 	useRPC bool, groupID string, isSegmented bool, segmentTags []string) TracerProvider {
 
 	traceLogger := logger.WithFields(logrus.Fields{
-		"exporter":           gwConfig.Exporter,
-		"endpoint":           gwConfig.Endpoint,
-		"connection_timeout": gwConfig.ConnectionTimeout,
+		"exporter":              gwConfig.Exporter,
+		"endpoint":              gwConfig.Endpoint,
+		"connection_timeout":    gwConfig.ConnectionTimeout,
+		"span_processor_type":   gwConfig.SpanProcessorType,
+		"max_queue_size":        gwConfig.SpanBatchConfig.MaxQueueSize,
+		"max_export_batch_size": gwConfig.SpanBatchConfig.MaxExportBatchSize,
+		"batch_timeout":         gwConfig.SpanBatchConfig.BatchTimeout,
 	})
 
 	provider, errOtel := tyktrace.NewProvider(
@@ -147,6 +151,20 @@ func ExtractTraceID(ctx context.Context) string {
 		return span.SpanContext().TraceID().String()
 	}
 	return ""
+}
+
+// ExtractTraceAndSpanID extracts both trace ID and span ID from the context.
+// Returns empty strings if no valid span context exists.
+func ExtractTraceAndSpanID(ctx context.Context) (traceID, spanID string) {
+	span := SpanFromContext(ctx)
+	spanCtx := span.SpanContext()
+
+	if spanCtx.IsValid() {
+		traceID = spanCtx.TraceID().String()
+		spanID = spanCtx.SpanID().String()
+	}
+
+	return traceID, spanID
 }
 
 func addTraceIDToResponseHeader(w http.ResponseWriter, traceID string) {

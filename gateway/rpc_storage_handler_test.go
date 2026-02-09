@@ -1,6 +1,7 @@
 package gateway
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -524,6 +525,11 @@ func TestRPCStorageHandler_BuildNodeInfo(t *testing.T) {
 				}
 			}
 
+			// Populate LoadedAPIs and LoadedPolicies from actual Gateway state
+			// since policy IDs are auto-generated and cannot be predicted
+			tc.expectedNodeInfo.Stats.LoadedAPIs = ts.Gw.GetLoadedAPIIDs()
+			tc.expectedNodeInfo.Stats.LoadedPolicies = ts.Gw.GetLoadedPolicyIDs()
+
 			expected, err := json.Marshal(tc.expectedNodeInfo)
 			assert.Nil(t, err)
 
@@ -545,6 +551,58 @@ func TestRPCStorageHandler_Disconnect(t *testing.T) {
 		expectedErr := errors.New("RPCStorageHandler: rpc is either down or was not configured")
 		assert.EqualError(t, err, expectedErr.Error())
 	})
+}
+
+func TestRPCStorageHandler_BuildNodeInfo_LoadedResources(t *testing.T) {
+	ts := StartTest(func(globalConf *config.Config) {
+		globalConf.SlaveOptions.GroupID = "group"
+		globalConf.DBAppConfOptions.Tags = []string{"tag1"}
+		globalConf.LivenessCheck.CheckDuration = 1000000000
+	})
+	defer ts.Close()
+
+	ts.Gw.BuildAndLoadAPI(
+		func(spec *APISpec) {
+			spec.APIID = "api-001"
+			spec.UseKeylessAccess = true
+			spec.OrgID = "default"
+			spec.Proxy.ListenPath = "/api1/"
+		},
+		func(spec *APISpec) {
+			spec.APIID = "api-002"
+			spec.UseKeylessAccess = true
+			spec.OrgID = "default"
+			spec.Proxy.ListenPath = "/api2/"
+		},
+	)
+
+	ts.CreatePolicy(func(p *user.Policy) {
+		p.ID = "policy-001"
+	})
+
+	r := &RPCStorageHandler{Gw: ts.Gw}
+	result := r.buildNodeInfo()
+
+	var actualNodeInfo model.NodeData
+	err := json.Unmarshal(result, &actualNodeInfo)
+	assert.NoError(t, err)
+
+	// Verify counts
+	assert.Equal(t, 2, actualNodeInfo.Stats.APIsCount)
+	assert.Equal(t, 1, actualNodeInfo.Stats.PoliciesCount)
+
+	// Verify LoadedAPIs
+	assert.Len(t, actualNodeInfo.Stats.LoadedAPIs, 2)
+	apiIDs := make(map[string]bool)
+	for _, api := range actualNodeInfo.Stats.LoadedAPIs {
+		apiIDs[api.APIID] = true
+	}
+	assert.True(t, apiIDs["api-001"], "Expected API ID api-001 not found")
+	assert.True(t, apiIDs["api-002"], "Expected API ID api-002 not found")
+
+	// Verify LoadedPolicies
+	assert.Len(t, actualNodeInfo.Stats.LoadedPolicies, 1)
+	assert.Equal(t, "policy-001", actualNodeInfo.Stats.LoadedPolicies[0].PolicyID)
 }
 
 func TestGetRawKey(t *testing.T) {
@@ -780,6 +838,206 @@ func TestProcessKeySpaceChanges_UserKeyReset(t *testing.T) {
 	}
 }
 
+func TestGetApiDefinitions_Fails_With_Timeout(t *testing.T) {
+	wait := make(chan struct{})
+	defer func() {
+		close(wait)
+	}()
+
+	dispatcher := gorpc.NewDispatcher()
+	dispatcher.AddFunc("Login", func(_, _ string) bool {
+		return true
+	})
+	dispatcher.AddFunc("Disconnect", func(_ string, _ *model.GroupLoginRequest) error {
+		return nil
+	})
+	dispatcher.AddFunc("GetApiDefinitions", func(_ string, _ interface{}) (string, error) {
+		<-wait // wait until the defer method is called
+		return "sample-response", nil
+	})
+
+	rpcMock, connectionString := startRPCMock(dispatcher)
+	defer stopRPCMock(rpcMock)
+
+	g := StartTest(func(globalConf *config.Config) {
+		globalConf.SlaveOptions.UseRPC = true
+		globalConf.SlaveOptions.RPCKey = "test_org"
+		globalConf.SlaveOptions.APIKey = "key"
+		globalConf.SlaveOptions.ConnectionString = connectionString
+		globalConf.SlaveOptions.CallTimeout = 1
+		globalConf.SlaveOptions.RPCPoolSize = 2
+		globalConf.SlaveOptions.DisableKeySpaceSync = true
+	})
+	g.Gw.afterConfSetup() // sets SlaveOptions.CallTimeout to GlobalRPCCallTimeout
+
+	defer g.Close()
+
+	time.Sleep(100 * time.Millisecond)
+
+	rpcListener := RPCStorageHandler{
+		KeyPrefix:        "rpc.listener.",
+		SuppressRegister: true,
+		HashKeys:         false,
+		Gw:               g.Gw,
+	}
+
+	connected := rpcListener.Connect()
+	if !connected {
+		t.Fatal("Failed to connect to RPC server")
+	}
+	// GetApiDefinitions calls rpc.FuncClientSingleton with a backoff algorithm.
+	// The algorithm tries to call the RPC method 3 times with a 10-millisecond interval.
+	// So the "GetApiDefinitions" method will be called 4 times, including the first try.
+	// It should return an empty string instead of "sample-response".
+	assert.Equal(t, "", rpcListener.GetApiDefinitions("test_org", nil))
+}
+
+func TestGetApiDefinitions(t *testing.T) {
+	var GetApiDefinitionsResponse = "sample-response"
+
+	dispatcher := gorpc.NewDispatcher()
+	dispatcher.AddFunc("Login", func(_, _ string) bool {
+		return true
+	})
+	dispatcher.AddFunc("Disconnect", func(_ string, _ *model.GroupLoginRequest) error {
+		return nil
+	})
+	dispatcher.AddFunc("GetApiDefinitions", func(_ string, _ interface{}) (string, error) {
+		return GetApiDefinitionsResponse, nil
+	})
+
+	rpcMock, connectionString := startRPCMock(dispatcher)
+	defer stopRPCMock(rpcMock)
+
+	g := StartTest(func(globalConf *config.Config) {
+		globalConf.SlaveOptions.UseRPC = true
+		globalConf.SlaveOptions.RPCKey = "test_org"
+		globalConf.SlaveOptions.APIKey = "key"
+		globalConf.SlaveOptions.ConnectionString = connectionString
+		globalConf.SlaveOptions.CallTimeout = 1
+		globalConf.SlaveOptions.RPCPoolSize = 2
+		globalConf.SlaveOptions.DisableKeySpaceSync = true
+	})
+	g.Gw.afterConfSetup() // sets SlaveOptions.CallTimeout to GlobalRPCCallTimeout
+
+	defer g.Close()
+
+	time.Sleep(100 * time.Millisecond)
+
+	rpcListener := RPCStorageHandler{
+		KeyPrefix:        "rpc.listener.",
+		SuppressRegister: true,
+		HashKeys:         false,
+		Gw:               g.Gw,
+	}
+
+	connected := rpcListener.Connect()
+	if !connected {
+		t.Fatal("Failed to connect to RPC server")
+	}
+	assert.Equal(t, GetApiDefinitionsResponse, rpcListener.GetApiDefinitions("test_org", nil))
+}
+
+func TestGetPolicies(t *testing.T) {
+	var GetPoliciesResponse = "sample-response"
+
+	dispatcher := gorpc.NewDispatcher()
+	dispatcher.AddFunc("Login", func(_, _ string) bool {
+		return true
+	})
+	dispatcher.AddFunc("Disconnect", func(_ string, _ *model.GroupLoginRequest) error {
+		return nil
+	})
+	dispatcher.AddFunc("GetPolicies", func(_ string, _ interface{}) (string, error) {
+		return GetPoliciesResponse, nil
+	})
+
+	rpcMock, connectionString := startRPCMock(dispatcher)
+	defer stopRPCMock(rpcMock)
+
+	g := StartTest(func(globalConf *config.Config) {
+		globalConf.SlaveOptions.UseRPC = true
+		globalConf.SlaveOptions.RPCKey = "test_org"
+		globalConf.SlaveOptions.APIKey = "key"
+		globalConf.SlaveOptions.ConnectionString = connectionString
+		globalConf.SlaveOptions.CallTimeout = 1
+		globalConf.SlaveOptions.RPCPoolSize = 2
+		globalConf.SlaveOptions.DisableKeySpaceSync = true
+	})
+	g.Gw.afterConfSetup() // sets SlaveOptions.CallTimeout to GlobalRPCCallTimeout
+
+	defer g.Close()
+
+	time.Sleep(100 * time.Millisecond)
+
+	rpcListener := RPCStorageHandler{
+		KeyPrefix:        "rpc.listener.",
+		SuppressRegister: true,
+		HashKeys:         false,
+		Gw:               g.Gw,
+	}
+
+	connected := rpcListener.Connect()
+	if !connected {
+		t.Fatal("Failed to connect to RPC server")
+	}
+	assert.Equal(t, GetPoliciesResponse, rpcListener.GetPolicies("test_org"))
+}
+
+func TestGetPolicies_Fails_With_Timeout(t *testing.T) {
+	wait := make(chan struct{})
+	defer func() {
+		close(wait)
+	}()
+
+	dispatcher := gorpc.NewDispatcher()
+	dispatcher.AddFunc("Login", func(_, _ string) bool {
+		return true
+	})
+	dispatcher.AddFunc("Disconnect", func(_ string, _ *model.GroupLoginRequest) error {
+		return nil
+	})
+	dispatcher.AddFunc("GetPolicies", func(_ string, _ interface{}) (string, error) {
+		<-wait // wait until the defer method is called
+		return "sample-response", nil
+	})
+
+	rpcMock, connectionString := startRPCMock(dispatcher)
+	defer stopRPCMock(rpcMock)
+
+	g := StartTest(func(globalConf *config.Config) {
+		globalConf.SlaveOptions.UseRPC = true
+		globalConf.SlaveOptions.RPCKey = "test_org"
+		globalConf.SlaveOptions.APIKey = "key"
+		globalConf.SlaveOptions.ConnectionString = connectionString
+		globalConf.SlaveOptions.CallTimeout = 1
+		globalConf.SlaveOptions.RPCPoolSize = 2
+		globalConf.SlaveOptions.DisableKeySpaceSync = true
+	})
+	g.Gw.afterConfSetup() // sets SlaveOptions.CallTimeout to GlobalRPCCallTimeout
+
+	defer g.Close()
+
+	time.Sleep(100 * time.Millisecond)
+
+	rpcListener := RPCStorageHandler{
+		KeyPrefix:        "rpc.listener.",
+		SuppressRegister: true,
+		HashKeys:         false,
+		Gw:               g.Gw,
+	}
+
+	connected := rpcListener.Connect()
+	if !connected {
+		t.Fatal("Failed to connect to RPC server")
+	}
+	// GetPolicies calls rpc.FuncClientSingleton with a backoff algorithm.
+	// The algorithm tries to call the RPC method 3 times with a 10-millisecond interval.
+	// So the "GetPolicies" method will be called 4 times, including the first try.
+	// It should return an empty string instead of "sample-response".
+	assert.Equal(t, "", rpcListener.GetPolicies("test_org"))
+}
+
 func TestIsRetriableError(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
@@ -813,4 +1071,31 @@ func TestIsRetriableError(t *testing.T) {
 			assert.Equal(t, tc.expected, result, "IsRetriableError(%v) should return %v", tc.err, tc.expected)
 		})
 	}
+}
+
+// TestSelectiveCertificateSync_Config tests the configuration for selective certificate sync
+func TestSelectiveCertificateSync_Config(t *testing.T) {
+	t.Run("config flag SyncUsedCertsOnly", func(t *testing.T) {
+		globalConf := config.Config{}
+		globalConf.SlaveOptions.UseRPC = true
+		globalConf.SlaveOptions.SyncUsedCertsOnly = true
+
+		assert.True(t, globalConf.SlaveOptions.UseRPC)
+		assert.True(t, globalConf.SlaveOptions.SyncUsedCertsOnly)
+	})
+
+	t.Run("certUsageTracker initialized only in RPC mode", func(t *testing.T) {
+		// Non-RPC mode
+		conf1 := config.Config{}
+		conf1.SlaveOptions.UseRPC = false
+		ctx := context.Background()
+		gw1 := NewGateway(conf1, ctx)
+		assert.Nil(t, gw1.certUsageTracker, "certUsageTracker should be nil in non-RPC mode")
+
+		// RPC mode
+		conf2 := config.Config{}
+		conf2.SlaveOptions.UseRPC = true
+		gw2 := NewGateway(conf2, ctx)
+		assert.NotNil(t, gw2.certUsageTracker, "certUsageTracker should be initialized in RPC mode")
+	})
 }

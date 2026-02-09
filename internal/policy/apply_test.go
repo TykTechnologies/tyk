@@ -12,6 +12,8 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/TykTechnologies/graphql-go-tools/pkg/graphql"
+
+	"github.com/TykTechnologies/tyk/internal/model"
 	"github.com/TykTechnologies/tyk/internal/policy"
 	"github.com/TykTechnologies/tyk/user"
 )
@@ -119,7 +121,7 @@ func TestApplyRateLimits_PolicyLimits(t *testing.T) {
 }
 
 func TestApplyRateLimits_FromCustomPolicies(t *testing.T) {
-	svc := &policy.Service{}
+	svc := policy.New(nil, nil, logrus.StandardLogger())
 
 	session := &user.SessionState{}
 	session.SetCustomPolicies([]user.Policy{
@@ -147,7 +149,7 @@ func TestApplyRateLimits_FromCustomPolicies(t *testing.T) {
 }
 
 func TestApplyACL_FromCustomPolicies(t *testing.T) {
-	svc := &policy.Service{}
+	svc := policy.New(nil, nil, logrus.StandardLogger())
 
 	pol1 := user.Policy{
 		ID:         "pol1",
@@ -505,6 +507,17 @@ func testPrepareApplyPolicies(tb testing.TB) (*policy.Service, []testApplyPolici
 
 	inactiveTCs := []testApplyPoliciesData{
 		{
+			"InactiveNoPolicies", []string{},
+			"", func(t *testing.T, s *user.SessionState) {
+				t.Helper()
+				if !s.IsInactive {
+					t.Fatalf("key without policies should preserve IsInactive=true from session")
+				}
+			}, &user.SessionState{
+				IsInactive: true,
+			}, false,
+		},
+		{
 			"InactiveMergeOne", []string{"tags1", "inactive1"},
 			"", func(t *testing.T, s *user.SessionState) {
 				t.Helper()
@@ -526,8 +539,8 @@ func testPrepareApplyPolicies(tb testing.TB) (*policy.Service, []testApplyPolici
 			"InactiveWithSession", []string{"tags1", "tags2"},
 			"", func(t *testing.T, s *user.SessionState) {
 				t.Helper()
-				if !s.IsInactive {
-					t.Fatalf("want IsInactive to be true")
+				if s.IsInactive {
+					t.Fatalf("both policies are active so we expect IsInactive to be false")
 				}
 			}, &user.SessionState{
 				IsInactive: true,
@@ -742,7 +755,7 @@ func testPrepareApplyPolicies(tb testing.TB) (*policy.Service, []testApplyPolici
 					},
 				}
 
-				gotPolicy, ok := store.PolicyByID("per-path2")
+				gotPolicy, ok := store.PolicyByID(model.NewScopedCustomPolicyId(orgID, "per-path2"))
 
 				assert.True(t, ok)
 				assert.Equal(t, user.AccessSpec{
@@ -1291,7 +1304,12 @@ func TestService_Apply(t *testing.T) {
 				}
 				sess.SetPolicies(policies...)
 				if err := service.Apply(sess); err != nil {
-					assert.ErrorContains(t, err, tc.errMatch)
+					if tc.errMatch != "" {
+						assert.ErrorContains(t, err, tc.errMatch)
+					} else {
+						t.Fail()
+					}
+
 					return
 				}
 

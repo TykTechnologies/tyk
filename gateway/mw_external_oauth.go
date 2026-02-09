@@ -22,7 +22,6 @@ import (
 )
 
 var (
-	externalOAuthJWKCache           cache.Repository = cache.New(240, 30)
 	externalOAuthIntrospectionCache *introspectionCache
 	ErrTokenValidationFailed        = errors.New("error happened during the access token validation")
 	ErrKIDNotAString                = errors.New("kid is not a string")
@@ -172,7 +171,7 @@ func (k *ExternalOAuthMiddleware) getSecretFromJWKURL(url string, kid interface{
 		err    error
 	)
 
-	cachedJWK, found := externalOAuthJWKCache.Get(k.Spec.APIID)
+	cachedJWK, found := k.Gw.jwkCache.Get(k.Spec.APIID)
 	if !found {
 		// Create HTTP client using factory for OAuth service
 		clientFactory := NewExternalHTTPClientFactory(k.Gw)
@@ -182,17 +181,19 @@ func (k *ExternalOAuthMiddleware) getSecretFromJWKURL(url string, kid interface{
 			// Fallback to original method if client factory fails
 			k.Logger().Debug("[ExternalServices] Falling back to legacy JWK client due to factory error")
 			if jwkSet, err = getJWK(url, k.Gw.GetConfig().JWTSSLInsecureSkipVerify); err != nil {
+				k.Gw.logJWKError(k.Logger(), url, err)
 				return nil, err
 			}
 		} else {
 			k.Logger().Debugf("[ExternalServices] Using external services JWK client to fetch: %s", url)
 			if jwkSet, err = getJWKWithClient(url, client); err != nil {
+				k.Gw.logJWKError(k.Logger(), url, err)
 				return nil, err
 			}
 		}
 
 		k.Logger().Debug("Caching JWK")
-		externalOAuthJWKCache.Set(k.Spec.APIID, jwkSet, cache.DefaultExpiration)
+		k.Gw.jwkCache.Set(k.Spec.APIID, jwkSet, cache.DefaultExpiration)
 	} else {
 		jwkSet = cachedJWK.(*jose.JSONWebKeySet)
 	}
@@ -215,6 +216,7 @@ func (k *ExternalOAuthMiddleware) getSecretFromJWKOrConfig(kid interface{}, jwtV
 
 	decodedSource, err := base64.StdEncoding.DecodeString(jwtValidation.Source)
 	if err != nil {
+		k.Logger().WithError(err).Errorf("JWKS source decode failed: %s is not a base64 string", jwtValidation.Source)
 		return nil, err
 	}
 

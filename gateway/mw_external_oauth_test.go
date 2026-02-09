@@ -10,6 +10,8 @@ import (
 	"time"
 
 	"github.com/golang-jwt/jwt/v4"
+	"github.com/sirupsen/logrus"
+	logrustest "github.com/sirupsen/logrus/hooks/test"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/TykTechnologies/tyk/apidef"
@@ -217,18 +219,13 @@ func TestExternalOAuth_JWT(t *testing.T) {
 		})
 
 		authHeaders := map[string]string{"authorization": jwtToken}
-		flush := func() {
-			if externalOAuthJWKCache != nil {
-				externalOAuthJWKCache.Flush()
-			}
-		}
 
 		t.Run("Direct JWK URL", func(t *testing.T) {
 			t.Run("valid jwk url", func(t *testing.T) {
 				spec.ExternalOAuth.Providers[0].JWT.Source = testHttpJWK
 				_ = ts.Gw.LoadAPI(spec)
 				t.Run("empty cache", func(t *testing.T) {
-					flush()
+					ts.Gw.jwkCache.Flush()
 					_, _ = ts.Run(t, test.TestCase{
 						Headers: authHeaders, Code: http.StatusOK,
 					})
@@ -417,4 +414,51 @@ func Test_isExpired(t *testing.T) {
 
 	assert.False(t, isExpired(claimsBuilder(10*time.Minute)))
 	assert.True(t, isExpired(claimsBuilder(-10*time.Minute)))
+}
+
+func TestGetSecretFromJWKURL_FetchError_LogsError(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	ts.Gw.jwkCache.Flush()
+
+	logger, hook := logrustest.NewNullLogger()
+
+	tsServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		_, err := w.Write([]byte("invalid-json-content"))
+		assert.NoError(t, err)
+	}))
+	defer tsServer.Close()
+
+	spec := BuildAPI(func(spec *APISpec) {
+		spec.ExternalOAuth = apidef.ExternalOAuth{
+			Enabled: true,
+			Providers: []apidef.Provider{
+				{
+					JWT: apidef.JWTValidation{
+						Enabled:           true,
+						IdentityBaseField: "user_id",
+						SigningMethod:     RSASign,
+						Source:            tsServer.URL,
+					},
+				},
+			},
+		}
+	})[0]
+
+	baseMw := &BaseMiddleware{Gw: ts.Gw, Spec: spec}
+	baseMw.logger = logger.WithField("mw", "ExternalOAuthMiddleware")
+	k := ExternalOAuthMiddleware{BaseMiddleware: baseMw}
+
+	t.Run("Standard fetch failure triggers logJWKError", func(t *testing.T) {
+		_, err := k.getSecretFromJWKOrConfig("any-kid", spec.ExternalOAuth.Providers[0].JWT)
+		assert.Error(t, err)
+
+		assert.NotEmpty(t, hook.Entries, "Expected a log entry but found none")
+		lastLog := hook.LastEntry()
+		assert.Equal(t, logrus.ErrorLevel, lastLog.Level)
+		assert.Contains(t, lastLog.Message, "Invalid JWKS retrieved from endpoint")
+		assert.Contains(t, lastLog.Message, tsServer.URL)
+	})
 }

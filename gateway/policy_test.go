@@ -11,16 +11,15 @@ import (
 	"testing"
 	"time"
 
-	persistentmodel "github.com/TykTechnologies/storage/persistent/model"
-
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/header"
+	"github.com/TykTechnologies/tyk/internal/model"
+	"github.com/TykTechnologies/tyk/internal/uuid"
 	"github.com/TykTechnologies/tyk/test"
 	"github.com/TykTechnologies/tyk/user"
-
-	"github.com/TykTechnologies/tyk/internal/uuid"
 )
 
 func TestLoadPoliciesFromDashboardReLogin(t *testing.T) {
@@ -39,8 +38,7 @@ func TestLoadPoliciesFromDashboardReLogin(t *testing.T) {
 	// Reset the global dashboard client to ensure test isolation
 	g.Gw.resetDashboardClient()
 
-	allowExplicitPolicyID := g.Gw.GetConfig().Policies.AllowExplicitPolicyID
-	policyMap, err := g.Gw.LoadPoliciesFromDashboard(ts.URL, "", allowExplicitPolicyID)
+	policyMap, err := g.Gw.LoadPoliciesFromDashboard(ts.URL, "")
 
 	assert.Error(t, ErrPoliciesFetchFailed, err)
 	assert.Empty(t, policyMap)
@@ -50,7 +48,6 @@ func TestApplyPoliciesQuotaAPILimit(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
 
-	ts.Gw.policiesMu.RLock()
 	policy := user.Policy{
 		ID:               "two_of_three_with_api_limit",
 		Per:              1,
@@ -92,10 +89,7 @@ func TestApplyPoliciesQuotaAPILimit(t *testing.T) {
 			},
 		},
 	}
-	ts.Gw.policiesByID = map[string]user.Policy{
-		"two_of_three_with_api_limit": policy,
-	}
-	ts.Gw.policiesMu.RUnlock()
+	ts.Gw.policies.Reload(policy)
 
 	// load APIs
 	ts.Gw.BuildAndLoadAPI(
@@ -337,12 +331,7 @@ func TestApplyMultiPolicies(t *testing.T) {
 
 	assert.True(t, !policy2.APILimit().IsEmpty())
 
-	ts.Gw.policiesMu.Lock()
-	ts.Gw.policiesByID = map[string]user.Policy{
-		"policy1": policy1,
-		"policy2": policy2,
-	}
-	ts.Gw.policiesMu.Unlock()
+	ts.Gw.policies.Reload(policy1, policy2)
 
 	// load APIs
 	ts.Gw.BuildAndLoadAPI(
@@ -427,7 +416,8 @@ func TestApplyMultiPolicies(t *testing.T) {
 				Code:      http.StatusOK,
 				BodyMatchFunc: func(data []byte) bool {
 					sessionData := user.SessionState{}
-					json.Unmarshal(data, &sessionData)
+					err := json.Unmarshal(data, &sessionData)
+					assert.NoError(t, err)
 
 					policy1Expected := user.APILimit{
 						RateLimit: user.RateLimit{
@@ -503,15 +493,10 @@ func TestApplyMultiPolicies(t *testing.T) {
 		}...)
 	})
 
-	ts.Gw.policiesMu.RLock()
 	policy1.Rate = 1
 	policy1.LastUpdated = strconv.Itoa(int(time.Now().Unix() + 1))
 
-	ts.Gw.policiesByID = map[string]user.Policy{
-		"policy1": policy1,
-		"policy2": policy2,
-	}
-	ts.Gw.policiesMu.RUnlock()
+	ts.Gw.policies.Reload(policy1, policy2)
 
 	// Rate limits after policy update
 	t.Run("Rate limits after policy update", func(t *testing.T) {
@@ -527,7 +512,6 @@ func TestPerAPIPolicyUpdate(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
 
-	ts.Gw.policiesMu.RLock()
 	policy := user.Policy{
 		ID:    "per_api_policy_with_two_apis",
 		OrgID: "default",
@@ -546,10 +530,8 @@ func TestPerAPIPolicyUpdate(t *testing.T) {
 			},
 		},
 	}
-	ts.Gw.policiesByID = map[string]user.Policy{
-		"per_api_policy_with_two_apis": policy,
-	}
-	ts.Gw.policiesMu.RUnlock()
+
+	ts.Gw.policies.Reload(policy)
 
 	// load APIs
 	ts.Gw.BuildAndLoadAPI(
@@ -621,8 +603,6 @@ func TestPerAPIPolicyUpdate(t *testing.T) {
 		},
 	}...)
 
-	//Update policy
-	ts.Gw.policiesMu.RLock()
 	policy = user.Policy{
 		ID:    "per_api_policy_with_two_apis",
 		OrgID: "default",
@@ -638,10 +618,7 @@ func TestPerAPIPolicyUpdate(t *testing.T) {
 			},
 		},
 	}
-	ts.Gw.policiesByID = map[string]user.Policy{
-		"per_api_policy_with_two_apis": policy,
-	}
-	ts.Gw.policiesMu.RUnlock()
+	ts.Gw.policies.Reload(policy)
 
 	ts.Run(t, []test.TestCase{
 		{
@@ -673,55 +650,17 @@ func TestPerAPIPolicyUpdate(t *testing.T) {
 }
 
 func TestParsePoliciesFromRPC(t *testing.T) {
-
-	objectID := persistentmodel.NewObjectID()
-	explicitID := "explicit_pol_id"
-	tcs := []struct {
-		testName      string
-		allowExplicit bool
-		policy        user.Policy
-		expectedID    string
-	}{
-		{
-			testName:      "policy with explicit ID - allow_explicit_id false",
-			allowExplicit: false,
-			policy:        user.Policy{MID: objectID, ID: explicitID},
-			expectedID:    objectID.Hex(),
-		},
-		{
-			testName:      "policy with explicit ID - allow_explicit_id true",
-			allowExplicit: true,
-			policy:        user.Policy{MID: objectID, ID: explicitID},
-			expectedID:    explicitID,
-		},
-		{
-			testName:      "policy without explicit ID - allow_explicit_id false",
-			allowExplicit: false,
-			policy:        user.Policy{MID: objectID, ID: ""},
-			expectedID:    objectID.Hex(),
-		},
-		{
-			testName:      "policy without explicit ID - allow_explicit_id true",
-			allowExplicit: true,
-			policy:        user.Policy{MID: objectID, ID: ""},
-			expectedID:    objectID.Hex(),
-		},
-	}
-
-	for _, tc := range tcs {
-		t.Run(tc.testName, func(t *testing.T) {
-
-			policyList, err := json.Marshal([]user.Policy{tc.policy})
-			assert.NoError(t, err, "error unmarshalling policies")
-
-			polMap, errParsing := parsePoliciesFromRPC(string(policyList), tc.allowExplicit)
-			assert.NoError(t, errParsing, "error parsing policies from RPC:", errParsing)
-
-			_, ok := polMap[tc.expectedID]
-			assert.True(t, ok, "expected policy id", tc.expectedID, " not found after parsing policies")
+	t.Run("responds with error if invalid MID provided", func(t *testing.T) {
+		policyList, err := json.Marshal([]user.Policy{
+			{MID: "asd"},
 		})
-	}
+		assert.NoError(t, err)
 
+		polMap, errParsing := parsePoliciesFromRPC(string(policyList))
+
+		assert.ErrorContains(t, errParsing, "invalid ObjectId in JSON")
+		assert.Nil(t, polMap)
+	})
 }
 
 // TestLoadPoliciesFromDashboardAutoRecovery tests that nonce desynchronization
@@ -789,7 +728,7 @@ func TestLoadPoliciesFromDashboardAutoRecovery(t *testing.T) {
 	}
 
 	// Test: Load policies should auto-recover from nonce failure
-	policyMap, err := g.Gw.LoadPoliciesFromDashboard(ts.URL, "", false)
+	policyMap, err := g.Gw.LoadPoliciesFromDashboard(ts.URL, "")
 
 	// Should succeed due to auto-recovery
 	assert.NoError(t, err, "Auto-recovery should allow successful policy loading")
@@ -856,7 +795,7 @@ func TestLoadPoliciesFromDashboardNonceEmptyAfterFailedRecovery(t *testing.T) {
 	g.Gw.ServiceNonce = "old-nonce"
 
 	// First call - should get "Nonce failed"
-	policyMap, err := g.Gw.LoadPoliciesFromDashboard(ts.URL, "", false)
+	policyMap, err := g.Gw.LoadPoliciesFromDashboard(ts.URL, "")
 	assert.Error(t, err)
 	assert.Empty(t, policyMap)
 
@@ -864,7 +803,7 @@ func TestLoadPoliciesFromDashboardNonceEmptyAfterFailedRecovery(t *testing.T) {
 	g.Gw.ServiceNonce = ""
 
 	// Second call - should get "Authorization failed (Nonce empty)"
-	policyMap, err = g.Gw.LoadPoliciesFromDashboard(ts.URL, "", false)
+	policyMap, err = g.Gw.LoadPoliciesFromDashboard(ts.URL, "")
 	assert.Error(t, err)
 	assert.Empty(t, policyMap)
 
@@ -890,8 +829,7 @@ func TestLoadPoliciesFromDashboardInvalidSecret(t *testing.T) {
 	g := StartTest(conf)
 	defer g.Close()
 
-	allowExplicitPolicyID := g.Gw.GetConfig().Policies.AllowExplicitPolicyID
-	policyMap, err := g.Gw.LoadPoliciesFromDashboard(ts.URL, "invalid-secret", allowExplicitPolicyID)
+	policyMap, err := g.Gw.LoadPoliciesFromDashboard(ts.URL, "invalid-secret")
 
 	// Should fail with the standard error, NOT trigger nonce recovery
 	assert.Error(t, err)
@@ -918,8 +856,7 @@ func TestLoadPoliciesFromDashboardServerError(t *testing.T) {
 	g := StartTest(conf)
 	defer g.Close()
 
-	allowExplicitPolicyID := g.Gw.GetConfig().Policies.AllowExplicitPolicyID
-	policyMap, err := g.Gw.LoadPoliciesFromDashboard(ts.URL, "", allowExplicitPolicyID)
+	policyMap, err := g.Gw.LoadPoliciesFromDashboard(ts.URL, "")
 
 	// Should fail with standard error, NOT trigger nonce recovery
 	assert.Error(t, err)
@@ -997,7 +934,7 @@ func TestLoadPoliciesFromDashboardTimeoutSimulation(t *testing.T) {
 	// Set initial nonce to simulate established session before timeout
 	g.Gw.ServiceNonce = "pre-timeout-nonce"
 
-	policyMap, err := g.Gw.LoadPoliciesFromDashboard(ts.URL, "", false)
+	policyMap, err := g.Gw.LoadPoliciesFromDashboard(ts.URL, "")
 
 	// Should succeed due to auto-recovery
 	assert.NoError(t, err, "Auto-recovery should handle timeout-induced nonce failure")
@@ -1026,8 +963,7 @@ func TestLoadPoliciesFromDashboardNoDashServiceFallback(t *testing.T) {
 	// DO NOT set up DashService - simulating environment where it's not available
 	g.Gw.DashService = nil
 
-	allowExplicitPolicyID := g.Gw.GetConfig().Policies.AllowExplicitPolicyID
-	policyMap, err := g.Gw.LoadPoliciesFromDashboard(ts.URL, "", allowExplicitPolicyID)
+	policyMap, err := g.Gw.LoadPoliciesFromDashboard(ts.URL, "")
 
 	// Should fail gracefully without causing panic
 	assert.Error(t, err)
@@ -1099,7 +1035,7 @@ func TestLoadPoliciesFromDashboardNoNodeIDFound(t *testing.T) {
 	}
 
 	// Test: Load policies should auto-recover from missing node ID
-	policyMap, err := g.Gw.LoadPoliciesFromDashboard(ts.URL, "", false)
+	policyMap, err := g.Gw.LoadPoliciesFromDashboard(ts.URL, "")
 
 	// Should succeed due to auto-recovery
 	assert.NoError(t, err, "Auto-recovery should allow successful policy loading after node ID error")
@@ -1197,7 +1133,7 @@ func TestLoadPoliciesFromDashboardNetworkErrors(t *testing.T) {
 			defer g.Close()
 
 			// Test: Load policies should fail with network error
-			policyMap, err := g.Gw.LoadPoliciesFromDashboard(ts.URL, "", false)
+			policyMap, err := g.Gw.LoadPoliciesFromDashboard(ts.URL, "")
 
 			// Should fail with appropriate error
 			assert.Error(t, err, tc.description)
@@ -1287,7 +1223,7 @@ func TestLoadPoliciesFromDashboardNetworkErrorRecovery(t *testing.T) {
 	}
 
 	// Test: Load policies should auto-recover from network error
-	policyMap, err := g.Gw.LoadPoliciesFromDashboard(ts.URL, "", false)
+	policyMap, err := g.Gw.LoadPoliciesFromDashboard(ts.URL, "")
 
 	// Should succeed due to auto-recovery from network error
 	assert.NoError(t, err, "Auto-recovery should handle network errors")
@@ -1407,7 +1343,7 @@ func TestLoadPoliciesFromDashboardLoadBalancerDrain(t *testing.T) {
 			}
 
 			// Test: Should recover from load balancer drain
-			policyMap, err := g.Gw.LoadPoliciesFromDashboard(ts.URL, "", false)
+			policyMap, err := g.Gw.LoadPoliciesFromDashboard(ts.URL, "")
 
 			// Should succeed after recovery
 			assert.NoError(t, err, tc.description+" - should recover")
@@ -1416,4 +1352,134 @@ func TestLoadPoliciesFromDashboardLoadBalancerDrain(t *testing.T) {
 			assert.GreaterOrEqual(t, registrationCount, 1, tc.description+" - should re-register")
 		})
 	}
+}
+
+func TestOrganizationScopedPolicies(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	t.Run("Same policy ID in different organizations", func(t *testing.T) {
+		apiID1 := "api1"
+		apiID2 := "api2"
+
+		org1 := "org1"
+		org2 := "org2"
+
+		ts.Gw.BuildAndLoadAPI(
+			func(spec *APISpec) {
+				spec.APIID = apiID1
+				spec.UseKeylessAccess = false
+				spec.OrgID = org1
+				spec.Proxy.ListenPath = "/api1"
+			},
+			func(spec *APISpec) {
+				spec.APIID = apiID2
+				spec.UseKeylessAccess = false
+				spec.OrgID = org2
+				spec.Proxy.ListenPath = "/api2"
+			},
+		)
+
+		const sharedPolicyID = "shared-policy-id"
+
+		policy1 := user.Policy{
+			ID:    sharedPolicyID,
+			OrgID: org1,
+			AccessRights: map[string]user.AccessDefinition{
+				apiID1: {
+					APIID:    apiID1,
+					Versions: []string{"Default"},
+				},
+			},
+		}
+
+		policy2 := user.Policy{
+			ID:    sharedPolicyID,
+			OrgID: org2,
+			AccessRights: map[string]user.AccessDefinition{
+				apiID2: {
+					APIID:    apiID2,
+					Versions: []string{"Default"},
+				},
+			},
+		}
+
+		ts.Gw.policies.Add(policy1, policy2)
+
+		retrievedPolicy1, found1 := ts.Gw.policies.PolicyByID(model.NewScopedCustomPolicyId(org1, sharedPolicyID))
+		require.True(t, found1, "Policy for org1 should exist")
+		assert.Equal(t, org1, retrievedPolicy1.OrgID, "Policy should have correct org ID")
+		assert.Contains(t, retrievedPolicy1.AccessRights, apiID1, "Policy should have access to API 1")
+
+		retrievedPolicy2, found2 := ts.Gw.policies.PolicyByID(model.NewScopedCustomPolicyId(org2, sharedPolicyID))
+		require.True(t, found2, "Policy for org2 should exist")
+		assert.Equal(t, org2, retrievedPolicy2.OrgID, "Policy should have correct org ID")
+		assert.Contains(t, retrievedPolicy2.AccessRights, apiID2, "Policy should have access to API 2")
+
+		_, key1 := ts.CreateSession(func(s *user.SessionState) {
+			s.OrgID = org1
+			s.ApplyPolicies = []string{sharedPolicyID}
+		})
+
+		_, key2 := ts.CreateSession(func(s *user.SessionState) {
+			s.OrgID = org2
+			s.ApplyPolicies = []string{sharedPolicyID}
+		})
+
+		authHeaders1 := map[string]string{"authorization": key1}
+		authHeaders2 := map[string]string{"authorization": key2}
+
+		_, _ = ts.Run(t, test.TestCase{
+			Method:  http.MethodGet,
+			Path:    "/api1",
+			Headers: authHeaders1,
+			Code:    http.StatusOK,
+		})
+
+		_, _ = ts.Run(t, test.TestCase{
+			Method:  http.MethodGet,
+			Path:    "/api2",
+			Headers: authHeaders1,
+			Code:    http.StatusForbidden,
+		})
+
+		_, _ = ts.Run(t, test.TestCase{
+			Method:  http.MethodGet,
+			Path:    "/api1",
+			Headers: authHeaders2,
+			Code:    http.StatusForbidden,
+		})
+
+		_, _ = ts.Run(t, test.TestCase{
+			Method:  http.MethodGet,
+			Path:    "/api2",
+			Headers: authHeaders2,
+			Code:    http.StatusOK,
+		})
+
+		deleted := ts.Gw.policies.DeleteById(model.NewScopedCustomPolicyId(org1, sharedPolicyID))
+		assert.True(t, deleted, "Policy deletion should succeed")
+
+		_, found1 = ts.Gw.policies.PolicyByID(model.NewScopedCustomPolicyId(org1, sharedPolicyID))
+		assert.False(t, found1, "Policy for org1 should no longer exist")
+
+		_, found2 = ts.Gw.policies.PolicyByID(model.NewScopedCustomPolicyId(org2, sharedPolicyID))
+		assert.True(t, found2, "Policy for org2 should still exist")
+
+		// key 1 should no longer have access to API 1
+		_, _ = ts.Run(t, test.TestCase{
+			Method:  http.MethodGet,
+			Path:    "/api1",
+			Headers: authHeaders1,
+			Code:    http.StatusForbidden,
+		})
+
+		// key 2 should still have access to API 2
+		_, _ = ts.Run(t, test.TestCase{
+			Method:  http.MethodGet,
+			Path:    "/api2",
+			Headers: authHeaders2,
+			Code:    http.StatusOK,
+		})
+	})
 }

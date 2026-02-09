@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -17,6 +18,7 @@ import (
 	"time"
 
 	"github.com/getkin/kin-openapi/openapi3"
+	vaultapi "github.com/hashicorp/vault/api"
 	"github.com/stretchr/testify/assert"
 
 	persistentmodel "github.com/TykTechnologies/storage/persistent/model"
@@ -1529,6 +1531,45 @@ func TestAPISpec_hasMock(t *testing.T) {
 
 	mock.Enabled = true
 	assert.True(t, s.hasActiveMock())
+
+	// Reset and test MCP tools
+	mock.Enabled = false
+	assert.False(t, s.hasActiveMock())
+
+	middleware.McpTools = oas.MCPPrimitives{
+		"get-weather": &oas.MCPPrimitive{
+			Operation: oas.Operation{
+				MockResponse: &oas.MockResponse{Enabled: true},
+			},
+		},
+	}
+	assert.True(t, s.hasActiveMock())
+
+	// Reset and test MCP resources
+	middleware.McpTools = nil
+	assert.False(t, s.hasActiveMock())
+
+	middleware.McpResources = oas.MCPPrimitives{
+		"file:///test": &oas.MCPPrimitive{
+			Operation: oas.Operation{
+				MockResponse: &oas.MockResponse{Enabled: true},
+			},
+		},
+	}
+	assert.True(t, s.hasActiveMock())
+
+	// Reset and test MCP prompts
+	middleware.McpResources = nil
+	assert.False(t, s.hasActiveMock())
+
+	middleware.McpPrompts = oas.MCPPrimitives{
+		"code-review": &oas.MCPPrimitive{
+			Operation: oas.Operation{
+				MockResponse: &oas.MockResponse{Enabled: true},
+			},
+		},
+	}
+	assert.True(t, s.hasActiveMock())
 }
 
 func TestAPISpec_isStreamingAPI(t *testing.T) {
@@ -2411,4 +2452,427 @@ func TestAPISpec_Version(t *testing.T) {
 		}
 	})
 
+}
+
+// mockVaultSecretReader implements vaultSecretReader and kv.Store for testing.
+type mockVaultSecretReader struct {
+	secret *vaultapi.Secret
+	err    error
+}
+
+func (m *mockVaultSecretReader) ReadSecret(_ string) (*vaultapi.Secret, error) {
+	return m.secret, m.err
+}
+
+func (m *mockVaultSecretReader) Get(_ string) (string, error) { return "", nil }
+func (m *mockVaultSecretReader) Put(_, _ string) error        { return nil }
+
+// mockKVStoreWithoutSecretReader implements kv.Store but NOT kv.SecretReader.
+type mockKVStoreWithoutSecretReader struct{}
+
+func (m *mockKVStoreWithoutSecretReader) Get(_ string) (string, error) { return "", nil }
+func (m *mockKVStoreWithoutSecretReader) Put(_, _ string) error        { return nil }
+
+// TT-14791: A non-existent Vault path caused a panic due to nil secret.
+func TestReplaceVaultSecrets(t *testing.T) {
+	t.Run("vault store does not implement SecretReader", func(t *testing.T) {
+		ts := StartTest(nil, TestConfig{
+			Delay: 10 * time.Millisecond,
+		})
+		defer ts.Close()
+
+		ts.Gw.vaultKVStore = &mockKVStoreWithoutSecretReader{}
+
+		l := APIDefinitionLoader{Gw: ts.Gw}
+		input := "some-api-key: vault://secret-key"
+		err := l.replaceVaultSecrets(&input)
+
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "could not read secrets")
+	})
+
+	t.Run("vault path does not exist - nil secret", func(t *testing.T) {
+		ts := StartTest(nil, TestConfig{
+			Delay: 10 * time.Millisecond,
+		})
+		defer ts.Close()
+
+		// nil secret simulates non-existent path
+		ts.Gw.vaultKVStore = &mockVaultSecretReader{secret: nil, err: nil}
+
+		l := APIDefinitionLoader{Gw: ts.Gw}
+		input := "some-api-key: vault://secret-key"
+		err := l.replaceVaultSecrets(&input)
+
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "vault path does not exist")
+	})
+
+	t.Run("vault path contains no data", func(t *testing.T) {
+		ts := StartTest(nil, TestConfig{
+			Delay: 10 * time.Millisecond,
+		})
+		defer ts.Close()
+
+		// non-nil secret but nil Data simulates empty/deleted secret
+		ts.Gw.vaultKVStore = &mockVaultSecretReader{
+			secret: &vaultapi.Secret{Data: nil},
+			err:    nil,
+		}
+
+		l := APIDefinitionLoader{Gw: ts.Gw}
+		input := "some-api-key: vault://secret-key"
+		err := l.replaceVaultSecrets(&input)
+
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "vault path contains no data")
+	})
+
+	t.Run("vault ReadSecret returns error", func(t *testing.T) {
+		ts := StartTest(nil, TestConfig{
+			Delay: 10 * time.Millisecond,
+		})
+		defer ts.Close()
+
+		ts.Gw.vaultKVStore = &mockVaultSecretReader{
+			secret: nil,
+			err:    errors.New("vault server unavailable"),
+		}
+
+		l := APIDefinitionLoader{Gw: ts.Gw}
+		input := "some-api-key: vault://secret-key"
+		err := l.replaceVaultSecrets(&input)
+
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "vault server unavailable")
+	})
+
+	t.Run("vault secret missing data key", func(t *testing.T) {
+		ts := StartTest(nil, TestConfig{
+			Delay: 10 * time.Millisecond,
+		})
+		defer ts.Close()
+
+		// secret.Data exists but doesn't have "data" key
+		ts.Gw.vaultKVStore = &mockVaultSecretReader{
+			secret: &vaultapi.Secret{
+				Data: map[string]interface{}{
+					"other-key": "some-value",
+				},
+			},
+		}
+
+		l := APIDefinitionLoader{Gw: ts.Gw}
+		input := "some-api-key: vault://secret-key"
+		err := l.replaceVaultSecrets(&input)
+
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "no data returned")
+	})
+
+	t.Run("vault secret data is wrong type", func(t *testing.T) {
+		ts := StartTest(nil, TestConfig{
+			Delay: 10 * time.Millisecond,
+		})
+		defer ts.Close()
+
+		// secret.Data["data"] exists but is not a map
+		ts.Gw.vaultKVStore = &mockVaultSecretReader{
+			secret: &vaultapi.Secret{
+				Data: map[string]interface{}{
+					"data": "not-a-map",
+				},
+			},
+		}
+
+		l := APIDefinitionLoader{Gw: ts.Gw}
+		input := "some-api-key: vault://secret-key"
+		err := l.replaceVaultSecrets(&input)
+
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "data is not in the map format")
+	})
+
+	t.Run("vault secrets replaced successfully", func(t *testing.T) {
+		ts := StartTest(nil, TestConfig{
+			Delay: 10 * time.Millisecond,
+		})
+		defer ts.Close()
+
+		ts.Gw.vaultKVStore = &mockVaultSecretReader{
+			secret: &vaultapi.Secret{
+				Data: map[string]interface{}{
+					"data": map[string]interface{}{
+						"secret-key": "my-secret-value",
+					},
+				},
+			},
+		}
+
+		l := APIDefinitionLoader{Gw: ts.Gw}
+		input := "some-api-key: vault://secret-key"
+		err := l.replaceVaultSecrets(&input)
+
+		assert.NoError(t, err)
+		assert.Equal(t, "some-api-key: my-secret-value", input)
+	})
+}
+
+func TestPopulateMCPPrimitivesMap(t *testing.T) {
+	loader := APIDefinitionLoader{}
+
+	t.Run("non-MCP API", func(t *testing.T) {
+		spec := &APISpec{
+			APIDefinition: &apidef.APIDefinition{},
+		}
+		loader.populateMCPPrimitivesMap(spec)
+		assert.Nil(t, spec.MCPPrimitives)
+	})
+
+	t.Run("MCP API with primitives", func(t *testing.T) {
+		spec := &APISpec{
+			APIDefinition: &apidef.APIDefinition{
+				ApplicationProtocol: apidef.AppProtocolMCP,
+				JsonRpcVersion:      apidef.JsonRPC20,
+			},
+			OAS: oas.OAS{},
+		}
+
+		middleware := &oas.Middleware{
+			McpTools: oas.MCPPrimitives{
+				"get_users": &oas.MCPPrimitive{},
+			},
+			McpResources: oas.MCPPrimitives{
+				"file:///*": &oas.MCPPrimitive{},
+			},
+			McpPrompts: oas.MCPPrimitives{
+				"code-review": &oas.MCPPrimitive{},
+			},
+		}
+		spec.OAS.SetTykExtension(&oas.XTykAPIGateway{Middleware: middleware})
+
+		loader.populateMCPPrimitivesMap(spec)
+
+		assert.Len(t, spec.MCPPrimitives, 3)
+		assert.Equal(t, "/mcp-tool:get_users", spec.MCPPrimitives["tool:get_users"])
+		assert.Equal(t, "/mcp-resource:file:///*", spec.MCPPrimitives["resource:file:///*"])
+		assert.Equal(t, "/mcp-prompt:code-review", spec.MCPPrimitives["prompt:code-review"])
+	})
+
+	t.Run("MCP API without middleware", func(t *testing.T) {
+		spec := &APISpec{
+			APIDefinition: &apidef.APIDefinition{
+				ApplicationProtocol: apidef.AppProtocolMCP,
+			},
+			OAS: oas.OAS{},
+		}
+
+		loader.populateMCPPrimitivesMap(spec)
+		assert.Nil(t, spec.MCPPrimitives)
+	})
+
+	t.Run("MCP API with operations and primitives", func(t *testing.T) {
+		spec := &APISpec{
+			APIDefinition: &apidef.APIDefinition{
+				ApplicationProtocol: apidef.AppProtocolMCP,
+				JsonRpcVersion:      apidef.JsonRPC20,
+			},
+		}
+
+		spec.OAS.Paths = &openapi3.Paths{}
+		spec.OAS.Paths.Set("/tools/call", &openapi3.PathItem{})
+		spec.OAS.Paths.Set("/resources/read", &openapi3.PathItem{})
+
+		middleware := &oas.Middleware{
+			McpTools: oas.MCPPrimitives{
+				"get_users": &oas.MCPPrimitive{},
+			},
+		}
+		spec.OAS.SetTykExtension(&oas.XTykAPIGateway{Middleware: middleware})
+
+		loader.populateMCPPrimitivesMap(spec)
+
+		assert.Len(t, spec.MCPPrimitives, 3)
+		assert.Equal(t, "/mcp-tool:get_users", spec.MCPPrimitives["tool:get_users"])
+		assert.Equal(t, "/tools/call", spec.MCPPrimitives["operation:tools/call"])
+		assert.Equal(t, "/resources/read", spec.MCPPrimitives["operation:resources/read"])
+	})
+}
+
+func TestCalculateMCPAllowlistFlags(t *testing.T) {
+	loader := APIDefinitionLoader{}
+
+	t.Run("no middleware", func(t *testing.T) {
+		spec := &APISpec{
+			APIDefinition: &apidef.APIDefinition{},
+			OAS:           oas.OAS{},
+		}
+
+		loader.calculateMCPAllowlistFlags(spec)
+
+		assert.False(t, spec.OperationsAllowListEnabled)
+		assert.False(t, spec.ToolsAllowListEnabled)
+		assert.False(t, spec.ResourcesAllowListEnabled)
+		assert.False(t, spec.PromptsAllowListEnabled)
+		assert.False(t, spec.MCPAllowListEnabled)
+	})
+
+	t.Run("tools allow enabled", func(t *testing.T) {
+		spec := &APISpec{
+			APIDefinition: &apidef.APIDefinition{},
+			OAS:           oas.OAS{},
+		}
+
+		middleware := &oas.Middleware{
+			McpTools: oas.MCPPrimitives{
+				"tool1": &oas.MCPPrimitive{
+					Operation: oas.Operation{
+						Allow: &oas.Allowance{Enabled: true},
+					},
+				},
+			},
+		}
+		spec.OAS.SetTykExtension(&oas.XTykAPIGateway{Middleware: middleware})
+
+		loader.calculateMCPAllowlistFlags(spec)
+
+		assert.False(t, spec.OperationsAllowListEnabled)
+		assert.True(t, spec.ToolsAllowListEnabled)
+		assert.False(t, spec.ResourcesAllowListEnabled)
+		assert.False(t, spec.PromptsAllowListEnabled)
+		assert.True(t, spec.MCPAllowListEnabled)
+	})
+
+	t.Run("all categories enabled", func(t *testing.T) {
+		spec := &APISpec{
+			APIDefinition: &apidef.APIDefinition{},
+			OAS:           oas.OAS{},
+		}
+
+		middleware := &oas.Middleware{
+			Operations: oas.Operations{
+				"op1": &oas.Operation{
+					Allow: &oas.Allowance{Enabled: true},
+				},
+			},
+			McpTools: oas.MCPPrimitives{
+				"tool1": &oas.MCPPrimitive{
+					Operation: oas.Operation{
+						Allow: &oas.Allowance{Enabled: true},
+					},
+				},
+			},
+			McpResources: oas.MCPPrimitives{
+				"res1": &oas.MCPPrimitive{
+					Operation: oas.Operation{
+						Allow: &oas.Allowance{Enabled: true},
+					},
+				},
+			},
+			McpPrompts: oas.MCPPrimitives{
+				"prompt1": &oas.MCPPrimitive{
+					Operation: oas.Operation{
+						Allow: &oas.Allowance{Enabled: true},
+					},
+				},
+			},
+		}
+		spec.OAS.SetTykExtension(&oas.XTykAPIGateway{Middleware: middleware})
+
+		loader.calculateMCPAllowlistFlags(spec)
+
+		assert.True(t, spec.OperationsAllowListEnabled)
+		assert.True(t, spec.ToolsAllowListEnabled)
+		assert.True(t, spec.ResourcesAllowListEnabled)
+		assert.True(t, spec.PromptsAllowListEnabled)
+		assert.True(t, spec.MCPAllowListEnabled)
+	})
+}
+
+// TestExtractMCPPrimitivesToPaths tests the extraction of MCP primitives to ExtendedPaths.
+
+// TestAddInternalMWtoMCPOperations tests adding internal middleware for MCP operations.
+func TestAddInternalMWtoMCPOperations(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	loader := APIDefinitionLoader{Gw: ts.Gw}
+
+	t.Run("adds internal middleware for existing MCP operations", func(t *testing.T) {
+		oasDoc := &oas.OAS{
+			T: openapi3.T{
+				Paths: openapi3.NewPaths(),
+			},
+		}
+
+		oasDoc.Paths.Set("/tools/call", &openapi3.PathItem{
+			Post: &openapi3.Operation{OperationID: "toolsCall"},
+		})
+		oasDoc.Paths.Set("/resources/read", &openapi3.PathItem{
+			Post: &openapi3.Operation{OperationID: "resourcesRead"},
+		})
+		oasDoc.Paths.Set("/prompts/get", &openapi3.PathItem{
+			Post: &openapi3.Operation{OperationID: "promptsGet"},
+		})
+
+		spec := &APISpec{
+			OAS: *oasDoc,
+		}
+
+		extendedPaths := &apidef.ExtendedPathsSet{}
+
+		loader.addInternalMWtoMCPOperations(spec, extendedPaths)
+
+		assert.Len(t, extendedPaths.Internal, 3)
+
+		paths := make(map[string]bool)
+		for _, internal := range extendedPaths.Internal {
+			paths[internal.Path] = true
+			assert.Equal(t, http.MethodPost, internal.Method)
+			assert.False(t, internal.Disabled)
+		}
+
+		assert.True(t, paths["/tools/call"])
+		assert.True(t, paths["/resources/read"])
+		assert.True(t, paths["/prompts/get"])
+	})
+
+	t.Run("skips operations not in OAS", func(t *testing.T) {
+		oasDoc := &oas.OAS{
+			T: openapi3.T{
+				Paths: openapi3.NewPaths(),
+			},
+		}
+
+		oasDoc.Paths.Set("/tools/call", &openapi3.PathItem{
+			Post: &openapi3.Operation{OperationID: "toolsCall"},
+		})
+
+		spec := &APISpec{
+			OAS: *oasDoc,
+		}
+
+		extendedPaths := &apidef.ExtendedPathsSet{}
+
+		loader.addInternalMWtoMCPOperations(spec, extendedPaths)
+
+		assert.Len(t, extendedPaths.Internal, 1)
+		assert.Equal(t, "/tools/call", extendedPaths.Internal[0].Path)
+	})
+
+	t.Run("handles nil paths", func(t *testing.T) {
+		spec := &APISpec{
+			OAS: oas.OAS{
+				T: openapi3.T{
+					Paths: nil,
+				},
+			},
+		}
+
+		extendedPaths := &apidef.ExtendedPathsSet{}
+
+		loader.addInternalMWtoMCPOperations(spec, extendedPaths)
+
+		assert.Empty(t, extendedPaths.Internal)
+	})
 }

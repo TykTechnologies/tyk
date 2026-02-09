@@ -120,7 +120,25 @@
         "span_processor_type": {
           "type": "string"
         },
+        "span_batch_config": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "max_queue_size": {
+              "type": "integer"
+            },
+            "max_export_batch_size": {
+              "type": "integer"
+            },
+            "batch_timeout": {
+              "type": "integer"
+            }
+          }
+        },
         "context_propagation": {
+          "type": "string"
+        },
+        "custom_trace_header": {
           "type": "string"
         },
         "headers": {
@@ -473,6 +491,9 @@
     "bundle_insecure_skip_verify": {
       "type": "boolean"
     },
+    "skip_verify_existing_plugin_bundle": {
+      "type": "boolean"
+    },
     "enable_custom_domains": {
       "type": "boolean"
     },
@@ -688,6 +709,12 @@
           }
         },
         "max_request_body_size": {
+          "type": "integer"
+        },
+        "max_response_body_size": {
+          "type": "integer"
+        },
+        "xff_depth": {
           "type": "integer"
         }
       }
@@ -996,6 +1023,21 @@
         },
         "synchroniser_enabled": {
           "type": "boolean"
+        },
+        "dns_monitor": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "check_interval": {
+              "type": "integer"
+            }
+          }
+        },
+        "sync_used_certs_only": {
+          "type": "boolean"
         }
       }
     },
@@ -1094,6 +1136,9 @@
           "items": {
             "type": "object"
           }
+        },
+        "allow_unsafe_dynamic_mtls_token": {
+          "type": "boolean"
         },
         "certificates": {
           "type": ["object", "null"],
@@ -1321,9 +1366,6 @@
     "secrets": {
       "type": ["array", "null"]
     },
-    "enable_http_profiler": {
-      "type": "boolean"
-    },
     "liveness_check": {
       "type": ["object", "null"],
       "additionalProperties": false,
@@ -1357,6 +1399,24 @@
       "type": ["object", "null"],
       "additionalProperties": true,
       "properties": {}
+    },
+    "jwks": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "properties": {
+        "cache": {
+          "type": ["object", "null"],
+          "additionalProperties": false,
+          "properties": {
+            "timeout": {
+              "type": ["integer"],
+              "description": "Cache timeout in seconds",
+              "minimum": 0,
+              "default": 240
+            }
+          }
+        }
+      }
     }
   }
 }

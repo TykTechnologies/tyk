@@ -1,23 +1,33 @@
 package gateway
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net"
 	"net/http"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
 	"time"
 
+	"github.com/samber/lo"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"go.uber.org/mock/gomock"
 
 	"github.com/TykTechnologies/again"
+	"github.com/TykTechnologies/storage/persistent/model"
+
 	"github.com/TykTechnologies/tyk/config"
+	internalmodel "github.com/TykTechnologies/tyk/internal/model"
 	"github.com/TykTechnologies/tyk/internal/netutil"
 	"github.com/TykTechnologies/tyk/internal/otel"
+	"github.com/TykTechnologies/tyk/internal/policy"
 	"github.com/TykTechnologies/tyk/rpc"
 	"github.com/TykTechnologies/tyk/tcp"
 	"github.com/TykTechnologies/tyk/test"
@@ -161,7 +171,7 @@ func TestGateway_policiesByIDLen(t *testing.T) {
 				})
 			}
 
-			actual := ts.Gw.PolicyCount()
+			actual := ts.Gw.policies.PolicyCount()
 
 			assert.Equal(t, tc.expected, actual)
 		})
@@ -1045,4 +1055,128 @@ func TestGateway_gracefulShutdown_MixedProxyConcurrency(t *testing.T) {
 	if err != nil {
 		t.Errorf("expected no error but got: %v", err)
 	}
+}
+
+func TestLoadPoliciesFromRPC(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	prev := rpc.IsEmergencyMode()
+	rpc.SetEmergencyMode(t, false)
+
+	defer func() {
+		rpc.SetEmergencyMode(t, prev)
+	}()
+
+	t.Run("responds error if failed to connect", func(t *testing.T) {
+		store := policy.NewMockRPCDataLoader(gomock.NewController(t))
+		store.EXPECT().Connect().Return(false)
+
+		_, err := ts.Gw.LoadPoliciesFromRPC(store, "")
+
+		assert.ErrorContains(t, err, "Failed connecting to database")
+	})
+
+	t.Run("responds with error if GetPolicies returns empty string", func(t *testing.T) {
+		orgId := "org123"
+
+		store := policy.NewMockRPCDataLoader(gomock.NewController(t))
+		store.EXPECT().Connect().Return(true)
+		store.EXPECT().GetPolicies(orgId).Return("")
+
+		_, err := ts.Gw.LoadPoliciesFromRPC(store, orgId)
+
+		assert.ErrorContains(t, err, "failed to fetch policies from RPC store; connection may be down")
+	})
+
+	t.Run("returns policies from rpc", func(t *testing.T) {
+		mid := model.NewObjectID()
+		orgId := "org123"
+
+		var policies = []user.Policy{
+			{MID: mid, OrgID: orgId},
+		}
+
+		marshaledPolicies, err := json.Marshal(policies)
+		assert.NoError(t, err)
+
+		store := policy.NewMockRPCDataLoader(gomock.NewController(t))
+		store.EXPECT().Connect().Return(true)
+		store.EXPECT().GetPolicies(orgId).Return(string(marshaledPolicies))
+
+		respondedPolicies, err := ts.Gw.LoadPoliciesFromRPC(store, orgId)
+		assert.NoError(t, err)
+
+		assert.Len(t, respondedPolicies, 1, "returns one policy like returned store")
+		ts.Gw.policies.Reload(respondedPolicies...)
+		_, ok := ts.Gw.policies.PolicyByID(internalmodel.NewScopedCustomPolicyId(orgId, mid.Hex()))
+		assert.True(t, ok, "adds missing information")
+	})
+
+	t.Run("returns error if invalid policy received from rpc storage", func(t *testing.T) {
+		var policies = []user.Policy{
+			{MID: "invalid"},
+		}
+
+		marshaledPolicies, err := json.Marshal(policies)
+		assert.NoError(t, err)
+
+		orgId := "org123"
+
+		store := policy.NewMockRPCDataLoader(gomock.NewController(t))
+		store.EXPECT().Connect().Return(true)
+		store.EXPECT().GetPolicies(orgId).Return(string(marshaledPolicies))
+
+		_, err = ts.Gw.LoadPoliciesFromRPC(store, orgId)
+		assert.ErrorContains(t, err, "invalid ObjectId in JSON")
+	})
+}
+
+func TestPoliciesCollisionMessage(t *testing.T) {
+	ts := StartTest(nil)
+	t.Cleanup(ts.Close)
+
+	type logMessage struct {
+		Level string    `json:"level"`
+		Msg   string    `json:"msg"`
+		Time  time.Time `json:"time"`
+	}
+
+	var buf bytes.Buffer
+
+	mock := logrus.New()
+	mock.SetOutput(&buf)
+	mock.SetFormatter(&logrus.JSONFormatter{})
+	mock.SetLevel(logrus.WarnLevel)
+
+	originGlobalLogger := log
+	log = mock
+	t.Cleanup(func() {
+		log = originGlobalLogger
+	})
+
+	id1 := model.NewObjectID()
+	id2 := model.NewObjectID()
+	id3 := model.NewObjectID()
+
+	ts.Gw.policies.Reload(
+		user.Policy{MID: id1, ID: "duplicate_id", OrgID: "A"},
+		user.Policy{MID: id2, ID: "duplicate_id", OrgID: "A"},
+		user.Policy{MID: id3, ID: "duplicate_id", OrgID: "B"},
+	)
+
+	msgs := lo.Map(slices.Collect(strings.Lines(buf.String())), func(line string, _ int) logMessage {
+		var res logMessage
+		err := json.Unmarshal([]byte(line), &res)
+		assert.NoError(t, err)
+		return res
+	})
+
+	require.Len(t, msgs, 1)
+	msg := msgs[0]
+
+	assert.Contains(t, msg.Msg, "Policies should not share the same ID")
+	assert.Contains(t, msg.Msg, "duplicate_id")
+	assert.Contains(t, msg.Msg, id1.Hex())
+	assert.Contains(t, msg.Msg, id2.Hex())
 }

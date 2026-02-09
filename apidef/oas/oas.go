@@ -212,6 +212,67 @@ func (s *OAS) Clone() (*OAS, error) {
 	return reflect.Clone(s), nil
 }
 
+// Initialize eagerly parses and caches all security schemes and extensions.
+// This should be called once when an API definition is loaded to prevent
+// race conditions caused by lazy-initialization during request processing.
+// The issue is that functions like getTykJWTAuth, getTykBasicAuth, etc. perform
+// lazy initialization by converting map[string]interface{} to typed structs and
+// caching the result. When multiple goroutines do this concurrently, it causes
+// "concurrent map writes" panic.
+func (s *OAS) Initialize() {
+	// First, ensure the main Tyk extensions are parsed and cached.
+	// These functions convert raw JSON to typed structs and cache them.
+	s.GetTykExtension()
+	s.GetTykStreamingExtension()
+
+	if s.Components == nil || s.Components.SecuritySchemes == nil {
+		return
+	}
+
+	// Iterate through all defined security schemes and trigger their caching.
+	// This converts map[string]interface{} entries to their proper typed structs.
+	for name, schemeRef := range s.Components.SecuritySchemes {
+		if schemeRef == nil || schemeRef.Value == nil {
+			continue
+		}
+
+		v := schemeRef.Value
+		switch v.Type {
+		case typeHTTP:
+			switch v.Scheme {
+			case schemeBasic:
+				s.getTykBasicAuth(name)
+			case schemeBearer:
+				if v.BearerFormat == bearerFormatJWT {
+					s.getTykJWTAuth(name)
+				} else {
+					// A bearer token that isn't a JWT is treated as a standard auth token.
+					s.getTykTokenAuth(name)
+				}
+			}
+		case typeAPIKey:
+			s.getTykTokenAuth(name)
+		case typeOAuth2:
+			// For OAuth2, we need to check the Tyk extension data to determine
+			// if it is a standard OAuth or external OAuth provider.
+			securityScheme := s.getTykSecurityScheme(name)
+			if securityScheme == nil {
+				continue
+			}
+
+			// Check if the scheme has providers configured (indicates ExternalOAuth)
+			externalOAuth := &ExternalOAuth{}
+			if _, ok := securityScheme.(*ExternalOAuth); ok {
+				s.getTykExternalOAuthAuth(name)
+			} else if toStructIfMap(securityScheme, externalOAuth) && len(externalOAuth.Providers) > 0 {
+				s.getTykExternalOAuthAuth(name)
+			} else {
+				s.getTykOAuthAuth(name)
+			}
+		}
+	}
+}
+
 func (s *OAS) getTykAuthentication() (authentication *Authentication) {
 	if s.GetTykExtension() != nil {
 		authentication = s.GetTykExtension().Server.Authentication
@@ -230,10 +291,12 @@ func (s *OAS) getTykTokenAuth(name string) (token *Token) {
 	if tokenVal, ok := securityScheme.(*Token); ok {
 		token = tokenVal
 	} else {
-		toStructIfMap(securityScheme, token)
+		// Security scheme is stored as map[string]interface{}, convert it to Token struct
+		if toStructIfMap(securityScheme, token) {
+			// Cache the converted struct for future use
+			s.getTykSecuritySchemes()[name] = token
+		}
 	}
-
-	s.getTykSecuritySchemes()[name] = token
 
 	return
 }
@@ -248,10 +311,12 @@ func (s *OAS) getTykJWTAuth(name string) (jwt *JWT) {
 	if jwtVal, ok := securityScheme.(*JWT); ok {
 		jwt = jwtVal
 	} else {
-		toStructIfMap(securityScheme, jwt)
+		// Security scheme is stored as map[string]interface{}, convert it to JWT struct
+		if toStructIfMap(securityScheme, jwt) {
+			// Cache the converted struct for future use
+			s.getTykSecuritySchemes()[name] = jwt
+		}
 	}
-
-	s.getTykSecuritySchemes()[name] = jwt
 
 	return
 }
@@ -289,10 +354,12 @@ func (s *OAS) getTykOAuthAuth(name string) (oauth *OAuth) {
 	if oauthVal, ok := securityScheme.(*OAuth); ok {
 		oauth = oauthVal
 	} else {
-		toStructIfMap(securityScheme, oauth)
+		// Security scheme is stored as map[string]interface{}, convert it to OAuth struct
+		if toStructIfMap(securityScheme, oauth) {
+			// Cache the converted struct for future use
+			s.getTykSecuritySchemes()[name] = oauth
+		}
 	}
-
-	s.getTykSecuritySchemes()[name] = oauth
 
 	return
 }
@@ -307,10 +374,12 @@ func (s *OAS) getTykExternalOAuthAuth(name string) (externalOAuth *ExternalOAuth
 	if oauthVal, ok := securityScheme.(*ExternalOAuth); ok {
 		externalOAuth = oauthVal
 	} else {
-		toStructIfMap(securityScheme, externalOAuth)
+		// Security scheme is stored as map[string]interface{}, convert it to ExternalOAuth struct
+		if toStructIfMap(securityScheme, externalOAuth) {
+			// Cache the converted struct for future use
+			s.getTykSecuritySchemes()[name] = externalOAuth
+		}
 	}
-
-	s.getTykSecuritySchemes()[name] = externalOAuth
 
 	return
 }
@@ -467,13 +536,24 @@ func (s *OAS) ReplaceServers(apiURLs, oldAPIURLs []string) {
 	s.Servers = append(newServers, userAddedServers...)
 }
 
-// Validate validates OAS document by calling openapi3.T.Validate() function. In addition, it validates Security
-// Requirement section and it's requirements by calling OAS.validateSecurity() function.
+// Validate validates OAS document by calling openapi3.T.Validate() function.
+// For OAS 3.1+ documents, JSON Schema 2020-12 validation is automatically enabled.
+// In addition, it validates Security Requirement section and its requirements by
+// calling OAS.validateSecurity() function.
 func (s *OAS) Validate(ctx context.Context, opts ...openapi3.ValidationOption) error {
-	validationErr := s.T.Validate(ctx, opts...)
-	securityErr := s.validateSecurity()
+	validationOpts := opts
+	if s.T.IsOpenAPI3_1() {
+		// Create new slice to avoid modifying caller's slice
+		validationOpts = make([]openapi3.ValidationOption, len(opts)+1)
+		copy(validationOpts, opts)
+		validationOpts[len(opts)] = openapi3.EnableJSONSchema2020Validation()
+	}
 
-	return errors.Join(validationErr, securityErr)
+	validationErr := s.T.Validate(ctx, validationOpts...)
+	securityErr := s.validateSecurity()
+	compliantModeErr := s.validateCompliantModeAuthentication()
+
+	return errors.Join(validationErr, securityErr, compliantModeErr)
 }
 
 // Normalize converts the OAS api to a normalized state.
@@ -509,6 +589,128 @@ func (s *OAS) validateSecurity() error {
 				return errors.New(errorMsg)
 			}
 		}
+	}
+
+	return nil
+}
+
+// validateCompliantModeAuthentication validates that all enabled auth methods in compliant mode
+// are properly configured in security requirements (either OAS security or vendor extension security).
+// This validation only runs when securityProcessingMode is set to "compliant".
+func (s *OAS) validateCompliantModeAuthentication() error {
+	tykAuth := s.getTykAuthentication()
+	if tykAuth == nil {
+		return nil
+	}
+
+	// Only validate in compliant mode
+	if tykAuth.SecurityProcessingMode != SecurityProcessingModeCompliant {
+		return nil
+	}
+
+	// Collect all security requirement names from both OAS and vendor extension
+	configuredAuthMethods := make(map[string]bool)
+
+	// Add OAS security requirements
+	for _, requirement := range s.T.Security {
+		for schemeName := range requirement {
+			configuredAuthMethods[schemeName] = true
+		}
+	}
+
+	// Add vendor extension security requirements
+	if tykAuth.Security != nil {
+		for _, requirement := range tykAuth.Security {
+			for _, schemeName := range requirement {
+				configuredAuthMethods[schemeName] = true
+			}
+		}
+	}
+
+	// Check each enabled auth method
+	var misconfiguredMethods []string
+
+	// Check top-level auth method fields (HMAC, OIDC, Custom)
+	if tykAuth.HMAC != nil && tykAuth.HMAC.Enabled {
+		if !configuredAuthMethods["hmac"] {
+			misconfiguredMethods = append(misconfiguredMethods, "hmac")
+		}
+	}
+
+	if tykAuth.OIDC != nil && tykAuth.OIDC.Enabled {
+		if !configuredAuthMethods["oidc"] {
+			misconfiguredMethods = append(misconfiguredMethods, "oidc")
+		}
+	}
+
+	if tykAuth.Custom != nil && tykAuth.Custom.Enabled {
+		if !configuredAuthMethods["custom"] {
+			misconfiguredMethods = append(misconfiguredMethods, "custom")
+		}
+	}
+
+	// Check auth methods in SecuritySchemes
+	if len(tykAuth.SecuritySchemes) > 0 {
+		for schemeName, scheme := range tykAuth.SecuritySchemes {
+			// Check if this auth method is enabled
+			enabled := false
+
+			// Type-specific enabled checks
+			switch v := scheme.(type) {
+			case *Token:
+				if v.Enabled != nil && *v.Enabled {
+					enabled = true
+				}
+			case *JWT:
+				if v.Enabled {
+					enabled = true
+				}
+			case *Basic:
+				if v.Enabled {
+					enabled = true
+				}
+			case *OAuth:
+				if v.Enabled {
+					enabled = true
+				}
+			case *HMAC:
+				if v.Enabled {
+					enabled = true
+				}
+			case *OIDC:
+				if v.Enabled {
+					enabled = true
+				}
+			case *CustomPluginAuthentication:
+				if v.Enabled {
+					enabled = true
+				}
+			case map[string]interface{}:
+				// Handle untyped schemes
+				if enabledVal, ok := v["enabled"]; ok {
+					if enabledBool, ok := enabledVal.(bool); ok && enabledBool {
+						enabled = true
+					}
+				}
+			}
+
+			// If enabled but not in any security requirement, add to misconfigured list
+			if enabled && !configuredAuthMethods[schemeName] {
+				misconfiguredMethods = append(misconfiguredMethods, schemeName)
+			}
+		}
+	}
+
+	// Return error if any misconfigured methods found
+	if len(misconfiguredMethods) > 0 {
+		methodList := strings.Join(misconfiguredMethods, " and ")
+		var authWord string
+		if len(misconfiguredMethods) == 1 {
+			authWord = "auth"
+		} else {
+			authWord = "auth methods"
+		}
+		return fmt.Errorf("invalid multi-auth configuration: %s %s enabled but not configured in a security requirement", methodList, authWord)
 	}
 
 	return nil

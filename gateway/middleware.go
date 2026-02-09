@@ -2,7 +2,6 @@ package gateway
 
 import (
 	"bytes"
-	"context"
 	"crypto/md5"
 	"errors"
 	"fmt"
@@ -23,6 +22,7 @@ import (
 	"golang.org/x/sync/singleflight"
 
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/ctx"
 	"github.com/TykTechnologies/tyk/header"
 	"github.com/TykTechnologies/tyk/internal/cache"
 	"github.com/TykTechnologies/tyk/internal/event"
@@ -78,18 +78,10 @@ func (tr TraceMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request,
 		cfg := baseMw.Gw.GetConfig()
 		if cfg.OpenTelemetry.Enabled {
 			otel.AddTraceID(r.Context(), w)
-			var span otel.Span
-			if baseMw.Spec.DetailedTracing {
-				var ctx context.Context
-				ctx, span = baseMw.Gw.TracerProvider.Tracer().Start(r.Context(), tr.Name())
-				defer span.End()
-				setContext(r, ctx)
-			} else {
-				span = otel.SpanFromContext(r.Context())
-			}
 
+			span := otel.SpanFromContext(r.Context())
 			err, i := tr.TykMiddleware.ProcessRequest(w, r, conf)
-			if err != nil {
+			if err != nil && span != nil {
 				span.SetStatus(otel.SPAN_STATUS_ERROR, err.Error())
 			}
 
@@ -137,6 +129,22 @@ func (gw *Gateway) createMiddleware(actualMW TykMiddleware) func(http.Handler) h
 
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			// Create span early if OpenTelemetry is enabled
+			if baseMw := mw.Base(); baseMw != nil {
+				cfg := baseMw.Gw.GetConfig()
+				if cfg.OpenTelemetry.Enabled && baseMw.Spec.DetailedTracing {
+					ctx, span := baseMw.Gw.TracerProvider.Tracer().Start(r.Context(), mw.Name())
+					setContext(r, ctx)
+					defer func() {
+						attrs := ctxGetSpanAttributes(r, mw.Name())
+						if len(attrs) > 0 {
+							span.SetAttributes(attrs...)
+						}
+						span.End()
+					}()
+				}
+			}
+
 			logger := mw.Base().SetRequestLogger(r)
 
 			if txn := newrelic.FromContext(r.Context()); txn != nil {
@@ -371,27 +379,33 @@ func (t *BaseMiddleware) SetOrgExpiry(orgid string, expiry int64) {
 func (t *BaseMiddleware) OrgSessionExpiry(orgid string) int64 {
 	t.Logger().Debug("Checking: ", orgid)
 
-	// Cache failed attempt
-	id, err, _ := orgSessionExpiryCache.Do(orgid, func() (interface{}, error) {
-		cachedVal, found := t.Gw.ExpiryCache.Get(orgid)
-		if found {
-			return cachedVal, nil
-		}
-
-		s, found := t.OrgSession(orgid)
-		if found && t.Spec.GlobalConfig.EnforceOrgDataAge {
-			return s.DataExpires, nil
-		}
-		return 0, errors.New("missing session")
-	})
-
-	if err != nil {
-		t.Logger().Debug("no cached entry found, returning 7 days")
-		t.SetOrgExpiry(orgid, DEFAULT_ORG_SESSION_EXPIRATION)
+	if rpc.IsEmergencyMode() {
 		return DEFAULT_ORG_SESSION_EXPIRATION
 	}
 
-	return id.(int64)
+	// Try to get from cache first
+	cachedVal, found := t.Gw.ExpiryCache.Get(orgid)
+	if found {
+		return cachedVal.(int64)
+	}
+
+	// Start async refresh in background
+	go t.refreshOrgSessionExpiry(orgid)
+
+	return DEFAULT_ORG_SESSION_EXPIRATION
+}
+
+func (t *BaseMiddleware) refreshOrgSessionExpiry(orgid string) {
+	orgSessionExpiryCache.Do(orgid, func() (interface{}, error) {
+		s, found := t.OrgSession(orgid)
+		if found && t.Spec.GlobalConfig.EnforceOrgDataAge {
+			t.SetOrgExpiry(orgid, s.DataExpires)
+			return s.DataExpires, nil
+		}
+		// On failure or if not found, cache the default value
+		t.SetOrgExpiry(orgid, DEFAULT_ORG_SESSION_EXPIRATION)
+		return DEFAULT_ORG_SESSION_EXPIRATION, nil
+	})
 }
 
 func (t *BaseMiddleware) UpdateRequestSession(r *http.Request) bool {
@@ -429,7 +443,7 @@ func (t *BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 	if t.Spec != nil {
 		orgID = &t.Spec.OrgID
 	}
-	store := policy.New(orgID, t.Gw, log)
+	store := policy.New(orgID, t.Gw.policies, log)
 	return store.Apply(session)
 }
 
@@ -448,9 +462,20 @@ func (t *BaseMiddleware) RecordAccessLog(req *http.Request, resp *http.Response,
 
 	// Set the access log fields
 	accessLog := accesslog.NewRecord()
+	accessLog.WithAPIID(t.Spec.APIID, t.Spec.Name, t.Spec.OrgID)
 	accessLog.WithApiKey(req, hashKeys, gw.obfuscateKey)
 	accessLog.WithRequest(req, latency)
 	accessLog.WithResponse(resp)
+
+	// Add error classification if present (only on error requests)
+	if errClass := ctx.GetErrorClassification(req); errClass != nil {
+		accessLog.WithErrorClassification(errClass)
+	}
+
+	// Only include trace_id when OpenTelemetry is enabled
+	if gwConfig.OpenTelemetry.Enabled {
+		accessLog.WithTraceID(req)
+	}
 
 	logFields := accessLog.Fields(allowedFields)
 
@@ -539,6 +564,7 @@ func (t *BaseMiddleware) CheckSessionAndIdentityForValidKey(originalKey string, 
 	}
 
 	if _, ok := t.Spec.AuthManager.Store().(*RPCStorageHandler); ok && rpc.IsEmergencyMode() {
+		session.KeyID = key
 		return session.Clone(), false
 	}
 

@@ -12,30 +12,30 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
-	"sync"
 	"time"
 
+	"github.com/go-jose/go-jose/v3"
+	"github.com/golang-jwt/jwt/v4"
 	"github.com/google/go-cmp/cmp"
 	"github.com/gorilla/mux"
+	"github.com/lonelycode/osin"
 	"github.com/ohler55/ojg/jp"
 	"github.com/tidwall/gjson"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/apidef/oas"
+	"github.com/TykTechnologies/tyk/ctx"
+	"github.com/TykTechnologies/tyk/internal/cache"
+	tykerrors "github.com/TykTechnologies/tyk/internal/errors"
+	"github.com/TykTechnologies/tyk/internal/model"
+	"github.com/TykTechnologies/tyk/internal/otel"
 	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/user"
-	"github.com/go-jose/go-jose/v3"
-	"github.com/golang-jwt/jwt/v4"
-	"github.com/lonelycode/osin"
-
-	"github.com/TykTechnologies/tyk/internal/cache"
 )
 
 type JWTMiddleware struct {
 	*BaseMiddleware
 }
-
-var JWKCaches = sync.Map{}
 
 const (
 	KID       = "kid"
@@ -76,8 +76,8 @@ func (k *JWTMiddleware) Init() {
 		go func() {
 			k.Logger().Debug("Pre-fetching JWKs asynchronously")
 			// Drop the previous cache for the API ID
-			JWKCaches.Delete(k.Spec.APIID)
-			jwkCache := loadOrCreateJWKCacheByApiID(k.Spec.APIID)
+			k.Gw.deleteJWKCacheByAPIID(k.Spec.APIID)
+			jwkCache := k.Gw.loadOrCreateJWKCacheByApiID(k.Spec.APIID)
 
 			// Create client factory for JWK fetching
 			clientFactory := NewExternalHTTPClientFactory(k.Gw)
@@ -97,7 +97,6 @@ func (k *JWTMiddleware) Init() {
 				}
 
 				if err != nil {
-					k.Logger().WithError(err).Infof("Failed to fetch or decode JWKs from %s", jwk.URL)
 					continue
 				}
 
@@ -114,8 +113,8 @@ func (k *JWTMiddleware) Unload() {
 	// Init tries to clean the cache for the API ID when it starts
 	spec := k.Gw.getApiSpec(k.Spec.APIID)
 	if spec == nil {
-		// Drop the cache for API ID if it's removed from Tyk
-		JWKCaches.Delete(k.Spec.APIID)
+		// delete the cache from the global map and stop its janitor.
+		k.Gw.deleteJWKCacheByAPIID(k.Spec.APIID)
 	}
 }
 
@@ -124,17 +123,7 @@ func (k *JWTMiddleware) EnabledForSpec() bool {
 }
 
 func (k *JWTMiddleware) loadOrCreateJWKCache() cache.Repository {
-	return loadOrCreateJWKCacheByApiID(k.Spec.APIID)
-}
-
-func loadOrCreateJWKCacheByApiID(apiID string) cache.Repository {
-	raw, _ := JWKCaches.LoadOrStore(apiID, cache.New(240, 30))
-	jwkCache, ok := raw.(cache.Repository)
-	if !ok {
-		// This should not be possible
-		panic("JWKCache instance must implement cache.Repository")
-	}
-	return jwkCache
+	return k.Gw.loadOrCreateJWKCacheByApiID(k.Spec.APIID)
 }
 
 type JWK struct {
@@ -180,14 +169,14 @@ func (k *JWTMiddleware) legacyGetSecretFromURL(url, kid, keyType string) (interf
 	if !found {
 		resp, err := client.Get(url)
 		if err != nil {
-			k.Logger().WithError(err).Error("Failed to get resource URL")
+			k.Gw.logJWKError(k.Logger(), url, err)
 			return nil, err
 		}
 		defer resp.Body.Close()
 
 		// Decode it
 		if err := json.NewDecoder(resp.Body).Decode(&jwkSet); err != nil {
-			k.Logger().WithError(err).Error("Failed to decode body JWK")
+			k.Gw.logJWKError(k.Logger(), url, err)
 			return nil, err
 		}
 
@@ -242,6 +231,7 @@ func (k *JWTMiddleware) getSecretFromURL(url string, kidVal interface{}, keyType
 
 		decodedURL, err := base64.StdEncoding.DecodeString(cachedAPIDef.JWTSource)
 		if err != nil {
+			k.Logger().WithError(err).Errorf("JWKS source decode failed: %s is not a base64 string", cachedAPIDef.JWTSource)
 			return nil, err
 		}
 
@@ -269,6 +259,7 @@ func (k *JWTMiddleware) getSecretFromURL(url string, kidVal interface{}, keyType
 		client, clientErr := clientFactory.CreateJWKClient()
 		if clientErr == nil {
 			if jwkSet, err = getJWKWithClient(url, client); err != nil {
+				k.Gw.logJWKError(k.Logger(), url, err)
 				k.Logger().WithError(err).Info("Failed to decode JWKs body with factory client. Trying x5c PEM fallback.")
 			}
 		}
@@ -276,7 +267,8 @@ func (k *JWTMiddleware) getSecretFromURL(url string, kidVal interface{}, keyType
 		// Fallback to original method if factory fails or JWK fetch fails
 		if clientErr != nil || err != nil {
 			if jwkSet, err = GetJWK(url, k.Gw.GetConfig().JWTSSLInsecureSkipVerify); err != nil {
-				k.Logger().WithError(err).Info("Failed to decode JWKs body. Trying x5c PEM fallback.")
+				k.Gw.logJWKError(k.Logger(), url, err)
+				k.Logger().Info("Failed to decode JWKs body. Trying x5c PEM fallback.")
 
 				key, legacyError := k.legacyGetSecretFromURL(url, kid, keyType)
 				if legacyError == nil {
@@ -341,6 +333,7 @@ func (k *JWTMiddleware) getSecretToVerifySignature(r *http.Request, token *jwt.T
 		// If not, return the actual value
 		decodedCert, err := base64.StdEncoding.DecodeString(config.JWTSource)
 		if err != nil {
+			k.Logger().WithError(err).Errorf("JWKS source decode failed: %s is not a base64 string", config.JWTSource)
 			return nil, err
 		}
 
@@ -385,7 +378,7 @@ func (k *JWTMiddleware) collectCachedJWKsFromCache(jwkURIs []apidef.JWK) (jwkSet
 		}
 		jwkSet, ok := cachedItem.(*jose.JSONWebKeySet)
 		if !ok {
-			k.Logger().Warnf("Invalid JWK cache format for APIID %s, URL %s — ignoring", k.Spec.APIID, jwkURI.URL)
+			k.Logger().Warnf("Invalid JWK cache format for APIID %s, URL %s ? ignoring", k.Spec.APIID, jwkURI.URL)
 		}
 		jwkSets = append(jwkSets, jwkSet)
 	}
@@ -421,7 +414,7 @@ func (k *JWTMiddleware) getSecretFromMultipleJWKURIs(jwkURIs []apidef.JWK, kidVa
 		}
 
 		if jwkURLsChanged(cachedAPIDef.JWTJwksURIs, jwkURIs) {
-			k.Logger().Infof("Detected change in JWK URLs — refreshing cache for APIID %s", k.Spec.APIID)
+			k.Logger().Infof("Detected change in JWK URLs ? refreshing cache for APIID %s", k.Spec.APIID)
 			cacheOutdated = true
 		} else {
 			jwkSets = k.collectCachedJWKsFromCache(jwkURIs)
@@ -452,7 +445,7 @@ func (k *JWTMiddleware) getSecretFromMultipleJWKURIs(jwkURIs []apidef.JWK, kidVa
 			}
 
 			if err != nil {
-				k.Logger().WithError(err).Infof("Failed to fetch or decode JWKs from %s", jwk.URL)
+				k.Gw.logJWKError(k.Logger(), jwk.URL, err)
 				fallbackJWKURIs = append(fallbackJWKURIs, jwk)
 				continue
 			}
@@ -508,36 +501,28 @@ func jwkURLsChanged(a, b []apidef.JWK) bool {
 
 func (k *JWTMiddleware) getPolicyIDFromToken(claims jwt.MapClaims) (string, bool) {
 	if k.Spec.IsOAS {
-		policyID := ""
-		found := false
 		fieldNames := k.Spec.OAS.GetJWTConfiguration().BasePolicyClaims
 		if len(fieldNames) == 0 && k.Spec.OAS.GetJWTConfiguration().PolicyFieldName != "" {
 			fieldNames = append(fieldNames, k.Spec.OAS.GetJWTConfiguration().PolicyFieldName)
 		}
-		for _, c := range fieldNames {
-			policyID, found = claims[c].(string)
-			if found {
-				break
+		for _, claimField := range fieldNames {
+			if policyID, found := getClaimValue(claims, claimField); found {
+				k.Logger().Debugf("Found policy in claim: %s", claimField)
+				return policyID, true
 			}
 		}
 
-		if !found || policyID == "" {
-			k.Logger().Debugf("Could not identify a policy to apply to this token from fields: %v", fieldNames)
-			return "", false
-		}
-		return policyID, true
+		k.Logger().Debugf("Could not identify a policy to apply to this token from fields: %v", fieldNames)
+		return "", false
 	} else {
-		policyID, foundPolicy := claims[k.Spec.JWTPolicyFieldName].(string)
-		if !foundPolicy {
-			k.Logger().Debugf("Could not identify a policy to apply to this token from field: %s", k.Spec.JWTPolicyFieldName)
-			return "", false
+		// Legacy path - also support nested claims
+		if policyID, found := getClaimValue(claims, k.Spec.JWTPolicyFieldName); found {
+			k.Logger().Debugf("Found policy in claim: %s", k.Spec.JWTPolicyFieldName)
+			return policyID, true
 		}
 
-		if policyID == "" {
-			k.Logger().Errorf("Policy field %s has empty value", k.Spec.JWTPolicyFieldName)
-			return "", false
-		}
-		return policyID, true
+		k.Logger().Debugf("Could not identify a policy to apply to this token from field: %s", k.Spec.JWTPolicyFieldName)
+		return "", false
 	}
 }
 
@@ -629,6 +614,31 @@ func toScopeStringsSlice(v interface{}, scopeSlice *[]string, nested bool) []str
 	return *scopeSlice
 }
 
+// getClaimValue attempts to retrieve a string value from JWT claims using a two-step lookup:
+// 1. First, it checks for a literal key (backward compatibility for keys with dots in their names)
+// 2. If not found and the field contains a dot, it attempts nested lookup (e.g., "user.id" -> claims["user"]["id"])
+//
+// Returns the claim value and a boolean indicating if it was found.
+func getClaimValue(claims jwt.MapClaims, claimField string) (string, bool) {
+	// STEP 1: Try literal key first (backward compatibility)
+	// Handles edge case where claim key contains literal dots (e.g., "user.id" as a key)
+	if value, found := claims[claimField].(string); found && value != "" {
+		return value, true
+	}
+
+	// STEP 2: Try nested lookup (new feature)
+	// Only if literal key wasn't found AND the field contains a dot
+	if strings.Contains(claimField, ".") {
+		if value := nestedMapLookup(claims, strings.Split(claimField, ".")...); value != nil {
+			if strValue, ok := value.(string); ok && strValue != "" {
+				return strValue, true
+			}
+		}
+	}
+
+	return "", false
+}
+
 func nestedMapLookup(m map[string]interface{}, ks ...string) interface{} {
 	var c interface{} = m
 	for _, k := range ks {
@@ -718,36 +728,38 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 		// We need a base policy as a template, either get it from the token itself OR a proxy client ID within Tyk
 		basePolicyID, foundPolicy = k.getBasePolicyID(r, claims)
 		if !foundPolicy {
-			if len(k.Spec.JWTDefaultPolicies) == 0 {
-				k.reportLoginFailure(baseFieldData, r)
-				return errors.New("key not authorized: no matching policy found"), http.StatusForbidden
-			} else {
+			// Only use default policies if configured - scope mapping may provide policies later
+			if len(k.Spec.JWTDefaultPolicies) > 0 {
 				isDefaultPol = true
 				basePolicyID = k.Spec.JWTDefaultPolicies[0]
 			}
 		}
 
-		session, err = k.Gw.generateSessionFromPolicy(basePolicyID,
-			k.Spec.OrgID,
-			true)
+		// Only generate from policy if we have a base policy ID
+		if basePolicyID != "" {
+			session, err = k.Gw.generateSessionFromPolicy(basePolicyID,
+				k.Spec.OrgID,
+				true)
 
-		// If base policy is one of the defaults, apply other ones as well
-		if isDefaultPol {
-			for _, pol := range k.Spec.JWTDefaultPolicies {
-				if !contains(session.ApplyPolicies, pol) {
-					session.ApplyPolicies = append(session.ApplyPolicies, pol)
+			if isDefaultPol {
+				for _, pol := range k.Spec.JWTDefaultPolicies {
+					if !contains(session.ApplyPolicies, pol) {
+						session.ApplyPolicies = append(session.ApplyPolicies, pol)
+					}
 				}
 			}
-		}
 
-		if err := k.ApplyPolicies(&session); err != nil {
-			return errors.New("failed to create key: " + err.Error()), http.StatusInternalServerError
-		}
+			if err := k.ApplyPolicies(&session); err != nil {
+				return errors.New("failed to create key: " + err.Error()), http.StatusInternalServerError
+			}
 
-		if err != nil {
-			k.reportLoginFailure(baseFieldData, r)
-			k.Logger().Error("Could not find a valid policy to apply to this token!")
-			return errors.New("key not authorized: no matching policy"), http.StatusForbidden
+			if err != nil {
+				k.reportLoginFailure(baseFieldData, r)
+				k.Logger().Error("Could not find a valid policy to apply to this token!")
+				return errors.New("key not authorized: no matching policy"), http.StatusForbidden
+			}
+		} else {
+			session = user.SessionState{OrgID: k.Spec.OrgID}
 		}
 
 		//override session expiry with JWT if longer lived
@@ -767,22 +779,21 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 		// extract policy ID from JWT token
 		basePolicyID, foundPolicy = k.getBasePolicyID(r, claims)
 		if !foundPolicy {
-			if len(k.Spec.JWTDefaultPolicies) == 0 {
-				k.reportLoginFailure(baseFieldData, r)
-				return errors.New("key not authorized: no matching policy found"), http.StatusForbidden
-			} else {
+			if len(k.Spec.JWTDefaultPolicies) > 0 {
 				isDefaultPol = true
 				basePolicyID = k.Spec.JWTDefaultPolicies[0]
 			}
 		}
-		// check if we received a valid policy ID in claim
-		k.Gw.policiesMu.RLock()
-		policy, ok := k.Gw.policiesByID[basePolicyID]
-		k.Gw.policiesMu.RUnlock()
-		if !ok {
-			k.reportLoginFailure(baseFieldData, r)
-			k.Logger().Error("Policy ID found is invalid!")
-			return errors.New("key not authorized: no matching policy"), http.StatusForbidden
+		// check if we received a valid policy ID in claim (skip if no base policy for scope-only auth)
+		var policy user.Policy
+		var ok bool
+		if basePolicyID != "" {
+			policy, ok = k.Gw.policies.PolicyByID(model.NewScopedCustomPolicyId(k.Spec.OrgID, basePolicyID))
+			if !ok {
+				k.reportLoginFailure(baseFieldData, r)
+				k.Logger().Error("Policy ID found is invalid!")
+				return errors.New("key not authorized: no matching policy"), http.StatusForbidden
+			}
 		}
 		// check if token for this session was switched to another valid policy
 		pols := session.PolicyIDs()
@@ -810,7 +821,7 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 			}
 		}
 
-		if !contains(pols, basePolicyID) || defaultPolicyListChanged {
+		if basePolicyID != "" && (!contains(pols, basePolicyID) || defaultPolicyListChanged) {
 			if policy.OrgID != k.Spec.OrgID {
 				k.reportLoginFailure(baseFieldData, r)
 				k.Logger().Error("Policy ID found is invalid (wrong ownership)!")
@@ -855,11 +866,13 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 		}
 
 		if scope := getScopeFromClaim(claims, scopeClaimName); len(scope) > 0 {
-			polIDs := []string{
-				basePolicyID, // add base policy as a first one
+			// Start with base policy if it exists
+			polIDs := []string{}
+			if basePolicyID != "" {
+				polIDs = []string{basePolicyID}
 			}
 
-			// // If specified, scopes should not use default policy
+			// If specified, scopes should not use default policy
 			if isDefaultPol {
 				polIDs = []string{}
 			}
@@ -893,12 +906,32 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 				return errors.New("key not authorized: could not apply several policies"), http.StatusForbidden
 			}
 
+		} else if basePolicyID == "" && exists {
+			// Security: existing session with no scope in token and no base policy
+			// Reject to prevent privilege escalation (token should reset policies)
+			k.reportLoginFailure(baseFieldData, r)
+			k.Logger().Error("Existing session requires scope or base policy when scope mapping is configured")
+			return errors.New("key not authorized: no scope or policy in token"), http.StatusForbidden
+		}
+	}
+
+	if basePolicyID == "" && len(k.Spec.JWTDefaultPolicies) == 0 {
+		if len(session.PolicyIDs()) == 0 {
+			k.reportLoginFailure(baseFieldData, r)
+			k.Logger().Error("No policies could be determined from token (no base policy, no valid scopes)")
+			return errors.New("key not authorized: no matching policy found"), http.StatusForbidden
+		} else if exists && len(k.Spec.GetScopeToPolicyMapping()) == 0 {
+			k.reportLoginFailure(baseFieldData, r)
+			k.Logger().Error("Existing session requires policy in token when no defaults configured")
+			return errors.New("key not authorized: no matching policy found"), http.StatusForbidden
 		}
 	}
 
 	oauthClientID := ""
-	// Get the OAuth client ID if available:
+	// Get the OAuth client ID if available.
+	// This step is skipped for external IDPs if IDPClientIDMappingDisabled is set to true.
 	if !k.Spec.IDPClientIDMappingDisabled {
+		k.Logger().Debug("IDP client ID mapping enabled, attempting to retrieve OAuth client ID from claims.")
 		oauthClientID = k.getOAuthClientIDFromClaim(claims)
 	}
 
@@ -944,7 +977,8 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 				}
 			}
 		} else {
-			k.Logger().WithError(err).Debug("Couldn't get OAuth client")
+			k.Logger().WithError(err).
+				Warnf("Failed to retrieve OAuth client. For external IDPs, consider disabling IDP client ID mapping for better performance.")
 		}
 	}
 
@@ -957,6 +991,7 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 		if updateSession {
 			k.Gw.SessionCache.Set(session.KeyHash(), session.Clone(), cache.DefaultExpiration)
 		}
+		ctxSetSpanAttributes(r, k.Name(), otel.APIKeyAliasAttribute(session.Alias))
 	}
 	ctxSetJWTContextVars(k.Spec, r, token)
 
@@ -1005,6 +1040,7 @@ func (k *JWTMiddleware) processOneToOneTokenMap(r *http.Request, token *jwt.Toke
 
 	k.Logger().Debug("Raw key ID found.")
 	ctxSetSession(r, &session, false, k.Gw.GetConfig().HashKeys)
+	ctxSetSpanAttributes(r, k.Name(), otel.APIKeyAliasAttribute(session.Alias))
 	ctxSetJWTContextVars(k.Spec, r, token)
 	return nil, http.StatusOK
 }
@@ -1032,6 +1068,7 @@ func (k *JWTMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, _
 		log.Debug("Raw data was: ", rawJWT)
 		log.Debug("Headers are: ", r.Header)
 
+		ctx.SetErrorClassification(r, tykerrors.ClassifyJWTError(tykerrors.ErrTypeAuthFieldMissing, k.Name()))
 		k.reportLoginFailure(tykId, r)
 		return errors.New("Authorization field missing"), http.StatusBadRequest
 	}
@@ -1060,6 +1097,12 @@ func (k *JWTMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, _
 
 	if err == nil && token.Valid {
 		if err := k.validateClaims(token); err != nil {
+			errType := tykerrors.ErrTypeClaimsInvalid
+			var vErr *jwt.ValidationError
+			if errors.As(err, &vErr) && vErr.Errors&jwt.ValidationErrorExpired != 0 {
+				errType = tykerrors.ErrTypeTokenExpired
+			}
+			ctx.SetErrorClassification(r, tykerrors.ClassifyJWTError(errType, k.Name()))
 			return errors.New("Key not authorized: " + err.Error()), http.StatusUnauthorized
 		}
 
@@ -1083,9 +1126,11 @@ func (k *JWTMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, _
 		logger.WithError(err).Error("JWT validation error")
 		errorDetails := strings.Split(err.Error(), ":")
 		if errorDetails[0] == UnexpectedSigningMethod {
+			ctx.SetErrorClassification(r, tykerrors.ClassifyJWTError(tykerrors.ErrTypeUnexpectedSigningMethod, k.Name()))
 			return errors.New(MsgKeyNotAuthorizedUnexpectedSigningMethod), http.StatusForbidden
 		}
 	}
+	ctx.SetErrorClassification(r, tykerrors.ClassifyJWTError(tykerrors.ErrTypeTokenInvalid, k.Name()))
 	return errors.New("Key not authorized"), http.StatusForbidden
 }
 
@@ -1366,9 +1411,15 @@ func ctxSetJWTContextVars(s *APISpec, r *http.Request, token *jwt.Token) {
 }
 
 func (gw *Gateway) generateSessionFromPolicy(policyID, orgID string, enforceOrg bool) (user.SessionState, error) {
-	gw.policiesMu.RLock()
-	policy, ok := gw.policiesByID[policyID]
-	gw.policiesMu.RUnlock()
+	var polId model.PolicyID
+
+	if enforceOrg {
+		polId = model.NewScopedCustomPolicyId(orgID, policyID)
+	} else {
+		polId = model.NonScopedLastInsertedPolicyId(policyID)
+	}
+
+	policy, ok := gw.policies.PolicyByID(polId)
 	session := user.SessionState{}
 
 	if !ok {
@@ -1376,7 +1427,6 @@ func (gw *Gateway) generateSessionFromPolicy(policyID, orgID string, enforceOrg 
 	}
 	// Check ownership, policy org owner must be the same as API,
 	// otherwise you could overwrite a session key with a policy from a different org!
-
 	if enforceOrg {
 		if policy.OrgID != orgID {
 			log.Error("Attempting to apply policy from different organisation to key, skipping")
@@ -1505,59 +1555,103 @@ func timeValidateJWTClaims(c jwt.MapClaims, expiresAt, issuedAt, notBefore uint6
 
 // getUserIDFromClaim parses jwt claims and get the userID from provided identityBaseField.
 func getUserIDFromClaim(claims jwt.MapClaims, identityBaseField string, shouldFallback bool) (string, error) {
-	var (
-		userID string
-		found  bool
-	)
-
 	if identityBaseField != "" {
-		if userID, found = claims[identityBaseField].(string); found {
-			if len(userID) > 0 {
-				log.WithField("userId", userID).Debug("Found User Id in Base Field")
-				return userID, nil
-			}
-
-			err := fmt.Errorf("%w, claim: %s", ErrEmptyUserIDInClaim, identityBaseField)
-			log.Error(err)
-			return "", err
-		}
-
-		if !found {
-			log.WithField("Base Field", identityBaseField).Warning("Base Field claim not found, trying to find user ID in 'sub' claim.")
-		}
-	}
-
-	if userID, found = claims[SUB].(string); shouldFallback && found {
-		if len(userID) > 0 {
-			log.WithField("userId", userID).Debug("Found User Id in 'sub' claim")
+		if userID, found := getClaimValue(claims, identityBaseField); found {
+			log.WithField("userId", userID).Debug("Found User Id in Base Field")
 			return userID, nil
 		}
 
-		log.Error(ErrEmptyUserIDInSubClaim)
-		return "", ErrEmptyUserIDInSubClaim
+		// Check if the field exists but is empty
+		if value, exists := claims[identityBaseField]; exists {
+			if strValue, ok := value.(string); ok && strValue == "" {
+				err := fmt.Errorf("%w, claim: %s", ErrEmptyUserIDInClaim, identityBaseField)
+				log.Error(err)
+				return "", err
+			}
+		}
+
+		// Also check nested path for empty string
+		if strings.Contains(identityBaseField, ".") {
+			if value := nestedMapLookup(claims, strings.Split(identityBaseField, ".")...); value != nil {
+				if strValue, ok := value.(string); ok && strValue == "" {
+					err := fmt.Errorf("%w, claim: %s", ErrEmptyUserIDInClaim, identityBaseField)
+					log.Error(err)
+					return "", err
+				}
+			}
+		}
+
+		log.WithField("Base Field", identityBaseField).Warning("Base Field claim not found, trying to find user ID in 'sub' claim.")
+	}
+
+	if shouldFallback {
+		if userID, found := claims[SUB].(string); found {
+			if len(userID) > 0 {
+				log.WithField("userId", userID).Debug("Found User Id in 'sub' claim")
+				return userID, nil
+			}
+
+			log.Error(ErrEmptyUserIDInSubClaim)
+			return "", ErrEmptyUserIDInSubClaim
+		}
 	}
 
 	log.Error(ErrNoSuitableUserIDClaimFound)
 	return "", ErrNoSuitableUserIDClaimFound
 }
 
+func (gw *Gateway) invalidateJWKSCacheByAPIID(apiID string) {
+	gw.deleteJWKCacheByAPIID(apiID)
+	mainLog.Debugf("JWKS cache for API: %s has been invalidated", apiID)
+}
+
 func (gw *Gateway) invalidateJWKSCacheForAPIID(w http.ResponseWriter, r *http.Request) {
 	apiID := mux.Vars(r)["apiID"]
-	raw, ok := JWKCaches.Load(apiID)
-	if ok {
-		jwkCache, interfaceOK := raw.(cache.Repository)
-		if !interfaceOK {
-			panic("JWKCache must implement cache.Repository")
-		}
-		jwkCache.Flush()
-	}
+	gw.invalidateJWKSCacheByAPIID(apiID)
 	// Cache invalidation is idempotent: calling it ensures the key is absent,
 	// regardless of whether it was cached before or not.
 	doJSONWrite(w, http.StatusOK, apiOk("cache invalidated"))
 }
 
 func (gw *Gateway) invalidateJWKSCacheForAllAPIs(w http.ResponseWriter, _ *http.Request) {
-	JWKCaches.Clear()
+	gw.apiJWKCaches.Range(func(key, _ any) bool {
+		apiID, ok := key.(string)
+		if ok {
+			gw.deleteJWKCacheByAPIID(apiID)
+		}
+		return true
+	})
 
 	doJSONWrite(w, http.StatusOK, apiOk("cache invalidated"))
+}
+
+func (gw *Gateway) loadOrCreateJWKCacheByApiID(apiID string) cache.Repository {
+	if raw, ok := gw.apiJWKCaches.Load(apiID); ok {
+		if jwkCache, ok := raw.(cache.Repository); ok {
+			return jwkCache
+		}
+	}
+
+	newCache := buildJWKSCache(gw.GetConfig())
+	raw, loaded := gw.apiJWKCaches.LoadOrStore(apiID, newCache)
+
+	// If another goroutine won the race, close the unused cache
+	if loaded {
+		newCache.Close()
+	}
+
+	jwkCache, ok := raw.(cache.Repository)
+	if !ok {
+		panic("JWKCache instance must implement cache.Repository")
+	}
+
+	return jwkCache
+}
+
+func (gw *Gateway) deleteJWKCacheByAPIID(apiID string) {
+	if existing, ok := gw.apiJWKCaches.LoadAndDelete(apiID); ok {
+		if repo, ok := existing.(cache.Repository); ok {
+			repo.Close()
+		}
+	}
 }
