@@ -2,7 +2,6 @@ package gateway
 
 import (
 	"bytes"
-	"context"
 	"crypto/md5"
 	"errors"
 	"fmt"
@@ -79,18 +78,10 @@ func (tr TraceMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request,
 		cfg := baseMw.Gw.GetConfig()
 		if cfg.OpenTelemetry.Enabled {
 			otel.AddTraceID(r.Context(), w)
-			var span otel.Span
-			if baseMw.Spec.DetailedTracing {
-				var ctx context.Context
-				ctx, span = baseMw.Gw.TracerProvider.Tracer().Start(r.Context(), tr.Name())
-				defer span.End()
-				setContext(r, ctx)
-			} else {
-				span = otel.SpanFromContext(r.Context())
-			}
 
+			span := otel.SpanFromContext(r.Context())
 			err, i := tr.TykMiddleware.ProcessRequest(w, r, conf)
-			if err != nil {
+			if err != nil && span != nil {
 				span.SetStatus(otel.SPAN_STATUS_ERROR, err.Error())
 			}
 
@@ -138,6 +129,22 @@ func (gw *Gateway) createMiddleware(actualMW TykMiddleware) func(http.Handler) h
 
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			// Create span early if OpenTelemetry is enabled
+			if baseMw := mw.Base(); baseMw != nil {
+				cfg := baseMw.Gw.GetConfig()
+				if cfg.OpenTelemetry.Enabled && baseMw.Spec.DetailedTracing {
+					ctx, span := baseMw.Gw.TracerProvider.Tracer().Start(r.Context(), mw.Name())
+					setContext(r, ctx)
+					defer func() {
+						attrs := ctxGetSpanAttributes(r, mw.Name())
+						if len(attrs) > 0 {
+							span.SetAttributes(attrs...)
+						}
+						span.End()
+					}()
+				}
+			}
+
 			logger := mw.Base().SetRequestLogger(r)
 
 			if txn := newrelic.FromContext(r.Context()); txn != nil {
