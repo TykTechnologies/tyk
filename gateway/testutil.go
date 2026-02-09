@@ -1288,6 +1288,18 @@ func (s *Test) newGateway(genConf func(globalConf *config.Config)) *Gateway {
 		gw.GetConfig().DBAppConfOptions.NodeIsSegmented,
 		gw.GetConfig().DBAppConfOptions.Tags)
 
+	gw.MeterProvider = otel.InitOpenTelemetryMetrics(gw.ctx, mainLog.Logger, &gwConfig.OpenTelemetry,
+		gw.GetNodeID(),
+		VERSION,
+		gw.GetConfig().SlaveOptions.UseRPC,
+		gw.GetConfig().SlaveOptions.GroupID,
+		gw.GetConfig().DBAppConfOptions.NodeIsSegmented,
+		gw.GetConfig().DBAppConfOptions.Tags)
+
+	// Create metrics recorder from provider
+	metricsRecorder, _ := otel.NewMetricsRecorder(gw.MeterProvider)
+	gw.MetricsRecorder = metricsRecorder
+
 	return gw
 }
 

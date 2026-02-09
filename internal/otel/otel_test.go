@@ -582,3 +582,50 @@ func TestExtractTraceAndSpanID(t *testing.T) {
 		assert.Len(t, spanID, 16, "span_id should be 16 characters long")
 	})
 }
+
+func TestMetricsRecorder_Disabled(t *testing.T) {
+	t.Run("nil provider returns disabled recorder", func(t *testing.T) {
+		recorder, err := NewMetricsRecorder(nil)
+		assert.NoError(t, err)
+		assert.NotNil(t, recorder)
+		assert.False(t, recorder.Enabled())
+
+		// Should not panic
+		recorder.Record(context.Background(), MetricAttributes{}, MetricLatency{})
+	})
+
+	t.Run("disabled provider returns disabled recorder", func(t *testing.T) {
+		cfg := &OpenTelemetry{
+			Enabled: false,
+		}
+
+		provider := InitOpenTelemetryMetrics(context.Background(), logrus.New(), cfg,
+			"gw-test", "v1.0.0", false, "", false, nil)
+
+		recorder, err := NewMetricsRecorder(provider)
+		assert.NoError(t, err)
+		assert.NotNil(t, recorder)
+		assert.False(t, recorder.Enabled())
+
+		// Should not panic
+		recorder.Record(context.Background(), MetricAttributes{
+			APIID:        "test-api",
+			APIName:      "Test API",
+			OrgID:        "test-org",
+			Method:       "GET",
+			Path:         "/test",
+			ResponseCode: 200,
+		}, MetricLatency{
+			Total:    100.0,
+			Gateway:  50.0,
+			Upstream: 50.0,
+		})
+	})
+}
+
+func TestMetricsRecorder_NilSafe(t *testing.T) {
+	var recorder *MetricsRecorder
+	// Should not panic
+	recorder.Record(context.Background(), MetricAttributes{}, MetricLatency{})
+	assert.False(t, recorder.Enabled())
+}

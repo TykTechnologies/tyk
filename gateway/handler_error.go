@@ -18,6 +18,7 @@ import (
 	"github.com/TykTechnologies/tyk/config"
 
 	"github.com/TykTechnologies/tyk/header"
+	"github.com/TykTechnologies/tyk/internal/otel"
 	"github.com/TykTechnologies/tyk/request"
 )
 
@@ -171,6 +172,9 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 		}
 	}
 
+	// Record RED metrics for errors (before DoNotTrack check as metrics should always be recorded)
+	e.recordREDMetrics(r, errCode)
+
 	if e.Spec.DoNotTrack || ctxGetDoNotTrack(r) {
 		return
 	}
@@ -317,4 +321,32 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 
 	// Report in health check
 	reportHealthValue(e.Spec, BlockedRequestLog, "-1")
+}
+
+// recordREDMetrics records Rate, Errors, and Duration metrics for error responses.
+func (e *ErrorHandler) recordREDMetrics(r *http.Request, errCode int) {
+	if e.Gw.MetricsRecorder == nil || !e.Gw.MetricsRecorder.Enabled() {
+		return
+	}
+
+	// Calculate total latency from request start time
+	var totalMs float64
+	if requestStartTime := ctxGetRequestStartTime(r); !requestStartTime.IsZero() {
+		totalMs = DurationToMillisecond(time.Since(requestStartTime))
+	}
+
+	e.Gw.MetricsRecorder.Record(r.Context(),
+		otel.MetricAttributes{
+			APIID:        e.Spec.APIID,
+			APIName:      e.Spec.Name,
+			OrgID:        e.Spec.OrgID,
+			Method:       r.Method,
+			Path:         e.Spec.Proxy.ListenPath,
+			ResponseCode: errCode,
+		},
+		otel.MetricLatency{
+			Total:    totalMs,
+			Gateway:  totalMs, // For errors, gateway time equals total time
+			Upstream: 0,       // No upstream for errors
+		})
 }

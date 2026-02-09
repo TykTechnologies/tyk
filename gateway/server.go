@@ -135,6 +135,8 @@ type Gateway struct {
 	HostCheckTicker      chan struct{}
 	HostCheckerClient    *http.Client
 	TracerProvider       otel.TracerProvider
+	MeterProvider        otel.MeterProvider
+	MetricsRecorder      *otel.MetricsRecorder
 	NewRelicApplication  *newrelic.Application
 
 	keyGen DefaultKeyGenerator
@@ -1915,6 +1917,21 @@ func Start() {
 		gw.GetConfig().SlaveOptions.GroupID,
 		gw.GetConfig().DBAppConfOptions.NodeIsSegmented,
 		gw.GetConfig().DBAppConfOptions.Tags)
+
+	gw.MeterProvider = otel.InitOpenTelemetryMetrics(gw.ctx, mainLog.Logger, &gwConfig.OpenTelemetry,
+		gw.GetNodeID(),
+		VERSION,
+		gw.GetConfig().SlaveOptions.UseRPC,
+		gw.GetConfig().SlaveOptions.GroupID,
+		gw.GetConfig().DBAppConfOptions.NodeIsSegmented,
+		gw.GetConfig().DBAppConfOptions.Tags)
+
+	// Create metrics recorder from provider
+	metricsRecorder, err := otel.NewMetricsRecorder(gw.MeterProvider)
+	if err != nil {
+		mainLog.Errorf("Failed to create metrics recorder: %s", err)
+	}
+	gw.MetricsRecorder = metricsRecorder
 
 	gw.start()
 

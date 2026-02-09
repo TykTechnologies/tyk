@@ -434,6 +434,9 @@ func (s *SuccessHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) *http
 
 		s.classifyUpstreamError(r, resp.Response.StatusCode)
 
+		// Record RED metrics
+		s.recordREDMetrics(r, resp.Response.StatusCode, latency)
+
 		s.RecordHit(r, latency, resp.Response.StatusCode, resp.Response, false)
 		s.RecordAccessLog(r, resp.Response, latency)
 	}
@@ -480,10 +483,35 @@ func (s *SuccessHandler) ServeHTTPWithCache(w http.ResponseWriter, r *http.Reque
 
 		s.classifyUpstreamError(r, inRes.Response.StatusCode)
 
+		// Record RED metrics
+		s.recordREDMetrics(r, inRes.Response.StatusCode, latency)
+
 		s.RecordHit(r, latency, inRes.Response.StatusCode, inRes.Response, false)
 		s.RecordAccessLog(r, inRes.Response, latency)
 
 	}
 
 	return inRes
+}
+
+// recordREDMetrics records Rate, Errors, and Duration metrics for the request.
+func (s *SuccessHandler) recordREDMetrics(r *http.Request, statusCode int, latency analytics.Latency) {
+	if s.Gw.MetricsRecorder == nil || !s.Gw.MetricsRecorder.Enabled() {
+		return
+	}
+
+	s.Gw.MetricsRecorder.Record(r.Context(),
+		otel.MetricAttributes{
+			APIID:        s.Spec.APIID,
+			APIName:      s.Spec.Name,
+			OrgID:        s.Spec.OrgID,
+			Method:       r.Method,
+			Path:         s.Spec.Proxy.ListenPath,
+			ResponseCode: statusCode,
+		},
+		otel.MetricLatency{
+			Total:    float64(latency.Total),
+			Gateway:  float64(latency.Gateway),
+			Upstream: float64(latency.Upstream),
+		})
 }
