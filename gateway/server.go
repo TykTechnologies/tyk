@@ -277,9 +277,7 @@ func NewGateway(config config.Config, ctx context.Context) *Gateway {
 
 	gw.SetNodeID("solo-" + uuid.New())
 	gw.SessionID = uuid.New()
-
-	// todo: extract from tests
-	gw.limitHeaderSender = rate.NewSender(rate.SourceQuota)
+	gw.limitHeaderSender = rate.NewSender(config.RateLimitHeadersSource)
 
 	// Only create registry in RPC mode
 	if config.SlaveOptions.UseRPC {
