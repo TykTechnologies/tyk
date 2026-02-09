@@ -5,15 +5,9 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/header"
 	"github.com/TykTechnologies/tyk/user"
-)
-
-type SenderType string
-
-const (
-	SourceQuota     SenderType = "quotas"
-	SourceRateLimit SenderType = "rate_limits"
 )
 
 type (
@@ -35,11 +29,11 @@ type (
 	rateLimitSender struct{}
 )
 
-func NewSender(typ SenderType) HeaderSender {
+func NewSender(typ config.RateLimitHeadersSource) HeaderSender {
 	switch typ {
-	case SourceRateLimit:
+	case config.RateLimitHeadersSourceRateLimit:
 		return &rateLimitSender{}
-	case SourceQuota:
+	case config.RateLimitHeadersSourceQuota:
 		fallthrough
 	default:
 		return &quotaSender{}

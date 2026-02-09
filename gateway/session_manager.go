@@ -50,12 +50,13 @@ const (
 // SessionLimiter is the rate limiter for the API, use ForwardMessage() to
 // check if a message should pass through or not
 type SessionLimiter struct {
-	ctx            context.Context
-	drlManager     *drl.DRL
-	config         *config.Config
-	bucketStore    model.BucketStorage
-	limiterStorage redis.UniversalClient
-	smoothing      *rate.Smoothing
+	ctx                    context.Context
+	drlManager             *drl.DRL
+	config                 *config.Config
+	bucketStore            model.BucketStorage
+	limiterStorage         redis.UniversalClient
+	smoothing              *rate.Smoothing
+	enableContextVariables bool
 }
 
 // NewSessionLimiter initializes the session limiter.
@@ -67,10 +68,11 @@ type SessionLimiter struct {
 // back onto the default gateway storage configuration.
 func NewSessionLimiter(ctx context.Context, conf *config.Config, drlManager *drl.DRL, externalServicesConfig *config.ExternalServiceConfig) SessionLimiter {
 	sessionLimiter := SessionLimiter{
-		ctx:         ctx,
-		drlManager:  drlManager,
-		config:      conf,
-		bucketStore: memorycache.New(ctx),
+		ctx:                    ctx,
+		drlManager:             drlManager,
+		config:                 conf,
+		bucketStore:            memorycache.New(ctx),
+		enableContextVariables: conf.EnableContextVariables,
 	}
 
 	log.Infof("[RATELIMIT] %s", conf.RateLimit.String())
@@ -278,6 +280,23 @@ func (l *SessionLimiter) RateLimitInfo(r *http.Request, api *APISpec, endpoints 
 // Key values to manage rate are Rate and Per, e.g. Rate of 10 messages
 // Per 10 seconds
 func (l *SessionLimiter) ForwardMessage(
+	r *http.Request,
+	session *user.SessionState,
+	rateLimitKey string,
+	quotaKey string,
+	store storage.Handler,
+	enableRL, enableQ bool,
+	api *APISpec,
+	dryRun bool,
+) sessionFailReason {
+
+	return l.extendContext(
+		r,
+		l.forwardMessageInternal(r, session, rateLimitKey, quotaKey, store, enableRL, enableQ, api, dryRun),
+	)
+}
+
+func (l *SessionLimiter) forwardMessageInternal(
 	r *http.Request,
 	session *user.SessionState,
 	rateLimitKey string,
@@ -497,6 +516,8 @@ func (l *SessionLimiter) RedisQuotaExceeded(r *http.Request, session *user.Sessi
 		logger.Debug("[QUOTA] Update quota key")
 
 		l.updateSessionQuota(session, scope, remaining, expiredAt.Unix())
+		l.extendContextWithQuota(r, int(limit.QuotaMax), int(remaining), int(expiredAt.Unix()))
+
 		return blocked
 	}
 
@@ -582,6 +603,50 @@ func (*SessionLimiter) updateSessionQuota(session *user.SessionState, scope stri
 	}
 
 	session.Touch()
+}
+
+func (l *SessionLimiter) extendContext(
+	r *http.Request,
+	result sessionFailReason,
+) sessionFailReason {
+
+	if failRateLimit, ok := result.(sessionFailRateLimit); ok {
+		l.extendContextWithLimits(r, failRateLimit)
+	}
+
+	return result
+}
+
+func (l *SessionLimiter) extendContextWithQuota(
+	r *http.Request,
+	quotaMax, remaining, reset int,
+) {
+
+	if !l.enableContextVariables {
+		return
+	}
+
+	data := ctxGetOrCreateData(r)
+
+	data[ctxDataKeyQuotaLimit] = quotaMax
+	data[ctxDataKeyQuotaRemaining] = remaining
+	data[ctxDataKeyQuotaReset] = reset
+}
+
+func (l *SessionLimiter) extendContextWithLimits(
+	r *http.Request,
+	frl sessionFailRateLimit,
+) {
+
+	if !l.enableContextVariables {
+		return
+	}
+
+	data := ctxGetOrCreateData(r)
+
+	data[ctxDataKeyRateLimitLimit] = int(frl.per)
+	data[ctxDataKeyRateLimitRemaining] = 0
+	data[ctxDataKeyRateLimitReset] = int(frl.reset.Seconds())
 }
 
 type sessionFailReason interface {

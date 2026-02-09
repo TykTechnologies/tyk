@@ -1435,6 +1435,17 @@
           }
         }
       }
+    },
+    "ratelimit_headers_source": {
+      "description": "defines the source for the rate limit headers",
+      "type": ["string"],
+      "enum": ["", "quotas", "rate_limits"],
+      "default": "quotas"
+    },
+    "enable_context_variables": {
+      "description": "enables extending context data by rate-limit information",
+      "type": ["boolean"],
+      "default": false
     }
   }
 }
