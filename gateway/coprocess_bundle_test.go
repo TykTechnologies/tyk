@@ -545,7 +545,7 @@ func TestBundle_Verify(t *testing.T) {
 			usePublicKey:   true,
 			partialVerify:  false,
 			wantErr:        true,
-			wantErrContain: "invalid checksum",
+			wantErrContain: "Bundle isn't signed",
 		},
 		{
 			name: "valid checksum with empty file list using DeepVerify",

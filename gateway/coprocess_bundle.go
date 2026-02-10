@@ -94,12 +94,12 @@ func (b *Bundle) DeepVerify(bundleFs afero.Fs) error {
 		return errors.New("Bundle isn't signed")
 	}
 
-	checkSignature := hasKey && hasSignature
-	if checkSignature {
-		sha256Hash, err := b.Gw.BundleChecksumVerifier(b, bundleFs)
-		if err != nil {
-			return err
-		}
+	// check hash first then check signature
+	sha256Hash, err := b.Gw.BundleChecksumVerifier(b, bundleFs)
+	if err != nil {
+		return err
+	}
+	if hasKey {
 		verifier, err := b.Gw.SignatureVerifier()
 		if err != nil {
 			return err
