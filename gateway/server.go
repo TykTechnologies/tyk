@@ -1942,13 +1942,17 @@ func Start() {
 		defer trace.Close()
 	}
 
-	gw.TracerProvider = otel.InitOpenTelemetry(gw.ctx, mainLog.Logger, &gwConfig.OpenTelemetry,
+	// Use gw.GetConfig() to ensure we get the config loaded from the --conf
+	// flag path (set in initSystem), not the stale local gwConfig which may
+	// have been loaded from the default tyk.conf before initSystem ran.
+	otelCfg := gw.GetConfig()
+	gw.TracerProvider = otel.InitOpenTelemetry(gw.ctx, mainLog.Logger, &otelCfg.OpenTelemetry,
 		gw.GetNodeID(),
 		VERSION,
-		gw.GetConfig().SlaveOptions.UseRPC,
-		gw.GetConfig().SlaveOptions.GroupID,
-		gw.GetConfig().DBAppConfOptions.NodeIsSegmented,
-		gw.GetConfig().DBAppConfOptions.Tags)
+		otelCfg.SlaveOptions.UseRPC,
+		otelCfg.SlaveOptions.GroupID,
+		otelCfg.DBAppConfOptions.NodeIsSegmented,
+		otelCfg.DBAppConfOptions.Tags)
 
 	gw.start()
 

@@ -554,6 +554,102 @@ func TestOTelConfig_BackwardCompatibility(t *testing.T) {
 	})
 }
 
+// TestCustomTraceHeader_EndToEnd verifies the full Gateway flow:
+// InitOpenTelemetry → global propagator set → HTTPHandler wraps chain →
+// incoming request with custom header → span inherits the expected trace ID.
+// This is the exact code path used in production (server.go → api_loader.go).
+func TestCustomTraceHeader_EndToEnd(t *testing.T) {
+	tests := []struct {
+		name               string
+		contextPropagation string
+		customTraceHeader  string
+		headerValue        string
+		expectTraceID      string
+	}{
+		{
+			name:               "custom mode - valid hex",
+			contextPropagation: "custom",
+			customTraceHeader:  "X-Correlation-ID",
+			headerValue:        "0102030405060708090a0b0c0d0e0f10",
+			expectTraceID:      "0102030405060708090a0b0c0d0e0f10",
+		},
+		{
+			name:               "custom mode - non-hex value (SHA-256 hashed)",
+			contextPropagation: "custom",
+			customTraceHeader:  "customtraceheader",
+			headerValue:        "27aa334455667788aabbccddeeff11hh",
+			expectTraceID:      "7150e64eb479f53060b2221e81416dcb",
+		},
+		{
+			name:               "custom mode - arbitrary string (SHA-256 hashed)",
+			contextPropagation: "custom",
+			customTraceHeader:  "customtraceheader",
+			headerValue:        "stuffabc",
+			expectTraceID:      "e9463449a54def0d61a12b4df1c2d180",
+		},
+		{
+			name:               "tracecontext mode with custom header",
+			contextPropagation: "tracecontext",
+			customTraceHeader:  "customtraceheader",
+			headerValue:        "26aa334455667788aabbccddeeff11hh",
+			expectTraceID:      "75598d42a9828ef6fbaedf06302b56a4",
+		},
+		{
+			name:               "composite mode with custom header",
+			contextPropagation: "composite",
+			customTraceHeader:  "X-Request-ID",
+			headerValue:        "my-service-request-42",
+			// SHA-256 of "my-service-request-42" first 16 bytes hex-encoded
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Use the same InitOpenTelemetry path the Gateway uses
+			listener, err := net.Listen("tcp", "127.0.0.1:0")
+			assert.NoError(t, err)
+			defer listener.Close()
+
+			cfg := &OpenTelemetry{
+				Enabled:            true,
+				Exporter:           "http",
+				Endpoint:           "http://" + listener.Addr().String(),
+				ContextPropagation: tt.contextPropagation,
+				CustomTraceHeader:  tt.customTraceHeader,
+			}
+
+			provider := InitOpenTelemetry(context.Background(), logrus.New(), cfg,
+				"gw-test", "v1.0.0", false, "", false, nil)
+			assert.NotNil(t, provider)
+			defer func() { _ = provider.Shutdown(context.Background()) }()
+
+			// Capture the trace ID from inside the handler
+			var capturedTraceID string
+
+			inner := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				capturedTraceID = ExtractTraceID(r.Context())
+				w.WriteHeader(http.StatusOK)
+			})
+
+			// Wrap with HTTPHandler — same as api_loader.go:598
+			wrapped := HTTPHandler("test-api", inner, provider)
+
+			req := httptest.NewRequest(http.MethodGet, "/test", nil)
+			req.Header.Set(tt.customTraceHeader, tt.headerValue)
+			rec := httptest.NewRecorder()
+
+			wrapped.ServeHTTP(rec, req)
+
+			assert.NotEmpty(t, capturedTraceID, "trace ID should not be empty")
+
+			if tt.expectTraceID != "" {
+				assert.Equal(t, tt.expectTraceID, capturedTraceID,
+					"trace ID should match the expected normalised value from custom header")
+			}
+		})
+	}
+}
+
 func TestExtractTraceAndSpanID(t *testing.T) {
 	t.Run("returns empty strings when no span in context", func(t *testing.T) {
 		traceID, spanID := ExtractTraceAndSpanID(context.Background())
