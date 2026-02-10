@@ -36,5 +36,5 @@ func (l *Limiter) LeakyBucket(ctx context.Context, key string, rate float64, per
 	// implementation of this function is wrong
 	// 1. it's not a leaky bucket
 	// 2. it's hidden behind compilation flag "dev"
-	return 0, err
+	return res, err
 }
