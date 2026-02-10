@@ -644,6 +644,11 @@ type SecurityConfig struct {
 	// Specify public keys used for Certificate Pinning on global level.
 	PinnedPublicKeys map[string]string `json:"pinned_public_keys"`
 
+	// AllowUnsafeDynamicMTLSToken controls whether certificate presence is required for
+	// dynamic mTLS authentication. If set to false (default), requests with a token but
+	// no certificate will be rejected for APIs using dynamic mTLS.
+	AllowUnsafeDynamicMTLSToken bool `json:"allow_unsafe_dynamic_mtls_token"`
+
 	Certificates CertificatesConfig `json:"certificates"`
 }
 
