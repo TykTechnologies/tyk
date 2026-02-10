@@ -259,6 +259,7 @@ func (gw *Gateway) TykNewSingleHostReverseProxy(target *url.URL, spec *APISpec, 
 			if err != nil {
 				logger.Error("[PROXY] [LOAD BALANCING] ", err)
 				host = allHostsDownURL
+				ctx.SetErrorClassification(req, tykerrors.ClassifyNoHealthyUpstreamsError(target.Host))
 			}
 			lbRemote, err := url.Parse(host)
 			if err != nil {
