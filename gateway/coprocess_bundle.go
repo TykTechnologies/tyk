@@ -115,77 +115,35 @@ func (b *Bundle) DeepVerify(bundleFs afero.Fs) error {
 	return nil
 }
 
-func (b *Bundle) PartialVerify(bundleFs afero.Fs, skipVerifyChecksum bool) error {
-	hasKey := b.Gw.GetConfig().PublicKeyPath != ""
-	if !hasKey {
+func (b *Bundle) PartialVerify(bundleFs afero.Fs, skipVerify bool) error {
+	if skipVerify {
 		return nil
 	}
-
+	hasKey := b.Gw.GetConfig().PublicKeyPath != ""
 	hasSignature := b.Manifest.Signature != ""
-	if !skipVerifyChecksum && !hasSignature {
+
+	if hasKey && !hasSignature {
 		return errors.New("Bundle isn't signed")
 	}
-	if !skipVerifyChecksum {
-		// Make a single call to compute both hashes if needed
-		sha256Hash, err := b.Gw.BundleChecksumVerifier(b, bundleFs)
-		if err != nil {
-			return err
-		}
+	// Make a single call to compute both hashes if needed
+	sha256Hash, err := b.Gw.BundleChecksumVerifier(b, bundleFs)
+	if err != nil {
+		return err
+	}
 
-		verifier, err := b.Gw.SignatureVerifier()
-		if err != nil {
-			return err
-		}
-		signed, err := base64.StdEncoding.DecodeString(b.Manifest.Signature)
-		if err != nil {
-			return err
-		}
-		if err := verifier.VerifyHash(sha256Hash.Sum(nil), signed); err != nil {
-			return err
-		}
+	verifier, err := b.Gw.SignatureVerifier()
+	if err != nil {
+		return err
+	}
+	signed, err := base64.StdEncoding.DecodeString(b.Manifest.Signature)
+	if err != nil {
+		return err
+	}
+	if err := verifier.VerifyHash(sha256Hash.Sum(nil), signed); err != nil {
+		return err
 	}
 	return nil
 }
-
-//// Verify performs signature verification on the bundle file.
-//func (b *Bundle) Verify(bundleFs afero.Fs) error {
-//	log.WithFields(logrus.Fields{
-//		"prefix": "main",
-//	}).Info("----> Verifying bundle: ", b.Spec.CustomMiddlewareBundle)
-//
-//	var useSignature = b.Gw.GetConfig().PublicKeyPath != ""
-//
-//	var (
-//		verifier goverify.Verifier
-//		err      error
-//	)
-//
-//	if useSignature {
-//		// Perform signature verification if a public key path is set:
-//		if b.Manifest.Signature == "" {
-//			// Error: A public key is set, but the bundle isn't signed.
-//			return errors.New("Bundle isn't signed")
-//		}
-//		verifier, err = b.Gw.SignatureVerifier()
-//		if err != nil {
-//			return err
-//		}
-//	}
-//
-//	sha256Hash, err := b.verifyChecksum(bundleFs, useSignature)
-//	if err != nil {
-//		return err
-//	}
-//
-//	if useSignature {
-//		signed, err := base64.StdEncoding.DecodeString(b.Manifest.Signature)
-//		if err != nil {
-//			return err
-//		}
-//		return verifier.VerifyHash(sha256Hash.Sum(nil), signed)
-//	}
-//	return nil
-//}
 
 // AddToSpec attaches the custom middleware settings to an API definition.
 func (b *Bundle) AddToSpec() {
@@ -442,6 +400,9 @@ func loadBundleManifest(bundleFs afero.Fs, bundle *Bundle, spec *APISpec, partia
 		return err
 	}
 
+	log.WithFields(logrus.Fields{
+		"prefix": "main",
+	}).Info("----> Verifying bundle: ", bundle.Spec.CustomMiddlewareBundle)
 	if partial {
 		err = bundle.PartialVerify(bundleFs, skipVerification)
 	} else {

@@ -670,6 +670,46 @@ func TestBundle_Verify(t *testing.T) {
 			skipVerifCheck: true,
 			wantErr:        false,
 		},
+		{
+			name: "partial verify skips signature check on skip check",
+			bundle: Bundle{
+				Name: "test",
+				Spec: &APISpec{
+					APIDefinition: &apidef.APIDefinition{
+						CustomMiddlewareBundle: "test-mw-bundle",
+					},
+				},
+				Manifest: apidef.BundleManifest{
+					Checksum: "invalidchecksum",
+					FileList: []string{},
+				},
+				Gw: &Gateway{},
+			},
+			usePublicKey:   true,
+			partialVerify:  true,
+			skipVerifCheck: true,
+			wantErr:        false,
+		},
+		{
+			name: "partial verify fails signature check on proper check",
+			bundle: Bundle{
+				Name: "test",
+				Spec: &APISpec{
+					APIDefinition: &apidef.APIDefinition{
+						CustomMiddlewareBundle: "test-mw-bundle",
+					},
+				},
+				Manifest: apidef.BundleManifest{
+					Checksum: "invalidchecksum",
+					FileList: []string{},
+				},
+				Gw: &Gateway{},
+			},
+			usePublicKey:   true,
+			partialVerify:  true,
+			skipVerifCheck: false,
+			wantErr:        true,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
