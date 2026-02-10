@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 
@@ -474,4 +475,14 @@ func TestSessionLimiter_RateLimitInfo(t *testing.T) {
 			assert.Equal(t, tt.expected, result)
 		})
 	}
+}
+
+func Test_newSessionFailRateLimit(t *testing.T) {
+	limit := newSessionFailRateLimit(
+		&user.APILimit{RateLimit: user.RateLimit{Rate: 1, Per: 2}},
+		time.Second,
+	)
+	assert.True(t, limit.limit == 1)
+	assert.True(t, limit.per == 2)
+	assert.True(t, limit.reset == time.Second)
 }
