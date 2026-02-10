@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"hash"
 	"net/http"
+	"net/http/httptest"
 	"net/url"
 	"strings"
 	"testing"
@@ -18,6 +19,7 @@ import (
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/apidef/oas"
+	"github.com/TykTechnologies/tyk/internal/otel"
 	"github.com/TykTechnologies/tyk/test"
 	"github.com/TykTechnologies/tyk/user"
 )
@@ -5377,4 +5379,208 @@ func TestIntegration_AND_Groups_With_HMAC(t *testing.T) {
 	}
 
 	ts.Run(t, testCases...)
+}
+
+// TestCompliantMode_OtelAliasAttribute verifies that OTEL span attributes (specifically
+// the API key alias) are propagated from inner auth middlewares to the AuthORWrapper name,
+// so that TraceMiddleware can apply them to the OTEL span.
+func TestCompliantMode_OtelAliasAttribute(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	const testAlias = "test-user-alias"
+
+	// Create JWT policy
+	pID := ts.CreatePolicy(func(p *user.Policy) {
+		p.OrgID = "default"
+		p.AccessRights = map[string]user.AccessDefinition{
+			"test-otel-alias": {
+				APIName:  "Test OTEL Alias",
+				APIID:    "test-otel-alias",
+				Versions: []string{"default"},
+			},
+		}
+	})
+
+	// Create API key with alias
+	apiKey := CreateSession(ts.Gw, func(s *user.SessionState) {
+		s.OrgID = "default"
+		s.Alias = testAlias
+		s.AccessRights = map[string]user.AccessDefinition{
+			"test-otel-alias": {
+				APIName:  "Test OTEL Alias",
+				APIID:    "test-otel-alias",
+				Versions: []string{"default"},
+			},
+		}
+	})
+
+	var loadedSpec *APISpec
+	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		spec.APIID = "test-otel-alias"
+		spec.Name = "Test OTEL Alias"
+		spec.OrgID = "default"
+		spec.Proxy.ListenPath = "/test-otel-alias/"
+		spec.UseKeylessAccess = false
+
+		oasDoc := oas.OAS{}
+		oasDoc.T = openapi3.T{
+			OpenAPI: "3.0.3",
+			Info: &openapi3.Info{
+				Title:   spec.Name,
+				Version: "1.0.0",
+			},
+			Paths: openapi3.NewPaths(),
+			Components: &openapi3.Components{
+				SecuritySchemes: openapi3.SecuritySchemes{
+					"jwt": &openapi3.SecuritySchemeRef{
+						Value: &openapi3.SecurityScheme{
+							Type:         "http",
+							Scheme:       "bearer",
+							BearerFormat: "JWT",
+						},
+					},
+					"apikey": &openapi3.SecuritySchemeRef{
+						Value: &openapi3.SecurityScheme{
+							Type: "apiKey",
+							In:   "header",
+							Name: "X-API-Key",
+						},
+					},
+				},
+			},
+			Security: openapi3.SecurityRequirements{
+				openapi3.SecurityRequirement{"jwt": []string{}},
+				openapi3.SecurityRequirement{"apikey": []string{}},
+			},
+		}
+
+		enabled := true
+		tykExtension := &oas.XTykAPIGateway{
+			Info: oas.Info{
+				ID:    spec.APIID,
+				Name:  spec.Name,
+				OrgID: "default",
+				State: oas.State{Active: true},
+			},
+			Server: oas.Server{
+				ListenPath: oas.ListenPath{
+					Value: spec.Proxy.ListenPath,
+					Strip: true,
+				},
+				Authentication: &oas.Authentication{
+					Enabled:                true,
+					SecurityProcessingMode: oas.SecurityProcessingModeCompliant,
+				},
+			},
+			Upstream: oas.Upstream{
+				URL: TestHttpAny,
+			},
+		}
+
+		tykExtension.Server.Authentication.SecuritySchemes = oas.SecuritySchemes{
+			"jwt": &oas.JWT{
+				Enabled:           true,
+				Source:            base64.StdEncoding.EncodeToString([]byte(jwtRSAPubKey)),
+				SigningMethod:     "rsa",
+				IdentityBaseField: "user_id",
+				PolicyFieldName:   "policy_id",
+				DefaultPolicies:   []string{pID},
+				AuthSources: oas.AuthSources{
+					Header: &oas.AuthSource{
+						Enabled: true,
+						Name:    "Authorization",
+					},
+				},
+			},
+			"apikey": &oas.Token{
+				Enabled: &enabled,
+				AuthSources: oas.AuthSources{
+					Header: &oas.AuthSource{
+						Enabled: true,
+						Name:    "X-API-Key",
+					},
+				},
+			},
+		}
+
+		oasDoc.SetTykExtension(tykExtension)
+		oasDoc.ExtractTo(spec.APIDefinition)
+		spec.IsOAS = true
+		spec.OAS = oasDoc
+
+		loadedSpec = spec
+	})
+
+	// Build the AuthORWrapper the same way api_loader does
+	baseMid := &BaseMiddleware{
+		Spec: loadedSpec,
+		Gw:   ts.Gw,
+	}
+
+	wrapper := &AuthORWrapper{
+		BaseMiddleware: *baseMid.Copy(),
+	}
+	wrapper.Init()
+
+	t.Run("JWT auth propagates alias to AuthORWrapper", func(t *testing.T) {
+		jwtToken := CreateJWKToken(func(t *jwt.Token) {
+			t.Claims.(jwt.MapClaims)["user_id"] = "jwt-otel-user"
+			t.Claims.(jwt.MapClaims)["policy_id"] = pID
+			t.Claims.(jwt.MapClaims)["exp"] = time.Now().Add(time.Hour).Unix()
+		})
+
+		req, _ := http.NewRequest("GET", "/test-otel-alias/", nil)
+		req.Header.Set("Authorization", "Bearer "+jwtToken)
+
+		recorder := httptest.NewRecorder()
+		err, code := wrapper.ProcessRequest(recorder, req, nil)
+		if err != nil {
+			t.Fatalf("Expected no error, got: %v (code: %d)", err, code)
+		}
+
+		attrs := ctxGetSpanAttributes(req, "AuthORWrapper")
+		if len(attrs) == 0 {
+			t.Fatal("Expected span attributes under AuthORWrapper name, got none")
+		}
+
+		// Verify that at least one attribute is an alias attribute
+		hasAlias := false
+		for _, attr := range attrs {
+			if attr.Key == otel.APIKeyAliasAttribute("").Key {
+				hasAlias = true
+				break
+			}
+		}
+		if !hasAlias {
+			t.Errorf("Expected alias span attribute to be propagated to AuthORWrapper, got: %v", attrs)
+		}
+	})
+
+	t.Run("API key auth propagates alias to AuthORWrapper", func(t *testing.T) {
+		req, _ := http.NewRequest("GET", "/test-otel-alias/", nil)
+		req.Header.Set("X-API-Key", apiKey)
+
+		recorder := httptest.NewRecorder()
+		err, code := wrapper.ProcessRequest(recorder, req, nil)
+		if err != nil {
+			t.Fatalf("Expected no error, got: %v (code: %d)", err, code)
+		}
+
+		attrs := ctxGetSpanAttributes(req, "AuthORWrapper")
+		if len(attrs) == 0 {
+			t.Fatal("Expected span attributes under AuthORWrapper name, got none")
+		}
+
+		found := false
+		for _, attr := range attrs {
+			if attr == otel.APIKeyAliasAttribute(testAlias) {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Errorf("Expected alias attribute with value %q under AuthORWrapper, got: %v", testAlias, attrs)
+		}
+	})
 }

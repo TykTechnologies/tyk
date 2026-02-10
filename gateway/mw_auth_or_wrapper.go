@@ -8,6 +8,7 @@ import (
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/apidef/oas"
 	"github.com/TykTechnologies/tyk/coprocess"
+	"github.com/TykTechnologies/tyk/internal/otel"
 )
 
 // OpenAPI security scheme constants
@@ -109,6 +110,20 @@ func (a *AuthORWrapper) ProcessRequest(w http.ResponseWriter, r *http.Request, _
 			}
 
 			*r = *lastSuccessfulClone
+
+			// Propagate span attributes from successful inner middlewares to AuthORWrapper
+			// so TraceMiddleware can apply them to the OTEL span.
+			var spanAttrs []otel.SpanAttribute
+			for _, schemeName := range requirement {
+				if mw := a.getMiddlewareForScheme(schemeName); mw != nil {
+					if attrs := ctxGetSpanAttributes(r, mw.Name()); len(attrs) > 0 {
+						spanAttrs = append(spanAttrs, attrs...)
+					}
+				}
+			}
+			if len(spanAttrs) > 0 {
+				ctxSetSpanAttributes(r, a.Name(), spanAttrs...)
+			}
 
 			return nil, http.StatusOK
 		}
