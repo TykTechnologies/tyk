@@ -110,6 +110,16 @@ func (a *AuthORWrapper) ProcessRequest(w http.ResponseWriter, r *http.Request, _
 
 			*r = *lastSuccessfulClone
 
+			// Propagate span attributes from successful inner middlewares to AuthORWrapper
+			// so TraceMiddleware can apply them to the OTEL span.
+			for _, schemeName := range requirement {
+				if mw := a.getMiddlewareForScheme(schemeName); mw != nil {
+					if attrs := ctxGetSpanAttributes(r, mw.Name()); len(attrs) > 0 {
+						ctxSetSpanAttributes(r, a.Name(), attrs...)
+					}
+				}
+			}
+
 			return nil, http.StatusOK
 		}
 

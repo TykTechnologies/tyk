@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"hash"
 	"net/http"
+	"net/http/httptest"
 	"net/url"
 	"strings"
 	"testing"
@@ -5377,4 +5378,220 @@ func TestIntegration_AND_Groups_With_HMAC(t *testing.T) {
 	}
 
 	ts.Run(t, testCases...)
+}
+
+// TestCompliantMode_OtelAliasAttribute tests that OTEL span attributes (specifically the
+// apikey alias) are propagated from inner auth middlewares to the AuthORWrapper name
+// in the request context, so that TraceMiddleware can apply them to the OTEL span.
+func TestCompliantMode_OtelAliasAttribute(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	const (
+		testAPIID    = "test-otel-alias"
+		testAPIName  = "Test OTEL Alias"
+		jwtAlias     = "jwt-test-alias"
+		apiKeyAlias  = "apikey-test-alias"
+		listenPath   = "/test-otel-alias/"
+		aliasAttrKey = "tyk.api.apikey.alias"
+	)
+
+	// Create JWT policy
+	pID := ts.CreatePolicy(func(p *user.Policy) {
+		p.OrgID = "default"
+		p.AccessRights = map[string]user.AccessDefinition{
+			testAPIID: {
+				APIName:  testAPIName,
+				APIID:    testAPIID,
+				Versions: []string{"default"},
+			},
+		}
+	})
+
+	// Create API key with alias
+	apiKey := CreateSession(ts.Gw, func(s *user.SessionState) {
+		s.OrgID = "default"
+		s.Alias = apiKeyAlias
+		s.AccessRights = map[string]user.AccessDefinition{
+			testAPIID: {
+				APIName:  testAPIName,
+				APIID:    testAPIID,
+				Versions: []string{"default"},
+			},
+		}
+	})
+
+	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		spec.APIID = testAPIID
+		spec.Name = testAPIName
+		spec.OrgID = "default"
+		spec.Proxy.ListenPath = listenPath
+		spec.UseKeylessAccess = false
+
+		oasDoc := oas.OAS{}
+		oasDoc.T = openapi3.T{
+			OpenAPI: "3.0.3",
+			Info: &openapi3.Info{
+				Title:   spec.Name,
+				Version: "1.0.0",
+			},
+			Paths: openapi3.NewPaths(),
+		}
+
+		oasDoc.T.Components = &openapi3.Components{
+			SecuritySchemes: openapi3.SecuritySchemes{
+				"jwt": &openapi3.SecuritySchemeRef{
+					Value: &openapi3.SecurityScheme{
+						Type:         "http",
+						Scheme:       "bearer",
+						BearerFormat: "JWT",
+					},
+				},
+				"apikey": &openapi3.SecuritySchemeRef{
+					Value: &openapi3.SecurityScheme{
+						Type: "apiKey",
+						In:   "header",
+						Name: "X-API-Key",
+					},
+				},
+			},
+		}
+
+		oasDoc.T.Security = openapi3.SecurityRequirements{
+			openapi3.SecurityRequirement{"jwt": []string{}},
+			openapi3.SecurityRequirement{"apikey": []string{}},
+		}
+
+		enabled := true
+		tykExtension := &oas.XTykAPIGateway{
+			Info: oas.Info{
+				ID:    spec.APIID,
+				Name:  spec.Name,
+				OrgID: "default",
+				State: oas.State{Active: true},
+			},
+			Server: oas.Server{
+				ListenPath: oas.ListenPath{
+					Value: spec.Proxy.ListenPath,
+					Strip: true,
+				},
+				Authentication: &oas.Authentication{
+					Enabled:                true,
+					SecurityProcessingMode: oas.SecurityProcessingModeCompliant,
+				},
+			},
+			Upstream: oas.Upstream{
+				URL: TestHttpAny,
+			},
+		}
+
+		tykExtension.Server.Authentication.SecuritySchemes = oas.SecuritySchemes{
+			"jwt": &oas.JWT{
+				Enabled:           true,
+				Source:            base64.StdEncoding.EncodeToString([]byte(jwtRSAPubKey)),
+				SigningMethod:     "rsa",
+				IdentityBaseField: "user_id",
+				PolicyFieldName:   "policy_id",
+				DefaultPolicies:   []string{pID},
+				AuthSources: oas.AuthSources{
+					Header: &oas.AuthSource{
+						Enabled: true,
+						Name:    "Authorization",
+					},
+				},
+			},
+			"apikey": &oas.Token{
+				Enabled: &enabled,
+				AuthSources: oas.AuthSources{
+					Header: &oas.AuthSource{
+						Enabled: true,
+						Name:    "X-API-Key",
+					},
+				},
+			},
+		}
+
+		oasDoc.SetTykExtension(tykExtension)
+		oasDoc.ExtractTo(spec.APIDefinition)
+		spec.IsOAS = true
+		spec.OAS = oasDoc
+	})
+
+	// Create JWT token - user_id becomes the session alias via JWT identity base field
+	jwtToken := CreateJWKToken(func(t *jwt.Token) {
+		t.Claims.(jwt.MapClaims)["user_id"] = jwtAlias
+		t.Claims.(jwt.MapClaims)["policy_id"] = pID
+		t.Claims.(jwt.MapClaims)["exp"] = time.Now().Add(time.Hour).Unix()
+	})
+
+	// Get the loaded spec and create the AuthORWrapper directly
+	ts.Gw.apisMu.Lock()
+	spec := ts.Gw.apiSpecs[0]
+	ts.Gw.apisMu.Unlock()
+
+	baseMid := &BaseMiddleware{Spec: spec, Gw: ts.Gw}
+	orWrapper := &AuthORWrapper{
+		BaseMiddleware: *baseMid,
+	}
+	orWrapper.Init()
+
+	t.Run("JWT auth propagates alias to AuthORWrapper", func(t *testing.T) {
+		req := TestReq(t, "GET", listenPath, nil)
+		req.Header.Set("Authorization", "Bearer "+jwtToken)
+
+		recorder := httptest.NewRecorder()
+		err, code := orWrapper.ProcessRequest(recorder, req, nil)
+		if err != nil {
+			t.Fatalf("ProcessRequest failed: %v (code: %d)", err, code)
+		}
+
+		attrs := ctxGetSpanAttributes(req, "AuthORWrapper")
+		if len(attrs) == 0 {
+			t.Fatal("expected span attributes under AuthORWrapper, got none")
+		}
+
+		found := false
+		for _, attr := range attrs {
+			if string(attr.Key) == aliasAttrKey {
+				found = true
+				if attr.Value.AsString() != jwtAlias {
+					t.Errorf("expected alias %q, got %q", jwtAlias, attr.Value.AsString())
+				}
+				break
+			}
+		}
+		if !found {
+			t.Errorf("expected attribute %q in span attributes, got: %v", aliasAttrKey, attrs)
+		}
+	})
+
+	t.Run("API key auth propagates alias to AuthORWrapper", func(t *testing.T) {
+		req := TestReq(t, "GET", listenPath, nil)
+		req.Header.Set("X-API-Key", apiKey)
+
+		recorder := httptest.NewRecorder()
+		err, code := orWrapper.ProcessRequest(recorder, req, nil)
+		if err != nil {
+			t.Fatalf("ProcessRequest failed: %v (code: %d)", err, code)
+		}
+
+		attrs := ctxGetSpanAttributes(req, "AuthORWrapper")
+		if len(attrs) == 0 {
+			t.Fatal("expected span attributes under AuthORWrapper, got none")
+		}
+
+		found := false
+		for _, attr := range attrs {
+			if string(attr.Key) == aliasAttrKey {
+				found = true
+				if attr.Value.AsString() != apiKeyAlias {
+					t.Errorf("expected alias %q, got %q", apiKeyAlias, attr.Value.AsString())
+				}
+				break
+			}
+		}
+		if !found {
+			t.Errorf("expected attribute %q in span attributes, got: %v", aliasAttrKey, attrs)
+		}
+	})
 }
