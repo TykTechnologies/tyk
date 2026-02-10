@@ -123,16 +123,16 @@ func (b *Bundle) PartialVerify(bundleFs afero.Fs, skipVerify bool) error {
 		return nil
 	}
 
-	log.WithFields(logrus.Fields{
-		"prefix": "main",
-	}).Info("----> Verifying bundle: ", b.Spec.CustomMiddlewareBundle)
-
 	hasKey := b.Gw.GetConfig().PublicKeyPath != ""
 	hasSignature := b.Manifest.Signature != ""
 
-	if hasKey && !hasSignature {
-		return errors.New("Bundle isn't signed")
+	if !hasSignature {
+		return nil
 	}
+
+	log.WithFields(logrus.Fields{
+		"prefix": "main",
+	}).Info("----> Verifying bundle: ", b.Spec.CustomMiddlewareBundle)
 	// Make a single call to compute both hashes if needed
 	sha256Hash, err := b.Gw.BundleChecksumVerifier(b, bundleFs)
 	if err != nil {

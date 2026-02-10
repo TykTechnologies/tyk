@@ -729,6 +729,46 @@ func TestBundle_Verify(t *testing.T) {
 			usePublicKey:   true,
 			partialVerify:  true,
 			skipVerifCheck: false,
+		},
+		{
+			name: "partial verify: no signature with public key set, should pass",
+			bundle: Bundle{
+				Name: "test",
+				Spec: &APISpec{
+					APIDefinition: &apidef.APIDefinition{
+						CustomMiddlewareBundle: "test-mw-bundle",
+					},
+				},
+				Manifest: apidef.BundleManifest{
+					Checksum: "invalidchecksum",
+					FileList: []string{},
+				},
+				Gw: &Gateway{},
+			},
+			usePublicKey:   true,
+			partialVerify:  true,
+			skipVerifCheck: false,
+			wantErr:        false,
+		},
+		{
+			name: "partial verify: signature and no public key, fail checksum validation",
+			bundle: Bundle{
+				Name: "test",
+				Spec: &APISpec{
+					APIDefinition: &apidef.APIDefinition{
+						CustomMiddlewareBundle: "test-mw-bundle",
+					},
+				},
+				Manifest: apidef.BundleManifest{
+					Checksum:  "invalidchecksum",
+					FileList:  []string{},
+					Signature: "test-signature",
+				},
+				Gw: &Gateway{},
+			},
+			usePublicKey:   false,
+			partialVerify:  true,
+			skipVerifCheck: false,
 			wantErr:        true,
 		},
 	}
