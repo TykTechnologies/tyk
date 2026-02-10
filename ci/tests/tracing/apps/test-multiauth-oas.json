@@ -1,0 +1,90 @@
+{
+    "openapi": "3.0.3",
+    "info": {
+        "title": "MultiAuthTestAPI",
+        "version": "1.0.0"
+    },
+    "paths": {
+        "/anything": {
+            "get": {
+                "operationId": "getAnything",
+                "responses": {
+                    "200": {
+                        "description": "Success"
+                    }
+                }
+            }
+        }
+    },
+    "components": {
+        "securitySchemes": {
+            "jwt": {
+                "type": "http",
+                "scheme": "bearer",
+                "bearerFormat": "JWT"
+            },
+            "authToken": {
+                "type": "apiKey",
+                "in": "header",
+                "name": "X-API-Key"
+            }
+        }
+    },
+    "security": [
+        {"jwt": []},
+        {"authToken": []}
+    ],
+    "x-tyk-api-gateway": {
+        "info": {
+            "id": "multiauth-test-api",
+            "name": "MultiAuthTestAPI",
+            "orgId": "default",
+            "state": {
+                "active": true
+            }
+        },
+        "server": {
+            "listenPath": {
+                "value": "/test-multiauth/",
+                "strip": true
+            },
+            "detailedTracing": {
+                "enabled": true
+            },
+            "authentication": {
+                "enabled": true,
+                "securityProcessingMode": "compliant",
+                "securitySchemes": {
+                    "jwt": {
+                        "enabled": true,
+                        "source": "dHlrLWp3dC10ZXN0LXNlY3JldA==",
+                        "signingMethod": "hmac",
+                        "identityBaseField": "sub",
+                        "defaultPolicies": ["multiauth-test-policy"],
+                        "header": {
+                            "enabled": true,
+                            "name": "Authorization"
+                        }
+                    },
+                    "authToken": {
+                        "enabled": true,
+                        "header": {
+                            "enabled": true,
+                            "name": "X-API-Key"
+                        }
+                    }
+                }
+            }
+        },
+        "upstream": {
+            "url": "http://httpbin:80/"
+        },
+        "middleware": {
+            "global": {
+                "contextVariables": {
+                    "enabled": true
+                }
+            }
+        }
+    }
+}
