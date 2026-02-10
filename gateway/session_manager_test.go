@@ -547,4 +547,62 @@ func TestSessionLimiter(t *testing.T) {
 
 		// key without ttl is rather exception, so it has no sens writing tests for this case
 	})
+
+	t.Run("extendContextWithQuota", func(t *testing.T) {
+		t.Run("extends request with quota information if is enabled", func(t *testing.T) {
+			r, err := http.NewRequestWithContext(t.Context(), http.MethodGet, "/", nil)
+			require.NoError(t, err)
+
+			limiter.enableContextVariables = true
+			limiter.extendContextWithQuota(r, 1, 2, 3)
+
+			data := ctxGetData(r)
+			require.NotNil(t, data)
+			require.Equal(t, 1, data[ctxDataKeyQuotaLimit])
+			require.Equal(t, 2, data[ctxDataKeyQuotaRemaining])
+			require.Equal(t, 3, data[ctxDataKeyQuotaReset])
+		})
+
+		t.Run("does not extend request with quota information if is disabled", func(t *testing.T) {
+			r, err := http.NewRequestWithContext(t.Context(), http.MethodGet, "/", nil)
+			require.NoError(t, err)
+
+			limiter.enableContextVariables = false
+			limiter.extendContextWithQuota(r, 1, 2, 3)
+
+			data := ctxGetData(r)
+			require.Nil(t, data)
+		})
+	})
+
+	t.Run("extendContextWithLimits", func(t *testing.T) {
+		t.Run("extends", func(t *testing.T) {
+			r, err := http.NewRequestWithContext(t.Context(), http.MethodGet, "/", nil)
+			require.NoError(t, err)
+
+			limiter.enableContextVariables = true
+			limiter.extendContextWithLimits(r, sessionFailRateLimit{
+				limit: 1,
+				per:   2,
+				reset: time.Second * 10,
+			})
+
+			data := ctxGetData(r)
+			require.NotNil(t, data)
+			assert.Equal(t, 1, data[ctxDataKeyRateLimitLimit])
+			assert.Equal(t, 0, data[ctxDataKeyRateLimitRemaining])
+			assert.Equal(t, 10, data[ctxDataKeyRateLimitReset])
+		})
+
+		t.Run("does not extend if is disabled", func(t *testing.T) {
+			r, err := http.NewRequestWithContext(t.Context(), http.MethodGet, "/", nil)
+			require.NoError(t, err)
+
+			limiter.enableContextVariables = false
+			limiter.extendContextWithLimits(r, sessionFailRateLimit{})
+
+			data := ctxGetData(r)
+			require.Nil(t, data)
+		})
+	})
 }
