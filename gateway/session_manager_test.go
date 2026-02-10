@@ -7,6 +7,9 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
+	"github.com/TykTechnologies/drl"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
@@ -485,4 +488,63 @@ func Test_newSessionFailRateLimit(t *testing.T) {
 	assert.True(t, limit.limit == 1)
 	assert.True(t, limit.per == 2)
 	assert.True(t, limit.reset == time.Second)
+}
+
+func TestSessionLimiter(t *testing.T) {
+	newSessionLimiter := func(t *testing.T) SessionLimiter {
+		t.Helper()
+		tc := StartTest(nil)
+		t.Cleanup(tc.Close)
+
+		cfg := tc.Gw.GetConfig()
+		drlManager := &drl.DRL{}
+		return NewSessionLimiter(tc.Gw.ctx, &cfg, drlManager, &cfg.ExternalServices)
+	}
+
+	limiter := newSessionLimiter(t)
+	key := "test"
+
+	t.Run("limitSentinel", func(t *testing.T) {
+		t.Run("returns false if key does not exist", func(t *testing.T) {
+			r, err := http.NewRequestWithContext(t.Context(), http.MethodGet, "/", nil)
+			require.NoError(t, err)
+
+			cmd := limiter.limiterStorage.Del(r.Context(), key+SentinelRateLimitKeyPostfix)
+			require.NoError(t, cmd.Err())
+
+			expires, ok := limiter.limitSentinel(
+				r,
+				&user.SessionState{},
+				"test",
+				&user.APILimit{RateLimit: user.RateLimit{Rate: 60, Per: 60}},
+				false,
+			)
+
+			require.False(t, ok, "is not blocked if key does not exist")
+			require.Equal(t, time.Duration(0), expires, "expires is zero")
+		})
+
+		t.Run("returns TTL from the key", func(t *testing.T) {
+			r, err := http.NewRequestWithContext(t.Context(), http.MethodGet, "/", nil)
+			require.NoError(t, err)
+
+			eps := 0.1
+			exp := time.Second * 60
+			cmd := limiter.limiterStorage.SetEx(r.Context(), key+SentinelRateLimitKeyPostfix, "1", exp)
+			require.NoError(t, cmd.Err())
+
+			expires, ok := limiter.limitSentinel(
+				r,
+				&user.SessionState{},
+				"test",
+				&user.APILimit{RateLimit: user.RateLimit{Rate: 60, Per: 60}},
+				false,
+			)
+
+			require.True(t, ok, "is blocked")
+			require.True(t, (expires.Seconds()-exp.Seconds()) < eps, "is in range of epsilon")
+		})
+
+		// key without ttl is rather exception, so it has no sens writing tests for this case
+	})
 }

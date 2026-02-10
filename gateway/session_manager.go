@@ -50,13 +50,12 @@ const (
 // SessionLimiter is the rate limiter for the API, use ForwardMessage() to
 // check if a message should pass through or not
 type SessionLimiter struct {
-	ctx            context.Context
-	drlManager     *drl.DRL
-	config         *config.Config
-	bucketStore    model.BucketStorage
-	limiterStorage redis.UniversalClient
-	smoothing      *rate.Smoothing
-
+	ctx                    context.Context
+	drlManager             *drl.DRL
+	config                 *config.Config
+	bucketStore            model.BucketStorage
+	limiterStorage         redis.UniversalClient
+	smoothing              *rate.Smoothing
 	enableContextVariables bool
 }
 
@@ -67,13 +66,18 @@ type SessionLimiter struct {
 // configured, then redis will be used. If local storage is configured, then
 // in-memory counters will be used. If no storage is configured, it falls
 // back onto the default gateway storage configuration.
-func NewSessionLimiter(ctx context.Context, conf *config.Config, drlManager *drl.DRL, externalServicesConfig *config.ExternalServiceConfig) SessionLimiter {
-	sessionLimiter := SessionLimiter{
-		ctx:         ctx,
-		drlManager:  drlManager,
-		config:      conf,
-		bucketStore: memorycache.New(ctx),
+func NewSessionLimiter(
+	ctx context.Context,
+	conf *config.Config,
+	drlManager *drl.DRL,
+	externalServicesConfig *config.ExternalServiceConfig,
+) SessionLimiter {
 
+	sessionLimiter := SessionLimiter{
+		ctx:                    ctx,
+		drlManager:             drlManager,
+		config:                 conf,
+		bucketStore:            memorycache.New(ctx),
 		enableContextVariables: conf.EnableContextVariables,
 	}
 
@@ -165,7 +169,14 @@ func (l *SessionLimiter) doRollingWindowWrite(r *http.Request, session *user.Ses
 	return blockDuration, shouldBlock
 }
 
-func (l *SessionLimiter) limitSentinel(r *http.Request, session *user.SessionState, rateLimiterKey string, apiLimit *user.APILimit, dryRun bool) (time.Duration, bool) {
+func (l *SessionLimiter) limitSentinel(
+	r *http.Request,
+	session *user.SessionState,
+	rateLimiterKey string,
+	apiLimit *user.APILimit,
+	dryRun bool,
+) (time.Duration, bool) {
+
 	defer func() {
 		go l.doRollingWindowWrite(r, session, rateLimiterKey, apiLimit, dryRun)
 	}()
@@ -175,8 +186,15 @@ func (l *SessionLimiter) limitSentinel(r *http.Request, session *user.SessionSta
 	// but the nearest
 	expires, err := l.limiterStorage.TTL(l.Context(), rateLimiterKey+SentinelRateLimitKeyPostfix).Result()
 
-	// Sentinel is set, fail
-	return expires, err == nil
+	if err != nil {
+		return apiLimit.Duration(), false
+	}
+
+	if expires < 0 {
+		expires = 0
+	}
+
+	return expires, expires > 0
 }
 
 func (l *SessionLimiter) limitRedis(r *http.Request, session *user.SessionState, rateLimiterKey string, apiLimit *user.APILimit, dryRun bool) (time.Duration, bool) {
@@ -197,7 +215,7 @@ func (l *SessionLimiter) limitDRL(bucketKey string, apiLimit *user.APILimit, dry
 
 	userBucket, err := l.bucketStore.Create(bucketKey, cost, time.Duration(per)*time.Second)
 	if err != nil {
-		log.WithError(err).Error("Failed to create bucket!")
+		log.Error("Failed to create bucket!")
 		return model.BucketState{}, true
 	}
 
