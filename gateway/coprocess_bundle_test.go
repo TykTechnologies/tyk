@@ -671,6 +671,27 @@ func TestBundle_Verify(t *testing.T) {
 			wantErr:        false,
 		},
 		{
+			name: "bundle signed but no public key path using PartialVerify",
+			bundle: Bundle{
+				Name: "test",
+				Spec: &APISpec{
+					APIDefinition: &apidef.APIDefinition{
+						CustomMiddlewareBundle: "test-mw-bundle",
+					},
+				},
+				Manifest: apidef.BundleManifest{
+					Checksum:  "invalidchecksum",
+					FileList:  []string{},
+					Signature: "test-signature",
+				},
+				Gw: &Gateway{},
+			},
+			usePublicKey:   false,
+			partialVerify:  true,
+			skipVerifCheck: false,
+			wantErr:        true,
+		},
+		{
 			name: "partial verify skips signature check on skip check",
 			bundle: Bundle{
 				Name: "test",

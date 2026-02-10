@@ -87,6 +87,9 @@ var bundleVerifyPool = sync.Pool{
 }
 
 func (b *Bundle) DeepVerify(bundleFs afero.Fs) error {
+	log.WithFields(logrus.Fields{
+		"prefix": "main",
+	}).Info("----> Verifying bundle: ", b.Spec.CustomMiddlewareBundle)
 	hasKey := b.Gw.GetConfig().PublicKeyPath != ""
 	hasSignature := b.Manifest.Signature != ""
 
@@ -119,6 +122,11 @@ func (b *Bundle) PartialVerify(bundleFs afero.Fs, skipVerify bool) error {
 	if skipVerify {
 		return nil
 	}
+
+	log.WithFields(logrus.Fields{
+		"prefix": "main",
+	}).Info("----> Verifying bundle: ", b.Spec.CustomMiddlewareBundle)
+
 	hasKey := b.Gw.GetConfig().PublicKeyPath != ""
 	hasSignature := b.Manifest.Signature != ""
 
@@ -131,17 +139,20 @@ func (b *Bundle) PartialVerify(bundleFs afero.Fs, skipVerify bool) error {
 		return err
 	}
 
-	verifier, err := b.Gw.SignatureVerifier()
-	if err != nil {
-		return err
+	if hasKey {
+		verifier, err := b.Gw.SignatureVerifier()
+		if err != nil {
+			return err
+		}
+		signed, err := base64.StdEncoding.DecodeString(b.Manifest.Signature)
+		if err != nil {
+			return err
+		}
+		if err := verifier.VerifyHash(sha256Hash.Sum(nil), signed); err != nil {
+			return err
+		}
 	}
-	signed, err := base64.StdEncoding.DecodeString(b.Manifest.Signature)
-	if err != nil {
-		return err
-	}
-	if err := verifier.VerifyHash(sha256Hash.Sum(nil), signed); err != nil {
-		return err
-	}
+
 	return nil
 }
 
@@ -400,9 +411,6 @@ func loadBundleManifest(bundleFs afero.Fs, bundle *Bundle, spec *APISpec, partia
 		return err
 	}
 
-	log.WithFields(logrus.Fields{
-		"prefix": "main",
-	}).Info("----> Verifying bundle: ", bundle.Spec.CustomMiddlewareBundle)
 	if partial {
 		err = bundle.PartialVerify(bundleFs, skipVerification)
 	} else {
