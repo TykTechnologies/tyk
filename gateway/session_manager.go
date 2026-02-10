@@ -346,34 +346,17 @@ func (l *SessionLimiter) forwardMessageInternal(
 
 		switch {
 		case limiter != nil:
-
-			if ttl, err := limiter(r.Context(), limiterKey, apiLimit.Rate, apiLimit.Per); errors.Is(
-				err,
-				rate.ErrLimitExhausted,
-			) {
-
-				return sessionFailRateLimit{
-					limit: uint(apiLimit.Rate),
-					per:   uint(apiLimit.Per),
-					reset: ttl,
-				}
+			if ttl, err := limiter(r.Context(), limiterKey, apiLimit.Rate, apiLimit.Per); errors.Is(err, rate.ErrLimitExhausted) {
+				return newSessionFailRateLimit(apiLimit, ttl)
 			}
 
 		case l.config.EnableSentinelRateLimiter:
 			if ttl, shouldBlock := l.limitSentinel(r, session, limiterKey, apiLimit, dryRun); shouldBlock {
-				return sessionFailRateLimit{
-					limit: uint(apiLimit.Rate),
-					per:   uint(apiLimit.Per),
-					reset: ttl,
-				}
+				return newSessionFailRateLimit(apiLimit, ttl)
 			}
 		case l.config.EnableRedisRollingLimiter:
 			if ttl, shouldBlock := l.limitRedis(r, session, limiterKey, apiLimit, dryRun); shouldBlock {
-				return sessionFailRateLimit{
-					limit: uint(apiLimit.Rate),
-					per:   uint(apiLimit.Per),
-					reset: ttl,
-				}
+				return newSessionFailRateLimit(apiLimit, ttl)
 			}
 		default:
 			var n float64
@@ -397,19 +380,11 @@ func (l *SessionLimiter) forwardMessageInternal(
 				}
 
 				if state, shouldBlock := l.limitDRL(bucketKey, apiLimit, dryRun); shouldBlock {
-					return sessionFailRateLimit{
-						limit: uint(apiLimit.Rate),
-						per:   uint(apiLimit.Per),
-						reset: time.Until(state.Reset),
-					}
+					return newSessionFailRateLimit(apiLimit, time.Until(state.Reset))
 				}
 			} else {
 				if ttl, shouldBlock := l.limitRedis(r, session, limiterKey, apiLimit, dryRun); shouldBlock {
-					return sessionFailRateLimit{
-						limit: uint(apiLimit.Rate),
-						per:   uint(apiLimit.Per),
-						reset: ttl,
-					}
+					return newSessionFailRateLimit(apiLimit, ttl)
 				}
 			}
 		}
@@ -667,3 +642,11 @@ func (sessionFailNone) sessionFailReason()                {}
 func (sessionFailRateLimit) sessionFailReason()           {}
 func (sessionFailQuota) sessionFailReason()               {}
 func (sessionFailInternalServerError) sessionFailReason() {}
+
+func newSessionFailRateLimit(limits *user.APILimit, ttl time.Duration) sessionFailRateLimit {
+	return sessionFailRateLimit{
+		limit: uint(limits.Rate),
+		per:   uint(limits.Per),
+		reset: ttl,
+	}
+}
