@@ -10,6 +10,8 @@ import (
 	"github.com/TykTechnologies/tyk/user"
 )
 
+//go:generate go tool mockgen -typed -source=./headers.go -destination=headers_mock.gen.go -package rate HeaderSender
+
 type (
 	HeaderSender interface {
 		SendQuotas(response *http.Response, session *user.SessionState, apiId string)
@@ -23,8 +25,7 @@ type (
 		Remaining uint
 	}
 
-	quotaSender struct {
-	}
+	quotaSender struct{}
 
 	rateLimitSender struct{}
 )
