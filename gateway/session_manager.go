@@ -166,6 +166,10 @@ func (l *SessionLimiter) doRollingWindowWrite(r *http.Request, session *user.Ses
 		log.WithError(err).Error("error writing sliding log")
 	}
 
+	if !shouldBlock {
+		blockDuration = 0
+	}
+
 	return blockDuration, shouldBlock
 }
 

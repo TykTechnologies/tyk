@@ -515,7 +515,7 @@ func TestSessionLimiter(t *testing.T) {
 			expires, ok := limiter.limitSentinel(
 				r,
 				&user.SessionState{},
-				"test",
+				key,
 				&user.APILimit{RateLimit: user.RateLimit{Rate: 60, Per: 60}},
 				false,
 			)
@@ -604,5 +604,32 @@ func TestSessionLimiter(t *testing.T) {
 			data := ctxGetData(r)
 			require.Nil(t, data)
 		})
+	})
+
+	t.Run("limitRedis", func(t *testing.T) {
+		r, err := http.NewRequestWithContext(t.Context(), http.MethodGet, "/", nil)
+		require.NoError(t, err)
+
+		cmd := limiter.limiterStorage.Del(r.Context(), key+SentinelRateLimitKeyPostfix, key)
+		require.NoError(t, cmd.Err())
+
+		session := &user.SessionState{}
+		apiLimit := &user.APILimit{RateLimit: user.RateLimit{Rate: 2, Per: 60}}
+
+		expires, block := limiter.limitRedis(r, session, key, apiLimit, false)
+		assert.True(t, expires == 0, "first cal is not blocked")
+		assert.True(t, block == false, "first cal is not blocked")
+
+		expires, block = limiter.limitRedis(r, session, key, apiLimit, false)
+		assert.True(t, expires == 0, "second cal is not blocked")
+		assert.True(t, block == false, "second cal is not blocked")
+
+		expires, block = limiter.limitRedis(r, session, key, apiLimit, false)
+		assert.True(t, expires.Seconds() == 60.0, "third call is blocked for all window size")
+		assert.True(t, block, "second cal is blocked")
+
+		dur, err := limiter.limiterStorage.TTL(r.Context(), key+SentinelRateLimitKeyPostfix).Result()
+		assert.NoError(t, err)
+		assert.True(t, (dur.Seconds()-(time.Second*60).Seconds()) < 0.1)
 	})
 }
