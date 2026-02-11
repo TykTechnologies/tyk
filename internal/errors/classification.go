@@ -11,7 +11,7 @@ const (
 	TLE ResponseFlag = "TLE" // TLS certificate expired
 	TLI ResponseFlag = "TLI" // TLS certificate invalid
 	TLM ResponseFlag = "TLM" // TLS certificate mismatch (hostname)
-	TLN ResponseFlag = "TLN" // TLS not configured
+	TLN ResponseFlag = "TLN" // TLS not trusted (unknown authority)
 	TLH ResponseFlag = "TLH" // TLS handshake failed
 	TLP ResponseFlag = "TLP" // TLS protocol error
 	TLA ResponseFlag = "TLA" // TLS alert (handshake failure, version mismatch)
@@ -93,6 +93,7 @@ const (
 
 	// JWT error types
 	ErrTypeClaimsInvalid           = "claims_invalid"
+	ErrTypeTokenExpired            = "token_expired"
 	ErrTypeTokenInvalid            = "token_invalid"
 	ErrTypeUnexpectedSigningMethod = "unexpected_signing_method"
 
@@ -143,6 +144,7 @@ const (
 	// JWT details
 	detailJWTFieldMissing            = "jwt_field_missing"
 	detailJWTClaimsInvalid           = "jwt_claims_invalid"
+	detailJWTTokenExpired            = "jwt_token_expired"
 	detailJWTTokenInvalid            = "jwt_token_invalid"
 	detailJWTUnexpectedSigningMethod = "jwt_unexpected_signing_method"
 

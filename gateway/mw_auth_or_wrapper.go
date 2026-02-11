@@ -110,6 +110,19 @@ func (a *AuthORWrapper) ProcessRequest(w http.ResponseWriter, r *http.Request, _
 
 			*r = *lastSuccessfulClone
 
+			// Propagate OTEL span attributes from successful inner middlewares to AuthORWrapper.
+			// Inner middlewares (e.g., JWTMiddleware, AuthKey) store attributes like
+			// tyk.api.apikey.alias under their own name, but TraceMiddleware looks them up
+			// under the wrapping middleware's name ("AuthORWrapper"). Without this,
+			// alias and other attributes are lost in multi-auth scenarios.
+			for _, schemeName := range requirement {
+				if mw := a.getMiddlewareForScheme(schemeName); mw != nil {
+					if attrs := ctxGetSpanAttributes(r, mw.Name()); len(attrs) > 0 {
+						ctxSetSpanAttributes(r, a.Name(), attrs...)
+					}
+				}
+			}
+
 			return nil, http.StatusOK
 		}
 

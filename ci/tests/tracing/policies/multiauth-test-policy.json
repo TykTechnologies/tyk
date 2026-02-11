@@ -1,0 +1,17 @@
+{
+    "id": "multiauth-test-policy",
+    "name": "MultiAuth Test Policy",
+    "org_id": "default",
+    "rate": 1000,
+    "per": 60,
+    "quota_max": -1,
+    "state": "active",
+    "access_rights": {
+        "multiauth-test-api": {
+            "api_id": "multiauth-test-api",
+            "api_name": "MultiAuthTestAPI",
+            "versions": ["Default"]
+        }
+    },
+    "active": true
+}
