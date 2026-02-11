@@ -503,13 +503,11 @@ func TestBundle_Verify(t *testing.T) {
 		bundle         Bundle
 		setupFs        func(afero.Fs, string)
 		usePublicKey   bool
-		partialVerify  bool
-		skipVerifCheck bool
 		wantErr        bool
 		wantErrContain string
 	}{
 		{
-			name: "bundle with invalid public key path using DeepVerify",
+			name: "bundle with invalid public key path",
 			bundle: Bundle{
 				Name: "test",
 				Data: []byte("test"),
@@ -523,12 +521,11 @@ func TestBundle_Verify(t *testing.T) {
 				},
 				Gw: &Gateway{},
 			},
-			usePublicKey:  true,
-			partialVerify: false,
-			wantErr:       true,
+			usePublicKey: true,
+			wantErr:      true,
 		},
 		{
-			name: "bundle without signature using DeepVerify",
+			name: "bundle without signature",
 			bundle: Bundle{
 				Name: "test",
 				Data: []byte("test"),
@@ -542,13 +539,11 @@ func TestBundle_Verify(t *testing.T) {
 				},
 				Gw: &Gateway{},
 			},
-			usePublicKey:   true,
-			partialVerify:  false,
-			wantErr:        true,
-			wantErrContain: "Bundle isn't signed",
+			usePublicKey: true,
+			wantErr:      true,
 		},
 		{
-			name: "valid checksum with empty file list using DeepVerify",
+			name: "valid checksum with empty file list",
 			bundle: Bundle{
 				Name: "test",
 				Spec: &APISpec{
@@ -562,12 +557,11 @@ func TestBundle_Verify(t *testing.T) {
 				},
 				Gw: &Gateway{},
 			},
-			usePublicKey:  false,
-			partialVerify: false,
-			wantErr:       false,
+			usePublicKey: false,
+			wantErr:      false,
 		},
 		{
-			name: "invalid checksum returns error using DeepVerify",
+			name: "invalid checksum returns error",
 			bundle: Bundle{
 				Name: "test",
 				Spec: &APISpec{
@@ -582,12 +576,11 @@ func TestBundle_Verify(t *testing.T) {
 				Gw: &Gateway{},
 			},
 			usePublicKey:   false,
-			partialVerify:  false,
 			wantErr:        true,
-			wantErrContain: "invalid checksum",
+			wantErrContain: "Invalid checksum",
 		},
 		{
-			name: "file not found in file list using DeepVerify",
+			name: "file not found in file list",
 			bundle: Bundle{
 				Name: "test",
 				Spec: &APISpec{
@@ -601,13 +594,12 @@ func TestBundle_Verify(t *testing.T) {
 				},
 				Gw: &Gateway{},
 			},
-			setupFs:       func(_ afero.Fs, _ string) {},
-			usePublicKey:  false,
-			partialVerify: false,
-			wantErr:       true,
+			setupFs:      func(fs afero.Fs, bundlePath string) {},
+			usePublicKey: false,
+			wantErr:      true,
 		},
 		{
-			name: "valid checksum with multiple files using DeepVerify",
+			name: "valid checksum with multiple files",
 			bundle: Bundle{
 				Name: "test",
 				Spec: &APISpec{
@@ -626,12 +618,11 @@ func TestBundle_Verify(t *testing.T) {
 				assert.NoError(t, afero.WriteFile(fs, filepath.Join(bundlePath, "file1.py"), []byte("file1 content"), 0644))
 				assert.NoError(t, afero.WriteFile(fs, filepath.Join(bundlePath, "file2.py"), []byte("file2 content"), 0644))
 			},
-			usePublicKey:  false,
-			partialVerify: false,
-			wantErr:       false,
+			usePublicKey: false,
+			wantErr:      false,
 		},
 		{
-			name: "invalid base64 signature returns error using DeepVerify",
+			name: "invalid base64 signature returns error",
 			bundle: Bundle{
 				Name: "test",
 				Spec: &APISpec{
@@ -646,138 +637,13 @@ func TestBundle_Verify(t *testing.T) {
 				},
 				Gw: &Gateway{},
 			},
-			usePublicKey:  true,
-			partialVerify: false,
-			wantErr:       true,
-		},
-		{
-			name: "partial verify skips checksum when specified",
-			bundle: Bundle{
-				Name: "test",
-				Spec: &APISpec{
-					APIDefinition: &apidef.APIDefinition{
-						CustomMiddlewareBundle: "test-mw-bundle",
-					},
-				},
-				Manifest: apidef.BundleManifest{
-					Checksum: "invalidchecksum",
-					FileList: []string{},
-				},
-				Gw: &Gateway{},
-			},
-			usePublicKey:   true,
-			partialVerify:  true,
-			skipVerifCheck: true,
-			wantErr:        false,
-		},
-		{
-			name: "bundle signed but no public key path using PartialVerify",
-			bundle: Bundle{
-				Name: "test",
-				Spec: &APISpec{
-					APIDefinition: &apidef.APIDefinition{
-						CustomMiddlewareBundle: "test-mw-bundle",
-					},
-				},
-				Manifest: apidef.BundleManifest{
-					Checksum:  "invalidchecksum",
-					FileList:  []string{},
-					Signature: "test-signature",
-				},
-				Gw: &Gateway{},
-			},
-			usePublicKey:   false,
-			partialVerify:  true,
-			skipVerifCheck: false,
-			wantErr:        true,
-		},
-		{
-			name: "partial verify skips signature check on skip check",
-			bundle: Bundle{
-				Name: "test",
-				Spec: &APISpec{
-					APIDefinition: &apidef.APIDefinition{
-						CustomMiddlewareBundle: "test-mw-bundle",
-					},
-				},
-				Manifest: apidef.BundleManifest{
-					Checksum: "invalidchecksum",
-					FileList: []string{},
-				},
-				Gw: &Gateway{},
-			},
-			usePublicKey:   true,
-			partialVerify:  true,
-			skipVerifCheck: true,
-			wantErr:        false,
-		},
-		{
-			name: "partial verify fails signature check on proper check",
-			bundle: Bundle{
-				Name: "test",
-				Spec: &APISpec{
-					APIDefinition: &apidef.APIDefinition{
-						CustomMiddlewareBundle: "test-mw-bundle",
-					},
-				},
-				Manifest: apidef.BundleManifest{
-					Checksum: "invalidchecksum",
-					FileList: []string{},
-				},
-				Gw: &Gateway{},
-			},
-			usePublicKey:   true,
-			partialVerify:  true,
-			skipVerifCheck: false,
-		},
-		{
-			name: "partial verify: no signature with public key set, should pass",
-			bundle: Bundle{
-				Name: "test",
-				Spec: &APISpec{
-					APIDefinition: &apidef.APIDefinition{
-						CustomMiddlewareBundle: "test-mw-bundle",
-					},
-				},
-				Manifest: apidef.BundleManifest{
-					Checksum: "invalidchecksum",
-					FileList: []string{},
-				},
-				Gw: &Gateway{},
-			},
-			usePublicKey:   true,
-			partialVerify:  true,
-			skipVerifCheck: false,
-			wantErr:        false,
-		},
-		{
-			name: "partial verify: signature and no public key, fail checksum validation",
-			bundle: Bundle{
-				Name: "test",
-				Spec: &APISpec{
-					APIDefinition: &apidef.APIDefinition{
-						CustomMiddlewareBundle: "test-mw-bundle",
-					},
-				},
-				Manifest: apidef.BundleManifest{
-					Checksum:  "invalidchecksum",
-					FileList:  []string{},
-					Signature: "test-signature",
-				},
-				Gw: &Gateway{},
-			},
-			usePublicKey:   false,
-			partialVerify:  true,
-			skipVerifCheck: false,
-			wantErr:        true,
+			usePublicKey: true,
+			wantErr:      true,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			b := tt.bundle
-
-			// Set up Gateway with BundleChecksumVerifier
-			b.Gw.BundleChecksumVerifier = defaultBundleVerifyFunction
 
 			globalConf := config.Config{}
 			if tt.usePublicKey {
@@ -802,13 +668,7 @@ func TestBundle_Verify(t *testing.T) {
 				tt.setupFs(fs, bundlePath)
 			}
 
-			var err error
-			if tt.partialVerify {
-				err = b.PartialVerify(fs, tt.skipVerifCheck)
-			} else {
-				err = b.DeepVerify(fs)
-			}
-
+			err := b.Verify(fs)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Bundle.Verify() error = %v, wantErr %v", err, tt.wantErr)
 			}
@@ -918,15 +778,11 @@ func BenchmarkBundle_Verify(b *testing.B) {
 			// Configure GW with no public key (no signature verification)
 			bundle.Gw.SetConfig(config.Config{})
 
-			// Initialize BundleChecksumVerifier
-			bundle.Gw.BundleChecksumVerifier = defaultBundleVerifyFunction
-
 			b.ResetTimer()
 			b.ReportAllocs()
 
 			for i := 0; i < b.N; i++ {
-				err := bundle.PartialVerify(fs, false)
-				assert.NoError(b, err)
+				_ = bundle.Verify(fs)
 			}
 		})
 	}

@@ -10,7 +10,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"hash"
 	"io"
 	"io/ioutil"
 	"net/http"
@@ -25,6 +24,8 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/afero"
 
+	"github.com/TykTechnologies/goverify"
+
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/internal/sanitize"
 )
@@ -33,40 +34,6 @@ var (
 	bundleBackoffMultiplier float64 = 2
 	bundleMaxBackoffRetries uint64  = 4
 )
-
-type bundleChecksumVerifyFunction func(bundle *Bundle, bundleFs afero.Fs) (sha256Hash hash.Hash, err error)
-
-func defaultBundleVerifyFunction(b *Bundle, bundleFs afero.Fs) (sha256Hash hash.Hash, err error) {
-	md5Hash := md5.New()
-	sha256Hash = sha256.New()
-
-	w := io.MultiWriter(sha256Hash, md5Hash)
-	buf, ok := bundleVerifyPool.Get().(*[]byte)
-	if !ok {
-		return nil, errors.New("error verifying bundle, please try again")
-	}
-	defer bundleVerifyPool.Put(buf)
-
-	for _, f := range b.Manifest.FileList {
-		extractedPath := filepath.Join(b.Path, f)
-		file, err := bundleFs.Open(extractedPath)
-		if err != nil {
-			return nil, err
-		}
-		_, err = io.CopyBuffer(w, file, *buf)
-		file.Close()
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	checksum := fmt.Sprintf("%x", md5Hash.Sum(nil))
-	if checksum != b.Manifest.Checksum {
-		return nil, errors.New("invalid checksum")
-	}
-
-	return sha256Hash, nil
-}
 
 // Bundle is the basic bundle data structure, it holds the bundle name and the data.
 type Bundle struct {
@@ -85,73 +52,67 @@ var bundleVerifyPool = sync.Pool{
 	},
 }
 
-func (b *Bundle) DeepVerify(bundleFs afero.Fs) error {
+// Verify performs signature verification on the bundle file.
+func (b *Bundle) Verify(bundleFs afero.Fs) error {
 	log.WithFields(logrus.Fields{
 		"prefix": "main",
 	}).Info("----> Verifying bundle: ", b.Spec.CustomMiddlewareBundle)
-	hasKey := b.Gw.GetConfig().PublicKeyPath != ""
-	hasSignature := b.Manifest.Signature != ""
 
-	if hasKey && !hasSignature {
-		return errors.New("Bundle isn't signed")
-	}
+	var useSignature = b.Gw.GetConfig().PublicKeyPath != ""
 
-	// check hash first then check signature
-	sha256Hash, err := b.Gw.BundleChecksumVerifier(b, bundleFs)
-	if err != nil {
-		return err
-	}
-	if hasKey {
-		verifier, err := b.Gw.SignatureVerifier()
+	var (
+		verifier goverify.Verifier
+		err      error
+	)
+
+	if useSignature {
+		// Perform signature verification if a public key path is set:
+		if b.Manifest.Signature == "" {
+			// Error: A public key is set, but the bundle isn't signed.
+			return errors.New("Bundle isn't signed")
+		}
+		verifier, err = b.Gw.SignatureVerifier()
 		if err != nil {
 			return err
 		}
+	}
+
+	md5Hash := md5.New()
+	sha256Hash := sha256.New()
+
+	var w io.Writer = md5Hash
+	if useSignature {
+		w = io.MultiWriter(md5Hash, sha256Hash)
+	}
+
+	buf := bundleVerifyPool.Get().(*[]byte)
+	defer bundleVerifyPool.Put(buf)
+
+	for _, f := range b.Manifest.FileList {
+		extractedPath := filepath.Join(b.Path, f)
+		file, err := bundleFs.Open(extractedPath)
+		if err != nil {
+			return err
+		}
+		_, err = io.CopyBuffer(w, file, *buf)
+		file.Close()
+		if err != nil {
+			return err
+		}
+	}
+
+	checksum := fmt.Sprintf("%x", md5Hash.Sum(nil))
+	if checksum != b.Manifest.Checksum {
+		return errors.New("Invalid checksum")
+	}
+
+	if useSignature {
 		signed, err := base64.StdEncoding.DecodeString(b.Manifest.Signature)
 		if err != nil {
 			return err
 		}
-		if err := verifier.VerifyHash(sha256Hash.Sum(nil), signed); err != nil {
-			return err
-		}
+		return verifier.VerifyHash(sha256Hash.Sum(nil), signed)
 	}
-	return nil
-}
-
-func (b *Bundle) PartialVerify(bundleFs afero.Fs, skipVerify bool) error {
-	if skipVerify {
-		return nil
-	}
-
-	hasKey := b.Gw.GetConfig().PublicKeyPath != ""
-	hasSignature := b.Manifest.Signature != ""
-
-	if !hasSignature {
-		return nil
-	}
-
-	log.WithFields(logrus.Fields{
-		"prefix": "main",
-	}).Info("----> Verifying bundle: ", b.Spec.CustomMiddlewareBundle)
-	// Make a single call to compute both hashes if needed
-	sha256Hash, err := b.Gw.BundleChecksumVerifier(b, bundleFs)
-	if err != nil {
-		return err
-	}
-
-	if hasKey {
-		verifier, err := b.Gw.SignatureVerifier()
-		if err != nil {
-			return err
-		}
-		signed, err := base64.StdEncoding.DecodeString(b.Manifest.Signature)
-		if err != nil {
-			return err
-		}
-		if err := verifier.VerifyHash(sha256Hash.Sum(nil), signed); err != nil {
-			return err
-		}
-	}
-
 	return nil
 }
 
@@ -391,7 +352,7 @@ func saveBundle(bundleFs afero.Fs, bundle *Bundle, destPath string, spec *APISpe
 }
 
 // loadBundleManifest will parse the manifest file and return the bundle parameters.
-func loadBundleManifest(bundleFs afero.Fs, bundle *Bundle, spec *APISpec, partial bool, skipVerification bool) error {
+func loadBundleManifest(bundleFs afero.Fs, bundle *Bundle, spec *APISpec, skipVerification bool) error {
 	log.WithFields(logrus.Fields{
 		"prefix": "main",
 	}).Info("----> Loading bundle: ", spec.CustomMiddlewareBundle)
@@ -410,18 +371,16 @@ func loadBundleManifest(bundleFs afero.Fs, bundle *Bundle, spec *APISpec, partia
 		return err
 	}
 
-	if partial {
-		err = bundle.PartialVerify(bundleFs, skipVerification)
-	} else {
-		err = bundle.DeepVerify(bundleFs)
+	if skipVerification {
+		return nil
 	}
-	if err != nil {
+
+	if err := bundle.Verify(bundleFs); err != nil {
 		log.WithFields(logrus.Fields{
 			"prefix": "main",
 		}).Info("----> Bundle verification failed: ", spec.CustomMiddlewareBundle)
 		return err
 	}
-
 	return nil
 }
 
@@ -483,7 +442,7 @@ func (gw *Gateway) loadBundleWithFs(spec *APISpec, bundleFs afero.Fs) error {
 			Gw:   gw,
 		}
 
-		err = loadBundleManifest(bundleFs, &bundle, spec, true, gw.GetConfig().SkipVerifyExistingPluginBundle)
+		err = loadBundleManifest(bundleFs, &bundle, spec, gw.GetConfig().SkipVerifyExistingPluginBundle)
 		if err != nil {
 			log.WithFields(logrus.Fields{
 				"prefix": "main",
@@ -524,7 +483,7 @@ func (gw *Gateway) loadBundleWithFs(spec *APISpec, bundleFs afero.Fs) error {
 	// Set the destination path:
 	bundle.Path = destPath
 
-	if err := loadBundleManifest(bundleFs, &bundle, spec, false, false); err != nil {
+	if err := loadBundleManifest(bundleFs, &bundle, spec, false); err != nil {
 		bundleError(spec, err, "Couldn't load bundle")
 
 		if removeErr := bundleFs.RemoveAll(bundle.Path); removeErr != nil {
