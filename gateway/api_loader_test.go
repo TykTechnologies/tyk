@@ -9370,12 +9370,14 @@ func TestDifferentDomainsWithOneListenPathBeingASubstringOfTheOtherWithStripList
 
 func TestSortAPISpecs(t *testing.T) {
 	tests := []struct {
-		name     string
-		input    []*APISpec
-		expected []*APISpec
+		name                 string
+		customDomainsEnabled bool
+		input                []*APISpec
+		expected             []*APISpec
 	}{
 		{
-			name: "APIs should be sorted by listen path, however if the domain is empty they should sit at the end",
+			name:                 "APIs should be sorted by listen path, however if the domain is empty they should sit at the end when custom domains are enabled in global config",
+			customDomainsEnabled: true,
 			input: []*APISpec{
 				{APIDefinition: &apidef.APIDefinition{Domain: "{domains:tyk.io}", Proxy: apidef.ProxyConfig{ListenPath: "/path-longer"}}},
 				{APIDefinition: &apidef.APIDefinition{Domain: "tyk.io", Proxy: apidef.ProxyConfig{ListenPath: "/path-longer"}}},
@@ -9407,11 +9409,45 @@ func TestSortAPISpecs(t *testing.T) {
 				{APIDefinition: &apidef.APIDefinition{Domain: "", Proxy: apidef.ProxyConfig{ListenPath: "/aaaaaaaaaaaaaaaaaaaa"}}},
 			},
 		},
+		{
+			name:                 "APIs should be sorted only by listen path when custom domains are disabled in global config",
+			customDomainsEnabled: false,
+			input: []*APISpec{
+				{APIDefinition: &apidef.APIDefinition{Domain: "{domains:tyk.io}", Proxy: apidef.ProxyConfig{ListenPath: "/path-longer"}}},
+				{APIDefinition: &apidef.APIDefinition{Domain: "tyk.io", Proxy: apidef.ProxyConfig{ListenPath: "/path-longer"}}},
+				{APIDefinition: &apidef.APIDefinition{Domain: "tyk.io", Proxy: apidef.ProxyConfig{ListenPath: "/a"}}},
+				{APIDefinition: &apidef.APIDefinition{Domain: "abc.def.ghi", Proxy: apidef.ProxyConfig{ListenPath: "/b"}}},
+				{APIDefinition: &apidef.APIDefinition{Domain: "tyk.io", Proxy: apidef.ProxyConfig{ListenPath: "/longerpath"}}},
+				{APIDefinition: &apidef.APIDefinition{Domain: "tyk.io", Proxy: apidef.ProxyConfig{ListenPath: "/short"}}},
+				{APIDefinition: &apidef.APIDefinition{Domain: "samelength1.com", Proxy: apidef.ProxyConfig{ListenPath: "/a"}}},
+				{APIDefinition: &apidef.APIDefinition{Domain: "samelength2.com", Proxy: apidef.ProxyConfig{ListenPath: "/b"}}},
+				{APIDefinition: &apidef.APIDefinition{Domain: "tyk.io", Proxy: apidef.ProxyConfig{ListenPath: "/path"}}},
+				{APIDefinition: &apidef.APIDefinition{Domain: "", Proxy: apidef.ProxyConfig{ListenPath: "/aaaaaaaaaaaaaaaaaaaa"}}},
+				{APIDefinition: &apidef.APIDefinition{Domain: "tyk.io", Proxy: apidef.ProxyConfig{ListenPath: "/b"}}},
+				{APIDefinition: &apidef.APIDefinition{Domain: "{domains:tyk.io}", Proxy: apidef.ProxyConfig{ListenPath: "/path"}}},
+				{APIDefinition: &apidef.APIDefinition{Domain: "{domains:tyk.io|abc.def.ghi}", Proxy: apidef.ProxyConfig{ListenPath: "/path"}}},
+			},
+			expected: []*APISpec{
+				{APIDefinition: &apidef.APIDefinition{Domain: "", Proxy: apidef.ProxyConfig{ListenPath: "/aaaaaaaaaaaaaaaaaaaa"}}},
+				{APIDefinition: &apidef.APIDefinition{Domain: "tyk.io", Proxy: apidef.ProxyConfig{ListenPath: "/path-longer"}}},
+				{APIDefinition: &apidef.APIDefinition{Domain: "{domains:tyk.io}", Proxy: apidef.ProxyConfig{ListenPath: "/path-longer"}}},
+				{APIDefinition: &apidef.APIDefinition{Domain: "tyk.io", Proxy: apidef.ProxyConfig{ListenPath: "/longerpath"}}},
+				{APIDefinition: &apidef.APIDefinition{Domain: "tyk.io", Proxy: apidef.ProxyConfig{ListenPath: "/short"}}},
+				{APIDefinition: &apidef.APIDefinition{Domain: "tyk.io", Proxy: apidef.ProxyConfig{ListenPath: "/path"}}},
+				{APIDefinition: &apidef.APIDefinition{Domain: "{domains:tyk.io|abc.def.ghi}", Proxy: apidef.ProxyConfig{ListenPath: "/path"}}},
+				{APIDefinition: &apidef.APIDefinition{Domain: "{domains:tyk.io}", Proxy: apidef.ProxyConfig{ListenPath: "/path"}}},
+				{APIDefinition: &apidef.APIDefinition{Domain: "abc.def.ghi", Proxy: apidef.ProxyConfig{ListenPath: "/b"}}},
+				{APIDefinition: &apidef.APIDefinition{Domain: "samelength2.com", Proxy: apidef.ProxyConfig{ListenPath: "/b"}}},
+				{APIDefinition: &apidef.APIDefinition{Domain: "tyk.io", Proxy: apidef.ProxyConfig{ListenPath: "/b"}}},
+				{APIDefinition: &apidef.APIDefinition{Domain: "samelength1.com", Proxy: apidef.ProxyConfig{ListenPath: "/a"}}},
+				{APIDefinition: &apidef.APIDefinition{Domain: "tyk.io", Proxy: apidef.ProxyConfig{ListenPath: "/a"}}},
+			},
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			sortSpecsByListenPath(tt.input)
+			sortSpecsByListenPath(tt.input, tt.customDomainsEnabled)
 			for i, spec := range tt.input {
 				if spec.Domain != tt.expected[i].Domain {
 					t.Errorf("expected %v, got %v", tt.expected[i].Domain, spec.Domain)
@@ -9545,7 +9581,7 @@ func TestSortSpecsByListenPath(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			sortSpecsByListenPath(tt.specs)
+			sortSpecsByListenPath(tt.specs, true)
 
 			var sortedPaths []string
 			for _, spec := range tt.specs {
@@ -9726,5 +9762,107 @@ func TestNewRelicMounting(t *testing.T) {
 		case <-time.After(1 * time.Second):
 			t.Fatal("FAILURE: Timeout - Middleware did not execute")
 		}
+	})
+}
+
+func TestListenPathConflictWhenCustomDomainIsDisabled(t *testing.T) {
+	ts := StartTest(func(globalConf *config.Config) {
+		globalConf.EnableCustomDomains = false
+		globalConf.HttpServerOptions.EnableStrictRoutes = true
+		globalConf.HttpServerOptions.EnablePathSuffixMatching = true
+		globalConf.HttpServerOptions.EnablePathPrefixMatching = true
+	})
+	t.Cleanup(ts.Close)
+
+	localClient := test.NewClientLocal()
+
+	listenPathA := "/caas2itsamu0456n07gfe"
+	listenPathB := "/caas2itsamu04567m9pxl"
+	listenPathC := "/caas2itsamu0456qnu2sj"
+
+	createMockServer := func(listenPath string) *httptest.Server {
+		return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			w.WriteHeader(http.StatusOK)
+			_, err := w.Write([]byte(listenPath))
+			assert.Nil(t, err)
+		}))
+	}
+
+	mockServerA := createMockServer(listenPathA)
+	defer mockServerA.Close()
+
+	mockServerB := createMockServer(listenPathB)
+	defer mockServerB.Close()
+
+	mockServerC := createMockServer(listenPathC)
+	defer mockServerC.Close()
+
+	getMockedApis := func() []func(spec *APISpec) {
+		return []func(spec *APISpec){
+			func(spec *APISpec) {
+				spec.APIID = "api-A"
+				spec.Proxy.ListenPath = listenPathA
+				spec.Proxy.TargetURL = mockServerA.URL
+				spec.Proxy.DisableStripSlash = true
+				spec.Proxy.StripListenPath = true
+			},
+			func(spec *APISpec) {
+				spec.APIID = "api-B"
+				spec.Proxy.ListenPath = listenPathB
+				spec.Proxy.TargetURL = mockServerB.URL
+				spec.Proxy.DisableStripSlash = true
+				spec.Proxy.StripListenPath = true
+			},
+			func(spec *APISpec) {
+				spec.APIID = "api-C"
+				spec.Proxy.ListenPath = listenPathC
+				spec.Proxy.TargetURL = mockServerC.URL
+				spec.Proxy.DisableStripSlash = true
+				spec.Proxy.StripListenPath = true
+			},
+		}
+	}
+
+	t.Run("conflicting api with custom domain enabled and set", func(t *testing.T) {
+		mockedApis := getMockedApis()
+		mockedApis = append(mockedApis, func(spec *APISpec) {
+			spec.APIID = "api-caa"
+			spec.DomainDisabled = false
+			spec.Domain = "test.com"
+			spec.Proxy.ListenPath = "/caa"
+			spec.Proxy.DisableStripSlash = true
+			spec.Proxy.StripListenPath = true
+		})
+
+		ts.Gw.BuildAndLoadAPI(mockedApis...)
+
+		var tcs []test.TestCase
+
+		for _, lp := range []string{listenPathA, listenPathB, listenPathC} {
+			tcs = append(tcs, test.TestCase{Client: localClient, Code: 200, Path: lp, BodyMatch: lp})
+		}
+
+		_, _ = ts.Run(t, tcs...)
+	})
+
+	t.Run("conflicting api with custom domain disabled", func(t *testing.T) {
+		mockedApis := getMockedApis()
+		mockedApis = append(mockedApis, func(spec *APISpec) {
+			spec.APIID = "api-caa"
+			spec.DomainDisabled = true
+			spec.Proxy.ListenPath = "/caa"
+			spec.Proxy.DisableStripSlash = true
+			spec.Proxy.StripListenPath = true
+		})
+
+		ts.Gw.BuildAndLoadAPI(mockedApis...)
+
+		var tcs []test.TestCase
+
+		for _, lp := range []string{listenPathA, listenPathB, listenPathC} {
+			tcs = append(tcs, test.TestCase{Client: localClient, Code: 200, Path: lp, BodyMatch: lp})
+		}
+
+		_, _ = ts.Run(t, tcs...)
 	})
 }
