@@ -206,6 +206,8 @@ type Gateway struct {
 	healthCheckInfo atomic.Value
 
 	dialCtxFn test.DialContext
+
+	BundleChecksumVerifier bundleChecksumVerifyFunction
 }
 
 func NewGateway(config config.Config, ctx context.Context) *Gateway {
@@ -246,6 +248,8 @@ func NewGateway(config config.Config, ctx context.Context) *Gateway {
 
 	gw.SetNodeID("solo-" + uuid.New())
 	gw.SessionID = uuid.New()
+
+	gw.BundleChecksumVerifier = defaultBundleVerifyFunction
 
 	return gw
 }
