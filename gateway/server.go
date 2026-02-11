@@ -108,8 +108,9 @@ const (
 
 type Gateway struct {
 	DefaultProxyMux *proxyMux
-	config          atomic.Value
-	configMu        sync.Mutex
+	config            atomic.Value
+	configMu          sync.Mutex
+	configViewerCache *configViewerCache
 
 	ctx context.Context
 
@@ -223,6 +224,8 @@ type Gateway struct {
 
 	// apiJWKCaches cache per api entity
 	apiJWKCaches sync.Map
+
+	BundleChecksumVerifier bundleChecksumVerifyFunction
 }
 
 func NewGateway(config config.Config, ctx context.Context) *Gateway {
@@ -278,6 +281,7 @@ func NewGateway(config config.Config, ctx context.Context) *Gateway {
 	}
 
 	gw.jwkCache = buildJWKSCache(config)
+	gw.BundleChecksumVerifier = defaultBundleVerifyFunction
 
 	return gw
 }
@@ -765,6 +769,21 @@ func (gw *Gateway) controlAPICheckClientCertificate(certLevel string, next http.
 	})
 }
 
+// loadConfigInspectionEndpoints registers the /config and /env endpoints for troubleshooting.
+// These endpoints are only enabled when EnableConfigInspection is true and Secret is set.
+func (gw *Gateway) loadConfigInspectionEndpoints(muxer *mux.Router) {
+	if !gw.GetConfig().EnableConfigInspection {
+		return
+	}
+	if gw.GetConfig().Secret == "" {
+		mainLog.Error("Cannot enable config inspection: secret not set")
+		return
+	}
+	muxer.Handle("/config", gw.checkIsAPIOwner(http.HandlerFunc(gw.configHandler)))
+	muxer.Handle("/env", gw.checkIsAPIOwner(http.HandlerFunc(gw.envHandler)))
+	mainLog.Info("Config inspection endpoints enabled: /config, /env")
+}
+
 // loadControlAPIEndpoints loads the endpoints used for controlling the Gateway.
 func (gw *Gateway) loadControlAPIEndpoints(muxer *mux.Router) {
 	hostname := gw.GetConfig().HostName
@@ -800,6 +819,8 @@ func (gw *Gateway) loadControlAPIEndpoints(muxer *mux.Router) {
 		muxer.HandleFunc("/debug/pprof/profile", pprofhttp.Profile)
 		muxer.HandleFunc("/debug/pprof/{_:.*}", pprofhttp.Index)
 	}
+
+	gw.loadConfigInspectionEndpoints(muxer)
 
 	r.MethodNotAllowedHandler = MethodNotAllowedHandler{}
 
@@ -2256,6 +2277,12 @@ func (gw *Gateway) SetConfig(conf config.Config, skipReload ...bool) {
 	gw.configMu.Lock()
 	gw.config.Store(conf)
 	gw.configMu.Unlock()
+
+	// Invalidate cached config viewer so the next request rebuilds it
+	// with the updated configuration.
+	if gw.configViewerCache != nil {
+		gw.configViewerCache.invalidate()
+	}
 }
 
 // shutdownHTTPServer gracefully shuts down an HTTP server

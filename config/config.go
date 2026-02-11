@@ -112,7 +112,7 @@ type PoliciesConfig struct {
 
 	// This option is required if `policies.policy_source` is set to `service`.
 	// Set this to the URL of your Tyk Dashboard installation. The URL needs to be formatted as: http://dashboard_host:port.
-	PolicyConnectionString string `json:"policy_connection_string"`
+	PolicyConnectionString string `json:"policy_connection_string" structviewer:"obfuscate"`
 
 	// This option only applies in OSS deployment when the `policies.policy_source` is either set
 	// to `file` or an empty string. If `policies.policy_path` is not set, then Tyk will load policies
@@ -137,7 +137,7 @@ type PoliciesConfig struct {
 
 type DBAppConfOptionsConfig struct {
 	// Set the URL to your Dashboard instance (or a load balanced instance). The URL needs to be formatted as: `http://dashboard_host:port`
-	ConnectionString string `json:"connection_string"`
+	ConnectionString string `json:"connection_string" structviewer:"obfuscate"`
 
 	// Set a timeout value, in seconds, for your Dashboard connection. Default value is 30.
 	ConnectionTimeout int `json:"connection_timeout"`
@@ -163,11 +163,11 @@ type StorageOptionsConf struct {
 	// Redis sentinel master name
 	MasterName string `json:"master_name"`
 	// Redis sentinel password
-	SentinelPassword string `json:"sentinel_password"`
+	SentinelPassword string `json:"sentinel_password" structviewer:"obfuscate"`
 	// Redis user name
 	Username string `json:"username"`
 	// If your Redis instance has a password set for access, you can set it here.
-	Password string `json:"password"`
+	Password string `json:"password" structviewer:"obfuscate"`
 	// Redis database
 	Database int `json:"database"`
 	// Set the number of maximum idle connections in the Redis connection pool, which defaults to 100. Set to a higher value if you are expecting more traffic.
@@ -384,7 +384,7 @@ type WebHookHandlerConf struct {
 	// The template to load in order to format the request.
 	TemplatePath string `bson:"template_path" json:"template_path"`
 	// Headers to set when firing the webhook.
-	HeaderList map[string]string `bson:"header_map" json:"header_map"`
+	HeaderList map[string]string `bson:"header_map" json:"header_map" structviewer:"obfuscate"`
 	// The cool-down for the event so it does not trigger again (in seconds).
 	EventTimeout int64 `bson:"event_timeout" json:"event_timeout"`
 }
@@ -409,15 +409,15 @@ type SlaveOptionsConfig struct {
 	SSLInsecureSkipVerify bool `json:"ssl_insecure_skip_verify"`
 
 	// Use this setting to add the URL for your MDCB or load balancer host.
-	ConnectionString string `json:"connection_string"`
+	ConnectionString string `json:"connection_string" structviewer:"obfuscate"`
 
 	// Your organization ID to connect to the MDCB installation.
 	RPCKey string `json:"rpc_key"`
 
-	// This the API key of a user used to authenticate and authorize the Gateway’s access through MDCB.
+	// This the API key of a user used to authenticate and authorize the Gateway's access through MDCB.
 	// The user should be a standard Dashboard user with minimal privileges so as to reduce any risk if the user is compromised.
 	// The suggested security settings are read for Real-time notifications and the remaining options set to deny.
-	APIKey string `json:"api_key"`
+	APIKey string `json:"api_key" structviewer:"obfuscate"`
 
 	// Set this option to `true` to enable RPC caching for keys.
 	EnableRPCCache bool `json:"enable_rpc_cache"`
@@ -726,7 +726,7 @@ type CertificateExpiryMonitorConfig struct {
 
 type SecurityConfig struct {
 	// Set the AES256 secret which is used to encode certificate private keys when they uploaded via certificate storage
-	PrivateCertificateEncodingSecret string `json:"private_certificate_encoding_secret"`
+	PrivateCertificateEncodingSecret string `json:"private_certificate_encoding_secret" structviewer:"obfuscate"`
 
 	// Enable Gateway Control API to use Mutual TLS. Certificates can be set via `security.certificates.control_api` section
 	ControlAPIUseMutualTLS bool `json:"control_api_use_mutual_tls"`
@@ -760,7 +760,7 @@ type NewRelicConfig struct {
 	// New Relic Application name
 	AppName string `json:"app_name"`
 	// New Relic License key
-	LicenseKey string `json:"license_key"`
+	LicenseKey string `json:"license_key" structviewer:"obfuscate"`
 	// Enable distributed tracing
 	EnableDistributedTracing bool `json:"enable_distributed_tracing"`
 }
@@ -857,10 +857,10 @@ type Config struct {
 	// This should be changed as soon as Tyk is installed on your system.
 	// This value is used in every interaction with the Tyk Gateway API. It should be passed along as the X-Tyk-Authorization header in any requests made.
 	// Tyk assumes that you are sensible enough not to expose the management endpoints publicly and to keep this configuration value to yourself.
-	Secret string `json:"secret"`
+	Secret string `json:"secret" structviewer:"obfuscate"`
 
 	// The shared secret between the Gateway and the Dashboard to ensure that API Definition downloads, heartbeat and Policy loads are from a valid source.
-	NodeSecret string `json:"node_secret"`
+	NodeSecret string `json:"node_secret" structviewer:"obfuscate"`
 
 	// Linux PID file location. Do not change unless you know what you are doing. Default: /var/run/tyk/tyk-gateway.pid
 	PIDFileLocation string `json:"pid_file_location"`
@@ -873,6 +873,11 @@ type Config struct {
 
 	// Allow your Dashboard to remotely set Gateway configuration via the Nodes screen.
 	AllowRemoteConfig bool `bson:"allow_remote_config" json:"allow_remote_config"`
+
+	// Set to true to enable the /config and /env endpoints for configuration inspection.
+	// These endpoints require X-Tyk-Authorization header with the secret value.
+	// Default: false
+	EnableConfigInspection bool `json:"enable_config_inspection"`
 
 	// Global Certificate configuration
 	Security SecurityConfig `json:"security"`
@@ -1232,7 +1237,7 @@ type Config struct {
 	// Enable Sentry logging
 	UseSentry bool `json:"use_sentry"`
 	// Sentry API code
-	SentryCode string `json:"sentry_code"`
+	SentryCode string `json:"sentry_code" structviewer:"obfuscate"`
 	// Log verbosity for Sentry logging
 	SentryLogLevel string `json:"sentry_log_level"`
 
@@ -1299,7 +1304,7 @@ type Config struct {
 	// In versions before gateway 5.3, only `listen_path` and `target_url` fields
 	// have had the secrets replaced.
 	// See more details https://tyk.io/docs/tyk-self-managed/#how-to-access-the-externally-stored-data
-	Secrets map[string]string `json:"secrets"`
+	Secrets map[string]string `json:"secrets" structviewer:"obfuscate"`
 
 	// Override the default error code and or message returned by middleware.
 	// The following message IDs can be used to override the message and error codes:
@@ -1408,7 +1413,7 @@ type VaultConfig struct {
 	Timeout time.Duration `json:"timeout"`
 
 	// Token is the vault root token
-	Token string `json:"token"`
+	Token string `json:"token" structviewer:"obfuscate"`
 
 	// KVVersion is the version number of Vault. Usually defaults to 2
 	KVVersion int `json:"kv_version"`
@@ -1432,7 +1437,7 @@ type ConsulConfig struct {
 		Username string `json:"username"`
 
 		// Password to use for HTTP Basic Authentication
-		Password string `json:"password"`
+		Password string `json:"password" structviewer:"obfuscate"`
 	} `json:"http_auth"`
 
 	// WaitTime limits how long a Watch will block. If not provided,
@@ -1441,7 +1446,7 @@ type ConsulConfig struct {
 
 	// Token is used to provide a per-request ACL token
 	// which overrides the agent's default token.
-	Token string `json:"token"`
+	Token string `json:"token" structviewer:"obfuscate"`
 
 	// TLS configuration
 	TLSConfig struct {
