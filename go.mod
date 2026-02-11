@@ -97,6 +97,7 @@ require (
 	github.com/Jeffail/gabs/v2 v2.7.0
 	github.com/TykTechnologies/graphql-go-tools/v2 v2.0.0-20250926102005-c54e73aae17d
 	github.com/TykTechnologies/opentelemetry v0.0.23-0.20260206152457-b854bfb45f46
+	github.com/TykTechnologies/structviewer v1.2.0
 	github.com/alecthomas/kingpin/v2 v2.4.0
 	github.com/eclipse/paho.mqtt.golang v1.5.1
 	github.com/getkin/kin-openapi v0.133.0
@@ -571,4 +572,4 @@ require (
 
 replace go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.54.0 => go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.49.0
 
-replace github.com/getkin/kin-openapi => github.com/TykTechnologies/kin-openapi v0.92.1-0.20260121113356-cca35373e785
+replace github.com/getkin/kin-openapi => github.com/TykTechnologies/kin-openapi v0.92.1-0.20260211103127-0004a8367058
