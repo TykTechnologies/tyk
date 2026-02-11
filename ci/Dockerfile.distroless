@@ -10,7 +10,14 @@ ENV DEBIAN_FRONTEND=noninteractive
 COPY ${BUILD_PACKAGE_NAME}_*${TARGETARCH}.deb /
 RUN dpkg -i /${BUILD_PACKAGE_NAME}_*${TARGETARCH}.deb && rm /*.deb
 
-FROM gcr.io/distroless/base-debian12:latest
+# FIPS base for amd64/arm64
+FROM tykio/dhi-busybox:1.37-fips AS base-amd64
+FROM tykio/dhi-busybox:1.37-fips AS base-arm64
+# Fallback for s390x (no FIPS base available)
+FROM gcr.io/distroless/base-debian12:latest AS base-s390x
+
+FROM base-${TARGETARCH}
+ARG TARGETARCH
 
 COPY --from=deb /opt/tyk-gateway /opt/tyk-gateway
 
