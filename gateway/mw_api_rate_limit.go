@@ -10,6 +10,7 @@ import (
 	"github.com/TykTechnologies/tyk/ctx"
 	tykerrors "github.com/TykTechnologies/tyk/internal/errors"
 	"github.com/TykTechnologies/tyk/internal/event"
+	"github.com/TykTechnologies/tyk/internal/rate"
 	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/user"
 )
@@ -94,7 +95,9 @@ func (k *RateLimitForAPI) EnabledForSpec() bool {
 }
 
 // ProcessRequest will run any checks on the request on the way through the system, return an error to have the chain fail
-func (k *RateLimitForAPI) ProcessRequest(_ http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
+//
+//nolint:staticcheck
+func (k *RateLimitForAPI) ProcessRequest(rw http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
 	// Skip rate limiting and quotas for looping
 	if !ctxCheckLimits(r) {
 		return nil, http.StatusOK
@@ -102,9 +105,10 @@ func (k *RateLimitForAPI) ProcessRequest(_ http.ResponseWriter, r *http.Request,
 
 	storeRef := k.Gw.GlobalSessionManager.Store()
 
+	session := k.getSession(r)
 	reason := k.Gw.SessionLimiter.ForwardMessage(
 		r,
-		k.getSession(r),
+		session,
 		k.keyName,
 		k.quotaKey,
 		storeRef,
@@ -116,9 +120,16 @@ func (k *RateLimitForAPI) ProcessRequest(_ http.ResponseWriter, r *http.Request,
 
 	k.emitRateLimitEvents(r, k.keyName)
 
-	if reason == sessionFailRateLimit {
-		// Set error classification for access logs
+	if info, ok := reason.(sessionFailRateLimit); ok {
+		k.Gw.limitHeaderSender.SendRateLimits(rw.Header(), rate.Limits{
+			Limit:     info.limit,
+			Per:       info.per,
+			Reset:     info.reset,
+			Remaining: 0,
+		})
+
 		ctx.SetErrorClassification(r, tykerrors.ClassifyRateLimitError(tykerrors.ErrTypeAPIRateLimit, k.Name()))
+
 		return k.handleRateLimitFailure(r, event.RateLimitExceeded, "API Rate Limit Exceeded", k.keyName)
 	}
 

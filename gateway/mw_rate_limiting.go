@@ -98,7 +98,7 @@ func (k *RateLimitAndQuotaCheck) ProcessRequest(w http.ResponseWriter, r *http.R
 
 	k.emitRateLimitEvents(r, rateLimitKey)
 
-	switch reason {
+	switch reason.(type) {
 	case sessionFailNone:
 	case sessionFailRateLimit:
 		// Set error classification for access logs
@@ -130,7 +130,7 @@ func (k *RateLimitAndQuotaCheck) ProcessRequest(w http.ResponseWriter, r *http.R
 					break
 				}
 
-				if reason == sessionFailNone {
+				if _, ok := reason.(sessionFailNone); ok {
 					return k.ProcessRequest(w, r, nil)
 				}
 			}

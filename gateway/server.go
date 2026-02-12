@@ -57,6 +57,7 @@ import (
 	"github.com/TykTechnologies/tyk/internal/model"
 	"github.com/TykTechnologies/tyk/internal/netutil"
 	"github.com/TykTechnologies/tyk/internal/otel"
+	"github.com/TykTechnologies/tyk/internal/rate"
 	"github.com/TykTechnologies/tyk/internal/scheduler"
 	"github.com/TykTechnologies/tyk/internal/service/newrelic"
 	"github.com/TykTechnologies/tyk/internal/uuid"
@@ -107,7 +108,7 @@ const (
 )
 
 type Gateway struct {
-	DefaultProxyMux *proxyMux
+	DefaultProxyMux   *proxyMux
 	config            atomic.Value
 	configMu          sync.Mutex
 	configViewerCache *configViewerCache
@@ -225,6 +226,8 @@ type Gateway struct {
 	// apiJWKCaches cache per api entity
 	apiJWKCaches sync.Map
 
+	limitHeaderSender rate.HeaderSender
+
 	BundleChecksumVerifier bundleChecksumVerifyFunction
 }
 
@@ -274,6 +277,7 @@ func NewGateway(config config.Config, ctx context.Context) *Gateway {
 
 	gw.SetNodeID("solo-" + uuid.New())
 	gw.SessionID = uuid.New()
+	gw.limitHeaderSender = rate.NewSender(config.RateLimitHeadersSource)
 
 	// Only create registry in RPC mode
 	if config.SlaveOptions.UseRPC {
@@ -1605,6 +1609,11 @@ func (gw *Gateway) initSystem() error {
 	// instances periodically and deletes idle items, closes net.Listener instances to
 	// free resources.
 	go cleanIdleMemConnProviders(gw.ctx)
+
+	// !!! review bootstrap process and NewGateway(); this process is broken :/
+	gw.limitHeaderSender = rate.NewSender(gwConfig.RateLimitHeadersSource)
+	gw.jwkCache = buildJWKSCache(gwConfig)
+
 	return nil
 }
 

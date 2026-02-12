@@ -50,12 +50,13 @@ const (
 // SessionLimiter is the rate limiter for the API, use ForwardMessage() to
 // check if a message should pass through or not
 type SessionLimiter struct {
-	ctx            context.Context
-	drlManager     *drl.DRL
-	config         *config.Config
-	bucketStore    model.BucketStorage
-	limiterStorage redis.UniversalClient
-	smoothing      *rate.Smoothing
+	ctx                    context.Context
+	drlManager             *drl.DRL
+	config                 *config.Config
+	bucketStore            model.BucketStorage
+	limiterStorage         redis.UniversalClient
+	smoothing              *rate.Smoothing
+	enableContextVariables bool
 }
 
 // NewSessionLimiter initializes the session limiter.
@@ -65,12 +66,19 @@ type SessionLimiter struct {
 // configured, then redis will be used. If local storage is configured, then
 // in-memory counters will be used. If no storage is configured, it falls
 // back onto the default gateway storage configuration.
-func NewSessionLimiter(ctx context.Context, conf *config.Config, drlManager *drl.DRL, externalServicesConfig *config.ExternalServiceConfig) SessionLimiter {
+func NewSessionLimiter(
+	ctx context.Context,
+	conf *config.Config,
+	drlManager *drl.DRL,
+	externalServicesConfig *config.ExternalServiceConfig,
+) SessionLimiter {
+
 	sessionLimiter := SessionLimiter{
-		ctx:         ctx,
-		drlManager:  drlManager,
-		config:      conf,
-		bucketStore: memorycache.New(ctx),
+		ctx:                    ctx,
+		drlManager:             drlManager,
+		config:                 conf,
+		bucketStore:            memorycache.New(ctx),
+		enableContextVariables: conf.EnableContextVariables,
 	}
 
 	log.Infof("[RATELIMIT] %s", conf.RateLimit.String())
@@ -91,7 +99,7 @@ func (l *SessionLimiter) Context() context.Context {
 	return l.ctx
 }
 
-func (l *SessionLimiter) doRollingWindowWrite(r *http.Request, session *user.SessionState, rateLimiterKey string, apiLimit *user.APILimit, dryRun bool) bool {
+func (l *SessionLimiter) doRollingWindowWrite(r *http.Request, session *user.SessionState, rateLimiterKey string, apiLimit *user.APILimit, dryRun bool) (time.Duration, bool) {
 	ctx := l.Context()
 	rateLimiterSentinelKey := rateLimiterKey + SentinelRateLimitKeyPostfix
 
@@ -142,11 +150,14 @@ func (l *SessionLimiter) doRollingWindowWrite(r *http.Request, session *user.Ses
 
 	ratelimit := rate.NewSlidingLogRedis(l.limiterStorage, pipeline, smoothingFn)
 	shouldBlock, err := ratelimit.Do(ctx, time.Now(), rateLimiterKey, int64(cost), int64(per))
+	blockDuration := time.Second * time.Duration(int64(per))
+
+	// Calculate the earliest possible hit more precisely.
 	if shouldBlock {
 		// Set a sentinel value with expire
 		if l.config.EnableSentinelRateLimiter || l.config.DRLEnableSentinelRateLimiter {
 			if !dryRun {
-				l.limiterStorage.SetNX(ctx, rateLimiterSentinelKey, "1", time.Second*time.Duration(int64(per)))
+				l.limiterStorage.SetNX(ctx, rateLimiterSentinelKey, "1", blockDuration)
 			}
 		}
 	}
@@ -155,35 +166,45 @@ func (l *SessionLimiter) doRollingWindowWrite(r *http.Request, session *user.Ses
 		log.WithError(err).Error("error writing sliding log")
 	}
 
-	return shouldBlock
+	if !shouldBlock {
+		blockDuration = 0
+	}
+
+	return blockDuration, shouldBlock
 }
 
-type sessionFailReason uint
+func (l *SessionLimiter) limitSentinel(
+	r *http.Request,
+	session *user.SessionState,
+	rateLimiterKey string,
+	apiLimit *user.APILimit,
+	dryRun bool,
+) (time.Duration, bool) {
 
-const (
-	sessionFailNone sessionFailReason = iota
-	sessionFailRateLimit
-	sessionFailQuota
-	sessionFailInternalServerError
-)
-
-func (l *SessionLimiter) limitSentinel(r *http.Request, session *user.SessionState, rateLimiterKey string, apiLimit *user.APILimit, dryRun bool) bool {
 	defer func() {
 		go l.doRollingWindowWrite(r, session, rateLimiterKey, apiLimit, dryRun)
 	}()
 
-	// Check sentinel
-	_, sentinelActive := l.limiterStorage.Get(l.Context(), rateLimiterKey+SentinelRateLimitKeyPostfix).Result()
+	// It is not the earliest possible timestamp for the API hit.
+	// It can be calculated like the first entry in the SET after ZSET gets trimmed to the desired cardinality.
+	expires, err := l.limiterStorage.TTL(l.Context(), rateLimiterKey+SentinelRateLimitKeyPostfix).Result()
 
-	// Sentinel is set, fail
-	return sentinelActive == nil
+	if err != nil {
+		return apiLimit.Duration(), false
+	}
+
+	if expires < 0 {
+		expires = 0
+	}
+
+	return expires, expires > 0
 }
 
-func (l *SessionLimiter) limitRedis(r *http.Request, session *user.SessionState, rateLimiterKey string, apiLimit *user.APILimit, dryRun bool) bool {
+func (l *SessionLimiter) limitRedis(r *http.Request, session *user.SessionState, rateLimiterKey string, apiLimit *user.APILimit, dryRun bool) (time.Duration, bool) {
 	return l.doRollingWindowWrite(r, session, rateLimiterKey, apiLimit, dryRun)
 }
 
-func (l *SessionLimiter) limitDRL(bucketKey string, apiLimit *user.APILimit, dryRun bool) bool {
+func (l *SessionLimiter) limitDRL(bucketKey string, apiLimit *user.APILimit, dryRun bool) (model.BucketState, bool) {
 	currRate := apiLimit.Rate
 	per := apiLimit.Per
 
@@ -198,34 +219,16 @@ func (l *SessionLimiter) limitDRL(bucketKey string, apiLimit *user.APILimit, dry
 	userBucket, err := l.bucketStore.Create(bucketKey, cost, time.Duration(per)*time.Second)
 	if err != nil {
 		log.Error("Failed to create bucket!")
-		return true
+		return model.BucketState{}, true
 	}
 
 	if dryRun {
-		// if userBucket is empty and not expired.
-		if userBucket.Remaining() == 0 && time.Now().Before(userBucket.Reset()) {
-			return true
-		}
-	} else {
-		_, errF := userBucket.Add(tokenValue)
-		if errF != nil {
-			return true
-		}
+		state := userBucket.State()
+		return state, state.Remaining == 0 && time.Now().Before(state.Reset)
 	}
-	return false
-}
 
-func (sfr sessionFailReason) String() string {
-	switch sfr {
-	case sessionFailNone:
-		return "sessionFailNone"
-	case sessionFailRateLimit:
-		return "sessionFailRateLimit"
-	case sessionFailQuota:
-		return "sessionFailQuota"
-	default:
-		return fmt.Sprintf("%d", uint(sfr))
-	}
+	state, errF := userBucket.Add(tokenValue)
+	return state, errF != nil
 }
 
 func (l *SessionLimiter) RateLimitInfo(r *http.Request, api *APISpec, endpoints user.Endpoints) (*user.EndpointRateLimitInfo, bool) {
@@ -288,11 +291,19 @@ func (l *SessionLimiter) ForwardMessage(
 	api *APISpec,
 	dryRun bool,
 ) sessionFailReason {
+
+	return l.extendContext(
+		r,
+		l.forwardMessageInternal(r, session, rateLimitKey, quotaKey, store, enableRL, enableQ, api, dryRun),
+	)
+}
+
+func (l *SessionLimiter) forwardMessageInternal(r *http.Request, session *user.SessionState, rateLimitKey string, quotaKey string, store storage.Handler, enableRL, enableQ bool, api *APISpec, dryRun bool) sessionFailReason {
 	// check for limit on API level (set to session by ApplyPolicies)
 	accessDef, allowanceScope, err := GetAccessDefinitionByAPIIDOrSession(session, api)
 	if err != nil {
 		log.WithField("apiID", api.APIID).Debugf("[RATE] %s", err.Error())
-		return sessionFailRateLimit
+		return sessionFailRateLimit{}
 	}
 
 	var (
@@ -328,19 +339,17 @@ func (l *SessionLimiter) ForwardMessage(
 
 		switch {
 		case limiter != nil:
-			err := limiter(r.Context(), limiterKey, apiLimit.Rate, apiLimit.Per)
-
-			if errors.Is(err, rate.ErrLimitExhausted) {
-				return sessionFailRateLimit
+			if ttl, err := limiter(r.Context(), limiterKey, apiLimit.Rate, apiLimit.Per); errors.Is(err, rate.ErrLimitExhausted) {
+				return newSessionFailRateLimit(apiLimit, ttl)
 			}
 
 		case l.config.EnableSentinelRateLimiter:
-			if l.limitSentinel(r, session, limiterKey, apiLimit, dryRun) {
-				return sessionFailRateLimit
+			if ttl, shouldBlock := l.limitSentinel(r, session, limiterKey, apiLimit, dryRun); shouldBlock {
+				return newSessionFailRateLimit(apiLimit, ttl)
 			}
 		case l.config.EnableRedisRollingLimiter:
-			if l.limitRedis(r, session, limiterKey, apiLimit, dryRun) {
-				return sessionFailRateLimit
+			if ttl, shouldBlock := l.limitRedis(r, session, limiterKey, apiLimit, dryRun); shouldBlock {
+				return newSessionFailRateLimit(apiLimit, ttl)
 			}
 		default:
 			var n float64
@@ -363,12 +372,12 @@ func (l *SessionLimiter) ForwardMessage(
 					bucketKey = limiterKey
 				}
 
-				if l.limitDRL(bucketKey, apiLimit, dryRun) {
-					return sessionFailRateLimit
+				if state, shouldBlock := l.limitDRL(bucketKey, apiLimit, dryRun); shouldBlock {
+					return newSessionFailRateLimit(apiLimit, time.Until(state.Reset))
 				}
 			} else {
-				if l.limitRedis(r, session, limiterKey, apiLimit, dryRun) {
-					return sessionFailRateLimit
+				if ttl, shouldBlock := l.limitRedis(r, session, limiterKey, apiLimit, dryRun); shouldBlock {
+					return newSessionFailRateLimit(apiLimit, ttl)
 				}
 			}
 		}
@@ -380,11 +389,11 @@ func (l *SessionLimiter) ForwardMessage(
 		}
 
 		if l.RedisQuotaExceeded(r, session, quotaKey, allowanceScope, apiLimit, store, l.config.HashKeys) {
-			return sessionFailQuota
+			return sessionFailQuota{}
 		}
 	}
 
-	return sessionFailNone
+	return sessionFailNone{}
 }
 
 // RedisQuotaExceeded returns true if the request should be blocked as over quota.
@@ -475,6 +484,7 @@ func (l *SessionLimiter) RedisQuotaExceeded(r *http.Request, session *user.Sessi
 		logger.Debug("[QUOTA] Update quota key")
 
 		l.updateSessionQuota(session, scope, remaining, expiredAt.Unix())
+		l.extendContextWithQuota(r, int(limit.QuotaMax), int(remaining), int(expiredAt.Unix()))
 		return blocked
 	}
 
@@ -560,4 +570,56 @@ func (*SessionLimiter) updateSessionQuota(session *user.SessionState, scope stri
 	}
 
 	session.Touch()
+}
+
+func (l *SessionLimiter) extendContext(r *http.Request, result sessionFailReason) sessionFailReason {
+	if failRateLimit, ok := result.(sessionFailRateLimit); ok {
+		l.extendContextWithLimits(r, failRateLimit)
+	}
+	return result
+}
+
+func (l *SessionLimiter) extendContextWithQuota(r *http.Request, quotaMax, remaining, reset int) {
+	if !l.enableContextVariables {
+		return
+	}
+	data := ctxGetOrCreateData(r)
+	data[ctxDataKeyQuotaLimit] = quotaMax
+	data[ctxDataKeyQuotaRemaining] = remaining
+	data[ctxDataKeyQuotaReset] = reset
+}
+
+func (l *SessionLimiter) extendContextWithLimits(r *http.Request, frl sessionFailRateLimit) {
+	if !l.enableContextVariables {
+		return
+	}
+	data := ctxGetOrCreateData(r)
+	data[ctxDataKeyRateLimitLimit] = int(frl.limit)
+	data[ctxDataKeyRateLimitRemaining] = 0
+	data[ctxDataKeyRateLimitReset] = int(frl.reset.Seconds())
+}
+
+type sessionFailReason interface {
+	reasonName() string
+}
+
+type sessionFailNone struct{}
+type sessionFailRateLimit struct {
+	reset      time.Duration
+	limit, per uint
+}
+type sessionFailQuota struct{}
+type sessionFailInternalServerError struct{}
+
+func (sessionFailNone) reasonName() string                { return "none" }
+func (sessionFailRateLimit) reasonName() string           { return "rate_limit" }
+func (sessionFailQuota) reasonName() string               { return "quota" }
+func (sessionFailInternalServerError) reasonName() string { return "internal_server_error" }
+
+func newSessionFailRateLimit(limits *user.APILimit, ttl time.Duration) sessionFailRateLimit {
+	return sessionFailRateLimit{
+		limit: uint(limits.Rate),
+		per:   uint(limits.Per),
+		reset: ttl,
+	}
 }

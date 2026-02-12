@@ -1355,7 +1355,20 @@ type Config struct {
 
 	// JWKS holds the configuration for Tyk JWKS functionalities
 	JWKS JWKSConfig `json:"jwks"`
+
+	// RateLimitHeadersSource source of rate limit headers
+	RateLimitHeadersSource RateLimitHeadersSource `json:"ratelimit_headers_source"`
+
+	// EnableContextVariables enables extending context data by rate-limit information
+	EnableContextVariables bool `json:"enable_context_variables"`
 }
+
+type RateLimitHeadersSource string
+
+const (
+	RateLimitHeadersSourceQuota     RateLimitHeadersSource = "quotas"
+	RateLimitHeadersSourceRateLimit RateLimitHeadersSource = "rate_limits"
+)
 
 // LabsConfig include config for streaming
 type LabsConfig map[string]interface{}
