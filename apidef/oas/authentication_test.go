@@ -153,6 +153,37 @@ func TestOIDC(t *testing.T) {
 	})
 }
 
+func TestCertificateAuth(t *testing.T) {
+	t.Run("empty", func(t *testing.T) {
+		var emptyCertificateAuth CertificateAuth
+		var convertedAPI apidef.APIDefinition
+		var resultCertificateAuth CertificateAuth
+
+		convertedAPI.SetDisabledFlags()
+		emptyCertificateAuth.ExtractTo(&convertedAPI)
+		resultCertificateAuth.Fill(convertedAPI)
+
+		assert.Equal(t, emptyCertificateAuth, resultCertificateAuth)
+		assert.Falsef(t, convertedAPI.AuthConfigs[apidef.AuthTokenType].UseCertificate, "AuthTokenType should not be set to use certificate auth")
+	})
+
+	t.Run("filled", func(t *testing.T) {
+		certAuth := CertificateAuth{
+			Enabled: true,
+		}
+
+		var convertedAPI apidef.APIDefinition
+		var resultCertificateAuth CertificateAuth
+
+		certAuth.ExtractTo(&convertedAPI)
+		assert.True(t, convertedAPI.AuthConfigs[apidef.AuthTokenType].UseCertificate)
+
+		resultCertificateAuth.Fill(convertedAPI)
+
+		assert.Equal(t, certAuth, resultCertificateAuth)
+	})
+}
+
 func TestKeyRetentionPeriod(t *testing.T) {
 	t.Run("empty", func(t *testing.T) {
 		var emptyCustomKeyLifetime CustomKeyLifetime

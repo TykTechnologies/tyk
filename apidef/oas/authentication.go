@@ -89,6 +89,9 @@ type Authentication struct {
 	// Security is an extension to the OpenAPI security field and is used when securityProcessingMode is set to "compliant".
 	// This can be used to combine any declared securitySchemes including Tyk proprietary auth methods.
 	Security [][]string `bson:"security,omitempty" json:"security,omitempty"`
+
+	// CertificateAuth represents certificate-based authentication configuration.
+	CertificateAuth *CertificateAuth `bson:"certificateAuth,omitempty" json:"certificateAuth,omitempty"`
 }
 
 // CustomKeyLifetime contains configuration for custom key retention.
@@ -116,6 +119,36 @@ type CustomKeyLifetime struct {
 	//
 	// Tyk classic API definition: `session_lifetime_respects_key_expiration`.
 	RespectValidity bool `bson:"respectValidity,omitempty" json:"respectValidity,omitempty"`
+}
+
+// CertificateAuth represents certificate-based authentication configuration.
+type CertificateAuth struct {
+	// Enabled activates the certificate-based authentication mode.
+	//
+	// Tyk classic API definition: `auth_configs["authToken"].use_certificate`
+	Enabled bool `bson:"enabled" json:"enabled"`
+}
+
+func (c *CertificateAuth) Fill(api apidef.APIDefinition) {
+	authConfig, ok := api.AuthConfigs[apidef.AuthTokenType]
+	if !ok {
+		return
+	}
+
+	c.Enabled = authConfig.UseCertificate
+}
+
+func (c *CertificateAuth) ExtractTo(api *apidef.APIDefinition) {
+	if api.AuthConfigs == nil {
+		api.AuthConfigs = make(map[string]apidef.AuthConfig)
+	}
+	authConfig, _ := api.AuthConfigs[apidef.AuthTokenType]
+
+	if c.Enabled {
+		authConfig.UseCertificate = true
+	}
+
+	api.AuthConfigs[apidef.AuthTokenType] = authConfig
 }
 
 // Fill fills *CustomKeyLifetime from apidef.APIDefinition.
@@ -194,6 +227,16 @@ func (a *Authentication) Fill(api apidef.APIDefinition) {
 	if ShouldOmit(a.OIDC) {
 		a.OIDC = nil
 	}
+
+	if a.CertificateAuth == nil {
+		a.CertificateAuth = &CertificateAuth{}
+	}
+
+	a.CertificateAuth.Fill(api)
+
+	if ShouldOmit(a.CertificateAuth) {
+		a.CertificateAuth = nil
+	}
 }
 
 // ExtractTo extracts *Authentication into *apidef.APIDefinition.
@@ -204,6 +247,10 @@ func (a *Authentication) ExtractTo(api *apidef.APIDefinition) {
 
 	if a.HMAC != nil {
 		a.HMAC.ExtractTo(api)
+	}
+
+	if a.CertificateAuth != nil {
+		a.CertificateAuth.ExtractTo(api)
 	}
 
 	if a.OIDC != nil {
