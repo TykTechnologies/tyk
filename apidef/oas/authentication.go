@@ -91,7 +91,7 @@ type Authentication struct {
 	Security [][]string `bson:"security,omitempty" json:"security,omitempty"`
 
 	// CertificateAuth represents certificate-based authentication configuration.
-	CertificateAuth *CertificateAuth `bson:"certificateAuth,omitempty" json:"certificateAuth,omitempty"`
+	CertificateAuth CertificateAuth `bson:"certificateAuth,omitempty" json:"certificateAuth,omitempty"`
 }
 
 // CustomKeyLifetime contains configuration for custom key retention.
@@ -144,9 +144,7 @@ func (c *CertificateAuth) ExtractTo(api *apidef.APIDefinition) {
 	}
 	authConfig := api.AuthConfigs[apidef.AuthTokenType]
 
-	if c.Enabled {
-		authConfig.UseCertificate = true
-	}
+	authConfig.UseCertificate = c.Enabled
 
 	api.AuthConfigs[apidef.AuthTokenType] = authConfig
 }
@@ -228,15 +226,7 @@ func (a *Authentication) Fill(api apidef.APIDefinition) {
 		a.OIDC = nil
 	}
 
-	if a.CertificateAuth == nil {
-		a.CertificateAuth = &CertificateAuth{}
-	}
-
 	a.CertificateAuth.Fill(api)
-
-	if ShouldOmit(a.CertificateAuth) {
-		a.CertificateAuth = nil
-	}
 }
 
 // ExtractTo extracts *Authentication into *apidef.APIDefinition.
@@ -249,9 +239,7 @@ func (a *Authentication) ExtractTo(api *apidef.APIDefinition) {
 		a.HMAC.ExtractTo(api)
 	}
 
-	if a.CertificateAuth != nil {
-		a.CertificateAuth.ExtractTo(api)
-	}
+	a.CertificateAuth.ExtractTo(api)
 
 	if a.OIDC != nil {
 		a.OIDC.ExtractTo(api)

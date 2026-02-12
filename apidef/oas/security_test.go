@@ -91,6 +91,7 @@ func TestGetJWTConfiguration(t *testing.T) {
 func TestOAS_Security(t *testing.T) {
 	var auth apidef.AuthConfig
 	Fill(t, &auth, 0)
+	auth.UseCertificate = false
 	auth.DisableHeader = false
 
 	var api apidef.APIDefinition // bundle enabled
@@ -282,6 +283,7 @@ func TestOAS_Token(t *testing.T) {
 	t.Run("enabled", func(t *testing.T) {
 		var token Token
 		Fill(t, &token, 0)
+		token.EnableClientCertificate = false
 		token.Query = nil
 
 		setToken(token)

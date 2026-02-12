@@ -4,6 +4,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/TykTechnologies/tyk/apidef"
@@ -150,6 +151,99 @@ func TestOIDC(t *testing.T) {
 
 		assert.Len(t, api.OpenIDOptions.Providers, 1)
 		assert.Equal(t, "5678", api.OpenIDOptions.Providers[0].Issuer)
+	})
+}
+
+func TestCertificateAuthPrecedence(t *testing.T) {
+	t.Run("certificate auth field exists", func(t *testing.T) {
+		const securityName = "custom"
+		var trueVal = true
+		oas := OAS{
+			T: openapi3.T{
+				Components: &openapi3.Components{
+					SecuritySchemes: openapi3.SecuritySchemes{
+						securityName: {
+							Value: &openapi3.SecurityScheme{
+								Type: typeAPIKey,
+								Name: "x-query",
+								In:   query,
+							},
+						},
+					},
+				},
+				Security: openapi3.SecurityRequirements{
+					{
+						securityName: []string{},
+					},
+				},
+				Extensions: map[string]interface{}{
+					ExtensionTykAPIGateway: &XTykAPIGateway{
+						Server: Server{
+							Authentication: &Authentication{
+								SecuritySchemes: SecuritySchemes{
+									securityName: &Token{
+										Enabled:                 &trueVal,
+										EnableClientCertificate: true,
+									},
+								},
+								CertificateAuth: CertificateAuth{
+									Enabled: false,
+								},
+							},
+						},
+					},
+				},
+			},
+		}
+
+		var apiDef apidef.APIDefinition
+		oas.ExtractTo(&apiDef)
+
+		assert.False(t, apiDef.AuthConfigs[apidef.AuthTokenType].UseCertificate)
+	})
+
+	t.Run("certificate auth field does not exist", func(t *testing.T) {
+		const securityName = "custom"
+		var trueVal = true
+		oas := OAS{
+			T: openapi3.T{
+				Components: &openapi3.Components{
+					SecuritySchemes: openapi3.SecuritySchemes{
+						securityName: {
+							Value: &openapi3.SecurityScheme{
+								Type: typeAPIKey,
+								Name: "x-query",
+								In:   query,
+							},
+						},
+					},
+				},
+				Security: openapi3.SecurityRequirements{
+					{
+						securityName: []string{},
+					},
+				},
+				Extensions: map[string]interface{}{
+					ExtensionTykAPIGateway: &XTykAPIGateway{
+						Server: Server{
+							Authentication: &Authentication{
+								SecuritySchemes: SecuritySchemes{
+									securityName: &Token{
+										Enabled:                 &trueVal,
+										EnableClientCertificate: true,
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		}
+
+		var apiDef apidef.APIDefinition
+		oas.ExtractTo(&apiDef)
+
+		assert.False(t, apiDef.AuthConfigs[apidef.AuthTokenType].UseCertificate)
 	})
 }
 
