@@ -451,6 +451,21 @@ type SlaveOptionsConfig struct {
 	// RPCKeysCacheExpiration defines the expiration time of the rpc cache that stores the keys, defined in seconds
 	RPCGlobalCacheExpiration float32 `json:"rpc_global_cache_expiration"`
 
+	// RPCCertFetchMaxElapsedTime sets the maximum time in seconds to retry certificate fetch from MDCB during startup (default: 30)
+	RPCCertFetchMaxElapsedTime float32 `json:"rpc_cert_fetch_max_elapsed_time"`
+
+	// RPCCertFetchInitialInterval sets the initial retry interval in seconds for certificate fetch backoff (default: 0.1)
+	RPCCertFetchInitialInterval float32 `json:"rpc_cert_fetch_initial_interval"`
+
+	// RPCCertFetchMaxInterval sets the maximum retry interval in seconds for certificate fetch backoff (default: 2)
+	RPCCertFetchMaxInterval float32 `json:"rpc_cert_fetch_max_interval"`
+
+	// RPCCertFetchRetryEnabled enables exponential backoff retry for certificate fetch from MDCB during startup (default: true)
+	RPCCertFetchRetryEnabled *bool `json:"rpc_cert_fetch_retry_enabled"`
+
+	// RPCCertFetchMaxRetries sets the maximum number of retry attempts for certificate fetch. 0 means unlimited (time-based only) (default: 3)
+	RPCCertFetchMaxRetries *int `json:"rpc_cert_fetch_max_retries"`
+
 	// SynchroniserEnabled enable this config if MDCB has enabled the synchoniser. If disabled then it will ignore signals to synchonise recources
 	SynchroniserEnabled bool `json:"synchroniser_enabled"`
 
