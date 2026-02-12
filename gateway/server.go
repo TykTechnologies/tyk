@@ -108,7 +108,7 @@ const (
 )
 
 type Gateway struct {
-	DefaultProxyMux *proxyMux
+	DefaultProxyMux   *proxyMux
 	config            atomic.Value
 	configMu          sync.Mutex
 	configViewerCache *configViewerCache
@@ -1609,6 +1609,11 @@ func (gw *Gateway) initSystem() error {
 	// instances periodically and deletes idle items, closes net.Listener instances to
 	// free resources.
 	go cleanIdleMemConnProviders(gw.ctx)
+
+	// !!! review bootstrap process and NewGateway(); this process is broken :/
+	gw.limitHeaderSender = rate.NewSender(gwConfig.RateLimitHeadersSource)
+	gw.jwkCache = buildJWKSCache(gwConfig)
+
 	return nil
 }
 
