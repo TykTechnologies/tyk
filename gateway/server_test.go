@@ -18,7 +18,6 @@ import (
 
 	"github.com/TykTechnologies/again"
 	"github.com/TykTechnologies/storage/persistent/model"
-
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/internal/netutil"
 	"github.com/TykTechnologies/tyk/internal/otel"
@@ -45,13 +44,18 @@ func TestGateway_afterConfSetup(t *testing.T) {
 			},
 			expectedConfig: config.Config{
 				SlaveOptions: config.SlaveOptionsConfig{
-					UseRPC:                   true,
-					GroupID:                  "ungrouped",
-					CallTimeout:              30,
-					PingTimeout:              60,
-					KeySpaceSyncInterval:     10,
-					RPCCertCacheExpiration:   3600,
-					RPCGlobalCacheExpiration: 30,
+					UseRPC:                      true,
+					GroupID:                     "ungrouped",
+					CallTimeout:                 30,
+					PingTimeout:                 60,
+					KeySpaceSyncInterval:        10,
+					RPCCertCacheExpiration:      3600,
+					RPCGlobalCacheExpiration:    30,
+					RPCCertFetchMaxElapsedTime:  30,
+					RPCCertFetchInitialInterval: 0.1,
+					RPCCertFetchMaxInterval:     2,
+					RPCCertFetchRetryEnabled:    func() *bool { b := true; return &b }(),
+					RPCCertFetchMaxRetries:      func() *int { i := 5; return &i }(),
 				},
 				AnalyticsConfig: config.AnalyticsConfigConfig{
 					PurgeInterval: 10,
