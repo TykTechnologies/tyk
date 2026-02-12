@@ -915,6 +915,12 @@ func (gw *Gateway) loadHTTPService(spec *APISpec, apisByListen map[string]int, g
 	}
 
 	// Register routes for each prefix
+	gw.generateRoutesForPrefixes(spec, prefixes, gwConfig.HttpServerOptions.EnableStrictRoutes, router, chainObj)
+
+	return chainObj, nil
+}
+
+func (gw *Gateway) generateRoutesForPrefixes(spec *APISpec, prefixes []string, enabledStrictRoutes bool, router *mux.Router, chainObj *ChainObject) {
 	for _, prefix := range prefixes {
 		subrouter := router.PathPrefix(prefix).Subrouter()
 
@@ -924,13 +930,11 @@ func (gw *Gateway) loadHTTPService(spec *APISpec, apisByListen map[string]int, g
 			subrouter.Handle(rateLimitEndpoint, chainObj.RateLimitChain)
 		}
 
-		httpHandler := explicitRouteSubpaths(prefix, chainObj.ThisHandler, gwConfig.HttpServerOptions.EnableStrictRoutes)
+		httpHandler := explicitRouteSubpaths(prefix, chainObj.ThisHandler, enabledStrictRoutes)
 
 		// Attach handlers
 		subrouter.NewRoute().Handler(httpHandler)
 	}
-
-	return chainObj, nil
 }
 
 func (gw *Gateway) loadTCPService(spec *APISpec, gs *generalStores, muxer *proxyMux) {
@@ -1033,14 +1037,17 @@ func (gw *Gateway) loadGraphQLPlayground(spec *APISpec, subrouter *mux.Router) {
 	})
 }
 
-func sortSpecsByListenPath(specs []*APISpec) {
+func sortSpecsByListenPath(specs []*APISpec, enabledCustomDomain bool) {
 	// sort by listen path from longer to shorter, so that /foo
 	// doesn't break /foo-bar
 	sort.Slice(specs, func(i, j int) bool {
-		// we sort by the following rules:
+		// when custom domains are disabled in config we sort by the following rules:
+		// - decreasing order of listen path length
+
+		// when custom domains are enabled in config we sort by the following rules:
 		// - decreasing order of listen path length
 		// - if a domain is empty it should be at the end
-		if (specs[i].Domain == "") != (specs[j].Domain == "") {
+		if enabledCustomDomain && (specs[i].Domain == "") != (specs[j].Domain == "") {
 			return specs[i].Domain != ""
 		}
 
@@ -1093,7 +1100,7 @@ func (gw *Gateway) loadApps(specs []*APISpec) {
 	tmpSpecRegister := make(map[string]*APISpec)
 	tmpSpecHandles := new(sync.Map)
 
-	sortSpecsByListenPath(specs)
+	sortSpecsByListenPath(specs, gw.GetConfig().EnableCustomDomains)
 
 	// Create a new handler for each API spec
 	apisByListen := countApisByListenHash(specs)
