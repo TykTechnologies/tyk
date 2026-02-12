@@ -551,7 +551,32 @@ func (gw *Gateway) setupGlobals() {
 	storeCert := &storage.RedisCluster{KeyPrefix: "cert-", HashKeys: false, ConnectionHandler: gw.StorageConnectionHandler}
 	storeCert.Connect()
 
-	gw.CertificateManager = certs.NewCertificateManager(storeCert, certificateSecret, log, !gw.GetConfig().Cloud)
+	conf := gw.GetConfig()
+
+	// Safely dereference pointer config fields with defaults
+	retryEnabled := certs.DefaultRPCCertFetchRetryEnabled
+	if conf.SlaveOptions.RPCCertFetchRetryEnabled != nil {
+		retryEnabled = *conf.SlaveOptions.RPCCertFetchRetryEnabled
+	}
+
+	maxRetries := certs.DefaultRPCCertFetchMaxRetries
+	if conf.SlaveOptions.RPCCertFetchMaxRetries != nil {
+		maxRetries = *conf.SlaveOptions.RPCCertFetchMaxRetries
+	}
+
+	gw.CertificateManager = certs.NewCertificateManager(
+		storeCert,
+		certificateSecret,
+		log,
+		!conf.Cloud,
+		certs.WithRetryEnabled(retryEnabled),
+		certs.WithMaxRetries(maxRetries),
+		certs.WithBackoffIntervals(
+			time.Duration(conf.SlaveOptions.RPCCertFetchMaxElapsedTime)*time.Second,
+			time.Duration(conf.SlaveOptions.RPCCertFetchInitialInterval)*time.Second,
+			time.Duration(conf.SlaveOptions.RPCCertFetchMaxInterval)*time.Second,
+		),
+	)
 
 	if gw.GetConfig().SlaveOptions.UseRPC {
 		rpcStore := &RPCStorageHandler{
@@ -559,7 +584,20 @@ func (gw *Gateway) setupGlobals() {
 			HashKeys:  false,
 			Gw:        gw,
 		}
-		gw.CertificateManager = certs.NewSlaveCertManager(storeCert, rpcStore, certificateSecret, log, !gw.GetConfig().Cloud)
+		gw.CertificateManager = certs.NewSlaveCertManager(
+			storeCert,
+			rpcStore,
+			certificateSecret,
+			log,
+			!gw.GetConfig().Cloud,
+			certs.WithRetryEnabled(retryEnabled),
+			certs.WithMaxRetries(maxRetries),
+			certs.WithBackoffIntervals(
+				time.Duration(conf.SlaveOptions.RPCCertFetchMaxElapsedTime)*time.Second,
+				time.Duration(conf.SlaveOptions.RPCCertFetchInitialInterval)*time.Second,
+				time.Duration(conf.SlaveOptions.RPCCertFetchMaxInterval)*time.Second,
+			),
+		)
 
 		// Wire certificate registry for selective sync
 		if gw.GetConfig().SlaveOptions.SyncUsedCertsOnly && gw.certUsageTracker != nil {
@@ -1636,6 +1674,33 @@ func (gw *Gateway) afterConfSetup() {
 
 		if conf.SlaveOptions.RPCGlobalCacheExpiration == 0 {
 			conf.SlaveOptions.RPCGlobalCacheExpiration = 30
+		}
+
+		if conf.SlaveOptions.RPCCertFetchMaxElapsedTime <= 0 {
+			conf.SlaveOptions.RPCCertFetchMaxElapsedTime = float32(certs.DefaultRPCCertFetchMaxElapsedTime.Seconds())
+		}
+
+		if conf.SlaveOptions.RPCCertFetchInitialInterval <= 0 {
+			conf.SlaveOptions.RPCCertFetchInitialInterval = float32(certs.DefaultRPCCertFetchInitialInterval.Seconds())
+		}
+
+		if conf.SlaveOptions.RPCCertFetchMaxInterval <= 0 {
+			conf.SlaveOptions.RPCCertFetchMaxInterval = float32(certs.DefaultRPCCertFetchMaxInterval.Seconds())
+		}
+
+		// Default RPCCertFetchRetryEnabled if not explicitly set
+		if conf.SlaveOptions.RPCCertFetchRetryEnabled == nil {
+			enabled := certs.DefaultRPCCertFetchRetryEnabled
+			conf.SlaveOptions.RPCCertFetchRetryEnabled = &enabled
+		}
+
+		// Default RPCCertFetchMaxRetries if not explicitly set (0 = unlimited, negative values default to constant)
+		if conf.SlaveOptions.RPCCertFetchMaxRetries == nil {
+			maxRetries := certs.DefaultRPCCertFetchMaxRetries
+			conf.SlaveOptions.RPCCertFetchMaxRetries = &maxRetries
+		} else if *conf.SlaveOptions.RPCCertFetchMaxRetries < 0 {
+			maxRetries := certs.DefaultRPCCertFetchMaxRetries
+			conf.SlaveOptions.RPCCertFetchMaxRetries = &maxRetries
 		}
 	}
 
