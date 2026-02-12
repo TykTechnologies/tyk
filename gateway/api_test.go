@@ -4356,7 +4356,7 @@ func TestAPIMCPListing(t *testing.T) {
 	regularAPI1 := allAPIs[2]
 	regularAPI2 := allAPIs[3]
 
-	t.Run("/tyk/apis includes all APIs by default", func(t *testing.T) {
+	t.Run("/tyk/apis excludes MCP by default", func(t *testing.T) {
 		req := TestReq(t, "GET", "/tyk/apis/", nil)
 		req = ts.withAuth(req)
 		rec := httptest.NewRecorder()
@@ -4367,7 +4367,30 @@ func TestAPIMCPListing(t *testing.T) {
 		var apis []*apidef.APIDefinition
 		err := json.Unmarshal(rec.Body.Bytes(), &apis)
 		assert.NoError(t, err)
-		assert.Len(t, apis, 4)
+		assert.Len(t, apis, 2, "Should only return non-MCP APIs by default")
+
+		apiIDs := make([]string, len(apis))
+		for i, api := range apis {
+			apiIDs[i] = api.APIID
+		}
+		assert.NotContains(t, apiIDs, mcpAPI1.APIID, "MCP API 1 should be excluded by default")
+		assert.NotContains(t, apiIDs, mcpAPI2.APIID, "MCP API 2 should be excluded by default")
+		assert.Contains(t, apiIDs, regularAPI1.APIID)
+		assert.Contains(t, apiIDs, regularAPI2.APIID)
+	})
+
+	t.Run("/tyk/apis?include_types=mcp includes all APIs", func(t *testing.T) {
+		req := TestReq(t, "GET", "/tyk/apis/?include_types=mcp", nil)
+		req = ts.withAuth(req)
+		rec := httptest.NewRecorder()
+		ts.mainRouter().ServeHTTP(rec, req)
+
+		assert.Equal(t, http.StatusOK, rec.Code)
+
+		var apis []*apidef.APIDefinition
+		err := json.Unmarshal(rec.Body.Bytes(), &apis)
+		assert.NoError(t, err)
+		assert.Len(t, apis, 4, "Should return all APIs including MCP when include_types=mcp")
 
 		apiIDs := make([]string, len(apis))
 		for i, api := range apis {
@@ -5857,7 +5880,7 @@ func TestUpdateKeyWithMtlsStaticCertificateBindings(t *testing.T) {
 	})
 }
 
-func TestAPIListFilter_ExcludeMCP(t *testing.T) {
+func TestAPIListFilter_IncludeTypes(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
 
@@ -5883,7 +5906,7 @@ func TestAPIListFilter_ExcludeMCP(t *testing.T) {
 
 	require.Len(t, allAPIs, 3)
 
-	t.Run("no filter returns all APIs", func(t *testing.T) {
+	t.Run("default excludes MCP APIs", func(t *testing.T) {
 		resp, _ := ts.Run(t, test.TestCase{
 			Path:      "/tyk/apis/",
 			Method:    http.MethodGet,
@@ -5903,21 +5926,26 @@ func TestAPIListFilter_ExcludeMCP(t *testing.T) {
 			t.Logf("  - %s (ID: %s, IsOAS: %v, IsMCP: %v)", api.Name, api.APIID, api.IsOAS, api.IsMCP())
 		}
 
-		assert.Equal(t, 3, len(apis), "Should return all 3 APIs")
+		assert.Equal(t, 2, len(apis), "Should return only 2 APIs (MCP excluded by default)")
 
-		// Check each API is present
+		// Check MCP is excluded by default
+		for _, api := range apis {
+			assert.NotEqual(t, "mcp789", api.APIID, "MCP API should be excluded by default")
+			assert.False(t, api.IsMCP(), "No MCP APIs should be in response by default")
+		}
+
+		// Check other APIs are present
 		apiIDs := make(map[string]bool)
 		for _, api := range apis {
 			apiIDs[api.APIID] = true
 		}
 		assert.True(t, apiIDs["classic123"], "Should have classic API 1")
 		assert.True(t, apiIDs["classic456"], "Should have classic API 2")
-		assert.True(t, apiIDs["mcp789"], "Should have MCP API")
 	})
 
-	t.Run("exclude_api_types=mcp excludes MCP Proxies", func(t *testing.T) {
+	t.Run("include_types=mcp includes MCP Proxies", func(t *testing.T) {
 		resp, _ := ts.Run(t, test.TestCase{
-			Path:      "/tyk/apis/?exclude_api_types=mcp",
+			Path:      "/tyk/apis/?include_types=mcp",
 			Method:    http.MethodGet,
 			AdminAuth: true,
 			Code:      http.StatusOK,
@@ -5930,25 +5958,20 @@ func TestAPIListFilter_ExcludeMCP(t *testing.T) {
 		err = json.Unmarshal(bodyBytes, &apis)
 		require.NoError(t, err)
 
-		t.Logf("With exclude_api_types=mcp: found %d APIs", len(apis))
+		t.Logf("With include_types=mcp: found %d APIs", len(apis))
 		for _, api := range apis {
 			t.Logf("  - %s (ID: %s, IsOAS: %v, IsMCP: %v)", api.Name, api.APIID, api.IsOAS, api.IsMCP())
 		}
 
-		assert.Equal(t, 2, len(apis), "Should return only 2 APIs (excluding MCP)")
+		assert.Equal(t, 3, len(apis), "Should return all 3 APIs when include_types=mcp")
 
-		// Check MCP is excluded
-		for _, api := range apis {
-			assert.NotEqual(t, "mcp789", api.APIID, "MCP API should be excluded")
-			assert.False(t, api.IsMCP(), "No MCP APIs should be in response")
-		}
-
-		// Check other APIs are present
+		// Check each API is present
 		apiIDs := make(map[string]bool)
 		for _, api := range apis {
 			apiIDs[api.APIID] = true
 		}
 		assert.True(t, apiIDs["classic123"], "Should have classic API 1")
 		assert.True(t, apiIDs["classic456"], "Should have classic API 2")
+		assert.True(t, apiIDs["mcp789"], "Should have MCP API")
 	})
 }
