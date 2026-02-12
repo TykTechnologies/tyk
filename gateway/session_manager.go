@@ -152,7 +152,7 @@ func (l *SessionLimiter) doRollingWindowWrite(r *http.Request, session *user.Ses
 	shouldBlock, err := ratelimit.Do(ctx, time.Now(), rateLimiterKey, int64(cost), int64(per))
 	blockDuration := time.Second * time.Duration(int64(per))
 
-	// value can be next from the
+	// Calculate the earliest possible hit more precisely.
 	if shouldBlock {
 		// Set a sentinel value with expire
 		if l.config.EnableSentinelRateLimiter || l.config.DRLEnableSentinelRateLimiter {
@@ -185,9 +185,8 @@ func (l *SessionLimiter) limitSentinel(
 		go l.doRollingWindowWrite(r, session, rateLimiterKey, apiLimit, dryRun)
 	}()
 
-	// reset value here is not a proper value for
-	// as doRollingWindowWrite uses sliding window and key is being blocked for the whole duration of the period.
-	// but the nearest
+	// It is not the earliest possible timestamp for the API hit.
+	// It can be calculated like the first entry in the SET after ZSET gets trimmed to the desired cardinality.
 	expires, err := l.limiterStorage.TTL(l.Context(), rateLimiterKey+SentinelRateLimitKeyPostfix).Result()
 
 	if err != nil {
