@@ -279,7 +279,7 @@ func (l *SessionLimiter) RateLimitInfo(r *http.Request, api *APISpec, endpoints 
 }
 
 // ForwardMessage will enforce rate limiting, returning a non-zero
-// sessionFailReasonMarker if session limits have been exceeded.
+// sessionFailReason if session limits have been exceeded.
 // Key values to manage rate are Rate and Per, e.g. Rate of 10 messages
 // Per 10 seconds
 func (l *SessionLimiter) ForwardMessage(
@@ -601,7 +601,7 @@ func (l *SessionLimiter) extendContextWithLimits(r *http.Request, frl sessionFai
 }
 
 type sessionFailReason interface {
-	sessionFailReasonMarker()
+	reasonName() string
 }
 
 type sessionFailNone struct{}
@@ -612,10 +612,10 @@ type sessionFailRateLimit struct {
 type sessionFailQuota struct{}
 type sessionFailInternalServerError struct{}
 
-func (sessionFailNone) sessionFailReasonMarker()                {}
-func (sessionFailRateLimit) sessionFailReasonMarker()           {}
-func (sessionFailQuota) sessionFailReasonMarker()               {}
-func (sessionFailInternalServerError) sessionFailReasonMarker() {}
+func (sessionFailNone) reasonName() string                { return "none" }
+func (sessionFailRateLimit) reasonName() string           { return "rate_limit" }
+func (sessionFailQuota) reasonName() string               { return "quota" }
+func (sessionFailInternalServerError) reasonName() string { return "internal_server_error" }
 
 func newSessionFailRateLimit(limits *user.APILimit, ttl time.Duration) sessionFailRateLimit {
 	return sessionFailRateLimit{
