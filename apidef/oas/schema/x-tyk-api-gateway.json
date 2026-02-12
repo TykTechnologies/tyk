@@ -1278,6 +1278,38 @@
             }
           },
           "description": "Vendor extension security requirements for proprietary auth methods"
+        },
+        "protectedResourceMetadata": {
+          "$ref": "#/definitions/X-Tyk-ProtectedResourceMetadata"
+        }
+      },
+      "required": [
+        "enabled"
+      ]
+    },
+    "X-Tyk-ProtectedResourceMetadata": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "wellKnownPath": {
+          "type": "string"
+        },
+        "resource": {
+          "type": "string"
+        },
+        "authorizationServers": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "scopesSupported": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
         }
       },
       "required": [

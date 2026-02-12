@@ -1,6 +1,7 @@
 package oas
 
 import (
+	"encoding/json"
 	"testing"
 	"time"
 
@@ -486,5 +487,146 @@ func TestVendorExtensionSecurity(t *testing.T) {
 		auth2.Fill(api)
 
 		assert.Nil(t, auth2.Security)
+	})
+}
+
+func TestProtectedResourceMetadata_Validate(t *testing.T) {
+	t.Parallel()
+
+	t.Run("nil PRM returns no error", func(t *testing.T) {
+		t.Parallel()
+		var prm *ProtectedResourceMetadata
+		assert.NoError(t, prm.Validate(false))
+		assert.NoError(t, prm.Validate(true))
+	})
+
+	t.Run("disabled PRM returns no error", func(t *testing.T) {
+		t.Parallel()
+		prm := &ProtectedResourceMetadata{Enabled: false}
+		assert.NoError(t, prm.Validate(false))
+		assert.NoError(t, prm.Validate(true))
+	})
+
+	t.Run("enabled without resource returns error", func(t *testing.T) {
+		t.Parallel()
+		prm := &ProtectedResourceMetadata{
+			Enabled:              true,
+			AuthorizationServers: []string{"https://auth.example.com"},
+		}
+		err := prm.Validate(false)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "resource is required")
+	})
+
+	t.Run("MCP without authorizationServers returns error", func(t *testing.T) {
+		t.Parallel()
+		prm := &ProtectedResourceMetadata{
+			Enabled:  true,
+			Resource: "https://api.example.com",
+		}
+		err := prm.Validate(true)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "authorizationServers")
+	})
+
+	t.Run("non-MCP without authorizationServers returns no error", func(t *testing.T) {
+		t.Parallel()
+		prm := &ProtectedResourceMetadata{
+			Enabled:  true,
+			Resource: "https://api.example.com",
+		}
+		assert.NoError(t, prm.Validate(false))
+	})
+
+	t.Run("valid MCP configuration", func(t *testing.T) {
+		t.Parallel()
+		prm := &ProtectedResourceMetadata{
+			Enabled:              true,
+			Resource:             "https://api.example.com",
+			AuthorizationServers: []string{"https://auth.example.com"},
+			ScopesSupported:      []string{"read", "write"},
+		}
+		assert.NoError(t, prm.Validate(true))
+	})
+
+	t.Run("valid non-MCP configuration", func(t *testing.T) {
+		t.Parallel()
+		prm := &ProtectedResourceMetadata{
+			Enabled:              true,
+			Resource:             "https://api.example.com",
+			AuthorizationServers: []string{"https://auth.example.com"},
+		}
+		assert.NoError(t, prm.Validate(false))
+	})
+}
+
+func TestProtectedResourceMetadata_GetWellKnownPath(t *testing.T) {
+	t.Parallel()
+
+	t.Run("nil returns default", func(t *testing.T) {
+		t.Parallel()
+		var prm *ProtectedResourceMetadata
+		assert.Equal(t, DefaultPRMWellKnownPath, prm.GetWellKnownPath())
+	})
+
+	t.Run("empty path returns default", func(t *testing.T) {
+		t.Parallel()
+		prm := &ProtectedResourceMetadata{}
+		assert.Equal(t, DefaultPRMWellKnownPath, prm.GetWellKnownPath())
+	})
+
+	t.Run("custom path returned", func(t *testing.T) {
+		t.Parallel()
+		prm := &ProtectedResourceMetadata{WellKnownPath: ".well-known/custom"}
+		assert.Equal(t, ".well-known/custom", prm.GetWellKnownPath())
+	})
+}
+
+func TestProtectedResourceMetadata_JSON(t *testing.T) {
+	t.Parallel()
+
+	t.Run("round-trip serialization", func(t *testing.T) {
+		t.Parallel()
+		prm := &ProtectedResourceMetadata{
+			Enabled:              true,
+			WellKnownPath:        ".well-known/oauth-protected-resource",
+			Resource:             "https://api.example.com",
+			AuthorizationServers: []string{"https://auth.example.com"},
+			ScopesSupported:      []string{"read", "write"},
+		}
+
+		data, err := json.Marshal(prm)
+		assert.NoError(t, err)
+
+		var decoded ProtectedResourceMetadata
+		err = json.Unmarshal(data, &decoded)
+		assert.NoError(t, err)
+		assert.Equal(t, *prm, decoded)
+	})
+
+	t.Run("ShouldOmit behavior", func(t *testing.T) {
+		t.Parallel()
+		prm := &ProtectedResourceMetadata{}
+		assert.True(t, ShouldOmit(prm))
+
+		prm.Enabled = true
+		assert.False(t, ShouldOmit(prm))
+	})
+
+	t.Run("omitempty fields excluded when empty", func(t *testing.T) {
+		t.Parallel()
+		prm := &ProtectedResourceMetadata{Enabled: true}
+
+		data, err := json.Marshal(prm)
+		assert.NoError(t, err)
+
+		var raw map[string]interface{}
+		err = json.Unmarshal(data, &raw)
+		assert.NoError(t, err)
+		assert.Contains(t, raw, "enabled")
+		assert.NotContains(t, raw, "wellKnownPath")
+		assert.NotContains(t, raw, "resource")
+		assert.NotContains(t, raw, "authorizationServers")
+		assert.NotContains(t, raw, "scopesSupported")
 	})
 }

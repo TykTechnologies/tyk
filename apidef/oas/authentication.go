@@ -2,6 +2,7 @@ package oas
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"reflect"
 	"sort"
@@ -21,6 +22,9 @@ const (
 	// SecurityProcessingModeCompliant processes all security requirements with OR logic and uses dynamic identity provider
 	SecurityProcessingModeCompliant = "compliant"
 )
+
+// DefaultPRMWellKnownPath is the default well-known path for OAuth 2.0 Protected Resource Metadata (RFC 9728).
+const DefaultPRMWellKnownPath = ".well-known/oauth-protected-resource"
 
 // ValidateSecurityProcessingMode validates the security processing mode value.
 func ValidateSecurityProcessingMode(mode string) bool {
@@ -89,6 +93,59 @@ type Authentication struct {
 	// Security is an extension to the OpenAPI security field and is used when securityProcessingMode is set to "compliant".
 	// This can be used to combine any declared securitySchemes including Tyk proprietary auth methods.
 	Security [][]string `bson:"security,omitempty" json:"security,omitempty"`
+
+	// ProtectedResourceMetadata configures OAuth 2.0 Protected Resource Metadata (RFC 9728)
+	// for authorization server discovery. This is used by MCP clients to discover which
+	// authorization server to use for accessing the API.
+	ProtectedResourceMetadata *ProtectedResourceMetadata `bson:"protectedResourceMetadata,omitempty" json:"protectedResourceMetadata,omitempty"`
+}
+
+// ProtectedResourceMetadata holds the configuration for OAuth 2.0 Protected Resource Metadata (RFC 9728).
+// It enables MCP clients to discover which authorization server protects this API resource.
+type ProtectedResourceMetadata struct {
+	// Enabled activates the Protected Resource Metadata endpoint.
+	Enabled bool `bson:"enabled" json:"enabled"` // required
+
+	// WellKnownPath is the path at which the metadata document is served.
+	// Defaults to ".well-known/oauth-protected-resource" if empty.
+	WellKnownPath string `bson:"wellKnownPath,omitempty" json:"wellKnownPath,omitempty"`
+
+	// Resource is the resource identifier (the API's resource URL).
+	Resource string `bson:"resource,omitempty" json:"resource,omitempty"`
+
+	// AuthorizationServers is the list of authorization server URLs that can issue tokens for this resource.
+	AuthorizationServers []string `bson:"authorizationServers,omitempty" json:"authorizationServers,omitempty"`
+
+	// ScopesSupported is the list of OAuth 2.0 scopes supported by this resource.
+	ScopesSupported []string `bson:"scopesSupported,omitempty" json:"scopesSupported,omitempty"`
+}
+
+// Validate validates the ProtectedResourceMetadata configuration.
+// When isMCP is true, authorizationServers must have at least one entry.
+func (prm *ProtectedResourceMetadata) Validate(isMCP bool) error {
+	if prm == nil || !prm.Enabled {
+		return nil
+	}
+
+	if prm.Resource == "" {
+		return errors.New("protectedResourceMetadata.resource is required when enabled")
+	}
+
+	if isMCP && len(prm.AuthorizationServers) == 0 {
+		return errors.New("protectedResourceMetadata.authorizationServers must have at least one entry for MCP APIs")
+	}
+
+	return nil
+}
+
+// GetWellKnownPath returns the well-known path for the PRM endpoint,
+// defaulting to DefaultPRMWellKnownPath if not set.
+func (prm *ProtectedResourceMetadata) GetWellKnownPath() string {
+	if prm == nil || prm.WellKnownPath == "" {
+		return DefaultPRMWellKnownPath
+	}
+
+	return prm.WellKnownPath
 }
 
 // CustomKeyLifetime contains configuration for custom key retention.
