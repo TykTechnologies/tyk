@@ -142,7 +142,7 @@ func (c *CertificateAuth) ExtractTo(api *apidef.APIDefinition) {
 	if api.AuthConfigs == nil {
 		api.AuthConfigs = make(map[string]apidef.AuthConfig)
 	}
-	authConfig, _ := api.AuthConfigs[apidef.AuthTokenType]
+	authConfig := api.AuthConfigs[apidef.AuthTokenType]
 
 	if c.Enabled {
 		authConfig.UseCertificate = true
