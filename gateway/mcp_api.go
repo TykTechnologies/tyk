@@ -64,6 +64,13 @@ func (gw *Gateway) validateMCP(next http.HandlerFunc) http.HandlerFunc {
 			return
 		}
 
+		if tykExt := mcpObj.GetTykExtension(); tykExt != nil && tykExt.Server.Authentication != nil {
+			if err = tykExt.Server.Authentication.ProtectedResourceMetadata.Validate(true); err != nil {
+				doJSONWrite(w, http.StatusBadRequest, apiError(err.Error()))
+				return
+			}
+		}
+
 		r.Body = ioutil.NopCloser(bytes.NewReader(reqBodyInBytes))
 		next.ServeHTTP(w, r)
 	}

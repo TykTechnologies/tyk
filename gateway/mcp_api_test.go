@@ -714,3 +714,165 @@ func TestMCPDeleteHandler(t *testing.T) {
 		assert.Contains(t, w.Body.String(), "Invalid API ID")
 	})
 }
+
+func TestValidateMCP_PRM(t *testing.T) {
+	t.Parallel()
+
+	t.Run("rejects PRM without resource", func(t *testing.T) {
+		t.Parallel()
+
+		ts := StartTest(nil)
+		defer ts.Close()
+
+		nextCalled := false
+		nextHandler := http.HandlerFunc(func(_ http.ResponseWriter, _ *http.Request) {
+			nextCalled = true
+		})
+
+		handler := ts.Gw.validateMCP(nextHandler)
+
+		mcpWithBadPRM := `{
+			"openapi": "3.0.3",
+			"info": {"title": "Test MCP API", "version": "1.0.0"},
+			"paths": {},
+			"x-tyk-api-gateway": {
+				"info": {
+					"name": "test-mcp-api",
+					"state": {"active": true}
+				},
+				"server": {
+					"listenPath": {"value": "/test-mcp/"},
+					"authentication": {
+						"enabled": true,
+						"protectedResourceMetadata": {
+							"enabled": true,
+							"authorizationServers": ["https://auth.example.com"]
+						}
+					}
+				},
+				"upstream": {"url": "http://upstream.url"},
+				"middleware": {
+					"mcpTools": {
+						"test-tool": {"allow": {"enabled": true}}
+					}
+				}
+			}
+		}`
+
+		req := httptest.NewRequest(http.MethodPost, "/test", strings.NewReader(mcpWithBadPRM))
+		req.Header.Set("Content-Type", "application/json")
+		w := httptest.NewRecorder()
+
+		handler.ServeHTTP(w, req)
+
+		assert.False(t, nextCalled, "next handler should not be called")
+		assert.Equal(t, http.StatusBadRequest, w.Code)
+		assert.Contains(t, w.Body.String(), "resource is required")
+	})
+
+	t.Run("rejects PRM without authorizationServers for MCP", func(t *testing.T) {
+		t.Parallel()
+
+		ts := StartTest(nil)
+		defer ts.Close()
+
+		nextCalled := false
+		nextHandler := http.HandlerFunc(func(_ http.ResponseWriter, _ *http.Request) {
+			nextCalled = true
+		})
+
+		handler := ts.Gw.validateMCP(nextHandler)
+
+		mcpWithBadPRM := `{
+			"openapi": "3.0.3",
+			"info": {"title": "Test MCP API", "version": "1.0.0"},
+			"paths": {},
+			"x-tyk-api-gateway": {
+				"info": {
+					"name": "test-mcp-api",
+					"state": {"active": true}
+				},
+				"server": {
+					"listenPath": {"value": "/test-mcp/"},
+					"authentication": {
+						"enabled": true,
+						"protectedResourceMetadata": {
+							"enabled": true,
+							"resource": "https://api.example.com"
+						}
+					}
+				},
+				"upstream": {"url": "http://upstream.url"},
+				"middleware": {
+					"mcpTools": {
+						"test-tool": {"allow": {"enabled": true}}
+					}
+				}
+			}
+		}`
+
+		req := httptest.NewRequest(http.MethodPost, "/test", strings.NewReader(mcpWithBadPRM))
+		req.Header.Set("Content-Type", "application/json")
+		w := httptest.NewRecorder()
+
+		handler.ServeHTTP(w, req)
+
+		assert.False(t, nextCalled, "next handler should not be called")
+		assert.Equal(t, http.StatusBadRequest, w.Code)
+		assert.Contains(t, w.Body.String(), "authorizationServers")
+	})
+
+	t.Run("accepts valid PRM", func(t *testing.T) {
+		t.Parallel()
+
+		ts := StartTest(nil)
+		defer ts.Close()
+
+		nextCalled := false
+		nextHandler := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			nextCalled = true
+			w.WriteHeader(http.StatusOK)
+		})
+
+		handler := ts.Gw.validateMCP(nextHandler)
+
+		mcpWithGoodPRM := `{
+			"openapi": "3.0.3",
+			"info": {"title": "Test MCP API", "version": "1.0.0"},
+			"paths": {},
+			"x-tyk-api-gateway": {
+				"info": {
+					"name": "test-mcp-api",
+					"state": {"active": true}
+				},
+				"server": {
+					"listenPath": {"value": "/test-mcp/"},
+					"authentication": {
+						"enabled": true,
+						"protectedResourceMetadata": {
+							"enabled": true,
+							"resource": "https://api.example.com",
+							"authorizationServers": ["https://auth.example.com"],
+							"scopesSupported": ["read", "write"]
+						}
+					}
+				},
+				"upstream": {"url": "http://upstream.url"},
+				"middleware": {
+					"mcpTools": {
+						"test-tool": {"allow": {"enabled": true}}
+					}
+				}
+			}
+		}`
+
+		req := httptest.NewRequest(http.MethodPost, "/test", strings.NewReader(mcpWithGoodPRM))
+		req.Header.Set("Content-Type", "application/json")
+		w := httptest.NewRecorder()
+
+		handler.ServeHTTP(w, req)
+
+		assert.True(t, nextCalled, "next handler should be called")
+		assert.Equal(t, http.StatusOK, w.Code)
+	})
+}
