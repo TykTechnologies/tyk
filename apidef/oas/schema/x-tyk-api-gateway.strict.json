@@ -1378,7 +1378,8 @@
         }
       },
       "required": [
-        "enabled"
+        "enabled",
+        "resource"
       ],
       "additionalProperties": false
     },
