@@ -77,7 +77,6 @@ func (tr TraceMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request,
 	if baseMw := tr.Base(); baseMw != nil {
 		cfg := baseMw.Gw.GetConfig()
 		if cfg.OpenTelemetry.Enabled {
-			newrelic.RenameTransaction(r)
 			otel.AddTraceID(r.Context(), w)
 
 			span := otel.SpanFromContext(r.Context())

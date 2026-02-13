@@ -1,8 +1,8 @@
 package newrelic
 
 import (
-	"context"
 	"net/http"
+	"strings"
 
 	"github.com/gorilla/mux"
 	"github.com/newrelic/go-agent/v3/integrations/nrgorilla"
@@ -15,9 +15,6 @@ type (
 	Transaction  = newrelic.Transaction
 	ConfigOption = newrelic.ConfigOption
 )
-
-// Context key - contains request path before any processing
-type requestPathKey struct{}
 
 // Variable aliases used from newrelic pkg.
 var (
@@ -39,29 +36,25 @@ func Mount(router *mux.Router, app *Application) {
 	}
 
 	router.Use(nrgorilla.Middleware(app))
-	router.Use(storeOriginalPathMiddleware)
+	router.Use(renameRelicTransactionMiddleware)
 }
 
-// storeOriginalPathMiddleware stores the original full request path before any processing
-func storeOriginalPathMiddleware(next http.Handler) http.Handler {
+// renameRelicTransactionMiddleware renames transaction name with request path before any processing
+func renameRelicTransactionMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		ctx := context.WithValue(r.Context(), requestPathKey{}, r.URL.Path)
+		ctx := r.Context()
+		txn := FromContext(ctx)
+		if txn == nil {
+			return
+		}
+
+		var builder strings.Builder
+		builder.Grow(len(r.URL.Path) + len(r.Method) + 1)
+		builder.WriteString(r.Method)
+		builder.WriteString(" ")
+		builder.WriteString(r.URL.Path)
+
+		txn.SetName(builder.String())
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
-}
-
-// RenameTransaction renames the New Relic transaction to include the full request path
-func RenameTransaction(r *http.Request) {
-	ctx := r.Context()
-	txn := FromContext(ctx)
-	if txn == nil {
-		return
-	}
-
-	originalPath, ok := ctx.Value(requestPathKey{}).(string)
-	if !ok {
-		return
-	}
-
-	txn.SetName(r.Method + " " + originalPath)
 }
