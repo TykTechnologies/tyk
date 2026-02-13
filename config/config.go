@@ -1173,8 +1173,11 @@ type Config struct {
 	// Set to true if you are using JSVM custom middleware or virtual endpoints.
 	EnableJSVM bool `json:"enable_jsvm"`
 
-	// Set the execution timeout for JSVM plugins and virtal endpoints
+	// Set the execution timeout for JSVM plugins and virtual endpoints
 	JSVMTimeout int `json:"jsvm_timeout"`
+
+	// Set the execution timeout for HTTP requests inside JSVM
+	JSVMHTTPRequestTimeout int `json:"jsvm_http_request_timeout"`
 
 	// Disable virtual endpoints and the code will not be loaded into the VM when the API definition initialises.
 	// This is useful for systems where you want to avoid having third-party code run.
