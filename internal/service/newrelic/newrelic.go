@@ -1,6 +1,9 @@
 package newrelic
 
 import (
+	"net/http"
+	"strings"
+
 	"github.com/gorilla/mux"
 	"github.com/newrelic/go-agent/v3/integrations/nrgorilla"
 	"github.com/newrelic/go-agent/v3/newrelic"
@@ -33,4 +36,22 @@ func Mount(router *mux.Router, app *Application) {
 	}
 
 	router.Use(nrgorilla.Middleware(app))
+	router.Use(renameRelicTransactionMiddleware)
+}
+
+// renameRelicTransactionMiddleware renames transaction name with request path before any processing
+func renameRelicTransactionMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if txn := FromContext(r.Context()); txn != nil {
+			var builder strings.Builder
+			builder.Grow(len(r.URL.Path) + len(r.Method) + 1)
+			builder.WriteString(r.Method)
+			builder.WriteString(" ")
+			builder.WriteString(r.URL.Path)
+
+			txn.SetName(builder.String())
+		}
+
+		next.ServeHTTP(w, r)
+	})
 }
