@@ -42,19 +42,16 @@ func Mount(router *mux.Router, app *Application) {
 // renameRelicTransactionMiddleware renames transaction name with request path before any processing
 func renameRelicTransactionMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		ctx := r.Context()
-		txn := FromContext(ctx)
-		if txn == nil {
-			return
+		if txn := FromContext(r.Context()); txn != nil {
+			var builder strings.Builder
+			builder.Grow(len(r.URL.Path) + len(r.Method) + 1)
+			builder.WriteString(r.Method)
+			builder.WriteString(" ")
+			builder.WriteString(r.URL.Path)
+
+			txn.SetName(builder.String())
 		}
 
-		var builder strings.Builder
-		builder.Grow(len(r.URL.Path) + len(r.Method) + 1)
-		builder.WriteString(r.Method)
-		builder.WriteString(" ")
-		builder.WriteString(r.URL.Path)
-
-		txn.SetName(builder.String())
-		next.ServeHTTP(w, r.WithContext(ctx))
+		next.ServeHTTP(w, r)
 	})
 }
