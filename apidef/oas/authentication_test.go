@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/TykTechnologies/tyk/apidef"
@@ -151,6 +152,130 @@ func TestOIDC(t *testing.T) {
 
 		assert.Len(t, api.OpenIDOptions.Providers, 1)
 		assert.Equal(t, "5678", api.OpenIDOptions.Providers[0].Issuer)
+	})
+}
+
+func TestCertificateAuthPrecedence(t *testing.T) {
+	t.Run("certificate auth field exists", func(t *testing.T) {
+		const securityName = "custom"
+		var trueVal = true
+		oas := OAS{
+			T: openapi3.T{
+				Components: &openapi3.Components{
+					SecuritySchemes: openapi3.SecuritySchemes{
+						securityName: {
+							Value: &openapi3.SecurityScheme{
+								Type: typeAPIKey,
+								Name: "x-query",
+								In:   query,
+							},
+						},
+					},
+				},
+				Security: openapi3.SecurityRequirements{
+					{
+						securityName: []string{},
+					},
+				},
+				Extensions: map[string]interface{}{
+					ExtensionTykAPIGateway: &XTykAPIGateway{
+						Server: Server{
+							Authentication: &Authentication{
+								SecuritySchemes: SecuritySchemes{
+									securityName: &Token{
+										Enabled:                 &trueVal,
+										EnableClientCertificate: true,
+									},
+								},
+								CertificateAuth: CertificateAuth{
+									Enabled: false,
+								},
+							},
+						},
+					},
+				},
+			},
+		}
+
+		var apiDef apidef.APIDefinition
+		oas.ExtractTo(&apiDef)
+
+		assert.False(t, apiDef.AuthConfigs[apidef.AuthTokenType].UseCertificate)
+	})
+
+	t.Run("certificate auth field does not exist", func(t *testing.T) {
+		const securityName = "custom"
+		var trueVal = true
+		oas := OAS{
+			T: openapi3.T{
+				Components: &openapi3.Components{
+					SecuritySchemes: openapi3.SecuritySchemes{
+						securityName: {
+							Value: &openapi3.SecurityScheme{
+								Type: typeAPIKey,
+								Name: "x-query",
+								In:   query,
+							},
+						},
+					},
+				},
+				Security: openapi3.SecurityRequirements{
+					{
+						securityName: []string{},
+					},
+				},
+				Extensions: map[string]interface{}{
+					ExtensionTykAPIGateway: &XTykAPIGateway{
+						Server: Server{
+							Authentication: &Authentication{
+								SecuritySchemes: SecuritySchemes{
+									securityName: &Token{
+										Enabled:                 &trueVal,
+										EnableClientCertificate: true,
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		}
+
+		var apiDef apidef.APIDefinition
+		oas.ExtractTo(&apiDef)
+
+		assert.False(t, apiDef.AuthConfigs[apidef.AuthTokenType].UseCertificate)
+	})
+}
+
+func TestCertificateAuth(t *testing.T) {
+	t.Run("empty", func(t *testing.T) {
+		var emptyCertificateAuth CertificateAuth
+		var convertedAPI apidef.APIDefinition
+		var resultCertificateAuth CertificateAuth
+
+		convertedAPI.SetDisabledFlags()
+		emptyCertificateAuth.ExtractTo(&convertedAPI)
+		resultCertificateAuth.Fill(convertedAPI)
+
+		assert.Equal(t, emptyCertificateAuth, resultCertificateAuth)
+		assert.Falsef(t, convertedAPI.AuthConfigs[apidef.AuthTokenType].UseCertificate, "AuthTokenType should not be set to use certificate auth")
+	})
+
+	t.Run("filled", func(t *testing.T) {
+		certAuth := CertificateAuth{
+			Enabled: true,
+		}
+
+		var convertedAPI apidef.APIDefinition
+		var resultCertificateAuth CertificateAuth
+
+		certAuth.ExtractTo(&convertedAPI)
+		assert.True(t, convertedAPI.AuthConfigs[apidef.AuthTokenType].UseCertificate)
+
+		resultCertificateAuth.Fill(convertedAPI)
+
+		assert.Equal(t, certAuth, resultCertificateAuth)
 	})
 }
 

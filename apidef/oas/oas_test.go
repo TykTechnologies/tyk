@@ -203,6 +203,7 @@ func TestOAS(t *testing.T) {
 
 		a := apidef.AuthConfig{}
 		Fill(t, &a, 0)
+		a.UseCertificate = false
 		api.AuthConfigs[apidef.AuthTokenType] = a
 
 		sw := &OAS{}
