@@ -1070,6 +1070,7 @@ func (k *JWTMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, _
 
 		ctx.SetErrorClassification(r, tykerrors.ClassifyJWTError(tykerrors.ErrTypeAuthFieldMissing, k.Name()))
 		k.reportLoginFailure(tykId, r)
+		setPRMWWWAuthenticateHeader(w, r, k.Spec)
 		return errors.New("Authorization field missing"), http.StatusBadRequest
 	}
 
@@ -1103,6 +1104,7 @@ func (k *JWTMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, _
 				errType = tykerrors.ErrTypeTokenExpired
 			}
 			ctx.SetErrorClassification(r, tykerrors.ClassifyJWTError(errType, k.Name()))
+			setPRMWWWAuthenticateHeader(w, r, k.Spec)
 			return errors.New("Key not authorized: " + err.Error()), http.StatusUnauthorized
 		}
 
@@ -1127,10 +1129,12 @@ func (k *JWTMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, _
 		errorDetails := strings.Split(err.Error(), ":")
 		if errorDetails[0] == UnexpectedSigningMethod {
 			ctx.SetErrorClassification(r, tykerrors.ClassifyJWTError(tykerrors.ErrTypeUnexpectedSigningMethod, k.Name()))
+			setPRMWWWAuthenticateHeader(w, r, k.Spec)
 			return errors.New(MsgKeyNotAuthorizedUnexpectedSigningMethod), http.StatusForbidden
 		}
 	}
 	ctx.SetErrorClassification(r, tykerrors.ClassifyJWTError(tykerrors.ErrTypeTokenInvalid, k.Name()))
+	setPRMWWWAuthenticateHeader(w, r, k.Spec)
 	return errors.New("Key not authorized"), http.StatusForbidden
 }
 

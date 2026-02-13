@@ -142,6 +142,20 @@ func (a *APISpec) GetTykExtension() *oas.XTykAPIGateway {
 	return res
 }
 
+// GetPRMConfig returns the Protected Resource Metadata configuration
+// if the API is an OAS API with PRM enabled. Returns nil otherwise.
+func (a *APISpec) GetPRMConfig() *oas.ProtectedResourceMetadata {
+	ext := a.GetTykExtension()
+	if ext == nil || ext.Server.Authentication == nil {
+		return nil
+	}
+	prm := ext.Server.Authentication.ProtectedResourceMetadata
+	if prm == nil || !prm.Enabled {
+		return nil
+	}
+	return prm
+}
+
 // FindSpecMatchesStatus checks if a URL spec has a specific status and returns the URLSpec for it.
 func (a *APISpec) FindSpecMatchesStatus(r *http.Request, rxPaths []URLSpec, mode URLStatus) (*URLSpec, bool) {
 	matchPath, method := a.getMatchPathAndMethod(r, mode)

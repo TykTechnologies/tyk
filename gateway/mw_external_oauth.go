@@ -56,6 +56,7 @@ func (k *ExternalOAuthMiddleware) ProcessRequest(w http.ResponseWriter, r *http.
 
 	token, _ := k.getAuthToken(k.getAuthType(), r)
 	if token == "" {
+		setPRMWWWAuthenticateHeader(w, r, k.Spec)
 		return errors.New("authorization field missing"), http.StatusBadRequest
 	}
 
@@ -86,6 +87,7 @@ func (k *ExternalOAuthMiddleware) ProcessRequest(w http.ResponseWriter, r *http.
 		switch {
 		case errors.Is(err, jwt.ErrSignatureInvalid), errors.Is(err, jwt.ErrTokenMalformed), errors.Is(err, jwt.ErrTokenNotValidYet),
 			errors.Is(err, jwt.ErrTokenUsedBeforeIssued), errors.Is(err, jwt.ErrTokenExpired):
+			setPRMWWWAuthenticateHeader(w, r, k.Spec)
 			return err, http.StatusUnauthorized
 		}
 
@@ -93,6 +95,7 @@ func (k *ExternalOAuthMiddleware) ProcessRequest(w http.ResponseWriter, r *http.
 	}
 
 	if !valid {
+		setPRMWWWAuthenticateHeader(w, r, k.Spec)
 		return errors.New("access token is not valid"), http.StatusUnauthorized
 	}
 

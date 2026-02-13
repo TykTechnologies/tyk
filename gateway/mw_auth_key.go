@@ -115,7 +115,7 @@ func (k *AuthKey) checkSessionWithCertFallback(r *http.Request, certHash string)
 	return session, keyExists
 }
 
-func (k *AuthKey) ProcessRequest(_ http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
+func (k *AuthKey) ProcessRequest(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
 	if ctxGetRequestStatus(r) == StatusOkAndIgnore {
 		return nil, http.StatusOK
 	}
@@ -138,9 +138,11 @@ func (k *AuthKey) ProcessRequest(_ http.ResponseWriter, r *http.Request, _ inter
 		if key == "" {
 			k.Logger().Info("Attempted access with malformed header, no auth header found.")
 			ctx.SetErrorClassification(r, tykerrors.ClassifyAuthError(tykerrors.ErrAuthAuthorizationFieldMissing, k.Name()))
+			setPRMWWWAuthenticateHeader(w, r, k.Spec)
 			return errorAndStatusCode(ErrAuthAuthorizationFieldMissing)
 		}
 		if !keyExists {
+			setPRMWWWAuthenticateHeader(w, r, k.Spec)
 			return k.reportInvalidKey(key, r, MsgNonExistentKey, ErrAuthKeyNotFound)
 		}
 	}
@@ -148,6 +150,7 @@ func (k *AuthKey) ProcessRequest(_ http.ResponseWriter, r *http.Request, _ inter
 		if len(r.TLS.PeerCertificates) > 0 {
 			if time.Now().After(r.TLS.PeerCertificates[0].NotAfter) {
 				ctx.SetErrorClassification(r, tykerrors.ClassifyAuthError(tykerrors.ErrAuthCertExpired, k.Name()))
+				setPRMWWWAuthenticateHeader(w, r, k.Spec)
 				return errorAndStatusCode(ErrAuthCertExpired)
 			}
 			certHash = k.Spec.OrgID + crypto.HexSHA256(r.TLS.PeerCertificates[0].Raw)
@@ -156,11 +159,13 @@ func (k *AuthKey) ProcessRequest(_ http.ResponseWriter, r *http.Request, _ inter
 		if !k.Gw.GetConfig().Security.AllowUnsafeDynamicMTLSToken {
 			if certHash == "" {
 				ctx.SetErrorClassification(r, tykerrors.ClassifyAuthError(tykerrors.ErrAuthCertRequired, k.Name()))
+				setPRMWWWAuthenticateHeader(w, r, k.Spec)
 				return errorAndStatusCode(ErrAuthCertRequired)
 			}
 			session, keyExists = k.checkSessionWithCertFallback(r, certHash)
 			if !keyExists {
 				ctx.SetErrorClassification(r, tykerrors.ClassifyAuthError(tykerrors.ErrAuthCertMismatch, k.Name()))
+				setPRMWWWAuthenticateHeader(w, r, k.Spec)
 				return errorAndStatusCode(ErrAuthCertMismatch)
 			}
 		} else {
@@ -168,12 +173,14 @@ func (k *AuthKey) ProcessRequest(_ http.ResponseWriter, r *http.Request, _ inter
 				session, keyExists = k.checkSessionWithCertFallback(r, certHash)
 				if !keyExists {
 					ctx.SetErrorClassification(r, tykerrors.ClassifyAuthError(tykerrors.ErrAuthCertMismatch, k.Name()))
+					setPRMWWWAuthenticateHeader(w, r, k.Spec)
 					return errorAndStatusCode(ErrAuthCertMismatch)
 				}
 			}
 			if key != "" {
 				session, keyExists = k.CheckSessionAndIdentityForValidKey(key, r)
 				if !keyExists {
+					setPRMWWWAuthenticateHeader(w, r, k.Spec)
 					return k.reportInvalidKey(key, r, MsgNonExistentKey, ErrAuthKeyNotFound)
 				}
 			}
@@ -183,6 +190,7 @@ func (k *AuthKey) ProcessRequest(_ http.ResponseWriter, r *http.Request, _ inter
 			// fallback to search by cert
 			session, keyExists = k.CheckSessionAndIdentityForValidKey(certHash, r)
 			if !keyExists {
+				setPRMWWWAuthenticateHeader(w, r, k.Spec)
 				return k.reportInvalidKey(key, r, MsgNonExistentKey, ErrAuthKeyNotFound)
 			}
 		}

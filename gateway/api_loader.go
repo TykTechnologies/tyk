@@ -137,6 +137,8 @@ func (gw *Gateway) generateSubRoutes(spec *APISpec, router *mux.Router) {
 		oauthManager := gw.addOAuthHandlers(spec, router)
 		spec.OAuthManager = oauthManager
 	}
+
+	gw.loadPRMWellKnownEndpoint(spec, router)
 }
 
 func (gw *Gateway) processSpec(
