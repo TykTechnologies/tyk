@@ -1063,13 +1063,20 @@ func listenPathLength(listenPath string) int {
 
 	// Split the path into segments and calculate the total length
 	length := strings.Count(listenPath, "/")
+	hasRegex := false
 
 	for _, segment := range strings.Split(listenPath, "/") {
-		// Skip segments enclosed by {} with non-empty content
+		// Check for regex segments and set a flag
 		if len(segment) > 2 && segment[0] == '{' && segment[len(segment)-1] == '}' {
+			hasRegex = true
 			continue
 		}
 		length += len(segment)
+	}
+
+	// Add a small bonus for paths containing regex to prioritize them over simple catch-all paths of the same segment count.
+	if hasRegex {
+		length += 1 // Small bonus to break ties in favor of regex paths over catch-all paths
 	}
 
 	return length
