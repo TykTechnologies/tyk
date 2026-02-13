@@ -594,7 +594,7 @@ type HttpServerOptionsConfig struct {
 	// This option does not give any hints to the client, on which certificate to pick (but this is very rare situation when it is required)
 	SkipClientCAAnnouncement bool `json:"skip_client_ca_announcement"`
 
-	// Set this to the number of seconds that Tyk uses to flush content from the proxied upstream connection to the open downstream connection.
+	// Set this to the number of milliseconds that Tyk uses to flush content from the proxied upstream connection to the open downstream connection.
 	// This option needed be set for streaming protocols like Server Side Events, or gRPC streaming.
 	FlushInterval int `json:"flush_interval"`
 
