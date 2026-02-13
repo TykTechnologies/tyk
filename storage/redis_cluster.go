@@ -1086,3 +1086,15 @@ func (r *RedisCluster) ScanKeys(pattern string) ([]string, error) {
 
 	return storage.Keys(context.Background(), pattern)
 }
+
+// PoolStats returns the connection pool statistics for this Redis cluster
+func (r *RedisCluster) PoolStats() *redis.PoolStats {
+	client, err := r.Client()
+	if err != nil {
+		log.WithError(err).Debug("Failed to get Redis client for pool stats")
+		return nil
+	}
+
+	stats := client.PoolStats()
+	return stats
+}

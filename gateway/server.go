@@ -137,6 +137,9 @@ type Gateway struct {
 	HostCheckerClient    *http.Client
 	TracerProvider       otel.TracerProvider
 	NewRelicApplication  *newrelic.Application
+	PrometheusMetrics    *PrometheusMetrics
+	prometheusServer     *http.Server
+	prometheusServerMu   sync.RWMutex
 
 	keyGen DefaultKeyGenerator
 
@@ -1600,6 +1603,7 @@ func (gw *Gateway) initSystem() error {
 	config.Global = gw.GetConfig
 	gw.getHostDetails()
 	gw.setupInstrumentation()
+	gw.setupPrometheusInstrumentation()
 
 	// cleanIdleMemConnProviders checks memconn.Provider (a part of internal API handling)
 	// instances periodically and deletes idle items, closes net.Listener instances to
@@ -2377,6 +2381,29 @@ func (gw *Gateway) gracefulShutdown(ctx context.Context) error {
 		mainLog.Warning("Shutdown timeout reached, some connections may have been terminated")
 		// Wait for goroutines to finish even after timeout to prevent panic
 		<-serverShutdownDone
+	}
+
+	// Shutdown Prometheus metrics collection and server if enabled
+	if gw.PrometheusMetrics != nil {
+		mainLog.Info("Waiting for Prometheus metrics collection to stop...")
+		gw.PrometheusMetrics.WaitForShutdown()
+		mainLog.Info("Prometheus metrics collection stopped")
+	}
+
+	gw.prometheusServerMu.RLock()
+	server := gw.prometheusServer
+	gw.prometheusServerMu.RUnlock()
+
+	if server != nil {
+		mainLog.Info("Shutting down Prometheus metrics server...")
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		if err := server.Shutdown(shutdownCtx); err != nil {
+			mainLog.WithError(err).Error("Error shutting down Prometheus server")
+			errChan <- err
+		} else {
+			mainLog.Info("Prometheus metrics server shut down gracefully")
+		}
 	}
 
 	// Close all cache stores and other resources
