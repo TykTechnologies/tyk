@@ -44,7 +44,9 @@ func (gw *Gateway) loadPRMWellKnownEndpoint(spec *APISpec, subrouter *mux.Router
 
 		w.Header().Set(header.ContentType, "application/json")
 		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(doc)
+		if err := json.NewEncoder(w).Encode(doc); err != nil {
+			log.WithError(err).Error("Failed to encode PRM response document")
+		}
 	})
 }
 

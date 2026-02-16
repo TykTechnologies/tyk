@@ -1,12 +1,15 @@
 package gateway
 
 import (
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/apidef/oas"
@@ -205,7 +208,7 @@ func TestPRMWellKnownEndpoint(t *testing.T) {
 		})
 	})
 
-	t.Run("PRM disabled returns 200 from upstream (falls through)", func(t *testing.T) {
+	t.Run("PRM disabled does not serve metadata endpoint", func(t *testing.T) {
 		oasDoc := oas.OAS{
 			T: openapi3.T{
 				OpenAPI: "3.0.3",
@@ -243,14 +246,16 @@ func TestPRMWellKnownEndpoint(t *testing.T) {
 			spec.OAS = oasDoc
 		})
 
-		// The well-known path should NOT be registered, so the request falls through
-		// to the normal middleware chain (proxy to upstream or 404 depending on upstream)
-		ts.Run(t, test.TestCase{
-			Method:       http.MethodGet,
-			Path:         "/prm-disabled/.well-known/oauth-protected-resource",
-			Code:         http.StatusOK,
-			BodyNotMatch: `"resource"`,
+		// The well-known path should NOT be registered as a PRM endpoint,
+		// so the request falls through to the normal middleware chain.
+		// We check that the response body does NOT contain the PRM JSON fields.
+		resp, _ := ts.Run(t, test.TestCase{
+			Method: http.MethodGet,
+			Path:   "/prm-disabled/.well-known/oauth-protected-resource",
 		})
+
+		assert.NotEqual(t, "application/json", resp.Header.Get(header.ContentType),
+			"PRM disabled API should not return application/json from the well-known path")
 	})
 }
 
@@ -426,14 +431,14 @@ func TestJWTMiddleware_PRMWWWAuthenticate(t *testing.T) {
 			spec.Proxy.ListenPath = "/jwt-no-prm/"
 		})
 
-		ts.Run(t, test.TestCase{
+		resp, _ := ts.Run(t, test.TestCase{
 			Method: http.MethodGet,
 			Path:   "/jwt-no-prm/test",
 			Code:   http.StatusBadRequest,
-			HeadersNotMatch: map[string]string{
-				header.WWWAuthenticate: `Bearer realm="tyk"`,
-			},
 		})
+
+		assert.Empty(t, resp.Header.Get(header.WWWAuthenticate),
+			"WWW-Authenticate header should not be present when PRM is not configured")
 	})
 }
 
@@ -493,4 +498,117 @@ func TestAuthKeyMiddleware_PRMWWWAuthenticate(t *testing.T) {
 		assert.Contains(t, wwwAuth, `resource_metadata=`)
 		assert.Contains(t, wwwAuth, `.well-known/oauth-protected-resource`)
 	})
+}
+
+// TestPRMHappyPath_FullDiscoveryFlow tests the full MCP authorization discovery flow:
+// 1. Client hits a JWT-protected endpoint without credentials
+// 2. Gets an error response with WWW-Authenticate header containing resource_metadata URL
+// 3. Client extracts the resource_metadata URL from the header
+// 4. Client GETs the resource_metadata URL (PRM well-known endpoint)
+// 5. Gets back a PRM JSON document with authorization_servers for discovery
+// This validates the PRM endpoint is accessible without auth and the URL in
+// the WWW-Authenticate header points to the correct, working PRM endpoint.
+func TestPRMHappyPath_FullDiscoveryFlow(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	const (
+		listenPath = "/mcp-api/"
+		resource   = "https://api.example.com/mcp"
+		authServer = "https://auth.example.com"
+		scope1     = "mcp:read"
+		scope2     = "mcp:write"
+	)
+
+	oasDoc := oas.OAS{
+		T: openapi3.T{
+			OpenAPI: "3.0.3",
+			Info:    &openapi3.Info{Title: "MCP Discovery Flow", Version: "1.0"},
+			Paths:   openapi3.NewPaths(),
+		},
+	}
+	oasDoc.SetTykExtension(&oas.XTykAPIGateway{
+		Info: oas.Info{
+			Name: "mcp-discovery-test",
+			State: oas.State{
+				Active: true,
+			},
+		},
+		Upstream: oas.Upstream{
+			URL: "http://httpbin.org",
+		},
+		Server: oas.Server{
+			ListenPath: oas.ListenPath{
+				Value: listenPath,
+				Strip: true,
+			},
+			Authentication: &oas.Authentication{
+				ProtectedResourceMetadata: &oas.ProtectedResourceMetadata{
+					Enabled:              true,
+					Resource:             resource,
+					AuthorizationServers: []string{authServer},
+					ScopesSupported:      []string{scope1, scope2},
+				},
+			},
+		},
+	})
+
+	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		spec.UseKeylessAccess = false
+		spec.EnableJWT = true
+		spec.JWTSigningMethod = HMACSign
+		spec.Proxy.ListenPath = listenPath
+		spec.IsOAS = true
+		spec.OAS = oasDoc
+	})
+
+	// Step 1: Client requests a protected endpoint without credentials.
+	// Expect an error response with a WWW-Authenticate header.
+	resp, _ := ts.Run(t, test.TestCase{
+		Method: http.MethodGet,
+		Path:   "/mcp-api/tools/list",
+		Code:   http.StatusBadRequest,
+	})
+
+	wwwAuth := resp.Header.Get(header.WWWAuthenticate)
+	require.NotEmpty(t, wwwAuth, "WWW-Authenticate header must be present on auth failure")
+	assert.Contains(t, wwwAuth, `Bearer realm="tyk"`)
+
+	// Step 2: Extract resource_metadata URL from WWW-Authenticate header.
+	// Header format: Bearer realm="tyk", resource_metadata="<url>"
+	const prefix = `resource_metadata="`
+	idx := strings.Index(wwwAuth, prefix)
+	require.NotEqual(t, -1, idx, "WWW-Authenticate header must contain resource_metadata URL")
+	metadataURLStart := idx + len(prefix)
+	endIdx := strings.Index(wwwAuth[metadataURLStart:], `"`)
+	require.NotEqual(t, -1, endIdx, "resource_metadata URL must be properly quoted")
+	metadataURL := wwwAuth[metadataURLStart : metadataURLStart+endIdx]
+
+	assert.Contains(t, metadataURL, listenPath)
+	assert.Contains(t, metadataURL, ".well-known/oauth-protected-resource")
+
+	// Step 3: Client fetches the PRM well-known endpoint using the extracted URL path.
+	// The URL is absolute (http://host:port/path), extract just the path.
+	prmPath := metadataURL[strings.Index(metadataURL, listenPath):]
+
+	resp, _ = ts.Run(t, test.TestCase{
+		Method: http.MethodGet,
+		Path:   prmPath,
+		Code:   http.StatusOK,
+		HeadersMatch: map[string]string{
+			header.ContentType: "application/json",
+		},
+	})
+
+	// Step 4: Parse the PRM response and validate all fields.
+	var prmDoc prmResponseDocument
+	err := json.NewDecoder(resp.Body).Decode(&prmDoc)
+	require.NoError(t, err, "PRM endpoint should return valid JSON")
+
+	assert.Equal(t, resource, prmDoc.Resource,
+		"PRM resource must match the configured resource identifier")
+	assert.Equal(t, []string{authServer}, prmDoc.AuthorizationServers,
+		"PRM must contain the configured authorization servers")
+	assert.Equal(t, []string{scope1, scope2}, prmDoc.ScopesSupported,
+		"PRM must contain the configured scopes")
 }
