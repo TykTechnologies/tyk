@@ -2,6 +2,7 @@ package gateway
 
 import (
 	"encoding/json"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -256,6 +257,120 @@ func TestPRMWellKnownEndpoint(t *testing.T) {
 
 		assert.NotEqual(t, "application/json", resp.Header.Get(header.ContentType),
 			"PRM disabled API should not return application/json from the well-known path")
+	})
+}
+
+func TestPRMMiddleware_ContextVariables(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	t.Run("context variables resolved in resource", func(t *testing.T) {
+		oasDoc := oas.OAS{
+			T: openapi3.T{
+				OpenAPI: "3.0.3",
+				Info:    &openapi3.Info{Title: "PRM Context Vars", Version: "1.0"},
+				Paths:   openapi3.NewPaths(),
+			},
+		}
+		oasDoc.SetTykExtension(&oas.XTykAPIGateway{
+			Info: oas.Info{
+				Name: "prm-ctx-vars",
+				State: oas.State{
+					Active: true,
+				},
+			},
+			Upstream: oas.Upstream{
+				URL: "http://httpbin.org",
+			},
+			Server: oas.Server{
+				ListenPath: oas.ListenPath{
+					Value: "/prm-ctx/",
+					Strip: true,
+				},
+				Authentication: &oas.Authentication{
+					ProtectedResourceMetadata: &oas.ProtectedResourceMetadata{
+						Enabled:              true,
+						Resource:             "https://example.com/$tyk_context.headers_X_Custom_Header",
+						AuthorizationServers: []string{"https://auth.example.com"},
+					},
+				},
+			},
+		})
+
+		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+			spec.UseKeylessAccess = true
+			spec.EnableContextVars = true
+			spec.Proxy.ListenPath = "/prm-ctx/"
+			spec.IsOAS = true
+			spec.OAS = oasDoc
+		})
+
+		resp, _ := ts.Run(t, test.TestCase{
+			Method: http.MethodGet,
+			Path:   "/prm-ctx/.well-known/oauth-protected-resource",
+			Headers: map[string]string{
+				"X-Custom-Header": "test-value",
+			},
+			Code:      http.StatusOK,
+			BodyMatch: `"resource":"https://example.com/test-value"`,
+		})
+
+		var doc prmResponseDocument
+		err := json.NewDecoder(resp.Body).Decode(&doc)
+		require.NoError(t, err)
+		assert.Equal(t, "https://example.com/test-value", doc.Resource)
+	})
+
+	t.Run("non-well-known path passes through", func(t *testing.T) {
+		oasDoc := oas.OAS{
+			T: openapi3.T{
+				OpenAPI: "3.0.3",
+				Info:    &openapi3.Info{Title: "PRM Passthrough", Version: "1.0"},
+				Paths:   openapi3.NewPaths(),
+			},
+		}
+		oasDoc.SetTykExtension(&oas.XTykAPIGateway{
+			Info: oas.Info{
+				Name: "prm-passthrough",
+				State: oas.State{
+					Active: true,
+				},
+			},
+			Upstream: oas.Upstream{
+				URL: "http://httpbin.org",
+			},
+			Server: oas.Server{
+				ListenPath: oas.ListenPath{
+					Value: "/prm-pass/",
+					Strip: true,
+				},
+				Authentication: &oas.Authentication{
+					ProtectedResourceMetadata: &oas.ProtectedResourceMetadata{
+						Enabled:              true,
+						Resource:             "https://api.example.com",
+						AuthorizationServers: []string{"https://auth.example.com"},
+					},
+				},
+			},
+		})
+
+		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+			spec.UseKeylessAccess = true
+			spec.Proxy.ListenPath = "/prm-pass/"
+			spec.IsOAS = true
+			spec.OAS = oasDoc
+		})
+
+		// A request to a non-well-known path should pass through (not return PRM doc)
+		resp, _ := ts.Run(t, test.TestCase{
+			Method: http.MethodGet,
+			Path:   "/prm-pass/some-other-path",
+			Code:   http.StatusOK,
+		})
+
+		// The response should NOT be the PRM document
+		body, _ := io.ReadAll(resp.Body)
+		assert.NotContains(t, string(body), `"authorization_servers"`)
 	})
 }
 

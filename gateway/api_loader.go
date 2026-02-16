@@ -138,7 +138,6 @@ func (gw *Gateway) generateSubRoutes(spec *APISpec, router *mux.Router) {
 		spec.OAuthManager = oauthManager
 	}
 
-	gw.loadPRMWellKnownEndpoint(spec, router)
 }
 
 func (gw *Gateway) processSpec(
@@ -349,6 +348,7 @@ func (gw *Gateway) processSpec(
 
 	gw.mwAppendEnabled(&chainArray, &MiddlewareContextVars{BaseMiddleware: baseMid.Copy()})
 	gw.mwAppendEnabled(&chainArray, &TrackEndpointMiddleware{baseMid.Copy()})
+	gw.mwAppendEnabled(&chainArray, &PRMMiddleware{BaseMiddleware: baseMid.Copy()})
 
 	// Track auth middlewares for OR wrapper
 	var authMiddlewares []TykMiddleware

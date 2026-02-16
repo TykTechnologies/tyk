@@ -6,9 +6,8 @@ import (
 	"net/http"
 	"path"
 
-	"github.com/gorilla/mux"
-
 	"github.com/TykTechnologies/tyk/header"
+	"github.com/TykTechnologies/tyk/internal/middleware"
 )
 
 // prmResponseDocument represents the OAuth 2.0 Protected Resource Metadata
@@ -19,35 +18,53 @@ type prmResponseDocument struct {
 	ScopesSupported      []string `json:"scopes_supported,omitempty"`
 }
 
-// loadPRMWellKnownEndpoint registers the PRM well-known endpoint on the subrouter.
-// The endpoint is registered directly on the subrouter, which means it is matched
-// before the catch-all middleware chain handler (same pattern as loadGraphQLPlayground).
-func (gw *Gateway) loadPRMWellKnownEndpoint(spec *APISpec, subrouter *mux.Router) {
-	prm := spec.GetPRMConfig()
+// PRMMiddleware intercepts GET requests to the PRM well-known path and serves
+// the OAuth 2.0 Protected Resource Metadata document (RFC 9728).
+// It runs after MiddlewareContextVars (so $tyk_context.* is available) but before
+// authentication middlewares, allowing the endpoint to be accessed without auth.
+type PRMMiddleware struct {
+	*BaseMiddleware
+}
+
+func (m *PRMMiddleware) Name() string {
+	return "PRMMiddleware"
+}
+
+func (m *PRMMiddleware) EnabledForSpec() bool {
+	return m.Spec.GetPRMConfig() != nil
+}
+
+func (m *PRMMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
+	prm := m.Spec.GetPRMConfig()
 	if prm == nil {
-		return
+		return nil, http.StatusOK // pass through
 	}
 
-	wellKnownPath := path.Join("/", prm.GetWellKnownPath())
+	// Only intercept GET requests to the well-known path (include listen path prefix)
+	wellKnownPath := path.Join(m.Spec.Proxy.ListenPath, prm.GetWellKnownPath())
+	if r.Method != http.MethodGet || r.URL.Path != wellKnownPath {
+		return nil, http.StatusOK // pass through to next middleware
+	}
 
-	subrouter.Methods(http.MethodGet).Path(wellKnownPath).HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		resource := prm.Resource
-		if resource != "" {
-			resource = gw.ReplaceTykVariables(r, resource, false)
-		}
+	// Resolve context variables in resource field
+	resource := prm.Resource
+	if resource != "" {
+		resource = m.Gw.ReplaceTykVariables(r, resource, false)
+	}
 
-		doc := prmResponseDocument{
-			Resource:             resource,
-			AuthorizationServers: prm.AuthorizationServers,
-			ScopesSupported:      prm.ScopesSupported,
-		}
+	doc := prmResponseDocument{
+		Resource:             resource,
+		AuthorizationServers: prm.AuthorizationServers,
+		ScopesSupported:      prm.ScopesSupported,
+	}
 
-		w.Header().Set(header.ContentType, "application/json")
-		w.WriteHeader(http.StatusOK)
-		if err := json.NewEncoder(w).Encode(doc); err != nil {
-			log.WithError(err).Error("Failed to encode PRM response document")
-		}
-	})
+	w.Header().Set(header.ContentType, "application/json")
+	w.WriteHeader(http.StatusOK)
+	if err := json.NewEncoder(w).Encode(doc); err != nil {
+		log.WithError(err).Error("Failed to encode PRM response document")
+	}
+
+	return nil, middleware.StatusRespond // terminate chain — response already written
 }
 
 // setPRMWWWAuthenticateHeader sets the WWW-Authenticate header with a Bearer challenge
