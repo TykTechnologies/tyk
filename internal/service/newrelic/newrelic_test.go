@@ -14,7 +14,7 @@ func TestRenameRelicTransactionMiddleware(t *testing.T) {
 	app, err := newrelic.NewApplication(newrelic.ConfigEnabled(false))
 	assert.NoError(t, err)
 
-	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	handler := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	})
 
@@ -48,7 +48,7 @@ func TestRenameRelicTransactionMiddleware(t *testing.T) {
 		defer txn.End()
 
 		var handlerCalled bool
-		handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		handler := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 			handlerCalled = true
 			w.WriteHeader(http.StatusOK)
 		})
