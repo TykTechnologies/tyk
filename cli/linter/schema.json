@@ -940,6 +940,21 @@
         "rpc_global_cache_expiration": {
           "type": "number"
         },
+        "rpc_cert_fetch_max_elapsed_time": {
+          "type": "number"
+        },
+        "rpc_cert_fetch_initial_interval": {
+          "type": "number"
+        },
+        "rpc_cert_fetch_max_interval": {
+          "type": "number"
+        },
+        "rpc_cert_fetch_retry_enabled": {
+          "type": ["boolean", "null"]
+        },
+        "rpc_cert_fetch_max_retries": {
+          "type": ["integer", "null"]
+        },
         "synchroniser_enabled": {
           "type": "boolean"
         },
