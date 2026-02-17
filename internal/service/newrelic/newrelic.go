@@ -2,7 +2,6 @@ package newrelic
 
 import (
 	"net/http"
-	"strings"
 
 	"github.com/gorilla/mux"
 	"github.com/newrelic/go-agent/v3/integrations/nrgorilla"
@@ -43,13 +42,7 @@ func Mount(router *mux.Router, app *Application) {
 func renameRelicTransactionMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if txn := FromContext(r.Context()); txn != nil {
-			var builder strings.Builder
-			builder.Grow(len(r.URL.Path) + len(r.Method) + 1)
-			builder.WriteString(r.Method)
-			builder.WriteString(" ")
-			builder.WriteString(r.URL.Path)
-
-			txn.SetName(builder.String())
+			txn.SetName(r.URL.Path)
 		}
 
 		next.ServeHTTP(w, r)

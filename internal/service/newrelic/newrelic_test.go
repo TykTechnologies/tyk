@@ -22,7 +22,7 @@ func TestRenameRelicTransactionMiddleware(t *testing.T) {
 
 	t.Run("renames transaction with method and path", func(t *testing.T) {
 		method := http.MethodGet
-		expectedTxnName := fmt.Sprintf("%s %s", method, targetPath)
+		expectedTxnName := fmt.Sprintf("%s", targetPath)
 
 		req := httptest.NewRequest(method, targetPath, nil)
 		res := httptest.NewRecorder()
@@ -63,7 +63,7 @@ func TestRenameRelicTransactionMiddleware(t *testing.T) {
 
 	t.Run("handles different methods", func(t *testing.T) {
 		method := http.MethodPost
-		expectedTxnName := fmt.Sprintf("%s %s", method, targetPath)
+		expectedTxnName := fmt.Sprintf("%s", targetPath)
 
 		req := httptest.NewRequest(method, targetPath, nil)
 		res := httptest.NewRecorder()
