@@ -1,7 +1,6 @@
 package newrelic
 
 import (
-	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -22,7 +21,6 @@ func TestRenameRelicTransactionMiddleware(t *testing.T) {
 
 	t.Run("renames transaction with method and path", func(t *testing.T) {
 		method := http.MethodGet
-		expectedTxnName := fmt.Sprintf("%s", targetPath)
 
 		req := httptest.NewRequest(method, targetPath, nil)
 		res := httptest.NewRecorder()
@@ -36,7 +34,7 @@ func TestRenameRelicTransactionMiddleware(t *testing.T) {
 		middleware := renameRelicTransactionMiddleware(handler)
 		middleware.ServeHTTP(res, req)
 
-		assert.Equal(t, expectedTxnName, txn.Name())
+		assert.Equal(t, targetPath, txn.Name())
 	})
 
 	t.Run("does not panic if no transaction in context", func(t *testing.T) {
@@ -63,7 +61,6 @@ func TestRenameRelicTransactionMiddleware(t *testing.T) {
 
 	t.Run("handles different methods", func(t *testing.T) {
 		method := http.MethodPost
-		expectedTxnName := fmt.Sprintf("%s", targetPath)
 
 		req := httptest.NewRequest(method, targetPath, nil)
 		res := httptest.NewRecorder()
@@ -77,6 +74,6 @@ func TestRenameRelicTransactionMiddleware(t *testing.T) {
 		middleware := renameRelicTransactionMiddleware(handler)
 		middleware.ServeHTTP(res, req)
 
-		assert.Equal(t, expectedTxnName, txn.Name())
+		assert.Equal(t, targetPath, txn.Name())
 	})
 }
