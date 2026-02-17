@@ -129,7 +129,7 @@ func (gw *Gateway) generateSubRoutes(spec *APISpec, router *mux.Router) {
 		gw.loadGraphQLPlayground(spec, router)
 	}
 
-	if spec.EnableBatchRequestSupport {
+	if spec.EnableBatchRequestSupport && !spec.IsMCP() {
 		gw.addBatchEndpoint(spec, router)
 	}
 
