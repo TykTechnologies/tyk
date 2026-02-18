@@ -562,9 +562,6 @@
         "responsePlugins": {
           "$ref": "#/definitions/X-Tyk-CustomPlugins"
         },
-        "cache": {
-          "$ref": "#/definitions/X-Tyk-Cache"
-        },
         "transformRequestHeaders": {
           "$ref": "#/definitions/X-Tyk-TransformHeaders"
         },
@@ -1070,11 +1067,56 @@
       }
     },
     "X-Tyk-MCPPrimitive": {
-      "allOf": [
-        {
-          "$ref": "#/definitions/X-Tyk-Operation"
+      "type": "object",
+      "properties": {
+        "allow": {
+          "$ref": "#/definitions/X-Tyk-Allowance"
+        },
+        "block": {
+          "$ref": "#/definitions/X-Tyk-Allowance"
+        },
+        "ignoreAuthentication": {
+          "$ref": "#/definitions/X-Tyk-Allowance"
+        },
+        "transformRequestBody": {
+          "$ref": "#/definitions/X-Tyk-TransformBody"
+        },
+        "transformRequestHeaders": {
+          "$ref": "#/definitions/X-Tyk-TransformHeaders"
+        },
+        "transformResponseHeaders": {
+          "$ref": "#/definitions/X-Tyk-TransformHeaders"
+        },
+        "enforceTimeout": {
+          "$ref": "#/definitions/X-Tyk-EnforceTimeout"
+        },
+        "virtualEndpoint": {
+          "$ref": "#/definitions/X-Tyk-VirtualEndpoint"
+        },
+        "postPlugins": {
+          "type": "array",
+          "items": [
+            {
+              "$ref": "#/definitions/X-Tyk-EndpointPostPlugin"
+            }
+          ]
+        },
+        "circuitBreaker": {
+          "$ref": "#/definitions/X-Tyk-CircuitBreaker"
+        },
+        "trackEndpoint": {
+          "$ref": "#/definitions/X-Tyk-TrackEndpoint"
+        },
+        "doNotTrackEndpoint": {
+          "$ref": "#/definitions/X-Tyk-TrackEndpoint"
+        },
+        "requestSizeLimit": {
+          "$ref": "#/definitions/X-Tyk-RequestSizeLimit"
+        },
+        "rateLimit": {
+          "$ref": "#/definitions/X-Tyk-RateLimit"
         }
-      ]
+      }
     },
     "X-Tyk-MCPPrimitives": {
       "type": "object",
@@ -1348,7 +1390,9 @@
         }
       },
       "required": [
-        "enabled"
+        "enabled",
+        "resource",
+        "authorizationServers"
       ]
     },
     "X-Tyk-Server": {
@@ -1392,9 +1436,6 @@
         },
         "ipAccessControl": {
           "$ref": "#/definitions/X-Tyk-IPAccessControl"
-        },
-        "batchProcessing": {
-          "$ref": "#/definitions/X-Tyk-BatchProcessing"
         },
         "port": {
           "type": "integer",

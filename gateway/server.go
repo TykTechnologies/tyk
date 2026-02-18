@@ -107,7 +107,7 @@ const (
 )
 
 type Gateway struct {
-	DefaultProxyMux *proxyMux
+	DefaultProxyMux   *proxyMux
 	config            atomic.Value
 	configMu          sync.Mutex
 	configViewerCache *configViewerCache
