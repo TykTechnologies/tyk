@@ -143,7 +143,8 @@ func (a *APISpec) GetTykExtension() *oas.XTykAPIGateway {
 }
 
 // GetPRMConfig returns the Protected Resource Metadata configuration
-// if the API is an OAS API with PRM enabled. Returns nil otherwise.
+// if the API is an OAS API Definition (OAS API, MCP Proxy, Stream API) with PRM enabled.
+// Returns nil otherwise.
 func (a *APISpec) GetPRMConfig() *oas.ProtectedResourceMetadata {
 	ext := a.GetTykExtension()
 	if ext == nil || ext.Server.Authentication == nil {
