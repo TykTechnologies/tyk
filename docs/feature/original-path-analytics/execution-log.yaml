@@ -45,5 +45,32 @@ events:
   s: EXECUTED
   sid: 01-02
   t: '2026-02-18T14:03:39Z'
+- d: PASS
+  p: COMMIT
+  s: EXECUTED
+  sid: 01-02
+  t: '2026-02-18T14:04:06Z'
+- d: PASS
+  p: PREPARE
+  s: EXECUTED
+  sid: 02-01
+  t: '2026-02-18T14:07:12Z'
+- d: PASS
+  p: RED_ACCEPTANCE
+  s: EXECUTED
+  sid: 02-01
+  t: '2026-02-18T14:08:16Z'
+- d: 'NOT_APPLICABLE: Analytics worker leading-slash validation is exercised through
+    existing full-pipeline acceptance tests (WS-1). Access log tests (AL-1, AL-2)
+    are the acceptance tests written in RED_ACCEPTANCE phase.'
+  p: RED_UNIT
+  s: SKIPPED
+  sid: 02-01
+  t: '2026-02-18T14:08:31Z'
+- d: PASS
+  p: GREEN
+  s: EXECUTED
+  sid: 02-01
+  t: '2026-02-18T14:09:58Z'
 project_id: original-path-analytics
 schema_version: '3.0'

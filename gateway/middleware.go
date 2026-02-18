@@ -465,6 +465,7 @@ func (t *BaseMiddleware) RecordAccessLog(req *http.Request, resp *http.Response,
 	accessLog.WithAPIID(t.Spec.APIID, t.Spec.Name, t.Spec.OrgID)
 	accessLog.WithApiKey(req, hashKeys, gw.obfuscateKey)
 	accessLog.WithRequest(req, latency)
+	accessLog.WithOriginalPath(req)
 	accessLog.WithResponse(resp)
 
 	// Add error classification if present (only on error requests)
