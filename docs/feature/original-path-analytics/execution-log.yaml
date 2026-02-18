@@ -103,5 +103,30 @@ events:
   s: EXECUTED
   sid: 02-02
   t: '2026-02-18T14:14:24Z'
+- d: PASS
+  p: PREPARE
+  s: EXECUTED
+  sid: 03-01
+  t: '2026-02-18T14:16:19Z'
+- d: PASS
+  p: RED_ACCEPTANCE
+  s: EXECUTED
+  sid: 03-01
+  t: '2026-02-18T14:18:36Z'
+- d: 'NOT_APPLICABLE: step 03-01 is purely integration tests with no new unit behavior'
+  p: RED_UNIT
+  s: SKIPPED
+  sid: 03-01
+  t: '2026-02-18T14:18:41Z'
+- d: PASS
+  p: GREEN
+  s: EXECUTED
+  sid: 03-01
+  t: '2026-02-18T14:18:45Z'
+- d: PASS
+  p: COMMIT
+  s: EXECUTED
+  sid: 03-01
+  t: '2026-02-18T14:19:04Z'
 project_id: original-path-analytics
 schema_version: '3.0'
