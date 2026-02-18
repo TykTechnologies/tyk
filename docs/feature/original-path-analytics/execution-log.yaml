@@ -72,5 +72,36 @@ events:
   s: EXECUTED
   sid: 02-01
   t: '2026-02-18T14:09:58Z'
+- d: PASS
+  p: COMMIT
+  s: EXECUTED
+  sid: 02-01
+  t: '2026-02-18T14:10:23Z'
+- d: PASS
+  p: PREPARE
+  s: EXECUTED
+  sid: 02-02
+  t: '2026-02-18T14:12:18Z'
+- d: PASS
+  p: RED_ACCEPTANCE
+  s: EXECUTED
+  sid: 02-02
+  t: '2026-02-18T14:12:39Z'
+- d: 'NOT_APPLICABLE: acceptance test covers both helper function scenarios (OT-1,
+    OT-2)'
+  p: RED_UNIT
+  s: SKIPPED
+  sid: 02-02
+  t: '2026-02-18T14:12:46Z'
+- d: PASS
+  p: GREEN
+  s: EXECUTED
+  sid: 02-02
+  t: '2026-02-18T14:13:55Z'
+- d: PASS
+  p: COMMIT
+  s: EXECUTED
+  sid: 02-02
+  t: '2026-02-18T14:14:24Z'
 project_id: original-path-analytics
 schema_version: '3.0'

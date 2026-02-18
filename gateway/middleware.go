@@ -90,6 +90,10 @@ func (tr TraceMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request,
 				span.SetAttributes(attrs...)
 			}
 
+			if originalPath := ctxGetOriginalRequestPath(r); originalPath != "" {
+				span.SetAttributes(otel.OriginalPathSpanAttribute(originalPath))
+			}
+
 			return err, i
 		}
 	}
@@ -139,6 +143,9 @@ func (gw *Gateway) createMiddleware(actualMW TykMiddleware) func(http.Handler) h
 						attrs := ctxGetSpanAttributes(r, mw.Name())
 						if len(attrs) > 0 {
 							span.SetAttributes(attrs...)
+						}
+						if originalPath := ctxGetOriginalRequestPath(r); originalPath != "" {
+							span.SetAttributes(otel.OriginalPathSpanAttribute(originalPath))
 						}
 						span.End()
 					}()
