@@ -228,7 +228,27 @@ func (gw *Gateway) createMiddleware(actualMW TykMiddleware) func(http.Handler) h
 	}
 }
 
+// isDisabledForMCP returns true if the given middleware should be disabled for MCP APIs.
+// Centralizes all MCP middleware restrictions for easy maintenance.
+func (gw *Gateway) isDisabledForMCP(mw TykMiddleware) bool {
+	spec := mw.Base().Spec
+	if !spec.IsMCP() {
+		return false
+	}
+
+	switch mw.(type) {
+	case *RedisCacheMiddleware:
+		return true
+	default:
+		return false
+	}
+}
+
 func (gw *Gateway) mwAppendEnabled(chain *[]alice.Constructor, mw TykMiddleware) bool {
+	if gw.isDisabledForMCP(mw) {
+		return false
+	}
+
 	if mw.EnabledForSpec() {
 		*chain = append(*chain, gw.createMiddleware(mw))
 		return true

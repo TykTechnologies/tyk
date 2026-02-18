@@ -1172,31 +1172,28 @@ func (gw *Gateway) handleDeletePolicy(polID string) (interface{}, int) {
 }
 
 func (gw *Gateway) handleGetAPIList(r *http.Request) (interface{}, int) {
-	excludeAPITypes := r.URL.Query().Get("exclude_api_types")
+	includeTypes := r.URL.Query().Get("include_types")
 
 	gw.apisMu.RLock()
 	defer gw.apisMu.RUnlock()
 	apiIDList := make([]*apidef.APIDefinition, 0, len(gw.apisByID))
 
 	for _, apiSpec := range gw.apisByID {
-		if shouldExcludeAPI(apiSpec, excludeAPITypes) {
-			continue
+		if shouldIncludeAPI(apiSpec, includeTypes) {
+			apiIDList = append(apiIDList, apiSpec.APIDefinition)
 		}
-		apiIDList = append(apiIDList, apiSpec.APIDefinition)
 	}
 	return apiIDList, http.StatusOK
 }
 
-// shouldExcludeAPI checks if an API should be excluded based on the comma-separated list of types
-func shouldExcludeAPI(apiSpec *APISpec, excludeAPITypes string) bool {
-	if excludeAPITypes == "" {
-		return false
+// shouldIncludeAPI checks if an API should be included in the listing.
+// MCP APIs are only included if explicitly requested in includeTypes.
+func shouldIncludeAPI(apiSpec *APISpec, includeTypes string) bool {
+	if !apiSpec.IsMCP() {
+		return true
 	}
-
-	types := strings.Split(excludeAPITypes, ",")
-	for _, t := range types {
-		t = strings.TrimSpace(t)
-		if t == "mcp" && apiSpec.IsMCP() {
+	for _, t := range strings.Split(includeTypes, ",") {
+		if strings.TrimSpace(t) == apidef.AppProtocolMCP {
 			return true
 		}
 	}

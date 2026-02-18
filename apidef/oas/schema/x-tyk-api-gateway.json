@@ -1185,6 +1185,14 @@
         "enabled"
       ]
     },
+    "X-Tyk-CertificateAuth": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        }
+      }
+    },
     "X-Tyk-Authentication": {
       "type": "object",
       "properties": {
@@ -1278,6 +1286,9 @@
             }
           },
           "description": "Vendor extension security requirements for proprietary auth methods"
+        },
+        "certificateAuth": {
+          "$ref": "#/definitions/X-Tyk-CertificateAuth"
         }
       },
       "required": [
