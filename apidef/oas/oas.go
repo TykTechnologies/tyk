@@ -552,8 +552,9 @@ func (s *OAS) Validate(ctx context.Context, opts ...openapi3.ValidationOption) e
 	validationErr := s.T.Validate(ctx, validationOpts...)
 	securityErr := s.validateSecurity()
 	compliantModeErr := s.validateCompliantModeAuthentication()
+	prmErr := s.validatePRM()
 
-	return errors.Join(validationErr, securityErr, compliantModeErr)
+	return errors.Join(validationErr, securityErr, compliantModeErr, prmErr)
 }
 
 // Normalize converts the OAS api to a normalized state.
@@ -714,6 +715,17 @@ func (s *OAS) validateCompliantModeAuthentication() error {
 	}
 
 	return nil
+}
+
+// validatePRM validates the Protected Resource Metadata configuration.
+// For non-MCP validation, resource is required when PRM is enabled.
+func (s *OAS) validatePRM() error {
+	tykAuth := s.getTykAuthentication()
+	if tykAuth == nil {
+		return nil
+	}
+
+	return tykAuth.ProtectedResourceMetadata.Validate(false)
 }
 
 // APIDef holds both OAS and Classic forms of an API definition.

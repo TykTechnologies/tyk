@@ -447,6 +447,68 @@ func TestGetMCPSchema(t *testing.T) {
 	})
 }
 
+func TestValidateMCPObject_WithPRM(t *testing.T) {
+	t.Parallel()
+
+	t.Run("valid MCP object with PRM configuration", func(t *testing.T) {
+		t.Parallel()
+
+		mcpWithPRM := oas.OAS{
+			T: openapi3.T{
+				OpenAPI: "3.0.3",
+				Info:    &openapi3.Info{},
+				Paths:   openapi3.NewPaths(),
+			},
+		}
+
+		ext := oas.XTykAPIGateway{
+			Info: oas.Info{
+				Name: "mcp-api-prm",
+				State: oas.State{
+					Active: true,
+				},
+			},
+			Server: oas.Server{
+				ListenPath: oas.ListenPath{
+					Value: "/mcp-api-prm/",
+				},
+				Authentication: &oas.Authentication{
+					Enabled: true,
+					ProtectedResourceMetadata: &oas.ProtectedResourceMetadata{
+						Enabled:              true,
+						Resource:             "https://api.example.com",
+						AuthorizationServers: []string{"https://auth.example.com"},
+						ScopesSupported:      []string{"read", "write"},
+					},
+				},
+			},
+			Upstream: oas.Upstream{
+				URL: "http://upstream.url",
+			},
+			Middleware: &oas.Middleware{
+				McpTools: map[string]*oas.MCPPrimitive{
+					"test-tool": {
+						Operation: oas.Operation{
+							Allow: &oas.Allowance{
+								Enabled: true,
+							},
+						},
+					},
+				},
+			},
+		}
+
+		mcpWithPRM.SetTykExtension(&ext)
+		definition, err := mcpWithPRM.MarshalJSON()
+		if err != nil {
+			t.Fatalf("failed to marshal MCP with PRM: %v", err)
+		}
+
+		err = ValidateMCPObject(definition, "3.0.3")
+		assert.NoError(t, err)
+	})
+}
+
 func TestValidateMCPObject_RestrictedMiddleware(t *testing.T) {
 	t.Parallel()
 
