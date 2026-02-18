@@ -25,3 +25,4 @@ spec:
     name: Checking the HTTP status code
     assertions:
     - attr:http.status_code = 403
+    - attr:tyk.original_path = "/versioned/ip"
