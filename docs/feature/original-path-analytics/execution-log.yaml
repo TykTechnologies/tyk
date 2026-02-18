@@ -1,0 +1,24 @@
+events:
+- d: PASS
+  p: PREPARE
+  s: EXECUTED
+  sid: 01-01
+  t: '2026-02-18T13:48:48Z'
+- d: PASS
+  p: RED_ACCEPTANCE
+  s: EXECUTED
+  sid: 01-01
+  t: '2026-02-18T13:49:17Z'
+- d: 'NOT_APPLICABLE: acceptance tests ARE the unit tests for context getter/setter
+    round-trips'
+  p: RED_UNIT
+  s: SKIPPED
+  sid: 01-01
+  t: '2026-02-18T13:49:22Z'
+- d: PASS
+  p: GREEN
+  s: EXECUTED
+  sid: 01-01
+  t: '2026-02-18T13:50:51Z'
+project_id: original-path-analytics
+schema_version: '3.0'

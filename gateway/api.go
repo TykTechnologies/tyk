@@ -3281,6 +3281,19 @@ func ctxGetRequestStartTime(r *http.Request) time.Time {
 	return time.Time{}
 }
 
+func ctxSetOriginalRequestPath(r *http.Request, path string) {
+	setCtxValue(r, ctx.OriginalRequestPath, path)
+}
+
+func ctxGetOriginalRequestPath(r *http.Request) string {
+	if v := r.Context().Value(ctx.OriginalRequestPath); v != nil {
+		if s, ok := v.(string); ok {
+			return s
+		}
+	}
+	return ""
+}
+
 func ctxGetVersionInfo(r *http.Request) *apidef.VersionInfo {
 	if v := r.Context().Value(ctx.VersionData); v != nil {
 		return v.(*apidef.VersionInfo)
