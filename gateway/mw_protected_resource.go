@@ -82,3 +82,18 @@ func setPRMWWWAuthenticateHeader(w http.ResponseWriter, r *http.Request, spec *A
 
 	w.Header().Set(header.WWWAuthenticate, fmt.Sprintf(`Bearer realm="tyk", resource_metadata="%s"`, metadataURL))
 }
+
+// prmError sets the WWW-Authenticate header with PRM metadata and returns
+// the given error and status code. This is a convenience wrapper to avoid
+// separate setPRMWWWAuthenticateHeader calls at every auth error return site.
+func (b *BaseMiddleware) prmError(w http.ResponseWriter, r *http.Request, err error, code int) (error, int) {
+	setPRMWWWAuthenticateHeader(w, r, b.Spec)
+	return err, code
+}
+
+// prmErrorAndStatusCode sets the WWW-Authenticate header with PRM metadata and
+// returns the error and status code for the given error type from TykErrors.
+func (b *BaseMiddleware) prmErrorAndStatusCode(w http.ResponseWriter, r *http.Request, errType string) (error, int) {
+	setPRMWWWAuthenticateHeader(w, r, b.Spec)
+	return errorAndStatusCode(errType)
+}
