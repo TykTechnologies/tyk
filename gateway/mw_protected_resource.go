@@ -7,6 +7,7 @@ import (
 	"path"
 
 	"github.com/TykTechnologies/tyk/header"
+	"github.com/TykTechnologies/tyk/internal/httputil"
 	"github.com/TykTechnologies/tyk/internal/middleware"
 )
 
@@ -76,15 +77,8 @@ func setPRMWWWAuthenticateHeader(w http.ResponseWriter, r *http.Request, spec *A
 		return
 	}
 
-	scheme := "https"
-	if proto := r.Header.Get(header.XForwardProto); proto != "" {
-		scheme = proto
-	} else if r.TLS == nil {
-		scheme = "http"
-	}
-
 	wellKnownPath := prm.GetWellKnownPath()
-	metadataURL := fmt.Sprintf("%s://%s%s", scheme, r.Host, path.Join(spec.Proxy.ListenPath, wellKnownPath))
+	metadataURL := fmt.Sprintf("%s://%s%s", httputil.RequestScheme(r), r.Host, path.Join(spec.Proxy.ListenPath, wellKnownPath))
 
 	w.Header().Set(header.WWWAuthenticate, fmt.Sprintf(`Bearer realm="tyk", resource_metadata="%s"`, metadataURL))
 }
