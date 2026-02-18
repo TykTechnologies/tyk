@@ -509,6 +509,95 @@ func TestValidateMCPObject_WithPRM(t *testing.T) {
 	})
 }
 
+func TestValidateMCPObject_RestrictedMiddleware(t *testing.T) {
+	t.Parallel()
+
+	buildMCPDoc := func(toolMiddleware string) []byte {
+		return []byte(`{
+			"openapi": "3.0.3",
+			"info": {"title": "MCP Test", "version": "1.0.0"},
+			"paths": {
+				"/test": {
+					"post": {
+						"responses": {"200": {"description": "OK"}}
+					}
+				}
+			},
+			"x-tyk-api-gateway": {
+				"info": {
+					"name": "mcp-test",
+					"state": {"active": true}
+				},
+				"upstream": {"url": "http://upstream.url"},
+				"server": {
+					"listenPath": {"value": "/mcp-test"}
+				},
+				"middleware": {
+					"mcpTools": {
+						"test-tool": ` + toolMiddleware + `
+					}
+				}
+			}
+		}`)
+	}
+
+	t.Run("allowed fields pass validation", func(t *testing.T) {
+		t.Parallel()
+		doc := buildMCPDoc(`{
+			"allow": {"enabled": true},
+			"rateLimit": {"enabled": true, "rate": 100, "per": "1m"},
+			"requestSizeLimit": {"enabled": true, "value": 1024}
+		}`)
+		err := ValidateMCPObject(doc, "3.0.3")
+		assert.NoError(t, err)
+	})
+
+	// Restricted middleware fields are accepted by schema (permissive validation for forward compatibility).
+	// Enforcement happens at extraction layer (see TestMCPPrimitive_DisabledMiddleware).
+	restrictedFields := []struct {
+		name       string
+		middleware string
+	}{
+		{
+			name:       "urlRewrite accepted by schema (ignored at extraction)",
+			middleware: `{"urlRewrite": {"enabled": true, "pattern": ".*", "rewriteTo": "/new"}}`,
+		},
+		{
+			name:       "transformRequestMethod accepted by schema (ignored at extraction)",
+			middleware: `{"transformRequestMethod": {"enabled": true, "toMethod": "GET"}}`,
+		},
+		{
+			name:       "transformResponseBody accepted by schema (ignored at extraction)",
+			middleware: `{"transformResponseBody": {"enabled": true, "format": "json", "body": "test"}}`,
+		},
+		{
+			name:       "internal accepted by schema (ignored at extraction)",
+			middleware: `{"internal": {"enabled": true}}`,
+		},
+		{
+			name:       "cache accepted by schema (ignored at extraction)",
+			middleware: `{"cache": {"enabled": true}}`,
+		},
+		{
+			name:       "validateRequest accepted by schema (ignored at extraction)",
+			middleware: `{"validateRequest": {"enabled": true}}`,
+		},
+		{
+			name:       "mockResponse accepted by schema (ignored at extraction)",
+			middleware: `{"mockResponse": {"enabled": true}}`,
+		},
+	}
+
+	for _, tc := range restrictedFields {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			doc := buildMCPDoc(tc.middleware)
+			err := ValidateMCPObject(doc, "3.0.3")
+			assert.NoError(t, err, "Schema should accept %s for forward compatibility", tc.name)
+		})
+	}
+}
+
 func TestGetMCPSchema_ContainsMCPExtensions(t *testing.T) {
 	t.Parallel()
 
