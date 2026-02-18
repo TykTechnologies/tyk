@@ -20,5 +20,30 @@ events:
   s: EXECUTED
   sid: 01-01
   t: '2026-02-18T13:50:51Z'
+- d: PASS
+  p: COMMIT
+  s: EXECUTED
+  sid: 01-01
+  t: '2026-02-18T13:51:13Z'
+- d: PASS
+  p: PREPARE
+  s: EXECUTED
+  sid: 01-02
+  t: '2026-02-18T14:00:18Z'
+- d: PASS
+  p: RED_ACCEPTANCE
+  s: EXECUTED
+  sid: 01-02
+  t: '2026-02-18T14:02:00Z'
+- d: PASS
+  p: RED_UNIT
+  s: EXECUTED
+  sid: 01-02
+  t: '2026-02-18T14:02:05Z'
+- d: PASS
+  p: GREEN
+  s: EXECUTED
+  sid: 01-02
+  t: '2026-02-18T14:03:39Z'
 project_id: original-path-analytics
 schema_version: '3.0'
