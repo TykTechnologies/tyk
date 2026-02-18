@@ -97,9 +97,9 @@ func (k *OrganizationMonitor) ProcessRequest(w http.ResponseWriter, r *http.Requ
 	if k.Spec.GlobalConfig.ExperimentalProcessOrgOffThread {
 		// Make a copy of request before sending to goroutine
 		r2 := r.WithContext(r.Context())
-		return k.ProcessRequestOffThread(r2, &clone)
+		return k.ProcessRequestOffThread(w, r2, &clone)
 	}
-	return k.ProcessRequestLive(r, &clone)
+	return k.ProcessRequestLive(w, r, &clone)
 }
 
 func (k *OrganizationMonitor) refreshOrgSession(orgID string) {
@@ -120,7 +120,14 @@ func (k *OrganizationMonitor) refreshOrgSession(orgID string) {
 }
 
 // ProcessRequest will run any checks on the request on the way through the system, return an error to have the chain fail
-func (k *OrganizationMonitor) ProcessRequestLive(r *http.Request, orgSession *user.SessionState) (error, int) {
+//
+//nolint:staticcheck
+func (k *OrganizationMonitor) ProcessRequestLive(
+	w http.ResponseWriter,
+	r *http.Request,
+	orgSession *user.SessionState,
+) (error, int) {
+
 	logger := k.Logger()
 
 	if orgSession.IsInactive {
@@ -135,11 +142,11 @@ func (k *OrganizationMonitor) ProcessRequestLive(r *http.Request, orgSession *us
 		orgSession,
 		k.Spec.OrgID,
 		"",
-		k.Spec.OrgSessionManager.Store(),
 		orgSession.Per > 0 && orgSession.Rate > 0,
 		true,
 		k.Spec,
 		false,
+		k.Gw.limitHeaderFactory(w.Header()),
 	)
 
 	sessionLifeTime := orgSession.Lifetime(k.Spec.GetSessionLifetimeRespectsKeyExpiration(), k.Spec.SessionLifetime, k.Gw.GetConfig().ForceGlobalSessionLifetime, k.Gw.GetConfig().GlobalSessionLifetime)
@@ -153,7 +160,7 @@ func (k *OrganizationMonitor) ProcessRequestLive(r *http.Request, orgSession *us
 		logger.WithError(err).Error("Could not update org session")
 	}
 
-	switch reason.(type) {
+	switch reason {
 	case sessionFailNone:
 		// all good, keep org active
 	case sessionFailQuota:
@@ -211,7 +218,13 @@ func (k *OrganizationMonitor) SetOrgSentinel(orgChan chan bool, orgId string) {
 	}
 }
 
-func (k *OrganizationMonitor) ProcessRequestOffThread(r *http.Request, orgSession *user.SessionState) (error, int) {
+//nolint:staticcheck
+func (k *OrganizationMonitor) ProcessRequestOffThread(
+	w http.ResponseWriter,
+	r *http.Request,
+	orgSession *user.SessionState,
+) (error, int) {
+
 	orgChanMap.Lock()
 	orgChan, ok := orgChanMap.channels[k.Spec.OrgID]
 	if !ok {
@@ -235,6 +248,7 @@ func (k *OrganizationMonitor) ProcessRequestOffThread(r *http.Request, orgSessio
 		request.RealIP(r),
 		r,
 		&orgSessionCopy,
+		w,
 	)
 
 	if found && !active.(bool) {
@@ -251,7 +265,9 @@ func (k *OrganizationMonitor) AllowAccessNext(
 	path string,
 	IP string,
 	r *http.Request,
-	session *user.SessionState) {
+	session *user.SessionState,
+	w http.ResponseWriter,
+) {
 
 	// Is it active?
 	logEntry := k.Gw.getExplicitLogEntryForRequest(k.Logger(), path, IP, k.Spec.OrgID, nil)
@@ -269,11 +285,11 @@ func (k *OrganizationMonitor) AllowAccessNext(
 		session,
 		k.Spec.OrgID,
 		customQuotaKey,
-		k.Spec.OrgSessionManager.Store(),
 		session.Per > 0 && session.Rate > 0,
 		true,
 		k.Spec,
 		false,
+		k.Gw.limitHeaderFactory(w.Header()),
 	)
 
 	sessionLifeTime := session.Lifetime(k.Spec.GetSessionLifetimeRespectsKeyExpiration(), k.Spec.SessionLifetime, k.Gw.GetConfig().ForceGlobalSessionLifetime, k.Gw.GetConfig().GlobalSessionLifetime)
@@ -288,7 +304,7 @@ func (k *OrganizationMonitor) AllowAccessNext(
 	}
 
 	isExceeded := false
-	switch reason.(type) {
+	switch reason {
 	case sessionFailNone:
 		// all good, keep org active
 	case sessionFailQuota:

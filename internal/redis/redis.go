@@ -19,6 +19,7 @@ var (
 
 	Nil       = redis.Nil
 	ErrClosed = redis.ErrClosed
+	NewScript = redis.NewScript
 )
 
 type (
@@ -36,6 +37,8 @@ type (
 	Subscription = redis.Subscription
 
 	IntCmd         = redis.IntCmd
+	ZSliceCmd      = redis.ZSliceCmd
 	StringCmd      = redis.StringCmd
 	StringSliceCmd = redis.StringSliceCmd
+	Script         = redis.Script
 )

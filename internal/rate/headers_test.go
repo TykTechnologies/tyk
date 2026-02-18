@@ -2,7 +2,6 @@ package rate
 
 import (
 	"net/http"
-	"net/textproto"
 	"testing"
 	"time"
 
@@ -12,44 +11,32 @@ import (
 )
 
 func Test_HeaderSender(t *testing.T) {
-	t.Run("NewSender", func(t *testing.T) {
+	t.Run("NewSenderFactory", func(t *testing.T) {
 		t.Run("create quota sender", func(t *testing.T) {
-			s := NewSender("")
+			s := NewSenderFactory("")(http.Header{})
 			assert.IsType(t, &quotaSender{}, s)
 
-			s = NewSender("dummy data")
+			s = NewSenderFactory("dummy data")(http.Header{})
 			assert.IsType(t, &quotaSender{}, s)
 
-			s = NewSender("quotas")
+			s = NewSenderFactory("quotas")(http.Header{})
 			assert.IsType(t, &quotaSender{}, s)
 		})
 
 		t.Run("create rate limit sender", func(t *testing.T) {
-			s := NewSender("rate_limits")
+			s := NewSenderFactory("rate_limits")(http.Header{})
 			assert.IsType(t, &rateLimitSender{}, s)
 		})
 	})
 }
 
 func Test_quotaSender(t *testing.T) {
-	t.Run("SendQuotas", func(t *testing.T) {
-		t.Run("sends quotas and creates headers map headers", func(t *testing.T) {
-			dst := http.Response{}
-			qs := &quotaSender{}
-			qs.SendQuotas(&dst, nil, "")
-
-			assert.NotNil(t, dst.Header)
-			assert.Contains(t, dst.Header, textproto.CanonicalMIMEHeaderKey(header.XRateLimitLimit))
-			assert.Contains(t, dst.Header, textproto.CanonicalMIMEHeaderKey(header.XRateLimitRemaining))
-			assert.Contains(t, dst.Header, textproto.CanonicalMIMEHeaderKey(header.XRateLimitReset))
-		})
-	})
-
 	t.Run("SendRateLimits", func(t *testing.T) {
 		t.Run("does nothing and dont fails", func(t *testing.T) {
 			assert.NotPanics(t, func() {
-				qs := &quotaSender{}
-				qs.SendRateLimits(nil, Limits{})
+				dst := http.Response{}
+				qs := &quotaSender{hdr: dst.Header}
+				qs.SendRateLimits(Stats{})
 			})
 		})
 	})
@@ -60,8 +47,8 @@ func Test_rateLimitSender(t *testing.T) {
 		t.Run("sends quotas and creates headers map headers", func(t *testing.T) {
 			assert.NotPanics(t, func() {
 				dst := http.Response{}
-				qs := &rateLimitSender{}
-				qs.SendQuotas(&dst, nil, "")
+				qs := &rateLimitSender{hdr: dst.Header}
+				qs.SendQuotas(nil, "")
 				assert.Nil(t, dst.Header)
 			})
 		})
@@ -70,11 +57,10 @@ func Test_rateLimitSender(t *testing.T) {
 	t.Run("SendRateLimits", func(t *testing.T) {
 		t.Run("sends quotas and creates headers map headers", func(t *testing.T) {
 			assert.NotPanics(t, func() {
-				rls := &rateLimitSender{}
-
 				hdr := http.Header{}
+				rls := &rateLimitSender{hdr: hdr}
 
-				rls.SendRateLimits(hdr, Limits{
+				rls.SendRateLimits(Stats{
 					Limit:     200,
 					Remaining: 100,
 					Reset:     time.Second,

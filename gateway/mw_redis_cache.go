@@ -246,8 +246,6 @@ func (m *RedisCacheMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 		newRes.Header.Del(h)
 	}
 
-	m.Gw.limitHeaderSender.SendQuotas(newRes, ctxGetSession(r), m.Spec.APIID)
-
 	newRes.Header.Set(cachedResponseHeader, "1")
 
 	copyHeader(w.Header(), newRes.Header, m.Gw.GetConfig().IgnoreCanonicalMIMEHeaderKey)

@@ -20,6 +20,7 @@ import (
 	headers2 "github.com/TykTechnologies/tyk/header"
 	"github.com/TykTechnologies/tyk/internal/cache"
 	"github.com/TykTechnologies/tyk/internal/otel"
+	"github.com/TykTechnologies/tyk/internal/rate"
 	"github.com/TykTechnologies/tyk/internal/uuid"
 	"github.com/TykTechnologies/tyk/test"
 	"github.com/TykTechnologies/tyk/user"
@@ -415,7 +416,7 @@ func TestSessionLimiter_RedisQuotaExceeded_ExpiredAtReset(t *testing.T) {
 		}
 
 		beforeTime := time.Now()
-		blocked := limiter.RedisQuotaExceeded(req, session, quotaKey, "", limit, g.Gw.GlobalSessionManager.Store(), false)
+		blocked := limiter.RedisQuotaExceeded(req, session, quotaKey, "", limit, false, rate.NewFakeHeaderSender(), "api1")
 		afterTime := time.Now()
 
 		assert.Equal(t, quotaMax-1, session.QuotaRemaining, "Quota remaining should be quotaMax - 1 after increment")
@@ -470,7 +471,7 @@ func TestSessionLimiter_RedisQuotaExceeded_ExpiredAtReset(t *testing.T) {
 		}
 
 		beforeTime := time.Now()
-		blocked := limiter.RedisQuotaExceeded(req, session, quotaKey, scope, limit, g.Gw.GlobalSessionManager.Store(), false)
+		blocked := limiter.RedisQuotaExceeded(req, session, quotaKey, scope, limit, false, rate.NewFakeHeaderSender(), "api1")
 		afterTime := time.Now()
 
 		accessDef := session.AccessRights["api1"]

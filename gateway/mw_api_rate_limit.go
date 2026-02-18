@@ -10,7 +10,6 @@ import (
 	"github.com/TykTechnologies/tyk/ctx"
 	tykerrors "github.com/TykTechnologies/tyk/internal/errors"
 	"github.com/TykTechnologies/tyk/internal/event"
-	"github.com/TykTechnologies/tyk/internal/rate"
 	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/user"
 )
@@ -103,33 +102,25 @@ func (k *RateLimitForAPI) ProcessRequest(rw http.ResponseWriter, r *http.Request
 		return nil, http.StatusOK
 	}
 
-	storeRef := k.Gw.GlobalSessionManager.Store()
-
 	session := k.getSession(r)
+	limitHeaderSender := k.Gw.limitHeaderFactory(rw.Header())
+
 	reason := k.Gw.SessionLimiter.ForwardMessage(
 		r,
 		session,
 		k.keyName,
 		k.quotaKey,
-		storeRef,
 		true,
 		false,
 		k.Spec,
 		false,
+		limitHeaderSender,
 	)
 
 	k.emitRateLimitEvents(r, k.keyName)
 
-	if info, ok := reason.(sessionFailRateLimit); ok {
-		k.Gw.limitHeaderSender.SendRateLimits(rw.Header(), rate.Limits{
-			Limit:     info.limit,
-			Per:       info.per,
-			Reset:     info.reset,
-			Remaining: 0,
-		})
-
+	if reason == sessionFailRateLimit {
 		ctx.SetErrorClassification(r, tykerrors.ClassifyRateLimitError(tykerrors.ErrTypeAPIRateLimit, k.Name()))
-
 		return k.handleRateLimitFailure(r, event.RateLimitExceeded, "API Rate Limit Exceeded", k.keyName)
 	}
 

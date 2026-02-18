@@ -13,6 +13,7 @@ import (
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/internal/rate"
 	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/test"
 	"github.com/TykTechnologies/tyk/user"
@@ -480,16 +481,6 @@ func TestSessionLimiter_RateLimitInfo(t *testing.T) {
 	}
 }
 
-func Test_newSessionFailRateLimit(t *testing.T) {
-	limit := newSessionFailRateLimit(
-		&user.APILimit{RateLimit: user.RateLimit{Rate: 1, Per: 2}},
-		time.Second,
-	)
-	assert.True(t, limit.limit == 1)
-	assert.True(t, limit.per == 2)
-	assert.True(t, limit.reset == time.Second)
-}
-
 func TestSessionLimiter(t *testing.T) {
 	newSessionLimiter := func(t *testing.T) SessionLimiter {
 		t.Helper()
@@ -581,16 +572,16 @@ func TestSessionLimiter(t *testing.T) {
 			require.NoError(t, err)
 
 			limiter.enableContextVariables = true
-			limiter.extendContextWithLimits(r, sessionFailRateLimit{
-				limit: 1,
-				per:   2,
-				reset: time.Second * 10,
+			limiter.extendContextWithLimits(r, rate.Stats{
+				Limit:     2,
+				Remaining: 1,
+				Reset:     time.Second * 10,
 			})
 
 			data := ctxGetData(r)
 			require.NotNil(t, data)
-			assert.Equal(t, 1, data[ctxDataKeyRateLimitLimit])
-			assert.Equal(t, 0, data[ctxDataKeyRateLimitRemaining])
+			assert.Equal(t, 2, data[ctxDataKeyRateLimitLimit])
+			assert.Equal(t, 1, data[ctxDataKeyRateLimitRemaining])
 			assert.Equal(t, 10, data[ctxDataKeyRateLimitReset])
 		})
 
@@ -599,7 +590,7 @@ func TestSessionLimiter(t *testing.T) {
 			require.NoError(t, err)
 
 			limiter.enableContextVariables = false
-			limiter.extendContextWithLimits(r, sessionFailRateLimit{})
+			limiter.extendContextWithLimits(r, rate.Stats{})
 
 			data := ctxGetData(r)
 			require.Nil(t, data)
@@ -616,20 +607,16 @@ func TestSessionLimiter(t *testing.T) {
 		session := &user.SessionState{}
 		apiLimit := &user.APILimit{RateLimit: user.RateLimit{Rate: 2, Per: 60}}
 
-		expires, block := limiter.limitRedis(r, session, key, apiLimit, false)
-		assert.True(t, expires == 0, "first cal is not blocked")
-		assert.True(t, block == false, "first cal is not blocked")
+		state, block := limiter.limitRedis(r, session, key, apiLimit, false)
+		assert.True(t, state.Reset == 0, "first cal is not blocked reset")
+		assert.False(t, block, "first cal is not blocked block")
 
-		expires, block = limiter.limitRedis(r, session, key, apiLimit, false)
-		assert.True(t, expires == 0, "second cal is not blocked")
-		assert.True(t, block == false, "second cal is not blocked")
+		state, block = limiter.limitRedis(r, session, key, apiLimit, false)
+		assert.Equal(t, float64(0), state.Reset.Seconds(), "second cal is blocked for all")
+		assert.False(t, block, "second cal is not blocked block")
 
-		expires, block = limiter.limitRedis(r, session, key, apiLimit, false)
-		assert.True(t, expires.Seconds() == 60.0, "third call is blocked for all window size")
-		assert.True(t, block, "second cal is blocked")
-
-		dur, err := limiter.limiterStorage.TTL(r.Context(), key+SentinelRateLimitKeyPostfix).Result()
-		assert.NoError(t, err)
-		assert.True(t, (dur.Seconds()-(time.Second*60).Seconds()) < 0.1)
+		state, block = limiter.limitRedis(r, session, key, apiLimit, false)
+		assert.InDelta(t, 60.0, state.Reset.Seconds(), 0.1, "third call is blocked for all window size")
+		assert.True(t, block, "third call is blocked")
 	})
 }

@@ -226,7 +226,7 @@ type Gateway struct {
 	// apiJWKCaches cache per api entity
 	apiJWKCaches sync.Map
 
-	limitHeaderSender rate.HeaderSender
+	limitHeaderFactory rate.HeaderSenderFactory
 
 	BundleChecksumVerifier bundleChecksumVerifyFunction
 }
@@ -277,7 +277,7 @@ func NewGateway(config config.Config, ctx context.Context) *Gateway {
 
 	gw.SetNodeID("solo-" + uuid.New())
 	gw.SessionID = uuid.New()
-	gw.limitHeaderSender = rate.NewSender(config.RateLimitHeadersSource)
+	gw.limitHeaderFactory = rate.NewSenderFactory(config.RateLimitHeadersSource)
 
 	// Only create registry in RPC mode
 	if config.SlaveOptions.UseRPC {
@@ -1611,7 +1611,7 @@ func (gw *Gateway) initSystem() error {
 	go cleanIdleMemConnProviders(gw.ctx)
 
 	// !!! review bootstrap process and NewGateway(); this process is broken :/
-	gw.limitHeaderSender = rate.NewSender(gwConfig.RateLimitHeadersSource)
+	gw.limitHeaderFactory = rate.NewSenderFactory(gwConfig.RateLimitHeadersSource)
 	gw.jwkCache = buildJWKSCache(gwConfig)
 
 	return nil
