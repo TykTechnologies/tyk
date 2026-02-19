@@ -2,6 +2,7 @@ package gateway
 
 import (
 	"bytes"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -1335,6 +1336,122 @@ func TestLoopingUrl(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.host, func(t *testing.T) {
 			assert.Equal(t, tc.expectedHost, LoopingUrl(tc.host))
+		})
+	}
+}
+
+type mockKVStore struct {
+	secrets map[string]string
+}
+
+func (m *mockKVStore) Get(key string) (string, error) {
+	if val, ok := m.secrets[key]; ok {
+		return val, nil
+	}
+	return "", fmt.Errorf("secret not found: %s", key)
+}
+
+func (m *mockKVStore) Put(key, value string) error {
+	m.secrets[key] = value
+	return nil
+}
+
+func TestReplaceTykVariables(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	// Mock Vault KV store
+	ts.Gw.vaultKVStore = &mockKVStore{
+		secrets: map[string]string{
+			"kv-v2/layer1/layer2/dev.API_KEY": "vault_api_key_value",
+			"simplekey":                       "simple_vault_value",
+		},
+	}
+
+	// Mock Consul KV store
+	ts.Gw.consulKVStore = &mockKVStore{
+		secrets: map[string]string{
+			"path/to/db_password": "consul_db_password_value",
+			"anotherkey":          "another_consul_value",
+		},
+	}
+
+	// Set up environment variable for testing
+	t.Setenv("TYK_SECRET_ENV_VAR", "env_var_value")
+	t.Setenv("TYK_SECRET_ENV_VAR_WITH_UNDERSCORE", "env_var_underscore_value")
+
+	tests := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{
+			name:     "Vault secret with underscore",
+			input:    "$secret_vault.kv-v2/layer1/layer2/dev.API_KEY",
+			expected: "vault_api_key_value",
+		},
+		{
+			name:     "Vault secret without underscore",
+			input:    "$secret_vault.simplekey",
+			expected: "simple_vault_value",
+		},
+		{
+			name:     "Consul secret with underscore",
+			input:    "$secret_consul.path/to/db_password",
+			expected: "consul_db_password_value",
+		},
+		{
+			name:     "Consul secret without underscore",
+			input:    "$secret_consul.anotherkey",
+			expected: "another_consul_value",
+		},
+		{
+			name:     "Environment variable",
+			input:    "$secret_env.env_var",
+			expected: "env_var_value",
+		},
+		{
+			name:     "Environment variable with underscore",
+			input:    "$secret_env.env_var_with_underscore",
+			expected: "env_var_underscore_value",
+		},
+		{
+			name:     "Mixed string with Vault secret",
+			input:    "My API Key is: $secret_vault.kv-v2/layer1/layer2/dev.API_KEY and some other text",
+			expected: "My API Key is: vault_api_key_value and some other text",
+		},
+		{
+			name:     "Mixed string with Consul secret",
+			input:    "My DB Password is: $secret_consul.path/to/db_password and some other text",
+			expected: "My DB Password is: consul_db_password_value and some other text",
+		},
+		{
+			name:     "Multiple secrets of different types",
+			input:    "Vault: $secret_vault.simplekey, Consul: $secret_consul.anotherkey, Env: $secret_env.env_var",
+			expected: "Vault: simple_vault_value, Consul: another_consul_value, Env: env_var_value",
+		},
+		{
+			name:     "Non-existent Vault secret",
+			input:    "$secret_vault.non_existent_key",
+			expected: "",
+		},
+		{
+			name:     "Non-existent Consul secret",
+			input:    "$secret_consul.another_non_existent_key",
+			expected: "",
+		},
+		{
+			name:     "Non-existent environment variable",
+			input:    "$secret_env.non_existent_env_var",
+			expected: "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req := httptest.NewRequest("GET", "/", nil)
+			result := ts.Gw.ReplaceTykVariables(req, tt.input, false)
+			assert.Equal(t, tt.expected, result)
 		})
 	}
 }
