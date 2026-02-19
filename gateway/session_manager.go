@@ -315,7 +315,7 @@ func (l *SessionLimiter) ForwardMessage(
 			session.Allowance = session.Allowance - 1
 		}
 
-		if l.RedisQuotaExceeded(r, session, quotaKey, allowanceScope, apiLimit, l.config.HashKeys, headerSender, api.APIID) {
+		if l.RedisQuotaExceeded(r, session, quotaKey, allowanceScope, apiLimit, l.config.HashKeys) {
 			return sessionFailQuota
 		}
 	}
@@ -426,8 +426,6 @@ func (l *SessionLimiter) RedisQuotaExceeded(
 	quotaKey, scope string,
 	limit *user.APILimit,
 	hashKeys bool,
-	headerSender rate.HeaderSender,
-	apiID string,
 ) bool {
 
 	logger := log.WithFields(logrus.Fields{
@@ -517,7 +515,6 @@ func (l *SessionLimiter) RedisQuotaExceeded(
 
 		l.updateSessionQuota(session, scope, remaining, expiredAt.Unix())
 		l.extendContextWithQuota(r, int(limit.QuotaMax), int(remaining), int(expiredAt.Unix()))
-		headerSender.SendQuotas(session, apiID)
 
 		return blocked
 	}

@@ -332,6 +332,8 @@ func (gw *Gateway) handleForcedResponse(rw http.ResponseWriter, res *http.Respon
 		res.Header.Set("Connection", "close")
 	}
 
+	gw.limitHeaderFactory(res.Header).SendQuotas(ses, spec.APIID)
+
 	copyHeader(rw.Header(), res.Header, gw.GetConfig().IgnoreCanonicalMIMEHeaderKey)
 
 	rw.WriteHeader(res.StatusCode)
