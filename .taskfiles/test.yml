@@ -66,7 +66,7 @@ tasks:
       - defer: { task: services:down }
       - defer: { task: report }
       - rm -rf coverage && mkdir -p coverage
-      - go test -p 1 -parallel 1 -json {{.testArgs}} -coverprofile=coverage/{{.product}}-all.cov -count=1 -v ./... > coverage/{{.product}}-all.json
+      - gotestsum --jsonfile coverage/{{.product}}-all.json --rerun-fails=2 -- -p 1 -parallel 1 {{.testArgs}} -coverprofile=coverage/{{.product}}-all.cov -count=1 -v ./...
 
   plugin:race:
     dir: '{{.dir}}'
