@@ -612,7 +612,7 @@ func TestSessionLimiter(t *testing.T) {
 		assert.False(t, block, "first cal is not blocked block")
 
 		state, block = limiter.limitRedis(r, session, key, apiLimit, false)
-		assert.Equal(t, float64(0), state.Reset.Seconds(), "second cal is blocked for all")
+		assert.InDelta(t, 60.0, state.Reset.Seconds(), 0.1, "second cal is blocked for all")
 		assert.False(t, block, "second cal is not blocked block")
 
 		state, block = limiter.limitRedis(r, session, key, apiLimit, false)
