@@ -9577,6 +9577,41 @@ func TestSortSpecsByListenPath(t *testing.T) {
 				"/products/{category}/items",
 			},
 		},
+		{
+			name: "TT-16219: Regex Path Prioritized Over Generic Root Path",
+			specs: []*APISpec{
+				createSpec("/"),
+				createSpec("/{param}"),
+			},
+			expected: []string{
+				"/{param}",
+				"/",
+			},
+		},
+		{
+			name: "TT-16219: Regex Path Prioritized Over Generic Root Path (Reverse Order)",
+			specs: []*APISpec{
+				createSpec("/{param}"),
+				createSpec("/"),
+			},
+			expected: []string{
+				"/{param}",
+				"/",
+			},
+		},
+		{
+			name: "TT-16219: Multiple Regex Paths vs Generic Root Path",
+			specs: []*APISpec{
+				createSpec("/"),
+				createSpec("/{id}"),
+				createSpec("/{category}/{id}"),
+			},
+			expected: []string{
+				"/{category}/{id}",
+				"/{id}",
+				"/",
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -9593,6 +9628,216 @@ func TestSortSpecsByListenPath(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestListenPathLength(t *testing.T) {
+	tests := []struct {
+		name       string
+		listenPath string
+		expected   int
+	}{
+		{
+			name:       "Root path",
+			listenPath: "/",
+			expected:   1,
+		},
+		{
+			name:       "Simple path",
+			listenPath: "/api",
+			expected:   4,
+		},
+		{
+			name:       "Path with single regex param",
+			listenPath: "/{param}",
+			expected:   2, // 1 (slash count) + 1 (regex bonus)
+		},
+		{
+			name:       "Path with regex and static segments",
+			listenPath: "/api/{id}/resource",
+			expected:   15, // 3 (slashes) + 3 (api) + 8 (resource) + 1 (regex bonus)
+		},
+		{
+			name:       "Path with multiple regex params",
+			listenPath: "/{category}/{id}",
+			expected:   3, // 2 (slashes) + 1 (regex bonus)
+		},
+		{
+			name:       "TT-16219: Regex path length greater than generic root",
+			listenPath: "/{param}",
+			expected:   2, // Must be > 1 (length of "/") to ensure regex is prioritized
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := listenPathLength(tt.listenPath)
+			if result != tt.expected {
+				t.Errorf("listenPathLength(%q) = %d, expected %d", tt.listenPath, result, tt.expected)
+			}
+		})
+	}
+
+	// Ensure regex path has higher score than root path for TT-16219
+	t.Run("TT-16219: Regex path must have higher score than root path", func(t *testing.T) {
+		rootLength := listenPathLength("/")
+		regexLength := listenPathLength("/{param}")
+		if regexLength <= rootLength {
+			t.Errorf("Regex path '/{param}' (length=%d) must have higher score than root path '/' (length=%d) to ensure proper routing priority",
+				regexLength, rootLength)
+		}
+	})
+}
+
+// TestListenPathRoutingPrioritization is an integration test that validates the fix for TT-16219.
+// It ensures that requests are correctly routed to the regex-path API when it competes with a
+// catch-all root path '/', regardless of the order the APIs are loaded.
+func TestListenPathRoutingPrioritization(t *testing.T) {
+	// Test with both load orders to ensure routing is consistent
+	testCases := []struct {
+		name           string
+		loadRootFirst  bool
+		requestPath    string
+		expectedHeader string // Header value identifies which API handled the request
+	}{
+		{
+			name:           "TT-16219: Request to /bar should route to regex API when root API loaded first",
+			loadRootFirst:  true,
+			requestPath:    "/bar",
+			expectedHeader: "regex-api",
+		},
+		{
+			name:           "TT-16219: Request to /bar should route to regex API when regex API loaded first",
+			loadRootFirst:  false,
+			requestPath:    "/bar",
+			expectedHeader: "regex-api",
+		},
+		{
+			name:           "TT-16219: Request to /anything should route to regex API when root API loaded first",
+			loadRootFirst:  true,
+			requestPath:    "/anything",
+			expectedHeader: "regex-api",
+		},
+		{
+			name:           "TT-16219: Request to /test-path should route to regex API when regex API loaded first",
+			loadRootFirst:  false,
+			requestPath:    "/test-path",
+			expectedHeader: "regex-api",
+		},
+		{
+			name:           "TT-16219: Request to exact root path / should route to root API",
+			loadRootFirst:  true,
+			requestPath:    "/",
+			expectedHeader: "root-api",
+		},
+		{
+			name:           "TT-16219: Request to exact root path / should route to root API (reverse load order)",
+			loadRootFirst:  false,
+			requestPath:    "/",
+			expectedHeader: "root-api",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			ts := StartTest(nil)
+			defer ts.Close()
+
+			// Create two APIs: one with root path "/" and one with regex path "/{foo}"
+			// Each API adds a unique response header to identify which one handled the request
+			rootAPI := func(spec *APISpec) {
+				spec.APIID = "root-api"
+				spec.Name = "Root API"
+				spec.Proxy.ListenPath = "/"
+				spec.UseKeylessAccess = true
+				UpdateAPIVersion(spec, "v1", func(v *apidef.VersionInfo) {
+					v.UseExtendedPaths = true
+					v.GlobalResponseHeaders = map[string]string{
+						"X-Handled-By": "root-api",
+					}
+				})
+			}
+
+			regexAPI := func(spec *APISpec) {
+				spec.APIID = "regex-api"
+				spec.Name = "Regex API"
+				spec.Proxy.ListenPath = "/{foo}"
+				spec.UseKeylessAccess = true
+				UpdateAPIVersion(spec, "v1", func(v *apidef.VersionInfo) {
+					v.UseExtendedPaths = true
+					v.GlobalResponseHeaders = map[string]string{
+						"X-Handled-By": "regex-api",
+					}
+				})
+			}
+
+			// Load APIs in the specified order
+			if tc.loadRootFirst {
+				ts.Gw.BuildAndLoadAPI(rootAPI, regexAPI)
+			} else {
+				ts.Gw.BuildAndLoadAPI(regexAPI, rootAPI)
+			}
+
+			// Make request and verify which API handled it
+			_, _ = ts.Run(t, test.TestCase{
+				Path: tc.requestPath,
+				Code: http.StatusOK,
+				HeadersMatch: map[string]string{
+					"X-Handled-By": tc.expectedHeader,
+				},
+			})
+		})
+	}
+}
+
+// TestRegexPathPriorityOverCatchAll validates TT-16219: a regex-based path like /{foo}
+// should have higher priority than a catch-all root path /.
+// This test creates two APIs - one with "/" and one with "/{foo}" - and verifies that
+// requests to paths like /test are routed to the regex API, not the catch-all.
+func TestRegexPathPriorityOverCatchAll(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	// API with catch-all root path "/"
+	catchAllAPI := func(spec *APISpec) {
+		spec.APIID = "catch-all-api"
+		spec.Name = "Catch All API"
+		spec.Proxy.ListenPath = "/"
+		spec.UseKeylessAccess = true
+		UpdateAPIVersion(spec, "v1", func(v *apidef.VersionInfo) {
+			v.UseExtendedPaths = true
+			v.GlobalResponseHeaders = map[string]string{
+				"X-API-ID": "catch-all-api",
+			}
+		})
+	}
+
+	// API with regex-based path "/{foo}"
+	regexPathAPI := func(spec *APISpec) {
+		spec.APIID = "regex-path-api"
+		spec.Name = "Regex Path API"
+		spec.Proxy.ListenPath = "/{foo}"
+		spec.UseKeylessAccess = true
+		UpdateAPIVersion(spec, "v1", func(v *apidef.VersionInfo) {
+			v.UseExtendedPaths = true
+			v.GlobalResponseHeaders = map[string]string{
+				"X-API-ID": "regex-path-api",
+			}
+		})
+	}
+
+	// Load catch-all API first, then regex API - this is the order that would have
+	// caused issues before the TT-16219 fix since both paths had the same score
+	ts.Gw.BuildAndLoadAPI(catchAllAPI, regexPathAPI)
+
+	// Request to /test should route to regex API /{foo}, not catch-all /
+	// This confirms the regex path has higher priority than the catch-all
+	_, _ = ts.Run(t, test.TestCase{
+		Path: "/test",
+		Code: http.StatusOK,
+		HeadersMatch: map[string]string{
+			"X-API-ID": "regex-path-api",
+		},
+	})
 }
 
 func TestRecoverFromLoadApiPanic(t *testing.T) {
