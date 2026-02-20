@@ -16,7 +16,7 @@ Table of Contents
     
 
 ## Tyk testing guide
-
+ 
 When it comes to the tests, one of the main questions is how to keep balance between expressivity, extendability, repeatability and performance. There are countless discussions if you should write integration or unit tests, should your mock or not, should you write tests first or after and etc. Since you will never find the right answer, on a growing code base, multiple people start introducing own methodology and distinct test helpers. Even looking at our quite small code base, you can find like 3-4 ways to write the same test.
 
 This document describes Tyk test framework and unified guidelines on writing tests.
