@@ -20,6 +20,10 @@ type (
 
 	Sampling = otelconfig.Sampling
 
+	MetricsConfig = otelconfig.MetricsConfig
+
+	MetricsRetryConfig = otelconfig.MetricsRetryConfig
+
 	SpanAttribute = tyktrace.Attribute
 
 	Span = tyktrace.Span

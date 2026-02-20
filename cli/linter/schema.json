@@ -179,6 +179,42 @@
           "min_version": {
             "type": "string"
           }
+        },
+        "metrics": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "export_interval": {
+              "type": "integer"
+            },
+            "temporality": {
+              "type": "string"
+            },
+            "shutdown_timeout": {
+              "type": "integer"
+            },
+            "retry": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "enabled": {
+                  "type": "boolean"
+                },
+                "initial_interval": {
+                  "type": "integer"
+                },
+                "max_interval": {
+                  "type": "integer"
+                },
+                "max_elapsed_time": {
+                  "type": "integer"
+                }
+              }
+            }
+          }
         }
       }
     },
