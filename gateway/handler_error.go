@@ -177,6 +177,8 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 			Host:          host,
 			Path:          trackedPath,
 			RawPath:       r.URL.Path,
+			OriginalPath:  ctxGetOriginalRequestPath(r),
+			ListenPath:    e.Spec.Proxy.ListenPath,
 			ContentLength: r.ContentLength,
 			UserAgent:     r.Header.Get(header.UserAgent),
 			Day:           t.Day(),

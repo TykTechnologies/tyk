@@ -205,6 +205,9 @@ func (r *RedisAnalyticsHandler) recordWorker() {
 			if !strings.HasPrefix(record.RawPath, "/") {
 				record.RawPath = "/" + record.RawPath
 			}
+			if record.OriginalPath != "" && !strings.HasPrefix(record.OriginalPath, "/") {
+				record.OriginalPath = "/" + record.OriginalPath
+			}
 
 			if encoded, err := r.analyticsSerializer.Encode(record); err != nil {
 				log.WithError(err).Error("Error encoding analytics data")

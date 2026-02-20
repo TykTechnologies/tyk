@@ -19,6 +19,7 @@ import (
 	"github.com/TykTechnologies/tyk/config"
 	headers2 "github.com/TykTechnologies/tyk/header"
 	"github.com/TykTechnologies/tyk/internal/cache"
+	"github.com/TykTechnologies/tyk/ctx"
 	"github.com/TykTechnologies/tyk/internal/otel"
 	"github.com/TykTechnologies/tyk/internal/uuid"
 	"github.com/TykTechnologies/tyk/test"
@@ -696,6 +697,82 @@ func TestRecordAccessLog_TraceID(t *testing.T) {
 			if tc.expectTraceID {
 				traceID := lastEntry.Data["trace_id"].(string)
 				assert.NotEmpty(t, traceID, "trace_id should not be empty when present")
+			}
+
+			hook.Reset()
+		})
+	}
+}
+
+func TestRecordAccessLog_OriginalPath(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	tests := []struct {
+		name               string
+		originalPath       string
+		expectOriginalPath bool
+	}{
+		{
+			name:               "AL-1: original_path present when context value is non-empty",
+			originalPath:       "/api/v1/users",
+			expectOriginalPath: true,
+		},
+		{
+			name:               "AL-2: original_path omitted when context value is empty",
+			originalPath:       "",
+			expectOriginalPath: false,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			logger, hook := logrustest.NewNullLogger()
+
+			gwConfig := ts.Gw.GetConfig()
+			gwConfig.AccessLogs.Enabled = true
+			ts.Gw.SetConfig(gwConfig)
+
+			spec := &APISpec{
+				APIDefinition: &apidef.APIDefinition{},
+				GlobalConfig:  gwConfig,
+			}
+
+			baseMw := &BaseMiddleware{
+				Spec:   spec,
+				Gw:     ts.Gw,
+				logger: logger.WithField("prefix", "test"),
+			}
+
+			req := httptest.NewRequest(http.MethodGet, "http://example.com/path", nil)
+
+			if tc.originalPath != "" {
+				reqCtx := context.WithValue(req.Context(), ctx.OriginalRequestPath, tc.originalPath)
+				req = req.WithContext(reqCtx)
+			}
+
+			resp := &http.Response{
+				StatusCode: http.StatusOK,
+			}
+
+			latency := analytics.Latency{
+				Total:    100,
+				Upstream: 80,
+				Gateway:  20,
+			}
+
+			baseMw.RecordAccessLog(req, resp, latency)
+
+			assert.NotEmpty(t, hook.Entries, "Expected a log entry")
+			lastEntry := hook.LastEntry()
+
+			_, hasOriginalPath := lastEntry.Data["original_path"]
+			assert.Equal(t, tc.expectOriginalPath, hasOriginalPath,
+				"original_path field presence mismatch")
+
+			if tc.expectOriginalPath {
+				assert.Equal(t, tc.originalPath, lastEntry.Data["original_path"],
+					"original_path value should match context value")
 			}
 
 			hook.Reset()

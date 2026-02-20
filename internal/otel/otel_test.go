@@ -554,6 +554,36 @@ func TestOTelConfig_BackwardCompatibility(t *testing.T) {
 	})
 }
 
+func TestOriginalPathSpanAttribute(t *testing.T) {
+	tests := []struct {
+		name          string
+		path          string
+		expectedKey   string
+		expectedValue string
+	}{
+		{
+			name:          "OT-1: creates attribute with correct key and value",
+			path:          "/api/v1/users",
+			expectedKey:   "tyk.original_path",
+			expectedValue: "/api/v1/users",
+		},
+		{
+			name:          "OT-2: creates attribute with empty value when path is empty",
+			path:          "",
+			expectedKey:   "tyk.original_path",
+			expectedValue: "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			attr := OriginalPathSpanAttribute(tt.path)
+			expected := tyktrace.NewAttribute(tt.expectedKey, tt.expectedValue)
+			assert.Equal(t, expected, attr)
+		})
+	}
+}
+
 func TestExtractTraceAndSpanID(t *testing.T) {
 	t.Run("returns empty strings when no span in context", func(t *testing.T) {
 		traceID, spanID := ExtractTraceAndSpanID(context.Background())

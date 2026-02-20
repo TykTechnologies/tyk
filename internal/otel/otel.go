@@ -131,6 +131,12 @@ func APIVersionAttribute(version string) SpanAttribute {
 	return semconv.TykAPIVersion(version)
 }
 
+// OriginalPathSpanAttribute creates a span attribute for the original client
+// request path before any middleware transformations (e.g., listen path stripping).
+func OriginalPathSpanAttribute(path string) SpanAttribute {
+	return tyktrace.NewAttribute("tyk.original_path", path)
+}
+
 var APIKeyAttribute = semconv.TykAPIKey
 
 var APIKeyAliasAttribute = semconv.TykAPIKeyAlias

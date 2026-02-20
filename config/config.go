@@ -301,7 +301,9 @@ type AccessLogsConfig struct {
 	//
 	// Template Options:
 	//
+	// - `api_id` will include the API ID.
 	// - `api_key` will include the obfuscated or hashed key.
+	// - `api_name` will include the API name.
 	// - `circuit_breaker_state` will include the circuit breaker state when applicable.
 	// - `client_ip` will include the IP of the request.
 	// - `error_source` will include the source of an error (e.g., ReverseProxy).
@@ -311,6 +313,7 @@ type AccessLogsConfig struct {
 	// - `latency_total` will include the total latency of the request.
 	// - `method` will include the request method.
 	// - `org_id` will include the organization ID.
+	// - `original_path` will include the original request path before URL rewrites.
 	// - `path` will include the path of the request.
 	// - `protocol` will include the protocol of the request.
 	// - `remote_addr` will include the remote address of the request.
