@@ -415,7 +415,7 @@ func TestSessionLimiter_RedisQuotaExceeded_ExpiredAtReset(t *testing.T) {
 		}
 
 		beforeTime := time.Now()
-		blocked := limiter.RedisQuotaExceeded(req, session, quotaKey, "", limit, g.Gw.GlobalSessionManager.Store(), false)
+		blocked := limiter.RedisQuotaExceeded(req, session, quotaKey, "", limit, false)
 		afterTime := time.Now()
 
 		assert.Equal(t, quotaMax-1, session.QuotaRemaining, "Quota remaining should be quotaMax - 1 after increment")
@@ -470,7 +470,7 @@ func TestSessionLimiter_RedisQuotaExceeded_ExpiredAtReset(t *testing.T) {
 		}
 
 		beforeTime := time.Now()
-		blocked := limiter.RedisQuotaExceeded(req, session, quotaKey, scope, limit, g.Gw.GlobalSessionManager.Store(), false)
+		blocked := limiter.RedisQuotaExceeded(req, session, quotaKey, scope, limit, false)
 		afterTime := time.Now()
 
 		accessDef := session.AccessRights["api1"]

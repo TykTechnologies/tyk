@@ -4,7 +4,6 @@ import (
 	"context"
 	"net/http"
 	"net/url"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -16,7 +15,6 @@ import (
 	"github.com/TykTechnologies/tyk/apidef/oas"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/ctx"
-	"github.com/TykTechnologies/tyk/header"
 	"github.com/TykTechnologies/tyk/internal/agentprotocol"
 	"github.com/TykTechnologies/tyk/internal/certcheck"
 	"github.com/TykTechnologies/tyk/internal/errors"
@@ -24,7 +22,6 @@ import (
 	"github.com/TykTechnologies/tyk/internal/httpctx"
 	"github.com/TykTechnologies/tyk/internal/httputil"
 	"github.com/TykTechnologies/tyk/internal/jsonrpc"
-	"github.com/TykTechnologies/tyk/user"
 
 	_ "github.com/TykTechnologies/tyk/internal/mcp" // registers MCP VEM prefixes
 )
@@ -324,20 +321,4 @@ func extractPathParams(oasPath, actualPath string) map[string]string {
 	}
 
 	return params
-}
-
-func (a *APISpec) sendRateLimitHeaders(session *user.SessionState, dest *http.Response) {
-	quotaMax, quotaRemaining, quotaRenews := int64(0), int64(0), int64(0)
-
-	if session != nil {
-		quotaMax, quotaRemaining, _, quotaRenews = session.GetQuotaLimitByAPIID(a.APIID)
-	}
-
-	if dest.Header == nil {
-		dest.Header = http.Header{}
-	}
-
-	dest.Header.Set(header.XRateLimitLimit, strconv.Itoa(int(quotaMax)))
-	dest.Header.Set(header.XRateLimitRemaining, strconv.Itoa(int(quotaRemaining)))
-	dest.Header.Set(header.XRateLimitReset, strconv.Itoa(int(quotaRenews)))
 }

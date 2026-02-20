@@ -7,7 +7,7 @@ import (
 	"github.com/TykTechnologies/exp/pkg/limiters"
 )
 
-func (l *Limiter) LeakyBucket(ctx context.Context, key string, rate float64, per float64) error {
+func (l *Limiter) LeakyBucket(ctx context.Context, key string, rate float64, per float64) (time.Duration, error) {
 	var (
 		storage limiters.LeakyBucketStateBackend
 		locker  limiters.DistLocker
@@ -32,5 +32,9 @@ func (l *Limiter) LeakyBucket(ctx context.Context, key string, rate float64, per
 	if err == nil {
 		time.Sleep(res)
 	}
-	return err
+
+	// implementation of this function is wrong
+	// 1. it's not a leaky bucket
+	// 2. it's hidden behind compilation flag "dev"
+	return res, err
 }

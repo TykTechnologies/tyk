@@ -1430,7 +1430,7 @@ func (p *ReverseProxy) HandleResponse(rw http.ResponseWriter, res *http.Response
 		res.Header.Set(header.Connection, "close")
 	}
 
-	p.TykAPISpec.sendRateLimitHeaders(ses, res)
+	p.Gw.limitHeaderFactory(res.Header).SendQuotas(ses, p.TykAPISpec.APIID)
 
 	copyHeader(rw.Header(), res.Header, p.Gw.GetConfig().IgnoreCanonicalMIMEHeaderKey)
 

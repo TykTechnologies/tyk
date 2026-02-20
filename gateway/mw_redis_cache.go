@@ -14,9 +14,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/TykTechnologies/tyk-pump/analytics"
-
 	"github.com/TykTechnologies/murmur3"
+
+	"github.com/TykTechnologies/tyk-pump/analytics"
 	"github.com/TykTechnologies/tyk/internal/middleware"
 	"github.com/TykTechnologies/tyk/regexp"
 	"github.com/TykTechnologies/tyk/request"
@@ -245,8 +245,6 @@ func (m *RedisCacheMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 	for _, h := range hopHeaders {
 		newRes.Header.Del(h)
 	}
-
-	m.Spec.sendRateLimitHeaders(ctxGetSession(r), newRes)
 
 	newRes.Header.Set(cachedResponseHeader, "1")
 
