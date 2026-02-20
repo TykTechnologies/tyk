@@ -6,6 +6,7 @@ import (
 
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	otelconfig "github.com/TykTechnologies/opentelemetry/config"
 )
@@ -43,7 +44,10 @@ func TestInitOpenTelemetryMetrics_Enabled(t *testing.T) {
 
 	// Shutdown flushes and stops — may fail if no collector is running,
 	// but must not panic
-	_ = inst.Shutdown(context.Background())
+	require.NotPanics(t, func() {
+		//nolint:errcheck // shutdown may fail without a running collector; we only assert no panic
+		inst.Shutdown(context.Background())
+	})
 }
 
 func TestRecordRequest_NilSafe(t *testing.T) {
@@ -53,7 +57,9 @@ func TestRecordRequest_NilSafe(t *testing.T) {
 		"", "", false, "", false, nil)
 
 	// Call many times — must never panic
-	for range 100 {
-		inst.RecordRequest(context.Background())
-	}
+	require.NotPanics(t, func() {
+		for range 100 {
+			inst.RecordRequest(context.Background())
+		}
+	})
 }

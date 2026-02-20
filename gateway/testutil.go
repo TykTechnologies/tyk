@@ -1346,7 +1346,9 @@ func (s *Test) Close() {
 	s.Gw.GlobalHostChecker.StopPoller()
 	s.Gw.NewRelicApplication.Shutdown(5 * time.Second)
 	if s.Gw.MetricInstruments != nil {
-		_ = s.Gw.MetricInstruments.Shutdown(ctxShutDown)
+		if err := s.Gw.MetricInstruments.Shutdown(ctxShutDown); err != nil {
+			log.WithError(err).Error("shutting down metric instruments")
+		}
 	}
 
 	err = s.RemoveApis()

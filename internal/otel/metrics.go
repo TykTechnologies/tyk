@@ -53,11 +53,14 @@ func InitOpenTelemetryMetrics(ctx context.Context, logger *logrus.Logger, gwConf
 		logger.Errorf("Initializing OpenTelemetry Metrics: %s", err)
 	}
 
-	requestCounter, _ := provider.NewCounter(
+	requestCounter, err := provider.NewCounter(
 		"tyk.http.requests",
 		"Total HTTP requests processed by the gateway",
 		"1",
 	)
+	if err != nil {
+		logger.Errorf("Creating request counter: %s", err)
+	}
 
 	return &Instruments{
 		provider:       provider,
