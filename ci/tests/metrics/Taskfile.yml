@@ -1,0 +1,27 @@
+---
+version: "3"
+
+tasks:
+  default:
+    desc: "setup, execute and shutdown e2e opentelemetry metrics tests"
+    cmds:
+      - defer:
+          task: teardown
+      - task: setup
+      - task: test
+
+  setup:
+    desc: "setup e2e opentelemetry metrics tests"
+    cmds:
+      - docker compose up -d --wait
+      - docker compose logs -f &
+
+  test:
+    desc: "run e2e opentelemetry metrics tests"
+    cmds:
+      - E2E_METRICS=1 go test -v -count=1 -timeout 120s ./...
+
+  teardown:
+    desc: "teardown e2e opentelemetry metrics tests environment"
+    cmds:
+      - docker compose down --remove-orphans
