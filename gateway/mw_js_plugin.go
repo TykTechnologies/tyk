@@ -14,7 +14,6 @@ import (
 	"path/filepath"
 	"reflect"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/dop251/goja"
@@ -301,34 +300,68 @@ type JSVM struct {
 	RawLog  *logrus.Logger `json:"-"` // logger used by `rawlog` func to avoid formatting
 	Gw      *Gateway       `json:"-"`
 
-	vm *goja.Runtime  // single pre-initialized runtime, guarded by mu
-	mu *sync.Mutex
+	programs    []*goja.Program // compiled JS programs replayed on each new runtime
+	initialized bool
 }
 
 // Initialized reports whether the JSVM has been set up.
 func (j *JSVM) Initialized() bool {
-	return j.vm != nil
+	return j.initialized
 }
 
-// Run executes a JS expression on the VM with timeout handling.
-// Access is serialized via a mutex; timeout uses goja's Interrupt (goroutine-safe).
+// newRuntime creates a fresh goja runtime with all loaded programs and Go API functions.
+func (j *JSVM) newRuntime() *goja.Runtime {
+	vm := goja.New()
+
+	// Register a silent no-op log during program replay to suppress
+	// top-level log() calls that already fired at load time.
+	nop := func(call goja.FunctionCall) goja.Value { return goja.Undefined() }
+	vm.Set("log", nop)
+	vm.Set("rawlog", nop)
+
+	// Register all other Go API functions (b64dec, TykMakeHttpRequest, etc.)
+	j.registerAPI(vm)
+
+	// Replay compiled programs (middleware definitions, coreJS, etc.)
+	for _, p := range j.programs {
+		if _, err := vm.RunProgram(p); err != nil {
+			if j.Log != nil {
+				j.Log.WithError(err).Error("Failed to replay JS program")
+			}
+		}
+	}
+
+	// Now install the real log/rawlog so request-time calls work.
+	vm.Set("log", func(call goja.FunctionCall) goja.Value {
+		j.Log.WithFields(logrus.Fields{
+			"type": "log-msg",
+		}).Info(call.Argument(0).String())
+		return goja.Undefined()
+	})
+	vm.Set("rawlog", func(call goja.FunctionCall) goja.Value {
+		j.RawLog.Print(call.Argument(0).String() + "\n")
+		return goja.Undefined()
+	})
+
+	return vm
+}
+
+// Run executes a JS expression on a fresh runtime with timeout handling.
+// Each call gets an isolated runtime so concurrent requests don't interfere.
 func (j *JSVM) Run(expr string) (string, error) {
-	if j.vm == nil {
+	if !j.initialized {
 		return "", errors.New("JSVM isn't enabled, check your gateway settings")
 	}
 
-	j.mu.Lock()
-	defer j.mu.Unlock()
+	vm := j.newRuntime()
 
 	timer := time.AfterFunc(j.Timeout, func() {
-		j.vm.Interrupt("timeout")
+		vm.Interrupt("timeout")
 	})
 	defer timer.Stop()
 
-	returnRaw, err := j.vm.RunString(expr)
+	returnRaw, err := vm.RunString(expr)
 	if err != nil {
-		// Clear the interrupt flag so the VM is usable for the next call.
-		j.vm.ClearInterrupt()
 		if _, ok := err.(*goja.InterruptedError); ok {
 			return "", fmt.Errorf("JS middleware timed out after %v", j.Timeout)
 		}
@@ -338,13 +371,14 @@ func (j *JSVM) Run(expr string) (string, error) {
 	return returnRaw.String(), nil
 }
 
-// LoadScript runs a JS source string on the VM (used during init/load, not per-request).
+// LoadScript compiles a JS source string and adds it to the programs list.
 func (j *JSVM) LoadScript(src string) error {
-	if j.vm == nil {
-		return errors.New("JSVM not initialized")
+	p, err := goja.Compile("", src, false)
+	if err != nil {
+		return err
 	}
-	_, err := j.vm.RunString(src)
-	return err
+	j.programs = append(j.programs, p)
+	return nil
 }
 
 const defaultJSVMTimeout = 5
@@ -353,39 +387,42 @@ const defaultJSVMTimeout = 5
 // timeout.
 func (j *JSVM) Init(spec *APISpec, logger *logrus.Entry, gw *Gateway) {
 	j.Gw = gw
-	j.mu = &sync.Mutex{}
+	j.programs = nil
 	logger = logger.WithField("prefix", "jsvm")
 
-	vm := goja.New()
-
-	// Register Go API functions first so JS init code can call log(), b64dec(), etc.
-	j.Log = logger
-	j.RawLog = rawLog
-	j.Spec = spec
-	j.vm = vm
-	j.registerAPI(vm)
-
-	// Init TykJS namespace, constructors etc.
-	if _, err := vm.RunString(coreJS); err != nil {
-		logger.WithError(err).Error("Could not load TykJS")
-		j.vm = nil
+	// Compile and store coreJS
+	p, err := goja.Compile("coreJS", coreJS, false)
+	if err != nil {
+		logger.WithError(err).Error("Could not compile TykJS")
 		return
 	}
+	j.programs = append(j.programs, p)
 
 	// Load user's TykJS on top, if any
 	if path := gw.GetConfig().TykJSPath; path != "" {
 		data, err := os.ReadFile(path)
 		if err == nil {
-			if _, err := vm.RunString(string(data)); err != nil {
-				logger.WithError(err).Error("Could not load user's TykJS")
+			p, err := goja.Compile(path, string(data), false)
+			if err != nil {
+				logger.WithError(err).Error("Could not compile user's TykJS")
+			} else {
+				j.programs = append(j.programs, p)
 			}
 		}
 	}
 
-	// Define the TykJsResponse helper
-	vm.RunString(`function TykJsResponse(response, session_meta) {
+	// Compile the TykJsResponse helper
+	tykJsResp, err := goja.Compile("TykJsResponse", `function TykJsResponse(response, session_meta) {
 		return JSON.stringify({Response: response, SessionMeta: session_meta})
-	}`)
+	}`, false)
+	if err != nil {
+		logger.WithError(err).Error("Could not compile TykJsResponse")
+	} else {
+		j.programs = append(j.programs, tykJsResp)
+	}
+
+	j.Spec = spec
+	j.initialized = true
 
 	if jsvmTimeout := gw.GetConfig().JSVMTimeout; jsvmTimeout <= 0 {
 		j.Timeout = time.Duration(defaultJSVMTimeout) * time.Second
@@ -394,6 +431,9 @@ func (j *JSVM) Init(spec *APISpec, logger *logrus.Entry, gw *Gateway) {
 		j.Timeout = time.Duration(jsvmTimeout) * time.Second
 		logger.Debugf("Custom JSVM timeout: %v", j.Timeout)
 	}
+
+	j.Log = logger // use the global logger by default
+	j.RawLog = rawLog
 }
 
 func (j *JSVM) DeInit() {
@@ -401,7 +441,7 @@ func (j *JSVM) DeInit() {
 	j.Log = nil
 	j.RawLog = nil
 	j.Gw = nil
-	j.vm = nil
+	j.initialized = false
 }
 
 // LoadJSPaths will load JS classes and functionality in to the VM by file
@@ -421,9 +461,12 @@ func (j *JSVM) LoadJSPaths(paths []string, prefix string) {
 			j.Log.WithError(err).Error("Failed to open JS middleware file")
 			continue
 		}
-		if _, err := j.vm.RunString(string(data)); err != nil {
-			j.Log.WithError(err).Error("Failed to load JS middleware")
+		p, err := goja.Compile(mwPath, string(data), false)
+		if err != nil {
+			j.Log.WithError(err).Error("Failed to compile JS middleware")
+			continue
 		}
+		j.programs = append(j.programs, p)
 	}
 }
 
