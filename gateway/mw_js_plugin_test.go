@@ -878,6 +878,164 @@ post.NewProcessRequest(function(request, session) {
 	})
 }
 
+func TestJSVMResponseHook(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	spec := &APISpec{APIDefinition: &apidef.APIDefinition{}}
+	jsvm := JSVM{}
+	jsvm.Init(nil, logrus.NewEntry(log), ts.Gw)
+
+	t.Run("set headers and body", func(t *testing.T) {
+		const js = `
+var respHook = new TykJS.TykMiddleware.NewMiddleware({});
+
+respHook.NewProcessResponse(function(response, session, spec) {
+	response.SetHeaders["X-Added"] = "added-value";
+	response.DeleteHeaders.push("X-Remove-Me");
+	response.Body = "modified body";
+	response.StatusCode = 201;
+	return respHook.ReturnResponseData(response, {});
+});`
+		if _, err := jsvm.VM.Run(js); err != nil {
+			t.Fatal("failed to set up js plugin:", err)
+		}
+
+		hook := &JSVMResponseHook{
+			BaseTykResponseHandler: BaseTykResponseHandler{Gw: ts.Gw},
+			MiddlewareClassName:    "respHook",
+			Spec:                   spec,
+		}
+		hook.Spec.JSVM = jsvm
+
+		res := &http.Response{
+			StatusCode: 200,
+			Header:     http.Header{},
+			Body:       ioutil.NopCloser(strings.NewReader("original body")),
+		}
+		res.Header.Set("X-Remove-Me", "should-be-gone")
+		res.Header.Set("X-Keep", "keep-value")
+
+		req := httptest.NewRequest("GET", "/test", nil)
+
+		err := hook.HandleResponse(nil, res, req, nil)
+		assert.NoError(t, err)
+
+		// Check headers
+		assert.Equal(t, "added-value", res.Header.Get("X-Added"))
+		assert.Empty(t, res.Header.Get("X-Remove-Me"))
+		assert.Equal(t, "keep-value", res.Header.Get("X-Keep"))
+
+		// Check status code
+		assert.Equal(t, 201, res.StatusCode)
+
+		// Check body
+		body, _ := ioutil.ReadAll(res.Body)
+		assert.Equal(t, "modified body", string(body))
+		assert.Equal(t, int64(len("modified body")), res.ContentLength)
+	})
+
+	t.Run("passthrough without modifications", func(t *testing.T) {
+		const js = `
+var passHook = new TykJS.TykMiddleware.NewMiddleware({});
+
+passHook.NewProcessResponse(function(response, session, spec) {
+	return passHook.ReturnResponseData(response, {});
+});`
+		if _, err := jsvm.VM.Run(js); err != nil {
+			t.Fatal("failed to set up js plugin:", err)
+		}
+
+		hook := &JSVMResponseHook{
+			BaseTykResponseHandler: BaseTykResponseHandler{Gw: ts.Gw},
+			MiddlewareClassName:    "passHook",
+			Spec:                   spec,
+		}
+		hook.Spec.JSVM = jsvm
+
+		res := &http.Response{
+			StatusCode: 200,
+			Header:     http.Header{},
+			Body:       ioutil.NopCloser(strings.NewReader("original")),
+		}
+		req := httptest.NewRequest("GET", "/test", nil)
+
+		err := hook.HandleResponse(nil, res, req, nil)
+		assert.NoError(t, err)
+
+		assert.Equal(t, 200, res.StatusCode)
+		body, _ := ioutil.ReadAll(res.Body)
+		assert.Equal(t, "original", string(body))
+	})
+
+	t.Run("nil JSVM returns error", func(t *testing.T) {
+		hook := &JSVMResponseHook{
+			BaseTykResponseHandler: BaseTykResponseHandler{Gw: ts.Gw},
+			MiddlewareClassName:    "noVM",
+			Spec:                   &APISpec{APIDefinition: &apidef.APIDefinition{}},
+		}
+
+		res := &http.Response{
+			StatusCode: 200,
+			Body:       ioutil.NopCloser(strings.NewReader("body")),
+		}
+		req := httptest.NewRequest("GET", "/test", nil)
+
+		err := hook.HandleResponse(nil, res, req, nil)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "JSVM not initialized")
+	})
+
+	t.Run("timeout returns error and preserves body", func(t *testing.T) {
+		const js = `
+var timeoutHook = new TykJS.TykMiddleware.NewMiddleware({});
+
+timeoutHook.NewProcessResponse(function(response, session, spec) {
+	while(true) {}
+	return timeoutHook.ReturnResponseData(response, {});
+});`
+		if _, err := jsvm.VM.Run(js); err != nil {
+			t.Fatal("failed to set up js plugin:", err)
+		}
+
+		timeoutJsvm := JSVM{}
+		timeoutJsvm.Init(nil, logrus.NewEntry(log), ts.Gw)
+		timeoutJsvm.Timeout = time.Millisecond
+		if _, err := timeoutJsvm.VM.Run(js); err != nil {
+			t.Fatal("failed to set up js plugin:", err)
+		}
+
+		hook := &JSVMResponseHook{
+			BaseTykResponseHandler: BaseTykResponseHandler{Gw: ts.Gw},
+			MiddlewareClassName:    "timeoutHook",
+			Spec:                   spec,
+		}
+		hook.Spec.JSVM = timeoutJsvm
+
+		res := &http.Response{
+			StatusCode: 200,
+			Header:     http.Header{},
+			Body:       ioutil.NopCloser(strings.NewReader("preserved body")),
+		}
+		req := httptest.NewRequest("GET", "/test", nil)
+
+		done := make(chan error, 1)
+		go func() {
+			done <- hook.HandleResponse(nil, res, req, nil)
+		}()
+
+		select {
+		case err := <-done:
+			assert.Error(t, err)
+			// Body should be restored on error
+			body, _ := ioutil.ReadAll(res.Body)
+			assert.Equal(t, "preserved body", string(body))
+		case <-time.After(3 * time.Second):
+			t.Fatal("response hook didn't time out")
+		}
+	})
+}
+
 func TestMiniRequestObject_ReconstructParams(t *testing.T) {
 	const exampleURL = "http://example.com/get?b=1&c=2&a=3"
 	r, _ := http.NewRequest(http.MethodGet, exampleURL, nil)

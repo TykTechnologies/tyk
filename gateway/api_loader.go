@@ -498,9 +498,11 @@ func (gw *Gateway) processSpec(
 						APILevel:       true,
 					},
 				)
-			} else {
+			} else if mwDriver != apidef.OttoDriver {
 				coprocessLog.Debug("Registering coprocess middleware, hook name: ", obj.Name, "hook type: Pre", ", driver: ", mwDriver)
 				gw.mwAppendEnabled(&chainArray, &CoProcessMiddleware{baseMid.Copy(), coprocess.HookType_PostKeyAuth, obj.Name, mwDriver, obj.RawBodyOnly, nil})
+			} else {
+				chainArray = append(chainArray, gw.createDynamicMiddleware(obj.Name, false, obj.RequireSession, baseMid.Copy()))
 			}
 		}
 

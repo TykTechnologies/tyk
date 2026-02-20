@@ -769,6 +769,8 @@ func (gw *Gateway) responseProcessorByName(name string, baseHandler BaseTykRespo
 		return &CustomMiddlewareResponseHook{BaseTykResponseHandler: baseHandler}
 	case "goplugin_res_hook":
 		return &ResponseGoPluginMiddleware{BaseTykResponseHandler: baseHandler}
+	case "jsvm_res_hook":
+		return &JSVMResponseHook{BaseTykResponseHandler: baseHandler}
 	}
 
 	return nil

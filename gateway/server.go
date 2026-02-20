@@ -1023,6 +1023,7 @@ func (gw *Gateway) loadCustomMiddleware(spec *APISpec) ([]string, apidef.Middlew
 		{name: "auth", single: &mwAuthCheckFunc},
 		{name: "post_auth", slice: &mwPostKeyAuthFuncs},
 		{name: "post", slice: &mwPostFuncs},
+		{name: "response", slice: &mwResponseFuncs},
 	} {
 		globPath := filepath.Join(gw.GetConfig().MiddlewarePath, spec.APIID, folder.name, "*.js")
 		paths, _ := filepath.Glob(globPath)
@@ -1037,7 +1038,7 @@ func (gw *Gateway) loadCustomMiddleware(spec *APISpec) ([]string, apidef.Middlew
 			mwDef.RequireSession = strings.HasSuffix(mwDef.Name, "_with_session")
 			if mwDef.RequireSession {
 				switch folder.name {
-				case "post_auth", "post":
+				case "post_auth", "post", "response":
 					mainLog.Debug("-- Middleware requires session")
 				default:
 					mainLog.Warning("Middleware requires session, but isn't post-auth: ", mwDef.Name)
@@ -1076,6 +1077,9 @@ func (gw *Gateway) loadCustomMiddleware(spec *APISpec) ([]string, apidef.Middlew
 			continue
 		}
 
+		if mw.Path != "" {
+			mwPaths = append(mwPaths, mw.Path)
+		}
 		mwResponseFuncs = append(mwResponseFuncs, mw)
 	}
 
@@ -1135,6 +1139,8 @@ func (gw *Gateway) createResponseMiddlewareChain(
 		//is it goplugin or other middleware
 		if strings.HasSuffix(mw.Path, ".so") {
 			processor = gw.responseProcessorByName("goplugin_res_hook", baseHandler)
+		} else if spec.CustomMiddleware.Driver == apidef.OttoDriver {
+			processor = gw.responseProcessorByName("jsvm_res_hook", baseHandler)
 		} else {
 			processor = gw.responseProcessorByName("custom_mw_res_hook", baseHandler)
 		}

@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io/ioutil"
 	"net/http"
 	"net/url"
@@ -175,8 +176,6 @@ func (d *DynamicMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 		return nil, http.StatusOK
 	}
 
-	specAsJson := specToJson(d.Spec)
-
 	session := &user.SessionState{}
 
 	// Encode the session object (if not a pre-process)
@@ -192,48 +191,13 @@ func (d *DynamicMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 
 	// Run the middleware
 	middlewareClassname := d.MiddlewareClassName
-	if d.Spec.JSVM.VM == nil {
-		logger.WithError(err).Error("JSVM isn't enabled, check your gateway settings")
-		return errors.New("Middleware error"), 500
-	}
-	vm := d.Spec.JSVM.VM.Copy()
-	vm.Interrupt = make(chan func(), 1)
 	logger.Debug("Running: ", middlewareClassname)
-	// buffered, leaving no chance of a goroutine leak since the
-	// spawned goroutine will send 0 or 1 values.
-	ret := make(chan otto.Value, 1)
-	errRet := make(chan error, 1)
-	go func() {
-		defer func() {
-			// the VM executes the panic func that gets it
-			// to stop, so we must recover here to not crash
-			// the whole Go program.
-			recover()
-		}()
-		returnRaw, err := vm.Run(middlewareClassname + `.DoProcessRequest(` + string(requestAsJson) + `, ` + string(sessionAsJson) + `, ` + specAsJson + `);`)
-		ret <- returnRaw
-		errRet <- err
-	}()
-	var returnRaw otto.Value
-	t := time.NewTimer(d.Spec.JSVM.Timeout)
-	select {
-	case returnRaw = <-ret:
-		if err := <-errRet; err != nil {
-			logger.WithError(err).Error("Failed to run JS middleware")
-			return errors.New(http.StatusText(http.StatusInternalServerError)), http.StatusInternalServerError
-		}
-		t.Stop()
-	case <-t.C:
-		t.Stop()
-		logger.Error("JS middleware timed out after ", d.Spec.JSVM.Timeout)
-		vm.Interrupt <- func() {
-			// only way to stop the VM is to send it a func
-			// that panics.
-			panic("stop")
-		}
+	expr := middlewareClassname + `.DoProcessRequest(` + string(requestAsJson) + `, ` + string(sessionAsJson) + `, ` + specToJson(d.Spec) + `);`
+	returnDataStr, err := d.Spec.JSVM.Run(expr)
+	if err != nil {
+		logger.WithError(err).Error("Failed to run JS middleware")
 		return errors.New(http.StatusText(http.StatusInternalServerError)), http.StatusInternalServerError
 	}
-	returnDataStr, _ := returnRaw.ToString()
 
 	// Decode the return object
 	newRequestData := VMReturnObject{}
@@ -343,6 +307,48 @@ type JSVM struct {
 	Log     *logrus.Entry  `json:"-"` // logger used by the JS code
 	RawLog  *logrus.Logger `json:"-"` // logger used by `rawlog` func to avoid formatting
 	Gw      *Gateway       `json:"-"`
+}
+
+// Run executes a JS expression on a copy of the VM with timeout handling.
+// Returns the stringified result or an error.
+func (j *JSVM) Run(expr string) (string, error) {
+	if j.VM == nil {
+		return "", errors.New("JSVM isn't enabled, check your gateway settings")
+	}
+
+	vm := j.VM.Copy()
+	vm.Interrupt = make(chan func(), 1)
+
+	ret := make(chan otto.Value, 1)
+	errRet := make(chan error, 1)
+	go func() {
+		defer func() {
+			recover()
+		}()
+		returnRaw, err := vm.Run(expr)
+		ret <- returnRaw
+		errRet <- err
+	}()
+
+	var returnRaw otto.Value
+	t := time.NewTimer(j.Timeout)
+	select {
+	case returnRaw = <-ret:
+		if err := <-errRet; err != nil {
+			t.Stop()
+			return "", err
+		}
+		t.Stop()
+	case <-t.C:
+		t.Stop()
+		vm.Interrupt <- func() {
+			panic("stop")
+		}
+		return "", fmt.Errorf("JS middleware timed out after %v", j.Timeout)
+	}
+
+	result, _ := returnRaw.ToString()
+	return result, nil
 }
 
 const defaultJSVMTimeout = 5
@@ -718,6 +724,34 @@ TykJS.TykMiddleware.NewMiddleware.prototype.ReturnAuthData = function(request, s
 	return {Request: request, Session: session}
 }
 
+// Response processing
+TykJS.TykMiddleware.MiddlewareComponentMeta.prototype.ProcessResponse = function(response, session, config) {
+	log("Process Response Not Implemented")
+	return response
+}
+
+TykJS.TykMiddleware.MiddlewareComponentMeta.prototype.DoProcessResponse = function(response, session, config) {
+	response.Body = b64dec(response.Body)
+	var processed_response = this.ProcessResponse(response, session, config)
+
+	if (!processed_response) {
+		log("Middleware didn't return response object!")
+		return
+	}
+
+	processed_response.Response.Body = b64enc(processed_response.Response.Body)
+
+	return JSON.stringify(processed_response)
+}
+
+TykJS.TykMiddleware.NewMiddleware.prototype.NewProcessResponse = function(callback) {
+	this.ProcessResponse = callback
+}
+
+TykJS.TykMiddleware.NewMiddleware.prototype.ReturnResponseData = function(response, session_meta) {
+	return {Response: response, SessionMeta: session_meta}
+}
+
 // Event Handler implementation
 
 TykJS.TykEventHandlers.EventHandlerComponentMeta.prototype.DoProcessEvent = function(event, context) {
@@ -744,3 +778,121 @@ TykJS.TykEventHandlers.NewEventHandler.prototype.constructor = TykJS.TykEventHan
 TykJS.TykEventHandlers.NewEventHandler.prototype.NewHandler = function(callback) {
 	this.Handle = callback
 };`
+
+// MiniResponseObject is marshalled to JSON and passed into JS response middleware
+type MiniResponseObject struct {
+	StatusCode    int                 `json:"StatusCode"`
+	Body          []byte              `json:"Body"`
+	Headers       map[string][]string `json:"Headers"`
+	SetHeaders    map[string]string   `json:"SetHeaders"`
+	DeleteHeaders []string            `json:"DeleteHeaders"`
+}
+
+// VMResponseReturnObject is the return value from the JS response middleware
+type VMResponseReturnObject struct {
+	Response    MiniResponseObject `json:"Response"`
+	SessionMeta map[string]string  `json:"SessionMeta"`
+}
+
+// JSVMResponseHook is a response hook that runs JS middleware via the Otto VM
+type JSVMResponseHook struct {
+	BaseTykResponseHandler
+	MiddlewareClassName string
+	Spec                *APISpec
+}
+
+func (h *JSVMResponseHook) Base() *BaseTykResponseHandler {
+	return &h.BaseTykResponseHandler
+}
+
+func (h *JSVMResponseHook) Init(mwDef interface{}, spec *APISpec) error {
+	mwDefinition := mwDef.(apidef.MiddlewareDefinition)
+	h.MiddlewareClassName = mwDefinition.Name
+	h.Spec = spec
+	return nil
+}
+
+func (h *JSVMResponseHook) Name() string {
+	return "JSVMResponseHook"
+}
+
+func (h *JSVMResponseHook) HandleError(rw http.ResponseWriter, req *http.Request) {
+	handler := ErrorHandler{&BaseMiddleware{Spec: h.Spec, Gw: h.Gw}}
+	handler.HandleError(rw, req, "Middleware error", http.StatusInternalServerError, true)
+}
+
+func (h *JSVMResponseHook) HandleResponse(rw http.ResponseWriter, res *http.Response, req *http.Request, ses *user.SessionState) error {
+	if h.Spec.JSVM.VM == nil {
+		log.Error("JSVM isn't enabled, check your gateway settings")
+		return errors.New("JSVM not initialized")
+	}
+
+	// Read the response body
+	body, err := ioutil.ReadAll(res.Body)
+	if err != nil {
+		log.WithError(err).Error("Failed to read response body")
+		return err
+	}
+	res.Body.Close()
+
+	responseData := MiniResponseObject{
+		StatusCode:    res.StatusCode,
+		Body:          body,
+		Headers:       res.Header,
+		SetHeaders:    map[string]string{},
+		DeleteHeaders: []string{},
+	}
+
+	responseAsJson, err := json.Marshal(responseData)
+	if err != nil {
+		log.WithError(err).Error("Failed to encode response object for JSVM")
+		res.Body = ioutil.NopCloser(bytes.NewReader(body))
+		return err
+	}
+
+	session := ses
+	if session == nil {
+		session = &user.SessionState{}
+	}
+
+	sessionAsJson, err := json.Marshal(session)
+	if err != nil {
+		log.WithError(err).Error("Failed to encode session for JSVM")
+		res.Body = ioutil.NopCloser(bytes.NewReader(body))
+		return err
+	}
+
+	expr := h.MiddlewareClassName + `.DoProcessResponse(` + string(responseAsJson) + `, ` + string(sessionAsJson) + `, ` + specToJson(h.Spec) + `);`
+	returnDataStr, err := h.Spec.JSVM.Run(expr)
+	if err != nil {
+		log.WithError(err).Error("Failed to run JS response middleware")
+		res.Body = ioutil.NopCloser(bytes.NewReader(body))
+		return err
+	}
+
+	newResponseData := VMResponseReturnObject{}
+	if err := json.Unmarshal([]byte(returnDataStr), &newResponseData); err != nil {
+		log.WithError(err).Error("Failed to decode response data from JSVM")
+		res.Body = ioutil.NopCloser(bytes.NewReader(body))
+		return err
+	}
+
+	// Apply header mutations
+	for _, dh := range newResponseData.Response.DeleteHeaders {
+		res.Header.Del(dh)
+	}
+	for hk, hv := range newResponseData.Response.SetHeaders {
+		res.Header.Set(hk, hv)
+	}
+
+	// Apply status code
+	if newResponseData.Response.StatusCode != 0 {
+		res.StatusCode = newResponseData.Response.StatusCode
+	}
+
+	// Apply body
+	res.Body = ioutil.NopCloser(bytes.NewReader(newResponseData.Response.Body))
+	res.ContentLength = int64(len(newResponseData.Response.Body))
+
+	return nil
+}
