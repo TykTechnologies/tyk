@@ -57,7 +57,17 @@ func TestIsUpgrade(t *testing.T) {
 	assert.True(t, ok)
 	assert.Equal(t, "websocket", upgradeType)
 
+	req = newRequestWithHeaders(t, 0, map[string]string{headerConnection: "keep-alive, Upgrade", headerUpgrade: "websocket"})
+	upgradeType, ok = IsUpgrade(req)
+	assert.True(t, ok)
+	assert.Equal(t, "websocket", upgradeType)
+
 	req = newRequestWithHeaders(t, 0, map[string]string{headerConnection: "keep-alive", headerUpgrade: "websocket"})
+	upgradeType, ok = IsUpgrade(req)
+	assert.False(t, ok)
+	assert.Empty(t, upgradeType)
+
+	req = newRequestWithHeaders(t, 0, map[string]string{headerConnection: "keep-alive, Upgrade"})
 	upgradeType, ok = IsUpgrade(req)
 	assert.False(t, ok)
 	assert.Empty(t, upgradeType)
