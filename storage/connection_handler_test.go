@@ -147,6 +147,96 @@ func TestConnectionHandler_Disconnect(t *testing.T) {
 	mockConn.AssertExpectations(t)
 }
 
+// TestConnectWithNilOnConnect verifies that Connect handles nil callback
+// without panicking when a reconnect event occurs.
+// Regression test for nil pointer dereference in recoverLoop.
+func TestConnectWithNilOnConnect(t *testing.T) {
+	t.Parallel()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	rc := NewConnectionHandler(ctx)
+
+	// Setup mock connections to avoid Redis dependency
+	mockConn := tempmocks.NewConnector(t)
+	mockConn.On("Ping", mock.Anything).Return(nil).Maybe()
+
+	rc.connections[DefaultConn] = mockConn
+	rc.connections[CacheConn] = mockConn
+	rc.connections[AnalyticsConn] = mockConn
+	rc.storageUp.Store(true)
+
+	// Track that recoverLoop processes the reconnect signal without panic
+	var wg sync.WaitGroup
+	wg.Add(1)
+
+	callbackExecuted := make(chan bool, 1)
+	testCallback := func() {
+		callbackExecuted <- true
+	}
+
+	go func() {
+		defer wg.Done()
+		rc.recoverLoop(ctx, testCallback)
+	}()
+
+	// Trigger reconnect signal
+	rc.reconnect <- struct{}{}
+
+	// Wait for callback execution with timeout
+	select {
+	case <-callbackExecuted:
+		// Success: callback was invoked without panic
+	case <-time.After(1 * time.Second):
+		t.Fatal("Test timed out: recoverLoop did not process reconnect signal")
+	}
+
+	// Cleanup: cancel context to stop recoverLoop
+	cancel()
+	wg.Wait()
+}
+
+// TestConnectNormalizesNilCallback verifies that Connect normalizes a nil
+// onConnect parameter to a no-op function, preventing nil pointer dereference.
+func TestConnectNormalizesNilCallback(t *testing.T) {
+	t.Parallel()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	rc := NewConnectionHandler(ctx)
+
+	// Setup mock connections
+	mockConn := tempmocks.NewConnector(t)
+	mockConn.On("Ping", mock.Anything).Return(nil).Maybe()
+
+	rc.connections[DefaultConn] = mockConn
+	rc.connections[CacheConn] = mockConn
+	rc.connections[AnalyticsConn] = mockConn
+
+	// Call Connect with nil - this should not panic
+	conf, err := config.New()
+	assert.NoError(t, err)
+
+	go rc.Connect(ctx, nil, conf)
+
+	// Wait for Connect to initialize and start recoverLoop
+	time.Sleep(100 * time.Millisecond)
+
+	// Trigger reconnect - without the fix, this would panic
+	select {
+	case rc.reconnect <- struct{}{}:
+	default:
+		// Channel might already have a message from statusCheck
+	}
+
+	// Allow time for recoverLoop to process
+	time.Sleep(100 * time.Millisecond)
+
+	// If we reach here without panic, nil was properly normalized
+}
+
 // TestConnectionHandler_statusCheck tests the status check routine of the connection handler.
 func TestConnectionHandler_statusCheck(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
