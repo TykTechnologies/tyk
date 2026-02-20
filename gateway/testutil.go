@@ -1320,7 +1320,7 @@ func (s *Test) Close() {
 
 	// if jsvm enabled we need to unmount to prevent high memory consumption
 	if s.Gw.GetConfig().EnableJSVM {
-		s.Gw.GlobalEventsJSVM.VM = nil
+		s.Gw.GlobalEventsJSVM.DeInit()
 	}
 
 	ctxShutDown, cancel := context.WithTimeout(context.Background(), 5*time.Second)
