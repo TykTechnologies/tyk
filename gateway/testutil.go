@@ -1288,6 +1288,14 @@ func (s *Test) newGateway(genConf func(globalConf *config.Config)) *Gateway {
 		gw.GetConfig().DBAppConfOptions.NodeIsSegmented,
 		gw.GetConfig().DBAppConfOptions.Tags)
 
+	gw.MetricInstruments = otel.InitOpenTelemetryMetrics(gw.ctx, mainLog.Logger, &gwConfig.OpenTelemetry,
+		gw.GetNodeID(),
+		VERSION,
+		gw.GetConfig().SlaveOptions.UseRPC,
+		gw.GetConfig().SlaveOptions.GroupID,
+		gw.GetConfig().DBAppConfOptions.NodeIsSegmented,
+		gw.GetConfig().DBAppConfOptions.Tags)
+
 	return gw
 }
 
@@ -1337,6 +1345,11 @@ func (s *Test) Close() {
 	s.Gw.ReloadTestCase.StopTicker()
 	s.Gw.GlobalHostChecker.StopPoller()
 	s.Gw.NewRelicApplication.Shutdown(5 * time.Second)
+	if s.Gw.MetricInstruments != nil {
+		if err := s.Gw.MetricInstruments.Shutdown(ctxShutDown); err != nil {
+			log.WithError(err).Error("shutting down metric instruments")
+		}
+	}
 
 	err = s.RemoveApis()
 	if err != nil {
