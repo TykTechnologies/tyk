@@ -65,7 +65,6 @@ require (
 	github.com/oschwald/maxminddb-golang v1.13.1
 	github.com/paulbellamy/ratecounter v0.2.0
 	github.com/pires/go-proxyproto v0.8.0
-	github.com/robertkrimen/otto v0.5.1
 	github.com/rs/cors v1.11.1
 	github.com/sirupsen/logrus v1.9.3
 	github.com/spf13/afero v1.11.0
@@ -99,6 +98,7 @@ require (
 	github.com/TykTechnologies/opentelemetry v0.0.23
 	github.com/TykTechnologies/structviewer v1.2.0
 	github.com/alecthomas/kingpin/v2 v2.4.0
+	github.com/dop251/goja v0.0.0-20241024094426-79f3a7efcdbd
 	github.com/eclipse/paho.mqtt.golang v1.5.1
 	github.com/getkin/kin-openapi v0.133.0
 	github.com/go-redis/redismock/v9 v9.2.0
@@ -281,7 +281,6 @@ require (
 	github.com/docker/docker v28.4.0+incompatible // indirect
 	github.com/docker/go-connections v0.5.0 // indirect
 	github.com/docker/go-units v0.5.0 // indirect
-	github.com/dop251/goja v0.0.0-20241024094426-79f3a7efcdbd // indirect
 	github.com/dop251/goja_nodejs v0.0.0-20240728170619-29b559befffc // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/dvsekhvalnov/jose2go v1.8.0 // indirect
@@ -559,7 +558,6 @@ require (
 	gopkg.in/jcmturner/rpc.v1 v1.1.0 // indirect
 	gopkg.in/mgo.v2 v2.0.0-20190816093944-a6b53ec6cb22 // indirect
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1 // indirect
-	gopkg.in/sourcemap.v1 v1.0.5 // indirect
 	gorm.io/gorm v1.30.1 // indirect
 	modernc.org/gc/v3 v3.0.0-20240107210532-573471604cb6 // indirect
 	modernc.org/libc v1.41.0 // indirect

@@ -64,7 +64,7 @@ func (l *JSVMEventHandler) HandleEvent(em config.EventMessage) {
 	}
 
 	// Execute the method name with the JSON object
-	_, err = l.Gw.GlobalEventsJSVM.VM.Run(l.conf.MethodName + `.DoProcessEvent(` + string(msgAsJSON) + `,` + l.SpecJSON + `);`)
+	_, err = l.Gw.GlobalEventsJSVM.Run(l.conf.MethodName + `.DoProcessEvent(` + string(msgAsJSON) + `,` + l.SpecJSON + `);`)
 	if err != nil {
 		log.WithError(err).Error("executing JSVM method")
 	}

@@ -126,7 +126,7 @@ rawlog('{"x": "y"}')
 		`foo`,
 		`{"x": "y"}`,
 	}
-	if _, err := jsvm.VM.Run(in); err != nil {
+	if _, err := jsvm.Run(in); err != nil {
 		t.Fatalf("failed to run js: %v", err)
 	}
 	got := strings.Split(strings.Trim(buf.String(), "\n"), "\n")
@@ -174,7 +174,7 @@ leakMid.NewProcessRequest(function(request, session) {
 	request.Body += " appended"
 	return leakMid.ReturnData(request, session.meta_data)
 });`
-	if _, err := jsvm.VM.Run(js); err != nil {
+	if err := jsvm.LoadScript(js); err != nil {
 		t.Fatalf("failed to set up js plugin: %v", err)
 	}
 	dynMid.Spec.JSVM = jsvm
@@ -221,7 +221,7 @@ var testJSVMMiddleware = new TykJS.TykMiddleware.NewMiddleware({});
 testJSVMMiddleware.NewProcessRequest(function(request, session) {
 	return testJSVMMiddleware.ReturnData(request, {same: "same", updated: "new"})
 });`
-	if _, err := jsvm.VM.Run(js); err != nil {
+	if err := jsvm.LoadScript(js); err != nil {
 		t.Fatalf("failed to set up js plugin: %v", err)
 	}
 	dynMid.Spec.JSVM = jsvm
@@ -356,7 +356,7 @@ leakMid.NewProcessRequest(function(request, session) {
 	}
 	return leakMid.ReturnData(request, session.meta_data)
 });`
-	if _, err := jsvm.VM.Run(js); err != nil {
+	if err := jsvm.LoadScript(js); err != nil {
 		t.Fatalf("failed to set up js plugin: %v", err)
 	}
 	dynMid.Spec.JSVM = jsvm
@@ -396,7 +396,7 @@ func TestJSVMConfigData(t *testing.T) {
 		}
 		jsvm := JSVM{}
 		jsvm.Init(nil, logrus.NewEntry(log), ts.Gw)
-		if _, err := jsvm.VM.Run(js); err != nil {
+		if err := jsvm.LoadScript(js); err != nil {
 			t.Fatalf("failed to set up js plugin: %v", err)
 		}
 		dynMid.Spec.JSVM = jsvm
@@ -420,7 +420,7 @@ func TestJSVMConfigData(t *testing.T) {
 		}
 		jsvm := JSVM{}
 		jsvm.Init(nil, logrus.NewEntry(log), ts.Gw)
-		if _, err := jsvm.VM.Run(js); err != nil {
+		if err := jsvm.LoadScript(js); err != nil {
 			t.Fatalf("failed to set up js plugin: %v", err)
 		}
 		dynMid.Spec.JSVM = jsvm
@@ -450,7 +450,7 @@ testJSVMData.NewProcessRequest(function(request, session, spec) {
 	}
 	jsvm := JSVM{}
 	jsvm.Init(nil, logrus.NewEntry(log), ts.Gw)
-	if _, err := jsvm.VM.Run(js); err != nil {
+	if err := jsvm.LoadScript(js); err != nil {
 		t.Fatalf("failed to set up js plugin: %v", err)
 	}
 	dynMid.Spec.JSVM = jsvm
@@ -509,7 +509,7 @@ testJSVMCore.NewProcessRequest(function(request, session, config) {
 	}()
 	jsvm := JSVM{}
 	jsvm.Init(nil, logrus.NewEntry(log), ts.Gw)
-	if _, err := jsvm.VM.Run(js); err != nil {
+	if err := jsvm.LoadScript(js); err != nil {
 		t.Fatalf("failed to set up js plugin: %v", err)
 	}
 	dynMid.Spec.JSVM = jsvm
@@ -548,7 +548,7 @@ leakMid.NewProcessRequest(function(request, session) {
     }
 	return leakMid.ReturnData(responseObject, session.meta_data)
 });`
-	if _, err := jsvm.VM.Run(js); err != nil {
+	if err := jsvm.LoadScript(js); err != nil {
 		t.Fatalf("failed to set up js plugin: %v", err)
 	}
 	dynMid.Spec.JSVM = jsvm
@@ -696,52 +696,51 @@ func TestJSVMBase64(t *testing.T) {
 	decodedJwtPayload := `{"sub":"1234567890","name":"John Doe","iat":1516239022}`
 
 	t.Run("b64dec with simple string input", func(t *testing.T) {
-		v, err := jsvm.VM.Run(`b64dec("` + inputB64 + `")`)
+		s, err := jsvm.Run(`b64dec("` + inputB64 + `")`)
 		if err != nil {
 			t.Fatalf("b64dec call failed: %s", err.Error())
 		}
-		if s := v.String(); s != inputString {
+		if s != inputString {
 			t.Fatalf("wanted '%s', got '%s'", inputString, s)
 		}
 	})
 
 	t.Run("b64dec with a JWT payload", func(t *testing.T) {
-		v, err := jsvm.VM.Run(`b64dec("` + jwtPayload + `")`)
+		s, err := jsvm.Run(`b64dec("` + jwtPayload + `")`)
 		if err != nil {
 			t.Fatalf("b64dec call failed: %s", err.Error())
 		}
-		if s := v.String(); s != decodedJwtPayload {
+		if s != decodedJwtPayload {
 			t.Fatalf("wanted '%s', got '%s'", decodedJwtPayload, s)
 		}
 	})
 
 	t.Run("b64enc with simple string input", func(t *testing.T) {
-		v, err := jsvm.VM.Run(`b64enc("` + inputString + `")`)
+		s, err := jsvm.Run(`b64enc("` + inputString + `")`)
 		if err != nil {
 			t.Fatalf("b64enc call failed: %s", err.Error())
 		}
-		if s := v.String(); s != inputB64 {
+		if s != inputB64 {
 			t.Fatalf("wanted '%s', got '%s'", inputB64, s)
 		}
 	})
 
 	t.Run("rawb64dec with simple string input", func(t *testing.T) {
-		v, err := jsvm.VM.Run(`rawb64dec("` + jwtPayload + `")`)
+		s, err := jsvm.Run(`rawb64dec("` + jwtPayload + `")`)
 		if err != nil {
 			t.Fatalf("rawb64dec call failed: %s", err.Error())
 		}
-		if s := v.String(); s != decodedJwtPayload {
+		if s != decodedJwtPayload {
 			t.Fatalf("wanted '%s', got '%s'", decodedJwtPayload, s)
 		}
 	})
 
 	t.Run("rawb64enc with simple string input", func(t *testing.T) {
-		jsvm.VM.Set("input", decodedJwtPayload)
-		v, err := jsvm.VM.Run(`rawb64enc(input)`)
+		s, err := jsvm.Run(`rawb64enc('` + decodedJwtPayload + `')`)
 		if err != nil {
 			t.Fatalf("rawb64enc call failed: %s", err.Error())
 		}
-		if s := v.String(); s != jwtPayload {
+		if s != jwtPayload {
 			t.Fatalf("wanted '%s', got '%s'", jwtPayload, s)
 		}
 	})
