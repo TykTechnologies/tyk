@@ -50,6 +50,7 @@ jobs:
             debvers: 'ubuntu/xenial ubuntu/bionic ubuntu/focal ubuntu/jammy ubuntu/noble debian/jessie debian/buster debian/bullseye debian/bookworm debian/trixie'
     outputs:
       ee_tags: ${{ steps.ci_metadata_ee.outputs.tags }}
+      fips_tags: ${{ steps.ci_metadata_fips.outputs.tags }}
       std_tags: ${{ steps.ci_metadata_std.outputs.tags }}
       commit_author: ${{ steps.set_outputs.outputs.commit_author}}
     steps:
@@ -197,6 +198,71 @@ jobs:
           labels: ${{ steps.tag_metadata_ee.outputs.labels }}
           build-args: |
             BUILD_PACKAGE_NAME=tyk-gateway-ee
+      - name: Docker metadata for fips CI
+        id: ci_metadata_fips
+        if: ${{ matrix.golang_cross == '1.24-bullseye' }}
+        uses: docker/metadata-action@v5
+        with:
+          images: |
+            ${{ steps.ecr.outputs.registry }}/tyk
+          flavor: |
+            latest=false
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=sha,format=long
+            type=semver,pattern={{major}},prefix=v
+            type=semver,pattern={{major}}.{{minor}},prefix=v
+            type=semver,pattern={{version}},prefix=v
+      - name: push fips image to CI
+        if: ${{ matrix.golang_cross == '1.24-bullseye' }}
+        uses: docker/build-push-action@v6
+        with:
+          context: "dist"
+          platforms: linux/amd64,linux/arm64
+          file: ci/Dockerfile.distroless
+          provenance: mode=max
+          sbom: true
+          push: true
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          tags: ${{ steps.ci_metadata_fips.outputs.tags }}
+          labels: ${{ steps.ci_metadata_fips.outputs.labels }}
+          build-args: |
+            BUILD_PACKAGE_NAME=tyk-gateway-fips
+      - name: Docker metadata for fips tag push
+        id: tag_metadata_fips
+        uses: docker/metadata-action@v5
+        with:
+          images: |
+            tykio/tyk-gateway-fips
+          flavor: |
+            latest=false
+            prefix=v
+          tags: |
+            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{version}}
+          labels: |
+            org.opencontainers.image.title=Tyk Gateway Enterprise Edition FIPS
+            org.opencontainers.image.description=Tyk API Gateway Enterprise Edition written in Go, supporting REST, GraphQL, TCP and gRPC protocols Built with boringssl
+            org.opencontainers.image.vendor=tyk.io
+            org.opencontainers.image.version=${{ github.ref_name }}
+      - name: push fips image to prod
+        if: ${{ matrix.golang_cross == '1.24-bullseye' }}
+        uses: docker/build-push-action@v6
+        with:
+          context: "dist"
+          platforms: linux/amd64,linux/arm64
+          file: ci/Dockerfile.distroless
+          provenance: mode=max
+          sbom: true
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          push: ${{ startsWith(github.ref, 'refs/tags') }}
+          tags: ${{ steps.tag_metadata_fips.outputs.tags }}
+          labels: ${{ steps.tag_metadata_fips.outputs.labels }}
+          build-args: |
+            BUILD_PACKAGE_NAME=tyk-gateway-fips
       - name: Docker metadata for std CI
         id: ci_metadata_std
         if: ${{ matrix.golang_cross == '1.24-bullseye' }}
