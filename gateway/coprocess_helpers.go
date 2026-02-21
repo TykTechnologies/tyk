@@ -14,7 +14,7 @@ func TykSessionState(session *coprocess.SessionState) *user.SessionState {
 	accessDefinitions := make(map[string]user.AccessDefinition, len(session.AccessRights))
 
 	for key, protoAccDef := range session.AccessRights {
-		allowedUrls := make([]user.AccessSpec, len(protoAccDef.AllowedUrls))
+		allowedUrls := make([]user.AccessSpec, 0, len(protoAccDef.AllowedUrls))
 		for _, protoAllowedURL := range protoAccDef.AllowedUrls {
 			allowedUrls = append(allowedUrls, user.AccessSpec{
 				URL:     protoAllowedURL.Url,
