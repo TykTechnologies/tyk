@@ -165,8 +165,8 @@ func (gw *Gateway) processSpec(
 		"prefix": "coprocess",
 	})
 
-	if spec.Proxy.Transport.SSLMaxVersion > 0 {
-		spec.Proxy.Transport.SSLMaxVersion = tls.VersionTLS12
+	if spec.Proxy.Transport.SSLMaxVersion == 0 {
+		spec.Proxy.Transport.SSLMaxVersion = tls.VersionTLS13
 	}
 
 	if spec.Proxy.Transport.SSLMinVersion > spec.Proxy.Transport.SSLMaxVersion {
