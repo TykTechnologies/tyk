@@ -54,6 +54,10 @@ import (
 
 var defaultUserAgent = "Tyk/" + VERSION
 
+const defaultChunkedEncodingMaxBodySize int64 = 10 * 1024 * 1024 // 10 MiB
+
+var errChunkedEncodingBodyTooLarge = errors.New("chunked encoding body too large")
+
 var corsHeaders = []string{
 	"Access-Control-Allow-Origin",
 	"Access-Control-Expose-Headers",
@@ -1164,6 +1168,18 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 		logreq.Header.Set("Upgrade", reqUpType)
 	}
 
+	if err := p.disableChunkedEncodingForUpstream(outreq); err != nil {
+		if errors.Is(err, errChunkedEncodingBodyTooLarge) {
+			httputil.EntityTooLarge(rw, logreq)
+			return ProxyResponse{}
+		}
+
+		p.logger.Debug("Unable to disable chunked encoding for upstream, err: ", err)
+		p.ErrorHandler.HandleError(rw, logreq, "There was a problem with reading Body of the Request.",
+			http.StatusInternalServerError, true)
+		return ProxyResponse{}
+	}
+
 	addrs := requestIPHops(req)
 	if !p.CheckHeaderInRemoveList(header.XForwardFor, p.TykAPISpec, req) {
 		outreq.Header.Set(header.XForwardFor, addrs)
@@ -1903,6 +1919,66 @@ func deepCopyBody(source *http.Request, target *http.Request) error {
 	nopCloseRequestBody(target)
 
 	return nil
+}
+
+func (p *ReverseProxy) disableChunkedEncodingForUpstream(req *http.Request) error {
+	if req == nil || req.Body == nil || !p.TykAPISpec.Proxy.DisableChunkedEncoding {
+		return nil
+	}
+
+	// Never buffer streaming requests (e.g. gRPC, websocket upgrades).
+	if httputil.IsStreamingRequest(req) || req.ContentLength >= 0 {
+		return nil
+	}
+
+	bodyBytes, err := readBodyForChunkedEncoding(req.Body, p.chunkedEncodingMaxBodySize())
+	if err != nil {
+		return err
+	}
+
+	if closeErr := req.Body.Close(); closeErr != nil {
+		log.WithError(closeErr).Warn("error closing request body while disabling chunked encoding")
+	}
+
+	req.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
+	req.ContentLength = int64(len(bodyBytes))
+	req.TransferEncoding = nil
+	req.Header.Del(header.TransferEncoding)
+	req.Header.Set(header.ContentLength, fmt.Sprintf("%d", req.ContentLength))
+
+	return nil
+}
+
+func (p *ReverseProxy) chunkedEncodingMaxBodySize() int64 {
+	if p.TykAPISpec != nil && p.TykAPISpec.Proxy.ChunkedEncodingMaxBodySize > 0 {
+		return p.TykAPISpec.Proxy.ChunkedEncodingMaxBodySize
+	}
+
+	if p.Gw != nil {
+		if limit := p.Gw.GetConfig().HttpServerOptions.MaxRequestBodySize; limit > 0 {
+			return limit
+		}
+	}
+
+	return defaultChunkedEncodingMaxBodySize
+}
+
+func readBodyForChunkedEncoding(body io.Reader, limit int64) ([]byte, error) {
+	if limit <= 0 {
+		return io.ReadAll(body)
+	}
+
+	limitedBody := io.LimitReader(body, limit+1)
+	data, err := io.ReadAll(limitedBody)
+	if err != nil {
+		return nil, err
+	}
+
+	if int64(len(data)) > limit {
+		return nil, errChunkedEncodingBodyTooLarge
+	}
+
+	return data, nil
 }
 
 // IsUpgrade will return the upgrade header value and true if present for the request.
