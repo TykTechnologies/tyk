@@ -55,6 +55,10 @@ func (p *ProxyOnly) EngineConfig() (*graphql.EngineV2Configuration, error) {
 		graphql.WithProxySubscriptionClientFactory(subscriptionClientFactoryOrDefault(p.subscriptionClientFactory)),
 	).EngineV2Configuration()
 
+	if err != nil {
+		return nil, err
+	}
+
 	v2Config.EnableSingleFlight(false)
-	return &v2Config, err
+	return &v2Config, nil
 }
