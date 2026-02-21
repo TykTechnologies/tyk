@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/gocraft/health"
+	"github.com/sirupsen/logrus"
 
 	"github.com/TykTechnologies/tyk/cli"
 	"github.com/TykTechnologies/tyk/request"
@@ -46,6 +47,73 @@ func (gw *Gateway) setupInstrumentation() {
 	instrument.AddSink(statsdSink)
 
 	gw.MonitorApplicationInstrumentation()
+}
+
+// setupPrometheusInstrumentation initializes Prometheus metrics collection and HTTP endpoint
+func (gw *Gateway) setupPrometheusInstrumentation() {
+	gwConfig := gw.GetConfig()
+
+	if !gwConfig.Prometheus.Enabled {
+		return
+	}
+
+	log.WithFields(logrus.Fields{
+		"per_api_metrics": gwConfig.Prometheus.EnablePerAPIMetrics,
+	}).Info("Initializing Prometheus metrics...")
+
+	gw.PrometheusMetrics = NewPrometheusMetrics(gw, gwConfig.Prometheus.MetricPrefix, gwConfig.Prometheus.EnablePerAPIMetrics)
+
+	// Register optional Go and process collectors
+	gw.PrometheusMetrics.RegisterGoCollectors(
+		gwConfig.Prometheus.EnableGoCollector,
+		gwConfig.Prometheus.EnableProcessCollector,
+	)
+
+	// Add Prometheus sink to instrument stream
+	prometheusSink := NewPrometheusSink(gw.PrometheusMetrics)
+	instrument.AddSink(prometheusSink)
+
+	// Start metrics collection
+	gw.PrometheusMetrics.StartMetricsCollection(gw.ctx)
+
+	// Start Prometheus HTTP server
+	gw.startPrometheusServer()
+
+	log.WithFields(logrus.Fields{
+		"listen_address": gwConfig.Prometheus.ListenAddress,
+		"path":           gwConfig.Prometheus.Path,
+		"prefix":         gwConfig.Prometheus.MetricPrefix,
+	}).Info("Prometheus metrics endpoint started")
+}
+
+// startPrometheusServer starts the HTTP server for Prometheus metrics endpoint
+func (gw *Gateway) startPrometheusServer() {
+	gwConfig := gw.GetConfig()
+
+	mux := http.NewServeMux()
+	mux.Handle(gwConfig.Prometheus.Path, gw.PrometheusMetrics.Handler())
+
+	server := &http.Server{
+		Addr:         gwConfig.Prometheus.ListenAddress,
+		Handler:      mux,
+		ReadTimeout:  10 * time.Second,
+		WriteTimeout: 10 * time.Second,
+		IdleTimeout:  120 * time.Second,
+	}
+
+	gw.prometheusServerMu.Lock()
+	gw.prometheusServer = server
+	gw.prometheusServerMu.Unlock()
+
+	go func() {
+		log.WithFields(logrus.Fields{
+			"address": gwConfig.Prometheus.ListenAddress,
+		}).Info("Starting Prometheus metrics server...")
+
+		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.WithError(err).Fatal("Prometheus metrics server failed to start")
+		}
+	}()
 }
 
 // InstrumentationMW will set basic instrumentation events, variables and timers on API jobs

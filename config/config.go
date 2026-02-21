@@ -59,6 +59,15 @@ var (
 			Enabled:     false,
 			AllowUnsafe: []string{},
 		},
+		Prometheus: PrometheusConfig{
+			Enabled:                false,
+			ListenAddress:          ":9090",
+			Path:                   "/metrics",
+			MetricPrefix:           "tyk_gateway",
+			EnableGoCollector:      true,
+			EnableProcessCollector: true,
+			EnablePerAPIMetrics:    false,
+		},
 		PIDFileLocation: "/var/run/tyk/tyk-gateway.pid",
 		Security: SecurityConfig{
 			CertificateExpiryMonitor: CertificateExpiryMonitorConfig{
@@ -837,6 +846,24 @@ type StreamingConfig struct {
 	AllowUnsafe []string `json:"allow_unsafe"`
 }
 
+// PrometheusConfig holds configuration for Prometheus metrics exposure
+type PrometheusConfig struct {
+	// Enabled activates Prometheus metrics endpoint
+	Enabled bool `json:"enabled"`
+	// ListenAddress is the address to expose metrics (e.g., ":9090")
+	ListenAddress string `json:"listen_address"`
+	// Path is the HTTP path for metrics endpoint (default: "/metrics")
+	Path string `json:"path"`
+	// MetricPrefix is the prefix for all Tyk metrics (default: "tyk_gateway")
+	MetricPrefix string `json:"metric_prefix"`
+	// EnableGoCollector enables Go runtime metrics
+	EnableGoCollector bool `json:"enable_go_collector"`
+	// EnableProcessCollector enables process metrics
+	EnableProcessCollector bool `json:"enable_process_collector"`
+	// EnablePerAPIMetrics enables per-API metrics with api_id label (can increase cardinality)
+	EnablePerAPIMetrics bool `json:"enable_per_api_metrics"`
+}
+
 // Config is the configuration object used by Tyk to set up various parameters.
 type Config struct {
 	// Force your Gateway to work only on a specific domain name. Can be overridden by API custom domain.
@@ -1267,6 +1294,9 @@ type Config struct {
 	StatsdConnectionString string `json:"statsd_connection_string"`
 	// StatsD prefix
 	StatsdPrefix string `json:"statsd_prefix"`
+
+	// Prometheus metrics configuration
+	Prometheus PrometheusConfig `json:"prometheus"`
 
 	// Event System
 	EventHandlers        apidef.EventHandlerMetaConfig         `json:"event_handlers"`

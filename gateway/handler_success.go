@@ -180,8 +180,22 @@ func (s *SuccessHandler) addTraceIDTag(reqCtx context.Context, tags []string) []
 }
 
 func (s *SuccessHandler) RecordHit(r *http.Request, timing analytics.Latency, code int, responseCopy *http.Response, cached bool) {
+	// Record Prometheus metrics (independent of analytics)
+	if s.Gw.PrometheusMetrics != nil {
+		s.Gw.PrometheusMetrics.RecordRequest(
+			s.Spec.APIID,
+			s.Spec.Name,
+			r.Method,
+			code,
+			timing.Total,
+			timing.Upstream,
+		)
+	} else {
+		log.Debug("PrometheusMetrics is nil, skipping metrics recording")
+	}
 
 	if s.Spec.DoNotTrack || ctxGetDoNotTrack(r) {
+		log.Debug("Skipping RecordHit: DoNotTrack enabled")
 		return
 	}
 
