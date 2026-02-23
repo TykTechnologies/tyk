@@ -1070,8 +1070,7 @@ func (k *JWTMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, _
 
 		ctx.SetErrorClassification(r, tykerrors.ClassifyJWTError(tykerrors.ErrTypeAuthFieldMissing, k.Name()))
 		k.reportLoginFailure(tykId, r)
-		setPRMWWWAuthenticateHeader(w, r, k.Spec)
-		return errors.New("Authorization field missing"), http.StatusBadRequest
+		return k.prmError(w, r, errors.New("Authorization field missing"), http.StatusBadRequest)
 	}
 
 	// enable bearer token format
@@ -1104,8 +1103,7 @@ func (k *JWTMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, _
 				errType = tykerrors.ErrTypeTokenExpired
 			}
 			ctx.SetErrorClassification(r, tykerrors.ClassifyJWTError(errType, k.Name()))
-			setPRMWWWAuthenticateHeader(w, r, k.Spec)
-			return errors.New("Key not authorized: " + err.Error()), http.StatusUnauthorized
+			return k.prmError(w, r, errors.New("Key not authorized: "+err.Error()), http.StatusUnauthorized)
 		}
 
 		// Token is valid - let's move on
@@ -1129,13 +1127,11 @@ func (k *JWTMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, _
 		errorDetails := strings.Split(err.Error(), ":")
 		if errorDetails[0] == UnexpectedSigningMethod {
 			ctx.SetErrorClassification(r, tykerrors.ClassifyJWTError(tykerrors.ErrTypeUnexpectedSigningMethod, k.Name()))
-			setPRMWWWAuthenticateHeader(w, r, k.Spec)
-			return errors.New(MsgKeyNotAuthorizedUnexpectedSigningMethod), http.StatusForbidden
+			return k.prmError(w, r, errors.New(MsgKeyNotAuthorizedUnexpectedSigningMethod), http.StatusForbidden)
 		}
 	}
 	ctx.SetErrorClassification(r, tykerrors.ClassifyJWTError(tykerrors.ErrTypeTokenInvalid, k.Name()))
-	setPRMWWWAuthenticateHeader(w, r, k.Spec)
-	return errors.New("Key not authorized"), http.StatusForbidden
+	return k.prmError(w, r, errors.New("Key not authorized"), http.StatusForbidden)
 }
 
 func ParseRSAPublicKey(data []byte) (interface{}, error) {

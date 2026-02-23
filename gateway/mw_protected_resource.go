@@ -6,7 +6,9 @@ import (
 	"net/http"
 	"path"
 
+	"github.com/TykTechnologies/tyk/apidef/oas"
 	"github.com/TykTechnologies/tyk/header"
+	"github.com/TykTechnologies/tyk/internal/httputil"
 	"github.com/TykTechnologies/tyk/internal/middleware"
 )
 
@@ -40,9 +42,8 @@ func (m *PRMMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, _
 		return nil, http.StatusOK // pass through
 	}
 
-	// Only intercept GET requests to the well-known path (include listen path prefix)
-	wellKnownPath := path.Join(m.Spec.Proxy.ListenPath, prm.GetWellKnownPath())
-	if r.Method != http.MethodGet || r.URL.Path != wellKnownPath {
+	// Only intercept GET requests to the well-known path
+	if r.Method != http.MethodGet || r.URL.Path != prmWellKnownPath(m.Spec, prm) {
 		return nil, http.StatusOK // pass through to next middleware
 	}
 
@@ -67,6 +68,12 @@ func (m *PRMMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, _
 	return nil, middleware.StatusRespond // terminate chain — response already written
 }
 
+// prmWellKnownPath returns the full well-known path for the PRM endpoint,
+// prefixed with the API's listen path.
+func prmWellKnownPath(spec *APISpec, prm *oas.ProtectedResourceMetadata) string {
+	return path.Join(spec.Proxy.ListenPath, prm.GetWellKnownPath())
+}
+
 // setPRMWWWAuthenticateHeader sets the WWW-Authenticate header with a Bearer challenge
 // that includes the resource_metadata URL pointing to the PRM well-known endpoint.
 // This is a no-op if PRM is not enabled for the API spec.
@@ -76,15 +83,22 @@ func setPRMWWWAuthenticateHeader(w http.ResponseWriter, r *http.Request, spec *A
 		return
 	}
 
-	scheme := "https"
-	if proto := r.Header.Get(header.XForwardProto); proto != "" {
-		scheme = proto
-	} else if r.TLS == nil {
-		scheme = "http"
-	}
-
-	wellKnownPath := prm.GetWellKnownPath()
-	metadataURL := fmt.Sprintf("%s://%s%s", scheme, r.Host, path.Join(spec.Proxy.ListenPath, wellKnownPath))
+	metadataURL := fmt.Sprintf("%s://%s%s", httputil.RequestScheme(r), r.Host, prmWellKnownPath(spec, prm))
 
 	w.Header().Set(header.WWWAuthenticate, fmt.Sprintf(`Bearer realm="tyk", resource_metadata="%s"`, metadataURL))
+}
+
+// prmError sets the WWW-Authenticate header with PRM metadata and returns
+// the given error and status code. This is a convenience wrapper to avoid
+// separate setPRMWWWAuthenticateHeader calls at every auth error return site.
+func (b *BaseMiddleware) prmError(w http.ResponseWriter, r *http.Request, err error, code int) (error, int) {
+	setPRMWWWAuthenticateHeader(w, r, b.Spec)
+	return err, code
+}
+
+// prmErrorAndStatusCode sets the WWW-Authenticate header with PRM metadata and
+// returns the error and status code for the given error type from TykErrors.
+func (b *BaseMiddleware) prmErrorAndStatusCode(w http.ResponseWriter, r *http.Request, errType string) (error, int) {
+	setPRMWWWAuthenticateHeader(w, r, b.Spec)
+	return errorAndStatusCode(errType)
 }
