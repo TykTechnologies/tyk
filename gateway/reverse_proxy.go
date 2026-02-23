@@ -1393,7 +1393,7 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 			var bodyBuffer bytes.Buffer
 			bodyBuffer2 := new(bytes.Buffer)
 
-			p.CopyResponse(&bodyBuffer, res.Body, p.flushInterval(res))
+			_ = p.CopyResponse(&bodyBuffer, res.Body, p.flushInterval(res))
 			*bodyBuffer2 = bodyBuffer
 
 			// Create new ReadClosers so we can split output
@@ -1457,7 +1457,13 @@ func (p *ReverseProxy) HandleResponse(rw http.ResponseWriter, res *http.Response
 		}
 	}
 
-	p.CopyResponse(rw, res.Body, p.flushInterval(res))
+	isSSE := httputil.IsStreamingResponse(res)
+	if isSSE {
+		p.prepareSSEStreaming(rw)
+	}
+	if err := p.CopyResponse(rw, res.Body, p.flushInterval(res)); err != nil {
+		p.handleCopyError(rw, err, isSSE)
+	}
 
 	if len(res.Trailer) == announcedTrailers {
 		copyHeader(rw.Header(), res.Trailer, p.Gw.GetConfig().IgnoreCanonicalMIMEHeaderKey)
@@ -1480,7 +1486,7 @@ func (p *ReverseProxy) flushInterval(res *http.Response) time.Duration {
 
 	// For Server-Sent Events responses, flush immediately.
 	// The MIME type is defined in https://www.w3.org/TR/eventsource/#text-event-stream
-	if resCT == "text/event-stream" {
+	if httputil.IsSseContentType(resCT) {
 		return -1 // negative means immediately
 	}
 
@@ -1492,7 +1498,30 @@ func (p *ReverseProxy) flushInterval(res *http.Response) time.Duration {
 	return p.FlushInterval
 }
 
-func (p *ReverseProxy) CopyResponse(dst io.Writer, src io.Reader, flushInterval time.Duration) {
+// prepareSSEStreaming clears the server's write deadline so that long-lived
+// SSE streams are not killed by the gateway's write_timeout.
+func (p *ReverseProxy) prepareSSEStreaming(rw http.ResponseWriter) {
+	rc := http.NewResponseController(rw)
+	if err := rc.SetWriteDeadline(time.Time{}); err != nil {
+		p.logger.WithError(err).Debug("failed to clear write deadline for streaming response")
+	}
+}
+
+// handleCopyError sends an SSE error event to the client when the upstream
+// body copy fails unexpectedly. Client-initiated disconnects (context.Canceled)
+// are silently ignored.
+func (p *ReverseProxy) handleCopyError(rw http.ResponseWriter, copyErr error, isSSE bool) {
+	if !isSSE || errors.Is(copyErr, context.Canceled) {
+		return
+	}
+	const errorEvent = "event: error\ndata: upstream connection terminated unexpectedly\n\n"
+	_, _ = io.WriteString(rw, errorEvent)
+	if flusher, ok := rw.(http.Flusher); ok {
+		flusher.Flush()
+	}
+}
+
+func (p *ReverseProxy) CopyResponse(dst io.Writer, src io.Reader, flushInterval time.Duration) error {
 
 	if flushInterval != 0 {
 		if wf, ok := dst.(writeFlusher); ok {
@@ -1510,7 +1539,11 @@ func (p *ReverseProxy) CopyResponse(dst io.Writer, src io.Reader, flushInterval 
 		}
 	}
 
-	p.copyBuffer(dst, src)
+	_, err := p.copyBuffer(dst, src)
+	if errors.Is(err, io.EOF) {
+		err = nil
+	}
+	return err
 }
 
 func (p *ReverseProxy) copyBuffer(dst io.Writer, src io.Reader) (int64, error) {
