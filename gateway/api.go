@@ -1585,7 +1585,25 @@ func (gw *Gateway) apiOASGetHandler(w http.ResponseWriter, r *http.Request) {
 		gw.setBaseAPIIDHeader(w, oasAPI)
 	}
 
-	doJSONWrite(w, code, obj)
+	if code != http.StatusOK {
+		doJSONWrite(w, code, obj)
+		return
+	}
+
+	jsonBytes, err := json.Marshal(obj)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	transformedBytes := lib.RestoreUnicodeEscapesInRegex(jsonBytes)
+
+	w.Header().Set(header.ContentType, header.ApplicationJSON)
+	w.WriteHeader(code)
+	_, err = w.Write(transformedBytes)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
 }
 
 func (gw *Gateway) apiOASPostHandler(w http.ResponseWriter, r *http.Request) {
@@ -3591,6 +3609,8 @@ func extractOASObjFromReq(reqBody io.Reader) ([]byte, *oas.OAS, error) {
 	if err != nil {
 		return nil, nil, ErrRequestMalformed
 	}
+
+	reqBodyInBytes = lib.SanitizeOASRegexForRE2(reqBodyInBytes)
 
 	loader := openapi3.NewLoader()
 	t, err := loader.LoadFromData(reqBodyInBytes)
