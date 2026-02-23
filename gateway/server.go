@@ -1933,6 +1933,14 @@ func Start() {
 		os.Exit(0)
 	}
 
+	// Check for --conf flag BEFORE loading the config
+	if *cli.Conf != "" {
+		mainLog.Debugf("Using %s for configuration", *cli.Conf)
+		confPaths = []string{*cli.Conf}
+	} else {
+		mainLog.Debug("No configuration file defined, will try to use default (tyk.conf)")
+	}
+
 	gwConfig := config.Config{}
 	if err := config.Load(confPaths, &gwConfig); err != nil {
 		mainLog.Errorf("Error loading config, using defaults: %v", err)
