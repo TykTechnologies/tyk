@@ -194,19 +194,18 @@ type VersionMeta struct {
 	IsDefaultVersion bool   `json:"isDefaultVersion"`
 }
 
-func writeJSONWithTransform[T any](w http.ResponseWriter, code int, obj T, fn func(T) (T, error)) {
-	t, err := fn(obj)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-	}
-
-	doJSONWrite(w, code, t)
-}
-
 func doJSONWrite(w http.ResponseWriter, code int, obj interface{}) {
 	w.Header().Set(header.ContentType, header.ApplicationJSON)
 	w.WriteHeader(code)
-	if err := json.NewEncoder(w).Encode(obj); err != nil {
+
+	var err error
+	if bodyBytes, ok := obj.([]byte); ok {
+		_, err = w.Write(bodyBytes)
+	} else {
+		err = json.NewEncoder(w).Encode(obj)
+	}
+
+	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 	if code != http.StatusOK {
@@ -1594,23 +1593,13 @@ func (gw *Gateway) apiOASGetHandler(w http.ResponseWriter, r *http.Request) {
 		gw.setBaseAPIIDHeader(w, oasAPI)
 	}
 
-	transformFn := func(obj any) (any, error) {
-		jsonBytes, err := json.Marshal(obj)
-		if err != nil {
-			return nil, fmt.Errorf("failed to marshal object: %w", err)
-		}
-
-		transformed := lib.RestoreUnicodeEscapesFromRE2(jsonBytes)
-
-		var result any
-		if err = json.Unmarshal(transformed, &result); err != nil {
-			return nil, fmt.Errorf("failed to unmarshal processed json: %w", err)
-		}
-
-		return result, nil
+	jsonBytes, err := json.Marshal(obj)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
 	}
 
-	writeJSONWithTransform(w, code, obj, transformFn)
+	doJSONWrite(w, code, lib.RestoreUnicodeEscapesFromRE2(jsonBytes))
 }
 
 func (gw *Gateway) apiOASPostHandler(w http.ResponseWriter, r *http.Request) {

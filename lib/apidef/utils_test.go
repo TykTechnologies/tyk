@@ -6,7 +6,7 @@ import (
 	"testing"
 )
 
-func TestSanitizeOASRegexForRE2(t *testing.T) {
+func TestTransformUnicodeEscapesToRE2(t *testing.T) {
 	testCases := []struct {
 		name     string
 		input    []byte
@@ -59,7 +59,7 @@ func TestSanitizeOASRegexForRE2(t *testing.T) {
 	}
 }
 
-func TestRestoreUnicodeEscapesInRegex(t *testing.T) {
+func TestRestoreUnicodeEscapesFromRE2(t *testing.T) {
 	testCases := []struct {
 		name     string
 		input    []byte
