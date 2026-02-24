@@ -8,6 +8,7 @@ import (
 	"net/url"
 	"path"
 	"path/filepath"
+	"runtime"
 	"runtime/debug"
 	"sort"
 	"strconv"
@@ -28,6 +29,7 @@ import (
 	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/trace"
 
+	"github.com/TykTechnologies/tyk/certs"
 	"github.com/TykTechnologies/tyk/internal/httpctx"
 	"github.com/TykTechnologies/tyk/internal/httputil"
 	"github.com/TykTechnologies/tyk/internal/otel"
@@ -1097,6 +1099,12 @@ func (gw *Gateway) loadApps(specs []*APISpec) {
 				"api_count":  len(specs),
 			}).Info("sync used certs only enabled")
 		}
+
+		// Catch-up sync for certs missed during startup race:
+		// CertificateAdded keyspace events may have fired before the tracker was
+		// populated, so we pro-actively fetch any required certs that are absent
+		// from local Redis now that the tracker is up-to-date.
+		gw.syncRequiredCertificates()
 	}
 
 	tmpSpecRegister := make(map[string]*APISpec)
@@ -1270,4 +1278,67 @@ func WithQuotaKey(key string) option.Option[ProcessSpecOptions] {
 	return func(p *ProcessSpecOptions) {
 		p.quotaKey = key
 	}
+}
+
+// certSyncWorkers is the maximum number of concurrent GetRaw calls issued
+// during catch-up sync. Mirrors the host-checker default (host_checker.go:37).
+var certSyncWorkers = runtime.NumCPU()
+
+// syncRequiredCertificates fetches any required certs not yet in local Redis.
+// Called after loadApps populates certUsageTracker to handle the startup race
+// where CertificateAdded keyspace events fire before the tracker is ready.
+// Fetches are issued concurrently, bounded by certSyncWorkers, and the
+// function blocks until all fetches complete.
+func (gw *Gateway) syncRequiredCertificates() {
+	if gw.certUsageTracker == nil {
+		return
+	}
+	if !gw.GetConfig().SlaveOptions.UseRPC || !gw.GetConfig().SlaveOptions.SyncUsedCertsOnly {
+		return
+	}
+
+	required := gw.certUsageTracker.Certs()
+	if len(required) == 0 {
+		return
+	}
+
+	mainLog.WithField("cert_count", len(required)).Info("syncing required certificates")
+
+	// Semaphore: limits concurrent MDCB round-trips to certSyncWorkers.
+	sem := make(chan struct{}, certSyncWorkers)
+	var (
+		wg      sync.WaitGroup
+		mu      sync.Mutex
+		synced  int
+		failed  int
+	)
+
+	for _, certID := range required {
+		wg.Add(1)
+		sem <- struct{}{}
+		go func(id string) {
+			defer wg.Done()
+			defer func() { <-sem }()
+
+			// GetRaw checks local storage first (MdcbStorage.GetKey:40-47),
+			// only pulls from MDCB if missing. Safe to call unconditionally.
+			if _, err := gw.CertificateManager.GetRaw(id); err != nil {
+				mainLog.WithField("cert_id", certs.MaskCertID(id)).
+					WithError(err).Warning("failed to sync required certificate")
+				mu.Lock()
+				failed++
+				mu.Unlock()
+			} else {
+				mu.Lock()
+				synced++
+				mu.Unlock()
+			}
+		}(certID)
+	}
+	wg.Wait()
+
+	mainLog.WithFields(logrus.Fields{
+		"synced": synced,
+		"failed": failed,
+	}).Info("certificate sync complete")
 }
