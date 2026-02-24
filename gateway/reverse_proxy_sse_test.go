@@ -18,11 +18,11 @@ import (
 	"github.com/TykTechnologies/tyk/config"
 )
 
-// TestSSE_WriteTimeoutBypass verifies that the gateway clears the write
+// TestSSE_MCP_WriteTimeoutBypass verifies that MCP APIs clear the write
 // deadline for SSE streams so that a short write_timeout does not kill
 // long-lived connections. Without the fix the 1-second write_timeout
 // would terminate the stream before all events are delivered.
-func TestSSE_WriteTimeoutBypass(t *testing.T) {
+func TestSSE_MCP_WriteTimeoutBypass(t *testing.T) {
 	const eventCount = 5
 
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
@@ -54,6 +54,7 @@ func TestSSE_WriteTimeoutBypass(t *testing.T) {
 		spec.Proxy.TargetURL = upstream.URL
 		spec.Proxy.ListenPath = "/"
 		spec.UseKeylessAccess = true
+		spec.MarkAsMCP()
 	})
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -85,12 +86,10 @@ func TestSSE_WriteTimeoutBypass(t *testing.T) {
 	}
 }
 
-// TestSSE_ContentTypeWithCharset verifies that upstream responses with
-// "text/event-stream; charset=utf-8" are correctly detected as SSE,
-// the write deadline is cleared, and all events are received. Without
-// the fix the charset parameter breaks SSE detection causing the stream
-// to be killed by the write_timeout.
-func TestSSE_ContentTypeWithCharset(t *testing.T) {
+// TestSSE_MCP_ContentTypeWithCharset verifies that MCP upstream responses
+// with "text/event-stream; charset=utf-8" are correctly detected as SSE,
+// the write deadline is cleared, and all events are received.
+func TestSSE_MCP_ContentTypeWithCharset(t *testing.T) {
 	const eventCount = 5
 
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
@@ -122,6 +121,7 @@ func TestSSE_ContentTypeWithCharset(t *testing.T) {
 		spec.Proxy.TargetURL = upstream.URL
 		spec.Proxy.ListenPath = "/"
 		spec.UseKeylessAccess = true
+		spec.MarkAsMCP()
 	})
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -340,4 +340,127 @@ func TestSSE_NonStreamingUnaffected(t *testing.T) {
 	body, err := io.ReadAll(resp.Body)
 	require.NoError(t, err)
 	assert.Equal(t, `{"status":"ok"}`, string(body))
+}
+
+// TestSSE_IdleTimeout_TerminatesStaleStream verifies that a stream with
+// sse_write_timeout configured is terminated when the upstream stalls and
+// no data is written within the idle window.
+func TestSSE_IdleTimeout_TerminatesStaleStream(t *testing.T) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/event-stream")
+		w.Header().Set("Cache-Control", "no-cache")
+		w.Header().Set("Connection", "keep-alive")
+
+		flusher, ok := w.(http.Flusher)
+		if !ok {
+			http.Error(w, "streaming unsupported", http.StatusInternalServerError)
+			return
+		}
+
+		// Send 1 event then stall forever (until client disconnects).
+		fmt.Fprintf(w, "data: hello\n\n")
+		flusher.Flush()
+
+		<-r.Context().Done()
+	}))
+	defer upstream.Close()
+
+	ts := StartTest(func(globalConf *config.Config) {
+		globalConf.HttpServerOptions.EnableWebSockets = false
+	})
+	defer ts.Close()
+
+	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		spec.Proxy.TargetURL = upstream.URL
+		spec.Proxy.ListenPath = "/"
+		spec.UseKeylessAccess = true
+		spec.Proxy.SSEWriteTimeout = 2 // 2-second idle timeout
+	})
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, ts.URL, nil)
+	require.NoError(t, err)
+	req.Header.Set("Accept", "text/event-stream")
+
+	start := time.Now()
+	resp, err := http.DefaultClient.Do(req)
+	require.NoError(t, err)
+	defer resp.Body.Close()
+
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+
+	body, _ := io.ReadAll(resp.Body)
+	elapsed := time.Since(start)
+
+	assert.Contains(t, string(body), "data: hello")
+	assert.Less(t, elapsed, 6*time.Second, "stream should have been terminated by idle timeout")
+	assert.GreaterOrEqual(t, elapsed, 2*time.Second, "stream closed too early")
+}
+
+// TestSSE_IdleTimeout_ActiveStreamSurvives verifies that an active stream
+// with data flowing within the idle window survives because the deadline
+// resets after each write.
+func TestSSE_IdleTimeout_ActiveStreamSurvives(t *testing.T) {
+	const eventCount = 5
+
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "text/event-stream")
+		w.Header().Set("Cache-Control", "no-cache")
+		w.Header().Set("Connection", "keep-alive")
+
+		flusher, ok := w.(http.Flusher)
+		if !ok {
+			http.Error(w, "streaming unsupported", http.StatusInternalServerError)
+			return
+		}
+
+		for i := 0; i < eventCount; i++ {
+			fmt.Fprintf(w, "data: %d\n\n", i)
+			flusher.Flush()
+			time.Sleep(500 * time.Millisecond) // each gap well within 2s idle
+		}
+	}))
+	defer upstream.Close()
+
+	ts := StartTest(func(globalConf *config.Config) {
+		globalConf.HttpServerOptions.EnableWebSockets = false
+	})
+	defer ts.Close()
+
+	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		spec.Proxy.TargetURL = upstream.URL
+		spec.Proxy.ListenPath = "/"
+		spec.UseKeylessAccess = true
+		spec.Proxy.SSEWriteTimeout = 2 // 2-second idle timeout
+	})
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, ts.URL, nil)
+	require.NoError(t, err)
+	req.Header.Set("Accept", "text/event-stream")
+
+	resp, err := http.DefaultClient.Do(req)
+	require.NoError(t, err)
+	defer resp.Body.Close()
+
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+
+	scanner := bufio.NewScanner(resp.Body)
+	var events []string
+	for scanner.Scan() {
+		line := scanner.Text()
+		if strings.HasPrefix(line, "data: ") {
+			events = append(events, line)
+		}
+	}
+
+	if assert.Len(t, events, eventCount) {
+		for i := 0; i < eventCount; i++ {
+			assert.Equal(t, fmt.Sprintf("data: %d", i), events[i])
+		}
+	}
 }
