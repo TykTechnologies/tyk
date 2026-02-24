@@ -61,6 +61,7 @@ import (
 	"github.com/TykTechnologies/tyk/internal/service/newrelic"
 	"github.com/TykTechnologies/tyk/internal/uuid"
 	logger "github.com/TykTechnologies/tyk/log"
+	"github.com/TykTechnologies/tyk/pkg/validator"
 	"github.com/TykTechnologies/tyk/regexp"
 	"github.com/TykTechnologies/tyk/request"
 	"github.com/TykTechnologies/tyk/rpc"
@@ -228,6 +229,8 @@ type Gateway struct {
 	apiJWKCaches sync.Map
 
 	BundleChecksumVerifier bundleChecksumVerifyFunction
+
+	validator validator.Validator
 }
 
 func NewGateway(config config.Config, ctx context.Context) *Gateway {
@@ -1603,6 +1606,11 @@ func (gw *Gateway) initSystem() error {
 	// instances periodically and deletes idle items, closes net.Listener instances to
 	// free resources.
 	go cleanIdleMemConnProviders(gw.ctx)
+
+	gw.validator = validator.New(
+		validator.WithDisabledPolicyIdValidation(gwConfig.DisableCustomIdValidation),
+	)
+
 	return nil
 }
 

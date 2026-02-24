@@ -1364,6 +1364,9 @@ type Config struct {
 
 	// JWKS holds the configuration for Tyk JWKS functionalities
 	JWKS JWKSConfig `json:"jwks"`
+
+	// DisableCustomIdValidation disables custom id validation and enables legacy behaviour
+	DisableCustomIdValidation bool `json:"disable_custom_id_validation"`
 }
 
 // LabsConfig include config for streaming

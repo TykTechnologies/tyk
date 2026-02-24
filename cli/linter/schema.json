@@ -1515,6 +1515,10 @@
           }
         }
       }
+    },
+    "disable_custom_id_validation": {
+      "type": ["boolean", "null"],
+      "additionalProperties": false
     }
   }
 }

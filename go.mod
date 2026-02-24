@@ -101,6 +101,7 @@ require (
 	github.com/alecthomas/kingpin/v2 v2.4.0
 	github.com/eclipse/paho.mqtt.golang v1.5.1
 	github.com/getkin/kin-openapi v0.133.0
+	github.com/go-playground/validator/v10 v10.30.1
 	github.com/go-redis/redismock/v9 v9.2.0
 	github.com/goccy/go-json v0.10.4
 	github.com/goccy/go-yaml v1.15.23
@@ -297,7 +298,7 @@ require (
 	github.com/fatih/structs v1.1.0 // indirect
 	github.com/felixge/httpsnoop v1.0.4 // indirect
 	github.com/fsnotify/fsnotify v1.7.0 // indirect
-	github.com/gabriel-vasile/mimetype v1.4.7 // indirect
+	github.com/gabriel-vasile/mimetype v1.4.12 // indirect
 	github.com/generikvault/gvalstrings v0.0.0-20180926130504-471f38f0112a // indirect
 	github.com/getsentry/raven-go v0.2.0 // indirect
 	github.com/getsentry/sentry-go v0.27.0 // indirect
@@ -310,6 +311,8 @@ require (
 	github.com/go-ole/go-ole v1.3.0 // indirect
 	github.com/go-openapi/jsonpointer v0.21.0 // indirect
 	github.com/go-openapi/swag v0.23.0 // indirect
+	github.com/go-playground/locales v0.14.1 // indirect
+	github.com/go-playground/universal-translator v0.18.1 // indirect
 	github.com/go-sourcemap/sourcemap v2.1.4+incompatible // indirect
 	github.com/go-sql-driver/mysql v1.7.1 // indirect
 	github.com/go-viper/mapstructure/v2 v2.4.0 // indirect
@@ -395,6 +398,7 @@ require (
 	github.com/kylelemons/godebug v1.1.0 // indirect
 	github.com/lann/builder v0.0.0-20180802200727-47ae307949d0 // indirect
 	github.com/lann/ps v0.0.0-20150810152359-62de8c46ede0 // indirect
+	github.com/leodido/go-urn v1.4.0 // indirect
 	github.com/lib/pq v1.10.9 // indirect
 	github.com/linkedin/goavro/v2 v2.12.0 // indirect
 	github.com/lonelycode/go-uuid v0.0.0-20141202165402-ed3ca8a15a93 // indirect

@@ -39,7 +39,6 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
-	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -69,6 +68,7 @@ import (
 	"github.com/TykTechnologies/tyk/internal/sanitize"
 	"github.com/TykTechnologies/tyk/internal/uuid"
 	lib "github.com/TykTechnologies/tyk/lib/apidef"
+	"github.com/TykTechnologies/tyk/pkg/identifier"
 	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/user"
 )
@@ -85,7 +85,6 @@ const (
 
 var (
 	ErrRequestMalformed = errors.New("request malformed")
-	validPolicyIDRegex  = regexp.MustCompile(`^[a-zA-Z0-9.\-_~]+$`)
 )
 
 // apiModifyKeySuccess represents when a Key modification was successful
@@ -1112,8 +1111,8 @@ func (gw *Gateway) handleAddOrUpdatePolicy(polID string, r *http.Request) (inter
 		return apiError("Request malformed"), http.StatusBadRequest
 	}
 
-	if newPol.ID != "" && !isValidPolicyID(newPol.ID) {
-		log.WithField("id", newPol.ID).Error("Policy ID contains invalid characters")
+	if err := gw.validator.Validate(identifier.Custom(newPol.ID)); err != nil {
+		log.WithField("id", newPol.ID).WithError(err).Error("Failed to validate policy ID")
 		return apiError(errMsgInvalidPolicyID), http.StatusBadRequest
 	}
 
@@ -1518,12 +1517,6 @@ func (gw *Gateway) handleDeleteAPI(apiID string) (interface{}, int) {
 func (gw *Gateway) polHandler(w http.ResponseWriter, r *http.Request) {
 	polID := mux.Vars(r)["polID"]
 
-	if polID != "" && !isValidPolicyID(polID) {
-		log.WithField("id", polID).Error("Policy ID contains invalid characters")
-		doJSONWrite(w, http.StatusBadRequest, apiError(errMsgInvalidPolicyID))
-		return
-	}
-
 	var obj interface{}
 	var code int
 
@@ -1556,10 +1549,6 @@ func (gw *Gateway) polHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	doJSONWrite(w, code, obj)
-}
-
-func isValidPolicyID(id string) bool {
-	return validPolicyIDRegex.MatchString(id)
 }
 
 func (gw *Gateway) apiHandler(w http.ResponseWriter, r *http.Request) {
