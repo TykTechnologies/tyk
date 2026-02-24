@@ -2,7 +2,6 @@ package apidef
 
 import (
 	"errors"
-	"fmt"
 	"regexp"
 )
 
@@ -18,15 +17,13 @@ var (
 // does support hexadecimal escapes, which can represent any Unicode code point.
 // The function returns a new byte array with the transformed pattern.
 func TransformUnicodeEscapesToRE2(data []byte) []byte {
-	jsonStr := string(data)
-
-	result := unicodeRegex.ReplaceAllStringFunc(jsonStr, func(match string) string {
-		hexDigits := match[2:]
-
-		return fmt.Sprintf("\\x{%s}", hexDigits)
+	return unicodeRegex.ReplaceAllFunc(data, func(match []byte) []byte {
+		res := make([]byte, 0, 8)
+		res = append(res, `\x{`...)
+		res = append(res, match[2:]...)
+		res = append(res, `}`...)
+		return res
 	})
-
-	return []byte(result)
 }
 
 // RestoreUnicodeEscapesFromRE2 translates RE2-compatible hexadecimal escape
@@ -37,15 +34,12 @@ func TransformUnicodeEscapesToRE2(data []byte) []byte {
 // It ensures that external consumers of the data receive the regex patterns
 // in their original, more widely supported format.
 func RestoreUnicodeEscapesFromRE2(data []byte) []byte {
-	jsonStr := string(data)
-
-	result := re2Regex.ReplaceAllStringFunc(jsonStr, func(match string) string {
-		hexDigits := match[3:7]
-
-		return fmt.Sprintf("\\u%s", hexDigits)
+	return re2Regex.ReplaceAllFunc(data, func(match []byte) []byte {
+		res := make([]byte, 0, 6)
+		res = append(res, `\u`...)
+		res = append(res, match[3:7]...)
+		return res
 	})
-
-	return []byte(result)
 }
 
 // RestoreUnicodeEscapesInError takes an error and applies the
