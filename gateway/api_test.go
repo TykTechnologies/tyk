@@ -85,6 +85,7 @@ func TestPolicyAPI(t *testing.T) {
 	ts := StartTest(func(cnf *config.Config) {
 		cnf.Policies.PolicyPath = "."
 		cnf.Policies.PolicySource = "file"
+		cnf.DisableCustomIdValidation = true
 	})
 
 	defer ts.Close()
@@ -176,17 +177,27 @@ func TestPolicyAPI(t *testing.T) {
 		})
 	})
 
-	t.Run("fails if ID contains invalid characters", func(t *testing.T) {
+	t.Run("GET does not fail if exitent policy has broken ID", func(t *testing.T) {
 		invalidURLID := "invalid@id"
+
+		ts.CreatePolicy(func(p *user.Policy) {
+			p.ID = "invalid@id"
+		})
 
 		_, err := ts.Run(t, test.TestCase{
 			Path:      "/tyk/policies/" + invalidURLID,
 			Method:    http.MethodGet,
 			AdminAuth: true,
-			Code:      http.StatusBadRequest,
-			BodyMatch: errMsgInvalidPolicyID,
+			Code:      http.StatusOK,
 		})
+
 		assert.NoError(t, err)
+	})
+
+	t.Run("fails create/update if ID contains invalid characters", func(t *testing.T) {
+		ts.setTestScopeConfig(t, func(cnf *config.Config) {
+			cnf.DisableCustomIdValidation = false
+		})
 
 		invalidBodyPol := user.Policy{
 			ID:           "invalid/id",
@@ -196,7 +207,7 @@ func TestPolicyAPI(t *testing.T) {
 			AccessRights: make(map[string]user.AccessDefinition),
 		}
 
-		_, err = ts.Run(t, test.TestCase{
+		_, err := ts.Run(t, test.TestCase{
 			Path:      "/tyk/policies",
 			Method:    http.MethodPost,
 			AdminAuth: true,
@@ -215,6 +226,42 @@ func TestPolicyAPI(t *testing.T) {
 			Data:      serializePolicy(t, invalidBodyPol), // sending "invalid/id" in body
 			Code:      http.StatusBadRequest,
 			BodyMatch: errMsgInvalidPolicyID,
+		})
+		assert.NoError(t, err)
+	})
+
+	t.Run("does not fail on create/update if ID contains invalid characters and when DisableCustomIdValidation=true", func(t *testing.T) {
+		ts.setTestScopeConfig(t, func(cnf *config.Config) {
+			cnf.DisableCustomIdValidation = true
+		})
+
+		t.Cleanup(func() {
+			_ = ts.Gw.removePersistentPolicyById("invalid@id") //nolint:errcheck
+		})
+
+		invalidBodyPol := user.Policy{
+			ID:           "invalid@id",
+			Rate:         100,
+			Per:          1,
+			OrgID:        "54de205930c55e15bd000001",
+			AccessRights: make(map[string]user.AccessDefinition),
+		}
+
+		_, err := ts.Run(t, test.TestCase{
+			Path:      "/tyk/policies",
+			Method:    http.MethodPost,
+			AdminAuth: true,
+			Data:      serializePolicy(t, invalidBodyPol),
+			Code:      http.StatusOK,
+		})
+		assert.NoError(t, err)
+
+		_, err = ts.Run(t, test.TestCase{
+			Path:      "/tyk/policies/invalid@id",
+			Method:    http.MethodPut,
+			AdminAuth: true,
+			Data:      serializePolicy(t, invalidBodyPol),
+			Code:      http.StatusOK,
 		})
 		assert.NoError(t, err)
 	})

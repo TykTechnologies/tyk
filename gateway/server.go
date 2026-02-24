@@ -1607,11 +1607,15 @@ func (gw *Gateway) initSystem() error {
 	// free resources.
 	go cleanIdleMemConnProviders(gw.ctx)
 
-	gw.validator = validator.New(
-		validator.WithDisabledPolicyIdValidation(gwConfig.DisableCustomIdValidation),
-	)
+	gw.initMembers(gwConfig)
 
 	return nil
+}
+
+func (gw *Gateway) initMembers(cfg config.Config) {
+	gw.validator = validator.New(
+		validator.WithDisabledPolicyIdValidation(cfg.DisableCustomIdValidation),
+	)
 }
 
 // SignatureVerifier returns a verifier to use for validating signatures.
