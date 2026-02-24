@@ -194,6 +194,15 @@ type VersionMeta struct {
 	IsDefaultVersion bool   `json:"isDefaultVersion"`
 }
 
+func writeJSONWithTransform[T any](w http.ResponseWriter, code int, obj T, fn func(T) (T, error)) {
+	t, err := fn(obj)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+
+	doJSONWrite(w, code, t)
+}
+
 func doJSONWrite(w http.ResponseWriter, code int, obj interface{}) {
 	w.Header().Set(header.ContentType, header.ApplicationJSON)
 	w.WriteHeader(code)
@@ -1585,25 +1594,23 @@ func (gw *Gateway) apiOASGetHandler(w http.ResponseWriter, r *http.Request) {
 		gw.setBaseAPIIDHeader(w, oasAPI)
 	}
 
-	if code != http.StatusOK {
-		doJSONWrite(w, code, obj)
-		return
+	transformFn := func(obj any) (any, error) {
+		jsonBytes, err := json.Marshal(obj)
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal object: %w", err)
+		}
+
+		transformed := lib.RestoreUnicodeEscapesFromRE2(jsonBytes)
+
+		var result any
+		if err = json.Unmarshal(transformed, &result); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal processed json: %w", err)
+		}
+
+		return result, nil
 	}
 
-	jsonBytes, err := json.Marshal(obj)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	transformedBytes := lib.RestoreUnicodeEscapesInRegex(jsonBytes)
-
-	w.Header().Set(header.ContentType, header.ApplicationJSON)
-	w.WriteHeader(code)
-	_, err = w.Write(transformedBytes)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-	}
+	writeJSONWithTransform(w, code, obj, transformFn)
 }
 
 func (gw *Gateway) apiOASPostHandler(w http.ResponseWriter, r *http.Request) {
@@ -3610,7 +3617,7 @@ func extractOASObjFromReq(reqBody io.Reader) ([]byte, *oas.OAS, error) {
 		return nil, nil, ErrRequestMalformed
 	}
 
-	reqBodyInBytes = lib.SanitizeOASRegexForRE2(reqBodyInBytes)
+	reqBodyInBytes = lib.TransformUnicodeEscapesToRE2(reqBodyInBytes)
 
 	loader := openapi3.NewLoader()
 	t, err := loader.LoadFromData(reqBodyInBytes)

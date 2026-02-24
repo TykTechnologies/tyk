@@ -51,7 +51,7 @@ func TestSanitizeOASRegexForRE2(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			actual := SanitizeOASRegexForRE2(tc.input)
+			actual := TransformUnicodeEscapesToRE2(tc.input)
 			if !bytes.Equal(actual, tc.expected) {
 				t.Errorf("expected %s, but got %s", tc.expected, actual)
 			}
@@ -104,7 +104,7 @@ func TestRestoreUnicodeEscapesInRegex(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			actual := RestoreUnicodeEscapesInRegex(tc.input)
+			actual := RestoreUnicodeEscapesFromRE2(tc.input)
 			if !bytes.Equal(actual, tc.expected) {
 				t.Errorf("expected %s, but got %s", tc.expected, actual)
 			}
