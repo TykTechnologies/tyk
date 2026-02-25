@@ -2023,7 +2023,7 @@ func Start() {
 		otelCfg.DBAppConfOptions.NodeIsSegmented,
 		otelCfg.DBAppConfOptions.Tags)
 
-	gw.MetricInstruments = otel.InitOpenTelemetryMetrics(gw.ctx, mainLog.Logger, &gwConfig.OpenTelemetry,
+	gw.MetricInstruments = otel.InitOpenTelemetryMetrics(gw.ctx, mainLog.Logger, &otelCfg.OpenTelemetry,
 		gw.GetNodeID(),
 		VERSION)
 
