@@ -136,7 +136,7 @@ type Gateway struct {
 	HostCheckTicker      chan struct{}
 	HostCheckerClient    *http.Client
 	TracerProvider       otel.TracerProvider
-	MetricInstruments    *otel.Instruments
+	MetricInstruments    *otel.MetricInstruments
 	NewRelicApplication  *newrelic.Application
 
 	keyGen DefaultKeyGenerator

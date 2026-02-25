@@ -51,7 +51,7 @@ func TestInitOpenTelemetryMetrics_Enabled(t *testing.T) {
 }
 
 func TestRecordRequest_NilSafe(t *testing.T) {
-	// Verify the Instruments struct handles disabled state gracefully
+	// Verify the MetricInstruments struct handles disabled state gracefully
 	cfg := &OpenTelemetry{Enabled: false}
 	inst := InitOpenTelemetryMetrics(context.Background(), logrus.New(), cfg,
 		"", "", false, "", false, nil)
