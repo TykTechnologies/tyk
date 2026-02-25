@@ -168,6 +168,7 @@ type Gateway struct {
 	policies *model.Policies
 
 	certUsageTracker *certUsageTracker // nil in non-RPC mode
+	pendingCerts     sync.Map          // certID -> struct{}, certs skipped due to tracker miss
 
 	dnsCacheManager dnscache.IDnsCacheManager
 
