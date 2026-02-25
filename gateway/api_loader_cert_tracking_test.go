@@ -279,6 +279,39 @@ func TestLoadApps_CertificateTracking(t *testing.T) {
 		assert.True(t, stillPending, "cert1 should remain in pendingCerts after a failed fetch")
 	})
 
+	t.Run("sync_used_certs_only disabled - pending certs not processed", func(t *testing.T) {
+		ts := StartTest(nil)
+		defer ts.Close()
+
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+
+		// UseRPC enabled but SyncUsedCertsOnly disabled
+		cfg := ts.Gw.GetConfig()
+		cfg.SlaveOptions.UseRPC = true
+		cfg.SlaveOptions.SyncUsedCertsOnly = false
+		ts.Gw.SetConfig(cfg)
+
+		mockCM := certsmock.NewMockCertificateManager(ctrl)
+		// GetRaw must NOT be called when selective sync is disabled
+		mockCM.EXPECT().GetRaw(gomock.Any()).Times(0)
+		ts.Gw.CertificateManager = mockCM
+
+		// Manually place a cert in pendingCerts (simulating a race condition)
+		ts.Gw.pendingCerts.Store("cert1", struct{}{})
+
+		spec := BuildAPI(func(spec *APISpec) {
+			spec.APIID = "api1"
+			spec.Proxy.ListenPath = "/api1/"
+			spec.UpstreamCertificates = map[string]string{"*": "cert1"}
+		})[0]
+		ts.Gw.loadApps([]*APISpec{spec})
+
+		// pendingCerts should be untouched — drain is skipped when SyncUsedCertsOnly is false
+		_, stillPending := ts.Gw.pendingCerts.Load("cert1")
+		assert.True(t, stillPending, "cert1 should remain untouched when SyncUsedCertsOnly is disabled")
+	})
+
 	t.Run("duplicate certs across APIs - tracked once", func(t *testing.T) {
 		// Create a test gateway
 		ts := StartTest(nil)
