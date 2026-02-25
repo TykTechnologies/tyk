@@ -1099,19 +1099,29 @@ func (gw *Gateway) loadApps(specs []*APISpec) {
 
 			// Drain pending certs that were skipped before this reload.
 			// Now that the tracker is up to date, fetch any that are required.
+			var wg sync.WaitGroup
 			gw.pendingCerts.Range(func(k, v any) bool {
 				certID := k.(string)
-				gw.pendingCerts.Delete(certID)
-				if gw.certUsageTracker.Required(certID) {
-					content, err := gw.CertificateManager.GetRaw(certID)
-					if err != nil || content == "" {
-						mainLog.WithField("cert_id", certID).Debug("failed to fetch pending cert after reload")
-					} else {
-						mainLog.WithField("cert_id", certID).Info("synced pending certificate after reload")
-					}
+				if !gw.certUsageTracker.Required(certID) {
+					// Not required by any loaded API — safe to discard.
+					gw.pendingCerts.Delete(certID)
+					return true
 				}
+				wg.Add(1)
+				go func(id string) {
+					defer wg.Done()
+					content, err := gw.CertificateManager.GetRaw(id)
+					if err != nil || content == "" {
+						mainLog.WithField("cert_id", id).Warn("failed to fetch pending cert after reload")
+						// Keep in pendingCerts so the next reload retries.
+						return
+					}
+					gw.pendingCerts.Delete(id)
+					mainLog.WithField("cert_id", id).Info("synced pending certificate after reload")
+				}(certID)
 				return true
 			})
+			wg.Wait()
 		}
 	}
 
