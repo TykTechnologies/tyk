@@ -1291,27 +1291,36 @@ func (gw *Gateway) syncRequiredCertificates() {
 		return
 	}
 
-	fetched := 0
-	cached := 0
+	var (
+		mu      sync.Mutex
+		fetched int
+		failed  int
+		wg      sync.WaitGroup
+	)
 
 	for _, certID := range certIDs {
-		_, err := gw.CertificateManager.GetRaw(certID)
-		if err != nil {
-			mainLog.WithFields(logrus.Fields{
-				"cert_id": certID,
-				"err":     err,
-			}).Debug("syncRequiredCertificates: could not fetch cert")
-			continue
-		}
-		// We can't distinguish a local-cache hit from an RPC pull here, but
-		// we track both to give a useful summary log line.
-		fetched++
+		wg.Add(1)
+		go func(id string) {
+			defer wg.Done()
+			_, err := gw.CertificateManager.GetRaw(id)
+			mu.Lock()
+			defer mu.Unlock()
+			if err != nil {
+				failed++
+				mainLog.WithFields(logrus.Fields{
+					"cert_id": id,
+					"err":     err,
+				}).Warn("syncRequiredCertificates: could not fetch cert")
+				return
+			}
+			fetched++
+		}(certID)
 	}
-
-	_ = cached // reserved for future local-cache detection
+	wg.Wait()
 
 	mainLog.WithFields(logrus.Fields{
 		"total":   len(certIDs),
 		"fetched": fetched,
+		"failed":  failed,
 	}).Info("syncRequiredCertificates: proactive cert sync complete")
 }
