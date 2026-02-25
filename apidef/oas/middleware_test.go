@@ -1454,3 +1454,203 @@ func TestCachePlugin_Fill(t *testing.T) {
 		assert.Equal(t, int64(60), cachePlugin.Timeout)
 	})
 }
+
+func TestMiddleware_HasMCPPrimitivesMocks(t *testing.T) {
+	t.Run("empty middleware returns false", func(t *testing.T) {
+		middleware := &Middleware{}
+		assert.False(t, middleware.HasMCPPrimitivesMocks())
+	})
+
+	t.Run("returns false when no mocks enabled", func(t *testing.T) {
+		middleware := &Middleware{
+			McpTools: MCPPrimitives{
+				"tool1": &MCPPrimitive{},
+			},
+			McpResources: MCPPrimitives{
+				"resource1": &MCPPrimitive{},
+			},
+			McpPrompts: MCPPrimitives{
+				"prompt1": &MCPPrimitive{},
+			},
+		}
+		assert.False(t, middleware.HasMCPPrimitivesMocks())
+	})
+
+	t.Run("returns false when mocks exist but disabled", func(t *testing.T) {
+		middleware := &Middleware{
+			McpTools: MCPPrimitives{
+				"tool1": &MCPPrimitive{
+					Operation: Operation{
+						MockResponse: &MockResponse{Enabled: false},
+					},
+				},
+			},
+		}
+		assert.False(t, middleware.HasMCPPrimitivesMocks())
+	})
+
+	t.Run("returns true when tool has enabled mock", func(t *testing.T) {
+		middleware := &Middleware{
+			McpTools: MCPPrimitives{
+				"tool1": &MCPPrimitive{
+					Operation: Operation{
+						MockResponse: &MockResponse{Enabled: true},
+					},
+				},
+			},
+		}
+		assert.True(t, middleware.HasMCPPrimitivesMocks())
+	})
+
+	t.Run("returns true when resource has enabled mock", func(t *testing.T) {
+		middleware := &Middleware{
+			McpResources: MCPPrimitives{
+				"resource1": &MCPPrimitive{
+					Operation: Operation{
+						MockResponse: &MockResponse{Enabled: true},
+					},
+				},
+			},
+		}
+		assert.True(t, middleware.HasMCPPrimitivesMocks())
+	})
+
+	t.Run("returns true when prompt has enabled mock", func(t *testing.T) {
+		middleware := &Middleware{
+			McpPrompts: MCPPrimitives{
+				"prompt1": &MCPPrimitive{
+					Operation: Operation{
+						MockResponse: &MockResponse{Enabled: true},
+					},
+				},
+			},
+		}
+		assert.True(t, middleware.HasMCPPrimitivesMocks())
+	})
+
+	t.Run("returns true when multiple primitives with one enabled", func(t *testing.T) {
+		middleware := &Middleware{
+			McpTools: MCPPrimitives{
+				"tool1": &MCPPrimitive{
+					Operation: Operation{
+						MockResponse: &MockResponse{Enabled: false},
+					},
+				},
+				"tool2": &MCPPrimitive{
+					Operation: Operation{
+						MockResponse: &MockResponse{Enabled: true},
+					},
+				},
+			},
+		}
+		assert.True(t, middleware.HasMCPPrimitivesMocks())
+	})
+}
+
+func TestMiddleware_ExtractPrimitivesToExtendedPaths(t *testing.T) {
+	t.Run("basic extraction", func(t *testing.T) {
+		middleware := &Middleware{
+			McpTools: MCPPrimitives{
+				"get_users": &MCPPrimitive{
+					Operation: Operation{
+						RateLimit: &RateLimitEndpoint{Enabled: true, Rate: 2, Per: 20},
+						TransformRequestHeaders: &TransformHeaders{
+							Enabled: true,
+							Add: Headers{
+								{Name: "X-Tool", Value: "test"},
+							},
+						},
+					},
+				},
+			},
+			McpResources: MCPPrimitives{
+				"file:///*": &MCPPrimitive{
+					Operation: Operation{
+						RateLimit: &RateLimitEndpoint{Enabled: true, Rate: 5, Per: 60},
+					},
+				},
+			},
+			McpPrompts: MCPPrimitives{
+				"code-review": &MCPPrimitive{
+					Operation: Operation{
+						MockResponse: &MockResponse{Enabled: true, Code: 200},
+					},
+				},
+			},
+		}
+
+		ep := &apidef.ExtendedPathsSet{}
+		middleware.ExtractPrimitivesToExtendedPaths(ep)
+
+		assert.Len(t, ep.RateLimit, 2)
+		assert.Equal(t, "/mcp-tool:get_users", ep.RateLimit[0].Path)
+		assert.Equal(t, 2.0, ep.RateLimit[0].Rate)
+
+		assert.Len(t, ep.TransformHeader, 1)
+		assert.Equal(t, "/mcp-tool:get_users", ep.TransformHeader[0].Path)
+
+		assert.Len(t, ep.Internal, 3)
+		assert.Equal(t, "/mcp-tool:get_users", ep.Internal[0].Path)
+		assert.Equal(t, "POST", ep.Internal[0].Method)
+		assert.False(t, ep.Internal[0].Disabled)
+
+		assert.Equal(t, "/mcp-resource:file:///*", ep.Internal[1].Path)
+		assert.Equal(t, "/mcp-prompt:code-review", ep.Internal[2].Path)
+	})
+
+	t.Run("no overwrite of operations", func(t *testing.T) {
+		ep := &apidef.ExtendedPathsSet{
+			RateLimit: []apidef.RateLimitMeta{
+				{Path: "/api/users", Method: "GET", Rate: 100},
+			},
+			Internal: []apidef.InternalMeta{
+				{Path: "/internal/health", Method: "GET"},
+			},
+		}
+
+		middleware := &Middleware{
+			McpTools: MCPPrimitives{
+				"get_users": &MCPPrimitive{
+					Operation: Operation{
+						RateLimit: &RateLimitEndpoint{Enabled: true, Rate: 2, Per: 20},
+					},
+				},
+			},
+		}
+
+		middleware.ExtractPrimitivesToExtendedPaths(ep)
+
+		assert.Len(t, ep.RateLimit, 2)
+		assert.Equal(t, "/api/users", ep.RateLimit[0].Path)
+		assert.Equal(t, "/mcp-tool:get_users", ep.RateLimit[1].Path)
+
+		assert.Len(t, ep.Internal, 2)
+		assert.Equal(t, "/internal/health", ep.Internal[0].Path)
+		assert.Equal(t, "/mcp-tool:get_users", ep.Internal[1].Path)
+	})
+
+	t.Run("empty primitives", func(t *testing.T) {
+		middleware := &Middleware{}
+		ep := &apidef.ExtendedPathsSet{}
+
+		middleware.ExtractPrimitivesToExtendedPaths(ep)
+
+		assert.Empty(t, ep.RateLimit)
+		assert.Empty(t, ep.Internal)
+	})
+
+	t.Run("VEM path format", func(t *testing.T) {
+		middleware := &Middleware{
+			McpTools:     MCPPrimitives{"tool-name": &MCPPrimitive{}},
+			McpResources: MCPPrimitives{"resource://path": &MCPPrimitive{}},
+			McpPrompts:   MCPPrimitives{"prompt-name": &MCPPrimitive{}},
+		}
+
+		ep := &apidef.ExtendedPathsSet{}
+		middleware.ExtractPrimitivesToExtendedPaths(ep)
+
+		assert.Equal(t, "/mcp-tool:tool-name", ep.Internal[0].Path)
+		assert.Equal(t, "/mcp-resource:resource://path", ep.Internal[1].Path)
+		assert.Equal(t, "/mcp-prompt:prompt-name", ep.Internal[2].Path)
+	})
+}

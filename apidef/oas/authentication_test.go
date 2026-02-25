@@ -1,9 +1,11 @@
 package oas
 
 import (
+	"encoding/json"
 	"testing"
 	"time"
 
+	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/TykTechnologies/tyk/apidef"
@@ -150,6 +152,130 @@ func TestOIDC(t *testing.T) {
 
 		assert.Len(t, api.OpenIDOptions.Providers, 1)
 		assert.Equal(t, "5678", api.OpenIDOptions.Providers[0].Issuer)
+	})
+}
+
+func TestCertificateAuthPrecedence(t *testing.T) {
+	t.Run("certificate auth field exists", func(t *testing.T) {
+		const securityName = "custom"
+		var trueVal = true
+		oas := OAS{
+			T: openapi3.T{
+				Components: &openapi3.Components{
+					SecuritySchemes: openapi3.SecuritySchemes{
+						securityName: {
+							Value: &openapi3.SecurityScheme{
+								Type: typeAPIKey,
+								Name: "x-query",
+								In:   query,
+							},
+						},
+					},
+				},
+				Security: openapi3.SecurityRequirements{
+					{
+						securityName: []string{},
+					},
+				},
+				Extensions: map[string]interface{}{
+					ExtensionTykAPIGateway: &XTykAPIGateway{
+						Server: Server{
+							Authentication: &Authentication{
+								SecuritySchemes: SecuritySchemes{
+									securityName: &Token{
+										Enabled:                 &trueVal,
+										EnableClientCertificate: true,
+									},
+								},
+								CertificateAuth: CertificateAuth{
+									Enabled: false,
+								},
+							},
+						},
+					},
+				},
+			},
+		}
+
+		var apiDef apidef.APIDefinition
+		oas.ExtractTo(&apiDef)
+
+		assert.False(t, apiDef.AuthConfigs[apidef.AuthTokenType].UseCertificate)
+	})
+
+	t.Run("certificate auth field does not exist", func(t *testing.T) {
+		const securityName = "custom"
+		var trueVal = true
+		oas := OAS{
+			T: openapi3.T{
+				Components: &openapi3.Components{
+					SecuritySchemes: openapi3.SecuritySchemes{
+						securityName: {
+							Value: &openapi3.SecurityScheme{
+								Type: typeAPIKey,
+								Name: "x-query",
+								In:   query,
+							},
+						},
+					},
+				},
+				Security: openapi3.SecurityRequirements{
+					{
+						securityName: []string{},
+					},
+				},
+				Extensions: map[string]interface{}{
+					ExtensionTykAPIGateway: &XTykAPIGateway{
+						Server: Server{
+							Authentication: &Authentication{
+								SecuritySchemes: SecuritySchemes{
+									securityName: &Token{
+										Enabled:                 &trueVal,
+										EnableClientCertificate: true,
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		}
+
+		var apiDef apidef.APIDefinition
+		oas.ExtractTo(&apiDef)
+
+		assert.False(t, apiDef.AuthConfigs[apidef.AuthTokenType].UseCertificate)
+	})
+}
+
+func TestCertificateAuth(t *testing.T) {
+	t.Run("empty", func(t *testing.T) {
+		var emptyCertificateAuth CertificateAuth
+		var convertedAPI apidef.APIDefinition
+		var resultCertificateAuth CertificateAuth
+
+		convertedAPI.SetDisabledFlags()
+		emptyCertificateAuth.ExtractTo(&convertedAPI)
+		resultCertificateAuth.Fill(convertedAPI)
+
+		assert.Equal(t, emptyCertificateAuth, resultCertificateAuth)
+		assert.Falsef(t, convertedAPI.AuthConfigs[apidef.AuthTokenType].UseCertificate, "AuthTokenType should not be set to use certificate auth")
+	})
+
+	t.Run("filled", func(t *testing.T) {
+		certAuth := CertificateAuth{
+			Enabled: true,
+		}
+
+		var convertedAPI apidef.APIDefinition
+		var resultCertificateAuth CertificateAuth
+
+		certAuth.ExtractTo(&convertedAPI)
+		assert.True(t, convertedAPI.AuthConfigs[apidef.AuthTokenType].UseCertificate)
+
+		resultCertificateAuth.Fill(convertedAPI)
+
+		assert.Equal(t, certAuth, resultCertificateAuth)
 	})
 }
 
@@ -486,5 +612,146 @@ func TestVendorExtensionSecurity(t *testing.T) {
 		auth2.Fill(api)
 
 		assert.Nil(t, auth2.Security)
+	})
+}
+
+func TestProtectedResourceMetadata_Validate(t *testing.T) {
+	t.Parallel()
+
+	t.Run("nil PRM returns no error", func(t *testing.T) {
+		t.Parallel()
+		var prm *ProtectedResourceMetadata
+		assert.NoError(t, prm.Validate(false))
+		assert.NoError(t, prm.Validate(true))
+	})
+
+	t.Run("disabled PRM returns no error", func(t *testing.T) {
+		t.Parallel()
+		prm := &ProtectedResourceMetadata{Enabled: false}
+		assert.NoError(t, prm.Validate(false))
+		assert.NoError(t, prm.Validate(true))
+	})
+
+	t.Run("enabled without resource returns error", func(t *testing.T) {
+		t.Parallel()
+		prm := &ProtectedResourceMetadata{
+			Enabled:              true,
+			AuthorizationServers: []string{"https://auth.example.com"},
+		}
+		err := prm.Validate(false)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "resource is required")
+	})
+
+	t.Run("MCP without authorizationServers returns error", func(t *testing.T) {
+		t.Parallel()
+		prm := &ProtectedResourceMetadata{
+			Enabled:  true,
+			Resource: "https://api.example.com",
+		}
+		err := prm.Validate(true)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "authorizationServers")
+	})
+
+	t.Run("non-MCP without authorizationServers returns no error", func(t *testing.T) {
+		t.Parallel()
+		prm := &ProtectedResourceMetadata{
+			Enabled:  true,
+			Resource: "https://api.example.com",
+		}
+		assert.NoError(t, prm.Validate(false))
+	})
+
+	t.Run("valid MCP configuration", func(t *testing.T) {
+		t.Parallel()
+		prm := &ProtectedResourceMetadata{
+			Enabled:              true,
+			Resource:             "https://api.example.com",
+			AuthorizationServers: []string{"https://auth.example.com"},
+			ScopesSupported:      []string{"read", "write"},
+		}
+		assert.NoError(t, prm.Validate(true))
+	})
+
+	t.Run("valid non-MCP configuration", func(t *testing.T) {
+		t.Parallel()
+		prm := &ProtectedResourceMetadata{
+			Enabled:              true,
+			Resource:             "https://api.example.com",
+			AuthorizationServers: []string{"https://auth.example.com"},
+		}
+		assert.NoError(t, prm.Validate(false))
+	})
+}
+
+func TestProtectedResourceMetadata_GetWellKnownPath(t *testing.T) {
+	t.Parallel()
+
+	t.Run("nil returns default", func(t *testing.T) {
+		t.Parallel()
+		var prm *ProtectedResourceMetadata
+		assert.Equal(t, DefaultPRMWellKnownPath, prm.GetWellKnownPath())
+	})
+
+	t.Run("empty path returns default", func(t *testing.T) {
+		t.Parallel()
+		prm := &ProtectedResourceMetadata{}
+		assert.Equal(t, DefaultPRMWellKnownPath, prm.GetWellKnownPath())
+	})
+
+	t.Run("custom path returned", func(t *testing.T) {
+		t.Parallel()
+		prm := &ProtectedResourceMetadata{WellKnownPath: ".well-known/custom"}
+		assert.Equal(t, ".well-known/custom", prm.GetWellKnownPath())
+	})
+}
+
+func TestProtectedResourceMetadata_JSON(t *testing.T) {
+	t.Parallel()
+
+	t.Run("round-trip serialization", func(t *testing.T) {
+		t.Parallel()
+		prm := &ProtectedResourceMetadata{
+			Enabled:              true,
+			WellKnownPath:        ".well-known/oauth-protected-resource",
+			Resource:             "https://api.example.com",
+			AuthorizationServers: []string{"https://auth.example.com"},
+			ScopesSupported:      []string{"read", "write"},
+		}
+
+		data, err := json.Marshal(prm)
+		assert.NoError(t, err)
+
+		var decoded ProtectedResourceMetadata
+		err = json.Unmarshal(data, &decoded)
+		assert.NoError(t, err)
+		assert.Equal(t, *prm, decoded)
+	})
+
+	t.Run("ShouldOmit behavior", func(t *testing.T) {
+		t.Parallel()
+		prm := &ProtectedResourceMetadata{}
+		assert.True(t, ShouldOmit(prm))
+
+		prm.Enabled = true
+		assert.False(t, ShouldOmit(prm))
+	})
+
+	t.Run("omitempty fields excluded when empty", func(t *testing.T) {
+		t.Parallel()
+		prm := &ProtectedResourceMetadata{Enabled: true}
+
+		data, err := json.Marshal(prm)
+		assert.NoError(t, err)
+
+		var raw map[string]interface{}
+		err = json.Unmarshal(data, &raw)
+		assert.NoError(t, err)
+		assert.Contains(t, raw, "enabled")
+		assert.NotContains(t, raw, "wellKnownPath")
+		assert.NotContains(t, raw, "resource")
+		assert.NotContains(t, raw, "authorizationServers")
+		assert.NotContains(t, raw, "scopesSupported")
 	})
 }

@@ -8,6 +8,7 @@ import (
 var (
 	New            = errors.New
 	Is             = errors.Is
+	As             = errors.As
 	Join           = errors.Join
 	Unwrap         = errors.Unwrap
 	ErrUnsupported = errors.ErrUnsupported

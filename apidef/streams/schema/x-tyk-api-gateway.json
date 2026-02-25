@@ -1141,6 +1141,14 @@
         "enabled"
       ]
     },
+    "X-Tyk-CertificateAuth": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        }
+      }
+    },
     "X-Tyk-Authentication": {
       "type": "object",
       "properties": {
@@ -1195,10 +1203,46 @@
               ]
             }
           }
+        },
+        "protectedResourceMetadata": {
+          "$ref": "#/definitions/X-Tyk-ProtectedResourceMetadata"
+        },
+        "certificateAuth": {
+          "$ref": "#/definitions/X-Tyk-CertificateAuth"
         }
       },
       "required": [
         "enabled"
+      ]
+    },
+    "X-Tyk-ProtectedResourceMetadata": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "wellKnownPath": {
+          "type": "string"
+        },
+        "resource": {
+          "type": "string"
+        },
+        "authorizationServers": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "scopesSupported": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "enabled",
+        "resource"
       ]
     },
     "X-Tyk-Server": {

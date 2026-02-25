@@ -458,6 +458,8 @@ func (m *mockCertificateManager) CertPool(certIDs []string) *x509.CertPool {
 
 func (m *mockCertificateManager) FlushCache() {}
 
+func (m *mockCertificateManager) SetUsageTracker(_ certs.UsageTracker, _ *config.Config) {}
+
 // Helper function to create a mock certificate for testing
 func createMockCertificate() *tls.Certificate {
 	return &tls.Certificate{

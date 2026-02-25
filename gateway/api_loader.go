@@ -129,7 +129,7 @@ func (gw *Gateway) generateSubRoutes(spec *APISpec, router *mux.Router) {
 		gw.loadGraphQLPlayground(spec, router)
 	}
 
-	if spec.EnableBatchRequestSupport {
+	if spec.EnableBatchRequestSupport && !spec.IsMCP() {
 		gw.addBatchEndpoint(spec, router)
 	}
 
@@ -137,6 +137,7 @@ func (gw *Gateway) generateSubRoutes(spec *APISpec, router *mux.Router) {
 		oauthManager := gw.addOAuthHandlers(spec, router)
 		spec.OAuthManager = oauthManager
 	}
+
 }
 
 func (gw *Gateway) processSpec(
@@ -301,6 +302,16 @@ func (gw *Gateway) processSpec(
 		logger.Info("Checking security policy: Open")
 	}
 
+	// For MCP/JSON-RPC APIs, add RequestSizeLimitMiddleware early to prevent DoS attacks.
+	// JSONRPCMiddleware reads the entire request body, so size must be validated first.
+	if spec.IsMCP() {
+		gw.mwAppendEnabled(&chainArray, &RequestSizeLimitMiddleware{baseMid.Copy()})
+	}
+
+	// JSONRPCMiddleware must run before VersionCheck for JSON-RPC APIs.
+	// It parses JSON-RPC payloads, rewrites URL paths to VEM paths, and sets
+	// the routing context that VersionCheck uses for whitelist/blacklist validation.
+	gw.mwAppendEnabled(&chainArray, &JSONRPCMiddleware{BaseMiddleware: baseMid.Copy()})
 	gw.mwAppendEnabled(&chainArray, &VersionCheck{BaseMiddleware: baseMid.Copy()})
 	gw.mwAppendEnabled(&chainArray, &CORSMiddleware{BaseMiddleware: baseMid.Copy()})
 
@@ -328,9 +339,16 @@ func (gw *Gateway) processSpec(
 	gw.mwAppendEnabled(&chainArray, &IPBlackListMiddleware{BaseMiddleware: baseMid.Copy()})
 	gw.mwAppendEnabled(&chainArray, &CertificateCheckMW{BaseMiddleware: baseMid.Copy()})
 	gw.mwAppendEnabled(&chainArray, &OrganizationMonitor{BaseMiddleware: baseMid.Copy(), mon: Monitor{Gw: gw}})
-	gw.mwAppendEnabled(&chainArray, &RequestSizeLimitMiddleware{baseMid.Copy()})
+
+	// For non-MCP APIs, add RequestSizeLimitMiddleware in its original position.
+	// For MCP APIs, it's already added earlier (before JSONRPCMiddleware) to prevent DoS.
+	if !spec.IsMCP() {
+		gw.mwAppendEnabled(&chainArray, &RequestSizeLimitMiddleware{baseMid.Copy()})
+	}
+
 	gw.mwAppendEnabled(&chainArray, &MiddlewareContextVars{BaseMiddleware: baseMid.Copy()})
 	gw.mwAppendEnabled(&chainArray, &TrackEndpointMiddleware{baseMid.Copy()})
+	gw.mwAppendEnabled(&chainArray, &PRMMiddleware{BaseMiddleware: baseMid.Copy()})
 
 	// Track auth middlewares for OR wrapper
 	var authMiddlewares []TykMiddleware
@@ -547,6 +565,12 @@ func (gw *Gateway) processSpec(
 			chainArray = append(chainArray, gw.createDynamicMiddleware(obj.Name, false, obj.RequireSession, baseMid.Copy()))
 		}
 	}
+
+	// MCPVEMContinuationMiddleware must be the last middleware in the chain.
+	// After all VEM-specific middleware has been applied, it checks the routing state
+	// and either continues to the next VEM or allows the request to proceed to upstream.
+	gw.mwAppendEnabled(&chainArray, &MCPVEMContinuationMiddleware{BaseMiddleware: baseMid.Copy()})
+
 	chain = alice.New(chainArray...).Then(&DummyProxyHandler{SH: SuccessHandler{baseMid.Copy()}, Gw: gw})
 
 	if !spec.UseKeylessAccess {
@@ -854,9 +878,11 @@ func (gw *Gateway) loadHTTPService(spec *APISpec, apisByListen map[string]int, g
 	router := muxer.router(port, spec.Protocol, gwConfig)
 	if router == nil {
 		router = mux.NewRouter()
-		newrelic.Mount(router, gw.NewRelicApplication)
-
 		muxer.setRouter(port, spec.Protocol, router, gwConfig)
+	}
+
+	if muxer.checkAndMarkInstrumented(router) {
+		newrelic.Mount(router, gw.NewRelicApplication)
 	}
 
 	hostname := gwConfig.HostName
@@ -891,6 +917,12 @@ func (gw *Gateway) loadHTTPService(spec *APISpec, apisByListen map[string]int, g
 	}
 
 	// Register routes for each prefix
+	gw.generateRoutesForPrefixes(spec, prefixes, gwConfig.HttpServerOptions.EnableStrictRoutes, router, chainObj)
+
+	return chainObj, nil
+}
+
+func (gw *Gateway) generateRoutesForPrefixes(spec *APISpec, prefixes []string, enabledStrictRoutes bool, router *mux.Router, chainObj *ChainObject) {
 	for _, prefix := range prefixes {
 		subrouter := router.PathPrefix(prefix).Subrouter()
 
@@ -900,13 +932,11 @@ func (gw *Gateway) loadHTTPService(spec *APISpec, apisByListen map[string]int, g
 			subrouter.Handle(rateLimitEndpoint, chainObj.RateLimitChain)
 		}
 
-		httpHandler := explicitRouteSubpaths(prefix, chainObj.ThisHandler, gwConfig.HttpServerOptions.EnableStrictRoutes)
+		httpHandler := explicitRouteSubpaths(prefix, chainObj.ThisHandler, enabledStrictRoutes)
 
 		// Attach handlers
 		subrouter.NewRoute().Handler(httpHandler)
 	}
-
-	return chainObj, nil
 }
 
 func (gw *Gateway) loadTCPService(spec *APISpec, gs *generalStores, muxer *proxyMux) {
@@ -1009,14 +1039,17 @@ func (gw *Gateway) loadGraphQLPlayground(spec *APISpec, subrouter *mux.Router) {
 	})
 }
 
-func sortSpecsByListenPath(specs []*APISpec) {
+func sortSpecsByListenPath(specs []*APISpec, enabledCustomDomain bool) {
 	// sort by listen path from longer to shorter, so that /foo
 	// doesn't break /foo-bar
 	sort.Slice(specs, func(i, j int) bool {
-		// we sort by the following rules:
+		// when custom domains are disabled in config we sort by the following rules:
+		// - decreasing order of listen path length
+
+		// when custom domains are enabled in config we sort by the following rules:
 		// - decreasing order of listen path length
 		// - if a domain is empty it should be at the end
-		if (specs[i].Domain == "") != (specs[j].Domain == "") {
+		if enabledCustomDomain && (specs[i].Domain == "") != (specs[j].Domain == "") {
 			return specs[i].Domain != ""
 		}
 
@@ -1048,10 +1081,28 @@ func listenPathLength(listenPath string) int {
 func (gw *Gateway) loadApps(specs []*APISpec) {
 	mainLog.Info("Loading API configurations.")
 
+	// Only build usage map in RPC mode (when tracker exists)
+	if gw.certUsageTracker != nil {
+		// Build the complete usage map offline (no locks held during construction)
+		newUsageMap := CollectCertUsageMap(specs, gw.GetConfig().HttpServerOptions.SSLCertificates)
+
+		// Atomically replace the old usage map with the new one
+		// This ensures no partial state is visible to concurrent readers
+		gw.certUsageTracker.ReplaceAll(newUsageMap)
+
+		// Log when feature is enabled
+		if gw.GetConfig().SlaveOptions.SyncUsedCertsOnly {
+			mainLog.WithFields(logrus.Fields{
+				"cert_count": gw.certUsageTracker.Len(),
+				"api_count":  len(specs),
+			}).Info("sync used certs only enabled")
+		}
+	}
+
 	tmpSpecRegister := make(map[string]*APISpec)
 	tmpSpecHandles := new(sync.Map)
 
-	sortSpecsByListenPath(specs)
+	sortSpecsByListenPath(specs, gw.GetConfig().EnableCustomDomains)
 
 	// Create a new handler for each API spec
 	apisByListen := countApisByListenHash(specs)

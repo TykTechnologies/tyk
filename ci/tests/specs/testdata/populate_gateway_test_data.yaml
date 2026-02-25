@@ -49,7 +49,7 @@ testcases:
               "location": "header"
             },
             "name": "Tyk Test API",
-            "org_id": "664a14650619d40001f1f00f",
+            "org_id": "5e9d9544a1dcd60001d0ed20",
             "proxy": {
               "listen_path": "/tyk-api-test/",
               "strip_listen_path": true,
@@ -115,7 +115,7 @@ testcases:
         body: |
           {
             "access_rights": {
-              "itachi-api": {
+              "f84ve1a04e5648c2797170567971565n": {
                 "allowed_urls": [
                   {
                     "methods": [
@@ -132,6 +132,7 @@ testcases:
                 ]
               }
             },
+            "org_id": "5e9d9544a1dcd60001d0ed20",
             "active": true,
             "hmac_enabled": false,
             "id": "46ad120575961080181867e",

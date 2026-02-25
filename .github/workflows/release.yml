@@ -741,7 +741,7 @@ jobs:
           org_gh_token: ${{ secrets.ORG_GH_TOKEN }}
       - name: Run API tests
         uses: TykTechnologies/github-actions/.github/actions/tests/api-tests@main
-        timeout-minutes: 30
+        timeout-minutes: 45
         id: test_execution
         with:
           user_api_secret: ${{ steps.env_up.outputs.USER_API_SECRET }}

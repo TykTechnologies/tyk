@@ -9,8 +9,10 @@ import (
 
 	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/getkin/kin-openapi/openapi3filter"
+	"github.com/sirupsen/logrus"
 
 	"github.com/TykTechnologies/tyk/header"
+	"github.com/TykTechnologies/tyk/internal/httputil"
 )
 
 var (
@@ -77,6 +79,78 @@ func (k *ValidateRequest) EnabledForSpec() bool {
 
 // ProcessRequest will run any checks on the request on the way through the system, return an error to have the chain fail
 func (k *ValidateRequest) ProcessRequest(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
+	// For APIs with mux-template listen paths (e.g., /api/{version:.*}), we fall back
+	// to the original findOperation behavior because StripListenPath doesn't work reliably
+	// with such patterns - they can greedily match parts of the OAS path.
+	if httputil.IsMuxTemplate(k.Spec.Proxy.ListenPath) {
+		return k.processRequestWithFindOperation(r)
+	}
+
+	// Use FindSpecMatchesStatus to check if this path should be validated
+	// This ensures the standard regex-based path matching is used, respecting gateway configurations
+	versionInfo, _ := k.Spec.Version(r)
+	versionPaths := k.Spec.RxPaths[versionInfo.Name]
+
+	urlSpec, found := k.Spec.FindSpecMatchesStatus(r, versionPaths, OASValidateRequest)
+
+	if !found || urlSpec == nil {
+		// No validation configured for this path
+		return nil, http.StatusOK
+	}
+
+	validateRequest := urlSpec.OASValidateRequestMeta
+	if validateRequest == nil || !validateRequest.Enabled {
+		return nil, http.StatusOK
+	}
+
+	errResponseCode := http.StatusUnprocessableEntity
+	if validateRequest.ErrorResponseCode != 0 {
+		errResponseCode = validateRequest.ErrorResponseCode
+	}
+
+	normalizeHeaders(r.Header)
+
+	// Find the route using the OAS path from URLSpec, not the actual request path.
+	// This allows prefix/suffix matching to work: request to /anything/abc can be
+	// validated against the /anything operation.
+	// We pass both the stripped path (for path param extraction) and full path (for regexp listen paths).
+	strippedPath := k.Spec.StripListenPath(r.URL.Path)
+	route, pathParams, err := k.Spec.findRouteForOASPath(urlSpec.OASPath, urlSpec.OASMethod, strippedPath, r.URL.Path)
+	if err != nil || route == nil {
+		log.WithFields(logrus.Fields{
+			"method":   r.Method,
+			"path":     r.URL.Path,
+			"oas_path": urlSpec.OASPath,
+			"error":    err,
+		}).Error("OAS ValidateRequest: could not find route for matched OAS path")
+		return fmt.Errorf("request validation error: no matching operation was found for request: %s %s", r.Method, r.URL.Path), errResponseCode
+	}
+
+	// Validate request
+	requestValidationInput := &openapi3filter.RequestValidationInput{
+		Request:    r,
+		PathParams: pathParams,
+		Route:      route,
+		Options: &openapi3filter.Options{
+			AuthenticationFunc: func(ctx context.Context, input *openapi3filter.AuthenticationInput) error {
+				return nil
+			},
+		},
+	}
+
+	err = openapi3filter.ValidateRequest(r.Context(), requestValidationInput)
+	if err != nil {
+		return fmt.Errorf("request validation error: %w", err), errResponseCode
+	}
+
+	// Handle Success
+	return nil, http.StatusOK
+}
+
+// processRequestWithFindOperation is the original implementation that uses findOperation
+// to locate the OAS route. This is used for APIs with mux-template listen paths where
+// the standard regex-based path matching doesn't work reliably.
+func (k *ValidateRequest) processRequestWithFindOperation(r *http.Request) (error, int) {
 	operation := k.Spec.findOperation(r)
 
 	if operation == nil {

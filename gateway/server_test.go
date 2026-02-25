@@ -1,25 +1,29 @@
 package gateway
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"net"
 	"net/http"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
 	"time"
 
+	"github.com/samber/lo"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 
 	"github.com/TykTechnologies/again"
 	"github.com/TykTechnologies/storage/persistent/model"
-
 	"github.com/TykTechnologies/tyk/config"
+	internalmodel "github.com/TykTechnologies/tyk/internal/model"
 	"github.com/TykTechnologies/tyk/internal/netutil"
 	"github.com/TykTechnologies/tyk/internal/otel"
 	"github.com/TykTechnologies/tyk/internal/policy"
@@ -45,13 +49,18 @@ func TestGateway_afterConfSetup(t *testing.T) {
 			},
 			expectedConfig: config.Config{
 				SlaveOptions: config.SlaveOptionsConfig{
-					UseRPC:                   true,
-					GroupID:                  "ungrouped",
-					CallTimeout:              30,
-					PingTimeout:              60,
-					KeySpaceSyncInterval:     10,
-					RPCCertCacheExpiration:   3600,
-					RPCGlobalCacheExpiration: 30,
+					UseRPC:                      true,
+					GroupID:                     "ungrouped",
+					CallTimeout:                 30,
+					PingTimeout:                 60,
+					KeySpaceSyncInterval:        10,
+					RPCCertCacheExpiration:      3600,
+					RPCGlobalCacheExpiration:    30,
+					RPCCertFetchMaxElapsedTime:  30,
+					RPCCertFetchInitialInterval: 0.1,
+					RPCCertFetchMaxInterval:     2,
+					RPCCertFetchRetryEnabled:    func() *bool { b := true; return &b }(),
+					RPCCertFetchMaxRetries:      func() *int { i := 5; return &i }(),
 				},
 				AnalyticsConfig: config.AnalyticsConfigConfig{
 					PurgeInterval: 10,
@@ -166,7 +175,7 @@ func TestGateway_policiesByIDLen(t *testing.T) {
 				})
 			}
 
-			actual := ts.Gw.PolicyCount()
+			actual := ts.Gw.policies.PolicyCount()
 
 			assert.Equal(t, tc.expected, actual)
 		})
@@ -1086,15 +1095,14 @@ func TestLoadPoliciesFromRPC(t *testing.T) {
 
 	t.Run("returns policies from rpc", func(t *testing.T) {
 		mid := model.NewObjectID()
+		orgId := "org123"
 
 		var policies = []user.Policy{
-			{MID: mid},
+			{MID: mid, OrgID: orgId},
 		}
 
 		marshaledPolicies, err := json.Marshal(policies)
 		assert.NoError(t, err)
-
-		orgId := "org123"
 
 		store := policy.NewMockRPCDataLoader(gomock.NewController(t))
 		store.EXPECT().Connect().Return(true)
@@ -1104,7 +1112,9 @@ func TestLoadPoliciesFromRPC(t *testing.T) {
 		assert.NoError(t, err)
 
 		assert.Len(t, respondedPolicies, 1, "returns one policy like returned store")
-		assert.Equal(t, mid.Hex(), respondedPolicies[mid.Hex()].ID, "ensures ID from MID ID is empty") // temporary solution can be removed in a while
+		ts.Gw.policies.Reload(respondedPolicies...)
+		_, ok := ts.Gw.policies.PolicyByID(internalmodel.NewScopedCustomPolicyId(orgId, mid.Hex()))
+		assert.True(t, ok, "adds missing information")
 	})
 
 	t.Run("returns error if invalid policy received from rpc storage", func(t *testing.T) {
@@ -1124,4 +1134,53 @@ func TestLoadPoliciesFromRPC(t *testing.T) {
 		_, err = ts.Gw.LoadPoliciesFromRPC(store, orgId)
 		assert.ErrorContains(t, err, "invalid ObjectId in JSON")
 	})
+}
+
+func TestPoliciesCollisionMessage(t *testing.T) {
+	ts := StartTest(nil)
+	t.Cleanup(ts.Close)
+
+	type logMessage struct {
+		Level string    `json:"level"`
+		Msg   string    `json:"msg"`
+		Time  time.Time `json:"time"`
+	}
+
+	var buf bytes.Buffer
+
+	mock := logrus.New()
+	mock.SetOutput(&buf)
+	mock.SetFormatter(&logrus.JSONFormatter{})
+	mock.SetLevel(logrus.WarnLevel)
+
+	originGlobalLogger := log
+	log = mock
+	t.Cleanup(func() {
+		log = originGlobalLogger
+	})
+
+	id1 := model.NewObjectID()
+	id2 := model.NewObjectID()
+	id3 := model.NewObjectID()
+
+	ts.Gw.policies.Reload(
+		user.Policy{MID: id1, ID: "duplicate_id", OrgID: "A"},
+		user.Policy{MID: id2, ID: "duplicate_id", OrgID: "A"},
+		user.Policy{MID: id3, ID: "duplicate_id", OrgID: "B"},
+	)
+
+	msgs := lo.Map(slices.Collect(strings.Lines(buf.String())), func(line string, _ int) logMessage {
+		var res logMessage
+		err := json.Unmarshal([]byte(line), &res)
+		assert.NoError(t, err)
+		return res
+	})
+
+	require.Len(t, msgs, 1)
+	msg := msgs[0]
+
+	assert.Contains(t, msg.Msg, "Policies should not share the same ID")
+	assert.Contains(t, msg.Msg, "duplicate_id")
+	assert.Contains(t, msg.Msg, id1.Hex())
+	assert.Contains(t, msg.Msg, id2.Hex())
 }

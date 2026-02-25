@@ -159,15 +159,25 @@ func (gw *Gateway) EventHandlerByName(handlerConf apidef.EventHandlerTriggerConf
 
 func fireEvent(name apidef.TykEvent, meta interface{}, handlers map[apidef.TykEvent][]config.TykEventHandler) {
 	log.Debug("EVENT FIRED: ", name)
+	log.Debugf("EVENT TRIGGERS MAP SIZE: %d", len(handlers))
+
+	// Log only event names (keys), not the full handler configuration which may contain sensitive data
+	// such as webhook URLs, headers with authentication tokens, or other credentials
+	eventNames := make([]apidef.TykEvent, 0, len(handlers))
+	for eventName := range handlers {
+		eventNames = append(eventNames, eventName)
+	}
+	log.Debugf("REGISTERED EVENT TYPES: %v", eventNames)
+
 	if handlers, e := handlers[name]; e {
-		log.Debugf("FOUND %d EVENT HANDLERS", len(handlers))
+		log.Debugf("FOUND %d EVENT HANDLERS FOR %s", len(handlers), name)
 		eventMessage := config.EventMessage{
 			Meta:      meta,
 			Type:      name,
 			TimeStamp: time.Now().Local().String(),
 		}
-		for _, handler := range handlers {
-			log.Debug("FIRING HANDLER: ", handler)
+		for i, handler := range handlers {
+			log.Debugf("FIRING HANDLER %d/%d FOR EVENT %s", i+1, len(handlers), name)
 			go handler.HandleEvent(eventMessage)
 		}
 	}

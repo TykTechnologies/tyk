@@ -2,7 +2,6 @@ package gateway
 
 import (
 	"bytes"
-	"context"
 	"crypto/md5"
 	"errors"
 	"fmt"
@@ -23,6 +22,7 @@ import (
 	"golang.org/x/sync/singleflight"
 
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/ctx"
 	"github.com/TykTechnologies/tyk/header"
 	"github.com/TykTechnologies/tyk/internal/cache"
 	"github.com/TykTechnologies/tyk/internal/event"
@@ -78,18 +78,10 @@ func (tr TraceMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request,
 		cfg := baseMw.Gw.GetConfig()
 		if cfg.OpenTelemetry.Enabled {
 			otel.AddTraceID(r.Context(), w)
-			var span otel.Span
-			if baseMw.Spec.DetailedTracing {
-				var ctx context.Context
-				ctx, span = baseMw.Gw.TracerProvider.Tracer().Start(r.Context(), tr.Name())
-				defer span.End()
-				setContext(r, ctx)
-			} else {
-				span = otel.SpanFromContext(r.Context())
-			}
 
+			span := otel.SpanFromContext(r.Context())
 			err, i := tr.TykMiddleware.ProcessRequest(w, r, conf)
-			if err != nil {
+			if err != nil && span != nil {
 				span.SetStatus(otel.SPAN_STATUS_ERROR, err.Error())
 			}
 
@@ -137,6 +129,22 @@ func (gw *Gateway) createMiddleware(actualMW TykMiddleware) func(http.Handler) h
 
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			// Create span early if OpenTelemetry is enabled
+			if baseMw := mw.Base(); baseMw != nil {
+				cfg := baseMw.Gw.GetConfig()
+				if cfg.OpenTelemetry.Enabled && baseMw.Spec.DetailedTracing {
+					ctx, span := baseMw.Gw.TracerProvider.Tracer().Start(r.Context(), mw.Name())
+					setContext(r, ctx)
+					defer func() {
+						attrs := ctxGetSpanAttributes(r, mw.Name())
+						if len(attrs) > 0 {
+							span.SetAttributes(attrs...)
+						}
+						span.End()
+					}()
+				}
+			}
+
 			logger := mw.Base().SetRequestLogger(r)
 
 			if txn := newrelic.FromContext(r.Context()); txn != nil {
@@ -213,7 +221,27 @@ func (gw *Gateway) createMiddleware(actualMW TykMiddleware) func(http.Handler) h
 	}
 }
 
+// isDisabledForMCP returns true if the given middleware should be disabled for MCP APIs.
+// Centralizes all MCP middleware restrictions for easy maintenance.
+func (gw *Gateway) isDisabledForMCP(mw TykMiddleware) bool {
+	spec := mw.Base().Spec
+	if !spec.IsMCP() {
+		return false
+	}
+
+	switch mw.(type) {
+	case *RedisCacheMiddleware:
+		return true
+	default:
+		return false
+	}
+}
+
 func (gw *Gateway) mwAppendEnabled(chain *[]alice.Constructor, mw TykMiddleware) bool {
+	if gw.isDisabledForMCP(mw) {
+		return false
+	}
+
 	if mw.EnabledForSpec() {
 		*chain = append(*chain, gw.createMiddleware(mw))
 		return true
@@ -435,7 +463,7 @@ func (t *BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 	if t.Spec != nil {
 		orgID = &t.Spec.OrgID
 	}
-	store := policy.New(orgID, t.Gw, log)
+	store := policy.New(orgID, t.Gw.policies, log)
 	return store.Apply(session)
 }
 
@@ -454,9 +482,20 @@ func (t *BaseMiddleware) RecordAccessLog(req *http.Request, resp *http.Response,
 
 	// Set the access log fields
 	accessLog := accesslog.NewRecord()
+	accessLog.WithAPIID(t.Spec.APIID, t.Spec.Name, t.Spec.OrgID)
 	accessLog.WithApiKey(req, hashKeys, gw.obfuscateKey)
 	accessLog.WithRequest(req, latency)
 	accessLog.WithResponse(resp)
+
+	// Add error classification if present (only on error requests)
+	if errClass := ctx.GetErrorClassification(req); errClass != nil {
+		accessLog.WithErrorClassification(errClass)
+	}
+
+	// Only include trace_id when OpenTelemetry is enabled
+	if gwConfig.OpenTelemetry.Enabled {
+		accessLog.WithTraceID(req)
+	}
 
 	logFields := accessLog.Fields(allowedFields)
 

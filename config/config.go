@@ -98,13 +98,21 @@ const (
 	DefaultOTelResourceName = "tyk-gateway"
 )
 
+type PolicySource string
+
+const (
+	PolicySourceService PolicySource = "service"
+	PolicySourceRpc     PolicySource = "rpc"
+	PolicySourceFile    PolicySource = "file"
+)
+
 type PoliciesConfig struct {
 	// Set this value to `file` to look in the file system for a definition file. Set to `service` to use the Dashboard service.
-	PolicySource string `json:"policy_source"`
+	PolicySource PolicySource `json:"policy_source"`
 
 	// This option is required if `policies.policy_source` is set to `service`.
 	// Set this to the URL of your Tyk Dashboard installation. The URL needs to be formatted as: http://dashboard_host:port.
-	PolicyConnectionString string `json:"policy_connection_string"`
+	PolicyConnectionString string `json:"policy_connection_string" structviewer:"obfuscate"`
 
 	// This option only applies in OSS deployment when the `policies.policy_source` is either set
 	// to `file` or an empty string. If `policies.policy_path` is not set, then Tyk will load policies
@@ -129,7 +137,7 @@ type PoliciesConfig struct {
 
 type DBAppConfOptionsConfig struct {
 	// Set the URL to your Dashboard instance (or a load balanced instance). The URL needs to be formatted as: `http://dashboard_host:port`
-	ConnectionString string `json:"connection_string"`
+	ConnectionString string `json:"connection_string" structviewer:"obfuscate"`
 
 	// Set a timeout value, in seconds, for your Dashboard connection. Default value is 30.
 	ConnectionTimeout int `json:"connection_timeout"`
@@ -155,11 +163,11 @@ type StorageOptionsConf struct {
 	// Redis sentinel master name
 	MasterName string `json:"master_name"`
 	// Redis sentinel password
-	SentinelPassword string `json:"sentinel_password"`
+	SentinelPassword string `json:"sentinel_password" structviewer:"obfuscate"`
 	// Redis user name
 	Username string `json:"username"`
 	// If your Redis instance has a password set for access, you can set it here.
-	Password string `json:"password"`
+	Password string `json:"password" structviewer:"obfuscate"`
 	// Redis database
 	Database int `json:"database"`
 	// Set the number of maximum idle connections in the Redis connection pool, which defaults to 100. Set to a higher value if you are expecting more traffic.
@@ -188,6 +196,12 @@ type StorageOptionsConf struct {
 	// Options: ["1.0", "1.1", "1.2", "1.3"].
 	// Defaults to "1.2".
 	TLSMinVersion string `json:"tls_min_version"`
+	// Enables Zstd compression of API definitions stored in Redis backups.
+	// When enabled, API definitions are compressed before encryption, reducing Redis storage.
+	// The Gateway can read both compressed and uncompressed formats for backward compatibility.
+	// Note: Decompression has a 100MB memory limit.
+	// Defaults to false.
+	CompressAPIDefinitions bool `json:"compress_api_definitions"`
 }
 
 type NormalisedURLConfig struct {
@@ -287,18 +301,29 @@ type AccessLogsConfig struct {
 	//
 	// Template Options:
 	//
-	// - `api_key` will include they obfuscated or hashed key.
-	// - `client_ip` will include the ip of the request.
+	// - `api_key` will include the obfuscated or hashed key.
+	// - `circuit_breaker_state` will include the circuit breaker state when applicable.
+	// - `client_ip` will include the IP of the request.
+	// - `error_source` will include the source of an error (e.g., ReverseProxy).
+	// - `error_target` will include the target that caused an error.
 	// - `host` will include the host of the request.
+	// - `latency_gateway` will include the gateway processing latency.
+	// - `latency_total` will include the total latency of the request.
 	// - `method` will include the request method.
+	// - `org_id` will include the organization ID.
 	// - `path` will include the path of the request.
 	// - `protocol` will include the protocol of the request.
 	// - `remote_addr` will include the remote address of the request.
-	// - `upstream_addr` will include the upstream address (scheme, host and path)
-	// - `upstream_latency` will include the upstream latency of the request.
-	// - `latency_total` will include the total latency of the request.
-	// - `user_agent` will include the user agent of the request.
+	// - `response_code_details` will include detailed error description for 5XX responses.
+	// - `response_flag` will include the error classification flag (e.g., URT, UCF, TLE).
 	// - `status` will include the response status code.
+	// - `tls_cert_expiry` will include the TLS certificate expiry date when applicable.
+	// - `tls_cert_subject` will include the TLS certificate subject when applicable.
+	// - `trace_id` will include the OpenTelemetry trace ID when tracing is enabled.
+	// - `upstream_addr` will include the upstream address (scheme, host and path).
+	// - `upstream_latency` will include the upstream latency of the request.
+	// - `upstream_status` will include the upstream response status code for 5XX responses.
+	// - `user_agent` will include the user agent of the request.
 	Template []string `json:"template"`
 }
 
@@ -359,7 +384,7 @@ type WebHookHandlerConf struct {
 	// The template to load in order to format the request.
 	TemplatePath string `bson:"template_path" json:"template_path"`
 	// Headers to set when firing the webhook.
-	HeaderList map[string]string `bson:"header_map" json:"header_map"`
+	HeaderList map[string]string `bson:"header_map" json:"header_map" structviewer:"obfuscate"`
 	// The cool-down for the event so it does not trigger again (in seconds).
 	EventTimeout int64 `bson:"event_timeout" json:"event_timeout"`
 }
@@ -384,15 +409,15 @@ type SlaveOptionsConfig struct {
 	SSLInsecureSkipVerify bool `json:"ssl_insecure_skip_verify"`
 
 	// Use this setting to add the URL for your MDCB or load balancer host.
-	ConnectionString string `json:"connection_string"`
+	ConnectionString string `json:"connection_string" structviewer:"obfuscate"`
 
 	// Your organization ID to connect to the MDCB installation.
 	RPCKey string `json:"rpc_key"`
 
-	// This the API key of a user used to authenticate and authorize the Gateway’s access through MDCB.
+	// This the API key of a user used to authenticate and authorize the Gateway's access through MDCB.
 	// The user should be a standard Dashboard user with minimal privileges so as to reduce any risk if the user is compromised.
 	// The suggested security settings are read for Real-time notifications and the remaining options set to deny.
-	APIKey string `json:"api_key"`
+	APIKey string `json:"api_key" structviewer:"obfuscate"`
 
 	// Set this option to `true` to enable RPC caching for keys.
 	EnableRPCCache bool `json:"enable_rpc_cache"`
@@ -426,11 +451,34 @@ type SlaveOptionsConfig struct {
 	// RPCKeysCacheExpiration defines the expiration time of the rpc cache that stores the keys, defined in seconds
 	RPCGlobalCacheExpiration float32 `json:"rpc_global_cache_expiration"`
 
+	// RPCCertFetchMaxElapsedTime sets the maximum time in seconds to retry certificate fetch from MDCB during startup (default: 30)
+	RPCCertFetchMaxElapsedTime float32 `json:"rpc_cert_fetch_max_elapsed_time"`
+
+	// RPCCertFetchInitialInterval sets the initial retry interval in seconds for certificate fetch backoff (default: 0.1)
+	RPCCertFetchInitialInterval float32 `json:"rpc_cert_fetch_initial_interval"`
+
+	// RPCCertFetchMaxInterval sets the maximum retry interval in seconds for certificate fetch backoff (default: 2)
+	RPCCertFetchMaxInterval float32 `json:"rpc_cert_fetch_max_interval"`
+
+	// RPCCertFetchRetryEnabled enables exponential backoff retry for certificate fetch from MDCB during startup (default: true)
+	RPCCertFetchRetryEnabled *bool `json:"rpc_cert_fetch_retry_enabled"`
+
+	// RPCCertFetchMaxRetries sets the maximum number of retry attempts for certificate fetch. 0 means unlimited (time-based only) (default: 3)
+	RPCCertFetchMaxRetries *int `json:"rpc_cert_fetch_max_retries"`
+
 	// SynchroniserEnabled enable this config if MDCB has enabled the synchoniser. If disabled then it will ignore signals to synchonise recources
 	SynchroniserEnabled bool `json:"synchroniser_enabled"`
 
 	// DNSMonitor configures background DNS monitoring for proactive detection of MDCB DNS changes
 	DNSMonitor DNSMonitorConfig `json:"dns_monitor"`
+
+	// Set to true to sync only certificates used by loaded APIs.
+	// Only applies when use_rpc is true.
+	// Prevents proactive sync of unused certificates from control plane.
+	// Certificates are fetched on-demand via RPC and cached locally.
+	// Note: Certificates accumulate over time as they are used; they are not removed when APIs are deleted.
+	// Reduces memory usage and log noise in segmented deployments.
+	SyncUsedCertsOnly bool `json:"sync_used_certs_only"`
 }
 
 type LocalSessionCacheConf struct {
@@ -678,7 +726,7 @@ type CertificateExpiryMonitorConfig struct {
 
 type SecurityConfig struct {
 	// Set the AES256 secret which is used to encode certificate private keys when they uploaded via certificate storage
-	PrivateCertificateEncodingSecret string `json:"private_certificate_encoding_secret"`
+	PrivateCertificateEncodingSecret string `json:"private_certificate_encoding_secret" structviewer:"obfuscate"`
 
 	// Enable Gateway Control API to use Mutual TLS. Certificates can be set via `security.certificates.control_api` section
 	ControlAPIUseMutualTLS bool `json:"control_api_use_mutual_tls"`
@@ -686,17 +734,33 @@ type SecurityConfig struct {
 	// Specify public keys used for Certificate Pinning on global level.
 	PinnedPublicKeys map[string]string `json:"pinned_public_keys"`
 
+	// AllowUnsafeDynamicMTLSToken controls whether certificate presence is required for
+	// dynamic mTLS authentication. If set to false (default), requests with a token but
+	// no certificate will be rejected for APIs using dynamic mTLS.
+	AllowUnsafeDynamicMTLSToken bool `json:"allow_unsafe_dynamic_mtls_token"`
+
 	Certificates CertificatesConfig `json:"certificates"`
 
 	// CertificateExpiryMonitor configures the certificate expiry monitoring and notification feature
 	CertificateExpiryMonitor CertificateExpiryMonitorConfig `json:"certificate_expiry_monitor"`
 }
 
+type JWKSConfig struct {
+	// Cache hodls configuration for JWKS caching
+	Cache JWKSCacheConfig `json:"cache"`
+}
+
+type JWKSCacheConfig struct {
+	// Timeout defines how long the JWKS will be kept in the cache before forcing a refresh from the JWKS endpoint.
+	// Default is 240 seconds (4 minutes). Set to 0 to use the default value.
+	Timeout int64 `json:"timeout"`
+}
+
 type NewRelicConfig struct {
 	// New Relic Application name
 	AppName string `json:"app_name"`
 	// New Relic License key
-	LicenseKey string `json:"license_key"`
+	LicenseKey string `json:"license_key" structviewer:"obfuscate"`
 	// Enable distributed tracing
 	EnableDistributedTracing bool `json:"enable_distributed_tracing"`
 }
@@ -793,10 +857,10 @@ type Config struct {
 	// This should be changed as soon as Tyk is installed on your system.
 	// This value is used in every interaction with the Tyk Gateway API. It should be passed along as the X-Tyk-Authorization header in any requests made.
 	// Tyk assumes that you are sensible enough not to expose the management endpoints publicly and to keep this configuration value to yourself.
-	Secret string `json:"secret"`
+	Secret string `json:"secret" structviewer:"obfuscate"`
 
 	// The shared secret between the Gateway and the Dashboard to ensure that API Definition downloads, heartbeat and Policy loads are from a valid source.
-	NodeSecret string `json:"node_secret"`
+	NodeSecret string `json:"node_secret" structviewer:"obfuscate"`
 
 	// Linux PID file location. Do not change unless you know what you are doing. Default: /var/run/tyk/tyk-gateway.pid
 	PIDFileLocation string `json:"pid_file_location"`
@@ -809,6 +873,11 @@ type Config struct {
 
 	// Allow your Dashboard to remotely set Gateway configuration via the Nodes screen.
 	AllowRemoteConfig bool `bson:"allow_remote_config" json:"allow_remote_config"`
+
+	// Set to true to enable the /config and /env endpoints for configuration inspection.
+	// These endpoints require X-Tyk-Authorization header with the secret value.
+	// Default: false
+	EnableConfigInspection bool `json:"enable_config_inspection"`
 
 	// Global Certificate configuration
 	Security SecurityConfig `json:"security"`
@@ -1098,6 +1167,9 @@ type Config struct {
 	// Disable TLS validation for bundle URLs
 	BundleInsecureSkipVerify bool `bson:"bundle_insecure_skip_verify" json:"bundle_insecure_skip_verify"`
 
+	// SkipVerifyExistingPluginBundle skips checksum verification for plugin bundles already on disk.
+	SkipVerifyExistingPluginBundle bool `bson:"skip_verify_existing_plugin_bundle" json:"skip_verify_existing_plugin_bundle"`
+
 	// Set to true if you are using JSVM custom middleware or virtual endpoints.
 	EnableJSVM bool `json:"enable_jsvm"`
 
@@ -1165,7 +1237,7 @@ type Config struct {
 	// Enable Sentry logging
 	UseSentry bool `json:"use_sentry"`
 	// Sentry API code
-	SentryCode string `json:"sentry_code"`
+	SentryCode string `json:"sentry_code" structviewer:"obfuscate"`
 	// Log verbosity for Sentry logging
 	SentryLogLevel string `json:"sentry_log_level"`
 
@@ -1232,7 +1304,7 @@ type Config struct {
 	// In versions before gateway 5.3, only `listen_path` and `target_url` fields
 	// have had the secrets replaced.
 	// See more details https://tyk.io/docs/tyk-self-managed/#how-to-access-the-externally-stored-data
-	Secrets map[string]string `json:"secrets"`
+	Secrets map[string]string `json:"secrets" structviewer:"obfuscate"`
 
 	// Override the default error code and or message returned by middleware.
 	// The following message IDs can be used to override the message and error codes:
@@ -1280,6 +1352,9 @@ type Config struct {
 	Streaming StreamingConfig `json:"streaming"`
 
 	Labs LabsConfig `json:"labs"`
+
+	// JWKS holds the configuration for Tyk JWKS functionalities
+	JWKS JWKSConfig `json:"jwks"`
 }
 
 // LabsConfig include config for streaming
@@ -1338,7 +1413,7 @@ type VaultConfig struct {
 	Timeout time.Duration `json:"timeout"`
 
 	// Token is the vault root token
-	Token string `json:"token"`
+	Token string `json:"token" structviewer:"obfuscate"`
 
 	// KVVersion is the version number of Vault. Usually defaults to 2
 	KVVersion int `json:"kv_version"`
@@ -1362,7 +1437,7 @@ type ConsulConfig struct {
 		Username string `json:"username"`
 
 		// Password to use for HTTP Basic Authentication
-		Password string `json:"password"`
+		Password string `json:"password" structviewer:"obfuscate"`
 	} `json:"http_auth"`
 
 	// WaitTime limits how long a Watch will block. If not provided,
@@ -1371,7 +1446,7 @@ type ConsulConfig struct {
 
 	// Token is used to provide a per-request ACL token
 	// which overrides the agent's default token.
-	Token string `json:"token"`
+	Token string `json:"token" structviewer:"obfuscate"`
 
 	// TLS configuration
 	TLSConfig struct {

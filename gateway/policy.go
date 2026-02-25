@@ -8,12 +8,14 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/samber/lo"
+	"github.com/sirupsen/logrus"
+
 	"github.com/TykTechnologies/graphql-go-tools/pkg/graphql"
+
 	"github.com/TykTechnologies/tyk/header"
 	"github.com/TykTechnologies/tyk/rpc"
 	"github.com/TykTechnologies/tyk/user"
-
-	"github.com/sirupsen/logrus"
 )
 
 var (
@@ -69,7 +71,7 @@ func (d *DBPolicy) ToRegularPolicy() user.Policy {
 	return policy
 }
 
-func LoadPoliciesFromFile(filePath string) (map[string]user.Policy, error) {
+func LoadPoliciesFromFile(filePath string) ([]user.Policy, error) {
 	f, err := os.Open(filePath)
 	if err != nil {
 		log.WithFields(logrus.Fields{
@@ -86,11 +88,18 @@ func LoadPoliciesFromFile(filePath string) (map[string]user.Policy, error) {
 		}).Error("Couldn't unmarshal policies: ", err)
 		return nil, err
 	}
-	return policies, nil
+
+	var res = make([]user.Policy, 0, len(policies))
+	for id, pol := range policies {
+		pol.ID = lo.CoalesceOrEmpty(id, pol.ID) // prioritize id over ID in field or not?
+		res = append(res, pol)
+	}
+
+	return res, nil
 }
 
-func LoadPoliciesFromDir(dir string) (map[string]user.Policy, error) {
-	policies := make(map[string]user.Policy)
+func LoadPoliciesFromDir(dir string) ([]user.Policy, error) {
+	policies := make([]user.Policy, 0)
 	// Grab json files from directory
 	paths, err := filepath.Glob(filepath.Join(dir, "*.json"))
 	if err != nil {
@@ -110,13 +119,14 @@ func LoadPoliciesFromDir(dir string) (map[string]user.Policy, error) {
 			log.Errorf("Couldn't unmarshal policy configuration from dir: %v : %v", path, err)
 		}
 		f.Close()
-		policies[pol.ID] = *pol
+		policies = append(policies, *pol)
 	}
+
 	return policies, nil
 }
 
 // LoadPoliciesFromDashboard will connect and download Policies from a Tyk Dashboard instance.
-func (gw *Gateway) LoadPoliciesFromDashboard(endpoint, secret string) (map[string]user.Policy, error) {
+func (gw *Gateway) LoadPoliciesFromDashboard(endpoint, secret string) ([]user.Policy, error) {
 	// Build request function for recovery mechanism
 	buildReq := func() (*http.Request, error) {
 		req, err := http.NewRequest("GET", endpoint, nil)
@@ -174,53 +184,20 @@ func (gw *Gateway) LoadPoliciesFromDashboard(endpoint, secret string) (map[strin
 	gw.ServiceNonceMutex.Unlock()
 	log.Debug("Loading Policies Finished: Nonce Set: ", list.Nonce)
 
-	policies := make(map[string]user.Policy, len(list.Message))
-
-	log.WithFields(logrus.Fields{
-		"prefix": "policy",
-	}).Info("Processing policy list")
-
-	for _, p := range list.Message {
-		if !ensurePolicyId(&p.Policy) {
-			log.Errorf("invalid policy %#v", p)
-			continue
-		}
-
-		if _, ok := policies[p.ID]; ok {
-			log.WithFields(logrus.Fields{
-				"prefix":   "policy",
-				"policyID": p.ID,
-				"OrgID":    p.OrgID,
-			}).Warning("--> Skipping policy, new item has a duplicate ID!")
-			continue
-		}
-
-		policies[p.ID] = p.ToRegularPolicy()
-	}
-
-	return policies, nil
+	return lo.Map(list.Message, func(item DBPolicy, _ int) user.Policy { return item.ToRegularPolicy() }), nil
 }
 
-func parsePoliciesFromRPC(list string) (map[string]user.Policy, error) {
-	var dbPolicyList []user.Policy
+func parsePoliciesFromRPC(list string) ([]user.Policy, error) {
+	var policies []user.Policy
 
-	if err := json.Unmarshal([]byte(list), &dbPolicyList); err != nil {
+	if err := json.Unmarshal([]byte(list), &policies); err != nil {
 		return nil, err
 	}
 
-	policies := make(map[string]user.Policy, len(dbPolicyList))
-
-	for _, p := range dbPolicyList {
-		if !ensurePolicyId(&p) {
-			continue
-		}
-		policies[p.ID] = p
-	}
-
 	return policies, nil
 }
 
-func (gw *Gateway) LoadPoliciesFromRPC(store RPCDataLoader, orgId string) (map[string]user.Policy, error) {
+func (gw *Gateway) LoadPoliciesFromRPC(store RPCDataLoader, orgId string) ([]user.Policy, error) {
 	if rpc.IsEmergencyMode() {
 		return gw.LoadPoliciesFromRPCBackup()
 	}
@@ -248,23 +225,4 @@ func (gw *Gateway) LoadPoliciesFromRPC(store RPCDataLoader, orgId string) (map[s
 	}
 
 	return policies, nil
-}
-
-// ensurePolicyId ensures ID field exists
-// should be removed after migrate
-func ensurePolicyId(policy *user.Policy) bool {
-	if policy == nil {
-		return false
-	}
-
-	if policy.ID != "" {
-		return true
-	}
-
-	if !policy.MID.Valid() {
-		return false
-	}
-
-	policy.ID = policy.MID.Hex()
-	return true
 }

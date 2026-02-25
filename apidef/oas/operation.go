@@ -88,6 +88,39 @@ type Operation struct {
 	RateLimit *RateLimitEndpoint `bson:"rateLimit,omitempty" json:"rateLimit,omitempty"`
 }
 
+// ExtractToExtendedPaths extracts operation-level middleware configuration into a classic
+// `apidef.ExtendedPathsSet` for the given `path` and `method`.
+//
+// This enables reusing the existing classic middleware compilation pipeline for
+// non-OAS routing constructs (e.g., MCP primitive VEMs).
+func (o *Operation) ExtractToExtendedPaths(ep *apidef.ExtendedPathsSet, path string, method string) {
+	if ep == nil || o == nil {
+		return
+	}
+
+	o.extractAllowanceTo(ep, path, method, allow)
+	o.extractAllowanceTo(ep, path, method, block)
+	o.extractAllowanceTo(ep, path, method, ignoreAuthentication)
+	o.extractInternalTo(ep, path, method)
+	o.extractTransformRequestMethodTo(ep, path, method)
+	o.extractTransformRequestBodyTo(ep, path, method)
+	o.extractTransformResponseBodyTo(ep, path, method)
+	o.extractTransformRequestHeadersTo(ep, path, method)
+	o.extractTransformResponseHeadersTo(ep, path, method)
+	o.extractURLRewriteTo(ep, path, method)
+	o.extractCacheTo(ep, path, method)
+	o.extractEnforceTimeoutTo(ep, path, method)
+	o.extractValidateRequestTo(ep, path, method)
+	o.extractMockResponseTo(ep, path, method)
+	o.extractVirtualEndpointTo(ep, path, method)
+	o.extractEndpointPostPluginTo(ep, path, method)
+	o.extractCircuitBreakerTo(ep, path, method)
+	o.extractTrackEndpointTo(ep, path, method)
+	o.extractDoNotTrackEndpointTo(ep, path, method)
+	o.extractRequestSizeLimitTo(ep, path, method)
+	o.extractRateLimitEndpointTo(ep, path, method)
+}
+
 // AllowanceType holds the valid allowance types values.
 type AllowanceType int
 
@@ -545,6 +578,26 @@ func (o *Operation) extractRequestSizeLimitTo(ep *apidef.ExtendedPathsSet, path 
 	ep.SizeLimit = append(ep.SizeLimit, meta)
 }
 
+func (o *Operation) extractValidateRequestTo(ep *apidef.ExtendedPathsSet, path string, method string) {
+	if o.ValidateRequest == nil {
+		return
+	}
+
+	meta := apidef.ValidateRequestMeta{Path: path, Method: method}
+	o.ValidateRequest.ExtractTo(&meta)
+	ep.ValidateRequest = append(ep.ValidateRequest, meta)
+}
+
+func (o *Operation) extractMockResponseTo(ep *apidef.ExtendedPathsSet, path string, method string) {
+	if o.MockResponse == nil {
+		return
+	}
+
+	meta := apidef.MockResponseMeta{Path: path, Method: method}
+	o.MockResponse.ExtractTo(&meta)
+	ep.MockResponse = append(ep.MockResponse, meta)
+}
+
 // detect possible regex pattern:
 // - character match ([a-z])
 // - greedy match (.*)
@@ -730,6 +783,12 @@ type ValidateRequest struct {
 func (v *ValidateRequest) Fill(meta apidef.ValidatePathMeta) {
 	v.Enabled = !meta.Disabled
 	v.ErrorResponseCode = meta.ErrorResponseCode
+}
+
+// ExtractTo extracts *ValidateRequest into apidef.ValidateRequestMeta.
+func (v *ValidateRequest) ExtractTo(meta *apidef.ValidateRequestMeta) {
+	meta.Enabled = v.Enabled
+	meta.ErrorResponseCode = v.ErrorResponseCode
 }
 
 func (*ValidateRequest) shouldImport(operation *openapi3.Operation) bool {
