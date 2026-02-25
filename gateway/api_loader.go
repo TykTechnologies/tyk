@@ -1096,6 +1096,11 @@ func (gw *Gateway) loadApps(specs []*APISpec) {
 				"cert_count": gw.certUsageTracker.Len(),
 				"api_count":  len(specs),
 			}).Info("sync used certs only enabled")
+
+			// Proactively fetch any required certs that aren't yet locally cached.
+			// This handles the race where CertificateAdded events fired before the API
+			// reload populated the tracker, causing those certs to be silently skipped.
+			gw.syncRequiredCertificates()
 		}
 	}
 
@@ -1270,4 +1275,43 @@ func WithQuotaKey(key string) option.Option[ProcessSpecOptions] {
 	return func(p *ProcessSpecOptions) {
 		p.quotaKey = key
 	}
+}
+
+// syncRequiredCertificates proactively fetches all certificates required by the
+// current tracker that are not yet present in local Redis. This resolves a race
+// where CertificateAdded events are received before the API reload has populated
+// the tracker, causing those certs to be silently skipped by ProcessKeySpaceChanges.
+//
+// GetRaw is idempotent: if the cert is already in local Redis, the MdcbStorage
+// layer returns it immediately without an RPC call. If not, it pulls from RPC and
+// the callbackOnPullCertFromRPC saves it to local Redis.
+func (gw *Gateway) syncRequiredCertificates() {
+	certIDs := gw.certUsageTracker.Certs()
+	if len(certIDs) == 0 {
+		return
+	}
+
+	fetched := 0
+	cached := 0
+
+	for _, certID := range certIDs {
+		_, err := gw.CertificateManager.GetRaw(certID)
+		if err != nil {
+			mainLog.WithFields(logrus.Fields{
+				"cert_id": certID,
+				"err":     err,
+			}).Debug("syncRequiredCertificates: could not fetch cert")
+			continue
+		}
+		// We can't distinguish a local-cache hit from an RPC pull here, but
+		// we track both to give a useful summary log line.
+		fetched++
+	}
+
+	_ = cached // reserved for future local-cache detection
+
+	mainLog.WithFields(logrus.Fields{
+		"total":   len(certIDs),
+		"fetched": fetched,
+	}).Info("syncRequiredCertificates: proactive cert sync complete")
 }
