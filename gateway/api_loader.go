@@ -15,8 +15,6 @@ import (
 	"sync"
 	texttemplate "text/template"
 
-	"golang.org/x/sync/errgroup"
-
 	"github.com/TykTechnologies/tyk/common/option"
 
 	"github.com/gorilla/mux"
@@ -1101,7 +1099,7 @@ func (gw *Gateway) loadApps(specs []*APISpec) {
 
 			// Drain pending certs that were skipped before this reload.
 			// Now that the tracker is up to date, fetch any that are required.
-			eg := new(errgroup.Group)
+			var wg sync.WaitGroup
 			gw.pendingCerts.Range(func(k, v any) bool {
 				certID := k.(string)
 				if !gw.certUsageTracker.Required(certID) {
@@ -1109,20 +1107,21 @@ func (gw *Gateway) loadApps(specs []*APISpec) {
 					gw.pendingCerts.Delete(certID)
 					return true
 				}
-				eg.Go(func() error {
+				wg.Add(1)
+				go func() {
+					defer wg.Done()
 					content, err := gw.CertificateManager.GetRaw(certID)
 					if err != nil || content == "" {
 						mainLog.WithField("cert_id", certID).Warn("failed to fetch pending cert after reload")
 						// Keep in pendingCerts so the next reload retries.
-						return nil
+						return
 					}
 					gw.pendingCerts.Delete(certID)
 					mainLog.WithField("cert_id", certID).Info("synced pending certificate after reload")
-					return nil
-				})
+				}()
 				return true
 			})
-			eg.Wait() //nolint:errcheck
+			wg.Wait()
 		}
 	}
 
