@@ -1108,17 +1108,17 @@ func (gw *Gateway) loadApps(specs []*APISpec) {
 					return true
 				}
 				wg.Add(1)
-				go func() {
+				go func(id string) {
 					defer wg.Done()
-					content, err := gw.CertificateManager.GetRaw(certID)
+					content, err := gw.CertificateManager.GetRaw(id)
 					if err != nil || content == "" {
-						mainLog.WithField("cert_id", certID).Warn("failed to fetch pending cert after reload")
+						mainLog.WithField("cert_id", id).Warn("failed to fetch pending cert after reload")
 						// Keep in pendingCerts so the next reload retries.
 						return
 					}
-					gw.pendingCerts.Delete(certID)
-					mainLog.WithField("cert_id", certID).Info("synced pending certificate after reload")
-				}()
+					gw.pendingCerts.Delete(id)
+					mainLog.WithField("cert_id", id).Info("synced pending certificate after reload")
+				}(certID)
 				return true
 			})
 			wg.Wait()
