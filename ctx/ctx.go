@@ -67,6 +67,8 @@ const (
 	JSONRPCRoutingState
 	// MCPRouting indicates the request came via MCP JSON-RPC routing
 	MCPRouting
+	// OriginalRequestPath stores the original request path before any middleware modifications
+	OriginalRequestPath
 )
 
 func ctxSetSession(r *http.Request, s *user.SessionState, scheduleUpdate bool, hashKey bool) {

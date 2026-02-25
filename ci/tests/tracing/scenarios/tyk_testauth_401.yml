@@ -31,3 +31,4 @@ spec:
     - attr:tyk.api.orgid  =  "default"
     - attr:tyk.api.tags  not-contains "test"
     - attr:tyk.api.path  =  "/test-auth/"
+    - attr:tyk.original_path  =  "/test-auth/ip"

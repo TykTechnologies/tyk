@@ -65,6 +65,8 @@ func (h *handleWrapper) handleRequestLimits(w http.ResponseWriter, r *http.Reque
 func (h *handleWrapper) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// Store request start time for accurate latency measurement including all middlewares
 	ctxSetRequestStartTime(r, time.Now())
+	// Capture original request path before any middleware modifications
+	ctxSetOriginalRequestPath(r, r.URL.Path)
 
 	if r.Body != nil {
 		if !h.handleRequestLimits(w, r) {

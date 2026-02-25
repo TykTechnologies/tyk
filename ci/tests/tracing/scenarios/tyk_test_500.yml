@@ -23,6 +23,7 @@ spec:
     - attr:tyk.api.orgid  =  "default"
     - attr:tyk.api.tags  not-contains "test"
     - attr:tyk.api.path  =  "/test/"
+    - attr:tyk.original_path  =  "/test/status/500"
   - name: Check the number of spans
     selector: "span[tracetest.span.type=\"general\" name=\"Tracetest trigger\"] span[tracetest.span.type=\"general\"],
       \nspan[tracetest.span.type = \"http\"]"

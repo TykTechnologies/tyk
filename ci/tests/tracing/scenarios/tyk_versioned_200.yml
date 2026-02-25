@@ -25,3 +25,4 @@ spec:
     - attr:tyk.api.name = "VersionedAPI"
     - attr:tyk.api.orgid = "default"
     - attr:tyk.api.path = "/versioned/"
+    - attr:tyk.original_path = "/versioned/ip"

@@ -275,6 +275,8 @@ func (s *SuccessHandler) RecordHit(r *http.Request, timing analytics.Latency, co
 			Host:          host,
 			Path:          trackedPath,
 			RawPath:       r.URL.Path,
+			OriginalPath:  ctxGetOriginalRequestPath(r),
+			ListenPath:    s.Spec.Proxy.ListenPath,
 			ContentLength: r.ContentLength,
 			UserAgent:     r.Header.Get(header.UserAgent),
 			Day:           t.Day(),

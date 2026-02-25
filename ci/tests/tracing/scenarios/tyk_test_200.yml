@@ -26,6 +26,7 @@ spec:
     - attr:tyk.api.orgid       =       "default"
     - attr:tyk.api.tags       not-contains      "test"
     - attr:tyk.api.path       =       "/test/"
+    - attr:tyk.original_path       =       "/test/ip"
   - selector: span[tracetest.span.type="general" name="Tracetest trigger"] span[tracetest.span.type="general"]
     name: Check if it contains Version and Rate middlewares
     assertions:
