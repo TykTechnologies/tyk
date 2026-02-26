@@ -638,6 +638,8 @@ func (t *Service) applyAPILevelLimits(policyAD user.AccessDefinition, currAD use
 	}
 
 	policyAD.Endpoints = t.ApplyEndpointLevelLimits(policyAD.Endpoints, currAD.Endpoints)
+	policyAD.JSONRPCMethods = t.ApplyJSONRPCMethodLimits(policyAD.JSONRPCMethods, currAD.JSONRPCMethods)
+	policyAD.MCPPrimitives = t.ApplyMCPPrimitiveLimits(policyAD.MCPPrimitives, currAD.MCPPrimitives)
 
 	return policyAD
 }
