@@ -922,11 +922,41 @@ func (gw *Gateway) handleAddKey(keyName, sessionString, orgId string) {
 		}).Error("Failed to update key.")
 		return
 	}
+
+	// Register any certificates bound to this token so they pass the selective-sync filter.
+	gw.trackSessionCerts(keyName, sess)
+
 	log.WithFields(logrus.Fields{
 		"prefix": "RPC",
 		"key":    gw.obfuscateKey(keyName),
 		"status": "ok",
 	}).Info("Updated key in slave storage.")
+}
+
+// trackSessionCerts registers certificates from a session into the cert usage tracker.
+// This ensures Certificate Auth (dynamic mTLS) certs are allowed through the
+// selective-sync filter in CertificateManager.GetRaw even though they are not
+// listed in any API definition.
+func (gw *Gateway) trackSessionCerts(tokenKey string, sess *user.SessionState) {
+	if gw.certUsageTracker == nil || sess == nil {
+		return
+	}
+
+	var certIDs []string
+	if sess.Certificate != "" {
+		certIDs = append(certIDs, sess.Certificate)
+	}
+	certIDs = append(certIDs, sess.MtlsStaticCertificateBindings...)
+
+	gw.certUsageTracker.TrackTokenCerts(tokenKey, certIDs)
+}
+
+// untrackSessionCerts removes cert tracker entries for a deleted token.
+func (gw *Gateway) untrackSessionCerts(tokenKey string) {
+	if gw.certUsageTracker == nil {
+		return
+	}
+	gw.certUsageTracker.UntrackTokenCerts(tokenKey)
 }
 
 func (gw *Gateway) handleDeleteKey(keyName, orgID, apiID string, resetQuota bool) (interface{}, int) {
@@ -935,6 +965,7 @@ func (gw *Gateway) handleDeleteKey(keyName, orgID, apiID string, resetQuota bool
 		return apiError("There is no such key found"), http.StatusNotFound
 	}
 	keyName = session.KeyID
+	gw.untrackSessionCerts(keyName)
 
 	if resetQuota {
 		gw.GlobalSessionManager.ResetQuota(keyName, &session, false)
@@ -1023,6 +1054,7 @@ func (gw *Gateway) handleDeleteHashedKey(keyName, orgID, apiID string, resetQuot
 		return apiError("There is no such key found"), http.StatusNotFound
 
 	}
+	gw.untrackSessionCerts(keyName)
 
 	if apiID == "-1" {
 		// Go through ALL managed API's and delete the key

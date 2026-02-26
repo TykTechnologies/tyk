@@ -1,6 +1,7 @@
 package gateway
 
 import (
+	"fmt"
 	"sync"
 	"testing"
 
@@ -26,7 +27,8 @@ func TestNewUsageTracker(t *testing.T) {
 	cr := newUsageTracker()
 
 	assert.NotNil(t, cr)
-	assert.NotNil(t, cr.apis)
+	assert.NotNil(t, cr.apiCerts)
+	assert.NotNil(t, cr.tokenCerts)
 	assert.Equal(t, 0, cr.Len())
 }
 
@@ -271,4 +273,159 @@ func TestUsageTracker_ReplaceAll(t *testing.T) {
 		assert.Equal(t, 1, length)
 	})
 
+}
+
+func TestUsageTracker_TrackTokenCerts(t *testing.T) {
+	t.Run("single token with Certificate field", func(t *testing.T) {
+		cr := newUsageTracker()
+
+		cr.TrackTokenCerts("token1", []string{"cert1"})
+
+		assert.True(t, cr.Required("cert1"))
+		assert.Equal(t, 1, cr.Len())
+	})
+
+	t.Run("single token with multiple cert bindings", func(t *testing.T) {
+		cr := newUsageTracker()
+
+		cr.TrackTokenCerts("token1", []string{"cert1", "cert2", "cert3"})
+
+		assert.True(t, cr.Required("cert1"))
+		assert.True(t, cr.Required("cert2"))
+		assert.True(t, cr.Required("cert3"))
+		assert.Equal(t, 3, cr.Len())
+	})
+
+	t.Run("multiple tokens sharing a cert", func(t *testing.T) {
+		cr := newUsageTracker()
+
+		cr.TrackTokenCerts("token1", []string{"shared-cert"})
+		cr.TrackTokenCerts("token2", []string{"shared-cert"})
+
+		assert.True(t, cr.Required("shared-cert"))
+		assert.Equal(t, 1, cr.Len())
+	})
+
+	t.Run("empty certIDs is a no-op", func(t *testing.T) {
+		cr := newUsageTracker()
+
+		cr.TrackTokenCerts("token1", nil)
+		cr.TrackTokenCerts("token2", []string{})
+
+		assert.Equal(t, 0, cr.Len())
+	})
+
+	t.Run("empty cert ID strings are ignored", func(t *testing.T) {
+		cr := newUsageTracker()
+
+		cr.TrackTokenCerts("token1", []string{"", "cert1", ""})
+
+		assert.True(t, cr.Required("cert1"))
+		assert.Equal(t, 1, cr.Len())
+	})
+
+	t.Run("token cert visible alongside api cert", func(t *testing.T) {
+		cr := newUsageTracker()
+		cr.ReplaceAll(map[string]map[string]struct{}{
+			"api-cert": {"api1": {}},
+		})
+
+		cr.TrackTokenCerts("token1", []string{"token-cert"})
+
+		assert.True(t, cr.Required("api-cert"))
+		assert.True(t, cr.Required("token-cert"))
+		assert.Equal(t, 2, cr.Len())
+	})
+
+	t.Run("token cert survives ReplaceAll", func(t *testing.T) {
+		cr := newUsageTracker()
+		cr.TrackTokenCerts("token1", []string{"token-cert"})
+
+		// Simulate API reload
+		cr.ReplaceAll(map[string]map[string]struct{}{
+			"api-cert": {"api1": {}},
+		})
+
+		assert.True(t, cr.Required("token-cert"), "token cert must survive API reload")
+		assert.True(t, cr.Required("api-cert"))
+		assert.Equal(t, 2, cr.Len())
+	})
+}
+
+func TestUsageTracker_UntrackTokenCerts(t *testing.T) {
+	t.Run("untrack removes token association", func(t *testing.T) {
+		cr := newUsageTracker()
+		cr.TrackTokenCerts("token1", []string{"cert1"})
+
+		cr.UntrackTokenCerts("token1")
+
+		assert.False(t, cr.Required("cert1"))
+		assert.Equal(t, 0, cr.Len())
+	})
+
+	t.Run("cert remains when another token still uses it", func(t *testing.T) {
+		cr := newUsageTracker()
+		cr.TrackTokenCerts("token1", []string{"shared-cert"})
+		cr.TrackTokenCerts("token2", []string{"shared-cert"})
+
+		cr.UntrackTokenCerts("token1")
+
+		assert.True(t, cr.Required("shared-cert"), "cert still needed by token2")
+	})
+
+	t.Run("untrack unknown token is a no-op", func(t *testing.T) {
+		cr := newUsageTracker()
+		cr.TrackTokenCerts("token1", []string{"cert1"})
+
+		cr.UntrackTokenCerts("unknown-token")
+
+		assert.True(t, cr.Required("cert1"))
+	})
+
+	t.Run("untrack removes all certs for the token", func(t *testing.T) {
+		cr := newUsageTracker()
+		cr.TrackTokenCerts("token1", []string{"cert1", "cert2", "cert3"})
+
+		cr.UntrackTokenCerts("token1")
+
+		assert.False(t, cr.Required("cert1"))
+		assert.False(t, cr.Required("cert2"))
+		assert.False(t, cr.Required("cert3"))
+		assert.Equal(t, 0, cr.Len())
+	})
+
+	t.Run("api cert not affected by token untrack", func(t *testing.T) {
+		cr := newUsageTracker()
+		cr.ReplaceAll(map[string]map[string]struct{}{
+			"api-cert": {"api1": {}},
+		})
+		cr.TrackTokenCerts("token1", []string{"token-cert"})
+
+		cr.UntrackTokenCerts("token1")
+
+		assert.True(t, cr.Required("api-cert"))
+		assert.False(t, cr.Required("token-cert"))
+	})
+
+	t.Run("concurrent track and untrack", func(t *testing.T) {
+		cr := newUsageTracker()
+
+		var wg sync.WaitGroup
+		for i := 0; i < 50; i++ {
+			wg.Add(2)
+			tokenKey := fmt.Sprintf("token%d", i)
+			certID := fmt.Sprintf("cert%d", i)
+			go func(tk, cid string) {
+				defer wg.Done()
+				cr.TrackTokenCerts(tk, []string{cid})
+			}(tokenKey, certID)
+			go func(tk string) {
+				defer wg.Done()
+				cr.UntrackTokenCerts(tk)
+			}(tokenKey)
+		}
+		wg.Wait()
+		// No panic and Len is consistent
+		_ = cr.Len()
+	})
 }
