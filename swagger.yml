@@ -1891,7 +1891,7 @@ paths:
                   request:
                     method: GET
                     path: /get
-                    oas:
+                  oas:
                       info:
                         title: testdebug
                         version: 1.0.0
