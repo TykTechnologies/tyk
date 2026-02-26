@@ -1103,7 +1103,10 @@ func (gw *Gateway) loadApps(specs []*APISpec) {
 			sem := make(chan struct{}, runtime.GOMAXPROCS(0))
 			var wg sync.WaitGroup
 			gw.pendingCerts.Range(func(k, _ any) bool {
-				certID := k.(string)
+				certID, ok := k.(string)
+				if !ok {
+					return true
+				}
 				gw.pendingCerts.Delete(certID)
 				if !gw.certUsageTracker.Required(certID) {
 					return true
