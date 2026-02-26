@@ -15,7 +15,7 @@ func TestInitOpenTelemetryMetrics_Disabled(t *testing.T) {
 	// metrics.enabled absent → noop instruments, no error
 	cfg := &OpenTelemetry{}
 	inst := InitOpenTelemetryMetrics(context.Background(), logrus.New(), cfg,
-		"node-1", "v5.0")
+		"node-1", "v5.0", false, "", false, nil)
 
 	// RecordRequest must not panic on noop
 	inst.RecordRequest(context.Background())
@@ -40,7 +40,7 @@ func TestInitOpenTelemetryMetrics_Enabled(t *testing.T) {
 		},
 	}
 	inst := InitOpenTelemetryMetrics(context.Background(), logrus.New(), cfg,
-		"node-1", "v5.0")
+		"node-1", "v5.0", true, "group1", true, []string{"tag1", "tag2"})
 
 	// RecordRequest must not panic
 	inst.RecordRequest(context.Background())
@@ -57,7 +57,7 @@ func TestRecordRequest_NilSafe(t *testing.T) {
 	// Verify the MetricInstruments struct handles disabled state gracefully
 	cfg := &OpenTelemetry{}
 	inst := InitOpenTelemetryMetrics(context.Background(), logrus.New(), cfg,
-		"", "")
+		"", "", false, "", false, nil)
 
 	// Call many times — must never panic
 	require.NotPanics(t, func() {
