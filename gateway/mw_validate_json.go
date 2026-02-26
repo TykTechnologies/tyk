@@ -8,6 +8,8 @@ import (
 	"net/http"
 
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/ctx"
+	tykerrors "github.com/TykTechnologies/tyk/internal/errors"
 	"github.com/TykTechnologies/tyk/internal/service/gojsonschema"
 )
 
@@ -56,6 +58,7 @@ func (k *ValidateJSON) ProcessRequest(_ http.ResponseWriter, r *http.Request, _ 
 	// Perform validation
 	result, err := gojsonschema.Validate(vPathMeta.SchemaCache, inputLoader)
 	if err != nil {
+		ctx.SetErrorClassification(r, tykerrors.ClassifyJSONValidationError(tykerrors.ErrTypeJSONParseError, k.Name()))
 		return fmt.Errorf("JSON parsing error: %w", err), http.StatusBadRequest
 	}
 
@@ -64,7 +67,7 @@ func (k *ValidateJSON) ProcessRequest(_ http.ResponseWriter, r *http.Request, _ 
 		if vPathMeta.ErrorResponseCode == 0 {
 			vPathMeta.ErrorResponseCode = http.StatusUnprocessableEntity
 		}
-
+		ctx.SetErrorClassification(r, tykerrors.ClassifyJSONValidationError(tykerrors.ErrTypeSchemaValidationFailed, k.Name()))
 		return k.formatError(result.Errors()), vPathMeta.ErrorResponseCode
 	}
 

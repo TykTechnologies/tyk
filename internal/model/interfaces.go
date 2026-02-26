@@ -1,6 +1,7 @@
 package model
 
 import (
+	"fmt"
 	"net/http"
 
 	"github.com/sirupsen/logrus"
@@ -45,8 +46,8 @@ type ConfigProvider interface {
 // PolicyProvider is a storage interface encapsulating policy retrieval.
 type PolicyProvider interface {
 	PolicyCount() int
-	PolicyIDs() []string
-	PolicyByID(string) (user.Policy, bool)
+	PolicyIDs() []PolicyID
+	PolicyByID(PolicyID) (user.Policy, bool)
 }
 
 // These are utility methods without any real data model design around them.
@@ -65,3 +66,9 @@ type (
 	// StripListenPathFunc is the function signature for StripListenPath.
 	StripListenPathFunc func(string) string
 )
+
+// PolicyID sealed interface
+type PolicyID interface {
+	fmt.Stringer
+	markerPolicyId()
+}

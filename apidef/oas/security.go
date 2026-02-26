@@ -87,7 +87,6 @@ func (s *OAS) extractTokenTo(api *apidef.APIDefinition, name string) {
 		if token.Enabled != nil {
 			enabled = *token.Enabled
 		}
-		authConfig.UseCertificate = token.EnableClientCertificate
 		token.AuthSources.ExtractTo(&authConfig)
 		if token.Signature != nil {
 			token.Signature.ExtractTo(&authConfig)

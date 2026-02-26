@@ -10,6 +10,7 @@ import (
 	"time"
 
 	temporalmodel "github.com/TykTechnologies/storage/temporal/model"
+	"github.com/TykTechnologies/tyk/certs"
 	"github.com/TykTechnologies/tyk/internal/cache"
 	"github.com/TykTechnologies/tyk/internal/model"
 	"github.com/TykTechnologies/tyk/rpc"
@@ -177,8 +178,10 @@ func (r *RPCStorageHandler) buildNodeInfo() []byte {
 		Tags:            config.DBAppConfOptions.Tags,
 		Health:          r.Gw.getHealthCheckInfo(),
 		Stats: model.GWStats{
-			APIsCount:     r.Gw.apisByIDLen(),
-			PoliciesCount: r.Gw.PolicyCount(),
+			APIsCount:      r.Gw.apisByIDLen(),
+			PoliciesCount:  r.Gw.policies.PolicyCount(),
+			LoadedAPIs:     r.Gw.GetLoadedAPIIDs(),
+			LoadedPolicies: r.Gw.GetLoadedPolicyIDs(),
 		},
 		HostDetails: model.HostDetails{
 			Hostname: r.Gw.hostDetails.Hostname,
@@ -1171,7 +1174,26 @@ func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string, orgId string) 
 	}
 
 	for _, certId := range CertificatesToAdd {
-		log.Debugf("Adding certificate: %v", certId)
+		// Only filter if feature enabled in RPC mode (backward compatible)
+		if r.Gw.GetConfig().SlaveOptions.UseRPC &&
+			r.Gw.GetConfig().SlaveOptions.SyncUsedCertsOnly {
+			if r.Gw.certUsageTracker != nil && !r.Gw.certUsageTracker.Required(certId) {
+				log.WithField("cert_id", certs.MaskCertID(certId)).
+					Debug("skipping certificate - not used by loaded APIs")
+				continue
+			}
+
+			if r.Gw.certUsageTracker != nil {
+				apis := r.Gw.certUsageTracker.APIs(certId)
+				log.WithFields(logrus.Fields{
+					"cert_id": certs.MaskCertID(certId),
+					"apis":    apis,
+				}).Info("syncing required certificate")
+			}
+		} else {
+			log.Debugf("Adding certificate: %v", certId)
+		}
+
 		//If we are in a slave node, MDCB Storage GetRaw should get the certificate from MDCB and cache it locally
 		content, err := r.Gw.CertificateManager.GetRaw(certId)
 		if content == "" && err != nil {
@@ -1239,7 +1261,7 @@ func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string, orgId string) 
 
 	for _, apiID := range apiIDsToInvalidateJWKSCache {
 		log.WithField("apiID", apiID).Debug("Received request to flush JWKS cache")
-		invalidateJWKSCacheByAPIID(apiID)
+		r.Gw.invalidateJWKSCacheByAPIID(apiID)
 	}
 
 	// Notify rest of gateways in cluster to flush cache

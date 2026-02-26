@@ -507,6 +507,7 @@ func (l *SessionLimiter) RedisQuotaExceeded(r *http.Request, session *user.Sessi
 
 	// locked: reset quota + increment
 	conn.Set(ctx, rawKey, 0, quotaRenewalRate)
+	expiredAt = now.Add(quotaRenewalRate)
 	return increment()
 }
 

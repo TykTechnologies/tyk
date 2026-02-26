@@ -1464,3 +1464,68 @@ func TestGetOperationID(t *testing.T) {
 		})
 	}
 }
+
+func TestOAS_ExtractTo_DoesNotExtractPrimitives(t *testing.T) {
+	oasAPI := minimumValidOAS()
+
+	xTykAPIGateway := &XTykAPIGateway{
+		Middleware: &Middleware{
+			McpTools: MCPPrimitives{
+				"get_users": &MCPPrimitive{
+					Operation: Operation{
+						RateLimit: &RateLimitEndpoint{Enabled: true, Rate: 2, Per: 20},
+					},
+				},
+			},
+			McpResources: MCPPrimitives{
+				"file:///*": &MCPPrimitive{
+					Operation: Operation{
+						Internal: &Internal{Enabled: true},
+					},
+				},
+			},
+		},
+	}
+	oasAPI.SetTykExtension(xTykAPIGateway)
+
+	var apiDef apidef.APIDefinition
+	apiDef.SetDisabledFlags()
+	oasAPI.ExtractTo(&apiDef)
+
+	versionInfo := apiDef.VersionData.Versions["Default"]
+
+	assert.Empty(t, versionInfo.ExtendedPaths.RateLimit, "Primitives should not be in ExtendedPaths after ExtractTo")
+	assert.Empty(t, versionInfo.ExtendedPaths.Internal, "Primitives should not be in ExtendedPaths after ExtractTo")
+	assert.Empty(t, versionInfo.ExtendedPaths.TransformHeader, "Primitives should not be in ExtendedPaths after ExtractTo")
+}
+
+func TestExtractPrimitivesToExtendedPaths_DoesNotOverwriteOperations(t *testing.T) {
+	ep := &apidef.ExtendedPathsSet{
+		RateLimit: []apidef.RateLimitMeta{
+			{Path: "/api/users", Method: "GET", Rate: 100},
+		},
+		Internal: []apidef.InternalMeta{
+			{Path: "/api/internal", Method: "POST"},
+		},
+	}
+
+	middleware := &Middleware{
+		McpTools: MCPPrimitives{
+			"get_users": &MCPPrimitive{
+				Operation: Operation{
+					RateLimit: &RateLimitEndpoint{Enabled: true, Rate: 2, Per: 20},
+				},
+			},
+		},
+	}
+
+	middleware.ExtractPrimitivesToExtendedPaths(ep)
+
+	assert.Len(t, ep.RateLimit, 2, "Should have both operation and primitive rate limits")
+	assert.Equal(t, "/api/users", ep.RateLimit[0].Path, "First entry should be original operation")
+	assert.Equal(t, "/mcp-tool:get_users", ep.RateLimit[1].Path, "Second entry should be primitive")
+
+	assert.Len(t, ep.Internal, 2, "Should have both operation and primitive internal")
+	assert.Equal(t, "/api/internal", ep.Internal[0].Path, "First entry should be original operation")
+	assert.Equal(t, "/mcp-tool:get_users", ep.Internal[1].Path, "Second entry should be primitive")
+}

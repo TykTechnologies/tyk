@@ -125,6 +125,48 @@ func TestValidateTykStreamsOASObject(t *testing.T) {
 	})
 }
 
+func TestValidateTykStreamsOASObject_3_1(t *testing.T) {
+	t.Parallel()
+
+	// Create minimal valid OAS 3.1 Tyk Streams document
+	validOAS31Doc := []byte(`{
+		"openapi": "3.1.0",
+		"info": {
+			"title": "Test Streams API 3.1",
+			"version": "1.0.0"
+		},
+		"paths": {},
+		"x-tyk-streaming": {
+			"streams": {}
+		},
+		"x-tyk-api-gateway": {
+			"info": {
+				"name": "test-streams-3.1",
+				"state": {
+					"active": true
+				}
+			},
+			"server": {
+				"listenPath": {
+					"value": "/test-streams-3.1/"
+				}
+			}
+		}
+	}`)
+
+	t.Run("valid OAS 3.1 Tyk Streams document with version 3.1.0", func(t *testing.T) {
+		t.Parallel()
+		err := ValidateOASObject(validOAS31Doc, "3.1.0")
+		assert.NoError(t, err)
+	})
+
+	t.Run("valid OAS 3.1 Tyk Streams document with version 3.1", func(t *testing.T) {
+		t.Parallel()
+		err := ValidateOASObject(validOAS31Doc, "3.1")
+		assert.NoError(t, err)
+	})
+}
+
 func TestValidateOASTemplate(t *testing.T) {
 	t.Run("empty x-tyk ext", func(t *testing.T) {
 		body, err := oasTemplateFS.ReadFile("testdata/empty-x-tyk-ext-oas-template.json")
@@ -141,22 +183,62 @@ func TestValidateOASTemplate(t *testing.T) {
 	})
 }
 
+func TestValidateOASTemplate_3_1(t *testing.T) {
+	t.Parallel()
+
+	// Minimal OAS 3.1 template (missing required x-tyk fields)
+	template31 := []byte(`{
+		"openapi": "3.1.0",
+		"info": {
+			"title": "Template Streams API 3.1",
+			"version": "1.0.0"
+		},
+		"paths": {},
+		"x-tyk-streaming": {},
+		"x-tyk-api-gateway": {}
+	}`)
+
+	t.Run("valid OAS 3.1 Tyk Streams template", func(t *testing.T) {
+		t.Parallel()
+		err := ValidateOASTemplate(template31, "3.1")
+		assert.NoError(t, err)
+	})
+}
+
 func Test_loadOASSchema(t *testing.T) {
 	t.Parallel()
-	t.Run("load Tyk Streams OAS", func(t *testing.T) {
+	t.Run("load Tyk Streams OAS schemas", func(t *testing.T) {
 		t.Parallel()
 		err := loadSchemas()
 		assert.Nil(t, err)
 		assert.NotNil(t, oasJSONSchemas)
-		for oasVersion := range oasJSONSchemas {
-			var xTykStreaming, xTykStreams []byte
-			xTykStreaming, _, _, err = jsonparser.Get(oasJSONSchemas[oasVersion], keyProperties, oas.ExtensionTykStreaming)
-			assert.NoError(t, err)
-			assert.NotNil(t, xTykStreaming)
 
-			xTykStreams, _, _, err = jsonparser.Get(oasJSONSchemas[oasVersion], keyDefinitions, "X-Tyk-Streams")
-			assert.NoError(t, err)
-			assert.NotNil(t, xTykStreams)
+		// Verify we have at least 3.0 and 3.1 schemas
+		assert.Contains(t, oasJSONSchemas, "3.0", "Should load OAS 3.0 schema")
+		assert.Contains(t, oasJSONSchemas, "3.1", "Should load OAS 3.1 schema")
+
+		for oasVersion, schemaData := range oasJSONSchemas {
+			// Check x-tyk-streaming extension is in properties
+			var xTykStreaming []byte
+			xTykStreaming, _, _, err = jsonparser.Get(schemaData, keyProperties, oas.ExtensionTykStreaming)
+			assert.NoError(t, err, "x-tyk-streaming should exist in properties for version %s", oasVersion)
+			assert.NotNil(t, xTykStreaming, "x-tyk-streaming should not be nil for version %s", oasVersion)
+
+			// Detect which definitions key this version uses
+			defsKey := oas.GetDefinitionsKey(schemaData)
+
+			// Check X-Tyk-Streams is in the correct definitions location
+			var xTykStreams []byte
+			xTykStreams, _, _, err = jsonparser.Get(schemaData, defsKey, "X-Tyk-Streams")
+			assert.NoError(t, err, "X-Tyk-Streams should exist in %s for version %s", defsKey, oasVersion)
+			assert.NotNil(t, xTykStreams, "X-Tyk-Streams should not be nil for version %s", oasVersion)
+
+			// Verify the correct key is used based on version
+			if strings.HasPrefix(oasVersion, "3.0") {
+				assert.Equal(t, "definitions", defsKey, "OAS 3.0 should use 'definitions'")
+			} else if strings.HasPrefix(oasVersion, "3.1") {
+				assert.Equal(t, "$defs", defsKey, "OAS 3.1 should use '$defs'")
+			}
 		}
 	})
 }
@@ -218,6 +300,26 @@ func TestGetOASSchema(t *testing.T) {
 		_, err = GetOASSchema(reqOASVersion)
 		expectedErr := fmt.Errorf("Malformed version: %s", reqOASVersion)
 		assert.Equal(t, expectedErr, err)
+	})
+
+	t.Run("return 3.1 schema when version 3.1 is requested", func(t *testing.T) {
+		schema, err := GetOASSchema("3.1")
+		assert.NoError(t, err)
+		assert.NotEmpty(t, schema)
+
+		// Verify it's the 3.1 schema by checking it uses $defs
+		defsKey := oas.GetDefinitionsKey(schema)
+		assert.Equal(t, "$defs", defsKey, "OAS 3.1 schema should use $defs")
+	})
+
+	t.Run("return 3.1 schema when version 3.1.0 is requested", func(t *testing.T) {
+		schema, err := GetOASSchema("3.1.0")
+		assert.NoError(t, err)
+		assert.NotEmpty(t, schema)
+
+		// Verify it's the 3.1 schema
+		defsKey := oas.GetDefinitionsKey(schema)
+		assert.Equal(t, "$defs", defsKey)
 	})
 }
 

@@ -120,7 +120,25 @@
         "span_processor_type": {
           "type": "string"
         },
+        "span_batch_config": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "max_queue_size": {
+              "type": "integer"
+            },
+            "max_export_batch_size": {
+              "type": "integer"
+            },
+            "batch_timeout": {
+              "type": "integer"
+            }
+          }
+        },
         "context_propagation": {
+          "type": "string"
+        },
+        "custom_trace_header": {
           "type": "string"
         },
         "headers": {
@@ -471,6 +489,12 @@
       "type": "boolean"
     },
     "bundle_insecure_skip_verify": {
+      "type": "boolean"
+    },
+    "skip_verify_existing_plugin_bundle": {
+      "type": "boolean"
+    },
+    "enable_config_inspection": {
       "type": "boolean"
     },
     "enable_custom_domains": {
@@ -1000,6 +1024,21 @@
         "rpc_global_cache_expiration": {
           "type": "number"
         },
+        "rpc_cert_fetch_max_elapsed_time": {
+          "type": "number"
+        },
+        "rpc_cert_fetch_initial_interval": {
+          "type": "number"
+        },
+        "rpc_cert_fetch_max_interval": {
+          "type": "number"
+        },
+        "rpc_cert_fetch_retry_enabled": {
+          "type": ["boolean", "null"]
+        },
+        "rpc_cert_fetch_max_retries": {
+          "type": ["integer", "null"]
+        },
         "synchroniser_enabled": {
           "type": "boolean"
         },
@@ -1014,6 +1053,9 @@
               "type": "integer"
             }
           }
+        },
+        "sync_used_certs_only": {
+          "type": "boolean"
         }
       }
     },
@@ -1112,6 +1154,9 @@
           "items": {
             "type": "object"
           }
+        },
+        "allow_unsafe_dynamic_mtls_token": {
+          "type": "boolean"
         },
         "certificates": {
           "type": ["object", "null"],
@@ -1372,6 +1417,24 @@
       "type": ["object", "null"],
       "additionalProperties": true,
       "properties": {}
+    },
+    "jwks": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "properties": {
+        "cache": {
+          "type": ["object", "null"],
+          "additionalProperties": false,
+          "properties": {
+            "timeout": {
+              "type": ["integer"],
+              "description": "Cache timeout in seconds",
+              "minimum": 0,
+              "default": 240
+            }
+          }
+        }
+      }
     }
   }
 }

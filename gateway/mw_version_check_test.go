@@ -2,12 +2,16 @@ package gateway
 
 import (
 	"net/http"
+	"net/http/httptest"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
 
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/internal/httpctx"
+	"github.com/TykTechnologies/tyk/internal/mcp"
 	"github.com/TykTechnologies/tyk/test"
 	"github.com/TykTechnologies/tyk/user"
 )
@@ -537,4 +541,269 @@ func TestOldVersioning_Expires(t *testing.T) {
 			})
 		})
 	})
+}
+
+func TestVersionCheck_getPrimitiveAllowListFlag(t *testing.T) {
+	tests := []struct {
+		name                      string
+		path                      string
+		toolsAllowListEnabled     bool
+		resourcesAllowListEnabled bool
+		promptsAllowListEnabled   bool
+		expected                  bool
+	}{
+		{
+			name:                      "tool prefix with allowlist enabled",
+			path:                      mcp.ToolPrefix + "get-weather",
+			toolsAllowListEnabled:     true,
+			resourcesAllowListEnabled: false,
+			promptsAllowListEnabled:   false,
+			expected:                  true,
+		},
+		{
+			name:                      "tool prefix with allowlist disabled",
+			path:                      mcp.ToolPrefix + "get-weather",
+			toolsAllowListEnabled:     false,
+			resourcesAllowListEnabled: false,
+			promptsAllowListEnabled:   false,
+			expected:                  false,
+		},
+		{
+			name:                      "resource prefix with allowlist enabled",
+			path:                      mcp.ResourcePrefix + "file:///config.json",
+			toolsAllowListEnabled:     false,
+			resourcesAllowListEnabled: true,
+			promptsAllowListEnabled:   false,
+			expected:                  true,
+		},
+		{
+			name:                      "resource prefix with allowlist disabled",
+			path:                      mcp.ResourcePrefix + "file:///config.json",
+			toolsAllowListEnabled:     false,
+			resourcesAllowListEnabled: false,
+			promptsAllowListEnabled:   false,
+			expected:                  false,
+		},
+		{
+			name:                      "prompt prefix with allowlist enabled",
+			path:                      mcp.PromptPrefix + "code-review",
+			toolsAllowListEnabled:     false,
+			resourcesAllowListEnabled: false,
+			promptsAllowListEnabled:   true,
+			expected:                  true,
+		},
+		{
+			name:                      "prompt prefix with allowlist disabled",
+			path:                      mcp.PromptPrefix + "code-review",
+			toolsAllowListEnabled:     false,
+			resourcesAllowListEnabled: false,
+			promptsAllowListEnabled:   false,
+			expected:                  false,
+		},
+		{
+			name:                      "non-MCP path returns false",
+			path:                      "/regular-path",
+			toolsAllowListEnabled:     true,
+			resourcesAllowListEnabled: true,
+			promptsAllowListEnabled:   true,
+			expected:                  false,
+		},
+		{
+			name:                      "empty path returns false",
+			path:                      "",
+			toolsAllowListEnabled:     true,
+			resourcesAllowListEnabled: true,
+			promptsAllowListEnabled:   true,
+			expected:                  false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			v := &VersionCheck{
+				BaseMiddleware: &BaseMiddleware{
+					Spec: &APISpec{
+						APIDefinition:             &apidef.APIDefinition{},
+						ToolsAllowListEnabled:     tt.toolsAllowListEnabled,
+						ResourcesAllowListEnabled: tt.resourcesAllowListEnabled,
+						PromptsAllowListEnabled:   tt.promptsAllowListEnabled,
+					},
+				},
+			}
+
+			result := v.getPrimitiveAllowListFlag(tt.path)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+func TestVersionCheck_checkVEMWhiteListEntry(t *testing.T) {
+	conf := config.Config{
+		HttpServerOptions: config.HttpServerOptionsConfig{
+			EnablePathPrefixMatching: true,
+			EnablePathSuffixMatching: true,
+		},
+	}
+	loader := APIDefinitionLoader{}
+	spec := &APISpec{
+		APIDefinition: &apidef.APIDefinition{},
+	}
+
+	tests := []struct {
+		name           string
+		path           string
+		whitelistPaths []apidef.EndPointMeta
+		errorMessage   string
+		expectError    bool
+	}{
+		{
+			name: "whitelist entry found - exact match",
+			path: mcp.ToolPrefix + "get-weather",
+			whitelistPaths: []apidef.EndPointMeta{
+				{Path: mcp.ToolPrefix + "get-weather", Method: http.MethodPost},
+			},
+			errorMessage: "Access denied",
+			expectError:  false,
+		},
+		{
+			name: "whitelist entry not found",
+			path: mcp.ToolPrefix + "delete-database",
+			whitelistPaths: []apidef.EndPointMeta{
+				{Path: mcp.ToolPrefix + "get-weather", Method: http.MethodPost},
+			},
+			errorMessage: "Access denied",
+			expectError:  true,
+		},
+		{
+			name:           "empty version paths",
+			path:           mcp.ToolPrefix + "get-weather",
+			whitelistPaths: []apidef.EndPointMeta{},
+			errorMessage:   "No access",
+			expectError:    true,
+		},
+		{
+			name: "multiple entries - match found",
+			path: mcp.ResourcePrefix + "file:///config.json",
+			whitelistPaths: []apidef.EndPointMeta{
+				{Path: mcp.ToolPrefix + "get-weather", Method: http.MethodPost},
+				{Path: mcp.ResourcePrefix + "file:///config.json", Method: http.MethodPost},
+				{Path: mcp.PromptPrefix + "code-review", Method: http.MethodPost},
+			},
+			errorMessage: "Access denied",
+			expectError:  false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Build URLSpecs using the loader
+			versionPaths := loader.compileExtendedPathSpec(false, tt.whitelistPaths, WhiteList, conf)
+
+			v := &VersionCheck{BaseMiddleware: &BaseMiddleware{Spec: spec}}
+			err := v.checkVEMWhiteListEntry(tt.path, versionPaths, tt.errorMessage)
+
+			if tt.expectError {
+				assert.Error(t, err)
+				assert.Equal(t, tt.errorMessage, err.Error())
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
+func TestResetJSONRPCRoutingAndProxyUpstream(t *testing.T) {
+	const vemPath = "/mcp-tool:get-weather"
+	const originalPath = "/mcp"
+	const rawQuery = "check_limits=true"
+
+	r := httptest.NewRequest(http.MethodPost, vemPath+"?"+rawQuery, nil)
+	r.URL.Path = vemPath
+	r.URL.RawQuery = rawQuery
+
+	state := &httpctx.JSONRPCRoutingState{
+		NextVEM:      vemPath,
+		OriginalPath: originalPath,
+	}
+	httpctx.SetJSONRPCRoutingState(r, state)
+
+	resetJSONRPCRoutingAndProxyUpstream(r, state)
+
+	assert.Equal(t, "", state.NextVEM)
+	assert.Equal(t, "", httpctx.GetJSONRPCRoutingState(r).NextVEM)
+	assert.Equal(t, vemPath, r.URL.Path)
+	assert.Equal(t, rawQuery, r.URL.RawQuery)
+}
+
+func TestVersionCheck_handleMCPPrimitiveNotFound(t *testing.T) {
+	const vemPath = "/mcp-tool:get-weather"
+	const originalPath = "/mcp"
+
+	tests := []struct {
+		name             string
+		toolsAllowList   bool
+		withRoutingState bool
+		expectedStatus   int
+		expectedError    bool
+		expectedPath     string
+	}{
+		{
+			name:             "no routing state returns 404",
+			toolsAllowList:   false,
+			withRoutingState: false,
+			expectedStatus:   http.StatusNotFound,
+			expectedError:    true,
+			expectedPath:     vemPath,
+		},
+		{
+			name:             "routing state with allow-list returns 403",
+			toolsAllowList:   true,
+			withRoutingState: true,
+			expectedStatus:   http.StatusForbidden,
+			expectedError:    true,
+			expectedPath:     vemPath,
+		},
+		{
+			name:             "routing state without allow-list preserves VEM path",
+			toolsAllowList:   false,
+			withRoutingState: true,
+			expectedStatus:   http.StatusOK,
+			expectedError:    false,
+			expectedPath:     vemPath,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			v := &VersionCheck{
+				BaseMiddleware: &BaseMiddleware{
+					Spec: &APISpec{
+						APIDefinition:         &apidef.APIDefinition{},
+						ToolsAllowListEnabled: tt.toolsAllowList,
+					},
+				},
+			}
+
+			r := httptest.NewRequest(http.MethodPost, vemPath, nil)
+			r.URL.Path = vemPath
+
+			if tt.withRoutingState {
+				state := &httpctx.JSONRPCRoutingState{
+					NextVEM:      vemPath,
+					OriginalPath: originalPath,
+				}
+				httpctx.SetJSONRPCRoutingState(r, state)
+			}
+
+			err, status := v.handleMCPPrimitiveNotFound(r)
+
+			assert.Equal(t, tt.expectedStatus, status)
+			if tt.expectedError {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+			}
+			assert.Equal(t, tt.expectedPath, r.URL.Path)
+		})
+	}
 }

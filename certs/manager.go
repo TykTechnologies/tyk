@@ -13,12 +13,16 @@ import (
 	"encoding/pem"
 	"errors"
 	"io/ioutil"
+	"strconv"
 	"strings"
 	"time"
 
+	"github.com/cenkalti/backoff/v4"
 	"github.com/sirupsen/logrus"
 
+	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/internal/cache"
+	"github.com/TykTechnologies/tyk/internal/certusage"
 	tykcrypto "github.com/TykTechnologies/tyk/internal/crypto"
 	"github.com/TykTechnologies/tyk/storage"
 )
@@ -26,6 +30,35 @@ import (
 const (
 	cacheDefaultTTL    = 300 // 5 minutes.
 	cacheCleanInterval = 600 // 10 minutes.
+
+	// MDCB retry configuration for certificate loading during startup.
+	//
+	// When the gateway starts with MDCB configured, it enters emergency mode until the
+	// RPC connection is established. During this period, certificate fetches from MDCB
+	// will fail with ErrMDCBConnectionLost. These constants control the retry behavior:
+	//
+	// DefaultRPCCertFetchMaxElapsedTime: Maximum time to wait for MDCB to become ready (30 seconds)
+	//   - If MDCB doesn't respond within this window, we give up and fall back to local files
+	//   - This prevents indefinite blocking during gateway startup
+	//
+	// DefaultRPCCertFetchInitialInterval: Starting delay for exponential backoff (100ms)
+	//   - First retry happens after 100ms
+	//   - Each subsequent retry doubles: 100ms → 200ms → 400ms → 800ms → 1600ms → 2000ms (capped)
+	//
+	// DefaultRPCCertFetchMaxInterval: Maximum delay between retry attempts (2 seconds)
+	//   - Caps exponential growth to prevent excessively long waits
+	//   - Ensures we check MDCB at least every 2 seconds
+	DefaultRPCCertFetchMaxElapsedTime  = 30 * time.Second
+	DefaultRPCCertFetchInitialInterval = 100 * time.Millisecond
+	DefaultRPCCertFetchMaxInterval     = 2 * time.Second
+
+	// DefaultRPCCertFetchRetryEnabled: Enable retry by default (true)
+	DefaultRPCCertFetchRetryEnabled = true
+
+	// DefaultRPCCertFetchMaxRetries: Maximum number of retry attempts (5)
+	//   - 0 means unlimited (time-based only)
+	//   - Default of 5 provides reasonable retry attempts with exponential backoff
+	DefaultRPCCertFetchMaxRetries = 5
 )
 
 var (
@@ -39,6 +72,10 @@ var (
 )
 
 //go:generate mockgen -destination=./mock/mock.go -package=mock . CertificateManager
+
+// UsageTracker is an alias for the certificate usage tracking interface.
+type UsageTracker = certusage.Tracker
+
 type CertificateManager interface {
 	List(certIDs []string, mode CertificateType) (out []*tls.Certificate)
 	ListPublicKeys(keyIDs []string) (out []string)
@@ -49,28 +86,93 @@ type CertificateManager interface {
 	Delete(certID string, orgID string)
 	CertPool(certIDs []string) *x509.CertPool
 	FlushCache()
+	SetUsageTracker(registry UsageTracker, cfg *config.Config)
 }
 
 type certificateManager struct {
-	storage         storage.Handler
-	logger          *logrus.Entry
-	cache           cache.Repository
-	secret          string
-	migrateCertList bool
+	storage                  storage.Handler
+	logger                   *logrus.Entry
+	cache                    cache.Repository
+	secret                   string
+	migrateCertList          bool
+	registry                 UsageTracker
+	selectiveSync            bool
+	certFetchMaxElapsedTime  time.Duration
+	certFetchInitialInterval time.Duration
+	certFetchMaxInterval     time.Duration
+	certFetchRetryEnabled    bool
+	certFetchMaxRetries      int
 }
 
-func NewCertificateManager(storage storage.Handler, secret string, logger *logrus.Logger, migrateCertList bool) *certificateManager {
+// CertificateManagerOption is a functional option for configuring certificate manager.
+type CertificateManagerOption func(*certificateManager)
+
+// WithRetryEnabled enables or disables retry logic for MDCB certificate fetching.
+func WithRetryEnabled(enabled bool) CertificateManagerOption {
+	return func(cm *certificateManager) {
+		cm.certFetchRetryEnabled = enabled
+	}
+}
+
+// WithMaxRetries sets the maximum number of retry attempts (0 = unlimited, time-based only).
+func WithMaxRetries(maxRetries int) CertificateManagerOption {
+	return func(cm *certificateManager) {
+		cm.certFetchMaxRetries = maxRetries
+	}
+}
+
+// WithBackoffIntervals configures the exponential backoff intervals.
+func WithBackoffIntervals(maxElapsed, initial, max time.Duration) CertificateManagerOption {
+	return func(cm *certificateManager) {
+		if maxElapsed > 0 {
+			cm.certFetchMaxElapsedTime = maxElapsed
+		}
+		if initial > 0 {
+			cm.certFetchInitialInterval = initial
+		}
+		if max > 0 {
+			cm.certFetchMaxInterval = max
+		}
+	}
+}
+
+// NewCertificateManager creates a certificate manager with optional retry configuration.
+// Maintains backward compatibility: calling without options uses defaults.
+//
+// Example with defaults (backward compatible):
+//
+//	cm := NewCertificateManager(storage, secret, logger, true)
+//
+// Example with custom retry config:
+//
+//	cm := NewCertificateManager(storage, secret, logger, true,
+//	    WithRetryEnabled(true),
+//	    WithMaxRetries(10),
+//	    WithBackoffIntervals(60*time.Second, 200*time.Millisecond, 5*time.Second))
+func NewCertificateManager(storageHandler storage.Handler, secret string, logger *logrus.Logger, migrateCertList bool, opts ...CertificateManagerOption) *certificateManager {
 	if logger == nil {
 		logger = logrus.New()
 	}
 
-	return &certificateManager{
-		storage:         storage,
-		logger:          logger.WithFields(logrus.Fields{"prefix": CertManagerLogPrefix}),
-		cache:           cache.New(cacheDefaultTTL, cacheCleanInterval),
-		secret:          secret,
-		migrateCertList: migrateCertList,
+	cm := &certificateManager{
+		storage:                  storageHandler,
+		logger:                   logger.WithFields(logrus.Fields{"prefix": CertManagerLogPrefix}),
+		cache:                    cache.New(cacheDefaultTTL, cacheCleanInterval),
+		secret:                   secret,
+		migrateCertList:          migrateCertList,
+		certFetchMaxElapsedTime:  DefaultRPCCertFetchMaxElapsedTime,
+		certFetchInitialInterval: DefaultRPCCertFetchInitialInterval,
+		certFetchMaxInterval:     DefaultRPCCertFetchMaxInterval,
+		certFetchRetryEnabled:    DefaultRPCCertFetchRetryEnabled,
+		certFetchMaxRetries:      DefaultRPCCertFetchMaxRetries,
 	}
+
+	// Apply functional options
+	for _, opt := range opts {
+		opt(cm)
+	}
+
+	return cm
 }
 
 func getOrgFromKeyID(key, certID string) string {
@@ -79,17 +181,27 @@ func getOrgFromKeyID(key, certID string) string {
 	return orgId
 }
 
-func NewSlaveCertManager(localStorage, rpcStorage storage.Handler, secret string, logger *logrus.Logger, migrateCertList bool) *certificateManager {
+func NewSlaveCertManager(localStorage, rpcStorage storage.Handler, secret string, logger *logrus.Logger, migrateCertList bool, opts ...CertificateManagerOption) *certificateManager {
 	if logger == nil {
 		logger = logrus.New()
 	}
 	log := logger.WithFields(logrus.Fields{"prefix": CertManagerLogPrefix})
 
 	cm := &certificateManager{
-		logger:          log,
-		cache:           cache.New(cacheDefaultTTL, cacheCleanInterval),
-		secret:          secret,
-		migrateCertList: migrateCertList,
+		logger:                   log,
+		cache:                    cache.New(cacheDefaultTTL, cacheCleanInterval),
+		secret:                   secret,
+		migrateCertList:          migrateCertList,
+		certFetchMaxElapsedTime:  DefaultRPCCertFetchMaxElapsedTime,
+		certFetchInitialInterval: DefaultRPCCertFetchInitialInterval,
+		certFetchMaxInterval:     DefaultRPCCertFetchMaxInterval,
+		certFetchRetryEnabled:    DefaultRPCCertFetchRetryEnabled,
+		certFetchMaxRetries:      DefaultRPCCertFetchMaxRetries,
+	}
+
+	// Apply functional options
+	for _, opt := range opts {
+		opt(cm)
 	}
 
 	callbackOnPullCertFromRPC := func(key, val string) error {
@@ -101,7 +213,7 @@ func NewSlaveCertManager(localStorage, rpcStorage storage.Handler, secret string
 		return err
 	}
 
-	mdcbStorage := storage.NewMdcbStorage(localStorage, rpcStorage, log, callbackOnPullCertFromRPC)
+	mdcbStorage := storage.NewMdcbStorage(localStorage, rpcStorage, log, callbackOnPullCertFromRPC, nil, nil)
 	cm.storage = mdcbStorage
 	return cm
 }
@@ -401,9 +513,81 @@ func GetCertIDAndChainPEM(certData []byte, secret string) (string, []byte, error
 	return certID, certChainPEM, nil
 }
 
+// fetchCertificateWithRetry retrieves a certificate from storage with optional retry support.
+func (c *certificateManager) fetchCertificateWithRetry(id string, sharedBackoff backoff.BackOff) (string, error) {
+	c.logger.WithFields(logrus.Fields{
+		"cert_id":       id,
+		"retry_enabled": c.certFetchRetryEnabled,
+	}).Debug("Certificate fetch starting")
+
+	// Early return: retry disabled
+	if !c.certFetchRetryEnabled {
+		c.logger.WithField("cert_id", id).Debug("Using non-retry path for certificate fetch")
+		return c.storage.GetKey("raw-" + id)
+	}
+
+	// Retry enabled - use shared exponential backoff
+	var val string
+	var err error
+	attemptCount := 0
+
+	operation := func() error {
+		attemptCount++
+		logFields := logrus.Fields{"cert_id": id}
+
+		if attemptCount == 1 {
+			c.logger.WithFields(logFields).Debug("Fetching certificate from MDCB (retry enabled)")
+		} else {
+			logFields["attempt"] = attemptCount
+			c.logger.WithFields(logFields).Debug("Retrying certificate fetch from MDCB")
+		}
+
+		val, err = c.storage.GetKey("raw-" + id)
+
+		if errors.Is(err, storage.ErrMDCBConnectionLost) {
+			c.logger.WithField("cert_id", id).Debug("Certificate fetch failed (MDCB not ready), will retry")
+			return err // Retryable error
+		}
+
+		if err == nil {
+			logFields["attempt"] = attemptCount
+			c.logger.WithFields(logFields).Debug("Certificate fetched successfully from MDCB")
+		}
+
+		return nil // Success or non-retryable error
+	}
+
+	if retryErr := backoff.Retry(operation, sharedBackoff); retryErr != nil {
+		if errors.Is(err, storage.ErrMDCBConnectionLost) {
+			c.logger.WithField("cert_id", id).Warn("Timeout waiting for MDCB connection for certificate")
+		}
+	}
+
+	return val, err
+}
+
 func (c *certificateManager) List(certIDs []string, mode CertificateType) (out []*tls.Certificate) {
 	var cert *tls.Certificate
 	var rawCert []byte
+
+	// Create backoff strategy once for all certificates in this List() call.
+	// This prevents exponential delay multiplication when loading multiple certificates.
+	// Without this, 100 certificates × 30s timeout = 50+ minutes startup delay!
+	var sharedBackoff backoff.BackOff
+	if c.certFetchRetryEnabled {
+		expBackoff := backoff.NewExponentialBackOff()
+		expBackoff.MaxElapsedTime = c.certFetchMaxElapsedTime
+		expBackoff.InitialInterval = c.certFetchInitialInterval
+		expBackoff.MaxInterval = c.certFetchMaxInterval
+		expBackoff.Multiplier = 2.0
+
+		// Apply max retries limit if configured (0 = unlimited, time-based only)
+		if c.certFetchMaxRetries > 0 {
+			sharedBackoff = backoff.WithMaxRetries(expBackoff, uint64(c.certFetchMaxRetries))
+		} else {
+			sharedBackoff = expBackoff
+		}
+	}
 
 	for _, id := range certIDs {
 		if cert, found := c.cache.Get(id); found {
@@ -413,7 +597,8 @@ func (c *certificateManager) List(certIDs []string, mode CertificateType) (out [
 			continue
 		}
 
-		val, err := c.storage.GetKey("raw-" + id)
+		// Fetch certificate from storage with optional retry support
+		val, err := c.fetchCertificateWithRetry(id, sharedBackoff)
 		// fallback to file
 		if err != nil {
 			// Try read from file
@@ -554,8 +739,39 @@ func (c *certificateManager) ListAllIds(prefix string) (out []string) {
 	return out
 }
 
+// MaskCertID truncates certificate IDs for logging to prevent information leakage.
+// Certificate IDs can be derived from API keys/auth tokens and should not be logged in clear text.
+// Returns first 8 characters plus length for debugging while protecting sensitive data.
+func MaskCertID(certID string) string {
+	if len(certID) <= 8 {
+		return certID
+	}
+	return certID[:8] + "***[len=" + strconv.Itoa(len(certID)) + "]"
+}
+
 func (c *certificateManager) GetRaw(certID string) (string, error) {
+	// Check registry before accessing storage when selective sync is enabled
+	if c.selectiveSync && c.registry != nil && !c.registry.Required(certID) {
+		c.logger.WithField("cert_id", MaskCertID(certID)).
+			Info("BLOCKED: certificate not required by loaded APIs")
+		return "", errors.New("certificate not required by loaded APIs")
+	}
 	return c.storage.GetKey("raw-" + certID)
+}
+
+// SetUsageTracker configures the certificate registry for selective sync
+func (c *certificateManager) SetUsageTracker(registry UsageTracker, cfg *config.Config) {
+	c.logger.Info("Setting certificate registry for selective sync")
+	c.registry = registry
+	c.selectiveSync = true
+
+	// Propagate to underlying MdcbStorage for storage-layer filtering
+	if mdcbStorage, ok := c.storage.(*storage.MdcbStorage); ok {
+		mdcbStorage.SetCertUsageConfig(registry, cfg)
+		c.logger.Info("Storage-layer certificate filtering enabled")
+	}
+
+	c.logger.WithField("selective_sync", c.selectiveSync).Info("Selective sync configured in CertificateManager")
 }
 
 func (c *certificateManager) Add(certData []byte, orgID string) (string, error) {

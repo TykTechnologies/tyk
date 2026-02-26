@@ -3,6 +3,7 @@ package sanitize
 import (
 	"errors"
 	"fmt"
+	"net/url"
 	"path/filepath"
 	"strings"
 )
@@ -25,6 +26,38 @@ func ZipFilePath(filePath string, targetDir string) error {
 
 	if strings.HasPrefix(relPath, "..") {
 		return fmt.Errorf("%w: %s", ErrInvalidFilePath, filePath)
+	}
+
+	return nil
+}
+
+func ValidatePathComponent(component string) error {
+	if component == "" || component == "." || component == ".." {
+		return fmt.Errorf("%w: invalid path component %q", ErrInvalidFilePath, component)
+	}
+
+	decoded := component
+	for i := 0; i < 3; i++ {
+		newDecoded, err := url.QueryUnescape(decoded)
+		if err != nil {
+			break
+		}
+		if newDecoded == decoded {
+			break
+		}
+		decoded = newDecoded
+	}
+
+	if decoded == "" || decoded == "." || decoded == ".." {
+		return fmt.Errorf("%w: invalid path component %q", ErrInvalidFilePath, component)
+	}
+
+	if filepath.Base(decoded) != decoded {
+		return fmt.Errorf("%w: path component contains separators: %q", ErrInvalidFilePath, component)
+	}
+
+	if strings.ContainsAny(decoded, "/\\") {
+		return fmt.Errorf("%w: path component contains separators: %q", ErrInvalidFilePath, component)
 	}
 
 	return nil

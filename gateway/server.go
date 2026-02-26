@@ -26,35 +26,24 @@ import (
 	texttemplate "text/template"
 	"time"
 
-	"github.com/rs/cors"
-	"github.com/samber/lo"
-
-	"github.com/TykTechnologies/tyk/tcp"
-	"github.com/TykTechnologies/tyk/trace"
-
 	logstashhook "github.com/bshuster-repo/logrus-logstash-hook"
 	logrussentry "github.com/evalphobia/logrus_sentry"
 	grayloghook "github.com/gemnasium/logrus-graylog-hook"
 	"github.com/gorilla/mux"
 	"github.com/lonelycode/osin"
+	"github.com/rs/cors"
+	"github.com/samber/lo"
 	"github.com/sirupsen/logrus"
 	logrussyslog "github.com/sirupsen/logrus/hooks/syslog"
-
-	"github.com/TykTechnologies/tyk/internal/crypto"
-	"github.com/TykTechnologies/tyk/internal/httputil"
-	"github.com/TykTechnologies/tyk/internal/otel"
-	"github.com/TykTechnologies/tyk/internal/scheduler"
-	"github.com/TykTechnologies/tyk/test"
-
-	"github.com/TykTechnologies/tyk/internal/uuid"
 
 	"github.com/TykTechnologies/again"
 	"github.com/TykTechnologies/drl"
 	gas "github.com/TykTechnologies/goautosocket"
 	"github.com/TykTechnologies/gorpc"
 	"github.com/TykTechnologies/goverify"
-	"github.com/TykTechnologies/tyk-pump/serializer"
+	persistentmodel "github.com/TykTechnologies/storage/persistent/model"
 
+	"github.com/TykTechnologies/tyk-pump/serializer"
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/certs"
 	"github.com/TykTechnologies/tyk/checkup"
@@ -62,18 +51,25 @@ import (
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/dnscache"
 	"github.com/TykTechnologies/tyk/header"
+	"github.com/TykTechnologies/tyk/internal/cache"
+	"github.com/TykTechnologies/tyk/internal/crypto"
+	"github.com/TykTechnologies/tyk/internal/httputil"
+	"github.com/TykTechnologies/tyk/internal/model"
+	"github.com/TykTechnologies/tyk/internal/netutil"
+	"github.com/TykTechnologies/tyk/internal/otel"
+	"github.com/TykTechnologies/tyk/internal/scheduler"
+	"github.com/TykTechnologies/tyk/internal/service/newrelic"
+	"github.com/TykTechnologies/tyk/internal/uuid"
 	logger "github.com/TykTechnologies/tyk/log"
 	"github.com/TykTechnologies/tyk/regexp"
+	"github.com/TykTechnologies/tyk/request"
 	"github.com/TykTechnologies/tyk/rpc"
 	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/storage/kv"
+	"github.com/TykTechnologies/tyk/tcp"
+	"github.com/TykTechnologies/tyk/test"
+	"github.com/TykTechnologies/tyk/trace"
 	"github.com/TykTechnologies/tyk/user"
-
-	"github.com/TykTechnologies/tyk/internal/cache"
-	"github.com/TykTechnologies/tyk/internal/model"
-	"github.com/TykTechnologies/tyk/internal/netutil"
-	"github.com/TykTechnologies/tyk/internal/service/newrelic"
-	"github.com/TykTechnologies/tyk/request"
 )
 
 var (
@@ -100,12 +96,21 @@ var (
 	ErrSyncResourceNotKnown = errors.New("unknown resource to sync")
 )
 
-const appName = "tyk-gateway"
+const (
+	appName = "tyk-gateway"
+
+	// externalOAuthJWKCacheExpiration
+	externalOAuthJWKCacheExpiration = 240
+
+	// externalOAuthJWKCacheCleanupInterval
+	externalOAuthJWKCacheCleanupInterval = 30
+)
 
 type Gateway struct {
-	DefaultProxyMux *proxyMux
-	config          atomic.Value
-	configMu        sync.Mutex
+	DefaultProxyMux   *proxyMux
+	config            atomic.Value
+	configMu          sync.Mutex
+	configViewerCache *configViewerCache
 
 	ctx context.Context
 
@@ -160,8 +165,9 @@ type Gateway struct {
 	apisByID        map[string]*APISpec
 	apisHandlesByID *sync.Map
 
-	policiesMu   sync.RWMutex
-	policiesByID map[string]user.Policy
+	policies *model.Policies
+
+	certUsageTracker *certUsageTracker // nil in non-RPC mode
 
 	dnsCacheManager dnscache.IDnsCacheManager
 
@@ -212,6 +218,14 @@ type Gateway struct {
 	healthCheckInfo atomic.Value
 
 	dialCtxFn test.DialContext
+
+	// jwkCache cache
+	jwkCache cache.Repository
+
+	// apiJWKCaches cache per api entity
+	apiJWKCaches sync.Map
+
+	BundleChecksumVerifier bundleChecksumVerifyFunction
 }
 
 func NewGateway(config config.Config, ctx context.Context) *Gateway {
@@ -240,7 +254,15 @@ func NewGateway(config config.Config, ctx context.Context) *Gateway {
 	gw.apisByID = map[string]*APISpec{}
 	gw.apisHandlesByID = new(sync.Map)
 
-	gw.policiesByID = make(map[string]user.Policy)
+	gw.policies = model.NewPolicies(
+		model.WithInternalCollision(func(customId string, ids []persistentmodel.ObjectID) {
+			log.Warnf(
+				"Policies should not share the same ID. %q is used for multiple policies: %q.",
+				customId,
+				ids,
+			)
+		}),
+	)
 
 	// reload
 	gw.reloadQueue = make(chan func())
@@ -252,6 +274,14 @@ func NewGateway(config config.Config, ctx context.Context) *Gateway {
 
 	gw.SetNodeID("solo-" + uuid.New())
 	gw.SessionID = uuid.New()
+
+	// Only create registry in RPC mode
+	if config.SlaveOptions.UseRPC {
+		gw.certUsageTracker = newUsageTracker()
+	}
+
+	gw.jwkCache = buildJWKSCache(config)
+	gw.BundleChecksumVerifier = defaultBundleVerifyFunction
 
 	return gw
 }
@@ -521,7 +551,32 @@ func (gw *Gateway) setupGlobals() {
 	storeCert := &storage.RedisCluster{KeyPrefix: "cert-", HashKeys: false, ConnectionHandler: gw.StorageConnectionHandler}
 	storeCert.Connect()
 
-	gw.CertificateManager = certs.NewCertificateManager(storeCert, certificateSecret, log, !gw.GetConfig().Cloud)
+	conf := gw.GetConfig()
+
+	// Safely dereference pointer config fields with defaults
+	retryEnabled := certs.DefaultRPCCertFetchRetryEnabled
+	if conf.SlaveOptions.RPCCertFetchRetryEnabled != nil {
+		retryEnabled = *conf.SlaveOptions.RPCCertFetchRetryEnabled
+	}
+
+	maxRetries := certs.DefaultRPCCertFetchMaxRetries
+	if conf.SlaveOptions.RPCCertFetchMaxRetries != nil {
+		maxRetries = *conf.SlaveOptions.RPCCertFetchMaxRetries
+	}
+
+	gw.CertificateManager = certs.NewCertificateManager(
+		storeCert,
+		certificateSecret,
+		log,
+		!conf.Cloud,
+		certs.WithRetryEnabled(retryEnabled),
+		certs.WithMaxRetries(maxRetries),
+		certs.WithBackoffIntervals(
+			time.Duration(conf.SlaveOptions.RPCCertFetchMaxElapsedTime)*time.Second,
+			time.Duration(conf.SlaveOptions.RPCCertFetchInitialInterval)*time.Second,
+			time.Duration(conf.SlaveOptions.RPCCertFetchMaxInterval)*time.Second,
+		),
+	)
 
 	if gw.GetConfig().SlaveOptions.UseRPC {
 		rpcStore := &RPCStorageHandler{
@@ -529,7 +584,26 @@ func (gw *Gateway) setupGlobals() {
 			HashKeys:  false,
 			Gw:        gw,
 		}
-		gw.CertificateManager = certs.NewSlaveCertManager(storeCert, rpcStore, certificateSecret, log, !gw.GetConfig().Cloud)
+		gw.CertificateManager = certs.NewSlaveCertManager(
+			storeCert,
+			rpcStore,
+			certificateSecret,
+			log,
+			!gw.GetConfig().Cloud,
+			certs.WithRetryEnabled(retryEnabled),
+			certs.WithMaxRetries(maxRetries),
+			certs.WithBackoffIntervals(
+				time.Duration(conf.SlaveOptions.RPCCertFetchMaxElapsedTime)*time.Second,
+				time.Duration(conf.SlaveOptions.RPCCertFetchInitialInterval)*time.Second,
+				time.Duration(conf.SlaveOptions.RPCCertFetchMaxInterval)*time.Second,
+			),
+		)
+
+		// Wire certificate registry for selective sync
+		if gw.GetConfig().SlaveOptions.SyncUsedCertsOnly && gw.certUsageTracker != nil {
+			cfg := gw.GetConfig()
+			gw.CertificateManager.SetUsageTracker(gw.certUsageTracker, &cfg)
+		}
 	}
 
 	if gw.GetConfig().NewRelic.AppName != "" {
@@ -617,12 +691,12 @@ func (gw *Gateway) syncAPISpecs() (int, error) {
 }
 
 func (gw *Gateway) syncPolicies() (count int, err error) {
-	var pols map[string]user.Policy
+	var pols []user.Policy
 
 	mainLog.Info("Loading policies")
 
 	switch gw.GetConfig().Policies.PolicySource {
-	case "service":
+	case config.PolicySourceService:
 		if gw.GetConfig().Policies.PolicyConnectionString == "" {
 			mainLog.Fatal("No connection string or node ID present. Failing.")
 		}
@@ -632,7 +706,7 @@ func (gw *Gateway) syncPolicies() (count int, err error) {
 		mainLog.Info("Using Policies from Dashboard Service")
 
 		pols, err = gw.LoadPoliciesFromDashboard(connStr, gw.GetConfig().NodeSecret)
-	case "rpc":
+	case config.PolicySourceRpc:
 		mainLog.Debug("Using Policies from RPC")
 		dataLoader := &RPCStorageHandler{
 			Gw:       gw,
@@ -643,7 +717,6 @@ func (gw *Gateway) syncPolicies() (count int, err error) {
 		//if policy path defined we want to allow use of the REST API
 		if gw.GetConfig().Policies.PolicyPath != "" {
 			pols, err = LoadPoliciesFromDir(gw.GetConfig().Policies.PolicyPath)
-
 		} else if gw.GetConfig().Policies.PolicyRecordName == "" {
 			// old way of doing things before REST Api added
 			// this is the only case now where we need a policy record name
@@ -654,17 +727,15 @@ func (gw *Gateway) syncPolicies() (count int, err error) {
 		}
 	}
 	mainLog.Infof("Policies found (%d total):", len(pols))
-	for id := range pols {
-		mainLog.Debugf(" - %s", id)
+	for _, pol := range pols {
+		mainLog.Debugf(" - %s", pol.ID)
 	}
 
 	if err != nil {
 		return len(pols), err
 	}
 
-	gw.policiesMu.Lock()
-	defer gw.policiesMu.Unlock()
-	gw.policiesByID = pols
+	gw.policies.Reload(pols...)
 
 	return len(pols), nil
 }
@@ -696,6 +767,21 @@ func (gw *Gateway) controlAPICheckClientCertificate(certLevel string, next http.
 
 		next.ServeHTTP(w, r)
 	})
+}
+
+// loadConfigInspectionEndpoints registers the /config and /env endpoints for troubleshooting.
+// These endpoints are only enabled when EnableConfigInspection is true and Secret is set.
+func (gw *Gateway) loadConfigInspectionEndpoints(muxer *mux.Router) {
+	if !gw.GetConfig().EnableConfigInspection {
+		return
+	}
+	if gw.GetConfig().Secret == "" {
+		mainLog.Error("Cannot enable config inspection: secret not set")
+		return
+	}
+	muxer.Handle("/config", gw.checkIsAPIOwner(http.HandlerFunc(gw.configHandler)))
+	muxer.Handle("/env", gw.checkIsAPIOwner(http.HandlerFunc(gw.envHandler)))
+	mainLog.Info("Config inspection endpoints enabled: /config, /env")
 }
 
 // loadControlAPIEndpoints loads the endpoints used for controlling the Gateway.
@@ -734,6 +820,8 @@ func (gw *Gateway) loadControlAPIEndpoints(muxer *mux.Router) {
 		muxer.HandleFunc("/debug/pprof/{_:.*}", pprofhttp.Index)
 	}
 
+	gw.loadConfigInspectionEndpoints(muxer)
+
 	r.MethodNotAllowedHandler = MethodNotAllowedHandler{}
 
 	mainLog.Info("Initialising Tyk REST API Endpoints")
@@ -765,6 +853,13 @@ func (gw *Gateway) loadControlAPIEndpoints(muxer *mux.Router) {
 		r.HandleFunc("/apis/oas/{apiID}", gw.blockInDashboardMode(gw.apiHandler)).Methods(http.MethodDelete)
 		r.HandleFunc("/apis/oas/{apiID}/versions", versionsHandler.ServeHTTP).Methods(http.MethodGet)
 		r.HandleFunc("/apis/oas/{apiID}/export", gw.apiOASExportHandler).Methods("GET")
+
+		// MCP Proxy routes
+		r.HandleFunc("/mcps", gw.mcpListHandler).Methods(http.MethodGet)
+		r.HandleFunc("/mcps", gw.validateMCP(gw.mcpCreateHandler)).Methods(http.MethodPost)
+		r.HandleFunc("/mcps/{apiID}", gw.mcpGetHandler).Methods(http.MethodGet)
+		r.HandleFunc("/mcps/{apiID}", gw.validateMCP(gw.mcpUpdateHandler)).Methods(http.MethodPut)
+		r.HandleFunc("/mcps/{apiID}", gw.mcpDeleteHandler).Methods(http.MethodDelete)
 		r.HandleFunc("/health", gw.healthCheckhandler).Methods("GET")
 		r.HandleFunc("/policies", gw.polHandler).Methods("GET", "POST", "PUT", "DELETE")
 		r.HandleFunc("/policies/{polID}", gw.polHandler).Methods("GET", "POST", "PUT", "DELETE")
@@ -1093,6 +1188,9 @@ func (gw *Gateway) DoReload() {
 		gw.GlobalEventsJSVM.DeInit()
 		gw.GlobalEventsJSVM.Init(nil, logrus.NewEntry(log), gw)
 	}
+
+	// Re-initialize global event handlers to ensure they persist across reloads
+	gw.initGenericEventHandlers()
 
 	// Load the API Policies
 	if _, err := syncResourcesWithReload("policies", gw.GetConfig(), gw.syncPolicies); err != nil {
@@ -1577,6 +1675,33 @@ func (gw *Gateway) afterConfSetup() {
 		if conf.SlaveOptions.RPCGlobalCacheExpiration == 0 {
 			conf.SlaveOptions.RPCGlobalCacheExpiration = 30
 		}
+
+		if conf.SlaveOptions.RPCCertFetchMaxElapsedTime <= 0 {
+			conf.SlaveOptions.RPCCertFetchMaxElapsedTime = float32(certs.DefaultRPCCertFetchMaxElapsedTime.Seconds())
+		}
+
+		if conf.SlaveOptions.RPCCertFetchInitialInterval <= 0 {
+			conf.SlaveOptions.RPCCertFetchInitialInterval = float32(certs.DefaultRPCCertFetchInitialInterval.Seconds())
+		}
+
+		if conf.SlaveOptions.RPCCertFetchMaxInterval <= 0 {
+			conf.SlaveOptions.RPCCertFetchMaxInterval = float32(certs.DefaultRPCCertFetchMaxInterval.Seconds())
+		}
+
+		// Default RPCCertFetchRetryEnabled if not explicitly set
+		if conf.SlaveOptions.RPCCertFetchRetryEnabled == nil {
+			enabled := certs.DefaultRPCCertFetchRetryEnabled
+			conf.SlaveOptions.RPCCertFetchRetryEnabled = &enabled
+		}
+
+		// Default RPCCertFetchMaxRetries if not explicitly set (0 = unlimited, negative values default to constant)
+		if conf.SlaveOptions.RPCCertFetchMaxRetries == nil {
+			maxRetries := certs.DefaultRPCCertFetchMaxRetries
+			conf.SlaveOptions.RPCCertFetchMaxRetries = &maxRetries
+		} else if *conf.SlaveOptions.RPCCertFetchMaxRetries < 0 {
+			maxRetries := certs.DefaultRPCCertFetchMaxRetries
+			conf.SlaveOptions.RPCCertFetchMaxRetries = &maxRetries
+		}
 	}
 
 	if conf.AnalyticsConfig.PurgeInterval == 0 {
@@ -1761,6 +1886,7 @@ func (gw *Gateway) getGlobalMDCBStorageHandler(keyPrefix string, hashKeys bool) 
 	logger := logrus.New().WithFields(logrus.Fields{"prefix": "mdcb-storage-handler"})
 
 	if gw.GetConfig().SlaveOptions.UseRPC {
+		cfg := gw.GetConfig()
 		return storage.NewMdcbStorage(
 			localStorage,
 			&RPCStorageHandler{
@@ -1770,6 +1896,8 @@ func (gw *Gateway) getGlobalMDCBStorageHandler(keyPrefix string, hashKeys bool) 
 			},
 			logger,
 			nil,
+			gw.certUsageTracker,
+			&cfg,
 		)
 	}
 	return localStorage
@@ -1882,13 +2010,17 @@ func Start() {
 		defer trace.Close()
 	}
 
-	gw.TracerProvider = otel.InitOpenTelemetry(gw.ctx, mainLog.Logger, &gwConfig.OpenTelemetry,
+	// Use gw.GetConfig() to ensure we get the config loaded from the --conf
+	// flag path (set in initSystem), not the stale local gwConfig which may
+	// have been loaded from the default tyk.conf before initSystem ran.
+	otelCfg := gw.GetConfig()
+	gw.TracerProvider = otel.InitOpenTelemetry(gw.ctx, mainLog.Logger, &otelCfg.OpenTelemetry,
 		gw.GetNodeID(),
 		VERSION,
-		gw.GetConfig().SlaveOptions.UseRPC,
-		gw.GetConfig().SlaveOptions.GroupID,
-		gw.GetConfig().DBAppConfOptions.NodeIsSegmented,
-		gw.GetConfig().DBAppConfOptions.Tags)
+		otelCfg.SlaveOptions.UseRPC,
+		otelCfg.SlaveOptions.GroupID,
+		otelCfg.DBAppConfOptions.NodeIsSegmented,
+		otelCfg.DBAppConfOptions.Tags)
 
 	gw.start()
 
@@ -2149,6 +2281,12 @@ func (gw *Gateway) SetConfig(conf config.Config, skipReload ...bool) {
 	gw.configMu.Lock()
 	gw.config.Store(conf)
 	gw.configMu.Unlock()
+
+	// Invalidate cached config viewer so the next request rebuilds it
+	// with the updated configuration.
+	if gw.configViewerCache != nil {
+		gw.configViewerCache.invalidate()
+	}
 }
 
 // shutdownHTTPServer gracefully shuts down an HTTP server
@@ -2247,6 +2385,7 @@ func (gw *Gateway) gracefulShutdown(ctx context.Context) error {
 
 	// Close all cache stores and other resources
 	mainLog.Info("Closing cache stores and other resources...")
+
 	gw.cacheClose()
 
 	// Check if there were any errors during shutdown
@@ -2294,4 +2433,17 @@ func (gw *Gateway) gracefulShutdown(ctx context.Context) error {
 	}
 	mainLog.Info("Terminating.")
 	return nil
+}
+
+func buildJWKSCache(cfg config.Config) *cache.MemRepository {
+	var jwkCacheExpiration int64 = externalOAuthJWKCacheExpiration
+
+	if cfg.JWKS.Cache.Timeout > 0 {
+		jwkCacheExpiration = cfg.JWKS.Cache.Timeout
+	}
+
+	return cache.New(
+		jwkCacheExpiration,
+		externalOAuthJWKCacheCleanupInterval,
+	)
 }

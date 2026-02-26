@@ -17,6 +17,15 @@ type Middleware struct {
 
 	// Operations contains configuration for middleware that can be applied to individual endpoints within the API (per-endpoint).
 	Operations Operations `bson:"operations,omitempty" json:"operations,omitempty"`
+
+	// McpTools contains configuration for middleware that can be applied to MCP tools.
+	McpTools MCPPrimitives `bson:"mcpTools,omitempty" json:"mcpTools,omitempty"`
+
+	// McpResources contains configuration for middleware that can be applied to MCP resources.
+	McpResources MCPPrimitives `bson:"mcpResources,omitempty" json:"mcpResources,omitempty"`
+
+	// McpPrompts contains configuration for middleware that can be applied to MCP prompts.
+	McpPrompts MCPPrimitives `bson:"mcpPrompts,omitempty" json:"mcpPrompts,omitempty"`
 }
 
 // Fill fills *Middleware from apidef.APIDefinition.
@@ -41,6 +50,50 @@ func (m *Middleware) ExtractTo(api *apidef.APIDefinition) {
 	}
 
 	m.Global.ExtractTo(api)
+}
+
+// HasMCPPrimitivesMocks checks if any MCP primitives (tools, resources, prompts) have enabled mock responses.
+func (m *Middleware) HasMCPPrimitivesMocks() bool {
+	return hasMockInPrimitives(m.McpTools) ||
+		hasMockInPrimitives(m.McpResources) ||
+		hasMockInPrimitives(m.McpPrompts)
+}
+
+func (m *Middleware) ExtractPrimitivesToExtendedPaths(ep *apidef.ExtendedPathsSet) {
+	if ep == nil || m == nil {
+		return
+	}
+
+	extractPrimitiveCategory := func(primitives MCPPrimitives, prefix string) {
+		for name, primitive := range primitives {
+			if primitive == nil {
+				continue
+			}
+
+			vemPath := prefix + name
+			primitive.ExtractToExtendedPaths(ep, vemPath, http.MethodPost)
+
+			ep.Internal = append(ep.Internal, apidef.InternalMeta{
+				Path:     vemPath,
+				Method:   http.MethodPost,
+				Disabled: false,
+			})
+		}
+	}
+
+	extractPrimitiveCategory(m.McpTools, "/mcp-tool:")
+	extractPrimitiveCategory(m.McpResources, "/mcp-resource:")
+	extractPrimitiveCategory(m.McpPrompts, "/mcp-prompt:")
+}
+
+// hasMockInPrimitives checks if any primitive in the collection has an enabled mock response.
+func hasMockInPrimitives(primitives MCPPrimitives) bool {
+	for _, primitive := range primitives {
+		if primitive.MockResponse != nil && primitive.MockResponse.Enabled {
+			return true
+		}
+	}
+	return false
 }
 
 // Global contains configuration that affects the whole API (all endpoints).

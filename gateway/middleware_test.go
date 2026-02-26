@@ -1,22 +1,27 @@
 package gateway
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"net/http/httptest"
 	"testing"
 	"time"
 
+	"github.com/justinas/alice"
+	logrustest "github.com/sirupsen/logrus/hooks/test"
 	"github.com/stretchr/testify/assert"
 
+	"github.com/TykTechnologies/tyk-pump/analytics"
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/config"
 	headers2 "github.com/TykTechnologies/tyk/header"
 	"github.com/TykTechnologies/tyk/internal/cache"
+	"github.com/TykTechnologies/tyk/internal/otel"
 	"github.com/TykTechnologies/tyk/internal/uuid"
 	"github.com/TykTechnologies/tyk/test"
-
-	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/user"
 )
 
@@ -371,6 +376,118 @@ func TestSessionLimiter_RedisQuotaExceeded_PerAPI(t *testing.T) {
 	})
 }
 
+func TestSessionLimiter_RedisQuotaExceeded_ExpiredAtReset(t *testing.T) {
+	g := StartTest(nil)
+	defer g.Close()
+
+	g.Gw.GlobalSessionManager.Store().DeleteAllKeys()
+	defer g.Gw.GlobalSessionManager.Store().DeleteAllKeys()
+
+	t.Run("expiredAt is set to now.Add(quotaRenewalRate) when lock succeeds", func(t *testing.T) {
+		quotaKey := "test-quota-key-expired-at"
+		quotaRenewalRate := int64(3600)
+		quotaMax := int64(100)
+		expectedTTL := time.Duration(quotaRenewalRate) * time.Second
+
+		limiter := g.Gw.SessionLimiter
+
+		session := &user.SessionState{
+			KeyID: "test-key-expired-at",
+			AccessRights: map[string]user.AccessDefinition{
+				"api1": {
+					Limit: user.APILimit{
+						QuotaMax:         quotaMax,
+						QuotaRenewalRate: quotaRenewalRate,
+					},
+					AllowanceScope: "",
+				},
+			},
+		}
+
+		req := &http.Request{}
+
+		rawKey := QuotaKeyPrefix + quotaKey
+		g.Gw.GlobalSessionManager.Store().DeleteRawKey(rawKey)
+
+		limit := &user.APILimit{
+			QuotaMax:         quotaMax,
+			QuotaRenewalRate: quotaRenewalRate,
+		}
+
+		beforeTime := time.Now()
+		blocked := limiter.RedisQuotaExceeded(req, session, quotaKey, "", limit, g.Gw.GlobalSessionManager.Store(), false)
+		afterTime := time.Now()
+
+		assert.Equal(t, quotaMax-1, session.QuotaRemaining, "Quota remaining should be quotaMax - 1 after increment")
+		assert.Greater(t, session.QuotaRenews, int64(0), "QuotaRenews should be set to a future timestamp")
+
+		expectedRenewTimeMin := beforeTime.Add(expectedTTL).Unix()
+		expectedRenewTimeMax := afterTime.Add(expectedTTL).Unix()
+		assert.GreaterOrEqual(t, session.QuotaRenews, expectedRenewTimeMin,
+			"QuotaRenews should be >= beforeTime + quotaRenewalRate (verifies line 510: expiredAt = now.Add(quotaRenewalRate))")
+		assert.LessOrEqual(t, session.QuotaRenews, expectedRenewTimeMax,
+			"QuotaRenews should be <= afterTime + quotaRenewalRate (verifies line 510: expiredAt = now.Add(quotaRenewalRate))")
+
+		ttl, err := g.Gw.GlobalSessionManager.Store().GetExp(rawKey)
+		if err == nil && ttl > 0 {
+			assert.InDelta(t, int64(expectedTTL.Seconds()), ttl, 5,
+				"Key TTL should be approximately quotaRenewalRate (verifies line 509: Set(rawKey, 0, quotaRenewalRate))")
+		}
+
+		assert.False(t, blocked, "Request should not be blocked when quota is not exceeded")
+	})
+
+	t.Run("expiredAt is set correctly for scoped quota", func(t *testing.T) {
+		quotaKey := "test-quota-key-scoped-expired-at"
+		scope := "scope1"
+		quotaRenewalRate := int64(1800)
+		quotaMax := int64(50)
+		expectedTTL := time.Duration(quotaRenewalRate) * time.Second
+
+		limiter := g.Gw.SessionLimiter
+
+		session := &user.SessionState{
+			KeyID: "test-key-scoped-expired-at",
+			AccessRights: map[string]user.AccessDefinition{
+				"api1": {
+					Limit: user.APILimit{
+						QuotaMax:         quotaMax,
+						QuotaRenewalRate: quotaRenewalRate,
+					},
+					AllowanceScope: scope,
+				},
+			},
+		}
+
+		req := &http.Request{}
+
+		rawKey := QuotaKeyPrefix + scope + "-" + quotaKey
+		g.Gw.GlobalSessionManager.Store().DeleteRawKey(rawKey)
+
+		limit := &user.APILimit{
+			QuotaMax:         quotaMax,
+			QuotaRenewalRate: quotaRenewalRate,
+		}
+
+		beforeTime := time.Now()
+		blocked := limiter.RedisQuotaExceeded(req, session, quotaKey, scope, limit, g.Gw.GlobalSessionManager.Store(), false)
+		afterTime := time.Now()
+
+		accessDef := session.AccessRights["api1"]
+		assert.Equal(t, quotaMax-1, accessDef.Limit.QuotaRemaining, "Quota remaining should be quotaMax - 1 after increment")
+		assert.Greater(t, accessDef.Limit.QuotaRenews, int64(0), "QuotaRenews should be set to a future timestamp")
+
+		expectedRenewTimeMin := beforeTime.Add(expectedTTL).Unix()
+		expectedRenewTimeMax := afterTime.Add(expectedTTL).Unix()
+		assert.GreaterOrEqual(t, accessDef.Limit.QuotaRenews, expectedRenewTimeMin,
+			"QuotaRenews should be >= beforeTime + quotaRenewalRate (verifies line 510: expiredAt = now.Add(quotaRenewalRate))")
+		assert.LessOrEqual(t, accessDef.Limit.QuotaRenews, expectedRenewTimeMax,
+			"QuotaRenews should be <= afterTime + quotaRenewalRate (verifies line 510: expiredAt = now.Add(quotaRenewalRate))")
+
+		assert.False(t, blocked, "Request should not be blocked when quota is not exceeded")
+	})
+}
+
 func TestCopyAllowedURLs(t *testing.T) {
 	testCases := []struct {
 		name  string
@@ -487,4 +604,210 @@ func TestQuotaNotAppliedWithURLRewrite(t *testing.T) {
 			Code:    http.StatusForbidden,
 		},
 	}...)
+}
+
+func TestRecordAccessLog_TraceID(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	tests := []struct {
+		name          string
+		otelEnabled   bool
+		hasTraceCtx   bool
+		expectTraceID bool
+	}{
+		{
+			name:          "OTel disabled - no trace_id field",
+			otelEnabled:   false,
+			hasTraceCtx:   false,
+			expectTraceID: false,
+		},
+		{
+			name:          "OTel enabled, no trace context - no trace_id field",
+			otelEnabled:   true,
+			hasTraceCtx:   false,
+			expectTraceID: false,
+		},
+		{
+			name:          "OTel enabled, valid trace context - trace_id present",
+			otelEnabled:   true,
+			hasTraceCtx:   true,
+			expectTraceID: true,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			logger, hook := logrustest.NewNullLogger()
+
+			gwConfig := ts.Gw.GetConfig()
+			gwConfig.AccessLogs.Enabled = true
+			gwConfig.OpenTelemetry.Enabled = tc.otelEnabled
+			ts.Gw.SetConfig(gwConfig)
+
+			spec := &APISpec{
+				APIDefinition: &apidef.APIDefinition{},
+				GlobalConfig:  gwConfig,
+			}
+
+			baseMw := &BaseMiddleware{
+				Spec:   spec,
+				Gw:     ts.Gw,
+				logger: logger.WithField("prefix", "test"),
+			}
+
+			req := httptest.NewRequest(http.MethodGet, "http://example.com/path", nil)
+
+			// Add trace context if needed
+			if tc.hasTraceCtx && tc.otelEnabled {
+				// Create a real OTel provider and span
+				otelCfg := &otel.OpenTelemetry{
+					Enabled:  true,
+					Exporter: "http",
+					Endpoint: "http://localhost:4318", // Won't actually connect
+				}
+				provider := otel.InitOpenTelemetry(context.Background(), logger, otelCfg, "test-gw", "v1.0.0", false, "", false, nil)
+				_, span := provider.Tracer().Start(context.Background(), "test-span")
+				defer span.End()
+
+				ctx := otel.ContextWithSpan(req.Context(), span)
+				req = req.WithContext(ctx)
+			}
+
+			resp := &http.Response{
+				StatusCode: http.StatusOK,
+			}
+
+			latency := analytics.Latency{
+				Total:    100,
+				Upstream: 80,
+				Gateway:  20,
+			}
+
+			baseMw.RecordAccessLog(req, resp, latency)
+
+			// Check the logged fields
+			assert.NotEmpty(t, hook.Entries, "Expected a log entry")
+			lastEntry := hook.LastEntry()
+
+			_, hasTraceID := lastEntry.Data["trace_id"]
+			assert.Equal(t, tc.expectTraceID, hasTraceID, "trace_id field presence mismatch")
+
+			if tc.expectTraceID {
+				traceID := lastEntry.Data["trace_id"].(string)
+				assert.NotEmpty(t, traceID, "trace_id should not be empty when present")
+			}
+
+			hook.Reset()
+		})
+	}
+}
+
+func TestGateway_isDisabledForMCP(t *testing.T) {
+	gw := &Gateway{}
+
+	t.Run("RedisCacheMiddleware disabled for MCP APIs", func(t *testing.T) {
+		mcpSpec := BuildAPI(func(spec *APISpec) {
+			spec.APIID = "mcp-test"
+			spec.MarkAsMCP()
+		})[0]
+
+		baseMid := &BaseMiddleware{Spec: mcpSpec}
+		cacheMW := &RedisCacheMiddleware{
+			BaseMiddleware: baseMid,
+			store:          nil, // store not needed for this test
+		}
+
+		result := gw.isDisabledForMCP(cacheMW)
+		assert.True(t, result, "RedisCacheMiddleware should be disabled for MCP APIs")
+	})
+
+	t.Run("RedisCacheMiddleware enabled for non-MCP APIs", func(t *testing.T) {
+		nonMCPSpec := BuildAPI(func(spec *APISpec) {
+			spec.APIID = "regular-api"
+		})[0]
+
+		baseMid := &BaseMiddleware{Spec: nonMCPSpec}
+		cacheMW := &RedisCacheMiddleware{
+			BaseMiddleware: baseMid,
+			store:          nil,
+		}
+
+		result := gw.isDisabledForMCP(cacheMW)
+		assert.False(t, result, "RedisCacheMiddleware should be enabled for non-MCP APIs")
+	})
+
+	t.Run("other middleware not affected for MCP APIs", func(t *testing.T) {
+		mcpSpec := BuildAPI(func(spec *APISpec) {
+			spec.APIID = "mcp-test"
+			spec.MarkAsMCP()
+		})[0]
+
+		baseMid := &BaseMiddleware{Spec: mcpSpec}
+		// Test with a non-restricted middleware (e.g., RequestSigning)
+		signingMW := &RequestSigning{BaseMiddleware: baseMid}
+
+		result := gw.isDisabledForMCP(signingMW)
+		assert.False(t, result, "Non-restricted middleware should work for MCP APIs")
+	})
+}
+
+func TestGateway_mwAppendEnabled_MCP(t *testing.T) {
+	gw := &Gateway{}
+
+	t.Run("does not append cache middleware for MCP APIs", func(t *testing.T) {
+		mcpSpec := BuildAPI(func(spec *APISpec) {
+			spec.APIID = "mcp-test"
+			spec.CacheOptions.EnableCache = true // Even if enabled in config
+			spec.MarkAsMCP()
+		})[0]
+
+		baseMid := &BaseMiddleware{Spec: mcpSpec}
+		cacheMW := &RedisCacheMiddleware{
+			BaseMiddleware: baseMid,
+			store:          nil,
+		}
+
+		var chain []alice.Constructor
+		result := gw.mwAppendEnabled(&chain, cacheMW)
+
+		assert.False(t, result, "mwAppendEnabled should return false for restricted MCP middleware")
+		assert.Empty(t, chain, "Chain should be empty - cache middleware should not be added for MCP")
+	})
+
+	t.Run("appends cache middleware for non-MCP APIs", func(t *testing.T) {
+		nonMCPSpec := BuildAPI(func(spec *APISpec) {
+			spec.APIID = "regular-api"
+			spec.CacheOptions.EnableCache = true
+		})[0]
+
+		baseMid := &BaseMiddleware{Spec: nonMCPSpec, Gw: gw}
+		cacheMW := &RedisCacheMiddleware{
+			BaseMiddleware: baseMid,
+			store:          nil,
+		}
+
+		var chain []alice.Constructor
+		result := gw.mwAppendEnabled(&chain, cacheMW)
+
+		assert.True(t, result, "mwAppendEnabled should return true for cache on non-MCP APIs")
+		assert.Len(t, chain, 1, "Chain should have cache middleware for non-MCP APIs")
+	})
+
+	t.Run("appends non-restricted middleware for MCP APIs", func(t *testing.T) {
+		mcpSpec := BuildAPI(func(spec *APISpec) {
+			spec.APIID = "mcp-test"
+			spec.RequestSigning.IsEnabled = true
+			spec.MarkAsMCP()
+		})[0]
+
+		baseMid := &BaseMiddleware{Spec: mcpSpec, Gw: gw}
+		signingMW := &RequestSigning{BaseMiddleware: baseMid}
+
+		var chain []alice.Constructor
+		result := gw.mwAppendEnabled(&chain, signingMW)
+
+		assert.True(t, result, "mwAppendEnabled should return true for non-restricted middleware on MCP")
+		assert.Len(t, chain, 1, "Chain should have non-restricted middleware for MCP APIs")
+	})
 }

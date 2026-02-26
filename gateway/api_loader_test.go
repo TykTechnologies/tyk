@@ -11,9 +11,13 @@ import (
 	_ "path"
 	"reflect"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"testing"
+	"time"
 
+	"github.com/gorilla/mux"
+	nr "github.com/newrelic/go-agent/v3/newrelic"
 	"github.com/stretchr/testify/assert"
 
 	persistentmodel "github.com/TykTechnologies/storage/persistent/model"
@@ -9366,12 +9370,14 @@ func TestDifferentDomainsWithOneListenPathBeingASubstringOfTheOtherWithStripList
 
 func TestSortAPISpecs(t *testing.T) {
 	tests := []struct {
-		name     string
-		input    []*APISpec
-		expected []*APISpec
+		name                 string
+		customDomainsEnabled bool
+		input                []*APISpec
+		expected             []*APISpec
 	}{
 		{
-			name: "APIs should be sorted by listen path, however if the domain is empty they should sit at the end",
+			name:                 "APIs should be sorted by listen path, however if the domain is empty they should sit at the end when custom domains are enabled in global config",
+			customDomainsEnabled: true,
 			input: []*APISpec{
 				{APIDefinition: &apidef.APIDefinition{Domain: "{domains:tyk.io}", Proxy: apidef.ProxyConfig{ListenPath: "/path-longer"}}},
 				{APIDefinition: &apidef.APIDefinition{Domain: "tyk.io", Proxy: apidef.ProxyConfig{ListenPath: "/path-longer"}}},
@@ -9403,11 +9409,45 @@ func TestSortAPISpecs(t *testing.T) {
 				{APIDefinition: &apidef.APIDefinition{Domain: "", Proxy: apidef.ProxyConfig{ListenPath: "/aaaaaaaaaaaaaaaaaaaa"}}},
 			},
 		},
+		{
+			name:                 "APIs should be sorted only by listen path when custom domains are disabled in global config",
+			customDomainsEnabled: false,
+			input: []*APISpec{
+				{APIDefinition: &apidef.APIDefinition{Domain: "{domains:tyk.io}", Proxy: apidef.ProxyConfig{ListenPath: "/path-longer"}}},
+				{APIDefinition: &apidef.APIDefinition{Domain: "tyk.io", Proxy: apidef.ProxyConfig{ListenPath: "/path-longer"}}},
+				{APIDefinition: &apidef.APIDefinition{Domain: "tyk.io", Proxy: apidef.ProxyConfig{ListenPath: "/a"}}},
+				{APIDefinition: &apidef.APIDefinition{Domain: "abc.def.ghi", Proxy: apidef.ProxyConfig{ListenPath: "/b"}}},
+				{APIDefinition: &apidef.APIDefinition{Domain: "tyk.io", Proxy: apidef.ProxyConfig{ListenPath: "/longerpath"}}},
+				{APIDefinition: &apidef.APIDefinition{Domain: "tyk.io", Proxy: apidef.ProxyConfig{ListenPath: "/short"}}},
+				{APIDefinition: &apidef.APIDefinition{Domain: "samelength1.com", Proxy: apidef.ProxyConfig{ListenPath: "/a"}}},
+				{APIDefinition: &apidef.APIDefinition{Domain: "samelength2.com", Proxy: apidef.ProxyConfig{ListenPath: "/b"}}},
+				{APIDefinition: &apidef.APIDefinition{Domain: "tyk.io", Proxy: apidef.ProxyConfig{ListenPath: "/path"}}},
+				{APIDefinition: &apidef.APIDefinition{Domain: "", Proxy: apidef.ProxyConfig{ListenPath: "/aaaaaaaaaaaaaaaaaaaa"}}},
+				{APIDefinition: &apidef.APIDefinition{Domain: "tyk.io", Proxy: apidef.ProxyConfig{ListenPath: "/b"}}},
+				{APIDefinition: &apidef.APIDefinition{Domain: "{domains:tyk.io}", Proxy: apidef.ProxyConfig{ListenPath: "/path"}}},
+				{APIDefinition: &apidef.APIDefinition{Domain: "{domains:tyk.io|abc.def.ghi}", Proxy: apidef.ProxyConfig{ListenPath: "/path"}}},
+			},
+			expected: []*APISpec{
+				{APIDefinition: &apidef.APIDefinition{Domain: "", Proxy: apidef.ProxyConfig{ListenPath: "/aaaaaaaaaaaaaaaaaaaa"}}},
+				{APIDefinition: &apidef.APIDefinition{Domain: "tyk.io", Proxy: apidef.ProxyConfig{ListenPath: "/path-longer"}}},
+				{APIDefinition: &apidef.APIDefinition{Domain: "{domains:tyk.io}", Proxy: apidef.ProxyConfig{ListenPath: "/path-longer"}}},
+				{APIDefinition: &apidef.APIDefinition{Domain: "tyk.io", Proxy: apidef.ProxyConfig{ListenPath: "/longerpath"}}},
+				{APIDefinition: &apidef.APIDefinition{Domain: "tyk.io", Proxy: apidef.ProxyConfig{ListenPath: "/short"}}},
+				{APIDefinition: &apidef.APIDefinition{Domain: "tyk.io", Proxy: apidef.ProxyConfig{ListenPath: "/path"}}},
+				{APIDefinition: &apidef.APIDefinition{Domain: "{domains:tyk.io|abc.def.ghi}", Proxy: apidef.ProxyConfig{ListenPath: "/path"}}},
+				{APIDefinition: &apidef.APIDefinition{Domain: "{domains:tyk.io}", Proxy: apidef.ProxyConfig{ListenPath: "/path"}}},
+				{APIDefinition: &apidef.APIDefinition{Domain: "abc.def.ghi", Proxy: apidef.ProxyConfig{ListenPath: "/b"}}},
+				{APIDefinition: &apidef.APIDefinition{Domain: "samelength2.com", Proxy: apidef.ProxyConfig{ListenPath: "/b"}}},
+				{APIDefinition: &apidef.APIDefinition{Domain: "tyk.io", Proxy: apidef.ProxyConfig{ListenPath: "/b"}}},
+				{APIDefinition: &apidef.APIDefinition{Domain: "samelength1.com", Proxy: apidef.ProxyConfig{ListenPath: "/a"}}},
+				{APIDefinition: &apidef.APIDefinition{Domain: "tyk.io", Proxy: apidef.ProxyConfig{ListenPath: "/a"}}},
+			},
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			sortSpecsByListenPath(tt.input)
+			sortSpecsByListenPath(tt.input, tt.customDomainsEnabled)
 			for i, spec := range tt.input {
 				if spec.Domain != tt.expected[i].Domain {
 					t.Errorf("expected %v, got %v", tt.expected[i].Domain, spec.Domain)
@@ -9541,7 +9581,7 @@ func TestSortSpecsByListenPath(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			sortSpecsByListenPath(tt.specs)
+			sortSpecsByListenPath(tt.specs, true)
 
 			var sortedPaths []string
 			for _, spec := range tt.specs {
@@ -9645,4 +9685,246 @@ func TestEnforceOrgDataAgeIfQuotasEnabled(t *testing.T) {
 			assert.Equal(t, tc.expectedEnforceOrgDataAge, spec.GlobalConfig.EnforceOrgDataAge)
 		})
 	}
+}
+
+func TestNewRelicMounting(t *testing.T) {
+	mwExecuted := make(chan bool, 1)
+
+	dummyHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		txn := nr.FromContext(r.Context())
+		mwExecuted <- txn != nil
+		w.WriteHeader(http.StatusOK)
+	})
+
+	muxer := &proxyMux{}
+
+	conf := &config.Config{
+		ListenPort: 8080,
+		HttpServerOptions: config.HttpServerOptionsConfig{
+			EnableStrictRoutes: false,
+		},
+	}
+
+	cleanRouter := mux.NewRouter()
+
+	muxer.setRouter(8080, "http", cleanRouter, *conf)
+
+	gw := &Gateway{
+		apisByID:        make(map[string]*APISpec),
+		apisHandlesByID: new(sync.Map),
+		DefaultProxyMux: muxer,
+	}
+
+	gw.config.Store(*conf)
+
+	app, err := nr.NewApplication(
+		nr.ConfigAppName("TestApp"),
+		nr.ConfigLicense("1234567890123456789012345678901234567890"),
+		nr.ConfigDistributedTracerEnabled(true),
+		nr.ConfigEnabled(false),
+	)
+	assert.NoError(t, err)
+	gw.NewRelicApplication = app
+
+	spec := &APISpec{
+		APIDefinition: &apidef.APIDefinition{
+			APIID:            "test-fix",
+			Name:             "Fix Test",
+			Protocol:         "http",
+			Active:           true,
+			UseKeylessAccess: true,
+			Proxy: apidef.ProxyConfig{
+				ListenPath: "/fix-test/",
+				TargetURL:  "http://mock",
+			},
+		},
+	}
+	gw.apisByID[spec.APIID] = spec
+	gw.apisHandlesByID.Store(spec.APIID, &ChainObject{
+		ThisHandler: dummyHandler,
+	})
+
+	_, err = gw.loadHTTPService(spec, map[string]int{}, nil, muxer)
+	assert.NoError(t, err)
+
+	_, err = gw.loadHTTPService(spec, map[string]int{}, nil, muxer)
+	assert.NoError(t, err)
+
+	t.Run("Router should have New Relic Middleware", func(t *testing.T) {
+		req := httptest.NewRequest("GET", "/fix-test/", nil)
+		w := httptest.NewRecorder()
+
+		cleanRouter.ServeHTTP(w, req)
+
+		select {
+		case success := <-mwExecuted:
+			assert.True(t, success, "FAILURE: New Relic middleware was not present")
+		case <-time.After(1 * time.Second):
+			t.Fatal("FAILURE: Timeout - Middleware did not execute")
+		}
+	})
+}
+
+func TestListenPathConflictWhenCustomDomainIsDisabled(t *testing.T) {
+	ts := StartTest(func(globalConf *config.Config) {
+		globalConf.EnableCustomDomains = false
+		globalConf.HttpServerOptions.EnableStrictRoutes = true
+		globalConf.HttpServerOptions.EnablePathSuffixMatching = true
+		globalConf.HttpServerOptions.EnablePathPrefixMatching = true
+	})
+	t.Cleanup(ts.Close)
+
+	localClient := test.NewClientLocal()
+
+	listenPathA := "/caas2itsamu0456n07gfe"
+	listenPathB := "/caas2itsamu04567m9pxl"
+	listenPathC := "/caas2itsamu0456qnu2sj"
+
+	createMockServer := func(listenPath string) *httptest.Server {
+		return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			w.WriteHeader(http.StatusOK)
+			_, err := w.Write([]byte(listenPath))
+			assert.Nil(t, err)
+		}))
+	}
+
+	mockServerA := createMockServer(listenPathA)
+	defer mockServerA.Close()
+
+	mockServerB := createMockServer(listenPathB)
+	defer mockServerB.Close()
+
+	mockServerC := createMockServer(listenPathC)
+	defer mockServerC.Close()
+
+	getMockedApis := func() []func(spec *APISpec) {
+		return []func(spec *APISpec){
+			func(spec *APISpec) {
+				spec.APIID = "api-A"
+				spec.Proxy.ListenPath = listenPathA
+				spec.Proxy.TargetURL = mockServerA.URL
+				spec.Proxy.DisableStripSlash = true
+				spec.Proxy.StripListenPath = true
+			},
+			func(spec *APISpec) {
+				spec.APIID = "api-B"
+				spec.Proxy.ListenPath = listenPathB
+				spec.Proxy.TargetURL = mockServerB.URL
+				spec.Proxy.DisableStripSlash = true
+				spec.Proxy.StripListenPath = true
+			},
+			func(spec *APISpec) {
+				spec.APIID = "api-C"
+				spec.Proxy.ListenPath = listenPathC
+				spec.Proxy.TargetURL = mockServerC.URL
+				spec.Proxy.DisableStripSlash = true
+				spec.Proxy.StripListenPath = true
+			},
+		}
+	}
+
+	t.Run("conflicting api with custom domain enabled and set", func(t *testing.T) {
+		mockedApis := getMockedApis()
+		mockedApis = append(mockedApis, func(spec *APISpec) {
+			spec.APIID = "api-caa"
+			spec.DomainDisabled = false
+			spec.Domain = "test.com"
+			spec.Proxy.ListenPath = "/caa"
+			spec.Proxy.DisableStripSlash = true
+			spec.Proxy.StripListenPath = true
+		})
+
+		ts.Gw.BuildAndLoadAPI(mockedApis...)
+
+		var tcs []test.TestCase
+
+		for _, lp := range []string{listenPathA, listenPathB, listenPathC} {
+			tcs = append(tcs, test.TestCase{Client: localClient, Code: 200, Path: lp, BodyMatch: lp})
+		}
+
+		_, _ = ts.Run(t, tcs...)
+	})
+
+	t.Run("conflicting api with custom domain disabled", func(t *testing.T) {
+		mockedApis := getMockedApis()
+		mockedApis = append(mockedApis, func(spec *APISpec) {
+			spec.APIID = "api-caa"
+			spec.DomainDisabled = true
+			spec.Proxy.ListenPath = "/caa"
+			spec.Proxy.DisableStripSlash = true
+			spec.Proxy.StripListenPath = true
+		})
+
+		ts.Gw.BuildAndLoadAPI(mockedApis...)
+
+		var tcs []test.TestCase
+
+		for _, lp := range []string{listenPathA, listenPathB, listenPathC} {
+			tcs = append(tcs, test.TestCase{Client: localClient, Code: 200, Path: lp, BodyMatch: lp})
+		}
+
+		_, _ = ts.Run(t, tcs...)
+	})
+}
+
+// TestMCPRequestSizeLimit_Security tests that RequestSizeLimitMiddleware
+// runs before JSONRPCMiddleware for MCP APIs to prevent DoS attacks.
+func TestMCPRequestSizeLimit_Security(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	t.Run("MCP API rejects oversized requests", func(t *testing.T) {
+		// Create upstream server
+		upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			w.WriteHeader(http.StatusOK)
+			if _, err := w.Write([]byte(`{"jsonrpc":"2.0","result":"success","id":1}`)); err != nil {
+				t.Errorf("failed to write response: %v", err)
+			}
+		}))
+		defer upstream.Close()
+
+		// Create MCP API with size limit
+		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+			spec.Name = "MCP Size Test"
+			spec.APIID = "mcp-size-test"
+			spec.Proxy.ListenPath = "/mcp-test/"
+			spec.Proxy.TargetURL = upstream.URL
+			spec.ApplicationProtocol = apidef.AppProtocolMCP
+			spec.JsonRpcVersion = apidef.JsonRPC20
+
+			UpdateAPIVersion(spec, "v1", func(v *apidef.VersionInfo) {
+				v.GlobalSizeLimit = 512 // Small limit for testing
+			})
+		})
+
+		// Test oversized request (should be rejected)
+		largePayload := `{"jsonrpc":"2.0","method":"tools/call","params":{"data":"` + strings.Repeat("x", 600) + `"},"id":1}`
+
+		_, _ = ts.Run(t, test.TestCase{
+			Method: http.MethodPost,
+			Path:   "/mcp-test/",
+			Data:   largePayload,
+			Code:   http.StatusBadRequest, // Should reject oversized request
+			Headers: map[string]string{
+				"Content-Type": "application/json",
+			},
+		})
+	})
+
+	t.Run("Regular API unaffected", func(t *testing.T) {
+		// Create regular API with size limit
+		api := ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+			spec.Name = "Regular API"
+			spec.APIID = "regular-test"
+			spec.Proxy.ListenPath = "/regular/"
+			// ApplicationProtocol not set - regular HTTP API
+
+			UpdateAPIVersion(spec, "v1", func(v *apidef.VersionInfo) {
+				v.GlobalSizeLimit = 1024
+			})
+		})[0]
+
+		// Verify it's not MCP
+		assert.False(t, api.IsMCP(), "API should not be MCP")
+	})
 }

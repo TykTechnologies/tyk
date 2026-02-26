@@ -11,6 +11,7 @@ import (
 
 	"github.com/sirupsen/logrus"
 
+	otelconfig "github.com/TykTechnologies/opentelemetry/config"
 	semconv "github.com/TykTechnologies/opentelemetry/semconv/v1.0.0"
 	tyktrace "github.com/TykTechnologies/opentelemetry/trace"
 	"github.com/TykTechnologies/tyk/apidef"
@@ -340,5 +341,244 @@ func TestAddTraceID(t *testing.T) {
 		h := rr.Header().Get(TykTraceIDHeader)
 		assert.NotEmpty(t, h, "expected X-Tyk-Trace-Id header to be set")
 		assert.Equal(t, span.SpanContext().TraceID().String(), h)
+	})
+}
+
+// TestExtractTraceID_WithRequest verifies ExtractTraceID correctly extracts
+// trace IDs from request contexts in various scenarios.
+func TestExtractTraceID_WithRequest(t *testing.T) {
+
+	tests := []struct {
+		name          string
+		setupContext  func(provider tyktrace.Provider) (context.Context, tyktrace.Span)
+		expectTraceID bool
+	}{
+		{
+			name: "empty context - no trace ID",
+			setupContext: func(_ tyktrace.Provider) (context.Context, tyktrace.Span) {
+				return context.Background(), nil
+			},
+			expectTraceID: false,
+		},
+		{
+			name: "valid span context - trace ID present",
+			setupContext: func(provider tyktrace.Provider) (context.Context, tyktrace.Span) {
+				ctx := context.Background()
+				_, span := provider.Tracer().Start(ctx, "access-log-test")
+				ctx = ContextWithSpan(ctx, span)
+				return ctx, span
+			},
+			expectTraceID: true,
+		},
+	}
+
+	provider := makeProviderHTTP(t)
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx, span := tc.setupContext(provider)
+			if span != nil {
+				defer span.End()
+			}
+
+			// Test ExtractTraceID directly with request context
+			req := httptest.NewRequest(http.MethodGet, "http://example.com/path", nil)
+			req = req.WithContext(ctx)
+
+			traceID := ExtractTraceID(req.Context())
+			hasTraceID := traceID != ""
+			assert.Equal(t, tc.expectTraceID, hasTraceID)
+
+			if tc.expectTraceID && span != nil {
+				assert.Equal(t, span.SpanContext().TraceID().String(), traceID)
+			}
+		})
+	}
+}
+
+func TestOTelConfig_SpanBatchConfig(t *testing.T) {
+	t.Run("provider initialized with custom span_batch_config", func(t *testing.T) {
+		endpoint, cleanup := makeHTTPCollector(t)
+		defer cleanup()
+
+		cfg := &OpenTelemetry{
+			Enabled:           true,
+			Exporter:          "http",
+			Endpoint:          endpoint,
+			SpanProcessorType: "batch",
+			SpanBatchConfig: otelconfig.SpanBatchConfig{
+				MaxQueueSize:       8192,
+				MaxExportBatchSize: 1024,
+				BatchTimeout:       3,
+			},
+		}
+
+		provider := InitOpenTelemetry(context.Background(), logrus.New(), cfg,
+			"gw-test", "v1.0.0", false, "", false, nil)
+
+		assert.NotNil(t, provider)
+		assert.Equal(t, tyktrace.OTEL_PROVIDER, provider.Type())
+
+		// Verify provider can create spans
+		ctx := context.Background()
+		_, span := provider.Tracer().Start(ctx, "test-span-with-batch-config")
+		assert.NotNil(t, span)
+		span.End()
+	})
+
+	t.Run("provider initialized with partial span_batch_config", func(t *testing.T) {
+		endpoint, cleanup := makeHTTPCollector(t)
+		defer cleanup()
+
+		cfg := &OpenTelemetry{
+			Enabled:           true,
+			Exporter:          "http",
+			Endpoint:          endpoint,
+			SpanProcessorType: "batch",
+			SpanBatchConfig: otelconfig.SpanBatchConfig{
+				MaxQueueSize: 4096,
+				// Other fields omitted - should use SDK defaults
+			},
+		}
+
+		provider := InitOpenTelemetry(context.Background(), logrus.New(), cfg,
+			"gw-test", "v1.0.0", false, "", false, nil)
+
+		assert.NotNil(t, provider)
+		assert.Equal(t, tyktrace.OTEL_PROVIDER, provider.Type())
+
+		// Verify provider can create spans
+		ctx := context.Background()
+		_, span := provider.Tracer().Start(ctx, "test-span-partial-config")
+		assert.NotNil(t, span)
+		span.End()
+	})
+
+	t.Run("simple processor ignores span_batch_config", func(t *testing.T) {
+		endpoint, cleanup := makeHTTPCollector(t)
+		defer cleanup()
+
+		cfg := &OpenTelemetry{
+			Enabled:           true,
+			Exporter:          "http",
+			Endpoint:          endpoint,
+			SpanProcessorType: "simple",
+			SpanBatchConfig: otelconfig.SpanBatchConfig{
+				MaxQueueSize:       8192,
+				MaxExportBatchSize: 1024,
+				BatchTimeout:       3,
+			},
+		}
+
+		provider := InitOpenTelemetry(context.Background(), logrus.New(), cfg,
+			"gw-test", "v1.0.0", false, "", false, nil)
+
+		assert.NotNil(t, provider)
+		assert.Equal(t, tyktrace.OTEL_PROVIDER, provider.Type())
+
+		// Verify provider works with simple processor
+		ctx := context.Background()
+		_, span := provider.Tracer().Start(ctx, "test-span-simple-processor")
+		assert.NotNil(t, span)
+		span.End()
+	})
+}
+
+func TestOTelConfig_BackwardCompatibility(t *testing.T) {
+	t.Run("existing config without span_batch_config works", func(t *testing.T) {
+		endpoint, cleanup := makeHTTPCollector(t)
+		defer cleanup()
+
+		// Config without span_batch_config - should use SDK defaults
+		cfg := &OpenTelemetry{
+			Enabled:           true,
+			Exporter:          "http",
+			Endpoint:          endpoint,
+			SpanProcessorType: "batch",
+			// No SpanBatchConfig specified
+		}
+
+		provider := InitOpenTelemetry(context.Background(), logrus.New(), cfg,
+			"gw-test", "v1.0.0", false, "", false, nil)
+
+		assert.NotNil(t, provider)
+		assert.Equal(t, tyktrace.OTEL_PROVIDER, provider.Type())
+
+		// Verify provider can create and export spans
+		ctx := context.Background()
+		_, span := provider.Tracer().Start(ctx, "test-span-backward-compat")
+		assert.NotNil(t, span)
+		span.End()
+	})
+
+	t.Run("minimal config still works", func(t *testing.T) {
+		endpoint, cleanup := makeHTTPCollector(t)
+		defer cleanup()
+
+		// Minimal config - only required fields
+		cfg := &OpenTelemetry{
+			Enabled:  true,
+			Exporter: "http",
+			Endpoint: endpoint,
+		}
+
+		provider := InitOpenTelemetry(context.Background(), logrus.New(), cfg,
+			"gw-test", "v1.0.0", false, "", false, nil)
+
+		assert.NotNil(t, provider)
+		assert.Equal(t, tyktrace.OTEL_PROVIDER, provider.Type())
+
+		// Verify provider works
+		ctx := context.Background()
+		_, span := provider.Tracer().Start(ctx, "test-span-minimal-config")
+		assert.NotNil(t, span)
+		span.End()
+	})
+
+	t.Run("disabled config returns noop provider", func(t *testing.T) {
+		cfg := &OpenTelemetry{
+			Enabled: false,
+			// Even with batch config, should return noop when disabled
+			SpanBatchConfig: otelconfig.SpanBatchConfig{
+				MaxQueueSize:       8192,
+				MaxExportBatchSize: 1024,
+				BatchTimeout:       3,
+			},
+		}
+
+		provider := InitOpenTelemetry(context.Background(), logrus.New(), cfg,
+			"gw-test", "v1.0.0", false, "", false, nil)
+
+		assert.NotNil(t, provider)
+		assert.Equal(t, tyktrace.NOOP_PROVIDER, provider.Type())
+	})
+}
+
+func TestExtractTraceAndSpanID(t *testing.T) {
+	t.Run("returns empty strings when no span in context", func(t *testing.T) {
+		traceID, spanID := ExtractTraceAndSpanID(context.Background())
+		assert.Equal(t, "", traceID)
+		assert.Equal(t, "", spanID)
+	})
+
+	t.Run("returns both trace and span IDs when span is present", func(t *testing.T) {
+		provider := makeProviderHTTP(t)
+
+		ctx := context.Background()
+		_, span := provider.Tracer().Start(ctx, "extract-both-test")
+		defer span.End()
+
+		ctx = ContextWithSpan(ctx, span)
+
+		traceID, spanID := ExtractTraceAndSpanID(ctx)
+
+		assert.NotEmpty(t, traceID, "expected non-empty trace id")
+		assert.NotEmpty(t, spanID, "expected non-empty span id")
+
+		assert.Equal(t, span.SpanContext().TraceID().String(), traceID)
+		assert.Equal(t, span.SpanContext().SpanID().String(), spanID)
+
+		assert.Len(t, traceID, 32, "trace_id should be 32 characters long")
+		assert.Len(t, spanID, 16, "span_id should be 16 characters long")
 	})
 }

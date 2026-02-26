@@ -7,6 +7,8 @@ import (
 
 	"github.com/sirupsen/logrus"
 
+	"github.com/TykTechnologies/tyk/ctx"
+	tykerrors "github.com/TykTechnologies/tyk/internal/errors"
 	"github.com/TykTechnologies/tyk/internal/event"
 	"github.com/TykTechnologies/tyk/request"
 )
@@ -27,6 +29,9 @@ func (k *RateLimitAndQuotaCheck) EnabledForSpec() bool {
 
 func (k *RateLimitAndQuotaCheck) handleQuotaFailure(r *http.Request, token string) (error, int) {
 	k.Logger().WithField("key", k.Gw.obfuscateKey(token)).Info("Key quota limit exceeded.")
+
+	// Set error classification for access logs
+	ctx.SetErrorClassification(r, tykerrors.ClassifyQuotaExceededError(k.Name()))
 
 	// Fire a quota exceeded event
 	k.FireEvent(EventQuotaExceeded, EventKeyFailureMeta{
@@ -96,6 +101,8 @@ func (k *RateLimitAndQuotaCheck) ProcessRequest(w http.ResponseWriter, r *http.R
 	switch reason {
 	case sessionFailNone:
 	case sessionFailRateLimit:
+		// Set error classification for access logs
+		ctx.SetErrorClassification(r, tykerrors.ClassifyRateLimitError(tykerrors.ErrTypeSessionRateLimit, k.Name()))
 		err, errCode := k.handleRateLimitFailure(r, event.RateLimitExceeded, "Rate Limit Exceeded", rateLimitKey)
 		if throttleRetryLimit > 0 {
 			for {
@@ -133,8 +140,10 @@ func (k *RateLimitAndQuotaCheck) ProcessRequest(w http.ResponseWriter, r *http.R
 	case sessionFailQuota:
 		return k.handleQuotaFailure(r, rateLimitKey)
 	case sessionFailInternalServerError:
+		ctx.SetErrorClassification(r, tykerrors.ClassifyRateLimitError(tykerrors.ErrTypeOtherRateLimit, k.Name()))
 		return ProxyingRequestFailedErr, http.StatusInternalServerError
 	default:
+		ctx.SetErrorClassification(r, tykerrors.ClassifyRateLimitError(tykerrors.ErrTypeOtherRateLimit, k.Name()))
 		// Other reason? Still not allowed
 		return errors.New("Access denied"), http.StatusForbidden
 	}

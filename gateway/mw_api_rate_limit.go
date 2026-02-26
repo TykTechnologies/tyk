@@ -7,6 +7,8 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/TykTechnologies/tyk/ctx"
+	tykerrors "github.com/TykTechnologies/tyk/internal/errors"
 	"github.com/TykTechnologies/tyk/internal/event"
 	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/user"
@@ -115,6 +117,8 @@ func (k *RateLimitForAPI) ProcessRequest(_ http.ResponseWriter, r *http.Request,
 	k.emitRateLimitEvents(r, k.keyName)
 
 	if reason == sessionFailRateLimit {
+		// Set error classification for access logs
+		ctx.SetErrorClassification(r, tykerrors.ClassifyRateLimitError(tykerrors.ErrTypeAPIRateLimit, k.Name()))
 		return k.handleRateLimitFailure(r, event.RateLimitExceeded, "API Rate Limit Exceeded", k.keyName)
 	}
 

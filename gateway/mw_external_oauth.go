@@ -22,7 +22,6 @@ import (
 )
 
 var (
-	externalOAuthJWKCache           cache.Repository = cache.New(240, 30)
 	externalOAuthIntrospectionCache *introspectionCache
 	ErrTokenValidationFailed        = errors.New("error happened during the access token validation")
 	ErrKIDNotAString                = errors.New("kid is not a string")
@@ -57,7 +56,7 @@ func (k *ExternalOAuthMiddleware) ProcessRequest(w http.ResponseWriter, r *http.
 
 	token, _ := k.getAuthToken(k.getAuthType(), r)
 	if token == "" {
-		return errors.New("authorization field missing"), http.StatusBadRequest
+		return k.prmError(w, r, errors.New("authorization field missing"), http.StatusBadRequest)
 	}
 
 	token = stripBearer(token)
@@ -87,14 +86,14 @@ func (k *ExternalOAuthMiddleware) ProcessRequest(w http.ResponseWriter, r *http.
 		switch {
 		case errors.Is(err, jwt.ErrSignatureInvalid), errors.Is(err, jwt.ErrTokenMalformed), errors.Is(err, jwt.ErrTokenNotValidYet),
 			errors.Is(err, jwt.ErrTokenUsedBeforeIssued), errors.Is(err, jwt.ErrTokenExpired):
-			return err, http.StatusUnauthorized
+			return k.prmError(w, r, err, http.StatusUnauthorized)
 		}
 
 		return ErrTokenValidationFailed, http.StatusInternalServerError
 	}
 
 	if !valid {
-		return errors.New("access token is not valid"), http.StatusUnauthorized
+		return k.prmError(w, r, errors.New("access token is not valid"), http.StatusUnauthorized)
 	}
 
 	sessionID := k.generateSessionID(identifier)
@@ -172,7 +171,7 @@ func (k *ExternalOAuthMiddleware) getSecretFromJWKURL(url string, kid interface{
 		err    error
 	)
 
-	cachedJWK, found := externalOAuthJWKCache.Get(k.Spec.APIID)
+	cachedJWK, found := k.Gw.jwkCache.Get(k.Spec.APIID)
 	if !found {
 		// Create HTTP client using factory for OAuth service
 		clientFactory := NewExternalHTTPClientFactory(k.Gw)
@@ -194,7 +193,7 @@ func (k *ExternalOAuthMiddleware) getSecretFromJWKURL(url string, kid interface{
 		}
 
 		k.Logger().Debug("Caching JWK")
-		externalOAuthJWKCache.Set(k.Spec.APIID, jwkSet, cache.DefaultExpiration)
+		k.Gw.jwkCache.Set(k.Spec.APIID, jwkSet, cache.DefaultExpiration)
 	} else {
 		jwkSet = cachedJWK.(*jose.JSONWebKeySet)
 	}

@@ -89,3 +89,7 @@ ci/tests/specs/policies
 .task-check-config-cache
 .task-check-x-tyk-gateway-cache
 .task-codegen-cache
+
+# unknown json files
+/gateway/test.json
+/gateway/child-v1.json
