@@ -1168,6 +1168,10 @@ type Config struct {
 	BundleInsecureSkipVerify bool `bson:"bundle_insecure_skip_verify" json:"bundle_insecure_skip_verify"`
 
 	// SkipVerifyExistingPluginBundle skips checksum verification for plugin bundles already on disk.
+	//
+	// Tyk always verifies the integrity of plugin bundles when downloading them for the first time to local disk. For security against corruption of the bundles after they have been loaded, it then re-verifies bundle checksum (for signed bundles) when loading each API that uses the plugins.
+	//
+	// In trusted environments, this reverification may be unnecessary and can be skipped using this option, reducing the API load time.
 	SkipVerifyExistingPluginBundle bool `bson:"skip_verify_existing_plugin_bundle" json:"skip_verify_existing_plugin_bundle"`
 
 	// Set to true if you are using JSVM custom middleware or virtual endpoints.
