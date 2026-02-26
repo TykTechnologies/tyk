@@ -1383,6 +1383,13 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 		withCache = false
 	}
 
+	// Wrap the response body with an SSE tap for MCP APIs so that hooks
+	// can inspect and filter individual SSE events before they reach the
+	// client. The tap is transparent to CopyResponse/copyBuffer.
+	if httputil.IsStreamingResponse(res) && p.TykAPISpec.IsMCP() {
+		res.Body = NewSSETap(res.Body, NewLoggingSSEHook(p.logger))
+	}
+
 	if withCache {
 		*inres = *res // includes shallow copies of maps, but okay
 

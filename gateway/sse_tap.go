@@ -1,0 +1,157 @@
+package gateway
+
+import (
+	"bytes"
+	"io"
+	"sync"
+)
+
+// readChunkSize is the number of bytes read from the upstream body in a single
+// call. 4 KB is a reasonable default for SSE where events are typically small.
+const readChunkSize = 4096
+
+// SSETap wraps an upstream http.Response.Body and intercepts individual SSE
+// events, running them through a chain of SSEHook implementations before
+// forwarding them to the downstream consumer (typically CopyResponse).
+//
+// When no hooks are registered the tap operates in pass-through mode with
+// minimal overhead: raw bytes are forwarded without parsing.
+//
+// SSETap implements io.ReadCloser and is safe for concurrent use.
+type SSETap struct {
+	reader       io.ReadCloser // upstream response body
+	inputBuffer  []byte        // accumulates raw upstream bytes
+	outputBuffer bytes.Buffer  // holds serialized events ready for the client
+	upstreamEOF  bool          // set once the upstream reader returns io.EOF
+	hooks        []SSEHook
+	mu           sync.Mutex
+}
+
+// NewSSETap creates a new SSETap wrapping reader. If no hooks are provided
+// the tap operates in a fast pass-through mode.
+func NewSSETap(reader io.ReadCloser, hooks ...SSEHook) *SSETap {
+	return &SSETap{
+		reader: reader,
+		hooks:  hooks,
+	}
+}
+
+// Read satisfies io.Reader. It never returns (0, nil) which would violate the
+// io.Reader contract. It loops internally until output data is available, the
+// upstream reaches EOF, or an error occurs.
+func (t *SSETap) Read(p []byte) (int, error) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+
+	for {
+		// 1. Drain any buffered output first.
+		if t.outputBuffer.Len() > 0 {
+			return t.outputBuffer.Read(p)
+		}
+
+		// 2. If upstream is done and no output remains, signal EOF.
+		if t.upstreamEOF {
+			return 0, io.EOF
+		}
+
+		// 3. Read a chunk from the upstream body.
+		chunk := make([]byte, readChunkSize)
+		n, err := t.reader.Read(chunk)
+		if n > 0 {
+			t.inputBuffer = append(t.inputBuffer, chunk[:n]...)
+		}
+
+		if err == io.EOF {
+			t.upstreamEOF = true
+		} else if err != nil {
+			return 0, err
+		}
+
+		// 4. Process any complete events in the input buffer.
+		t.processInputBuffer()
+
+		// 5. If we produced output, the next iteration will return it.
+		// If upstream hit EOF but processInputBuffer produced nothing,
+		// flush any remaining unparseable bytes as-is (fail-open).
+		if t.outputBuffer.Len() == 0 && t.upstreamEOF {
+			if len(t.inputBuffer) > 0 {
+				// Forward leftover bytes unchanged (incomplete event
+				// at stream end).
+				t.outputBuffer.Write(t.inputBuffer)
+				t.inputBuffer = nil
+			}
+		}
+
+		// Loop continues; next iteration will either return output or EOF.
+	}
+}
+
+// Close releases all internal buffers and closes the underlying reader.
+func (t *SSETap) Close() error {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+
+	t.inputBuffer = nil
+	t.outputBuffer.Reset()
+
+	return t.reader.Close()
+}
+
+// processInputBuffer parses complete SSE events from inputBuffer, runs them
+// through all registered hooks, and writes allowed (possibly modified) events
+// to outputBuffer.
+//
+// When no hooks are registered, raw event bytes are forwarded directly to
+// avoid the cost of serialization.
+func (t *SSETap) processInputBuffer() {
+	passthrough := len(t.hooks) == 0
+
+	for {
+		event, rawBytes, rest, err := parseSSEEvent(t.inputBuffer)
+		if err != nil {
+			// errIncompleteEvent: wait for more data.
+			return
+		}
+
+		t.inputBuffer = rest
+
+		if passthrough {
+			// No hooks: forward raw bytes unchanged.
+			t.outputBuffer.Write(rawBytes)
+			continue
+		}
+
+		if event == nil {
+			// Block was only comments/empty; forward raw bytes to preserve
+			// comments in the stream.
+			t.outputBuffer.Write(rawBytes)
+			continue
+		}
+
+		// Run through hooks.
+		allowed := true
+		current := event
+		for _, hook := range t.hooks {
+			hookAllowed, modified := hook.FilterEvent(current)
+			if !hookAllowed {
+				allowed = false
+				break
+			}
+			if modified != nil {
+				current = modified
+			}
+		}
+
+		if !allowed {
+			continue // drop the event
+		}
+
+		// If any hook modified the event, serialize the modified version.
+		if current != event {
+			t.outputBuffer.Write(serializeSSEEvent(current))
+		} else {
+			// No modification; forward original bytes to preserve formatting.
+			t.outputBuffer.Write(rawBytes)
+		}
+	}
+}
