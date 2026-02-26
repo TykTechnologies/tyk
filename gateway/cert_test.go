@@ -39,14 +39,14 @@ import (
 )
 
 const (
-	internalTLSErr          = "tls: unrecognized name"
-	certNotMatchErr         = "Client TLS certificate is required"
+	internalTLSErr  = "tls: unrecognized name"
+	certNotMatchErr = "Client TLS certificate is required"
 	// Go 1.25 TLS error strings for mutual TLS scenarios:
 	// When ClientCA is announced: no cert → handshake failure, wrong cert → unknown certificate authority
 	// When ClientCA is skipped:   no cert → bad certificate,   wrong cert → bad certificate
-	noCertAnnounceErr       = "tls: handshake failure"
-	wrongCertAnnounceErr    = "tls: unknown certificate authority"
-	noCertSkipAnnounceErr   = "tls: bad certificate"
+	noCertAnnounceErr        = "tls: handshake failure"
+	wrongCertAnnounceErr     = "tls: unknown certificate authority"
+	noCertSkipAnnounceErr    = "tls: bad certificate"
 	wrongCertSkipAnnounceErr = "tls: bad certificate"
 )
 
