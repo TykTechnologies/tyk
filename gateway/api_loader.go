@@ -511,6 +511,11 @@ func (gw *Gateway) processSpec(
 		gw.mwAppendEnabled(&chainArray, &RateLimitAndQuotaCheck{baseMid.Copy()})
 	}
 
+	if spec.IsMCP() {
+		gw.mwAppendEnabled(&chainArray, &JSONRPCAccessControlMiddleware{baseMid.Copy()})
+		gw.mwAppendEnabled(&chainArray, &MCPAccessControlMiddleware{baseMid.Copy()})
+	}
+
 	gw.mwAppendEnabled(&chainArray, &RateLimitForAPI{BaseMiddleware: baseMid.Copy(), quotaKey: options.quotaKey})
 	gw.mwAppendEnabled(&chainArray, &GraphQLMiddleware{BaseMiddleware: baseMid.Copy()})
 
