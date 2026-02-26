@@ -3,6 +3,7 @@ package gateway
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io/ioutil"
 	"net/http"
 	"os"
@@ -35,6 +36,11 @@ type DBAccessDefinition struct {
 
 	// Endpoints contains endpoint rate limit settings.
 	Endpoints user.Endpoints `json:"endpoints,omitempty"`
+
+	JSONRPCMethods             []user.JSONRPCMethodLimit `json:"json_rpc_methods,omitempty"`
+	JSONRPCMethodsAccessRights user.AccessControlRules   `json:"json_rpc_methods_access_rights,omitzero"`
+	MCPPrimitives              []user.MCPPrimitiveLimit  `json:"mcp_primitives,omitempty"`
+	MCPAccessRights            user.MCPAccessRights      `json:"mcp_access_rights,omitzero"`
 }
 
 func (d *DBAccessDefinition) ToRegularAD() user.AccessDefinition {
@@ -53,12 +59,50 @@ func (d *DBAccessDefinition) ToRegularAD() user.AccessDefinition {
 	if d.Limit != nil {
 		ad.Limit = *d.Limit
 	}
+
+	ad.JSONRPCMethods = d.JSONRPCMethods
+	ad.JSONRPCMethodsAccessRights = d.JSONRPCMethodsAccessRights
+	ad.MCPPrimitives = d.MCPPrimitives
+	ad.MCPAccessRights = d.MCPAccessRights
+
 	return ad
 }
 
 type DBPolicy struct {
 	user.Policy
 	AccessRights map[string]DBAccessDefinition `bson:"access_rights" json:"access_rights"`
+}
+
+// hasMCPFields returns true if the access definition contains any MCP-specific fields.
+func hasMCPFields(ar user.AccessDefinition) bool {
+	return len(ar.JSONRPCMethods) > 0 ||
+		!ar.JSONRPCMethodsAccessRights.IsEmpty() ||
+		len(ar.MCPPrimitives) > 0 ||
+		!ar.MCPAccessRights.IsEmpty()
+}
+
+// validateMCPFieldsInAccessRights returns an error if any MCP-specific fields are set
+// on an access right whose API is loaded and is not an MCP Proxy.
+// Unknown APIs (not yet loaded) are skipped to avoid false negatives during bootstrap.
+func (gw *Gateway) validateMCPFieldsInAccessRights(accessRights map[string]user.AccessDefinition) error {
+	for apiID, ar := range accessRights {
+		if !hasMCPFields(ar) {
+			continue
+		}
+		spec := gw.getApiSpec(apiID)
+		if spec == nil {
+			continue
+		}
+		if !spec.IsMCP() {
+			return fmt.Errorf("MCP fields can only be configured on MCP Proxies, API %q is not an MCP Proxy", apiID)
+		}
+		for _, p := range ar.MCPPrimitives {
+			if err := p.Validate(); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
 }
 
 func (d *DBPolicy) ToRegularPolicy() user.Policy {

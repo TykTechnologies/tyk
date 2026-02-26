@@ -1483,3 +1483,120 @@ func TestOrganizationScopedPolicies(t *testing.T) {
 		})
 	})
 }
+
+func TestHasMCPFields(t *testing.T) {
+	cases := []struct {
+		name   string
+		ar     user.AccessDefinition
+		expect bool
+	}{
+		{
+			name:   "empty",
+			ar:     user.AccessDefinition{},
+			expect: false,
+		},
+		{
+			name:   "json_rpc_methods set",
+			ar:     user.AccessDefinition{JSONRPCMethods: []user.JSONRPCMethodLimit{{Name: "tools/call"}}},
+			expect: true,
+		},
+		{
+			name:   "json_rpc_methods_access_rights allowed set",
+			ar:     user.AccessDefinition{JSONRPCMethodsAccessRights: user.AccessControlRules{Allowed: []string{"tools/call"}}},
+			expect: true,
+		},
+		{
+			name:   "mcp_primitives set",
+			ar:     user.AccessDefinition{MCPPrimitives: []user.MCPPrimitiveLimit{{Type: "tool", Name: "weather"}}},
+			expect: true,
+		},
+		{
+			name:   "mcp_access_rights tools set",
+			ar:     user.AccessDefinition{MCPAccessRights: user.MCPAccessRights{Tools: user.AccessControlRules{Allowed: []string{"weather"}}}},
+			expect: true,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			assert.Equal(t, tc.expect, hasMCPFields(tc.ar))
+		})
+	}
+}
+
+func TestValidateMCPFieldsInAccessRights(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	specs := ts.Gw.BuildAndLoadAPI(
+		func(spec *APISpec) {
+			spec.APIID = "mcp-api-id"
+			spec.MarkAsMCP()
+		},
+		func(spec *APISpec) {
+			spec.APIID = "non-mcp-api-id"
+			spec.Name = "non-mcp-api"
+		},
+	)
+	mcpAPIID := specs[0].APIID
+	nonMCPAPIID := specs[1].APIID
+
+	mcpAR := user.AccessDefinition{
+		JSONRPCMethods: []user.JSONRPCMethodLimit{{Name: "tools/call"}},
+	}
+
+	cases := []struct {
+		name         string
+		accessRights map[string]user.AccessDefinition
+		expectErr    string // substring expected in error; empty means no error
+	}{
+		{
+			name:         "MCP fields on MCP Proxy are accepted",
+			accessRights: map[string]user.AccessDefinition{mcpAPIID: mcpAR},
+		},
+		{
+			name:         "MCP fields on non-MCP API are rejected",
+			accessRights: map[string]user.AccessDefinition{nonMCPAPIID: mcpAR},
+			expectErr:    "MCP fields can only be configured on MCP Proxies",
+		},
+		{
+			name:         "MCP fields on unknown API are accepted",
+			accessRights: map[string]user.AccessDefinition{"unknown-api-id": mcpAR},
+		},
+		{
+			name:         "no MCP fields on non-MCP API are accepted",
+			accessRights: map[string]user.AccessDefinition{nonMCPAPIID: {APIID: nonMCPAPIID}},
+		},
+		{
+			name: "valid primitive type on MCP Proxy is accepted",
+			accessRights: map[string]user.AccessDefinition{
+				mcpAPIID: {MCPPrimitives: []user.MCPPrimitiveLimit{{Type: "tool", Name: "weather"}}},
+			},
+		},
+		{
+			name: "invalid primitive type on MCP Proxy is rejected",
+			accessRights: map[string]user.AccessDefinition{
+				mcpAPIID: {MCPPrimitives: []user.MCPPrimitiveLimit{{Type: "invalid", Name: "weather"}}},
+			},
+			expectErr: "invalid MCP primitive type",
+		},
+		{
+			name: "invalid primitive type on unknown API is accepted (fail-open)",
+			accessRights: map[string]user.AccessDefinition{
+				"unknown-api-id": {MCPPrimitives: []user.MCPPrimitiveLimit{{Type: "invalid", Name: "weather"}}},
+			},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			err := ts.Gw.validateMCPFieldsInAccessRights(tc.accessRights)
+			if tc.expectErr != "" {
+				assert.Error(t, err)
+				assert.Contains(t, err.Error(), tc.expectErr)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
