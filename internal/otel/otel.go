@@ -6,41 +6,9 @@ import (
 
 	"github.com/sirupsen/logrus"
 
-	otelconfig "github.com/TykTechnologies/opentelemetry/config"
 	semconv "github.com/TykTechnologies/opentelemetry/semconv/v1.0.0"
 	tyktrace "github.com/TykTechnologies/opentelemetry/trace"
 	"github.com/TykTechnologies/tyk/apidef"
-)
-
-// general type aliases
-type (
-	TracerProvider = tyktrace.Provider
-
-	OpenTelemetry = otelconfig.OpenTelemetry
-
-	Sampling = otelconfig.Sampling
-
-	SpanAttribute = tyktrace.Attribute
-
-	Span = tyktrace.Span
-)
-
-// HTTP Handlers
-var (
-	HTTPHandler = tyktrace.NewHTTPHandler
-
-	HTTPRoundTripper = tyktrace.NewHTTPTransport
-)
-
-// span const
-const (
-	SPAN_STATUS_OK    = tyktrace.SPAN_STATUS_OK
-	SPAN_STATUS_ERROR = tyktrace.SPAN_STATUS_ERROR
-	SPAN_STATUS_UNSET = tyktrace.SPAN_STATUS_UNSET
-)
-
-const (
-	NON_VERSIONED = "Non Versioned"
 )
 
 func ContextWithSpan(ctx context.Context, span tyktrace.Span) context.Context {
@@ -65,7 +33,7 @@ func InitOpenTelemetry(ctx context.Context, logger *logrus.Logger, gwConfig *Ope
 
 	provider, errOtel := tyktrace.NewProvider(
 		tyktrace.WithContext(ctx),
-		tyktrace.WithConfig(gwConfig),
+		tyktrace.WithConfig(gwConfig.LibraryConfig()),
 		tyktrace.WithLogger(traceLogger),
 		tyktrace.WithServiceID(id),
 		tyktrace.WithServiceVersion(version),

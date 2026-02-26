@@ -32,18 +32,20 @@ func Test_InitOpenTelemetry(t *testing.T) {
 	}{
 		{
 			testName: "opentelemetry disabled",
-			givenConfig: OpenTelemetry{
+			givenConfig: OpenTelemetry{BaseOpenTelemetry: BaseOpenTelemetry{
 				Enabled: false,
-			},
+			}},
 			expectedType: tyktrace.NOOP_PROVIDER,
 		},
 		{
 			testName: "opentelemetry enabled, exporter set to http",
-			givenConfig: OpenTelemetry{
-				Enabled:  true,
-				Exporter: "http",
-				Endpoint: "http://localhost:4317",
-			},
+			givenConfig: OpenTelemetry{BaseOpenTelemetry: BaseOpenTelemetry{
+				Enabled: true,
+				ExporterConfig: ExporterConfig{
+					Exporter: "http",
+					Endpoint: "http://localhost:4317",
+				},
+			}},
 			setupFn: func() (string, func()) {
 				server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 					// Here you can check the request and return a response
@@ -56,11 +58,13 @@ func Test_InitOpenTelemetry(t *testing.T) {
 		},
 		{
 			testName: "opentelemetry enabled, exporter set to grpc",
-			givenConfig: OpenTelemetry{
-				Enabled:  true,
-				Exporter: "grpc",
-				Endpoint: "localhost:4317",
-			},
+			givenConfig: OpenTelemetry{BaseOpenTelemetry: BaseOpenTelemetry{
+				Enabled: true,
+				ExporterConfig: ExporterConfig{
+					Exporter: "grpc",
+					Endpoint: "localhost:4317",
+				},
+			}},
 			setupFn: func() (string, func()) {
 				lis, err := net.Listen("tcp", "localhost:0")
 				if err != nil {
@@ -81,11 +85,13 @@ func Test_InitOpenTelemetry(t *testing.T) {
 		},
 		{
 			testName: "opentelemetry enabled, exporter set to invalid - noop provider should be used",
-			givenConfig: OpenTelemetry{
-				Enabled:  true,
-				Exporter: "invalid",
-				Endpoint: "localhost:4317",
-			},
+			givenConfig: OpenTelemetry{BaseOpenTelemetry: BaseOpenTelemetry{
+				Enabled: true,
+				ExporterConfig: ExporterConfig{
+					Exporter: "invalid",
+					Endpoint: "localhost:4317",
+				},
+			}},
 			expectedType: tyktrace.NOOP_PROVIDER,
 		},
 	}
@@ -251,10 +257,12 @@ func TestGatewayResourceAttributes(t *testing.T) {
 }
 
 func TestContextWithSpan(t *testing.T) {
-	provider := InitOpenTelemetry(context.Background(), logger.GetLogger(), &OpenTelemetry{
-		Enabled:  true,
-		Endpoint: "invalid",
-	}, "test", "test", false, "", false, []string{})
+	provider := InitOpenTelemetry(context.Background(), logger.GetLogger(), &OpenTelemetry{BaseOpenTelemetry: BaseOpenTelemetry{
+		Enabled: true,
+		ExporterConfig: ExporterConfig{
+			Endpoint: "invalid",
+		},
+	}}, "test", "test", false, "", false, []string{})
 
 	ctx := context.Background()
 	_, span := provider.Tracer().Start(context.Background(), "test operation")
@@ -279,11 +287,13 @@ func makeProviderHTTP(t *testing.T) tyktrace.Provider {
 	endpoint, cleanup := makeHTTPCollector(t)
 	t.Cleanup(cleanup)
 
-	cfg := &OpenTelemetry{
-		Enabled:  true,
-		Exporter: "http",
-		Endpoint: endpoint,
-	}
+	cfg := &OpenTelemetry{BaseOpenTelemetry: BaseOpenTelemetry{
+		Enabled: true,
+		ExporterConfig: ExporterConfig{
+			Exporter: "http",
+			Endpoint: endpoint,
+		},
+	}}
 
 	provider := InitOpenTelemetry(context.Background(), logrus.New(), cfg,
 		"gw-id-1", "v1.2.3", false, "", false, nil)
@@ -401,17 +411,19 @@ func TestOTelConfig_SpanBatchConfig(t *testing.T) {
 		endpoint, cleanup := makeHTTPCollector(t)
 		defer cleanup()
 
-		cfg := &OpenTelemetry{
-			Enabled:           true,
-			Exporter:          "http",
-			Endpoint:          endpoint,
+		cfg := &OpenTelemetry{BaseOpenTelemetry: BaseOpenTelemetry{
+			Enabled: true,
+			ExporterConfig: ExporterConfig{
+				Exporter: "http",
+				Endpoint: endpoint,
+			},
 			SpanProcessorType: "batch",
 			SpanBatchConfig: otelconfig.SpanBatchConfig{
 				MaxQueueSize:       8192,
 				MaxExportBatchSize: 1024,
 				BatchTimeout:       3,
 			},
-		}
+		}}
 
 		provider := InitOpenTelemetry(context.Background(), logrus.New(), cfg,
 			"gw-test", "v1.0.0", false, "", false, nil)
@@ -430,16 +442,18 @@ func TestOTelConfig_SpanBatchConfig(t *testing.T) {
 		endpoint, cleanup := makeHTTPCollector(t)
 		defer cleanup()
 
-		cfg := &OpenTelemetry{
-			Enabled:           true,
-			Exporter:          "http",
-			Endpoint:          endpoint,
+		cfg := &OpenTelemetry{BaseOpenTelemetry: BaseOpenTelemetry{
+			Enabled: true,
+			ExporterConfig: ExporterConfig{
+				Exporter: "http",
+				Endpoint: endpoint,
+			},
 			SpanProcessorType: "batch",
 			SpanBatchConfig: otelconfig.SpanBatchConfig{
 				MaxQueueSize: 4096,
 				// Other fields omitted - should use SDK defaults
 			},
-		}
+		}}
 
 		provider := InitOpenTelemetry(context.Background(), logrus.New(), cfg,
 			"gw-test", "v1.0.0", false, "", false, nil)
@@ -458,17 +472,19 @@ func TestOTelConfig_SpanBatchConfig(t *testing.T) {
 		endpoint, cleanup := makeHTTPCollector(t)
 		defer cleanup()
 
-		cfg := &OpenTelemetry{
-			Enabled:           true,
-			Exporter:          "http",
-			Endpoint:          endpoint,
+		cfg := &OpenTelemetry{BaseOpenTelemetry: BaseOpenTelemetry{
+			Enabled: true,
+			ExporterConfig: ExporterConfig{
+				Exporter: "http",
+				Endpoint: endpoint,
+			},
 			SpanProcessorType: "simple",
 			SpanBatchConfig: otelconfig.SpanBatchConfig{
 				MaxQueueSize:       8192,
 				MaxExportBatchSize: 1024,
 				BatchTimeout:       3,
 			},
-		}
+		}}
 
 		provider := InitOpenTelemetry(context.Background(), logrus.New(), cfg,
 			"gw-test", "v1.0.0", false, "", false, nil)
@@ -490,13 +506,15 @@ func TestOTelConfig_BackwardCompatibility(t *testing.T) {
 		defer cleanup()
 
 		// Config without span_batch_config - should use SDK defaults
-		cfg := &OpenTelemetry{
-			Enabled:           true,
-			Exporter:          "http",
-			Endpoint:          endpoint,
+		cfg := &OpenTelemetry{BaseOpenTelemetry: BaseOpenTelemetry{
+			Enabled: true,
+			ExporterConfig: ExporterConfig{
+				Exporter: "http",
+				Endpoint: endpoint,
+			},
 			SpanProcessorType: "batch",
 			// No SpanBatchConfig specified
-		}
+		}}
 
 		provider := InitOpenTelemetry(context.Background(), logrus.New(), cfg,
 			"gw-test", "v1.0.0", false, "", false, nil)
@@ -516,11 +534,13 @@ func TestOTelConfig_BackwardCompatibility(t *testing.T) {
 		defer cleanup()
 
 		// Minimal config - only required fields
-		cfg := &OpenTelemetry{
-			Enabled:  true,
-			Exporter: "http",
-			Endpoint: endpoint,
-		}
+		cfg := &OpenTelemetry{BaseOpenTelemetry: BaseOpenTelemetry{
+			Enabled: true,
+			ExporterConfig: ExporterConfig{
+				Exporter: "http",
+				Endpoint: endpoint,
+			},
+		}}
 
 		provider := InitOpenTelemetry(context.Background(), logrus.New(), cfg,
 			"gw-test", "v1.0.0", false, "", false, nil)
@@ -536,7 +556,7 @@ func TestOTelConfig_BackwardCompatibility(t *testing.T) {
 	})
 
 	t.Run("disabled config returns noop provider", func(t *testing.T) {
-		cfg := &OpenTelemetry{
+		cfg := &OpenTelemetry{BaseOpenTelemetry: BaseOpenTelemetry{
 			Enabled: false,
 			// Even with batch config, should return noop when disabled
 			SpanBatchConfig: otelconfig.SpanBatchConfig{
@@ -544,7 +564,7 @@ func TestOTelConfig_BackwardCompatibility(t *testing.T) {
 				MaxExportBatchSize: 1024,
 				BatchTimeout:       3,
 			},
-		}
+		}}
 
 		provider := InitOpenTelemetry(context.Background(), logrus.New(), cfg,
 			"gw-test", "v1.0.0", false, "", false, nil)

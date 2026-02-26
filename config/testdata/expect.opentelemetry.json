@@ -1,0 +1,56 @@
+{
+    "enabled": true,
+    "exporter": "grpc",
+    "endpoint": "collector.example.com:4317",
+    "headers": null,
+    "connection_timeout": 5,
+    "resource_name": "my-gateway",
+    "tls": {
+        "enable": false,
+        "insecure_skip_verify": false,
+        "ca_file": "",
+        "cert_file": "",
+        "key_file": "",
+        "max_version": "",
+        "min_version": ""
+    },
+    "span_processor_type": "batch",
+    "span_batch_config": {
+        "max_queue_size": 0,
+        "max_export_batch_size": 0,
+        "batch_timeout": 0
+    },
+    "context_propagation": "tracecontext",
+    "custom_trace_header": "",
+    "sampling": {
+        "type": "TraceIDRatioBased",
+        "rate": 0.5,
+        "parent_based": true
+    },
+    "metrics": {
+        "enabled": true,
+        "exporter": "",
+        "endpoint": "",
+        "headers": null,
+        "connection_timeout": 0,
+        "resource_name": "",
+        "tls": {
+            "enable": false,
+            "insecure_skip_verify": false,
+            "ca_file": "",
+            "cert_file": "",
+            "key_file": "",
+            "max_version": "",
+            "min_version": ""
+        },
+        "export_interval": 30,
+        "temporality": "cumulative",
+        "shutdown_timeout": 15,
+        "retry": {
+            "enabled": true,
+            "initial_interval": 3000,
+            "max_interval": 15000,
+            "max_elapsed_time": 30000
+        }
+    }
+}
