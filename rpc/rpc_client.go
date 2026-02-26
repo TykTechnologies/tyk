@@ -104,12 +104,17 @@ func (r rpcOpts) Config() Config {
 	return Config{}
 }
 
-func (r *rpcOpts) Reset() {
-	r.loadCounts.Store(0)
-	r.emergencyMode.Store(false)
-	r.emergencyModeLoaded.Store(false)
-	r.clientIsConnected.Store(false)
-	r.dnsCheckedAfterError.Store(false)
+func Reset() {
+	clientSingletonMu.Lock()
+	defer clientSingletonMu.Unlock()
+
+	StopDNSMonitor()
+	if clientSingleton != nil {
+		clientSingleton.Stop()
+	}
+	clientSingleton = nil
+	funcClientSingleton = nil
+	values.Reset()
 }
 
 func (r *rpcOpts) SetLoadCounts(n int) {
@@ -233,8 +238,8 @@ func Connect(
 	emergencyModeFunc func(),
 	emergencyModeLoadedFunc func(),
 ) bool {
-	rpcConnectMu.Lock()
-	defer rpcConnectMu.Unlock()
+	clientSingletonMu.Lock()
+	defer clientSingletonMu.Unlock()
 
 	setupConnectionConfig(connConfig, getGroupLoginFunc, emergencyModeFunc, emergencyModeLoadedFunc)
 	if values.ClientIsConnected() {
@@ -527,7 +532,16 @@ func FuncClientSingleton(funcName string, request interface{}) (result interface
 		if !values.ClientIsConnected() {
 			return ErrRPCIsDown
 		}
-		result, err = funcClientSingleton.CallTimeout(funcName, request, GlobalRPCCallTimeout)
+
+		clientSingletonMu.Lock()
+		fcs := funcClientSingleton
+		clientSingletonMu.Unlock()
+
+		if fcs == nil {
+			return ErrRPCIsDown
+		}
+
+		result, err = fcs.CallTimeout(funcName, request, GlobalRPCCallTimeout)
 
 		// If there's an error, handle it with our dedicated error handler
 		if err != nil {
