@@ -736,6 +736,7 @@ func (r RPCStorageHandler) IsRetriableError(err error) bool {
 }
 
 // GetAPIDefinitions will pull API definitions from the RPC server
+// GetAPIDefinitions will pull API definitions from the RPC server
 func (r *RPCStorageHandler) GetApiDefinitions(orgId string, tags []string) string {
 	dr := model.DefRequest{
 		OrgId:   orgId,
@@ -758,17 +759,24 @@ func (r *RPCStorageHandler) GetApiDefinitions(orgId string, tags []string) strin
 		// Callers of the "RPCStorageHandler.GetApiDefinitions" method should switch to the fallback
 		// by enabling emergency mode. See syncResourcesWithReload in the server.go file.
 		log.Debugf("RPC Handler: GetApiDefinitions() returned %s, returning empty string", err)
-		return ""
+		return "[]"
 	}
 	log.Debug("API Definitions retrieved")
 
 	if defString == nil {
 		log.Warning("RPC Handler: GetApiDefinitions() returned nil, returning empty string")
-		return ""
+		return "[]"
 	}
-	return defString.(string)
+
+	s := defString.(string)
+	if s == "[null]" {
+		log.Warning("RPC Handler: GetApiDefinitions() returned '[null]', returning empty JSON array '[]'")
+			return "[]"
+	}
+	return s
 }
 
+// GetPolicies will pull Policies from the RPC server
 // GetPolicies will pull Policies from the RPC server
 func (r *RPCStorageHandler) GetPolicies(orgId string) string {
 	defString, err := rpc.FuncClientSingleton("GetPolicies", orgId)
@@ -786,13 +794,19 @@ func (r *RPCStorageHandler) GetPolicies(orgId string) string {
 		// Callers of the "RPCStorageHandler.GetPolicies" method should switch to the fallback
 		// by enabling emergency mode. See syncResourcesWithReload in the server.go file.
 		log.Debugf("RPC Handler: GetPolicies() returned %s, returning empty string", err)
-		return ""
+		return "[]"
 	}
 
 	if defString != nil {
-		return defString.(string)
+		s := defString.(string)
+		if s == "[null]" {
+			log.Warning("RPC Handler: GetPolicies() returned '[null]', returning empty JSON array '[]'")
+			return "[]"
+		}
+		return s
 	}
-	return ""
+
+	return "[]"
 }
 
 // CheckForReload will start a long poll
