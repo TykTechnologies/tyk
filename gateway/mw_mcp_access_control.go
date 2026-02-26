@@ -32,6 +32,8 @@ func (m *MCPAccessControlMiddleware) EnabledForSpec() bool {
 
 // ProcessRequest enforces MCP primitive allow/block rules.
 // Skips when state.PrimitiveType is empty (non-primitive methods such as initialize, ping, tools/list).
+//
+//nolint:staticcheck
 func (m *MCPAccessControlMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
 	if ctxGetRequestStatus(r) == StatusOkAndIgnore {
 		return nil, http.StatusOK
@@ -53,7 +55,7 @@ func (m *MCPAccessControlMiddleware) ProcessRequest(w http.ResponseWriter, r *ht
 	}
 
 	rules := rulesForPrimitiveType(accessDef.MCPAccessRights, state.PrimitiveType)
-	if err := checkAccessControlRules(rules, state.PrimitiveName); err != nil {
+	if checkAccessControlRules(rules, state.PrimitiveName) != nil {
 		writeJSONRPCAccessDenied(w, r,
 			fmt.Sprintf("%s '%s' is not available", state.PrimitiveType, state.PrimitiveName))
 		return nil, middleware.StatusRespond

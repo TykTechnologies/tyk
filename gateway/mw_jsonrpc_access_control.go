@@ -31,6 +31,8 @@ func (m *JSONRPCAccessControlMiddleware) EnabledForSpec() bool {
 }
 
 // ProcessRequest enforces JSON-RPC method allow/block rules.
+//
+//nolint:staticcheck
 func (m *JSONRPCAccessControlMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
 	if ctxGetRequestStatus(r) == StatusOkAndIgnore {
 		return nil, http.StatusOK
@@ -51,7 +53,7 @@ func (m *JSONRPCAccessControlMiddleware) ProcessRequest(w http.ResponseWriter, r
 		return nil, http.StatusOK
 	}
 
-	if err := checkAccessControlRules(accessDef.JSONRPCMethodsAccessRights, state.Method); err != nil {
+	if checkAccessControlRules(accessDef.JSONRPCMethodsAccessRights, state.Method) != nil {
 		writeJSONRPCAccessDenied(w, r, fmt.Sprintf("method '%s' is not available", state.Method))
 		return nil, middleware.StatusRespond
 	}

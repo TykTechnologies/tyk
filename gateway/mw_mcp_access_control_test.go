@@ -439,7 +439,9 @@ func TestMCPAccessControlMiddleware_ResponseBody(t *testing.T) {
 	}
 	setSessionForTest(r, session)
 
-	_, _ = mw.ProcessRequest(w, r, nil)
+	err, code := mw.ProcessRequest(w, r, nil)
+	assert.NoError(t, err)
+	assert.Equal(t, middleware.StatusRespond, code)
 
 	require.Equal(t, http.StatusForbidden, w.Code)
 	body := w.Body.String()
