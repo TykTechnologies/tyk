@@ -746,7 +746,7 @@ type SecurityConfig struct {
 }
 
 type JWKSConfig struct {
-	// Cache hodls configuration for JWKS caching
+	// Cache holds configuration for JWKS caching
 	Cache JWKSCacheConfig `json:"cache"`
 }
 
