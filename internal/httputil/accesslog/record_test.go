@@ -79,11 +79,13 @@ func TestWithTraceID(t *testing.T) {
 				}))
 				t.Cleanup(srv.Close)
 
-				cfg := &otel.OpenTelemetry{
-					Enabled:  true,
-					Exporter: "http",
-					Endpoint: srv.URL,
-				}
+				cfg := &otel.OpenTelemetry{BaseOpenTelemetry: otel.BaseOpenTelemetry{
+					Enabled: true,
+					ExporterConfig: otel.ExporterConfig{
+						Exporter: "http",
+						Endpoint: srv.URL,
+					},
+				}}
 				provider := otel.InitOpenTelemetry(context.Background(), logrus.New(), cfg, "test", "v1", false, "", false, nil)
 
 				// Create a span with trace context
