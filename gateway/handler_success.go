@@ -443,6 +443,7 @@ func (s *SuccessHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) *http
 		s.RecordHit(r, latency, resp.Response.StatusCode, resp.Response, false)
 		s.RecordAccessLog(r, resp.Response, latency)
 	}
+	s.Base().Gw.MetricInstruments.RecordRequest(r.Context())
 	log.Debug("Done proxy")
 
 	return nil

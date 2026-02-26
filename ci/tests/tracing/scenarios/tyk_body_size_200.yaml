@@ -12,7 +12,7 @@ spec:
         - key: Content-Type
           value: application/json
   specs:
-    - selector: span[tracetest.span.type="http" name="GET /test/" http.method="GET"]
+    - selector: span[tracetest.span.type="http" name="GET /test/" http.request.method="GET"]
       name: Checking request and response body sizes
       assertions:
         - attr:http.request.body.size = 15 # {"foo": "bar"} = 15 bytes
