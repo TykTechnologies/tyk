@@ -2,6 +2,7 @@ package gateway
 
 import (
 	"net/http"
+	"net/http/httptest"
 	"testing"
 	"time"
 
@@ -9,6 +10,7 @@ import (
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/internal/httpctx"
 	"github.com/TykTechnologies/tyk/internal/mcp"
 	"github.com/TykTechnologies/tyk/test"
 	"github.com/TykTechnologies/tyk/user"
@@ -706,6 +708,102 @@ func TestVersionCheck_checkVEMWhiteListEntry(t *testing.T) {
 			} else {
 				assert.NoError(t, err)
 			}
+		})
+	}
+}
+
+func TestResetJSONRPCRoutingAndProxyUpstream(t *testing.T) {
+	const vemPath = "/mcp-tool:get-weather"
+	const originalPath = "/mcp"
+	const rawQuery = "check_limits=true"
+
+	r := httptest.NewRequest(http.MethodPost, vemPath+"?"+rawQuery, nil)
+	r.URL.Path = vemPath
+	r.URL.RawQuery = rawQuery
+
+	state := &httpctx.JSONRPCRoutingState{
+		NextVEM:      vemPath,
+		OriginalPath: originalPath,
+	}
+	httpctx.SetJSONRPCRoutingState(r, state)
+
+	resetJSONRPCRoutingAndProxyUpstream(r, state)
+
+	assert.Equal(t, "", state.NextVEM)
+	assert.Equal(t, "", httpctx.GetJSONRPCRoutingState(r).NextVEM)
+	assert.Equal(t, vemPath, r.URL.Path)
+	assert.Equal(t, rawQuery, r.URL.RawQuery)
+}
+
+func TestVersionCheck_handleMCPPrimitiveNotFound(t *testing.T) {
+	const vemPath = "/mcp-tool:get-weather"
+	const originalPath = "/mcp"
+
+	tests := []struct {
+		name             string
+		toolsAllowList   bool
+		withRoutingState bool
+		expectedStatus   int
+		expectedError    bool
+		expectedPath     string
+	}{
+		{
+			name:             "no routing state returns 404",
+			toolsAllowList:   false,
+			withRoutingState: false,
+			expectedStatus:   http.StatusNotFound,
+			expectedError:    true,
+			expectedPath:     vemPath,
+		},
+		{
+			name:             "routing state with allow-list returns 403",
+			toolsAllowList:   true,
+			withRoutingState: true,
+			expectedStatus:   http.StatusForbidden,
+			expectedError:    true,
+			expectedPath:     vemPath,
+		},
+		{
+			name:             "routing state without allow-list preserves VEM path",
+			toolsAllowList:   false,
+			withRoutingState: true,
+			expectedStatus:   http.StatusOK,
+			expectedError:    false,
+			expectedPath:     vemPath,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			v := &VersionCheck{
+				BaseMiddleware: &BaseMiddleware{
+					Spec: &APISpec{
+						APIDefinition:         &apidef.APIDefinition{},
+						ToolsAllowListEnabled: tt.toolsAllowList,
+					},
+				},
+			}
+
+			r := httptest.NewRequest(http.MethodPost, vemPath, nil)
+			r.URL.Path = vemPath
+
+			if tt.withRoutingState {
+				state := &httpctx.JSONRPCRoutingState{
+					NextVEM:      vemPath,
+					OriginalPath: originalPath,
+				}
+				httpctx.SetJSONRPCRoutingState(r, state)
+			}
+
+			err, status := v.handleMCPPrimitiveNotFound(r)
+
+			assert.Equal(t, tt.expectedStatus, status)
+			if tt.expectedError {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+			}
+			assert.Equal(t, tt.expectedPath, r.URL.Path)
 		})
 	}
 }

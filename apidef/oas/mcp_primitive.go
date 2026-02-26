@@ -16,6 +16,42 @@ func (m *MCPPrimitive) extractTransformResponseBodyTo(_ *apidef.ExtendedPathsSet
 	// Intentionally empty - MCP primitives don't support response body transformation
 }
 
+// extractTransformRequestMethodTo disables method transformation for MCP (always POST).
+//
+//nolint:revive,unparam
+func (m *MCPPrimitive) extractTransformRequestMethodTo(_ *apidef.ExtendedPathsSet, _ string, _ string) {
+}
+
+// extractInternalTo disables internal endpoint configuration (managed by JSON-RPC router).
+//
+//nolint:revive,unparam
+func (m *MCPPrimitive) extractInternalTo(_ *apidef.ExtendedPathsSet, _ string, _ string) {
+}
+
+// extractURLRewriteTo disables URL rewriting (MCP uses fixed paths).
+//
+//nolint:revive,unparam
+func (m *MCPPrimitive) extractURLRewriteTo(_ *apidef.ExtendedPathsSet, _ string, _ string) {
+}
+
+// extractCacheTo disables per-endpoint caching (incompatible with JSON-RPC).
+//
+//nolint:revive,unparam
+func (m *MCPPrimitive) extractCacheTo(_ *apidef.ExtendedPathsSet, _ string, _ string) {
+}
+
+// extractValidateRequestTo disables OAS validation (handled by JSON-RPC middleware).
+//
+//nolint:revive,unparam
+func (m *MCPPrimitive) extractValidateRequestTo(_ *apidef.ExtendedPathsSet, _ string, _ string) {
+}
+
+// extractMockResponseTo disables mock responses (incompatible with JSON-RPC protocol).
+//
+//nolint:revive,unparam
+func (m *MCPPrimitive) extractMockResponseTo(_ *apidef.ExtendedPathsSet, _ string, _ string) {
+}
+
 // ExtractToExtendedPaths extracts middleware config, delegating to embedded Operation
 // but allowing MCPPrimitive-specific overrides. Methods without overrides are promoted
 // to Operation. Methods with empty overrides (like extractTransformResponseBodyTo) are
@@ -33,7 +69,7 @@ func (m *MCPPrimitive) ExtractToExtendedPaths(ep *apidef.ExtendedPathsSet, path 
 	m.extractInternalTo(ep, path, method)
 	m.extractTransformRequestMethodTo(ep, path, method)
 	m.extractTransformRequestBodyTo(ep, path, method)
-	m.extractTransformResponseBodyTo(ep, path, method) // empty override - disabled for MCP
+	m.extractTransformResponseBodyTo(ep, path, method)
 	m.extractTransformRequestHeadersTo(ep, path, method)
 	m.extractTransformResponseHeadersTo(ep, path, method)
 	m.extractURLRewriteTo(ep, path, method)

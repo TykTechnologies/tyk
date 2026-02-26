@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/justinas/alice"
 	logrustest "github.com/sirupsen/logrus/hooks/test"
 	"github.com/stretchr/testify/assert"
 
@@ -700,4 +701,113 @@ func TestRecordAccessLog_TraceID(t *testing.T) {
 			hook.Reset()
 		})
 	}
+}
+
+func TestGateway_isDisabledForMCP(t *testing.T) {
+	gw := &Gateway{}
+
+	t.Run("RedisCacheMiddleware disabled for MCP APIs", func(t *testing.T) {
+		mcpSpec := BuildAPI(func(spec *APISpec) {
+			spec.APIID = "mcp-test"
+			spec.MarkAsMCP()
+		})[0]
+
+		baseMid := &BaseMiddleware{Spec: mcpSpec}
+		cacheMW := &RedisCacheMiddleware{
+			BaseMiddleware: baseMid,
+			store:          nil, // store not needed for this test
+		}
+
+		result := gw.isDisabledForMCP(cacheMW)
+		assert.True(t, result, "RedisCacheMiddleware should be disabled for MCP APIs")
+	})
+
+	t.Run("RedisCacheMiddleware enabled for non-MCP APIs", func(t *testing.T) {
+		nonMCPSpec := BuildAPI(func(spec *APISpec) {
+			spec.APIID = "regular-api"
+		})[0]
+
+		baseMid := &BaseMiddleware{Spec: nonMCPSpec}
+		cacheMW := &RedisCacheMiddleware{
+			BaseMiddleware: baseMid,
+			store:          nil,
+		}
+
+		result := gw.isDisabledForMCP(cacheMW)
+		assert.False(t, result, "RedisCacheMiddleware should be enabled for non-MCP APIs")
+	})
+
+	t.Run("other middleware not affected for MCP APIs", func(t *testing.T) {
+		mcpSpec := BuildAPI(func(spec *APISpec) {
+			spec.APIID = "mcp-test"
+			spec.MarkAsMCP()
+		})[0]
+
+		baseMid := &BaseMiddleware{Spec: mcpSpec}
+		// Test with a non-restricted middleware (e.g., RequestSigning)
+		signingMW := &RequestSigning{BaseMiddleware: baseMid}
+
+		result := gw.isDisabledForMCP(signingMW)
+		assert.False(t, result, "Non-restricted middleware should work for MCP APIs")
+	})
+}
+
+func TestGateway_mwAppendEnabled_MCP(t *testing.T) {
+	gw := &Gateway{}
+
+	t.Run("does not append cache middleware for MCP APIs", func(t *testing.T) {
+		mcpSpec := BuildAPI(func(spec *APISpec) {
+			spec.APIID = "mcp-test"
+			spec.CacheOptions.EnableCache = true // Even if enabled in config
+			spec.MarkAsMCP()
+		})[0]
+
+		baseMid := &BaseMiddleware{Spec: mcpSpec}
+		cacheMW := &RedisCacheMiddleware{
+			BaseMiddleware: baseMid,
+			store:          nil,
+		}
+
+		var chain []alice.Constructor
+		result := gw.mwAppendEnabled(&chain, cacheMW)
+
+		assert.False(t, result, "mwAppendEnabled should return false for restricted MCP middleware")
+		assert.Empty(t, chain, "Chain should be empty - cache middleware should not be added for MCP")
+	})
+
+	t.Run("appends cache middleware for non-MCP APIs", func(t *testing.T) {
+		nonMCPSpec := BuildAPI(func(spec *APISpec) {
+			spec.APIID = "regular-api"
+			spec.CacheOptions.EnableCache = true
+		})[0]
+
+		baseMid := &BaseMiddleware{Spec: nonMCPSpec, Gw: gw}
+		cacheMW := &RedisCacheMiddleware{
+			BaseMiddleware: baseMid,
+			store:          nil,
+		}
+
+		var chain []alice.Constructor
+		result := gw.mwAppendEnabled(&chain, cacheMW)
+
+		assert.True(t, result, "mwAppendEnabled should return true for cache on non-MCP APIs")
+		assert.Len(t, chain, 1, "Chain should have cache middleware for non-MCP APIs")
+	})
+
+	t.Run("appends non-restricted middleware for MCP APIs", func(t *testing.T) {
+		mcpSpec := BuildAPI(func(spec *APISpec) {
+			spec.APIID = "mcp-test"
+			spec.RequestSigning.IsEnabled = true
+			spec.MarkAsMCP()
+		})[0]
+
+		baseMid := &BaseMiddleware{Spec: mcpSpec, Gw: gw}
+		signingMW := &RequestSigning{BaseMiddleware: baseMid}
+
+		var chain []alice.Constructor
+		result := gw.mwAppendEnabled(&chain, signingMW)
+
+		assert.True(t, result, "mwAppendEnabled should return true for non-restricted middleware on MCP")
+		assert.Len(t, chain, 1, "Chain should have non-restricted middleware for MCP APIs")
+	})
 }

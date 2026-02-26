@@ -222,45 +222,135 @@ func TestMCPPrimitives_MapOperations(t *testing.T) {
 }
 
 func TestMCPPrimitive_DisabledMiddleware(t *testing.T) {
-	t.Run("response transformation disabled for MCP", func(t *testing.T) {
-		primitive := &MCPPrimitive{}
-		primitive.TransformResponseBody = &TransformBody{
-			Enabled: true,
-			Format:  apidef.RequestJSON,
-			Body:    "transformed",
-		}
+	vemPath := mcp.ToolPrefix + "test"
 
-		operation := &Operation{}
-		operation.TransformResponseBody = &TransformBody{
-			Enabled: true,
-			Format:  apidef.RequestJSON,
-			Body:    "transformed",
-		}
+	// Table-driven tests for all 7 disabled middleware.
+	// Each test configures middleware on MCPPrimitive and verifies extraction is empty,
+	// then configures the same middleware on Operation and verifies it works.
+	testCases := []struct {
+		name           string
+		setupPrimitive func(p *MCPPrimitive)
+		setupOperation func(o *Operation)
+		// assertMCPEmpty checks that the extended paths set is empty for the disabled middleware.
+		assertMCPEmpty func(t *testing.T, ep *apidef.ExtendedPathsSet)
+		// assertOpPopulated checks that the extended paths set is populated for the Operation.
+		assertOpPopulated func(t *testing.T, ep *apidef.ExtendedPathsSet)
+	}{
+		{
+			name: "transformResponseBody",
+			setupPrimitive: func(p *MCPPrimitive) {
+				p.TransformResponseBody = &TransformBody{Enabled: true, Format: apidef.RequestJSON, Body: "transformed"}
+			},
+			setupOperation: func(o *Operation) {
+				o.TransformResponseBody = &TransformBody{Enabled: true, Format: apidef.RequestJSON, Body: "transformed"}
+			},
+			assertMCPEmpty:    func(t *testing.T, ep *apidef.ExtendedPathsSet) { assert.Empty(t, ep.TransformResponse) },
+			assertOpPopulated: func(t *testing.T, ep *apidef.ExtendedPathsSet) { assert.Len(t, ep.TransformResponse, 1) },
+		},
+		{
+			name: "transformRequestMethod",
+			setupPrimitive: func(p *MCPPrimitive) {
+				p.TransformRequestMethod = &TransformRequestMethod{Enabled: true, ToMethod: "GET"}
+			},
+			setupOperation: func(o *Operation) {
+				o.TransformRequestMethod = &TransformRequestMethod{Enabled: true, ToMethod: "GET"}
+			},
+			assertMCPEmpty:    func(t *testing.T, ep *apidef.ExtendedPathsSet) { assert.Empty(t, ep.MethodTransforms) },
+			assertOpPopulated: func(t *testing.T, ep *apidef.ExtendedPathsSet) { assert.Len(t, ep.MethodTransforms, 1) },
+		},
+		{
+			name: "internal",
+			setupPrimitive: func(p *MCPPrimitive) {
+				p.Internal = &Internal{Enabled: true}
+			},
+			setupOperation: func(o *Operation) {
+				o.Internal = &Internal{Enabled: true}
+			},
+			assertMCPEmpty:    func(t *testing.T, ep *apidef.ExtendedPathsSet) { assert.Empty(t, ep.Internal) },
+			assertOpPopulated: func(t *testing.T, ep *apidef.ExtendedPathsSet) { assert.Len(t, ep.Internal, 1) },
+		},
+		{
+			name: "urlRewrite",
+			setupPrimitive: func(p *MCPPrimitive) {
+				p.URLRewrite = &URLRewrite{Enabled: true, Pattern: ".*", RewriteTo: "/new"}
+			},
+			setupOperation: func(o *Operation) {
+				o.URLRewrite = &URLRewrite{Enabled: true, Pattern: ".*", RewriteTo: "/new"}
+			},
+			assertMCPEmpty:    func(t *testing.T, ep *apidef.ExtendedPathsSet) { assert.Empty(t, ep.URLRewrite) },
+			assertOpPopulated: func(t *testing.T, ep *apidef.ExtendedPathsSet) { assert.Len(t, ep.URLRewrite, 1) },
+		},
+		{
+			name: "cache",
+			setupPrimitive: func(p *MCPPrimitive) {
+				p.Cache = &CachePlugin{Enabled: true, Timeout: 60}
+			},
+			setupOperation: func(o *Operation) {
+				o.Cache = &CachePlugin{Enabled: true, Timeout: 60}
+			},
+			assertMCPEmpty:    func(t *testing.T, ep *apidef.ExtendedPathsSet) { assert.Empty(t, ep.AdvanceCacheConfig) },
+			assertOpPopulated: func(t *testing.T, ep *apidef.ExtendedPathsSet) { assert.Len(t, ep.AdvanceCacheConfig, 1) },
+		},
+		{
+			name: "validateRequest",
+			setupPrimitive: func(p *MCPPrimitive) {
+				p.ValidateRequest = &ValidateRequest{Enabled: true, ErrorResponseCode: 400}
+			},
+			setupOperation: func(o *Operation) {
+				o.ValidateRequest = &ValidateRequest{Enabled: true, ErrorResponseCode: 400}
+			},
+			assertMCPEmpty:    func(t *testing.T, ep *apidef.ExtendedPathsSet) { assert.Empty(t, ep.ValidateRequest) },
+			assertOpPopulated: func(t *testing.T, ep *apidef.ExtendedPathsSet) { assert.Len(t, ep.ValidateRequest, 1) },
+		},
+		{
+			name: "mockResponse",
+			setupPrimitive: func(p *MCPPrimitive) {
+				p.MockResponse = &MockResponse{Enabled: true, Code: 200, Body: `{"ok":true}`}
+			},
+			setupOperation: func(o *Operation) {
+				o.MockResponse = &MockResponse{Enabled: true, Code: 200, Body: `{"ok":true}`}
+			},
+			assertMCPEmpty:    func(t *testing.T, ep *apidef.ExtendedPathsSet) { assert.Empty(t, ep.MockResponse) },
+			assertOpPopulated: func(t *testing.T, ep *apidef.ExtendedPathsSet) { assert.Len(t, ep.MockResponse, 1) },
+		},
+	}
 
-		vemPath := mcp.ToolPrefix + "test"
-		var mcpEP, opEP apidef.ExtendedPathsSet
+	for _, tc := range testCases {
+		t.Run(tc.name+" disabled for MCPPrimitive", func(t *testing.T) {
+			primitive := &MCPPrimitive{}
+			tc.setupPrimitive(primitive)
 
-		primitive.extractTransformResponseBodyTo(&mcpEP, vemPath, "POST")
-		operation.extractTransformResponseBodyTo(&opEP, vemPath, "POST")
+			var ep apidef.ExtendedPathsSet
+			primitive.ExtractToExtendedPaths(&ep, vemPath, "POST")
+			tc.assertMCPEmpty(t, &ep)
+		})
 
-		assert.Empty(t, mcpEP.TransformResponse)
-		assert.Len(t, opEP.TransformResponse, 1)
-	})
+		t.Run(tc.name+" works for Operation", func(t *testing.T) {
+			operation := &Operation{}
+			tc.setupOperation(operation)
 
-	t.Run("request transformations still work", func(t *testing.T) {
+			var ep apidef.ExtendedPathsSet
+			operation.ExtractToExtendedPaths(&ep, vemPath, "POST")
+			tc.assertOpPopulated(t, &ep)
+		})
+	}
+
+	t.Run("allowed middleware still works for MCPPrimitive", func(t *testing.T) {
 		primitive := &MCPPrimitive{}
 		primitive.TransformRequestHeaders = &TransformHeaders{
 			Enabled: true,
 			Add:     Headers{{Name: "X-MCP", Value: "test"}},
 		}
 		primitive.TransformResponseBody = &TransformBody{Enabled: true}
+		primitive.RateLimit = &RateLimitEndpoint{Enabled: true, Rate: 100, Per: ReadableDuration(time.Minute)}
 
 		var ep apidef.ExtendedPathsSet
-		primitive.ExtractToExtendedPaths(&ep, "/test", "POST")
+		primitive.ExtractToExtendedPaths(&ep, vemPath, "POST")
 
-		// Request headers transformation works
+		// Allowed middleware works
 		assert.Len(t, ep.TransformHeader, 1)
-		// Response body transformation is skipped for MCPPrimitive
+		assert.Len(t, ep.RateLimit, 1)
+		// Disabled middleware is skipped
 		assert.Empty(t, ep.TransformResponse)
 	})
 }
@@ -381,7 +471,7 @@ func TestOperation_ExtractToExtendedPaths_ValidateRequestAndMockResponse(t *test
 		assert.Equal(t, "true", ep.MockResponse[0].Headers["X-Mock"])
 	})
 
-	t.Run("MCPPrimitive inherits extraction", func(t *testing.T) {
+	t.Run("MCPPrimitive disables validateRequest and mockResponse extraction", func(t *testing.T) {
 		primitive := &MCPPrimitive{}
 		primitive.ValidateRequest = &ValidateRequest{
 			Enabled:           true,
@@ -396,12 +486,8 @@ func TestOperation_ExtractToExtendedPaths_ValidateRequestAndMockResponse(t *test
 		var ep apidef.ExtendedPathsSet
 		primitive.ExtractToExtendedPaths(&ep, "/mcp/tool/test", "POST")
 
-		assert.Len(t, ep.ValidateRequest, 1)
-		assert.True(t, ep.ValidateRequest[0].Enabled)
-		assert.Equal(t, 422, ep.ValidateRequest[0].ErrorResponseCode)
-
-		assert.Len(t, ep.MockResponse, 1)
-		assert.False(t, ep.MockResponse[0].Disabled)
-		assert.Equal(t, 404, ep.MockResponse[0].Code)
+		// ValidateRequest and MockResponse are disabled for MCP primitives
+		assert.Empty(t, ep.ValidateRequest)
+		assert.Empty(t, ep.MockResponse)
 	})
 }

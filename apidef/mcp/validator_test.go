@@ -447,6 +447,157 @@ func TestGetMCPSchema(t *testing.T) {
 	})
 }
 
+func TestValidateMCPObject_WithPRM(t *testing.T) {
+	t.Parallel()
+
+	t.Run("valid MCP object with PRM configuration", func(t *testing.T) {
+		t.Parallel()
+
+		mcpWithPRM := oas.OAS{
+			T: openapi3.T{
+				OpenAPI: "3.0.3",
+				Info:    &openapi3.Info{},
+				Paths:   openapi3.NewPaths(),
+			},
+		}
+
+		ext := oas.XTykAPIGateway{
+			Info: oas.Info{
+				Name: "mcp-api-prm",
+				State: oas.State{
+					Active: true,
+				},
+			},
+			Server: oas.Server{
+				ListenPath: oas.ListenPath{
+					Value: "/mcp-api-prm/",
+				},
+				Authentication: &oas.Authentication{
+					Enabled: true,
+					ProtectedResourceMetadata: &oas.ProtectedResourceMetadata{
+						Enabled:              true,
+						Resource:             "https://api.example.com",
+						AuthorizationServers: []string{"https://auth.example.com"},
+						ScopesSupported:      []string{"read", "write"},
+					},
+				},
+			},
+			Upstream: oas.Upstream{
+				URL: "http://upstream.url",
+			},
+			Middleware: &oas.Middleware{
+				McpTools: map[string]*oas.MCPPrimitive{
+					"test-tool": {
+						Operation: oas.Operation{
+							Allow: &oas.Allowance{
+								Enabled: true,
+							},
+						},
+					},
+				},
+			},
+		}
+
+		mcpWithPRM.SetTykExtension(&ext)
+		definition, err := mcpWithPRM.MarshalJSON()
+		if err != nil {
+			t.Fatalf("failed to marshal MCP with PRM: %v", err)
+		}
+
+		err = ValidateMCPObject(definition, "3.0.3")
+		assert.NoError(t, err)
+	})
+}
+
+func TestValidateMCPObject_RestrictedMiddleware(t *testing.T) {
+	t.Parallel()
+
+	buildMCPDoc := func(toolMiddleware string) []byte {
+		return []byte(`{
+			"openapi": "3.0.3",
+			"info": {"title": "MCP Test", "version": "1.0.0"},
+			"paths": {
+				"/test": {
+					"post": {
+						"responses": {"200": {"description": "OK"}}
+					}
+				}
+			},
+			"x-tyk-api-gateway": {
+				"info": {
+					"name": "mcp-test",
+					"state": {"active": true}
+				},
+				"upstream": {"url": "http://upstream.url"},
+				"server": {
+					"listenPath": {"value": "/mcp-test"}
+				},
+				"middleware": {
+					"mcpTools": {
+						"test-tool": ` + toolMiddleware + `
+					}
+				}
+			}
+		}`)
+	}
+
+	t.Run("allowed fields pass validation", func(t *testing.T) {
+		t.Parallel()
+		doc := buildMCPDoc(`{
+			"allow": {"enabled": true},
+			"rateLimit": {"enabled": true, "rate": 100, "per": "1m"},
+			"requestSizeLimit": {"enabled": true, "value": 1024}
+		}`)
+		err := ValidateMCPObject(doc, "3.0.3")
+		assert.NoError(t, err)
+	})
+
+	// Restricted middleware fields are accepted by schema (permissive validation for forward compatibility).
+	// Enforcement happens at extraction layer (see TestMCPPrimitive_DisabledMiddleware).
+	restrictedFields := []struct {
+		name       string
+		middleware string
+	}{
+		{
+			name:       "urlRewrite accepted by schema (ignored at extraction)",
+			middleware: `{"urlRewrite": {"enabled": true, "pattern": ".*", "rewriteTo": "/new"}}`,
+		},
+		{
+			name:       "transformRequestMethod accepted by schema (ignored at extraction)",
+			middleware: `{"transformRequestMethod": {"enabled": true, "toMethod": "GET"}}`,
+		},
+		{
+			name:       "transformResponseBody accepted by schema (ignored at extraction)",
+			middleware: `{"transformResponseBody": {"enabled": true, "format": "json", "body": "test"}}`,
+		},
+		{
+			name:       "internal accepted by schema (ignored at extraction)",
+			middleware: `{"internal": {"enabled": true}}`,
+		},
+		{
+			name:       "cache accepted by schema (ignored at extraction)",
+			middleware: `{"cache": {"enabled": true}}`,
+		},
+		{
+			name:       "validateRequest accepted by schema (ignored at extraction)",
+			middleware: `{"validateRequest": {"enabled": true}}`,
+		},
+		{
+			name:       "mockResponse accepted by schema (ignored at extraction)",
+			middleware: `{"mockResponse": {"enabled": true}}`,
+		},
+	}
+
+	for _, tc := range restrictedFields {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			doc := buildMCPDoc(tc.middleware)
+			err := ValidateMCPObject(doc, "3.0.3")
+			assert.NoError(t, err, "Schema should accept %s for forward compatibility", tc.name)
+		})
+	}
+}
+
 func TestGetMCPSchema_ContainsMCPExtensions(t *testing.T) {
 	t.Parallel()
 
