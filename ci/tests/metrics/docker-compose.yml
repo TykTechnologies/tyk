@@ -1,0 +1,73 @@
+# yamllint disable rule:line-length
+---
+services:
+  redis:
+    image: redis:6
+    platform: linux/amd64
+    healthcheck:
+      test:
+        - CMD
+        - redis-cli
+        - ping
+      timeout: 3s
+      interval: 1s
+      retries: 60
+    restart: unless-stopped
+
+  tyk:
+    image: ${GATEWAY_IMAGE:-internal/tyk-gateway}
+    platform: linux/amd64
+    ports:
+      - 9000:8080
+    env_file:
+      - ./configs/tyk.env
+    volumes:
+      - ./apps:/opt/tyk-gateway/apps
+    depends_on:
+      - redis
+
+  tyk-checker:
+    platform: linux/amd64
+    image: badouralix/curl-jq
+    command: tail -f /dev/null
+    depends_on:
+      - tyk
+    healthcheck:
+      test: curl -s --fail http://tyk:8080/hello | jq --exit-status -n 'inputs | if has("status") then .status=="pass" else false end' > /dev/null || exit 1
+      interval: 5s
+      retries: 10
+      start_period: 4s
+      timeout: 10s
+
+  httpbin:
+    platform: linux/amd64
+    image: kennethreitz/httpbin:latest
+
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.100.0
+    platform: linux/amd64
+    command:
+      - --config
+      - /otel-local-config.yml
+    ports:
+      - 4317:4317
+      - 8889:8889
+    volumes:
+      - ./configs/otelcollector/collector.config.yml:/otel-local-config.yml
+
+  prometheus:
+    image: prom/prometheus:v2.51.0
+    platform: linux/amd64
+    ports:
+      - 9090:9090
+    volumes:
+      - ./configs/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+    healthcheck:
+      test:
+        - CMD
+        - wget
+        - --spider
+        - http://localhost:9090/-/healthy
+      timeout: 3s
+      interval: 5s
+      retries: 10

@@ -9,6 +9,9 @@ includes:
   opentelemetry:
     taskfile: ci/tests/tracing/Taskfile.yml
     dir: ci/tests/tracing/
+  opentelemetry-metrics:
+    taskfile: ci/tests/metrics/Taskfile.yml
+    dir: ci/tests/metrics/
   services:
     taskfile: docker/services/Taskfile.yml
     dir: docker/services/
