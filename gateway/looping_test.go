@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	"github.com/getkin/kin-openapi/openapi3"
+	"github.com/stretchr/testify/assert"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/apidef/oas"
@@ -277,7 +278,7 @@ func TestLooping(t *testing.T) {
 	t.Run("Rewritten query params preserved, original dropped", func(t *testing.T) {
 		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 			version := spec.VersionData.Versions["v1"]
-			json.Unmarshal([]byte(`{
+			err := json.Unmarshal([]byte(`{
                 "use_extended_paths": true,
                 "extended_paths": {
                     "internal": [{
@@ -292,6 +293,7 @@ func TestLooping(t *testing.T) {
                     }]
                 }
             }`), &version)
+			assert.NoError(t, err)
 
 			spec.VersionData.Versions["v1"] = version
 			spec.Proxy.ListenPath = "/"
