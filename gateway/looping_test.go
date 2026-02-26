@@ -81,8 +81,8 @@ func TestLooping(t *testing.T) {
 		ts.Run(t, []test.TestCase{
 			{Method: "POST", Path: "/xml", Data: postAction, BodyMatch: `"Url":"/post_action`},
 
-			// Should retain original query params
-			{Method: "POST", Path: "/xml?a=b", Data: getAction, BodyMatch: `"Url":"/get_action`},
+			// Should use rewritten path query params, not original request query params
+			{Method: "POST", Path: "/xml?a=b", Data: getAction, BodyMatch: `"Url":"/get_action"`, BodyNotMatch: `a=b`},
 
 			// Should rewrite http method, if loop rewrite param passed
 			{Method: "POST", Path: "/xml", Data: getAction, BodyMatch: `"Method":"GET"`},
@@ -211,8 +211,8 @@ func TestLooping(t *testing.T) {
 		ts.Run(t, []test.TestCase{
 			{Method: "POST", Path: "/virt", Data: postAction, BodyMatch: `"Url":"/post_action`},
 
-			// Should retain original query params
-			{Method: "POST", Path: "/virt?a=b", Data: getAction, BodyMatch: `"Url":"/get_action`},
+			// Should use rewritten path query params, not original request query params
+			{Method: "POST", Path: "/virt?a=b", Data: getAction, BodyMatch: `"Url":"/get_action"`, BodyNotMatch: `a=b`},
 
 			// Should rewrite http method, if loop rewrite param passed
 			{Method: "POST", Path: "/virt", Data: getAction, BodyMatch: `"Method":"GET"`},
@@ -271,6 +271,41 @@ func TestLooping(t *testing.T) {
 
 		ts.Run(t, []test.TestCase{
 			{Method: "GET", Path: "/recursion", Headers: authHeaders, BodyNotMatch: "Quota exceeded"},
+		}...)
+	})
+
+	t.Run("Rewritten query params preserved, original dropped", func(t *testing.T) {
+		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+			version := spec.VersionData.Versions["v1"]
+			json.Unmarshal([]byte(`{
+                "use_extended_paths": true,
+                "extended_paths": {
+                    "internal": [{
+                        "path": "/target",
+                        "method": "GET"
+                    }],
+                    "url_rewrites": [{
+                        "path": "/rewrite",
+                        "match_pattern": "/rewrite(.*)",
+                        "method": "GET",
+                        "rewrite_to": "tyk://self/target?new_param=new_value&method=GET"
+                    }]
+                }
+            }`), &version)
+
+			spec.VersionData.Versions["v1"] = version
+			spec.Proxy.ListenPath = "/"
+		})
+
+		ts.Run(t, []test.TestCase{
+			// Rewritten query params (minus control params) should be preserved
+			{Method: "GET", Path: "/rewrite", BodyMatch: `new_param=new_value`},
+
+			// Original request query params should be dropped
+			{Method: "GET", Path: "/rewrite?old_param=old_value", BodyMatch: `new_param=new_value`, BodyNotMatch: `old_param`},
+
+			// Control params (method, loop_limit, check_limits) should be stripped
+			{Method: "GET", Path: "/rewrite", BodyNotMatch: `method=GET`},
 		}...)
 	})
 
