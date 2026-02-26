@@ -508,6 +508,11 @@ func (gw *Gateway) handleAddOrUpdate(keyName string, r *http.Request, isHashed b
 		return apiError("Request malformed"), http.StatusBadRequest
 	}
 
+	if err := gw.validateMCPFieldsInAccessRights(newSession.AccessRights); err != nil {
+		log.Error(err)
+		return apiError(err.Error()), http.StatusBadRequest
+	}
+
 	mw := &BaseMiddleware{Gw: gw}
 	mw.ApplyPolicies(newSession)
 
@@ -1108,6 +1113,11 @@ func (gw *Gateway) handleAddOrUpdatePolicy(polID string, r *http.Request) (inter
 		const errMsg = "Unable to create policy without id."
 		log.Error(errMsg)
 		return apiError(errMsg), http.StatusBadRequest
+	}
+
+	if err := gw.validateMCPFieldsInAccessRights(newPol.AccessRights); err != nil {
+		log.Error(err)
+		return apiError(err.Error()), http.StatusBadRequest
 	}
 
 	root, err := gw.newPolicyPathRoot()
