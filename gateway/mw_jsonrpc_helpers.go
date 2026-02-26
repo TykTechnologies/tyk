@@ -41,7 +41,7 @@ func checkAccessControlRules(rules user.AccessControlRules, name string) error {
 // Uses the tyk/regexp package which caches compiled patterns.
 // Falls back to exact-string comparison if the pattern is not valid regex.
 func matchPattern(pattern, name string) bool {
-	re, err := regexp.Compile("^" + pattern + "$")
+	re, err := regexp.Compile("^(?:" + pattern + ")$")
 	if err != nil {
 		return pattern == name
 	}

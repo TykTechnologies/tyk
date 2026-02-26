@@ -53,6 +53,12 @@ func TestCheckAccessControlRules(t *testing.T) {
 			user.AccessControlRules{Blocked: []string{"delete_.*"}, Allowed: []string{"get_.*", "delete_.*"}},
 			"get_weather", false},
 
+		{"alternation: allowed prefix match", user.AccessControlRules{Allowed: []string{"get_.*|set_.*"}}, "get_weather", false},
+		{"alternation: allowed second branch", user.AccessControlRules{Allowed: []string{"get_.*|set_.*"}}, "set_config", false},
+		{"alternation: denied non-matching", user.AccessControlRules{Allowed: []string{"get_.*|set_.*"}}, "delete_all", true},
+		{"alternation: allowed spurious prefix leak", user.AccessControlRules{Allowed: []string{"get_.*|set_.*"}}, "bad_prefix_set_foo", true},
+		{"alternation: blocked spurious trailing leak", user.AccessControlRules{Blocked: []string{"admin|debug"}}, "prefix_debug", false},
+
 		// Edge cases
 		{"pattern with URI chars", user.AccessControlRules{Allowed: []string{"file:///public/.*"}}, "file:///public/readme.md", false},
 		{"pattern with URI chars, no match", user.AccessControlRules{Allowed: []string{"file:///public/.*"}}, "file:///secret/keys.txt", true},
@@ -101,6 +107,12 @@ func TestMatchPattern(t *testing.T) {
 		{"get_.*|set_.*", "get_weather", true},
 		{"get_.*|set_.*", "set_config", true},
 		{"get_.*|set_.*", "delete_all", false},
+		{"get_.*|set_.*", "bad_prefix_set_foo", false},
+		{"get_.*|set_.*", "get_weather_extra", true},
+		{"a|b", "xb", false},
+		{"a|b", "ax", false},
+		{"a|b", "a", true},
+		{"a|b", "b", true},
 
 		// URI patterns with slashes
 		{"file:///.*", "file:///repo/README", true},
