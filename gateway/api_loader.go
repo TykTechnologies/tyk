@@ -1102,7 +1102,7 @@ func (gw *Gateway) loadApps(specs []*APISpec) {
 			// Now that the tracker is up to date, fetch any that are required.
 			sem := make(chan struct{}, runtime.GOMAXPROCS(0))
 			var wg sync.WaitGroup
-			gw.pendingCerts.Range(func(k, v any) bool {
+			gw.pendingCerts.Range(func(k, _ any) bool {
 				certID := k.(string)
 				gw.pendingCerts.Delete(certID)
 				if !gw.certUsageTracker.Required(certID) {
