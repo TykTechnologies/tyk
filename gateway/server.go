@@ -586,7 +586,7 @@ func (gw *Gateway) setupGlobals() {
 			HashKeys:  false,
 			Gw:        gw,
 		}
-		gw.CertificateManager = certs.NewSlaveCertManager(
+		slaveCM := certs.NewSlaveCertManager(
 			storeCert,
 			rpcStore,
 			certificateSecret,
@@ -601,11 +601,14 @@ func (gw *Gateway) setupGlobals() {
 			),
 		)
 
-		// Wire certificate registry for selective sync
+		// Wire certificate registry for selective sync directly on the concrete
+		// slave cert manager — the tracker lives in the gateway layer, not in
+		// the CertificateManager interface.
 		if gw.GetConfig().SlaveOptions.SyncUsedCertsOnly && gw.certUsageTracker != nil {
 			cfg := gw.GetConfig()
-			gw.CertificateManager.SetUsageTracker(gw.certUsageTracker, &cfg)
+			slaveCM.SetCertUsageConfig(gw.certUsageTracker, &cfg)
 		}
+		gw.CertificateManager = slaveCM
 	}
 
 	if gw.GetConfig().NewRelic.AppName != "" {
