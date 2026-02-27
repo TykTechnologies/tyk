@@ -289,4 +289,3 @@ func getResourceType(key string) string {
 		return resourceKey
 	}
 }
-
