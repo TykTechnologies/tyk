@@ -14,6 +14,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/TykTechnologies/graphql-go-tools/pkg/graphql"
+
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/header"
 	"github.com/TykTechnologies/tyk/internal/model"
@@ -1591,6 +1593,151 @@ func TestValidateMCPFieldsInAccessRights(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			err := ts.Gw.validateMCPFieldsInAccessRights(tc.accessRights)
+			if tc.expectErr != "" {
+				assert.Error(t, err)
+				assert.Contains(t, err.Error(), tc.expectErr)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
+func TestHasNonMCPFields(t *testing.T) {
+	cases := []struct {
+		name   string
+		ar     user.AccessDefinition
+		expect bool
+	}{
+		{
+			name:   "empty",
+			ar:     user.AccessDefinition{},
+			expect: false,
+		},
+		{
+			name:   "AllowedURLs set",
+			ar:     user.AccessDefinition{AllowedURLs: []user.AccessSpec{{URL: "/foo", Methods: []string{"GET"}}}},
+			expect: true,
+		},
+		{
+			name:   "Endpoints set",
+			ar:     user.AccessDefinition{Endpoints: []user.Endpoint{{Path: "/foo", Methods: []user.EndpointMethod{{Name: "GET"}}}}},
+			expect: true,
+		},
+		{
+			name:   "RestrictedTypes set",
+			ar:     user.AccessDefinition{RestrictedTypes: []graphql.Type{{Name: "Query"}}},
+			expect: true,
+		},
+		{
+			name:   "AllowedTypes set",
+			ar:     user.AccessDefinition{AllowedTypes: []graphql.Type{{Name: "Query"}}},
+			expect: true,
+		},
+		{
+			name:   "DisableIntrospection true",
+			ar:     user.AccessDefinition{DisableIntrospection: true},
+			expect: true,
+		},
+		{
+			name:   "FieldAccessRights set",
+			ar:     user.AccessDefinition{FieldAccessRights: []user.FieldAccessDefinition{{TypeName: "Query", FieldName: "users"}}},
+			expect: true,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			assert.Equal(t, tc.expect, hasNonMCPFields(tc.ar))
+		})
+	}
+}
+
+func TestValidateNonMCPFieldsOnMCPProxy(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	specs := ts.Gw.BuildAndLoadAPI(
+		func(spec *APISpec) {
+			spec.APIID = "mcp-api-id"
+			spec.MarkAsMCP()
+		},
+		func(spec *APISpec) {
+			spec.APIID = "non-mcp-api-id"
+			spec.Name = "non-mcp-api"
+		},
+	)
+	mcpAPIID := specs[0].APIID
+	nonMCPAPIID := specs[1].APIID
+
+	cases := []struct {
+		name         string
+		accessRights map[string]user.AccessDefinition
+		expectErr    string // substring expected in error; empty means no error
+	}{
+		{
+			name: "AllowedURLs on MCP Proxy is rejected",
+			accessRights: map[string]user.AccessDefinition{
+				mcpAPIID: {AllowedURLs: []user.AccessSpec{{URL: "/foo", Methods: []string{"GET"}}}},
+			},
+			expectErr: "HTTP/REST and GraphQL fields cannot be configured on MCP Proxies",
+		},
+		{
+			name: "Endpoints on MCP Proxy is rejected",
+			accessRights: map[string]user.AccessDefinition{
+				mcpAPIID: {Endpoints: []user.Endpoint{{Path: "/foo", Methods: []user.EndpointMethod{{Name: "GET"}}}}},
+			},
+			expectErr: "HTTP/REST and GraphQL fields cannot be configured on MCP Proxies",
+		},
+		{
+			name: "RestrictedTypes on MCP Proxy is rejected",
+			accessRights: map[string]user.AccessDefinition{
+				mcpAPIID: {RestrictedTypes: []graphql.Type{{Name: "Query"}}},
+			},
+			expectErr: "HTTP/REST and GraphQL fields cannot be configured on MCP Proxies",
+		},
+		{
+			name: "AllowedTypes on MCP Proxy is rejected",
+			accessRights: map[string]user.AccessDefinition{
+				mcpAPIID: {AllowedTypes: []graphql.Type{{Name: "Query"}}},
+			},
+			expectErr: "HTTP/REST and GraphQL fields cannot be configured on MCP Proxies",
+		},
+		{
+			name: "DisableIntrospection on MCP Proxy is rejected",
+			accessRights: map[string]user.AccessDefinition{
+				mcpAPIID: {DisableIntrospection: true},
+			},
+			expectErr: "HTTP/REST and GraphQL fields cannot be configured on MCP Proxies",
+		},
+		{
+			name: "FieldAccessRights on MCP Proxy is rejected",
+			accessRights: map[string]user.AccessDefinition{
+				mcpAPIID: {FieldAccessRights: []user.FieldAccessDefinition{{TypeName: "Query", FieldName: "users"}}},
+			},
+			expectErr: "HTTP/REST and GraphQL fields cannot be configured on MCP Proxies",
+		},
+		{
+			name: "non-MCP fields on non-MCP API are accepted",
+			accessRights: map[string]user.AccessDefinition{
+				nonMCPAPIID: {AllowedURLs: []user.AccessSpec{{URL: "/foo", Methods: []string{"GET"}}}},
+			},
+		},
+		{
+			name: "non-MCP fields on unknown API are accepted (fail-open)",
+			accessRights: map[string]user.AccessDefinition{
+				"unknown-api-id": {AllowedURLs: []user.AccessSpec{{URL: "/foo", Methods: []string{"GET"}}}},
+			},
+		},
+		{
+			name:         "no non-MCP fields on MCP Proxy are accepted",
+			accessRights: map[string]user.AccessDefinition{mcpAPIID: {APIID: mcpAPIID}},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			err := ts.Gw.validateNonMCPFieldsOnMCPProxy(tc.accessRights)
 			if tc.expectErr != "" {
 				assert.Error(t, err)
 				assert.Contains(t, err.Error(), tc.expectErr)
