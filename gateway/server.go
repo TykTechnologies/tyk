@@ -169,6 +169,7 @@ type Gateway struct {
 	policies *model.Policies
 
 	certUsageTracker *certUsageTracker // nil in non-RPC mode
+	pendingCerts     sync.Map          // certID -> struct{}, certs skipped due to tracker miss
 
 	dnsCacheManager dnscache.IDnsCacheManager
 
@@ -585,7 +586,7 @@ func (gw *Gateway) setupGlobals() {
 			HashKeys:  false,
 			Gw:        gw,
 		}
-		gw.CertificateManager = certs.NewSlaveCertManager(
+		slaveCM := certs.NewSlaveCertManager(
 			storeCert,
 			rpcStore,
 			certificateSecret,
@@ -600,11 +601,7 @@ func (gw *Gateway) setupGlobals() {
 			),
 		)
 
-		// Wire certificate registry for selective sync
-		if gw.GetConfig().SlaveOptions.SyncUsedCertsOnly && gw.certUsageTracker != nil {
-			cfg := gw.GetConfig()
-			gw.CertificateManager.SetUsageTracker(gw.certUsageTracker, &cfg)
-		}
+		gw.CertificateManager = slaveCM
 	}
 
 	if gw.GetConfig().NewRelic.AppName != "" {
@@ -1887,7 +1884,6 @@ func (gw *Gateway) getGlobalMDCBStorageHandler(keyPrefix string, hashKeys bool) 
 	logger := logrus.New().WithFields(logrus.Fields{"prefix": "mdcb-storage-handler"})
 
 	if gw.GetConfig().SlaveOptions.UseRPC {
-		cfg := gw.GetConfig()
 		return storage.NewMdcbStorage(
 			localStorage,
 			&RPCStorageHandler{
@@ -1897,8 +1893,6 @@ func (gw *Gateway) getGlobalMDCBStorageHandler(keyPrefix string, hashKeys bool) 
 			},
 			logger,
 			nil,
-			gw.certUsageTracker,
-			&cfg,
 		)
 	}
 	return localStorage
@@ -1932,6 +1926,14 @@ func Start() {
 	// Stop gateway process if not running in "start" mode:
 	if !cli.DefaultMode {
 		os.Exit(0)
+	}
+
+	// Check for --conf flag BEFORE loading the config
+	if *cli.Conf != "" {
+		mainLog.Debugf("Using %s for configuration", *cli.Conf)
+		confPaths = []string{*cli.Conf}
+	} else {
+		mainLog.Debug("No configuration file defined, will try to use default (tyk.conf)")
 	}
 
 	gwConfig := config.Config{}

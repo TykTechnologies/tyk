@@ -1,9 +1,13 @@
 package gateway
 
 import (
+	"errors"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"go.uber.org/mock/gomock"
+
+	certsmock "github.com/TykTechnologies/tyk/certs/mock"
 )
 
 // TestLoadApps_CertificateTracking tests that loadApps correctly updates the certificate usage tracker
@@ -171,6 +175,124 @@ func TestLoadApps_CertificateTracking(t *testing.T) {
 		assert.False(t, ts.Gw.certUsageTracker.Required("cert1"))
 		assert.True(t, ts.Gw.certUsageTracker.Required("server-cert"))
 		assert.Equal(t, 1, ts.Gw.certUsageTracker.Len())
+	})
+
+	t.Run("pending certs drained on reload when cert becomes required", func(t *testing.T) {
+		ts := StartTest(nil)
+		defer ts.Close()
+
+		ctrl := gomock.NewController(t)
+
+		cfg := ts.Gw.GetConfig()
+		cfg.SlaveOptions.UseRPC = true
+		cfg.SlaveOptions.SyncUsedCertsOnly = true
+		ts.Gw.SetConfig(cfg)
+
+		ts.Gw.certUsageTracker = newUsageTracker()
+
+		mockCM := certsmock.NewMockCertificateManager(ctrl)
+		mockCM.EXPECT().GetRaw("cert1").Return("cert-data", nil).Times(1)
+		ts.Gw.CertificateManager = mockCM
+
+		ts.Gw.pendingCerts.Store("cert1", struct{}{})
+
+		spec := BuildAPI(func(spec *APISpec) {
+			spec.APIID = "api1"
+			spec.Proxy.ListenPath = "/api1/"
+			spec.UpstreamCertificates = map[string]string{"*": "cert1"}
+		})[0]
+		ts.Gw.loadApps([]*APISpec{spec})
+
+		_, stillPending := ts.Gw.pendingCerts.Load("cert1")
+		assert.False(t, stillPending, "cert1 should be removed from pendingCerts after successful fetch")
+	})
+
+	t.Run("pending cert not required after reload - discarded without fetch", func(t *testing.T) {
+		ts := StartTest(nil)
+		defer ts.Close()
+
+		ctrl := gomock.NewController(t)
+
+		cfg := ts.Gw.GetConfig()
+		cfg.SlaveOptions.UseRPC = true
+		cfg.SlaveOptions.SyncUsedCertsOnly = true
+		ts.Gw.SetConfig(cfg)
+
+		ts.Gw.certUsageTracker = newUsageTracker()
+
+		mockCM := certsmock.NewMockCertificateManager(ctrl)
+		mockCM.EXPECT().GetRaw(gomock.Any()).Times(0)
+		ts.Gw.CertificateManager = mockCM
+
+		ts.Gw.pendingCerts.Store("unreferenced-cert", struct{}{})
+
+		spec := BuildAPI(func(spec *APISpec) {
+			spec.APIID = "api1"
+			spec.Proxy.ListenPath = "/api1/"
+		})[0]
+		ts.Gw.loadApps([]*APISpec{spec})
+
+		_, stillPending := ts.Gw.pendingCerts.Load("unreferenced-cert")
+		assert.False(t, stillPending, "unreferenced-cert should be discarded from pendingCerts")
+	})
+
+	t.Run("pending cert discarded on fetch error", func(t *testing.T) {
+		ts := StartTest(nil)
+		defer ts.Close()
+
+		ctrl := gomock.NewController(t)
+
+		cfg := ts.Gw.GetConfig()
+		cfg.SlaveOptions.UseRPC = true
+		cfg.SlaveOptions.SyncUsedCertsOnly = true
+		ts.Gw.SetConfig(cfg)
+
+		ts.Gw.certUsageTracker = newUsageTracker()
+
+		mockCM := certsmock.NewMockCertificateManager(ctrl)
+		mockCM.EXPECT().GetRaw("cert1").Return("", errors.New("rpc unavailable")).Times(1)
+		ts.Gw.CertificateManager = mockCM
+
+		ts.Gw.pendingCerts.Store("cert1", struct{}{})
+
+		spec := BuildAPI(func(spec *APISpec) {
+			spec.APIID = "api1"
+			spec.Proxy.ListenPath = "/api1/"
+			spec.UpstreamCertificates = map[string]string{"*": "cert1"}
+		})[0]
+		ts.Gw.loadApps([]*APISpec{spec})
+
+		_, stillPending := ts.Gw.pendingCerts.Load("cert1")
+		assert.False(t, stillPending, "cert1 should be discarded from pendingCerts after a failed fetch")
+	})
+
+	t.Run("sync_used_certs_only disabled - pending certs not processed", func(t *testing.T) {
+		ts := StartTest(nil)
+		defer ts.Close()
+
+		ctrl := gomock.NewController(t)
+
+		// UseRPC enabled but SyncUsedCertsOnly disabled
+		cfg := ts.Gw.GetConfig()
+		cfg.SlaveOptions.UseRPC = true
+		cfg.SlaveOptions.SyncUsedCertsOnly = false
+		ts.Gw.SetConfig(cfg)
+
+		mockCM := certsmock.NewMockCertificateManager(ctrl)
+		mockCM.EXPECT().GetRaw(gomock.Any()).Times(0)
+		ts.Gw.CertificateManager = mockCM
+
+		ts.Gw.pendingCerts.Store("cert1", struct{}{})
+
+		spec := BuildAPI(func(spec *APISpec) {
+			spec.APIID = "api1"
+			spec.Proxy.ListenPath = "/api1/"
+			spec.UpstreamCertificates = map[string]string{"*": "cert1"}
+		})[0]
+		ts.Gw.loadApps([]*APISpec{spec})
+
+		_, stillPending := ts.Gw.pendingCerts.Load("cert1")
+		assert.True(t, stillPending, "cert1 should remain untouched when SyncUsedCertsOnly is disabled")
 	})
 
 	t.Run("duplicate certs across APIs - tracked once", func(t *testing.T) {

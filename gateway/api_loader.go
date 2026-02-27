@@ -8,6 +8,7 @@ import (
 	"net/url"
 	"path"
 	"path/filepath"
+	"runtime"
 	"runtime/debug"
 	"sort"
 	"strconv"
@@ -1096,6 +1097,35 @@ func (gw *Gateway) loadApps(specs []*APISpec) {
 				"cert_count": gw.certUsageTracker.Len(),
 				"api_count":  len(specs),
 			}).Info("sync used certs only enabled")
+
+			// Drain pending certs that were skipped before this reload.
+			// Now that the tracker is up to date, fetch any that are required.
+			sem := make(chan struct{}, runtime.GOMAXPROCS(0))
+			var wg sync.WaitGroup
+			gw.pendingCerts.Range(func(k, _ any) bool {
+				certID, ok := k.(string)
+				if !ok {
+					return true
+				}
+				gw.pendingCerts.Delete(certID)
+				if !gw.certUsageTracker.Required(certID) {
+					return true
+				}
+				wg.Add(1)
+				go func(id string) {
+					defer wg.Done()
+					sem <- struct{}{}
+					defer func() { <-sem }()
+					content, err := gw.CertificateManager.GetRaw(id)
+					if err != nil || content == "" {
+						mainLog.WithField("cert_id", id).Warn("failed to fetch pending cert after reload")
+						return
+					}
+					mainLog.WithField("cert_id", id).Info("synced pending certificate after reload")
+				}(certID)
+				return true
+			})
+			wg.Wait()
 		}
 	}
 
