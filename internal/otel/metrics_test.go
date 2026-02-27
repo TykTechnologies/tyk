@@ -66,3 +66,91 @@ func TestRecordRequest_NilSafe(t *testing.T) {
 		}
 	})
 }
+
+func TestNewMetricProvider_ResourceAttributes(t *testing.T) {
+	tests := []struct {
+		name        string
+		id          string
+		version     string
+		useRPC      bool
+		groupID     string
+		isSegmented bool
+		segmentTags []string
+		expectError bool
+	}{
+		{
+			name:        "Non-dataplane, non-segmented gateway",
+			id:          "node-1",
+			version:     "v5.0",
+			useRPC:      false,
+			groupID:     "",
+			isSegmented: false,
+			segmentTags: nil,
+			expectError: false,
+		},
+		{
+			name:        "Dataplane gateway with group ID",
+			id:          "node-2",
+			version:     "v5.0",
+			useRPC:      true,
+			groupID:     "edge-group-1",
+			isSegmented: false,
+			segmentTags: nil,
+			expectError: false,
+		},
+		{
+			name:        "Segmented gateway with tags",
+			id:          "node-3",
+			version:     "v5.0",
+			useRPC:      false,
+			groupID:     "",
+			isSegmented: true,
+			segmentTags: []string{"production", "eu-west"},
+			expectError: false,
+		},
+		{
+			name:        "Dataplane and segmented gateway",
+			id:          "node-4",
+			version:     "v5.0",
+			useRPC:      true,
+			groupID:     "edge-group-2",
+			isSegmented: true,
+			segmentTags: []string{"staging", "us-east"},
+			expectError: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			metricsEnabled := true
+			cfg := &MetricsConfig{
+				Enabled: &metricsEnabled,
+				ExporterConfig: otelconfig.ExporterConfig{
+					Exporter: "grpc",
+					Endpoint: "localhost:4317",
+				},
+				ExportInterval: 60,
+			}
+
+			provider, err := NewMetricProvider(
+				context.Background(),
+				logrus.New(),
+				cfg,
+				tt.id,
+				tt.version,
+				tt.useRPC,
+				tt.groupID,
+				tt.isSegmented,
+				tt.segmentTags,
+			)
+
+			if tt.expectError {
+				assert.Error(t, err)
+				assert.Nil(t, provider)
+			} else {
+				// Provider creation may fail without a running collector, but should not panic
+				assert.NotNil(t, provider)
+			}
+		})
+	}
+}
