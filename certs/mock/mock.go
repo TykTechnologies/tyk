@@ -165,4 +165,3 @@ func (mr *MockCertificateManagerMockRecorder) ListRawPublicKey(keyID any) *gomoc
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListRawPublicKey", reflect.TypeOf((*MockCertificateManager)(nil).ListRawPublicKey), keyID)
 }
-
