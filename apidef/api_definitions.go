@@ -536,10 +536,17 @@ func (v *VersionInfo) HasEndpointResHeader() bool {
 	return false
 }
 
+// AuthProviderMeta defines the configuration for an authentication provider.
 type AuthProviderMeta struct {
-	Name          AuthProviderCode       `bson:"name" json:"name"`
-	StorageEngine StorageEngineCode      `bson:"storage_engine" json:"storage_engine"`
-	Meta          map[string]interface{} `bson:"meta" json:"meta"`
+	// Name specifies the name of the authentication provider.
+	Name AuthProviderCode `bson:"name" json:"name"`
+
+	// StorageEngine specifies the storage engine to use for the authentication provider.
+	StorageEngine StorageEngineCode `bson:"storage_engine" json:"storage_engine"`
+
+	// Meta contains the specific configuration for the authentication provider.
+	// The structure of this map depends on the value of the `Name` field.
+	Meta map[string]interface{} `bson:"meta" json:"meta"`
 }
 
 type SessionProviderMeta struct {
