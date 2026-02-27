@@ -70,11 +70,11 @@ func TestCheckAccessControlRules(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := checkAccessControlRules(tt.rules, tt.input)
+			denied := checkAccessControlRules(tt.rules, tt.input)
 			if tt.wantErr {
-				assert.Error(t, err, "expected error for input %q", tt.input)
+				assert.True(t, denied, "expected denied for input %q", tt.input)
 			} else {
-				assert.NoError(t, err, "expected no error for input %q", tt.input)
+				assert.False(t, denied, "expected allowed for input %q", tt.input)
 			}
 		})
 	}

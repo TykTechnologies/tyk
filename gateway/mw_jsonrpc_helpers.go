@@ -1,7 +1,6 @@
 package gateway
 
 import (
-	"fmt"
 	"net/http"
 
 	"github.com/TykTechnologies/tyk/internal/httpctx"
@@ -11,30 +10,30 @@ import (
 )
 
 // checkAccessControlRules evaluates allow/block lists against a name.
-// Returns an error if the name is denied.
+// Returns true if the name is denied, false if permitted.
 //
 // Evaluation order:
 //  1. Blocked is checked first — if matched, the request is denied.
 //  2. If Allowed is non-empty and the name does not match any entry, the request is denied.
 //  3. If both lists are empty, access is permitted.
-func checkAccessControlRules(rules user.AccessControlRules, name string) error {
+func checkAccessControlRules(rules user.AccessControlRules, name string) bool {
 	for _, pattern := range rules.Blocked {
 		if matchPattern(pattern, name) {
-			return fmt.Errorf("blocked by pattern: %s", pattern)
+			return true
 		}
 	}
 
 	if len(rules.Allowed) == 0 {
-		return nil // no allow-list restriction
+		return false
 	}
 
 	for _, pattern := range rules.Allowed {
 		if matchPattern(pattern, name) {
-			return nil
+			return false
 		}
 	}
 
-	return fmt.Errorf("not in allowed list")
+	return true
 }
 
 // matchPattern tests name against a regex pattern anchored with ^...$, enforcing full-match semantics.

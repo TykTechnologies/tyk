@@ -53,7 +53,7 @@ func (m *JSONRPCAccessControlMiddleware) ProcessRequest(w http.ResponseWriter, r
 		return nil, http.StatusOK
 	}
 
-	if checkAccessControlRules(accessDef.JSONRPCMethodsAccessRights, state.Method) != nil {
+	if checkAccessControlRules(accessDef.JSONRPCMethodsAccessRights, state.Method) {
 		writeJSONRPCAccessDenied(w, r, fmt.Sprintf("method '%s' is not available", state.Method))
 		return nil, middleware.StatusRespond
 	}
