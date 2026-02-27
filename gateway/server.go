@@ -586,7 +586,7 @@ func (gw *Gateway) setupGlobals() {
 			HashKeys:  false,
 			Gw:        gw,
 		}
-		gw.CertificateManager = certs.NewSlaveCertManager(
+		slaveCM := certs.NewSlaveCertManager(
 			storeCert,
 			rpcStore,
 			certificateSecret,
@@ -601,11 +601,7 @@ func (gw *Gateway) setupGlobals() {
 			),
 		)
 
-		// Wire certificate registry for selective sync
-		if gw.GetConfig().SlaveOptions.SyncUsedCertsOnly && gw.certUsageTracker != nil {
-			cfg := gw.GetConfig()
-			gw.CertificateManager.SetUsageTracker(gw.certUsageTracker, &cfg)
-		}
+		gw.CertificateManager = slaveCM
 	}
 
 	if gw.GetConfig().NewRelic.AppName != "" {
@@ -1888,7 +1884,6 @@ func (gw *Gateway) getGlobalMDCBStorageHandler(keyPrefix string, hashKeys bool) 
 	logger := logrus.New().WithFields(logrus.Fields{"prefix": "mdcb-storage-handler"})
 
 	if gw.GetConfig().SlaveOptions.UseRPC {
-		cfg := gw.GetConfig()
 		return storage.NewMdcbStorage(
 			localStorage,
 			&RPCStorageHandler{
@@ -1898,8 +1893,6 @@ func (gw *Gateway) getGlobalMDCBStorageHandler(keyPrefix string, hashKeys bool) 
 			},
 			logger,
 			nil,
-			gw.certUsageTracker,
-			&cfg,
 		)
 	}
 	return localStorage
