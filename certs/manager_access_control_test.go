@@ -3,7 +3,6 @@ package certs
 import (
 	"testing"
 
-	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/TykTechnologies/tyk/storage"
@@ -32,18 +31,3 @@ func TestCertificateManager_GetRaw(t *testing.T) {
 	})
 }
 
-func TestCertificateManager_SetCertUsageConfig(t *testing.T) {
-	t.Run("does not panic when storage is not MdcbStorage", func(t *testing.T) {
-		store := storage.NewDummyStorage()
-		logger := logrus.NewEntry(logrus.New())
-		manager := &certificateManager{
-			storage: store,
-			secret:  "test",
-			logger:  logger,
-		}
-
-		assert.NotPanics(t, func() {
-			manager.SetCertUsageConfig(nil, nil)
-		})
-	})
-}

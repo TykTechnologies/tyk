@@ -20,9 +20,7 @@ import (
 	"github.com/cenkalti/backoff/v4"
 	"github.com/sirupsen/logrus"
 
-	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/internal/cache"
-	"github.com/TykTechnologies/tyk/internal/certusage"
 	tykcrypto "github.com/TykTechnologies/tyk/internal/crypto"
 	"github.com/TykTechnologies/tyk/storage"
 )
@@ -207,7 +205,7 @@ func NewSlaveCertManager(localStorage, rpcStorage storage.Handler, secret string
 		return err
 	}
 
-	mdcbStorage := storage.NewMdcbStorage(localStorage, rpcStorage, log, callbackOnPullCertFromRPC, nil, nil)
+	mdcbStorage := storage.NewMdcbStorage(localStorage, rpcStorage, log, callbackOnPullCertFromRPC)
 	cm.storage = mdcbStorage
 	return cm
 }
@@ -747,15 +745,6 @@ func (c *certificateManager) GetRaw(certID string) (string, error) {
 	return c.storage.GetKey("raw-" + certID)
 }
 
-// SetCertUsageConfig wires the cert usage tracker into the underlying MdcbStorage
-// so the storage-layer sync filter can use it. This is called directly on the
-// concrete type in server.go before the manager is assigned to the interface.
-func (c *certificateManager) SetCertUsageConfig(registry certusage.Tracker, cfg *config.Config) {
-	if mdcbStorage, ok := c.storage.(*storage.MdcbStorage); ok {
-		mdcbStorage.SetCertUsageConfig(registry, cfg)
-		c.logger.Info("Storage-layer certificate filtering enabled")
-	}
-}
 
 func (c *certificateManager) Add(certData []byte, orgID string) (string, error) {
 

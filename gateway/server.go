@@ -601,13 +601,6 @@ func (gw *Gateway) setupGlobals() {
 			),
 		)
 
-		// Wire certificate registry for selective sync directly on the concrete
-		// slave cert manager — the tracker lives in the gateway layer, not in
-		// the CertificateManager interface.
-		if gw.GetConfig().SlaveOptions.SyncUsedCertsOnly && gw.certUsageTracker != nil {
-			cfg := gw.GetConfig()
-			slaveCM.SetCertUsageConfig(gw.certUsageTracker, &cfg)
-		}
 		gw.CertificateManager = slaveCM
 	}
 
@@ -1891,7 +1884,6 @@ func (gw *Gateway) getGlobalMDCBStorageHandler(keyPrefix string, hashKeys bool) 
 	logger := logrus.New().WithFields(logrus.Fields{"prefix": "mdcb-storage-handler"})
 
 	if gw.GetConfig().SlaveOptions.UseRPC {
-		cfg := gw.GetConfig()
 		return storage.NewMdcbStorage(
 			localStorage,
 			&RPCStorageHandler{
@@ -1901,8 +1893,6 @@ func (gw *Gateway) getGlobalMDCBStorageHandler(keyPrefix string, hashKeys bool) 
 			},
 			logger,
 			nil,
-			gw.certUsageTracker,
-			&cfg,
 		)
 	}
 	return localStorage
