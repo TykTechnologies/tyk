@@ -61,12 +61,11 @@ func getRefreshToken(td tokenData) string {
 	return td.RefreshToken
 }
 
-type dispatcherOption func(*gorpc.Dispatcher) string
+type dispatcherOption func() (string, any)
 
-func withFunc(name string, f any) func(*gorpc.Dispatcher) string {
-	return func(d *gorpc.Dispatcher) string {
-		d.AddFunc(name, f)
-		return name
+func withFunc(name string, f any) dispatcherOption {
+	return func() (string, any) {
+		return name, f
 	}
 }
 
@@ -75,46 +74,45 @@ func withFunc(name string, f any) func(*gorpc.Dispatcher) string {
 // dispatcherOptions. This ensures the gateway can start cleanly for tests without
 // causing delays or failures from RPC retries.
 func newDispatcher(opts ...dispatcherOption) *gorpc.Dispatcher {
-	d := gorpc.NewDispatcher()
+	dispatcher := gorpc.NewDispatcher()
 
-	mandatoryFuncs := map[string]bool{
-		"Login":             false,
-		"Disconnect":        false,
-		"GetApiDefinitions": false,
-		"GetPolicies":       false,
+	funcs := map[string]any{
+		"Login": func(_, _ string) bool {
+			return true
+		},
+		"Disconnect": func(_ string, _ *model.GroupLoginRequest) error {
+			return nil
+		},
+		"GetApiDefinitions": func(_ string, _ interface{}) (string, error) {
+			return "[]", nil
+		},
+		"GetPolicies": func(_ string, _ interface{}) (string, error) {
+			return "[]", nil
+		},
 	}
 
 	for _, opt := range opts {
-		funcName := opt(d)
-		mandatoryFuncs[funcName] = true
-	}
-
-	for k, v := range mandatoryFuncs {
-		if !v {
-			switch k {
-			case "Login":
-				d.AddFunc("Login", func(_, _ string) bool {
-					return true
-				})
-			case "Disconnect":
-				d.AddFunc("Disconnect", func(_ string, _ *model.GroupLoginRequest) error {
-					return nil
-				})
-			case "GetApiDefinitions":
-				d.AddFunc("GetApiDefinitions", func(_ string, _ any) (string, error) {
-					return "[]", nil
-				})
-			case "GetPolicies":
-				d.AddFunc("GetPolicies", func(_ string, _ any) (string, error) {
-					return "[]", nil
-				})
-			}
-
-			mandatoryFuncs[k] = true
+		if opt == nil {
+			continue
 		}
+
+		name, f := opt()
+
+		if name == "" {
+			panic("dispatcher function name cannot be empty")
+		}
+		if f == nil {
+			panic("dispatcher function cannot be nil")
+		}
+
+		funcs[name] = f
 	}
 
-	return d
+	for name, f := range funcs {
+		dispatcher.AddFunc(name, f)
+	}
+
+	return dispatcher
 }
 
 func TestProcessKeySpaceChangesForOauth(t *testing.T) {
