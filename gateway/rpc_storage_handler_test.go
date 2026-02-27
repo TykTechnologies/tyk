@@ -809,13 +809,14 @@ func TestProcessKeySpaceChanges_UserKeyReset(t *testing.T) {
 	oldKey := "old-api-key"
 	newKey := "new-api-key"
 
-	dispatcher := newDispatcher()
-	dispatcher.AddFunc("GetKeySpaceUpdate", func(_, _ string) ([]string, error) {
-		return []string{}, nil
-	})
-	dispatcher.AddFunc("GetGroupKeySpaceUpdate", func(_ string, _ string) ([]string, error) {
-		return []string{}, nil
-	})
+	dispatcher := newDispatcher(
+		withFunc("GetKeySpaceUpdate", func(_, _ string) ([]string, error) {
+			return []string{}, nil
+		}),
+		withFunc("GetGroupKeySpaceUpdate", func(_, _ string) ([]string, error) {
+			return []string{}, nil
+		}),
+	)
 
 	rpcMock, connectionString := startRPCMock(dispatcher)
 	defer stopRPCMock(rpcMock)
@@ -892,10 +893,12 @@ func TestGetApiDefinitions_Fails_With_Timeout(t *testing.T) {
 		close(wait)
 	}()
 
-	dispatcher := newDispatcher(withFunc("GetApiDefinitions", func(_ string, _ any) (string, error) {
-		<-wait // wait until the defer method is called
-		return "[]", nil
-	}))
+	dispatcher := newDispatcher(
+		withFunc("GetApiDefinitions", func(_ string, _ any) (string, error) {
+			<-wait // wait until the defer method is called
+			return "[]", nil
+		}),
+	)
 
 	rpcMock, connectionString := startRPCMock(dispatcher)
 	defer stopRPCMock(rpcMock)
@@ -936,9 +939,11 @@ func TestGetApiDefinitions_Fails_With_Timeout(t *testing.T) {
 func TestGetApiDefinitions(t *testing.T) {
 	var GetApiDefinitionsResponse = "[]"
 
-	dispatcher := newDispatcher(withFunc("GetApiDefinitions", func(_ string, _ any) (string, error) {
-		return GetApiDefinitionsResponse, nil
-	}))
+	dispatcher := newDispatcher(
+		withFunc("GetApiDefinitions", func(_ string, _ any) (string, error) {
+			return GetApiDefinitionsResponse, nil
+		}),
+	)
 
 	rpcMock, connectionString := startRPCMock(dispatcher)
 	defer stopRPCMock(rpcMock)
@@ -975,9 +980,11 @@ func TestGetApiDefinitions(t *testing.T) {
 func TestGetPolicies(t *testing.T) {
 	var GetPoliciesResponse = "[]"
 
-	dispatcher := newDispatcher(withFunc("GetPolicies", func(_ string, _ any) (string, error) {
-		return GetPoliciesResponse, nil
-	}))
+	dispatcher := newDispatcher(
+		withFunc("GetPolicies", func(_ string, _ any) (string, error) {
+			return GetPoliciesResponse, nil
+		}),
+	)
 
 	rpcMock, connectionString := startRPCMock(dispatcher)
 	defer stopRPCMock(rpcMock)
@@ -1017,10 +1024,12 @@ func TestGetPolicies_Fails_With_Timeout(t *testing.T) {
 		close(wait)
 	}()
 
-	dispatcher := newDispatcher(withFunc("GetPolicies", func(_ string, _ any) (string, error) {
-		<-wait // wait until the defer method is called
-		return "[]", nil
-	}))
+	dispatcher := newDispatcher(
+		withFunc("GetPolicies", func(_ string, _ any) (string, error) {
+			<-wait // wait until the defer method is called
+			return "[]", nil
+		}),
+	)
 
 	rpcMock, connectionString := startRPCMock(dispatcher)
 	defer stopRPCMock(rpcMock)
