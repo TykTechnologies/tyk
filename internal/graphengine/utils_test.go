@@ -188,6 +188,25 @@ func TestAdditionalUpstreamHeaders_PropagateAuthHeaders(t *testing.T) {
 		assert.Empty(t, result.Get(header.Authorization))
 	})
 
+	t.Run("should not propagate when active auth type has no AuthConfigs entry and no fallback", func(t *testing.T) {
+		req, err := http.NewRequestWithContext(context.Background(), http.MethodPost, "http://example.com", nil)
+		require.NoError(t, err)
+		req.Header.Set(header.Authorization, "Bearer token123")
+
+		apiDef := &apidef.APIDefinition{
+			StripAuthData: false,
+			UseBasicAuth:  true,
+		}
+		apiDef.GraphQL.Enabled = true
+		apiDef.GraphQL.ExecutionMode = apidef.GraphQLExecutionModeExecutionEngine
+		// AuthConfigs is empty — no "basic" key present, and BasicType doesn't
+		// qualify for the deprecated Auth field fallback.
+
+		result := additionalUpstreamHeaders(testLogger(), req, apiDef)
+		assert.Empty(t, result.Get(header.Authorization),
+			"should return early when active auth config is missing and not eligible for fallback")
+	})
+
 	t.Run("should propagate JWT auth header when EnableJWT is true", func(t *testing.T) {
 		req, err := http.NewRequestWithContext(context.Background(), http.MethodPost, "http://example.com", nil)
 		require.NoError(t, err)
@@ -247,6 +266,81 @@ func TestAdditionalUpstreamHeaders_PropagateAuthHeaders(t *testing.T) {
 		assert.Empty(t, result.Get("X-Basic-Auth"),
 			"inactive basic auth header should not be propagated")
 	})
+}
+
+func TestActiveAuthType(t *testing.T) {
+	tests := []struct {
+		name     string
+		apiDef   *apidef.APIDefinition
+		expected string
+	}{
+		{
+			name:     "returns empty string for keyless access",
+			apiDef:   &apidef.APIDefinition{UseKeylessAccess: true},
+			expected: "",
+		},
+		{
+			name:     "returns JWTType when EnableJWT is true",
+			apiDef:   &apidef.APIDefinition{EnableJWT: true},
+			expected: apidef.JWTType,
+		},
+		{
+			name:     "returns BasicType when UseBasicAuth is true",
+			apiDef:   &apidef.APIDefinition{UseBasicAuth: true},
+			expected: apidef.BasicType,
+		},
+		{
+			name:     "returns HMACType when EnableSignatureChecking is true",
+			apiDef:   &apidef.APIDefinition{EnableSignatureChecking: true},
+			expected: apidef.HMACType,
+		},
+		{
+			name:     "returns OAuthType when UseOauth2 is true",
+			apiDef:   &apidef.APIDefinition{UseOauth2: true},
+			expected: apidef.OAuthType,
+		},
+		{
+			name: "returns ExternalOAuthType when ExternalOAuth is enabled",
+			apiDef: func() *apidef.APIDefinition {
+				def := &apidef.APIDefinition{}
+				def.ExternalOAuth.Enabled = true
+				return def
+			}(),
+			expected: apidef.ExternalOAuthType,
+		},
+		{
+			name:     "returns OIDCType when UseOpenID is true",
+			apiDef:   &apidef.APIDefinition{UseOpenID: true},
+			expected: apidef.OIDCType,
+		},
+		{
+			name:     "returns AuthTokenType when UseStandardAuth is true",
+			apiDef:   &apidef.APIDefinition{UseStandardAuth: true},
+			expected: apidef.AuthTokenType,
+		},
+		{
+			name:     "returns AuthTokenType as default fallback",
+			apiDef:   &apidef.APIDefinition{},
+			expected: apidef.AuthTokenType,
+		},
+		{
+			name:     "keyless takes precedence over other flags",
+			apiDef:   &apidef.APIDefinition{UseKeylessAccess: true, EnableJWT: true},
+			expected: "",
+		},
+		{
+			name:     "JWT takes precedence over basic auth",
+			apiDef:   &apidef.APIDefinition{EnableJWT: true, UseBasicAuth: true},
+			expected: apidef.JWTType,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			result := activeAuthType(tc.apiDef)
+			assert.Equal(t, tc.expected, result)
+		})
+	}
 }
 
 // TestAdditionalUpstreamHeaders_NoAuthHeaderLeakAcrossConnections simulates two
