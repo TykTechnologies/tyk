@@ -86,7 +86,7 @@ runs:
 
         if [[ "${{ inputs.quality-gate-name }}" != "" ]]; then
           SONAR_ARGS="$SONAR_ARGS \
-          -Dsonar.qualitygate.name=${{ inputs.quality-gate-name }}"
+          -Dsonar.qualitygate.name=\"${{ inputs.quality-gate-name }}\""
         fi
 
         if [[ "${{ inputs.event-name }}" == "pull_request" ]]; then
