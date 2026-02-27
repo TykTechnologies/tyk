@@ -53,10 +53,6 @@ type Operation struct {
 
 // ProcessRequest will run any checks on the request on the way through the system, return an error to have the chain fail
 func (v *VersionCheck) ProcessRequest(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
-	if r.Method == http.MethodOptions && v.Spec.CORS.Enable && !v.Spec.CORS.OptionsPassthrough && r.Header.Get("Access-Control-Request-Method") != "" {
-		return nil, http.StatusOK
-	}
-
 	targetVersion := v.Spec.getVersionFromRequest(r)
 	if targetVersion == "" {
 		targetVersion = v.Spec.VersionDefinition.Default
