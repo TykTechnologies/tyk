@@ -61,6 +61,36 @@ func getRefreshToken(td tokenData) string {
 	return td.RefreshToken
 }
 
+// newDispatcher creates a minimal RPC dispatcher with required handlers for gateway startup.
+//
+// When StartTest() initializes the gateway, it triggers DoReload() which attempts to sync
+// API definitions and policies from RPC. Without these handlers, or if they return invalid JSON,
+// the gateway will:
+//  1. Retry the RPC calls multiple times with exponential backoff
+//  2. Eventually enter emergency mode and attempt to load from Redis backup
+//  3. Cause unnecessary delays and potential test failures
+//
+// Returning empty JSON arrays ("[]") allows the gateway to start cleanly without any
+// APIs or policies loaded, which is the desired state for most tests.
+func newDispatcher() *gorpc.Dispatcher {
+	d := gorpc.NewDispatcher()
+
+	d.AddFunc("Login", func(_, _ string) bool {
+		return true
+	})
+	d.AddFunc("Disconnect", func(_ string, _ *model.GroupLoginRequest) error {
+		return nil
+	})
+	d.AddFunc("GetApiDefinitions", func(_ string, _ any) (string, error) {
+		return "[]", nil
+	})
+	d.AddFunc("GetPolicies", func(_ string, _ any) (string, error) {
+		return "[]", nil
+	})
+
+	return d
+}
+
 func TestProcessKeySpaceChangesForOauth(t *testing.T) {
 	t.Skip() // DeleteAllKeys interferes with other tests.
 
@@ -755,13 +785,7 @@ func TestProcessKeySpaceChanges_UserKeyReset(t *testing.T) {
 	oldKey := "old-api-key"
 	newKey := "new-api-key"
 
-	dispatcher := gorpc.NewDispatcher()
-	dispatcher.AddFunc("Login", func(_, _ string) bool {
-		return true
-	})
-	dispatcher.AddFunc("Disconnect", func(_ string, _ *model.GroupLoginRequest) error {
-		return nil
-	})
+	dispatcher := newDispatcher()
 	dispatcher.AddFunc("GetKeySpaceUpdate", func(_, _ string) ([]string, error) {
 		return []string{}, nil
 	})
