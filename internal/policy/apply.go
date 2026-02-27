@@ -481,6 +481,11 @@ func (t *Service) applyPartitions(policy user.Policy, session *user.SessionState
 					}
 				}
 
+				r.JSONRPCMethodsAccessRights = mergeACLRules(r.JSONRPCMethodsAccessRights, v.JSONRPCMethodsAccessRights)
+				r.MCPAccessRights.Tools = mergeACLRules(r.MCPAccessRights.Tools, v.MCPAccessRights.Tools)
+				r.MCPAccessRights.Resources = mergeACLRules(r.MCPAccessRights.Resources, v.MCPAccessRights.Resources)
+				r.MCPAccessRights.Prompts = mergeACLRules(r.MCPAccessRights.Prompts, v.MCPAccessRights.Prompts)
+
 				ar = r
 			}
 
@@ -512,6 +517,8 @@ func (t *Service) applyPartitions(policy user.Policy, session *user.SessionState
 
 			if rightsAR, ok := rights[k]; ok {
 				ar.Endpoints = t.ApplyEndpointLevelLimits(v.Endpoints, rightsAR.Endpoints)
+				ar.JSONRPCMethods = t.ApplyJSONRPCMethodLimits(v.JSONRPCMethods, rightsAR.JSONRPCMethods)
+				ar.MCPPrimitives = t.ApplyMCPPrimitiveLimits(v.MCPPrimitives, rightsAR.MCPPrimitives)
 			}
 
 			if policy.ThrottleRetryLimit > ar.Limit.ThrottleRetryLimit {
@@ -631,6 +638,8 @@ func (t *Service) applyAPILevelLimits(policyAD user.AccessDefinition, currAD use
 	}
 
 	policyAD.Endpoints = t.ApplyEndpointLevelLimits(policyAD.Endpoints, currAD.Endpoints)
+	policyAD.JSONRPCMethods = t.ApplyJSONRPCMethodLimits(policyAD.JSONRPCMethods, currAD.JSONRPCMethods)
+	policyAD.MCPPrimitives = t.ApplyMCPPrimitiveLimits(policyAD.MCPPrimitives, currAD.MCPPrimitives)
 
 	return policyAD
 }
@@ -671,4 +680,87 @@ func (t *Service) ApplyEndpointLevelLimits(policyEndpoints user.Endpoints, currE
 	}
 
 	return result.Endpoints()
+}
+
+// mergeACLRules merges two AccessControlRules using union semantics, consistent
+// with how AllowedURLs are merged across policies: both Allowed and Blocked lists
+// are unioned. If src is empty (not configured), dst is returned unchanged.
+func mergeACLRules(dst, src user.AccessControlRules) user.AccessControlRules {
+	if src.IsEmpty() {
+		return dst
+	}
+	if dst.IsEmpty() {
+		return src
+	}
+	return user.AccessControlRules{
+		Allowed: appendIfMissing(dst.Allowed, src.Allowed...),
+		Blocked: appendIfMissing(dst.Blocked, src.Blocked...),
+	}
+}
+
+// ApplyJSONRPCMethodLimits merges per-method rate limits: higher rate (lower duration) wins,
+// matching the semantics of ApplyEndpointLevelLimits.
+func (t *Service) ApplyJSONRPCMethodLimits(policy, current []user.JSONRPCMethodLimit) []user.JSONRPCMethodLimit {
+	if len(current) == 0 {
+		return policy
+	}
+	if len(policy) == 0 {
+		return current
+	}
+
+	result := make(map[string]user.JSONRPCMethodLimit)
+	for _, m := range current {
+		result[m.Name] = m
+	}
+	for _, m := range policy {
+		curr, ok := result[m.Name]
+		if !ok {
+			result[m.Name] = m
+			continue
+		}
+		if m.Limit.Duration() < curr.Limit.Duration() || curr.Limit.Duration() == 0 {
+			result[m.Name] = m
+		}
+	}
+
+	out := make([]user.JSONRPCMethodLimit, 0, len(result))
+	for _, m := range result {
+		out = append(out, m)
+	}
+	return out
+}
+
+// ApplyMCPPrimitiveLimits merges per-primitive rate limits keyed on type+name:
+// higher rate (lower duration) wins, matching ApplyEndpointLevelLimits semantics.
+func (t *Service) ApplyMCPPrimitiveLimits(policy, current []user.MCPPrimitiveLimit) []user.MCPPrimitiveLimit {
+	if len(current) == 0 {
+		return policy
+	}
+	if len(policy) == 0 {
+		return current
+	}
+
+	type key struct{ typ, name string }
+
+	result := make(map[key]user.MCPPrimitiveLimit)
+	for _, p := range current {
+		result[key{p.Type, p.Name}] = p
+	}
+	for _, p := range policy {
+		k := key{p.Type, p.Name}
+		curr, ok := result[k]
+		if !ok {
+			result[k] = p
+			continue
+		}
+		if p.Limit.Duration() < curr.Limit.Duration() || curr.Limit.Duration() == 0 {
+			result[k] = p
+		}
+	}
+
+	out := make([]user.MCPPrimitiveLimit, 0, len(result))
+	for _, p := range result {
+		out = append(out, p)
+	}
+	return out
 }
