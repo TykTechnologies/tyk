@@ -63,7 +63,7 @@ runs:
     - name: Check reports existence
       uses: andstor/file-existence-action@v3
       with:
-        files: ${{ inputs.coverage-path != '' && 'gateway-all.cov, golangci-lint-report.json' || 'golangci-lint-report.json' }}
+        files: ${{ inputs.coverage-path != '' && format('{0}, golangci-lint-report.json', inputs.coverage-path) || 'golangci-lint-report.json' }}
         fail: true
 
     - name: Set SonarCloud parameters
