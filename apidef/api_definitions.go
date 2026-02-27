@@ -537,7 +537,6 @@ func (v *VersionInfo) HasEndpointResHeader() bool {
 }
 
 // AuthProviderMeta defines the configuration for an authentication provider.
-type // AuthProviderMeta defines the configuration for an authentication provider.
 type AuthProviderMeta struct {
 	// Name specifies the name of the authentication provider.
 	// Possible values are: "oidc", "jwt", "saml", "ldap", "social", "custom".
