@@ -11,6 +11,8 @@ import (
 )
 
 // NewMetricProvider creates an OTel metrics provider with the given metrics configuration.
+//
+//nolint:revive
 func NewMetricProvider(ctx context.Context, logger *logrus.Logger, metricsCfg *BaseMetricsConfig,
 	id string, version string, useRPC bool, groupID string, isSegmented bool, segmentTags []string) (tykmetric.Provider, error) {
 
@@ -43,6 +45,8 @@ func NewMetricProvider(ctx context.Context, logger *logrus.Logger, metricsCfg *B
 //	nil (field omitted)  → default RED instruments created
 //	empty slice          → no API metrics (explicitly disabled)
 //	populated slice      → only configured instruments
+//
+//nolint:revive
 func InitOpenTelemetryMetrics(ctx context.Context, logger *logrus.Logger, gwConfig *OpenTelemetry,
 	id string, version string, useRPC bool, groupID string, isSegmented bool, segmentTags []string) *MetricInstruments {
 
