@@ -1165,7 +1165,8 @@ func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string, orgId string) 
 			r.Gw.GetConfig().SlaveOptions.SyncUsedCertsOnly {
 			if r.Gw.certUsageTracker != nil && !r.Gw.certUsageTracker.Required(certId) {
 				log.WithField("cert_id", certs.MaskCertID(certId)).
-					Debug("skipping certificate - not used by loaded APIs")
+					Debug("skipping certificate - not used by loaded APIs, queuing for re-check after reload")
+				r.Gw.pendingCerts.Store(certId, struct{}{})
 				continue
 			}
 
