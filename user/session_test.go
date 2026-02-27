@@ -1406,3 +1406,32 @@ func BenchmarkSessionState_RoundTrip(b *testing.B) {
 		})
 	}
 }
+
+func TestAccessDefinition_MCPFields_OmittedFromJSONWhenEmpty(t *testing.T) {
+	ad := AccessDefinition{}
+
+	b, err := json.Marshal(ad)
+	assert.NoError(t, err)
+
+	var out map[string]json.RawMessage
+	assert.NoError(t, json.Unmarshal(b, &out))
+
+	assert.NotContains(t, out, "json_rpc_methods_access_rights")
+	assert.NotContains(t, out, "mcp_access_rights")
+}
+
+func TestAccessDefinition_MCPFields_PresentWhenSet(t *testing.T) {
+	ad := AccessDefinition{
+		JSONRPCMethodsAccessRights: AccessControlRules{Allowed: []string{"tools/call"}},
+		MCPAccessRights:            MCPAccessRights{Tools: AccessControlRules{Allowed: []string{"weather"}}},
+	}
+
+	b, err := json.Marshal(ad)
+	assert.NoError(t, err)
+
+	var out map[string]json.RawMessage
+	assert.NoError(t, json.Unmarshal(b, &out))
+
+	assert.Contains(t, out, "json_rpc_methods_access_rights")
+	assert.Contains(t, out, "mcp_access_rights")
+}

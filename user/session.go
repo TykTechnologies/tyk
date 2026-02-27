@@ -115,6 +115,11 @@ type AccessDefinition struct {
 	AllowanceScope string `json:"allowance_scope,omitzero" msg:"allowance_scope"`
 
 	Endpoints Endpoints `json:"endpoints,omitzero" msg:"endpoints,omitempty"`
+
+	JSONRPCMethods             []JSONRPCMethodLimit `json:"json_rpc_methods,omitempty" msg:"json_rpc_methods"`
+	JSONRPCMethodsAccessRights AccessControlRules   `json:"json_rpc_methods_access_rights,omitzero" msg:"json_rpc_methods_access_rights"`
+	MCPPrimitives              []MCPPrimitiveLimit  `json:"mcp_primitives,omitempty" msg:"mcp_primitives"`
+	MCPAccessRights            MCPAccessRights      `json:"mcp_access_rights,omitzero" msg:"mcp_access_rights"`
 }
 
 // IsEmpty checks if APILimit is empty.
