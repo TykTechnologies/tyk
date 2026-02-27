@@ -16,10 +16,12 @@ import (
 
 	"github.com/TykTechnologies/tyk-pump/analytics"
 	"github.com/TykTechnologies/tyk/config"
+	ctxpkg "github.com/TykTechnologies/tyk/ctx"
 
 	"github.com/TykTechnologies/tyk/header"
 	"github.com/TykTechnologies/tyk/internal/httpctx"
 	jsonrpcerrors "github.com/TykTechnologies/tyk/internal/jsonrpc/errors"
+	"github.com/TykTechnologies/tyk/internal/otel/apimetrics"
 	"github.com/TykTechnologies/tyk/request"
 )
 
@@ -105,17 +107,7 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 		}
 	}
 
-	if e.Spec.DoNotTrack || ctxGetDoNotTrack(r) {
-		return
-	}
-
-	// Track the key ID if it exists
-	token := ctxGetAuthToken(r)
-	var alias string
-
-	ip := request.RealIP(r)
-
-	// Calculate latency for error responses
+	// Calculate latency for error responses (needed for both API metrics and analytics).
 	var latency analytics.Latency
 	if requestStartTime := ctxGetRequestStartTime(r); !requestStartTime.IsZero() {
 		totalMs := int64(DurationToMillisecond(time.Since(requestStartTime)))
@@ -125,6 +117,44 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 			Gateway:  totalMs, // All time is gateway time for errors
 		}
 	}
+
+	// Record API metrics with error context.
+	rc := &apimetrics.RequestContext{
+		Request:         r,
+		StatusCode:      errCode,
+		APIID:           e.Spec.APIID,
+		APIName:         e.Spec.Name,
+		OrgID:           e.Spec.OrgID,
+		ListenPath:      e.Spec.Proxy.ListenPath,
+		IPAddress:       request.RealIP(r),
+		LatencyTotal:    latency.Total,
+		LatencyUpstream: latency.Upstream,
+		LatencyGateway:  latency.Gateway,
+	}
+	if v := e.Spec.getVersionFromRequest(r); v != "" {
+		rc.APIVersion = v
+	}
+	if e.Base().Gw.MetricInstruments.NeedsSession() {
+		rc.Session = ctxGetSession(r)
+		rc.Token = ctxGetAuthToken(r)
+	}
+	if e.Base().Gw.MetricInstruments.NeedsContext() {
+		rc.ContextVariables = ctxGetData(r)
+	}
+	if errClass := ctxpkg.GetErrorClassification(r); errClass != nil {
+		rc.ErrorClassification = string(errClass.Flag)
+	}
+	e.Base().Gw.MetricInstruments.RecordAPIMetrics(r.Context(), rc)
+
+	if e.Spec.DoNotTrack || ctxGetDoNotTrack(r) {
+		return
+	}
+
+	// Track the key ID if it exists
+	token := ctxGetAuthToken(r)
+	var alias string
+
+	ip := request.RealIP(r)
 
 	if e.Spec.GlobalConfig.StoreAnalytics(ip) {
 
