@@ -61,32 +61,58 @@ func getRefreshToken(td tokenData) string {
 	return td.RefreshToken
 }
 
+type dispatcherOption func(*gorpc.Dispatcher) string
+
+func withFunc(name string, f any) func(*gorpc.Dispatcher) string {
+	return func(d *gorpc.Dispatcher) string {
+		d.AddFunc(name, f)
+		return name
+	}
+}
+
 // newDispatcher creates a minimal RPC dispatcher with required handlers for gateway startup.
-//
-// When StartTest() initializes the gateway, it triggers DoReload() which attempts to sync
-// API definitions and policies from RPC. Without these handlers, or if they return invalid JSON,
-// the gateway will:
-//  1. Retry the RPC calls multiple times with exponential backoff
-//  2. Eventually enter emergency mode and attempt to load from Redis backup
-//  3. Cause unnecessary delays and potential test failures
-//
-// Returning empty JSON arrays ("[]") allows the gateway to start cleanly without any
-// APIs or policies loaded, which is the desired state for most tests.
-func newDispatcher() *gorpc.Dispatcher {
+// It establishes a set of default handlers that can be overridden by providing
+// dispatcherOptions. This ensures the gateway can start cleanly for tests without
+// causing delays or failures from RPC retries.
+func newDispatcher(opts ...dispatcherOption) *gorpc.Dispatcher {
 	d := gorpc.NewDispatcher()
 
-	d.AddFunc("Login", func(_, _ string) bool {
-		return true
-	})
-	d.AddFunc("Disconnect", func(_ string, _ *model.GroupLoginRequest) error {
-		return nil
-	})
-	d.AddFunc("GetApiDefinitions", func(_ string, _ any) (string, error) {
-		return "[]", nil
-	})
-	d.AddFunc("GetPolicies", func(_ string, _ any) (string, error) {
-		return "[]", nil
-	})
+	mandatoryFuncs := map[string]bool{
+		"Login":             false,
+		"Disconnect":        false,
+		"GetApiDefinitions": false,
+		"GetPolicies":       false,
+	}
+
+	for _, opt := range opts {
+		funcName := opt(d)
+		mandatoryFuncs[funcName] = true
+	}
+
+	for k, v := range mandatoryFuncs {
+		if !v {
+			switch k {
+			case "Login":
+				d.AddFunc("Login", func(_, _ string) bool {
+					return true
+				})
+			case "Disconnect":
+				d.AddFunc("Disconnect", func(_ string, _ *model.GroupLoginRequest) error {
+					return nil
+				})
+			case "GetApiDefinitions":
+				d.AddFunc("GetApiDefinitions", func(_ string, _ any) (string, error) {
+					return "[]", nil
+				})
+			case "GetPolicies":
+				d.AddFunc("GetPolicies", func(_ string, _ any) (string, error) {
+					return "[]", nil
+				})
+			}
+
+			mandatoryFuncs[k] = true
+		}
+	}
 
 	return d
 }
@@ -868,17 +894,10 @@ func TestGetApiDefinitions_Fails_With_Timeout(t *testing.T) {
 		close(wait)
 	}()
 
-	dispatcher := gorpc.NewDispatcher()
-	dispatcher.AddFunc("Login", func(_, _ string) bool {
-		return true
-	})
-	dispatcher.AddFunc("Disconnect", func(_ string, _ *model.GroupLoginRequest) error {
-		return nil
-	})
-	dispatcher.AddFunc("GetApiDefinitions", func(_ string, _ interface{}) (string, error) {
+	dispatcher := newDispatcher(withFunc("GetApiDefinitions", func(_ string, _ any) (string, error) {
 		<-wait // wait until the defer method is called
-		return "sample-response", nil
-	})
+		return "[]", nil
+	}))
 
 	rpcMock, connectionString := startRPCMock(dispatcher)
 	defer stopRPCMock(rpcMock)
@@ -912,23 +931,16 @@ func TestGetApiDefinitions_Fails_With_Timeout(t *testing.T) {
 	// GetApiDefinitions calls rpc.FuncClientSingleton with a backoff algorithm.
 	// The algorithm tries to call the RPC method 3 times with a 10-millisecond interval.
 	// So the "GetApiDefinitions" method will be called 4 times, including the first try.
-	// It should return an empty string instead of "sample-response".
+	// It should return an empty string instead of "[]".
 	assert.Equal(t, "", rpcListener.GetApiDefinitions("test_org", nil))
 }
 
 func TestGetApiDefinitions(t *testing.T) {
-	var GetApiDefinitionsResponse = "sample-response"
+	var GetApiDefinitionsResponse = "[]"
 
-	dispatcher := gorpc.NewDispatcher()
-	dispatcher.AddFunc("Login", func(_, _ string) bool {
-		return true
-	})
-	dispatcher.AddFunc("Disconnect", func(_ string, _ *model.GroupLoginRequest) error {
-		return nil
-	})
-	dispatcher.AddFunc("GetApiDefinitions", func(_ string, _ interface{}) (string, error) {
+	dispatcher := newDispatcher(withFunc("GetApiDefinitions", func(_ string, _ any) (string, error) {
 		return GetApiDefinitionsResponse, nil
-	})
+	}))
 
 	rpcMock, connectionString := startRPCMock(dispatcher)
 	defer stopRPCMock(rpcMock)
@@ -963,18 +975,11 @@ func TestGetApiDefinitions(t *testing.T) {
 }
 
 func TestGetPolicies(t *testing.T) {
-	var GetPoliciesResponse = "sample-response"
+	var GetPoliciesResponse = "[]"
 
-	dispatcher := gorpc.NewDispatcher()
-	dispatcher.AddFunc("Login", func(_, _ string) bool {
-		return true
-	})
-	dispatcher.AddFunc("Disconnect", func(_ string, _ *model.GroupLoginRequest) error {
-		return nil
-	})
-	dispatcher.AddFunc("GetPolicies", func(_ string, _ interface{}) (string, error) {
+	dispatcher := newDispatcher(withFunc("GetPolicies", func(_ string, _ any) (string, error) {
 		return GetPoliciesResponse, nil
-	})
+	}))
 
 	rpcMock, connectionString := startRPCMock(dispatcher)
 	defer stopRPCMock(rpcMock)
@@ -1014,17 +1019,10 @@ func TestGetPolicies_Fails_With_Timeout(t *testing.T) {
 		close(wait)
 	}()
 
-	dispatcher := gorpc.NewDispatcher()
-	dispatcher.AddFunc("Login", func(_, _ string) bool {
-		return true
-	})
-	dispatcher.AddFunc("Disconnect", func(_ string, _ *model.GroupLoginRequest) error {
-		return nil
-	})
-	dispatcher.AddFunc("GetPolicies", func(_ string, _ interface{}) (string, error) {
+	dispatcher := newDispatcher(withFunc("GetPolicies", func(_ string, _ any) (string, error) {
 		<-wait // wait until the defer method is called
-		return "sample-response", nil
-	})
+		return "[]", nil
+	}))
 
 	rpcMock, connectionString := startRPCMock(dispatcher)
 	defer stopRPCMock(rpcMock)
@@ -1058,7 +1056,7 @@ func TestGetPolicies_Fails_With_Timeout(t *testing.T) {
 	// GetPolicies calls rpc.FuncClientSingleton with a backoff algorithm.
 	// The algorithm tries to call the RPC method 3 times with a 10-millisecond interval.
 	// So the "GetPolicies" method will be called 4 times, including the first try.
-	// It should return an empty string instead of "sample-response".
+	// It should return an empty string instead of "[]".
 	assert.Equal(t, "", rpcListener.GetPolicies("test_org"))
 }
 
