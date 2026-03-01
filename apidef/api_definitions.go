@@ -1042,6 +1042,13 @@ type ProxyConfig struct {
 		SSLForceCommonNameCheck bool     `json:"ssl_force_common_name_check"`
 		ProxyURL                string   `bson:"proxy_url" json:"proxy_url"`
 	} `bson:"transport" json:"transport"`
+
+	// SSEWriteTimeout is an optional idle timeout (in seconds) for SSE streaming responses.
+	// When set to a value > 0, the write deadline resets after each successful write.
+	// If no data is written within this window the connection is closed.
+	// When not set (0), MCP APIs clear the deadline entirely; other APIs retain
+	// the default server write_timeout behavior.
+	SSEWriteTimeout int `bson:"sse_write_timeout" json:"sse_write_timeout"`
 }
 
 type CORSConfig struct {

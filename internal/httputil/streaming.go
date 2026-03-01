@@ -1,6 +1,7 @@
 package httputil
 
 import (
+	"mime"
 	"net/http"
 	"strings"
 )
@@ -16,9 +17,23 @@ func IsGrpcStreaming(r *http.Request) bool {
 	return r.ContentLength == -1 && r.Header.Get(headerContentType) == "application/grpc"
 }
 
+// IsSseContentType returns true if the Content-Type value designates SSE.
+// It handles both exact matches (e.g. "text/event-stream") and values with
+// parameters (e.g. "text/event-stream; charset=utf-8").
+func IsSseContentType(ct string) bool {
+	if ct == "text/event-stream" {
+		return true
+	}
+	mediaType, _, err := mime.ParseMediaType(ct)
+	if err != nil {
+		return false
+	}
+	return mediaType == "text/event-stream"
+}
+
 // IsSseStreamingResponse returns true if the response designates SSE streaming.
 func IsSseStreamingResponse(r *http.Response) bool {
-	return r.Header.Get(headerContentType) == "text/event-stream"
+	return IsSseContentType(r.Header.Get(headerContentType))
 }
 
 // IsUpgrade checks if the request is an upgrade request and returns the upgrade type.

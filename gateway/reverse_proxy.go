@@ -1393,7 +1393,7 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 			var bodyBuffer bytes.Buffer
 			bodyBuffer2 := new(bytes.Buffer)
 
-			p.CopyResponse(&bodyBuffer, res.Body, p.flushInterval(res))
+			_ = p.CopyResponse(&bodyBuffer, res.Body, p.flushInterval(res))
 			*bodyBuffer2 = bodyBuffer
 
 			// Create new ReadClosers so we can split output
@@ -1457,7 +1457,17 @@ func (p *ReverseProxy) HandleResponse(rw http.ResponseWriter, res *http.Response
 		}
 	}
 
-	p.CopyResponse(rw, res.Body, p.flushInterval(res))
+	isSSE := httputil.IsStreamingResponse(res)
+	copyDst := io.Writer(rw)
+	if isSSE {
+		if w, cleanup := p.prepareSSEStreaming(rw, res.Body); w != nil {
+			copyDst = w
+			defer cleanup()
+		}
+	}
+	if err := p.CopyResponse(copyDst, res.Body, p.flushInterval(res)); err != nil {
+		p.handleCopyError(rw, err, isSSE)
+	}
 
 	if len(res.Trailer) == announcedTrailers {
 		copyHeader(rw.Header(), res.Trailer, p.Gw.GetConfig().IgnoreCanonicalMIMEHeaderKey)
@@ -1480,7 +1490,7 @@ func (p *ReverseProxy) flushInterval(res *http.Response) time.Duration {
 
 	// For Server-Sent Events responses, flush immediately.
 	// The MIME type is defined in https://www.w3.org/TR/eventsource/#text-event-stream
-	if resCT == "text/event-stream" {
+	if httputil.IsSseContentType(resCT) {
 		return -1 // negative means immediately
 	}
 
@@ -1492,7 +1502,61 @@ func (p *ReverseProxy) flushInterval(res *http.Response) time.Duration {
 	return p.FlushInterval
 }
 
-func (p *ReverseProxy) CopyResponse(dst io.Writer, src io.Reader, flushInterval time.Duration) {
+// prepareSSEStreaming configures the write deadline for SSE streams.
+//
+// Default behaviour matches master: regular APIs keep the server's write_timeout.
+// MCP APIs clear the deadline so streams live indefinitely.
+// When sse_write_timeout > 0 is set on any API, an idle-timeout writer is
+// returned that resets the deadline after each write and terminates the stream
+// if no data flows within the window.
+//
+// Returns (nil, nil) when no writer wrapper is needed.
+func (p *ReverseProxy) prepareSSEStreaming(rw http.ResponseWriter, body io.Closer) (io.Writer, func()) {
+	rc := http.NewResponseController(rw)
+	idleTimeout := p.TykAPISpec.Proxy.SSEWriteTimeout
+
+	if idleTimeout > 0 {
+		// Explicit idle timeout: close the stream if no data is written
+		// within the window.
+		timeout := time.Duration(idleTimeout) * time.Second
+		if err := rc.SetWriteDeadline(time.Now().Add(timeout)); err != nil {
+			p.logger.WithError(err).Debug("failed to set SSE idle write deadline")
+			return nil, nil
+		}
+		wf, ok := rw.(writeFlusher)
+		if !ok {
+			return nil, nil
+		}
+		dw := newDeadlineWriter(wf, rc, timeout, body)
+		return dw, dw.stop
+	}
+
+	// MCP APIs: clear deadline so streams live indefinitely.
+	if p.TykAPISpec.IsMCP() {
+		if err := rc.SetWriteDeadline(time.Time{}); err != nil {
+			p.logger.WithError(err).Debug("failed to clear write deadline for MCP SSE stream")
+		}
+	}
+
+	// Regular non-MCP APIs: no-op, keep server's default write_timeout.
+	return nil, nil
+}
+
+// handleCopyError sends an SSE error event to the client when the upstream
+// body copy fails unexpectedly. Client-initiated disconnects (context.Canceled)
+// are silently ignored.
+func (p *ReverseProxy) handleCopyError(rw http.ResponseWriter, copyErr error, isSSE bool) {
+	if !isSSE || errors.Is(copyErr, context.Canceled) {
+		return
+	}
+	const errorEvent = "event: error\ndata: upstream connection terminated unexpectedly\n\n"
+	_, _ = io.WriteString(rw, errorEvent)
+	if flusher, ok := rw.(http.Flusher); ok {
+		flusher.Flush()
+	}
+}
+
+func (p *ReverseProxy) CopyResponse(dst io.Writer, src io.Reader, flushInterval time.Duration) error {
 
 	if flushInterval != 0 {
 		if wf, ok := dst.(writeFlusher); ok {
@@ -1510,7 +1574,11 @@ func (p *ReverseProxy) CopyResponse(dst io.Writer, src io.Reader, flushInterval 
 		}
 	}
 
-	p.copyBuffer(dst, src)
+	_, err := p.copyBuffer(dst, src)
+	if errors.Is(err, io.EOF) {
+		err = nil
+	}
+	return err
 }
 
 func (p *ReverseProxy) copyBuffer(dst io.Writer, src io.Reader) (int64, error) {
@@ -1666,6 +1734,47 @@ func (m *maxLatencyWriter) stop() {
 	if m.t != nil {
 		m.t.Stop()
 	}
+}
+
+// deadlineWriter wraps a writeFlusher and implements an idle timeout for SSE
+// streams. After each successful write the idle timer resets. If no write
+// occurs within the timeout window, the upstream response body is closed to
+// unblock the copy loop and terminate the stream.
+type deadlineWriter struct {
+	dst     writeFlusher
+	rc      *http.ResponseController
+	timeout time.Duration
+	timer   *time.Timer
+}
+
+func newDeadlineWriter(dst writeFlusher, rc *http.ResponseController, timeout time.Duration, body io.Closer) *deadlineWriter {
+	dw := &deadlineWriter{
+		dst:     dst,
+		rc:      rc,
+		timeout: timeout,
+	}
+	dw.timer = time.AfterFunc(timeout, func() {
+		// Close the upstream body to unblock the read side of copyBuffer.
+		body.Close()
+	})
+	return dw
+}
+
+func (dw *deadlineWriter) Write(p []byte) (n int, err error) {
+	n, err = dw.dst.Write(p)
+	if n > 0 {
+		dw.timer.Reset(dw.timeout)
+		_ = dw.rc.SetWriteDeadline(time.Now().Add(dw.timeout))
+	}
+	return
+}
+
+func (dw *deadlineWriter) Flush() {
+	dw.dst.Flush()
+}
+
+func (dw *deadlineWriter) stop() {
+	dw.timer.Stop()
 }
 
 func requestIPHops(r *http.Request) string {
