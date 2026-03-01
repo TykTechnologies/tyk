@@ -10,16 +10,17 @@ import (
 	"testing"
 	"time"
 
-	"github.com/TykTechnologies/gorpc"
-	"github.com/TykTechnologies/tyk/internal/model"
-	"github.com/TykTechnologies/tyk/rpc"
-
-	"github.com/TykTechnologies/tyk/config"
-
 	"github.com/lonelycode/osin"
 	"github.com/stretchr/testify/assert"
+	"go.uber.org/mock/gomock"
 
+	"github.com/TykTechnologies/gorpc"
+
+	certsmock "github.com/TykTechnologies/tyk/certs/mock"
+	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/header"
+	"github.com/TykTechnologies/tyk/internal/model"
+	"github.com/TykTechnologies/tyk/rpc"
 	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/test"
 	"github.com/TykTechnologies/tyk/user"
@@ -1097,5 +1098,221 @@ func TestSelectiveCertificateSync_Config(t *testing.T) {
 		conf2.SlaveOptions.UseRPC = true
 		gw2 := NewGateway(conf2, ctx)
 		assert.NotNil(t, gw2.certUsageTracker, "certUsageTracker should be initialized in RPC mode")
+	})
+}
+
+// TestProcessKeySpaceChanges_CertHandling covers the certificate add/skip/queue logic
+// introduced by the SyncUsedCertsOnly feature.
+func TestProcessKeySpaceChanges_CertHandling(t *testing.T) {
+	// helper: build a CertificateAdded keyspace event string
+	certAddedEvent := func(certID string) string {
+		return certID + ":" + CertificateAdded
+	}
+
+	newRPCListener := func(ts *Test) RPCStorageHandler {
+		return RPCStorageHandler{
+			KeyPrefix:        "rpc.listener.",
+			SuppressRegister: true,
+			HashKeys:         false,
+			Gw:               ts.Gw,
+		}
+	}
+
+	t.Run("cert not required by tracker - queued to pendingCerts, not fetched", func(t *testing.T) {
+		ts := StartTest(nil)
+		defer ts.Close()
+
+		ctrl := gomock.NewController(t)
+
+		cfg := ts.Gw.GetConfig()
+		cfg.SlaveOptions.UseRPC = true
+		cfg.SlaveOptions.SyncUsedCertsOnly = true
+		ts.Gw.SetConfig(cfg)
+
+		ts.Gw.certUsageTracker = newUsageTracker()
+		// tracker is empty - certID is not required
+
+		mockCM := certsmock.NewMockCertificateManager(ctrl)
+		mockCM.EXPECT().GetRaw(gomock.Any()).Times(0)
+		ts.Gw.CertificateManager = mockCM
+
+		listener := newRPCListener(ts)
+		listener.ProcessKeySpaceChanges([]string{certAddedEvent("cert-unrequired")}, DefaultOrg)
+
+		_, queued := ts.Gw.pendingCerts.Load("cert-unrequired")
+		assert.True(t, queued, "cert should be queued to pendingCerts when not required by tracker")
+	})
+
+	t.Run("cert required by tracker - fetched immediately, not queued", func(t *testing.T) {
+		ts := StartTest(nil)
+		defer ts.Close()
+
+		ctrl := gomock.NewController(t)
+
+		cfg := ts.Gw.GetConfig()
+		cfg.SlaveOptions.UseRPC = true
+		cfg.SlaveOptions.SyncUsedCertsOnly = true
+		ts.Gw.SetConfig(cfg)
+
+		ts.Gw.certUsageTracker = newUsageTracker()
+		ts.Gw.certUsageTracker.ReplaceAll(map[string]map[string]struct{}{
+			"cert-required": {"api1": {}},
+		})
+
+		mockCM := certsmock.NewMockCertificateManager(ctrl)
+		mockCM.EXPECT().GetRaw("cert-required").Return("cert-data", nil).Times(1)
+		ts.Gw.CertificateManager = mockCM
+
+		listener := newRPCListener(ts)
+		listener.ProcessKeySpaceChanges([]string{certAddedEvent("cert-required")}, DefaultOrg)
+
+		_, queued := ts.Gw.pendingCerts.Load("cert-required")
+		assert.False(t, queued, "required cert should not be queued to pendingCerts")
+	})
+
+	t.Run("SyncUsedCertsOnly disabled - cert fetched directly without tracker check", func(t *testing.T) {
+		ts := StartTest(nil)
+		defer ts.Close()
+
+		ctrl := gomock.NewController(t)
+
+		cfg := ts.Gw.GetConfig()
+		cfg.SlaveOptions.UseRPC = true
+		cfg.SlaveOptions.SyncUsedCertsOnly = false
+		ts.Gw.SetConfig(cfg)
+
+		mockCM := certsmock.NewMockCertificateManager(ctrl)
+		mockCM.EXPECT().GetRaw("cert1").Return("cert-data", nil).Times(1)
+		ts.Gw.CertificateManager = mockCM
+
+		listener := newRPCListener(ts)
+		listener.ProcessKeySpaceChanges([]string{certAddedEvent("cert1")}, DefaultOrg)
+
+		_, queued := ts.Gw.pendingCerts.Load("cert1")
+		assert.False(t, queued, "cert should not be queued when SyncUsedCertsOnly is disabled")
+	})
+
+	t.Run("nil tracker with SyncUsedCertsOnly - cert fetched directly", func(t *testing.T) {
+		ts := StartTest(nil)
+		defer ts.Close()
+
+		ctrl := gomock.NewController(t)
+
+		cfg := ts.Gw.GetConfig()
+		cfg.SlaveOptions.UseRPC = true
+		cfg.SlaveOptions.SyncUsedCertsOnly = true
+		ts.Gw.SetConfig(cfg)
+
+		ts.Gw.certUsageTracker = nil
+
+		mockCM := certsmock.NewMockCertificateManager(ctrl)
+		mockCM.EXPECT().GetRaw("cert1").Return("cert-data", nil).Times(1)
+		ts.Gw.CertificateManager = mockCM
+
+		listener := newRPCListener(ts)
+		listener.ProcessKeySpaceChanges([]string{certAddedEvent("cert1")}, DefaultOrg)
+
+		_, queued := ts.Gw.pendingCerts.Load("cert1")
+		assert.False(t, queued, "cert should not be queued when tracker is nil")
+	})
+}
+
+// TestLoadApps_PendingCertsDrain_Extended covers additional drain-loop edge cases.
+func TestLoadApps_PendingCertsDrain_Extended(t *testing.T) {
+	t.Run("empty content treated as fetch failure - cert discarded", func(t *testing.T) {
+		ts := StartTest(nil)
+		defer ts.Close()
+
+		ctrl := gomock.NewController(t)
+
+		cfg := ts.Gw.GetConfig()
+		cfg.SlaveOptions.UseRPC = true
+		cfg.SlaveOptions.SyncUsedCertsOnly = true
+		ts.Gw.SetConfig(cfg)
+
+		ts.Gw.certUsageTracker = newUsageTracker()
+
+		mockCM := certsmock.NewMockCertificateManager(ctrl)
+		// GetRaw returns empty content with no error - should still be treated as failure
+		mockCM.EXPECT().GetRaw("cert1").Return("", nil).Times(1)
+		ts.Gw.CertificateManager = mockCM
+
+		ts.Gw.pendingCerts.Store("cert1", struct{}{})
+
+		spec := BuildAPI(func(spec *APISpec) {
+			spec.APIID = "api1"
+			spec.Proxy.ListenPath = "/api1/"
+			spec.UpstreamCertificates = map[string]string{"*": "cert1"}
+		})[0]
+		ts.Gw.loadApps([]*APISpec{spec})
+
+		_, stillPending := ts.Gw.pendingCerts.Load("cert1")
+		assert.False(t, stillPending, "cert1 should be discarded from pendingCerts even when content is empty with no error")
+	})
+
+	t.Run("multiple pending certs - all drained on reload", func(t *testing.T) {
+		ts := StartTest(nil)
+		defer ts.Close()
+
+		ctrl := gomock.NewController(t)
+
+		cfg := ts.Gw.GetConfig()
+		cfg.SlaveOptions.UseRPC = true
+		cfg.SlaveOptions.SyncUsedCertsOnly = true
+		ts.Gw.SetConfig(cfg)
+
+		ts.Gw.certUsageTracker = newUsageTracker()
+
+		mockCM := certsmock.NewMockCertificateManager(ctrl)
+		mockCM.EXPECT().GetRaw("cert1").Return("data1", nil).Times(1)
+		mockCM.EXPECT().GetRaw("cert2").Return("data2", nil).Times(1)
+		mockCM.EXPECT().GetRaw("cert3").Return("", errors.New("timeout")).Times(1)
+		ts.Gw.CertificateManager = mockCM
+
+		ts.Gw.pendingCerts.Store("cert1", struct{}{})
+		ts.Gw.pendingCerts.Store("cert2", struct{}{})
+		ts.Gw.pendingCerts.Store("cert3", struct{}{})
+		// cert4 not required - should be silently discarded without fetch
+		ts.Gw.pendingCerts.Store("cert4", struct{}{})
+
+		specs := BuildAPI(
+			func(spec *APISpec) {
+				spec.APIID = "api1"
+				spec.Proxy.ListenPath = "/api1/"
+				spec.UpstreamCertificates = map[string]string{"host1": "cert1", "host2": "cert2", "host3": "cert3"}
+			},
+		)
+		ts.Gw.loadApps(specs)
+
+		for _, id := range []string{"cert1", "cert2", "cert3", "cert4"} {
+			_, stillPending := ts.Gw.pendingCerts.Load(id)
+			assert.False(t, stillPending, "%s should be removed from pendingCerts after drain", id)
+		}
+	})
+
+	t.Run("pending certs map empty before reload - no fetch calls", func(t *testing.T) {
+		ts := StartTest(nil)
+		defer ts.Close()
+
+		ctrl := gomock.NewController(t)
+
+		cfg := ts.Gw.GetConfig()
+		cfg.SlaveOptions.UseRPC = true
+		cfg.SlaveOptions.SyncUsedCertsOnly = true
+		ts.Gw.SetConfig(cfg)
+
+		ts.Gw.certUsageTracker = newUsageTracker()
+
+		mockCM := certsmock.NewMockCertificateManager(ctrl)
+		mockCM.EXPECT().GetRaw(gomock.Any()).Times(0)
+		ts.Gw.CertificateManager = mockCM
+
+		spec := BuildAPI(func(spec *APISpec) {
+			spec.APIID = "api1"
+			spec.Proxy.ListenPath = "/api1/"
+			spec.UpstreamCertificates = map[string]string{"*": "cert1"}
+		})[0]
+		ts.Gw.loadApps([]*APISpec{spec})
+		// no assertion needed beyond mock expectation: GetRaw must not be called
 	})
 }
