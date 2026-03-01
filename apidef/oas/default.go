@@ -286,7 +286,14 @@ func (s *OAS) deleteTykOperationIfEmpty(tykOperation *Operation, method, path st
 
 func getURLFormatErr(fromParam bool, upstreamURL string) error {
 	parsedURL, err := url.Parse(upstreamURL)
-	if err != nil || !parsedURL.IsAbs() {
+	if err != nil {
+		if fromParam {
+			return errInvalidUpstreamURL
+		}
+		return fmt.Errorf("%w %s", errInvalidServerURL, fmt.Sprintf(invalidServerURLFmt, upstreamURL))
+	}
+
+	if !parsedURL.IsAbs() {
 		if fromParam {
 			return errInvalidUpstreamURL
 		}
