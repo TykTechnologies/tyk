@@ -125,18 +125,13 @@ func (s *OAS) hasCertificateAuth() bool {
 	return tykAuth != nil && tykAuth.CertificateAuth != nil
 }
 
-func (s *OAS) hasTokenWithCertificate() bool {
-	tykAuth := s.getTykAuthentication()
-	if tykAuth == nil || tykAuth.SecuritySchemes == nil {
+// tokenHasCertificateEnabled checks if the token scheme uses the old contract (enableClientCertificate).
+func (s *OAS) tokenHasCertificateEnabled(schemeName string) bool {
+	if schemeName == "" {
 		return false
 	}
-	for name := range tykAuth.SecuritySchemes {
-		token := s.getTykTokenAuth(name)
-		if token != nil && token.EnableClientCertificate {
-			return true
-		}
-	}
-	return false
+	token := s.getTykTokenAuth(schemeName)
+	return token != nil && token.EnableClientCertificate
 }
 
 // JWK represents a JSON Web Key Set containing configuration for the JWKS endpoint and its cache timeout.
@@ -1079,9 +1074,9 @@ func (s *OAS) fillSecurity(api apidef.APIDefinition) {
 	}
 
 	// Detect existing contract before Fill to preserve backwards compatibility
-	existingCertAuthEnabled := tykAuthentication.CertificateAuth != nil && tykAuthentication.CertificateAuth.Enabled
-	existingTokenCert := s.hasTokenWithCertificate()
-	useOldContract := existingTokenCert && !existingCertAuthEnabled
+	// Old contract: token.enableClientCertificate; New contract: certificateAuth.enabled
+	tokenSchemeName := api.AuthConfigs[apidef.AuthTokenType].Name
+	useOldContract := s.tokenHasCertificateEnabled(tokenSchemeName) && !s.hasCertificateAuthEnabled()
 
 	if tykAuthentication.SecuritySchemes == nil {
 		s.GetTykExtension().Server.Authentication.SecuritySchemes = make(SecuritySchemes)

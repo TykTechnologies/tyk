@@ -302,9 +302,14 @@ func (a *Authentication) ExtractTo(api *apidef.APIDefinition) {
 		a.HMAC.ExtractTo(api)
 	}
 
-	if a.CertificateAuth != nil {
-		a.CertificateAuth.ExtractTo(api)
+	if a.CertificateAuth == nil {
+		a.CertificateAuth = &CertificateAuth{}
+		defer func() {
+			a.CertificateAuth = nil
+		}()
 	}
+
+	a.CertificateAuth.ExtractTo(api)
 
 	if a.OIDC != nil {
 		a.OIDC.ExtractTo(api)
