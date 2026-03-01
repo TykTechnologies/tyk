@@ -248,27 +248,31 @@ func determineHosts(apiData *apidef.APIDefinition, config ServerRegenerationConf
 
 // determineHostsWithEdgeSupport determines hosts based on edge endpoints and API tags.
 func determineHostsWithEdgeSupport(apiData *apidef.APIDefinition, config ServerRegenerationConfig) []string {
-	if apiData.TagsDisabled {
-		if config.HybridEnabled {
-			return []string{""}
-		}
-		return []string{config.DefaultHost}
-	}
-
-	if len(apiData.Tags) == 0 {
-		if config.HybridEnabled {
+	if apiData.TagsDisabled || len(apiData.Tags) == 0 {
+		// Only suppress DefaultHost in favour of relative paths when hybrid mode is active
+		// AND edge endpoints are configured. Without edge endpoints, the gateway's own host
+		// is the correct URL.
+		if config.HybridEnabled && len(config.EdgeEndpoints) > 0 {
 			return []string{""}
 		}
 		return []string{config.DefaultHost}
 	}
 
 	if len(config.EdgeEndpoints) == 0 {
-		return []string{""}
+		// No edge endpoints configured — DefaultHost is always correct regardless of
+		// hybrid mode, since there are no edge gateways to resolve against.
+		return []string{config.DefaultHost}
 	}
 
 	matchingHosts := findEndpointsMatchingTags(apiData.Tags, config.EdgeEndpoints)
 	if len(matchingHosts) == 0 {
-		return []string{""}
+		// Tags didn't match any edge endpoint. In hybrid/MDCB mode we can't know which
+		// edge gateway will serve this API, so return a relative path. In standard mode
+		// the gateway's own host is correct.
+		if config.HybridEnabled {
+			return []string{""}
+		}
+		return []string{config.DefaultHost}
 	}
 
 	return appendRelativePathIfNotPresent(matchingHosts)
