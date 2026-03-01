@@ -199,10 +199,13 @@ func (c *CertificateAuth) ExtractTo(api *apidef.APIDefinition) {
 	if api.AuthConfigs == nil {
 		api.AuthConfigs = make(map[string]apidef.AuthConfig)
 	}
+
+	if c == nil {
+		return
+	}
+
 	authConfig := api.AuthConfigs[apidef.AuthTokenType]
-
 	authConfig.UseCertificate = c.Enabled
-
 	api.AuthConfigs[apidef.AuthTokenType] = authConfig
 }
 
@@ -300,13 +303,6 @@ func (a *Authentication) ExtractTo(api *apidef.APIDefinition) {
 
 	if a.HMAC != nil {
 		a.HMAC.ExtractTo(api)
-	}
-
-	if a.CertificateAuth == nil {
-		a.CertificateAuth = &CertificateAuth{}
-		defer func() {
-			a.CertificateAuth = nil
-		}()
 	}
 
 	a.CertificateAuth.ExtractTo(api)
