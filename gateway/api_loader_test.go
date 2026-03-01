@@ -2,6 +2,7 @@ package gateway
 
 import (
 	"context"
+	"crypto/tls"
 	"fmt"
 	"io"
 	"net"
@@ -9926,5 +9927,34 @@ func TestMCPRequestSizeLimit_Security(t *testing.T) {
 
 		// Verify it's not MCP
 		assert.False(t, api.IsMCP(), "API should not be MCP")
+	})
+}
+
+func TestProcessSpec_SSLMaxVersion(t *testing.T) {
+	ts := StartTest(nil)
+	t.Cleanup(ts.Close)
+
+	t.Run("default SSLMaxVersion should be TLS 1.3", func(t *testing.T) {
+		specs := ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+			spec.Proxy.ListenPath = "/"
+		})
+		assert.Equal(t, uint16(tls.VersionTLS13), specs[0].Proxy.Transport.SSLMaxVersion)
+	})
+
+	t.Run("explicit SSLMaxVersion should not be overwritten", func(t *testing.T) {
+		specs := ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+			spec.Proxy.ListenPath = "/"
+			spec.Proxy.Transport.SSLMaxVersion = tls.VersionTLS13
+		})
+		assert.Equal(t, uint16(tls.VersionTLS13), specs[0].Proxy.Transport.SSLMaxVersion)
+	})
+
+	t.Run("SSLMinVersion greater than SSLMaxVersion corrects max", func(t *testing.T) {
+		specs := ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+			spec.Proxy.ListenPath = "/"
+			spec.Proxy.Transport.SSLMinVersion = tls.VersionTLS13
+			spec.Proxy.Transport.SSLMaxVersion = tls.VersionTLS12
+		})
+		assert.Equal(t, uint16(tls.VersionTLS13), specs[0].Proxy.Transport.SSLMaxVersion)
 	})
 }
