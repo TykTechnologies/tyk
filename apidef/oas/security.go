@@ -61,7 +61,12 @@ func (s *OAS) fillToken(api apidef.APIDefinition) {
 	token := &Token{}
 	token.Enabled = &api.UseStandardAuth
 	token.AuthSources.Fill(authConfig)
-	token.EnableClientCertificate = authConfig.UseCertificate
+
+	// Old contract: set enableClientCertificate only if certificateAuth.enabled is not set
+	if authConfig.UseCertificate && !s.hasCertificateAuthEnabled() {
+		token.EnableClientCertificate = true
+	}
+
 	if token.Signature == nil {
 		token.Signature = &Signature{}
 	}
@@ -79,7 +84,10 @@ func (s *OAS) fillToken(api apidef.APIDefinition) {
 }
 
 func (s *OAS) extractTokenTo(api *apidef.APIDefinition, name string) {
-	authConfig := apidef.AuthConfig{DisableHeader: true}
+	authConfig, exists := api.AuthConfigs[apidef.AuthTokenType]
+	if !exists {
+		authConfig = apidef.AuthConfig{DisableHeader: true}
+	}
 
 	token := s.getTykTokenAuth(name)
 	var enabled bool
@@ -91,12 +99,44 @@ func (s *OAS) extractTokenTo(api *apidef.APIDefinition, name string) {
 		if token.Signature != nil {
 			token.Signature.ExtractTo(&authConfig)
 		}
+
+		// Old contract: enableClientCertificate sets UseCertificate (only if new contract doesn't exist)
+		if token.EnableClientCertificate && !s.hasCertificateAuth() {
+			authConfig.UseCertificate = true
+		}
 	}
 	api.UseStandardAuth = enabled
 
 	s.extractAPIKeySchemeTo(&authConfig, name)
 
 	api.AuthConfigs[apidef.AuthTokenType] = authConfig
+}
+
+func (s *OAS) hasCertificateAuthEnabled() bool {
+	tykAuth := s.getTykAuthentication()
+	if tykAuth == nil || tykAuth.CertificateAuth == nil {
+		return false
+	}
+	return tykAuth.CertificateAuth.Enabled
+}
+
+func (s *OAS) hasCertificateAuth() bool {
+	tykAuth := s.getTykAuthentication()
+	return tykAuth != nil && tykAuth.CertificateAuth != nil
+}
+
+func (s *OAS) hasTokenWithCertificate() bool {
+	tykAuth := s.getTykAuthentication()
+	if tykAuth == nil || tykAuth.SecuritySchemes == nil {
+		return false
+	}
+	for name := range tykAuth.SecuritySchemes {
+		token := s.getTykTokenAuth(name)
+		if token != nil && token.EnableClientCertificate {
+			return true
+		}
+	}
+	return false
 }
 
 // JWK represents a JSON Web Key Set containing configuration for the JWKS endpoint and its cache timeout.
@@ -1038,11 +1078,21 @@ func (s *OAS) fillSecurity(api apidef.APIDefinition) {
 		s.GetTykExtension().Server.Authentication = tykAuthentication
 	}
 
+	// Detect existing contract before Fill to preserve backwards compatibility
+	existingCertAuthEnabled := tykAuthentication.CertificateAuth != nil && tykAuthentication.CertificateAuth.Enabled
+	existingTokenCert := s.hasTokenWithCertificate()
+	useOldContract := existingTokenCert && !existingCertAuthEnabled
+
 	if tykAuthentication.SecuritySchemes == nil {
 		s.GetTykExtension().Server.Authentication.SecuritySchemes = make(SecuritySchemes)
 	}
 
 	tykAuthentication.Fill(api)
+
+	// Old contract: set CertificateAuth to nil so it gets omitted
+	if useOldContract {
+		tykAuthentication.CertificateAuth = nil
+	}
 
 	if s.Components == nil {
 		s.Components = &openapi3.Components{}

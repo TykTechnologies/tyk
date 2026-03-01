@@ -100,7 +100,7 @@ type Authentication struct {
 	ProtectedResourceMetadata *ProtectedResourceMetadata `bson:"protectedResourceMetadata,omitempty" json:"protectedResourceMetadata,omitempty"`
 
 	// CertificateAuth represents certificate-based authentication configuration.
-	CertificateAuth CertificateAuth `bson:"certificateAuth,omitempty" json:"certificateAuth,omitempty"`
+	CertificateAuth *CertificateAuth `bson:"certificateAuth,omitempty" json:"certificateAuth,omitempty"`
 }
 
 // ProtectedResourceMetadata holds the configuration for OAuth 2.0 Protected Resource Metadata (RFC 9728).
@@ -283,7 +283,13 @@ func (a *Authentication) Fill(api apidef.APIDefinition) {
 		a.OIDC = nil
 	}
 
+	if a.CertificateAuth == nil {
+		a.CertificateAuth = &CertificateAuth{}
+	}
 	a.CertificateAuth.Fill(api)
+	if ShouldOmit(a.CertificateAuth) {
+		a.CertificateAuth = nil
+	}
 }
 
 // ExtractTo extracts *Authentication into *apidef.APIDefinition.
@@ -296,7 +302,9 @@ func (a *Authentication) ExtractTo(api *apidef.APIDefinition) {
 		a.HMAC.ExtractTo(api)
 	}
 
-	a.CertificateAuth.ExtractTo(api)
+	if a.CertificateAuth != nil {
+		a.CertificateAuth.ExtractTo(api)
+	}
 
 	if a.OIDC != nil {
 		a.OIDC.ExtractTo(api)
