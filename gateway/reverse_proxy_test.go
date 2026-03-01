@@ -925,6 +925,119 @@ func TestDeepCopyBody(t *testing.T) {
 	assert.True(t, ok, "target request body should have been of type nopCloserBuffer")
 }
 
+func TestDisableChunkedEncodingForUpstream(t *testing.T) {
+	t.Run("buffers chunked request when enabled", func(t *testing.T) {
+		proxy := &ReverseProxy{
+			TykAPISpec: &APISpec{
+				APIDefinition: &apidef.APIDefinition{
+					Proxy: apidef.ProxyConfig{
+						DisableChunkedEncoding: true,
+					},
+				},
+			},
+		}
+
+		req := httptest.NewRequest(http.MethodPost, "/test", io.NopCloser(strings.NewReader("payload")))
+		req.ContentLength = -1
+		req.TransferEncoding = []string{"chunked"}
+		req.Header.Set(header.TransferEncoding, "chunked")
+
+		err := proxy.disableChunkedEncodingForUpstream(req)
+		require.NoError(t, err)
+
+		body, err := io.ReadAll(req.Body)
+		require.NoError(t, err)
+		assert.Equal(t, "payload", string(body))
+		assert.Equal(t, int64(len("payload")), req.ContentLength)
+		assert.Nil(t, req.TransferEncoding)
+		assert.Empty(t, req.Header.Get(header.TransferEncoding))
+		assert.Equal(t, "7", req.Header.Get(header.ContentLength))
+	})
+
+	t.Run("does nothing when disabled", func(t *testing.T) {
+		proxy := &ReverseProxy{
+			TykAPISpec: &APISpec{
+				APIDefinition: &apidef.APIDefinition{},
+			},
+		}
+
+		req := httptest.NewRequest(http.MethodPost, "/test", io.NopCloser(strings.NewReader("payload")))
+		req.ContentLength = -1
+		req.TransferEncoding = []string{"chunked"}
+		req.Header.Set(header.TransferEncoding, "chunked")
+
+		err := proxy.disableChunkedEncodingForUpstream(req)
+		require.NoError(t, err)
+		assert.Equal(t, int64(-1), req.ContentLength)
+		assert.Equal(t, []string{"chunked"}, req.TransferEncoding)
+		assert.Equal(t, "chunked", req.Header.Get(header.TransferEncoding))
+	})
+
+	t.Run("does nothing for streaming requests", func(t *testing.T) {
+		proxy := &ReverseProxy{
+			TykAPISpec: &APISpec{
+				APIDefinition: &apidef.APIDefinition{
+					Proxy: apidef.ProxyConfig{
+						DisableChunkedEncoding: true,
+					},
+				},
+			},
+		}
+
+		req := httptest.NewRequest(http.MethodPost, "/test", io.NopCloser(strings.NewReader("payload")))
+		req.ContentLength = -1
+		req.TransferEncoding = []string{"chunked"}
+		req.Header.Set("Content-Type", "application/grpc")
+
+		err := proxy.disableChunkedEncodingForUpstream(req)
+		require.NoError(t, err)
+		assert.Equal(t, int64(-1), req.ContentLength)
+		assert.Equal(t, []string{"chunked"}, req.TransferEncoding)
+	})
+
+	t.Run("returns body too large when limit exceeded", func(t *testing.T) {
+		proxy := &ReverseProxy{
+			TykAPISpec: &APISpec{
+				APIDefinition: &apidef.APIDefinition{
+					Proxy: apidef.ProxyConfig{
+						DisableChunkedEncoding:     true,
+						ChunkedEncodingMaxBodySize: 3,
+					},
+				},
+			},
+		}
+
+		req := httptest.NewRequest(http.MethodPost, "/test", io.NopCloser(strings.NewReader("payload")))
+		req.ContentLength = -1
+		req.TransferEncoding = []string{"chunked"}
+
+		err := proxy.disableChunkedEncodingForUpstream(req)
+		require.Error(t, err)
+		assert.ErrorIs(t, err, errChunkedEncodingBodyTooLarge)
+	})
+
+	t.Run("uses default limit when no explicit limit is configured", func(t *testing.T) {
+		proxy := &ReverseProxy{
+			TykAPISpec: &APISpec{
+				APIDefinition: &apidef.APIDefinition{
+					Proxy: apidef.ProxyConfig{
+						DisableChunkedEncoding: true,
+					},
+				},
+			},
+		}
+
+		body := bytes.Repeat([]byte("x"), int(defaultChunkedEncodingMaxBodySize)+1)
+		req := httptest.NewRequest(http.MethodPost, "/test", io.NopCloser(bytes.NewReader(body)))
+		req.ContentLength = -1
+		req.TransferEncoding = []string{"chunked"}
+
+		err := proxy.disableChunkedEncodingForUpstream(req)
+		require.Error(t, err)
+		assert.ErrorIs(t, err, errChunkedEncodingBodyTooLarge)
+	})
+}
+
 func BenchmarkGraphqlUDG(b *testing.B) {
 	g := StartTest(func(globalConf *config.Config) {
 		globalConf.OpenTelemetry.Enabled = true
