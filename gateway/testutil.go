@@ -6,14 +6,15 @@ import (
 	"bytes"
 	"compress/gzip"
 	"context"
+	"crypto/rand"
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/binary"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
 	"io/ioutil"
-	"math/rand"
 	mathrand "math/rand"
 	"net"
 	"net/http"
@@ -31,6 +32,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/TykTechnologies/tyk/apidef/oas"
+	"github.com/TykTechnologies/tyk/regexp"
 
 	"github.com/TykTechnologies/tyk/rpc"
 
@@ -1040,12 +1042,32 @@ type SlaveDataCenter struct {
 	Redis        config.StorageOptionsConf
 }
 
+var nonAlphanumericRegex = regexp.MustCompile(`[^a-zA-Z0-9 ]+`)
+
 // generateUniqueTestTag creates a sanitized, unique tag from a test name to be used
 // for isolating tests that write to Redis.
 func generateUniqueTestTag(testName string) string {
-	r := rand.New(rand.NewSource(time.Now().UnixNano()))
-	sanitizedName := strings.Join(strings.Split(strings.ToLower(testName), " "), "-")
-	return fmt.Sprintf("%s-%d", sanitizedName, r.Intn(100000))
+	const defaultName = "test"
+
+	cleanName := strings.ToLower(testName)
+	cleanName = nonAlphanumericRegex.ReplaceAllString(cleanName, "")
+	cleanName = strings.ReplaceAll(cleanName, " ", "-")
+
+	if cleanName == "" {
+		cleanName = defaultName
+	}
+
+	cleanName = strings.Trim(cleanName, "-")
+	if cleanName == "" {
+		cleanName = defaultName
+	}
+
+	bytes := make([]byte, 8)
+	if _, err := rand.Read(bytes); err != nil {
+		return cleanName
+	}
+
+	return fmt.Sprintf("%s-%s", cleanName, hex.EncodeToString(bytes))
 }
 
 func StartTest(genConf func(globalConf *config.Config), testConfig ...TestConfig) *Test {
