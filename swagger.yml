@@ -454,7 +454,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
           description: Internal server error.
-      summary: Creat an API
+      summary: Create an API
       tags:
       - APIs
   /tyk/apis/{apiID}:
@@ -1891,7 +1891,7 @@ paths:
                   request:
                     method: GET
                     path: /get
-                    oas:
+                  oas:
                       info:
                         title: testdebug
                         version: 1.0.0

@@ -1,0 +1,28 @@
+{
+    "opentelemetry": {
+        "enabled": true,
+        "exporter": "grpc",
+        "endpoint": "collector.example.com:4317",
+        "connection_timeout": 5,
+        "resource_name": "my-gateway",
+        "span_processor_type": "batch",
+        "context_propagation": "tracecontext",
+        "sampling": {
+            "type": "TraceIDRatioBased",
+            "rate": 0.5,
+            "parent_based": true
+        },
+        "metrics": {
+            "enabled": true,
+            "export_interval": 30,
+            "temporality": "cumulative",
+            "shutdown_timeout": 15,
+            "retry": {
+                "enabled": true,
+                "initial_interval": 3000,
+                "max_interval": 15000,
+                "max_elapsed_time": 30000
+            }
+        }
+    }
+}
