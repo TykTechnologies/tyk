@@ -30,7 +30,6 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/TykTechnologies/tyk/apidef/oas"
-	"github.com/TykTechnologies/tyk/regexp"
 
 	"github.com/TykTechnologies/tyk/rpc"
 
@@ -1039,8 +1038,6 @@ type SlaveDataCenter struct {
 	SlaveOptions config.SlaveOptionsConfig
 	Redis        config.StorageOptionsConf
 }
-
-var nonAlphanumericRegex = regexp.MustCompile(`[^a-zA-Z0-9 ]+`)
 
 func StartTest(genConf func(globalConf *config.Config), testConfig ...TestConfig) *Test {
 	t := &Test{
