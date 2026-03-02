@@ -1546,6 +1546,9 @@ func (a *APISpec) getURLStatus(stat URLStatus) RequestStatus {
 
 // URLAllowedAndIgnored checks if a url is allowed and ignored.
 func (a *APISpec) URLAllowedAndIgnored(r *http.Request, rxPaths []URLSpec, whiteListStatus bool) (RequestStatus, interface{}) {
+	if r.Method == http.MethodOptions && a.CORS.Enable && !a.CORS.OptionsPassthrough {
+		return StatusOkAndIgnore, nil
+	}
 	for i := range rxPaths {
 		if !rxPaths[i].matchesPath(r.URL.Path, a) {
 			continue

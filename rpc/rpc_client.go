@@ -114,7 +114,6 @@ func Reset() {
 	}
 	clientSingleton = nil
 	funcClientSingleton = nil
-	values.Reset()
 }
 
 func (r *rpcOpts) SetLoadCounts(n int) {
@@ -187,13 +186,7 @@ func LoadCount() int {
 	return values.GetLoadCounts()
 }
 
-func Reset() {
-	StopDNSMonitor()
-	clientSingleton.Stop()
-	clientSingleton = nil
-	funcClientSingleton = nil
-	values.Reset()
-}
+
 
 func ResetEmergencyMode() {
 	values.SetEmergencyMode(false)

@@ -2412,3 +2412,19 @@ func TestAPISpec_Version(t *testing.T) {
 	})
 
 }
+
+func TestURLAllowedAndIgnoredCORS(t *testing.T) {
+	spec := APISpec{
+		APIDefinition: &apidef.APIDefinition{
+			CORS: apidef.CORSConfig{
+				Enable:             true,
+				OptionsPassthrough: false,
+			},
+		},
+	}
+
+	req, _ := http.NewRequest(http.MethodOptions, "/", nil)
+	status, _ := spec.URLAllowedAndIgnored(req, []URLSpec{}, false)
+
+	assert.Equal(t, StatusOkAndIgnore, status)
+}
