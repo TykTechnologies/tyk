@@ -513,6 +513,11 @@ func (gw *Gateway) handleAddOrUpdate(keyName string, r *http.Request, isHashed b
 		return apiError(err.Error()), http.StatusBadRequest
 	}
 
+	if err := gw.validateNonMCPFieldsOnMCPProxy(newSession.AccessRights); err != nil {
+		log.Error(err)
+		return apiError(err.Error()), http.StatusBadRequest
+	}
+
 	mw := &BaseMiddleware{Gw: gw}
 	mw.ApplyPolicies(newSession)
 
@@ -1116,6 +1121,11 @@ func (gw *Gateway) handleAddOrUpdatePolicy(polID string, r *http.Request) (inter
 	}
 
 	if err := gw.validateMCPFieldsInAccessRights(newPol.AccessRights); err != nil {
+		log.Error(err)
+		return apiError(err.Error()), http.StatusBadRequest
+	}
+
+	if err := gw.validateNonMCPFieldsOnMCPProxy(newPol.AccessRights); err != nil {
 		log.Error(err)
 		return apiError(err.Error()), http.StatusBadRequest
 	}

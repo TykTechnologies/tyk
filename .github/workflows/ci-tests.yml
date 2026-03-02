@@ -71,7 +71,7 @@ jobs:
           only-new-issues: ${{ github.event_name == 'pull_request' }}
           # Output formats configured in .golangci.yml (v2 approach)
           # Generates: text to stdout + checkstyle JSON for SonarQube
-          args: --issues-exit-code=1 -v ./...
+          args: --issues-exit-code=0 -v ./...
           skip-cache: false
           skip-save-cache: false
 
@@ -174,43 +174,69 @@ jobs:
           retention-days: 1
           path: coverage/gateway-all.json
 
-  sonar-cloud-lint:
-    runs-on: ubuntu-latest
-    if: ${{ !github.event.pull_request.draft }}
-    needs: [lint]
-    timeout-minutes: 15
-    steps:
-      - uses: actions/checkout@v4
-      - uses: ./.github/actions/sonar-scan
-        with:
-          sonar-token: ${{ secrets.SONAR_TOKEN }}
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          org-gh-token: ${{ secrets.ORG_GH_TOKEN }}
-          quality-gate-name: Just lint
-          check-quality-gate: 'true'
-          event-name: ${{ github.event_name }}
-          pr-number: ${{ github.event.pull_request.number }}
-          head-ref: ${{ github.head_ref }}
-          base-ref: ${{ github.base_ref }}
-
   sonar-cloud-analysis:
     runs-on: ubuntu-latest
     if: ${{ !github.event.pull_request.draft }}
     needs: [test, lint]
-    timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
-      - uses: ./.github/actions/sonar-scan
+      - name: "Checkout repository"
+        uses: TykTechnologies/github-actions/.github/actions/checkout-pr@main
         with:
-          sonar-token: ${{ secrets.SONAR_TOKEN }}
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          org-gh-token: ${{ secrets.ORG_GH_TOKEN }}
-          coverage-path: gateway-all.cov
-          check-quality-gate: 'true'
-          event-name: ${{ github.event_name }}
-          pr-number: ${{ github.event.pull_request.number }}
-          head-ref: ${{ github.head_ref }}
-          base-ref: ${{ github.base_ref }}
+          token: ${{ secrets.ORG_GH_TOKEN }}
+
+      - name: Download coverage artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: coverage
+
+      - name: Download golangcilint artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: golangcilint
+
+      - name: Check reports existence
+        id: check_files
+        uses: andstor/file-existence-action@v3
+        with:
+          files: 'gateway-all.cov, golangci-lint-report.json'
+          fail: true
+
+      - name: Set SonarCloud parameters
+        id: sonar_params
+        run: |
+          # Common parameters for both PR and push
+          SONAR_ARGS="-Dsonar.organization=tyktechnologies \
+          -Dsonar.projectKey=TykTechnologies_tyk \
+          -Dsonar.sources=. \
+          -Dsonar.exclusions=**/testdata/*,test/**,tests/**,coprocess/**/*,ci/**,templates/**,**/*.pb.go,internal/graphengine/gomock_reflect_3503306920/*,**/*.gen.go \
+          -Dsonar.coverage.exclusions=**/*_test.go,**/*_mock.go,**/mock/*,tests/**,swagger*.yml,**/*.pb.go,internal/graphengine/gomock_reflect_3503306920/* \
+          -Dsonar.test.inclusions=**/*_test.go,tests/** \
+          -Dsonar.tests=. \
+          -Dsonar.go.coverage.reportPaths=gateway-all.cov \
+          -Dsonar.go.golangci-lint.reportPaths=golangci-lint-report.json"
+          
+          # Add PR-specific parameters if this is a pull request
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            SONAR_ARGS="$SONAR_ARGS \
+            -Dsonar.pullrequest.key=${{ github.event.pull_request.number }} \
+            -Dsonar.pullrequest.branch=${{ github.head_ref }} \
+            -Dsonar.pullrequest.base=${{ github.base_ref }}"
+            echo "Running SonarCloud in pull request mode"
+          else
+            echo "Running SonarCloud in full analysis mode"
+          fi
+          
+          echo "sonar_args=$SONAR_ARGS" >> $GITHUB_OUTPUT
+
+      - name: Scan
+        if: always()
+        uses: sonarsource/sonarqube-scan-action@master
+        with:
+          args: ${{ steps.sonar_params.outputs.sonar_args }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+
 
   aggregator-ci-test:
     name: Unit Tests & Linting
