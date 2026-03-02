@@ -24,6 +24,7 @@ import (
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/header"
 	"github.com/TykTechnologies/tyk/internal/model"
+	"github.com/TykTechnologies/tyk/regexp"
 	"github.com/TykTechnologies/tyk/rpc"
 	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/test"
@@ -119,6 +120,8 @@ func newDispatcher(opts ...dispatcherOption) *gorpc.Dispatcher {
 
 	return dispatcher
 }
+
+var nonAlphanumericRegex = regexp.MustCompile(`[^a-zA-Z0-9 ]+`)
 
 // generateUniqueTestTag creates a sanitized, unique tag from a test name to be used
 // for isolating tests that interact with Redis.
