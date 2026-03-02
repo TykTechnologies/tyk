@@ -6,11 +6,9 @@ import (
 	"bytes"
 	"compress/gzip"
 	"context"
-	"crypto/rand"
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/binary"
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -1043,32 +1041,6 @@ type SlaveDataCenter struct {
 }
 
 var nonAlphanumericRegex = regexp.MustCompile(`[^a-zA-Z0-9 ]+`)
-
-// generateUniqueTestTag creates a sanitized, unique tag from a test name to be used
-// for isolating tests that interact with Redis.
-func generateUniqueTestTag(testName string) (string, error) {
-	const defaultName = "test"
-
-	cleanName := strings.ToLower(testName)
-	cleanName = nonAlphanumericRegex.ReplaceAllString(cleanName, "")
-	cleanName = strings.ReplaceAll(cleanName, " ", "-")
-
-	if cleanName == "" {
-		cleanName = defaultName
-	}
-
-	cleanName = strings.Trim(cleanName, "-")
-	if cleanName == "" {
-		cleanName = defaultName
-	}
-
-	suffix := make([]byte, 8)
-	if _, err := rand.Read(suffix); err != nil {
-		return "", fmt.Errorf("failed to generate unique test tag: %w", err)
-	}
-
-	return fmt.Sprintf("%s-%s", cleanName, hex.EncodeToString(suffix)), nil
-}
 
 func StartTest(genConf func(globalConf *config.Config), testConfig ...TestConfig) *Test {
 	t := &Test{
