@@ -196,11 +196,16 @@ type StorageOptionsConf struct {
 	// Options: ["1.0", "1.1", "1.2", "1.3"].
 	// Defaults to "1.2".
 	TLSMinVersion string `json:"tls_min_version"`
-	// Enables Zstd compression of API definitions stored in Redis backups.
-	// When enabled, API definitions are compressed before encryption, reducing Redis storage.
+	// When set to `true`, enables Zstd compression for API definitions stored in Redis RPC backups.
+	// This feature significantly reduces Redis memory usage in MDCB deployments where API definitions are cached locally on Data Plane Gateways.
 	// The Gateway can read both compressed and uncompressed formats for backward compatibility.
-	// Note: Decompression has a 100MB memory limit.
-	// Defaults to false.
+	//
+	// You can safely enable this setting on existing deployments.
+	// The Gateway continues to load previously stored uncompressed backups and stores all new backups in compressed form.
+	//
+	// Note: This feature works with API definitions up to 100MB uncompressed
+	//
+	// Defaults to `false`.
 	CompressAPIDefinitions bool `json:"compress_api_definitions"`
 }
 
@@ -746,7 +751,7 @@ type SecurityConfig struct {
 }
 
 type JWKSConfig struct {
-	// Cache hodls configuration for JWKS caching
+	// Cache holds configuration for JWKS caching
 	Cache JWKSCacheConfig `json:"cache"`
 }
 
@@ -1168,6 +1173,10 @@ type Config struct {
 	BundleInsecureSkipVerify bool `bson:"bundle_insecure_skip_verify" json:"bundle_insecure_skip_verify"`
 
 	// SkipVerifyExistingPluginBundle skips checksum verification for plugin bundles already on disk.
+	//
+	// Tyk always verifies the integrity of plugin bundles when downloading them for the first time to local disk. For security against corruption of the bundles after they have been loaded, it then re-verifies bundle checksum (for signed bundles) when loading each API that uses the plugins.
+	//
+	// In trusted environments, this reverification may be unnecessary and can be skipped using this option, reducing the API load time.
 	SkipVerifyExistingPluginBundle bool `bson:"skip_verify_existing_plugin_bundle" json:"skip_verify_existing_plugin_bundle"`
 
 	// Set to true if you are using JSVM custom middleware or virtual endpoints.

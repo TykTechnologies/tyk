@@ -38,12 +38,12 @@ spec:
       request: "{\n  \"name\": \"tom\"\n}"
       auth: {}
   specs:
-  - selector: span[tracetest.span.type="http" name="POST /helloworld.Greeter/SayHello" http.method="POST"]
+  - selector: span[tracetest.span.type="http" name="POST /helloworld.Greeter/SayHello" http.request.method="POST"]
     name: Check http span attributes
     assertions:
-    - attr:http.status_code = 200
-    - attr:http.scheme = "http"
-    - attr:http.method = "POST"
+    - attr:http.response.status_code = 200
+    - attr:url.scheme = "http"
+    - attr:http.request.method = "POST"
     - attr:tracetest.span.type = "http"
   - selector: |-
       span[name = "POST /helloworld.Greeter/SayHello"] 
@@ -51,8 +51,8 @@ spec:
     name: Check the middlewares executed
     assertions:
     - attr:tracetest.selected_spans.count  =  4
-  - selector: span[tracetest.span.type="http" name="HTTP POST" http.method="POST"]
+  - selector: span[tracetest.span.type="http" name="HTTP POST" http.request.method="POST"]
     name: Checking the h2c proxying  
     assertions:
-    - attr:http.method = "POST"
-    - attr:http.url = "http://grpcapi:50051/helloworld.Greeter/SayHello"
+    - attr:http.request.method = "POST"
+    - attr:url.full = "http://grpcapi:50051/helloworld.Greeter/SayHello"

@@ -136,6 +136,7 @@ type Gateway struct {
 	HostCheckTicker      chan struct{}
 	HostCheckerClient    *http.Client
 	TracerProvider       otel.TracerProvider
+	MetricInstruments    *otel.MetricInstruments
 	NewRelicApplication  *newrelic.Application
 
 	keyGen DefaultKeyGenerator
@@ -2010,13 +2011,21 @@ func Start() {
 		defer trace.Close()
 	}
 
-	gw.TracerProvider = otel.InitOpenTelemetry(gw.ctx, mainLog.Logger, &gwConfig.OpenTelemetry,
+	// Use gw.GetConfig() to ensure we get the config loaded from the --conf
+	// flag path (set in initSystem), not the stale local gwConfig which may
+	// have been loaded from the default tyk.conf before initSystem ran.
+	otelCfg := gw.GetConfig()
+	gw.TracerProvider = otel.InitOpenTelemetry(gw.ctx, mainLog.Logger, &otelCfg.OpenTelemetry,
 		gw.GetNodeID(),
 		VERSION,
-		gw.GetConfig().SlaveOptions.UseRPC,
-		gw.GetConfig().SlaveOptions.GroupID,
-		gw.GetConfig().DBAppConfOptions.NodeIsSegmented,
-		gw.GetConfig().DBAppConfOptions.Tags)
+		otelCfg.SlaveOptions.UseRPC,
+		otelCfg.SlaveOptions.GroupID,
+		otelCfg.DBAppConfOptions.NodeIsSegmented,
+		otelCfg.DBAppConfOptions.Tags)
+
+	gw.MetricInstruments = otel.InitOpenTelemetryMetrics(gw.ctx, mainLog.Logger, &otelCfg.OpenTelemetry,
+		gw.GetNodeID(),
+		VERSION)
 
 	gw.start()
 
@@ -2377,6 +2386,13 @@ func (gw *Gateway) gracefulShutdown(ctx context.Context) error {
 		mainLog.Warning("Shutdown timeout reached, some connections may have been terminated")
 		// Wait for goroutines to finish even after timeout to prevent panic
 		<-serverShutdownDone
+	}
+
+	// Flush and shut down OTel metrics provider
+	if gw.MetricInstruments != nil {
+		if err := gw.MetricInstruments.Shutdown(ctx); err != nil {
+			mainLog.Warnf("Error shutting down OTel metrics: %v", err)
+		}
 	}
 
 	// Close all cache stores and other resources
