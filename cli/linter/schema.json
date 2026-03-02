@@ -179,6 +179,83 @@
           "min_version": {
             "type": "string"
           }
+        },
+        "metrics": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "exporter": {
+              "type": "string"
+            },
+            "endpoint": {
+              "type": "string"
+            },
+            "headers": {
+              "type": ["object", "null"]
+            },
+            "connection_timeout": {
+              "type": "integer"
+            },
+            "resource_name": {
+              "type": "string"
+            },
+            "tls": {
+              "type": "object",
+              "properties": {
+                "enable": {
+                  "type": "boolean"
+                },
+                "insecure_skip_verify": {
+                  "type": "boolean"
+                },
+                "ca_file": {
+                  "type": "string"
+                },
+                "cert_file": {
+                  "type": "string"
+                },
+                "key_file": {
+                  "type": "string"
+                },
+                "max_version": {
+                  "type": "string"
+                },
+                "min_version": {
+                  "type": "string"
+                }
+              }
+            },
+            "export_interval": {
+              "type": "integer"
+            },
+            "temporality": {
+              "type": "string"
+            },
+            "shutdown_timeout": {
+              "type": "integer"
+            },
+            "retry": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "enabled": {
+                  "type": "boolean"
+                },
+                "initial_interval": {
+                  "type": "integer"
+                },
+                "max_interval": {
+                  "type": "integer"
+                },
+                "max_elapsed_time": {
+                  "type": "integer"
+                }
+              }
+            }
+          }
         }
       }
     },

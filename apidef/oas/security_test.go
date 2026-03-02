@@ -3138,3 +3138,216 @@ func TestModeSwitching(t *testing.T) {
 		assert.Contains(t, tykAuth.Security[1], "jwtAuth", "second requirement should contain jwtAuth")
 	})
 }
+
+func TestHasCertificateAuthEnabled(t *testing.T) {
+	t.Run("returns false when authentication is nil", func(t *testing.T) {
+		oas := OAS{}
+		oas.SetTykExtension(&XTykAPIGateway{})
+
+		assert.False(t, oas.hasCertificateAuthEnabled())
+	})
+
+	t.Run("returns false when certificateAuth is nil", func(t *testing.T) {
+		oas := OAS{}
+		oas.SetTykExtension(&XTykAPIGateway{
+			Server: Server{
+				Authentication: &Authentication{
+					Enabled: true,
+				},
+			},
+		})
+
+		assert.False(t, oas.hasCertificateAuthEnabled())
+	})
+
+	t.Run("returns false when certificateAuth.enabled is false", func(t *testing.T) {
+		oas := OAS{}
+		oas.SetTykExtension(&XTykAPIGateway{
+			Server: Server{
+				Authentication: &Authentication{
+					Enabled: true,
+					CertificateAuth: &CertificateAuth{
+						Enabled: false,
+					},
+				},
+			},
+		})
+
+		assert.False(t, oas.hasCertificateAuthEnabled())
+	})
+
+	t.Run("returns true when certificateAuth.enabled is true", func(t *testing.T) {
+		oas := OAS{}
+		oas.SetTykExtension(&XTykAPIGateway{
+			Server: Server{
+				Authentication: &Authentication{
+					Enabled: true,
+					CertificateAuth: &CertificateAuth{
+						Enabled: true,
+					},
+				},
+			},
+		})
+
+		assert.True(t, oas.hasCertificateAuthEnabled())
+	})
+}
+
+func TestHasCertificateAuth(t *testing.T) {
+	t.Run("returns false when authentication is nil", func(t *testing.T) {
+		oas := OAS{}
+		oas.SetTykExtension(&XTykAPIGateway{})
+
+		assert.False(t, oas.hasCertificateAuth())
+	})
+
+	t.Run("returns false when certificateAuth is nil", func(t *testing.T) {
+		oas := OAS{}
+		oas.SetTykExtension(&XTykAPIGateway{
+			Server: Server{
+				Authentication: &Authentication{
+					Enabled: true,
+				},
+			},
+		})
+
+		assert.False(t, oas.hasCertificateAuth())
+	})
+
+	t.Run("returns true when certificateAuth exists with enabled false", func(t *testing.T) {
+		oas := OAS{}
+		oas.SetTykExtension(&XTykAPIGateway{
+			Server: Server{
+				Authentication: &Authentication{
+					Enabled: true,
+					CertificateAuth: &CertificateAuth{
+						Enabled: false,
+					},
+				},
+			},
+		})
+
+		assert.True(t, oas.hasCertificateAuth())
+	})
+
+	t.Run("returns true when certificateAuth exists with enabled true", func(t *testing.T) {
+		oas := OAS{}
+		oas.SetTykExtension(&XTykAPIGateway{
+			Server: Server{
+				Authentication: &Authentication{
+					Enabled: true,
+					CertificateAuth: &CertificateAuth{
+						Enabled: true,
+					},
+				},
+			},
+		})
+
+		assert.True(t, oas.hasCertificateAuth())
+	})
+}
+
+func TestTokenHasCertificateEnabled(t *testing.T) {
+	t.Run("returns false when scheme name is empty", func(t *testing.T) {
+		oas := OAS{}
+		oas.SetTykExtension(&XTykAPIGateway{})
+
+		assert.False(t, oas.tokenHasCertificateEnabled(""))
+	})
+
+	t.Run("returns false when scheme does not exist", func(t *testing.T) {
+		oas := OAS{}
+		oas.SetTykExtension(&XTykAPIGateway{
+			Server: Server{
+				Authentication: &Authentication{
+					Enabled: true,
+				},
+			},
+		})
+
+		assert.False(t, oas.tokenHasCertificateEnabled("authToken"))
+	})
+
+	t.Run("returns false when token has enableClientCertificate false", func(t *testing.T) {
+		trueVal := true
+		oas := OAS{}
+		oas.SetTykExtension(&XTykAPIGateway{
+			Server: Server{
+				Authentication: &Authentication{
+					Enabled: true,
+					SecuritySchemes: SecuritySchemes{
+						"authToken": &Token{
+							Enabled:                 &trueVal,
+							EnableClientCertificate: false,
+						},
+					},
+				},
+			},
+		})
+
+		assert.False(t, oas.tokenHasCertificateEnabled("authToken"))
+	})
+
+	t.Run("returns false when scheme is not a token type", func(t *testing.T) {
+		oas := OAS{}
+		oas.SetTykExtension(&XTykAPIGateway{
+			Server: Server{
+				Authentication: &Authentication{
+					Enabled: true,
+					SecuritySchemes: SecuritySchemes{
+						"jwtAuth": &JWT{
+							Enabled: true,
+						},
+					},
+				},
+			},
+		})
+
+		assert.False(t, oas.tokenHasCertificateEnabled("jwtAuth"))
+	})
+
+	t.Run("returns true when token has enableClientCertificate", func(t *testing.T) {
+		trueVal := true
+		oas := OAS{}
+		oas.SetTykExtension(&XTykAPIGateway{
+			Server: Server{
+				Authentication: &Authentication{
+					Enabled: true,
+					SecuritySchemes: SecuritySchemes{
+						"authToken": &Token{
+							Enabled:                 &trueVal,
+							EnableClientCertificate: true,
+						},
+					},
+				},
+			},
+		})
+
+		assert.True(t, oas.tokenHasCertificateEnabled("authToken"))
+	})
+
+	t.Run("checks specific scheme only", func(t *testing.T) {
+		trueVal := true
+		oas := OAS{}
+		oas.SetTykExtension(&XTykAPIGateway{
+			Server: Server{
+				Authentication: &Authentication{
+					Enabled: true,
+					SecuritySchemes: SecuritySchemes{
+						"authToken1": &Token{
+							Enabled:                 &trueVal,
+							EnableClientCertificate: false,
+						},
+						"authToken2": &Token{
+							Enabled:                 &trueVal,
+							EnableClientCertificate: true,
+						},
+					},
+				},
+			},
+		})
+
+		assert.False(t, oas.tokenHasCertificateEnabled("authToken1"))
+		assert.True(t, oas.tokenHasCertificateEnabled("authToken2"))
+	})
+}
