@@ -1062,12 +1062,14 @@ func generateUniqueTestTag(testName string) string {
 		cleanName = defaultName
 	}
 
-	bytes := make([]byte, 8)
-	if _, err := rand.Read(bytes); err != nil {
+	suffix := make([]byte, 8)
+	if _, err := rand.Read(suffix); err != nil {
+		log.Error(fmt.Sprintf("failed to generate random bytes for test tag: %v", err))
+
 		return cleanName
 	}
 
-	return fmt.Sprintf("%s-%s", cleanName, hex.EncodeToString(bytes))
+	return fmt.Sprintf("%s-%s", cleanName, hex.EncodeToString(suffix))
 }
 
 func StartTest(genConf func(globalConf *config.Config), testConfig ...TestConfig) *Test {
