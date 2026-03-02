@@ -2,12 +2,14 @@ package gateway
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"io"
 	"runtime"
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -215,14 +217,11 @@ func TestSSETap_Close_SubsequentReadReturnsError(t *testing.T) {
 	tap := NewSSETap(body)
 	require.NoError(t, tap.Close())
 
-	// After Close, reading should not panic. The underlying reader is closed
-	// so behaviour depends on the reader, but we should not get (0, nil).
+	// After Close, Read should return ErrClosedPipe because the closed
+	// flag is checked before attempting any upstream read.
 	buf := make([]byte, 128)
-	n, err := tap.Read(buf)
-	// After close, either EOF or an error is acceptable; (0, nil) is not.
-	if n == 0 {
-		assert.Error(t, err, "Read after Close should return an error or EOF")
-	}
+	_, err := tap.Read(buf)
+	assert.ErrorIs(t, err, io.ErrClosedPipe, "Read after Close should return ErrClosedPipe")
 }
 
 func TestSSETap_ReadNeverReturnsZeroNil(t *testing.T) {
@@ -407,6 +406,102 @@ func TestSSETap_ZeroNilReader_DoesNotSpin(t *testing.T) {
 	buf := make([]byte, 128)
 	_, err := tap.Read(buf)
 	assert.ErrorIs(t, err, io.ErrNoProgress, "should bail out on repeated (0, nil) reads")
+}
+
+// blockingReader blocks on Read until its channel is closed or a value is sent,
+// then returns the configured error. Close sends on the close channel.
+type blockingReader struct {
+	readCh    chan struct{} // closed to unblock a pending Read
+	closeCh   chan struct{} // closed when Close is called
+	closeOnce sync.Once
+}
+
+func newBlockingReader() *blockingReader {
+	return &blockingReader{
+		readCh:  make(chan struct{}),
+		closeCh: make(chan struct{}),
+	}
+}
+
+func (r *blockingReader) Read([]byte) (int, error) {
+	<-r.readCh
+	return 0, errors.New("reader closed")
+}
+
+func (r *blockingReader) Close() error {
+	r.closeOnce.Do(func() {
+		close(r.closeCh)
+		close(r.readCh) // unblock any pending Read
+	})
+	return nil
+}
+
+func TestSSETap_Close_UnblocksRead(t *testing.T) {
+	t.Parallel()
+
+	br := newBlockingReader()
+	tap := NewSSETap(br)
+
+	readDone := make(chan struct{})
+	var readErr error
+
+	go func() {
+		buf := make([]byte, 128)
+		_, readErr = tap.Read(buf)
+		close(readDone)
+	}()
+
+	// Give the goroutine time to enter the blocking Read.
+	time.Sleep(50 * time.Millisecond)
+
+	// Close should not deadlock — it must be able to proceed while
+	// Read is blocked on the upstream reader.
+	closeDone := make(chan error, 1)
+	go func() {
+		closeDone <- tap.Close()
+	}()
+
+	select {
+	case err := <-closeDone:
+		assert.NoError(t, err)
+	case <-time.After(2 * time.Second):
+		t.Fatal("Close() deadlocked while Read() was blocked on upstream")
+	}
+
+	// Read should also return now.
+	select {
+	case <-readDone:
+		// Read returns either the reader's error or io.ErrClosedPipe.
+		assert.Error(t, readErr)
+	case <-time.After(2 * time.Second):
+		t.Fatal("Read() did not unblock after Close()")
+	}
+}
+
+func TestSSETap_ReadAfterClose_ReturnsError(t *testing.T) {
+	t.Parallel()
+
+	body := &trackingCloser{Reader: strings.NewReader("data: x\n\n")}
+	tap := NewSSETap(body)
+	require.NoError(t, tap.Close())
+
+	buf := make([]byte, 128)
+	_, err := tap.Read(buf)
+	assert.ErrorIs(t, err, io.ErrClosedPipe, "Read after Close should return ErrClosedPipe")
+}
+
+func TestSSETap_UnderlyingCloser(t *testing.T) {
+	t.Parallel()
+
+	body := &trackingCloser{Reader: strings.NewReader("data: x\n\n")}
+	tap := NewSSETap(body)
+
+	uc := tap.UnderlyingCloser()
+	assert.Equal(t, body, uc, "UnderlyingCloser should return the original reader")
+
+	// Closing the underlying closer should not require SSETap's mutex.
+	require.NoError(t, uc.Close())
+	assert.True(t, body.wasClosed())
 }
 
 // --- benchmarks ---

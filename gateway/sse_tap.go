@@ -23,11 +23,14 @@ const maxInputBufferSize = 1 << 20 // 1 MB
 // minimal overhead: raw bytes are forwarded without parsing.
 //
 // SSETap implements io.ReadCloser and is safe for concurrent use.
+// The mutex is released during blocking upstream reads so that Close can
+// be called from another goroutine (e.g. a deadline timer) without deadlocking.
 type SSETap struct {
 	reader       io.ReadCloser // upstream response body
 	inputBuffer  []byte        // accumulates raw upstream bytes
 	outputBuffer bytes.Buffer  // holds serialized events ready for the client
 	upstreamEOF  bool          // set once the upstream reader returns io.EOF
+	closed       bool          // set by Close; checked after re-acquiring the mutex
 	hooks        []SSEHook
 	mu           sync.Mutex
 	readBuf      [readChunkSize]byte // reusable read buffer — avoids per-Read allocation
@@ -45,6 +48,9 @@ func NewSSETap(reader io.ReadCloser, hooks ...SSEHook) *SSETap {
 // Read satisfies io.Reader. It never returns (0, nil) which would violate the
 // io.Reader contract. It loops internally until output data is available, the
 // upstream reaches EOF, or an error occurs.
+//
+// The mutex is released while waiting on the upstream reader so that Close
+// can be called concurrently (e.g. from a deadline timer) without deadlocking.
 func (t *SSETap) Read(p []byte) (int, error) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
@@ -62,8 +68,24 @@ func (t *SSETap) Read(p []byte) (int, error) {
 			return 0, io.EOF
 		}
 
-		// 3. Read a chunk from the upstream body (reusing the struct-level buffer).
+		// 3. If we were closed, return immediately.
+		if t.closed {
+			return 0, io.ErrClosedPipe
+		}
+
+		// 4. Read a chunk from the upstream body. Release the mutex so
+		// that Close can proceed if a deadline timer fires while the
+		// upstream read blocks.
+		t.mu.Unlock()
 		n, err := t.reader.Read(t.readBuf[:])
+		t.mu.Lock()
+
+		// Re-check closed: Close may have been called while we were
+		// waiting on the upstream reader.
+		if t.closed {
+			return 0, io.ErrClosedPipe
+		}
+
 		if n > 0 {
 			t.inputBuffer = append(t.inputBuffer, t.readBuf[:n]...)
 			noProgressCount = 0
@@ -86,10 +108,10 @@ func (t *SSETap) Read(p []byte) (int, error) {
 			continue
 		}
 
-		// 4. Process any complete events in the input buffer.
+		// 5. Process any complete events in the input buffer.
 		t.processInputBuffer()
 
-		// 5. If the input buffer has grown past the safety limit without
+		// 6. If the input buffer has grown past the safety limit without
 		// producing a complete event boundary, flush it as-is (fail-open)
 		// to prevent unbounded memory growth from a malicious upstream.
 		if len(t.inputBuffer) > maxInputBufferSize {
@@ -97,7 +119,7 @@ func (t *SSETap) Read(p []byte) (int, error) {
 			t.inputBuffer = nil
 		}
 
-		// 6. If we produced output, the next iteration will return it.
+		// 7. If we produced output, the next iteration will return it.
 		// If upstream hit EOF but processInputBuffer produced nothing,
 		// flush any remaining unparseable bytes as-is (fail-open).
 		if t.outputBuffer.Len() == 0 && t.upstreamEOF {
@@ -114,14 +136,24 @@ func (t *SSETap) Read(p []byte) (int, error) {
 }
 
 // Close releases all internal buffers and closes the underlying reader.
+// It is safe to call from a different goroutine while Read is blocked;
+// the closed flag unblocks Read after the underlying reader is closed.
 func (t *SSETap) Close() error {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 
+	t.closed = true
 	t.inputBuffer = nil
 	t.outputBuffer.Reset()
 
 	return t.reader.Close()
+}
+
+// UnderlyingCloser returns the upstream reader's io.Closer. This allows
+// callers (such as deadline timers) to close the underlying connection
+// directly without going through SSETap's mutex.
+func (t *SSETap) UnderlyingCloser() io.Closer {
+	return t.reader
 }
 
 // processInputBuffer parses complete SSE events from inputBuffer, runs them

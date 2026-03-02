@@ -1538,7 +1538,13 @@ func (p *ReverseProxy) prepareSSEStreaming(rw http.ResponseWriter, body io.Close
 		if !ok {
 			return nil, nil
 		}
-		dw := newDeadlineWriter(wf, rc, timeout, body)
+		// If body is an SSETap, close the underlying reader directly so
+		// the timer callback does not contend with SSETap's mutex.
+		timeoutCloser := body
+		if tap, ok := body.(*SSETap); ok {
+			timeoutCloser = tap.UnderlyingCloser()
+		}
+		dw := newDeadlineWriter(wf, rc, timeout, timeoutCloser)
 		return dw, dw.stop
 	}
 
