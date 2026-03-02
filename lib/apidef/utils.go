@@ -10,14 +10,29 @@ var (
 	re2Regex     = regexp.MustCompile(`\\x\{([0-9a-fA-F]{4})}`)
 )
 
-// TransformUnicodeEscapesToRE2 takes a byte array containing a regular expression
-// pattern and transforms ECMA-262 compliant Unicode escape sequences (`\uXXXX`)
+type DataBytesModifier struct {
+	data []byte
+}
+
+func (d *DataBytesModifier) Result() []byte {
+	return d.data
+}
+
+func (d *DataBytesModifier) Reset() {
+	d.data = nil
+}
+
+func (d *DataBytesModifier) Data(data []byte) {
+	d.data = data
+}
+
+// TransformUnicodeEscapesToRE2 transforms ECMA-262 compliant Unicode escape sequences (`\uXXXX`)
 // into a format that is compatible with Go's RE2 regex engine (`\x{XXXX}`).
 // This is necessary because RE2 does not support the `\u` escape sequence but
 // does support hexadecimal escapes, which can represent any Unicode code point.
 // The function returns a new byte array with the transformed pattern.
-func TransformUnicodeEscapesToRE2(data []byte) []byte {
-	return unicodeRegex.ReplaceAllFunc(data, func(match []byte) []byte {
+func (d *DataBytesModifier) TransformUnicodeEscapesToRE2() {
+	d.data = unicodeRegex.ReplaceAllFunc(d.data, func(match []byte) []byte {
 		res := make([]byte, 0, 8)
 		res = append(res, `\x{`...)
 		res = append(res, match[2:]...)
@@ -33,13 +48,17 @@ func TransformUnicodeEscapesToRE2(data []byte) []byte {
 // patterns were previously sanitized for internal use with Go's RE2 engine.
 // It ensures that external consumers of the data receive the regex patterns
 // in their original, more widely supported format.
-func RestoreUnicodeEscapesFromRE2(data []byte) []byte {
-	return re2Regex.ReplaceAllFunc(data, func(match []byte) []byte {
+func (d *DataBytesModifier) RestoreUnicodeEscapesFromRE2() {
+	d.data = re2Regex.ReplaceAllFunc(d.data, func(match []byte) []byte {
 		res := make([]byte, 0, 6)
 		res = append(res, `\u`...)
 		res = append(res, match[3:7]...)
 		return res
 	})
+}
+
+func NewDataBytesModifier(data []byte) *DataBytesModifier {
+	return &DataBytesModifier{data: data}
 }
 
 // RestoreUnicodeEscapesInError takes an error and applies the
@@ -52,8 +71,8 @@ func RestoreUnicodeEscapesInError(err error) error {
 		return nil
 	}
 
-	originalMsgBytes := []byte(err.Error())
-	restoredMsgBytes := RestoreUnicodeEscapesFromRE2(originalMsgBytes)
+	modifier := NewDataBytesModifier([]byte(err.Error()))
+	modifier.RestoreUnicodeEscapesFromRE2()
 
-	return errors.New(string(restoredMsgBytes))
+	return errors.New(string(modifier.Result()))
 }

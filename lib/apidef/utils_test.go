@@ -49,9 +49,13 @@ func TestTransformUnicodeEscapesToRE2(t *testing.T) {
 		},
 	}
 
+	modifier := NewDataBytesModifier(nil)
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			actual := TransformUnicodeEscapesToRE2(tc.input)
+			modifier.Reset()
+			modifier.Data(tc.input)
+			modifier.TransformUnicodeEscapesToRE2()
+			actual := modifier.Result()
 			if !bytes.Equal(actual, tc.expected) {
 				t.Errorf("expected %s, but got %s", tc.expected, actual)
 			}
@@ -102,9 +106,13 @@ func TestRestoreUnicodeEscapesFromRE2(t *testing.T) {
 		},
 	}
 
+	modifier := NewDataBytesModifier(nil)
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			actual := RestoreUnicodeEscapesFromRE2(tc.input)
+			modifier.Reset()
+			modifier.Data(tc.input)
+			modifier.RestoreUnicodeEscapesFromRE2()
+			actual := modifier.Result()
 			if !bytes.Equal(actual, tc.expected) {
 				t.Errorf("expected %s, but got %s", tc.expected, actual)
 			}

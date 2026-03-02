@@ -1619,7 +1619,10 @@ func (gw *Gateway) apiOASGetHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	doJSONWrite(w, code, lib.RestoreUnicodeEscapesFromRE2(jsonBytes))
+	bytesModifier := lib.NewDataBytesModifier(jsonBytes)
+	bytesModifier.RestoreUnicodeEscapesFromRE2()
+
+	doJSONWrite(w, code, bytesModifier.Result())
 }
 
 func (gw *Gateway) apiOASPostHandler(w http.ResponseWriter, r *http.Request) {
@@ -3626,7 +3629,10 @@ func extractOASObjFromReq(reqBody io.Reader) ([]byte, *oas.OAS, error) {
 		return nil, nil, ErrRequestMalformed
 	}
 
-	reqBodyInBytes = lib.TransformUnicodeEscapesToRE2(reqBodyInBytes)
+	bytesModifier := lib.NewDataBytesModifier(reqBodyInBytes)
+	bytesModifier.TransformUnicodeEscapesToRE2()
+
+	reqBodyInBytes = bytesModifier.Result()
 
 	loader := openapi3.NewLoader()
 	t, err := loader.LoadFromData(reqBodyInBytes)
