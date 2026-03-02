@@ -1046,7 +1046,7 @@ var nonAlphanumericRegex = regexp.MustCompile(`[^a-zA-Z0-9 ]+`)
 
 // generateUniqueTestTag creates a sanitized, unique tag from a test name to be used
 // for isolating tests that write to Redis.
-func generateUniqueTestTag(testName string) string {
+func generateUniqueTestTag(testName string) (string, error) {
 	const defaultName = "test"
 
 	cleanName := strings.ToLower(testName)
@@ -1064,12 +1064,10 @@ func generateUniqueTestTag(testName string) string {
 
 	suffix := make([]byte, 8)
 	if _, err := rand.Read(suffix); err != nil {
-		log.Error(fmt.Sprintf("failed to generate random bytes for test tag: %s", err.Error()))
-
-		return fmt.Sprintf("%s-%x", cleanName, time.Now().UnixNano())
+		return "", fmt.Errorf("failed to generate unique test tag: %w", err)
 	}
 
-	return fmt.Sprintf("%s-%s", cleanName, hex.EncodeToString(suffix))
+	return fmt.Sprintf("%s-%s", cleanName, hex.EncodeToString(suffix)), nil
 }
 
 func StartTest(genConf func(globalConf *config.Config), testConfig ...TestConfig) *Test {

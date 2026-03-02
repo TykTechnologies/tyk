@@ -12,6 +12,7 @@ import (
 
 	"github.com/lonelycode/osin"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 
 	"github.com/TykTechnologies/gorpc"
@@ -822,6 +823,9 @@ func TestProcessKeySpaceChanges_UserKeyReset(t *testing.T) {
 	rpcMock, connectionString := startRPCMock(dispatcher)
 	defer stopRPCMock(rpcMock)
 
+	uniqueTag, err := generateUniqueTestTag(t.Name())
+	require.NoError(t, err)
+
 	g := StartTest(func(globalConf *config.Config) {
 		globalConf.SlaveOptions.UseRPC = true
 		globalConf.SlaveOptions.RPCKey = "test_org"
@@ -830,7 +834,7 @@ func TestProcessKeySpaceChanges_UserKeyReset(t *testing.T) {
 		globalConf.SlaveOptions.CallTimeout = 1
 		globalConf.SlaveOptions.RPCPoolSize = 2
 		globalConf.SlaveOptions.DisableKeySpaceSync = true
-		globalConf.DBAppConfOptions.Tags = []string{generateUniqueTestTag(t.Name())}
+		globalConf.DBAppConfOptions.Tags = []string{uniqueTag}
 	})
 	defer g.Close()
 
@@ -877,10 +881,12 @@ func TestProcessKeySpaceChanges_UserKeyReset(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
+			uniqueTag, err := generateUniqueTestTag(tc.name)
+			require.NoError(t, err)
 			// Reset config before each test
 			config := g.Gw.GetConfig()
 			config.SlaveOptions.APIKey = oldKey
-			config.DBAppConfOptions.Tags = []string{generateUniqueTestTag(tc.name)}
+			config.DBAppConfOptions.Tags = []string{uniqueTag}
 			g.Gw.SetConfig(config)
 
 			rpcListener.ProcessKeySpaceChanges(tc.keys, DefaultOrg)
@@ -906,6 +912,9 @@ func TestGetApiDefinitions_Fails_With_Timeout(t *testing.T) {
 	rpcMock, connectionString := startRPCMock(dispatcher)
 	defer stopRPCMock(rpcMock)
 
+	uniqueTag, err := generateUniqueTestTag(t.Name())
+	require.NoError(t, err)
+
 	g := StartTest(func(globalConf *config.Config) {
 		globalConf.SlaveOptions.UseRPC = true
 		globalConf.SlaveOptions.RPCKey = "test_org"
@@ -914,7 +923,7 @@ func TestGetApiDefinitions_Fails_With_Timeout(t *testing.T) {
 		globalConf.SlaveOptions.CallTimeout = 1
 		globalConf.SlaveOptions.RPCPoolSize = 2
 		globalConf.SlaveOptions.DisableKeySpaceSync = true
-		globalConf.DBAppConfOptions.Tags = []string{generateUniqueTestTag(t.Name())}
+		globalConf.DBAppConfOptions.Tags = []string{uniqueTag}
 	})
 	g.Gw.afterConfSetup() // sets SlaveOptions.CallTimeout to GlobalRPCCallTimeout
 
@@ -952,6 +961,9 @@ func TestGetApiDefinitions(t *testing.T) {
 	rpcMock, connectionString := startRPCMock(dispatcher)
 	defer stopRPCMock(rpcMock)
 
+	uniqueTag, err := generateUniqueTestTag(t.Name())
+	require.NoError(t, err)
+
 	g := StartTest(func(globalConf *config.Config) {
 		globalConf.SlaveOptions.UseRPC = true
 		globalConf.SlaveOptions.RPCKey = "test_org"
@@ -960,7 +972,7 @@ func TestGetApiDefinitions(t *testing.T) {
 		globalConf.SlaveOptions.CallTimeout = 1
 		globalConf.SlaveOptions.RPCPoolSize = 2
 		globalConf.SlaveOptions.DisableKeySpaceSync = true
-		globalConf.DBAppConfOptions.Tags = []string{generateUniqueTestTag(t.Name())}
+		globalConf.DBAppConfOptions.Tags = []string{uniqueTag}
 	})
 	g.Gw.afterConfSetup() // sets SlaveOptions.CallTimeout to GlobalRPCCallTimeout
 
@@ -994,6 +1006,9 @@ func TestGetPolicies(t *testing.T) {
 	rpcMock, connectionString := startRPCMock(dispatcher)
 	defer stopRPCMock(rpcMock)
 
+	uniqueTag, err := generateUniqueTestTag(t.Name())
+	require.NoError(t, err)
+
 	g := StartTest(func(globalConf *config.Config) {
 		globalConf.SlaveOptions.UseRPC = true
 		globalConf.SlaveOptions.RPCKey = "test_org"
@@ -1002,7 +1017,7 @@ func TestGetPolicies(t *testing.T) {
 		globalConf.SlaveOptions.CallTimeout = 1
 		globalConf.SlaveOptions.RPCPoolSize = 2
 		globalConf.SlaveOptions.DisableKeySpaceSync = true
-		globalConf.DBAppConfOptions.Tags = []string{generateUniqueTestTag(t.Name())}
+		globalConf.DBAppConfOptions.Tags = []string{uniqueTag}
 	})
 	g.Gw.afterConfSetup() // sets SlaveOptions.CallTimeout to GlobalRPCCallTimeout
 
@@ -1040,6 +1055,9 @@ func TestGetPolicies_Fails_With_Timeout(t *testing.T) {
 	rpcMock, connectionString := startRPCMock(dispatcher)
 	defer stopRPCMock(rpcMock)
 
+	uniqueTag, err := generateUniqueTestTag(t.Name())
+	require.NoError(t, err)
+
 	g := StartTest(func(globalConf *config.Config) {
 		globalConf.SlaveOptions.UseRPC = true
 		globalConf.SlaveOptions.RPCKey = "test_org"
@@ -1048,7 +1066,7 @@ func TestGetPolicies_Fails_With_Timeout(t *testing.T) {
 		globalConf.SlaveOptions.CallTimeout = 1
 		globalConf.SlaveOptions.RPCPoolSize = 2
 		globalConf.SlaveOptions.DisableKeySpaceSync = true
-		globalConf.DBAppConfOptions.Tags = []string{generateUniqueTestTag(t.Name())}
+		globalConf.DBAppConfOptions.Tags = []string{uniqueTag}
 	})
 	g.Gw.afterConfSetup() // sets SlaveOptions.CallTimeout to GlobalRPCCallTimeout
 
