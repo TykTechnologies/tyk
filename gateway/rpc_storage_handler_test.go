@@ -73,7 +73,7 @@ func withFunc(name string, f any) dispatcherOption {
 // newDispatcher creates a minimal RPC dispatcher with required handlers for gateway startup.
 // It establishes a set of default handlers that can be overridden by providing
 // dispatcherOptions. This ensures the gateway can start cleanly for tests without
-// causing delays or failures from RPC retries.
+// causing delays or failures from RPC retries if emergency mode is initially disabled.
 func newDispatcher(opts ...dispatcherOption) *gorpc.Dispatcher {
 	dispatcher := gorpc.NewDispatcher()
 
@@ -830,6 +830,7 @@ func TestProcessKeySpaceChanges_UserKeyReset(t *testing.T) {
 		globalConf.SlaveOptions.CallTimeout = 1
 		globalConf.SlaveOptions.RPCPoolSize = 2
 		globalConf.SlaveOptions.DisableKeySpaceSync = true
+		globalConf.DBAppConfOptions.Tags = []string{generateUniqueTestTag(t.Name())}
 	})
 	defer g.Close()
 
@@ -879,6 +880,7 @@ func TestProcessKeySpaceChanges_UserKeyReset(t *testing.T) {
 			// Reset config before each test
 			config := g.Gw.GetConfig()
 			config.SlaveOptions.APIKey = oldKey
+			config.DBAppConfOptions.Tags = []string{generateUniqueTestTag(tc.name)}
 			g.Gw.SetConfig(config)
 
 			rpcListener.ProcessKeySpaceChanges(tc.keys, DefaultOrg)
@@ -912,6 +914,7 @@ func TestGetApiDefinitions_Fails_With_Timeout(t *testing.T) {
 		globalConf.SlaveOptions.CallTimeout = 1
 		globalConf.SlaveOptions.RPCPoolSize = 2
 		globalConf.SlaveOptions.DisableKeySpaceSync = true
+		globalConf.DBAppConfOptions.Tags = []string{generateUniqueTestTag(t.Name())}
 	})
 	g.Gw.afterConfSetup() // sets SlaveOptions.CallTimeout to GlobalRPCCallTimeout
 
@@ -957,6 +960,7 @@ func TestGetApiDefinitions(t *testing.T) {
 		globalConf.SlaveOptions.CallTimeout = 1
 		globalConf.SlaveOptions.RPCPoolSize = 2
 		globalConf.SlaveOptions.DisableKeySpaceSync = true
+		globalConf.DBAppConfOptions.Tags = []string{generateUniqueTestTag(t.Name())}
 	})
 	g.Gw.afterConfSetup() // sets SlaveOptions.CallTimeout to GlobalRPCCallTimeout
 
@@ -998,6 +1002,7 @@ func TestGetPolicies(t *testing.T) {
 		globalConf.SlaveOptions.CallTimeout = 1
 		globalConf.SlaveOptions.RPCPoolSize = 2
 		globalConf.SlaveOptions.DisableKeySpaceSync = true
+		globalConf.DBAppConfOptions.Tags = []string{generateUniqueTestTag(t.Name())}
 	})
 	g.Gw.afterConfSetup() // sets SlaveOptions.CallTimeout to GlobalRPCCallTimeout
 
@@ -1043,6 +1048,7 @@ func TestGetPolicies_Fails_With_Timeout(t *testing.T) {
 		globalConf.SlaveOptions.CallTimeout = 1
 		globalConf.SlaveOptions.RPCPoolSize = 2
 		globalConf.SlaveOptions.DisableKeySpaceSync = true
+		globalConf.DBAppConfOptions.Tags = []string{generateUniqueTestTag(t.Name())}
 	})
 	g.Gw.afterConfSetup() // sets SlaveOptions.CallTimeout to GlobalRPCCallTimeout
 

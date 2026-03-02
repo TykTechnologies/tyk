@@ -13,6 +13,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"math/rand"
 	mathrand "math/rand"
 	"net"
 	"net/http"
@@ -1037,6 +1038,14 @@ type Test struct {
 type SlaveDataCenter struct {
 	SlaveOptions config.SlaveOptionsConfig
 	Redis        config.StorageOptionsConf
+}
+
+// generateUniqueTestTag creates a sanitized, unique tag from a test name to be used
+// for isolating tests that write to Redis.
+func generateUniqueTestTag(testName string) string {
+	r := rand.New(rand.NewSource(time.Now().UnixNano()))
+	sanitizedName := strings.Join(strings.Split(strings.ToLower(testName), " "), "-")
+	return fmt.Sprintf("%s-%d", sanitizedName, r.Intn(100000))
 }
 
 func StartTest(genConf func(globalConf *config.Config), testConfig ...TestConfig) *Test {
