@@ -881,12 +881,9 @@ func TestProcessKeySpaceChanges_UserKeyReset(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			uniqueTag, err := generateUniqueTestTag(tc.name)
-			require.NoError(t, err)
 			// Reset config before each test
 			config := g.Gw.GetConfig()
 			config.SlaveOptions.APIKey = oldKey
-			config.DBAppConfOptions.Tags = []string{uniqueTag}
 			g.Gw.SetConfig(config)
 
 			rpcListener.ProcessKeySpaceChanges(tc.keys, DefaultOrg)
