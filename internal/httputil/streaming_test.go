@@ -46,7 +46,7 @@ func TestIsGrpcStreaming(t *testing.T) {
 	assert.False(t, IsGrpcStreaming(newRequestWithHeaders(t, -1, map[string]string{headerContentType: "text/plain"})))
 }
 
-func TestIsSseContentType(t *testing.T) {
+func TestIsSSEContentType(t *testing.T) {
 	tests := []struct {
 		name string
 		ct   string
@@ -62,15 +62,15 @@ func TestIsSseContentType(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			assert.Equal(t, tt.want, IsSseContentType(tt.ct))
+			assert.Equal(t, tt.want, IsSSEContentType(tt.ct))
 		})
 	}
 }
 
-func TestIsSseStreamingResponse(t *testing.T) {
-	assert.True(t, IsSseStreamingResponse(newResponseWithHeaders(t, map[string]string{headerContentType: "text/event-stream"})))
-	assert.True(t, IsSseStreamingResponse(newResponseWithHeaders(t, map[string]string{headerContentType: "text/event-stream; charset=utf-8"})))
-	assert.False(t, IsSseStreamingResponse(newResponseWithHeaders(t, map[string]string{headerContentType: "application/json"})))
+func TestIsSSEStreamingResponse(t *testing.T) {
+	assert.True(t, IsSSEStreamingResponse(newResponseWithHeaders(t, map[string]string{headerContentType: "text/event-stream"})))
+	assert.True(t, IsSSEStreamingResponse(newResponseWithHeaders(t, map[string]string{headerContentType: "text/event-stream; charset=utf-8"})))
+	assert.False(t, IsSSEStreamingResponse(newResponseWithHeaders(t, map[string]string{headerContentType: "application/json"})))
 }
 
 func TestIsUpgrade(t *testing.T) {

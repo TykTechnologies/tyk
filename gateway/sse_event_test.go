@@ -47,6 +47,12 @@ func TestFindEventBoundary(t *testing.T) {
 			wantLen: 3,
 		},
 		{
+			name:    "CRLF CR mixed",
+			input:   "data: hello\r\n\r",
+			wantIdx: 11,
+			wantLen: 3,
+		},
+		{
 			name:    "no boundary",
 			input:   "data: hello\n",
 			wantIdx: -1,
@@ -213,6 +219,14 @@ func TestParseSSEEvent(t *testing.T) {
 			input: "data: cr\r\r",
 			wantEvent: &SSEEvent{
 				Data: []string{"cr"},
+			},
+			wantRest: "",
+		},
+		{
+			name:  "event with CRLF CR mixed boundary",
+			input: "data: mixed\r\n\r",
+			wantEvent: &SSEEvent{
+				Data: []string{"mixed"},
 			},
 			wantRest: "",
 		},

@@ -374,11 +374,47 @@ func TestSSETap_EmptyStream(t *testing.T) {
 	assert.Empty(t, got)
 }
 
+func TestSSETap_InputBufferCapped(t *testing.T) {
+	t.Parallel()
+
+	// Upstream sends data without an event boundary, exceeding maxInputBufferSize.
+	// The tap should flush the data as-is (fail-open) rather than growing forever.
+	bigPayload := strings.Repeat("x", maxInputBufferSize+100)
+	body := &trackingCloser{Reader: strings.NewReader(bigPayload)}
+	tap := NewSSETap(body, &passHook{})
+
+	got := readAll(t, tap)
+	assert.Equal(t, bigPayload, got, "oversized input should be flushed as-is")
+}
+
+// zeroNilReader returns (0, nil) on every Read to simulate a misbehaving reader.
+type zeroNilReader struct {
+	calls int
+}
+
+func (r *zeroNilReader) Read([]byte) (int, error) {
+	r.calls++
+	return 0, nil
+}
+
+func (r *zeroNilReader) Close() error { return nil }
+
+func TestSSETap_ZeroNilReader_DoesNotSpin(t *testing.T) {
+	t.Parallel()
+
+	tap := NewSSETap(&zeroNilReader{})
+
+	buf := make([]byte, 128)
+	_, err := tap.Read(buf)
+	assert.ErrorIs(t, err, io.ErrNoProgress, "should bail out on repeated (0, nil) reads")
+}
+
 // --- benchmarks ---
 
 func BenchmarkSSETap_NoHooks(b *testing.B) {
 	input := []byte(buildEvents(100))
 	b.SetBytes(int64(len(input)))
+	b.ReportAllocs()
 	b.ResetTimer()
 
 	for i := 0; i < b.N; i++ {
@@ -391,6 +427,7 @@ func BenchmarkSSETap_NoHooks(b *testing.B) {
 func BenchmarkSSETap_WithHook(b *testing.B) {
 	input := []byte(buildEvents(100))
 	b.SetBytes(int64(len(input)))
+	b.ReportAllocs()
 	b.ResetTimer()
 
 	for i := 0; i < b.N; i++ {
@@ -404,6 +441,7 @@ func BenchmarkSSETap_PerEvent(b *testing.B) {
 	// Measure per-event overhead.
 	singleEvent := []byte("data: benchmark-payload-data\n\n")
 	b.SetBytes(int64(len(singleEvent)))
+	b.ReportAllocs()
 	b.ResetTimer()
 
 	for i := 0; i < b.N; i++ {

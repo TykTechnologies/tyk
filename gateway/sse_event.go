@@ -52,6 +52,10 @@ func findEventBoundary(buffer []byte) (int, int) {
 					if i+2 < len(buffer) && buffer[i+2] == '\n' {
 						return i, 3
 					}
+					// \r\n followed by \r (not \r\n) — mixed line endings
+					if i+2 < len(buffer) && buffer[i+2] == '\r' {
+						return i, 3
+					}
 				} else if buffer[i+1] == '\r' {
 					// \r\r
 					return i, 2

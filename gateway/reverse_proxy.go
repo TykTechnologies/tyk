@@ -1387,7 +1387,11 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 	// can inspect and filter individual SSE events before they reach the
 	// client. The tap is transparent to CopyResponse/copyBuffer.
 	if httputil.IsStreamingResponse(res) && p.TykAPISpec.IsMCP() {
-		res.Body = NewSSETap(res.Body, NewLoggingSSEHook(p.logger))
+		var hooks []SSEHook
+		if p.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
+			hooks = append(hooks, NewLoggingSSEHook(p.logger))
+		}
+		res.Body = NewSSETap(res.Body, hooks...)
 	}
 
 	if withCache {
@@ -1497,7 +1501,7 @@ func (p *ReverseProxy) flushInterval(res *http.Response) time.Duration {
 
 	// For Server-Sent Events responses, flush immediately.
 	// The MIME type is defined in https://www.w3.org/TR/eventsource/#text-event-stream
-	if httputil.IsSseContentType(resCT) {
+	if httputil.IsSSEContentType(resCT) {
 		return -1 // negative means immediately
 	}
 
@@ -1553,7 +1557,12 @@ func (p *ReverseProxy) prepareSSEStreaming(rw http.ResponseWriter, body io.Close
 // body copy fails unexpectedly. Client-initiated disconnects (context.Canceled)
 // are silently ignored.
 func (p *ReverseProxy) handleCopyError(rw http.ResponseWriter, copyErr error, isSSE bool) {
-	if !isSSE || errors.Is(copyErr, context.Canceled) {
+	if !isSSE {
+		return
+	}
+	// Ignore client disconnects, context timeouts, and deliberate idle-timeout
+	// body closes — these are normal lifecycle events, not upstream failures.
+	if errors.Is(copyErr, context.Canceled) || errors.Is(copyErr, context.DeadlineExceeded) || errors.Is(copyErr, net.ErrClosed) {
 		return
 	}
 	const errorEvent = "event: error\ndata: upstream connection terminated unexpectedly\n\n"

@@ -10,6 +10,11 @@ import (
 // call. 4 KB is a reasonable default for SSE where events are typically small.
 const readChunkSize = 4096
 
+// maxInputBufferSize is the maximum number of bytes the input buffer is allowed
+// to accumulate before being flushed as-is. This prevents a malicious or buggy
+// upstream from consuming unbounded memory by never sending an event boundary.
+const maxInputBufferSize = 1 << 20 // 1 MB
+
 // SSETap wraps an upstream http.Response.Body and intercepts individual SSE
 // events, running them through a chain of SSEHook implementations before
 // forwarding them to the downstream consumer (typically CopyResponse).
@@ -25,6 +30,7 @@ type SSETap struct {
 	upstreamEOF  bool          // set once the upstream reader returns io.EOF
 	hooks        []SSEHook
 	mu           sync.Mutex
+	readBuf      [readChunkSize]byte // reusable read buffer — avoids per-Read allocation
 }
 
 // NewSSETap creates a new SSETap wrapping reader. If no hooks are provided
@@ -43,6 +49,8 @@ func (t *SSETap) Read(p []byte) (int, error) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 
+	noProgressCount := 0
+
 	for {
 		// 1. Drain any buffered output first.
 		if t.outputBuffer.Len() > 0 {
@@ -54,11 +62,11 @@ func (t *SSETap) Read(p []byte) (int, error) {
 			return 0, io.EOF
 		}
 
-		// 3. Read a chunk from the upstream body.
-		chunk := make([]byte, readChunkSize)
-		n, err := t.reader.Read(chunk)
+		// 3. Read a chunk from the upstream body (reusing the struct-level buffer).
+		n, err := t.reader.Read(t.readBuf[:])
 		if n > 0 {
-			t.inputBuffer = append(t.inputBuffer, chunk[:n]...)
+			t.inputBuffer = append(t.inputBuffer, t.readBuf[:n]...)
+			noProgressCount = 0
 		}
 
 		if err == io.EOF {
@@ -67,10 +75,29 @@ func (t *SSETap) Read(p []byte) (int, error) {
 			return 0, err
 		}
 
+		// Guard against upstream readers that return (0, nil), which violates
+		// the io.Reader contract but can happen in practice. Bail out after a
+		// few consecutive no-progress reads to avoid spinning.
+		if n == 0 && err == nil {
+			noProgressCount++
+			if noProgressCount >= 3 {
+				return 0, io.ErrNoProgress
+			}
+			continue
+		}
+
 		// 4. Process any complete events in the input buffer.
 		t.processInputBuffer()
 
-		// 5. If we produced output, the next iteration will return it.
+		// 5. If the input buffer has grown past the safety limit without
+		// producing a complete event boundary, flush it as-is (fail-open)
+		// to prevent unbounded memory growth from a malicious upstream.
+		if len(t.inputBuffer) > maxInputBufferSize {
+			t.outputBuffer.Write(t.inputBuffer)
+			t.inputBuffer = nil
+		}
+
+		// 6. If we produced output, the next iteration will return it.
 		// If upstream hit EOF but processInputBuffer produced nothing,
 		// flush any remaining unparseable bytes as-is (fail-open).
 		if t.outputBuffer.Len() == 0 && t.upstreamEOF {
@@ -113,7 +140,8 @@ func (t *SSETap) processInputBuffer() {
 			return
 		}
 
-		t.inputBuffer = rest
+		// Copy rest into a new slice so the old backing array can be GC'd.
+		t.inputBuffer = append([]byte(nil), rest...)
 
 		if passthrough {
 			// No hooks: forward raw bytes unchanged.
