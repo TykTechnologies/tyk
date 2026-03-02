@@ -157,20 +157,24 @@ func TestREDMetrics_ResponseFlag(t *testing.T) {
 	assertMetricExists(t, `http_server_request_duration_seconds_count{tyk_api_id="3",tyk_response_flag="URS"}`)
 }
 
-func TestREDMetrics_DoNotTrackIndependence(t *testing.T) {
+
+func TestDoNotTrack_NoMetrics(t *testing.T) {
 	if gwProfile() != "default" {
 		t.Skip("only runs under default profile")
 	}
 	waitForGateway(t)
 
-	// The test API has do_not_track: true, but OTel API metrics should still be recorded.
-	sendTraffic(t, "GET", gatewayURL+"/test/ip", 10)
+	// Send traffic exclusively to the do_not_track API (api_id=4, /notrack/).
+	sendTraffic(t, "GET", gatewayURL+"/notrack/ip", 10)
 
-	// If metrics are recorded despite do_not_track, these should all exist.
-	assertMetricGTE(t, `tyk_api_requests_total{tyk_api_id="3"}`, 10)
-	assertMetricExists(t, `http_server_request_duration_seconds_count{tyk_api_id="3"}`)
-	assertMetricExists(t, `tyk_gateway_request_duration_seconds_count{tyk_api_id="3"}`)
-	assertMetricExists(t, `tyk_upstream_request_duration_seconds_count{tyk_api_id="3"}`)
+	// Allow time for a full export + scrape cycle before asserting absence.
+	time.Sleep(15 * time.Second)
+
+	// No metric should carry api_id="4".
+	assertMetricAbsent(t, `tyk_api_requests_total{tyk_api_id="4"}`)
+	assertMetricAbsent(t, `http_server_request_duration_seconds_count{tyk_api_id="4"}`)
+	assertMetricAbsent(t, `tyk_gateway_request_duration_seconds_count{tyk_api_id="4"}`)
+	assertMetricAbsent(t, `tyk_upstream_request_duration_seconds_count{tyk_api_id="4"}`)
 }
 
 func TestREDMetrics_AllDimensionsPresent(t *testing.T) {
