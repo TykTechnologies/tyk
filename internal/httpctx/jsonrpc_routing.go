@@ -23,6 +23,14 @@ type JSONRPCRoutingState struct {
 	// Metadata for debugging and telemetry
 	VEMChain    []string // Full planned chain (for debugging)
 	VisitedVEMs []string // VEMs we've visited so far
+
+	// Resolved primitive info for policy enforcement.
+	// PrimitiveType is one of: mcp.PrimitiveTypeTool, PrimitiveTypeResource, PrimitiveTypePrompt,
+	// or "" for non-primitive methods (initialize, ping, tools/list, etc.).
+	PrimitiveType string
+	// PrimitiveName is the resolved primitive identifier (tool name, resource URI, prompt name).
+	// Set from the JSON-RPC params at parse time; empty for non-primitive methods.
+	PrimitiveName string
 }
 
 var routingStateValue = NewValue[*JSONRPCRoutingState](ctx.JSONRPCRoutingState)
