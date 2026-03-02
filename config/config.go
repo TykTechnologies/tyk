@@ -739,9 +739,9 @@ type SecurityConfig struct {
 	// Specify public keys used for Certificate Pinning on global level.
 	PinnedPublicKeys map[string]string `json:"pinned_public_keys"`
 
-	// AllowUnsafeDynamicMTLSToken controls whether certificate presence is required for
-	// dynamic mTLS authentication. If set to false (default), requests with a token but
-	// no certificate will be rejected for APIs using dynamic mTLS.
+	// AllowUnsafeDynamicMTLSToken is provided for backward compatibility with clients that are authorized using just the
+	// token for APIs secured with legacy Dynamic mTLS. If set to false (default), the client certificate must be presented
+	// and the mTLS handshake will be enforced. This is the recommended setting.
 	AllowUnsafeDynamicMTLSToken bool `json:"allow_unsafe_dynamic_mtls_token"`
 
 	Certificates CertificatesConfig `json:"certificates"`
@@ -880,7 +880,6 @@ type Config struct {
 	AllowRemoteConfig bool `bson:"allow_remote_config" json:"allow_remote_config"`
 
 	// Set to true to enable the /config and /env endpoints for configuration inspection.
-	// These endpoints require X-Tyk-Authorization header with the secret value.
 	// Default: false
 	EnableConfigInspection bool `json:"enable_config_inspection"`
 
