@@ -16,12 +16,9 @@ import (
 
 	"github.com/TykTechnologies/tyk-pump/analytics"
 	"github.com/TykTechnologies/tyk/config"
-	ctxpkg "github.com/TykTechnologies/tyk/ctx"
-
 	"github.com/TykTechnologies/tyk/header"
 	"github.com/TykTechnologies/tyk/internal/httpctx"
 	jsonrpcerrors "github.com/TykTechnologies/tyk/internal/jsonrpc/errors"
-	"github.com/TykTechnologies/tyk/internal/otel/apimetrics"
 	"github.com/TykTechnologies/tyk/request"
 )
 
@@ -95,7 +92,6 @@ type TemplateExecutor interface {
 // HandleError is the actual error handler and will store the error details in analytics if analytics processing is enabled.
 func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMsg string, errCode int, writeResponse bool) {
 	defer e.Base().UpdateRequestSession(r)
-	e.Base().Gw.MetricInstruments.RecordRequest(r.Context())
 	response := &http.Response{}
 
 	if writeResponse {
@@ -117,34 +113,6 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 			Gateway:  totalMs, // All time is gateway time for errors
 		}
 	}
-
-	// Record API metrics with error context.
-	rc := &apimetrics.RequestContext{
-		Request:         r,
-		StatusCode:      errCode,
-		APIID:           e.Spec.APIID,
-		APIName:         e.Spec.Name,
-		OrgID:           e.Spec.OrgID,
-		ListenPath:      e.Spec.Proxy.ListenPath,
-		IPAddress:       request.RealIP(r),
-		LatencyTotal:    latency.Total,
-		LatencyUpstream: latency.Upstream,
-		LatencyGateway:  latency.Gateway,
-	}
-	if v := e.Spec.getVersionFromRequest(r); v != "" {
-		rc.APIVersion = v
-	}
-	if e.Base().Gw.MetricInstruments.NeedsSession() {
-		rc.Session = ctxGetSession(r)
-		rc.Token = ctxGetAuthToken(r)
-	}
-	if e.Base().Gw.MetricInstruments.NeedsContext() {
-		rc.ContextVariables = ctxGetData(r)
-	}
-	if errClass := ctxpkg.GetErrorClassification(r); errClass != nil {
-		rc.ErrorClassification = string(errClass.Flag)
-	}
-	e.Base().Gw.MetricInstruments.RecordAPIMetrics(r.Context(), rc)
 
 	if e.Spec.DoNotTrack || ctxGetDoNotTrack(r) {
 		return
@@ -289,6 +257,7 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 	}
 
 	e.RecordAccessLog(r, response, latency)
+	e.Base().RecordMetrics(r, errCode, latency, nil)
 
 	// Report in health check
 	reportHealthValue(e.Spec, BlockedRequestLog, "-1")

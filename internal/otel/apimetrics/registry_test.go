@@ -29,8 +29,8 @@ func TestNewInstrumentRegistry_DefaultInstruments(t *testing.T) {
 	require.NoError(t, err)
 	assert.Len(t, reg.instruments, 4, "expected 4 default instruments")
 
-	// Default instruments use session source (api_key, oauth_id in counter).
-	assert.True(t, reg.NeedsSession(), "defaults use session source")
+	// Default instruments do not use session source.
+	assert.False(t, reg.NeedsSession(), "defaults do not use session source")
 	// Default instruments only use metadata and session, not context or response_header.
 	assert.False(t, reg.NeedsContext(), "defaults do not use context source")
 	assert.False(t, reg.NeedsResponse(), "defaults do not use response_header source")

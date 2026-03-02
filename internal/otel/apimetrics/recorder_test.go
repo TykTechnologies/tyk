@@ -668,8 +668,6 @@ func TestRecordAPIMetrics_DefaultConfig(t *testing.T) {
 				}},
 				{Name: "tyk.api.requests.total", Type: "counter", Sum: 1, Attrs: map[string]string{
 					"http.request.method": "GET", "http.response.status_code": "200", "tyk.api.id": "gw-api",
-					"tyk.api.key":      "efghij", // truncateKey: last 6 of "tok-abcdefghij"
-					"tyk.api.oauth_id": "oa-1",
 				}},
 			},
 		},

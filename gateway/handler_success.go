@@ -20,7 +20,6 @@ import (
 	graphqlinternal "github.com/TykTechnologies/tyk/internal/graphql"
 	"github.com/TykTechnologies/tyk/internal/httputil"
 	"github.com/TykTechnologies/tyk/internal/otel"
-	"github.com/TykTechnologies/tyk/internal/otel/apimetrics"
 	"github.com/TykTechnologies/tyk/request"
 	"github.com/TykTechnologies/tyk/user"
 )
@@ -444,38 +443,8 @@ func (s *SuccessHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) *http
 		s.RecordHit(r, latency, resp.Response.StatusCode, resp.Response, false)
 		s.RecordAccessLog(r, resp.Response, latency)
 
-		// Record API metrics with full request context.
-		rc := &apimetrics.RequestContext{
-			Request:         r,
-			StatusCode:      resp.Response.StatusCode,
-			APIID:           s.Spec.APIID,
-			APIName:         s.Spec.Name,
-			OrgID:           s.Spec.OrgID,
-			ListenPath:      s.Spec.Proxy.ListenPath,
-			IPAddress:       request.RealIP(r),
-			LatencyTotal:    latency.Total,
-			LatencyUpstream: latency.Upstream,
-			LatencyGateway:  latency.Gateway,
-		}
-		if v := s.Spec.getVersionFromRequest(r); v != "" {
-			rc.APIVersion = v
-		}
-		if s.Base().Gw.MetricInstruments.NeedsSession() {
-			rc.Session = ctxGetSession(r)
-			rc.Token = ctxGetAuthToken(r)
-		}
-		if s.Base().Gw.MetricInstruments.NeedsContext() {
-			rc.ContextVariables = ctxGetData(r)
-		}
-		if s.Base().Gw.MetricInstruments.NeedsResponse() {
-			rc.Response = resp.Response
-		}
-		if errClass := ctx.GetErrorClassification(r); errClass != nil {
-			rc.ErrorClassification = string(errClass.Flag)
-		}
-		s.Base().Gw.MetricInstruments.RecordAPIMetrics(r.Context(), rc)
+		s.Base().RecordMetrics(r, resp.Response.StatusCode, latency, resp.Response)
 	}
-	s.Base().Gw.MetricInstruments.RecordRequest(r.Context())
 	log.Debug("Done proxy")
 
 	return nil
@@ -522,36 +491,7 @@ func (s *SuccessHandler) ServeHTTPWithCache(w http.ResponseWriter, r *http.Reque
 		s.RecordHit(r, latency, inRes.Response.StatusCode, inRes.Response, false)
 		s.RecordAccessLog(r, inRes.Response, latency)
 
-		// Record API metrics with full request context.
-		rc := &apimetrics.RequestContext{
-			Request:         r,
-			StatusCode:      inRes.Response.StatusCode,
-			APIID:           s.Spec.APIID,
-			APIName:         s.Spec.Name,
-			OrgID:           s.Spec.OrgID,
-			ListenPath:      s.Spec.Proxy.ListenPath,
-			IPAddress:       request.RealIP(r),
-			LatencyTotal:    latency.Total,
-			LatencyUpstream: latency.Upstream,
-			LatencyGateway:  latency.Gateway,
-		}
-		if v := s.Spec.getVersionFromRequest(r); v != "" {
-			rc.APIVersion = v
-		}
-		if s.Base().Gw.MetricInstruments.NeedsSession() {
-			rc.Session = ctxGetSession(r)
-			rc.Token = ctxGetAuthToken(r)
-		}
-		if s.Base().Gw.MetricInstruments.NeedsContext() {
-			rc.ContextVariables = ctxGetData(r)
-		}
-		if s.Base().Gw.MetricInstruments.NeedsResponse() {
-			rc.Response = inRes.Response
-		}
-		if errClass := ctx.GetErrorClassification(r); errClass != nil {
-			rc.ErrorClassification = string(errClass.Flag)
-		}
-		s.Base().Gw.MetricInstruments.RecordAPIMetrics(r.Context(), rc)
+		s.Base().RecordMetrics(r, inRes.Response.StatusCode, latency, inRes.Response)
 	}
 
 	return inRes

@@ -203,7 +203,7 @@ func TestREDMetrics_AllDimensionsPresent(t *testing.T) {
 		"tyk_response_flag",
 	})
 
-	// tyk.api.requests.total has: method, response_code, api_id, api_key, oauth_id.
+	// tyk.api.requests.total has: method, response_code, api_id.
 	assertMetricHasLabels(t, "tyk_api_requests_total", []string{
 		"http_request_method",
 		"http_response_status_code",

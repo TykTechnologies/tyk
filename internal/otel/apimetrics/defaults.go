@@ -47,8 +47,6 @@ func DefaultAPIMetrics() []APIMetricDefinition {
 				{Source: "metadata", Key: "method", Label: "http.request.method"},
 				{Source: "metadata", Key: "response_code", Label: "http.response.status_code"},
 				{Source: "metadata", Key: "api_id", Label: "tyk.api.id"},
-				{Source: "session", Key: "api_key", Label: "tyk.api.key"},
-				{Source: "session", Key: "oauth_id", Label: "tyk.api.oauth_id"},
 			},
 		},
 	}
