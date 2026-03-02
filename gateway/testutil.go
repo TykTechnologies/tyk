@@ -1064,7 +1064,7 @@ func generateUniqueTestTag(testName string) string {
 
 	suffix := make([]byte, 8)
 	if _, err := rand.Read(suffix); err != nil {
-		log.Error(fmt.Sprintf("failed to generate random bytes for test tag: %v", err))
+		log.Error(fmt.Sprintf("failed to generate random bytes for test tag: %s", err.Error()))
 
 		return fmt.Sprintf("%s-%x", cleanName, time.Now().UnixNano())
 	}
