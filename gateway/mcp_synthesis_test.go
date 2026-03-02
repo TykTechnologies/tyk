@@ -220,7 +220,6 @@ func TestSynthesizeMCPEndpoints_PreservesExistingEndpoints(t *testing.T) {
 	assert.Equal(t, jsonrpc.MethodVEMPrefix+"tools/call", ad.Endpoints[1].Path)
 }
 
-
 func TestSynthesizeMCPEndpoints_MethodIsHttpMethodPost(t *testing.T) {
 	ad := &user.AccessDefinition{
 		JSONRPCMethods: []user.JSONRPCMethodLimit{
