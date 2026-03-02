@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/TykTechnologies/tyk/regexp"
 	"io"
 	"io/ioutil"
 	"net"
@@ -2874,5 +2875,44 @@ func TestAddInternalMWtoMCPOperations(t *testing.T) {
 		loader.addInternalMWtoMCPOperations(spec, extendedPaths)
 
 		assert.Empty(t, extendedPaths.Internal)
+	})
+}
+
+func TestURLAllowedAndIgnored_CORSPreflight(t *testing.T) {
+	spec := APISpec{
+		APIDefinition: &apidef.APIDefinition{
+			CORS: apidef.CORSConfig{
+				Enable:             true,
+				OptionsPassthrough: false,
+			},
+		},
+	}
+
+	testPath := "/test"
+	compile, _ := regexp.Compile(testPath)
+	paths := []URLSpec{
+		{
+			spec:   compile,
+			Status: WhiteList,
+			Whitelist: apidef.EndPointMeta{
+				Disabled: false,
+				Path:     testPath,
+				Method:   http.MethodGet,
+			},
+		},
+	}
+
+	req := httptest.NewRequest(http.MethodOptions, testPath, nil)
+	req.Header.Set("Access-Control-Request-Method", http.MethodGet)
+
+	t.Run("should return StatusOkAndIgnore for CORS preflight request when CORS is enabled", func(t *testing.T) {
+		status, _ := spec.URLAllowedAndIgnored(req, paths, false)
+		assert.Equal(t, StatusOkAndIgnore, status)
+	})
+
+	t.Run("should return EndPointNotAllowed for CORS preflight request when CORS is disabled - GET on Whitelist", func(t *testing.T) {
+		spec.CORS.Enable = false
+		status, _ := spec.URLAllowedAndIgnored(req, paths, true)
+		assert.Equal(t, EndPointNotAllowed, status)
 	})
 }
