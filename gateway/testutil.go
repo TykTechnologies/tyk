@@ -1045,7 +1045,7 @@ type SlaveDataCenter struct {
 var nonAlphanumericRegex = regexp.MustCompile(`[^a-zA-Z0-9 ]+`)
 
 // generateUniqueTestTag creates a sanitized, unique tag from a test name to be used
-// for isolating tests that write to Redis.
+// for isolating tests that interact with Redis.
 func generateUniqueTestTag(testName string) (string, error) {
 	const defaultName = "test"
 
