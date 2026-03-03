@@ -407,4 +407,3 @@ func TestCacheCertificate(t *testing.T) {
 		})
 	}
 }
-

@@ -554,6 +554,7 @@ func (t *BaseMiddleware) CheckSessionAndIdentityForValidKey(originalKey string, 
 				t.Logger().Error(err)
 				return session, false
 			}
+			NormalizeMCPEndpoints(&session)
 			return session, true
 		}
 	}
@@ -579,6 +580,7 @@ func (t *BaseMiddleware) CheckSessionAndIdentityForValidKey(originalKey string, 
 			t.Logger().Error(err)
 			return session, false
 		}
+		NormalizeMCPEndpoints(&session)
 		t.Logger().Debug("Got key")
 		return session, true
 	}
@@ -610,6 +612,7 @@ func (t *BaseMiddleware) CheckSessionAndIdentityForValidKey(originalKey string, 
 			t.Logger().Error(err)
 			return session, false
 		}
+		NormalizeMCPEndpoints(&session)
 
 		t.Logger().Debug("Lifetime is: ", session.Lifetime(t.Spec.GetSessionLifetimeRespectsKeyExpiration(), t.Spec.SessionLifetime, t.Gw.GetConfig().ForceGlobalSessionLifetime, t.Gw.GetConfig().GlobalSessionLifetime))
 

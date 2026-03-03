@@ -77,7 +77,6 @@ func (m *mockWebhookCertificateManager) CertPool(certIDs []string) *x509.CertPoo
 
 func (m *mockWebhookCertificateManager) FlushCache() {}
 
-
 func TestWebHookHandler_ProxyIntegration(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
