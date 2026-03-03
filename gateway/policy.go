@@ -105,6 +105,35 @@ func (gw *Gateway) validateMCPFieldsInAccessRights(accessRights map[string]user.
 	return nil
 }
 
+// hasNonMCPFields returns true if the access definition contains any HTTP/REST or
+// GraphQL fields that have no meaning in the MCP (JSON-RPC) protocol.
+func hasNonMCPFields(ar user.AccessDefinition) bool {
+	return len(ar.AllowedURLs) > 0 ||
+		len(ar.Endpoints) > 0 ||
+		len(ar.RestrictedTypes) > 0 ||
+		len(ar.AllowedTypes) > 0 ||
+		ar.DisableIntrospection ||
+		len(ar.FieldAccessRights) > 0
+}
+
+// validateNonMCPFieldsOnMCPProxy returns an error if HTTP/REST or GraphQL access-right
+// fields are set on a known MCP Proxy. Unknown APIs are skipped (fail-open).
+func (gw *Gateway) validateNonMCPFieldsOnMCPProxy(accessRights map[string]user.AccessDefinition) error {
+	for apiID, ar := range accessRights {
+		if !hasNonMCPFields(ar) {
+			continue
+		}
+		spec := gw.getApiSpec(apiID)
+		if spec == nil {
+			continue
+		}
+		if spec.IsMCP() {
+			return fmt.Errorf("HTTP/REST and GraphQL fields cannot be configured on MCP Proxies, API %q is an MCP Proxy", apiID)
+		}
+	}
+	return nil
+}
+
 func (d *DBPolicy) ToRegularPolicy() user.Policy {
 	policy := d.Policy
 	policy.AccessRights = make(map[string]user.AccessDefinition)
