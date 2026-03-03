@@ -80,12 +80,22 @@ func (p *ReverseProxy) handleCopyError(rw http.ResponseWriter, copyErr error, is
 		flusher.Flush()
 	}
 
-	// Hijack the connection and close it so it cannot be reused via keep-alive.
-	// The error event has already been flushed to the client's TCP receive
-	// buffer. After Hijack, Go's net/http server will not touch the connection.
-	if hj, ok := rw.(http.Hijacker); ok {
-		if conn, _, err := hj.Hijack(); err == nil {
-			conn.Close()
+	// Hijack the connection and close it so it cannot be reused via keep-alive,
+	// but only when prepareSSEStreaming cleared the write deadline. Without the
+	// hijack, Go's net/http server would return the connection to the keep-alive
+	// pool with no write deadline, risking goroutine leaks if the client stalls.
+	//
+	// When the deadline was NOT cleared (regular SSE proxying), we must not
+	// hijack because that would prevent the HTTP server from sending the
+	// chunked transfer-encoding termination, causing the client to see an
+	// unexpected EOF.
+	deadlineCleared := p.TykAPISpec.Proxy.SSEWriteTimeout == 0 &&
+		(p.TykAPISpec.Proxy.SSEWriteTimeoutDisabled || p.TykAPISpec.IsMCP())
+	if deadlineCleared {
+		if hj, ok := rw.(http.Hijacker); ok {
+			if conn, _, err := hj.Hijack(); err == nil {
+				conn.Close()
+			}
 		}
 	}
 }
