@@ -1,4 +1,4 @@
-ARG GO_VERSION=1.23
+ARG GO_VERSION=1.25
 FROM golang:${GO_VERSION}-bullseye
 
 # Build essentials
