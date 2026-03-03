@@ -23,6 +23,8 @@ type (
 
 	MetricsRetryConfig = otelconfig.MetricsRetryConfig
 
+	SpanBatchConfig = otelconfig.SpanBatchConfig
+
 	SpanAttribute = tyktrace.Attribute
 
 	Span = tyktrace.Span

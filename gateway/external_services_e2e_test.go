@@ -80,7 +80,6 @@ func (m *mockE2ECertificateManager) CertPool(certIDs []string) *x509.CertPool {
 
 func (m *mockE2ECertificateManager) FlushCache() {}
 
-
 func TestE2E_OAuthFlowWithProxyAndmTLS(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
