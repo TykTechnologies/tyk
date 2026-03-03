@@ -87,7 +87,12 @@ func TestGateway_afterConfSetup(t *testing.T) {
 							ResourceName:      "tyk-gateway",
 							ConnectionTimeout: 1,
 						},
-						SpanProcessorType:  "batch",
+						SpanProcessorType: "batch",
+						SpanBatchConfig: otel.SpanBatchConfig{
+							MaxQueueSize:       2048,
+							MaxExportBatchSize: 512,
+							BatchTimeout:       5,
+						},
 						ContextPropagation: "tracecontext",
 						Sampling: otel.Sampling{
 							Type: "AlwaysOn",
