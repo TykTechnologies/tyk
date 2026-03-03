@@ -2889,7 +2889,9 @@ func TestURLAllowedAndIgnored_CORSPreflight(t *testing.T) {
 	}
 
 	testPath := "/test"
-	compile, _ := regexp.Compile(testPath)
+	compile, err := regexp.Compile(testPath)
+	assert.NoError(t, err)
+
 	paths := []URLSpec{
 		{
 			spec:   compile,
@@ -2902,16 +2904,35 @@ func TestURLAllowedAndIgnored_CORSPreflight(t *testing.T) {
 		},
 	}
 
+	headerKey := "Access-Control-Request-Method"
 	req := httptest.NewRequest(http.MethodOptions, testPath, nil)
-	req.Header.Set("Access-Control-Request-Method", http.MethodGet)
+	req.Header.Set(headerKey, http.MethodGet)
 
 	t.Run("should return StatusOkAndIgnore for CORS preflight request when CORS is enabled", func(t *testing.T) {
-		status, _ := spec.URLAllowedAndIgnored(req, paths, false)
+		spec.CORS.Enable = true
+		spec.CORS.OptionsPassthrough = false
+		status, _ := spec.URLAllowedAndIgnored(req, paths, true)
 		assert.Equal(t, StatusOkAndIgnore, status)
+	})
+
+	t.Run("should return EndPointNotAllowed when CORS passthrough is enabled", func(t *testing.T) {
+		spec.CORS.Enable = true
+		spec.CORS.OptionsPassthrough = true
+		status, _ := spec.URLAllowedAndIgnored(req, paths, true)
+		assert.Equal(t, EndPointNotAllowed, status)
 	})
 
 	t.Run("should return EndPointNotAllowed for CORS preflight request when CORS is disabled - GET on Whitelist", func(t *testing.T) {
 		spec.CORS.Enable = false
+		spec.CORS.OptionsPassthrough = false
+		status, _ := spec.URLAllowedAndIgnored(req, paths, true)
+		assert.Equal(t, EndPointNotAllowed, status)
+	})
+
+	t.Run("should return EndPointNotAllowed for normal OPTIONS request", func(t *testing.T) {
+		req.Header.Del(headerKey)
+		spec.CORS.Enable = true
+		spec.CORS.OptionsPassthrough = false
 		status, _ := spec.URLAllowedAndIgnored(req, paths, true)
 		assert.Equal(t, EndPointNotAllowed, status)
 	})
