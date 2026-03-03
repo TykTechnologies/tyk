@@ -18,7 +18,7 @@ import (
 	"github.com/TykTechnologies/tyk/config"
 )
 
-// TestSSE_MCP_WriteTimeoutBypass verifies that MCP APIs clear the write
+// TestSSE_MCP_WriteTimeoutBypass verifies that MCP Proxies clear the write
 // deadline for SSE streams so that a short write_timeout does not kill
 // long-lived connections. Without the fix the 1-second write_timeout
 // would terminate the stream before all events are delivered.
@@ -55,6 +55,7 @@ func TestSSE_MCP_WriteTimeoutBypass(t *testing.T) {
 		spec.Proxy.ListenPath = "/"
 		spec.UseKeylessAccess = true
 		spec.MarkAsMCP()
+		spec.Proxy.SSEWriteTimeoutDisabled = true
 	})
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -122,6 +123,74 @@ func TestSSE_MCP_ContentTypeWithCharset(t *testing.T) {
 		spec.Proxy.ListenPath = "/"
 		spec.UseKeylessAccess = true
 		spec.MarkAsMCP()
+		spec.Proxy.SSEWriteTimeoutDisabled = true
+	})
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, ts.URL, nil)
+	require.NoError(t, err)
+	req.Header.Set("Accept", "text/event-stream")
+
+	resp, err := http.DefaultClient.Do(req)
+	require.NoError(t, err)
+	defer resp.Body.Close()
+
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+
+	scanner := bufio.NewScanner(resp.Body)
+	var events []string
+	for scanner.Scan() {
+		line := scanner.Text()
+		if strings.HasPrefix(line, "data: ") {
+			events = append(events, line)
+		}
+	}
+
+	if assert.Len(t, events, eventCount) {
+		for i := 0; i < eventCount; i++ {
+			assert.Equal(t, fmt.Sprintf("data: %d", i), events[i])
+		}
+	}
+}
+
+// TestSSE_WriteTimeoutDisabled_NonMCP verifies that a non-MCP Proxy with
+// SSEWriteTimeoutDisabled set to true also clears the write deadline,
+// allowing streams to survive past the gateway-level write_timeout.
+func TestSSE_WriteTimeoutDisabled_NonMCP(t *testing.T) {
+	const eventCount = 5
+
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "text/event-stream")
+		w.Header().Set("Cache-Control", "no-cache")
+		w.Header().Set("Connection", "keep-alive")
+
+		flusher, ok := w.(http.Flusher)
+		if !ok {
+			http.Error(w, "streaming unsupported", http.StatusInternalServerError)
+			return
+		}
+
+		for i := 0; i < eventCount; i++ {
+			fmt.Fprintf(w, "data: %d\n\n", i)
+			flusher.Flush()
+			time.Sleep(300 * time.Millisecond) // total ~1.5s, exceeds 1s write_timeout
+		}
+	}))
+	defer upstream.Close()
+
+	ts := StartTest(func(globalConf *config.Config) {
+		globalConf.HttpServerOptions.EnableWebSockets = false
+		globalConf.HttpServerOptions.WriteTimeout = 1 // 1 second
+	})
+	defer ts.Close()
+
+	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		spec.Proxy.TargetURL = upstream.URL
+		spec.Proxy.ListenPath = "/"
+		spec.UseKeylessAccess = true
+		spec.Proxy.SSEWriteTimeoutDisabled = true
 	})
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
