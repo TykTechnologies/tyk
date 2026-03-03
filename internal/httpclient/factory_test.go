@@ -458,7 +458,6 @@ func (m *mockCertificateManager) CertPool(certIDs []string) *x509.CertPool {
 
 func (m *mockCertificateManager) FlushCache() {}
 
-
 // Helper function to create a mock certificate for testing
 func createMockCertificate() *tls.Certificate {
 	return &tls.Certificate{
