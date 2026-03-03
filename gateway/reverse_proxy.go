@@ -1562,6 +1562,13 @@ func (p *ReverseProxy) prepareSSEStreaming(rw http.ResponseWriter, body io.Close
 // handleCopyError sends an SSE error event to the client when the upstream
 // body copy fails unexpectedly. Client-initiated disconnects (context.Canceled)
 // are silently ignored.
+//
+// After writing and flushing the error event, the function hijacks the
+// underlying TCP connection and closes it. This prevents Go's net/http server
+// from returning the connection to the keep-alive pool. Without this, the
+// pooled connection retains a cleared write deadline (from
+// prepareSSEStreaming), and any subsequent request reusing that connection
+// would have no write deadline, risking goroutine leaks if the client stalls.
 func (p *ReverseProxy) handleCopyError(rw http.ResponseWriter, copyErr error, isSSE bool) {
 	if !isSSE {
 		return
@@ -1575,6 +1582,15 @@ func (p *ReverseProxy) handleCopyError(rw http.ResponseWriter, copyErr error, is
 	_, _ = io.WriteString(rw, errorEvent)
 	if flusher, ok := rw.(http.Flusher); ok {
 		flusher.Flush()
+	}
+
+	// Hijack the connection and close it so it cannot be reused via keep-alive.
+	// The error event has already been flushed to the client's TCP receive
+	// buffer. After Hijack, Go's net/http server will not touch the connection.
+	if hj, ok := rw.(http.Hijacker); ok {
+		if conn, _, err := hj.Hijack(); err == nil {
+			conn.Close()
+		}
 	}
 }
 
