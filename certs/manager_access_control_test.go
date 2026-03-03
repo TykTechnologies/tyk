@@ -30,4 +30,3 @@ func TestCertificateManager_GetRaw(t *testing.T) {
 		assert.Equal(t, "", certData)
 	})
 }
-
