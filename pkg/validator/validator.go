@@ -10,7 +10,7 @@ import (
 	"github.com/TykTechnologies/tyk/pkg/identifier"
 )
 
-const customIdValidatorTag = "custom_id"
+const customIdValidatorTag = "custom_policy_id"
 
 type Validator interface {
 	Validate(v any) error
@@ -41,9 +41,9 @@ func New(opts ...Option) Validator {
 	}
 
 	if !cfg.allowUnsafePolicyIds {
-		validator.autoregister(identifier.Custom(""))
+		validator.autoregister(identifier.CustomPolicyId(""))
 		validator.mustRegisterValidator(customIdValidatorTag, func(fl govalidator.FieldLevel) bool {
-			return identifier.Custom(fl.Field().String()).Validate() == nil
+			return identifier.CustomPolicyId(fl.Field().String()).Validate() == nil
 		})
 	} else {
 		validator.mustRegisterValidator(customIdValidatorTag, func(_ govalidator.FieldLevel) bool {

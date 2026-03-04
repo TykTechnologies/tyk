@@ -12,19 +12,19 @@ import (
 
 func Test_Validate(t *testing.T) {
 	type parentStruct struct {
-		Id string `validate:"custom_id"`
+		Id string `validate:"custom_policy_id"`
 	}
 
 	t.Run("WithAllowUnsafePolicyIds=true", func(t *testing.T) {
 		validator := tykvalidator.New(tykvalidator.WithAllowUnsafePolicyIds(true))
 
-		t.Run("ignores invalid custom_id", func(t *testing.T) {
-			id := identifier.Custom("żuk")
+		t.Run("ignores invalid custom_policy_id", func(t *testing.T) {
+			id := identifier.CustomPolicyId("żuk")
 			err := validator.Validate(id)
 			assert.NoError(t, err)
 		})
 
-		t.Run("ignores build-in custom_id tag", func(t *testing.T) {
+		t.Run("ignores build-in custom_policy_id tag", func(t *testing.T) {
 			err := validator.Validate(&parentStruct{
 				Id: "żuk",
 			})
@@ -36,7 +36,7 @@ func Test_Validate(t *testing.T) {
 		validator := tykvalidator.New(tykvalidator.WithAllowUnsafePolicyIds(false))
 
 		t.Run("validates", func(t *testing.T) {
-			id := identifier.Custom("żuk")
+			id := identifier.CustomPolicyId("żuk")
 			err := validator.Validate(id)
 			assert.ErrorIs(t, err, identifier.ErrInvalidCustomId)
 		})

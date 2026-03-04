@@ -7,23 +7,23 @@ import (
 )
 
 var (
-	validRe            = regexp.MustCompile(`^[a-zA-Z0-9.\-_~]+$`)
-	ErrInvalidCustomId = errpack.Domain("Invalid custom ID: Allowed characters: a-z, A-Z, 0-9, ., _, -, ~")
+	validPolicyRe      = regexp.MustCompile(`^[a-zA-Z0-9.\-_~]+$`)
+	ErrInvalidCustomId = errpack.Domain("Invalid Policy id ID: Allowed characters: a-z, A-Z, 0-9, ., _, -, ~")
 )
 
-// Custom (user-defined-identifier)
-type Custom string
+// CustomPolicyId (user-defined-identifier)
+type CustomPolicyId string
 
-func (c Custom) String() string {
+func (c CustomPolicyId) String() string {
 	return string(c)
 }
 
-func (c Custom) Validate() error {
+func (c CustomPolicyId) Validate() error {
 	if len(c) == 0 {
 		return nil
 	}
 
-	if !validRe.MatchString(string(c)) {
+	if !validPolicyRe.MatchString(string(c)) {
 		return ErrInvalidCustomId
 	}
 
