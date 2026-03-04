@@ -1098,16 +1098,6 @@ func (gw *Gateway) newPolicyPathRoot() (*osutil.Root, error) {
 	return osutil.NewRoot(policyPath)
 }
 
-func (gw *Gateway) removePersistentPolicyById(id string) error {
-	root, err := gw.newPolicyPathRoot()
-
-	if err != nil {
-		return err
-	}
-
-	return root.Remove(id + ".json")
-}
-
 func (gw *Gateway) handleAddOrUpdatePolicy(polID string, r *http.Request) (interface{}, int) {
 	if gw.GetConfig().Policies.PolicySource == "service" {
 		log.Error("Rejected new policy due to PolicySource = service")

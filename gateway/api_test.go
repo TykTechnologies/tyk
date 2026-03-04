@@ -6066,3 +6066,13 @@ func TestAPIListFilter_IncludeTypes(t *testing.T) {
 		assert.True(t, apiIDs["mcp789"], "Should have MCP API")
 	})
 }
+
+func (gw *Gateway) removePersistentPolicyById(id string) error {
+	root, err := gw.newPolicyPathRoot()
+
+	if err != nil {
+		return err
+	}
+
+	return root.Remove(id + ".json")
+}
