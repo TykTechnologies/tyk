@@ -52,6 +52,7 @@ import (
 	"github.com/TykTechnologies/tyk/dnscache"
 	"github.com/TykTechnologies/tyk/header"
 	"github.com/TykTechnologies/tyk/internal/cache"
+	"github.com/TykTechnologies/tyk/internal/compression"
 	"github.com/TykTechnologies/tyk/internal/crypto"
 	"github.com/TykTechnologies/tyk/internal/httputil"
 	"github.com/TykTechnologies/tyk/internal/model"
@@ -1776,6 +1777,8 @@ func (gw *Gateway) afterConfSetup() {
 
 		conf.OpenTelemetry.SetDefaults()
 	}
+
+	compression.SetDecompressedSizeLimit(conf.Storage.DecompressedSizeLimit)
 
 	gw.SetConfig(conf)
 }

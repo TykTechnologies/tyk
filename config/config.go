@@ -207,6 +207,9 @@ type StorageOptionsConf struct {
 	//
 	// Defaults to `false`.
 	CompressAPIDefinitions bool `json:"compress_api_definitions"`
+	// Maximum size of API definitions stored in Redis RPC backups.
+	// Defaults to 100MB.
+	DecompressedSizeLimit int `json:"decompressed_size_limit"`
 }
 
 type NormalisedURLConfig struct {
