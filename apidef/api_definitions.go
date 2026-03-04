@@ -1042,19 +1042,6 @@ type ProxyConfig struct {
 		SSLForceCommonNameCheck bool     `json:"ssl_force_common_name_check"`
 		ProxyURL                string   `bson:"proxy_url" json:"proxy_url"`
 	} `bson:"transport" json:"transport"`
-
-	// SSEWriteTimeout is an optional idle timeout (in seconds) for SSE streaming responses.
-	// When set to a value > 0, the write deadline resets after each successful write.
-	// If no data is written within this window the connection is closed.
-	// When not set (0), the behavior depends on SSEWriteTimeoutDisabled:
-	// if true the deadline is cleared; otherwise the server write_timeout applies.
-	SSEWriteTimeout int `bson:"sse_write_timeout" json:"sse_write_timeout"`
-
-	// SSEWriteTimeoutDisabled, when true, clears the write deadline entirely for
-	// SSE streaming responses, allowing streams to live indefinitely regardless of
-	// the gateway-level write_timeout. When false (default), SSE responses respect
-	// the gateway-level write_timeout unless SSEWriteTimeout is set to a value > 0.
-	SSEWriteTimeoutDisabled bool `bson:"sse_write_timeout_disabled" json:"sse_write_timeout_disabled"`
 }
 
 type CORSConfig struct {
@@ -1465,7 +1452,6 @@ func (a *APIDefinition) IsMCP() bool {
 // MarkAsMCP configures the API definition as a Model Context Protocol (MCP) API.
 func (a *APIDefinition) MarkAsMCP() {
 	a.SetProtocol(JsonRPC20, AppProtocolMCP)
-	a.Proxy.SSEWriteTimeoutDisabled = true
 }
 
 // IsChildAPI returns true if this API is a child API in a versioning hierarchy.
