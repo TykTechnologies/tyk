@@ -1369,7 +1369,7 @@ type Config struct {
 	// PrometheusConfig holds the configuration for Prometheus
 	PrometheusConfig PrometheusConfig `json:"prometheus_config"`
 }
-type PrometheusConfig metrics.Config
+type PrometheusConfig = metrics.Config
 
 // LabsConfig include config for streaming
 type LabsConfig map[string]interface{}

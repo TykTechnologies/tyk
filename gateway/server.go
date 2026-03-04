@@ -533,7 +533,7 @@ func (gw *Gateway) setupGlobals() {
 	mainNotifierStore := &storage.RedisCluster{ConnectionHandler: gw.StorageConnectionHandler}
 	mainNotifierStore.Connect()
 
-	gw.metrics = lo.Must(metrics.New(metrics.Config{}))
+	gw.metrics = lo.Must(metrics.New(gwConfig.PrometheusConfig))
 
 	gw.MainNotifier = &RedisNotifier{mainNotifierStore, RedisPubSubChannel, gw}
 	gw.MainNotifier = gw.metrics.DecorateNotifier(gw.MainNotifier)
