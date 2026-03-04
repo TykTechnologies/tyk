@@ -214,7 +214,7 @@ func TestPolicyAPI(t *testing.T) {
 			AdminAuth: true,
 			Data:      serializePolicy(t, invalidBodyPol),
 			Code:      http.StatusBadRequest,
-			BodyMatch: identifier.ErrInvalidCustomId.Error(),
+			BodyMatch: identifier.ErrInvalidCustomPolicyId.Error(),
 		})
 		assert.NoError(t, err)
 
@@ -226,7 +226,7 @@ func TestPolicyAPI(t *testing.T) {
 			AdminAuth: true,
 			Data:      serializePolicy(t, invalidBodyPol), // sending "invalid/id" in body
 			Code:      http.StatusBadRequest,
-			BodyMatch: identifier.ErrInvalidCustomId.Error(),
+			BodyMatch: identifier.ErrInvalidCustomPolicyId.Error(),
 		})
 		assert.NoError(t, err)
 	})

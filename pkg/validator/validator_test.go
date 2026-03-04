@@ -38,7 +38,7 @@ func Test_Validate(t *testing.T) {
 		t.Run("validates", func(t *testing.T) {
 			id := identifier.CustomPolicyId("żuk")
 			err := validator.Validate(id)
-			assert.ErrorIs(t, err, identifier.ErrInvalidCustomId)
+			assert.ErrorIs(t, err, identifier.ErrInvalidCustomPolicyId)
 		})
 
 		t.Run("rejects validation of build-in struct", func(t *testing.T) {

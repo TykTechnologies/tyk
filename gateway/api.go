@@ -1122,7 +1122,7 @@ func (gw *Gateway) handleAddOrUpdatePolicy(polID string, r *http.Request) (inter
 
 	if err := gw.validator.Validate(identifier.CustomPolicyId(newPol.ID)); err != nil {
 		log.WithField("id", newPol.ID).WithError(err).Error("Failed to validate policy ID")
-		return apiError(identifier.ErrInvalidCustomId.Error()), http.StatusBadRequest
+		return apiError(identifier.ErrInvalidCustomPolicyId.Error()), http.StatusBadRequest
 	}
 
 	if polID != "" && newPol.ID != polID && r.Method == http.MethodPut {
