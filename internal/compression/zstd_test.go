@@ -313,6 +313,16 @@ func TestDecompressZstd_MaxSizeLimit(t *testing.T) {
 	}
 }
 
+func TestSetMaxDecompressedSize_ClampsBelowMinimum(t *testing.T) {
+	orig := maxDecompressedSize
+	defer SetMaxDecompressedSize(orig)
+
+	SetMaxDecompressedSize(512) // well below 1MB minimum
+	if maxDecompressedSize != minDecompressedSize {
+		t.Errorf("expected maxDecompressedSize to be clamped to %d, got %d", minDecompressedSize, maxDecompressedSize)
+	}
+}
+
 func TestIsZstdCompressed_WithActualCompressedData(t *testing.T) {
 	// Test with actual compressed data
 	original := []byte(`{"api_id":"test","name":"Test API"}`)

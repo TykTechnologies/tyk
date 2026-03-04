@@ -96,6 +96,11 @@ func DecompressZstd(data []byte) ([]byte, error) {
 	return decompressed, nil
 }
 
+// GetMaxDecompressedSize returns the current maximum allowed decompressed size.
+func GetMaxDecompressedSize() uint64 {
+	return maxDecompressedSize
+}
+
 // SetMaxDecompressedSize updates the maximum allowed decompressed size
 // and reinitializes the decoder pool with the new limit.
 // Values below 1MB are clamped to 1MB with a warning.
