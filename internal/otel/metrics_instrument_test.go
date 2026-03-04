@@ -3,6 +3,7 @@ package otel
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
@@ -18,11 +19,36 @@ func noopProvider(t *testing.T) *MetricInstruments {
 	return NewMetricInstruments(provider, logrus.New())
 }
 
+// runConcurrent launches n goroutines each calling fn iter times,
+// then waits for all to complete.
+func runConcurrent(n, iter int, fn func()) {
+	done := make(chan struct{})
+	for range n {
+		go func() {
+			defer func() { done <- struct{}{} }()
+			for range iter {
+				fn()
+			}
+		}()
+	}
+	for range n {
+		<-done
+	}
+}
+
 func TestNewMetricInstruments(t *testing.T) {
 	inst := noopProvider(t)
 	assert.NotNil(t, inst)
 	assert.NotNil(t, inst.provider)
 	assert.NotNil(t, inst.requestCounter)
+}
+
+func TestNewMetricInstruments_ConfigFields(t *testing.T) {
+	inst := noopProvider(t)
+	assert.NotNil(t, inst.apisLoaded)
+	assert.NotNil(t, inst.policiesLoaded)
+	assert.NotNil(t, inst.reloadCounter)
+	assert.NotNil(t, inst.reloadDuration)
 }
 
 func TestRecordRequest_Noop(t *testing.T) {
@@ -38,19 +64,9 @@ func TestRecordRequest_Concurrent(t *testing.T) {
 	inst := noopProvider(t)
 	ctx := context.Background()
 
-	// Concurrent calls must not race or panic
-	done := make(chan struct{})
-	for range 10 {
-		go func() {
-			defer func() { done <- struct{}{} }()
-			for range 100 {
-				inst.RecordRequest(ctx)
-			}
-		}()
-	}
-	for range 10 {
-		<-done
-	}
+	runConcurrent(10, 100, func() {
+		inst.RecordRequest(ctx)
+	})
 }
 
 func TestShutdown_Noop(t *testing.T) {
@@ -67,5 +83,41 @@ func TestShutdown_Idempotent(t *testing.T) {
 	require.NotPanics(t, func() {
 		//nolint:errcheck // second shutdown may error; we only assert no panic
 		inst.Shutdown(ctx)
+	})
+}
+
+func TestRecordConfigState_Noop(t *testing.T) {
+	inst := noopProvider(t)
+
+	// Must not panic on noop provider
+	require.NotPanics(t, func() {
+		inst.RecordConfigState(context.Background(), 5, 3)
+	})
+}
+
+func TestRecordReload_Noop(t *testing.T) {
+	inst := noopProvider(t)
+
+	// Must not panic on noop provider
+	require.NotPanics(t, func() {
+		inst.RecordReload(context.Background(), 250*time.Millisecond)
+	})
+}
+
+func TestRecordConfigState_Concurrent(t *testing.T) {
+	inst := noopProvider(t)
+	ctx := context.Background()
+
+	runConcurrent(10, 100, func() {
+		inst.RecordConfigState(ctx, 10, 5)
+	})
+}
+
+func TestRecordReload_Concurrent(t *testing.T) {
+	inst := noopProvider(t)
+	ctx := context.Background()
+
+	runConcurrent(10, 100, func() {
+		inst.RecordReload(ctx, 100*time.Millisecond)
 	})
 }

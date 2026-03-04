@@ -1181,6 +1181,8 @@ func (gw *Gateway) DoReload() {
 	gw.reloadMu.Lock()
 	defer gw.reloadMu.Unlock()
 
+	start := time.Now()
+
 	// Initialize/reset the JSVM
 	if gw.GetConfig().EnableJSVM {
 		gw.GlobalEventsJSVM.DeInit()
@@ -1211,6 +1213,9 @@ func (gw *Gateway) DoReload() {
 	}
 
 	gw.loadGlobalApps()
+
+	gw.MetricInstruments.RecordReload(gw.ctx, time.Since(start))
+	gw.MetricInstruments.RecordConfigState(gw.ctx, gw.apisByIDLen(), gw.policies.PolicyCount())
 
 	gw.performedSuccessfulReload = true
 	mainLog.Info("API reload complete")
@@ -1327,6 +1332,7 @@ func (gw *Gateway) reloadLoop(tick <-chan time.Time, complete ...func()) {
 			if len(complete) != 0 {
 				complete[0]()
 			}
+
 			mainLog.Infof("reload: cycle completed in %v", time.Since(start))
 		}
 	}

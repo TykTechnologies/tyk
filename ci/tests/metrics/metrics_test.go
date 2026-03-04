@@ -54,6 +54,23 @@ func TestRequestCounter(t *testing.T) {
 	assertMetricGTE(t, "tyk_http_requests_total", N)
 }
 
+func TestConfigMetrics(t *testing.T) {
+	waitForGateway(t)
+
+	// The gateway loads 1 API from the apps/ directory on startup, which
+	// triggers a reload cycle. After the initial load the config metrics
+	// should be populated.
+
+	// Gauge: tyk.gateway.apis.loaded → tyk_gateway_apis_loaded
+	assertMetricGTE(t, "tyk_gateway_apis_loaded", 1)
+
+	// Counter: tyk.gateway.config.reload → tyk_gateway_config_reload_total
+	assertMetricGTE(t, "tyk_gateway_config_reload_total", 1)
+
+	// Histogram: tyk.gateway.config.reload.duration (unit s) → tyk_gateway_config_reload_duration_seconds_count
+	assertMetricExists(t, "tyk_gateway_config_reload_duration_seconds_count")
+}
+
 // --- helpers ---
 
 func waitForGateway(t *testing.T) {
@@ -100,6 +117,12 @@ func queryPrometheus(t *testing.T, query string) (float64, bool) {
 		fmt.Sscanf(s, "%f", &val)
 	}
 	return val, true
+}
+
+// assertMetricExists polls Prometheus until the metric has at least one result.
+func assertMetricExists(t *testing.T, metric string) {
+	t.Helper()
+	assertMetricGTE(t, metric, 0)
 }
 
 // assertMetricGTE polls Prometheus until metric >= expected or times out.
