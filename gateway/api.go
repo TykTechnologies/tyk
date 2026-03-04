@@ -80,7 +80,6 @@ const (
 	KeyListingWorkerEntriesPerKey = 100
 	errInvalidAPIID               = "Invalid API ID"
 	errInvalidAPIIDFmt            = errInvalidAPIID + " %q: %v"
-	errMsgInvalidPolicyID         = "Invalid Policy ID. Allowed characters: a-z, A-Z, 0-9, ., _, -, ~"
 )
 
 var (
@@ -1123,7 +1122,7 @@ func (gw *Gateway) handleAddOrUpdatePolicy(polID string, r *http.Request) (inter
 
 	if err := gw.validator.Validate(identifier.Custom(newPol.ID)); err != nil {
 		log.WithField("id", newPol.ID).WithError(err).Error("Failed to validate policy ID")
-		return apiError(errMsgInvalidPolicyID), http.StatusBadRequest
+		return apiError(identifier.ErrInvalidCustomId.Error()), http.StatusBadRequest
 	}
 
 	if polID != "" && newPol.ID != polID && r.Method == http.MethodPut {

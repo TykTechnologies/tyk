@@ -20,6 +20,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/TykTechnologies/tyk/pkg/identifier"
 	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
@@ -177,7 +178,7 @@ func TestPolicyAPI(t *testing.T) {
 		})
 	})
 
-	t.Run("GET does not fail if exitent policy has broken ID", func(t *testing.T) {
+	t.Run("GET does not fail if existent policy has broken ID", func(t *testing.T) {
 		invalidURLID := "invalid@id"
 
 		ts.CreatePolicy(func(p *user.Policy) {
@@ -213,7 +214,7 @@ func TestPolicyAPI(t *testing.T) {
 			AdminAuth: true,
 			Data:      serializePolicy(t, invalidBodyPol),
 			Code:      http.StatusBadRequest,
-			BodyMatch: errMsgInvalidPolicyID,
+			BodyMatch: identifier.ErrInvalidCustomId.Error(),
 		})
 		assert.NoError(t, err)
 
@@ -225,7 +226,7 @@ func TestPolicyAPI(t *testing.T) {
 			AdminAuth: true,
 			Data:      serializePolicy(t, invalidBodyPol), // sending "invalid/id" in body
 			Code:      http.StatusBadRequest,
-			BodyMatch: errMsgInvalidPolicyID,
+			BodyMatch: identifier.ErrInvalidCustomId.Error(),
 		})
 		assert.NoError(t, err)
 	})
