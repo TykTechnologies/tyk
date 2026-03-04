@@ -1,6 +1,9 @@
 package errpack
 
-import "fmt"
+import (
+	"errors"
+	"fmt"
+)
 
 var (
 	TypeUnknown        = Type{typ: "unknown"}
@@ -45,9 +48,18 @@ func (e Error) Error() string {
 	return fmt.Sprintf("%s: %s", e.msg, e.prev.Error())
 }
 
-// Chain sets error predecessor
-func (e Error) Chain(err error) Error {
-	e.prev = err
+func (e Error) Unwrap() error {
+	return e.prev
+}
+
+func (e Error) Is(other error) bool {
+	var typed Error
+	return errors.As(other, &typed) && typed.typ == e.typ && typed.msg == e.msg
+}
+
+// Wrap sets predecessor error
+func (e Error) Wrap(prev error) Error {
+	e.prev = prev
 	return e
 }
 

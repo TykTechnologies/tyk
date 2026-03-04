@@ -13,6 +13,7 @@ import (
 	"github.com/kelseyhightower/envconfig"
 
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/internal/metrics"
 	"github.com/TykTechnologies/tyk/internal/otel"
 	logger "github.com/TykTechnologies/tyk/log"
 	"github.com/TykTechnologies/tyk/regexp"
@@ -1364,7 +1365,11 @@ type Config struct {
 
 	// JWKS holds the configuration for Tyk JWKS functionalities
 	JWKS JWKSConfig `json:"jwks"`
+
+	// PrometheusConfig holds the configuration for Prometheus
+	PrometheusConfig PrometheusConfig `json:"prometheus_config"`
 }
+type PrometheusConfig metrics.Config
 
 // LabsConfig include config for streaming
 type LabsConfig map[string]interface{}

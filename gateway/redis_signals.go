@@ -6,7 +6,6 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
-
 	"strconv"
 	"strings"
 	"sync"
@@ -15,6 +14,7 @@ import (
 	temporalmodel "github.com/TykTechnologies/storage/temporal/model"
 
 	"github.com/TykTechnologies/tyk/internal/crypto"
+	"github.com/TykTechnologies/tyk/internal/interfaces"
 	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/storage/kv"
 )
@@ -79,6 +79,7 @@ func (gw *Gateway) startPubSubLoop() {
 		default:
 		}
 
+		gw.metrics.IncrPubSubDisconnect()
 		gw.logPubSubError(err, message)
 		gw.addPubSubDelay(10 * time.Second)
 	}
@@ -237,6 +238,8 @@ type RedisNotifier struct {
 	channel string
 	*Gateway
 }
+
+var _ interfaces.Notifier = new(RedisNotifier)
 
 // Notify will send a notification to a channel
 func (r *RedisNotifier) Notify(notif interface{}) bool {
