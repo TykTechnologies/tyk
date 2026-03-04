@@ -157,6 +157,69 @@ func TestREDMetrics_ResponseFlag(t *testing.T) {
 	assertMetricExists(t, `http_server_request_duration_seconds_count{tyk_api_id="3",tyk_response_flag="URS"}`)
 }
 
+func TestResourceAttributes(t *testing.T) {
+	waitForGateway(t)
+
+	// Send traffic to generate metrics.
+	const N = 10
+	for i := range N {
+		resp, err := http.Get(gatewayURL + "/test/ip")
+		if err != nil {
+			t.Fatalf("request %d: %v", i, err)
+		}
+		resp.Body.Close()
+	}
+
+	// Test 1: Verify target_info has all resource attributes
+	t.Run("target_info_has_resource_attributes", func(t *testing.T) {
+		query := `target_info{job="tyk-gateway"}`
+
+		// tyk_gw_id must be present and non-empty
+		gwID := assertLabelPresent(t, query, "tyk_gw_id")
+		t.Logf("Gateway ID: %s", gwID)
+
+		// tyk_gw_dataplane must equal "false" (standalone mode, not dataplane)
+		assertLabelEquals(t, query, "tyk_gw_dataplane", "false")
+
+		// tyk_gw_group_id should NOT be present (only in dataplane mode)
+		// Skip this check for standalone mode
+
+		// tyk_gw_tags must contain configured segment tags
+		assertLabelContains(t, query, "tyk_gw_tags", "production")
+		assertLabelContains(t, query, "tyk_gw_tags", "edge")
+		assertLabelContains(t, query, "tyk_gw_tags", "e2e-test")
+	})
+
+	// Test 2: Verify resource_to_telemetry_conversion works
+	// Resource attributes should appear as direct labels on metrics
+	t.Run("resource_attributes_on_metrics", func(t *testing.T) {
+		query := `tyk_http_requests_total`
+
+		// tyk_gw_id should appear as a direct label on the metric
+		gwID := assertLabelPresent(t, query, "tyk_gw_id")
+		t.Logf("tyk_http_requests_total has tyk_gw_id=%s", gwID)
+
+		// tyk_gw_dataplane should appear as a direct label (false for standalone)
+		assertLabelEquals(t, query, "tyk_gw_dataplane", "false")
+
+		// tyk_gw_tags should appear as a direct label
+		assertLabelContains(t, query, "tyk_gw_tags", "production")
+		assertLabelContains(t, query, "tyk_gw_tags", "edge")
+		assertLabelContains(t, query, "tyk_gw_tags", "e2e-test")
+	})
+
+	// Test 3: Verify standard OTel resource attributes are present
+	t.Run("standard_otel_attributes", func(t *testing.T) {
+		query := `target_info{job="tyk-gateway"}`
+
+		// Standard attributes should be present
+		assertLabelPresent(t, query, "service_name")
+		assertLabelPresent(t, query, "service_version")
+		assertLabelPresent(t, query, "host_name")
+		assertLabelPresent(t, query, "process_pid")
+	})
+}
+
 
 func TestDoNotTrack_NoMetrics(t *testing.T) {
 	if gwProfile() != "default" {
@@ -644,4 +707,104 @@ func assertMetricHasLabels(t *testing.T, metric string, expectedLabels []string)
 	}
 	labels, _ := queryPrometheusLabels(t, metric)
 	t.Fatalf("%s missing expected labels; have %v, want %v", metric, labels, expectedLabels)
+}
+
+// queryPrometheusLabels runs an instant PromQL query and returns the first result's labels.
+func queryPrometheusLabels(t *testing.T, query string) (map[string]string, bool) {
+	t.Helper()
+	u := fmt.Sprintf("%s/api/v1/query?query=%s", prometheusURL, url.QueryEscape(query))
+	resp, err := http.Get(u)
+	if err != nil {
+		return nil, false
+	}
+	defer resp.Body.Close()
+
+	var result promQueryResult
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, false
+	}
+	if result.Status != "success" || len(result.Data.Result) == 0 {
+		return nil, false
+	}
+
+	return result.Data.Result[0].Metric, true
+}
+
+// assertLabelPresent polls Prometheus until the label is present on the metric or times out.
+func assertLabelPresent(t *testing.T, query, labelKey string) string {
+	t.Helper()
+	deadline := time.Now().Add(pollTimeout)
+	for time.Now().Before(deadline) {
+		labels, ok := queryPrometheusLabels(t, query)
+		if ok {
+			if val, exists := labels[labelKey]; exists && val != "" {
+				t.Logf("%s has label %s=%q OK", query, labelKey, val)
+				return val
+			}
+		}
+		time.Sleep(pollInterval)
+	}
+	// Final attempt for error message.
+	labels, _ := queryPrometheusLabels(t, query)
+	t.Fatalf("%s missing label %s, got labels: %v", query, labelKey, labels)
+	return ""
+}
+
+// assertLabelEquals polls Prometheus until the label equals expected value or times out.
+func assertLabelEquals(t *testing.T, query, labelKey, expected string) {
+	t.Helper()
+	deadline := time.Now().Add(pollTimeout)
+	for time.Now().Before(deadline) {
+		labels, ok := queryPrometheusLabels(t, query)
+		if ok {
+			if val, exists := labels[labelKey]; exists && val == expected {
+				t.Logf("%s has label %s=%q OK", query, labelKey, val)
+				return
+			}
+		}
+		time.Sleep(pollInterval)
+	}
+	// Final attempt for error message.
+	labels, _ := queryPrometheusLabels(t, query)
+	actualVal := labels[labelKey]
+	t.Fatalf("%s label %s=%q, expected %q", query, labelKey, actualVal, expected)
+}
+
+// assertLabelContains polls Prometheus until the label contains expected substring or times out.
+func assertLabelContains(t *testing.T, query, labelKey, expected string) {
+	t.Helper()
+	deadline := time.Now().Add(pollTimeout)
+	for time.Now().Before(deadline) {
+		labels, ok := queryPrometheusLabels(t, query)
+		if ok {
+			if val, exists := labels[labelKey]; exists {
+				// For array-like labels like tyk_gw_tags, check if substring is present
+				if len(val) > 0 && (val == expected || containsSubstring(val, expected)) {
+					t.Logf("%s has label %s containing %q OK", query, labelKey, expected)
+					return
+				}
+			}
+		}
+		time.Sleep(pollInterval)
+	}
+	// Final attempt for error message.
+	labels, _ := queryPrometheusLabels(t, query)
+	actualVal := labels[labelKey]
+	t.Fatalf("%s label %s=%q does not contain %q", query, labelKey, actualVal, expected)
+}
+
+// containsSubstring checks if s contains substr (simple string search).
+func containsSubstring(s, substr string) bool {
+	return len(s) >= len(substr) && (s == substr || len(s) > len(substr) &&
+		(s[:len(substr)] == substr || s[len(s)-len(substr):] == substr ||
+			findInString(s, substr)))
+}
+
+func findInString(s, substr string) bool {
+	for i := 0; i <= len(s)-len(substr); i++ {
+		if s[i:i+len(substr)] == substr {
+			return true
+		}
+	}
+	return false
 }
