@@ -7,12 +7,14 @@ import (
 
 	"github.com/klauspost/compress/zstd"
 	"github.com/sirupsen/logrus"
+
+	logger "github.com/TykTechnologies/tyk/log"
 )
 
 var maxDecompressedSize uint64 = 100 * 1024 * 1024
 
 var (
-	log = logrus.WithField("prefix", "compression")
+	log = logger.Get().WithField("prefix", "compression")
 
 	// zstdMagicBytes are the magic bytes that identify a Zstd frame
 	// See: https://github.com/facebook/zstd/blob/dev/doc/zstd_compression_format.md#zstandard-frames
@@ -49,7 +51,7 @@ func SetDecompressedSizeLimit(limitMB int) {
 		return
 	}
 	maxDecompressedSize = uint64(limitMB) * 1024 * 1024
-	log.WithField("limit_mb", limitMB).Info("Zstd decompressed size limit set")
+	log.WithField("limit_mb", limitMB).Debug("Zstd decompressed size limit set")
 	decoderPool = sync.Pool{
 		New: func() interface{} {
 			decoder, err := zstd.NewReader(nil, zstd.WithDecoderMaxMemory(maxDecompressedSize))
