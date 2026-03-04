@@ -37,9 +37,5 @@ func RequestScheme(r *http.Request) string {
 // It returns true if the request's method is OPTIONS and the Access-Control-Request-Method header is present
 // and not empty, which are the conditions for a standard preflight request. Otherwise, it returns false.
 func IsCORSPreflightRequest(r *http.Request) bool {
-	if r.Method == http.MethodOptions && r.Header.Get("Access-Control-Request-Method") != "" {
-		return true
-	}
-
-	return false
+	return r.Method == http.MethodOptions && r.Header.Get("Access-Control-Request-Method") != ""
 }
