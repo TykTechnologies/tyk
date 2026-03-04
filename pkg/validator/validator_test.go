@@ -15,8 +15,8 @@ func Test_Validate(t *testing.T) {
 		Id string `validate:"custom_id"`
 	}
 
-	t.Run("WithDisabledPolicyIdValidation=true", func(t *testing.T) {
-		validator := tykvalidator.New(tykvalidator.WithDisabledPolicyIdValidation(true))
+	t.Run("WithAllowUnsafePolicyIds=true", func(t *testing.T) {
+		validator := tykvalidator.New(tykvalidator.WithAllowUnsafePolicyIds(true))
 
 		t.Run("ignores invalid custom_id", func(t *testing.T) {
 			id := identifier.Custom("żuk")
@@ -32,8 +32,8 @@ func Test_Validate(t *testing.T) {
 		})
 	})
 
-	t.Run("WithDisabledPolicyIdValidation=false", func(t *testing.T) {
-		validator := tykvalidator.New(tykvalidator.WithDisabledPolicyIdValidation(false))
+	t.Run("WithAllowUnsafePolicyIds=false", func(t *testing.T) {
+		validator := tykvalidator.New(tykvalidator.WithAllowUnsafePolicyIds(false))
 
 		t.Run("validates", func(t *testing.T) {
 			id := identifier.Custom("żuk")

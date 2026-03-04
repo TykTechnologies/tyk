@@ -21,7 +21,7 @@ type Option func(*validatorCfg)
 type ValidateFn func(val reflect.Value) error
 
 type validatorCfg struct {
-	disablePolicyIdValidation bool
+	allowUnsafePolicyIds bool
 }
 
 type customValidator interface {
@@ -40,7 +40,7 @@ func New(opts ...Option) Validator {
 		apply(&cfg)
 	}
 
-	if !cfg.disablePolicyIdValidation {
+	if !cfg.allowUnsafePolicyIds {
 		validator.autoregister(identifier.Custom(""))
 		validator.mustRegisterValidator(customIdValidatorTag, func(fl govalidator.FieldLevel) bool {
 			return identifier.Custom(fl.Field().String()).Validate() == nil
@@ -115,8 +115,8 @@ func (v *validatorImpl) autoregister(val customValidator) {
 	}
 }
 
-func WithDisabledPolicyIdValidation(disabled bool) Option {
+func WithAllowUnsafePolicyIds(disabled bool) Option {
 	return func(cfg *validatorCfg) {
-		cfg.disablePolicyIdValidation = disabled
+		cfg.allowUnsafePolicyIds = disabled
 	}
 }

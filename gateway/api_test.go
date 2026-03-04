@@ -86,7 +86,7 @@ func TestPolicyAPI(t *testing.T) {
 	ts := StartTest(func(cnf *config.Config) {
 		cnf.Policies.PolicyPath = "."
 		cnf.Policies.PolicySource = "file"
-		cnf.DisableCustomIdValidation = true
+		cnf.AllowUnsafePolicyIds = true
 	})
 
 	defer ts.Close()
@@ -197,7 +197,7 @@ func TestPolicyAPI(t *testing.T) {
 
 	t.Run("fails create/update if ID contains invalid characters", func(t *testing.T) {
 		ts.setTestScopeConfig(t, func(cnf *config.Config) {
-			cnf.DisableCustomIdValidation = false
+			cnf.AllowUnsafePolicyIds = false
 		})
 
 		invalidBodyPol := user.Policy{
@@ -231,9 +231,9 @@ func TestPolicyAPI(t *testing.T) {
 		assert.NoError(t, err)
 	})
 
-	t.Run("does not fail on create/update if ID contains invalid characters and when DisableCustomIdValidation=true", func(t *testing.T) {
+	t.Run("does not fail on create/update if ID contains invalid characters and when AllowUnsafePolicyIds=true", func(t *testing.T) {
 		ts.setTestScopeConfig(t, func(cnf *config.Config) {
-			cnf.DisableCustomIdValidation = true
+			cnf.AllowUnsafePolicyIds = true
 		})
 
 		t.Cleanup(func() {

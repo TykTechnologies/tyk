@@ -1614,7 +1614,7 @@ func (gw *Gateway) initSystem() error {
 
 func (gw *Gateway) initMembers(cfg config.Config) {
 	gw.validator = validator.New(
-		validator.WithDisabledPolicyIdValidation(cfg.DisableCustomIdValidation),
+		validator.WithAllowUnsafePolicyIds(cfg.AllowUnsafePolicyIds),
 	)
 }
 
