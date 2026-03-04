@@ -23,6 +23,7 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/internal/condition"
 	"github.com/TykTechnologies/tyk/apidef/oas"
 	"github.com/TykTechnologies/tyk/coprocess"
 	"github.com/TykTechnologies/tyk/rpc"
@@ -90,6 +91,18 @@ func (gw *Gateway) skipSpecBecauseInvalid(spec *APISpec, logger *logrus.Entry) b
 	if err != nil {
 		logger.Error("couldn't parse target URL: ", err)
 		return true
+	}
+
+	// Validate condition expressions on rate limit entries
+	for _, vInfo := range spec.VersionData.Versions {
+		for _, rl := range vInfo.ExtendedPaths.RateLimit {
+			if rl.Condition != "" {
+				if _, err := condition.Compile(rl.Condition); err != nil {
+					logger.WithError(err).Errorf("invalid condition on rate limit %s %s", rl.Method, rl.Path)
+					return true
+				}
+			}
+		}
 	}
 
 	return false

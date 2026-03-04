@@ -6,6 +6,8 @@ import (
 	"net"
 	"sort"
 	"strings"
+
+	"github.com/TykTechnologies/tyk/internal/condition"
 )
 
 type ValidationResult struct {
@@ -59,6 +61,7 @@ var DefaultValidationRuleSet = ValidationRuleSet{
 	&RuleValidateEnforceTimeout{},
 	&RuleUpstreamAuth{},
 	&RuleLoadBalancingTargets{},
+	&RuleValidateConditions{},
 }
 
 func Validate(definition *APIDefinition, ruleSet ValidationRuleSet) ValidationResult {
@@ -268,5 +271,27 @@ func (r *RuleLoadBalancingTargets) Validate(apiDef *APIDefinition, validationRes
 	if len(apiDef.Proxy.Targets) == 0 {
 		validationResult.IsValid = false
 		validationResult.AppendError(ErrAllLoadBalancingTargetsZeroWeight)
+	}
+}
+
+// RuleValidateConditions validates condition expressions on rate limit entries.
+type RuleValidateConditions struct{}
+
+// Validate checks that all condition expressions on rate limit entries compile successfully.
+func (r *RuleValidateConditions) Validate(apiDef *APIDefinition, validationResult *ValidationResult) {
+	if apiDef.VersionData.Versions == nil {
+		return
+	}
+
+	for _, vInfo := range apiDef.VersionData.Versions {
+		for _, rl := range vInfo.ExtendedPaths.RateLimit {
+			if rl.Condition == "" {
+				continue
+			}
+			if _, err := condition.Compile(rl.Condition); err != nil {
+				validationResult.IsValid = false
+				validationResult.AppendError(fmt.Errorf("invalid condition %q on rate limit %s %s: %w", rl.Condition, rl.Method, rl.Path, err))
+			}
+		}
 	}
 }

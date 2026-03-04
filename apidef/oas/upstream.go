@@ -939,21 +939,34 @@ func (r *RateLimit) ExtractTo(api *apidef.APIDefinition) {
 	api.GlobalRateLimit.Per = r.Per.Seconds()
 }
 
-// RateLimitEndpoint carries same settings as RateLimit but for endpoints.
-type RateLimitEndpoint RateLimit
+// RateLimitEndpoint carries same settings as RateLimit but for endpoints,
+// with an additional Condition field for conditional evaluation.
+type RateLimitEndpoint struct {
+	// Enabled activates the rate limit for this endpoint.
+	Enabled bool `bson:"enabled" json:"enabled"`
+	// Rate is the number of requests allowed in the given time period.
+	Rate int `bson:"rate" json:"rate"`
+	// Per is the time period for the rate limit.
+	Per ReadableDuration `bson:"per" json:"per"`
+	// Condition is an optional expression evaluated per-request.
+	// If the condition evaluates to false, this rate limit entry is skipped.
+	Condition string `bson:"condition,omitempty" json:"condition,omitempty"`
+}
 
-// Fill fills *RateLimit from apidef.RateLimitMeta.
+// Fill fills *RateLimitEndpoint from apidef.RateLimitMeta.
 func (r *RateLimitEndpoint) Fill(api apidef.RateLimitMeta) {
 	r.Enabled = !api.Disabled
 	r.Rate = int(api.Rate)
 	r.Per = ReadableDuration(time.Duration(api.Per) * time.Second)
+	r.Condition = api.Condition
 }
 
-// ExtractTo extracts *Ratelimit into *apidef.RateLimitMeta.
+// ExtractTo extracts *RateLimitEndpoint into *apidef.RateLimitMeta.
 func (r *RateLimitEndpoint) ExtractTo(meta *apidef.RateLimitMeta) {
 	meta.Disabled = !r.Enabled
 	meta.Rate = float64(r.Rate)
 	meta.Per = r.Per.Seconds()
+	meta.Condition = r.Condition
 }
 
 // UpstreamAuth holds the configurations related to upstream API authentication.

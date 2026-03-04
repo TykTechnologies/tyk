@@ -861,3 +861,30 @@ func TestVersionDefinition_ResolvedDefault(t *testing.T) {
 		})
 	}
 }
+
+func TestRateLimitMeta_ConditionField_JSONRoundTrip(t *testing.T) {
+	meta := RateLimitMeta{
+		Path:      "/api",
+		Method:    "GET",
+		Rate:      100,
+		Per:       60,
+		Condition: `request.method == "GET"`,
+	}
+
+	data, err := json.Marshal(meta)
+	assert.NoError(t, err)
+
+	var decoded RateLimitMeta
+	err = json.Unmarshal(data, &decoded)
+	assert.NoError(t, err)
+	assert.Equal(t, meta.Condition, decoded.Condition)
+}
+
+func TestRateLimitMeta_ConditionField_BackwardCompat(t *testing.T) {
+	data := `{"path":"/api","method":"GET","rate":100,"per":60}`
+
+	var meta RateLimitMeta
+	err := json.Unmarshal([]byte(data), &meta)
+	assert.NoError(t, err)
+	assert.Equal(t, "", meta.Condition)
+}

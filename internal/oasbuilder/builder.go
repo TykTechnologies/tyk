@@ -209,7 +209,11 @@ func (eb *EndpointBuilder) RateLimit(amount uint, duration time.Duration, enable
 	if rl, err := newRateLimit(amount, duration, enabled...); err != nil {
 		eb.errors = append(eb.errors, err)
 	} else {
-		eb.operation().RateLimit = (*oas.RateLimitEndpoint)(rl)
+		eb.operation().RateLimit = &oas.RateLimitEndpoint{
+			Enabled: rl.Enabled,
+			Rate:    rl.Rate,
+			Per:     rl.Per,
+		}
 	}
 
 	return eb

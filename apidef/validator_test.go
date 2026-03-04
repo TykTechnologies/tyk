@@ -583,3 +583,81 @@ func TestRuleLoadBalancingTargets_Validate(t *testing.T) {
 		t.Run(tc.name, runValidationTest(tc.apiDef, ruleSet, tc.result))
 	}
 }
+
+func TestRuleValidateConditions(t *testing.T) {
+	ruleSet := ValidationRuleSet{&RuleValidateConditions{}}
+
+	t.Run("valid condition", runValidationTest(
+		&APIDefinition{
+			VersionData: VersionData{
+				Versions: map[string]VersionInfo{
+					"Default": {
+						ExtendedPaths: ExtendedPathsSet{
+							RateLimit: []RateLimitMeta{
+								{Path: "/api", Method: "GET", Rate: 100, Per: 60, Condition: `request.method == "GET"`},
+							},
+						},
+					},
+				},
+			},
+		},
+		ruleSet,
+		ValidationResult{IsValid: true},
+	))
+
+	t.Run("empty condition", runValidationTest(
+		&APIDefinition{
+			VersionData: VersionData{
+				Versions: map[string]VersionInfo{
+					"Default": {
+						ExtendedPaths: ExtendedPathsSet{
+							RateLimit: []RateLimitMeta{
+								{Path: "/api", Method: "GET", Rate: 100, Per: 60},
+							},
+						},
+					},
+				},
+			},
+		},
+		ruleSet,
+		ValidationResult{IsValid: true},
+	))
+
+	t.Run("invalid syntax", func(t *testing.T) {
+		apiDef := &APIDefinition{
+			VersionData: VersionData{
+				Versions: map[string]VersionInfo{
+					"Default": {
+						ExtendedPaths: ExtendedPathsSet{
+							RateLimit: []RateLimitMeta{
+								{Path: "/api", Method: "GET", Rate: 100, Per: 60, Condition: `request.method ==`},
+							},
+						},
+					},
+				},
+			},
+		}
+		result := Validate(apiDef, ruleSet)
+		assert.False(t, result.IsValid)
+		assert.Len(t, result.Errors, 1)
+	})
+
+	t.Run("bad regex", func(t *testing.T) {
+		apiDef := &APIDefinition{
+			VersionData: VersionData{
+				Versions: map[string]VersionInfo{
+					"Default": {
+						ExtendedPaths: ExtendedPathsSet{
+							RateLimit: []RateLimitMeta{
+								{Path: "/api", Method: "GET", Rate: 100, Per: 60, Condition: `request.path matches "[invalid"`},
+							},
+						},
+					},
+				},
+			},
+		}
+		result := Validate(apiDef, ruleSet)
+		assert.False(t, result.IsValid)
+		assert.Len(t, result.Errors, 1)
+	})
+}

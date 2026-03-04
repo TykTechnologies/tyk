@@ -3,6 +3,7 @@ package gateway
 import (
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/apidef/oas"
+	"github.com/TykTechnologies/tyk/internal/condition"
 	"github.com/TykTechnologies/tyk/regexp"
 )
 
@@ -38,6 +39,7 @@ type URLSpec struct {
 	GoPluginMeta              GoPluginMiddleware
 	PersistGraphQL            apidef.PersistGraphQLMeta
 	RateLimit                 apidef.RateLimitMeta
+	RateLimitConditionFunc    condition.ConditionFunc
 	OASValidateRequestMeta    *oas.ValidateRequest
 	OASMockResponseMeta       *oas.MockResponse
 

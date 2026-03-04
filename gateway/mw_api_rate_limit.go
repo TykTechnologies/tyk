@@ -57,6 +57,11 @@ func (k *RateLimitForAPI) getSession(r *http.Request) *user.SessionState {
 	spec, ok := k.Spec.FindSpecMatchesStatus(r, versionPaths, RateLimit)
 	if ok {
 		if limits := spec.RateLimit; limits.Valid() {
+			// Evaluate per-entry condition if present
+			if spec.RateLimitConditionFunc != nil && !safeEvalCondition(spec.RateLimitConditionFunc, r, nil) {
+				return k.apiSess
+			}
+
 			// track per-endpoint with a hash of the path
 			keyname := k.keyName + "-" + storage.HashStr(fmt.Sprintf("%s:%s", limits.Method, limits.Path))
 

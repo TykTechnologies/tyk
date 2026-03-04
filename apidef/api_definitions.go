@@ -246,6 +246,10 @@ type RateLimitMeta struct {
 
 	Rate float64 `bson:"rate" json:"rate"`
 	Per  float64 `bson:"per" json:"per"`
+
+	// Condition is an optional expression evaluated per-request.
+	// If the condition evaluates to false, this rate limit entry is skipped.
+	Condition string `bson:"condition,omitempty" json:"condition,omitempty"`
 }
 
 // Valid will return true if the rate limit should be applied.

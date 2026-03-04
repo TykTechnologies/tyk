@@ -42,6 +42,7 @@ import (
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/internal/condition"
 	"github.com/TykTechnologies/tyk/header"
 	"github.com/TykTechnologies/tyk/internal/model"
 	"github.com/TykTechnologies/tyk/regexp"
@@ -1344,6 +1345,13 @@ func (a APIDefinitionLoader) compileRateLimitPathsSpec(paths []apidef.RateLimitM
 		a.generateRegex(stringSpec.Path, &newSpec, stat, conf)
 		// Extend with method actions
 		newSpec.RateLimit = stringSpec
+		// Compile condition if present
+		if stringSpec.Condition != "" {
+			fn, err := condition.Compile(stringSpec.Condition)
+			if err == nil {
+				newSpec.RateLimitConditionFunc = fn
+			}
+		}
 		urlSpec = append(urlSpec, newSpec)
 	}
 

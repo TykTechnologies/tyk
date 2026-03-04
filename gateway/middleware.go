@@ -23,6 +23,7 @@ import (
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/ctx"
+	"github.com/TykTechnologies/tyk/internal/condition"
 	"github.com/TykTechnologies/tyk/header"
 	"github.com/TykTechnologies/tyk/internal/cache"
 	"github.com/TykTechnologies/tyk/internal/event"
@@ -36,6 +37,12 @@ import (
 	"github.com/TykTechnologies/tyk/trace"
 	"github.com/TykTechnologies/tyk/user"
 )
+
+func init() {
+	// Set the context data key for the condition package so it can access
+	// context variables from requests without importing the ctx package directly.
+	condition.ContextDataKey = ctx.ContextData
+}
 
 const (
 	DEFAULT_ORG_SESSION_EXPIRATION = int64(604800)
@@ -176,6 +183,18 @@ func (gw *Gateway) createMiddleware(actualMW TykMiddleware) func(http.Handler) h
 				return
 			}
 
+			// Check API-level condition
+			if fn := mw.Base().conditionFunc; fn != nil {
+				skip := func() bool {
+					defer func() { recover() }()
+					return !fn(r, nil)
+				}()
+				if skip {
+					next.ServeHTTP(w, r)
+					return
+				}
+			}
+
 			err, errCode := mw.ProcessRequest(w, r, mwConf)
 
 			if err != nil {
@@ -275,6 +294,24 @@ type BaseMiddleware struct {
 
 	loggerMu sync.Mutex
 	logger   *logrus.Entry
+
+	// Condition is an optional expression evaluated per-request.
+	// If the condition evaluates to false, the middleware is skipped.
+	Condition     string
+	conditionFunc condition.ConditionFunc
+}
+
+// CompileCondition compiles the Condition expression string into a ConditionFunc.
+func (t *BaseMiddleware) CompileCondition() error {
+	if t.Condition == "" {
+		return nil
+	}
+	fn, err := condition.Compile(t.Condition)
+	if err != nil {
+		return err
+	}
+	t.conditionFunc = fn
+	return nil
 }
 
 // NewBaseMiddleware creates a new *BaseMiddleware.
@@ -786,6 +823,16 @@ func handleResponseChain(chain []TykResponseHandler, rw http.ResponseWriter, res
 
 	traceIsEnabled := trace.IsEnabled()
 	for _, rh := range chain {
+		// Check response handler condition
+		if fn := rh.Base().conditionFunc; fn != nil {
+			skip := func() bool {
+				defer func() { recover() }()
+				return !fn(req, nil)
+			}()
+			if skip {
+				continue
+			}
+		}
 		if err := handleResponse(rh, rw, res, req, ses, traceIsEnabled); err != nil {
 			// Abort the request if this handler is a response middleware hook:
 			if rh.Name() == "CustomMiddlewareResponseHook" {
@@ -871,10 +918,39 @@ func parseForm(r *http.Request) {
 	r.ParseForm()
 }
 
+// safeEvalCondition evaluates a condition function with panic recovery.
+// Returns true if the condition passes or if a panic occurs (fail-closed).
+func safeEvalCondition(fn condition.ConditionFunc, r *http.Request, metadata map[string]interface{}) (result bool) {
+	defer func() {
+		if recover() != nil {
+			result = true // fail-closed: run the middleware/apply the limit
+		}
+	}()
+	return fn(r, metadata)
+}
+
 type BaseTykResponseHandler struct {
 	Spec *APISpec `json:"-"`
 	Gw   *Gateway `json:"-"`
 	log  *logrus.Entry
+
+	// Condition is an optional expression evaluated per-request.
+	// If the condition evaluates to false, the response handler is skipped.
+	Condition     string
+	conditionFunc condition.ConditionFunc
+}
+
+// CompileCondition compiles the Condition expression string.
+func (b *BaseTykResponseHandler) CompileCondition() error {
+	if b.Condition == "" {
+		return nil
+	}
+	fn, err := condition.Compile(b.Condition)
+	if err != nil {
+		return err
+	}
+	b.conditionFunc = fn
+	return nil
 }
 
 func (b *BaseTykResponseHandler) Enabled() bool {

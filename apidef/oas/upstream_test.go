@@ -1342,3 +1342,52 @@ func TestPreserveHostHeader(t *testing.T) {
 		}
 	})
 }
+
+func TestRateLimitEndpoint_ConditionRoundTrip(t *testing.T) {
+	t.Run("Fill sets Condition from RateLimitMeta", func(t *testing.T) {
+		meta := apidef.RateLimitMeta{
+			Rate:      100,
+			Per:       60,
+			Condition: `request.method == "GET"`,
+		}
+		var ep RateLimitEndpoint
+		ep.Fill(meta)
+		assert.Equal(t, `request.method == "GET"`, ep.Condition)
+	})
+
+	t.Run("ExtractTo sets Condition on RateLimitMeta", func(t *testing.T) {
+		ep := RateLimitEndpoint{
+			Enabled:   true,
+			Rate:      100,
+			Per:       ReadableDuration(60 * time.Second),
+			Condition: `request.path contains "/api"`,
+		}
+		var meta apidef.RateLimitMeta
+		ep.ExtractTo(&meta)
+		assert.Equal(t, `request.path contains "/api"`, meta.Condition)
+	})
+
+	t.Run("empty condition omitted in JSON", func(t *testing.T) {
+		ep := RateLimitEndpoint{Enabled: true, Rate: 100, Per: ReadableDuration(60 * time.Second)}
+		data, err := json.Marshal(ep)
+		assert.NoError(t, err)
+		assert.NotContains(t, string(data), "condition")
+	})
+
+	t.Run("full round-trip ExtractTo then Fill", func(t *testing.T) {
+		original := RateLimitEndpoint{
+			Enabled:   true,
+			Rate:      50,
+			Per:       ReadableDuration(30 * time.Second),
+			Condition: `request.headers["X-Flag"] == "on"`,
+		}
+		var meta apidef.RateLimitMeta
+		original.ExtractTo(&meta)
+
+		var restored RateLimitEndpoint
+		restored.Fill(meta)
+		assert.Equal(t, original.Enabled, restored.Enabled)
+		assert.Equal(t, original.Rate, restored.Rate)
+		assert.Equal(t, original.Condition, restored.Condition)
+	})
+}
