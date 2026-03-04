@@ -96,7 +96,7 @@ require (
 	github.com/IBM/sarama v1.43.3
 	github.com/Jeffail/gabs/v2 v2.7.0
 	github.com/TykTechnologies/graphql-go-tools/v2 v2.0.0-20250926102005-c54e73aae17d
-	github.com/TykTechnologies/opentelemetry v0.0.24-0.20260303073222-7a4da52b4f5d
+	github.com/TykTechnologies/opentelemetry v0.0.24-0.20260304074850-a8998769f430
 	github.com/TykTechnologies/structviewer v1.2.0
 	github.com/alecthomas/kingpin/v2 v2.4.0
 	github.com/eclipse/paho.mqtt.golang v1.5.1
@@ -124,6 +124,7 @@ require (
 	github.com/tidwall/gjson v1.17.1
 	github.com/warpstreamlabs/bento v1.7.1
 	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.60.0
+	go.opentelemetry.io/contrib/instrumentation/runtime v0.60.0
 	go.opentelemetry.io/otel v1.40.0
 	go.opentelemetry.io/otel/trace v1.40.0
 	go.uber.org/mock v0.5.0
