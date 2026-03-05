@@ -99,20 +99,22 @@ func TestGateway_afterConfSetup(t *testing.T) {
 						},
 					},
 					Metrics: otel.MetricsConfig{
-						ExporterConfig: otel.ExporterConfig{
-							Exporter:          "grpc",
-							Endpoint:          "localhost:4317",
-							ResourceName:      "tyk-gateway",
-							ConnectionTimeout: 1,
-						},
-						ExportInterval:  60,
-						Temporality:     "cumulative",
-						ShutdownTimeout: 30,
-						Retry: otel.MetricsRetryConfig{
-							Enabled:         func() *bool { b := true; return &b }(),
-							InitialInterval: 5000,
-							MaxInterval:     30000,
-							MaxElapsedTime:  60000,
+						BaseMetricsConfig: otel.BaseMetricsConfig{
+							ExporterConfig: otel.ExporterConfig{
+								Exporter:          "grpc",
+								Endpoint:          "localhost:4317",
+								ResourceName:      "tyk-gateway",
+								ConnectionTimeout: 1,
+							},
+							ExportInterval:  60,
+							Temporality:     "cumulative",
+							ShutdownTimeout: 30,
+							Retry: otel.MetricsRetryConfig{
+								Enabled:         func() *bool { b := true; return &b }(),
+								InitialInterval: 5000,
+								MaxInterval:     30000,
+								MaxElapsedTime:  60000,
+							},
 						},
 					},
 				},

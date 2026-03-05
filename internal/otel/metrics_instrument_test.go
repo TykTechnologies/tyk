@@ -14,7 +14,7 @@ import (
 func noopProvider(t *testing.T) *MetricInstruments {
 	t.Helper()
 	cfg := &MetricsConfig{} // nil Enabled → noop
-	provider, err := NewMetricProvider(context.Background(), logrus.New(), cfg, "test-node", "v0.0.0-test")
+	provider, err := NewMetricProvider(context.Background(), logrus.New(), &cfg.BaseMetricsConfig, "test-node", "v0.0.0-test")
 	require.NoError(t, err)
 	return NewMetricInstruments(provider, logrus.New())
 }

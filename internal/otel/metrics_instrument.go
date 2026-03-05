@@ -7,6 +7,8 @@ import (
 	"github.com/sirupsen/logrus"
 
 	tykmetric "github.com/TykTechnologies/opentelemetry/metric"
+
+	"github.com/TykTechnologies/tyk/internal/otel/apimetrics"
 )
 
 // reloadDurationBuckets defines histogram bucket boundaries (in seconds) for
@@ -19,6 +21,7 @@ var reloadDurationBuckets = []float64{0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0, 30.0,
 type MetricInstruments struct {
 	provider       tykmetric.Provider
 	requestCounter *tykmetric.Counter
+	registry       *apimetrics.InstrumentRegistry
 
 	// Configuration state gauges.
 	apisLoaded     *tykmetric.Gauge
@@ -90,6 +93,28 @@ func NewMetricInstruments(provider tykmetric.Provider, logger *logrus.Logger) *M
 // RecordRequest increments the request counter.
 func (i *MetricInstruments) RecordRequest(ctx context.Context) {
 	i.requestCounter.Add(ctx, 1)
+}
+
+// RecordAPIMetrics records all configured API-level metrics for a request.
+func (i *MetricInstruments) RecordAPIMetrics(ctx context.Context, rc *apimetrics.RequestContext) {
+	if i.registry != nil {
+		i.registry.RecordAPIMetrics(ctx, rc)
+	}
+}
+
+// NeedsSession returns true if any API metric instrument uses session dimensions.
+func (i *MetricInstruments) NeedsSession() bool {
+	return i.registry != nil && i.registry.NeedsSession()
+}
+
+// NeedsContext returns true if any API metric instrument uses context dimensions.
+func (i *MetricInstruments) NeedsContext() bool {
+	return i.registry != nil && i.registry.NeedsContext()
+}
+
+// NeedsResponse returns true if any API metric instrument uses response_header dimensions.
+func (i *MetricInstruments) NeedsResponse() bool {
+	return i.registry != nil && i.registry.NeedsResponse()
 }
 
 // RecordConfigState records the current count of loaded APIs and policies.

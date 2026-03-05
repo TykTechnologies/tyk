@@ -30,12 +30,14 @@ func TestInitOpenTelemetryMetrics_Enabled(t *testing.T) {
 	metricsEnabled := true
 	cfg := &OpenTelemetry{
 		Metrics: MetricsConfig{
-			Enabled: &metricsEnabled,
-			ExporterConfig: otelconfig.ExporterConfig{
-				Exporter: "grpc",
-				Endpoint: "localhost:4317",
+			BaseMetricsConfig: BaseMetricsConfig{
+				Enabled: &metricsEnabled,
+				ExporterConfig: otelconfig.ExporterConfig{
+					Exporter: "grpc",
+					Endpoint: "localhost:4317",
+				},
+				ExportInterval: 60,
 			},
-			ExportInterval: 60,
 		},
 	}
 	inst := InitOpenTelemetryMetrics(context.Background(), logrus.New(), cfg,
