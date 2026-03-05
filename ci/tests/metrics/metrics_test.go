@@ -220,7 +220,6 @@ func TestResourceAttributes(t *testing.T) {
 	})
 }
 
-
 func TestDoNotTrack_NoMetrics(t *testing.T) {
 	if gwProfile() != "default" {
 		t.Skip("only runs under default profile")
@@ -749,27 +748,6 @@ func assertMetricHasLabels(t *testing.T, metric string, expectedLabels []string)
 	}
 	labels, _ := queryPrometheusLabels(t, metric)
 	t.Fatalf("%s missing expected labels; have %v, want %v", metric, labels, expectedLabels)
-}
-
-// queryPrometheusLabels runs an instant PromQL query and returns the first result's labels.
-func queryPrometheusLabels(t *testing.T, query string) (map[string]string, bool) {
-	t.Helper()
-	u := fmt.Sprintf("%s/api/v1/query?query=%s", prometheusURL, url.QueryEscape(query))
-	resp, err := http.Get(u)
-	if err != nil {
-		return nil, false
-	}
-	defer resp.Body.Close()
-
-	var result promQueryResult
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		return nil, false
-	}
-	if result.Status != "success" || len(result.Data.Result) == 0 {
-		return nil, false
-	}
-
-	return result.Data.Result[0].Metric, true
 }
 
 // assertLabelPresent polls Prometheus until the label is present on the metric or times out.

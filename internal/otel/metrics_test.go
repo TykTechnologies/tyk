@@ -164,18 +164,20 @@ func TestNewMetricProvider_ResourceAttributes(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			metricsEnabled := true
 			cfg := &MetricsConfig{
-				Enabled: &metricsEnabled,
-				ExporterConfig: otelconfig.ExporterConfig{
-					Exporter: "grpc",
-					Endpoint: "localhost:4317",
+				BaseMetricsConfig: otelconfig.MetricsConfig{
+					Enabled: &metricsEnabled,
+					ExporterConfig: otelconfig.ExporterConfig{
+						Exporter: "grpc",
+						Endpoint: "localhost:4317",
+					},
+					ExportInterval: 60,
 				},
-				ExportInterval: 60,
 			}
 
 			provider, err := NewMetricProvider(
 				context.Background(),
 				logrus.New(),
-				cfg,
+				&cfg.BaseMetricsConfig,
 				tt.id,
 				tt.version,
 				tt.useRPC,
