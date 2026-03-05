@@ -19,39 +19,49 @@ func TestIsRuntimeMetricsEnabled(t *testing.T) {
 		{
 			name: "metrics disabled - runtime metrics disabled",
 			cfg: &MetricsConfig{
-				Enabled: nil, // nil = disabled
+				BaseMetricsConfig: otelconfig.MetricsConfig{
+					Enabled: nil, // nil = disabled
+				},
 			},
 			expected: false,
 		},
 		{
 			name: "metrics enabled, runtime metrics nil (not set by SetDefaults)",
 			cfg: &MetricsConfig{
-				Enabled:        boolPtr(true),
-				RuntimeMetrics: nil,
+				BaseMetricsConfig: otelconfig.MetricsConfig{
+					Enabled:        boolPtr(true),
+					RuntimeMetrics: nil,
+				},
 			},
 			expected: false, // SetDefaults should be called to set this to true
 		},
 		{
 			name: "metrics enabled, runtime_metrics explicitly true",
 			cfg: &MetricsConfig{
-				Enabled:        boolPtr(true),
-				RuntimeMetrics: boolPtr(true),
+				BaseMetricsConfig: otelconfig.MetricsConfig{
+					Enabled:        boolPtr(true),
+					RuntimeMetrics: boolPtr(true),
+				},
 			},
 			expected: true,
 		},
 		{
 			name: "metrics enabled, runtime_metrics explicitly false",
 			cfg: &MetricsConfig{
-				Enabled:        boolPtr(true),
-				RuntimeMetrics: boolPtr(false),
+				BaseMetricsConfig: otelconfig.MetricsConfig{
+					Enabled:        boolPtr(true),
+					RuntimeMetrics: boolPtr(false),
+				},
 			},
 			expected: false,
 		},
 		{
 			name: "metrics disabled, runtime_metrics explicitly true",
 			cfg: &MetricsConfig{
-				Enabled:        boolPtr(false),
-				RuntimeMetrics: boolPtr(true),
+				BaseMetricsConfig: otelconfig.MetricsConfig{
+					Enabled:        boolPtr(false),
+					RuntimeMetrics: boolPtr(true),
+				},
 			},
 			expected: false,
 		},
@@ -69,13 +79,15 @@ func TestInitOpenTelemetryMetrics_RuntimeMetricsEnabled(t *testing.T) {
 	metricsEnabled := true
 	cfg := &OpenTelemetry{
 		Metrics: MetricsConfig{
-			Enabled: &metricsEnabled,
-			ExporterConfig: otelconfig.ExporterConfig{
-				Exporter: "grpc",
-				Endpoint: "localhost:4317",
+			BaseMetricsConfig: otelconfig.MetricsConfig{
+				Enabled: &metricsEnabled,
+				ExporterConfig: otelconfig.ExporterConfig{
+					Exporter: "grpc",
+					Endpoint: "localhost:4317",
+				},
+				ExportInterval: 60,
+				// RuntimeMetrics defaults to true when not set
 			},
-			ExportInterval: 60,
-			// RuntimeMetrics defaults to true when not set
 		},
 	}
 
@@ -91,13 +103,15 @@ func TestInitOpenTelemetryMetrics_RuntimeMetricsDisabled(t *testing.T) {
 	runtimeMetricsDisabled := false
 	cfg := &OpenTelemetry{
 		Metrics: MetricsConfig{
-			Enabled: &metricsEnabled,
-			ExporterConfig: otelconfig.ExporterConfig{
-				Exporter: "grpc",
-				Endpoint: "localhost:4317",
+			BaseMetricsConfig: otelconfig.MetricsConfig{
+				Enabled: &metricsEnabled,
+				ExporterConfig: otelconfig.ExporterConfig{
+					Exporter: "grpc",
+					Endpoint: "localhost:4317",
+				},
+				ExportInterval: 60,
+				RuntimeMetrics: &runtimeMetricsDisabled,
 			},
-			ExportInterval: 60,
-			RuntimeMetrics: &runtimeMetricsDisabled,
 		},
 	}
 
@@ -111,7 +125,9 @@ func TestInitOpenTelemetryMetrics_RuntimeMetricsDisabled(t *testing.T) {
 func TestInitOpenTelemetryMetrics_MetricsDisabled(t *testing.T) {
 	cfg := &OpenTelemetry{
 		Metrics: MetricsConfig{
-			Enabled: nil,
+			BaseMetricsConfig: otelconfig.MetricsConfig{
+				Enabled: nil,
+			},
 		},
 	}
 
