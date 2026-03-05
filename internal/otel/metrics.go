@@ -80,6 +80,7 @@ func InitOpenTelemetryMetrics(ctx context.Context, logger *logrus.Logger, gwConf
 }
 
 // isRuntimeMetricsEnabled determines if runtime metrics should be enabled.
+// RuntimeMetrics defaults to true when metrics are enabled (set by opentelemetry library's SetDefaults).
 func isRuntimeMetricsEnabled(cfg *MetricsConfig) bool {
 	if cfg.Enabled == nil || !*cfg.Enabled {
 		return false

@@ -77,6 +77,7 @@ func TestIsRuntimeMetricsEnabled(t *testing.T) {
 
 func TestInitOpenTelemetryMetrics_RuntimeMetricsEnabled(t *testing.T) {
 	metricsEnabled := true
+	runtimeMetricsEnabled := true
 	cfg := &OpenTelemetry{
 		Metrics: MetricsConfig{
 			BaseMetricsConfig: otelconfig.MetricsConfig{
@@ -86,7 +87,7 @@ func TestInitOpenTelemetryMetrics_RuntimeMetricsEnabled(t *testing.T) {
 					Endpoint: "localhost:4317",
 				},
 				ExportInterval: 60,
-				// RuntimeMetrics defaults to true when not set
+				RuntimeMetrics: &runtimeMetricsEnabled, // Explicitly set to true
 			},
 		},
 	}
@@ -94,6 +95,9 @@ func TestInitOpenTelemetryMetrics_RuntimeMetricsEnabled(t *testing.T) {
 	inst := InitOpenTelemetryMetrics(context.Background(), logrus.New(), cfg, "test-node", "v1.0.0")
 	assert.NotNil(t, inst)
 	assert.NotNil(t, inst.provider)
+
+	// Verify runtime metrics are enabled
+	assert.True(t, isRuntimeMetricsEnabled(&cfg.Metrics))
 
 	_ = inst.Shutdown(context.Background())
 }
