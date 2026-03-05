@@ -54,6 +54,8 @@ import (
 	"github.com/TykTechnologies/tyk/internal/cache"
 	"github.com/TykTechnologies/tyk/internal/crypto"
 	"github.com/TykTechnologies/tyk/internal/httputil"
+	"github.com/TykTechnologies/tyk/internal/interfaces"
+	"github.com/TykTechnologies/tyk/internal/metrics"
 	"github.com/TykTechnologies/tyk/internal/model"
 	"github.com/TykTechnologies/tyk/internal/netutil"
 	"github.com/TykTechnologies/tyk/internal/otel"
@@ -123,7 +125,7 @@ type Gateway struct {
 
 	Analytics            RedisAnalyticsHandler
 	GlobalEventsJSVM     JSVM
-	MainNotifier         RedisNotifier
+	MainNotifier         interfaces.Notifier
 	DefaultOrgStore      DefaultSessionManager
 	DefaultQuotaStore    DefaultSessionManager
 	GlobalSessionManager SessionHandler
@@ -228,6 +230,9 @@ type Gateway struct {
 	apiJWKCaches sync.Map
 
 	BundleChecksumVerifier bundleChecksumVerifyFunction
+
+	// metrics manager
+	metrics metrics.Metrics
 }
 
 func NewGateway(config config.Config, ctx context.Context) *Gateway {
@@ -528,7 +533,10 @@ func (gw *Gateway) setupGlobals() {
 	mainNotifierStore := &storage.RedisCluster{ConnectionHandler: gw.StorageConnectionHandler}
 	mainNotifierStore.Connect()
 
-	gw.MainNotifier = RedisNotifier{mainNotifierStore, RedisPubSubChannel, gw}
+	gw.metrics = lo.Must(metrics.New(gwConfig.PrometheusConfig))
+
+	gw.MainNotifier = &RedisNotifier{mainNotifierStore, RedisPubSubChannel, gw}
+	gw.MainNotifier = gw.metrics.DecorateNotifier(gw.MainNotifier)
 
 	if gwConfig.Monitor.EnableTriggerMonitors {
 		h := &WebHookHandler{Gw: gw}
@@ -827,6 +835,7 @@ func (gw *Gateway) loadControlAPIEndpoints(muxer *mux.Router) {
 	// set up main API handlers
 	r.HandleFunc("/reload/group", gw.groupResetHandler).Methods("GET")
 	r.HandleFunc("/reload", gw.resetHandler(nil)).Methods("GET")
+	r.HandleFunc("/metrics", gw.metrics.Handler().ServeHTTP).Methods(http.MethodGet)
 
 	if !gw.isRPCMode() {
 		versionsHandler := NewVersionHandler(gw.getAPIDefinition)

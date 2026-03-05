@@ -3,10 +3,12 @@ package oasutil
 import (
 	"errors"
 	"fmt"
-	"github.com/TykTechnologies/tyk/pkg/errpack"
-	"github.com/getkin/kin-openapi/openapi3"
 	"regexp"
 	"strings"
+
+	"github.com/getkin/kin-openapi/openapi3"
+
+	"github.com/TykTechnologies/tyk/pkg/errpack"
 )
 
 var (
@@ -158,9 +160,9 @@ func (p *serverUrlParser) extractValueBetweenBraces() (serverVariable, error) {
 			}
 
 			if re, err := regexp.Compile(pattern); err != nil {
-				return serverVariable{}, errpack.Domain("failed to compile pattern").Chain(ErrInvalidPattern)
+				return serverVariable{}, errpack.Domain("failed to compile pattern").Wrap(ErrInvalidPattern)
 			} else if hasCaptureGroups(re) {
-				return serverVariable{}, errpack.Domain("using capture group is not allowed in server patterns").Chain(ErrNoCaptureGroup)
+				return serverVariable{}, errpack.Domain("using capture group is not allowed in server patterns").Wrap(ErrNoCaptureGroup)
 			}
 
 			return serverVariable{
