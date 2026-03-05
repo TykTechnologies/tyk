@@ -1,11 +1,11 @@
 ARG GO_VERSION=1.25
-FROM golang:${GO_VERSION}-bullseye
+FROM golang:${GO_VERSION}-bookworm
 
 # Build essentials
 
 RUN apt update && apt install build-essential zlib1g-dev libncurses5-dev libgdbm-dev libnss3-dev libssl-dev libsqlite3-dev libreadline-dev libffi-dev curl wget libbz2-dev -y
 
-## This just installs whatever is is bullseye, makes docker build (fast/small)-(er)
+## This just installs whatever is in bookworm, makes docker build (fast/small)-(er)
 RUN	apt install python3 -y
 
 # Build gateway
