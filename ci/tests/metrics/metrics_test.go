@@ -170,9 +170,8 @@ func TestResourceAttributes(t *testing.T) {
 		resp.Body.Close()
 	}
 
-	// Test 1: Verify target_info has all resource attributes
 	t.Run("target_info_has_resource_attributes", func(t *testing.T) {
-		query := `target_info{job="tyk-gateway"}`
+		query := `target_info{job="otel-collector"}`
 
 		// tyk_gw_id must be present and non-empty
 		gwID := assertLabelPresent(t, query, "tyk_gw_id")
@@ -190,8 +189,6 @@ func TestResourceAttributes(t *testing.T) {
 		assertLabelContains(t, query, "tyk_gw_tags", "e2e-test")
 	})
 
-	// Test 2: Verify resource_to_telemetry_conversion works
-	// Resource attributes should appear as direct labels on metrics
 	t.Run("resource_attributes_on_metrics", func(t *testing.T) {
 		query := `tyk_http_requests_total`
 
@@ -208,9 +205,8 @@ func TestResourceAttributes(t *testing.T) {
 		assertLabelContains(t, query, "tyk_gw_tags", "e2e-test")
 	})
 
-	// Test 3: Verify standard OTel resource attributes are present
 	t.Run("standard_otel_attributes", func(t *testing.T) {
-		query := `target_info{job="tyk-gateway"}`
+		query := `target_info{job="otel-collector"}`
 
 		// Standard attributes should be present
 		assertLabelPresent(t, query, "service_name")
@@ -757,7 +753,7 @@ func assertLabelContains(t *testing.T, query, labelKey, expected string) {
 		if ok {
 			if val, exists := labels[labelKey]; exists {
 				// For array-like labels like tyk_gw_tags, check if substring is present
-				if len(val) > 0 && (val == expected || containsSubstring(val, expected)) {
+				if strings.Contains(val, expected) {
 					t.Logf("%s has label %s containing %q OK", query, labelKey, expected)
 					return
 				}
@@ -769,20 +765,4 @@ func assertLabelContains(t *testing.T, query, labelKey, expected string) {
 	labels, _ := queryPrometheusLabels(t, query)
 	actualVal := labels[labelKey]
 	t.Fatalf("%s label %s=%q does not contain %q", query, labelKey, actualVal, expected)
-}
-
-// containsSubstring checks if s contains substr (simple string search).
-func containsSubstring(s, substr string) bool {
-	return len(s) >= len(substr) && (s == substr || len(s) > len(substr) &&
-		(s[:len(substr)] == substr || s[len(s)-len(substr):] == substr ||
-			findInString(s, substr)))
-}
-
-func findInString(s, substr string) bool {
-	for i := 0; i <= len(s)-len(substr); i++ {
-		if s[i:i+len(substr)] == substr {
-			return true
-		}
-	}
-	return false
 }
