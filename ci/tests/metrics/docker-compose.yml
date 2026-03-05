@@ -20,7 +20,7 @@ services:
     ports:
       - 9000:8080
     env_file:
-      - ./configs/tyk.env
+      - ./profiles/${GW_PROFILE:-default}/tyk.env
     volumes:
       - ./apps:/opt/tyk-gateway/apps
     depends_on:
