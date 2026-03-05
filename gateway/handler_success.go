@@ -39,7 +39,7 @@ type ProxyResponse struct {
 type ReturningHttpHandler interface {
 	ServeHTTP(http.ResponseWriter, *http.Request) ProxyResponse
 	ServeHTTPForCache(http.ResponseWriter, *http.Request) ProxyResponse
-	CopyResponse(io.Writer, io.Reader, time.Duration)
+	CopyResponse(io.Writer, io.Reader, time.Duration) error
 }
 
 // SuccessHandler represents the final ServeHTTP() request for a proxied API request
@@ -443,6 +443,7 @@ func (s *SuccessHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) *http
 		s.RecordHit(r, latency, resp.Response.StatusCode, resp.Response, false)
 		s.RecordAccessLog(r, resp.Response, latency)
 	}
+	s.Base().Gw.MetricInstruments.RecordRequest(r.Context())
 	log.Debug("Done proxy")
 
 	return nil

@@ -11,6 +11,7 @@ import (
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/internal/httpctx"
+	"github.com/TykTechnologies/tyk/internal/jsonrpc"
 	"github.com/TykTechnologies/tyk/internal/mcp"
 	"github.com/TykTechnologies/tyk/internal/middleware"
 )
@@ -103,26 +104,28 @@ func (m *JSONRPCMiddleware) readAndParseJSONRPC(w http.ResponseWriter, r *http.R
 
 // setupSequentialRouting initializes sequential VEM routing for JSON-RPC requests.
 // The routing strategy (operation → primitive) is determined by the router implementation.
-func (m *JSONRPCMiddleware) setupSequentialRouting(r *http.Request, rpcReq *JSONRPCRequest, vemChain []string) {
-	if len(vemChain) == 0 {
+func (m *JSONRPCMiddleware) setupSequentialRouting(r *http.Request, rpcReq *JSONRPCRequest, result jsonrpc.RouteResult) {
+	if len(result.VEMChain) == 0 {
 		return
 	}
 
 	method := rpcReq.Method
 
 	var nextVEM string
-	if len(vemChain) > 1 {
-		nextVEM = vemChain[1]
+	if len(result.VEMChain) > 1 {
+		nextVEM = result.VEMChain[1]
 	}
 
 	state := &httpctx.JSONRPCRoutingState{
-		Method:       method,
-		Params:       rpcReq.Params,
-		ID:           rpcReq.ID,
-		NextVEM:      nextVEM,
-		OriginalPath: r.URL.Path,
-		VEMChain:     vemChain,
-		VisitedVEMs:  []string{},
+		Method:        method,
+		Params:        rpcReq.Params,
+		ID:            rpcReq.ID,
+		NextVEM:       nextVEM,
+		OriginalPath:  r.URL.Path,
+		VEMChain:      result.VEMChain,
+		VisitedVEMs:   []string{},
+		PrimitiveType: primitiveTypeForMethod(method),
+		PrimitiveName: result.PrimitiveName,
 	}
 
 	httpctx.SetJSONRPCRoutingState(r, state)
@@ -132,9 +135,24 @@ func (m *JSONRPCMiddleware) setupSequentialRouting(r *http.Request, rpcReq *JSON
 	ctxSetURLRewriteTarget(r, &url.URL{
 		Scheme:   "tyk",
 		Host:     "self",
-		Path:     vemChain[0],
+		Path:     result.VEMChain[0],
 		RawQuery: "check_limits=true",
 	})
+}
+
+// primitiveTypeForMethod maps a JSON-RPC method name to its MCP primitive type.
+// Returns the primitive type string or "" for non-primitive methods.
+func primitiveTypeForMethod(method string) string {
+	switch method {
+	case mcp.MethodToolsCall:
+		return mcp.PrimitiveTypeTool
+	case mcp.MethodResourcesRead:
+		return mcp.PrimitiveTypeResource
+	case mcp.MethodPromptsGet:
+		return mcp.PrimitiveTypePrompt
+	default:
+		return ""
+	}
 }
 
 // ProcessRequest handles JSON-RPC request detection and routing.
@@ -170,7 +188,7 @@ func (m *JSONRPCMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 		return nil, middleware.StatusRespond
 	}
 
-	m.setupSequentialRouting(r, rpcReq, result.VEMChain)
+	m.setupSequentialRouting(r, rpcReq, result)
 
 	// Return StatusOK to allow chain to continue to DummyProxyHandler, which will handle the redirect
 	return nil, http.StatusOK
