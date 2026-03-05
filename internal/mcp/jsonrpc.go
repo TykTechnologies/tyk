@@ -19,12 +19,16 @@ const (
 const (
 	// Tool methods
 	MethodToolsCall = "tools/call"
+	MethodToolsList = "tools/list"
 
 	// Resource methods
-	MethodResourcesRead = "resources/read"
+	MethodResourcesRead          = "resources/read"
+	MethodResourcesList          = "resources/list"
+	MethodResourcesTemplatesList = "resources/templates/list"
 
 	// Prompt methods
-	MethodPromptsGet = "prompts/get"
+	MethodPromptsGet  = "prompts/get"
+	MethodPromptsList = "prompts/list"
 )
 
 // JSON-RPC parameter keys used across MCP methods
