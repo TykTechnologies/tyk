@@ -465,8 +465,8 @@ func TestRuntimeMetrics(t *testing.T) {
 }
 
 func TestRuntimeMetrics_Disabled(t *testing.T) {
-	if gwProfile() != "runtime-disabled" {
-		t.Skip("only runs under runtime-disabled profile")
+	if gwProfile() != "disabled" {
+		t.Skip("only runs under disabled profile")
 	}
 	waitForGateway(t)
 
