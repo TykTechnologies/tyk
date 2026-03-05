@@ -202,10 +202,22 @@ func TestCompileExtractor_SessionPortalApp(t *testing.T) {
 	ext, err := CompileExtractor(DimensionDefinition{Source: "session", Key: "portal_app"})
 	require.NoError(t, err)
 
-	t.Run("returns apply policy ID", func(t *testing.T) {
+	t.Run("returns app ID from portal tag", func(t *testing.T) {
 		rc := makeRequestContext()
-		rc.Session = &user.SessionState{ApplyPolicyID: "policy-abc"}
-		assert.Equal(t, "policy-abc", ext.Extract(rc))
+		rc.Session = &user.SessionState{Tags: []string{"portal-app-123"}}
+		assert.Equal(t, "123", ext.Extract(rc))
+	})
+
+	t.Run("returns first match when multiple tags", func(t *testing.T) {
+		rc := makeRequestContext()
+		rc.Session = &user.SessionState{Tags: []string{"other-tag", "portal-app-456", "portal-org-789"}}
+		assert.Equal(t, "456", ext.Extract(rc))
+	})
+
+	t.Run("returns empty when no portal-app tag", func(t *testing.T) {
+		rc := makeRequestContext()
+		rc.Session = &user.SessionState{Tags: []string{"portal-org-789"}}
+		assert.Equal(t, "", ext.Extract(rc))
 	})
 
 	t.Run("returns empty when session nil", func(t *testing.T) {
@@ -219,10 +231,22 @@ func TestCompileExtractor_SessionPortalOrg(t *testing.T) {
 	ext, err := CompileExtractor(DimensionDefinition{Source: "session", Key: "portal_org"})
 	require.NoError(t, err)
 
-	t.Run("returns session org ID", func(t *testing.T) {
+	t.Run("returns org ID from portal tag", func(t *testing.T) {
 		rc := makeRequestContext()
-		rc.Session = &user.SessionState{OrgID: "sess-org-789"}
-		assert.Equal(t, "sess-org-789", ext.Extract(rc))
+		rc.Session = &user.SessionState{Tags: []string{"portal-org-789"}}
+		assert.Equal(t, "789", ext.Extract(rc))
+	})
+
+	t.Run("returns first match when multiple tags", func(t *testing.T) {
+		rc := makeRequestContext()
+		rc.Session = &user.SessionState{Tags: []string{"portal-app-123", "portal-org-456"}}
+		assert.Equal(t, "456", ext.Extract(rc))
+	})
+
+	t.Run("returns empty when no portal-org tag", func(t *testing.T) {
+		rc := makeRequestContext()
+		rc.Session = &user.SessionState{Tags: []string{"portal-app-123"}}
+		assert.Equal(t, "", ext.Extract(rc))
 	})
 
 	t.Run("returns empty when session nil", func(t *testing.T) {
