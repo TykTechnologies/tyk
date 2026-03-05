@@ -42,13 +42,9 @@ func New(opts ...Option) Validator {
 
 	if !cfg.allowUnsafePolicyIds {
 		validator.autoregister(identifier.CustomPolicyId(""))
-		validator.mustRegisterValidator(customIdValidatorTag, func(fl govalidator.FieldLevel) bool {
-			return identifier.CustomPolicyId(fl.Field().String()).Validate() == nil
-		})
+		validator.mustRegisterValidator(customIdValidatorTag, customPolicyIdValidator)
 	} else {
-		validator.mustRegisterValidator(customIdValidatorTag, func(_ govalidator.FieldLevel) bool {
-			return true
-		})
+		validator.mustRegisterValidator(customIdValidatorTag, skipValidator)
 	}
 
 	return validator
@@ -119,4 +115,8 @@ func WithAllowUnsafePolicyIds(disabled bool) Option {
 	return func(cfg *validatorCfg) {
 		cfg.allowUnsafePolicyIds = disabled
 	}
+}
+
+func skipValidator(_ govalidator.FieldLevel) bool {
+	return true
 }
