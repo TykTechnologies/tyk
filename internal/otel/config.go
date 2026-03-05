@@ -90,11 +90,6 @@ func (c *OpenTelemetry) SetDefaults() {
 		c.Metrics.TLS = c.TLS
 	}
 
-	if c.Metrics.Enabled != nil && *c.Metrics.Enabled && c.Metrics.RuntimeMetrics == nil {
-		trueVal := true
-		c.Metrics.RuntimeMetrics = &trueVal
-	}
-
 	// 3. Fill remaining gaps with library defaults (export interval, temporality, etc.).
 	c.Metrics.SetDefaults()
 }

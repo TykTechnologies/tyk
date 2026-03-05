@@ -26,14 +26,14 @@ func TestIsRuntimeMetricsEnabled(t *testing.T) {
 			expected: false,
 		},
 		{
-			name: "metrics enabled, runtime metrics nil (not set by SetDefaults)",
+			name: "metrics enabled, runtime metrics nil (defaults to true)",
 			cfg: &MetricsConfig{
 				BaseMetricsConfig: otelconfig.MetricsConfig{
 					Enabled: boolPtr(true),
 				},
 				RuntimeMetrics: nil,
 			},
-			expected: false, // SetDefaults should be called to set this to true
+			expected: true, // Defaults to true when nil
 		},
 		{
 			name: "metrics enabled, runtime_metrics explicitly true",
