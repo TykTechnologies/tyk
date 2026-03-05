@@ -3,6 +3,7 @@ package apimetrics
 import (
 	"fmt"
 	"strconv"
+	"strings"
 )
 
 // DimensionExtractor extracts a single OTel attribute value from the request context.
@@ -148,13 +149,21 @@ var sessionExtractors = map[string]func(rc *RequestContext) string{
 	},
 	"portal_app": func(rc *RequestContext) string {
 		if rc.Session != nil {
-			return rc.Session.ApplyPolicyID
+			for _, tag := range rc.Session.Tags {
+				if v, ok := strings.CutPrefix(tag, "portal-app-"); ok {
+					return v
+				}
+			}
 		}
 		return ""
 	},
 	"portal_org": func(rc *RequestContext) string {
 		if rc.Session != nil {
-			return rc.Session.OrgID
+			for _, tag := range rc.Session.Tags {
+				if v, ok := strings.CutPrefix(tag, "portal-org-"); ok {
+					return v
+				}
+			}
 		}
 		return ""
 	},
