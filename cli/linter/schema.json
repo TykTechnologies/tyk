@@ -1518,6 +1518,10 @@
           }
         }
       }
+    },
+    "allow_unsafe_policy_ids": {
+      "type": ["boolean", "null"],
+      "additionalProperties": false
     }
   }
 }
