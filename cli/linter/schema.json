@@ -254,6 +254,9 @@
                   "type": "integer"
                 }
               }
+            },
+            "api_metrics": {
+              "type": ["array", "null"]
             }
           }
         }
