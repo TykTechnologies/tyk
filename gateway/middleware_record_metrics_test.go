@@ -19,7 +19,17 @@ import (
 func noopMetricInstruments(t *testing.T) *otel.MetricInstruments {
 	t.Helper()
 	cfg := &otel.MetricsConfig{}
-	provider, err := otel.NewMetricProvider(context.Background(), logrus.New(), &cfg.BaseMetricsConfig, "test-node", "v0.0.0-test")
+	provider, err := otel.NewMetricProvider(
+		context.Background(),
+		logrus.New(),
+		&cfg.BaseMetricsConfig,
+		"test-node",
+		"v0.0.0-test",
+		false,
+		"",
+		false,
+		nil,
+	)
 	if err != nil {
 		t.Fatalf("creating noop metric provider: %v", err)
 	}
