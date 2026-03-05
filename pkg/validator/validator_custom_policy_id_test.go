@@ -10,7 +10,7 @@ import (
 	tykvalidator "github.com/TykTechnologies/tyk/pkg/validator"
 )
 
-func Test_Validate(t *testing.T) {
+func Test_customPolicyIdValidator(t *testing.T) {
 	type parentStruct struct {
 		Id string `validate:"custom_policy_id"`
 	}
