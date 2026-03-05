@@ -99,7 +99,7 @@ func TestInitOpenTelemetryMetrics_RuntimeMetricsEnabled(t *testing.T) {
 	// Verify runtime metrics are enabled
 	assert.True(t, isRuntimeMetricsEnabled(&cfg.Metrics))
 
-	_ = inst.Shutdown(context.Background())
+	_ = inst.Shutdown(context.Background()) //nolint:errcheck // Test cleanup, error not relevant
 }
 
 func TestInitOpenTelemetryMetrics_RuntimeMetricsDisabled(t *testing.T) {
@@ -123,7 +123,7 @@ func TestInitOpenTelemetryMetrics_RuntimeMetricsDisabled(t *testing.T) {
 	assert.NotNil(t, inst)
 	assert.NotNil(t, inst.provider)
 
-	_ = inst.Shutdown(context.Background())
+	_ = inst.Shutdown(context.Background()) //nolint:errcheck // Test cleanup, error not relevant
 }
 
 func TestInitOpenTelemetryMetrics_MetricsDisabled(t *testing.T) {
@@ -141,5 +141,5 @@ func TestInitOpenTelemetryMetrics_MetricsDisabled(t *testing.T) {
 	// Should not panic
 	inst.RecordRequest(context.Background())
 
-	_ = inst.Shutdown(context.Background())
+	_ = inst.Shutdown(context.Background()) //nolint:errcheck // Test cleanup, error not relevant
 }
