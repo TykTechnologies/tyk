@@ -52,6 +52,7 @@
             "max_interval": 15000,
             "max_elapsed_time": 30000
         },
+        "runtime_metrics": null,
         "api_metrics": null
     }
 }
