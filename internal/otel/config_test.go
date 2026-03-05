@@ -64,15 +64,17 @@ func TestOpenTelemetry_SetDefaults(t *testing.T) {
 					},
 				},
 				Metrics: MetricsConfig{
-					ExporterConfig: ExporterConfig{
-						Exporter:          "http",
-						Endpoint:          "metrics-collector:4318",
-						Headers:           map[string]string{"X-Metrics": "1"},
-						ConnectionTimeout: 20,
-						ResourceName:      "metrics-gw",
-						TLS: otelconfig.TLS{
-							Enable:   true,
-							CertFile: "/metrics-cert.pem",
+					BaseMetricsConfig: BaseMetricsConfig{
+						ExporterConfig: ExporterConfig{
+							Exporter:          "http",
+							Endpoint:          "metrics-collector:4318",
+							Headers:           map[string]string{"X-Metrics": "1"},
+							ConnectionTimeout: 20,
+							ResourceName:      "metrics-gw",
+							TLS: otelconfig.TLS{
+								Enable:   true,
+								CertFile: "/metrics-cert.pem",
+							},
 						},
 					},
 				},
@@ -102,8 +104,10 @@ func TestOpenTelemetry_SetDefaults(t *testing.T) {
 					},
 				},
 				Metrics: MetricsConfig{
-					ExporterConfig: ExporterConfig{
-						Endpoint: "metrics-only:9090",
+					BaseMetricsConfig: BaseMetricsConfig{
+						ExporterConfig: ExporterConfig{
+							Endpoint: "metrics-only:9090",
+						},
 					},
 				},
 			},
@@ -141,8 +145,10 @@ func TestOpenTelemetry_SetDefaults(t *testing.T) {
 					},
 				},
 				Metrics: MetricsConfig{
-					ExporterConfig: ExporterConfig{
-						Headers: map[string]string{}, // non-nil empty map
+					BaseMetricsConfig: BaseMetricsConfig{
+						ExporterConfig: ExporterConfig{
+							Headers: map[string]string{}, // non-nil empty map
+						},
 					},
 				},
 			},
@@ -208,9 +214,11 @@ func TestOpenTelemetry_SetDefaults(t *testing.T) {
 					},
 				},
 				Metrics: MetricsConfig{
-					ExporterConfig: ExporterConfig{
-						TLS: otelconfig.TLS{
-							CAFile: "/metrics-ca.pem",
+					BaseMetricsConfig: BaseMetricsConfig{
+						ExporterConfig: ExporterConfig{
+							TLS: otelconfig.TLS{
+								CAFile: "/metrics-ca.pem",
+							},
 						},
 					},
 				},
@@ -274,14 +282,16 @@ func TestOpenTelemetry_SetDefaults(t *testing.T) {
 					Enabled: true,
 				},
 				Metrics: MetricsConfig{
-					ExportInterval:  15,
-					Temporality:     "delta",
-					ShutdownTimeout: 5,
-					Retry: MetricsRetryConfig{
-						Enabled:         boolPtr(false),
-						InitialInterval: 1000,
-						MaxInterval:     5000,
-						MaxElapsedTime:  10000,
+					BaseMetricsConfig: BaseMetricsConfig{
+						ExportInterval:  15,
+						Temporality:     "delta",
+						ShutdownTimeout: 5,
+						Retry: MetricsRetryConfig{
+							Enabled:         boolPtr(false),
+							InitialInterval: 1000,
+							MaxInterval:     5000,
+							MaxElapsedTime:  10000,
+						},
 					},
 				},
 			},

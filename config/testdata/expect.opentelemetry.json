@@ -51,6 +51,7 @@
             "initial_interval": 3000,
             "max_interval": 15000,
             "max_elapsed_time": 30000
-        }
+        },
+        "api_metrics": null
     }
 }
