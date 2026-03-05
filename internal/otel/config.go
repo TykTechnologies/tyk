@@ -37,6 +37,10 @@ type (
 type MetricsConfig struct {
 	BaseMetricsConfig `json:",inline"`
 
+	// RuntimeMetrics enables Go runtime metrics collection (goroutines, memory, GC).
+	// Defaults to true when metrics are enabled.
+	RuntimeMetrics *bool `json:"runtime_metrics"`
+
 	// APIMetrics defines the metric instruments created at startup.
 	// Each instrument has its own dimension scope — only declared dimensions are recorded.
 	//
@@ -84,6 +88,11 @@ func (c *OpenTelemetry) SetDefaults() {
 	}
 	if (c.Metrics.TLS == otelconfig.TLS{}) {
 		c.Metrics.TLS = c.TLS
+	}
+
+	if c.Metrics.Enabled != nil && *c.Metrics.Enabled && c.Metrics.RuntimeMetrics == nil {
+		trueVal := true
+		c.Metrics.RuntimeMetrics = &trueVal
 	}
 
 	// 3. Fill remaining gaps with library defaults (export interval, temporality, etc.).

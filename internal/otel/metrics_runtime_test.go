@@ -29,9 +29,9 @@ func TestIsRuntimeMetricsEnabled(t *testing.T) {
 			name: "metrics enabled, runtime metrics nil (not set by SetDefaults)",
 			cfg: &MetricsConfig{
 				BaseMetricsConfig: otelconfig.MetricsConfig{
-					Enabled:        boolPtr(true),
-					RuntimeMetrics: nil,
+					Enabled: boolPtr(true),
 				},
+				RuntimeMetrics: nil,
 			},
 			expected: false, // SetDefaults should be called to set this to true
 		},
@@ -39,9 +39,9 @@ func TestIsRuntimeMetricsEnabled(t *testing.T) {
 			name: "metrics enabled, runtime_metrics explicitly true",
 			cfg: &MetricsConfig{
 				BaseMetricsConfig: otelconfig.MetricsConfig{
-					Enabled:        boolPtr(true),
-					RuntimeMetrics: boolPtr(true),
+					Enabled: boolPtr(true),
 				},
+				RuntimeMetrics: boolPtr(true),
 			},
 			expected: true,
 		},
@@ -49,9 +49,9 @@ func TestIsRuntimeMetricsEnabled(t *testing.T) {
 			name: "metrics enabled, runtime_metrics explicitly false",
 			cfg: &MetricsConfig{
 				BaseMetricsConfig: otelconfig.MetricsConfig{
-					Enabled:        boolPtr(true),
-					RuntimeMetrics: boolPtr(false),
+					Enabled: boolPtr(true),
 				},
+				RuntimeMetrics: boolPtr(false),
 			},
 			expected: false,
 		},
@@ -59,9 +59,9 @@ func TestIsRuntimeMetricsEnabled(t *testing.T) {
 			name: "metrics disabled, runtime_metrics explicitly true",
 			cfg: &MetricsConfig{
 				BaseMetricsConfig: otelconfig.MetricsConfig{
-					Enabled:        boolPtr(false),
-					RuntimeMetrics: boolPtr(true),
+					Enabled: boolPtr(false),
 				},
+				RuntimeMetrics: boolPtr(true),
 			},
 			expected: false,
 		},
@@ -87,8 +87,8 @@ func TestInitOpenTelemetryMetrics_RuntimeMetricsEnabled(t *testing.T) {
 					Endpoint: "localhost:4317",
 				},
 				ExportInterval: 60,
-				RuntimeMetrics: &runtimeMetricsEnabled, // Explicitly set to true
 			},
+			RuntimeMetrics: &runtimeMetricsEnabled,
 		},
 	}
 
@@ -114,8 +114,8 @@ func TestInitOpenTelemetryMetrics_RuntimeMetricsDisabled(t *testing.T) {
 					Endpoint: "localhost:4317",
 				},
 				ExportInterval: 60,
-				RuntimeMetrics: &runtimeMetricsDisabled,
 			},
+			RuntimeMetrics: &runtimeMetricsDisabled,
 		},
 	}
 
