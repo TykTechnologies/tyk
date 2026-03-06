@@ -273,6 +273,9 @@ func (e *ErrorHandler) writeTemplateErrorResponse(w http.ResponseWriter, r *http
 	contentType = strings.Split(contentType, ";")[0]
 
 	switch contentType {
+	case header.ApplicationSoapXML:
+		templateExtension = "xml"
+		contentType = header.ApplicationSoapXML
 	case header.ApplicationXML:
 		templateExtension = "xml"
 		contentType = header.ApplicationXML
