@@ -13,6 +13,9 @@
     },
     "middleware": {
       "$ref": "#/definitions/X-Tyk-Middleware"
+    },
+    "sla": {
+      "$ref": "#/definitions/X-Tyk-SLA"
     }
   },
   "required": [
@@ -2915,6 +2918,45 @@
         "url",
         "weight"
       ],
+      "additionalProperties": false
+    },
+    "X-Tyk-SLATarget": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "target_value": {
+          "type": "number"
+        },
+        "warning_threshold": {
+          "type": "number"
+        },
+        "slo_percentage": {
+          "type": "number"
+        }
+      },
+      "additionalProperties": false
+    },
+    "X-Tyk-SLA": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "rate": {
+          "$ref": "#/definitions/X-Tyk-SLATarget"
+        },
+        "error_rate": {
+          "$ref": "#/definitions/X-Tyk-SLATarget"
+        },
+        "latency": {
+          "$ref": "#/definitions/X-Tyk-SLATarget"
+        },
+        "compliance_window": {
+          "type": "integer"
+        }
+      },
       "additionalProperties": false
     }
   },

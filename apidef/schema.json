@@ -1149,6 +1149,68 @@
           "type": "string"
         }
       }
+    },
+    "sla": {
+      "type": ["object", "null"],
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "rate": {
+          "type": ["object", "null"],
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "target_value": {
+              "type": "number"
+            },
+            "warning_threshold": {
+              "type": "number"
+            },
+            "slo_percentage": {
+              "type": "number"
+            }
+          }
+        },
+        "error_rate": {
+          "type": ["object", "null"],
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "target_value": {
+              "type": "number"
+            },
+            "warning_threshold": {
+              "type": "number"
+            },
+            "slo_percentage": {
+              "type": "number"
+            }
+          }
+        },
+        "latency": {
+          "type": ["object", "null"],
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "target_value": {
+              "type": "number"
+            },
+            "warning_threshold": {
+              "type": "number"
+            },
+            "slo_percentage": {
+              "type": "number"
+            }
+          }
+        },
+        "compliance_window": {
+          "type": "integer"
+        }
+      }
     }
   },
   "required": [

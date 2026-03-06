@@ -792,6 +792,9 @@ type APIDefinition struct {
 	// SecurityRequirements stores all OAS security requirements (auto-populated from OpenAPI description import)
 	// When len(SecurityRequirements) > 1, OR logic is automatically applied
 	SecurityRequirements [][]string `json:"security_requirements,omitempty" bson:"security_requirements,omitempty"`
+
+	// SLA holds the SLA/SLO configuration for the API.
+	SLA *SLAConfig `bson:"sla,omitempty" json:"sla,omitempty"`
 }
 
 type JWK struct {

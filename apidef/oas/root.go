@@ -20,6 +20,8 @@ type XTykAPIGateway struct {
 	Server Server `bson:"server" json:"server"` // required
 	// Middleware contains the configurations related to the Tyk middleware.
 	Middleware *Middleware `bson:"middleware,omitempty" json:"middleware,omitempty"`
+	// SLA holds the SLA/SLO configuration for the API.
+	SLA *apidef.SLAConfig `bson:"sla,omitempty" json:"sla,omitempty"`
 }
 
 // Fill fills *XTykAPIGateway from apidef.APIDefinition.
@@ -36,6 +38,8 @@ func (x *XTykAPIGateway) Fill(api apidef.APIDefinition) {
 	if ShouldOmit(x.Middleware) {
 		x.Middleware = nil
 	}
+
+	x.SLA = api.SLA
 }
 
 // ExtractTo extracts *XTykAPIGateway into *apidef.APIDefinition.
@@ -54,6 +58,8 @@ func (x *XTykAPIGateway) ExtractTo(api *apidef.APIDefinition) {
 	}
 
 	x.Middleware.ExtractTo(api)
+
+	api.SLA = x.SLA
 }
 
 // Info contains the main metadata for the API definition.
