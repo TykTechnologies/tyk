@@ -157,7 +157,6 @@ func TestREDMetrics_ResponseFlag(t *testing.T) {
 	assertMetricExists(t, `http_server_request_duration_seconds_count{tyk_api_id="3",tyk_response_flag="URS"}`)
 }
 
-
 func TestDoNotTrack_NoMetrics(t *testing.T) {
 	if gwProfile() != "default" {
 		t.Skip("only runs under default profile")
@@ -435,6 +434,48 @@ func TestCustomProfile_Instruments(t *testing.T) {
 			tc.assert(t)
 		})
 	}
+}
+
+// ---------- Runtime Metrics tests ----------
+
+func TestRuntimeMetrics(t *testing.T) {
+	if gwProfile() != "default" {
+		t.Skip("only runs under default profile")
+	}
+	waitForGateway(t)
+
+	time.Sleep(15 * time.Second)
+
+	tests := []struct {
+		name   string
+		metric string
+	}{
+		{"goroutine count exists", `process_runtime_go_goroutines`},
+		{"heap memory allocated exists", `process_runtime_go_mem_heap_alloc_bytes`},
+		{"heap memory in use exists", `process_runtime_go_mem_heap_inuse_bytes`},
+		{"GC count exists", `process_runtime_go_gc_count_total`},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			// Runtime metrics should exist and be > 0.
+			assertMetricExists(t, tc.metric)
+		})
+	}
+}
+
+func TestRuntimeMetrics_Disabled(t *testing.T) {
+	if gwProfile() != "disabled" {
+		t.Skip("only runs under disabled profile")
+	}
+	waitForGateway(t)
+
+	time.Sleep(15 * time.Second)
+
+	// Runtime metrics should not exist.
+	assertMetricAbsent(t, `process_runtime_go_goroutines`)
+	assertMetricAbsent(t, `process_runtime_go_mem_heap_alloc_bytes`)
+	assertMetricAbsent(t, `process_runtime_go_gc_count_total`)
 }
 
 // ---------- Disabled profile tests ----------
