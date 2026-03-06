@@ -1085,6 +1085,10 @@ func (gw *Gateway) rpcReloadLoop(rpcKey string) {
 }
 
 func (gw *Gateway) DoReload() {
+	if gw.GetConfig().EnableDeltaSync {
+		log.Info("Delta sync is enabled, skipping full reload")
+		return
+	}
 	gw.reloadMu.Lock()
 	defer gw.reloadMu.Unlock()
 

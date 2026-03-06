@@ -40,6 +40,7 @@
   "hash_keys": true,
   "hash_key_function": "murmur64",
   "suppress_redis_signal_reload": false,
+  "enable_delta_sync": false,
   "force_global_session_lifetime": false,
   "max_idle_connections_per_host": 500
 }
