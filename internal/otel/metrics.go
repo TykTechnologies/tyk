@@ -11,8 +11,10 @@ import (
 )
 
 // NewMetricProvider creates an OTel metrics provider with the given metrics configuration.
+//
+//nolint:revive
 func NewMetricProvider(ctx context.Context, logger *logrus.Logger, metricsCfg *BaseMetricsConfig,
-	id string, version string) (tykmetric.Provider, error) {
+	id string, version string, useRPC bool, groupID string, isSegmented bool, segmentTags []string) (tykmetric.Provider, error) {
 
 	metricLogger := logger.WithFields(logrus.Fields{
 		"component": "otel-metrics",
@@ -27,6 +29,13 @@ func NewMetricProvider(ctx context.Context, logger *logrus.Logger, metricsCfg *B
 		tykmetric.WithHostDetector(),
 		tykmetric.WithContainerDetector(),
 		tykmetric.WithProcessDetector(),
+		tykmetric.WithCustomResourceAttributes(GatewayResourceAttributes(
+			id,
+			useRPC,
+			groupID,
+			isSegmented,
+			segmentTags,
+		)...),
 	)
 }
 
@@ -36,10 +45,12 @@ func NewMetricProvider(ctx context.Context, logger *logrus.Logger, metricsCfg *B
 //	nil (field omitted)  → default RED instruments created
 //	empty slice          → no API metrics (explicitly disabled)
 //	populated slice      → only configured instruments
+//
+//nolint:revive
 func InitOpenTelemetryMetrics(ctx context.Context, logger *logrus.Logger, gwConfig *OpenTelemetry,
-	id string, version string) *MetricInstruments {
+	id string, version string, useRPC bool, groupID string, isSegmented bool, segmentTags []string) *MetricInstruments {
 
-	provider, err := NewMetricProvider(ctx, logger, &gwConfig.Metrics.BaseMetricsConfig, id, version)
+	provider, err := NewMetricProvider(ctx, logger, &gwConfig.Metrics.BaseMetricsConfig, id, version, useRPC, groupID, isSegmented, segmentTags)
 	if err != nil {
 		logger.Errorf("Initializing OpenTelemetry Metrics: %s", err)
 		return &MetricInstruments{}
