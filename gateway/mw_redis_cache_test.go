@@ -8,14 +8,21 @@ import (
 	"hash"
 	"net/http"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
+	"github.com/sirupsen/logrus"
+	logrustest "github.com/sirupsen/logrus/hooks/test"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
+	"github.com/TykTechnologies/opentelemetry/metric/metrictest"
 	"github.com/TykTechnologies/tyk-pump/analytics"
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/internal/otel"
 	"github.com/TykTechnologies/tyk/test"
 )
 
@@ -359,4 +366,131 @@ func Test_addBodyHash(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestRedisCacheMiddleware_Observability verifies that cache hits produce
+// the same observability signals as regular (non-cached) requests.
+//
+// Currently, the cache middleware short-circuits the chain via middleware.StatusRespond
+// and only calls RecordHit (analytics). It does NOT call RecordAccessLog or RecordMetrics,
+// which means cache hits are invisible to access logs and OTel API metrics.
+func TestRedisCacheMiddleware_Observability(t *testing.T) {
+	// Install a test hook on the global logger to capture access log entries.
+	hook := &logrustest.Hook{}
+	log.AddHook(hook)
+	defer log.ReplaceHooks(make(logrus.LevelHooks))
+
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	// StartTest sets log level to Error when TYK_LOGLEVEL is unset.
+	// Access logs are emitted at Info level, so we must restore it.
+	origLevel := log.GetLevel()
+	log.SetLevel(logrus.InfoLevel)
+	defer log.SetLevel(origLevel)
+
+	// Enable access logs.
+	gwConfig := ts.Gw.GetConfig()
+	gwConfig.AccessLogs.Enabled = true
+	ts.Gw.SetConfig(gwConfig)
+
+	// Track analytics RecordHit calls.
+	var analyticsCount atomic.Int32
+	var analyticsMu sync.Mutex
+	var analyticsRecords []*analytics.AnalyticsRecord
+	ts.Gw.Analytics.mockEnabled = true
+	ts.Gw.Analytics.mockRecordHit = func(record *analytics.AnalyticsRecord) {
+		analyticsCount.Add(1)
+		analyticsMu.Lock()
+		defer analyticsMu.Unlock()
+		analyticsRecords = append(analyticsRecords, record)
+	}
+	defer func() {
+		ts.Gw.Analytics.mockEnabled = false
+	}()
+
+	// Build API with caching enabled on /cached path.
+	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		spec.Proxy.ListenPath = "/"
+		spec.CacheOptions.CacheTimeout = 60
+		spec.CacheOptions.EnableCache = true
+		UpdateAPIVersion(spec, "v1", func(v *apidef.VersionInfo) {
+			v.ExtendedPaths.Cached = []string{"/cached"}
+		})
+	})
+
+	// Sanity: verify the hook captures Info entries from the gateway logger.
+	hook.Reset()
+	log.WithField("status", 200).Info("sanity check")
+	require.Equal(t, 1, len(hook.AllEntries()), "hook sanity check: should capture log entries")
+	hook.Reset()
+
+	// --- Request 1: cache miss (goes through SuccessHandler) ---
+
+	// Install a real metrics provider so we can read the tyk.http.requests counter.
+	missTP := metrictest.NewProvider(t)
+	ts.Gw.MetricInstruments = otel.NewMetricInstruments(missTP, logrus.New())
+
+	ts.Run(t, test.TestCase{
+		Path: "/cached",
+		Code: http.StatusOK,
+		HeadersNotMatch: map[string]string{
+			"x-tyk-cached-response": "1",
+		},
+	})
+
+	missAnalyticsCount := analyticsCount.Load()
+	missAccessLogCount := countAccessLogEntries(hook)
+
+	require.Equal(t, int32(1), missAnalyticsCount, "cache miss: expected 1 analytics RecordHit call")
+	require.Equal(t, 1, missAccessLogCount, "cache miss: expected 1 access log entry")
+
+	// Verify RecordMetrics was called (it calls RecordRequest which increments tyk.http.requests).
+	missMetric := missTP.FindMetric(t, "tyk.http.requests")
+	metrictest.AssertSum(t, missMetric, int64(1))
+
+	// --- Request 2: cache hit (served by RedisCacheMiddleware, chain short-circuited) ---
+	hook.Reset()
+	analyticsCount.Store(0)
+
+	// Fresh metrics provider for the cache hit request.
+	hitTP := metrictest.NewProvider(t)
+	ts.Gw.MetricInstruments = otel.NewMetricInstruments(hitTP, logrus.New())
+
+	ts.Run(t, test.TestCase{
+		Path: "/cached",
+		Code: http.StatusOK,
+		HeadersMatch: map[string]string{
+			"x-tyk-cached-response": "1",
+		},
+	})
+
+	hitAnalyticsCount := analyticsCount.Load()
+	hitAccessLogCount := countAccessLogEntries(hook)
+
+	// Analytics (RecordHit) works for cache hits — the cache middleware calls it directly.
+	assert.Equal(t, int32(1), hitAnalyticsCount, "cache hit: expected 1 analytics RecordHit call")
+
+	// BUG: RecordAccessLog is NOT called on cache hits.
+	// When fixed, change this to assert.Equal(t, 1, hitAccessLogCount, ...).
+	assert.Equal(t, 0, hitAccessLogCount,
+		"cache hit: access log is missing (known gap — RecordAccessLog not called on cache hit path)")
+
+	// BUG: RecordMetrics (OTel) is NOT called on cache hits.
+	// When fixed, change assert.NotContains to use FindMetric + AssertSum(t, m, 1).
+	hitMetricNames := hitTP.MetricNames()
+	assert.NotContains(t, hitMetricNames, "tyk.http.requests",
+		"cache hit: RecordMetrics not called (known gap — no OTel metrics on cache hit path)")
+}
+
+// countAccessLogEntries counts log entries with prefix "access-log"
+// (set by accesslog.NewRecord in internal/httputil/accesslog/record.go:26).
+func countAccessLogEntries(hook *logrustest.Hook) int {
+	count := 0
+	for _, entry := range hook.AllEntries() {
+		if entry.Data["prefix"] == "access-log" {
+			count++
+		}
+	}
+	return count
 }
