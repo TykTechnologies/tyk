@@ -8,7 +8,6 @@ import (
 	"hash"
 	"net/http"
 	"strings"
-	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -393,14 +392,9 @@ func TestRedisCacheMiddleware_Observability(t *testing.T) {
 
 	// Track analytics RecordHit calls.
 	var analyticsCount atomic.Int32
-	var analyticsMu sync.Mutex
-	var analyticsRecords []*analytics.AnalyticsRecord
 	ts.Gw.Analytics.mockEnabled = true
 	ts.Gw.Analytics.mockRecordHit = func(record *analytics.AnalyticsRecord) {
 		analyticsCount.Add(1)
-		analyticsMu.Lock()
-		defer analyticsMu.Unlock()
-		analyticsRecords = append(analyticsRecords, record)
 	}
 	defer func() {
 		ts.Gw.Analytics.mockEnabled = false
