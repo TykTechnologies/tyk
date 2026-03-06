@@ -56,71 +56,8 @@ func (h *MCPListFilterSSEHook) FilterEvent(event *SSEEvent) (bool, *SSEEvent) {
 		return true, nil
 	}
 
-	// Parse the JSON-RPC envelope.
-	var envelope jsonRPCResponse
-	if err := json.Unmarshal([]byte(data), &envelope); err != nil {
-		return true, nil
-	}
-	if envelope.Result == nil {
-		return true, nil
-	}
-
-	// We need to determine the method. JSON-RPC responses don't include the
-	// method name, but we can infer the list type from the result keys.
-	var result map[string]json.RawMessage
-	if err := json.Unmarshal(envelope.Result, &result); err != nil {
-		return true, nil
-	}
-
-	cfg := inferListConfigFromResult(result)
-	if cfg == nil {
-		return true, nil // not a list response
-	}
-
-	accessDef := h.ses.AccessRights[h.apiID]
-	rules := cfg.rulesFrom(accessDef.MCPAccessRights)
-	if rules.IsEmpty() {
-		return true, nil
-	}
-
-	// Filter the items array.
-	itemsRaw, exists := result[cfg.arrayKey]
-	if !exists {
-		return true, nil
-	}
-
-	var items []json.RawMessage
-	if err := json.Unmarshal(itemsRaw, &items); err != nil {
-		return true, nil
-	}
-
-	filtered := make([]json.RawMessage, 0, len(items))
-	for _, item := range items {
-		name := extractStringField(item, cfg.nameField)
-		if name == "" {
-			filtered = append(filtered, item)
-			continue
-		}
-		if !checkAccessControlRules(rules, name) {
-			filtered = append(filtered, item)
-		}
-	}
-
-	// Re-encode.
-	filteredBytes, err := json.Marshal(filtered)
-	if err != nil {
-		return true, nil
-	}
-	result[cfg.arrayKey] = filteredBytes
-
-	resultBytes, err := json.Marshal(result)
-	if err != nil {
-		return true, nil
-	}
-	envelope.Result = resultBytes
-
-	newData, err := json.Marshal(envelope)
-	if err != nil {
+	newData, ok := h.filterSSEData([]byte(data))
+	if !ok {
 		return true, nil
 	}
 
@@ -134,35 +71,50 @@ func (h *MCPListFilterSSEHook) FilterEvent(event *SSEEvent) (bool, *SSEEvent) {
 	return true, modified
 }
 
+// filterSSEData parses a JSON-RPC response from SSE event data, infers the
+// list type from the result keys, and filters the items. Returns (nil, false)
+// when the data is not a filterable list response or any step fails.
+func (h *MCPListFilterSSEHook) filterSSEData(data []byte) ([]byte, bool) {
+	// Parse the JSON-RPC envelope.
+	var envelope jsonRPCResponse
+	if err := json.Unmarshal(data, &envelope); err != nil {
+		return nil, false
+	}
+	if envelope.Result == nil {
+		return nil, false
+	}
+
+	// We need to determine the method. JSON-RPC responses don't include the
+	// method name, but we can infer the list type from the result keys.
+	var result map[string]json.RawMessage
+	if err := json.Unmarshal(envelope.Result, &result); err != nil {
+		return nil, false
+	}
+
+	cfg := inferListConfigFromResult(result)
+	if cfg == nil {
+		return nil, false
+	}
+
+	accessDef := h.ses.AccessRights[h.apiID]
+	rules := cfg.rulesFrom(accessDef.MCPAccessRights)
+	if rules.IsEmpty() {
+		return nil, false
+	}
+
+	return filterParsedJSONRPC(&envelope, result, cfg, rules)
+}
+
 // inferListConfigFromResult determines the list type by inspecting which
 // well-known array key is present in the JSON-RPC result object.
 func inferListConfigFromResult(result map[string]json.RawMessage) *mcpListConfig {
-	if _, ok := result["tools"]; ok {
-		return &mcpListConfig{
-			arrayKey:  "tools",
-			nameField: "name",
-			rulesFrom: func(r user.MCPAccessRights) user.AccessControlRules { return r.Tools },
-		}
-	}
-	if _, ok := result["prompts"]; ok {
-		return &mcpListConfig{
-			arrayKey:  "prompts",
-			nameField: "name",
-			rulesFrom: func(r user.MCPAccessRights) user.AccessControlRules { return r.Prompts },
-		}
-	}
-	if _, ok := result["resourceTemplates"]; ok {
-		return &mcpListConfig{
-			arrayKey:  "resourceTemplates",
-			nameField: "uriTemplate",
-			rulesFrom: func(r user.MCPAccessRights) user.AccessControlRules { return r.Resources },
-		}
-	}
-	if _, ok := result["resources"]; ok {
-		return &mcpListConfig{
-			arrayKey:  "resources",
-			nameField: "uri",
-			rulesFrom: func(r user.MCPAccessRights) user.AccessControlRules { return r.Resources },
+	// Check resourceTemplates before resources — "resources" would also match
+	// if we checked it first, since both use the Resources access rights,
+	// but we need the correct arrayKey and nameField.
+	lookupOrder := []string{"tools", "prompts", "resourceTemplates", "resources"}
+	for _, key := range lookupOrder {
+		if _, ok := result[key]; ok {
+			return mcpListConfigs[key]
 		}
 	}
 	return nil
