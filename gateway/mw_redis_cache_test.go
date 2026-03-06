@@ -369,11 +369,8 @@ func Test_addBodyHash(t *testing.T) {
 }
 
 // TestRedisCacheMiddleware_Observability verifies that cache hits produce
-// the same observability signals as regular (non-cached) requests.
-//
-// Currently, the cache middleware short-circuits the chain via middleware.StatusRespond
-// and only calls RecordHit (analytics). It does NOT call RecordAccessLog or RecordMetrics,
-// which means cache hits are invisible to access logs and OTel API metrics.
+// the same observability signals as regular (non-cached) requests:
+// analytics (RecordHit), access logs (RecordAccessLog), and OTel metrics (RecordMetrics).
 func TestRedisCacheMiddleware_Observability(t *testing.T) {
 	// Install a test hook on the global logger to capture access log entries.
 	hook := &logrustest.Hook{}
@@ -471,16 +468,12 @@ func TestRedisCacheMiddleware_Observability(t *testing.T) {
 	// Analytics (RecordHit) works for cache hits — the cache middleware calls it directly.
 	assert.Equal(t, int32(1), hitAnalyticsCount, "cache hit: expected 1 analytics RecordHit call")
 
-	// BUG: RecordAccessLog is NOT called on cache hits.
-	// When fixed, change this to assert.Equal(t, 1, hitAccessLogCount, ...).
-	assert.Equal(t, 0, hitAccessLogCount,
-		"cache hit: access log is missing (known gap — RecordAccessLog not called on cache hit path)")
+	// RecordAccessLog is called on cache hits.
+	assert.Equal(t, 1, hitAccessLogCount, "cache hit: expected 1 access log entry")
 
-	// BUG: RecordMetrics (OTel) is NOT called on cache hits.
-	// When fixed, change assert.NotContains to use FindMetric + AssertSum(t, m, 1).
-	hitMetricNames := hitTP.MetricNames()
-	assert.NotContains(t, hitMetricNames, "tyk.http.requests",
-		"cache hit: RecordMetrics not called (known gap — no OTel metrics on cache hit path)")
+	// RecordMetrics (OTel) is called on cache hits.
+	hitMetric := hitTP.FindMetric(t, "tyk.http.requests")
+	metrictest.AssertSum(t, hitMetric, int64(1))
 }
 
 // countAccessLogEntries counts log entries with prefix "access-log"
