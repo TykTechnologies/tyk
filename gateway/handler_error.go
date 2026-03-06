@@ -333,7 +333,7 @@ func (e *ErrorHandler) writeTemplateErrorResponse(w http.ResponseWriter, r *http
 
 		apiError := APIError{htmltemplate.HTML(htmltemplate.JSEscapeString(errMsg))}
 
-		if contentType == header.ApplicationXML || contentType == header.TextXML {
+		if contentType == header.ApplicationXML || contentType == header.TextXML || contentType == header.ApplicationSoapXML {
 			apiError.Message = htmltemplate.HTML(errMsg)
 
 			//we look up in the last defined templateName to obtain the template.
