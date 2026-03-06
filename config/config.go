@@ -908,6 +908,12 @@ type Config struct {
 
 	// DisableKeyActionsByUsername disables key search by username.
 	// When this is set to `true` you are able to search for keys only by keyID or key hash (if `hash_keys` is also set to `true`)
+
+	// EnableDeltaSync enables the delta sync feature.
+	EnableDeltaSync bool `json:"enable_delta_sync"`
+
+	// Disable dynamic API and Policy reloads, e.g. it will load new changes only on procecss start.
+	SuppressRedisSignalReload bool `json:"suppress_redis_signal_reload"`
 	// Note that if `hash_keys` is also set to `true` then the keyID will not be provided for APIs secured using basic auth. In this scenario the only search option would be to use key hash
 	// If you are using the Tyk Dashboard, you must configure this setting with the same value in both Gateway and Dashboard
 	DisableKeyActionsByUsername bool `json:"disable_key_actions_by_username"`
