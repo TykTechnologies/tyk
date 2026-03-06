@@ -18,6 +18,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/TykTechnologies/opentelemetry/metric/metrictest"
+
 	"github.com/TykTechnologies/tyk-pump/analytics"
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
@@ -393,7 +394,7 @@ func TestRedisCacheMiddleware_Observability(t *testing.T) {
 	// Track analytics RecordHit calls.
 	var analyticsCount atomic.Int32
 	ts.Gw.Analytics.mockEnabled = true
-	ts.Gw.Analytics.mockRecordHit = func(record *analytics.AnalyticsRecord) {
+	ts.Gw.Analytics.mockRecordHit = func(_ *analytics.AnalyticsRecord) {
 		analyticsCount.Add(1)
 	}
 	defer func() {
