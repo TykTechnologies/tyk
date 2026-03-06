@@ -203,10 +203,15 @@ type StorageOptionsConf struct {
 	// You can safely enable this setting on existing deployments.
 	// The Gateway continues to load previously stored uncompressed backups and stores all new backups in compressed form.
 	//
-	// Note: This feature works with API definitions up to 100MB uncompressed
+	// Note: The maximum decompressed size is controlled by `max_decompressed_size`.
 	//
 	// Defaults to `false`.
 	CompressAPIDefinitions bool `json:"compress_api_definitions"`
+
+	// Maximum decompressed size (in bytes) for API definitions when using compression.
+	// This limit prevents memory exhaustion during decompression.
+	// Defaults to 104857600 (100MB).
+	MaxDecompressedSize int64 `json:"max_decompressed_size"`
 }
 
 type NormalisedURLConfig struct {
