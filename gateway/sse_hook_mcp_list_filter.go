@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"strings"
 
+	"github.com/TykTechnologies/tyk/internal/mcp"
 	"github.com/TykTechnologies/tyk/user"
 )
 
@@ -76,7 +77,7 @@ func (h *MCPListFilterSSEHook) FilterEvent(event *SSEEvent) (bool, *SSEEvent) {
 // when the data is not a filterable list response or any step fails.
 func (h *MCPListFilterSSEHook) filterSSEData(data []byte) ([]byte, bool) {
 	// Parse the JSON-RPC envelope.
-	var envelope jsonRPCResponse
+	var envelope mcp.JSONRPCResponse
 	if err := json.Unmarshal(data, &envelope); err != nil {
 		return nil, false
 	}
@@ -91,31 +92,16 @@ func (h *MCPListFilterSSEHook) filterSSEData(data []byte) ([]byte, bool) {
 		return nil, false
 	}
 
-	cfg := inferListConfigFromResult(result)
+	cfg := mcp.InferListConfigFromResult(result)
 	if cfg == nil {
 		return nil, false
 	}
 
 	accessDef := h.ses.AccessRights[h.apiID]
-	rules := cfg.rulesFrom(accessDef.MCPAccessRights)
+	rules := cfg.RulesFrom(accessDef.MCPAccessRights)
 	if rules.IsEmpty() {
 		return nil, false
 	}
 
-	return filterParsedJSONRPC(&envelope, result, cfg, rules)
-}
-
-// inferListConfigFromResult determines the list type by inspecting which
-// well-known array key is present in the JSON-RPC result object.
-func inferListConfigFromResult(result map[string]json.RawMessage) *mcpListConfig {
-	// Check resourceTemplates before resources — "resources" would also match
-	// if we checked it first, since both use the Resources access rights,
-	// but we need the correct arrayKey and nameField.
-	lookupOrder := []string{"tools", "prompts", "resourceTemplates", "resources"}
-	for _, key := range lookupOrder {
-		if _, ok := result[key]; ok {
-			return mcpListConfigs[key]
-		}
-	}
-	return nil
+	return mcp.FilterParsedJSONRPC(&envelope, result, cfg, rules)
 }

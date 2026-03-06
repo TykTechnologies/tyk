@@ -103,7 +103,7 @@ func readResponseBody(t *testing.T, res *http.Response) []byte {
 // extractToolNames extracts the "name" fields from the tools array in a JSON-RPC response.
 func extractToolNames(t *testing.T, body []byte) []string {
 	t.Helper()
-	var envelope jsonRPCResponse
+	var envelope mcp.JSONRPCResponse
 	require.NoError(t, json.Unmarshal(body, &envelope))
 
 	var result map[string]json.RawMessage
@@ -124,7 +124,7 @@ func extractToolNames(t *testing.T, body []byte) []string {
 // extractPromptNames extracts the "name" fields from the prompts array in a JSON-RPC response.
 func extractPromptNames(t *testing.T, body []byte) []string {
 	t.Helper()
-	var envelope jsonRPCResponse
+	var envelope mcp.JSONRPCResponse
 	require.NoError(t, json.Unmarshal(body, &envelope))
 
 	var result map[string]json.RawMessage
@@ -145,7 +145,7 @@ func extractPromptNames(t *testing.T, body []byte) []string {
 // extractResourceURIs extracts the "uri" fields from the resources array in a JSON-RPC response.
 func extractResourceURIs(t *testing.T, body []byte) []string {
 	t.Helper()
-	var envelope jsonRPCResponse
+	var envelope mcp.JSONRPCResponse
 	require.NoError(t, json.Unmarshal(body, &envelope))
 
 	var result map[string]json.RawMessage
@@ -166,7 +166,7 @@ func extractResourceURIs(t *testing.T, body []byte) []string {
 // extractResourceTemplateURIs extracts the "uriTemplate" fields from the resourceTemplates array.
 func extractResourceTemplateURIs(t *testing.T, body []byte) []string {
 	t.Helper()
-	var envelope jsonRPCResponse
+	var envelope mcp.JSONRPCResponse
 	require.NoError(t, json.Unmarshal(body, &envelope))
 
 	var result map[string]json.RawMessage
@@ -563,7 +563,7 @@ func TestMCPListFilterResponseHandler_HandleResponse(t *testing.T) {
 
 			// Verify pagination cursor is preserved when applicable.
 			if tt.name == "tools/list pagination nextCursor preserved" {
-				var envelope jsonRPCResponse
+				var envelope mcp.JSONRPCResponse
 				require.NoError(t, json.Unmarshal(body, &envelope))
 				var result map[string]json.RawMessage
 				require.NoError(t, json.Unmarshal(envelope.Result, &result))
@@ -837,53 +837,6 @@ func TestMCPListFilterResponseHandler_HandleResponse_WrongAPIID(t *testing.T) {
 	body := readResponseBody(t, res)
 	assert.JSONEq(t, string(responseBody), string(body),
 		"response should pass through when API ID does not match session access rights")
-}
-
-func TestExtractStringField(t *testing.T) {
-	tests := []struct {
-		name  string
-		raw   string
-		field string
-		want  string
-	}{
-		{
-			name:  "existing string field",
-			raw:   `{"name":"get_weather","description":"Get weather"}`,
-			field: "name",
-			want:  "get_weather",
-		},
-		{
-			name:  "missing field",
-			raw:   `{"description":"Get weather"}`,
-			field: "name",
-			want:  "",
-		},
-		{
-			name:  "non-string field",
-			raw:   `{"name":42}`,
-			field: "name",
-			want:  "",
-		},
-		{
-			name:  "invalid JSON",
-			raw:   `{not json}`,
-			field: "name",
-			want:  "",
-		},
-		{
-			name:  "empty object",
-			raw:   `{}`,
-			field: "name",
-			want:  "",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got := extractStringField(json.RawMessage(tt.raw), tt.field)
-			assert.Equal(t, tt.want, got)
-		})
-	}
 }
 
 // generateTools creates n tools with names "tool_0", "tool_1", ..., "tool_{n-1}".

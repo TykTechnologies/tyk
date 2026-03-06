@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/TykTechnologies/tyk/internal/mcp"
 	"github.com/TykTechnologies/tyk/user"
 )
 
@@ -95,7 +96,7 @@ func TestMCPListFilterSSEHook_FilterEvent(t *testing.T) {
 
 	extractToolNames := func(t *testing.T, data string) []string {
 		t.Helper()
-		var envelope jsonRPCResponse
+		var envelope mcp.JSONRPCResponse
 		require.NoError(t, json.Unmarshal([]byte(data), &envelope))
 
 		var result map[string]json.RawMessage
@@ -214,7 +215,7 @@ func TestMCPListFilterSSEHook_FilterEvent(t *testing.T) {
 		assert.True(t, allowed)
 		require.NotNil(t, modified)
 
-		var env jsonRPCResponse
+		var env mcp.JSONRPCResponse
 		require.NoError(t, json.Unmarshal([]byte(modified.Data[0]), &env))
 		var res map[string]json.RawMessage
 		require.NoError(t, json.Unmarshal(env.Result, &res))
@@ -352,7 +353,7 @@ func TestMCPListFilterSSEHook_PromptFiltering(t *testing.T) {
 	assert.True(t, allowed)
 	require.NotNil(t, modified)
 
-	var env jsonRPCResponse
+	var env mcp.JSONRPCResponse
 	require.NoError(t, json.Unmarshal([]byte(modified.Data[0]), &env))
 	var res map[string]json.RawMessage
 	require.NoError(t, json.Unmarshal(env.Result, &res))
@@ -393,7 +394,7 @@ func TestMCPListFilterSSEHook_ResourceTemplateFiltering(t *testing.T) {
 	assert.True(t, allowed)
 	require.NotNil(t, modified)
 
-	var env jsonRPCResponse
+	var env mcp.JSONRPCResponse
 	require.NoError(t, json.Unmarshal([]byte(modified.Data[0]), &env))
 	var res map[string]json.RawMessage
 	require.NoError(t, json.Unmarshal(env.Result, &res))
@@ -563,33 +564,5 @@ func BenchmarkSSETap_E2E_NoRules(b *testing.B) {
 		tap := NewSSETap(reader) // no hooks
 		io.ReadAll(tap)          //nolint:errcheck
 		tap.Close()
-	}
-}
-
-func TestInferListConfigFromResult(t *testing.T) {
-	tests := []struct {
-		name     string
-		key      string
-		expected string
-	}{
-		{"tools", "tools", "tools"},
-		{"prompts", "prompts", "prompts"},
-		{"resources", "resources", "resources"},
-		{"resourceTemplates", "resourceTemplates", "resourceTemplates"},
-		{"content (not a list)", "content", ""},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			result := map[string]json.RawMessage{
-				tt.key: json.RawMessage(`[]`),
-			}
-			cfg := inferListConfigFromResult(result)
-			if tt.expected == "" {
-				assert.Nil(t, cfg)
-			} else {
-				require.NotNil(t, cfg)
-				assert.Equal(t, tt.expected, cfg.arrayKey)
-			}
-		})
 	}
 }
