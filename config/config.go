@@ -13,6 +13,7 @@ import (
 	"github.com/kelseyhightower/envconfig"
 
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/internal/errors"
 	"github.com/TykTechnologies/tyk/internal/otel"
 	logger "github.com/TykTechnologies/tyk/log"
 	"github.com/TykTechnologies/tyk/regexp"
@@ -1338,6 +1339,109 @@ type Config struct {
 	// ```
 	OverrideMessages map[string]TykError `bson:"override_messages" json:"override_messages"`
 
+	// ErrorOverrides allows you to customize error responses at the gateway level.
+	// You can override both gateway-generated errors (authentication failures, rate limits, validation errors)
+	// and upstream service errors (4xx/5xx responses from your backend APIs).
+	//
+	// Rules are organized by HTTP status code and can include additional matching criteria.
+	// When multiple rules match, the first matching rule is applied. API-level overrides take precedence over gateway-level overrides.
+	//
+	// Common use cases:
+	// - Standardize error responses across all APIs (e.g., RFC 7807 Problem Details format)
+	// - Hide internal error details from external clients
+	// - Provide branded or localized error messages
+	// - Add custom headers for CORS, correlation IDs, or rate limit guidance
+	// - Transform upstream errors into a consistent format
+	//
+	// Example - Basic status code override with direct body (all 500 errors):
+	// ```
+	// "error_overrides": {
+	//   "500": [{
+	//     "response": {
+	//       "code": 503,
+	//       "body": "{\"error\": \"Service temporarily unavailable\", \"retry_after\": 300}",
+	//       "headers": {"Retry-After": "300", "X-Error-Source": "gateway"}
+	//     }
+	//   }]
+	// }
+	// ```
+	//
+	// Example - Inline body template with message (database timeout errors):
+	// ```
+	// "error_overrides": {
+	//   "500": [{
+	//     "match": {
+	//       "message_pattern": "database.*timeout"
+	//     },
+	//     "response": {
+	//       "code": 504,
+	//       "body": "{\"error\": \"Request timeout\", \"status\": {{.StatusCode}}, \"detail\": \"{{.Message}}\"}",
+	//       "message": "Database query took too long"
+	//     }
+	//   }]
+	// }
+	// ```
+	//
+	// Example - JSON body field matching for upstream errors (match specific error codes):
+	// ```
+	// "error_overrides": {
+	//   "400": [{
+	//     "match": {
+	//       "body_field": "error.code",
+	//       "body_value": "INVALID_PAYMENT_METHOD"
+	//     },
+	//     "response": {
+	//       "code": 402,
+	//       "template": "error_payment",
+	//       "message": "Invalid payment method provided"
+	//     }
+	//   }]
+	// }
+	// ```
+	//
+	// Example - Wildcard patterns (override all 4xx and 5xx errors):
+	// ```
+	// "error_overrides": {
+	//   "4xx": [{
+	//     "response": {
+	//       "template": "error_client",
+	//       "message": "Client error occurred",
+	//       "headers": {"X-Error-Category": "client"}
+	//     }
+	//   }],
+	//   "5xx": [{
+	//     "response": {
+	//       "template": "error_server",
+	//       "message": "Server error occurred",
+	//       "headers": {"X-Error-Category": "server"}
+	//     }
+	//   }]
+	// }
+	// ```
+	//
+	// Example - File template with custom message:
+	// ```
+	// "error_overrides": {
+	//   "500": [{
+	//     "match": {
+	//       "message_pattern": "database.*timeout"
+	//     },
+	//     "response": {
+	//       "code": 504,
+	//       "template": "error_upstream",
+	//       "message": "Database query timeout - please try again"
+	//     }
+	//   }]
+	// }
+	// ```
+	// The template "error_upstream.json" receives {{.Message}} = "Database query timeout - please try again"
+	//
+	// Field summary:
+	// - body: The HTTP response body (literal or inline template). Takes precedence over template.
+	// - message: Semantic error message passed as {{.Message}} to body templates, file templates, or default template.
+	// - template: File template reference. Used when body is not set.
+	ErrorOverrides ErrorOverridesMap `json:"error_overrides,omitempty"`
+
 	// Cloud flag shows the Gateway runs in Tyk Cloud.
 	Cloud bool `json:"cloud"`
 
@@ -1401,6 +1505,149 @@ type ResourceSyncConfig struct {
 type TykError struct {
 	Message string `json:"message"`
 	Code    int    `json:"code"`
+}
+
+// ErrorMatcher defines additional matching criteria for error overrides.
+// Status code matching is handled by the map key in ErrorOverridesMap.
+type ErrorMatcher struct {
+	// Flag matches against the error classification flag from the request context.
+	// When specified, takes priority over message_pattern and body_field matching.
+	// If flag doesn't match, falls back to other matching criteria.
+	Flag errors.ResponseFlag `json:"flag,omitempty"`
+
+	// MessagePattern is a regex pattern to match against the response body.
+	// Use when matching specific text patterns in error messages.
+	// Examples: "database.*timeout", "^Authentication failed$", "connection refused"
+	MessagePattern string `json:"message_pattern,omitempty"`
+
+	// BodyField is a JSON path (gjson syntax) to extract a value from the response body.
+	// Use when matching structured JSON error responses from upstream services.
+	// For gateway-generated errors, use message_pattern with exact text matching instead,
+	// since the error matcher intercepts the gateway error message before it's wrapped in the JSON response structure.
+	// Examples: "error.code", "details.reason", "metadata.error_type"
+	BodyField string `json:"body_field,omitempty"`
+
+	// BodyValue is the expected value at BodyField for the match to succeed.
+	// Required when BodyField is set. If both BodyField and MessagePattern are specified,
+	// BodyField/BodyValue takes precedence (more specific match wins).
+	BodyValue string `json:"body_value,omitempty"`
+
+	// CompiledPattern is the pre-compiled regex for MessagePattern.
+	// Populated during config/API load, not serialized.
+	CompiledPattern *regexp.Regexp `json:"-" ignored:"true"`
+}
+
+// Compile compiles the MessagePattern regex if present.
+// Should be called after unmarshaling from JSON or YAML.
+func (m *ErrorMatcher) Compile() error {
+	if m.MessagePattern != "" && m.CompiledPattern == nil {
+		re, err := regexp.Compile(m.MessagePattern)
+		if err != nil {
+			return fmt.Errorf("invalid regex pattern %q: %w", m.MessagePattern, err)
+		}
+
+		m.CompiledPattern = re
+	}
+
+	return nil
+}
+
+// ErrorResponse defines the override response for error overrides.
+//
+// Priority order:
+//  1. Body (if set): Use explicit body - literal text or inline template
+//  2. Template (if set, no Body): Use specified file template
+//  3. Message only (no Body, no Template): Use Tyk's default error template with {{.Message}}
+type ErrorResponse struct {
+	// Code is the HTTP status code to return.
+	// If not set, the original status code is preserved.
+	Code int `json:"code"`
+
+	// Body is the HTTP response body to return. Can be either:
+	// 1. Literal response body (JSON/XML/text): Written directly without templating
+	//    Example: "{\"error\": \"Service unavailable\", \"code\": \"UNAVAILABLE\"}"
+	//    Note: You are responsible for providing valid JSON/XML matching the Content-Type
+	// 2. Inline template with variables: Executed as a Go template
+	//    Example: "{\"status\": {{.StatusCode}}, \"detail\": \"{{.Message}}\"}"
+	//    Available variables: {{.StatusCode}}, {{.Message}}
+	//
+	// Takes precedence over Template if both are specified.
+	Body string `json:"body,omitempty"`
+
+	// Message is the semantic error message passed to templates as {{.Message}}.
+	// Use this to provide a human-readable error description.
+	// Works with inline Body templates, file Templates, or standalone (uses default template).
+	// Example: "Database connection timeout - please retry"
+	Message string `json:"message,omitempty"`
+
+	// Template references an existing error template file in the templates/ directory.
+	// Template files must start with "error" prefix (e.g., "error_upstream" loads "error_upstream.json").
+	// Used when Body is not specified. If neither Body nor Template is set but Message is,
+	// Tyk's default error template is used with {{.Message}} populated.
+	// Template files can access: {{.StatusCode}}, {{.Message}}
+	// Original error bodies are NOT exposed to templates (security: prevents leaking internal errors).
+	// The file extension (.json or .xml) is determined by the request's Content-Type header.
+	Template string `json:"template,omitempty"`
+
+	// Headers are additional HTTP headers to include in the response.
+	// Useful for CORS, rate limit info, retry guidance, correlation IDs, etc.
+	Headers map[string]string `json:"headers,omitempty"`
+}
+
+// ErrorOverride combines an optional matcher with its response.
+type ErrorOverride struct {
+	// Match contains optional additional matching criteria (message_pattern, body_field).
+	// If nil or empty, the override applies to all errors with the status code.
+	Match *ErrorMatcher `json:"match,omitempty"`
+
+	// Response defines the response to return when matched.
+	Response ErrorResponse `json:"response"`
+
+	// compiledBodyTmpl is the pre-compiled text/template for inline Body (XML).
+	// Populated during CompileErrorOverrides(), not serialized.
+	compiledBodyTmpl any `json:"-" ignored:"true"`
+
+	// compiledBodyTmplHTML is the pre-compiled html/template for inline Body (JSON).
+	// Populated during CompileErrorOverrides(), not serialized.
+	compiledBodyTmplHTML any `json:"-" ignored:"true"`
+}
+
+// SetCompiledTemplates stores the pre-compiled templates for inline Body.
+func (e *ErrorOverride) SetCompiledTemplates(textTmpl, htmlTmpl any) {
+	e.compiledBodyTmpl = textTmpl
+	e.compiledBodyTmplHTML = htmlTmpl
+}
+
+// GetCompiledTemplate returns the pre-compiled template for the given content type.
+// Returns nil if no inline Body template was compiled (e.g., using file template).
+func (e *ErrorOverride) GetCompiledTemplate(isXML bool) interface{} {
+	if isXML {
+		return e.compiledBodyTmpl
+	}
+
+	return e.compiledBodyTmplHTML
+}
+
+// HasCompiledTemplate returns true if this override has a pre-compiled inline Body template.
+func (e *ErrorOverride) HasCompiledTemplate() bool {
+	return e.compiledBodyTmpl != nil
+}
+
+// ErrorOverridesMap maps status codes to their override rules.
+// Keys can be exact codes ("500", "401") or patterns ("4xx", "5xx").
+// Values are arrays of ErrorOverride, evaluated in order (first match wins).
+type ErrorOverridesMap map[string][]ErrorOverride
+
+// CompiledErrorOverrides provides O(1) lookup for error overrides by status code.
+// Built from ErrorOverridesMap during config load for efficient runtime matching.
+type CompiledErrorOverrides struct {
+	// ByExactCode maps exact status codes (e.g., 500, 401) to their override rules.
+	// Multiple rules for the same code are evaluated in order (first match wins).
+	ByExactCode map[int][]*ErrorOverride
+
+	// ByPrefix maps status code prefixes (4, 5) to pattern rules (4xx, 5xx).
+	// Checked after exact matches fail.
+	ByPrefix map[int][]*ErrorOverride
 }
 
 // VaultConfig is used to configure the creation of a client

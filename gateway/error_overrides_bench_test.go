@@ -1,0 +1,838 @@
+package gateway
+
+import (
+	htmltemplate "html/template"
+	"net/http/httptest"
+	"testing"
+	texttemplate "text/template"
+
+	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/ctx"
+	"github.com/TykTechnologies/tyk/header"
+	"github.com/TykTechnologies/tyk/internal/errors"
+)
+
+func BenchmarkApplyOverride(b *testing.B) {
+	b.Run("no overrides configured", func(b *testing.B) {
+		gw := &Gateway{}
+		eo := NewErrorOverrides(nil, gw)
+		req := httptest.NewRequest("GET", "/test", nil)
+		body := []byte("Internal server error")
+
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			eo.ApplyOverride(req, 500, body)
+		}
+	})
+
+	b.Run("exact code match - no additional criteria", func(b *testing.B) {
+		overrides := config.ErrorOverridesMap{
+			"500": []config.ErrorOverride{
+				{
+					Response: config.ErrorResponse{
+						Code:    503,
+						Message: "Service unavailable",
+					},
+				},
+			},
+		}
+
+		gw := &Gateway{}
+		compiled := CompileErrorOverrides(overrides)
+		gw.SetCompiledErrorOverrides(compiled)
+		eo := NewErrorOverrides(nil, gw)
+		req := httptest.NewRequest("GET", "/test", nil)
+		body := []byte("Internal server error")
+
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			eo.ApplyOverride(req, 500, body)
+		}
+	})
+
+	b.Run("pattern match 4xx", func(b *testing.B) {
+		overrides := config.ErrorOverridesMap{
+			"4xx": []config.ErrorOverride{
+				{
+					Response: config.ErrorResponse{
+						Message: "Client error",
+					},
+				},
+			},
+		}
+
+		gw := &Gateway{}
+		compiled := CompileErrorOverrides(overrides)
+		gw.SetCompiledErrorOverrides(compiled)
+		eo := NewErrorOverrides(nil, gw)
+		req := httptest.NewRequest("GET", "/test", nil)
+		body := []byte("Not found")
+
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			eo.ApplyOverride(req, 404, body)
+		}
+	})
+
+	b.Run("regex pattern match", func(b *testing.B) {
+		overrides := config.ErrorOverridesMap{
+			"500": []config.ErrorOverride{
+				{
+					Match: &config.ErrorMatcher{
+						MessagePattern: "database.*timeout",
+					},
+					Response: config.ErrorResponse{
+						Code:    504,
+						Message: "Database timeout",
+					},
+				},
+			},
+		}
+
+		gw := &Gateway{}
+		compiled := CompileErrorOverrides(overrides)
+		gw.SetCompiledErrorOverrides(compiled)
+		eo := NewErrorOverrides(nil, gw)
+		req := httptest.NewRequest("GET", "/test", nil)
+		body := []byte("database connection timeout occurred")
+
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			eo.ApplyOverride(req, 500, body)
+		}
+	})
+
+	b.Run("regex pattern non-match", func(b *testing.B) {
+		overrides := config.ErrorOverridesMap{
+			"500": []config.ErrorOverride{
+				{
+					Match: &config.ErrorMatcher{
+						MessagePattern: "database.*timeout",
+					},
+					Response: config.ErrorResponse{
+						Code:    504,
+						Message: "Database timeout",
+					},
+				},
+			},
+		}
+
+		gw := &Gateway{}
+		compiled := CompileErrorOverrides(overrides)
+		gw.SetCompiledErrorOverrides(compiled)
+		eo := NewErrorOverrides(nil, gw)
+		req := httptest.NewRequest("GET", "/test", nil)
+		body := []byte("network error occurred")
+
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			eo.ApplyOverride(req, 500, body)
+		}
+	})
+
+	b.Run("JSON body field match", func(b *testing.B) {
+		overrides := config.ErrorOverridesMap{
+			"400": []config.ErrorOverride{
+				{
+					Match: &config.ErrorMatcher{
+						BodyField: "error.code",
+						BodyValue: "INVALID_INPUT",
+					},
+					Response: config.ErrorResponse{
+						Code:    422,
+						Message: "Validation failed",
+					},
+				},
+			},
+		}
+
+		gw := &Gateway{}
+		compiled := CompileErrorOverrides(overrides)
+		gw.SetCompiledErrorOverrides(compiled)
+		eo := NewErrorOverrides(nil, gw)
+		req := httptest.NewRequest("GET", "/test", nil)
+		body := []byte(`{"error": {"code": "INVALID_INPUT", "message": "Field x is required"}}`)
+
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			eo.ApplyOverride(req, 400, body)
+		}
+	})
+
+	b.Run("multiple rules - first match", func(b *testing.B) {
+		overrides := config.ErrorOverridesMap{
+			"500": []config.ErrorOverride{
+				{
+					Match: &config.ErrorMatcher{
+						MessagePattern: "database",
+					},
+					Response: config.ErrorResponse{
+						Message: "Database error",
+					},
+				},
+				{
+					Match: &config.ErrorMatcher{
+						MessagePattern: "network",
+					},
+					Response: config.ErrorResponse{
+						Message: "Network error",
+					},
+				},
+				{
+					Response: config.ErrorResponse{
+						Message: "Generic error",
+					},
+				},
+			},
+		}
+
+		gw := &Gateway{}
+		compiled := CompileErrorOverrides(overrides)
+		gw.SetCompiledErrorOverrides(compiled)
+		eo := NewErrorOverrides(nil, gw)
+		req := httptest.NewRequest("GET", "/test", nil)
+		body := []byte("database connection failed")
+
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			eo.ApplyOverride(req, 500, body)
+		}
+	})
+
+	b.Run("large body truncation", func(b *testing.B) {
+		overrides := config.ErrorOverridesMap{
+			"500": []config.ErrorOverride{
+				{
+					Match: &config.ErrorMatcher{
+						MessagePattern: "error at start",
+					},
+					Response: config.ErrorResponse{
+						Message: "Matched",
+					},
+				},
+			},
+		}
+
+		gw := &Gateway{}
+		compiled := CompileErrorOverrides(overrides)
+		gw.SetCompiledErrorOverrides(compiled)
+		eo := NewErrorOverrides(nil, gw)
+		req := httptest.NewRequest("GET", "/test", nil)
+		largeBody := make([]byte, maxBodySizeForMatching+1000)
+		copy(largeBody, []byte("error at start"))
+
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			eo.ApplyOverride(req, 500, largeBody)
+		}
+	})
+
+	b.Run("flag match - exact match", func(b *testing.B) {
+		overrides := config.ErrorOverridesMap{
+			"429": []config.ErrorOverride{
+				{
+					Match: &config.ErrorMatcher{
+						Flag: errors.RLT,
+					},
+					Response: config.ErrorResponse{
+						Code:    429,
+						Message: "Rate limit exceeded",
+					},
+				},
+			},
+		}
+
+		gw := &Gateway{}
+		compiled := CompileErrorOverrides(overrides)
+		gw.SetCompiledErrorOverrides(compiled)
+		eo := NewErrorOverrides(nil, gw)
+		req := httptest.NewRequest("GET", "/test", nil)
+		ctx.SetErrorClassification(req, errors.NewErrorClassification(errors.RLT, "rate_limited"))
+
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			eo.ApplyOverride(req, 429, nil)
+		}
+	})
+
+	b.Run("flag match - no classification in context", func(b *testing.B) {
+		overrides := config.ErrorOverridesMap{
+			"429": []config.ErrorOverride{
+				{
+					Match: &config.ErrorMatcher{
+						Flag: errors.RLT,
+					},
+					Response: config.ErrorResponse{
+						Code:    429,
+						Message: "Rate limit exceeded",
+					},
+				},
+			},
+		}
+
+		gw := &Gateway{}
+		compiled := CompileErrorOverrides(overrides)
+		gw.SetCompiledErrorOverrides(compiled)
+		eo := NewErrorOverrides(nil, gw)
+		req := httptest.NewRequest("GET", "/test", nil)
+		// No classification set
+
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			eo.ApplyOverride(req, 429, nil)
+		}
+	})
+
+	b.Run("flag match - fallback to regex", func(b *testing.B) {
+		overrides := config.ErrorOverridesMap{
+			"500": []config.ErrorOverride{
+				{
+					Match: &config.ErrorMatcher{
+						Flag:           errors.CBO,
+						MessagePattern: "circuit.*breaker",
+					},
+					Response: config.ErrorResponse{
+						Code:    503,
+						Message: "Service unavailable",
+					},
+				},
+			},
+		}
+
+		gw := &Gateway{}
+		compiled := CompileErrorOverrides(overrides)
+		gw.SetCompiledErrorOverrides(compiled)
+		eo := NewErrorOverrides(nil, gw)
+		req := httptest.NewRequest("GET", "/test", nil)
+		// Set different flag so it falls back to regex
+		ctx.SetErrorClassification(req, errors.NewErrorClassification(errors.UCF, "connection_failure"))
+		body := []byte("circuit breaker is open")
+
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			eo.ApplyOverride(req, 500, body)
+		}
+	})
+
+	b.Run("multiple flag rules - first match", func(b *testing.B) {
+		overrides := config.ErrorOverridesMap{
+			"401": []config.ErrorOverride{
+				{
+					Match: &config.ErrorMatcher{
+						Flag: errors.TKE,
+					},
+					Response: config.ErrorResponse{
+						Message: "Token expired",
+					},
+				},
+				{
+					Match: &config.ErrorMatcher{
+						Flag: errors.AMF,
+					},
+					Response: config.ErrorResponse{
+						Message: "Auth field missing",
+					},
+				},
+				{
+					Match: &config.ErrorMatcher{
+						Flag: errors.TKI,
+					},
+					Response: config.ErrorResponse{
+						Message: "Token invalid",
+					},
+				},
+				{
+					Response: config.ErrorResponse{
+						Message: "Unauthorized",
+					},
+				},
+			},
+		}
+
+		gw := &Gateway{}
+		compiled := CompileErrorOverrides(overrides)
+		gw.SetCompiledErrorOverrides(compiled)
+		eo := NewErrorOverrides(nil, gw)
+		req := httptest.NewRequest("GET", "/test", nil)
+		ctx.SetErrorClassification(req, errors.NewErrorClassification(errors.TKE, "token_expired"))
+
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			eo.ApplyOverride(req, 401, nil)
+		}
+	})
+
+	b.Run("multiple flag rules - last match (catch-all)", func(b *testing.B) {
+		overrides := config.ErrorOverridesMap{
+			"401": []config.ErrorOverride{
+				{
+					Match: &config.ErrorMatcher{
+						Flag: errors.TKE,
+					},
+					Response: config.ErrorResponse{
+						Message: "Token expired",
+					},
+				},
+				{
+					Match: &config.ErrorMatcher{
+						Flag: errors.AMF,
+					},
+					Response: config.ErrorResponse{
+						Message: "Auth field missing",
+					},
+				},
+				{
+					Response: config.ErrorResponse{
+						Message: "Unauthorized",
+					},
+				},
+			},
+		}
+
+		gw := &Gateway{}
+		compiled := CompileErrorOverrides(overrides)
+		gw.SetCompiledErrorOverrides(compiled)
+		eo := NewErrorOverrides(nil, gw)
+		req := httptest.NewRequest("GET", "/test", nil)
+		// Set a flag that doesn't match any specific rule
+		ctx.SetErrorClassification(req, errors.NewErrorClassification(errors.AKI, "api_key_invalid"))
+
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			eo.ApplyOverride(req, 401, nil)
+		}
+	})
+
+	b.Run("flag vs regex performance comparison - flag", func(b *testing.B) {
+		overrides := config.ErrorOverridesMap{
+			"429": []config.ErrorOverride{
+				{
+					Match: &config.ErrorMatcher{
+						Flag: errors.RLT,
+					},
+					Response: config.ErrorResponse{
+						Message: "Rate limited",
+					},
+				},
+			},
+		}
+
+		gw := &Gateway{}
+		compiled := CompileErrorOverrides(overrides)
+		gw.SetCompiledErrorOverrides(compiled)
+		eo := NewErrorOverrides(nil, gw)
+		req := httptest.NewRequest("GET", "/test", nil)
+		ctx.SetErrorClassification(req, errors.NewErrorClassification(errors.RLT, "rate_limited"))
+
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			eo.ApplyOverride(req, 429, nil)
+		}
+	})
+
+	b.Run("flag vs regex performance comparison - regex", func(b *testing.B) {
+		overrides := config.ErrorOverridesMap{
+			"429": []config.ErrorOverride{
+				{
+					Match: &config.ErrorMatcher{
+						MessagePattern: "rate.*limit.*exceeded",
+					},
+					Response: config.ErrorResponse{
+						Message: "Rate limited",
+					},
+				},
+			},
+		}
+
+		gw := &Gateway{}
+		compiled := CompileErrorOverrides(overrides)
+		gw.SetCompiledErrorOverrides(compiled)
+		eo := NewErrorOverrides(nil, gw)
+		req := httptest.NewRequest("GET", "/test", nil)
+		body := []byte("Rate limit exceeded")
+
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			eo.ApplyOverride(req, 429, body)
+		}
+	})
+}
+
+func BenchmarkWriteOverrideResponse(b *testing.B) {
+	b.Run("direct message write - JSON", func(b *testing.B) {
+		gw := &Gateway{}
+		handler := &ErrorHandler{
+			BaseMiddleware: &BaseMiddleware{
+				Spec: &APISpec{
+					GlobalConfig: config.Config{},
+				},
+				Gw: gw,
+			},
+		}
+
+		result := &OverrideResult{
+			Code: 503,
+			rule: &config.ErrorOverride{
+				Response: config.ErrorResponse{
+					Message: `{"error": "Service temporarily unavailable", "code": "SERVICE_DOWN"}`,
+				},
+			},
+		}
+
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			w := httptest.NewRecorder()
+			req := httptest.NewRequest("GET", "/test", nil)
+			req.Header.Set(header.ContentType, header.ApplicationJSON)
+			handler.writeOverrideResponse(w, req, result, "original error")
+		}
+	})
+
+	b.Run("inline template - JSON", func(b *testing.B) {
+		gw := &Gateway{}
+		handler := &ErrorHandler{
+			BaseMiddleware: &BaseMiddleware{
+				Spec: &APISpec{
+					GlobalConfig: config.Config{},
+				},
+				Gw: gw,
+			},
+		}
+
+		rule := &config.ErrorOverride{
+			Response: config.ErrorResponse{
+				Message: `{"error": "Error {{.StatusCode}}", "message": "{{.Message}}"}`,
+			},
+		}
+		_ = compileSingleRule(rule)
+
+		result := &OverrideResult{
+			Code: 504,
+			rule: rule,
+		}
+
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			w := httptest.NewRecorder()
+			req := httptest.NewRequest("GET", "/test", nil)
+			req.Header.Set(header.ContentType, header.ApplicationJSON)
+			handler.writeOverrideResponse(w, req, result, "timeout")
+		}
+	})
+
+	b.Run("inline template - XML", func(b *testing.B) {
+		gw := &Gateway{}
+		handler := &ErrorHandler{
+			BaseMiddleware: &BaseMiddleware{
+				Spec: &APISpec{
+					GlobalConfig: config.Config{},
+				},
+				Gw: gw,
+			},
+		}
+
+		rule := &config.ErrorOverride{
+			Response: config.ErrorResponse{
+				Message: `<error><code>{{.StatusCode}}</code><message>{{.Message}}</message></error>`,
+			},
+		}
+		_ = compileSingleRule(rule)
+
+		result := &OverrideResult{
+			Code: 500,
+			rule: rule,
+		}
+
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			w := httptest.NewRecorder()
+			req := httptest.NewRequest("GET", "/test", nil)
+			req.Header.Set(header.ContentType, header.ApplicationXML)
+			handler.writeOverrideResponse(w, req, result, "server error")
+		}
+	})
+
+	b.Run("file template - JSON", func(b *testing.B) {
+		gw := &Gateway{}
+		jsonTmpl := htmltemplate.Must(htmltemplate.New("error_test.json").Parse(
+			`{"type": "error", "status": {{.StatusCode}}, "detail": "{{.Message}}"}`,
+		))
+		gw.templates = jsonTmpl
+
+		handler := &ErrorHandler{
+			BaseMiddleware: &BaseMiddleware{
+				Spec: &APISpec{
+					GlobalConfig: config.Config{},
+				},
+				Gw: gw,
+			},
+		}
+
+		result := &OverrideResult{
+			Code: 503,
+			rule: &config.ErrorOverride{
+				Response: config.ErrorResponse{
+					Message:     "Custom error message",
+					Template: "error_test",
+				},
+			},
+		}
+
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			w := httptest.NewRecorder()
+			req := httptest.NewRequest("GET", "/test", nil)
+			req.Header.Set(header.ContentType, header.ApplicationJSON)
+			handler.writeOverrideResponse(w, req, result, "original")
+		}
+	})
+
+	b.Run("file template - XML", func(b *testing.B) {
+		gw := &Gateway{}
+		xmlTmpl := texttemplate.Must(texttemplate.New("error_test.xml").Parse(
+			`<error><status>{{.StatusCode}}</status><message>{{.Message}}</message></error>`,
+		))
+		gw.templatesRaw = xmlTmpl
+
+		handler := &ErrorHandler{
+			BaseMiddleware: &BaseMiddleware{
+				Spec: &APISpec{
+					GlobalConfig: config.Config{},
+				},
+				Gw: gw,
+			},
+		}
+
+		result := &OverrideResult{
+			Code: 500,
+			rule: &config.ErrorOverride{
+				Response: config.ErrorResponse{
+					Message:     "Server error occurred",
+					Template: "error_test",
+				},
+			},
+		}
+
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			w := httptest.NewRecorder()
+			req := httptest.NewRequest("GET", "/test", nil)
+			req.Header.Set(header.ContentType, header.ApplicationXML)
+			handler.writeOverrideResponse(w, req, result, "original")
+		}
+	})
+
+	b.Run("with custom headers", func(b *testing.B) {
+		gw := &Gateway{}
+		handler := &ErrorHandler{
+			BaseMiddleware: &BaseMiddleware{
+				Spec: &APISpec{
+					GlobalConfig: config.Config{},
+				},
+				Gw: gw,
+			},
+		}
+
+		result := &OverrideResult{
+			Code: 429,
+			Headers: map[string]string{
+				"Retry-After":      "300",
+				"X-RateLimit":      "100",
+				"X-RateLimit-Used": "100",
+				"X-Custom":         "value",
+			},
+			rule: &config.ErrorOverride{
+				Response: config.ErrorResponse{
+					Message: `{"error": "Too many requests"}`,
+				},
+			},
+		}
+
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			w := httptest.NewRecorder()
+			req := httptest.NewRequest("GET", "/test", nil)
+			req.Header.Set(header.ContentType, header.ApplicationJSON)
+			handler.writeOverrideResponse(w, req, result, "rate limited")
+		}
+	})
+}
+
+func BenchmarkWriteTemplateErrorResponse(b *testing.B) {
+	b.Run("default error template - JSON", func(b *testing.B) {
+		gw := &Gateway{}
+		jsonTmpl := htmltemplate.Must(htmltemplate.New("error.json").Parse(
+			`{"error": "{{.Message}}"}`,
+		))
+		gw.templates = jsonTmpl
+
+		handler := &ErrorHandler{
+			BaseMiddleware: &BaseMiddleware{
+				Spec: &APISpec{
+					GlobalConfig: config.Config{},
+				},
+				Gw: gw,
+			},
+		}
+
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			w := httptest.NewRecorder()
+			req := httptest.NewRequest("GET", "/test", nil)
+			req.Header.Set(header.ContentType, header.ApplicationJSON)
+			handler.writeTemplateErrorResponse(w, req, "Internal server error", 500)
+		}
+	})
+}
+
+func BenchmarkCompileErrorOverrides(b *testing.B) {
+	b.Run("single exact code", func(b *testing.B) {
+		overrides := config.ErrorOverridesMap{
+			"500": []config.ErrorOverride{
+				{
+					Response: config.ErrorResponse{
+						Code:    503,
+						Message: "Service unavailable",
+					},
+				},
+			},
+		}
+
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			CompileErrorOverrides(overrides)
+		}
+	})
+
+	b.Run("multiple exact codes", func(b *testing.B) {
+		overrides := config.ErrorOverridesMap{
+			"400": []config.ErrorOverride{
+				{Response: config.ErrorResponse{Message: "Bad request"}},
+			},
+			"401": []config.ErrorOverride{
+				{Response: config.ErrorResponse{Message: "Unauthorized"}},
+			},
+			"403": []config.ErrorOverride{
+				{Response: config.ErrorResponse{Message: "Forbidden"}},
+			},
+			"404": []config.ErrorOverride{
+				{Response: config.ErrorResponse{Message: "Not found"}},
+			},
+			"500": []config.ErrorOverride{
+				{Response: config.ErrorResponse{Message: "Internal error"}},
+			},
+		}
+
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			CompileErrorOverrides(overrides)
+		}
+	})
+
+	b.Run("with regex patterns", func(b *testing.B) {
+		overrides := config.ErrorOverridesMap{
+			"500": []config.ErrorOverride{
+				{
+					Match: &config.ErrorMatcher{
+						MessagePattern: "database.*timeout",
+					},
+					Response: config.ErrorResponse{
+						Code:    504,
+						Message: "Database timeout",
+					},
+				},
+				{
+					Match: &config.ErrorMatcher{
+						MessagePattern: "network.*error",
+					},
+					Response: config.ErrorResponse{
+						Code:    502,
+						Message: "Network error",
+					},
+				},
+			},
+		}
+
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			CompileErrorOverrides(overrides)
+		}
+	})
+
+	b.Run("with inline templates", func(b *testing.B) {
+		overrides := config.ErrorOverridesMap{
+			"500": []config.ErrorOverride{
+				{
+					Response: config.ErrorResponse{
+						Message: `{"error": "Error {{.StatusCode}}", "message": "{{.Message}}"}`,
+					},
+				},
+			},
+		}
+
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			CompileErrorOverrides(overrides)
+		}
+	})
+
+	b.Run("mixed exact and patterns", func(b *testing.B) {
+		overrides := config.ErrorOverridesMap{
+			"401": []config.ErrorOverride{
+				{Response: config.ErrorResponse{Message: "Unauthorized"}},
+			},
+			"500": []config.ErrorOverride{
+				{
+					Match: &config.ErrorMatcher{
+						MessagePattern: "database",
+					},
+					Response: config.ErrorResponse{Message: "Database error"},
+				},
+				{Response: config.ErrorResponse{Message: "Generic error"}},
+			},
+			"4xx": []config.ErrorOverride{
+				{Response: config.ErrorResponse{Message: "Client error"}},
+			},
+			"5xx": []config.ErrorOverride{
+				{Response: config.ErrorResponse{Message: "Server error"}},
+			},
+		}
+
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			CompileErrorOverrides(overrides)
+		}
+	})
+}
+
+func BenchmarkErrorResponseContext(b *testing.B) {
+	b.Run("detect JSON content type", func(b *testing.B) {
+		req := httptest.NewRequest("GET", "/test", nil)
+		req.Header.Set(header.ContentType, header.ApplicationJSON)
+
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			DetectErrorResponseContext(req)
+		}
+	})
+
+	b.Run("detect XML content type", func(b *testing.B) {
+		req := httptest.NewRequest("GET", "/test", nil)
+		req.Header.Set(header.ContentType, header.ApplicationXML)
+
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			DetectErrorResponseContext(req)
+		}
+	})
+
+	b.Run("detect JSON with charset", func(b *testing.B) {
+		req := httptest.NewRequest("GET", "/test", nil)
+		req.Header.Set(header.ContentType, "application/json; charset=utf-8")
+
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			DetectErrorResponseContext(req)
+		}
+	})
+}

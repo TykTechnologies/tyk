@@ -78,6 +78,15 @@ type APIError struct {
 	Message htmltemplate.HTML
 }
 
+// APIErrorWithContext extends APIError with additional context for error override templates.
+// Embeds APIError so existing templates using {{.Message}} continue to work.
+type APIErrorWithContext struct {
+	APIError
+	StatusCode int
+	// Future fields for validation errors:
+	// InvalidParams []ValidationError
+}
+
 // ErrorHandler is invoked whenever there is an issue with a proxied request, most middleware will invoke
 // the ErrorHandler if something is wrong with the request and halt the request processing through the chain
 type ErrorHandler struct {
@@ -97,9 +106,10 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 	response := &http.Response{}
 
 	if writeResponse {
-		// Handle JSON-RPC error formatting for MCP APIs
 		if e.Spec.IsMCP() && e.shouldWriteJSONRPCError(r) {
 			response = e.writeJSONRPCErrorResponse(w, r, errMsg, errCode)
+		} else if resp := e.tryWriteOverride(w, r, errMsg, errCode); resp != nil {
+			response = resp
 		} else {
 			response = e.writeTemplateErrorResponse(w, r, errMsg, errCode)
 		}
@@ -173,6 +183,13 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 			host = e.Spec.target.Host
 		}
 
+		// Use the actual response status code (which may be overridden) for analytics.
+		// If no response was written or StatusCode is not set, fall back to the original errCode.
+		responseCode := errCode
+		if response.StatusCode != 0 {
+			responseCode = response.StatusCode
+		}
+
 		record := analytics.AnalyticsRecord{
 			Method:        r.Method,
 			Host:          host,
@@ -184,7 +201,7 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 			Month:         t.Month(),
 			Year:          t.Year(),
 			Hour:          t.Hour(),
-			ResponseCode:  errCode,
+			ResponseCode:  responseCode,
 			APIKey:        token,
 			TimeStamp:     t,
 			APIVersion:    version,
@@ -374,5 +391,70 @@ func (e *ErrorHandler) writeJSONRPCErrorResponse(w http.ResponseWriter, r *http.
 		StatusCode: httpCode,
 		Header:     http.Header{header.ContentType: []string{header.ApplicationJSON}},
 		Body:       io.NopCloser(bytes.NewReader(responseBody)),
+	}
+}
+
+// tryWriteOverride attempts to apply an error override and write the response.
+// Returns nil if no override applies, allowing fallback to the default template.
+func (e *ErrorHandler) tryWriteOverride(w http.ResponseWriter, r *http.Request, errMsg string, errCode int) *http.Response {
+	if e.Gw.GetCompiledErrorOverrides() == nil {
+		return nil
+	}
+
+	overrides := NewErrorOverrides(e.Spec, e.Gw)
+	result := overrides.ApplyOverride(r, errCode, []byte(errMsg))
+	if result == nil {
+		return nil
+	}
+
+	return e.writeOverrideResponse(w, r, result, errMsg)
+}
+
+// writeOverrideResponse writes the error override result.
+func (e *ErrorHandler) writeOverrideResponse(w http.ResponseWriter, r *http.Request, result *OverrideResult, originalMsg string) *http.Response {
+	ctx := DetectErrorResponseContext(r)
+	respHeader := e.SetErrorResponseHeaders(w, ctx.ContentType)
+
+	for k, v := range result.Headers {
+		w.Header().Set(k, v)
+		respHeader.Set(k, v)
+	}
+
+	// Body without template variables - write directly
+	if result.ShouldWriteDirectly() {
+		return e.writeDirectOverrideResponse(w, result, respHeader)
+	}
+
+	// Body with template variables, or file template
+	tmpl := result.GetTemplateExecutor(e.Gw, ctx)
+	if tmpl != nil {
+		data := &APIErrorWithContext{
+			APIError:   APIError{Message: htmltemplate.HTML(result.GetMessageForTemplate())},
+			StatusCode: result.Code,
+		}
+		response := e.ExecuteErrorTemplate(w, tmpl, data, result.Code)
+		response.Header = respHeader
+		return response
+	}
+
+	// Message only - use default template with override message
+	if result.ShouldUseDefaultTemplate() {
+		return e.writeTemplateErrorResponse(w, r, result.GetMessageForTemplate(), result.Code)
+	}
+
+	// Fallback - use default template with original message
+	return e.writeTemplateErrorResponse(w, r, originalMsg, result.Code)
+}
+
+// writeDirectOverrideResponse writes the body directly without templating.
+func (e *ErrorHandler) writeDirectOverrideResponse(w http.ResponseWriter, result *OverrideResult, respHeader http.Header) *http.Response {
+	w.WriteHeader(result.Code)
+	bodyBytes := []byte(result.GetBody())
+	w.Write(bodyBytes)
+
+	return &http.Response{
+		StatusCode: result.Code,
+		Header:     respHeader,
+		Body:       io.NopCloser(bytes.NewReader(bodyBytes)),
 	}
 }

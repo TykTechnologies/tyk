@@ -228,6 +228,10 @@ type Gateway struct {
 	apiJWKCaches sync.Map
 
 	BundleChecksumVerifier bundleChecksumVerifyFunction
+
+	// compiledErrorOverrides holds the indexed error override rules for O(1) lookup.
+	// Built from config.ErrorOverrides during gateway startup.
+	compiledErrorOverrides atomic.Pointer[config.CompiledErrorOverrides]
 }
 
 func NewGateway(config config.Config, ctx context.Context) *Gateway {
@@ -1508,6 +1512,13 @@ func (gw *Gateway) initSystem() error {
 			return err
 		}
 
+		// Compile error override regex patterns and build indexed lookup
+		// Compilation failures are logged as warnings and those rules are skipped
+		compiled := CompileErrorOverrides(gwConfig.ErrorOverrides)
+		if compiled != nil {
+			gw.SetCompiledErrorOverrides(compiled)
+		}
+
 		gw.SetConfig(gwConfig)
 		gw.afterConfSetup()
 	}
@@ -2282,6 +2293,16 @@ func (gw *Gateway) GetConfig() config.Config {
 
 func (gw *Gateway) GetCertificateManager() certs.CertificateManager {
 	return gw.CertificateManager
+}
+
+// GetCompiledErrorOverrides returns the compiled error overrides for O(1) lookup.
+func (gw *Gateway) GetCompiledErrorOverrides() *config.CompiledErrorOverrides {
+	return gw.compiledErrorOverrides.Load()
+}
+
+// SetCompiledErrorOverrides stores the compiled error overrides.
+func (gw *Gateway) SetCompiledErrorOverrides(compiled *config.CompiledErrorOverrides) {
+	gw.compiledErrorOverrides.Store(compiled)
 }
 
 func (gw *Gateway) SetConfig(conf config.Config, skipReload ...bool) {

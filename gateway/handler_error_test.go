@@ -248,3 +248,106 @@ func TestErrorHandler_LatencyRecording(t *testing.T) {
 		assert.Zero(t, record.Latency.Upstream, "Upstream should be zero for connection errors")
 	})
 }
+
+func TestErrorHandler_AnalyticsRecordsOverriddenStatusCode(t *testing.T) {
+	t.Run("analytics records overridden status code not original", func(t *testing.T) {
+		ts := StartTest(func(globalConf *config.Config) {
+			globalConf.AnalyticsConfig.EnableDetailedRecording = true
+			// Configure error override: 401 -> 403
+			globalConf.ErrorOverrides = config.ErrorOverridesMap{
+				"401": []config.ErrorOverride{
+					{
+						Response: config.ErrorResponse{
+							Code:    403, // Override to 403
+							Body:    `{"error": "access_denied", "code": "FORBIDDEN"}`,
+							Message: "Access denied",
+						},
+					},
+				},
+			}
+		})
+		defer ts.Close()
+
+		// Clear any existing analytics records
+		ts.Gw.Analytics.Flush()
+		ts.Gw.Analytics.Store.GetAndDeleteSet(analyticsKeyName)
+
+		// Create an API that requires authentication
+		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+			spec.Proxy.ListenPath = "/test-override/"
+			spec.Proxy.TargetURL = "http://httpbin.org"
+			spec.UseKeylessAccess = false // Require auth
+			spec.Auth.AuthHeaderName = "Authorization"
+		})
+
+		// Send request without auth - should trigger 401, but override returns 403
+		_, _ = ts.Run(t, test.TestCase{
+			Path: "/test-override/get",
+			Code: http.StatusForbidden, // Expect overridden code
+		})
+
+		// Let records be sent
+		ts.Gw.Analytics.Flush()
+
+		results := ts.Gw.Analytics.Store.GetAndDeleteSet(analyticsKeyName)
+		require.Len(t, results, 1, "Should return 1 record")
+
+		var record analytics.AnalyticsRecord
+		err := ts.Gw.Analytics.analyticsSerializer.Decode([]byte(results[0].(string)), &record)
+		require.NoError(t, err)
+
+		// Key assertion: analytics should record the OVERRIDDEN status code (403), not original (401)
+		assert.Equal(t, http.StatusForbidden, record.ResponseCode,
+			"Analytics should record overridden status code (403), not original (401)")
+	})
+
+	t.Run("analytics records original code when no override matches", func(t *testing.T) {
+		ts := StartTest(func(globalConf *config.Config) {
+			globalConf.AnalyticsConfig.EnableDetailedRecording = true
+			// Configure error override only for 500
+			globalConf.ErrorOverrides = config.ErrorOverridesMap{
+				"500": []config.ErrorOverride{
+					{
+						Response: config.ErrorResponse{
+							Code:    503,
+							Message: "Service unavailable",
+						},
+					},
+				},
+			}
+		})
+		defer ts.Close()
+
+		// Clear any existing analytics records
+		ts.Gw.Analytics.Flush()
+		ts.Gw.Analytics.Store.GetAndDeleteSet(analyticsKeyName)
+
+		// Create an API that requires authentication
+		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+			spec.Proxy.ListenPath = "/test-no-override/"
+			spec.Proxy.TargetURL = "http://httpbin.org"
+			spec.UseKeylessAccess = false
+			spec.Auth.AuthHeaderName = "Authorization"
+		})
+
+		// Send request without auth - should trigger 401 (no override configured for 401)
+		_, _ = ts.Run(t, test.TestCase{
+			Path: "/test-no-override/get",
+			Code: http.StatusUnauthorized, // No override, expect original code
+		})
+
+		// Let records be sent
+		ts.Gw.Analytics.Flush()
+
+		results := ts.Gw.Analytics.Store.GetAndDeleteSet(analyticsKeyName)
+		require.Len(t, results, 1, "Should return 1 record")
+
+		var record analytics.AnalyticsRecord
+		err := ts.Gw.Analytics.analyticsSerializer.Decode([]byte(results[0].(string)), &record)
+		require.NoError(t, err)
+
+		// No override matched, so analytics should record original status code
+		assert.Equal(t, http.StatusUnauthorized, record.ResponseCode,
+			"Analytics should record original status code when no override matches")
+	})
+}
