@@ -1127,8 +1127,10 @@ func (s *Test) setTestScopeConfig(t *testing.T, apply func(cnf *config.Config)) 
 	newCnf := reflect.Clone(cnf)
 	apply(&newCnf)
 	s.Gw.SetConfig(newCnf)
+	s.Gw.initMembers(newCnf)
 	t.Cleanup(func() {
 		s.Gw.SetConfig(cnf)
+		s.Gw.initMembers(cnf)
 	})
 }
 
