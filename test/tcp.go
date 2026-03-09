@@ -134,7 +134,7 @@ func TcpMock(useSSL bool, cb func(in []byte, err error) (out []byte)) net.Listen
 
 // Generate cert
 func Cert(domain string) tls.Certificate {
-	private, _ := rsa.GenerateKey(rand.Reader, 512)
+	private, _ := rsa.GenerateKey(rand.Reader, 2048)
 	template := &x509.Certificate{
 		SerialNumber: big.NewInt(1),
 		Subject: pkix.Name{
