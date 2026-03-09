@@ -61,6 +61,7 @@ import (
 	"github.com/TykTechnologies/tyk/internal/service/newrelic"
 	"github.com/TykTechnologies/tyk/internal/uuid"
 	logger "github.com/TykTechnologies/tyk/log"
+	"github.com/TykTechnologies/tyk/pkg/validator"
 	"github.com/TykTechnologies/tyk/regexp"
 	"github.com/TykTechnologies/tyk/request"
 	"github.com/TykTechnologies/tyk/rpc"
@@ -228,6 +229,8 @@ type Gateway struct {
 	apiJWKCaches sync.Map
 
 	BundleChecksumVerifier bundleChecksumVerifyFunction
+
+	validator validator.Validator
 
 	// compiledErrorOverrides holds the indexed error override rules for O(1) lookup.
 	// Built from config.ErrorOverrides during gateway startup.
@@ -1614,7 +1617,16 @@ func (gw *Gateway) initSystem() error {
 	// instances periodically and deletes idle items, closes net.Listener instances to
 	// free resources.
 	go cleanIdleMemConnProviders(gw.ctx)
+
+	gw.initMembers(gwConfig)
+
 	return nil
+}
+
+func (gw *Gateway) initMembers(cfg config.Config) {
+	gw.validator = validator.New(
+		validator.WithAllowUnsafePolicyIds(cfg.AllowUnsafePolicyIds),
+	)
 }
 
 // SignatureVerifier returns a verifier to use for validating signatures.

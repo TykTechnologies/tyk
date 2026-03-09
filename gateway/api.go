@@ -68,6 +68,7 @@ import (
 	"github.com/TykTechnologies/tyk/internal/sanitize"
 	"github.com/TykTechnologies/tyk/internal/uuid"
 	lib "github.com/TykTechnologies/tyk/lib/apidef"
+	"github.com/TykTechnologies/tyk/pkg/identifier"
 	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/user"
 )
@@ -1107,6 +1108,11 @@ func (gw *Gateway) handleAddOrUpdatePolicy(polID string, r *http.Request) (inter
 	if err := json.NewDecoder(r.Body).Decode(newPol); err != nil {
 		log.Error("Couldn't decode new policy object: ", err)
 		return apiError("Request malformed"), http.StatusBadRequest
+	}
+
+	if err := gw.validator.Validate(identifier.CustomPolicyId(newPol.ID)); err != nil {
+		log.WithField("id", newPol.ID).WithError(err).Error("Failed to validate policy ID")
+		return apiError(identifier.ErrInvalidCustomPolicyId.Error()), http.StatusBadRequest
 	}
 
 	if polID != "" && newPol.ID != polID && r.Method == http.MethodPut {

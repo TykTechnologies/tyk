@@ -28,6 +28,7 @@ import (
 	"github.com/TykTechnologies/tyk/internal/event"
 	"github.com/TykTechnologies/tyk/internal/middleware"
 	"github.com/TykTechnologies/tyk/internal/otel"
+	"github.com/TykTechnologies/tyk/internal/otel/apimetrics"
 	"github.com/TykTechnologies/tyk/internal/policy"
 	"github.com/TykTechnologies/tyk/internal/service/newrelic"
 	"github.com/TykTechnologies/tyk/request"
@@ -502,6 +503,46 @@ func (t *BaseMiddleware) RecordAccessLog(req *http.Request, resp *http.Response,
 	t.Logger().WithFields(logFields).Info()
 }
 
+// RecordMetrics builds a RequestContext from the current request state and
+// records all configured OTEL metric instruments. Pass the upstream response
+// when available (success path); nil is safe (error path).
+func (t *BaseMiddleware) RecordMetrics(r *http.Request, statusCode int, latency analytics.Latency, response *http.Response) {
+	if t.Spec.DoNotTrack || ctxGetDoNotTrack(r) {
+		return
+	}
+
+	rc := &apimetrics.RequestContext{
+		Request:         r,
+		StatusCode:      statusCode,
+		APIID:           t.Spec.APIID,
+		APIName:         t.Spec.Name,
+		OrgID:           t.Spec.OrgID,
+		ListenPath:      t.Spec.Proxy.ListenPath,
+		IPAddress:       request.RealIP(r),
+		LatencyTotal:    latency.Total,
+		LatencyUpstream: latency.Upstream,
+		LatencyGateway:  latency.Gateway,
+	}
+	if v := t.Spec.getVersionFromRequest(r); v != "" {
+		rc.APIVersion = v
+	}
+	if t.Gw.MetricInstruments.NeedsSession() {
+		rc.Session = ctxGetSession(r)
+		rc.Token = ctxGetAuthToken(r)
+	}
+	if t.Gw.MetricInstruments.NeedsContext() {
+		rc.ContextVariables = ctxGetData(r)
+	}
+	if response != nil && t.Gw.MetricInstruments.NeedsResponse() {
+		rc.Response = response
+	}
+	if errClass := ctx.GetErrorClassification(r); errClass != nil {
+		rc.ErrorClassification = string(errClass.Flag)
+	}
+	t.Gw.MetricInstruments.RecordRequest(r.Context())
+	t.Gw.MetricInstruments.RecordAPIMetrics(r.Context(), rc)
+}
+
 func copyAllowedURLs(input []user.AccessSpec) []user.AccessSpec {
 	if input == nil {
 		return nil
@@ -554,6 +595,7 @@ func (t *BaseMiddleware) CheckSessionAndIdentityForValidKey(originalKey string, 
 				t.Logger().Error(err)
 				return session, false
 			}
+			NormalizeMCPEndpoints(&session)
 			return session, true
 		}
 	}
@@ -579,6 +621,7 @@ func (t *BaseMiddleware) CheckSessionAndIdentityForValidKey(originalKey string, 
 			t.Logger().Error(err)
 			return session, false
 		}
+		NormalizeMCPEndpoints(&session)
 		t.Logger().Debug("Got key")
 		return session, true
 	}
@@ -610,6 +653,7 @@ func (t *BaseMiddleware) CheckSessionAndIdentityForValidKey(originalKey string, 
 			t.Logger().Error(err)
 			return session, false
 		}
+		NormalizeMCPEndpoints(&session)
 
 		t.Logger().Debug("Lifetime is: ", session.Lifetime(t.Spec.GetSessionLifetimeRespectsKeyExpiration(), t.Spec.SessionLifetime, t.Gw.GetConfig().ForceGlobalSessionLifetime, t.Gw.GetConfig().GlobalSessionLifetime))
 
