@@ -14,7 +14,7 @@ ENV PLUGIN_SOURCE_PATH=/plugin-source
 RUN mkdir -p $TYK_GW_PATH $PLUGIN_SOURCE_PATH
 
 # remove for avoiding CVEs
-RUN apt-get purge -y --allow-remove-essential --auto-remove mercurial wget curl automake cmake python* docker* libsqlite* qemu* \
+RUN apt-get purge -y --allow-remove-essential --auto-remove wget curl automake cmake python* docker* libsqlite* qemu* \
 	&& rm -f /usr/bin/passwd /usr/sbin/adduser /usr/bin/goreleaser
 
 ADD go.mod go.sum $TYK_GW_PATH
