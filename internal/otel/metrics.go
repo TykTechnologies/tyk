@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/sirupsen/logrus"
+	otelruntime "go.opentelemetry.io/contrib/instrumentation/runtime"
 
 	tykmetric "github.com/TykTechnologies/opentelemetry/metric"
 
@@ -67,5 +68,28 @@ func InitOpenTelemetryMetrics(ctx context.Context, logger *logrus.Logger, gwConf
 		}
 	}
 
+	if isRuntimeMetricsEnabled(&gwConfig.Metrics) {
+		if err := otelruntime.Start(); err != nil {
+			logger.WithError(err).Warn("Failed to start Go runtime metrics")
+		} else {
+			logger.Debug("Go runtime metrics enabled")
+		}
+	}
+
 	return inst
+}
+
+// isRuntimeMetricsEnabled determines if runtime metrics should be enabled.
+// Defaults to true when metrics are enabled and RuntimeMetrics is not explicitly set.
+func isRuntimeMetricsEnabled(cfg *MetricsConfig) bool {
+	if cfg.Enabled == nil || !*cfg.Enabled {
+		return false
+	}
+
+	// Default to true when metrics are enabled
+	if cfg.RuntimeMetrics == nil {
+		return true
+	}
+
+	return *cfg.RuntimeMetrics
 }
