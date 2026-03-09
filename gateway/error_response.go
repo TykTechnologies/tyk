@@ -79,6 +79,7 @@ func (e *ErrorHandler) ExecuteErrorTemplate(w http.ResponseWriter, tmpl Template
 
 	var log bytes.Buffer
 	rsp := io.MultiWriter(w, &log)
+	//nolint:errcheck // Consistent with writeTemplateErrorResponse - error can't be handled after headers written
 	tmpl.Execute(rsp, data)
 
 	return &http.Response{

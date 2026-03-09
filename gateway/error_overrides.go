@@ -321,10 +321,10 @@ func (o *ErrorOverrides) matchBodyField(field, expectedValue string, body []byte
 }
 
 // GetTemplateExecutor returns the template to execute, or nil if body should be written directly.
-func (r *OverrideResult) GetTemplateExecutor(gw *Gateway, ctx *ErrorResponseContext) TemplateExecutor {
+func (r *OverrideResult) GetTemplateExecutor(gw *Gateway, errCtx *ErrorResponseContext) TemplateExecutor {
 	// Body with template variables
 	if r.rule.Response.Body != "" && r.rule.HasCompiledTemplate() {
-		return r.getInlineTemplate(ctx)
+		return r.getInlineTemplate(errCtx)
 	}
 
 	// Plain body - written directly, no template needed
@@ -334,7 +334,7 @@ func (r *OverrideResult) GetTemplateExecutor(gw *Gateway, ctx *ErrorResponseCont
 
 	// File template
 	if r.rule.Response.Template != "" {
-		return r.getFileTemplate(gw, ctx)
+		return r.getFileTemplate(gw, errCtx)
 	}
 
 	return nil
@@ -363,10 +363,10 @@ func (r *OverrideResult) ShouldUseDefaultTemplate() bool {
 }
 
 // getFileTemplate looks up a template file from the gateway's template cache.
-func (r *OverrideResult) getFileTemplate(gw *Gateway, ctx *ErrorResponseContext) TemplateExecutor {
-	templateName := r.rule.Response.Template + "." + ctx.TemplateExtension
+func (r *OverrideResult) getFileTemplate(gw *Gateway, errCtx *ErrorResponseContext) TemplateExecutor {
+	templateName := r.rule.Response.Template + "." + errCtx.TemplateExtension
 
-	if ctx.IsXML {
+	if errCtx.IsXML {
 		if tmpl := gw.templatesRaw.Lookup(templateName); tmpl != nil {
 			return tmpl
 		}
@@ -382,8 +382,8 @@ func (r *OverrideResult) getFileTemplate(gw *Gateway, ctx *ErrorResponseContext)
 }
 
 // getInlineTemplate returns the pre-compiled inline message template.
-func (r *OverrideResult) getInlineTemplate(ctx *ErrorResponseContext) TemplateExecutor {
-	compiled := r.rule.GetCompiledTemplate(ctx.IsXML)
+func (r *OverrideResult) getInlineTemplate(errCtx *ErrorResponseContext) TemplateExecutor {
+	compiled := r.rule.GetCompiledTemplate(errCtx.IsXML)
 	if compiled == nil {
 		return nil
 	}

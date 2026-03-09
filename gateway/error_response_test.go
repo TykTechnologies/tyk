@@ -191,9 +191,7 @@ func TestExecuteErrorTemplate(t *testing.T) {
 
 		tmpl := htmltemplate.Must(htmltemplate.New("test").Parse(`{"error": "{{.Message}}", "code": {{.StatusCode}}}`))
 		data := &APIErrorWithContext{
-			APIError: APIError{
-				Message: htmltemplate.HTML("Service unavailable"),
-			},
+			Message:    "Service unavailable",
 			StatusCode: 503,
 		}
 
@@ -218,9 +216,7 @@ func TestExecuteErrorTemplate(t *testing.T) {
 
 		tmpl := texttemplate.Must(texttemplate.New("test").Parse(`<error><message>{{.Message}}</message><code>{{.StatusCode}}</code></error>`))
 		data := &APIErrorWithContext{
-			APIError: APIError{
-				Message: htmltemplate.HTML("Timeout"),
-			},
+			Message:    "Timeout",
 			StatusCode: 504,
 		}
 
@@ -240,15 +236,14 @@ func TestExecuteErrorTemplate(t *testing.T) {
 
 		tmpl := htmltemplate.Must(htmltemplate.New("test").Parse(`{"msg": "{{.Message}}"}`))
 		data := &APIErrorWithContext{
-			APIError: APIError{
-				Message: htmltemplate.HTML("test"),
-			},
+			Message: "test",
 		}
 
 		response := handler.ExecuteErrorTemplate(w, tmpl, data, 500)
 
 		// Check both have the same content
-		responseBody, _ := io.ReadAll(response.Body)
+		responseBody, err := io.ReadAll(response.Body)
+		require.NoError(t, err)
 		writerBody := w.Body.String()
 
 		assert.Equal(t, string(responseBody), writerBody)
@@ -264,9 +259,7 @@ func TestExecuteErrorTemplate(t *testing.T) {
 			"message": "{{.Message}}"
 		}`))
 		data := &APIErrorWithContext{
-			APIError: APIError{
-				Message: htmltemplate.HTML("Authentication failed"),
-			},
+			Message:    "Authentication failed",
 			StatusCode: 401,
 		}
 
@@ -286,9 +279,7 @@ func TestExecuteErrorTemplate(t *testing.T) {
 
 		tmpl := htmltemplate.Must(htmltemplate.New("test").Parse(`{"message": "{{.Message}}"}`))
 		data := &APIErrorWithContext{
-			APIError: APIError{
-				Message: htmltemplate.HTML(""),
-			},
+			Message: "",
 		}
 
 		response := handler.ExecuteErrorTemplate(w, tmpl, data, 500)
@@ -304,9 +295,7 @@ func TestExecuteErrorTemplate(t *testing.T) {
 
 		tmpl := htmltemplate.Must(htmltemplate.New("test").Parse(`{"msg": "test"}`))
 		data := &APIErrorWithContext{
-			APIError: APIError{
-				Message: htmltemplate.HTML("test"),
-			},
+			Message: "test",
 		}
 
 		response := handler.ExecuteErrorTemplate(w, tmpl, data, 500)
@@ -322,30 +311,23 @@ func TestExecuteErrorTemplate(t *testing.T) {
 	})
 }
 
-// TestAPIErrorWithContext tests the extended error context structure
+// TestAPIErrorWithContext tests the error context structure
 func TestAPIErrorWithContext(t *testing.T) {
-	t.Run("embeds APIError", func(t *testing.T) {
+	t.Run("has Message and StatusCode fields", func(t *testing.T) {
 		errCtx := &APIErrorWithContext{
-			APIError: APIError{
-				Message: htmltemplate.HTML("Test error"),
-			},
+			Message:    "Test error",
 			StatusCode: 500,
 		}
 
-		// Can access embedded fields directly
-		assert.Equal(t, htmltemplate.HTML("Test error"), errCtx.Message)
+		assert.Equal(t, "Test error", errCtx.Message)
 		assert.Equal(t, 500, errCtx.StatusCode)
 	})
 
-	t.Run("can be used with existing templates expecting APIError", func(t *testing.T) {
-		// This simulates backwards compatibility - templates using {{.Message}}
-		// should still work with APIErrorWithContext
+	t.Run("templates using Message work correctly", func(t *testing.T) {
 		tmpl := htmltemplate.Must(htmltemplate.New("test").Parse(`{{.Message}}`))
 
 		errCtx := &APIErrorWithContext{
-			APIError: APIError{
-				Message: htmltemplate.HTML("Compatible"),
-			},
+			Message: "Compatible",
 		}
 
 		var buf bytes.Buffer
@@ -354,13 +336,11 @@ func TestAPIErrorWithContext(t *testing.T) {
 		assert.Equal(t, "Compatible", buf.String())
 	})
 
-	t.Run("can use new StatusCode field in templates", func(t *testing.T) {
+	t.Run("can use StatusCode field in templates", func(t *testing.T) {
 		tmpl := htmltemplate.Must(htmltemplate.New("test").Parse(`Status: {{.StatusCode}}, Message: {{.Message}}`))
 
 		errCtx := &APIErrorWithContext{
-			APIError: APIError{
-				Message: htmltemplate.HTML("Error"),
-			},
+			Message:    "Error",
 			StatusCode: 404,
 		}
 
@@ -368,6 +348,22 @@ func TestAPIErrorWithContext(t *testing.T) {
 		err := tmpl.Execute(&buf, errCtx)
 		require.NoError(t, err)
 		assert.Equal(t, "Status: 404, Message: Error", buf.String())
+	})
+
+	t.Run("html/template auto-escapes Message in JSON context", func(t *testing.T) {
+		// This tests that using plain string allows html/template to properly escape
+		tmpl := htmltemplate.Must(htmltemplate.New("test").Parse(`{"error": "{{.Message}}"}`))
+
+		errCtx := &APIErrorWithContext{
+			Message: `Test with "quotes" and <tags>`,
+		}
+
+		var buf bytes.Buffer
+		err := tmpl.Execute(&buf, errCtx)
+		require.NoError(t, err)
+		// html/template should escape for JSON context
+		assert.Contains(t, buf.String(), `"error":`)
+		assert.NotContains(t, buf.String(), `<tags>`) // Should be escaped
 	})
 }
 

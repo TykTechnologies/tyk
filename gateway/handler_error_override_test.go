@@ -54,7 +54,8 @@ func TestWriteOverrideResponse(t *testing.T) {
 		assert.Equal(t, "value", w.Header().Get("X-Custom"))
 		assert.Contains(t, w.Body.String(), "Service unavailable")
 
-		bodyBytes, _ := io.ReadAll(response.Body)
+		bodyBytes, err := io.ReadAll(response.Body)
+		require.NoError(t, err)
 		assert.Contains(t, string(bodyBytes), "Service unavailable")
 	})
 
@@ -81,7 +82,8 @@ func TestWriteOverrideResponse(t *testing.T) {
 		response := handler.writeOverrideResponse(w, req, result, "timeout")
 
 		assert.Equal(t, 504, w.Code)
-		bodyBytes, _ := io.ReadAll(response.Body)
+		bodyBytes, err := io.ReadAll(response.Body)
+		require.NoError(t, err)
 		body := string(bodyBytes)
 
 		assert.Contains(t, body, `"error": "Error 504"`)
@@ -111,7 +113,8 @@ func TestWriteOverrideResponse(t *testing.T) {
 		response := handler.writeOverrideResponse(w, req, result, "original error")
 
 		assert.Equal(t, 500, w.Code)
-		bodyBytes, _ := io.ReadAll(response.Body)
+		bodyBytes, err := io.ReadAll(response.Body)
+		require.NoError(t, err)
 		body := string(bodyBytes)
 
 		assert.Contains(t, body, "<code>500</code>")
@@ -145,7 +148,7 @@ func TestWriteOverrideResponse(t *testing.T) {
 			Code: 503,
 			rule: &config.ErrorOverride{
 				Response: config.ErrorResponse{
-					Message:     "Custom error message",
+					Message:  "Custom error message",
 					Template: "error_test",
 				},
 			},
@@ -154,7 +157,8 @@ func TestWriteOverrideResponse(t *testing.T) {
 		response := handler.writeOverrideResponse(w, req, result, "original")
 
 		assert.Equal(t, 503, w.Code)
-		bodyBytes, _ := io.ReadAll(response.Body)
+		bodyBytes, err := io.ReadAll(response.Body)
+		require.NoError(t, err)
 		body := string(bodyBytes)
 
 		assert.Contains(t, body, `"status": 503`)
@@ -188,7 +192,7 @@ func TestWriteOverrideResponse(t *testing.T) {
 			Code: 500,
 			rule: &config.ErrorOverride{
 				Response: config.ErrorResponse{
-					Message:     "Server error occurred",
+					Message:  "Server error occurred",
 					Template: "error_test",
 				},
 			},
@@ -197,7 +201,8 @@ func TestWriteOverrideResponse(t *testing.T) {
 		response := handler.writeOverrideResponse(w, req, result, "original")
 
 		assert.Equal(t, 500, w.Code)
-		bodyBytes, _ := io.ReadAll(response.Body)
+		bodyBytes, err := io.ReadAll(response.Body)
+		require.NoError(t, err)
 		body := string(bodyBytes)
 
 		assert.Contains(t, body, "<status>500</status>")
@@ -238,7 +243,8 @@ func TestWriteOverrideResponse(t *testing.T) {
 		response := handler.writeOverrideResponse(w, req, result, "original error")
 
 		assert.Equal(t, 500, response.StatusCode)
-		bodyBytes, _ := io.ReadAll(response.Body)
+		bodyBytes, err := io.ReadAll(response.Body)
+		require.NoError(t, err)
 		body := string(bodyBytes)
 		assert.Contains(t, body, "original error")
 	})
@@ -277,7 +283,8 @@ func TestWriteOverrideResponse(t *testing.T) {
 		response := handler.writeOverrideResponse(w, req, result, "Authentication failed")
 
 		assert.Equal(t, 401, response.StatusCode)
-		bodyBytes, _ := io.ReadAll(response.Body)
+		bodyBytes, err := io.ReadAll(response.Body)
+		require.NoError(t, err)
 		body := string(bodyBytes)
 		assert.Contains(t, body, "Authentication failed")
 	})
@@ -347,7 +354,8 @@ func TestWriteDirectOverrideResponse(t *testing.T) {
 		assert.Equal(t, 503, response.StatusCode)
 		assert.JSONEq(t, `{"error": "Service unavailable", "code": "SERVICE_DOWN"}`, w.Body.String())
 
-		bodyBytes, _ := io.ReadAll(response.Body)
+		bodyBytes, err := io.ReadAll(response.Body)
+		require.NoError(t, err)
 		assert.JSONEq(t, `{"error": "Service unavailable", "code": "SERVICE_DOWN"}`, string(bodyBytes))
 	})
 
@@ -373,7 +381,8 @@ func TestWriteDirectOverrideResponse(t *testing.T) {
 		assert.Contains(t, w.Body.String(), "<error>")
 		assert.Contains(t, w.Body.String(), "<code>500</code>")
 
-		bodyBytes, _ := io.ReadAll(response.Body)
+		bodyBytes, err := io.ReadAll(response.Body)
+		require.NoError(t, err)
 		assert.Contains(t, string(bodyBytes), "<message>Internal error</message>")
 	})
 
@@ -398,7 +407,8 @@ func TestWriteDirectOverrideResponse(t *testing.T) {
 		assert.Equal(t, 404, w.Code)
 		assert.Equal(t, "Not found", w.Body.String())
 
-		bodyBytes, _ := io.ReadAll(response.Body)
+		bodyBytes, err := io.ReadAll(response.Body)
+		require.NoError(t, err)
 		assert.Equal(t, "Not found", string(bodyBytes))
 	})
 
@@ -423,7 +433,8 @@ func TestWriteDirectOverrideResponse(t *testing.T) {
 		assert.Equal(t, 204, w.Code)
 		assert.Empty(t, w.Body.String())
 
-		bodyBytes, _ := io.ReadAll(response.Body)
+		bodyBytes, err := io.ReadAll(response.Body)
+		require.NoError(t, err)
 		assert.Empty(t, string(bodyBytes))
 	})
 

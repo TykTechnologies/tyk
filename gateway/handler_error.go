@@ -78,13 +78,11 @@ type APIError struct {
 	Message htmltemplate.HTML
 }
 
-// APIErrorWithContext extends APIError with additional context for error override templates.
-// Embeds APIError so existing templates using {{.Message}} continue to work.
+// APIErrorWithContext provides context for error override templates.
+// Uses plain string Message to allow html/template's context-aware escaping for JSON.
 type APIErrorWithContext struct {
-	APIError
+	Message    string
 	StatusCode int
-	// Future fields for validation errors:
-	// InvalidParams []ValidationError
 }
 
 // ErrorHandler is invoked whenever there is an issue with a proxied request, most middleware will invoke
@@ -428,16 +426,15 @@ func (e *ErrorHandler) writeOverrideResponse(w http.ResponseWriter, r *http.Requ
 	// Body with template variables, or file template
 	tmpl := result.GetTemplateExecutor(e.Gw, ctx)
 	if tmpl != nil {
-		// Escape message to prevent XSS - same pattern as writeTemplateErrorResponse
 		msg := result.GetMessageForTemplate()
 		if ctx.IsXML {
+			// text/template doesn't auto-escape, so we need explicit HTML escaping for XML
 			msg = html.EscapeString(msg)
-		} else {
-			msg = htmltemplate.JSEscapeString(msg)
 		}
+		// For JSON, html/template does context-aware escaping automatically
 
 		data := &APIErrorWithContext{
-			APIError:   APIError{Message: htmltemplate.HTML(msg)},
+			Message:    msg,
 			StatusCode: result.Code,
 		}
 		response := e.ExecuteErrorTemplate(w, tmpl, data, result.Code)
@@ -459,6 +456,7 @@ func (e *ErrorHandler) writeOverrideResponse(w http.ResponseWriter, r *http.Requ
 func (e *ErrorHandler) writeDirectOverrideResponse(w http.ResponseWriter, result *OverrideResult, respHeader http.Header) *http.Response {
 	w.WriteHeader(result.Code)
 	bodyBytes := []byte(result.GetBody())
+	//nolint:errcheck // Error can't be handled after headers written, consistent with writeTemplateErrorResponse
 	w.Write(bodyBytes)
 
 	return &http.Response{

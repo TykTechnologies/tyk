@@ -574,7 +574,7 @@ func BenchmarkWriteOverrideResponse(b *testing.B) {
 			Code: 503,
 			rule: &config.ErrorOverride{
 				Response: config.ErrorResponse{
-					Message:     "Custom error message",
+					Message:  "Custom error message",
 					Template: "error_test",
 				},
 			},
@@ -609,7 +609,7 @@ func BenchmarkWriteOverrideResponse(b *testing.B) {
 			Code: 500,
 			rule: &config.ErrorOverride{
 				Response: config.ErrorResponse{
-					Message:     "Server error occurred",
+					Message:  "Server error occurred",
 					Template: "error_test",
 				},
 			},
