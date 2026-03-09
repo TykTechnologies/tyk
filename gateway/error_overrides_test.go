@@ -2,7 +2,6 @@ package gateway
 
 import (
 	"html/template"
-	"net/http"
 	"net/http/httptest"
 	"testing"
 	texttemplate "text/template"
@@ -366,7 +365,7 @@ func TestApplyOverride(t *testing.T) {
 	t.Run("no overrides configured", func(t *testing.T) {
 		gw := &Gateway{}
 		eo := NewErrorOverrides(nil, gw)
-		req, _ := http.NewRequest("GET", "/test", nil)
+		req := httptest.NewRequest("GET", "/test", nil)
 
 		result := eo.ApplyOverride(req, 500, []byte("error message"))
 		assert.Nil(t, result)
@@ -386,7 +385,7 @@ func TestApplyOverride(t *testing.T) {
 
 		gw := createGateway(overrides)
 		eo := NewErrorOverrides(nil, gw)
-		req, _ := http.NewRequest("GET", "/test", nil)
+		req := httptest.NewRequest("GET", "/test", nil)
 
 		result := eo.ApplyOverride(req, 500, []byte("internal error"))
 		require.NotNil(t, result)
@@ -408,7 +407,7 @@ func TestApplyOverride(t *testing.T) {
 
 		gw := createGateway(overrides)
 		eo := NewErrorOverrides(nil, gw)
-		req, _ := http.NewRequest("GET", "/test", nil)
+		req := httptest.NewRequest("GET", "/test", nil)
 
 		result := eo.ApplyOverride(req, 404, []byte("not found"))
 		require.NotNil(t, result)
@@ -430,7 +429,7 @@ func TestApplyOverride(t *testing.T) {
 
 		gw := createGateway(overrides)
 		eo := NewErrorOverrides(nil, gw)
-		req, _ := http.NewRequest("GET", "/test", nil)
+		req := httptest.NewRequest("GET", "/test", nil)
 
 		result := eo.ApplyOverride(req, 502, []byte("bad gateway"))
 		require.NotNil(t, result)
@@ -450,7 +449,7 @@ func TestApplyOverride(t *testing.T) {
 
 		gw := createGateway(overrides)
 		eo := NewErrorOverrides(nil, gw)
-		req, _ := http.NewRequest("GET", "/test", nil)
+		req := httptest.NewRequest("GET", "/test", nil)
 
 		result := eo.ApplyOverride(req, 500, []byte("error"))
 		require.NotNil(t, result)
@@ -474,7 +473,7 @@ func TestApplyOverride(t *testing.T) {
 
 		gw := createGateway(overrides)
 		eo := NewErrorOverrides(nil, gw)
-		req, _ := http.NewRequest("GET", "/test", nil)
+		req := httptest.NewRequest("GET", "/test", nil)
 
 		// Should match first rule with pattern
 		result := eo.ApplyOverride(req, 500, []byte("database connection failed"))
@@ -504,7 +503,7 @@ func TestApplyOverride(t *testing.T) {
 
 		gw := createGateway(overrides)
 		eo := NewErrorOverrides(nil, gw)
-		req, _ := http.NewRequest("GET", "/test", nil)
+		req := httptest.NewRequest("GET", "/test", nil)
 
 		// Should match
 		result := eo.ApplyOverride(req, 500, []byte("database connection timeout"))
@@ -534,7 +533,7 @@ func TestApplyOverride(t *testing.T) {
 
 		gw := createGateway(overrides)
 		eo := NewErrorOverrides(nil, gw)
-		req, _ := http.NewRequest("GET", "/test", nil)
+		req := httptest.NewRequest("GET", "/test", nil)
 
 		// Should match
 		body := []byte(`{"error": {"code": "INVALID_PAYMENT"}}`)
@@ -571,7 +570,7 @@ func TestApplyOverride(t *testing.T) {
 
 		gw := createGateway(overrides)
 		eo := NewErrorOverrides(nil, gw)
-		req, _ := http.NewRequest("GET", "/test", nil)
+		req := httptest.NewRequest("GET", "/test", nil)
 
 		body := []byte(`{"metadata": {"error": {"type": "timeout"}}}`)
 		result := eo.ApplyOverride(req, 500, body)
@@ -593,7 +592,7 @@ func TestApplyOverride(t *testing.T) {
 
 		gw := createGateway(overrides)
 		eo := NewErrorOverrides(nil, gw)
-		req, _ := http.NewRequest("GET", "/test", nil)
+		req := httptest.NewRequest("GET", "/test", nil)
 
 		// Create a large body (> 4KB) with pattern at start
 		largeBody := make([]byte, maxBodySizeForMatching+1000)
@@ -622,7 +621,7 @@ func TestApplyOverride(t *testing.T) {
 
 		gw := createGateway(overrides)
 		eo := NewErrorOverrides(nil, gw)
-		req, _ := http.NewRequest("GET", "/test", nil)
+		req := httptest.NewRequest("GET", "/test", nil)
 
 		result := eo.ApplyOverride(req, 429, []byte("too many requests"))
 		require.NotNil(t, result)
@@ -645,7 +644,7 @@ func TestApplyOverride(t *testing.T) {
 
 		gw := createGateway(overrides)
 		eo := NewErrorOverrides(nil, gw)
-		req, _ := http.NewRequest("GET", "/test", nil)
+		req := httptest.NewRequest("GET", "/test", nil)
 
 		result := eo.ApplyOverride(req, 401, []byte("unauthorized"))
 		require.NotNil(t, result)
@@ -661,7 +660,7 @@ func TestApplyOverride(t *testing.T) {
 
 		gw := createGateway(overrides)
 		eo := NewErrorOverrides(nil, gw)
-		req, _ := http.NewRequest("GET", "/test", nil)
+		req := httptest.NewRequest("GET", "/test", nil)
 
 		// 404 is not configured
 		result := eo.ApplyOverride(req, 404, []byte("not found"))
@@ -998,7 +997,7 @@ func TestApplyOverrideWithFlag(t *testing.T) {
 			"500": []config.ErrorOverride{
 				{
 					Match: &config.ErrorMatcher{
-						Flag:           errors.CBO,           // Circuit breaker
+						Flag:           errors.CBO,         // Circuit breaker
 						MessagePattern: "circuit.*breaker", // Fallback pattern
 					},
 					Response: config.ErrorResponse{
@@ -1168,11 +1167,13 @@ func TestGetInlineTemplate(t *testing.T) {
 }
 
 // TestTemplateCompilationEdgeCases tests edge cases in template compilation
+// Note: Templates are only compiled from the Body field, not Message field.
+// Message is a semantic value passed to templates as {{.Message}}.
 func TestTemplateCompilationEdgeCases(t *testing.T) {
 	t.Run("template with only StatusCode", func(t *testing.T) {
 		rule := &config.ErrorOverride{
 			Response: config.ErrorResponse{
-				Message: `{"code": {{.StatusCode}}}`,
+				Body: `{"code": {{.StatusCode}}}`,
 			},
 		}
 
@@ -1184,7 +1185,7 @@ func TestTemplateCompilationEdgeCases(t *testing.T) {
 	t.Run("template with only Message", func(t *testing.T) {
 		rule := &config.ErrorOverride{
 			Response: config.ErrorResponse{
-				Message: `{"error": "{{.Message}}"}`,
+				Body: `{"error": "{{.Message}}"}`,
 			},
 		}
 
@@ -1196,7 +1197,7 @@ func TestTemplateCompilationEdgeCases(t *testing.T) {
 	t.Run("template with both variables", func(t *testing.T) {
 		rule := &config.ErrorOverride{
 			Response: config.ErrorResponse{
-				Message: `{"code": {{.StatusCode}}, "message": "{{.Message}}"}`,
+				Body: `{"code": {{.StatusCode}}, "message": "{{.Message}}"}`,
 			},
 		}
 
@@ -1205,10 +1206,10 @@ func TestTemplateCompilationEdgeCases(t *testing.T) {
 		assert.True(t, rule.HasCompiledTemplate())
 	})
 
-	t.Run("message with {{ but no template vars", func(t *testing.T) {
+	t.Run("body with {{ but no template vars", func(t *testing.T) {
 		rule := &config.ErrorOverride{
 			Response: config.ErrorResponse{
-				Message: `{"json": "with {{ braces }} but not template"}`,
+				Body: `{"json": "with {{ braces }} but not template"}`,
 			},
 		}
 
@@ -1217,10 +1218,10 @@ func TestTemplateCompilationEdgeCases(t *testing.T) {
 		assert.False(t, rule.HasCompiledTemplate())
 	})
 
-	t.Run("empty message", func(t *testing.T) {
+	t.Run("empty body", func(t *testing.T) {
 		rule := &config.ErrorOverride{
 			Response: config.ErrorResponse{
-				Message: "",
+				Body: "",
 			},
 		}
 

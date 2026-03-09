@@ -474,7 +474,7 @@ func BenchmarkWriteOverrideResponse(b *testing.B) {
 			Code: 503,
 			rule: &config.ErrorOverride{
 				Response: config.ErrorResponse{
-					Message: `{"error": "Service temporarily unavailable", "code": "SERVICE_DOWN"}`,
+					Body: `{"error": "Service temporarily unavailable", "code": "SERVICE_DOWN"}`,
 				},
 			},
 		}
@@ -501,7 +501,8 @@ func BenchmarkWriteOverrideResponse(b *testing.B) {
 
 		rule := &config.ErrorOverride{
 			Response: config.ErrorResponse{
-				Message: `{"error": "Error {{.StatusCode}}", "message": "{{.Message}}"}`,
+				Body:    `{"error": "Error {{.StatusCode}}", "message": "{{.Message}}"}`,
+				Message: "timeout",
 			},
 		}
 		_ = compileSingleRule(rule)
@@ -533,7 +534,8 @@ func BenchmarkWriteOverrideResponse(b *testing.B) {
 
 		rule := &config.ErrorOverride{
 			Response: config.ErrorResponse{
-				Message: `<error><code>{{.StatusCode}}</code><message>{{.Message}}</message></error>`,
+				Body:    `<error><code>{{.StatusCode}}</code><message>{{.Message}}</message></error>`,
+				Message: "server error",
 			},
 		}
 		_ = compileSingleRule(rule)
@@ -624,6 +626,11 @@ func BenchmarkWriteOverrideResponse(b *testing.B) {
 
 	b.Run("with custom headers", func(b *testing.B) {
 		gw := &Gateway{}
+		jsonTmpl := htmltemplate.Must(htmltemplate.New("error.json").Parse(
+			`{"error": "{{.Message}}"}`,
+		))
+		gw.templates = jsonTmpl
+
 		handler := &ErrorHandler{
 			BaseMiddleware: &BaseMiddleware{
 				Spec: &APISpec{
@@ -764,7 +771,8 @@ func BenchmarkCompileErrorOverrides(b *testing.B) {
 			"500": []config.ErrorOverride{
 				{
 					Response: config.ErrorResponse{
-						Message: `{"error": "Error {{.StatusCode}}", "message": "{{.Message}}"}`,
+						Body:    `{"error": "Error {{.StatusCode}}", "message": "{{.Message}}"}`,
+						Message: "error message",
 					},
 				},
 			},

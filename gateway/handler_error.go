@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/base64"
 	"errors"
+	"html"
 	htmltemplate "html/template"
 	"io"
 	"io/ioutil"
@@ -427,12 +428,21 @@ func (e *ErrorHandler) writeOverrideResponse(w http.ResponseWriter, r *http.Requ
 	// Body with template variables, or file template
 	tmpl := result.GetTemplateExecutor(e.Gw, ctx)
 	if tmpl != nil {
+		// Escape message to prevent XSS - same pattern as writeTemplateErrorResponse
+		msg := result.GetMessageForTemplate()
+		if ctx.IsXML {
+			msg = html.EscapeString(msg)
+		} else {
+			msg = htmltemplate.JSEscapeString(msg)
+		}
+
 		data := &APIErrorWithContext{
-			APIError:   APIError{Message: htmltemplate.HTML(result.GetMessageForTemplate())},
+			APIError:   APIError{Message: htmltemplate.HTML(msg)},
 			StatusCode: result.Code,
 		}
 		response := e.ExecuteErrorTemplate(w, tmpl, data, result.Code)
 		response.Header = respHeader
+
 		return response
 	}
 
