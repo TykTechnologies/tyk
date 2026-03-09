@@ -182,6 +182,107 @@ func TestMatchPattern(t *testing.T) {
 	}
 }
 
+func TestFilterItems(t *testing.T) {
+	t.Run("empty items array returns empty", func(t *testing.T) {
+		rules := user.AccessControlRules{Allowed: []string{"anything"}}
+		result := FilterItems([]json.RawMessage{}, "name", rules)
+		assert.Empty(t, result)
+	})
+
+	t.Run("items missing name field are included (fail-open)", func(t *testing.T) {
+		items := []json.RawMessage{
+			json.RawMessage(`{"name":"keep_me","description":"has name"}`),
+			json.RawMessage(`{"description":"no name field at all"}`),
+			json.RawMessage(`{"name":"block_me","description":"will be blocked"}`),
+		}
+		rules := user.AccessControlRules{Blocked: []string{"block_me"}}
+		result := FilterItems(items, "name", rules)
+		assert.Len(t, result, 2, "item without name field should be included (fail-open)")
+
+		// Verify the kept items.
+		names := make([]string, 0, len(result))
+		for _, item := range result {
+			n := ExtractStringField(item, "name")
+			names = append(names, n)
+		}
+		assert.Contains(t, names, "keep_me")
+		assert.Contains(t, names, "", "nameless item should pass through with empty name")
+	})
+
+	t.Run("items with non-string name field are included (fail-open)", func(t *testing.T) {
+		items := []json.RawMessage{
+			json.RawMessage(`{"name":42,"description":"numeric name"}`),
+			json.RawMessage(`{"name":true,"description":"boolean name"}`),
+			json.RawMessage(`{"name":"normal","description":"string name"}`),
+		}
+		rules := user.AccessControlRules{Allowed: []string{"normal"}}
+		result := FilterItems(items, "name", rules)
+		// Items with non-string names can't be extracted — fail-open includes them.
+		assert.Len(t, result, 3)
+	})
+
+	t.Run("invalid regex in rules falls back to exact match", func(t *testing.T) {
+		items := []json.RawMessage{
+			json.RawMessage(`{"name":"[unclosed","description":"literal bracket name"}`),
+			json.RawMessage(`{"name":"normal_tool","description":"normal"}`),
+		}
+		// "[unclosed" is an invalid regex — should fall back to exact string comparison.
+		rules := user.AccessControlRules{Blocked: []string{"[unclosed"}}
+		result := FilterItems(items, "name", rules)
+		assert.Len(t, result, 1, "invalid regex should still match by exact string comparison")
+		assert.Equal(t, "normal_tool", ExtractStringField(result[0], "name"))
+	})
+}
+
+func TestFilterJSONRPCBody(t *testing.T) {
+	t.Run("batch JSON-RPC array passes through (returns false)", func(t *testing.T) {
+		// JSON-RPC batch = top-level array. Not supported for filtering.
+		batch := `[{"jsonrpc":"2.0","id":1,"result":{"tools":[{"name":"a"}]}},{"jsonrpc":"2.0","id":2,"result":{"tools":[{"name":"b"}]}}]`
+		cfg := ListFilterConfigs["tools"]
+		rules := user.AccessControlRules{Allowed: []string{"a"}}
+		result, ok := FilterJSONRPCBody([]byte(batch), cfg, rules)
+		assert.False(t, ok, "batch responses should not be parsed")
+		assert.Nil(t, result)
+	})
+
+	t.Run("error response with no result passes through", func(t *testing.T) {
+		errResp := `{"jsonrpc":"2.0","id":1,"error":{"code":-32600,"message":"invalid request"}}`
+		cfg := ListFilterConfigs["tools"]
+		rules := user.AccessControlRules{Blocked: []string{".*"}}
+		result, ok := FilterJSONRPCBody([]byte(errResp), cfg, rules)
+		assert.False(t, ok)
+		assert.Nil(t, result)
+	})
+
+	t.Run("empty result object passes through", func(t *testing.T) {
+		emptyResult := `{"jsonrpc":"2.0","id":1,"result":{}}`
+		cfg := ListFilterConfigs["tools"]
+		rules := user.AccessControlRules{Allowed: []string{"anything"}}
+		result, ok := FilterJSONRPCBody([]byte(emptyResult), cfg, rules)
+		assert.False(t, ok, "empty result with no array key should pass through")
+		assert.Nil(t, result)
+	})
+
+	t.Run("unicode tool names are matched correctly", func(t *testing.T) {
+		body := `{"jsonrpc":"2.0","id":1,"result":{"tools":[{"name":"résumé_tool"},{"name":"日本語ツール"},{"name":"normal_tool"}]}}`
+		cfg := ListFilterConfigs["tools"]
+		rules := user.AccessControlRules{Allowed: []string{"résumé_tool", "normal_tool"}}
+		result, ok := FilterJSONRPCBody([]byte(body), cfg, rules)
+		require.True(t, ok)
+
+		var envelope JSONRPCResponse
+		require.NoError(t, json.Unmarshal(result, &envelope))
+		var res map[string]json.RawMessage
+		require.NoError(t, json.Unmarshal(envelope.Result, &res))
+		var tools []map[string]any
+		require.NoError(t, json.Unmarshal(res["tools"], &tools))
+		assert.Len(t, tools, 2)
+		names := []string{tools[0]["name"].(string), tools[1]["name"].(string)}
+		assert.Contains(t, names, "résumé_tool")
+		assert.Contains(t, names, "normal_tool")
+	})
+}
+
 func TestInferListConfigFromResult(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -208,4 +309,21 @@ func TestInferListConfigFromResult(t *testing.T) {
 			}
 		})
 	}
+
+	t.Run("ambiguous keys returns first in lookup order", func(t *testing.T) {
+		// Result with both "tools" and "prompts" — should return tools (first in order).
+		result := map[string]json.RawMessage{
+			"tools":   json.RawMessage(`[]`),
+			"prompts": json.RawMessage(`[]`),
+		}
+		cfg := InferListConfigFromResult(result)
+		require.NotNil(t, cfg)
+		assert.Equal(t, "tools", cfg.ArrayKey)
+	})
+
+	t.Run("empty result returns nil", func(t *testing.T) {
+		result := map[string]json.RawMessage{}
+		cfg := InferListConfigFromResult(result)
+		assert.Nil(t, cfg)
+	})
 }

@@ -302,6 +302,65 @@ func TestMCPListFilterSSEHook_FilterEvent(t *testing.T) {
 		assert.Nil(t, modified)
 	})
 
+	t.Run("preserves event ID through filtering", func(t *testing.T) {
+		ses := makeSession(user.AccessControlRules{
+			Allowed: []string{"get_weather"},
+		})
+		hook := NewMCPListFilterSSEHook(apiID, ses)
+		require.NotNil(t, hook)
+
+		event := &SSEEvent{
+			ID:    "evt-42",
+			Event: "message",
+			Data:  []string{makeToolsListData([]string{"get_weather", "set_alert"})},
+		}
+
+		allowed, modified := hook.FilterEvent(event)
+		assert.True(t, allowed)
+		require.NotNil(t, modified)
+		assert.Equal(t, "evt-42", modified.ID, "event ID should be preserved")
+
+		names := extractToolNames(t, strings.Join(modified.Data, "\n"))
+		assert.Equal(t, []string{"get_weather"}, names)
+	})
+
+	t.Run("preserves retry field through filtering", func(t *testing.T) {
+		ses := makeSession(user.AccessControlRules{
+			Allowed: []string{"get_weather"},
+		})
+		hook := NewMCPListFilterSSEHook(apiID, ses)
+		require.NotNil(t, hook)
+
+		event := &SSEEvent{
+			Event: "message",
+			Retry: 5000,
+			Data:  []string{makeToolsListData([]string{"get_weather", "set_alert"})},
+		}
+
+		allowed, modified := hook.FilterEvent(event)
+		assert.True(t, allowed)
+		require.NotNil(t, modified)
+		assert.Equal(t, 5000, modified.Retry, "retry should be preserved")
+	})
+
+	t.Run("empty result object passes through", func(t *testing.T) {
+		ses := makeSession(user.AccessControlRules{Allowed: []string{"get_weather"}})
+		hook := NewMCPListFilterSSEHook(apiID, ses)
+
+		// Result exists but has no list key.
+		envelope := map[string]any{
+			"jsonrpc": "2.0",
+			"id":      1,
+			"result":  map[string]any{},
+		}
+		b, _ := json.Marshal(envelope) //nolint:errcheck
+
+		event := &SSEEvent{Data: []string{string(b)}}
+		allowed, modified := hook.FilterEvent(event)
+		assert.True(t, allowed)
+		assert.Nil(t, modified, "empty result should pass through unmodified")
+	})
+
 	t.Run("handles multi-line SSE data", func(t *testing.T) {
 		ses := makeSession(user.AccessControlRules{
 			Allowed: []string{"get_weather"},

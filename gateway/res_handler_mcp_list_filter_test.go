@@ -839,6 +839,163 @@ func TestMCPListFilterResponseHandler_HandleResponse_WrongAPIID(t *testing.T) {
 		"response should pass through when API ID does not match session access rights")
 }
 
+func TestMCPListFilterResponseHandler_HandleResponse_SSEContentType(t *testing.T) {
+	h := buildMCPListFilterHandler("api-1", true)
+	rw := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/mcp", nil)
+	httpctx.SetJSONRPCRoutingState(req, &httpctx.JSONRPCRoutingState{
+		Method: mcp.MethodToolsList,
+		ID:     1,
+	})
+
+	session := &user.SessionState{
+		AccessRights: map[string]user.AccessDefinition{
+			"api-1": {
+				APIID: "api-1",
+				MCPAccessRights: user.MCPAccessRights{
+					Tools: user.AccessControlRules{Blocked: []string{".*"}},
+				},
+			},
+		},
+	}
+
+	responseBody := makeToolsListResponse([]map[string]any{
+		{"name": "tool_a"},
+	}, "")
+
+	// SSE Content-Type should cause handler to skip (SSE handled by hook instead).
+	res := &http.Response{
+		StatusCode: http.StatusOK,
+		Header:     http.Header{"Content-Type": []string{"text/event-stream; charset=utf-8"}},
+		Body:       io.NopCloser(bytes.NewReader(responseBody)),
+	}
+
+	err := h.HandleResponse(rw, res, req, session)
+	require.NoError(t, err)
+
+	body := readResponseBody(t, res)
+	assert.JSONEq(t, string(responseBody), string(body),
+		"SSE responses should pass through unmodified")
+}
+
+func TestMCPListFilterResponseHandler_HandleResponse_Non200Status(t *testing.T) {
+	h := buildMCPListFilterHandler("api-1", true)
+	rw := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/mcp", nil)
+	httpctx.SetJSONRPCRoutingState(req, &httpctx.JSONRPCRoutingState{
+		Method: mcp.MethodToolsList,
+		ID:     1,
+	})
+
+	session := &user.SessionState{
+		AccessRights: map[string]user.AccessDefinition{
+			"api-1": {
+				APIID: "api-1",
+				MCPAccessRights: user.MCPAccessRights{
+					Tools: user.AccessControlRules{Blocked: []string{".*"}},
+				},
+			},
+		},
+	}
+
+	// A 500 error with a JSON-RPC error body (no "result" key).
+	errorBody := []byte(`{"jsonrpc":"2.0","id":1,"error":{"code":-32603,"message":"internal error"}}`)
+	res := &http.Response{
+		StatusCode: http.StatusInternalServerError,
+		Header:     http.Header{"Content-Type": []string{"application/json"}},
+		Body:       io.NopCloser(bytes.NewReader(errorBody)),
+	}
+
+	err := h.HandleResponse(rw, res, req, session)
+	require.NoError(t, err)
+
+	body := readResponseBody(t, res)
+	assert.JSONEq(t, string(errorBody), string(body),
+		"error responses should pass through unmodified")
+}
+
+func TestMCPListFilterResponseHandler_HandleResponse_BatchResponse(t *testing.T) {
+	h := buildMCPListFilterHandler("api-1", true)
+	rw := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/mcp", nil)
+	httpctx.SetJSONRPCRoutingState(req, &httpctx.JSONRPCRoutingState{
+		Method: mcp.MethodToolsList,
+		ID:     1,
+	})
+
+	session := &user.SessionState{
+		AccessRights: map[string]user.AccessDefinition{
+			"api-1": {
+				APIID: "api-1",
+				MCPAccessRights: user.MCPAccessRights{
+					Tools: user.AccessControlRules{Blocked: []string{".*"}},
+				},
+			},
+		},
+	}
+
+	// JSON-RPC batch response (top-level array) — should pass through without crashing.
+	batchBody := []byte(`[{"jsonrpc":"2.0","id":1,"result":{"tools":[{"name":"a"}]}},{"jsonrpc":"2.0","id":2,"result":{"tools":[{"name":"b"}]}}]`)
+	res := &http.Response{
+		StatusCode: http.StatusOK,
+		Header:     http.Header{"Content-Type": []string{"application/json"}},
+		Body:       io.NopCloser(bytes.NewReader(batchBody)),
+	}
+
+	err := h.HandleResponse(rw, res, req, session)
+	require.NoError(t, err)
+
+	body := readResponseBody(t, res)
+	assert.Equal(t, batchBody, body,
+		"batch responses should pass through unmodified (not crash)")
+}
+
+func TestMCPListFilterResponseHandler_HandleResponse_ItemsMissingNameField(t *testing.T) {
+	h := buildMCPListFilterHandler("api-1", true)
+	rw := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/mcp", nil)
+	httpctx.SetJSONRPCRoutingState(req, &httpctx.JSONRPCRoutingState{
+		Method: mcp.MethodToolsList,
+		ID:     1,
+	})
+
+	session := &user.SessionState{
+		AccessRights: map[string]user.AccessDefinition{
+			"api-1": {
+				APIID: "api-1",
+				MCPAccessRights: user.MCPAccessRights{
+					Tools: user.AccessControlRules{
+						Allowed: []string{"keep_tool"},
+					},
+				},
+			},
+		},
+	}
+
+	// One tool has a name, one doesn't — nameless should pass through (fail-open).
+	tools := []map[string]any{
+		{"name": "keep_tool", "description": "has name"},
+		{"description": "no name field"},
+		{"name": "block_tool", "description": "not in allowlist"},
+	}
+	res := makeHTTPResponse(makeToolsListResponse(tools, ""))
+	err := h.HandleResponse(rw, res, req, session)
+	require.NoError(t, err)
+
+	body := readResponseBody(t, res)
+	got := extractToolNames(t, body)
+	assert.Equal(t, []string{"keep_tool"}, got, "only named+allowed tools should be in names")
+
+	// But the nameless item should also be in the result (fail-open).
+	var envelope mcp.JSONRPCResponse
+	require.NoError(t, json.Unmarshal(body, &envelope))
+	var result map[string]json.RawMessage
+	require.NoError(t, json.Unmarshal(envelope.Result, &result))
+	var items []json.RawMessage
+	require.NoError(t, json.Unmarshal(result["tools"], &items))
+	assert.Len(t, items, 2, "should include keep_tool + nameless item (fail-open)")
+}
+
 // generateTools creates n tools with names "tool_0", "tool_1", ..., "tool_{n-1}".
 func generateTools(n int) []map[string]any {
 	tools := make([]map[string]any, n)
