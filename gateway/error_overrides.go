@@ -185,7 +185,6 @@ func compileBodyTemplates(rule *config.ErrorOverride) error {
 // ApplyOverride attempts to match and apply an override for the given error.
 // Uses O(1) lookup by status code, then checks additional matching criteria.
 // Returns nil if no override matches.
-// Note: body is only used for pattern matching, not stored in result.
 func (o *ErrorOverrides) ApplyOverride(r *http.Request, statusCode int, body []byte) *OverrideResult {
 	// Future: Check API-level first (o.Spec.CompiledErrorOverrides)
 

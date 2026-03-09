@@ -1347,10 +1347,10 @@ type Config struct {
 	// When multiple rules match, the first matching rule is applied. API-level overrides take precedence over gateway-level overrides.
 	//
 	// Common use cases:
-	// - Standardize error responses across all APIs (e.g., RFC 7807 Problem Details format)
+	// - Standardize error responses across all APIs
 	// - Hide internal error details from external clients
 	// - Provide branded or localized error messages
-	// - Add custom headers for CORS, correlation IDs, or rate limit guidance
+	// - Add custom headers
 	// - Transform upstream errors into a consistent format
 	//
 	// Example - Basic status code override with direct body (all 500 errors):
@@ -1434,7 +1434,6 @@ type Config struct {
 	//   }]
 	// }
 	// ```
-	// The template "error_upstream.json" receives {{.Message}} = "Database query timeout - please try again"
 	//
 	// Field summary:
 	// - body: The HTTP response body (literal or inline template). Takes precedence over template.
@@ -1522,8 +1521,8 @@ type ErrorMatcher struct {
 
 	// BodyField is a JSON path (gjson syntax) to extract a value from the response body.
 	// Use when matching structured JSON error responses from upstream services.
-	// For gateway-generated errors, use message_pattern with exact text matching instead,
-	// since the error matcher intercepts the gateway error message before it's wrapped in the JSON response structure.
+	// Error matcher intercepts the Gateway-generated errors before they are wrapped in the response structure
+	// so use flag when possible or message_pattern for these instead.
 	// Examples: "error.code", "details.reason", "metadata.error_type"
 	BodyField string `json:"body_field,omitempty"`
 
@@ -1585,12 +1584,11 @@ type ErrorResponse struct {
 	// Used when Body is not specified. If neither Body nor Template is set but Message is,
 	// Tyk's default error template is used with {{.Message}} populated.
 	// Template files can access: {{.StatusCode}}, {{.Message}}
-	// Original error bodies are NOT exposed to templates (security: prevents leaking internal errors).
+	// Original error bodies are NOT exposed to templates.
 	// The file extension (.json or .xml) is determined by the request's Content-Type header.
 	Template string `json:"template,omitempty"`
 
-	// Headers are additional HTTP headers to include in the response.
-	// Useful for CORS, rate limit info, retry guidance, correlation IDs, etc.
+	// Headers are HTTP headers to override or include in the response.
 	Headers map[string]string `json:"headers,omitempty"`
 }
 
