@@ -1,6 +1,10 @@
 package errpack
 
-import "fmt"
+import (
+	"fmt"
+
+	"github.com/TykTechnologies/tyk/internal/errors"
+)
 
 var (
 	TypeUnknown        = Type{typ: "unknown"}
@@ -45,6 +49,11 @@ func (e Error) Error() string {
 	return fmt.Sprintf("%s: %s", e.msg, e.prev.Error())
 }
 
+func (e Error) Is(err error) bool {
+	var errp Error
+	return errors.As(err, errp) && errp.typ == e.typ && errp.msg == e.msg
+}
+
 // Chain sets error predecessor
 func (e Error) Chain(err error) Error {
 	e.prev = err
@@ -57,6 +66,16 @@ func (e Error) TypeOf(typ Type) bool {
 
 func Domain(msg string) Error {
 	return New(msg, WithType(TypeDomain))
+}
+
+func Domainf(format string, a ...any) Error {
+	err := fmt.Errorf(format, a...)
+
+	return Error{
+		msg:  err.Error(),
+		typ:  TypeDomain,
+		prev: err,
+	}
 }
 
 func Infra(msg string) Error {

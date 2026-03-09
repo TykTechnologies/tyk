@@ -1364,6 +1364,9 @@ type Config struct {
 
 	// JWKS holds the configuration for Tyk JWKS functionalities
 	JWKS JWKSConfig `json:"jwks"`
+
+	// AllowUnsafePolicyIds allows unsafe policy identifiers
+	AllowUnsafePolicyIds bool `json:"allow_unsafe_policy_ids"`
 }
 
 // LabsConfig include config for streaming

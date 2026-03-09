@@ -255,6 +255,9 @@
                 }
               }
             },
+            "runtime_metrics": {
+              "type": ["boolean", "null"]
+            },
             "api_metrics": {
               "type": ["array", "null"]
             }
@@ -1515,6 +1518,10 @@
           }
         }
       }
+    },
+    "allow_unsafe_policy_ids": {
+      "type": ["boolean", "null"],
+      "additionalProperties": false
     }
   }
 }
