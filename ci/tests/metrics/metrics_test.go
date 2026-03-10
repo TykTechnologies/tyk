@@ -736,8 +736,10 @@ func assertMetricAbsent(t *testing.T, query string) {
 func assertMetricHasLabels(t *testing.T, metric string, expectedLabels []string) {
 	t.Helper()
 	deadline := time.Now().Add(pollTimeout)
+	var lastLabels map[string]string
 	for time.Now().Before(deadline) {
 		labels, ok := queryPrometheusLabels(t, metric)
+		lastLabels = labels
 		if ok && labels != nil {
 			missing := []string{}
 			for _, l := range expectedLabels {
@@ -752,16 +754,17 @@ func assertMetricHasLabels(t *testing.T, metric string, expectedLabels []string)
 		}
 		time.Sleep(pollInterval)
 	}
-	labels, _ := queryPrometheusLabels(t, metric)
-	t.Fatalf("%s missing expected labels; have %v, want %v", metric, labels, expectedLabels)
+	t.Fatalf("%s missing expected labels; have %v, want %v", metric, lastLabels, expectedLabels)
 }
 
 // assertLabelPresent polls Prometheus until the label is present on the metric or times out.
 func assertLabelPresent(t *testing.T, query, labelKey string) string {
 	t.Helper()
 	deadline := time.Now().Add(pollTimeout)
+	var lastLabels map[string]string
 	for time.Now().Before(deadline) {
 		labels, ok := queryPrometheusLabels(t, query)
+		lastLabels = labels
 		if ok {
 			if val, exists := labels[labelKey]; exists && val != "" {
 				t.Logf("%s has label %s=%q OK", query, labelKey, val)
@@ -770,9 +773,7 @@ func assertLabelPresent(t *testing.T, query, labelKey string) string {
 		}
 		time.Sleep(pollInterval)
 	}
-	// Final attempt for error message.
-	labels, _ := queryPrometheusLabels(t, query)
-	t.Fatalf("%s missing label %s, got labels: %v", query, labelKey, labels)
+	t.Fatalf("%s missing label %s, got labels: %v", query, labelKey, lastLabels)
 	return ""
 }
 
@@ -780,8 +781,10 @@ func assertLabelPresent(t *testing.T, query, labelKey string) string {
 func assertLabelEquals(t *testing.T, query, labelKey, expected string) {
 	t.Helper()
 	deadline := time.Now().Add(pollTimeout)
+	var lastLabels map[string]string
 	for time.Now().Before(deadline) {
 		labels, ok := queryPrometheusLabels(t, query)
+		lastLabels = labels
 		if ok {
 			if val, exists := labels[labelKey]; exists && val == expected {
 				t.Logf("%s has label %s=%q OK", query, labelKey, val)
@@ -790,9 +793,10 @@ func assertLabelEquals(t *testing.T, query, labelKey, expected string) {
 		}
 		time.Sleep(pollInterval)
 	}
-	// Final attempt for error message.
-	labels, _ := queryPrometheusLabels(t, query)
-	actualVal := labels[labelKey]
+	actualVal := ""
+	if lastLabels != nil {
+		actualVal = lastLabels[labelKey]
+	}
 	t.Fatalf("%s label %s=%q, expected %q", query, labelKey, actualVal, expected)
 }
 
@@ -800,8 +804,10 @@ func assertLabelEquals(t *testing.T, query, labelKey, expected string) {
 func assertLabelContains(t *testing.T, query, labelKey, expected string) {
 	t.Helper()
 	deadline := time.Now().Add(pollTimeout)
+	var lastLabels map[string]string
 	for time.Now().Before(deadline) {
 		labels, ok := queryPrometheusLabels(t, query)
+		lastLabels = labels
 		if ok {
 			if val, exists := labels[labelKey]; exists {
 				// For array-like labels like tyk_gw_tags, check if substring is present
@@ -813,8 +819,9 @@ func assertLabelContains(t *testing.T, query, labelKey, expected string) {
 		}
 		time.Sleep(pollInterval)
 	}
-	// Final attempt for error message.
-	labels, _ := queryPrometheusLabels(t, query)
-	actualVal := labels[labelKey]
+	actualVal := ""
+	if lastLabels != nil {
+		actualVal = lastLabels[labelKey]
+	}
 	t.Fatalf("%s label %s=%q does not contain %q", query, labelKey, actualVal, expected)
 }
