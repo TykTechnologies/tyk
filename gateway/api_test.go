@@ -34,6 +34,7 @@ import (
 	"github.com/TykTechnologies/tyk/config"
 	internalmodel "github.com/TykTechnologies/tyk/internal/model"
 	"github.com/TykTechnologies/tyk/internal/uuid"
+	"github.com/TykTechnologies/tyk/pkg/identifier"
 	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/test"
 	"github.com/TykTechnologies/tyk/user"
@@ -85,6 +86,7 @@ func TestPolicyAPI(t *testing.T) {
 	ts := StartTest(func(cnf *config.Config) {
 		cnf.Policies.PolicyPath = "."
 		cnf.Policies.PolicySource = "file"
+		cnf.AllowUnsafePolicyIds = true
 	})
 
 	defer ts.Close()
@@ -174,6 +176,95 @@ func TestPolicyAPI(t *testing.T) {
 			Data:      serializePolicy(t, user.Policy{ID: "test"}),
 			Code:      http.StatusOK,
 		})
+	})
+
+	t.Run("GET does not fail if existent policy has broken ID", func(t *testing.T) {
+		invalidURLID := "invalid@id"
+
+		ts.CreatePolicy(func(p *user.Policy) {
+			p.ID = "invalid@id"
+		})
+
+		_, err := ts.Run(t, test.TestCase{
+			Path:      "/tyk/policies/" + invalidURLID,
+			Method:    http.MethodGet,
+			AdminAuth: true,
+			Code:      http.StatusOK,
+		})
+
+		assert.NoError(t, err)
+	})
+
+	t.Run("fails create/update if ID contains invalid characters", func(t *testing.T) {
+		ts.setTestScopeConfig(t, func(cnf *config.Config) {
+			cnf.AllowUnsafePolicyIds = false
+		})
+
+		invalidBodyPol := user.Policy{
+			ID:           "invalid/id",
+			Rate:         100,
+			Per:          1,
+			OrgID:        "54de205930c55e15bd000001",
+			AccessRights: make(map[string]user.AccessDefinition),
+		}
+
+		_, err := ts.Run(t, test.TestCase{
+			Path:      "/tyk/policies",
+			Method:    http.MethodPost,
+			AdminAuth: true,
+			Data:      serializePolicy(t, invalidBodyPol),
+			Code:      http.StatusBadRequest,
+			BodyMatch: identifier.ErrInvalidCustomPolicyId.Error(),
+		})
+		assert.NoError(t, err)
+
+		validID := "valid-id"
+
+		_, err = ts.Run(t, test.TestCase{
+			Path:      "/tyk/policies/" + validID,
+			Method:    http.MethodPut,
+			AdminAuth: true,
+			Data:      serializePolicy(t, invalidBodyPol), // sending "invalid/id" in body
+			Code:      http.StatusBadRequest,
+			BodyMatch: identifier.ErrInvalidCustomPolicyId.Error(),
+		})
+		assert.NoError(t, err)
+	})
+
+	t.Run("does not fail on create/update if ID contains invalid characters and when AllowUnsafePolicyIds=true", func(t *testing.T) {
+		ts.setTestScopeConfig(t, func(cnf *config.Config) {
+			cnf.AllowUnsafePolicyIds = true
+		})
+
+		t.Cleanup(func() {
+			_ = ts.Gw.removePersistentPolicyById("invalid@id") //nolint:errcheck
+		})
+
+		invalidBodyPol := user.Policy{
+			ID:           "invalid@id",
+			Rate:         100,
+			Per:          1,
+			OrgID:        "54de205930c55e15bd000001",
+			AccessRights: make(map[string]user.AccessDefinition),
+		}
+
+		_, err := ts.Run(t, test.TestCase{
+			Path:      "/tyk/policies",
+			Method:    http.MethodPost,
+			AdminAuth: true,
+			Data:      serializePolicy(t, invalidBodyPol),
+			Code:      http.StatusOK,
+		})
+		assert.NoError(t, err)
+
+		_, err = ts.Run(t, test.TestCase{
+			Path:      "/tyk/policies/invalid@id",
+			Method:    http.MethodPut,
+			AdminAuth: true,
+			Data:      serializePolicy(t, invalidBodyPol),
+			Code:      http.StatusOK,
+		})
+		assert.NoError(t, err)
 	})
 }
 
@@ -5974,4 +6065,14 @@ func TestAPIListFilter_IncludeTypes(t *testing.T) {
 		assert.True(t, apiIDs["classic456"], "Should have classic API 2")
 		assert.True(t, apiIDs["mcp789"], "Should have MCP API")
 	})
+}
+
+func (gw *Gateway) removePersistentPolicyById(id string) error {
+	root, err := gw.newPolicyPathRoot()
+
+	if err != nil {
+		return err
+	}
+
+	return root.Remove(id + ".json")
 }

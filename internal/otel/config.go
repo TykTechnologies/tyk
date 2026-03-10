@@ -3,6 +3,8 @@ package otel
 import (
 	otelconfig "github.com/TykTechnologies/opentelemetry/config"
 	tyktrace "github.com/TykTechnologies/opentelemetry/trace"
+
+	"github.com/TykTechnologies/tyk/internal/otel/apimetrics"
 )
 
 // general type aliases
@@ -17,7 +19,7 @@ type (
 
 	Sampling = otelconfig.Sampling
 
-	MetricsConfig = otelconfig.MetricsConfig
+	BaseMetricsConfig = otelconfig.MetricsConfig
 
 	MetricsRetryConfig = otelconfig.MetricsRetryConfig
 
@@ -27,6 +29,27 @@ type (
 
 	Span = tyktrace.Span
 )
+
+// MetricsConfig wraps the library's MetricsConfig and adds gateway-specific
+// fields. This keeps api_metrics nested under opentelemetry.metrics in JSON:
+//
+//	{"opentelemetry": {"metrics": {"enabled": true, "api_metrics": [...]}}}
+type MetricsConfig struct {
+	BaseMetricsConfig `json:",inline"`
+
+	// RuntimeMetrics enables Go runtime metrics collection (goroutines, memory, GC).
+	// Defaults to true when metrics are enabled.
+	RuntimeMetrics *bool `json:"runtime_metrics"`
+
+	// APIMetrics defines the metric instruments created at startup.
+	// Each instrument has its own dimension scope — only declared dimensions are recorded.
+	//
+	// Slice semantics:
+	//   nil (field omitted)  → default RED instruments created
+	//   empty slice          → no API metrics (explicitly disabled)
+	//   populated slice      → only configured instruments
+	APIMetrics apimetrics.APIMetricDefinitions `json:"api_metrics"`
+}
 
 // OpenTelemetry wraps the library trace config and adds a Metrics section.
 // The library's OpenTelemetry no longer contains Metrics, so the gateway
