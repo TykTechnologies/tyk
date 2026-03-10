@@ -125,6 +125,7 @@ require (
 	github.com/tidwall/gjson v1.17.1
 	github.com/warpstreamlabs/bento v1.7.1
 	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.60.0
+	go.opentelemetry.io/contrib/instrumentation/runtime v0.60.0
 	go.opentelemetry.io/otel v1.40.0
 	go.opentelemetry.io/otel/trace v1.40.0
 	go.uber.org/mock v0.5.0
