@@ -12,6 +12,65 @@ import (
 	"github.com/TykTechnologies/tyk/internal/errors"
 )
 
+func BenchmarkTryWriteOverride(b *testing.B) {
+	b.Run("empty config - fast path", func(b *testing.B) {
+		gw := &Gateway{}
+		handler := &ErrorHandler{
+			BaseMiddleware: &BaseMiddleware{
+				Spec: &APISpec{
+					GlobalConfig: config.Config{
+						ErrorOverrides: nil, // Empty - triggers fast path (map length check)
+					},
+				},
+				Gw: gw,
+			},
+		}
+
+		req := httptest.NewRequest("GET", "/test", nil)
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			handler.tryWriteOverride(nil, req, "error message", 500)
+		}
+	})
+
+	b.Run("config exists - match with direct body", func(b *testing.B) {
+		overrides := config.ErrorOverridesMap{
+			"500": []config.ErrorOverride{
+				{
+					Response: config.ErrorResponse{
+						Code: 503,
+						Body: `{"error": "Service unavailable"}`,
+					},
+				},
+			},
+		}
+
+		gw := &Gateway{}
+		compiled := CompileErrorOverrides(overrides)
+		gw.SetCompiledErrorOverrides(compiled)
+
+		handler := &ErrorHandler{
+			BaseMiddleware: &BaseMiddleware{
+				Spec: &APISpec{
+					GlobalConfig: config.Config{
+						ErrorOverrides: overrides, // Must be set to pass fast path check
+					},
+				},
+				Gw: gw,
+			},
+		}
+
+		req := httptest.NewRequest("GET", "/test", nil)
+		req.Header.Set(header.ContentType, header.ApplicationJSON)
+
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			w := httptest.NewRecorder()
+			handler.tryWriteOverride(w, req, "error message", 500)
+		}
+	})
+}
+
 func BenchmarkApplyOverride(b *testing.B) {
 	b.Run("no overrides configured", func(b *testing.B) {
 		gw := &Gateway{}
