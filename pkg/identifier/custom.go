@@ -8,7 +8,7 @@ import (
 
 var (
 	validPolicyRe            = regexp.MustCompile(`^[a-zA-Z0-9.\-_~]+$`)
-	ErrInvalidCustomPolicyId = errpack.Domain("Invalid Policy ID. Allowed characters: a-z, A-Z, 0-9, ., _, -, ~")
+	ErrInvalidCustomPolicyId = errpack.Domain("Invalid Policy ID: Allowed characters: a-z, A-Z, 0-9, ., _, -, ~")
 )
 
 // CustomPolicyId (user-defined-identifier)
