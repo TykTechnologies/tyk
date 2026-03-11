@@ -48,6 +48,19 @@ func gwProfile() string {
 
 // ---------- Default profile tests ----------
 
+func TestConfigMetrics(t *testing.T) {
+	if gwProfile() != "default" {
+		t.Skip("only runs under default profile")
+	}
+	waitForGateway(t)
+
+	// The gateway loads APIs from apps/ on startup, which triggers a reload
+	// cycle. After the initial load the config metrics should be populated.
+	assertMetricGTE(t, "tyk_gateway_apis_loaded", 1)
+	assertMetricGTE(t, "tyk_gateway_config_reload_total", 1)
+	assertMetricExists(t, "tyk_gateway_config_reload_duration_seconds_count")
+}
+
 func TestRequestCounter(t *testing.T) {
 	if gwProfile() != "default" {
 		t.Skip("only runs under default profile")

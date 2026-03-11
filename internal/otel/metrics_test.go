@@ -3,6 +3,7 @@ package otel
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
@@ -195,4 +196,26 @@ func TestNewMetricProvider_ResourceAttributes(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestRecordConfigState_NilSafe(t *testing.T) {
+	cfg := &OpenTelemetry{}
+	inst := InitOpenTelemetryMetrics(context.Background(), logrus.New(), cfg, "", "", false, "", false, nil)
+
+	require.NotPanics(t, func() {
+		for range 100 {
+			inst.RecordConfigState(context.Background(), 10, 5)
+		}
+	})
+}
+
+func TestRecordReload_NilSafe(t *testing.T) {
+	cfg := &OpenTelemetry{}
+	inst := InitOpenTelemetryMetrics(context.Background(), logrus.New(), cfg, "", "", false, "", false, nil)
+
+	require.NotPanics(t, func() {
+		for range 100 {
+			inst.RecordReload(context.Background(), 200*time.Millisecond)
+		}
+	})
 }
