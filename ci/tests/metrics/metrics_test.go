@@ -170,6 +170,75 @@ func TestREDMetrics_ResponseFlag(t *testing.T) {
 	assertMetricExists(t, `http_server_request_duration_seconds_count{tyk_api_id="3",tyk_response_flag="URS"}`)
 }
 
+func TestResourceAttributes(t *testing.T) {
+	waitForGateway(t)
+
+	// Send traffic to generate metrics.
+	const N = 10
+	for i := range N {
+		resp, err := http.Get(gatewayURL + "/test/ip")
+		if err != nil {
+			t.Fatalf("request %d: %v", i, err)
+		}
+		resp.Body.Close()
+	}
+
+	t.Run("target_info_has_resource_attributes", func(t *testing.T) {
+		query := `target_info{job="otel-collector"}`
+
+		// tyk_gw_id must be present and non-empty
+		gwID := assertLabelPresent(t, query, "tyk_gw_id")
+		t.Logf("Gateway ID: %s", gwID)
+
+		// tyk_gw_dataplane must equal "false" (standalone mode, not dataplane)
+		assertLabelEquals(t, query, "tyk_gw_dataplane", "false")
+
+		// tyk_gw_group_id should not be present (only in dataplane mode)
+		// Skip this check for standalone mode
+
+		// tyk_gw_tags is only present when NodeIsSegmented=true
+		// The test config has NodeIsSegmented=true and Tags set, so we expect the label
+		// Note: tags are only added when isSegmented is true in GatewayResourceAttributes
+		labels, ok := queryPrometheusLabels(t, query)
+		if ok {
+			if val, exists := labels["tyk_gw_tags"]; exists && val != "" {
+				t.Logf("tyk_gw_tags found: %s", val)
+				assertLabelContains(t, query, "tyk_gw_tags", "production")
+				assertLabelContains(t, query, "tyk_gw_tags", "edge")
+				assertLabelContains(t, query, "tyk_gw_tags", "e2e-test")
+			} else {
+				t.Logf("tyk_gw_tags is empty or missing - this may indicate NodeIsSegmented is not properly set")
+			}
+		}
+	})
+
+	t.Run("resource_attributes_on_metrics", func(t *testing.T) {
+		query := `tyk_http_requests_total`
+
+		// tyk_gw_id should appear as a direct label on the metric
+		gwID := assertLabelPresent(t, query, "tyk_gw_id")
+		t.Logf("tyk_http_requests_total has tyk_gw_id=%s", gwID)
+
+		// tyk_gw_dataplane should appear as a direct label (false for standalone)
+		assertLabelEquals(t, query, "tyk_gw_dataplane", "false")
+
+		// tyk_gw_tags should appear as a direct label
+		assertLabelContains(t, query, "tyk_gw_tags", "production")
+		assertLabelContains(t, query, "tyk_gw_tags", "edge")
+		assertLabelContains(t, query, "tyk_gw_tags", "e2e-test")
+	})
+
+	t.Run("standard_otel_attributes", func(t *testing.T) {
+		query := `target_info{job="otel-collector"}`
+
+		// Standard attributes should be present
+		// Note: service_name is exported as exported_job by the OTel collector
+		assertLabelPresent(t, query, "service_version")
+		assertLabelPresent(t, query, "host_name")
+		assertLabelPresent(t, query, "process_pid")
+	})
+}
+
 func TestDoNotTrack_NoMetrics(t *testing.T) {
 	if gwProfile() != "default" {
 		t.Skip("only runs under default profile")
@@ -680,8 +749,10 @@ func assertMetricAbsent(t *testing.T, query string) {
 func assertMetricHasLabels(t *testing.T, metric string, expectedLabels []string) {
 	t.Helper()
 	deadline := time.Now().Add(pollTimeout)
+	var lastLabels map[string]string
 	for time.Now().Before(deadline) {
 		labels, ok := queryPrometheusLabels(t, metric)
+		lastLabels = labels
 		if ok && labels != nil {
 			missing := []string{}
 			for _, l := range expectedLabels {
@@ -696,6 +767,74 @@ func assertMetricHasLabels(t *testing.T, metric string, expectedLabels []string)
 		}
 		time.Sleep(pollInterval)
 	}
-	labels, _ := queryPrometheusLabels(t, metric)
-	t.Fatalf("%s missing expected labels; have %v, want %v", metric, labels, expectedLabels)
+	t.Fatalf("%s missing expected labels; have %v, want %v", metric, lastLabels, expectedLabels)
+}
+
+// assertLabelPresent polls Prometheus until the label is present on the metric or times out.
+func assertLabelPresent(t *testing.T, query, labelKey string) string {
+	t.Helper()
+	deadline := time.Now().Add(pollTimeout)
+	var lastLabels map[string]string
+	for time.Now().Before(deadline) {
+		labels, ok := queryPrometheusLabels(t, query)
+		lastLabels = labels
+		if ok {
+			if val, exists := labels[labelKey]; exists && val != "" {
+				t.Logf("%s has label %s=%q OK", query, labelKey, val)
+				return val
+			}
+		}
+		time.Sleep(pollInterval)
+	}
+	t.Fatalf("%s missing label %s, got labels: %v", query, labelKey, lastLabels)
+	return ""
+}
+
+// assertLabelEquals polls Prometheus until the label equals expected value or times out.
+func assertLabelEquals(t *testing.T, query, labelKey, expected string) {
+	t.Helper()
+	deadline := time.Now().Add(pollTimeout)
+	var lastLabels map[string]string
+	for time.Now().Before(deadline) {
+		labels, ok := queryPrometheusLabels(t, query)
+		lastLabels = labels
+		if ok {
+			if val, exists := labels[labelKey]; exists && val == expected {
+				t.Logf("%s has label %s=%q OK", query, labelKey, val)
+				return
+			}
+		}
+		time.Sleep(pollInterval)
+	}
+	actualVal := ""
+	if lastLabels != nil {
+		actualVal = lastLabels[labelKey]
+	}
+	t.Fatalf("%s label %s=%q, expected %q", query, labelKey, actualVal, expected)
+}
+
+// assertLabelContains polls Prometheus until the label contains expected substring or times out.
+func assertLabelContains(t *testing.T, query, labelKey, expected string) {
+	t.Helper()
+	deadline := time.Now().Add(pollTimeout)
+	var lastLabels map[string]string
+	for time.Now().Before(deadline) {
+		labels, ok := queryPrometheusLabels(t, query)
+		lastLabels = labels
+		if ok {
+			if val, exists := labels[labelKey]; exists {
+				// For array-like labels like tyk_gw_tags, check if substring is present
+				if strings.Contains(val, expected) {
+					t.Logf("%s has label %s containing %q OK", query, labelKey, expected)
+					return
+				}
+			}
+		}
+		time.Sleep(pollInterval)
+	}
+	actualVal := ""
+	if lastLabels != nil {
+		actualVal = lastLabels[labelKey]
+	}
+	t.Fatalf("%s label %s=%q does not contain %q", query, labelKey, actualVal, expected)
 }
