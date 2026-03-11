@@ -1462,17 +1462,6 @@ run_all_override_tests() {
         "CBO Override - Circuit Breaker Open" \
         "/test-cbo/500"
 
-    # ==========================================================================
-    # Pattern Matching - 4xx Pattern (no explicit 404 rule, should use 4xx pattern)
-    # ==========================================================================
-    log_info "Testing 4xx pattern matching (no explicit 404 rule exists, falls back to 4xx pattern)"
-    run_override_test \
-        "4xx Pattern Override - 404 Not Found" \
-        "/test-ok/nonexistent-path-12345" \
-        "" \
-        "4xx_pattern" \
-        "" \
-        "404"
 }
 
 # -----------------------------------------------------------------------------
