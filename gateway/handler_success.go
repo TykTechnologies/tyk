@@ -18,6 +18,7 @@ import (
 	"github.com/TykTechnologies/tyk/header"
 	tykerrors "github.com/TykTechnologies/tyk/internal/errors"
 	graphqlinternal "github.com/TykTechnologies/tyk/internal/graphql"
+	"github.com/TykTechnologies/tyk/internal/httpctx"
 	"github.com/TykTechnologies/tyk/internal/httputil"
 	"github.com/TykTechnologies/tyk/internal/otel"
 	"github.com/TykTechnologies/tyk/request"
@@ -167,6 +168,28 @@ func recordGraphDetails(rec *analytics.AnalyticsRecord, r *http.Request, resp *h
 	rec.GraphQLStats = stats
 }
 
+func recordMCPDetails(rec *analytics.AnalyticsRecord, r *http.Request) {
+	state := httpctx.GetJSONRPCRoutingState(r)
+	if state == nil {
+		return
+	}
+
+	rec.MCPStats = analytics.MCPStats{
+		IsMCP:         true,
+		JSONRPCMethod: state.Method,
+		PrimitiveType: state.PrimitiveType,
+		PrimitiveName: state.PrimitiveName,
+	}
+
+	// Normalise path to the original listen path so internal routing paths
+	// never appear in analytics. Guard against an empty OriginalPath to avoid
+	// blanking out the recorded path when the field has not been populated.
+	if state.OriginalPath != "" {
+		rec.Path = state.OriginalPath
+		rec.RawPath = state.OriginalPath
+	}
+}
+
 const traceTagPrefix = "trace-id-"
 
 func (s *SuccessHandler) addTraceIDTag(reqCtx context.Context, tags []string) []string {
@@ -311,6 +334,11 @@ func (s *SuccessHandler) RecordHit(r *http.Request, timing analytics.Latency, co
 		if s.Spec.GraphQL.Enabled && s.Spec.GraphQL.ExecutionMode != apidef.GraphQLExecutionModeSubgraph {
 			record.Tags = append(record.Tags, "tyk-graph-analytics")
 			record.ApiSchema = base64.StdEncoding.EncodeToString([]byte(s.Spec.GraphQL.Schema))
+		}
+
+		recordMCPDetails(&record, r)
+		if record.MCPStats.IsMCP {
+			record.Tags = append(record.Tags, analytics.PredefinedTagMCPAnalytics)
 		}
 
 		expiresAfter := s.Spec.ExpireAnalyticsAfter
