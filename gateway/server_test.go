@@ -21,9 +21,8 @@ import (
 	"go.uber.org/mock/gomock"
 
 	"github.com/TykTechnologies/again"
-	"github.com/TykTechnologies/storage/persistent/model"
-
 	tyktrace "github.com/TykTechnologies/opentelemetry/trace"
+	"github.com/TykTechnologies/storage/persistent/model"
 
 	"github.com/TykTechnologies/tyk/config"
 	internalmodel "github.com/TykTechnologies/tyk/internal/model"
