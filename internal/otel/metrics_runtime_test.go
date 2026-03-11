@@ -92,7 +92,7 @@ func TestInitOpenTelemetryMetrics_RuntimeMetricsEnabled(t *testing.T) {
 		},
 	}
 
-	inst := InitOpenTelemetryMetrics(context.Background(), logrus.New(), cfg, "test-node", "v1.0.0")
+	inst := InitOpenTelemetryMetrics(context.Background(), logrus.New(), cfg, "test-node", "v1.0.0", false, "", false, nil)
 	assert.NotNil(t, inst)
 	assert.NotNil(t, inst.provider)
 
@@ -119,7 +119,7 @@ func TestInitOpenTelemetryMetrics_RuntimeMetricsDisabled(t *testing.T) {
 		},
 	}
 
-	inst := InitOpenTelemetryMetrics(context.Background(), logrus.New(), cfg, "test-node", "v1.0.0")
+	inst := InitOpenTelemetryMetrics(context.Background(), logrus.New(), cfg, "test-node", "v1.0.0", false, "", false, nil)
 	assert.NotNil(t, inst)
 	assert.NotNil(t, inst.provider)
 
@@ -135,7 +135,7 @@ func TestInitOpenTelemetryMetrics_MetricsDisabled(t *testing.T) {
 		},
 	}
 
-	inst := InitOpenTelemetryMetrics(context.Background(), logrus.New(), cfg, "test-node", "v1.0.0")
+	inst := InitOpenTelemetryMetrics(context.Background(), logrus.New(), cfg, "test-node", "v1.0.0", false, "", false, nil)
 	assert.NotNil(t, inst)
 
 	// Should not panic

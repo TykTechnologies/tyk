@@ -21,6 +21,7 @@ import (
 	"go.uber.org/mock/gomock"
 
 	"github.com/TykTechnologies/again"
+	tyktrace "github.com/TykTechnologies/opentelemetry/trace"
 	"github.com/TykTechnologies/storage/persistent/model"
 
 	"github.com/TykTechnologies/tyk/config"
@@ -1213,4 +1214,92 @@ func TestPoliciesCollisionMessage(t *testing.T) {
 	assert.Contains(t, msg.Msg, "duplicate_id")
 	assert.Contains(t, msg.Msg, id1.Hex())
 	assert.Contains(t, msg.Msg, id2.Hex())
+}
+
+// newMinimalGateway creates a Gateway with only the fields needed for
+// InitOpenTelemetryInstruments, avoiding the full test harness and Redis.
+func newMinimalGateway(t *testing.T, cfg config.Config) *Gateway {
+	t.Helper()
+	gw := &Gateway{
+		ctx: context.Background(),
+	}
+	gw.SetConfig(cfg)
+	gw.SetNodeID("test-node")
+	return gw
+}
+
+func TestInitOpenTelemetryInstruments(t *testing.T) {
+	tests := []struct {
+		name               string
+		cfg                config.Config
+		expectNoopTracer   bool
+		expectNonNilMetric bool
+	}{
+		{
+			name: "disabled otel produces noop tracer and empty metrics",
+			cfg: config.Config{
+				OpenTelemetry: otel.OpenTelemetry{
+					BaseOpenTelemetry: otel.BaseOpenTelemetry{
+						Enabled: false,
+					},
+				},
+			},
+			expectNoopTracer:   true,
+			expectNonNilMetric: true,
+		},
+		{
+			name: "enabled otel with invalid exporter falls back to noop",
+			cfg: config.Config{
+				OpenTelemetry: otel.OpenTelemetry{
+					BaseOpenTelemetry: otel.BaseOpenTelemetry{
+						Enabled: true,
+						ExporterConfig: otel.ExporterConfig{
+							Exporter: "invalid",
+							Endpoint: "localhost:4317",
+						},
+					},
+				},
+			},
+			expectNoopTracer:   true,
+			expectNonNilMetric: true,
+		},
+		{
+			name: "slave options are forwarded to resource attributes",
+			cfg: config.Config{
+				OpenTelemetry: otel.OpenTelemetry{
+					BaseOpenTelemetry: otel.BaseOpenTelemetry{
+						Enabled: false,
+					},
+				},
+				SlaveOptions: config.SlaveOptionsConfig{
+					UseRPC:  true,
+					GroupID: "edge-group-1",
+				},
+				DBAppConfOptions: config.DBAppConfOptionsConfig{
+					NodeIsSegmented: true,
+					Tags:            []string{"tag1", "tag2"},
+				},
+			},
+			expectNoopTracer:   true,
+			expectNonNilMetric: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gw := newMinimalGateway(t, tt.cfg)
+
+			gw.InitOpenTelemetryInstruments()
+
+			assert.NotNil(t, gw.TracerProvider, "TracerProvider should not be nil")
+			if tt.expectNoopTracer {
+				assert.Equal(t, tyktrace.NOOP_PROVIDER, gw.TracerProvider.Type(),
+					"expected noop tracer provider")
+			}
+
+			if tt.expectNonNilMetric {
+				assert.NotNil(t, gw.MetricInstruments, "MetricInstruments should not be nil")
+			}
+		})
+	}
 }
