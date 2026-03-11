@@ -141,9 +141,11 @@ func additionalUpstreamHeaders(logger abstractlogger.Logger, outreq *http.Reques
 	}
 
 	// When StripAuthData is false, propagate auth headers from the original request
-	// to the upstream. For proxy-only and subgraph modes this is handled separately
-	// via setProxyOnlyHeaders in the transport layer.
-	if !apiDefinition.StripAuthData && !isProxyOnly(apiDefinition) {
+	// to the upstream. For regular proxy-only queries the transport layer also
+	// forwards headers via setProxyOnlyHeaders, but the headerModifier guards
+	// against double-writes (only sets when absent). For proxy-only subscriptions,
+	// the transport path is not used so this is the only propagation point.
+	if !apiDefinition.StripAuthData {
 		propagateAuthHeaders(outreq, upstreamHeaders, apiDefinition)
 	}
 

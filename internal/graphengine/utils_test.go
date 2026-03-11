@@ -67,7 +67,7 @@ func TestAdditionalUpstreamHeaders_PropagateAuthHeaders(t *testing.T) {
 		assert.Empty(t, result.Get(header.Authorization))
 	})
 
-	t.Run("should not propagate auth headers for proxy-only mode", func(t *testing.T) {
+	t.Run("should propagate auth headers for proxy-only mode (needed for subscriptions)", func(t *testing.T) {
 		req, err := http.NewRequestWithContext(context.Background(), http.MethodPost, "http://example.com", nil)
 		require.NoError(t, err)
 		req.Header.Set(header.Authorization, "Bearer token123")
@@ -79,10 +79,11 @@ func TestAdditionalUpstreamHeaders_PropagateAuthHeaders(t *testing.T) {
 		apiDef.GraphQL.ExecutionMode = apidef.GraphQLExecutionModeProxyOnly
 
 		result := additionalUpstreamHeaders(testLogger(), req, apiDef)
-		assert.Empty(t, result.Get(header.Authorization))
+		assert.Equal(t, "Bearer token123", result.Get(header.Authorization),
+			"proxy-only subscriptions bypass transport so auth must be propagated here")
 	})
 
-	t.Run("should not propagate auth headers for subgraph mode", func(t *testing.T) {
+	t.Run("should propagate auth headers for subgraph mode", func(t *testing.T) {
 		req, err := http.NewRequestWithContext(context.Background(), http.MethodPost, "http://example.com", nil)
 		require.NoError(t, err)
 		req.Header.Set(header.Authorization, "Bearer token123")
@@ -94,7 +95,8 @@ func TestAdditionalUpstreamHeaders_PropagateAuthHeaders(t *testing.T) {
 		apiDef.GraphQL.ExecutionMode = apidef.GraphQLExecutionModeSubgraph
 
 		result := additionalUpstreamHeaders(testLogger(), req, apiDef)
-		assert.Empty(t, result.Get(header.Authorization))
+		assert.Equal(t, "Bearer token123", result.Get(header.Authorization),
+			"subgraph subscriptions bypass transport so auth must be propagated here")
 	})
 
 	t.Run("should propagate custom auth header name from AuthConfigs", func(t *testing.T) {
