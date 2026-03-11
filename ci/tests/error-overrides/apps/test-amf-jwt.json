@@ -1,0 +1,26 @@
+{
+  "name": "Test AMF - JWT Field Missing",
+  "api_id": "test-amf-jwt",
+  "org_id": "default",
+  "use_keyless": false,
+  "enable_jwt": true,
+  "active": true,
+  "jwt_signing_method": "hmac",
+  "jwt_source": "header",
+  "jwt_identity_base_field": "sub",
+  "jwt_policy_field_name": "policy_id",
+  "proxy": {
+    "listen_path": "/test-amf-jwt/",
+    "target_url": "http://backend-ok:80",
+    "strip_listen_path": true
+  },
+  "version_data": {
+    "not_versioned": true,
+    "default_version": "",
+    "versions": {
+      "Default": {
+        "name": "Default"
+      }
+    }
+  }
+}

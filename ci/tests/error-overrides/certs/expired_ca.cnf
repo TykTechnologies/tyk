@@ -1,0 +1,15 @@
+[ ca ]
+default_ca = CA_default
+[ CA_default ]
+database = /certs/index.txt
+serial = /certs/serial
+new_certs_dir = /certs
+certificate = /certs/ca.crt
+private_key = /certs/ca.key
+default_md = sha256
+policy = policy_any
+copy_extensions = copyall
+default_startdate = 200101000000Z
+default_enddate = 200102000000Z
+[ policy_any ]
+commonName = supplied
