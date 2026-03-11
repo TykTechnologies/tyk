@@ -310,9 +310,11 @@ func (s *OAS) getTykJWTAuth(name string) (jwt *JWT) {
 	jwt = &JWT{}
 	if jwtVal, ok := securityScheme.(*JWT); ok {
 		jwt = jwtVal
+		jwt.Normalize()
 	} else {
 		// Security scheme is stored as map[string]interface{}, convert it to JWT struct
 		if toStructIfMap(securityScheme, jwt) {
+			jwt.Normalize()
 			// Cache the converted struct for future use
 			s.getTykSecuritySchemes()[name] = jwt
 		}

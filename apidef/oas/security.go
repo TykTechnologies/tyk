@@ -1,6 +1,9 @@
 package oas
 
 import (
+	"encoding/base64"
+	"strings"
+
 	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/lonelycode/osin"
 
@@ -285,10 +288,33 @@ func (j *JWT) Import(enable bool) {
 }
 
 func (j *JWT) Normalize() {
-	// copy the values of the new JWT validation
 	if j == nil {
 		return
 	}
+
+	// Migrate legacy fields to new fields if new fields are empty
+	if len(j.BasePolicyClaims) == 0 && j.PolicyFieldName != "" {
+		j.BasePolicyClaims = []string{j.PolicyFieldName}
+	}
+	if len(j.SubjectClaims) == 0 && j.IdentityBaseField != "" {
+		j.SubjectClaims = []string{j.IdentityBaseField}
+	}
+	if len(j.JwksURIs) == 0 && j.Source != "" {
+		isURL := func(s string) bool {
+			lower := strings.ToLower(s)
+			return strings.HasPrefix(lower, "http://") || strings.HasPrefix(lower, "https://")
+		}
+		
+		if isURL(j.Source) {
+			j.JwksURIs = []JWK{{URL: j.Source}}
+		} else if decoded, err := base64.StdEncoding.DecodeString(j.Source); err == nil {
+			if decodedStr := string(decoded); isURL(decodedStr) {
+				j.JwksURIs = []JWK{{URL: decodedStr}}
+			}
+		}
+	}
+
+	// copy the values of the new JWT validation
 	if len(j.BasePolicyClaims) > 0 {
 		j.PolicyFieldName = j.BasePolicyClaims[0]
 	}

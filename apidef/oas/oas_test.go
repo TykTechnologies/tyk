@@ -628,7 +628,6 @@ func TestOAS_ReplaceServers(t *testing.T) {
 func TestOAS_GetSecuritySchemes(t *testing.T) {
 	token := Token{}
 	Fill(t, &token, 0)
-
 	jwt := JWT{}
 	Fill(t, &jwt, 0)
 	// set the customClaims value to float if it is an int, it is reconverted to float on unmarshal since the field is an interface{}
@@ -640,6 +639,7 @@ func TestOAS_GetSecuritySchemes(t *testing.T) {
 			}
 		}
 	}
+	jwt.Normalize()
 
 	oauth := OAuth{}
 	Fill(t, &oauth, 0)
@@ -1437,6 +1437,60 @@ func TestOAS_Normalize(t *testing.T) {
 		assert.Nil(t, jwtConfig)
 	})
 
+	t.Run("should migrate legacy JWT validation fields correctly", func(t *testing.T) {
+		oas := &OAS{
+			T: openapi3.T{
+				Security: openapi3.SecurityRequirements{
+					{
+						"jwt1": []string{},
+					},
+				},
+				Components: &openapi3.Components{
+					SecuritySchemes: openapi3.SecuritySchemes{
+						"jwt1": &openapi3.SecuritySchemeRef{
+							Value: &openapi3.SecurityScheme{
+								Type:         typeHTTP,
+								Scheme:       schemeBearer,
+								BearerFormat: bearerFormatJWT,
+							},
+						},
+					},
+				},
+			},
+		}
+
+		// Setup initial JWT configuration with legacy fields
+		jwt := &JWT{
+			PolicyFieldName:   "legacy_policy_claim",
+			IdentityBaseField: "legacy_subject_claim",
+			Source:            "http://example.com/jwks",
+		}
+
+		oas.SetTykExtension(&XTykAPIGateway{
+			Server: Server{
+				Authentication: &Authentication{
+					SecuritySchemes: SecuritySchemes{
+						"jwt1": jwt,
+					},
+				},
+			},
+		})
+
+		// Call Normalize to migrate values to new fields
+		oas.Normalize()
+
+		// Verify that new fields were populated from legacy fields
+		jwtConfig := oas.GetJWTConfiguration()
+		assert.Equal(t, []string{"legacy_policy_claim"}, jwtConfig.BasePolicyClaims)
+		assert.Equal(t, []string{"legacy_subject_claim"}, jwtConfig.SubjectClaims)
+		assert.Len(t, jwtConfig.JwksURIs, 1)
+		assert.Equal(t, "http://example.com/jwks", jwtConfig.JwksURIs[0].URL)
+
+		// Verify that legacy fields remain unchanged
+		assert.Equal(t, "legacy_policy_claim", jwtConfig.PolicyFieldName)
+		assert.Equal(t, "legacy_subject_claim", jwtConfig.IdentityBaseField)
+		assert.Equal(t, "http://example.com/jwks", jwtConfig.Source)
+	})
 }
 
 func TestOAS_ValidateSecurity(t *testing.T) {
