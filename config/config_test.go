@@ -542,6 +542,7 @@ func TestOpenTelemetryConfig(t *testing.T) {
 		assert.Equal(t, 30, otelCfg.Metrics.ExportInterval)
 		assert.Equal(t, "cumulative", otelCfg.Metrics.Temporality)
 		assert.Equal(t, 15, otelCfg.Metrics.ShutdownTimeout)
+		assert.Equal(t, 5000, otelCfg.Metrics.CardinalityLimit)
 
 		// Metrics retry
 		require.NotNil(t, otelCfg.Metrics.Retry.Enabled)
@@ -575,6 +576,7 @@ func TestOpenTelemetryConfig(t *testing.T) {
 		t.Setenv("TYK_GW_OPENTELEMETRY_CONNECTIONTIMEOUT", "10")
 		t.Setenv("TYK_GW_OPENTELEMETRY_SAMPLING_TYPE", "AlwaysOn")
 		t.Setenv("TYK_GW_OPENTELEMETRY_METRICS_EXPORTINTERVAL", "45")
+		t.Setenv("TYK_GW_OPENTELEMETRY_METRICS_CARDINALITYLIMIT", "500")
 
 		var c Config
 		err := Load([]string{"testdata/opentelemetry_env_override.json"}, &c)
@@ -587,6 +589,7 @@ func TestOpenTelemetryConfig(t *testing.T) {
 		assert.Equal(t, 10, c.OpenTelemetry.ConnectionTimeout, "connection_timeout should be overridden")
 		assert.Equal(t, "AlwaysOn", c.OpenTelemetry.Sampling.Type, "sampling type should be overridden")
 		assert.Equal(t, 45, c.OpenTelemetry.Metrics.ExportInterval, "metrics export_interval should be overridden")
+		assert.Equal(t, 500, c.OpenTelemetry.Metrics.CardinalityLimit, "cardinality_limit should be overridden")
 	})
 
 	t.Run("env var only (no config file)", func(t *testing.T) {

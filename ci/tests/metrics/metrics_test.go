@@ -509,6 +509,81 @@ func TestDisabledProfile_NoAPIMetrics(t *testing.T) {
 	}
 }
 
+// ---------- Cardinality limit tests ----------
+
+func TestCardinalityLimit_OverflowSeries(t *testing.T) {
+	if gwProfile() != "cardinality" {
+		t.Skip("only runs under cardinality profile")
+	}
+	waitForGateway(t)
+
+	// The cardinality profile sets CardinalityLimit=5 and defines a counter
+	// with a high-cardinality header dimension (X-Request-ID).
+	// Send 20 requests, each with a unique X-Request-ID header value.
+	const totalRequests = 20
+	for i := range totalRequests {
+		sendTrafficWithHeaders(t, "GET", gatewayURL+"/test/ip", 1,
+			map[string]string{"X-Request-ID": fmt.Sprintf("req-%d", i)})
+	}
+
+	// Wait for export + scrape cycle.
+	time.Sleep(15 * time.Second)
+
+	// Query Prometheus for the counter. OTel counter "cardinality.test.requests.total"
+	// becomes "cardinality_test_requests_total" in Prometheus.
+	//
+	// With CardinalityLimit=5, we expect at most 5 regular series + 1 overflow series.
+	// The overflow series has the label otel_metric_overflow="true".
+	results := queryPrometheusAllSeries(t, "cardinality_test_requests_total")
+
+	var hasOverflow bool
+	var totalCount float64
+	for _, r := range results {
+		if r.labels["otel_metric_overflow"] == "true" {
+			hasOverflow = true
+		}
+		totalCount += r.value
+	}
+
+	// With limit=5, we expect at most 6 series (5 + 1 overflow).
+	maxSeries := 5 + 1
+	if len(results) > maxSeries {
+		t.Errorf("expected at most %d series for cardinality_test_requests_total, got %d", maxSeries, len(results))
+	}
+
+	if !hasOverflow {
+		t.Error("expected overflow series with otel_metric_overflow=\"true\" label")
+	}
+
+	// Total count across all series should equal totalRequests.
+	if int(totalCount) != totalRequests {
+		t.Errorf("expected total count=%d across all series, got %v", totalRequests, totalCount)
+	}
+
+	t.Logf("cardinality test: %d series, overflow=%v, total_count=%v", len(results), hasOverflow, totalCount)
+}
+
+func TestCardinalityLimit_DefaultMetricsUnaffected(t *testing.T) {
+	if gwProfile() != "default" {
+		t.Skip("only runs under default profile")
+	}
+	waitForGateway(t)
+
+	// With the default profile (default CardinalityLimit=2000), normal traffic
+	// should never trigger overflow because default RED dimensions are low-cardinality.
+	sendTraffic(t, "GET", gatewayURL+"/test/ip", 10)
+
+	time.Sleep(15 * time.Second)
+
+	// Verify no overflow series on default RED metrics.
+	results := queryPrometheusAllSeries(t, "tyk_api_requests_total")
+	for _, r := range results {
+		if r.labels["otel_metric_overflow"] == "true" {
+			t.Error("unexpected overflow series on tyk_api_requests_total with default cardinality limit")
+		}
+	}
+}
+
 // ---------- helpers ----------
 
 func waitForGateway(t *testing.T) {
@@ -613,6 +688,42 @@ func queryPrometheusLabels(t *testing.T, query string) (map[string]string, bool)
 	}
 
 	return result.Data.Result[0].Metric, true
+}
+
+// promSeries represents a single Prometheus time series with its labels and value.
+type promSeries struct {
+	labels map[string]string
+	value  float64
+}
+
+// queryPrometheusAllSeries returns all series for a metric name.
+func queryPrometheusAllSeries(t *testing.T, metric string) []promSeries {
+	t.Helper()
+	u := fmt.Sprintf("%s/api/v1/query?query=%s", prometheusURL, url.QueryEscape(metric))
+	resp, err := http.Get(u)
+	if err != nil {
+		t.Fatalf("prometheus query failed: %v", err)
+	}
+	defer resp.Body.Close()
+
+	var result promQueryResult
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		t.Fatalf("failed to decode prometheus response: %v", err)
+	}
+	if result.Status != "success" {
+		t.Fatalf("prometheus query returned status: %s", result.Status)
+	}
+
+	var series []promSeries
+	for _, r := range result.Data.Result {
+		var val float64
+		var s string
+		if err := json.Unmarshal(r.Value[1], &s); err == nil {
+			fmt.Sscanf(s, "%f", &val)
+		}
+		series = append(series, promSeries{labels: r.Metric, value: val})
+	}
+	return series
 }
 
 // assertMetricExists polls Prometheus until metric > 0 or times out.
