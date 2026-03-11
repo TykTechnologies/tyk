@@ -1560,6 +1560,12 @@ func (a *APISpec) getURLStatus(stat URLStatus) RequestStatus {
 
 // URLAllowedAndIgnored checks if a url is allowed and ignored.
 func (a *APISpec) URLAllowedAndIgnored(r *http.Request, rxPaths []URLSpec, whiteListStatus bool) (RequestStatus, interface{}) {
+	// Skip Whitelist and Blocklist for CORS preflight requests when CORS is enabled and passthrough is disabled.
+	// Let CORS middleware process this request.
+	if a.CORS.Enable && !a.CORS.OptionsPassthrough && httputil.IsCORSPreflightRequest(r) {
+		return StatusOkAndIgnore, nil
+	}
+
 	for i := range rxPaths {
 		if !rxPaths[i].matchesPath(r.URL.Path, a) {
 			continue
