@@ -14,7 +14,7 @@ function setup {
 
 setup $1
 
-#trap "task teardown" EXIT
+trap "task teardown" EXIT
 
 # Run tasks sequentially
 task setup
