@@ -171,6 +171,9 @@ func TestREDMetrics_ResponseFlag(t *testing.T) {
 }
 
 func TestResourceAttributes(t *testing.T) {
+	if gwProfile() == "cardinality" {
+		t.Skip("skipped under cardinality profile (no segment tags configured)")
+	}
 	waitForGateway(t)
 
 	// Send traffic to generate metrics.
