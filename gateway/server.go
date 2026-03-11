@@ -372,6 +372,27 @@ func (gw *Gateway) SetupNewRelic() (app *newrelic.Application) {
 	return
 }
 
+// InitOpenTelemetryInstruments initializes the OpenTelemetry tracer provider
+// and metric instruments from the current gateway configuration.
+func (gw *Gateway) InitOpenTelemetryInstruments() {
+	cfg := gw.GetConfig()
+	gw.TracerProvider = otel.InitOpenTelemetry(gw.ctx, mainLog.Logger, &cfg.OpenTelemetry,
+		gw.GetNodeID(),
+		VERSION,
+		cfg.SlaveOptions.UseRPC,
+		cfg.SlaveOptions.GroupID,
+		cfg.DBAppConfOptions.NodeIsSegmented,
+		cfg.DBAppConfOptions.Tags)
+
+	gw.MetricInstruments = otel.InitOpenTelemetryMetrics(gw.ctx, mainLog.Logger, &cfg.OpenTelemetry,
+		gw.GetNodeID(),
+		VERSION,
+		cfg.SlaveOptions.UseRPC,
+		cfg.SlaveOptions.GroupID,
+		cfg.DBAppConfOptions.NodeIsSegmented,
+		cfg.DBAppConfOptions.Tags)
+}
+
 func (gw *Gateway) UnmarshalJSON(data []byte) error {
 	return nil
 }
@@ -2031,25 +2052,7 @@ func Start() {
 		defer trace.Close()
 	}
 
-	// Use gw.GetConfig() to ensure we get the config loaded from the --conf
-	// flag path (set in initSystem), not the stale local gwConfig which may
-	// have been loaded from the default tyk.conf before initSystem ran.
-	otelCfg := gw.GetConfig()
-	gw.TracerProvider = otel.InitOpenTelemetry(gw.ctx, mainLog.Logger, &otelCfg.OpenTelemetry,
-		gw.GetNodeID(),
-		VERSION,
-		otelCfg.SlaveOptions.UseRPC,
-		otelCfg.SlaveOptions.GroupID,
-		otelCfg.DBAppConfOptions.NodeIsSegmented,
-		otelCfg.DBAppConfOptions.Tags)
-
-	gw.MetricInstruments = otel.InitOpenTelemetryMetrics(gw.ctx, mainLog.Logger, &otelCfg.OpenTelemetry,
-		gw.GetNodeID(),
-		VERSION,
-		otelCfg.SlaveOptions.UseRPC,
-		otelCfg.SlaveOptions.GroupID,
-		otelCfg.DBAppConfOptions.NodeIsSegmented,
-		otelCfg.DBAppConfOptions.Tags)
+	gw.InitOpenTelemetryInstruments()
 
 	gw.start()
 
