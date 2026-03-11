@@ -29,6 +29,7 @@ import (
 	"github.com/TykTechnologies/tyk/ee/middleware/streams"
 	"github.com/TykTechnologies/tyk/internal/model"
 	"github.com/TykTechnologies/tyk/internal/policy"
+	"github.com/TykTechnologies/tyk/regexp"
 	"github.com/TykTechnologies/tyk/rpc"
 	"github.com/TykTechnologies/tyk/test"
 	"github.com/TykTechnologies/tyk/user"
@@ -2874,5 +2875,65 @@ func TestAddInternalMWtoMCPOperations(t *testing.T) {
 		loader.addInternalMWtoMCPOperations(spec, extendedPaths)
 
 		assert.Empty(t, extendedPaths.Internal)
+	})
+}
+
+func TestURLAllowedAndIgnored_CORSPreflight(t *testing.T) {
+	spec := APISpec{
+		APIDefinition: &apidef.APIDefinition{
+			CORS: apidef.CORSConfig{
+				Enable:             true,
+				OptionsPassthrough: false,
+			},
+		},
+	}
+
+	testPath := "/test"
+	compile, err := regexp.Compile(testPath)
+	assert.NoError(t, err)
+
+	paths := []URLSpec{
+		{
+			spec:   compile,
+			Status: WhiteList,
+			Whitelist: apidef.EndPointMeta{
+				Disabled: false,
+				Path:     testPath,
+				Method:   http.MethodGet,
+			},
+		},
+	}
+
+	headerKey := "Access-Control-Request-Method"
+	req := httptest.NewRequest(http.MethodOptions, testPath, nil)
+	req.Header.Set(headerKey, http.MethodGet)
+
+	t.Run("should return StatusOkAndIgnore for CORS preflight request when CORS is enabled", func(t *testing.T) {
+		spec.CORS.Enable = true
+		spec.CORS.OptionsPassthrough = false
+		status, _ := spec.URLAllowedAndIgnored(req, paths, true)
+		assert.Equal(t, StatusOkAndIgnore, status)
+	})
+
+	t.Run("should return EndPointNotAllowed when CORS passthrough is enabled", func(t *testing.T) {
+		spec.CORS.Enable = true
+		spec.CORS.OptionsPassthrough = true
+		status, _ := spec.URLAllowedAndIgnored(req, paths, true)
+		assert.Equal(t, EndPointNotAllowed, status)
+	})
+
+	t.Run("should return EndPointNotAllowed for CORS preflight request when CORS is disabled - GET on Whitelist", func(t *testing.T) {
+		spec.CORS.Enable = false
+		spec.CORS.OptionsPassthrough = false
+		status, _ := spec.URLAllowedAndIgnored(req, paths, true)
+		assert.Equal(t, EndPointNotAllowed, status)
+	})
+
+	t.Run("should return EndPointNotAllowed for normal OPTIONS request", func(t *testing.T) {
+		req.Header.Del(headerKey)
+		spec.CORS.Enable = true
+		spec.CORS.OptionsPassthrough = false
+		status, _ := spec.URLAllowedAndIgnored(req, paths, true)
+		assert.Equal(t, EndPointNotAllowed, status)
 	})
 }
