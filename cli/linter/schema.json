@@ -237,6 +237,9 @@
             "shutdown_timeout": {
               "type": "integer"
             },
+            "cardinality_limit": {
+              "type": "integer"
+            },
             "retry": {
               "type": "object",
               "additionalProperties": false,

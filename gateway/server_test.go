@@ -107,9 +107,10 @@ func TestGateway_afterConfSetup(t *testing.T) {
 								ResourceName:      "tyk-gateway",
 								ConnectionTimeout: 1,
 							},
-							ExportInterval:  60,
-							Temporality:     "cumulative",
-							ShutdownTimeout: 30,
+							ExportInterval:   60,
+							Temporality:      "cumulative",
+							ShutdownTimeout:  30,
+							CardinalityLimit: 2000,
 							Retry: otel.MetricsRetryConfig{
 								Enabled:         func() *bool { b := true; return &b }(),
 								InitialInterval: 5000,
