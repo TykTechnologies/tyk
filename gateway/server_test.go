@@ -43,6 +43,7 @@ func TestGateway_afterConfSetup(t *testing.T) {
 		name           string
 		initialConfig  config.Config
 		expectedConfig config.Config
+		setup          func(t *testing.T, gw *Gateway)
 	}{
 		{
 			name: "slave options test",
@@ -129,16 +130,229 @@ func TestGateway_afterConfSetup(t *testing.T) {
 				ReadinessCheckEndpointName: "ready",
 			},
 		},
+		{
+			name: "oauth mtls kv store - secrets backend",
+			initialConfig: config.Config{
+				ExternalServices: config.ExternalServiceConfig{
+					OAuth: config.ServiceConfig{
+						MTLS: config.MTLSConfig{
+							Enabled:  true,
+							CertFile: "secrets://oauth_cert",
+							KeyFile:  "secrets://oauth_key",
+							CAFile:   "secrets://oauth_ca",
+						},
+					},
+				},
+				Secrets: map[string]string{
+					"oauth_cert": "/path/to/cert.pem",
+					"oauth_key":  "/path/to/key.pem",
+					"oauth_ca":   "/path/to/ca.pem",
+				},
+			},
+			expectedConfig: config.Config{
+				ExternalServices: config.ExternalServiceConfig{
+					OAuth: config.ServiceConfig{
+						MTLS: config.MTLSConfig{
+							Enabled:  true,
+							CertFile: "/path/to/cert.pem",
+							KeyFile:  "/path/to/key.pem",
+							CAFile:   "/path/to/ca.pem",
+						},
+					},
+				},
+				Secrets: map[string]string{
+					"oauth_cert": "/path/to/cert.pem",
+					"oauth_key":  "/path/to/key.pem",
+					"oauth_ca":   "/path/to/ca.pem",
+				},
+				AnalyticsConfig: config.AnalyticsConfigConfig{
+					PurgeInterval: 10,
+				},
+				HealthCheckEndpointName:    "hello",
+				ReadinessCheckEndpointName: "ready",
+			},
+		},
+		{
+			name: "oauth mtls kv store - env backend",
+			initialConfig: config.Config{
+				ExternalServices: config.ExternalServiceConfig{
+					OAuth: config.ServiceConfig{
+						MTLS: config.MTLSConfig{
+							Enabled:  true,
+							CertFile: "env://oauth_cert_file",
+							KeyFile:  "env://oauth_key_file",
+							CAFile:   "env://oauth_ca_file",
+						},
+					},
+				},
+			},
+			setup: func(t *testing.T, _ *Gateway) {
+				t.Setenv("TYK_SECRET_OAUTH_CERT_FILE", "/env/path/to/cert.pem")
+				t.Setenv("TYK_SECRET_OAUTH_KEY_FILE", "/env/path/to/key.pem")
+				t.Setenv("TYK_SECRET_OAUTH_CA_FILE", "/env/path/to/ca.pem")
+			},
+			expectedConfig: config.Config{
+				ExternalServices: config.ExternalServiceConfig{
+					OAuth: config.ServiceConfig{
+						MTLS: config.MTLSConfig{
+							Enabled:  true,
+							CertFile: "/env/path/to/cert.pem",
+							KeyFile:  "/env/path/to/key.pem",
+							CAFile:   "/env/path/to/ca.pem",
+						},
+					},
+				},
+				AnalyticsConfig: config.AnalyticsConfigConfig{
+					PurgeInterval: 10,
+				},
+				HealthCheckEndpointName:    "hello",
+				ReadinessCheckEndpointName: "ready",
+			},
+		},
+		{
+			name: "oauth mtls kv store - vault backend",
+			initialConfig: config.Config{
+				ExternalServices: config.ExternalServiceConfig{
+					OAuth: config.ServiceConfig{
+						MTLS: config.MTLSConfig{
+							Enabled:  true,
+							CertFile: "vault://secret/oauth/cert_file",
+							KeyFile:  "vault://secret/oauth/key_file",
+							CAFile:   "vault://secret/oauth/ca_file",
+						},
+					},
+				},
+			},
+			setup: func(_ *testing.T, gw *Gateway) {
+				gw.vaultKVStore = &mockKVStore{
+					data: map[string]string{
+						"secret/oauth/cert_file": "/vault/path/to/cert.pem",
+						"secret/oauth/key_file":  "/vault/path/to/key.pem",
+						"secret/oauth/ca_file":   "/vault/path/to/ca.pem",
+					},
+				}
+			},
+			expectedConfig: config.Config{
+				ExternalServices: config.ExternalServiceConfig{
+					OAuth: config.ServiceConfig{
+						MTLS: config.MTLSConfig{
+							Enabled:  true,
+							CertFile: "/vault/path/to/cert.pem",
+							KeyFile:  "/vault/path/to/key.pem",
+							CAFile:   "/vault/path/to/ca.pem",
+						},
+					},
+				},
+				AnalyticsConfig: config.AnalyticsConfigConfig{
+					PurgeInterval: 10,
+				},
+				HealthCheckEndpointName:    "hello",
+				ReadinessCheckEndpointName: "ready",
+			},
+		},
+		{
+			name: "oauth mtls kv store - consul backend",
+			initialConfig: config.Config{
+				ExternalServices: config.ExternalServiceConfig{
+					OAuth: config.ServiceConfig{
+						MTLS: config.MTLSConfig{
+							Enabled:  true,
+							CertFile: "consul://oauth/cert_file",
+							KeyFile:  "consul://oauth/key_file",
+							CAFile:   "consul://oauth/ca_file",
+						},
+					},
+				},
+			},
+			setup: func(_ *testing.T, gw *Gateway) {
+				gw.consulKVStore = &mockKVStore{
+					data: map[string]string{
+						"oauth/cert_file": "/consul/path/to/cert.pem",
+						"oauth/key_file":  "/consul/path/to/key.pem",
+						"oauth/ca_file":   "/consul/path/to/ca.pem",
+					},
+				}
+			},
+			expectedConfig: config.Config{
+				ExternalServices: config.ExternalServiceConfig{
+					OAuth: config.ServiceConfig{
+						MTLS: config.MTLSConfig{
+							Enabled:  true,
+							CertFile: "/consul/path/to/cert.pem",
+							KeyFile:  "/consul/path/to/key.pem",
+							CAFile:   "/consul/path/to/ca.pem",
+						},
+					},
+				},
+				AnalyticsConfig: config.AnalyticsConfigConfig{
+					PurgeInterval: 10,
+				},
+				HealthCheckEndpointName:    "hello",
+				ReadinessCheckEndpointName: "ready",
+			},
+		},
+		{
+			name: "oauth mtls kv store - disabled mtls skips kv resolution",
+			initialConfig: config.Config{
+				ExternalServices: config.ExternalServiceConfig{
+					OAuth: config.ServiceConfig{
+						MTLS: config.MTLSConfig{
+							Enabled:  false,
+							CertFile: "secrets://oauth_cert",
+							KeyFile:  "secrets://oauth_key",
+							CAFile:   "secrets://oauth_ca",
+						},
+					},
+				},
+			},
+			expectedConfig: config.Config{
+				ExternalServices: config.ExternalServiceConfig{
+					OAuth: config.ServiceConfig{
+						MTLS: config.MTLSConfig{
+							Enabled:  false,
+							CertFile: "secrets://oauth_cert",
+							KeyFile:  "secrets://oauth_key",
+							CAFile:   "secrets://oauth_ca",
+						},
+					},
+				},
+				AnalyticsConfig: config.AnalyticsConfigConfig{
+					PurgeInterval: 10,
+				},
+				HealthCheckEndpointName:    "hello",
+				ReadinessCheckEndpointName: "ready",
+			},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			gw := NewGateway(tt.initialConfig, context.Background())
+			if tt.setup != nil {
+				tt.setup(t, gw)
+			}
 			gw.afterConfSetup()
 
 			assert.Equal(t, tt.expectedConfig, gw.GetConfig())
-
 		})
 	}
+}
+
+// mockKVStore is a simple in-memory kv.Store used for testing vault and consul backends.
+type mockKVStore struct {
+	data map[string]string
+}
+
+func (m *mockKVStore) Get(key string) (string, error) {
+	val, ok := m.data[key]
+	if !ok {
+		return "", fmt.Errorf("key not found: %s", key)
+	}
+	return val, nil
+}
+
+func (m *mockKVStore) Put(key, val string) error {
+	m.data[key] = val
+	return nil
 }
 
 func TestGateway_apisByIDLen(t *testing.T) {

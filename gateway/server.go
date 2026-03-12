@@ -1828,6 +1828,22 @@ func (gw *Gateway) afterConfSetup() {
 		}
 	}
 
+	// Retrieve OAuth mTLS certificate paths from KV store
+	if conf.ExternalServices.OAuth.MTLS.Enabled {
+		conf.ExternalServices.OAuth.MTLS.CertFile, err = gw.kvStore(conf.ExternalServices.OAuth.MTLS.CertFile)
+		if err != nil {
+			log.WithError(err).Fatal("Could not retrieve OAuth mTLS cert file path from KV store.")
+		}
+		conf.ExternalServices.OAuth.MTLS.KeyFile, err = gw.kvStore(conf.ExternalServices.OAuth.MTLS.KeyFile)
+		if err != nil {
+			log.WithError(err).Fatal("Could not retrieve OAuth mTLS key file path from KV store.")
+		}
+		conf.ExternalServices.OAuth.MTLS.CAFile, err = gw.kvStore(conf.ExternalServices.OAuth.MTLS.CAFile)
+		if err != nil {
+			log.WithError(err).Fatal("Could not retrieve OAuth mTLS CA file path from KV store.")
+		}
+	}
+
 	if conf.OpenTelemetry.TracesEnabled() || (conf.OpenTelemetry.Metrics.Enabled != nil && *conf.OpenTelemetry.Metrics.Enabled) {
 		if traceConfig := conf.OpenTelemetry.EffectiveTraceConfig(); traceConfig.ResourceName == "" {
 			traceConfig.ResourceName = config.DefaultOTelResourceName
