@@ -1340,7 +1340,7 @@ type Config struct {
 	// ```
 	OverrideMessages map[string]TykError `bson:"override_messages" json:"override_messages"`
 
-	// ErrorOverrides customizes error responses at the gateway level.
+	// ErrorOverrides allows you to customize the error responses that the Gateway will return to API clients.
 	// Overrides both gateway-generated errors (authentication failures, rate limits, validation errors)
 	// and upstream service errors (4xx/5xx responses from backend APIs).
 	// Rules are organized by HTTP status code and can include additional matching criteria.
