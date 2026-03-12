@@ -1,6 +1,7 @@
 package oas_test
 
 import (
+	"context"
 	"embed"
 	"encoding/json"
 	"sort"
@@ -12,7 +13,7 @@ import (
 	"github.com/TykTechnologies/tyk/apidef/oas"
 )
 
-//go:embed testdata/urlRewrite.json testdata/petstore-no-responses.json
+//go:embed testdata/urlRewrite.json testdata/petstore-no-responses.json testdata/oas31-no-responses.json
 var oasTestAPIs embed.FS
 
 // TestLoad_URLRewrite(t *testing.T)
@@ -133,4 +134,26 @@ func TestImportValidateRequest(t *testing.T) {
 
 		assert.Equal(t, want, got)
 	})
+}
+
+func TestImportOAS31NoResponses(t *testing.T) {
+	oasContents, err := oasTestAPIs.ReadFile("testdata/oas31-no-responses.json")
+	assert.NoError(t, err)
+	assert.NotNil(t, oasContents)
+
+	var oasObj oas.OAS
+	assert.NoError(t, json.Unmarshal(oasContents, &oasObj))
+
+	trueVal, falseVal := true, false
+	params := oas.TykExtensionConfigParams{
+		ListenPath:      "/listen-api",
+		UpstreamURL:     "https://example.org/api",
+		ValidateRequest: &trueVal,
+		MockResponse:    &falseVal,
+	}
+	err = oasObj.BuildDefaultTykExtension(params, true)
+	assert.NoError(t, err)
+
+	err = oasObj.Validate(context.Background())
+	assert.NoError(t, err)
 }
