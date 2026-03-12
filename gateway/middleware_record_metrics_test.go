@@ -119,7 +119,7 @@ func TestBaseMiddleware_RecordMetrics(t *testing.T) {
 			}
 
 			assert.NotPanics(t, func() {
-				bm.RecordMetrics(r, tt.statusCode, latency, tt.response)
+				bm.RecordMetrics(nil, r, tt.statusCode, latency, tt.response)
 			})
 		})
 	}
