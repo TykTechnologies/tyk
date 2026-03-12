@@ -138,7 +138,15 @@ type VersionMeta struct {
 func doJSONWrite(w http.ResponseWriter, code int, obj interface{}) {
 	w.Header().Set(header.ContentType, header.ApplicationJSON)
 	w.WriteHeader(code)
-	if err := json.NewEncoder(w).Encode(obj); err != nil {
+
+	var err error
+	if bodyBytes, ok := obj.([]byte); ok {
+		_, err = w.Write(bodyBytes)
+	} else {
+		err = json.NewEncoder(w).Encode(obj)
+	}
+
+	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 	if code != http.StatusOK {
@@ -1568,7 +1576,16 @@ func (gw *Gateway) apiOASGetHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	doJSONWrite(w, code, obj)
+	jsonBytes, err := json.Marshal(obj)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	bytesModifier := lib.NewDataBytesModifier(jsonBytes)
+	bytesModifier.RestoreUnicodeEscapesFromRE2()
+
+	doJSONWrite(w, code, bytesModifier.Result())
 }
 
 func (gw *Gateway) apiOASPostHandler(w http.ResponseWriter, r *http.Request) {
@@ -3537,6 +3554,11 @@ func extractOASObjFromReq(reqBody io.Reader) ([]byte, *oas.OAS, error) {
 	if err != nil {
 		return nil, nil, ErrRequestMalformed
 	}
+
+	bytesModifier := lib.NewDataBytesModifier(reqBodyInBytes)
+	bytesModifier.TransformUnicodeEscapesToRE2()
+
+	reqBodyInBytes = bytesModifier.Result()
 
 	loader := openapi3.NewLoader()
 	t, err := loader.LoadFromData(reqBodyInBytes)
