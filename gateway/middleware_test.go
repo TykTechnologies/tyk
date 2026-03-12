@@ -11,15 +11,20 @@ import (
 	"time"
 
 	"github.com/justinas/alice"
+	"github.com/sirupsen/logrus"
 	logrustest "github.com/sirupsen/logrus/hooks/test"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/TykTechnologies/opentelemetry/metric/metrictest"
 
 	"github.com/TykTechnologies/tyk-pump/analytics"
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
+	ctxpkg "github.com/TykTechnologies/tyk/ctx"
 	headers2 "github.com/TykTechnologies/tyk/header"
 	"github.com/TykTechnologies/tyk/internal/cache"
 	"github.com/TykTechnologies/tyk/internal/otel"
+	"github.com/TykTechnologies/tyk/internal/otel/apimetrics"
 	"github.com/TykTechnologies/tyk/internal/uuid"
 	"github.com/TykTechnologies/tyk/test"
 	"github.com/TykTechnologies/tyk/user"
@@ -811,5 +816,143 @@ func TestGateway_mwAppendEnabled_MCP(t *testing.T) {
 
 		assert.True(t, result, "mwAppendEnabled should return true for non-restricted middleware on MCP")
 		assert.Len(t, chain, 1, "Chain should have non-restricted middleware for MCP APIs")
+	})
+}
+
+// testMetricInstruments creates MetricInstruments backed by a real in-memory
+// provider so tests can assert recorded metric values. If defs is non-nil,
+// an API metric registry is configured with the given definitions.
+func testMetricInstruments(t *testing.T, defs []apimetrics.APIMetricDefinition) (*otel.MetricInstruments, *metrictest.TestProvider) {
+	t.Helper()
+	tp := metrictest.NewProvider(t)
+	inst := otel.NewMetricInstruments(tp, logrus.New())
+	if defs != nil {
+		inst.SetRegistry(tp, defs)
+	}
+	return inst, tp
+}
+
+func TestBaseMiddleware_RecordMetrics(t *testing.T) {
+	t.Run("records tyk.http.requests counter", func(t *testing.T) {
+		inst, tp := testMetricInstruments(t, nil)
+		bm := &BaseMiddleware{
+			Spec: &APISpec{APIDefinition: &apidef.APIDefinition{APIID: "test-api", Name: "TestAPI"}},
+			Gw:   &Gateway{MetricInstruments: inst},
+		}
+
+		r := httptest.NewRequest(http.MethodGet, "http://example.com/test", nil)
+		bm.RecordMetrics(nil, r, 200, analytics.Latency{Total: 150, Upstream: 100, Gateway: 50}, nil)
+
+		m := tp.FindMetric(t, "tyk.http.requests")
+		metrictest.AssertSum(t, m, int64(1))
+	})
+
+	t.Run("skipped when DoNotTrack on spec", func(t *testing.T) {
+		inst, tp := testMetricInstruments(t, nil)
+		bm := &BaseMiddleware{
+			Spec: &APISpec{APIDefinition: &apidef.APIDefinition{APIID: "test-api", DoNotTrack: true}},
+			Gw:   &Gateway{MetricInstruments: inst},
+		}
+
+		r := httptest.NewRequest(http.MethodGet, "http://example.com/test", nil)
+		bm.RecordMetrics(nil, r, 200, analytics.Latency{}, nil)
+
+		names := tp.MetricNames()
+		assert.NotContains(t, names, "tyk.http.requests")
+	})
+
+	t.Run("skipped when DoNotTrack on context", func(t *testing.T) {
+		inst, tp := testMetricInstruments(t, nil)
+		bm := &BaseMiddleware{
+			Spec: &APISpec{APIDefinition: &apidef.APIDefinition{APIID: "test-api"}},
+			Gw:   &Gateway{MetricInstruments: inst},
+		}
+
+		r := httptest.NewRequest(http.MethodGet, "http://example.com/test", nil)
+		setCtxValue(r, ctxpkg.DoNotTrackThisEndpoint, true)
+		bm.RecordMetrics(nil, r, 200, analytics.Latency{}, nil)
+
+		names := tp.MetricNames()
+		assert.NotContains(t, names, "tyk.http.requests")
+	})
+
+	t.Run("response_header dimension from proxy response", func(t *testing.T) {
+		defs := []apimetrics.APIMetricDefinition{{
+			Name: "test.by.version",
+			Type: "counter",
+			Dimensions: []apimetrics.DimensionDefinition{
+				{Source: "response_header", Key: "X-Version", Label: "version", Default: "unknown"},
+			},
+		}}
+		inst, tp := testMetricInstruments(t, defs)
+		bm := &BaseMiddleware{
+			Spec: &APISpec{APIDefinition: &apidef.APIDefinition{APIID: "test-api"}},
+			Gw:   &Gateway{MetricInstruments: inst},
+		}
+
+		r := httptest.NewRequest(http.MethodGet, "http://example.com/test", nil)
+		resp := &http.Response{Header: http.Header{"X-Version": []string{"v2.0"}}}
+		bm.RecordMetrics(nil, r, 200, analytics.Latency{}, resp)
+
+		m := tp.FindMetric(t, "test.by.version")
+		metrictest.AssertSum(t, m, int64(1))
+	})
+
+	t.Run("response_header fallback to ResponseWriter", func(t *testing.T) {
+		defs := []apimetrics.APIMetricDefinition{{
+			Name: "test.by.version",
+			Type: "counter",
+			Dimensions: []apimetrics.DimensionDefinition{
+				{Source: "response_header", Key: "X-Version", Label: "version", Default: "unknown"},
+			},
+		}}
+		inst, tp := testMetricInstruments(t, defs)
+		bm := &BaseMiddleware{
+			Spec: &APISpec{APIDefinition: &apidef.APIDefinition{APIID: "test-api"}},
+			Gw:   &Gateway{MetricInstruments: inst},
+		}
+
+		w := httptest.NewRecorder()
+		w.Header().Set("X-Version", "v3.0")
+		r := httptest.NewRequest(http.MethodGet, "http://example.com/test", nil)
+		// nil response forces the ResponseWriter fallback path.
+		bm.RecordMetrics(w, r, 200, analytics.Latency{}, nil)
+
+		m := tp.FindMetric(t, "test.by.version")
+		metrictest.AssertSum(t, m, int64(1))
+	})
+
+	t.Run("response_header default when both response and writer nil", func(t *testing.T) {
+		defs := []apimetrics.APIMetricDefinition{{
+			Name: "test.by.version",
+			Type: "counter",
+			Dimensions: []apimetrics.DimensionDefinition{
+				{Source: "response_header", Key: "X-Version", Label: "version", Default: "unknown"},
+			},
+		}}
+		inst, tp := testMetricInstruments(t, defs)
+		bm := &BaseMiddleware{
+			Spec: &APISpec{APIDefinition: &apidef.APIDefinition{APIID: "test-api"}},
+			Gw:   &Gateway{MetricInstruments: inst},
+		}
+
+		r := httptest.NewRequest(http.MethodGet, "http://example.com/test", nil)
+		bm.RecordMetrics(nil, r, 500, analytics.Latency{}, nil)
+
+		m := tp.FindMetric(t, "test.by.version")
+		metrictest.AssertSum(t, m, int64(1))
+	})
+
+	t.Run("error path nil response does not panic", func(t *testing.T) {
+		inst, _ := testMetricInstruments(t, nil)
+		bm := &BaseMiddleware{
+			Spec: &APISpec{APIDefinition: &apidef.APIDefinition{APIID: "test-api"}},
+			Gw:   &Gateway{MetricInstruments: inst},
+		}
+
+		r := httptest.NewRequest(http.MethodGet, "http://example.com/test", nil)
+		assert.NotPanics(t, func() {
+			bm.RecordMetrics(nil, r, 500, analytics.Latency{}, nil)
+		})
 	})
 }

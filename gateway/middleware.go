@@ -545,7 +545,7 @@ func (t *BaseMiddleware) RecordMetrics(w http.ResponseWriter, r *http.Request, s
 			// populated with upstream headers.
 			rc.Response = &http.Response{
 				StatusCode: statusCode,
-				Header:     w.Header().Clone(),
+				Header:     w.Header(),
 			}
 		}
 	}
