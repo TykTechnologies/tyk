@@ -271,7 +271,7 @@ func (m *RedisCacheMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 		latency := analytics.Latency{Total: int64(ms), Upstream: 0, Gateway: int64(ms)}
 		m.sh.RecordHit(r, latency, newRes.StatusCode, newRes, true)
 		m.sh.RecordAccessLog(r, newRes, latency)
-		m.sh.Base().RecordMetrics(r, newRes.StatusCode, latency, newRes)
+		m.sh.Base().RecordMetrics(w, r, newRes.StatusCode, latency, newRes)
 	}
 
 	// Stop any further execution after we wrote cache out
