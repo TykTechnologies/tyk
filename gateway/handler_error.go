@@ -257,7 +257,7 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 	}
 
 	e.RecordAccessLog(r, response, latency)
-	e.Base().RecordMetrics(r, errCode, latency, nil)
+	e.Base().RecordMetrics(w, r, errCode, latency, nil)
 
 	// Report in health check
 	reportHealthValue(e.Spec, BlockedRequestLog, "-1")

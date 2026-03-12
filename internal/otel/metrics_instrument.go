@@ -112,6 +112,17 @@ func (i *MetricInstruments) NeedsContext() bool {
 	return i.registry != nil && i.registry.NeedsContext()
 }
 
+// SetRegistry creates and attaches an API metric registry from the given
+// definitions. This is intended for tests that need to exercise custom
+// API metric dimensions without going through the full gateway config flow.
+func (i *MetricInstruments) SetRegistry(provider tykmetric.Provider, defs []apimetrics.APIMetricDefinition) {
+	registry, err := apimetrics.NewInstrumentRegistry(provider, defs)
+	if err != nil {
+		panic("SetRegistry: " + err.Error())
+	}
+	i.registry = registry
+}
+
 // NeedsResponse returns true if any API metric instrument uses response_header dimensions.
 func (i *MetricInstruments) NeedsResponse() bool {
 	return i.registry != nil && i.registry.NeedsResponse()
