@@ -63,29 +63,30 @@ func TestGetJWTConfiguration(t *testing.T) {
 
 		var newAPIDef apidef.APIDefinition
 		oas.GetJWTConfiguration().PolicyFieldName = "policy"
+		oas.GetJWTConfiguration().BasePolicyClaims = []string{"policy"}
 		oas.GetJWTConfiguration().IdentityBaseField = "subject"
+		oas.GetJWTConfiguration().SubjectClaims = []string{"subject"}
 		oas.ExtractTo(&newAPIDef)
 
 		assert.Equal(t, "policy", newAPIDef.JWTPolicyFieldName)
 		assert.Equal(t, "subject", newAPIDef.JWTIdentityBaseField)
 	})
+		t.Run("should return nil", func(t *testing.T) {
+			var auth apidef.AuthConfig
+			Fill(t, &auth, 0)
+			auth.DisableHeader = false
 
-	t.Run("should return nil", func(t *testing.T) {
-		var auth apidef.AuthConfig
-		Fill(t, &auth, 0)
-		auth.DisableHeader = false
+			var api apidef.APIDefinition
+			api.AuthConfigs = map[string]apidef.AuthConfig{
+				apidef.AuthTokenType: auth,
+			}
 
-		var api apidef.APIDefinition
-		api.AuthConfigs = map[string]apidef.AuthConfig{
-			apidef.AuthTokenType: auth,
-		}
+			var oas OAS
+			oas.SetTykExtension(&XTykAPIGateway{})
+			oas.fillSecurity(api)
 
-		var oas OAS
-		oas.SetTykExtension(&XTykAPIGateway{})
-		oas.fillSecurity(api)
-
-		assert.Nil(t, oas.GetJWTConfiguration())
-	})
+			assert.Nil(t, oas.GetJWTConfiguration())
+		})
 }
 
 func TestOAS_Security(t *testing.T) {
