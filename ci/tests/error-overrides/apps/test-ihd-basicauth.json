@@ -1,0 +1,22 @@
+{
+  "name": "Test IHD - Basic Auth Header Malformed",
+  "api_id": "test-ihd-basicauth",
+  "org_id": "default",
+  "use_keyless": false,
+  "use_basic_auth": true,
+  "active": true,
+  "proxy": {
+    "listen_path": "/test-ihd-basicauth/",
+    "target_url": "http://backend-ok:80",
+    "strip_listen_path": true
+  },
+  "version_data": {
+    "not_versioned": true,
+    "default_version": "",
+    "versions": {
+      "Default": {
+        "name": "Default"
+      }
+    }
+  }
+}
