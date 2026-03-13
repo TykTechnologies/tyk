@@ -1201,7 +1201,7 @@ func (gw *Gateway) rpcReloadLoop(rpcKey string) {
 	}
 }
 
-func (gw *Gateway) DoReload() {
+func (gw *Gateway) DoReloadWithError() error {
 	gw.reloadMu.Lock()
 	defer gw.reloadMu.Unlock()
 
@@ -1219,20 +1219,20 @@ func (gw *Gateway) DoReload() {
 	// Load the API Policies
 	if _, err := syncResourcesWithReload("policies", gw.GetConfig(), gw.syncPolicies); err != nil {
 		mainLog.Error("Error during syncing policies")
-		return
+		return err
 	}
 
 	// load the specs
 	if count, err := syncResourcesWithReload("apis", gw.GetConfig(), gw.syncAPISpecs); err != nil {
 		mainLog.Error("Error during syncing apis")
-		return
+		return err
 	} else {
 		// skip re-loading only if dashboard service reported 0 APIs
 		// and current registry had 0 APIs
 		if count == 0 && gw.apisByIDLen() == 0 {
 			mainLog.Warning("No API Definitions found, not reloading")
 			gw.performedSuccessfulReload = true
-			return
+			return nil
 		}
 	}
 
@@ -1243,6 +1243,11 @@ func (gw *Gateway) DoReload() {
 
 	gw.performedSuccessfulReload = true
 	mainLog.Info("API reload complete")
+	return nil
+}
+
+func (gw *Gateway) DoReload() {
+	_ = gw.DoReloadWithError()
 }
 
 func createCORSWrapper(spec *APISpec) func(handler http.HandlerFunc) http.HandlerFunc {

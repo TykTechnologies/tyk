@@ -246,7 +246,15 @@ func (h *HTTPDashboardHandler) Register(ctx context.Context) error {
 	h.Gw.ServiceNonce = val.Nonce
 	h.Gw.ServiceNonceMutex.Unlock()
 	dashLog.Debug("Registration Finished: Nonce Set: ", val.Nonce)
-	h.Gw.DoReload()
+	if err := h.Gw.DoReloadWithError(); err != nil {
+		dashLog.Errorf("Failed to reload APIs after registration: %v, retrying in 5s", err)
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-time.After(5 * time.Second):
+		}
+		return h.Register(ctx)
+	}
 
 	return nil
 }
