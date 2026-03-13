@@ -53,6 +53,11 @@ type Upstream struct {
 	// Tyk classic API definition: `proxy.disable_strip_slash`.
 	PreserveTrailingSlash *PreserveTrailingSlash `bson:"preserveTrailingSlash,omitempty" json:"preserveTrailingSlash,omitempty"`
 
+	// DisableChunkedEncoding controls whether Tyk buffers request bodies and forwards them upstream
+	// with a Content-Length header instead of chunked transfer encoding.
+	// Tyk classic API definition: `proxy.disable_chunked_encoding`.
+	DisableChunkedEncoding *DisableChunkedEncoding `bson:"disableChunkedEncoding,omitempty" json:"disableChunkedEncoding,omitempty"`
+
 	// TLSTransport contains the configuration for TLS transport settings.
 	// Tyk classic API definition: `proxy.transport`
 	TLSTransport *TLSTransport `bson:"tlsTransport,omitempty" json:"tlsTransport,omitempty"`
@@ -139,6 +144,7 @@ func (u *Upstream) Fill(api apidef.APIDefinition) {
 	u.fillLoadBalancing(api)
 	u.fillPreserveHostHeader(api)
 	u.fillPreserveTrailingSlash(api)
+	u.fillDisableChunkedEncoding(api)
 }
 
 func (u *Upstream) fillPreserveTrailingSlash(api apidef.APIDefinition) {
@@ -161,6 +167,18 @@ func (u *Upstream) fillPreserveHostHeader(api apidef.APIDefinition) {
 
 	if !u.PreserveHostHeader.Enabled {
 		u.PreserveHostHeader = nil
+	}
+}
+
+func (u *Upstream) fillDisableChunkedEncoding(api apidef.APIDefinition) {
+	if u.DisableChunkedEncoding == nil {
+		u.DisableChunkedEncoding = &DisableChunkedEncoding{}
+	}
+
+	u.DisableChunkedEncoding.Fill(api)
+
+	if !u.DisableChunkedEncoding.Enabled && u.DisableChunkedEncoding.MaxBodySize == 0 {
+		u.DisableChunkedEncoding = nil
 	}
 }
 
@@ -242,6 +260,7 @@ func (u *Upstream) ExtractTo(api *apidef.APIDefinition) {
 
 	u.preserveHostHeaderExtractTo(api)
 	u.preserveTrailingSlashExtractTo(api)
+	u.disableChunkedEncodingExtractTo(api)
 }
 
 func (u *Upstream) preserveHostHeaderExtractTo(api *apidef.APIDefinition) {
@@ -264,6 +283,17 @@ func (u *Upstream) preserveTrailingSlashExtractTo(api *apidef.APIDefinition) {
 	}
 
 	u.PreserveTrailingSlash.ExtractTo(api)
+}
+
+func (u *Upstream) disableChunkedEncodingExtractTo(api *apidef.APIDefinition) {
+	if u.DisableChunkedEncoding == nil {
+		u.DisableChunkedEncoding = &DisableChunkedEncoding{}
+		defer func() {
+			u.DisableChunkedEncoding = nil
+		}()
+	}
+
+	u.DisableChunkedEncoding.ExtractTo(api)
 }
 
 func (u *Upstream) fillLoadBalancing(api apidef.APIDefinition) {
@@ -1407,4 +1437,27 @@ func (p *PreserveTrailingSlash) Fill(api apidef.APIDefinition) {
 // ExtractTo extracts *PreserveTrailingSlash into *apidef.APIDefinition.
 func (p *PreserveTrailingSlash) ExtractTo(api *apidef.APIDefinition) {
 	api.Proxy.DisableStripSlash = p.Enabled
+}
+
+// DisableChunkedEncoding holds the configuration for disabling chunked request
+// transfer encoding to upstream targets.
+type DisableChunkedEncoding struct {
+	// Enabled activates buffering request bodies in Tyk and forwarding with Content-Length.
+	Enabled bool `json:"enabled" bson:"enabled"`
+
+	// MaxBodySize limits the request body size (in bytes) for chunked-to-buffer conversion.
+	// If this value is not set, Tyk falls back to the gateway-level max request body size.
+	MaxBodySize int64 `json:"maxBodySize,omitempty" bson:"maxBodySize,omitempty"`
+}
+
+// Fill fills *DisableChunkedEncoding from apidef.APIDefinition.
+func (d *DisableChunkedEncoding) Fill(api apidef.APIDefinition) {
+	d.Enabled = api.Proxy.DisableChunkedEncoding
+	d.MaxBodySize = api.Proxy.ChunkedEncodingMaxBodySize
+}
+
+// ExtractTo extracts *DisableChunkedEncoding into *apidef.APIDefinition.
+func (d *DisableChunkedEncoding) ExtractTo(api *apidef.APIDefinition) {
+	api.Proxy.DisableChunkedEncoding = d.Enabled
+	api.Proxy.ChunkedEncodingMaxBodySize = d.MaxBodySize
 }
