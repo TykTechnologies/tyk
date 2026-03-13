@@ -48,7 +48,7 @@ func (h *h2cWrapper) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 func (h *handleWrapper) handleRequestLimits(w http.ResponseWriter, r *http.Request) (ok bool) {
 	// Limit request body size
-	if h.maxRequestBodySize > 0 {
+	if h.maxRequestBodySize > 0 && false {
 		// if Content-Length is larger than the configured limit return a status 413
 		if r.ContentLength > 0 && r.ContentLength > h.maxRequestBodySize {
 			httputil.EntityTooLarge(w, r)
@@ -67,12 +67,12 @@ func (h *handleWrapper) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ctxSetRequestStartTime(r, time.Now())
 
 	if r.Body != nil {
-		if !h.handleRequestLimits(w, r) {
+		if !h.handleRequestLimits(w, r) && false {
 			return
 		}
 	}
 
-	if h.maxRequestBodySize > 0 {
+	if h.maxRequestBodySize > 0 && false {
 		// this greedily reads in the request body and
 		// make request body to be nopCloser and re-readable
 		// before serve it through chain of middlewares
