@@ -12,6 +12,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"sync/atomic"
 	texttemplate "text/template"
@@ -1392,6 +1393,13 @@ func (a APIDefinitionLoader) compileOASValidateRequestPathSpec(apiSpec *APISpec,
 		urlSpec = append(urlSpec, newSpec)
 	}
 
+	sort.Slice(urlSpec, func(i, j int) bool {
+		if len(urlSpec[i].OASPath) != len(urlSpec[j].OASPath) {
+			return len(urlSpec[i].OASPath) > len(urlSpec[j].OASPath)
+		}
+		return urlSpec[i].OASPath < urlSpec[j].OASPath
+	})
+
 	return urlSpec
 }
 
@@ -1433,6 +1441,13 @@ func (a APIDefinitionLoader) compileOASMockResponsePathSpec(apiSpec *APISpec, co
 		a.generateRegex(path, &newSpec, OASMockResponse, conf)
 		urlSpec = append(urlSpec, newSpec)
 	}
+
+	sort.Slice(urlSpec, func(i, j int) bool {
+		if len(urlSpec[i].OASPath) != len(urlSpec[j].OASPath) {
+			return len(urlSpec[i].OASPath) > len(urlSpec[j].OASPath)
+		}
+		return urlSpec[i].OASPath < urlSpec[j].OASPath
+	})
 
 	return urlSpec
 }
