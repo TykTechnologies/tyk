@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io/ioutil"
 	"net/http"
 	"net/url"
@@ -15,8 +16,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/robertkrimen/otto"
-	_ "github.com/robertkrimen/otto/underscore"
+	"github.com/dop251/goja"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/internal/httpctx"
@@ -117,11 +117,6 @@ func specToJson(spec *APISpec) string {
 // ProcessRequest will run any checks on the request on the way through the system, return an error to have the chain fail
 func (d *DynamicMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
 	// Skip post-phase JS plugins on self-looped requests (internal redirects).
-	// This prevents the plugin from executing multiple times during internal routing
-	// (e.g., VEM chain traversal, URL rewrites with tyk://self).
-	// Pre-phase plugins run before auth and should execute on every request.
-	// Similar to auth middleware behavior (see mw_auth_key.go:124).
-	// Only applies to MCP proxies.
 	if d.Spec.IsMCP() && !d.Pre && httpctx.IsSelfLooping(r) {
 		return nil, http.StatusOK
 	}
@@ -192,48 +187,13 @@ func (d *DynamicMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 
 	// Run the middleware
 	middlewareClassname := d.MiddlewareClassName
-	if d.Spec.JSVM.VM == nil {
-		logger.WithError(err).Error("JSVM isn't enabled, check your gateway settings")
-		return errors.New("Middleware error"), 500
-	}
-	vm := d.Spec.JSVM.VM.Copy()
-	vm.Interrupt = make(chan func(), 1)
 	logger.Debug("Running: ", middlewareClassname)
-	// buffered, leaving no chance of a goroutine leak since the
-	// spawned goroutine will send 0 or 1 values.
-	ret := make(chan otto.Value, 1)
-	errRet := make(chan error, 1)
-	go func() {
-		defer func() {
-			// the VM executes the panic func that gets it
-			// to stop, so we must recover here to not crash
-			// the whole Go program.
-			recover()
-		}()
-		returnRaw, err := vm.Run(middlewareClassname + `.DoProcessRequest(` + string(requestAsJson) + `, ` + string(sessionAsJson) + `, ` + specAsJson + `);`)
-		ret <- returnRaw
-		errRet <- err
-	}()
-	var returnRaw otto.Value
-	t := time.NewTimer(d.Spec.JSVM.Timeout)
-	select {
-	case returnRaw = <-ret:
-		if err := <-errRet; err != nil {
-			logger.WithError(err).Error("Failed to run JS middleware")
-			return errors.New(http.StatusText(http.StatusInternalServerError)), http.StatusInternalServerError
-		}
-		t.Stop()
-	case <-t.C:
-		t.Stop()
-		logger.Error("JS middleware timed out after ", d.Spec.JSVM.Timeout)
-		vm.Interrupt <- func() {
-			// only way to stop the VM is to send it a func
-			// that panics.
-			panic("stop")
-		}
+	expr := middlewareClassname + `.DoProcessRequest(` + string(requestAsJson) + `, ` + string(sessionAsJson) + `, ` + specAsJson + `);`
+	returnDataStr, err := d.Spec.JSVM.Run(expr)
+	if err != nil {
+		logger.WithError(err).Error("Failed to run JS middleware")
 		return errors.New(http.StatusText(http.StatusInternalServerError)), http.StatusInternalServerError
 	}
-	returnDataStr, _ := returnRaw.ToString()
 
 	// Decode the return object
 	newRequestData := VMReturnObject{}
@@ -264,7 +224,6 @@ func (d *DynamicMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 	for _, dh := range newRequestData.Request.DeleteHeaders {
 		r.Header.Del(dh)
 		if ignoreCanonical {
-			// Make sure we delete the header in case the header key was not canonical.
 			delete(r.Header, dh)
 		}
 	}
@@ -325,8 +284,6 @@ func (d *DynamicMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 }
 
 func mapStrsToIfaces(m map[string]string) map[string]interface{} {
-	// TODO: do we really need this conversion? note that we can't
-	// make user.SessionState.MetaData a map[string]string, however.
 	m2 := make(map[string]interface{}, len(m))
 	for k, v := range m {
 		m2[k] = v
@@ -338,11 +295,90 @@ func mapStrsToIfaces(m map[string]string) map[string]interface{} {
 
 type JSVM struct {
 	Spec    *APISpec
-	VM      *otto.Otto `json:"-"`
 	Timeout time.Duration
 	Log     *logrus.Entry  `json:"-"` // logger used by the JS code
 	RawLog  *logrus.Logger `json:"-"` // logger used by `rawlog` func to avoid formatting
 	Gw      *Gateway       `json:"-"`
+
+	programs    []*goja.Program // compiled JS programs replayed on each new runtime
+	initialized bool
+}
+
+// Initialized reports whether the JSVM has been set up.
+func (j *JSVM) Initialized() bool {
+	return j.initialized
+}
+
+// newRuntime creates a fresh goja runtime with all loaded programs and Go API functions.
+func (j *JSVM) newRuntime() *goja.Runtime {
+	vm := goja.New()
+
+	// Register a silent no-op log during program replay to suppress
+	// top-level log() calls that already fired at load time.
+	nop := func(call goja.FunctionCall) goja.Value { return goja.Undefined() }
+	vm.Set("log", nop)
+	vm.Set("rawlog", nop)
+
+	// Register all other Go API functions (b64dec, TykMakeHttpRequest, etc.)
+	j.registerAPI(vm)
+
+	// Replay compiled programs (middleware definitions, coreJS, etc.)
+	for _, p := range j.programs {
+		if _, err := vm.RunProgram(p); err != nil {
+			if j.Log != nil {
+				j.Log.WithError(err).Error("Failed to replay JS program")
+			}
+		}
+	}
+
+	// Now install the real log/rawlog so request-time calls work.
+	vm.Set("log", func(call goja.FunctionCall) goja.Value {
+		j.Log.WithFields(logrus.Fields{
+			"type": "log-msg",
+		}).Info(call.Argument(0).String())
+		return goja.Undefined()
+	})
+	vm.Set("rawlog", func(call goja.FunctionCall) goja.Value {
+		j.RawLog.Print(call.Argument(0).String() + "\n")
+		return goja.Undefined()
+	})
+
+	return vm
+}
+
+// Run executes a JS expression on a fresh runtime with timeout handling.
+// Each call gets an isolated runtime so concurrent requests don't interfere.
+func (j *JSVM) Run(expr string) (string, error) {
+	if !j.initialized {
+		return "", errors.New("JSVM isn't enabled, check your gateway settings")
+	}
+
+	vm := j.newRuntime()
+
+	timer := time.AfterFunc(j.Timeout, func() {
+		vm.Interrupt("timeout")
+	})
+	defer timer.Stop()
+
+	returnRaw, err := vm.RunString(expr)
+	if err != nil {
+		if _, ok := err.(*goja.InterruptedError); ok {
+			return "", fmt.Errorf("JS middleware timed out after %v", j.Timeout)
+		}
+		return "", err
+	}
+
+	return returnRaw.String(), nil
+}
+
+// LoadScript compiles a JS source string and adds it to the programs list.
+func (j *JSVM) LoadScript(src string) error {
+	p, err := goja.Compile("", src, false)
+	if err != nil {
+		return err
+	}
+	j.programs = append(j.programs, p)
+	return nil
 }
 
 const defaultJSVMTimeout = 5
@@ -350,34 +386,43 @@ const defaultJSVMTimeout = 5
 // Init creates the JSVM with the core library and sets up a default
 // timeout.
 func (j *JSVM) Init(spec *APISpec, logger *logrus.Entry, gw *Gateway) {
-	vm := otto.New()
 	j.Gw = gw
+	j.programs = nil
 	logger = logger.WithField("prefix", "jsvm")
 
-	// Init TykJS namespace, constructors etc.
-	if _, err := vm.Run(coreJS); err != nil {
-		logger.WithError(err).Error("Could not load TykJS")
+	// Compile and store coreJS
+	p, err := goja.Compile("coreJS", coreJS, false)
+	if err != nil {
+		logger.WithError(err).Error("Could not compile TykJS")
 		return
 	}
+	j.programs = append(j.programs, p)
 
 	// Load user's TykJS on top, if any
 	if path := gw.GetConfig().TykJSPath; path != "" {
-		f, err := os.Open(path)
+		data, err := os.ReadFile(path)
 		if err == nil {
-			_, err = vm.Run(f)
-			f.Close()
-
+			p, err := goja.Compile(path, string(data), false)
 			if err != nil {
-				logger.WithError(err).Error("Could not load user's TykJS")
+				logger.WithError(err).Error("Could not compile user's TykJS")
+			} else {
+				j.programs = append(j.programs, p)
 			}
 		}
 	}
 
-	j.VM = vm
-	j.Spec = spec
+	// Compile the TykJsResponse helper
+	tykJsResp, err := goja.Compile("TykJsResponse", `function TykJsResponse(response, session_meta) {
+		return JSON.stringify({Response: response, SessionMeta: session_meta})
+	}`, false)
+	if err != nil {
+		logger.WithError(err).Error("Could not compile TykJsResponse")
+	} else {
+		j.programs = append(j.programs, tykJsResp)
+	}
 
-	// Add environment API
-	j.LoadTykJSApi()
+	j.Spec = spec
+	j.initialized = true
 
 	if jsvmTimeout := gw.GetConfig().JSVMTimeout; jsvmTimeout <= 0 {
 		j.Timeout = time.Duration(defaultJSVMTimeout) * time.Second
@@ -396,6 +441,7 @@ func (j *JSVM) DeInit() {
 	j.Log = nil
 	j.RawLog = nil
 	j.Gw = nil
+	j.initialized = false
 }
 
 // LoadJSPaths will load JS classes and functionality in to the VM by file
@@ -410,15 +456,17 @@ func (j *JSVM) LoadJSPaths(paths []string, prefix string) {
 			continue
 		}
 		j.Log.Info("Loading JS File: ", mwPath)
-		f, err := os.Open(mwPath)
+		data, err := os.ReadFile(mwPath)
 		if err != nil {
 			j.Log.WithError(err).Error("Failed to open JS middleware file")
 			continue
 		}
-		if _, err := j.VM.Run(f); err != nil {
-			j.Log.WithError(err).Error("Failed to load JS middleware")
+		p, err := goja.Compile(mwPath, string(data), false)
+		if err != nil {
+			j.Log.WithError(err).Error("Failed to compile JS middleware")
+			continue
 		}
-		f.Close()
+		j.programs = append(j.programs, p)
 	}
 }
 
@@ -442,21 +490,21 @@ type TykJSHttpResponse struct {
 	HeadersComp map[string][]string `json:"headers"`
 }
 
-func (j *JSVM) LoadTykJSApi() {
+func (j *JSVM) registerAPI(vm *goja.Runtime) {
 	// Enable a log
-	j.VM.Set("log", func(call otto.FunctionCall) otto.Value {
+	vm.Set("log", func(call goja.FunctionCall) goja.Value {
 		j.Log.WithFields(logrus.Fields{
 			"type": "log-msg",
 		}).Info(call.Argument(0).String())
-		return otto.Value{}
+		return goja.Undefined()
 	})
-	j.VM.Set("rawlog", func(call otto.FunctionCall) otto.Value {
+	vm.Set("rawlog", func(call goja.FunctionCall) goja.Value {
 		j.RawLog.Print(call.Argument(0).String() + "\n")
-		return otto.Value{}
+		return goja.Undefined()
 	})
 
 	// these two needed for non-utf8 bodies
-	j.VM.Set("b64dec", func(call otto.FunctionCall) otto.Value {
+	vm.Set("b64dec", func(call goja.FunctionCall) goja.Value {
 		in := call.Argument(0).String()
 		out, err := base64.StdEncoding.DecodeString(in)
 
@@ -465,63 +513,42 @@ func (j *JSVM) LoadTykJSApi() {
 			out, err = base64.RawStdEncoding.DecodeString(in)
 			if err != nil {
 				j.Log.WithError(err).Error("Failed to base64 decode")
-				return otto.Value{}
+				return goja.Undefined()
 			}
 		}
-		returnVal, err := j.VM.ToValue(string(out))
-		if err != nil {
-			j.Log.WithError(err).Error("Failed to base64 decode")
-			return otto.Value{}
-		}
-		return returnVal
+		return vm.ToValue(string(out))
 	})
-	j.VM.Set("b64enc", func(call otto.FunctionCall) otto.Value {
+	vm.Set("b64enc", func(call goja.FunctionCall) goja.Value {
 		in := []byte(call.Argument(0).String())
 		out := base64.StdEncoding.EncodeToString(in)
-		returnVal, err := j.VM.ToValue(out)
-		if err != nil {
-			j.Log.WithError(err).Error("Failed to base64 encode")
-			return otto.Value{}
-		}
-		return returnVal
+		return vm.ToValue(out)
 	})
 
-	j.VM.Set("rawb64dec", func(call otto.FunctionCall) otto.Value {
+	vm.Set("rawb64dec", func(call goja.FunctionCall) goja.Value {
 		in := call.Argument(0).String()
 		out, err := base64.RawStdEncoding.DecodeString(in)
 		if err != nil {
 			j.Log.WithError(err).Error("Failed to base64 decode")
-			return otto.Value{}
+			return goja.Undefined()
 		}
-		returnVal, err := j.VM.ToValue(string(out))
-		if err != nil {
-			j.Log.WithError(err).Error("Failed to base64 decode")
-			return otto.Value{}
-		}
-		return returnVal
+		return vm.ToValue(string(out))
 	})
-	j.VM.Set("rawb64enc", func(call otto.FunctionCall) otto.Value {
+	vm.Set("rawb64enc", func(call goja.FunctionCall) goja.Value {
 		in := []byte(call.Argument(0).String())
 		out := base64.RawStdEncoding.EncodeToString(in)
-		returnVal, err := j.VM.ToValue(out)
-		if err != nil {
-			j.Log.WithError(err).Error("Failed to base64 encode")
-			return otto.Value{}
-		}
-		return returnVal
+		return vm.ToValue(out)
 	})
 	ignoreCanonical := j.Gw.GetConfig().IgnoreCanonicalMIMEHeaderKey
-	// Enable the creation of HTTP Requsts
-	j.VM.Set("TykMakeHttpRequest", func(call otto.FunctionCall) otto.Value {
+	// Enable the creation of HTTP Requests
+	vm.Set("TykMakeHttpRequest", func(call goja.FunctionCall) goja.Value {
 		jsonHRO := call.Argument(0).String()
 		if jsonHRO == "undefined" {
-			// Nope, return nothing
-			return otto.Value{}
+			return goja.Undefined()
 		}
 		hro := TykJSHttpRequest{}
 		if err := json.Unmarshal([]byte(jsonHRO), &hro); err != nil {
 			j.Log.WithError(err).Error("JSVM: Failed to deserialise HTTP Request object")
-			return otto.Value{}
+			return goja.Undefined()
 		}
 
 		// Make the request
@@ -532,7 +559,7 @@ func (j *JSVM) LoadTykJSApi() {
 		}
 
 		u, _ := url.ParseRequestURI(domain + hro.Resource)
-		urlStr := u.String() // "https://api.com/user/"
+		urlStr := u.String()
 
 		var d string
 		if hro.Body != "" {
@@ -577,12 +604,11 @@ func (j *JSVM) LoadTykJSApi() {
 
 		tr.Proxy = proxyFromAPI(j.Spec)
 
-		// using new Client each time should be ok, since we closing connection every time
 		client := &http.Client{Transport: tr}
 		resp, err := client.Do(r)
 		if err != nil {
 			j.Log.WithError(err).Error("Request failed")
-			return otto.Value{}
+			return goja.Undefined()
 		}
 
 		body, _ := ioutil.ReadAll(resp.Body)
@@ -597,33 +623,21 @@ func (j *JSVM) LoadTykJSApi() {
 		}
 
 		retAsStr, _ := json.Marshal(tykResp)
-		returnVal, err := j.VM.ToValue(string(retAsStr))
-		if err != nil {
-			j.Log.WithError(err).Error("Failed to encode return value")
-			return otto.Value{}
-		}
-
-		return returnVal
+		return vm.ToValue(string(retAsStr))
 	})
 
 	// Expose Setters and Getters in the REST API for a key:
-	j.VM.Set("TykGetKeyData", func(call otto.FunctionCall) otto.Value {
+	vm.Set("TykGetKeyData", func(call goja.FunctionCall) goja.Value {
 		apiKey := call.Argument(0).String()
 		apiId := call.Argument(1).String()
 
 		obj, _ := j.Gw.handleGetDetail(apiKey, apiId, "", false)
 		bs, _ := json.Marshal(obj)
 
-		returnVal, err := j.VM.ToValue(string(bs))
-		if err != nil {
-			j.Log.WithError(err).Error("Failed to encode return value")
-			return otto.Value{}
-		}
-
-		return returnVal
+		return vm.ToValue(string(bs))
 	})
 
-	j.VM.Set("TykSetKeyData", func(call otto.FunctionCall) otto.Value {
+	vm.Set("TykSetKeyData", func(call goja.FunctionCall) goja.Value {
 		apiKey := call.Argument(0).String()
 		encoddedSession := call.Argument(1).String()
 		suppressReset := call.Argument(2).String()
@@ -632,38 +646,29 @@ func (j *JSVM) LoadTykJSApi() {
 		err := json.Unmarshal([]byte(encoddedSession), &newSession)
 		if err != nil {
 			j.Log.WithError(err).Error("Failed to decode the sesison data")
-			return otto.Value{}
+			return goja.Undefined()
 		}
 
 		j.Gw.doAddOrUpdate(apiKey, &newSession, suppressReset == "1", false)
-		return otto.Value{}
+		return goja.Undefined()
 	})
 
 	// Batch request method
 	unsafeBatchHandler := BatchRequestHandler{Gw: j.Gw}
-	j.VM.Set("TykBatchRequest", func(call otto.FunctionCall) otto.Value {
+	vm.Set("TykBatchRequest", func(call goja.FunctionCall) goja.Value {
 		requestSet := call.Argument(0).String()
 		j.Log.Debug("Batch input is: ", requestSet)
 		bs, err := unsafeBatchHandler.ManualBatchRequest([]byte(requestSet))
 		if err != nil {
 			j.Log.WithError(err).Error("Batch request error")
-			return otto.Value{}
+			return goja.Undefined()
 		}
 
-		returnVal, err := j.VM.ToValue(string(bs))
-		if err != nil {
-			j.Log.WithError(err).Error("Failed to encode return value")
-			return otto.Value{}
-		}
-
-		return returnVal
+		return vm.ToValue(string(bs))
 	})
-
-	j.VM.Run(`function TykJsResponse(response, session_meta) {
-		return JSON.stringify({Response: response, SessionMeta: session_meta})
-	}`)
 }
 
+// Response processing support
 const coreJS = `
 var TykJS = {
 	TykMiddleware: {
@@ -716,6 +721,34 @@ TykJS.TykMiddleware.NewMiddleware.prototype.ReturnData = function(request, sessi
 
 TykJS.TykMiddleware.NewMiddleware.prototype.ReturnAuthData = function(request, session) {
 	return {Request: request, Session: session}
+}
+
+// Response processing
+TykJS.TykMiddleware.MiddlewareComponentMeta.prototype.ProcessResponse = function(response, session, config) {
+	log("Process Response Not Implemented")
+	return response
+}
+
+TykJS.TykMiddleware.MiddlewareComponentMeta.prototype.DoProcessResponse = function(response, session, config) {
+	response.Body = b64dec(response.Body)
+	var processed_response = this.ProcessResponse(response, session, config)
+
+	if (!processed_response) {
+		log("Middleware didn't return response object!")
+		return
+	}
+
+	processed_response.Response.Body = b64enc(processed_response.Response.Body)
+
+	return JSON.stringify(processed_response)
+}
+
+TykJS.TykMiddleware.NewMiddleware.prototype.NewProcessResponse = function(callback) {
+	this.ProcessResponse = callback
+}
+
+TykJS.TykMiddleware.NewMiddleware.prototype.ReturnResponseData = function(response, session_meta) {
+	return {Response: response, SessionMeta: session_meta}
 }
 
 // Event Handler implementation
