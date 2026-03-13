@@ -3607,6 +3607,50 @@ func ctxGetRequestStatus(r *http.Request) (stat RequestStatus) {
 	return
 }
 
+func ctxSetMCPMethod(r *http.Request, method string) {
+	setCtxValue(r, ctx.MCPMethod, method)
+}
+
+func ctxGetMCPMethod(r *http.Request) string {
+	if v, ok := r.Context().Value(ctx.MCPMethod).(string); ok {
+		return v
+	}
+	return ""
+}
+
+func ctxSetMCPPrimitiveType(r *http.Request, primitiveType string) {
+	setCtxValue(r, ctx.MCPPrimitiveType, primitiveType)
+}
+
+func ctxGetMCPPrimitiveType(r *http.Request) string {
+	if v, ok := r.Context().Value(ctx.MCPPrimitiveType).(string); ok {
+		return v
+	}
+	return ""
+}
+
+func ctxSetMCPPrimitiveName(r *http.Request, name string) {
+	setCtxValue(r, ctx.MCPPrimitiveName, name)
+}
+
+func ctxGetMCPPrimitiveName(r *http.Request) string {
+	if v, ok := r.Context().Value(ctx.MCPPrimitiveName).(string); ok {
+		return v
+	}
+	return ""
+}
+
+func ctxSetJSONRPCErrorCode(r *http.Request, code int) {
+	setCtxValue(r, ctx.JSONRPCErrorCode, code)
+}
+
+func ctxGetJSONRPCErrorCode(r *http.Request) int {
+	if v, ok := r.Context().Value(ctx.JSONRPCErrorCode).(int); ok {
+		return v
+	}
+	return 0
+}
+
 var createOauthClientSecret = func() string {
 	secret := uuid.New()
 	return base64.StdEncoding.EncodeToString([]byte(secret))
