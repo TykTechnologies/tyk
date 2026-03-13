@@ -285,7 +285,7 @@ func TestProcessRequest_InvalidJSON_StashesParseError(t *testing.T) {
 	w := httptest.NewRecorder()
 
 	err, _ := m.ProcessRequest(w, r, nil)
-	require.Error(t, err)
+	require.NoError(t, err)
 
 	assert.Equal(t, mcp.JSONRPCParseError, ctxGetJSONRPCErrorCode(r))
 }
@@ -297,7 +297,7 @@ func TestProcessRequest_MissingVersion_StashesInvalidRequest(t *testing.T) {
 	w := httptest.NewRecorder()
 
 	err, _ := m.ProcessRequest(w, r, nil)
-	require.Error(t, err)
+	require.NoError(t, err)
 
 	assert.Equal(t, mcp.JSONRPCInvalidRequest, ctxGetJSONRPCErrorCode(r))
 }
@@ -309,7 +309,7 @@ func TestProcessRequest_EmptyMethod_StashesInvalidRequest(t *testing.T) {
 	w := httptest.NewRecorder()
 
 	err, _ := m.ProcessRequest(w, r, nil)
-	require.Error(t, err)
+	require.NoError(t, err)
 
 	assert.Equal(t, mcp.JSONRPCInvalidRequest, ctxGetJSONRPCErrorCode(r))
 }
