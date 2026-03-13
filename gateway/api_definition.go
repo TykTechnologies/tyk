@@ -614,7 +614,7 @@ func (a APIDefinitionLoader) replaceVaultSecrets(input *string) error {
 	return nil
 }
 
-// FromCloud will connect and download ApiDefintions from a Mongo DB instance.
+// FromRPC will connect and download ApiDefinitions from a Mongo DB instance.
 func (a APIDefinitionLoader) FromRPC(store RPCDataLoader, orgId string, gw *Gateway) ([]*APISpec, error) {
 	if rpc.IsEmergencyMode() {
 		return gw.LoadDefinitionsFromRPCBackup()
