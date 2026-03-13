@@ -413,6 +413,10 @@ type SessionState struct {
 	MaxQueryDepth int64 `protobuf:"varint,31,opt,name=max_query_depth,json=maxQueryDepth,proto3" json:"max_query_depth,omitempty"`
 	// KeyId corresponds to the token used for API access.
 	KeyId string `protobuf:"bytes,32,opt,name=key_id,json=keyId,proto3" json:"key_id,omitempty"`
+	// PostExpiryAction defines the action to take on a key in Redis after it expires.
+	PostExpiryAction string `protobuf:"bytes,33,opt,name=post_expiry_action,json=postExpiryAction,proto3" json:"post_expiry_action,omitempty"`
+	// PostExpiryGracePeriod defines the duration in seconds to retain a key in Redis after it expires.
+	PostExpiryGracePeriod int64 `protobuf:"varint,34,opt,name=post_expiry_grace_period,json=postExpiryGracePeriod,proto3" json:"post_expiry_grace_period,omitempty"`
 }
 
 func (x *SessionState) Reset() {
@@ -669,6 +673,20 @@ func (x *SessionState) GetKeyId() string {
 		return x.KeyId
 	}
 	return ""
+}
+
+func (x *SessionState) GetPostExpiryAction() string {
+	if x != nil {
+		return x.PostExpiryAction
+	}
+	return ""
+}
+
+func (x *SessionState) GetPostExpiryGracePeriod() int64 {
+	if x != nil {
+		return x.PostExpiryGracePeriod
+	}
+	return 0
 }
 
 var File_coprocess_session_state_proto protoreflect.FileDescriptor
