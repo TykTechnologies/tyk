@@ -273,6 +273,9 @@ func (e *ErrorHandler) writeTemplateErrorResponse(w http.ResponseWriter, r *http
 	contentType = strings.Split(contentType, ";")[0]
 
 	switch contentType {
+	case header.ApplicationSoapXML:
+		templateExtension = "xml"
+		contentType = header.ApplicationSoapXML
 	case header.ApplicationXML:
 		templateExtension = "xml"
 		contentType = header.ApplicationXML
@@ -330,7 +333,7 @@ func (e *ErrorHandler) writeTemplateErrorResponse(w http.ResponseWriter, r *http
 
 		apiError := APIError{htmltemplate.HTML(htmltemplate.JSEscapeString(errMsg))}
 
-		if contentType == header.ApplicationXML || contentType == header.TextXML {
+		if contentType == header.ApplicationXML || contentType == header.TextXML || contentType == header.ApplicationSoapXML {
 			apiError.Message = htmltemplate.HTML(errMsg)
 
 			//we look up in the last defined templateName to obtain the template.
