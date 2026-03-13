@@ -43,7 +43,7 @@ jobs:
           token: ${{ secrets.ORG_GH_TOKEN }}
 
       - name: Setup Golang
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v6
         with:
           go-version: stable
 
