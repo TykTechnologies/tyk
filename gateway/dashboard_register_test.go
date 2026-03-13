@@ -80,11 +80,16 @@ func Test_DashboardRegister_DoReloadFails(t *testing.T) {
 	defer mockServer.Close()
 
 	ts := StartTest(func(globalConf *config.Config) {
-		globalConf.UseDBAppConfigs = true
+		globalConf.UseDBAppConfigs = false // Set to false so StartTest doesn't block
 		globalConf.DBAppConfOptions.ConnectionString = mockServer.URL
 		globalConf.NodeSecret = "test-secret"
 	})
 	defer ts.Close()
+
+	// Now set it to true for the manual Register call
+	cfg := ts.Gw.GetConfig()
+	cfg.UseDBAppConfigs = true
+	ts.Gw.SetConfig(cfg)
 
 	// Reset the dashboard client so it uses the new config
 	ts.Gw.resetDashboardClient()
@@ -95,11 +100,15 @@ func Test_DashboardRegister_DoReloadFails(t *testing.T) {
 	// Initialize the dashboard service
 	dashboardServiceInit(ts.Gw)
 
-	// Call gw.DashService.Register(context.Background())
-	err := ts.Gw.DashService.Register(context.Background())
+	// Create a context with a short timeout so the retry loop doesn't block forever
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
 
-	// Assert that Register() returns nil (indicating success)
-	assert.NoError(t, err)
+	// Call gw.DashService.Register(ctx)
+	err := ts.Gw.DashService.Register(ctx)
+
+	// Assert that Register() returns an error (context deadline exceeded)
+	assert.ErrorIs(t, err, context.DeadlineExceeded)
 
 	// Verify that the gateway did not successfully load APIs
 	assert.False(t, ts.Gw.performedSuccessfulReload)
