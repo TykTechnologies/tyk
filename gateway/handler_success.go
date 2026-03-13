@@ -443,7 +443,7 @@ func (s *SuccessHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) *http
 		s.RecordHit(r, latency, resp.Response.StatusCode, resp.Response, false)
 		s.RecordAccessLog(r, resp.Response, latency)
 
-		s.Base().RecordMetrics(r, resp.Response.StatusCode, latency, resp.Response)
+		s.Base().RecordMetrics(w, r, resp.Response.StatusCode, latency, resp.Response)
 	}
 	log.Debug("Done proxy")
 
@@ -491,7 +491,7 @@ func (s *SuccessHandler) ServeHTTPWithCache(w http.ResponseWriter, r *http.Reque
 		s.RecordHit(r, latency, inRes.Response.StatusCode, inRes.Response, false)
 		s.RecordAccessLog(r, inRes.Response, latency)
 
-		s.Base().RecordMetrics(r, inRes.Response.StatusCode, latency, inRes.Response)
+		s.Base().RecordMetrics(w, r, inRes.Response.StatusCode, latency, inRes.Response)
 	}
 
 	return inRes

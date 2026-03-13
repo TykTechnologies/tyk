@@ -505,8 +505,10 @@ func (t *BaseMiddleware) RecordAccessLog(req *http.Request, resp *http.Response,
 
 // RecordMetrics builds a RequestContext from the current request state and
 // records all configured OTEL metric instruments. Pass the upstream response
-// when available (success path); nil is safe (error path).
-func (t *BaseMiddleware) RecordMetrics(r *http.Request, statusCode int, latency analytics.Latency, response *http.Response) {
+// when available (success path); nil is safe (error path). The ResponseWriter
+// is used as a fallback source for response headers when the proxy response
+// object does not carry them (e.g. when enable_detailed_recording is false).
+func (t *BaseMiddleware) RecordMetrics(w http.ResponseWriter, r *http.Request, statusCode int, latency analytics.Latency, response *http.Response) {
 	if t.Spec.DoNotTrack || ctxGetDoNotTrack(r) {
 		return
 	}
@@ -533,8 +535,19 @@ func (t *BaseMiddleware) RecordMetrics(r *http.Request, statusCode int, latency 
 	if t.Gw.MetricInstruments.NeedsContext() {
 		rc.ContextVariables = ctxGetData(r)
 	}
-	if response != nil && t.Gw.MetricInstruments.NeedsResponse() {
-		rc.Response = response
+	if t.Gw.MetricInstruments.NeedsResponse() {
+		if response != nil && response.Header != nil {
+			rc.Response = response
+		} else if w != nil {
+			// The proxy response may not carry headers when
+			// enable_detailed_recording is false. Fall back to
+			// the ResponseWriter which HandleResponse already
+			// populated with upstream headers.
+			rc.Response = &http.Response{
+				StatusCode: statusCode,
+				Header:     w.Header(),
+			}
+		}
 	}
 	if errClass := ctx.GetErrorClassification(r); errClass != nil {
 		rc.ErrorClassification = string(errClass.Flag)
