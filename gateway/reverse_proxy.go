@@ -261,6 +261,16 @@ func (gw *Gateway) TykNewSingleHostReverseProxy(target *url.URL, spec *APISpec, 
 				host = allHostsDownURL
 				ctx.SetErrorClassification(req, tykerrors.ClassifyNoHealthyUpstreamsError(target.Host))
 			}
+			
+			// Process dynamic variables in load balanced host
+			if spec.EnableContextVars {
+				processedHost := gw.ReplaceTykVariables(req, host, false)
+				if processedHost != host {
+					logger.WithField("original_host", host).WithField("processed_host", processedHost).Debug("Processing dynamic variables in load balanced host")
+					host = processedHost
+				}
+			}
+			
 			lbRemote, err := url.Parse(host)
 			if err != nil {
 				logger.Error("[PROXY] [LOAD BALANCING] Couldn't parse target URL:", err)
@@ -284,12 +294,34 @@ func (gw *Gateway) TykNewSingleHostReverseProxy(target *url.URL, spec *APISpec, 
 			}
 		}
 
+		// Process dynamic variables in the target URL
+		variablesProcessed := false
+		if targetToUse != nil && spec.EnableContextVars {
+			originalURL := targetToUse.String()
+			processedURL := gw.ReplaceTykVariables(req, originalURL, false)
+			
+			if processedURL != originalURL {
+				logger.WithField("original_url", originalURL).WithField("processed_url", processedURL).Debug("Processing dynamic variables in upstream URL")
+				if newTarget, err := url.Parse(processedURL); err == nil {
+					targetToUse = newTarget
+					variablesProcessed = true
+					// Update targetQuery if the processed URL has a different query
+					if newTarget.RawQuery != "" {
+						targetQuery = newTarget.RawQuery
+					}
+				} else {
+					logger.WithError(err).Error("Failed to parse URL after variable processing, using original URL")
+					// Keep original targetToUse as fallback
+				}
+			}
+		}
+
 		// No override, and no load balancing? Use the existing target
 
 		// if this is false, there was an url rewrite, thus we
 		// don't want to do anything to the path - req.URL is
 		// already final.
-		if targetToUse == target {
+		if targetToUse == target || variablesProcessed {
 			req.URL.Scheme = targetToUse.Scheme
 			req.URL.Host = targetToUse.Host
 			req.URL.Path = singleJoiningSlash(targetToUse.Path, req.URL.Path, spec.Proxy.DisableStripSlash)
