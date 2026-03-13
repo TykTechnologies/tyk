@@ -2081,7 +2081,10 @@ func Start() {
 			panic(err)
 		}
 		pprof.StartCPUProfile(cpuProfFile)
-		defer pprof.StopCPUProfile()
+		defer func() {
+			pprof.StopCPUProfile()
+			cpuProfFile.Close()
+		}()
 	}
 	if *cli.BlockProfile {
 		mainLog.Info("Block profiling active")
