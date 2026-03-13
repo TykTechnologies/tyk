@@ -55,7 +55,7 @@ func (m *MCPAccessControlMiddleware) ProcessRequest(w http.ResponseWriter, r *ht
 	}
 
 	rules := rulesForPrimitiveType(accessDef.MCPAccessRights, state.PrimitiveType)
-	if checkAccessControlRules(rules, state.PrimitiveName) {
+	if mcp.CheckAccessControlRules(rules, state.PrimitiveName) {
 		writeJSONRPCAccessDenied(w, r,
 			fmt.Sprintf("%s '%s' is not available", state.PrimitiveType, state.PrimitiveName))
 		return nil, middleware.StatusRespond
