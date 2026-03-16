@@ -2,6 +2,8 @@ package otel
 
 import (
 	"context"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 	"time"
 
@@ -10,6 +12,8 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/TykTechnologies/opentelemetry/metric/metrictest"
+
+	"github.com/TykTechnologies/tyk/internal/otel/apimetrics"
 )
 
 // noopProvider creates a disabled provider suitable for unit tests.
@@ -191,6 +195,105 @@ func TestRecordReload_Accumulates(t *testing.T) {
 	metrictest.AssertSum(t, tp.FindMetric(t, "tyk.gateway.config.reload"), int64(3))
 	metrictest.AssertHistogramCount(t, tp.FindMetric(t, "tyk.gateway.config.reload.duration"), uint64(3))
 	metrictest.AssertHistogramSum(t, tp.FindMetric(t, "tyk.gateway.config.reload.duration"), 0.8)
+}
+
+func TestSetRegistry(t *testing.T) {
+	tests := []struct {
+		name          string
+		defs          []apimetrics.APIMetricDefinition
+		wantPanic     bool
+		needsSession  bool
+		needsContext  bool
+		needsResponse bool
+		wantMetric    string // if non-empty, record a request and assert this counter exists
+	}{
+		{
+			name: "metadata dimension registers and records",
+			defs: []apimetrics.APIMetricDefinition{{
+				Name: "test.metadata",
+				Type: "counter",
+				Dimensions: []apimetrics.DimensionDefinition{
+					{Source: "metadata", Key: "method", Label: "method"},
+				},
+			}},
+			wantMetric: "test.metadata",
+		},
+		{
+			name: "response_header dimension sets NeedsResponse",
+			defs: []apimetrics.APIMetricDefinition{{
+				Name: "test.resp.header",
+				Type: "counter",
+				Dimensions: []apimetrics.DimensionDefinition{
+					{Source: "response_header", Key: "X-Version", Label: "version", Default: "unknown"},
+				},
+			}},
+			needsResponse: true,
+			wantMetric:    "test.resp.header",
+		},
+		{
+			name: "session dimension sets NeedsSession",
+			defs: []apimetrics.APIMetricDefinition{{
+				Name: "test.session",
+				Type: "counter",
+				Dimensions: []apimetrics.DimensionDefinition{
+					{Source: "session", Key: "oauth_id", Label: "oauth"},
+				},
+			}},
+			needsSession: true,
+			wantMetric:   "test.session",
+		},
+		{
+			name: "context dimension sets NeedsContext",
+			defs: []apimetrics.APIMetricDefinition{{
+				Name: "test.context",
+				Type: "counter",
+				Dimensions: []apimetrics.DimensionDefinition{
+					{Source: "context", Key: "tier", Label: "tier", Default: "basic"},
+				},
+			}},
+			needsContext: true,
+			wantMetric:   "test.context",
+		},
+		{
+			name: "invalid definition panics",
+			defs: []apimetrics.APIMetricDefinition{{
+				Name: "",
+				Type: "counter",
+			}},
+			wantPanic: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			inst, tp := activeProvider(t)
+
+			if tt.wantPanic {
+				assert.Panics(t, func() {
+					inst.SetRegistry(tp, tt.defs)
+				})
+				return
+			}
+
+			inst.SetRegistry(tp, tt.defs)
+
+			assert.Equal(t, tt.needsSession, inst.NeedsSession())
+			assert.Equal(t, tt.needsContext, inst.NeedsContext())
+			assert.Equal(t, tt.needsResponse, inst.NeedsResponse())
+
+			if tt.wantMetric != "" {
+				rc := &apimetrics.RequestContext{
+					Request:    httptest.NewRequest(http.MethodGet, "http://example.com/", nil),
+					StatusCode: 200,
+					APIID:      "api-1",
+				}
+				inst.RecordAPIMetrics(context.Background(), rc)
+
+				m := tp.FindMetric(t, tt.wantMetric)
+				metrictest.AssertSum(t, m, int64(1))
+			}
+		})
+	}
 }
 
 func TestAllMetricNames_Registered(t *testing.T) {

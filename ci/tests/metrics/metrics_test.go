@@ -171,6 +171,9 @@ func TestREDMetrics_ResponseFlag(t *testing.T) {
 }
 
 func TestResourceAttributes(t *testing.T) {
+	if p := gwProfile(); p == "cardinality" || p == "response-headers" {
+		t.Skip("skipped under " + p + " profile (no segment tags configured)")
+	}
 	waitForGateway(t)
 
 	// Send traffic to generate metrics.
@@ -591,6 +594,222 @@ func TestDisabledProfile_NoAPIMetrics(t *testing.T) {
 	}
 }
 
+// ---------- Cardinality limit tests ----------
+
+func TestCardinalityLimit_OverflowSeries(t *testing.T) {
+	if gwProfile() != "cardinality" {
+		t.Skip("only runs under cardinality profile")
+	}
+	waitForGateway(t)
+
+	// The cardinality profile sets CardinalityLimit=5 and defines a counter
+	// with a high-cardinality header dimension (X-Request-ID).
+	// Send 20 requests, each with a unique X-Request-ID header value.
+	const totalRequests = 20
+	for i := range totalRequests {
+		sendTrafficWithHeaders(t, "GET", gatewayURL+"/test/ip", 1,
+			map[string]string{"X-Request-ID": fmt.Sprintf("req-%d", i)})
+	}
+
+	// Wait for export + scrape cycle.
+	time.Sleep(15 * time.Second)
+
+	// Query Prometheus for the counter. OTel counter "cardinality.test.requests.total"
+	// becomes "cardinality_test_requests_total" in Prometheus.
+	//
+	// With CardinalityLimit=5, we expect at most 5 regular series + 1 overflow series.
+	// The overflow series has the label otel_metric_overflow="true".
+	results := queryPrometheusAllSeries(t, "cardinality_test_requests_total")
+
+	var hasOverflow bool
+	var totalCount float64
+	for _, r := range results {
+		if r.labels["otel_metric_overflow"] == "true" {
+			hasOverflow = true
+		}
+		totalCount += r.value
+	}
+
+	// With limit=5, we expect at most 6 series (5 + 1 overflow).
+	maxSeries := 5 + 1
+	if len(results) > maxSeries {
+		t.Errorf("expected at most %d series for cardinality_test_requests_total, got %d", maxSeries, len(results))
+	}
+
+	if !hasOverflow {
+		t.Error("expected overflow series with otel_metric_overflow=\"true\" label")
+	}
+
+	// Total count across all series should equal totalRequests.
+	if int(totalCount) != totalRequests {
+		t.Errorf("expected total count=%d across all series, got %v", totalRequests, totalCount)
+	}
+
+	t.Logf("cardinality test: %d series, overflow=%v, total_count=%v", len(results), hasOverflow, totalCount)
+}
+
+func TestCardinalityLimit_DefaultMetricsUnaffected(t *testing.T) {
+	if gwProfile() != "default" {
+		t.Skip("only runs under default profile")
+	}
+	waitForGateway(t)
+
+	// With the default profile (default CardinalityLimit=2000), normal traffic
+	// should never trigger overflow because default RED dimensions are low-cardinality.
+	sendTraffic(t, "GET", gatewayURL+"/test/ip", 10)
+
+	time.Sleep(15 * time.Second)
+
+	// Verify no overflow series on default RED metrics.
+	results := queryPrometheusAllSeries(t, "tyk_api_requests_total")
+	for _, r := range results {
+		if r.labels["otel_metric_overflow"] == "true" {
+			t.Error("unexpected overflow series on tyk_api_requests_total with default cardinality limit")
+		}
+	}
+}
+
+// ---------- Response-header dimension tests ----------
+
+// TestResponseHeaderDimension_WithDetailedRecording validates that response_header
+// dimensions work correctly when enable_detailed_recording is true on the API.
+// Uses httpbin's /response-headers endpoint to return known header values.
+func TestResponseHeaderDimension_WithDetailedRecording(t *testing.T) {
+	if gwProfile() != "response-headers" {
+		t.Skip("only runs under response-headers profile")
+	}
+	waitForGateway(t)
+
+	// Hit httpbin's /response-headers endpoint through the API that has
+	// enable_detailed_recording: true (api_id=5, listen_path=/resp-headers/).
+	// This makes httpbin return X-Backend-Version: v2.1.0 in the response.
+	sendTraffic(t, "GET", gatewayURL+"/resp-headers/response-headers?X-Backend-Version=v2.1.0", 10)
+
+	// OTel counter "tyk.requests.by.backend.version" -> Prometheus "tyk_requests_by_backend_version_total".
+	// The response_header dimension should extract "v2.1.0" from the response.
+	assertMetricExists(t, `tyk_requests_by_backend_version_total{tyk_api_id="5",backend_version="v2.1.0"}`)
+}
+
+// TestResponseHeaderDimension_ContentType validates Content-Type response header
+// extraction when enable_detailed_recording is true.
+func TestResponseHeaderDimension_ContentType(t *testing.T) {
+	if gwProfile() != "response-headers" {
+		t.Skip("only runs under response-headers profile")
+	}
+	waitForGateway(t)
+
+	// /ip returns application/json content type.
+	sendTraffic(t, "GET", gatewayURL+"/resp-headers/ip", 10)
+
+	// Content-Type from httpbin is "application/json".
+	assertMetricExists(t, `tyk_requests_by_content_type_total{tyk_api_id="5",content_type="application/json"}`)
+}
+
+// TestResponseHeaderDimension_MultipleValues validates that different response
+// header values create separate metric series.
+func TestResponseHeaderDimension_MultipleValues(t *testing.T) {
+	if gwProfile() != "response-headers" {
+		t.Skip("only runs under response-headers profile")
+	}
+	waitForGateway(t)
+
+	// Send requests that return different X-Backend-Version values.
+	sendTraffic(t, "GET", gatewayURL+"/resp-headers/response-headers?X-Backend-Version=v1.0.0", 5)
+	sendTraffic(t, "GET", gatewayURL+"/resp-headers/response-headers?X-Backend-Version=v2.0.0", 5)
+
+	// Both versions should appear as separate series.
+	assertMetricExists(t, `tyk_requests_by_backend_version_total{tyk_api_id="5",backend_version="v1.0.0"}`)
+	assertMetricExists(t, `tyk_requests_by_backend_version_total{tyk_api_id="5",backend_version="v2.0.0"}`)
+}
+
+// TestResponseHeaderDimension_DefaultWhenMissing validates that the default value
+// is used when the response header is absent.
+func TestResponseHeaderDimension_DefaultWhenMissing(t *testing.T) {
+	if gwProfile() != "response-headers" {
+		t.Skip("only runs under response-headers profile")
+	}
+	waitForGateway(t)
+
+	// /ip does NOT return X-Backend-Version, so the default "unknown" should be used.
+	sendTraffic(t, "GET", gatewayURL+"/resp-headers/ip", 10)
+
+	assertMetricExists(t, `tyk_requests_by_backend_version_total{tyk_api_id="5",backend_version="unknown"}`)
+}
+
+// TestResponseHeaderDimension_WithoutDetailedRecording validates that response_header
+// dimensions work correctly even when enable_detailed_recording is false.
+// Previously this was broken because WrappedServeHTTP only copied response headers
+// when withCache=true (which was tied to enable_detailed_recording on the non-cache path).
+func TestResponseHeaderDimension_WithoutDetailedRecording(t *testing.T) {
+	if gwProfile() != "response-headers" {
+		t.Skip("only runs under response-headers profile")
+	}
+	waitForGateway(t)
+
+	// Hit httpbin's /response-headers endpoint through the API with
+	// enable_detailed_recording: false (api_id=6, listen_path=/resp-headers-nodetail/).
+	sendTraffic(t, "GET", gatewayURL+"/resp-headers-nodetail/response-headers?X-Backend-Version=v3.0.0", 10)
+
+	// Response headers should be extracted regardless of enable_detailed_recording.
+	assertMetricExists(t, `tyk_requests_by_backend_version_total{tyk_api_id="6",backend_version="v3.0.0"}`)
+}
+
+// TestResponseHeaderDimension_HasExpectedLabels validates all expected labels
+// are present on the response-header-based counter.
+func TestResponseHeaderDimension_HasExpectedLabels(t *testing.T) {
+	if gwProfile() != "response-headers" {
+		t.Skip("only runs under response-headers profile")
+	}
+	waitForGateway(t)
+
+	sendTraffic(t, "GET", gatewayURL+"/resp-headers/response-headers?X-Backend-Version=v1.0.0", 5)
+
+	assertMetricHasLabels(t, "tyk_requests_by_backend_version_total", []string{
+		"backend_version",
+		"tyk_api_id",
+	})
+}
+
+// TestResponseHeaderDimension_CachedAPIWithoutDetailedRecording validates that
+// when caching is enabled (ServeHTTPForCache path), response headers ARE available
+// for OTel dimensions even without enable_detailed_recording, because the cache
+// path always passes withCache=true to WrappedServeHTTP.
+func TestResponseHeaderDimension_CachedAPIWithoutDetailedRecording(t *testing.T) {
+	if gwProfile() != "response-headers" {
+		t.Skip("only runs under response-headers profile")
+	}
+	waitForGateway(t)
+
+	// api_id=7 has enable_detailed_recording=false BUT cache enabled.
+	// The cache code path (ServeHTTPForCache) always does *inres = *res,
+	// so response headers should be copied regardless.
+	sendTraffic(t, "GET", gatewayURL+"/resp-headers-cached/response-headers?X-Backend-Version=v4.0.0", 10)
+
+	// With caching on, the response headers should be available even without detailed recording.
+	assertMetricExists(t, `tyk_requests_by_backend_version_total{tyk_api_id="7",backend_version="v4.0.0"}`)
+}
+
+// TestResponseHeaderDimension_ErrorPath validates that the error handler path
+// does not panic when response_header dimensions are configured and the upstream
+// is unreachable (no upstream response at all). The dimension should fall back
+// to its default value.
+func TestResponseHeaderDimension_ErrorPath(t *testing.T) {
+	if gwProfile() != "response-headers" {
+		t.Skip("only runs under response-headers profile")
+	}
+	waitForGateway(t)
+
+	// api_id=8 proxies to a non-existent upstream. Every request will hit
+	// the error handler path (HandleError), which passes nil response to
+	// RecordMetrics. The gateway should not panic and should record the
+	// metric with the default dimension value.
+	sendTraffic(t, "GET", gatewayURL+"/resp-headers-error/anything", 5)
+
+	// The error requests should be counted with the default "unknown" for
+	// backend_version (no upstream response to extract headers from).
+	assertMetricExists(t, `tyk_requests_by_backend_version_total{tyk_api_id="8",backend_version="unknown"}`)
+}
+
 // ---------- helpers ----------
 
 func waitForGateway(t *testing.T) {
@@ -695,6 +914,42 @@ func queryPrometheusLabels(t *testing.T, query string) (map[string]string, bool)
 	}
 
 	return result.Data.Result[0].Metric, true
+}
+
+// promSeries represents a single Prometheus time series with its labels and value.
+type promSeries struct {
+	labels map[string]string
+	value  float64
+}
+
+// queryPrometheusAllSeries returns all series for a metric name.
+func queryPrometheusAllSeries(t *testing.T, metric string) []promSeries {
+	t.Helper()
+	u := fmt.Sprintf("%s/api/v1/query?query=%s", prometheusURL, url.QueryEscape(metric))
+	resp, err := http.Get(u)
+	if err != nil {
+		t.Fatalf("prometheus query failed: %v", err)
+	}
+	defer resp.Body.Close()
+
+	var result promQueryResult
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		t.Fatalf("failed to decode prometheus response: %v", err)
+	}
+	if result.Status != "success" {
+		t.Fatalf("prometheus query returned status: %s", result.Status)
+	}
+
+	var series []promSeries
+	for _, r := range result.Data.Result {
+		var val float64
+		var s string
+		if err := json.Unmarshal(r.Value[1], &s); err == nil {
+			fmt.Sscanf(s, "%f", &val)
+		}
+		series = append(series, promSeries{labels: r.Metric, value: val})
+	}
+	return series
 }
 
 // assertMetricExists polls Prometheus until metric > 0 or times out.
