@@ -233,8 +233,8 @@ type Gateway struct {
 	validator validator.Validator
 
 	// compiledErrorOverrides holds the indexed error override rules for O(1) lookup.
-	// Built from config.ErrorOverrides during gateway startup.
-	compiledErrorOverrides atomic.Pointer[config.CompiledErrorOverrides]
+	// Built from apidef.ErrorOverrides during gateway startup.
+	compiledErrorOverrides atomic.Pointer[CompiledErrorOverrides]
 }
 
 func NewGateway(config config.Config, ctx context.Context) *Gateway {
@@ -2321,12 +2321,12 @@ func (gw *Gateway) GetCertificateManager() certs.CertificateManager {
 }
 
 // GetCompiledErrorOverrides returns the compiled error overrides for O(1) lookup.
-func (gw *Gateway) GetCompiledErrorOverrides() *config.CompiledErrorOverrides {
+func (gw *Gateway) GetCompiledErrorOverrides() *CompiledErrorOverrides {
 	return gw.compiledErrorOverrides.Load()
 }
 
 // SetCompiledErrorOverrides stores the compiled error overrides.
-func (gw *Gateway) SetCompiledErrorOverrides(compiled *config.CompiledErrorOverrides) {
+func (gw *Gateway) SetCompiledErrorOverrides(compiled *CompiledErrorOverrides) {
 	gw.compiledErrorOverrides.Store(compiled)
 }
 

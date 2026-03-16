@@ -10,7 +10,7 @@ import (
 
 	"github.com/tidwall/gjson"
 
-	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/ctx"
 	"github.com/TykTechnologies/tyk/internal/errors"
 )
@@ -22,6 +22,15 @@ const (
 	// Gateway-generated errors are typically small and won't hit this limit.
 	maxBodySizeForMatching = 4096 // 4KB
 )
+
+// CompiledErrorOverrides provides lookup for error overrides by status code.
+type CompiledErrorOverrides struct {
+	// ByExactCode maps exact status codes to their override rules.
+	ByExactCode map[int][]*apidef.ErrorOverride
+
+	// ByPrefix maps status code prefixes to pattern rules.
+	ByPrefix map[int][]*apidef.ErrorOverride
+}
 
 // ErrorOverrides provides centralized error override logic for both
 // Tyk-generated errors (via HandleError) and upstream error responses
@@ -44,7 +53,7 @@ type OverrideResult struct {
 	OriginalCode int
 
 	// rule is the matched ErrorOverride rule (for template access).
-	rule *config.ErrorOverride
+	rule *apidef.ErrorOverride
 }
 
 // NewErrorOverrides creates a new ErrorOverrides instance.
@@ -60,14 +69,14 @@ func NewErrorOverrides(spec *APISpec, gw *Gateway) *ErrorOverrides {
 // Called during config load (gateway-level) or API load (API-level).
 // Compilation failures are logged as warnings and those rules are skipped.
 // Returns nil if no overrides are provided or all rules failed to compile.
-func CompileErrorOverrides(overrides config.ErrorOverridesMap) *config.CompiledErrorOverrides {
+func CompileErrorOverrides(overrides apidef.ErrorOverridesMap) *CompiledErrorOverrides {
 	if len(overrides) == 0 {
 		return nil
 	}
 
-	compiled := &config.CompiledErrorOverrides{
-		ByExactCode: make(map[int][]*config.ErrorOverride),
-		ByPrefix:    make(map[int][]*config.ErrorOverride),
+	compiled := &CompiledErrorOverrides{
+		ByExactCode: make(map[int][]*apidef.ErrorOverride),
+		ByPrefix:    make(map[int][]*apidef.ErrorOverride),
 	}
 
 	for statusCode, rules := range overrides {
@@ -88,8 +97,8 @@ func CompileErrorOverrides(overrides config.ErrorOverridesMap) *config.CompiledE
 
 // compileRulesForStatusCode validates and compiles all rules for a given status code.
 // Returns pointers to successfully compiled rules; failed rules are logged and skipped.
-func compileRulesForStatusCode(rules []config.ErrorOverride, statusCode string) []*config.ErrorOverride {
-	validRules := make([]config.ErrorOverride, 0, len(rules))
+func compileRulesForStatusCode(rules []apidef.ErrorOverride, statusCode string) []*apidef.ErrorOverride {
+	validRules := make([]apidef.ErrorOverride, 0, len(rules))
 
 	for i := range rules {
 		if err := compileSingleRule(&rules[i]); err != nil {
@@ -104,7 +113,7 @@ func compileRulesForStatusCode(rules []config.ErrorOverride, statusCode string) 
 	}
 
 	// Convert to pointer slice for storage
-	rulePtrs := make([]*config.ErrorOverride, len(validRules))
+	rulePtrs := make([]*apidef.ErrorOverride, len(validRules))
 	for i := range validRules {
 		rulePtrs[i] = &validRules[i]
 	}
@@ -114,7 +123,7 @@ func compileRulesForStatusCode(rules []config.ErrorOverride, statusCode string) 
 
 // compileSingleRule compiles regex patterns and templates for a single override rule.
 // Returns error if compilation fails; the rule should be skipped.
-func compileSingleRule(rule *config.ErrorOverride) error {
+func compileSingleRule(rule *apidef.ErrorOverride) error {
 	// Compile regex pattern for matching
 	if rule.Match != nil {
 		if err := rule.Match.Compile(); err != nil {
@@ -133,7 +142,7 @@ func compileSingleRule(rule *config.ErrorOverride) error {
 }
 
 // indexCompiledRules adds validated rules to the appropriate index (exact code or pattern).
-func indexCompiledRules(compiled *config.CompiledErrorOverrides, statusCode string, rules []*config.ErrorOverride) {
+func indexCompiledRules(compiled *CompiledErrorOverrides, statusCode string, rules []*apidef.ErrorOverride) {
 	// Try exact match first: "500", "401"
 	if exact, err := strconv.Atoi(statusCode); err == nil {
 		compiled.ByExactCode[exact] = rules
@@ -156,7 +165,7 @@ func indexCompiledRules(compiled *config.CompiledErrorOverrides, statusCode stri
 // compileBodyTemplates pre-compiles inline Body into both template types if it contains template variables.
 // text/template is used for XML, html/template for JSON (auto-escapes).
 // Plain text bodies are skipped - they'll be written directly.
-func compileBodyTemplates(rule *config.ErrorOverride) error {
+func compileBodyTemplates(rule *apidef.ErrorOverride) error {
 	body := rule.Response.Body
 
 	// Simple heuristic: check if body looks like a template
@@ -220,7 +229,7 @@ func (o *ErrorOverrides) ApplyOverride(r *http.Request, statusCode int, body []b
 // findMatchingRule searches for a matching override rule.
 // Checks exact status code first, then pattern matches (4xx, 5xx).
 // Rules are evaluated in order within each status code (first match wins).
-func (o *ErrorOverrides) findMatchingRule(r *http.Request, compiled *config.CompiledErrorOverrides, statusCode int, body []byte) *config.ErrorOverride {
+func (o *ErrorOverrides) findMatchingRule(r *http.Request, compiled *CompiledErrorOverrides, statusCode int, body []byte) *apidef.ErrorOverride {
 	// First, check exact status code matches (O(1) lookup)
 	if rules, ok := compiled.ByExactCode[statusCode]; ok {
 		for _, rule := range rules {
@@ -247,7 +256,7 @@ func (o *ErrorOverrides) findMatchingRule(r *http.Request, compiled *config.Comp
 // Status code is already matched via map lookup.
 // Match priority: flag > body_field > message_pattern.
 // Large bodies are truncated before matching to prevent performance issues.
-func (o *ErrorOverrides) matchesAdditionalCriteria(r *http.Request, rule *config.ErrorOverride, body []byte) bool {
+func (o *ErrorOverrides) matchesAdditionalCriteria(r *http.Request, rule *apidef.ErrorOverride, body []byte) bool {
 	// If no match criteria, always matches
 	if rule.Match == nil {
 		return true
@@ -302,7 +311,7 @@ func (o *ErrorOverrides) matchFlag(r *http.Request, expectedFlag errors.Response
 }
 
 // matchMessagePattern matches body against a pre-compiled regex pattern.
-func (o *ErrorOverrides) matchMessagePattern(match *config.ErrorMatcher, body []byte) bool {
+func (o *ErrorOverrides) matchMessagePattern(match *apidef.ErrorMatcher, body []byte) bool {
 	if match.CompiledPattern == nil {
 		// Pattern was not compiled (should not happen if CompileErrorOverrides was called)
 		log.Warn("Error override message_pattern not compiled, skipping match")
