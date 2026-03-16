@@ -137,6 +137,30 @@ func (a *Record) WithErrorClassification(ec *errors.ErrorClassification) *Record
 	return a
 }
 
+// WithAPIType adds the api_type field based on the API definition characteristics.
+func (a *Record) WithAPIType(apiType string) *Record {
+	a.fields["api_type"] = apiType
+	return a
+}
+
+// WithMCP adds MCP-specific fields from the request context.
+// Fields are only added when non-empty/non-zero to avoid log noise.
+func (a *Record) WithMCP(req *http.Request) *Record {
+	if method := ctx.GetMCPMethod(req); method != "" {
+		a.fields["mcp_method"] = method
+	}
+	if pt := ctx.GetMCPPrimitiveType(req); pt != "" {
+		a.fields["mcp_primitive_type"] = pt
+	}
+	if pn := ctx.GetMCPPrimitiveName(req); pn != "" {
+		a.fields["mcp_primitive_name"] = pn
+	}
+	if code := ctx.GetJSONRPCErrorCode(req); code != 0 {
+		a.fields["mcp_error_code"] = code
+	}
+	return a
+}
+
 // Fields returns a logrus.Fields intended for logging.
 func (a *Record) Fields(allowedKeys []string) logrus.Fields {
 	return Filter(a.fields, allowedKeys)
