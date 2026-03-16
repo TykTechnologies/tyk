@@ -1101,7 +1101,7 @@ run_override_test_upstream_passthrough() {
     local failures=""
 
     # Check body contains ORIGINAL upstream content
-    if echo "$response_body" | grep -q "service_unavailable"; then
+    if echo "$response_body" | grep -q "bad_request"; then
         log_info "  [OK] Body contains original upstream content"
     else
         test_passed=false
@@ -1116,12 +1116,12 @@ run_override_test_upstream_passthrough() {
         failures="${failures}\n  - X-Override-Applied present (should not be)"
     fi
 
-    # Check status code remains 503
-    if [ "$http_code" = "503" ]; then
-        log_info "  [OK] Status code unchanged: 503"
+    # Check status code remains 400
+    if [ "$http_code" = "400" ]; then
+        log_info "  [OK] Status code unchanged: 400"
     else
         test_passed=false
-        failures="${failures}\n  - Status changed: got $http_code, expected 503"
+        failures="${failures}\n  - Status changed: got $http_code, expected 400"
     fi
 
     if [ "$test_passed" = true ]; then
@@ -1567,7 +1567,7 @@ run_all_override_tests() {
     # Test 4: Upstream no match - body passthrough
     run_override_test_upstream_passthrough \
         "Upstream Override - No Match Passthrough" \
-        "/test-upstream/503-nomatch"
+        "/test-upstream/400-nomatch"
 
 }
 

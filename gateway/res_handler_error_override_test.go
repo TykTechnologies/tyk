@@ -89,6 +89,45 @@ func TestLazyBodyReader(t *testing.T) {
 		assert.Equal(t, bodyContent, restored)
 	})
 
+	t.Run("RestoreIfRead preserves full body for large responses", func(t *testing.T) {
+		// Create body larger than maxBodySizeForMatching
+		largeBody := make([]byte, maxBodySizeForMatching+5000)
+		for i := range largeBody {
+			largeBody[i] = byte('a' + (i % 26))
+		}
+
+		reader := newLazyBodyReader(io.NopCloser(bytes.NewReader(largeBody)), logger)
+
+		// Read (will only read first maxBodySizeForMatching bytes)
+		truncated := reader.Read()
+		assert.Len(t, truncated, maxBodySizeForMatching)
+
+		// Restore to response
+		res := &http.Response{}
+		reader.RestoreIfRead(res)
+
+		// Should be able to read FULL body (not just truncated part)
+		restored, err := io.ReadAll(res.Body)
+		require.NoError(t, err)
+		assert.Equal(t, largeBody, restored, "Full body should be restored, not truncated")
+	})
+
+	t.Run("CloseOriginal closes the underlying body", func(t *testing.T) {
+		closeCalled := false
+		mockCloser := &mockReadCloser{
+			reader: bytes.NewReader([]byte("test")),
+			onClose: func() error {
+				closeCalled = true
+				return nil
+			},
+		}
+
+		reader := newLazyBodyReader(mockCloser, logger)
+		reader.CloseOriginal()
+
+		assert.True(t, closeCalled, "Close should be called on original body")
+	})
+
 	t.Run("RestoreIfRead does nothing when not read", func(t *testing.T) {
 		reader := newLazyBodyReader(io.NopCloser(bytes.NewReader([]byte("test"))), logger)
 
@@ -191,9 +230,10 @@ func TestApplyOverrideToResponse(t *testing.T) {
 		req := httptest.NewRequest("GET", "/test", nil)
 		logger := logrus.NewEntry(logrus.New())
 
-		middleware.applyOverrideToResponse(res, result, req, logger)
+		bodyReplaced := middleware.applyOverrideToResponse(res, result, req, logger)
 
 		assert.Equal(t, 503, res.StatusCode)
+		assert.False(t, bodyReplaced, "Should return false when no body config")
 	})
 
 	t.Run("sets response headers", func(t *testing.T) {
@@ -238,8 +278,9 @@ func TestApplyOverrideToResponse(t *testing.T) {
 		req := httptest.NewRequest("GET", "/test", nil)
 		logger := logrus.NewEntry(logrus.New())
 
-		middleware.applyOverrideToResponse(res, result, req, logger)
+		bodyReplaced := middleware.applyOverrideToResponse(res, result, req, logger)
 
+		assert.True(t, bodyReplaced, "Should return true when body is replaced")
 		body, _ := io.ReadAll(res.Body)
 		assert.Equal(t, "Custom error message", string(body))
 		assert.Equal(t, int64(len("Custom error message")), res.ContentLength)
@@ -259,8 +300,9 @@ func TestApplyOverrideToResponse(t *testing.T) {
 		req := httptest.NewRequest("GET", "/test", nil)
 		logger := logrus.NewEntry(logrus.New())
 
-		middleware.applyOverrideToResponse(res, result, req, logger)
+		bodyReplaced := middleware.applyOverrideToResponse(res, result, req, logger)
 
+		assert.False(t, bodyReplaced, "Should return false when no body config")
 		// Body should not be set
 		assert.Nil(t, res.Body)
 	})
@@ -357,5 +399,21 @@ func (e *errorReadCloser) Read(p []byte) (n int, err error) {
 }
 
 func (e *errorReadCloser) Close() error {
+	return nil
+}
+
+type mockReadCloser struct {
+	reader  io.Reader
+	onClose func() error
+}
+
+func (m *mockReadCloser) Read(p []byte) (n int, err error) {
+	return m.reader.Read(p)
+}
+
+func (m *mockReadCloser) Close() error {
+	if m.onClose != nil {
+		return m.onClose()
+	}
 	return nil
 }

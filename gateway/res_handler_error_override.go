@@ -2,6 +2,7 @@ package gateway
 
 import (
 	"bytes"
+	"html"
 	"io"
 	"net/http"
 	"strconv"
@@ -49,8 +50,6 @@ func (r *ResponseErrorOverrideMiddleware) HandleResponse(
 		return nil
 	}
 
-	defer res.Body.Close()
-
 	logger := r.logger().WithFields(logrus.Fields{
 		"prefix": "error-override",
 		"api_id": r.Spec.APIID,
@@ -66,8 +65,14 @@ func (r *ResponseErrorOverrideMiddleware) HandleResponse(
 	}
 
 	logger.Debug("Applying upstream error override")
-	r.applyOverrideToResponse(res, result, req, logger)
-	bodyReader.RestoreIfRead(res)
+	bodyReplaced := r.applyOverrideToResponse(res, result, req, logger)
+	if !bodyReplaced {
+		logger.Debug("Override body generation failed or not configured, using original upstream body")
+		bodyReader.RestoreIfRead(res)
+	} else {
+		// Body was replaced with override, close the original body as we won't need it
+		bodyReader.CloseOriginal()
+	}
 
 	return nil
 }
@@ -104,37 +109,49 @@ func (l *lazyBodyReader) Read() []byte {
 
 func (l *lazyBodyReader) RestoreIfRead(res *http.Response) {
 	if l.read {
-		res.Body = io.NopCloser(bytes.NewReader(l.data))
+		// Combine the data we already read with the remainder of the original body stream.
+		// This prevents data loss for responses larger than maxBodySizeForMatching.
+		res.Body = io.NopCloser(io.MultiReader(bytes.NewReader(l.data), l.body))
+	}
+}
+
+func (l *lazyBodyReader) CloseOriginal() {
+	if l.body != nil {
+		l.body.Close()
 	}
 }
 
 // applyOverrideToResponse applies the override result to the HTTP response.
+// Returns true if the response body was successfully replaced, false otherwise.
 func (r *ResponseErrorOverrideMiddleware) applyOverrideToResponse(
 	res *http.Response,
 	result *OverrideResult,
 	req *http.Request,
 	logger *logrus.Entry,
-) {
+) bool {
 	if result.Code > 0 {
 		res.StatusCode = result.Code
+	}
+
+	bodyReplaced := false
+
+	if r.hasBodyConfig(result) {
+		errCtx := DetectErrorResponseContext(req)
+		newBody := r.generateOverrideBody(result, errCtx, res.StatusCode, logger)
+		if newBody != nil {
+			res.Body = io.NopCloser(bytes.NewReader(newBody))
+			res.ContentLength = int64(len(newBody))
+			res.Header.Set("Content-Length", strconv.Itoa(len(newBody)))
+			res.Header.Set("Content-Type", errCtx.ContentType)
+			bodyReplaced = true
+		}
 	}
 
 	for key, value := range result.Headers {
 		res.Header.Set(key, value)
 	}
 
-	if !r.hasBodyConfig(result) {
-		return
-	}
-
-	errCtx := DetectErrorResponseContext(req)
-	newBody := r.generateOverrideBody(result, errCtx, res.StatusCode, logger)
-	if newBody != nil {
-		res.Body = io.NopCloser(bytes.NewReader(newBody))
-		res.ContentLength = int64(len(newBody))
-		res.Header.Set("Content-Length", strconv.Itoa(len(newBody)))
-		res.Header.Set("Content-Type", errCtx.ContentType)
-	}
+	return bodyReplaced
 }
 
 // hasBodyConfig returns true if the override has body configuration.
@@ -150,22 +167,73 @@ func (r *ResponseErrorOverrideMiddleware) generateOverrideBody(
 	statusCode int,
 	logger *logrus.Entry,
 ) []byte {
+	// Check for inline template (body with {{.}} variables) or file template
 	if tmplExecutor := result.GetTemplateExecutor(r.Gw, errCtx); tmplExecutor != nil {
-		var buf bytes.Buffer
-		data := &APIErrorWithContext{
-			StatusCode: statusCode,
-			Message:    result.GetMessageForTemplate(),
-		}
-		if err := tmplExecutor.Execute(&buf, data); err != nil {
-			logger.WithError(err).Error("Failed to apply error override template")
-			return nil
-		}
-		return buf.Bytes()
+		return r.executeTemplate(tmplExecutor, result.GetMessageForTemplate(), statusCode, errCtx.IsXML, logger)
 	}
 
+	// Direct body (no template variables)
 	if body := result.GetBody(); body != "" {
 		return []byte(body)
 	}
 
+	// Message only - use default Tyk error template (like gateway errors do)
+	if result.ShouldUseDefaultTemplate() {
+		return r.generateDefaultTemplateBody(result, errCtx, statusCode, logger)
+	}
+
 	return nil
+}
+
+// generateDefaultTemplateBody generates response using Tyk's default error template.
+// This matches the behavior of gateway-generated errors when only message is configured.
+func (r *ResponseErrorOverrideMiddleware) generateDefaultTemplateBody(
+	result *OverrideResult,
+	errCtx *ErrorResponseContext,
+	statusCode int,
+	logger *logrus.Entry,
+) []byte {
+	templateName := "error." + errCtx.TemplateExtension
+
+	var tmpl TemplateExecutor
+	if errCtx.IsXML {
+		tmpl = r.Gw.templatesRaw.Lookup(templateName)
+	} else {
+		tmpl = r.Gw.templates.Lookup(templateName)
+	}
+
+	if tmpl == nil {
+		logger.WithField("template", templateName).Warn("Default error template not found")
+		return nil
+	}
+
+	return r.executeTemplate(tmpl, result.GetMessageForTemplate(), statusCode, errCtx.IsXML, logger)
+}
+
+// executeTemplate is a helper that executes a template with the given message and status code.
+func (r *ResponseErrorOverrideMiddleware) executeTemplate(
+	tmpl TemplateExecutor,
+	message string,
+	statusCode int,
+	isXML bool,
+	logger *logrus.Entry,
+) []byte {
+	// Escape message for XML templates (text/template doesn't auto-escape)
+	if isXML {
+		message = html.EscapeString(message)
+	}
+	// For JSON, html/template does context-aware escaping automatically
+
+	var buf bytes.Buffer
+	data := &APIErrorWithContext{
+		StatusCode: statusCode,
+		Message:    message,
+	}
+
+	if err := tmpl.Execute(&buf, data); err != nil {
+		logger.WithError(err).Error("Failed to execute error template")
+		return nil
+	}
+
+	return buf.Bytes()
 }
