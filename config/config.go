@@ -1526,6 +1526,20 @@ type CompiledErrorOverrides struct {
 	ByPrefix map[int][]*ErrorOverride
 }
 
+// HasRulesForStatus returns true if there are potential overrides for the given status code.
+// Checks both exact matches (e.g., "503") and pattern matches (e.g., "5xx").
+func (c *CompiledErrorOverrides) HasRulesForStatus(statusCode int) bool {
+	if c == nil {
+		return false
+	}
+	if _, ok := c.ByExactCode[statusCode]; ok {
+		return true
+	}
+	prefix := statusCode / 100
+	_, ok := c.ByPrefix[prefix]
+	return ok
+}
+
 // VaultConfig is used to configure the creation of a client
 // This is a stripped down version of the config structure in vault's API client
 type VaultConfig struct {
