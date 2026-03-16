@@ -3,7 +3,7 @@ package gateway
 import (
 	"testing"
 
-	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/apidef"
 )
 
 func BenchmarkAtomicLoadOverhead(b *testing.B) {
@@ -18,9 +18,9 @@ func BenchmarkAtomicLoadOverhead(b *testing.B) {
 
 	b.Run("atomic load - non-nil pointer", func(b *testing.B) {
 		gw := &Gateway{}
-		overrides := config.ErrorOverridesMap{
-			"500": []config.ErrorOverride{
-				{Response: config.ErrorResponse{Message: "test"}},
+		overrides := apidef.ErrorOverridesMap{
+			"500": []apidef.ErrorOverride{
+				{Response: apidef.ErrorResponse{Message: "test"}},
 			},
 		}
 		compiled := CompileErrorOverrides(overrides)

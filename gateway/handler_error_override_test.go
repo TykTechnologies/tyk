@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/header"
 )
@@ -40,8 +41,8 @@ func TestWriteOverrideResponse(t *testing.T) {
 			Headers: map[string]string{
 				"X-Custom": "value",
 			},
-			rule: &config.ErrorOverride{
-				Response: config.ErrorResponse{
+			rule: &apidef.ErrorOverride{
+				Response: apidef.ErrorResponse{
 					Body: `{"error": "Service unavailable"}`,
 				},
 			},
@@ -65,8 +66,8 @@ func TestWriteOverrideResponse(t *testing.T) {
 		req := httptest.NewRequest("GET", "/test", nil)
 		req.Header.Set(header.ContentType, header.ApplicationJSON)
 
-		rule := &config.ErrorOverride{
-			Response: config.ErrorResponse{
+		rule := &apidef.ErrorOverride{
+			Response: apidef.ErrorResponse{
 				Body:    `{"error": "Error {{.StatusCode}}", "msg": "{{.Message}}"}`,
 				Message: "timeout occurred",
 			},
@@ -96,8 +97,8 @@ func TestWriteOverrideResponse(t *testing.T) {
 		req := httptest.NewRequest("GET", "/test", nil)
 		req.Header.Set(header.ContentType, header.ApplicationXML)
 
-		rule := &config.ErrorOverride{
-			Response: config.ErrorResponse{
+		rule := &apidef.ErrorOverride{
+			Response: apidef.ErrorResponse{
 				Body:    `<error><code>{{.StatusCode}}</code><msg>{{.Message}}</msg></error>`,
 				Message: "server error",
 			},
@@ -146,8 +147,8 @@ func TestWriteOverrideResponse(t *testing.T) {
 
 		result := &OverrideResult{
 			Code: 503,
-			rule: &config.ErrorOverride{
-				Response: config.ErrorResponse{
+			rule: &apidef.ErrorOverride{
+				Response: apidef.ErrorResponse{
 					Message:  "Custom error message",
 					Template: "error_test",
 				},
@@ -190,8 +191,8 @@ func TestWriteOverrideResponse(t *testing.T) {
 
 		result := &OverrideResult{
 			Code: 500,
-			rule: &config.ErrorOverride{
-				Response: config.ErrorResponse{
+			rule: &apidef.ErrorOverride{
+				Response: apidef.ErrorResponse{
 					Message:  "Server error occurred",
 					Template: "error_test",
 				},
@@ -232,8 +233,8 @@ func TestWriteOverrideResponse(t *testing.T) {
 
 		result := &OverrideResult{
 			Code: 500,
-			rule: &config.ErrorOverride{
-				Response: config.ErrorResponse{
+			rule: &apidef.ErrorOverride{
+				Response: apidef.ErrorResponse{
 					// No message, no template - will fallback to default
 				},
 			},
@@ -272,8 +273,8 @@ func TestWriteOverrideResponse(t *testing.T) {
 
 		result := &OverrideResult{
 			Code: 401,
-			rule: &config.ErrorOverride{
-				Response: config.ErrorResponse{
+			rule: &apidef.ErrorOverride{
+				Response: apidef.ErrorResponse{
 					// Only status code override, no message
 				},
 			},
@@ -303,8 +304,8 @@ func TestWriteOverrideResponse(t *testing.T) {
 				"X-Correlation-ID":  "abc-123",
 				"X-Request-Timeout": "30s",
 			},
-			rule: &config.ErrorOverride{
-				Response: config.ErrorResponse{
+			rule: &apidef.ErrorOverride{
+				Response: apidef.ErrorResponse{
 					Body: `{"error": "Service unavailable"}`,
 				},
 			},
@@ -341,8 +342,8 @@ func TestWriteDirectOverrideResponse(t *testing.T) {
 
 		result := &OverrideResult{
 			Code: 503,
-			rule: &config.ErrorOverride{
-				Response: config.ErrorResponse{
+			rule: &apidef.ErrorOverride{
+				Response: apidef.ErrorResponse{
 					Body: `{"error": "Service unavailable", "code": "SERVICE_DOWN"}`,
 				},
 			},
@@ -368,8 +369,8 @@ func TestWriteDirectOverrideResponse(t *testing.T) {
 
 		result := &OverrideResult{
 			Code: 500,
-			rule: &config.ErrorOverride{
-				Response: config.ErrorResponse{
+			rule: &apidef.ErrorOverride{
+				Response: apidef.ErrorResponse{
 					Body: `<error><code>500</code><message>Internal error</message></error>`,
 				},
 			},
@@ -395,8 +396,8 @@ func TestWriteDirectOverrideResponse(t *testing.T) {
 
 		result := &OverrideResult{
 			Code: 404,
-			rule: &config.ErrorOverride{
-				Response: config.ErrorResponse{
+			rule: &apidef.ErrorOverride{
+				Response: apidef.ErrorResponse{
 					Body: "Not found",
 				},
 			},
@@ -421,8 +422,8 @@ func TestWriteDirectOverrideResponse(t *testing.T) {
 
 		result := &OverrideResult{
 			Code: 204,
-			rule: &config.ErrorOverride{
-				Response: config.ErrorResponse{
+			rule: &apidef.ErrorOverride{
+				Response: apidef.ErrorResponse{
 					Body: "",
 				},
 			},
@@ -448,8 +449,8 @@ func TestWriteDirectOverrideResponse(t *testing.T) {
 
 		result := &OverrideResult{
 			Code: 500,
-			rule: &config.ErrorOverride{
-				Response: config.ErrorResponse{
+			rule: &apidef.ErrorOverride{
+				Response: apidef.ErrorResponse{
 					Body: `{"error": "test"}`,
 				},
 			},
@@ -471,8 +472,8 @@ func TestOverrideResultBehavior(t *testing.T) {
 		gw.templates = jsonTmpl
 
 		// Rule has both inline body template AND file template - body should win
-		rule := &config.ErrorOverride{
-			Response: config.ErrorResponse{
+		rule := &apidef.ErrorOverride{
+			Response: apidef.ErrorResponse{
 				Body:     `{"inline": "{{.StatusCode}}"}`,
 				Template: "error_file",
 			},
@@ -497,8 +498,8 @@ func TestOverrideResultBehavior(t *testing.T) {
 	t.Run("GetTemplateExecutor - inline body template", func(t *testing.T) {
 		gw := &Gateway{}
 
-		rule := &config.ErrorOverride{
-			Response: config.ErrorResponse{
+		rule := &apidef.ErrorOverride{
+			Response: apidef.ErrorResponse{
 				Body: `{"status": {{.StatusCode}}}`,
 			},
 		}
@@ -522,8 +523,8 @@ func TestOverrideResultBehavior(t *testing.T) {
 		gw := &Gateway{}
 
 		result := &OverrideResult{
-			rule: &config.ErrorOverride{
-				Response: config.ErrorResponse{
+			rule: &apidef.ErrorOverride{
+				Response: apidef.ErrorResponse{
 					Body: `{"plain": "body"}`,
 				},
 			},
@@ -538,8 +539,8 @@ func TestOverrideResultBehavior(t *testing.T) {
 		gw := &Gateway{}
 
 		result := &OverrideResult{
-			rule: &config.ErrorOverride{
-				Response: config.ErrorResponse{},
+			rule: &apidef.ErrorOverride{
+				Response: apidef.ErrorResponse{},
 			},
 		}
 		ctx := &ErrorResponseContext{IsXML: false}
@@ -552,10 +553,10 @@ func TestOverrideResultBehavior(t *testing.T) {
 // TestErrorOverrideEdgeCases tests edge cases and error conditions
 func TestErrorOverrideEdgeCases(t *testing.T) {
 	t.Run("override with zero status code preserves original", func(t *testing.T) {
-		overrides := config.ErrorOverridesMap{
-			"500": []config.ErrorOverride{
+		overrides := apidef.ErrorOverridesMap{
+			"500": []apidef.ErrorOverride{
 				{
-					Response: config.ErrorResponse{
+					Response: apidef.ErrorResponse{
 						Code:    0, // Not set
 						Message: "Error occurred",
 					},
@@ -590,8 +591,8 @@ func TestErrorOverrideEdgeCases(t *testing.T) {
 		result := &OverrideResult{
 			Code:    500,
 			Headers: map[string]string{},
-			rule: &config.ErrorOverride{
-				Response: config.ErrorResponse{
+			rule: &apidef.ErrorOverride{
+				Response: apidef.ErrorResponse{
 					Body: `{"error": "test"}`,
 				},
 			},
@@ -615,8 +616,8 @@ func TestErrorOverrideEdgeCases(t *testing.T) {
 		result := &OverrideResult{
 			Code:    500,
 			Headers: nil,
-			rule: &config.ErrorOverride{
-				Response: config.ErrorResponse{
+			rule: &apidef.ErrorOverride{
+				Response: apidef.ErrorResponse{
 					Body: `{"error": "test"}`,
 				},
 			},
@@ -643,8 +644,8 @@ func TestErrorOverrideEdgeCases(t *testing.T) {
 
 		result := &OverrideResult{
 			Code: 500,
-			rule: &config.ErrorOverride{
-				Response: config.ErrorResponse{
+			rule: &apidef.ErrorOverride{
+				Response: apidef.ErrorResponse{
 					Body: longBody,
 				},
 			},
