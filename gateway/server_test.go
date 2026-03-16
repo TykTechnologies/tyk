@@ -40,10 +40,11 @@ import (
 func TestGateway_afterConfSetup(t *testing.T) {
 
 	tests := []struct {
-		name           string
-		initialConfig  config.Config
-		expectedConfig config.Config
-		setup          func(t *testing.T, gw *Gateway)
+		name            string
+		initialConfig   config.Config
+		expectedConfig  config.Config
+		setup           func(t *testing.T, gw *Gateway)
+		wantErrContains string
 	}{
 		{
 			name: "slave options test",
@@ -292,6 +293,67 @@ func TestGateway_afterConfSetup(t *testing.T) {
 			},
 		},
 		{
+			name: "oauth mtls kv store - secrets backend missing key returns error",
+			initialConfig: config.Config{
+				ExternalServices: config.ExternalServiceConfig{
+					OAuth: config.ServiceConfig{
+						MTLS: config.MTLSConfig{
+							Enabled:  true,
+							CertFile: "secrets://missing_cert",
+							KeyFile:  "secrets://oauth_key",
+							CAFile:   "secrets://oauth_ca",
+						},
+					},
+				},
+				// Secrets map is empty — the reference cannot be resolved
+			},
+			wantErrContains: "could not retrieve OAuth mTLS cert file path from KV store",
+		},
+		{
+			name: "oauth mtls kv store - vault backend error propagates for cert file",
+			initialConfig: config.Config{
+				ExternalServices: config.ExternalServiceConfig{
+					OAuth: config.ServiceConfig{
+						MTLS: config.MTLSConfig{
+							Enabled:  true,
+							CertFile: "vault://secret/oauth/cert_file",
+							KeyFile:  "vault://secret/oauth/key_file",
+							CAFile:   "vault://secret/oauth/ca_file",
+						},
+					},
+				},
+			},
+			setup: func(_ *testing.T, gw *Gateway) {
+				// Empty data map — all keys will return "key not found" errors
+				gw.vaultKVStore = &mockKVStore{data: map[string]string{}}
+			},
+			wantErrContains: "could not retrieve OAuth mTLS cert file path from KV store",
+		},
+		{
+			name: "oauth mtls kv store - consul backend error propagates for key file",
+			initialConfig: config.Config{
+				ExternalServices: config.ExternalServiceConfig{
+					OAuth: config.ServiceConfig{
+						MTLS: config.MTLSConfig{
+							Enabled:  true,
+							CertFile: "consul://oauth/cert_file",
+							KeyFile:  "consul://oauth/key_file",
+							CAFile:   "consul://oauth/ca_file",
+						},
+					},
+				},
+			},
+			setup: func(_ *testing.T, gw *Gateway) {
+				// Only cert_file is present — key_file lookup will fail
+				gw.consulKVStore = &mockKVStore{
+					data: map[string]string{
+						"oauth/cert_file": "/consul/path/to/cert.pem",
+					},
+				}
+			},
+			wantErrContains: "could not retrieve OAuth mTLS key file path from KV store",
+		},
+		{
 			name: "oauth mtls kv store - disabled mtls skips kv resolution",
 			initialConfig: config.Config{
 				ExternalServices: config.ExternalServiceConfig{
@@ -330,8 +392,13 @@ func TestGateway_afterConfSetup(t *testing.T) {
 			if tt.setup != nil {
 				tt.setup(t, gw)
 			}
-			gw.afterConfSetup()
+			err := gw.afterConfSetup()
 
+			if tt.wantErrContains != "" {
+				require.ErrorContains(t, err, tt.wantErrContains)
+				return
+			}
+			require.NoError(t, err)
 			assert.Equal(t, tt.expectedConfig, gw.GetConfig())
 		})
 	}
