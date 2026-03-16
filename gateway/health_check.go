@@ -187,12 +187,6 @@ func (gw *Gateway) liveCheckHandler(w http.ResponseWriter, r *http.Request) {
 		Details:     checks,
 	}
 
-	failCount, criticalFailure := gw.evaluateHealthChecks(checks)
-
-	status, httpStatus := gw.determineHealthStatus(failCount, criticalFailure, len(checks))
-
-	res.Status = status
-
 	w.Header().Set("Content-Type", header.ApplicationJSON)
 
 	// If this option is not set, or is explicitly set to false, add the mascot headers
@@ -200,7 +194,7 @@ func (gw *Gateway) liveCheckHandler(w http.ResponseWriter, r *http.Request) {
 		addMascotHeaders(w)
 	}
 
-	w.WriteHeader(httpStatus)
+	w.WriteHeader(http.StatusOK)
 	err := json.NewEncoder(w).Encode(res)
 	if err != nil {
 		mainLog.Warning(fmt.Sprintf("[Liveness] Could not encode response, error: %s", err.Error()))
@@ -262,49 +256,3 @@ func (gw *Gateway) readinessHandler(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(res)
 }
 
-func (gw *Gateway) determineHealthStatus(failCount int, criticalFailure bool, totalChecks int) (HealthCheckStatus, int) {
-	switch {
-	case failCount == 0:
-		return Pass, http.StatusOK
-	case criticalFailure:
-		return Fail, http.StatusServiceUnavailable
-	case failCount == totalChecks:
-		return Fail, http.StatusServiceUnavailable
-	default:
-		// Non-critical failures return a warning but still 200 OK
-		return Warn, http.StatusOK
-	}
-}
-
-func (gw *Gateway) evaluateHealthChecks(checks map[string]HealthCheckItem) (failCount int, criticalFailure bool) {
-	// Check for critical failures
-	for component, check := range checks {
-		if check.Status == Fail {
-			failCount++
-
-			if gw.isCriticalFailure(component) {
-				criticalFailure = true
-			}
-		}
-	}
-	return failCount, criticalFailure
-}
-
-func (gw *Gateway) isCriticalFailure(component string) bool {
-	// Redis is always considered critical
-	if component == "redis" {
-		return true
-	}
-
-	// Consider dashboard critical only if UseDBAppConfigs is enabled
-	if component == "dashboard" && gw.GetConfig().UseDBAppConfigs {
-		return true
-	}
-
-	// Consider RPC critical only if using RPC and gw not in emergency mode
-	if component == "rpc" && gw.GetConfig().Policies.PolicySource == "rpc" && !rpc.IsEmergencyMode() {
-		return true
-	}
-
-	return false
-}
