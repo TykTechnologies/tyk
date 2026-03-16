@@ -181,8 +181,8 @@ services:
       timeout: 3s
       retries: 3
 
-  # 5XX backend - returns various 5XX errors to trigger upstream response status (URS)
-  backend-5xx:
+  # Multi-error backend - handles all upstream error test scenarios
+  backend-multi-error:
     image: python:3.11-alpine
     ports:
       - "5003:5003"
@@ -191,39 +191,78 @@ services:
       - -c
       - |
         from http.server import HTTPServer, BaseHTTPRequestHandler
+        import json
 
         class ErrorHandler(BaseHTTPRequestHandler):
             error_codes = [500, 502, 503, 504]
             current_index = 0
 
             def do_GET(self):
+                # Health check
                 if self.path == '/health':
                     self.send_response(200)
                     self.end_headers()
                     self.wfile.write(b'OK')
                     return
 
-                if self.path == '/500':
-                    code = 500
-                elif self.path == '/502':
-                    code = 502
-                elif self.path == '/503':
-                    code = 503
-                elif self.path == '/504':
-                    code = 504
-                else:
-                    # Cycle through error codes
-                    code = ErrorHandler.error_codes[ErrorHandler.current_index]
-                    ErrorHandler.current_index = (ErrorHandler.current_index + 1) % len(ErrorHandler.error_codes)
+                # 5xx rotation (for URS flag test)
+                if self.path in ['/', '/5xx', '/500', '/502', '/503', '/504']:
+                    if self.path == '/500':
+                        code = 500
+                    elif self.path == '/502':
+                        code = 502
+                    elif self.path == '/503':
+                        code = 503
+                    elif self.path == '/504':
+                        code = 504
+                    else:
+                        # Cycle through error codes
+                        code = ErrorHandler.error_codes[ErrorHandler.current_index]
+                        ErrorHandler.current_index = (ErrorHandler.current_index + 1) % len(ErrorHandler.error_codes)
 
-                self.send_response(code)
+                    self.send_response(code)
+                    self.send_header('Content-Type', 'application/json')
+                    self.end_headers()
+                    body = {'error': f'upstream_error_{code}', 'message': f'Upstream returned {code}'}
+                    self.wfile.write(json.dumps(body).encode())
+                    return
+
+                # 404 with JSON body (for body_field matching)
+                if self.path == '/404-json':
+                    self.send_response(404)
+                    self.send_header('Content-Type', 'application/json')
+                    self.end_headers()
+                    body = {'error': {'code': 'RESOURCE_NOT_FOUND', 'message': 'User not found'}}
+                    self.wfile.write(json.dumps(body).encode())
+                    return
+
+                # 404 with HTML (for message_pattern matching)
+                if self.path == '/404-html':
+                    self.send_response(404)
+                    self.send_header('Content-Type', 'text/html')
+                    self.end_headers()
+                    html = '<html><body><h1>Page Not Found</h1><p>The requested resource does not exist.</p></body></html>'
+                    self.wfile.write(html.encode())
+                    return
+
+                # 400 for no-match test (use 4xx to avoid matching 5xx URS rule)
+                if self.path == '/400-nomatch':
+                    self.send_response(400)
+                    self.send_header('Content-Type', 'application/json')
+                    self.end_headers()
+                    body = {'error': 'bad_request', 'message': 'Invalid input'}
+                    self.wfile.write(json.dumps(body).encode())
+                    return
+
+                # Default 404
+                self.send_response(404)
                 self.end_headers()
-                self.wfile.write(f'Error {code}'.encode())
+                self.wfile.write(b'Not Found')
 
             def log_message(self, format, *args):
-                print(f"[backend-5xx] {args[0]}")
+                print(f"[backend-multi-error] {args[0]}")
 
-        print("Starting 5XX backend on port 5003...")
+        print("Starting multi-error backend on port 5003...")
         HTTPServer(('0.0.0.0', 5003), ErrorHandler).serve_forever()
     healthcheck:
       test: ["CMD", "wget", "-q", "--spider", "http://localhost:5003/health"]

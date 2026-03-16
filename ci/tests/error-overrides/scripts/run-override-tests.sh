@@ -1072,6 +1072,72 @@ run_override_test_circuit_breaker() {
     rm -f "$body_file" "$header_file"
 }
 
+# Test that upstream error passes through unchanged when no rule matches
+run_override_test_upstream_passthrough() {
+    local test_name=$1
+    local api_path=$2
+
+    echo ""
+    log_info "Testing: $test_name"
+    log_info "  API Path: $api_path"
+
+    local body_file=$(mktemp)
+    local header_file=$(mktemp)
+
+    local http_code=$(curl -s -o "$body_file" -D "$header_file" -w "%{http_code}" \
+        --connect-timeout 10 \
+        --max-time 10 \
+        "${TYK_OVERRIDE_URL}${api_path}" 2>/dev/null || echo "000")
+
+    local response_body=$(cat "$body_file")
+    local response_headers=$(cat "$header_file")
+
+    log_info "  HTTP Response: $http_code"
+
+    sleep "$WAIT_FOR_LOG_SECONDS"
+    refresh_logs
+
+    local test_passed=true
+    local failures=""
+
+    # Check body contains ORIGINAL upstream content
+    if echo "$response_body" | grep -q "service_unavailable"; then
+        log_info "  [OK] Body contains original upstream content"
+    else
+        test_passed=false
+        failures="${failures}\n  - Body was modified (should be passthrough)"
+    fi
+
+    # Check X-Override-Applied header is NOT present
+    if ! echo "$response_headers" | grep -qi "X-Override-Applied"; then
+        log_info "  [OK] X-Override-Applied header not present (as expected)"
+    else
+        test_passed=false
+        failures="${failures}\n  - X-Override-Applied present (should not be)"
+    fi
+
+    # Check status code remains 503
+    if [ "$http_code" = "503" ]; then
+        log_info "  [OK] Status code unchanged: 503"
+    else
+        test_passed=false
+        failures="${failures}\n  - Status changed: got $http_code, expected 503"
+    fi
+
+    if [ "$test_passed" = true ]; then
+        log_success "$test_name"
+        ((PASSED++))
+    else
+        log_fail "$test_name"
+        echo -e "${RED}  Failures:${NC}$failures"
+        ((FAILED++))
+    fi
+
+    echo -e "  ${BLUE}Response Body:${NC} $response_body"
+
+    rm -f "$body_file" "$header_file"
+}
+
 # -----------------------------------------------------------------------------
 # Pre-flight Checks
 # -----------------------------------------------------------------------------
@@ -1461,6 +1527,47 @@ run_all_override_tests() {
     run_override_test_circuit_breaker \
         "CBO Override - Circuit Breaker Open" \
         "/test-cbo/500"
+
+    # ==========================================================================
+    # Upstream Error Override Tests
+    # ==========================================================================
+
+    echo ""
+    log_info "=========================================="
+    log_info "UPSTREAM ERROR OVERRIDE TESTS"
+    log_info "=========================================="
+
+    # Test 1: URS flag on 5xx (ONLY test using URS flag)
+    run_override_test \
+        "URS Override - 5xx Generic Match" \
+        "/test-upstream/5xx" \
+        "URS" \
+        "upstream_service_error" \
+        "URS" \
+        ""
+
+    # Test 2: Upstream 404 with body_field matching
+    run_override_test \
+        "Upstream Override - 404 JSON Body Match" \
+        "/test-upstream/404-json" \
+        "" \
+        "resource_not_found" \
+        "NOT_FOUND" \
+        "404"
+
+    # Test 3: Upstream 404 with message_pattern
+    run_override_test \
+        "Upstream Override - 404 Regex Match" \
+        "/test-upstream/404-html" \
+        "" \
+        "page_not_found" \
+        "PAGE_NOT_FOUND" \
+        "404"
+
+    # Test 4: Upstream no match - body passthrough
+    run_override_test_upstream_passthrough \
+        "Upstream Override - No Match Passthrough" \
+        "/test-upstream/503-nomatch"
 
 }
 

@@ -6,7 +6,7 @@
   "active": true,
   "proxy": {
     "listen_path": "/test-cbo/",
-    "target_url": "http://backend-5xx:5003",
+    "target_url": "http://backend-multi-error:5003",
     "strip_listen_path": true
   },
   "version_data": {
