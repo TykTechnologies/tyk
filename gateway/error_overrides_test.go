@@ -15,7 +15,7 @@ import (
 )
 
 // createGateway is a test helper to create a gateway with compiled overrides
-func createGateway(overrides config.ErrorOverridesMap) *Gateway {
+func createGateway(overrides apidef.ErrorOverridesMap) *Gateway {
 	gw := &Gateway{}
 	compiled := CompileErrorOverrides(overrides)
 	if compiled != nil {
@@ -1244,19 +1244,19 @@ func TestTemplateCompilationEdgeCases(t *testing.T) {
 // Tests for new methods
 
 func TestFindMatchingRuleGeneric(t *testing.T) {
-	overrides := config.ErrorOverridesMap{
-		"500": []config.ErrorOverride{
+	overrides := apidef.ErrorOverridesMap{
+		"500": []apidef.ErrorOverride{
 			{
-				Match: &config.ErrorMatcher{Flag: errors.AKI},
-				Response: config.ErrorResponse{Message: "First rule"},
+				Match:    &apidef.ErrorMatcher{Flag: errors.AKI},
+				Response: apidef.ErrorResponse{Message: "First rule"},
 			},
 			{
-				Response: config.ErrorResponse{Message: "Second rule"},
+				Response: apidef.ErrorResponse{Message: "Second rule"},
 			},
 		},
-		"5xx": []config.ErrorOverride{
+		"5xx": []apidef.ErrorOverride{
 			{
-				Response: config.ErrorResponse{Message: "Pattern rule"},
+				Response: apidef.ErrorResponse{Message: "Pattern rule"},
 			},
 		},
 	}
@@ -1267,7 +1267,7 @@ func TestFindMatchingRuleGeneric(t *testing.T) {
 
 	t.Run("finds first matching rule in exact code", func(t *testing.T) {
 		matchCount := 0
-		rule := eo.findMatchingRuleGeneric(compiled, 500, func(rule *config.ErrorOverride) bool {
+		rule := eo.findMatchingRuleGeneric(compiled, 500, func(rule *apidef.ErrorOverride) bool {
 			matchCount++
 			return matchCount == 2 // Match second rule
 		})
@@ -1277,7 +1277,7 @@ func TestFindMatchingRuleGeneric(t *testing.T) {
 	})
 
 	t.Run("falls through to pattern match", func(t *testing.T) {
-		rule := eo.findMatchingRuleGeneric(compiled, 502, func(rule *config.ErrorOverride) bool {
+		rule := eo.findMatchingRuleGeneric(compiled, 502, func(rule *apidef.ErrorOverride) bool {
 			return true // Match all
 		})
 
@@ -1286,7 +1286,7 @@ func TestFindMatchingRuleGeneric(t *testing.T) {
 	})
 
 	t.Run("returns nil when no match", func(t *testing.T) {
-		rule := eo.findMatchingRuleGeneric(compiled, 500, func(rule *config.ErrorOverride) bool {
+		rule := eo.findMatchingRuleGeneric(compiled, 500, func(rule *apidef.ErrorOverride) bool {
 			return false // Match nothing
 		})
 
@@ -1294,7 +1294,7 @@ func TestFindMatchingRuleGeneric(t *testing.T) {
 	})
 
 	t.Run("exact code takes precedence over pattern", func(t *testing.T) {
-		rule := eo.findMatchingRuleGeneric(compiled, 500, func(rule *config.ErrorOverride) bool {
+		rule := eo.findMatchingRuleGeneric(compiled, 500, func(rule *apidef.ErrorOverride) bool {
 			return true // Match all
 		})
 
@@ -1305,7 +1305,7 @@ func TestFindMatchingRuleGeneric(t *testing.T) {
 
 func TestApplyUpstreamOverride(t *testing.T) {
 	t.Run("returns nil when no overrides configured", func(t *testing.T) {
-		gw := createGateway(config.ErrorOverridesMap{})
+		gw := createGateway(apidef.ErrorOverridesMap{})
 		eo := NewErrorOverrides(nil, gw)
 
 		readBodyCalled := false
@@ -1319,10 +1319,10 @@ func TestApplyUpstreamOverride(t *testing.T) {
 	})
 
 	t.Run("matches exact status code", func(t *testing.T) {
-		overrides := config.ErrorOverridesMap{
-			"503": []config.ErrorOverride{
+		overrides := apidef.ErrorOverridesMap{
+			"503": []apidef.ErrorOverride{
 				{
-					Response: config.ErrorResponse{
+					Response: apidef.ErrorResponse{
 						Code:    500,
 						Message: "Upstream unavailable",
 					},
@@ -1344,10 +1344,10 @@ func TestApplyUpstreamOverride(t *testing.T) {
 	})
 
 	t.Run("matches pattern 5xx", func(t *testing.T) {
-		overrides := config.ErrorOverridesMap{
-			"5xx": []config.ErrorOverride{
+		overrides := apidef.ErrorOverridesMap{
+			"5xx": []apidef.ErrorOverride{
 				{
-					Response: config.ErrorResponse{
+					Response: apidef.ErrorResponse{
 						Code:    503,
 						Message: "Server error",
 					},
@@ -1368,11 +1368,11 @@ func TestApplyUpstreamOverride(t *testing.T) {
 	})
 
 	t.Run("matches URS flag for 5xx responses", func(t *testing.T) {
-		overrides := config.ErrorOverridesMap{
-			"5xx": []config.ErrorOverride{
+		overrides := apidef.ErrorOverridesMap{
+			"5xx": []apidef.ErrorOverride{
 				{
-					Match: &config.ErrorMatcher{Flag: errors.URS},
-					Response: config.ErrorResponse{
+					Match: &apidef.ErrorMatcher{Flag: errors.URS},
+					Response: apidef.ErrorResponse{
 						Code:    503,
 						Message: "Upstream error",
 					},
@@ -1395,11 +1395,11 @@ func TestApplyUpstreamOverride(t *testing.T) {
 	})
 
 	t.Run("does not match URS flag for 4xx responses", func(t *testing.T) {
-		overrides := config.ErrorOverridesMap{
-			"4xx": []config.ErrorOverride{
+		overrides := apidef.ErrorOverridesMap{
+			"4xx": []apidef.ErrorOverride{
 				{
-					Match: &config.ErrorMatcher{Flag: errors.URS},
-					Response: config.ErrorResponse{
+					Match: &apidef.ErrorMatcher{Flag: errors.URS},
+					Response: apidef.ErrorResponse{
 						Message: "Should not match",
 					},
 				},
@@ -1417,11 +1417,11 @@ func TestApplyUpstreamOverride(t *testing.T) {
 	})
 
 	t.Run("skips gateway-only flags", func(t *testing.T) {
-		overrides := config.ErrorOverridesMap{
-			"5xx": []config.ErrorOverride{
+		overrides := apidef.ErrorOverridesMap{
+			"5xx": []apidef.ErrorOverride{
 				{
-					Match: &config.ErrorMatcher{Flag: errors.AKI},
-					Response: config.ErrorResponse{
+					Match: &apidef.ErrorMatcher{Flag: errors.AKI},
+					Response: apidef.ErrorResponse{
 						Message: "Should not match",
 					},
 				},
@@ -1439,14 +1439,14 @@ func TestApplyUpstreamOverride(t *testing.T) {
 	})
 
 	t.Run("matches body field in JSON response", func(t *testing.T) {
-		overrides := config.ErrorOverridesMap{
-			"5xx": []config.ErrorOverride{
+		overrides := apidef.ErrorOverridesMap{
+			"5xx": []apidef.ErrorOverride{
 				{
-					Match: &config.ErrorMatcher{
+					Match: &apidef.ErrorMatcher{
 						BodyField: "error.type",
 						BodyValue: "timeout",
 					},
-					Response: config.ErrorResponse{
+					Response: apidef.ErrorResponse{
 						Code:    504,
 						Message: "Timeout occurred",
 					},
@@ -1466,13 +1466,13 @@ func TestApplyUpstreamOverride(t *testing.T) {
 	})
 
 	t.Run("matches message pattern", func(t *testing.T) {
-		overrides := config.ErrorOverridesMap{
-			"5xx": []config.ErrorOverride{
+		overrides := apidef.ErrorOverridesMap{
+			"5xx": []apidef.ErrorOverride{
 				{
-					Match: &config.ErrorMatcher{
+					Match: &apidef.ErrorMatcher{
 						MessagePattern: "database.*unavailable",
 					},
-					Response: config.ErrorResponse{
+					Response: apidef.ErrorResponse{
 						Code:    503,
 						Message: "Database is down",
 					},
@@ -1499,11 +1499,11 @@ func TestApplyUpstreamOverride(t *testing.T) {
 	})
 
 	t.Run("lazy body reading - only reads when needed", func(t *testing.T) {
-		overrides := config.ErrorOverridesMap{
-			"5xx": []config.ErrorOverride{
+		overrides := apidef.ErrorOverridesMap{
+			"5xx": []apidef.ErrorOverride{
 				{
 					// First rule has no body match - should not read body
-					Response: config.ErrorResponse{
+					Response: apidef.ErrorResponse{
 						Code:    503,
 						Message: "Generic error",
 					},
@@ -1525,14 +1525,14 @@ func TestApplyUpstreamOverride(t *testing.T) {
 	})
 
 	t.Run("lazy body reading - reads when needed", func(t *testing.T) {
-		overrides := config.ErrorOverridesMap{
-			"5xx": []config.ErrorOverride{
+		overrides := apidef.ErrorOverridesMap{
+			"5xx": []apidef.ErrorOverride{
 				{
-					Match: &config.ErrorMatcher{
+					Match: &apidef.ErrorMatcher{
 						BodyField: "error.code",
 						BodyValue: "TIMEOUT",
 					},
-					Response: config.ErrorResponse{
+					Response: apidef.ErrorResponse{
 						Message: "Matched",
 					},
 				},
@@ -1553,10 +1553,10 @@ func TestApplyUpstreamOverride(t *testing.T) {
 	})
 
 	t.Run("preserves original status code when override code is 0", func(t *testing.T) {
-		overrides := config.ErrorOverridesMap{
-			"500": []config.ErrorOverride{
+		overrides := apidef.ErrorOverridesMap{
+			"500": []apidef.ErrorOverride{
 				{
-					Response: config.ErrorResponse{
+					Response: apidef.ErrorResponse{
 						Code:    0, // Don't change status code
 						Message: "Keep original code",
 					},
@@ -1578,11 +1578,11 @@ func TestApplyUpstreamOverride(t *testing.T) {
 }
 
 func TestMatchesUpstreamCriteria(t *testing.T) {
-	gw := createGateway(config.ErrorOverridesMap{})
+	gw := createGateway(apidef.ErrorOverridesMap{})
 	eo := NewErrorOverrides(nil, gw)
 
 	t.Run("matches when no criteria specified", func(t *testing.T) {
-		rule := &config.ErrorOverride{
+		rule := &apidef.ErrorOverride{
 			Match: nil,
 		}
 
@@ -1591,8 +1591,8 @@ func TestMatchesUpstreamCriteria(t *testing.T) {
 	})
 
 	t.Run("matches URS flag for 5xx", func(t *testing.T) {
-		rule := &config.ErrorOverride{
-			Match: &config.ErrorMatcher{Flag: errors.URS},
+		rule := &apidef.ErrorOverride{
+			Match: &apidef.ErrorMatcher{Flag: errors.URS},
 		}
 
 		testCases := []struct {
@@ -1621,8 +1621,8 @@ func TestMatchesUpstreamCriteria(t *testing.T) {
 		}
 
 		for _, flag := range gatewayFlags {
-			rule := &config.ErrorOverride{
-				Match: &config.ErrorMatcher{Flag: flag},
+			rule := &apidef.ErrorOverride{
+				Match: &apidef.ErrorMatcher{Flag: flag},
 			}
 
 			matches := eo.matchesUpstreamCriteria(rule, nil, 500)
@@ -1631,8 +1631,8 @@ func TestMatchesUpstreamCriteria(t *testing.T) {
 	})
 
 	t.Run("matches body field", func(t *testing.T) {
-		rule := &config.ErrorOverride{
-			Match: &config.ErrorMatcher{
+		rule := &apidef.ErrorOverride{
+			Match: &apidef.ErrorMatcher{
 				BodyField: "status",
 				BodyValue: "error",
 			},
@@ -1644,8 +1644,8 @@ func TestMatchesUpstreamCriteria(t *testing.T) {
 	})
 
 	t.Run("does not match wrong body field value", func(t *testing.T) {
-		rule := &config.ErrorOverride{
-			Match: &config.ErrorMatcher{
+		rule := &apidef.ErrorOverride{
+			Match: &apidef.ErrorMatcher{
 				BodyField: "status",
 				BodyValue: "error",
 			},
@@ -1657,8 +1657,8 @@ func TestMatchesUpstreamCriteria(t *testing.T) {
 	})
 
 	t.Run("matches message pattern", func(t *testing.T) {
-		rule := &config.ErrorOverride{
-			Match: &config.ErrorMatcher{
+		rule := &apidef.ErrorOverride{
+			Match: &apidef.ErrorMatcher{
 				MessagePattern: "timeout",
 			},
 		}
@@ -1670,8 +1670,8 @@ func TestMatchesUpstreamCriteria(t *testing.T) {
 	})
 
 	t.Run("returns true when no match criteria", func(t *testing.T) {
-		rule := &config.ErrorOverride{
-			Match: &config.ErrorMatcher{},
+		rule := &apidef.ErrorOverride{
+			Match: &apidef.ErrorMatcher{},
 		}
 
 		matches := eo.matchesUpstreamCriteria(rule, nil, 500)
@@ -1680,11 +1680,11 @@ func TestMatchesUpstreamCriteria(t *testing.T) {
 }
 
 func TestNeedsBodyForMatch(t *testing.T) {
-	gw := createGateway(config.ErrorOverridesMap{})
+	gw := createGateway(apidef.ErrorOverridesMap{})
 	eo := NewErrorOverrides(nil, gw)
 
 	t.Run("returns false when no match criteria", func(t *testing.T) {
-		rule := &config.ErrorOverride{
+		rule := &apidef.ErrorOverride{
 			Match: nil,
 		}
 
@@ -1693,8 +1693,8 @@ func TestNeedsBodyForMatch(t *testing.T) {
 	})
 
 	t.Run("returns true when body field is set", func(t *testing.T) {
-		rule := &config.ErrorOverride{
-			Match: &config.ErrorMatcher{
+		rule := &apidef.ErrorOverride{
+			Match: &apidef.ErrorMatcher{
 				BodyField: "error.code",
 				BodyValue: "timeout",
 			},
@@ -1705,8 +1705,8 @@ func TestNeedsBodyForMatch(t *testing.T) {
 	})
 
 	t.Run("returns true when message pattern is set", func(t *testing.T) {
-		rule := &config.ErrorOverride{
-			Match: &config.ErrorMatcher{
+		rule := &apidef.ErrorOverride{
+			Match: &apidef.ErrorMatcher{
 				MessagePattern: "error.*timeout",
 			},
 		}
@@ -1716,8 +1716,8 @@ func TestNeedsBodyForMatch(t *testing.T) {
 	})
 
 	t.Run("returns false when only flag is set", func(t *testing.T) {
-		rule := &config.ErrorOverride{
-			Match: &config.ErrorMatcher{
+		rule := &apidef.ErrorOverride{
+			Match: &apidef.ErrorMatcher{
 				Flag: errors.URS,
 			},
 		}
@@ -1728,12 +1728,12 @@ func TestNeedsBodyForMatch(t *testing.T) {
 }
 
 func TestCreateOverrideResult(t *testing.T) {
-	gw := createGateway(config.ErrorOverridesMap{})
+	gw := createGateway(apidef.ErrorOverridesMap{})
 	eo := NewErrorOverrides(nil, gw)
 
 	t.Run("creates result with override code", func(t *testing.T) {
-		rule := &config.ErrorOverride{
-			Response: config.ErrorResponse{
+		rule := &apidef.ErrorOverride{
+			Response: apidef.ErrorResponse{
 				Code:    503,
 				Message: "Service unavailable",
 				Headers: map[string]string{"Retry-After": "60"},
@@ -1749,8 +1749,8 @@ func TestCreateOverrideResult(t *testing.T) {
 	})
 
 	t.Run("preserves original code when override code is 0", func(t *testing.T) {
-		rule := &config.ErrorOverride{
-			Response: config.ErrorResponse{
+		rule := &apidef.ErrorOverride{
+			Response: apidef.ErrorResponse{
 				Code:    0,
 				Message: "Keep original",
 			},
@@ -1763,8 +1763,8 @@ func TestCreateOverrideResult(t *testing.T) {
 	})
 
 	t.Run("handles nil headers", func(t *testing.T) {
-		rule := &config.ErrorOverride{
-			Response: config.ErrorResponse{
+		rule := &apidef.ErrorOverride{
+			Response: apidef.ErrorResponse{
 				Code:    503,
 				Headers: nil,
 			},

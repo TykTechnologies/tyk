@@ -410,6 +410,7 @@ func (o *ErrorOverrides) ApplyUpstreamOverride(statusCode int, readBody func() [
 		if o.needsBodyForMatch(rule) {
 			matchBody = readBody()
 		}
+
 		return o.matchesUpstreamCriteria(rule, matchBody, statusCode)
 	})
 

@@ -1537,14 +1537,14 @@ run_all_override_tests() {
     log_info "UPSTREAM ERROR OVERRIDE TESTS"
     log_info "=========================================="
 
-    # Test 1: URS flag on 5xx (ONLY test using URS flag)
+    # Test 1: URS flag on 5xx (ONLY test using URS flag) - Uses message-only (default template)
     run_override_test \
-        "URS Override - 5xx Generic Match" \
+        "URS Override - 5xx Generic Match [Message Only]" \
         "/test-upstream/5xx" \
         "URS" \
-        "upstream_service_error" \
+        "Upstream service error occurred" \
         "URS" \
-        ""
+        "503"
 
     # Test 2: Upstream 404 with body_field matching
     run_override_test \
@@ -1555,12 +1555,12 @@ run_all_override_tests() {
         "NOT_FOUND" \
         "404"
 
-    # Test 3: Upstream 404 with message_pattern
+    # Test 3: Upstream 404 with message_pattern - Uses template: error_validation
     run_override_test \
-        "Upstream Override - 404 Regex Match" \
+        "Upstream Override - 404 Regex Match [Template: error_validation]" \
         "/test-upstream/404-html" \
         "" \
-        "page_not_found" \
+        "Validation Error" \
         "PAGE_NOT_FOUND" \
         "404"
 

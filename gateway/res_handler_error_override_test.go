@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -146,8 +147,8 @@ func TestShouldProcessResponse(t *testing.T) {
 			BaseTykResponseHandler: BaseTykResponseHandler{
 				Spec: &APISpec{
 					GlobalConfig: config.Config{
-						ErrorOverrides: config.ErrorOverridesMap{
-							"500": []config.ErrorOverride{{}},
+						ErrorOverrides: apidef.ErrorOverridesMap{
+							"500": []apidef.ErrorOverride{{}},
 						},
 					},
 				},
@@ -163,8 +164,8 @@ func TestShouldProcessResponse(t *testing.T) {
 			BaseTykResponseHandler: BaseTykResponseHandler{
 				Spec: &APISpec{
 					GlobalConfig: config.Config{
-						ErrorOverrides: config.ErrorOverridesMap{
-							"500": []config.ErrorOverride{{}},
+						ErrorOverrides: apidef.ErrorOverridesMap{
+							"500": []apidef.ErrorOverride{{}},
 						},
 					},
 				},
@@ -183,7 +184,7 @@ func TestShouldProcessResponse(t *testing.T) {
 			BaseTykResponseHandler: BaseTykResponseHandler{
 				Spec: &APISpec{
 					GlobalConfig: config.Config{
-						ErrorOverrides: config.ErrorOverridesMap{},
+						ErrorOverrides: apidef.ErrorOverridesMap{},
 					},
 				},
 			},
@@ -198,8 +199,8 @@ func TestShouldProcessResponse(t *testing.T) {
 			BaseTykResponseHandler: BaseTykResponseHandler{
 				Spec: &APISpec{
 					GlobalConfig: config.Config{
-						ErrorOverrides: config.ErrorOverridesMap{
-							"4xx": []config.ErrorOverride{{}},
+						ErrorOverrides: apidef.ErrorOverridesMap{
+							"4xx": []apidef.ErrorOverride{{}},
 						},
 					},
 				},
@@ -224,7 +225,7 @@ func TestApplyOverrideToResponse(t *testing.T) {
 		result := &OverrideResult{
 			Code:         503,
 			OriginalCode: 500,
-			rule:         &config.ErrorOverride{},
+			rule:         &apidef.ErrorOverride{},
 		}
 
 		req := httptest.NewRequest("GET", "/test", nil)
@@ -248,7 +249,7 @@ func TestApplyOverrideToResponse(t *testing.T) {
 				"X-Error-Code": "SERVICE_DOWN",
 				"Retry-After":  "60",
 			},
-			rule: &config.ErrorOverride{},
+			rule: &apidef.ErrorOverride{},
 		}
 
 		req := httptest.NewRequest("GET", "/test", nil)
@@ -268,8 +269,8 @@ func TestApplyOverrideToResponse(t *testing.T) {
 		}
 		result := &OverrideResult{
 			Code: 500,
-			rule: &config.ErrorOverride{
-				Response: config.ErrorResponse{
+			rule: &apidef.ErrorOverride{
+				Response: apidef.ErrorResponse{
 					Body: "Custom error message",
 				},
 			},
@@ -294,7 +295,7 @@ func TestApplyOverrideToResponse(t *testing.T) {
 		}
 		result := &OverrideResult{
 			Code: 503,
-			rule: &config.ErrorOverride{},
+			rule: &apidef.ErrorOverride{},
 		}
 
 		req := httptest.NewRequest("GET", "/test", nil)
@@ -313,8 +314,8 @@ func TestHasBodyConfig(t *testing.T) {
 
 	t.Run("returns true when body is set", func(t *testing.T) {
 		result := &OverrideResult{
-			rule: &config.ErrorOverride{
-				Response: config.ErrorResponse{
+			rule: &apidef.ErrorOverride{
+				Response: apidef.ErrorResponse{
 					Body: "error message",
 				},
 			},
@@ -324,8 +325,8 @@ func TestHasBodyConfig(t *testing.T) {
 
 	t.Run("returns true when template is set", func(t *testing.T) {
 		result := &OverrideResult{
-			rule: &config.ErrorOverride{
-				Response: config.ErrorResponse{
+			rule: &apidef.ErrorOverride{
+				Response: apidef.ErrorResponse{
 					Template: "error_template",
 				},
 			},
@@ -335,8 +336,8 @@ func TestHasBodyConfig(t *testing.T) {
 
 	t.Run("returns true when message is set", func(t *testing.T) {
 		result := &OverrideResult{
-			rule: &config.ErrorOverride{
-				Response: config.ErrorResponse{
+			rule: &apidef.ErrorOverride{
+				Response: apidef.ErrorResponse{
 					Message: "Custom message",
 				},
 			},
@@ -346,8 +347,8 @@ func TestHasBodyConfig(t *testing.T) {
 
 	t.Run("returns false when no body config", func(t *testing.T) {
 		result := &OverrideResult{
-			rule: &config.ErrorOverride{
-				Response: config.ErrorResponse{},
+			rule: &apidef.ErrorOverride{
+				Response: apidef.ErrorResponse{},
 			},
 		}
 		assert.False(t, middleware.hasBodyConfig(result))
@@ -358,8 +359,8 @@ func TestGenerateOverrideBody(t *testing.T) {
 	t.Run("returns plain body when no template", func(t *testing.T) {
 		middleware := &ResponseErrorOverrideMiddleware{}
 		result := &OverrideResult{
-			rule: &config.ErrorOverride{
-				Response: config.ErrorResponse{
+			rule: &apidef.ErrorOverride{
+				Response: apidef.ErrorResponse{
 					Body: "Plain error text",
 				},
 			},
@@ -375,8 +376,8 @@ func TestGenerateOverrideBody(t *testing.T) {
 	t.Run("returns nil when no body and no template", func(t *testing.T) {
 		middleware := &ResponseErrorOverrideMiddleware{}
 		result := &OverrideResult{
-			rule: &config.ErrorOverride{
-				Response: config.ErrorResponse{},
+			rule: &apidef.ErrorOverride{
+				Response: apidef.ErrorResponse{},
 			},
 		}
 

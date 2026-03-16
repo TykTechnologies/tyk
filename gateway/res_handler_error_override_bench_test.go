@@ -17,7 +17,7 @@ import (
 
 // Benchmark helpers
 
-func createBenchmarkGateway(overrides config.ErrorOverridesMap) *Gateway {
+func createBenchmarkGateway(overrides apidef.ErrorOverridesMap) *Gateway {
 	gw := &Gateway{}
 	compiled := CompileErrorOverrides(overrides)
 	if compiled != nil {
@@ -26,7 +26,7 @@ func createBenchmarkGateway(overrides config.ErrorOverridesMap) *Gateway {
 	return gw
 }
 
-func createBenchmarkMiddleware(overrides config.ErrorOverridesMap) *ResponseErrorOverrideMiddleware {
+func createBenchmarkMiddleware(overrides apidef.ErrorOverridesMap) *ResponseErrorOverrideMiddleware {
 	gw := createBenchmarkGateway(overrides)
 	spec := &APISpec{
 		APIDefinition: &apidef.APIDefinition{
@@ -121,9 +121,9 @@ func BenchmarkLazyBodyReader_RestoreBody(b *testing.B) {
 // Benchmark: ApplyUpstreamOverride - core matching logic
 
 func BenchmarkApplyUpstreamOverride_NoMatch(b *testing.B) {
-	overrides := config.ErrorOverridesMap{
-		"404": []config.ErrorOverride{
-			{Response: config.ErrorResponse{Code: 404, Message: "Not found"}},
+	overrides := apidef.ErrorOverridesMap{
+		"404": []apidef.ErrorOverride{
+			{Response: apidef.ErrorResponse{Code: 404, Body: `{"error":"not_found"}`}},
 		},
 	}
 
@@ -137,9 +137,9 @@ func BenchmarkApplyUpstreamOverride_NoMatch(b *testing.B) {
 }
 
 func BenchmarkApplyUpstreamOverride_ExactMatch_NoBody(b *testing.B) {
-	overrides := config.ErrorOverridesMap{
-		"503": []config.ErrorOverride{
-			{Response: config.ErrorResponse{Code: 500, Message: "Service unavailable"}},
+	overrides := apidef.ErrorOverridesMap{
+		"503": []apidef.ErrorOverride{
+			{Response: apidef.ErrorResponse{Code: 500, Message: "Service unavailable"}},
 		},
 	}
 
@@ -153,9 +153,9 @@ func BenchmarkApplyUpstreamOverride_ExactMatch_NoBody(b *testing.B) {
 }
 
 func BenchmarkApplyUpstreamOverride_PatternMatch_5xx(b *testing.B) {
-	overrides := config.ErrorOverridesMap{
-		"5xx": []config.ErrorOverride{
-			{Response: config.ErrorResponse{Code: 503, Message: "Server error"}},
+	overrides := apidef.ErrorOverridesMap{
+		"5xx": []apidef.ErrorOverride{
+			{Response: apidef.ErrorResponse{Code: 503, Message: "Server error"}},
 		},
 	}
 
@@ -169,11 +169,11 @@ func BenchmarkApplyUpstreamOverride_PatternMatch_5xx(b *testing.B) {
 }
 
 func BenchmarkApplyUpstreamOverride_URSFlag(b *testing.B) {
-	overrides := config.ErrorOverridesMap{
-		"5xx": []config.ErrorOverride{
+	overrides := apidef.ErrorOverridesMap{
+		"5xx": []apidef.ErrorOverride{
 			{
-				Match:    &config.ErrorMatcher{Flag: errors.URS},
-				Response: config.ErrorResponse{Code: 503, Message: "Upstream error"},
+				Match:    &apidef.ErrorMatcher{Flag: errors.URS},
+				Response: apidef.ErrorResponse{Code: 503, Body: `{"error":"upstream_error"}`},
 			},
 		},
 	}
@@ -188,14 +188,14 @@ func BenchmarkApplyUpstreamOverride_URSFlag(b *testing.B) {
 }
 
 func BenchmarkApplyUpstreamOverride_BodyFieldMatch(b *testing.B) {
-	overrides := config.ErrorOverridesMap{
-		"5xx": []config.ErrorOverride{
+	overrides := apidef.ErrorOverridesMap{
+		"5xx": []apidef.ErrorOverride{
 			{
-				Match: &config.ErrorMatcher{
+				Match: &apidef.ErrorMatcher{
 					BodyField: "error.type",
 					BodyValue: "timeout",
 				},
-				Response: config.ErrorResponse{Code: 504, Message: "Timeout"},
+				Response: apidef.ErrorResponse{Code: 504, Body: `{"error":"timeout"}`},
 			},
 		},
 	}
@@ -211,13 +211,13 @@ func BenchmarkApplyUpstreamOverride_BodyFieldMatch(b *testing.B) {
 }
 
 func BenchmarkApplyUpstreamOverride_MessagePatternMatch(b *testing.B) {
-	overrides := config.ErrorOverridesMap{
-		"5xx": []config.ErrorOverride{
+	overrides := apidef.ErrorOverridesMap{
+		"5xx": []apidef.ErrorOverride{
 			{
-				Match: &config.ErrorMatcher{
+				Match: &apidef.ErrorMatcher{
 					MessagePattern: "database.*unavailable",
 				},
-				Response: config.ErrorResponse{Code: 503, Message: "DB down"},
+				Response: apidef.ErrorResponse{Code: 503, Message: "DB down"},
 			},
 		},
 	}
@@ -233,11 +233,11 @@ func BenchmarkApplyUpstreamOverride_MessagePatternMatch(b *testing.B) {
 }
 
 func BenchmarkApplyUpstreamOverride_MultipleRules_FirstMatch(b *testing.B) {
-	overrides := config.ErrorOverridesMap{
-		"500": []config.ErrorOverride{
-			{Response: config.ErrorResponse{Code: 503, Message: "First"}},
-			{Response: config.ErrorResponse{Code: 503, Message: "Second"}},
-			{Response: config.ErrorResponse{Code: 503, Message: "Third"}},
+	overrides := apidef.ErrorOverridesMap{
+		"500": []apidef.ErrorOverride{
+			{Response: apidef.ErrorResponse{Code: 503, Message: "First"}},
+			{Response: apidef.ErrorResponse{Code: 503, Message: "Second"}},
+			{Response: apidef.ErrorResponse{Code: 503, Message: "Third"}},
 		},
 	}
 
@@ -251,18 +251,18 @@ func BenchmarkApplyUpstreamOverride_MultipleRules_FirstMatch(b *testing.B) {
 }
 
 func BenchmarkApplyUpstreamOverride_MultipleRules_LastMatch(b *testing.B) {
-	overrides := config.ErrorOverridesMap{
-		"500": []config.ErrorOverride{
+	overrides := apidef.ErrorOverridesMap{
+		"500": []apidef.ErrorOverride{
 			{
-				Match:    &config.ErrorMatcher{Flag: errors.AKI},
-				Response: config.ErrorResponse{Message: "Skip 1"},
+				Match:    &apidef.ErrorMatcher{Flag: errors.AKI},
+				Response: apidef.ErrorResponse{Message: "Skip 1"},
 			},
 			{
-				Match:    &config.ErrorMatcher{Flag: errors.RLT},
-				Response: config.ErrorResponse{Message: "Skip 2"},
+				Match:    &apidef.ErrorMatcher{Flag: errors.RLT},
+				Response: apidef.ErrorResponse{Message: "Skip 2"},
 			},
 			{
-				Response: config.ErrorResponse{Code: 503, Message: "Match"},
+				Response: apidef.ErrorResponse{Code: 503, Message: "Match"},
 			},
 		},
 	}
@@ -279,9 +279,9 @@ func BenchmarkApplyUpstreamOverride_MultipleRules_LastMatch(b *testing.B) {
 // Benchmark: Full middleware HandleResponse
 
 func BenchmarkHandleResponse_NoOverride_Passthrough(b *testing.B) {
-	overrides := config.ErrorOverridesMap{
-		"404": []config.ErrorOverride{
-			{Response: config.ErrorResponse{Message: "Not found"}},
+	overrides := apidef.ErrorOverridesMap{
+		"404": []apidef.ErrorOverride{
+			{Response: apidef.ErrorResponse{Message: "Not found"}},
 		},
 	}
 
@@ -297,9 +297,9 @@ func BenchmarkHandleResponse_NoOverride_Passthrough(b *testing.B) {
 }
 
 func BenchmarkHandleResponse_SuccessResponse_Skip(b *testing.B) {
-	overrides := config.ErrorOverridesMap{
-		"500": []config.ErrorOverride{
-			{Response: config.ErrorResponse{Message: "Error"}},
+	overrides := apidef.ErrorOverridesMap{
+		"500": []apidef.ErrorOverride{
+			{Response: apidef.ErrorResponse{Message: "Error"}},
 		},
 	}
 
@@ -315,9 +315,9 @@ func BenchmarkHandleResponse_SuccessResponse_Skip(b *testing.B) {
 }
 
 func BenchmarkHandleResponse_ExactMatch_StatusOnly(b *testing.B) {
-	overrides := config.ErrorOverridesMap{
-		"503": []config.ErrorOverride{
-			{Response: config.ErrorResponse{Code: 500, Message: "Unavailable"}},
+	overrides := apidef.ErrorOverridesMap{
+		"503": []apidef.ErrorOverride{
+			{Response: apidef.ErrorResponse{Code: 500, Body: "Service unavailable"}},
 		},
 	}
 
@@ -333,10 +333,10 @@ func BenchmarkHandleResponse_ExactMatch_StatusOnly(b *testing.B) {
 }
 
 func BenchmarkHandleResponse_ExactMatch_WithBody(b *testing.B) {
-	overrides := config.ErrorOverridesMap{
-		"503": []config.ErrorOverride{
+	overrides := apidef.ErrorOverridesMap{
+		"503": []apidef.ErrorOverride{
 			{
-				Response: config.ErrorResponse{
+				Response: apidef.ErrorResponse{
 					Code:    500,
 					Body:    "Custom error message",
 					Headers: map[string]string{"Retry-After": "60"},
@@ -357,14 +357,14 @@ func BenchmarkHandleResponse_ExactMatch_WithBody(b *testing.B) {
 }
 
 func BenchmarkHandleResponse_PatternMatch_SmallBody(b *testing.B) {
-	overrides := config.ErrorOverridesMap{
-		"5xx": []config.ErrorOverride{
+	overrides := apidef.ErrorOverridesMap{
+		"5xx": []apidef.ErrorOverride{
 			{
-				Match: &config.ErrorMatcher{
+				Match: &apidef.ErrorMatcher{
 					BodyField: "error.code",
 					BodyValue: "TIMEOUT",
 				},
-				Response: config.ErrorResponse{Code: 504, Message: "Timeout"},
+				Response: apidef.ErrorResponse{Code: 504, Body: `{"error": "timeout"}`},
 			},
 		},
 	}
@@ -381,13 +381,13 @@ func BenchmarkHandleResponse_PatternMatch_SmallBody(b *testing.B) {
 }
 
 func BenchmarkHandleResponse_PatternMatch_LargeBody(b *testing.B) {
-	overrides := config.ErrorOverridesMap{
-		"5xx": []config.ErrorOverride{
+	overrides := apidef.ErrorOverridesMap{
+		"5xx": []apidef.ErrorOverride{
 			{
-				Match: &config.ErrorMatcher{
+				Match: &apidef.ErrorMatcher{
 					MessagePattern: "database.*error",
 				},
-				Response: config.ErrorResponse{Code: 503, Message: "DB error"},
+				Response: apidef.ErrorResponse{Code: 503, Body: `{"error": "db_error"}`},
 			},
 		},
 	}
@@ -425,13 +425,13 @@ func BenchmarkFindMatchingRuleGeneric_100Rules(b *testing.B) {
 }
 
 func benchmarkFindMatchingRuleGeneric(b *testing.B, ruleCount int) {
-	overrides := config.ErrorOverridesMap{}
+	overrides := apidef.ErrorOverridesMap{}
 
 	// Create many rules for status 500
-	rules := make([]config.ErrorOverride, ruleCount)
+	rules := make([]apidef.ErrorOverride, ruleCount)
 	for i := 0; i < ruleCount; i++ {
-		rules[i] = config.ErrorOverride{
-			Response: config.ErrorResponse{
+		rules[i] = apidef.ErrorOverride{
+			Response: apidef.ErrorResponse{
 				Code:    500,
 				Message: fmt.Sprintf("Rule %d", i),
 			},
@@ -449,62 +449,62 @@ func benchmarkFindMatchingRuleGeneric(b *testing.B, ruleCount int) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		matchCount = 0
-		_ = eo.findMatchingRuleGeneric(compiled, 500, func(rule *config.ErrorOverride) bool {
+		_ = eo.findMatchingRuleGeneric(compiled, 500, func(rule *apidef.ErrorOverride) bool {
 			matchCount++
 			return matchCount == ruleCount // Match last rule
 		})
 	}
 }
 
-// Benchmark: HasRulesForStatus optimization
+// Benchmark: Direct map lookup in CompiledErrorOverrides
 
-func BenchmarkHasRulesForStatus_ExactMatch(b *testing.B) {
-	overrides := config.ErrorOverridesMap{
-		"500": []config.ErrorOverride{{Response: config.ErrorResponse{Message: "Error"}}},
-		"503": []config.ErrorOverride{{Response: config.ErrorResponse{Message: "Error"}}},
-		"504": []config.ErrorOverride{{Response: config.ErrorResponse{Message: "Error"}}},
+func BenchmarkCompiledErrorOverrides_ExactCodeLookup(b *testing.B) {
+	overrides := apidef.ErrorOverridesMap{
+		"500": []apidef.ErrorOverride{{Response: apidef.ErrorResponse{Message: "Error"}}},
+		"503": []apidef.ErrorOverride{{Response: apidef.ErrorResponse{Message: "Error"}}},
+		"504": []apidef.ErrorOverride{{Response: apidef.ErrorResponse{Message: "Error"}}},
 	}
 
 	compiled := CompileErrorOverrides(overrides)
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		_ = compiled.HasRulesForStatus(500)
+		_ = compiled.ByExactCode[500]
 	}
 }
 
-func BenchmarkHasRulesForStatus_PatternMatch(b *testing.B) {
-	overrides := config.ErrorOverridesMap{
-		"5xx": []config.ErrorOverride{{Response: config.ErrorResponse{Message: "Error"}}},
+func BenchmarkCompiledErrorOverrides_PrefixLookup(b *testing.B) {
+	overrides := apidef.ErrorOverridesMap{
+		"5xx": []apidef.ErrorOverride{{Response: apidef.ErrorResponse{Message: "Error"}}},
 	}
 
 	compiled := CompileErrorOverrides(overrides)
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		_ = compiled.HasRulesForStatus(502)
+		_ = compiled.ByPrefix[5]
 	}
 }
 
-func BenchmarkHasRulesForStatus_NoMatch(b *testing.B) {
-	overrides := config.ErrorOverridesMap{
-		"404": []config.ErrorOverride{{Response: config.ErrorResponse{Message: "Error"}}},
+func BenchmarkCompiledErrorOverrides_NoMatch(b *testing.B) {
+	overrides := apidef.ErrorOverridesMap{
+		"404": []apidef.ErrorOverride{{Response: apidef.ErrorResponse{Message: "Error"}}},
 	}
 
 	compiled := CompileErrorOverrides(overrides)
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		_ = compiled.HasRulesForStatus(500)
+		_ = compiled.ByExactCode[500]
 	}
 }
 
 // Benchmark: matchesUpstreamCriteria variations
 
 func BenchmarkMatchesUpstreamCriteria_NoCriteria(b *testing.B) {
-	gw := createBenchmarkGateway(config.ErrorOverridesMap{})
+	gw := createBenchmarkGateway(apidef.ErrorOverridesMap{})
 	eo := NewErrorOverrides(nil, gw)
-	rule := &config.ErrorOverride{Match: nil}
+	rule := &apidef.ErrorOverride{Match: nil}
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
@@ -513,10 +513,10 @@ func BenchmarkMatchesUpstreamCriteria_NoCriteria(b *testing.B) {
 }
 
 func BenchmarkMatchesUpstreamCriteria_URSFlag(b *testing.B) {
-	gw := createBenchmarkGateway(config.ErrorOverridesMap{})
+	gw := createBenchmarkGateway(apidef.ErrorOverridesMap{})
 	eo := NewErrorOverrides(nil, gw)
-	rule := &config.ErrorOverride{
-		Match: &config.ErrorMatcher{Flag: errors.URS},
+	rule := &apidef.ErrorOverride{
+		Match: &apidef.ErrorMatcher{Flag: errors.URS},
 	}
 
 	b.ResetTimer()
@@ -526,10 +526,10 @@ func BenchmarkMatchesUpstreamCriteria_URSFlag(b *testing.B) {
 }
 
 func BenchmarkMatchesUpstreamCriteria_BodyField_SmallJSON(b *testing.B) {
-	gw := createBenchmarkGateway(config.ErrorOverridesMap{})
+	gw := createBenchmarkGateway(apidef.ErrorOverridesMap{})
 	eo := NewErrorOverrides(nil, gw)
-	rule := &config.ErrorOverride{
-		Match: &config.ErrorMatcher{
+	rule := &apidef.ErrorOverride{
+		Match: &apidef.ErrorMatcher{
 			BodyField: "error.type",
 			BodyValue: "timeout",
 		},
@@ -543,10 +543,10 @@ func BenchmarkMatchesUpstreamCriteria_BodyField_SmallJSON(b *testing.B) {
 }
 
 func BenchmarkMatchesUpstreamCriteria_BodyField_LargeJSON(b *testing.B) {
-	gw := createBenchmarkGateway(config.ErrorOverridesMap{})
+	gw := createBenchmarkGateway(apidef.ErrorOverridesMap{})
 	eo := NewErrorOverrides(nil, gw)
-	rule := &config.ErrorOverride{
-		Match: &config.ErrorMatcher{
+	rule := &apidef.ErrorOverride{
+		Match: &apidef.ErrorMatcher{
 			BodyField: "deep.nested.field",
 			BodyValue: "value",
 		},
@@ -574,10 +574,10 @@ func BenchmarkMatchesUpstreamCriteria_BodyField_LargeJSON(b *testing.B) {
 }
 
 func BenchmarkMatchesUpstreamCriteria_MessagePattern_SimpleRegex(b *testing.B) {
-	overrides := config.ErrorOverridesMap{
-		"500": []config.ErrorOverride{
+	overrides := apidef.ErrorOverridesMap{
+		"500": []apidef.ErrorOverride{
 			{
-				Match: &config.ErrorMatcher{
+				Match: &apidef.ErrorMatcher{
 					MessagePattern: "timeout",
 				},
 			},
@@ -597,10 +597,10 @@ func BenchmarkMatchesUpstreamCriteria_MessagePattern_SimpleRegex(b *testing.B) {
 }
 
 func BenchmarkMatchesUpstreamCriteria_MessagePattern_ComplexRegex(b *testing.B) {
-	overrides := config.ErrorOverridesMap{
-		"500": []config.ErrorOverride{
+	overrides := apidef.ErrorOverridesMap{
+		"500": []apidef.ErrorOverride{
 			{
-				Match: &config.ErrorMatcher{
+				Match: &apidef.ErrorMatcher{
 					MessagePattern: `(database|db|mysql|postgres).*?(connection|timeout|unavailable|error)`,
 				},
 			},
@@ -622,8 +622,8 @@ func BenchmarkMatchesUpstreamCriteria_MessagePattern_ComplexRegex(b *testing.B) 
 // Benchmark: Comparison scenarios - with vs without optimization
 
 func BenchmarkShouldProcessResponse_FastPath_Success(b *testing.B) {
-	middleware := createBenchmarkMiddleware(config.ErrorOverridesMap{
-		"500": []config.ErrorOverride{{}},
+	middleware := createBenchmarkMiddleware(apidef.ErrorOverridesMap{
+		"500": []apidef.ErrorOverride{{}},
 	})
 
 	b.ResetTimer()
@@ -634,7 +634,7 @@ func BenchmarkShouldProcessResponse_FastPath_Success(b *testing.B) {
 }
 
 func BenchmarkShouldProcessResponse_FastPath_NoConfig(b *testing.B) {
-	middleware := createBenchmarkMiddleware(config.ErrorOverridesMap{})
+	middleware := createBenchmarkMiddleware(apidef.ErrorOverridesMap{})
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
@@ -644,8 +644,8 @@ func BenchmarkShouldProcessResponse_FastPath_NoConfig(b *testing.B) {
 }
 
 func BenchmarkShouldProcessResponse_Error(b *testing.B) {
-	middleware := createBenchmarkMiddleware(config.ErrorOverridesMap{
-		"500": []config.ErrorOverride{{}},
+	middleware := createBenchmarkMiddleware(apidef.ErrorOverridesMap{
+		"500": []apidef.ErrorOverride{{}},
 	})
 
 	b.ResetTimer()
@@ -658,10 +658,10 @@ func BenchmarkShouldProcessResponse_Error(b *testing.B) {
 // Benchmark: Memory allocations
 
 func BenchmarkCreateOverrideResult(b *testing.B) {
-	gw := createBenchmarkGateway(config.ErrorOverridesMap{})
+	gw := createBenchmarkGateway(apidef.ErrorOverridesMap{})
 	eo := NewErrorOverrides(nil, gw)
-	rule := &config.ErrorOverride{
-		Response: config.ErrorResponse{
+	rule := &apidef.ErrorOverride{
+		Response: apidef.ErrorResponse{
 			Code:    503,
 			Message: "Service unavailable",
 			Headers: map[string]string{
@@ -679,10 +679,10 @@ func BenchmarkCreateOverrideResult(b *testing.B) {
 }
 
 func BenchmarkNeedsBodyForMatch(b *testing.B) {
-	gw := createBenchmarkGateway(config.ErrorOverridesMap{})
+	gw := createBenchmarkGateway(apidef.ErrorOverridesMap{})
 	eo := NewErrorOverrides(nil, gw)
-	rule := &config.ErrorOverride{
-		Match: &config.ErrorMatcher{
+	rule := &apidef.ErrorOverride{
+		Match: &apidef.ErrorMatcher{
 			BodyField: "error.code",
 			BodyValue: "timeout",
 		},
@@ -698,9 +698,9 @@ func BenchmarkNeedsBodyForMatch(b *testing.B) {
 
 func BenchmarkRealWorld_HighTraffic_NoOverride(b *testing.B) {
 	// Simulate high traffic scenario where most requests don't match
-	overrides := config.ErrorOverridesMap{
-		"503": []config.ErrorOverride{
-			{Response: config.ErrorResponse{Code: 500, Message: "Unavailable"}},
+	overrides := apidef.ErrorOverridesMap{
+		"503": []apidef.ErrorOverride{
+			{Response: apidef.ErrorResponse{Code: 500, Message: "Unavailable"}},
 		},
 	}
 
@@ -722,11 +722,11 @@ func BenchmarkRealWorld_HighTraffic_NoOverride(b *testing.B) {
 
 func BenchmarkRealWorld_HighTraffic_WithOverride(b *testing.B) {
 	// Simulate scenario with occasional overrides
-	overrides := config.ErrorOverridesMap{
-		"5xx": []config.ErrorOverride{
+	overrides := apidef.ErrorOverridesMap{
+		"5xx": []apidef.ErrorOverride{
 			{
-				Match:    &config.ErrorMatcher{Flag: errors.URS},
-				Response: config.ErrorResponse{Code: 503, Message: "Upstream error"},
+				Match:    &apidef.ErrorMatcher{Flag: errors.URS},
+				Response: apidef.ErrorResponse{Code: 503, Body: `{"error":"upstream_error"}`},
 			},
 		},
 	}
@@ -749,38 +749,38 @@ func BenchmarkRealWorld_HighTraffic_WithOverride(b *testing.B) {
 
 func BenchmarkRealWorld_ComplexRuleset(b *testing.B) {
 	// Simulate complex production configuration
-	overrides := config.ErrorOverridesMap{
-		"400": []config.ErrorOverride{
-			{Response: config.ErrorResponse{Code: 400, Message: "Bad request"}},
+	overrides := apidef.ErrorOverridesMap{
+		"400": []apidef.ErrorOverride{
+			{Response: apidef.ErrorResponse{Code: 400, Body: `{"error":"bad_request"}`}},
 		},
-		"401": []config.ErrorOverride{
-			{Response: config.ErrorResponse{Code: 401, Message: "Unauthorized"}},
+		"401": []apidef.ErrorOverride{
+			{Response: apidef.ErrorResponse{Code: 401, Body: `{"error":"unauthorized"}`}},
 		},
-		"403": []config.ErrorOverride{
-			{Response: config.ErrorResponse{Code: 403, Message: "Forbidden"}},
+		"403": []apidef.ErrorOverride{
+			{Response: apidef.ErrorResponse{Code: 403, Body: `{"error":"forbidden"}`}},
 		},
-		"404": []config.ErrorOverride{
-			{Response: config.ErrorResponse{Code: 404, Message: "Not found"}},
+		"404": []apidef.ErrorOverride{
+			{Response: apidef.ErrorResponse{Code: 404, Body: `{"error":"not_found"}`}},
 		},
-		"429": []config.ErrorOverride{
-			{Response: config.ErrorResponse{Code: 429, Message: "Rate limited"}},
+		"429": []apidef.ErrorOverride{
+			{Response: apidef.ErrorResponse{Code: 429, Body: `{"error":"rate_limited"}`}},
 		},
-		"500": []config.ErrorOverride{
-			{Response: config.ErrorResponse{Code: 500, Message: "Internal error"}},
+		"500": []apidef.ErrorOverride{
+			{Response: apidef.ErrorResponse{Code: 500, Body: `{"error":"internal_error"}`}},
 		},
-		"502": []config.ErrorOverride{
-			{Response: config.ErrorResponse{Code: 502, Message: "Bad gateway"}},
+		"502": []apidef.ErrorOverride{
+			{Response: apidef.ErrorResponse{Code: 502, Body: `{"error":"bad_gateway"}`}},
 		},
-		"503": []config.ErrorOverride{
-			{Response: config.ErrorResponse{Code: 503, Message: "Unavailable"}},
+		"503": []apidef.ErrorOverride{
+			{Response: apidef.ErrorResponse{Code: 503, Body: `{"error":"unavailable"}`}},
 		},
-		"504": []config.ErrorOverride{
-			{Response: config.ErrorResponse{Code: 504, Message: "Timeout"}},
+		"504": []apidef.ErrorOverride{
+			{Response: apidef.ErrorResponse{Code: 504, Body: `{"error":"timeout"}`}},
 		},
-		"5xx": []config.ErrorOverride{
+		"5xx": []apidef.ErrorOverride{
 			{
-				Match:    &config.ErrorMatcher{Flag: errors.URS},
-				Response: config.ErrorResponse{Code: 503, Message: "Upstream error"},
+				Match:    &apidef.ErrorMatcher{Flag: errors.URS},
+				Response: apidef.ErrorResponse{Code: 503, Body: `{"error":"upstream_error"}`},
 			},
 		},
 	}
