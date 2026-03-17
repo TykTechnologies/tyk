@@ -129,8 +129,8 @@ func (r *ResponseErrorOverrideMiddleware) applyOverrideToResponse(
 	req *http.Request,
 	logger *logrus.Entry,
 ) bool {
-	if result.Code > 0 {
-		res.StatusCode = result.Code
+	if result.StatusCode > 0 {
+		res.StatusCode = result.StatusCode
 	}
 
 	bodyReplaced := false

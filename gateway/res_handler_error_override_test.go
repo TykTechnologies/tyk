@@ -223,7 +223,7 @@ func TestApplyOverrideToResponse(t *testing.T) {
 			Header:     http.Header{},
 		}
 		result := &OverrideResult{
-			Code:         503,
+			StatusCode:   503,
 			OriginalCode: 500,
 			rule:         &apidef.ErrorOverride{},
 		}
@@ -244,7 +244,7 @@ func TestApplyOverrideToResponse(t *testing.T) {
 			Header:     http.Header{},
 		}
 		result := &OverrideResult{
-			Code: 500,
+			StatusCode: 500,
 			Headers: map[string]string{
 				"X-Error-Code": "SERVICE_DOWN",
 				"Retry-After":  "60",
@@ -268,7 +268,7 @@ func TestApplyOverrideToResponse(t *testing.T) {
 			Header:     http.Header{},
 		}
 		result := &OverrideResult{
-			Code: 500,
+			StatusCode: 500,
 			rule: &apidef.ErrorOverride{
 				Response: apidef.ErrorResponse{
 					Body: "Custom error message",
@@ -294,7 +294,7 @@ func TestApplyOverrideToResponse(t *testing.T) {
 			Header:     http.Header{},
 		}
 		result := &OverrideResult{
-			Code: 503,
+			StatusCode: 503,
 			rule: &apidef.ErrorOverride{},
 		}
 

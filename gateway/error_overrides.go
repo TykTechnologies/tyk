@@ -423,13 +423,13 @@ func (o *ErrorOverrides) ApplyUpstreamOverride(statusCode int, readBody func() [
 
 func (o *ErrorOverrides) createOverrideResult(rule *apidef.ErrorOverride, statusCode int) *OverrideResult {
 	result := &OverrideResult{
-		Code:         rule.Response.Code,
+		StatusCode:   rule.Response.StatusCode,
 		Headers:      rule.Response.Headers,
 		OriginalCode: statusCode,
 		rule:         rule,
 	}
-	if result.Code == 0 {
-		result.Code = statusCode
+	if result.StatusCode == 0 {
+		result.StatusCode = statusCode
 	}
 	return result
 }

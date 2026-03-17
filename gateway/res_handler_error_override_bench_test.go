@@ -123,7 +123,7 @@ func BenchmarkLazyBodyReader_RestoreBody(b *testing.B) {
 func BenchmarkApplyUpstreamOverride_NoMatch(b *testing.B) {
 	overrides := apidef.ErrorOverridesMap{
 		"404": []apidef.ErrorOverride{
-			{Response: apidef.ErrorResponse{Code: 404, Body: `{"error":"not_found"}`}},
+			{Response: apidef.ErrorResponse{StatusCode: 404, Body: `{"error":"not_found"}`}},
 		},
 	}
 
@@ -139,7 +139,7 @@ func BenchmarkApplyUpstreamOverride_NoMatch(b *testing.B) {
 func BenchmarkApplyUpstreamOverride_ExactMatch_NoBody(b *testing.B) {
 	overrides := apidef.ErrorOverridesMap{
 		"503": []apidef.ErrorOverride{
-			{Response: apidef.ErrorResponse{Code: 500, Message: "Service unavailable"}},
+			{Response: apidef.ErrorResponse{StatusCode: 500, Message: "Service unavailable"}},
 		},
 	}
 
@@ -155,7 +155,7 @@ func BenchmarkApplyUpstreamOverride_ExactMatch_NoBody(b *testing.B) {
 func BenchmarkApplyUpstreamOverride_PatternMatch_5xx(b *testing.B) {
 	overrides := apidef.ErrorOverridesMap{
 		"5xx": []apidef.ErrorOverride{
-			{Response: apidef.ErrorResponse{Code: 503, Message: "Server error"}},
+			{Response: apidef.ErrorResponse{StatusCode: 503, Message: "Server error"}},
 		},
 	}
 
@@ -173,7 +173,7 @@ func BenchmarkApplyUpstreamOverride_URSFlag(b *testing.B) {
 		"5xx": []apidef.ErrorOverride{
 			{
 				Match:    &apidef.ErrorMatcher{Flag: errors.URS},
-				Response: apidef.ErrorResponse{Code: 503, Body: `{"error":"upstream_error"}`},
+				Response: apidef.ErrorResponse{StatusCode: 503, Body: `{"error":"upstream_error"}`},
 			},
 		},
 	}
@@ -195,7 +195,7 @@ func BenchmarkApplyUpstreamOverride_BodyFieldMatch(b *testing.B) {
 					BodyField: "error.type",
 					BodyValue: "timeout",
 				},
-				Response: apidef.ErrorResponse{Code: 504, Body: `{"error":"timeout"}`},
+				Response: apidef.ErrorResponse{StatusCode: 504, Body: `{"error":"timeout"}`},
 			},
 		},
 	}
@@ -217,7 +217,7 @@ func BenchmarkApplyUpstreamOverride_MessagePatternMatch(b *testing.B) {
 				Match: &apidef.ErrorMatcher{
 					MessagePattern: "database.*unavailable",
 				},
-				Response: apidef.ErrorResponse{Code: 503, Message: "DB down"},
+				Response: apidef.ErrorResponse{StatusCode: 503, Message: "DB down"},
 			},
 		},
 	}
@@ -235,9 +235,9 @@ func BenchmarkApplyUpstreamOverride_MessagePatternMatch(b *testing.B) {
 func BenchmarkApplyUpstreamOverride_MultipleRules_FirstMatch(b *testing.B) {
 	overrides := apidef.ErrorOverridesMap{
 		"500": []apidef.ErrorOverride{
-			{Response: apidef.ErrorResponse{Code: 503, Message: "First"}},
-			{Response: apidef.ErrorResponse{Code: 503, Message: "Second"}},
-			{Response: apidef.ErrorResponse{Code: 503, Message: "Third"}},
+			{Response: apidef.ErrorResponse{StatusCode: 503, Message: "First"}},
+			{Response: apidef.ErrorResponse{StatusCode: 503, Message: "Second"}},
+			{Response: apidef.ErrorResponse{StatusCode: 503, Message: "Third"}},
 		},
 	}
 
@@ -262,7 +262,7 @@ func BenchmarkApplyUpstreamOverride_MultipleRules_LastMatch(b *testing.B) {
 				Response: apidef.ErrorResponse{Message: "Skip 2"},
 			},
 			{
-				Response: apidef.ErrorResponse{Code: 503, Message: "Match"},
+				Response: apidef.ErrorResponse{StatusCode: 503, Message: "Match"},
 			},
 		},
 	}
@@ -317,7 +317,7 @@ func BenchmarkHandleResponse_SuccessResponse_Skip(b *testing.B) {
 func BenchmarkHandleResponse_ExactMatch_StatusOnly(b *testing.B) {
 	overrides := apidef.ErrorOverridesMap{
 		"503": []apidef.ErrorOverride{
-			{Response: apidef.ErrorResponse{Code: 500, Body: "Service unavailable"}},
+			{Response: apidef.ErrorResponse{StatusCode: 500, Body: "Service unavailable"}},
 		},
 	}
 
@@ -337,7 +337,7 @@ func BenchmarkHandleResponse_ExactMatch_WithBody(b *testing.B) {
 		"503": []apidef.ErrorOverride{
 			{
 				Response: apidef.ErrorResponse{
-					Code:    500,
+					StatusCode: 500,
 					Body:    "Custom error message",
 					Headers: map[string]string{"Retry-After": "60"},
 				},
@@ -364,7 +364,7 @@ func BenchmarkHandleResponse_PatternMatch_SmallBody(b *testing.B) {
 					BodyField: "error.code",
 					BodyValue: "TIMEOUT",
 				},
-				Response: apidef.ErrorResponse{Code: 504, Body: `{"error": "timeout"}`},
+				Response: apidef.ErrorResponse{StatusCode: 504, Body: `{"error": "timeout"}`},
 			},
 		},
 	}
@@ -387,7 +387,7 @@ func BenchmarkHandleResponse_PatternMatch_LargeBody(b *testing.B) {
 				Match: &apidef.ErrorMatcher{
 					MessagePattern: "database.*error",
 				},
-				Response: apidef.ErrorResponse{Code: 503, Body: `{"error": "db_error"}`},
+				Response: apidef.ErrorResponse{StatusCode: 503, Body: `{"error": "db_error"}`},
 			},
 		},
 	}
@@ -432,7 +432,7 @@ func benchmarkFindMatchingRuleGeneric(b *testing.B, ruleCount int) {
 	for i := 0; i < ruleCount; i++ {
 		rules[i] = apidef.ErrorOverride{
 			Response: apidef.ErrorResponse{
-				Code:    500,
+				StatusCode: 500,
 				Message: fmt.Sprintf("Rule %d", i),
 			},
 		}
@@ -662,7 +662,7 @@ func BenchmarkCreateOverrideResult(b *testing.B) {
 	eo := NewErrorOverrides(nil, gw)
 	rule := &apidef.ErrorOverride{
 		Response: apidef.ErrorResponse{
-			Code:    503,
+			StatusCode: 503,
 			Message: "Service unavailable",
 			Headers: map[string]string{
 				"Retry-After":  "60",
@@ -700,7 +700,7 @@ func BenchmarkRealWorld_HighTraffic_NoOverride(b *testing.B) {
 	// Simulate high traffic scenario where most requests don't match
 	overrides := apidef.ErrorOverridesMap{
 		"503": []apidef.ErrorOverride{
-			{Response: apidef.ErrorResponse{Code: 500, Message: "Unavailable"}},
+			{Response: apidef.ErrorResponse{StatusCode: 500, Message: "Unavailable"}},
 		},
 	}
 
@@ -726,7 +726,7 @@ func BenchmarkRealWorld_HighTraffic_WithOverride(b *testing.B) {
 		"5xx": []apidef.ErrorOverride{
 			{
 				Match:    &apidef.ErrorMatcher{Flag: errors.URS},
-				Response: apidef.ErrorResponse{Code: 503, Body: `{"error":"upstream_error"}`},
+				Response: apidef.ErrorResponse{StatusCode: 503, Body: `{"error":"upstream_error"}`},
 			},
 		},
 	}
@@ -751,36 +751,36 @@ func BenchmarkRealWorld_ComplexRuleset(b *testing.B) {
 	// Simulate complex production configuration
 	overrides := apidef.ErrorOverridesMap{
 		"400": []apidef.ErrorOverride{
-			{Response: apidef.ErrorResponse{Code: 400, Body: `{"error":"bad_request"}`}},
+			{Response: apidef.ErrorResponse{StatusCode: 400, Body: `{"error":"bad_request"}`}},
 		},
 		"401": []apidef.ErrorOverride{
-			{Response: apidef.ErrorResponse{Code: 401, Body: `{"error":"unauthorized"}`}},
+			{Response: apidef.ErrorResponse{StatusCode: 401, Body: `{"error":"unauthorized"}`}},
 		},
 		"403": []apidef.ErrorOverride{
-			{Response: apidef.ErrorResponse{Code: 403, Body: `{"error":"forbidden"}`}},
+			{Response: apidef.ErrorResponse{StatusCode: 403, Body: `{"error":"forbidden"}`}},
 		},
 		"404": []apidef.ErrorOverride{
-			{Response: apidef.ErrorResponse{Code: 404, Body: `{"error":"not_found"}`}},
+			{Response: apidef.ErrorResponse{StatusCode: 404, Body: `{"error":"not_found"}`}},
 		},
 		"429": []apidef.ErrorOverride{
-			{Response: apidef.ErrorResponse{Code: 429, Body: `{"error":"rate_limited"}`}},
+			{Response: apidef.ErrorResponse{StatusCode: 429, Body: `{"error":"rate_limited"}`}},
 		},
 		"500": []apidef.ErrorOverride{
-			{Response: apidef.ErrorResponse{Code: 500, Body: `{"error":"internal_error"}`}},
+			{Response: apidef.ErrorResponse{StatusCode: 500, Body: `{"error":"internal_error"}`}},
 		},
 		"502": []apidef.ErrorOverride{
-			{Response: apidef.ErrorResponse{Code: 502, Body: `{"error":"bad_gateway"}`}},
+			{Response: apidef.ErrorResponse{StatusCode: 502, Body: `{"error":"bad_gateway"}`}},
 		},
 		"503": []apidef.ErrorOverride{
-			{Response: apidef.ErrorResponse{Code: 503, Body: `{"error":"unavailable"}`}},
+			{Response: apidef.ErrorResponse{StatusCode: 503, Body: `{"error":"unavailable"}`}},
 		},
 		"504": []apidef.ErrorOverride{
-			{Response: apidef.ErrorResponse{Code: 504, Body: `{"error":"timeout"}`}},
+			{Response: apidef.ErrorResponse{StatusCode: 504, Body: `{"error":"timeout"}`}},
 		},
 		"5xx": []apidef.ErrorOverride{
 			{
 				Match:    &apidef.ErrorMatcher{Flag: errors.URS},
-				Response: apidef.ErrorResponse{Code: 503, Body: `{"error":"upstream_error"}`},
+				Response: apidef.ErrorResponse{StatusCode: 503, Body: `{"error":"upstream_error"}`},
 			},
 		},
 	}

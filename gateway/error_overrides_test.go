@@ -1323,7 +1323,7 @@ func TestApplyUpstreamOverride(t *testing.T) {
 			"503": []apidef.ErrorOverride{
 				{
 					Response: apidef.ErrorResponse{
-						Code:    500,
+						StatusCode: 500,
 						Message: "Upstream unavailable",
 					},
 				},
@@ -1338,7 +1338,7 @@ func TestApplyUpstreamOverride(t *testing.T) {
 		})
 
 		require.NotNil(t, result)
-		assert.Equal(t, 500, result.Code)
+		assert.Equal(t, 500, result.StatusCode)
 		assert.Equal(t, 503, result.OriginalCode)
 		assert.Equal(t, "Upstream unavailable", result.GetMessageForTemplate())
 	})
@@ -1348,7 +1348,7 @@ func TestApplyUpstreamOverride(t *testing.T) {
 			"5xx": []apidef.ErrorOverride{
 				{
 					Response: apidef.ErrorResponse{
-						Code:    503,
+						StatusCode: 503,
 						Message: "Server error",
 					},
 				},
@@ -1363,7 +1363,7 @@ func TestApplyUpstreamOverride(t *testing.T) {
 		})
 
 		require.NotNil(t, result)
-		assert.Equal(t, 503, result.Code)
+		assert.Equal(t, 503, result.StatusCode)
 		assert.Equal(t, "Server error", result.GetMessageForTemplate())
 	})
 
@@ -1373,7 +1373,7 @@ func TestApplyUpstreamOverride(t *testing.T) {
 				{
 					Match: &apidef.ErrorMatcher{Flag: errors.URS},
 					Response: apidef.ErrorResponse{
-						Code:    503,
+						StatusCode: 503,
 						Message: "Upstream error",
 					},
 				},
@@ -1390,7 +1390,7 @@ func TestApplyUpstreamOverride(t *testing.T) {
 			})
 
 			require.NotNil(t, result, "status code %d", code)
-			assert.Equal(t, 503, result.Code)
+			assert.Equal(t, 503, result.StatusCode)
 		}
 	})
 
@@ -1447,7 +1447,7 @@ func TestApplyUpstreamOverride(t *testing.T) {
 						BodyValue: "timeout",
 					},
 					Response: apidef.ErrorResponse{
-						Code:    504,
+						StatusCode: 504,
 						Message: "Timeout occurred",
 					},
 				},
@@ -1462,7 +1462,7 @@ func TestApplyUpstreamOverride(t *testing.T) {
 		})
 
 		require.NotNil(t, result)
-		assert.Equal(t, 504, result.Code)
+		assert.Equal(t, 504, result.StatusCode)
 	})
 
 	t.Run("matches message pattern", func(t *testing.T) {
@@ -1473,7 +1473,7 @@ func TestApplyUpstreamOverride(t *testing.T) {
 						MessagePattern: "database.*unavailable",
 					},
 					Response: apidef.ErrorResponse{
-						Code:    503,
+						StatusCode: 503,
 						Message: "Database is down",
 					},
 				},
@@ -1495,7 +1495,7 @@ func TestApplyUpstreamOverride(t *testing.T) {
 		})
 
 		require.NotNil(t, result)
-		assert.Equal(t, 503, result.Code)
+		assert.Equal(t, 503, result.StatusCode)
 	})
 
 	t.Run("lazy body reading - only reads when needed", func(t *testing.T) {
@@ -1504,7 +1504,7 @@ func TestApplyUpstreamOverride(t *testing.T) {
 				{
 					// First rule has no body match - should not read body
 					Response: apidef.ErrorResponse{
-						Code:    503,
+						StatusCode: 503,
 						Message: "Generic error",
 					},
 				},
@@ -1557,7 +1557,7 @@ func TestApplyUpstreamOverride(t *testing.T) {
 			"500": []apidef.ErrorOverride{
 				{
 					Response: apidef.ErrorResponse{
-						Code:    0, // Don't change status code
+						StatusCode: 0, // Don't change status code
 						Message: "Keep original code",
 					},
 				},
@@ -1572,7 +1572,7 @@ func TestApplyUpstreamOverride(t *testing.T) {
 		})
 
 		require.NotNil(t, result)
-		assert.Equal(t, 500, result.Code, "should preserve original status code")
+		assert.Equal(t, 500, result.StatusCode, "should preserve original status code")
 		assert.Equal(t, 500, result.OriginalCode)
 	})
 }
@@ -1734,7 +1734,7 @@ func TestCreateOverrideResult(t *testing.T) {
 	t.Run("creates result with override code", func(t *testing.T) {
 		rule := &apidef.ErrorOverride{
 			Response: apidef.ErrorResponse{
-				Code:    503,
+				StatusCode: 503,
 				Message: "Service unavailable",
 				Headers: map[string]string{"Retry-After": "60"},
 			},
@@ -1742,7 +1742,7 @@ func TestCreateOverrideResult(t *testing.T) {
 
 		result := eo.createOverrideResult(rule, 500)
 
-		assert.Equal(t, 503, result.Code)
+		assert.Equal(t, 503, result.StatusCode)
 		assert.Equal(t, 500, result.OriginalCode)
 		assert.Equal(t, "60", result.Headers["Retry-After"])
 		assert.Equal(t, rule, result.rule)
@@ -1751,21 +1751,21 @@ func TestCreateOverrideResult(t *testing.T) {
 	t.Run("preserves original code when override code is 0", func(t *testing.T) {
 		rule := &apidef.ErrorOverride{
 			Response: apidef.ErrorResponse{
-				Code:    0,
+				StatusCode: 0,
 				Message: "Keep original",
 			},
 		}
 
 		result := eo.createOverrideResult(rule, 500)
 
-		assert.Equal(t, 500, result.Code, "should use original code")
+		assert.Equal(t, 500, result.StatusCode, "should use original code")
 		assert.Equal(t, 500, result.OriginalCode)
 	})
 
 	t.Run("handles nil headers", func(t *testing.T) {
 		rule := &apidef.ErrorOverride{
 			Response: apidef.ErrorResponse{
-				Code:    503,
+				StatusCode: 503,
 				Headers: nil,
 			},
 		}
