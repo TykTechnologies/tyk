@@ -1004,6 +1004,79 @@ func TestUpstreamMutualTLS(t *testing.T) {
 	})
 }
 
+func TestUpstreamMutualTLS_BypassCAFiltering(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	ts.Gw.dialCtxFn = test.LocalDialer()
+
+	// Generate a CA
+	caCertPEM, caKeyPEM, err := crypto.GenerateRootCertAndKey(t)
+	assert.NoError(t, err)
+
+	// Generate a client cert signed by the CA
+	clientCertPEM, clientKeyPEM, err := crypto.GenerateClientCertAndKeyChain(t, caCertPEM, caKeyPEM)
+	assert.NoError(t, err)
+
+	clientCert, err := tls.X509KeyPair(clientCertPEM.Bytes(), clientKeyPEM.Bytes())
+	assert.NoError(t, err)
+	clientCert.Leaf, err = x509.ParseCertificate(clientCert.Certificate[0])
+	assert.NoError(t, err)
+
+	// The upstream server will ask for a certificate issued by the client cert's subject (the leaf cert itself)
+	// This simulates the bug where Gateway A adds the leaf cert to its ClientCAs pool
+	pool := x509.NewCertPool()
+	pool.AddCert(clientCert.Leaf)
+
+	upstream := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(200)
+	}))
+
+	upstream.TLS = &tls.Config{
+		ClientAuth:         tls.RequireAndVerifyClientCert,
+		ClientCAs:          pool, // This is the key part: asking for the leaf cert's subject
+		InsecureSkipVerify: true,
+		MaxVersion:         tls.VersionTLS12,
+	}
+
+	upstream.StartTLS()
+	defer upstream.Close()
+
+	upstreamURL, _ := url.Parse(upstream.URL)
+
+	globalConf := ts.Gw.GetConfig()
+	globalConf.ProxySSLInsecureSkipVerify = true
+	ts.Gw.SetConfig(globalConf)
+
+	// Add the client cert to the Gateway's CertificateManager
+	combinedClientPEM := append(clientCertPEM.Bytes(), []byte("\n")...)
+	combinedClientPEM = append(combinedClientPEM, clientKeyPEM.Bytes()...)
+	clientCertID, err := ts.Gw.CertificateManager.Add(combinedClientPEM, "")
+	assert.NoError(t, err)
+	defer ts.Gw.CertificateManager.Delete(clientCertID, "")
+
+	api := BuildAPI(func(spec *APISpec) {
+		spec.Proxy.ListenPath = "/"
+		spec.Proxy.TargetURL = fmt.Sprintf("https://%s:%s", "127.0.0.1", upstreamURL.Port())
+		spec.UpstreamCertificates = map[string]string{
+			"*:*": clientCertID,
+			"*":   clientCertID,
+		}
+	})[0]
+
+	ts.Gw.LoadAPI(api)
+
+	// Make a request to the Gateway
+	// If the fix works, the Gateway will send the client cert to the upstream server,
+	// and the upstream server will accept it (because it's the exact cert it asked for).
+	// If the fix is not present, Go's TLS client will filter out the cert because its issuer (the CA)
+	// does not match the requested CA (the leaf cert's subject).
+	_, _ = ts.Run(t, test.TestCase{
+		Code:   http.StatusOK,
+		Client: test.NewClientLocal(),
+	})
+}
+
 func TestUpstreamCertificateWithPort(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()

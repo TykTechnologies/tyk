@@ -30,10 +30,12 @@ import (
 	"github.com/TykTechnologies/tyk-pump/analytics"
 
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/certs"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/ctx"
 	"github.com/TykTechnologies/tyk/dnscache"
 	"github.com/TykTechnologies/tyk/header"
+	"github.com/TykTechnologies/tyk/internal/crypto"
 	"github.com/TykTechnologies/tyk/request"
 	"github.com/TykTechnologies/tyk/test"
 	"github.com/TykTechnologies/tyk/user"
@@ -411,6 +413,45 @@ func TestWrappedServeHTTP(t *testing.T) {
 	assert.NotNil(t, proxyResponse, "error on deepCopyBody should return an empty ProxyResponse")
 	assert.Nil(t, proxyResponse.Response, "no response should be expected on error")
 	assert.Equal(t, http.StatusInternalServerError, recorder.Code)
+}
+
+func TestWrappedServeHTTP_GetClientCertificate(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	// Generate a mock certificate
+	_, _, combinedPEM, _ := crypto.GenServerCertificate()
+	certID, err := ts.Gw.CertificateManager.Add(combinedPEM, "")
+	assert.NoError(t, err)
+	defer ts.Gw.CertificateManager.Delete(certID, "")
+
+	target, _ := url.Parse("http://localhost:8080")
+	spec := &APISpec{
+		APIDefinition: &apidef.APIDefinition{
+			UpstreamCertificates: map[string]string{
+				"localhost:8080": certID,
+			},
+		},
+	}
+
+	proxy := ts.Gw.TykNewSingleHostReverseProxy(target, spec, nil)
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	recorder := httptest.NewRecorder()
+
+	proxy.WrappedServeHTTP(recorder, req, false)
+	// Verify that GetClientCertificate is set
+	assert.NotNil(t, spec.HTTPTransport)
+	assert.NotNil(t, spec.HTTPTransport.transport)
+	assert.NotNil(t, spec.HTTPTransport.transport.TLSClientConfig)
+
+	if spec.HTTPTransport.transport.TLSClientConfig.GetClientCertificate == nil {
+		t.Fatalf("GetClientCertificate is nil, certID: %s, certs: %v", certID, ts.Gw.CertificateManager.List([]string{certID}, certs.CertificatePrivate))
+	}
+
+	// Verify that it returns the correct certificate
+	cert, err := spec.HTTPTransport.transport.TLSClientConfig.GetClientCertificate(nil)
+	assert.NoError(t, err)
+	assert.NotNil(t, cert)
 }
 
 func TestCircuitBreaker5xxs(t *testing.T) {
