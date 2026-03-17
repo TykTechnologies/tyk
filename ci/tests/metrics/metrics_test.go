@@ -535,10 +535,14 @@ func TestRuntimeMetrics(t *testing.T) {
 		name   string
 		metric string
 	}{
-		{"goroutine count exists", `process_runtime_go_goroutines`},
-		{"heap memory allocated exists", `process_runtime_go_mem_heap_alloc_bytes`},
-		{"heap memory in use exists", `process_runtime_go_mem_heap_inuse_bytes`},
-		{"GC count exists", `process_runtime_go_gc_count_total`},
+		// New Go runtime metric names (semconv) from runtime instrumentation v0.61+.
+		{"go.goroutine.count exists", `go_goroutine_count`},
+		{"go.memory.used exists", `go_memory_used_bytes`},
+		{"go.memory.allocated exists", `go_memory_allocated_bytes_total`},
+		{"go.memory.allocations exists", `go_memory_allocations_total`},
+		{"go.memory.gc.goal exists", `go_memory_gc_goal_bytes`},
+		{"go.processor.limit exists", `go_processor_limit`},
+		{"go.config.gogc exists", `go_config_gogc_percent`},
 	}
 
 	for _, tc := range tests {
@@ -557,10 +561,10 @@ func TestRuntimeMetrics_Disabled(t *testing.T) {
 
 	time.Sleep(15 * time.Second)
 
-	// Runtime metrics should not exist.
-	assertMetricAbsent(t, `process_runtime_go_goroutines`)
-	assertMetricAbsent(t, `process_runtime_go_mem_heap_alloc_bytes`)
-	assertMetricAbsent(t, `process_runtime_go_gc_count_total`)
+	// Runtime metrics should not exist (new names).
+	assertMetricAbsent(t, `go_goroutine_count`)
+	assertMetricAbsent(t, `go_memory_used_bytes`)
+	assertMetricAbsent(t, `go_memory_allocated_bytes_total`)
 }
 
 // ---------- Disabled profile tests ----------
