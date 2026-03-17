@@ -293,7 +293,77 @@ func TestGateway_afterConfSetup(t *testing.T) {
 			},
 		},
 		{
-			name: "oauth mtls kv store - secrets backend missing key returns error",
+			name: "error - secret key missing from kv store",
+			initialConfig: config.Config{
+				Secret: "secrets://missing_secret",
+			},
+			wantErrContains: "could not retrieve the secret key",
+		},
+		{
+			name: "error - node secret key missing from kv store",
+			initialConfig: config.Config{
+				NodeSecret: "secrets://missing_node_secret",
+			},
+			wantErrContains: "could not retrieve the node secret key",
+		},
+		{
+			name: "error - redis password missing from kv store",
+			initialConfig: config.Config{
+				Storage: config.StorageOptionsConf{
+					Password: "secrets://missing_redis_password",
+				},
+			},
+			wantErrContains: "could not retrieve redis password",
+		},
+		{
+			name: "error - cache storage password missing from kv store",
+			initialConfig: config.Config{
+				CacheStorage: config.StorageOptionsConf{
+					Password: "secrets://missing_cache_password",
+				},
+			},
+			wantErrContains: "could not retrieve cache storage password",
+		},
+		{
+			name: "error - private certificate encoding secret missing from kv store",
+			initialConfig: config.Config{
+				Security: config.SecurityConfig{
+					PrivateCertificateEncodingSecret: "secrets://missing_cert_secret",
+				},
+			},
+			wantErrContains: "could not retrieve the private certificate encoding secret",
+		},
+		{
+			name: "error - dashboard connection string missing from kv store",
+			initialConfig: config.Config{
+				UseDBAppConfigs: true,
+				DBAppConfOptions: config.DBAppConfOptionsConfig{
+					ConnectionString: "secrets://missing_dashboard_conn",
+				},
+			},
+			wantErrContains: "could not fetch dashboard connection string",
+		},
+		{
+			name: "error - policy connection string missing from kv store",
+			initialConfig: config.Config{
+				Policies: config.PoliciesConfig{
+					PolicySource:           "service",
+					PolicyConnectionString: "secrets://missing_policy_conn",
+				},
+			},
+			wantErrContains: "could not fetch policy connection string",
+		},
+		{
+			name: "error - slave options api key missing from kv store",
+			initialConfig: config.Config{
+				SlaveOptions: config.SlaveOptionsConfig{
+					APIKey: "secrets://missing_api_key",
+				},
+			},
+			wantErrContains: "could not retrieve API key from KV store",
+		},
+		{
+			name: "oauth mtls kv store - error on cert file",
 			initialConfig: config.Config{
 				ExternalServices: config.ExternalServiceConfig{
 					OAuth: config.ServiceConfig{
@@ -305,53 +375,50 @@ func TestGateway_afterConfSetup(t *testing.T) {
 						},
 					},
 				},
-				// Secrets map is empty — the reference cannot be resolved
+				// Secrets map is empty — no references can be resolved
 			},
 			wantErrContains: "could not retrieve OAuth mTLS cert file path from KV store",
 		},
 		{
-			name: "oauth mtls kv store - vault backend error propagates for cert file",
+			name: "oauth mtls kv store - error on key file",
 			initialConfig: config.Config{
 				ExternalServices: config.ExternalServiceConfig{
 					OAuth: config.ServiceConfig{
 						MTLS: config.MTLSConfig{
 							Enabled:  true,
-							CertFile: "vault://secret/oauth/cert_file",
-							KeyFile:  "vault://secret/oauth/key_file",
-							CAFile:   "vault://secret/oauth/ca_file",
+							CertFile: "secrets://oauth_cert",
+							KeyFile:  "secrets://missing_key",
+							CAFile:   "secrets://oauth_ca",
 						},
 					},
 				},
-			},
-			setup: func(_ *testing.T, gw *Gateway) {
-				// Empty data map — all keys will return "key not found" errors
-				gw.vaultKVStore = &mockKVStore{data: map[string]string{}}
-			},
-			wantErrContains: "could not retrieve OAuth mTLS cert file path from KV store",
-		},
-		{
-			name: "oauth mtls kv store - consul backend error propagates for key file",
-			initialConfig: config.Config{
-				ExternalServices: config.ExternalServiceConfig{
-					OAuth: config.ServiceConfig{
-						MTLS: config.MTLSConfig{
-							Enabled:  true,
-							CertFile: "consul://oauth/cert_file",
-							KeyFile:  "consul://oauth/key_file",
-							CAFile:   "consul://oauth/ca_file",
-						},
-					},
+				Secrets: map[string]string{
+					"oauth_cert": "/path/to/cert.pem",
+					// key file deliberately absent
 				},
-			},
-			setup: func(_ *testing.T, gw *Gateway) {
-				// Only cert_file is present — key_file lookup will fail
-				gw.consulKVStore = &mockKVStore{
-					data: map[string]string{
-						"oauth/cert_file": "/consul/path/to/cert.pem",
-					},
-				}
 			},
 			wantErrContains: "could not retrieve OAuth mTLS key file path from KV store",
+		},
+		{
+			name: "oauth mtls kv store - error on ca file",
+			initialConfig: config.Config{
+				ExternalServices: config.ExternalServiceConfig{
+					OAuth: config.ServiceConfig{
+						MTLS: config.MTLSConfig{
+							Enabled:  true,
+							CertFile: "secrets://oauth_cert",
+							KeyFile:  "secrets://oauth_key",
+							CAFile:   "secrets://missing_ca",
+						},
+					},
+				},
+				Secrets: map[string]string{
+					"oauth_cert": "/path/to/cert.pem",
+					"oauth_key":  "/path/to/key.pem",
+					// ca file deliberately absent
+				},
+			},
+			wantErrContains: "could not retrieve OAuth mTLS CA file path from KV store",
 		},
 		{
 			name: "oauth mtls kv store - disabled mtls skips kv resolution",
