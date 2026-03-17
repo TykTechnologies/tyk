@@ -5,6 +5,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/header"
 )
@@ -72,10 +73,10 @@ func BenchmarkErrorHandlerOverhead(b *testing.B) {
 	})
 
 	b.Run("with override check - overrides configured but not matching", func(b *testing.B) {
-		overrides := config.ErrorOverridesMap{
-			"404": []config.ErrorOverride{
+		overrides := apidef.ErrorOverridesMap{
+			"404": []apidef.ErrorOverride{
 				{
-					Response: config.ErrorResponse{
+					Response: apidef.ErrorResponse{
 						Message: "Not found",
 					},
 				},
@@ -120,11 +121,11 @@ func BenchmarkErrorHandlerOverhead(b *testing.B) {
 	})
 
 	b.Run("with override check - overrides matching", func(b *testing.B) {
-		overrides := config.ErrorOverridesMap{
-			"500": []config.ErrorOverride{
+		overrides := apidef.ErrorOverridesMap{
+			"500": []apidef.ErrorOverride{
 				{
-					Response: config.ErrorResponse{
-						Code:    503,
+					Response: apidef.ErrorResponse{
+						StatusCode: 503,
 						Message: `{"error": "Service unavailable"}`,
 					},
 				},

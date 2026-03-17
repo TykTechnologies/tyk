@@ -6,6 +6,7 @@ import (
 	"testing"
 	texttemplate "text/template"
 
+	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/ctx"
 	"github.com/TykTechnologies/tyk/header"
@@ -34,11 +35,11 @@ func BenchmarkTryWriteOverride(b *testing.B) {
 	})
 
 	b.Run("config exists - match with direct body", func(b *testing.B) {
-		overrides := config.ErrorOverridesMap{
-			"500": []config.ErrorOverride{
+		overrides := apidef.ErrorOverridesMap{
+			"500": []apidef.ErrorOverride{
 				{
-					Response: config.ErrorResponse{
-						Code: 503,
+					Response: apidef.ErrorResponse{
+						StatusCode: 503,
 						Body: `{"error": "Service unavailable"}`,
 					},
 				},
@@ -85,11 +86,11 @@ func BenchmarkApplyOverride(b *testing.B) {
 	})
 
 	b.Run("exact code match - no additional criteria", func(b *testing.B) {
-		overrides := config.ErrorOverridesMap{
-			"500": []config.ErrorOverride{
+		overrides := apidef.ErrorOverridesMap{
+			"500": []apidef.ErrorOverride{
 				{
-					Response: config.ErrorResponse{
-						Code:    503,
+					Response: apidef.ErrorResponse{
+						StatusCode: 503,
 						Message: "Service unavailable",
 					},
 				},
@@ -110,10 +111,10 @@ func BenchmarkApplyOverride(b *testing.B) {
 	})
 
 	b.Run("pattern match 4xx", func(b *testing.B) {
-		overrides := config.ErrorOverridesMap{
-			"4xx": []config.ErrorOverride{
+		overrides := apidef.ErrorOverridesMap{
+			"4xx": []apidef.ErrorOverride{
 				{
-					Response: config.ErrorResponse{
+					Response: apidef.ErrorResponse{
 						Message: "Client error",
 					},
 				},
@@ -134,14 +135,14 @@ func BenchmarkApplyOverride(b *testing.B) {
 	})
 
 	b.Run("regex pattern match", func(b *testing.B) {
-		overrides := config.ErrorOverridesMap{
-			"500": []config.ErrorOverride{
+		overrides := apidef.ErrorOverridesMap{
+			"500": []apidef.ErrorOverride{
 				{
-					Match: &config.ErrorMatcher{
+					Match: &apidef.ErrorMatcher{
 						MessagePattern: "database.*timeout",
 					},
-					Response: config.ErrorResponse{
-						Code:    504,
+					Response: apidef.ErrorResponse{
+						StatusCode: 504,
 						Message: "Database timeout",
 					},
 				},
@@ -162,14 +163,14 @@ func BenchmarkApplyOverride(b *testing.B) {
 	})
 
 	b.Run("regex pattern non-match", func(b *testing.B) {
-		overrides := config.ErrorOverridesMap{
-			"500": []config.ErrorOverride{
+		overrides := apidef.ErrorOverridesMap{
+			"500": []apidef.ErrorOverride{
 				{
-					Match: &config.ErrorMatcher{
+					Match: &apidef.ErrorMatcher{
 						MessagePattern: "database.*timeout",
 					},
-					Response: config.ErrorResponse{
-						Code:    504,
+					Response: apidef.ErrorResponse{
+						StatusCode: 504,
 						Message: "Database timeout",
 					},
 				},
@@ -190,15 +191,15 @@ func BenchmarkApplyOverride(b *testing.B) {
 	})
 
 	b.Run("JSON body field match", func(b *testing.B) {
-		overrides := config.ErrorOverridesMap{
-			"400": []config.ErrorOverride{
+		overrides := apidef.ErrorOverridesMap{
+			"400": []apidef.ErrorOverride{
 				{
-					Match: &config.ErrorMatcher{
+					Match: &apidef.ErrorMatcher{
 						BodyField: "error.code",
 						BodyValue: "INVALID_INPUT",
 					},
-					Response: config.ErrorResponse{
-						Code:    422,
+					Response: apidef.ErrorResponse{
+						StatusCode: 422,
 						Message: "Validation failed",
 					},
 				},
@@ -219,26 +220,26 @@ func BenchmarkApplyOverride(b *testing.B) {
 	})
 
 	b.Run("multiple rules - first match", func(b *testing.B) {
-		overrides := config.ErrorOverridesMap{
-			"500": []config.ErrorOverride{
+		overrides := apidef.ErrorOverridesMap{
+			"500": []apidef.ErrorOverride{
 				{
-					Match: &config.ErrorMatcher{
+					Match: &apidef.ErrorMatcher{
 						MessagePattern: "database",
 					},
-					Response: config.ErrorResponse{
+					Response: apidef.ErrorResponse{
 						Message: "Database error",
 					},
 				},
 				{
-					Match: &config.ErrorMatcher{
+					Match: &apidef.ErrorMatcher{
 						MessagePattern: "network",
 					},
-					Response: config.ErrorResponse{
+					Response: apidef.ErrorResponse{
 						Message: "Network error",
 					},
 				},
 				{
-					Response: config.ErrorResponse{
+					Response: apidef.ErrorResponse{
 						Message: "Generic error",
 					},
 				},
@@ -259,13 +260,13 @@ func BenchmarkApplyOverride(b *testing.B) {
 	})
 
 	b.Run("large body truncation", func(b *testing.B) {
-		overrides := config.ErrorOverridesMap{
-			"500": []config.ErrorOverride{
+		overrides := apidef.ErrorOverridesMap{
+			"500": []apidef.ErrorOverride{
 				{
-					Match: &config.ErrorMatcher{
+					Match: &apidef.ErrorMatcher{
 						MessagePattern: "error at start",
 					},
-					Response: config.ErrorResponse{
+					Response: apidef.ErrorResponse{
 						Message: "Matched",
 					},
 				},
@@ -287,14 +288,14 @@ func BenchmarkApplyOverride(b *testing.B) {
 	})
 
 	b.Run("flag match - exact match", func(b *testing.B) {
-		overrides := config.ErrorOverridesMap{
-			"429": []config.ErrorOverride{
+		overrides := apidef.ErrorOverridesMap{
+			"429": []apidef.ErrorOverride{
 				{
-					Match: &config.ErrorMatcher{
+					Match: &apidef.ErrorMatcher{
 						Flag: errors.RLT,
 					},
-					Response: config.ErrorResponse{
-						Code:    429,
+					Response: apidef.ErrorResponse{
+						StatusCode: 429,
 						Message: "Rate limit exceeded",
 					},
 				},
@@ -315,14 +316,14 @@ func BenchmarkApplyOverride(b *testing.B) {
 	})
 
 	b.Run("flag match - no classification in context", func(b *testing.B) {
-		overrides := config.ErrorOverridesMap{
-			"429": []config.ErrorOverride{
+		overrides := apidef.ErrorOverridesMap{
+			"429": []apidef.ErrorOverride{
 				{
-					Match: &config.ErrorMatcher{
+					Match: &apidef.ErrorMatcher{
 						Flag: errors.RLT,
 					},
-					Response: config.ErrorResponse{
-						Code:    429,
+					Response: apidef.ErrorResponse{
+						StatusCode: 429,
 						Message: "Rate limit exceeded",
 					},
 				},
@@ -343,15 +344,15 @@ func BenchmarkApplyOverride(b *testing.B) {
 	})
 
 	b.Run("flag match - fallback to regex", func(b *testing.B) {
-		overrides := config.ErrorOverridesMap{
-			"500": []config.ErrorOverride{
+		overrides := apidef.ErrorOverridesMap{
+			"500": []apidef.ErrorOverride{
 				{
-					Match: &config.ErrorMatcher{
+					Match: &apidef.ErrorMatcher{
 						Flag:           errors.CBO,
 						MessagePattern: "circuit.*breaker",
 					},
-					Response: config.ErrorResponse{
-						Code:    503,
+					Response: apidef.ErrorResponse{
+						StatusCode: 503,
 						Message: "Service unavailable",
 					},
 				},
@@ -374,34 +375,34 @@ func BenchmarkApplyOverride(b *testing.B) {
 	})
 
 	b.Run("multiple flag rules - first match", func(b *testing.B) {
-		overrides := config.ErrorOverridesMap{
-			"401": []config.ErrorOverride{
+		overrides := apidef.ErrorOverridesMap{
+			"401": []apidef.ErrorOverride{
 				{
-					Match: &config.ErrorMatcher{
+					Match: &apidef.ErrorMatcher{
 						Flag: errors.TKE,
 					},
-					Response: config.ErrorResponse{
+					Response: apidef.ErrorResponse{
 						Message: "Token expired",
 					},
 				},
 				{
-					Match: &config.ErrorMatcher{
+					Match: &apidef.ErrorMatcher{
 						Flag: errors.AMF,
 					},
-					Response: config.ErrorResponse{
+					Response: apidef.ErrorResponse{
 						Message: "Auth field missing",
 					},
 				},
 				{
-					Match: &config.ErrorMatcher{
+					Match: &apidef.ErrorMatcher{
 						Flag: errors.TKI,
 					},
-					Response: config.ErrorResponse{
+					Response: apidef.ErrorResponse{
 						Message: "Token invalid",
 					},
 				},
 				{
-					Response: config.ErrorResponse{
+					Response: apidef.ErrorResponse{
 						Message: "Unauthorized",
 					},
 				},
@@ -422,26 +423,26 @@ func BenchmarkApplyOverride(b *testing.B) {
 	})
 
 	b.Run("multiple flag rules - last match (catch-all)", func(b *testing.B) {
-		overrides := config.ErrorOverridesMap{
-			"401": []config.ErrorOverride{
+		overrides := apidef.ErrorOverridesMap{
+			"401": []apidef.ErrorOverride{
 				{
-					Match: &config.ErrorMatcher{
+					Match: &apidef.ErrorMatcher{
 						Flag: errors.TKE,
 					},
-					Response: config.ErrorResponse{
+					Response: apidef.ErrorResponse{
 						Message: "Token expired",
 					},
 				},
 				{
-					Match: &config.ErrorMatcher{
+					Match: &apidef.ErrorMatcher{
 						Flag: errors.AMF,
 					},
-					Response: config.ErrorResponse{
+					Response: apidef.ErrorResponse{
 						Message: "Auth field missing",
 					},
 				},
 				{
-					Response: config.ErrorResponse{
+					Response: apidef.ErrorResponse{
 						Message: "Unauthorized",
 					},
 				},
@@ -463,13 +464,13 @@ func BenchmarkApplyOverride(b *testing.B) {
 	})
 
 	b.Run("flag vs regex performance comparison - flag", func(b *testing.B) {
-		overrides := config.ErrorOverridesMap{
-			"429": []config.ErrorOverride{
+		overrides := apidef.ErrorOverridesMap{
+			"429": []apidef.ErrorOverride{
 				{
-					Match: &config.ErrorMatcher{
+					Match: &apidef.ErrorMatcher{
 						Flag: errors.RLT,
 					},
-					Response: config.ErrorResponse{
+					Response: apidef.ErrorResponse{
 						Message: "Rate limited",
 					},
 				},
@@ -490,13 +491,13 @@ func BenchmarkApplyOverride(b *testing.B) {
 	})
 
 	b.Run("flag vs regex performance comparison - regex", func(b *testing.B) {
-		overrides := config.ErrorOverridesMap{
-			"429": []config.ErrorOverride{
+		overrides := apidef.ErrorOverridesMap{
+			"429": []apidef.ErrorOverride{
 				{
-					Match: &config.ErrorMatcher{
+					Match: &apidef.ErrorMatcher{
 						MessagePattern: "rate.*limit.*exceeded",
 					},
-					Response: config.ErrorResponse{
+					Response: apidef.ErrorResponse{
 						Message: "Rate limited",
 					},
 				},
@@ -530,9 +531,9 @@ func BenchmarkWriteOverrideResponse(b *testing.B) {
 		}
 
 		result := &OverrideResult{
-			Code: 503,
-			rule: &config.ErrorOverride{
-				Response: config.ErrorResponse{
+			StatusCode: 503,
+			rule: &apidef.ErrorOverride{
+				Response: apidef.ErrorResponse{
 					Body: `{"error": "Service temporarily unavailable", "code": "SERVICE_DOWN"}`,
 				},
 			},
@@ -558,8 +559,8 @@ func BenchmarkWriteOverrideResponse(b *testing.B) {
 			},
 		}
 
-		rule := &config.ErrorOverride{
-			Response: config.ErrorResponse{
+		rule := &apidef.ErrorOverride{
+			Response: apidef.ErrorResponse{
 				Body:    `{"error": "Error {{.StatusCode}}", "message": "{{.Message}}"}`,
 				Message: "timeout",
 			},
@@ -567,7 +568,7 @@ func BenchmarkWriteOverrideResponse(b *testing.B) {
 		_ = compileSingleRule(rule)
 
 		result := &OverrideResult{
-			Code: 504,
+			StatusCode: 504,
 			rule: rule,
 		}
 
@@ -591,8 +592,8 @@ func BenchmarkWriteOverrideResponse(b *testing.B) {
 			},
 		}
 
-		rule := &config.ErrorOverride{
-			Response: config.ErrorResponse{
+		rule := &apidef.ErrorOverride{
+			Response: apidef.ErrorResponse{
 				Body:    `<error><code>{{.StatusCode}}</code><message>{{.Message}}</message></error>`,
 				Message: "server error",
 			},
@@ -600,7 +601,7 @@ func BenchmarkWriteOverrideResponse(b *testing.B) {
 		_ = compileSingleRule(rule)
 
 		result := &OverrideResult{
-			Code: 500,
+			StatusCode: 500,
 			rule: rule,
 		}
 
@@ -630,9 +631,9 @@ func BenchmarkWriteOverrideResponse(b *testing.B) {
 		}
 
 		result := &OverrideResult{
-			Code: 503,
-			rule: &config.ErrorOverride{
-				Response: config.ErrorResponse{
+			StatusCode: 503,
+			rule: &apidef.ErrorOverride{
+				Response: apidef.ErrorResponse{
 					Message:  "Custom error message",
 					Template: "error_test",
 				},
@@ -665,9 +666,9 @@ func BenchmarkWriteOverrideResponse(b *testing.B) {
 		}
 
 		result := &OverrideResult{
-			Code: 500,
-			rule: &config.ErrorOverride{
-				Response: config.ErrorResponse{
+			StatusCode: 500,
+			rule: &apidef.ErrorOverride{
+				Response: apidef.ErrorResponse{
 					Message:  "Server error occurred",
 					Template: "error_test",
 				},
@@ -700,15 +701,15 @@ func BenchmarkWriteOverrideResponse(b *testing.B) {
 		}
 
 		result := &OverrideResult{
-			Code: 429,
+			StatusCode: 429,
 			Headers: map[string]string{
 				"Retry-After":      "300",
 				"X-RateLimit":      "100",
 				"X-RateLimit-Used": "100",
 				"X-Custom":         "value",
 			},
-			rule: &config.ErrorOverride{
-				Response: config.ErrorResponse{
+			rule: &apidef.ErrorOverride{
+				Response: apidef.ErrorResponse{
 					Message: `{"error": "Too many requests"}`,
 				},
 			},
@@ -753,11 +754,11 @@ func BenchmarkWriteTemplateErrorResponse(b *testing.B) {
 
 func BenchmarkCompileErrorOverrides(b *testing.B) {
 	b.Run("single exact code", func(b *testing.B) {
-		overrides := config.ErrorOverridesMap{
-			"500": []config.ErrorOverride{
+		overrides := apidef.ErrorOverridesMap{
+			"500": []apidef.ErrorOverride{
 				{
-					Response: config.ErrorResponse{
-						Code:    503,
+					Response: apidef.ErrorResponse{
+						StatusCode: 503,
 						Message: "Service unavailable",
 					},
 				},
@@ -771,21 +772,21 @@ func BenchmarkCompileErrorOverrides(b *testing.B) {
 	})
 
 	b.Run("multiple exact codes", func(b *testing.B) {
-		overrides := config.ErrorOverridesMap{
-			"400": []config.ErrorOverride{
-				{Response: config.ErrorResponse{Message: "Bad request"}},
+		overrides := apidef.ErrorOverridesMap{
+			"400": []apidef.ErrorOverride{
+				{Response: apidef.ErrorResponse{Message: "Bad request"}},
 			},
-			"401": []config.ErrorOverride{
-				{Response: config.ErrorResponse{Message: "Unauthorized"}},
+			"401": []apidef.ErrorOverride{
+				{Response: apidef.ErrorResponse{Message: "Unauthorized"}},
 			},
-			"403": []config.ErrorOverride{
-				{Response: config.ErrorResponse{Message: "Forbidden"}},
+			"403": []apidef.ErrorOverride{
+				{Response: apidef.ErrorResponse{Message: "Forbidden"}},
 			},
-			"404": []config.ErrorOverride{
-				{Response: config.ErrorResponse{Message: "Not found"}},
+			"404": []apidef.ErrorOverride{
+				{Response: apidef.ErrorResponse{Message: "Not found"}},
 			},
-			"500": []config.ErrorOverride{
-				{Response: config.ErrorResponse{Message: "Internal error"}},
+			"500": []apidef.ErrorOverride{
+				{Response: apidef.ErrorResponse{Message: "Internal error"}},
 			},
 		}
 
@@ -796,23 +797,23 @@ func BenchmarkCompileErrorOverrides(b *testing.B) {
 	})
 
 	b.Run("with regex patterns", func(b *testing.B) {
-		overrides := config.ErrorOverridesMap{
-			"500": []config.ErrorOverride{
+		overrides := apidef.ErrorOverridesMap{
+			"500": []apidef.ErrorOverride{
 				{
-					Match: &config.ErrorMatcher{
+					Match: &apidef.ErrorMatcher{
 						MessagePattern: "database.*timeout",
 					},
-					Response: config.ErrorResponse{
-						Code:    504,
+					Response: apidef.ErrorResponse{
+						StatusCode: 504,
 						Message: "Database timeout",
 					},
 				},
 				{
-					Match: &config.ErrorMatcher{
+					Match: &apidef.ErrorMatcher{
 						MessagePattern: "network.*error",
 					},
-					Response: config.ErrorResponse{
-						Code:    502,
+					Response: apidef.ErrorResponse{
+						StatusCode: 502,
 						Message: "Network error",
 					},
 				},
@@ -826,10 +827,10 @@ func BenchmarkCompileErrorOverrides(b *testing.B) {
 	})
 
 	b.Run("with inline templates", func(b *testing.B) {
-		overrides := config.ErrorOverridesMap{
-			"500": []config.ErrorOverride{
+		overrides := apidef.ErrorOverridesMap{
+			"500": []apidef.ErrorOverride{
 				{
-					Response: config.ErrorResponse{
+					Response: apidef.ErrorResponse{
 						Body:    `{"error": "Error {{.StatusCode}}", "message": "{{.Message}}"}`,
 						Message: "error message",
 					},
@@ -844,24 +845,24 @@ func BenchmarkCompileErrorOverrides(b *testing.B) {
 	})
 
 	b.Run("mixed exact and patterns", func(b *testing.B) {
-		overrides := config.ErrorOverridesMap{
-			"401": []config.ErrorOverride{
-				{Response: config.ErrorResponse{Message: "Unauthorized"}},
+		overrides := apidef.ErrorOverridesMap{
+			"401": []apidef.ErrorOverride{
+				{Response: apidef.ErrorResponse{Message: "Unauthorized"}},
 			},
-			"500": []config.ErrorOverride{
+			"500": []apidef.ErrorOverride{
 				{
-					Match: &config.ErrorMatcher{
+					Match: &apidef.ErrorMatcher{
 						MessagePattern: "database",
 					},
-					Response: config.ErrorResponse{Message: "Database error"},
+					Response: apidef.ErrorResponse{Message: "Database error"},
 				},
-				{Response: config.ErrorResponse{Message: "Generic error"}},
+				{Response: apidef.ErrorResponse{Message: "Generic error"}},
 			},
-			"4xx": []config.ErrorOverride{
-				{Response: config.ErrorResponse{Message: "Client error"}},
+			"4xx": []apidef.ErrorOverride{
+				{Response: apidef.ErrorResponse{Message: "Client error"}},
 			},
-			"5xx": []config.ErrorOverride{
-				{Response: config.ErrorResponse{Message: "Server error"}},
+			"5xx": []apidef.ErrorOverride{
+				{Response: apidef.ErrorResponse{Message: "Server error"}},
 			},
 		}
 

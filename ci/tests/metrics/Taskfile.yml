@@ -2,7 +2,7 @@
 version: "3"
 
 vars:
-  PROFILES: default custom disabled
+  PROFILES: default custom disabled cardinality response-headers
 
 tasks:
   default:

@@ -15,6 +15,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/TykTechnologies/tyk-pump/analytics"
+	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/header"
 	"github.com/TykTechnologies/tyk/test"
@@ -254,13 +255,13 @@ func TestErrorHandler_AnalyticsRecordsOverriddenStatusCode(t *testing.T) {
 		ts := StartTest(func(globalConf *config.Config) {
 			globalConf.AnalyticsConfig.EnableDetailedRecording = true
 			// Configure error override: 401 -> 403
-			globalConf.ErrorOverrides = config.ErrorOverridesMap{
-				"401": []config.ErrorOverride{
+			globalConf.ErrorOverrides = apidef.ErrorOverridesMap{
+				"401": []apidef.ErrorOverride{
 					{
-						Response: config.ErrorResponse{
-							Code:    403, // Override to 403
-							Body:    `{"error": "access_denied", "code": "FORBIDDEN"}`,
-							Message: "Access denied",
+						Response: apidef.ErrorResponse{
+							StatusCode: 403, // Override to 403
+							Body:       `{"error": "access_denied", "code": "FORBIDDEN"}`,
+							Message:    "Access denied",
 						},
 					},
 				},
@@ -305,12 +306,12 @@ func TestErrorHandler_AnalyticsRecordsOverriddenStatusCode(t *testing.T) {
 		ts := StartTest(func(globalConf *config.Config) {
 			globalConf.AnalyticsConfig.EnableDetailedRecording = true
 			// Configure error override only for 500
-			globalConf.ErrorOverrides = config.ErrorOverridesMap{
-				"500": []config.ErrorOverride{
+			globalConf.ErrorOverrides = apidef.ErrorOverridesMap{
+				"500": []apidef.ErrorOverride{
 					{
-						Response: config.ErrorResponse{
-							Code:    503,
-							Message: "Service unavailable",
+						Response: apidef.ErrorResponse{
+							StatusCode: 503,
+							Message:    "Service unavailable",
 						},
 					},
 				},

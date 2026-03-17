@@ -9,7 +9,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/ctx"
 	"github.com/TykTechnologies/tyk/internal/errors"
 )
@@ -22,16 +22,16 @@ func TestCompileErrorOverrides(t *testing.T) {
 	})
 
 	t.Run("empty overrides", func(t *testing.T) {
-		result := CompileErrorOverrides(config.ErrorOverridesMap{})
+		result := CompileErrorOverrides(apidef.ErrorOverridesMap{})
 		assert.Nil(t, result)
 	})
 
 	t.Run("exact status code", func(t *testing.T) {
-		overrides := config.ErrorOverridesMap{
-			"500": []config.ErrorOverride{
+		overrides := apidef.ErrorOverridesMap{
+			"500": []apidef.ErrorOverride{
 				{
-					Response: config.ErrorResponse{
-						Code:    503,
+					Response: apidef.ErrorResponse{
+						StatusCode: 503,
 						Message: "Service unavailable",
 					},
 				},
@@ -42,14 +42,14 @@ func TestCompileErrorOverrides(t *testing.T) {
 		require.NotNil(t, result)
 		assert.Contains(t, result.ByExactCode, 500)
 		assert.Len(t, result.ByExactCode[500], 1)
-		assert.Equal(t, 503, result.ByExactCode[500][0].Response.Code)
+		assert.Equal(t, 503, result.ByExactCode[500][0].Response.StatusCode)
 	})
 
 	t.Run("pattern status code 4xx", func(t *testing.T) {
-		overrides := config.ErrorOverridesMap{
-			"4xx": []config.ErrorOverride{
+		overrides := apidef.ErrorOverridesMap{
+			"4xx": []apidef.ErrorOverride{
 				{
-					Response: config.ErrorResponse{
+					Response: apidef.ErrorResponse{
 						Template: "error_client",
 					},
 				},
@@ -63,10 +63,10 @@ func TestCompileErrorOverrides(t *testing.T) {
 	})
 
 	t.Run("pattern status code 5xx", func(t *testing.T) {
-		overrides := config.ErrorOverridesMap{
-			"5xx": []config.ErrorOverride{
+		overrides := apidef.ErrorOverridesMap{
+			"5xx": []apidef.ErrorOverride{
 				{
-					Response: config.ErrorResponse{
+					Response: apidef.ErrorResponse{
 						Template: "error_server",
 					},
 				},
@@ -80,20 +80,20 @@ func TestCompileErrorOverrides(t *testing.T) {
 	})
 
 	t.Run("multiple rules for same status code", func(t *testing.T) {
-		overrides := config.ErrorOverridesMap{
-			"500": []config.ErrorOverride{
+		overrides := apidef.ErrorOverridesMap{
+			"500": []apidef.ErrorOverride{
 				{
-					Match: &config.ErrorMatcher{
+					Match: &apidef.ErrorMatcher{
 						MessagePattern: "database.*timeout",
 					},
-					Response: config.ErrorResponse{
-						Code:    504,
+					Response: apidef.ErrorResponse{
+						StatusCode: 504,
 						Message: "Database timeout",
 					},
 				},
 				{
-					Response: config.ErrorResponse{
-						Code:    503,
+					Response: apidef.ErrorResponse{
+						StatusCode: 503,
 						Message: "Generic server error",
 					},
 				},
@@ -106,18 +106,18 @@ func TestCompileErrorOverrides(t *testing.T) {
 	})
 
 	t.Run("mixed exact and pattern codes", func(t *testing.T) {
-		overrides := config.ErrorOverridesMap{
-			"401": []config.ErrorOverride{
-				{Response: config.ErrorResponse{Message: "Unauthorized"}},
+		overrides := apidef.ErrorOverridesMap{
+			"401": []apidef.ErrorOverride{
+				{Response: apidef.ErrorResponse{Message: "Unauthorized"}},
 			},
-			"500": []config.ErrorOverride{
-				{Response: config.ErrorResponse{Message: "Internal error"}},
+			"500": []apidef.ErrorOverride{
+				{Response: apidef.ErrorResponse{Message: "Internal error"}},
 			},
-			"4xx": []config.ErrorOverride{
-				{Response: config.ErrorResponse{Message: "Client error"}},
+			"4xx": []apidef.ErrorOverride{
+				{Response: apidef.ErrorResponse{Message: "Client error"}},
 			},
-			"5xx": []config.ErrorOverride{
-				{Response: config.ErrorResponse{Message: "Server error"}},
+			"5xx": []apidef.ErrorOverride{
+				{Response: apidef.ErrorResponse{Message: "Server error"}},
 			},
 		}
 
@@ -132,18 +132,18 @@ func TestCompileErrorOverrides(t *testing.T) {
 	})
 
 	t.Run("invalid regex pattern is skipped", func(t *testing.T) {
-		overrides := config.ErrorOverridesMap{
-			"500": []config.ErrorOverride{
+		overrides := apidef.ErrorOverridesMap{
+			"500": []apidef.ErrorOverride{
 				{
-					Match: &config.ErrorMatcher{
+					Match: &apidef.ErrorMatcher{
 						MessagePattern: "[invalid(regex",
 					},
-					Response: config.ErrorResponse{
+					Response: apidef.ErrorResponse{
 						Message: "Should be skipped",
 					},
 				},
 				{
-					Response: config.ErrorResponse{
+					Response: apidef.ErrorResponse{
 						Message: "Valid rule",
 					},
 				},
@@ -158,15 +158,15 @@ func TestCompileErrorOverrides(t *testing.T) {
 	})
 
 	t.Run("invalid body template syntax is skipped", func(t *testing.T) {
-		overrides := config.ErrorOverridesMap{
-			"500": []config.ErrorOverride{
+		overrides := apidef.ErrorOverridesMap{
+			"500": []apidef.ErrorOverride{
 				{
-					Response: config.ErrorResponse{
+					Response: apidef.ErrorResponse{
 						Body: "{{.InvalidSyntax",
 					},
 				},
 				{
-					Response: config.ErrorResponse{
+					Response: apidef.ErrorResponse{
 						Body: `{"error": "valid"}`,
 					},
 				},
@@ -181,11 +181,11 @@ func TestCompileErrorOverrides(t *testing.T) {
 	})
 
 	t.Run("invalid status code format is skipped", func(t *testing.T) {
-		overrides := config.ErrorOverridesMap{
-			"abc":  []config.ErrorOverride{{Response: config.ErrorResponse{Message: "invalid"}}},
-			"50x":  []config.ErrorOverride{{Response: config.ErrorResponse{Message: "invalid pattern"}}},
-			"500x": []config.ErrorOverride{{Response: config.ErrorResponse{Message: "too long"}}},
-			"500":  []config.ErrorOverride{{Response: config.ErrorResponse{Message: "valid"}}},
+		overrides := apidef.ErrorOverridesMap{
+			"abc":  []apidef.ErrorOverride{{Response: apidef.ErrorResponse{Message: "invalid"}}},
+			"50x":  []apidef.ErrorOverride{{Response: apidef.ErrorResponse{Message: "invalid pattern"}}},
+			"500x": []apidef.ErrorOverride{{Response: apidef.ErrorResponse{Message: "too long"}}},
+			"500":  []apidef.ErrorOverride{{Response: apidef.ErrorResponse{Message: "valid"}}},
 		}
 
 		result := CompileErrorOverrides(overrides)
@@ -197,10 +197,10 @@ func TestCompileErrorOverrides(t *testing.T) {
 	})
 
 	t.Run("body with template variables is compiled", func(t *testing.T) {
-		overrides := config.ErrorOverridesMap{
-			"500": []config.ErrorOverride{
+		overrides := apidef.ErrorOverridesMap{
+			"500": []apidef.ErrorOverride{
 				{
-					Response: config.ErrorResponse{
+					Response: apidef.ErrorResponse{
 						Body: `{"error": "timeout", "status": {{.StatusCode}}}`,
 					},
 				},
@@ -218,10 +218,10 @@ func TestCompileErrorOverrides(t *testing.T) {
 	})
 
 	t.Run("plain body without template variables is not compiled", func(t *testing.T) {
-		overrides := config.ErrorOverridesMap{
-			"500": []config.ErrorOverride{
+		overrides := apidef.ErrorOverridesMap{
+			"500": []apidef.ErrorOverride{
 				{
-					Response: config.ErrorResponse{
+					Response: apidef.ErrorResponse{
 						Body: `{"error": "Service unavailable"}`,
 					},
 				},
@@ -240,11 +240,11 @@ func TestCompileErrorOverrides(t *testing.T) {
 // TestCompileSingleRule tests compilation of individual rules
 func TestCompileSingleRule(t *testing.T) {
 	t.Run("valid rule with regex", func(t *testing.T) {
-		rule := &config.ErrorOverride{
-			Match: &config.ErrorMatcher{
+		rule := &apidef.ErrorOverride{
+			Match: &apidef.ErrorMatcher{
 				MessagePattern: "database.*timeout",
 			},
-			Response: config.ErrorResponse{
+			Response: apidef.ErrorResponse{
 				Message: "Timeout occurred",
 			},
 		}
@@ -255,8 +255,8 @@ func TestCompileSingleRule(t *testing.T) {
 	})
 
 	t.Run("valid rule with body template", func(t *testing.T) {
-		rule := &config.ErrorOverride{
-			Response: config.ErrorResponse{
+		rule := &apidef.ErrorOverride{
+			Response: apidef.ErrorResponse{
 				Body: "Error {{.StatusCode}}",
 			},
 		}
@@ -267,8 +267,8 @@ func TestCompileSingleRule(t *testing.T) {
 	})
 
 	t.Run("invalid regex pattern", func(t *testing.T) {
-		rule := &config.ErrorOverride{
-			Match: &config.ErrorMatcher{
+		rule := &apidef.ErrorOverride{
+			Match: &apidef.ErrorMatcher{
 				MessagePattern: "[invalid",
 			},
 		}
@@ -279,8 +279,8 @@ func TestCompileSingleRule(t *testing.T) {
 	})
 
 	t.Run("invalid body template syntax", func(t *testing.T) {
-		rule := &config.ErrorOverride{
-			Response: config.ErrorResponse{
+		rule := &apidef.ErrorOverride{
+			Response: apidef.ErrorResponse{
 				Body: "{{.Invalid",
 			},
 		}
@@ -291,8 +291,8 @@ func TestCompileSingleRule(t *testing.T) {
 	})
 
 	t.Run("no match criteria", func(t *testing.T) {
-		rule := &config.ErrorOverride{
-			Response: config.ErrorResponse{
+		rule := &apidef.ErrorOverride{
+			Response: apidef.ErrorResponse{
 				Message: "Simple error",
 			},
 		}
@@ -305,7 +305,7 @@ func TestCompileSingleRule(t *testing.T) {
 // TestErrorMatcherCompile tests regex compilation in ErrorMatcher
 func TestErrorMatcherCompile(t *testing.T) {
 	t.Run("valid regex", func(t *testing.T) {
-		matcher := &config.ErrorMatcher{
+		matcher := &apidef.ErrorMatcher{
 			MessagePattern: "database.*error",
 		}
 
@@ -316,7 +316,7 @@ func TestErrorMatcherCompile(t *testing.T) {
 	})
 
 	t.Run("invalid regex", func(t *testing.T) {
-		matcher := &config.ErrorMatcher{
+		matcher := &apidef.ErrorMatcher{
 			MessagePattern: "[invalid(regex",
 		}
 
@@ -326,7 +326,7 @@ func TestErrorMatcherCompile(t *testing.T) {
 	})
 
 	t.Run("empty pattern", func(t *testing.T) {
-		matcher := &config.ErrorMatcher{}
+		matcher := &apidef.ErrorMatcher{}
 
 		err := matcher.Compile()
 		assert.NoError(t, err)
@@ -334,7 +334,7 @@ func TestErrorMatcherCompile(t *testing.T) {
 	})
 
 	t.Run("already compiled", func(t *testing.T) {
-		matcher := &config.ErrorMatcher{
+		matcher := &apidef.ErrorMatcher{
 			MessagePattern: "test",
 		}
 
@@ -353,7 +353,7 @@ func TestErrorMatcherCompile(t *testing.T) {
 // TestApplyOverride tests the application of error overrides
 func TestApplyOverride(t *testing.T) {
 	// Helper to create a gateway with compiled overrides
-	createGateway := func(overrides config.ErrorOverridesMap) *Gateway {
+	createGateway := func(overrides apidef.ErrorOverridesMap) *Gateway {
 		gw := &Gateway{}
 		compiled := CompileErrorOverrides(overrides)
 		if compiled != nil {
@@ -372,11 +372,11 @@ func TestApplyOverride(t *testing.T) {
 	})
 
 	t.Run("exact status code match", func(t *testing.T) {
-		overrides := config.ErrorOverridesMap{
-			"500": []config.ErrorOverride{
+		overrides := apidef.ErrorOverridesMap{
+			"500": []apidef.ErrorOverride{
 				{
-					Response: config.ErrorResponse{
-						Code:    503,
+					Response: apidef.ErrorResponse{
+						StatusCode: 503,
 						Message: "Service unavailable",
 					},
 				},
@@ -389,16 +389,16 @@ func TestApplyOverride(t *testing.T) {
 
 		result := eo.ApplyOverride(req, 500, []byte("internal error"))
 		require.NotNil(t, result)
-		assert.Equal(t, 503, result.Code)
+		assert.Equal(t, 503, result.StatusCode)
 		assert.Equal(t, 500, result.OriginalCode)
 		assert.Equal(t, "Service unavailable", result.GetMessageForTemplate())
 	})
 
 	t.Run("pattern match 4xx", func(t *testing.T) {
-		overrides := config.ErrorOverridesMap{
-			"4xx": []config.ErrorOverride{
+		overrides := apidef.ErrorOverridesMap{
+			"4xx": []apidef.ErrorOverride{
 				{
-					Response: config.ErrorResponse{
+					Response: apidef.ErrorResponse{
 						Message: "Client error",
 					},
 				},
@@ -411,16 +411,16 @@ func TestApplyOverride(t *testing.T) {
 
 		result := eo.ApplyOverride(req, 404, []byte("not found"))
 		require.NotNil(t, result)
-		assert.Equal(t, 404, result.Code) // No override code, keep original
+		assert.Equal(t, 404, result.StatusCode) // No override code, keep original
 		assert.Equal(t, "Client error", result.GetMessageForTemplate())
 	})
 
 	t.Run("pattern match 5xx", func(t *testing.T) {
-		overrides := config.ErrorOverridesMap{
-			"5xx": []config.ErrorOverride{
+		overrides := apidef.ErrorOverridesMap{
+			"5xx": []apidef.ErrorOverride{
 				{
-					Response: config.ErrorResponse{
-						Code:    503,
+					Response: apidef.ErrorResponse{
+						StatusCode: 503,
 						Message: "Server error",
 					},
 				},
@@ -433,17 +433,17 @@ func TestApplyOverride(t *testing.T) {
 
 		result := eo.ApplyOverride(req, 502, []byte("bad gateway"))
 		require.NotNil(t, result)
-		assert.Equal(t, 503, result.Code)
+		assert.Equal(t, 503, result.StatusCode)
 		assert.Equal(t, "Server error", result.GetMessageForTemplate())
 	})
 
 	t.Run("exact match takes precedence over pattern", func(t *testing.T) {
-		overrides := config.ErrorOverridesMap{
-			"500": []config.ErrorOverride{
-				{Response: config.ErrorResponse{Message: "Exact match"}},
+		overrides := apidef.ErrorOverridesMap{
+			"500": []apidef.ErrorOverride{
+				{Response: apidef.ErrorResponse{Message: "Exact match"}},
 			},
-			"5xx": []config.ErrorOverride{
-				{Response: config.ErrorResponse{Message: "Pattern match"}},
+			"5xx": []apidef.ErrorOverride{
+				{Response: apidef.ErrorResponse{Message: "Pattern match"}},
 			},
 		}
 
@@ -457,16 +457,16 @@ func TestApplyOverride(t *testing.T) {
 	})
 
 	t.Run("first matching rule wins", func(t *testing.T) {
-		overrides := config.ErrorOverridesMap{
-			"500": []config.ErrorOverride{
+		overrides := apidef.ErrorOverridesMap{
+			"500": []apidef.ErrorOverride{
 				{
-					Match: &config.ErrorMatcher{
+					Match: &apidef.ErrorMatcher{
 						MessagePattern: "database",
 					},
-					Response: config.ErrorResponse{Message: "Database error"},
+					Response: apidef.ErrorResponse{Message: "Database error"},
 				},
 				{
-					Response: config.ErrorResponse{Message: "Generic error"},
+					Response: apidef.ErrorResponse{Message: "Generic error"},
 				},
 			},
 		}
@@ -487,14 +487,14 @@ func TestApplyOverride(t *testing.T) {
 	})
 
 	t.Run("message pattern matching", func(t *testing.T) {
-		overrides := config.ErrorOverridesMap{
-			"500": []config.ErrorOverride{
+		overrides := apidef.ErrorOverridesMap{
+			"500": []apidef.ErrorOverride{
 				{
-					Match: &config.ErrorMatcher{
+					Match: &apidef.ErrorMatcher{
 						MessagePattern: "database.*timeout",
 					},
-					Response: config.ErrorResponse{
-						Code:    504,
+					Response: apidef.ErrorResponse{
+						StatusCode: 504,
 						Message: "Database timeout",
 					},
 				},
@@ -508,7 +508,7 @@ func TestApplyOverride(t *testing.T) {
 		// Should match
 		result := eo.ApplyOverride(req, 500, []byte("database connection timeout"))
 		require.NotNil(t, result)
-		assert.Equal(t, 504, result.Code)
+		assert.Equal(t, 504, result.StatusCode)
 
 		// Should not match
 		result = eo.ApplyOverride(req, 500, []byte("network error"))
@@ -516,15 +516,15 @@ func TestApplyOverride(t *testing.T) {
 	})
 
 	t.Run("body field matching", func(t *testing.T) {
-		overrides := config.ErrorOverridesMap{
-			"400": []config.ErrorOverride{
+		overrides := apidef.ErrorOverridesMap{
+			"400": []apidef.ErrorOverride{
 				{
-					Match: &config.ErrorMatcher{
+					Match: &apidef.ErrorMatcher{
 						BodyField: "error.code",
 						BodyValue: "INVALID_PAYMENT",
 					},
-					Response: config.ErrorResponse{
-						Code:    402,
+					Response: apidef.ErrorResponse{
+						StatusCode: 402,
 						Message: "Payment required",
 					},
 				},
@@ -539,7 +539,7 @@ func TestApplyOverride(t *testing.T) {
 		body := []byte(`{"error": {"code": "INVALID_PAYMENT"}}`)
 		result := eo.ApplyOverride(req, 400, body)
 		require.NotNil(t, result)
-		assert.Equal(t, 402, result.Code)
+		assert.Equal(t, 402, result.StatusCode)
 
 		// Should not match - different code
 		body = []byte(`{"error": {"code": "INVALID_INPUT"}}`)
@@ -553,15 +553,15 @@ func TestApplyOverride(t *testing.T) {
 	})
 
 	t.Run("body field with nested path", func(t *testing.T) {
-		overrides := config.ErrorOverridesMap{
-			"500": []config.ErrorOverride{
+		overrides := apidef.ErrorOverridesMap{
+			"500": []apidef.ErrorOverride{
 				{
-					Match: &config.ErrorMatcher{
+					Match: &apidef.ErrorMatcher{
 						BodyField: "metadata.error.type",
 						BodyValue: "timeout",
 					},
-					Response: config.ErrorResponse{
-						Code:    504,
+					Response: apidef.ErrorResponse{
+						StatusCode: 504,
 						Message: "Request timeout",
 					},
 				},
@@ -575,17 +575,17 @@ func TestApplyOverride(t *testing.T) {
 		body := []byte(`{"metadata": {"error": {"type": "timeout"}}}`)
 		result := eo.ApplyOverride(req, 500, body)
 		require.NotNil(t, result)
-		assert.Equal(t, 504, result.Code)
+		assert.Equal(t, 504, result.StatusCode)
 	})
 
 	t.Run("large body is truncated for matching", func(t *testing.T) {
-		overrides := config.ErrorOverridesMap{
-			"500": []config.ErrorOverride{
+		overrides := apidef.ErrorOverridesMap{
+			"500": []apidef.ErrorOverride{
 				{
-					Match: &config.ErrorMatcher{
+					Match: &apidef.ErrorMatcher{
 						MessagePattern: "error at start",
 					},
-					Response: config.ErrorResponse{Message: "Matched"},
+					Response: apidef.ErrorResponse{Message: "Matched"},
 				},
 			},
 		}
@@ -604,10 +604,10 @@ func TestApplyOverride(t *testing.T) {
 	})
 
 	t.Run("custom headers", func(t *testing.T) {
-		overrides := config.ErrorOverridesMap{
-			"429": []config.ErrorOverride{
+		overrides := apidef.ErrorOverridesMap{
+			"429": []apidef.ErrorOverride{
 				{
-					Response: config.ErrorResponse{
+					Response: apidef.ErrorResponse{
 						Message: "Rate limited",
 						Headers: map[string]string{
 							"Retry-After":    "300",
@@ -631,10 +631,10 @@ func TestApplyOverride(t *testing.T) {
 	})
 
 	t.Run("no status code override preserves original", func(t *testing.T) {
-		overrides := config.ErrorOverridesMap{
-			"401": []config.ErrorOverride{
+		overrides := apidef.ErrorOverridesMap{
+			"401": []apidef.ErrorOverride{
 				{
-					Response: config.ErrorResponse{
+					Response: apidef.ErrorResponse{
 						Message: "Auth failed",
 						// Code not specified
 					},
@@ -648,13 +648,13 @@ func TestApplyOverride(t *testing.T) {
 
 		result := eo.ApplyOverride(req, 401, []byte("unauthorized"))
 		require.NotNil(t, result)
-		assert.Equal(t, 401, result.Code) // Original preserved
+		assert.Equal(t, 401, result.StatusCode) // Original preserved
 	})
 
 	t.Run("non-matching status code", func(t *testing.T) {
-		overrides := config.ErrorOverridesMap{
-			"500": []config.ErrorOverride{
-				{Response: config.ErrorResponse{Message: "Server error"}},
+		overrides := apidef.ErrorOverridesMap{
+			"500": []apidef.ErrorOverride{
+				{Response: apidef.ErrorResponse{Message: "Server error"}},
 			},
 		}
 
@@ -673,9 +673,9 @@ func TestMatchesAdditionalCriteria(t *testing.T) {
 	eo := &ErrorOverrides{}
 
 	t.Run("no match criteria always matches", func(t *testing.T) {
-		rule := &config.ErrorOverride{
+		rule := &apidef.ErrorOverride{
 			Match:    nil,
-			Response: config.ErrorResponse{Message: "test"},
+			Response: apidef.ErrorResponse{Message: "test"},
 		}
 		req := httptest.NewRequest("GET", "/test", nil)
 
@@ -684,8 +684,8 @@ func TestMatchesAdditionalCriteria(t *testing.T) {
 	})
 
 	t.Run("message pattern match success", func(t *testing.T) {
-		rule := &config.ErrorOverride{
-			Match: &config.ErrorMatcher{
+		rule := &apidef.ErrorOverride{
+			Match: &apidef.ErrorMatcher{
 				MessagePattern: "database",
 			},
 		}
@@ -698,8 +698,8 @@ func TestMatchesAdditionalCriteria(t *testing.T) {
 	})
 
 	t.Run("message pattern match failure", func(t *testing.T) {
-		rule := &config.ErrorOverride{
-			Match: &config.ErrorMatcher{
+		rule := &apidef.ErrorOverride{
+			Match: &apidef.ErrorMatcher{
 				MessagePattern: "database",
 			},
 		}
@@ -712,8 +712,8 @@ func TestMatchesAdditionalCriteria(t *testing.T) {
 	})
 
 	t.Run("body field match success", func(t *testing.T) {
-		rule := &config.ErrorOverride{
-			Match: &config.ErrorMatcher{
+		rule := &apidef.ErrorOverride{
+			Match: &apidef.ErrorMatcher{
 				BodyField: "error.code",
 				BodyValue: "TIMEOUT",
 			},
@@ -726,8 +726,8 @@ func TestMatchesAdditionalCriteria(t *testing.T) {
 	})
 
 	t.Run("body field match failure - wrong value", func(t *testing.T) {
-		rule := &config.ErrorOverride{
-			Match: &config.ErrorMatcher{
+		rule := &apidef.ErrorOverride{
+			Match: &apidef.ErrorMatcher{
 				BodyField: "error.code",
 				BodyValue: "TIMEOUT",
 			},
@@ -740,8 +740,8 @@ func TestMatchesAdditionalCriteria(t *testing.T) {
 	})
 
 	t.Run("body field match failure - field not exist", func(t *testing.T) {
-		rule := &config.ErrorOverride{
-			Match: &config.ErrorMatcher{
+		rule := &apidef.ErrorOverride{
+			Match: &apidef.ErrorMatcher{
 				BodyField: "error.code",
 				BodyValue: "TIMEOUT",
 			},
@@ -754,8 +754,8 @@ func TestMatchesAdditionalCriteria(t *testing.T) {
 	})
 
 	t.Run("body field takes priority over message pattern", func(t *testing.T) {
-		rule := &config.ErrorOverride{
-			Match: &config.ErrorMatcher{
+		rule := &apidef.ErrorOverride{
+			Match: &apidef.ErrorMatcher{
 				MessagePattern: "error",
 				BodyField:      "status",
 				BodyValue:      "failed",
@@ -772,8 +772,8 @@ func TestMatchesAdditionalCriteria(t *testing.T) {
 	})
 
 	t.Run("fallback to message pattern when body field doesn't match", func(t *testing.T) {
-		rule := &config.ErrorOverride{
-			Match: &config.ErrorMatcher{
+		rule := &apidef.ErrorOverride{
+			Match: &apidef.ErrorMatcher{
 				MessagePattern: "error",
 				BodyField:      "status",
 				BodyValue:      "failed",
@@ -795,11 +795,11 @@ func TestFlagMatching(t *testing.T) {
 	eo := &ErrorOverrides{}
 
 	t.Run("flag match success", func(t *testing.T) {
-		rule := &config.ErrorOverride{
-			Match: &config.ErrorMatcher{
+		rule := &apidef.ErrorOverride{
+			Match: &apidef.ErrorMatcher{
 				Flag: errors.RLT, // Rate limited
 			},
-			Response: config.ErrorResponse{Message: "Rate limited"},
+			Response: apidef.ErrorResponse{Message: "Rate limited"},
 		}
 		req := httptest.NewRequest("GET", "/test", nil)
 
@@ -811,11 +811,11 @@ func TestFlagMatching(t *testing.T) {
 	})
 
 	t.Run("flag match failure - different flag", func(t *testing.T) {
-		rule := &config.ErrorOverride{
-			Match: &config.ErrorMatcher{
+		rule := &apidef.ErrorOverride{
+			Match: &apidef.ErrorMatcher{
 				Flag: errors.RLT, // Rate limited
 			},
-			Response: config.ErrorResponse{Message: "Rate limited"},
+			Response: apidef.ErrorResponse{Message: "Rate limited"},
 		}
 		req := httptest.NewRequest("GET", "/test", nil)
 
@@ -827,11 +827,11 @@ func TestFlagMatching(t *testing.T) {
 	})
 
 	t.Run("flag match failure - no classification in context", func(t *testing.T) {
-		rule := &config.ErrorOverride{
-			Match: &config.ErrorMatcher{
+		rule := &apidef.ErrorOverride{
+			Match: &apidef.ErrorMatcher{
 				Flag: errors.RLT,
 			},
-			Response: config.ErrorResponse{Message: "Rate limited"},
+			Response: apidef.ErrorResponse{Message: "Rate limited"},
 		}
 		req := httptest.NewRequest("GET", "/test", nil)
 		// No error classification set
@@ -841,12 +841,12 @@ func TestFlagMatching(t *testing.T) {
 	})
 
 	t.Run("flag takes priority over message pattern", func(t *testing.T) {
-		rule := &config.ErrorOverride{
-			Match: &config.ErrorMatcher{
+		rule := &apidef.ErrorOverride{
+			Match: &apidef.ErrorMatcher{
 				Flag:           errors.RLT,
 				MessagePattern: "should not be checked",
 			},
-			Response: config.ErrorResponse{Message: "Rate limited"},
+			Response: apidef.ErrorResponse{Message: "Rate limited"},
 		}
 		err := rule.Match.Compile()
 		require.NoError(t, err)
@@ -861,12 +861,12 @@ func TestFlagMatching(t *testing.T) {
 	})
 
 	t.Run("fallback to message pattern when flag doesn't match", func(t *testing.T) {
-		rule := &config.ErrorOverride{
-			Match: &config.ErrorMatcher{
+		rule := &apidef.ErrorOverride{
+			Match: &apidef.ErrorMatcher{
 				Flag:           errors.RLT,
 				MessagePattern: "timeout",
 			},
-			Response: config.ErrorResponse{Message: "Error"},
+			Response: apidef.ErrorResponse{Message: "Error"},
 		}
 		err := rule.Match.Compile()
 		require.NoError(t, err)
@@ -881,13 +881,13 @@ func TestFlagMatching(t *testing.T) {
 	})
 
 	t.Run("fallback to body field when flag doesn't match", func(t *testing.T) {
-		rule := &config.ErrorOverride{
-			Match: &config.ErrorMatcher{
+		rule := &apidef.ErrorOverride{
+			Match: &apidef.ErrorMatcher{
 				Flag:      errors.RLT,
 				BodyField: "error.code",
 				BodyValue: "TIMEOUT",
 			},
-			Response: config.ErrorResponse{Message: "Error"},
+			Response: apidef.ErrorResponse{Message: "Error"},
 		}
 		req := httptest.NewRequest("GET", "/test", nil)
 
@@ -900,7 +900,7 @@ func TestFlagMatching(t *testing.T) {
 
 // TestApplyOverrideWithFlag tests ApplyOverride with flag matching
 func TestApplyOverrideWithFlag(t *testing.T) {
-	createGateway := func(overrides config.ErrorOverridesMap) *Gateway {
+	createGateway := func(overrides apidef.ErrorOverridesMap) *Gateway {
 		gw := &Gateway{}
 		compiled := CompileErrorOverrides(overrides)
 		if compiled != nil {
@@ -910,14 +910,14 @@ func TestApplyOverrideWithFlag(t *testing.T) {
 	}
 
 	t.Run("flag-based override match", func(t *testing.T) {
-		overrides := config.ErrorOverridesMap{
-			"429": []config.ErrorOverride{
+		overrides := apidef.ErrorOverridesMap{
+			"429": []apidef.ErrorOverride{
 				{
-					Match: &config.ErrorMatcher{
+					Match: &apidef.ErrorMatcher{
 						Flag: errors.RLT,
 					},
-					Response: config.ErrorResponse{
-						Code:    429,
+					Response: apidef.ErrorResponse{
+						StatusCode: 429,
 						Message: "Rate limit exceeded - please slow down",
 						Headers: map[string]string{"Retry-After": "60"},
 					},
@@ -934,33 +934,33 @@ func TestApplyOverrideWithFlag(t *testing.T) {
 
 		result := eo.ApplyOverride(req, 429, []byte(""))
 		require.NotNil(t, result)
-		assert.Equal(t, 429, result.Code)
+		assert.Equal(t, 429, result.StatusCode)
 		assert.Equal(t, "Rate limit exceeded - please slow down", result.GetMessageForTemplate())
 		assert.Equal(t, "60", result.Headers["Retry-After"])
 	})
 
 	t.Run("multiple flag rules - first match wins", func(t *testing.T) {
-		overrides := config.ErrorOverridesMap{
-			"401": []config.ErrorOverride{
+		overrides := apidef.ErrorOverridesMap{
+			"401": []apidef.ErrorOverride{
 				{
-					Match: &config.ErrorMatcher{
+					Match: &apidef.ErrorMatcher{
 						Flag: errors.TKE, // Token expired
 					},
-					Response: config.ErrorResponse{
+					Response: apidef.ErrorResponse{
 						Message: "Token expired - please refresh",
 					},
 				},
 				{
-					Match: &config.ErrorMatcher{
+					Match: &apidef.ErrorMatcher{
 						Flag: errors.AMF, // Auth field missing
 					},
-					Response: config.ErrorResponse{
+					Response: apidef.ErrorResponse{
 						Message: "Authentication required",
 					},
 				},
 				{
 					// Catch-all for other 401 errors
-					Response: config.ErrorResponse{
+					Response: apidef.ErrorResponse{
 						Message: "Unauthorized",
 					},
 				},
@@ -993,15 +993,15 @@ func TestApplyOverrideWithFlag(t *testing.T) {
 	})
 
 	t.Run("no flag classification falls back to pattern matching", func(t *testing.T) {
-		overrides := config.ErrorOverridesMap{
-			"500": []config.ErrorOverride{
+		overrides := apidef.ErrorOverridesMap{
+			"500": []apidef.ErrorOverride{
 				{
-					Match: &config.ErrorMatcher{
+					Match: &apidef.ErrorMatcher{
 						Flag:           errors.CBO,         // Circuit breaker
 						MessagePattern: "circuit.*breaker", // Fallback pattern
 					},
-					Response: config.ErrorResponse{
-						Code:    503,
+					Response: apidef.ErrorResponse{
+						StatusCode: 503,
 						Message: "Service temporarily unavailable",
 					},
 				},
@@ -1016,7 +1016,7 @@ func TestApplyOverrideWithFlag(t *testing.T) {
 		// Should fall back to pattern matching
 		result := eo.ApplyOverride(req, 500, []byte("circuit breaker is open"))
 		require.NotNil(t, result)
-		assert.Equal(t, 503, result.Code)
+		assert.Equal(t, 503, result.StatusCode)
 	})
 }
 
@@ -1024,8 +1024,8 @@ func TestApplyOverrideWithFlag(t *testing.T) {
 func TestOverrideResult(t *testing.T) {
 	t.Run("ShouldWriteDirectly with plain body", func(t *testing.T) {
 		result := &OverrideResult{
-			rule: &config.ErrorOverride{
-				Response: config.ErrorResponse{
+			rule: &apidef.ErrorOverride{
+				Response: apidef.ErrorResponse{
 					Body: `{"error": "Service unavailable"}`,
 				},
 			},
@@ -1035,8 +1035,8 @@ func TestOverrideResult(t *testing.T) {
 	})
 
 	t.Run("ShouldWriteDirectly with body template variables", func(t *testing.T) {
-		rule := &config.ErrorOverride{
-			Response: config.ErrorResponse{
+		rule := &apidef.ErrorOverride{
+			Response: apidef.ErrorResponse{
 				Body: `{"error": "Code {{.StatusCode}}"}`,
 			},
 		}
@@ -1048,8 +1048,8 @@ func TestOverrideResult(t *testing.T) {
 
 	t.Run("ShouldWriteDirectly with file template", func(t *testing.T) {
 		result := &OverrideResult{
-			rule: &config.ErrorOverride{
-				Response: config.ErrorResponse{
+			rule: &apidef.ErrorOverride{
+				Response: apidef.ErrorResponse{
 					Message:  "Error message",
 					Template: "error_upstream",
 				},
@@ -1061,8 +1061,8 @@ func TestOverrideResult(t *testing.T) {
 
 	t.Run("ShouldUseDefaultTemplate with message only", func(t *testing.T) {
 		result := &OverrideResult{
-			rule: &config.ErrorOverride{
-				Response: config.ErrorResponse{
+			rule: &apidef.ErrorOverride{
+				Response: apidef.ErrorResponse{
 					Message: "Custom error message",
 				},
 			},
@@ -1073,8 +1073,8 @@ func TestOverrideResult(t *testing.T) {
 
 	t.Run("ShouldUseDefaultTemplate false with body", func(t *testing.T) {
 		result := &OverrideResult{
-			rule: &config.ErrorOverride{
-				Response: config.ErrorResponse{
+			rule: &apidef.ErrorOverride{
+				Response: apidef.ErrorResponse{
 					Body:    `{"error": "test"}`,
 					Message: "Custom error message",
 				},
@@ -1086,8 +1086,8 @@ func TestOverrideResult(t *testing.T) {
 
 	t.Run("GetMessageForTemplate", func(t *testing.T) {
 		result := &OverrideResult{
-			rule: &config.ErrorOverride{
-				Response: config.ErrorResponse{
+			rule: &apidef.ErrorOverride{
+				Response: apidef.ErrorResponse{
 					Message: "Custom error message",
 				},
 			},
@@ -1098,8 +1098,8 @@ func TestOverrideResult(t *testing.T) {
 
 	t.Run("GetBody", func(t *testing.T) {
 		result := &OverrideResult{
-			rule: &config.ErrorOverride{
-				Response: config.ErrorResponse{
+			rule: &apidef.ErrorOverride{
+				Response: apidef.ErrorResponse{
 					Body: `{"error": "test"}`,
 				},
 			},
@@ -1112,8 +1112,8 @@ func TestOverrideResult(t *testing.T) {
 // TestGetInlineTemplate tests inline template compilation
 func TestGetInlineTemplate(t *testing.T) {
 	t.Run("JSON content - returns HTML template", func(t *testing.T) {
-		rule := &config.ErrorOverride{
-			Response: config.ErrorResponse{
+		rule := &apidef.ErrorOverride{
+			Response: apidef.ErrorResponse{
 				Body: `{"status": {{.StatusCode}}}`,
 			},
 		}
@@ -1132,8 +1132,8 @@ func TestGetInlineTemplate(t *testing.T) {
 	})
 
 	t.Run("XML content - returns text template", func(t *testing.T) {
-		rule := &config.ErrorOverride{
-			Response: config.ErrorResponse{
+		rule := &apidef.ErrorOverride{
+			Response: apidef.ErrorResponse{
 				Body: `<error><status>{{.StatusCode}}</status></error>`,
 			},
 		}
@@ -1152,8 +1152,8 @@ func TestGetInlineTemplate(t *testing.T) {
 	})
 
 	t.Run("no compiled template - plain body", func(t *testing.T) {
-		rule := &config.ErrorOverride{
-			Response: config.ErrorResponse{
+		rule := &apidef.ErrorOverride{
+			Response: apidef.ErrorResponse{
 				Body: "plain text",
 			},
 		}
@@ -1171,8 +1171,8 @@ func TestGetInlineTemplate(t *testing.T) {
 // Message is a semantic value passed to templates as {{.Message}}.
 func TestTemplateCompilationEdgeCases(t *testing.T) {
 	t.Run("template with only StatusCode", func(t *testing.T) {
-		rule := &config.ErrorOverride{
-			Response: config.ErrorResponse{
+		rule := &apidef.ErrorOverride{
+			Response: apidef.ErrorResponse{
 				Body: `{"code": {{.StatusCode}}}`,
 			},
 		}
@@ -1183,8 +1183,8 @@ func TestTemplateCompilationEdgeCases(t *testing.T) {
 	})
 
 	t.Run("template with only Message", func(t *testing.T) {
-		rule := &config.ErrorOverride{
-			Response: config.ErrorResponse{
+		rule := &apidef.ErrorOverride{
+			Response: apidef.ErrorResponse{
 				Body: `{"error": "{{.Message}}"}`,
 			},
 		}
@@ -1195,8 +1195,8 @@ func TestTemplateCompilationEdgeCases(t *testing.T) {
 	})
 
 	t.Run("template with both variables", func(t *testing.T) {
-		rule := &config.ErrorOverride{
-			Response: config.ErrorResponse{
+		rule := &apidef.ErrorOverride{
+			Response: apidef.ErrorResponse{
 				Body: `{"code": {{.StatusCode}}, "message": "{{.Message}}"}`,
 			},
 		}
@@ -1207,8 +1207,8 @@ func TestTemplateCompilationEdgeCases(t *testing.T) {
 	})
 
 	t.Run("body with {{ but no template vars", func(t *testing.T) {
-		rule := &config.ErrorOverride{
-			Response: config.ErrorResponse{
+		rule := &apidef.ErrorOverride{
+			Response: apidef.ErrorResponse{
 				Body: `{"json": "with {{ braces }} but not template"}`,
 			},
 		}
@@ -1219,8 +1219,8 @@ func TestTemplateCompilationEdgeCases(t *testing.T) {
 	})
 
 	t.Run("empty body", func(t *testing.T) {
-		rule := &config.ErrorOverride{
-			Response: config.ErrorResponse{
+		rule := &apidef.ErrorOverride{
+			Response: apidef.ErrorResponse{
 				Body: "",
 			},
 		}
