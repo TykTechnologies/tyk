@@ -326,6 +326,13 @@ func (gw *Gateway) checkAndApplyTrialPeriod(
 				newSession.Expires = time.Now().Unix() + policy.KeyExpiresIn
 			}
 		}
+
+		if policy.PostExpiryAction != "" {
+			newSession.PostExpiryAction = policy.PostExpiryAction
+		}
+		if policy.PostExpiryGracePeriod != 0 {
+			newSession.PostExpiryGracePeriod = policy.PostExpiryGracePeriod
+		}
 	}
 }
 
@@ -372,6 +379,10 @@ func (gw *Gateway) ApplyLifetime(sess *user.SessionState, specs ...*APISpec) int
 	for _, spec := range specs {
 		if spec != nil {
 			sessionLifeTime := sess.Lifetime(spec.GetSessionLifetimeRespectsKeyExpiration(), spec.SessionLifetime, gw.GetConfig().ForceGlobalSessionLifetime, gw.GetConfig().GlobalSessionLifetime)
+			// -1 means "never delete" (persist forever), which is the maximum possible lifetime
+			if sessionLifeTime == -1 {
+				return -1
+			}
 			// uses the greater lifetime
 			if sessionLifeTime > lifetime {
 				lifetime = sessionLifeTime

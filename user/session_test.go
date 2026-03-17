@@ -121,6 +121,115 @@ func TestSessionState_Lifetime(t *testing.T) {
 	})
 }
 
+func TestSessionState_Lifetime_PostExpiry(t *testing.T) {
+	now := time.Now().Unix()
+
+	tests := []struct {
+		name                       string
+		postExpiryAction           PostExpiryAction
+		postExpiryGracePeriod      int64
+		expires                    int64
+		forceGlobalSessionLifetime bool
+		globalSessionLifetime      int64
+		sessionLifetime            int64
+		fallback                   int64
+		wantFn                     func(t *testing.T, got int64)
+	}{
+		{
+			name:             "delete action with future expiry",
+			postExpiryAction: PostExpiryActionDelete,
+			expires:          now + 100,
+			wantFn: func(t *testing.T, got int64) {
+				assert.InDelta(t, 100, got, 10)
+			},
+		},
+		{
+			name:             "delete action with past expiry",
+			postExpiryAction: PostExpiryActionDelete,
+			expires:          now - 50,
+			wantFn: func(t *testing.T, got int64) {
+				assert.Equal(t, int64(1), got)
+			},
+		},
+		{
+			name:             "delete action with zero expiry",
+			postExpiryAction: PostExpiryActionDelete,
+			expires:          0,
+			wantFn: func(t *testing.T, got int64) {
+				assert.Equal(t, int64(0), got)
+			},
+		},
+		{
+			name:                  "retain with grace_period=-1 (never delete)",
+			postExpiryAction:      PostExpiryActionRetain,
+			postExpiryGracePeriod: -1,
+			expires:               now + 100,
+			wantFn: func(t *testing.T, got int64) {
+				assert.Equal(t, int64(-1), got)
+			},
+		},
+		{
+			name:                  "retain with grace_period>0 and future expiry",
+			postExpiryAction:      PostExpiryActionRetain,
+			postExpiryGracePeriod: 200,
+			expires:               now + 100,
+			wantFn: func(t *testing.T, got int64) {
+				assert.InDelta(t, 300, got, 10)
+			},
+		},
+		{
+			name:                  "retain with grace_period>0 and past expiry",
+			postExpiryAction:      PostExpiryActionRetain,
+			postExpiryGracePeriod: 10,
+			expires:               now - 50,
+			wantFn: func(t *testing.T, got int64) {
+				assert.Equal(t, int64(1), got)
+			},
+		},
+		{
+			name:                  "retain with grace_period=0 falls through to legacy",
+			postExpiryAction:      PostExpiryActionRetain,
+			postExpiryGracePeriod: 0,
+			expires:               now + 100,
+			sessionLifetime:       60,
+			wantFn: func(t *testing.T, got int64) {
+				assert.Equal(t, int64(60), got)
+			},
+		},
+		{
+			name:            "unset fields fall through to legacy",
+			expires:         now + 100,
+			sessionLifetime: 60,
+			wantFn: func(t *testing.T, got int64) {
+				assert.Equal(t, int64(60), got)
+			},
+		},
+		{
+			name:                       "forceGlobalSessionLifetime overrides new fields",
+			postExpiryAction:           PostExpiryActionDelete,
+			expires:                    now + 100,
+			forceGlobalSessionLifetime: true,
+			globalSessionLifetime:      42,
+			wantFn: func(t *testing.T, got int64) {
+				assert.Equal(t, int64(42), got)
+			},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			s := SessionState{
+				PostExpiryAction:      tc.postExpiryAction,
+				PostExpiryGracePeriod: tc.postExpiryGracePeriod,
+				Expires:               tc.expires,
+				SessionLifetime:       tc.sessionLifetime,
+			}
+			got := s.Lifetime(false, tc.fallback, tc.forceGlobalSessionLifetime, tc.globalSessionLifetime)
+			tc.wantFn(t, got)
+		})
+	}
+}
+
 func Test_calculateLifetime(t *testing.T) {
 	unixTime := func(t time.Duration) int64 {
 		return time.Now().Add(t * time.Second).Unix()
@@ -1434,4 +1543,183 @@ func TestAccessDefinition_MCPFields_PresentWhenSet(t *testing.T) {
 
 	assert.Contains(t, out, "json_rpc_methods_access_rights")
 	assert.Contains(t, out, "mcp_access_rights")
+}
+
+func TestSessionState_PostExpiry_JSONSerialization(t *testing.T) {
+	t.Run("zero values omitted", func(t *testing.T) {
+		s := SessionState{}
+		b, err := json.Marshal(s)
+		assert.NoError(t, err)
+		raw := string(b)
+		assert.NotContains(t, raw, "post_expiry_action")
+		assert.NotContains(t, raw, "post_expiry_grace_period")
+	})
+
+	t.Run("set values present", func(t *testing.T) {
+		s := SessionState{
+			PostExpiryAction:      PostExpiryActionDelete,
+			PostExpiryGracePeriod: 3600,
+		}
+		b, err := json.Marshal(s)
+		assert.NoError(t, err)
+		raw := string(b)
+		assert.Contains(t, raw, `"post_expiry_action"`)
+		assert.Contains(t, raw, `"post_expiry_grace_period"`)
+	})
+
+	t.Run("round-trip preserves", func(t *testing.T) {
+		original := SessionState{
+			PostExpiryAction:      PostExpiryActionRetain,
+			PostExpiryGracePeriod: 7200,
+		}
+		b, err := json.Marshal(original)
+		assert.NoError(t, err)
+
+		var restored SessionState
+		err = json.Unmarshal(b, &restored)
+		assert.NoError(t, err)
+		assert.Equal(t, original.PostExpiryAction, restored.PostExpiryAction)
+		assert.Equal(t, original.PostExpiryGracePeriod, restored.PostExpiryGracePeriod)
+	})
+}
+
+func TestCalculatePostExpiryLifetime(t *testing.T) {
+	now := time.Now().Unix()
+
+	tests := []struct {
+		name    string
+		action  PostExpiryAction
+		grace   int64
+		expires int64
+		wantFn  func(t *testing.T, got int64)
+	}{
+		{
+			name:    "Expires=0 returns 0",
+			action:  PostExpiryActionDelete,
+			grace:   0,
+			expires: 0,
+			wantFn: func(t *testing.T, got int64) {
+				assert.Equal(t, int64(0), got)
+			},
+		},
+		{
+			name:    "Expires=-1 returns 0",
+			action:  PostExpiryActionDelete,
+			grace:   0,
+			expires: -1,
+			wantFn: func(t *testing.T, got int64) {
+				assert.Equal(t, int64(0), got)
+			},
+		},
+		{
+			name:    "Expires=-1 retain grace=-1 returns 0",
+			action:  PostExpiryActionRetain,
+			grace:   -1,
+			expires: -1,
+			wantFn: func(t *testing.T, got int64) {
+				assert.Equal(t, int64(0), got)
+			},
+		},
+		{
+			name:    "delete future expiry",
+			action:  PostExpiryActionDelete,
+			grace:   0,
+			expires: now + 100,
+			wantFn: func(t *testing.T, got int64) {
+				assert.InDelta(t, 100, got, 10)
+			},
+		},
+		{
+			name:    "delete past expiry",
+			action:  PostExpiryActionDelete,
+			grace:   0,
+			expires: now - 50,
+			wantFn: func(t *testing.T, got int64) {
+				assert.Equal(t, int64(1), got)
+			},
+		},
+		{
+			name:    "retain grace=-1 never delete",
+			action:  PostExpiryActionRetain,
+			grace:   -1,
+			expires: now + 100,
+			wantFn: func(t *testing.T, got int64) {
+				assert.Equal(t, int64(-1), got)
+			},
+		},
+		{
+			name:    "retain grace>0 future",
+			action:  PostExpiryActionRetain,
+			grace:   200,
+			expires: now + 100,
+			wantFn: func(t *testing.T, got int64) {
+				assert.InDelta(t, 300, got, 10)
+			},
+		},
+		{
+			name:    "retain grace>0 past (TTL<=0)",
+			action:  PostExpiryActionRetain,
+			grace:   10,
+			expires: now - 50,
+			wantFn: func(t *testing.T, got int64) {
+				assert.Equal(t, int64(1), got)
+			},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			s := SessionState{
+				PostExpiryAction:      tc.action,
+				PostExpiryGracePeriod: tc.grace,
+				Expires:               tc.expires,
+			}
+			// Invoke via Lifetime with no SessionLifetime, no fallback, no force-global
+			// so the only active code path is hasNewExpiryBehaviour() → calculatePostExpiryLifetime()
+			got := s.Lifetime(false, 0, false, 0)
+			tc.wantFn(t, got)
+		})
+	}
+}
+
+func TestSessionState_Lifetime_PostExpiry_BypassesRespectKeyExpiration(t *testing.T) {
+	now := time.Now().Unix()
+
+	tests := []struct {
+		name   string
+		action PostExpiryAction
+		grace  int64
+		wantFn func(t *testing.T, got int64)
+	}{
+		{
+			name:   "delete ignores respect",
+			action: PostExpiryActionDelete,
+			grace:  0,
+			wantFn: func(t *testing.T, got int64) {
+				assert.InDelta(t, 100, got, 10)
+			},
+		},
+		{
+			name:   "retain+grace ignores respect",
+			action: PostExpiryActionRetain,
+			grace:  200,
+			wantFn: func(t *testing.T, got int64) {
+				assert.InDelta(t, 300, got, 10)
+			},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			s := SessionState{
+				PostExpiryAction:      tc.action,
+				PostExpiryGracePeriod: tc.grace,
+				Expires:               now + 100,
+				SessionLifetime:       10,
+			}
+			// respectKeyExpiration=true, sessLifetime=10 — but new behaviour should bypass it
+			got := s.Lifetime(true, 10, false, 0)
+			tc.wantFn(t, got)
+		})
+	}
 }
