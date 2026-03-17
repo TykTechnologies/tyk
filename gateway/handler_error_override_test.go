@@ -37,7 +37,7 @@ func TestWriteOverrideResponse(t *testing.T) {
 		req.Header.Set(header.ContentType, header.ApplicationJSON)
 
 		result := &OverrideResult{
-			Code: 503,
+			StatusCode: 503,
 			Headers: map[string]string{
 				"X-Custom": "value",
 			},
@@ -76,7 +76,7 @@ func TestWriteOverrideResponse(t *testing.T) {
 		require.NoError(t, err)
 
 		result := &OverrideResult{
-			Code: 504,
+			StatusCode: 504,
 			rule: rule,
 		}
 
@@ -107,7 +107,7 @@ func TestWriteOverrideResponse(t *testing.T) {
 		require.NoError(t, err)
 
 		result := &OverrideResult{
-			Code: 500,
+			StatusCode: 500,
 			rule: rule,
 		}
 
@@ -146,7 +146,7 @@ func TestWriteOverrideResponse(t *testing.T) {
 		req.Header.Set(header.ContentType, header.ApplicationJSON)
 
 		result := &OverrideResult{
-			Code: 503,
+			StatusCode: 503,
 			rule: &apidef.ErrorOverride{
 				Response: apidef.ErrorResponse{
 					Message:  "Custom error message",
@@ -190,7 +190,7 @@ func TestWriteOverrideResponse(t *testing.T) {
 		req.Header.Set(header.ContentType, header.ApplicationXML)
 
 		result := &OverrideResult{
-			Code: 500,
+			StatusCode: 500,
 			rule: &apidef.ErrorOverride{
 				Response: apidef.ErrorResponse{
 					Message:  "Server error occurred",
@@ -232,7 +232,7 @@ func TestWriteOverrideResponse(t *testing.T) {
 		req.Header.Set(header.ContentType, header.ApplicationJSON)
 
 		result := &OverrideResult{
-			Code: 500,
+			StatusCode: 500,
 			rule: &apidef.ErrorOverride{
 				Response: apidef.ErrorResponse{
 					// No message, no template - will fallback to default
@@ -272,7 +272,7 @@ func TestWriteOverrideResponse(t *testing.T) {
 		req.Header.Set(header.ContentType, header.ApplicationJSON)
 
 		result := &OverrideResult{
-			Code: 401,
+			StatusCode: 401,
 			rule: &apidef.ErrorOverride{
 				Response: apidef.ErrorResponse{
 					// Only status code override, no message
@@ -297,7 +297,7 @@ func TestWriteOverrideResponse(t *testing.T) {
 		req.Header.Set(header.ContentType, header.ApplicationJSON)
 
 		result := &OverrideResult{
-			Code: 503,
+			StatusCode: 503,
 			Headers: map[string]string{
 				"Retry-After":       "600",
 				"X-Error-Category":  "server",
@@ -341,7 +341,7 @@ func TestWriteDirectOverrideResponse(t *testing.T) {
 		respHeader.Set(header.ContentType, header.ApplicationJSON)
 
 		result := &OverrideResult{
-			Code: 503,
+			StatusCode: 503,
 			rule: &apidef.ErrorOverride{
 				Response: apidef.ErrorResponse{
 					Body: `{"error": "Service unavailable", "code": "SERVICE_DOWN"}`,
@@ -368,7 +368,7 @@ func TestWriteDirectOverrideResponse(t *testing.T) {
 		respHeader.Set(header.ContentType, header.ApplicationXML)
 
 		result := &OverrideResult{
-			Code: 500,
+			StatusCode: 500,
 			rule: &apidef.ErrorOverride{
 				Response: apidef.ErrorResponse{
 					Body: `<error><code>500</code><message>Internal error</message></error>`,
@@ -395,7 +395,7 @@ func TestWriteDirectOverrideResponse(t *testing.T) {
 		respHeader.Set(header.ContentType, "text/plain")
 
 		result := &OverrideResult{
-			Code: 404,
+			StatusCode: 404,
 			rule: &apidef.ErrorOverride{
 				Response: apidef.ErrorResponse{
 					Body: "Not found",
@@ -421,7 +421,7 @@ func TestWriteDirectOverrideResponse(t *testing.T) {
 		respHeader.Set(header.ContentType, header.ApplicationJSON)
 
 		result := &OverrideResult{
-			Code: 204,
+			StatusCode: 204,
 			rule: &apidef.ErrorOverride{
 				Response: apidef.ErrorResponse{
 					Body: "",
@@ -448,7 +448,7 @@ func TestWriteDirectOverrideResponse(t *testing.T) {
 		respHeader.Set("X-Custom", "preserved")
 
 		result := &OverrideResult{
-			Code: 500,
+			StatusCode: 500,
 			rule: &apidef.ErrorOverride{
 				Response: apidef.ErrorResponse{
 					Body: `{"error": "test"}`,
@@ -557,7 +557,7 @@ func TestErrorOverrideEdgeCases(t *testing.T) {
 			"500": []apidef.ErrorOverride{
 				{
 					Response: apidef.ErrorResponse{
-						Code:    0, // Not set
+						StatusCode: 0, // Not set
 						Message: "Error occurred",
 					},
 				},
@@ -573,7 +573,7 @@ func TestErrorOverrideEdgeCases(t *testing.T) {
 
 		result := eo.ApplyOverride(req, 500, []byte("error"))
 		require.NotNil(t, result)
-		assert.Equal(t, 500, result.Code) // Original preserved
+		assert.Equal(t, 500, result.StatusCode) // Original preserved
 		assert.Equal(t, 500, result.OriginalCode)
 	})
 
@@ -589,7 +589,7 @@ func TestErrorOverrideEdgeCases(t *testing.T) {
 		req := httptest.NewRequest("GET", "/test", nil)
 
 		result := &OverrideResult{
-			Code:    500,
+			StatusCode: 500,
 			Headers: map[string]string{},
 			rule: &apidef.ErrorOverride{
 				Response: apidef.ErrorResponse{
@@ -614,7 +614,7 @@ func TestErrorOverrideEdgeCases(t *testing.T) {
 		req := httptest.NewRequest("GET", "/test", nil)
 
 		result := &OverrideResult{
-			Code:    500,
+			StatusCode: 500,
 			Headers: nil,
 			rule: &apidef.ErrorOverride{
 				Response: apidef.ErrorResponse{
@@ -643,7 +643,7 @@ func TestErrorOverrideEdgeCases(t *testing.T) {
 		longBody := `{"error": "` + string(make([]byte, 10000)) + `"}`
 
 		result := &OverrideResult{
-			Code: 500,
+			StatusCode: 500,
 			rule: &apidef.ErrorOverride{
 				Response: apidef.ErrorResponse{
 					Body: longBody,

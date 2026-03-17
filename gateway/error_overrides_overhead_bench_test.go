@@ -125,7 +125,7 @@ func BenchmarkErrorHandlerOverhead(b *testing.B) {
 			"500": []apidef.ErrorOverride{
 				{
 					Response: apidef.ErrorResponse{
-						Code:    503,
+						StatusCode: 503,
 						Message: `{"error": "Service unavailable"}`,
 					},
 				},

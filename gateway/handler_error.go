@@ -440,9 +440,9 @@ func (e *ErrorHandler) writeOverrideResponse(w http.ResponseWriter, r *http.Requ
 
 		data := &APIErrorWithContext{
 			Message:    msg,
-			StatusCode: result.Code,
+			StatusCode: result.StatusCode,
 		}
-		response := e.ExecuteErrorTemplate(w, tmpl, data, result.Code)
+		response := e.ExecuteErrorTemplate(w, tmpl, data, result.StatusCode)
 		response.Header = respHeader
 
 		return response
@@ -450,22 +450,22 @@ func (e *ErrorHandler) writeOverrideResponse(w http.ResponseWriter, r *http.Requ
 
 	// Message only - use default template with override message
 	if result.ShouldUseDefaultTemplate() {
-		return e.writeTemplateErrorResponse(w, r, result.GetMessageForTemplate(), result.Code)
+		return e.writeTemplateErrorResponse(w, r, result.GetMessageForTemplate(), result.StatusCode)
 	}
 
 	// Fallback - use default template with original message
-	return e.writeTemplateErrorResponse(w, r, originalMsg, result.Code)
+	return e.writeTemplateErrorResponse(w, r, originalMsg, result.StatusCode)
 }
 
 // writeDirectOverrideResponse writes the body directly without templating.
 func (e *ErrorHandler) writeDirectOverrideResponse(w http.ResponseWriter, result *OverrideResult, respHeader http.Header) *http.Response {
-	w.WriteHeader(result.Code)
+	w.WriteHeader(result.StatusCode)
 	bodyBytes := []byte(result.GetBody())
 	//nolint:errcheck // Error can't be handled after headers written, consistent with writeTemplateErrorResponse
 	w.Write(bodyBytes)
 
 	return &http.Response{
-		StatusCode: result.Code,
+		StatusCode: result.StatusCode,
 		Header:     respHeader,
 		Body:       io.NopCloser(bytes.NewReader(bodyBytes)),
 	}

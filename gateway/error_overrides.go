@@ -43,8 +43,8 @@ type ErrorOverrides struct {
 // OverrideResult contains the result of applying an error override.
 // Holds context needed for response writing including the matched rule.
 type OverrideResult struct {
-	// Code is the HTTP status code to return.
-	Code int
+	// StatusCode is the HTTP status code to return.
+	StatusCode int
 
 	// Headers are additional HTTP headers to include.
 	Headers map[string]string
@@ -212,15 +212,15 @@ func (o *ErrorOverrides) ApplyOverride(r *http.Request, statusCode int, body []b
 	// Build result with context for response writing
 	// Original body is NOT stored - users must provide explicit override messages
 	result := &OverrideResult{
-		Code:         rule.Response.Code,
+		StatusCode:   rule.Response.StatusCode,
 		Headers:      rule.Response.Headers,
 		OriginalCode: statusCode,
 		rule:         rule,
 	}
 
-	// If Code is not set, keep the original status code
-	if result.Code == 0 {
-		result.Code = statusCode
+	// If StatusCode is not set, keep the original status code
+	if result.StatusCode == 0 {
+		result.StatusCode = statusCode
 	}
 
 	return result

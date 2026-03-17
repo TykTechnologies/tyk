@@ -39,7 +39,7 @@ func BenchmarkTryWriteOverride(b *testing.B) {
 			"500": []apidef.ErrorOverride{
 				{
 					Response: apidef.ErrorResponse{
-						Code: 503,
+						StatusCode: 503,
 						Body: `{"error": "Service unavailable"}`,
 					},
 				},
@@ -90,7 +90,7 @@ func BenchmarkApplyOverride(b *testing.B) {
 			"500": []apidef.ErrorOverride{
 				{
 					Response: apidef.ErrorResponse{
-						Code:    503,
+						StatusCode: 503,
 						Message: "Service unavailable",
 					},
 				},
@@ -142,7 +142,7 @@ func BenchmarkApplyOverride(b *testing.B) {
 						MessagePattern: "database.*timeout",
 					},
 					Response: apidef.ErrorResponse{
-						Code:    504,
+						StatusCode: 504,
 						Message: "Database timeout",
 					},
 				},
@@ -170,7 +170,7 @@ func BenchmarkApplyOverride(b *testing.B) {
 						MessagePattern: "database.*timeout",
 					},
 					Response: apidef.ErrorResponse{
-						Code:    504,
+						StatusCode: 504,
 						Message: "Database timeout",
 					},
 				},
@@ -199,7 +199,7 @@ func BenchmarkApplyOverride(b *testing.B) {
 						BodyValue: "INVALID_INPUT",
 					},
 					Response: apidef.ErrorResponse{
-						Code:    422,
+						StatusCode: 422,
 						Message: "Validation failed",
 					},
 				},
@@ -295,7 +295,7 @@ func BenchmarkApplyOverride(b *testing.B) {
 						Flag: errors.RLT,
 					},
 					Response: apidef.ErrorResponse{
-						Code:    429,
+						StatusCode: 429,
 						Message: "Rate limit exceeded",
 					},
 				},
@@ -323,7 +323,7 @@ func BenchmarkApplyOverride(b *testing.B) {
 						Flag: errors.RLT,
 					},
 					Response: apidef.ErrorResponse{
-						Code:    429,
+						StatusCode: 429,
 						Message: "Rate limit exceeded",
 					},
 				},
@@ -352,7 +352,7 @@ func BenchmarkApplyOverride(b *testing.B) {
 						MessagePattern: "circuit.*breaker",
 					},
 					Response: apidef.ErrorResponse{
-						Code:    503,
+						StatusCode: 503,
 						Message: "Service unavailable",
 					},
 				},
@@ -531,7 +531,7 @@ func BenchmarkWriteOverrideResponse(b *testing.B) {
 		}
 
 		result := &OverrideResult{
-			Code: 503,
+			StatusCode: 503,
 			rule: &apidef.ErrorOverride{
 				Response: apidef.ErrorResponse{
 					Body: `{"error": "Service temporarily unavailable", "code": "SERVICE_DOWN"}`,
@@ -568,7 +568,7 @@ func BenchmarkWriteOverrideResponse(b *testing.B) {
 		_ = compileSingleRule(rule)
 
 		result := &OverrideResult{
-			Code: 504,
+			StatusCode: 504,
 			rule: rule,
 		}
 
@@ -601,7 +601,7 @@ func BenchmarkWriteOverrideResponse(b *testing.B) {
 		_ = compileSingleRule(rule)
 
 		result := &OverrideResult{
-			Code: 500,
+			StatusCode: 500,
 			rule: rule,
 		}
 
@@ -631,7 +631,7 @@ func BenchmarkWriteOverrideResponse(b *testing.B) {
 		}
 
 		result := &OverrideResult{
-			Code: 503,
+			StatusCode: 503,
 			rule: &apidef.ErrorOverride{
 				Response: apidef.ErrorResponse{
 					Message:  "Custom error message",
@@ -666,7 +666,7 @@ func BenchmarkWriteOverrideResponse(b *testing.B) {
 		}
 
 		result := &OverrideResult{
-			Code: 500,
+			StatusCode: 500,
 			rule: &apidef.ErrorOverride{
 				Response: apidef.ErrorResponse{
 					Message:  "Server error occurred",
@@ -701,7 +701,7 @@ func BenchmarkWriteOverrideResponse(b *testing.B) {
 		}
 
 		result := &OverrideResult{
-			Code: 429,
+			StatusCode: 429,
 			Headers: map[string]string{
 				"Retry-After":      "300",
 				"X-RateLimit":      "100",
@@ -758,7 +758,7 @@ func BenchmarkCompileErrorOverrides(b *testing.B) {
 			"500": []apidef.ErrorOverride{
 				{
 					Response: apidef.ErrorResponse{
-						Code:    503,
+						StatusCode: 503,
 						Message: "Service unavailable",
 					},
 				},
@@ -804,7 +804,7 @@ func BenchmarkCompileErrorOverrides(b *testing.B) {
 						MessagePattern: "database.*timeout",
 					},
 					Response: apidef.ErrorResponse{
-						Code:    504,
+						StatusCode: 504,
 						Message: "Database timeout",
 					},
 				},
@@ -813,7 +813,7 @@ func BenchmarkCompileErrorOverrides(b *testing.B) {
 						MessagePattern: "network.*error",
 					},
 					Response: apidef.ErrorResponse{
-						Code:    502,
+						StatusCode: 502,
 						Message: "Network error",
 					},
 				},
