@@ -33,7 +33,7 @@ jobs:
   goreleaser:
     if: github.event.pull_request.draft == false
     name: '${{ matrix.golang_cross }}'
-    runs-on: ${{ vars.DEFAULT_RUNNER }}
+    runs-on: warp-ubuntu-latest-x64-4x
     permissions:
       id-token: write # AWS OIDC JWT
       contents: read # actions/checkout
@@ -286,7 +286,7 @@ jobs:
   resolve-dashboard-image:
     if: github.event.pull_request.draft == false
     needs: goreleaser
-    runs-on: ${{ vars.DEFAULT_RUNNER }}
+    runs-on: warp-ubuntu-latest-x64-2x
     permissions:
       id-token: write
       contents: read
@@ -477,7 +477,7 @@ jobs:
   build-dashboard-image:
     if: needs.resolve-dashboard-image.outputs.needs_build == 'true'
     needs: resolve-dashboard-image
-    runs-on: ${{ vars.DEFAULT_RUNNER }}
+    runs-on: warp-ubuntu-latest-x64-2x
     permissions:
       id-token: write
       contents: read
@@ -658,7 +658,7 @@ jobs:
     if: github.event.pull_request.draft == false
     needs:
       - goreleaser
-    runs-on: ${{ vars.DEFAULT_RUNNER }}
+    runs-on: warp-ubuntu-latest-x64-2x
     outputs:
       envfiles: ${{ steps.params.outputs.envfiles }}
       pump: ${{ steps.params.outputs.pump }}
@@ -684,7 +684,7 @@ jobs:
       needs.goreleaser.result == 'success' &&
       needs.resolve-dashboard-image.result == 'success' &&
       (needs.build-dashboard-image.result == 'success' || needs.build-dashboard-image.result == 'skipped')
-    runs-on: ${{ vars.DEFAULT_RUNNER }}
+    runs-on: warp-ubuntu-latest-x64-4x
     env:
       XUNIT_REPORT_PATH: ${{ github.workspace}}/test-results.xml
     permissions:
@@ -753,7 +753,7 @@ jobs:
           execution_status: ${{ steps.test_execution.outcome }}
   aggregator-ci-test:
     name: Aggregated CI Status
-    runs-on: ${{ vars.DEFAULT_RUNNER }}
+    runs-on: warp-ubuntu-latest-x64-2x
     # Dynamically determine which jobs to depend on based on repository configuration
     needs: [goreleaser, api-tests]
     if: ${{ always() && github.event_name == 'pull_request' }}
@@ -785,7 +785,7 @@ jobs:
     if: github.event.pull_request.draft == false
     needs:
       - goreleaser
-    runs-on: ${{ vars.DEFAULT_RUNNER }}
+    runs-on: warp-ubuntu-latest-x64-2x
     outputs:
       deb: ${{ steps.params.outputs.deb }}
       rpm: ${{ steps.params.outputs.rpm }}
@@ -806,7 +806,7 @@ jobs:
     services:
       httpbin.org:
         image: kennethreitz/httpbin
-    runs-on: ${{ vars.DEFAULT_RUNNER }}
+    runs-on: warp-ubuntu-latest-x64-2x
     needs:
       - test-controller-distros
     strategy:
@@ -864,7 +864,7 @@ jobs:
     services:
       httpbin.org:
         image: kennethreitz/httpbin
-    runs-on: ${{ vars.DEFAULT_RUNNER }}
+    runs-on: warp-ubuntu-latest-x64-2x
     needs:
       - test-controller-distros
     strategy:
