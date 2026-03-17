@@ -259,9 +259,9 @@ func TestErrorHandler_AnalyticsRecordsOverriddenStatusCode(t *testing.T) {
 				"401": []apidef.ErrorOverride{
 					{
 						Response: apidef.ErrorResponse{
-							Code:    403, // Override to 403
-							Body:    `{"error": "access_denied", "code": "FORBIDDEN"}`,
-							Message: "Access denied",
+							StatusCode: 403, // Override to 403
+							Body:       `{"error": "access_denied", "code": "FORBIDDEN"}`,
+							Message:    "Access denied",
 						},
 					},
 				},
@@ -310,8 +310,8 @@ func TestErrorHandler_AnalyticsRecordsOverriddenStatusCode(t *testing.T) {
 				"500": []apidef.ErrorOverride{
 					{
 						Response: apidef.ErrorResponse{
-							Code:    503,
-							Message: "Service unavailable",
+							StatusCode: 503,
+							Message:    "Service unavailable",
 						},
 					},
 				},

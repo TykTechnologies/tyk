@@ -41,7 +41,7 @@ func TestCompileErrorOverrides(t *testing.T) {
 			"500": []apidef.ErrorOverride{
 				{
 					Response: apidef.ErrorResponse{
-						Code:    503,
+						StatusCode: 503,
 						Message: "Service unavailable",
 					},
 				},
@@ -52,7 +52,7 @@ func TestCompileErrorOverrides(t *testing.T) {
 		require.NotNil(t, result)
 		assert.Contains(t, result.ByExactCode, 500)
 		assert.Len(t, result.ByExactCode[500], 1)
-		assert.Equal(t, 503, result.ByExactCode[500][0].Response.Code)
+		assert.Equal(t, 503, result.ByExactCode[500][0].Response.StatusCode)
 	})
 
 	t.Run("pattern status code 4xx", func(t *testing.T) {
@@ -97,13 +97,13 @@ func TestCompileErrorOverrides(t *testing.T) {
 						MessagePattern: "database.*timeout",
 					},
 					Response: apidef.ErrorResponse{
-						Code:    504,
+						StatusCode: 504,
 						Message: "Database timeout",
 					},
 				},
 				{
 					Response: apidef.ErrorResponse{
-						Code:    503,
+						StatusCode: 503,
 						Message: "Generic server error",
 					},
 				},
@@ -386,7 +386,7 @@ func TestApplyOverride(t *testing.T) {
 			"500": []apidef.ErrorOverride{
 				{
 					Response: apidef.ErrorResponse{
-						Code:    503,
+						StatusCode: 503,
 						Message: "Service unavailable",
 					},
 				},
@@ -399,7 +399,7 @@ func TestApplyOverride(t *testing.T) {
 
 		result := eo.ApplyOverride(req, 500, []byte("internal error"))
 		require.NotNil(t, result)
-		assert.Equal(t, 503, result.Code)
+		assert.Equal(t, 503, result.StatusCode)
 		assert.Equal(t, 500, result.OriginalCode)
 		assert.Equal(t, "Service unavailable", result.GetMessageForTemplate())
 	})
@@ -421,7 +421,7 @@ func TestApplyOverride(t *testing.T) {
 
 		result := eo.ApplyOverride(req, 404, []byte("not found"))
 		require.NotNil(t, result)
-		assert.Equal(t, 404, result.Code) // No override code, keep original
+		assert.Equal(t, 404, result.StatusCode) // No override code, keep original
 		assert.Equal(t, "Client error", result.GetMessageForTemplate())
 	})
 
@@ -430,7 +430,7 @@ func TestApplyOverride(t *testing.T) {
 			"5xx": []apidef.ErrorOverride{
 				{
 					Response: apidef.ErrorResponse{
-						Code:    503,
+						StatusCode: 503,
 						Message: "Server error",
 					},
 				},
@@ -443,7 +443,7 @@ func TestApplyOverride(t *testing.T) {
 
 		result := eo.ApplyOverride(req, 502, []byte("bad gateway"))
 		require.NotNil(t, result)
-		assert.Equal(t, 503, result.Code)
+		assert.Equal(t, 503, result.StatusCode)
 		assert.Equal(t, "Server error", result.GetMessageForTemplate())
 	})
 
@@ -504,7 +504,7 @@ func TestApplyOverride(t *testing.T) {
 						MessagePattern: "database.*timeout",
 					},
 					Response: apidef.ErrorResponse{
-						Code:    504,
+						StatusCode: 504,
 						Message: "Database timeout",
 					},
 				},
@@ -518,7 +518,7 @@ func TestApplyOverride(t *testing.T) {
 		// Should match
 		result := eo.ApplyOverride(req, 500, []byte("database connection timeout"))
 		require.NotNil(t, result)
-		assert.Equal(t, 504, result.Code)
+		assert.Equal(t, 504, result.StatusCode)
 
 		// Should not match
 		result = eo.ApplyOverride(req, 500, []byte("network error"))
@@ -534,7 +534,7 @@ func TestApplyOverride(t *testing.T) {
 						BodyValue: "INVALID_PAYMENT",
 					},
 					Response: apidef.ErrorResponse{
-						Code:    402,
+						StatusCode: 402,
 						Message: "Payment required",
 					},
 				},
@@ -549,7 +549,7 @@ func TestApplyOverride(t *testing.T) {
 		body := []byte(`{"error": {"code": "INVALID_PAYMENT"}}`)
 		result := eo.ApplyOverride(req, 400, body)
 		require.NotNil(t, result)
-		assert.Equal(t, 402, result.Code)
+		assert.Equal(t, 402, result.StatusCode)
 
 		// Should not match - different code
 		body = []byte(`{"error": {"code": "INVALID_INPUT"}}`)
@@ -571,7 +571,7 @@ func TestApplyOverride(t *testing.T) {
 						BodyValue: "timeout",
 					},
 					Response: apidef.ErrorResponse{
-						Code:    504,
+						StatusCode: 504,
 						Message: "Request timeout",
 					},
 				},
@@ -585,7 +585,7 @@ func TestApplyOverride(t *testing.T) {
 		body := []byte(`{"metadata": {"error": {"type": "timeout"}}}`)
 		result := eo.ApplyOverride(req, 500, body)
 		require.NotNil(t, result)
-		assert.Equal(t, 504, result.Code)
+		assert.Equal(t, 504, result.StatusCode)
 	})
 
 	t.Run("large body is truncated for matching", func(t *testing.T) {
@@ -658,7 +658,7 @@ func TestApplyOverride(t *testing.T) {
 
 		result := eo.ApplyOverride(req, 401, []byte("unauthorized"))
 		require.NotNil(t, result)
-		assert.Equal(t, 401, result.Code) // Original preserved
+		assert.Equal(t, 401, result.StatusCode) // Original preserved
 	})
 
 	t.Run("non-matching status code", func(t *testing.T) {
@@ -927,7 +927,7 @@ func TestApplyOverrideWithFlag(t *testing.T) {
 						Flag: errors.RLT,
 					},
 					Response: apidef.ErrorResponse{
-						Code:    429,
+						StatusCode: 429,
 						Message: "Rate limit exceeded - please slow down",
 						Headers: map[string]string{"Retry-After": "60"},
 					},
@@ -944,7 +944,7 @@ func TestApplyOverrideWithFlag(t *testing.T) {
 
 		result := eo.ApplyOverride(req, 429, []byte(""))
 		require.NotNil(t, result)
-		assert.Equal(t, 429, result.Code)
+		assert.Equal(t, 429, result.StatusCode)
 		assert.Equal(t, "Rate limit exceeded - please slow down", result.GetMessageForTemplate())
 		assert.Equal(t, "60", result.Headers["Retry-After"])
 	})
@@ -1011,7 +1011,7 @@ func TestApplyOverrideWithFlag(t *testing.T) {
 						MessagePattern: "circuit.*breaker", // Fallback pattern
 					},
 					Response: apidef.ErrorResponse{
-						Code:    503,
+						StatusCode: 503,
 						Message: "Service temporarily unavailable",
 					},
 				},
@@ -1026,7 +1026,7 @@ func TestApplyOverrideWithFlag(t *testing.T) {
 		// Should fall back to pattern matching
 		result := eo.ApplyOverride(req, 500, []byte("circuit breaker is open"))
 		require.NotNil(t, result)
-		assert.Equal(t, 503, result.Code)
+		assert.Equal(t, 503, result.StatusCode)
 	})
 }
 

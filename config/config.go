@@ -1350,7 +1350,7 @@ type Config struct {
 	// "error_overrides": {
 	//   "500": [{
 	//     "response": {
-	//       "code": 503,
+	//       "status_code": 503,
 	//       "body": "{\"error\": \"Service temporarily unavailable\"}"
 	//     }
 	//   }]

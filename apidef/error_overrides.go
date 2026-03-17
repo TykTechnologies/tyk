@@ -81,8 +81,8 @@ func (m *ErrorMatcher) Compile() error {
 
 // ErrorResponse defines the override response for error overrides.
 type ErrorResponse struct {
-	// Code is the HTTP status code to return.
-	Code int `json:"code"`
+	// StatusCode is the HTTP status code to return.
+	StatusCode int `json:"status_code"`
 
 	// Body is the HTTP response body (literal or inline template).
 	Body string `json:"body,omitempty"`
