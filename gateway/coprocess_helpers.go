@@ -84,6 +84,8 @@ func TykSessionState(session *coprocess.SessionState) *user.SessionState {
 		LastUpdated:             session.LastUpdated,
 		IdExtractorDeadline:     session.IdExtractorDeadline,
 		SessionLifetime:         session.SessionLifetime,
+		PostExpiryAction:        user.PostExpiryAction(session.PostExpiryAction),
+		PostExpiryGracePeriod:   session.PostExpiryGracePeriod,
 		KeyID:                   session.KeyId,
 	}
 }
@@ -171,6 +173,8 @@ func ProtoSessionState(session *user.SessionState) *coprocess.SessionState {
 		LastUpdated:             session.LastUpdated,
 		IdExtractorDeadline:     session.IdExtractorDeadline,
 		SessionLifetime:         session.SessionLifetime,
+		PostExpiryAction:        string(session.PostExpiryAction),
+		PostExpiryGracePeriod:   session.PostExpiryGracePeriod,
 		KeyId:                   session.KeyID,
 	}
 }
