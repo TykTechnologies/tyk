@@ -40,7 +40,7 @@ func BenchmarkTryWriteOverride(b *testing.B) {
 				{
 					Response: apidef.ErrorResponse{
 						StatusCode: 503,
-						Body: `{"error": "Service unavailable"}`,
+						Body:       `{"error": "Service unavailable"}`,
 					},
 				},
 			},
@@ -91,7 +91,7 @@ func BenchmarkApplyOverride(b *testing.B) {
 				{
 					Response: apidef.ErrorResponse{
 						StatusCode: 503,
-						Message: "Service unavailable",
+						Message:    "Service unavailable",
 					},
 				},
 			},
@@ -143,7 +143,7 @@ func BenchmarkApplyOverride(b *testing.B) {
 					},
 					Response: apidef.ErrorResponse{
 						StatusCode: 504,
-						Message: "Database timeout",
+						Message:    "Database timeout",
 					},
 				},
 			},
@@ -171,7 +171,7 @@ func BenchmarkApplyOverride(b *testing.B) {
 					},
 					Response: apidef.ErrorResponse{
 						StatusCode: 504,
-						Message: "Database timeout",
+						Message:    "Database timeout",
 					},
 				},
 			},
@@ -200,7 +200,7 @@ func BenchmarkApplyOverride(b *testing.B) {
 					},
 					Response: apidef.ErrorResponse{
 						StatusCode: 422,
-						Message: "Validation failed",
+						Message:    "Validation failed",
 					},
 				},
 			},
@@ -296,7 +296,7 @@ func BenchmarkApplyOverride(b *testing.B) {
 					},
 					Response: apidef.ErrorResponse{
 						StatusCode: 429,
-						Message: "Rate limit exceeded",
+						Message:    "Rate limit exceeded",
 					},
 				},
 			},
@@ -324,7 +324,7 @@ func BenchmarkApplyOverride(b *testing.B) {
 					},
 					Response: apidef.ErrorResponse{
 						StatusCode: 429,
-						Message: "Rate limit exceeded",
+						Message:    "Rate limit exceeded",
 					},
 				},
 			},
@@ -353,7 +353,7 @@ func BenchmarkApplyOverride(b *testing.B) {
 					},
 					Response: apidef.ErrorResponse{
 						StatusCode: 503,
-						Message: "Service unavailable",
+						Message:    "Service unavailable",
 					},
 				},
 			},
@@ -569,7 +569,7 @@ func BenchmarkWriteOverrideResponse(b *testing.B) {
 
 		result := &OverrideResult{
 			StatusCode: 504,
-			rule: rule,
+			rule:       rule,
 		}
 
 		b.ResetTimer()
@@ -602,7 +602,7 @@ func BenchmarkWriteOverrideResponse(b *testing.B) {
 
 		result := &OverrideResult{
 			StatusCode: 500,
-			rule: rule,
+			rule:       rule,
 		}
 
 		b.ResetTimer()
@@ -759,7 +759,7 @@ func BenchmarkCompileErrorOverrides(b *testing.B) {
 				{
 					Response: apidef.ErrorResponse{
 						StatusCode: 503,
-						Message: "Service unavailable",
+						Message:    "Service unavailable",
 					},
 				},
 			},
@@ -805,7 +805,7 @@ func BenchmarkCompileErrorOverrides(b *testing.B) {
 					},
 					Response: apidef.ErrorResponse{
 						StatusCode: 504,
-						Message: "Database timeout",
+						Message:    "Database timeout",
 					},
 				},
 				{
@@ -814,7 +814,7 @@ func BenchmarkCompileErrorOverrides(b *testing.B) {
 					},
 					Response: apidef.ErrorResponse{
 						StatusCode: 502,
-						Message: "Network error",
+						Message:    "Network error",
 					},
 				},
 			},
