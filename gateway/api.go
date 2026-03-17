@@ -68,6 +68,7 @@ import (
 	"github.com/TykTechnologies/tyk/internal/sanitize"
 	"github.com/TykTechnologies/tyk/internal/uuid"
 	lib "github.com/TykTechnologies/tyk/lib/apidef"
+	"github.com/TykTechnologies/tyk/pkg/identifier"
 	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/user"
 )
@@ -197,7 +198,15 @@ type VersionMeta struct {
 func doJSONWrite(w http.ResponseWriter, code int, obj interface{}) {
 	w.Header().Set(header.ContentType, header.ApplicationJSON)
 	w.WriteHeader(code)
-	if err := json.NewEncoder(w).Encode(obj); err != nil {
+
+	var err error
+	if bodyBytes, ok := obj.([]byte); ok {
+		_, err = w.Write(bodyBytes)
+	} else {
+		err = json.NewEncoder(w).Encode(obj)
+	}
+
+	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 	if code != http.StatusOK {
@@ -317,6 +326,13 @@ func (gw *Gateway) checkAndApplyTrialPeriod(
 				newSession.Expires = time.Now().Unix() + policy.KeyExpiresIn
 			}
 		}
+
+		if policy.PostExpiryAction != "" {
+			newSession.PostExpiryAction = policy.PostExpiryAction
+		}
+		if policy.PostExpiryGracePeriod != 0 {
+			newSession.PostExpiryGracePeriod = policy.PostExpiryGracePeriod
+		}
 	}
 }
 
@@ -363,6 +379,10 @@ func (gw *Gateway) ApplyLifetime(sess *user.SessionState, specs ...*APISpec) int
 	for _, spec := range specs {
 		if spec != nil {
 			sessionLifeTime := sess.Lifetime(spec.GetSessionLifetimeRespectsKeyExpiration(), spec.SessionLifetime, gw.GetConfig().ForceGlobalSessionLifetime, gw.GetConfig().GlobalSessionLifetime)
+			// -1 means "never delete" (persist forever), which is the maximum possible lifetime
+			if sessionLifeTime == -1 {
+				return -1
+			}
 			// uses the greater lifetime
 			if sessionLifeTime > lifetime {
 				lifetime = sessionLifeTime
@@ -1109,6 +1129,11 @@ func (gw *Gateway) handleAddOrUpdatePolicy(polID string, r *http.Request) (inter
 		return apiError("Request malformed"), http.StatusBadRequest
 	}
 
+	if err := gw.validator.Validate(identifier.CustomPolicyId(newPol.ID)); err != nil {
+		log.WithField("id", newPol.ID).WithError(err).Error("Failed to validate policy ID")
+		return apiError(identifier.ErrInvalidCustomPolicyId.Error()), http.StatusBadRequest
+	}
+
 	if polID != "" && newPol.ID != polID && r.Method == http.MethodPut {
 		log.Error("PUT operation on different IDs")
 		return apiError("Request ID does not match that in policy! For Update operations these must match."), http.StatusBadRequest
@@ -1605,7 +1630,16 @@ func (gw *Gateway) apiOASGetHandler(w http.ResponseWriter, r *http.Request) {
 		gw.setBaseAPIIDHeader(w, oasAPI)
 	}
 
-	doJSONWrite(w, code, obj)
+	jsonBytes, err := json.Marshal(obj)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	bytesModifier := lib.NewDataBytesModifier(jsonBytes)
+	bytesModifier.RestoreUnicodeEscapesFromRE2()
+
+	doJSONWrite(w, code, bytesModifier.Result())
 }
 
 func (gw *Gateway) apiOASPostHandler(w http.ResponseWriter, r *http.Request) {
@@ -3611,6 +3645,11 @@ func extractOASObjFromReq(reqBody io.Reader) ([]byte, *oas.OAS, error) {
 	if err != nil {
 		return nil, nil, ErrRequestMalformed
 	}
+
+	bytesModifier := lib.NewDataBytesModifier(reqBodyInBytes)
+	bytesModifier.TransformUnicodeEscapesToRE2()
+
+	reqBodyInBytes = bytesModifier.Result()
 
 	loader := openapi3.NewLoader()
 	t, err := loader.LoadFromData(reqBodyInBytes)

@@ -1,27 +1,52 @@
 ---
 version: "3"
 
+vars:
+  PROFILES: default custom disabled cardinality response-headers
+
 tasks:
   default:
-    desc: "setup, execute and shutdown e2e opentelemetry metrics tests"
+    desc: "run all profile matrix tests sequentially"
+    cmds:
+      - for:
+          var: PROFILES
+        cmd: task run-profile GW_PROFILE={{.ITEM}}
+
+  run-profile:
+    desc: "setup, test and teardown a single profile"
+    requires:
+      vars: [GW_PROFILE]
     cmds:
       - defer:
           task: teardown
+          vars:
+            GW_PROFILE: "{{.GW_PROFILE}}"
       - task: setup
+        vars:
+          GW_PROFILE: "{{.GW_PROFILE}}"
       - task: test
+        vars:
+          GW_PROFILE: "{{.GW_PROFILE}}"
 
   setup:
     desc: "setup e2e opentelemetry metrics tests"
+    requires:
+      vars: [GW_PROFILE]
     cmds:
-      - docker compose up -d --wait
-      - docker compose logs -f &
+      - echo "=== Setting up profile {{.GW_PROFILE}} ==="
+      - GW_PROFILE={{.GW_PROFILE}} docker compose -p metrics-{{.GW_PROFILE}} up -d --wait
+      - GW_PROFILE={{.GW_PROFILE}} docker compose -p metrics-{{.GW_PROFILE}} logs -f > /tmp/metrics-{{.GW_PROFILE}}.log 2>&1 &
 
   test:
     desc: "run e2e opentelemetry metrics tests"
+    requires:
+      vars: [GW_PROFILE]
     cmds:
-      - E2E_METRICS=1 go test -v -count=1 -timeout 120s ./...
+      - GW_PROFILE={{.GW_PROFILE}} E2E_METRICS=1 go test -v -count=1 -timeout 120s ./...
 
   teardown:
     desc: "teardown e2e opentelemetry metrics tests environment"
+    requires:
+      vars: [GW_PROFILE]
     cmds:
-      - docker compose down --remove-orphans
+      - GW_PROFILE={{.GW_PROFILE}} docker compose -p metrics-{{.GW_PROFILE}} down --remove-orphans --volumes

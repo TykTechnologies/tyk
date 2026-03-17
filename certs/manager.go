@@ -745,7 +745,6 @@ func (c *certificateManager) GetRaw(certID string) (string, error) {
 	return c.storage.GetKey("raw-" + certID)
 }
 
-
 func (c *certificateManager) Add(certData []byte, orgID string) (string, error) {
 
 	certID, certChainPEM, err := GetCertIDAndChainPEM(certData, c.secret)

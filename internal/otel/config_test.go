@@ -64,15 +64,17 @@ func TestOpenTelemetry_SetDefaults(t *testing.T) {
 					},
 				},
 				Metrics: MetricsConfig{
-					ExporterConfig: ExporterConfig{
-						Exporter:          "http",
-						Endpoint:          "metrics-collector:4318",
-						Headers:           map[string]string{"X-Metrics": "1"},
-						ConnectionTimeout: 20,
-						ResourceName:      "metrics-gw",
-						TLS: otelconfig.TLS{
-							Enable:   true,
-							CertFile: "/metrics-cert.pem",
+					BaseMetricsConfig: BaseMetricsConfig{
+						ExporterConfig: ExporterConfig{
+							Exporter:          "http",
+							Endpoint:          "metrics-collector:4318",
+							Headers:           map[string]string{"X-Metrics": "1"},
+							ConnectionTimeout: 20,
+							ResourceName:      "metrics-gw",
+							TLS: otelconfig.TLS{
+								Enable:   true,
+								CertFile: "/metrics-cert.pem",
+							},
 						},
 					},
 				},
@@ -102,8 +104,10 @@ func TestOpenTelemetry_SetDefaults(t *testing.T) {
 					},
 				},
 				Metrics: MetricsConfig{
-					ExporterConfig: ExporterConfig{
-						Endpoint: "metrics-only:9090",
+					BaseMetricsConfig: BaseMetricsConfig{
+						ExporterConfig: ExporterConfig{
+							Endpoint: "metrics-only:9090",
+						},
 					},
 				},
 			},
@@ -141,8 +145,10 @@ func TestOpenTelemetry_SetDefaults(t *testing.T) {
 					},
 				},
 				Metrics: MetricsConfig{
-					ExporterConfig: ExporterConfig{
-						Headers: map[string]string{}, // non-nil empty map
+					BaseMetricsConfig: BaseMetricsConfig{
+						ExporterConfig: ExporterConfig{
+							Headers: map[string]string{}, // non-nil empty map
+						},
 					},
 				},
 			},
@@ -208,9 +214,11 @@ func TestOpenTelemetry_SetDefaults(t *testing.T) {
 					},
 				},
 				Metrics: MetricsConfig{
-					ExporterConfig: ExporterConfig{
-						TLS: otelconfig.TLS{
-							CAFile: "/metrics-ca.pem",
+					BaseMetricsConfig: BaseMetricsConfig{
+						ExporterConfig: ExporterConfig{
+							TLS: otelconfig.TLS{
+								CAFile: "/metrics-ca.pem",
+							},
 						},
 					},
 				},
@@ -274,14 +282,16 @@ func TestOpenTelemetry_SetDefaults(t *testing.T) {
 					Enabled: true,
 				},
 				Metrics: MetricsConfig{
-					ExportInterval:  15,
-					Temporality:     "delta",
-					ShutdownTimeout: 5,
-					Retry: MetricsRetryConfig{
-						Enabled:         boolPtr(false),
-						InitialInterval: 1000,
-						MaxInterval:     5000,
-						MaxElapsedTime:  10000,
+					BaseMetricsConfig: BaseMetricsConfig{
+						ExportInterval:  15,
+						Temporality:     "delta",
+						ShutdownTimeout: 5,
+						Retry: MetricsRetryConfig{
+							Enabled:         boolPtr(false),
+							InitialInterval: 1000,
+							MaxInterval:     5000,
+							MaxElapsedTime:  10000,
+						},
 					},
 				},
 			},
@@ -295,6 +305,52 @@ func TestOpenTelemetry_SetDefaults(t *testing.T) {
 				assert.Equal(t, 1000, got.Metrics.Retry.InitialInterval)
 				assert.Equal(t, 5000, got.Metrics.Retry.MaxInterval)
 				assert.Equal(t, 10000, got.Metrics.Retry.MaxElapsedTime)
+			},
+		},
+		{
+			name: "cardinality_limit defaults to 2000",
+			input: OpenTelemetry{
+				BaseOpenTelemetry: BaseOpenTelemetry{
+					Enabled: true,
+				},
+			},
+			assert: func(t *testing.T, got *OpenTelemetry) {
+				t.Helper()
+				assert.Equal(t, 2000, got.Metrics.CardinalityLimit)
+			},
+		},
+		{
+			name: "cardinality_limit preserves explicit value",
+			input: OpenTelemetry{
+				BaseOpenTelemetry: BaseOpenTelemetry{
+					Enabled: true,
+				},
+				Metrics: MetricsConfig{
+					BaseMetricsConfig: BaseMetricsConfig{
+						CardinalityLimit: 500,
+					},
+				},
+			},
+			assert: func(t *testing.T, got *OpenTelemetry) {
+				t.Helper()
+				assert.Equal(t, 500, got.Metrics.CardinalityLimit)
+			},
+		},
+		{
+			name: "negative cardinality_limit preserved (disables limit)",
+			input: OpenTelemetry{
+				BaseOpenTelemetry: BaseOpenTelemetry{
+					Enabled: true,
+				},
+				Metrics: MetricsConfig{
+					BaseMetricsConfig: BaseMetricsConfig{
+						CardinalityLimit: -1,
+					},
+				},
+			},
+			assert: func(t *testing.T, got *OpenTelemetry) {
+				t.Helper()
+				assert.Equal(t, -1, got.Metrics.CardinalityLimit)
 			},
 		},
 	}
