@@ -71,7 +71,7 @@ The `error_overrides` configuration in `tyk.conf` maps status codes and flags to
       {
         "match": {"flag": "RLT"},
         "response": {
-          "code": 429,
+          "status_code": 429,
           "body": "{\"error\": \"rate_limit_exceeded\", ...}",
           "headers": {
             "X-Error-Flag": "RLT",
