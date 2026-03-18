@@ -1628,9 +1628,9 @@ func (gw *Gateway) apiOASGetHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if oasAPI, ok := obj.(*oas.OAS); ok {
-		visitor := schema.NewVisitor(oasAPI)
+		visitor := schema.NewVisitor()
 		visitor.AddSchemaManipulation(schema.RestoreUnicodeEscapesFromRE2Manipulation)
-		visitor.ProcessOAS()
+		visitor.ProcessOAS(oasAPI)
 
 		gw.setBaseAPIIDHeader(w, oasAPI)
 	}
@@ -3700,9 +3700,9 @@ func extractOASObjFromReq(reqBody io.Reader) ([]byte, *oas.OAS, error) {
 
 	oasObj.T = *t
 
-	visitor := schema.NewVisitor(&oasObj)
+	visitor := schema.NewVisitor()
 	visitor.AddSchemaManipulation(schema.TransformUnicodeEscapesToRE2Manipulation)
-	visitor.ProcessOAS()
+	visitor.ProcessOAS(&oasObj)
 
 	return reqBodyInBytes, &oasObj, nil
 }

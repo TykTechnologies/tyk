@@ -15,9 +15,8 @@ var (
 	re2Regex     = regexp.MustCompile(`\\x\{([0-9a-fA-F]{4})}`)
 )
 
-func NewVisitor(doc *oas.OAS) *Visitor {
+func NewVisitor() *Visitor {
 	return &Visitor{
-		doc:           doc,
 		manipulations: make(Manipulations, 0),
 		visited:       make(map[*openapi3.Schema]bool),
 	}
@@ -27,7 +26,6 @@ type Manipulation func(schema *openapi3.Schema)
 type Manipulations []Manipulation
 
 type Visitor struct {
-	doc           *oas.OAS
 	manipulations Manipulations
 
 	visited map[*openapi3.Schema]bool
@@ -35,6 +33,75 @@ type Visitor struct {
 
 func (v *Visitor) AddSchemaManipulation(manipulation Manipulation) {
 	v.manipulations = append(v.manipulations, manipulation)
+}
+
+func (v *Visitor) ProcessOAS(doc *oas.OAS) {
+	if doc.Components != nil && doc.Components.Schemas != nil {
+		for _, schemaRef := range doc.Components.Schemas {
+			v.ProcessSchema(schemaRef)
+		}
+	}
+
+	if doc.Paths != nil {
+		for _, pathItem := range doc.Paths.Map() {
+			if pathItem == nil {
+				continue
+			}
+			for _, op := range pathItem.Operations() {
+				for _, paramRef := range op.Parameters {
+					if paramRef.Value != nil && paramRef.Value.Schema != nil {
+						v.ProcessSchema(paramRef.Value.Schema)
+					}
+				}
+				if op.RequestBody != nil && op.RequestBody.Value != nil {
+					for _, mediaType := range op.RequestBody.Value.Content {
+						v.ProcessSchema(mediaType.Schema)
+					}
+				}
+				for _, respRef := range op.Responses.Map() {
+					if respRef.Value != nil {
+						for _, mediaType := range respRef.Value.Content {
+							v.ProcessSchema(mediaType.Schema)
+						}
+					}
+				}
+			}
+		}
+	}
+}
+
+func (v *Visitor) ProcessSchema(schemaRef *openapi3.SchemaRef) {
+	if schemaRef == nil || schemaRef.Value == nil {
+		return
+	}
+
+	if v.isVisited(schemaRef.Value) {
+		return
+	}
+
+	v.applyManipulations(schemaRef.Value)
+
+	for _, propSchemaRef := range schemaRef.Value.Properties {
+		v.ProcessSchema(propSchemaRef)
+	}
+	if schemaRef.Value.Items != nil {
+		v.ProcessSchema(schemaRef.Value.Items)
+	}
+	if schemaRef.Value.AdditionalProperties.Schema != nil {
+		v.ProcessSchema(schemaRef.Value.AdditionalProperties.Schema)
+	}
+	if schemaRef.Value.Not != nil {
+		v.ProcessSchema(schemaRef.Value.Not)
+	}
+	for _, subSchemaRef := range schemaRef.Value.AllOf {
+		v.ProcessSchema(subSchemaRef)
+	}
+	for _, subSchemaRef := range schemaRef.Value.AnyOf {
+		v.ProcessSchema(subSchemaRef)
+	}
+	for _, subSchemaRef := range schemaRef.Value.OneOf {
+		v.ProcessSchema(subSchemaRef)
+	}
 }
 
 func (v *Visitor) applyManipulations(schema *openapi3.Schema) {
@@ -54,75 +121,6 @@ func (v *Visitor) isVisited(schema *openapi3.Schema) bool {
 
 func (v *Visitor) resetVisited() {
 	v.visited = make(map[*openapi3.Schema]bool)
-}
-
-func (v *Visitor) ProcessOAS() {
-	if v.doc.Components != nil && v.doc.Components.Schemas != nil {
-		for _, schemaRef := range v.doc.Components.Schemas {
-			v.processSchema(schemaRef)
-		}
-	}
-
-	if v.doc.Paths != nil {
-		for _, pathItem := range v.doc.Paths.Map() {
-			if pathItem == nil {
-				continue
-			}
-			for _, op := range pathItem.Operations() {
-				for _, paramRef := range op.Parameters {
-					if paramRef.Value != nil && paramRef.Value.Schema != nil {
-						v.processSchema(paramRef.Value.Schema)
-					}
-				}
-				if op.RequestBody != nil && op.RequestBody.Value != nil {
-					for _, mediaType := range op.RequestBody.Value.Content {
-						v.processSchema(mediaType.Schema)
-					}
-				}
-				for _, respRef := range op.Responses.Map() {
-					if respRef.Value != nil {
-						for _, mediaType := range respRef.Value.Content {
-							v.processSchema(mediaType.Schema)
-						}
-					}
-				}
-			}
-		}
-	}
-}
-
-func (v *Visitor) processSchema(schemaRef *openapi3.SchemaRef) {
-	if schemaRef == nil || schemaRef.Value == nil {
-		return
-	}
-
-	if v.isVisited(schemaRef.Value) {
-		return
-	}
-
-	v.applyManipulations(schemaRef.Value)
-
-	for _, propSchemaRef := range schemaRef.Value.Properties {
-		v.processSchema(propSchemaRef)
-	}
-	if schemaRef.Value.Items != nil {
-		v.processSchema(schemaRef.Value.Items)
-	}
-	if schemaRef.Value.AdditionalProperties.Schema != nil {
-		v.processSchema(schemaRef.Value.AdditionalProperties.Schema)
-	}
-	if schemaRef.Value.Not != nil {
-		v.processSchema(schemaRef.Value.Not)
-	}
-	for _, subSchemaRef := range schemaRef.Value.AllOf {
-		v.processSchema(subSchemaRef)
-	}
-	for _, subSchemaRef := range schemaRef.Value.AnyOf {
-		v.processSchema(subSchemaRef)
-	}
-	for _, subSchemaRef := range schemaRef.Value.OneOf {
-		v.processSchema(subSchemaRef)
-	}
 }
 
 func TransformUnicodeEscapesToRE2Manipulation(schema *openapi3.Schema) {

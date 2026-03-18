@@ -11,45 +11,43 @@ import (
 )
 
 func TestNewVisitor(t *testing.T) {
-	doc := &oas.OAS{}
-	sm := NewVisitor(doc)
+	visitor := NewVisitor()
 
-	assert.NotNil(t, sm)
-	assert.Equal(t, doc, sm.doc)
-	assert.NotNil(t, sm.manipulations)
-	assert.NotNil(t, sm.visited)
-	assert.Empty(t, sm.manipulations)
-	assert.Empty(t, sm.visited)
+	assert.NotNil(t, visitor)
+	assert.NotNil(t, visitor.manipulations)
+	assert.NotNil(t, visitor.visited)
+	assert.Empty(t, visitor.manipulations)
+	assert.Empty(t, visitor.visited)
 }
 
 func TestVisitor_AddManipulation(t *testing.T) {
-	sm := NewVisitor(&oas.OAS{})
+	visitor := NewVisitor()
 
-	sm.AddSchemaManipulation(func(schema *openapi3.Schema) {
+	visitor.AddSchemaManipulation(func(schema *openapi3.Schema) {
 		schema.Description = "test"
 	})
 
-	assert.Len(t, sm.manipulations, 1)
+	assert.Len(t, visitor.manipulations, 1)
 }
 
 func TestVisitor_applyManipulations(t *testing.T) {
-	sm := NewVisitor(&oas.OAS{})
+	visitor := NewVisitor()
 
 	calledDesc, calledTitle := false, false
 	schemaDesc := "custom description"
 	schemaTitle := "custom title"
 
-	sm.AddSchemaManipulation(func(schema *openapi3.Schema) {
+	visitor.AddSchemaManipulation(func(schema *openapi3.Schema) {
 		calledDesc = true
 		schema.Description = schemaDesc
 	})
-	sm.AddSchemaManipulation(func(schema *openapi3.Schema) {
+	visitor.AddSchemaManipulation(func(schema *openapi3.Schema) {
 		calledTitle = true
 		schema.Title = schemaTitle
 	})
 
 	schema := openapi3.NewSchema()
-	sm.applyManipulations(schema)
+	visitor.applyManipulations(schema)
 
 	assert.True(t, calledDesc)
 	assert.True(t, calledTitle)
@@ -58,15 +56,15 @@ func TestVisitor_applyManipulations(t *testing.T) {
 }
 
 func TestVisitor_isVisited_and_resetVisited(t *testing.T) {
-	sm := NewVisitor(&oas.OAS{})
+	visitor := NewVisitor()
 	schema := openapi3.NewSchema()
 
-	assert.False(t, sm.isVisited(schema))
-	assert.True(t, sm.isVisited(schema))
+	assert.False(t, visitor.isVisited(schema))
+	assert.True(t, visitor.isVisited(schema))
 
-	sm.resetVisited()
+	visitor.resetVisited()
 
-	assert.False(t, sm.isVisited(schema))
+	assert.False(t, visitor.isVisited(schema))
 }
 
 func TestVisitor_ProcessOAS_Components(t *testing.T) {
@@ -84,16 +82,16 @@ func TestVisitor_ProcessOAS_Components(t *testing.T) {
 		},
 	}
 
-	sm := NewVisitor(doc)
+	visitor := NewVisitor()
 
 	visitCount := 0
 	schemaDesc := "visited"
-	sm.AddSchemaManipulation(func(schema *openapi3.Schema) {
+	visitor.AddSchemaManipulation(func(schema *openapi3.Schema) {
 		visitCount++
 		schema.Description = schemaDesc
 	})
 
-	sm.ProcessOAS()
+	visitor.ProcessOAS(doc)
 
 	assert.Equal(t, 2, visitCount)
 	assert.Equal(t, schemaDesc, schema1.Description)
@@ -145,16 +143,16 @@ func TestVisitor_ProcessOAS_Paths(t *testing.T) {
 		},
 	}
 
-	sm := NewVisitor(doc)
+	visitor := NewVisitor()
 
 	visitCount := 0
 	schemaDesc := "visited"
-	sm.AddSchemaManipulation(func(schema *openapi3.Schema) {
+	visitor.AddSchemaManipulation(func(schema *openapi3.Schema) {
 		visitCount++
 		schema.Description = schemaDesc
 	})
 
-	sm.ProcessOAS()
+	visitor.ProcessOAS(doc)
 
 	assert.Equal(t, 3, visitCount)
 	assert.Equal(t, schemaDesc, paramSchema.Description)
@@ -174,7 +172,7 @@ func TestVisitor_processSchema(t *testing.T) {
 	schemaA := openapi3.NewSchema()
 	schemaB := openapi3.NewSchema()
 
-	visitor := NewVisitor(&oas.OAS{})
+	visitor := NewVisitor()
 	visitCount := 0
 
 	visitor.AddSchemaManipulation(func(schema *openapi3.Schema) {
@@ -193,7 +191,7 @@ func TestVisitor_processSchema(t *testing.T) {
 		rootSchema.OneOf = openapi3.SchemaRefs{openapi3.NewSchemaRef("", oneOfSchema)}
 
 		visitCount = 0
-		visitor.processSchema(openapi3.NewSchemaRef("", rootSchema))
+		visitor.ProcessSchema(openapi3.NewSchemaRef("", rootSchema))
 
 		// root + 7 sub-schemas = 8
 		assert.Equal(t, 8, visitCount)
@@ -211,7 +209,7 @@ func TestVisitor_processSchema(t *testing.T) {
 		}
 
 		visitCount = 0
-		visitor.processSchema(openapi3.NewSchemaRef("", schemaA))
+		visitor.ProcessSchema(openapi3.NewSchemaRef("", schemaA))
 
 		// Should visit A, then B, then stop at A because it's already visited
 		assert.Equal(t, 2, visitCount)
@@ -219,8 +217,8 @@ func TestVisitor_processSchema(t *testing.T) {
 
 	t.Run("Nil", func(t *testing.T) {
 		assert.NotPanics(t, func() {
-			visitor.processSchema(nil)
-			visitor.processSchema(&openapi3.SchemaRef{Value: nil})
+			visitor.ProcessSchema(nil)
+			visitor.ProcessSchema(&openapi3.SchemaRef{Value: nil})
 		})
 	})
 }
@@ -321,7 +319,7 @@ func TestVisitor_regexpManipulations(t *testing.T) {
 		},
 	}
 
-	visitor := NewVisitor(testOAS)
+	visitor := NewVisitor()
 
 	t.Run("TransformUnicodeEscapesToRE2", func(t *testing.T) {
 		resetVisitor(visitor)
@@ -332,8 +330,7 @@ func TestVisitor_regexpManipulations(t *testing.T) {
 				visitor.resetVisited()
 
 				testOAS.Components.Schemas[schemaName].Value.Pattern = tc.input
-				visitor.doc = testOAS
-				visitor.ProcessOAS()
+				visitor.ProcessOAS(testOAS)
 
 				assert.Equal(t, tc.expected, testOAS.Components.Schemas[schemaName].Value.Pattern)
 			})
@@ -349,8 +346,7 @@ func TestVisitor_regexpManipulations(t *testing.T) {
 				visitor.resetVisited()
 
 				testOAS.Components.Schemas[schemaName].Value.Pattern = tc.input
-				visitor.doc = testOAS
-				visitor.ProcessOAS()
+				visitor.ProcessOAS(testOAS)
 
 				assert.Equal(t, tc.expected, testOAS.Components.Schemas[schemaName].Value.Pattern)
 			})
