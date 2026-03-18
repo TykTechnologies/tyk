@@ -3623,10 +3623,7 @@ func ctxSetMCPMethod(r *http.Request, method string) {
 }
 
 func ctxGetMCPMethod(r *http.Request) string {
-	if v, ok := r.Context().Value(ctx.MCPMethod).(string); ok {
-		return v
-	}
-	return ""
+	return ctx.GetMCPMethod(r)
 }
 
 func ctxSetMCPPrimitiveType(r *http.Request, primitiveType string) {
@@ -3634,10 +3631,7 @@ func ctxSetMCPPrimitiveType(r *http.Request, primitiveType string) {
 }
 
 func ctxGetMCPPrimitiveType(r *http.Request) string {
-	if v, ok := r.Context().Value(ctx.MCPPrimitiveType).(string); ok {
-		return v
-	}
-	return ""
+	return ctx.GetMCPPrimitiveType(r)
 }
 
 func ctxSetMCPPrimitiveName(r *http.Request, name string) {
@@ -3645,10 +3639,7 @@ func ctxSetMCPPrimitiveName(r *http.Request, name string) {
 }
 
 func ctxGetMCPPrimitiveName(r *http.Request) string {
-	if v, ok := r.Context().Value(ctx.MCPPrimitiveName).(string); ok {
-		return v
-	}
-	return ""
+	return ctx.GetMCPPrimitiveName(r)
 }
 
 func ctxSetJSONRPCErrorCode(r *http.Request, code int) {
@@ -3656,10 +3647,7 @@ func ctxSetJSONRPCErrorCode(r *http.Request, code int) {
 }
 
 func ctxGetJSONRPCErrorCode(r *http.Request) int {
-	if v, ok := r.Context().Value(ctx.JSONRPCErrorCode).(int); ok {
-		return v
-	}
-	return 0
+	return ctx.GetJSONRPCErrorCode(r)
 }
 
 var createOauthClientSecret = func() string {
