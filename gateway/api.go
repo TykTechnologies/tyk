@@ -69,6 +69,7 @@ import (
 	"github.com/TykTechnologies/tyk/internal/uuid"
 	lib "github.com/TykTechnologies/tyk/lib/apidef"
 	"github.com/TykTechnologies/tyk/pkg/identifier"
+	"github.com/TykTechnologies/tyk/pkg/schema"
 	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/user"
 )
@@ -1627,6 +1628,10 @@ func (gw *Gateway) apiOASGetHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if oasAPI, ok := obj.(*oas.OAS); ok {
+		visitor := schema.NewVisitor(oasAPI)
+		visitor.AddSchemaManipulation(schema.RestoreUnicodeEscapesFromRE2Manipulation)
+		visitor.ProcessOAS()
+
 		gw.setBaseAPIIDHeader(w, oasAPI)
 	}
 
@@ -1636,10 +1641,7 @@ func (gw *Gateway) apiOASGetHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	bytesModifier := lib.NewDataBytesModifier(jsonBytes)
-	bytesModifier.RestoreUnicodeEscapesFromRE2()
-
-	doJSONWrite(w, code, bytesModifier.Result())
+	doJSONWrite(w, code, jsonBytes)
 }
 
 func (gw *Gateway) apiOASPostHandler(w http.ResponseWriter, r *http.Request) {
@@ -3690,11 +3692,6 @@ func extractOASObjFromReq(reqBody io.Reader) ([]byte, *oas.OAS, error) {
 		return nil, nil, ErrRequestMalformed
 	}
 
-	bytesModifier := lib.NewDataBytesModifier(reqBodyInBytes)
-	bytesModifier.TransformUnicodeEscapesToRE2()
-
-	reqBodyInBytes = bytesModifier.Result()
-
 	loader := openapi3.NewLoader()
 	t, err := loader.LoadFromData(reqBodyInBytes)
 	if err != nil {
@@ -3702,6 +3699,10 @@ func extractOASObjFromReq(reqBody io.Reader) ([]byte, *oas.OAS, error) {
 	}
 
 	oasObj.T = *t
+
+	visitor := schema.NewVisitor(&oasObj)
+	visitor.AddSchemaManipulation(schema.TransformUnicodeEscapesToRE2Manipulation)
+	visitor.ProcessOAS()
 
 	return reqBodyInBytes, &oasObj, nil
 }
