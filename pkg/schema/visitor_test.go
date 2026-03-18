@@ -175,7 +175,7 @@ func TestVisitor_processSchema(t *testing.T) {
 	visitor := NewVisitor()
 	visitCount := 0
 
-	visitor.AddSchemaManipulation(func(schema *openapi3.Schema) {
+	visitor.AddSchemaManipulation(func(_ *openapi3.Schema) {
 		visitCount++
 	})
 

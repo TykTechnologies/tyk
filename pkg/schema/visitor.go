@@ -43,30 +43,7 @@ func (v *Visitor) ProcessOAS(doc *oas.OAS) {
 	}
 
 	if doc.Paths != nil {
-		for _, pathItem := range doc.Paths.Map() {
-			if pathItem == nil {
-				continue
-			}
-			for _, op := range pathItem.Operations() {
-				for _, paramRef := range op.Parameters {
-					if paramRef.Value != nil && paramRef.Value.Schema != nil {
-						v.ProcessSchema(paramRef.Value.Schema)
-					}
-				}
-				if op.RequestBody != nil && op.RequestBody.Value != nil {
-					for _, mediaType := range op.RequestBody.Value.Content {
-						v.ProcessSchema(mediaType.Schema)
-					}
-				}
-				for _, respRef := range op.Responses.Map() {
-					if respRef.Value != nil {
-						for _, mediaType := range respRef.Value.Content {
-							v.ProcessSchema(mediaType.Schema)
-						}
-					}
-				}
-			}
-		}
+		v.processOASPaths(doc.Paths.Map())
 	}
 }
 
@@ -101,6 +78,59 @@ func (v *Visitor) ProcessSchema(schemaRef *openapi3.SchemaRef) {
 	}
 	for _, subSchemaRef := range schemaRef.Value.OneOf {
 		v.ProcessSchema(subSchemaRef)
+	}
+}
+
+func (v *Visitor) processOASPaths(paths map[string]*openapi3.PathItem) {
+	for _, pathItem := range paths {
+		if pathItem == nil {
+			continue
+		}
+		for _, op := range pathItem.Operations() {
+			v.processOperationParameters(op)
+			v.processOperationContent(op)
+			v.processOperationResponses(op)
+			v.processOperationCallbacks(op)
+		}
+	}
+}
+
+func (v *Visitor) processOperationCallbacks(op *openapi3.Operation) {
+	for _, callbackRef := range op.Callbacks {
+		if callbackRef.Value != nil {
+			v.processOASPaths(callbackRef.Value.Map())
+		}
+	}
+}
+
+func (v *Visitor) processOperationResponses(op *openapi3.Operation) {
+	for _, respRef := range op.Responses.Map() {
+		if respRef.Value != nil {
+			for _, mediaType := range respRef.Value.Content {
+				v.ProcessSchema(mediaType.Schema)
+			}
+			for _, header := range respRef.Value.Headers {
+				if header.Value != nil {
+					v.ProcessSchema(header.Value.Schema)
+				}
+			}
+		}
+	}
+}
+
+func (v *Visitor) processOperationContent(op *openapi3.Operation) {
+	if op.RequestBody != nil && op.RequestBody.Value != nil {
+		for _, mediaType := range op.RequestBody.Value.Content {
+			v.ProcessSchema(mediaType.Schema)
+		}
+	}
+}
+
+func (v *Visitor) processOperationParameters(op *openapi3.Operation) {
+	for _, paramRef := range op.Parameters {
+		if paramRef.Value != nil && paramRef.Value.Schema != nil {
+			v.ProcessSchema(paramRef.Value.Schema)
+		}
 	}
 }
 
