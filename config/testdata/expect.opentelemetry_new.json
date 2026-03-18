@@ -1,10 +1,10 @@
 {
-    "enabled": true,
-    "exporter": "grpc",
-    "endpoint": "collector.example.com:4317",
+    "enabled": false,
+    "exporter": "",
+    "endpoint": "",
     "headers": null,
-    "connection_timeout": 5,
-    "resource_name": "my-gateway",
+    "connection_timeout": 0,
+    "resource_name": "",
     "tls": {
         "enable": false,
         "insecure_skip_verify": false,
@@ -14,26 +14,26 @@
         "max_version": "",
         "min_version": ""
     },
-    "span_processor_type": "batch",
+    "span_processor_type": "",
     "span_batch_config": {
         "max_queue_size": 0,
         "max_export_batch_size": 0,
         "batch_timeout": 0
     },
-    "context_propagation": "tracecontext",
+    "context_propagation": "",
     "custom_trace_header": "",
     "sampling": {
-        "type": "TraceIDRatioBased",
-        "rate": 0.5,
-        "parent_based": true
+        "type": "",
+        "rate": 0,
+        "parent_based": false
     },
     "traces": {
-        "enabled": false,
-        "exporter": "",
-        "endpoint": "",
+        "enabled": true,
+        "exporter": "grpc",
+        "endpoint": "trace-collector.example.com:4317",
         "headers": null,
-        "connection_timeout": 0,
-        "resource_name": "",
+        "connection_timeout": 5,
+        "resource_name": "my-gateway",
         "tls": {
             "enable": false,
             "insecure_skip_verify": false,
@@ -43,24 +43,24 @@
             "max_version": "",
             "min_version": ""
         },
-        "span_processor_type": "",
+        "span_processor_type": "batch",
         "span_batch_config": {
             "max_queue_size": 0,
             "max_export_batch_size": 0,
             "batch_timeout": 0
         },
-        "context_propagation": "",
+        "context_propagation": "tracecontext",
         "custom_trace_header": "",
         "sampling": {
-            "type": "",
-            "rate": 0,
-            "parent_based": false
+            "type": "TraceIDRatioBased",
+            "rate": 0.5,
+            "parent_based": true
         }
     },
     "metrics": {
         "enabled": true,
-        "exporter": "",
-        "endpoint": "",
+        "exporter": "http",
+        "endpoint": "metrics-collector.example.com:4318",
         "headers": null,
         "connection_timeout": 0,
         "resource_name": "",
@@ -76,13 +76,13 @@
         "export_interval": 30,
         "temporality": "cumulative",
         "shutdown_timeout": 15,
-        "cardinality_limit": 5000,
         "retry": {
             "enabled": true,
             "initial_interval": 3000,
             "max_interval": 15000,
             "max_elapsed_time": 30000
         },
+        "cardinality_limit": 5000,
         "runtime_metrics": null,
         "api_metrics": null
     }
