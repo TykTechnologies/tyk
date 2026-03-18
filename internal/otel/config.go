@@ -37,6 +37,10 @@ type (
 type MetricsConfig struct {
 	BaseMetricsConfig `json:",inline"`
 
+	// RuntimeMetrics enables Go runtime metrics collection (goroutines, memory, GC).
+	// Defaults to true when metrics are enabled.
+	RuntimeMetrics *bool `json:"runtime_metrics"`
+
 	// APIMetrics defines the metric instruments created at startup.
 	// Each instrument has its own dimension scope — only declared dimensions are recorded.
 	//

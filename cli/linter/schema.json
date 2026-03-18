@@ -237,6 +237,9 @@
             "shutdown_timeout": {
               "type": "integer"
             },
+            "cardinality_limit": {
+              "type": "integer"
+            },
             "retry": {
               "type": "object",
               "additionalProperties": false,
@@ -254,6 +257,9 @@
                   "type": "integer"
                 }
               }
+            },
+            "runtime_metrics": {
+              "type": ["boolean", "null"]
             },
             "api_metrics": {
               "type": ["array", "null"]

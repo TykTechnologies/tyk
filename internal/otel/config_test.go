@@ -307,6 +307,52 @@ func TestOpenTelemetry_SetDefaults(t *testing.T) {
 				assert.Equal(t, 10000, got.Metrics.Retry.MaxElapsedTime)
 			},
 		},
+		{
+			name: "cardinality_limit defaults to 2000",
+			input: OpenTelemetry{
+				BaseOpenTelemetry: BaseOpenTelemetry{
+					Enabled: true,
+				},
+			},
+			assert: func(t *testing.T, got *OpenTelemetry) {
+				t.Helper()
+				assert.Equal(t, 2000, got.Metrics.CardinalityLimit)
+			},
+		},
+		{
+			name: "cardinality_limit preserves explicit value",
+			input: OpenTelemetry{
+				BaseOpenTelemetry: BaseOpenTelemetry{
+					Enabled: true,
+				},
+				Metrics: MetricsConfig{
+					BaseMetricsConfig: BaseMetricsConfig{
+						CardinalityLimit: 500,
+					},
+				},
+			},
+			assert: func(t *testing.T, got *OpenTelemetry) {
+				t.Helper()
+				assert.Equal(t, 500, got.Metrics.CardinalityLimit)
+			},
+		},
+		{
+			name: "negative cardinality_limit preserved (disables limit)",
+			input: OpenTelemetry{
+				BaseOpenTelemetry: BaseOpenTelemetry{
+					Enabled: true,
+				},
+				Metrics: MetricsConfig{
+					BaseMetricsConfig: BaseMetricsConfig{
+						CardinalityLimit: -1,
+					},
+				},
+			},
+			assert: func(t *testing.T, got *OpenTelemetry) {
+				t.Helper()
+				assert.Equal(t, -1, got.Metrics.CardinalityLimit)
+			},
+		},
 	}
 
 	for _, tt := range tests {
