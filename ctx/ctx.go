@@ -67,6 +67,14 @@ const (
 	JSONRPCRoutingState
 	// MCPRouting indicates the request came via MCP JSON-RPC routing
 	MCPRouting
+	// MCPMethod stores the JSON-RPC method name for MCP metrics dimensions.
+	MCPMethod
+	// MCPPrimitiveType stores the MCP primitive type (tool/resource/prompt) for metrics dimensions.
+	MCPPrimitiveType
+	// MCPPrimitiveName stores the MCP primitive name for metrics dimensions.
+	MCPPrimitiveName
+	// JSONRPCErrorCode stores the JSON-RPC error code for metrics dimensions.
+	JSONRPCErrorCode
 )
 
 func ctxSetSession(r *http.Request, s *user.SessionState, scheduleUpdate bool, hashKey bool) {

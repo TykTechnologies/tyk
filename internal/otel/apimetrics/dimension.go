@@ -125,6 +125,21 @@ var metadataExtractors = map[string]func(rc *RequestContext) string{
 		}
 		return "http"
 	},
+	"mcp_method": func(rc *RequestContext) string {
+		return rc.MCPMethod
+	},
+	"mcp_primitive_type": func(rc *RequestContext) string {
+		return rc.MCPPrimitiveType
+	},
+	"mcp_primitive_name": func(rc *RequestContext) string {
+		return rc.MCPPrimitiveName
+	},
+	"mcp_error_code": func(rc *RequestContext) string {
+		if rc.MCPErrorCode == 0 {
+			return ""
+		}
+		return strconv.Itoa(rc.MCPErrorCode)
+	},
 }
 
 // sessionExtractors maps session keys to extraction functions.

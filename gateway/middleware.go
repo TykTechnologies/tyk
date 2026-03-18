@@ -552,6 +552,12 @@ func (t *BaseMiddleware) RecordMetrics(w http.ResponseWriter, r *http.Request, s
 	if errClass := ctx.GetErrorClassification(r); errClass != nil {
 		rc.ErrorClassification = string(errClass.Flag)
 	}
+	if t.Gw.MetricInstruments.NeedsMCP() {
+		rc.MCPMethod = ctxGetMCPMethod(r)
+		rc.MCPPrimitiveType = ctxGetMCPPrimitiveType(r)
+		rc.MCPPrimitiveName = ctxGetMCPPrimitiveName(r)
+		rc.MCPErrorCode = ctxGetJSONRPCErrorCode(r)
+	}
 	t.Gw.MetricInstruments.RecordRequest(r.Context())
 	t.Gw.MetricInstruments.RecordAPIMetrics(r.Context(), rc)
 }
