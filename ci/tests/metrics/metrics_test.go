@@ -1,8 +1,10 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
 	"os"
@@ -814,6 +816,144 @@ func TestResponseHeaderDimension_ErrorPath(t *testing.T) {
 	assertMetricExists(t, `tyk_requests_by_backend_version_total{tyk_api_id="8",backend_version="unknown"}`)
 }
 
+// ---------- MCP profile tests ----------
+
+func TestMCPProfile_MetricEmission(t *testing.T) {
+	if gwProfile() != "mcp" {
+		t.Skip("only runs under mcp profile")
+	}
+	waitForGateway(t)
+
+	// Send a tools/call JSON-RPC request through the MCP API.
+	// The MCP everything server at mcp-server:3001 should handle this.
+	sendJSONRPC(t, gatewayURL+"/mcp/", "tools/call", map[string]interface{}{
+		"name":      "echo",
+		"arguments": map[string]string{"message": "hello"},
+	})
+
+	// Assert MCP counter exists with expected dimensions.
+	assertMetricExists(t, `tyk_mcp_requests_total{mcp_method_name="tools/call",mcp_primitive_type="tool"}`)
+}
+
+func TestMCPProfile_PrimitiveName(t *testing.T) {
+	if gwProfile() != "mcp" {
+		t.Skip("only runs under mcp profile")
+	}
+	waitForGateway(t)
+
+	sendJSONRPC(t, gatewayURL+"/mcp/", "tools/call", map[string]interface{}{
+		"name":      "echo",
+		"arguments": map[string]string{"message": "test"},
+	})
+
+	// Assert primitive name dimension is populated.
+	assertMetricExists(t, `tyk_mcp_requests_total{mcp_primitive_name="echo",mcp_primitive_type="tool"}`)
+}
+
+func TestMCPProfile_NonMCPIsolation(t *testing.T) {
+	if gwProfile() != "mcp" {
+		t.Skip("only runs under mcp profile")
+	}
+	waitForGateway(t)
+
+	// Send regular REST traffic to the non-MCP API.
+	sendTraffic(t, "GET", gatewayURL+"/test/ip", 10)
+
+	// Send MCP traffic.
+	sendJSONRPC(t, gatewayURL+"/mcp/", "tools/call", map[string]interface{}{
+		"name":      "echo",
+		"arguments": map[string]string{"message": "test"},
+	})
+
+	// REST API metrics should have empty MCP labels.
+	// MCP counter should exist with MCP labels populated.
+	assertMetricExists(t, `tyk_mcp_requests_total{mcp_method_name="tools/call"}`)
+}
+
+func TestMCPProfile_HistogramDuration(t *testing.T) {
+	if gwProfile() != "mcp" {
+		t.Skip("only runs under mcp profile")
+	}
+	waitForGateway(t)
+
+	for i := 0; i < 5; i++ {
+		sendJSONRPC(t, gatewayURL+"/mcp/", "tools/call", map[string]interface{}{
+			"name":      "echo",
+			"arguments": map[string]string{"message": "test"},
+		})
+	}
+
+	// Assert histogram exists.
+	assertMetricExists(t, `tyk_mcp_primitive_duration_seconds_count{mcp_primitive_type="tool",mcp_primitive_name="echo"}`)
+}
+
+func TestMCPProfile_HTTPServerDurationWithMCPMethod(t *testing.T) {
+	if gwProfile() != "mcp" {
+		t.Skip("only runs under mcp profile")
+	}
+	waitForGateway(t)
+
+	sendJSONRPC(t, gatewayURL+"/mcp/", "tools/call", map[string]interface{}{
+		"name":      "echo",
+		"arguments": map[string]string{"message": "test"},
+	})
+
+	// http.server.request.duration should also have the mcp.method.name label.
+	assertMetricExists(t, `http_server_request_duration_seconds_count{mcp_method_name="tools/call"}`)
+}
+
+func TestMCPProfile_SessionIdFromHeader(t *testing.T) {
+	if gwProfile() != "mcp" {
+		t.Skip("only runs under mcp profile")
+	}
+	waitForGateway(t)
+
+	sendJSONRPCWithHeaders(t, gatewayURL+"/mcp/", "tools/call", map[string]interface{}{
+		"name":      "echo",
+		"arguments": map[string]string{"message": "test"},
+	}, map[string]string{
+		"Mcp-Session-Id": "test-session-123",
+	})
+
+	// http.server.request.duration should have mcp.session.id from header.
+	assertMetricExists(t, `http_server_request_duration_seconds_count{mcp_session_id="test-session-123"}`)
+}
+
+func TestMCPProfile_InitializeMethod(t *testing.T) {
+	if gwProfile() != "mcp" {
+		t.Skip("only runs under mcp profile")
+	}
+	waitForGateway(t)
+
+	// Initialize is a non-primitive method (no tool/resource/prompt).
+	sendJSONRPC(t, gatewayURL+"/mcp/", "initialize", map[string]interface{}{
+		"protocolVersion": "2025-06-18",
+		"capabilities":    map[string]interface{}{},
+		"clientInfo":      map[string]interface{}{"name": "test-client", "version": "1.0"},
+	})
+
+	// Should have mcp_method_name="initialize" but empty primitive type/name.
+	assertMetricExists(t, `tyk_mcp_requests_total{mcp_method_name="initialize"}`)
+}
+
+func TestMCPProfile_CounterHasAllExpectedLabels(t *testing.T) {
+	if gwProfile() != "mcp" {
+		t.Skip("only runs under mcp profile")
+	}
+	waitForGateway(t)
+
+	// Use proper MCP session so the upstream returns 200.
+	sendMCPToolCall(t, gatewayURL+"/mcp/", "echo", map[string]string{"message": "test"})
+
+	query := `tyk_mcp_requests_total{api_id="mcp-1",mcp_method_name="tools/call",mcp_primitive_name="echo",response_code="200"}`
+	assertLabelEquals(t, query, "mcp_method_name", "tools/call")
+	assertLabelEquals(t, query, "mcp_primitive_type", "tool")
+	assertLabelEquals(t, query, "mcp_primitive_name", "echo")
+	assertLabelEquals(t, query, "response_code", "200")
+	assertLabelEquals(t, query, "api_id", "mcp-1")
+	// mcp_error_code is omitted by Prometheus when empty (no error).
+}
+
 // ---------- helpers ----------
 
 func waitForGateway(t *testing.T) {
@@ -1096,4 +1236,107 @@ func assertLabelContains(t *testing.T, query, labelKey, expected string) {
 		actualVal = lastLabels[labelKey]
 	}
 	t.Fatalf("%s label %s=%q does not contain %q", query, labelKey, actualVal, expected)
+}
+
+// sendJSONRPC sends a JSON-RPC 2.0 request to the given URL.
+func sendJSONRPC(t *testing.T, url, method string, params interface{}) {
+	t.Helper()
+	sendJSONRPCWithHeaders(t, url, method, params, nil)
+}
+
+// sendJSONRPCWithHeaders sends a JSON-RPC 2.0 request with custom headers.
+func sendJSONRPCWithHeaders(t *testing.T, url, method string, params interface{}, headers map[string]string) {
+	t.Helper()
+	doJSONRPC(t, url, method, params, headers)
+}
+
+// doJSONRPC sends a JSON-RPC 2.0 request and returns the HTTP response.
+func doJSONRPC(t *testing.T, url, method string, params interface{}, headers map[string]string) *http.Response {
+	t.Helper()
+	body := map[string]interface{}{
+		"jsonrpc": "2.0",
+		"method":  method,
+		"params":  params,
+		"id":      1,
+	}
+	jsonBody, err := json.Marshal(body)
+	if err != nil {
+		t.Fatalf("failed to marshal JSON-RPC body: %v", err)
+	}
+
+	req, err := http.NewRequest("POST", url, bytes.NewReader(jsonBody))
+	if err != nil {
+		t.Fatalf("failed to create request: %v", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Accept", "application/json, text/event-stream")
+	for k, v := range headers {
+		req.Header.Set(k, v)
+	}
+
+	client := &http.Client{Timeout: 10 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		t.Fatalf("JSON-RPC request failed: %v", err)
+	}
+	io.Copy(io.Discard, resp.Body)
+	resp.Body.Close()
+	return resp
+}
+
+// initMCPSession performs the MCP initialize handshake and returns the session ID.
+// The Streamable HTTP transport requires: initialize → (get Mcp-Session-Id) → initialized notification.
+func initMCPSession(t *testing.T, mcpURL string) string {
+	t.Helper()
+
+	// Step 1: Send initialize request.
+	resp := doJSONRPC(t, mcpURL, "initialize", map[string]interface{}{
+		"protocolVersion": "2025-06-18",
+		"capabilities":    map[string]interface{}{},
+		"clientInfo":      map[string]interface{}{"name": "test-client", "version": "1.0"},
+	}, nil)
+
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("initialize returned HTTP %d (expected 200); check that operation-level allow is disabled", resp.StatusCode)
+	}
+
+	sessionID := resp.Header.Get("Mcp-Session-Id")
+	if sessionID == "" {
+		t.Logf("initialize response headers: %v", resp.Header)
+		t.Fatal("MCP server did not return Mcp-Session-Id header on initialize")
+	}
+
+	// Step 2: Send initialized notification (no id field = notification).
+	notifBody, _ := json.Marshal(map[string]interface{}{
+		"jsonrpc": "2.0",
+		"method":  "notifications/initialized",
+	})
+	req, err := http.NewRequest("POST", mcpURL, bytes.NewReader(notifBody))
+	if err != nil {
+		t.Fatalf("failed to create initialized notification request: %v", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Accept", "application/json, text/event-stream")
+	req.Header.Set("Mcp-Session-Id", sessionID)
+
+	client := &http.Client{Timeout: 10 * time.Second}
+	notifResp, err := client.Do(req)
+	if err != nil {
+		t.Fatalf("initialized notification failed: %v", err)
+	}
+	notifResp.Body.Close()
+
+	return sessionID
+}
+
+// sendMCPToolCall initializes an MCP session and sends a tools/call request.
+func sendMCPToolCall(t *testing.T, mcpURL, toolName string, args map[string]string) {
+	t.Helper()
+	sessionID := initMCPSession(t, mcpURL)
+	sendJSONRPCWithHeaders(t, mcpURL, "tools/call", map[string]interface{}{
+		"name":      toolName,
+		"arguments": args,
+	}, map[string]string{
+		"Mcp-Session-Id": sessionID,
+	})
 }
