@@ -468,21 +468,6 @@ func (t *BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 	return store.Apply(session)
 }
 
-// resolveAPIType returns the api_type string for the given API spec.
-// Precedence: mcp > graphql > oas > classic.
-func resolveAPIType(spec *APISpec) string {
-	switch {
-	case spec.IsMCP():
-		return "mcp"
-	case spec.GraphQL.Enabled:
-		return "graphql"
-	case spec.IsOAS:
-		return "oas"
-	default:
-		return "classic"
-	}
-}
-
 // RecordAccessLog is used for Success/Error handler logging.
 // It emits a log entry with populated access log fields.
 func (t *BaseMiddleware) RecordAccessLog(req *http.Request, resp *http.Response, latency analytics.Latency) {
@@ -513,7 +498,7 @@ func (t *BaseMiddleware) RecordAccessLog(req *http.Request, resp *http.Response,
 		accessLog.WithTraceID(req)
 	}
 
-	accessLog.WithAPIType(resolveAPIType(t.Spec))
+	accessLog.WithAPIType(t.Spec.APIType())
 
 	if t.Spec.IsMCP() {
 		accessLog.WithMCP(req)
