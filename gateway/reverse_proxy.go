@@ -841,7 +841,7 @@ func (rt *TykRoundTripper) RoundTrip(r *http.Request) (*http.Response, error) {
 		return handleInMemoryLoop(handler, r)
 	}
 
-	if rt.Gw.GetConfig().OpenTelemetry.Enabled {
+	if rt.Gw.GetConfig().OpenTelemetry.TracesEnabled() {
 		var baseRoundTripper http.RoundTripper = rt.transport
 		if rt.h2ctransport != nil {
 			baseRoundTripper = rt.h2ctransport

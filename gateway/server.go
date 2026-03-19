@@ -1808,11 +1808,10 @@ func (gw *Gateway) afterConfSetup() {
 		}
 	}
 
-	if conf.OpenTelemetry.Enabled {
-		if conf.OpenTelemetry.ResourceName == "" {
-			conf.OpenTelemetry.ResourceName = config.DefaultOTelResourceName
+	if conf.OpenTelemetry.TracesEnabled() || (conf.OpenTelemetry.Metrics.Enabled != nil && *conf.OpenTelemetry.Metrics.Enabled) {
+		if traceConfig := conf.OpenTelemetry.EffectiveTraceConfig(); traceConfig.ResourceName == "" {
+			traceConfig.ResourceName = config.DefaultOTelResourceName
 		}
-
 		conf.OpenTelemetry.SetDefaults()
 	}
 
