@@ -498,6 +498,12 @@ func (t *BaseMiddleware) RecordAccessLog(req *http.Request, resp *http.Response,
 		accessLog.WithTraceID(req)
 	}
 
+	accessLog.WithAPIType(t.Spec.APIType())
+
+	if t.Spec.IsMCP() {
+		accessLog.WithMCP(req)
+	}
+
 	logFields := accessLog.Fields(allowedFields)
 
 	t.Logger().WithFields(logFields).Info()
