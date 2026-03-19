@@ -336,9 +336,8 @@ func (s *SuccessHandler) RecordHit(r *http.Request, timing analytics.Latency, co
 			record.ApiSchema = base64.StdEncoding.EncodeToString([]byte(s.Spec.GraphQL.Schema))
 		}
 
-		recordMCPDetails(&record, r)
-		if record.MCPStats.IsMCP {
-			record.Tags = append(record.Tags, analytics.PredefinedTagMCPAnalytics)
+		if s.Spec.IsMCP() {
+			recordMCPDetails(&record, r)
 		}
 
 		expiresAfter := s.Spec.ExpireAnalyticsAfter

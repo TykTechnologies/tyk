@@ -545,28 +545,6 @@ func TestRecordMCPDetails(t *testing.T) {
 		assert.Equal(t, "/mcp", rec.RawPath, "raw path must not be cleared when OriginalPath is empty")
 	})
 
-	t.Run("IsMCP tag is added when MCPStats.IsMCP is true", func(t *testing.T) {
-		req, _ := http.NewRequest("POST", "/mcp", nil)
-		state := &httpctx.JSONRPCRoutingState{
-			Method:        "tools/call",
-			PrimitiveType: "tool",
-			PrimitiveName: "get_weather",
-			OriginalPath:  "/mcp",
-		}
-		httpctx.SetJSONRPCRoutingState(req, state)
-
-		var rec analytics.AnalyticsRecord
-		recordMCPDetails(&rec, req.WithContext(req.Context()))
-
-		assert.True(t, rec.MCPStats.IsMCP)
-
-		// Simulate what RecordHit / HandleError do after recordMCPDetails.
-		if rec.MCPStats.IsMCP {
-			rec.Tags = append(rec.Tags, analytics.PredefinedTagMCPAnalytics)
-		}
-
-		assert.Contains(t, rec.Tags, analytics.PredefinedTagMCPAnalytics)
-	})
 }
 
 func TestSuccessHandler_classifyUpstreamError(t *testing.T) {

@@ -201,7 +201,9 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 			ExpireAt:      t,
 		}
 		recordGraphDetails(&record, r, response, e.Spec)
-		recordMCPDetails(&record, r)
+		if e.Spec.IsMCP() {
+			recordMCPDetails(&record, r)
+		}
 
 		rawRequest := ""
 		rawResponse := ""
@@ -228,9 +230,6 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 		if e.Spec.GraphQL.Enabled && e.Spec.GraphQL.ExecutionMode != apidef.GraphQLExecutionModeSubgraph {
 			record.Tags = append(record.Tags, "tyk-graph-analytics")
 			record.ApiSchema = base64.StdEncoding.EncodeToString([]byte(e.Spec.GraphQL.Schema))
-		}
-		if record.MCPStats.IsMCP {
-			record.Tags = append(record.Tags, analytics.PredefinedTagMCPAnalytics)
 		}
 
 		expiresAfter := e.Spec.ExpireAnalyticsAfter
