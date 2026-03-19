@@ -312,6 +312,47 @@ paths:
       summary: Check the health of the Tyk Gateway.
       tags:
       - Health Checking
+  /ready:
+    get:
+      description: The `/ready` endpoint is used for readiness checks and can be renamed using the `readiness_check_endpoint_name` configuration option.
+      operationId: ready
+      responses:
+        "200":
+          content:
+            application/json:
+              example:
+                description: Tyk GW Ready
+                details:
+                  redis:
+                    componentType: datastore
+                    status: pass
+                    time: "2020-05-19T03:42:55+01:00"
+                status: pass
+                version: v5.5.0-dev
+              schema:
+                $ref: '#/components/schemas/HealthCheckResponse'
+          description: Success.
+        "405":
+          content:
+            application/json:
+              example:
+                message: Method Not Allowed
+                status: error
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Method Not Allowed
+        "503":
+          content:
+            application/json:
+              example:
+                message: Redis connection not available
+                status: error
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Service Unavailable
+      summary: Check if the Tyk Gateway is ready to serve requests.
+      tags:
+      - Health Checking
   /tyk/apis:
     get:
       description: List APIs from Tyk Gateway
