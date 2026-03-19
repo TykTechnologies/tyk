@@ -18,7 +18,6 @@ import (
 	"github.com/TykTechnologies/tyk/header"
 	tykerrors "github.com/TykTechnologies/tyk/internal/errors"
 	graphqlinternal "github.com/TykTechnologies/tyk/internal/graphql"
-	"github.com/TykTechnologies/tyk/internal/httpctx"
 	"github.com/TykTechnologies/tyk/internal/httputil"
 	"github.com/TykTechnologies/tyk/internal/otel"
 	"github.com/TykTechnologies/tyk/request"
@@ -169,24 +168,16 @@ func recordGraphDetails(rec *analytics.AnalyticsRecord, r *http.Request, resp *h
 }
 
 func recordMCPDetails(rec *analytics.AnalyticsRecord, r *http.Request) {
-	state := httpctx.GetJSONRPCRoutingState(r)
-	if state == nil {
+	method := ctxGetMCPMethod(r)
+	if method == "" {
 		return
 	}
 
 	rec.MCPStats = analytics.MCPStats{
 		IsMCP:         true,
-		JSONRPCMethod: state.Method,
-		PrimitiveType: state.PrimitiveType,
-		PrimitiveName: state.PrimitiveName,
-	}
-
-	// Normalise path to the original listen path so internal routing paths
-	// never appear in analytics. Guard against an empty OriginalPath to avoid
-	// blanking out the recorded path when the field has not been populated.
-	if state.OriginalPath != "" {
-		rec.Path = state.OriginalPath
-		rec.RawPath = state.OriginalPath
+		JSONRPCMethod: method,
+		PrimitiveType: ctxGetMCPPrimitiveType(r),
+		PrimitiveName: ctxGetMCPPrimitiveName(r),
 	}
 }
 

@@ -18,7 +18,6 @@ import (
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
 	ctxpkg "github.com/TykTechnologies/tyk/ctx"
-	httpctx "github.com/TykTechnologies/tyk/internal/httpctx"
 	"github.com/TykTechnologies/tyk/test"
 	"github.com/TykTechnologies/tyk/user"
 )
@@ -431,62 +430,27 @@ func TestSuccessHandler_addTraceIDTag(t *testing.T) {
 }
 
 func TestRecordMCPDetails(t *testing.T) {
-	t.Run("does nothing when no JSONRPCRoutingState in context", func(t *testing.T) {
+	t.Run("populates MCPStats from context values", func(t *testing.T) {
 		req, _ := http.NewRequest("POST", "/mcp", nil)
+		ctxSetMCPMethod(req, "tools/call")
+		ctxSetMCPPrimitiveType(req, "tool")
+		ctxSetMCPPrimitiveName(req, "my_tool")
+
 		var rec analytics.AnalyticsRecord
 		recordMCPDetails(&rec, req)
-		assert.False(t, rec.IsMCPRecord())
-		assert.Empty(t, rec.MCPStats.JSONRPCMethod)
-	})
-
-	t.Run("populates MCPStats identity fields from routing state", func(t *testing.T) {
-		req, _ := http.NewRequest("POST", "/mcp", nil)
-		state := &httpctx.JSONRPCRoutingState{
-			Method:        "tools/call",
-			PrimitiveType: "tool",
-			PrimitiveName: "my_tool",
-			OriginalPath:  "/mcp",
-		}
-		httpctx.SetJSONRPCRoutingState(req, state)
-
-		var rec analytics.AnalyticsRecord
-		recordMCPDetails(&rec, req.WithContext(req.Context()))
 
 		assert.True(t, rec.MCPStats.IsMCP)
 		assert.Equal(t, "tools/call", rec.MCPStats.JSONRPCMethod)
 		assert.Equal(t, "tool", rec.MCPStats.PrimitiveType)
 		assert.Equal(t, "my_tool", rec.MCPStats.PrimitiveName)
-		assert.Equal(t, "/mcp", rec.Path)
-		assert.Equal(t, "/mcp", rec.RawPath)
-	})
-
-	t.Run("sets path to original path from routing state", func(t *testing.T) {
-		req, _ := http.NewRequest("POST", "/mcp/tools/call", nil)
-		state := &httpctx.JSONRPCRoutingState{
-			Method:       "tools/call",
-			OriginalPath: "/mcp",
-		}
-		httpctx.SetJSONRPCRoutingState(req, state)
-
-		rec := analytics.AnalyticsRecord{Path: "/mcp/tools/call", RawPath: "/mcp/tools/call"}
-		recordMCPDetails(&rec, req.WithContext(req.Context()))
-
-		assert.Equal(t, "/mcp", rec.Path)
-		assert.Equal(t, "/mcp", rec.RawPath)
 	})
 
 	t.Run("list operation has empty PrimitiveType and PrimitiveName", func(t *testing.T) {
 		req, _ := http.NewRequest("POST", "/mcp", nil)
-		state := &httpctx.JSONRPCRoutingState{
-			Method:        "tools/list",
-			PrimitiveType: "",
-			PrimitiveName: "",
-			OriginalPath:  "/mcp",
-		}
-		httpctx.SetJSONRPCRoutingState(req, state)
+		ctxSetMCPMethod(req, "tools/list")
 
 		var rec analytics.AnalyticsRecord
-		recordMCPDetails(&rec, req.WithContext(req.Context()))
+		recordMCPDetails(&rec, req)
 
 		assert.True(t, rec.MCPStats.IsMCP)
 		assert.Equal(t, "tools/list", rec.MCPStats.JSONRPCMethod)
@@ -494,16 +458,12 @@ func TestRecordMCPDetails(t *testing.T) {
 		assert.Empty(t, rec.MCPStats.PrimitiveName)
 	})
 
-	t.Run("initialize handshake has empty PrimitiveType and PrimitiveName", func(t *testing.T) {
+	t.Run("initialize has empty PrimitiveType and PrimitiveName", func(t *testing.T) {
 		req, _ := http.NewRequest("POST", "/mcp", nil)
-		state := &httpctx.JSONRPCRoutingState{
-			Method:       "initialize",
-			OriginalPath: "/mcp",
-		}
-		httpctx.SetJSONRPCRoutingState(req, state)
+		ctxSetMCPMethod(req, "initialize")
 
 		var rec analytics.AnalyticsRecord
-		recordMCPDetails(&rec, req.WithContext(req.Context()))
+		recordMCPDetails(&rec, req)
 
 		assert.True(t, rec.MCPStats.IsMCP)
 		assert.Equal(t, "initialize", rec.MCPStats.JSONRPCMethod)
@@ -511,9 +471,8 @@ func TestRecordMCPDetails(t *testing.T) {
 		assert.Empty(t, rec.MCPStats.PrimitiveName)
 	})
 
-	t.Run("non-MCP request leaves record completely unaffected", func(t *testing.T) {
+	t.Run("no MCP context leaves record unaffected", func(t *testing.T) {
 		req, _ := http.NewRequest("GET", "/api/users", nil)
-		// No routing state in context — a plain REST request.
 
 		original := analytics.AnalyticsRecord{
 			APIID:        "rest-api",
@@ -523,28 +482,12 @@ func TestRecordMCPDetails(t *testing.T) {
 		rec := original
 		recordMCPDetails(&rec, req)
 
-		assert.False(t, rec.IsMCPRecord())
+		assert.False(t, rec.MCPStats.IsMCP)
 		assert.Equal(t, original.Path, rec.Path)
 		assert.Equal(t, original.APIID, rec.APIID)
 		assert.Equal(t, original.ResponseCode, rec.ResponseCode)
 		assert.Empty(t, rec.MCPStats.JSONRPCMethod)
 	})
-
-	t.Run("does not override path when OriginalPath is empty", func(t *testing.T) {
-		req, _ := http.NewRequest("POST", "/mcp", nil)
-		state := &httpctx.JSONRPCRoutingState{
-			Method:       "tools/call",
-			OriginalPath: "", // empty — must not blank out the recorded path
-		}
-		httpctx.SetJSONRPCRoutingState(req, state)
-
-		rec := analytics.AnalyticsRecord{Path: "/mcp", RawPath: "/mcp"}
-		recordMCPDetails(&rec, req.WithContext(req.Context()))
-
-		assert.Equal(t, "/mcp", rec.Path, "path must not be cleared when OriginalPath is empty")
-		assert.Equal(t, "/mcp", rec.RawPath, "raw path must not be cleared when OriginalPath is empty")
-	})
-
 }
 
 func TestSuccessHandler_classifyUpstreamError(t *testing.T) {
