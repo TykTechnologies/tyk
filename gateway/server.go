@@ -372,6 +372,27 @@ func (gw *Gateway) SetupNewRelic() (app *newrelic.Application) {
 	return
 }
 
+// InitOpenTelemetryInstruments initializes the OpenTelemetry tracer provider
+// and metric instruments from the current gateway configuration.
+func (gw *Gateway) InitOpenTelemetryInstruments() {
+	cfg := gw.GetConfig()
+	gw.TracerProvider = otel.InitOpenTelemetry(gw.ctx, mainLog.Logger, &cfg.OpenTelemetry,
+		gw.GetNodeID(),
+		VERSION,
+		cfg.SlaveOptions.UseRPC,
+		cfg.SlaveOptions.GroupID,
+		cfg.DBAppConfOptions.NodeIsSegmented,
+		cfg.DBAppConfOptions.Tags)
+
+	gw.MetricInstruments = otel.InitOpenTelemetryMetrics(gw.ctx, mainLog.Logger, &cfg.OpenTelemetry,
+		gw.GetNodeID(),
+		VERSION,
+		cfg.SlaveOptions.UseRPC,
+		cfg.SlaveOptions.GroupID,
+		cfg.DBAppConfOptions.NodeIsSegmented,
+		cfg.DBAppConfOptions.Tags)
+}
+
 func (gw *Gateway) UnmarshalJSON(data []byte) error {
 	return nil
 }
@@ -1184,6 +1205,8 @@ func (gw *Gateway) DoReload() {
 	gw.reloadMu.Lock()
 	defer gw.reloadMu.Unlock()
 
+	start := time.Now()
+
 	// Initialize/reset the JSVM
 	if gw.GetConfig().EnableJSVM {
 		gw.GlobalEventsJSVM.DeInit()
@@ -1214,6 +1237,9 @@ func (gw *Gateway) DoReload() {
 	}
 
 	gw.loadGlobalApps()
+
+	gw.MetricInstruments.RecordReload(gw.ctx, time.Since(start))
+	gw.MetricInstruments.RecordConfigState(gw.ctx, gw.apisByIDLen(), gw.policies.PolicyCount())
 
 	gw.performedSuccessfulReload = true
 	mainLog.Info("API reload complete")
@@ -1330,6 +1356,7 @@ func (gw *Gateway) reloadLoop(tick <-chan time.Time, complete ...func()) {
 			if len(complete) != 0 {
 				complete[0]()
 			}
+
 			mainLog.Infof("reload: cycle completed in %v", time.Since(start))
 		}
 	}
@@ -1781,11 +1808,10 @@ func (gw *Gateway) afterConfSetup() {
 		}
 	}
 
-	if conf.OpenTelemetry.Enabled {
-		if conf.OpenTelemetry.ResourceName == "" {
-			conf.OpenTelemetry.ResourceName = config.DefaultOTelResourceName
+	if conf.OpenTelemetry.TracesEnabled() || (conf.OpenTelemetry.Metrics.Enabled != nil && *conf.OpenTelemetry.Metrics.Enabled) {
+		if traceConfig := conf.OpenTelemetry.EffectiveTraceConfig(); traceConfig.ResourceName == "" {
+			traceConfig.ResourceName = config.DefaultOTelResourceName
 		}
-
 		conf.OpenTelemetry.SetDefaults()
 	}
 
@@ -2025,21 +2051,7 @@ func Start() {
 		defer trace.Close()
 	}
 
-	// Use gw.GetConfig() to ensure we get the config loaded from the --conf
-	// flag path (set in initSystem), not the stale local gwConfig which may
-	// have been loaded from the default tyk.conf before initSystem ran.
-	otelCfg := gw.GetConfig()
-	gw.TracerProvider = otel.InitOpenTelemetry(gw.ctx, mainLog.Logger, &otelCfg.OpenTelemetry,
-		gw.GetNodeID(),
-		VERSION,
-		otelCfg.SlaveOptions.UseRPC,
-		otelCfg.SlaveOptions.GroupID,
-		otelCfg.DBAppConfOptions.NodeIsSegmented,
-		otelCfg.DBAppConfOptions.Tags)
-
-	gw.MetricInstruments = otel.InitOpenTelemetryMetrics(gw.ctx, mainLog.Logger, &otelCfg.OpenTelemetry,
-		gw.GetNodeID(),
-		VERSION)
+	gw.InitOpenTelemetryInstruments()
 
 	gw.start()
 
