@@ -1631,6 +1631,7 @@ func (gw *Gateway) apiOASGetHandler(w http.ResponseWriter, r *http.Request) {
 		visitor := schema.NewVisitor()
 		visitor.AddSchemaManipulation(schema.RestoreUnicodeEscapesFromRE2Manipulation)
 		visitor.ProcessOAS(oasAPI)
+		obj = oasAPI
 
 		gw.setBaseAPIIDHeader(w, oasAPI)
 	}
