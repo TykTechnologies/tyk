@@ -486,6 +486,65 @@ func TestCustomProfile_Instruments(t *testing.T) {
 			},
 		},
 		{
+			name: "tracked endpoint counter with listen_path dimension",
+			traffic: func(t *testing.T) {
+				t.Helper()
+				sendTraffic(t, "GET", gatewayURL+"/tracked/ip", 5)
+			},
+			assert: func(t *testing.T) {
+				t.Helper()
+				// The TrackedAPI (api_id=9) has listen_path=/tracked/.
+				// The endpoint dimension should be /ip (from track_endpoints config).
+				assertMetricExists(t, `custom_tracked_requests_total{tyk_api_id="9",tyk_listen_path="/tracked/"}`)
+				assertMetricExists(t, `custom_tracked_requests_total{tyk_api_id="9",tyk_endpoint="/ip"}`)
+			},
+		},
+		{
+			name: "tracked endpoint counter has all expected labels",
+			traffic: func(t *testing.T) {
+				t.Helper()
+				sendTraffic(t, "GET", gatewayURL+"/tracked/ip", 5)
+			},
+			assert: func(t *testing.T) {
+				t.Helper()
+				// Query the tracked API (api_id=9) specifically because the
+				// non-tracked API has an empty tyk_endpoint which Prometheus drops.
+				assertMetricHasLabels(t, `custom_tracked_requests_total{tyk_api_id="9"}`, []string{
+					"http_request_method",
+					"tyk_api_id",
+					"tyk_listen_path",
+					"tyk_endpoint",
+				})
+			},
+		},
+		{
+			name: "tracked endpoint dimension distinguishes different endpoints",
+			traffic: func(t *testing.T) {
+				t.Helper()
+				sendTraffic(t, "GET", gatewayURL+"/tracked/ip", 5)
+				sendTraffic(t, "GET", gatewayURL+"/tracked/get", 5)
+			},
+			assert: func(t *testing.T) {
+				t.Helper()
+				// Both tracked paths should appear as separate series.
+				assertMetricExists(t, `custom_tracked_requests_total{tyk_api_id="9",tyk_endpoint="/ip"}`)
+				assertMetricExists(t, `custom_tracked_requests_total{tyk_api_id="9",tyk_endpoint="/get"}`)
+			},
+		},
+		{
+			name: "non-tracked endpoint has empty endpoint dimension",
+			traffic: func(t *testing.T) {
+				t.Helper()
+				// /test/ API (api_id=3) has no track_endpoints, so endpoint should be empty.
+				sendTraffic(t, "GET", gatewayURL+"/test/ip", 5)
+			},
+			assert: func(t *testing.T) {
+				t.Helper()
+				// For a non-tracked API, the endpoint dimension should be empty.
+				assertMetricExists(t, `custom_tracked_requests_total{tyk_api_id="3",tyk_endpoint=""}`)
+			},
+		},
+		{
 			name: "default RED instruments are NOT present in custom profile",
 			traffic: func(t *testing.T) {
 				t.Helper()

@@ -89,8 +89,11 @@ var metadataExtractors = map[string]func(rc *RequestContext) string{
 	"response_code": func(rc *RequestContext) string {
 		return strconv.Itoa(rc.StatusCode)
 	},
-	"route": func(rc *RequestContext) string {
+	"listen_path": func(rc *RequestContext) string {
 		return rc.ListenPath
+	},
+	"endpoint": func(rc *RequestContext) string {
+		return rc.Endpoint
 	},
 	"api_id": func(rc *RequestContext) string {
 		return rc.APIID
