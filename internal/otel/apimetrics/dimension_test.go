@@ -445,6 +445,36 @@ func TestCompileExtractor_MCPExtractorsEmptyWhenNotSet(t *testing.T) {
 	}
 }
 
+func TestCompileExtractor_ConfigData(t *testing.T) {
+	ext, err := CompileExtractor(DimensionDefinition{Source: "configdata", Key: "environment", Label: "configdata.environment"})
+	require.NoError(t, err)
+	assert.Equal(t, "configdata.environment", ext.Label)
+
+	t.Run("reads from config data map", func(t *testing.T) {
+		rc := makeRequestContext()
+		rc.ConfigData = map[string]interface{}{"environment": "production"}
+		assert.Equal(t, "production", ext.Extract(rc))
+	})
+
+	t.Run("returns empty when key missing", func(t *testing.T) {
+		rc := makeRequestContext()
+		rc.ConfigData = map[string]interface{}{"other": "value"}
+		assert.Equal(t, "", ext.Extract(rc))
+	})
+
+	t.Run("returns empty when config data nil", func(t *testing.T) {
+		rc := makeRequestContext()
+		rc.ConfigData = nil
+		assert.Equal(t, "", ext.Extract(rc))
+	})
+
+	t.Run("converts non-string values via Sprint", func(t *testing.T) {
+		rc := makeRequestContext()
+		rc.ConfigData = map[string]interface{}{"environment": 42}
+		assert.Equal(t, "42", ext.Extract(rc))
+	})
+}
+
 func BenchmarkCompileExtractor_Metadata(b *testing.B) {
 	dim := DimensionDefinition{Source: "metadata", Key: "method", Label: "http.method"}
 	b.ReportAllocs()

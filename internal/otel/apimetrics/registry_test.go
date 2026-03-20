@@ -31,9 +31,10 @@ func TestNewInstrumentRegistry_DefaultInstruments(t *testing.T) {
 
 	// Default instruments do not use session source.
 	assert.False(t, reg.NeedsSession(), "defaults do not use session source")
-	// Default instruments only use metadata and session, not context or response_header.
+	// Default instruments only use metadata and session, not context, response_header, or configdata.
 	assert.False(t, reg.NeedsContext(), "defaults do not use context source")
 	assert.False(t, reg.NeedsResponse(), "defaults do not use response_header source")
+	assert.False(t, reg.NeedsConfigData(), "defaults do not use configdata source")
 }
 
 func TestNewInstrumentRegistry_ValidationErrors(t *testing.T) {
@@ -278,6 +279,47 @@ func TestNewInstrumentRegistry_NeedsMCP(t *testing.T) {
 	})
 }
 
+func TestNewInstrumentRegistry_NeedsConfigData(t *testing.T) {
+	provider := noopProvider(t)
+
+	t.Run("true when configdata source used", func(t *testing.T) {
+		defs := []APIMetricDefinition{
+			{
+				Name: "test.counter",
+				Type: "counter",
+				Dimensions: []DimensionDefinition{
+					{Source: "configdata", Key: "environment", Label: "env"},
+				},
+			},
+		}
+		reg, err := NewInstrumentRegistry(provider, defs)
+		require.NoError(t, err)
+		assert.True(t, reg.NeedsConfigData())
+	})
+
+	t.Run("false when no configdata source", func(t *testing.T) {
+		defs := []APIMetricDefinition{
+			{
+				Name: "test.counter",
+				Type: "counter",
+				Dimensions: []DimensionDefinition{
+					{Source: "metadata", Key: "method"},
+				},
+			},
+		}
+		reg, err := NewInstrumentRegistry(provider, defs)
+		require.NoError(t, err)
+		assert.False(t, reg.NeedsConfigData())
+	})
+
+	t.Run("false for default metrics", func(t *testing.T) {
+		defs := DefaultAPIMetrics()
+		reg, err := NewInstrumentRegistry(provider, defs)
+		require.NoError(t, err)
+		assert.False(t, reg.NeedsConfigData(), "default metrics should not need configdata")
+	})
+}
+
 func TestNewInstrumentRegistry_MultipleSourceFlags(t *testing.T) {
 	provider := noopProvider(t)
 
@@ -289,6 +331,7 @@ func TestNewInstrumentRegistry_MultipleSourceFlags(t *testing.T) {
 				{Source: "session", Key: "api_key", Label: "key"},
 				{Source: "context", Key: "tier", Label: "tier"},
 				{Source: "response_header", Key: "X-Cache", Label: "cache"},
+				{Source: "configdata", Key: "environment", Label: "env"},
 			},
 		},
 	}
@@ -298,4 +341,5 @@ func TestNewInstrumentRegistry_MultipleSourceFlags(t *testing.T) {
 	assert.True(t, reg.NeedsSession())
 	assert.True(t, reg.NeedsContext())
 	assert.True(t, reg.NeedsResponse())
+	assert.True(t, reg.NeedsConfigData())
 }
