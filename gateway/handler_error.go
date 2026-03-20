@@ -16,7 +16,6 @@ import (
 
 	"github.com/TykTechnologies/tyk-pump/analytics"
 	"github.com/TykTechnologies/tyk/config"
-
 	"github.com/TykTechnologies/tyk/header"
 	"github.com/TykTechnologies/tyk/internal/httpctx"
 	jsonrpcerrors "github.com/TykTechnologies/tyk/internal/jsonrpc/errors"
@@ -104,17 +103,7 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 		}
 	}
 
-	if e.Spec.DoNotTrack || ctxGetDoNotTrack(r) {
-		return
-	}
-
-	// Track the key ID if it exists
-	token := ctxGetAuthToken(r)
-	var alias string
-
-	ip := request.RealIP(r)
-
-	// Calculate latency for error responses
+	// Calculate latency for error responses (needed for both API metrics and analytics).
 	var latency analytics.Latency
 	if requestStartTime := ctxGetRequestStartTime(r); !requestStartTime.IsZero() {
 		totalMs := int64(DurationToMillisecond(time.Since(requestStartTime)))
@@ -124,6 +113,16 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 			Gateway:  totalMs, // All time is gateway time for errors
 		}
 	}
+
+	if e.Spec.DoNotTrack || ctxGetDoNotTrack(r) {
+		return
+	}
+
+	// Track the key ID if it exists
+	token := ctxGetAuthToken(r)
+	var alias string
+
+	ip := request.RealIP(r)
 
 	if e.Spec.GlobalConfig.StoreAnalytics(ip) {
 
@@ -258,6 +257,7 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 	}
 
 	e.RecordAccessLog(r, response, latency)
+	e.Base().RecordMetrics(w, r, errCode, latency, nil)
 
 	// Report in health check
 	reportHealthValue(e.Spec, BlockedRequestLog, "-1")
@@ -366,6 +366,8 @@ func (e *ErrorHandler) writeJSONRPCErrorResponse(w http.ResponseWriter, r *http.
 	if state := httpctx.GetJSONRPCRoutingState(r); state != nil {
 		requestID = state.ID
 	}
+
+	ctxSetJSONRPCErrorCode(r, jsonrpcerrors.MapHTTPStatusToJSONRPCCode(httpCode))
 
 	responseBody := jsonrpcerrors.WriteJSONRPCError(w, requestID, httpCode, errMsg)
 

@@ -2,24 +2,30 @@ package gateway
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 	"testing"
 	"time"
 
-	"github.com/TykTechnologies/gorpc"
-	"github.com/TykTechnologies/tyk/internal/model"
-	"github.com/TykTechnologies/tyk/rpc"
-
-	"github.com/TykTechnologies/tyk/config"
-
 	"github.com/lonelycode/osin"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"go.uber.org/mock/gomock"
 
+	"github.com/TykTechnologies/gorpc"
+
+	certsmock "github.com/TykTechnologies/tyk/certs/mock"
+	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/header"
+	"github.com/TykTechnologies/tyk/internal/model"
+	"github.com/TykTechnologies/tyk/regexp"
+	"github.com/TykTechnologies/tyk/rpc"
 	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/test"
 	"github.com/TykTechnologies/tyk/user"
@@ -59,6 +65,88 @@ func getAccessToken(td tokenData) string {
 
 func getRefreshToken(td tokenData) string {
 	return td.RefreshToken
+}
+
+type dispatcherOption func() (string, any)
+
+func withFunc(name string, f any) dispatcherOption {
+	return func() (string, any) {
+		return name, f
+	}
+}
+
+// newDispatcher creates a minimal RPC dispatcher with required handlers for gateway startup.
+// It establishes a set of default handlers that can be overridden by providing
+// dispatcherOptions. This ensures the gateway can start cleanly for tests without
+// causing delays or failures from RPC retries if emergency mode is initially disabled.
+func newDispatcher(opts ...dispatcherOption) *gorpc.Dispatcher {
+	dispatcher := gorpc.NewDispatcher()
+
+	funcs := map[string]any{
+		"Login": func(_, _ string) bool {
+			return true
+		},
+		"Disconnect": func(_ string, _ *model.GroupLoginRequest) error {
+			return nil
+		},
+		"GetApiDefinitions": func(_ string, _ interface{}) (string, error) {
+			return "[]", nil
+		},
+		"GetPolicies": func(_ string, _ interface{}) (string, error) {
+			return "[]", nil
+		},
+	}
+
+	for _, opt := range opts {
+		if opt == nil {
+			continue
+		}
+
+		name, f := opt()
+
+		if name == "" {
+			panic("dispatcher function name cannot be empty")
+		}
+		if f == nil {
+			panic("dispatcher function cannot be nil")
+		}
+
+		funcs[name] = f
+	}
+
+	for name, f := range funcs {
+		dispatcher.AddFunc(name, f)
+	}
+
+	return dispatcher
+}
+
+var nonAlphanumericRegex = regexp.MustCompile(`[^a-zA-Z0-9 ]+`)
+
+// generateUniqueTestTag creates a sanitized, unique tag from a test name to be used
+// for isolating tests that interact with Redis.
+func generateUniqueTestTag(testName string) (string, error) {
+	const defaultName = "test"
+
+	cleanName := strings.ToLower(testName)
+	cleanName = nonAlphanumericRegex.ReplaceAllString(cleanName, "")
+	cleanName = strings.ReplaceAll(cleanName, " ", "-")
+
+	if cleanName == "" {
+		cleanName = defaultName
+	}
+
+	cleanName = strings.Trim(cleanName, "-")
+	if cleanName == "" {
+		cleanName = defaultName
+	}
+
+	suffix := make([]byte, 8)
+	if _, err := rand.Read(suffix); err != nil {
+		return "", fmt.Errorf("failed to generate unique test tag: %w", err)
+	}
+
+	return fmt.Sprintf("%s-%s", cleanName, hex.EncodeToString(suffix)), nil
 }
 
 func TestProcessKeySpaceChangesForOauth(t *testing.T) {
@@ -755,22 +843,20 @@ func TestProcessKeySpaceChanges_UserKeyReset(t *testing.T) {
 	oldKey := "old-api-key"
 	newKey := "new-api-key"
 
-	dispatcher := gorpc.NewDispatcher()
-	dispatcher.AddFunc("Login", func(_, _ string) bool {
-		return true
-	})
-	dispatcher.AddFunc("Disconnect", func(_ string, _ *model.GroupLoginRequest) error {
-		return nil
-	})
-	dispatcher.AddFunc("GetKeySpaceUpdate", func(_, _ string) ([]string, error) {
-		return []string{}, nil
-	})
-	dispatcher.AddFunc("GetGroupKeySpaceUpdate", func(_ string, _ string) ([]string, error) {
-		return []string{}, nil
-	})
+	dispatcher := newDispatcher(
+		withFunc("GetKeySpaceUpdate", func(_, _ string) ([]string, error) {
+			return []string{}, nil
+		}),
+		withFunc("GetGroupKeySpaceUpdate", func(_, _ string) ([]string, error) {
+			return []string{}, nil
+		}),
+	)
 
 	rpcMock, connectionString := startRPCMock(dispatcher)
 	defer stopRPCMock(rpcMock)
+
+	uniqueTag, err := generateUniqueTestTag(t.Name())
+	require.NoError(t, err)
 
 	g := StartTest(func(globalConf *config.Config) {
 		globalConf.SlaveOptions.UseRPC = true
@@ -780,6 +866,7 @@ func TestProcessKeySpaceChanges_UserKeyReset(t *testing.T) {
 		globalConf.SlaveOptions.CallTimeout = 1
 		globalConf.SlaveOptions.RPCPoolSize = 2
 		globalConf.SlaveOptions.DisableKeySpaceSync = true
+		globalConf.DBAppConfOptions.Tags = []string{uniqueTag}
 	})
 	defer g.Close()
 
@@ -844,20 +931,18 @@ func TestGetApiDefinitions_Fails_With_Timeout(t *testing.T) {
 		close(wait)
 	}()
 
-	dispatcher := gorpc.NewDispatcher()
-	dispatcher.AddFunc("Login", func(_, _ string) bool {
-		return true
-	})
-	dispatcher.AddFunc("Disconnect", func(_ string, _ *model.GroupLoginRequest) error {
-		return nil
-	})
-	dispatcher.AddFunc("GetApiDefinitions", func(_ string, _ interface{}) (string, error) {
-		<-wait // wait until the defer method is called
-		return "sample-response", nil
-	})
+	dispatcher := newDispatcher(
+		withFunc("GetApiDefinitions", func(_ string, _ any) (string, error) {
+			<-wait // wait until the defer method is called
+			return "[]", nil
+		}),
+	)
 
 	rpcMock, connectionString := startRPCMock(dispatcher)
 	defer stopRPCMock(rpcMock)
+
+	uniqueTag, err := generateUniqueTestTag(t.Name())
+	require.NoError(t, err)
 
 	g := StartTest(func(globalConf *config.Config) {
 		globalConf.SlaveOptions.UseRPC = true
@@ -867,6 +952,7 @@ func TestGetApiDefinitions_Fails_With_Timeout(t *testing.T) {
 		globalConf.SlaveOptions.CallTimeout = 1
 		globalConf.SlaveOptions.RPCPoolSize = 2
 		globalConf.SlaveOptions.DisableKeySpaceSync = true
+		globalConf.DBAppConfOptions.Tags = []string{uniqueTag}
 	})
 	g.Gw.afterConfSetup() // sets SlaveOptions.CallTimeout to GlobalRPCCallTimeout
 
@@ -888,26 +974,24 @@ func TestGetApiDefinitions_Fails_With_Timeout(t *testing.T) {
 	// GetApiDefinitions calls rpc.FuncClientSingleton with a backoff algorithm.
 	// The algorithm tries to call the RPC method 3 times with a 10-millisecond interval.
 	// So the "GetApiDefinitions" method will be called 4 times, including the first try.
-	// It should return an empty string instead of "sample-response".
+	// It should return an empty string instead of "[]".
 	assert.Equal(t, "", rpcListener.GetApiDefinitions("test_org", nil))
 }
 
 func TestGetApiDefinitions(t *testing.T) {
-	var GetApiDefinitionsResponse = "sample-response"
+	var GetApiDefinitionsResponse = "[]"
 
-	dispatcher := gorpc.NewDispatcher()
-	dispatcher.AddFunc("Login", func(_, _ string) bool {
-		return true
-	})
-	dispatcher.AddFunc("Disconnect", func(_ string, _ *model.GroupLoginRequest) error {
-		return nil
-	})
-	dispatcher.AddFunc("GetApiDefinitions", func(_ string, _ interface{}) (string, error) {
-		return GetApiDefinitionsResponse, nil
-	})
+	dispatcher := newDispatcher(
+		withFunc("GetApiDefinitions", func(_ string, _ any) (string, error) {
+			return GetApiDefinitionsResponse, nil
+		}),
+	)
 
 	rpcMock, connectionString := startRPCMock(dispatcher)
 	defer stopRPCMock(rpcMock)
+
+	uniqueTag, err := generateUniqueTestTag(t.Name())
+	require.NoError(t, err)
 
 	g := StartTest(func(globalConf *config.Config) {
 		globalConf.SlaveOptions.UseRPC = true
@@ -917,6 +1001,7 @@ func TestGetApiDefinitions(t *testing.T) {
 		globalConf.SlaveOptions.CallTimeout = 1
 		globalConf.SlaveOptions.RPCPoolSize = 2
 		globalConf.SlaveOptions.DisableKeySpaceSync = true
+		globalConf.DBAppConfOptions.Tags = []string{uniqueTag}
 	})
 	g.Gw.afterConfSetup() // sets SlaveOptions.CallTimeout to GlobalRPCCallTimeout
 
@@ -939,21 +1024,19 @@ func TestGetApiDefinitions(t *testing.T) {
 }
 
 func TestGetPolicies(t *testing.T) {
-	var GetPoliciesResponse = "sample-response"
+	var GetPoliciesResponse = "[]"
 
-	dispatcher := gorpc.NewDispatcher()
-	dispatcher.AddFunc("Login", func(_, _ string) bool {
-		return true
-	})
-	dispatcher.AddFunc("Disconnect", func(_ string, _ *model.GroupLoginRequest) error {
-		return nil
-	})
-	dispatcher.AddFunc("GetPolicies", func(_ string, _ interface{}) (string, error) {
-		return GetPoliciesResponse, nil
-	})
+	dispatcher := newDispatcher(
+		withFunc("GetPolicies", func(_ string, _ any) (string, error) {
+			return GetPoliciesResponse, nil
+		}),
+	)
 
 	rpcMock, connectionString := startRPCMock(dispatcher)
 	defer stopRPCMock(rpcMock)
+
+	uniqueTag, err := generateUniqueTestTag(t.Name())
+	require.NoError(t, err)
 
 	g := StartTest(func(globalConf *config.Config) {
 		globalConf.SlaveOptions.UseRPC = true
@@ -963,6 +1046,7 @@ func TestGetPolicies(t *testing.T) {
 		globalConf.SlaveOptions.CallTimeout = 1
 		globalConf.SlaveOptions.RPCPoolSize = 2
 		globalConf.SlaveOptions.DisableKeySpaceSync = true
+		globalConf.DBAppConfOptions.Tags = []string{uniqueTag}
 	})
 	g.Gw.afterConfSetup() // sets SlaveOptions.CallTimeout to GlobalRPCCallTimeout
 
@@ -990,20 +1074,18 @@ func TestGetPolicies_Fails_With_Timeout(t *testing.T) {
 		close(wait)
 	}()
 
-	dispatcher := gorpc.NewDispatcher()
-	dispatcher.AddFunc("Login", func(_, _ string) bool {
-		return true
-	})
-	dispatcher.AddFunc("Disconnect", func(_ string, _ *model.GroupLoginRequest) error {
-		return nil
-	})
-	dispatcher.AddFunc("GetPolicies", func(_ string, _ interface{}) (string, error) {
-		<-wait // wait until the defer method is called
-		return "sample-response", nil
-	})
+	dispatcher := newDispatcher(
+		withFunc("GetPolicies", func(_ string, _ any) (string, error) {
+			<-wait // wait until the defer method is called
+			return "[]", nil
+		}),
+	)
 
 	rpcMock, connectionString := startRPCMock(dispatcher)
 	defer stopRPCMock(rpcMock)
+
+	uniqueTag, err := generateUniqueTestTag(t.Name())
+	require.NoError(t, err)
 
 	g := StartTest(func(globalConf *config.Config) {
 		globalConf.SlaveOptions.UseRPC = true
@@ -1013,6 +1095,7 @@ func TestGetPolicies_Fails_With_Timeout(t *testing.T) {
 		globalConf.SlaveOptions.CallTimeout = 1
 		globalConf.SlaveOptions.RPCPoolSize = 2
 		globalConf.SlaveOptions.DisableKeySpaceSync = true
+		globalConf.DBAppConfOptions.Tags = []string{uniqueTag}
 	})
 	g.Gw.afterConfSetup() // sets SlaveOptions.CallTimeout to GlobalRPCCallTimeout
 
@@ -1034,7 +1117,7 @@ func TestGetPolicies_Fails_With_Timeout(t *testing.T) {
 	// GetPolicies calls rpc.FuncClientSingleton with a backoff algorithm.
 	// The algorithm tries to call the RPC method 3 times with a 10-millisecond interval.
 	// So the "GetPolicies" method will be called 4 times, including the first try.
-	// It should return an empty string instead of "sample-response".
+	// It should return an empty string instead of "[]".
 	assert.Equal(t, "", rpcListener.GetPolicies("test_org"))
 }
 
@@ -1097,5 +1180,221 @@ func TestSelectiveCertificateSync_Config(t *testing.T) {
 		conf2.SlaveOptions.UseRPC = true
 		gw2 := NewGateway(conf2, ctx)
 		assert.NotNil(t, gw2.certUsageTracker, "certUsageTracker should be initialized in RPC mode")
+	})
+}
+
+// TestProcessKeySpaceChanges_CertHandling covers the certificate add/skip/queue logic
+// introduced by the SyncUsedCertsOnly feature.
+func TestProcessKeySpaceChanges_CertHandling(t *testing.T) {
+	// helper: build a CertificateAdded keyspace event string
+	certAddedEvent := func(certID string) string {
+		return certID + ":" + CertificateAdded
+	}
+
+	newRPCListener := func(ts *Test) RPCStorageHandler {
+		return RPCStorageHandler{
+			KeyPrefix:        "rpc.listener.",
+			SuppressRegister: true,
+			HashKeys:         false,
+			Gw:               ts.Gw,
+		}
+	}
+
+	t.Run("cert not required by tracker - queued to pendingCerts, not fetched", func(t *testing.T) {
+		ts := StartTest(nil)
+		defer ts.Close()
+
+		ctrl := gomock.NewController(t)
+
+		cfg := ts.Gw.GetConfig()
+		cfg.SlaveOptions.UseRPC = true
+		cfg.SlaveOptions.SyncUsedCertsOnly = true
+		ts.Gw.SetConfig(cfg)
+
+		ts.Gw.certUsageTracker = newUsageTracker()
+		// tracker is empty - certID is not required
+
+		mockCM := certsmock.NewMockCertificateManager(ctrl)
+		mockCM.EXPECT().GetRaw(gomock.Any()).Times(0)
+		ts.Gw.CertificateManager = mockCM
+
+		listener := newRPCListener(ts)
+		listener.ProcessKeySpaceChanges([]string{certAddedEvent("cert-unrequired")}, DefaultOrg)
+
+		_, queued := ts.Gw.pendingCerts.Load("cert-unrequired")
+		assert.True(t, queued, "cert should be queued to pendingCerts when not required by tracker")
+	})
+
+	t.Run("cert required by tracker - fetched immediately, not queued", func(t *testing.T) {
+		ts := StartTest(nil)
+		defer ts.Close()
+
+		ctrl := gomock.NewController(t)
+
+		cfg := ts.Gw.GetConfig()
+		cfg.SlaveOptions.UseRPC = true
+		cfg.SlaveOptions.SyncUsedCertsOnly = true
+		ts.Gw.SetConfig(cfg)
+
+		ts.Gw.certUsageTracker = newUsageTracker()
+		ts.Gw.certUsageTracker.ReplaceAll(map[string]map[string]struct{}{
+			"cert-required": {"api1": {}},
+		})
+
+		mockCM := certsmock.NewMockCertificateManager(ctrl)
+		mockCM.EXPECT().GetRaw("cert-required").Return("cert-data", nil).Times(1)
+		ts.Gw.CertificateManager = mockCM
+
+		listener := newRPCListener(ts)
+		listener.ProcessKeySpaceChanges([]string{certAddedEvent("cert-required")}, DefaultOrg)
+
+		_, queued := ts.Gw.pendingCerts.Load("cert-required")
+		assert.False(t, queued, "required cert should not be queued to pendingCerts")
+	})
+
+	t.Run("SyncUsedCertsOnly disabled - cert fetched directly without tracker check", func(t *testing.T) {
+		ts := StartTest(nil)
+		defer ts.Close()
+
+		ctrl := gomock.NewController(t)
+
+		cfg := ts.Gw.GetConfig()
+		cfg.SlaveOptions.UseRPC = true
+		cfg.SlaveOptions.SyncUsedCertsOnly = false
+		ts.Gw.SetConfig(cfg)
+
+		mockCM := certsmock.NewMockCertificateManager(ctrl)
+		mockCM.EXPECT().GetRaw("cert1").Return("cert-data", nil).Times(1)
+		ts.Gw.CertificateManager = mockCM
+
+		listener := newRPCListener(ts)
+		listener.ProcessKeySpaceChanges([]string{certAddedEvent("cert1")}, DefaultOrg)
+
+		_, queued := ts.Gw.pendingCerts.Load("cert1")
+		assert.False(t, queued, "cert should not be queued when SyncUsedCertsOnly is disabled")
+	})
+
+	t.Run("nil tracker with SyncUsedCertsOnly - cert fetched directly", func(t *testing.T) {
+		ts := StartTest(nil)
+		defer ts.Close()
+
+		ctrl := gomock.NewController(t)
+
+		cfg := ts.Gw.GetConfig()
+		cfg.SlaveOptions.UseRPC = true
+		cfg.SlaveOptions.SyncUsedCertsOnly = true
+		ts.Gw.SetConfig(cfg)
+
+		ts.Gw.certUsageTracker = nil
+
+		mockCM := certsmock.NewMockCertificateManager(ctrl)
+		mockCM.EXPECT().GetRaw("cert1").Return("cert-data", nil).Times(1)
+		ts.Gw.CertificateManager = mockCM
+
+		listener := newRPCListener(ts)
+		listener.ProcessKeySpaceChanges([]string{certAddedEvent("cert1")}, DefaultOrg)
+
+		_, queued := ts.Gw.pendingCerts.Load("cert1")
+		assert.False(t, queued, "cert should not be queued when tracker is nil")
+	})
+}
+
+// TestLoadApps_PendingCertsDrain_Extended covers additional drain-loop edge cases.
+func TestLoadApps_PendingCertsDrain_Extended(t *testing.T) {
+	t.Run("empty content treated as fetch failure - cert discarded", func(t *testing.T) {
+		ts := StartTest(nil)
+		defer ts.Close()
+
+		ctrl := gomock.NewController(t)
+
+		cfg := ts.Gw.GetConfig()
+		cfg.SlaveOptions.UseRPC = true
+		cfg.SlaveOptions.SyncUsedCertsOnly = true
+		ts.Gw.SetConfig(cfg)
+
+		ts.Gw.certUsageTracker = newUsageTracker()
+
+		mockCM := certsmock.NewMockCertificateManager(ctrl)
+		// GetRaw returns empty content with no error - should still be treated as failure
+		mockCM.EXPECT().GetRaw("cert1").Return("", nil).Times(1)
+		ts.Gw.CertificateManager = mockCM
+
+		ts.Gw.pendingCerts.Store("cert1", struct{}{})
+
+		spec := BuildAPI(func(spec *APISpec) {
+			spec.APIID = "api1"
+			spec.Proxy.ListenPath = "/api1/"
+			spec.UpstreamCertificates = map[string]string{"*": "cert1"}
+		})[0]
+		ts.Gw.loadApps([]*APISpec{spec})
+
+		_, stillPending := ts.Gw.pendingCerts.Load("cert1")
+		assert.False(t, stillPending, "cert1 should be discarded from pendingCerts even when content is empty with no error")
+	})
+
+	t.Run("multiple pending certs - all drained on reload", func(t *testing.T) {
+		ts := StartTest(nil)
+		defer ts.Close()
+
+		ctrl := gomock.NewController(t)
+
+		cfg := ts.Gw.GetConfig()
+		cfg.SlaveOptions.UseRPC = true
+		cfg.SlaveOptions.SyncUsedCertsOnly = true
+		ts.Gw.SetConfig(cfg)
+
+		ts.Gw.certUsageTracker = newUsageTracker()
+
+		mockCM := certsmock.NewMockCertificateManager(ctrl)
+		mockCM.EXPECT().GetRaw("cert1").Return("data1", nil).Times(1)
+		mockCM.EXPECT().GetRaw("cert2").Return("data2", nil).Times(1)
+		mockCM.EXPECT().GetRaw("cert3").Return("", errors.New("timeout")).Times(1)
+		ts.Gw.CertificateManager = mockCM
+
+		ts.Gw.pendingCerts.Store("cert1", struct{}{})
+		ts.Gw.pendingCerts.Store("cert2", struct{}{})
+		ts.Gw.pendingCerts.Store("cert3", struct{}{})
+		// cert4 not required - should be silently discarded without fetch
+		ts.Gw.pendingCerts.Store("cert4", struct{}{})
+
+		specs := BuildAPI(
+			func(spec *APISpec) {
+				spec.APIID = "api1"
+				spec.Proxy.ListenPath = "/api1/"
+				spec.UpstreamCertificates = map[string]string{"host1": "cert1", "host2": "cert2", "host3": "cert3"}
+			},
+		)
+		ts.Gw.loadApps(specs)
+
+		for _, id := range []string{"cert1", "cert2", "cert3", "cert4"} {
+			_, stillPending := ts.Gw.pendingCerts.Load(id)
+			assert.False(t, stillPending, "%s should be removed from pendingCerts after drain", id)
+		}
+	})
+
+	t.Run("pending certs map empty before reload - no fetch calls", func(t *testing.T) {
+		ts := StartTest(nil)
+		defer ts.Close()
+
+		ctrl := gomock.NewController(t)
+
+		cfg := ts.Gw.GetConfig()
+		cfg.SlaveOptions.UseRPC = true
+		cfg.SlaveOptions.SyncUsedCertsOnly = true
+		ts.Gw.SetConfig(cfg)
+
+		ts.Gw.certUsageTracker = newUsageTracker()
+
+		mockCM := certsmock.NewMockCertificateManager(ctrl)
+		mockCM.EXPECT().GetRaw(gomock.Any()).Times(0)
+		ts.Gw.CertificateManager = mockCM
+
+		spec := BuildAPI(func(spec *APISpec) {
+			spec.APIID = "api1"
+			spec.Proxy.ListenPath = "/api1/"
+			spec.UpstreamCertificates = map[string]string{"*": "cert1"}
+		})[0]
+		ts.Gw.loadApps([]*APISpec{spec})
+		// no assertion needed beyond mock expectation: GetRaw must not be called
 	})
 }

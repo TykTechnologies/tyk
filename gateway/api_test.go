@@ -34,6 +34,7 @@ import (
 	"github.com/TykTechnologies/tyk/config"
 	internalmodel "github.com/TykTechnologies/tyk/internal/model"
 	"github.com/TykTechnologies/tyk/internal/uuid"
+	"github.com/TykTechnologies/tyk/pkg/identifier"
 	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/test"
 	"github.com/TykTechnologies/tyk/user"
@@ -85,6 +86,7 @@ func TestPolicyAPI(t *testing.T) {
 	ts := StartTest(func(cnf *config.Config) {
 		cnf.Policies.PolicyPath = "."
 		cnf.Policies.PolicySource = "file"
+		cnf.AllowUnsafePolicyIds = true
 	})
 
 	defer ts.Close()
@@ -174,6 +176,95 @@ func TestPolicyAPI(t *testing.T) {
 			Data:      serializePolicy(t, user.Policy{ID: "test"}),
 			Code:      http.StatusOK,
 		})
+	})
+
+	t.Run("GET does not fail if existent policy has broken ID", func(t *testing.T) {
+		invalidURLID := "invalid@id"
+
+		ts.CreatePolicy(func(p *user.Policy) {
+			p.ID = "invalid@id"
+		})
+
+		_, err := ts.Run(t, test.TestCase{
+			Path:      "/tyk/policies/" + invalidURLID,
+			Method:    http.MethodGet,
+			AdminAuth: true,
+			Code:      http.StatusOK,
+		})
+
+		assert.NoError(t, err)
+	})
+
+	t.Run("fails create/update if ID contains invalid characters", func(t *testing.T) {
+		ts.setTestScopeConfig(t, func(cnf *config.Config) {
+			cnf.AllowUnsafePolicyIds = false
+		})
+
+		invalidBodyPol := user.Policy{
+			ID:           "invalid/id",
+			Rate:         100,
+			Per:          1,
+			OrgID:        "54de205930c55e15bd000001",
+			AccessRights: make(map[string]user.AccessDefinition),
+		}
+
+		_, err := ts.Run(t, test.TestCase{
+			Path:      "/tyk/policies",
+			Method:    http.MethodPost,
+			AdminAuth: true,
+			Data:      serializePolicy(t, invalidBodyPol),
+			Code:      http.StatusBadRequest,
+			BodyMatch: identifier.ErrInvalidCustomPolicyId.Error(),
+		})
+		assert.NoError(t, err)
+
+		validID := "valid-id"
+
+		_, err = ts.Run(t, test.TestCase{
+			Path:      "/tyk/policies/" + validID,
+			Method:    http.MethodPut,
+			AdminAuth: true,
+			Data:      serializePolicy(t, invalidBodyPol), // sending "invalid/id" in body
+			Code:      http.StatusBadRequest,
+			BodyMatch: identifier.ErrInvalidCustomPolicyId.Error(),
+		})
+		assert.NoError(t, err)
+	})
+
+	t.Run("does not fail on create/update if ID contains invalid characters and when AllowUnsafePolicyIds=true", func(t *testing.T) {
+		ts.setTestScopeConfig(t, func(cnf *config.Config) {
+			cnf.AllowUnsafePolicyIds = true
+		})
+
+		t.Cleanup(func() {
+			_ = ts.Gw.removePersistentPolicyById("invalid@id") //nolint:errcheck
+		})
+
+		invalidBodyPol := user.Policy{
+			ID:           "invalid@id",
+			Rate:         100,
+			Per:          1,
+			OrgID:        "54de205930c55e15bd000001",
+			AccessRights: make(map[string]user.AccessDefinition),
+		}
+
+		_, err := ts.Run(t, test.TestCase{
+			Path:      "/tyk/policies",
+			Method:    http.MethodPost,
+			AdminAuth: true,
+			Data:      serializePolicy(t, invalidBodyPol),
+			Code:      http.StatusOK,
+		})
+		assert.NoError(t, err)
+
+		_, err = ts.Run(t, test.TestCase{
+			Path:      "/tyk/policies/invalid@id",
+			Method:    http.MethodPut,
+			AdminAuth: true,
+			Data:      serializePolicy(t, invalidBodyPol),
+			Code:      http.StatusOK,
+		})
+		assert.NoError(t, err)
 	})
 }
 
@@ -4045,6 +4136,121 @@ func TestApplyLifetime(t *testing.T) {
 	}
 }
 
+func TestApplyLifetime_PostExpiry(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	ts.Gw.BuildAndLoadAPI(
+		func(spec *APISpec) {
+			spec.APIID = "api1"
+			spec.SessionLifetime = 60
+		},
+	)
+
+	now := time.Now().Unix()
+
+	testCases := []struct {
+		name   string
+		sess   user.SessionState
+		wantFn func(t *testing.T, got int64)
+	}{
+		{
+			name: "delete returns TTL from Expires",
+			sess: user.SessionState{
+				PostExpiryAction: user.PostExpiryActionDelete,
+				Expires:          now + 300,
+				AccessRights: map[string]user.AccessDefinition{
+					"api1": {APIID: "api1", Versions: []string{"v1"}},
+				},
+			},
+			wantFn: func(t *testing.T, got int64) {
+				assert.InDelta(t, 300, got, 10)
+			},
+		},
+		{
+			name: "retain grace=-1 returns -1",
+			sess: user.SessionState{
+				PostExpiryAction:      user.PostExpiryActionRetain,
+				PostExpiryGracePeriod: -1,
+				Expires:               now + 300,
+				AccessRights: map[string]user.AccessDefinition{
+					"api1": {APIID: "api1", Versions: []string{"v1"}},
+				},
+			},
+			wantFn: func(t *testing.T, got int64) {
+				assert.Equal(t, int64(-1), got)
+			},
+		},
+		{
+			name: "retain grace=600",
+			sess: user.SessionState{
+				PostExpiryAction:      user.PostExpiryActionRetain,
+				PostExpiryGracePeriod: 600,
+				Expires:               now + 300,
+				AccessRights: map[string]user.AccessDefinition{
+					"api1": {APIID: "api1", Versions: []string{"v1"}},
+				},
+			},
+			wantFn: func(t *testing.T, got int64) {
+				assert.InDelta(t, 900, got, 10)
+			},
+		},
+		{
+			name: "unset fields use legacy",
+			sess: user.SessionState{
+				AccessRights: map[string]user.AccessDefinition{
+					"api1": {APIID: "api1", Versions: []string{"v1"}},
+				},
+			},
+			wantFn: func(t *testing.T, got int64) {
+				assert.Equal(t, int64(60), got)
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			sess := tc.sess
+			got := ts.Gw.ApplyLifetime(&sess)
+			tc.wantFn(t, got)
+		})
+	}
+}
+
+func TestApplyLifetime_PostExpiry_FromPolicy(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		spec.APIID = "api1"
+		spec.UseKeylessAccess = false
+		spec.OrgID = "default"
+	})
+
+	pID := ts.CreatePolicy(func(p *user.Policy) {
+		p.PostExpiryAction = user.PostExpiryActionDelete
+		p.PostExpiryGracePeriod = 600
+		p.AccessRights = map[string]user.AccessDefinition{
+			"api1": {APIID: "api1", Versions: []string{"v1"}},
+		}
+	})
+
+	session, _ := ts.CreateSession(func(s *user.SessionState) {
+		s.ApplyPolicies = []string{pID}
+	})
+
+	assert.Equal(t, user.PostExpiryActionDelete, session.PostExpiryAction)
+	assert.Equal(t, int64(600), session.PostExpiryGracePeriod)
+
+	// Set Expires and verify ApplyLifetime returns correct TTL
+	now := time.Now().Unix()
+	session.Expires = now + 300
+
+	got := ts.Gw.ApplyLifetime(session)
+	// TTL = Expires - now, should be around 300
+	assert.InDelta(t, 300, got, 10)
+}
+
 func TestOrgKeyHandler_LastUpdated(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
@@ -5974,4 +6180,14 @@ func TestAPIListFilter_IncludeTypes(t *testing.T) {
 		assert.True(t, apiIDs["classic456"], "Should have classic API 2")
 		assert.True(t, apiIDs["mcp789"], "Should have MCP API")
 	})
+}
+
+func (gw *Gateway) removePersistentPolicyById(id string) error {
+	root, err := gw.newPolicyPathRoot()
+
+	if err != nil {
+		return err
+	}
+
+	return root.Remove(id + ".json")
 }

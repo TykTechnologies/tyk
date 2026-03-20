@@ -33,6 +33,14 @@ const (
 	ParamKeyURI  = "uri"  // Used by resources/* methods
 )
 
+// Primitive type identifiers — mirrors user.PrimitiveType* for gateway-internal use.
+// Gateway code always uses these constants; dashboard code uses user.PrimitiveType*.
+const (
+	PrimitiveTypeTool     = "tool"
+	PrimitiveTypeResource = "resource"
+	PrimitiveTypePrompt   = "prompt"
+)
+
 // Primitive type key prefixes for primitives map lookups
 const (
 	PrimitiveKeyTool      = "tool:"

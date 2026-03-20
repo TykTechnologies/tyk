@@ -1,0 +1,10 @@
+{
+    "opentelemetry": {
+        "enabled": false,
+        "exporter": "http",
+        "endpoint": "localhost:4318",
+        "metrics": {
+            "export_interval": 60
+        }
+    }
+}

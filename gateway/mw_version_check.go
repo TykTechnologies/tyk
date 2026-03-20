@@ -205,21 +205,15 @@ func (v *VersionCheck) handleMCPPrimitiveNotFound(r *http.Request) (error, int) 
 			return errors.New("access to this resource has been disallowed"), http.StatusForbidden
 		}
 
-		// No allow-list: reset routing and proxy request to upstream
 		resetJSONRPCRoutingAndProxyUpstream(r, state)
 		return nil, http.StatusOK
 	}
-	// Scenario 1: Direct access to VEM path without JSON-RPC routing
 	return errors.New(http.StatusText(http.StatusNotFound)), http.StatusNotFound
 }
 
-// resetJSONRPCRoutingAndProxyUpstream clears the JSON-RPC routing state and resets
-// the request URL to its original path, preparing it to be proxied to the upstream.
 func resetJSONRPCRoutingAndProxyUpstream(r *http.Request, state *httpctx.JSONRPCRoutingState) {
 	state.NextVEM = ""
 	httpctx.SetJSONRPCRoutingState(r, state)
-	r.URL.Path = state.OriginalPath
-	r.URL.RawQuery = ""
 }
 
 // getPrimitiveAllowListFlag returns the allowlist flag for a given MCP primitive VEM path.
