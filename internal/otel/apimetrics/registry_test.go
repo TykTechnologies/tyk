@@ -31,10 +31,10 @@ func TestNewInstrumentRegistry_DefaultInstruments(t *testing.T) {
 
 	// Default instruments do not use session source.
 	assert.False(t, reg.NeedsSession(), "defaults do not use session source")
-	// Default instruments only use metadata and session, not context, response_header, or configdata.
+	// Default instruments only use metadata and session, not context, response_header, or config_data.
 	assert.False(t, reg.NeedsContext(), "defaults do not use context source")
 	assert.False(t, reg.NeedsResponse(), "defaults do not use response_header source")
-	assert.False(t, reg.NeedsConfigData(), "defaults do not use configdata source")
+	assert.False(t, reg.NeedsConfigData(), "defaults do not use config_data source")
 }
 
 func TestNewInstrumentRegistry_ValidationErrors(t *testing.T) {
@@ -282,13 +282,13 @@ func TestNewInstrumentRegistry_NeedsMCP(t *testing.T) {
 func TestNewInstrumentRegistry_NeedsConfigData(t *testing.T) {
 	provider := noopProvider(t)
 
-	t.Run("true when configdata source used", func(t *testing.T) {
+	t.Run("true when config_data source used", func(t *testing.T) {
 		defs := []APIMetricDefinition{
 			{
 				Name: "test.counter",
 				Type: "counter",
 				Dimensions: []DimensionDefinition{
-					{Source: "configdata", Key: "environment", Label: "env"},
+					{Source: "config_data", Key: "environment", Label: "env"},
 				},
 			},
 		}
@@ -297,7 +297,7 @@ func TestNewInstrumentRegistry_NeedsConfigData(t *testing.T) {
 		assert.True(t, reg.NeedsConfigData())
 	})
 
-	t.Run("false when no configdata source", func(t *testing.T) {
+	t.Run("false when no config_data source", func(t *testing.T) {
 		defs := []APIMetricDefinition{
 			{
 				Name: "test.counter",
@@ -316,7 +316,7 @@ func TestNewInstrumentRegistry_NeedsConfigData(t *testing.T) {
 		defs := DefaultAPIMetrics()
 		reg, err := NewInstrumentRegistry(provider, defs)
 		require.NoError(t, err)
-		assert.False(t, reg.NeedsConfigData(), "default metrics should not need configdata")
+		assert.False(t, reg.NeedsConfigData(), "default metrics should not need config_data")
 	})
 }
 
@@ -331,7 +331,7 @@ func TestNewInstrumentRegistry_MultipleSourceFlags(t *testing.T) {
 				{Source: "session", Key: "api_key", Label: "key"},
 				{Source: "context", Key: "tier", Label: "tier"},
 				{Source: "response_header", Key: "X-Cache", Label: "cache"},
-				{Source: "configdata", Key: "environment", Label: "env"},
+				{Source: "config_data", Key: "environment", Label: "env"},
 			},
 		},
 	}

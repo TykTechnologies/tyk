@@ -71,7 +71,7 @@ func CompileExtractor(dim DimensionDefinition) (*DimensionExtractor, error) {
 			return rc.Response.Header.Get(key)
 		}
 
-	case "configdata":
+	case "config_data":
 		key := dim.Key
 		ext.Extract = func(rc *RequestContext) string {
 			if rc.ConfigData == nil {

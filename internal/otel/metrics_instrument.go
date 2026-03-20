@@ -133,7 +133,7 @@ func (i *MetricInstruments) NeedsMCP() bool {
 	return i.registry != nil && i.registry.NeedsMCP()
 }
 
-// NeedsConfigData returns true if any API metric instrument uses configdata dimensions.
+// NeedsConfigData returns true if any API metric instrument uses config_data dimensions.
 func (i *MetricInstruments) NeedsConfigData() bool {
 	return i.registry != nil && i.registry.NeedsConfigData()
 }

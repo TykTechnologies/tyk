@@ -27,7 +27,7 @@ type InstrumentRegistry struct {
 	needsContext    bool // true if any instrument uses source:"context"
 	needsResponse   bool // true if any instrument uses source:"response_header"
 	needsMCP        bool // true if any instrument uses source:"metadata" with key prefix "mcp_"
-	needsConfigData bool // true if any instrument uses source:"configdata"
+	needsConfigData bool // true if any instrument uses source:"config_data"
 }
 
 // NewInstrumentRegistry validates definitions, compiles builders and filters,
@@ -53,7 +53,7 @@ func NewInstrumentRegistry(provider tykmetric.Provider, defs []APIMetricDefiniti
 				reg.needsContext = true
 			case "response_header":
 				reg.needsResponse = true
-			case "configdata":
+			case "config_data":
 				reg.needsConfigData = true
 			case "metadata":
 				if strings.HasPrefix(dim.Key, "mcp_") {
@@ -115,5 +115,5 @@ func (r *InstrumentRegistry) NeedsResponse() bool { return r.needsResponse }
 // NeedsMCP returns true if any instrument uses MCP metadata dimensions (key prefix "mcp_").
 func (r *InstrumentRegistry) NeedsMCP() bool { return r.needsMCP }
 
-// NeedsConfigData returns true if any instrument uses configdata dimensions.
+// NeedsConfigData returns true if any instrument uses config_data dimensions.
 func (r *InstrumentRegistry) NeedsConfigData() bool { return r.needsConfigData }

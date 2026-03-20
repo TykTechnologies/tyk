@@ -446,9 +446,9 @@ func TestCompileExtractor_MCPExtractorsEmptyWhenNotSet(t *testing.T) {
 }
 
 func TestCompileExtractor_ConfigData(t *testing.T) {
-	ext, err := CompileExtractor(DimensionDefinition{Source: "configdata", Key: "environment", Label: "configdata.environment"})
+	ext, err := CompileExtractor(DimensionDefinition{Source: "config_data", Key: "environment", Label: "config_data.environment"})
 	require.NoError(t, err)
-	assert.Equal(t, "configdata.environment", ext.Label)
+	assert.Equal(t, "config_data.environment", ext.Label)
 
 	t.Run("reads from config data map", func(t *testing.T) {
 		rc := makeRequestContext()

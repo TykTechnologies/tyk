@@ -196,9 +196,9 @@ func TestValidateDefinitions(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name: "configdata source accepts any key",
+			name: "config_data source accepts any key",
 			defs: []APIMetricDefinition{
-				{Name: "test", Type: "counter", Dimensions: []DimensionDefinition{{Source: "configdata", Key: "environment"}}},
+				{Name: "test", Type: "counter", Dimensions: []DimensionDefinition{{Source: "config_data", Key: "environment"}}},
 			},
 			wantErr: false,
 		},

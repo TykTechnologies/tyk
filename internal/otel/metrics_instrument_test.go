@@ -256,16 +256,16 @@ func TestSetRegistry(t *testing.T) {
 			wantMetric:   "test.context",
 		},
 		{
-			name: "configdata dimension sets NeedsConfigData",
+			name: "config_data dimension sets NeedsConfigData",
 			defs: []apimetrics.APIMetricDefinition{{
-				Name: "test.configdata",
+				Name: "test.config_data",
 				Type: "counter",
 				Dimensions: []apimetrics.DimensionDefinition{
-					{Source: "configdata", Key: "environment", Label: "env", Default: "unknown"},
+					{Source: "config_data", Key: "environment", Label: "env", Default: "unknown"},
 				},
 			}},
 			needsConfigData: true,
-			wantMetric:      "test.configdata",
+			wantMetric:      "test.config_data",
 		},
 		{
 			name: "invalid definition panics",
