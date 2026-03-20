@@ -9,7 +9,9 @@ import (
 	"net/http"
 	"sort"
 	"strconv"
+	"time"
 
+	"github.com/TykTechnologies/tyk-pump/analytics"
 	"github.com/TykTechnologies/tyk/apidef/oas"
 	"github.com/TykTechnologies/tyk/common/option"
 	"github.com/TykTechnologies/tyk/header"
@@ -21,11 +23,21 @@ var _ TykMiddleware = (*mockResponseMiddleware)(nil)
 
 type mockResponseMiddleware struct {
 	*BaseMiddleware
+	hitRecorder hitRecorder
+}
+
+//nolint:unused
+func withHitRecorder(h hitRecorder) option.Option[mockResponseMiddleware] {
+	// todo: use to mock and cover with unit tets
+	return func(m *mockResponseMiddleware) {
+		m.hitRecorder = h
+	}
 }
 
 func newMockResponseMiddleware(base *BaseMiddleware, opts ...option.Option[mockResponseMiddleware]) TykMiddleware {
 	return option.New(opts).Build(mockResponseMiddleware{
 		BaseMiddleware: base,
+		hitRecorder:    &mockHitRecorder{successHandler: &SuccessHandler{base.Copy()}},
 	})
 }
 
@@ -61,6 +73,8 @@ func (m *mockResponseMiddleware) forward(res *http.Response, rw http.ResponseWri
 }
 
 func (m *mockResponseMiddleware) ProcessRequest(rw http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
+	start := time.Now()
+
 	if !m.Spec.hasActiveMock() {
 		return nil, http.StatusOK
 	}
@@ -85,6 +99,8 @@ func (m *mockResponseMiddleware) ProcessRequest(rw http.ResponseWriter, r *http.
 	if err = m.forward(res, rw); err != nil {
 		return fmt.Errorf("failed to forward response: %w", err), http.StatusInternalServerError
 	}
+
+	m.hitRecorder.hit(rw, r, res, start)
 
 	return nil, middleware.StatusRespond
 }
@@ -267,4 +283,24 @@ func mockFromOAS(r *http.Request, operation *openapi3.Operation, fromOASExamples
 	}
 
 	return code, contentType, body, headers, err
+}
+
+type hitRecorder interface {
+	hit(rw http.ResponseWriter, r *http.Request, res *http.Response, start time.Time)
+}
+
+type mockHitRecorder struct {
+	successHandler *SuccessHandler
+}
+
+func (s *mockHitRecorder) hit(rw http.ResponseWriter, r *http.Request, res *http.Response, start time.Time) {
+	if s.successHandler.Spec.DoNotTrack {
+		return
+	}
+
+	ms := DurationToMillisecond(time.Since(start))
+	latency := analytics.Latency{Total: int64(ms), Upstream: 0, Gateway: int64(ms)}
+	s.successHandler.RecordHit(r, latency, res.StatusCode, res, true)
+	s.successHandler.RecordAccessLog(r, res, latency)
+	s.successHandler.Base().RecordMetrics(rw, r, res.StatusCode, latency, res)
 }
