@@ -1,0 +1,35 @@
+{
+    "name": "TestAPIResponseHeadersError",
+    "api_id": "8",
+    "org_id": "default",
+    "definition": {
+        "location": "",
+        "key": ""
+    },
+    "use_keyless": true,
+    "auth": {
+        "auth_header_name": ""
+    },
+    "enable_detailed_recording": false,
+    "version_data": {
+        "not_versioned": true,
+        "versions": {
+            "Default": {
+                "name": "Default",
+                "expires": "3000-01-02 15:04",
+                "use_extended_paths": true,
+                "extended_paths": {
+                    "ignored": [],
+                    "white_list": [],
+                    "black_list": []
+                }
+            }
+        }
+    },
+    "proxy": {
+        "listen_path": "/resp-headers-error/",
+        "target_url": "http://nonexistent-upstream:9999/",
+        "strip_listen_path": true
+    },
+    "do_not_track": false
+}

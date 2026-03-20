@@ -2,6 +2,7 @@ package apimetrics
 
 import (
 	"fmt"
+	"strings"
 
 	logger "github.com/sirupsen/logrus"
 
@@ -25,6 +26,7 @@ type InstrumentRegistry struct {
 	needsSession  bool // true if any instrument uses source:"session"
 	needsContext  bool // true if any instrument uses source:"context"
 	needsResponse bool // true if any instrument uses source:"response_header"
+	needsMCP      bool // true if any instrument uses source:"metadata" with key prefix "mcp_"
 }
 
 // NewInstrumentRegistry validates definitions, compiles builders and filters,
@@ -50,6 +52,10 @@ func NewInstrumentRegistry(provider tykmetric.Provider, defs []APIMetricDefiniti
 				reg.needsContext = true
 			case "response_header":
 				reg.needsResponse = true
+			case "metadata":
+				if strings.HasPrefix(dim.Key, "mcp_") {
+					reg.needsMCP = true
+				}
 			}
 		}
 
@@ -102,3 +108,6 @@ func (r *InstrumentRegistry) NeedsContext() bool { return r.needsContext }
 
 // NeedsResponse returns true if any instrument uses response_header dimensions.
 func (r *InstrumentRegistry) NeedsResponse() bool { return r.needsResponse }
+
+// NeedsMCP returns true if any instrument uses MCP metadata dimensions (key prefix "mcp_").
+func (r *InstrumentRegistry) NeedsMCP() bool { return r.needsMCP }

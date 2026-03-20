@@ -3,6 +3,7 @@ package apimetrics
 import (
 	"fmt"
 	"strconv"
+	"strings"
 )
 
 // DimensionExtractor extracts a single OTel attribute value from the request context.
@@ -124,6 +125,21 @@ var metadataExtractors = map[string]func(rc *RequestContext) string{
 		}
 		return "http"
 	},
+	"mcp_method": func(rc *RequestContext) string {
+		return rc.MCPMethod
+	},
+	"mcp_primitive_type": func(rc *RequestContext) string {
+		return rc.MCPPrimitiveType
+	},
+	"mcp_primitive_name": func(rc *RequestContext) string {
+		return rc.MCPPrimitiveName
+	},
+	"mcp_error_code": func(rc *RequestContext) string {
+		if rc.MCPErrorCode == 0 {
+			return ""
+		}
+		return strconv.Itoa(rc.MCPErrorCode)
+	},
 }
 
 // sessionExtractors maps session keys to extraction functions.
@@ -148,13 +164,21 @@ var sessionExtractors = map[string]func(rc *RequestContext) string{
 	},
 	"portal_app": func(rc *RequestContext) string {
 		if rc.Session != nil {
-			return rc.Session.ApplyPolicyID
+			for _, tag := range rc.Session.Tags {
+				if v, ok := strings.CutPrefix(tag, "portal-app-"); ok {
+					return v
+				}
+			}
 		}
 		return ""
 	},
 	"portal_org": func(rc *RequestContext) string {
 		if rc.Session != nil {
-			return rc.Session.OrgID
+			for _, tag := range rc.Session.Tags {
+				if v, ok := strings.CutPrefix(tag, "portal-org-"); ok {
+					return v
+				}
+			}
 		}
 		return ""
 	},

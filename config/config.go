@@ -334,6 +334,11 @@ type AccessLogsConfig struct {
 	// - `upstream_latency` will include the upstream latency of the request.
 	// - `upstream_status` will include the upstream response status code for 5XX responses.
 	// - `user_agent` will include the user agent of the request.
+	// - `api_type` will include the API protocol type (classic, oas, graphql, mcp).
+	// - `mcp_method` will include the JSON-RPC method name (MCP APIs only).
+	// - `mcp_primitive_type` will include the MCP primitive type (MCP APIs only).
+	// - `mcp_primitive_name` will include the MCP primitive name (MCP APIs only).
+	// - `mcp_error_code` will include the JSON-RPC error code (MCP APIs only).
 	Template []string `json:"template"`
 }
 
@@ -1369,6 +1374,9 @@ type Config struct {
 
 	// JWKS holds the configuration for Tyk JWKS functionalities
 	JWKS JWKSConfig `json:"jwks"`
+
+	// AllowUnsafePolicyIds allows unsafe policy identifiers
+	AllowUnsafePolicyIds bool `json:"allow_unsafe_policy_ids"`
 }
 
 // LabsConfig include config for streaming
