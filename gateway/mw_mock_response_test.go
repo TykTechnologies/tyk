@@ -147,9 +147,7 @@ func TestMockResponse(t *testing.T) {
 	})
 
 	t.Run("ProcessRequest", func(t *testing.T) {
-		t.Run("calls hit recorder if DoNotTrack=true", func(t *testing.T) {
-			t.Skip("just temporary")
-
+		t.Run("calls hit recorder for oas API", func(t *testing.T) {
 			spec := BuildOASAPI(func(oasDef *oas.OAS) {
 				opId := uuid.New()
 
@@ -157,16 +155,16 @@ func TestMockResponse(t *testing.T) {
 				headers.Add("Content-Type", "application/json")
 
 				tykExt := oasDef.GetTykExtension()
-				tykExt.Info.ID = "v1-api-name"
-				tykExt.Info.Name = "v1-api-name"
-				tykExt.Server.ListenPath.Value = "/v1-api-name"
+				tykExt.Info.ID = "test"
+				tykExt.Info.Name = "test"
+				tykExt.Server.ListenPath.Value = "/test"
 				tykExt.Middleware = &oas.Middleware{}
 				tykExt.Middleware.Operations = oas.Operations{}
 				tykExt.Middleware.Operations[opId] = &oas.Operation{
 					MockResponse: &oas.MockResponse{
 						Enabled: true,
-						Code:    201,
-						Body:    "[null]",
+						Code:    http.StatusCreated,
+						Body:    `{"mocked":true}`,
 						Headers: headers,
 					},
 				}
@@ -184,7 +182,7 @@ func TestMockResponse(t *testing.T) {
 				})
 
 				oasDef.Paths = openapi3.NewPaths()
-				oasDef.Paths.Set("/hello", &openapi3.PathItem{
+				oasDef.Paths.Set("/mock", &openapi3.PathItem{
 					Get: &openapi3.Operation{
 						OperationID: opId,
 						Responses:   responses,
@@ -192,20 +190,27 @@ func TestMockResponse(t *testing.T) {
 				})
 			})[0]
 
+			apiSpec := g.Gw.LoadAPI(spec)[0]
+
+			_, _ = g.Run(t, test.TestCase{
+				Path:   "/test/mock",
+				Method: http.MethodGet,
+				Code:   http.StatusCreated,
+			})
+
 			logger := logrus.New()
 			logger.SetOutput(io.Discard)
 			entry := logrus.NewEntry(logger)
 
 			mockRecorder := &mockHitRecorder{}
 
-			baseMid := NewBaseMiddleware(g.Gw, spec, nil, entry)
+			baseMid := NewBaseMiddleware(g.Gw, apiSpec, nil, entry)
 			mockMw := newMockResponseMiddleware(baseMid, withHitRecorder(mockRecorder))
 
 			rw := httptest.NewRecorder()
-			r := httptest.NewRequest(http.MethodGet, "/", nil)
+			r := httptest.NewRequest(http.MethodGet, "/test/mock", nil)
 
 			err, _ := mockMw.ProcessRequest(rw, r, nil)
-
 			assert.NoError(t, err)
 			assert.True(t, mockRecorder.hitCalled)
 		})
