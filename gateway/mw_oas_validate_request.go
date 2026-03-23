@@ -13,7 +13,7 @@ import (
 
 	"github.com/TykTechnologies/tyk/header"
 	"github.com/TykTechnologies/tyk/internal/httputil"
-	lib "github.com/TykTechnologies/tyk/lib/apidef"
+	"github.com/TykTechnologies/tyk/pkg/schema"
 )
 
 var (
@@ -141,7 +141,7 @@ func (k *ValidateRequest) ProcessRequest(w http.ResponseWriter, r *http.Request,
 
 	err = openapi3filter.ValidateRequest(r.Context(), requestValidationInput)
 	if err != nil {
-		return fmt.Errorf("request validation error: %w", lib.RestoreUnicodeEscapesInError(err)), errResponseCode
+		return fmt.Errorf("request validation error: %w", schema.RestoreUnicodeEscapesInError(err)), errResponseCode
 	}
 
 	// Handle Success
@@ -184,7 +184,7 @@ func (k *ValidateRequest) processRequestWithFindOperation(r *http.Request) (erro
 
 	err := openapi3filter.ValidateRequest(r.Context(), requestValidationInput)
 	if err != nil {
-		return fmt.Errorf("request validation error: %w", err), errResponseCode
+		return fmt.Errorf("request validation error: %w", schema.RestoreUnicodeEscapesInError(err)), errResponseCode
 	}
 
 	// Handle Success
