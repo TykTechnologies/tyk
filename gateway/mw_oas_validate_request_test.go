@@ -666,6 +666,128 @@ func TestValidateRequest_PathParameters(t *testing.T) {
 	}...)
 }
 
+// contentTypeOverrideTransport wraps an http.RoundTripper to force a specific Content-Type,
+// removing the duplicate application/json that the test framework adds.
+type contentTypeOverrideTransport struct {
+	wrapped     http.RoundTripper
+	contentType string
+}
+
+func (t *contentTypeOverrideTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	req.Header.Set("Content-Type", t.contentType)
+	return t.wrapped.RoundTrip(req)
+}
+
+// TestValidateRequest_XML verifies that validateRequest works with application/xml
+// and text/xml content types when the OAS spec defines XML request bodies.
+func TestValidateRequest_XML(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	const oasSpec = `{
+		"openapi": "3.0.0",
+		"info": {"title": "XML Validation Test", "version": "1.0.0"},
+		"paths": {
+			"/xml-endpoint": {
+				"post": {
+					"operationId": "postxml",
+					"requestBody": {
+						"required": true,
+						"content": {
+							"application/xml": {
+								"schema": {
+									"type": "object",
+									"required": ["name"],
+									"properties": {
+										"name": {"type": "string"},
+										"age": {"type": "integer"}
+									}
+								}
+							},
+							"text/xml": {
+								"schema": {
+									"type": "object",
+									"required": ["name"],
+									"properties": {
+										"name": {"type": "string"}
+									}
+								}
+							}
+						}
+					},
+					"responses": {"200": {"description": "OK"}}
+				}
+			}
+		}
+	}`
+
+	oasDoc, err := openapi3.NewLoader().LoadFromData([]byte(oasSpec))
+	assert.NoError(t, err)
+
+	oasAPI := oas.OAS{T: *oasDoc}
+	oasAPI.SetTykExtension(&oas.XTykAPIGateway{
+		Middleware: &oas.Middleware{
+			Operations: oas.Operations{
+				"postxml": {
+					ValidateRequest: &oas.ValidateRequest{
+						Enabled:           true,
+						ErrorResponseCode: http.StatusUnprocessableEntity,
+					},
+				},
+			},
+		},
+	})
+
+	var def apidef.APIDefinition
+	oasAPI.ExtractTo(&def)
+
+	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		spec.VersionData = def.VersionData
+		spec.Name = "xml-validate-test"
+		spec.OAS = oasAPI
+		spec.IsOAS = true
+		spec.Proxy.ListenPath = "/api/"
+	})
+
+	// xmlClient creates an http.Client that forces the Content-Type header,
+	// overriding the test framework's default application/json.
+	xmlClient := func(contentType string) *http.Client {
+		return &http.Client{
+			Transport: &contentTypeOverrideTransport{
+				wrapped:     http.DefaultTransport,
+				contentType: contentType,
+			},
+		}
+	}
+
+	t.Run("application/xml", func(t *testing.T) {
+		client := xmlClient("application/xml")
+		_, _ = ts.Run(t, []test.TestCase{
+			// Valid XML with required field
+			{Data: `<root><name>test-product</name></root>`, Method: http.MethodPost,
+				Path: "/api/xml-endpoint", Code: http.StatusOK, Client: client},
+			// Missing required field "name" — should fail validation
+			{Data: `<root><age>25</age></root>`, Method: http.MethodPost,
+				Path: "/api/xml-endpoint", Code: http.StatusUnprocessableEntity, Client: client},
+			// Malformed XML — should fail
+			{Data: `<root><name>unclosed`, Method: http.MethodPost,
+				Path: "/api/xml-endpoint", Code: http.StatusUnprocessableEntity, Client: client},
+		}...)
+	})
+
+	t.Run("text/xml", func(t *testing.T) {
+		client := xmlClient("text/xml")
+		_, _ = ts.Run(t, []test.TestCase{
+			// Valid XML
+			{Data: `<root><name>test-product</name></root>`, Method: http.MethodPost,
+				Path: "/api/xml-endpoint", Code: http.StatusOK, Client: client},
+			// Missing required field
+			{Data: `<root><other>value</other></root>`, Method: http.MethodPost,
+				Path: "/api/xml-endpoint", Code: http.StatusUnprocessableEntity, Client: client},
+		}...)
+	})
+}
+
 func TestValidateRequest_NormalizeHeaders(t *testing.T) {
 	customHeader := "X-Custom"
 	tests := []struct {

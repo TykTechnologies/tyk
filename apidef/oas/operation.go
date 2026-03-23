@@ -806,9 +806,13 @@ func (*ValidateRequest) shouldImport(operation *openapi3.Operation) bool {
 		return false
 	}
 
-	media := reqBodyVal.Content.Get("application/json")
+	for _, media := range reqBodyVal.Content {
+		if media != nil && media.Schema != nil {
+			return true
+		}
+	}
 
-	return media != nil
+	return false
 }
 
 // Import populates *ValidateRequest with enabled argument and a default error response code.
