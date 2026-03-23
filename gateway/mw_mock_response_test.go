@@ -212,7 +212,16 @@ func TestMockResponse(t *testing.T) {
 
 			err, _ := mockMw.ProcessRequest(rw, r, nil)
 			assert.NoError(t, err)
-			assert.True(t, mockRecorder.hitCalled)
+			require.Len(t, mockRecorder.calls, 1, "expected to be called once")
+
+			req := mockRecorder.calls[0].req
+			res := mockRecorder.calls[0].res
+
+			// is needed downstack during writing the log
+			assert.Equal(t, "/mock", req.URL.Path, "req is overwritten to local api endpoint")
+
+			// is needed downstack; body is being read at least twice: during writing log and during proxying to the real response
+			assert.IsType(t, nopCloser{}, res.Body, "response body is wrapped by nopCloser")
 		})
 	})
 }

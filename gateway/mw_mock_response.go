@@ -309,10 +309,20 @@ func (s *realHitRecorder) hit(rw http.ResponseWriter, r *http.Request, res *http
 
 var _ hitRecorder = new(mockHitRecorder)
 
-type mockHitRecorder struct {
-	hitCalled bool
-}
+type (
+	mockHitRecorder struct {
+		calls []mockHitRecorderCall
+	}
 
-func (h *mockHitRecorder) hit(_ http.ResponseWriter, _ *http.Request, _ *http.Response, _ time.Time) {
-	h.hitCalled = true
+	mockHitRecorderCall struct {
+		req *http.Request
+		res *http.Response
+	}
+)
+
+func (h *mockHitRecorder) hit(_ http.ResponseWriter, req *http.Request, res *http.Response, _ time.Time) {
+	h.calls = append(h.calls, mockHitRecorderCall{
+		req: req,
+		res: res,
+	})
 }
