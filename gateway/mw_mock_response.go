@@ -17,6 +17,7 @@ import (
 	"github.com/TykTechnologies/tyk/header"
 	"github.com/TykTechnologies/tyk/internal/middleware"
 	"github.com/getkin/kin-openapi/openapi3"
+	clone "github.com/huandu/go-clone/generic"
 )
 
 var _ TykMiddleware = (*mockResponseMiddleware)(nil)
@@ -77,7 +78,7 @@ func (m *mockResponseMiddleware) ProcessRequest(rw http.ResponseWriter, r *http.
 		return nil, http.StatusOK
 	}
 
-	res, err := m.mockResponse(r)
+	res, rOverriten, err := m.mockResponse(r)
 
 	if err != nil {
 		return fmt.Errorf("failed to mock response: %w", err), http.StatusInternalServerError
@@ -98,12 +99,16 @@ func (m *mockResponseMiddleware) ProcessRequest(rw http.ResponseWriter, r *http.
 		return fmt.Errorf("failed to forward response: %w", err), http.StatusInternalServerError
 	}
 
-	m.hitRecorder.hit(rw, r, res, start)
+	m.hitRecorder.hit(rw, rOverriten, res, start)
 
 	return nil, middleware.StatusRespond
 }
 
-func (m *mockResponseMiddleware) mockResponse(r *http.Request) (*http.Response, error) {
+func (m *mockResponseMiddleware) mockResponse(r *http.Request) (
+	res *http.Response,
+	internal *http.Request,
+	err error,
+) {
 	// Use FindSpecMatchesStatus to check if this path should be mocked
 	// This ensures the standard regex-based path matching is used, respecting gateway configurations
 	versionInfo, _ := m.Spec.Version(r)
@@ -113,21 +118,23 @@ func (m *mockResponseMiddleware) mockResponse(r *http.Request) (*http.Response, 
 
 	if !found || urlSpec == nil {
 		// No mock response configured for this path
-		return nil, nil
+		return nil, nil, nil
 	}
 
 	mockResponse := urlSpec.OASMockResponseMeta
 	if mockResponse == nil || !mockResponse.Enabled {
-		return nil, nil
+		return nil, nil, nil
 	}
 
-	res := &http.Response{Header: http.Header{}}
+	res = &http.Response{Header: http.Header{}}
+	internal = r
+	internal.URL = clone.Clone(r.URL)
+	internal.URL.Path = urlSpec.OASPath
 
 	var code int
 	var contentType string
 	var body []byte
 	var headers []oas.Header
-	var err error
 
 	if mockResponse.FromOASExamples != nil && mockResponse.FromOASExamples.Enabled {
 		// Find the route using the OAS path from URLSpec, not the actual request path.
@@ -136,13 +143,12 @@ func (m *mockResponseMiddleware) mockResponse(r *http.Request) (*http.Response, 
 		route, _, routeErr := m.Spec.findRouteForOASPath(urlSpec.OASPath, urlSpec.OASMethod, strippedPath, r.URL.Path)
 		if routeErr != nil || route == nil {
 			log.Tracef("URL spec matched for mock response but route not found for OAS path %s: %v", urlSpec.OASPath, routeErr)
-			return nil, nil
+			return nil, nil, nil
 		}
 		code, contentType, body, headers, err = mockFromOAS(r, route.Operation, mockResponse.FromOASExamples)
 		res.StatusCode = code
 		if err != nil {
-			err = fmt.Errorf("mock: %w", err)
-			return res, err
+			return res, internal, fmt.Errorf("mock: %w", err)
 		}
 	} else {
 		code, body, headers = mockFromConfig(mockResponse)
@@ -157,12 +163,11 @@ func (m *mockResponseMiddleware) mockResponse(r *http.Request) (*http.Response, 
 	}
 
 	res.StatusCode = code
-
 	res.Body = nopCloser{ReadSeeker: bytes.NewReader(body)}
 
 	m.Spec.sendRateLimitHeaders(ctxGetSession(r), res)
 
-	return res, nil
+	return res, internal, nil
 }
 
 func mockFromConfig(tykMockRespOp *oas.MockResponse) (int, []byte, []oas.Header) {
