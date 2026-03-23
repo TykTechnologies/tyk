@@ -17,7 +17,6 @@ import (
 	"github.com/TykTechnologies/tyk/header"
 	"github.com/TykTechnologies/tyk/internal/middleware"
 	"github.com/getkin/kin-openapi/openapi3"
-	clone "github.com/huandu/go-clone/generic"
 )
 
 var _ TykMiddleware = (*mockResponseMiddleware)(nil)
@@ -127,8 +126,8 @@ func (m *mockResponseMiddleware) mockResponse(r *http.Request) (
 	}
 
 	res = &http.Response{Header: http.Header{}}
-	internal = r
-	internal.URL = clone.Clone(r.URL)
+
+	internal = r.Clone(r.Context())
 	internal.URL.Path = urlSpec.OASPath
 
 	var code int
