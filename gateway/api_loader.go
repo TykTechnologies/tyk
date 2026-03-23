@@ -234,6 +234,10 @@ func (gw *Gateway) processSpec(
 	// Health checkers are initialised per spec so that each API handler has it's own connection and redis storage pool
 	spec.Init(authStore, sessionStore, gs.healthStore, orgStore)
 
+	if len(spec.ErrorOverrides) > 0 {
+		spec.compiledErrorOverrides = CompileErrorOverrides(spec.ErrorOverrides)
+	}
+
 	// Set up all the JSVM middleware
 	var mwAuthCheckFunc apidef.MiddlewareDefinition
 	mwPreFuncs := []apidef.MiddlewareDefinition{}

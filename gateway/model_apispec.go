@@ -106,6 +106,10 @@ type APISpec struct {
 	// all primitives on every JSON-RPC request that doesn't match a VEM.
 	// This is a convenience flag that combines ToolsAllowListEnabled, ResourcesAllowListEnabled, and PromptsAllowListEnabled.
 	MCPAllowListEnabled bool
+
+	// compiledErrorOverrides holds the indexed error override rules for O(1) lookup.
+	// Built from apidef.ErrorOverrides during gateway startup.
+	compiledErrorOverrides *CompiledErrorOverrides
 }
 
 // CheckSpecMatchesStatus checks if a URL spec has a specific status.

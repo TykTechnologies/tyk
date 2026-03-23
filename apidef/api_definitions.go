@@ -792,6 +792,9 @@ type APIDefinition struct {
 	// SecurityRequirements stores all OAS security requirements (auto-populated from OpenAPI description import)
 	// When len(SecurityRequirements) > 1, OR logic is automatically applied
 	SecurityRequirements [][]string `json:"security_requirements,omitempty" bson:"security_requirements,omitempty"`
+
+	// ErrorOverrides contains the configurations for error response customization.
+	ErrorOverrides ErrorOverridesMap `bson:"error_overrides" json:"error_overrides"`
 }
 
 type JWK struct {
