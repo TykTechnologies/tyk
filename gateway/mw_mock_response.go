@@ -26,19 +26,17 @@ type mockResponseMiddleware struct {
 	hitRecorder hitRecorder
 }
 
-//nolint:unused
-func withHitRecorder(h hitRecorder) option.Option[mockResponseMiddleware] {
-	// todo: use to mock and cover with unit tets
-	return func(m *mockResponseMiddleware) {
-		m.hitRecorder = h
-	}
-}
-
 func newMockResponseMiddleware(base *BaseMiddleware, opts ...option.Option[mockResponseMiddleware]) TykMiddleware {
 	return option.New(opts).Build(mockResponseMiddleware{
 		BaseMiddleware: base,
-		hitRecorder:    &mockHitRecorder{successHandler: &SuccessHandler{base.Copy()}},
+		hitRecorder:    &realHitRecorder{successHandler: &SuccessHandler{base.Copy()}},
 	})
+}
+
+func withHitRecorder(h hitRecorder) option.Option[mockResponseMiddleware] {
+	return func(m *mockResponseMiddleware) {
+		m.hitRecorder = h
+	}
 }
 
 func (m *mockResponseMiddleware) Name() string {
@@ -160,7 +158,7 @@ func (m *mockResponseMiddleware) mockResponse(r *http.Request) (*http.Response, 
 
 	res.StatusCode = code
 
-	res.Body = io.NopCloser(bytes.NewBuffer(body))
+	res.Body = nopCloser{ReadSeeker: bytes.NewReader(body)}
 
 	m.Spec.sendRateLimitHeaders(ctxGetSession(r), res)
 
@@ -289,11 +287,11 @@ type hitRecorder interface {
 	hit(rw http.ResponseWriter, r *http.Request, res *http.Response, start time.Time)
 }
 
-type mockHitRecorder struct {
+type realHitRecorder struct {
 	successHandler *SuccessHandler
 }
 
-func (s *mockHitRecorder) hit(rw http.ResponseWriter, r *http.Request, res *http.Response, start time.Time) {
+func (s *realHitRecorder) hit(rw http.ResponseWriter, r *http.Request, res *http.Response, start time.Time) {
 	if s.successHandler.Spec.DoNotTrack {
 		return
 	}
@@ -303,4 +301,14 @@ func (s *mockHitRecorder) hit(rw http.ResponseWriter, r *http.Request, res *http
 	s.successHandler.RecordHit(r, latency, res.StatusCode, res, true)
 	s.successHandler.RecordAccessLog(r, res, latency)
 	s.successHandler.Base().RecordMetrics(rw, r, res.StatusCode, latency, res)
+}
+
+var _ hitRecorder = new(mockHitRecorder)
+
+type mockHitRecorder struct {
+	hitCalled bool
+}
+
+func (h *mockHitRecorder) hit(_ http.ResponseWriter, _ *http.Request, _ *http.Response, _ time.Time) {
+	h.hitCalled = true
 }

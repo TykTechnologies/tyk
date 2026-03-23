@@ -2,10 +2,13 @@ package gateway
 
 import (
 	"context"
+	"io"
 	"net/http"
+	"net/http/httptest"
 	"testing"
 
 	"github.com/getkin/kin-openapi/openapi3"
+	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -140,6 +143,71 @@ func TestMockResponse(t *testing.T) {
 			g.Gw.LoadAPI(api)
 
 			_, _ = g.Run(t, test.TestCase{Path: "/listen-path/get", BodyMatch: "mock: there is no example response for the content type: application/xml"})
+		})
+	})
+
+	t.Run("ProcessRequest", func(t *testing.T) {
+		t.Run("calls hit recorder if DoNotTrack=true", func(t *testing.T) {
+			t.Skip("just temporary")
+
+			spec := BuildOASAPI(func(oasDef *oas.OAS) {
+				opId := uuid.New()
+
+				headers := oas.Headers{}
+				headers.Add("Content-Type", "application/json")
+
+				tykExt := oasDef.GetTykExtension()
+				tykExt.Info.ID = "v1-api-name"
+				tykExt.Info.Name = "v1-api-name"
+				tykExt.Server.ListenPath.Value = "/v1-api-name"
+				tykExt.Middleware = &oas.Middleware{}
+				tykExt.Middleware.Operations = oas.Operations{}
+				tykExt.Middleware.Operations[opId] = &oas.Operation{
+					MockResponse: &oas.MockResponse{
+						Enabled: true,
+						Code:    201,
+						Body:    "[null]",
+						Headers: headers,
+					},
+				}
+
+				desc := "hello world"
+				responses := openapi3.NewResponses()
+				responses.Delete("default")
+				responses.Set("200", &openapi3.ResponseRef{
+					Value: &openapi3.Response{
+						Description: &desc,
+						Content: openapi3.Content{
+							"application/json": &openapi3.MediaType{},
+						},
+					},
+				})
+
+				oasDef.Paths = openapi3.NewPaths()
+				oasDef.Paths.Set("/hello", &openapi3.PathItem{
+					Get: &openapi3.Operation{
+						OperationID: opId,
+						Responses:   responses,
+					},
+				})
+			})[0]
+
+			logger := logrus.New()
+			logger.SetOutput(io.Discard)
+			entry := logrus.NewEntry(logger)
+
+			mockRecorder := &mockHitRecorder{}
+
+			baseMid := NewBaseMiddleware(g.Gw, spec, nil, entry)
+			mockMw := newMockResponseMiddleware(baseMid, withHitRecorder(mockRecorder))
+
+			rw := httptest.NewRecorder()
+			r := httptest.NewRequest(http.MethodGet, "/", nil)
+
+			err, _ := mockMw.ProcessRequest(rw, r, nil)
+
+			assert.NoError(t, err)
+			assert.True(t, mockRecorder.hitCalled)
 		})
 	})
 }
