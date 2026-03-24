@@ -402,6 +402,7 @@ func TestExternalHTTPClientFactory_CertificateStore(t *testing.T) {
 
 // Mock certificate manager for testing
 type mockCertificateManager struct {
+	certs.IdGetter
 	certificates   map[string]*tls.Certificate
 	caCertificates []string
 }
