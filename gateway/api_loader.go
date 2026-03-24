@@ -235,7 +235,9 @@ func (gw *Gateway) processSpec(
 	spec.Init(authStore, sessionStore, gs.healthStore, orgStore)
 
 	if len(spec.ErrorOverrides) > 0 {
-		spec.compiledErrorOverrides = CompileErrorOverrides(spec.ErrorOverrides)
+		if compiled := CompileErrorOverrides(spec.ErrorOverrides); compiled != nil {
+			spec.SetCompiledErrorOverrides(compiled)
+		}
 	}
 
 	// Set up all the JSVM middleware
