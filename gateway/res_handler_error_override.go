@@ -79,7 +79,9 @@ func (r *ResponseErrorOverrideMiddleware) HandleResponse(
 
 // shouldProcessResponse checks if response should be processed for error overrides.
 func (r *ResponseErrorOverrideMiddleware) shouldProcessResponse(res *http.Response) bool {
-	return res.StatusCode >= 400 && len(r.Spec.GlobalConfig.ErrorOverrides) > 0
+	hasGlobal := len(r.Spec.GlobalConfig.ErrorOverrides) > 0
+	hasAPI := r.Spec != nil && r.Spec.CompiledErrorOverrides != nil
+	return res.StatusCode >= 400 && (hasGlobal || hasAPI)
 }
 
 // lazyBodyReader handles lazy reading and caching of response body.

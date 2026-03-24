@@ -92,7 +92,6 @@ type APISpec struct {
 	// ToolsAllowListEnabled is true if any MCP tool has an allow rule enabled.
 	// Pre-calculated during API loading.
 	ToolsAllowListEnabled bool
-
 	// ResourcesAllowListEnabled is true if any MCP resource has an allow rule enabled.
 	// Pre-calculated during API loading.
 	ResourcesAllowListEnabled bool
@@ -106,6 +105,8 @@ type APISpec struct {
 	// all primitives on every JSON-RPC request that doesn't match a VEM.
 	// This is a convenience flag that combines ToolsAllowListEnabled, ResourcesAllowListEnabled, and PromptsAllowListEnabled.
 	MCPAllowListEnabled bool
+
+	CompiledErrorOverrides *CompiledErrorOverrides
 }
 
 // CheckSpecMatchesStatus checks if a URL spec has a specific status.
