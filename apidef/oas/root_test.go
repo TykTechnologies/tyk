@@ -568,3 +568,63 @@ func TestFillWithContext(t *testing.T) {
 		assert.Nil(t, gw.Middleware.McpPrompts)
 	})
 }
+
+func TestErrorOverrides_FillExtract(t *testing.T) {
+	api := apidef.APIDefinition{
+		ErrorOverrides: apidef.ErrorOverridesMap{
+			"404": []apidef.ErrorOverride{
+				{
+					Match: &apidef.ErrorMatcher{
+						Flag:           "upstream_timeout",
+						MessagePattern: "timeout.*",
+					},
+					Response: apidef.ErrorResponse{
+						StatusCode: 504,
+						Message:    "Gateway Timeout",
+						Body:       `{"error": "upstream unavailable"}`,
+						Headers:    map[string]string{"X-Custom": "timeout"},
+					},
+				},
+			},
+			"500": []apidef.ErrorOverride{
+				{
+					Response: apidef.ErrorResponse{
+						StatusCode: 500,
+						Template:   "error_500.tmpl",
+					},
+				},
+			},
+		},
+	}
+
+	var x XTykAPIGateway
+	x.Fill(api)
+
+	assert.NotNil(t, x.ErrorOverrides)
+	assert.Len(t, x.ErrorOverrides, 2)
+	assert.Len(t, x.ErrorOverrides["404"], 1)
+	assert.Equal(t, 504, x.ErrorOverrides["404"][0].Response.StatusCode)
+	assert.Equal(t, "upstream_timeout", string(x.ErrorOverrides["404"][0].Match.Flag))
+
+	var extracted apidef.APIDefinition
+	x.ExtractTo(&extracted)
+
+	assert.Equal(t, api.ErrorOverrides, extracted.ErrorOverrides)
+	assert.Equal(t, "timeout.*", extracted.ErrorOverrides["404"][0].Match.MessagePattern)
+}
+
+func TestErrorOverrides_EmptyMap(t *testing.T) {
+	api := apidef.APIDefinition{
+		ErrorOverrides: nil,
+	}
+
+	var x XTykAPIGateway
+	x.Fill(api)
+
+	assert.Nil(t, x.ErrorOverrides)
+
+	var extracted apidef.APIDefinition
+	x.ExtractTo(&extracted)
+
+	assert.Nil(t, extracted.ErrorOverrides)
+}
