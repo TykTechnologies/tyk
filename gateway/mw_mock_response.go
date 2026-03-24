@@ -164,6 +164,10 @@ func (m *mockResponseMiddleware) mockResponse(r *http.Request) (
 	res.StatusCode = code
 	res.Body = nopCloser{ReadSeeker: bytes.NewReader(body)}
 
+	if m.Gw.GetConfig().CloseConnections {
+		res.Header.Set(header.Connection, "close")
+	}
+
 	m.Spec.sendRateLimitHeaders(ctxGetSession(r), res)
 
 	return res, internal, nil
