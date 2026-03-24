@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/test"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -295,7 +296,7 @@ func TestApplyOverrideToResponse(t *testing.T) {
 		}
 		result := &OverrideResult{
 			StatusCode: 503,
-			rule: &apidef.ErrorOverride{},
+			rule:       &apidef.ErrorOverride{},
 		}
 
 		req := httptest.NewRequest("GET", "/test", nil)
@@ -387,6 +388,315 @@ func TestGenerateOverrideBody(t *testing.T) {
 		body := middleware.generateOverrideBody(result, errCtx, 500, logger)
 		assert.Nil(t, body)
 	})
+}
+
+func TestUpstreamErrorOverride_APILevel(t *testing.T) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(503)
+		w.Write([]byte(`{"upstream":"error"}`))
+	}))
+	defer upstream.Close()
+
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		spec.Proxy.ListenPath = "/"
+		spec.Proxy.TargetURL = upstream.URL
+		spec.ErrorOverrides = apidef.ErrorOverridesMap{
+			"503": []apidef.ErrorOverride{{
+				Response: apidef.ErrorResponse{
+					StatusCode: 503,
+					Body:       `{"error":"api-override"}`,
+				},
+			}},
+		}
+		spec.SetCompiledErrorOverrides(CompileErrorOverrides(spec.ErrorOverrides))
+	})
+
+	ts.Run(t, []test.TestCase{{
+		Path:      "/",
+		Code:      503,
+		BodyMatch: `"api-override"`,
+	}}...)
+}
+
+func TestUpstreamErrorOverride_APIPrecedenceOverGateway(t *testing.T) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(503)
+		w.Write([]byte(`{"upstream":"error"}`))
+	}))
+	defer upstream.Close()
+
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	globalConf := ts.Gw.GetConfig()
+	globalConf.ErrorOverrides = apidef.ErrorOverridesMap{
+		"503": []apidef.ErrorOverride{{
+			Response: apidef.ErrorResponse{
+				StatusCode: 503,
+				Body:       `{"source":"gateway"}`,
+			},
+		}},
+	}
+	ts.Gw.SetConfig(globalConf)
+	ts.Gw.SetCompiledErrorOverrides(CompileErrorOverrides(globalConf.ErrorOverrides))
+
+	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		spec.Proxy.ListenPath = "/"
+		spec.Proxy.TargetURL = upstream.URL
+		spec.ErrorOverrides = apidef.ErrorOverridesMap{
+			"503": []apidef.ErrorOverride{{
+				Response: apidef.ErrorResponse{
+					StatusCode: 503,
+					Body:       `{"source":"api"}`,
+				},
+			}},
+		}
+		spec.SetCompiledErrorOverrides(CompileErrorOverrides(spec.ErrorOverrides))
+	})
+
+	ts.Run(t, []test.TestCase{{
+		Path:      "/",
+		Code:      503,
+		BodyMatch: `"api"`,
+	}}...)
+}
+
+func TestUpstreamErrorOverride_GatewayFallback(t *testing.T) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(502)
+		w.Write([]byte(`{"upstream":"bad gateway"}`))
+	}))
+	defer upstream.Close()
+
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	globalConf := ts.Gw.GetConfig()
+	globalConf.ErrorOverrides = apidef.ErrorOverridesMap{
+		"502": []apidef.ErrorOverride{{
+			Response: apidef.ErrorResponse{
+				StatusCode: 502,
+				Body:       `{"source":"gateway-fallback"}`,
+			},
+		}},
+	}
+	ts.Gw.SetConfig(globalConf)
+	ts.Gw.SetCompiledErrorOverrides(CompileErrorOverrides(globalConf.ErrorOverrides))
+
+	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		spec.Proxy.ListenPath = "/"
+		spec.Proxy.TargetURL = upstream.URL
+		spec.ErrorOverrides = apidef.ErrorOverridesMap{
+			"404": []apidef.ErrorOverride{{
+				Response: apidef.ErrorResponse{Body: `{"error":"not found"}`},
+			}},
+		}
+		spec.SetCompiledErrorOverrides(CompileErrorOverrides(spec.ErrorOverrides))
+	})
+
+	ts.Run(t, []test.TestCase{{
+		Path:      "/",
+		Code:      502,
+		BodyMatch: `"gateway-fallback"`,
+	}}...)
+}
+
+func TestUpstreamErrorOverride_APILevelPatternMatching(t *testing.T) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/401":
+			w.WriteHeader(401)
+		case "/403":
+			w.WriteHeader(403)
+		case "/500":
+			w.WriteHeader(500)
+		case "/503":
+			w.WriteHeader(503)
+		}
+		w.Write([]byte(`{"upstream":"error"}`))
+	}))
+	defer upstream.Close()
+
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		spec.Proxy.ListenPath = "/"
+		spec.Proxy.TargetURL = upstream.URL
+		spec.ErrorOverrides = apidef.ErrorOverridesMap{
+			"4xx": []apidef.ErrorOverride{{
+				Response: apidef.ErrorResponse{Body: `{"error":"client-error"}`},
+			}},
+			"5xx": []apidef.ErrorOverride{{
+				Response: apidef.ErrorResponse{Body: `{"error":"server-error"}`},
+			}},
+		}
+		spec.SetCompiledErrorOverrides(CompileErrorOverrides(spec.ErrorOverrides))
+	})
+
+	ts.Run(t, []test.TestCase{
+		{Path: "/401", Code: 401, BodyMatch: `"client-error"`},
+		{Path: "/403", Code: 403, BodyMatch: `"client-error"`},
+		{Path: "/500", Code: 500, BodyMatch: `"server-error"`},
+		{Path: "/503", Code: 503, BodyMatch: `"server-error"`},
+	}...)
+}
+
+func TestUpstreamErrorOverride_APILevelBodyFieldMatching(t *testing.T) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(500)
+		switch r.URL.Path {
+		case "/db-error":
+			w.Write([]byte(`{"error":{"code":"DB_CONN_FAILED","message":"Database unavailable"}}`))
+		case "/cache-error":
+			w.Write([]byte(`{"error":{"code":"CACHE_MISS","message":"Cache unavailable"}}`))
+		default:
+			w.Write([]byte(`{"error":{"code":"UNKNOWN"}}`))
+		}
+	}))
+	defer upstream.Close()
+
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		spec.Proxy.ListenPath = "/"
+		spec.Proxy.TargetURL = upstream.URL
+		spec.ErrorOverrides = apidef.ErrorOverridesMap{
+			"500": []apidef.ErrorOverride{
+				{
+					Match: &apidef.ErrorMatcher{
+						BodyField: "error.code",
+						BodyValue: "DB_CONN_FAILED",
+					},
+					Response: apidef.ErrorResponse{
+						StatusCode: 503,
+						Body:       `{"error":"database-override"}`,
+					},
+				},
+				{
+					Match: &apidef.ErrorMatcher{
+						BodyField: "error.code",
+						BodyValue: "CACHE_MISS",
+					},
+					Response: apidef.ErrorResponse{
+						StatusCode: 500,
+						Body:       `{"error":"cache-override"}`,
+					},
+				},
+			},
+		}
+		spec.SetCompiledErrorOverrides(CompileErrorOverrides(spec.ErrorOverrides))
+	})
+
+	ts.Run(t, []test.TestCase{
+		{Path: "/db-error", Code: 503, BodyMatch: `"database-override"`},
+		{Path: "/cache-error", Code: 500, BodyMatch: `"cache-override"`},
+		{Path: "/other", Code: 500, BodyNotMatch: `"override"`}, // No match = original body
+	}...)
+}
+
+func TestUpstreamErrorOverride_APILevelMessagePattern(t *testing.T) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(500)
+		switch r.URL.Path {
+		case "/timeout":
+			w.Write([]byte(`Connection timeout after 30s`))
+		case "/oom":
+			w.Write([]byte(`OutOfMemoryError: Java heap space`))
+		default:
+			w.Write([]byte(`Generic error`))
+		}
+	}))
+	defer upstream.Close()
+
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		spec.Proxy.ListenPath = "/"
+		spec.Proxy.TargetURL = upstream.URL
+		spec.ErrorOverrides = apidef.ErrorOverridesMap{
+			"500": []apidef.ErrorOverride{
+				{
+					Match: &apidef.ErrorMatcher{
+						MessagePattern: "(?i)timeout",
+					},
+					Response: apidef.ErrorResponse{
+						StatusCode: 504,
+						Body:       `{"error":"gateway-timeout"}`,
+					},
+				},
+				{
+					Match: &apidef.ErrorMatcher{
+						MessagePattern: "(?i)OutOfMemory",
+					},
+					Response: apidef.ErrorResponse{
+						StatusCode: 503,
+						Body:       `{"error":"service-overloaded"}`,
+					},
+				},
+			},
+		}
+		spec.SetCompiledErrorOverrides(CompileErrorOverrides(spec.ErrorOverrides))
+	})
+
+	ts.Run(t, []test.TestCase{
+		{Path: "/timeout", Code: 504, BodyMatch: `"gateway-timeout"`},
+		{Path: "/oom", Code: 503, BodyMatch: `"service-overloaded"`},
+		{Path: "/other", Code: 500, BodyMatch: `Generic error`}, // No match = original
+	}...)
+}
+
+func TestUpstreamErrorOverride_APILevelFirstMatchWins(t *testing.T) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(500)
+		w.Write([]byte(`{"error":"database connection failed"}`))
+	}))
+	defer upstream.Close()
+
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		spec.Proxy.ListenPath = "/"
+		spec.Proxy.TargetURL = upstream.URL
+		spec.ErrorOverrides = apidef.ErrorOverridesMap{
+			"500": []apidef.ErrorOverride{
+				{
+					Match: &apidef.ErrorMatcher{
+						MessagePattern: "database",
+					},
+					Response: apidef.ErrorResponse{
+						Body: `{"error":"first-rule"}`,
+					},
+				},
+				{
+					Match: &apidef.ErrorMatcher{
+						MessagePattern: "connection",
+					},
+					Response: apidef.ErrorResponse{
+						Body: `{"error":"second-rule"}`,
+					},
+				},
+				{
+					Response: apidef.ErrorResponse{
+						Body: `{"error":"catch-all"}`,
+					},
+				},
+			},
+		}
+		spec.SetCompiledErrorOverrides(CompileErrorOverrides(spec.ErrorOverrides))
+	})
+
+	ts.Run(t, []test.TestCase{{
+		Path:      "/",
+		Code:      500,
+		BodyMatch: `"first-rule"`,
+	}}...)
 }
 
 // Helper types for testing

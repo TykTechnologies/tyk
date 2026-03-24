@@ -1529,11 +1529,11 @@ run_all_override_tests() {
         "/test-cbo/500"
 
     # ==========================================================================
-    # API-Level Override Precedence Tests
+    # API-Level Override Tests
     # ==========================================================================
     echo ""
     log_info "=========================================="
-    log_info "API LEVEL OVERRIDE PRECEDENCE TESTS"
+    log_info "API LEVEL OVERRIDE TESTS"
     log_info "=========================================="
 
     run_override_test \
@@ -1552,6 +1552,14 @@ run_all_override_tests() {
         "authentication_required" \
         "AMF" \
         "401"
+
+    run_override_test \
+        "API Override Upstream - 404" \
+        "/test-api-override-upstream/404-json" \
+        "" \
+        "api_level_upstream" \
+        "UPSTREAM-API" \
+        "420"
 
     # ==========================================================================
     # Upstream Error Override Tests

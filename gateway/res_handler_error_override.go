@@ -28,7 +28,8 @@ func (r *ResponseErrorOverrideMiddleware) Name() string {
 
 func (r *ResponseErrorOverrideMiddleware) Enabled() bool {
 	// Fast path: check config before any processing
-	return len(r.Spec.GlobalConfig.ErrorOverrides) > 0
+	return len(r.Spec.GlobalConfig.ErrorOverrides) > 0 ||
+		len(r.Spec.APIDefinition.ErrorOverrides) > 0
 }
 
 func (r *ResponseErrorOverrideMiddleware) Init(c interface{}, spec *APISpec) error {
@@ -79,7 +80,8 @@ func (r *ResponseErrorOverrideMiddleware) HandleResponse(
 
 // shouldProcessResponse checks if response should be processed for error overrides.
 func (r *ResponseErrorOverrideMiddleware) shouldProcessResponse(res *http.Response) bool {
-	return res.StatusCode >= 400 && len(r.Spec.GlobalConfig.ErrorOverrides) > 0
+	return res.StatusCode >= 400 &&
+		(len(r.Spec.GlobalConfig.ErrorOverrides) > 0 || len(r.Spec.APIDefinition.ErrorOverrides) > 0)
 }
 
 // lazyBodyReader handles lazy reading and caching of response body.

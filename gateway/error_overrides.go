@@ -389,27 +389,35 @@ func (r *OverrideResult) getInlineTemplate(errCtx *ErrorResponseContext) Templat
 // ApplyUpstreamOverride applies overrides for upstream 4xx/5xx responses.
 // Uses lazy body reading via closure.
 func (o *ErrorOverrides) ApplyUpstreamOverride(statusCode int, readBody func() []byte) *OverrideResult {
-	// TODO: Check API-level overrides first (higher priority) when implemented
+	apiCompiled := o.Spec.GetCompiledErrorOverrides()
+	gwCompiled := o.Gw.GetCompiledErrorOverrides()
 
-	compiled := o.Gw.GetCompiledErrorOverrides()
-	if compiled == nil {
+	if apiCompiled == nil && gwCompiled == nil {
 		return nil
 	}
 
-	rule := o.findMatchingRuleGeneric(compiled, statusCode, func(rule *apidef.ErrorOverride) bool {
+	matchFunc := func(rule *apidef.ErrorOverride) bool {
 		var matchBody []byte
 		if o.needsBodyForMatch(rule) {
 			matchBody = readBody()
 		}
 
 		return o.matchesUpstreamCriteria(rule, matchBody, statusCode)
-	})
-
-	if rule == nil {
-		return nil
 	}
 
-	return o.createOverrideResult(rule, statusCode)
+	if apiCompiled != nil {
+		if rule := o.findMatchingRuleGeneric(apiCompiled, statusCode, matchFunc); rule != nil {
+			return o.createOverrideResult(rule, statusCode)
+		}
+	}
+
+	if gwCompiled != nil {
+		if rule := o.findMatchingRuleGeneric(gwCompiled, statusCode, matchFunc); rule != nil {
+			return o.createOverrideResult(rule, statusCode)
+		}
+	}
+
+	return nil
 }
 
 func (o *ErrorOverrides) createOverrideResult(rule *apidef.ErrorOverride, statusCode int) *OverrideResult {
