@@ -1529,6 +1529,31 @@ run_all_override_tests() {
         "/test-cbo/500"
 
     # ==========================================================================
+    # API-Level Override Precedence Tests
+    # ==========================================================================
+    echo ""
+    log_info "=========================================="
+    log_info "API LEVEL OVERRIDE PRECEDENCE TESTS"
+    log_info "=========================================="
+
+    run_override_test \
+        "API Override Precedence - AKI" \
+        "/test-api-override-aki/get" \
+        "AKI" \
+        "api_level_override" \
+        "AKI-API" \
+        "418" \
+        "-H \"Authorization: invalid-key-12345\""
+
+    run_override_test \
+        "API Override Fallback - AMF" \
+        "/test-api-override-aki/get" \
+        "AMF" \
+        "authentication_required" \
+        "AMF" \
+        "401"
+
+    # ==========================================================================
     # Upstream Error Override Tests
     # ==========================================================================
 
