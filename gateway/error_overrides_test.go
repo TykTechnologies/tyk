@@ -42,7 +42,7 @@ func TestCompileErrorOverrides(t *testing.T) {
 				{
 					Response: apidef.ErrorResponse{
 						StatusCode: 503,
-						Message: "Service unavailable",
+						Message:    "Service unavailable",
 					},
 				},
 			},
@@ -98,13 +98,13 @@ func TestCompileErrorOverrides(t *testing.T) {
 					},
 					Response: apidef.ErrorResponse{
 						StatusCode: 504,
-						Message: "Database timeout",
+						Message:    "Database timeout",
 					},
 				},
 				{
 					Response: apidef.ErrorResponse{
 						StatusCode: 503,
-						Message: "Generic server error",
+						Message:    "Generic server error",
 					},
 				},
 			},
@@ -372,6 +372,15 @@ func TestApplyOverride(t *testing.T) {
 		return gw
 	}
 
+	createSpec := func(overrides apidef.ErrorOverridesMap) *APISpec {
+		spec := &APISpec{}
+		compiled := CompileErrorOverrides(overrides)
+		if compiled != nil {
+			spec.SetCompiledErrorOverrides(compiled)
+		}
+		return spec
+	}
+
 	t.Run("no overrides configured", func(t *testing.T) {
 		gw := &Gateway{}
 		eo := NewErrorOverrides(nil, gw)
@@ -387,7 +396,7 @@ func TestApplyOverride(t *testing.T) {
 				{
 					Response: apidef.ErrorResponse{
 						StatusCode: 503,
-						Message: "Service unavailable",
+						Message:    "Service unavailable",
 					},
 				},
 			},
@@ -431,7 +440,7 @@ func TestApplyOverride(t *testing.T) {
 				{
 					Response: apidef.ErrorResponse{
 						StatusCode: 503,
-						Message: "Server error",
+						Message:    "Server error",
 					},
 				},
 			},
@@ -505,7 +514,7 @@ func TestApplyOverride(t *testing.T) {
 					},
 					Response: apidef.ErrorResponse{
 						StatusCode: 504,
-						Message: "Database timeout",
+						Message:    "Database timeout",
 					},
 				},
 			},
@@ -535,7 +544,7 @@ func TestApplyOverride(t *testing.T) {
 					},
 					Response: apidef.ErrorResponse{
 						StatusCode: 402,
-						Message: "Payment required",
+						Message:    "Payment required",
 					},
 				},
 			},
@@ -572,7 +581,7 @@ func TestApplyOverride(t *testing.T) {
 					},
 					Response: apidef.ErrorResponse{
 						StatusCode: 504,
-						Message: "Request timeout",
+						Message:    "Request timeout",
 					},
 				},
 			},
@@ -675,6 +684,67 @@ func TestApplyOverride(t *testing.T) {
 		// 404 is not configured
 		result := eo.ApplyOverride(req, 404, []byte("not found"))
 		assert.Nil(t, result)
+	})
+
+	t.Run("API-level override takes precedence over gateway-level", func(t *testing.T) {
+		gwOverrides := apidef.ErrorOverridesMap{
+			"500": []apidef.ErrorOverride{
+				{Response: apidef.ErrorResponse{Message: "Gateway error"}},
+			},
+		}
+		apiOverrides := apidef.ErrorOverridesMap{
+			"500": []apidef.ErrorOverride{
+				{Response: apidef.ErrorResponse{Message: "API error"}},
+			},
+		}
+
+		gw := createGateway(gwOverrides)
+		spec := createSpec(apiOverrides)
+		eo := NewErrorOverrides(spec, gw)
+		req := httptest.NewRequest("GET", "/test", nil)
+
+		result := eo.ApplyOverride(req, 500, []byte("error"))
+		require.NotNil(t, result)
+		assert.Equal(t, "API error", result.GetMessageForTemplate())
+	})
+
+	t.Run("falls back to gateway-level when API-level doesn't match", func(t *testing.T) {
+		gwOverrides := apidef.ErrorOverridesMap{
+			"500": []apidef.ErrorOverride{
+				{Response: apidef.ErrorResponse{Message: "Gateway error"}},
+			},
+		}
+		apiOverrides := apidef.ErrorOverridesMap{
+			"400": []apidef.ErrorOverride{
+				{Response: apidef.ErrorResponse{Message: "API error"}},
+			},
+		}
+
+		gw := createGateway(gwOverrides)
+		spec := createSpec(apiOverrides)
+		eo := NewErrorOverrides(spec, gw)
+		req := httptest.NewRequest("GET", "/test", nil)
+
+		result := eo.ApplyOverride(req, 500, []byte("error"))
+		require.NotNil(t, result)
+		assert.Equal(t, "Gateway error", result.GetMessageForTemplate())
+	})
+
+	t.Run("API-level override works without gateway-level overrides", func(t *testing.T) {
+		apiOverrides := apidef.ErrorOverridesMap{
+			"500": []apidef.ErrorOverride{
+				{Response: apidef.ErrorResponse{Message: "API error"}},
+			},
+		}
+
+		gw := &Gateway{}
+		spec := createSpec(apiOverrides)
+		eo := NewErrorOverrides(spec, gw)
+		req := httptest.NewRequest("GET", "/test", nil)
+
+		result := eo.ApplyOverride(req, 500, []byte("error"))
+		require.NotNil(t, result)
+		assert.Equal(t, "API error", result.GetMessageForTemplate())
 	})
 }
 
@@ -928,8 +998,8 @@ func TestApplyOverrideWithFlag(t *testing.T) {
 					},
 					Response: apidef.ErrorResponse{
 						StatusCode: 429,
-						Message: "Rate limit exceeded - please slow down",
-						Headers: map[string]string{"Retry-After": "60"},
+						Message:    "Rate limit exceeded - please slow down",
+						Headers:    map[string]string{"Retry-After": "60"},
 					},
 				},
 			},
@@ -1012,7 +1082,7 @@ func TestApplyOverrideWithFlag(t *testing.T) {
 					},
 					Response: apidef.ErrorResponse{
 						StatusCode: 503,
-						Message: "Service temporarily unavailable",
+						Message:    "Service temporarily unavailable",
 					},
 				},
 			},
@@ -1324,7 +1394,7 @@ func TestApplyUpstreamOverride(t *testing.T) {
 				{
 					Response: apidef.ErrorResponse{
 						StatusCode: 500,
-						Message: "Upstream unavailable",
+						Message:    "Upstream unavailable",
 					},
 				},
 			},
@@ -1349,7 +1419,7 @@ func TestApplyUpstreamOverride(t *testing.T) {
 				{
 					Response: apidef.ErrorResponse{
 						StatusCode: 503,
-						Message: "Server error",
+						Message:    "Server error",
 					},
 				},
 			},
@@ -1374,7 +1444,7 @@ func TestApplyUpstreamOverride(t *testing.T) {
 					Match: &apidef.ErrorMatcher{Flag: errors.URS},
 					Response: apidef.ErrorResponse{
 						StatusCode: 503,
-						Message: "Upstream error",
+						Message:    "Upstream error",
 					},
 				},
 			},
@@ -1448,7 +1518,7 @@ func TestApplyUpstreamOverride(t *testing.T) {
 					},
 					Response: apidef.ErrorResponse{
 						StatusCode: 504,
-						Message: "Timeout occurred",
+						Message:    "Timeout occurred",
 					},
 				},
 			},
@@ -1474,7 +1544,7 @@ func TestApplyUpstreamOverride(t *testing.T) {
 					},
 					Response: apidef.ErrorResponse{
 						StatusCode: 503,
-						Message: "Database is down",
+						Message:    "Database is down",
 					},
 				},
 			},
@@ -1505,7 +1575,7 @@ func TestApplyUpstreamOverride(t *testing.T) {
 					// First rule has no body match - should not read body
 					Response: apidef.ErrorResponse{
 						StatusCode: 503,
-						Message: "Generic error",
+						Message:    "Generic error",
 					},
 				},
 			},
@@ -1558,7 +1628,7 @@ func TestApplyUpstreamOverride(t *testing.T) {
 				{
 					Response: apidef.ErrorResponse{
 						StatusCode: 0, // Don't change status code
-						Message: "Keep original code",
+						Message:    "Keep original code",
 					},
 				},
 			},
@@ -1735,8 +1805,8 @@ func TestCreateOverrideResult(t *testing.T) {
 		rule := &apidef.ErrorOverride{
 			Response: apidef.ErrorResponse{
 				StatusCode: 503,
-				Message: "Service unavailable",
-				Headers: map[string]string{"Retry-After": "60"},
+				Message:    "Service unavailable",
+				Headers:    map[string]string{"Retry-After": "60"},
 			},
 		}
 
@@ -1752,7 +1822,7 @@ func TestCreateOverrideResult(t *testing.T) {
 		rule := &apidef.ErrorOverride{
 			Response: apidef.ErrorResponse{
 				StatusCode: 0,
-				Message: "Keep original",
+				Message:    "Keep original",
 			},
 		}
 
@@ -1766,7 +1836,7 @@ func TestCreateOverrideResult(t *testing.T) {
 		rule := &apidef.ErrorOverride{
 			Response: apidef.ErrorResponse{
 				StatusCode: 503,
-				Headers: nil,
+				Headers:    nil,
 			},
 		}
 

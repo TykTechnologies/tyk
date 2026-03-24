@@ -195,35 +195,26 @@ func compileBodyTemplates(rule *apidef.ErrorOverride) error {
 // Uses O(1) lookup by status code, then checks additional matching criteria.
 // Returns nil if no override matches.
 func (o *ErrorOverrides) ApplyOverride(r *http.Request, statusCode int, body []byte) *OverrideResult {
-	// Future: Check API-level first (o.Spec.CompiledErrorOverrides)
+	apiCompiled := o.Spec.GetCompiledErrorOverrides()
+	gwCompiled := o.Gw.GetCompiledErrorOverrides()
 
-	// Check gateway-level compiled overrides
-	compiled := o.Gw.GetCompiledErrorOverrides()
-	if compiled == nil {
+	if apiCompiled == nil && gwCompiled == nil {
 		return nil
 	}
 
-	// Find matching rule (uses request context for flag matching, body for pattern matching)
-	rule := o.findMatchingRule(r, compiled, statusCode, body)
-	if rule == nil {
-		return nil
+	if apiCompiled != nil {
+		if rule := o.findMatchingRule(r, apiCompiled, statusCode, body); rule != nil {
+			return o.createOverrideResult(rule, statusCode)
+		}
 	}
 
-	// Build result with context for response writing
-	// Original body is NOT stored - users must provide explicit override messages
-	result := &OverrideResult{
-		StatusCode:   rule.Response.StatusCode,
-		Headers:      rule.Response.Headers,
-		OriginalCode: statusCode,
-		rule:         rule,
+	if gwCompiled != nil {
+		if rule := o.findMatchingRule(r, gwCompiled, statusCode, body); rule != nil {
+			return o.createOverrideResult(rule, statusCode)
+		}
 	}
 
-	// If StatusCode is not set, keep the original status code
-	if result.StatusCode == 0 {
-		result.StatusCode = statusCode
-	}
-
-	return result
+	return nil
 }
 
 // findMatchingRuleGeneric searches for a matching override rule using a custom match function.

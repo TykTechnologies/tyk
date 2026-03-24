@@ -396,11 +396,8 @@ func (e *ErrorHandler) writeJSONRPCErrorResponse(w http.ResponseWriter, r *http.
 // Returns nil if no override applies, allowing fallback to the default template.
 func (e *ErrorHandler) tryWriteOverride(w http.ResponseWriter, r *http.Request, errMsg string, errCode int) *http.Response {
 	// Fast path: check config map length before atomic load
-	if len(e.Spec.GlobalConfig.ErrorOverrides) == 0 {
-		return nil
-	}
-
-	if e.Gw.GetCompiledErrorOverrides() == nil {
+	if len(e.Spec.GlobalConfig.ErrorOverrides) == 0 &&
+		len(e.Spec.APIDefinition.ErrorOverrides) == 0 {
 		return nil
 	}
 

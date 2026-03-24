@@ -77,7 +77,7 @@ func TestWriteOverrideResponse(t *testing.T) {
 
 		result := &OverrideResult{
 			StatusCode: 504,
-			rule: rule,
+			rule:       rule,
 		}
 
 		response := handler.writeOverrideResponse(w, req, result, "timeout")
@@ -108,7 +108,7 @@ func TestWriteOverrideResponse(t *testing.T) {
 
 		result := &OverrideResult{
 			StatusCode: 500,
-			rule: rule,
+			rule:       rule,
 		}
 
 		response := handler.writeOverrideResponse(w, req, result, "original error")
@@ -558,7 +558,7 @@ func TestErrorOverrideEdgeCases(t *testing.T) {
 				{
 					Response: apidef.ErrorResponse{
 						StatusCode: 0, // Not set
-						Message: "Error occurred",
+						Message:    "Error occurred",
 					},
 				},
 			},
@@ -568,7 +568,7 @@ func TestErrorOverrideEdgeCases(t *testing.T) {
 		compiled := CompileErrorOverrides(overrides)
 		gw.SetCompiledErrorOverrides(compiled)
 
-		eo := NewErrorOverrides(nil, gw)
+		eo := NewErrorOverrides(&APISpec{}, gw)
 		req := httptest.NewRequest("GET", "/test", nil)
 
 		result := eo.ApplyOverride(req, 500, []byte("error"))
@@ -590,7 +590,7 @@ func TestErrorOverrideEdgeCases(t *testing.T) {
 
 		result := &OverrideResult{
 			StatusCode: 500,
-			Headers: map[string]string{},
+			Headers:    map[string]string{},
 			rule: &apidef.ErrorOverride{
 				Response: apidef.ErrorResponse{
 					Body: `{"error": "test"}`,
@@ -615,7 +615,7 @@ func TestErrorOverrideEdgeCases(t *testing.T) {
 
 		result := &OverrideResult{
 			StatusCode: 500,
-			Headers: nil,
+			Headers:    nil,
 			rule: &apidef.ErrorOverride{
 				Response: apidef.ErrorResponse{
 					Body: `{"error": "test"}`,
