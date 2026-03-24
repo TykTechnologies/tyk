@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/getkin/kin-openapi/routers"
@@ -109,7 +110,7 @@ type APISpec struct {
 
 	// compiledErrorOverrides holds the indexed error override rules for O(1) lookup.
 	// Built from apidef.ErrorOverrides during gateway startup.
-	compiledErrorOverrides *CompiledErrorOverrides
+	compiledErrorOverrides atomic.Pointer[CompiledErrorOverrides]
 }
 
 // CheckSpecMatchesStatus checks if a URL spec has a specific status.
@@ -144,6 +145,16 @@ func (a *APISpec) GetTykExtension() *oas.XTykAPIGateway {
 		log.Warn("APISpec is an invalid OAS API")
 	}
 	return res
+}
+
+// GetCompiledErrorOverrides returns the compiled error overrides for O(1) lookup.
+func (a *APISpec) GetCompiledErrorOverrides() *CompiledErrorOverrides {
+	return a.compiledErrorOverrides.Load()
+}
+
+// SetCompiledErrorOverrides stores the compiled error overrides.
+func (a *APISpec) SetCompiledErrorOverrides(compiled *CompiledErrorOverrides) {
+	a.compiledErrorOverrides.Store(compiled)
 }
 
 // GetPRMConfig returns the Protected Resource Metadata configuration
