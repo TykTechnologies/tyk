@@ -11,6 +11,9 @@
     "server": {
       "$ref": "#/definitions/X-Tyk-Server"
     },
+    "error_overrides": {
+      "$ref": "#/definitions/X-Tyk-ErrorOverrides"
+    },
     "middleware": {
       "$ref": "#/definitions/X-Tyk-Middleware"
     }
@@ -2753,10 +2756,69 @@
           "type": "number"
         }
       },
-      "required": [
-        "url",
-        "weight"
-      ]
+      "required": ["url", "weight"]
+    },
+    "X-Tyk-ErrorOverrides": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "array",
+        "items": {
+          "$ref": "#/definitions/X-Tyk-ErrorOverride"
+        }
+      }
+    },
+    "X-Tyk-ErrorOverride": {
+      "type": "object",
+      "properties": {
+        "match": {
+          "$ref": "#/definitions/X-Tyk-ErrorMatcher"
+        },
+        "response": {
+          "$ref": "#/definitions/X-Tyk-ErrorResponse"
+        }
+      },
+      "required": ["response"]
+    },
+    "X-Tyk-ErrorMatcher": {
+      "type": "object",
+      "properties": {
+        "flag": {
+          "type": "string"
+        },
+        "message_pattern": {
+          "type": "string"
+        },
+        "body_field": {
+          "type": "string"
+        },
+        "body_value": {
+          "type": "string"
+        }
+      }
+    },
+    "X-Tyk-ErrorResponse": {
+      "type": "object",
+      "properties": {
+        "status_code": {
+          "type": "integer"
+        },
+        "body": {
+          "type": "string"
+        },
+        "message": {
+          "type": "string"
+        },
+        "template": {
+          "type": "string"
+        },
+        "headers": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        }
+      },
+      "required": ["status_code"]
     }
   }
 }
