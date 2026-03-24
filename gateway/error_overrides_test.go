@@ -383,7 +383,7 @@ func TestApplyOverride(t *testing.T) {
 
 	t.Run("no overrides configured", func(t *testing.T) {
 		gw := &Gateway{}
-		eo := NewErrorOverrides(nil, gw)
+		eo := NewErrorOverrides(APISpec{}, gw)
 		req := httptest.NewRequest("GET", "/test", nil)
 
 		result := eo.ApplyOverride(req, 500, []byte("error message"))
@@ -403,7 +403,7 @@ func TestApplyOverride(t *testing.T) {
 		}
 
 		gw := createGateway(overrides)
-		eo := NewErrorOverrides(nil, gw)
+		eo := NewErrorOverrides(APISpec{}, gw)
 		req := httptest.NewRequest("GET", "/test", nil)
 
 		result := eo.ApplyOverride(req, 500, []byte("internal error"))
@@ -425,7 +425,7 @@ func TestApplyOverride(t *testing.T) {
 		}
 
 		gw := createGateway(overrides)
-		eo := NewErrorOverrides(nil, gw)
+		eo := NewErrorOverrides(APISpec{}, gw)
 		req := httptest.NewRequest("GET", "/test", nil)
 
 		result := eo.ApplyOverride(req, 404, []byte("not found"))
@@ -447,7 +447,7 @@ func TestApplyOverride(t *testing.T) {
 		}
 
 		gw := createGateway(overrides)
-		eo := NewErrorOverrides(nil, gw)
+		eo := NewErrorOverrides(APISpec{}, gw)
 		req := httptest.NewRequest("GET", "/test", nil)
 
 		result := eo.ApplyOverride(req, 502, []byte("bad gateway"))
@@ -467,7 +467,7 @@ func TestApplyOverride(t *testing.T) {
 		}
 
 		gw := createGateway(overrides)
-		eo := NewErrorOverrides(nil, gw)
+		eo := NewErrorOverrides(APISpec{}, gw)
 		req := httptest.NewRequest("GET", "/test", nil)
 
 		result := eo.ApplyOverride(req, 500, []byte("error"))
@@ -491,7 +491,7 @@ func TestApplyOverride(t *testing.T) {
 		}
 
 		gw := createGateway(overrides)
-		eo := NewErrorOverrides(nil, gw)
+		eo := NewErrorOverrides(APISpec{}, gw)
 		req := httptest.NewRequest("GET", "/test", nil)
 
 		// Should match first rule with pattern
@@ -521,7 +521,7 @@ func TestApplyOverride(t *testing.T) {
 		}
 
 		gw := createGateway(overrides)
-		eo := NewErrorOverrides(nil, gw)
+		eo := NewErrorOverrides(APISpec{}, gw)
 		req := httptest.NewRequest("GET", "/test", nil)
 
 		// Should match
@@ -551,7 +551,7 @@ func TestApplyOverride(t *testing.T) {
 		}
 
 		gw := createGateway(overrides)
-		eo := NewErrorOverrides(nil, gw)
+		eo := NewErrorOverrides(APISpec{}, gw)
 		req := httptest.NewRequest("GET", "/test", nil)
 
 		// Should match
@@ -588,7 +588,7 @@ func TestApplyOverride(t *testing.T) {
 		}
 
 		gw := createGateway(overrides)
-		eo := NewErrorOverrides(nil, gw)
+		eo := NewErrorOverrides(APISpec{}, gw)
 		req := httptest.NewRequest("GET", "/test", nil)
 
 		body := []byte(`{"metadata": {"error": {"type": "timeout"}}}`)
@@ -610,7 +610,7 @@ func TestApplyOverride(t *testing.T) {
 		}
 
 		gw := createGateway(overrides)
-		eo := NewErrorOverrides(nil, gw)
+		eo := NewErrorOverrides(APISpec{}, gw)
 		req := httptest.NewRequest("GET", "/test", nil)
 
 		// Create a large body (> 4KB) with pattern at start
@@ -639,7 +639,7 @@ func TestApplyOverride(t *testing.T) {
 		}
 
 		gw := createGateway(overrides)
-		eo := NewErrorOverrides(nil, gw)
+		eo := NewErrorOverrides(APISpec{}, gw)
 		req := httptest.NewRequest("GET", "/test", nil)
 
 		result := eo.ApplyOverride(req, 429, []byte("too many requests"))
@@ -662,7 +662,7 @@ func TestApplyOverride(t *testing.T) {
 		}
 
 		gw := createGateway(overrides)
-		eo := NewErrorOverrides(nil, gw)
+		eo := NewErrorOverrides(APISpec{}, gw)
 		req := httptest.NewRequest("GET", "/test", nil)
 
 		result := eo.ApplyOverride(req, 401, []byte("unauthorized"))
@@ -678,7 +678,7 @@ func TestApplyOverride(t *testing.T) {
 		}
 
 		gw := createGateway(overrides)
-		eo := NewErrorOverrides(nil, gw)
+		eo := NewErrorOverrides(APISpec{}, gw)
 		req := httptest.NewRequest("GET", "/test", nil)
 
 		// 404 is not configured
@@ -700,7 +700,7 @@ func TestApplyOverride(t *testing.T) {
 
 		gw := createGateway(gwOverrides)
 		spec := createSpec(apiOverrides)
-		eo := NewErrorOverrides(spec, gw)
+		eo := NewErrorOverrides(APISpec{}, gw)
 		req := httptest.NewRequest("GET", "/test", nil)
 
 		result := eo.ApplyOverride(req, 500, []byte("error"))
@@ -1006,7 +1006,7 @@ func TestApplyOverrideWithFlag(t *testing.T) {
 		}
 
 		gw := createGateway(overrides)
-		eo := NewErrorOverrides(nil, gw)
+		eo := NewErrorOverrides(APISpec{}, gw)
 		req := httptest.NewRequest("GET", "/test", nil)
 
 		// Set rate limit classification
@@ -1048,7 +1048,7 @@ func TestApplyOverrideWithFlag(t *testing.T) {
 		}
 
 		gw := createGateway(overrides)
-		eo := NewErrorOverrides(nil, gw)
+		eo := NewErrorOverrides(APISpec{}, gw)
 
 		// Test token expired
 		req1 := httptest.NewRequest("GET", "/test", nil)
@@ -1089,7 +1089,7 @@ func TestApplyOverrideWithFlag(t *testing.T) {
 		}
 
 		gw := createGateway(overrides)
-		eo := NewErrorOverrides(nil, gw)
+		eo := NewErrorOverrides(APISpec{}, gw)
 		req := httptest.NewRequest("GET", "/test", nil)
 		// No classification set
 
@@ -1332,7 +1332,7 @@ func TestFindMatchingRuleGeneric(t *testing.T) {
 	}
 
 	gw := createGateway(overrides)
-	eo := NewErrorOverrides(nil, gw)
+	eo := NewErrorOverrides(APISpec{}, gw)
 	compiled := gw.GetCompiledErrorOverrides()
 
 	t.Run("finds first matching rule in exact code", func(t *testing.T) {
@@ -1376,7 +1376,7 @@ func TestFindMatchingRuleGeneric(t *testing.T) {
 func TestApplyUpstreamOverride(t *testing.T) {
 	t.Run("returns nil when no overrides configured", func(t *testing.T) {
 		gw := createGateway(apidef.ErrorOverridesMap{})
-		eo := NewErrorOverrides(nil, gw)
+		eo := NewErrorOverrides(APISpec{}, gw)
 
 		readBodyCalled := false
 		result := eo.ApplyUpstreamOverride(500, func() []byte {
@@ -1401,7 +1401,7 @@ func TestApplyUpstreamOverride(t *testing.T) {
 		}
 
 		gw := createGateway(overrides)
-		eo := NewErrorOverrides(nil, gw)
+		eo := NewErrorOverrides(APISpec{}, gw)
 
 		result := eo.ApplyUpstreamOverride(503, func() []byte {
 			return []byte("")
@@ -1426,7 +1426,7 @@ func TestApplyUpstreamOverride(t *testing.T) {
 		}
 
 		gw := createGateway(overrides)
-		eo := NewErrorOverrides(nil, gw)
+		eo := NewErrorOverrides(APISpec{}, gw)
 
 		result := eo.ApplyUpstreamOverride(502, func() []byte {
 			return []byte("")
@@ -1451,7 +1451,7 @@ func TestApplyUpstreamOverride(t *testing.T) {
 		}
 
 		gw := createGateway(overrides)
-		eo := NewErrorOverrides(nil, gw)
+		eo := NewErrorOverrides(APISpec{}, gw)
 
 		testCases := []int{500, 502, 503, 504, 599}
 		for _, code := range testCases {
@@ -1477,7 +1477,7 @@ func TestApplyUpstreamOverride(t *testing.T) {
 		}
 
 		gw := createGateway(overrides)
-		eo := NewErrorOverrides(nil, gw)
+		eo := NewErrorOverrides(APISpec{}, gw)
 
 		result := eo.ApplyUpstreamOverride(404, func() []byte {
 			return []byte("")
@@ -1499,7 +1499,7 @@ func TestApplyUpstreamOverride(t *testing.T) {
 		}
 
 		gw := createGateway(overrides)
-		eo := NewErrorOverrides(nil, gw)
+		eo := NewErrorOverrides(APISpec{}, gw)
 
 		result := eo.ApplyUpstreamOverride(500, func() []byte {
 			return []byte("")
@@ -1525,7 +1525,7 @@ func TestApplyUpstreamOverride(t *testing.T) {
 		}
 
 		gw := createGateway(overrides)
-		eo := NewErrorOverrides(nil, gw)
+		eo := NewErrorOverrides(APISpec{}, gw)
 
 		result := eo.ApplyUpstreamOverride(500, func() []byte {
 			return []byte(`{"error": {"type": "timeout"}}`)
@@ -1558,7 +1558,7 @@ func TestApplyUpstreamOverride(t *testing.T) {
 		}
 
 		gw := createGateway(overrides)
-		eo := NewErrorOverrides(nil, gw)
+		eo := NewErrorOverrides(APISpec{}, gw)
 
 		result := eo.ApplyUpstreamOverride(500, func() []byte {
 			return []byte("database connection unavailable")
@@ -1582,7 +1582,7 @@ func TestApplyUpstreamOverride(t *testing.T) {
 		}
 
 		gw := createGateway(overrides)
-		eo := NewErrorOverrides(nil, gw)
+		eo := NewErrorOverrides(APISpec{}, gw)
 
 		readBodyCalled := false
 		result := eo.ApplyUpstreamOverride(500, func() []byte {
@@ -1610,7 +1610,7 @@ func TestApplyUpstreamOverride(t *testing.T) {
 		}
 
 		gw := createGateway(overrides)
-		eo := NewErrorOverrides(nil, gw)
+		eo := NewErrorOverrides(APISpec{}, gw)
 
 		readBodyCalled := false
 		result := eo.ApplyUpstreamOverride(500, func() []byte {
@@ -1635,7 +1635,7 @@ func TestApplyUpstreamOverride(t *testing.T) {
 		}
 
 		gw := createGateway(overrides)
-		eo := NewErrorOverrides(nil, gw)
+		eo := NewErrorOverrides(APISpec{}, gw)
 
 		result := eo.ApplyUpstreamOverride(500, func() []byte {
 			return []byte("")
@@ -1649,7 +1649,7 @@ func TestApplyUpstreamOverride(t *testing.T) {
 
 func TestMatchesUpstreamCriteria(t *testing.T) {
 	gw := createGateway(apidef.ErrorOverridesMap{})
-	eo := NewErrorOverrides(nil, gw)
+	eo := NewErrorOverrides(APISpec{}, gw)
 
 	t.Run("matches when no criteria specified", func(t *testing.T) {
 		rule := &apidef.ErrorOverride{
@@ -1751,7 +1751,7 @@ func TestMatchesUpstreamCriteria(t *testing.T) {
 
 func TestNeedsBodyForMatch(t *testing.T) {
 	gw := createGateway(apidef.ErrorOverridesMap{})
-	eo := NewErrorOverrides(nil, gw)
+	eo := NewErrorOverrides(APISpec{}, gw)
 
 	t.Run("returns false when no match criteria", func(t *testing.T) {
 		rule := &apidef.ErrorOverride{
@@ -1799,7 +1799,7 @@ func TestNeedsBodyForMatch(t *testing.T) {
 
 func TestCreateOverrideResult(t *testing.T) {
 	gw := createGateway(apidef.ErrorOverridesMap{})
-	eo := NewErrorOverrides(nil, gw)
+	eo := NewErrorOverrides(APISpec{}, gw)
 
 	t.Run("creates result with override code", func(t *testing.T) {
 		rule := &apidef.ErrorOverride{
