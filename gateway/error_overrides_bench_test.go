@@ -40,7 +40,7 @@ func BenchmarkTryWriteOverride(b *testing.B) {
 				{
 					Response: apidef.ErrorResponse{
 						StatusCode: 503,
-						Body: `{"error": "Service unavailable"}`,
+						Body:       `{"error": "Service unavailable"}`,
 					},
 				},
 			},
@@ -75,7 +75,7 @@ func BenchmarkTryWriteOverride(b *testing.B) {
 func BenchmarkApplyOverride(b *testing.B) {
 	b.Run("no overrides configured", func(b *testing.B) {
 		gw := &Gateway{}
-		eo := NewErrorOverrides(nil, gw)
+		eo := NewErrorOverrides(&APISpec{}, gw)
 		req := httptest.NewRequest("GET", "/test", nil)
 		body := []byte("Internal server error")
 
@@ -91,7 +91,7 @@ func BenchmarkApplyOverride(b *testing.B) {
 				{
 					Response: apidef.ErrorResponse{
 						StatusCode: 503,
-						Message: "Service unavailable",
+						Message:    "Service unavailable",
 					},
 				},
 			},
@@ -100,7 +100,7 @@ func BenchmarkApplyOverride(b *testing.B) {
 		gw := &Gateway{}
 		compiled := CompileErrorOverrides(overrides)
 		gw.SetCompiledErrorOverrides(compiled)
-		eo := NewErrorOverrides(nil, gw)
+		eo := NewErrorOverrides(&APISpec{}, gw)
 		req := httptest.NewRequest("GET", "/test", nil)
 		body := []byte("Internal server error")
 
@@ -124,7 +124,7 @@ func BenchmarkApplyOverride(b *testing.B) {
 		gw := &Gateway{}
 		compiled := CompileErrorOverrides(overrides)
 		gw.SetCompiledErrorOverrides(compiled)
-		eo := NewErrorOverrides(nil, gw)
+		eo := NewErrorOverrides(&APISpec{}, gw)
 		req := httptest.NewRequest("GET", "/test", nil)
 		body := []byte("Not found")
 
@@ -143,7 +143,7 @@ func BenchmarkApplyOverride(b *testing.B) {
 					},
 					Response: apidef.ErrorResponse{
 						StatusCode: 504,
-						Message: "Database timeout",
+						Message:    "Database timeout",
 					},
 				},
 			},
@@ -152,7 +152,7 @@ func BenchmarkApplyOverride(b *testing.B) {
 		gw := &Gateway{}
 		compiled := CompileErrorOverrides(overrides)
 		gw.SetCompiledErrorOverrides(compiled)
-		eo := NewErrorOverrides(nil, gw)
+		eo := NewErrorOverrides(&APISpec{}, gw)
 		req := httptest.NewRequest("GET", "/test", nil)
 		body := []byte("database connection timeout occurred")
 
@@ -171,7 +171,7 @@ func BenchmarkApplyOverride(b *testing.B) {
 					},
 					Response: apidef.ErrorResponse{
 						StatusCode: 504,
-						Message: "Database timeout",
+						Message:    "Database timeout",
 					},
 				},
 			},
@@ -180,7 +180,7 @@ func BenchmarkApplyOverride(b *testing.B) {
 		gw := &Gateway{}
 		compiled := CompileErrorOverrides(overrides)
 		gw.SetCompiledErrorOverrides(compiled)
-		eo := NewErrorOverrides(nil, gw)
+		eo := NewErrorOverrides(&APISpec{}, gw)
 		req := httptest.NewRequest("GET", "/test", nil)
 		body := []byte("network error occurred")
 
@@ -200,7 +200,7 @@ func BenchmarkApplyOverride(b *testing.B) {
 					},
 					Response: apidef.ErrorResponse{
 						StatusCode: 422,
-						Message: "Validation failed",
+						Message:    "Validation failed",
 					},
 				},
 			},
@@ -209,7 +209,7 @@ func BenchmarkApplyOverride(b *testing.B) {
 		gw := &Gateway{}
 		compiled := CompileErrorOverrides(overrides)
 		gw.SetCompiledErrorOverrides(compiled)
-		eo := NewErrorOverrides(nil, gw)
+		eo := NewErrorOverrides(&APISpec{}, gw)
 		req := httptest.NewRequest("GET", "/test", nil)
 		body := []byte(`{"error": {"code": "INVALID_INPUT", "message": "Field x is required"}}`)
 
@@ -249,7 +249,7 @@ func BenchmarkApplyOverride(b *testing.B) {
 		gw := &Gateway{}
 		compiled := CompileErrorOverrides(overrides)
 		gw.SetCompiledErrorOverrides(compiled)
-		eo := NewErrorOverrides(nil, gw)
+		eo := NewErrorOverrides(&APISpec{}, gw)
 		req := httptest.NewRequest("GET", "/test", nil)
 		body := []byte("database connection failed")
 
@@ -276,7 +276,7 @@ func BenchmarkApplyOverride(b *testing.B) {
 		gw := &Gateway{}
 		compiled := CompileErrorOverrides(overrides)
 		gw.SetCompiledErrorOverrides(compiled)
-		eo := NewErrorOverrides(nil, gw)
+		eo := NewErrorOverrides(&APISpec{}, gw)
 		req := httptest.NewRequest("GET", "/test", nil)
 		largeBody := make([]byte, maxBodySizeForMatching+1000)
 		copy(largeBody, []byte("error at start"))
@@ -296,7 +296,7 @@ func BenchmarkApplyOverride(b *testing.B) {
 					},
 					Response: apidef.ErrorResponse{
 						StatusCode: 429,
-						Message: "Rate limit exceeded",
+						Message:    "Rate limit exceeded",
 					},
 				},
 			},
@@ -305,7 +305,7 @@ func BenchmarkApplyOverride(b *testing.B) {
 		gw := &Gateway{}
 		compiled := CompileErrorOverrides(overrides)
 		gw.SetCompiledErrorOverrides(compiled)
-		eo := NewErrorOverrides(nil, gw)
+		eo := NewErrorOverrides(&APISpec{}, gw)
 		req := httptest.NewRequest("GET", "/test", nil)
 		ctx.SetErrorClassification(req, errors.NewErrorClassification(errors.RLT, "rate_limited"))
 
@@ -324,7 +324,7 @@ func BenchmarkApplyOverride(b *testing.B) {
 					},
 					Response: apidef.ErrorResponse{
 						StatusCode: 429,
-						Message: "Rate limit exceeded",
+						Message:    "Rate limit exceeded",
 					},
 				},
 			},
@@ -333,7 +333,7 @@ func BenchmarkApplyOverride(b *testing.B) {
 		gw := &Gateway{}
 		compiled := CompileErrorOverrides(overrides)
 		gw.SetCompiledErrorOverrides(compiled)
-		eo := NewErrorOverrides(nil, gw)
+		eo := NewErrorOverrides(&APISpec{}, gw)
 		req := httptest.NewRequest("GET", "/test", nil)
 		// No classification set
 
@@ -353,7 +353,7 @@ func BenchmarkApplyOverride(b *testing.B) {
 					},
 					Response: apidef.ErrorResponse{
 						StatusCode: 503,
-						Message: "Service unavailable",
+						Message:    "Service unavailable",
 					},
 				},
 			},
@@ -362,7 +362,7 @@ func BenchmarkApplyOverride(b *testing.B) {
 		gw := &Gateway{}
 		compiled := CompileErrorOverrides(overrides)
 		gw.SetCompiledErrorOverrides(compiled)
-		eo := NewErrorOverrides(nil, gw)
+		eo := NewErrorOverrides(&APISpec{}, gw)
 		req := httptest.NewRequest("GET", "/test", nil)
 		// Set different flag so it falls back to regex
 		ctx.SetErrorClassification(req, errors.NewErrorClassification(errors.UCF, "connection_failure"))
@@ -412,7 +412,7 @@ func BenchmarkApplyOverride(b *testing.B) {
 		gw := &Gateway{}
 		compiled := CompileErrorOverrides(overrides)
 		gw.SetCompiledErrorOverrides(compiled)
-		eo := NewErrorOverrides(nil, gw)
+		eo := NewErrorOverrides(&APISpec{}, gw)
 		req := httptest.NewRequest("GET", "/test", nil)
 		ctx.SetErrorClassification(req, errors.NewErrorClassification(errors.TKE, "token_expired"))
 
@@ -452,7 +452,7 @@ func BenchmarkApplyOverride(b *testing.B) {
 		gw := &Gateway{}
 		compiled := CompileErrorOverrides(overrides)
 		gw.SetCompiledErrorOverrides(compiled)
-		eo := NewErrorOverrides(nil, gw)
+		eo := NewErrorOverrides(&APISpec{}, gw)
 		req := httptest.NewRequest("GET", "/test", nil)
 		// Set a flag that doesn't match any specific rule
 		ctx.SetErrorClassification(req, errors.NewErrorClassification(errors.AKI, "api_key_invalid"))
@@ -480,7 +480,7 @@ func BenchmarkApplyOverride(b *testing.B) {
 		gw := &Gateway{}
 		compiled := CompileErrorOverrides(overrides)
 		gw.SetCompiledErrorOverrides(compiled)
-		eo := NewErrorOverrides(nil, gw)
+		eo := NewErrorOverrides(&APISpec{}, gw)
 		req := httptest.NewRequest("GET", "/test", nil)
 		ctx.SetErrorClassification(req, errors.NewErrorClassification(errors.RLT, "rate_limited"))
 
@@ -507,7 +507,7 @@ func BenchmarkApplyOverride(b *testing.B) {
 		gw := &Gateway{}
 		compiled := CompileErrorOverrides(overrides)
 		gw.SetCompiledErrorOverrides(compiled)
-		eo := NewErrorOverrides(nil, gw)
+		eo := NewErrorOverrides(&APISpec{}, gw)
 		req := httptest.NewRequest("GET", "/test", nil)
 		body := []byte("Rate limit exceeded")
 
@@ -569,7 +569,7 @@ func BenchmarkWriteOverrideResponse(b *testing.B) {
 
 		result := &OverrideResult{
 			StatusCode: 504,
-			rule: rule,
+			rule:       rule,
 		}
 
 		b.ResetTimer()
@@ -602,7 +602,7 @@ func BenchmarkWriteOverrideResponse(b *testing.B) {
 
 		result := &OverrideResult{
 			StatusCode: 500,
-			rule: rule,
+			rule:       rule,
 		}
 
 		b.ResetTimer()
@@ -759,7 +759,7 @@ func BenchmarkCompileErrorOverrides(b *testing.B) {
 				{
 					Response: apidef.ErrorResponse{
 						StatusCode: 503,
-						Message: "Service unavailable",
+						Message:    "Service unavailable",
 					},
 				},
 			},
@@ -805,7 +805,7 @@ func BenchmarkCompileErrorOverrides(b *testing.B) {
 					},
 					Response: apidef.ErrorResponse{
 						StatusCode: 504,
-						Message: "Database timeout",
+						Message:    "Database timeout",
 					},
 				},
 				{
@@ -814,7 +814,7 @@ func BenchmarkCompileErrorOverrides(b *testing.B) {
 					},
 					Response: apidef.ErrorResponse{
 						StatusCode: 502,
-						Message: "Network error",
+						Message:    "Network error",
 					},
 				},
 			},
