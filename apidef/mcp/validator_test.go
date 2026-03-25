@@ -53,6 +53,16 @@ func TestValidateMCPObject(t *testing.T) {
 				},
 			},
 		},
+		ErrorOverrides: oas.ErrorOverridesMap{
+			"400": []oas.ErrorOverride{
+				{
+					Response: oas.ErrorResponse{
+						StatusCode: 400,
+						Message:    "Bad Request",
+					},
+				},
+			},
+		},
 	}
 
 	validOASObject.SetTykExtension(&validXTykAPIGateway)

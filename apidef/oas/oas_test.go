@@ -930,7 +930,7 @@ func TestOAS_ErrorOverrides_UnmarshalJSON(t *testing.T) {
 					"500": [
 						{
 							"response": {
-								"status_code": 504,
+								"statusCode": 504,
 								"body": "{\"error\": \"Gateway Timeout\"}",
 								"message": "Service temporarily unavailable",
 								"headers": {
@@ -986,12 +986,12 @@ func TestOAS_ErrorOverrides_UnmarshalJSON(t *testing.T) {
 						{
 							"match": {
 								"flag": "TLE",
-								"message_pattern": "token.*expired",
-								"body_field": "error.code",
-								"body_value": "TOKEN_EXPIRED"
+								"messagePattern": "token.*expired",
+								"bodyField": "error.code",
+								"bodyValue": "TOKEN_EXPIRED"
 							},
 							"response": {
-								"status_code": 401,
+								"statusCode": 401,
 								"body": "{\"error\": \"Authentication token has expired\"}",
 								"message": "Token validation failed",
 								"template": "auth_error.html",
@@ -1005,7 +1005,7 @@ func TestOAS_ErrorOverrides_UnmarshalJSON(t *testing.T) {
 					"503": [
 						{
 							"response": {
-								"status_code": 503,
+								"statusCode": 503,
 								"body": "{\"error\": \"Service unavailable\", \"retry_after\": 60}",
 								"headers": {
 									"Retry-After": "60"
@@ -1090,16 +1090,16 @@ func TestOAS_ErrorOverrides_UnmarshalJSON(t *testing.T) {
 		addMinimalTykExtension(oas)
 
 		tykExt := oas.GetTykExtension()
-		tykExt.ErrorOverrides = apidef.ErrorOverridesMap{
-			"404": []apidef.ErrorOverride{
+		tykExt.ErrorOverrides = ErrorOverridesMap{
+			"404": []ErrorOverride{
 				{
-					Match: &apidef.ErrorMatcher{
+					Match: &ErrorMatcher{
 						Flag:           "TLE",
 						MessagePattern: "not.*found",
 						BodyField:      "error.type",
 						BodyValue:      "NOT_FOUND",
 					},
-					Response: apidef.ErrorResponse{
+					Response: ErrorResponse{
 						StatusCode: 404,
 						Body:       "{\"error\": \"Resource not found\"}",
 						Message:    "The requested resource was not found",

@@ -1604,6 +1604,26 @@ func DummyAPI() APIDefinition {
 		},
 	}
 
+	errorOverrides := ErrorOverridesMap{
+		"400": []ErrorOverride{
+			{
+				Match: &ErrorMatcher{
+					Flag:           "RLT",
+					MessagePattern: ".*",
+					BodyField:      "error",
+					BodyValue:      "invalid",
+				},
+				Response: ErrorResponse{
+					StatusCode: 400,
+					Body:       "Bad Request",
+					Message:    "Error",
+					Template:   "error",
+					Headers:    map[string]string{"X-Error": "true"},
+				},
+			},
+		},
+	}
+
 	return APIDefinition{
 		VersionData:          versionData,
 		ConfigData:           map[string]interface{}{},
@@ -1635,9 +1655,10 @@ func DummyAPI() APIDefinition {
 		Proxy: ProxyConfig{
 			DisableStripSlash: true,
 		},
-		CORS:    defaultCORSConfig,
-		Tags:    []string{},
-		GraphQL: graphql,
+		CORS:           defaultCORSConfig,
+		Tags:           []string{},
+		GraphQL:        graphql,
+		ErrorOverrides: errorOverrides,
 	}
 }
 

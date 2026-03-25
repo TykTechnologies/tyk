@@ -198,20 +198,20 @@ func TestXTykAPIGateway_ErrorOverrides_Reset(t *testing.T) {
 		x := XTykAPIGateway{}
 
 		x.ExtractTo(&api)
-		assert.NotNil(t, api.ErrorOverrides)
+		assert.Nil(t, api.ErrorOverrides)
 		assert.Empty(t, api.ErrorOverrides)
 	})
 
 	t.Run("Fill Resets OAS", func(t *testing.T) {
 		x := XTykAPIGateway{
-			ErrorOverrides: apidef.ErrorOverridesMap{
-				"400": []apidef.ErrorOverride{{Response: apidef.ErrorResponse{StatusCode: 400}}},
+			ErrorOverrides: ErrorOverridesMap{
+				"400": []ErrorOverride{{Response: ErrorResponse{StatusCode: 400}}},
 			},
 		}
 		api := apidef.APIDefinition{}
 
 		x.Fill(api)
-		assert.NotNil(t, x.ErrorOverrides)
+		assert.Nil(t, x.ErrorOverrides)
 		assert.Empty(t, x.ErrorOverrides)
 	})
 }

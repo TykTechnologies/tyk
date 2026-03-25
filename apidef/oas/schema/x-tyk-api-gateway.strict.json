@@ -2947,13 +2947,13 @@
         "flag": {
           "type": "string"
         },
-        "message_pattern": {
+        "messagePattern": {
           "type": "string"
         },
-        "body_field": {
+        "bodyField": {
           "type": "string"
         },
-        "body_value": {
+        "bodyValue": {
           "type": "string"
         }
       }
@@ -2961,7 +2961,7 @@
     "X-Tyk-ErrorResponse": {
       "type": "object",
       "properties": {
-        "status_code": {
+        "statusCode": {
           "type": "integer"
         },
         "body": {
@@ -2979,8 +2979,7 @@
             "type": "string"
           }
         }
-      },
-      "required": ["status_code"]
+      }
     }
   },
   "additionalProperties": false
