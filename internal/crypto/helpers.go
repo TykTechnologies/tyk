@@ -23,8 +23,9 @@ import (
 	"time"
 
 	"github.com/sirupsen/logrus"
-
 	"github.com/stretchr/testify/assert"
+
+	"github.com/TykTechnologies/tyk/internal/errlog"
 )
 
 var (
@@ -100,7 +101,8 @@ func ValidateRequestCerts(r *http.Request, certs []*tls.Certificate) error {
 	}
 
 	if len(r.TLS.PeerCertificates) == 0 {
-		return errors.New("Client TLS certificate is required")
+		//nolint:staticcheck
+		return errlog.Wrap(errors.New("Client TLS certificate is required"), logrus.InfoLevel)
 	}
 
 	// Loop through r.TLS.PeerCertificates to add intermediate CA certificates to the allow list.
