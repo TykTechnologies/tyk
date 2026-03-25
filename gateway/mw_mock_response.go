@@ -77,7 +77,7 @@ func (m *mockResponseMiddleware) ProcessRequest(rw http.ResponseWriter, r *http.
 		return nil, http.StatusOK
 	}
 
-	res, rOverriten, err := m.mockResponse(r)
+	res, requestOverwritten, err := m.mockResponse(r)
 
 	if err != nil {
 		return fmt.Errorf("failed to mock response: %w", err), http.StatusInternalServerError
@@ -98,7 +98,7 @@ func (m *mockResponseMiddleware) ProcessRequest(rw http.ResponseWriter, r *http.
 		return fmt.Errorf("failed to forward response: %w", err), http.StatusInternalServerError
 	}
 
-	m.hitRecorder.hit(rw, rOverriten, res, start)
+	m.hitRecorder.hit(rw, requestOverwritten, res, start)
 
 	return nil, middleware.StatusRespond
 }
