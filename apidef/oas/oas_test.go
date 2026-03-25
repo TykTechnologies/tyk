@@ -949,7 +949,6 @@ func TestOAS_ErrorOverrides_UnmarshalJSON(t *testing.T) {
 		require.NoError(t, err)
 
 		tykExt := oas.GetTykExtension()
-		fmt.Printf("%+v", tykExt)
 		require.NotNil(t, tykExt)
 		require.NotNil(t, tykExt.ErrorOverrides)
 		require.Len(t, tykExt.ErrorOverrides["500"], 1)
