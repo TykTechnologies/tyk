@@ -10,11 +10,13 @@ import (
 	"github.com/TykTechnologies/storage/persistent/model"
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/internal/errors"
 	"github.com/TykTechnologies/tyk/internal/event"
 
 	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/oasdiff/yaml"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // createBaseOAS creates a minimal valid OAS object with specified version
@@ -900,6 +902,241 @@ func TestOAS_MarshalJSON(t *testing.T) {
 			assert.NoError(t, err)
 			assert.Contains(t, string(data), `"x-abcd":[{"key":"value"},{"key":"value"}]`)
 		})
+	})
+}
+
+func TestOAS_ErrorOverrides_UnmarshalJSON(t *testing.T) {
+	t.Run("basic error override", func(t *testing.T) {
+		jsonData := []byte(`{
+			"openapi": "3.0.0",
+			"info": {
+				"title": "Test API",
+				"version": "1.0.0"
+			},
+			"paths": {},
+			"x-tyk-api-gateway": {
+				"info": {
+					"name": "Test API"
+				},
+				"server": {
+					"listenPath": {
+						"value": "/test"
+					}
+				},
+				"upstream": {
+					"url": "http://upstream.test"
+				},
+				"errorOverrides": {
+					"500": [
+						{
+							"response": {
+								"status_code": 504,
+								"body": "{\"error\": \"Gateway Timeout\"}",
+								"message": "Service temporarily unavailable",
+								"headers": {
+									"X-Error-Source": "GATEWAY",
+									"Retry-After": "30"
+								}
+							}
+						}
+					]
+				}
+			}
+		}`)
+
+		var oas OAS
+		err := json.Unmarshal(jsonData, &oas)
+		require.NoError(t, err)
+
+		tykExt := oas.GetTykExtension()
+		fmt.Printf("%+v", tykExt)
+		require.NotNil(t, tykExt)
+		require.NotNil(t, tykExt.ErrorOverrides)
+		require.Len(t, tykExt.ErrorOverrides["500"], 1)
+
+		errorOverride := tykExt.ErrorOverrides["500"][0]
+		assert.Equal(t, 504, errorOverride.Response.StatusCode)
+		assert.Equal(t, "{\"error\": \"Gateway Timeout\"}", errorOverride.Response.Body)
+		assert.Equal(t, "Service temporarily unavailable", errorOverride.Response.Message)
+		assert.Equal(t, "GATEWAY", errorOverride.Response.Headers["X-Error-Source"])
+		assert.Equal(t, "30", errorOverride.Response.Headers["Retry-After"])
+	})
+
+	t.Run("complete error override with match criteria", func(t *testing.T) {
+		jsonData := []byte(`{
+			"openapi": "3.0.0",
+			"info": {
+				"title": "Test API",
+				"version": "1.0.0"
+			},
+			"paths": {},
+			"x-tyk-api-gateway": {
+				"info": {
+					"name": "Test API"
+				},
+				"server": {
+					"listenPath": {
+						"value": "/test"
+					}
+				},
+				"upstream": {
+					"url": "http://upstream.test"
+				},
+				"errorOverrides": {
+					"401": [
+						{
+							"match": {
+								"flag": "TLE",
+								"message_pattern": "token.*expired",
+								"body_field": "error.code",
+								"body_value": "TOKEN_EXPIRED"
+							},
+							"response": {
+								"status_code": 401,
+								"body": "{\"error\": \"Authentication token has expired\"}",
+								"message": "Token validation failed",
+								"template": "auth_error.html",
+								"headers": {
+									"WWW-Authenticate": "Bearer realm=\"api\"",
+									"X-Auth-Error": "TOKEN_EXPIRED"
+								}
+							}
+						}
+					],
+					"503": [
+						{
+							"response": {
+								"status_code": 503,
+								"body": "{\"error\": \"Service unavailable\", \"retry_after\": 60}",
+								"headers": {
+									"Retry-After": "60"
+								}
+							}
+						}
+					]
+				}
+			}
+		}`)
+
+		var oas OAS
+		err := json.Unmarshal(jsonData, &oas)
+		require.NoError(t, err)
+
+		tykExt := oas.GetTykExtension()
+		require.NotNil(t, tykExt)
+		require.NotNil(t, tykExt.ErrorOverrides)
+		require.Len(t, tykExt.ErrorOverrides, 2)
+
+		require.Len(t, tykExt.ErrorOverrides["401"], 1)
+		override401 := tykExt.ErrorOverrides["401"][0]
+
+		require.NotNil(t, override401.Match)
+		assert.Equal(t, errors.TLE, override401.Match.Flag)
+		assert.Equal(t, "token.*expired", override401.Match.MessagePattern)
+		assert.Equal(t, "error.code", override401.Match.BodyField)
+		assert.Equal(t, "TOKEN_EXPIRED", override401.Match.BodyValue)
+
+		assert.Equal(t, 401, override401.Response.StatusCode)
+		assert.Equal(t, "{\"error\": \"Authentication token has expired\"}", override401.Response.Body)
+		assert.Equal(t, "Token validation failed", override401.Response.Message)
+		assert.Equal(t, "auth_error.html", override401.Response.Template)
+		assert.Equal(t, "Bearer realm=\"api\"", override401.Response.Headers["WWW-Authenticate"])
+		assert.Equal(t, "TOKEN_EXPIRED", override401.Response.Headers["X-Auth-Error"])
+
+		require.Len(t, tykExt.ErrorOverrides["503"], 1)
+		override503 := tykExt.ErrorOverrides["503"][0]
+
+		assert.Nil(t, override503.Match)
+		assert.Equal(t, 503, override503.Response.StatusCode)
+		assert.Equal(t, "{\"error\": \"Service unavailable\", \"retry_after\": 60}", override503.Response.Body)
+		assert.Equal(t, "60", override503.Response.Headers["Retry-After"])
+	})
+
+	t.Run("empty error overrides in x-tyk-api-gateway", func(t *testing.T) {
+		jsonData := []byte(`{
+			"openapi": "3.0.0",
+			"info": {
+				"title": "Test API",
+				"version": "1.0.0"
+			},
+			"paths": {},
+			"x-tyk-api-gateway": {
+				"info": {
+					"name": "Test API"
+				},
+				"server": {
+					"listenPath": {
+						"value": "/test"
+					}
+				},
+				"upstream": {
+					"url": "http://upstream.test"
+				},
+				"errorOverrides": {}
+			}
+		}`)
+
+		var oas OAS
+		err := json.Unmarshal(jsonData, &oas)
+		require.NoError(t, err)
+
+		tykExt := oas.GetTykExtension()
+		require.NotNil(t, tykExt)
+		require.NotNil(t, tykExt.ErrorOverrides)
+		assert.Len(t, tykExt.ErrorOverrides, 0)
+	})
+
+	t.Run("round trip marshal/unmarshal", func(t *testing.T) {
+		oas := createBaseOAS("3.0.0", "Test API")
+		addMinimalTykExtension(oas)
+
+		tykExt := oas.GetTykExtension()
+		tykExt.ErrorOverrides = apidef.ErrorOverridesMap{
+			"404": []apidef.ErrorOverride{
+				{
+					Match: &apidef.ErrorMatcher{
+						Flag:           "TLE",
+						MessagePattern: "not.*found",
+						BodyField:      "error.type",
+						BodyValue:      "NOT_FOUND",
+					},
+					Response: apidef.ErrorResponse{
+						StatusCode: 404,
+						Body:       "{\"error\": \"Resource not found\"}",
+						Message:    "The requested resource was not found",
+						Template:   "404.html",
+						Headers: map[string]string{
+							"X-Error-Type":  "NOT_FOUND",
+							"Cache-Control": "no-cache",
+						},
+					},
+				},
+			},
+		}
+
+		jsonData, err := json.Marshal(oas)
+		require.NoError(t, err)
+
+		var unmarshaledOAS OAS
+		err = json.Unmarshal(jsonData, &unmarshaledOAS)
+		require.NoError(t, err)
+
+		unmarshaledTykExt := unmarshaledOAS.GetTykExtension()
+		require.NotNil(t, unmarshaledTykExt)
+		require.NotNil(t, unmarshaledTykExt.ErrorOverrides)
+		require.Len(t, unmarshaledTykExt.ErrorOverrides["404"], 1)
+
+		errorOverride := unmarshaledTykExt.ErrorOverrides["404"][0]
+		assert.Equal(t, errors.TLE, errorOverride.Match.Flag)
+		assert.Equal(t, "not.*found", errorOverride.Match.MessagePattern)
+		assert.Equal(t, "error.type", errorOverride.Match.BodyField)
+		assert.Equal(t, "NOT_FOUND", errorOverride.Match.BodyValue)
+		assert.Equal(t, 404, errorOverride.Response.StatusCode)
+		assert.Equal(t, "{\"error\": \"Resource not found\"}", errorOverride.Response.Body)
+		assert.Equal(t, "The requested resource was not found", errorOverride.Response.Message)
+		assert.Equal(t, "404.html", errorOverride.Response.Template)
+		assert.Equal(t, "NOT_FOUND", errorOverride.Response.Headers["X-Error-Type"])
+		assert.Equal(t, "no-cache", errorOverride.Response.Headers["Cache-Control"])
 	})
 }
 

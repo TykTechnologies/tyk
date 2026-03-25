@@ -188,6 +188,34 @@ func TestXTykAPIGateway_EnableContextVariables(t *testing.T) {
 	}
 }
 
+func TestXTykAPIGateway_ErrorOverrides_Reset(t *testing.T) {
+	t.Run("ExtractTo Resets API", func(t *testing.T) {
+		api := apidef.APIDefinition{
+			ErrorOverrides: apidef.ErrorOverridesMap{
+				"400": []apidef.ErrorOverride{{Response: apidef.ErrorResponse{StatusCode: 400}}},
+			},
+		}
+		x := XTykAPIGateway{}
+
+		x.ExtractTo(&api)
+		assert.NotNil(t, api.ErrorOverrides)
+		assert.Empty(t, api.ErrorOverrides)
+	})
+
+	t.Run("Fill Resets OAS", func(t *testing.T) {
+		x := XTykAPIGateway{
+			ErrorOverrides: apidef.ErrorOverridesMap{
+				"400": []apidef.ErrorOverride{{Response: apidef.ErrorResponse{StatusCode: 400}}},
+			},
+		}
+		api := apidef.APIDefinition{}
+
+		x.Fill(api)
+		assert.NotNil(t, x.ErrorOverrides)
+		assert.Empty(t, x.ErrorOverrides)
+	})
+}
+
 func TestInfo(t *testing.T) {
 	var emptyInfo Info
 
