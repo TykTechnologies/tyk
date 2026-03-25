@@ -21,7 +21,7 @@ type XTykAPIGateway struct {
 	// Middleware contains the configurations related to the Tyk middleware.
 	Middleware *Middleware `bson:"middleware,omitempty" json:"middleware,omitempty"`
 	// ErrorOverrides contains the configurations for error response customization.
-	ErrorOverrides apidef.ErrorOverridesMap `bson:"error_overrides" json:"error_overrides"`
+	ErrorOverrides apidef.ErrorOverridesMap `bson:"errorOverrides,omitempty" json:"errorOverrides,omitempty"`
 }
 
 // Fill fills *XTykAPIGateway from apidef.APIDefinition.
@@ -39,6 +39,7 @@ func (x *XTykAPIGateway) Fill(api apidef.APIDefinition) {
 		x.Middleware = nil
 	}
 
+	x.ErrorOverrides = apidef.ErrorOverridesMap{}
 	if len(api.ErrorOverrides) > 0 {
 		x.ErrorOverrides = api.ErrorOverrides
 	}
@@ -61,6 +62,7 @@ func (x *XTykAPIGateway) ExtractTo(api *apidef.APIDefinition) {
 
 	x.Middleware.ExtractTo(api)
 
+	api.ErrorOverrides = apidef.ErrorOverridesMap{}
 	if len(x.ErrorOverrides) > 0 {
 		api.ErrorOverrides = x.ErrorOverrides
 	}

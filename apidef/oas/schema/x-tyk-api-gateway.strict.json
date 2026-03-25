@@ -11,7 +11,7 @@
     "server": {
       "$ref": "#/definitions/X-Tyk-Server"
     },
-    "error_overrides": {
+    "errorOverrides": {
       "$ref": "#/definitions/X-Tyk-ErrorOverrides"
     },
     "middleware": {
