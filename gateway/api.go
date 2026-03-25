@@ -3693,6 +3693,11 @@ func extractOASObjFromReq(reqBody io.Reader) ([]byte, *oas.OAS, error) {
 	visitor.AddSchemaManipulation(schema.TransformUnicodeEscapesToRE2Manipulation)
 	visitor.ProcessOAS(&oasObj)
 
+	reqBodyInBytes, err = json.Marshal(oasObj)
+	if err != nil {
+		return nil, nil, ErrRequestMalformed
+	}
+
 	return reqBodyInBytes, &oasObj, nil
 }
 
