@@ -1601,19 +1601,29 @@ func (gw *Gateway) initSystem() error {
 		}
 	}
 
-	if gwConfig.ProxySSLMaxVersion == 0 {
-		gwConfig.ProxySSLMaxVersion = tls.VersionTLS12
-	}
+	setDefaultIfZero(&gwConfig.ProxySSLMinVersion, tls.VersionTLS12)
+	setDefaultIfZero(&gwConfig.ProxySSLMaxVersion, tls.VersionTLS13)
 
 	if gwConfig.ProxySSLMinVersion > gwConfig.ProxySSLMaxVersion {
+		log.Warningf(
+			"`proxy_ssl_max_version` is lower than `proxy_ssl_min_version`. Bumping `proxy_ssl_max_version` from %s to %s",
+			tls.VersionName(gwConfig.ProxySSLMaxVersion),
+			tls.VersionName(gwConfig.ProxySSLMinVersion),
+		)
+
 		gwConfig.ProxySSLMaxVersion = gwConfig.ProxySSLMinVersion
 	}
 
-	if gwConfig.HttpServerOptions.MaxVersion == 0 {
-		gwConfig.HttpServerOptions.MaxVersion = tls.VersionTLS12
-	}
+	setDefaultIfZero(&gwConfig.HttpServerOptions.MinVersion, tls.VersionTLS12)
+	setDefaultIfZero(&gwConfig.HttpServerOptions.MaxVersion, tls.VersionTLS13)
 
 	if gwConfig.HttpServerOptions.MinVersion > gwConfig.HttpServerOptions.MaxVersion {
+		log.Warningf(
+			"`http_server_options.max_version` is lower than `http_server_options.min_version`. Bumping `http_server_options.min_version` from %s to %s",
+			tls.VersionName(gwConfig.HttpServerOptions.MinVersion),
+			tls.VersionName(gwConfig.HttpServerOptions.MaxVersion),
+		)
+
 		gwConfig.HttpServerOptions.MaxVersion = gwConfig.HttpServerOptions.MinVersion
 	}
 

@@ -216,3 +216,18 @@ func containsEscapedChars(str string) bool {
 
 	return str != unescaped
 }
+
+// setDefaultIfZero sets ptr value to default if it is not defined
+func setDefaultIfZero[T comparable](ptr *T, defValue T) {
+	if ptr == nil {
+		panic("setDefaultIfZero expects non nil ptr")
+	}
+
+	var zero T
+
+	if *ptr != zero {
+		return
+	}
+
+	*ptr = defValue
+}

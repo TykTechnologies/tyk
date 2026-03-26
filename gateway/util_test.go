@@ -550,3 +550,28 @@ func TestContainsEscapedCharacters(t *testing.T) {
 		})
 	}
 }
+
+func Test_setDefaultIfZero(t *testing.T) {
+	t.Run("sets default value if ptr value is non zero", func(t *testing.T) {
+		var ptr int
+		setDefaultIfZero(&ptr, 123)
+		assert.Equal(t, 123, ptr)
+	})
+
+	t.Run("does not modify ptr value if it's already defined", func(t *testing.T) {
+		var ptr = 100
+		setDefaultIfZero(&ptr, 123)
+		assert.Equal(t, 100, ptr)
+	})
+
+	t.Run("panics if null ptr is given", func(t *testing.T) {
+		assert.PanicsWithValue(t, "setDefaultIfZero expects non nil ptr", func() {
+			var ptr *int
+			setDefaultIfZero(ptr, 123)
+		})
+
+		assert.PanicsWithValue(t, "setDefaultIfZero expects non nil ptr", func() {
+			setDefaultIfZero(nil, 123)
+		})
+	})
+}
