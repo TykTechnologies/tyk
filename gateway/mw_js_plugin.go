@@ -714,6 +714,22 @@ TykJS.TykMiddleware.MiddlewareComponentMeta.prototype.DoProcessRequest = functio
 	return JSON.stringify(processed_request)
 }
 
+TykJS.TykMiddleware.MiddlewareComponentMeta.prototype.ProcessResponse = function(response, request, session, config) {
+	log("Process Response Not Implemented")
+	return response
+}
+
+TykJS.TykMiddleware.MiddlewareComponentMeta.prototype.DoProcessResponse = function(response, request, session, config) {
+	var processed_response = this.ProcessResponse(response, request, session, config)
+
+	if (!processed_response) {
+		log("Middleware didn't return response object!")
+		return
+	}
+
+	return JSON.stringify(processed_response)
+}
+
 // The user-level middleware component
 TykJS.TykMiddleware.NewMiddleware = function(configuration) {
 	TykJS.TykMiddleware.MiddlewareComponentMeta.call(this, configuration)
@@ -727,8 +743,16 @@ TykJS.TykMiddleware.NewMiddleware.prototype.NewProcessRequest = function(callbac
 	this.ProcessRequest = callback
 }
 
+TykJS.TykMiddleware.NewMiddleware.prototype.NewProcessResponse = function(callback) {
+	this.ProcessResponse = callback
+}
+
 TykJS.TykMiddleware.NewMiddleware.prototype.ReturnData = function(request, session) {
 	return {Request: request, SessionMeta: session}
+}
+
+TykJS.TykMiddleware.NewMiddleware.prototype.ReturnResponseData = function(response, session) {
+	return {Response: response, SessionMeta: session}
 }
 
 TykJS.TykMiddleware.NewMiddleware.prototype.ReturnAuthData = function(request, session) {

@@ -846,6 +846,8 @@ func (gw *Gateway) responseProcessorByName(name string, baseHandler BaseTykRespo
 		return &HeaderTransform{BaseTykResponseHandler: baseHandler}
 	case "custom_mw_res_hook":
 		return &CustomMiddlewareResponseHook{BaseTykResponseHandler: baseHandler}
+	case "custom_mw_js_res_hook":
+		return &JSResponseMiddleware{BaseTykResponseHandler: baseHandler}
 	case "goplugin_res_hook":
 		return &ResponseGoPluginMiddleware{BaseTykResponseHandler: baseHandler}
 	}
@@ -864,7 +866,7 @@ func handleResponseChain(chain []TykResponseHandler, rw http.ResponseWriter, res
 	for _, rh := range chain {
 		if err := handleResponse(rh, rw, res, req, ses, traceIsEnabled); err != nil {
 			// Abort the request if this handler is a response middleware hook:
-			if rh.Name() == "CustomMiddlewareResponseHook" {
+			if rh.Name() == "CustomMiddlewareResponseHook" || rh.Name() == "JSResponseMiddleware" {
 				rh.HandleError(rw, req)
 				return true, err
 			}

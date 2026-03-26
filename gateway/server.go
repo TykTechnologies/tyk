@@ -1103,6 +1103,9 @@ func (gw *Gateway) loadCustomMiddleware(spec *APISpec) ([]string, apidef.Middlew
 			continue
 		}
 
+		if mw.Path != "" {
+			mwPaths = append(mwPaths, mw.Path)
+		}
 		mwResponseFuncs = append(mwResponseFuncs, mw)
 	}
 
@@ -1162,6 +1165,8 @@ func (gw *Gateway) createResponseMiddlewareChain(
 		//is it goplugin or other middleware
 		if strings.HasSuffix(mw.Path, ".so") {
 			processor = gw.responseProcessorByName("goplugin_res_hook", baseHandler)
+		} else if isJSDriver(spec.CustomMiddleware.Driver) {
+			processor = gw.responseProcessorByName("custom_mw_js_res_hook", baseHandler)
 		} else {
 			processor = gw.responseProcessorByName("custom_mw_res_hook", baseHandler)
 		}

@@ -414,7 +414,67 @@ func TestGoja_Base64(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// 9. Bundle-based middleware (verifies bundles work with goja driver)
+// 9. Post-auth (post_key_auth) hook — header injection after authentication
+// ---------------------------------------------------------------------------
+
+func TestGoja_PostKeyAuthHook(t *testing.T) {
+	const postAuthJS = `
+var postAuth = new TykJS.TykMiddleware.NewMiddleware({});
+
+postAuth.NewProcessRequest(function(request, session) {
+	request.SetHeaders["X-Post-Auth"] = "true";
+	return postAuth.ReturnData(request, {});
+});`
+
+	for _, driver := range drivers {
+		t.Run(string(driver), func(t *testing.T) {
+			ts := StartTest(nil)
+			defer ts.Close()
+
+			apiID := "post_key_auth_test_" + string(driver)
+			ts.RegisterJSFileMiddleware(apiID, map[string]string{
+				"post_auth.js": postAuthJS,
+			})
+
+			ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+				spec.APIID = apiID
+				spec.OrgID = "default"
+				spec.Proxy.ListenPath = "/post-auth-test"
+				spec.UseKeylessAccess = false
+				spec.UseStandardAuth = true
+				spec.CustomMiddleware = apidef.MiddlewareSection{
+					Driver: driver,
+					PostKeyAuth: []apidef.MiddlewareDefinition{{
+						Name: "postAuth",
+						Path: ts.Gw.GetConfig().MiddlewarePath + "/" + apiID + "/post_auth.js",
+					}},
+				}
+			})
+
+			_, key := ts.CreateSession(func(s *user.SessionState) {
+				s.AccessRights = map[string]user.AccessDefinition{
+					apiID: {
+						APIID:    apiID,
+						Versions: []string{"Default"},
+					},
+				}
+			})
+
+			ts.Run(t, []test.TestCase{
+				// Request without auth key should be rejected.
+				{Path: "/post-auth-test", Code: http.StatusUnauthorized},
+				// Request with valid auth key should succeed and include
+				// the header injected by the post_key_auth JS middleware.
+				{Path: "/post-auth-test", Code: http.StatusOK,
+					Headers:   map[string]string{"Authorization": key},
+					BodyMatch: `"X-Post-Auth":"true"`},
+			}...)
+		})
+	}
+}
+
+// ---------------------------------------------------------------------------
+// 10. Bundle-based middleware (verifies bundles work with goja driver)
 // ---------------------------------------------------------------------------
 
 func TestGoja_Bundle(t *testing.T) {
