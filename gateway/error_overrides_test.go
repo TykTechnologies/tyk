@@ -749,31 +749,59 @@ func TestMatchesAdditionalCriteria(t *testing.T) {
 		err := rule.Match.Compile()
 		require.NoError(t, err)
 		req := httptest.NewRequest("GET", "/test", nil)
+
 		matches := eo.matchesAdditionalCriteria(req, rule, []byte("network error"))
 		assert.False(t, matches)
 	})
-	t.Run("flag and message pattern must both match (AND logic)", func(t *testing.T) {
+
+	t.Run("body field match success", func(t *testing.T) {
 		rule := &apidef.ErrorOverride{
 			Match: &apidef.ErrorMatcher{
-				Flag:           errors.RLT,
-				MessagePattern: "timeout",
+				BodyField: "error.code",
+				BodyValue: "TIMEOUT",
 			},
-			Response: apidef.ErrorResponse{Message: "Error"},
+		}
+		req := httptest.NewRequest("GET", "/test", nil)
+
+		body := []byte(`{"error": {"code": "TIMEOUT"}}`)
+		matches := eo.matchesAdditionalCriteria(req, rule, body)
+		assert.True(t, matches)
+	})
+
+	t.Run("body field takes priority over message pattern", func(t *testing.T) {
+		rule := &apidef.ErrorOverride{
+			Match: &apidef.ErrorMatcher{
+				MessagePattern: "error",
+				BodyField:      "status",
+				BodyValue:      "failed",
+			},
 		}
 		err := rule.Match.Compile()
 		require.NoError(t, err)
 		req := httptest.NewRequest("GET", "/test", nil)
 
-		// Set matching flag
-		ctx.SetErrorClassification(req, errors.NewErrorClassification(errors.RLT, "rate_limited"))
-
-		// Pattern doesn't match
-		matches := eo.matchesAdditionalCriteria(req, rule, []byte("connection error"))
-		assert.False(t, matches)
-
-		// Both match
-		matches = eo.matchesAdditionalCriteria(req, rule, []byte("connection timeout"))
+		// Body field matches - should match even though pattern also matches
+		body := []byte(`{"status": "failed", "message": "error occurred"}`)
+		matches := eo.matchesAdditionalCriteria(req, rule, body)
 		assert.True(t, matches)
+	})
+
+	t.Run("fallback to message pattern when body field doesn't match", func(t *testing.T) {
+		rule := &apidef.ErrorOverride{
+			Match: &apidef.ErrorMatcher{
+				MessagePattern: "error",
+				BodyField:      "status",
+				BodyValue:      "failed",
+			},
+		}
+		err := rule.Match.Compile()
+		require.NoError(t, err)
+		req := httptest.NewRequest("GET", "/test", nil)
+
+		// Body field doesn't match, but message pattern does
+		body := []byte(`{"status": "success", "message": "error occurred"}`)
+		matches := eo.matchesAdditionalCriteria(req, rule, body)
+		assert.True(t, matches) // Falls back to message pattern
 	})
 }
 
@@ -827,6 +855,45 @@ func TestFlagMatching(t *testing.T) {
 		assert.False(t, matches)
 	})
 
+	t.Run("flag takes priority over message pattern", func(t *testing.T) {
+		rule := &apidef.ErrorOverride{
+			Match: &apidef.ErrorMatcher{
+				Flag:           errors.RLT,
+				MessagePattern: "should not be checked",
+			},
+			Response: apidef.ErrorResponse{Message: "Rate limited"},
+		}
+		err := rule.Match.Compile()
+		require.NoError(t, err)
+		req := httptest.NewRequest("GET", "/test", nil)
+
+		// Set matching flag
+		ctx.SetErrorClassification(req, errors.NewErrorClassification(errors.RLT, "rate_limited"))
+
+		// Should match on flag, ignoring pattern
+		matches := eo.matchesAdditionalCriteria(req, rule, []byte("unrelated body"))
+		assert.True(t, matches)
+	})
+
+	t.Run("fallback to message pattern when flag doesn't match", func(t *testing.T) {
+		rule := &apidef.ErrorOverride{
+			Match: &apidef.ErrorMatcher{
+				Flag:           errors.RLT,
+				MessagePattern: "timeout",
+			},
+			Response: apidef.ErrorResponse{Message: "Error"},
+		}
+		err := rule.Match.Compile()
+		require.NoError(t, err)
+		req := httptest.NewRequest("GET", "/test", nil)
+
+		// Set different flag
+		ctx.SetErrorClassification(req, errors.NewErrorClassification(errors.QEX, "quota_exceeded"))
+
+		// Flag doesn't match, but pattern does
+		matches := eo.matchesAdditionalCriteria(req, rule, []byte("connection timeout"))
+		assert.True(t, matches)
+	})
 }
 
 // TestApplyOverrideWithFlag tests ApplyOverride with flag matching
@@ -1649,29 +1716,6 @@ func TestMatchesUpstreamCriteria(t *testing.T) {
 
 		matches := eo.matchesUpstreamCriteria(rule, nil, 500)
 		assert.True(t, matches)
-	})
-
-	t.Run("body field and message pattern must both match (AND logic)", func(t *testing.T) {
-		rule := &apidef.ErrorOverride{
-			Match: &apidef.ErrorMatcher{
-				BodyField:      "status",
-				BodyValue:      "error",
-				MessagePattern: "timeout",
-			},
-		}
-		rule.Match.Compile()
-
-		// Only body field matches
-		body1 := []byte(`{"status": "error", "message": "connection failed"}`)
-		assert.False(t, eo.matchesUpstreamCriteria(rule, body1, 500))
-
-		// Only message pattern matches
-		body2 := []byte(`{"status": "ok", "message": "connection timeout"}`)
-		assert.False(t, eo.matchesUpstreamCriteria(rule, body2, 500))
-
-		// Both match
-		body3 := []byte(`{"status": "error", "message": "connection timeout"}`)
-		assert.True(t, eo.matchesUpstreamCriteria(rule, body3, 500))
 	})
 }
 
