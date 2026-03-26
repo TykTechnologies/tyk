@@ -13,10 +13,37 @@ import (
 // 2. The internal 'apidef' structures use snake_case to maintain compatibility with Tyk's
 // Classic API definitions and 'tyk.conf'.
 
+type ErrorOverrides struct {
+	Enabled bool              `json:"enabled"`
+	Value   ErrorOverridesMap `json:"value"`
+}
+
+func (e *ErrorOverrides) Fill(api apidef.APIDefinition) {
+	e.Enabled = !api.ErrorOverridesDisabled
+
+	if len(api.ErrorOverrides) > 0 {
+		e.Value = make(ErrorOverridesMap)
+		e.Value.Fill(api)
+	}
+}
+
+func (e *ErrorOverrides) ExtractTo(api *apidef.APIDefinition) {
+	api.ErrorOverridesDisabled = !e.Enabled
+
+	if len(e.Value) == 0 {
+		api.ErrorOverrides = nil
+
+		return
+	}
+
+	api.ErrorOverrides = make(apidef.ErrorOverridesMap)
+	e.Value.ExtractTo(api)
+}
+
 type ErrorOverridesMap map[string][]ErrorOverride
 
-func (e *ErrorOverridesMap) Fill(internal apidef.APIDefinition) {
-	if len(internal.ErrorOverrides) == 0 {
+func (e *ErrorOverridesMap) Fill(api apidef.APIDefinition) {
+	if len(api.ErrorOverrides) == 0 {
 		return
 	}
 
@@ -24,7 +51,7 @@ func (e *ErrorOverridesMap) Fill(internal apidef.APIDefinition) {
 		*e = make(ErrorOverridesMap)
 	}
 
-	for code, overrides := range internal.ErrorOverrides {
+	for code, overrides := range api.ErrorOverrides {
 		oasOverrides := make([]ErrorOverride, len(overrides))
 
 		for i, apiOverride := range overrides {
@@ -35,23 +62,23 @@ func (e *ErrorOverridesMap) Fill(internal apidef.APIDefinition) {
 	}
 }
 
-func (e *ErrorOverridesMap) ExtractTo(internal *apidef.APIDefinition) {
+func (e *ErrorOverridesMap) ExtractTo(api *apidef.APIDefinition) {
 	if e == nil || len(*e) == 0 {
 		return
 	}
 
-	if internal.ErrorOverrides == nil {
-		internal.ErrorOverrides = make(apidef.ErrorOverridesMap)
+	if api.ErrorOverrides == nil {
+		api.ErrorOverrides = make(apidef.ErrorOverridesMap)
 	}
 
 	for code, oasOverrides := range *e {
-		internalOverride := make([]apidef.ErrorOverride, len(oasOverrides))
+		apiOverride := make([]apidef.ErrorOverride, len(oasOverrides))
 
 		for i, oasOverride := range oasOverrides {
-			oasOverride.ExtractTo(&internalOverride[i])
+			oasOverride.ExtractTo(&apiOverride[i])
 		}
 
-		internal.ErrorOverrides[code] = internalOverride
+		api.ErrorOverrides[code] = apiOverride
 	}
 }
 
@@ -60,31 +87,31 @@ type ErrorOverride struct {
 	Response ErrorResponse `json:"response"`
 }
 
-func (eo *ErrorOverride) Fill(internal apidef.ErrorOverride) {
-	if internal.Match != nil {
+func (eo *ErrorOverride) Fill(api apidef.ErrorOverride) {
+	if api.Match != nil {
 		eo.Match = &ErrorMatcher{
-			Flag:           internal.Match.Flag,
-			MessagePattern: internal.Match.MessagePattern,
-			BodyField:      internal.Match.BodyField,
-			BodyValue:      internal.Match.BodyValue,
+			Flag:           api.Match.Flag,
+			MessagePattern: api.Match.MessagePattern,
+			BodyField:      api.Match.BodyField,
+			BodyValue:      api.Match.BodyValue,
 		}
 	}
 	eo.Response = ErrorResponse{
-		StatusCode: internal.Response.StatusCode,
-		Body:       internal.Response.Body,
-		Message:    internal.Response.Message,
-		Template:   internal.Response.Template,
-		Headers:    internal.Response.Headers,
+		StatusCode: api.Response.StatusCode,
+		Body:       api.Response.Body,
+		Message:    api.Response.Message,
+		Template:   api.Response.Template,
+		Headers:    api.Response.Headers,
 	}
 }
 
-func (eo *ErrorOverride) ExtractTo(internal *apidef.ErrorOverride) {
+func (eo *ErrorOverride) ExtractTo(api *apidef.ErrorOverride) {
 	if eo.Match != nil {
-		internal.Match = &apidef.ErrorMatcher{}
-		eo.Match.ExtractTo(internal.Match)
+		api.Match = &apidef.ErrorMatcher{}
+		eo.Match.ExtractTo(api.Match)
 	}
 
-	eo.Response.ExtractTo(&internal.Response)
+	eo.Response.ExtractTo(&api.Response)
 }
 
 type ErrorMatcher struct {
@@ -94,11 +121,11 @@ type ErrorMatcher struct {
 	BodyValue      string              `json:"bodyValue,omitempty"`
 }
 
-func (em *ErrorMatcher) ExtractTo(internal *apidef.ErrorMatcher) {
-	internal.Flag = em.Flag
-	internal.MessagePattern = em.MessagePattern
-	internal.BodyField = em.BodyField
-	internal.BodyValue = em.BodyValue
+func (em *ErrorMatcher) ExtractTo(api *apidef.ErrorMatcher) {
+	api.Flag = em.Flag
+	api.MessagePattern = em.MessagePattern
+	api.BodyField = em.BodyField
+	api.BodyValue = em.BodyValue
 
 }
 
@@ -110,10 +137,10 @@ type ErrorResponse struct {
 	Headers    map[string]string `json:"headers,omitempty"`
 }
 
-func (er ErrorResponse) ExtractTo(internal *apidef.ErrorResponse) {
-	internal.StatusCode = er.StatusCode
-	internal.Body = er.Body
-	internal.Message = er.Message
-	internal.Template = er.Template
-	internal.Headers = er.Headers
+func (er ErrorResponse) ExtractTo(api *apidef.ErrorResponse) {
+	api.StatusCode = er.StatusCode
+	api.Body = er.Body
+	api.Message = er.Message
+	api.Template = er.Template
+	api.Headers = er.Headers
 }

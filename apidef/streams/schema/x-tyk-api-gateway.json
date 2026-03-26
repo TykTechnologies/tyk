@@ -2011,12 +2011,21 @@
     },
     "X-Tyk-ErrorOverrides": {
       "type": "object",
-      "additionalProperties": {
-        "type": "array",
-        "items": {
-          "$ref": "#/definitions/X-Tyk-ErrorOverride"
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "value": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "array",
+            "items": {
+              "$ref": "#/definitions/X-Tyk-ErrorOverride"
+            }
+          }
         }
-      }
+      },
+      "required": ["enabled", "value"]
     },
     "X-Tyk-ErrorOverride": {
       "type": "object",

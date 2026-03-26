@@ -92,12 +92,15 @@ func TestXTykAPIGateway_Lint_MCP(t *testing.T) {
 				},
 			},
 		},
-		ErrorOverrides: oas.ErrorOverridesMap{
-			"500": []oas.ErrorOverride{
-				{
-					Response: oas.ErrorResponse{
-						StatusCode: 500,
-						Message:    "Internal Server Error",
+		ErrorOverrides: &oas.ErrorOverrides{
+			Enabled: true,
+			Value: oas.ErrorOverridesMap{
+				"500": []oas.ErrorOverride{
+					{
+						Response: oas.ErrorResponse{
+							StatusCode: 500,
+							Message:    "Internal Server Error",
+						},
 					},
 				},
 			},

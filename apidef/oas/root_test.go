@@ -9,6 +9,7 @@ import (
 	"github.com/getkin/kin-openapi/openapi3"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/TykTechnologies/tyk/apidef"
 )
@@ -186,34 +187,6 @@ func TestXTykAPIGateway_EnableContextVariables(t *testing.T) {
 			assert.EqualExportedValues(t, tc.expect, tc.in)
 		})
 	}
-}
-
-func TestXTykAPIGateway_ErrorOverrides_Reset(t *testing.T) {
-	t.Run("ExtractTo Resets API", func(t *testing.T) {
-		api := apidef.APIDefinition{
-			ErrorOverrides: apidef.ErrorOverridesMap{
-				"400": []apidef.ErrorOverride{{Response: apidef.ErrorResponse{StatusCode: 400}}},
-			},
-		}
-		x := XTykAPIGateway{}
-
-		x.ExtractTo(&api)
-		assert.Nil(t, api.ErrorOverrides)
-		assert.Empty(t, api.ErrorOverrides)
-	})
-
-	t.Run("Fill Resets OAS", func(t *testing.T) {
-		x := XTykAPIGateway{
-			ErrorOverrides: ErrorOverridesMap{
-				"400": []ErrorOverride{{Response: ErrorResponse{StatusCode: 400}}},
-			},
-		}
-		api := apidef.APIDefinition{}
-
-		x.Fill(api)
-		assert.Nil(t, x.ErrorOverrides)
-		assert.Empty(t, x.ErrorOverrides)
-	})
 }
 
 func TestInfo(t *testing.T) {
@@ -598,61 +571,314 @@ func TestFillWithContext(t *testing.T) {
 }
 
 func TestErrorOverrides_FillExtract(t *testing.T) {
-	api := apidef.APIDefinition{
-		ErrorOverrides: apidef.ErrorOverridesMap{
-			"404": []apidef.ErrorOverride{
-				{
-					Match: &apidef.ErrorMatcher{
-						Flag:           "upstream_timeout",
-						MessagePattern: "timeout.*",
+	t.Run("fill and extract with error overrides enabled", func(t *testing.T) {
+		api := apidef.APIDefinition{
+			ErrorOverridesDisabled: false,
+			ErrorOverrides: apidef.ErrorOverridesMap{
+				"404": []apidef.ErrorOverride{
+					{
+						Match: &apidef.ErrorMatcher{
+							Flag:           "upstream_timeout",
+							MessagePattern: "timeout.*",
+							BodyField:      "error.code",
+							BodyValue:      "TIMEOUT",
+						},
+						Response: apidef.ErrorResponse{
+							StatusCode: 504,
+							Message:    "Gateway Timeout",
+							Body:       `{"error": "upstream unavailable"}`,
+							Template:   "timeout.html",
+							Headers:    map[string]string{"X-Custom": "timeout"},
+						},
 					},
-					Response: apidef.ErrorResponse{
-						StatusCode: 504,
-						Message:    "Gateway Timeout",
-						Body:       `{"error": "upstream unavailable"}`,
-						Headers:    map[string]string{"X-Custom": "timeout"},
+				},
+				"500": []apidef.ErrorOverride{
+					{
+						Response: apidef.ErrorResponse{
+							StatusCode: 500,
+							Template:   "error_500.tmpl",
+							Body:       `{"error": "internal server error"}`,
+						},
 					},
 				},
 			},
-			"500": []apidef.ErrorOverride{
-				{
-					Response: apidef.ErrorResponse{
-						StatusCode: 500,
-						Template:   "error_500.tmpl",
+		}
+
+		var x XTykAPIGateway
+		x.Fill(api)
+
+		assert.NotNil(t, x.ErrorOverrides)
+		assert.True(t, x.ErrorOverrides.Enabled)
+		assert.NotNil(t, x.ErrorOverrides.Value)
+		assert.Len(t, x.ErrorOverrides.Value, 2)
+		assert.Len(t, x.ErrorOverrides.Value["404"], 1)
+
+		override404 := x.ErrorOverrides.Value["404"][0]
+		assert.Equal(t, 504, override404.Response.StatusCode)
+		assert.Equal(t, "upstream_timeout", string(override404.Match.Flag))
+		assert.Equal(t, "timeout.*", override404.Match.MessagePattern)
+		assert.Equal(t, "error.code", override404.Match.BodyField)
+		assert.Equal(t, "TIMEOUT", override404.Match.BodyValue)
+		assert.Equal(t, "Gateway Timeout", override404.Response.Message)
+		assert.Equal(t, `{"error": "upstream unavailable"}`, override404.Response.Body)
+		assert.Equal(t, "timeout.html", override404.Response.Template)
+		assert.Equal(t, "timeout", override404.Response.Headers["X-Custom"])
+
+		override500 := x.ErrorOverrides.Value["500"][0]
+		assert.Equal(t, 500, override500.Response.StatusCode)
+		assert.Equal(t, "error_500.tmpl", override500.Response.Template)
+		assert.Equal(t, `{"error": "internal server error"}`, override500.Response.Body)
+		assert.Nil(t, override500.Match)
+
+		var extracted apidef.APIDefinition
+		x.ExtractTo(&extracted)
+
+		assert.False(t, extracted.ErrorOverridesDisabled)
+		assert.Equal(t, api.ErrorOverrides, extracted.ErrorOverrides)
+		assert.Equal(t, "timeout.*", extracted.ErrorOverrides["404"][0].Match.MessagePattern)
+		assert.Equal(t, "error.code", extracted.ErrorOverrides["404"][0].Match.BodyField)
+		assert.Equal(t, "TIMEOUT", extracted.ErrorOverrides["404"][0].Match.BodyValue)
+	})
+
+	t.Run("fill and extract with error overrides disabled", func(t *testing.T) {
+		api := apidef.APIDefinition{
+			ErrorOverridesDisabled: true,
+			ErrorOverrides: apidef.ErrorOverridesMap{
+				"404": []apidef.ErrorOverride{
+					{
+						Response: apidef.ErrorResponse{
+							StatusCode: 404,
+							Body:       `{"error": "not found"}`,
+						},
 					},
 				},
 			},
-		},
-	}
+		}
 
-	var x XTykAPIGateway
-	x.Fill(api)
+		var x XTykAPIGateway
+		x.Fill(api)
 
-	assert.NotNil(t, x.ErrorOverrides)
-	assert.Len(t, x.ErrorOverrides, 2)
-	assert.Len(t, x.ErrorOverrides["404"], 1)
-	assert.Equal(t, 504, x.ErrorOverrides["404"][0].Response.StatusCode)
-	assert.Equal(t, "upstream_timeout", string(x.ErrorOverrides["404"][0].Match.Flag))
+		assert.NotNil(t, x.ErrorOverrides)
+		assert.False(t, x.ErrorOverrides.Enabled)
+		assert.NotNil(t, x.ErrorOverrides.Value)
+		assert.Len(t, x.ErrorOverrides.Value, 1)
 
-	var extracted apidef.APIDefinition
-	x.ExtractTo(&extracted)
+		var extracted apidef.APIDefinition
+		x.ExtractTo(&extracted)
 
-	assert.Equal(t, api.ErrorOverrides, extracted.ErrorOverrides)
-	assert.Equal(t, "timeout.*", extracted.ErrorOverrides["404"][0].Match.MessagePattern)
+		assert.True(t, extracted.ErrorOverridesDisabled)
+		assert.NotNil(t, extracted.ErrorOverrides)
+		assert.Equal(t, api.ErrorOverrides, extracted.ErrorOverrides)
+	})
+
+	t.Run("extract with nil error overrides", func(t *testing.T) {
+		var x XTykAPIGateway
+		x.ErrorOverrides = nil
+
+		var extracted apidef.APIDefinition
+		x.ExtractTo(&extracted)
+
+		assert.True(t, extracted.ErrorOverridesDisabled)
+		assert.Nil(t, extracted.ErrorOverrides)
+	})
+
+	t.Run("extract with error overrides but empty value", func(t *testing.T) {
+		var x XTykAPIGateway
+		x.ErrorOverrides = &ErrorOverrides{
+			Enabled: true,
+			Value:   nil,
+		}
+
+		var extracted apidef.APIDefinition
+		x.ExtractTo(&extracted)
+
+		assert.False(t, extracted.ErrorOverridesDisabled)
+		assert.Nil(t, extracted.ErrorOverrides)
+	})
 }
 
 func TestErrorOverrides_EmptyMap(t *testing.T) {
-	api := apidef.APIDefinition{
-		ErrorOverrides: nil,
-	}
+	t.Run("nil error overrides", func(t *testing.T) {
+		api := apidef.APIDefinition{
+			ErrorOverridesDisabled: false,
+			ErrorOverrides:         nil,
+		}
 
-	var x XTykAPIGateway
-	x.Fill(api)
+		var x XTykAPIGateway
+		x.Fill(api)
 
-	assert.Nil(t, x.ErrorOverrides)
+		assert.NotNil(t, x.ErrorOverrides)
+		assert.True(t, x.ErrorOverrides.Enabled)
+		assert.Nil(t, x.ErrorOverrides.Value)
 
-	var extracted apidef.APIDefinition
-	x.ExtractTo(&extracted)
+		var extracted apidef.APIDefinition
+		x.ExtractTo(&extracted)
 
-	assert.Nil(t, extracted.ErrorOverrides)
+		assert.False(t, extracted.ErrorOverridesDisabled)
+		assert.Nil(t, extracted.ErrorOverrides)
+	})
+
+	t.Run("disabled with nil error overrides", func(t *testing.T) {
+		api := apidef.APIDefinition{
+			ErrorOverridesDisabled: true,
+			ErrorOverrides:         nil,
+		}
+
+		var x XTykAPIGateway
+		x.Fill(api)
+
+		assert.Nil(t, x.ErrorOverrides)
+
+		var extracted apidef.APIDefinition
+		x.ExtractTo(&extracted)
+
+		assert.True(t, extracted.ErrorOverridesDisabled)
+		assert.Nil(t, extracted.ErrorOverrides)
+	})
+}
+
+func TestErrorOverrides_EdgeCases(t *testing.T) {
+	t.Run("error override without match criteria", func(t *testing.T) {
+		api := apidef.APIDefinition{
+			ErrorOverridesDisabled: false,
+			ErrorOverrides: apidef.ErrorOverridesMap{
+				"401": []apidef.ErrorOverride{
+					{
+						Match: nil,
+						Response: apidef.ErrorResponse{
+							StatusCode: 401,
+							Body:       `{"error": "unauthorized"}`,
+							Message:    "Access denied",
+							Headers:    map[string]string{"WWW-Authenticate": "Bearer"},
+						},
+					},
+				},
+			},
+		}
+
+		var x XTykAPIGateway
+		x.Fill(api)
+
+		assert.NotNil(t, x.ErrorOverrides)
+		assert.True(t, x.ErrorOverrides.Enabled)
+		require.Len(t, x.ErrorOverrides.Value["401"], 1)
+
+		override := x.ErrorOverrides.Value["401"][0]
+		assert.Nil(t, override.Match)
+		assert.Equal(t, 401, override.Response.StatusCode)
+		assert.Equal(t, "Access denied", override.Response.Message)
+
+		var extracted apidef.APIDefinition
+		x.ExtractTo(&extracted)
+
+		assert.False(t, extracted.ErrorOverridesDisabled)
+		require.Len(t, extracted.ErrorOverrides["401"], 1)
+		assert.Nil(t, extracted.ErrorOverrides["401"][0].Match)
+		assert.Equal(t, api.ErrorOverrides, extracted.ErrorOverrides)
+	})
+
+	t.Run("multiple overrides for same status code", func(t *testing.T) {
+		api := apidef.APIDefinition{
+			ErrorOverridesDisabled: false,
+			ErrorOverrides: apidef.ErrorOverridesMap{
+				"500": []apidef.ErrorOverride{
+					{
+						Match: &apidef.ErrorMatcher{
+							Flag: "database_error",
+						},
+						Response: apidef.ErrorResponse{
+							StatusCode: 503,
+							Body:       `{"error": "database unavailable"}`,
+						},
+					},
+					{
+						Match: &apidef.ErrorMatcher{
+							Flag: "timeout_error",
+						},
+						Response: apidef.ErrorResponse{
+							StatusCode: 504,
+							Body:       `{"error": "request timeout"}`,
+						},
+					},
+				},
+			},
+		}
+
+		var x XTykAPIGateway
+		x.Fill(api)
+
+		assert.NotNil(t, x.ErrorOverrides)
+		assert.True(t, x.ErrorOverrides.Enabled)
+		require.Len(t, x.ErrorOverrides.Value["500"], 2)
+
+		var extracted apidef.APIDefinition
+		x.ExtractTo(&extracted)
+
+		assert.False(t, extracted.ErrorOverridesDisabled)
+		require.Len(t, extracted.ErrorOverrides["500"], 2)
+		assert.Equal(t, api.ErrorOverrides, extracted.ErrorOverrides)
+	})
+
+	t.Run("error response with empty headers", func(t *testing.T) {
+		api := apidef.APIDefinition{
+			ErrorOverridesDisabled: false,
+			ErrorOverrides: apidef.ErrorOverridesMap{
+				"403": []apidef.ErrorOverride{
+					{
+						Response: apidef.ErrorResponse{
+							StatusCode: 403,
+							Body:       `{"error": "forbidden"}`,
+							Headers:    map[string]string{},
+						},
+					},
+				},
+			},
+		}
+
+		var x XTykAPIGateway
+		x.Fill(api)
+
+		assert.NotNil(t, x.ErrorOverrides)
+		require.Len(t, x.ErrorOverrides.Value["403"], 1)
+
+		override := x.ErrorOverrides.Value["403"][0]
+		assert.NotNil(t, override.Response.Headers)
+		assert.Len(t, override.Response.Headers, 0)
+
+		var extracted apidef.APIDefinition
+		x.ExtractTo(&extracted)
+
+		assert.Equal(t, api.ErrorOverrides, extracted.ErrorOverrides)
+	})
+
+	t.Run("error response with nil headers", func(t *testing.T) {
+		api := apidef.APIDefinition{
+			ErrorOverridesDisabled: false,
+			ErrorOverrides: apidef.ErrorOverridesMap{
+				"502": []apidef.ErrorOverride{
+					{
+						Response: apidef.ErrorResponse{
+							StatusCode: 502,
+							Body:       `{"error": "bad gateway"}`,
+							Headers:    nil,
+						},
+					},
+				},
+			},
+		}
+
+		var x XTykAPIGateway
+		x.Fill(api)
+
+		assert.NotNil(t, x.ErrorOverrides)
+		require.Len(t, x.ErrorOverrides.Value["502"], 1)
+
+		override := x.ErrorOverrides.Value["502"][0]
+		assert.Nil(t, override.Response.Headers)
+
+		var extracted apidef.APIDefinition
+		x.ExtractTo(&extracted)
+
+		assert.Equal(t, api.ErrorOverrides, extracted.ErrorOverrides)
+	})
 }

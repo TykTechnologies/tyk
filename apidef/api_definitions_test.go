@@ -727,6 +727,7 @@ func TestAPIDefinition_ErrorOverrides_UnmarshalJSON(t *testing.T) {
 		  "api_id": "test-api-override-upstream",
 		  "org_id": "default",
 		  "use_keyless": true,
+		  "error_overrides_disabled": false,
 		  "error_overrides": {
 			"404": [
 			  {
@@ -750,6 +751,7 @@ func TestAPIDefinition_ErrorOverrides_UnmarshalJSON(t *testing.T) {
 		require.NotNil(t, api.ErrorOverrides)
 		require.Len(t, api.ErrorOverrides["404"], 1)
 		assert.Equal(t, 420, api.ErrorOverrides["404"][0].Response.StatusCode)
+		assert.False(t, api.ErrorOverridesDisabled)
 	})
 
 	t.Run("complete error override with all fields", func(t *testing.T) {
@@ -758,6 +760,7 @@ func TestAPIDefinition_ErrorOverrides_UnmarshalJSON(t *testing.T) {
 		  "api_id": "test-api-complete-override",
 		  "org_id": "default",
 		  "use_keyless": true,
+		  "error_overrides_disabled": false,
 		  "error_overrides": {
 			"500": [
 			  {
@@ -806,6 +809,7 @@ func TestAPIDefinition_ErrorOverrides_UnmarshalJSON(t *testing.T) {
 		require.NoError(t, err)
 
 		require.NotNil(t, api.ErrorOverrides)
+		require.False(t, api.ErrorOverridesDisabled)
 		require.Len(t, api.ErrorOverrides, 2)
 
 		require.Len(t, api.ErrorOverrides["500"], 1)
@@ -850,6 +854,7 @@ func TestAPIDefinition_ErrorOverrides_UnmarshalJSON(t *testing.T) {
 		  "api_id": "test-api-multiple-overrides",
 		  "org_id": "default",
 		  "use_keyless": true,
+		  "error_overrides_disabled": true,
 		  "error_overrides": {
 			"400": [
 			  {
@@ -881,6 +886,7 @@ func TestAPIDefinition_ErrorOverrides_UnmarshalJSON(t *testing.T) {
 		require.NoError(t, err)
 
 		require.NotNil(t, api.ErrorOverrides)
+		require.True(t, api.ErrorOverridesDisabled)
 		require.Len(t, api.ErrorOverrides["400"], 2)
 
 		assert.Equal(t, "validation", api.ErrorOverrides["400"][0].Match.BodyValue)
@@ -896,6 +902,7 @@ func TestAPIDefinition_ErrorOverrides_UnmarshalJSON(t *testing.T) {
 		  "api_id": "test-api-no-match-override",
 		  "org_id": "default",
 		  "use_keyless": true,
+		  "error_overrides_disabled": false,
 		  "error_overrides": {
 			"502": [
 			  {
@@ -918,6 +925,7 @@ func TestAPIDefinition_ErrorOverrides_UnmarshalJSON(t *testing.T) {
 		require.NoError(t, err)
 
 		require.NotNil(t, api.ErrorOverrides)
+		require.False(t, api.ErrorOverridesDisabled)
 		require.Len(t, api.ErrorOverrides["502"], 1)
 
 		override := api.ErrorOverrides["502"][0]
@@ -943,6 +951,7 @@ func TestAPIDefinition_ErrorOverrides_UnmarshalJSON(t *testing.T) {
 		require.NoError(t, err)
 
 		require.NotNil(t, api.ErrorOverrides)
+		require.False(t, api.ErrorOverridesDisabled)
 		assert.Len(t, api.ErrorOverrides, 0)
 	})
 
@@ -959,6 +968,7 @@ func TestAPIDefinition_ErrorOverrides_UnmarshalJSON(t *testing.T) {
 		require.NoError(t, err)
 
 		assert.Nil(t, api.ErrorOverrides)
+		require.False(t, api.ErrorOverridesDisabled)
 	})
 }
 

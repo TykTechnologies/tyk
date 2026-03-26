@@ -29,7 +29,7 @@ func (r *ResponseErrorOverrideMiddleware) Name() string {
 func (r *ResponseErrorOverrideMiddleware) Enabled() bool {
 	// Fast path: check config before any processing
 	return len(r.Spec.GlobalConfig.ErrorOverrides) > 0 ||
-		len(r.Spec.ErrorOverrides) > 0
+		(!r.Spec.ErrorOverridesDisabled && len(r.Spec.ErrorOverrides) > 0)
 }
 
 func (r *ResponseErrorOverrideMiddleware) Init(c interface{}, spec *APISpec) error {

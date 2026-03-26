@@ -467,6 +467,38 @@ func TestUpstreamErrorOverride_APILevel(t *testing.T) {
 	}}...)
 }
 
+func TestUpstreamErrorOverride_DisableReturnsUpstreamResponse(t *testing.T) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(503)
+		w.Write([]byte(`{"upstream":"error"}`))
+	}))
+	defer upstream.Close()
+
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		spec.Proxy.ListenPath = "/"
+		spec.Proxy.TargetURL = upstream.URL
+		spec.ErrorOverrides = apidef.ErrorOverridesMap{
+			"503": []apidef.ErrorOverride{{
+				Response: apidef.ErrorResponse{
+					StatusCode: 503,
+					Body:       `{"error":"api-override"}`,
+				},
+			}},
+		}
+		spec.ErrorOverridesDisabled = true
+		spec.SetCompiledErrorOverrides(CompileErrorOverrides(spec.ErrorOverrides))
+	})
+
+	ts.Run(t, []test.TestCase{{
+		Path:      "/",
+		Code:      503,
+		BodyMatch: `{"upstream":"error"}`,
+	}}...)
+}
+
 func TestUpstreamErrorOverride_APIPrecedenceOverGateway(t *testing.T) {
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(503)

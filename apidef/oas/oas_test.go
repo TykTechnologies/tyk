@@ -291,6 +291,7 @@ func TestOAS_ExtractTo_ResetAPIDefinition(t *testing.T) {
 	a.DoNotTrack = false
 	a.IPAccessControlDisabled = false
 	a.UptimeTests.Disabled = false
+	a.ErrorOverridesDisabled = false
 
 	// deprecated fields
 	a.Auth = apidef.AuthConfig{}
@@ -927,19 +928,22 @@ func TestOAS_ErrorOverrides_UnmarshalJSON(t *testing.T) {
 					"url": "http://upstream.test"
 				},
 				"errorOverrides": {
-					"500": [
-						{
-							"response": {
-								"statusCode": 504,
-								"body": "{\"error\": \"Gateway Timeout\"}",
-								"message": "Service temporarily unavailable",
-								"headers": {
-									"X-Error-Source": "GATEWAY",
-									"Retry-After": "30"
+					"enabled": true,
+					"value":  {
+						"500": [
+							{
+								"response": {
+									"statusCode": 504,
+									"body": "{\"error\": \"Gateway Timeout\"}",
+									"message": "Service temporarily unavailable",
+									"headers": {
+										"X-Error-Source": "GATEWAY",
+										"Retry-After": "30"
+									}
 								}
 							}
-						}
-					]
+						]
+					}
 				}
 			}
 		}`)
@@ -951,9 +955,11 @@ func TestOAS_ErrorOverrides_UnmarshalJSON(t *testing.T) {
 		tykExt := oas.GetTykExtension()
 		require.NotNil(t, tykExt)
 		require.NotNil(t, tykExt.ErrorOverrides)
-		require.Len(t, tykExt.ErrorOverrides["500"], 1)
+		assert.True(t, tykExt.ErrorOverrides.Enabled)
+		require.NotNil(t, tykExt.ErrorOverrides.Value)
+		require.Len(t, tykExt.ErrorOverrides.Value["500"], 1)
 
-		errorOverride := tykExt.ErrorOverrides["500"][0]
+		errorOverride := tykExt.ErrorOverrides.Value["500"][0]
 		assert.Equal(t, 504, errorOverride.Response.StatusCode)
 		assert.Equal(t, "{\"error\": \"Gateway Timeout\"}", errorOverride.Response.Body)
 		assert.Equal(t, "Service temporarily unavailable", errorOverride.Response.Message)
@@ -982,37 +988,40 @@ func TestOAS_ErrorOverrides_UnmarshalJSON(t *testing.T) {
 					"url": "http://upstream.test"
 				},
 				"errorOverrides": {
-					"401": [
-						{
-							"match": {
-								"flag": "TLE",
-								"messagePattern": "token.*expired",
-								"bodyField": "error.code",
-								"bodyValue": "TOKEN_EXPIRED"
-							},
-							"response": {
-								"statusCode": 401,
-								"body": "{\"error\": \"Authentication token has expired\"}",
-								"message": "Token validation failed",
-								"template": "auth_error.html",
-								"headers": {
-									"WWW-Authenticate": "Bearer realm=\"api\"",
-									"X-Auth-Error": "TOKEN_EXPIRED"
+					"enabled": true,
+					"value": {
+						"401": [
+							{
+								"match": {
+									"flag": "TLE",
+									"messagePattern": "token.*expired",
+									"bodyField": "error.code",
+									"bodyValue": "TOKEN_EXPIRED"
+								},
+								"response": {
+									"statusCode": 401,
+									"body": "{\"error\": \"Authentication token has expired\"}",
+									"message": "Token validation failed",
+									"template": "auth_error.html",
+									"headers": {
+										"WWW-Authenticate": "Bearer realm=\"api\"",
+										"X-Auth-Error": "TOKEN_EXPIRED"
+									}
 								}
 							}
-						}
-					],
-					"503": [
-						{
-							"response": {
-								"statusCode": 503,
-								"body": "{\"error\": \"Service unavailable\", \"retry_after\": 60}",
-								"headers": {
-									"Retry-After": "60"
+						],
+						"503": [
+							{
+								"response": {
+									"statusCode": 503,
+									"body": "{\"error\": \"Service unavailable\", \"retry_after\": 60}",
+									"headers": {
+										"Retry-After": "60"
+									}
 								}
 							}
-						}
-					]
+						]
+					}
 				}
 			}
 		}`)
@@ -1024,10 +1033,12 @@ func TestOAS_ErrorOverrides_UnmarshalJSON(t *testing.T) {
 		tykExt := oas.GetTykExtension()
 		require.NotNil(t, tykExt)
 		require.NotNil(t, tykExt.ErrorOverrides)
-		require.Len(t, tykExt.ErrorOverrides, 2)
+		assert.True(t, tykExt.ErrorOverrides.Enabled)
+		require.NotNil(t, tykExt.ErrorOverrides.Value)
+		require.Len(t, tykExt.ErrorOverrides.Value, 2)
 
-		require.Len(t, tykExt.ErrorOverrides["401"], 1)
-		override401 := tykExt.ErrorOverrides["401"][0]
+		require.Len(t, tykExt.ErrorOverrides.Value["401"], 1)
+		override401 := tykExt.ErrorOverrides.Value["401"][0]
 
 		require.NotNil(t, override401.Match)
 		assert.Equal(t, errors.TLE, override401.Match.Flag)
@@ -1042,8 +1053,8 @@ func TestOAS_ErrorOverrides_UnmarshalJSON(t *testing.T) {
 		assert.Equal(t, "Bearer realm=\"api\"", override401.Response.Headers["WWW-Authenticate"])
 		assert.Equal(t, "TOKEN_EXPIRED", override401.Response.Headers["X-Auth-Error"])
 
-		require.Len(t, tykExt.ErrorOverrides["503"], 1)
-		override503 := tykExt.ErrorOverrides["503"][0]
+		require.Len(t, tykExt.ErrorOverrides.Value["503"], 1)
+		override503 := tykExt.ErrorOverrides.Value["503"][0]
 
 		assert.Nil(t, override503.Match)
 		assert.Equal(t, 503, override503.Response.StatusCode)
@@ -1071,7 +1082,10 @@ func TestOAS_ErrorOverrides_UnmarshalJSON(t *testing.T) {
 				"upstream": {
 					"url": "http://upstream.test"
 				},
-				"errorOverrides": {}
+				"errorOverrides": {
+					"enabled": false,
+					"value": {}
+				}
 			}
 		}`)
 
@@ -1082,7 +1096,9 @@ func TestOAS_ErrorOverrides_UnmarshalJSON(t *testing.T) {
 		tykExt := oas.GetTykExtension()
 		require.NotNil(t, tykExt)
 		require.NotNil(t, tykExt.ErrorOverrides)
-		assert.Len(t, tykExt.ErrorOverrides, 0)
+		assert.False(t, tykExt.ErrorOverrides.Enabled)
+		require.NotNil(t, tykExt.ErrorOverrides.Value)
+		assert.Len(t, tykExt.ErrorOverrides.Value, 0)
 	})
 
 	t.Run("round trip marshal/unmarshal", func(t *testing.T) {
@@ -1090,23 +1106,26 @@ func TestOAS_ErrorOverrides_UnmarshalJSON(t *testing.T) {
 		addMinimalTykExtension(oas)
 
 		tykExt := oas.GetTykExtension()
-		tykExt.ErrorOverrides = ErrorOverridesMap{
-			"404": []ErrorOverride{
-				{
-					Match: &ErrorMatcher{
-						Flag:           "TLE",
-						MessagePattern: "not.*found",
-						BodyField:      "error.type",
-						BodyValue:      "NOT_FOUND",
-					},
-					Response: ErrorResponse{
-						StatusCode: 404,
-						Body:       "{\"error\": \"Resource not found\"}",
-						Message:    "The requested resource was not found",
-						Template:   "404.html",
-						Headers: map[string]string{
-							"X-Error-Type":  "NOT_FOUND",
-							"Cache-Control": "no-cache",
+		tykExt.ErrorOverrides = &ErrorOverrides{
+			Enabled: true,
+			Value: ErrorOverridesMap{
+				"404": []ErrorOverride{
+					{
+						Match: &ErrorMatcher{
+							Flag:           "TLE",
+							MessagePattern: "not.*found",
+							BodyField:      "error.type",
+							BodyValue:      "NOT_FOUND",
+						},
+						Response: ErrorResponse{
+							StatusCode: 404,
+							Body:       "{\"error\": \"Resource not found\"}",
+							Message:    "The requested resource was not found",
+							Template:   "404.html",
+							Headers: map[string]string{
+								"X-Error-Type":  "NOT_FOUND",
+								"Cache-Control": "no-cache",
+							},
 						},
 					},
 				},
@@ -1123,9 +1142,11 @@ func TestOAS_ErrorOverrides_UnmarshalJSON(t *testing.T) {
 		unmarshaledTykExt := unmarshaledOAS.GetTykExtension()
 		require.NotNil(t, unmarshaledTykExt)
 		require.NotNil(t, unmarshaledTykExt.ErrorOverrides)
-		require.Len(t, unmarshaledTykExt.ErrorOverrides["404"], 1)
+		assert.True(t, unmarshaledTykExt.ErrorOverrides.Enabled)
+		require.NotNil(t, unmarshaledTykExt.ErrorOverrides.Value)
+		require.Len(t, unmarshaledTykExt.ErrorOverrides.Value["404"], 1)
 
-		errorOverride := unmarshaledTykExt.ErrorOverrides["404"][0]
+		errorOverride := unmarshaledTykExt.ErrorOverrides.Value["404"][0]
 		assert.Equal(t, errors.TLE, errorOverride.Match.Flag)
 		assert.Equal(t, "not.*found", errorOverride.Match.MessagePattern)
 		assert.Equal(t, "error.type", errorOverride.Match.BodyField)
@@ -1281,6 +1302,7 @@ func TestMigrateAndFillOAS_DropEmpties(t *testing.T) {
 		"Default": {},
 	}
 	api.ConfigDataDisabled = true
+	api.ErrorOverridesDisabled = true
 
 	baseAPI, _, err := MigrateAndFillOAS(&api)
 	assert.NoError(t, err)
@@ -1314,6 +1336,10 @@ func TestMigrateAndFillOAS_DropEmpties(t *testing.T) {
 	t.Run("customDomain", func(t *testing.T) {
 		assert.Nil(t, baseAPI.OAS.GetTykExtension().Server.CustomDomain)
 	})
+
+	t.Run("errorOverrides", func(t *testing.T) {
+		assert.Nil(t, baseAPI.OAS.GetTykExtension().ErrorOverrides)
+	})
 }
 
 func TestMigrateAndFillOAS_ValidateRequest(t *testing.T) {
@@ -1339,7 +1365,8 @@ func TestMigrateAndFillOAS_ValidateRequest(t *testing.T) {
 					},
 				},
 			},
-			ConfigDataDisabled: true,
+			ConfigDataDisabled:     true,
+			ErrorOverridesDisabled: true,
 		}
 	}
 
@@ -1385,7 +1412,8 @@ func TestMigrateAndFillOAS_CustomPluginAuth(t *testing.T) {
 				NotVersioned: true,
 				Versions:     map[string]apidef.VersionInfo{},
 			},
-			ConfigDataDisabled: true,
+			ConfigDataDisabled:     true,
+			ErrorOverridesDisabled: true,
 		}
 		migratedAPI, _, err := MigrateAndFillOAS(&api)
 		assert.NoError(t, err)
@@ -1429,7 +1457,8 @@ func TestMigrateAndFillOAS_CustomPluginAuth(t *testing.T) {
 					AuthHeaderName: "Authorization",
 				},
 			},
-			ConfigDataDisabled: true,
+			ConfigDataDisabled:     true,
+			ErrorOverridesDisabled: true,
 		}
 		migratedAPI, _, err := MigrateAndFillOAS(&api)
 		assert.NoError(t, err)
@@ -1479,7 +1508,8 @@ func TestMigrateAndFillOAS_CustomPlugins(t *testing.T) {
 				NotVersioned: true,
 				Versions:     map[string]apidef.VersionInfo{},
 			},
-			ConfigDataDisabled: true,
+			ConfigDataDisabled:     true,
+			ErrorOverridesDisabled: true,
 		}
 		migratedAPI, _, err := MigrateAndFillOAS(&api)
 		assert.NoError(t, err)
@@ -1516,7 +1546,8 @@ func TestMigrateAndFillOAS_CustomPlugins(t *testing.T) {
 				NotVersioned: true,
 				Versions:     map[string]apidef.VersionInfo{},
 			},
-			ConfigDataDisabled: true,
+			ConfigDataDisabled:     true,
+			ErrorOverridesDisabled: true,
 		}
 		migratedAPI, _, err := MigrateAndFillOAS(&api)
 		assert.NoError(t, err)
@@ -1553,7 +1584,8 @@ func TestMigrateAndFillOAS_CustomPlugins(t *testing.T) {
 				NotVersioned: true,
 				Versions:     map[string]apidef.VersionInfo{},
 			},
-			ConfigDataDisabled: true,
+			ConfigDataDisabled:     true,
+			ErrorOverridesDisabled: true,
 		}
 		migratedAPI, _, err := MigrateAndFillOAS(&api)
 		assert.NoError(t, err)
@@ -1590,7 +1622,8 @@ func TestMigrateAndFillOAS_CustomPlugins(t *testing.T) {
 				NotVersioned: true,
 				Versions:     map[string]apidef.VersionInfo{},
 			},
-			ConfigDataDisabled: true,
+			ConfigDataDisabled:     true,
+			ErrorOverridesDisabled: true,
 		}
 		migratedAPI, _, err := MigrateAndFillOAS(&api)
 		assert.NoError(t, err)
@@ -1625,7 +1658,8 @@ func TestMigrateAndFillOAS_PluginConfigData(t *testing.T) {
 			NotVersioned: true,
 			Versions:     map[string]apidef.VersionInfo{},
 		},
-		ConfigData: configData,
+		ConfigData:             configData,
+		ErrorOverridesDisabled: true,
 	}
 	migratedAPI, _, err := MigrateAndFillOAS(&api)
 	assert.NoError(t, err)
