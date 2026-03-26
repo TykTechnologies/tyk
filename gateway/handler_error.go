@@ -396,7 +396,7 @@ func (e *ErrorHandler) writeJSONRPCErrorResponse(w http.ResponseWriter, r *http.
 func (e *ErrorHandler) tryWriteOverride(w http.ResponseWriter, r *http.Request, errMsg string, errCode int) *http.Response {
 	// Fast path: check config map length before atomic load
 	if len(e.Spec.GlobalConfig.ErrorOverrides) == 0 &&
-		len(e.Spec.ErrorOverrides) == 0 {
+		(e.Spec.ErrorOverridesDisabled || len(e.Spec.ErrorOverrides) == 0) {
 		return nil
 	}
 

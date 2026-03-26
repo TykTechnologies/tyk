@@ -265,21 +265,19 @@ func (o *ErrorOverrides) matchesAdditionalCriteria(r *http.Request, rule *apidef
 		return true
 	}
 
-	// Flag matching (highest priority - semantic match from error classification)
 	if rule.Match.Flag != "" {
-		if o.matchFlag(r, rule.Match.Flag) {
-			return true
+		if !o.matchFlag(r, rule.Match.Flag) {
+			return false
 		}
 	}
 
-	// Message pattern matching (regex on error message)
 	if rule.Match.MessagePattern != "" {
-		return o.matchMessagePattern(rule.Match, body)
+		if !o.matchMessagePattern(rule.Match, body) {
+			return false
+		}
 	}
 
-	// No criteria specified = match all
-	hasMatchCriteria := rule.Match.Flag != "" || rule.Match.MessagePattern != ""
-	return !hasMatchCriteria
+	return true
 }
 
 // matchFlag checks if the error classification flag matches the expected flag.
@@ -441,32 +439,33 @@ func (o *ErrorOverrides) matchesUpstreamCriteria(rule *apidef.ErrorOverride, bod
 		return true
 	}
 
-	// URS flag matches any 5xx upstream response
-	if rule.Match.Flag == errors.URS {
-		return statusCode >= 500 && statusCode <= 599
-	}
-
-	// Skip rules with other flags - they're gateway-only (AKI, RLT, etc.)
 	if rule.Match.Flag != "" {
-		return false
+		// URS flag matches any 5xx upstream response
+		if rule.Match.Flag == errors.URS {
+			if statusCode < 500 || statusCode > 599 {
+				return false
+			}
+		} else {
+			// Skip rules with other flags - they're gateway-only (AKI, RLT, etc.)
+			return false
+		}
 	}
 
 	// Body field matching (JSON path) - useful for upstream JSON responses
 	if rule.Match.BodyField != "" && rule.Match.BodyValue != "" {
-		if o.matchBodyField(rule.Match.BodyField, rule.Match.BodyValue, body) {
-			return true
+		if !o.matchBodyField(rule.Match.BodyField, rule.Match.BodyValue, body) {
+			return false
 		}
 	}
 
 	// Message pattern matching (regex)
 	if rule.Match.MessagePattern != "" {
-		return o.matchMessagePattern(rule.Match, body)
+		if !o.matchMessagePattern(rule.Match, body) {
+			return false
+		}
 	}
 
-	// No match criteria = match all
-	hasMatchCriteria := rule.Match.MessagePattern != "" ||
-		(rule.Match.BodyField != "" && rule.Match.BodyValue != "")
-	return !hasMatchCriteria
+	return true
 }
 
 // needsBodyForMatch returns true if the rule requires body inspection.
