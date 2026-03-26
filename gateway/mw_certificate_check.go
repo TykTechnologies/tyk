@@ -11,7 +11,7 @@ import (
 	"github.com/TykTechnologies/tyk/certs"
 	"github.com/TykTechnologies/tyk/internal/certcheck"
 	"github.com/TykTechnologies/tyk/internal/crypto"
-	"github.com/TykTechnologies/tyk/internal/errlog"
+	"github.com/TykTechnologies/tyk/pkg/errpack"
 	"github.com/TykTechnologies/tyk/storage"
 )
 
@@ -118,7 +118,7 @@ func (m *CertificateCheckMW) ProcessRequest(w http.ResponseWriter, r *http.Reque
 				WithField("api_id", m.Spec.APIID).
 				WithField("api_name", m.Spec.Name).
 				WithField("mw", m.Name()).
-				Log(errlog.Level(err, logrus.WarnLevel), "Certificate validation failed: ", err)
+				Log(errpack.LogLevel(err, logrus.WarnLevel), "Certificate validation failed: ", err)
 			m.batchCertificatesExpirationCheck(apiCerts)
 			return err, http.StatusForbidden
 		}

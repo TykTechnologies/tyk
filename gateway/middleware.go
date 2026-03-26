@@ -13,8 +13,8 @@ import (
 	"time"
 
 	"github.com/TykTechnologies/tyk-pump/analytics"
-	"github.com/TykTechnologies/tyk/internal/errlog"
 	"github.com/TykTechnologies/tyk/internal/httputil/accesslog"
+	"github.com/TykTechnologies/tyk/pkg/errpack"
 
 	"github.com/gocraft/health"
 	"github.com/justinas/alice"
@@ -203,7 +203,7 @@ func (gw *Gateway) createMiddleware(actualMW TykMiddleware) func(http.Handler) h
 					WithError(err).
 					WithField("code", errCode).
 					WithField("ns", finishTime.Nanoseconds()).
-					Log(errlog.Level(err, logrus.DebugLevel), "Finished")
+					Log(errpack.LogLevel(err, logrus.DebugLevel), "Finished")
 
 				return
 			}
@@ -474,7 +474,7 @@ func (t *BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 	return store.Apply(session)
 }
 
-// RecordAccessLog is used for Success/logError handler logging.
+// RecordAccessLog is used for Success/Error handler logging.
 // It emits a log entry with populated access log fields.
 func (t *BaseMiddleware) RecordAccessLog(req *http.Request, resp *http.Response, latency analytics.Latency) {
 	if !t.Spec.GlobalConfig.AccessLogs.Enabled {
