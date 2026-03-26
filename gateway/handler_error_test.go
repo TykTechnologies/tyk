@@ -2,6 +2,7 @@ package gateway
 
 import (
 	"bytes"
+	"context"
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
@@ -13,6 +14,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.opentelemetry.io/otel/trace"
 
 	"github.com/TykTechnologies/tyk-pump/analytics"
 	"github.com/TykTechnologies/tyk/config"
@@ -281,4 +283,69 @@ func TestErrorHandler_LatencyRecording(t *testing.T) {
 		// 3. Upstream is 0 for connection errors
 		assert.Zero(t, record.Latency.Upstream, "Upstream should be zero for connection errors")
 	})
+}
+
+// TestErrorHandler_HandleError_RecordsTraceIDTag verifies that HandleError includes the
+// trace-id tag in the analytics record when OpenTelemetry is enabled.
+func TestErrorHandler_HandleError_RecordsTraceIDTag(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	makeCtxWithTrace := func(hex string) context.Context {
+		tid, err := trace.TraceIDFromHex(hex)
+		if err != nil {
+			t.Fatalf("invalid trace id: %v", err)
+		}
+		sc := trace.NewSpanContext(trace.SpanContextConfig{
+			TraceID:    tid,
+			TraceFlags: trace.FlagsSampled,
+		})
+		return trace.ContextWithSpanContext(context.Background(), sc)
+	}
+
+	tests := map[string]struct {
+		enableOTel bool
+		wantTag    bool
+	}{
+		"enabled_with_trace_appends": {enableOTel: true, wantTag: true},
+		"disabled_with_trace_noop":   {enableOTel: false, wantTag: false},
+	}
+
+	spec := ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		spec.Proxy.ListenPath = "/test/"
+	})[0]
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			cfg := ts.Gw.GetConfig()
+			cfg.OpenTelemetry.Enabled = tc.enableOTel
+			ts.Gw.SetConfig(cfg)
+
+			handler := ErrorHandler{
+				BaseMiddleware: &BaseMiddleware{Spec: spec, Gw: ts.Gw},
+			}
+
+			r := httptest.NewRequest(http.MethodGet, "/test/", nil)
+			r = r.WithContext(makeCtxWithTrace("0123456789abcdef0123456789abcdef"))
+
+			ts.Gw.Analytics.Flush()
+			ts.Gw.Analytics.Store.GetAndDeleteSet(analyticsKeyName)
+
+			handler.HandleError(httptest.NewRecorder(), r, "unauthorized", http.StatusUnauthorized, true)
+
+			ts.Gw.Analytics.Flush()
+			results := ts.Gw.Analytics.Store.GetAndDeleteSet(analyticsKeyName)
+			require.Len(t, results, 1)
+
+			var record analytics.AnalyticsRecord
+			err := ts.Gw.Analytics.analyticsSerializer.Decode([]byte(results[0].(string)), &record)
+			require.NoError(t, err)
+
+			if tc.wantTag {
+				assert.Contains(t, record.Tags, traceTagPrefix+"0123456789abcdef0123456789abcdef")
+			} else {
+				assert.NotContains(t, record.Tags, traceTagPrefix+"0123456789abcdef0123456789abcdef")
+			}
+		})
+	}
 }
