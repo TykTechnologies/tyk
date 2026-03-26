@@ -1275,8 +1275,13 @@ func (gw *Gateway) handleGetAPIOAS(apiID string, modePublic bool) (interface{}, 
 	defer gw.apisMu.RUnlock()
 
 	obj, code := gw.handleGetAPI(apiID, true)
-	if apiOAS, ok := obj.(*oas.OAS); ok && modePublic {
-		apiOAS.RemoveTykExtension()
+	if apiOAS, ok := obj.(*oas.OAS); ok {
+		if modePublic {
+			apiOAS.RemoveTykExtension()
+		}
+
+		// We have to operate on oas clone in order to preserve original state after any manipulations on schema.
+		obj, _ = apiOAS.Clone()
 	}
 	return obj, code
 
