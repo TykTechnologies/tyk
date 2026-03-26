@@ -1456,6 +1456,10 @@ func (gw *Gateway) writeOASAndAPIDefToFile(fs afero.Fs, apiDef *apidef.APIDefini
 		suffix = "-mcp"
 	}
 
+	visitor := schema.NewVisitor()
+	visitor.AddSchemaManipulation(schema.RestoreUnicodeEscapesFromRE2Manipulation)
+	visitor.ProcessOAS(oasObj)
+
 	err, errCode = gw.writeToFile(fs, oasObj, apiDef.APIID+suffix)
 	if err != nil {
 		return
