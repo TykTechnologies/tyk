@@ -794,7 +794,8 @@ type APIDefinition struct {
 	SecurityRequirements [][]string `json:"security_requirements,omitempty" bson:"security_requirements,omitempty"`
 
 	// ErrorOverrides contains the configurations for error response customization.
-	ErrorOverrides ErrorOverridesMap `bson:"error_overrides" json:"error_overrides"`
+	ErrorOverrides         ErrorOverridesMap `bson:"error_overrides" json:"error_overrides"`
+	ErrorOverridesDisabled bool              `bson:"error_overrides_disabled" json:"error_overrides_disabled" `
 }
 
 type JWK struct {

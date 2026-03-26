@@ -1150,6 +1150,9 @@
         }
       }
     },
+    "error_overrides_disabled": {
+      "type": "boolean"
+    },
     "error_overrides": {
       "type": ["object", "null"],
       "additionalProperties": {

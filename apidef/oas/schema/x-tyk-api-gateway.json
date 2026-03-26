@@ -11,11 +11,11 @@
     "server": {
       "$ref": "#/definitions/X-Tyk-Server"
     },
-    "errorOverrides": {
-      "$ref": "#/definitions/X-Tyk-ErrorOverrides"
-    },
     "middleware": {
       "$ref": "#/definitions/X-Tyk-Middleware"
+    },
+    "errorOverrides": {
+      "$ref": "#/definitions/X-Tyk-ErrorOverrides"
     }
   },
   "required": [
@@ -2760,12 +2760,21 @@
     },
     "X-Tyk-ErrorOverrides": {
       "type": "object",
-      "additionalProperties": {
-        "type": "array",
-        "items": {
-          "$ref": "#/definitions/X-Tyk-ErrorOverride"
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "value": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "array",
+            "items": {
+              "$ref": "#/definitions/X-Tyk-ErrorOverride"
+            }
+          }
         }
-      }
+      },
+      "required": ["enabled", "value"]
     },
     "X-Tyk-ErrorOverride": {
       "type": "object",
