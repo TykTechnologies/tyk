@@ -1546,6 +1546,15 @@ run_all_override_tests() {
         "-H \"Authorization: invalid-key-12345\""
 
     run_override_test \
+        "API Override Disabled - AKI" \
+        "/test-api-override-disabled/get" \
+        "AKI" \
+        "invalid_api_key" \
+        "AKI" \
+        "403" \
+        "-H \"Authorization: invalid-key-12345\""
+
+    run_override_test \
         "API Override Fallback - AMF" \
         "/test-api-override-aki/get" \
         "AMF" \

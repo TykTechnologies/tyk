@@ -196,6 +196,24 @@ func TestShouldProcessResponse(t *testing.T) {
 		assert.False(t, middleware.shouldProcessResponse(res))
 	})
 
+	t.Run("skips when API-level override is disabled", func(t *testing.T) {
+		middleware := &ResponseErrorOverrideMiddleware{
+			BaseTykResponseHandler: BaseTykResponseHandler{
+				Spec: &APISpec{
+					APIDefinition: &apidef.APIDefinition{
+						ErrorOverrides: apidef.ErrorOverridesMap{
+							"500": []apidef.ErrorOverride{{}},
+						},
+						ErrorOverridesDisabled: true,
+					},
+				},
+			},
+		}
+
+		res := &http.Response{StatusCode: 500}
+		assert.False(t, middleware.shouldProcessResponse(res))
+	})
+
 	t.Run("processes all error status codes", func(t *testing.T) {
 		middleware := &ResponseErrorOverrideMiddleware{
 			BaseTykResponseHandler: BaseTykResponseHandler{
