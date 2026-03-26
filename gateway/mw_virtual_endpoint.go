@@ -91,6 +91,38 @@ func (gw *Gateway) preLoadVirtualMetaCode(meta *apidef.VirtualMeta, j *JSVM) {
 	}
 }
 
+func (gw *Gateway) preLoadVirtualMetaCodeGoja(meta *apidef.VirtualMeta, j *GojaJSVM) {
+	var src string
+	switch meta.FunctionSourceType {
+	case apidef.UseFile:
+		j.Log.Debug("Loading JS Endpoint File: ", meta.FunctionSourceURI)
+		data, err := os.ReadFile(meta.FunctionSourceURI)
+		if err != nil {
+			j.Log.WithError(err).Error("Failed to open Endpoint JS")
+			return
+		}
+		src = string(data)
+	case apidef.UseBlob:
+		if gw.GetConfig().DisableVirtualPathBlobs {
+			j.Log.Error("[JSVM] Blobs not allowed on this node")
+			return
+		}
+		j.Log.Debug("Loading JS blob")
+		js, err := base64.StdEncoding.DecodeString(meta.FunctionSourceURI)
+		if err != nil {
+			j.Log.WithError(err).Error("Failed to load blob JS")
+			return
+		}
+		src = string(js)
+	default:
+		j.Log.Error("Type must be either file or blob (base64)!")
+		return
+	}
+	if err := j.LoadScript(src); err != nil {
+		j.Log.WithError(err).Error("Could not load virtual endpoint JS")
+	}
+}
+
 func (d *VirtualEndpoint) Init() {
 	d.sh = SuccessHandler{d.BaseMiddleware}
 }
@@ -171,44 +203,58 @@ func (d *VirtualEndpoint) ServeHTTPForCache(w http.ResponseWriter, r *http.Reque
 	}
 
 	// Run the middleware
-
-	vm := d.Spec.JSVM.VM.Copy()
-	vm.Interrupt = make(chan func(), 1)
+	expr := vmeta.ResponseFunctionName + `(` + string(requestAsJson) + `, ` + string(sessionAsJson) + `, ` + specAsJson + `);`
 	d.Logger().Debug("Running: ", vmeta.ResponseFunctionName)
-	// buffered, leaving no chance of a goroutine leak since the
-	// spawned goroutine will send 0 or 1 values.
-	ret := make(chan otto.Value, 1)
-	errRet := make(chan error, 1)
-	go func() {
-		defer func() {
-			// the VM executes the panic func that gets it
-			// to stop, so we must recover here to not crash
-			// the whole Go program.
-			recover()
-		}()
-		returnRaw, err := vm.Run(vmeta.ResponseFunctionName + `(` + string(requestAsJson) + `, ` + string(sessionAsJson) + `, ` + specAsJson + `);`)
-		ret <- returnRaw
-		errRet <- err
-	}()
-	var returnRaw otto.Value
-	t := time.NewTimer(d.Spec.JSVM.Timeout)
-	select {
-	case returnRaw = <-ret:
-		if err := <-errRet; err != nil {
+
+	var returnDataStr string
+
+	if d.Spec.CustomMiddleware.Driver == apidef.GojaDriver {
+		if d.Spec.GojaJSVM.VM() == nil {
+			return nil, errors.New("GojaJSVM isn't initialized")
+		}
+		var err error
+		returnDataStr, err = d.Spec.GojaJSVM.Run(expr)
+		if err != nil {
 			return nil, fmt.Errorf("Failed to run JS middleware: %w", err)
 		}
-		t.Stop()
-	case <-t.C:
-		t.Stop()
-		d.Logger().Error("JS middleware timed out after ", d.Spec.JSVM.Timeout)
-		vm.Interrupt <- func() {
-			// only way to stop the VM is to send it a func
-			// that panics.
-			panic("stop")
+	} else {
+		vm := d.Spec.JSVM.VM.Copy()
+		vm.Interrupt = make(chan func(), 1)
+		// buffered, leaving no chance of a goroutine leak since the
+		// spawned goroutine will send 0 or 1 values.
+		ret := make(chan otto.Value, 1)
+		errRet := make(chan error, 1)
+		go func() {
+			defer func() {
+				// the VM executes the panic func that gets it
+				// to stop, so we must recover here to not crash
+				// the whole Go program.
+				recover()
+			}()
+			returnRaw, err := vm.Run(expr)
+			ret <- returnRaw
+			errRet <- err
+		}()
+		var returnRaw otto.Value
+		t := time.NewTimer(d.Spec.JSVM.Timeout)
+		select {
+		case returnRaw = <-ret:
+			if err := <-errRet; err != nil {
+				return nil, fmt.Errorf("Failed to run JS middleware: %w", err)
+			}
+			t.Stop()
+		case <-t.C:
+			t.Stop()
+			d.Logger().Error("JS middleware timed out after ", d.Spec.JSVM.Timeout)
+			vm.Interrupt <- func() {
+				// only way to stop the VM is to send it a func
+				// that panics.
+				panic("stop")
+			}
+			return nil, fmt.Errorf("JS middleware timed out after %s", d.Spec.JSVM.Timeout)
 		}
-		return nil, fmt.Errorf("JS middleware timed out after %s", d.Spec.JSVM.Timeout)
+		returnDataStr, _ = returnRaw.ToString()
 	}
-	returnDataStr, _ := returnRaw.ToString()
 
 	// Decode the return object
 	newResponseData := VMResponseObject{}

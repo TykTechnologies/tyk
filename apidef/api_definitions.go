@@ -65,6 +65,7 @@ const (
 	RequestJSON RequestInputType = "json"
 
 	OttoDriver     MiddlewareDriver = "otto"
+	GojaDriver     MiddlewareDriver = "goja"
 	PythonDriver   MiddlewareDriver = "python"
 	LuaDriver      MiddlewareDriver = "lua"
 	GrpcDriver     MiddlewareDriver = "grpc"

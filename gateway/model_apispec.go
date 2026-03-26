@@ -48,6 +48,7 @@ type APISpec struct {
 	EventPaths               map[apidef.TykEvent][]config.TykEventHandler
 	Health                   HealthChecker
 	JSVM                     JSVM
+	GojaJSVM                 GojaJSVM
 	ResponseChain            []TykResponseHandler
 	RoundRobin               RoundRobin
 	URLRewriteEnabled        bool

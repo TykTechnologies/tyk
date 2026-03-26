@@ -192,48 +192,65 @@ func (d *DynamicMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 
 	// Run the middleware
 	middlewareClassname := d.MiddlewareClassName
-	if d.Spec.JSVM.VM == nil {
-		logger.WithError(err).Error("JSVM isn't enabled, check your gateway settings")
-		return errors.New("Middleware error"), 500
-	}
-	vm := d.Spec.JSVM.VM.Copy()
-	vm.Interrupt = make(chan func(), 1)
+	expr := middlewareClassname + `.DoProcessRequest(` + string(requestAsJson) + `, ` + string(sessionAsJson) + `, ` + specAsJson + `);`
 	logger.Debug("Running: ", middlewareClassname)
-	// buffered, leaving no chance of a goroutine leak since the
-	// spawned goroutine will send 0 or 1 values.
-	ret := make(chan otto.Value, 1)
-	errRet := make(chan error, 1)
-	go func() {
-		defer func() {
-			// the VM executes the panic func that gets it
-			// to stop, so we must recover here to not crash
-			// the whole Go program.
-			recover()
-		}()
-		returnRaw, err := vm.Run(middlewareClassname + `.DoProcessRequest(` + string(requestAsJson) + `, ` + string(sessionAsJson) + `, ` + specAsJson + `);`)
-		ret <- returnRaw
-		errRet <- err
-	}()
-	var returnRaw otto.Value
-	t := time.NewTimer(d.Spec.JSVM.Timeout)
-	select {
-	case returnRaw = <-ret:
-		if err := <-errRet; err != nil {
+
+	var returnDataStr string
+
+	if d.Spec.CustomMiddleware.Driver == apidef.GojaDriver {
+		if d.Spec.GojaJSVM.VM() == nil {
+			logger.Error("GojaJSVM isn't initialized, check your gateway settings")
+			return errors.New("Middleware error"), http.StatusInternalServerError
+		}
+		var err error
+		returnDataStr, err = d.Spec.GojaJSVM.Run(expr)
+		if err != nil {
 			logger.WithError(err).Error("Failed to run JS middleware")
 			return errors.New(http.StatusText(http.StatusInternalServerError)), http.StatusInternalServerError
 		}
-		t.Stop()
-	case <-t.C:
-		t.Stop()
-		logger.Error("JS middleware timed out after ", d.Spec.JSVM.Timeout)
-		vm.Interrupt <- func() {
-			// only way to stop the VM is to send it a func
-			// that panics.
-			panic("stop")
+	} else {
+		if d.Spec.JSVM.VM == nil {
+			logger.Error("JSVM isn't enabled, check your gateway settings")
+			return errors.New("Middleware error"), http.StatusInternalServerError
 		}
-		return errors.New(http.StatusText(http.StatusInternalServerError)), http.StatusInternalServerError
+		vm := d.Spec.JSVM.VM.Copy()
+		vm.Interrupt = make(chan func(), 1)
+		// buffered, leaving no chance of a goroutine leak since the
+		// spawned goroutine will send 0 or 1 values.
+		ret := make(chan otto.Value, 1)
+		errRet := make(chan error, 1)
+		go func() {
+			defer func() {
+				// the VM executes the panic func that gets it
+				// to stop, so we must recover here to not crash
+				// the whole Go program.
+				recover()
+			}()
+			returnRaw, err := vm.Run(expr)
+			ret <- returnRaw
+			errRet <- err
+		}()
+		var returnRaw otto.Value
+		t := time.NewTimer(d.Spec.JSVM.Timeout)
+		select {
+		case returnRaw = <-ret:
+			if err := <-errRet; err != nil {
+				logger.WithError(err).Error("Failed to run JS middleware")
+				return errors.New(http.StatusText(http.StatusInternalServerError)), http.StatusInternalServerError
+			}
+			t.Stop()
+		case <-t.C:
+			t.Stop()
+			logger.Error("JS middleware timed out after ", d.Spec.JSVM.Timeout)
+			vm.Interrupt <- func() {
+				// only way to stop the VM is to send it a func
+				// that panics.
+				panic("stop")
+			}
+			return errors.New(http.StatusText(http.StatusInternalServerError)), http.StatusInternalServerError
+		}
+		returnDataStr, _ = returnRaw.ToString()
 	}
-	returnDataStr, _ := returnRaw.ToString()
 
 	// Decode the return object
 	newRequestData := VMReturnObject{}

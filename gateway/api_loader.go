@@ -39,6 +39,12 @@ const (
 	rateLimitEndpoint = "/tyk/rate-limits/"
 )
 
+// isJSDriver returns true for drivers that use in-process JS execution
+// (otto or goja) as opposed to coprocess (python, lua, grpc) or go plugins.
+func isJSDriver(d apidef.MiddlewareDriver) bool {
+	return d == apidef.OttoDriver || d == apidef.GojaDriver
+}
+
 type ChainObject struct {
 	ThisHandler    http.Handler
 	RateLimitChain http.Handler
@@ -252,9 +258,13 @@ func (gw *Gateway) processSpec(
 	var mwPaths []string
 
 	mwPaths, mwAuthCheckFunc, mwPreFuncs, mwPostFuncs, mwPostAuthCheckFuncs, mwResponseFuncs, mwDriver = gw.loadCustomMiddleware(spec)
-	if gw.GetConfig().EnableJSVM && (spec.hasVirtualEndpoint() || mwDriver == apidef.OttoDriver) {
+	if gw.GetConfig().EnableJSVM && (spec.hasVirtualEndpoint() || isJSDriver(mwDriver)) {
 		logger.Debug("Loading JS Paths")
-		spec.JSVM.LoadJSPaths(mwPaths, prefix)
+		if mwDriver == apidef.GojaDriver {
+			spec.GojaJSVM.LoadJSPaths(mwPaths, prefix)
+		} else {
+			spec.JSVM.LoadJSPaths(mwPaths, prefix)
+		}
 	}
 
 	//  if bundle was used - fix paths for goplugin-type custom middle-wares
@@ -327,7 +337,7 @@ func (gw *Gateway) processSpec(
 					APILevel:       true,
 				},
 			)
-		} else if mwDriver != apidef.OttoDriver {
+		} else if !isJSDriver(mwDriver) {
 			coprocessLog.Debug("Registering coprocess middleware, hook name: ", obj.Name, "hook type: Pre", ", driver: ", mwDriver)
 			gw.mwAppendEnabled(&chainArray, &CoProcessMiddleware{baseMid.Copy(), coprocess.HookType_Pre, obj.Name, mwDriver, obj.RawBodyOnly, nil})
 		} else {
@@ -414,7 +424,7 @@ func (gw *Gateway) processSpec(
 
 		if customPluginAuthEnabled && !mwAuthCheckFunc.Disabled {
 			switch spec.CustomMiddleware.Driver {
-			case apidef.OttoDriver:
+			case apidef.OttoDriver, apidef.GojaDriver:
 				logger.Info("----> Checking security policy: JS Plugin")
 				dynamicMW := &DynamicMiddleware{
 					BaseMiddleware:      baseMid.Copy(),
@@ -564,7 +574,7 @@ func (gw *Gateway) processSpec(
 					APILevel:       true,
 				},
 			)
-		} else if mwDriver != apidef.OttoDriver {
+		} else if !isJSDriver(mwDriver) {
 			coprocessLog.Debug("Registering coprocess middleware, hook name: ", obj.Name, "hook type: Post", ", driver: ", mwDriver)
 			gw.mwAppendEnabled(&chainArray, &CoProcessMiddleware{baseMid.Copy(), coprocess.HookType_Post, obj.Name, mwDriver, obj.RawBodyOnly, nil})
 		} else {
