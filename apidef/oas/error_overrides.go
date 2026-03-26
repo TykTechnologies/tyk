@@ -55,7 +55,6 @@ func (e *ErrorOverridesMap) ExtractTo(internal *apidef.APIDefinition) {
 	}
 }
 
-// ErrorOverride matches apidef.ErrorOverride but with camelCase tags for OAS.
 type ErrorOverride struct {
 	Match    *ErrorMatcher `json:"match,omitempty"`
 	Response ErrorResponse `json:"response"`
