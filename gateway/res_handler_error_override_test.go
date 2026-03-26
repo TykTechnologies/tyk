@@ -187,6 +187,7 @@ func TestShouldProcessResponse(t *testing.T) {
 					GlobalConfig: config.Config{
 						ErrorOverrides: apidef.ErrorOverridesMap{},
 					},
+					APIDefinition: &apidef.APIDefinition{},
 				},
 			},
 		}
@@ -213,6 +214,51 @@ func TestShouldProcessResponse(t *testing.T) {
 			res := &http.Response{StatusCode: code}
 			assert.True(t, middleware.shouldProcessResponse(res), "status code %d", code)
 		}
+	})
+
+	t.Run("processes error responses with API-level overrides configured", func(t *testing.T) {
+		middleware := &ResponseErrorOverrideMiddleware{
+			BaseTykResponseHandler: BaseTykResponseHandler{
+				Spec: &APISpec{
+					APIDefinition: &apidef.APIDefinition{
+						ErrorOverrides: apidef.ErrorOverridesMap{
+							"500": []apidef.ErrorOverride{{}},
+						},
+					},
+					GlobalConfig: config.Config{
+						ErrorOverrides: apidef.ErrorOverridesMap{},
+					},
+				},
+			},
+		}
+
+		res := &http.Response{StatusCode: 500}
+		assert.True(t, middleware.shouldProcessResponse(res))
+	})
+
+	t.Run("processes error responses with both global and API-level overrides", func(t *testing.T) {
+		middleware := &ResponseErrorOverrideMiddleware{
+			BaseTykResponseHandler: BaseTykResponseHandler{
+				Spec: &APISpec{
+					APIDefinition: &apidef.APIDefinition{
+						ErrorOverrides: apidef.ErrorOverridesMap{
+							"404": []apidef.ErrorOverride{{}},
+						},
+					},
+					GlobalConfig: config.Config{
+						ErrorOverrides: apidef.ErrorOverridesMap{
+							"500": []apidef.ErrorOverride{{}},
+						},
+					},
+				},
+			},
+		}
+
+		res404 := &http.Response{StatusCode: 404}
+		assert.True(t, middleware.shouldProcessResponse(res404))
+
+		res500 := &http.Response{StatusCode: 500}
+		assert.True(t, middleware.shouldProcessResponse(res500))
 	})
 }
 
