@@ -1,6 +1,7 @@
 package gateway
 
 import (
+	"crypto/tls"
 	"strings"
 	"testing"
 
@@ -551,27 +552,84 @@ func TestContainsEscapedCharacters(t *testing.T) {
 	}
 }
 
-func Test_setDefaultIfZero(t *testing.T) {
-	t.Run("sets default value if ptr value is non zero", func(t *testing.T) {
-		var ptr int
-		setDefaultIfZero(&ptr, 123)
-		assert.Equal(t, 123, ptr)
-	})
+func Test_resolveTLSVersions(t *testing.T) {
+	tests := []struct {
+		name    string
+		uMin    uint16
+		uMax    uint16
+		wantMin uint16
+		wantMax uint16
+		wantErr bool
+	}{
+		{
+			name:    "Both empty - returns defaults",
+			uMin:    0,
+			uMax:    0,
+			wantMin: tls.VersionTLS12,
+			wantMax: tls.VersionTLS13,
+			wantErr: false,
+		},
+		{
+			name:    "Only Min defined (small) - Max stays default",
+			uMin:    tls.VersionTLS11,
+			uMax:    0,
+			wantMin: tls.VersionTLS11,
+			wantMax: tls.VersionTLS13,
+			wantErr: false,
+		},
+		{
+			name:    "Only Min defined (high) - Max pushed up (no regression)",
+			uMin:    tls.VersionTLS13,
+			uMax:    0,
+			wantMin: tls.VersionTLS13,
+			wantMax: tls.VersionTLS13,
+			wantErr: false,
+		},
+		{
+			name:    "Only Max defined (high) - Min stays default",
+			uMin:    0,
+			uMax:    tls.VersionTLS13,
+			wantMin: tls.VersionTLS12,
+			wantMax: tls.VersionTLS13,
+			wantErr: false,
+		},
+		{
+			name:    "Only Max defined (low) - Min pushed down (no regression)",
+			uMin:    0,
+			uMax:    tls.VersionTLS11,
+			wantMin: tls.VersionTLS11,
+			wantMax: tls.VersionTLS11,
+			wantErr: false,
+		},
+		{
+			name:    "Both defined valid - returns user values",
+			uMin:    tls.VersionTLS12,
+			uMax:    tls.VersionTLS12,
+			wantMin: tls.VersionTLS12,
+			wantMax: tls.VersionTLS12,
+			wantErr: false,
+		},
+		{
+			name:    "Both defined invalid - returns error",
+			uMin:    tls.VersionTLS13,
+			uMax:    tls.VersionTLS12,
+			wantMin: 0,
+			wantMax: 0,
+			wantErr: true,
+		},
+	}
 
-	t.Run("does not modify ptr value if it's already defined", func(t *testing.T) {
-		var ptr = 100
-		setDefaultIfZero(&ptr, 123)
-		assert.Equal(t, 100, ptr)
-	})
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gotMin, gotMax, err := resolveTLSVersions(tt.uMin, tt.uMax)
 
-	t.Run("panics if null ptr is given", func(t *testing.T) {
-		assert.PanicsWithValue(t, "setDefaultIfZero expects non nil ptr", func() {
-			var ptr *int
-			setDefaultIfZero(ptr, 123)
+			if tt.wantErr {
+				assert.Error(t, err)
+				return
+			}
+
+			assert.Equal(t, tt.wantMin, gotMin)
+			assert.Equal(t, tt.wantMax, gotMax)
 		})
-
-		assert.PanicsWithValue(t, "setDefaultIfZero expects non nil ptr", func() {
-			setDefaultIfZero(nil, 123)
-		})
-	})
+	}
 }

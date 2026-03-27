@@ -1601,30 +1601,28 @@ func (gw *Gateway) initSystem() error {
 		}
 	}
 
-	setDefaultIfZero(&gwConfig.ProxySSLMinVersion, tls.VersionTLS12)
-	setDefaultIfZero(&gwConfig.ProxySSLMaxVersion, tls.VersionTLS13)
+	if tMin, tMax, err := resolveTLSVersions(gwConfig.ProxySSLMinVersion, gwConfig.ProxySSLMaxVersion); err != nil {
+		return fmt.Errorf("failed to resolve `proxy_ssl_min_version` and `proxy_ssl_max_version`: %w", err)
+	} else {
+		log.
+			WithField("proxy_ssl_min_version", tls.VersionName(tMin)).
+			WithField("proxy_ssl_max_version", tls.VersionName(tMax)).
+			Info("Proxy TLS protocol range resolved and applied")
 
-	if gwConfig.ProxySSLMinVersion > gwConfig.ProxySSLMaxVersion {
-		log.Warningf(
-			"`proxy_ssl_max_version` is lower than `proxy_ssl_min_version`. Bumping `proxy_ssl_max_version` from %s to %s",
-			tls.VersionName(gwConfig.ProxySSLMaxVersion),
-			tls.VersionName(gwConfig.ProxySSLMinVersion),
-		)
-
-		gwConfig.ProxySSLMaxVersion = gwConfig.ProxySSLMinVersion
+		gwConfig.ProxySSLMinVersion = tMin
+		gwConfig.ProxySSLMaxVersion = tMax
 	}
 
-	setDefaultIfZero(&gwConfig.HttpServerOptions.MinVersion, tls.VersionTLS12)
-	setDefaultIfZero(&gwConfig.HttpServerOptions.MaxVersion, tls.VersionTLS13)
+	if tMin, tMax, err := resolveTLSVersions(gwConfig.HttpServerOptions.MinVersion, gwConfig.HttpServerOptions.MaxVersion); err != nil {
+		return fmt.Errorf("failed to resolve `http_server_options.min_version` and `http_server_options.max_version`: %w", err)
+	} else {
+		log.
+			WithField("http_server_options.min_version", tls.VersionName(tMin)).
+			WithField("http_server_options.max_version", tls.VersionName(tMax)).
+			Info("Proxy TLS protocol range resolved and applied")
 
-	if gwConfig.HttpServerOptions.MinVersion > gwConfig.HttpServerOptions.MaxVersion {
-		log.Warningf(
-			"`http_server_options.max_version` is lower than `http_server_options.min_version`. Bumping `http_server_options.min_version` from %s to %s",
-			tls.VersionName(gwConfig.HttpServerOptions.MinVersion),
-			tls.VersionName(gwConfig.HttpServerOptions.MaxVersion),
-		)
-
-		gwConfig.HttpServerOptions.MaxVersion = gwConfig.HttpServerOptions.MinVersion
+		gwConfig.HttpServerOptions.MinVersion = tMin
+		gwConfig.HttpServerOptions.MaxVersion = tMax
 	}
 
 	if gwConfig.UseDBAppConfigs && gwConfig.Policies.PolicySource != config.DefaultDashPolicySource {

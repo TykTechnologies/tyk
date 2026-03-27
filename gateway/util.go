@@ -1,6 +1,8 @@
 package gateway
 
 import (
+	"crypto/tls"
+	"fmt"
 	"net"
 	"net/url"
 	"strconv"
@@ -217,17 +219,31 @@ func containsEscapedChars(str string) bool {
 	return str != unescaped
 }
 
-// setDefaultIfZero sets ptr value to default if it is not defined
-func setDefaultIfZero[T comparable](ptr *T, defValue T) {
-	if ptr == nil {
-		panic("setDefaultIfZero expects non nil ptr")
+func resolveTLSVersions(userMin, userMax uint16) (uint16, uint16, error) {
+	const defaultMin = tls.VersionTLS12
+	const defaultMax = tls.VersionTLS13
+
+	resMin := userMin
+	resMax := userMax
+
+	if resMin == 0 {
+		resMin = defaultMin
+	}
+	if resMax == 0 {
+		resMax = defaultMax
 	}
 
-	var zero T
-
-	if *ptr != zero {
-		return
+	if userMin != 0 && userMax == 0 && resMin > resMax {
+		resMax = resMin
 	}
 
-	*ptr = defValue
+	if userMax != 0 && userMin == 0 && resMax < resMin {
+		resMin = resMax
+	}
+
+	if userMin != 0 && userMax != 0 && userMin > userMax {
+		return 0, 0, fmt.Errorf("TLS validation error: minTLS (0x%X) cannot be greater than maxTLS (0x%X)", userMin, userMax)
+	}
+
+	return resMin, resMax, nil
 }
