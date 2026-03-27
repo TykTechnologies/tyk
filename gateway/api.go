@@ -1641,8 +1641,14 @@ func (gw *Gateway) apiOASGetHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if code == http.StatusInternalServerError {
-		err := obj.(error)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		if err, ok := obj.(error); ok {
+			log.WithFields(logrus.Fields{
+				"prefix": "api",
+				"apiID":  fmt.Sprintf("%q", apiID),
+			}).Error(fmt.Sprintf("API definition for %q could not be cloned, err: %v", apiID, err.Error()))
+		}
+
+		http.Error(w, fmt.Sprintf("API definition for %v could not be retrieved", apiID), http.StatusInternalServerError)
 		return
 	}
 
