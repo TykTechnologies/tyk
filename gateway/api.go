@@ -1284,8 +1284,7 @@ func (gw *Gateway) handleGetAPIOAS(apiID string, modePublic bool) (interface{}, 
 		var err error
 		obj, err = apiOAS.Clone()
 		if err != nil {
-			// Return original oas object when encountered an error during clone action.
-			return apiOAS, code
+			return err, http.StatusInternalServerError
 		}
 	}
 	return obj, code
@@ -1639,6 +1638,12 @@ func (gw *Gateway) apiOASGetHandler(w http.ResponseWriter, r *http.Request) {
 	} else {
 		log.Debug("Requesting API list")
 		obj, code = gw.handleGetAPIListOAS(false)
+	}
+
+	if code == http.StatusInternalServerError {
+		err := obj.(error)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
 	}
 
 	if oasAPI, ok := obj.(*oas.OAS); ok {
