@@ -51,9 +51,9 @@ func (j *GojaJSVM) newRuntime() *goja.Runtime {
 	vm := goja.New()
 
 	// Suppress top-level log() calls during program replay.
-	nop := func(call goja.FunctionCall) goja.Value { return goja.Undefined() }
-	vm.Set("log", nop)
-	vm.Set("rawlog", nop)
+	nop := func(_ goja.FunctionCall) goja.Value { return goja.Undefined() }
+	_ = vm.Set("log", nop)
+	_ = vm.Set("rawlog", nop)
 
 	// Replay compiled programs (middleware definitions, coreJS, etc.)
 	// Programs only define functions/prototypes — no API calls at top level.
@@ -199,49 +199,57 @@ func (j *GojaJSVM) LoadJSPaths(paths []string, prefix string) {
 func (j *GojaJSVM) registerAPI(vm *goja.Runtime) {
 	h := &JSVMAPIHelper{Spec: j.Spec, Gw: j.Gw, Log: j.Log, RawLog: j.RawLog}
 
-	vm.Set("log", func(call goja.FunctionCall) goja.Value {
+	set := func(name string, fn interface{}) {
+		if err := vm.Set(name, fn); err != nil && j.Log != nil {
+			j.Log.WithError(err).Errorf("Failed to register JS function: %s", name)
+		}
+	}
+
+	set("log", func(call goja.FunctionCall) goja.Value {
 		h.LogMessage(call.Argument(0).String())
 		return goja.Undefined()
 	})
-	vm.Set("rawlog", func(call goja.FunctionCall) goja.Value {
+	set("rawlog", func(call goja.FunctionCall) goja.Value {
 		h.RawLogMessage(call.Argument(0).String())
 		return goja.Undefined()
 	})
-	vm.Set("b64dec", func(call goja.FunctionCall) goja.Value {
+	set("b64dec", func(call goja.FunctionCall) goja.Value {
 		out, err := h.B64Decode(call.Argument(0).String())
 		if err != nil {
 			return goja.Undefined()
 		}
 		return vm.ToValue(out)
 	})
-	vm.Set("b64enc", func(call goja.FunctionCall) goja.Value {
+	set("b64enc", func(call goja.FunctionCall) goja.Value {
 		return vm.ToValue(h.B64Encode(call.Argument(0).String()))
 	})
-	vm.Set("rawb64dec", func(call goja.FunctionCall) goja.Value {
+	set("rawb64dec", func(call goja.FunctionCall) goja.Value {
 		out, err := h.RawB64Decode(call.Argument(0).String())
 		if err != nil {
 			return goja.Undefined()
 		}
 		return vm.ToValue(out)
 	})
-	vm.Set("rawb64enc", func(call goja.FunctionCall) goja.Value {
+	set("rawb64enc", func(call goja.FunctionCall) goja.Value {
 		return vm.ToValue(h.RawB64Encode(call.Argument(0).String()))
 	})
-	vm.Set("TykMakeHttpRequest", func(call goja.FunctionCall) goja.Value {
+	set("TykMakeHttpRequest", func(call goja.FunctionCall) goja.Value {
 		result, err := h.MakeHTTPRequest(call.Argument(0).String())
 		if err != nil || result == "" {
 			return goja.Undefined()
 		}
 		return vm.ToValue(result)
 	})
-	vm.Set("TykGetKeyData", func(call goja.FunctionCall) goja.Value {
+	set("TykGetKeyData", func(call goja.FunctionCall) goja.Value {
 		return vm.ToValue(h.GetKeyData(call.Argument(0).String(), call.Argument(1).String()))
 	})
-	vm.Set("TykSetKeyData", func(call goja.FunctionCall) goja.Value {
-		h.SetKeyData(call.Argument(0).String(), call.Argument(1).String(), call.Argument(2).String())
+	set("TykSetKeyData", func(call goja.FunctionCall) goja.Value {
+		if err := h.SetKeyData(call.Argument(0).String(), call.Argument(1).String(), call.Argument(2).String()); err != nil {
+			h.Log.WithError(err).Error("Failed to set key data from JS")
+		}
 		return goja.Undefined()
 	})
-	vm.Set("TykBatchRequest", func(call goja.FunctionCall) goja.Value {
+	set("TykBatchRequest", func(call goja.FunctionCall) goja.Value {
 		result, err := h.BatchRequest(call.Argument(0).String())
 		if err != nil {
 			return goja.Undefined()

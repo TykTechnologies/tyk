@@ -112,9 +112,11 @@ bodyMid.NewProcessRequest(function(request, session) {
 
 			body := "hello world"
 			req := httptest.NewRequest("GET", "/foo", strings.NewReader(body))
-			_, _ = dynMid.ProcessRequest(nil, req, nil)
+			processErr, _ := dynMid.ProcessRequest(nil, req, nil)
+			assert.NoError(t, processErr)
 
-			got, _ := io.ReadAll(req.Body)
+			got, readErr := io.ReadAll(req.Body)
+			assert.NoError(t, readErr)
 			assert.Equal(t, "hello world appended", string(got))
 		})
 	}
@@ -155,7 +157,8 @@ metaMid.NewProcessRequest(function(request, session) {
 			}}
 			ctxSetSession(req, s, true, ts.Gw.GetConfig().HashKeys)
 
-			_, _ = dynMid.ProcessRequest(nil, req, nil)
+			processErr, _ := dynMid.ProcessRequest(nil, req, nil)
+			assert.NoError(t, processErr)
 
 			updated := ctx.GetSession(req)
 			assert.Equal(t, "same", updated.MetaData["same"])
@@ -249,7 +252,8 @@ configMid.NewProcessRequest(function(request, session, spec) {
 			initJSVM(t, spec, ts.Gw, driver, js)
 
 			r := TestReq(t, "GET", "/test", nil)
-			_, _ = dynMid.ProcessRequest(nil, r, nil)
+			processErr, _ := dynMid.ProcessRequest(nil, r, nil)
+			assert.NoError(t, processErr)
 			assert.Equal(t, "bar", r.Header.Get("X-Config-Foo"))
 		})
 	}
@@ -317,7 +321,7 @@ jsAuth.NewProcessRequest(function(request, session) {
 					}},
 				// Bad token → 401
 				{Path: "/auth-test", Code: http.StatusUnauthorized,
-					Headers:       map[string]string{"Authorization": "wrong"},
+					Headers: map[string]string{"Authorization": "wrong"},
 					BodyMatchFunc: func(b []byte) bool {
 						return strings.Contains(string(b), "Not authorized")
 					}},

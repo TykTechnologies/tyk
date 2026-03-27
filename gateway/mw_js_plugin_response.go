@@ -68,7 +68,7 @@ func (h *JSResponseMiddleware) HandleError(rw http.ResponseWriter, req *http.Req
 	handler.HandleError(rw, req, "Middleware error", http.StatusInternalServerError, true)
 }
 
-func (h *JSResponseMiddleware) HandleResponse(rw http.ResponseWriter, res *http.Response, req *http.Request, ses *user.SessionState) error {
+func (h *JSResponseMiddleware) HandleResponse(_ http.ResponseWriter, res *http.Response, req *http.Request, ses *user.SessionState) error {
 	logger := h.logger().WithFields(logrus.Fields{
 		"prefix": "jsvm-response",
 	})

@@ -167,7 +167,11 @@ func (h *JSVMAPIHelper) MakeHTTPRequest(jsonHRO string) (string, error) {
 
 func (h *JSVMAPIHelper) GetKeyData(apiKey, apiID string) string {
 	obj, _ := h.Gw.handleGetDetail(apiKey, apiID, "", false)
-	bs, _ := json.Marshal(obj)
+	bs, err := json.Marshal(obj)
+	if err != nil {
+		h.Log.WithError(err).Error("Failed to encode key data")
+		return "{}"
+	}
 	return string(bs)
 }
 
@@ -177,7 +181,10 @@ func (h *JSVMAPIHelper) SetKeyData(apiKey, encodedSession, suppressReset string)
 		h.Log.WithError(err).Error("Failed to decode the sesison data")
 		return err
 	}
-	h.Gw.doAddOrUpdate(apiKey, &newSession, suppressReset == "1", false)
+	if err := h.Gw.doAddOrUpdate(apiKey, &newSession, suppressReset == "1", false); err != nil {
+		h.Log.WithError(err).Error("Failed to update key data")
+		return err
+	}
 	return nil
 }
 

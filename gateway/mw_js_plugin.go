@@ -197,7 +197,7 @@ func (d *DynamicMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 	runner := d.Spec.GetJSRunner()
 	if runner == nil {
 		logger.Error("JSVM isn't initialized, check your gateway settings")
-		return errors.New("Middleware error"), http.StatusInternalServerError
+		return errors.New("middleware error"), http.StatusInternalServerError
 	}
 	returnDataStr, err := runner.Run(expr)
 	if err != nil {
@@ -384,7 +384,7 @@ func (j *JSVM) Run(expr string) (string, error) {
 	ret := make(chan otto.Value, 1)
 	errRet := make(chan error, 1)
 	go func() {
-		defer func() { recover() }()
+		defer func() { _ = recover() }()
 		returnRaw, err := vm.Run(expr)
 		ret <- returnRaw
 		errRet <- err
@@ -396,7 +396,10 @@ func (j *JSVM) Run(expr string) (string, error) {
 		if err := <-errRet; err != nil {
 			return "", err
 		}
-		s, _ := returnRaw.ToString()
+		s, err := returnRaw.ToString()
+		if err != nil {
+			return "", err
+		}
 		return s, nil
 	case <-t.C:
 		t.Stop()
@@ -452,6 +455,15 @@ type TykJSHttpResponse struct {
 func (j *JSVM) LoadTykJSApi() {
 	h := &JSVMAPIHelper{Spec: j.Spec, Gw: j.Gw, Log: j.Log, RawLog: j.RawLog}
 
+	toValue := func(v interface{}) otto.Value {
+		val, err := j.VM.ToValue(v)
+		if err != nil {
+			h.Log.WithError(err).Error("Failed to convert value for JS")
+			return otto.Value{}
+		}
+		return val
+	}
+
 	j.VM.Set("log", func(call otto.FunctionCall) otto.Value {
 		h.LogMessage(call.Argument(0).String())
 		return otto.Value{}
@@ -465,39 +477,35 @@ func (j *JSVM) LoadTykJSApi() {
 		if err != nil {
 			return otto.Value{}
 		}
-		v, _ := j.VM.ToValue(out)
-		return v
+		return toValue(out)
 	})
 	j.VM.Set("b64enc", func(call otto.FunctionCall) otto.Value {
-		v, _ := j.VM.ToValue(h.B64Encode(call.Argument(0).String()))
-		return v
+		return toValue(h.B64Encode(call.Argument(0).String()))
 	})
 	j.VM.Set("rawb64dec", func(call otto.FunctionCall) otto.Value {
 		out, err := h.RawB64Decode(call.Argument(0).String())
 		if err != nil {
 			return otto.Value{}
 		}
-		v, _ := j.VM.ToValue(out)
-		return v
+		return toValue(out)
 	})
 	j.VM.Set("rawb64enc", func(call otto.FunctionCall) otto.Value {
-		v, _ := j.VM.ToValue(h.RawB64Encode(call.Argument(0).String()))
-		return v
+		return toValue(h.RawB64Encode(call.Argument(0).String()))
 	})
 	j.VM.Set("TykMakeHttpRequest", func(call otto.FunctionCall) otto.Value {
 		result, err := h.MakeHTTPRequest(call.Argument(0).String())
 		if err != nil || result == "" {
 			return otto.Value{}
 		}
-		v, _ := j.VM.ToValue(result)
-		return v
+		return toValue(result)
 	})
 	j.VM.Set("TykGetKeyData", func(call otto.FunctionCall) otto.Value {
-		v, _ := j.VM.ToValue(h.GetKeyData(call.Argument(0).String(), call.Argument(1).String()))
-		return v
+		return toValue(h.GetKeyData(call.Argument(0).String(), call.Argument(1).String()))
 	})
 	j.VM.Set("TykSetKeyData", func(call otto.FunctionCall) otto.Value {
-		h.SetKeyData(call.Argument(0).String(), call.Argument(1).String(), call.Argument(2).String())
+		if err := h.SetKeyData(call.Argument(0).String(), call.Argument(1).String(), call.Argument(2).String()); err != nil {
+			h.Log.WithError(err).Error("Failed to set key data from JS")
+		}
 		return otto.Value{}
 	})
 	j.VM.Set("TykBatchRequest", func(call otto.FunctionCall) otto.Value {
@@ -505,8 +513,7 @@ func (j *JSVM) LoadTykJSApi() {
 		if err != nil {
 			return otto.Value{}
 		}
-		v, _ := j.VM.ToValue(result)
-		return v
+		return toValue(result)
 	})
 
 	j.VM.Run(`function TykJsResponse(response, session_meta) {
