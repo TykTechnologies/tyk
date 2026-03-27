@@ -374,65 +374,6 @@ func TestCompileExtractor_MetadataSchemeNilRequest(t *testing.T) {
 	assert.Equal(t, "http", ext.Extract(rc), "nil request should return http")
 }
 
-func TestCompileExtractor_MetadataMCPMethod(t *testing.T) {
-	ext, err := CompileExtractor(DimensionDefinition{Source: "metadata", Key: "mcp_method"})
-	require.NoError(t, err)
-
-	rc := makeRequestContext()
-	rc.MCPMethod = "tools/call"
-	assert.Equal(t, "tools/call", ext.Extract(rc))
-}
-
-func TestCompileExtractor_MetadataMCPPrimitiveType(t *testing.T) {
-	ext, err := CompileExtractor(DimensionDefinition{Source: "metadata", Key: "mcp_primitive_type"})
-	require.NoError(t, err)
-
-	rc := makeRequestContext()
-	rc.MCPPrimitiveType = "tool"
-	assert.Equal(t, "tool", ext.Extract(rc))
-}
-
-func TestCompileExtractor_MetadataMCPPrimitiveName(t *testing.T) {
-	ext, err := CompileExtractor(DimensionDefinition{Source: "metadata", Key: "mcp_primitive_name"})
-	require.NoError(t, err)
-
-	rc := makeRequestContext()
-	rc.MCPPrimitiveName = "get_weather"
-	assert.Equal(t, "get_weather", ext.Extract(rc))
-}
-
-func TestCompileExtractor_MetadataMCPErrorCode(t *testing.T) {
-	ext, err := CompileExtractor(DimensionDefinition{Source: "metadata", Key: "mcp_error_code"})
-	require.NoError(t, err)
-
-	t.Run("returns string representation for non-zero code", func(t *testing.T) {
-		rc := makeRequestContext()
-		rc.MCPErrorCode = -32601
-		assert.Equal(t, "-32601", ext.Extract(rc))
-	})
-
-	t.Run("returns empty string for zero code", func(t *testing.T) {
-		rc := makeRequestContext()
-		rc.MCPErrorCode = 0
-		assert.Equal(t, "", ext.Extract(rc))
-	})
-}
-
-func TestCompileExtractor_MCPExtractorsEmptyWhenNotSet(t *testing.T) {
-	mcpKeys := []string{"mcp_method", "mcp_primitive_type", "mcp_primitive_name", "mcp_error_code"}
-
-	for _, key := range mcpKeys {
-		t.Run(key, func(t *testing.T) {
-			ext, err := CompileExtractor(DimensionDefinition{Source: "metadata", Key: key})
-			require.NoError(t, err)
-
-			// Zero-valued RequestContext (non-MCP API case).
-			rc := makeRequestContext()
-			assert.Equal(t, "", ext.Extract(rc), "MCP extractor %q should return empty for non-MCP request", key)
-		})
-	}
-}
-
 func BenchmarkCompileExtractor_Metadata(b *testing.B) {
 	dim := DimensionDefinition{Source: "metadata", Key: "method", Label: "http.method"}
 	b.ReportAllocs()

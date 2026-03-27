@@ -69,7 +69,6 @@ import (
 	"github.com/TykTechnologies/tyk/internal/uuid"
 	lib "github.com/TykTechnologies/tyk/lib/apidef"
 	"github.com/TykTechnologies/tyk/pkg/identifier"
-	"github.com/TykTechnologies/tyk/pkg/schema"
 	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/user"
 )
@@ -327,13 +326,6 @@ func (gw *Gateway) checkAndApplyTrialPeriod(
 				newSession.Expires = time.Now().Unix() + policy.KeyExpiresIn
 			}
 		}
-
-		if policy.PostExpiryAction != "" {
-			newSession.PostExpiryAction = policy.PostExpiryAction
-		}
-		if policy.PostExpiryGracePeriod != 0 {
-			newSession.PostExpiryGracePeriod = policy.PostExpiryGracePeriod
-		}
 	}
 }
 
@@ -380,10 +372,6 @@ func (gw *Gateway) ApplyLifetime(sess *user.SessionState, specs ...*APISpec) int
 	for _, spec := range specs {
 		if spec != nil {
 			sessionLifeTime := sess.Lifetime(spec.GetSessionLifetimeRespectsKeyExpiration(), spec.SessionLifetime, gw.GetConfig().ForceGlobalSessionLifetime, gw.GetConfig().GlobalSessionLifetime)
-			// -1 means "never delete" (persist forever), which is the maximum possible lifetime
-			if sessionLifeTime == -1 {
-				return -1
-			}
 			// uses the greater lifetime
 			if sessionLifeTime > lifetime {
 				lifetime = sessionLifeTime
@@ -1628,11 +1616,6 @@ func (gw *Gateway) apiOASGetHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if oasAPI, ok := obj.(*oas.OAS); ok {
-		visitor := schema.NewVisitor()
-		visitor.AddSchemaManipulation(schema.RestoreUnicodeEscapesFromRE2Manipulation)
-		visitor.ProcessOAS(oasAPI)
-		obj = oasAPI
-
 		gw.setBaseAPIIDHeader(w, oasAPI)
 	}
 
@@ -1642,7 +1625,10 @@ func (gw *Gateway) apiOASGetHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	doJSONWrite(w, code, jsonBytes)
+	bytesModifier := lib.NewDataBytesModifier(jsonBytes)
+	bytesModifier.RestoreUnicodeEscapesFromRE2()
+
+	doJSONWrite(w, code, bytesModifier.Result())
 }
 
 func (gw *Gateway) apiOASPostHandler(w http.ResponseWriter, r *http.Request) {
@@ -3621,38 +3607,6 @@ func ctxGetRequestStatus(r *http.Request) (stat RequestStatus) {
 	return
 }
 
-func ctxSetMCPMethod(r *http.Request, method string) {
-	setCtxValue(r, ctx.MCPMethod, method)
-}
-
-func ctxGetMCPMethod(r *http.Request) string {
-	return ctx.GetMCPMethod(r)
-}
-
-func ctxSetMCPPrimitiveType(r *http.Request, primitiveType string) {
-	setCtxValue(r, ctx.MCPPrimitiveType, primitiveType)
-}
-
-func ctxGetMCPPrimitiveType(r *http.Request) string {
-	return ctx.GetMCPPrimitiveType(r)
-}
-
-func ctxSetMCPPrimitiveName(r *http.Request, name string) {
-	setCtxValue(r, ctx.MCPPrimitiveName, name)
-}
-
-func ctxGetMCPPrimitiveName(r *http.Request) string {
-	return ctx.GetMCPPrimitiveName(r)
-}
-
-func ctxSetJSONRPCErrorCode(r *http.Request, code int) {
-	setCtxValue(r, ctx.JSONRPCErrorCode, code)
-}
-
-func ctxGetJSONRPCErrorCode(r *http.Request) int {
-	return ctx.GetJSONRPCErrorCode(r)
-}
-
 var createOauthClientSecret = func() string {
 	secret := uuid.New()
 	return base64.StdEncoding.EncodeToString([]byte(secret))
@@ -3681,6 +3635,11 @@ func extractOASObjFromReq(reqBody io.Reader) ([]byte, *oas.OAS, error) {
 		return nil, nil, ErrRequestMalformed
 	}
 
+	bytesModifier := lib.NewDataBytesModifier(reqBodyInBytes)
+	bytesModifier.TransformUnicodeEscapesToRE2()
+
+	reqBodyInBytes = bytesModifier.Result()
+
 	loader := openapi3.NewLoader()
 	t, err := loader.LoadFromData(reqBodyInBytes)
 	if err != nil {
@@ -3688,10 +3647,6 @@ func extractOASObjFromReq(reqBody io.Reader) ([]byte, *oas.OAS, error) {
 	}
 
 	oasObj.T = *t
-
-	visitor := schema.NewVisitor()
-	visitor.AddSchemaManipulation(schema.TransformUnicodeEscapesToRE2Manipulation)
-	visitor.ProcessOAS(&oasObj)
 
 	return reqBodyInBytes, &oasObj, nil
 }

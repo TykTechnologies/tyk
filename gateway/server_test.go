@@ -25,7 +25,6 @@ import (
 	"github.com/TykTechnologies/storage/persistent/model"
 
 	"github.com/TykTechnologies/tyk/config"
-	"github.com/TykTechnologies/tyk/internal/compression"
 	internalmodel "github.com/TykTechnologies/tyk/internal/model"
 	"github.com/TykTechnologies/tyk/internal/netutil"
 	"github.com/TykTechnologies/tyk/internal/otel"
@@ -1165,45 +1164,6 @@ func TestLoadPoliciesFromRPC(t *testing.T) {
 
 		_, err = ts.Gw.LoadPoliciesFromRPC(store, orgId)
 		assert.ErrorContains(t, err, "invalid ObjectId in JSON")
-	})
-}
-
-func TestSetupGlobals_MaxDecompressedSize(t *testing.T) {
-	origSize := compression.GetMaxDecompressedSize()
-	defer compression.SetMaxDecompressedSize(origSize)
-
-	t.Run("sets compression limit from config", func(t *testing.T) {
-		var configuredSize int64 = 50 * 1024 * 1024 // 50MB
-		ts := StartTest(func(globalConf *config.Config) {
-			globalConf.Storage.MaxDecompressedSize = configuredSize
-		})
-		defer ts.Close()
-
-		assert.Equal(t, uint64(configuredSize), compression.GetMaxDecompressedSize())
-	})
-
-	t.Run("keeps default when config is zero", func(t *testing.T) {
-		defaultSize := uint64(100 * 1024 * 1024) // 100MB default
-		compression.SetMaxDecompressedSize(defaultSize)
-
-		ts := StartTest(func(globalConf *config.Config) {
-			globalConf.Storage.MaxDecompressedSize = 0
-		})
-		defer ts.Close()
-
-		assert.Equal(t, defaultSize, compression.GetMaxDecompressedSize())
-	})
-
-	t.Run("keeps default when config is negative", func(t *testing.T) {
-		defaultSize := uint64(100 * 1024 * 1024)
-		compression.SetMaxDecompressedSize(defaultSize)
-
-		ts := StartTest(func(globalConf *config.Config) {
-			globalConf.Storage.MaxDecompressedSize = -1
-		})
-		defer ts.Close()
-
-		assert.Equal(t, defaultSize, compression.GetMaxDecompressedSize())
 	})
 }
 

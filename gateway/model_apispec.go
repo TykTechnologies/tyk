@@ -341,21 +341,6 @@ func extractPathParams(oasPath, actualPath string) map[string]string {
 	return params
 }
 
-// APIType returns the api_type string for the given API spec.
-// Precedence: mcp > graphql > oas > classic.
-func (a *APISpec) APIType() string {
-	switch {
-	case a.IsMCP():
-		return "mcp"
-	case a.GraphQL.Enabled:
-		return "graphql"
-	case a.IsOAS:
-		return "oas"
-	default:
-		return "classic"
-	}
-}
-
 func (a *APISpec) sendRateLimitHeaders(session *user.SessionState, dest *http.Response) {
 	quotaMax, quotaRemaining, quotaRenews := int64(0), int64(0), int64(0)
 

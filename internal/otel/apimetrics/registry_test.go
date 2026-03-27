@@ -215,69 +215,6 @@ func TestNewInstrumentRegistry_WithFilters(t *testing.T) {
 	assert.Nil(t, reg.instruments[1].Filter, "second instrument should have no filter")
 }
 
-func TestNewInstrumentRegistry_NeedsMCP(t *testing.T) {
-	provider := noopProvider(t)
-
-	t.Run("true when mcp metadata key used", func(t *testing.T) {
-		defs := []APIMetricDefinition{
-			{
-				Name: "test.counter",
-				Type: "counter",
-				Dimensions: []DimensionDefinition{
-					{Source: "metadata", Key: "mcp_method"},
-				},
-			},
-		}
-		reg, err := NewInstrumentRegistry(provider, defs)
-		require.NoError(t, err)
-		assert.True(t, reg.NeedsMCP())
-	})
-
-	t.Run("false when no mcp metadata key", func(t *testing.T) {
-		defs := []APIMetricDefinition{
-			{
-				Name: "test.counter",
-				Type: "counter",
-				Dimensions: []DimensionDefinition{
-					{Source: "metadata", Key: "method"},
-				},
-			},
-		}
-		reg, err := NewInstrumentRegistry(provider, defs)
-		require.NoError(t, err)
-		assert.False(t, reg.NeedsMCP())
-	})
-
-	t.Run("true across multiple instruments", func(t *testing.T) {
-		defs := []APIMetricDefinition{
-			{
-				Name: "test.counter",
-				Type: "counter",
-				Dimensions: []DimensionDefinition{
-					{Source: "metadata", Key: "method"},
-				},
-			},
-			{
-				Name: "test.counter2",
-				Type: "counter",
-				Dimensions: []DimensionDefinition{
-					{Source: "metadata", Key: "mcp_primitive_type"},
-				},
-			},
-		}
-		reg, err := NewInstrumentRegistry(provider, defs)
-		require.NoError(t, err)
-		assert.True(t, reg.NeedsMCP())
-	})
-
-	t.Run("false for default metrics", func(t *testing.T) {
-		defs := DefaultAPIMetrics()
-		reg, err := NewInstrumentRegistry(provider, defs)
-		require.NoError(t, err)
-		assert.False(t, reg.NeedsMCP(), "default metrics should not need MCP")
-	})
-}
-
 func TestNewInstrumentRegistry_MultipleSourceFlags(t *testing.T) {
 	provider := noopProvider(t)
 

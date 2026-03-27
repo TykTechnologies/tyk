@@ -165,13 +165,6 @@ func (t *Service) Apply(session *user.SessionState) error {
 		if policy.LastUpdated > session.LastUpdated {
 			session.LastUpdated = policy.LastUpdated
 		}
-
-		if policy.PostExpiryAction != "" {
-			session.PostExpiryAction = policy.PostExpiryAction
-		}
-		if policy.PostExpiryGracePeriod != 0 {
-			session.PostExpiryGracePeriod = policy.PostExpiryGracePeriod
-		}
 	}
 
 	session.IsInactive = sessionInactiveState

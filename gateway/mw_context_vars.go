@@ -29,7 +29,7 @@ func (m *MiddlewareContextVars) addTraceIDToContextVars(
 	ctx context.Context,
 	vars map[string]interface{},
 ) map[string]interface{} {
-	if !m.Gw.GetConfig().OpenTelemetry.TracesEnabled() {
+	if !m.Gw.GetConfig().OpenTelemetry.Enabled {
 		return vars
 	}
 

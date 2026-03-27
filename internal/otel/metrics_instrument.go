@@ -128,11 +128,6 @@ func (i *MetricInstruments) NeedsResponse() bool {
 	return i.registry != nil && i.registry.NeedsResponse()
 }
 
-// NeedsMCP returns true if any API metric instrument uses MCP metadata dimensions.
-func (i *MetricInstruments) NeedsMCP() bool {
-	return i.registry != nil && i.registry.NeedsMCP()
-}
-
 // RecordConfigState records the current count of loaded APIs and policies.
 func (i *MetricInstruments) RecordConfigState(ctx context.Context, apiCount, policyCount int) {
 	i.apisLoaded.Record(ctx, float64(apiCount))

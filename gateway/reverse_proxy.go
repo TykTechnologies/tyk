@@ -841,7 +841,7 @@ func (rt *TykRoundTripper) RoundTrip(r *http.Request) (*http.Response, error) {
 		return handleInMemoryLoop(handler, r)
 	}
 
-	if rt.Gw.GetConfig().OpenTelemetry.TracesEnabled() {
+	if rt.Gw.GetConfig().OpenTelemetry.Enabled {
 		var baseRoundTripper http.RoundTripper = rt.transport
 		if rt.h2ctransport != nil {
 			baseRoundTripper = rt.h2ctransport
@@ -1173,9 +1173,11 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 	breakerEnforced, breakerConf := p.CheckCircuitBreakerEnforced(p.TykAPISpec, req)
 
 	// set up TLS certificates for upstream if needed
-	cert := p.Gw.getUpstreamCertificate(outreq.URL.Host, p.TykAPISpec)
-	if cert != nil {
+	var tlsCertificates []tls.Certificate
+	if cert := p.Gw.getUpstreamCertificate(outreq.URL.Host, p.TykAPISpec); cert != nil {
 		p.logger.Debug("Found upstream mutual TLS certificate")
+		tlsCertificates = []tls.Certificate{*cert}
+
 		// Check upstream certificate expiry
 		p.checkUpstreamCertificateExpiry(cert)
 	}
@@ -1234,11 +1236,8 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 
 	roundTripper = p.TykAPISpec.HTTPTransport
 
-	if roundTripper.transport != nil && cert != nil {
-		roundTripper.transport.TLSClientConfig.Certificates = []tls.Certificate{*cert}
-		roundTripper.transport.TLSClientConfig.GetClientCertificate = func(_ *tls.CertificateRequestInfo) (*tls.Certificate, error) {
-			return cert, nil
-		}
+	if roundTripper.transport != nil {
+		roundTripper.transport.TLSClientConfig.Certificates = tlsCertificates
 	}
 	p.TykAPISpec.Unlock()
 

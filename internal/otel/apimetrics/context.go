@@ -29,10 +29,4 @@ type RequestContext struct {
 
 	Session          *user.SessionState     // nil when unauthenticated or NeedsSession=false
 	ContextVariables map[string]interface{} // Tyk context variables (nil when not enabled)
-
-	// MCP/JSON-RPC fields (populated via ctxGet* from request context)
-	MCPMethod        string // e.g., "tools/call"
-	MCPPrimitiveType string // e.g., "tool"
-	MCPPrimitiveName string // e.g., "get_weather"
-	MCPErrorCode     int    // e.g., -32601
 }
