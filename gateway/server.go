@@ -1619,7 +1619,7 @@ func (gw *Gateway) initSystem() error {
 		log.
 			WithField("http_server_options.min_version", tls.VersionName(tMin)).
 			WithField("http_server_options.max_version", tls.VersionName(tMax)).
-			Info("Proxy TLS protocol range resolved and applied")
+			Info("HttpServerOptions TLS protocol range resolved and applied")
 
 		gwConfig.HttpServerOptions.MinVersion = tMin
 		gwConfig.HttpServerOptions.MaxVersion = tMax

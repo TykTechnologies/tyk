@@ -242,7 +242,11 @@ func resolveTLSVersions(userMin, userMax uint16) (uint16, uint16, error) {
 	}
 
 	if userMin != 0 && userMax != 0 && userMin > userMax {
-		return 0, 0, fmt.Errorf("TLS validation error: minTLS (0x%X) cannot be greater than maxTLS (0x%X)", userMin, userMax)
+		return 0, 0, fmt.Errorf(
+			"TLS validation error: minTLS (0x%X / %s) cannot be greater than maxTLS (0x%X / %s)",
+			userMin, tls.VersionName(userMin),
+			userMax, tls.VersionName(userMax),
+		)
 	}
 
 	return resMin, resMax, nil
