@@ -109,6 +109,21 @@ type APISpec struct {
 	MCPAllowListEnabled bool
 }
 
+// GetJSRunner returns the active JSRunner for this API spec based on the
+// configured middleware driver. Returns nil if no JS VM is initialized.
+func (a *APISpec) GetJSRunner() JSRunner {
+	if a.CustomMiddleware.Driver == apidef.GojaDriver {
+		if a.GojaJSVM.Ready() {
+			return &a.GojaJSVM
+		}
+		return nil
+	}
+	if a.JSVM.Ready() {
+		return &a.JSVM
+	}
+	return nil
+}
+
 // CheckSpecMatchesStatus checks if a URL spec has a specific status.
 // Deprecated: The function doesn't follow go return conventions (T, ok); use FindSpecMatchesStatus;
 func (a *APISpec) CheckSpecMatchesStatus(r *http.Request, rxPaths []URLSpec, mode URLStatus) (bool, interface{}) {

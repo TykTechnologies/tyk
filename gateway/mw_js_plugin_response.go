@@ -9,7 +9,6 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/robertkrimen/otto"
 	"github.com/sirupsen/logrus"
 
 	"github.com/TykTechnologies/tyk/apidef"
@@ -154,54 +153,15 @@ func (h *JSResponseMiddleware) HandleResponse(rw http.ResponseWriter, res *http.
 	expr := h.hookName + `.DoProcessResponse(` + string(responseAsJSON) + `, ` + string(requestAsJSON) + `, ` + string(sessionAsJSON) + `, ` + specAsJSON + `);`
 	logger.Debug("Running JS response hook: ", h.hookName)
 
-	var returnDataStr string
-
-	if h.spec.CustomMiddleware.Driver == apidef.GojaDriver {
-		if h.spec.GojaJSVM.VM() == nil {
-			logger.Error("GojaJSVM isn't initialized")
-			return errors.New("Middleware error")
-		}
-		returnDataStr, err = h.spec.GojaJSVM.Run(expr)
-		if err != nil {
-			logger.WithError(err).Error("Failed to run JS response middleware")
-			return errors.New("Middleware error")
-		}
-	} else {
-		if h.spec.JSVM.VM == nil {
-			logger.Error("JSVM isn't enabled")
-			return errors.New("Middleware error")
-		}
-		vm := h.spec.JSVM.VM.Copy()
-		vm.Interrupt = make(chan func(), 1)
-		ret := make(chan otto.Value, 1)
-		errRet := make(chan error, 1)
-		go func() {
-			defer func() {
-				recover()
-			}()
-			returnRaw, err := vm.Run(expr)
-			ret <- returnRaw
-			errRet <- err
-		}()
-		var returnRaw otto.Value
-		t := time.NewTimer(h.spec.JSVM.Timeout)
-		select {
-		case returnRaw = <-ret:
-			if err := <-errRet; err != nil {
-				logger.WithError(err).Error("Failed to run JS response middleware")
-				t.Stop()
-				return errors.New("Middleware error")
-			}
-			t.Stop()
-		case <-t.C:
-			t.Stop()
-			logger.Error("JS response middleware timed out after ", h.spec.JSVM.Timeout)
-			vm.Interrupt <- func() {
-				panic("stop")
-			}
-			return errors.New("Middleware error")
-		}
-		returnDataStr, _ = returnRaw.ToString()
+	runner := h.spec.GetJSRunner()
+	if runner == nil {
+		logger.Error("JSVM isn't initialized")
+		return errors.New("Middleware error")
+	}
+	returnDataStr, runErr := runner.Run(expr)
+	if runErr != nil {
+		logger.WithError(runErr).Error("Failed to run JS response middleware")
+		return errors.New("Middleware error")
 	}
 
 	// Decode the return object.

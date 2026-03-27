@@ -1,23 +1,14 @@
 package gateway
 
 import (
-	"crypto/tls"
-	"encoding/base64"
-	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
-	"net/http"
-	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
 	"time"
 
 	"github.com/dop251/goja"
-
-	"github.com/TykTechnologies/tyk/user"
-
 	"github.com/sirupsen/logrus"
 )
 
@@ -37,6 +28,11 @@ type GojaJSVM struct {
 
 // Initialized reports whether the GojaJSVM has been set up.
 func (j *GojaJSVM) Initialized() bool {
+	return j.initialized
+}
+
+// Ready implements JSRunner.
+func (j *GojaJSVM) Ready() bool {
 	return j.initialized
 }
 
@@ -200,180 +196,55 @@ func (j *GojaJSVM) LoadJSPaths(paths []string, prefix string) {
 }
 
 func (j *GojaJSVM) registerAPI(vm *goja.Runtime) {
-	// Enable a log
+	h := &JSVMAPIHelper{Spec: j.Spec, Gw: j.Gw, Log: j.Log, RawLog: j.RawLog}
+
 	vm.Set("log", func(call goja.FunctionCall) goja.Value {
-		j.Log.WithFields(logrus.Fields{
-			"type": "log-msg",
-		}).Info(call.Argument(0).String())
+		h.LogMessage(call.Argument(0).String())
 		return goja.Undefined()
 	})
 	vm.Set("rawlog", func(call goja.FunctionCall) goja.Value {
-		j.RawLog.Print(call.Argument(0).String() + "\n")
+		h.RawLogMessage(call.Argument(0).String())
 		return goja.Undefined()
 	})
-
-	// these two needed for non-utf8 bodies
 	vm.Set("b64dec", func(call goja.FunctionCall) goja.Value {
-		in := call.Argument(0).String()
-		out, err := base64.StdEncoding.DecodeString(in)
-
-		// Fallback to RawStdEncoding:
+		out, err := h.B64Decode(call.Argument(0).String())
 		if err != nil {
-			out, err = base64.RawStdEncoding.DecodeString(in)
-			if err != nil {
-				j.Log.WithError(err).Error("Failed to base64 decode")
-				return goja.Undefined()
-			}
+			return goja.Undefined()
 		}
-		return vm.ToValue(string(out))
+		return vm.ToValue(out)
 	})
 	vm.Set("b64enc", func(call goja.FunctionCall) goja.Value {
-		in := []byte(call.Argument(0).String())
-		out := base64.StdEncoding.EncodeToString(in)
-		return vm.ToValue(out)
+		return vm.ToValue(h.B64Encode(call.Argument(0).String()))
 	})
-
 	vm.Set("rawb64dec", func(call goja.FunctionCall) goja.Value {
-		in := call.Argument(0).String()
-		out, err := base64.RawStdEncoding.DecodeString(in)
+		out, err := h.RawB64Decode(call.Argument(0).String())
 		if err != nil {
-			j.Log.WithError(err).Error("Failed to base64 decode")
 			return goja.Undefined()
 		}
-		return vm.ToValue(string(out))
+		return vm.ToValue(out)
 	})
 	vm.Set("rawb64enc", func(call goja.FunctionCall) goja.Value {
-		in := []byte(call.Argument(0).String())
-		out := base64.RawStdEncoding.EncodeToString(in)
-		return vm.ToValue(out)
+		return vm.ToValue(h.RawB64Encode(call.Argument(0).String()))
 	})
-	ignoreCanonical := j.Gw.GetConfig().IgnoreCanonicalMIMEHeaderKey
-	// Enable the creation of HTTP Requests
 	vm.Set("TykMakeHttpRequest", func(call goja.FunctionCall) goja.Value {
-		jsonHRO := call.Argument(0).String()
-		if jsonHRO == "undefined" {
+		result, err := h.MakeHTTPRequest(call.Argument(0).String())
+		if err != nil || result == "" {
 			return goja.Undefined()
 		}
-		hro := TykJSHttpRequest{}
-		if err := json.Unmarshal([]byte(jsonHRO), &hro); err != nil {
-			j.Log.WithError(err).Error("JSVM: Failed to deserialise HTTP Request object")
-			return goja.Undefined()
-		}
-
-		// Make the request
-		domain := hro.Domain
-		data := url.Values{}
-		for k, v := range hro.FormData {
-			data.Set(k, v)
-		}
-
-		u, _ := url.ParseRequestURI(domain + hro.Resource)
-		urlStr := u.String()
-
-		var d string
-		if hro.Body != "" {
-			d = hro.Body
-		} else if len(hro.FormData) > 0 {
-			d = data.Encode()
-		}
-
-		r, _ := http.NewRequest(hro.Method, urlStr, nil)
-
-		if d != "" {
-			r, _ = http.NewRequest(hro.Method, urlStr, strings.NewReader(d))
-		}
-
-		for k, v := range hro.Headers {
-			setCustomHeader(r.Header, k, v, ignoreCanonical)
-		}
-		r.Close = true
-
-		maxSSLVersion := j.Gw.GetConfig().ProxySSLMaxVersion
-		if j.Spec.Proxy.Transport.SSLMaxVersion > 0 {
-			maxSSLVersion = j.Spec.Proxy.Transport.SSLMaxVersion
-		}
-
-		tr := &http.Transport{TLSClientConfig: &tls.Config{
-			MaxVersion: maxSSLVersion,
-		}}
-
-		if cert := j.Gw.getUpstreamCertificate(r.Host, j.Spec); cert != nil {
-			tr.TLSClientConfig.Certificates = []tls.Certificate{*cert}
-		}
-
-		if j.Gw.GetConfig().ProxySSLInsecureSkipVerify {
-			tr.TLSClientConfig.InsecureSkipVerify = true
-		}
-
-		if j.Spec.Proxy.Transport.SSLInsecureSkipVerify {
-			tr.TLSClientConfig.InsecureSkipVerify = true
-		}
-
-		tr.DialTLS = j.Gw.customDialTLSCheck(j.Spec, tr.TLSClientConfig)
-
-		tr.Proxy = proxyFromAPI(j.Spec)
-
-		client := &http.Client{Transport: tr}
-		resp, err := client.Do(r)
-		if err != nil {
-			j.Log.WithError(err).Error("Request failed")
-			return goja.Undefined()
-		}
-		defer resp.Body.Close()
-
-		body, _ := io.ReadAll(resp.Body)
-		bodyStr := string(body)
-		tykResp := TykJSHttpResponse{
-			Code:        resp.StatusCode,
-			Body:        bodyStr,
-			Headers:     resp.Header,
-			CodeComp:    resp.StatusCode,
-			BodyComp:    bodyStr,
-			HeadersComp: resp.Header,
-		}
-
-		retAsStr, _ := json.Marshal(tykResp)
-		return vm.ToValue(string(retAsStr))
+		return vm.ToValue(result)
 	})
-
-	// Expose Setters and Getters in the REST API for a key:
 	vm.Set("TykGetKeyData", func(call goja.FunctionCall) goja.Value {
-		apiKey := call.Argument(0).String()
-		apiId := call.Argument(1).String()
-
-		obj, _ := j.Gw.handleGetDetail(apiKey, apiId, "", false)
-		bs, _ := json.Marshal(obj)
-
-		return vm.ToValue(string(bs))
+		return vm.ToValue(h.GetKeyData(call.Argument(0).String(), call.Argument(1).String()))
 	})
-
 	vm.Set("TykSetKeyData", func(call goja.FunctionCall) goja.Value {
-		apiKey := call.Argument(0).String()
-		encoddedSession := call.Argument(1).String()
-		suppressReset := call.Argument(2).String()
-
-		newSession := user.SessionState{}
-		err := json.Unmarshal([]byte(encoddedSession), &newSession)
-		if err != nil {
-			j.Log.WithError(err).Error("Failed to decode the sesison data")
-			return goja.Undefined()
-		}
-
-		j.Gw.doAddOrUpdate(apiKey, &newSession, suppressReset == "1", false)
+		h.SetKeyData(call.Argument(0).String(), call.Argument(1).String(), call.Argument(2).String())
 		return goja.Undefined()
 	})
-
-	// Batch request method
-	unsafeBatchHandler := BatchRequestHandler{Gw: j.Gw}
 	vm.Set("TykBatchRequest", func(call goja.FunctionCall) goja.Value {
-		requestSet := call.Argument(0).String()
-		j.Log.Debug("Batch input is: ", requestSet)
-		bs, err := unsafeBatchHandler.ManualBatchRequest([]byte(requestSet))
+		result, err := h.BatchRequest(call.Argument(0).String())
 		if err != nil {
-			j.Log.WithError(err).Error("Batch request error")
 			return goja.Undefined()
 		}
-
-		return vm.ToValue(string(bs))
+		return vm.ToValue(result)
 	})
 }
