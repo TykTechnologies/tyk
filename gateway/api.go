@@ -1281,7 +1281,12 @@ func (gw *Gateway) handleGetAPIOAS(apiID string, modePublic bool) (interface{}, 
 		}
 
 		// We have to operate on oas clone in order to preserve original state after any manipulations on schema.
-		obj, _ = apiOAS.Clone()
+		var err error
+		obj, err = apiOAS.Clone()
+		if err != nil {
+			// Return original oas object when encountered an error during clone action.
+			return apiOAS, code
+		}
 	}
 	return obj, code
 
