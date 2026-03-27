@@ -79,7 +79,11 @@ func (h *JSVMAPIHelper) MakeHTTPRequest(jsonHRO string) (string, error) {
 		data.Set(k, v)
 	}
 
-	u, _ := url.ParseRequestURI(domain + hro.Resource)
+	u, err := url.ParseRequestURI(domain + hro.Resource)
+	if err != nil {
+		h.Log.WithError(err).Error("JSVM: Failed to parse request URI")
+		return "", err
+	}
 	urlStr := u.String()
 
 	var d string
@@ -89,9 +93,15 @@ func (h *JSVMAPIHelper) MakeHTTPRequest(jsonHRO string) (string, error) {
 		d = data.Encode()
 	}
 
-	r, _ := http.NewRequest(hro.Method, urlStr, nil)
+	var r *http.Request
 	if d != "" {
-		r, _ = http.NewRequest(hro.Method, urlStr, strings.NewReader(d))
+		r, err = http.NewRequest(hro.Method, urlStr, strings.NewReader(d))
+	} else {
+		r, err = http.NewRequest(hro.Method, urlStr, nil)
+	}
+	if err != nil {
+		h.Log.WithError(err).Error("JSVM: Failed to create HTTP request")
+		return "", err
 	}
 
 	ignoreCanonical := h.Gw.GetConfig().IgnoreCanonicalMIMEHeaderKey
@@ -132,7 +142,11 @@ func (h *JSVMAPIHelper) MakeHTTPRequest(jsonHRO string) (string, error) {
 	}
 	defer resp.Body.Close()
 
-	body, _ := io.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		h.Log.WithError(err).Error("JSVM: Failed to read response body")
+		return "", err
+	}
 	bodyStr := string(body)
 	tykResp := TykJSHttpResponse{
 		Code:        resp.StatusCode,
@@ -143,7 +157,11 @@ func (h *JSVMAPIHelper) MakeHTTPRequest(jsonHRO string) (string, error) {
 		HeadersComp: resp.Header,
 	}
 
-	retAsStr, _ := json.Marshal(tykResp)
+	retAsStr, err := json.Marshal(tykResp)
+	if err != nil {
+		h.Log.WithError(err).Error("JSVM: Failed to encode response")
+		return "", err
+	}
 	return string(retAsStr), nil
 }
 

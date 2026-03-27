@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"time"
 
@@ -77,10 +77,10 @@ func (h *JSResponseMiddleware) HandleResponse(rw http.ResponseWriter, res *http.
 	t1 := time.Now().UnixNano()
 
 	// Read the upstream response body.
-	originalBody, err := ioutil.ReadAll(res.Body)
+	originalBody, err := io.ReadAll(res.Body)
 	if err != nil {
 		logger.WithError(err).Error("Failed to read response body")
-		return errors.New("Middleware error")
+		return errors.New("middleware error")
 	}
 	res.Body.Close()
 
@@ -95,7 +95,7 @@ func (h *JSResponseMiddleware) HandleResponse(rw http.ResponseWriter, res *http.
 	responseAsJSON, err := json.Marshal(responseData)
 	if err != nil {
 		logger.WithError(err).Error("Failed to encode response object for JS middleware")
-		return errors.New("Middleware error")
+		return errors.New("middleware error")
 	}
 
 	// Build a minimal request object.
@@ -133,7 +133,7 @@ func (h *JSResponseMiddleware) HandleResponse(rw http.ResponseWriter, res *http.
 	requestAsJSON, err := json.Marshal(requestData)
 	if err != nil {
 		logger.WithError(err).Error("Failed to encode request object for JS response middleware")
-		return errors.New("Middleware error")
+		return errors.New("middleware error")
 	}
 
 	// Build session and spec JSON.
@@ -144,7 +144,7 @@ func (h *JSResponseMiddleware) HandleResponse(rw http.ResponseWriter, res *http.
 	sessionAsJSON, err := json.Marshal(session)
 	if err != nil {
 		logger.WithError(err).Error("Failed to encode session for JS response middleware")
-		return errors.New("Middleware error")
+		return errors.New("middleware error")
 	}
 
 	specAsJSON := specToJson(h.spec)
@@ -156,19 +156,19 @@ func (h *JSResponseMiddleware) HandleResponse(rw http.ResponseWriter, res *http.
 	runner := h.spec.GetJSRunner()
 	if runner == nil {
 		logger.Error("JSVM isn't initialized")
-		return errors.New("Middleware error")
+		return errors.New("middleware error")
 	}
 	returnDataStr, runErr := runner.Run(expr)
 	if runErr != nil {
 		logger.WithError(runErr).Error("Failed to run JS response middleware")
-		return errors.New("Middleware error")
+		return errors.New("middleware error")
 	}
 
 	// Decode the return object.
 	newResponseData := VMResponseReturnObject{}
 	if err := json.Unmarshal([]byte(returnDataStr), &newResponseData); err != nil {
 		logger.WithError(err).Error("Failed to decode JS response middleware return data: ", returnDataStr)
-		return errors.New("Middleware error")
+		return errors.New("middleware error")
 	}
 
 	// Apply header deletions.
@@ -187,7 +187,7 @@ func (h *JSResponseMiddleware) HandleResponse(rw http.ResponseWriter, res *http.
 
 	// Apply body changes.
 	newBody := []byte(newResponseData.Response.Body)
-	res.Body = ioutil.NopCloser(bytes.NewBuffer(newBody))
+	res.Body = io.NopCloser(bytes.NewBuffer(newBody))
 	res.ContentLength = int64(len(newBody))
 	res.Header.Set("Content-Length", fmt.Sprintf("%d", len(newBody)))
 

@@ -170,3 +170,41 @@ delRespHook.NewProcessResponse(function(response, request, session, config) {
 		})
 	}
 }
+
+// ---------------------------------------------------------------------------
+// Unit tests for JSResponseMiddleware accessors and error paths
+// ---------------------------------------------------------------------------
+
+func TestJSResponseMiddleware_Init_InvalidType(t *testing.T) {
+	h := &JSResponseMiddleware{}
+	err := h.Init("not a MiddlewareDefinition", nil) //nolint:govet // intentionally passing wrong type
+	if err == nil {
+		t.Fatal("expected error for invalid middleware definition type")
+	}
+}
+
+func TestJSResponseMiddleware_Init_Valid(t *testing.T) {
+	h := &JSResponseMiddleware{}
+	err := h.Init(apidef.MiddlewareDefinition{Name: "testHook"}, nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if h.hookName != "testHook" {
+		t.Fatalf("expected hookName 'testHook', got '%s'", h.hookName)
+	}
+}
+
+func TestJSResponseMiddleware_Name(t *testing.T) {
+	h := &JSResponseMiddleware{}
+	if h.Name() != "JSResponseMiddleware" {
+		t.Fatalf("expected 'JSResponseMiddleware', got '%s'", h.Name())
+	}
+}
+
+func TestJSResponseMiddleware_Base(t *testing.T) {
+	h := JSResponseMiddleware{}
+	b := h.Base()
+	if b == nil {
+		t.Fatal("expected non-nil BaseTykResponseHandler")
+	}
+}

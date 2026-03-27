@@ -88,7 +88,8 @@ func (j *GojaJSVM) Run(expr string) (string, error) {
 
 	returnRaw, err := vm.RunString(expr)
 	if err != nil {
-		if _, ok := err.(*goja.InterruptedError); ok {
+		var interrupted *goja.InterruptedError
+		if errors.As(err, &interrupted) {
 			return "", fmt.Errorf("JS middleware timed out after %v", j.Timeout)
 		}
 		return "", err

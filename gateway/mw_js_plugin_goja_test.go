@@ -4,6 +4,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -516,4 +517,82 @@ bundlePre.NewProcessRequest(function(request, session) {
 			})
 		})
 	}
+}
+
+// ---------------------------------------------------------------------------
+// 11. GojaJSVM edge cases — DeInit, VM(), Run when not initialized
+// ---------------------------------------------------------------------------
+
+func TestGoja_DeInit(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	vm := GojaJSVM{}
+	vm.Init(nil, logrus.NewEntry(log), ts.Gw)
+	assert.True(t, vm.Initialized())
+	assert.NotNil(t, vm.VM())
+
+	vm.DeInit()
+	assert.False(t, vm.Initialized())
+	assert.Nil(t, vm.VM())
+}
+
+func TestGoja_RunNotInitialized(t *testing.T) {
+	vm := GojaJSVM{}
+	assert.False(t, vm.Ready())
+	assert.Nil(t, vm.VM())
+
+	_, err := vm.Run(`"hello"`)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "JSVM isn't enabled")
+}
+
+func TestGoja_LoadScriptCompileError(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	vm := GojaJSVM{}
+	vm.Init(nil, logrus.NewEntry(log), ts.Gw)
+
+	err := vm.LoadScript("function {{{ invalid syntax")
+	assert.Error(t, err)
+}
+
+// ---------------------------------------------------------------------------
+// 12. LoadJSPaths — unsupported extension, missing file, compile error
+// ---------------------------------------------------------------------------
+
+func TestGoja_LoadJSPaths(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	vm := GojaJSVM{}
+	vm.Init(nil, logrus.NewEntry(log), ts.Gw)
+
+	initialCount := len(vm.programs)
+
+	// Unsupported extension — should skip, not crash.
+	vm.LoadJSPaths([]string{"plugin.py"}, "")
+	assert.Equal(t, initialCount, len(vm.programs), "should not load non-.js file")
+
+	// Missing file — should skip, not crash.
+	vm.LoadJSPaths([]string{"nonexistent.js"}, "")
+	assert.Equal(t, initialCount, len(vm.programs), "should not load missing file")
+
+	// Valid file with bad JS — should skip, not crash.
+	dir := t.TempDir()
+	badFile := dir + "/bad.js"
+	if err := os.WriteFile(badFile, []byte("function {{{ invalid"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	vm.LoadJSPaths([]string{"bad.js"}, dir)
+	assert.Equal(t, initialCount, len(vm.programs), "should not load file with syntax error")
+
+	// Valid JS file — should load.
+	goodFile := dir + "/good.js"
+	if err := os.WriteFile(goodFile, []byte("function hello() { return 'hi'; }"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	vm.LoadJSPaths([]string{"good.js"}, dir)
+	assert.Equal(t, initialCount+1, len(vm.programs), "should load valid .js file")
 }
