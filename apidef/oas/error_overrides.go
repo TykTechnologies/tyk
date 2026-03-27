@@ -14,8 +14,9 @@ import (
 // Classic API definitions and 'tyk.conf'.
 
 type ErrorOverrides struct {
-	Enabled bool              `json:"enabled"`
-	Value   ErrorOverridesMap `json:"value"`
+	// Tyk classic API definition: `error_overrides_disabled`
+	Enabled bool              `bson:"enabled" json:"enabled"`
+	Value   ErrorOverridesMap `bson:"value" json:"value"`
 }
 
 func (e *ErrorOverrides) Fill(api apidef.APIDefinition) {
@@ -83,8 +84,8 @@ func (e *ErrorOverridesMap) ExtractTo(api *apidef.APIDefinition) {
 }
 
 type ErrorOverride struct {
-	Match    *ErrorMatcher `json:"match,omitempty"`
-	Response ErrorResponse `json:"response"`
+	Match    *ErrorMatcher `bson:"match,omitempty" json:"match,omitempty"`
+	Response ErrorResponse `bson:"response" json:"response"`
 }
 
 func (eo *ErrorOverride) Fill(api apidef.ErrorOverride) {
@@ -115,10 +116,10 @@ func (eo *ErrorOverride) ExtractTo(api *apidef.ErrorOverride) {
 }
 
 type ErrorMatcher struct {
-	Flag           errors.ResponseFlag `json:"flag,omitempty"`
-	MessagePattern string              `json:"messagePattern,omitempty"`
-	BodyField      string              `json:"bodyField,omitempty"`
-	BodyValue      string              `json:"bodyValue,omitempty"`
+	Flag           errors.ResponseFlag `bson:"flag,omitempty" json:"flag,omitempty"`
+	MessagePattern string              `bson:"messagePattern,omitempty" json:"messagePattern,omitempty"`
+	BodyField      string              `bson:"bodyField,omitempty" json:"bodyField,omitempty"`
+	BodyValue      string              `bson:"bodyValue,omitempty" json:"bodyValue,omitempty"`
 }
 
 func (em *ErrorMatcher) ExtractTo(api *apidef.ErrorMatcher) {
@@ -130,11 +131,11 @@ func (em *ErrorMatcher) ExtractTo(api *apidef.ErrorMatcher) {
 }
 
 type ErrorResponse struct {
-	StatusCode int               `json:"statusCode"`
-	Body       string            `json:"body,omitempty"`
-	Message    string            `json:"message,omitempty"`
-	Template   string            `json:"template,omitempty"`
-	Headers    map[string]string `json:"headers,omitempty"`
+	StatusCode int               `bson:"statusCode" json:"statusCode"`
+	Body       string            `bson:"body,omitempty" json:"body,omitempty"`
+	Message    string            `bson:"message,omitempty" json:"message,omitempty"`
+	Template   string            `bson:"template,omitempty" json:"template,omitempty"`
+	Headers    map[string]string `bson:"headers,omitempty" json:"headers,omitempty"`
 }
 
 func (er ErrorResponse) ExtractTo(api *apidef.ErrorResponse) {
