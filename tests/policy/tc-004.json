@@ -1,0 +1,19 @@
+{
+  "name": "FLIP-016: SYS-REQ-008 result_returned (result_returned_0)",
+  "requirement": "SYS-REQ-008",
+  "obligation": "flip_flip_result_returned_0",
+  "trace_length": 1,
+  "signals": {
+    "apply_requested": [
+      true
+    ],
+    "result_returned": [
+      true
+    ]
+  },
+  "expected_holds": {
+    "SYS-REQ-008": [
+      true
+    ]
+  }
+}

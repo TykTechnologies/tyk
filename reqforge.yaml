@@ -1,0 +1,14 @@
+project:
+    name: Tyk API Gateway
+    version: 0.1.0
+    description: Requirements for Tyk API Gateway
+    specs:
+        - path: specs/system
+          prefix: SYS-REQ
+          type: system
+    id_format:
+        pattern: '{prefix}-{number:03d}'
+        auto_increment: true
+    default_assurance_level: E
+    baselines:
+        naming: BL-{date}-{seq:02d}

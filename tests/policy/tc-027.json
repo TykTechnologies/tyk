@@ -1,0 +1,25 @@
+{
+  "name": "FLIP-049: SYS-REQ-019 error_reported (error_reported_0)",
+  "requirement": "SYS-REQ-019",
+  "obligation": "flip_flip_error_reported_0",
+  "trace_length": 1,
+  "signals": {
+    "clear_requested": [
+      true
+    ],
+    "error_reported": [
+      true
+    ],
+    "policy_found": [
+      true
+    ],
+    "session_cleared": [
+      false
+    ]
+  },
+  "expected_holds": {
+    "SYS-REQ-019": [
+      true
+    ]
+  }
+}

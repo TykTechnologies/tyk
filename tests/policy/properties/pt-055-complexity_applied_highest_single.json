@@ -1,0 +1,14 @@
+{
+  "name": "complexity_applied_highest_single",
+  "property": "complexity_applied",
+  "strategy": "highest",
+  "inputs": [
+    {
+      "complexity_applied": 42
+    }
+  ],
+  "expected": {
+    "complexity_applied": 42
+  },
+  "check": "highest"
+}

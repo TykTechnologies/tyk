@@ -1,0 +1,22 @@
+{
+  "name": "FLIP-073: SYS-REQ-026 quota_applied (quota_applied_0)",
+  "requirement": "SYS-REQ-026",
+  "obligation": "flip_flip_quota_applied_0",
+  "trace_length": 1,
+  "signals": {
+    "apply_requested": [
+      true
+    ],
+    "error_reported": [
+      true
+    ],
+    "quota_applied": [
+      false
+    ]
+  },
+  "expected_holds": {
+    "SYS-REQ-026": [
+      true
+    ]
+  }
+}

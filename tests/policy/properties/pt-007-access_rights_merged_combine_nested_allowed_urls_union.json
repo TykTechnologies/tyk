@@ -1,0 +1,39 @@
+{
+  "name": "access_rights_merged_combine_nested_allowed_urls_union",
+  "property": "access_rights_merged",
+  "strategy": "combine",
+  "inputs": [
+    {
+      "access_rights_merged": {
+        "key1": {
+          "allowed_urls": [
+            "alpha",
+            "bravo"
+          ]
+        }
+      }
+    },
+    {
+      "access_rights_merged": {
+        "key1": {
+          "allowed_urls": [
+            "bravo",
+            "charlie"
+          ]
+        }
+      }
+    }
+  ],
+  "expected": {
+    "access_rights_merged": {
+      "key1": {
+        "allowed_urls": [
+          "alpha",
+          "bravo",
+          "charlie"
+        ]
+      }
+    }
+  },
+  "check": "nested_union"
+}

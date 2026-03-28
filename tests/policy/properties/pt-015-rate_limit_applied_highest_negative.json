@@ -1,0 +1,17 @@
+{
+  "name": "rate_limit_applied_highest_negative",
+  "property": "rate_limit_applied",
+  "strategy": "highest",
+  "inputs": [
+    {
+      "rate_limit_applied": -10
+    },
+    {
+      "rate_limit_applied": 5
+    }
+  ],
+  "expected": {
+    "rate_limit_applied": 5
+  },
+  "check": "highest"
+}

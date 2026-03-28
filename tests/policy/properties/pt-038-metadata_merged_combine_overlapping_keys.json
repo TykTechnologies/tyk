@@ -1,0 +1,41 @@
+{
+  "name": "metadata_merged_combine_overlapping_keys",
+  "property": "metadata_merged",
+  "strategy": "combine",
+  "inputs": [
+    {
+      "metadata_merged": {
+        "key1": {
+          "value": "a"
+        },
+        "key2": {
+          "value": "b"
+        }
+      }
+    },
+    {
+      "metadata_merged": {
+        "key2": {
+          "value": "c"
+        },
+        "key3": {
+          "value": "d"
+        }
+      }
+    }
+  ],
+  "expected": {
+    "metadata_merged": {
+      "key1": {
+        "value": "a"
+      },
+      "key2": {
+        "value": "c"
+      },
+      "key3": {
+        "value": "d"
+      }
+    }
+  },
+  "check": "combine"
+}

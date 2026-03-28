@@ -1,0 +1,19 @@
+{
+  "name": "FLIP-004: SYS-REQ-002 policy_found (policy_found_0)",
+  "requirement": "SYS-REQ-002",
+  "obligation": "flip_flip_policy_found_0",
+  "trace_length": 1,
+  "signals": {
+    "per_api_and_partition_set": [
+      true
+    ],
+    "policy_found": [
+      false
+    ]
+  },
+  "expected_holds": {
+    "SYS-REQ-002": [
+      true
+    ]
+  }
+}

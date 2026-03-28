@@ -1,0 +1,22 @@
+{
+  "name": "FLIP-067: SYS-REQ-024 error_reported (error_reported_0)",
+  "requirement": "SYS-REQ-024",
+  "obligation": "flip_flip_error_reported_0",
+  "trace_length": 1,
+  "signals": {
+    "access_rights_merged": [
+      true
+    ],
+    "apply_requested": [
+      true
+    ],
+    "error_reported": [
+      false
+    ]
+  },
+  "expected_holds": {
+    "SYS-REQ-024": [
+      true
+    ]
+  }
+}

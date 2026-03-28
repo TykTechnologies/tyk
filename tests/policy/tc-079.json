@@ -1,0 +1,19 @@
+{
+  "name": "FLIP-116: SYS-REQ-034 policy_found (policy_found_0)",
+  "requirement": "SYS-REQ-034",
+  "obligation": "flip_flip_policy_found_0",
+  "trace_length": 1,
+  "signals": {
+    "policy_found": [
+      true
+    ],
+    "policy_inactive": [
+      true
+    ]
+  },
+  "expected_holds": {
+    "SYS-REQ-034": [
+      true
+    ]
+  }
+}

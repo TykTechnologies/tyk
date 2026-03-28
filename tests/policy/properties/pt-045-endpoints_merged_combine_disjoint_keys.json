@@ -1,0 +1,32 @@
+{
+  "name": "endpoints_merged_combine_disjoint_keys",
+  "property": "endpoints_merged",
+  "strategy": "combine",
+  "inputs": [
+    {
+      "endpoints_merged": {
+        "key1": {
+          "value": "a"
+        }
+      }
+    },
+    {
+      "endpoints_merged": {
+        "key2": {
+          "value": "b"
+        }
+      }
+    }
+  ],
+  "expected": {
+    "endpoints_merged": {
+      "key1": {
+        "value": "a"
+      },
+      "key2": {
+        "value": "b"
+      }
+    }
+  },
+  "check": "combine"
+}

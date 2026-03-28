@@ -1,0 +1,25 @@
+{
+  "name": "FLIP-050: SYS-REQ-019 policy_found (policy_found_0)",
+  "requirement": "SYS-REQ-019",
+  "obligation": "flip_flip_policy_found_0",
+  "trace_length": 1,
+  "signals": {
+    "clear_requested": [
+      true
+    ],
+    "error_reported": [
+      false
+    ],
+    "policy_found": [
+      false
+    ],
+    "session_cleared": [
+      false
+    ]
+  },
+  "expected_holds": {
+    "SYS-REQ-019": [
+      true
+    ]
+  }
+}

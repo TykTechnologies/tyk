@@ -1,0 +1,31 @@
+{
+  "name": "FLIP-104: SYS-REQ-031 complexity_applied (complexity_applied_0)",
+  "requirement": "SYS-REQ-031",
+  "obligation": "flip_flip_complexity_applied_0",
+  "trace_length": 1,
+  "signals": {
+    "apply_requested": [
+      true
+    ],
+    "complexity_applied": [
+      true
+    ],
+    "is_per_api": [
+      false
+    ],
+    "org_matches": [
+      true
+    ],
+    "partitions_enabled": [
+      true
+    ],
+    "policy_found": [
+      true
+    ]
+  },
+  "expected_holds": {
+    "SYS-REQ-031": [
+      true
+    ]
+  }
+}

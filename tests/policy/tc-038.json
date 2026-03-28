@@ -1,0 +1,19 @@
+{
+  "name": "FLIP-064: SYS-REQ-023 endpoints_merged (endpoints_merged_0)",
+  "requirement": "SYS-REQ-023",
+  "obligation": "flip_flip_endpoints_merged_0",
+  "trace_length": 1,
+  "signals": {
+    "endpoint_limit_apply_requested": [
+      true
+    ],
+    "endpoints_merged": [
+      true
+    ]
+  },
+  "expected_holds": {
+    "SYS-REQ-023": [
+      true
+    ]
+  }
+}

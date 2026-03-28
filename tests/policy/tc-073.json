@@ -1,0 +1,31 @@
+{
+  "name": "FLIP-108: SYS-REQ-031 policy_found (policy_found_0)",
+  "requirement": "SYS-REQ-031",
+  "obligation": "flip_flip_policy_found_0",
+  "trace_length": 1,
+  "signals": {
+    "apply_requested": [
+      true
+    ],
+    "complexity_applied": [
+      false
+    ],
+    "is_per_api": [
+      false
+    ],
+    "org_matches": [
+      true
+    ],
+    "partitions_enabled": [
+      true
+    ],
+    "policy_found": [
+      false
+    ]
+  },
+  "expected_holds": {
+    "SYS-REQ-031": [
+      true
+    ]
+  }
+}

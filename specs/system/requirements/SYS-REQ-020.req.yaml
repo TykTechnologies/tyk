@@ -1,0 +1,49 @@
+id: SYS-REQ-020
+version: 1
+status: draft
+priority: shall
+category: functional
+req_type: guarantee
+fretish: the policy shall always satisfy !clear_requested | policy_found | error_reported
+description: ClearSession must report an error when a referenced policy is not found. Silent failure would leave the session un-cleared, causing policy application to merge with stale values.
+formalization_strategy: fretish
+informal_verification:
+    method: ""
+    evidence: ""
+    verified: false
+parent: ""
+component: policy
+rationale: ""
+tags: []
+variables: []
+traces:
+    verified_by:
+        - FLIP:policy/tc-030
+        - FLIP:policy/tc-031
+verification:
+    assurance_level: C
+    formalization_status: valid
+    realizability: realizable
+    consistency_checked: true
+    vacuity_checked: true
+    review:
+        status: pending
+        reviewer: ""
+        reviewed_at: ""
+        ai_generated: false
+history:
+    created_by: human:cli
+    created_at: "2026-03-28T13:28:53Z"
+    last_modified_by: auto:flip-fixtures
+    last_modified_at: "2026-03-28T17:22:42Z"
+_computed:
+    formalization:
+        CoCoSpecCode: (H(not clear_requested or policy_found or error_reported))
+        description: 'SCOPE: in the interval defined by the entire execution.<br>TRIGGER: first point in the interval.<br>REQUIRED BEHAVIOR: for every trigger, not clear_requested or policy_found or error_reported must hold at all time points between (and including) the trigger and the end of the interval.'
+        ft: (LAST V not clear_requested or policy_found or error_reported)
+        ftExpanded: (LAST V not clear_requested or policy_found or error_reported)
+        pt: (H not clear_requested or policy_found or error_reported)
+        ptExpanded: (H not clear_requested or policy_found or error_reported)
+    parse_status: valid
+    last_compiled: "2026-03-28T18:03:09Z"
+    file_hash: sha256:cbe849c94d2bd56217a912f6eca615884b699c583ae421f2919bd4c354374ea9

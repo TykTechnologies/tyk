@@ -1,0 +1,25 @@
+{
+  "name": "metadata_merged_combine_empty_second",
+  "property": "metadata_merged",
+  "strategy": "combine",
+  "inputs": [
+    {
+      "metadata_merged": {
+        "key1": {
+          "value": "a"
+        }
+      }
+    },
+    {
+      "metadata_merged": {}
+    }
+  ],
+  "expected": {
+    "metadata_merged": {
+      "key1": {
+        "value": "a"
+      }
+    }
+  },
+  "check": "combine"
+}

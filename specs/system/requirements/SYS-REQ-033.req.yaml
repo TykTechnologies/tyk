@@ -1,0 +1,53 @@
+id: SYS-REQ-033
+version: 1
+status: draft
+priority: shall
+category: constraint
+req_type: constraint
+fretish: the policy shall always satisfy result_returned | !apply_requested
+description: |-
+    COMPONENT OVERVIEW: The policy package implements Tyk API Gateway's policy merging engine. It takes a session (API key) referencing one or more policies and applies those policies to the session, producing merged access rights, rate limits, quotas, tags, metadata, and complexity limits.
+
+    ARCHITECTURE: The Service struct holds a policy store and logger. Apply() iterates over policy IDs, looks up each policy, validates org ownership, and dispatches to either applyPerAPI() or applyPartitions() based on the PerAPI flag. ClearSession() resets session values before application. ApplyRateLimits() implements the highest-rate-wins merge. ApplyEndpointLevelLimits() merges per-endpoint rate limits. MergeAllowedURLs() merges per-URL ACLs. The Store and StoreMap provide policy lookup.
+
+    DESIGN DECISIONS: (1) Highest value wins for rate limits and quotas, ensuring the most permissive policy governs. (2) Per-API mode and partition mode are mutually exclusive. (3) Missing policies are skipped when multiple policies exist but cause errors for single-policy sessions. (4) Org ID mismatch is a hard error (security boundary). (5) Session clearing happens before application to prevent stale values from surviving.
+formalization_strategy: fretish
+informal_verification:
+    method: ""
+    evidence: ""
+    verified: false
+parent: ""
+component: policy
+rationale: ""
+tags: []
+variables: []
+traces:
+    verified_by:
+        - FLIP:policy/tc-078
+verification:
+    assurance_level: E
+    formalization_status: valid
+    realizability: not_applicable
+    consistency_checked: true
+    vacuity_checked: true
+    review:
+        status: pending
+        reviewer: ""
+        reviewed_at: ""
+        ai_generated: false
+history:
+    created_by: human:cli
+    created_at: "2026-03-28T13:29:33Z"
+    last_modified_by: auto:flip-fixtures
+    last_modified_at: "2026-03-28T17:22:42Z"
+_computed:
+    formalization:
+        CoCoSpecCode: (H(result_returned or not apply_requested))
+        description: 'SCOPE: in the interval defined by the entire execution.<br>TRIGGER: first point in the interval.<br>REQUIRED BEHAVIOR: for every trigger, result_returned or not apply_requested must hold at all time points between (and including) the trigger and the end of the interval.'
+        ft: (LAST V result_returned or not apply_requested)
+        ftExpanded: (LAST V result_returned or not apply_requested)
+        pt: (H result_returned or not apply_requested)
+        ptExpanded: (H result_returned or not apply_requested)
+    parse_status: valid
+    last_compiled: "2026-03-28T18:03:09Z"
+    file_hash: sha256:52ab088d0e6b74e079277674eed3520159f57e71f381fcd5db8fd81b666e37e2

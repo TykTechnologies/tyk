@@ -1,0 +1,17 @@
+{
+  "name": "complexity_applied_special_unlimited_in_both",
+  "property": "complexity_applied",
+  "strategy": "highest",
+  "inputs": [
+    {
+      "complexity_applied": "-1"
+    },
+    {
+      "complexity_applied": "-1"
+    }
+  ],
+  "expected": {
+    "complexity_applied": "-1"
+  },
+  "check": "special_unlimited"
+}

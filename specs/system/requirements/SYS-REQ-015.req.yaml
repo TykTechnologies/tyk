@@ -1,0 +1,51 @@
+id: SYS-REQ-015
+version: 1
+status: draft
+priority: shall
+category: functional
+req_type: guarantee
+fretish: the policy shall always satisfy !apply_requested | !policy_found | !org_matches | !is_per_api | rate_limit_applied
+description: 'When Apply processes a valid per-API policy (found, org matches, per-API mode), rate limits must be applied. Reads as: if apply requested AND policy found AND org matches AND is per-API, then rate limit applied.'
+formalization_strategy: fretish
+informal_verification:
+    method: ""
+    evidence: ""
+    verified: false
+parent: ""
+component: policy
+rationale: ""
+tags: []
+variables: []
+traces:
+    verified_by:
+        - FLIP:policy/tc-020
+        - FLIP:policy/tc-021
+        - FLIP:policy/tc-022
+        - FLIP:policy/tc-023
+verification:
+    assurance_level: C
+    formalization_status: valid
+    realizability: realizable
+    consistency_checked: true
+    vacuity_checked: true
+    review:
+        status: pending
+        reviewer: ""
+        reviewed_at: ""
+        ai_generated: false
+history:
+    created_by: human:cli
+    created_at: "2026-03-28T13:28:42Z"
+    last_modified_by: human:cli
+    last_modified_at: "2026-03-28T17:44:19Z"
+_computed:
+    formalization:
+        CoCoSpecCode: (H(not apply_requested or not policy_found or not org_matches or not is_per_api or rate_limit_applied))
+        description: 'SCOPE: in the interval defined by the entire execution.<br>TRIGGER: first point in the interval.<br>REQUIRED BEHAVIOR: for every trigger, not apply_requested or not policy_found or not org_matches or not is_per_api or rate_limit_applied must hold at all time points between (and including) the trigger and the end of the interval.'
+        ft: (LAST V not apply_requested or not policy_found or not org_matches or not is_per_api or rate_limit_applied)
+        ftExpanded: (LAST V not apply_requested or not policy_found or not org_matches or not is_per_api or rate_limit_applied)
+        pt: (H not apply_requested or not policy_found or not org_matches or not is_per_api or rate_limit_applied)
+        ptExpanded: (H not apply_requested or not policy_found or not org_matches or not is_per_api or rate_limit_applied)
+    parse_status: valid
+    last_compiled: "2026-03-28T18:03:09Z"
+    file_hash: sha256:47c4a36281c55e4828886be48353a64476562ecc9004d100d0086d378b5d19fa

@@ -1,0 +1,31 @@
+{
+  "name": "FLIP-100: SYS-REQ-030 org_matches (org_matches_0)",
+  "requirement": "SYS-REQ-030",
+  "obligation": "flip_flip_org_matches_0",
+  "trace_length": 1,
+  "signals": {
+    "access_rights_merged": [
+      false
+    ],
+    "apply_requested": [
+      true
+    ],
+    "is_per_api": [
+      false
+    ],
+    "org_matches": [
+      false
+    ],
+    "partitions_enabled": [
+      true
+    ],
+    "policy_found": [
+      true
+    ]
+  },
+  "expected_holds": {
+    "SYS-REQ-030": [
+      true
+    ]
+  }
+}

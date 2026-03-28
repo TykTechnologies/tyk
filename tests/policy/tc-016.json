@@ -1,0 +1,28 @@
+{
+  "name": "FLIP-033: SYS-REQ-014 is_per_api (is_per_api_0)",
+  "requirement": "SYS-REQ-014",
+  "obligation": "flip_flip_is_per_api_0",
+  "trace_length": 1,
+  "signals": {
+    "apply_requested": [
+      true
+    ],
+    "is_per_api": [
+      false
+    ],
+    "org_matches": [
+      true
+    ],
+    "policy_found": [
+      true
+    ],
+    "quota_applied": [
+      false
+    ]
+  },
+  "expected_holds": {
+    "SYS-REQ-014": [
+      true
+    ]
+  }
+}

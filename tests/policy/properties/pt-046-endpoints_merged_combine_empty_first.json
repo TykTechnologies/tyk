@@ -1,0 +1,25 @@
+{
+  "name": "endpoints_merged_combine_empty_first",
+  "property": "endpoints_merged",
+  "strategy": "combine",
+  "inputs": [
+    {
+      "endpoints_merged": {}
+    },
+    {
+      "endpoints_merged": {
+        "key1": {
+          "value": "a"
+        }
+      }
+    }
+  ],
+  "expected": {
+    "endpoints_merged": {
+      "key1": {
+        "value": "a"
+      }
+    }
+  },
+  "check": "combine"
+}
