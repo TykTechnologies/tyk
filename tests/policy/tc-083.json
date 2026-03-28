@@ -1,0 +1,22 @@
+{
+  "name": "FLIP-124: SYS-REQ-037 policy_found (policy_found_0)",
+  "requirement": "SYS-REQ-037",
+  "obligation": "flip_flip_policy_found_0",
+  "trace_length": 1,
+  "signals": {
+    "has_access_rights": [
+      false
+    ],
+    "is_per_api": [
+      true
+    ],
+    "policy_found": [
+      false
+    ]
+  },
+  "expected_holds": {
+    "SYS-REQ-037": [
+      true
+    ]
+  }
+}

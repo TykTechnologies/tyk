@@ -1,0 +1,19 @@
+{
+  "name": "FLIP-121: SYS-REQ-036 policies_provided (policies_provided_0)",
+  "requirement": "SYS-REQ-036",
+  "obligation": "flip_flip_policies_provided_0",
+  "trace_length": 1,
+  "signals": {
+    "multiple_policies": [
+      true
+    ],
+    "policies_provided": [
+      true
+    ]
+  },
+  "expected_holds": {
+    "SYS-REQ-036": [
+      true
+    ]
+  }
+}

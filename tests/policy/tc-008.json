@@ -1,0 +1,22 @@
+{
+  "name": "FLIP-022: SYS-REQ-011 error_reported (error_reported_0)",
+  "requirement": "SYS-REQ-011",
+  "obligation": "flip_flip_error_reported_0",
+  "trace_length": 1,
+  "signals": {
+    "apply_requested": [
+      true
+    ],
+    "error_reported": [
+      true
+    ],
+    "org_matches": [
+      false
+    ]
+  },
+  "expected_holds": {
+    "SYS-REQ-011": [
+      true
+    ]
+  }
+}

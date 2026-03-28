@@ -1,0 +1,20 @@
+{
+  "name": "rate_limit_applied_highest_by_duration_first",
+  "property": "rate_limit_applied",
+  "strategy": "highest",
+  "inputs": [
+    {
+      "per": 60,
+      "rate": 100
+    },
+    {
+      "per": 60,
+      "rate": 50
+    }
+  ],
+  "expected": {
+    "per": 60,
+    "rate": 100
+  },
+  "check": "highest_by_field"
+}

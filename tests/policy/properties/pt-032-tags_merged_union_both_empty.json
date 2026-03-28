@@ -1,0 +1,17 @@
+{
+  "name": "tags_merged_union_both_empty",
+  "property": "tags_merged",
+  "strategy": "union",
+  "inputs": [
+    {
+      "tags_merged": []
+    },
+    {
+      "tags_merged": []
+    }
+  ],
+  "expected": {
+    "tags_merged": []
+  },
+  "check": "union"
+}

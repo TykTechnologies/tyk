@@ -1,0 +1,17 @@
+{
+  "name": "quota_applied_special_unlimited_in_both",
+  "property": "quota_applied",
+  "strategy": "highest",
+  "inputs": [
+    {
+      "quota_applied": "-1"
+    },
+    {
+      "quota_applied": "-1"
+    }
+  ],
+  "expected": {
+    "quota_applied": "-1"
+  },
+  "check": "special_unlimited"
+}

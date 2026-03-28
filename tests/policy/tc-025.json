@@ -1,0 +1,19 @@
+{
+  "name": "FLIP-045: SYS-REQ-017 metadata_merged (metadata_merged_0)",
+  "requirement": "SYS-REQ-017",
+  "obligation": "flip_flip_metadata_merged_0",
+  "trace_length": 1,
+  "signals": {
+    "apply_requested": [
+      true
+    ],
+    "metadata_merged": [
+      true
+    ]
+  },
+  "expected_holds": {
+    "SYS-REQ-017": [
+      true
+    ]
+  }
+}

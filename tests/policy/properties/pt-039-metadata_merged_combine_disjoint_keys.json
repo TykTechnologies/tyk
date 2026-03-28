@@ -1,0 +1,32 @@
+{
+  "name": "metadata_merged_combine_disjoint_keys",
+  "property": "metadata_merged",
+  "strategy": "combine",
+  "inputs": [
+    {
+      "metadata_merged": {
+        "key1": {
+          "value": "a"
+        }
+      }
+    },
+    {
+      "metadata_merged": {
+        "key2": {
+          "value": "b"
+        }
+      }
+    }
+  ],
+  "expected": {
+    "metadata_merged": {
+      "key1": {
+        "value": "a"
+      },
+      "key2": {
+        "value": "b"
+      }
+    }
+  },
+  "check": "combine"
+}

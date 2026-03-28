@@ -1,0 +1,51 @@
+id: SYS-REQ-021
+version: 1
+status: draft
+priority: shall
+category: functional
+req_type: guarantee
+fretish: the policy shall always satisfy !rate_limit_apply_requested | policy_rate_empty | api_limit_empty | policy_rate_higher | policy_rate_equal | rate_limit_applied
+description: 'ApplyRateLimits must apply policy rate limits when: policy rate is non-empty AND not equal to current AND (current API limit is empty OR policy allows higher rate). The highest-rate-wins rule ensures the most permissive policy governs. Equal rates preserve the existing limit (see SYS-REQ-041).'
+formalization_strategy: fretish
+informal_verification:
+    method: ""
+    evidence: ""
+    verified: false
+parent: ""
+component: policy
+rationale: ""
+tags: []
+variables: []
+traces:
+    verified_by:
+        - FLIP:policy/tc-032
+        - FLIP:policy/tc-033
+        - FLIP:policy/tc-034
+        - FLIP:policy/tc-035
+verification:
+    assurance_level: C
+    formalization_status: valid
+    realizability: realizable
+    consistency_checked: true
+    vacuity_checked: true
+    review:
+        status: pending
+        reviewer: ""
+        reviewed_at: ""
+        ai_generated: false
+history:
+    created_by: human:cli
+    created_at: "2026-03-28T13:28:53Z"
+    last_modified_by: auto:flip-fixtures
+    last_modified_at: "2026-03-28T17:22:42Z"
+_computed:
+    formalization:
+        CoCoSpecCode: (H(not rate_limit_apply_requested or policy_rate_empty or api_limit_empty or policy_rate_higher or policy_rate_equal or rate_limit_applied))
+        description: 'SCOPE: in the interval defined by the entire execution.<br>TRIGGER: first point in the interval.<br>REQUIRED BEHAVIOR: for every trigger, not rate_limit_apply_requested or policy_rate_empty or api_limit_empty or policy_rate_higher or policy_rate_equal or rate_limit_applied must hold at all time points between (and including) the trigger and the end of the interval.'
+        ft: (LAST V not rate_limit_apply_requested or policy_rate_empty or api_limit_empty or policy_rate_higher or policy_rate_equal or rate_limit_applied)
+        ftExpanded: (LAST V not rate_limit_apply_requested or policy_rate_empty or api_limit_empty or policy_rate_higher or policy_rate_equal or rate_limit_applied)
+        pt: (H not rate_limit_apply_requested or policy_rate_empty or api_limit_empty or policy_rate_higher or policy_rate_equal or rate_limit_applied)
+        ptExpanded: (H not rate_limit_apply_requested or policy_rate_empty or api_limit_empty or policy_rate_higher or policy_rate_equal or rate_limit_applied)
+    parse_status: valid
+    last_compiled: "2026-03-28T18:03:09Z"
+    file_hash: sha256:a2da76c4cca2b12c2b0f42a35c6ad167bc9a1be4521239210fea16dd2143e237

@@ -1,0 +1,46 @@
+id: SYS-REQ-007
+version: 1
+status: draft
+priority: shall
+category: functional
+req_type: assumption
+fretish: the policy shall always satisfy !(clear_requested & rate_limit_apply_requested)
+description: ClearSession and ApplyRateLimits are never called simultaneously.
+formalization_strategy: fretish
+informal_verification:
+    method: ""
+    evidence: ""
+    verified: false
+parent: ""
+component: policy
+rationale: ""
+tags: []
+variables: []
+traces: {}
+verification:
+    assurance_level: C
+    formalization_status: valid
+    realizability: realizable
+    consistency_checked: true
+    vacuity_checked: true
+    review:
+        status: pending
+        reviewer: ""
+        reviewed_at: ""
+        ai_generated: false
+history:
+    created_by: human:cli
+    created_at: "2026-03-28T13:28:05Z"
+    last_modified_by: human:cli
+    last_modified_at: "2026-03-28T13:28:05Z"
+_computed:
+    formalization:
+        CoCoSpecCode: (H(not (clear_requested and rate_limit_apply_requested)))
+        description: 'SCOPE: in the interval defined by the entire execution.<br>TRIGGER: first point in the interval.<br>REQUIRED BEHAVIOR: for every trigger, not (clear_requested and rate_limit_apply_requested) must hold at all time points between (and including) the trigger and the end of the interval.'
+        ft: (LAST V not (clear_requested and rate_limit_apply_requested))
+        ftExpanded: (LAST V not (clear_requested and rate_limit_apply_requested))
+        pt: (H not (clear_requested and rate_limit_apply_requested))
+        ptExpanded: (H not (clear_requested and rate_limit_apply_requested))
+    parse_status: valid
+    last_compiled: "2026-03-28T18:03:09Z"
+    file_hash: sha256:d9760208b68cb7767bc89cc6238e6306858811142424d2968bb351f619ad93e4

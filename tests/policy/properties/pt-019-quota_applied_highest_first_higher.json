@@ -1,0 +1,17 @@
+{
+  "name": "quota_applied_highest_first_higher",
+  "property": "quota_applied",
+  "strategy": "highest",
+  "inputs": [
+    {
+      "quota_applied": 100
+    },
+    {
+      "quota_applied": 50
+    }
+  ],
+  "expected": {
+    "quota_applied": 100
+  },
+  "check": "highest"
+}

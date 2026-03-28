@@ -1,0 +1,25 @@
+{
+  "name": "FLIP-051: SYS-REQ-019 session_cleared (session_cleared_0)",
+  "requirement": "SYS-REQ-019",
+  "obligation": "flip_flip_session_cleared_0",
+  "trace_length": 1,
+  "signals": {
+    "clear_requested": [
+      true
+    ],
+    "error_reported": [
+      false
+    ],
+    "policy_found": [
+      true
+    ],
+    "session_cleared": [
+      true
+    ]
+  },
+  "expected_holds": {
+    "SYS-REQ-019": [
+      true
+    ]
+  }
+}

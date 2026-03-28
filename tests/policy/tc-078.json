@@ -1,0 +1,19 @@
+{
+  "name": "FLIP-114: SYS-REQ-033 apply_requested (apply_requested_0)",
+  "requirement": "SYS-REQ-033",
+  "obligation": "flip_flip_apply_requested_0",
+  "trace_length": 1,
+  "signals": {
+    "apply_requested": [
+      false
+    ],
+    "result_returned": [
+      false
+    ]
+  },
+  "expected_holds": {
+    "SYS-REQ-033": [
+      true
+    ]
+  }
+}

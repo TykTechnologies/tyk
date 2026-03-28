@@ -1,0 +1,28 @@
+{
+  "name": "tags_merged_union_disjoint",
+  "property": "tags_merged",
+  "strategy": "union",
+  "inputs": [
+    {
+      "tags_merged": [
+        "alpha",
+        "bravo"
+      ]
+    },
+    {
+      "tags_merged": [
+        "charlie",
+        "delta"
+      ]
+    }
+  ],
+  "expected": {
+    "tags_merged": [
+      "alpha",
+      "bravo",
+      "charlie",
+      "delta"
+    ]
+  },
+  "check": "union"
+}

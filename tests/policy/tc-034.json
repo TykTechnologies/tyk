@@ -1,0 +1,28 @@
+{
+  "name": "FLIP-057: SYS-REQ-021 policy_rate_higher (policy_rate_higher_0)",
+  "requirement": "SYS-REQ-021",
+  "obligation": "flip_flip_policy_rate_higher_0",
+  "trace_length": 1,
+  "signals": {
+    "api_limit_empty": [
+      false
+    ],
+    "policy_rate_empty": [
+      false
+    ],
+    "policy_rate_higher": [
+      true
+    ],
+    "rate_limit_applied": [
+      false
+    ],
+    "rate_limit_apply_requested": [
+      true
+    ]
+  },
+  "expected_holds": {
+    "SYS-REQ-021": [
+      true
+    ]
+  }
+}

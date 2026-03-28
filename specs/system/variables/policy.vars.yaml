@@ -1,0 +1,189 @@
+component: policy
+variables:
+    - name: apply_requested
+      type: bool
+      direction: mode
+      description: Policy application has been requested via Apply()
+    - name: clear_requested
+      type: bool
+      direction: mode
+      description: Session clearing has been requested via ClearSession()
+    - name: rate_limit_apply_requested
+      type: bool
+      direction: mode
+      description: Rate limit application requested via ApplyRateLimits()
+    - name: endpoint_limit_apply_requested
+      type: bool
+      direction: mode
+      description: Endpoint-level limit merge requested via ApplyEndpointLevelLimits()
+    - name: policies_provided
+      type: bool
+      direction: input
+      description: At least one policy ID exists in the session
+    - name: policy_found
+      type: bool
+      direction: input
+      description: The referenced policy exists in the store
+    - name: org_matches
+      type: bool
+      direction: input
+      description: Policy org ID matches the service org ID
+    - name: is_per_api
+      type: bool
+      direction: input
+      description: Policy has Partitions.PerAPI set
+    - name: partitions_enabled
+      type: bool
+      direction: input
+      description: Policy has at least one partition flag set (Quota/RateLimit/Acl/Complexity)
+    - name: has_access_rights
+      type: bool
+      direction: input
+      description: Policy has non-empty AccessRights map
+    - name: policy_rate_empty
+      type: bool
+      direction: input
+      description: Policy rate limit values are zero/empty
+    - name: api_limit_empty
+      type: bool
+      direction: input
+      description: Current API-level rate limit is empty (Rate=0 or Per=0)
+    - name: policy_rate_higher
+      type: bool
+      direction: input
+      description: Policy allows higher request rate than current API limit (shorter duration)
+    - name: multiple_policies
+      type: bool
+      direction: input
+      description: More than one policy ID is referenced by the session
+    - name: policy_inactive
+      type: bool
+      direction: input
+      description: The policy IsInactive flag is true
+    - name: per_api_and_partition_set
+      type: bool
+      direction: input
+      description: Policy has both PerAPI and partition flags set simultaneously
+    - name: session_cleared
+      type: bool
+      direction: output
+      description: Session quota/rate/complexity values were reset to zero
+    - name: access_rights_merged
+      type: bool
+      direction: output
+      description: Access rights from policy were merged into session
+      properties:
+        merge: combine
+        key: api_id
+        nested:
+          allowed_urls:
+            type: "[]AccessSpec"
+            merge: union
+            key: url
+            deduplicate: true
+          versions:
+            type: "[]string"
+            merge: union
+            deduplicate: true
+          restricted_types:
+            type: "[]GraphQLType"
+            merge: intersection
+            key: type_name
+          allowed_types:
+            type: "[]GraphQLType"
+            merge: union
+            key: type_name
+          field_access_rights:
+            type: "[]FieldAccessRight"
+            merge: union
+            key: type_name+field_name
+    - name: rate_limit_applied
+      type: bool
+      direction: output
+      description: Rate limit values were applied to session and/or API limit
+      properties:
+        merge: highest
+        compare_by: duration
+        fields: [Rate, Per]
+        note: "Compares by duration (Per/Rate); shorter duration = higher rate wins"
+    - name: quota_applied
+      type: bool
+      direction: output
+      description: Quota values were applied to session and/or API limit
+      properties:
+        merge: highest
+        compare_by: value
+        special:
+          "-1": unlimited
+          rule: "unlimited (-1) always wins via greaterThanInt64"
+    - name: tags_merged
+      type: bool
+      direction: output
+      description: Policy tags were merged into session tags
+      properties:
+        merge: union
+        deduplicate: true
+        commutative: true
+    - name: metadata_merged
+      type: bool
+      direction: output
+      description: Policy metadata was merged into session metadata
+      properties:
+        merge: combine
+        key: metadata_key
+        note: "last-write-wins per key when policies overlap"
+    - name: error_reported
+      type: bool
+      direction: output
+      description: An error was returned to the caller
+    - name: session_inactive_set
+      type: bool
+      direction: output
+      description: Session IsInactive was set based on policy inactive status
+    - name: endpoints_merged
+      type: bool
+      direction: output
+      description: Endpoint-level rate limits were merged taking highest rate
+      properties:
+        merge: combine
+        key: path+method
+        nested:
+          rate_limit:
+            type: RateLimit
+            merge: highest
+            compare_by: duration
+            note: "Shorter duration wins; on equal duration, higher Rate wins"
+    - name: complexity_applied
+      type: bool
+      direction: output
+      description: MaxQueryDepth complexity limit was applied
+      properties:
+        merge: highest
+        compare_by: value
+        special:
+          "-1": unlimited
+          rule: "unlimited (-1) always wins via greaterThanInt"
+    - name: result_returned
+      type: bool
+      direction: output
+      description: A result (nil error or error) was returned to the caller
+    - name: policies_all_missing
+      type: bool
+      direction: input
+      description: All referenced policy IDs are missing from the store
+    - name: policy_rate_equal
+      type: bool
+      direction: input
+      description: Policy rate limit equals current rate limit (same duration)
+    - name: store_available
+      type: bool
+      direction: input
+      description: The policy store is non-nil and reachable
+    - name: metadata_order_independent
+      type: bool
+      direction: output
+      description: Metadata merge result is the same regardless of policy iteration order
+    - name: apply_time_bounded
+      type: bool
+      direction: output
+      description: Apply() completed within the performance bound (100ms for up to 50 policies)

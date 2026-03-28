@@ -1,0 +1,49 @@
+id: SYS-REQ-039
+version: 1
+status: draft
+priority: shall
+category: functional
+req_type: assumption
+fretish: the policy shall always satisfy !api_limit_empty | rate_limit_apply_requested | apply_requested
+description: API limit emptiness is only meaningful during rate limit application or full apply. Outside these operations the value is irrelevant.
+formalization_strategy: fretish
+informal_verification:
+    method: ""
+    evidence: ""
+    verified: false
+parent: ""
+component: policy
+rationale: ""
+tags: []
+variables: []
+traces:
+    verified_by:
+        - FLIP:policy/tc-086
+        - FLIP:policy/tc-087
+verification:
+    assurance_level: C
+    formalization_status: valid
+    realizability: realizable
+    consistency_checked: true
+    vacuity_checked: true
+    review:
+        status: pending
+        reviewer: ""
+        reviewed_at: ""
+        ai_generated: false
+history:
+    created_by: human:cli
+    created_at: "2026-03-28T13:30:07Z"
+    last_modified_by: auto:flip-fixtures
+    last_modified_at: "2026-03-28T17:22:42Z"
+_computed:
+    formalization:
+        CoCoSpecCode: (H(not api_limit_empty or rate_limit_apply_requested or apply_requested))
+        description: 'SCOPE: in the interval defined by the entire execution.<br>TRIGGER: first point in the interval.<br>REQUIRED BEHAVIOR: for every trigger, not api_limit_empty or rate_limit_apply_requested or apply_requested must hold at all time points between (and including) the trigger and the end of the interval.'
+        ft: (LAST V not api_limit_empty or rate_limit_apply_requested or apply_requested)
+        ftExpanded: (LAST V not api_limit_empty or rate_limit_apply_requested or apply_requested)
+        pt: (H not api_limit_empty or rate_limit_apply_requested or apply_requested)
+        ptExpanded: (H not api_limit_empty or rate_limit_apply_requested or apply_requested)
+    parse_status: valid
+    last_compiled: "2026-03-28T18:03:09Z"
+    file_hash: sha256:e4b337c9a642900d3ef39bfc926a89dff8778eb91afd213f4e20fd8a2db54a96

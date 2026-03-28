@@ -1,0 +1,17 @@
+{
+  "name": "complexity_applied_highest_first_higher",
+  "property": "complexity_applied",
+  "strategy": "highest",
+  "inputs": [
+    {
+      "complexity_applied": 100
+    },
+    {
+      "complexity_applied": 50
+    }
+  ],
+  "expected": {
+    "complexity_applied": 100
+  },
+  "check": "highest"
+}

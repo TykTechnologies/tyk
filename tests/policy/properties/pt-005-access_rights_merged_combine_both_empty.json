@@ -1,0 +1,17 @@
+{
+  "name": "access_rights_merged_combine_both_empty",
+  "property": "access_rights_merged",
+  "strategy": "combine",
+  "inputs": [
+    {
+      "access_rights_merged": {}
+    },
+    {
+      "access_rights_merged": {}
+    }
+  ],
+  "expected": {
+    "access_rights_merged": {}
+  },
+  "check": "combine"
+}

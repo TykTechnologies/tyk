@@ -1,0 +1,19 @@
+{
+  "name": "FLIP-006: SYS-REQ-003 partitions_enabled (partitions_enabled_0)",
+  "requirement": "SYS-REQ-003",
+  "obligation": "flip_flip_partitions_enabled_0",
+  "trace_length": 1,
+  "signals": {
+    "is_per_api": [
+      true
+    ],
+    "partitions_enabled": [
+      false
+    ]
+  },
+  "expected_holds": {
+    "SYS-REQ-003": [
+      true
+    ]
+  }
+}

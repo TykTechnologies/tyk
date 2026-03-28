@@ -1,0 +1,19 @@
+{
+  "name": "FLIP-043: SYS-REQ-016 tags_merged (tags_merged_0)",
+  "requirement": "SYS-REQ-016",
+  "obligation": "flip_flip_tags_merged_0",
+  "trace_length": 1,
+  "signals": {
+    "apply_requested": [
+      true
+    ],
+    "tags_merged": [
+      true
+    ]
+  },
+  "expected_holds": {
+    "SYS-REQ-016": [
+      true
+    ]
+  }
+}

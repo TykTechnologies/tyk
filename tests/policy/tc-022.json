@@ -1,0 +1,28 @@
+{
+  "name": "FLIP-040: SYS-REQ-015 policy_found (policy_found_0)",
+  "requirement": "SYS-REQ-015",
+  "obligation": "flip_flip_policy_found_0",
+  "trace_length": 1,
+  "signals": {
+    "apply_requested": [
+      true
+    ],
+    "is_per_api": [
+      true
+    ],
+    "org_matches": [
+      true
+    ],
+    "policy_found": [
+      false
+    ],
+    "rate_limit_applied": [
+      false
+    ]
+  },
+  "expected_holds": {
+    "SYS-REQ-015": [
+      true
+    ]
+  }
+}

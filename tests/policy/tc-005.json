@@ -1,0 +1,25 @@
+{
+  "name": "FLIP-018: SYS-REQ-010 error_reported (error_reported_0)",
+  "requirement": "SYS-REQ-010",
+  "obligation": "flip_flip_error_reported_0",
+  "trace_length": 1,
+  "signals": {
+    "apply_requested": [
+      true
+    ],
+    "error_reported": [
+      true
+    ],
+    "multiple_policies": [
+      false
+    ],
+    "policy_found": [
+      false
+    ]
+  },
+  "expected_holds": {
+    "SYS-REQ-010": [
+      true
+    ]
+  }
+}
