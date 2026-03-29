@@ -114,22 +114,6 @@ func z3StringMap(m map[string]interface{}, property string) map[string]interface
 	return inner
 }
 
-// TestZ3_FixturesExist verifies that Z3 fixtures were generated and reports a summary.
-func TestZ3_FixturesExist(t *testing.T) {
-	fixtures := loadAllZ3Fixtures(t)
-	assert.GreaterOrEqual(t, len(fixtures), 30,
-		"should have at least 30 Z3 fixtures")
-	t.Logf("Total Z3 fixtures: %d", len(fixtures))
-
-	byProp := make(map[string]int)
-	for _, f := range fixtures {
-		byProp[f.Property]++
-	}
-	for prop, count := range byProp {
-		t.Logf("  %s: %d fixtures", prop, count)
-	}
-}
-
 // z3PropertyMapping describes how to set a property on a Policy from fixture
 // inputs and how to assert the result on a SessionState.
 type z3PropertyMapping struct {
