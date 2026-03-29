@@ -1,0 +1,16 @@
+{
+  "name": "complexity_applied_z3_highest_negative_boundary",
+  "property": "complexity_applied",
+  "source": "z3-boundary",
+  "inputs": [
+    {
+      "complexity_applied": -1
+    },
+    {
+      "complexity_applied": -2
+    }
+  ],
+  "expected": {
+    "complexity_applied": -1
+  }
+}

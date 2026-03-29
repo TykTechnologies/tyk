@@ -1,0 +1,26 @@
+{
+  "name": "access_rights_merged_z3_combine_overlapping_keys",
+  "property": "access_rights_merged",
+  "source": "z3-boundary",
+  "inputs": [
+    {
+      "access_rights_merged": {
+        "A": "val_a",
+        "B": "val_shared_a"
+      }
+    },
+    {
+      "access_rights_merged": {
+        "B": "val_shared_b",
+        "C": "val_b"
+      }
+    }
+  ],
+  "expected": {
+    "access_rights_merged": {
+      "A": "val_a",
+      "B": "val_shared_b",
+      "C": "val_b"
+    }
+  }
+}
