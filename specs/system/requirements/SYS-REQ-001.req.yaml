@@ -19,7 +19,7 @@ variables: []
 references:
     - type: ticket
       id: BUG-1234
-      description: Nil store crash found by ReqForge specification
+      description: Nil store crash found by ReqProof specification
     - type: standard
       id: NPR-7150-SWE-042
       url: https://standards.nasa.gov/standard/oce/npr-71502d
