@@ -1,8 +1,13 @@
 package gateway
 
 import (
+	"io"
 	"net/http"
+	"net/http/httptest"
+	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/test"
@@ -207,4 +212,30 @@ func TestJSResponseMiddleware_Base(t *testing.T) {
 	if b == nil {
 		t.Fatal("expected non-nil BaseTykResponseHandler")
 	}
+}
+
+// ---------------------------------------------------------------------------
+// HandleResponse — error paths
+// ---------------------------------------------------------------------------
+
+// TestJSResponseMiddleware_HandleResponse_NoRunner verifies that HandleResponse
+// returns an error when no JS runner is initialised on the spec.
+func TestJSResponseMiddleware_HandleResponse_NoRunner(t *testing.T) {
+	// Fresh spec with no JSVM initialised → GetJSRunner() returns nil.
+	spec := &APISpec{APIDefinition: &apidef.APIDefinition{}}
+
+	h := &JSResponseMiddleware{
+		hookName: "testHook",
+		spec:     spec,
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/test", nil)
+	res := &http.Response{
+		StatusCode: http.StatusOK,
+		Header:     make(http.Header),
+		Body:       io.NopCloser(strings.NewReader("response body")),
+	}
+
+	err := h.HandleResponse(nil, res, req, nil)
+	assert.Error(t, err)
 }

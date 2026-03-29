@@ -9,9 +9,9 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/TykTechnologies/tyk/user"
-
 	"github.com/sirupsen/logrus"
+
+	"github.com/TykTechnologies/tyk/user"
 )
 
 // JSVMAPIHelper contains the shared business logic for JS API bindings.

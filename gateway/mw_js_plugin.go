@@ -384,7 +384,11 @@ func (j *JSVM) Run(expr string) (string, error) {
 	ret := make(chan otto.Value, 1)
 	errRet := make(chan error, 1)
 	go func() {
-		defer func() { _ = recover() }()
+		defer func() {
+			if r := recover(); r != nil {
+				j.Log.WithField("panic", r).Debug("Recovered from JS goroutine panic")
+			}
+		}()
 		returnRaw, err := vm.Run(expr)
 		ret <- returnRaw
 		errRet <- err

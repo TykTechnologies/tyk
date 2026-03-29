@@ -3,12 +3,17 @@ package gateway
 import (
 	"encoding/base64"
 	"net/http"
+	"os"
 	"testing"
 
-	"github.com/TykTechnologies/tyk/user"
+	"github.com/sirupsen/logrus"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/test"
+	"github.com/TykTechnologies/tyk/user"
 )
 
 const virtTestJS = `
@@ -283,4 +288,111 @@ func TestVirtualEndpointDisabled(t *testing.T) {
 			)
 		})
 	}
+}
+
+// ---------------------------------------------------------------------------
+// preLoadVirtualMetaCodeGoja — unit tests for goja-specific loading branches
+// ---------------------------------------------------------------------------
+
+const simpleVirtJS = `
+function simpleVirt(request, session, config) {
+	var resp = { Body: "ok", Headers: {}, Code: 200 };
+	return TykJsResponse(resp, session.meta_data);
+}
+`
+
+func TestPreLoadVirtualMetaCodeGoja_UseFile(t *testing.T) {
+	dir := t.TempDir()
+	jsFile := dir + "/virt.js"
+	require.NoError(t, os.WriteFile(jsFile, []byte(simpleVirtJS), 0644))
+
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	vm := &GojaJSVM{}
+	vm.Init(nil, logrus.NewEntry(log), ts.Gw)
+	before := len(vm.programs)
+
+	meta := &apidef.VirtualMeta{
+		FunctionSourceType: apidef.UseFile,
+		FunctionSourceURI:  jsFile,
+	}
+
+	ts.Gw.preLoadVirtualMetaCodeGoja(meta, vm)
+	// The JS file should have been compiled and added as a program.
+	assert.Greater(t, len(vm.programs), before)
+}
+
+func TestPreLoadVirtualMetaCodeGoja_UseFile_Missing(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	vm := &GojaJSVM{}
+	vm.Init(nil, logrus.NewEntry(log), ts.Gw)
+	before := len(vm.programs)
+
+	meta := &apidef.VirtualMeta{
+		FunctionSourceType: apidef.UseFile,
+		FunctionSourceURI:  "/nonexistent/path/to/file.js",
+	}
+
+	ts.Gw.preLoadVirtualMetaCodeGoja(meta, vm)
+	// File missing → no new program added.
+	assert.Equal(t, before, len(vm.programs))
+}
+
+func TestPreLoadVirtualMetaCodeGoja_BlobDisabled(t *testing.T) {
+	ts := StartTest(func(c *config.Config) {
+		c.DisableVirtualPathBlobs = true
+	})
+	defer ts.Close()
+
+	vm := &GojaJSVM{}
+	vm.Init(nil, logrus.NewEntry(log), ts.Gw)
+	before := len(vm.programs)
+
+	meta := &apidef.VirtualMeta{
+		FunctionSourceType: apidef.UseBlob,
+		FunctionSourceURI:  base64.StdEncoding.EncodeToString([]byte(simpleVirtJS)),
+	}
+
+	ts.Gw.preLoadVirtualMetaCodeGoja(meta, vm)
+	// Blobs disabled → no new program added.
+	assert.Equal(t, before, len(vm.programs))
+}
+
+func TestPreLoadVirtualMetaCodeGoja_UseBlob_InvalidBase64(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	vm := &GojaJSVM{}
+	vm.Init(nil, logrus.NewEntry(log), ts.Gw)
+	before := len(vm.programs)
+
+	meta := &apidef.VirtualMeta{
+		FunctionSourceType: apidef.UseBlob,
+		FunctionSourceURI:  "!!!not-valid-base64!!!",
+	}
+
+	ts.Gw.preLoadVirtualMetaCodeGoja(meta, vm)
+	// Invalid base64 → no new program added.
+	assert.Equal(t, before, len(vm.programs))
+}
+
+func TestPreLoadVirtualMetaCodeGoja_UnknownType(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	vm := &GojaJSVM{}
+	vm.Init(nil, logrus.NewEntry(log), ts.Gw)
+	before := len(vm.programs)
+
+	meta := &apidef.VirtualMeta{
+		FunctionSourceType: "unknown-type",
+		FunctionSourceURI:  "something",
+	}
+
+	ts.Gw.preLoadVirtualMetaCodeGoja(meta, vm)
+	// Unknown type → no new program added.
+	assert.Equal(t, before, len(vm.programs))
 }

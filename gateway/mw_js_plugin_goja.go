@@ -52,8 +52,12 @@ func (j *GojaJSVM) newRuntime() *goja.Runtime {
 
 	// Suppress top-level log() calls during program replay.
 	nop := func(_ goja.FunctionCall) goja.Value { return goja.Undefined() }
-	_ = vm.Set("log", nop)
-	_ = vm.Set("rawlog", nop)
+	if err := vm.Set("log", nop); err != nil && j.Log != nil {
+		j.Log.WithError(err).Error("Failed to suppress log during replay")
+	}
+	if err := vm.Set("rawlog", nop); err != nil && j.Log != nil {
+		j.Log.WithError(err).Error("Failed to suppress rawlog during replay")
+	}
 
 	// Replay compiled programs (middleware definitions, coreJS, etc.)
 	// Programs only define functions/prototypes — no API calls at top level.

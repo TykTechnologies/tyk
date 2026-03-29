@@ -1,6 +1,7 @@
 package gateway
 
 import (
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -11,6 +12,7 @@ import (
 
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
@@ -560,6 +562,134 @@ func TestGoja_LoadScriptCompileError(t *testing.T) {
 
 	err := vm.LoadScript("function {{{ invalid syntax")
 	assert.Error(t, err)
+}
+
+// ---------------------------------------------------------------------------
+// 11b. GojaJSVM Init — TykJSPath and custom timeout branches
+// ---------------------------------------------------------------------------
+
+func TestGoja_Init_TykJSPath_Valid(t *testing.T) {
+	dir := t.TempDir()
+	jsFile := dir + "/user.js"
+	require.NoError(t, os.WriteFile(jsFile, []byte("function myHelper() { return 42; }"), 0644))
+
+	ts := StartTest(func(c *config.Config) {
+		c.TykJSPath = jsFile
+	})
+	defer ts.Close()
+
+	vm := GojaJSVM{}
+	vm.Init(nil, logrus.NewEntry(log), ts.Gw)
+	assert.True(t, vm.Initialized())
+
+	// coreJS + userJS + TykJsResponse = 3 programs
+	assert.Equal(t, 3, len(vm.programs))
+
+	// The user-defined function should be available at runtime.
+	result, err := vm.Run("myHelper()")
+	assert.NoError(t, err)
+	assert.Equal(t, "42", result)
+}
+
+func TestGoja_Init_TykJSPath_CompileError(t *testing.T) {
+	dir := t.TempDir()
+	jsFile := dir + "/bad.js"
+	require.NoError(t, os.WriteFile(jsFile, []byte("function {{{ bad syntax"), 0644))
+
+	ts := StartTest(func(c *config.Config) {
+		c.TykJSPath = jsFile
+	})
+	defer ts.Close()
+
+	vm := GojaJSVM{}
+	vm.Init(nil, logrus.NewEntry(log), ts.Gw)
+	assert.True(t, vm.Initialized())
+
+	// Bad JS skipped — only coreJS + TykJsResponse remain.
+	assert.Equal(t, 2, len(vm.programs))
+}
+
+func TestGoja_Init_CustomTimeout(t *testing.T) {
+	ts := StartTest(func(c *config.Config) {
+		c.JSVMTimeout = 15
+	})
+	defer ts.Close()
+
+	vm := GojaJSVM{}
+	vm.Init(nil, logrus.NewEntry(log), ts.Gw)
+	assert.Equal(t, 15*time.Second, vm.Timeout)
+}
+
+// ---------------------------------------------------------------------------
+// 11c. registerAPI closures — error and success paths via the JS VM
+// ---------------------------------------------------------------------------
+
+// TestGoja_RegisterAPI_ErrorPaths exercises the if-err branches inside every
+// set() closure in registerAPI, ensuring goja.Undefined() is returned instead
+// of panicking.  These lines are only reachable through the JS VM.
+func TestGoja_RegisterAPI_ErrorPaths(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	// nil spec is safe here — all tested code paths fail before accessing Spec.
+	gojaVM := GojaJSVM{}
+	gojaVM.Init(nil, logrus.NewEntry(log), ts.Gw)
+
+	tests := []struct {
+		name string
+		js   string
+		want string // expected typeof result
+	}{
+		// b64dec error path: invalid base64 → undefined
+		{"b64dec_error", "typeof b64dec('!!invalid!!')", "undefined"},
+		// rawb64dec error path: invalid raw-base64 → undefined
+		{"rawb64dec_error", "typeof rawb64dec('!!invalid!!')", "undefined"},
+		// rawb64dec success path: valid raw-base64 → string
+		{"rawb64dec_success", `rawb64dec("dGVzdA")`, "test"},
+		// log and rawlog success paths (must not throw)
+		{"log_call", `log("msg"); "ok"`, "ok"},
+		{"rawlog_call", `rawlog("msg"); "ok"`, "ok"},
+		// TykMakeHttpRequest: bad JSON → undefined
+		{"TykMakeHttpRequest_badJSON", "typeof TykMakeHttpRequest('{invalid}')", "undefined"},
+		// TykMakeHttpRequest: undefined sentinel → undefined
+		{"TykMakeHttpRequest_undefined", "typeof TykMakeHttpRequest('undefined')", "undefined"},
+		// TykBatchRequest: bad JSON → undefined
+		{"TykBatchRequest_badJSON", "typeof TykBatchRequest('{invalid}')", "undefined"},
+		// TykSetKeyData: bad JSON session → logs error, returns undefined
+		{"TykSetKeyData_badJSON", "typeof TykSetKeyData('key','notjson','0')", "undefined"},
+		// TykGetKeyData: non-existent key → returns a JSON string
+		{"TykGetKeyData_notFound", `typeof TykGetKeyData("no-such-key","")`, "string"},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			result, err := gojaVM.Run(tc.js)
+			assert.NoError(t, err)
+			assert.Equal(t, tc.want, result)
+		})
+	}
+}
+
+// TestGoja_TykMakeHttpRequest_Via_JS covers the success path of
+// TykMakeHttpRequest (the vm.ToValue branch) via a real HTTP server.
+func TestGoja_TykMakeHttpRequest_Via_JS(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte("hello from server"))
+	}))
+	defer server.Close()
+
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	spec := &APISpec{APIDefinition: &apidef.APIDefinition{}}
+	gojaVM := GojaJSVM{}
+	gojaVM.Init(spec, logrus.NewEntry(log), ts.Gw)
+
+	js := fmt.Sprintf(`TykMakeHttpRequest('{"Method":"GET","Domain":"%s","Resource":"/"}')`, server.URL)
+	result, err := gojaVM.Run(js)
+	assert.NoError(t, err)
+	assert.Contains(t, result, "hello from server")
 }
 
 // ---------------------------------------------------------------------------
