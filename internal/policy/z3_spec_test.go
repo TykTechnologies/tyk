@@ -114,8 +114,7 @@ func z3StringMap(m map[string]interface{}, property string) map[string]interface
 	return inner
 }
 
-// TestZ3_FixturesExist verifies that Z3 fixtures were generated and
-// reports a summary.
+// TestZ3_FixturesExist verifies that Z3 fixtures were generated and reports a summary.
 func TestZ3_FixturesExist(t *testing.T) {
 	fixtures := loadAllZ3Fixtures(t)
 	assert.GreaterOrEqual(t, len(fixtures), 30,
@@ -249,10 +248,7 @@ var z3PropertyMappings = map[string]z3PropertyMapping{
 	},
 }
 
-// TestZ3_AllProperties is a table-driven test runner that loads all Z3 fixtures,
-// groups them by property, and runs each through the corresponding property mapping.
-// It replaces the individual per-property test functions (TestZ3_RateLimitHighest,
-// TestZ3_QuotaApplied, TestZ3_ComplexityApplied, TestZ3_TagsUnion, TestZ3_MetadataMerged).
+// Verifies: SYS-REQ-021, SYS-REQ-022, SYS-REQ-033, SYS-REQ-016, SYS-REQ-017
 func TestZ3_AllProperties(t *testing.T) {
 	allFixtures := loadAllZ3Fixtures(t)
 
@@ -315,10 +311,7 @@ func TestZ3_AllProperties(t *testing.T) {
 	}
 }
 
-// TestZ3_QuotaBoundary_ZeroVsNegative specifically checks the Z3 zero_boundary case.
-// Z3 says max(0, -1) = 0, but Tyk treats -1 as unlimited (always wins).
-// This is an intentional divergence: Z3 treats -1 as a literal integer for pure
-// "highest" comparison; Tyk's greaterThanInt64 treats -1 as a special sentinel.
+// Verifies: SYS-REQ-022
 func TestZ3_QuotaBoundary_ZeroVsNegative(t *testing.T) {
 	orgID := "org1"
 	pol1 := user.Policy{
@@ -358,7 +351,7 @@ func TestZ3_QuotaBoundary_ZeroVsNegative(t *testing.T) {
 		"Tyk treats -1 as unlimited (always wins), not as literal -1 < 0")
 }
 
-// TestZ3_ComplexityBoundary_ZeroVsNegative same sentinel check for MaxQueryDepth.
+// Verifies: SYS-REQ-033
 func TestZ3_ComplexityBoundary_ZeroVsNegative(t *testing.T) {
 	orgID := "org1"
 	pol1 := user.Policy{
@@ -396,9 +389,7 @@ func TestZ3_ComplexityBoundary_ZeroVsNegative(t *testing.T) {
 		"Tyk treats -1 as unlimited (always wins) for MaxQueryDepth")
 }
 
-// TestZ3_QuotaBoundary_NegativeVsNegative tests the Z3 negative_boundary case.
-// Z3 says max(-1, -2) = -1. In Tyk, -1 is unlimited (wins); -2 is just a negative
-// integer. greaterThanInt64(-1, -2) returns true because first==-1 is the sentinel.
+// Verifies: SYS-REQ-022
 func TestZ3_QuotaBoundary_NegativeVsNegative(t *testing.T) {
 	orgID := "org1"
 	pol1 := user.Policy{
