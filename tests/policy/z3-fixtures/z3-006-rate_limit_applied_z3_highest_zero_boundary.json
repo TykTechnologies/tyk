@@ -1,0 +1,16 @@
+{
+  "name": "rate_limit_applied_z3_highest_zero_boundary",
+  "property": "rate_limit_applied",
+  "source": "z3-boundary",
+  "inputs": [
+    {
+      "rate_limit_applied": 0
+    },
+    {
+      "rate_limit_applied": -1
+    }
+  ],
+  "expected": {
+    "rate_limit_applied": 0
+  }
+}

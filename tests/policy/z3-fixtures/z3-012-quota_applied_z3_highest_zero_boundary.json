@@ -1,0 +1,16 @@
+{
+  "name": "quota_applied_z3_highest_zero_boundary",
+  "property": "quota_applied",
+  "source": "z3-boundary",
+  "inputs": [
+    {
+      "quota_applied": 0
+    },
+    {
+      "quota_applied": -1
+    }
+  ],
+  "expected": {
+    "quota_applied": 0
+  }
+}

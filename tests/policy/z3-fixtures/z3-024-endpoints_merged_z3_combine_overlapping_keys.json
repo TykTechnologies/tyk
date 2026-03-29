@@ -1,0 +1,26 @@
+{
+  "name": "endpoints_merged_z3_combine_overlapping_keys",
+  "property": "endpoints_merged",
+  "source": "z3-boundary",
+  "inputs": [
+    {
+      "endpoints_merged": {
+        "B": "val_a",
+        "C": "val_shared_a"
+      }
+    },
+    {
+      "endpoints_merged": {
+        "A": "val_b",
+        "C": "val_shared_b"
+      }
+    }
+  ],
+  "expected": {
+    "endpoints_merged": {
+      "A": "val_b",
+      "B": "val_a",
+      "C": "val_shared_b"
+    }
+  }
+}

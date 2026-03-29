@@ -1,0 +1,27 @@
+{
+  "name": "metadata_merged_z3_combine_disjoint_keys",
+  "property": "metadata_merged",
+  "source": "z3-boundary",
+  "inputs": [
+    {
+      "metadata_merged": {
+        "A": "val_0",
+        "C": "val_1"
+      }
+    },
+    {
+      "metadata_merged": {
+        "B": "val_3",
+        "D": "val_2"
+      }
+    }
+  ],
+  "expected": {
+    "metadata_merged": {
+      "A": "val_0",
+      "B": "val_3",
+      "C": "val_1",
+      "D": "val_2"
+    }
+  }
+}
