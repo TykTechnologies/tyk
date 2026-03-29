@@ -40,7 +40,7 @@ func TestJSVMAPIHelper_MakeHTTPRequest_InvalidURL(t *testing.T) {
 }
 
 func TestJSVMAPIHelper_MakeHTTPRequest_Success(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte("response body"))
 	}))
@@ -63,7 +63,7 @@ func TestJSVMAPIHelper_MakeHTTPRequest_Success(t *testing.T) {
 }
 
 func TestJSVMAPIHelper_MakeHTTPRequest_WithBody(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusCreated)
 		_, _ = w.Write([]byte("created"))
 	}))
@@ -89,7 +89,7 @@ func TestJSVMAPIHelper_MakeHTTPRequest_WithBody(t *testing.T) {
 }
 
 func TestJSVMAPIHelper_MakeHTTPRequest_WithFormData(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte("form ok"))
 	}))
@@ -140,12 +140,12 @@ func TestJSVMAPIHelper_RawB64Decode_Invalid(t *testing.T) {
 
 func TestJSVMAPIHelper_LogMessage(t *testing.T) {
 	h := &JSVMAPIHelper{Log: logrus.NewEntry(logrus.New())}
-	h.LogMessage("test log message") // must not panic
+	assert.NotPanics(t, func() { h.LogMessage("test log message") })
 }
 
 func TestJSVMAPIHelper_RawLogMessage(t *testing.T) {
 	h := &JSVMAPIHelper{RawLog: logrus.New()}
-	h.RawLogMessage("test raw log message") // must not panic
+	assert.NotPanics(t, func() { h.RawLogMessage("test raw log message") })
 }
 
 // ---------------------------------------------------------------------------

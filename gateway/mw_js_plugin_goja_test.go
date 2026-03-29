@@ -673,7 +673,7 @@ func TestGoja_RegisterAPI_ErrorPaths(t *testing.T) {
 // TestGoja_TykMakeHttpRequest_Via_JS covers the success path of
 // TykMakeHttpRequest (the vm.ToValue branch) via a real HTTP server.
 func TestGoja_TykMakeHttpRequest_Via_JS(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte("hello from server"))
 	}))
