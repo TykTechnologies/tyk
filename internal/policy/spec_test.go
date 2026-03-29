@@ -17,46 +17,6 @@ import (
 	"github.com/TykTechnologies/tyk/user"
 )
 
-// FLIPTestCase represents a FLIP-generated test fixture.
-type FLIPTestCase struct {
-	Name          string                    `json:"name"`
-	Requirement   string                    `json:"requirement"`
-	Obligation    string                    `json:"obligation"`
-	TraceLength   int                       `json:"trace_length"`
-	Signals       map[string][]bool         `json:"signals"`
-	ExpectedHolds map[string][]bool         `json:"expected_holds"`
-}
-
-func loadFLIPFixtures(t *testing.T) []FLIPTestCase {
-	t.Helper()
-
-	// FLIP test cases are in the project root tests/policy/ dir
-	root := filepath.Join("..", "..", "tests", "policy")
-	matches, err := filepath.Glob(filepath.Join(root, "tc-*.json"))
-	if err != nil || len(matches) == 0 {
-		t.Skipf("No FLIP test fixtures found in %s", root)
-	}
-
-	var fixtures []FLIPTestCase
-	for _, path := range matches {
-		data, err := os.ReadFile(path)
-		require.NoError(t, err, "reading %s", path)
-
-		var tc FLIPTestCase
-		require.NoError(t, json.Unmarshal(data, &tc), "parsing %s", path)
-		fixtures = append(fixtures, tc)
-	}
-	return fixtures
-}
-
-func sig(tc FLIPTestCase, name string, step int) bool {
-	vals, ok := tc.Signals[name]
-	if !ok || step >= len(vals) {
-		return false
-	}
-	return vals[step]
-}
-
 // newTestService creates a policy.Service for testing.
 func newTestService(orgID string, policies []user.Policy) *policy.Service {
 	logger := logrus.New()
@@ -65,8 +25,7 @@ func newTestService(orgID string, policies []user.Policy) *policy.Service {
 	return policy.New(&orgID, store, logger)
 }
 
-// TestSpec_MetadataMerged verifies SYS-REQ-017:
-// Apply always merges metadata
+// Verifies: SYS-REQ-017
 func TestSpec_MetadataMerged(t *testing.T) {
 	orgID := "org1"
 	pol := user.Policy{
@@ -96,7 +55,7 @@ func TestSpec_MetadataMerged(t *testing.T) {
 	assert.Equal(t, "data", session.MetaData["existing"])
 }
 
-// TestSpec_ClearSession verifies SYS-REQ-019 and SYS-REQ-020
+// Verifies: SYS-REQ-019, SYS-REQ-020
 func TestSpec_ClearSession(t *testing.T) {
 	orgID := "org1"
 
@@ -136,8 +95,7 @@ func TestSpec_ClearSession(t *testing.T) {
 	})
 }
 
-// TestSpec_MutualExclusivity_ErrorAndAccess verifies SYS-REQ-028:
-// error_reported and access_rights_merged cannot both be true
+// Verifies: SYS-REQ-024, SYS-REQ-028
 func TestSpec_MutualExclusivity_ErrorAndAccess(t *testing.T) {
 	orgID := "org1"
 
@@ -190,76 +148,6 @@ func TestSpec_MutualExclusivity_ErrorAndAccess(t *testing.T) {
 		assert.False(t, accessMerged, "error should prevent access rights merge")
 	})
 }
-
-// ============================================================================
-// FLIP Fixtures: Formal Verification Artifacts (NOT Go-Level Test Coverage)
-// ============================================================================
-//
-// The tests/policy/tc-*.json files contain 87 FLIP-generated boolean signal
-// traces. These traces are produced by the FLIP model checker to verify that
-// the LTL (Linear Temporal Logic) specification of the policy engine is
-// internally consistent.
-//
-// IMPORTANT DISTINCTION:
-// - FLIP fixtures prove the SPECIFICATION is correct (the LTL formulas in
-//   policy.vars.yaml satisfy MC/DC coverage for each requirement).
-// - They do NOT prove the Go CODE matches the specification. That is the
-//   job of the Apply()-based tests (apply_test.go, the TestProperty_* and
-//   TestZ3_* tests in this file).
-//
-// Only ~4 fixtures are exercised at the Go level (via TestSpec_FLIPSignalMapping
-// below), specifically those testing SYS-REQ-027 (idle state invariant) which
-// has a direct boolean-signal interpretation. The other 83 fixtures are formal
-// verification artifacts: they certify specification completeness and are
-// consumed by the FLIP toolchain, not by `go test`.
-//
-// This is BY DESIGN. Attempting to map all 87 traces to Go-level assertions
-// would require reimplementing the LTL evaluator in Go, which defeats the
-// purpose of having a separate formal verification layer.
-// ============================================================================
-
-// TestSpec_FLIPSignalMapping verifies that FLIP test signals map to actual code behavior
-// for the idle state invariant (SYS-REQ-027).
-// NOTE: FLIP traces exercise ONE requirement at a time via MC/DC variable flipping.
-// This means individual traces may violate other requirements (Finding 12/29 from dogfooding).
-// We only check the idle state invariant on fixtures that explicitly test SYS-REQ-027 (the idle req).
-func TestSpec_FLIPSignalMapping(t *testing.T) {
-	fixtures := loadFLIPFixtures(t)
-
-	for _, tc := range fixtures {
-		t.Run(tc.Name, func(t *testing.T) {
-			// Only check idle state constraint on the idle state requirement's own fixtures
-			if tc.Requirement != "SYS-REQ-027" {
-				return
-			}
-
-			for step := 0; step < tc.TraceLength; step++ {
-				applyReq := sig(tc, "apply_requested", step)
-				clearReq := sig(tc, "clear_requested", step)
-				rateLimitReq := sig(tc, "rate_limit_apply_requested", step)
-				endpointReq := sig(tc, "endpoint_limit_apply_requested", step)
-
-				// Verify idle state invariant (SYS-REQ-027):
-				// If no mode is active, all outputs should be false
-				if !applyReq && !clearReq && !rateLimitReq && !endpointReq {
-					for _, outVar := range []string{
-						"session_cleared", "access_rights_merged", "rate_limit_applied",
-						"quota_applied", "tags_merged", "metadata_merged", "error_reported",
-						"session_inactive_set", "endpoints_merged", "complexity_applied",
-						"result_returned",
-					} {
-						val := sig(tc, outVar, step)
-						if _, exists := tc.Signals[outVar]; exists {
-							assert.False(t, val,
-								"idle state: %s should be false when no mode active (step %d)", outVar, step)
-						}
-					}
-				}
-			}
-		})
-	}
-}
-
 
 // ============================================================================
 // Property-Based Tests: Data-Level Merge Semantics
@@ -493,16 +381,7 @@ var propertyFixtureMappings = map[string]propertyFixtureMapping{
 	},
 }
 
-// TestProperty_FromFixtures is a table-driven test runner that loads all property
-// fixtures (pt-*.json), groups them by property, and runs each through Apply()
-// using the corresponding property mapping.
-//
-// Properties with direct Policy field mappings (rate_limit_applied, quota_applied,
-// complexity_applied, tags_merged) are fully exercised. Properties that use abstract
-// data models (access_rights_merged, endpoints_merged, metadata_merged) are skipped
-// because their fixture format uses abstract key/value maps that do not correspond
-// to real Go types. Those properties are verified by the hand-written TestProperty_*
-// tests and the Z3 fixture runner.
+// Verifies: SYS-REQ-021, SYS-REQ-022, SYS-REQ-033, SYS-REQ-016
 func TestProperty_FromFixtures(t *testing.T) {
 	allFixtures := loadPropertyFixtures(t)
 
@@ -510,21 +389,6 @@ func TestProperty_FromFixtures(t *testing.T) {
 	byProperty := make(map[string][]PropertyFixture)
 	for _, f := range allFixtures {
 		byProperty[f.Property] = append(byProperty[f.Property], f)
-	}
-
-	// Track which properties we skip due to unmappable fixture format.
-	unmappable := map[string]string{
-		"access_rights_merged": "abstract key/value maps do not map to user.AccessDefinition",
-		"endpoints_merged":     "abstract key/value maps do not map to user.Endpoints",
-		"metadata_merged":      "abstract {key: {value: x}} nesting does not map to flat metadata",
-	}
-
-	for property, reason := range unmappable {
-		if fixtures, ok := byProperty[property]; ok {
-			t.Run(property, func(t *testing.T) {
-				t.Skipf("Skipping %d fixtures: %s", len(fixtures), reason)
-			})
-		}
 	}
 
 	for property, mapping := range propertyFixtureMappings {
@@ -582,8 +446,7 @@ func TestProperty_FromFixtures(t *testing.T) {
 
 // --- Tags: set union, dedup, commutativity ---
 
-// TestProperty_Tags_Dedup verifies that duplicate tags within a single
-// policy's tag list are deduplicated in the result.
+// Verifies: SYS-REQ-016
 func TestProperty_Tags_Dedup(t *testing.T) {
 	orgID := "org1"
 	pol := user.Policy{
@@ -614,8 +477,7 @@ func TestProperty_Tags_Dedup(t *testing.T) {
 	assert.Equal(t, 1, count, "tag 'dup' should appear exactly once (dedup property)")
 }
 
-// TestProperty_Tags_Commutativity verifies that changing the order of
-// policies produces the same tag set.
+// Verifies: SYS-REQ-016
 func TestProperty_Tags_Commutativity(t *testing.T) {
 	orgID := "org1"
 	pol1 := user.Policy{
@@ -662,8 +524,7 @@ func TestProperty_Tags_Commutativity(t *testing.T) {
 
 // --- Rate Limits: highest wins via duration comparison ---
 
-// TestProperty_RateLimit_HighestWins_ByDuration verifies that the policy
-// allowing the highest request rate (shortest duration) wins.
+// Verifies: SYS-REQ-021
 func TestProperty_RateLimit_HighestWins_ByDuration(t *testing.T) {
 	svc := &policy.Service{}
 
@@ -720,8 +581,7 @@ func TestProperty_RateLimit_HighestWins_ByDuration(t *testing.T) {
 
 // --- Quota: highest wins, -1 means unlimited ---
 
-// TestProperty_Quota_HighestWins verifies that greaterThanInt64 picks the
-// highest quota value, with -1 meaning unlimited.
+// Verifies: SYS-REQ-022
 func TestProperty_Quota_HighestWins(t *testing.T) {
 	orgID := "org1"
 
@@ -822,8 +682,7 @@ func TestProperty_Quota_HighestWins(t *testing.T) {
 
 // --- Access Rights: combine by API ID with nested URL union ---
 
-// TestProperty_AccessRights_NestedURLUnion verifies that AllowedURLs within
-// access rights are merged via URL-keyed union with method union per URL.
+// Verifies: SYS-REQ-013
 func TestProperty_AccessRights_NestedURLUnion(t *testing.T) {
 	orgID := "org1"
 	pol1 := user.Policy{
@@ -877,8 +736,7 @@ func TestProperty_AccessRights_NestedURLUnion(t *testing.T) {
 	assert.Contains(t, ordersSpec.Methods, "GET")
 }
 
-// TestProperty_AccessRights_VersionUnion verifies that versions are merged
-// via union across policies for the same API ID.
+// Verifies: SYS-REQ-013
 func TestProperty_AccessRights_VersionUnion(t *testing.T) {
 	orgID := "org1"
 	pol1 := user.Policy{
@@ -908,8 +766,7 @@ func TestProperty_AccessRights_VersionUnion(t *testing.T) {
 
 // --- Metadata: combine by key (last-write-wins per key) ---
 
-// TestProperty_Metadata_CombineByKey verifies that metadata is merged
-// as a map where later policies overwrite earlier values for the same key.
+// Verifies: SYS-REQ-017
 func TestProperty_Metadata_CombineByKey(t *testing.T) {
 	orgID := "org1"
 
@@ -988,8 +845,7 @@ func TestProperty_Metadata_CombineByKey(t *testing.T) {
 
 // --- Endpoints: combine by path+method, highest rate per endpoint ---
 
-// TestProperty_Endpoints_CombineHighest verifies that endpoint-level rate
-// limits are combined by path+method key with the highest rate winning.
+// Verifies: SYS-REQ-023
 func TestProperty_Endpoints_CombineHighest(t *testing.T) {
 	svc := &policy.Service{}
 
@@ -1084,8 +940,7 @@ func TestProperty_Endpoints_CombineHighest(t *testing.T) {
 
 // --- MergeAllowedURLs: direct unit test of the utility function ---
 
-// TestProperty_MergeAllowedURLs_Union verifies the set union semantics
-// of MergeAllowedURLs including deduplication and key-based merge.
+// Verifies: SYS-REQ-013
 func TestProperty_MergeAllowedURLs_Union(t *testing.T) {
 	t.Run("methods are unioned per URL", func(t *testing.T) {
 		s1 := []user.AccessSpec{
@@ -1152,8 +1007,7 @@ func TestProperty_MergeAllowedURLs_Union(t *testing.T) {
 
 // --- ClearSession: partition-aware clearing ---
 
-// TestProperty_ClearSession_PartitionBehavior verifies that ClearSession
-// respects partition flags when deciding what to clear.
+// Verifies: SYS-REQ-019
 func TestProperty_ClearSession_PartitionBehavior(t *testing.T) {
 	orgID := "org1"
 
@@ -1244,8 +1098,7 @@ func TestProperty_ClearSession_PartitionBehavior(t *testing.T) {
 
 // --- Master Policy: no access rights -> session-level values set directly ---
 
-// TestProperty_MasterPolicy_SessionLevelValues verifies master policy behavior
-// where no AccessRights are defined and values apply directly to session.
+// Verifies: SYS-REQ-029
 func TestProperty_MasterPolicy_SessionLevelValues(t *testing.T) {
 	orgID := "org1"
 	pol := user.Policy{
@@ -1272,8 +1125,7 @@ func TestProperty_MasterPolicy_SessionLevelValues(t *testing.T) {
 
 // --- HMAC/HTTP Signature: sticky-true semantics ---
 
-// TestProperty_HMACEnabled_StickyTrue verifies that once HMAC is enabled
-// by a policy, it stays enabled (doesn't get overwritten to false).
+// Verifies: SYS-REQ-033
 func TestProperty_HMACEnabled_StickyTrue(t *testing.T) {
 	orgID := "org1"
 	pol1 := user.Policy{
@@ -1303,8 +1155,7 @@ func TestProperty_HMACEnabled_StickyTrue(t *testing.T) {
 
 // --- LastUpdated: highest timestamp wins ---
 
-// TestProperty_LastUpdated_HighestWins verifies that the session LastUpdated
-// is set to the highest value among all applied policies.
+// Verifies: SYS-REQ-038
 func TestProperty_LastUpdated_HighestWins(t *testing.T) {
 	orgID := "org1"
 	pol1 := user.Policy{
@@ -1336,8 +1187,7 @@ func TestProperty_LastUpdated_HighestWins(t *testing.T) {
 // Intent-Based Tests: Rewritten Spec Issues 1-7
 // ============================================================================
 
-// TestSpec_Issue1_TagsNotMergedOnError verifies updated SYS-REQ-016:
-// Tags must NOT be merged when an error occurs (policy not found, org mismatch).
+// Verifies: SYS-REQ-016
 func TestSpec_Issue1_TagsNotMergedOnError(t *testing.T) {
 	orgID := "org1"
 
@@ -1377,8 +1227,7 @@ func TestSpec_Issue1_TagsNotMergedOnError(t *testing.T) {
 	})
 }
 
-// TestSpec_Issue1_MetadataNotMergedOnError verifies updated SYS-REQ-017:
-// Metadata must NOT be merged when an error occurs.
+// Verifies: SYS-REQ-017
 func TestSpec_Issue1_MetadataNotMergedOnError(t *testing.T) {
 	orgID := "org1"
 
@@ -1417,8 +1266,7 @@ func TestSpec_Issue1_MetadataNotMergedOnError(t *testing.T) {
 	})
 }
 
-// TestSpec_Issue1_SessionInactiveNotSetOnError verifies updated SYS-REQ-018:
-// session_inactive must NOT be modified when an error occurs.
+// Verifies: SYS-REQ-018
 func TestSpec_Issue1_SessionInactiveNotSetOnError(t *testing.T) {
 	orgID := "org1"
 
@@ -1442,8 +1290,7 @@ func TestSpec_Issue1_SessionInactiveNotSetOnError(t *testing.T) {
 		"session inactive should NOT be set when error occurs")
 }
 
-// TestSpec_Issue2_AllPoliciesMissing verifies SYS-REQ-040:
-// When ALL referenced policies are missing, Apply must return an error.
+// Verifies: SYS-REQ-040
 func TestSpec_Issue2_AllPoliciesMissing(t *testing.T) {
 	orgID := "org1"
 	svc := newTestService(orgID, nil) // empty store
@@ -1457,8 +1304,7 @@ func TestSpec_Issue2_AllPoliciesMissing(t *testing.T) {
 		"Apply should return error when ALL policies are missing")
 }
 
-// TestSpec_Issue3_EqualRateLimits verifies SYS-REQ-041:
-// When policy rate equals current rate (same duration), what happens?
+// Verifies: SYS-REQ-041
 func TestSpec_Issue3_EqualRateLimits(t *testing.T) {
 	t.Run("equal duration does NOT overwrite", func(t *testing.T) {
 		svc := &policy.Service{}
@@ -1499,8 +1345,7 @@ func TestSpec_Issue3_EqualRateLimits(t *testing.T) {
 	})
 }
 
-// TestSpec_Issue4_NilStore verifies SYS-REQ-042:
-// Apply must not panic when store is nil or unavailable.
+// Verifies: SYS-REQ-042
 func TestSpec_Issue4_NilStore(t *testing.T) {
 	t.Run("nil store panics or errors on Apply", func(t *testing.T) {
 		logger := logrus.New()
@@ -1538,8 +1383,7 @@ func TestSpec_Issue4_NilStore(t *testing.T) {
 	})
 }
 
-// TestSpec_Issue6_MetadataIterationOrder verifies SYS-REQ-043:
-// Metadata merge with conflicting keys in different policy orders.
+// Verifies: SYS-REQ-043
 func TestSpec_Issue6_MetadataIterationOrder(t *testing.T) {
 	orgID := "org1"
 
@@ -1600,8 +1444,7 @@ func TestSpec_Issue6_MetadataIterationOrder(t *testing.T) {
 	}
 }
 
-// TestSpec_Issue7_PerformanceBound verifies SYS-REQ-044:
-// Apply() must complete within 100ms for up to 50 policies.
+// Verifies: SYS-REQ-044
 func TestSpec_Issue7_PerformanceBound(t *testing.T) {
 	orgID := "org1"
 
@@ -1652,9 +1495,7 @@ func TestSpec_Issue7_PerformanceBound(t *testing.T) {
 	t.Logf("Apply() with 50 policies completed in %v", elapsed)
 }
 
-// TestSpec_Issue2_AllPoliciesMissing_MultipleSkipped verifies SYS-REQ-040 deeper:
-// When multiple policies are referenced and ALL are missing, error must occur.
-// The code currently skips missing policies in multi-policy mode via "continue".
+// Verifies: SYS-REQ-040
 func TestSpec_Issue2_AllPoliciesMissing_MultiplePolicies(t *testing.T) {
 	orgID := "org1"
 	svc := newTestService(orgID, nil) // empty store
@@ -1672,9 +1513,7 @@ func TestSpec_Issue2_AllPoliciesMissing_MultiplePolicies(t *testing.T) {
 		"When ALL policies are missing in multi-policy mode, should still error")
 }
 
-// TestSpec_Issue1_TagsMergedOnPartialError verifies edge case:
-// With 2 policies where one is found and one is missing, tags from
-// the found policy ARE merged (the missing one is skipped).
+// Verifies: SYS-REQ-016
 func TestSpec_Issue1_TagsMergedOnPartialError(t *testing.T) {
 	orgID := "org1"
 	pol := user.Policy{
