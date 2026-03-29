@@ -376,6 +376,9 @@ func (a APIDefinitionLoader) MakeSpec(def *model.MergedAPI, logger *logrus.Entry
 		spec.OAS.Initialize()
 
 		if spec.IsMCP() {
+			// Run introspection at load time if configured.
+			a.runLoadTimeIntrospection(spec)
+
 			a.extractMCPPrimitivesToPaths(spec, def)
 			a.initMCPConfiguration(spec)
 		}
@@ -1498,6 +1501,33 @@ func (a APIDefinitionLoader) addInternalMWtoMCPOperations(spec *APISpec, extende
 	}
 }
 
+// runLoadTimeIntrospection performs MCP introspection at API load time if configured.
+// It populates spec.DiscoveredMCPPrimitives with primitives discovered from the upstream server.
+// Failures are non-fatal: the API loads with manual config only.
+func (a APIDefinitionLoader) runLoadTimeIntrospection(spec *APISpec) {
+	cfg := getIntrospectionConfig(spec)
+	if cfg == nil || !cfg.Enabled {
+		return
+	}
+
+	logger := log.WithField("apiID", spec.APIID)
+	logger.Info("running MCP introspection at load time")
+
+	result, err := a.Gw.runIntrospection(spec)
+	if err != nil {
+		logger.WithError(err).Warn("load-time introspection failed, using manual config only")
+		return
+	}
+
+	spec.DiscoveredMCPPrimitives = buildDiscoveredPrimitives(result.Capabilities, cfg)
+
+	if result.Partial {
+		logger.Warn("load-time introspection returned partial results")
+	}
+
+	logger.Infof("introspection discovered %d primitives", len(spec.DiscoveredMCPPrimitives))
+}
+
 // initMCPConfiguration initializes MCP-specific configuration for the API spec.
 // This includes registering VEM prefixes, populating the primitives map,
 // calculating allow-list flags, and setting up the JSON-RPC router if needed.
@@ -2175,6 +2205,12 @@ func (a APIDefinitionLoader) populateMCPPrimitivesMap(spec *APISpec) {
 
 	spec.MCPPrimitives = make(map[string]string)
 
+	// Step 1: Load discovered primitives (base layer from introspection).
+	for key, vem := range spec.DiscoveredMCPPrimitives {
+		spec.MCPPrimitives[key] = vem
+	}
+
+	// Step 2: Overlay manual config (always wins over discovered).
 	for name := range middleware.McpTools {
 		spec.MCPPrimitives["tool:"+name] = mcp.ToolPrefix + name
 	}

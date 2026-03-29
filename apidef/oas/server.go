@@ -61,6 +61,10 @@ type Server struct {
 	//
 	// Tyk classic API definition: `listen_port`.
 	Port int `bson:"port,omitempty" json:"port,omitempty"`
+
+	// Introspection configures automatic discovery of upstream MCP server capabilities.
+	// Only applicable to MCP APIs.
+	Introspection *MCPIntrospection `bson:"introspection,omitempty" json:"introspection,omitempty"`
 }
 
 // Fill fills *Server from apidef.APIDefinition.

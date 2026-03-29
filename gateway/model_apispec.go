@@ -78,6 +78,11 @@ type APISpec struct {
 	upstreamCertExpiryCancelFunc   context.CancelFunc
 	upstreamCertExpiryInitOnce     sync.Once
 
+	// DiscoveredMCPPrimitives holds primitives found via introspection of the upstream MCP server.
+	// These are merged with manually-configured primitives (manual takes precedence).
+	// Key format matches MCPPrimitives: "tool:{name}", "resource:{uri}", "prompt:{name}"
+	DiscoveredMCPPrimitives map[string]string
+
 	// MCPPrimitives maps primitive identifiers to their VEM paths for JSON-RPC routing.
 	// Key format: "tool:{name}", "resource:{pattern}", "prompt:{name}"
 	// Value: VEM path (e.g., "/mcp-tool:get-weather")

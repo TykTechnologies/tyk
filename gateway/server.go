@@ -887,6 +887,7 @@ func (gw *Gateway) loadControlAPIEndpoints(muxer *mux.Router) {
 		r.HandleFunc("/mcps/{apiID}", gw.mcpGetHandler).Methods(http.MethodGet)
 		r.HandleFunc("/mcps/{apiID}", gw.validateMCP(gw.mcpUpdateHandler)).Methods(http.MethodPut)
 		r.HandleFunc("/mcps/{apiID}", gw.mcpDeleteHandler).Methods(http.MethodDelete)
+		r.HandleFunc("/mcps/{apiID}/introspect", gw.mcpIntrospectHandler).Methods(http.MethodPost)
 		r.HandleFunc("/health", gw.healthCheckhandler).Methods("GET")
 		r.HandleFunc("/policies", gw.polHandler).Methods("GET", "POST", "PUT", "DELETE")
 		r.HandleFunc("/policies/{polID}", gw.polHandler).Methods("GET", "POST", "PUT", "DELETE")
