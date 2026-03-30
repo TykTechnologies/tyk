@@ -52,6 +52,7 @@ import (
 	"github.com/TykTechnologies/tyk/dnscache"
 	"github.com/TykTechnologies/tyk/header"
 	"github.com/TykTechnologies/tyk/internal/cache"
+	"github.com/TykTechnologies/tyk/internal/compression"
 	"github.com/TykTechnologies/tyk/internal/crypto"
 	"github.com/TykTechnologies/tyk/internal/httputil"
 	"github.com/TykTechnologies/tyk/internal/model"
@@ -460,6 +461,10 @@ func (gw *Gateway) setupGlobals() {
 
 	// Initialize the Global function in the request package to access the gateway config
 	request.Global = gw.GetConfig
+
+	if gwConfig.Storage.MaxDecompressedSize > 0 {
+		compression.SetMaxDecompressedSize(uint64(gwConfig.Storage.MaxDecompressedSize))
+	}
 
 	gw.dnsCacheManager = dnscache.NewDnsCacheManager(gwConfig.DnsCache.MultipleIPsHandleStrategy)
 
