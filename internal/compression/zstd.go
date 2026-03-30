@@ -7,6 +7,8 @@ import (
 
 	"github.com/klauspost/compress/zstd"
 	"github.com/sirupsen/logrus"
+
+	tyklog "github.com/TykTechnologies/tyk/log"
 )
 
 // maxDecompressedSize is the maximum allowed size for decompressed data.
@@ -16,7 +18,7 @@ var maxDecompressedSize uint64 = 100 * 1024 * 1024
 const minDecompressedSize = 1 * 1024 * 1024 // 1MB
 
 var (
-	log = logrus.WithField("prefix", "compression")
+	log = tyklog.Get().WithField("prefix", "compression")
 
 	// zstdMagicBytes are the magic bytes that identify a Zstd frame
 	// See: https://github.com/facebook/zstd/blob/dev/doc/zstd_compression_format.md#zstandard-frames
