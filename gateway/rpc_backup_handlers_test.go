@@ -7,6 +7,7 @@ import (
 	persistentmodel "github.com/TykTechnologies/storage/persistent/model"
 
 	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/internal/compression"
 )
 
 func TestSaveRPCDefinitionsBackup(t *testing.T) {
@@ -175,6 +176,22 @@ func TestDecompressAPIBackup(t *testing.T) {
 			}
 		})
 	}
+
+	t.Run("Oversized uncompressed data", func(t *testing.T) {
+		// Temporarily lower the limit to the minimum (1MB) and test with a payload just above it.
+		// SetMaxDecompressedSize clamps to 1MB minimum, so 1MB+1 byte is the smallest testable oversize.
+		original := compression.GetMaxDecompressedSize()
+		compression.SetMaxDecompressedSize(1 * 1024 * 1024)
+		defer compression.SetMaxDecompressedSize(original)
+
+		oversized := strings.Repeat("x", 1*1024*1024+1)
+		_, err := ts.Gw.decompressAPIBackup(oversized)
+		if err == nil {
+			t.Error("Expected error for oversized uncompressed data, got nil")
+		} else if !strings.Contains(err.Error(), "exceeds maximum allowed size") {
+			t.Errorf("Expected size limit error, got: %v", err)
+		}
+	})
 
 	t.Run("Compressed data round-trip", func(t *testing.T) {
 		ts := StartTest(func(globalConf *config.Config) {
@@ -463,6 +480,22 @@ func TestDecompressPolicyBackup(t *testing.T) {
 			}
 		})
 	}
+
+	t.Run("Oversized uncompressed data", func(t *testing.T) {
+		// Temporarily lower the limit to the minimum (1MB) and test with a payload just above it.
+		// SetMaxDecompressedSize clamps to 1MB minimum, so 1MB+1 byte is the smallest testable oversize.
+		original := compression.GetMaxDecompressedSize()
+		compression.SetMaxDecompressedSize(1 * 1024 * 1024)
+		defer compression.SetMaxDecompressedSize(original)
+
+		oversized := strings.Repeat("x", 1*1024*1024+1)
+		_, err := ts.Gw.decompressPolicyBackup(oversized)
+		if err == nil {
+			t.Error("Expected error for oversized uncompressed data, got nil")
+		} else if !strings.Contains(err.Error(), "exceeds maximum allowed size") {
+			t.Errorf("Expected size limit error, got: %v", err)
+		}
+	})
 
 	t.Run("Compressed data round-trip", func(t *testing.T) {
 		ts := StartTest(func(globalConf *config.Config) {

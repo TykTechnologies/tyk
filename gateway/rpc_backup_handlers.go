@@ -17,6 +17,16 @@ const RPCKeyPrefix = "rpc:"
 const BackupApiKeyBase = "node-definition-backup:"
 const BackupPolicyKeyBase = "node-policy-backup:"
 
+// backupKind identifies the type of data being compressed or decompressed,
+// used for log and error messages. Defining it as a named type lets the
+// compiler catch mismatched or missing kind arguments at the call sites.
+type backupKind string
+
+const (
+	backupKindAPIDefinitions backupKind = "API Definitions"
+	backupKindPolicies       backupKind = "Policies"
+)
+
 func getTagListAsString(tags []string) string {
 	tagList := ""
 	if len(tags) > 0 {
@@ -87,9 +97,9 @@ func (gw *Gateway) saveRPCDefinitionsBackup(list string) error {
 }
 
 // compressBackup compresses backup data using Zstd if enabled, logging with the
-// provided kind label (e.g. "API definitions", "Policies"). Returns the original
-// data unchanged if compression is disabled or fails.
-func (gw *Gateway) compressBackup(list string, enabled bool, kind string) string {
+// provided kind label. Returns the original data unchanged if compression is
+// disabled or fails.
+func (gw *Gateway) compressBackup(list string, enabled bool, kind backupKind) string {
 	if !enabled {
 		log.Debugf("[RPC] --> %s compression disabled", kind)
 		return list
@@ -105,15 +115,17 @@ func (gw *Gateway) compressBackup(list string, enabled bool, kind string) string
 }
 
 // decompressBackup decompresses Zstd-compressed backup data if the magic bytes
-// are present, logging with the provided kind label. Returns the data unchanged
-// if it is not compressed.
-func (gw *Gateway) decompressBackup(decrypted, kind string) (string, error) {
+// are present, logging with the provided kind label. For compressed data the
+// max decompressed size is enforced by DecompressZstd via the decoder pool.
+// For uncompressed data the same limit is applied explicitly to prevent a large
+// plaintext payload written to Redis from exhausting gateway memory.
+func (gw *Gateway) decompressBackup(decrypted string, kind backupKind) (string, error) {
 	data := []byte(decrypted)
 
 	if compression.IsZstdCompressed(data) {
 		decompressed, err := compression.DecompressZstd(data)
 		if err != nil {
-			return "", errors.New("[RPC] --> Failed to decompress " + kind + " backup: " + err.Error())
+			return "", errors.New("[RPC] --> Failed to decompress " + string(kind) + " backup: " + err.Error())
 		}
 
 		log.Debugf("[RPC] --> Loaded compressed %s from backup", kind)
@@ -125,19 +137,19 @@ func (gw *Gateway) decompressBackup(decrypted, kind string) (string, error) {
 }
 
 func (gw *Gateway) compressAPIBackup(list string) string {
-	return gw.compressBackup(list, gw.GetConfig().Storage.CompressAPIDefinitions, "API definitions")
+	return gw.compressBackup(list, gw.GetConfig().Storage.CompressAPIDefinitions, backupKindAPIDefinitions)
 }
 
 func (gw *Gateway) decompressAPIBackup(decrypted string) (string, error) {
-	return gw.decompressBackup(decrypted, "API definitions")
+	return gw.decompressBackup(decrypted, backupKindAPIDefinitions)
 }
 
 func (gw *Gateway) compressPolicyBackup(list string) string {
-	return gw.compressBackup(list, gw.GetConfig().Storage.CompressPolicies, "Policies")
+	return gw.compressBackup(list, gw.GetConfig().Storage.CompressPolicies, backupKindPolicies)
 }
 
 func (gw *Gateway) decompressPolicyBackup(decrypted string) (string, error) {
-	return gw.decompressBackup(decrypted, "Policies")
+	return gw.decompressBackup(decrypted, backupKindPolicies)
 }
 
 func (gw *Gateway) LoadPoliciesFromRPCBackup() ([]user.Policy, error) {
