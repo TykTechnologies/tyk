@@ -526,6 +526,7 @@ func (t *BaseMiddleware) RecordMetrics(w http.ResponseWriter, r *http.Request, s
 		APIName:         t.Spec.Name,
 		OrgID:           t.Spec.OrgID,
 		ListenPath:      t.Spec.Proxy.ListenPath,
+		Endpoint:        ctxGetTrackedPath(r),
 		IPAddress:       request.RealIP(r),
 		LatencyTotal:    latency.Total,
 		LatencyUpstream: latency.Upstream,
