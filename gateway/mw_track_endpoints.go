@@ -16,7 +16,14 @@ func (t *TrackEndpointMiddleware) Name() string {
 }
 
 func (t *TrackEndpointMiddleware) EnabledForSpec() bool {
-	if !t.Spec.GlobalConfig.EnableAnalytics || t.Spec.DoNotTrack {
+	if t.Spec.DoNotTrack {
+		return false
+	}
+
+	analyticsEnabled := t.Spec.GlobalConfig.EnableAnalytics
+	metricsEnabled := t.Spec.GlobalConfig.OpenTelemetry.Metrics.Enabled != nil && *t.Spec.GlobalConfig.OpenTelemetry.Metrics.Enabled
+
+	if !analyticsEnabled && !metricsEnabled {
 		return false
 	}
 
