@@ -11,7 +11,9 @@ import (
 	"github.com/getkin/kin-openapi/openapi3filter"
 	"github.com/sirupsen/logrus"
 
+	"github.com/TykTechnologies/tyk/ctx"
 	"github.com/TykTechnologies/tyk/header"
+	tykerrors "github.com/TykTechnologies/tyk/internal/errors"
 	"github.com/TykTechnologies/tyk/internal/httputil"
 	lib "github.com/TykTechnologies/tyk/lib/apidef"
 )
@@ -141,6 +143,8 @@ func (k *ValidateRequest) ProcessRequest(w http.ResponseWriter, r *http.Request,
 
 	err = openapi3filter.ValidateRequest(r.Context(), requestValidationInput)
 	if err != nil {
+		ctx.SetErrorClassification(r, tykerrors.ClassifyJSONValidationError(tykerrors.ErrTypeSchemaValidationFailed, k.Name()).
+			WithTemplateData(map[string]any{"invalid_params": err.Error()}))
 		return fmt.Errorf("request validation error: %w", lib.RestoreUnicodeEscapesInError(err)), errResponseCode
 	}
 
@@ -184,6 +188,8 @@ func (k *ValidateRequest) processRequestWithFindOperation(r *http.Request) (erro
 
 	err := openapi3filter.ValidateRequest(r.Context(), requestValidationInput)
 	if err != nil {
+		ctx.SetErrorClassification(r, tykerrors.ClassifyJSONValidationError(tykerrors.ErrTypeSchemaValidationFailed, k.Name()).
+			WithTemplateData(map[string]any{"invalid_params": err.Error()}))
 		return fmt.Errorf("request validation error: %w", err), errResponseCode
 	}
 

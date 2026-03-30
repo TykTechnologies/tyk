@@ -17,6 +17,7 @@ import (
 
 	"github.com/TykTechnologies/tyk-pump/analytics"
 	"github.com/TykTechnologies/tyk/config"
+	tykctx "github.com/TykTechnologies/tyk/ctx"
 	"github.com/TykTechnologies/tyk/header"
 	"github.com/TykTechnologies/tyk/internal/httpctx"
 	jsonrpcerrors "github.com/TykTechnologies/tyk/internal/jsonrpc/errors"
@@ -438,9 +439,14 @@ func (e *ErrorHandler) writeOverrideResponse(w http.ResponseWriter, r *http.Requ
 		}
 		// For JSON, html/template does context-aware escaping automatically
 
-		data := &APIErrorWithContext{
-			Message:    msg,
-			StatusCode: result.StatusCode,
+		data := map[string]any{
+			"Message":    msg,
+			"StatusCode": result.StatusCode,
+		}
+		if ec := tykctx.GetErrorClassification(r); ec != nil && ec.TemplateData != nil {
+			for k, v := range ec.TemplateData {
+				data[k] = v
+			}
 		}
 		response := e.ExecuteErrorTemplate(w, tmpl, data, result.StatusCode)
 		response.Header = respHeader

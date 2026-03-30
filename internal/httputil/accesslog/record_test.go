@@ -263,6 +263,31 @@ func TestWithErrorClassification(t *testing.T) {
 				"error_source":          "ReverseProxy",
 			},
 		},
+		{
+			name: "template data is JSON-encoded in error_template_data field",
+			classification: errors.NewErrorClassification(errors.BIV, "schema_validation_failed").
+				WithSource("ValidateJSON").
+				WithTemplateData(map[string]any{"invalid_params": "firstName is required; lastName is required"}),
+			expectedFields: logrus.Fields{
+				"prefix":                "access-log",
+				"response_flag":         "BIV",
+				"response_code_details": "schema_validation_failed",
+				"error_source":          "ValidateJSON",
+				"error_template_data":   `{"invalid_params":"firstName is required; lastName is required"}`,
+			},
+		},
+		{
+			name: "empty template data omits error_template_data field",
+			classification: errors.NewErrorClassification(errors.BIV, "schema_validation_failed").
+				WithSource("ValidateJSON").
+				WithTemplateData(map[string]any{}),
+			expectedFields: logrus.Fields{
+				"prefix":                "access-log",
+				"response_flag":         "BIV",
+				"response_code_details": "schema_validation_failed",
+				"error_source":          "ValidateJSON",
+			},
+		},
 	}
 
 	for _, tc := range tests {

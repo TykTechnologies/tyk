@@ -1,6 +1,7 @@
 package accesslog
 
 import (
+	"encoding/json"
 	"net/http"
 	"net/url"
 
@@ -132,6 +133,13 @@ func (a *Record) WithErrorClassification(ec *errors.ErrorClassification) *Record
 	// Add circuit breaker state only when present
 	if ec.CircuitBreakerState != "" {
 		a.fields["circuit_breaker_state"] = ec.CircuitBreakerState
+	}
+
+	// Add template data as a JSON-encoded field when present
+	if len(ec.TemplateData) > 0 {
+		if b, err := json.Marshal(ec.TemplateData); err == nil {
+			a.fields["error_template_data"] = string(b)
+		}
 	}
 
 	return a
