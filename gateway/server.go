@@ -903,6 +903,7 @@ func (gw *Gateway) loadControlAPIEndpoints(muxer *mux.Router) {
 	}
 
 	r.HandleFunc("/debug", gw.traceHandler).Methods("POST")
+	r.HandleFunc("/plugins/test", gw.pluginTestHandler).Methods("POST")
 	r.HandleFunc("/cache/jwks/{apiID}", gw.invalidateJWKSCacheForAPIID).Methods("DELETE")
 	r.HandleFunc("/cache/jwks", gw.invalidateJWKSCacheForAllAPIs).Methods("DELETE")
 	r.HandleFunc("/cache/{apiID}", gw.invalidateCacheHandler).Methods("DELETE")

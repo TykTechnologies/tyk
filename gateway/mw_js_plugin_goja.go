@@ -166,6 +166,25 @@ func (j *GojaJSVM) Init(spec *APISpec, logger *logrus.Entry, gw *Gateway) {
 	j.RawLog = rawLog
 }
 
+// TestRunnerRuntime returns a fresh runtime with all programs replayed and real
+// bindings registered, but with log/rawlog overridden to capture output
+// into the provided slice instead of writing to logrus.
+// Used by the plugin test runner (mw_js_plugin_test_runner.go).
+func (j *GojaJSVM) TestRunnerRuntime(logs *[]testRunnerLog) *goja.Runtime {
+	vm := j.newRuntime() // replays programs; registers real APIs including logrus-backed log
+	capture := func(call goja.FunctionCall) goja.Value {
+		*logs = append(*logs, testRunnerLog{
+			Level:   "info",
+			Message: call.Argument(0).String(),
+			Time:    time.Now().UTC().Format(time.RFC3339Nano),
+		})
+		return goja.Undefined()
+	}
+	_ = vm.Set("log", capture)
+	_ = vm.Set("rawlog", capture)
+	return vm
+}
+
 func (j *GojaJSVM) DeInit() {
 	j.Spec = nil
 	j.Log = nil
