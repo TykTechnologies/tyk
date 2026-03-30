@@ -13,9 +13,6 @@
     },
     "middleware": {
       "$ref": "#/definitions/X-Tyk-Middleware"
-    },
-    "errorOverrides": {
-      "$ref": "#/definitions/X-Tyk-ErrorOverrides"
     }
   },
   "required": [
@@ -2820,77 +2817,10 @@
           "type": "number"
         }
       },
-      "required": ["url", "weight"]
-    },
-    "X-Tyk-ErrorOverrides": {
-      "type": "object",
-      "properties": {
-        "enabled": {
-          "type": "boolean"
-        },
-        "value": {
-          "type": "object",
-          "additionalProperties": {
-            "type": "array",
-            "items": {
-              "$ref": "#/definitions/X-Tyk-ErrorOverride"
-            }
-          }
-        }
-      },
-      "required": ["enabled", "value"]
-    },
-    "X-Tyk-ErrorOverride": {
-      "type": "object",
-      "properties": {
-        "match": {
-          "$ref": "#/definitions/X-Tyk-ErrorMatcher"
-        },
-        "response": {
-          "$ref": "#/definitions/X-Tyk-ErrorResponse"
-        }
-      },
-      "required": ["response"]
-    },
-    "X-Tyk-ErrorMatcher": {
-      "type": "object",
-      "properties": {
-        "flag": {
-          "type": "string"
-        },
-        "messagePattern": {
-          "type": "string"
-        },
-        "bodyField": {
-          "type": "string"
-        },
-        "bodyValue": {
-          "type": "string"
-        }
-      }
-    },
-    "X-Tyk-ErrorResponse": {
-      "type": "object",
-      "properties": {
-        "statusCode": {
-          "type": "integer"
-        },
-        "body": {
-          "type": "string"
-        },
-        "message": {
-          "type": "string"
-        },
-        "template": {
-          "type": "string"
-        },
-        "headers": {
-          "type": "object",
-          "additionalProperties": {
-            "type": "string"
-          }
-        }
-      }
+      "required": [
+        "url",
+        "weight"
+      ]
     }
   }
 }
