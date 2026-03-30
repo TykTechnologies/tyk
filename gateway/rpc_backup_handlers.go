@@ -86,73 +86,58 @@ func (gw *Gateway) saveRPCDefinitionsBackup(list string) error {
 	return nil
 }
 
-// compressAPIBackup compresses API backup data if compression is enabled
+// compressBackup compresses backup data using Zstd if enabled, logging with the
+// provided kind label (e.g. "API definitions", "Policies"). Returns the original
+// data unchanged if compression is disabled or fails.
+func (gw *Gateway) compressBackup(list string, enabled bool, kind string) string {
+	if !enabled {
+		log.Debugf("[RPC] --> %s compression disabled", kind)
+		return list
+	}
+
+	compressed, err := compression.CompressZstd([]byte(list))
+	if err != nil {
+		log.WithError(err).Errorf("[RPC] --> Failed to compress %s, storing uncompressed", kind)
+		return list
+	}
+	log.Debugf("[RPC] --> %s compressed with Zstd", kind)
+	return string(compressed)
+}
+
+// decompressBackup decompresses Zstd-compressed backup data if the magic bytes
+// are present, logging with the provided kind label. Returns the data unchanged
+// if it is not compressed.
+func (gw *Gateway) decompressBackup(decrypted, kind string) (string, error) {
+	data := []byte(decrypted)
+
+	if compression.IsZstdCompressed(data) {
+		decompressed, err := compression.DecompressZstd(data)
+		if err != nil {
+			return "", errors.New("[RPC] --> Failed to decompress " + kind + " backup: " + err.Error())
+		}
+
+		log.Debugf("[RPC] --> Loaded compressed %s from backup", kind)
+		return string(decompressed), nil
+	}
+
+	log.Debugf("[RPC] --> Loaded uncompressed %s from backup", kind)
+	return decrypted, nil
+}
+
 func (gw *Gateway) compressAPIBackup(list string) string {
-	if !gw.GetConfig().Storage.CompressAPIDefinitions {
-		log.Debug("[RPC] --> API definition compression disabled")
-		return list
-	}
-
-	compressed, err := compression.CompressZstd([]byte(list))
-	if err != nil {
-		log.WithError(err).Error("[RPC] --> Failed to compress API definitions, storing uncompressed")
-		return list
-	}
-	log.Debug("[RPC] --> API definitions compressed with Zstd")
-	return string(compressed)
+	return gw.compressBackup(list, gw.GetConfig().Storage.CompressAPIDefinitions, "API definitions")
 }
 
-// decompressAPIBackup decompresses API backup data if it's compressed
 func (gw *Gateway) decompressAPIBackup(decrypted string) (string, error) {
-	data := []byte(decrypted)
-
-	if compression.IsZstdCompressed(data) {
-		decompressed, err := compression.DecompressZstd(data)
-		if err != nil {
-			return "", errors.New("[RPC] --> Failed to decompress backup: " + err.Error())
-		}
-
-		log.Debug("[RPC] --> Loaded compressed API definitions from backup")
-		return string(decompressed), nil
-	}
-
-	// Uncompressed JSON
-	log.Debug("[RPC] --> Loaded uncompressed API definitions from backup")
-	return decrypted, nil
+	return gw.decompressBackup(decrypted, "API definitions")
 }
 
-// compressPolicyBackup compresses policy backup data if compression is enabled
 func (gw *Gateway) compressPolicyBackup(list string) string {
-	if !gw.GetConfig().Storage.CompressPolicies {
-		log.Debug("[RPC] --> Policy compression disabled")
-		return list
-	}
-
-	compressed, err := compression.CompressZstd([]byte(list))
-	if err != nil {
-		log.WithError(err).Error("[RPC] --> Failed to compress policies, storing uncompressed")
-		return list
-	}
-	log.Debug("[RPC] --> Policies compressed with Zstd")
-	return string(compressed)
+	return gw.compressBackup(list, gw.GetConfig().Storage.CompressPolicies, "Policies")
 }
 
-// decompressPolicyBackup decompresses policy backup data if it's compressed
 func (gw *Gateway) decompressPolicyBackup(decrypted string) (string, error) {
-	data := []byte(decrypted)
-
-	if compression.IsZstdCompressed(data) {
-		decompressed, err := compression.DecompressZstd(data)
-		if err != nil {
-			return "", errors.New("[RPC] --> Failed to decompress policy backup: " + err.Error())
-		}
-
-		log.Debug("[RPC] --> Loaded compressed policies from backup")
-		return string(decompressed), nil
-	}
-
-	log.Debug("[RPC] --> Loaded uncompressed policies from backup")
-	return decrypted, nil
+	return gw.decompressBackup(decrypted, "Policies")
 }
 
 func (gw *Gateway) LoadPoliciesFromRPCBackup() ([]user.Policy, error) {
