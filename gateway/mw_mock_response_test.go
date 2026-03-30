@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/sirupsen/logrus"
@@ -745,5 +746,25 @@ func TestMockResponseWithInternalRedirect(t *testing.T) {
 			Method: http.MethodGet,
 			Code:   201,
 		})
+	})
+}
+
+var _ hitRecorder = new(mockHitRecorder)
+
+type (
+	mockHitRecorder struct {
+		calls []mockHitRecorderCall
+	}
+
+	mockHitRecorderCall struct {
+		req *http.Request
+		res *http.Response
+	}
+)
+
+func (h *mockHitRecorder) hit(_ http.ResponseWriter, req *http.Request, res *http.Response, _ time.Time) {
+	h.calls = append(h.calls, mockHitRecorderCall{
+		req: req,
+		res: res,
 	})
 }

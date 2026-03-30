@@ -310,23 +310,3 @@ func (s *realHitRecorder) hit(rw http.ResponseWriter, r *http.Request, res *http
 	s.successHandler.RecordAccessLog(r, res, latency)
 	s.successHandler.Base().RecordMetrics(rw, r, res.StatusCode, latency, res)
 }
-
-var _ hitRecorder = new(mockHitRecorder)
-
-type (
-	mockHitRecorder struct {
-		calls []mockHitRecorderCall
-	}
-
-	mockHitRecorderCall struct {
-		req *http.Request
-		res *http.Response
-	}
-)
-
-func (h *mockHitRecorder) hit(_ http.ResponseWriter, req *http.Request, res *http.Response, _ time.Time) {
-	h.calls = append(h.calls, mockHitRecorderCall{
-		req: req,
-		res: res,
-	})
-}
