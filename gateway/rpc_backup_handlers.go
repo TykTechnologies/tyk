@@ -115,10 +115,9 @@ func (gw *Gateway) compressBackup(list string, enabled bool, kind backupKind) st
 }
 
 // decompressBackup decompresses Zstd-compressed backup data if the magic bytes
-// are present, logging with the provided kind label. For compressed data the
-// max decompressed size is enforced by DecompressZstd via the decoder pool.
-// For uncompressed data the same limit is applied explicitly to prevent a large
-// plaintext payload written to Redis from exhausting gateway memory.
+// are present, logging with the provided kind label. The max decompressed size
+// is enforced by DecompressZstd via the decoder pool. Uncompressed data is
+// returned as-is; the size limit does not apply because there is no expansion.
 func (gw *Gateway) decompressBackup(decrypted string, kind backupKind) (string, error) {
 	data := []byte(decrypted)
 
