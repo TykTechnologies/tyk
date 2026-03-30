@@ -153,6 +153,12 @@ func TestDecompressAPIBackup(t *testing.T) {
 			wantErr:  false,   // Should be treated as uncompressed JSON
 			expected: "hello",
 		},
+		{
+			name:        "Corrupt compressed data (valid magic bytes, invalid payload)",
+			input:       string([]byte{0x28, 0xB5, 0x2F, 0xFD}) + "this is not valid zstd data",
+			wantErr:     true,
+			expectedErr: "[RPC] --> Failed to decompress",
+		},
 	}
 
 	for _, tt := range tests {
@@ -440,6 +446,12 @@ func TestDecompressPolicyBackup(t *testing.T) {
 			input:    "hello", // Plain text, not valid zstd
 			wantErr:  false,   // Should be treated as uncompressed JSON
 			expected: "hello",
+		},
+		{
+			name:        "Corrupt compressed data (valid magic bytes, invalid payload)",
+			input:       string([]byte{0x28, 0xB5, 0x2F, 0xFD}) + "this is not valid zstd data",
+			wantErr:     true,
+			expectedErr: "[RPC] --> Failed to decompress",
 		},
 	}
 
