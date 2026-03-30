@@ -400,6 +400,8 @@ func testAPIMutualTLSHelper(t *testing.T, skipCAAnnounce bool) {
 		globalConf.HttpServerOptions.SSLCertificates = []string{certID}
 		globalConf.HttpServerOptions.SkipClientCAAnnouncement = skipCAAnnounce
 		globalConf.ControlAPIPort = 1212
+		globalConf.ProxySSLMaxVersion = tls.VersionTLS12
+		globalConf.HttpServerOptions.MaxVersion = tls.VersionTLS12
 	}
 	ts := StartTest(conf)
 	defer ts.Close()
