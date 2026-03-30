@@ -675,7 +675,9 @@ func TestGoja_RegisterAPI_ErrorPaths(t *testing.T) {
 func TestGoja_TykMakeHttpRequest_Via_JS(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte("hello from server"))
+		if _, err := w.Write([]byte("hello from server")); err != nil {
+			t.Errorf("w.Write: %v", err)
+		}
 	}))
 	defer server.Close()
 

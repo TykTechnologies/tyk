@@ -42,7 +42,9 @@ func TestJSVMAPIHelper_MakeHTTPRequest_InvalidURL(t *testing.T) {
 func TestJSVMAPIHelper_MakeHTTPRequest_Success(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte("response body"))
+		if _, err := w.Write([]byte("response body")); err != nil {
+			t.Errorf("w.Write: %v", err)
+		}
 	}))
 	defer server.Close()
 
@@ -65,7 +67,9 @@ func TestJSVMAPIHelper_MakeHTTPRequest_Success(t *testing.T) {
 func TestJSVMAPIHelper_MakeHTTPRequest_WithBody(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusCreated)
-		_, _ = w.Write([]byte("created"))
+		if _, err := w.Write([]byte("created")); err != nil {
+			t.Errorf("w.Write: %v", err)
+		}
 	}))
 	defer server.Close()
 
@@ -91,7 +95,9 @@ func TestJSVMAPIHelper_MakeHTTPRequest_WithBody(t *testing.T) {
 func TestJSVMAPIHelper_MakeHTTPRequest_WithFormData(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte("form ok"))
+		if _, err := w.Write([]byte("form ok")); err != nil {
+			t.Errorf("w.Write: %v", err)
+		}
 	}))
 	defer server.Close()
 
