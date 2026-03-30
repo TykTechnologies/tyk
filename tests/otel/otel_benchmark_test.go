@@ -4,7 +4,6 @@ import (
 	"net/http"
 	"testing"
 
-
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/gateway"
 	"github.com/TykTechnologies/tyk/internal/otel"
@@ -97,4 +96,3 @@ func BenchmarkOTel(b *testing.B) {
 		})
 	}
 }
-
