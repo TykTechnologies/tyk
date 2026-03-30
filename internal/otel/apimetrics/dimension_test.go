@@ -48,12 +48,24 @@ func TestCompileExtractor_MetadataResponseCode(t *testing.T) {
 	assert.Equal(t, "404", ext.Extract(rc))
 }
 
-func TestCompileExtractor_MetadataRoute(t *testing.T) {
-	ext, err := CompileExtractor(DimensionDefinition{Source: "metadata", Key: "route"})
+func TestCompileExtractor_MetadataListenPath(t *testing.T) {
+	ext, err := CompileExtractor(DimensionDefinition{Source: "metadata", Key: "listen_path"})
 	require.NoError(t, err)
 
 	rc := makeRequestContext()
 	assert.Equal(t, "/test", ext.Extract(rc))
+}
+
+func TestCompileExtractor_MetadataEndpoint(t *testing.T) {
+	ext, err := CompileExtractor(DimensionDefinition{Source: "metadata", Key: "endpoint"})
+	require.NoError(t, err)
+
+	rc := makeRequestContext()
+	rc.Endpoint = "/users/123"
+	assert.Equal(t, "/users/123", ext.Extract(rc))
+
+	rc.Endpoint = ""
+	assert.Equal(t, "", ext.Extract(rc))
 }
 
 func TestCompileExtractor_MetadataAPIID(t *testing.T) {
