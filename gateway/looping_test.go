@@ -281,16 +281,36 @@ func TestLooping(t *testing.T) {
 			err := json.Unmarshal([]byte(`{
                 "use_extended_paths": true,
                 "extended_paths": {
-                    "internal": [{
-                        "path": "/target",
-                        "method": "GET"
-                    }],
-                    "url_rewrites": [{
-                        "path": "/rewrite",
-                        "match_pattern": "/rewrite(.*)",
-                        "method": "GET",
-                        "rewrite_to": "tyk://self/target?new_param=new_value&method=GET"
-                    }]
+                    "internal": [
+                        {"path": "/target", "method": "GET"},
+                        {"path": "/target", "method": "POST"}
+                    ],
+                    "url_rewrites": [
+                        {
+                            "path": "/rewrite_with_param",
+                            "match_pattern": "/rewrite_with_param",
+                            "method": "GET",
+                            "rewrite_to": "tyk://self/target?foo=bar"
+                        },
+                        {
+                            "path": "/rewrite_method_only",
+                            "match_pattern": "/rewrite_method_only",
+                            "method": "GET",
+                            "rewrite_to": "tyk://self/target?method=POST"
+                        },
+                        {
+                            "path": "/rewrite_param_and_method",
+                            "match_pattern": "/rewrite_param_and_method",
+                            "method": "GET",
+                            "rewrite_to": "tyk://self/target?foo=bar&method=POST"
+                        },
+                        {
+                            "path": "/rewrite_no_params",
+                            "match_pattern": "/rewrite_no_params",
+                            "method": "GET",
+                            "rewrite_to": "tyk://self/target"
+                        }
+                    ]
                 }
             }`), &version)
 			assert.NoError(t, err)
@@ -299,16 +319,43 @@ func TestLooping(t *testing.T) {
 			spec.Proxy.ListenPath = "/"
 		})
 
-		ts.Run(t, []test.TestCase{
-			// Rewritten query params (minus control params) should be preserved
-			{Method: "GET", Path: "/rewrite", BodyMatch: `new_param=new_value`},
+		// tyk://api/path?foo=bar, foo=bar passed to target
+		t.Run("rewrite with user query param", func(t *testing.T) {
+			ts.Run(t, []test.TestCase{
+				{Method: "GET", Path: "/rewrite_with_param", BodyMatch: `foo=bar`},
+			}...)
+		})
 
-			// Original request query params should be dropped
-			{Method: "GET", Path: "/rewrite?old_param=old_value", BodyMatch: `new_param=new_value`, BodyNotMatch: `old_param`},
+		// tyk://api/path?method=POST, method consumed and dropped
+		t.Run("rewrite with method control param only", func(t *testing.T) {
+			ts.Run(t, []test.TestCase{
+				{Method: "GET", Path: "/rewrite_method_only",
+					BodyMatch:    `"Method":"POST"`,
+					BodyNotMatch: `method=POST`},
+			}...)
+		})
 
-			// Control params (method, loop_limit, check_limits) should be stripped
-			{Method: "GET", Path: "/rewrite", BodyNotMatch: `method=GET`},
-		}...)
+		// tyk://api/path?foo=bar&method=POST, foo=bar preserved, method consumed + dropped
+		t.Run("rewrite with user and control params", func(t *testing.T) {
+			ts.Run(t, []test.TestCase{
+				{Method: "GET", Path: "/rewrite_param_and_method",
+					BodyMatch:    `foo=bar`,
+					BodyNotMatch: `method=POST`},
+				{Method: "GET", Path: "/rewrite_param_and_method",
+					BodyMatch: `"Method":"POST"`},
+			}...)
+		})
+
+		// tyk://api/path?a=b, a=b dropped (must be explicit in rewrite)
+		t.Run("original query params dropped", func(t *testing.T) {
+			ts.Run(t, []test.TestCase{
+				{Method: "GET", Path: "/rewrite_no_params?a=b",
+					BodyNotMatch: `a=b`},
+				{Method: "GET", Path: "/rewrite_with_param?a=b",
+					BodyMatch:    `foo=bar`,
+					BodyNotMatch: `a=b`},
+			}...)
+		})
 	})
 
 	t.Run("loop external native def to internal OAS", func(t *testing.T) {
