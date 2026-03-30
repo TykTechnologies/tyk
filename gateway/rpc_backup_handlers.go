@@ -121,6 +121,40 @@ func (gw *Gateway) decompressAPIBackup(decrypted string) (string, error) {
 	return decrypted, nil
 }
 
+// compressPolicyBackup compresses policy backup data if compression is enabled
+func (gw *Gateway) compressPolicyBackup(list string) string {
+	if !gw.GetConfig().Storage.CompressPolicies {
+		log.Debug("[RPC] --> Policy compression disabled")
+		return list
+	}
+
+	compressed, err := compression.CompressZstd([]byte(list))
+	if err != nil {
+		log.WithError(err).Error("[RPC] --> Failed to compress policies, storing uncompressed")
+		return list
+	}
+	log.Debug("[RPC] --> Policies compressed with Zstd")
+	return string(compressed)
+}
+
+// decompressPolicyBackup decompresses policy backup data if it's compressed
+func (gw *Gateway) decompressPolicyBackup(decrypted string) (string, error) {
+	data := []byte(decrypted)
+
+	if compression.IsZstdCompressed(data) {
+		decompressed, err := compression.DecompressZstd(data)
+		if err != nil {
+			return "", errors.New("[RPC] --> Failed to decompress policy backup: " + err.Error())
+		}
+
+		log.Debug("[RPC] --> Loaded compressed policies from backup")
+		return string(decompressed), nil
+	}
+
+	log.Debug("[RPC] --> Loaded uncompressed policies from backup")
+	return decrypted, nil
+}
+
 func (gw *Gateway) LoadPoliciesFromRPCBackup() ([]user.Policy, error) {
 	tagList := getTagListAsString(gw.GetConfig().DBAppConfOptions.Tags)
 	checkKey := BackupPolicyKeyBase + tagList
@@ -140,7 +174,12 @@ func (gw *Gateway) LoadPoliciesFromRPCBackup() ([]user.Policy, error) {
 		return nil, errors.New("[RPC] --> Failed to get node policy backup (" + checkKey + "): " + err.Error())
 	}
 
-	listAsString := crypto.Decrypt(secret, cryptoText)
+	decrypted := crypto.Decrypt(secret, cryptoText)
+
+	listAsString, err := gw.decompressPolicyBackup(decrypted)
+	if err != nil {
+		return nil, err
+	}
 
 	if policies, err := parsePoliciesFromRPC(listAsString); err != nil {
 		log.WithFields(logrus.Fields{
@@ -172,7 +211,8 @@ func (gw *Gateway) saveRPCPoliciesBackup(list string) error {
 	}
 
 	secret := crypto.GetPaddedString(gw.GetConfig().Secret)
-	cryptoText := crypto.Encrypt(secret, list)
+	dataToEncrypt := gw.compressPolicyBackup(list)
+	cryptoText := crypto.Encrypt(secret, dataToEncrypt)
 	err := store.SetKey(BackupPolicyKeyBase+tagList, cryptoText, -1)
 	if err != nil {
 		return errors.New("Failed to store node backup: " + err.Error())
