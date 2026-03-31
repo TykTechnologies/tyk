@@ -3023,7 +3023,7 @@ func TestLoadDefFromFilePath(t *testing.T) {
 		assert.Equal(t, apiName, spec.Name)
 		assert.Equal(t, apiID, spec.APIID)
 		assert.NotNil(t, spec.OAS)
-		assert.Equal(t, expectedPatternAfterLoad, spec.OAS.T.Components.Schemas["Schema1"].Value.Pattern)
+		assert.Equal(t, expectedPatternAfterLoad, spec.OAS.Components.Schemas["Schema1"].Value.Pattern)
 	})
 
 	t.Run("file not found", func(t *testing.T) {
