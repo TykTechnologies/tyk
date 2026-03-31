@@ -199,13 +199,14 @@ func TestRecordReload_Accumulates(t *testing.T) {
 
 func TestSetRegistry(t *testing.T) {
 	tests := []struct {
-		name          string
-		defs          []apimetrics.APIMetricDefinition
-		wantPanic     bool
-		needsSession  bool
-		needsContext  bool
-		needsResponse bool
-		wantMetric    string // if non-empty, record a request and assert this counter exists
+		name            string
+		defs            []apimetrics.APIMetricDefinition
+		wantPanic       bool
+		needsSession    bool
+		needsContext    bool
+		needsResponse   bool
+		needsConfigData bool
+		wantMetric      string // if non-empty, record a request and assert this counter exists
 	}{
 		{
 			name: "metadata dimension registers and records",
@@ -255,6 +256,18 @@ func TestSetRegistry(t *testing.T) {
 			wantMetric:   "test.context",
 		},
 		{
+			name: "config_data dimension sets NeedsConfigData",
+			defs: []apimetrics.APIMetricDefinition{{
+				Name: "test.config_data",
+				Type: "counter",
+				Dimensions: []apimetrics.DimensionDefinition{
+					{Source: "config_data", Key: "environment", Label: "env", Default: "unknown"},
+				},
+			}},
+			needsConfigData: true,
+			wantMetric:      "test.config_data",
+		},
+		{
 			name: "invalid definition panics",
 			defs: []apimetrics.APIMetricDefinition{{
 				Name: "",
@@ -280,6 +293,7 @@ func TestSetRegistry(t *testing.T) {
 			assert.Equal(t, tt.needsSession, inst.NeedsSession())
 			assert.Equal(t, tt.needsContext, inst.NeedsContext())
 			assert.Equal(t, tt.needsResponse, inst.NeedsResponse())
+			assert.Equal(t, tt.needsConfigData, inst.NeedsConfigData())
 
 			if tt.wantMetric != "" {
 				rc := &apimetrics.RequestContext{

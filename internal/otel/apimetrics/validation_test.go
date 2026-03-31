@@ -196,6 +196,13 @@ func TestValidateDefinitions(t *testing.T) {
 			wantErr: false,
 		},
 		{
+			name: "config_data source accepts any key",
+			defs: []APIMetricDefinition{
+				{Name: "test", Type: "counter", Dimensions: []DimensionDefinition{{Source: "config_data", Key: "environment"}}},
+			},
+			wantErr: false,
+		},
+		{
 			name: "all valid metadata keys",
 			defs: []APIMetricDefinition{
 				{
@@ -203,7 +210,7 @@ func TestValidateDefinitions(t *testing.T) {
 					Dimensions: []DimensionDefinition{
 						{Source: "metadata", Key: "method"},
 						{Source: "metadata", Key: "response_code"},
-						{Source: "metadata", Key: "route"},
+						{Source: "metadata", Key: "listen_path"},
 						{Source: "metadata", Key: "api_id"},
 						{Source: "metadata", Key: "api_name"},
 						{Source: "metadata", Key: "org_id"},

@@ -532,6 +532,7 @@ func (t *BaseMiddleware) RecordMetrics(w http.ResponseWriter, r *http.Request, s
 		APIName:         t.Spec.Name,
 		OrgID:           t.Spec.OrgID,
 		ListenPath:      t.Spec.Proxy.ListenPath,
+		Endpoint:        ctxGetTrackedPath(r),
 		IPAddress:       request.RealIP(r),
 		LatencyTotal:    latency.Total,
 		LatencyUpstream: latency.Upstream,
@@ -569,6 +570,9 @@ func (t *BaseMiddleware) RecordMetrics(w http.ResponseWriter, r *http.Request, s
 		rc.MCPPrimitiveType = ctxGetMCPPrimitiveType(r)
 		rc.MCPPrimitiveName = ctxGetMCPPrimitiveName(r)
 		rc.MCPErrorCode = ctxGetJSONRPCErrorCode(r)
+	}
+	if t.Gw.MetricInstruments.NeedsConfigData() && !t.Spec.ConfigDataDisabled && len(t.Spec.ConfigData) > 0 {
+		rc.ConfigData = t.Spec.ConfigData
 	}
 	t.Gw.MetricInstruments.RecordRequest(r.Context())
 	t.Gw.MetricInstruments.RecordAPIMetrics(r.Context(), rc)
