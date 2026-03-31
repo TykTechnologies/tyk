@@ -400,6 +400,8 @@ func testAPIMutualTLSHelper(t *testing.T, skipCAAnnounce bool) {
 		globalConf.HttpServerOptions.SSLCertificates = []string{certID}
 		globalConf.HttpServerOptions.SkipClientCAAnnouncement = skipCAAnnounce
 		globalConf.ControlAPIPort = 1212
+		globalConf.ProxySSLMaxVersion = tls.VersionTLS12
+		globalConf.HttpServerOptions.MaxVersion = tls.VersionTLS12
 	}
 	ts := StartTest(conf)
 	defer ts.Close()
@@ -1983,6 +1985,8 @@ func TestClientCertificates_WithProtocolTLS(t *testing.T) {
 	ts := StartTest(func(globalConf *config.Config) {
 		globalConf.HttpServerOptions.UseSSL = false
 		globalConf.HttpServerOptions.SSLCertificates = []string{serverCertID}
+		globalConf.ProxySSLMaxVersion = tls.VersionTLS12
+		globalConf.HttpServerOptions.MaxVersion = tls.VersionTLS12
 	})
 	defer ts.Close()
 
@@ -2046,6 +2050,8 @@ func TestStaticMTLSAPI(t *testing.T) {
 			globalConf.HttpServerOptions.SSLInsecureSkipVerify = true
 			globalConf.HttpServerOptions.SSLCertificates = []string{"default" + certID}
 			globalConf.SuppressRedisSignalReload = true
+			globalConf.ProxySSLMaxVersion = tls.VersionTLS12
+			globalConf.HttpServerOptions.MaxVersion = tls.VersionTLS12
 		}
 		ts := StartTest(conf)
 
