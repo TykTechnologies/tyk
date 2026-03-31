@@ -36,4 +36,7 @@ type RequestContext struct {
 	MCPPrimitiveType string // e.g., "tool"
 	MCPPrimitiveName string // e.g., "get_weather"
 	MCPErrorCode     int    // e.g., -32601
+
+	// ConfigData from the API definition (nil when ConfigDataDisabled or empty).
+	ConfigData map[string]interface{}
 }

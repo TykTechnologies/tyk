@@ -40,5 +40,10 @@
         "target_url": "http://httpbin:80/",
         "strip_listen_path": true
     },
-    "do_not_track": false
+    "do_not_track": false,
+    "config_data": {
+        "environment": "staging",
+        "team": "platform"
+    },
+    "config_data_disabled": false
 }
