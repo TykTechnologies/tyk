@@ -15,7 +15,7 @@ concurrency:
 jobs:
   godoc:
     if: ${{ !github.event.pull_request.draft }}
-    uses: TykTechnologies/github-actions/.github/workflows/godoc.yml@main
+    uses: TykTechnologies/github-actions/.github/workflows/godoc.yml@92b66e740444aba67fdbc96c07c69e1c6dd6f32d  # main
     secrets:
       ORG_GH_TOKEN: ${{ secrets.ORG_GH_TOKEN }}
     with:
