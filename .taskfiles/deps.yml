@@ -21,7 +21,7 @@ tasks:
     status:
       - type mockgen
     cmds:
-      - go install go.uber.org/mock/mockgen@v0.4.0
+      - go install go.uber.org/mock/mockgen@74a29c6e6c2cbb8ccee94db061c1604ff33fd188  # v0.4.0
 
   goimports:
     internal: true
@@ -29,7 +29,7 @@ tasks:
     status:
       - type goimports
     cmds:
-      - go install golang.org/x/tools/cmd/goimports@latest
+      - go install golang.org/x/tools/cmd/goimports@24a8e95f9d7ae2696f66314da5e50c0d98ccaa90  # v0.43.0
 
   golangci-lint:
     internal: true
@@ -37,7 +37,7 @@ tasks:
     status:
       - type golangci-lint
     cmds:
-      - go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.55.2
+      - go install github.com/golangci/golangci-lint/cmd/golangci-lint@e3c2265f4939976874989e159386b3bb7dcf8e1f  # v1.55.2
 
   faillint:
     internal: true
@@ -45,7 +45,7 @@ tasks:
     status:
       - type faillint
     cmds:
-      - go install github.com/fatih/faillint@latest
+      - go install github.com/fatih/faillint@c56e3ec6dbfc933bbeb884fd31f2bcd41f712657  # v1.15.0
 
   exp:
     desc: 'Install exp/cmd'
@@ -54,4 +54,4 @@ tasks:
     status:
       - type {{.name}}
     cmds:
-      - go install github.com/TykTechnologies/exp/cmd/{{.name}}@main
+      - go install github.com/TykTechnologies/exp/cmd/{{.name}}@49245597f0620ef8460735bb0ae6e93be5f8ca51  # main
