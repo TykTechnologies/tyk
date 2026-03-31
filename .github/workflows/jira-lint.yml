@@ -10,11 +10,18 @@ on:
       - reopened
       - synchronize
       - ready_for_review
+      - labeled
 
 jobs:
+  dep-guard:
+    uses: TykTechnologies/github-actions/.github/workflows/dependency-guard.yml@2b35ab5dd4cfff21ced9d12446e9e27d10bf5785  # main
+    permissions:
+      contents: read
+
   jira-lint:
+    needs: [dep-guard]
     if: ${{ !github.event.pull_request.draft }}
-    uses: TykTechnologies/github-actions/.github/workflows/jira-lint.yaml@main
+    uses: TykTechnologies/github-actions/.github/workflows/jira-lint.yaml@2b35ab5dd4cfff21ced9d12446e9e27d10bf5785  # main
     secrets:
       JIRA_TOKEN: ${{ secrets.JIRA_TOKEN }}
       ORG_GH_TOKEN: ${{ secrets.ORG_GH_TOKEN }}

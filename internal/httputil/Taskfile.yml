@@ -46,4 +46,4 @@ tasks:
     env:
       GOBIN: /usr/local/bin
     cmds:
-      - go install github.com/gregoryv/uncover/...@latest
+      - go install github.com/gregoryv/uncover/...@v0.9.0
