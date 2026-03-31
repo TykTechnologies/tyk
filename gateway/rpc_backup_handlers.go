@@ -3,6 +3,7 @@ package gateway
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"strings"
 
 	"github.com/sirupsen/logrus"
@@ -124,7 +125,7 @@ func (gw *Gateway) decompressBackup(decrypted string, kind backupKind) (string, 
 	if compression.IsZstdCompressed(data) {
 		decompressed, err := compression.DecompressZstd(data)
 		if err != nil {
-			return "", errors.New("[RPC] --> Failed to decompress " + string(kind) + " backup: " + err.Error())
+			return "", fmt.Errorf("[RPC] --> Failed to decompress %s backup: %w", kind, err)
 		}
 
 		log.Debugf("[RPC] --> Loaded compressed %s from backup", kind)
