@@ -34,6 +34,7 @@ jobs:
       contents: read
 
   lint:
+    needs: [dep-guard]
     runs-on: ubuntu-latest
     if: ${{ !github.event.pull_request.draft }}
     steps:
@@ -54,6 +55,7 @@ jobs:
           cache-dependency-path: go.sum
 
       - name: Setup CI Tooling
+        # TODO: Pin tykio/ci-tools to a digest (e.g., tykio/ci-tools@sha256:...) instead of :latest
         uses: shrink/actions-docker-extract@04c17c51a5b9fd93b7aed2e05e86c8fe2d90ee52  # v3
         with:
           image: tykio/ci-tools:latest
@@ -132,6 +134,7 @@ jobs:
         run: pip -V && pip3 -V
 
       - name: Setup CI Tooling
+        # TODO: Pin tykio/ci-tools to a digest (e.g., tykio/ci-tools@sha256:...) instead of :latest
         uses: shrink/actions-docker-extract@04c17c51a5b9fd93b7aed2e05e86c8fe2d90ee52  # v3
         with:
           image: tykio/ci-tools:latest
