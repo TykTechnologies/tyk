@@ -3,6 +3,7 @@ package rate
 import (
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/header"
@@ -57,8 +58,16 @@ func (q *quotaSender) SendQuotas(session *user.SessionState, apiId string) {
 func (r *rateLimitSender) SendQuotas(_ *user.SessionState, _ string) {}
 func (r *rateLimitSender) SendRateLimits(limits Stats) {
 	r.hdr.Set(header.XRateLimitLimit, strconv.Itoa(limits.Limit))
-	r.hdr.Set(header.XRateLimitRemaining, strconv.Itoa(limits.Remaining))
-	r.hdr.Set(header.XRateLimitReset, strconv.Itoa(int(limits.Reset.Seconds())))
+
+	// The value of Remaining header must be a non-negative integer.
+	if limits.Remaining >= 0 {
+		r.hdr.Set(header.XRateLimitRemaining, strconv.Itoa(limits.Remaining))
+	}
+
+	// HTTP rate limit standards expect UNIX timestamps (seconds since epoch)
+	// for client compatibility and to match industry conventions.
+	resetTime := time.Now().Add(limits.Reset).Unix()
+	r.hdr.Set(header.XRateLimitReset, strconv.FormatInt(resetTime, 10))
 }
 
 func NewFakeHeaderSender() *FakeHeaderSender {

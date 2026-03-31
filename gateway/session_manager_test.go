@@ -13,6 +13,7 @@ import (
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/internal/model"
 	"github.com/TykTechnologies/tyk/internal/rate"
 	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/test"
@@ -619,4 +620,23 @@ func TestSessionLimiter(t *testing.T) {
 		assert.InDelta(t, 60.0, state.Reset.Seconds(), 0.1, "third call is blocked for all window size")
 		assert.True(t, block, "third call is blocked")
 	})
+}
+
+func TestNewBucketStateChecker(t *testing.T) {
+	rateLimit := 100.0
+	state := model.BucketState{
+		Capacity:  100,
+		Remaining: 50,
+		Reset:     time.Now().Add(10 * time.Second),
+	}
+	shouldBlock := false
+
+	checker := newBucketStateChecker(rateLimit, state, shouldBlock)
+	stats, block, err := checker.Check()
+
+	assert.NoError(t, err)
+	assert.False(t, block)
+	assert.Equal(t, 100, stats.Limit)
+	assert.Equal(t, 50, stats.Remaining)
+	assert.InDelta(t, float64(10*time.Second), float64(stats.Reset), float64(time.Second))
 }

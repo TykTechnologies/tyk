@@ -2,6 +2,7 @@ package rate
 
 import (
 	"net/http"
+	"strconv"
 	"testing"
 	"time"
 
@@ -69,6 +70,45 @@ func Test_rateLimitSender(t *testing.T) {
 				assert.Equal(t, "200", hdr.Get(header.XRateLimitLimit))
 				assert.Equal(t, "100", hdr.Get(header.XRateLimitRemaining))
 				assert.Equal(t, "1", hdr.Get(header.XRateLimitReset))
+			})
+		})
+
+		t.Run("sends rate limits and formats reset as unix timestamp", func(t *testing.T) {
+			assert.NotPanics(t, func() {
+				hdr := http.Header{}
+				rls := &rateLimitSender{hdr: hdr}
+
+				rls.SendRateLimits(Stats{
+					Limit:     200,
+					Remaining: 100,
+					Reset:     5 * time.Second,
+				})
+
+				assert.Equal(t, "200", hdr.Get(header.XRateLimitLimit))
+				assert.Equal(t, "100", hdr.Get(header.XRateLimitRemaining))
+
+				resetStr := hdr.Get(header.XRateLimitReset)
+				resetInt, err := strconv.ParseInt(resetStr, 10, 64)
+				assert.NoError(t, err)
+
+				expectedReset := time.Now().Add(time.Second * 5).Unix()
+				assert.InDelta(t, expectedReset, resetInt, 1)
+			})
+		})
+
+		t.Run("omits remaining header if value is negative number", func(t *testing.T) {
+			assert.NotPanics(t, func() {
+				hdr := http.Header{}
+				rls := &rateLimitSender{hdr: hdr}
+
+				rls.SendRateLimits(Stats{
+					Limit:     200,
+					Remaining: -1,
+					Reset:     5 * time.Second,
+				})
+
+				assert.Equal(t, "200", hdr.Get(header.XRateLimitLimit))
+				assert.Empty(t, hdr.Get(header.XRateLimitRemaining))
 			})
 		})
 	})
