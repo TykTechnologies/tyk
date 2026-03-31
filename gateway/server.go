@@ -52,6 +52,7 @@ import (
 	"github.com/TykTechnologies/tyk/dnscache"
 	"github.com/TykTechnologies/tyk/header"
 	"github.com/TykTechnologies/tyk/internal/cache"
+	"github.com/TykTechnologies/tyk/internal/compression"
 	"github.com/TykTechnologies/tyk/internal/crypto"
 	"github.com/TykTechnologies/tyk/internal/httputil"
 	"github.com/TykTechnologies/tyk/internal/model"
@@ -464,6 +465,10 @@ func (gw *Gateway) setupGlobals() {
 
 	// Initialize the Global function in the request package to access the gateway config
 	request.Global = gw.GetConfig
+
+	if gwConfig.Storage.MaxDecompressedSize > 0 {
+		compression.SetMaxDecompressedSize(uint64(gwConfig.Storage.MaxDecompressedSize))
+	}
 
 	gw.dnsCacheManager = dnscache.NewDnsCacheManager(gwConfig.DnsCache.MultipleIPsHandleStrategy)
 
@@ -1215,6 +1220,13 @@ func (gw *Gateway) DoReload() {
 
 	start := time.Now()
 
+	// Always record the current config state (loaded API and policy counts)
+	// even if the reload fails partway through. This ensures gauges report 0
+	// rather than emitting no data when e.g. MDCB is unreachable.
+	defer func() {
+		gw.MetricInstruments.RecordConfigState(gw.ctx, gw.apisByIDLen(), gw.policies.PolicyCount())
+	}()
+
 	// Initialize/reset the JSVM
 	if gw.GetConfig().EnableJSVM {
 		gw.GlobalEventsJSVM.DeInit()
@@ -1247,7 +1259,6 @@ func (gw *Gateway) DoReload() {
 	gw.loadGlobalApps()
 
 	gw.MetricInstruments.RecordReload(gw.ctx, time.Since(start))
-	gw.MetricInstruments.RecordConfigState(gw.ctx, gw.apisByIDLen(), gw.policies.PolicyCount())
 
 	gw.performedSuccessfulReload = true
 	mainLog.Info("API reload complete")
@@ -1823,11 +1834,10 @@ func (gw *Gateway) afterConfSetup() {
 		}
 	}
 
-	if conf.OpenTelemetry.Enabled {
-		if conf.OpenTelemetry.ResourceName == "" {
-			conf.OpenTelemetry.ResourceName = config.DefaultOTelResourceName
+	if conf.OpenTelemetry.TracesEnabled() || (conf.OpenTelemetry.Metrics.Enabled != nil && *conf.OpenTelemetry.Metrics.Enabled) {
+		if traceConfig := conf.OpenTelemetry.EffectiveTraceConfig(); traceConfig.ResourceName == "" {
+			traceConfig.ResourceName = config.DefaultOTelResourceName
 		}
-
 		conf.OpenTelemetry.SetDefaults()
 	}
 
