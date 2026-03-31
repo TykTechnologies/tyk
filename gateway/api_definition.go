@@ -1513,7 +1513,7 @@ func (a APIDefinitionLoader) runLoadTimeIntrospection(spec *APISpec) {
 	logger := log.WithField("apiID", spec.APIID)
 	logger.Info("running MCP introspection at load time")
 
-	result, err := a.Gw.runIntrospection(spec)
+	result, err := a.Gw.runIntrospectionWithCache(spec)
 	if err != nil {
 		logger.WithError(err).Warn("load-time introspection failed, using manual config only")
 		return
