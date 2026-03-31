@@ -7,6 +7,7 @@ import (
 	persistentmodel "github.com/TykTechnologies/storage/persistent/model"
 
 	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/internal/compression"
 )
 
 func TestSaveRPCDefinitionsBackup(t *testing.T) {
@@ -215,6 +216,29 @@ func TestDecompressAPIBackup(t *testing.T) {
 		// Verify it matches the original
 		if decompressed != original {
 			t.Errorf("Round-trip failed. Expected %q, got %q", original, decompressed)
+		}
+	})
+
+	t.Run("Compressed data exceeds max decompressed size", func(t *testing.T) {
+		// SetMaxDecompressedSize clamps to a 1MB minimum, so the payload must exceed 1MB.
+		// A string of repeated characters compresses very efficiently, meaning the stored
+		// blob is tiny but decompression is aborted once the output crosses the limit.
+		originalMaxSize := compression.GetMaxDecompressedSize()
+		compression.SetMaxDecompressedSize(1 * 1024 * 1024)
+		defer compression.SetMaxDecompressedSize(originalMaxSize)
+
+		largePayload := strings.Repeat("a", 1*1024*1024+1)
+		compressed, err := compression.CompressZstd([]byte(largePayload))
+		if err != nil {
+			t.Fatalf("Failed to compress test payload: %v", err)
+		}
+
+		_, err = ts.Gw.decompressAPIBackup(string(compressed))
+		if err == nil {
+			t.Fatal("Expected error for payload exceeding max decompressed size, got nil")
+		}
+		if !strings.Contains(err.Error(), "Failed to decompress") {
+			t.Errorf("Expected decompression failure error, got: %v", err)
 		}
 	})
 }
@@ -509,6 +533,29 @@ func TestDecompressPolicyBackup(t *testing.T) {
 		// Verify it matches the original
 		if decompressed != original {
 			t.Errorf("Round-trip failed. Expected %q, got %q", original, decompressed)
+		}
+	})
+
+	t.Run("Compressed data exceeds max decompressed size", func(t *testing.T) {
+		// SetMaxDecompressedSize clamps to a 1MB minimum, so the payload must exceed 1MB.
+		// A string of repeated characters compresses very efficiently, meaning the stored
+		// blob is tiny but decompression is aborted once the output crosses the limit.
+		originalMaxSize := compression.GetMaxDecompressedSize()
+		compression.SetMaxDecompressedSize(1 * 1024 * 1024)
+		defer compression.SetMaxDecompressedSize(originalMaxSize)
+
+		largePayload := strings.Repeat("a", 1*1024*1024+1)
+		compressed, err := compression.CompressZstd([]byte(largePayload))
+		if err != nil {
+			t.Fatalf("Failed to compress test payload: %v", err)
+		}
+
+		_, err = ts.Gw.decompressPolicyBackup(string(compressed))
+		if err == nil {
+			t.Fatal("Expected error for payload exceeding max decompressed size, got nil")
+		}
+		if !strings.Contains(err.Error(), "Failed to decompress") {
+			t.Errorf("Expected decompression failure error, got: %v", err)
 		}
 	})
 }
