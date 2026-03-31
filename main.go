@@ -8,3 +8,4 @@ func main() {
 
 	gateway.Start()
 }
+// test: dep guard verification
