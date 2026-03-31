@@ -32,7 +32,7 @@ jobs:
           node-version: 20
       - name: Validate OpenAPI definition with redocly
         run: |
-          npm install @redocly/cli -g
+          npm install --ignore-scripts @redocly/cli@1.33.0 -g
           redocly lint swagger.yml --config=redocly.yml
 
   diff_swagger:

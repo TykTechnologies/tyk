@@ -7,13 +7,20 @@ name: CI lint
 
 on:
   pull_request:
+    types: [opened, synchronize, reopened, labeled]
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
+  dep-guard:
+    uses: TykTechnologies/github-actions/.github/workflows/dependency-guard.yml@75796ad54ffce9f0036f036414f8c9fb3dc5c0e0  # main
+    permissions:
+      contents: read
+
   godoc:
+    needs: [dep-guard]
     if: ${{ !github.event.pull_request.draft }}
     uses: TykTechnologies/github-actions/.github/workflows/godoc.yml@92b66e740444aba67fdbc96c07c69e1c6dd6f32d  # main
     secrets:
