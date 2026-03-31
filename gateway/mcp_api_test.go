@@ -116,8 +116,6 @@ func TestExtractMCPObjFromReq(t *testing.T) {
 }
 
 func TestValidateMCP(t *testing.T) {
-	t.Parallel()
-
 	validMCPDefinition := `{
 		"openapi": "3.0.3",
 		"info": {
@@ -153,8 +151,6 @@ func TestValidateMCP(t *testing.T) {
 	}`
 
 	t.Run("valid MCP object passes validation", func(t *testing.T) {
-		t.Parallel()
-
 		ts := StartTest(nil)
 		defer ts.Close()
 
@@ -177,8 +173,6 @@ func TestValidateMCP(t *testing.T) {
 	})
 
 	t.Run("PUT request with valid MCP object", func(t *testing.T) {
-		t.Parallel()
-
 		ts := StartTest(nil)
 		defer ts.Close()
 
@@ -201,8 +195,6 @@ func TestValidateMCP(t *testing.T) {
 	})
 
 	t.Run("malformed request body", func(t *testing.T) {
-		t.Parallel()
-
 		ts := StartTest(nil)
 		defer ts.Close()
 
@@ -225,8 +217,6 @@ func TestValidateMCP(t *testing.T) {
 	})
 
 	t.Run("POST without Tyk extension returns error", func(t *testing.T) {
-		t.Parallel()
-
 		ts := StartTest(nil)
 		defer ts.Close()
 
@@ -255,8 +245,6 @@ func TestValidateMCP(t *testing.T) {
 	})
 
 	t.Run("PUT without Tyk extension returns error", func(t *testing.T) {
-		t.Parallel()
-
 		ts := StartTest(nil)
 		defer ts.Close()
 
@@ -285,8 +273,6 @@ func TestValidateMCP(t *testing.T) {
 	})
 
 	t.Run("GET request without Tyk extension passes", func(t *testing.T) {
-		t.Parallel()
-
 		ts := StartTest(nil)
 		defer ts.Close()
 
@@ -316,8 +302,6 @@ func TestValidateMCP(t *testing.T) {
 	})
 
 	t.Run("missing required Tyk fields returns error", func(t *testing.T) {
-		t.Parallel()
-
 		ts := StartTest(nil)
 		defer ts.Close()
 
@@ -350,8 +334,6 @@ func TestValidateMCP(t *testing.T) {
 	})
 
 	t.Run("request body is preserved for next handler", func(t *testing.T) {
-		t.Parallel()
-
 		ts := StartTest(nil)
 		defer ts.Close()
 
@@ -377,8 +359,6 @@ func TestValidateMCP(t *testing.T) {
 	})
 
 	t.Run("context is passed through", func(t *testing.T) {
-		t.Parallel()
-
 		ts := StartTest(nil)
 		defer ts.Close()
 
@@ -409,8 +389,6 @@ func TestValidateMCP(t *testing.T) {
 	})
 
 	t.Run("response headers are set correctly on error", func(t *testing.T) {
-		t.Parallel()
-
 		ts := StartTest(nil)
 		defer ts.Close()
 
@@ -429,11 +407,7 @@ func TestValidateMCP(t *testing.T) {
 }
 
 func TestValidateMCP_EdgeCases(t *testing.T) {
-	t.Parallel()
-
 	t.Run("empty request body reader", func(t *testing.T) {
-		t.Parallel()
-
 		ts := StartTest(nil)
 		defer ts.Close()
 
@@ -455,8 +429,6 @@ func TestValidateMCP_EdgeCases(t *testing.T) {
 	})
 
 	t.Run("MCP object with multiple tools", func(t *testing.T) {
-		t.Parallel()
-
 		ts := StartTest(nil)
 		defer ts.Close()
 
@@ -504,8 +476,6 @@ func TestValidateMCP_EdgeCases(t *testing.T) {
 	})
 
 	t.Run("DELETE request behavior", func(t *testing.T) {
-		t.Parallel()
-
 		ts := StartTest(nil)
 		defer ts.Close()
 
@@ -716,11 +686,7 @@ func TestMCPDeleteHandler(t *testing.T) {
 }
 
 func TestValidateMCP_PRM(t *testing.T) {
-	t.Parallel()
-
 	t.Run("rejects PRM without resource", func(t *testing.T) {
-		t.Parallel()
-
 		ts := StartTest(nil)
 		defer ts.Close()
 
@@ -771,8 +737,6 @@ func TestValidateMCP_PRM(t *testing.T) {
 	})
 
 	t.Run("rejects PRM without authorizationServers for MCP", func(t *testing.T) {
-		t.Parallel()
-
 		ts := StartTest(nil)
 		defer ts.Close()
 
@@ -823,8 +787,6 @@ func TestValidateMCP_PRM(t *testing.T) {
 	})
 
 	t.Run("accepts valid PRM", func(t *testing.T) {
-		t.Parallel()
-
 		ts := StartTest(nil)
 		defer ts.Close()
 

@@ -179,6 +179,180 @@
           "min_version": {
             "type": "string"
           }
+        },
+        "traces": {
+          "type": ["object", "null"],
+          "additionalProperties": false,
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "exporter": {
+              "type": "string"
+            },
+            "endpoint": {
+              "type": "string"
+            },
+            "connection_timeout": {
+              "type": "integer"
+            },
+            "resource_name": {
+              "type": "string"
+            },
+            "span_processor_type": {
+              "type": "string"
+            },
+            "span_batch_config": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "max_queue_size": {
+                  "type": "integer"
+                },
+                "max_export_batch_size": {
+                  "type": "integer"
+                },
+                "batch_timeout": {
+                  "type": "integer"
+                }
+              }
+            },
+            "context_propagation": {
+              "type": "string"
+            },
+            "custom_trace_header": {
+              "type": "string"
+            },
+            "headers": {
+              "type": ["array", "null"]
+            },
+            "sampling": {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "type": "string"
+                },
+                "rate": {
+                  "type": "number"
+                },
+                "parent_based": {
+                  "type": "boolean"
+                }
+              }
+            },
+            "tls": {
+              "type": "object",
+              "properties": {
+                "enable": {
+                  "type": "boolean"
+                },
+                "insecure_skip_verify": {
+                  "type": "boolean"
+                },
+                "ca_file": {
+                  "type": "string"
+                },
+                "cert_file": {
+                  "type": "string"
+                },
+                "key_file": {
+                  "type": "string"
+                },
+                "max_version": {
+                  "type": "string"
+                },
+                "min_version": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "metrics": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "exporter": {
+              "type": "string"
+            },
+            "endpoint": {
+              "type": "string"
+            },
+            "headers": {
+              "type": ["object", "null"]
+            },
+            "connection_timeout": {
+              "type": "integer"
+            },
+            "resource_name": {
+              "type": "string"
+            },
+            "tls": {
+              "type": "object",
+              "properties": {
+                "enable": {
+                  "type": "boolean"
+                },
+                "insecure_skip_verify": {
+                  "type": "boolean"
+                },
+                "ca_file": {
+                  "type": "string"
+                },
+                "cert_file": {
+                  "type": "string"
+                },
+                "key_file": {
+                  "type": "string"
+                },
+                "max_version": {
+                  "type": "string"
+                },
+                "min_version": {
+                  "type": "string"
+                }
+              }
+            },
+            "export_interval": {
+              "type": "integer"
+            },
+            "temporality": {
+              "type": "string"
+            },
+            "shutdown_timeout": {
+              "type": "integer"
+            },
+            "cardinality_limit": {
+              "type": "integer"
+            },
+            "retry": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "enabled": {
+                  "type": "boolean"
+                },
+                "initial_interval": {
+                  "type": "integer"
+                },
+                "max_interval": {
+                  "type": "integer"
+                },
+                "max_elapsed_time": {
+                  "type": "integer"
+                }
+              }
+            },
+            "runtime_metrics": {
+              "type": ["boolean", "null"]
+            },
+            "api_metrics": {
+              "type": ["array", "null"]
+            }
+          }
         }
       }
     },
@@ -1446,6 +1620,10 @@
       "description": "enables extending context data by rate-limit information",
       "type": ["boolean"],
       "default": false
+    },
+    "allow_unsafe_policy_ids": {
+      "type": ["boolean", "null"],
+      "additionalProperties": false
     }
   }
 }

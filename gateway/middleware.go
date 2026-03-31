@@ -28,6 +28,7 @@ import (
 	"github.com/TykTechnologies/tyk/internal/event"
 	"github.com/TykTechnologies/tyk/internal/middleware"
 	"github.com/TykTechnologies/tyk/internal/otel"
+	"github.com/TykTechnologies/tyk/internal/otel/apimetrics"
 	"github.com/TykTechnologies/tyk/internal/policy"
 	"github.com/TykTechnologies/tyk/internal/service/newrelic"
 	"github.com/TykTechnologies/tyk/request"
@@ -76,7 +77,7 @@ func (tr TraceMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request,
 
 	if baseMw := tr.Base(); baseMw != nil {
 		cfg := baseMw.Gw.GetConfig()
-		if cfg.OpenTelemetry.Enabled {
+		if cfg.OpenTelemetry.TracesEnabled() {
 			otel.AddTraceID(r.Context(), w)
 
 			span := otel.SpanFromContext(r.Context())
@@ -132,7 +133,7 @@ func (gw *Gateway) createMiddleware(actualMW TykMiddleware) func(http.Handler) h
 			// Create span early if OpenTelemetry is enabled
 			if baseMw := mw.Base(); baseMw != nil {
 				cfg := baseMw.Gw.GetConfig()
-				if cfg.OpenTelemetry.Enabled && baseMw.Spec.DetailedTracing {
+				if cfg.OpenTelemetry.TracesEnabled() && baseMw.Spec.DetailedTracing {
 					ctx, span := baseMw.Gw.TracerProvider.Tracer().Start(r.Context(), mw.Name())
 					setContext(r, ctx)
 					defer func() {
@@ -493,13 +494,82 @@ func (t *BaseMiddleware) RecordAccessLog(req *http.Request, resp *http.Response,
 	}
 
 	// Only include trace_id when OpenTelemetry is enabled
-	if gwConfig.OpenTelemetry.Enabled {
+	if gwConfig.OpenTelemetry.TracesEnabled() {
 		accessLog.WithTraceID(req)
+	}
+
+	accessLog.WithAPIType(t.Spec.APIType())
+
+	if t.Spec.IsMCP() {
+		accessLog.WithMCP(req)
 	}
 
 	logFields := accessLog.Fields(allowedFields)
 
 	t.Logger().WithFields(logFields).Info()
+}
+
+// RecordMetrics builds a RequestContext from the current request state and
+// records all configured OTEL metric instruments. Pass the upstream response
+// when available (success path); nil is safe (error path). The ResponseWriter
+// is used as a fallback source for response headers when the proxy response
+// object does not carry them (e.g. when enable_detailed_recording is false).
+func (t *BaseMiddleware) RecordMetrics(w http.ResponseWriter, r *http.Request, statusCode int, latency analytics.Latency, response *http.Response) {
+	if t.Spec.DoNotTrack || ctxGetDoNotTrack(r) {
+		return
+	}
+
+	rc := &apimetrics.RequestContext{
+		Request:         r,
+		StatusCode:      statusCode,
+		APIID:           t.Spec.APIID,
+		APIName:         t.Spec.Name,
+		OrgID:           t.Spec.OrgID,
+		ListenPath:      t.Spec.Proxy.ListenPath,
+		Endpoint:        ctxGetTrackedPath(r),
+		IPAddress:       request.RealIP(r),
+		LatencyTotal:    latency.Total,
+		LatencyUpstream: latency.Upstream,
+		LatencyGateway:  latency.Gateway,
+	}
+	if v := t.Spec.getVersionFromRequest(r); v != "" {
+		rc.APIVersion = v
+	}
+	if t.Gw.MetricInstruments.NeedsSession() {
+		rc.Session = ctxGetSession(r)
+		rc.Token = ctxGetAuthToken(r)
+	}
+	if t.Gw.MetricInstruments.NeedsContext() {
+		rc.ContextVariables = ctxGetData(r)
+	}
+	if t.Gw.MetricInstruments.NeedsResponse() {
+		if response != nil && response.Header != nil {
+			rc.Response = response
+		} else if w != nil {
+			// The proxy response may not carry headers when
+			// enable_detailed_recording is false. Fall back to
+			// the ResponseWriter which HandleResponse already
+			// populated with upstream headers.
+			rc.Response = &http.Response{
+				StatusCode: statusCode,
+				Header:     w.Header(),
+			}
+		}
+	}
+	if errClass := ctx.GetErrorClassification(r); errClass != nil {
+		rc.ErrorClassification = string(errClass.Flag)
+	}
+	if t.Gw.MetricInstruments.NeedsMCP() {
+		rc.MCPMethod = ctxGetMCPMethod(r)
+		rc.MCPPrimitiveType = ctxGetMCPPrimitiveType(r)
+		rc.MCPPrimitiveName = ctxGetMCPPrimitiveName(r)
+		rc.MCPErrorCode = ctxGetJSONRPCErrorCode(r)
+	}
+	if t.Gw.MetricInstruments.NeedsConfigData() && !t.Spec.ConfigDataDisabled && len(t.Spec.ConfigData) > 0 {
+		rc.ConfigData = t.Spec.ConfigData
+	}
+	t.Gw.MetricInstruments.RecordRequest(r.Context())
+	t.Gw.MetricInstruments.RecordAPIMetrics(r.Context(), rc)
 }
 
 func copyAllowedURLs(input []user.AccessSpec) []user.AccessSpec {
@@ -554,6 +624,7 @@ func (t *BaseMiddleware) CheckSessionAndIdentityForValidKey(originalKey string, 
 				t.Logger().Error(err)
 				return session, false
 			}
+			NormalizeMCPEndpoints(&session)
 			return session, true
 		}
 	}
@@ -579,6 +650,7 @@ func (t *BaseMiddleware) CheckSessionAndIdentityForValidKey(originalKey string, 
 			t.Logger().Error(err)
 			return session, false
 		}
+		NormalizeMCPEndpoints(&session)
 		t.Logger().Debug("Got key")
 		return session, true
 	}
@@ -610,6 +682,7 @@ func (t *BaseMiddleware) CheckSessionAndIdentityForValidKey(originalKey string, 
 			t.Logger().Error(err)
 			return session, false
 		}
+		NormalizeMCPEndpoints(&session)
 
 		t.Logger().Debug("Lifetime is: ", session.Lifetime(t.Spec.GetSessionLifetimeRespectsKeyExpiration(), t.Spec.SessionLifetime, t.Gw.GetConfig().ForceGlobalSessionLifetime, t.Gw.GetConfig().GlobalSessionLifetime))
 
@@ -801,8 +874,11 @@ func handleResponse(rh TykResponseHandler, rw http.ResponseWriter, res *http.Res
 		span, ctx := trace.Span(req.Context(), rh.Name())
 		defer span.Finish()
 		req = req.WithContext(ctx)
-	} else if rh.Base().Gw.GetConfig().OpenTelemetry.Enabled {
-		return handleOtelTracedResponse(rh, rw, res, req, ses)
+	} else {
+		cfg := rh.Base().Gw.GetConfig()
+		if cfg.OpenTelemetry.TracesEnabled() {
+			return handleOtelTracedResponse(rh, rw, res, req, ses)
+		}
 	}
 	return rh.HandleResponse(rw, res, req, ses)
 }

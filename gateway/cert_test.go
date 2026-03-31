@@ -2,6 +2,8 @@ package gateway
 
 import (
 	"bytes"
+	"crypto/rand"
+	"crypto/rsa"
 	"crypto/tls"
 	"crypto/x509"
 	"crypto/x509/pkix"
@@ -9,6 +11,7 @@ import (
 	"encoding/pem"
 	"fmt"
 	"io/ioutil"
+	"math/big"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -19,6 +22,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/mccutchen/go-httpbin/v2/httpbin"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
@@ -39,10 +43,15 @@ import (
 )
 
 const (
-	internalTLSErr          = "tls: unrecognized name"
-	badcertErr              = "tls: bad certificate"
-	certNotMatchErr         = "Client TLS certificate is required"
-	unknownCertAuthorityErr = "unknown certificate authority"
+	internalTLSErr  = "tls: unrecognized name"
+	certNotMatchErr = "Client TLS certificate is required"
+	// Go 1.25 TLS error strings for mutual TLS scenarios:
+	// When ClientCA is announced: no cert → handshake failure, wrong cert → unknown certificate authority
+	// When ClientCA is skipped:   no cert → bad certificate,   wrong cert → bad certificate
+	noCertAnnounceErr        = "tls: handshake failure"
+	wrongCertAnnounceErr     = "tls: unknown certificate authority"
+	noCertSkipAnnounceErr    = "tls: bad certificate"
+	wrongCertSkipAnnounceErr = "tls: bad certificate"
 )
 
 func TestGatewayTLS(t *testing.T) {
@@ -207,7 +216,7 @@ func TestGatewayControlAPIMutualTLS(t *testing.T) {
 			// Should raise error for ControlAPI without certificate
 			{ControlRequest: true, ErrorMatch: unknownErr},
 			// Should raise error for unknown certificate
-			{ControlRequest: true, ErrorMatch: unknownCertAuthorityErr, Client: clientWithCert},
+			{ControlRequest: true, ErrorMatch: wrongCertAnnounceErr, Client: clientWithCert},
 		}...)
 	})
 
@@ -259,7 +268,7 @@ func TestGatewayControlAPIMutualTLS(t *testing.T) {
 
 		// Should fail as no valid cert IDs exist in Certificates.ControlAPI
 		_, _ = ts.Run(t, test.TestCase{
-			Path: "/tyk/certs", Code: http.StatusForbidden, ErrorMatch: unknownCertAuthorityErr, ControlRequest: true, AdminAuth: true, Client: clientWithCert,
+			Path: "/tyk/certs", Code: http.StatusForbidden, ErrorMatch: wrongCertAnnounceErr, ControlRequest: true, AdminAuth: true, Client: clientWithCert,
 		})
 	})
 
@@ -378,9 +387,11 @@ func testAPIMutualTLSHelper(t *testing.T, skipCAAnnounce bool) {
 	serverCertPem, _, combinedPEM, _ := crypto.GenServerCertificate()
 	certID, _, _ := certs.GetCertIDAndChainPEM(combinedPEM, "")
 
-	expectedCertErr := unknownCertAuthorityErr
+	expectedNoCertErr := noCertAnnounceErr
+	expectedWrongCertErr := wrongCertAnnounceErr
 	if skipCAAnnounce {
-		expectedCertErr = badcertErr
+		expectedNoCertErr = noCertSkipAnnounceErr
+		expectedWrongCertErr = wrongCertSkipAnnounceErr
 	}
 
 	conf := func(globalConf *config.Config) {
@@ -465,7 +476,7 @@ func testAPIMutualTLSHelper(t *testing.T, skipCAAnnounce bool) {
 			})
 
 			_, _ = ts.Run(t, test.TestCase{
-				ErrorMatch: badcertErr,
+				ErrorMatch: expectedNoCertErr,
 				Client:     client,
 				Domain:     "localhost",
 			})
@@ -492,7 +503,7 @@ func testAPIMutualTLSHelper(t *testing.T, skipCAAnnounce bool) {
 
 			client = GetTLSClient(&clientCert, serverCertPem)
 			_, _ = ts.Run(t, test.TestCase{
-				Client: client, Domain: "localhost", ErrorMatch: expectedCertErr,
+				Client: client, Domain: "localhost", ErrorMatch: expectedWrongCertErr,
 			})
 		})
 
@@ -511,7 +522,7 @@ func testAPIMutualTLSHelper(t *testing.T, skipCAAnnounce bool) {
 			})
 
 			_, _ = ts.Run(t, test.TestCase{
-				Client: client, ErrorMatch: expectedCertErr, Domain: "localhost",
+				Client: client, ErrorMatch: expectedWrongCertErr, Domain: "localhost",
 			})
 		})
 	})
@@ -633,13 +644,13 @@ func testAPIMutualTLSHelper(t *testing.T, skipCAAnnounce bool) {
 						Path:       "/with_mutual",
 						Client:     clientWithoutCert,
 						Domain:     domain,
-						ErrorMatch: badcertErr,
+						ErrorMatch: expectedNoCertErr,
 					},
 					{
 						Path:       "/with_mutual_2",
 						Client:     clientWithoutCert,
 						Domain:     domain,
-						ErrorMatch: badcertErr,
+						ErrorMatch: expectedNoCertErr,
 					},
 				}...)
 			})
@@ -653,14 +664,14 @@ func testAPIMutualTLSHelper(t *testing.T, skipCAAnnounce bool) {
 					Path:       "/with_mutual",
 					Client:     client,
 					Domain:     domain,
-					ErrorMatch: expectedCertErr,
+					ErrorMatch: expectedWrongCertErr,
 				})
 
 				_, _ = ts.Run(t, test.TestCase{
 					Path:       "/with_mutual_2",
 					Client:     client,
 					Domain:     domain,
-					ErrorMatch: expectedCertErr,
+					ErrorMatch: expectedWrongCertErr,
 				})
 			})
 
@@ -749,7 +760,7 @@ func testAPIMutualTLSHelper(t *testing.T, skipCAAnnounce bool) {
 						Path:       "/with_mutual",
 						Client:     clientWithoutCert,
 						Domain:     domain,
-						ErrorMatch: badcertErr,
+						ErrorMatch: expectedNoCertErr,
 					})
 				}
 
@@ -779,7 +790,7 @@ func testAPIMutualTLSHelper(t *testing.T, skipCAAnnounce bool) {
 						Path:       "/with_mutual",
 						Client:     client,
 						Domain:     domain,
-						ErrorMatch: expectedCertErr,
+						ErrorMatch: expectedWrongCertErr,
 					})
 				}
 			})
@@ -842,7 +853,7 @@ func testAPIMutualTLSHelper(t *testing.T, skipCAAnnounce bool) {
 					_, _ = ts.Run(t, test.TestCase{
 						Path:       "/with_mutual",
 						Client:     clientWithoutCert,
-						ErrorMatch: badcertErr,
+						ErrorMatch: expectedNoCertErr,
 					})
 				}
 
@@ -871,7 +882,7 @@ func testAPIMutualTLSHelper(t *testing.T, skipCAAnnounce bool) {
 					_, _ = ts.Run(t, test.TestCase{
 						Path:       "/with_mutual",
 						Client:     client,
-						ErrorMatch: expectedCertErr,
+						ErrorMatch: expectedWrongCertErr,
 					})
 				}
 			})
@@ -1886,7 +1897,7 @@ func TestCipherSuites(t *testing.T) {
 			MaxVersion:         tls.VersionTLS12,
 		}}}
 
-		_, _ = ts.Run(t, test.TestCase{Client: client, Path: "/", ErrorMatch: "tls: handshake failure"})
+		_, _ = ts.Run(t, test.TestCase{Client: client, Path: "/", ErrorMatch: noCertAnnounceErr})
 	})
 }
 
@@ -2004,7 +2015,7 @@ func TestClientCertificates_WithProtocolTLS(t *testing.T) {
 	// client
 	t.Run("bad certificate", func(t *testing.T) {
 		_, err := tls.Dial("tcp", apiAddr, mTLSConfig)
-		assert.ErrorContains(t, err, badcertErr)
+		assert.ErrorContains(t, err, noCertAnnounceErr)
 	})
 
 	t.Run("correct certificate", func(t *testing.T) {
@@ -2342,4 +2353,185 @@ func TestStaticMTLSAPI(t *testing.T) {
 			assert.ErrorContains(t, err, "tls: failed to verify certificate")
 		})
 	})
+}
+
+func TestUpstreamMutualTLS_GwCommunication(t *testing.T) {
+	// https://tyktech.atlassian.net/browse/TT-13912
+
+	mtlsCerts := newCertSet(t)
+
+	upstream := httptest.NewServer(httpbin.New())
+	defer upstream.Close()
+
+	combinedClientPEM := append(mtlsCerts.clientCert, []byte("\n")...)
+	combinedClientPEM = append(combinedClientPEM, mtlsCerts.clientKey...)
+
+	gwA := StartTest(func(cnf *config.Config) {
+		cnf.HttpServerOptions.UseSSL = true
+		cnf.HttpServerOptions.Certificates = []config.CertData{{
+			Name:     "localhost",
+			CertFile: mtlsCerts.saveTemp("server.crt", mtlsCerts.servCert),
+			KeyFile:  mtlsCerts.saveTemp("server.key", mtlsCerts.servKey),
+		}}
+	})
+	defer gwA.Close()
+
+	clientCertIDA, err := gwA.Gw.CertificateManager.Add(combinedClientPEM, "")
+	require.NoError(t, err)
+	defer gwA.Gw.CertificateManager.Delete(clientCertIDA, "")
+
+	gwA.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		spec.Proxy.ListenPath = "/api-a/"
+		spec.Proxy.StripListenPath = true
+		spec.Proxy.TargetURL = upstream.URL
+		spec.UseMutualTLSAuth = true
+		spec.ClientCertificates = []string{clientCertIDA}
+	})
+
+	clientCert, err := tls.X509KeyPair(mtlsCerts.clientCert, mtlsCerts.clientKey)
+	require.NoError(t, err)
+	clientCert.Leaf, err = x509.ParseCertificate(clientCert.Certificate[0])
+	require.NoError(t, err)
+
+	caCertPool := x509.NewCertPool()
+	caCertPool.AppendCertsFromPEM(mtlsCerts.ca)
+
+	clientA := &http.Client{
+		Transport: &http.Transport{
+			TLSClientConfig: &tls.Config{
+				Certificates:       []tls.Certificate{clientCert},
+				RootCAs:            caCertPool,
+				InsecureSkipVerify: true,
+				GetClientCertificate: func(_ *tls.CertificateRequestInfo) (*tls.Certificate, error) {
+					return &clientCert, nil
+				},
+			},
+		},
+	}
+
+	_, _ = gwA.Run(t, test.TestCase{
+		Path:   "/api-a/uuid",
+		Client: clientA,
+		Code:   http.StatusOK,
+	})
+
+	gwB := StartTest(func(cnf *config.Config) {
+		cnf.HttpServerOptions.UseSSL = true
+		cnf.HttpServerOptions.Certificates = []config.CertData{{
+			Name:     "localhost",
+			CertFile: mtlsCerts.saveTemp("serverB.crt", mtlsCerts.servCert),
+			KeyFile:  mtlsCerts.saveTemp("serverB.key", mtlsCerts.servKey),
+		}}
+		cnf.ProxySSLInsecureSkipVerify = true
+	})
+	defer gwB.Close()
+
+	clientCertIDB, err := gwB.Gw.CertificateManager.Add(combinedClientPEM, "")
+	require.NoError(t, err)
+	defer gwB.Gw.CertificateManager.Delete(clientCertIDB, "")
+
+	gwB.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		spec.Proxy.ListenPath = "/api-b/"
+		spec.Proxy.StripListenPath = true
+		spec.Proxy.TargetURL = gwA.URL + "/api-a"
+		spec.UpstreamCertificates = map[string]string{
+			"*": clientCertIDB,
+		}
+	})
+
+	clientB := &http.Client{
+		Transport: &http.Transport{
+			TLSClientConfig: &tls.Config{
+				InsecureSkipVerify: true,
+			},
+		},
+	}
+
+	_, _ = gwB.Run(t, test.TestCase{
+		Path:   "/api-b/uuid",
+		Client: clientB,
+		Code:   http.StatusOK,
+	})
+}
+
+type certSet struct {
+	t                                            testing.TB
+	ca, servCert, servKey, clientCert, clientKey []byte
+	tmpDir                                       string
+}
+
+func (c *certSet) saveTemp(name string, data []byte) string {
+	path := filepath.Join(c.tmpDir, name)
+	err := os.WriteFile(path, data, 0644)
+	require.NoError(c.t, err)
+	return path
+}
+
+func newCertSet(tb testing.TB) certSet {
+	tb.Helper()
+
+	dir, err := os.MkdirTemp("", "certs")
+	require.NoError(tb, err)
+
+	tb.Cleanup(func() {
+		_ = os.RemoveAll(dir)
+	})
+
+	caKey, err := rsa.GenerateKey(rand.Reader, 2048)
+	require.NoError(tb, err)
+	caTmpl := &x509.Certificate{
+		SerialNumber:          big.NewInt(1),
+		Subject:               pkix.Name{CommonName: "Test CA"},
+		NotBefore:             time.Now(),
+		NotAfter:              time.Now().Add(time.Hour),
+		IsCA:                  true,
+		KeyUsage:              x509.KeyUsageCertSign | x509.KeyUsageDigitalSignature,
+		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth, x509.ExtKeyUsageServerAuth},
+		BasicConstraintsValid: true,
+	}
+
+	caDer, err := x509.CreateCertificate(rand.Reader, caTmpl, caTmpl, &caKey.PublicKey, caKey)
+	require.NoError(tb, err)
+	ca := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: caDer})
+
+	servKeyPriv, err := rsa.GenerateKey(rand.Reader, 2048)
+	require.NoError(tb, err)
+	servTmpl := &x509.Certificate{
+		SerialNumber: big.NewInt(2),
+		Subject:      pkix.Name{CommonName: "localhost"},
+		DNSNames:     []string{"localhost"},
+		NotBefore:    time.Now(),
+		NotAfter:     time.Now().Add(time.Hour),
+		ExtKeyUsage:  []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
+	}
+
+	servDer, err := x509.CreateCertificate(rand.Reader, servTmpl, caTmpl, &servKeyPriv.PublicKey, caKey)
+	require.NoError(tb, err)
+	servCert := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: servDer})
+	servKey := pem.EncodeToMemory(&pem.Block{Type: "RSA PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(servKeyPriv)})
+
+	clientKeyPriv, err := rsa.GenerateKey(rand.Reader, 2048)
+	require.NoError(tb, err)
+	clientTmpl := &x509.Certificate{
+		SerialNumber: big.NewInt(3),
+		Subject:      pkix.Name{CommonName: "client-a"},
+		NotBefore:    time.Now(),
+		NotAfter:     time.Now().Add(time.Hour),
+		ExtKeyUsage:  []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth},
+	}
+
+	clientDer, err := x509.CreateCertificate(rand.Reader, clientTmpl, caTmpl, &clientKeyPriv.PublicKey, caKey)
+	require.NoError(tb, err)
+	clientCert := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: clientDer})
+	clientKey := pem.EncodeToMemory(&pem.Block{Type: "RSA PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(clientKeyPriv)})
+
+	return certSet{
+		t:          tb,
+		tmpDir:     dir,
+		ca:         ca,
+		clientCert: clientCert,
+		clientKey:  clientKey,
+		servCert:   servCert,
+		servKey:    servKey,
+	}
 }

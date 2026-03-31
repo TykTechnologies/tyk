@@ -841,7 +841,7 @@ func (rt *TykRoundTripper) RoundTrip(r *http.Request) (*http.Response, error) {
 		return handleInMemoryLoop(handler, r)
 	}
 
-	if rt.Gw.GetConfig().OpenTelemetry.Enabled {
+	if rt.Gw.GetConfig().OpenTelemetry.TracesEnabled() {
 		var baseRoundTripper http.RoundTripper = rt.transport
 		if rt.h2ctransport != nil {
 			baseRoundTripper = rt.h2ctransport
@@ -1173,11 +1173,9 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 	breakerEnforced, breakerConf := p.CheckCircuitBreakerEnforced(p.TykAPISpec, req)
 
 	// set up TLS certificates for upstream if needed
-	var tlsCertificates []tls.Certificate
-	if cert := p.Gw.getUpstreamCertificate(outreq.URL.Host, p.TykAPISpec); cert != nil {
+	cert := p.Gw.getUpstreamCertificate(outreq.URL.Host, p.TykAPISpec)
+	if cert != nil {
 		p.logger.Debug("Found upstream mutual TLS certificate")
-		tlsCertificates = []tls.Certificate{*cert}
-
 		// Check upstream certificate expiry
 		p.checkUpstreamCertificateExpiry(cert)
 	}
@@ -1236,8 +1234,11 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 
 	roundTripper = p.TykAPISpec.HTTPTransport
 
-	if roundTripper.transport != nil {
-		roundTripper.transport.TLSClientConfig.Certificates = tlsCertificates
+	if roundTripper.transport != nil && cert != nil {
+		roundTripper.transport.TLSClientConfig.Certificates = []tls.Certificate{*cert}
+		roundTripper.transport.TLSClientConfig.GetClientCertificate = func(_ *tls.CertificateRequestInfo) (*tls.Certificate, error) {
+			return cert, nil
+		}
 	}
 	p.TykAPISpec.Unlock()
 
@@ -1383,6 +1384,17 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 		withCache = false
 	}
 
+	// Wrap the response body with an SSE tap for MCP Proxies so that hooks
+	// can inspect and filter individual SSE events before they reach the
+	// client. The tap is transparent to CopyResponse/copyBuffer.
+	if httputil.IsStreamingResponse(res) && p.TykAPISpec.IsMCP() {
+		var hooks []SSEHook
+		if p.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
+			hooks = append(hooks, NewLoggingSSEHook(p.logger))
+		}
+		res.Body = NewSSETap(res.Body, hooks...)
+	}
+
 	if withCache {
 		*inres = *res // includes shallow copies of maps, but okay
 
@@ -1393,7 +1405,7 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 			var bodyBuffer bytes.Buffer
 			bodyBuffer2 := new(bytes.Buffer)
 
-			p.CopyResponse(&bodyBuffer, res.Body, p.flushInterval(res))
+			_ = p.CopyResponse(&bodyBuffer, res.Body, p.flushInterval(res))
 			*bodyBuffer2 = bodyBuffer
 
 			// Create new ReadClosers so we can split output
@@ -1457,7 +1469,17 @@ func (p *ReverseProxy) HandleResponse(rw http.ResponseWriter, res *http.Response
 		}
 	}
 
-	p.CopyResponse(rw, res.Body, p.flushInterval(res))
+	isStreaming := httputil.IsStreamingResponse(res)
+	copyDst := io.Writer(rw)
+	if isStreaming {
+		if w, cleanup := p.prepareSSEStreaming(rw, res.Body); w != nil {
+			copyDst = w
+			defer cleanup()
+		}
+	}
+	if err := p.CopyResponse(copyDst, res.Body, p.flushInterval(res)); err != nil {
+		p.handleCopyError(rw, err, isStreaming)
+	}
 
 	if len(res.Trailer) == announcedTrailers {
 		copyHeader(rw.Header(), res.Trailer, p.Gw.GetConfig().IgnoreCanonicalMIMEHeaderKey)
@@ -1480,7 +1502,7 @@ func (p *ReverseProxy) flushInterval(res *http.Response) time.Duration {
 
 	// For Server-Sent Events responses, flush immediately.
 	// The MIME type is defined in https://www.w3.org/TR/eventsource/#text-event-stream
-	if resCT == "text/event-stream" {
+	if httputil.IsSSEContentType(resCT) {
 		return -1 // negative means immediately
 	}
 
@@ -1492,7 +1514,7 @@ func (p *ReverseProxy) flushInterval(res *http.Response) time.Duration {
 	return p.FlushInterval
 }
 
-func (p *ReverseProxy) CopyResponse(dst io.Writer, src io.Reader, flushInterval time.Duration) {
+func (p *ReverseProxy) CopyResponse(dst io.Writer, src io.Reader, flushInterval time.Duration) error {
 
 	if flushInterval != 0 {
 		if wf, ok := dst.(writeFlusher); ok {
@@ -1510,7 +1532,11 @@ func (p *ReverseProxy) CopyResponse(dst io.Writer, src io.Reader, flushInterval 
 		}
 	}
 
-	p.copyBuffer(dst, src)
+	_, err := p.copyBuffer(dst, src)
+	if errors.Is(err, io.EOF) {
+		err = nil
+	}
+	return err
 }
 
 func (p *ReverseProxy) copyBuffer(dst io.Writer, src io.Reader) (int64, error) {

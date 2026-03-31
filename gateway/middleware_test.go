@@ -11,15 +11,20 @@ import (
 	"time"
 
 	"github.com/justinas/alice"
+	"github.com/sirupsen/logrus"
 	logrustest "github.com/sirupsen/logrus/hooks/test"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/TykTechnologies/opentelemetry/metric/metrictest"
 
 	"github.com/TykTechnologies/tyk-pump/analytics"
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
+	ctxpkg "github.com/TykTechnologies/tyk/ctx"
 	headers2 "github.com/TykTechnologies/tyk/header"
 	"github.com/TykTechnologies/tyk/internal/cache"
 	"github.com/TykTechnologies/tyk/internal/otel"
+	"github.com/TykTechnologies/tyk/internal/otel/apimetrics"
 	"github.com/TykTechnologies/tyk/internal/uuid"
 	"github.com/TykTechnologies/tyk/test"
 	"github.com/TykTechnologies/tyk/user"
@@ -661,11 +666,13 @@ func TestRecordAccessLog_TraceID(t *testing.T) {
 			// Add trace context if needed
 			if tc.hasTraceCtx && tc.otelEnabled {
 				// Create a real OTel provider and span
-				otelCfg := &otel.OpenTelemetry{
-					Enabled:  true,
-					Exporter: "http",
-					Endpoint: "http://localhost:4318", // Won't actually connect
-				}
+				otelCfg := &otel.OpenTelemetry{BaseOpenTelemetry: otel.BaseOpenTelemetry{
+					Enabled: true,
+					ExporterConfig: otel.ExporterConfig{
+						Exporter: "http",
+						Endpoint: "http://localhost:4318", // Won't actually connect
+					},
+				}}
 				provider := otel.InitOpenTelemetry(context.Background(), logger, otelCfg, "test-gw", "v1.0.0", false, "", false, nil)
 				_, span := provider.Tracer().Start(context.Background(), "test-span")
 				defer span.End()
@@ -810,4 +817,407 @@ func TestGateway_mwAppendEnabled_MCP(t *testing.T) {
 		assert.True(t, result, "mwAppendEnabled should return true for non-restricted middleware on MCP")
 		assert.Len(t, chain, 1, "Chain should have non-restricted middleware for MCP APIs")
 	})
+}
+
+// testMetricInstruments creates MetricInstruments backed by a real in-memory
+// provider so tests can assert recorded metric values. If defs is non-nil,
+// an API metric registry is configured with the given definitions.
+func testMetricInstruments(t *testing.T, defs []apimetrics.APIMetricDefinition) (*otel.MetricInstruments, *metrictest.TestProvider) {
+	t.Helper()
+	tp := metrictest.NewProvider(t)
+	inst := otel.NewMetricInstruments(tp, logrus.New())
+	if defs != nil {
+		inst.SetRegistry(tp, defs)
+	}
+	return inst, tp
+}
+
+func TestBaseMiddleware_RecordMetrics(t *testing.T) {
+	t.Run("records tyk.http.requests counter", func(t *testing.T) {
+		inst, tp := testMetricInstruments(t, nil)
+		bm := &BaseMiddleware{
+			Spec: &APISpec{APIDefinition: &apidef.APIDefinition{APIID: "test-api", Name: "TestAPI"}},
+			Gw:   &Gateway{MetricInstruments: inst},
+		}
+
+		r := httptest.NewRequest(http.MethodGet, "http://example.com/test", nil)
+		bm.RecordMetrics(nil, r, 200, analytics.Latency{Total: 150, Upstream: 100, Gateway: 50}, nil)
+
+		m := tp.FindMetric(t, "tyk.http.requests")
+		metrictest.AssertSum(t, m, int64(1))
+	})
+
+	t.Run("skipped when DoNotTrack on spec", func(t *testing.T) {
+		inst, tp := testMetricInstruments(t, nil)
+		bm := &BaseMiddleware{
+			Spec: &APISpec{APIDefinition: &apidef.APIDefinition{APIID: "test-api", DoNotTrack: true}},
+			Gw:   &Gateway{MetricInstruments: inst},
+		}
+
+		r := httptest.NewRequest(http.MethodGet, "http://example.com/test", nil)
+		bm.RecordMetrics(nil, r, 200, analytics.Latency{}, nil)
+
+		names := tp.MetricNames()
+		assert.NotContains(t, names, "tyk.http.requests")
+	})
+
+	t.Run("skipped when DoNotTrack on context", func(t *testing.T) {
+		inst, tp := testMetricInstruments(t, nil)
+		bm := &BaseMiddleware{
+			Spec: &APISpec{APIDefinition: &apidef.APIDefinition{APIID: "test-api"}},
+			Gw:   &Gateway{MetricInstruments: inst},
+		}
+
+		r := httptest.NewRequest(http.MethodGet, "http://example.com/test", nil)
+		setCtxValue(r, ctxpkg.DoNotTrackThisEndpoint, true)
+		bm.RecordMetrics(nil, r, 200, analytics.Latency{}, nil)
+
+		names := tp.MetricNames()
+		assert.NotContains(t, names, "tyk.http.requests")
+	})
+
+	t.Run("response_header dimension from proxy response", func(t *testing.T) {
+		defs := []apimetrics.APIMetricDefinition{{
+			Name: "test.by.version",
+			Type: "counter",
+			Dimensions: []apimetrics.DimensionDefinition{
+				{Source: "response_header", Key: "X-Version", Label: "version", Default: "unknown"},
+			},
+		}}
+		inst, tp := testMetricInstruments(t, defs)
+		bm := &BaseMiddleware{
+			Spec: &APISpec{APIDefinition: &apidef.APIDefinition{APIID: "test-api"}},
+			Gw:   &Gateway{MetricInstruments: inst},
+		}
+
+		r := httptest.NewRequest(http.MethodGet, "http://example.com/test", nil)
+		resp := &http.Response{Header: http.Header{"X-Version": []string{"v2.0"}}}
+		bm.RecordMetrics(nil, r, 200, analytics.Latency{}, resp)
+
+		m := tp.FindMetric(t, "test.by.version")
+		metrictest.AssertSum(t, m, int64(1))
+	})
+
+	t.Run("response_header fallback to ResponseWriter", func(t *testing.T) {
+		defs := []apimetrics.APIMetricDefinition{{
+			Name: "test.by.version",
+			Type: "counter",
+			Dimensions: []apimetrics.DimensionDefinition{
+				{Source: "response_header", Key: "X-Version", Label: "version", Default: "unknown"},
+			},
+		}}
+		inst, tp := testMetricInstruments(t, defs)
+		bm := &BaseMiddleware{
+			Spec: &APISpec{APIDefinition: &apidef.APIDefinition{APIID: "test-api"}},
+			Gw:   &Gateway{MetricInstruments: inst},
+		}
+
+		w := httptest.NewRecorder()
+		w.Header().Set("X-Version", "v3.0")
+		r := httptest.NewRequest(http.MethodGet, "http://example.com/test", nil)
+		// nil response forces the ResponseWriter fallback path.
+		bm.RecordMetrics(w, r, 200, analytics.Latency{}, nil)
+
+		m := tp.FindMetric(t, "test.by.version")
+		metrictest.AssertSum(t, m, int64(1))
+	})
+
+	t.Run("response_header default when both response and writer nil", func(t *testing.T) {
+		defs := []apimetrics.APIMetricDefinition{{
+			Name: "test.by.version",
+			Type: "counter",
+			Dimensions: []apimetrics.DimensionDefinition{
+				{Source: "response_header", Key: "X-Version", Label: "version", Default: "unknown"},
+			},
+		}}
+		inst, tp := testMetricInstruments(t, defs)
+		bm := &BaseMiddleware{
+			Spec: &APISpec{APIDefinition: &apidef.APIDefinition{APIID: "test-api"}},
+			Gw:   &Gateway{MetricInstruments: inst},
+		}
+
+		r := httptest.NewRequest(http.MethodGet, "http://example.com/test", nil)
+		bm.RecordMetrics(nil, r, 500, analytics.Latency{}, nil)
+
+		m := tp.FindMetric(t, "test.by.version")
+		metrictest.AssertSum(t, m, int64(1))
+	})
+
+	t.Run("error path nil response does not panic", func(t *testing.T) {
+		inst, _ := testMetricInstruments(t, nil)
+		bm := &BaseMiddleware{
+			Spec: &APISpec{APIDefinition: &apidef.APIDefinition{APIID: "test-api"}},
+			Gw:   &Gateway{MetricInstruments: inst},
+		}
+
+		r := httptest.NewRequest(http.MethodGet, "http://example.com/test", nil)
+		assert.NotPanics(t, func() {
+			bm.RecordMetrics(nil, r, 500, analytics.Latency{}, nil)
+		})
+	})
+}
+
+func TestRecordAccessLog_APIType(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	tests := []struct {
+		name        string
+		givenAPIDef func(spec *APISpec)
+		givenSetup  func(req *http.Request)
+		validate    func(t *testing.T, fields logrus.Fields)
+	}{
+		{
+			name:        "classic API",
+			givenAPIDef: func(_ *APISpec) {},
+			validate: func(t *testing.T, fields logrus.Fields) {
+				assert.Equal(t, "classic", fields["api_type"])
+				assert.NotContains(t, fields, "mcp_method")
+				assert.NotContains(t, fields, "mcp_primitive_type")
+				assert.NotContains(t, fields, "mcp_primitive_name")
+				assert.NotContains(t, fields, "mcp_error_code")
+			},
+		},
+		{
+			name: "OAS API",
+			givenAPIDef: func(s *APISpec) {
+				s.IsOAS = true
+			},
+			validate: func(t *testing.T, fields logrus.Fields) {
+				assert.Equal(t, "oas", fields["api_type"])
+				assert.NotContains(t, fields, "mcp_method")
+			},
+		},
+		{
+			name: "GraphQL API",
+			givenAPIDef: func(s *APISpec) {
+				s.GraphQL.Enabled = true
+			},
+			validate: func(t *testing.T, fields logrus.Fields) {
+				assert.Equal(t, "graphql", fields["api_type"])
+				assert.NotContains(t, fields, "mcp_method")
+			},
+		},
+		{
+			name: "GraphQL takes precedence over OAS",
+			givenAPIDef: func(s *APISpec) {
+				s.GraphQL.Enabled = true
+				s.IsOAS = true
+			},
+			validate: func(t *testing.T, fields logrus.Fields) {
+				assert.Equal(t, "graphql", fields["api_type"])
+			},
+		},
+		{
+			name: "MCP takes precedence over OAS",
+			givenAPIDef: func(s *APISpec) {
+				s.MarkAsMCP()
+				s.IsOAS = true
+			},
+			validate: func(t *testing.T, fields logrus.Fields) {
+				assert.Equal(t, "mcp", fields["api_type"])
+			},
+		},
+		{
+			name: "MCP tools/call with all fields",
+			givenAPIDef: func(s *APISpec) {
+				s.MarkAsMCP()
+				s.IsOAS = true
+			},
+			givenSetup: func(req *http.Request) {
+				ctxSetMCPMethod(req, "tools/call")
+				ctxSetMCPPrimitiveType(req, "tool")
+				ctxSetMCPPrimitiveName(req, "get_weather")
+			},
+			validate: func(t *testing.T, fields logrus.Fields) {
+				assert.Equal(t, "mcp", fields["api_type"])
+				assert.Equal(t, "tools/call", fields["mcp_method"])
+				assert.Equal(t, "tool", fields["mcp_primitive_type"])
+				assert.Equal(t, "get_weather", fields["mcp_primitive_name"])
+				assert.NotContains(t, fields, "mcp_error_code")
+			},
+		},
+		{
+			name: "MCP error includes error code",
+			givenAPIDef: func(s *APISpec) {
+				s.MarkAsMCP()
+			},
+			givenSetup: func(req *http.Request) {
+				ctxSetMCPMethod(req, "tools/call")
+				ctxSetMCPPrimitiveType(req, "tool")
+				ctxSetMCPPrimitiveName(req, "unknown_tool")
+				ctxSetJSONRPCErrorCode(req, -32601)
+			},
+			validate: func(t *testing.T, fields logrus.Fields) {
+				assert.Equal(t, "mcp", fields["api_type"])
+				assert.Equal(t, "tools/call", fields["mcp_method"])
+				assert.Equal(t, "tool", fields["mcp_primitive_type"])
+				assert.Equal(t, "unknown_tool", fields["mcp_primitive_name"])
+				assert.Equal(t, -32601, fields["mcp_error_code"])
+			},
+		},
+		{
+			name: "MCP initialize has method only",
+			givenAPIDef: func(s *APISpec) {
+				s.MarkAsMCP()
+			},
+			givenSetup: func(req *http.Request) {
+				ctxSetMCPMethod(req, "initialize")
+			},
+			validate: func(t *testing.T, fields logrus.Fields) {
+				assert.Equal(t, "mcp", fields["api_type"])
+				assert.Equal(t, "initialize", fields["mcp_method"])
+				assert.NotContains(t, fields, "mcp_primitive_type")
+				assert.NotContains(t, fields, "mcp_primitive_name")
+				assert.NotContains(t, fields, "mcp_error_code")
+			},
+		},
+		{
+			name: "MCP without context values has api_type only",
+			givenAPIDef: func(s *APISpec) {
+				s.MarkAsMCP()
+			},
+			validate: func(t *testing.T, fields logrus.Fields) {
+				assert.Equal(t, "mcp", fields["api_type"])
+				assert.NotContains(t, fields, "mcp_method")
+				assert.NotContains(t, fields, "mcp_primitive_type")
+				assert.NotContains(t, fields, "mcp_primitive_name")
+				assert.NotContains(t, fields, "mcp_error_code")
+			},
+		},
+		{
+			name: "MCP resources/read",
+			givenAPIDef: func(s *APISpec) {
+				s.MarkAsMCP()
+			},
+			givenSetup: func(req *http.Request) {
+				ctxSetMCPMethod(req, "resources/read")
+				ctxSetMCPPrimitiveType(req, "resource")
+				ctxSetMCPPrimitiveName(req, "docs://api/readme")
+			},
+			validate: func(t *testing.T, fields logrus.Fields) {
+				assert.Equal(t, "mcp", fields["api_type"])
+				assert.Equal(t, "resources/read", fields["mcp_method"])
+				assert.Equal(t, "resource", fields["mcp_primitive_type"])
+				assert.Equal(t, "docs://api/readme", fields["mcp_primitive_name"])
+			},
+		},
+		{
+			name: "MCP prompts/get",
+			givenAPIDef: func(s *APISpec) {
+				s.MarkAsMCP()
+			},
+			givenSetup: func(req *http.Request) {
+				ctxSetMCPMethod(req, "prompts/get")
+				ctxSetMCPPrimitiveType(req, "prompt")
+				ctxSetMCPPrimitiveName(req, "summarize")
+			},
+			validate: func(t *testing.T, fields logrus.Fields) {
+				assert.Equal(t, "mcp", fields["api_type"])
+				assert.Equal(t, "prompts/get", fields["mcp_method"])
+				assert.Equal(t, "prompt", fields["mcp_primitive_type"])
+				assert.Equal(t, "summarize", fields["mcp_primitive_name"])
+			},
+		},
+		{
+			name: "template filters to api_type only",
+			givenAPIDef: func(s *APISpec) {
+				s.MarkAsMCP()
+			},
+			givenSetup: func(req *http.Request) {
+				ctxSetMCPMethod(req, "tools/call")
+				ctxSetMCPPrimitiveType(req, "tool")
+				ctxSetMCPPrimitiveName(req, "get_weather")
+			},
+			validate: func(t *testing.T, fields logrus.Fields) {
+				// Template filtering is validated via allowedFields in the harness below.
+				// This case uses the "api_type" template set by givenAPIDef override.
+				assert.Contains(t, fields, "api_type")
+				assert.NotContains(t, fields, "mcp_method")
+				assert.NotContains(t, fields, "mcp_primitive_type")
+				assert.NotContains(t, fields, "mcp_primitive_name")
+			},
+		},
+		{
+			name: "template allows api_type and mcp_method",
+			givenAPIDef: func(s *APISpec) {
+				s.MarkAsMCP()
+			},
+			givenSetup: func(req *http.Request) {
+				ctxSetMCPMethod(req, "tools/call")
+				ctxSetMCPPrimitiveType(req, "tool")
+				ctxSetMCPPrimitiveName(req, "get_weather")
+			},
+			validate: func(t *testing.T, fields logrus.Fields) {
+				assert.Contains(t, fields, "api_type")
+				assert.Contains(t, fields, "mcp_method")
+				assert.NotContains(t, fields, "mcp_primitive_type")
+				assert.NotContains(t, fields, "mcp_primitive_name")
+			},
+		},
+		{
+			name: "all api types produce common access log fields",
+			givenAPIDef: func(s *APISpec) {
+				s.APIID = "test-api"
+				s.Name = "Test API"
+				s.OrgID = "org-123"
+			},
+			validate: func(t *testing.T, fields logrus.Fields) {
+				assert.Equal(t, "classic", fields["api_type"])
+				// Verify common access log fields are still present alongside api_type
+				assert.Equal(t, "test-api", fields["api_id"])
+				assert.Equal(t, "Test API", fields["api_name"])
+				assert.Equal(t, "org-123", fields["org_id"])
+				assert.Contains(t, fields, "method")
+				assert.Contains(t, fields, "path")
+				assert.Contains(t, fields, "status")
+				assert.Contains(t, fields, "latency_total")
+			},
+		},
+	}
+
+	// Template overrides keyed by test name. If a test name appears here,
+	// the gwConfig.AccessLogs.Template is set to this value instead of nil.
+	templateOverrides := map[string][]string{
+		"template filters to api_type only":       {"api_type"},
+		"template allows api_type and mcp_method": {"api_type", "mcp_method"},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			logger, hook := logrustest.NewNullLogger()
+
+			gwConfig := ts.Gw.GetConfig()
+			gwConfig.AccessLogs.Enabled = true
+			gwConfig.AccessLogs.Template = templateOverrides[tc.name]
+			ts.Gw.SetConfig(gwConfig)
+
+			spec := &APISpec{
+				APIDefinition: &apidef.APIDefinition{},
+				GlobalConfig:  gwConfig,
+			}
+			tc.givenAPIDef(spec)
+
+			baseMw := &BaseMiddleware{
+				Spec:   spec,
+				Gw:     ts.Gw,
+				logger: logger.WithField("prefix", "test"),
+			}
+
+			req := httptest.NewRequest(http.MethodPost, "http://example.com/test", nil)
+			if tc.givenSetup != nil {
+				tc.givenSetup(req)
+			}
+
+			resp := &http.Response{StatusCode: http.StatusOK}
+			latency := analytics.Latency{Total: 100, Upstream: 80, Gateway: 20}
+
+			baseMw.RecordAccessLog(req, resp, latency)
+
+			assert.NotEmpty(t, hook.Entries, "expected a log entry")
+			tc.validate(t, hook.LastEntry().Data)
+
+			hook.Reset()
+		})
+	}
 }
