@@ -18,7 +18,7 @@ concurrency:
 
 jobs:
   dep-guard:
-    uses: TykTechnologies/github-actions/.github/workflows/dependency-guard.yml@6c675f850b1ba48da2bcd1b6caa16f9cf154e9e3  # main
+    uses: TykTechnologies/github-actions/.github/workflows/dependency-guard.yml@2b35ab5dd4cfff21ced9d12446e9e27d10bf5785  # main
     permissions:
       contents: read
 
