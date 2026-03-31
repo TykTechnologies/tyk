@@ -29,7 +29,7 @@ env:
 
 jobs:
   dep-guard:
-    uses: TykTechnologies/github-actions/.github/workflows/dependency-guard.yml@main
+    uses: TykTechnologies/github-actions/.github/workflows/dependency-guard.yml@75796ad54ffce9f0036f036414f8c9fb3dc5c0e0  # main
     permissions:
       contents: read
 
