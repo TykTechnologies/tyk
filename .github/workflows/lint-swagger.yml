@@ -48,7 +48,7 @@ jobs:
           git config --global url."https://${TOKEN}@github.com".insteadOf "https://github.com"
 
       - name: Checkout repo
-        uses: TykTechnologies/github-actions/.github/actions/checkout-pr@92b66e740444aba67fdbc96c07c69e1c6dd6f32d  # main
+        uses: TykTechnologies/github-actions/.github/actions/checkout-pr@2b35ab5dd4cfff21ced9d12446e9e27d10bf5785  # main
         with:
           token: ${{ secrets.ORG_GH_TOKEN }}
 
