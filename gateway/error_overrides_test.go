@@ -42,7 +42,7 @@ func TestCompileErrorOverrides(t *testing.T) {
 				{
 					Response: apidef.ErrorResponse{
 						StatusCode: 503,
-						Message: "Service unavailable",
+						Message:    "Service unavailable",
 					},
 				},
 			},
@@ -98,13 +98,13 @@ func TestCompileErrorOverrides(t *testing.T) {
 					},
 					Response: apidef.ErrorResponse{
 						StatusCode: 504,
-						Message: "Database timeout",
+						Message:    "Database timeout",
 					},
 				},
 				{
 					Response: apidef.ErrorResponse{
 						StatusCode: 503,
-						Message: "Generic server error",
+						Message:    "Generic server error",
 					},
 				},
 			},
@@ -387,7 +387,7 @@ func TestApplyOverride(t *testing.T) {
 				{
 					Response: apidef.ErrorResponse{
 						StatusCode: 503,
-						Message: "Service unavailable",
+						Message:    "Service unavailable",
 					},
 				},
 			},
@@ -431,7 +431,7 @@ func TestApplyOverride(t *testing.T) {
 				{
 					Response: apidef.ErrorResponse{
 						StatusCode: 503,
-						Message: "Server error",
+						Message:    "Server error",
 					},
 				},
 			},
@@ -505,7 +505,7 @@ func TestApplyOverride(t *testing.T) {
 					},
 					Response: apidef.ErrorResponse{
 						StatusCode: 504,
-						Message: "Database timeout",
+						Message:    "Database timeout",
 					},
 				},
 			},
@@ -535,7 +535,7 @@ func TestApplyOverride(t *testing.T) {
 					},
 					Response: apidef.ErrorResponse{
 						StatusCode: 402,
-						Message: "Payment required",
+						Message:    "Payment required",
 					},
 				},
 			},
@@ -572,7 +572,7 @@ func TestApplyOverride(t *testing.T) {
 					},
 					Response: apidef.ErrorResponse{
 						StatusCode: 504,
-						Message: "Request timeout",
+						Message:    "Request timeout",
 					},
 				},
 			},
@@ -928,8 +928,8 @@ func TestApplyOverrideWithFlag(t *testing.T) {
 					},
 					Response: apidef.ErrorResponse{
 						StatusCode: 429,
-						Message: "Rate limit exceeded - please slow down",
-						Headers: map[string]string{"Retry-After": "60"},
+						Message:    "Rate limit exceeded - please slow down",
+						Headers:    map[string]string{"Retry-After": "60"},
 					},
 				},
 			},
@@ -1012,7 +1012,7 @@ func TestApplyOverrideWithFlag(t *testing.T) {
 					},
 					Response: apidef.ErrorResponse{
 						StatusCode: 503,
-						Message: "Service temporarily unavailable",
+						Message:    "Service temporarily unavailable",
 					},
 				},
 			},
