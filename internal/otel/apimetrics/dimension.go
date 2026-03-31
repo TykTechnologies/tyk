@@ -71,6 +71,18 @@ func CompileExtractor(dim DimensionDefinition) (*DimensionExtractor, error) {
 			return rc.Response.Header.Get(key)
 		}
 
+	case "config_data":
+		key := dim.Key
+		ext.Extract = func(rc *RequestContext) string {
+			if rc.ConfigData == nil {
+				return ""
+			}
+			if v, ok := rc.ConfigData[key]; ok {
+				return fmt.Sprint(v)
+			}
+			return ""
+		}
+
 	default:
 		return nil, fmt.Errorf("unknown dimension source: %q", dim.Source)
 	}
@@ -89,8 +101,11 @@ var metadataExtractors = map[string]func(rc *RequestContext) string{
 	"response_code": func(rc *RequestContext) string {
 		return strconv.Itoa(rc.StatusCode)
 	},
-	"route": func(rc *RequestContext) string {
+	"listen_path": func(rc *RequestContext) string {
 		return rc.ListenPath
+	},
+	"endpoint": func(rc *RequestContext) string {
+		return rc.Endpoint
 	},
 	"api_id": func(rc *RequestContext) string {
 		return rc.APIID
@@ -124,6 +139,21 @@ var metadataExtractors = map[string]func(rc *RequestContext) string{
 			return "https"
 		}
 		return "http"
+	},
+	"mcp_method": func(rc *RequestContext) string {
+		return rc.MCPMethod
+	},
+	"mcp_primitive_type": func(rc *RequestContext) string {
+		return rc.MCPPrimitiveType
+	},
+	"mcp_primitive_name": func(rc *RequestContext) string {
+		return rc.MCPPrimitiveName
+	},
+	"mcp_error_code": func(rc *RequestContext) string {
+		if rc.MCPErrorCode == 0 {
+			return ""
+		}
+		return strconv.Itoa(rc.MCPErrorCode)
 	},
 }
 

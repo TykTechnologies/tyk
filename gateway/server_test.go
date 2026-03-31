@@ -21,10 +21,12 @@ import (
 	"go.uber.org/mock/gomock"
 
 	"github.com/TykTechnologies/again"
+	"github.com/TykTechnologies/opentelemetry/metric/metrictest"
 	tyktrace "github.com/TykTechnologies/opentelemetry/trace"
 	"github.com/TykTechnologies/storage/persistent/model"
 
 	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/internal/compression"
 	internalmodel "github.com/TykTechnologies/tyk/internal/model"
 	"github.com/TykTechnologies/tyk/internal/netutil"
 	"github.com/TykTechnologies/tyk/internal/otel"
@@ -1167,6 +1169,45 @@ func TestLoadPoliciesFromRPC(t *testing.T) {
 	})
 }
 
+func TestSetupGlobals_MaxDecompressedSize(t *testing.T) {
+	origSize := compression.GetMaxDecompressedSize()
+	defer compression.SetMaxDecompressedSize(origSize)
+
+	t.Run("sets compression limit from config", func(t *testing.T) {
+		var configuredSize int64 = 50 * 1024 * 1024 // 50MB
+		ts := StartTest(func(globalConf *config.Config) {
+			globalConf.Storage.MaxDecompressedSize = configuredSize
+		})
+		defer ts.Close()
+
+		assert.Equal(t, uint64(configuredSize), compression.GetMaxDecompressedSize())
+	})
+
+	t.Run("keeps default when config is zero", func(t *testing.T) {
+		defaultSize := uint64(100 * 1024 * 1024) // 100MB default
+		compression.SetMaxDecompressedSize(defaultSize)
+
+		ts := StartTest(func(globalConf *config.Config) {
+			globalConf.Storage.MaxDecompressedSize = 0
+		})
+		defer ts.Close()
+
+		assert.Equal(t, defaultSize, compression.GetMaxDecompressedSize())
+	})
+
+	t.Run("keeps default when config is negative", func(t *testing.T) {
+		defaultSize := uint64(100 * 1024 * 1024)
+		compression.SetMaxDecompressedSize(defaultSize)
+
+		ts := StartTest(func(globalConf *config.Config) {
+			globalConf.Storage.MaxDecompressedSize = -1
+		})
+		defer ts.Close()
+
+		assert.Equal(t, defaultSize, compression.GetMaxDecompressedSize())
+	})
+}
+
 func TestPoliciesCollisionMessage(t *testing.T) {
 	ts := StartTest(nil)
 	t.Cleanup(ts.Close)
@@ -1302,4 +1343,42 @@ func TestInitOpenTelemetryInstruments(t *testing.T) {
 			}
 		})
 	}
+}
+
+// testGatewayMetricInstruments creates MetricInstruments backed by a real
+// in-memory provider so tests can assert recorded metric values.
+func testGatewayMetricInstruments(t *testing.T) (*otel.MetricInstruments, *metrictest.TestProvider) {
+	t.Helper()
+	tp := metrictest.NewProvider(t)
+	inst := otel.NewMetricInstruments(tp, logrus.New())
+	return inst, tp
+}
+
+func TestDoReload_RecordsConfigStateOnSyncFailure(t *testing.T) {
+	// Start gateway normally so it initializes all subsystems.
+	ts := StartTest(func(conf *config.Config) {
+		conf.ResourceSync.RetryAttempts = 0
+	})
+	defer ts.Close()
+
+	// Replace metric instruments with a test provider we can inspect.
+	inst, tp := testGatewayMetricInstruments(t)
+	ts.Gw.MetricInstruments = inst
+
+	// Reconfigure gateway so that API sync will fail (unreachable dashboard).
+	conf := ts.Gw.GetConfig()
+	conf.UseDBAppConfigs = true
+	conf.DBAppConfOptions.ConnectionString = "http://localhost:1"
+	ts.Gw.SetConfig(conf)
+
+	// DoReload will: sync policies (succeeds with 0) then sync APIs (fails).
+	// Before the fix, the early return skipped RecordConfigState entirely,
+	// leaving the gauges without any data point.
+	ts.Gw.DoReload()
+
+	// After fix: gauges must report 0, not be absent.
+	apisMetric := tp.FindMetric(t, "tyk.gateway.apis.loaded")
+	policiesMetric := tp.FindMetric(t, "tyk.gateway.policies.loaded")
+	metrictest.AssertGauge(t, apisMetric, float64(0))
+	metrictest.AssertGauge(t, policiesMetric, float64(0))
 }
