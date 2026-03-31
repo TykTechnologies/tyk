@@ -15,6 +15,7 @@ import (
 
 	"github.com/TykTechnologies/tyk-pump/analytics"
 	"github.com/TykTechnologies/tyk/internal/httputil/accesslog"
+	"github.com/TykTechnologies/tyk/pkg/errpack"
 
 	"github.com/gocraft/health"
 	"github.com/justinas/alice"
@@ -189,7 +190,12 @@ func (gw *Gateway) createMiddleware(actualMW TykMiddleware) func(http.Handler) h
 					job.TimingKv(eventName+".exec_time", finishTime.Nanoseconds(), meta)
 				}
 
-				logger.WithError(err).WithField("code", errCode).WithField("ns", finishTime.Nanoseconds()).Debug("Finished")
+				logger.
+					WithError(err).
+					WithField("code", errCode).
+					WithField("ns", finishTime.Nanoseconds()).
+					Log(errpack.LogLevel(err, logrus.DebugLevel), "Finished")
+
 				return
 			}
 

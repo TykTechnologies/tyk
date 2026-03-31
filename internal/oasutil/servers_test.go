@@ -103,7 +103,7 @@ func TestParseServerUrl(t *testing.T) {
 			t.Run(tCase.name, func(t *testing.T) {
 				_, err := oasutil.ParseServerUrl(tCase.input)
 				assert.NotNil(t, err)
-				assert.ErrorContains(t, err, tCase.expectedErr.Error())
+				assert.ErrorIs(t, err, tCase.expectedErr)
 			})
 		}
 	})
