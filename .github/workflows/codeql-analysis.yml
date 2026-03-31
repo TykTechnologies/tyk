@@ -17,7 +17,13 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
+  dep-guard:
+    uses: TykTechnologies/github-actions/.github/workflows/dependency-guard.yml@main
+    permissions:
+      contents: read
+
   analyze:
+    needs: [dep-guard]
     name: Analyze
     if: ${{ !github.event.pull_request.draft }}
     runs-on: ubuntu-latest
@@ -43,22 +49,6 @@ jobs:
     # the head of the pull request instead of the merge commit.
     - run: git checkout HEAD^2
       if: ${{ github.event_name == 'pull_request' }}
-
-    - name: Guard — block build if dependencies changed
-      if: ${{ github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'deps-reviewed') }}
-      env:
-        BASE_REF: ${{ github.event.pull_request.base.ref }}
-      run: |
-        git fetch origin "$BASE_REF" --depth=1
-        CHANGED=$(git diff --name-only "origin/$BASE_REF"...HEAD -- \
-          go.mod go.sum vendor/ \
-          package.json package-lock.json yarn.lock pnpm-lock.yaml node_modules/ \
-          '**/requirements*.txt' '**/Pipfile' '**/Pipfile.lock' '**/pyproject.toml' '**/poetry.lock' '**/setup.py' '**/setup.cfg')
-        if [ -n "$CHANGED" ]; then
-          echo "::error::Dependency files changed. Add 'deps-reviewed' label after review."
-          echo "$CHANGED"
-          exit 1
-        fi
 
     - name: Install Go
       uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff  # v5

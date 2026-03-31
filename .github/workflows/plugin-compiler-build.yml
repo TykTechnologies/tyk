@@ -19,7 +19,13 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
+  dep-guard:
+    uses: TykTechnologies/github-actions/.github/workflows/dependency-guard.yml@main
+    permissions:
+      contents: read
+
   docker-build:
+    needs: [dep-guard]
     runs-on: ubuntu-latest
     if: ${{ !github.event.pull_request.draft }}
     permissions:
@@ -32,22 +38,6 @@ jobs:
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4
         with:
           fetch-depth: 0
-
-      - name: Guard — block build if dependencies changed
-        if: ${{ github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'deps-reviewed') }}
-        env:
-          BASE_REF: ${{ github.event.pull_request.base.ref }}
-        run: |
-          git fetch origin "$BASE_REF" --depth=1
-          CHANGED=$(git diff --name-only "origin/$BASE_REF"...HEAD -- \
-            go.mod go.sum vendor/ \
-            package.json package-lock.json yarn.lock pnpm-lock.yaml node_modules/ \
-            '**/requirements*.txt' '**/Pipfile' '**/Pipfile.lock' '**/pyproject.toml' '**/poetry.lock' '**/setup.py' '**/setup.cfg')
-          if [ -n "$CHANGED" ]; then
-            echo "::error::Dependency files changed. Add 'deps-reviewed' label after review."
-            echo "$CHANGED"
-            exit 1
-          fi
 
       - name: Configure AWS Credentials
         id: configure-aws

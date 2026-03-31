@@ -28,6 +28,11 @@ env:
   BRANCH_NAME: ${{ github.base_ref || github.ref_name }} # base_ref for PRs is 'master', but merges read in ref_name
 
 jobs:
+  dep-guard:
+    uses: TykTechnologies/github-actions/.github/workflows/dependency-guard.yml@main
+    permissions:
+      contents: read
+
   lint:
     runs-on: ubuntu-latest
     if: ${{ !github.event.pull_request.draft }}
@@ -87,7 +92,7 @@ jobs:
   test:
     name: Go ${{ matrix.go-version }} Redis ${{ matrix.redis-version }}
     if: ${{ !github.event.pull_request.draft }}
-    needs: lint
+    needs: [dep-guard, lint]
     # Runs on is pinned to a version that provides python 3.10.
     # See: https://github.com/actions/runner-images?tab=readme-ov-file#available-images
     # Avoid using ubuntu-latest as it would upgrade python unattended.
@@ -107,22 +112,6 @@ jobs:
         with:
           ref: ${{ github.ref }}
           fetch-depth: 0
-
-      - name: Guard — block build if dependencies changed
-        if: ${{ github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'deps-reviewed') }}
-        env:
-          BASE_REF: ${{ github.event.pull_request.base.ref }}
-        run: |
-          git fetch origin "$BASE_REF" --depth=1
-          CHANGED=$(git diff --name-only "origin/$BASE_REF"...HEAD -- \
-            go.mod go.sum vendor/ \
-            package.json package-lock.json yarn.lock pnpm-lock.yaml node_modules/ \
-            '**/requirements*.txt' '**/Pipfile' '**/Pipfile.lock' '**/pyproject.toml' '**/poetry.lock' '**/setup.py' '**/setup.cfg')
-          if [ -n "$CHANGED" ]; then
-            echo "::error::Dependency files changed. Add 'deps-reviewed' label after review."
-            echo "$CHANGED"
-            exit 1
-          fi
 
       - name: "Get base ref"
         run: |
