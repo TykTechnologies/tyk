@@ -9,7 +9,14 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  dep-guard:
+    if: ${{ github.event_name == 'pull_request' }}
+    uses: TykTechnologies/github-actions/.github/workflows/dependency-guard.yml@2b35ab5dd4cfff21ced9d12446e9e27d10bf5785  # main
+    permissions:
+      contents: read
+
   validate:
+    needs: [dep-guard]
     if: ${{ !github.event.pull_request.draft }}
     runs-on: ubuntu-latest
     steps:

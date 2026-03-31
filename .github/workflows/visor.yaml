@@ -15,7 +15,14 @@ permissions:
   checks: write
 
 jobs:
+  dep-guard:
+    if: ${{ github.event_name == 'pull_request' }}
+    uses: TykTechnologies/github-actions/.github/workflows/dependency-guard.yml@2b35ab5dd4cfff21ced9d12446e9e27d10bf5785  # main
+    permissions:
+      contents: read
+
   visor:
+    needs: [dep-guard]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
