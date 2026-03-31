@@ -399,6 +399,20 @@ type CertificateMeta struct {
 	IsCA          bool      `json:"is_ca"`
 }
 
+// ToCertificateBasics converts a CertificateMeta to a CertificateBasics struct.
+func (cm *CertificateMeta) ToCertificateBasics() *CertificateBasics {
+	return &CertificateBasics{
+		ID:            cm.ID,
+		IssuerCN:      cm.Issuer.CommonName,
+		SubjectCN:     cm.Subject.CommonName,
+		DNSNames:      cm.DNSNames,
+		HasPrivateKey: cm.HasPrivateKey,
+		NotBefore:     cm.NotBefore,
+		NotAfter:      cm.NotAfter,
+		IsCA:          cm.IsCA,
+	}
+}
+
 func ExtractCertificateMeta(cert *tls.Certificate, certID string) *CertificateMeta {
 	return &CertificateMeta{
 		ID:            certID,

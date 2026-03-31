@@ -225,3 +225,35 @@ func TestStorageIndex(t *testing.T) {
 		t.Error("Storage index list should have 0 certificates after deleting a certificate")
 	}
 }
+
+func TestToCertificateBasics(t *testing.T) {
+	now := time.Now()
+
+	meta := &CertificateMeta{
+		ID:            "cert-123",
+		Fingerprint:   "fingerprint-123",
+		HasPrivateKey: true,
+		Issuer: pkix.Name{
+			CommonName: "Issuer CN",
+		},
+		Subject: pkix.Name{
+			CommonName: "Subject CN",
+		},
+		NotBefore: now,
+		NotAfter:  now.Add(24 * time.Hour),
+		DNSNames:  []string{"tyk.com", "www.tyk.com"},
+		IsCA:      true,
+	}
+
+	basics := meta.ToCertificateBasics()
+
+	assert.NotNil(t, basics)
+	assert.Equal(t, meta.ID, basics.ID)
+	assert.Equal(t, meta.Issuer.CommonName, basics.IssuerCN)
+	assert.Equal(t, meta.Subject.CommonName, basics.SubjectCN)
+	assert.Equal(t, meta.DNSNames, basics.DNSNames)
+	assert.Equal(t, meta.HasPrivateKey, basics.HasPrivateKey)
+	assert.Equal(t, meta.NotBefore, basics.NotBefore)
+	assert.Equal(t, meta.NotAfter, basics.NotAfter)
+	assert.Equal(t, meta.IsCA, basics.IsCA)
+}
