@@ -1,0 +1,59 @@
+{
+  "name": "Tyk Gateway",
+  "dockerComposeFile": "../docker-compose.dev.yml",
+  "service": "gateway",
+  "workspaceFolder": "/app",
+
+  "features": {
+    "ghcr.io/anthropics/devcontainer-features/claude-code:1.0": {}
+  },
+
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "golang.go",
+        "ms-azuretools.vscode-docker",
+        "eamodio.gitlens"
+      ],
+      "settings": {
+        "go.toolsManagement.autoUpdate": false,
+        "go.useLanguageServer": true,
+        "go.lintTool": "golangci-lint",
+        "go.formatTool": "goimports",
+        "[go]": {
+          "editor.formatOnSave": true,
+          "editor.codeActionsOnSave": {
+            "source.organizeImports": true
+          }
+        }
+      }
+    },
+    "jetbrains": {
+      "plugins": ["org.jetbrains.plugins.go"],
+      "settings": {
+        "go.gopath": "/go",
+        "go.goroot": "/usr/local/go"
+      }
+    }
+  },
+
+  "postCreateCommand": "go mod download && git config core.hooksPath .githooks",
+
+  "postStartCommand": "sudo /usr/local/bin/init-firewall.sh",
+  "waitFor": "postStartCommand",
+
+  "mounts": [
+    "source=tyk-gomodcache,target=/go/pkg/mod,type=volume",
+    "source=tyk-gocache,target=/root/.cache/go-build,type=volume",
+    "source=tyk-claude-config-${devcontainerId},target=/root/.claude,type=volume"
+  ],
+
+  "remoteEnv": {
+    "GONOSUMDB": "github.com/TykTechnologies/*",
+    "GOPRIVATE": "github.com/TykTechnologies/*",
+    "GOPROXY": "https://proxy.golang.org,direct",
+    "GOFLAGS": "-mod=readonly"
+  },
+
+  "capAdd": ["NET_ADMIN", "NET_RAW"]
+}
