@@ -411,7 +411,9 @@ func (l *SessionLimiter) newRateLimitChecker(
 			}
 
 			state, shouldBlock := l.limitDRL(bucketKey, apiLimit, dryRun)
-			return newBucketStateChecker(apiLimit.Rate, state, shouldBlock)
+			tokenValue := uint(l.drlManager.CurrentTokenValue())
+
+			return newBucketStateChecker(apiLimit.Rate, state, shouldBlock, tokenValue)
 		} else {
 			// sliding window
 			return newStaticTtlChecker(l.limitRedis(r, session, limiterKey, apiLimit, dryRun))
@@ -667,12 +669,18 @@ func newBucketStateChecker(
 	rateLimit float64,
 	state model.BucketState,
 	shouldBlock bool,
+	tokenValue uint,
 ) rate.AnonChecker {
 	return func() (rate.Stats, bool, error) {
+		remaining := int(state.Remaining)
+		if tokenValue > 0 {
+			remaining = int(state.Remaining) / int(tokenValue)
+		}
+
 		return rate.Stats{
 			Limit:     int(rateLimit),
 			Reset:     time.Until(state.Reset),
-			Remaining: int(state.Remaining),
+			Remaining: remaining,
 		}, shouldBlock, nil
 	}
 }

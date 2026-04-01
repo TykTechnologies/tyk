@@ -622,21 +622,27 @@ func TestSessionLimiter(t *testing.T) {
 	})
 }
 
+// TestNewBucketStateChecker verifies the conversion from token-based bucket state
+// to request-based rate limit statistics. The DRL uses tokens internally where
+// each request consumes multiple tokens, but the API returns request-based stats.
 func TestNewBucketStateChecker(t *testing.T) {
 	rateLimit := 100.0
+
+	// Token bucket state (all values in tokens, not requests)
 	state := model.BucketState{
-		Capacity:  100,
-		Remaining: 50,
+		Capacity:  10000,
+		Remaining: 5000,
 		Reset:     time.Now().Add(10 * time.Second),
 	}
 	shouldBlock := false
+	tokenValue := uint(100)
 
-	checker := newBucketStateChecker(rateLimit, state, shouldBlock)
+	checker := newBucketStateChecker(rateLimit, state, shouldBlock, tokenValue)
 	stats, block, err := checker.Check()
 
 	assert.NoError(t, err)
 	assert.False(t, block)
 	assert.Equal(t, 100, stats.Limit)
-	assert.Equal(t, 50, stats.Remaining)
+	assert.Equal(t, 50, stats.Remaining) // state.Remaining / tokenValue
 	assert.InDelta(t, float64(10*time.Second), float64(stats.Reset), float64(time.Second))
 }
