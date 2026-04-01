@@ -10,7 +10,7 @@ tasks:
           echo "Creating virtual environment"
           python3 -m venv .venv
           source .venv/bin/activate
-          pip install grpcio grpcio-tools
+          pip install --no-deps grpcio grpcio-tools
           source deactivate
         fi
  
