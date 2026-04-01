@@ -623,7 +623,9 @@ func (l *SessionLimiter) extendContextWithLimits(r *http.Request, stats rate.Sta
 
 	data[ctxDataKeyRateLimitLimit] = stats.Limit
 	data[ctxDataKeyRateLimitRemaining] = stats.Remaining
-	data[ctxDataKeyRateLimitReset] = int(stats.Reset.Seconds())
+
+	resetTime := time.Now().Add(stats.Reset).Unix()
+	data[ctxDataKeyRateLimitReset] = int(resetTime)
 }
 
 type sessionFailReason uint

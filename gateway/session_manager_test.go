@@ -596,6 +596,27 @@ func TestSessionLimiter(t *testing.T) {
 			data := ctxGetData(r)
 			require.Nil(t, data)
 		})
+
+		t.Run("extends with unix timestamp for reset", func(t *testing.T) {
+			r, err := http.NewRequestWithContext(t.Context(), http.MethodGet, "/", nil)
+			require.NoError(t, err)
+
+			limiter.enableContextVariables = true
+			limiter.extendContextWithLimits(r, rate.Stats{
+				Limit:     2,
+				Remaining: 1,
+				Reset:     time.Second * 10,
+			})
+
+			data := ctxGetData(r)
+			require.NotNil(t, data)
+			assert.Equal(t, 2, data[ctxDataKeyRateLimitLimit])
+			assert.Equal(t, 1, data[ctxDataKeyRateLimitRemaining])
+
+			resetTime := int64(data[ctxDataKeyRateLimitReset].(int))
+			expectedTime := time.Now().Add(10 * time.Second).Unix()
+			assert.InDelta(t, expectedTime, resetTime, 1)
+		})
 	})
 
 	t.Run("limitRedis", func(t *testing.T) {
