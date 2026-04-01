@@ -568,6 +568,9 @@ type MiddlewareDefinition struct {
 	Disabled       bool   `bson:"disabled" json:"disabled"`
 	Name           string `bson:"name" json:"name"`
 	Path           string `bson:"path" json:"path"`
+	Code           string `bson:"code,omitempty" json:"code,omitempty"`
+	PluginID       string `bson:"plugin_id,omitempty" json:"plugin_id,omitempty"`
+	PluginHash     string `bson:"plugin_hash,omitempty" json:"plugin_hash,omitempty"`
 	RequireSession bool   `bson:"require_session" json:"require_session"`
 	RawBodyOnly    bool   `bson:"raw_body_only" json:"raw_body_only"`
 }

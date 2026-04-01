@@ -273,7 +273,8 @@
             "python",
             "lua",
             "grpc",
-            "goplugin"
+            "goplugin",
+            "goja"
           ]
         },
         "bundle": {

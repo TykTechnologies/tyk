@@ -2,6 +2,7 @@ package gateway
 
 import (
 	"crypto/tls"
+	"encoding/base64"
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -262,6 +263,22 @@ func (gw *Gateway) processSpec(
 		logger.Debug("Loading JS Paths")
 		if mwDriver == apidef.GojaDriver {
 			spec.GojaJSVM.LoadJSPaths(mwPaths, prefix)
+
+			// Load inline code from MiddlewareDefinition.Code fields (goja only)
+			for _, md := range collectAllMiddleware(mwAuthCheckFunc, mwPreFuncs, mwPostFuncs, mwPostAuthCheckFuncs, mwResponseFuncs) {
+				if md.Code == "" {
+					continue
+				}
+				decoded, err := base64.StdEncoding.DecodeString(md.Code)
+				if err != nil {
+					logger.WithError(err).Errorf("Failed to decode inline code for middleware %q", md.Name)
+					continue
+				}
+				if err := spec.GojaJSVM.LoadScript(string(decoded)); err != nil {
+					logger.WithError(err).Errorf("Failed to compile inline code for middleware %q", md.Name)
+					continue
+				}
+			}
 		} else {
 			spec.JSVM.LoadJSPaths(mwPaths, prefix)
 		}
@@ -1310,6 +1327,21 @@ func (gw *Gateway) enforceOrgDataAgeIfQuotasEnabled(spec *APISpec) {
 	spec.GlobalConfig.EnforceOrgDataAge = true
 	globalConf.EnforceOrgDataAge = true
 	gw.SetConfig(globalConf)
+}
+
+// collectAllMiddleware gathers MiddlewareDefinition entries from the auth check hook
+// and all hook slices (pre, post, post-key-auth, response) into a single flat slice.
+func collectAllMiddleware(authCheck apidef.MiddlewareDefinition, slices ...[]apidef.MiddlewareDefinition) []apidef.MiddlewareDefinition {
+	total := 1
+	for _, s := range slices {
+		total += len(s)
+	}
+	all := make([]apidef.MiddlewareDefinition, 0, total)
+	all = append(all, authCheck)
+	for _, s := range slices {
+		all = append(all, s...)
+	}
+	return all
 }
 
 // WithQuotaKey overrides quota key manually

@@ -1015,7 +1015,7 @@ func (gw *Gateway) loadCustomMiddleware(spec *APISpec) ([]string, apidef.Middlew
 	// Set AuthCheck hook
 	if !spec.CustomMiddleware.AuthCheck.Disabled && spec.CustomMiddleware.AuthCheck.Name != "" {
 		mwAuthCheckFunc = spec.CustomMiddleware.AuthCheck
-		if spec.CustomMiddleware.AuthCheck.Path != "" {
+		if spec.CustomMiddleware.AuthCheck.Code == "" && spec.CustomMiddleware.AuthCheck.Path != "" {
 			// Feed a JS file to Otto
 			mwPaths = append(mwPaths, spec.CustomMiddleware.AuthCheck.Path)
 		}
@@ -1027,7 +1027,9 @@ func (gw *Gateway) loadCustomMiddleware(spec *APISpec) ([]string, apidef.Middlew
 			continue
 		}
 
-		mwPaths = append(mwPaths, mwObj.Path)
+		if mwObj.Code == "" {
+			mwPaths = append(mwPaths, mwObj.Path)
+		}
 		mwPreFuncs = append(mwPreFuncs, mwObj)
 		mainLog.Debug("Loading custom PRE-PROCESSOR middleware: ", mwObj.Name)
 	}
@@ -1036,7 +1038,9 @@ func (gw *Gateway) loadCustomMiddleware(spec *APISpec) ([]string, apidef.Middlew
 			continue
 		}
 
-		mwPaths = append(mwPaths, mwObj.Path)
+		if mwObj.Code == "" {
+			mwPaths = append(mwPaths, mwObj.Path)
+		}
 		mwPostFuncs = append(mwPostFuncs, mwObj)
 		mainLog.Debug("Loading custom POST-PROCESSOR middleware: ", mwObj.Name)
 	}

@@ -1349,6 +1349,22 @@ type CustomPlugin struct {
 	// Tyk classic API definition: `custom_middleware.pre[].path`, `custom_middleware.post_key_auth[].path`,
 	// `custom_middleware.post[].path`, `custom_middleware.response[].path`.
 	Path string `bson:"path" json:"path"`
+	// Code is the base64-encoded JS source code for inline plugin execution (goja driver).
+	// When non-empty, Code takes precedence over Path.
+	//
+	// Tyk classic API definition: `custom_middleware.pre[].code`, `custom_middleware.post_key_auth[].code`,
+	// `custom_middleware.post[].code`, `custom_middleware.response[].code`.
+	Code string `bson:"code,omitempty" json:"code,omitempty"`
+	// PluginID references the Plugin Studio entity this middleware was loaded from.
+	//
+	// Tyk classic API definition: `custom_middleware.pre[].plugin_id`, `custom_middleware.post_key_auth[].plugin_id`,
+	// `custom_middleware.post[].plugin_id`, `custom_middleware.response[].plugin_id`.
+	PluginID string `bson:"pluginId,omitempty" json:"pluginId,omitempty"`
+	// PluginHash is the SHA-256 hash of the plugin source code at the time it was attached.
+	//
+	// Tyk classic API definition: `custom_middleware.pre[].plugin_hash`, `custom_middleware.post_key_auth[].plugin_hash`,
+	// `custom_middleware.post[].plugin_hash`, `custom_middleware.response[].plugin_hash`.
+	PluginHash string `bson:"pluginHash,omitempty" json:"pluginHash,omitempty"`
 	// RawBodyOnly if set to true, do not fill body in request or response object.
 	//
 	// Tyk classic API definition: `custom_middleware.pre[].raw_body_only`, `custom_middleware.post_key_auth[].raw_body_only`,
@@ -1376,6 +1392,9 @@ func (c *CustomPlugins) Fill(mwDefs []apidef.MiddlewareDefinition) {
 		customPlugins[i] = CustomPlugin{
 			Enabled:        !mwDef.Disabled,
 			Path:           mwDef.Path,
+			Code:           mwDef.Code,
+			PluginID:       mwDef.PluginID,
+			PluginHash:     mwDef.PluginHash,
 			FunctionName:   mwDef.Name,
 			RawBodyOnly:    mwDef.RawBodyOnly,
 			RequireSession: mwDef.RequireSession,
@@ -1396,6 +1415,9 @@ func (c *CustomPlugins) ExtractTo(mwDefs []apidef.MiddlewareDefinition) {
 			Disabled:       !plugin.Enabled,
 			Name:           plugin.FunctionName,
 			Path:           plugin.Path,
+			Code:           plugin.Code,
+			PluginID:       plugin.PluginID,
+			PluginHash:     plugin.PluginHash,
 			RawBodyOnly:    plugin.RawBodyOnly,
 			RequireSession: plugin.RequireSession,
 		}
