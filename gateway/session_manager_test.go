@@ -1,6 +1,7 @@
 package gateway
 
 import (
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -622,6 +623,28 @@ func TestSessionLimiter(t *testing.T) {
 		state, block = limiter.limitRedis(r, session, key, apiLimit, false)
 		assert.InDelta(t, 60.0, state.Reset.Seconds(), 0.1, "third call is blocked for all window size")
 		assert.True(t, block, "third call is blocked")
+	})
+
+	t.Run("limitDRL should correctly report blocked status during dry run when remaining tokens are insufficient", func(t *testing.T) {
+		drlManager := &drl.DRL{RequestTokenValue: 2}
+		drlManager.SetCurrentTokenValue(3)
+
+		limiter := newSessionLimiter(t)
+		limiter.drlManager = drlManager
+
+		apiLimit := &user.APILimit{RateLimit: user.RateLimit{Rate: 2, Per: 60}}
+		bucketKey := "test-drl-dryrun-key"
+
+		state, blocked := limiter.limitDRL(bucketKey, apiLimit, false)
+		require.False(t, blocked)
+		require.Equal(t, uint(1), state.Remaining)
+
+		_, blocked = limiter.limitDRL(bucketKey, apiLimit, true)
+		require.True(t, blocked, fmt.Sprintf(
+			"Dry run should return blocked=true when available tokens (%d) are less than cost (%d)",
+			state.Remaining,
+			drlManager.RequestTokenValue,
+		))
 	})
 }
 

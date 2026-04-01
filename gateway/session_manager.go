@@ -207,7 +207,7 @@ func (l *SessionLimiter) limitDRL(bucketKey string, apiLimit *user.APILimit, dry
 
 	if dryRun {
 		state := userBucket.State()
-		return state, state.Remaining == 0 && time.Now().Before(state.Reset)
+		return state, state.Remaining < tokenValue && time.Now().Before(state.Reset)
 	}
 
 	state, errF := userBucket.Add(tokenValue)
