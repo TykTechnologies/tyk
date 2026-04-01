@@ -10,12 +10,12 @@ jobs:
     name: Opentelemetry e2e
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4
         with:
           fetch-depth: 1
 
       - name: Install Task
-        uses: arduino/setup-task@v1
+        uses: arduino/setup-task@accf38bba955639d21816bb68775e5c48c482182  # v1
         with:
           version: 3
 
@@ -32,7 +32,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4
         with:
           fetch-depth: 1
 
@@ -40,9 +40,9 @@ jobs:
         uses: ./.github/actions/ecr-login
 
       - name: Setup CI Tooling
-        uses: shrink/actions-docker-extract@v3
+        uses: shrink/actions-docker-extract@04c17c51a5b9fd93b7aed2e05e86c8fe2d90ee52  # v3
         with:
-          image: tykio/ci-tools:latest
+          image: tykio/ci-tools@sha256:1796c0938247f42c580c501f7cd04e1144a59a62c6d8ba743572ff40371e1306  # latest
           path: /usr/local/bin/.
           destination: /usr/local/bin
 
@@ -70,7 +70,7 @@ jobs:
     if: startsWith(github.ref, 'refs/tags')
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4
         with:
           fetch-depth: 1
 
