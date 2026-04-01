@@ -56,23 +56,6 @@ func Test_rateLimitSender(t *testing.T) {
 	})
 
 	t.Run("SendRateLimits", func(t *testing.T) {
-		t.Run("sends quotas and creates headers map headers", func(t *testing.T) {
-			assert.NotPanics(t, func() {
-				hdr := http.Header{}
-				rls := &rateLimitSender{hdr: hdr}
-
-				rls.SendRateLimits(Stats{
-					Limit:     200,
-					Remaining: 100,
-					Reset:     time.Second,
-				})
-
-				assert.Equal(t, "200", hdr.Get(header.XRateLimitLimit))
-				assert.Equal(t, "100", hdr.Get(header.XRateLimitRemaining))
-				assert.Equal(t, "1", hdr.Get(header.XRateLimitReset))
-			})
-		})
-
 		t.Run("sends rate limits and formats reset as unix timestamp", func(t *testing.T) {
 			assert.NotPanics(t, func() {
 				hdr := http.Header{}
