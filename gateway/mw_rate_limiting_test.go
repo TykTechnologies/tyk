@@ -179,6 +179,7 @@ func TestRateLimitResponseHeaders_NoDuplicated(t *testing.T) {
 	api := ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 		spec.Proxy.ListenPath = "/rate-limit-headers-test"
 		spec.Proxy.TargetURL = TestHttpAny + "/upstream-with-rl-headers"
+		spec.Proxy.StripListenPath = true
 		spec.UseKeylessAccess = false
 	})[0]
 
