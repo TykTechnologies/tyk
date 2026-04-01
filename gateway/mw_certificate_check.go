@@ -6,12 +6,9 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/sirupsen/logrus"
-
 	"github.com/TykTechnologies/tyk/certs"
 	"github.com/TykTechnologies/tyk/internal/certcheck"
 	"github.com/TykTechnologies/tyk/internal/crypto"
-	"github.com/TykTechnologies/tyk/pkg/errpack"
 	"github.com/TykTechnologies/tyk/storage"
 )
 
@@ -114,11 +111,6 @@ func (m *CertificateCheckMW) ProcessRequest(w http.ResponseWriter, r *http.Reque
 		certIDs := append(m.Spec.ClientCertificates, m.Spec.GlobalConfig.Security.Certificates.API...)
 		apiCerts := m.Gw.CertificateManager.List(certIDs, certs.CertificatePublic)
 		if err := crypto.ValidateRequestCerts(r, apiCerts); err != nil {
-			log.
-				WithField("api_id", m.Spec.APIID).
-				WithField("api_name", m.Spec.Name).
-				WithField("mw", m.Name()).
-				Log(errpack.LogLevel(err, logrus.WarnLevel), "Certificate validation failed: ", err)
 			m.batchCertificatesExpirationCheck(apiCerts)
 			return err, http.StatusForbidden
 		}
