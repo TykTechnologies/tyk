@@ -361,13 +361,13 @@ func (l *SessionLimiter) newRateLimitChecker(
 
 		// todo: change limiter to interface and remove limiter.Func
 		return rate.AnonChecker(func() (rate.Stats, bool, error) {
-			ttl, err := limiterFn(r.Context(), limiterKey, apiLimit.Rate, apiLimit.Per)
+			waitTime, err := limiterFn(r.Context(), limiterKey, apiLimit.Rate, apiLimit.Per)
 
 			switch {
 			case errors.Is(err, rate.ErrLimitExhausted):
 				return rate.Stats{
 					Limit:     int(apiLimit.Rate),
-					Reset:     ttl,
+					Reset:     waitTime,
 					Remaining: -1,
 				}, true, nil
 
@@ -378,9 +378,9 @@ func (l *SessionLimiter) newRateLimitChecker(
 
 				return rate.Stats{
 					Limit:     int(apiLimit.Rate),
-					Reset:     ttl,
+					Reset:     waitTime,
 					Remaining: -1,
-				}, ttl <= 0, nil
+				}, waitTime > 0, nil
 			}
 		})
 
@@ -671,6 +671,7 @@ func newBucketStateChecker(
 	shouldBlock bool,
 	tokenValue uint,
 ) rate.AnonChecker {
+
 	return func() (rate.Stats, bool, error) {
 		remaining := int(state.Remaining)
 		if tokenValue > 0 {
