@@ -162,6 +162,93 @@ func TestRateLimitResponseHeaders(t *testing.T) {
 	}
 }
 
+func TestRateLimitResponseHeaders_NoDuplicated(t *testing.T) {
+	ts := StartTest(func(globalConf *config.Config) {
+		globalConf.RateLimitHeadersSource = config.RateLimitHeadersSourceRateLimit
+		globalConf.EnableRedisRollingLimiter = true
+	})
+	defer ts.Close()
+
+	ts.AddDynamicHandler("upstream-with-rl-headers", func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set(header.XRateLimitLimit, "999")
+		w.Header().Set(header.XRateLimitRemaining, "998")
+		w.Header().Set(header.XRateLimitReset, "1234567890")
+		w.WriteHeader(http.StatusOK)
+	})
+
+	api := ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		spec.Proxy.ListenPath = "/rate-limit-headers-test"
+		spec.Proxy.TargetURL = TestHttpAny + "/upstream-with-rl-headers"
+		spec.UseKeylessAccess = false
+	})[0]
+
+	_, authKey := ts.CreateSession(func(s *user.SessionState) {
+		s.AccessRights = map[string]user.AccessDefinition{
+			api.APIID: {
+				APIName: api.Name,
+				APIID:   api.APIID,
+				Limit: user.APILimit{
+					RateLimit: user.RateLimit{Rate: 2, Per: 10},
+				},
+			},
+		}
+	})
+
+	resp, _ := ts.Run(t, []test.TestCase{
+		{
+			Headers: map[string]string{header.Authorization: authKey},
+			Path:    "/rate-limit-headers-test",
+			Code:    http.StatusOK,
+		},
+	}...)
+
+	assert.Equal(t, "2", resp.Header.Get(header.XRateLimitLimit))
+	assert.Equal(t, "1", resp.Header.Get(header.XRateLimitRemaining))
+	assert.NotEqual(t, "1234567890", resp.Header.Get(header.XRateLimitReset))
+	assert.NotEmpty(t, resp.Header.Get(header.XRateLimitReset))
+	assert.Len(t, resp.Header.Values(header.XRateLimitLimit), 1)
+}
+
+// TestQuotaHeadersOnErrorResponses verifies the current behavior where quota headers
+// are not populated when requests are rejected due to quota exhaustion.
+//
+// When a request exceeds the quota limit and returns 403 Forbidden,
+// the X-RateLimit-* headers are not included in the response. This differs from
+// rate limiting behavior where headers are typically present on rejection.
+func TestQuotaHeadersOnErrorResponses(t *testing.T) {
+	ts := StartTest(func(globalConf *config.Config) {
+		globalConf.RateLimitHeadersSource = config.RateLimitHeadersSourceQuota
+	})
+
+	api := ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		spec.Proxy.ListenPath = "/quota-headers-error-test"
+		spec.UseKeylessAccess = false
+	})[0]
+
+	_, authKey := ts.CreateSession(func(s *user.SessionState) {
+		s.AccessRights = map[string]user.AccessDefinition{
+			api.APIID: {
+				APIName: api.Name,
+				APIID:   api.APIID,
+				Limit: user.APILimit{
+					QuotaMax:         1,
+					QuotaRenewalRate: 60,
+				},
+			},
+		}
+	})
+
+	authHeader := map[string]string{header.Authorization: authKey}
+
+	resp, _ := ts.Run(t, []test.TestCase{
+		{Headers: authHeader, Path: "/quota-headers-error-test", Code: http.StatusOK},
+		{Headers: authHeader, Path: "/quota-headers-error-test", Code: http.StatusForbidden},
+	}...)
+
+	assert.Equal(t, "", resp.Header.Get(header.XRateLimitLimit))
+	assert.Equal(t, "", resp.Header.Get(header.XRateLimitRemaining))
+}
+
 func TestNeverRenewQuota(t *testing.T) {
 	g := StartTest(nil)
 	defer g.Close()
