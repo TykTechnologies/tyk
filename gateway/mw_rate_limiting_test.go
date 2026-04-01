@@ -1,6 +1,7 @@
 package gateway
 
 import (
+	"fmt"
 	"net/http"
 	"testing"
 	"time"
@@ -8,6 +9,8 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/TykTechnologies/graphql-go-tools/pkg/graphql"
+
+	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/header"
 	"github.com/TykTechnologies/tyk/test"
 	"github.com/TykTechnologies/tyk/user"
@@ -63,6 +66,100 @@ func TestRateLimit_Unlimited(t *testing.T) {
 			{Headers: authHeader, Code: http.StatusOK},
 		}...)
 	})
+}
+
+func TestRateLimitResponseHeaders(t *testing.T) {
+	limiters := []string{"Redis", "Sentinel", "DRL", "FixedWindow"}
+
+	for _, limiter := range limiters {
+		t.Run("Rate limit headers for "+limiter, func(t *testing.T) {
+			ts := StartTest(func(globalConf *config.Config) {
+				globalConf.RateLimitHeadersSource = config.RateLimitHeadersSourceRateLimit
+
+				switch limiter {
+				case "Redis":
+					globalConf.EnableRedisRollingLimiter = true
+				case "Sentinel":
+					globalConf.EnableSentinelRateLimiter = true
+				case "DRL":
+					globalConf.DRLEnableSentinelRateLimiter = true
+				case "FixedWindow":
+					globalConf.EnableFixedWindowRateLimiter = true
+				}
+			})
+			defer ts.Close()
+
+			api := ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+				spec.Proxy.ListenPath = "/rate-limit-headers-test"
+				spec.UseKeylessAccess = false
+			})[0]
+
+			var (
+				rateLimitRate float64 = 2
+				rateLimitPer  float64 = 10
+			)
+
+			_, authKey := ts.CreateSession(func(s *user.SessionState) {
+				s.AccessRights = map[string]user.AccessDefinition{
+					api.APIID: {
+						APIName: api.Name,
+						APIID:   api.APIID,
+						Limit: user.APILimit{
+							RateLimit: user.RateLimit{
+								Rate: rateLimitRate,
+								Per:  rateLimitPer,
+							},
+						},
+						AllowanceScope: api.APIID,
+					},
+				}
+				s.OrgID = api.OrgID
+			})
+
+			authorization := map[string]string{
+				header.Authorization: authKey,
+			}
+
+			expectedRemaining1 := fmt.Sprintf("%d", int(rateLimitRate)-1)
+			expectedRemaining2 := fmt.Sprintf("%d", int(rateLimitRate)-2)
+
+			headersMatch1 := map[string]string{
+				header.XRateLimitLimit: fmt.Sprintf("%d", int(rateLimitRate)),
+			}
+			headersMatch2 := map[string]string{
+				header.XRateLimitLimit: fmt.Sprintf("%d", int(rateLimitRate)),
+			}
+
+			// For limiters that don't support Remaining (Sentinel, FixedWindow), it should be omitted.
+			if limiter == "Redis" || limiter == "DRL" {
+				headersMatch1[header.XRateLimitRemaining] = expectedRemaining1
+				headersMatch2[header.XRateLimitRemaining] = expectedRemaining2
+			} else {
+				headersMatch1[header.XRateLimitRemaining] = ""
+				headersMatch2[header.XRateLimitRemaining] = ""
+			}
+
+			_, _ = ts.Run(t, []test.TestCase{
+				{
+					Headers:      authorization,
+					Path:         "/rate-limit-headers-test",
+					Code:         http.StatusOK,
+					HeadersMatch: headersMatch1,
+				},
+				{
+					Headers:      authorization,
+					Path:         "/rate-limit-headers-test",
+					Code:         http.StatusOK,
+					HeadersMatch: headersMatch2,
+				},
+				{
+					Headers: authorization,
+					Path:    "/rate-limit-headers-test",
+					Code:    http.StatusTooManyRequests,
+				},
+			}...)
+		})
+	}
 }
 
 func TestNeverRenewQuota(t *testing.T) {
