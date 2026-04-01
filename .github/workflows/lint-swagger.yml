@@ -14,7 +14,7 @@ concurrency:
 
 jobs:
   dep-guard:
-    uses: TykTechnologies/github-actions/.github/workflows/dependency-guard.yml@2b35ab5dd4cfff21ced9d12446e9e27d10bf5785  # main
+    uses: TykTechnologies/github-actions/.github/workflows/dependency-guard.yml@42304edda365365e0a887cf018d8edc34b960b82  # main
     permissions:
       contents: read
 
@@ -48,7 +48,7 @@ jobs:
           git config --global url."https://${TOKEN}@github.com".insteadOf "https://github.com"
 
       - name: Checkout repo
-        uses: TykTechnologies/github-actions/.github/actions/checkout-pr@2b35ab5dd4cfff21ced9d12446e9e27d10bf5785  # main
+        uses: TykTechnologies/github-actions/.github/actions/checkout-pr@42304edda365365e0a887cf018d8edc34b960b82  # main
         with:
           token: ${{ secrets.ORG_GH_TOKEN }}
 
