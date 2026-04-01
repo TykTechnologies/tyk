@@ -16,7 +16,6 @@ import (
 
 	"github.com/TykTechnologies/tyk-pump/analytics"
 	"github.com/TykTechnologies/tyk/config"
-
 	"github.com/TykTechnologies/tyk/header"
 	"github.com/TykTechnologies/tyk/internal/httpctx"
 	jsonrpcerrors "github.com/TykTechnologies/tyk/internal/jsonrpc/errors"
@@ -93,7 +92,6 @@ type TemplateExecutor interface {
 // HandleError is the actual error handler and will store the error details in analytics if analytics processing is enabled.
 func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMsg string, errCode int, writeResponse bool) {
 	defer e.Base().UpdateRequestSession(r)
-	e.Base().Gw.MetricInstruments.RecordRequest(r.Context())
 	response := &http.Response{}
 
 	if writeResponse {
@@ -102,6 +100,17 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 			response = e.writeJSONRPCErrorResponse(w, r, errMsg, errCode)
 		} else {
 			response = e.writeTemplateErrorResponse(w, r, errMsg, errCode)
+		}
+	}
+
+	// Calculate latency for error responses (needed for both API metrics and analytics).
+	var latency analytics.Latency
+	if requestStartTime := ctxGetRequestStartTime(r); !requestStartTime.IsZero() {
+		totalMs := int64(DurationToMillisecond(time.Since(requestStartTime)))
+		latency = analytics.Latency{
+			Total:    totalMs,
+			Upstream: 0,       // No successful upstream response for errors
+			Gateway:  totalMs, // All time is gateway time for errors
 		}
 	}
 
@@ -114,17 +123,6 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 	var alias string
 
 	ip := request.RealIP(r)
-
-	// Calculate latency for error responses
-	var latency analytics.Latency
-	if requestStartTime := ctxGetRequestStartTime(r); !requestStartTime.IsZero() {
-		totalMs := int64(DurationToMillisecond(time.Since(requestStartTime)))
-		latency = analytics.Latency{
-			Total:    totalMs,
-			Upstream: 0,       // No successful upstream response for errors
-			Gateway:  totalMs, // All time is gateway time for errors
-		}
-	}
 
 	if e.Spec.GlobalConfig.StoreAnalytics(ip) {
 
@@ -259,6 +257,7 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 	}
 
 	e.RecordAccessLog(r, response, latency)
+	e.Base().RecordMetrics(w, r, errCode, latency, nil)
 
 	// Report in health check
 	reportHealthValue(e.Spec, BlockedRequestLog, "-1")
@@ -274,6 +273,9 @@ func (e *ErrorHandler) writeTemplateErrorResponse(w http.ResponseWriter, r *http
 	contentType = strings.Split(contentType, ";")[0]
 
 	switch contentType {
+	case header.ApplicationSoapXML:
+		templateExtension = "xml"
+		contentType = header.ApplicationSoapXML
 	case header.ApplicationXML:
 		templateExtension = "xml"
 		contentType = header.ApplicationXML
@@ -331,7 +333,7 @@ func (e *ErrorHandler) writeTemplateErrorResponse(w http.ResponseWriter, r *http
 
 		apiError := APIError{htmltemplate.HTML(htmltemplate.JSEscapeString(errMsg))}
 
-		if contentType == header.ApplicationXML || contentType == header.TextXML {
+		if contentType == header.ApplicationXML || contentType == header.TextXML || contentType == header.ApplicationSoapXML {
 			apiError.Message = htmltemplate.HTML(errMsg)
 
 			//we look up in the last defined templateName to obtain the template.
@@ -367,6 +369,8 @@ func (e *ErrorHandler) writeJSONRPCErrorResponse(w http.ResponseWriter, r *http.
 	if state := httpctx.GetJSONRPCRoutingState(r); state != nil {
 		requestID = state.ID
 	}
+
+	ctxSetJSONRPCErrorCode(r, jsonrpcerrors.MapHTTPStatusToJSONRPCCode(httpCode))
 
 	responseBody := jsonrpcerrors.WriteJSONRPCError(w, requestID, httpCode, errMsg)
 

@@ -125,6 +125,10 @@ func TestContextKeyUniqueness(t *testing.T) {
 		ctx.JSONRPCRequest:            "JSONRPCRequest",
 		ctx.JSONRPCRoutingState:       "JSONRPCRoutingState",
 		ctx.MCPRouting:                "MCPRouting",
+		ctx.MCPMethod:                 "MCPMethod",
+		ctx.MCPPrimitiveType:          "MCPPrimitiveType",
+		ctx.MCPPrimitiveName:          "MCPPrimitiveName",
+		ctx.JSONRPCErrorCode:          "JSONRPCErrorCode",
 	}
 
 	seen := make(map[ctx.Key]bool)

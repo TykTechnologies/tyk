@@ -52,6 +52,7 @@ import (
 	"github.com/TykTechnologies/tyk/dnscache"
 	"github.com/TykTechnologies/tyk/header"
 	"github.com/TykTechnologies/tyk/internal/cache"
+	"github.com/TykTechnologies/tyk/internal/compression"
 	"github.com/TykTechnologies/tyk/internal/crypto"
 	"github.com/TykTechnologies/tyk/internal/httputil"
 	"github.com/TykTechnologies/tyk/internal/model"
@@ -61,6 +62,7 @@ import (
 	"github.com/TykTechnologies/tyk/internal/service/newrelic"
 	"github.com/TykTechnologies/tyk/internal/uuid"
 	logger "github.com/TykTechnologies/tyk/log"
+	"github.com/TykTechnologies/tyk/pkg/validator"
 	"github.com/TykTechnologies/tyk/regexp"
 	"github.com/TykTechnologies/tyk/request"
 	"github.com/TykTechnologies/tyk/rpc"
@@ -169,6 +171,7 @@ type Gateway struct {
 	policies *model.Policies
 
 	certUsageTracker *certUsageTracker // nil in non-RPC mode
+	pendingCerts     sync.Map          // certID -> struct{}, certs skipped due to tracker miss
 
 	dnsCacheManager dnscache.IDnsCacheManager
 
@@ -227,6 +230,8 @@ type Gateway struct {
 	apiJWKCaches sync.Map
 
 	BundleChecksumVerifier bundleChecksumVerifyFunction
+
+	validator validator.Validator
 }
 
 func NewGateway(config config.Config, ctx context.Context) *Gateway {
@@ -368,6 +373,27 @@ func (gw *Gateway) SetupNewRelic() (app *newrelic.Application) {
 	return
 }
 
+// InitOpenTelemetryInstruments initializes the OpenTelemetry tracer provider
+// and metric instruments from the current gateway configuration.
+func (gw *Gateway) InitOpenTelemetryInstruments() {
+	cfg := gw.GetConfig()
+	gw.TracerProvider = otel.InitOpenTelemetry(gw.ctx, mainLog.Logger, &cfg.OpenTelemetry,
+		gw.GetNodeID(),
+		VERSION,
+		cfg.SlaveOptions.UseRPC,
+		cfg.SlaveOptions.GroupID,
+		cfg.DBAppConfOptions.NodeIsSegmented,
+		cfg.DBAppConfOptions.Tags)
+
+	gw.MetricInstruments = otel.InitOpenTelemetryMetrics(gw.ctx, mainLog.Logger, &cfg.OpenTelemetry,
+		gw.GetNodeID(),
+		VERSION,
+		cfg.SlaveOptions.UseRPC,
+		cfg.SlaveOptions.GroupID,
+		cfg.DBAppConfOptions.NodeIsSegmented,
+		cfg.DBAppConfOptions.Tags)
+}
+
 func (gw *Gateway) UnmarshalJSON(data []byte) error {
 	return nil
 }
@@ -435,6 +461,10 @@ func (gw *Gateway) setupGlobals() {
 
 	// Initialize the Global function in the request package to access the gateway config
 	request.Global = gw.GetConfig
+
+	if gwConfig.Storage.MaxDecompressedSize > 0 {
+		compression.SetMaxDecompressedSize(uint64(gwConfig.Storage.MaxDecompressedSize))
+	}
 
 	gw.dnsCacheManager = dnscache.NewDnsCacheManager(gwConfig.DnsCache.MultipleIPsHandleStrategy)
 
@@ -585,7 +615,7 @@ func (gw *Gateway) setupGlobals() {
 			HashKeys:  false,
 			Gw:        gw,
 		}
-		gw.CertificateManager = certs.NewSlaveCertManager(
+		slaveCM := certs.NewSlaveCertManager(
 			storeCert,
 			rpcStore,
 			certificateSecret,
@@ -600,11 +630,7 @@ func (gw *Gateway) setupGlobals() {
 			),
 		)
 
-		// Wire certificate registry for selective sync
-		if gw.GetConfig().SlaveOptions.SyncUsedCertsOnly && gw.certUsageTracker != nil {
-			cfg := gw.GetConfig()
-			gw.CertificateManager.SetUsageTracker(gw.certUsageTracker, &cfg)
-		}
+		gw.CertificateManager = slaveCM
 	}
 
 	if gw.GetConfig().NewRelic.AppName != "" {
@@ -1184,6 +1210,15 @@ func (gw *Gateway) DoReload() {
 	gw.reloadMu.Lock()
 	defer gw.reloadMu.Unlock()
 
+	start := time.Now()
+
+	// Always record the current config state (loaded API and policy counts)
+	// even if the reload fails partway through. This ensures gauges report 0
+	// rather than emitting no data when e.g. MDCB is unreachable.
+	defer func() {
+		gw.MetricInstruments.RecordConfigState(gw.ctx, gw.apisByIDLen(), gw.policies.PolicyCount())
+	}()
+
 	// Initialize/reset the JSVM
 	if gw.GetConfig().EnableJSVM {
 		gw.GlobalEventsJSVM.DeInit()
@@ -1214,6 +1249,8 @@ func (gw *Gateway) DoReload() {
 	}
 
 	gw.loadGlobalApps()
+
+	gw.MetricInstruments.RecordReload(gw.ctx, time.Since(start))
 
 	gw.performedSuccessfulReload = true
 	mainLog.Info("API reload complete")
@@ -1330,6 +1367,7 @@ func (gw *Gateway) reloadLoop(tick <-chan time.Time, complete ...func()) {
 			if len(complete) != 0 {
 				complete[0]()
 			}
+
 			mainLog.Infof("reload: cycle completed in %v", time.Since(start))
 		}
 	}
@@ -1569,20 +1607,28 @@ func (gw *Gateway) initSystem() error {
 		}
 	}
 
-	if gwConfig.ProxySSLMaxVersion == 0 {
-		gwConfig.ProxySSLMaxVersion = tls.VersionTLS12
+	if tMin, tMax, err := resolveTLSVersions(gwConfig.ProxySSLMinVersion, gwConfig.ProxySSLMaxVersion); err != nil {
+		return fmt.Errorf("failed to resolve `proxy_ssl_min_version` and `proxy_ssl_max_version`: %w", err)
+	} else {
+		log.
+			WithField("proxy_ssl_min_version", tls.VersionName(tMin)).
+			WithField("proxy_ssl_max_version", tls.VersionName(tMax)).
+			Info("Proxy TLS protocol range resolved and applied")
+
+		gwConfig.ProxySSLMinVersion = tMin
+		gwConfig.ProxySSLMaxVersion = tMax
 	}
 
-	if gwConfig.ProxySSLMinVersion > gwConfig.ProxySSLMaxVersion {
-		gwConfig.ProxySSLMaxVersion = gwConfig.ProxySSLMinVersion
-	}
+	if tMin, tMax, err := resolveTLSVersions(gwConfig.HttpServerOptions.MinVersion, gwConfig.HttpServerOptions.MaxVersion); err != nil {
+		return fmt.Errorf("failed to resolve `http_server_options.min_version` and `http_server_options.max_version`: %w", err)
+	} else {
+		log.
+			WithField("http_server_options.min_version", tls.VersionName(tMin)).
+			WithField("http_server_options.max_version", tls.VersionName(tMax)).
+			Info("HttpServerOptions TLS protocol range resolved and applied")
 
-	if gwConfig.HttpServerOptions.MaxVersion == 0 {
-		gwConfig.HttpServerOptions.MaxVersion = tls.VersionTLS12
-	}
-
-	if gwConfig.HttpServerOptions.MinVersion > gwConfig.HttpServerOptions.MaxVersion {
-		gwConfig.HttpServerOptions.MaxVersion = gwConfig.HttpServerOptions.MinVersion
+		gwConfig.HttpServerOptions.MinVersion = tMin
+		gwConfig.HttpServerOptions.MaxVersion = tMax
 	}
 
 	if gwConfig.UseDBAppConfigs && gwConfig.Policies.PolicySource != config.DefaultDashPolicySource {
@@ -1606,7 +1652,16 @@ func (gw *Gateway) initSystem() error {
 	// instances periodically and deletes idle items, closes net.Listener instances to
 	// free resources.
 	go cleanIdleMemConnProviders(gw.ctx)
+
+	gw.initMembers(gwConfig)
+
 	return nil
+}
+
+func (gw *Gateway) initMembers(cfg config.Config) {
+	gw.validator = validator.New(
+		validator.WithAllowUnsafePolicyIds(cfg.AllowUnsafePolicyIds),
+	)
 }
 
 // SignatureVerifier returns a verifier to use for validating signatures.
@@ -1772,11 +1827,10 @@ func (gw *Gateway) afterConfSetup() {
 		}
 	}
 
-	if conf.OpenTelemetry.Enabled {
-		if conf.OpenTelemetry.ResourceName == "" {
-			conf.OpenTelemetry.ResourceName = config.DefaultOTelResourceName
+	if conf.OpenTelemetry.TracesEnabled() || (conf.OpenTelemetry.Metrics.Enabled != nil && *conf.OpenTelemetry.Metrics.Enabled) {
+		if traceConfig := conf.OpenTelemetry.EffectiveTraceConfig(); traceConfig.ResourceName == "" {
+			traceConfig.ResourceName = config.DefaultOTelResourceName
 		}
-
 		conf.OpenTelemetry.SetDefaults()
 	}
 
@@ -1887,7 +1941,6 @@ func (gw *Gateway) getGlobalMDCBStorageHandler(keyPrefix string, hashKeys bool) 
 	logger := logrus.New().WithFields(logrus.Fields{"prefix": "mdcb-storage-handler"})
 
 	if gw.GetConfig().SlaveOptions.UseRPC {
-		cfg := gw.GetConfig()
 		return storage.NewMdcbStorage(
 			localStorage,
 			&RPCStorageHandler{
@@ -1897,8 +1950,6 @@ func (gw *Gateway) getGlobalMDCBStorageHandler(keyPrefix string, hashKeys bool) 
 			},
 			logger,
 			nil,
-			gw.certUsageTracker,
-			&cfg,
 		)
 	}
 	return localStorage
@@ -1932,6 +1983,14 @@ func Start() {
 	// Stop gateway process if not running in "start" mode:
 	if !cli.DefaultMode {
 		os.Exit(0)
+	}
+
+	// Check for --conf flag BEFORE loading the config
+	if *cli.Conf != "" {
+		mainLog.Debugf("Using %s for configuration", *cli.Conf)
+		confPaths = []string{*cli.Conf}
+	} else {
+		mainLog.Debug("No configuration file defined, will try to use default (tyk.conf)")
 	}
 
 	gwConfig := config.Config{}
@@ -2011,21 +2070,7 @@ func Start() {
 		defer trace.Close()
 	}
 
-	// Use gw.GetConfig() to ensure we get the config loaded from the --conf
-	// flag path (set in initSystem), not the stale local gwConfig which may
-	// have been loaded from the default tyk.conf before initSystem ran.
-	otelCfg := gw.GetConfig()
-	gw.TracerProvider = otel.InitOpenTelemetry(gw.ctx, mainLog.Logger, &otelCfg.OpenTelemetry,
-		gw.GetNodeID(),
-		VERSION,
-		otelCfg.SlaveOptions.UseRPC,
-		otelCfg.SlaveOptions.GroupID,
-		otelCfg.DBAppConfOptions.NodeIsSegmented,
-		otelCfg.DBAppConfOptions.Tags)
-
-	gw.MetricInstruments = otel.InitOpenTelemetryMetrics(gw.ctx, mainLog.Logger, &otelCfg.OpenTelemetry,
-		gw.GetNodeID(),
-		VERSION)
+	gw.InitOpenTelemetryInstruments()
 
 	gw.start()
 

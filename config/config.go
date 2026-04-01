@@ -196,12 +196,22 @@ type StorageOptionsConf struct {
 	// Options: ["1.0", "1.1", "1.2", "1.3"].
 	// Defaults to "1.2".
 	TLSMinVersion string `json:"tls_min_version"`
-	// Enables Zstd compression of API definitions stored in Redis backups.
-	// When enabled, API definitions are compressed before encryption, reducing Redis storage.
+	// When set to `true`, enables Zstd compression for API definitions stored in Redis RPC backups.
+	// This feature significantly reduces Redis memory usage in MDCB deployments where API definitions are cached locally on Data Plane Gateways.
 	// The Gateway can read both compressed and uncompressed formats for backward compatibility.
-	// Note: Decompression has a 100MB memory limit.
-	// Defaults to false.
+	//
+	// You can safely enable this setting on existing deployments.
+	// The Gateway continues to load previously stored uncompressed backups and stores all new backups in compressed form.
+	//
+	// Note: The maximum decompressed size is controlled by `max_decompressed_size`.
+	//
+	// Defaults to `false`.
 	CompressAPIDefinitions bool `json:"compress_api_definitions"`
+
+	// Maximum decompressed size (in bytes) for API definitions when using compression.
+	// This limit prevents memory exhaustion during decompression.
+	// Defaults to 104857600 (100MB).
+	MaxDecompressedSize int64 `json:"max_decompressed_size"`
 }
 
 type NormalisedURLConfig struct {
@@ -324,6 +334,11 @@ type AccessLogsConfig struct {
 	// - `upstream_latency` will include the upstream latency of the request.
 	// - `upstream_status` will include the upstream response status code for 5XX responses.
 	// - `user_agent` will include the user agent of the request.
+	// - `api_type` will include the API protocol type (classic, oas, graphql, mcp).
+	// - `mcp_method` will include the JSON-RPC method name (MCP APIs only).
+	// - `mcp_primitive_type` will include the MCP primitive type (MCP APIs only).
+	// - `mcp_primitive_name` will include the MCP primitive name (MCP APIs only).
+	// - `mcp_error_code` will include the JSON-RPC error code (MCP APIs only).
 	Template []string `json:"template"`
 }
 
@@ -510,6 +525,7 @@ type HttpServerOptionsConfig struct {
 	//
 	// Note:
 	//   If you set `proxy_default_timeout` to a value greater than 120 seconds, you must also increase [http_server_options.write_timeout](#http-server-options-write-timeout) to a value greater than `proxy_default_timeout`. The `write_timeout` setting defaults to 120 seconds and controls how long Tyk waits to write the response back to the client. If not adjusted, the client connection will be closed before the upstream response is received.
+	//   This timeout does not apply to MCP (Model Context Protocol) SSE streams — the write deadline is cleared for MCP connections to allow long-lived streaming, similar to WebSocket connections.
 	WriteTimeout int `json:"write_timeout"`
 
 	// Set to true to enable SSL connections
@@ -734,9 +750,9 @@ type SecurityConfig struct {
 	// Specify public keys used for Certificate Pinning on global level.
 	PinnedPublicKeys map[string]string `json:"pinned_public_keys"`
 
-	// AllowUnsafeDynamicMTLSToken controls whether certificate presence is required for
-	// dynamic mTLS authentication. If set to false (default), requests with a token but
-	// no certificate will be rejected for APIs using dynamic mTLS.
+	// AllowUnsafeDynamicMTLSToken is provided for backward compatibility with clients that are authorized using just the
+	// token for APIs secured with legacy Dynamic mTLS. If set to false (default), the client certificate must be presented
+	// and the mTLS handshake will be enforced. This is the recommended setting.
 	AllowUnsafeDynamicMTLSToken bool `json:"allow_unsafe_dynamic_mtls_token"`
 
 	Certificates CertificatesConfig `json:"certificates"`
@@ -746,7 +762,7 @@ type SecurityConfig struct {
 }
 
 type JWKSConfig struct {
-	// Cache hodls configuration for JWKS caching
+	// Cache holds configuration for JWKS caching
 	Cache JWKSCacheConfig `json:"cache"`
 }
 
@@ -875,7 +891,6 @@ type Config struct {
 	AllowRemoteConfig bool `bson:"allow_remote_config" json:"allow_remote_config"`
 
 	// Set to true to enable the /config and /env endpoints for configuration inspection.
-	// These endpoints require X-Tyk-Authorization header with the secret value.
 	// Default: false
 	EnableConfigInspection bool `json:"enable_config_inspection"`
 
@@ -1359,6 +1374,9 @@ type Config struct {
 
 	// JWKS holds the configuration for Tyk JWKS functionalities
 	JWKS JWKSConfig `json:"jwks"`
+
+	// AllowUnsafePolicyIds allows unsafe policy identifiers
+	AllowUnsafePolicyIds bool `json:"allow_unsafe_policy_ids"`
 }
 
 // LabsConfig include config for streaming
