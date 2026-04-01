@@ -6,7 +6,7 @@ on:
 
 jobs:
   call_force_merge:
-    uses: TykTechnologies/github-actions/.github/workflows/force-merge.yaml@main
+    uses: TykTechnologies/github-actions/.github/workflows/force-merge.yaml@2b35ab5dd4cfff21ced9d12446e9e27d10bf5785  # main
     secrets:
       ADMIN_PAT: ${{ secrets.ORG_GH_TOKEN }}
       SLACK_WEBHOOK_URL: ${{ secrets.FORCE_MERGE_SLACK_WEBHOOK }}
