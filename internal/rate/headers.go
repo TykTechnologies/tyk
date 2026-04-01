@@ -55,7 +55,12 @@ func (q *quotaSender) SendQuotas(session *user.SessionState, apiId string) {
 	q.hdr.Set(header.XRateLimitReset, strconv.Itoa(int(quotaRenews)))
 }
 
-func (r *rateLimitSender) SendQuotas(_ *user.SessionState, _ string) {}
+// SendQuotas clears any rate limit headers that may have been injected by the upstream.
+func (r *rateLimitSender) SendQuotas(_ *user.SessionState, _ string) {
+	r.hdr.Del(header.XRateLimitLimit)
+	r.hdr.Del(header.XRateLimitRemaining)
+	r.hdr.Del(header.XRateLimitReset)
+}
 func (r *rateLimitSender) SendRateLimits(limits Stats) {
 	r.hdr.Set(header.XRateLimitLimit, strconv.Itoa(limits.Limit))
 
