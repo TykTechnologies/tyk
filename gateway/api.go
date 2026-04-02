@@ -1282,6 +1282,10 @@ func (gw *Gateway) handleGetAPIOAS(apiID string, modePublic bool) (interface{}, 
 			oasClone.RemoveTykExtension()
 		}
 
+		visitor := schema.NewVisitor()
+		visitor.AddSchemaManipulation(schema.RestoreUnicodeEscapesFromRE2Manipulation)
+		visitor.ProcessOAS(oasClone)
+
 		obj = oasClone
 	}
 
@@ -1638,11 +1642,6 @@ func (gw *Gateway) apiOASGetHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if oasAPI, ok := obj.(*oas.OAS); ok {
-		visitor := schema.NewVisitor()
-		visitor.AddSchemaManipulation(schema.RestoreUnicodeEscapesFromRE2Manipulation)
-		visitor.ProcessOAS(oasAPI)
-		obj = oasAPI
-
 		gw.setBaseAPIIDHeader(w, oasAPI)
 	}
 
