@@ -257,7 +257,7 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 	}
 
 	e.RecordAccessLog(r, response, latency)
-	e.Base().RecordMetrics(r, errCode, latency, nil)
+	e.Base().RecordMetrics(w, r, errCode, latency, nil)
 
 	// Report in health check
 	reportHealthValue(e.Spec, BlockedRequestLog, "-1")
@@ -273,6 +273,9 @@ func (e *ErrorHandler) writeTemplateErrorResponse(w http.ResponseWriter, r *http
 	contentType = strings.Split(contentType, ";")[0]
 
 	switch contentType {
+	case header.ApplicationSoapXML:
+		templateExtension = "xml"
+		contentType = header.ApplicationSoapXML
 	case header.ApplicationXML:
 		templateExtension = "xml"
 		contentType = header.ApplicationXML
@@ -330,7 +333,7 @@ func (e *ErrorHandler) writeTemplateErrorResponse(w http.ResponseWriter, r *http
 
 		apiError := APIError{htmltemplate.HTML(htmltemplate.JSEscapeString(errMsg))}
 
-		if contentType == header.ApplicationXML || contentType == header.TextXML {
+		if contentType == header.ApplicationXML || contentType == header.TextXML || contentType == header.ApplicationSoapXML {
 			apiError.Message = htmltemplate.HTML(errMsg)
 
 			//we look up in the last defined templateName to obtain the template.
@@ -366,6 +369,8 @@ func (e *ErrorHandler) writeJSONRPCErrorResponse(w http.ResponseWriter, r *http.
 	if state := httpctx.GetJSONRPCRoutingState(r); state != nil {
 		requestID = state.ID
 	}
+
+	ctxSetJSONRPCErrorCode(r, jsonrpcerrors.MapHTTPStatusToJSONRPCCode(httpCode))
 
 	responseBody := jsonrpcerrors.WriteJSONRPCError(w, requestID, httpCode, errMsg)
 

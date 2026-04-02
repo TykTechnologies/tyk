@@ -246,6 +246,68 @@ func TestGatewayResourceAttributes(t *testing.T) {
 				tyktrace.NewAttribute(string(semconv.TykGWSegmentTagsKey), []string{"tag1", "tag2"}),
 			},
 		},
+		{
+			name:        "Empty gateway ID",
+			gwID:        "",
+			isHybrid:    false,
+			groupID:     "",
+			isSegmented: false,
+			segmentTags: nil,
+			expectedAttr: []SpanAttribute{
+				tyktrace.NewAttribute(string(semconv.TykGWIDKey), ""),
+				tyktrace.NewAttribute(string(semconv.TykGWDataplaneKey), false),
+			},
+		},
+		{
+			name:        "Segmented with empty tags",
+			gwID:        "gw4",
+			isHybrid:    false,
+			groupID:     "",
+			isSegmented: true,
+			segmentTags: []string{},
+			expectedAttr: []SpanAttribute{
+				tyktrace.NewAttribute(string(semconv.TykGWIDKey), "gw4"),
+				tyktrace.NewAttribute(string(semconv.TykGWDataplaneKey), false),
+				tyktrace.NewAttribute(string(semconv.TykGWSegmentTagsKey), []string{}),
+			},
+		},
+		{
+			name:        "Segmented with nil tags",
+			gwID:        "gw5",
+			isHybrid:    false,
+			groupID:     "",
+			isSegmented: true,
+			segmentTags: nil,
+			expectedAttr: []SpanAttribute{
+				tyktrace.NewAttribute(string(semconv.TykGWIDKey), "gw5"),
+				tyktrace.NewAttribute(string(semconv.TykGWDataplaneKey), false),
+				tyktrace.NewAttribute(string(semconv.TykGWSegmentTagsKey), []string(nil)),
+			},
+		},
+		{
+			name:        "Non-segmented gateway with tags provided (should not include tags)",
+			gwID:        "gw6",
+			isHybrid:    false,
+			groupID:     "",
+			isSegmented: false,
+			segmentTags: []string{"ignored", "tags"},
+			expectedAttr: []SpanAttribute{
+				tyktrace.NewAttribute(string(semconv.TykGWIDKey), "gw6"),
+				tyktrace.NewAttribute(string(semconv.TykGWDataplaneKey), false),
+			},
+		},
+		{
+			name:        "Non-dataplane gateway with groupID provided (should not include groupID)",
+			gwID:        "gw7",
+			isHybrid:    false,
+			groupID:     "ignored-group",
+			isSegmented: false,
+			segmentTags: nil,
+			expectedAttr: []SpanAttribute{
+				tyktrace.NewAttribute(string(semconv.TykGWIDKey), "gw7"),
+				tyktrace.NewAttribute(string(semconv.TykGWDataplaneKey), false),
+			},
+		},
 	}
 
 	for _, tt := range tests {

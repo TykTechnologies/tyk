@@ -6,7 +6,7 @@ on:
 
 jobs:
   release_bot:
-    uses: TykTechnologies/github-actions/.github/workflows/release-bot.yaml@main
+    uses: TykTechnologies/github-actions/.github/workflows/release-bot.yaml@2b35ab5dd4cfff21ced9d12446e9e27d10bf5785  # main
     secrets:
       APP_ID: ${{ secrets.PROBE_APP_ID }}
       APP_PRIVATE_KEY: ${{ secrets.PROBE_APP_PRIVATE_KEY }}

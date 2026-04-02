@@ -17,6 +17,7 @@ type RequestContext struct {
 	APIName             string
 	OrgID               string
 	ListenPath          string
+	Endpoint            string // matched endpoint path (tracked path or URL path)
 	Token               string // hashed auth token
 	APIVersion          string
 	IPAddress           string // client IP (resolved by the recording site via request.RealIP)
@@ -29,4 +30,13 @@ type RequestContext struct {
 
 	Session          *user.SessionState     // nil when unauthenticated or NeedsSession=false
 	ContextVariables map[string]interface{} // Tyk context variables (nil when not enabled)
+
+	// MCP/JSON-RPC fields (populated via ctxGet* from request context)
+	MCPMethod        string // e.g., "tools/call"
+	MCPPrimitiveType string // e.g., "tool"
+	MCPPrimitiveName string // e.g., "get_weather"
+	MCPErrorCode     int    // e.g., -32601
+
+	// ConfigData from the API definition (nil when ConfigDataDisabled or empty).
+	ConfigData map[string]interface{}
 }
