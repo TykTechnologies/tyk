@@ -12,6 +12,7 @@ import (
 	"github.com/TykTechnologies/tyk/apidef/oas"
 	"github.com/TykTechnologies/tyk/header"
 	"github.com/TykTechnologies/tyk/test"
+	"github.com/TykTechnologies/tyk/user"
 )
 
 const testOASForValidateRequest = `{
@@ -760,4 +761,1163 @@ func TestValidateRequest_NormalizeHeaders(t *testing.T) {
 			assert.Equal(t, tt.expected, tt.input)
 		})
 	}
+}
+
+func TestValidateRequest_EndpointCollision(t *testing.T) {
+	t.Run("case 1 basic test-case from the ticket TT-16890 /employees/static is matched /employees/\\d+ and validated against it", func(t *testing.T) {
+		// client's case from the ticket https://tyktech.atlassian.net/browse/TT-16890
+
+		ts := StartTest(nil)
+		defer ts.Close()
+
+		const oasSpec = `{
+        "openapi": "3.0.3",
+        "info": {"title": "test", "version": "1.0.0"},
+        "paths": {
+            "/employees/static": {
+                "get": {
+                    "operationId": "employees/staticget",
+                    "responses": {"200": {"description": ""}}
+                }
+            },
+            "/employees/{id}": {
+                "get": {
+                    "operationId": "employees/{id}get",
+                    "parameters": [
+                        {
+                            "name": "id",
+                            "in": "path",
+                            "required": true,
+                            "schema": {
+                                "type": "string",
+                                "pattern": "^\\d+$"
+                            }
+                        }
+                    ],
+                    "responses": {"200": {"description": ""}}
+                }
+            }
+        }
+    }`
+
+		oasDoc, err := openapi3.NewLoader().LoadFromData([]byte(oasSpec))
+		assert.NoError(t, err)
+
+		oasAPI := oas.OAS{T: *oasDoc}
+		oasAPI.SetTykExtension(&oas.XTykAPIGateway{
+			Middleware: &oas.Middleware{
+				Operations: oas.Operations{
+					"employees/{id}get": {
+						ValidateRequest: &oas.ValidateRequest{
+							Enabled:           true,
+							ErrorResponseCode: 422,
+						},
+					},
+				},
+			},
+		})
+
+		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+			spec.Name = "Static and Path Params Validate Test"
+			spec.APIID = "static-pathparams-validate-test"
+			spec.Proxy.ListenPath = "/test/"
+			spec.Proxy.StripListenPath = true
+			spec.UseKeylessAccess = true
+			spec.IsOAS = true
+			spec.OAS = oasAPI
+		})
+
+		_, _ = ts.Run(t, []test.TestCase{
+			// Static path - should not be validated by the {id} schema (returns 200 from mock upstream)
+			{
+				Method: http.MethodGet,
+				Path:   "/test/employees/static",
+				Code:   http.StatusOK,
+			},
+			// Valid path parameter (digits)
+			{
+				Method: http.MethodGet,
+				Path:   "/test/employees/123",
+				Code:   http.StatusOK,
+			},
+			// Invalid path parameter (letters instead of digits)
+			{
+				Method:    http.MethodGet,
+				Path:      "/test/employees/gg",
+				Code:      422,
+				BodyMatch: `request validation error`,
+			},
+		}...)
+	})
+
+	t.Run("case 2; additional endpoint without validation and regex /employees/{name}", func(t *testing.T) {
+		ts := StartTest(nil)
+		defer ts.Close()
+
+		const oasSpec = `{
+        "openapi": "3.0.3",
+        "info": {"title": "test", "version": "1.0.0"},
+        "paths": {
+            "/employees/static": {
+                "get": {
+                    "operationId": "employees/staticget",
+                    "responses": {"200": {"description": ""}}
+                }
+            },
+            "/employees/{id}": {
+                "get": {
+                    "operationId": "employees/{id}get",
+                    "parameters": [
+                        {
+                            "name": "id",
+                            "in": "path",
+                            "required": true,
+                            "schema": {
+                                "type": "string",
+                                "pattern": "^\\\\d+$"
+                            }
+                        }
+                    ],
+                    "responses": {"200": {"description": ""}}
+                }
+            },
+            "/employees/{name}": {
+                "get": {
+                    "parameters": [
+                        {
+                            "name": "name",
+                            "in": "path",
+                            "required": true,
+                            "schema": {
+                                "type": "string"
+                            }
+                        }
+                    ],
+                    "responses": {"200": {"description": ""}}
+                }
+            }
+        }
+    }`
+
+		oasDoc, err := openapi3.NewLoader().LoadFromData([]byte(oasSpec))
+		assert.NoError(t, err)
+
+		oasAPI := oas.OAS{T: *oasDoc}
+		oasAPI.SetTykExtension(&oas.XTykAPIGateway{
+			Middleware: &oas.Middleware{
+				Operations: oas.Operations{
+					"employees/{id}get": {
+						ValidateRequest: &oas.ValidateRequest{
+							Enabled:           true,
+							ErrorResponseCode: 422,
+						},
+					},
+				},
+			},
+		})
+
+		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+			spec.Name = "Multiple Path Params Validate Test"
+			spec.APIID = "multiple-pathparams-validate-test"
+			spec.Proxy.ListenPath = "/test/"
+			spec.Proxy.StripListenPath = true
+			spec.UseKeylessAccess = true
+			spec.IsOAS = true
+			spec.OAS = oasAPI
+		})
+
+		_, _ = ts.Run(t, []test.TestCase{
+			// Static path - should not be validated by the {id} schema
+			{
+				Method: http.MethodGet,
+				Path:   "/test/employees/static",
+				Code:   http.StatusOK,
+			},
+			// Valid path parameter for {id} (digits)
+			{
+				Method: http.MethodGet,
+				Path:   "/test/employees/123",
+				Code:   http.StatusOK,
+			},
+			// Path parameter matching {name} (letters)
+			// Since {name} does not have validateRequest enabled, it passes through to upstream
+			{
+				Method: http.MethodGet,
+				Path:   "/test/employees/gg",
+				Code:   http.StatusOK,
+			},
+		}...)
+	})
+
+	t.Run("case 3; /employees/{name} schema added for the :name param", func(t *testing.T) {
+		ts := StartTest(nil)
+		defer ts.Close()
+
+		const oasSpec = `{
+        "openapi": "3.0.3",
+        "info": {"title": "test", "version": "1.0.0"},
+        "paths": {
+            "/employees/static": {
+                "get": {
+                    "operationId": "employees/staticget",
+                    "responses": {"200": {"description": ""}}
+                }
+            },
+            "/employees/{id}": {
+                "get": {
+                    "operationId": "employees/{id}get",
+                    "parameters": [
+                        {
+                            "name": "id",
+                            "in": "path",
+                            "required": true,
+                            "schema": {
+                                "type": "string",
+                                "pattern": "^\\\\d+$"
+                            }
+                        }
+                    ],
+                    "responses": {"200": {"description": ""}}
+                }
+            },
+            "/employees/{name}": {
+                "get": {
+                    "parameters": [
+                        {
+                            "name": "name",
+                            "in": "path",
+                            "required": true,
+                            "schema": {
+                                "type": "string"
+                            }
+                        }
+                    ],
+                    "responses": {"200": {"description": ""}}
+                }
+            }
+        }
+    }`
+
+		oasDoc, err := openapi3.NewLoader().LoadFromData([]byte(oasSpec))
+		assert.NoError(t, err)
+
+		oasAPI := oas.OAS{T: *oasDoc}
+		oasAPI.SetTykExtension(&oas.XTykAPIGateway{
+			Middleware: &oas.Middleware{
+				Operations: oas.Operations{
+					"employees/{id}get": {
+						ValidateRequest: &oas.ValidateRequest{
+							Enabled:           true,
+							ErrorResponseCode: 422,
+						},
+					},
+				},
+			},
+		})
+
+		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+			spec.Name = "Overlapping Path Params Validate Test"
+			spec.APIID = "overlapping-pathparams-validate-test"
+			spec.Proxy.ListenPath = "/test/"
+			spec.Proxy.StripListenPath = true
+			spec.UseKeylessAccess = true
+			spec.IsOAS = true
+			spec.OAS = oasAPI
+		})
+
+		_, _ = ts.Run(t, []test.TestCase{
+			// Static path - passes to upstream (no validateRequest middleware configured for this operation)
+			{
+				Method: http.MethodGet,
+				Path:   "/test/employees/static",
+				Code:   http.StatusOK,
+			},
+			// Valid path parameter (digits) - passes to upstream (validation is skipped because router matches {name} which has no operation ID)
+			{
+				Method: http.MethodGet,
+				Path:   "/test/employees/123",
+				Code:   http.StatusOK,
+			},
+			// Invalid path parameter (letters instead of digits) - passes to upstream (validation is skipped because router matches {name} which has no operation ID)
+			{
+				Method: http.MethodGet,
+				Path:   "/test/employees/aaa",
+				Code:   http.StatusOK,
+			},
+		}...)
+	})
+
+	t.Run("case 4; /employees/{name} schema added for the :name param and validate reqeust middleware", func(t *testing.T) {
+		ts := StartTest(nil)
+		defer ts.Close()
+
+		const oasSpec = `{
+        "openapi": "3.0.3",
+        "info": {"title": "test", "version": "1.0.0"},
+        "paths": {
+            "/employees/static": {
+                "get": {
+                    "operationId": "employees/staticget",
+                    "responses": {"200": {"description": ""}}
+                }
+            },
+            "/employees/{id}": {
+                "get": {
+                    "operationId": "employees/{id}get",
+                    "parameters": [
+                        {
+                            "name": "id",
+                            "in": "path",
+                            "required": true,
+                            "schema": {
+                                "type": "string",
+                                "pattern": "^\\d+$"
+                            }
+                        }
+                    ],
+                    "responses": {"200": {"description": ""}}
+                }
+            },
+            "/employees/{name}": {
+                "get": {
+					"operationId": "employees/{name}get",
+                    "parameters": [
+                        {
+                            "name": "name",
+                            "in": "path",
+                            "required": true,
+                            "schema": {
+                                "type": "string",
+                                "pattern": "^[a-z]+$"
+                            }
+                        }
+                    ],
+                    "responses": {"200": {"description": ""}}
+                }
+            }
+        }
+    }`
+
+		oasDoc, err := openapi3.NewLoader().LoadFromData([]byte(oasSpec))
+		assert.NoError(t, err)
+
+		oasAPI := oas.OAS{T: *oasDoc}
+		oasAPI.SetTykExtension(&oas.XTykAPIGateway{
+			Middleware: &oas.Middleware{
+				Operations: oas.Operations{
+					"employees/{id}get": {
+						ValidateRequest: &oas.ValidateRequest{
+							Enabled:           true,
+							ErrorResponseCode: 422,
+						},
+					},
+					"employees/{name}get": {
+						ValidateRequest: &oas.ValidateRequest{
+							Enabled:           true,
+							ErrorResponseCode: 422,
+						},
+					},
+				},
+			},
+		})
+
+		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+			spec.Name = "Case 4 Test"
+			spec.APIID = "case-4-test"
+			spec.Proxy.ListenPath = "/test/"
+			spec.Proxy.StripListenPath = true
+			spec.UseKeylessAccess = true
+			spec.IsOAS = true
+			spec.OAS = oasAPI
+		})
+
+		_, _ = ts.Run(t, []test.TestCase{
+			{
+				Method: http.MethodGet,
+				Path:   "/test/employees/static",
+				Code:   http.StatusOK,
+			},
+			{
+				// fails on release-5.11 with error code 422
+				Method: http.MethodGet,
+				Path:   "/test/employees/123",
+				Code:   http.StatusOK,
+			},
+			{
+				Method: http.MethodGet,
+				Path:   "/test/employees/asd",
+				Code:   http.StatusOK,
+			},
+			{
+				Method: http.MethodGet,
+				Path:   "/test/employees/asd123",
+				Code:   http.StatusUnprocessableEntity,
+			},
+		}...)
+	})
+
+	t.Run("case 5; Allow List (WhiteList) Activation", func(t *testing.T) {
+		// 1. Allow List (WhiteList) Activation:
+		// The mission briefing explicitly states [allow mw] is configured.
+		// However, the tests in the patch do not enable the Allow List middleware.
+		// In Case 4, the test for /test/employees/asd123 returns 200 OK (with the comment // imo it should not pass).
+		// The reason it passes is that without the Allow List enabled, the Gateway simply proxies unknown paths.
+		// To properly test the expectation, you must enable the Allow List.
+		// This ensures paths not matching any defined regex return a 403 Forbidden.
+
+		ts := StartTest(nil)
+		defer ts.Close()
+
+		const oasSpec = `{
+        "openapi": "3.0.3",
+        "info": {"title": "test", "version": "1.0.0"},
+        "paths": {
+            "/employees/static": {
+                "get": {
+                    "operationId": "employees/staticget",
+                    "responses": {"200": {"description": ""}}
+                }
+            },
+            "/employees/{id}": {
+                "get": {
+                    "operationId": "employees/{id}get",
+                    "parameters": [
+                        {
+                            "name": "id",
+                            "in": "path",
+                            "required": true,
+                            "schema": {
+                                "type": "string",
+                                "pattern": "^\\d+$"
+                            }
+                        }
+                    ],
+                    "responses": {"200": {"description": ""}}
+                }
+            },
+            "/employees/{name}": {
+                "get": {
+					"operationId": "employees/{name}get",
+                    "parameters": [
+                        {
+                            "name": "name",
+                            "in": "path",
+                            "required": true,
+                            "schema": {
+                                "type": "string",
+                                "pattern": "^[a-z]+$"
+                            }
+                        }
+                    ],
+                    "responses": {"200": {"description": ""}}
+                }
+            }
+        }
+    }`
+
+		oasDoc, err := openapi3.NewLoader().LoadFromData([]byte(oasSpec))
+		assert.NoError(t, err)
+
+		oasAPI := oas.OAS{T: *oasDoc}
+		oasAPI.SetTykExtension(&oas.XTykAPIGateway{
+			Middleware: &oas.Middleware{
+				Operations: oas.Operations{
+					"employees/{id}get": {
+						ValidateRequest: &oas.ValidateRequest{
+							Enabled:           true,
+							ErrorResponseCode: 422,
+						},
+					},
+				},
+			},
+		})
+
+		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+			spec.Name = "Case 5 Test"
+			spec.APIID = "case-5-test"
+			spec.Proxy.ListenPath = "/test/"
+			spec.Proxy.StripListenPath = true
+
+			// --- Auth Layer Configuration ---
+			spec.UseKeylessAccess = false
+			spec.UseStandardAuth = true
+			authConf := apidef.AuthConfig{
+				AuthHeaderName: "Authorization",
+			}
+			spec.AuthConfigs = map[string]apidef.AuthConfig{
+				"authToken": authConf,
+			}
+			spec.Auth = authConf
+			// --------------------------------
+
+			spec.IsOAS = true
+			spec.OAS = oasAPI
+		})
+
+		// Create a session (token) with access to the API
+		_, key := ts.CreateSession(func(s *user.SessionState) {
+			s.AccessRights = map[string]user.AccessDefinition{
+				"case-5-test": {
+					APIID: "case-5-test",
+				},
+			}
+		})
+
+		auth := map[string]string{
+			"Authorization": key,
+		}
+
+		_, _ = ts.Run(t, []test.TestCase{
+			{
+				Method:  http.MethodGet,
+				Path:    "/test/employees/static",
+				Headers: auth,
+				Code:    http.StatusOK,
+			},
+			{
+				Method:  http.MethodGet,
+				Path:    "/test/employees/123",
+				Headers: auth,
+				Code:    http.StatusOK,
+			},
+			{
+				Method:  http.MethodGet,
+				Path:    "/test/employees/asd",
+				Headers: auth,
+				Code:    http.StatusOK,
+			},
+			{
+				Method:  http.MethodGet,
+				Path:    "/test/employees/asd123",
+				Headers: auth,
+				Code:    http.StatusOK,
+			},
+			// Verify auth layer is active (no token provided)
+			{
+				Method: http.MethodGet,
+				Path:   "/test/employees/static",
+				Code:   http.StatusUnauthorized,
+			},
+		}...)
+	})
+
+	t.Run("case 6; Dual ValidateRequest Deployment", func(t *testing.T) {
+		// 2. Dual ValidateRequest Deployment:
+		// In the second example, both /employees/{id:\d+} and /employees/{name:[a-z]+} have [validate request mw] enabled.
+		// The current patch only has ValidateRequest enabled on the {id} operation.
+		// A test case must be added where both operations have ValidateRequest enabled
+		// to ensure the router applies the correct schema based on the matched regex.
+
+		ts := StartTest(nil)
+		defer ts.Close()
+
+		const oasSpec = `{
+        "openapi": "3.0.3",
+        "info": {"title": "test", "version": "1.0.0"},
+        "paths": {
+            "/employees/static": {
+                "get": {
+                    "operationId": "employees/staticget",
+                    "responses": {"200": {"description": ""}}
+                }
+            },
+            "/employees/{id}": {
+                "get": {
+                    "operationId": "employees/{id}get",
+                    "parameters": [
+                        {
+                            "name": "id",
+                            "in": "path",
+                            "required": true,
+                            "schema": {
+                                "type": "string",
+                                "pattern": "^\\d+$"
+                            }
+                        }
+                    ],
+                    "responses": {"200": {"description": ""}}
+                }
+            },
+            "/employees/{name}": {
+                "get": {
+                    "operationId": "employees/{name}get",
+                    "parameters": [
+                        {
+                            "name": "name",
+                            "in": "path",
+                            "required": true,
+                            "schema": {
+                                "type": "string",
+                                "pattern": "^[a-z]+$"
+                            }
+                        }
+                    ],
+                    "responses": {"200": {"description": ""}}
+                }
+            }
+        }
+    }`
+
+		oasDoc, err := openapi3.NewLoader().LoadFromData([]byte(oasSpec))
+		assert.NoError(t, err)
+
+		oasAPI := oas.OAS{T: *oasDoc}
+		oasAPI.SetTykExtension(&oas.XTykAPIGateway{
+			Middleware: &oas.Middleware{
+				Operations: oas.Operations{
+					"employees/staticget": {
+						Allow: &oas.Allowance{Enabled: true},
+					},
+					"employees/{id}get": {
+						Allow: &oas.Allowance{Enabled: true},
+						ValidateRequest: &oas.ValidateRequest{
+							Enabled:           true,
+							ErrorResponseCode: 422,
+						},
+					},
+					"employees/{name}get": {
+						Allow: &oas.Allowance{Enabled: true},
+						ValidateRequest: &oas.ValidateRequest{
+							Enabled:           true,
+							ErrorResponseCode: 422,
+						},
+					},
+				},
+			},
+		})
+
+		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+			spec.Name = "Case 6 Test"
+			spec.APIID = "case-6-test"
+			spec.Proxy.ListenPath = "/test/"
+			spec.Proxy.StripListenPath = true
+
+			spec.UseKeylessAccess = false
+			spec.UseStandardAuth = true
+			authConf := apidef.AuthConfig{
+				AuthHeaderName: "Authorization",
+			}
+			spec.AuthConfigs = map[string]apidef.AuthConfig{
+				"authToken": authConf,
+			}
+			spec.Auth = authConf
+
+			spec.IsOAS = true
+			spec.OAS = oasAPI
+		})
+
+		_, key := ts.CreateSession(func(s *user.SessionState) {
+			s.AccessRights = map[string]user.AccessDefinition{
+				"case-6-test": {
+					APIID: "case-6-test",
+				},
+			}
+		})
+
+		auth := map[string]string{
+			"Authorization": key,
+		}
+
+		_, _ = ts.Run(t, []test.TestCase{
+			{
+				Method:  http.MethodGet,
+				Path:    "/test/employees/static",
+				Headers: auth,
+				Code:    http.StatusOK,
+			},
+			{
+				// fails on release-5.11 with error code 422
+				Method:  http.MethodGet,
+				Path:    "/test/employees/123",
+				Headers: auth,
+				Code:    http.StatusOK,
+			},
+			{
+				Method:  http.MethodGet,
+				Path:    "/test/employees/asd",
+				Headers: auth,
+				Code:    http.StatusOK,
+			},
+			{
+				// fails on release-5.11 with error code 422
+				Method:  http.MethodGet,
+				Path:    "/test/employees/asd123",
+				Headers: auth,
+				Code:    403,
+			},
+			{
+				Method: http.MethodGet,
+				Path:   "/test/employees/static",
+				Code:   http.StatusUnauthorized,
+			},
+		}...)
+	})
+
+	t.Run("case 7; Regex Matching the Static Path", func(t *testing.T) {
+		// 3. Regex Matching the Static Path:
+		// What happens if the regex for a path parameter matches the static path string?
+		// For example, the regex ^[a-z]+$ for {name} will match the string static in /employees/static.
+		// A test case should verify that the static path strictly
+		// takes precedence over the regex path, even when the regex is a valid match.
+
+		ts := StartTest(nil)
+		defer ts.Close()
+
+		const oasSpec = `{
+        "openapi": "3.0.3",
+        "info": {"title": "test", "version": "1.0.0"},
+        "paths": {
+            "/employees/static": {
+                "get": {
+                    "operationId": "employees/staticget",
+                    "responses": {"200": {"description": ""}}
+                }
+            },
+            "/employees/{id}": {
+                "get": {
+                    "operationId": "employees/{id}get",
+                    "parameters": [
+                        {
+                            "name": "id",
+                            "in": "path",
+                            "required": true,
+                            "schema": {
+                                "type": "string",
+                                "pattern": "^\\d+$"
+                            }
+                        }
+                    ],
+                    "responses": {"200": {"description": ""}}
+                }
+            },
+            "/employees/{name}": {
+                "get": {
+                    "operationId": "employees/{name}get",
+                    "parameters": [
+                        {
+                            "name": "name",
+                            "in": "path",
+                            "required": true,
+                            "schema": {
+                                "type": "string",
+                                "pattern": "^[a-z]+$"
+                            }
+                        }
+                    ],
+                    "responses": {"200": {"description": ""}}
+                }
+            }
+        }
+    }`
+
+		oasDoc, err := openapi3.NewLoader().LoadFromData([]byte(oasSpec))
+		assert.NoError(t, err)
+
+		oasAPI := oas.OAS{T: *oasDoc}
+		oasAPI.SetTykExtension(&oas.XTykAPIGateway{
+			Middleware: &oas.Middleware{
+				Operations: oas.Operations{
+					"employees/staticget": {
+						Allow: &oas.Allowance{Enabled: true},
+						MockResponse: &oas.MockResponse{
+							Enabled: true,
+							Code:    200,
+							Body:    `{"matched": "static"}`,
+						},
+					},
+					"employees/{id}get": {
+						Allow: &oas.Allowance{Enabled: true},
+						ValidateRequest: &oas.ValidateRequest{
+							Enabled:           true,
+							ErrorResponseCode: 422,
+						},
+						MockResponse: &oas.MockResponse{
+							Enabled: true,
+							Code:    200,
+							Body:    `{"matched": "id"}`,
+						},
+					},
+					"employees/{name}get": {
+						Allow: &oas.Allowance{Enabled: true},
+						ValidateRequest: &oas.ValidateRequest{
+							Enabled:           true,
+							ErrorResponseCode: 422,
+						},
+						MockResponse: &oas.MockResponse{
+							Enabled: true,
+							Code:    200,
+							Body:    `{"matched": "name"}`,
+						},
+					},
+				},
+			},
+		})
+
+		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+			spec.Name = "Case 7 Test"
+			spec.APIID = "case-7-test"
+			spec.Proxy.ListenPath = "/test/"
+			spec.Proxy.StripListenPath = true
+
+			spec.UseKeylessAccess = false
+			spec.UseStandardAuth = true
+			authConf := apidef.AuthConfig{
+				AuthHeaderName: "Authorization",
+			}
+			spec.AuthConfigs = map[string]apidef.AuthConfig{
+				"authToken": authConf,
+			}
+			spec.Auth = authConf
+
+			spec.IsOAS = true
+			spec.OAS = oasAPI
+		})
+
+		_, key := ts.CreateSession(func(s *user.SessionState) {
+			s.AccessRights = map[string]user.AccessDefinition{
+				"case-7-test": {
+					APIID: "case-7-test",
+				},
+			}
+		})
+
+		_, _ = ts.Run(t, []test.TestCase{
+			{
+				Method: http.MethodGet,
+				Path:   "/test/employees/static",
+				Headers: map[string]string{
+					"Authorization": key,
+				},
+				Code:      http.StatusOK,
+				BodyMatch: `{"matched": "static"}`,
+			},
+			{
+				// fails on release-5.11 with status code 422
+				Method: http.MethodGet,
+				Path:   "/test/employees/123",
+				Headers: map[string]string{
+					"Authorization": key,
+				},
+				Code:      http.StatusOK,
+				BodyMatch: `{"matched": "id"}`,
+			},
+			{
+				Method: http.MethodGet,
+				Path:   "/test/employees/asd",
+				Headers: map[string]string{
+					"Authorization": key,
+				},
+				Code:      http.StatusOK,
+				BodyMatch: `{"matched": "name"}`,
+			},
+			{
+				// fails on release-5.11 with status code 422
+				Method: http.MethodGet,
+				Path:   "/test/employees/asd123",
+				Headers: map[string]string{
+					"Authorization": key,
+				},
+				Code: 403,
+			},
+		}...)
+	})
+
+	t.Run("case 8; Nested Parameterized Routes", func(t *testing.T) {
+		// 4. Nested Parameterized Routes:
+		// Test path ordering when there are multiple path parameters in the same route. For example:
+		// • /departments/{dept}/employees/static
+		// • /departments/{dept}/employees/{id}
+
+		ts := StartTest(nil)
+		defer ts.Close()
+
+		const oasSpec = `{
+        "openapi": "3.0.3",
+        "info": {"title": "test", "version": "1.0.0"},
+        "paths": {
+            "/departments/{dept}/employees/static": {
+                "get": {
+                    "operationId": "departments/{dept}/employees/staticget",
+                    "parameters": [
+                        {
+                            "name": "dept",
+                            "in": "path",
+                            "required": true,
+                            "schema": {
+                                "type": "string"
+                            }
+                        }
+                    ],
+                    "responses": {"200": {"description": ""}}
+                }
+            },
+            "/departments/{dept}/employees/{id}": {
+                "get": {
+                    "operationId": "departments/{dept}/employees/{id}get",
+                    "parameters": [
+                        {
+                            "name": "dept",
+                            "in": "path",
+                            "required": true,
+                            "schema": {
+                                "type": "string"
+                            }
+                        },
+                        {
+                            "name": "id",
+                            "in": "path",
+                            "required": true,
+                            "schema": {
+                                "type": "string",
+                                "pattern": "^\\d+$"
+                            }
+                        }
+                    ],
+                    "responses": {"200": {"description": ""}}
+                }
+            }
+        }
+    }`
+
+		oasDoc, err := openapi3.NewLoader().LoadFromData([]byte(oasSpec))
+		assert.NoError(t, err)
+
+		oasAPI := oas.OAS{T: *oasDoc}
+		oasAPI.SetTykExtension(&oas.XTykAPIGateway{
+			Middleware: &oas.Middleware{
+				Operations: oas.Operations{
+					"departments/{dept}/employees/staticget": {
+						Allow: &oas.Allowance{Enabled: true},
+						MockResponse: &oas.MockResponse{
+							Enabled: true,
+							Code:    200,
+							Body:    `{"matched": "static"}`,
+						},
+					},
+					"departments/{dept}/employees/{id}get": {
+						Allow: &oas.Allowance{Enabled: true},
+						ValidateRequest: &oas.ValidateRequest{
+							Enabled:           true,
+							ErrorResponseCode: 422,
+						},
+						MockResponse: &oas.MockResponse{
+							Enabled: true,
+							Code:    200,
+							Body:    `{"matched": "id"}`,
+						},
+					},
+				},
+			},
+		})
+
+		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+			spec.Name = "Case 8 Test"
+			spec.APIID = "case-8-test"
+			spec.Proxy.ListenPath = "/test/"
+			spec.Proxy.StripListenPath = true
+
+			spec.UseKeylessAccess = false
+			spec.UseStandardAuth = true
+			authConf := apidef.AuthConfig{
+				AuthHeaderName: "Authorization",
+			}
+			spec.AuthConfigs = map[string]apidef.AuthConfig{
+				"authToken": authConf,
+			}
+			spec.Auth = authConf
+
+			spec.IsOAS = true
+			spec.OAS = oasAPI
+		})
+
+		_, key := ts.CreateSession(func(s *user.SessionState) {
+			s.AccessRights = map[string]user.AccessDefinition{
+				"case-8-test": {
+					APIID: "case-8-test",
+				},
+			}
+		})
+
+		_, _ = ts.Run(t, []test.TestCase{
+			{
+				Method: http.MethodGet,
+				Path:   "/test/departments/hr/employees/static",
+				Headers: map[string]string{
+					"Authorization": key,
+				},
+				Code:      http.StatusOK,
+				BodyMatch: `"matched": "static"`,
+			},
+			{
+				Method: http.MethodGet,
+				Path:   "/test/departments/hr/employees/123",
+				Headers: map[string]string{
+					"Authorization": key,
+				},
+				Code:      http.StatusOK,
+				BodyMatch: `"matched": "id"`,
+			},
+			{
+				// fails on release-5.11 with status code 422
+				Method: http.MethodGet,
+				Path:   "/test/departments/hr/employees/asd",
+				Headers: map[string]string{
+					"Authorization": key,
+				},
+				Code: 403, // Blocked by AllowList since 'asd' doesn't match the '^\d+$' regex
+			},
+		}...)
+	})
+
+	t.Run("case 9; Cross-Method Overlap", func(t *testing.T) {
+		// 5. Cross-Method Overlap:
+		// Test overlapping paths with different HTTP methods (e.g., GET /employees/{id} vs POST /employees/static).
+		// This ensures the router doesn't incorrectly apply validation
+		// or routing logic across different methods for the same path structure.
+		// Regarding your question on logical validity: Affirmative, the cases are valid. GET /employees/pepe123 should
+		// not be rejected because it doesn't match \d+ or [a-z]+.
+		// However, it will only be rejected if the Allow List middleware is enabled.
+		// New construction options are available.
+		// Let me know when you are ready to deploy these tests. For the Union!
+
+		ts := StartTest(nil)
+		defer ts.Close()
+
+		const oasSpec = `{
+        "openapi": "3.0.3",
+        "info": {"title": "test", "version": "1.0.0"},
+        "paths": {
+            "/employees/static": {
+                "post": {
+                    "operationId": "postEmployeesStatic",
+                    "responses": {"200": {"description": ""}}
+                }
+            },
+            "/employees/{id}": {
+                "get": {
+                    "operationId": "getEmployeesId",
+                    "parameters": [
+                        {
+                            "name": "id",
+                            "in": "path",
+                            "required": true,
+                            "schema": {
+                                "type": "string",
+                                "pattern": "^\\d+$"
+                            }
+                        }
+                    ],
+                    "responses": {"200": {"description": ""}}
+                }
+            }
+        }
+    }`
+
+		oasDoc, err := openapi3.NewLoader().LoadFromData([]byte(oasSpec))
+		assert.NoError(t, err)
+
+		oasAPI := oas.OAS{T: *oasDoc}
+		oasAPI.SetTykExtension(&oas.XTykAPIGateway{
+			Middleware: &oas.Middleware{
+				Operations: oas.Operations{
+					"postEmployeesStatic": {
+						Allow: &oas.Allowance{Enabled: true},
+						MockResponse: &oas.MockResponse{
+							Enabled: true,
+							Code:    200,
+							Body:    `{"matched": "post_static"}`,
+						},
+					},
+					"getEmployeesId": {
+						Allow: &oas.Allowance{Enabled: true},
+						ValidateRequest: &oas.ValidateRequest{
+							Enabled:           true,
+							ErrorResponseCode: 422,
+						},
+						MockResponse: &oas.MockResponse{
+							Enabled: true,
+							Code:    200,
+							Body:    `{"matched": "get_id"}`,
+						},
+					},
+				},
+			},
+		})
+
+		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+			spec.Name = "Case 9 Test"
+			spec.APIID = "case-9-test"
+			spec.Proxy.ListenPath = "/test/"
+			spec.Proxy.StripListenPath = true
+
+			spec.UseKeylessAccess = false
+			spec.UseStandardAuth = true
+			authConf := apidef.AuthConfig{
+				AuthHeaderName: "Authorization",
+			}
+			spec.AuthConfigs = map[string]apidef.AuthConfig{
+				"authToken": authConf,
+			}
+			spec.Auth = authConf
+
+			spec.IsOAS = true
+			spec.OAS = oasAPI
+		})
+
+		_, key := ts.CreateSession(func(s *user.SessionState) {
+			s.AccessRights = map[string]user.AccessDefinition{
+				"case-9-test": {
+					APIID: "case-9-test",
+				},
+			}
+		})
+
+		_, _ = ts.Run(t, []test.TestCase{
+			{
+				Method: http.MethodPost,
+				Path:   "/test/employees/static",
+				Headers: map[string]string{
+					"Authorization": key,
+				},
+				Code:      http.StatusOK,
+				BodyMatch: `"matched": "post_static"`,
+			},
+			{
+				Method: http.MethodGet,
+				Path:   "/test/employees/123",
+				Headers: map[string]string{
+					"Authorization": key,
+				},
+				Code:      http.StatusOK,
+				BodyMatch: `"matched": "get_id"`,
+			},
+			{
+				// fails on release-5.11 : Expected status code `403` got `200
+				Method: http.MethodGet,
+				Path:   "/test/employees/static",
+				Headers: map[string]string{
+					"Authorization": key,
+				},
+				Code: 403,
+			},
+			{
+				// fails on release-5.11 : Expected status code `403` got `200
+				Method: http.MethodPost,
+				Path:   "/test/employees/123",
+				Headers: map[string]string{
+					"Authorization": key,
+				},
+				Code: 403,
+			},
+			{
+				// fails on release-5.11 : Expected status code `403` got `422
+				Method: http.MethodGet,
+				Path:   "/test/employees/pepe123",
+				Headers: map[string]string{
+					"Authorization": key,
+				},
+				Code: 403,
+			},
+		}...)
+	})
 }
