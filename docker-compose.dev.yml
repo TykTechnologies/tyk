@@ -1,0 +1,44 @@
+name: tyk-dev
+
+include:
+  - docker/services/redis.yml
+  - docker/services/httpbin.yml
+
+services:
+  gateway:
+    build:
+      context: .
+      dockerfile: .devcontainer/Dockerfile
+    env_file:
+      - .env
+    volumes:
+      - .:/app
+      - tyk-gomodcache:/go/pkg/mod
+      - tyk-gocache:/root/.cache/go-build
+    environment:
+      - TYK_GW_STORAGE_HOST=redis
+      - TYK_GW_STORAGE_PORT=6379
+      - GONOSUMDB=github.com/TykTechnologies/*
+      - GOPRIVATE=github.com/TykTechnologies/*
+      - GOPROXY=off
+      - GOFLAGS=-mod=readonly
+      - ANTHROPIC_AUTH_TOKEN
+      - ANTHROPIC_BASE_URL
+    ports:
+      - "8080:8080"
+      - "2345:2345"
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+    networks:
+      - proxy
+    command: sleep infinity
+
+networks:
+  proxy:
+    name: proxy
+    driver: bridge
+
+volumes:
+  tyk-gomodcache:
+  tyk-gocache:

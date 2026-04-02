@@ -1,0 +1,30 @@
+#!/bin/bash
+# .githooks/pre-commit
+# Blocks commits that modify lockfiles outside the dep review workflow.
+set -euo pipefail
+
+LOCKFILES="go.mod go.sum package-lock.json package.json requirements.txt"
+MARKER_FILE="/tmp/.dep-workflow-active"
+
+MODIFIED_LOCKFILES=""
+for f in $LOCKFILES; do
+  if git diff --cached --name-only | grep -qx "$f"; then
+    MODIFIED_LOCKFILES="$MODIFIED_LOCKFILES $f"
+  fi
+done
+
+if [ -n "$MODIFIED_LOCKFILES" ]; then
+  if [ ! -f "$MARKER_FILE" ]; then
+    echo ""
+    echo "ERROR: Lockfile(s) modified outside the dep review workflow:"
+    echo "  $MODIFIED_LOCKFILES"
+    echo ""
+    echo "Dependency changes must go through: make dep LANG=... PKG=..."
+    echo "This ensures isolated review, scanning, and provenance checks."
+    echo ""
+    echo "If you are certain this change is intentional (e.g. a go mod tidy"
+    echo "after removing an import), you can bypass with: git commit --no-verify"
+    echo "but the PR will still require tech lead approval."
+    exit 1
+  fi
+fi

@@ -1,0 +1,26 @@
+FROM golang:1.25-alpine@sha256:8e02eb337d9e0ea459e041f1ee5eece41cbb61f1d83e7d883a3e2fb4862063fa
+
+# All ecosystems in one image
+RUN apk add --no-cache \
+    git \
+    bash \
+    curl \
+    nodejs \
+    npm \
+    python3 \
+    py3-pip
+
+# Go security tools - pinned to commit SHAs
+# SHA corresponds to: govulncheck@v1.1.4
+RUN go install golang.org/x/vuln/cmd/govulncheck@d1f380186385b4f64e00313f31743df8e4b89a77 && \
+    # SHA corresponds to: osv-scanner@v1.9.2
+    go install github.com/google/osv-scanner/cmd/osv-scanner@1e295ee11c5e107886e58bacb04228325082146f
+
+# Python security tools - pinned versions
+RUN pip install --no-cache-dir --break-system-packages pip-audit==2.7.3
+
+# Scripts - dep.sh and dep-verify.sh
+COPY scripts/ /scripts/
+RUN chmod +x /scripts/*.sh
+
+WORKDIR /workspace

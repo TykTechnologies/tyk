@@ -1,5 +1,5 @@
 {
-  "name": "Tyk Gateway",
+  "name": "Tyk Gateway dev",
   "dockerComposeFile": "../docker-compose.dev.yml",
   "service": "gateway",
   "workspaceFolder": "/app",
@@ -37,9 +37,8 @@
     }
   },
 
-  "postCreateCommand": "go mod download && git config core.hooksPath .githooks",
-
-  "postStartCommand": "sudo /usr/local/bin/init-firewall.sh",
+  "postCreateCommand": "GOPROXY=https://proxy.golang.org,direct go mod download && git config core.hooksPath .githooks",
+  "postStartCommand": "",
   "waitFor": "postStartCommand",
 
   "mounts": [
@@ -51,7 +50,7 @@
   "remoteEnv": {
     "GONOSUMDB": "github.com/TykTechnologies/*",
     "GOPRIVATE": "github.com/TykTechnologies/*",
-    "GOPROXY": "https://proxy.golang.org,direct",
+    "GOPROXY": "off",
     "GOFLAGS": "-mod=readonly"
   },
 

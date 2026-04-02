@@ -97,3 +97,23 @@ docker:
 docker-std: build
 	docker build --platform ${BUILD_PLATFORM} --no-cache -t internal/tyk-gateway:std -f ci/Dockerfile.std .
 
+.PHONY: dep dep-verify
+
+## dep: Add a dependency at a specific pinned version
+## A pinned version is always required - no @latest, no version ranges.
+## Usage:
+##   make dep LANG=go     PKG=github.com/some/pkg@v1.2.3
+##   make dep LANG=npm    PKG=lodash@4.17.21
+##   make dep LANG=python PKG=requests==2.32.3
+dep:
+	@[ "$(LANG)" ] || ( echo "Usage: make dep LANG=go|npm|python PKG=<package@version>"; exit 1 )
+	@[ "$(PKG)" ]  || ( echo "Usage: make dep LANG=go|npm|python PKG=<package@version>"; exit 1 )
+	@echo ">>> Starting dep review container (isolated, no host credentials)..."
+	@docker compose -f docker-compose.deps.yml run --rm depreviewer \
+		/scripts/dep.sh $(LANG) "$(PKG)"
+
+## dep-verify: Verify all current deps across all ecosystems - no network, no changes
+dep-verify:
+	@docker compose -f docker-compose.deps.yml run --rm depreviewer \
+		/scripts/dep-verify.sh
+

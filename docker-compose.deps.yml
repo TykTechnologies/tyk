@@ -1,0 +1,45 @@
+services:
+  squid:
+    image: ubuntu/squid:latest
+    volumes:
+      - ./.devcontainer/squid.conf:/etc/squid/squid.conf:ro
+    networks:
+      - dep-internal
+      - dep-egress
+
+  depreviewer:
+    build:
+      context: .
+      dockerfile: .devcontainer/Dockerfile.depreviewer
+    volumes:
+      - .:/workspace
+      - tyk-gomodcache:/go/pkg/mod
+    working_dir: /workspace
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
+    tmpfs:
+      - /tmp
+      - /root/.cache
+    environment:
+      - GONOSUMDB=github.com/TykTechnologies/*
+      - GOPRIVATE=github.com/TykTechnologies/*
+      - GOPROXY=https://proxy.golang.org,direct
+      - HTTPS_PROXY=http://squid:3128
+      - HTTP_PROXY=http://squid:3128
+    networks:
+      - dep-internal
+    depends_on:
+      - squid
+
+networks:
+  dep-internal:
+    driver: bridge
+    internal: true
+  dep-egress:
+    driver: bridge
+
+volumes:
+  tyk-gomodcache:
