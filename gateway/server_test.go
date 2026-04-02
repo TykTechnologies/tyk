@@ -21,6 +21,7 @@ import (
 	"go.uber.org/mock/gomock"
 
 	"github.com/TykTechnologies/again"
+	"github.com/TykTechnologies/opentelemetry/metric/metrictest"
 	tyktrace "github.com/TykTechnologies/opentelemetry/trace"
 	"github.com/TykTechnologies/storage/persistent/model"
 
@@ -1342,4 +1343,42 @@ func TestInitOpenTelemetryInstruments(t *testing.T) {
 			}
 		})
 	}
+}
+
+// testGatewayMetricInstruments creates MetricInstruments backed by a real
+// in-memory provider so tests can assert recorded metric values.
+func testGatewayMetricInstruments(t *testing.T) (*otel.MetricInstruments, *metrictest.TestProvider) {
+	t.Helper()
+	tp := metrictest.NewProvider(t)
+	inst := otel.NewMetricInstruments(tp, logrus.New())
+	return inst, tp
+}
+
+func TestDoReload_RecordsConfigStateOnSyncFailure(t *testing.T) {
+	// Start gateway normally so it initializes all subsystems.
+	ts := StartTest(func(conf *config.Config) {
+		conf.ResourceSync.RetryAttempts = 0
+	})
+	defer ts.Close()
+
+	// Replace metric instruments with a test provider we can inspect.
+	inst, tp := testGatewayMetricInstruments(t)
+	ts.Gw.MetricInstruments = inst
+
+	// Reconfigure gateway so that API sync will fail (unreachable dashboard).
+	conf := ts.Gw.GetConfig()
+	conf.UseDBAppConfigs = true
+	conf.DBAppConfOptions.ConnectionString = "http://localhost:1"
+	ts.Gw.SetConfig(conf)
+
+	// DoReload will: sync policies (succeeds with 0) then sync APIs (fails).
+	// Before the fix, the early return skipped RecordConfigState entirely,
+	// leaving the gauges without any data point.
+	ts.Gw.DoReload()
+
+	// After fix: gauges must report 0, not be absent.
+	apisMetric := tp.FindMetric(t, "tyk.gateway.apis.loaded")
+	policiesMetric := tp.FindMetric(t, "tyk.gateway.policies.loaded")
+	metrictest.AssertGauge(t, apisMetric, float64(0))
+	metrictest.AssertGauge(t, policiesMetric, float64(0))
 }
