@@ -359,7 +359,6 @@ func (l *SessionLimiter) newRateLimitChecker(
 	switch {
 	case limiterFn != nil:
 
-		// todo: change limiter to interface and remove limiter.Func
 		return rate.AnonChecker(func() (rate.Stats, bool, error) {
 			waitTime, err := limiterFn(r.Context(), limiterKey, apiLimit.Rate, apiLimit.Per)
 

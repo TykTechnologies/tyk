@@ -1657,7 +1657,6 @@ func (gw *Gateway) initSystem() error {
 	// free resources.
 	go cleanIdleMemConnProviders(gw.ctx)
 
-	// !!! review bootstrap process and NewGateway(); this process is broken :/
 	gw.limitHeaderFactory = rate.NewSenderFactory(gwConfig.RateLimitHeadersSource)
 	gw.jwkCache = buildJWKSCache(gwConfig)
 
