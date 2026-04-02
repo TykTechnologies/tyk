@@ -1281,14 +1281,10 @@ func (gw *Gateway) handleGetAPIOAS(apiID string, modePublic bool) (interface{}, 
 		}
 
 		// We have to operate on oas clone in order to preserve original state after any manipulations on schema.
-		var err error
-		obj, err = apiOAS.Clone()
-		if err != nil {
-			return err, http.StatusInternalServerError
-		}
+		obj, _ = apiOAS.Clone()
 	}
-	return obj, code
 
+	return obj, code
 }
 
 func (gw *Gateway) handleAddApi(r *http.Request, fs afero.Fs, oasEndpoint bool) (interface{}, int) {
@@ -1638,18 +1634,6 @@ func (gw *Gateway) apiOASGetHandler(w http.ResponseWriter, r *http.Request) {
 	} else {
 		log.Debug("Requesting API list")
 		obj, code = gw.handleGetAPIListOAS(false)
-	}
-
-	if code == http.StatusInternalServerError {
-		if err, ok := obj.(error); ok {
-			log.WithFields(logrus.Fields{
-				"prefix": "api",
-				"apiID":  fmt.Sprintf("%q", apiID),
-			}).Error(fmt.Sprintf("API definition for %q could not be cloned, err: %v", apiID, err.Error()))
-		}
-
-		http.Error(w, fmt.Sprintf("API definition for %v could not be retrieved", apiID), http.StatusInternalServerError)
-		return
 	}
 
 	if oasAPI, ok := obj.(*oas.OAS); ok {
