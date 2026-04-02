@@ -6,9 +6,11 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/gorilla/mux"
 
 	"github.com/TykTechnologies/tyk/internal/maps"
+	"github.com/TykTechnologies/tyk/internal/oasutil"
 )
 
 // routeCache holds the raw routes as they are mapped from mux parameters to regular expressions.
@@ -58,6 +60,38 @@ func PreparePathRegexp(pattern string, prefix bool, suffix bool) string {
 
 	// Save cache for following invocations.
 	pathRegexpCache.Set(key, pattern)
+
+	return pattern
+}
+
+func PreparePathRegexpStrict(
+	pattern string,
+	prefix bool,
+	suffix bool,
+	parameters openapi3.Parameters,
+) string {
+
+	pattern = oasutil.PathToRegex(pattern, parameters)
+
+	// copied: from upper function
+
+	// Replace mux wildcard path with a `.*` (match 0 or more characters)
+	if strings.Contains(pattern, "/*") {
+		pattern = strings.ReplaceAll(pattern, "/*/", "/[^/]+/")
+		pattern = strings.ReplaceAll(pattern, "/*", "/.*")
+	}
+
+	// Pattern `/users` becomes `^/users`.
+	if prefix && strings.HasPrefix(pattern, "/") {
+		pattern = "^" + pattern
+	}
+
+	// Append $ if necessary to enforce suffix matching.
+	// Pattern `/users` becomes `/users$`.
+	// Pattern `^/users` becomes `^/users$`.
+	if suffix && !strings.HasSuffix(pattern, "$") {
+		pattern = pattern + "$"
+	}
 
 	return pattern
 }

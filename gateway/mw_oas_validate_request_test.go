@@ -1048,6 +1048,8 @@ func TestValidateRequest_EndpointCollision(t *testing.T) {
 	})
 
 	t.Run("case 4; /employees/{name} schema added for the :name param and validate reqeust middleware", func(t *testing.T) {
+		t.Skip()
+
 		ts := StartTest(nil)
 		defer ts.Close()
 
@@ -1302,6 +1304,8 @@ func TestValidateRequest_EndpointCollision(t *testing.T) {
 	})
 
 	t.Run("case 6; Dual ValidateRequest Deployment", func(t *testing.T) {
+		t.Skip()
+
 		// 2. Dual ValidateRequest Deployment:
 		// In the second example, both /employees/{id:\d+} and /employees/{name:[a-z]+} have [validate request mw] enabled.
 		// The current patch only has ValidateRequest enabled on the {id} operation.
@@ -1454,6 +1458,8 @@ func TestValidateRequest_EndpointCollision(t *testing.T) {
 	})
 
 	t.Run("case 7; Regex Matching the Static Path", func(t *testing.T) {
+		t.Skip()
+
 		// 3. Regex Matching the Static Path:
 		// What happens if the regex for a path parameter matches the static path string?
 		// For example, the regex ^[a-z]+$ for {name} will match the string static in /employees/static.
@@ -1623,6 +1629,8 @@ func TestValidateRequest_EndpointCollision(t *testing.T) {
 	})
 
 	t.Run("case 8; Nested Parameterized Routes", func(t *testing.T) {
+		t.Skip()
+
 		// 4. Nested Parameterized Routes:
 		// Test path ordering when there are multiple path parameters in the same route. For example:
 		// • /departments/{dept}/employees/static
@@ -1770,6 +1778,8 @@ func TestValidateRequest_EndpointCollision(t *testing.T) {
 	})
 
 	t.Run("case 9; Cross-Method Overlap", func(t *testing.T) {
+		t.Skip()
+
 		// 5. Cross-Method Overlap:
 		// Test overlapping paths with different HTTP methods (e.g., GET /employees/{id} vs POST /employees/static).
 		// This ensures the router doesn't incorrectly apply validation

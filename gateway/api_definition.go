@@ -17,36 +17,28 @@ import (
 	texttemplate "text/template"
 	"time"
 
-	"github.com/TykTechnologies/tyk/ee/middleware/streams"
-	"github.com/TykTechnologies/tyk/storage/kv"
-
-	"github.com/TykTechnologies/tyk/internal/httpctx"
-	"github.com/TykTechnologies/tyk/internal/httputil"
-	"github.com/TykTechnologies/tyk/internal/mcp"
-
-	"github.com/getkin/kin-openapi/routers/gorillamux"
-
-	"github.com/getkin/kin-openapi/openapi3"
-
-	"github.com/TykTechnologies/tyk/apidef/oas"
-
-	"github.com/cenk/backoff"
-
 	"github.com/Masterminds/sprig/v3"
-
+	"github.com/cenk/backoff"
+	"github.com/getkin/kin-openapi/openapi3"
+	"github.com/getkin/kin-openapi/routers/gorillamux"
 	"github.com/sirupsen/logrus"
 
 	circuit "github.com/TykTechnologies/circuitbreaker"
 
-	"github.com/TykTechnologies/tyk/internal/service/gojsonschema"
-
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/apidef/oas"
 	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/ee/middleware/streams"
 	"github.com/TykTechnologies/tyk/header"
+	"github.com/TykTechnologies/tyk/internal/httpctx"
+	"github.com/TykTechnologies/tyk/internal/httputil"
+	"github.com/TykTechnologies/tyk/internal/mcp"
 	"github.com/TykTechnologies/tyk/internal/model"
+	"github.com/TykTechnologies/tyk/internal/service/gojsonschema"
 	"github.com/TykTechnologies/tyk/regexp"
 	"github.com/TykTechnologies/tyk/rpc"
 	"github.com/TykTechnologies/tyk/storage"
+	"github.com/TykTechnologies/tyk/storage/kv"
 )
 
 // const used by cache middleware
@@ -1388,11 +1380,54 @@ func (a APIDefinitionLoader) compileOASValidateRequestPathSpec(apiSpec *APISpec,
 		// For regex matching, we don't prepend listenPath because URLSpec.matchesPath
 		// will strip the listenPath before matching
 		// Use standard regex generation with gateway config
-		a.generateRegex(path, &newSpec, OASValidateRequest, conf)
+		a.generateStrictRegex(path, method, &newSpec, OASValidateRequest, conf, apiSpec.OAS)
 		urlSpec = append(urlSpec, newSpec)
 	}
 
 	return urlSpec
+}
+
+func (a APIDefinitionLoader) generateStrictRegex(
+	path string,
+	method string,
+	newSpec *URLSpec,
+	specType URLStatus,
+	conf config.Config,
+	oasSpec oas.OAS,
+) {
+
+	var (
+		pattern string
+		err     error
+	)
+	// Hook per-api settings here via newSpec *URLSpec
+	isPrefixMatch := conf.HttpServerOptions.EnablePathPrefixMatching
+	isSuffixMatch := conf.HttpServerOptions.EnablePathSuffixMatching
+	isIgnoreCase := newSpec.IgnoreCase || conf.IgnoreEndpointCase
+
+	var parameters openapi3.Parameters
+
+	// todo: extract as get op parameters
+	if oasSpec.Paths != nil {
+		if pi := oasSpec.Paths.Value(path); pi != nil {
+			if op := pi.GetOperation(method); op != nil {
+				parameters = op.Parameters
+			}
+		}
+	}
+
+	pattern = httputil.PreparePathRegexpStrict(path, isPrefixMatch, isSuffixMatch, parameters)
+
+	// Case insensitive match
+	if isIgnoreCase {
+		pattern = "(?i)" + pattern
+	}
+
+	asRegex, err := regexp.Compile(pattern)
+	log.WithError(err).Debugf("URLSpec: %s => %s type=%d", path, pattern, specType)
+
+	newSpec.Status = specType
+	newSpec.spec = asRegex
 }
 
 // compileOASMockResponsePathSpec extracts MockResponse operations from OAS middleware
