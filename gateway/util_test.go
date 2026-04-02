@@ -491,6 +491,7 @@ func Test_shouldReloadSpec(t *testing.T) {
 }
 
 func TestAreMapsEqual(t *testing.T) {
+	t.Errorf("intentional failure")
 	tests := []struct {
 		name     string
 		map1     map[string]string
