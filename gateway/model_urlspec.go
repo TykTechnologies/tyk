@@ -48,6 +48,8 @@ type URLSpec struct {
 	// OASPath stores the original OAS path pattern (e.g., "/users/{id}")
 	// This is used for matching against the OAS router when needed
 	OASPath string
+	// Path stores the original path pattern for classic APIs
+	Path string
 }
 
 // modeSpecificSpec returns the respective field of URLSpec if it matches the given mode.

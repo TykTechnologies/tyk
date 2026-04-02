@@ -12,6 +12,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"sync/atomic"
 	texttemplate "text/template"
@@ -813,6 +814,7 @@ func (a APIDefinitionLoader) generateRegex(stringSpec string, newSpec *URLSpec, 
 
 	newSpec.Status = specType
 	newSpec.spec = asRegex
+	newSpec.Path = stringSpec
 }
 
 func (a APIDefinitionLoader) compilePathSpec(paths []string, specType URLStatus, conf config.Config) []URLSpec {
@@ -1571,6 +1573,30 @@ func (a APIDefinitionLoader) getExtendedPathSpecs(apiVersionDef apidef.VersionIn
 	combinedPath = append(combinedPath, rateLimitPaths...)
 	combinedPath = append(combinedPath, oasValidateRequestPaths...)
 	combinedPath = append(combinedPath, oasMockResponsePaths...)
+
+	// Sort combinedPath to ensure static paths take precedence over parameterized paths
+	sort.SliceStable(combinedPath, func(i, j int) bool {
+		if combinedPath[i].Status != combinedPath[j].Status {
+			return false
+		}
+
+		pathI := combinedPath[i].OASPath
+		if pathI == "" {
+			pathI = combinedPath[i].Path
+		}
+		pathJ := combinedPath[j].OASPath
+		if pathJ == "" {
+			pathJ = combinedPath[j].Path
+		}
+
+		isParamI := httputil.IsMuxTemplate(pathI) || strings.Contains(pathI, "/*") || strings.Contains(pathI, "(.*)") || strings.Contains(pathI, "([^/]+)")
+		isParamJ := httputil.IsMuxTemplate(pathJ) || strings.Contains(pathJ, "/*") || strings.Contains(pathJ, "(.*)") || strings.Contains(pathJ, "([^/]+)")
+
+		if !isParamI && isParamJ {
+			return true
+		}
+		return false
+	})
 
 	// Enable whitelist mode if there are whitelist paths or operation-level allows.
 	// For MCP APIs, we disable global whitelist mode here (whiteListEnabled = false), but this
