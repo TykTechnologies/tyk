@@ -666,6 +666,94 @@ func TestValidateRequest_PathParameters(t *testing.T) {
 	}...)
 }
 
+func TestValidateRequest_StaticVsParameterizedPath(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	const oasSpec = `{
+		"openapi": "3.0.0",
+		"info": {"title": "Static vs Parameterized Test", "version": "1.0.0"},
+		"paths": {
+			"/employees/static": {
+				"get": {
+					"operationId": "getStatic",
+					"responses": {"200": {"description": "OK"}}
+				}
+			},
+			"/employees/{id}": {
+				"get": {
+					"operationId": "getEmployee",
+					"parameters": [
+						{
+							"name": "id",
+							"in": "path",
+							"required": true,
+							"schema": {"type": "integer"}
+						},
+						{
+							"name": "X-Request-ID",
+							"in": "header",
+							"required": true,
+							"schema": {"type": "string"}
+						}
+					],
+					"responses": {"200": {"description": "OK"}}
+				}
+			}
+		}
+	}`
+
+	oasDoc, err := openapi3.NewLoader().LoadFromData([]byte(oasSpec))
+	assert.NoError(t, err)
+
+	oasAPI := oas.OAS{T: *oasDoc}
+	oasAPI.SetTykExtension(&oas.XTykAPIGateway{
+		Middleware: &oas.Middleware{
+			Operations: oas.Operations{
+				"getEmployee": {
+					ValidateRequest: &oas.ValidateRequest{
+						Enabled:           true,
+						ErrorResponseCode: http.StatusUnprocessableEntity,
+					},
+				},
+			},
+		},
+	})
+
+	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		spec.Name = "Static vs Parameterized Validate Test"
+		spec.APIID = "static-param-validate-test"
+		spec.Proxy.ListenPath = "/api/"
+		spec.UseKeylessAccess = true
+		spec.IsOAS = true
+		spec.OAS = oasAPI
+	})
+
+	_, _ = ts.Run(t, []test.TestCase{
+		// Request to static path should NOT trigger validateRequest
+		// (even though it matches the regex for /employees/{id})
+		{
+			Method:  http.MethodGet,
+			Path:    "/api/employees/static",
+			Code:    http.StatusOK, // Should not fail with 422
+		},
+		// Request to parameterized path should trigger validateRequest and fail (missing header)
+		{
+			Method:    http.MethodGet,
+			Path:      "/api/employees/123",
+			Code:      http.StatusUnprocessableEntity,
+			BodyMatch: "X-Request-ID",
+		},
+		// Request to parameterized path with header should pass
+		{
+			Method:  http.MethodGet,
+			Path:    "/api/employees/123",
+			Headers: map[string]string{"X-Request-ID": "req-123"},
+			Code:    http.StatusOK,
+		},
+	}...)
+}
+
 func TestValidateRequest_NormalizeHeaders(t *testing.T) {
 	customHeader := "X-Custom"
 	tests := []struct {

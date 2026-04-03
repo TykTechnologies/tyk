@@ -172,6 +172,22 @@ func (a *APISpec) FindSpecMatchesStatus(r *http.Request, rxPaths []URLSpec, mode
 			continue
 		}
 
+		// Verify Match Against OAS Router Before Firing
+		if mode == OASValidateRequest || mode == OASMockResponse {
+			if a.IsOAS && a.oasRouter != nil {
+				rClone := *r
+				rClone.URL = ctxGetInternalRedirectTarget(r)
+				route, _, err := a.oasRouter.FindRoute(&rClone)
+				if err == nil && route != nil {
+					if route.Path != rxPaths[i].OASPath {
+						continue
+					}
+				}
+				// If the OAS router didn't find a route (e.g. due to prefix/suffix matching),
+				// we trust the regex match and proceed.
+			}
+		}
+
 		return &rxPaths[i], true
 	}
 	return nil, false
