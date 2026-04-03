@@ -78,10 +78,10 @@ func (k *ValidateRequest) EnabledForSpec() bool {
 }
 
 func (k *ValidateRequest) ProcessRequest(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
-	operation, urlSpec := k.Spec.FindOASMatch(r, OASValidateRequest)
-
+	// Phase 1: Try exact match using the highly-optimized OAS tree router (v5.11 behavior)
+	operation := k.Spec.findOperation(r)
 	if operation != nil {
-		// Phase 1: Exact match found! Strictly enforce its configuration.
+		// Exact match found! Strictly enforce its configuration.
 		validateRequest := operation.ValidateRequest
 		if validateRequest == nil || !validateRequest.Enabled {
 			return nil, http.StatusOK // Shielded! Static paths exit here.
@@ -115,7 +115,13 @@ func (k *ValidateRequest) ProcessRequest(w http.ResponseWriter, r *http.Request,
 		return nil, http.StatusOK
 	}
 
-	if urlSpec == nil {
+	// Phase 2: Fallback to regex matching (v5.12 behavior for Asurion's prefix/wildcard use case)
+	versionInfo, _ := k.Spec.Version(r)
+	versionPaths := k.Spec.RxPaths[versionInfo.Name]
+
+	urlSpec, found := k.Spec.FindSpecMatchesStatus(r, versionPaths, OASValidateRequest)
+
+	if !found || urlSpec == nil {
 		// No validation configured for this path
 		return nil, http.StatusOK
 	}

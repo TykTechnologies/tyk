@@ -108,8 +108,8 @@ func (m *mockResponseMiddleware) mockResponse(r *http.Request) (
 	internal *http.Request,
 	err error,
 ) {
-	operation, urlSpec := m.Spec.FindOASMatch(r, OASMockResponse)
-
+	// Phase 1: Try exact match using the highly-optimized OAS tree router
+	operation := m.Spec.findOperation(r)
 	if operation != nil {
 		mockResponse := operation.MockResponse
 		if mockResponse == nil || !mockResponse.Enabled {
@@ -155,7 +155,13 @@ func (m *mockResponseMiddleware) mockResponse(r *http.Request) (
 		return res, internal, nil
 	}
 
-	if urlSpec == nil {
+	// Phase 2: Fallback to regex matching
+	versionInfo, _ := m.Spec.Version(r)
+	versionPaths := m.Spec.RxPaths[versionInfo.Name]
+
+	urlSpec, found := m.Spec.FindSpecMatchesStatus(r, versionPaths, OASMockResponse)
+
+	if !found || urlSpec == nil {
 		// No mock response configured for this path
 		return nil, nil, nil
 	}

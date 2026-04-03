@@ -1,12 +1,9 @@
 package gateway
 
 import (
-	"bytes"
 	"context"
 	"fmt"
-	"io"
 	"net/http"
-	"net/http/httptest"
 	"testing"
 
 	"github.com/getkin/kin-openapi/openapi3"
@@ -870,23 +867,22 @@ func BenchmarkOASValidateRequest_StaticVsParameterizedPath(b *testing.B) {
 
 	ts.Gw.LoadAPI()
 	_ = api
+
 	b.Run("StaticPath", func(b *testing.B) {
+		req, _ := http.NewRequest("GET", ts.URL+"/api/employees/static", nil)
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
-			req, _ := http.NewRequest("GET", ts.URL+"/api/employees/static", nil)
-			req.Body = io.NopCloser(bytes.NewReader([]byte{}))
-			recorder := httptest.NewRecorder()
-			ts.TestServerRouter.ServeHTTP(recorder, req)
+			resp, _ := http.DefaultClient.Do(req)
+			resp.Body.Close()
 		}
 	})
 
 	b.Run("ParameterizedPath", func(b *testing.B) {
+		req, _ := http.NewRequest("GET", ts.URL+"/api/employees/123", nil)
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
-			req, _ := http.NewRequest("GET", ts.URL+"/api/employees/123", nil)
-			req.Body = io.NopCloser(bytes.NewReader([]byte{}))
-			recorder := httptest.NewRecorder()
-			ts.TestServerRouter.ServeHTTP(recorder, req)
+			resp, _ := http.DefaultClient.Do(req)
+			resp.Body.Close()
 		}
 	})
 }

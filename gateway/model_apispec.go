@@ -256,27 +256,6 @@ func (a *APISpec) findOperation(r *http.Request) *Operation {
 		pathParams: pathParams,
 	}
 }
-// FindOASMatch implements Two-Phase Matching for OAS middlewares.
-// Phase 1: Try exact match using the highly-optimized OAS tree router (v5.11 behavior).
-// Phase 2: Fallback to regex matching (v5.12 behavior for prefix/wildcard use cases).
-func (a *APISpec) FindOASMatch(r *http.Request, mode URLStatus) (*Operation, *URLSpec) {
-	// Phase 1: Try exact match using the highly-optimized OAS tree router
-	operation := a.findOperation(r)
-	if operation != nil {
-		return operation, nil
-	}
-
-	// Phase 2: Fallback to regex matching
-	versionInfo, _ := a.Version(r)
-	versionPaths := a.RxPaths[versionInfo.Name]
-
-	urlSpec, found := a.FindSpecMatchesStatus(r, versionPaths, mode)
-	if !found || urlSpec == nil {
-		return nil, nil
-	}
-
-	return nil, urlSpec
-}
 
 // findRouteForOASPath finds the OAS route using the OAS path pattern (e.g., "/users/{id}")
 // and method, rather than the actual request path. This is used when gateway path matching
