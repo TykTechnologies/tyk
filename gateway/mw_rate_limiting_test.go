@@ -214,8 +214,8 @@ func TestRateLimitResponseHeaders_NoDuplicated(t *testing.T) {
 // are not populated when requests are rejected due to quota exhaustion.
 //
 // When a request exceeds the quota limit and returns 403 Forbidden,
-// the X-RateLimit-* headers are not included in the response. This differs from
-// rate limiting behavior where headers are typically present on rejection.
+// the X-RateLimit-* headers are not included in the response to suppport
+// backward compatibility.
 func TestQuotaHeadersOnErrorResponses(t *testing.T) {
 	ts := StartTest(func(globalConf *config.Config) {
 		globalConf.RateLimitHeadersSource = config.RateLimitHeadersSourceQuota
