@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/TykTechnologies/tyk/ctx"
+	"github.com/TykTechnologies/tyk/header"
 	tykerrors "github.com/TykTechnologies/tyk/internal/errors"
 	"github.com/TykTechnologies/tyk/internal/event"
 	"github.com/TykTechnologies/tyk/storage"
@@ -103,7 +104,13 @@ func (k *RateLimitForAPI) ProcessRequest(rw http.ResponseWriter, r *http.Request
 	}
 
 	session := k.getSession(r)
+
 	limitHeaderSender := k.Gw.limitHeaderFactory(rw.Header())
+	// Only inject API-level rate limit headers if personal rate limit headers
+	// haven't already been injected by RateLimitAndQuotaCheck.
+	if rw.Header().Get(header.XRateLimitLimit) != "" {
+		limitHeaderSender = nil
+	}
 
 	reason := k.Gw.SessionLimiter.ForwardMessage(
 		r,
