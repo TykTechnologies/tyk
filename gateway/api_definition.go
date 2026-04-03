@@ -1373,6 +1373,37 @@ func (a APIDefinitionLoader) compileOASValidateRequestPathSpec(apiSpec *APISpec,
 	// Get sorted paths (static paths before parameterized paths, then by length descending)
 	sortedPaths := oasutil.SortByPathLength(*apiSpec.OAS.Paths)
 
+	// First pass: collect all parameterized paths that have ValidateRequest enabled
+	var parameterizedRegexes []*regexp.Regexp
+	for _, pathItem := range sortedPaths {
+		path := pathItem.Path
+		if !strings.Contains(path, "{") {
+			continue
+		}
+
+		for _, operation := range pathItem.Operations() {
+			if operation == nil {
+				continue
+			}
+
+			if tykOp, ok := middleware.Operations[operation.OperationID]; ok {
+				if tykOp.ValidateRequest != nil && tykOp.ValidateRequest.Enabled {
+					// Compile regex for this parameterized path
+					isPrefixMatch := conf.HttpServerOptions.EnablePathPrefixMatching
+					isSuffixMatch := conf.HttpServerOptions.EnablePathSuffixMatching
+					pattern := httputil.PreparePathRegexp(path, isPrefixMatch, isSuffixMatch)
+					if conf.IgnoreEndpointCase {
+						pattern = "(?i)" + pattern
+					}
+					if re, err := regexp.Compile(pattern); err == nil {
+						parameterizedRegexes = append(parameterizedRegexes, re)
+					}
+					break // One regex per path is enough
+				}
+			}
+		}
+	}
+
 	for _, pathItem := range sortedPaths {
 		path := pathItem.Path
 		isStaticPath := !strings.Contains(path, "{")
@@ -1403,15 +1434,26 @@ func (a APIDefinitionLoader) compileOASValidateRequestPathSpec(apiSpec *APISpec,
 				a.generateRegex(path, &newSpec, OASValidateRequest, conf)
 				urlSpec = append(urlSpec, newSpec)
 			} else if isStaticPath {
-				// Create a disabled entry to act as a shield
-				newSpec := URLSpec{
-					OASValidateRequestMeta: &oas.ValidateRequest{Enabled: false},
-					OASMethod:              strings.ToUpper(method),
-					OASPath:                path,
+				// Check if this static path matches any parameterized regex
+				matchesParameterized := false
+				for _, re := range parameterizedRegexes {
+					if re.MatchString(path) {
+						matchesParameterized = true
+						break
+					}
 				}
 
-				a.generateRegex(path, &newSpec, OASValidateRequest, conf)
-				urlSpec = append(urlSpec, newSpec)
+				if matchesParameterized {
+					// Create a disabled entry to act as a shield
+					newSpec := URLSpec{
+						OASValidateRequestMeta: &oas.ValidateRequest{Enabled: false},
+						OASMethod:              strings.ToUpper(method),
+						OASPath:                path,
+					}
+
+					a.generateRegex(path, &newSpec, OASValidateRequest, conf)
+					urlSpec = append(urlSpec, newSpec)
+				}
 			}
 		}
 	}
@@ -1441,6 +1483,38 @@ func (a APIDefinitionLoader) compileOASMockResponsePathSpec(apiSpec *APISpec, co
 
 	// Get sorted paths (static paths before parameterized paths, then by length descending)
 	sortedPaths := oasutil.SortByPathLength(*apiSpec.OAS.Paths)
+
+	// First pass: collect all parameterized paths that have MockResponse enabled
+	var parameterizedRegexes []*regexp.Regexp
+	for _, pathItem := range sortedPaths {
+		path := pathItem.Path
+		if !strings.Contains(path, "{") {
+			continue
+		}
+
+		for _, operation := range pathItem.Operations() {
+			if operation == nil {
+				continue
+			}
+
+			if tykOp, ok := middleware.Operations[operation.OperationID]; ok {
+				if tykOp.MockResponse != nil && tykOp.MockResponse.Enabled {
+					// Compile regex for this parameterized path
+					isPrefixMatch := conf.HttpServerOptions.EnablePathPrefixMatching
+					isSuffixMatch := conf.HttpServerOptions.EnablePathSuffixMatching
+					pattern := httputil.PreparePathRegexp(path, isPrefixMatch, isSuffixMatch)
+					if conf.IgnoreEndpointCase {
+						pattern = "(?i)" + pattern
+					}
+					if re, err := regexp.Compile(pattern); err == nil {
+						parameterizedRegexes = append(parameterizedRegexes, re)
+					}
+					break // One regex per path is enough
+				}
+			}
+		}
+	}
+
 	for _, pathItem := range sortedPaths {
 		path := pathItem.Path
 		isStaticPath := !strings.Contains(path, "{")
@@ -1471,15 +1545,26 @@ func (a APIDefinitionLoader) compileOASMockResponsePathSpec(apiSpec *APISpec, co
 				a.generateRegex(path, &newSpec, OASMockResponse, conf)
 				urlSpec = append(urlSpec, newSpec)
 			} else if isStaticPath {
-				// Create a disabled entry to act as a shield
-				newSpec := URLSpec{
-					OASMockResponseMeta: &oas.MockResponse{Enabled: false},
-					OASMethod:           strings.ToUpper(method),
-					OASPath:             path,
+				// Check if this static path matches any parameterized regex
+				matchesParameterized := false
+				for _, re := range parameterizedRegexes {
+					if re.MatchString(path) {
+						matchesParameterized = true
+						break
+					}
 				}
 
-				a.generateRegex(path, &newSpec, OASMockResponse, conf)
-				urlSpec = append(urlSpec, newSpec)
+				if matchesParameterized {
+					// Create a disabled entry to act as a shield
+					newSpec := URLSpec{
+						OASMockResponseMeta: &oas.MockResponse{Enabled: false},
+						OASMethod:           strings.ToUpper(method),
+						OASPath:             path,
+					}
+
+					a.generateRegex(path, &newSpec, OASMockResponse, conf)
+					urlSpec = append(urlSpec, newSpec)
+				}
 			}
 		}
 	}
