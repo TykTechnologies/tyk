@@ -10,8 +10,6 @@ import (
 	"github.com/TykTechnologies/tyk/user"
 )
 
-///go:generate go tool mockgen -typed -source=./headers.go -destination=headers_mock.gen.go -package rate HeaderSender
-
 type (
 	HeaderSenderFactory func(http.Header) HeaderSender
 
@@ -92,12 +90,3 @@ func (r *rateLimitSender) SendRateLimits(limits Stats) {
 	resetTime := time.Now().Add(limits.Reset).Unix()
 	r.hdr.Set(header.XRateLimitReset, strconv.FormatInt(resetTime, 10))
 }
-
-func NewFakeHeaderSender() *FakeHeaderSender {
-	return &FakeHeaderSender{}
-}
-
-type FakeHeaderSender struct{}
-
-func (r *FakeHeaderSender) SendQuotas(_ *user.SessionState, _ string) {}
-func (r *FakeHeaderSender) SendRateLimits(_ Stats)                    {}
