@@ -23,7 +23,7 @@ import (
 	"github.com/TykTechnologies/tyk/internal/httpctx"
 	"github.com/TykTechnologies/tyk/internal/httputil"
 	"github.com/TykTechnologies/tyk/internal/mcp"
-
+	"github.com/TykTechnologies/tyk/internal/oasutil"
 	"github.com/getkin/kin-openapi/routers/gorillamux"
 
 	"github.com/getkin/kin-openapi/openapi3"
@@ -1364,32 +1364,56 @@ func (a APIDefinitionLoader) compileOASValidateRequestPathSpec(apiSpec *APISpec,
 		return nil
 	}
 
+	if apiSpec.OAS.Paths == nil {
+		return nil
+	}
+
 	urlSpec := []URLSpec{}
 
-	// Iterate through all OAS operations and find those with ValidateRequest enabled
-	for operationID, operation := range middleware.Operations {
-		if operation.ValidateRequest == nil || !operation.ValidateRequest.Enabled {
-			continue
-		}
+	// Get sorted paths (static paths before parameterized paths, then by length descending)
+	sortedPaths := oasutil.SortByPathLength(*apiSpec.OAS.Paths)
 
-		// Find the path and method for this operation
-		path, method := a.findPathAndMethodForOperation(apiSpec, operationID)
-		if path == "" || method == "" {
-			continue
-		}
+	for _, pathItem := range sortedPaths {
+		path := pathItem.Path
+		isStaticPath := !strings.Contains(path, "{")
 
-		newSpec := URLSpec{
-			OASValidateRequestMeta: operation.ValidateRequest,
-			OASMethod:              strings.ToUpper(method),
-			OASPath:                path,
-		}
+		// Iterate over all operations for this path
+		for method, operation := range pathItem.Operations() {
+			if operation == nil {
+				continue
+			}
 
-		// The path in OAS is relative to the server URL (listenPath)
-		// For regex matching, we don't prepend listenPath because URLSpec.matchesPath
-		// will strip the listenPath before matching
-		// Use standard regex generation with gateway config
-		a.generateRegex(path, &newSpec, OASValidateRequest, conf)
-		urlSpec = append(urlSpec, newSpec)
+			// Check if this operation has ValidateRequest enabled
+			var validateRequest *oas.ValidateRequest
+			
+			// Find the operation in middleware.Operations
+			if tykOp, ok := middleware.Operations[operation.OperationID]; ok {
+				if tykOp.ValidateRequest != nil && tykOp.ValidateRequest.Enabled {
+					validateRequest = tykOp.ValidateRequest
+				}
+			}
+
+			if validateRequest != nil {
+				newSpec := URLSpec{
+					OASValidateRequestMeta: validateRequest,
+					OASMethod:              strings.ToUpper(method),
+					OASPath:                path,
+				}
+
+				a.generateRegex(path, &newSpec, OASValidateRequest, conf)
+				urlSpec = append(urlSpec, newSpec)
+			} else if isStaticPath {
+				// Create a disabled entry to act as a shield
+				newSpec := URLSpec{
+					OASValidateRequestMeta: &oas.ValidateRequest{Enabled: false},
+					OASMethod:              strings.ToUpper(method),
+					OASPath:                path,
+				}
+
+				a.generateRegex(path, &newSpec, OASValidateRequest, conf)
+				urlSpec = append(urlSpec, newSpec)
+			}
+		}
 	}
 
 	return urlSpec
@@ -1409,29 +1433,55 @@ func (a APIDefinitionLoader) compileOASMockResponsePathSpec(apiSpec *APISpec, co
 		return nil
 	}
 
+	if apiSpec.OAS.Paths == nil {
+		return nil
+	}
+
 	urlSpec := []URLSpec{}
 
-	// Iterate through all OAS operations and find those with MockResponse enabled
-	for operationID, operation := range middleware.Operations {
-		if operation.MockResponse == nil || !operation.MockResponse.Enabled {
-			continue
-		}
+	// Get sorted paths (static paths before parameterized paths, then by length descending)
+	sortedPaths := oasutil.SortByPathLength(*apiSpec.OAS.Paths)
+	for _, pathItem := range sortedPaths {
+		path := pathItem.Path
+		isStaticPath := !strings.Contains(path, "{")
 
-		// Find the path and method for this operation
-		path, method := a.findPathAndMethodForOperation(apiSpec, operationID)
-		if path == "" || method == "" {
-			continue
-		}
+		// Iterate over all operations for this path
+		for method, operation := range pathItem.Operations() {
+			if operation == nil {
+				continue
+			}
 
-		newSpec := URLSpec{
-			OASMockResponseMeta: operation.MockResponse,
-			OASMethod:           strings.ToUpper(method),
-			OASPath:             path,
-		}
+			// Check if this operation has MockResponse enabled
+			var mockResponse *oas.MockResponse
+			
+			// Find the operation in middleware.Operations
+			if tykOp, ok := middleware.Operations[operation.OperationID]; ok {
+				if tykOp.MockResponse != nil && tykOp.MockResponse.Enabled {
+					mockResponse = tykOp.MockResponse
+				}
+			}
 
-		// Use standard regex generation with gateway config
-		a.generateRegex(path, &newSpec, OASMockResponse, conf)
-		urlSpec = append(urlSpec, newSpec)
+			if mockResponse != nil {
+				newSpec := URLSpec{
+					OASMockResponseMeta: mockResponse,
+					OASMethod:           strings.ToUpper(method),
+					OASPath:             path,
+				}
+
+				a.generateRegex(path, &newSpec, OASMockResponse, conf)
+				urlSpec = append(urlSpec, newSpec)
+			} else if isStaticPath {
+				// Create a disabled entry to act as a shield
+				newSpec := URLSpec{
+					OASMockResponseMeta: &oas.MockResponse{Enabled: false},
+					OASMethod:           strings.ToUpper(method),
+					OASPath:             path,
+				}
+
+				a.generateRegex(path, &newSpec, OASMockResponse, conf)
+				urlSpec = append(urlSpec, newSpec)
+			}
+		}
 	}
 
 	return urlSpec
