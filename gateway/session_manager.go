@@ -305,7 +305,10 @@ func (l *SessionLimiter) ForwardMessage(
 		// even if the request is subsequently blocked (429).
 		// Quota headers are injected later in the chain (e.g., HandleResponse)
 		// to preserve backward compatibility.
-		headerSender.SendRateLimits(stats)
+		if headerSender != nil {
+			headerSender.SendRateLimits(stats)
+		}
+
 		l.extendContextWithLimits(r, stats)
 
 		if shouldBlock {

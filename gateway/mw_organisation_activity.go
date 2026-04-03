@@ -97,9 +97,9 @@ func (k *OrganizationMonitor) ProcessRequest(w http.ResponseWriter, r *http.Requ
 	if k.Spec.GlobalConfig.ExperimentalProcessOrgOffThread {
 		// Make a copy of request before sending to goroutine
 		r2 := r.WithContext(r.Context())
-		return k.ProcessRequestOffThread(w, r2, &clone)
+		return k.ProcessRequestOffThread(r2, &clone)
 	}
-	return k.ProcessRequestLive(w, r, &clone)
+	return k.ProcessRequestLive(r, &clone)
 }
 
 func (k *OrganizationMonitor) refreshOrgSession(orgID string) {
@@ -123,7 +123,6 @@ func (k *OrganizationMonitor) refreshOrgSession(orgID string) {
 //
 //nolint:staticcheck
 func (k *OrganizationMonitor) ProcessRequestLive(
-	w http.ResponseWriter,
 	r *http.Request,
 	orgSession *user.SessionState,
 ) (error, int) {
@@ -146,7 +145,7 @@ func (k *OrganizationMonitor) ProcessRequestLive(
 		true,
 		k.Spec,
 		false,
-		k.Gw.limitHeaderFactory(w.Header()),
+		nil,
 	)
 
 	sessionLifeTime := orgSession.Lifetime(k.Spec.GetSessionLifetimeRespectsKeyExpiration(), k.Spec.SessionLifetime, k.Gw.GetConfig().ForceGlobalSessionLifetime, k.Gw.GetConfig().GlobalSessionLifetime)
@@ -220,7 +219,6 @@ func (k *OrganizationMonitor) SetOrgSentinel(orgChan chan bool, orgId string) {
 
 //nolint:staticcheck
 func (k *OrganizationMonitor) ProcessRequestOffThread(
-	w http.ResponseWriter,
 	r *http.Request,
 	orgSession *user.SessionState,
 ) (error, int) {
@@ -248,7 +246,6 @@ func (k *OrganizationMonitor) ProcessRequestOffThread(
 		request.RealIP(r),
 		r,
 		&orgSessionCopy,
-		w,
 	)
 
 	if found && !active.(bool) {
@@ -266,7 +263,6 @@ func (k *OrganizationMonitor) AllowAccessNext(
 	IP string,
 	r *http.Request,
 	session *user.SessionState,
-	w http.ResponseWriter,
 ) {
 
 	// Is it active?
@@ -289,7 +285,7 @@ func (k *OrganizationMonitor) AllowAccessNext(
 		true,
 		k.Spec,
 		false,
-		k.Gw.limitHeaderFactory(w.Header()),
+		nil,
 	)
 
 	sessionLifeTime := session.Lifetime(k.Spec.GetSessionLifetimeRespectsKeyExpiration(), k.Spec.SessionLifetime, k.Gw.GetConfig().ForceGlobalSessionLifetime, k.Gw.GetConfig().GlobalSessionLifetime)
