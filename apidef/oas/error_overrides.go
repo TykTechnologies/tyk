@@ -16,7 +16,7 @@ import (
 // ErrorOverrides defines the OAS extension configuration for error overrides.
 type ErrorOverrides struct {
 	// Enabled determines if error overrides are active for this API.
-	// Maps to Tyk classic API definition: `error_overrides_disabled`.
+	// Maps to Tyk classic API definition: `error_overrides_disabled`
 	Enabled bool `bson:"enabled" json:"enabled"`
 
 	// Value contains the map of status codes to their override rules.
