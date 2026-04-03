@@ -495,7 +495,7 @@ func TestSessionLimiter(t *testing.T) {
 	}
 
 	limiter := newSessionLimiter(t)
-	key := "test"
+	key := "test_session_limiter"
 
 	t.Run("limitSentinel", func(t *testing.T) {
 		t.Run("returns false if key does not exist", func(t *testing.T) {

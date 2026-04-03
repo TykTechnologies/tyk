@@ -391,6 +391,7 @@ func TestWrappedServeHTTP(t *testing.T) {
 	defer func() { idleConnTimeout = originalTimeout }()
 
 	ts := StartTest(nil)
+	ts.HttpHandler.IdleTimeout = 10 * time.Second
 	defer ts.Close()
 
 	for i := 0; i < 10; i++ {
@@ -1438,6 +1439,9 @@ func TestGraphQL_SubgraphBatchRequest(t *testing.T) {
 			lock.Lock()
 			timesHit++
 			lock.Unlock()
+			writer.Header().Set("Content-Type", "application/json")
+			_, err := writer.Write([]byte(`{"data": {}}`))
+			assert.NoError(t, err)
 		})
 
 		q := graphql.Request{
