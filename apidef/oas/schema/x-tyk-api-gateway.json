@@ -2774,7 +2774,7 @@
           }
         }
       },
-      "required": ["enabled", "value"]
+      "required": ["enabled"]
     },
     "X-Tyk-ErrorOverride": {
       "type": "object",

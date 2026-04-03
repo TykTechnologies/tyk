@@ -20,7 +20,7 @@ type ErrorOverrides struct {
 	Enabled bool `bson:"enabled" json:"enabled"`
 
 	// Value contains the map of status codes to their override rules.
-	Value ErrorOverridesMap `bson:"value" json:"value"`
+	Value ErrorOverridesMap `bson:"value,omitempty" json:"value,omitempty"`
 }
 
 func (e *ErrorOverrides) Fill(api apidef.APIDefinition) {
