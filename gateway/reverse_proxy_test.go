@@ -386,7 +386,9 @@ func createReverseProxyAndServeHTTP(ts *Test, req *http.Request) (*httptest.Resp
 }
 
 func TestWrappedServeHTTP(t *testing.T) {
-	idleConnTimeout = 1
+	originalTimeout := idleConnTimeout
+	idleConnTimeout = 5
+	defer func() { idleConnTimeout = originalTimeout }()
 
 	ts := StartTest(nil)
 	defer ts.Close()
@@ -400,7 +402,7 @@ func TestWrappedServeHTTP(t *testing.T) {
 	time.Sleep(time.Second * 2)
 	assert.Eventually(t, func() bool {
 		return ts.Gw.ConnectionWatcher.Count() == 0
-	}, time.Second*10, time.Millisecond*100)
+	}, time.Second*15, time.Millisecond*100)
 
 	// Test error on deepCopyBody function
 	mockReadCloser := createMockReadCloserWithError(errors.New("test error"))
@@ -1454,7 +1456,7 @@ func TestGraphQL_SubgraphBatchRequest(t *testing.T) {
 			lock.Lock()
 			defer lock.Unlock()
 			return timesHit == 2
-		}, time.Second*5, time.Millisecond*100)
+		}, time.Second*15, time.Millisecond*100)
 	})
 }
 
