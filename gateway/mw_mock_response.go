@@ -108,8 +108,54 @@ func (m *mockResponseMiddleware) mockResponse(r *http.Request) (
 	internal *http.Request,
 	err error,
 ) {
-	// Use FindSpecMatchesStatus to check if this path should be mocked
-	// This ensures the standard regex-based path matching is used, respecting gateway configurations
+	// Phase 1: Try exact match using the highly-optimized OAS tree router
+	operation := m.Spec.findOperation(r)
+	if operation != nil {
+		mockResponse := operation.MockResponse
+		if mockResponse == nil || !mockResponse.Enabled {
+			return nil, nil, nil
+		}
+
+		res = &http.Response{Header: http.Header{}}
+		internal = r.Clone(r.Context())
+		internal.URL.Path = operation.route.Path
+
+		var code int
+		var contentType string
+		var body []byte
+		var headers []oas.Header
+
+		if mockResponse.FromOASExamples != nil && mockResponse.FromOASExamples.Enabled {
+			code, contentType, body, headers, err = mockFromOAS(r, operation.route.Operation, mockResponse.FromOASExamples)
+			res.StatusCode = code
+			if err != nil {
+				return res, internal, fmt.Errorf("mock: %w", err)
+			}
+		} else {
+			code, body, headers = mockFromConfig(mockResponse)
+		}
+
+		for _, h := range headers {
+			res.Header.Set(h.Name, h.Value)
+		}
+
+		if contentType != "" {
+			res.Header.Set(header.ContentType, contentType)
+		}
+
+		res.StatusCode = code
+		res.Body = nopCloser{ReadSeeker: bytes.NewReader(body)}
+
+		if m.Gw.GetConfig().CloseConnections {
+			res.Header.Set(header.Connection, "close")
+		}
+
+		m.Spec.sendRateLimitHeaders(ctxGetSession(r), res)
+
+		return res, internal, nil
+	}
+
+	// Phase 2: Fallback to regex matching
 	versionInfo, _ := m.Spec.Version(r)
 	versionPaths := m.Spec.RxPaths[versionInfo.Name]
 

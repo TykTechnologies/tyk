@@ -2,6 +2,7 @@ package gateway
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"testing"
 
@@ -760,4 +761,128 @@ func TestValidateRequest_NormalizeHeaders(t *testing.T) {
 			assert.Equal(t, tt.expected, tt.input)
 		})
 	}
+}
+
+func BenchmarkOASValidateRequest_StaticVsParameterizedPath(b *testing.B) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	paths := openapi3.NewPaths()
+	
+	// Add 100 non-conflicting static paths to test performance degradation
+	for i := 0; i < 100; i++ {
+		paths.Set(fmt.Sprintf("/static-%d", i), &openapi3.PathItem{
+			Get: &openapi3.Operation{
+				OperationID: fmt.Sprintf("getStatic%d", i),
+				Responses: openapi3.NewResponses(
+					openapi3.WithStatus(200, &openapi3.ResponseRef{
+						Value: &openapi3.Response{
+							Description: stringPtrHelper("Static"),
+						},
+					}),
+				),
+			},
+		})
+	}
+
+	// Static path
+	paths.Set("/employees/static", &openapi3.PathItem{
+		Get: &openapi3.Operation{
+			OperationID: "getStaticEmployee",
+			Responses: openapi3.NewResponses(
+				openapi3.WithStatus(200, &openapi3.ResponseRef{
+					Value: &openapi3.Response{
+						Description: stringPtrHelper("Static Success"),
+					},
+				}),
+			),
+		},
+	})
+
+	// Parameterized path
+	paths.Set("/employees/{id}", &openapi3.PathItem{
+		Get: &openapi3.Operation{
+			OperationID: "getEmployeeById",
+			Parameters: openapi3.Parameters{
+				&openapi3.ParameterRef{
+					Value: &openapi3.Parameter{
+						Name: "id",
+						In:   "path",
+						Required: true,
+						Schema: &openapi3.SchemaRef{
+							Value: &openapi3.Schema{
+								Type: &openapi3.Types{"string"},
+							},
+						},
+					},
+				},
+			},
+			Responses: openapi3.NewResponses(
+				openapi3.WithStatus(200, &openapi3.ResponseRef{
+					Value: &openapi3.Response{
+						Description: stringPtrHelper("Parameterized Success"),
+					},
+				}),
+			),
+		},
+	})
+
+	doc := openapi3.T{
+		OpenAPI: "3.0.0",
+		Info: &openapi3.Info{
+			Title:   "Benchmark API",
+			Version: "1.0.0",
+		},
+		Paths: paths,
+	}
+
+	oasAPI := oas.OAS{T: doc}
+	oasAPI.SetTykExtension(&oas.XTykAPIGateway{
+		Middleware: &oas.Middleware{
+			Operations: oas.Operations{
+				"getEmployeeById": {
+					ValidateRequest: &oas.ValidateRequest{
+						Enabled: true,
+						ErrorResponseCode: 422,
+					},
+				},
+				"getStaticEmployee": {
+					ValidateRequest: &oas.ValidateRequest{
+						Enabled: true,
+						ErrorResponseCode: 422,
+					},
+				},
+			},
+		},
+	})
+
+	api := ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		spec.Name = "OAS Benchmark Test"
+		spec.APIID = "oas-benchmark-test"
+		spec.Proxy.ListenPath = "/api/"
+		spec.UseKeylessAccess = true
+		spec.IsOAS = true
+		spec.OAS = oasAPI
+	})[0]
+
+	ts.Gw.LoadAPI()
+	_ = api
+
+	b.Run("StaticPath", func(b *testing.B) {
+		req, _ := http.NewRequest("GET", ts.URL+"/api/employees/static", nil)
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			resp, _ := http.DefaultClient.Do(req)
+			resp.Body.Close()
+		}
+	})
+
+	b.Run("ParameterizedPath", func(b *testing.B) {
+		req, _ := http.NewRequest("GET", ts.URL+"/api/employees/123", nil)
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			resp, _ := http.DefaultClient.Do(req)
+			resp.Body.Close()
+		}
+	})
 }

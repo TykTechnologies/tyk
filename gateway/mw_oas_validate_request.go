@@ -12,7 +12,6 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"github.com/TykTechnologies/tyk/header"
-	"github.com/TykTechnologies/tyk/internal/httputil"
 	"github.com/TykTechnologies/tyk/pkg/schema"
 )
 
@@ -78,17 +77,45 @@ func (k *ValidateRequest) EnabledForSpec() bool {
 	return false
 }
 
-// ProcessRequest will run any checks on the request on the way through the system, return an error to have the chain fail
 func (k *ValidateRequest) ProcessRequest(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
-	// For APIs with mux-template listen paths (e.g., /api/{version:.*}), we fall back
-	// to the original findOperation behavior because StripListenPath doesn't work reliably
-	// with such patterns - they can greedily match parts of the OAS path.
-	if httputil.IsMuxTemplate(k.Spec.Proxy.ListenPath) {
-		return k.processRequestWithFindOperation(r)
+	// Phase 1: Try exact match using the highly-optimized OAS tree router (v5.11 behavior)
+	operation := k.Spec.findOperation(r)
+	if operation != nil {
+		// Exact match found! Strictly enforce its configuration.
+		validateRequest := operation.ValidateRequest
+		if validateRequest == nil || !validateRequest.Enabled {
+			return nil, http.StatusOK // Shielded! Static paths exit here.
+		}
+
+		errResponseCode := http.StatusUnprocessableEntity
+		if validateRequest.ErrorResponseCode != 0 {
+			errResponseCode = validateRequest.ErrorResponseCode
+		}
+
+		normalizeHeaders(r.Header)
+
+		// Validate request
+		requestValidationInput := &openapi3filter.RequestValidationInput{
+			Request:    r,
+			PathParams: operation.pathParams,
+			Route:      operation.route,
+			Options: &openapi3filter.Options{
+				AuthenticationFunc: func(ctx context.Context, input *openapi3filter.AuthenticationInput) error {
+					return nil
+				},
+			},
+		}
+
+		err := openapi3filter.ValidateRequest(r.Context(), requestValidationInput)
+		if err != nil {
+			return fmt.Errorf("request validation error: %w", schema.RestoreUnicodeEscapesInError(err)), errResponseCode
+		}
+
+		// Handle Success
+		return nil, http.StatusOK
 	}
 
-	// Use FindSpecMatchesStatus to check if this path should be validated
-	// This ensures the standard regex-based path matching is used, respecting gateway configurations
+	// Phase 2: Fallback to regex matching (v5.12 behavior for Asurion's prefix/wildcard use case)
 	versionInfo, _ := k.Spec.Version(r)
 	versionPaths := k.Spec.RxPaths[versionInfo.Name]
 
@@ -140,49 +167,6 @@ func (k *ValidateRequest) ProcessRequest(w http.ResponseWriter, r *http.Request,
 	}
 
 	err = openapi3filter.ValidateRequest(r.Context(), requestValidationInput)
-	if err != nil {
-		return fmt.Errorf("request validation error: %w", schema.RestoreUnicodeEscapesInError(err)), errResponseCode
-	}
-
-	// Handle Success
-	return nil, http.StatusOK
-}
-
-// processRequestWithFindOperation is the original implementation that uses findOperation
-// to locate the OAS route. This is used for APIs with mux-template listen paths where
-// the standard regex-based path matching doesn't work reliably.
-func (k *ValidateRequest) processRequestWithFindOperation(r *http.Request) (error, int) {
-	operation := k.Spec.findOperation(r)
-
-	if operation == nil {
-		return nil, http.StatusOK
-	}
-
-	validateRequest := operation.ValidateRequest
-	if validateRequest == nil || !validateRequest.Enabled {
-		return nil, http.StatusOK
-	}
-
-	errResponseCode := http.StatusUnprocessableEntity
-	if validateRequest.ErrorResponseCode != 0 {
-		errResponseCode = validateRequest.ErrorResponseCode
-	}
-
-	normalizeHeaders(r.Header)
-
-	// Validate request
-	requestValidationInput := &openapi3filter.RequestValidationInput{
-		Request:    r,
-		PathParams: operation.pathParams,
-		Route:      operation.route,
-		Options: &openapi3filter.Options{
-			AuthenticationFunc: func(ctx context.Context, input *openapi3filter.AuthenticationInput) error {
-				return nil
-			},
-		},
-	}
-
-	err := openapi3filter.ValidateRequest(r.Context(), requestValidationInput)
 	if err != nil {
 		return fmt.Errorf("request validation error: %w", schema.RestoreUnicodeEscapesInError(err)), errResponseCode
 	}
