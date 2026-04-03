@@ -2936,7 +2936,9 @@
           }
         }
       },
-      "required": ["enabled"],
+      "required": [
+        "enabled"
+      ],
       "additionalProperties": false
     },
     "X-Tyk-ErrorOverride": {
