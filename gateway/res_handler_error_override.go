@@ -32,21 +32,22 @@ func (r *ResponseErrorOverrideMiddleware) Enabled() bool {
 		len(r.Spec.ErrorOverrides) > 0
 }
 
-func (r *ResponseErrorOverrideMiddleware) Init(c interface{}, spec *APISpec) error {
+func (r *ResponseErrorOverrideMiddleware) Init(_ any, spec *APISpec) error {
 	r.Spec = spec
 	return nil
 }
 
-func (r *ResponseErrorOverrideMiddleware) HandleError(rw http.ResponseWriter, req *http.Request) {
+func (r *ResponseErrorOverrideMiddleware) HandleError(_ http.ResponseWriter, _ *http.Request) {
 	//no-op: this middleware only handles upstream responses, not errors in the gateway itself
 }
 
 func (r *ResponseErrorOverrideMiddleware) HandleResponse(
-	rw http.ResponseWriter,
+	_ http.ResponseWriter,
 	res *http.Response,
 	req *http.Request,
-	ses *user.SessionState,
+	_ *user.SessionState,
 ) error {
+
 	if !r.shouldProcessResponse(res) {
 		return nil
 	}
@@ -131,6 +132,7 @@ func (r *ResponseErrorOverrideMiddleware) applyOverrideToResponse(
 	req *http.Request,
 	logger *logrus.Entry,
 ) bool {
+
 	if result.StatusCode > 0 {
 		res.StatusCode = result.StatusCode
 	}
@@ -195,6 +197,7 @@ func (r *ResponseErrorOverrideMiddleware) generateDefaultTemplateBody(
 	statusCode int,
 	logger *logrus.Entry,
 ) []byte {
+
 	templateName := "error." + errCtx.TemplateExtension
 
 	var tmpl TemplateExecutor

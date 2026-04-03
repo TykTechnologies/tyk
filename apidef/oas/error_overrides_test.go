@@ -4,9 +4,10 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/internal/errors"
-	"github.com/stretchr/testify/assert"
 )
 
 func TestErrorOverridesMap_FillAndExtract(t *testing.T) {

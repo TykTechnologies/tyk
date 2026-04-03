@@ -347,7 +347,8 @@ func TestApplyOverrideToResponse(t *testing.T) {
 		bodyReplaced := middleware.applyOverrideToResponse(res, result, req, logger)
 
 		assert.True(t, bodyReplaced, "Should return true when body is replaced")
-		body, _ := io.ReadAll(res.Body)
+		body, err := io.ReadAll(res.Body)
+		assert.NoError(t, err)
 		assert.Equal(t, "Custom error message", string(body))
 		assert.Equal(t, int64(len("Custom error message")), res.ContentLength)
 	})
@@ -455,9 +456,10 @@ func TestGenerateOverrideBody(t *testing.T) {
 }
 
 func TestUpstreamErrorOverride_APILevel(t *testing.T) {
-	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(503)
-		w.Write([]byte(`{"upstream":"error"}`))
+		_, err := w.Write([]byte(`{"upstream":"error"}`))
+		assert.NoError(t, err)
 	}))
 	defer upstream.Close()
 
@@ -486,9 +488,10 @@ func TestUpstreamErrorOverride_APILevel(t *testing.T) {
 }
 
 func TestUpstreamErrorOverride_DisableReturnsUpstreamResponse(t *testing.T) {
-	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(503)
-		w.Write([]byte(`{"upstream":"error"}`))
+		_, err := w.Write([]byte(`{"upstream":"error"}`))
+		assert.NoError(t, err)
 	}))
 	defer upstream.Close()
 
@@ -518,9 +521,10 @@ func TestUpstreamErrorOverride_DisableReturnsUpstreamResponse(t *testing.T) {
 }
 
 func TestUpstreamErrorOverride_APIPrecedenceOverGateway(t *testing.T) {
-	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(503)
-		w.Write([]byte(`{"upstream":"error"}`))
+		_, err := w.Write([]byte(`{"upstream":"error"}`))
+		assert.NoError(t, err)
 	}))
 	defer upstream.Close()
 
@@ -561,9 +565,10 @@ func TestUpstreamErrorOverride_APIPrecedenceOverGateway(t *testing.T) {
 }
 
 func TestUpstreamErrorOverride_GatewayFallback(t *testing.T) {
-	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(502)
-		w.Write([]byte(`{"upstream":"bad gateway"}`))
+		_, err := w.Write([]byte(`{"upstream":"bad gateway"}`))
+		assert.NoError(t, err)
 	}))
 	defer upstream.Close()
 
@@ -612,7 +617,8 @@ func TestUpstreamErrorOverride_APILevelPatternMatching(t *testing.T) {
 		case "/503":
 			w.WriteHeader(503)
 		}
-		w.Write([]byte(`{"upstream":"error"}`))
+		_, err := w.Write([]byte(`{"upstream":"error"}`))
+		assert.NoError(t, err)
 	}))
 	defer upstream.Close()
 
@@ -644,14 +650,18 @@ func TestUpstreamErrorOverride_APILevelPatternMatching(t *testing.T) {
 func TestUpstreamErrorOverride_APILevelBodyFieldMatching(t *testing.T) {
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(500)
+
+		var err error
 		switch r.URL.Path {
 		case "/db-error":
-			w.Write([]byte(`{"error":{"code":"DB_CONN_FAILED","message":"Database unavailable"}}`))
+			_, err = w.Write([]byte(`{"error":{"code":"DB_CONN_FAILED","message":"Database unavailable"}}`))
 		case "/cache-error":
-			w.Write([]byte(`{"error":{"code":"CACHE_MISS","message":"Cache unavailable"}}`))
+			_, err = w.Write([]byte(`{"error":{"code":"CACHE_MISS","message":"Cache unavailable"}}`))
 		default:
-			w.Write([]byte(`{"error":{"code":"UNKNOWN"}}`))
+			_, err = w.Write([]byte(`{"error":{"code":"UNKNOWN"}}`))
 		}
+
+		assert.NoError(t, err)
 	}))
 	defer upstream.Close()
 
@@ -698,14 +708,19 @@ func TestUpstreamErrorOverride_APILevelBodyFieldMatching(t *testing.T) {
 func TestUpstreamErrorOverride_APILevelMessagePattern(t *testing.T) {
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(500)
+
+		var err error
+
 		switch r.URL.Path {
 		case "/timeout":
-			w.Write([]byte(`Connection timeout after 30s`))
+			_, err = w.Write([]byte(`Connection timeout after 30s`))
 		case "/oom":
-			w.Write([]byte(`OutOfMemoryError: Java heap space`))
+			_, err = w.Write([]byte(`OutOfMemoryError: Java heap space`))
 		default:
-			w.Write([]byte(`Generic error`))
+			_, err = w.Write([]byte(`Generic error`))
 		}
+
+		assert.NoError(t, err)
 	}))
 	defer upstream.Close()
 
@@ -748,9 +763,10 @@ func TestUpstreamErrorOverride_APILevelMessagePattern(t *testing.T) {
 }
 
 func TestUpstreamErrorOverride_APILevelFirstMatchWins(t *testing.T) {
-	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(500)
-		w.Write([]byte(`{"error":"database connection failed"}`))
+		_, err := w.Write([]byte(`{"error":"database connection failed"}`))
+		assert.NoError(t, err)
 	}))
 	defer upstream.Close()
 
@@ -801,7 +817,7 @@ type errorReadCloser struct {
 	err error
 }
 
-func (e *errorReadCloser) Read(p []byte) (n int, err error) {
+func (e *errorReadCloser) Read(_ []byte) (n int, err error) {
 	return 0, e.err
 }
 

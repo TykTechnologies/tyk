@@ -1255,7 +1255,7 @@ func TestFindMatchingRuleGeneric(t *testing.T) {
 
 	t.Run("finds first matching rule in exact code", func(t *testing.T) {
 		matchCount := 0
-		rule := eo.findMatchingRuleGeneric(compiled, 500, func(rule *apidef.ErrorOverride) bool {
+		rule := eo.findMatchingRuleGeneric(compiled, 500, func(_ *apidef.ErrorOverride) bool {
 			matchCount++
 			return matchCount == 2 // Match second rule
 		})
@@ -1265,7 +1265,7 @@ func TestFindMatchingRuleGeneric(t *testing.T) {
 	})
 
 	t.Run("falls through to pattern match", func(t *testing.T) {
-		rule := eo.findMatchingRuleGeneric(compiled, 502, func(rule *apidef.ErrorOverride) bool {
+		rule := eo.findMatchingRuleGeneric(compiled, 502, func(_ *apidef.ErrorOverride) bool {
 			return true // Match all
 		})
 
@@ -1274,7 +1274,7 @@ func TestFindMatchingRuleGeneric(t *testing.T) {
 	})
 
 	t.Run("returns nil when no match", func(t *testing.T) {
-		rule := eo.findMatchingRuleGeneric(compiled, 500, func(rule *apidef.ErrorOverride) bool {
+		rule := eo.findMatchingRuleGeneric(compiled, 500, func(_ *apidef.ErrorOverride) bool {
 			return false // Match nothing
 		})
 
@@ -1282,7 +1282,7 @@ func TestFindMatchingRuleGeneric(t *testing.T) {
 	})
 
 	t.Run("exact code takes precedence over pattern", func(t *testing.T) {
-		rule := eo.findMatchingRuleGeneric(compiled, 500, func(rule *apidef.ErrorOverride) bool {
+		rule := eo.findMatchingRuleGeneric(compiled, 500, func(_ *apidef.ErrorOverride) bool {
 			return true // Match all
 		})
 
@@ -1471,7 +1471,8 @@ func TestApplyUpstreamOverride(t *testing.T) {
 		// Compile the pattern
 		for _, rules := range overrides {
 			for i := range rules {
-				rules[i].Match.Compile()
+				err := rules[i].Match.Compile()
+				assert.NoError(t, err)
 			}
 		}
 
@@ -1702,7 +1703,8 @@ func TestMatchesUpstreamCriteria(t *testing.T) {
 				MessagePattern: "timeout",
 			},
 		}
-		rule.Match.Compile()
+		err := rule.Match.Compile()
+		assert.NoError(t, err)
 
 		body := []byte("connection timeout error")
 		matches := eo.matchesUpstreamCriteria(rule, body, 500)

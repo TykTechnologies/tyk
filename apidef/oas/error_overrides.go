@@ -144,7 +144,6 @@ func (em *ErrorMatcher) ExtractTo(api *apidef.ErrorMatcher) {
 	api.MessagePattern = em.MessagePattern
 	api.BodyField = em.BodyField
 	api.BodyValue = em.BodyValue
-
 }
 
 // ErrorResponse defines the override response for error overrides.

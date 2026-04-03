@@ -2936,7 +2936,10 @@
           }
         }
       },
-      "required": ["enabled", "value"],
+      "required": [
+        "enabled",
+        "value"
+      ],
       "additionalProperties": false
     },
     "X-Tyk-ErrorOverride": {
@@ -2949,7 +2952,9 @@
           "$ref": "#/definitions/X-Tyk-ErrorResponse"
         }
       },
-      "required": ["response"],
+      "required": [
+        "response"
+      ],
       "additionalProperties": false
     },
     "X-Tyk-ErrorMatcher": {

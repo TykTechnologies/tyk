@@ -402,6 +402,7 @@ func (e *ErrorHandler) tryWriteOverride(w http.ResponseWriter, r *http.Request, 
 	// Fast path: check config map length before atomic load
 	if len(e.Spec.GlobalConfig.ErrorOverrides) == 0 &&
 		(e.Spec.ErrorOverridesDisabled || len(e.Spec.ErrorOverrides) == 0) {
+
 		return nil
 	}
 

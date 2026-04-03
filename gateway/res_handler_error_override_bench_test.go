@@ -292,7 +292,10 @@ func BenchmarkHandleResponse_NoOverride_Passthrough(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		res := createBenchmarkResponse(500, `{"error": "internal server error"}`)
-		_ = middleware.HandleResponse(rw, res, req, nil)
+		err := middleware.HandleResponse(rw, res, req, nil)
+		if err != nil {
+			b.Fatal(err)
+		}
 	}
 }
 
@@ -310,7 +313,10 @@ func BenchmarkHandleResponse_SuccessResponse_Skip(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		res := createBenchmarkResponse(200, `{"success": true}`)
-		_ = middleware.HandleResponse(rw, res, req, nil)
+		err := middleware.HandleResponse(rw, res, req, nil)
+		if err != nil {
+			b.Fatal(err)
+		}
 	}
 }
 
@@ -328,7 +334,10 @@ func BenchmarkHandleResponse_ExactMatch_StatusOnly(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		res := createBenchmarkResponse(503, "Service unavailable")
-		_ = middleware.HandleResponse(rw, res, req, nil)
+		err := middleware.HandleResponse(rw, res, req, nil)
+		if err != nil {
+			b.Fatal(err)
+		}
 	}
 }
 
@@ -352,7 +361,10 @@ func BenchmarkHandleResponse_ExactMatch_WithBody(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		res := createBenchmarkResponse(503, "Service unavailable")
-		_ = middleware.HandleResponse(rw, res, req, nil)
+		err := middleware.HandleResponse(rw, res, req, nil)
+		if err != nil {
+			b.Fatal(err)
+		}
 	}
 }
 
@@ -376,7 +388,10 @@ func BenchmarkHandleResponse_PatternMatch_SmallBody(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		res := createBenchmarkResponse(500, `{"error": {"code": "TIMEOUT"}}`)
-		_ = middleware.HandleResponse(rw, res, req, nil)
+		err := middleware.HandleResponse(rw, res, req, nil)
+		if err != nil {
+			b.Fatal(err)
+		}
 	}
 }
 
@@ -406,7 +421,10 @@ func BenchmarkHandleResponse_PatternMatch_LargeBody(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		res := createBenchmarkResponse(500, bodyStr)
-		_ = middleware.HandleResponse(rw, res, req, nil)
+		err := middleware.HandleResponse(rw, res, req, nil)
+		if err != nil {
+			b.Fatal(err)
+		}
 	}
 }
 
@@ -425,6 +443,7 @@ func BenchmarkFindMatchingRuleGeneric_100Rules(b *testing.B) {
 }
 
 func benchmarkFindMatchingRuleGeneric(b *testing.B, ruleCount int) {
+	b.Helper()
 	overrides := apidef.ErrorOverridesMap{}
 
 	// Create many rules for status 500
@@ -449,7 +468,7 @@ func benchmarkFindMatchingRuleGeneric(b *testing.B, ruleCount int) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		matchCount = 0
-		_ = eo.findMatchingRuleGeneric(compiled, 500, func(rule *apidef.ErrorOverride) bool {
+		_ = eo.findMatchingRuleGeneric(compiled, 500, func(_ *apidef.ErrorOverride) bool {
 			matchCount++
 			return matchCount == ruleCount // Match last rule
 		})
@@ -716,7 +735,10 @@ func BenchmarkRealWorld_HighTraffic_NoOverride(b *testing.B) {
 			statusCode = 500 // 1% errors, different from override rule
 		}
 		res := createBenchmarkResponse(statusCode, "response")
-		_ = middleware.HandleResponse(rw, res, req, nil)
+		err := middleware.HandleResponse(rw, res, req, nil)
+		if err != nil {
+			b.Fatal(err)
+		}
 	}
 }
 
@@ -743,7 +765,10 @@ func BenchmarkRealWorld_HighTraffic_WithOverride(b *testing.B) {
 			statusCode = 500 // 2% errors that match override
 		}
 		res := createBenchmarkResponse(statusCode, "response")
-		_ = middleware.HandleResponse(rw, res, req, nil)
+		err := middleware.HandleResponse(rw, res, req, nil)
+		if err != nil {
+			b.Fatal(err)
+		}
 	}
 }
 
@@ -796,6 +821,9 @@ func BenchmarkRealWorld_ComplexRuleset(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		statusCode := errorCodes[i%len(errorCodes)]
 		res := createBenchmarkResponse(statusCode, "error")
-		_ = middleware.HandleResponse(rw, res, req, nil)
+		err := middleware.HandleResponse(rw, res, req, nil)
+		if err != nil {
+			b.Fatal(err)
+		}
 	}
 }
