@@ -1,6 +1,7 @@
 package gateway
 
 import (
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -61,6 +62,22 @@ func BenchmarkOASValidateRequest_StaticVsParameterizedPath(b *testing.B) {
 			),
 		},
 	})
+
+	// Add 100 static paths that don't conflict with /users/{id}
+	for i := 0; i < 100; i++ {
+		paths.Set(fmt.Sprintf("/static/path/%d", i), &openapi3.PathItem{
+			Get: &openapi3.Operation{
+				OperationID: fmt.Sprintf("getStatic%d", i),
+				Responses: openapi3.NewResponses(
+					openapi3.WithStatus(200, &openapi3.ResponseRef{
+						Value: &openapi3.Response{
+							Description: ptrStr("Success"),
+						},
+					}),
+				),
+			},
+		})
+	}
 
 	doc := openapi3.T{
 		OpenAPI: "3.0.0",
