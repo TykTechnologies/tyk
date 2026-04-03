@@ -108,73 +108,54 @@ func (m *mockResponseMiddleware) mockResponse(r *http.Request) (
 	internal *http.Request,
 	err error,
 ) {
+	var mockResponse *oas.MockResponse
+	var oasPath string
+	var operation *openapi3.Operation
+
 	// Phase 1: Try exact match using the highly-optimized OAS tree router
-	operation := m.Spec.findOperation(r)
-	if operation != nil {
-		mockResponse := operation.MockResponse
+	op := m.Spec.findOperation(r)
+	if op != nil {
+		mockResponse = op.MockResponse
+		if mockResponse == nil || !mockResponse.Enabled {
+			return nil, nil, nil
+		}
+		oasPath = op.route.Path
+		operation = op.route.Operation
+	} else {
+		// Phase 2: Fallback to regex matching
+		versionInfo, _ := m.Spec.Version(r)
+		versionPaths := m.Spec.RxPaths[versionInfo.Name]
+
+		urlSpec, found := m.Spec.FindSpecMatchesStatus(r, versionPaths, OASMockResponse)
+
+		if !found || urlSpec == nil {
+			// No mock response configured for this path
+			return nil, nil, nil
+		}
+
+		mockResponse = urlSpec.OASMockResponseMeta
 		if mockResponse == nil || !mockResponse.Enabled {
 			return nil, nil, nil
 		}
 
-		res = &http.Response{Header: http.Header{}}
-		internal = r.Clone(r.Context())
-		internal.URL.Path = operation.route.Path
-
-		var code int
-		var contentType string
-		var body []byte
-		var headers []oas.Header
+		oasPath = urlSpec.OASPath
 
 		if mockResponse.FromOASExamples != nil && mockResponse.FromOASExamples.Enabled {
-			code, contentType, body, headers, err = mockFromOAS(r, operation.route.Operation, mockResponse.FromOASExamples)
-			res.StatusCode = code
-			if err != nil {
-				return res, internal, fmt.Errorf("mock: %w", err)
+			// Find the route using the OAS path from URLSpec, not the actual request path.
+			// This allows prefix/suffix matching to work correctly.
+			strippedPath := m.Spec.StripListenPath(r.URL.Path)
+			route, _, routeErr := m.Spec.findRouteForOASPath(urlSpec.OASPath, urlSpec.OASMethod, strippedPath, r.URL.Path)
+			if routeErr != nil || route == nil {
+				log.Tracef("URL spec matched for mock response but route not found for OAS path %s: %v", urlSpec.OASPath, routeErr)
+				return nil, nil, nil
 			}
-		} else {
-			code, body, headers = mockFromConfig(mockResponse)
+			operation = route.Operation
 		}
-
-		for _, h := range headers {
-			res.Header.Set(h.Name, h.Value)
-		}
-
-		if contentType != "" {
-			res.Header.Set(header.ContentType, contentType)
-		}
-
-		res.StatusCode = code
-		res.Body = nopCloser{ReadSeeker: bytes.NewReader(body)}
-
-		if m.Gw.GetConfig().CloseConnections {
-			res.Header.Set(header.Connection, "close")
-		}
-
-		m.Spec.sendRateLimitHeaders(ctxGetSession(r), res)
-
-		return res, internal, nil
-	}
-
-	// Phase 2: Fallback to regex matching
-	versionInfo, _ := m.Spec.Version(r)
-	versionPaths := m.Spec.RxPaths[versionInfo.Name]
-
-	urlSpec, found := m.Spec.FindSpecMatchesStatus(r, versionPaths, OASMockResponse)
-
-	if !found || urlSpec == nil {
-		// No mock response configured for this path
-		return nil, nil, nil
-	}
-
-	mockResponse := urlSpec.OASMockResponseMeta
-	if mockResponse == nil || !mockResponse.Enabled {
-		return nil, nil, nil
 	}
 
 	res = &http.Response{Header: http.Header{}}
-
 	internal = r.Clone(r.Context())
-	internal.URL.Path = urlSpec.OASPath
+	internal.URL.Path = oasPath
 
 	var code int
 	var contentType string
@@ -182,15 +163,7 @@ func (m *mockResponseMiddleware) mockResponse(r *http.Request) (
 	var headers []oas.Header
 
 	if mockResponse.FromOASExamples != nil && mockResponse.FromOASExamples.Enabled {
-		// Find the route using the OAS path from URLSpec, not the actual request path.
-		// This allows prefix/suffix matching to work correctly.
-		strippedPath := m.Spec.StripListenPath(r.URL.Path)
-		route, _, routeErr := m.Spec.findRouteForOASPath(urlSpec.OASPath, urlSpec.OASMethod, strippedPath, r.URL.Path)
-		if routeErr != nil || route == nil {
-			log.Tracef("URL spec matched for mock response but route not found for OAS path %s: %v", urlSpec.OASPath, routeErr)
-			return nil, nil, nil
-		}
-		code, contentType, body, headers, err = mockFromOAS(r, route.Operation, mockResponse.FromOASExamples)
+		code, contentType, body, headers, err = mockFromOAS(r, operation, mockResponse.FromOASExamples)
 		res.StatusCode = code
 		if err != nil {
 			return res, internal, fmt.Errorf("mock: %w", err)

@@ -13,6 +13,8 @@ import (
 
 	"github.com/TykTechnologies/tyk/header"
 	"github.com/TykTechnologies/tyk/pkg/schema"
+	"github.com/TykTechnologies/tyk/apidef/oas"
+	"github.com/getkin/kin-openapi/routers"
 )
 
 var (
@@ -78,57 +80,58 @@ func (k *ValidateRequest) EnabledForSpec() bool {
 }
 
 func (k *ValidateRequest) ProcessRequest(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
+	var validateRequest *oas.ValidateRequest
+	var route *routers.Route
+	var pathParams map[string]string
+
 	// Phase 1: Try exact match using the highly-optimized OAS tree router (v5.11 behavior)
 	operation := k.Spec.findOperation(r)
 	if operation != nil {
 		// Exact match found! Strictly enforce its configuration.
-		validateRequest := operation.ValidateRequest
+		validateRequest = operation.ValidateRequest
 		if validateRequest == nil || !validateRequest.Enabled {
 			return nil, http.StatusOK // Shielded! Static paths exit here.
 		}
+		route = operation.route
+		pathParams = operation.pathParams
+	} else {
+		// Phase 2: Fallback to regex matching (v5.12 behavior for Asurion's prefix/wildcard use case)
+		versionInfo, _ := k.Spec.Version(r)
+		versionPaths := k.Spec.RxPaths[versionInfo.Name]
 
-		errResponseCode := http.StatusUnprocessableEntity
-		if validateRequest.ErrorResponseCode != 0 {
-			errResponseCode = validateRequest.ErrorResponseCode
+		urlSpec, found := k.Spec.FindSpecMatchesStatus(r, versionPaths, OASValidateRequest)
+
+		if !found || urlSpec == nil {
+			// No validation configured for this path
+			return nil, http.StatusOK
 		}
 
-		normalizeHeaders(r.Header)
-
-		// Validate request
-		requestValidationInput := &openapi3filter.RequestValidationInput{
-			Request:    r,
-			PathParams: operation.pathParams,
-			Route:      operation.route,
-			Options: &openapi3filter.Options{
-				AuthenticationFunc: func(ctx context.Context, input *openapi3filter.AuthenticationInput) error {
-					return nil
-				},
-			},
+		validateRequest = urlSpec.OASValidateRequestMeta
+		if validateRequest == nil || !validateRequest.Enabled {
+			return nil, http.StatusOK
 		}
 
-		err := openapi3filter.ValidateRequest(r.Context(), requestValidationInput)
-		if err != nil {
-			return fmt.Errorf("request validation error: %w", schema.RestoreUnicodeEscapesInError(err)), errResponseCode
+		// Find the route using the OAS path from URLSpec, not the actual request path.
+		// This allows prefix/suffix matching to work: request to /anything/abc can be
+		// validated against the /anything operation.
+		// We pass both the stripped path (for path param extraction) and full path (for regexp listen paths).
+		strippedPath := k.Spec.StripListenPath(r.URL.Path)
+		var err error
+		route, pathParams, err = k.Spec.findRouteForOASPath(urlSpec.OASPath, urlSpec.OASMethod, strippedPath, r.URL.Path)
+		if err != nil || route == nil {
+			log.WithFields(logrus.Fields{
+				"method":   r.Method,
+				"path":     r.URL.Path,
+				"oas_path": urlSpec.OASPath,
+				"error":    err,
+			}).Error("OAS ValidateRequest: could not find route for matched OAS path")
+			
+			errResponseCode := http.StatusUnprocessableEntity
+			if validateRequest.ErrorResponseCode != 0 {
+				errResponseCode = validateRequest.ErrorResponseCode
+			}
+			return fmt.Errorf("request validation error: no matching operation was found for request: %s %s", r.Method, r.URL.Path), errResponseCode
 		}
-
-		// Handle Success
-		return nil, http.StatusOK
-	}
-
-	// Phase 2: Fallback to regex matching (v5.12 behavior for Asurion's prefix/wildcard use case)
-	versionInfo, _ := k.Spec.Version(r)
-	versionPaths := k.Spec.RxPaths[versionInfo.Name]
-
-	urlSpec, found := k.Spec.FindSpecMatchesStatus(r, versionPaths, OASValidateRequest)
-
-	if !found || urlSpec == nil {
-		// No validation configured for this path
-		return nil, http.StatusOK
-	}
-
-	validateRequest := urlSpec.OASValidateRequestMeta
-	if validateRequest == nil || !validateRequest.Enabled {
-		return nil, http.StatusOK
 	}
 
 	errResponseCode := http.StatusUnprocessableEntity
@@ -137,22 +140,6 @@ func (k *ValidateRequest) ProcessRequest(w http.ResponseWriter, r *http.Request,
 	}
 
 	normalizeHeaders(r.Header)
-
-	// Find the route using the OAS path from URLSpec, not the actual request path.
-	// This allows prefix/suffix matching to work: request to /anything/abc can be
-	// validated against the /anything operation.
-	// We pass both the stripped path (for path param extraction) and full path (for regexp listen paths).
-	strippedPath := k.Spec.StripListenPath(r.URL.Path)
-	route, pathParams, err := k.Spec.findRouteForOASPath(urlSpec.OASPath, urlSpec.OASMethod, strippedPath, r.URL.Path)
-	if err != nil || route == nil {
-		log.WithFields(logrus.Fields{
-			"method":   r.Method,
-			"path":     r.URL.Path,
-			"oas_path": urlSpec.OASPath,
-			"error":    err,
-		}).Error("OAS ValidateRequest: could not find route for matched OAS path")
-		return fmt.Errorf("request validation error: no matching operation was found for request: %s %s", r.Method, r.URL.Path), errResponseCode
-	}
 
 	// Validate request
 	requestValidationInput := &openapi3filter.RequestValidationInput{
@@ -166,7 +153,7 @@ func (k *ValidateRequest) ProcessRequest(w http.ResponseWriter, r *http.Request,
 		},
 	}
 
-	err = openapi3filter.ValidateRequest(r.Context(), requestValidationInput)
+	err := openapi3filter.ValidateRequest(r.Context(), requestValidationInput)
 	if err != nil {
 		return fmt.Errorf("request validation error: %w", schema.RestoreUnicodeEscapesInError(err)), errResponseCode
 	}
