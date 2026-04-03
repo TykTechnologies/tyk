@@ -124,13 +124,13 @@ func TestAPIRateLimitResponseHeaders(t *testing.T) {
 				header.XRateLimitLimit: fmt.Sprintf("%d", int(rateLimitRate)),
 			}
 
-			// For limiters that don't support Remaining (Sentinel, FixedWindow), it should be omitted.
+			// For limiters that don't support Remaining (Sentinel, FixedWindow), it should be assigned to 0.
 			if limiter == "Redis" || limiter == "DRL" {
 				headersMatch1[header.XRateLimitRemaining] = expectedRemaining1
 				headersMatch2[header.XRateLimitRemaining] = expectedRemaining2
 			} else {
-				headersMatch1[header.XRateLimitRemaining] = ""
-				headersMatch2[header.XRateLimitRemaining] = ""
+				headersMatch1[header.XRateLimitRemaining] = "0"
+				headersMatch2[header.XRateLimitRemaining] = "0"
 			}
 
 			_, _ = ts.Run(t, []test.TestCase{
