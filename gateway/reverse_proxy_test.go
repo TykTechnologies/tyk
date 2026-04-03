@@ -397,15 +397,10 @@ func TestWrappedServeHTTP(t *testing.T) {
 	}
 
 	assert.Equal(t, 10, ts.Gw.ConnectionWatcher.Count())
-
-	// Connections may not all be tracked yet or some may have already closed
-	assert.Eventually(t, func() bool {
-		return ts.Gw.ConnectionWatcher.Count() >= 1
-	}, time.Second*5, time.Millisecond*50)
-
+	time.Sleep(time.Second * 2)
 	assert.Eventually(t, func() bool {
 		return ts.Gw.ConnectionWatcher.Count() == 0
-	}, time.Second*15, time.Millisecond*100)
+	}, time.Second*10, time.Millisecond*100)
 
 	// Test error on deepCopyBody function
 	mockReadCloser := createMockReadCloserWithError(errors.New("test error"))
