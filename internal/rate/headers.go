@@ -15,6 +15,19 @@ import (
 type (
 	HeaderSenderFactory func(http.Header) HeaderSender
 
+	// HeaderSender handles the injection of rate limit and quota headers into HTTP responses.
+	//
+	// The injection of these headers happens at two different points in the request lifecycle
+	// to preserve backward compatibility:
+	//
+	// 1. SendRateLimits is called early in the middleware chain (e.g., SessionLimiter.ForwardMessage).
+	//    This ensures that rate limit headers are included even on blocked requests (429 Too Many Requests),
+	//    which is the correct and expected behavior for rate limiting.
+	//
+	// 2. SendQuotas is called late in the middleware chain (e.g., ReverseProxy.HandleResponse, mw_redis_cache.go).
+	//    Historically, quota headers were only injected after a successful proxy to the upstream.
+	//    To maintain strict backward compatibility, we preserve this legacy behavior so that blocked requests
+	//    (e.g., 403 Quota Exceeded) do not receive quota headers.
 	HeaderSender interface {
 		SendQuotas(session *user.SessionState, apiId string)
 		SendRateLimits(stats Stats)
