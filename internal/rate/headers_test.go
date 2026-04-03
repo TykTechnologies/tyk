@@ -79,7 +79,7 @@ func Test_rateLimitSender(t *testing.T) {
 			})
 		})
 
-		t.Run("omits remaining header if value is negative number", func(t *testing.T) {
+		t.Run("updates remaining header to 0 if value is negative number", func(t *testing.T) {
 			assert.NotPanics(t, func() {
 				hdr := http.Header{}
 				rls := &rateLimitSender{hdr: hdr}
@@ -91,7 +91,7 @@ func Test_rateLimitSender(t *testing.T) {
 				})
 
 				assert.Equal(t, "200", hdr.Get(header.XRateLimitLimit))
-				assert.Empty(t, hdr.Get(header.XRateLimitRemaining))
+				assert.Equal(t, "0", hdr.Get(header.XRateLimitRemaining))
 			})
 		})
 	})

@@ -64,10 +64,15 @@ func (r *rateLimitSender) SendQuotas(_ *user.SessionState, _ string) {
 func (r *rateLimitSender) SendRateLimits(limits Stats) {
 	r.hdr.Set(header.XRateLimitLimit, strconv.Itoa(limits.Limit))
 
-	// The value of Remaining header must be a non-negative integer.
-	if limits.Remaining >= 0 {
-		r.hdr.Set(header.XRateLimitRemaining, strconv.Itoa(limits.Remaining))
+	// The value of the Remaining header must be a non-negative integer.
+	// Some rate limiters (like the Sentinel rate limiter) do not track exact remaining
+	// tokens and return -1. To ensure the header is always present and valid for clients,
+	// we default any negative values to 0.
+	remaining := limits.Remaining
+	if remaining < 0 {
+		remaining = 0
 	}
+	r.hdr.Set(header.XRateLimitRemaining, strconv.Itoa(remaining))
 
 	// HTTP rate limit standards expect UNIX timestamps (seconds since epoch)
 	// for client compatibility and to match industry conventions.
