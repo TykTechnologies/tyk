@@ -385,13 +385,20 @@ func createReverseProxyAndServeHTTP(ts *Test, req *http.Request) (*httptest.Resp
 	return recorder, resp
 }
 
+var testConfigMutex sync.Mutex
+
 func TestWrappedServeHTTP(t *testing.T) {
+	testConfigMutex.Lock()
+	defer testConfigMutex.Unlock()
+
 	originalTimeout := idleConnTimeout
-	idleConnTimeout = 5
-	defer func() { idleConnTimeout = originalTimeout }()
+	t.Cleanup(func() {
+		idleConnTimeout = originalTimeout
+	})
+
+	idleConnTimeout = 1
 
 	ts := StartTest(nil)
-	ts.HttpHandler.IdleTimeout = 10 * time.Second
 	defer ts.Close()
 
 	for i := 0; i < 10; i++ {

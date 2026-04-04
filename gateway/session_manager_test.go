@@ -529,7 +529,7 @@ func TestSessionLimiter(t *testing.T) {
 			expires, ok := limiter.limitSentinel(
 				r,
 				&user.SessionState{},
-				"test",
+				key,
 				&user.APILimit{RateLimit: user.RateLimit{Rate: 60, Per: 60}},
 				false,
 			)
