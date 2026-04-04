@@ -396,7 +396,7 @@ func TestWrappedServeHTTP(t *testing.T) {
 		idleConnTimeout = originalTimeout
 	})
 
-	idleConnTimeout = 1
+	idleConnTimeout = 10
 
 	ts := StartTest(nil)
 	defer ts.Close()
