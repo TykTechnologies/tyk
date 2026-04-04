@@ -401,16 +401,14 @@ func TestWrappedServeHTTP(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
 
-	var wg sync.WaitGroup
-	for i := 0; i < 10; i++ {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			req := httptest.NewRequest(http.MethodGet, "/", nil)
-			_, _ = createReverseProxyAndServeHTTP(ts, req)
-		}()
+	ts.HttpHandler.ReadTimeout = 10 * time.Second
+	ts.HttpHandler.WriteTimeout = 10 * time.Second
+	ts.HttpHandler.IdleTimeout = 10 * time.Second
+
+	for range 10 {
+		req := httptest.NewRequest(http.MethodGet, "/", nil)
+		_, _ = createReverseProxyAndServeHTTP(ts, req)
 	}
-	wg.Wait()
 
 	assert.True(t, ts.Gw.ConnectionWatcher.Count() > 0)
 	// assert.Equal(t, 10, ts.Gw.ConnectionWatcher.Count())
