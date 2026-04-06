@@ -12,6 +12,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"sync/atomic"
 	texttemplate "text/template"
@@ -1353,7 +1354,58 @@ func (a APIDefinitionLoader) compileRateLimitPathsSpec(paths []apidef.RateLimitM
 // compileOASValidateRequestPathSpec extracts ValidateRequest operations from OAS middleware
 // and converts them to URLSpec entries that use the standard regex-based path matching algorithm.
 // This ensures OAS validateRequest middleware respects gateway configurations like
-// EnablePathPrefixMatching, EnablePathSuffixMatching, and IgnoreEndpointCase.
+func sortPathsForOASMiddleware(in openapi3.Paths) []oasutil.PathItem {
+	paths := []string{}
+	pathsMap := in.Map()
+	for k := range pathsMap {
+		paths = append(paths, k)
+	}
+
+	sort.Slice(paths, func(i, j int) bool {
+		pathI := paths[i]
+		pathJ := paths[j]
+
+		isStaticI := !strings.Contains(pathI, "{")
+		isStaticJ := !strings.Contains(pathJ, "{")
+
+		// 1. ALL static paths must come before ANY parameterized paths.
+		if isStaticI != isStaticJ {
+			return isStaticI
+		}
+
+		// 2. For parameterized paths, prioritize longer static prefixes
+		if !isStaticI && !isStaticJ {
+			prefixI := strings.Split(pathI, "{")[0]
+			prefixJ := strings.Split(pathJ, "{")[0]
+
+			fragmentsI := strings.Count(prefixI, "/")
+			fragmentsJ := strings.Count(prefixJ, "/")
+			if fragmentsI != fragmentsJ {
+				return fragmentsI > fragmentsJ
+			}
+
+			if len(prefixI) != len(prefixJ) {
+				return len(prefixI) > len(prefixJ)
+			}
+		}
+
+		// 3. Sort by fragments descending, then length descending.
+		fragmentsI := strings.Count(pathI, "/")
+		fragmentsJ := strings.Count(pathJ, "/")
+		if fragmentsI != fragmentsJ {
+			return fragmentsI > fragmentsJ
+		}
+
+		if len(pathI) != len(pathJ) {
+			return len(pathI) > len(pathJ)
+		}
+
+		return pathI < pathJ
+	})
+
+	return oasutil.ExtractPaths(in, paths)
+}
+
 func (a APIDefinitionLoader) compileOASValidateRequestPathSpec(apiSpec *APISpec, conf config.Config) []URLSpec {
 	if !apiSpec.IsOAS {
 		return nil
@@ -1371,7 +1423,38 @@ func (a APIDefinitionLoader) compileOASValidateRequestPathSpec(apiSpec *APISpec,
 	urlSpec := []URLSpec{}
 
 	// Get sorted paths (static paths before parameterized paths, then by length descending)
-	sortedPaths := oasutil.SortByPathLength(*apiSpec.OAS.Paths)
+	sortedPaths := sortPathsForOASMiddleware(*apiSpec.OAS.Paths)
+
+	// First pass: collect all parameterized paths that have ValidateRequest enabled
+	var parameterizedRegexes []*regexp.Regexp
+	for _, pathItem := range sortedPaths {
+		path := pathItem.Path
+		if !strings.Contains(path, "{") {
+			continue
+		}
+
+		for _, operation := range pathItem.Operations() {
+			if operation == nil {
+				continue
+			}
+
+			if tykOp, ok := middleware.Operations[operation.OperationID]; ok {
+				if tykOp.ValidateRequest != nil && tykOp.ValidateRequest.Enabled {
+					// Compile regex for this parameterized path
+					isPrefixMatch := conf.HttpServerOptions.EnablePathPrefixMatching
+					isSuffixMatch := conf.HttpServerOptions.EnablePathSuffixMatching
+					pattern := httputil.PreparePathRegexp(path, isPrefixMatch, isSuffixMatch)
+					if conf.IgnoreEndpointCase {
+						pattern = "(?i)" + pattern
+					}
+					if re, err := regexp.Compile(pattern); err == nil {
+						parameterizedRegexes = append(parameterizedRegexes, re)
+					}
+					break // One regex per path is enough
+				}
+			}
+		}
+	}
 
 	for _, pathItem := range sortedPaths {
 		path := pathItem.Path
@@ -1385,7 +1468,7 @@ func (a APIDefinitionLoader) compileOASValidateRequestPathSpec(apiSpec *APISpec,
 
 			// Check if this operation has ValidateRequest enabled
 			var validateRequest *oas.ValidateRequest
-			
+
 			// Find the operation in middleware.Operations
 			if tykOp, ok := middleware.Operations[operation.OperationID]; ok {
 				if tykOp.ValidateRequest != nil && tykOp.ValidateRequest.Enabled {
@@ -1403,15 +1486,26 @@ func (a APIDefinitionLoader) compileOASValidateRequestPathSpec(apiSpec *APISpec,
 				a.generateRegex(path, &newSpec, OASValidateRequest, conf)
 				urlSpec = append(urlSpec, newSpec)
 			} else if isStaticPath {
-				// Create a disabled entry to act as a shield
-				newSpec := URLSpec{
-					OASValidateRequestMeta: &oas.ValidateRequest{Enabled: false},
-					OASMethod:              strings.ToUpper(method),
-					OASPath:                path,
+				// Check if this static path matches any parameterized regex
+				matchesParameterized := false
+				for _, re := range parameterizedRegexes {
+					if re.MatchString(path) {
+						matchesParameterized = true
+						break
+					}
 				}
 
-				a.generateRegex(path, &newSpec, OASValidateRequest, conf)
-				urlSpec = append(urlSpec, newSpec)
+				if matchesParameterized {
+					// Create a disabled entry to act as a shield
+					newSpec := URLSpec{
+						OASValidateRequestMeta: &oas.ValidateRequest{Enabled: false},
+						OASMethod:              strings.ToUpper(method),
+						OASPath:                path,
+					}
+
+					a.generateRegex(path, &newSpec, OASValidateRequest, conf)
+					urlSpec = append(urlSpec, newSpec)
+				}
 			}
 		}
 	}
@@ -1440,7 +1534,39 @@ func (a APIDefinitionLoader) compileOASMockResponsePathSpec(apiSpec *APISpec, co
 	urlSpec := []URLSpec{}
 
 	// Get sorted paths (static paths before parameterized paths, then by length descending)
-	sortedPaths := oasutil.SortByPathLength(*apiSpec.OAS.Paths)
+	sortedPaths := sortPathsForOASMiddleware(*apiSpec.OAS.Paths)
+
+	// First pass: collect all parameterized paths that have MockResponse enabled
+	var parameterizedRegexes []*regexp.Regexp
+	for _, pathItem := range sortedPaths {
+		path := pathItem.Path
+		if !strings.Contains(path, "{") {
+			continue
+		}
+
+		for _, operation := range pathItem.Operations() {
+			if operation == nil {
+				continue
+			}
+
+			if tykOp, ok := middleware.Operations[operation.OperationID]; ok {
+				if tykOp.MockResponse != nil && tykOp.MockResponse.Enabled {
+					// Compile regex for this parameterized path
+					isPrefixMatch := conf.HttpServerOptions.EnablePathPrefixMatching
+					isSuffixMatch := conf.HttpServerOptions.EnablePathSuffixMatching
+					pattern := httputil.PreparePathRegexp(path, isPrefixMatch, isSuffixMatch)
+					if conf.IgnoreEndpointCase {
+						pattern = "(?i)" + pattern
+					}
+					if re, err := regexp.Compile(pattern); err == nil {
+						parameterizedRegexes = append(parameterizedRegexes, re)
+					}
+					break // One regex per path is enough
+				}
+			}
+		}
+	}
+
 	for _, pathItem := range sortedPaths {
 		path := pathItem.Path
 		isStaticPath := !strings.Contains(path, "{")
@@ -1453,7 +1579,7 @@ func (a APIDefinitionLoader) compileOASMockResponsePathSpec(apiSpec *APISpec, co
 
 			// Check if this operation has MockResponse enabled
 			var mockResponse *oas.MockResponse
-			
+
 			// Find the operation in middleware.Operations
 			if tykOp, ok := middleware.Operations[operation.OperationID]; ok {
 				if tykOp.MockResponse != nil && tykOp.MockResponse.Enabled {
@@ -1471,15 +1597,26 @@ func (a APIDefinitionLoader) compileOASMockResponsePathSpec(apiSpec *APISpec, co
 				a.generateRegex(path, &newSpec, OASMockResponse, conf)
 				urlSpec = append(urlSpec, newSpec)
 			} else if isStaticPath {
-				// Create a disabled entry to act as a shield
-				newSpec := URLSpec{
-					OASMockResponseMeta: &oas.MockResponse{Enabled: false},
-					OASMethod:           strings.ToUpper(method),
-					OASPath:             path,
+				// Check if this static path matches any parameterized regex
+				matchesParameterized := false
+				for _, re := range parameterizedRegexes {
+					if re.MatchString(path) {
+						matchesParameterized = true
+						break
+					}
 				}
 
-				a.generateRegex(path, &newSpec, OASMockResponse, conf)
-				urlSpec = append(urlSpec, newSpec)
+				if matchesParameterized {
+					// Create a disabled entry to act as a shield
+					newSpec := URLSpec{
+						OASMockResponseMeta: &oas.MockResponse{Enabled: false},
+						OASMethod:           strings.ToUpper(method),
+						OASPath:             path,
+					}
+
+					a.generateRegex(path, &newSpec, OASMockResponse, conf)
+					urlSpec = append(urlSpec, newSpec)
+				}
 			}
 		}
 	}
