@@ -220,6 +220,7 @@ func TestQuotaHeadersOnErrorResponses(t *testing.T) {
 	ts := StartTest(func(globalConf *config.Config) {
 		globalConf.RateLimitHeadersSource = config.RateLimitHeadersSourceQuota
 	})
+	defer ts.Close()
 
 	api := ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 		spec.Proxy.ListenPath = "/quota-headers-error-test"

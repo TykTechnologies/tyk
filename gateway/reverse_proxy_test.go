@@ -385,37 +385,22 @@ func createReverseProxyAndServeHTTP(ts *Test, req *http.Request) (*httptest.Resp
 	return recorder, resp
 }
 
-var testConfigMutex sync.Mutex
-
 func TestWrappedServeHTTP(t *testing.T) {
-	testConfigMutex.Lock()
-	defer testConfigMutex.Unlock()
-
-	originalTimeout := idleConnTimeout
-	t.Cleanup(func() {
-		idleConnTimeout = originalTimeout
-	})
-
-	idleConnTimeout = 10
+	idleConnTimeout = 1
 
 	ts := StartTest(nil)
 	defer ts.Close()
 
-	ts.HttpHandler.ReadTimeout = 10 * time.Second
-	ts.HttpHandler.WriteTimeout = 10 * time.Second
-	ts.HttpHandler.IdleTimeout = 10 * time.Second
-
-	for range 10 {
+	for i := 0; i < 10; i++ {
 		req := httptest.NewRequest(http.MethodGet, "/", nil)
 		_, _ = createReverseProxyAndServeHTTP(ts, req)
 	}
 
-	assert.True(t, ts.Gw.ConnectionWatcher.Count() > 0)
-	// assert.Equal(t, 10, ts.Gw.ConnectionWatcher.Count())
+	assert.Equal(t, 10, ts.Gw.ConnectionWatcher.Count())
 	time.Sleep(time.Second * 2)
 	assert.Eventually(t, func() bool {
 		return ts.Gw.ConnectionWatcher.Count() == 0
-	}, time.Second*15, time.Millisecond*100)
+	}, time.Second*10, time.Millisecond*100)
 
 	// Test error on deepCopyBody function
 	mockReadCloser := createMockReadCloserWithError(errors.New("test error"))
@@ -1451,9 +1436,6 @@ func TestGraphQL_SubgraphBatchRequest(t *testing.T) {
 			lock.Lock()
 			timesHit++
 			lock.Unlock()
-			writer.Header().Set("Content-Type", "application/json")
-			_, err := writer.Write([]byte(`{"data": {}}`))
-			assert.NoError(t, err)
 		})
 
 		q := graphql.Request{
@@ -1472,7 +1454,7 @@ func TestGraphQL_SubgraphBatchRequest(t *testing.T) {
 			lock.Lock()
 			defer lock.Unlock()
 			return timesHit == 2
-		}, time.Second*15, time.Millisecond*100)
+		}, time.Second*5, time.Millisecond*100)
 	})
 }
 
