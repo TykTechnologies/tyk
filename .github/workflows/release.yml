@@ -32,7 +32,7 @@ env:
   BASE_REF: ${{startsWith(github.event_name, 'pull_request') && github.base_ref || github.ref_name}}
 jobs:
   dep-guard:
-    uses: TykTechnologies/github-actions/.github/workflows/dependency-guard.yml@2b35ab5dd4cfff21ced9d12446e9e27d10bf5785  # main
+    uses: TykTechnologies/github-actions/.github/workflows/dependency-guard.yml@f867e501af8d103dd4b2a43a53f15c72d7de180f  # main
     permissions:
       contents: read
 
@@ -672,7 +672,7 @@ jobs:
       sink: ${{ steps.params.outputs.sink }}
     steps:
       - name: Set test parameters
-        uses: TykTechnologies/github-actions/.github/actions/tests/test-controller@2b35ab5dd4cfff21ced9d12446e9e27d10bf5785  # main
+        uses: TykTechnologies/github-actions/.github/actions/tests/test-controller@f867e501af8d103dd4b2a43a53f15c72d7de180f  # main
         id: params
         with:
           variation: ${{ env.VARIATION }}
@@ -727,11 +727,11 @@ jobs:
           # Only ${{ github.actor }} has access
           # See https://github.com/mxschmitt/action-tmate#use-registered-public-ssh-keys
       - name: Fetch environment from tyk-pro
-        uses: TykTechnologies/github-actions/.github/actions/tests/checkout-tyk-pro@2b35ab5dd4cfff21ced9d12446e9e27d10bf5785  # main
+        uses: TykTechnologies/github-actions/.github/actions/tests/checkout-tyk-pro@f867e501af8d103dd4b2a43a53f15c72d7de180f  # main
         with:
           org_gh_token: ${{ github.token }}
       - name: Set up test environment
-        uses: TykTechnologies/github-actions/.github/actions/tests/env-up@2b35ab5dd4cfff21ced9d12446e9e27d10bf5785  # main
+        uses: TykTechnologies/github-actions/.github/actions/tests/env-up@f867e501af8d103dd4b2a43a53f15c72d7de180f  # main
         timeout-minutes: 5
         id: env_up
         with:
@@ -742,18 +742,18 @@ jobs:
           TYK_DB_LICENSEKEY: ${{ secrets.DASH_LICENSE }}
           TYK_MDCB_LICENSE: ${{ secrets.MDCB_LICENSE }}
       - name: Choose test code branch
-        uses: TykTechnologies/github-actions/.github/actions/tests/choose-test-branch@2b35ab5dd4cfff21ced9d12446e9e27d10bf5785  # main
+        uses: TykTechnologies/github-actions/.github/actions/tests/choose-test-branch@f867e501af8d103dd4b2a43a53f15c72d7de180f  # main
         with:
           test_folder: api
           org_gh_token: ${{ secrets.ORG_GH_TOKEN }}
       - name: Run API tests
-        uses: TykTechnologies/github-actions/.github/actions/tests/api-tests@2b35ab5dd4cfff21ced9d12446e9e27d10bf5785  # main
+        uses: TykTechnologies/github-actions/.github/actions/tests/api-tests@f867e501af8d103dd4b2a43a53f15c72d7de180f  # main
         timeout-minutes: 45
         id: test_execution
         with:
           user_api_secret: ${{ steps.env_up.outputs.USER_API_SECRET }}
       - name: Generate test reports and collect logs
-        uses: TykTechnologies/github-actions/.github/actions/tests/reporting@2b35ab5dd4cfff21ced9d12446e9e27d10bf5785  # main
+        uses: TykTechnologies/github-actions/.github/actions/tests/reporting@f867e501af8d103dd4b2a43a53f15c72d7de180f  # main
         if: always() && (steps.test_execution.conclusion != 'skipped')
         with:
           report_xml: 'true'
@@ -936,7 +936,7 @@ jobs:
     secrets: inherit
   sbom:
     needs: goreleaser
-    uses: TykTechnologies/github-actions/.github/workflows/sbom.yaml@2b35ab5dd4cfff21ced9d12446e9e27d10bf5785  # main
+    uses: TykTechnologies/github-actions/.github/workflows/sbom.yaml@f867e501af8d103dd4b2a43a53f15c72d7de180f  # main
     secrets:
       DEPDASH_URL: ${{ secrets.DEPDASH_URL }}
       DEPDASH_KEY: ${{ secrets.DEPDASH_KEY }}
