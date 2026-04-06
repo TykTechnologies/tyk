@@ -12,6 +12,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"sync/atomic"
 	texttemplate "text/template"
@@ -1372,7 +1373,6 @@ func (a APIDefinitionLoader) compileOASValidateRequestPathSpec(apiSpec *APISpec,
 			continue
 		}
 
-		// Find the path and method for this operation
 		path, method := a.findPathAndMethodForOperation(apiSpec, operationID)
 		if path == "" || method == "" {
 			continue
@@ -1384,13 +1384,19 @@ func (a APIDefinitionLoader) compileOASValidateRequestPathSpec(apiSpec *APISpec,
 			OASPath:                path,
 		}
 
-		// The path in OAS is relative to the server URL (listenPath)
-		// For regex matching, we don't prepend listenPath because URLSpec.matchesPath
-		// will strip the listenPath before matching
-		// Use standard regex generation with gateway config
 		a.generateRegex(path, &newSpec, OASValidateRequest, conf)
 		urlSpec = append(urlSpec, newSpec)
 	}
+
+	urlSpec = a.addStaticPathShields(apiSpec, conf, urlSpec, OASValidateRequest, func(path, method string) URLSpec {
+		return URLSpec{
+			OASValidateRequestMeta: &oas.ValidateRequest{Enabled: false},
+			OASMethod:              method,
+			OASPath:                path,
+		}
+	})
+
+	sortURLSpecsByPathPriority(urlSpec)
 
 	return urlSpec
 }
@@ -1417,7 +1423,6 @@ func (a APIDefinitionLoader) compileOASMockResponsePathSpec(apiSpec *APISpec, co
 			continue
 		}
 
-		// Find the path and method for this operation
 		path, method := a.findPathAndMethodForOperation(apiSpec, operationID)
 		if path == "" || method == "" {
 			continue
@@ -1429,12 +1434,76 @@ func (a APIDefinitionLoader) compileOASMockResponsePathSpec(apiSpec *APISpec, co
 			OASPath:             path,
 		}
 
-		// Use standard regex generation with gateway config
 		a.generateRegex(path, &newSpec, OASMockResponse, conf)
 		urlSpec = append(urlSpec, newSpec)
 	}
 
+	urlSpec = a.addStaticPathShields(apiSpec, conf, urlSpec, OASMockResponse, func(path, method string) URLSpec {
+		return URLSpec{
+			OASMockResponseMeta: &oas.MockResponse{Enabled: false},
+			OASMethod:           method,
+			OASPath:             path,
+		}
+	})
+
+	sortURLSpecsByPathPriority(urlSpec)
+
 	return urlSpec
+}
+
+// addStaticPathShields adds synthetic disabled URLSpec entries for static OAS paths
+// that don't already have an entry in urlSpec. These entries act as shields: when the
+// middleware scans the path list, a static shield entry matches before any parameterised
+// regex, and the middleware sees Enabled=false and skips it. This prevents parameterised
+// paths (e.g. /employees/{id}) from incorrectly matching static paths (e.g. /employees/static).
+//
+// Shield entries are only added when urlSpec contains at least one parameterised path,
+// since without parameterised paths there is no cross-matching risk.
+func (a APIDefinitionLoader) addStaticPathShields(
+	apiSpec *APISpec,
+	conf config.Config,
+	urlSpec []URLSpec,
+	status URLStatus,
+	newDisabledSpec func(path, method string) URLSpec,
+) []URLSpec {
+	if apiSpec.OAS.Paths == nil {
+		return urlSpec
+	}
+
+	existing, hasParameterised := indexURLSpecs(urlSpec)
+	if !hasParameterised {
+		return urlSpec
+	}
+
+	for path, pathItem := range apiSpec.OAS.Paths.Map() {
+		if httputil.IsMuxTemplate(path) {
+			continue
+		}
+		for method := range pathItem.Operations() {
+			method = strings.ToUpper(method)
+			if _, exists := existing[path+":"+method]; exists {
+				continue
+			}
+			newSpec := newDisabledSpec(path, method)
+			a.generateRegex(path, &newSpec, status, conf)
+			urlSpec = append(urlSpec, newSpec)
+		}
+	}
+
+	return urlSpec
+}
+
+// indexURLSpecs builds a set of "path:METHOD" keys from the given specs and reports
+// whether any spec uses a parameterised (mux-template) path.
+func indexURLSpecs(specs []URLSpec) (existing map[string]struct{}, hasParameterised bool) {
+	existing = make(map[string]struct{}, len(specs))
+	for _, spec := range specs {
+		existing[spec.OASPath+":"+spec.OASMethod] = struct{}{}
+		if httputil.IsMuxTemplate(spec.OASPath) {
+			hasParameterised = true
+		}
+	}
+	return
 }
 
 // findPathAndMethodForOperation finds the path and method for a given operation ID
@@ -1453,6 +1522,42 @@ func (a APIDefinitionLoader) findPathAndMethodForOperation(apiSpec *APISpec, ope
 	}
 
 	return "", ""
+}
+
+// pathParamRegex matches path parameters like {id} or {employeeId} in OAS paths.
+var pathParamRegex = regexp.MustCompile(`\{[^}]+\}`)
+
+// sortURLSpecsByPathPriority sorts URLSpec entries so that more specific paths come before
+// less specific ones. This uses the same algorithm as oasutil.SortByPathLength:
+//   - Strip path parameters {…} before comparing
+//   - If two paths are equal after stripping, the non-parameterised one goes first
+//   - Sort by number of "/" segments (more segments first)
+//   - Sort by string length (longer first)
+//   - Alphabetical for equal length
+func sortURLSpecsByPathPriority(specs []URLSpec) {
+	sort.Slice(specs, func(i, j int) bool {
+		pathI := pathParamRegex.ReplaceAllString(specs[i].OASPath, "")
+		pathJ := pathParamRegex.ReplaceAllString(specs[j].OASPath, "")
+
+		// If paths are equal after stripping params, the non-parameterised one goes first.
+		// We reverse the indices so the literal path sorts before the parameterised one.
+		if pathI == pathJ {
+			pathI, pathJ = specs[j].OASPath, specs[i].OASPath
+		}
+
+		// Sort by number of path segments (more segments first).
+		k, v := strings.Count(pathI, "/"), strings.Count(pathJ, "/")
+		if k != v {
+			return k > v
+		}
+
+		// Sort by string length (longer first).
+		il, jl := len(pathI), len(pathJ)
+		if il == jl {
+			return pathI < pathJ
+		}
+		return il > jl
+	})
 }
 
 // extractMCPPrimitivesToPaths extracts MCP primitives (tools, resources, prompts) from the OAS
