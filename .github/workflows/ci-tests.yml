@@ -29,7 +29,7 @@ env:
 
 jobs:
   dep-guard:
-    uses: TykTechnologies/github-actions/.github/workflows/dependency-guard.yml@2b35ab5dd4cfff21ced9d12446e9e27d10bf5785  # main
+    uses: TykTechnologies/github-actions/.github/workflows/dependency-guard.yml@f867e501af8d103dd4b2a43a53f15c72d7de180f  # main
     permissions:
       contents: read
 
@@ -39,7 +39,7 @@ jobs:
     if: ${{ !github.event.pull_request.draft }}
     steps:
       - name: "Checkout PR"
-        uses: TykTechnologies/github-actions/.github/actions/checkout-pr@2b35ab5dd4cfff21ced9d12446e9e27d10bf5785  # main
+        uses: TykTechnologies/github-actions/.github/actions/checkout-pr@f867e501af8d103dd4b2a43a53f15c72d7de180f  # main
         with:
           token: ${{ secrets.ORG_GH_TOKEN }}
 
@@ -188,7 +188,7 @@ jobs:
     needs: [test, lint]
     steps:
       - name: "Checkout repository"
-        uses: TykTechnologies/github-actions/.github/actions/checkout-pr@2b35ab5dd4cfff21ced9d12446e9e27d10bf5785  # main
+        uses: TykTechnologies/github-actions/.github/actions/checkout-pr@f867e501af8d103dd4b2a43a53f15c72d7de180f  # main
         with:
           token: ${{ secrets.ORG_GH_TOKEN }}
 
