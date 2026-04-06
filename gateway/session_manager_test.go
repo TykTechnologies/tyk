@@ -603,24 +603,25 @@ func TestSessionLimiter(t *testing.T) {
 	})
 
 	t.Run("limitRedis", func(t *testing.T) {
+		redisKey := key + "_redis"
 		r, err := http.NewRequestWithContext(t.Context(), http.MethodGet, "/", nil)
 		require.NoError(t, err)
 
-		cmd := limiter.limiterStorage.Del(r.Context(), key+SentinelRateLimitKeyPostfix, key)
+		cmd := limiter.limiterStorage.Del(r.Context(), key+SentinelRateLimitKeyPostfix, redisKey)
 		require.NoError(t, cmd.Err())
 
 		session := &user.SessionState{}
 		apiLimit := &user.APILimit{RateLimit: user.RateLimit{Rate: 2, Per: 60}}
 
-		state, block := limiter.limitRedis(r, session, key, apiLimit, false)
+		state, block := limiter.limitRedis(r, session, redisKey, apiLimit, false)
 		assert.True(t, state.Reset == 0, "first cal is not blocked reset")
 		assert.False(t, block, "first cal is not blocked block")
 
-		state, block = limiter.limitRedis(r, session, key, apiLimit, false)
+		state, block = limiter.limitRedis(r, session, redisKey, apiLimit, false)
 		assert.InDelta(t, 60.0, state.Reset.Seconds(), 0.1, "second cal is blocked for all")
 		assert.False(t, block, "second cal is not blocked block")
 
-		state, block = limiter.limitRedis(r, session, key, apiLimit, false)
+		state, block = limiter.limitRedis(r, session, redisKey, apiLimit, false)
 		assert.InDelta(t, 60.0, state.Reset.Seconds(), 0.1, "third call is blocked for all window size")
 		assert.True(t, block, "third call is blocked")
 	})
