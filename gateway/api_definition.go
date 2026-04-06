@@ -24,6 +24,7 @@ import (
 	"github.com/TykTechnologies/tyk/internal/httpctx"
 	"github.com/TykTechnologies/tyk/internal/httputil"
 	"github.com/TykTechnologies/tyk/internal/mcp"
+	"github.com/TykTechnologies/tyk/internal/oasutil"
 
 	"github.com/getkin/kin-openapi/routers/gorillamux"
 
@@ -1524,39 +1525,11 @@ func (a APIDefinitionLoader) findPathAndMethodForOperation(apiSpec *APISpec, ope
 	return "", ""
 }
 
-// pathParamRegex matches path parameters like {id} or {employeeId} in OAS paths.
-var pathParamRegex = regexp.MustCompile(`\{[^}]+\}`)
-
-// sortURLSpecsByPathPriority sorts URLSpec entries so that more specific paths come before
-// less specific ones. This uses the same algorithm as oasutil.SortByPathLength:
-//   - Strip path parameters {…} before comparing
-//   - If two paths are equal after stripping, the non-parameterised one goes first
-//   - Sort by number of "/" segments (more segments first)
-//   - Sort by string length (longer first)
-//   - Alphabetical for equal length
+// sortURLSpecsByPathPriority sorts URLSpec entries using the same path priority
+// rules as oasutil.SortByPathLength, ensuring consistent ordering across the gateway.
 func sortURLSpecsByPathPriority(specs []URLSpec) {
 	sort.Slice(specs, func(i, j int) bool {
-		pathI := pathParamRegex.ReplaceAllString(specs[i].OASPath, "")
-		pathJ := pathParamRegex.ReplaceAllString(specs[j].OASPath, "")
-
-		// If paths are equal after stripping params, the non-parameterised one goes first.
-		// We reverse the indices so the literal path sorts before the parameterised one.
-		if pathI == pathJ {
-			pathI, pathJ = specs[j].OASPath, specs[i].OASPath
-		}
-
-		// Sort by number of path segments (more segments first).
-		k, v := strings.Count(pathI, "/"), strings.Count(pathJ, "/")
-		if k != v {
-			return k > v
-		}
-
-		// Sort by string length (longer first).
-		il, jl := len(pathI), len(pathJ)
-		if il == jl {
-			return pathI < pathJ
-		}
-		return il > jl
+		return oasutil.PathLess(specs[i].OASPath, specs[j].OASPath)
 	})
 }
 
