@@ -105,6 +105,7 @@ func TestAPIRateLimitResponseHeaders(t *testing.T) {
 			)
 
 			_ = ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+				spec.APIID = "api-rate-limit-headers-test-" + limiter
 				spec.Proxy.ListenPath = "/api-rate-limit-headers-test"
 				spec.UseKeylessAccess = true
 				spec.GlobalRateLimit = apidef.GlobalRateLimit{
