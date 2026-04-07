@@ -15,6 +15,7 @@ import (
 	"testing"
 	"time"
 
+	backoffv4 "github.com/cenkalti/backoff/v4"
 	"github.com/samber/lo"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
@@ -1396,7 +1397,9 @@ func TestDoReloadWithRetry_RetriesUntilSuccess(t *testing.T) {
 	defer ts.Close()
 
 	// Use a fast retry interval so the test does not wait seconds between retries.
-	ts.Gw.reloadRetryInterval = 50 * time.Millisecond
+	ts.Gw.reloadRetryBackoff = func() backoffv4.BackOff {
+		return backoffv4.NewConstantBackOff(50 * time.Millisecond)
+	}
 
 	const succeedOnCall = 3
 	var callCount int
@@ -1455,7 +1458,9 @@ func TestDoReloadWithRetry_StopsOnContextCancel(t *testing.T) {
 	defer ts.Close()
 
 	// Use a fast retry interval so context cancellation is observed quickly.
-	ts.Gw.reloadRetryInterval = 50 * time.Millisecond
+	ts.Gw.reloadRetryBackoff = func() backoffv4.BackOff {
+		return backoffv4.NewConstantBackOff(50 * time.Millisecond)
+	}
 
 	// Mock dashboard that always returns 500 so the reload never succeeds.
 	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
@@ -1496,18 +1501,19 @@ func TestDoReloadWithRetry_StopsOnContextCancel(t *testing.T) {
 		"performedSuccessfulReload should remain false when reload never succeeded")
 }
 
-// TestDoReloadWithRetry_BackoffIntervalsGrow verifies that successive retry
-// intervals grow according to the exponential backoff configuration
-// (InitialInterval, Multiplier). Uses fast intervals so the test completes
-// quickly while still observing the doubling behaviour.
-func TestDoReloadWithRetry_BackoffIntervalsGrow(t *testing.T) {
+// TestDoReloadWithRetry_RetriesWithConstantInterval verifies that successive
+// retry attempts are spaced by the configured interval. Uses a constant
+// backoff so the test completes quickly with predictable timing.
+func TestDoReloadWithRetry_RetriesWithConstantInterval(t *testing.T) {
 	ts := StartTest(func(conf *config.Config) {
 		conf.ResourceSync.RetryAttempts = 0
 	})
 	defer ts.Close()
 
 	// Use a fast constant retry interval.
-	ts.Gw.reloadRetryInterval = 100 * time.Millisecond
+	ts.Gw.reloadRetryBackoff = func() backoffv4.BackOff {
+		return backoffv4.NewConstantBackOff(100 * time.Millisecond)
+	}
 
 	const succeedOnCall = 4 // fail 3 times, succeed on the 4th
 	var (
@@ -1677,7 +1683,9 @@ func TestRegister_DoReloadWithRetry_OnStartup(t *testing.T) {
 	defer ts.Close()
 
 	// Use a fast retry interval so retries happen in milliseconds during the test.
-	ts.Gw.reloadRetryInterval = 50 * time.Millisecond
+	ts.Gw.reloadRetryBackoff = func() backoffv4.BackOff {
+		return backoffv4.NewConstantBackOff(50 * time.Millisecond)
+	}
 
 	// Enable dashboard mode and wire up the mock dashboard.
 	conf := ts.Gw.GetConfig()

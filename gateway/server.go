@@ -30,6 +30,7 @@ import (
 	logrussentry "github.com/evalphobia/logrus_sentry"
 	grayloghook "github.com/gemnasium/logrus-graylog-hook"
 	"github.com/gorilla/mux"
+	backoffv4 "github.com/cenkalti/backoff/v4"
 	"github.com/lonelycode/osin"
 	"github.com/rs/cors"
 	"github.com/samber/lo"
@@ -199,10 +200,10 @@ type Gateway struct {
 	// performedSuccessfulReload is used to know whether a successful reload happened
 	performedSuccessfulReload bool
 
-	// reloadRetryInterval is the fixed pause between DoReloadWithRetry attempts.
-	// Production code leaves this as zero and DoReloadWithRetry uses the default
-	// of 5s. Tests set it to a small value to avoid waiting.
-	reloadRetryInterval time.Duration
+	// reloadRetryBackoff optionally returns a custom backoff strategy for
+	// DoReloadWithRetry. Production code leaves this nil (default exponential
+	// backoff is used). Tests set it to return a fast constant backoff.
+	reloadRetryBackoff func() backoffv4.BackOff
 
 	requeueLock sync.Mutex
 
@@ -1276,33 +1277,46 @@ func (gw *Gateway) DoReload() {
 	}
 }
 
-// DoReloadWithRetry calls DoReloadWithError in a constant-interval retry loop.
-// It is used at the two startup call sites (Register and startServer) where a
-// failed reload means the gateway has zero APIs and policies and must keep
-// retrying until the upstream recovers.
+// Backoff parameters for DoReloadWithRetry.
+const (
+	reloadRetryInitialInterval = 5 * time.Second
+	reloadRetryMaxInterval     = 60 * time.Second
+	reloadRetryMultiplier      = 2.0
+)
+
+// DoReloadWithRetry calls DoReloadWithError in an exponential-backoff retry
+// loop (5s → 10s → 20s → 40s → 60s cap). It is used at the two startup call
+// sites (Register and startServer) where a failed reload means the gateway has
+// zero APIs and policies and must keep retrying until the upstream recovers.
 //
 // The loop is intentionally NOT used in reloadLoop (the runtime hot-reload
 // path) because that goroutine must remain unblocked so that subsequent
 // pub/sub-triggered reloads can be processed without delay.
 func (gw *Gateway) DoReloadWithRetry(ctx context.Context) {
-	interval := gw.reloadRetryInterval
-	if interval <= 0 {
-		interval = 5 * time.Second
+	var b backoffv4.BackOff
+	if gw.reloadRetryBackoff != nil {
+		b = gw.reloadRetryBackoff()
+	} else {
+		eb := backoffv4.NewExponentialBackOff()
+		eb.InitialInterval = reloadRetryInitialInterval
+		eb.MaxInterval = reloadRetryMaxInterval
+		eb.MaxElapsedTime = 0 // never stop on elapsed time; only ctx or success stops it
+		eb.Multiplier = reloadRetryMultiplier
+		eb.RandomizationFactor = 0 // deterministic intervals for predictable log output
+		eb.Reset()
+		b = eb
 	}
 
-	for {
-		if err := gw.DoReloadWithError(); err == nil {
-			return
-		} else {
-			mainLog.Errorf("Reload failed, will retry in %s: %v", interval, err)
+	err := backoffv4.Retry(func() error {
+		if err := gw.DoReloadWithError(); err != nil {
+			mainLog.Errorf("Reload failed, will retry: %v", err)
+			return err
 		}
+		return nil
+	}, backoffv4.WithContext(b, ctx))
 
-		select {
-		case <-ctx.Done():
-			mainLog.Warning("Reload retry abandoned: gateway shutting down")
-			return
-		case <-time.After(interval):
-		}
+	if err != nil && ctx.Err() != nil {
+		mainLog.Warning("Reload retry abandoned: gateway shutting down")
 	}
 }
 
