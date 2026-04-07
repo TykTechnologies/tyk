@@ -546,8 +546,7 @@ func TestSessionLimiter(t *testing.T) {
 			r, err := http.NewRequestWithContext(t.Context(), http.MethodGet, "/", nil)
 			require.NoError(t, err)
 
-			limiter.enableContextVariables = true
-			limiter.extendContextWithQuota(r, 1, 2, 3)
+			limiter.extendContextWithQuota(r, 1, 2, 3, true)
 
 			data := ctxGetData(r)
 			require.NotNil(t, data)
@@ -560,8 +559,7 @@ func TestSessionLimiter(t *testing.T) {
 			r, err := http.NewRequestWithContext(t.Context(), http.MethodGet, "/", nil)
 			require.NoError(t, err)
 
-			limiter.enableContextVariables = false
-			limiter.extendContextWithQuota(r, 1, 2, 3)
+			limiter.extendContextWithQuota(r, 1, 2, 3, false)
 
 			data := ctxGetData(r)
 			require.Nil(t, data)
@@ -573,12 +571,11 @@ func TestSessionLimiter(t *testing.T) {
 			r, err := http.NewRequestWithContext(t.Context(), http.MethodGet, "/", nil)
 			require.NoError(t, err)
 
-			limiter.enableContextVariables = true
 			limiter.extendContextWithLimits(r, rate.Stats{
 				Limit:     2,
 				Remaining: 1,
 				Reset:     time.Second * 10,
-			})
+			}, true)
 
 			data := ctxGetData(r)
 			require.NotNil(t, data)
@@ -594,8 +591,7 @@ func TestSessionLimiter(t *testing.T) {
 			r, err := http.NewRequestWithContext(t.Context(), http.MethodGet, "/", nil)
 			require.NoError(t, err)
 
-			limiter.enableContextVariables = false
-			limiter.extendContextWithLimits(r, rate.Stats{})
+			limiter.extendContextWithLimits(r, rate.Stats{}, false)
 
 			data := ctxGetData(r)
 			require.Nil(t, data)

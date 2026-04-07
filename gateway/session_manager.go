@@ -50,13 +50,12 @@ const (
 // SessionLimiter is the rate limiter for the API, use ForwardMessage() to
 // check if a message should pass through or not
 type SessionLimiter struct {
-	ctx                    context.Context
-	drlManager             *drl.DRL
-	config                 *config.Config
-	bucketStore            model.BucketStorage
-	limiterStorage         redis.UniversalClient
-	smoothing              *rate.Smoothing
-	enableContextVariables bool
+	ctx            context.Context
+	drlManager     *drl.DRL
+	config         *config.Config
+	bucketStore    model.BucketStorage
+	limiterStorage redis.UniversalClient
+	smoothing      *rate.Smoothing
 }
 
 // NewSessionLimiter initializes the session limiter.
@@ -74,11 +73,10 @@ func NewSessionLimiter(
 ) SessionLimiter {
 
 	sessionLimiter := SessionLimiter{
-		ctx:                    ctx,
-		drlManager:             drlManager,
-		config:                 conf,
-		bucketStore:            memorycache.New(ctx),
-		enableContextVariables: conf.EnableContextVariables,
+		ctx:         ctx,
+		drlManager:  drlManager,
+		config:      conf,
+		bucketStore: memorycache.New(ctx),
 	}
 
 	log.Infof("[RATELIMIT] %s", conf.RateLimit.String())
@@ -309,7 +307,7 @@ func (l *SessionLimiter) ForwardMessage(
 			headerSender.SendRateLimits(stats)
 		}
 
-		l.extendContextWithLimits(r, stats)
+		l.extendContextWithLimits(r, stats, api.EnableContextVars)
 
 		if shouldBlock {
 			return sessionFailRateLimit
@@ -322,7 +320,7 @@ func (l *SessionLimiter) ForwardMessage(
 			session.Allowance = session.Allowance - 1
 		}
 
-		if l.RedisQuotaExceeded(r, session, quotaKey, allowanceScope, apiLimit, l.config.HashKeys) {
+		if l.RedisQuotaExceeded(r, session, quotaKey, allowanceScope, apiLimit, l.config.HashKeys, api.EnableContextVars) {
 			return sessionFailQuota
 		}
 	}
@@ -434,6 +432,7 @@ func (l *SessionLimiter) RedisQuotaExceeded(
 	quotaKey, scope string,
 	limit *user.APILimit,
 	hashKeys bool,
+	enableCtxVars bool,
 ) bool {
 
 	logger := log.WithFields(logrus.Fields{
@@ -522,7 +521,7 @@ func (l *SessionLimiter) RedisQuotaExceeded(
 		logger.Debug("[QUOTA] Update quota key")
 
 		l.updateSessionQuota(session, scope, remaining, expiredAt.Unix())
-		l.extendContextWithQuota(r, int(limit.QuotaMax), int(remaining), int(expiredAt.Unix()))
+		l.extendContextWithQuota(r, int(limit.QuotaMax), int(remaining), int(expiredAt.Unix()), enableCtxVars)
 
 		return blocked
 	}
@@ -611,8 +610,8 @@ func (*SessionLimiter) updateSessionQuota(session *user.SessionState, scope stri
 	session.Touch()
 }
 
-func (l *SessionLimiter) extendContextWithQuota(r *http.Request, quotaMax, remaining, reset int) {
-	if !l.enableContextVariables {
+func (l *SessionLimiter) extendContextWithQuota(r *http.Request, quotaMax, remaining, reset int, enableCtxVars bool) {
+	if !enableCtxVars {
 		return
 	}
 	data := ctxGetOrCreateData(r)
@@ -621,8 +620,8 @@ func (l *SessionLimiter) extendContextWithQuota(r *http.Request, quotaMax, remai
 	data[ctxDataKeyQuotaReset] = reset
 }
 
-func (l *SessionLimiter) extendContextWithLimits(r *http.Request, stats rate.Stats) {
-	if !l.enableContextVariables {
+func (l *SessionLimiter) extendContextWithLimits(r *http.Request, stats rate.Stats, enableCtxVars bool) {
+	if !enableCtxVars {
 		return
 	}
 	data := ctxGetOrCreateData(r)

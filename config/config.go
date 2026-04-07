@@ -1378,9 +1378,6 @@ type Config struct {
 	// RateLimitHeadersSource source of rate limit headers
 	RateLimitHeadersSource RateLimitHeadersSource `json:"ratelimit_headers_source"`
 
-	// EnableContextVariables enables extending context data by rate-limit information
-	EnableContextVariables bool `json:"enable_context_variables"`
-
 	// AllowUnsafePolicyIds allows unsafe policy identifiers
 	AllowUnsafePolicyIds bool `json:"allow_unsafe_policy_ids"`
 }
