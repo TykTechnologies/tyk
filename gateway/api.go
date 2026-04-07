@@ -1277,7 +1277,7 @@ func (gw *Gateway) handleGetAPIOAS(apiID string, modePublic bool) (interface{}, 
 	obj, code := gw.handleGetAPI(apiID, true)
 	if apiOAS, ok := obj.(*oas.OAS); ok {
 		// We have to operate on oas clone in order to preserve original state after any manipulations on schema.
-		oasClone, _ := apiOAS.Clone()
+		oasClone, _ := apiOAS.Clone() // nolint:errcheck
 		if modePublic {
 			oasClone.RemoveTykExtension()
 		}
@@ -1466,11 +1466,12 @@ func (gw *Gateway) writeOASAndAPIDefToFile(fs afero.Fs, apiDef *apidef.APIDefini
 		suffix = "-mcp"
 	}
 
+	oasDeepCopy, _ := oasObj.Clone() // nolint:errcheck
 	visitor := schema.NewVisitor()
 	visitor.AddSchemaManipulation(schema.RestoreUnicodeEscapesFromRE2Manipulation)
-	visitor.ProcessOAS(oasObj)
+	visitor.ProcessOAS(oasDeepCopy)
 
-	err, errCode = gw.writeToFile(fs, oasObj, apiDef.APIID+suffix)
+	err, errCode = gw.writeToFile(fs, oasDeepCopy, apiDef.APIID+suffix)
 	if err != nil {
 		return
 	}
