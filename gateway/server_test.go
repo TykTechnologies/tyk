@@ -188,6 +188,7 @@ func TestGateway_afterConfSetup(t *testing.T) {
 				},
 			},
 			setup: func(t *testing.T, _ *Gateway) {
+				t.Helper()
 				t.Setenv("TYK_SECRET_OAUTH_CERT_FILE", "/env/path/to/cert.pem")
 				t.Setenv("TYK_SECRET_OAUTH_KEY_FILE", "/env/path/to/key.pem")
 				t.Setenv("TYK_SECRET_OAUTH_CA_FILE", "/env/path/to/ca.pem")
@@ -487,6 +488,90 @@ func (m *mockKVStore) Get(key string) (string, error) {
 func (m *mockKVStore) Put(key, val string) error {
 	m.data[key] = val
 	return nil
+}
+
+func TestGateway_kvResolvers_hotReload(t *testing.T) {
+	initialCert := "secrets://oauth_cert"
+	initialKey := "secrets://oauth_key"
+	initialCA := "secrets://oauth_ca"
+
+	gw := NewGateway(config.Config{
+		Secrets: map[string]string{
+			"oauth_cert": "/initial/cert.pem",
+			"oauth_key":  "/initial/key.pem",
+			"oauth_ca":   "/initial/ca.pem",
+		},
+		ExternalServices: config.ExternalServiceConfig{
+			OAuth: config.ServiceConfig{
+				MTLS: config.MTLSConfig{
+					Enabled:  true,
+					CertFile: initialCert,
+					KeyFile:  initialKey,
+					CAFile:   initialCA,
+				},
+			},
+		},
+	}, context.Background())
+
+	require.NoError(t, gw.afterConfSetup())
+
+	conf := gw.GetConfig()
+	assert.Equal(t, "/initial/cert.pem", conf.ExternalServices.OAuth.MTLS.CertFile)
+	assert.Equal(t, "/initial/key.pem", conf.ExternalServices.OAuth.MTLS.KeyFile)
+	assert.Equal(t, "/initial/ca.pem", conf.ExternalServices.OAuth.MTLS.CAFile)
+	assert.Len(t, gw.kvResolvers, 3)
+
+	// simulate updated secrets
+	updatedConf := gw.GetConfig()
+	updatedConf.Secrets = map[string]string{
+		"oauth_cert": "/updated/cert.pem",
+		"oauth_key":  "/updated/key.pem",
+		"oauth_ca":   "/updated/ca.pem",
+	}
+	gw.SetConfig(updatedConf)
+
+	for _, resolve := range gw.kvResolvers {
+		require.NoError(t, resolve())
+	}
+
+	conf = gw.GetConfig()
+	assert.Equal(t, "/updated/cert.pem", conf.ExternalServices.OAuth.MTLS.CertFile)
+	assert.Equal(t, "/updated/key.pem", conf.ExternalServices.OAuth.MTLS.KeyFile)
+	assert.Equal(t, "/updated/ca.pem", conf.ExternalServices.OAuth.MTLS.CAFile)
+}
+
+func TestGateway_kvResolvers_notRegisteredWhenMTLSDisabled(t *testing.T) {
+	gw := NewGateway(config.Config{
+		ExternalServices: config.ExternalServiceConfig{
+			OAuth: config.ServiceConfig{
+				MTLS: config.MTLSConfig{
+					Enabled:  false,
+					CertFile: "secrets://oauth_cert",
+				},
+			},
+		},
+	}, context.Background())
+
+	require.NoError(t, gw.afterConfSetup())
+	assert.Empty(t, gw.kvResolvers)
+}
+
+func TestGateway_kvResolvers_notRegisteredForPlainValues(t *testing.T) {
+	gw := NewGateway(config.Config{
+		ExternalServices: config.ExternalServiceConfig{
+			OAuth: config.ServiceConfig{
+				MTLS: config.MTLSConfig{
+					Enabled:  true,
+					CertFile: "/plain/cert.pem",
+					KeyFile:  "/plain/key.pem",
+					CAFile:   "/plain/ca.pem",
+				},
+			},
+		},
+	}, context.Background())
+
+	require.NoError(t, gw.afterConfSetup())
+	assert.Empty(t, gw.kvResolvers)
 }
 
 func TestGateway_apisByIDLen(t *testing.T) {

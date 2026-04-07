@@ -114,6 +114,8 @@ type Gateway struct {
 	configMu          sync.Mutex
 	configViewerCache *configViewerCache
 
+	kvResolvers []func() error
+
 	ctx context.Context
 
 	nodeIDMu sync.Mutex
@@ -1220,6 +1222,12 @@ func (gw *Gateway) DoReload() {
 		gw.MetricInstruments.RecordConfigState(gw.ctx, gw.apisByIDLen(), gw.policies.PolicyCount())
 	}()
 
+	for _, resolve := range gw.kvResolvers {
+		if err := resolve(); err != nil {
+			mainLog.WithError(err).Error("Failed to re-resolve KV value on reload")
+		}
+	}
+
 	// Initialize/reset the JSVM
 	if gw.GetConfig().EnableJSVM {
 		gw.GlobalEventsJSVM.DeInit()
@@ -1832,15 +1840,21 @@ func (gw *Gateway) afterConfSetup() error {
 
 	// Retrieve OAuth mTLS certificate paths from KV store
 	if conf.ExternalServices.OAuth.MTLS.Enabled {
-		conf.ExternalServices.OAuth.MTLS.CertFile, err = gw.kvStore(conf.ExternalServices.OAuth.MTLS.CertFile)
+		conf.ExternalServices.OAuth.MTLS.CertFile, err = gw.resolveKV(conf.ExternalServices.OAuth.MTLS.CertFile, func(c *config.Config, v string) {
+			c.ExternalServices.OAuth.MTLS.CertFile = v
+		}, true)
 		if err != nil {
 			return fmt.Errorf("could not retrieve OAuth mTLS cert file path from KV store: %w", err)
 		}
-		conf.ExternalServices.OAuth.MTLS.KeyFile, err = gw.kvStore(conf.ExternalServices.OAuth.MTLS.KeyFile)
+		conf.ExternalServices.OAuth.MTLS.KeyFile, err = gw.resolveKV(conf.ExternalServices.OAuth.MTLS.KeyFile, func(c *config.Config, v string) {
+			c.ExternalServices.OAuth.MTLS.KeyFile = v
+		}, true)
 		if err != nil {
 			return fmt.Errorf("could not retrieve OAuth mTLS key file path from KV store: %w", err)
 		}
-		conf.ExternalServices.OAuth.MTLS.CAFile, err = gw.kvStore(conf.ExternalServices.OAuth.MTLS.CAFile)
+		conf.ExternalServices.OAuth.MTLS.CAFile, err = gw.resolveKV(conf.ExternalServices.OAuth.MTLS.CAFile, func(c *config.Config, v string) {
+			c.ExternalServices.OAuth.MTLS.CAFile = v
+		}, true)
 		if err != nil {
 			return fmt.Errorf("could not retrieve OAuth mTLS CA file path from KV store: %w", err)
 		}
@@ -1855,6 +1869,26 @@ func (gw *Gateway) afterConfSetup() error {
 
 	gw.SetConfig(conf)
 	return nil
+}
+
+func (gw *Gateway) resolveKV(original string, set func(*config.Config, string), hotReload bool) (string, error) {
+	resolved, err := gw.kvStore(original)
+	if err != nil {
+		return original, err
+	}
+	if hotReload && resolved != original {
+		gw.kvResolvers = append(gw.kvResolvers, func() error {
+			val, err := gw.kvStore(original)
+			if err != nil {
+				return err
+			}
+			conf := gw.GetConfig()
+			set(&conf, val)
+			gw.SetConfig(conf)
+			return nil
+		})
+	}
+	return resolved, nil
 }
 
 func (gw *Gateway) kvStore(value string) (string, error) {
