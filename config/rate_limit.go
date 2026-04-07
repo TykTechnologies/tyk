@@ -37,7 +37,17 @@ type RateLimit struct {
 
 	// Controls which algorthm to use as a fallback when your distributed rate limiter can't be used.
 	DRLEnableSentinelRateLimiter bool `json:"drl_enable_sentinel_rate_limiter"`
+
+	// RateLimitHeadersSource source of rate limit headers
+	RateLimitHeadersSource RateLimitHeadersSource `json:"rate_limit_headers_source"`
 }
+
+type RateLimitHeadersSource string
+
+const (
+	RateLimitHeadersSourceQuota     RateLimitHeadersSource = "quotas"
+	RateLimitHeadersSourceRateLimit RateLimitHeadersSource = "rate_limits"
+)
 
 // String returns a readable setting for the rate limiter in effect.
 func (r *RateLimit) String() string {

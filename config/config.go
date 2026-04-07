@@ -1375,19 +1375,9 @@ type Config struct {
 	// JWKS holds the configuration for Tyk JWKS functionalities
 	JWKS JWKSConfig `json:"jwks"`
 
-	// RateLimitHeadersSource source of rate limit headers
-	RateLimitHeadersSource RateLimitHeadersSource `json:"ratelimit_headers_source"`
-
 	// AllowUnsafePolicyIds allows unsafe policy identifiers
 	AllowUnsafePolicyIds bool `json:"allow_unsafe_policy_ids"`
 }
-
-type RateLimitHeadersSource string
-
-const (
-	RateLimitHeadersSourceQuota     RateLimitHeadersSource = "quotas"
-	RateLimitHeadersSourceRateLimit RateLimitHeadersSource = "rate_limits"
-)
 
 // LabsConfig include config for streaming
 type LabsConfig map[string]interface{}

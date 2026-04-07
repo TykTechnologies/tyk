@@ -1610,7 +1610,7 @@
         }
       }
     },
-    "ratelimit_headers_source": {
+    "rate_limit_headers_source": {
       "description": "defines the source for the rate limit headers",
       "type": ["string"],
       "enum": ["", "quotas", "rate_limits"],
