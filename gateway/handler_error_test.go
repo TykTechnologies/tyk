@@ -11,11 +11,13 @@ import (
 	"testing"
 	"time"
 
+	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/TykTechnologies/tyk-pump/analytics"
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/apidef/oas"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/header"
 	"github.com/TykTechnologies/tyk/test"
@@ -384,5 +386,200 @@ func TestErrorHandler_AnalyticsRecordsOverriddenStatusCode(t *testing.T) {
 		// No override matched, so analytics should record original status code
 		assert.Equal(t, http.StatusUnauthorized, record.ResponseCode,
 			"Analytics should record original status code when no override matches")
+	})
+}
+
+func TestErrorHandler_APILevelErrorOverrides(t *testing.T) {
+	t.Run("API-level override takes precedence over gateway-level", func(t *testing.T) {
+		ts := StartTest(func(globalConf *config.Config) {
+			globalConf.ErrorOverrides = apidef.ErrorOverridesMap{
+				"401": []apidef.ErrorOverride{
+					{
+						Response: apidef.ErrorResponse{
+							StatusCode: 403,
+							Body:       `{"error": "gateway_override"}`,
+						},
+					},
+				},
+			}
+		})
+		defer ts.Close()
+
+		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+			spec.Proxy.ListenPath = "/test-api-override/"
+			spec.Proxy.TargetURL = "http://httpbin.org"
+			spec.UseKeylessAccess = false
+			spec.Auth.AuthHeaderName = "Authorization"
+
+			spec.ErrorOverrides = apidef.ErrorOverridesMap{
+				"401": []apidef.ErrorOverride{
+					{
+						Response: apidef.ErrorResponse{
+							StatusCode: 418,
+							Body:       `{"error": "api_override"}`,
+						},
+					},
+				},
+			}
+		})
+
+		ts.Run(t, test.TestCase{
+			Path: "/test-api-override/get",
+			Code: http.StatusTeapot,
+			BodyMatchFunc: func(b []byte) bool {
+				return strings.Contains(string(b), "api_override")
+			},
+		})
+	})
+
+	t.Run("Gateway-level fallback when API-level has no match", func(t *testing.T) {
+		ts := StartTest(func(globalConf *config.Config) {
+			globalConf.ErrorOverrides = apidef.ErrorOverridesMap{
+				"401": []apidef.ErrorOverride{
+					{
+						Response: apidef.ErrorResponse{
+							StatusCode: 403,
+							Body:       `{"error": "gateway_override"}`,
+						},
+					},
+				},
+			}
+		})
+		defer ts.Close()
+
+		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+			spec.Proxy.ListenPath = "/test-fallback/"
+			spec.Proxy.TargetURL = "http://httpbin.org"
+			spec.UseKeylessAccess = false
+			spec.Auth.AuthHeaderName = "Authorization"
+
+			spec.ErrorOverrides = apidef.ErrorOverridesMap{
+				"500": []apidef.ErrorOverride{
+					{
+						Response: apidef.ErrorResponse{
+							StatusCode: 503,
+							Body:       `{"error": "api_override"}`,
+						},
+					},
+				},
+			}
+		})
+
+		ts.Run(t, test.TestCase{
+			Path: "/test-fallback/get",
+			Code: http.StatusForbidden,
+			BodyMatchFunc: func(b []byte) bool {
+				return strings.Contains(string(b), "gateway_override")
+			},
+		})
+	})
+
+	t.Run("API-level override works without gateway-level overrides", func(t *testing.T) {
+		ts := StartTest(nil)
+		defer ts.Close()
+
+		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+			spec.Proxy.ListenPath = "/test-api-only/"
+			spec.Proxy.TargetURL = "http://httpbin.org"
+			spec.UseKeylessAccess = false
+			spec.Auth.AuthHeaderName = "Authorization"
+
+			spec.ErrorOverrides = apidef.ErrorOverridesMap{
+				"401": []apidef.ErrorOverride{
+					{
+						Response: apidef.ErrorResponse{
+							StatusCode: 418,
+							Body:       `{"error": "api_override_only"}`,
+						},
+					},
+				},
+			}
+		})
+
+		ts.Run(t, test.TestCase{
+			Path: "/test-api-only/get",
+			Code: http.StatusTeapot,
+			BodyMatchFunc: func(b []byte) bool {
+				return strings.Contains(string(b), "api_override_only")
+			},
+		})
+	})
+
+	t.Run("OAS API-level override", func(t *testing.T) {
+		ts := StartTest(nil)
+		defer ts.Close()
+
+		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+			spec.Proxy.ListenPath = "/test-oas-override/"
+			spec.Proxy.TargetURL = "http://httpbin.org"
+			spec.UseKeylessAccess = false
+			spec.Auth.AuthHeaderName = "Authorization"
+			spec.IsOAS = true
+
+			spec.ErrorOverrides = apidef.ErrorOverridesMap{
+				"401": []apidef.ErrorOverride{
+					{
+						Response: apidef.ErrorResponse{
+							StatusCode: 418,
+							Body:       `{"error": "oas_api_override"}`,
+						},
+					},
+				},
+			}
+
+			spec.OAS = oas.OAS{
+				T: openapi3.T{
+					OpenAPI: "3.0.3",
+					Info: &openapi3.Info{
+						Title:   "OAS API",
+						Version: "1",
+					},
+					Paths: openapi3.NewPaths(
+						openapi3.WithPath("/get", &openapi3.PathItem{
+							Get: &openapi3.Operation{
+								Responses: openapi3.NewResponses(),
+							},
+						}),
+					),
+				},
+			}
+		})
+
+		ts.Run(t, test.TestCase{
+			Path: "/test-oas-override/get",
+			Code: http.StatusTeapot,
+			BodyMatchFunc: func(b []byte) bool {
+				return strings.Contains(string(b), "oas_api_override")
+			},
+		})
+	})
+
+	t.Run("skips error override when API-level override is disabled", func(t *testing.T) {
+		ts := StartTest(nil)
+		defer ts.Close()
+
+		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+			spec.Proxy.ListenPath = "/test-api-only/"
+			spec.Proxy.TargetURL = "http://httpbin.org"
+			spec.UseKeylessAccess = false
+			spec.Auth.AuthHeaderName = "Authorization"
+
+			spec.ErrorOverrides = apidef.ErrorOverridesMap{
+				"401": []apidef.ErrorOverride{
+					{
+						Response: apidef.ErrorResponse{
+							StatusCode: 418,
+							Body:       `{"error": "api_override_only"}`,
+						},
+					},
+				},
+			}
+			spec.ErrorOverridesDisabled = true
+		})
+
+		ts.Run(t, test.TestCase{
+			Path: "/test-api-only/get",
+			Code: 401,
+		})
 	})
 }

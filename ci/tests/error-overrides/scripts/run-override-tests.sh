@@ -1072,6 +1072,72 @@ run_override_test_circuit_breaker() {
     rm -f "$body_file" "$header_file"
 }
 
+# Test that upstream error passes through unchanged when no rule matches
+run_override_test_upstream_passthrough() {
+    local test_name=$1
+    local api_path=$2
+
+    echo ""
+    log_info "Testing: $test_name"
+    log_info "  API Path: $api_path"
+
+    local body_file=$(mktemp)
+    local header_file=$(mktemp)
+
+    local http_code=$(curl -s -o "$body_file" -D "$header_file" -w "%{http_code}" \
+        --connect-timeout 10 \
+        --max-time 10 \
+        "${TYK_OVERRIDE_URL}${api_path}" 2>/dev/null || echo "000")
+
+    local response_body=$(cat "$body_file")
+    local response_headers=$(cat "$header_file")
+
+    log_info "  HTTP Response: $http_code"
+
+    sleep "$WAIT_FOR_LOG_SECONDS"
+    refresh_logs
+
+    local test_passed=true
+    local failures=""
+
+    # Check body contains ORIGINAL upstream content
+    if echo "$response_body" | grep -q "bad_request"; then
+        log_info "  [OK] Body contains original upstream content"
+    else
+        test_passed=false
+        failures="${failures}\n  - Body was modified (should be passthrough)"
+    fi
+
+    # Check X-Override-Applied header is NOT present
+    if ! echo "$response_headers" | grep -qi "X-Override-Applied"; then
+        log_info "  [OK] X-Override-Applied header not present (as expected)"
+    else
+        test_passed=false
+        failures="${failures}\n  - X-Override-Applied present (should not be)"
+    fi
+
+    # Check status code remains 400
+    if [ "$http_code" = "400" ]; then
+        log_info "  [OK] Status code unchanged: 400"
+    else
+        test_passed=false
+        failures="${failures}\n  - Status changed: got $http_code, expected 400"
+    fi
+
+    if [ "$test_passed" = true ]; then
+        log_success "$test_name"
+        ((PASSED++))
+    else
+        log_fail "$test_name"
+        echo -e "${RED}  Failures:${NC}$failures"
+        ((FAILED++))
+    fi
+
+    echo -e "  ${BLUE}Response Body:${NC} $response_body"
+
+    rm -f "$body_file" "$header_file"
+}
+
 # -----------------------------------------------------------------------------
 # Pre-flight Checks
 # -----------------------------------------------------------------------------
@@ -1461,6 +1527,122 @@ run_all_override_tests() {
     run_override_test_circuit_breaker \
         "CBO Override - Circuit Breaker Open" \
         "/test-cbo/500"
+
+    # ==========================================================================
+    # API-Level Override Tests
+    # ==========================================================================
+    echo ""
+    log_info "=========================================="
+    log_info "API LEVEL OVERRIDE TESTS"
+    log_info "=========================================="
+
+    run_override_test \
+        "API Override Precedence - AKI" \
+        "/test-api-override-aki/get" \
+        "AKI" \
+        "api_level_override" \
+        "AKI-API" \
+        "418" \
+        "-H \"Authorization: invalid-key-12345\""
+
+    run_override_test \
+        "API Override Disabled - AKI" \
+        "/test-api-override-disabled/get" \
+        "AKI" \
+        "invalid_api_key" \
+        "AKI" \
+        "403" \
+        "-H \"Authorization: invalid-key-12345\""
+
+    run_override_test \
+        "API Override Fallback - AMF" \
+        "/test-api-override-aki/get" \
+        "AMF" \
+        "authentication_required" \
+        "AMF" \
+        "401"
+
+    run_override_test \
+        "API Override Upstream - 404" \
+        "/test-api-override-upstream/404-json" \
+        "" \
+        "api_level_upstream" \
+        "UPSTREAM-API" \
+        "420"
+
+     run_override_test \
+         "API Override Upstream - 500 [Body Field and Value match]" \
+         "/test-api-override-upstream-match/500-complex" \
+         "URS" \
+         "override_all_match" \
+         "UPSTREAM-MATCH-FIELD-VALUE-API" \
+         "501"
+
+     run_override_test \
+         "API Override Upstream - 500 [Inline Template]"\
+         "/edge-cases/500-template" \
+         "URS" \
+         "{\"code\": 501}" \
+         "UPSTREAM-INLINE-TEMPLATE" \
+         "501"
+
+     run_override_test \
+         "API Override Upstream - 500 [JSON Escaping in inline templates]"\
+         "/edge-cases/500-json-escape" \
+         "URS" \
+         '{"error_detail": "Invalid token &#34;abc&#34;
+           and some newlines"}' \
+         "UPSTREAM-JSON-ESCAPED-INLINE-TEMPLATE" \
+         "502"
+
+    run_override_test \
+        "API Override Upstream - 500 [Truncate large body, skips api override rule but apply gateway matching rule]"\
+        "/edge-cases/500-truncation" \
+        "URS" \
+        "Upstream service error occurred" \
+        "" \
+        "503"
+
+    # ==========================================================================
+    # Upstream Error Override Tests
+    # ==========================================================================
+
+    echo ""
+    log_info "=========================================="
+    log_info "UPSTREAM ERROR OVERRIDE TESTS"
+    log_info "=========================================="
+
+    # Test 1: URS flag on 5xx (ONLY test using URS flag) - Uses message-only (default template)
+    run_override_test \
+        "URS Override - 5xx Generic Match [Message Only]" \
+        "/test-upstream/5xx" \
+        "URS" \
+        "Upstream service error occurred" \
+        "URS" \
+        "503"
+
+    # Test 2: Upstream 404 with body_field matching
+    run_override_test \
+        "Upstream Override - 404 JSON Body Match" \
+        "/test-upstream/404-json" \
+        "" \
+        "resource_not_found" \
+        "NOT_FOUND" \
+        "404"
+
+    # Test 3: Upstream 404 with message_pattern - Uses template: error_validation
+    run_override_test \
+        "Upstream Override - 404 Regex Match [Template: error_validation]" \
+        "/test-upstream/404-html" \
+        "" \
+        "Validation Error" \
+        "PAGE_NOT_FOUND" \
+        "404"
+
+    # Test 4: Upstream no match - body passthrough
+    run_override_test_upstream_passthrough \
+        "Upstream Override - No Match Passthrough" \
+        "/test-upstream/400-nomatch"
 
 }
 
