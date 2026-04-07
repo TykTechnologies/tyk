@@ -283,7 +283,7 @@ func NewGateway(config config.Config, ctx context.Context) *Gateway {
 
 	gw.SetNodeID("solo-" + uuid.New())
 	gw.SessionID = uuid.New()
-	gw.limitHeaderFactory = rate.NewSenderFactory(config.RateLimitHeadersSource)
+	gw.limitHeaderFactory = rate.NewSenderFactory(config.RateLimitResponseHeaders)
 
 	// Only create registry in RPC mode
 	if config.SlaveOptions.UseRPC {
@@ -1657,7 +1657,7 @@ func (gw *Gateway) initSystem() error {
 	// free resources.
 	go cleanIdleMemConnProviders(gw.ctx)
 
-	gw.limitHeaderFactory = rate.NewSenderFactory(gwConfig.RateLimitHeadersSource)
+	gw.limitHeaderFactory = rate.NewSenderFactory(gwConfig.RateLimitResponseHeaders)
 	gw.jwkCache = buildJWKSCache(gwConfig)
 
 	gw.initMembers(gwConfig)

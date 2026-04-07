@@ -40,12 +40,12 @@ type (
 	}
 )
 
-func NewSenderFactory(typ config.RateLimitHeadersSource) HeaderSenderFactory {
+func NewSenderFactory(typ config.RateLimitSource) HeaderSenderFactory {
 	return func(hdr http.Header) HeaderSender {
 		switch typ {
-		case config.RateLimitHeadersSourceRateLimit:
+		case config.SourceRateLimits:
 			return &rateLimitSender{hdr: hdr}
-		case config.RateLimitHeadersSourceQuota:
+		case config.SourceQuotas:
 			fallthrough
 		default:
 			return &quotaSender{hdr: hdr}

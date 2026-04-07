@@ -74,7 +74,7 @@ func TestRateLimitResponseHeaders(t *testing.T) {
 	for _, limiter := range limiters {
 		t.Run("Rate limit headers for "+limiter, func(t *testing.T) {
 			ts := StartTest(func(globalConf *config.Config) {
-				globalConf.RateLimitHeadersSource = config.RateLimitHeadersSourceRateLimit
+				globalConf.RateLimitResponseHeaders = config.SourceRateLimits
 
 				switch limiter {
 				case "Redis":
@@ -164,7 +164,7 @@ func TestRateLimitResponseHeaders(t *testing.T) {
 
 func TestRateLimitResponseHeaders_NoDuplicated(t *testing.T) {
 	ts := StartTest(func(globalConf *config.Config) {
-		globalConf.RateLimitHeadersSource = config.RateLimitHeadersSourceRateLimit
+		globalConf.RateLimitResponseHeaders = config.SourceRateLimits
 		globalConf.EnableRedisRollingLimiter = true
 	})
 	defer ts.Close()
@@ -218,7 +218,7 @@ func TestRateLimitResponseHeaders_NoDuplicated(t *testing.T) {
 // backward compatibility.
 func TestQuotaHeadersOnErrorResponses(t *testing.T) {
 	ts := StartTest(func(globalConf *config.Config) {
-		globalConf.RateLimitHeadersSource = config.RateLimitHeadersSourceQuota
+		globalConf.RateLimitResponseHeaders = config.SourceQuotas
 	})
 	defer ts.Close()
 

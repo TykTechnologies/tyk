@@ -288,7 +288,7 @@ func TestRedisCacheMiddlewareV2(t *testing.T) {
 
 func TestRedisCacheMiddleware_RateLimitHeaders(t *testing.T) {
 	ts := StartTest(func(globalConf *config.Config) {
-		globalConf.RateLimitHeadersSource = config.RateLimitHeadersSourceQuota
+		globalConf.RateLimitResponseHeaders = config.SourceQuotas
 	})
 	defer ts.Close()
 

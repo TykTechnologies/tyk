@@ -84,7 +84,7 @@ func TestAPIRateLimitResponseHeaders(t *testing.T) {
 	for _, limiter := range limiters {
 		t.Run("API Rate limit headers for "+limiter, func(t *testing.T) {
 			ts := StartTest(func(globalConf *config.Config) {
-				globalConf.RateLimitHeadersSource = config.RateLimitHeadersSourceRateLimit
+				globalConf.RateLimitResponseHeaders = config.SourceRateLimits
 
 				switch limiter {
 				case "Redis":
