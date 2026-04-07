@@ -9,6 +9,7 @@ import (
 
 	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/getkin/kin-openapi/openapi3filter"
+	"github.com/getkin/kin-openapi/routers"
 	"github.com/sirupsen/logrus"
 
 	"github.com/TykTechnologies/tyk/header"
@@ -99,6 +100,12 @@ func (k *ValidateRequest) ProcessRequest(w http.ResponseWriter, r *http.Request,
 		return nil, http.StatusOK
 	}
 
+	// If this URLSpec has multiple candidates (collapsed parameterized paths),
+	// disambiguate using path parameter schema validation.
+	if len(urlSpec.OASValidateRequestCandidates) > 0 {
+		return k.processRequestWithCandidates(r, urlSpec)
+	}
+
 	validateRequest := urlSpec.OASValidateRequestMeta
 	if validateRequest == nil || !validateRequest.Enabled {
 		return nil, http.StatusOK
@@ -146,6 +153,76 @@ func (k *ValidateRequest) ProcessRequest(w http.ResponseWriter, r *http.Request,
 
 	// Handle Success
 	return nil, http.StatusOK
+}
+
+// processRequestWithCandidates handles validation when multiple OAS endpoints collapse
+// to the same regex pattern (e.g., /employees/{prct} and /employees/{zd} both become
+// /employees/([^/]+)). It constructs the OAS route directly for each candidate — bypassing
+// the OAS router which cannot distinguish structurally identical parameterized paths — and
+// runs full validation. The first candidate that passes wins.
+func (k *ValidateRequest) processRequestWithCandidates(r *http.Request, urlSpec *URLSpec) (error, int) {
+	normalizeHeaders(r.Header)
+	strippedPath := k.Spec.StripListenPath(r.URL.Path)
+
+	var lastErr error
+	for _, candidate := range urlSpec.OASValidateRequestCandidates {
+		if candidate.OASValidateRequestMeta == nil || !candidate.OASValidateRequestMeta.Enabled {
+			continue
+		}
+
+		// Look up the path item directly from the OAS spec instead of using the OAS
+		// router, which cannot distinguish between structurally identical paths.
+		pathItem := k.Spec.OAS.Paths.Find(candidate.OASPath)
+		if pathItem == nil {
+			continue
+		}
+		operation := pathItem.GetOperation(candidate.OASMethod)
+		if operation == nil {
+			continue
+		}
+
+		route := &routers.Route{
+			Spec:      &k.Spec.OAS.T,
+			Path:      candidate.OASPath,
+			PathItem:  pathItem,
+			Method:    candidate.OASMethod,
+			Operation: operation,
+		}
+
+		pathParams := extractPathParams(candidate.OASPath, strippedPath)
+
+		requestValidationInput := &openapi3filter.RequestValidationInput{
+			Request:    r,
+			PathParams: pathParams,
+			Route:      route,
+			Options: &openapi3filter.Options{
+				AuthenticationFunc: func(ctx context.Context, input *openapi3filter.AuthenticationInput) error {
+					return nil
+				},
+			},
+		}
+
+		err := openapi3filter.ValidateRequest(r.Context(), requestValidationInput)
+		if err == nil {
+			return nil, http.StatusOK
+		}
+		lastErr = err
+	}
+
+	// No candidate passed validation. Determine error response code from the first
+	// enabled candidate.
+	errResponseCode := http.StatusUnprocessableEntity
+	for _, candidate := range urlSpec.OASValidateRequestCandidates {
+		if candidate.OASValidateRequestMeta != nil && candidate.OASValidateRequestMeta.ErrorResponseCode != 0 {
+			errResponseCode = candidate.OASValidateRequestMeta.ErrorResponseCode
+			break
+		}
+	}
+
+	if lastErr != nil {
+		return fmt.Errorf("request validation error: %w", schema.RestoreUnicodeEscapesInError(lastErr)), errResponseCode
+	}
+	return fmt.Errorf("request validation error: path parameter doesn't match any endpoint"), errResponseCode
 }
 
 // processRequestWithFindOperation is the original implementation that uses findOperation

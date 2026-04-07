@@ -1389,6 +1389,8 @@ func (a APIDefinitionLoader) compileOASValidateRequestPathSpec(apiSpec *APISpec,
 		urlSpec = append(urlSpec, newSpec)
 	}
 
+	urlSpec = groupCollapsedValidateRequestSpecs(urlSpec)
+
 	urlSpec = a.addStaticPathShields(apiSpec, conf, urlSpec, OASValidateRequest, func(path, method string) URLSpec {
 		return URLSpec{
 			OASValidateRequestMeta: &oas.ValidateRequest{Enabled: false},
@@ -1400,6 +1402,76 @@ func (a APIDefinitionLoader) compileOASValidateRequestPathSpec(apiSpec *APISpec,
 	sortURLSpecsByPathPriority(urlSpec)
 
 	return urlSpec
+}
+
+// groupCollapsedValidateRequestSpecs detects URLSpec entries that compile to the same
+// regex+method pair and groups them as candidates on a single representative URLSpec.
+// This allows the validate request middleware to disambiguate at request time using
+// full path parameter schema validation.
+func groupCollapsedValidateRequestSpecs(specs []URLSpec) []URLSpec {
+	type key struct {
+		regex  string
+		method string
+	}
+
+	// Build groups of specs that share the same compiled regex + method.
+	groups := make(map[key][]int)
+	var order []key
+	for i, s := range specs {
+		if s.Status != OASValidateRequest || s.spec == nil {
+			continue
+		}
+		k := key{regex: s.spec.String(), method: s.OASMethod}
+		if _, exists := groups[k]; !exists {
+			order = append(order, k)
+		}
+		groups[k] = append(groups[k], i)
+	}
+
+	toRemove := make(map[int]bool)
+	for _, k := range order {
+		indices := groups[k]
+		if len(indices) < 2 {
+			continue
+		}
+
+		// Sort candidate indices by OASPath for deterministic ordering.
+		sort.Slice(indices, func(a, b int) bool {
+			return specs[indices[a]].OASPath < specs[indices[b]].OASPath
+		})
+
+		primary := indices[0]
+		candidates := make([]ValidateRequestCandidate, len(indices))
+		for ci, idx := range indices {
+			candidates[ci] = ValidateRequestCandidate{
+				OASValidateRequestMeta: specs[idx].OASValidateRequestMeta,
+				OASMethod:              specs[idx].OASMethod,
+				OASPath:                specs[idx].OASPath,
+			}
+			if idx != primary {
+				toRemove[idx] = true
+			}
+		}
+
+		// Update the primary spec to reference the first candidate's fields
+		// and store all candidates.
+		specs[primary].OASValidateRequestMeta = candidates[0].OASValidateRequestMeta
+		specs[primary].OASMethod = candidates[0].OASMethod
+		specs[primary].OASPath = candidates[0].OASPath
+		specs[primary].OASValidateRequestCandidates = candidates
+	}
+
+	if len(toRemove) == 0 {
+		return specs
+	}
+
+	result := make([]URLSpec, 0, len(specs)-len(toRemove))
+	for i, s := range specs {
+		if !toRemove[i] {
+			result = append(result, s)
+		}
+	}
+	return result
 }
 
 // compileOASMockResponsePathSpec extracts MockResponse operations from OAS middleware

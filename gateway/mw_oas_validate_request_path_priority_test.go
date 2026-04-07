@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/TykTechnologies/tyk/apidef/oas"
+	"github.com/TykTechnologies/tyk/regexp"
 	"github.com/TykTechnologies/tyk/test"
 )
 
@@ -254,6 +255,204 @@ func TestMockResponseStaticPathPriority(t *testing.T) {
 			BodyMatch: "mocked",
 		},
 	}...)
+}
+
+func TestSameBasePathDifferentParamSchemas(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	paths := openapi3.NewPaths()
+
+	// First endpoint: /employees/{prct} where prct must match ^[a-z]$, requires header "def"
+	paths.Set("/employees/{prct}", &openapi3.PathItem{
+		Get: &openapi3.Operation{
+			OperationID: "getEmployeeByPrct",
+			Parameters: openapi3.Parameters{
+				{
+					Value: &openapi3.Parameter{
+						Name: "prct", In: "path", Required: true,
+						Schema: &openapi3.SchemaRef{
+							Value: &openapi3.Schema{
+								Type:    &openapi3.Types{"string"},
+								Pattern: "^[a-z]$",
+							},
+						},
+					},
+				},
+				{
+					Value: &openapi3.Parameter{
+						Name: "def", In: "header", Required: true,
+						Schema: &openapi3.SchemaRef{
+							Value: &openapi3.Schema{Type: &openapi3.Types{"string"}},
+						},
+					},
+				},
+			},
+			Responses: openapi3.NewResponses(
+				openapi3.WithStatus(200, &openapi3.ResponseRef{
+					Value: &openapi3.Response{Description: stringPtrHelper("Success")},
+				}),
+			),
+		},
+	})
+
+	// Second endpoint: /employees/{zd} where zd must match [1-9], requires header "abc"
+	paths.Set("/employees/{zd}", &openapi3.PathItem{
+		Get: &openapi3.Operation{
+			OperationID: "getEmployeeByZd",
+			Parameters: openapi3.Parameters{
+				{
+					Value: &openapi3.Parameter{
+						Name: "zd", In: "path", Required: true,
+						Schema: &openapi3.SchemaRef{
+							Value: &openapi3.Schema{
+								Type:    &openapi3.Types{"string"},
+								Pattern: "[1-9]",
+							},
+						},
+					},
+				},
+				{
+					Value: &openapi3.Parameter{
+						Name: "abc", In: "header", Required: true,
+						Schema: &openapi3.SchemaRef{
+							Value: &openapi3.Schema{Type: &openapi3.Types{"string"}},
+						},
+					},
+				},
+			},
+			Responses: openapi3.NewResponses(
+				openapi3.WithStatus(200, &openapi3.ResponseRef{
+					Value: &openapi3.Response{Description: stringPtrHelper("Success")},
+				}),
+			),
+		},
+	})
+
+	doc := openapi3.T{
+		OpenAPI: "3.0.0",
+		Info:    &openapi3.Info{Title: "Same Base Path Test", Version: "1.0.0"},
+		Paths:   paths,
+	}
+
+	oasAPI := oas.OAS{T: doc}
+	oasAPI.SetTykExtension(&oas.XTykAPIGateway{
+		Middleware: &oas.Middleware{
+			Operations: oas.Operations{
+				"getEmployeeByPrct": {
+					ValidateRequest: &oas.ValidateRequest{Enabled: true},
+				},
+				"getEmployeeByZd": {
+					ValidateRequest: &oas.ValidateRequest{Enabled: true},
+				},
+			},
+		},
+	})
+
+	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		spec.Name = "Same Base Path API"
+		spec.APIID = "same-base-path"
+		spec.Proxy.ListenPath = "/api/"
+		spec.UseKeylessAccess = true
+		spec.IsOAS = true
+		spec.OAS = oasAPI
+	})
+
+	_, _ = ts.Run(t, []test.TestCase{
+		{
+			// /employees/a matches {prct} (^[a-z]$), with correct header "def" -> 200
+			Method:  http.MethodGet,
+			Path:    "/api/employees/a",
+			Headers: map[string]string{"def": "value"},
+			Code:    http.StatusOK,
+		},
+		{
+			// /employees/5 matches {zd} ([1-9]), with correct header "abc" -> 200
+			Method:  http.MethodGet,
+			Path:    "/api/employees/5",
+			Headers: map[string]string{"abc": "value"},
+			Code:    http.StatusOK,
+		},
+		{
+			// /employees/a matches {prct} but missing required header "def" -> 422
+			Method: http.MethodGet,
+			Path:   "/api/employees/a",
+			Code:   http.StatusUnprocessableEntity,
+		},
+		{
+			// /employees/5 matches {zd} but missing required header "abc" -> 422
+			Method: http.MethodGet,
+			Path:   "/api/employees/5",
+			Code:   http.StatusUnprocessableEntity,
+		},
+		{
+			// /employees/!!! matches neither param schema -> 422
+			Method: http.MethodGet,
+			Path:   "/api/employees/!!!",
+			Code:   http.StatusUnprocessableEntity,
+		},
+	}...)
+}
+
+func TestGroupCollapsedValidateRequestSpecs(t *testing.T) {
+	makeSpec := func(path, method, regex string) URLSpec {
+		return URLSpec{
+			Status:                 OASValidateRequest,
+			OASValidateRequestMeta: &oas.ValidateRequest{Enabled: true},
+			OASMethod:              method,
+			OASPath:                path,
+			spec:                   regexp.MustCompile(regex),
+		}
+	}
+
+	t.Run("no collision leaves specs unchanged", func(t *testing.T) {
+		specs := []URLSpec{
+			makeSpec("/users/{id}", "GET", `^/users/([^/]+)$`),
+			makeSpec("/items/{id}", "GET", `^/items/([^/]+)$`),
+		}
+		result := groupCollapsedValidateRequestSpecs(specs)
+		assert.Len(t, result, 2)
+		assert.Nil(t, result[0].OASValidateRequestCandidates)
+		assert.Nil(t, result[1].OASValidateRequestCandidates)
+	})
+
+	t.Run("same regex same method groups into candidates", func(t *testing.T) {
+		specs := []URLSpec{
+			makeSpec("/employees/{prct}", "GET", `^/employees/([^/]+)$`),
+			makeSpec("/employees/{zd}", "GET", `^/employees/([^/]+)$`),
+		}
+		result := groupCollapsedValidateRequestSpecs(specs)
+		assert.Len(t, result, 1)
+		assert.Len(t, result[0].OASValidateRequestCandidates, 2)
+		// Candidates are sorted by OASPath
+		assert.Equal(t, "/employees/{prct}", result[0].OASValidateRequestCandidates[0].OASPath)
+		assert.Equal(t, "/employees/{zd}", result[0].OASValidateRequestCandidates[1].OASPath)
+	})
+
+	t.Run("same regex different methods are not grouped", func(t *testing.T) {
+		specs := []URLSpec{
+			makeSpec("/employees/{id}", "GET", `^/employees/([^/]+)$`),
+			makeSpec("/employees/{id}", "POST", `^/employees/([^/]+)$`),
+		}
+		result := groupCollapsedValidateRequestSpecs(specs)
+		assert.Len(t, result, 2)
+		assert.Nil(t, result[0].OASValidateRequestCandidates)
+		assert.Nil(t, result[1].OASValidateRequestCandidates)
+	})
+
+	t.Run("three specs with same regex and method all grouped", func(t *testing.T) {
+		specs := []URLSpec{
+			makeSpec("/employees/{a}", "GET", `^/employees/([^/]+)$`),
+			makeSpec("/employees/{b}", "GET", `^/employees/([^/]+)$`),
+			makeSpec("/employees/{c}", "GET", `^/employees/([^/]+)$`),
+		}
+		result := groupCollapsedValidateRequestSpecs(specs)
+		assert.Len(t, result, 1)
+		assert.Len(t, result[0].OASValidateRequestCandidates, 3)
+		assert.Equal(t, "/employees/{a}", result[0].OASValidateRequestCandidates[0].OASPath)
+		assert.Equal(t, "/employees/{b}", result[0].OASValidateRequestCandidates[1].OASPath)
+		assert.Equal(t, "/employees/{c}", result[0].OASValidateRequestCandidates[2].OASPath)
+	})
 }
 
 func TestStaticPathPriorityWithPrefixMatching(t *testing.T) {
