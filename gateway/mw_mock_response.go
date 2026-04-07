@@ -17,6 +17,7 @@ import (
 	"github.com/TykTechnologies/tyk/header"
 	"github.com/TykTechnologies/tyk/internal/middleware"
 	"github.com/getkin/kin-openapi/openapi3"
+	"github.com/getkin/kin-openapi/routers"
 )
 
 var _ TykMiddleware = (*mockResponseMiddleware)(nil)
@@ -136,10 +137,22 @@ func (m *mockResponseMiddleware) mockResponse(r *http.Request) (
 	var headers []oas.Header
 
 	if mockResponse.FromOASExamples != nil && mockResponse.FromOASExamples.Enabled {
-		// Find the route using the OAS path from URLSpec, not the actual request path.
-		// This allows prefix/suffix matching to work correctly.
 		strippedPath := m.Spec.StripListenPath(r.URL.Path)
-		route, _, routeErr := m.Spec.findRouteForOASPath(urlSpec.OASPath, urlSpec.OASMethod, strippedPath, r.URL.Path)
+
+		var (
+			route    *routers.Route
+			routeErr error
+		)
+
+		if urlSpec.subSpec != nil {
+			// For overlapping parameterised paths, build the route directly
+			// to avoid the OAS router conflating paths.
+			route, _, routeErr = m.Spec.buildRouteForOASPath(urlSpec.OASPath, urlSpec.OASMethod, strippedPath)
+		} else {
+			// Standard path: use the OAS router for route finding.
+			route, _, routeErr = m.Spec.findRouteForOASPath(urlSpec.OASPath, urlSpec.OASMethod, strippedPath, r.URL.Path)
+		}
+
 		if routeErr != nil || route == nil {
 			log.Tracef("URL spec matched for mock response but route not found for OAS path %s: %v", urlSpec.OASPath, routeErr)
 			return nil, nil, nil
