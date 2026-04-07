@@ -497,6 +497,86 @@ func TestSessionLimiter(t *testing.T) {
 	limiter := newSessionLimiter(t)
 	key := "test_session_limiter"
 
+	t.Run("ForwardMessage", func(t *testing.T) {
+		t.Run("attaches context variables when EnableContextVars is true", func(t *testing.T) {
+			r, err := http.NewRequestWithContext(t.Context(), http.MethodGet, "/", nil)
+			require.NoError(t, err)
+
+			session := &user.SessionState{
+				Rate:        10,
+				Per:         60,
+				QuotaMax:    100,
+				QuotaRenews: time.Now().Add(time.Hour).Unix(),
+			}
+			api := &APISpec{
+				APIDefinition: &apidef.APIDefinition{
+					APIID:             "test-api",
+					EnableContextVars: true,
+				},
+			}
+
+			reason := limiter.ForwardMessage(
+				r,
+				session,
+				key+"_fw_rl_1",
+				key+"_fw_q_1",
+				true,
+				true,
+				api,
+				false,
+				nil,
+			)
+
+			require.Equal(t, sessionFailNone, reason)
+
+			data := ctxGetData(r)
+			require.NotNil(t, data)
+
+			require.Contains(t, data, ctxDataKeyRateLimitLimit)
+			require.Contains(t, data, ctxDataKeyRateLimitRemaining)
+			require.Contains(t, data, ctxDataKeyRateLimitReset)
+
+			require.Contains(t, data, ctxDataKeyQuotaLimit)
+			require.Contains(t, data, ctxDataKeyQuotaRemaining)
+			require.Contains(t, data, ctxDataKeyQuotaReset)
+		})
+
+		t.Run("does not attach context variables when EnableContextVars is false", func(t *testing.T) {
+			r, err := http.NewRequestWithContext(t.Context(), http.MethodGet, "/", nil)
+			require.NoError(t, err)
+
+			session := &user.SessionState{
+				Rate:        10,
+				Per:         60,
+				QuotaMax:    100,
+				QuotaRenews: time.Now().Add(time.Hour).Unix(),
+			}
+			api := &APISpec{
+				APIDefinition: &apidef.APIDefinition{
+					APIID:             "test-api",
+					EnableContextVars: false,
+				},
+			}
+
+			reason := limiter.ForwardMessage(
+				r,
+				session,
+				key+"_fw_rl_2",
+				key+"_fw_q_2",
+				true,
+				true,
+				api,
+				false,
+				nil,
+			)
+
+			require.Equal(t, sessionFailNone, reason)
+
+			data := ctxGetData(r)
+			require.Nil(t, data)
+		})
+	})
+
 	t.Run("limitSentinel", func(t *testing.T) {
 		t.Run("returns false if key does not exist", func(t *testing.T) {
 			r, err := http.NewRequestWithContext(t.Context(), http.MethodGet, "/", nil)
