@@ -1616,11 +1616,6 @@
       "enum": ["", "quotas", "rate_limits"],
       "default": "quotas"
     },
-    "enable_context_variables": {
-      "description": "enables extending context data by rate-limit information",
-      "type": ["boolean"],
-      "default": false
-    },
     "allow_unsafe_policy_ids": {
       "type": ["boolean", "null"],
       "additionalProperties": false
