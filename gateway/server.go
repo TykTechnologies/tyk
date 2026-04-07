@@ -27,10 +27,10 @@ import (
 	"time"
 
 	logstashhook "github.com/bshuster-repo/logrus-logstash-hook"
+	"github.com/cenkalti/backoff/v4"
 	logrussentry "github.com/evalphobia/logrus_sentry"
 	grayloghook "github.com/gemnasium/logrus-graylog-hook"
 	"github.com/gorilla/mux"
-	"github.com/cenkalti/backoff/v4"
 	"github.com/lonelycode/osin"
 	"github.com/rs/cors"
 	"github.com/samber/lo"
@@ -1302,7 +1302,6 @@ func (gw *Gateway) DoReloadWithRetry(ctx context.Context) {
 		eb.MaxInterval = reloadRetryMaxInterval
 		eb.MaxElapsedTime = 0 // never stop on elapsed time; only ctx or success stops it
 		eb.Multiplier = reloadRetryMultiplier
-		eb.RandomizationFactor = 0 // deterministic intervals for predictable log output
 		eb.Reset()
 		b = eb
 	}
