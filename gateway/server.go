@@ -199,6 +199,11 @@ type Gateway struct {
 	// performedSuccessfulReload is used to know whether a successful reload happened
 	performedSuccessfulReload bool
 
+	// reloadRetryInterval is the fixed pause between DoReloadWithRetry attempts.
+	// Production code leaves this as zero and DoReloadWithRetry uses the default
+	// of 5s. Tests set it to a small value to avoid waiting.
+	reloadRetryInterval time.Duration
+
 	requeueLock sync.Mutex
 
 	// This is a list of callbacks to execute on the next reload. It is protected by
@@ -1206,7 +1211,10 @@ func (gw *Gateway) rpcReloadLoop(rpcKey string) {
 	}
 }
 
-func (gw *Gateway) DoReload() {
+// DoReloadWithError performs a full reload of APIs and policies, returning any
+// sync error that prevented a successful reload. The reloadMu mutex is acquired
+// for the duration of the reload, so each call is safe to make concurrently.
+func (gw *Gateway) DoReloadWithError() error {
 	gw.reloadMu.Lock()
 	defer gw.reloadMu.Unlock()
 
@@ -1231,20 +1239,20 @@ func (gw *Gateway) DoReload() {
 	// Load the API Policies
 	if _, err := syncResourcesWithReload("policies", gw.GetConfig(), gw.syncPolicies); err != nil {
 		mainLog.Error("Error during syncing policies")
-		return
+		return err
 	}
 
 	// load the specs
 	if count, err := syncResourcesWithReload("apis", gw.GetConfig(), gw.syncAPISpecs); err != nil {
 		mainLog.Error("Error during syncing apis")
-		return
+		return err
 	} else {
 		// skip re-loading only if dashboard service reported 0 APIs
 		// and current registry had 0 APIs
 		if count == 0 && gw.apisByIDLen() == 0 {
 			mainLog.Warning("No API Definitions found, not reloading")
 			gw.performedSuccessfulReload = true
-			return
+			return nil
 		}
 	}
 
@@ -1254,6 +1262,48 @@ func (gw *Gateway) DoReload() {
 
 	gw.performedSuccessfulReload = true
 	mainLog.Info("API reload complete")
+	return nil
+}
+
+// DoReload preserves the func() signature required by RPCStorageHandler,
+// rpc.Connect, reloadLoop, gracefulShutdown, and all test callers.
+// Changing DoReload to return an error would break the stored func() field
+// in RPCStorageHandler and the emergencyModeLoadedFunc func() parameter in
+// rpc.Connect without a much wider refactor.
+func (gw *Gateway) DoReload() {
+	if err := gw.DoReloadWithError(); err != nil {
+		mainLog.Errorf("Reload failed: %v", err)
+	}
+}
+
+// DoReloadWithRetry calls DoReloadWithError in a constant-interval retry loop.
+// It is used at the two startup call sites (Register and startServer) where a
+// failed reload means the gateway has zero APIs and policies and must keep
+// retrying until the upstream recovers.
+//
+// The loop is intentionally NOT used in reloadLoop (the runtime hot-reload
+// path) because that goroutine must remain unblocked so that subsequent
+// pub/sub-triggered reloads can be processed without delay.
+func (gw *Gateway) DoReloadWithRetry(ctx context.Context) {
+	interval := gw.reloadRetryInterval
+	if interval <= 0 {
+		interval = 5 * time.Second
+	}
+
+	for {
+		if err := gw.DoReloadWithError(); err == nil {
+			return
+		} else {
+			mainLog.Errorf("Reload failed, will retry in %s: %v", interval, err)
+		}
+
+		select {
+		case <-ctx.Done():
+			mainLog.Warning("Reload retry abandoned: gateway shutting down")
+			return
+		case <-time.After(interval):
+		}
+	}
 }
 
 func createCORSWrapper(spec *APISpec) func(handler http.HandlerFunc) http.HandlerFunc {
@@ -2316,7 +2366,7 @@ func (gw *Gateway) startServer() {
 	mainLog.Info("--> Listening on port: ", gw.GetConfig().ListenPort)
 	mainLog.Info("--> PID: ", gw.hostDetails.PID)
 
-	gw.DoReload()
+	gw.DoReloadWithRetry(gw.ctx)
 }
 
 func (gw *Gateway) GetConfig() config.Config {
