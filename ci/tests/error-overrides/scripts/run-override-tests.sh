@@ -1529,6 +1529,81 @@ run_all_override_tests() {
         "/test-cbo/500"
 
     # ==========================================================================
+    # API-Level Override Tests
+    # ==========================================================================
+    echo ""
+    log_info "=========================================="
+    log_info "API LEVEL OVERRIDE TESTS"
+    log_info "=========================================="
+
+    run_override_test \
+        "API Override Precedence - AKI" \
+        "/test-api-override-aki/get" \
+        "AKI" \
+        "api_level_override" \
+        "AKI-API" \
+        "418" \
+        "-H \"Authorization: invalid-key-12345\""
+
+    run_override_test \
+        "API Override Disabled - AKI" \
+        "/test-api-override-disabled/get" \
+        "AKI" \
+        "invalid_api_key" \
+        "AKI" \
+        "403" \
+        "-H \"Authorization: invalid-key-12345\""
+
+    run_override_test \
+        "API Override Fallback - AMF" \
+        "/test-api-override-aki/get" \
+        "AMF" \
+        "authentication_required" \
+        "AMF" \
+        "401"
+
+    run_override_test \
+        "API Override Upstream - 404" \
+        "/test-api-override-upstream/404-json" \
+        "" \
+        "api_level_upstream" \
+        "UPSTREAM-API" \
+        "420"
+
+     run_override_test \
+         "API Override Upstream - 500 [Body Field and Value match]" \
+         "/test-api-override-upstream-match/500-complex" \
+         "URS" \
+         "override_all_match" \
+         "UPSTREAM-MATCH-FIELD-VALUE-API" \
+         "501"
+
+     run_override_test \
+         "API Override Upstream - 500 [Inline Template]"\
+         "/edge-cases/500-template" \
+         "URS" \
+         "{\"code\": 501}" \
+         "UPSTREAM-INLINE-TEMPLATE" \
+         "501"
+
+     run_override_test \
+         "API Override Upstream - 500 [JSON Escaping in inline templates]"\
+         "/edge-cases/500-json-escape" \
+         "URS" \
+         '{"error_detail": "Invalid token &#34;abc&#34;
+           and some newlines"}' \
+         "UPSTREAM-JSON-ESCAPED-INLINE-TEMPLATE" \
+         "502"
+
+    run_override_test \
+        "API Override Upstream - 500 [Truncate large body, skips api override rule but apply gateway matching rule]"\
+        "/edge-cases/500-truncation" \
+        "URS" \
+        "Upstream service error occurred" \
+        "" \
+        "503"
+
+    # ==========================================================================
     # Upstream Error Override Tests
     # ==========================================================================
 

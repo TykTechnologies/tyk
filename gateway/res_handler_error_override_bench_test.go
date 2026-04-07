@@ -128,7 +128,7 @@ func BenchmarkApplyUpstreamOverride_NoMatch(b *testing.B) {
 	}
 
 	gw := createBenchmarkGateway(overrides)
-	eo := NewErrorOverrides(nil, gw)
+	eo := NewErrorOverrides(&APISpec{}, gw)
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
@@ -144,7 +144,7 @@ func BenchmarkApplyUpstreamOverride_ExactMatch_NoBody(b *testing.B) {
 	}
 
 	gw := createBenchmarkGateway(overrides)
-	eo := NewErrorOverrides(nil, gw)
+	eo := NewErrorOverrides(&APISpec{}, gw)
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
@@ -160,7 +160,7 @@ func BenchmarkApplyUpstreamOverride_PatternMatch_5xx(b *testing.B) {
 	}
 
 	gw := createBenchmarkGateway(overrides)
-	eo := NewErrorOverrides(nil, gw)
+	eo := NewErrorOverrides(&APISpec{}, gw)
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
@@ -179,7 +179,7 @@ func BenchmarkApplyUpstreamOverride_URSFlag(b *testing.B) {
 	}
 
 	gw := createBenchmarkGateway(overrides)
-	eo := NewErrorOverrides(nil, gw)
+	eo := NewErrorOverrides(&APISpec{}, gw)
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
@@ -201,7 +201,7 @@ func BenchmarkApplyUpstreamOverride_BodyFieldMatch(b *testing.B) {
 	}
 
 	gw := createBenchmarkGateway(overrides)
-	eo := NewErrorOverrides(nil, gw)
+	eo := NewErrorOverrides(&APISpec{}, gw)
 	body := []byte(`{"error": {"type": "timeout", "message": "request timed out"}}`)
 
 	b.ResetTimer()
@@ -223,7 +223,7 @@ func BenchmarkApplyUpstreamOverride_MessagePatternMatch(b *testing.B) {
 	}
 
 	gw := createBenchmarkGateway(overrides)
-	eo := NewErrorOverrides(nil, gw)
+	eo := NewErrorOverrides(&APISpec{}, gw)
 	body := []byte("database connection unavailable")
 
 	b.ResetTimer()
@@ -242,7 +242,7 @@ func BenchmarkApplyUpstreamOverride_MultipleRules_FirstMatch(b *testing.B) {
 	}
 
 	gw := createBenchmarkGateway(overrides)
-	eo := NewErrorOverrides(nil, gw)
+	eo := NewErrorOverrides(&APISpec{}, gw)
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
@@ -268,7 +268,7 @@ func BenchmarkApplyUpstreamOverride_MultipleRules_LastMatch(b *testing.B) {
 	}
 
 	gw := createBenchmarkGateway(overrides)
-	eo := NewErrorOverrides(nil, gw)
+	eo := NewErrorOverrides(&APISpec{}, gw)
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
@@ -292,7 +292,10 @@ func BenchmarkHandleResponse_NoOverride_Passthrough(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		res := createBenchmarkResponse(500, `{"error": "internal server error"}`)
-		_ = middleware.HandleResponse(rw, res, req, nil)
+		err := middleware.HandleResponse(rw, res, req, nil)
+		if err != nil {
+			b.Fatal(err)
+		}
 	}
 }
 
@@ -310,7 +313,10 @@ func BenchmarkHandleResponse_SuccessResponse_Skip(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		res := createBenchmarkResponse(200, `{"success": true}`)
-		_ = middleware.HandleResponse(rw, res, req, nil)
+		err := middleware.HandleResponse(rw, res, req, nil)
+		if err != nil {
+			b.Fatal(err)
+		}
 	}
 }
 
@@ -328,7 +334,10 @@ func BenchmarkHandleResponse_ExactMatch_StatusOnly(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		res := createBenchmarkResponse(503, "Service unavailable")
-		_ = middleware.HandleResponse(rw, res, req, nil)
+		err := middleware.HandleResponse(rw, res, req, nil)
+		if err != nil {
+			b.Fatal(err)
+		}
 	}
 }
 
@@ -338,8 +347,8 @@ func BenchmarkHandleResponse_ExactMatch_WithBody(b *testing.B) {
 			{
 				Response: apidef.ErrorResponse{
 					StatusCode: 500,
-					Body:    "Custom error message",
-					Headers: map[string]string{"Retry-After": "60"},
+					Body:       "Custom error message",
+					Headers:    map[string]string{"Retry-After": "60"},
 				},
 			},
 		},
@@ -352,7 +361,10 @@ func BenchmarkHandleResponse_ExactMatch_WithBody(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		res := createBenchmarkResponse(503, "Service unavailable")
-		_ = middleware.HandleResponse(rw, res, req, nil)
+		err := middleware.HandleResponse(rw, res, req, nil)
+		if err != nil {
+			b.Fatal(err)
+		}
 	}
 }
 
@@ -376,7 +388,10 @@ func BenchmarkHandleResponse_PatternMatch_SmallBody(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		res := createBenchmarkResponse(500, `{"error": {"code": "TIMEOUT"}}`)
-		_ = middleware.HandleResponse(rw, res, req, nil)
+		err := middleware.HandleResponse(rw, res, req, nil)
+		if err != nil {
+			b.Fatal(err)
+		}
 	}
 }
 
@@ -406,7 +421,10 @@ func BenchmarkHandleResponse_PatternMatch_LargeBody(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		res := createBenchmarkResponse(500, bodyStr)
-		_ = middleware.HandleResponse(rw, res, req, nil)
+		err := middleware.HandleResponse(rw, res, req, nil)
+		if err != nil {
+			b.Fatal(err)
+		}
 	}
 }
 
@@ -425,6 +443,7 @@ func BenchmarkFindMatchingRuleGeneric_100Rules(b *testing.B) {
 }
 
 func benchmarkFindMatchingRuleGeneric(b *testing.B, ruleCount int) {
+	b.Helper()
 	overrides := apidef.ErrorOverridesMap{}
 
 	// Create many rules for status 500
@@ -433,14 +452,14 @@ func benchmarkFindMatchingRuleGeneric(b *testing.B, ruleCount int) {
 		rules[i] = apidef.ErrorOverride{
 			Response: apidef.ErrorResponse{
 				StatusCode: 500,
-				Message: fmt.Sprintf("Rule %d", i),
+				Message:    fmt.Sprintf("Rule %d", i),
 			},
 		}
 	}
 	overrides["500"] = rules
 
 	gw := createBenchmarkGateway(overrides)
-	eo := NewErrorOverrides(nil, gw)
+	eo := NewErrorOverrides(&APISpec{}, gw)
 	compiled := gw.GetCompiledErrorOverrides()
 
 	// Match last rule to test worst-case
@@ -449,7 +468,7 @@ func benchmarkFindMatchingRuleGeneric(b *testing.B, ruleCount int) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		matchCount = 0
-		_ = eo.findMatchingRuleGeneric(compiled, 500, func(rule *apidef.ErrorOverride) bool {
+		_ = eo.findMatchingRuleGeneric(compiled, 500, func(_ *apidef.ErrorOverride) bool {
 			matchCount++
 			return matchCount == ruleCount // Match last rule
 		})
@@ -503,7 +522,7 @@ func BenchmarkCompiledErrorOverrides_NoMatch(b *testing.B) {
 
 func BenchmarkMatchesUpstreamCriteria_NoCriteria(b *testing.B) {
 	gw := createBenchmarkGateway(apidef.ErrorOverridesMap{})
-	eo := NewErrorOverrides(nil, gw)
+	eo := NewErrorOverrides(&APISpec{}, gw)
 	rule := &apidef.ErrorOverride{Match: nil}
 
 	b.ResetTimer()
@@ -514,7 +533,7 @@ func BenchmarkMatchesUpstreamCriteria_NoCriteria(b *testing.B) {
 
 func BenchmarkMatchesUpstreamCriteria_URSFlag(b *testing.B) {
 	gw := createBenchmarkGateway(apidef.ErrorOverridesMap{})
-	eo := NewErrorOverrides(nil, gw)
+	eo := NewErrorOverrides(&APISpec{}, gw)
 	rule := &apidef.ErrorOverride{
 		Match: &apidef.ErrorMatcher{Flag: errors.URS},
 	}
@@ -527,7 +546,7 @@ func BenchmarkMatchesUpstreamCriteria_URSFlag(b *testing.B) {
 
 func BenchmarkMatchesUpstreamCriteria_BodyField_SmallJSON(b *testing.B) {
 	gw := createBenchmarkGateway(apidef.ErrorOverridesMap{})
-	eo := NewErrorOverrides(nil, gw)
+	eo := NewErrorOverrides(&APISpec{}, gw)
 	rule := &apidef.ErrorOverride{
 		Match: &apidef.ErrorMatcher{
 			BodyField: "error.type",
@@ -544,7 +563,7 @@ func BenchmarkMatchesUpstreamCriteria_BodyField_SmallJSON(b *testing.B) {
 
 func BenchmarkMatchesUpstreamCriteria_BodyField_LargeJSON(b *testing.B) {
 	gw := createBenchmarkGateway(apidef.ErrorOverridesMap{})
-	eo := NewErrorOverrides(nil, gw)
+	eo := NewErrorOverrides(&APISpec{}, gw)
 	rule := &apidef.ErrorOverride{
 		Match: &apidef.ErrorMatcher{
 			BodyField: "deep.nested.field",
@@ -585,7 +604,7 @@ func BenchmarkMatchesUpstreamCriteria_MessagePattern_SimpleRegex(b *testing.B) {
 	}
 
 	gw := createBenchmarkGateway(overrides)
-	eo := NewErrorOverrides(nil, gw)
+	eo := NewErrorOverrides(&APISpec{}, gw)
 	compiled := gw.GetCompiledErrorOverrides()
 	rule := compiled.ByExactCode[500][0]
 	body := []byte("connection timeout error")
@@ -608,7 +627,7 @@ func BenchmarkMatchesUpstreamCriteria_MessagePattern_ComplexRegex(b *testing.B) 
 	}
 
 	gw := createBenchmarkGateway(overrides)
-	eo := NewErrorOverrides(nil, gw)
+	eo := NewErrorOverrides(&APISpec{}, gw)
 	compiled := gw.GetCompiledErrorOverrides()
 	rule := compiled.ByExactCode[500][0]
 	body := []byte("database connection unavailable - unable to connect to mysql server")
@@ -659,11 +678,11 @@ func BenchmarkShouldProcessResponse_Error(b *testing.B) {
 
 func BenchmarkCreateOverrideResult(b *testing.B) {
 	gw := createBenchmarkGateway(apidef.ErrorOverridesMap{})
-	eo := NewErrorOverrides(nil, gw)
+	eo := NewErrorOverrides(&APISpec{}, gw)
 	rule := &apidef.ErrorOverride{
 		Response: apidef.ErrorResponse{
 			StatusCode: 503,
-			Message: "Service unavailable",
+			Message:    "Service unavailable",
 			Headers: map[string]string{
 				"Retry-After":  "60",
 				"X-Error-Code": "SERVICE_DOWN",
@@ -680,7 +699,7 @@ func BenchmarkCreateOverrideResult(b *testing.B) {
 
 func BenchmarkNeedsBodyForMatch(b *testing.B) {
 	gw := createBenchmarkGateway(apidef.ErrorOverridesMap{})
-	eo := NewErrorOverrides(nil, gw)
+	eo := NewErrorOverrides(&APISpec{}, gw)
 	rule := &apidef.ErrorOverride{
 		Match: &apidef.ErrorMatcher{
 			BodyField: "error.code",
@@ -716,7 +735,10 @@ func BenchmarkRealWorld_HighTraffic_NoOverride(b *testing.B) {
 			statusCode = 500 // 1% errors, different from override rule
 		}
 		res := createBenchmarkResponse(statusCode, "response")
-		_ = middleware.HandleResponse(rw, res, req, nil)
+		err := middleware.HandleResponse(rw, res, req, nil)
+		if err != nil {
+			b.Fatal(err)
+		}
 	}
 }
 
@@ -743,7 +765,10 @@ func BenchmarkRealWorld_HighTraffic_WithOverride(b *testing.B) {
 			statusCode = 500 // 2% errors that match override
 		}
 		res := createBenchmarkResponse(statusCode, "response")
-		_ = middleware.HandleResponse(rw, res, req, nil)
+		err := middleware.HandleResponse(rw, res, req, nil)
+		if err != nil {
+			b.Fatal(err)
+		}
 	}
 }
 
@@ -796,6 +821,9 @@ func BenchmarkRealWorld_ComplexRuleset(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		statusCode := errorCodes[i%len(errorCodes)]
 		res := createBenchmarkResponse(statusCode, "error")
-		_ = middleware.HandleResponse(rw, res, req, nil)
+		err := middleware.HandleResponse(rw, res, req, nil)
+		if err != nil {
+			b.Fatal(err)
+		}
 	}
 }

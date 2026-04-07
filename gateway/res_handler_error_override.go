@@ -28,24 +28,26 @@ func (r *ResponseErrorOverrideMiddleware) Name() string {
 
 func (r *ResponseErrorOverrideMiddleware) Enabled() bool {
 	// Fast path: check config before any processing
-	return len(r.Spec.GlobalConfig.ErrorOverrides) > 0
+	return len(r.Spec.GlobalConfig.ErrorOverrides) > 0 ||
+		len(r.Spec.ErrorOverrides) > 0
 }
 
-func (r *ResponseErrorOverrideMiddleware) Init(c interface{}, spec *APISpec) error {
+func (r *ResponseErrorOverrideMiddleware) Init(_ any, spec *APISpec) error {
 	r.Spec = spec
 	return nil
 }
 
-func (r *ResponseErrorOverrideMiddleware) HandleError(rw http.ResponseWriter, req *http.Request) {
+func (r *ResponseErrorOverrideMiddleware) HandleError(_ http.ResponseWriter, _ *http.Request) {
 	//no-op: this middleware only handles upstream responses, not errors in the gateway itself
 }
 
 func (r *ResponseErrorOverrideMiddleware) HandleResponse(
-	rw http.ResponseWriter,
+	_ http.ResponseWriter,
 	res *http.Response,
 	req *http.Request,
-	ses *user.SessionState,
+	_ *user.SessionState,
 ) error {
+
 	if !r.shouldProcessResponse(res) {
 		return nil
 	}
@@ -79,7 +81,8 @@ func (r *ResponseErrorOverrideMiddleware) HandleResponse(
 
 // shouldProcessResponse checks if response should be processed for error overrides.
 func (r *ResponseErrorOverrideMiddleware) shouldProcessResponse(res *http.Response) bool {
-	return res.StatusCode >= 400 && len(r.Spec.GlobalConfig.ErrorOverrides) > 0
+	return res.StatusCode >= 400 &&
+		(len(r.Spec.GlobalConfig.ErrorOverrides) > 0 || (!r.Spec.ErrorOverridesDisabled && len(r.Spec.ErrorOverrides) > 0))
 }
 
 // lazyBodyReader handles lazy reading and caching of response body.
@@ -129,6 +132,7 @@ func (r *ResponseErrorOverrideMiddleware) applyOverrideToResponse(
 	req *http.Request,
 	logger *logrus.Entry,
 ) bool {
+
 	if result.StatusCode > 0 {
 		res.StatusCode = result.StatusCode
 	}
@@ -193,6 +197,7 @@ func (r *ResponseErrorOverrideMiddleware) generateDefaultTemplateBody(
 	statusCode int,
 	logger *logrus.Entry,
 ) []byte {
+
 	templateName := "error." + errCtx.TemplateExtension
 
 	var tmpl TemplateExecutor
