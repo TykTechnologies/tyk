@@ -259,7 +259,7 @@
             "lua",
             "grpc",
             "goplugin",
-            "goja"
+            "javascript"
           ]
         },
         "bundle": {

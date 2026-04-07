@@ -22,7 +22,7 @@ import (
 )
 
 // drivers runs subtests against both otto and goja to verify identical behaviour.
-var drivers = []apidef.MiddlewareDriver{apidef.OttoDriver, apidef.GojaDriver}
+var drivers = []apidef.MiddlewareDriver{apidef.OttoDriver, apidef.JavaScriptDriver}
 
 // initJSVM initialises the correct JSVM type on the spec for the given driver
 // and loads the JS source into it.
@@ -30,7 +30,7 @@ func initJSVM(t *testing.T, spec *APISpec, gw *Gateway, driver apidef.Middleware
 	t.Helper()
 	spec.CustomMiddleware.Driver = driver
 
-	if driver == apidef.GojaDriver {
+	if driver == apidef.JavaScriptDriver {
 		spec.GojaJSVM.Init(spec, logrus.NewEntry(log), gw)
 		if err := spec.GojaJSVM.LoadScript(js); err != nil {
 			t.Fatalf("failed to load JS into GojaJSVM: %v", err)
@@ -198,7 +198,7 @@ timeoutMid.NewProcessRequest(function(request, session) {
 			initJSVM(t, spec, ts.Gw, driver, js)
 
 			// Set a very short timeout
-			if driver == apidef.GojaDriver {
+			if driver == apidef.JavaScriptDriver {
 				spec.GojaJSVM.Timeout = 50 * time.Millisecond
 			} else {
 				spec.JSVM.Timeout = 50 * time.Millisecond

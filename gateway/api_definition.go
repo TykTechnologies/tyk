@@ -341,7 +341,7 @@ func (a APIDefinitionLoader) MakeSpec(def *model.MergedAPI, logger *logrus.Entry
 	}
 
 	if a.Gw.GetConfig().EnableJSVM {
-		if spec.CustomMiddleware.Driver == apidef.GojaDriver {
+		if spec.CustomMiddleware.Driver == apidef.JavaScriptDriver {
 			logger.Debug("Initializing GojaJSVM")
 			spec.GojaJSVM.Init(spec, logger, a.Gw)
 		} else if spec.hasVirtualEndpoint() || spec.CustomMiddleware.Driver == apidef.OttoDriver {
@@ -1205,7 +1205,7 @@ func (a APIDefinitionLoader) compileVirtualPathsSpec(paths []apidef.VirtualMeta,
 		// Extend with method actions
 		newSpec.VirtualPathSpec = stringSpec
 
-		if apiSpec.CustomMiddleware.Driver == apidef.GojaDriver {
+		if apiSpec.CustomMiddleware.Driver == apidef.JavaScriptDriver {
 			a.Gw.preLoadVirtualMetaCodeGoja(&newSpec.VirtualPathSpec, &apiSpec.GojaJSVM)
 		} else {
 			a.Gw.preLoadVirtualMetaCode(&newSpec.VirtualPathSpec, &apiSpec.JSVM)

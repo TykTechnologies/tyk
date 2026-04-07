@@ -43,7 +43,7 @@ const (
 // isJSDriver returns true for drivers that use in-process JS execution
 // (otto or goja) as opposed to coprocess (python, lua, grpc) or go plugins.
 func isJSDriver(d apidef.MiddlewareDriver) bool {
-	return d == apidef.OttoDriver || d == apidef.GojaDriver
+	return d == apidef.OttoDriver || d == apidef.JavaScriptDriver
 }
 
 type ChainObject struct {
@@ -261,7 +261,7 @@ func (gw *Gateway) processSpec(
 	mwPaths, mwAuthCheckFunc, mwPreFuncs, mwPostFuncs, mwPostAuthCheckFuncs, mwResponseFuncs, mwDriver = gw.loadCustomMiddleware(spec)
 	if gw.GetConfig().EnableJSVM && (spec.hasVirtualEndpoint() || isJSDriver(mwDriver)) {
 		logger.Debug("Loading JS Paths")
-		if mwDriver == apidef.GojaDriver {
+		if mwDriver == apidef.JavaScriptDriver {
 			spec.GojaJSVM.LoadJSPaths(mwPaths, prefix)
 
 			// Load inline code from MiddlewareDefinition.Code fields (goja only)
@@ -441,7 +441,7 @@ func (gw *Gateway) processSpec(
 
 		if customPluginAuthEnabled && !mwAuthCheckFunc.Disabled {
 			switch spec.CustomMiddleware.Driver {
-			case apidef.OttoDriver, apidef.GojaDriver:
+			case apidef.OttoDriver, apidef.JavaScriptDriver:
 				logger.Info("----> Checking security policy: JS Plugin")
 				dynamicMW := &DynamicMiddleware{
 					BaseMiddleware:      baseMid.Copy(),
