@@ -41,6 +41,12 @@ type URLSpec struct {
 	OASValidateRequestMeta    *oas.ValidateRequest
 	OASMockResponseMeta       *oas.MockResponse
 
+	// subSpec holds a more specific regex compiled from OAS path parameter
+	// schemas (e.g., pattern or type). It is used for two-step matching:
+	// the primary spec regex matches generically, then subSpec disambiguates
+	// among overlapping parameterised paths.
+	subSpec *regexp.Regexp
+
 	IgnoreCase bool
 	// OASMethod stores the HTTP method for OAS-specific middleware
 	// This is needed because OAS operations are method-specific
@@ -173,6 +179,27 @@ func (a *URLSpec) matchesPath(reqPath string, api *APISpec) bool {
 	}
 	// match /listenpath/v3/users
 	if a.spec.MatchString(reqPath) {
+		return true
+	}
+	return false
+}
+
+// matchesSubSpec checks if the request path matches the more specific sub-spec regex.
+// It follows the same path stripping logic as matchesPath.
+// Returns false if subSpec is nil.
+func (a *URLSpec) matchesSubSpec(reqPath string, api *APISpec) bool {
+	if a.subSpec == nil {
+		return false
+	}
+	clean := api.StripListenPath(reqPath)
+	noVersion := api.StripVersionPath(clean)
+	if noVersion != clean && a.subSpec.MatchString(noVersion) {
+		return true
+	}
+	if a.subSpec.MatchString(clean) {
+		return true
+	}
+	if a.subSpec.MatchString(reqPath) {
 		return true
 	}
 	return false

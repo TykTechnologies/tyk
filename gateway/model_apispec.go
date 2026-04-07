@@ -2,6 +2,7 @@ package gateway
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -158,9 +159,15 @@ func (a *APISpec) GetPRMConfig() *oas.ProtectedResourceMetadata {
 }
 
 // FindSpecMatchesStatus checks if a URL spec has a specific status and returns the URLSpec for it.
+// For OAS middleware (ValidateRequest, MockResponse), when multiple URLSpecs share the same
+// generic regex (e.g., overlapping parameterised paths like /employees/{prct} and /employees/{zd}),
+// it performs two-step matching: first the generic regex, then sub-spec regexes compiled from
+// original path parameter schemas to disambiguate.
 func (a *APISpec) FindSpecMatchesStatus(r *http.Request, rxPaths []URLSpec, mode URLStatus) (*URLSpec, bool) {
 	matchPath, method := a.getMatchPathAndMethod(r, mode)
 
+	// Collect all specs that match the generic regex, method, and status.
+	var matches []*URLSpec
 	for i := range rxPaths {
 		if rxPaths[i].Status != mode {
 			continue
@@ -172,9 +179,33 @@ func (a *APISpec) FindSpecMatchesStatus(r *http.Request, rxPaths []URLSpec, mode
 			continue
 		}
 
-		return &rxPaths[i], true
+		// Fast path: if this spec has no sub-spec, no overlapping paths exist.
+		// Return immediately (preserves original behavior for non-overlapping paths).
+		if rxPaths[i].subSpec == nil {
+			return &rxPaths[i], true
+		}
+
+		matches = append(matches, &rxPaths[i])
 	}
-	return nil, false
+
+	if len(matches) == 0 {
+		return nil, false
+	}
+
+	return resolveSubSpecMatch(matches, matchPath, a), true
+}
+
+// resolveSubSpecMatch picks the best match among URLSpecs that share the same generic regex.
+// It tries each spec's sub-spec regex against the request path.
+// If no sub-spec matches, the last spec in the list acts as a catch-all fallback.
+func resolveSubSpecMatch(matches []*URLSpec, matchPath string, api *APISpec) *URLSpec {
+	for _, spec := range matches {
+		if spec.matchesSubSpec(matchPath, api) {
+			return spec
+		}
+	}
+	// Fallback: return the last match (catch-all).
+	return matches[len(matches)-1]
 }
 
 // isJSONRPCVEMPath returns true if the request is a JSON-RPC routed request
@@ -300,6 +331,37 @@ func (a *APISpec) findRouteForOASPath(oasPath, method, actualPath, fullRequestPa
 	// like /users/{id} and we need to extract the actual id value from the request.
 	pathParams := extractPathParams(oasPath, actualPath)
 
+	return route, pathParams, nil
+}
+
+// buildRouteForOASPath constructs a routers.Route directly from the OAS spec
+// without using the OAS router. This is needed for overlapping parameterised
+// paths (e.g., /employees/{prct} and /employees/{zd}) where the OAS router's
+// FindRoute cannot distinguish between them.
+func (a *APISpec) buildRouteForOASPath(oasPath, method, actualPath string) (*routers.Route, map[string]string, error) {
+	if a.OAS.Paths == nil {
+		return nil, nil, errors.New("OAS paths not defined")
+	}
+
+	pathItem := a.OAS.Paths.Map()[oasPath]
+	if pathItem == nil {
+		return nil, nil, fmt.Errorf("path %s not found in OAS spec", oasPath)
+	}
+
+	operation := pathItem.Operations()[strings.ToUpper(method)]
+	if operation == nil {
+		return nil, nil, fmt.Errorf("method %s not found for path %s", method, oasPath)
+	}
+
+	route := &routers.Route{
+		Spec:      &a.OAS.T,
+		Path:      oasPath,
+		PathItem:  pathItem,
+		Method:    method,
+		Operation: operation,
+	}
+
+	pathParams := extractPathParams(oasPath, actualPath)
 	return route, pathParams, nil
 }
 

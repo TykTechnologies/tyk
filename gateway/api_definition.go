@@ -1386,6 +1386,15 @@ func (a APIDefinitionLoader) compileOASValidateRequestPathSpec(apiSpec *APISpec,
 		}
 
 		a.generateRegex(path, &newSpec, OASValidateRequest, conf)
+
+		// Build sub-spec regex from path parameter schemas for two-step matching.
+		pathItem, op := findOASOperation(apiSpec.OAS.Paths, path, method)
+		if pathItem != nil {
+			if paramSchemas := extractOASPathParamSchemas(pathItem, op); paramSchemas != nil {
+				newSpec.subSpec = compileSubSpec(path, paramSchemas, conf)
+			}
+		}
+
 		urlSpec = append(urlSpec, newSpec)
 	}
 

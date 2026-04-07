@@ -9,6 +9,7 @@ import (
 
 	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/getkin/kin-openapi/openapi3filter"
+	"github.com/getkin/kin-openapi/routers"
 	"github.com/sirupsen/logrus"
 
 	"github.com/TykTechnologies/tyk/header"
@@ -111,12 +112,25 @@ func (k *ValidateRequest) ProcessRequest(w http.ResponseWriter, r *http.Request,
 
 	normalizeHeaders(r.Header)
 
-	// Find the route using the OAS path from URLSpec, not the actual request path.
-	// This allows prefix/suffix matching to work: request to /anything/abc can be
-	// validated against the /anything operation.
-	// We pass both the stripped path (for path param extraction) and full path (for regexp listen paths).
 	strippedPath := k.Spec.StripListenPath(r.URL.Path)
-	route, pathParams, err := k.Spec.findRouteForOASPath(urlSpec.OASPath, urlSpec.OASMethod, strippedPath, r.URL.Path)
+
+	var (
+		route      *routers.Route
+		pathParams map[string]string
+		err        error
+	)
+
+	if urlSpec.subSpec != nil {
+		// For overlapping parameterised paths, build the route directly from the
+		// exact OAS path to avoid the OAS router conflating paths like
+		// /employees/{prct} and /employees/{zd}.
+		route, pathParams, err = k.Spec.buildRouteForOASPath(urlSpec.OASPath, urlSpec.OASMethod, strippedPath)
+	} else {
+		// Standard path: use the OAS router for route finding.
+		// This allows prefix/suffix matching to work.
+		route, pathParams, err = k.Spec.findRouteForOASPath(urlSpec.OASPath, urlSpec.OASMethod, strippedPath, r.URL.Path)
+	}
+
 	if err != nil || route == nil {
 		log.WithFields(logrus.Fields{
 			"method":   r.Method,
