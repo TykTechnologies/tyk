@@ -15,7 +15,7 @@ import (
 	"testing"
 	"time"
 
-	backoffv4 "github.com/cenkalti/backoff/v4"
+	"github.com/cenkalti/backoff/v4"
 	"github.com/samber/lo"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
@@ -1397,8 +1397,8 @@ func TestDoReloadWithRetry_RetriesUntilSuccess(t *testing.T) {
 	defer ts.Close()
 
 	// Use a fast retry interval so the test does not wait seconds between retries.
-	ts.Gw.reloadRetryBackoff = func() backoffv4.BackOff {
-		return backoffv4.NewConstantBackOff(50 * time.Millisecond)
+	ts.Gw.reloadRetryBackoff = func() backoff.BackOff {
+		return backoff.NewConstantBackOff(50 * time.Millisecond)
 	}
 
 	const succeedOnCall = 3
@@ -1458,8 +1458,8 @@ func TestDoReloadWithRetry_StopsOnContextCancel(t *testing.T) {
 	defer ts.Close()
 
 	// Use a fast retry interval so context cancellation is observed quickly.
-	ts.Gw.reloadRetryBackoff = func() backoffv4.BackOff {
-		return backoffv4.NewConstantBackOff(50 * time.Millisecond)
+	ts.Gw.reloadRetryBackoff = func() backoff.BackOff {
+		return backoff.NewConstantBackOff(50 * time.Millisecond)
 	}
 
 	// Mock dashboard that always returns 500 so the reload never succeeds.
@@ -1511,8 +1511,8 @@ func TestDoReloadWithRetry_RetriesWithConstantInterval(t *testing.T) {
 	defer ts.Close()
 
 	// Use a fast constant retry interval.
-	ts.Gw.reloadRetryBackoff = func() backoffv4.BackOff {
-		return backoffv4.NewConstantBackOff(100 * time.Millisecond)
+	ts.Gw.reloadRetryBackoff = func() backoff.BackOff {
+		return backoff.NewConstantBackOff(100 * time.Millisecond)
 	}
 
 	const succeedOnCall = 4 // fail 3 times, succeed on the 4th
@@ -1683,8 +1683,8 @@ func TestRegister_DoReloadWithRetry_OnStartup(t *testing.T) {
 	defer ts.Close()
 
 	// Use a fast retry interval so retries happen in milliseconds during the test.
-	ts.Gw.reloadRetryBackoff = func() backoffv4.BackOff {
-		return backoffv4.NewConstantBackOff(50 * time.Millisecond)
+	ts.Gw.reloadRetryBackoff = func() backoff.BackOff {
+		return backoff.NewConstantBackOff(50 * time.Millisecond)
 	}
 
 	// Enable dashboard mode and wire up the mock dashboard.

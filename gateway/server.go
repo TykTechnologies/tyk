@@ -30,7 +30,7 @@ import (
 	logrussentry "github.com/evalphobia/logrus_sentry"
 	grayloghook "github.com/gemnasium/logrus-graylog-hook"
 	"github.com/gorilla/mux"
-	backoffv4 "github.com/cenkalti/backoff/v4"
+	"github.com/cenkalti/backoff/v4"
 	"github.com/lonelycode/osin"
 	"github.com/rs/cors"
 	"github.com/samber/lo"
@@ -203,7 +203,7 @@ type Gateway struct {
 	// reloadRetryBackoff optionally returns a custom backoff strategy for
 	// DoReloadWithRetry. Production code leaves this nil (default exponential
 	// backoff is used). Tests set it to return a fast constant backoff.
-	reloadRetryBackoff func() backoffv4.BackOff
+	reloadRetryBackoff func() backoff.BackOff
 
 	requeueLock sync.Mutex
 
@@ -1293,11 +1293,11 @@ const (
 // path) because that goroutine must remain unblocked so that subsequent
 // pub/sub-triggered reloads can be processed without delay.
 func (gw *Gateway) DoReloadWithRetry(ctx context.Context) {
-	var b backoffv4.BackOff
+	var b backoff.BackOff
 	if gw.reloadRetryBackoff != nil {
 		b = gw.reloadRetryBackoff()
 	} else {
-		eb := backoffv4.NewExponentialBackOff()
+		eb := backoff.NewExponentialBackOff()
 		eb.InitialInterval = reloadRetryInitialInterval
 		eb.MaxInterval = reloadRetryMaxInterval
 		eb.MaxElapsedTime = 0 // never stop on elapsed time; only ctx or success stops it
@@ -1307,13 +1307,13 @@ func (gw *Gateway) DoReloadWithRetry(ctx context.Context) {
 		b = eb
 	}
 
-	err := backoffv4.Retry(func() error {
+	err := backoff.Retry(func() error {
 		if err := gw.DoReloadWithError(); err != nil {
 			mainLog.Errorf("Reload failed, will retry: %v", err)
 			return err
 		}
 		return nil
-	}, backoffv4.WithContext(b, ctx))
+	}, backoff.WithContext(b, ctx))
 
 	if err != nil && ctx.Err() != nil {
 		mainLog.Warning("Reload retry abandoned: gateway shutting down")
