@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/getkin/kin-openapi/routers"
@@ -106,6 +107,10 @@ type APISpec struct {
 	// all primitives on every JSON-RPC request that doesn't match a VEM.
 	// This is a convenience flag that combines ToolsAllowListEnabled, ResourcesAllowListEnabled, and PromptsAllowListEnabled.
 	MCPAllowListEnabled bool
+
+	// compiledErrorOverrides holds the indexed error override rules for O(1) lookup.
+	// Built from apidef.ErrorOverrides during gateway startup.
+	compiledErrorOverrides atomic.Pointer[CompiledErrorOverrides]
 }
 
 // CheckSpecMatchesStatus checks if a URL spec has a specific status.
@@ -140,6 +145,16 @@ func (a *APISpec) GetTykExtension() *oas.XTykAPIGateway {
 		log.Warn("APISpec is an invalid OAS API")
 	}
 	return res
+}
+
+// GetCompiledErrorOverrides returns the compiled error overrides for O(1) lookup.
+func (a *APISpec) GetCompiledErrorOverrides() *CompiledErrorOverrides {
+	return a.compiledErrorOverrides.Load()
+}
+
+// SetCompiledErrorOverrides stores the compiled error overrides.
+func (a *APISpec) SetCompiledErrorOverrides(compiled *CompiledErrorOverrides) {
+	a.compiledErrorOverrides.Store(compiled)
 }
 
 // GetPRMConfig returns the Protected Resource Metadata configuration
@@ -324,6 +339,21 @@ func extractPathParams(oasPath, actualPath string) map[string]string {
 	}
 
 	return params
+}
+
+// APIType returns the api_type string for the given API spec.
+// Precedence: mcp > graphql > oas > classic.
+func (a *APISpec) APIType() string {
+	switch {
+	case a.IsMCP():
+		return "mcp"
+	case a.GraphQL.Enabled:
+		return "graphql"
+	case a.IsOAS:
+		return "oas"
+	default:
+		return "classic"
+	}
 }
 
 func (a *APISpec) sendRateLimitHeaders(session *user.SessionState, dest *http.Response) {

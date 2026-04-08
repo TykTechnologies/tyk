@@ -234,6 +234,12 @@ func (gw *Gateway) processSpec(
 	// Health checkers are initialised per spec so that each API handler has it's own connection and redis storage pool
 	spec.Init(authStore, sessionStore, gs.healthStore, orgStore)
 
+	if !spec.ErrorOverridesDisabled && len(spec.ErrorOverrides) > 0 {
+		if compiled := CompileErrorOverrides(spec.ErrorOverrides); compiled != nil {
+			spec.SetCompiledErrorOverrides(compiled)
+		}
+	}
+
 	// Set up all the JSVM middleware
 	var mwAuthCheckFunc apidef.MiddlewareDefinition
 	mwPreFuncs := []apidef.MiddlewareDefinition{}
@@ -600,7 +606,7 @@ func (gw *Gateway) processSpec(
 
 	if trace.IsEnabled() { // trace.IsEnabled = check if opentracing is enabled
 		chainDef.ThisHandler = trace.Handle(spec.Name, chain)
-	} else if gw.GetConfig().OpenTelemetry.Enabled { // check if opentelemetry is enabled
+	} else if gw.GetConfig().OpenTelemetry.TracesEnabled() { // check if opentelemetry is enabled
 		spanAttrs := []otel.SpanAttribute{}
 		spanAttrs = append(spanAttrs, otel.ApidefSpanAttributes(spec.APIDefinition)...)
 		chainDef.ThisHandler = otel.HTTPHandler(spec.Name, chain, gw.TracerProvider, spanAttrs...)

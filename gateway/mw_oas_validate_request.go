@@ -15,7 +15,6 @@ import (
 	"github.com/TykTechnologies/tyk/header"
 	tykerrors "github.com/TykTechnologies/tyk/internal/errors"
 	"github.com/TykTechnologies/tyk/internal/httputil"
-	lib "github.com/TykTechnologies/tyk/lib/apidef"
 )
 
 var (

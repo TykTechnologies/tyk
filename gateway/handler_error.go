@@ -13,9 +13,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/TykTechnologies/tyk/apidef"
-
 	"github.com/TykTechnologies/tyk-pump/analytics"
+	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
 	tykctx "github.com/TykTechnologies/tyk/ctx"
 	"github.com/TykTechnologies/tyk/header"
@@ -290,6 +289,9 @@ func (e *ErrorHandler) writeTemplateErrorResponse(w http.ResponseWriter, r *http
 	contentType = strings.Split(contentType, ";")[0]
 
 	switch contentType {
+	case header.ApplicationSoapXML:
+		templateExtension = "xml"
+		contentType = header.ApplicationSoapXML
 	case header.ApplicationXML:
 		templateExtension = "xml"
 		contentType = header.ApplicationXML
@@ -347,7 +349,7 @@ func (e *ErrorHandler) writeTemplateErrorResponse(w http.ResponseWriter, r *http
 
 		apiError := APIError{htmltemplate.HTML(htmltemplate.JSEscapeString(errMsg))}
 
-		if contentType == header.ApplicationXML || contentType == header.TextXML {
+		if contentType == header.ApplicationXML || contentType == header.TextXML || contentType == header.ApplicationSoapXML {
 			apiError.Message = htmltemplate.HTML(errMsg)
 
 			//we look up in the last defined templateName to obtain the template.
@@ -384,6 +386,8 @@ func (e *ErrorHandler) writeJSONRPCErrorResponse(w http.ResponseWriter, r *http.
 		requestID = state.ID
 	}
 
+	ctxSetJSONRPCErrorCode(r, jsonrpcerrors.MapHTTPStatusToJSONRPCCode(httpCode))
+
 	responseBody := jsonrpcerrors.WriteJSONRPCError(w, requestID, httpCode, errMsg)
 
 	return &http.Response{
@@ -397,11 +401,9 @@ func (e *ErrorHandler) writeJSONRPCErrorResponse(w http.ResponseWriter, r *http.
 // Returns nil if no override applies, allowing fallback to the default template.
 func (e *ErrorHandler) tryWriteOverride(w http.ResponseWriter, r *http.Request, errMsg string, errCode int) *http.Response {
 	// Fast path: check config map length before atomic load
-	if len(e.Spec.GlobalConfig.ErrorOverrides) == 0 {
-		return nil
-	}
+	if len(e.Spec.GlobalConfig.ErrorOverrides) == 0 &&
+		(e.Spec.ErrorOverridesDisabled || len(e.Spec.ErrorOverrides) == 0) {
 
-	if e.Gw.GetCompiledErrorOverrides() == nil {
 		return nil
 	}
 
