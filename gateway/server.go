@@ -2379,7 +2379,11 @@ func (gw *Gateway) startServer() {
 	mainLog.Info("--> Listening on port: ", gw.GetConfig().ListenPort)
 	mainLog.Info("--> PID: ", gw.hostDetails.PID)
 
-	gw.DoReloadWithRetry(gw.ctx)
+	if gw.GetConfig().UseDBAppConfigs {
+		gw.DoReloadWithRetry(gw.ctx)
+	} else {
+		gw.DoReload()
+	}
 }
 
 func (gw *Gateway) GetConfig() config.Config {
