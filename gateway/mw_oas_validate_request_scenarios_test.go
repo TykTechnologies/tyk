@@ -2296,3 +2296,229 @@ func TestScenario15_MixedAlphanumericWithAllowList(t *testing.T) {
 		{Method: http.MethodGet, Path: "/test-15/employees/asd123", Code: http.StatusUnprocessableEntity},
 	}...)
 }
+
+// Scenario 39: String with format:date vs unconstrained string.
+// format:date scores higher and valueMatchesSchema checks the date format,
+// so non-date values fall through to the unconstrained candidate.
+func TestScenario39_StringFormatVsUnconstrained(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	paths := openapi3.NewPaths()
+
+	paths.Set("/employees/{date}", &openapi3.PathItem{
+		Get: &openapi3.Operation{
+			OperationID: "getByDate",
+			Parameters: openapi3.Parameters{
+				{Value: &openapi3.Parameter{
+					Name: "date", In: "path", Required: true,
+					Schema: &openapi3.SchemaRef{Value: &openapi3.Schema{
+						Type: &openapi3.Types{"string"}, Format: "date",
+					}},
+				}},
+				headerParam("X-Date"),
+			},
+			Responses: oasResponse200(),
+		},
+	})
+
+	paths.Set("/employees/{any}", &openapi3.PathItem{
+		Get: &openapi3.Operation{
+			OperationID: "getByAny",
+			Parameters: openapi3.Parameters{
+				pathParam("any", &openapi3.Schema{Type: &openapi3.Types{"string"}}),
+				headerParam("X-Any"),
+			},
+			Responses: oasResponse200(),
+		},
+	})
+
+	doc := openapi3.T{
+		OpenAPI: "3.0.0",
+		Info:    &openapi3.Info{Title: "Scenario 39", Version: "1.0.0"},
+		Paths:   paths,
+	}
+
+	oasAPI := oas.OAS{T: doc}
+	oasAPI.SetTykExtension(&oas.XTykAPIGateway{
+		Middleware: &oas.Middleware{
+			Operations: oas.Operations{
+				"getByDate": {ValidateRequest: &oas.ValidateRequest{Enabled: true, ErrorResponseCode: 400}},
+				"getByAny":  {ValidateRequest: &oas.ValidateRequest{Enabled: true, ErrorResponseCode: 422}},
+			},
+		},
+	})
+
+	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		spec.Name = "Scenario 39 API"
+		spec.APIID = "scenario-39"
+		spec.Proxy.ListenPath = "/test-39/"
+		spec.UseKeylessAccess = true
+		spec.IsOAS = true
+		spec.OAS = oasAPI
+	})
+
+	_, _ = ts.Run(t, []test.TestCase{
+		// Valid date + correct header -> 200
+		{Method: http.MethodGet, Path: "/test-39/employees/2026-01-15", Headers: map[string]string{"X-Date": "v"}, Code: http.StatusOK},
+		// Valid date, no header -> 400 (commits to date candidate, missing header)
+		{Method: http.MethodGet, Path: "/test-39/employees/2026-01-15", Code: http.StatusBadRequest},
+		// Non-date value + X-Any header -> 200 (fails date format, falls to unconstrained)
+		{Method: http.MethodGet, Path: "/test-39/employees/hello", Headers: map[string]string{"X-Any": "v"}, Code: http.StatusOK},
+		// Non-date value, no header -> 422 (falls to unconstrained, missing header)
+		{Method: http.MethodGet, Path: "/test-39/employees/hello", Code: http.StatusUnprocessableEntity},
+	}...)
+}
+
+// Scenario 40: String with minLength/maxLength vs unconstrained string.
+// Length constraints are checked in valueMatchesSchema, so values outside the
+// range fall through to the unconstrained candidate.
+func TestScenario40_StringMinLengthVsUnconstrained(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	paths := openapi3.NewPaths()
+
+	maxLen := uint64(5)
+	paths.Set("/employees/{short}", &openapi3.PathItem{
+		Get: &openapi3.Operation{
+			OperationID: "getByShort",
+			Parameters: openapi3.Parameters{
+				{Value: &openapi3.Parameter{
+					Name: "short", In: "path", Required: true,
+					Schema: &openapi3.SchemaRef{Value: &openapi3.Schema{
+						Type: &openapi3.Types{"string"}, MinLength: 2, MaxLength: &maxLen,
+					}},
+				}},
+				headerParam("X-Short"),
+			},
+			Responses: oasResponse200(),
+		},
+	})
+
+	paths.Set("/employees/{any}", &openapi3.PathItem{
+		Get: &openapi3.Operation{
+			OperationID: "getByAny",
+			Parameters: openapi3.Parameters{
+				pathParam("any", &openapi3.Schema{Type: &openapi3.Types{"string"}}),
+				headerParam("X-Any"),
+			},
+			Responses: oasResponse200(),
+		},
+	})
+
+	doc := openapi3.T{
+		OpenAPI: "3.0.0",
+		Info:    &openapi3.Info{Title: "Scenario 40", Version: "1.0.0"},
+		Paths:   paths,
+	}
+
+	oasAPI := oas.OAS{T: doc}
+	oasAPI.SetTykExtension(&oas.XTykAPIGateway{
+		Middleware: &oas.Middleware{
+			Operations: oas.Operations{
+				"getByShort": {ValidateRequest: &oas.ValidateRequest{Enabled: true, ErrorResponseCode: 400}},
+				"getByAny":   {ValidateRequest: &oas.ValidateRequest{Enabled: true, ErrorResponseCode: 422}},
+			},
+		},
+	})
+
+	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		spec.Name = "Scenario 40 API"
+		spec.APIID = "scenario-40"
+		spec.Proxy.ListenPath = "/test-40/"
+		spec.UseKeylessAccess = true
+		spec.IsOAS = true
+		spec.OAS = oasAPI
+	})
+
+	_, _ = ts.Run(t, []test.TestCase{
+		// "abc" (3 chars, in range 2-5) + correct header -> 200
+		{Method: http.MethodGet, Path: "/test-40/employees/abc", Headers: map[string]string{"X-Short": "v"}, Code: http.StatusOK},
+		// "abc" no header -> 400 (commits to short, missing header)
+		{Method: http.MethodGet, Path: "/test-40/employees/abc", Code: http.StatusBadRequest},
+		// "a" (1 char, below minLength 2) + X-Any -> 200 (falls to unconstrained)
+		{Method: http.MethodGet, Path: "/test-40/employees/a", Headers: map[string]string{"X-Any": "v"}, Code: http.StatusOK},
+		// "toolongstring" (13 chars, above maxLength 5) + X-Any -> 200 (falls to unconstrained)
+		{Method: http.MethodGet, Path: "/test-40/employees/toolongstring", Headers: map[string]string{"X-Any": "v"}, Code: http.StatusOK},
+	}...)
+}
+
+// Scenario 42: Two path params — integer+unconstrained vs pattern+pattern.
+// Cumulative scores tie (7+0=7 vs 2+2=4), so typed path wins.
+// But the key test is that when dept is non-integer, the patterned path matches.
+func TestScenario42_MultiParamMixedTypeAndPattern(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	paths := openapi3.NewPaths()
+
+	paths.Set("/departments/{dept_id}/employees/{emp_any}", &openapi3.PathItem{
+		Get: &openapi3.Operation{
+			OperationID: "getTyped",
+			Parameters: openapi3.Parameters{
+				{Value: &openapi3.Parameter{
+					Name: "dept_id", In: "path", Required: true,
+					Schema: &openapi3.SchemaRef{Value: &openapi3.Schema{Type: &openapi3.Types{"integer"}}},
+				}},
+				pathParam("emp_any", &openapi3.Schema{Type: &openapi3.Types{"string"}}),
+				headerParam("X-Typed"),
+			},
+			Responses: oasResponse200(),
+		},
+	})
+
+	paths.Set("/departments/{dept_code}/employees/{emp_code}", &openapi3.PathItem{
+		Get: &openapi3.Operation{
+			OperationID: "getPatterned",
+			Parameters: openapi3.Parameters{
+				{Value: &openapi3.Parameter{
+					Name: "dept_code", In: "path", Required: true,
+					Schema: &openapi3.SchemaRef{Value: &openapi3.Schema{
+						Type: &openapi3.Types{"string"}, Pattern: `^[A-Z]{3}$`,
+					}},
+				}},
+				{Value: &openapi3.Parameter{
+					Name: "emp_code", In: "path", Required: true,
+					Schema: &openapi3.SchemaRef{Value: &openapi3.Schema{
+						Type: &openapi3.Types{"string"}, Pattern: `^[A-Z]{3}$`,
+					}},
+				}},
+				headerParam("X-Patterned"),
+			},
+			Responses: oasResponse200(),
+		},
+	})
+
+	doc := openapi3.T{
+		OpenAPI: "3.0.0",
+		Info:    &openapi3.Info{Title: "Scenario 42", Version: "1.0.0"},
+		Paths:   paths,
+	}
+
+	oasAPI := oas.OAS{T: doc}
+	oasAPI.SetTykExtension(&oas.XTykAPIGateway{
+		Middleware: &oas.Middleware{
+			Operations: oas.Operations{
+				"getTyped":     {ValidateRequest: &oas.ValidateRequest{Enabled: true, ErrorResponseCode: 400}},
+				"getPatterned": {ValidateRequest: &oas.ValidateRequest{Enabled: true, ErrorResponseCode: 422}},
+			},
+		},
+	})
+
+	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		spec.Name = "Scenario 42 API"
+		spec.APIID = "scenario-42"
+		spec.Proxy.ListenPath = "/test-42/"
+		spec.UseKeylessAccess = true
+		spec.IsOAS = true
+		spec.OAS = oasAPI
+	})
+
+	_, _ = ts.Run(t, []test.TestCase{
+		// dept_id=1 (integer), emp_any=alice -> typed path matches, header satisfied
+		{Method: http.MethodGet, Path: "/test-42/departments/1/employees/alice", Headers: map[string]string{"X-Typed": "v"}, Code: http.StatusOK},
+		// dept_code=ENG, emp_code=MGR (both ^[A-Z]{3}$) -> patterned path matches, header satisfied
+		{Method: http.MethodGet, Path: "/test-42/departments/ENG/employees/MGR", Headers: map[string]string{"X-Patterned": "v"}, Code: http.StatusOK},
+	}...)
+}

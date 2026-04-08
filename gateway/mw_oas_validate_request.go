@@ -312,7 +312,41 @@ func valueMatchesSchema(value string, s *openapi3.Schema) bool {
 		}
 	}
 
+	// Check minLength/maxLength constraints.
+	if s.MinLength != 0 && uint64(len(value)) < s.MinLength {
+		return false
+	}
+	if s.MaxLength != nil && uint64(len(value)) > *s.MaxLength {
+		return false
+	}
+
+	// Check format constraint.
+	if s.Format != "" && !valueMatchesFormat(value, s.Format) {
+		return false
+	}
+
 	return true
+}
+
+// valueMatchesFormat checks if a string value satisfies the given OAS format constraint.
+func valueMatchesFormat(value, format string) bool {
+	switch format {
+	case "date":
+		_, err := time.Parse(time.DateOnly, value)
+		return err == nil
+	case "date-time":
+		_, err := time.Parse(time.RFC3339, value)
+		return err == nil
+	case "email":
+		return strings.Contains(value, "@")
+	case "uuid":
+		// UUID: 8-4-4-4-12 hex chars
+		matched, _ := tykregexp.MatchString(`^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$`, value)
+		return matched
+	default:
+		// Unknown format — don't reject, let full validation handle it.
+		return true
+	}
 }
 
 // processRequestWithFindOperation is the original implementation that uses findOperation
