@@ -1532,17 +1532,31 @@ func pathParamRestrictiveness(oasPath, method string, oasPaths *openapi3.Paths) 
 }
 
 // schemaRestrictiveness returns a score for how restrictive a single path parameter
-// schema is. Non-string types (number, integer, boolean) score highest because they
-// reject non-parseable values. String with any constraint (pattern, enum, format,
-// length) scores medium. Unconstrained type:string scores 0.
+// schema is. The hierarchy from most to least restrictive:
+//
+//	integer (7) > number (6) > boolean (5) > array (4) > object (3)
+//	> string with constraints (2) > unconstrained string (0)
+//
+// This ensures that integer parameters are tried before number (since every integer
+// is a valid number but not vice versa), and all typed parameters are tried before
+// string which accepts everything.
 func schemaRestrictiveness(s *openapi3.Schema) int {
-	isString := s.Type == nil || s.Type.Is("string")
-
-	// Non-string types are inherently restrictive (require parsing).
-	if !isString {
-		return 2
+	if s.Type != nil {
+		switch {
+		case s.Type.Is("integer"):
+			return 7
+		case s.Type.Is("number"):
+			return 6
+		case s.Type.Is("boolean"):
+			return 5
+		case s.Type.Is("array"):
+			return 4
+		case s.Type.Is("object"):
+			return 3
+		}
 	}
 
+	// type:string or untyped — check for constraints.
 	hasPattern := s.Pattern != ""
 	hasEnum := len(s.Enum) > 0
 	hasFormat := s.Format != ""
@@ -1550,7 +1564,7 @@ func schemaRestrictiveness(s *openapi3.Schema) int {
 	hasMaxLen := s.MaxLength != nil
 
 	if hasPattern || hasEnum || hasFormat || hasMinLen || hasMaxLen {
-		return 1
+		return 2
 	}
 
 	// Unconstrained string — matches everything.
