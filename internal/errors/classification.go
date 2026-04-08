@@ -193,7 +193,7 @@ type ErrorClassification struct {
 	CircuitBreakerState string
 
 	// TemplateData holds arbitrary key-value pairs passed to error override templates.
-	// Keys are exposed as top-level template variables (e.g. {{.invalid_params}}).
+	// Keys are exposed as top-level template variables (e.g. {{.InvalidParams}}).
 	TemplateData map[string]any
 }
 

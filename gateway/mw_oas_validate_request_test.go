@@ -794,13 +794,13 @@ func buildOASValidateAPI(t *testing.T, ts *Test, listenPath string) {
 }
 
 func TestValidateOASRequestTemplateData(t *testing.T) {
-	t.Run("invalid_params rendered in override template on schema failure", func(t *testing.T) {
+	t.Run("InvalidParams rendered in override template on schema failure", func(t *testing.T) {
 		ts := StartTest(func(globalConf *config.Config) {
 			globalConf.ErrorOverrides = apidef.ErrorOverridesMap{
 				"422": []apidef.ErrorOverride{{
 					Response: apidef.ErrorResponse{
 						StatusCode: http.StatusUnprocessableEntity,
-						Body:       `{"detail": "{{.invalid_params}}"}`,
+						Body:       `{"detail": "{{.InvalidParams}}"}`,
 					},
 				}},
 			}
@@ -810,7 +810,7 @@ func TestValidateOASRequestTemplateData(t *testing.T) {
 		buildOASValidateAPI(t, ts, "/product")
 
 		// {"name": 123} fails because owner.name must be a string, not integer.
-		// The rendered response should contain the validation error via {{.invalid_params}}.
+		// The rendered response should contain the validation error via {{.InvalidParams}}.
 		_, _ = ts.Run(t, test.TestCase{
 			Method: http.MethodPost,
 			Path:   "/product/post",
@@ -818,18 +818,18 @@ func TestValidateOASRequestTemplateData(t *testing.T) {
 			Code:   http.StatusUnprocessableEntity,
 			BodyMatchFunc: func(b []byte) bool {
 				body := string(b)
-				return strings.Contains(body, `"detail"`) && !strings.Contains(body, "{{.invalid_params}}")
+				return strings.Contains(body, `"detail"`) && !strings.Contains(body, "{{.InvalidParams}}")
 			},
 		})
 	})
 
-	t.Run("invalid_params contains the validation error text", func(t *testing.T) {
+	t.Run("InvalidParams contains the validation error text", func(t *testing.T) {
 		ts := StartTest(func(globalConf *config.Config) {
 			globalConf.ErrorOverrides = apidef.ErrorOverridesMap{
 				"422": []apidef.ErrorOverride{{
 					Response: apidef.ErrorResponse{
 						StatusCode: http.StatusUnprocessableEntity,
-						Body:       `{"detail": "{{.invalid_params}}"}`,
+						Body:       `{"detail": "{{.InvalidParams}}"}`,
 					},
 				}},
 			}
@@ -866,7 +866,7 @@ func TestValidateOASRequestTemplateData(t *testing.T) {
 		})
 
 		// Sending the wrong type for a query param triggers an OAS validation error.
-		// The {{.invalid_params}} key in the override body should be rendered with the error text.
+		// The {{.InvalidParams}} key in the override body should be rendered with the error text.
 		_, _ = ts.Run(t, test.TestCase{
 			Method: http.MethodPost,
 			Path:   "/product/post?id=not-an-integer",

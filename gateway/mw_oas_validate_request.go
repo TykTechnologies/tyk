@@ -15,6 +15,7 @@ import (
 	"github.com/TykTechnologies/tyk/header"
 	tykerrors "github.com/TykTechnologies/tyk/internal/errors"
 	"github.com/TykTechnologies/tyk/internal/httputil"
+	"github.com/TykTechnologies/tyk/pkg/schema"
 )
 
 var (
@@ -143,8 +144,8 @@ func (k *ValidateRequest) ProcessRequest(w http.ResponseWriter, r *http.Request,
 	err = openapi3filter.ValidateRequest(r.Context(), requestValidationInput)
 	if err != nil {
 		ctx.SetErrorClassification(r, tykerrors.ClassifyJSONValidationError(tykerrors.ErrTypeSchemaValidationFailed, k.Name()).
-			WithTemplateData(map[string]any{"invalid_params": err.Error()}))
-		return fmt.Errorf("request validation error: %w", lib.RestoreUnicodeEscapesInError(err)), errResponseCode
+			WithTemplateData(map[string]any{"InvalidParams": err.Error()}))
+		return fmt.Errorf("request validation error: %w", schema.RestoreUnicodeEscapesInError(err)), errResponseCode
 	}
 
 	// Handle Success
@@ -188,7 +189,7 @@ func (k *ValidateRequest) processRequestWithFindOperation(r *http.Request) (erro
 	err := openapi3filter.ValidateRequest(r.Context(), requestValidationInput)
 	if err != nil {
 		ctx.SetErrorClassification(r, tykerrors.ClassifyJSONValidationError(tykerrors.ErrTypeSchemaValidationFailed, k.Name()).
-			WithTemplateData(map[string]any{"invalid_params": err.Error()}))
+			WithTemplateData(map[string]any{"InvalidParams": err.Error()}))
 		return fmt.Errorf("request validation error: %w", err), errResponseCode
 	}
 

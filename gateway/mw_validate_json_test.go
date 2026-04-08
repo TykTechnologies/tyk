@@ -118,13 +118,13 @@ func (ts *Test) prepareValidateJSONWithOverride(t *testing.T) {
 }
 
 func TestValidateJSONSchemaTemplateData(t *testing.T) {
-	t.Run("invalid_params rendered in override template on schema failure", func(t *testing.T) {
+	t.Run("InvalidParams rendered in override template on schema failure", func(t *testing.T) {
 		ts := StartTest(func(globalConf *config.Config) {
 			globalConf.ErrorOverrides = apidef.ErrorOverridesMap{
 				"422": []apidef.ErrorOverride{{
 					Response: apidef.ErrorResponse{
 						StatusCode: http.StatusUnprocessableEntity,
-						Body:       `{"detail": "{{.invalid_params}}"}`,
+						Body:       `{"detail": "{{.InvalidParams}}"}`,
 					},
 				}},
 			}
@@ -147,13 +147,13 @@ func TestValidateJSONSchemaTemplateData(t *testing.T) {
 		})
 	})
 
-	t.Run("invalid_params rendered in override template on JSON parse failure", func(t *testing.T) {
+	t.Run("InvalidParams rendered in override template on JSON parse failure", func(t *testing.T) {
 		ts := StartTest(func(globalConf *config.Config) {
 			globalConf.ErrorOverrides = apidef.ErrorOverridesMap{
 				"400": []apidef.ErrorOverride{{
 					Response: apidef.ErrorResponse{
 						StatusCode: http.StatusBadRequest,
-						Body:       `{"detail": "{{.invalid_params}}"}`,
+						Body:       `{"detail": "{{.InvalidParams}}"}`,
 					},
 				}},
 			}
@@ -169,7 +169,7 @@ func TestValidateJSONSchemaTemplateData(t *testing.T) {
 			Code:   http.StatusBadRequest,
 			BodyMatchFunc: func(b []byte) bool {
 				body := string(b)
-				return strings.Contains(body, `"detail"`) && !strings.Contains(body, "{{.invalid_params}}")
+				return strings.Contains(body, `"detail"`) && !strings.Contains(body, "{{.InvalidParams}}")
 			},
 		})
 	})

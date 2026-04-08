@@ -109,7 +109,7 @@ func TestErrorClassificationBuilderChaining(t *testing.T) {
 
 	t.Run("WithTemplateData sets data", func(t *testing.T) {
 		ec := NewErrorClassification(BIV, "schema_validation_failed")
-		data := map[string]any{"invalid_params": "field foo is required"}
+		data := map[string]any{"InvalidParams": "field foo is required"}
 		result := ec.WithTemplateData(data)
 		assert.Same(t, ec, result)
 		assert.Equal(t, data, ec.TemplateData)

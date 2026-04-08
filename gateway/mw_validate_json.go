@@ -59,7 +59,7 @@ func (k *ValidateJSON) ProcessRequest(_ http.ResponseWriter, r *http.Request, _ 
 	result, err := gojsonschema.Validate(vPathMeta.SchemaCache, inputLoader)
 	if err != nil {
 		ctx.SetErrorClassification(r, tykerrors.ClassifyJSONValidationError(tykerrors.ErrTypeJSONParseError, k.Name()).
-			WithTemplateData(map[string]any{"invalid_params": err.Error()}))
+			WithTemplateData(map[string]any{"InvalidParams": err.Error()}))
 		return fmt.Errorf("JSON parsing error: %w", err), http.StatusBadRequest
 	}
 
@@ -70,7 +70,7 @@ func (k *ValidateJSON) ProcessRequest(_ http.ResponseWriter, r *http.Request, _ 
 		}
 		formattedErr := k.formatError(result.Errors())
 		ctx.SetErrorClassification(r, tykerrors.ClassifyJSONValidationError(tykerrors.ErrTypeSchemaValidationFailed, k.Name()).
-			WithTemplateData(map[string]any{"invalid_params": formattedErr.Error()}))
+			WithTemplateData(map[string]any{"InvalidParams": formattedErr.Error()}))
 		return formattedErr, vPathMeta.ErrorResponseCode
 	}
 
