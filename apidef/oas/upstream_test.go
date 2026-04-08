@@ -1342,3 +1342,91 @@ func TestPreserveHostHeader(t *testing.T) {
 		}
 	})
 }
+
+func TestDisableChunkedEncoding(t *testing.T) {
+	t.Run("fill", func(t *testing.T) {
+		type testCase struct {
+			title    string
+			input    apidef.APIDefinition
+			expected *DisableChunkedEncoding
+		}
+
+		testCases := []testCase{
+			{
+				title: "disable chunked encoding disabled",
+				input: apidef.APIDefinition{
+					Proxy: apidef.ProxyConfig{
+						DisableChunkedEncoding: false,
+					},
+				},
+				expected: nil,
+			},
+			{
+				title: "disable chunked encoding enabled",
+				input: apidef.APIDefinition{
+					Proxy: apidef.ProxyConfig{
+						DisableChunkedEncoding:     true,
+						ChunkedEncodingMaxBodySize: 1024,
+					},
+				},
+				expected: &DisableChunkedEncoding{
+					Enabled:     true,
+					MaxBodySize: 1024,
+				},
+			},
+		}
+
+		for _, tc := range testCases {
+			tc := tc
+			t.Run(tc.title, func(t *testing.T) {
+				t.Parallel()
+
+				g := new(Upstream)
+				g.Fill(tc.input)
+
+				assert.Equal(t, tc.expected, g.DisableChunkedEncoding)
+			})
+		}
+	})
+
+	t.Run("extractTo", func(t *testing.T) {
+		type testCase struct {
+			title           string
+			input           *DisableChunkedEncoding
+			expectedEnabled bool
+		}
+
+		testCases := []testCase{
+			{
+				title: "disable chunked encoding disabled",
+				input: &DisableChunkedEncoding{
+					Enabled: false,
+				},
+				expectedEnabled: false,
+			},
+			{
+				title: "disable chunked encoding enabled",
+				input: &DisableChunkedEncoding{
+					Enabled:     true,
+					MaxBodySize: 1024,
+				},
+				expectedEnabled: true,
+			},
+		}
+
+		for _, tc := range testCases {
+			tc := tc
+			t.Run(tc.title, func(t *testing.T) {
+				g := new(Upstream)
+				g.DisableChunkedEncoding = tc.input
+
+				var apiDef apidef.APIDefinition
+				apiDef.Proxy.DisableChunkedEncoding = true
+				g.ExtractTo(&apiDef)
+
+				assert.Equal(t, tc.expectedEnabled, apiDef.Proxy.DisableChunkedEncoding)
+				assert.Equal(t, tc.input.MaxBodySize, apiDef.Proxy.ChunkedEncodingMaxBodySize)
+			})
+		}
+	})
+}
