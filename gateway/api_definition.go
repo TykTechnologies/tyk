@@ -1437,43 +1437,54 @@ func groupCollapsedValidateRequestSpecs(specs []URLSpec, oasPaths *openapi3.Path
 			continue
 		}
 
-		// Sort candidates so more restrictive path parameter schemas are tried first.
-		// type:string with no pattern/constraints is a catch-all and must come last.
-		sort.Slice(indices, func(a, b int) bool {
-			scoreA := pathParamRestrictiveness(specs[indices[a]].OASPath, specs[indices[a]].OASMethod, oasPaths)
-			scoreB := pathParamRestrictiveness(specs[indices[b]].OASPath, specs[indices[b]].OASMethod, oasPaths)
-			if scoreA != scoreB {
-				return scoreA > scoreB
-			}
-			// Tie-break alphabetically for determinism.
-			return specs[indices[a]].OASPath < specs[indices[b]].OASPath
-		})
-
-		primary := indices[0]
-		candidates := make([]ValidateRequestCandidate, len(indices))
-		for ci, idx := range indices {
-			candidates[ci] = ValidateRequestCandidate{
-				OASValidateRequestMeta: specs[idx].OASValidateRequestMeta,
-				OASMethod:              specs[idx].OASMethod,
-				OASPath:                specs[idx].OASPath,
-			}
-			if idx != primary {
-				toRemove[idx] = true
-			}
-		}
-
-		// Update the primary spec to reference the first candidate's fields
-		// and store all candidates.
-		specs[primary].OASValidateRequestMeta = candidates[0].OASValidateRequestMeta
-		specs[primary].OASMethod = candidates[0].OASMethod
-		specs[primary].OASPath = candidates[0].OASPath
-		specs[primary].OASValidateRequestCandidates = candidates
+		sortByRestrictiveness(indices, specs, oasPaths)
+		mergeGroupIntoPrimary(indices, specs, toRemove)
 	}
 
+	return removeIndices(specs, toRemove)
+}
+
+// sortByRestrictiveness sorts spec indices so that more restrictive path parameter
+// schemas come first. Unconstrained type:string is a catch-all and sorts last.
+func sortByRestrictiveness(indices []int, specs []URLSpec, oasPaths *openapi3.Paths) {
+	sort.Slice(indices, func(a, b int) bool {
+		scoreA := pathParamRestrictiveness(specs[indices[a]].OASPath, specs[indices[a]].OASMethod, oasPaths)
+		scoreB := pathParamRestrictiveness(specs[indices[b]].OASPath, specs[indices[b]].OASMethod, oasPaths)
+		if scoreA != scoreB {
+			return scoreA > scoreB
+		}
+		return specs[indices[a]].OASPath < specs[indices[b]].OASPath
+	})
+}
+
+// mergeGroupIntoPrimary takes a sorted list of spec indices that share the same
+// regex+method, builds ValidateRequestCandidates from them, and assigns them to
+// the primary (first) spec. Non-primary indices are marked for removal.
+func mergeGroupIntoPrimary(indices []int, specs []URLSpec, toRemove map[int]bool) {
+	primary := indices[0]
+	candidates := make([]ValidateRequestCandidate, len(indices))
+	for ci, idx := range indices {
+		candidates[ci] = ValidateRequestCandidate{
+			OASValidateRequestMeta: specs[idx].OASValidateRequestMeta,
+			OASMethod:              specs[idx].OASMethod,
+			OASPath:                specs[idx].OASPath,
+		}
+		if idx != primary {
+			toRemove[idx] = true
+		}
+	}
+
+	specs[primary].OASValidateRequestMeta = candidates[0].OASValidateRequestMeta
+	specs[primary].OASMethod = candidates[0].OASMethod
+	specs[primary].OASPath = candidates[0].OASPath
+	specs[primary].OASValidateRequestCandidates = candidates
+}
+
+// removeIndices returns a new slice with entries at the given indices removed.
+func removeIndices(specs []URLSpec, toRemove map[int]bool) []URLSpec {
 	if len(toRemove) == 0 {
 		return specs
 	}
-
 	result := make([]URLSpec, 0, len(specs)-len(toRemove))
 	for i, s := range specs {
 		if !toRemove[i] {

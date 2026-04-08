@@ -13,6 +13,7 @@ import (
 	"github.com/getkin/kin-openapi/routers"
 	"github.com/sirupsen/logrus"
 
+	"github.com/TykTechnologies/tyk/apidef/oas"
 	"github.com/TykTechnologies/tyk/header"
 	"github.com/TykTechnologies/tyk/internal/httputil"
 	"github.com/TykTechnologies/tyk/pkg/schema"
@@ -176,68 +177,82 @@ func (k *ValidateRequest) processRequestWithCandidates(r *http.Request, urlSpec 
 			continue
 		}
 
-		// Look up the path item directly from the OAS spec instead of using the OAS
-		// router, which cannot distinguish between structurally identical paths.
-		pathItem := k.Spec.OAS.Paths.Value(candidate.OASPath)
-		if pathItem == nil {
-			continue
-		}
-		operation := pathItem.GetOperation(candidate.OASMethod)
-		if operation == nil {
+		route, pathParams, ok := k.resolveCandidate(candidate, strippedPath)
+		if !ok {
 			continue
 		}
 
-		pathParams := extractPathParams(candidate.OASPath, strippedPath)
-
-		// Phase 1: validate path parameters against this candidate's schemas.
-		// If they don't match, skip to the next candidate.
-		if !pathParamsMatchOperation(pathParams, operation) {
-			continue
-		}
-
-		// Phase 2: path params matched — commit to this candidate. Run full validation
-		// and return the result regardless of success/failure. Do not fall through.
-		route := &routers.Route{
-			Spec:      &k.Spec.OAS.T,
-			Path:      candidate.OASPath,
-			PathItem:  pathItem,
-			Method:    candidate.OASMethod,
-			Operation: operation,
-		}
-
-		errResponseCode := http.StatusUnprocessableEntity
-		if candidate.OASValidateRequestMeta.ErrorResponseCode != 0 {
-			errResponseCode = candidate.OASValidateRequestMeta.ErrorResponseCode
-		}
-
-		requestValidationInput := &openapi3filter.RequestValidationInput{
-			Request:    r,
-			PathParams: pathParams,
-			Route:      route,
-			Options: &openapi3filter.Options{
-				AuthenticationFunc: func(ctx context.Context, input *openapi3filter.AuthenticationInput) error {
-					return nil
-				},
-			},
-		}
-
-		err := openapi3filter.ValidateRequest(r.Context(), requestValidationInput)
-		if err != nil {
-			return fmt.Errorf("request validation error: %w", schema.RestoreUnicodeEscapesInError(err)), errResponseCode
-		}
-		return nil, http.StatusOK
+		// Path params matched — commit to this candidate and return regardless of outcome.
+		return k.validateRoute(r, route, pathParams, candidate.OASValidateRequestMeta)
 	}
 
-	// No candidate's path params matched at all.
+	return fmt.Errorf("request validation error: path parameter doesn't match any endpoint"),
+		candidatesErrorResponseCode(urlSpec.OASValidateRequestCandidates)
+}
+
+// resolveCandidate looks up the candidate's path item directly from the OAS spec (bypassing
+// the OAS router which cannot distinguish structurally identical paths), extracts path
+// parameters, and checks them against the candidate's schemas. Returns the constructed
+// route, path params, and true if the candidate matches; false otherwise.
+func (k *ValidateRequest) resolveCandidate(candidate ValidateRequestCandidate, strippedPath string) (*routers.Route, map[string]string, bool) {
+	pathItem := k.Spec.OAS.Paths.Value(candidate.OASPath)
+	if pathItem == nil {
+		return nil, nil, false
+	}
+	operation := pathItem.GetOperation(candidate.OASMethod)
+	if operation == nil {
+		return nil, nil, false
+	}
+
+	pathParams := extractPathParams(candidate.OASPath, strippedPath)
+	if !pathParamsMatchOperation(pathParams, operation) {
+		return nil, nil, false
+	}
+
+	route := &routers.Route{
+		Spec:      &k.Spec.OAS.T,
+		Path:      candidate.OASPath,
+		PathItem:  pathItem,
+		Method:    candidate.OASMethod,
+		Operation: operation,
+	}
+	return route, pathParams, true
+}
+
+// validateRoute runs openapi3filter.ValidateRequest against a resolved route and returns
+// the appropriate error/status pair.
+func (k *ValidateRequest) validateRoute(r *http.Request, route *routers.Route, pathParams map[string]string, meta *oas.ValidateRequest) (error, int) {
 	errResponseCode := http.StatusUnprocessableEntity
-	for _, candidate := range urlSpec.OASValidateRequestCandidates {
-		if candidate.OASValidateRequestMeta != nil && candidate.OASValidateRequestMeta.ErrorResponseCode != 0 {
-			errResponseCode = candidate.OASValidateRequestMeta.ErrorResponseCode
-			break
-		}
+	if meta != nil && meta.ErrorResponseCode != 0 {
+		errResponseCode = meta.ErrorResponseCode
 	}
 
-	return fmt.Errorf("request validation error: path parameter doesn't match any endpoint"), errResponseCode
+	input := &openapi3filter.RequestValidationInput{
+		Request:    r,
+		PathParams: pathParams,
+		Route:      route,
+		Options: &openapi3filter.Options{
+			AuthenticationFunc: func(ctx context.Context, input *openapi3filter.AuthenticationInput) error {
+				return nil
+			},
+		},
+	}
+
+	if err := openapi3filter.ValidateRequest(r.Context(), input); err != nil {
+		return fmt.Errorf("request validation error: %w", schema.RestoreUnicodeEscapesInError(err)), errResponseCode
+	}
+	return nil, http.StatusOK
+}
+
+// candidatesErrorResponseCode returns the error response code from the first enabled
+// candidate that has a custom code configured, defaulting to 422.
+func candidatesErrorResponseCode(candidates []ValidateRequestCandidate) int {
+	for _, c := range candidates {
+		if c.OASValidateRequestMeta != nil && c.OASValidateRequestMeta.ErrorResponseCode != 0 {
+			return c.OASValidateRequestMeta.ErrorResponseCode
+		}
+	}
+	return http.StatusUnprocessableEntity
 }
 
 // pathParamsMatchOperation checks whether the given path parameter values satisfy
@@ -258,44 +273,52 @@ func pathParamsMatchOperation(pathParams map[string]string, operation *openapi3.
 			return false
 		}
 
-		// For type:number/integer, attempt to parse as float to match kin-openapi behavior.
-		// For type:string (no constraints), this always passes — that's expected,
-		// the candidate ordering ensures more restrictive types are checked first.
-		s := param.Schema.Value
-		if s.Type != nil {
-			if s.Type.Is("number") || s.Type.Is("integer") {
-				if _, err := strconv.ParseFloat(value, 64); err != nil {
-					return false
-				}
-			} else if s.Type.Is("boolean") {
-				if _, err := strconv.ParseBool(value); err != nil {
-					return false
-				}
-			}
+		if !valueMatchesSchema(value, param.Schema.Value) {
+			return false
 		}
+	}
+	return true
+}
 
-		// Check pattern constraint if present.
-		if s.Pattern != "" {
-			matched, err := tykregexp.MatchString(s.Pattern, value)
-			if err != nil || !matched {
+// valueMatchesSchema checks if a path parameter string value satisfies the schema's
+// type, pattern, and enum constraints. This mirrors kin-openapi's parsing behavior
+// for path parameters.
+func valueMatchesSchema(value string, s *openapi3.Schema) bool {
+	// Check type constraints.
+	if s.Type != nil {
+		if s.Type.Is("number") || s.Type.Is("integer") {
+			if _, err := strconv.ParseFloat(value, 64); err != nil {
 				return false
 			}
-		}
-
-		// Check enum constraint if present.
-		if len(s.Enum) > 0 {
-			found := false
-			for _, e := range s.Enum {
-				if fmt.Sprintf("%v", e) == value {
-					found = true
-					break
-				}
-			}
-			if !found {
+		} else if s.Type.Is("boolean") {
+			if _, err := strconv.ParseBool(value); err != nil {
 				return false
 			}
 		}
 	}
+
+	// Check pattern constraint.
+	if s.Pattern != "" {
+		matched, err := tykregexp.MatchString(s.Pattern, value)
+		if err != nil || !matched {
+			return false
+		}
+	}
+
+	// Check enum constraint.
+	if len(s.Enum) > 0 {
+		found := false
+		for _, e := range s.Enum {
+			if fmt.Sprintf("%v", e) == value {
+				found = true
+				break
+			}
+		}
+		if !found {
+			return false
+		}
+	}
+
 	return true
 }
 
