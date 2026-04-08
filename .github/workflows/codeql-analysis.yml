@@ -8,12 +8,25 @@ name: "CodeQL"
 on:
   pull_request:
     branches: [master]
+    types:
+      - opened
+      - reopened
+      - synchronize
+      - labeled
   schedule:
     - cron: '0 18 * * 4'
 
 jobs:
+  dep-guard:
+    if: ${{ github.event_name == 'pull_request' }}
+    uses: TykTechnologies/github-actions/.github/workflows/dependency-guard.yml@2b35ab5dd4cfff21ced9d12446e9e27d10bf5785  # main
+    permissions:
+      contents: read
+
   analyze:
     name: Analyze
+    needs: [dep-guard]
+    if: ${{ always() && (needs.dep-guard.result == 'success' || needs.dep-guard.result == 'skipped') }}
     runs-on: ubuntu-latest
 
     strategy:
@@ -27,7 +40,7 @@ jobs:
 
     steps:
     - name: Checkout repository
-      uses: actions/checkout@v2
+      uses: actions/checkout@ee0669bd1cc54295c223e0bb666b733df41de1c5  # v2
       with:
         # We must fetch at least the immediate parents so that if this is
         # a pull request then we can checkout the head.
@@ -39,24 +52,24 @@ jobs:
       if: ${{ github.event_name == 'pull_request' }}
 
     - name: Install Go
-      uses: actions/setup-go@v4
+      uses: actions/setup-go@7b8cf10d4e4a01d4992d18a89f4d7dc5a3e6d6f4  # v4
       with:
         go-version-file: go.mod
 
     # Initializes the CodeQL tools for scanning.
     - name: Initialize CodeQL
-      uses: github/codeql-action/init@v2
+      uses: github/codeql-action/init@b8d3b6e8af63cde30bdc382c0bc28114f4346c88  # v2
       with:
         languages: ${{ matrix.language }}
         # If you wish to specify custom queries, you can do so here or in a config file.
-        # By default, queries listed here will override any specified in a config file. 
+        # By default, queries listed here will override any specified in a config file.
         # Prefix the list here with "+" to use these queries and those in the config file.
         # queries: ./path/to/local/query, your-org/your-repo/queries@main
 
     # Autobuild attempts to build any compiled languages  (C/C++, C#, or Java).
     # If this step fails, then you should remove it and run the build manually (see below)
     - name: Autobuild
-      uses: github/codeql-action/autobuild@v2
+      uses: github/codeql-action/autobuild@b8d3b6e8af63cde30bdc382c0bc28114f4346c88  # v2
 
     # ℹ️ Command-line programs to run using the OS shell.
     # 📚 https://git.io/JvXDl
@@ -70,4 +83,4 @@ jobs:
     #   make release
 
     - name: Perform CodeQL Analysis
-      uses: github/codeql-action/analyze@v2
+      uses: github/codeql-action/analyze@b8d3b6e8af63cde30bdc382c0bc28114f4346c88  # v2

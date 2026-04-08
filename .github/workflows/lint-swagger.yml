@@ -3,15 +3,26 @@ on:
     branches:
       - master
       - release-**
+    types:
+      - opened
+      - reopened
+      - synchronize
+      - labeled
 
 jobs:
+  dep-guard:
+    uses: TykTechnologies/github-actions/.github/workflows/dependency-guard.yml@2b35ab5dd4cfff21ced9d12446e9e27d10bf5785  # main
+    permissions:
+      contents: read
+
   test_swagger_editor_validator_remote:
+    needs: [dep-guard]
     runs-on: ubuntu-latest
     name: Swagger Editor Validator Remote
 
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@ee0669bd1cc54295c223e0bb666b733df41de1c5  # v2
       - name: Validate OpenAPI definition
-        uses: char0n/swagger-editor-validate@v1
+        uses: char0n/swagger-editor-validate@fe35d650e9fc674505607519d0d12ab4de5d415d  # v1
         with:
           definition-file: swagger.yml

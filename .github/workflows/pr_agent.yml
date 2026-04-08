@@ -5,16 +5,24 @@ on:
       - reopened
       - synchronize
       - ready_for_review
+      - labeled
   issue_comment:
 jobs:
+  dep-guard:
+    if: ${{ github.event_name == 'pull_request' }}
+    uses: TykTechnologies/github-actions/.github/workflows/dependency-guard.yml@2b35ab5dd4cfff21ced9d12446e9e27d10bf5785  # main
+    permissions:
+      contents: read
+
   pr_agent_job:
+    needs: [dep-guard]
+    if: ${{ !github.event.pull_request.draft && always() && (needs.dep-guard.result == 'success' || needs.dep-guard.result == 'skipped') }}
     runs-on: ubuntu-latest
     name: Run pr agent on every pull request, respond to user comments
-    if: ${{ !github.event.pull_request.draft }}
     steps:
       - name: PR Agent action step
         id: pragent
-        uses: Codium-ai/pr-agent@main
+        uses: Codium-ai/pr-agent@0b0c175f6a0ae73f75bfb12a0eecb440a216a891  # main
         env:
           OPENAI_KEY: ${{ secrets.OPENAI_KEY }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

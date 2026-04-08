@@ -5,10 +5,21 @@ on:
     branches:
       - master
       - release-**
+    types:
+      - opened
+      - reopened
+      - synchronize
+      - labeled
 
 jobs:
+  dep-guard:
+    uses: TykTechnologies/github-actions/.github/workflows/dependency-guard.yml@2b35ab5dd4cfff21ced9d12446e9e27d10bf5785  # main
+    permissions:
+      contents: read
+
   godoc:
-    uses: TykTechnologies/github-actions/.github/workflows/godoc.yml@main
+    needs: [dep-guard]
+    uses: TykTechnologies/github-actions/.github/workflows/godoc.yml@2b35ab5dd4cfff21ced9d12446e9e27d10bf5785  # main
     secrets:
       ORG_GH_TOKEN: ${{ secrets.ORG_GH_TOKEN }}
     with:
