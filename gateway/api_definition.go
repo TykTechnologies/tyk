@@ -1445,13 +1445,19 @@ func groupCollapsedValidateRequestSpecs(specs []URLSpec, oasPaths *openapi3.Path
 }
 
 // sortByRestrictiveness sorts spec indices so that more restrictive path parameter
-// schemas come first. Unconstrained type:string is a catch-all and sorts last.
+// schemas come first. Ties in restrictiveness score are broken by total pattern length
+// (longer patterns are more specific, e.g., ^\d+$ before .*), then alphabetically.
 func sortByRestrictiveness(indices []int, specs []URLSpec, oasPaths *openapi3.Paths) {
 	sort.Slice(indices, func(a, b int) bool {
 		scoreA := pathParamRestrictiveness(specs[indices[a]].OASPath, specs[indices[a]].OASMethod, oasPaths)
 		scoreB := pathParamRestrictiveness(specs[indices[b]].OASPath, specs[indices[b]].OASMethod, oasPaths)
 		if scoreA != scoreB {
 			return scoreA > scoreB
+		}
+		lenA := pathParamPatternLength(specs[indices[a]].OASPath, specs[indices[a]].OASMethod, oasPaths)
+		lenB := pathParamPatternLength(specs[indices[b]].OASPath, specs[indices[b]].OASMethod, oasPaths)
+		if lenA != lenB {
+			return lenA > lenB
 		}
 		return specs[indices[a]].OASPath < specs[indices[b]].OASPath
 	})
@@ -1520,24 +1526,63 @@ func pathParamRestrictiveness(oasPath, method string, oasPaths *openapi3.Paths) 
 		if param.Schema == nil || param.Schema.Value == nil {
 			continue
 		}
-		s := param.Schema.Value
-
-		hasPattern := s.Pattern != ""
-		hasEnum := len(s.Enum) > 0
-		hasFormat := s.Format != ""
-		hasMinLen := s.MinLength != 0
-		hasMaxLen := s.MaxLength != nil
-
-		isString := s.Type != nil && s.Type.Is("string")
-
-		if isString && !hasPattern && !hasEnum && !hasFormat && !hasMinLen && !hasMaxLen {
-			// Unconstrained string — catch-all, no added restrictiveness.
-			continue
-		}
-		// Any non-string type or any constraint adds restrictiveness.
-		score++
+		score += schemaRestrictiveness(param.Schema.Value)
 	}
 	return score
+}
+
+// schemaRestrictiveness returns a score for how restrictive a single path parameter
+// schema is. Non-string types (number, integer, boolean) score highest because they
+// reject non-parseable values. String with any constraint (pattern, enum, format,
+// length) scores medium. Unconstrained type:string scores 0.
+func schemaRestrictiveness(s *openapi3.Schema) int {
+	isString := s.Type == nil || s.Type.Is("string")
+
+	// Non-string types are inherently restrictive (require parsing).
+	if !isString {
+		return 2
+	}
+
+	hasPattern := s.Pattern != ""
+	hasEnum := len(s.Enum) > 0
+	hasFormat := s.Format != ""
+	hasMinLen := s.MinLength != 0
+	hasMaxLen := s.MaxLength != nil
+
+	if hasPattern || hasEnum || hasFormat || hasMinLen || hasMaxLen {
+		return 1
+	}
+
+	// Unconstrained string — matches everything.
+	return 0
+}
+
+// pathParamPatternLength returns the total length of all path parameter pattern strings
+// for a given OAS path+method. Used as a tie-breaker when restrictiveness scores are
+// equal — longer patterns tend to be more specific (e.g., ^\d+$ vs .*).
+func pathParamPatternLength(oasPath, method string, oasPaths *openapi3.Paths) int {
+	if oasPaths == nil {
+		return 0
+	}
+	pathItem := oasPaths.Value(oasPath)
+	if pathItem == nil {
+		return 0
+	}
+	op := pathItem.GetOperation(method)
+	if op == nil {
+		return 0
+	}
+
+	total := 0
+	for _, paramRef := range op.Parameters {
+		if paramRef == nil || paramRef.Value == nil || paramRef.Value.In != "path" {
+			continue
+		}
+		if paramRef.Value.Schema != nil && paramRef.Value.Schema.Value != nil {
+			total += len(paramRef.Value.Schema.Value.Pattern)
+		}
+	}
+	return total
 }
 
 // compileOASMockResponsePathSpec extracts MockResponse operations from OAS middleware

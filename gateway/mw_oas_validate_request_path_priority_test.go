@@ -394,6 +394,128 @@ func TestSameBasePathDifferentParamSchemas(t *testing.T) {
 	}...)
 }
 
+// TestDualValidateRequestWithStaticPath mirrors the python integration test
+// test_dual_validate_request_on_overlapping_parameterized: two parameterized paths
+// with validateRequest plus a static path without validateRequest.
+func TestDualValidateRequestWithStaticPath(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	paths := openapi3.NewPaths()
+
+	paths.Set("/employees/{id}", &openapi3.PathItem{
+		Get: &openapi3.Operation{
+			OperationID: "getById",
+			Parameters: openapi3.Parameters{
+				{Value: &openapi3.Parameter{
+					Name: "id", In: "path", Required: true,
+					Schema: &openapi3.SchemaRef{Value: &openapi3.Schema{
+						Type: &openapi3.Types{"string"}, Pattern: `^\d+$`,
+					}},
+				}},
+				{Value: &openapi3.Parameter{
+					Name: "X-Id-Header", In: "header", Required: true,
+					Schema: &openapi3.SchemaRef{Value: &openapi3.Schema{Type: &openapi3.Types{"string"}}},
+				}},
+			},
+			Responses: openapi3.NewResponses(openapi3.WithStatus(200, &openapi3.ResponseRef{
+				Value: &openapi3.Response{Description: stringPtrHelper("Success")},
+			})),
+		},
+	})
+
+	paths.Set("/employees/{name}", &openapi3.PathItem{
+		Get: &openapi3.Operation{
+			OperationID: "getByName",
+			Parameters: openapi3.Parameters{
+				{Value: &openapi3.Parameter{
+					Name: "name", In: "path", Required: true,
+					Schema: &openapi3.SchemaRef{Value: &openapi3.Schema{
+						Type: &openapi3.Types{"string"}, Pattern: `^[a-z]+$`,
+					}},
+				}},
+				{Value: &openapi3.Parameter{
+					Name: "X-Name-Header", In: "header", Required: true,
+					Schema: &openapi3.SchemaRef{Value: &openapi3.Schema{Type: &openapi3.Types{"string"}}},
+				}},
+			},
+			Responses: openapi3.NewResponses(openapi3.WithStatus(200, &openapi3.ResponseRef{
+				Value: &openapi3.Response{Description: stringPtrHelper("Success")},
+			})),
+		},
+	})
+
+	paths.Set("/employees/static", &openapi3.PathItem{
+		Get: &openapi3.Operation{
+			OperationID: "getStatic",
+			Responses: openapi3.NewResponses(openapi3.WithStatus(200, &openapi3.ResponseRef{
+				Value: &openapi3.Response{Description: stringPtrHelper("Success")},
+			})),
+		},
+	})
+
+	doc := openapi3.T{
+		OpenAPI: "3.0.0",
+		Info:    &openapi3.Info{Title: "Dual VR + Static Test", Version: "1.0.0"},
+		Paths:   paths,
+	}
+
+	oasAPI := oas.OAS{T: doc}
+	oasAPI.SetTykExtension(&oas.XTykAPIGateway{
+		Middleware: &oas.Middleware{
+			Operations: oas.Operations{
+				"getById":   {ValidateRequest: &oas.ValidateRequest{Enabled: true, ErrorResponseCode: 400}},
+				"getByName": {ValidateRequest: &oas.ValidateRequest{Enabled: true, ErrorResponseCode: 422}},
+				"getStatic": {},
+			},
+		},
+	})
+
+	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		spec.Name = "Dual VR Static API"
+		spec.APIID = "dual-vr-static"
+		spec.Proxy.ListenPath = "/api/"
+		spec.UseKeylessAccess = true
+		spec.IsOAS = true
+		spec.OAS = oasAPI
+	})
+
+	_, _ = ts.Run(t, []test.TestCase{
+		{
+			// Static path — no validateRequest, should pass through
+			Method: http.MethodGet,
+			Path:   "/api/employees/static",
+			Code:   http.StatusOK,
+		},
+		{
+			// "123" matches ^\d+$ ({id}), no X-Id-Header -> 400
+			Method: http.MethodGet,
+			Path:   "/api/employees/123",
+			Code:   http.StatusBadRequest,
+		},
+		{
+			// "123" matches ^\d+$ ({id}), with both headers -> 200
+			Method:  http.MethodGet,
+			Path:    "/api/employees/123",
+			Headers: map[string]string{"X-Id-Header": "v", "X-Name-Header": "v"},
+			Code:    http.StatusOK,
+		},
+		{
+			// "abc" matches ^[a-z]+$ ({name}), no X-Name-Header -> 422
+			Method: http.MethodGet,
+			Path:   "/api/employees/abc",
+			Code:   http.StatusUnprocessableEntity,
+		},
+		{
+			// "abc" matches ^[a-z]+$ ({name}), with header -> 200
+			Method:  http.MethodGet,
+			Path:    "/api/employees/abc",
+			Headers: map[string]string{"X-Name-Header": "v"},
+			Code:    http.StatusOK,
+		},
+	}...)
+}
+
 // TestSameBasePathStringCatchAll reproduces the exampleOas.yaml scenario where
 // type:string (no pattern) sorts alphabetically BEFORE type:number, proving that
 // the string candidate steals numeric path values.
