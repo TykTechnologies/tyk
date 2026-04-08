@@ -1406,21 +1406,39 @@ func (a APIDefinitionLoader) compileOASValidateRequestPathSpec(apiSpec *APISpec,
 
 // groupCollapsedValidateRequestSpecs detects URLSpec entries that compile to the same
 // regex+method pair and groups them as candidates on a single representative URLSpec.
-// This allows the validate request middleware to disambiguate at request time using
-// full path parameter schema validation. Candidates are sorted so that endpoints with
-// more restrictive path parameter schemas are tried first (e.g., type:number before
-// type:string which matches everything).
+// Candidates are sorted so that more restrictive path parameter schemas are tried first.
 func groupCollapsedValidateRequestSpecs(specs []URLSpec, oasPaths *openapi3.Paths) []URLSpec {
+	return groupCollapsedSpecs(specs, oasPaths, OASValidateRequest, func(indices []int, specs []URLSpec, toRemove map[int]bool) {
+		mergeGroupIntoPrimary(indices, specs, toRemove)
+	})
+}
+
+// groupCollapsedMockResponseSpecs is the mock response equivalent of
+// groupCollapsedValidateRequestSpecs.
+func groupCollapsedMockResponseSpecs(specs []URLSpec, oasPaths *openapi3.Paths) []URLSpec {
+	return groupCollapsedSpecs(specs, oasPaths, OASMockResponse, func(indices []int, specs []URLSpec, toRemove map[int]bool) {
+		mergeMockGroupIntoPrimary(indices, specs, toRemove)
+	})
+}
+
+// groupCollapsedSpecs is the shared grouping logic for both validate request and mock
+// response. It finds URLSpec entries with the same compiled regex+method, sorts them
+// by restrictiveness, and calls the provided merge function to build candidates.
+func groupCollapsedSpecs(
+	specs []URLSpec,
+	oasPaths *openapi3.Paths,
+	status URLStatus,
+	merge func(indices []int, specs []URLSpec, toRemove map[int]bool),
+) []URLSpec {
 	type key struct {
 		regex  string
 		method string
 	}
 
-	// Build groups of specs that share the same compiled regex + method.
 	groups := make(map[key][]int)
 	var order []key
 	for i, s := range specs {
-		if s.Status != OASValidateRequest || s.spec == nil {
+		if s.Status != status || s.spec == nil {
 			continue
 		}
 		k := key{regex: s.spec.String(), method: s.OASMethod}
@@ -1436,12 +1454,33 @@ func groupCollapsedValidateRequestSpecs(specs []URLSpec, oasPaths *openapi3.Path
 		if len(indices) < 2 {
 			continue
 		}
-
 		sortByRestrictiveness(indices, specs, oasPaths)
-		mergeGroupIntoPrimary(indices, specs, toRemove)
+		merge(indices, specs, toRemove)
 	}
 
 	return removeIndices(specs, toRemove)
+}
+
+// mergeMockGroupIntoPrimary builds MockResponseCandidates from the sorted indices
+// and assigns them to the primary (first) spec.
+func mergeMockGroupIntoPrimary(indices []int, specs []URLSpec, toRemove map[int]bool) {
+	primary := indices[0]
+	candidates := make([]MockResponseCandidate, len(indices))
+	for ci, idx := range indices {
+		candidates[ci] = MockResponseCandidate{
+			OASMockResponseMeta: specs[idx].OASMockResponseMeta,
+			OASMethod:           specs[idx].OASMethod,
+			OASPath:             specs[idx].OASPath,
+		}
+		if idx != primary {
+			toRemove[idx] = true
+		}
+	}
+
+	specs[primary].OASMockResponseMeta = candidates[0].OASMockResponseMeta
+	specs[primary].OASMethod = candidates[0].OASMethod
+	specs[primary].OASPath = candidates[0].OASPath
+	specs[primary].OASMockResponseCandidates = candidates
 }
 
 // sortByRestrictiveness sorts spec indices so that more restrictive path parameter
@@ -1635,6 +1674,8 @@ func (a APIDefinitionLoader) compileOASMockResponsePathSpec(apiSpec *APISpec, co
 		a.generateRegex(path, &newSpec, OASMockResponse, conf)
 		urlSpec = append(urlSpec, newSpec)
 	}
+
+	urlSpec = groupCollapsedMockResponseSpecs(urlSpec, apiSpec.OAS.Paths)
 
 	urlSpec = a.addStaticPathShields(apiSpec, conf, urlSpec, OASMockResponse, func(path, method string) URLSpec {
 		return URLSpec{

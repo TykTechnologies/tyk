@@ -190,22 +190,11 @@ func (k *ValidateRequest) processRequestWithCandidates(r *http.Request, urlSpec 
 		candidatesErrorResponseCode(urlSpec.OASValidateRequestCandidates)
 }
 
-// resolveCandidate looks up the candidate's path item directly from the OAS spec (bypassing
-// the OAS router which cannot distinguish structurally identical paths), extracts path
-// parameters, and checks them against the candidate's schemas. Returns the constructed
-// route, path params, and true if the candidate matches; false otherwise.
+// resolveCandidate uses matchCandidatePath to check if the candidate's path param
+// schemas match the request, then builds a routers.Route for full validation.
 func (k *ValidateRequest) resolveCandidate(candidate ValidateRequestCandidate, strippedPath string) (*routers.Route, map[string]string, bool) {
-	pathItem := k.Spec.OAS.Paths.Value(candidate.OASPath)
-	if pathItem == nil {
-		return nil, nil, false
-	}
-	operation := pathItem.GetOperation(candidate.OASMethod)
-	if operation == nil {
-		return nil, nil, false
-	}
-
-	pathParams := extractPathParams(candidate.OASPath, strippedPath)
-	if !pathParamsMatchOperation(pathParams, operation) {
+	pathItem, operation, pathParams, ok := k.Spec.matchCandidatePath(candidate.OASPath, candidate.OASMethod, strippedPath)
+	if !ok {
 		return nil, nil, false
 	}
 
@@ -286,7 +275,11 @@ func pathParamsMatchOperation(pathParams map[string]string, operation *openapi3.
 func valueMatchesSchema(value string, s *openapi3.Schema) bool {
 	// Check type constraints.
 	if s.Type != nil {
-		if s.Type.Is("number") || s.Type.Is("integer") {
+		if s.Type.Is("integer") {
+			if _, err := strconv.ParseInt(value, 10, 64); err != nil {
+				return false
+			}
+		} else if s.Type.Is("number") {
 			if _, err := strconv.ParseFloat(value, 64); err != nil {
 				return false
 			}
