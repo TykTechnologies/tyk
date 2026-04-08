@@ -360,13 +360,9 @@ func TestAnalyticsIgnoreSubgraph(t *testing.T) {
 	assert.NoError(t, err)
 }
 
-func TestSuccessHandler_addTraceIDTag(t *testing.T) {
+func TestAddTraceIDTag(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
-
-	s := &SuccessHandler{
-		BaseMiddleware: &BaseMiddleware{Gw: ts.Gw},
-	}
 
 	makeCtxWithTrace := func(hex string) context.Context {
 		tid, err := trace.TraceIDFromHex(hex)
@@ -415,7 +411,7 @@ func TestSuccessHandler_addTraceIDTag(t *testing.T) {
 			tags := make([]string, 0, len(tc.in))
 			tags = append(tags, tc.in...)
 
-			tags = s.addTraceIDTag(tc.ctx, tags)
+			tags = addTraceIDTag(ts.Gw, tc.ctx, tags)
 
 			want := tc.want
 			if want == nil {

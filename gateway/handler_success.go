@@ -169,8 +169,8 @@ func recordGraphDetails(rec *analytics.AnalyticsRecord, r *http.Request, resp *h
 
 const traceTagPrefix = "trace-id-"
 
-func (s *SuccessHandler) addTraceIDTag(reqCtx context.Context, tags []string) []string {
-	if !s.Gw.GetConfig().OpenTelemetry.TracesEnabled() {
+func addTraceIDTag(gw *Gateway, reqCtx context.Context, tags []string) []string {
+	if !gw.GetConfig().OpenTelemetry.TracesEnabled() {
 		return tags
 	}
 	if id := otel.ExtractTraceID(reqCtx); id != "" {
@@ -222,7 +222,7 @@ func (s *SuccessHandler) RecordHit(r *http.Request, timing analytics.Latency, co
 			tags = append(tags, "cached-response")
 		}
 
-		tags = s.addTraceIDTag(r.Context(), tags)
+		tags = addTraceIDTag(s.Gw, r.Context(), tags)
 
 		rawRequest := ""
 		rawResponse := ""

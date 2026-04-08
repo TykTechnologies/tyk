@@ -157,6 +157,9 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 		if len(e.Spec.Tags) > 0 {
 			tags = append(tags, e.Spec.Tags...)
 		}
+
+		tags = addTraceIDTag(e.Gw, r.Context(), tags)
+
 		trackEP := false
 		trackedPath := r.URL.Path
 
