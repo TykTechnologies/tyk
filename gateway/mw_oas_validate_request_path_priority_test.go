@@ -394,6 +394,131 @@ func TestSameBasePathDifferentParamSchemas(t *testing.T) {
 	}...)
 }
 
+// TestSameBasePathStringCatchAll reproduces the exampleOas.yaml scenario where
+// type:string (no pattern) sorts alphabetically BEFORE type:number, proving that
+// the string candidate steals numeric path values.
+func TestSameBasePathStringCatchAll(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	paths := openapi3.NewPaths()
+
+	// /employees/{prct} — type:string (catch-all), requires header "def"
+	// Alphabetically {prct} < {zd}, so this candidate is tried first.
+	paths.Set("/employees/{prct}", &openapi3.PathItem{
+		Get: &openapi3.Operation{
+			OperationID: "getEmployeeByPrct",
+			Parameters: openapi3.Parameters{
+				{
+					Value: &openapi3.Parameter{
+						Name: "prct", In: "path", Required: true,
+						Schema: &openapi3.SchemaRef{
+							Value: &openapi3.Schema{Type: &openapi3.Types{"string"}},
+						},
+					},
+				},
+				{
+					Value: &openapi3.Parameter{
+						Name: "def", In: "header", Required: true,
+						Schema: &openapi3.SchemaRef{
+							Value: &openapi3.Schema{Type: &openapi3.Types{"string"}},
+						},
+					},
+				},
+			},
+			Responses: openapi3.NewResponses(
+				openapi3.WithStatus(200, &openapi3.ResponseRef{
+					Value: &openapi3.Response{Description: stringPtrHelper("Success")},
+				}),
+			),
+		},
+	})
+
+	// /employees/{zd} — type:number, requires header "abc"
+	// Alphabetically {zd} > {prct}, so this candidate is tried second.
+	paths.Set("/employees/{zd}", &openapi3.PathItem{
+		Get: &openapi3.Operation{
+			OperationID: "getEmployeeByZd",
+			Parameters: openapi3.Parameters{
+				{
+					Value: &openapi3.Parameter{
+						Name: "zd", In: "path", Required: true,
+						Schema: &openapi3.SchemaRef{
+							Value: &openapi3.Schema{Type: &openapi3.Types{"number"}},
+						},
+					},
+				},
+				{
+					Value: &openapi3.Parameter{
+						Name: "abc", In: "header", Required: true,
+						Schema: &openapi3.SchemaRef{
+							Value: &openapi3.Schema{Type: &openapi3.Types{"string"}},
+						},
+					},
+				},
+			},
+			Responses: openapi3.NewResponses(
+				openapi3.WithStatus(200, &openapi3.ResponseRef{
+					Value: &openapi3.Response{Description: stringPtrHelper("Success")},
+				}),
+			),
+		},
+	})
+
+	doc := openapi3.T{
+		OpenAPI: "3.0.0",
+		Info:    &openapi3.Info{Title: "String Catch-All Test", Version: "1.0.0"},
+		Paths:   paths,
+	}
+
+	oasAPI := oas.OAS{T: doc}
+	oasAPI.SetTykExtension(&oas.XTykAPIGateway{
+		Middleware: &oas.Middleware{
+			Operations: oas.Operations{
+				"getEmployeeByPrct": {
+					ValidateRequest: &oas.ValidateRequest{Enabled: true},
+				},
+				"getEmployeeByZd": {
+					ValidateRequest: &oas.ValidateRequest{Enabled: true},
+				},
+			},
+		},
+	})
+
+	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		spec.Name = "String Catch-All API"
+		spec.APIID = "string-catch-all"
+		spec.Proxy.ListenPath = "/api/"
+		spec.UseKeylessAccess = true
+		spec.IsOAS = true
+		spec.OAS = oasAPI
+	})
+
+	_, _ = ts.Run(t, []test.TestCase{
+		{
+			// /employees/5 with header "abc" should match {zd} (type:number) -> 200
+			// BUG: {prct} (type:string) is tried first alphabetically,
+			// "5" is a valid string, but header "def" is missing -> fails,
+			// then {zd} is tried -> passes. This case works by accident.
+			Method:  http.MethodGet,
+			Path:    "/api/employees/5",
+			Headers: map[string]string{"abc": "value"},
+			Code:    http.StatusOK,
+		},
+		{
+			// /employees/5 with header "def" should ideally NOT match {prct}
+			// since "5" is a number and {zd} is the number endpoint.
+			// BUG: {prct} (type:string) is tried first, "5" is a valid string,
+			// header "def" is present -> validation passes -> 200 on WRONG endpoint.
+			// This should match {zd} which requires header "abc", not "def".
+			Method:  http.MethodGet,
+			Path:    "/api/employees/5",
+			Headers: map[string]string{"def": "value"},
+			Code:    http.StatusUnprocessableEntity,
+		},
+	}...)
+}
+
 func TestGroupCollapsedValidateRequestSpecs(t *testing.T) {
 	makeSpec := func(path, method, regex string) URLSpec {
 		return URLSpec{
@@ -410,7 +535,7 @@ func TestGroupCollapsedValidateRequestSpecs(t *testing.T) {
 			makeSpec("/users/{id}", "GET", `^/users/([^/]+)$`),
 			makeSpec("/items/{id}", "GET", `^/items/([^/]+)$`),
 		}
-		result := groupCollapsedValidateRequestSpecs(specs)
+		result := groupCollapsedValidateRequestSpecs(specs, nil)
 		assert.Len(t, result, 2)
 		assert.Nil(t, result[0].OASValidateRequestCandidates)
 		assert.Nil(t, result[1].OASValidateRequestCandidates)
@@ -421,7 +546,7 @@ func TestGroupCollapsedValidateRequestSpecs(t *testing.T) {
 			makeSpec("/employees/{prct}", "GET", `^/employees/([^/]+)$`),
 			makeSpec("/employees/{zd}", "GET", `^/employees/([^/]+)$`),
 		}
-		result := groupCollapsedValidateRequestSpecs(specs)
+		result := groupCollapsedValidateRequestSpecs(specs, nil)
 		assert.Len(t, result, 1)
 		assert.Len(t, result[0].OASValidateRequestCandidates, 2)
 		// Candidates are sorted by OASPath
@@ -434,7 +559,7 @@ func TestGroupCollapsedValidateRequestSpecs(t *testing.T) {
 			makeSpec("/employees/{id}", "GET", `^/employees/([^/]+)$`),
 			makeSpec("/employees/{id}", "POST", `^/employees/([^/]+)$`),
 		}
-		result := groupCollapsedValidateRequestSpecs(specs)
+		result := groupCollapsedValidateRequestSpecs(specs, nil)
 		assert.Len(t, result, 2)
 		assert.Nil(t, result[0].OASValidateRequestCandidates)
 		assert.Nil(t, result[1].OASValidateRequestCandidates)
@@ -446,7 +571,7 @@ func TestGroupCollapsedValidateRequestSpecs(t *testing.T) {
 			makeSpec("/employees/{b}", "GET", `^/employees/([^/]+)$`),
 			makeSpec("/employees/{c}", "GET", `^/employees/([^/]+)$`),
 		}
-		result := groupCollapsedValidateRequestSpecs(specs)
+		result := groupCollapsedValidateRequestSpecs(specs, nil)
 		assert.Len(t, result, 1)
 		assert.Len(t, result[0].OASValidateRequestCandidates, 3)
 		assert.Equal(t, "/employees/{a}", result[0].OASValidateRequestCandidates[0].OASPath)

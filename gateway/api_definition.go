@@ -1389,7 +1389,7 @@ func (a APIDefinitionLoader) compileOASValidateRequestPathSpec(apiSpec *APISpec,
 		urlSpec = append(urlSpec, newSpec)
 	}
 
-	urlSpec = groupCollapsedValidateRequestSpecs(urlSpec)
+	urlSpec = groupCollapsedValidateRequestSpecs(urlSpec, apiSpec.OAS.Paths)
 
 	urlSpec = a.addStaticPathShields(apiSpec, conf, urlSpec, OASValidateRequest, func(path, method string) URLSpec {
 		return URLSpec{
@@ -1407,8 +1407,10 @@ func (a APIDefinitionLoader) compileOASValidateRequestPathSpec(apiSpec *APISpec,
 // groupCollapsedValidateRequestSpecs detects URLSpec entries that compile to the same
 // regex+method pair and groups them as candidates on a single representative URLSpec.
 // This allows the validate request middleware to disambiguate at request time using
-// full path parameter schema validation.
-func groupCollapsedValidateRequestSpecs(specs []URLSpec) []URLSpec {
+// full path parameter schema validation. Candidates are sorted so that endpoints with
+// more restrictive path parameter schemas are tried first (e.g., type:number before
+// type:string which matches everything).
+func groupCollapsedValidateRequestSpecs(specs []URLSpec, oasPaths *openapi3.Paths) []URLSpec {
 	type key struct {
 		regex  string
 		method string
@@ -1435,8 +1437,15 @@ func groupCollapsedValidateRequestSpecs(specs []URLSpec) []URLSpec {
 			continue
 		}
 
-		// Sort candidate indices by OASPath for deterministic ordering.
+		// Sort candidates so more restrictive path parameter schemas are tried first.
+		// type:string with no pattern/constraints is a catch-all and must come last.
 		sort.Slice(indices, func(a, b int) bool {
+			scoreA := pathParamRestrictiveness(specs[indices[a]].OASPath, specs[indices[a]].OASMethod, oasPaths)
+			scoreB := pathParamRestrictiveness(specs[indices[b]].OASPath, specs[indices[b]].OASMethod, oasPaths)
+			if scoreA != scoreB {
+				return scoreA > scoreB
+			}
+			// Tie-break alphabetically for determinism.
 			return specs[indices[a]].OASPath < specs[indices[b]].OASPath
 		})
 
@@ -1472,6 +1481,52 @@ func groupCollapsedValidateRequestSpecs(specs []URLSpec) []URLSpec {
 		}
 	}
 	return result
+}
+
+// pathParamRestrictiveness returns a score indicating how restrictive the path parameter
+// schemas are for a given OAS path+method. Higher scores mean more restrictive. A plain
+// type:string with no constraints scores 0 (catch-all), while type:number, type:integer,
+// type:boolean, or any parameter with a pattern/enum/format scores higher.
+func pathParamRestrictiveness(oasPath, method string, oasPaths *openapi3.Paths) int {
+	if oasPaths == nil {
+		return 0
+	}
+	pathItem := oasPaths.Value(oasPath)
+	if pathItem == nil {
+		return 0
+	}
+	op := pathItem.GetOperation(method)
+	if op == nil {
+		return 0
+	}
+
+	score := 0
+	for _, paramRef := range op.Parameters {
+		if paramRef == nil || paramRef.Value == nil || paramRef.Value.In != "path" {
+			continue
+		}
+		param := paramRef.Value
+		if param.Schema == nil || param.Schema.Value == nil {
+			continue
+		}
+		s := param.Schema.Value
+
+		hasPattern := s.Pattern != ""
+		hasEnum := len(s.Enum) > 0
+		hasFormat := s.Format != ""
+		hasMinLen := s.MinLength != 0
+		hasMaxLen := s.MaxLength != nil
+
+		isString := s.Type != nil && s.Type.Is("string")
+
+		if isString && !hasPattern && !hasEnum && !hasFormat && !hasMinLen && !hasMaxLen {
+			// Unconstrained string — catch-all, no added restrictiveness.
+			continue
+		}
+		// Any non-string type or any constraint adds restrictiveness.
+		score++
+	}
+	return score
 }
 
 // compileOASMockResponsePathSpec extracts MockResponse operations from OAS middleware
