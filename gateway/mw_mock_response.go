@@ -195,9 +195,8 @@ func (m *mockResponseMiddleware) resolveMockCandidate(r *http.Request, urlSpec *
 		}
 	}
 
-	// No candidate matched — fall back to the last (least restrictive) candidate.
-	last := urlSpec.OASMockResponseCandidates[len(urlSpec.OASMockResponseCandidates)-1]
-	return last.OASMockResponseMeta, last.OASPath
+	// No candidate matched — don't mock.
+	return nil, ""
 }
 
 func mockFromConfig(tykMockRespOp *oas.MockResponse) (int, []byte, []oas.Header) {
