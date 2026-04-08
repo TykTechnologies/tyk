@@ -64,12 +64,12 @@ const (
 	RequestXML  RequestInputType = "xml"
 	RequestJSON RequestInputType = "json"
 
-	OttoDriver     MiddlewareDriver = "otto"
+	OttoDriver       MiddlewareDriver = "otto"
 	JavaScriptDriver MiddlewareDriver = "javascript"
-	PythonDriver   MiddlewareDriver = "python"
-	LuaDriver      MiddlewareDriver = "lua"
-	GrpcDriver     MiddlewareDriver = "grpc"
-	GoPluginDriver MiddlewareDriver = "goplugin"
+	PythonDriver     MiddlewareDriver = "python"
+	LuaDriver        MiddlewareDriver = "lua"
+	GrpcDriver       MiddlewareDriver = "grpc"
+	GoPluginDriver   MiddlewareDriver = "goplugin"
 
 	BodySource        IdExtractorSource = "body"
 	HeaderSource      IdExtractorSource = "header"

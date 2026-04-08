@@ -20,14 +20,14 @@ import (
 // pluginTestRunnerRequest is the request body for POST /tyk/plugins/test.
 // org_id and api_id are always injected by the dashboard — clients cannot override them.
 type pluginTestRunnerRequest struct {
-	Code       string                 `json:"code"`
-	HookType   string                 `json:"hook_type"`
-	OrgID      string                 `json:"org_id"`
-	APIID      string                 `json:"api_id"`
+	Code       string                    `json:"code"`
+	HookType   string                    `json:"hook_type"`
+	OrgID      string                    `json:"org_id"`
+	APIID      string                    `json:"api_id"`
 	Request    pluginTestRunnerMockReq   `json:"request"`
 	Response   *pluginTestRunnerMockResp `json:"response,omitempty"`
-	Session    json.RawMessage        `json:"session,omitempty"`
-	ConfigData map[string]any `json:"config_data,omitempty"`
+	Session    json.RawMessage           `json:"session,omitempty"`
+	ConfigData map[string]any            `json:"config_data,omitempty"`
 }
 
 type pluginTestRunnerMockReq struct {
@@ -74,10 +74,10 @@ type pluginTestRunnerResponse struct {
 	RequestBefore  *pluginTestRunnerMockReq  `json:"request_before,omitempty"`
 	RequestAfter   *testRunnerRequestAfter   `json:"request_after,omitempty"`
 	ResponseBefore *pluginTestRunnerMockResp `json:"response_before,omitempty"`
-	ResponseAfter  *MiniResponseObject    `json:"response_after,omitempty"`
-	SessionAfter   any            `json:"session_after,omitempty"`
+	ResponseAfter  *MiniResponseObject       `json:"response_after,omitempty"`
+	SessionAfter   any                       `json:"session_after,omitempty"`
 	Error          *testRunnerError          `json:"error,omitempty"`
-	ExecutionMs    int64                  `json:"execution_ms"`
+	ExecutionMs    int64                     `json:"execution_ms"`
 }
 
 var validHookTypes = map[string]bool{
@@ -115,7 +115,8 @@ func (gw *Gateway) pluginTestHandler(w http.ResponseWriter, r *http.Request) {
 	writeJSON := func(status int, v any) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(status)
-		_ = json.NewEncoder(w).Encode(v)
+		//nolint:errcheck // best-effort response write
+		json.NewEncoder(w).Encode(v)
 	}
 
 	// 1. Parse request body
@@ -212,7 +213,11 @@ func (gw *Gateway) pluginTestHandler(w http.ResponseWriter, r *http.Request) {
 	if req.HookType == "pre" || req.HookType == "auth_check" {
 		session = user.SessionState{}
 	}
-	sessionAsJSON, _ := json.Marshal(session)
+	sessionAsJSON, err := json.Marshal(session)
+	if err != nil {
+		writeJSON(http.StatusInternalServerError, map[string]string{"error": "failed to marshal session: " + err.Error()})
+		return
+	}
 	configAsJSON := specToJson(spec)
 
 	// Build request_before for display (using the resolved URL/RequestURI)
@@ -309,13 +314,24 @@ func (gw *Gateway) runTestRunnerResponseHook(
 		SetHeaders:    map[string]string{},
 		DeleteHeaders: []string{},
 	}
-	responseAsJSON, _ := json.Marshal(mockResp)
+	responseAsJSON, err := json.Marshal(mockResp)
+	if err != nil {
+		runnerResp.Error = &testRunnerError{Message: "failed to marshal response: " + err.Error(), Type: "internal"}
+		return
+	}
 
 	// Response hooks receive nil body on the request object (matches mw_js_plugin_response.go:123)
 	var reqForRespObj MiniRequestObject
-	_ = json.Unmarshal(requestAsJSON, &reqForRespObj)
+	if err := json.Unmarshal(requestAsJSON, &reqForRespObj); err != nil {
+		runnerResp.Error = &testRunnerError{Message: "failed to unmarshal request: " + err.Error(), Type: "internal"}
+		return
+	}
 	reqForRespObj.Body = nil
-	reqForRespJSON, _ := json.Marshal(reqForRespObj)
+	reqForRespJSON, err := json.Marshal(reqForRespObj)
+	if err != nil {
+		runnerResp.Error = &testRunnerError{Message: "failed to marshal request: " + err.Error(), Type: "internal"}
+		return
+	}
 
 	expr := fmt.Sprintf("__sandboxMiddleware.DoProcessResponse(%s, %s, %s, %s)", responseAsJSON, reqForRespJSON, sessionAsJSON, configAsJSON)
 	retVal, err := vm.RunString(expr)

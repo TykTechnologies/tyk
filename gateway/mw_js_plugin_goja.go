@@ -38,7 +38,7 @@ func (j *GojaJSVM) Ready() bool {
 
 // VM returns nil — goja does not have a persistent VM; a fresh runtime is
 // created per Run() call.  This satisfies call-sites that guard on VM != nil.
-func (j *GojaJSVM) VM() interface{} {
+func (j *GojaJSVM) VM() any {
 	if !j.initialized {
 		return nil
 	}
@@ -180,8 +180,12 @@ func (j *GojaJSVM) TestRunnerRuntime(logs *[]testRunnerLog) *goja.Runtime {
 		})
 		return goja.Undefined()
 	}
-	_ = vm.Set("log", capture)
-	_ = vm.Set("rawlog", capture)
+	if err := vm.Set("log", capture); err != nil {
+		log.WithError(err).Error("Failed to set log function in sandbox VM")
+	}
+	if err := vm.Set("rawlog", capture); err != nil {
+		log.WithError(err).Error("Failed to set rawlog function in sandbox VM")
+	}
 	return vm
 }
 
@@ -222,7 +226,7 @@ func (j *GojaJSVM) LoadJSPaths(paths []string, prefix string) {
 func (j *GojaJSVM) registerAPI(vm *goja.Runtime) {
 	h := &JSVMAPIHelper{Spec: j.Spec, Gw: j.Gw, Log: j.Log, RawLog: j.RawLog}
 
-	set := func(name string, fn interface{}) {
+	set := func(name string, fn any) {
 		if err := vm.Set(name, fn); err != nil && j.Log != nil {
 			j.Log.WithError(err).Errorf("Failed to register JS function: %s", name)
 		}
