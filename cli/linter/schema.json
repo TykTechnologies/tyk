@@ -1611,7 +1611,7 @@
       }
     },
     "rate_limit_response_headers": {
-      "description": "defines the source for the rate limit headers",
+      "description": "Determines the type of data that will be returned in the rate limit headers",
       "type": ["string"],
       "enum": ["", "quotas", "rate_limits"],
       "default": "quotas"
