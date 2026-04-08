@@ -170,7 +170,7 @@ func recordGraphDetails(rec *analytics.AnalyticsRecord, r *http.Request, resp *h
 const traceTagPrefix = "trace-id-"
 
 func (s *SuccessHandler) addTraceIDTag(reqCtx context.Context, tags []string) []string {
-	if !s.Gw.GetConfig().OpenTelemetry.Enabled {
+	if !s.Gw.GetConfig().OpenTelemetry.TracesEnabled() {
 		return tags
 	}
 	if id := otel.ExtractTraceID(reqCtx); id != "" {
@@ -442,8 +442,9 @@ func (s *SuccessHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) *http
 
 		s.RecordHit(r, latency, resp.Response.StatusCode, resp.Response, false)
 		s.RecordAccessLog(r, resp.Response, latency)
+
+		s.Base().RecordMetrics(w, r, resp.Response.StatusCode, latency, resp.Response)
 	}
-	s.Base().Gw.MetricInstruments.RecordRequest(r.Context())
 	log.Debug("Done proxy")
 
 	return nil
@@ -490,6 +491,7 @@ func (s *SuccessHandler) ServeHTTPWithCache(w http.ResponseWriter, r *http.Reque
 		s.RecordHit(r, latency, inRes.Response.StatusCode, inRes.Response, false)
 		s.RecordAccessLog(r, inRes.Response, latency)
 
+		s.Base().RecordMetrics(w, r, inRes.Response.StatusCode, latency, inRes.Response)
 	}
 
 	return inRes

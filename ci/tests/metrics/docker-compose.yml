@@ -20,7 +20,7 @@ services:
     ports:
       - 9000:8080
     env_file:
-      - ./configs/tyk.env
+      - ./profiles/${GW_PROFILE:-default}/tyk.env
     volumes:
       - ./apps:/opt/tyk-gateway/apps
     depends_on:
@@ -54,6 +54,13 @@ services:
       - 8889:8889
     volumes:
       - ./configs/otelcollector/collector.config.yml:/otel-local-config.yml
+
+  mcp-server:
+    image: tzolov/mcp-everything-server:v3
+    platform: linux/amd64
+    command: ["node", "dist/index.js", "streamableHttp"]
+    expose:
+      - "3001"
 
   prometheus:
     image: prom/prometheus:v2.51.0

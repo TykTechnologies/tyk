@@ -1460,6 +1460,9 @@ func (gw *Gateway) generateSessionFromPolicy(policyID, orgID string, enforceOrg 
 		session.Expires = time.Now().Unix() + policy.KeyExpiresIn
 	}
 
+	session.PostExpiryAction = policy.PostExpiryAction
+	session.PostExpiryGracePeriod = policy.PostExpiryGracePeriod
+
 	return session.Clone(), nil
 }
 
