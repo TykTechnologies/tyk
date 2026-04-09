@@ -14,6 +14,7 @@ import (
 
 	"github.com/TykTechnologies/tyk-pump/analytics"
 	"github.com/TykTechnologies/tyk/internal/httputil/accesslog"
+	"github.com/TykTechnologies/tyk/pkg/errpack"
 
 	"github.com/gocraft/health"
 	"github.com/justinas/alice"
@@ -198,7 +199,12 @@ func (gw *Gateway) createMiddleware(actualMW TykMiddleware) func(http.Handler) h
 					job.TimingKv(eventName+".exec_time", finishTime.Nanoseconds(), meta)
 				}
 
-				logger.WithError(err).WithField("code", errCode).WithField("ns", finishTime.Nanoseconds()).Debug("Finished")
+				logger.
+					WithError(err).
+					WithField("code", errCode).
+					WithField("ns", finishTime.Nanoseconds()).
+					Log(errpack.LogLevel(err, logrus.DebugLevel), "Finished")
+
 				return
 			}
 
@@ -526,6 +532,7 @@ func (t *BaseMiddleware) RecordMetrics(w http.ResponseWriter, r *http.Request, s
 		APIName:         t.Spec.Name,
 		OrgID:           t.Spec.OrgID,
 		ListenPath:      t.Spec.Proxy.ListenPath,
+		Endpoint:        ctxGetTrackedPath(r),
 		IPAddress:       request.RealIP(r),
 		LatencyTotal:    latency.Total,
 		LatencyUpstream: latency.Upstream,
@@ -563,6 +570,9 @@ func (t *BaseMiddleware) RecordMetrics(w http.ResponseWriter, r *http.Request, s
 		rc.MCPPrimitiveType = ctxGetMCPPrimitiveType(r)
 		rc.MCPPrimitiveName = ctxGetMCPPrimitiveName(r)
 		rc.MCPErrorCode = ctxGetJSONRPCErrorCode(r)
+	}
+	if t.Gw.MetricInstruments.NeedsConfigData() && !t.Spec.ConfigDataDisabled && len(t.Spec.ConfigData) > 0 {
+		rc.ConfigData = t.Spec.ConfigData
 	}
 	t.Gw.MetricInstruments.RecordRequest(r.Context())
 	t.Gw.MetricInstruments.RecordAPIMetrics(r.Context(), rc)
