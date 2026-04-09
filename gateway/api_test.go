@@ -4251,6 +4251,103 @@ func TestApplyLifetime_PostExpiry_FromPolicy(t *testing.T) {
 	assert.InDelta(t, 300, got, 10)
 }
 
+func TestPostExpiryFields_APIRoundTrip(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		spec.APIID = "api1"
+		spec.UseKeylessAccess = false
+		spec.OrgID = "default"
+	})
+
+	t.Run("direct key creation", func(t *testing.T) {
+		session := CreateStandardSession()
+		session.PostExpiryAction = user.PostExpiryActionRetain
+		session.PostExpiryGracePeriod = 600
+		session.AccessRights = map[string]user.AccessDefinition{
+			"api1": {APIID: "api1", Versions: []string{"v1"}},
+		}
+
+		resp, err := ts.Do(test.TestCase{
+			Method:    http.MethodPost,
+			Path:      "/tyk/keys/create",
+			Data:      session,
+			AdminAuth: true,
+		})
+		assert.NoError(t, err)
+
+		var keyResp apiModifyKeySuccess
+		err = json.NewDecoder(resp.Body).Decode(&keyResp)
+		assert.NoError(t, err)
+		assert.Equal(t, "ok", keyResp.Status)
+
+		// GET the key and verify post_expiry fields are returned
+		stored, ok := ts.Gw.GlobalSessionManager.SessionDetail("default", keyResp.Key, false)
+		assert.True(t, ok)
+		assert.Equal(t, user.PostExpiryActionRetain, stored.PostExpiryAction)
+		assert.Equal(t, int64(600), stored.PostExpiryGracePeriod)
+
+		// Also verify via HTTP GET that the fields appear in the JSON response
+		resp, err = ts.Do(test.TestCase{
+			Method:    http.MethodGet,
+			Path:      "/tyk/keys/" + keyResp.Key,
+			AdminAuth: true,
+		})
+		assert.NoError(t, err)
+
+		body, _ := ioutil.ReadAll(resp.Body)
+		var fetched user.SessionState
+		err = json.Unmarshal(body, &fetched)
+		assert.NoError(t, err)
+		assert.Equal(t, user.PostExpiryActionRetain, fetched.PostExpiryAction)
+		assert.Equal(t, int64(600), fetched.PostExpiryGracePeriod)
+	})
+
+	t.Run("from policy", func(t *testing.T) {
+		pID := ts.CreatePolicy(func(p *user.Policy) {
+			p.PostExpiryAction = user.PostExpiryActionDelete
+			p.PostExpiryGracePeriod = 3600
+			p.AccessRights = map[string]user.AccessDefinition{
+				"api1": {APIID: "api1", Versions: []string{"v1"}},
+			}
+		})
+
+		session := CreateStandardSession()
+		session.ApplyPolicies = []string{pID}
+		session.AccessRights = map[string]user.AccessDefinition{
+			"api1": {APIID: "api1", Versions: []string{"v1"}},
+		}
+
+		resp, err := ts.Do(test.TestCase{
+			Method:    http.MethodPost,
+			Path:      "/tyk/keys/create",
+			Data:      session,
+			AdminAuth: true,
+		})
+		assert.NoError(t, err)
+
+		var keyResp apiModifyKeySuccess
+		err = json.NewDecoder(resp.Body).Decode(&keyResp)
+		assert.NoError(t, err)
+
+		// GET the key via HTTP and verify policy values are applied
+		resp, err = ts.Do(test.TestCase{
+			Method:    http.MethodGet,
+			Path:      "/tyk/keys/" + keyResp.Key,
+			AdminAuth: true,
+		})
+		assert.NoError(t, err)
+
+		body, _ := ioutil.ReadAll(resp.Body)
+		var fetched user.SessionState
+		err = json.Unmarshal(body, &fetched)
+		assert.NoError(t, err)
+		assert.Equal(t, user.PostExpiryActionDelete, fetched.PostExpiryAction)
+		assert.Equal(t, int64(3600), fetched.PostExpiryGracePeriod)
+	})
+}
+
 func TestOrgKeyHandler_LastUpdated(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
