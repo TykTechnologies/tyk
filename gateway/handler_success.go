@@ -195,14 +195,15 @@ func (s *SuccessHandler) addTraceIDTag(reqCtx context.Context, tags []string) []
 }
 
 func (s *SuccessHandler) RecordHit(r *http.Request, timing analytics.Latency, code int, responseCopy *http.Response, cached bool) {
-
+	fmt.Println("QATEST3: insideRecordHit")
 	if s.Spec.DoNotTrack || ctxGetDoNotTrack(r) {
+		fmt.Println("QATEST5: insideRecordHit, DoNotTrack is enabled for this request, skipping analytics recording")
 		return
 	}
 
 	ip := request.RealIP(r)
 	if s.Spec.GlobalConfig.StoreAnalytics(ip) {
-
+		fmt.Println("QATEST4: insideRecordHit, IP is not in the analytics ignore list, proceeding to record analytics")
 		t := time.Now()
 
 		// Track the key ID if it exists
