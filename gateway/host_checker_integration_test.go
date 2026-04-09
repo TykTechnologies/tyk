@@ -17,6 +17,7 @@ import (
 
 // Mock certificate manager for host checker integration testing
 type mockHostCheckerCertificateManager struct {
+	certs.IdGetter
 	certificates   map[string]*tls.Certificate
 	caCertificates []string
 }
