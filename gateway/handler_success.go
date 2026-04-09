@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/base64"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"net/http"
@@ -327,7 +328,9 @@ func (s *SuccessHandler) RecordHit(r *http.Request, timing analytics.Latency, co
 			record.ApiSchema = base64.StdEncoding.EncodeToString([]byte(s.Spec.GraphQL.Schema))
 		}
 
+		fmt.Println("QATEST1: record hit is being called, checking if this is for MCP API and if so, recording MCP details in the analytics record")
 		if s.Spec.IsMCP() {
+			fmt.Println("QATEST2: record hit is being called for MCP API, recording MCP details in the analytics record")
 			recordMCPDetails(&record, r)
 		}
 
