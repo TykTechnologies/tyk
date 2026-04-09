@@ -21,6 +21,7 @@ import (
 
 // Mock certificate manager for E2E testing
 type mockE2ECertificateManager struct {
+	certs.IdGetter
 	certificates   map[string]*tls.Certificate
 	caCertificates []string
 }
