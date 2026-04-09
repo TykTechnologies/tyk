@@ -107,7 +107,8 @@ func (k *ValidateRequest) ProcessRequest(w http.ResponseWriter, r *http.Request,
 	// If this URLSpec has multiple candidates (collapsed parameterized paths),
 	// disambiguate using path parameter schema validation.
 	if len(urlSpec.OASValidateRequestCandidates) > 0 {
-		return k.processRequestWithCandidates(r, urlSpec)
+		code, err := k.processRequestWithCandidates(r, urlSpec)
+		return err, code
 	}
 
 	validateRequest := urlSpec.OASValidateRequestMeta
@@ -168,7 +169,7 @@ func (k *ValidateRequest) ProcessRequest(w http.ResponseWriter, r *http.Request,
 //
 // This prevents a catch-all type:string candidate from stealing requests that belong to
 // a more restrictive type:number candidate.
-func (k *ValidateRequest) processRequestWithCandidates(r *http.Request, urlSpec *URLSpec) (error, int) {
+func (k *ValidateRequest) processRequestWithCandidates(r *http.Request, urlSpec *URLSpec) (int, error) {
 	normalizeHeaders(r.Header)
 	strippedPath := k.Spec.StripListenPath(r.URL.Path)
 
@@ -186,8 +187,8 @@ func (k *ValidateRequest) processRequestWithCandidates(r *http.Request, urlSpec 
 		return k.validateRoute(r, route, pathParams, candidate.OASValidateRequestMeta)
 	}
 
-	return fmt.Errorf("request validation error: path parameter doesn't match any endpoint"),
-		candidatesErrorResponseCode(urlSpec.OASValidateRequestCandidates)
+	return candidatesErrorResponseCode(urlSpec.OASValidateRequestCandidates),
+		fmt.Errorf("request validation error: path parameter doesn't match any endpoint")
 }
 
 // resolveCandidate uses matchCandidatePath to check if the candidate's path param
@@ -210,7 +211,7 @@ func (k *ValidateRequest) resolveCandidate(candidate ValidateRequestCandidate, s
 
 // validateRoute runs openapi3filter.ValidateRequest against a resolved route and returns
 // the appropriate error/status pair.
-func (k *ValidateRequest) validateRoute(r *http.Request, route *routers.Route, pathParams map[string]string, meta *oas.ValidateRequest) (error, int) {
+func (k *ValidateRequest) validateRoute(r *http.Request, route *routers.Route, pathParams map[string]string, meta *oas.ValidateRequest) (int, error) {
 	errResponseCode := http.StatusUnprocessableEntity
 	if meta != nil && meta.ErrorResponseCode != 0 {
 		errResponseCode = meta.ErrorResponseCode
@@ -228,9 +229,9 @@ func (k *ValidateRequest) validateRoute(r *http.Request, route *routers.Route, p
 	}
 
 	if err := openapi3filter.ValidateRequest(r.Context(), input); err != nil {
-		return fmt.Errorf("request validation error: %w", schema.RestoreUnicodeEscapesInError(err)), errResponseCode
+		return errResponseCode, fmt.Errorf("request validation error: %w", schema.RestoreUnicodeEscapesInError(err))
 	}
-	return nil, http.StatusOK
+	return http.StatusOK, nil
 }
 
 // candidatesErrorResponseCode returns the error response code from the first enabled
@@ -341,8 +342,8 @@ func valueMatchesFormat(value, format string) bool {
 		return strings.Contains(value, "@")
 	case "uuid":
 		// UUID: 8-4-4-4-12 hex chars
-		matched, _ := tykregexp.MatchString(`^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$`, value)
-		return matched
+		matched, err := tykregexp.MatchString(`^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$`, value)
+		return err == nil && matched
 	default:
 		// Unknown format — don't reject, let full validation handle it.
 		return true
