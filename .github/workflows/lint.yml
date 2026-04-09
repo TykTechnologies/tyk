@@ -15,14 +15,14 @@ concurrency:
 
 jobs:
   dep-guard:
-    uses: TykTechnologies/github-actions/.github/workflows/dependency-guard.yml@2b35ab5dd4cfff21ced9d12446e9e27d10bf5785  # main
+    uses: TykTechnologies/github-actions/.github/workflows/dependency-guard.yml@d3fa20888fa2878e877e22bb7702141217290e7c  # main
     permissions:
       contents: read
 
   godoc:
     needs: [dep-guard]
     if: ${{ !github.event.pull_request.draft }}
-    uses: TykTechnologies/github-actions/.github/workflows/godoc.yml@2b35ab5dd4cfff21ced9d12446e9e27d10bf5785  # main
+    uses: TykTechnologies/github-actions/.github/workflows/godoc.yml@d3fa20888fa2878e877e22bb7702141217290e7c  # main
     secrets:
       ORG_GH_TOKEN: ${{ secrets.ORG_GH_TOKEN }}
     with:
