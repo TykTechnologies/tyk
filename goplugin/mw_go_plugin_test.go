@@ -323,6 +323,62 @@ func TestGoPluginResponseHook(t *testing.T) {
 	})
 }
 
+func TestGoPlugin_IPBindingPerKey(t *testing.T) {
+	ts := gateway.StartTest(nil)
+	defer ts.Close()
+
+	ts.Gw.BuildAndLoadAPI(func(spec *gateway.APISpec) {
+		spec.APIID = "plugin_api_ip_binding"
+		spec.Proxy.ListenPath = "/goplugin-ip-binding"
+		spec.UseKeylessAccess = false
+		spec.UseStandardAuth = true
+		spec.CustomMiddleware = apidef.MiddlewareSection{
+			Driver: apidef.GoPluginDriver,
+			PostKeyAuth: []apidef.MiddlewareDefinition{
+				{
+					Name: "MyPluginIPBindingPostKeyAuth",
+					Path: goPluginFilename(),
+				},
+			},
+		}
+	})
+
+	// Create a key with allowed_ips in meta_data
+	key := gateway.CreateSession(ts.Gw, func(s *user.SessionState) {
+		if s.MetaData == nil {
+			s.MetaData = make(map[string]interface{})
+		}
+		s.MetaData["allowed_ips"] = "1.2.3.4"
+	})
+
+	t.Run("Allowed IP", func(t *testing.T) {
+		ts.Run(t, []test.TestCase{
+			{
+				Path: "/goplugin-ip-binding/hit",
+				Headers: map[string]string{
+					"Authorization":   key,
+					"X-Forwarded-For": "1.2.3.4",
+				},
+				Code: http.StatusOK,
+			},
+		}...)
+	})
+
+	t.Run("Disallowed IP", func(t *testing.T) {
+		ts.Run(t, []test.TestCase{
+			{
+				Path: "/goplugin-ip-binding/hit",
+				Headers: map[string]string{
+					"Authorization":   key,
+					"X-Forwarded-For": "5.6.7.8",
+				},
+				Code:      http.StatusForbidden,
+				BodyMatch: "IP not allowed",
+			},
+		}...)
+	})
+}
+
 func TestGoPluginPerPathSingleFile(t *testing.T) {
 
 	ts := gateway.StartTest(nil)

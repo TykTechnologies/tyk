@@ -227,3 +227,26 @@ func MyPluginApplyingPolicy(rw http.ResponseWriter, r *http.Request) {
 
 	ctx.SetSession(r, session, true)
 }
+
+func MyPluginIPBindingPostKeyAuth(rw http.ResponseWriter, r *http.Request) {
+	session := ctx.GetSession(r)
+	if session == nil {
+		rw.WriteHeader(http.StatusUnauthorized)
+		return
+	}
+
+	// Extract allowed_ips from session.MetaData
+	allowedIPs, ok := session.MetaData["allowed_ips"].(string)
+	if !ok {
+		// No IP binding configured, allow request
+		return
+	}
+
+	// Compare with client IP (e.g., from X-Forwarded-For or r.RemoteAddr)
+	clientIP := r.Header.Get("X-Forwarded-For")
+	if clientIP != allowedIPs {
+		rw.WriteHeader(http.StatusForbidden)
+		rw.Write([]byte("IP not allowed"))
+		return
+	}
+}
