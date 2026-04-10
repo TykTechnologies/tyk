@@ -71,6 +71,18 @@ func CompileExtractor(dim DimensionDefinition) (*DimensionExtractor, error) {
 			return rc.Response.Header.Get(key)
 		}
 
+	case "config_data":
+		key := dim.Key
+		ext.Extract = func(rc *RequestContext) string {
+			if rc.ConfigData == nil {
+				return ""
+			}
+			if v, ok := rc.ConfigData[key]; ok {
+				return fmt.Sprint(v)
+			}
+			return ""
+		}
+
 	default:
 		return nil, fmt.Errorf("unknown dimension source: %q", dim.Source)
 	}
