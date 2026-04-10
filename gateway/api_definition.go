@@ -200,6 +200,9 @@ func (s *APISpec) Unload() {
 	if s.JSVM.VM != nil {
 		s.JSVM.DeInit()
 	}
+	if s.GojaJSVM.Initialized() {
+		s.GojaJSVM.DeInit()
+	}
 
 	if s.HTTPTransport != nil {
 		// Prevent new idle connections to be generated.
@@ -337,9 +340,14 @@ func (a APIDefinitionLoader) MakeSpec(def *model.MergedAPI, logger *logrus.Entry
 		return nil, err
 	}
 
-	if a.Gw.GetConfig().EnableJSVM && (spec.hasVirtualEndpoint() || spec.CustomMiddleware.Driver == apidef.OttoDriver) {
-		logger.Debug("Initializing JSVM")
-		spec.JSVM.Init(spec, logger, a.Gw)
+	if a.Gw.GetConfig().EnableJSVM {
+		if spec.CustomMiddleware.Driver == apidef.JavaScriptDriver {
+			logger.Debug("Initializing GojaJSVM")
+			spec.GojaJSVM.Init(spec, logger, a.Gw)
+		} else if spec.hasVirtualEndpoint() || spec.CustomMiddleware.Driver == apidef.OttoDriver {
+			logger.Debug("Initializing JSVM")
+			spec.JSVM.Init(spec, logger, a.Gw)
+		}
 	}
 
 	// Set up Event Handlers
@@ -1197,7 +1205,11 @@ func (a APIDefinitionLoader) compileVirtualPathsSpec(paths []apidef.VirtualMeta,
 		// Extend with method actions
 		newSpec.VirtualPathSpec = stringSpec
 
-		a.Gw.preLoadVirtualMetaCode(&newSpec.VirtualPathSpec, &apiSpec.JSVM)
+		if apiSpec.CustomMiddleware.Driver == apidef.JavaScriptDriver {
+			a.Gw.preLoadVirtualMetaCodeGoja(&newSpec.VirtualPathSpec, &apiSpec.GojaJSVM)
+		} else {
+			a.Gw.preLoadVirtualMetaCode(&newSpec.VirtualPathSpec, &apiSpec.JSVM)
+		}
 
 		urlSpec = append(urlSpec, newSpec)
 	}

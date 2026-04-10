@@ -2,6 +2,7 @@ package gateway
 
 import (
 	"crypto/tls"
+	"encoding/base64"
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -38,6 +39,12 @@ import (
 const (
 	rateLimitEndpoint = "/tyk/rate-limits/"
 )
+
+// isJSDriver returns true for drivers that use in-process JS execution
+// (otto or goja) as opposed to coprocess (python, lua, grpc) or go plugins.
+func isJSDriver(d apidef.MiddlewareDriver) bool {
+	return d == apidef.OttoDriver || d == apidef.JavaScriptDriver
+}
 
 type ChainObject struct {
 	ThisHandler    http.Handler
@@ -252,9 +259,29 @@ func (gw *Gateway) processSpec(
 	var mwPaths []string
 
 	mwPaths, mwAuthCheckFunc, mwPreFuncs, mwPostFuncs, mwPostAuthCheckFuncs, mwResponseFuncs, mwDriver = gw.loadCustomMiddleware(spec)
-	if gw.GetConfig().EnableJSVM && (spec.hasVirtualEndpoint() || mwDriver == apidef.OttoDriver) {
+	if gw.GetConfig().EnableJSVM && (spec.hasVirtualEndpoint() || isJSDriver(mwDriver)) {
 		logger.Debug("Loading JS Paths")
-		spec.JSVM.LoadJSPaths(mwPaths, prefix)
+		if mwDriver == apidef.JavaScriptDriver {
+			spec.GojaJSVM.LoadJSPaths(mwPaths, prefix)
+
+			// Load inline code from MiddlewareDefinition.Code fields (goja only)
+			for _, md := range collectAllMiddleware(mwAuthCheckFunc, mwPreFuncs, mwPostFuncs, mwPostAuthCheckFuncs, mwResponseFuncs) {
+				if md.Code == "" {
+					continue
+				}
+				decoded, err := base64.StdEncoding.DecodeString(md.Code)
+				if err != nil {
+					logger.WithError(err).Errorf("Failed to decode inline code for middleware %q", md.Name)
+					continue
+				}
+				if err := spec.GojaJSVM.LoadScript(string(decoded)); err != nil {
+					logger.WithError(err).Errorf("Failed to compile inline code for middleware %q", md.Name)
+					continue
+				}
+			}
+		} else {
+			spec.JSVM.LoadJSPaths(mwPaths, prefix)
+		}
 	}
 
 	//  if bundle was used - fix paths for goplugin-type custom middle-wares
@@ -327,7 +354,7 @@ func (gw *Gateway) processSpec(
 					APILevel:       true,
 				},
 			)
-		} else if mwDriver != apidef.OttoDriver {
+		} else if !isJSDriver(mwDriver) {
 			coprocessLog.Debug("Registering coprocess middleware, hook name: ", obj.Name, "hook type: Pre", ", driver: ", mwDriver)
 			gw.mwAppendEnabled(&chainArray, &CoProcessMiddleware{baseMid.Copy(), coprocess.HookType_Pre, obj.Name, mwDriver, obj.RawBodyOnly, nil})
 		} else {
@@ -414,7 +441,7 @@ func (gw *Gateway) processSpec(
 
 		if customPluginAuthEnabled && !mwAuthCheckFunc.Disabled {
 			switch spec.CustomMiddleware.Driver {
-			case apidef.OttoDriver:
+			case apidef.OttoDriver, apidef.JavaScriptDriver:
 				logger.Info("----> Checking security policy: JS Plugin")
 				dynamicMW := &DynamicMiddleware{
 					BaseMiddleware:      baseMid.Copy(),
@@ -499,6 +526,8 @@ func (gw *Gateway) processSpec(
 						APILevel:       true,
 					},
 				)
+			} else if isJSDriver(mwDriver) {
+				chainArray = append(chainArray, gw.createDynamicMiddleware(obj.Name, false, obj.RequireSession, baseMid.Copy()))
 			} else {
 				coprocessLog.Debug("Registering coprocess middleware, hook name: ", obj.Name, "hook type: Pre", ", driver: ", mwDriver)
 				gw.mwAppendEnabled(&chainArray, &CoProcessMiddleware{baseMid.Copy(), coprocess.HookType_PostKeyAuth, obj.Name, mwDriver, obj.RawBodyOnly, nil})
@@ -564,7 +593,7 @@ func (gw *Gateway) processSpec(
 					APILevel:       true,
 				},
 			)
-		} else if mwDriver != apidef.OttoDriver {
+		} else if !isJSDriver(mwDriver) {
 			coprocessLog.Debug("Registering coprocess middleware, hook name: ", obj.Name, "hook type: Post", ", driver: ", mwDriver)
 			gw.mwAppendEnabled(&chainArray, &CoProcessMiddleware{baseMid.Copy(), coprocess.HookType_Post, obj.Name, mwDriver, obj.RawBodyOnly, nil})
 		} else {
@@ -1298,6 +1327,21 @@ func (gw *Gateway) enforceOrgDataAgeIfQuotasEnabled(spec *APISpec) {
 	spec.GlobalConfig.EnforceOrgDataAge = true
 	globalConf.EnforceOrgDataAge = true
 	gw.SetConfig(globalConf)
+}
+
+// collectAllMiddleware gathers MiddlewareDefinition entries from the auth check hook
+// and all hook slices (pre, post, post-key-auth, response) into a single flat slice.
+func collectAllMiddleware(authCheck apidef.MiddlewareDefinition, slices ...[]apidef.MiddlewareDefinition) []apidef.MiddlewareDefinition {
+	total := 1
+	for _, s := range slices {
+		total += len(s)
+	}
+	all := make([]apidef.MiddlewareDefinition, 0, total)
+	all = append(all, authCheck)
+	for _, s := range slices {
+		all = append(all, s...)
+	}
+	return all
 }
 
 // WithQuotaKey overrides quota key manually

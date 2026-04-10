@@ -273,7 +273,8 @@
             "python",
             "lua",
             "grpc",
-            "goplugin"
+            "goplugin",
+            "javascript"
           ]
         },
         "bundle": {
@@ -312,6 +313,15 @@
         },
         "path": {
           "type": "string"
+        },
+        "code": {
+          "type": "string"
+        },
+        "pluginId": {
+          "type": "string"
+        },
+        "pluginHash": {
+          "type": "string"
         }
       },
       "required": [
@@ -347,6 +357,15 @@
           "type": "string"
         },
         "path": {
+          "type": "string"
+        },
+        "code": {
+          "type": "string"
+        },
+        "pluginId": {
+          "type": "string"
+        },
+        "pluginHash": {
           "type": "string"
         },
         "rawBodyOnly": {

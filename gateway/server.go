@@ -903,6 +903,7 @@ func (gw *Gateway) loadControlAPIEndpoints(muxer *mux.Router) {
 	}
 
 	r.HandleFunc("/debug", gw.traceHandler).Methods("POST")
+	r.HandleFunc("/plugins/test", gw.pluginTestHandler).Methods("POST")
 	r.HandleFunc("/cache/jwks/{apiID}", gw.invalidateJWKSCacheForAPIID).Methods("DELETE")
 	r.HandleFunc("/cache/jwks", gw.invalidateJWKSCacheForAllAPIs).Methods("DELETE")
 	r.HandleFunc("/cache/{apiID}", gw.invalidateCacheHandler).Methods("DELETE")
@@ -1014,7 +1015,7 @@ func (gw *Gateway) loadCustomMiddleware(spec *APISpec) ([]string, apidef.Middlew
 	// Set AuthCheck hook
 	if !spec.CustomMiddleware.AuthCheck.Disabled && spec.CustomMiddleware.AuthCheck.Name != "" {
 		mwAuthCheckFunc = spec.CustomMiddleware.AuthCheck
-		if spec.CustomMiddleware.AuthCheck.Path != "" {
+		if spec.CustomMiddleware.AuthCheck.Code == "" && spec.CustomMiddleware.AuthCheck.Path != "" {
 			// Feed a JS file to Otto
 			mwPaths = append(mwPaths, spec.CustomMiddleware.AuthCheck.Path)
 		}
@@ -1026,7 +1027,9 @@ func (gw *Gateway) loadCustomMiddleware(spec *APISpec) ([]string, apidef.Middlew
 			continue
 		}
 
-		mwPaths = append(mwPaths, mwObj.Path)
+		if mwObj.Code == "" {
+			mwPaths = append(mwPaths, mwObj.Path)
+		}
 		mwPreFuncs = append(mwPreFuncs, mwObj)
 		mainLog.Debug("Loading custom PRE-PROCESSOR middleware: ", mwObj.Name)
 	}
@@ -1035,7 +1038,9 @@ func (gw *Gateway) loadCustomMiddleware(spec *APISpec) ([]string, apidef.Middlew
 			continue
 		}
 
-		mwPaths = append(mwPaths, mwObj.Path)
+		if mwObj.Code == "" {
+			mwPaths = append(mwPaths, mwObj.Path)
+		}
 		mwPostFuncs = append(mwPostFuncs, mwObj)
 		mainLog.Debug("Loading custom POST-PROCESSOR middleware: ", mwObj.Name)
 	}
@@ -1103,6 +1108,9 @@ func (gw *Gateway) loadCustomMiddleware(spec *APISpec) ([]string, apidef.Middlew
 			continue
 		}
 
+		if mw.Path != "" {
+			mwPaths = append(mwPaths, mw.Path)
+		}
 		mwResponseFuncs = append(mwResponseFuncs, mw)
 	}
 
@@ -1162,6 +1170,8 @@ func (gw *Gateway) createResponseMiddlewareChain(
 		//is it goplugin or other middleware
 		if strings.HasSuffix(mw.Path, ".so") {
 			processor = gw.responseProcessorByName("goplugin_res_hook", baseHandler)
+		} else if isJSDriver(spec.CustomMiddleware.Driver) {
+			processor = gw.responseProcessorByName("custom_mw_js_res_hook", baseHandler)
 		} else {
 			processor = gw.responseProcessorByName("custom_mw_res_hook", baseHandler)
 		}
