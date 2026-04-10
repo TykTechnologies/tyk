@@ -546,7 +546,7 @@ func TestE2E_VaultHotReload(t *testing.T) {
 		"ca_file":   "/initial/ca.pem",
 	}
 
-	mockVault := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	mockVault := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		response := map[string]interface{}{
 			"data": map[string]interface{}{
 				"data": map[string]interface{}{

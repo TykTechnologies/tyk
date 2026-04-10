@@ -227,7 +227,7 @@ func TestGateway_afterConfSetup(t *testing.T) {
 			},
 			setup: func(_ *testing.T, gw *Gateway) {
 				gw.vaultKVStore = &mockKVStore{
-					data: map[string]string{
+					store: map[string]string{
 						"secret/oauth/cert_file": "/vault/path/to/cert.pem",
 						"secret/oauth/key_file":  "/vault/path/to/key.pem",
 						"secret/oauth/ca_file":   "/vault/path/to/ca.pem",
@@ -268,7 +268,7 @@ func TestGateway_afterConfSetup(t *testing.T) {
 			},
 			setup: func(_ *testing.T, gw *Gateway) {
 				gw.consulKVStore = &mockKVStore{
-					data: map[string]string{
+					store: map[string]string{
 						"oauth/cert_file": "/consul/path/to/cert.pem",
 						"oauth/key_file":  "/consul/path/to/key.pem",
 						"oauth/ca_file":   "/consul/path/to/ca.pem",
@@ -470,24 +470,6 @@ func TestGateway_afterConfSetup(t *testing.T) {
 			assert.Equal(t, tt.expectedConfig, gw.GetConfig())
 		})
 	}
-}
-
-// mockKVStore is a simple in-memory kv.Store used for testing vault and consul backends.
-type mockKVStore struct {
-	data map[string]string
-}
-
-func (m *mockKVStore) Get(key string) (string, error) {
-	val, ok := m.data[key]
-	if !ok {
-		return "", fmt.Errorf("key not found: %s", key)
-	}
-	return val, nil
-}
-
-func (m *mockKVStore) Put(key, val string) error {
-	m.data[key] = val
-	return nil
 }
 
 func TestGateway_kvResolvers_hotReload(t *testing.T) {
