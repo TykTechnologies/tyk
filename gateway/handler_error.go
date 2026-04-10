@@ -439,15 +439,30 @@ func (e *ErrorHandler) writeOverrideResponse(w http.ResponseWriter, r *http.Requ
 			// text/template doesn't auto-escape, so we need explicit HTML escaping for XML
 			msg = html.EscapeString(msg)
 		}
-		// For JSON, html/template does context-aware escaping automatically
+
+		// escapeForTemplate converts a string to the appropriate type for the template engine.
+		// For XML (text/template): the string is already HTML-escaped above, return as-is.
+		// For JSON (html/template): html/template HTML-escapes plain strings, which is wrong for
+		// JSON responses (e.g. ' becomes &#39;). Apply JS-escaping and mark as safe HTML so the
+		// template engine does not re-encode it.
+		escapeForTemplate := func(s string) any {
+			if ctx.IsXML {
+				return s
+			}
+			return htmltemplate.HTML(htmltemplate.JSEscapeString(s))
+		}
 
 		data := map[string]any{
-			"Message":    msg,
+			"Message":    escapeForTemplate(msg),
 			"StatusCode": result.StatusCode,
 		}
 		if ec := tykctx.GetErrorClassification(r); ec != nil && ec.TemplateData != nil {
 			for k, v := range ec.TemplateData {
-				data[k] = v
+				if s, ok := v.(string); ok {
+					data[k] = escapeForTemplate(s)
+				} else {
+					data[k] = v
+				}
 			}
 		}
 		response := e.ExecuteErrorTemplate(w, tmpl, data, result.StatusCode)
