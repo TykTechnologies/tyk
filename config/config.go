@@ -220,7 +220,7 @@ type StorageOptionsConf struct {
 	// Defaults to `false`.
 	CompressPolicies bool `json:"compress_policies"`
 
-	// Maximum decompressed size (in bytes) for API definitions when using compression.
+	// Maximum decompressed size (in bytes) for API definitions and Policies when using compression.
 	// This limit prevents memory exhaustion during decompression.
 	// Defaults to 104857600 (100MB).
 	MaxDecompressedSize int64 `json:"max_decompressed_size"`
