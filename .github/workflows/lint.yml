@@ -1,0 +1,29 @@
+# yamllint disable rule:truthy
+---
+name: CI lint
+
+# API Changes (godoc) and JIRA validation only apply to PRs.
+# Branches are not important, supports chaining PRs.
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize, labeled]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  dep-guard:
+    uses: TykTechnologies/github-actions/.github/workflows/dependency-guard.yml@2b35ab5dd4cfff21ced9d12446e9e27d10bf5785  # main
+    permissions:
+      contents: read
+
+  godoc:
+    needs: [dep-guard]
+    if: ${{ !github.event.pull_request.draft }}
+    uses: TykTechnologies/github-actions/.github/workflows/godoc.yml@2b35ab5dd4cfff21ced9d12446e9e27d10bf5785  # main
+    secrets:
+      ORG_GH_TOKEN: ${{ secrets.ORG_GH_TOKEN }}
+    with:
+      go-version: stable

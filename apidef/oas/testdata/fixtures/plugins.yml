@@ -1,0 +1,17 @@
+---
+name: "Plugins"
+tests:
+  - desc: "From OAS to Classic"
+    source: oas
+    input:
+      x-tyk-api-gateway:
+        server:
+          authentication:
+            custom:
+              enabled: true
+              functionName: "name"
+              path: "/path/to/file.so"
+              rawBodyOnly: true
+              requireSession: true
+    output:
+      custom_plugin_auth_enabled: true

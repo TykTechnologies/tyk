@@ -1,0 +1,20 @@
+name: tyk-dev
+
+include:
+  - docker/services/redis.yml
+  - docker/services/httpbin.yml
+
+services:
+  tyk:
+    image: internal/tyk-gateway
+    networks: [ proxy ]
+    build: .
+    ports:
+    - 9000:8080
+    volumes:
+    - ./tyk.conf.example:/opt/tyk-gateway/tyk.conf
+
+networks:
+  proxy:
+    name: proxy
+    driver: bridge

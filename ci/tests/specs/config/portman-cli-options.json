@@ -1,0 +1,12 @@
+{
+  "local": "../../../swagger.yml",
+  "baseUrl": "http://localhost:8080",
+  "output": "gateway.collection.postman.json",
+  "oaOutput": "filtered.gateway.swagger.yml",
+  "includeTests": true,
+  "syncPostman": false,
+  "runNewman": true,
+  "envFile": ".env",
+  "ignoreCircularRefs": true,
+  "portmanConfigFile":"config/portmanconfig.json"
+}

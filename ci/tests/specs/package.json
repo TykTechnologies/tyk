@@ -1,0 +1,16 @@
+{
+  "name": "cli-filtering",
+  "version": "1.0.0",
+  "description": "ns",
+  "directories": {
+    "example": "examples"
+  },
+  "scripts": {
+    "start": "portman --cliOptionsFile=config/portman-cli-options.json"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@apideck/portman": "1.30.7"
+  }
+}

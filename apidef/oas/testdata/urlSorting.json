@@ -1,0 +1,221 @@
+{
+  "info": {
+    "title": "test",
+    "version": "1.0.0"
+  },
+  "openapi": "3.0.3",
+  "servers": [
+    {
+      "url": "http://tyk-gateway:8080/rate-limit/"
+    }
+  ],
+  "security": [],
+  "paths": {
+    "/anything": {
+      "get": {
+        "operationId": "anythingget",
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        }
+      }
+    },
+    "/anything/dupa": {
+      "get": {
+        "operationId": "anything/dupaget",
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        }
+      }
+    },
+    "/anything/dupe": {
+      "get": {
+        "operationId": "anything/dupeget",
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        }
+      }
+    },
+    "/anything/dupi": {
+      "get": {
+        "operationId": "anything/dupiget",
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        }
+      }
+    },
+    "/anything/dupo": {
+      "get": {
+        "operationId": "anything/dupoget",
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        }
+      }
+    },
+    "/anything/{id}": {
+      "get": {
+        "operationId": "anything/{id}get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        }
+      }
+    },
+    "/test": {
+      "get": {
+        "operationId": "testget",
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        }
+      }
+    },
+    "/test/abc": {
+      "get": {
+        "operationId": "test/abcget",
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        }
+      }
+    },
+    "/test/abc/def": {
+      "get": {
+        "operationId": "test/abc/defget",
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        }
+      }
+    },
+    "/test/{id}": {
+      "get": {
+        "operationId": "test/{id}get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {}
+  },
+  "x-tyk-api-gateway": {
+    "info": {
+      "dbId": "66a0d64a208a080001587cb3",
+      "id": "5bf76548acb3488b5c2da2f715cf42c3",
+      "orgId": "66a0d637208a080001587cb1",
+      "name": "test",
+      "state": {
+        "active": true,
+        "internal": false
+      }
+    },
+    "middleware": {
+      "global": {
+        "contextVariables": {
+          "enabled": true
+        },
+        "trafficLogs": {
+          "enabled": true
+        }
+      },
+      "operations": {
+        "anythingget": {
+          "ignoreAuthentication": {
+            "enabled": true
+          }
+        },
+        "anything/dupaget": {
+          "ignoreAuthentication": {
+            "enabled": true
+          }
+        },
+        "anything/dupeget": {
+          "ignoreAuthentication": {
+            "enabled": true
+          }
+        },
+        "anything/dupiget": {
+          "ignoreAuthentication": {
+            "enabled": true
+          }
+        },
+        "anything/dupoget": {
+          "ignoreAuthentication": {
+            "enabled": true
+          }
+        },
+        "anything/{id}get": {
+          "ignoreAuthentication": {
+            "enabled": true
+          }
+        },
+        "testget": {
+          "ignoreAuthentication": {
+            "enabled": true
+          }
+        },
+        "test/abcget": {
+          "ignoreAuthentication": {
+            "enabled": true
+          }
+        },
+        "test/abc/defget": {
+          "ignoreAuthentication": {
+            "enabled": true
+          }
+        },
+        "test/{id}get": {
+          "ignoreAuthentication": {
+            "enabled": true
+          }
+        }
+      }
+    },
+    "server": {
+      "listenPath": {
+        "strip": true,
+        "value": "/rate-limit/"
+      }
+    },
+    "upstream": {
+      "url": "http://httpbin.org/"
+    }
+  }
+}

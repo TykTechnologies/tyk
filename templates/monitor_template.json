@@ -1,0 +1,7 @@
+{
+    "event": "{{.Type}}",
+    "message": "{{.Meta.Message}}",
+    "org": "{{.Meta.OrgID}}",
+    "key": "{{.Meta.Key}}",
+    "trigger_limit": "{{.Meta.TriggerLimit}}"
+}

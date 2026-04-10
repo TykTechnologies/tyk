@@ -1,0 +1,49 @@
+{
+    "name": "Tyk Test API (Coprocess)",
+    "api_id": "2",
+    "org_id": "default",
+    "definition": {
+        "location": "header",
+        "key": "version"
+    },
+    "auth": {
+        "auth_header_name": "authorization"
+    },
+    "use_keyless": true,
+    "version_data": {
+        "not_versioned": true,
+        "versions": {
+            "Default": {
+                "name": "Default",
+                "expires": "3000-01-02 15:04",
+                "use_extended_paths": true,
+                "extended_paths": {
+                    "ignored": [],
+                    "white_list": [],
+                    "black_list": []
+                }
+            }
+        }
+    },
+    "proxy": {
+        "listen_path": "/coprocess-tyk-api-test/",
+        "target_url": "http://httpbin.org",
+        "strip_listen_path": true
+    },
+    "custom_middleware": {
+      "pre": [
+        {
+          "name": "MyPreMiddleware",
+          "require_session": false
+        }
+      ],
+      "post": [
+        {
+          "name": "MyPostMiddleware",
+          "require_session": false
+        }
+      ],
+      "driver": "python"
+    },
+    "enable_batch_request_support": true
+}

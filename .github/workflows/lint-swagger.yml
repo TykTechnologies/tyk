@@ -1,0 +1,115 @@
+# yamllint disable rule:line-length rule:truthy
+---
+name: "Lint swagger schema"
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize, labeled]
+    paths:
+      - 'swagger.yml'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  dep-guard:
+    uses: TykTechnologies/github-actions/.github/workflows/dependency-guard.yml@2b35ab5dd4cfff21ced9d12446e9e27d10bf5785  # main
+    permissions:
+      contents: read
+
+  redocly_validator:
+    needs: [dep-guard]
+    runs-on: ubuntu-latest
+    name: Validate the swagger with redocly cli
+
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020  # v4
+        with:
+          node-version: 20
+      - name: Validate OpenAPI definition with redocly
+        run: |
+          npm install --ignore-scripts @redocly/cli@1.25.13 -g
+          redocly lint swagger.yml --config=redocly.yml
+
+  diff_swagger:
+    needs: [dep-guard]
+    name: Diff swagger yaml for comment
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Use GitHub Token
+        env:
+          TOKEN: ${{ secrets.ORG_GH_TOKEN }}
+        run: >
+          git config --global url."https://${TOKEN}@github.com".insteadOf "https://github.com"
+
+      - name: Checkout repo
+        uses: TykTechnologies/github-actions/.github/actions/checkout-pr@2b35ab5dd4cfff21ced9d12446e9e27d10bf5785  # main
+        with:
+          token: ${{ secrets.ORG_GH_TOKEN }}
+
+      - name: Setup Golang
+        uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff  # v5
+        with:
+          go-version: stable
+
+      - name: Install dyff binary
+        run: |
+          # this is the upstream, missing -w (trim whitespace)
+          # curl --silent --location https://git.io/JYfAY | bash
+          git clone --depth=1 https://github.com/aoktox/dyff
+          cd dyff && go install ./cmd/...
+
+      - name: Set up comment author
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+
+      - name: Collect
+        run: |
+          cp swagger.yml swagger-current.yml
+
+          git checkout -- .
+          git fetch --depth=1 origin ${{ github.base_ref }}
+          git checkout ${{ github.base_ref }}
+
+          cp swagger.yml swagger-prev.yml
+
+      - name: Diff
+        id: api-check
+        run: |
+          set +e
+          dyff between -c on --ignore-whitespace-changes -i swagger-prev.yml swagger-current.yml
+          dyff between -c off --ignore-whitespace-changes -i swagger-prev.yml swagger-current.yml | egrep -v '^    . ' | sort > changes.txt
+
+          LINE_COUNT=$(wc -l < changes.txt)
+
+          echo "diff-output<<EOF" >> $GITHUB_OUTPUT
+          if [ $LINE_COUNT -gt 200 ]; then
+            echo "Changes in swagger.yml too large (line count ${LINE_COUNT}), check CI lint action for differences" >> $GITHUB_OUTPUT
+          else
+            cat changes.txt >> $GITHUB_OUTPUT
+          fi
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Find Comment
+        uses: peter-evans/find-comment@a54c31d7fa095754bfef525c0c8e5e5674c4b4b1  # v2
+        id: fc
+        with:
+          issue-number: ${{ github.event.pull_request.number }}
+          comment-author: 'github-actions[bot]'
+          body-includes: Swagger Changes
+
+      - name: Create or update comment
+        uses: peter-evans/create-or-update-comment@23ff15729ef2fc348714a3bb66d2f655ca9066f2  # v3
+        with:
+          comment-id: ${{ steps.fc.outputs.comment-id }}
+          issue-number: ${{ github.event.pull_request.number }}
+          body: |
+            Swagger Changes
+            ```diff
+            ${{ steps.api-check.outputs.diff-output || 'no api changes detected' }}
+            ```
+          edit-mode: replace

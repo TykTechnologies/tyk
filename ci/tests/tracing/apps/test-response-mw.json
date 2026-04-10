@@ -1,0 +1,50 @@
+{
+    "name": "TestAPI with response MW",
+    "api_id": "3c79f1eba3cb41114264edc03127bb6d",
+    "org_id": "default",
+    "definition": {
+        "location": "",
+        "key": ""
+    },
+    "use_keyless": true,
+    "auth": {
+        "auth_header_name": ""
+    },
+    "version_data": {
+        "not_versioned": true,
+        "versions": {
+            "Default": {
+                "name": "Default",
+                "expires": "3000-01-02 15:04",
+                "use_extended_paths": true,
+                "extended_paths": {
+                    "ignored": [],
+                    "white_list": [],
+                    "black_list": []
+                }
+            }
+        }
+    },
+    "proxy": {
+        "listen_path": "/test-response-mw/",
+        "target_url": "http://httpbin:80/",
+        "strip_listen_path": true
+    },
+    "extended_paths": {
+        "ignored": [],
+        "white_list": [],
+        "black_list": [],
+        "cache": ["get"],
+        "transform": [],
+        "transform_response_headers": [
+            {
+                "add_headers": {"x-server-id": "this-is-important"},
+                "path": "/ip",
+                "method": "GET"
+            }
+        ]
+    },
+    "response_processors":[{"name": "header_injector"}],
+    "do_not_track": true,
+    "detailed_tracing":true
+}

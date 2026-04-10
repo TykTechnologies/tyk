@@ -1,0 +1,66 @@
+{{ if eq .Type "HostDown"}}
+{
+    "event": "{{.Type}}",
+    "message": "{{.Meta.Message}}",
+    "url": "{{.Meta.HostInfo.CheckURL}}",
+    "response_code": "{{.Meta.HostInfo.ResponseCode}}",
+    "tcp_error": "{{.Meta.HostInfo.IsTCPError}}",
+    "host": "{{.Meta.HostInfo.MetaData.host_name}}",
+    "api_id": "{{.Meta.HostInfo.MetaData.api_id}}"
+}
+{{ else if eq .Type "HostUp"}}
+{
+    "event": "{{.Type}}",
+    "message": "{{.Meta.Message}}",
+    "url": "{{.Meta.HostInfo.CheckURL}}",
+    "response_code": "{{.Meta.HostInfo.ResponseCode}}",
+    "tcp_error": "{{.Meta.HostInfo.IsTCPError}}",
+    "host": "{{.Meta.HostInfo.MetaData.host_name}}",
+    "api_id": "{{.Meta.HostInfo.MetaData.api_id}}"
+}
+{{ else if eq .Type "TriggerExceeded"}}
+{
+    "event": "{{.Type}}",
+    "message": "{{.Meta.Message}}",
+    "org": "{{.Meta.OrgID}}",
+    "key": "{{.Meta.Key}}",
+    "trigger_limit": "{{.Meta.TriggerLimit}}"
+}
+{{ else if eq .Type "BreakerTriggered"}}
+{
+    "event": "{{.Type}}",
+    "message": "{{.Meta.Message}}",
+    "api_id": "{{.Meta.APIID}}",
+    "path": "{{.Meta.Path}}",
+    "Status": "{{.Meta.CircuitEvent}}"
+}
+{{ else if eq .Type "BreakerTripped"}}
+{
+    "event": "{{.Type}}",
+    "message": "{{.Meta.Message}}",
+    "api_id": "{{.Meta.APIID}}",
+    "path": "{{.Meta.Path}}"
+}
+{{ else if eq .Type "BreakerReset"}}
+{
+    "event": "{{.Type}}",
+    "message": "{{.Meta.Message}}",
+    "api_id": "{{.Meta.APIID}}",
+    "path": "{{.Meta.Path}}"
+}
+{{ else if eq .Type "UpstreamOAuthError"}}
+{
+    "event": "{{.Type}}",
+    "message": "{{.Meta.Message}}",
+    "api_id": "{{.Meta.APIID}}",
+}
+{{ else}}
+{
+    "event": "{{.Type}}",
+    "message": "{{.Meta.Message}}",
+    "path": "{{.Meta.Path}}",
+    "origin": "{{.Meta.Origin}}",
+    "key": "{{.Meta.Key}}"
+}
+{{ end }}
+

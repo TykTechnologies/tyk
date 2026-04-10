@@ -1,0 +1,177 @@
+---
+name: "Path Params"
+tests:
+  - source: "classic"
+    input:
+      version_data:
+        versions:
+          "":
+            extended_paths:
+              white_list:
+                - path: "/test/{id}"
+                  method: ""
+                  ignore_case: false
+                  disabled: false
+                  method_actions:
+                    GET:
+                      action: "reply"
+                      code: 200
+                      headers:
+                        Content-Type: "application/json"
+                      data: '{"message": "success"}'
+    output:
+      paths:
+        /test/{id}:
+          parameters:
+            - name: id
+              in: path
+              required: true
+              schema:
+                type: string
+                pattern: <nil>
+  - source: "classic"
+    input:
+      version_data:
+        versions:
+          "":
+            extended_paths:
+              white_list:
+                - path: "/test/{testId:[0-9]+}"
+                  method: ""
+                  ignore_case: false
+                  disabled: false
+                  method_actions:
+                    GET:
+                      action: "reply"
+                      code: 200
+                      headers:
+                        Content-Type: "application/json"
+                      data: '{"message": "success"}'
+    output:
+      paths:
+        /test/{testId}:
+          parameters:
+            - name: testId
+              in: path
+              required: true
+              schema:
+                type: string
+                pattern: "<nil>"
+  - source: "classic"
+    input:
+      version_data:
+        versions:
+          "":
+            extended_paths:
+              white_list:
+                - path: "/test/[0-9]+"
+                  method: ""
+                  ignore_case: false
+                  disabled: false
+                  method_actions:
+                    GET:
+                      action: "reply"
+                      code: 200
+                      headers:
+                        Content-Type: "application/json"
+                      data: '{"message": "success"}'
+    output:
+      paths:
+        /test/{customRegex1}:
+          parameters:
+            - name: customRegex1
+              in: path
+              required: true
+              schema:
+                type: string
+                pattern: "[0-9]+"
+  - source: "classic"
+    input:
+      version_data:
+        versions:
+          "":
+            extended_paths:
+              white_list:
+                - path: "/test/testId"
+                  method: ""
+                  ignore_case: false
+                  disabled: false
+                  method_actions:
+                    GET:
+                      action: "reply"
+                      code: 200
+                      headers:
+                        Content-Type: "application/json"
+                      data: '{"message": "success"}'
+    output:
+      paths:
+        /test/testId:
+          parameters: <nil>
+  - source: "classic"
+    input:
+      version_data:
+        versions:
+          "":
+            extended_paths:
+              white_list:
+                - path: "/test/{[0-9]+}/{id}"
+                  method: ""
+                  ignore_case: false
+                  disabled: false
+                  method_actions:
+                    GET:
+                      action: "reply"
+                      code: 200
+                      headers:
+                        Content-Type: "application/json"
+                      data: '{"message": "success"}'
+    output:
+      paths:
+        /test/{customRegex1}/{id}:
+          parameters:
+            - name: customRegex1
+              in: path
+              required: true
+              schema:
+                type: string
+                pattern: <nil>
+            - name: id
+              in: path
+              required: true
+              schema:
+                type: string
+                pattern: <nil>
+  - source: "classic"
+    input:
+      version_data:
+        versions:
+          "":
+            extended_paths:
+              white_list:
+                - path: "/abc/{id}/def/[0-9]+"
+                  method: ""
+                  ignore_case: false
+                  disabled: false
+                  method_actions:
+                    GET:
+                      action: "reply"
+                      code: 200
+                      headers:
+                        Content-Type: "application/json"
+                      data: '{"message": "success"}'
+    output:
+      paths:
+        /abc/{id}/def/{customRegex1}:
+          parameters:
+            - name: id
+              in: path
+              required: true
+              schema:
+                type: string
+                pattern: <nil>
+            - name: customRegex1
+              in: path
+              required: true
+              schema:
+                type: string
+                pattern: "[0-9]+"

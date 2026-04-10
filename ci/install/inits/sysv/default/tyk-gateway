@@ -1,0 +1,5 @@
+user="root"
+group="root"
+chroot="/"
+chdir="/opt/tyk-gateway"
+nice=""

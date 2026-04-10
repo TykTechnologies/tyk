@@ -1,0 +1,34 @@
+# yamllint disable rule:line-length
+---
+version: "3"
+
+# Taskfile tests the provided Dockerfile, see `test` for more details.
+# This confirms a python environment, not end to end as it doesn't confirm
+# gateway python plugin loading works. We're missing acceptance tests.
+
+vars:
+  base: '{{.BASE_IMAGE | default "tykio/tyk-gateway:v5.3.6-rc4"}}'
+  image: internal/tyk-gateway
+  platform: '{{.BUILD_PLATFORM | default "linux/amd64"}}'
+
+tasks:
+  build:
+    desc: "Build docker images"
+    vars:
+      tags: latest
+      args: --rm --build-arg BASE_IMAGE={{.base}} --platform {{.platform}} -q --no-cache --pull
+    cmds:
+      - for:
+          var: tags
+          as: tag
+        cmd: docker build {{.args}} -t {{.image}}:{{.tag}} -f Dockerfile .
+
+  test:
+    desc: "Print python version"
+    cmds:
+      - BASE_IMAGE=tykio/tyk-gateway:v5.3.6-rc4 task build
+      - docker run --rm --entrypoint=/bin/bash {{.image}} -c "python -V"
+      - docker run --rm --entrypoint=/bin/bash {{.image}} -c "/opt/tyk-gateway/tyk version"
+      - BASE_IMAGE=tykio/tyk-gateway:v5.3.0 task build
+      - docker run --rm --entrypoint=/bin/bash {{.image}} -c "python -V"
+      - docker run --rm --entrypoint=/bin/bash {{.image}} -c "/opt/tyk-gateway/tyk version"

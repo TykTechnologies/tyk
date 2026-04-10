@@ -1,0 +1,264 @@
+[
+  {
+    "name": "both empty",
+    "policyEP": [],
+    "currEP": [],
+    "expected": []
+  },
+  {
+    "name": "policy endpoints empty",
+    "policyEP": [],
+    "currEP": [
+      {
+        "path": "/user",
+        "methods": [
+          {
+            "name": "GET",
+            "limit": {
+              "rate": 10,
+              "per": 60
+            }
+          }
+        ]
+      }
+    ],
+    "expected": [
+      {
+        "path": "/user",
+        "methods": [
+          {
+            "name": "GET",
+            "limit": {
+              "rate": 10,
+              "per": 60
+            }
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "curr endpoints empty",
+    "policyEP": [
+      {
+        "path": "/user",
+        "methods": [
+          {
+            "name": "GET",
+            "limit": {
+              "rate": 10,
+              "per": 60
+            }
+          }
+        ]
+      }
+    ],
+    "currEP": [],
+    "expected": [
+      {
+        "path": "/user",
+        "methods": [
+          {
+            "name": "GET",
+            "limit": {
+              "rate": 10,
+              "per": 60
+            }
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "non overlapping endpoints",
+    "policyEP": [
+      {
+        "path": "/user",
+        "methods": [
+          {
+            "name": "GET",
+            "limit": {
+              "rate": 10,
+              "per": 60
+            }
+          }
+        ]
+      }
+    ],
+    "currEP": [
+      {
+        "path": "/admin",
+        "methods": [
+          {
+            "name": "POST",
+            "limit": {
+              "rate": 5,
+              "per": 30
+            }
+          }
+        ]
+      }
+    ],
+    "expected": [
+      {
+        "path": "/user",
+        "methods": [
+          {
+            "name": "GET",
+            "limit": {
+              "rate": 10,
+              "per": 60
+            }
+          }
+        ]
+      },
+      {
+        "path": "/admin",
+        "methods": [
+          {
+            "name": "POST",
+            "limit": {
+              "rate": 5,
+              "per": 30
+            }
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "overlapping endpoints with different limits #1",
+    "policyEP": [
+      {
+        "path": "/user",
+        "methods": [
+          {
+            "name": "GET",
+            "limit": {
+              "rate": 10,
+              "per": 60
+            }
+          }
+        ]
+      }
+    ],
+    "currEP": [
+      {
+        "path": "/user",
+        "methods": [
+          {
+            "name": "GET",
+            "limit": {
+              "rate": 5,
+              "per": 30
+            }
+          }
+        ]
+      }
+    ],
+    "expected": [
+      {
+        "path": "/user",
+        "methods": [
+          {
+            "name": "GET",
+            "limit": {
+              "rate": 10,
+              "per": 60
+            }
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "overlapping endpoints with different limits #2",
+    "currEP": [
+      {
+        "path": "/user",
+        "methods": [
+          {
+            "name": "GET",
+            "limit": {
+              "rate": 10,
+              "per": 60
+            }
+          }
+        ]
+      }
+    ],
+    "policyEP": [
+      {
+        "path": "/user",
+        "methods": [
+          {
+            "name": "GET",
+            "limit": {
+              "rate": 5,
+              "per": 30
+            }
+          }
+        ]
+      }
+    ],
+    "expected": [
+      {
+        "path": "/user",
+        "methods": [
+          {
+            "name": "GET",
+            "limit": {
+              "rate": 10,
+              "per": 60
+            }
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "overlapping endpoints with same limits",
+    "policyEP": [
+      {
+        "path": "/user",
+        "methods": [
+          {
+            "name": "GET",
+            "limit": {
+              "rate": 10,
+              "per": 60
+            }
+          }
+        ]
+      }
+    ],
+    "currEP": [
+      {
+        "path": "/user",
+        "methods": [
+          {
+            "name": "GET",
+            "limit": {
+              "rate": 10,
+              "per": 60
+            }
+          }
+        ]
+      }
+    ],
+    "expected": [
+      {
+        "path": "/user",
+        "methods": [
+          {
+            "name": "GET",
+            "limit": {
+              "rate": 10,
+              "per": 60
+            }
+          }
+        ]
+      }
+    ]
+  }
+]

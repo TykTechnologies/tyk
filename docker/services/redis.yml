@@ -1,0 +1,9 @@
+---
+services:
+  redis:
+    image: ${REDIS_IMAGE:-redis:6-alpine}
+    networks:
+      - proxy
+    ports:
+      - 6379:6379
+    command: redis-server --appendonly yes

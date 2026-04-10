@@ -1,0 +1,13 @@
+{
+    "value1": "{{.value2}}",
+    "value2": "{{.value1}}",
+    "transformed_list": [
+        {{range $index, $element := .value_list}}
+            {{if $index}}
+            , "{{$element}}"
+            {{else}}
+                 "{{$element}}"
+            {{end}}
+        {{end}}
+    ]
+}

@@ -1,0 +1,56 @@
+rules:
+  #Special rules
+  no-unresolved-refs: error
+  no-unused-components: warn
+  security-defined: error
+  spec: error
+  spec-components-invalid-map-name: error #All the fixed fields declared below are objects that MUST use keys that match the regular expression
+  spec-strict-refs: error
+  #info
+  info-contact: warn
+  info-license: warn
+  info-license-url: warn
+  #Operations
+  operation-operationId: error
+  operation-operationId-unique: error
+  operation-operationId-url-safe: error
+  operation-summary: error
+  operation-2xx-response: error
+  operation-4xx-response: error
+  operation-description: error
+  #Parameters
+  no-invalid-parameter-examples:
+    severity: error
+    allowAdditionalProperties: false
+  operation-parameters-unique: error
+  #parameter-description: error    #uncomment this
+  path-declaration-must-exist: error
+  path-parameters-defined: error
+  #path rules
+  no-ambiguous-paths: error
+  no-http-verbs-in-paths:
+    severity: warn
+    splitIntoWords: true
+  no-identical-paths: error
+  no-path-trailing-slash: error
+
+  #Requests, Responses, and Schemas  rules
+  no-enum-type-mismatch: error
+  no-example-value-and-externalValue: error
+  no-invalid-media-type-examples:
+    severity: error
+    allowAdditionalProperties: false
+  #scalar-property-missing-example:
+    #severity: warn
+  no-invalid-schema-examples:
+    severity: error
+    allowAdditionalProperties: false
+  #Server rules
+  no-empty-servers: error
+  no-server-trailing-slash: error
+  no-undefined-server-variable: error
+  #Tags  rules
+  operation-singular-tag: error
+  #operation-tag-defined: error
+
+

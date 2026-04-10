@@ -1,0 +1,58 @@
+type: Test
+spec:
+  id: ZpZ5snj4g
+  name: gRPC API
+  description: Testing gRPC API + Unary call
+  trigger:
+    type: grpc
+    grpc:
+      protobufFile: |-
+        syntax = "proto3";
+        
+        option java_multiple_files = true;
+        option java_package = "io.grpc.examples.helloworld";
+        option java_outer_classname = "HelloWorldProto";
+        option objc_class_prefix = "HLW";
+        
+        package helloworld;
+        
+        // The greeting service definition.
+        service Greeter {
+          // Sends a greeting
+          rpc SayHello (HelloRequest) returns (HelloReply) {}
+        
+          rpc SayHelloStreamReply (HelloRequest) returns (stream HelloReply) {}
+        }
+        
+        // The request message containing the user's name.
+        message HelloRequest {
+          string name = 1;
+        }
+        
+        // The response message containing the greetings
+        message HelloReply {
+          string message = 1;
+        }
+      address: tyk:8080
+      method: helloworld.Greeter.SayHello
+      request: "{\n  \"name\": \"tom\"\n}"
+      auth: {}
+  specs:
+  - selector: span[tracetest.span.type="http" name="POST /helloworld.Greeter/SayHello" http.method="POST"]
+    name: Check http span attributes
+    assertions:
+    - attr:http.status_code = 200
+    - attr:http.scheme = "http"
+    - attr:http.method = "POST"
+    - attr:tracetest.span.type = "http"
+  - selector: |-
+      span[name = "POST /helloworld.Greeter/SayHello"] 
+      span[tracetest.span.type="general"]
+    name: Check the middlewares executed
+    assertions:
+    - attr:tracetest.selected_spans.count  =  4
+  - selector: span[tracetest.span.type="http" name="HTTP POST" http.method="POST"]
+    name: Checking the h2c proxying  
+    assertions:
+    - attr:http.method = "POST"
+    - attr:http.url = "http://grpcapi:50051/helloworld.Greeter/SayHello"

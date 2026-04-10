@@ -1,0 +1,201 @@
+---
+name: "Upstream uptime tests"
+tests:
+  - desc: "unset oas uptime tests"
+    source: oas
+    input:
+      x-tyk-api-gateway:
+        upstream: {}
+    output:
+      proxy:
+        check_host_against_uptime_tests: false
+  - desc: "upstream uptime test oas"
+    source: oas
+    input:
+      x-tyk-api-gateway:
+        upstream:
+          uptimeTests:
+            enabled: true
+            hostDownRetestPeriod: 20s
+            logRetentionPeriod: 10s
+            tests:
+            - url: "https://www.google.com"
+              timeout: 1s
+              method: "GET"
+              enableProxyProtocol: true
+              headers:
+                "Content-Type": "application/json"
+              body: "test"
+    output:
+      uptime_tests.config.expire_utime_after: 10
+      uptime_tests.config.recheck_wait: 20
+      uptime_tests:
+        disabled: false
+        check_list:
+          - url: "https://www.google.com"
+            protocol: "https"
+            timeout: 1000000000
+            method: "GET"
+            headers.Content-Type: "application/json"
+            body: "test"
+            enable_proxy_protocol: true
+      serviceDiscovery: <nil>
+  - desc: "upstream uptime test classic"
+    source: classic
+    input:
+      uptime_tests:
+        disabled: true
+        config:
+          expire_utime_after: 10
+          recheck_wait: 20
+        check_list:
+          - url: "http://www.google.com"
+            protocol: "https"
+            timeout: 2000000
+            method: "GET"
+            headers:
+              "Content-Type": "application/json"
+    output:
+      x-tyk-api-gateway:
+        upstream:
+          serviceDiscovery: <nil>
+          uptimeTests:
+            enabled: false
+            hostDownRetestPeriod: 20s
+            logRetentionPeriod: 10s
+            tests:
+            - url: "https://www.google.com"
+              timeout: 2ms
+              method: "GET"
+              headers:
+                "Content-Type": "application/json"
+  - desc: "upstream uptime test classic"
+    source: classic
+    input:
+      uptime_tests:
+        disabled: true
+        config:
+          expire_utime_after: 10
+          recheck_wait: 20
+        check_list:
+          - url: "http://www.google.com"
+            protocol: "https"
+            timeout: 20000
+            method: "GET"
+            headers:
+              "Content-Type": "application/json"
+    output:
+      x-tyk-api-gateway:
+        upstream:
+          serviceDiscovery: <nil>
+          uptimeTests:
+            enabled: false
+            hostDownRetestPeriod: 20s
+            logRetentionPeriod: 10s
+            tests:
+              - url: "https://www.google.com"
+                timeout: 20µs
+                method: "GET"
+                headers:
+                  "Content-Type": "application/json"
+  - desc: "upstream uptime test classic"
+    source: classic
+    input:
+      uptime_tests:
+        disabled: true
+        config:
+          expire_utime_after: 10
+          recheck_wait: 20
+        check_list:
+          - url: "http://www.google.com"
+            protocol: "https"
+            timeout: 200
+            method: "GET"
+            headers:
+              "Content-Type": "application/json"
+    output:
+      x-tyk-api-gateway:
+        upstream:
+          serviceDiscovery: <nil>
+          uptimeTests:
+            enabled: false
+            hostDownRetestPeriod: 20s
+            logRetentionPeriod: 10s
+            tests:
+              - url: "https://www.google.com"
+                timeout: 200ns
+                method: "GET"
+                headers:
+                  "Content-Type": "application/json"
+  - desc: "upstream uptime test classic"
+    source: classic
+    input:
+      uptime_tests:
+        disabled: false
+        config:
+          expire_utime_after: 10
+          recheck_wait: 20
+        check_list:
+          - url: "https://www.google.com"
+            protocol: "https"
+            timeout: 2000000000
+            method: "GET"
+            enable_proxy_protocol: true
+            headers:
+              "Content-Type": "application/json"
+    output:
+      x-tyk-api-gateway:
+        upstream:
+          serviceDiscovery: <nil>
+          uptimeTests:
+            enabled: true
+            hostDownRetestPeriod: 20s
+            logRetentionPeriod: 10s
+            tests:
+            - url: "https://www.google.com"
+              timeout: 2s
+              method: "GET"
+              enableProxyProtocol: true
+              headers:
+                "Content-Type": "application/json"
+  - desc: "upstream uptime test classic - commands"
+    source: classic
+    input:
+      uptime_tests:
+        disabled: false
+        config:
+          expire_utime_after: 10
+          recheck_wait: 20
+        check_list:
+          - url: "https://www.google.com"
+            protocol: "https"
+            timeout: 2000000000
+            method: "GET"
+            enable_proxy_protocol: true
+            headers:
+              "Content-Type": "application/json"
+            commands:
+            - name: send
+              message: "test"
+            - name: expect
+              message: "test2"
+    output:
+      x-tyk-api-gateway:
+        upstream:
+          serviceDiscovery: <nil>
+          uptimeTests:
+            enabled: true
+            hostDownRetestPeriod: 20s
+            logRetentionPeriod: 10s
+            tests:
+            - url: "https://www.google.com"
+              timeout: 2s
+              method: "GET"
+              enableProxyProtocol: true
+              headers:
+                "Content-Type": "application/json"
+              commands:
+              - name: send
+                message: "test"
+              - name: expect
+                message: "test2"

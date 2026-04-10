@@ -1,0 +1,71 @@
+{
+  "enabled": true,
+  "pattern": "example_pattern",
+  "rewriteTo": "http://example.com",
+  "triggers": [
+    {
+      "condition": "any",
+      "rules": [
+        {
+          "in": "query",
+          "pattern": "query_pattern",
+          "name": "query_name",
+          "negate": true
+        },
+        {
+          "in": "path",
+          "pattern": "path_pattern",
+          "name": "path_name",
+          "negate": false
+        },
+        {
+          "in": "header",
+          "pattern": "header_pattern",
+          "name": "header_name",
+          "negate": true
+        },
+        {
+          "in": "sessionMetadata",
+          "pattern": "session_metadata_pattern",
+          "name": "session_metadata_name",
+          "negate": false
+        },
+        {
+          "in": "requestBody",
+          "pattern": "request_body_pattern",
+          "negate": true
+        },
+        {
+          "in": "requestContext",
+          "pattern": "request_context_pattern",
+          "name": "request_context_name",
+          "negate": false
+        },
+        {
+          "in": "header",
+          "pattern": "header_pattern_without_negate",
+          "name": "content-type"
+        }
+      ],
+      "rewriteTo": "http://example.com/rewritten-one"
+    },
+    {
+      "condition": "all",
+      "rules": [
+        {
+          "in": "path",
+          "pattern": "path_pattern",
+          "name": "path_name",
+          "negate": true
+        },
+        {
+          "in": "query",
+          "pattern": "query_pattern",
+          "name": "query_name",
+          "negate": false
+        }
+      ],
+      "rewriteTo": "http://example.com/rewritten-two"
+    }
+  ]
+}

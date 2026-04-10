@@ -1,0 +1,58 @@
+---
+version: '3'
+
+tasks:
+  default:
+    desc: 'Install CI tooling'
+    deps:
+      - mockgen
+      - gotestsum
+      - golangci-lint
+      - lefthook
+    cmds:
+      - for: ['go-fsck', 'schema-gen', 'summary']
+        task: exp
+        vars:
+          name: '{{.ITEM}}'
+
+  mockgen:
+    internal: true
+    desc: 'Install go.uber.org/mock mockgen'
+    status:
+      - type mockgen
+    cmds:
+      - go install go.uber.org/mock/mockgen@2d1c58167e30f380cf78e44a43b100a14767e817  # v0.6.0
+
+  gotestsum:
+    internal: true
+    desc: 'Install golang/mock gotestsum'
+    status:
+      - type gotestsum
+    cmds:
+      - go install gotest.tools/gotestsum@c4a0df2e75a225d979a444342dd3db752b53619f  # v1.13.0
+
+  golangci-lint:
+    internal: true
+    desc: 'Install golangci-lint v2.5.0'
+    status:
+      - type golangci-lint
+    cmds:
+      - go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@ff63786c30d6c2926f99d677ab2ecf089e9390ad  # v2.5.0
+
+  lefthook:
+    internal: true
+    desc: 'Install lefthook'
+    status:
+      - type lefthook
+    cmds:
+      - go install github.com/evilmartians/lefthook@83ec3a9212b41d20576c45a4b5dc5bccff2d5e8a  # v2.1.4
+
+  exp:
+    internal: true
+    desc: 'Install exp/cmd'
+    requires:
+      vars: [name]
+    status:
+      - type {{.name}}
+    cmds:
+      - go install github.com/TykTechnologies/exp/cmd/{{.name}}@49245597f0620ef8460735bb0ae6e93be5f8ca51  # main

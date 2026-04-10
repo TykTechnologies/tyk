@@ -1,0 +1,45 @@
+---
+version: "3"
+
+includes:
+  services:
+    taskfile: ../../docker/services/Taskfile.yml
+    dir: ../../docker/services
+
+tasks:
+  default:
+    desc: "Run everything"
+    cmds:
+      - task: fmt
+      - task: test
+
+  fmt:
+    desc: "Run formatters"
+    cmds:
+      - goimports -local github.com/TykTechnologies,github.com/TykTechnologies/tyk/internal -w .
+      - go fmt ./...
+
+  test:
+    desc: "Build/run tests"
+    deps: [ test:build ]
+    cmds:
+      - defer: { task: test:clean }
+      - task: test:run
+
+  test:build:
+    desc: "Build tests"
+    cmds:
+      - go test -race -c .
+
+  test:run:
+    desc: "Run tests"
+    deps: [ services:up ]
+    cmds:
+      - defer: { task: services:down }
+      - ./coprocess.test -test.v
+
+  test:clean:
+    desc: "Clean up temporary files"
+    aliases: [ clean ]
+    cmds:
+      - rm -f coprocess.test
