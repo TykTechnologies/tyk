@@ -191,7 +191,7 @@ func TestExecuteErrorTemplate(t *testing.T) {
 
 		tmpl := htmltemplate.Must(htmltemplate.New("test").Parse(`{"error": "{{.Message}}", "code": {{.StatusCode}}}`))
 		data := &APIErrorWithContext{
-			Message:    "Service unavailable",
+			Message:    htmltemplate.HTML("Service unavailable"),
 			StatusCode: 503,
 		}
 
@@ -216,7 +216,7 @@ func TestExecuteErrorTemplate(t *testing.T) {
 
 		tmpl := texttemplate.Must(texttemplate.New("test").Parse(`<error><message>{{.Message}}</message><code>{{.StatusCode}}</code></error>`))
 		data := &APIErrorWithContext{
-			Message:    "Timeout",
+			Message:    htmltemplate.HTML("Timeout"),
 			StatusCode: 504,
 		}
 
@@ -236,7 +236,7 @@ func TestExecuteErrorTemplate(t *testing.T) {
 
 		tmpl := htmltemplate.Must(htmltemplate.New("test").Parse(`{"msg": "{{.Message}}"}`))
 		data := &APIErrorWithContext{
-			Message: "test",
+			Message: htmltemplate.HTML("test"),
 		}
 
 		response := handler.ExecuteErrorTemplate(w, tmpl, data, 500)
@@ -259,7 +259,7 @@ func TestExecuteErrorTemplate(t *testing.T) {
 			"message": "{{.Message}}"
 		}`))
 		data := &APIErrorWithContext{
-			Message:    "Authentication failed",
+			Message:    htmltemplate.HTML("Authentication failed"),
 			StatusCode: 401,
 		}
 
@@ -279,7 +279,7 @@ func TestExecuteErrorTemplate(t *testing.T) {
 
 		tmpl := htmltemplate.Must(htmltemplate.New("test").Parse(`{"message": "{{.Message}}"}`))
 		data := &APIErrorWithContext{
-			Message: "",
+			Message: htmltemplate.HTML(""),
 		}
 
 		response := handler.ExecuteErrorTemplate(w, tmpl, data, 500)
@@ -295,7 +295,7 @@ func TestExecuteErrorTemplate(t *testing.T) {
 
 		tmpl := htmltemplate.Must(htmltemplate.New("test").Parse(`{"msg": "test"}`))
 		data := &APIErrorWithContext{
-			Message: "test",
+			Message: htmltemplate.HTML("test"),
 		}
 
 		response := handler.ExecuteErrorTemplate(w, tmpl, data, 500)
@@ -315,11 +315,11 @@ func TestExecuteErrorTemplate(t *testing.T) {
 func TestAPIErrorWithContext(t *testing.T) {
 	t.Run("has Message and StatusCode fields", func(t *testing.T) {
 		errCtx := &APIErrorWithContext{
-			Message:    "Test error",
+			Message:    htmltemplate.HTML("Test error"),
 			StatusCode: 500,
 		}
 
-		assert.Equal(t, "Test error", errCtx.Message)
+		assert.Equal(t, htmltemplate.HTML("Test error"), errCtx.Message)
 		assert.Equal(t, 500, errCtx.StatusCode)
 	})
 
@@ -327,7 +327,7 @@ func TestAPIErrorWithContext(t *testing.T) {
 		tmpl := htmltemplate.Must(htmltemplate.New("test").Parse(`{{.Message}}`))
 
 		errCtx := &APIErrorWithContext{
-			Message: "Compatible",
+			Message: htmltemplate.HTML("Compatible"),
 		}
 
 		var buf bytes.Buffer
@@ -340,7 +340,7 @@ func TestAPIErrorWithContext(t *testing.T) {
 		tmpl := htmltemplate.Must(htmltemplate.New("test").Parse(`Status: {{.StatusCode}}, Message: {{.Message}}`))
 
 		errCtx := &APIErrorWithContext{
-			Message:    "Error",
+			Message:    htmltemplate.HTML("Error"),
 			StatusCode: 404,
 		}
 
@@ -350,21 +350,88 @@ func TestAPIErrorWithContext(t *testing.T) {
 		assert.Equal(t, "Status: 404, Message: Error", buf.String())
 	})
 
-	t.Run("html/template auto-escapes Message in JSON context", func(t *testing.T) {
-		// This tests that using plain string allows html/template to properly escape
+	t.Run("htmltemplate.HTML Message is not re-escaped by html/template", func(t *testing.T) {
+		// Message is htmltemplate.HTML, so html/template treats it as already-safe and does
+		// not apply HTML entity encoding. Callers are responsible for escaping before assignment.
 		tmpl := htmltemplate.Must(htmltemplate.New("test").Parse(`{"error": "{{.Message}}"}`))
 
 		errCtx := &APIErrorWithContext{
-			Message: `Test with "quotes" and <tags>`,
+			Message: htmltemplate.HTML(`already escaped \x27content\x27`),
 		}
 
 		var buf bytes.Buffer
 		err := tmpl.Execute(&buf, errCtx)
 		require.NoError(t, err)
-		// html/template should escape for JSON context
-		assert.Contains(t, buf.String(), `"error":`)
-		assert.NotContains(t, buf.String(), `<tags>`) // Should be escaped
+		assert.Contains(t, buf.String(), `"error": "already escaped \x27content\x27"`)
 	})
+}
+
+func TestEscapeTemplateString(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		isXML    bool
+		expected htmltemplate.HTML
+	}{
+		// JSON path: html/template would HTML-encode plain strings (e.g. ' → &#39;).
+		// escapeTemplateString must produce htmltemplate.HTML so the engine treats it as safe.
+		{
+			name:     "JSON: plain string is unchanged",
+			input:    "validation failed",
+			isXML:    false,
+			expected: htmltemplate.HTML("validation failed"),
+		},
+		{
+			name:     "JSON: single quote is JS-escaped, not HTML-encoded",
+			input:    "it's invalid",
+			isXML:    false,
+			expected: htmltemplate.HTML(`it\'s invalid`),
+		},
+		{
+			name:     "JSON: angle brackets are JS-escaped",
+			input:    "<script>",
+			isXML:    false,
+			expected: htmltemplate.HTML(`\u003Cscript\u003E`),
+		},
+		{
+			name:     "JSON: ampersand is JS-escaped",
+			input:    "a & b",
+			isXML:    false,
+			expected: htmltemplate.HTML(`a \u0026 b`),
+		},
+		// XML path: text/template does not auto-escape, so HTML-escaping must be applied explicitly.
+		{
+			name:     "XML: plain string is unchanged",
+			input:    "validation failed",
+			isXML:    true,
+			expected: htmltemplate.HTML("validation failed"),
+		},
+		{
+			name:     "XML: single quote is HTML-escaped",
+			input:    "it's invalid",
+			isXML:    true,
+			expected: htmltemplate.HTML("it&#39;s invalid"),
+		},
+		{
+			name:     "XML: angle brackets are HTML-escaped",
+			input:    "<error>",
+			isXML:    true,
+			expected: htmltemplate.HTML("&lt;error&gt;"),
+		},
+		{
+			name:     "XML: ampersand is HTML-escaped",
+			input:    "a & b",
+			isXML:    true,
+			expected: htmltemplate.HTML("a &amp; b"),
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			got := escapeTemplateString(tc.input, tc.isXML)
+			assert.Equal(t, tc.expected, got)
+		})
+	}
 }
 
 // TestHeaderPropagation tests that headers are correctly set on both writer and response

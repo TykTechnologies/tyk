@@ -2,7 +2,6 @@ package gateway
 
 import (
 	"bytes"
-	"html"
 	"io"
 	"net/http"
 	"strconv"
@@ -223,16 +222,10 @@ func (r *ResponseErrorOverrideMiddleware) executeTemplate(
 	isXML bool,
 	logger *logrus.Entry,
 ) []byte {
-	// Escape message for XML templates (text/template doesn't auto-escape)
-	if isXML {
-		message = html.EscapeString(message)
-	}
-	// For JSON, html/template does context-aware escaping automatically
-
 	var buf bytes.Buffer
 	data := &APIErrorWithContext{
 		StatusCode: statusCode,
-		Message:    message,
+		Message:    escapeTemplateString(message, isXML),
 	}
 
 	if err := tmpl.Execute(&buf, data); err != nil {

@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/base64"
 	"errors"
-	"html"
 	htmltemplate "html/template"
 	"io"
 	"io/ioutil"
@@ -79,9 +78,8 @@ type APIError struct {
 }
 
 // APIErrorWithContext provides context for error override templates.
-// Uses plain string Message to allow html/template's context-aware escaping for JSON.
 type APIErrorWithContext struct {
-	Message    string
+	Message    htmltemplate.HTML
 	StatusCode int
 }
 
@@ -434,35 +432,18 @@ func (e *ErrorHandler) writeOverrideResponse(w http.ResponseWriter, r *http.Requ
 	// Body with template variables, or file template
 	tmpl := result.GetTemplateExecutor(e.Gw, ctx)
 	if tmpl != nil {
-		msg := result.GetMessageForTemplate()
-		if ctx.IsXML {
-			// text/template doesn't auto-escape, so we need explicit HTML escaping for XML
-			msg = html.EscapeString(msg)
-		}
-
-		// escapeForTemplate converts a string to the appropriate type for the template engine.
-		// For XML (text/template): the string is already HTML-escaped above, return as-is.
-		// For JSON (html/template): html/template HTML-escapes plain strings, which is wrong for
-		// JSON responses (e.g. ' becomes &#39;). Apply JS-escaping and mark as safe HTML so the
-		// template engine does not re-encode it.
-		escapeForTemplate := func(s string) any {
-			if ctx.IsXML {
-				return s
-			}
-			return htmltemplate.HTML(htmltemplate.JSEscapeString(s))
-		}
-
 		data := map[string]any{
-			"Message":    escapeForTemplate(msg),
+			"Message":    escapeTemplateString(result.GetMessageForTemplate(), ctx.IsXML),
 			"StatusCode": result.StatusCode,
 		}
 		if ec := tykctx.GetErrorClassification(r); ec != nil && ec.TemplateData != nil {
 			for k, v := range ec.TemplateData {
-				if s, ok := v.(string); ok {
-					data[k] = escapeForTemplate(s)
-				} else {
+				s, ok := v.(string)
+				if !ok {
 					data[k] = v
+					continue
 				}
+				data[k] = escapeTemplateString(s, ctx.IsXML)
 			}
 		}
 		response := e.ExecuteErrorTemplate(w, tmpl, data, result.StatusCode)

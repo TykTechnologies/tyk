@@ -455,6 +455,106 @@ run_override_test_invalid_json() {
     rm -f "$body_file" "$header_file"
 }
 
+# Test BIV with a template that renders {{.InvalidParams}}
+# Verifies the error detail from Go's validator is rendered without HTML entity encoding.
+run_override_test_biv_invalid_params() {
+    local test_name=$1
+    local api_path=$2
+    local request_body=$3
+    local expected_status=$4
+
+    echo ""
+    log_info "Testing: $test_name"
+    log_info "  API Path: $api_path"
+
+    local body_file=$(mktemp)
+    local header_file=$(mktemp)
+
+    local http_code=$(curl -s -o "$body_file" -D "$header_file" -w "%{http_code}" \
+        --connect-timeout 10 \
+        --max-time 10 \
+        -X POST \
+        -H "Content-Type: application/json" \
+        -d "$request_body" \
+        "${TYK_OVERRIDE_URL}${api_path}" 2>/dev/null || echo "000")
+
+    local response_body=$(cat "$body_file")
+    local response_headers=$(cat "$header_file")
+
+    log_info "  HTTP Response: $http_code"
+
+    sleep "$WAIT_FOR_LOG_SECONDS"
+    refresh_logs
+
+    local test_passed=true
+    local failures=""
+
+    # Check status code
+    if [ "$http_code" = "$expected_status" ]; then
+        log_info "  [OK] Status code: $http_code"
+    else
+        test_passed=false
+        failures="${failures}\n  - Status mismatch: got $http_code, expected $expected_status"
+    fi
+
+    # Check the validation template was rendered (invalid_params field present)
+    if echo "$response_body" | grep -q '"invalid_params"'; then
+        log_info "  [OK] Body contains: invalid_params field"
+    else
+        test_passed=false
+        failures="${failures}\n  - Body missing invalid_params field"
+    fi
+
+    # Regression: single quotes in validator error messages must not be HTML-encoded as &#39;
+    if ! echo "$response_body" | grep -q '&#39;'; then
+        log_info "  [OK] No HTML entity encoding in invalid_params value"
+    else
+        test_passed=false
+        failures="${failures}\n  - HTML entity encoding (&#39;) found in response body"
+    fi
+
+    # Check X-Error-Flag header
+    if echo "$response_headers" | grep -qi "X-Error-Flag: BIV"; then
+        log_info "  [OK] X-Error-Flag: BIV"
+    else
+        test_passed=false
+        failures="${failures}\n  - Missing X-Error-Flag: BIV"
+    fi
+
+    # Check X-Override-Applied header
+    if echo "$response_headers" | grep -qi "X-Override-Applied: true"; then
+        log_info "  [OK] X-Override-Applied: true"
+    else
+        test_passed=false
+        failures="${failures}\n  - Missing X-Override-Applied header"
+    fi
+
+    # Check access log
+    local log_entry=$(get_log_entry "$api_path")
+    local actual_flag=$(get_flag_from_log "$log_entry")
+
+    if [ "$actual_flag" = "BIV" ]; then
+        log_info "  [OK] Access log flag: BIV"
+    else
+        test_passed=false
+        failures="${failures}\n  - Access log flag mismatch: got '${actual_flag:-<empty>}', expected BIV"
+    fi
+
+    if [ "$test_passed" = true ]; then
+        log_success "$test_name"
+        ((PASSED++))
+    else
+        log_fail "$test_name"
+        echo -e "${RED}  Failures:${NC}$failures"
+        ((FAILED++))
+    fi
+
+    echo -e "  ${BLUE}Response Body:${NC} $response_body"
+    [ -n "$log_entry" ] && echo -e "  ${BLUE}Access Log:${NC} $log_entry"
+
+    rm -f "$body_file" "$header_file"
+}
+
 # Test without Content-Length for CLM override
 run_override_test_no_content_length() {
     local test_name=$1
@@ -1305,6 +1405,21 @@ run_all_override_tests() {
         "BIV Override - Invalid JSON" \
         "/test-biv-json/validate"
 
+    # BIV - InvalidParams template rendering
+    # Verifies that {{.InvalidParams}} in the template receives the validator's error detail
+    # and that single quotes in the error message are not HTML-encoded as &#39;.
+    run_override_test_biv_invalid_params \
+        "BIV Override - InvalidParams rendered in template (JSON parse error)" \
+        "/test-biv-json-invalid-params/validate" \
+        '{invalid json: missing quotes}' \
+        "400"
+
+    run_override_test_biv_invalid_params \
+        "BIV Override - InvalidParams rendered in template (schema validation)" \
+        "/test-biv-schema-invalid-params/validate" \
+        '{"wrong_field": "value"}' \
+        "422"
+
     # ==========================================================================
     # 5XX Errors - Gateway-Generated Errors
     # ==========================================================================
@@ -1586,12 +1701,13 @@ run_all_override_tests() {
          "UPSTREAM-INLINE-TEMPLATE" \
          "501"
 
+     # Message contains " and newline; escapeTemplateString applies JS-escaping so the
+     # body has \" (not HTML &#34;) and \u000A (not a literal newline).
      run_override_test \
          "API Override Upstream - 500 [JSON Escaping in inline templates]"\
          "/edge-cases/500-json-escape" \
          "URS" \
-         '{"error_detail": "Invalid token &#34;abc&#34;
-           and some newlines"}' \
+         '\\"' \
          "UPSTREAM-JSON-ESCAPED-INLINE-TEMPLATE" \
          "502"
 
