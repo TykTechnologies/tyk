@@ -3,13 +3,16 @@ package gateway
 import (
 	"context"
 	"net/http"
+	"strings"
 	"testing"
 
 	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/apidef/oas"
+	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/header"
 	"github.com/TykTechnologies/tyk/test"
 )
@@ -760,4 +763,122 @@ func TestValidateRequest_NormalizeHeaders(t *testing.T) {
 			assert.Equal(t, tt.expected, tt.input)
 		})
 	}
+}
+
+func buildOASValidateAPI(t *testing.T, ts *Test, listenPath string) {
+	oasDoc, err := openapi3.NewLoader().LoadFromData([]byte(testOASForValidateRequest))
+	require.NoError(t, err)
+
+	xTykAPIGateway := &oas.XTykAPIGateway{
+		Middleware: &oas.Middleware{
+			Operations: oas.Operations{
+				"postpost": {
+					ValidateRequest: &oas.ValidateRequest{Enabled: true},
+				},
+			},
+		},
+	}
+
+	oasAPI := oas.OAS{T: *oasDoc}
+	oasAPI.SetTykExtension(xTykAPIGateway)
+
+	var def apidef.APIDefinition
+	oasAPI.ExtractTo(&def)
+
+	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		spec.VersionData = def.VersionData
+		spec.OAS = oasAPI
+		spec.IsOAS = true
+		spec.Proxy.ListenPath = listenPath
+	})
+}
+
+func TestValidateOASRequestTemplateData(t *testing.T) {
+	t.Run("InvalidParams rendered in override template on schema failure", func(t *testing.T) {
+		ts := StartTest(func(globalConf *config.Config) {
+			globalConf.ErrorOverrides = apidef.ErrorOverridesMap{
+				"422": []apidef.ErrorOverride{{
+					Response: apidef.ErrorResponse{
+						StatusCode: http.StatusUnprocessableEntity,
+						Body:       `{"detail": "{{.InvalidParams}}"}`,
+					},
+				}},
+			}
+		})
+		defer ts.Close()
+
+		buildOASValidateAPI(t, ts, "/product")
+
+		// {"name": 123} fails because owner.name must be a string, not integer.
+		// The rendered response should contain the validation error via {{.InvalidParams}}.
+		_, _ = ts.Run(t, test.TestCase{
+			Method: http.MethodPost,
+			Path:   "/product/post",
+			Data:   `{"name": "ok", "owner": {"name": 123}}`,
+			Code:   http.StatusUnprocessableEntity,
+			BodyMatchFunc: func(b []byte) bool {
+				body := string(b)
+				return strings.Contains(body, `"detail"`) && !strings.Contains(body, "{{.InvalidParams}}")
+			},
+		})
+	})
+
+	t.Run("InvalidParams contains the validation error text", func(t *testing.T) {
+		ts := StartTest(func(globalConf *config.Config) {
+			globalConf.ErrorOverrides = apidef.ErrorOverridesMap{
+				"422": []apidef.ErrorOverride{{
+					Response: apidef.ErrorResponse{
+						StatusCode: http.StatusUnprocessableEntity,
+						Body:       `{"detail": "{{.InvalidParams}}"}`,
+					},
+				}},
+			}
+		})
+		defer ts.Close()
+
+		oasDoc, err := openapi3.NewLoader().LoadFromData([]byte(testOASForValidateRequest))
+		require.NoError(t, err)
+
+		xTykAPIGateway := &oas.XTykAPIGateway{
+			Middleware: &oas.Middleware{
+				Operations: oas.Operations{
+					"postpost": {
+						ValidateRequest: &oas.ValidateRequest{Enabled: true},
+					},
+				},
+			},
+		}
+
+		oasAPI := oas.OAS{T: *oasDoc}
+		oasAPI.SetTykExtension(xTykAPIGateway)
+
+		var def apidef.APIDefinition
+		oasAPI.ExtractTo(&def)
+
+		err = oasAPI.Validate(context.Background())
+		require.NoError(t, err)
+
+		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+			spec.VersionData = def.VersionData
+			spec.OAS = oasAPI
+			spec.IsOAS = true
+			spec.Proxy.ListenPath = "/product"
+		})
+
+		// Sending the wrong type for a query param triggers an OAS validation error.
+		// The {{.InvalidParams}} key in the override body should be rendered with the error text.
+		_, _ = ts.Run(t, test.TestCase{
+			Method: http.MethodPost,
+			Path:   "/product/post?id=not-an-integer",
+			Data:   `{"name": "my-product"}`,
+			Code:   http.StatusUnprocessableEntity,
+			BodyMatchFunc: func(b []byte) bool {
+				body := string(b)
+				// Override template rendered: contains "detail" key, no literal template syntax
+				return strings.Contains(body, `"detail"`) &&
+					!strings.Contains(body, "{{") &&
+					len(body) > len(`{"detail": ""}`)
+			},
+		})
+	})
 }

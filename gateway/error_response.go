@@ -2,6 +2,8 @@ package gateway
 
 import (
 	"bytes"
+	"html"
+	htmltemplate "html/template"
 	"io"
 	"net/http"
 	"strings"
@@ -70,6 +72,16 @@ func (e *ErrorHandler) SetErrorResponseHeaders(w http.ResponseWriter, contentTyp
 	}
 
 	return respHeader
+}
+
+// escapeTemplateString prepares s for safe rendering by the appropriate template engine.
+// For JSON (html/template): JS-escapes and marks safe to prevent HTML entity encoding.
+// For XML (text/template): HTML-escapes explicitly since text/template does not auto-escape.
+func escapeTemplateString(s string, isXML bool) htmltemplate.HTML {
+	if isXML {
+		return htmltemplate.HTML(html.EscapeString(s))
+	}
+	return htmltemplate.HTML(htmltemplate.JSEscapeString(s))
 }
 
 // ExecuteErrorTemplate executes a template and captures output for analytics.

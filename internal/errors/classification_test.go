@@ -107,6 +107,21 @@ func TestErrorClassificationBuilderChaining(t *testing.T) {
 		assert.Equal(t, 503, ec.UpstreamStatus)
 	})
 
+	t.Run("WithTemplateData sets data", func(t *testing.T) {
+		ec := NewErrorClassification(BIV, "schema_validation_failed")
+		data := map[string]any{"InvalidParams": "field foo is required"}
+		result := ec.WithTemplateData(data)
+		assert.Same(t, ec, result)
+		assert.Equal(t, data, ec.TemplateData)
+	})
+
+	t.Run("WithTemplateData nil is allowed", func(t *testing.T) {
+		ec := NewErrorClassification(BIV, "schema_validation_failed")
+		result := ec.WithTemplateData(nil)
+		assert.Same(t, ec, result)
+		assert.Nil(t, ec.TemplateData)
+	})
+
 	t.Run("chaining multiple methods", func(t *testing.T) {
 		expiry := time.Date(2024, 1, 15, 0, 0, 0, 0, time.UTC)
 		ec := NewErrorClassification(TLE, "tls_certificate_expired").
