@@ -143,9 +143,10 @@ func (k *ValidateRequest) ProcessRequest(w http.ResponseWriter, r *http.Request,
 
 	err = openapi3filter.ValidateRequest(r.Context(), requestValidationInput)
 	if err != nil {
+		err = schema.RestoreUnicodeEscapesInError(err)
 		ctx.SetErrorClassification(r, tykerrors.ClassifyJSONValidationError(tykerrors.ErrTypeSchemaValidationFailed, k.Name()).
 			WithTemplateData(map[string]any{"InvalidParams": err.Error()}))
-		return fmt.Errorf("request validation error: %w", schema.RestoreUnicodeEscapesInError(err)), errResponseCode
+		return fmt.Errorf("request validation error: %w", err), errResponseCode
 	}
 
 	// Handle Success
