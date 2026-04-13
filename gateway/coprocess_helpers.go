@@ -11,6 +11,9 @@ import (
 
 // TykSessionState takes a coprocess.SessionState (as returned by the Protocol Buffer binding), and outputs a standard Tyk SessionState.
 func TykSessionState(session *coprocess.SessionState) *user.SessionState {
+	if session == nil {
+		return nil
+	}
 	accessDefinitions := make(map[string]user.AccessDefinition, len(session.AccessRights))
 
 	for key, protoAccDef := range session.AccessRights {
@@ -92,6 +95,9 @@ func TykSessionState(session *coprocess.SessionState) *user.SessionState {
 
 // ProtoSessionState takes a standard SessionState and outputs a SessionState object compatible with Protocol Buffers.
 func ProtoSessionState(session *user.SessionState) *coprocess.SessionState {
+	if session == nil {
+		return nil
+	}
 
 	var accessDefinitions map[string]*coprocess.AccessDefinition
 	if len(session.AccessRights) > 0 {
