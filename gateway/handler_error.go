@@ -436,16 +436,17 @@ func (e *ErrorHandler) writeOverrideResponse(w http.ResponseWriter, r *http.Requ
 			"Message":    escapeTemplateString(result.GetMessageForTemplate(), ctx.IsXML),
 			"StatusCode": result.StatusCode,
 		}
+
 		if ec := tykctx.GetErrorClassification(r); ec != nil && ec.TemplateData != nil {
 			for k, v := range ec.TemplateData {
-				s, ok := v.(string)
-				if !ok {
-					data[k] = v
-					continue
+				if s, ok := v.(string); ok {
+					v = escapeTemplateString(s, ctx.IsXML)
 				}
-				data[k] = escapeTemplateString(s, ctx.IsXML)
+
+				data[k] = v
 			}
 		}
+
 		response := e.ExecuteErrorTemplate(w, tmpl, data, result.StatusCode)
 		response.Header = respHeader
 
