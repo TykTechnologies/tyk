@@ -667,7 +667,6 @@ func BenchmarkGRPCDispatch_MemoryOverhead(b *testing.B) {
 		}
 	})
 	headers := map[string]string{"authorization": keyID}
-
 	b.Run("Pre Hook with Large Session", func(b *testing.B) {
 		basepath := "/grpc-test-api/"
 		b.ReportAllocs() // This will print B/op and allocs/op
@@ -678,6 +677,23 @@ func BenchmarkGRPCDispatch_MemoryOverhead(b *testing.B) {
 				Method:  http.MethodGet,
 				Code:    http.StatusOK,
 				Headers: headers,
+			})
+		}
+	})
+
+	emptyKeyID := gateway.CreateSession(ts.Gw, func(s *user.SessionState) {})
+	emptyHeaders := map[string]string{"authorization": emptyKeyID}
+
+	b.Run("Pre Hook with Empty Session", func(b *testing.B) {
+		basepath := "/grpc-test-api/"
+		b.ReportAllocs()
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			ts.Run(b, test.TestCase{
+				Path:    basepath,
+				Method:  http.MethodGet,
+				Code:    http.StatusOK,
+				Headers: emptyHeaders,
 			})
 		}
 	})
@@ -723,7 +739,7 @@ func TestGRPCDispatch_MemoryLeakCheck(t *testing.T) {
 
 	t.Logf("Initial Alloc: %d bytes", initialAlloc)
 	t.Logf("Final Alloc: %d bytes", finalAlloc)
-	t.Logf("Difference: %d bytes", finalAlloc-initialAlloc)
+	t.Logf("Difference: %d bytes", int64(finalAlloc)-int64(initialAlloc))
 
 	// If it was a leak, the difference would be huge (e.g., hundreds of MBs).
 	// Since it's just churn, the difference will be relatively small after GC.
