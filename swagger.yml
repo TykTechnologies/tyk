@@ -1568,8 +1568,9 @@ paths:
       - Tyk OAS APIs
   /tyk/mcps:
     get:
-      description: List all MCP Proxies defined on this Tyk Gateway. Each entry is
-        a Tyk OAS document whose `x-tyk-api-gateway` extension marks it as an MCP Proxy.
+      description: List all MCP Proxy definitions on this Tyk Gateway. Each entry
+        is a Tyk OAS document whose `x-tyk-api-gateway` extension marks it as an
+        MCP Proxy definition.
       operationId: listMCPs
       responses:
         "200":
@@ -1588,29 +1589,17 @@ paths:
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
           description: Forbidden
-      summary: List MCP Proxies.
+      summary: List MCP Proxy definitions.
       tags:
       - MCP Proxies
     post:
       description: |
-        Create an MCP Proxy from a Tyk OAS document. The payload must contain the
-        `x-tyk-api-gateway` extension with MCP configuration and is validated against
-        the MCP JSON schema (`/tyk/schema?type=mcp`) before being stored. The Gateway
-        must be reloaded (`POST /tyk/reload`) for the new MCP Proxy to take effect.
+        Create an MCP Proxy definition from a Tyk OAS document. The payload must
+        contain the `x-tyk-api-gateway` extension with MCP configuration and is
+        validated against the MCP JSON schema (`/tyk/schema?type=mcp`) before being
+        stored. The Gateway must be reloaded (`POST /tyk/reload`) for the new MCP
+        Proxy definition to take effect.
       operationId: createMCP
-      parameters:
-      - description: Existing MCP Proxy ID to version from.
-        in: query
-        name: base_api_id
-        required: false
-        schema:
-          type: string
-      - description: Version name of the newly created MCP Proxy version.
-        in: query
-        name: new_version_name
-        required: false
-        schema:
-          type: string
       requestBody:
         content:
           application/json:
@@ -1628,7 +1617,7 @@ paths:
                 status: ok
               schema:
                 $ref: '#/components/schemas/ApiModifyKeySuccess'
-          description: MCP Proxy created.
+          description: MCP Proxy definition created.
         "400":
           content:
             application/json:
@@ -1644,25 +1633,19 @@ paths:
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
           description: Forbidden
-        "422":
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiStatusMessage'
-          description: Versioning error.
-      summary: Create an MCP Proxy.
+      summary: Create an MCP Proxy definition.
       tags:
       - MCP Proxies
   /tyk/mcps/{apiID}:
     parameters:
-    - description: The MCP Proxy ID.
+    - description: The MCP Proxy definition ID.
       in: path
       name: apiID
       required: true
       schema:
         type: string
     get:
-      description: Retrieve a single MCP Proxy definition by its MCP Proxy ID.
+      description: Retrieve a single MCP Proxy definition by its ID.
       operationId: getMCP
       responses:
         "200":
@@ -1678,13 +1661,13 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: MCP Proxy not found.
-      summary: Get an MCP Proxy.
+          description: MCP Proxy definition not found.
+      summary: Get an MCP Proxy definition.
       tags:
       - MCP Proxies
     put:
-      description: Update an existing MCP Proxy. Body is validated against the MCP
-        JSON schema. A Gateway reload is required for changes to take effect.
+      description: Update an existing MCP Proxy definition. Body is validated against
+        the MCP JSON schema. A Gateway reload is required for changes to take effect.
       operationId: updateMCP
       requestBody:
         content:
@@ -1703,7 +1686,7 @@ paths:
                 status: ok
               schema:
                 $ref: '#/components/schemas/ApiModifyKeySuccess'
-          description: MCP Proxy updated.
+          description: MCP Proxy definition updated.
         "400":
           content:
             application/json:
@@ -1715,8 +1698,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: MCP Proxy not found.
-      summary: Update an MCP Proxy.
+          description: MCP Proxy definition not found.
+      summary: Update an MCP Proxy definition.
       tags:
       - MCP Proxies
     delete:
@@ -1733,20 +1716,20 @@ paths:
                 status: ok
               schema:
                 $ref: '#/components/schemas/ApiModifyKeySuccess'
-          description: MCP Proxy deleted.
+          description: MCP Proxy definition deleted.
         "404":
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: MCP Proxy not found.
+          description: MCP Proxy definition not found.
         "500":
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
           description: Delete failed.
-      summary: Delete an MCP Proxy.
+      summary: Delete an MCP Proxy definition.
       tags:
       - MCP Proxies
   /tyk/cache/{apiID}:
