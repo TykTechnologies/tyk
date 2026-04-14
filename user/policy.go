@@ -29,7 +29,7 @@ type Policy struct {
 	IsInactive                    bool                             `bson:"is_inactive" json:"is_inactive"`
 	Tags                          []string                         `bson:"tags" json:"tags"`
 	KeyExpiresIn                  int64                            `bson:"key_expires_in" json:"key_expires_in"`
-	PostExpiryAction              PostExpiryAction                 `bson:"post_expiry_action" json:"post_expiry_action"`
+	PostExpiryAction              PostExpiryAction                 `bson:"post_expiry_action" json:"post_expiry_action,omitzero"`
 	PostExpiryGracePeriod         int64                            `bson:"post_expiry_grace_period" json:"post_expiry_grace_period"`
 	Partitions                    PolicyPartitions                 `bson:"partitions" json:"partitions"`
 	LastUpdated                   string                           `bson:"last_updated" json:"last_updated"`
