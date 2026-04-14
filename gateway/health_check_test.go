@@ -248,6 +248,7 @@ func TestGateway_readinessHandler(t *testing.T) {
 	}
 
 	for _, tt := range tests {
+		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			// Create a new gateway instance for each test
 			gw := NewGateway(config.Config{}, nil)
@@ -491,6 +492,7 @@ func TestGateway_isCriticalFailure(t *testing.T) {
 	}
 
 	for _, tt := range tests {
+		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			// Create a new gateway instance for each test
 			conf := config.Config{}
@@ -694,6 +696,7 @@ func TestGateway_evaluateHealthChecks(t *testing.T) {
 	}
 
 	for _, tt := range tests {
+		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			// Create a new gateway instance for each test
 			conf := config.Config{}
@@ -706,6 +709,561 @@ func TestGateway_evaluateHealthChecks(t *testing.T) {
 			// Assert the results
 			assert.Equal(t, tt.expectedFailCount, failCount)
 			assert.Equal(t, tt.expectedCriticalFailure, criticalFailure)
+		})
+	}
+}
+
+func TestGateway_liveCheckHandler(t *testing.T) {
+	tests := []struct {
+		name                   string
+		method                 string
+		setupGateway           func(*Gateway)
+		setupHealthCheck       func(*Gateway)
+		expectedStatus         int
+		expectedResponseStatus HealthCheckStatus
+	}{
+		{
+			name:             "method not allowed - POST",
+			method:           http.MethodPost,
+			setupGateway:     func(_ *Gateway) {},
+			setupHealthCheck: func(_ *Gateway) {},
+			expectedStatus:   http.StatusMethodNotAllowed,
+		},
+		{
+			name:             "method not allowed - PUT",
+			method:           http.MethodPut,
+			setupGateway:     func(_ *Gateway) {},
+			setupHealthCheck: func(_ *Gateway) {},
+			expectedStatus:   http.StatusMethodNotAllowed,
+		},
+		{
+			name:   "all health checks pass - returns 200 OK with Pass status",
+			method: http.MethodGet,
+			setupGateway: func(_ *Gateway) {
+			},
+			setupHealthCheck: func(gw *Gateway) {
+				healthInfo := map[string]HealthCheckItem{
+					"redis": {
+						Status:        Pass,
+						ComponentType: Datastore,
+					},
+					"dashboard": {
+						Status:        Pass,
+						ComponentType: System,
+					},
+				}
+				gw.setCurrentHealthCheckInfo(healthInfo)
+			},
+			expectedStatus:         http.StatusOK,
+			expectedResponseStatus: Pass,
+		},
+		{
+			name:   "redis health check failed - still returns 200 OK with Fail status",
+			method: http.MethodGet,
+			setupGateway: func(_ *Gateway) {
+			},
+			setupHealthCheck: func(gw *Gateway) {
+				healthInfo := map[string]HealthCheckItem{
+					"redis": {
+						Status:        Fail,
+						ComponentType: Datastore,
+						Output:        "Connection failed",
+					},
+					"dashboard": {
+						Status:        Pass,
+						ComponentType: System,
+					},
+				}
+				gw.setCurrentHealthCheckInfo(healthInfo)
+			},
+			expectedStatus:         http.StatusOK,
+			expectedResponseStatus: Warn,
+		},
+		{
+			name:   "all health checks failed - returns 200 OK with Fail status",
+			method: http.MethodGet,
+			setupGateway: func(_ *Gateway) {
+			},
+			setupHealthCheck: func(gw *Gateway) {
+				healthInfo := map[string]HealthCheckItem{
+					"redis": {
+						Status:        Fail,
+						ComponentType: Datastore,
+						Output:        "Redis connection failed",
+					},
+					"dashboard": {
+						Status:        Fail,
+						ComponentType: System,
+						Output:        "Dashboard connection failed",
+					},
+				}
+				gw.setCurrentHealthCheckInfo(healthInfo)
+			},
+			expectedStatus:         http.StatusOK,
+			expectedResponseStatus: Fail,
+		},
+		{
+			name:   "partial health check failures - returns 200 OK with Warn status",
+			method: http.MethodGet,
+			setupGateway: func(_ *Gateway) {
+			},
+			setupHealthCheck: func(gw *Gateway) {
+				healthInfo := map[string]HealthCheckItem{
+					"redis": {
+						Status:        Pass,
+						ComponentType: Datastore,
+					},
+					"dashboard": {
+						Status:        Fail,
+						ComponentType: System,
+						Output:        "Dashboard connection failed",
+					},
+					"rpc": {
+						Status:        Pass,
+						ComponentType: System,
+					},
+				}
+				gw.setCurrentHealthCheckInfo(healthInfo)
+			},
+			expectedStatus:         http.StatusOK,
+			expectedResponseStatus: Warn,
+		},
+		{
+			name:   "empty health check data - returns 200 OK with Pass status",
+			method: http.MethodGet,
+			setupGateway: func(_ *Gateway) {
+			},
+			setupHealthCheck: func(gw *Gateway) {
+				gw.setCurrentHealthCheckInfo(map[string]HealthCheckItem{})
+			},
+			expectedStatus:         http.StatusOK,
+			expectedResponseStatus: Pass,
+		},
+		{
+			name:   "hide generator header enabled - returns 200 OK",
+			method: http.MethodGet,
+			setupGateway: func(gw *Gateway) {
+				conf := gw.GetConfig()
+				conf.HideGeneratorHeader = true
+				gw.SetConfig(conf)
+			},
+			setupHealthCheck: func(gw *Gateway) {
+				healthInfo := map[string]HealthCheckItem{
+					"redis": {
+						Status:        Pass,
+						ComponentType: Datastore,
+					},
+				}
+				gw.setCurrentHealthCheckInfo(healthInfo)
+			},
+			expectedStatus:         http.StatusOK,
+			expectedResponseStatus: Pass,
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			gw := NewGateway(config.Config{}, nil)
+
+			tt.setupGateway(gw)
+			tt.setupHealthCheck(gw)
+
+			req := httptest.NewRequest(tt.method, "/hello", nil)
+			w := httptest.NewRecorder()
+
+			gw.liveCheckHandler(w, req)
+
+			assert.Equal(t, tt.expectedStatus, w.Code)
+
+			if w.Code != http.StatusMethodNotAllowed {
+				assert.Equal(t, "application/json", w.Header().Get("Content-Type"))
+			}
+
+			switch tt.expectedStatus {
+			case http.StatusOK:
+				var response HealthCheckResponse
+				err := json.Unmarshal(w.Body.Bytes(), &response)
+				require.NoError(t, err)
+
+				assert.Equal(t, tt.expectedResponseStatus, response.Status)
+				assert.Equal(t, VERSION, response.Version)
+				assert.Equal(t, "Tyk GW", response.Description)
+			case http.StatusMethodNotAllowed:
+				var errorResponse apiStatusMessage
+				err := json.Unmarshal(w.Body.Bytes(), &errorResponse)
+				require.NoError(t, err)
+
+				assert.Equal(t, "error", errorResponse.Status)
+				assert.Equal(t, "Method Not Allowed", errorResponse.Message)
+			}
+		})
+	}
+}
+
+func TestGateway_liveCheckHandler_vs_readinessHandler(t *testing.T) {
+	tests := []struct {
+		name                    string
+		setupHealthCheck        func(*Gateway)
+		expectedLiveStatus      int
+		expectedLiveResponse    HealthCheckStatus
+		expectedReadinessStatus int
+		expectedReadinessError  string
+	}{
+		{
+			name: "redis failed - /hello returns 200 OK, /ready returns 503",
+			setupHealthCheck: func(gw *Gateway) {
+				healthInfo := map[string]HealthCheckItem{
+					"redis": {
+						Status:        Fail,
+						ComponentType: Datastore,
+						Output:        "Redis connection failed",
+					},
+				}
+				gw.setCurrentHealthCheckInfo(healthInfo)
+				gw.performedSuccessfulReload = true
+			},
+			expectedLiveStatus:      http.StatusOK,
+			expectedLiveResponse:    Fail,
+			expectedReadinessStatus: http.StatusServiceUnavailable,
+			expectedReadinessError:  "Redis connection not available",
+		},
+		{
+			name: "dashboard failed (UseDBAppConfigs disabled) - both return 200 OK",
+			setupHealthCheck: func(gw *Gateway) {
+				conf := gw.GetConfig()
+				conf.UseDBAppConfigs = false
+				gw.SetConfig(conf)
+
+				healthInfo := map[string]HealthCheckItem{
+					"redis": {
+						Status:        Pass,
+						ComponentType: Datastore,
+					},
+					"dashboard": {
+						Status:        Fail,
+						ComponentType: System,
+						Output:        "Dashboard connection failed",
+					},
+				}
+				gw.setCurrentHealthCheckInfo(healthInfo)
+				gw.performedSuccessfulReload = true
+			},
+			expectedLiveStatus:      http.StatusOK,
+			expectedLiveResponse:    Warn,
+			expectedReadinessStatus: http.StatusOK,
+		},
+		{
+			name: "all checks pass - both return 200 OK",
+			setupHealthCheck: func(gw *Gateway) {
+				healthInfo := map[string]HealthCheckItem{
+					"redis": {
+						Status:        Pass,
+						ComponentType: Datastore,
+					},
+					"dashboard": {
+						Status:        Pass,
+						ComponentType: System,
+					},
+				}
+				gw.setCurrentHealthCheckInfo(healthInfo)
+				gw.performedSuccessfulReload = true
+			},
+			expectedLiveStatus:      http.StatusOK,
+			expectedLiveResponse:    Pass,
+			expectedReadinessStatus: http.StatusOK,
+		},
+		{
+			name: "no successful reload - /hello returns 200 OK, /ready returns 503",
+			setupHealthCheck: func(gw *Gateway) {
+				healthInfo := map[string]HealthCheckItem{
+					"redis": {
+						Status:        Pass,
+						ComponentType: Datastore,
+					},
+				}
+				gw.setCurrentHealthCheckInfo(healthInfo)
+				gw.performedSuccessfulReload = false
+			},
+			expectedLiveStatus:      http.StatusOK,
+			expectedLiveResponse:    Pass,
+			expectedReadinessStatus: http.StatusServiceUnavailable,
+			expectedReadinessError:  "A successful API reload did not happen",
+		},
+		{
+			name: "multiple failures - /hello returns 200 OK with Warn, /ready checks Redis first",
+			setupHealthCheck: func(gw *Gateway) {
+				healthInfo := map[string]HealthCheckItem{
+					"redis": {
+						Status:        Pass,
+						ComponentType: Datastore,
+					},
+					"dashboard": {
+						Status:        Fail,
+						ComponentType: System,
+						Output:        "Dashboard failed",
+					},
+					"rpc": {
+						Status:        Fail,
+						ComponentType: System,
+						Output:        "RPC failed",
+					},
+				}
+				gw.setCurrentHealthCheckInfo(healthInfo)
+				gw.performedSuccessfulReload = true
+			},
+			expectedLiveStatus:      http.StatusOK,
+			expectedLiveResponse:    Warn,
+			expectedReadinessStatus: http.StatusOK,
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			gw := NewGateway(config.Config{}, nil)
+			tt.setupHealthCheck(gw)
+
+			liveReq := httptest.NewRequest(http.MethodGet, "/hello", nil)
+			liveW := httptest.NewRecorder()
+			gw.liveCheckHandler(liveW, liveReq)
+
+			assert.Equal(t, tt.expectedLiveStatus, liveW.Code)
+			assert.Equal(t, "application/json", liveW.Header().Get("Content-Type"))
+
+			var liveResponse HealthCheckResponse
+			err := json.Unmarshal(liveW.Body.Bytes(), &liveResponse)
+			require.NoError(t, err)
+			assert.Equal(t, tt.expectedLiveResponse, liveResponse.Status)
+
+			readyReq := httptest.NewRequest(http.MethodGet, "/ready", nil)
+			readyW := httptest.NewRecorder()
+			gw.readinessHandler(readyW, readyReq)
+
+			assert.Equal(t, tt.expectedReadinessStatus, readyW.Code)
+			assert.Equal(t, "application/json", readyW.Header().Get("Content-Type"))
+
+			if tt.expectedReadinessStatus == http.StatusOK {
+				var readyResponse HealthCheckResponse
+				err := json.Unmarshal(readyW.Body.Bytes(), &readyResponse)
+				require.NoError(t, err)
+				assert.Equal(t, Pass, readyResponse.Status)
+			} else if tt.expectedReadinessError != "" {
+				var errorResponse apiStatusMessage
+				err := json.Unmarshal(readyW.Body.Bytes(), &errorResponse)
+				require.NoError(t, err)
+				assert.Equal(t, "error", errorResponse.Status)
+				assert.Equal(t, tt.expectedReadinessError, errorResponse.Message)
+			}
+		})
+	}
+}
+
+func TestGateway_liveCheckHandler_EdgeCases(t *testing.T) {
+	tests := []struct {
+		name                   string
+		setupGateway           func(*Gateway)
+		setupHealthCheck       func(*Gateway)
+		expectedStatus         int
+		expectedResponseStatus HealthCheckStatus
+		testDescription        string
+	}{
+		{
+			name: "custom health check endpoint name configuration",
+			setupGateway: func(gw *Gateway) {
+				conf := gw.GetConfig()
+				conf.HealthCheckEndpointName = "custom-health"
+				gw.SetConfig(conf)
+			},
+			setupHealthCheck: func(gw *Gateway) {
+				healthInfo := map[string]HealthCheckItem{
+					"redis": {
+						Status:        Pass,
+						ComponentType: Datastore,
+					},
+				}
+				gw.setCurrentHealthCheckInfo(healthInfo)
+			},
+			expectedStatus:         http.StatusOK,
+			expectedResponseStatus: Pass,
+			testDescription:        "Custom endpoint name should not affect handler behavior",
+		},
+		{
+			name: "UseDBAppConfigs enabled with dashboard failure",
+			setupGateway: func(gw *Gateway) {
+				conf := gw.GetConfig()
+				conf.UseDBAppConfigs = true
+				gw.SetConfig(conf)
+			},
+			setupHealthCheck: func(gw *Gateway) {
+				healthInfo := map[string]HealthCheckItem{
+					"redis": {
+						Status:        Pass,
+						ComponentType: Datastore,
+					},
+					"dashboard": {
+						Status:        Fail,
+						ComponentType: System,
+						Output:        "Dashboard connection failed",
+					},
+				}
+				gw.setCurrentHealthCheckInfo(healthInfo)
+			},
+			expectedStatus:         http.StatusOK,
+			expectedResponseStatus: Warn,
+			testDescription:        "Dashboard failure with UseDBAppConfigs should return 200 OK with Warn",
+		},
+		{
+			name: "RPC policy source with RPC failure",
+			setupGateway: func(gw *Gateway) {
+				conf := gw.GetConfig()
+				conf.Policies.PolicySource = "rpc"
+				gw.SetConfig(conf)
+			},
+			setupHealthCheck: func(gw *Gateway) {
+				healthInfo := map[string]HealthCheckItem{
+					"redis": {
+						Status:        Pass,
+						ComponentType: Datastore,
+					},
+					"rpc": {
+						Status:        Fail,
+						ComponentType: System,
+						Output:        "RPC connection failed",
+					},
+				}
+				gw.setCurrentHealthCheckInfo(healthInfo)
+			},
+			expectedStatus:         http.StatusOK,
+			expectedResponseStatus: Warn,
+			testDescription:        "RPC failure should return 200 OK with Warn status",
+		},
+		{
+			name: "file policy source with RPC failure",
+			setupGateway: func(gw *Gateway) {
+				conf := gw.GetConfig()
+				conf.Policies.PolicySource = "file"
+				gw.SetConfig(conf)
+			},
+			setupHealthCheck: func(gw *Gateway) {
+				healthInfo := map[string]HealthCheckItem{
+					"redis": {
+						Status:        Pass,
+						ComponentType: Datastore,
+					},
+					"rpc": {
+						Status:        Fail,
+						ComponentType: System,
+						Output:        "RPC connection failed",
+					},
+				}
+				gw.setCurrentHealthCheckInfo(healthInfo)
+			},
+			expectedStatus:         http.StatusOK,
+			expectedResponseStatus: Warn,
+			testDescription:        "RPC failure with file policy source should return 200 OK with Warn",
+		},
+		{
+			name:         "warning status in health checks",
+			setupGateway: func(_ *Gateway) {},
+			setupHealthCheck: func(gw *Gateway) {
+				healthInfo := map[string]HealthCheckItem{
+					"redis": {
+						Status:        Warn,
+						ComponentType: Datastore,
+					},
+					"dashboard": {
+						Status:        Pass,
+						ComponentType: System,
+					},
+				}
+				gw.setCurrentHealthCheckInfo(healthInfo)
+			},
+			expectedStatus:         http.StatusOK,
+			expectedResponseStatus: Pass,
+			testDescription:        "Warning status should not count as failure",
+		},
+		{
+			name:         "single component with different status values",
+			setupGateway: func(_ *Gateway) {},
+			setupHealthCheck: func(gw *Gateway) {
+				healthInfo := map[string]HealthCheckItem{
+					"redis": {
+						Status:        Fail,
+						ComponentType: Datastore,
+						Output:        "Redis completely down",
+					},
+				}
+				gw.setCurrentHealthCheckInfo(healthInfo)
+			},
+			expectedStatus:         http.StatusOK,
+			expectedResponseStatus: Fail,
+			testDescription:        "Single failing component should result in Fail status",
+		},
+		{
+			name:         "multiple mixed component types",
+			setupGateway: func(_ *Gateway) {},
+			setupHealthCheck: func(gw *Gateway) {
+				healthInfo := map[string]HealthCheckItem{
+					"redis": {
+						Status:        Pass,
+						ComponentType: Datastore,
+					},
+					"dashboard": {
+						Status:        Pass,
+						ComponentType: System,
+					},
+					"custom-service": {
+						Status:        Warn,
+						ComponentType: System,
+					},
+					"another-service": {
+						Status:        Fail,
+						ComponentType: System,
+						Output:        "Custom service failed",
+					},
+				}
+				gw.setCurrentHealthCheckInfo(healthInfo)
+			},
+			expectedStatus:         http.StatusOK,
+			expectedResponseStatus: Warn,
+			testDescription:        "Mixed component results should return Warn when some fail",
+		},
+		{
+			name:         "nil health check data handling",
+			setupGateway: func(_ *Gateway) {},
+			setupHealthCheck: func(gw *Gateway) {
+				gw.setCurrentHealthCheckInfo(nil)
+			},
+			expectedStatus:         http.StatusOK,
+			expectedResponseStatus: Pass,
+			testDescription:        "Nil health check data should be handled gracefully",
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			gw := NewGateway(config.Config{}, nil)
+
+			tt.setupGateway(gw)
+			tt.setupHealthCheck(gw)
+
+			req := httptest.NewRequest(http.MethodGet, "/hello", nil)
+			w := httptest.NewRecorder()
+
+			gw.liveCheckHandler(w, req)
+
+			assert.Equal(t, tt.expectedStatus, w.Code, tt.testDescription)
+			assert.Equal(t, "application/json", w.Header().Get("Content-Type"))
+
+			var response HealthCheckResponse
+			err := json.Unmarshal(w.Body.Bytes(), &response)
+			require.NoError(t, err)
+
+			assert.Equal(t, tt.expectedResponseStatus, response.Status, tt.testDescription)
+			assert.Equal(t, VERSION, response.Version)
+			assert.Equal(t, "Tyk GW", response.Description)
 		})
 	}
 }
@@ -802,6 +1360,7 @@ func TestGateway_determineHealthStatus(t *testing.T) {
 	}
 
 	for _, tt := range tests {
+		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			// Create a gateway instance (config doesn't matter for this function)
 			gw := NewGateway(config.Config{}, nil)
