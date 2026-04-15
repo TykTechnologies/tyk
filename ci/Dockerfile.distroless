@@ -14,12 +14,12 @@ RUN dpkg -i /${BUILD_PACKAGE_NAME}_*${TARGETARCH}.deb && rm /*.deb
 
 FROM ${BASE_IMAGE}
 
-COPY --from=deb /opt/tyk-gateway /opt/tyk-gateway
+COPY --from=deb /opt/tyk-dashboard /opt/tyk-dashboard
 
 ARG PORTS
 EXPOSE $PORTS
 
-WORKDIR /opt/tyk-gateway/
+WORKDIR /opt/tyk-dashboard/
 
-ENTRYPOINT ["/opt/tyk-gateway/tyk" ]
-CMD [ "--conf=/opt/tyk-gateway/tyk.conf" ]
+ENTRYPOINT ["/opt/tyk-dashboard/tyk-analytics" ]
+CMD [ "--conf=/opt/tyk-dashboard/tyk_analytics.conf" ]

@@ -28,9 +28,9 @@ ARG PORTS
 
 EXPOSE $PORTS
 
-WORKDIR /opt/tyk-gateway/
+WORKDIR /opt/tyk-dashboard/
 
 # Uncomment this to test in dev
-# COPY tyk .
-ENTRYPOINT ["/opt/tyk-gateway/tyk" ]
-CMD [ "--conf=/opt/tyk-gateway/tyk.conf" ]
+# COPY tyk-analytics .
+ENTRYPOINT ["/opt/tyk-dashboard/tyk-analytics" ]
+CMD [ "--conf=/opt/tyk-dashboard/tyk_analytics.conf" ]
