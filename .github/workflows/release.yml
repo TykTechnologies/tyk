@@ -214,7 +214,7 @@ jobs:
         uses: docker/metadata-action@c299e40c65443455700f0fdfc63efafe5b349051 # v5
         with:
           images: |
-            ${{ steps.ecr.outputs.registry }}/tyk
+            ${{ steps.ecr.outputs.registry }}/tyk-fips
           flavor: |
             latest=false
           tags: |
