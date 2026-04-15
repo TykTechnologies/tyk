@@ -38,7 +38,10 @@ jobs:
   goreleaser:
     needs:
       - dep-guard
-    if: github.event.pull_request.draft == false
+    if: |
+      !cancelled() &&
+      (needs.dep-guard.result == 'success' || needs.dep-guard.result == 'skipped') &&
+      github.event.pull_request.draft == false
     name: '${{ matrix.golang_cross }}'
     runs-on: ${{ vars.DEFAULT_RUNNER }}
     permissions:
