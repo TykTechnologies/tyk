@@ -168,14 +168,9 @@ func recordGraphDetails(rec *analytics.AnalyticsRecord, r *http.Request, resp *h
 }
 
 func recordMCPDetails(rec *analytics.AnalyticsRecord, r *http.Request) {
-	method := ctxGetMCPMethod(r)
-	if method == "" {
-		return
-	}
-
 	rec.MCPStats = analytics.MCPStats{
 		IsMCP:         true,
-		JSONRPCMethod: method,
+		JSONRPCMethod: ctxGetMCPMethod(r),
 		PrimitiveType: ctxGetMCPPrimitiveType(r),
 		PrimitiveName: ctxGetMCPPrimitiveName(r),
 	}

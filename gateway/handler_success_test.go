@@ -474,7 +474,7 @@ func TestRecordMCPDetails(t *testing.T) {
 		assert.Empty(t, rec.MCPStats.PrimitiveName)
 	})
 
-	t.Run("no MCP context leaves record unaffected", func(t *testing.T) {
+	t.Run("no MCP context still tags record as MCP", func(t *testing.T) {
 		req, err := http.NewRequest("GET", "/api/users", nil)
 		assert.NoError(t, err)
 
@@ -486,11 +486,13 @@ func TestRecordMCPDetails(t *testing.T) {
 		rec := original
 		recordMCPDetails(&rec, req)
 
-		assert.False(t, rec.MCPStats.IsMCP)
+		assert.True(t, rec.MCPStats.IsMCP)
 		assert.Equal(t, original.Path, rec.Path)
 		assert.Equal(t, original.APIID, rec.APIID)
 		assert.Equal(t, original.ResponseCode, rec.ResponseCode)
 		assert.Empty(t, rec.MCPStats.JSONRPCMethod)
+		assert.Empty(t, rec.MCPStats.PrimitiveType)
+		assert.Empty(t, rec.MCPStats.PrimitiveName)
 	})
 }
 

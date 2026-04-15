@@ -2,6 +2,7 @@ package gateway
 
 import (
 	"net/http"
+	"net/http/httptest"
 	"sync/atomic"
 	"testing"
 
@@ -239,6 +240,15 @@ func TestMCPAnalytics_ErrorPath_RecordsMCPStats(t *testing.T) {
 	assert.Equal(t, "tools/call", rec.MCPStats.JSONRPCMethod)
 	assert.Equal(t, "tool", rec.MCPStats.PrimitiveType)
 	assert.Equal(t, "get_weather", rec.MCPStats.PrimitiveName)
+}
+
+func TestRecordMCPDetails_TagsRequestWithoutJSONRPCState(t *testing.T) {
+	r := httptest.NewRequest(http.MethodPost, "/mcp", nil)
+	rec := &analytics.AnalyticsRecord{}
+
+	recordMCPDetails(rec, r)
+
+	assert.True(t, rec.MCPStats.IsMCP)
 }
 
 func TestMCPAnalytics_NonMCP_NoMCPStats(t *testing.T) {
