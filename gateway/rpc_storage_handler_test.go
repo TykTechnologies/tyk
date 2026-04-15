@@ -2,16 +2,20 @@ package gateway
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/lonelycode/osin"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 
 	"github.com/TykTechnologies/gorpc"
@@ -20,6 +24,7 @@ import (
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/header"
 	"github.com/TykTechnologies/tyk/internal/model"
+	"github.com/TykTechnologies/tyk/regexp"
 	"github.com/TykTechnologies/tyk/rpc"
 	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/test"
@@ -60,6 +65,88 @@ func getAccessToken(td tokenData) string {
 
 func getRefreshToken(td tokenData) string {
 	return td.RefreshToken
+}
+
+type dispatcherOption func() (string, any)
+
+func withFunc(name string, f any) dispatcherOption {
+	return func() (string, any) {
+		return name, f
+	}
+}
+
+// newDispatcher creates a minimal RPC dispatcher with required handlers for gateway startup.
+// It establishes a set of default handlers that can be overridden by providing
+// dispatcherOptions. This ensures the gateway can start cleanly for tests without
+// causing delays or failures from RPC retries if emergency mode is initially disabled.
+func newDispatcher(opts ...dispatcherOption) *gorpc.Dispatcher {
+	dispatcher := gorpc.NewDispatcher()
+
+	funcs := map[string]any{
+		"Login": func(_, _ string) bool {
+			return true
+		},
+		"Disconnect": func(_ string, _ *model.GroupLoginRequest) error {
+			return nil
+		},
+		"GetApiDefinitions": func(_ string, _ interface{}) (string, error) {
+			return "[]", nil
+		},
+		"GetPolicies": func(_ string, _ interface{}) (string, error) {
+			return "[]", nil
+		},
+	}
+
+	for _, opt := range opts {
+		if opt == nil {
+			continue
+		}
+
+		name, f := opt()
+
+		if name == "" {
+			panic("dispatcher function name cannot be empty")
+		}
+		if f == nil {
+			panic("dispatcher function cannot be nil")
+		}
+
+		funcs[name] = f
+	}
+
+	for name, f := range funcs {
+		dispatcher.AddFunc(name, f)
+	}
+
+	return dispatcher
+}
+
+var nonAlphanumericRegex = regexp.MustCompile(`[^a-zA-Z0-9 ]+`)
+
+// generateUniqueTestTag creates a sanitized, unique tag from a test name to be used
+// for isolating tests that interact with Redis.
+func generateUniqueTestTag(testName string) (string, error) {
+	const defaultName = "test"
+
+	cleanName := strings.ToLower(testName)
+	cleanName = nonAlphanumericRegex.ReplaceAllString(cleanName, "")
+	cleanName = strings.ReplaceAll(cleanName, " ", "-")
+
+	if cleanName == "" {
+		cleanName = defaultName
+	}
+
+	cleanName = strings.Trim(cleanName, "-")
+	if cleanName == "" {
+		cleanName = defaultName
+	}
+
+	suffix := make([]byte, 8)
+	if _, err := rand.Read(suffix); err != nil {
+		return "", fmt.Errorf("failed to generate unique test tag: %w", err)
+	}
+
+	return fmt.Sprintf("%s-%s", cleanName, hex.EncodeToString(suffix)), nil
 }
 
 func TestProcessKeySpaceChangesForOauth(t *testing.T) {
@@ -756,22 +843,20 @@ func TestProcessKeySpaceChanges_UserKeyReset(t *testing.T) {
 	oldKey := "old-api-key"
 	newKey := "new-api-key"
 
-	dispatcher := gorpc.NewDispatcher()
-	dispatcher.AddFunc("Login", func(_, _ string) bool {
-		return true
-	})
-	dispatcher.AddFunc("Disconnect", func(_ string, _ *model.GroupLoginRequest) error {
-		return nil
-	})
-	dispatcher.AddFunc("GetKeySpaceUpdate", func(_, _ string) ([]string, error) {
-		return []string{}, nil
-	})
-	dispatcher.AddFunc("GetGroupKeySpaceUpdate", func(_ string, _ string) ([]string, error) {
-		return []string{}, nil
-	})
+	dispatcher := newDispatcher(
+		withFunc("GetKeySpaceUpdate", func(_, _ string) ([]string, error) {
+			return []string{}, nil
+		}),
+		withFunc("GetGroupKeySpaceUpdate", func(_, _ string) ([]string, error) {
+			return []string{}, nil
+		}),
+	)
 
 	rpcMock, connectionString := startRPCMock(dispatcher)
 	defer stopRPCMock(rpcMock)
+
+	uniqueTag, err := generateUniqueTestTag(t.Name())
+	require.NoError(t, err)
 
 	g := StartTest(func(globalConf *config.Config) {
 		globalConf.SlaveOptions.UseRPC = true
@@ -781,6 +866,7 @@ func TestProcessKeySpaceChanges_UserKeyReset(t *testing.T) {
 		globalConf.SlaveOptions.CallTimeout = 1
 		globalConf.SlaveOptions.RPCPoolSize = 2
 		globalConf.SlaveOptions.DisableKeySpaceSync = true
+		globalConf.DBAppConfOptions.Tags = []string{uniqueTag}
 	})
 	defer g.Close()
 
@@ -845,20 +931,18 @@ func TestGetApiDefinitions_Fails_With_Timeout(t *testing.T) {
 		close(wait)
 	}()
 
-	dispatcher := gorpc.NewDispatcher()
-	dispatcher.AddFunc("Login", func(_, _ string) bool {
-		return true
-	})
-	dispatcher.AddFunc("Disconnect", func(_ string, _ *model.GroupLoginRequest) error {
-		return nil
-	})
-	dispatcher.AddFunc("GetApiDefinitions", func(_ string, _ interface{}) (string, error) {
-		<-wait // wait until the defer method is called
-		return "sample-response", nil
-	})
+	dispatcher := newDispatcher(
+		withFunc("GetApiDefinitions", func(_ string, _ any) (string, error) {
+			<-wait // wait until the defer method is called
+			return "[]", nil
+		}),
+	)
 
 	rpcMock, connectionString := startRPCMock(dispatcher)
 	defer stopRPCMock(rpcMock)
+
+	uniqueTag, err := generateUniqueTestTag(t.Name())
+	require.NoError(t, err)
 
 	g := StartTest(func(globalConf *config.Config) {
 		globalConf.SlaveOptions.UseRPC = true
@@ -868,6 +952,7 @@ func TestGetApiDefinitions_Fails_With_Timeout(t *testing.T) {
 		globalConf.SlaveOptions.CallTimeout = 1
 		globalConf.SlaveOptions.RPCPoolSize = 2
 		globalConf.SlaveOptions.DisableKeySpaceSync = true
+		globalConf.DBAppConfOptions.Tags = []string{uniqueTag}
 	})
 	g.Gw.afterConfSetup() // sets SlaveOptions.CallTimeout to GlobalRPCCallTimeout
 
@@ -889,26 +974,24 @@ func TestGetApiDefinitions_Fails_With_Timeout(t *testing.T) {
 	// GetApiDefinitions calls rpc.FuncClientSingleton with a backoff algorithm.
 	// The algorithm tries to call the RPC method 3 times with a 10-millisecond interval.
 	// So the "GetApiDefinitions" method will be called 4 times, including the first try.
-	// It should return an empty string instead of "sample-response".
+	// It should return an empty string instead of "[]".
 	assert.Equal(t, "", rpcListener.GetApiDefinitions("test_org", nil))
 }
 
 func TestGetApiDefinitions(t *testing.T) {
-	var GetApiDefinitionsResponse = "sample-response"
+	var GetApiDefinitionsResponse = "[]"
 
-	dispatcher := gorpc.NewDispatcher()
-	dispatcher.AddFunc("Login", func(_, _ string) bool {
-		return true
-	})
-	dispatcher.AddFunc("Disconnect", func(_ string, _ *model.GroupLoginRequest) error {
-		return nil
-	})
-	dispatcher.AddFunc("GetApiDefinitions", func(_ string, _ interface{}) (string, error) {
-		return GetApiDefinitionsResponse, nil
-	})
+	dispatcher := newDispatcher(
+		withFunc("GetApiDefinitions", func(_ string, _ any) (string, error) {
+			return GetApiDefinitionsResponse, nil
+		}),
+	)
 
 	rpcMock, connectionString := startRPCMock(dispatcher)
 	defer stopRPCMock(rpcMock)
+
+	uniqueTag, err := generateUniqueTestTag(t.Name())
+	require.NoError(t, err)
 
 	g := StartTest(func(globalConf *config.Config) {
 		globalConf.SlaveOptions.UseRPC = true
@@ -918,6 +1001,7 @@ func TestGetApiDefinitions(t *testing.T) {
 		globalConf.SlaveOptions.CallTimeout = 1
 		globalConf.SlaveOptions.RPCPoolSize = 2
 		globalConf.SlaveOptions.DisableKeySpaceSync = true
+		globalConf.DBAppConfOptions.Tags = []string{uniqueTag}
 	})
 	g.Gw.afterConfSetup() // sets SlaveOptions.CallTimeout to GlobalRPCCallTimeout
 
@@ -940,21 +1024,19 @@ func TestGetApiDefinitions(t *testing.T) {
 }
 
 func TestGetPolicies(t *testing.T) {
-	var GetPoliciesResponse = "sample-response"
+	var GetPoliciesResponse = "[]"
 
-	dispatcher := gorpc.NewDispatcher()
-	dispatcher.AddFunc("Login", func(_, _ string) bool {
-		return true
-	})
-	dispatcher.AddFunc("Disconnect", func(_ string, _ *model.GroupLoginRequest) error {
-		return nil
-	})
-	dispatcher.AddFunc("GetPolicies", func(_ string, _ interface{}) (string, error) {
-		return GetPoliciesResponse, nil
-	})
+	dispatcher := newDispatcher(
+		withFunc("GetPolicies", func(_ string, _ any) (string, error) {
+			return GetPoliciesResponse, nil
+		}),
+	)
 
 	rpcMock, connectionString := startRPCMock(dispatcher)
 	defer stopRPCMock(rpcMock)
+
+	uniqueTag, err := generateUniqueTestTag(t.Name())
+	require.NoError(t, err)
 
 	g := StartTest(func(globalConf *config.Config) {
 		globalConf.SlaveOptions.UseRPC = true
@@ -964,6 +1046,7 @@ func TestGetPolicies(t *testing.T) {
 		globalConf.SlaveOptions.CallTimeout = 1
 		globalConf.SlaveOptions.RPCPoolSize = 2
 		globalConf.SlaveOptions.DisableKeySpaceSync = true
+		globalConf.DBAppConfOptions.Tags = []string{uniqueTag}
 	})
 	g.Gw.afterConfSetup() // sets SlaveOptions.CallTimeout to GlobalRPCCallTimeout
 
@@ -991,20 +1074,18 @@ func TestGetPolicies_Fails_With_Timeout(t *testing.T) {
 		close(wait)
 	}()
 
-	dispatcher := gorpc.NewDispatcher()
-	dispatcher.AddFunc("Login", func(_, _ string) bool {
-		return true
-	})
-	dispatcher.AddFunc("Disconnect", func(_ string, _ *model.GroupLoginRequest) error {
-		return nil
-	})
-	dispatcher.AddFunc("GetPolicies", func(_ string, _ interface{}) (string, error) {
-		<-wait // wait until the defer method is called
-		return "sample-response", nil
-	})
+	dispatcher := newDispatcher(
+		withFunc("GetPolicies", func(_ string, _ any) (string, error) {
+			<-wait // wait until the defer method is called
+			return "[]", nil
+		}),
+	)
 
 	rpcMock, connectionString := startRPCMock(dispatcher)
 	defer stopRPCMock(rpcMock)
+
+	uniqueTag, err := generateUniqueTestTag(t.Name())
+	require.NoError(t, err)
 
 	g := StartTest(func(globalConf *config.Config) {
 		globalConf.SlaveOptions.UseRPC = true
@@ -1014,6 +1095,7 @@ func TestGetPolicies_Fails_With_Timeout(t *testing.T) {
 		globalConf.SlaveOptions.CallTimeout = 1
 		globalConf.SlaveOptions.RPCPoolSize = 2
 		globalConf.SlaveOptions.DisableKeySpaceSync = true
+		globalConf.DBAppConfOptions.Tags = []string{uniqueTag}
 	})
 	g.Gw.afterConfSetup() // sets SlaveOptions.CallTimeout to GlobalRPCCallTimeout
 
@@ -1035,7 +1117,7 @@ func TestGetPolicies_Fails_With_Timeout(t *testing.T) {
 	// GetPolicies calls rpc.FuncClientSingleton with a backoff algorithm.
 	// The algorithm tries to call the RPC method 3 times with a 10-millisecond interval.
 	// So the "GetPolicies" method will be called 4 times, including the first try.
-	// It should return an empty string instead of "sample-response".
+	// It should return an empty string instead of "[]".
 	assert.Equal(t, "", rpcListener.GetPolicies("test_org"))
 }
 
