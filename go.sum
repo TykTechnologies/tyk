@@ -288,8 +288,8 @@ github.com/TykTechnologies/openid2go v0.1.2 h1:WXctksOahA/epTVVvbn9iNUuMXKRr0ksr
 github.com/TykTechnologies/openid2go v0.1.2/go.mod h1:gYfkqeWa+lY3Xz/Z2xYtIzmYXynlgKZaBIbPCqdcdMA=
 github.com/TykTechnologies/opentelemetry v0.0.24-0.20260311151149-64d208d9ae58 h1:Bb2+YJd5dx+gJUzUiCCqHonXxghFPw7DAv8vhyPsDa4=
 github.com/TykTechnologies/opentelemetry v0.0.24-0.20260311151149-64d208d9ae58/go.mod h1:SAzttxevztytdlzhqIhWtUvzZwqelaVWiHuSulEJ8/w=
-github.com/TykTechnologies/storage v1.3.0 h1:y/ORW7hSZHw8Pr0aSaxN1bXH/u7tuhOW/RRiPkaQNLo=
-github.com/TykTechnologies/storage v1.3.0/go.mod h1:psPnFQBWQ/gBQKGHrviJqXQ5HCz8EwTWm41RWpunosM=
+github.com/TykTechnologies/storage v1.3.1-0.20260415170427-6e1f48df3d13 h1:ldUj9ms7No6hutAsG9M77ShoO4cwSXU1eU+/wTsKk7s=
+github.com/TykTechnologies/storage v1.3.1-0.20260415170427-6e1f48df3d13/go.mod h1:5/mDyQznmoPgDJrxlmT5lRiswtHEQ3ZO5Hw1r+/skDI=
 github.com/TykTechnologies/structviewer v1.2.0 h1:wV3AyTmWCZ3n7/llp+6xuDjnS/EJ/Ct/HG2pPE9+VX8=
 github.com/TykTechnologies/structviewer v1.2.0/go.mod h1:XKJbqX8Q7n9FUrqTK58yVZUi5zWAkeRcULcPLDoWvvY=
 github.com/TykTechnologies/tyk-pump v1.13.0-rc2.0.20251023125113-bc7641d42e63 h1:6n4yFtsBhcQayXzY8AdTKlmaJGw2Z3Uqm6ARIETmiVA=
