@@ -66,6 +66,7 @@ import (
 	"github.com/TykTechnologies/tyk/internal/redis"
 	"github.com/TykTechnologies/tyk/internal/uuid"
 	lib "github.com/TykTechnologies/tyk/lib/apidef"
+	"github.com/TykTechnologies/tyk/pkg/schema"
 	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/user"
 )
@@ -1181,11 +1182,21 @@ func (gw *Gateway) handleGetAPIOAS(apiID string, modePublic bool) (interface{}, 
 	defer gw.apisMu.RUnlock()
 
 	obj, code := gw.handleGetAPI(apiID, true)
-	if apiOAS, ok := obj.(*oas.OAS); ok && modePublic {
-		apiOAS.RemoveTykExtension()
-	}
-	return obj, code
+	if apiOAS, ok := obj.(*oas.OAS); ok {
+		// We have to operate on oas clone in order to preserve original state after any manipulations on schema.
+		oasClone, _ := apiOAS.Clone() // nolint:errcheck
+		if modePublic {
+			oasClone.RemoveTykExtension()
+		}
 
+		visitor := schema.NewVisitor()
+		visitor.AddSchemaManipulation(schema.RestoreUnicodeEscapesFromRE2Manipulation)
+		visitor.ProcessOAS(oasClone)
+
+		obj = oasClone
+	}
+
+	return obj, code
 }
 
 func (gw *Gateway) handleAddApi(r *http.Request, fs afero.Fs, oasEndpoint bool) (interface{}, int) {
@@ -1364,7 +1375,12 @@ func (gw *Gateway) writeOASAndAPIDefToFile(fs afero.Fs, apiDef *apidef.APIDefini
 		return
 	}
 
-	err, errCode = gw.writeToFile(fs, oasObj, apiDef.APIID+"-oas")
+	oasDeepCopy, _ := oasObj.Clone() // nolint:errcheck
+	visitor := schema.NewVisitor()
+	visitor.AddSchemaManipulation(schema.RestoreUnicodeEscapesFromRE2Manipulation)
+	visitor.ProcessOAS(oasDeepCopy)
+
+	err, errCode = gw.writeToFile(fs, oasDeepCopy, apiDef.APIID+"-oas")
 	if err != nil {
 		return
 	}
@@ -1582,10 +1598,7 @@ func (gw *Gateway) apiOASGetHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	bytesModifier := lib.NewDataBytesModifier(jsonBytes)
-	bytesModifier.RestoreUnicodeEscapesFromRE2()
-
-	doJSONWrite(w, code, bytesModifier.Result())
+	doJSONWrite(w, code, jsonBytes)
 }
 
 func (gw *Gateway) apiOASPostHandler(w http.ResponseWriter, r *http.Request) {
@@ -3555,11 +3568,6 @@ func extractOASObjFromReq(reqBody io.Reader) ([]byte, *oas.OAS, error) {
 		return nil, nil, ErrRequestMalformed
 	}
 
-	bytesModifier := lib.NewDataBytesModifier(reqBodyInBytes)
-	bytesModifier.TransformUnicodeEscapesToRE2()
-
-	reqBodyInBytes = bytesModifier.Result()
-
 	loader := openapi3.NewLoader()
 	t, err := loader.LoadFromData(reqBodyInBytes)
 	if err != nil {
@@ -3567,6 +3575,15 @@ func extractOASObjFromReq(reqBody io.Reader) ([]byte, *oas.OAS, error) {
 	}
 
 	oasObj.T = *t
+
+	visitor := schema.NewVisitor()
+	visitor.AddSchemaManipulation(schema.TransformUnicodeEscapesToRE2Manipulation)
+	visitor.ProcessOAS(&oasObj)
+
+	reqBodyInBytes, err = json.Marshal(&oasObj)
+	if err != nil {
+		return nil, nil, ErrRequestMalformed
+	}
 
 	return reqBodyInBytes, &oasObj, nil
 }
