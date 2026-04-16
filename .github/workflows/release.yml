@@ -163,7 +163,7 @@ jobs:
         uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
         with:
           context: "dist"
-          platforms: linux/amd64,linux/arm64,linux/s390x
+          platforms: ${{ github.event_name == 'pull_request' && 'linux/amd64' || 'linux/amd64,linux/arm64,linux/s390x' }}
           file: ci/Dockerfile.distroless
           provenance: mode=max
           sbom: true
@@ -210,7 +210,7 @@ jobs:
             BUILD_PACKAGE_NAME=tyk-gateway-ee
       - name: Docker metadata for fips CI
         id: ci_metadata_fips
-        if: ${{ matrix.golang_cross == '1.25-bullseye' }}
+        if: ${{ matrix.golang_cross == '1.25-bullseye' && github.event_name != 'pull_request' }}
         uses: docker/metadata-action@c299e40c65443455700f0fdfc63efafe5b349051 # v5
         with:
           images: |
@@ -225,7 +225,7 @@ jobs:
             type=semver,pattern={{major}}.{{minor}},prefix=v
             type=semver,pattern={{version}},prefix=v
       - name: push fips image to CI
-        if: ${{ matrix.golang_cross == '1.25-bullseye' }}
+        if: ${{ matrix.golang_cross == '1.25-bullseye' && github.event_name != 'pull_request' }}
         uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
         with:
           context: "dist"
@@ -289,7 +289,7 @@ jobs:
           fi
       - name: Docker metadata for std CI
         id: ci_metadata_std
-        if: ${{ matrix.golang_cross == '1.25-bullseye' }}
+        if: ${{ matrix.golang_cross == '1.25-bullseye' && github.event_name != 'pull_request' }}
         uses: docker/metadata-action@c299e40c65443455700f0fdfc63efafe5b349051 # v5
         with:
           images: |
@@ -304,7 +304,7 @@ jobs:
             type=semver,pattern={{major}}.{{minor}},prefix=v
             type=semver,pattern={{version}},prefix=v
       - name: push std image to CI
-        if: ${{ matrix.golang_cross == '1.25-bullseye' }}
+        if: ${{ matrix.golang_cross == '1.25-bullseye' && github.event_name != 'pull_request' }}
         uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
         with:
           context: "dist"
