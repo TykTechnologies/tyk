@@ -13,12 +13,12 @@ spec:
         value: application/json
   specs:
   - name: /tykprotocol/ip http attributes
-    selector: span[tracetest.span.type="http" name="GET /tykprotocol/ip" http.method="GET"]
+    selector: span[tracetest.span.type="http" name="GET /tykprotocol/ip" http.request.method="GET"]
     assertions:
-    - attr:http.status_code = 200
+    - attr:http.response.status_code = 200
     - attr:tracetest.span.type = "http"
-    - attr:http.method = "GET"
-    - attr:http.wrote_bytes != 0
+    - attr:http.request.method = "GET"
+    - attr:http.response.body.size != 0
   - name: We should have double VersionCheck spans
     selector: span[tracetest.span.type="general" name="VersionCheck"]
     assertions:
@@ -28,7 +28,7 @@ spec:
     assertions:
     - attr:tracetest.selected_spans.count = 2
   - name: We should have only 1 proxy to httpbin
-    selector: span[tracetest.span.type="http" name="HTTP GET" http.method="GET"]
+    selector: span[tracetest.span.type="http" name="HTTP GET" http.request.method="GET"]
     assertions:
-    - attr:net.peer.name = "httpbin"
+    - attr:server.address = "httpbin"
     - attr:tracetest.selected_spans.count = 1
