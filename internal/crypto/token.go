@@ -6,8 +6,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/sirupsen/logrus"
-
 	"github.com/buger/jsonparser"
 
 	"github.com/TykTechnologies/tyk/internal/uuid"
@@ -48,7 +46,7 @@ func TokenHashAlgo(token string) string {
 			hashAlgo, err := jsonparser.GetString(jsonToken, "h")
 
 			if err != nil {
-				logrus.Error(err)
+				log.Error(err)
 				return ""
 			}
 

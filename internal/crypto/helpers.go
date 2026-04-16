@@ -25,8 +25,11 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 
+	logger "github.com/TykTechnologies/tyk/log"
 	"github.com/TykTechnologies/tyk/pkg/errpack"
 )
+
+var log = logger.Get()
 
 var (
 	ErrCertExpired = errors.New("Certificate has expired")
@@ -185,7 +188,7 @@ func AddCACertificatesFromChainToPool(pool *x509.CertPool, cert *tls.Certificate
 			// Only re-parse if Leaf is not set
 			parsedCert, err := x509.ParseCertificate(cert.Certificate[0])
 			if err != nil {
-				logrus.WithFields(logrus.Fields{
+				log.WithFields(logrus.Fields{
 					"index": 0,
 					"error": err,
 				}).Error("Failed to parse certificate")
@@ -195,7 +198,7 @@ func AddCACertificatesFromChainToPool(pool *x509.CertPool, cert *tls.Certificate
 		}
 
 		pool.AddCert(certToAdd)
-		logrus.WithFields(logrus.Fields{
+		log.WithFields(logrus.Fields{
 			"subject": certToAdd.Subject.CommonName,
 			"isCA":    certToAdd.IsCA,
 		}).Debug("Added certificate to pool")
@@ -206,7 +209,7 @@ func AddCACertificatesFromChainToPool(pool *x509.CertPool, cert *tls.Certificate
 	for i := 1; i < len(cert.Certificate); i++ {
 		parsedCert, err := x509.ParseCertificate(cert.Certificate[i])
 		if err != nil {
-			logrus.WithFields(logrus.Fields{
+			log.WithFields(logrus.Fields{
 				"index": i,
 				"error": err,
 			}).Error("Failed to parse certificate in chain")
@@ -216,7 +219,7 @@ func AddCACertificatesFromChainToPool(pool *x509.CertPool, cert *tls.Certificate
 		// Only add if it's a CA certificate
 		if parsedCert.IsCA {
 			pool.AddCert(parsedCert)
-			logrus.WithFields(logrus.Fields{
+			log.WithFields(logrus.Fields{
 				"subject": parsedCert.Subject.CommonName,
 				"index":   i,
 			}).Debug("Added CA certificate from chain to pool")
@@ -267,7 +270,7 @@ func Encrypt(key []byte, str string) string {
 
 	block, err := aes.NewCipher(key)
 	if err != nil {
-		logrus.Error(err)
+		log.Error(err)
 		return ""
 	}
 
@@ -276,7 +279,7 @@ func Encrypt(key []byte, str string) string {
 	ciphertext := make([]byte, aes.BlockSize+len(plaintext))
 	iv := ciphertext[:aes.BlockSize]
 	if _, err := io.ReadFull(rand.Reader, iv); err != nil {
-		logrus.Error(err)
+		log.Error(err)
 		return ""
 	}
 
@@ -291,20 +294,20 @@ func Encrypt(key []byte, str string) string {
 func Decrypt(key []byte, cryptoText string) string {
 	ciphertext, err := base64.URLEncoding.DecodeString(cryptoText)
 	if err != nil {
-		logrus.Error(err)
+		log.Error(err)
 		return ""
 	}
 
 	block, err := aes.NewCipher(key)
 	if err != nil {
-		logrus.Error(err)
+		log.Error(err)
 		return ""
 	}
 
 	// The IV needs to be unique, but not secure. Therefore it's common to
 	// include it at the beginning of the ciphertext.
 	if len(ciphertext) < aes.BlockSize {
-		logrus.Error("ciphertext too short")
+		log.Error("ciphertext too short")
 		return ""
 	}
 	iv := ciphertext[:aes.BlockSize]

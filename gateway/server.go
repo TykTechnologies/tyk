@@ -1938,7 +1938,7 @@ func (gw *Gateway) getGlobalMDCBStorageHandler(keyPrefix string, hashKeys bool) 
 	localStorage := &storage.RedisCluster{KeyPrefix: keyPrefix, HashKeys: hashKeys, ConnectionHandler: gw.StorageConnectionHandler}
 	localStorage.Connect()
 
-	logger := logrus.New().WithFields(logrus.Fields{"prefix": "mdcb-storage-handler"})
+	mdcbLog := log.WithFields(logrus.Fields{"prefix": "mdcb-storage-handler"})
 
 	if gw.GetConfig().SlaveOptions.UseRPC {
 		return storage.NewMdcbStorage(
@@ -1948,7 +1948,7 @@ func (gw *Gateway) getGlobalMDCBStorageHandler(keyPrefix string, hashKeys bool) 
 				HashKeys:  hashKeys,
 				Gw:        gw,
 			},
-			logger,
+			mdcbLog,
 			nil,
 		)
 	}

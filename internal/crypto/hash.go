@@ -6,8 +6,6 @@ import (
 	"fmt"
 	"hash"
 
-	"github.com/sirupsen/logrus"
-
 	"github.com/TykTechnologies/murmur3"
 )
 
@@ -44,7 +42,7 @@ func HashStr(in string, withAlg ...string) string {
 	h, err := hashFunction(algo)
 
 	if err != nil {
-		logrus.Error(err)
+		log.Error(err)
 	}
 
 	h.Write([]byte(in))

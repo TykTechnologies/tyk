@@ -17,7 +17,6 @@ import (
 	"github.com/TykTechnologies/tyk/header"
 	"github.com/TykTechnologies/tyk/internal/httputil"
 	"github.com/TykTechnologies/tyk/pkg/schema"
-
 	tykregexp "github.com/TykTechnologies/tyk/regexp"
 )
 
@@ -145,7 +144,7 @@ func (k *ValidateRequest) ProcessRequest(w http.ResponseWriter, r *http.Request,
 		PathParams: pathParams,
 		Route:      route,
 		Options: &openapi3filter.Options{
-			AuthenticationFunc: func(ctx context.Context, input *openapi3filter.AuthenticationInput) error {
+			AuthenticationFunc: func(_ context.Context, _ *openapi3filter.AuthenticationInput) error {
 				return nil
 			},
 		},
@@ -222,7 +221,7 @@ func (k *ValidateRequest) validateRoute(r *http.Request, route *routers.Route, p
 		PathParams: pathParams,
 		Route:      route,
 		Options: &openapi3filter.Options{
-			AuthenticationFunc: func(ctx context.Context, input *openapi3filter.AuthenticationInput) error {
+			AuthenticationFunc: func(_ context.Context, _ *openapi3filter.AuthenticationInput) error {
 				return nil
 			},
 		},
@@ -378,7 +377,7 @@ func (k *ValidateRequest) processRequestWithFindOperation(r *http.Request) (erro
 		PathParams: operation.pathParams,
 		Route:      operation.route,
 		Options: &openapi3filter.Options{
-			AuthenticationFunc: func(ctx context.Context, input *openapi3filter.AuthenticationInput) error {
+			AuthenticationFunc: func(_ context.Context, _ *openapi3filter.AuthenticationInput) error {
 				return nil
 			},
 		},
