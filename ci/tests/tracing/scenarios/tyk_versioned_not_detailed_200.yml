@@ -11,7 +11,7 @@ spec:
         - key: Content-Type
           value: application/json
   specs:
-    - selector: span[tracetest.span.type="http" name="GET /versioned-not-detailed/ip" http.method="GET"]
+    - selector: span[tracetest.span.type="http" name="GET /versioned-not-detailed/ip" http.request.method="GET"]
       name: Checking API attributes + version
       assertions:
         - attr:tyk.api.id   =   7
