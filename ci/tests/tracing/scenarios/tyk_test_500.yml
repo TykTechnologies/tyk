@@ -13,11 +13,11 @@ spec:
         value: application/json
   specs:
   - name: Check main span http attributes
-    selector: span[tracetest.span.type="http" name="GET /test/status/500" http.method="GET"]
+    selector: span[tracetest.span.type="http" name="GET /test/status/500" http.request.method="GET"]
     assertions:
-    - attr:http.method    =    "GET"
-    - attr:http.scheme    =    "http"
-    - attr:http.status_code    =    500
+    - attr:http.request.method    =    "GET"
+    - attr:url.scheme    =    "http"
+    - attr:http.response.status_code    =    500
     - attr:tyk.api.id  =  "3"
     - attr:tyk.api.name  =  "TestAPI"
     - attr:tyk.api.orgid  =  "default"
@@ -29,8 +29,8 @@ spec:
     assertions:
     - attr:tracetest.selected_spans.count = 4
   - name: Check the proxying request span
-    selector: span[tracetest.span.type="http" name="HTTP GET" http.method="GET"]
+    selector: span[tracetest.span.type="http" name="HTTP GET" http.request.method="GET"]
     assertions:
-    - attr:http.status_code = 500
-    - attr:http.url = "http://httpbin:80/status/500"
+    - attr:http.response.status_code = 500
+    - attr:url.full = "http://httpbin:80/status/500"
     - attr:tracetest.span.parent_id != ""
