@@ -12,7 +12,7 @@ spec:
         value: application/json
   specs:
   - selector: |-
-      span[tracetest.span.type="http" name="GET /versioned/ip" http.method="GET"] 
+      span[tracetest.span.type="http" name="GET /versioned/ip" http.request.method="GET"] 
       span[tracetest.span.type = "general"]
     name: Checking if it's failing in the VersionCheck MW
     assertions:
@@ -21,7 +21,7 @@ spec:
     name: Checking if the version is "Non versioned"
     assertions:
     - attr:tyk.api.version = "Non Versioned"
-  - selector: span[tracetest.span.type="http" name="GET /versioned/ip" http.method="GET"]
+  - selector: span[tracetest.span.type="http" name="GET /versioned/ip" http.request.method="GET"]
     name: Checking the HTTP status code
     assertions:
-    - attr:http.status_code = 403
+    - attr:http.response.status_code = 403
