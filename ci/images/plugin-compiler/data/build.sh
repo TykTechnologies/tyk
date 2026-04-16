@@ -145,11 +145,7 @@ if [[ "$DEBUG" == "1" ]] ; then
 	git diff --cached
 fi
 
-if [ -n "$BUILD_TAG" ]; then
-    CC=$CC CGO_ENABLED=1 GOOS=$GOOS GOARCH=$GOARCH go build -buildmode=plugin -trimpath -tags=$BUILD_TAG -o $plugin_name
-else
-    CC=$CC CGO_ENABLED=1 GOOS=$GOOS GOARCH=$GOARCH go build -buildmode=plugin -trimpath -o $plugin_name
-fi
+CC=$CC CGO_ENABLED=1 GOOS=$GOOS GOARCH=$GOARCH go build -buildmode=plugin -trimpath -tags=goplugin${BUILD_TAG:+,$BUILD_TAG} -o $plugin_name
 
 set +x
 
