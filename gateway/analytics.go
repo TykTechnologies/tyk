@@ -20,6 +20,7 @@ import (
 
 const analyticsKeyName = "tyk-system-analytics"
 
+
 const (
 	recordsBufferFlushInterval       = 200 * time.Millisecond
 	recordsBufferForcedFlushInterval = 1 * time.Second
