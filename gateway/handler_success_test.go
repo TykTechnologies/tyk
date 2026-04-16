@@ -431,7 +431,7 @@ func TestSuccessHandler_addTraceIDTag(t *testing.T) {
 
 func TestRecordMCPDetails(t *testing.T) {
 	t.Run("populates MCPStats from context values", func(t *testing.T) {
-		req, err := http.NewRequest("POST", "/mcp", nil)
+		req, err := http.NewRequestWithContext(context.Background(), "POST", "/mcp", nil)
 		assert.NoError(t, err)
 		ctxSetMCPMethod(req, "tools/call")
 		ctxSetMCPPrimitiveType(req, "tool")
@@ -447,7 +447,7 @@ func TestRecordMCPDetails(t *testing.T) {
 	})
 
 	t.Run("list operation has empty PrimitiveType and PrimitiveName", func(t *testing.T) {
-		req, err := http.NewRequest("POST", "/mcp", nil)
+		req, err := http.NewRequestWithContext(context.Background(), "POST", "/mcp", nil)
 		assert.NoError(t, err)
 		ctxSetMCPMethod(req, "tools/list")
 
@@ -461,7 +461,7 @@ func TestRecordMCPDetails(t *testing.T) {
 	})
 
 	t.Run("initialize has empty PrimitiveType and PrimitiveName", func(t *testing.T) {
-		req, err := http.NewRequest("POST", "/mcp", nil)
+		req, err := http.NewRequestWithContext(context.Background(), "POST", "/mcp", nil)
 		assert.NoError(t, err)
 		ctxSetMCPMethod(req, "initialize")
 
@@ -475,7 +475,7 @@ func TestRecordMCPDetails(t *testing.T) {
 	})
 
 	t.Run("no MCP context still tags record as MCP", func(t *testing.T) {
-		req, err := http.NewRequest("GET", "/api/users", nil)
+		req, err := http.NewRequestWithContext(context.Background(), "GET", "/api/users", nil)
 		assert.NoError(t, err)
 
 		original := analytics.AnalyticsRecord{
