@@ -38,8 +38,12 @@ jobs:
       contents: read
 
   goreleaser:
-    needs: [dep-guard]
-    if: ${{ always() && github.event.pull_request.draft == false && (needs.dep-guard.result == 'success' || needs.dep-guard.result == 'skipped') }}
+    needs:
+      - dep-guard
+    if: |
+      !cancelled() &&
+      (needs.dep-guard.result == 'success' || needs.dep-guard.result == 'skipped') &&
+      github.event.pull_request.draft == false
     name: '${{ matrix.golang_cross }}'
     runs-on: ubuntu-latest-m
     permissions:
@@ -358,9 +362,12 @@ jobs:
             !dist/*PAYG*.rpm
             !dist/*fips*.rpm
   test-controller-api:
-    if: github.event.pull_request.draft == false
     needs:
       - goreleaser
+    if: |
+      !cancelled() &&
+      needs.goreleaser.result == 'success' &&
+      github.event.pull_request.draft == false
     runs-on: ubuntu-latest
     outputs:
       envfiles: ${{ steps.params.outputs.envfiles }}
@@ -378,6 +385,10 @@ jobs:
     needs:
       - test-controller-api
       - goreleaser
+    if: |
+      !cancelled() &&
+      needs.goreleaser.result == 'success' &&
+      needs.test-controller-api.result == 'success'
     runs-on: ubuntu-latest-m-2
     env:
       XUNIT_REPORT_PATH: ${{ github.workspace}}/test-results.xml
@@ -448,7 +459,7 @@ jobs:
     name: Aggregated CI Status
     runs-on: ubuntu-latest
     # Dynamically determine which jobs to depend on based on repository configuration
-    needs: [goreleaser, api-tests]
+    needs: [goreleaser, api-tests, dep-guard]
     if: ${{ always() && github.event_name == 'pull_request' }}
     steps:
       - name: Aggregate results
@@ -475,9 +486,12 @@ jobs:
 
           echo "✅ All required jobs succeeded"
   test-controller-distros:
-    if: github.event.pull_request.draft == false
     needs:
       - goreleaser
+    if: |
+      !cancelled() &&
+      needs.goreleaser.result == 'success' &&
+      github.event.pull_request.draft == false
     runs-on: ubuntu-latest
     outputs:
       deb: ${{ steps.params.outputs.deb }}
@@ -502,6 +516,9 @@ jobs:
     runs-on: ubuntu-latest
     needs:
       - test-controller-distros
+    if: |
+      !cancelled() &&
+      needs.test-controller-distros.result == 'success'
     strategy:
       fail-fast: true
       matrix:
@@ -561,6 +578,9 @@ jobs:
     runs-on: ubuntu-latest
     needs:
       - test-controller-distros
+    if: |
+      !cancelled() &&
+      needs.test-controller-distros.result == 'success'
     strategy:
       fail-fast: true
       matrix:
@@ -614,6 +634,9 @@ jobs:
   release-tests:
     needs:
       - goreleaser
+    if: |
+      !cancelled() &&
+      needs.goreleaser.result == 'success'
     permissions:
       id-token: write # This is required for requesting the JWT
       contents: read # This is required for actions/checkout
@@ -622,6 +645,9 @@ jobs:
     secrets: inherit
   sbom:
     needs: goreleaser
+    if: |
+      !cancelled() &&
+      needs.goreleaser.result == 'success'
     uses: TykTechnologies/github-actions/.github/workflows/sbom.yaml@2b35ab5dd4cfff21ced9d12446e9e27d10bf5785  # main
     secrets:
       DEPDASH_URL: ${{ secrets.DEPDASH_URL }}
