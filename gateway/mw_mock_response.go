@@ -102,7 +102,9 @@ func (m *mockResponseMiddleware) mockResponse(r *http.Request) (*http.Response, 
 		return nil, nil
 	}
 
-	mockResponse := urlSpec.OASMockResponseMeta
+	// Resolve the mock response config and OAS path. When multiple candidates
+	// exist (collapsed parameterized paths), disambiguate using path param schemas.
+	mockResponse, oasPath := m.resolveMockCandidate(r, urlSpec)
 	if mockResponse == nil || !mockResponse.Enabled {
 		return nil, nil
 	}
@@ -119,9 +121,9 @@ func (m *mockResponseMiddleware) mockResponse(r *http.Request) (*http.Response, 
 		// Find the route using the OAS path from URLSpec, not the actual request path.
 		// This allows prefix/suffix matching to work correctly.
 		strippedPath := m.Spec.StripListenPath(r.URL.Path)
-		route, _, routeErr := m.Spec.findRouteForOASPath(urlSpec.OASPath, urlSpec.OASMethod, strippedPath, r.URL.Path)
+		route, _, routeErr := m.Spec.findRouteForOASPath(oasPath, urlSpec.OASMethod, strippedPath, r.URL.Path)
 		if routeErr != nil || route == nil {
-			log.Tracef("URL spec matched for mock response but route not found for OAS path %s: %v", urlSpec.OASPath, routeErr)
+			log.Tracef("URL spec matched for mock response but route not found for OAS path %s: %v", oasPath, routeErr)
 			return nil, nil
 		}
 		code, contentType, body, headers, err = mockFromOAS(r, route.Operation, mockResponse.FromOASExamples)
@@ -149,6 +151,30 @@ func (m *mockResponseMiddleware) mockResponse(r *http.Request) (*http.Response, 
 	m.Spec.sendRateLimitHeaders(ctxGetSession(r), res)
 
 	return res, nil
+}
+
+// resolveMockCandidate returns the mock response config and OAS path to use.
+// When the URLSpec has collapsed candidates, it disambiguates using matchCandidatePath.
+// When there are no candidates, it returns the URLSpec's own config.
+func (m *mockResponseMiddleware) resolveMockCandidate(r *http.Request, urlSpec *URLSpec) (*oas.MockResponse, string) {
+	if len(urlSpec.OASMockResponseCandidates) == 0 {
+		return urlSpec.OASMockResponseMeta, urlSpec.OASPath
+	}
+
+	strippedPath := m.Spec.StripListenPath(r.URL.Path)
+
+	for _, candidate := range urlSpec.OASMockResponseCandidates {
+		if candidate.OASMockResponseMeta == nil || !candidate.OASMockResponseMeta.Enabled {
+			continue
+		}
+
+		if _, _, _, ok := m.Spec.matchCandidatePath(candidate.OASPath, candidate.OASMethod, strippedPath); ok {
+			return candidate.OASMockResponseMeta, candidate.OASPath
+		}
+	}
+
+	// No candidate matched — don't mock.
+	return nil, ""
 }
 
 func mockFromConfig(tykMockRespOp *oas.MockResponse) (int, []byte, []oas.Header) {
