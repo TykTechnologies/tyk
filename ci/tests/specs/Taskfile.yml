@@ -13,7 +13,7 @@ tasks:
     desc: "Run the OpenAPI specification tests"
     cmds:
       - venom run testdata/populate_gateway_test_data.yaml --var bearerToken=$PORTMAN_API_Key  --stop-on-failure && rm venom*.log
-      - npm install --ignore-scripts
+      - npm ci
       - npm start
 
   build:
