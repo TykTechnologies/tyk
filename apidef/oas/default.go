@@ -13,6 +13,7 @@ import (
 	"github.com/getkin/kin-openapi/openapi3"
 )
 
+
 const (
 	invalidServerURLFmt          = "Please update %q to be a valid URL and try again."
 	unsupportedSecuritySchemeFmt = "unsupported security scheme: %s"
