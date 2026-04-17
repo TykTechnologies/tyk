@@ -12,6 +12,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"sync/atomic"
 	texttemplate "text/template"
@@ -23,6 +24,7 @@ import (
 	"github.com/TykTechnologies/tyk/internal/httpctx"
 	"github.com/TykTechnologies/tyk/internal/httputil"
 	"github.com/TykTechnologies/tyk/internal/mcp"
+	oasutil "github.com/TykTechnologies/tyk/internal/oasutil"
 
 	"github.com/getkin/kin-openapi/routers/gorillamux"
 
@@ -1629,6 +1631,14 @@ func pathParamPatternLength(oasPath, method string, oasPaths *openapi3.Paths) in
 		}
 	}
 	return total
+}
+
+// sortURLSpecsByPathPriority sorts URLSpec entries using the same path priority
+// rules as oasutil.SortByPathLength, ensuring consistent ordering across the gateway.
+func sortURLSpecsByPathPriority(specs []URLSpec) {
+	sort.Slice(specs, func(i, j int) bool {
+		return oasutil.PathLess(specs[i].OASPath, specs[j].OASPath)
+	})
 }
 
 // compileOASMockResponsePathSpec extracts MockResponse operations from OAS middleware
