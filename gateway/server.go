@@ -1127,6 +1127,7 @@ func (gw *Gateway) createResponseMiddlewareChain(
 	)
 	decorate := makeDefaultDecorator(log)
 
+	gw.responseMWAppendEnabled(&responseMWChain, decorate(&MCPListFilterResponseHandler{BaseTykResponseHandler: baseHandler}))
 	gw.responseMWAppendEnabled(&responseMWChain, decorate(&ResponseTransformMiddleware{BaseTykResponseHandler: baseHandler}))
 	headerInjector := decorate(&HeaderInjector{BaseTykResponseHandler: baseHandler})
 	headerInjectorAdded := gw.responseMWAppendEnabled(&responseMWChain, headerInjector)
