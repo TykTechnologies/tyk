@@ -32,8 +32,11 @@ jobs:
 
   docker-build:
     needs: [dep-guard]
+    if: |
+      !cancelled() &&
+      (needs.dep-guard.result == 'success' || needs.dep-guard.result == 'skipped') &&
+      !github.event.pull_request.draft
     runs-on: ubuntu-latest
-    if: ${{ !github.event.pull_request.draft }}
     permissions:
       id-token: write
     steps:
