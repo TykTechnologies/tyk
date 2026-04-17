@@ -38,8 +38,7 @@ jobs:
       contents: read
 
   goreleaser:
-    needs: [dep-guard]
-    if: ${{ always() && github.event.pull_request.draft == false && (needs.dep-guard.result == 'success' || needs.dep-guard.result == 'skipped') }}
+    if: github.event.pull_request.draft == false
     name: '${{ matrix.golang_cross }}'
     runs-on: ubuntu-latest-m
     permissions:
@@ -448,7 +447,7 @@ jobs:
     name: Aggregated CI Status
     runs-on: ubuntu-latest
     # Dynamically determine which jobs to depend on based on repository configuration
-    needs: [goreleaser, api-tests]
+    needs: [goreleaser, api-tests, dep-guard]
     if: ${{ always() && github.event_name == 'pull_request' }}
     steps:
       - name: Aggregate results
