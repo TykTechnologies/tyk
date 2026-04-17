@@ -8,6 +8,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/getkin/kin-openapi/routers"
 
 	"github.com/TykTechnologies/tyk-pump/analytics"
@@ -226,6 +227,29 @@ func (a *APISpec) findRouteForOASPath(oasPath, method, actualPath, fullRequestPa
 	pathParams := extractPathParams(oasPath, actualPath)
 
 	return route, pathParams, nil
+}
+
+// matchCandidatePath looks up the path item and operation from the OAS spec for a
+// candidate path+method, extracts path parameters from the actual request path, and
+// validates them against the operation's path parameter schemas. Returns the operation,
+// path params, and true if the candidate matches; false otherwise.
+// This is the shared disambiguation logic used by both validate request and mock response.
+func (a *APISpec) matchCandidatePath(oasPath, oasMethod, strippedPath string) (*openapi3.PathItem, *openapi3.Operation, map[string]string, bool) {
+	pathItem := a.OAS.Paths.Value(oasPath)
+	if pathItem == nil {
+		return nil, nil, nil, false
+	}
+	operation := pathItem.GetOperation(oasMethod)
+	if operation == nil {
+		return nil, nil, nil, false
+	}
+
+	pathParams := extractPathParams(oasPath, strippedPath)
+	if !pathParamsMatchOperation(pathParams, operation) {
+		return nil, nil, nil, false
+	}
+
+	return pathItem, operation, pathParams, true
 }
 
 // extractPathParams extracts path parameter values from actualPath based on the
