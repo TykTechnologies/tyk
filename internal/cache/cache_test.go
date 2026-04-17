@@ -1,34 +1,52 @@
-package cache_test
+package cache
 
 import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-
-	"github.com/TykTechnologies/tyk/internal/cache"
 )
 
 func TestCache(t *testing.T) {
-	t.Parallel()
+	cache := NewCache(0, 0)
+	assert.NotNil(t, cache)
+}
 
-	cache := cache.New(1, 1)
+func TestCache_Expired(t *testing.T) {
+	cache := &Cache{
+		items: map[string]Item{
+			"one": Item{
+				Expiration: 1,
+			},
+			"two": Item{
+				Expiration: 0,
+			},
+		},
+	}
 
-	assert.Equal(t, 0, cache.Count())
+	t.Run("Test Get", func(t *testing.T) {
+		_, ok := cache.Get("one")
+		assert.False(t, ok)
+	})
 
-	cache.Set("key", "value", 1)
-	assert.Equal(t, 1, cache.Count())
+	t.Run("Test Items", func(t *testing.T) {
+		want := map[string]Item{
+			"two": Item{
+				Expiration: 0,
+			},
+		}
 
-	cache.Set("key", "value", 0)
-	assert.Equal(t, 1, cache.Count())
+		got := cache.Items()
+		assert.Equal(t, want, got)
+	})
 
-	val, ok := cache.Get("key")
-	assert.True(t, ok)
-	assert.Equal(t, "value", val.(string))
+	t.Run("Test Cleanup", func(t *testing.T) {
+		assert.Equal(t, 2, cache.Count())
+		cache.Cleanup()
+		assert.Equal(t, 1, cache.Count())
+	})
 
-	cache.Delete("key")
-	assert.Equal(t, 0, cache.Count())
-
-	cache.Set("key", "value", 1)
-	cache.Flush()
-	assert.Equal(t, 0, cache.Count())
+	t.Run("Test Set", func(t *testing.T) {
+		cache.Set("foo", "bar", 0)
+		assert.Equal(t, 2, cache.Count())
+	})
 }

@@ -67,7 +67,6 @@ require (
 	github.com/oschwald/maxminddb-golang v1.13.1
 	github.com/paulbellamy/ratecounter v0.2.0
 	github.com/pires/go-proxyproto v0.8.0
-	github.com/pmylund/go-cache v2.1.0+incompatible
 	github.com/robertkrimen/otto v0.5.1
 	github.com/rs/cors v1.11.1
 	github.com/sirupsen/logrus v1.9.3

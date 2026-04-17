@@ -228,16 +228,7 @@ func NewGateway(config config.Config, ctx context.Context) *Gateway {
 	}
 	gw.ConnectionWatcher = httputil.NewConnectionWatcher()
 
-	gw.SessionCache = cache.New(10, 5)
-	gw.ExpiryCache = cache.New(600, 10*60)
-	gw.UtilCache = cache.New(3600, 10*60)
-
-	var timeout = int64(config.ServiceDiscovery.DefaultCacheTimeout)
-	if timeout <= 0 {
-		timeout = 120 // 2 minutes
-	}
-
-	gw.ServiceCache = cache.New(timeout, 15)
+	gw.cacheCreate()
 
 	gw.apisByID = map[string]*APISpec{}
 	gw.apisHandlesByID = new(sync.Map)
@@ -258,6 +249,64 @@ func NewGateway(config config.Config, ctx context.Context) *Gateway {
 	return gw
 }
 
+<<<<<<< HEAD
+=======
+// cacheCreate will create the caches in *Gateway.
+func (gw *Gateway) cacheCreate() {
+	conf := gw.GetConfig()
+
+	gw.SessionCache = cache.New(10, 5)
+	gw.ExpiryCache = cache.New(600, 10*60)
+	gw.UtilCache = cache.New(3600, 10*60)
+
+	var timeout = int64(conf.ServiceDiscovery.DefaultCacheTimeout)
+	if timeout <= 0 {
+		timeout = 120 // 2 minutes
+	}
+	gw.ServiceCache = cache.New(timeout, 15)
+
+	gw.RPCGlobalCache = cache.New(int64(conf.SlaveOptions.RPCGlobalCacheExpiration), 15)
+	gw.RPCCertCache = cache.New(int64(conf.SlaveOptions.RPCCertCacheExpiration), 15)
+}
+
+// cacheClose will close the caches in *Gateway, cleaning up the goroutines.
+func (gw *Gateway) cacheClose() {
+	gw.SessionCache.Close()
+	gw.ServiceCache.Close()
+	gw.ExpiryCache.Close()
+	gw.UtilCache.Close()
+	gw.RPCGlobalCache.Close()
+	gw.RPCCertCache.Close()
+}
+
+// SetupNewRelic creates new newrelic.Application instance.
+func (gw *Gateway) SetupNewRelic() (app *newrelic.Application) {
+	var (
+		err      error
+		gwConfig = gw.GetConfig()
+	)
+
+	log := log.WithFields(logrus.Fields{"prefix": "newrelic"})
+
+	cfg := []newrelic.ConfigOption{
+		newrelic.ConfigAppName(gwConfig.NewRelic.AppName),
+		newrelic.ConfigLicense(gwConfig.NewRelic.LicenseKey),
+		newrelic.ConfigEnabled(gwConfig.NewRelic.AppName != ""),
+		newrelic.ConfigDistributedTracerEnabled(gwConfig.NewRelic.EnableDistributedTracing),
+		newrelic.ConfigLogger(newrelic.NewLogger(log)),
+	}
+
+	if app, err = newrelic.NewApplication(cfg...); err != nil {
+		log.Warn("Error initializing NewRelic, skipping... ", err)
+		return
+	}
+
+	instrument.AddSink(newrelic.NewSink(app))
+
+	return
+}
+
+>>>>>>> 89b51c320... TT-14085: Remove the pmylund/go-cache dependency (#6871)
 func (gw *Gateway) UnmarshalJSON(data []byte) error {
 	return nil
 }
@@ -265,12 +314,15 @@ func (gw *Gateway) MarshalJSON() ([]byte, error) {
 	return json.Marshal(struct{}{})
 }
 
+<<<<<<< HEAD
 func (gw *Gateway) InitializeRPCCache() {
 	conf := gw.GetConfig()
 	gw.RPCGlobalCache = cache.New(int64(conf.SlaveOptions.RPCGlobalCacheExpiration), 15)
 	gw.RPCCertCache = cache.New(int64(conf.SlaveOptions.RPCCertCacheExpiration), 15)
 }
 
+=======
+>>>>>>> 89b51c320... TT-14085: Remove the pmylund/go-cache dependency (#6871)
 // SetNodeID writes NodeID safely.
 func (gw *Gateway) SetNodeID(nodeID string) {
 	gw.nodeIDMu.Lock()
@@ -1348,8 +1400,12 @@ func (gw *Gateway) initSystem() error {
 
 	gw.SetConfig(gwConfig)
 	config.Global = gw.GetConfig
+<<<<<<< HEAD
 	gw.getHostDetails(gw.GetConfig().PIDFileLocation)
 	gw.InitializeRPCCache()
+=======
+	gw.getHostDetails()
+>>>>>>> 89b51c320... TT-14085: Remove the pmylund/go-cache dependency (#6871)
 	gw.setupInstrumentation()
 
 	// cleanIdleMemConnProviders checks memconn.Provider (a part of internal API handling)
