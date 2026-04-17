@@ -17,4 +17,5 @@ jobs:
         uses: TykTechnologies/jira-linter@main
         with:
           jira-base-url: 'https://tyktech.atlassian.net'
+          jira-user-email: ${{ secrets.JIRA_USER_EMAIL }}
           jira-api-token: ${{ secrets.JIRA_TOKEN }}
