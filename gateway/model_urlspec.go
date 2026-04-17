@@ -41,6 +41,16 @@ type URLSpec struct {
 	OASValidateRequestMeta    *oas.ValidateRequest
 	OASMockResponseMeta       *oas.MockResponse
 
+	// OASValidateRequestCandidates holds multiple OAS endpoints that compile to the
+	// same regex pattern. When non-empty, the validate request middleware must
+	// disambiguate by checking path parameter schemas against each candidate.
+	OASValidateRequestCandidates []ValidateRequestCandidate
+
+	// OASMockResponseCandidates holds multiple OAS endpoints that compile to the
+	// same regex pattern. When non-empty, the mock response middleware must
+	// disambiguate by checking path parameter schemas against each candidate.
+	OASMockResponseCandidates []MockResponseCandidate
+
 	IgnoreCase bool
 	// OASMethod stores the HTTP method for OAS-specific middleware
 	// This is needed because OAS operations are method-specific
@@ -48,6 +58,23 @@ type URLSpec struct {
 	// OASPath stores the original OAS path pattern (e.g., "/users/{id}")
 	// This is used for matching against the OAS router when needed
 	OASPath string
+}
+
+// ValidateRequestCandidate represents one OAS endpoint that maps to the same
+// compiled regex pattern. Used for disambiguation when multiple parameterized
+// paths collapse to the same regex (e.g., /employees/{prct} and /employees/{zd}).
+type ValidateRequestCandidate struct {
+	OASValidateRequestMeta *oas.ValidateRequest
+	OASMethod              string
+	OASPath                string
+}
+
+// MockResponseCandidate represents one OAS endpoint that maps to the same
+// compiled regex pattern for mock response disambiguation.
+type MockResponseCandidate struct {
+	OASMockResponseMeta *oas.MockResponse
+	OASMethod           string
+	OASPath             string
 }
 
 // modeSpecificSpec returns the respective field of URLSpec if it matches the given mode.
