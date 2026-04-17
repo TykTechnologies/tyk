@@ -391,8 +391,11 @@ jobs:
             !dist/*PAYG*.rpm
             !dist/*fips*.rpm
   resolve-dashboard-image:
-    if: github.event.pull_request.draft == false
     needs: goreleaser
+    if: |
+      !cancelled() &&
+      needs.goreleaser.result == 'success' &&
+      github.event.pull_request.draft == false
     runs-on: ${{ vars.DEFAULT_RUNNER }}
     permissions:
       id-token: write
@@ -593,8 +596,11 @@ jobs:
           echo "✅ Resolution complete"
           echo "=================================="
   build-dashboard-image:
-    if: needs.resolve-dashboard-image.outputs.needs_build == 'true'
     needs: resolve-dashboard-image
+    if: |
+      !cancelled() &&
+      needs.resolve-dashboard-image.result == 'success' &&
+      needs.resolve-dashboard-image.outputs.needs_build == 'true'
     runs-on: ${{ vars.DEFAULT_RUNNER }}
     permissions:
       id-token: write
@@ -773,9 +779,12 @@ jobs:
           echo "image=$IMAGE" >> $GITHUB_OUTPUT
           echo "✅ Dashboard image built and pushed: $IMAGE"
   test-controller-api:
-    if: github.event.pull_request.draft == false
     needs:
       - goreleaser
+    if: |
+      !cancelled() &&
+      needs.goreleaser.result == 'success' &&
+      github.event.pull_request.draft == false
     runs-on: ${{ vars.DEFAULT_RUNNER }}
     outputs:
       envfiles: ${{ steps.params.outputs.envfiles }}
@@ -795,9 +804,9 @@ jobs:
       - goreleaser
       - resolve-dashboard-image
       - build-dashboard-image
-    # build-dashboard-image may be skipped, so use if: always() to run regardless
+    # build-dashboard-image may be skipped, so use !cancelled() to run regardless
     if: |
-      always() &&
+      !cancelled() &&
       needs.test-controller-api.result == 'success' &&
       needs.goreleaser.result == 'success' &&
       needs.resolve-dashboard-image.result == 'success' &&
@@ -873,7 +882,7 @@ jobs:
     name: Aggregated CI Status
     runs-on: ${{ vars.DEFAULT_RUNNER }}
     # Dynamically determine which jobs to depend on based on repository configuration
-    needs: [goreleaser, api-tests]
+    needs: [goreleaser, api-tests, dep-guard]
     if: ${{ always() && github.event_name == 'pull_request' }}
     steps:
       - name: Aggregate results
@@ -900,9 +909,12 @@ jobs:
 
           echo "✅ All required jobs succeeded"
   test-controller-distros:
-    if: github.event.pull_request.draft == false
     needs:
       - goreleaser
+    if: |
+      !cancelled() &&
+      needs.goreleaser.result == 'success' &&
+      github.event.pull_request.draft == false
     runs-on: ${{ vars.DEFAULT_RUNNER }}
     outputs:
       deb: ${{ steps.params.outputs.deb }}
@@ -927,6 +939,9 @@ jobs:
     runs-on: ${{ vars.DEFAULT_RUNNER }}
     needs:
       - test-controller-distros
+    if: |
+      !cancelled() &&
+      needs.test-controller-distros.result == 'success'
     strategy:
       fail-fast: true
       matrix:
@@ -986,6 +1001,9 @@ jobs:
     runs-on: ${{ vars.DEFAULT_RUNNER }}
     needs:
       - test-controller-distros
+    if: |
+      !cancelled() &&
+      needs.test-controller-distros.result == 'success'
     strategy:
       fail-fast: true
       matrix:
@@ -1039,6 +1057,9 @@ jobs:
   release-tests:
     needs:
       - goreleaser
+    if: |
+      !cancelled() &&
+      needs.goreleaser.result == 'success'
     permissions:
       id-token: write # This is required for requesting the JWT
       contents: read # This is required for actions/checkout
@@ -1047,6 +1068,9 @@ jobs:
     secrets: inherit
   sbom:
     needs: goreleaser
+    if: |
+      !cancelled() &&
+      needs.goreleaser.result == 'success'
     uses: TykTechnologies/github-actions/.github/workflows/sbom.yaml@42304edda365365e0a887cf018d8edc34b960b82 # main
     secrets:
       DEPDASH_URL: ${{ secrets.DEPDASH_URL }}
