@@ -1217,7 +1217,9 @@ func (s *Test) newGateway(genConf func(globalConf *config.Config)) *Gateway {
 
 	gw.keyGen = DefaultKeyGenerator{Gw: gw}
 	gw.CoProcessInit()
-	gw.afterConfSetup()
+	if err := gw.afterConfSetup(); err != nil {
+		panic(err)
+	}
 
 	gw.SetConfig(gwConfig)
 
