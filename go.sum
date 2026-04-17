@@ -185,12 +185,12 @@ github.com/TykTechnologies/openid2go v0.1.2 h1:WXctksOahA/epTVVvbn9iNUuMXKRr0ksr
 github.com/TykTechnologies/openid2go v0.1.2/go.mod h1:gYfkqeWa+lY3Xz/Z2xYtIzmYXynlgKZaBIbPCqdcdMA=
 github.com/TykTechnologies/opentelemetry v0.0.25 h1:Qen0fTy8EZHY7my1fokOrm0vcyOsBHwnyvXBG/bS87A=
 github.com/TykTechnologies/opentelemetry v0.0.25/go.mod h1:FoJH6aRf8W+Rs9/Csvayfy3U2p4+vp46dj0CuGMBLSU=
-github.com/TykTechnologies/storage v1.3.0 h1:y/ORW7hSZHw8Pr0aSaxN1bXH/u7tuhOW/RRiPkaQNLo=
-github.com/TykTechnologies/storage v1.3.0/go.mod h1:psPnFQBWQ/gBQKGHrviJqXQ5HCz8EwTWm41RWpunosM=
+github.com/TykTechnologies/storage v1.3.1 h1:UzfrAillaXXe5AHeIGUHVf/1niLPNJChMWrqgjCiAjY=
+github.com/TykTechnologies/storage v1.3.1/go.mod h1:fw7yR9/LgVFVAlaQFLypFnfsIP/JOkF/tAsgAwMkKj0=
 github.com/TykTechnologies/structviewer v1.2.0 h1:wV3AyTmWCZ3n7/llp+6xuDjnS/EJ/Ct/HG2pPE9+VX8=
 github.com/TykTechnologies/structviewer v1.2.0/go.mod h1:XKJbqX8Q7n9FUrqTK58yVZUi5zWAkeRcULcPLDoWvvY=
-github.com/TykTechnologies/tyk-pump v1.13.0-rc2.0.20251023125113-bc7641d42e63 h1:6n4yFtsBhcQayXzY8AdTKlmaJGw2Z3Uqm6ARIETmiVA=
-github.com/TykTechnologies/tyk-pump v1.13.0-rc2.0.20251023125113-bc7641d42e63/go.mod h1:oTgH2TL6Qjon1Sh3PmcijwOxLetcyu+7DohJr4VwM+c=
+github.com/TykTechnologies/tyk-pump v1.14.1-rc2 h1:FZVTGv+m/J1gU8PRtCUhvQgpfb2/umQVorstdv+xi1I=
+github.com/TykTechnologies/tyk-pump v1.14.1-rc2/go.mod h1:av5P8OrDOrYtlXz2fqjw23lfBW/vZPleLwdc9+nmOv4=
 github.com/agnivade/levenshtein v1.1.1 h1:QY8M92nrzkmr798gCo3kmMyqXFzdQVpxLlGPRBij0P8=
 github.com/agnivade/levenshtein v1.1.1/go.mod h1:veldBMzWxcCG2ZvUTKD2kJNRdCk5hVbJomOvKkmgYbo=
 github.com/ajstarks/svgo v0.0.0-20180226025133-644b8db467af/go.mod h1:K08gAheRH3/J6wwsYMMT4xOr94bZjxIelGM0+d/wbFw=
