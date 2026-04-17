@@ -12,7 +12,14 @@ permissions:
   contents: read
 
 jobs:
+  dep-guard:
+    if: ${{ github.event_name == 'pull_request' }}
+    uses: TykTechnologies/github-actions/.github/workflows/dependency-guard.yml@2b35ab5dd4cfff21ced9d12446e9e27d10bf5785  # main
+    permissions:
+      contents: read
+
   branch-suggestions:
-    uses: TykTechnologies/github-actions/.github/workflows/branch-suggestion.yml@main
+    needs: [dep-guard]
+    uses: TykTechnologies/github-actions/.github/workflows/branch-suggestion.yml@2b35ab5dd4cfff21ced9d12446e9e27d10bf5785  # main
     secrets:
       JIRA_TOKEN: ${{ secrets.JIRA_TOKEN }}

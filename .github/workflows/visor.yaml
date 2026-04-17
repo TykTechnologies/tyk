@@ -15,12 +15,19 @@ permissions:
   checks: write
 
 jobs:
+  dep-guard:
+    if: ${{ github.event_name == 'pull_request' }}
+    uses: TykTechnologies/github-actions/.github/workflows/dependency-guard.yml@2b35ab5dd4cfff21ced9d12446e9e27d10bf5785  # main
+    permissions:
+      contents: read
+
   visor:
+    needs: [dep-guard]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
-      - uses: probelabs/visor@main
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4
+      - uses: probelabs/visor@02e893ad11b66319b0fca1a43622038171c1a159  # main
         with:
           app-id: ${{ secrets.PROBE_APP_ID }}
           private-key: ${{ secrets.PROBE_APP_PRIVATE_KEY }}
