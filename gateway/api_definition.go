@@ -1360,6 +1360,8 @@ func (a APIDefinitionLoader) compileOASValidateRequestPathSpec(apiSpec *APISpec,
 		urlSpec = append(urlSpec, newSpec)
 	}
 
+	urlSpec = groupCollapsedValidateRequestSpecs(urlSpec, apiSpec.OAS.Paths)
+
 	urlSpec = a.addStaticPathShields(apiSpec, conf, urlSpec, OASValidateRequest, func(path, method string) URLSpec {
 		return URLSpec{
 			OASValidateRequestMeta: &oas.ValidateRequest{Enabled: false},
@@ -1371,6 +1373,240 @@ func (a APIDefinitionLoader) compileOASValidateRequestPathSpec(apiSpec *APISpec,
 	sortURLSpecsByPathPriority(urlSpec)
 
 	return urlSpec
+}
+
+// groupCollapsedValidateRequestSpecs detects URLSpec entries that compile to the same
+// regex+method pair and groups them as candidates on a single representative URLSpec.
+// Candidates are sorted so that more restrictive path parameter schemas are tried first.
+func groupCollapsedValidateRequestSpecs(specs []URLSpec, oasPaths *openapi3.Paths) []URLSpec {
+	return groupCollapsedSpecs(specs, oasPaths, OASValidateRequest, func(indices []int, specs []URLSpec, toRemove map[int]bool) {
+		mergeGroupIntoPrimary(indices, specs, toRemove)
+	})
+}
+
+// groupCollapsedMockResponseSpecs is the mock response equivalent of
+// groupCollapsedValidateRequestSpecs.
+func groupCollapsedMockResponseSpecs(specs []URLSpec, oasPaths *openapi3.Paths) []URLSpec {
+	return groupCollapsedSpecs(specs, oasPaths, OASMockResponse, func(indices []int, specs []URLSpec, toRemove map[int]bool) {
+		mergeMockGroupIntoPrimary(indices, specs, toRemove)
+	})
+}
+
+// groupCollapsedSpecs is the shared grouping logic for both validate request and mock
+// response. It finds URLSpec entries with the same compiled regex+method, sorts them
+// by restrictiveness, and calls the provided merge function to build candidates.
+func groupCollapsedSpecs(
+	specs []URLSpec,
+	oasPaths *openapi3.Paths,
+	status URLStatus,
+	merge func(indices []int, specs []URLSpec, toRemove map[int]bool),
+) []URLSpec {
+	type key struct {
+		regex  string
+		method string
+	}
+
+	groups := make(map[key][]int)
+	var order []key
+	for i, s := range specs {
+		if s.Status != status || s.spec == nil {
+			continue
+		}
+		k := key{regex: s.spec.String(), method: s.OASMethod}
+		if _, exists := groups[k]; !exists {
+			order = append(order, k)
+		}
+		groups[k] = append(groups[k], i)
+	}
+
+	toRemove := make(map[int]bool)
+	for _, k := range order {
+		indices := groups[k]
+		if len(indices) < 2 {
+			continue
+		}
+		sortByRestrictiveness(indices, specs, oasPaths)
+		merge(indices, specs, toRemove)
+	}
+
+	return removeIndices(specs, toRemove)
+}
+
+// mergeMockGroupIntoPrimary builds MockResponseCandidates from the sorted indices
+// and assigns them to the primary (first) spec.
+func mergeMockGroupIntoPrimary(indices []int, specs []URLSpec, toRemove map[int]bool) {
+	primary := indices[0]
+	candidates := make([]MockResponseCandidate, len(indices))
+	for ci, idx := range indices {
+		candidates[ci] = MockResponseCandidate{
+			OASMockResponseMeta: specs[idx].OASMockResponseMeta,
+			OASMethod:           specs[idx].OASMethod,
+			OASPath:             specs[idx].OASPath,
+		}
+		if idx != primary {
+			toRemove[idx] = true
+		}
+	}
+
+	specs[primary].OASMockResponseMeta = candidates[0].OASMockResponseMeta
+	specs[primary].OASMethod = candidates[0].OASMethod
+	specs[primary].OASPath = candidates[0].OASPath
+	specs[primary].OASMockResponseCandidates = candidates
+}
+
+// sortByRestrictiveness sorts spec indices so that more restrictive path parameter
+// schemas come first. Ties in restrictiveness score are broken by total pattern length
+// (longer patterns are more specific, e.g., ^\d+$ before .*), then alphabetically.
+func sortByRestrictiveness(indices []int, specs []URLSpec, oasPaths *openapi3.Paths) {
+	sort.Slice(indices, func(a, b int) bool {
+		scoreA := pathParamRestrictiveness(specs[indices[a]].OASPath, specs[indices[a]].OASMethod, oasPaths)
+		scoreB := pathParamRestrictiveness(specs[indices[b]].OASPath, specs[indices[b]].OASMethod, oasPaths)
+		if scoreA != scoreB {
+			return scoreA > scoreB
+		}
+		lenA := pathParamPatternLength(specs[indices[a]].OASPath, specs[indices[a]].OASMethod, oasPaths)
+		lenB := pathParamPatternLength(specs[indices[b]].OASPath, specs[indices[b]].OASMethod, oasPaths)
+		if lenA != lenB {
+			return lenA > lenB
+		}
+		return specs[indices[a]].OASPath < specs[indices[b]].OASPath
+	})
+}
+
+// mergeGroupIntoPrimary takes a sorted list of spec indices that share the same
+// regex+method, builds ValidateRequestCandidates from them, and assigns them to
+// the primary (first) spec. Non-primary indices are marked for removal.
+func mergeGroupIntoPrimary(indices []int, specs []URLSpec, toRemove map[int]bool) {
+	primary := indices[0]
+	candidates := make([]ValidateRequestCandidate, len(indices))
+	for ci, idx := range indices {
+		candidates[ci] = ValidateRequestCandidate{
+			OASValidateRequestMeta: specs[idx].OASValidateRequestMeta,
+			OASMethod:              specs[idx].OASMethod,
+			OASPath:                specs[idx].OASPath,
+		}
+		if idx != primary {
+			toRemove[idx] = true
+		}
+	}
+
+	specs[primary].OASValidateRequestMeta = candidates[0].OASValidateRequestMeta
+	specs[primary].OASMethod = candidates[0].OASMethod
+	specs[primary].OASPath = candidates[0].OASPath
+	specs[primary].OASValidateRequestCandidates = candidates
+}
+
+// removeIndices returns a new slice with entries at the given indices removed.
+func removeIndices(specs []URLSpec, toRemove map[int]bool) []URLSpec {
+	if len(toRemove) == 0 {
+		return specs
+	}
+	result := make([]URLSpec, 0, len(specs)-len(toRemove))
+	for i, s := range specs {
+		if !toRemove[i] {
+			result = append(result, s)
+		}
+	}
+	return result
+}
+
+// pathParamRestrictiveness returns a score indicating how restrictive the path parameter
+// schemas are for a given OAS path+method. Higher scores mean more restrictive. A plain
+// type:string with no constraints scores 0 (catch-all), while type:number, type:integer,
+// type:boolean, or any parameter with a pattern/enum/format scores higher.
+func pathParamRestrictiveness(oasPath, method string, oasPaths *openapi3.Paths) int {
+	if oasPaths == nil {
+		return 0
+	}
+	pathItem := oasPaths.Value(oasPath)
+	if pathItem == nil {
+		return 0
+	}
+	op := pathItem.GetOperation(method)
+	if op == nil {
+		return 0
+	}
+
+	score := 0
+	for _, paramRef := range op.Parameters {
+		if paramRef == nil || paramRef.Value == nil || paramRef.Value.In != "path" {
+			continue
+		}
+		param := paramRef.Value
+		if param.Schema == nil || param.Schema.Value == nil {
+			continue
+		}
+		score += schemaRestrictiveness(param.Schema.Value)
+	}
+	return score
+}
+
+// schemaRestrictiveness returns a score for how restrictive a single path parameter
+// schema is. The hierarchy from most to least restrictive:
+//
+//	integer (7) > number (6) > boolean (5) > array (4) > object (3)
+//	> string with constraints (2) > unconstrained string (0)
+//
+// This ensures that integer parameters are tried before number (since every integer
+// is a valid number but not vice versa), and all typed parameters are tried before
+// string which accepts everything.
+func schemaRestrictiveness(s *openapi3.Schema) int {
+	if s.Type != nil {
+		switch {
+		case s.Type.Is("integer"):
+			return 7
+		case s.Type.Is("number"):
+			return 6
+		case s.Type.Is("boolean"):
+			return 5
+		case s.Type.Is("array"):
+			return 4
+		case s.Type.Is("object"):
+			return 3
+		}
+	}
+
+	// type:string or untyped — check for constraints.
+	hasPattern := s.Pattern != ""
+	hasEnum := len(s.Enum) > 0
+	hasFormat := s.Format != ""
+	hasMinLen := s.MinLength != 0
+	hasMaxLen := s.MaxLength != nil
+
+	if hasPattern || hasEnum || hasFormat || hasMinLen || hasMaxLen {
+		return 2
+	}
+
+	// Unconstrained string — matches everything.
+	return 0
+}
+
+// pathParamPatternLength returns the total length of all path parameter pattern strings
+// for a given OAS path+method. Used as a tie-breaker when restrictiveness scores are
+// equal — longer patterns tend to be more specific (e.g., ^\d+$ vs .*).
+func pathParamPatternLength(oasPath, method string, oasPaths *openapi3.Paths) int {
+	if oasPaths == nil {
+		return 0
+	}
+	pathItem := oasPaths.Value(oasPath)
+	if pathItem == nil {
+		return 0
+	}
+	op := pathItem.GetOperation(method)
+	if op == nil {
+		return 0
+	}
+
+	total := 0
+	for _, paramRef := range op.Parameters {
+		if paramRef == nil || paramRef.Value == nil || paramRef.Value.In != "path" {
+			continue
+		}
+		if paramRef.Value.Schema != nil && paramRef.Value.Schema.Value != nil {
+			total += len(paramRef.Value.Schema.Value.Pattern)
+		}
+	}
+	return total
 }
 
 // compileOASMockResponsePathSpec extracts MockResponse operations from OAS middleware
@@ -1409,6 +1645,8 @@ func (a APIDefinitionLoader) compileOASMockResponsePathSpec(apiSpec *APISpec, co
 		a.generateRegex(path, &newSpec, OASMockResponse, conf)
 		urlSpec = append(urlSpec, newSpec)
 	}
+
+	urlSpec = groupCollapsedMockResponseSpecs(urlSpec, apiSpec.OAS.Paths)
 
 	urlSpec = a.addStaticPathShields(apiSpec, conf, urlSpec, OASMockResponse, func(path, method string) URLSpec {
 		return URLSpec{
