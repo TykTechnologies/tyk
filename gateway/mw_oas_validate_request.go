@@ -16,7 +16,6 @@ import (
 	"github.com/TykTechnologies/tyk/apidef/oas"
 	"github.com/TykTechnologies/tyk/header"
 	"github.com/TykTechnologies/tyk/internal/httputil"
-	"github.com/TykTechnologies/tyk/pkg/schema"
 
 	tykregexp "github.com/TykTechnologies/tyk/regexp"
 )
@@ -229,7 +228,7 @@ func (k *ValidateRequest) validateRoute(r *http.Request, route *routers.Route, p
 	}
 
 	if err := openapi3filter.ValidateRequest(r.Context(), input); err != nil {
-		return errResponseCode, fmt.Errorf("request validation error: %w", schema.RestoreUnicodeEscapesInError(err))
+		return errResponseCode, fmt.Errorf("request validation error: %w", err)
 	}
 	return http.StatusOK, nil
 }
