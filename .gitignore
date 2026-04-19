@@ -89,3 +89,9 @@ ci/tests/specs/policies
 .task-check-config-cache
 .task-check-x-tyk-gateway-cache
 .task-codegen-cache
+
+# ReqProof generated artifacts
+.proof/
+tests/policy/properties/
+tests/policy/tc-*.json
+tests/policy/z3-*.json
