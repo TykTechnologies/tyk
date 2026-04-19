@@ -19,6 +19,7 @@ import (
 //go:embed testdata/*.json
 var testDataFS embed.FS
 
+// Verifies: STK-REQ-003, SYS-REQ-021, SYS-REQ-022, SYS-REQ-041 [boundary]
 func TestApplyRateLimits_PolicyLimits(t *testing.T) {
 	t.Run("policy limits unset", func(t *testing.T) {
 		svc := &policy.Service{}
@@ -118,6 +119,7 @@ func TestApplyRateLimits_PolicyLimits(t *testing.T) {
 	})
 }
 
+// Verifies: SYS-REQ-021, SYS-REQ-031 [example]
 func TestApplyRateLimits_FromCustomPolicies(t *testing.T) {
 	svc := &policy.Service{}
 
@@ -146,6 +148,7 @@ func TestApplyRateLimits_FromCustomPolicies(t *testing.T) {
 	assert.Equal(t, 10, int(session.Rate))
 }
 
+// Verifies: SYS-REQ-013, SYS-REQ-030 [example]
 func TestApplyACL_FromCustomPolicies(t *testing.T) {
 	svc := &policy.Service{}
 
@@ -193,6 +196,7 @@ func TestApplyACL_FromCustomPolicies(t *testing.T) {
 	})
 }
 
+// Verifies: STK-REQ-004, SYS-REQ-023 [example]
 func TestApplyEndpointLevelLimits(t *testing.T) {
 	f, err := testDataFS.ReadFile("testdata/apply_endpoint_rl.json")
 	assert.NoError(t, err)
@@ -227,6 +231,7 @@ type testApplyPoliciesData struct {
 	reverseOrder bool
 }
 
+// Verifies: SYS-REQ-008
 func testPrepareApplyPolicies(tb testing.TB) (*policy.Service, []testApplyPoliciesData) {
 	tb.Helper()
 
@@ -1266,6 +1271,7 @@ func testPrepareApplyPolicies(tb testing.TB) (*policy.Service, []testApplyPolici
 	return service, tests
 }
 
+// Verifies: STK-REQ-001, STK-REQ-005, STK-REQ-007, SYS-REQ-008, SYS-REQ-010, SYS-REQ-011, SYS-REQ-012, SYS-REQ-013, SYS-REQ-014, SYS-REQ-015, SYS-REQ-025, SYS-REQ-026, SYS-REQ-027, SYS-REQ-030, SYS-REQ-032 [example]
 func TestService_Apply(t *testing.T) {
 	service, tests := testPrepareApplyPolicies(t)
 
@@ -1308,6 +1314,7 @@ func TestService_Apply(t *testing.T) {
 	}
 }
 
+// Verifies: STK-REQ-007, SYS-REQ-008 [example]
 func BenchmarkService_Apply(b *testing.B) {
 	b.ReportAllocs()
 

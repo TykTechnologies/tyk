@@ -1,6 +1,6 @@
 id: SYS-REQ-030
 version: 1
-status: draft
+status: review
 priority: shall
 category: functional
 req_type: guarantee
@@ -13,22 +13,23 @@ informal_verification:
     verified: false
 parent: ""
 component: policy
-rationale: ""
+rationale: When Apply processes a valid partitioned policy (not per-API, partitions enabled, org matches), access rights must be merged according to partition flags. The ACL partition controls whether access rig
 tags: []
 variables: []
 traces:
-    verified_by:
+    satisfies:
+        - STK-REQ-001
+    verified_by_extra:
         - FLIP:policy/tc-064
         - FLIP:policy/tc-065
         - FLIP:policy/tc-066
         - FLIP:policy/tc-067
         - FLIP:policy/tc-068
+    documented_by_extra:
+        - README.md
 verification:
-    assurance_level: C
+    assurance_level: A
     formalization_status: valid
-    realizability: realizable
-    consistency_checked: true
-    vacuity_checked: true
     review:
         status: pending
         reviewer: ""
@@ -37,16 +38,13 @@ verification:
 history:
     created_by: human:cli
     created_at: "2026-03-28T13:29:22Z"
-    last_modified_by: auto:flip-fixtures
-    last_modified_at: "2026-03-28T17:22:42Z"
-_computed:
-    formalization:
-        CoCoSpecCode: (H(not apply_requested or not policy_found or not org_matches or is_per_api or not partitions_enabled or access_rights_merged))
-        description: 'SCOPE: in the interval defined by the entire execution.<br>TRIGGER: first point in the interval.<br>REQUIRED BEHAVIOR: for every trigger, not apply_requested or not policy_found or not org_matches or is_per_api or not partitions_enabled or access_rights_merged must hold at all time points between (and including) the trigger and the end of the interval.'
-        ft: (LAST V not apply_requested or not policy_found or not org_matches or is_per_api or not partitions_enabled or access_rights_merged)
-        ftExpanded: (LAST V not apply_requested or not policy_found or not org_matches or is_per_api or not partitions_enabled or access_rights_merged)
-        pt: (H not apply_requested or not policy_found or not org_matches or is_per_api or not partitions_enabled or access_rights_merged)
-        ptExpanded: (H not apply_requested or not policy_found or not org_matches or is_per_api or not partitions_enabled or access_rights_merged)
-    parse_status: valid
-    last_compiled: "2026-03-28T18:03:09Z"
-    file_hash: sha256:4239bbd4c57a2f406a22d025abe7a0a0c8e407068ccb5e958390ba1f3b87c0f1
+    last_modified_by: human:cli
+    last_modified_at: "2026-04-19T15:13:34Z"
+obligation_class: nominal
+lifecycle:
+    change_history:
+        - date: "2026-04-19T15:13:34Z"
+          from: draft
+          to: review
+          reason: Migration to assurance model complete
+          changed_by: human:cli

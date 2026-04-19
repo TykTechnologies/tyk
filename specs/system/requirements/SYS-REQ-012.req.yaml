@@ -1,6 +1,6 @@
 id: SYS-REQ-012
 version: 1
-status: draft
+status: review
 priority: shall
 category: functional
 req_type: guarantee
@@ -13,19 +13,21 @@ informal_verification:
     verified: false
 parent: ""
 component: policy
-rationale: ""
+rationale: When a policy has both PerAPI and partition flags set, Apply must report an error. These modes are mutually exclusive; applying both would produce undefined merge behavior.
 tags: []
 variables: []
 traces:
-    verified_by:
+    satisfies:
+        - STK-REQ-001
+        - STK-REQ-005
+    verified_by_extra:
         - FLIP:policy/tc-010
         - FLIP:policy/tc-011
+    documented_by_extra:
+        - README.md
 verification:
-    assurance_level: C
+    assurance_level: A
     formalization_status: valid
-    realizability: realizable
-    consistency_checked: true
-    vacuity_checked: true
     review:
         status: pending
         reviewer: ""
@@ -34,16 +36,13 @@ verification:
 history:
     created_by: human:cli
     created_at: "2026-03-28T13:28:26Z"
-    last_modified_by: auto:flip-fixtures
-    last_modified_at: "2026-03-28T17:22:42Z"
-_computed:
-    formalization:
-        CoCoSpecCode: (H(not apply_requested or not per_api_and_partition_set or error_reported))
-        description: 'SCOPE: in the interval defined by the entire execution.<br>TRIGGER: first point in the interval.<br>REQUIRED BEHAVIOR: for every trigger, not apply_requested or not per_api_and_partition_set or error_reported must hold at all time points between (and including) the trigger and the end of the interval.'
-        ft: (LAST V not apply_requested or not per_api_and_partition_set or error_reported)
-        ftExpanded: (LAST V not apply_requested or not per_api_and_partition_set or error_reported)
-        pt: (H not apply_requested or not per_api_and_partition_set or error_reported)
-        ptExpanded: (H not apply_requested or not per_api_and_partition_set or error_reported)
-    parse_status: valid
-    last_compiled: "2026-03-28T18:03:09Z"
-    file_hash: sha256:022941e6615b3710449ac4654a3191c564360ac783942a0965e13cea7299529f
+    last_modified_by: human:cli
+    last_modified_at: "2026-04-19T15:13:34Z"
+obligation_class: malformed_input
+lifecycle:
+    change_history:
+        - date: "2026-04-19T15:13:34Z"
+          from: draft
+          to: review
+          reason: Migration to assurance model complete
+          changed_by: human:cli

@@ -1,0 +1,44 @@
+id: SYS-REQ-053
+version: 1
+status: review
+priority: shall
+category: functional
+req_type: guarantee
+fretish: the policy shall always satisfy !apply_requested | !policy_inactive | session_inactive_set
+description: 'When multiple policies are applied, session.IsInactive is the logical OR of all policies'' IsInactive flags. If ANY policy marks itself inactive, the session becomes inactive. This is the conservative security choice: one inactive policy deactivates the entire session to prevent an active policy from overriding an administrative deactivation.'
+formalization_strategy: fretish
+informal_verification:
+    method: ""
+    evidence: ""
+    verified: false
+parent: ""
+component: policy
+rationale: ""
+tags: []
+variables: []
+traces:
+    satisfies:
+        - STK-REQ-001
+    documented_by_extra:
+        - README.md
+verification:
+    assurance_level: B
+    formalization_status: valid
+    review:
+        status: pending
+        reviewer: ""
+        reviewed_at: ""
+        ai_generated: false
+history:
+    created_by: human:cli
+    created_at: "2026-04-19T15:29:46Z"
+    last_modified_by: human:cli
+    last_modified_at: "2026-04-19T15:35:44Z"
+obligation_class: nominal
+lifecycle:
+    change_history:
+        - date: "2026-04-19T15:35:44Z"
+          from: draft
+          to: review
+          reason: Migration to assurance model complete
+          changed_by: human:cli

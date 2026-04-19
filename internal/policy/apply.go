@@ -13,6 +13,9 @@ import (
 var (
 	// ErrMixedPartitionAndPerAPIPolicies is the error to return when a mix of per api and partitioned policies are to be applied in a session.
 	ErrMixedPartitionAndPerAPIPolicies = errors.New("cannot apply multiple policies when some have per_api set and some are partitioned")
+
+	// ErrNilPolicyStore is returned when Apply or ClearSession is called with a nil policy store.
+	ErrNilPolicyStore = errors.New("policy store is nil")
 )
 
 // Service represents the implementation for apply policies logic.
@@ -24,6 +27,7 @@ type Service struct {
 	orgID *string
 }
 
+// SYS-REQ-008, SYS-REQ-042
 func New(orgID *string, storage model.PolicyProvider, logger *logrus.Logger) *Service {
 	return &Service{
 		orgID:   orgID,
@@ -32,9 +36,14 @@ func New(orgID *string, storage model.PolicyProvider, logger *logrus.Logger) *Se
 	}
 }
 
+// SYS-REQ-019, SYS-REQ-020, SYS-REQ-049
 // ClearSession clears the quota, rate limit and complexity values so that partitioned policies can apply their values.
 // Otherwise, if the session has already a higher value, an applied policy will not win, and its values will be ignored.
 func (t *Service) ClearSession(session *user.SessionState) error {
+	if t.storage == nil {
+		return ErrNilPolicyStore
+	}
+
 	policies := session.PolicyIDs()
 
 	for _, polID := range policies {
@@ -75,6 +84,9 @@ type applyStatus struct {
 	didPartition  bool
 }
 
+// SYS-REQ-008, SYS-REQ-010, SYS-REQ-011, SYS-REQ-012, SYS-REQ-013, SYS-REQ-014, SYS-REQ-015, SYS-REQ-016, SYS-REQ-017, SYS-REQ-018
+// SYS-REQ-024, SYS-REQ-025, SYS-REQ-026, SYS-REQ-027, SYS-REQ-028, SYS-REQ-029, SYS-REQ-030, SYS-REQ-031, SYS-REQ-032, SYS-REQ-033
+// SYS-REQ-040, SYS-REQ-042, SYS-REQ-043, SYS-REQ-044, SYS-REQ-050, SYS-REQ-052, SYS-REQ-053, SYS-REQ-054
 // Apply will check if any policies are loaded. If any are, it
 // will overwrite the session state to use the policy values.
 func (t *Service) Apply(session *user.SessionState) error {
@@ -85,7 +97,9 @@ func (t *Service) Apply(session *user.SessionState) error {
 	}
 
 	if err := t.ClearSession(session); err != nil {
-		t.logger.WithError(err).Warn("error clearing session")
+		if t.logger != nil {
+			t.logger.WithError(err).Warn("error clearing session")
+		}
 	}
 
 	applyState := applyStatus{
@@ -104,6 +118,10 @@ func (t *Service) Apply(session *user.SessionState) error {
 
 	customPolicies, err := session.GetCustomPolicies()
 	if err != nil {
+		// No custom policies; storage must be available.
+		if t.storage == nil {
+			return ErrNilPolicyStore
+		}
 		policyIDs = session.PolicyIDs()
 	} else {
 		storage = NewStore(customPolicies)
@@ -246,11 +264,13 @@ func (t *Service) Apply(session *user.SessionState) error {
 	return nil
 }
 
+// SYS-REQ-008
 // Logger implements a typical logger signature with service context.
 func (t *Service) Logger() *logrus.Entry {
 	return logrus.NewEntry(t.logger)
 }
 
+// SYS-REQ-021, SYS-REQ-022, SYS-REQ-041, SYS-REQ-051
 // ApplyRateLimits will write policy limits to session and apiLimits.
 // The limits get written if either are empty.
 // The limits get written if filled and policyLimits allows a higher request rate.
@@ -288,10 +308,12 @@ func (t *Service) ApplyRateLimits(session *user.SessionState, policy user.Policy
 	}
 }
 
+// SYS-REQ-021
 func (t *Service) emptyRateLimit(m user.APILimit) bool {
 	return m.Rate == 0 || m.Per == 0
 }
 
+// SYS-REQ-013, SYS-REQ-014, SYS-REQ-015
 func (t *Service) applyPerAPI(policy user.Policy, session *user.SessionState, rights map[string]user.AccessDefinition,
 	applyState *applyStatus) error {
 
@@ -344,6 +366,7 @@ func (t *Service) applyPerAPI(policy user.Policy, session *user.SessionState, ri
 	return nil
 }
 
+// SYS-REQ-030, SYS-REQ-031, SYS-REQ-032
 func (t *Service) applyPartitions(policy user.Policy, session *user.SessionState, rights map[string]user.AccessDefinition,
 	applyState *applyStatus) error {
 
@@ -559,6 +582,7 @@ func (t *Service) applyPartitions(policy user.Policy, session *user.SessionState
 	return nil
 }
 
+// SYS-REQ-024, SYS-REQ-025
 func (t *Service) updateSessionRootVars(session *user.SessionState, rights map[string]user.AccessDefinition, applyState applyStatus) {
 	if len(applyState.didQuota) == 1 && len(applyState.didRateLimit) == 1 && len(applyState.didComplexity) == 1 {
 		for _, v := range rights {
@@ -581,6 +605,7 @@ func (t *Service) updateSessionRootVars(session *user.SessionState, rights map[s
 	}
 }
 
+// SYS-REQ-023
 func (t *Service) applyAPILevelLimits(policyAD user.AccessDefinition, currAD user.AccessDefinition) user.AccessDefinition {
 	var updated bool
 	if policyAD.Limit.Duration() > currAD.Limit.Duration() {
@@ -613,6 +638,7 @@ func (t *Service) applyAPILevelLimits(policyAD user.AccessDefinition, currAD use
 	return policyAD
 }
 
+// SYS-REQ-023
 // ApplyEndpointLevelLimits combines policyEndpoints and currEndpoints and returns the combined value.
 // The returned endpoints would have the highest request rate from policyEndpoints and currEndpoints.
 func (t *Service) ApplyEndpointLevelLimits(policyEndpoints user.Endpoints, currEndpoints user.Endpoints) user.Endpoints {

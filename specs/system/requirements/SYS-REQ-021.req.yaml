@@ -1,6 +1,6 @@
 id: SYS-REQ-021
 version: 1
-status: draft
+status: review
 priority: shall
 category: functional
 req_type: guarantee
@@ -13,21 +13,22 @@ informal_verification:
     verified: false
 parent: ""
 component: policy
-rationale: ""
+rationale: 'ApplyRateLimits must apply policy rate limits when: policy rate is non-empty AND not equal to current AND (current API limit is empty OR policy allows higher rate). The highest-rate-wins rule ensures '
 tags: []
 variables: []
 traces:
-    verified_by:
+    satisfies:
+        - STK-REQ-003
+    verified_by_extra:
         - FLIP:policy/tc-032
         - FLIP:policy/tc-033
         - FLIP:policy/tc-034
         - FLIP:policy/tc-035
+    documented_by_extra:
+        - README.md
 verification:
-    assurance_level: C
+    assurance_level: A
     formalization_status: valid
-    realizability: realizable
-    consistency_checked: true
-    vacuity_checked: true
     review:
         status: pending
         reviewer: ""
@@ -36,16 +37,13 @@ verification:
 history:
     created_by: human:cli
     created_at: "2026-03-28T13:28:53Z"
-    last_modified_by: auto:flip-fixtures
-    last_modified_at: "2026-03-28T17:22:42Z"
-_computed:
-    formalization:
-        CoCoSpecCode: (H(not rate_limit_apply_requested or policy_rate_empty or api_limit_empty or policy_rate_higher or policy_rate_equal or rate_limit_applied))
-        description: 'SCOPE: in the interval defined by the entire execution.<br>TRIGGER: first point in the interval.<br>REQUIRED BEHAVIOR: for every trigger, not rate_limit_apply_requested or policy_rate_empty or api_limit_empty or policy_rate_higher or policy_rate_equal or rate_limit_applied must hold at all time points between (and including) the trigger and the end of the interval.'
-        ft: (LAST V not rate_limit_apply_requested or policy_rate_empty or api_limit_empty or policy_rate_higher or policy_rate_equal or rate_limit_applied)
-        ftExpanded: (LAST V not rate_limit_apply_requested or policy_rate_empty or api_limit_empty or policy_rate_higher or policy_rate_equal or rate_limit_applied)
-        pt: (H not rate_limit_apply_requested or policy_rate_empty or api_limit_empty or policy_rate_higher or policy_rate_equal or rate_limit_applied)
-        ptExpanded: (H not rate_limit_apply_requested or policy_rate_empty or api_limit_empty or policy_rate_higher or policy_rate_equal or rate_limit_applied)
-    parse_status: valid
-    last_compiled: "2026-03-28T18:03:09Z"
-    file_hash: sha256:a2da76c4cca2b12c2b0f42a35c6ad167bc9a1be4521239210fea16dd2143e237
+    last_modified_by: human:cli
+    last_modified_at: "2026-04-19T15:13:34Z"
+obligation_class: nominal
+lifecycle:
+    change_history:
+        - date: "2026-04-19T15:13:34Z"
+          from: draft
+          to: review
+          reason: Migration to assurance model complete
+          changed_by: human:cli

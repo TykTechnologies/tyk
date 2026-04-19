@@ -1,0 +1,44 @@
+id: SYS-REQ-054
+version: 1
+status: review
+priority: shall
+category: functional
+req_type: guarantee
+fretish: the policy shall always satisfy !apply_requested | !multiple_policies | error_reported | !access_rights_merged | result_returned
+description: 'When multiple policies are applied and one uses per-API mode while another uses partition mode, Apply must report ErrMixedPartitionAndPerAPIPolicies. The cross-policy mode conflict is detected via the applyState didPerAPI/didPartition flags, not just within a single policy''s flags. SECURITY: Allowing mixed modes across policies could produce unpredictable merge results.'
+formalization_strategy: fretish
+informal_verification:
+    method: ""
+    evidence: ""
+    verified: false
+parent: ""
+component: policy
+rationale: ""
+tags: []
+variables: []
+traces:
+    satisfies:
+        - STK-REQ-005
+    documented_by_extra:
+        - README.md
+verification:
+    assurance_level: B
+    formalization_status: valid
+    review:
+        status: pending
+        reviewer: ""
+        reviewed_at: ""
+        ai_generated: false
+history:
+    created_by: human:cli
+    created_at: "2026-04-19T15:30:02Z"
+    last_modified_by: human:cli
+    last_modified_at: "2026-04-19T15:35:44Z"
+obligation_class: malformed_input
+lifecycle:
+    change_history:
+        - date: "2026-04-19T15:35:44Z"
+          from: draft
+          to: review
+          reason: Migration to assurance model complete
+          changed_by: human:cli

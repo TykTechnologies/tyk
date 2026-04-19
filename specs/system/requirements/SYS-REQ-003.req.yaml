@@ -1,6 +1,6 @@
 id: SYS-REQ-003
 version: 1
-status: draft
+status: review
 priority: shall
 category: functional
 req_type: assumption
@@ -13,7 +13,7 @@ informal_verification:
     verified: false
 parent: ""
 component: policy
-rationale: ""
+rationale: PerAPI mode and partition mode are mutually exclusive operational modes. A policy uses either per-API limits or partitioned limits, never both.
 tags: []
 variables: []
 references:
@@ -22,14 +22,15 @@ references:
       url: https://wiki.internal/tyk/architecture/policy-engine
       description: Policy engine architecture - mutual exclusion of PerAPI and partition modes
 traces:
-    verified_by:
+    satisfies:
+        - STK-REQ-001
+    verified_by_extra:
         - FLIP:policy/tc-003
+    documented_by_extra:
+        - README.md
 verification:
-    assurance_level: C
+    assurance_level: B
     formalization_status: valid
-    realizability: realizable
-    consistency_checked: true
-    vacuity_checked: true
     review:
         status: pending
         reviewer: ""
@@ -38,16 +39,13 @@ verification:
 history:
     created_by: human:cli
     created_at: "2026-03-28T13:28:05Z"
-    last_modified_by: auto:flip-fixtures
-    last_modified_at: "2026-03-28T17:22:42Z"
-_computed:
-    formalization:
-        CoCoSpecCode: (H(not is_per_api or not partitions_enabled))
-        description: 'SCOPE: in the interval defined by the entire execution.<br>TRIGGER: first point in the interval.<br>REQUIRED BEHAVIOR: for every trigger, not is_per_api or not partitions_enabled must hold at all time points between (and including) the trigger and the end of the interval.'
-        ft: (LAST V not is_per_api or not partitions_enabled)
-        ftExpanded: (LAST V not is_per_api or not partitions_enabled)
-        pt: (H not is_per_api or not partitions_enabled)
-        ptExpanded: (H not is_per_api or not partitions_enabled)
-    parse_status: valid
-    last_compiled: "2026-03-28T18:03:09Z"
-    file_hash: sha256:6aeaf2629d172c719757d8942f725cf87b8b51d6fe7d32df552fd529ab1c4bc1
+    last_modified_by: human:cli
+    last_modified_at: "2026-04-19T15:13:33Z"
+obligation_class: nominal
+lifecycle:
+    change_history:
+        - date: "2026-04-19T15:13:33Z"
+          from: draft
+          to: review
+          reason: Migration to assurance model complete
+          changed_by: human:cli

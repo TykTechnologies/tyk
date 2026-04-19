@@ -1,6 +1,6 @@
 id: SYS-REQ-043
 version: 1
-status: draft
+status: review
 priority: shall
 category: functional
 req_type: constraint
@@ -13,16 +13,17 @@ informal_verification:
     verified: false
 parent: ""
 component: policy
-rationale: ""
+rationale: 'KNOWN LIMITATION: Metadata merge uses last-write-wins per key. When policies are iterated in different order, conflicting keys produce different results. This is a known non-determinism risk documente'
 tags: []
 variables: []
-traces: {}
+traces:
+    satisfies:
+        - STK-REQ-001
+    documented_by_extra:
+        - README.md
 verification:
-    assurance_level: E
+    assurance_level: B
     formalization_status: valid
-    realizability: not_applicable
-    consistency_checked: true
-    vacuity_checked: true
     review:
         status: pending
         reviewer: ""
@@ -32,15 +33,12 @@ history:
     created_by: human:cli
     created_at: "2026-03-28T17:44:07Z"
     last_modified_by: human:cli
-    last_modified_at: "2026-03-28T17:46:30Z"
-_computed:
-    formalization:
-        CoCoSpecCode: (H(not apply_requested or metadata_order_independent))
-        description: 'SCOPE: in the interval defined by the entire execution.<br>TRIGGER: first point in the interval.<br>REQUIRED BEHAVIOR: for every trigger, not apply_requested or metadata_order_independent must hold at all time points between (and including) the trigger and the end of the interval.'
-        ft: (LAST V not apply_requested or metadata_order_independent)
-        ftExpanded: (LAST V not apply_requested or metadata_order_independent)
-        pt: (H not apply_requested or metadata_order_independent)
-        ptExpanded: (H not apply_requested or metadata_order_independent)
-    parse_status: valid
-    last_compiled: "2026-03-28T18:03:09Z"
-    file_hash: sha256:06ccab3307fe360af1adba96e9b8d0fe7f2a9332ddfbbc11b22e141a7831e0e4
+    last_modified_at: "2026-04-19T15:13:34Z"
+obligation_class: policy_merge
+lifecycle:
+    change_history:
+        - date: "2026-04-19T15:13:34Z"
+          from: draft
+          to: review
+          reason: Migration to assurance model complete
+          changed_by: human:cli

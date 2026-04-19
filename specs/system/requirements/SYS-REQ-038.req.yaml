@@ -1,6 +1,6 @@
 id: SYS-REQ-038
 version: 1
-status: draft
+status: review
 priority: shall
 category: functional
 req_type: assumption
@@ -13,19 +13,20 @@ informal_verification:
     verified: false
 parent: ""
 component: policy
-rationale: ""
+rationale: Org mismatch can only occur when a policy is found during an apply operation. Outside of apply, org matching is irrelevant.
 tags: []
 variables: []
 traces:
-    verified_by:
+    satisfies:
+        - STK-REQ-005
+    verified_by_extra:
         - FLIP:policy/tc-084
         - FLIP:policy/tc-085
+    documented_by_extra:
+        - README.md
 verification:
-    assurance_level: C
+    assurance_level: B
     formalization_status: valid
-    realizability: realizable
-    consistency_checked: true
-    vacuity_checked: true
     review:
         status: pending
         reviewer: ""
@@ -34,16 +35,13 @@ verification:
 history:
     created_by: human:cli
     created_at: "2026-03-28T13:30:07Z"
-    last_modified_by: auto:flip-fixtures
-    last_modified_at: "2026-03-28T17:22:42Z"
-_computed:
-    formalization:
-        CoCoSpecCode: (H(org_matches or not policy_found or apply_requested))
-        description: 'SCOPE: in the interval defined by the entire execution.<br>TRIGGER: first point in the interval.<br>REQUIRED BEHAVIOR: for every trigger, org_matches or not policy_found or apply_requested must hold at all time points between (and including) the trigger and the end of the interval.'
-        ft: (LAST V org_matches or not policy_found or apply_requested)
-        ftExpanded: (LAST V org_matches or not policy_found or apply_requested)
-        pt: (H org_matches or not policy_found or apply_requested)
-        ptExpanded: (H org_matches or not policy_found or apply_requested)
-    parse_status: valid
-    last_compiled: "2026-03-28T18:03:09Z"
-    file_hash: sha256:f4d8e6125e7875f3964b332b23a8152af19a8a065528402be3c7de71a9e110de
+    last_modified_by: human:cli
+    last_modified_at: "2026-04-19T15:13:34Z"
+obligation_class: nominal
+lifecycle:
+    change_history:
+        - date: "2026-04-19T15:13:34Z"
+          from: draft
+          to: review
+          reason: Migration to assurance model complete
+          changed_by: human:cli

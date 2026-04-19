@@ -1,0 +1,27 @@
+{
+  "name": "access_rights_merged_z3_combine_disjoint_keys",
+  "property": "access_rights_merged",
+  "source": "z3-boundary",
+  "inputs": [
+    {
+      "access_rights_merged": {
+        "A": "val_1",
+        "B": "val_0"
+      }
+    },
+    {
+      "access_rights_merged": {
+        "C": "val_2",
+        "D": "val_3"
+      }
+    }
+  ],
+  "expected": {
+    "access_rights_merged": {
+      "A": "val_1",
+      "B": "val_0",
+      "C": "val_2",
+      "D": "val_3"
+    }
+  }
+}

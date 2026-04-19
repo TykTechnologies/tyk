@@ -1,6 +1,6 @@
 id: SYS-REQ-035
 version: 1
-status: draft
+status: review
 priority: shall
 category: functional
 req_type: assumption
@@ -13,18 +13,19 @@ informal_verification:
     verified: false
 parent: ""
 component: policy
-rationale: ""
+rationale: A policy cannot have a higher rate than the current limit if its rate is empty (zero). These are logically exclusive.
 tags: []
 variables: []
 traces:
-    verified_by:
+    satisfies:
+        - STK-REQ-003
+    verified_by_extra:
         - FLIP:policy/tc-080
+    documented_by_extra:
+        - README.md
 verification:
-    assurance_level: C
+    assurance_level: B
     formalization_status: valid
-    realizability: realizable
-    consistency_checked: true
-    vacuity_checked: true
     review:
         status: pending
         reviewer: ""
@@ -33,16 +34,13 @@ verification:
 history:
     created_by: human:cli
     created_at: "2026-03-28T13:29:56Z"
-    last_modified_by: auto:flip-fixtures
-    last_modified_at: "2026-03-28T17:22:42Z"
-_computed:
-    formalization:
-        CoCoSpecCode: (H(not policy_rate_higher or not policy_rate_empty))
-        description: 'SCOPE: in the interval defined by the entire execution.<br>TRIGGER: first point in the interval.<br>REQUIRED BEHAVIOR: for every trigger, not policy_rate_higher or not policy_rate_empty must hold at all time points between (and including) the trigger and the end of the interval.'
-        ft: (LAST V not policy_rate_higher or not policy_rate_empty)
-        ftExpanded: (LAST V not policy_rate_higher or not policy_rate_empty)
-        pt: (H not policy_rate_higher or not policy_rate_empty)
-        ptExpanded: (H not policy_rate_higher or not policy_rate_empty)
-    parse_status: valid
-    last_compiled: "2026-03-28T18:03:09Z"
-    file_hash: sha256:3f3bd8d1495befafe82470036a3202135868238e93db7e3dfdf64a65095eef8a
+    last_modified_by: human:cli
+    last_modified_at: "2026-04-19T15:13:34Z"
+obligation_class: rate_limit_boundary
+lifecycle:
+    change_history:
+        - date: "2026-04-19T15:13:34Z"
+          from: draft
+          to: review
+          reason: Migration to assurance model complete
+          changed_by: human:cli

@@ -1,3 +1,4 @@
+// SYS-REQ-008: map-based policy storage for Apply and ClearSession operations
 package policy
 
 import (
@@ -9,6 +10,7 @@ type StoreMap struct {
 	policies map[string]user.Policy
 }
 
+// SYS-REQ-008
 // NewStoreMap returns a new policy.StoreMap.
 func NewStoreMap(policies map[string]user.Policy) *StoreMap {
 	if len(policies) == 0 {
@@ -20,6 +22,7 @@ func NewStoreMap(policies map[string]user.Policy) *StoreMap {
 	}
 }
 
+// SYS-REQ-008
 // PolicyIDs returns a list policy IDs in the store.
 // It will return nil if no policies exist.
 func (s *StoreMap) PolicyIDs() []string {
@@ -34,12 +37,14 @@ func (s *StoreMap) PolicyIDs() []string {
 	return policyIDs
 }
 
+// SYS-REQ-008
 // PolicyByID returns a policy by ID.
 func (s *StoreMap) PolicyByID(id string) (user.Policy, bool) {
 	v, ok := s.policies[id]
 	return v, ok
 }
 
+// SYS-REQ-008
 // PolicyCount returns the number of policies in the store.
 func (s *StoreMap) PolicyCount() int {
 	return len(s.policies)

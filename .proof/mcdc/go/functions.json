@@ -1,0 +1,676 @@
+{
+  "generated_at": "2026-04-19T19:23:44.82652Z",
+  "engine": "go",
+  "pattern": "./internal/policy/...",
+  "functions": [
+    {
+      "id": "github.com/TykTechnologies/tyk/internal/policy:apply.go:*Service.Apply",
+      "package": "github.com/TykTechnologies/tyk/internal/policy",
+      "file": "apply.go",
+      "function": "*Service.Apply",
+      "layers": {
+        "statement_percent": 0,
+        "decision_count": 24,
+        "covered_decisions": 22,
+        "decision_percent": 91.66666666666667,
+        "condition_count": 28,
+        "covered_conditions": 26,
+        "condition_percent": 92.85714285714286,
+        "incomplete_decisions": 2,
+        "missing_condition_count": 2
+      },
+      "decision_count": 24,
+      "fully_covered": 22,
+      "partially_covered": 2,
+      "hotspots": [
+        {
+          "package": "github.com/TykTechnologies/tyk/internal/policy",
+          "file": "apply.go",
+          "function": "*Service.Apply",
+          "line": 242,
+          "kind": "if",
+          "expression": "v.AllowanceScope == \"\" \u0026\u0026 v.Limit.SetBy != \"\"",
+          "samples": 2,
+          "missing_conditions": [
+            "v.Limit.SetBy != \"\""
+          ],
+          "example_row": "v.AllowanceScope == \"\"=F, [v.Limit.SetBy != \"\"=- skipped] =\u003e F"
+        },
+        {
+          "package": "github.com/TykTechnologies/tyk/internal/policy",
+          "file": "apply.go",
+          "function": "*Service.Apply",
+          "line": 199,
+          "kind": "if",
+          "expression": "!accessRight.Limit.IsEmpty()",
+          "samples": 1,
+          "missing_conditions": [
+            "accessRight.Limit.IsEmpty()"
+          ],
+          "example_row": "accessRight.Limit.IsEmpty()=F =\u003e T"
+        }
+      ]
+    },
+    {
+      "id": "github.com/TykTechnologies/tyk/internal/policy:apply.go:*Service.ApplyEndpointLevelLimits",
+      "package": "github.com/TykTechnologies/tyk/internal/policy",
+      "file": "apply.go",
+      "function": "*Service.ApplyEndpointLevelLimits",
+      "layers": {
+        "statement_percent": 0,
+        "decision_count": 5,
+        "covered_decisions": 5,
+        "decision_percent": 100,
+        "condition_count": 6,
+        "covered_conditions": 6,
+        "condition_percent": 100,
+        "incomplete_decisions": 0,
+        "missing_condition_count": 0
+      },
+      "decision_count": 5,
+      "fully_covered": 5,
+      "partially_covered": 0
+    },
+    {
+      "id": "github.com/TykTechnologies/tyk/internal/policy:apply.go:*Service.ApplyRateLimits",
+      "package": "github.com/TykTechnologies/tyk/internal/policy",
+      "file": "apply.go",
+      "function": "*Service.ApplyRateLimits",
+      "layers": {
+        "statement_percent": 0,
+        "decision_count": 3,
+        "covered_decisions": 3,
+        "decision_percent": 100,
+        "condition_count": 5,
+        "covered_conditions": 5,
+        "condition_percent": 100,
+        "incomplete_decisions": 0,
+        "missing_condition_count": 0
+      },
+      "decision_count": 3,
+      "fully_covered": 3,
+      "partially_covered": 0
+    },
+    {
+      "id": "github.com/TykTechnologies/tyk/internal/policy:apply.go:*Service.ClearSession",
+      "package": "github.com/TykTechnologies/tyk/internal/policy",
+      "file": "apply.go",
+      "function": "*Service.ClearSession",
+      "layers": {
+        "statement_percent": 0,
+        "decision_count": 5,
+        "covered_decisions": 5,
+        "decision_percent": 100,
+        "condition_count": 8,
+        "covered_conditions": 8,
+        "condition_percent": 100,
+        "incomplete_decisions": 0,
+        "missing_condition_count": 0
+      },
+      "decision_count": 5,
+      "fully_covered": 5,
+      "partially_covered": 0
+    },
+    {
+      "id": "github.com/TykTechnologies/tyk/internal/policy:apply.go:*Service.applyAPILevelLimits",
+      "package": "github.com/TykTechnologies/tyk/internal/policy",
+      "file": "apply.go",
+      "function": "*Service.applyAPILevelLimits",
+      "layers": {
+        "statement_percent": 0,
+        "decision_count": 5,
+        "covered_decisions": 5,
+        "decision_percent": 100,
+        "condition_count": 6,
+        "covered_conditions": 6,
+        "condition_percent": 100,
+        "incomplete_decisions": 0,
+        "missing_condition_count": 0
+      },
+      "decision_count": 5,
+      "fully_covered": 5,
+      "partially_covered": 0
+    },
+    {
+      "id": "github.com/TykTechnologies/tyk/internal/policy:apply.go:*Service.applyPartitions",
+      "package": "github.com/TykTechnologies/tyk/internal/policy",
+      "file": "apply.go",
+      "function": "*Service.applyPartitions",
+      "layers": {
+        "statement_percent": 0,
+        "decision_count": 35,
+        "covered_decisions": 22,
+        "decision_percent": 62.857142857142854,
+        "condition_count": 45,
+        "covered_conditions": 31,
+        "condition_percent": 68.88888888888889,
+        "incomplete_decisions": 13,
+        "missing_condition_count": 14
+      },
+      "decision_count": 35,
+      "fully_covered": 22,
+      "partially_covered": 13,
+      "hotspots": [
+        {
+          "package": "github.com/TykTechnologies/tyk/internal/policy",
+          "file": "apply.go",
+          "function": "*Service.applyPartitions",
+          "line": 545,
+          "kind": "if",
+          "expression": "ok \u0026\u0026 !r.Limit.IsEmpty()",
+          "samples": 1,
+          "missing_conditions": [
+            "ok",
+            "!r.Limit.IsEmpty()"
+          ],
+          "example_row": "ok=F, [!r.Limit.IsEmpty()=- skipped] =\u003e F"
+        },
+        {
+          "package": "github.com/TykTechnologies/tyk/internal/policy",
+          "file": "apply.go",
+          "function": "*Service.applyPartitions",
+          "line": 428,
+          "kind": "if",
+          "expression": "!typeFound",
+          "samples": 1,
+          "missing_conditions": [
+            "typeFound"
+          ],
+          "example_row": "typeFound=T =\u003e F"
+        },
+        {
+          "package": "github.com/TykTechnologies/tyk/internal/policy",
+          "file": "apply.go",
+          "function": "*Service.applyPartitions",
+          "line": 455,
+          "kind": "if",
+          "expression": "!typeFound",
+          "samples": 1,
+          "missing_conditions": [
+            "typeFound"
+          ],
+          "example_row": "typeFound=T =\u003e F"
+        },
+        {
+          "package": "github.com/TykTechnologies/tyk/internal/policy",
+          "file": "apply.go",
+          "function": "*Service.applyPartitions",
+          "line": 576,
+          "kind": "if",
+          "expression": "!session.EnableHTTPSignatureValidation",
+          "samples": 1,
+          "missing_conditions": [
+            "session.EnableHTTPSignatureValidation"
+          ],
+          "example_row": "session.EnableHTTPSignatureValidation=F =\u003e T"
+        },
+        {
+          "package": "github.com/TykTechnologies/tyk/internal/policy",
+          "file": "apply.go",
+          "function": "*Service.applyPartitions",
+          "line": 562,
+          "kind": "if",
+          "expression": "!usePartitions || policy.Partitions.Complexity",
+          "samples": 2,
+          "missing_conditions": [
+            "policy.Partitions.Complexity"
+          ],
+          "example_row": "!usePartitions=F, [policy.Partitions.Complexity=- skipped] =\u003e T"
+        }
+      ]
+    },
+    {
+      "id": "github.com/TykTechnologies/tyk/internal/policy:apply.go:*Service.applyPerAPI",
+      "package": "github.com/TykTechnologies/tyk/internal/policy",
+      "file": "apply.go",
+      "function": "*Service.applyPerAPI",
+      "layers": {
+        "statement_percent": 0,
+        "decision_count": 7,
+        "covered_decisions": 3,
+        "decision_percent": 42.857142857142854,
+        "condition_count": 8,
+        "covered_conditions": 3,
+        "condition_percent": 37.5,
+        "incomplete_decisions": 4,
+        "missing_condition_count": 5
+      },
+      "decision_count": 7,
+      "fully_covered": 3,
+      "partially_covered": 4,
+      "hotspots": [
+        {
+          "package": "github.com/TykTechnologies/tyk/internal/policy",
+          "file": "apply.go",
+          "function": "*Service.applyPerAPI",
+          "line": 337,
+          "kind": "if",
+          "expression": "ok \u0026\u0026 !r.Limit.IsEmpty()",
+          "samples": 1,
+          "missing_conditions": [
+            "ok",
+            "!r.Limit.IsEmpty()"
+          ],
+          "example_row": "ok=F, [!r.Limit.IsEmpty()=- skipped] =\u003e F"
+        },
+        {
+          "package": "github.com/TykTechnologies/tyk/internal/policy",
+          "file": "apply.go",
+          "function": "*Service.applyPerAPI",
+          "line": 362,
+          "kind": "if",
+          "expression": "len(policy.AccessRights) \u003e 0",
+          "samples": 1,
+          "missing_conditions": [
+            "len(policy.AccessRights) \u003e 0"
+          ],
+          "example_row": "len(policy.AccessRights) \u003e 0=T =\u003e T"
+        },
+        {
+          "package": "github.com/TykTechnologies/tyk/internal/policy",
+          "file": "apply.go",
+          "function": "*Service.applyPerAPI",
+          "line": 341,
+          "kind": "if",
+          "expression": "ok",
+          "samples": 1,
+          "missing_conditions": [
+            "ok"
+          ],
+          "example_row": "ok=F =\u003e F"
+        },
+        {
+          "package": "github.com/TykTechnologies/tyk/internal/policy",
+          "file": "apply.go",
+          "function": "*Service.applyPerAPI",
+          "line": 343,
+          "kind": "if",
+          "expression": "r.DisableIntrospection",
+          "samples": 0,
+          "missing_conditions": [
+            "r.DisableIntrospection"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "github.com/TykTechnologies/tyk/internal/policy:apply.go:*Service.updateSessionRootVars",
+      "package": "github.com/TykTechnologies/tyk/internal/policy",
+      "file": "apply.go",
+      "function": "*Service.updateSessionRootVars",
+      "layers": {
+        "statement_percent": 0,
+        "decision_count": 4,
+        "covered_decisions": 1,
+        "decision_percent": 25,
+        "condition_count": 6,
+        "covered_conditions": 3,
+        "condition_percent": 50,
+        "incomplete_decisions": 3,
+        "missing_condition_count": 3
+      },
+      "decision_count": 4,
+      "fully_covered": 1,
+      "partially_covered": 3,
+      "hotspots": [
+        {
+          "package": "github.com/TykTechnologies/tyk/internal/policy",
+          "file": "apply.go",
+          "function": "*Service.updateSessionRootVars",
+          "line": 589,
+          "kind": "if",
+          "expression": "len(applyState.didRateLimit) == 1",
+          "samples": 1,
+          "missing_conditions": [
+            "len(applyState.didRateLimit) == 1"
+          ],
+          "example_row": "len(applyState.didRateLimit) == 1=T =\u003e T"
+        },
+        {
+          "package": "github.com/TykTechnologies/tyk/internal/policy",
+          "file": "apply.go",
+          "function": "*Service.updateSessionRootVars",
+          "line": 595,
+          "kind": "if",
+          "expression": "len(applyState.didQuota) == 1",
+          "samples": 1,
+          "missing_conditions": [
+            "len(applyState.didQuota) == 1"
+          ],
+          "example_row": "len(applyState.didQuota) == 1=T =\u003e T"
+        },
+        {
+          "package": "github.com/TykTechnologies/tyk/internal/policy",
+          "file": "apply.go",
+          "function": "*Service.updateSessionRootVars",
+          "line": 601,
+          "kind": "if",
+          "expression": "len(applyState.didComplexity) == 1",
+          "samples": 1,
+          "missing_conditions": [
+            "len(applyState.didComplexity) == 1"
+          ],
+          "example_row": "len(applyState.didComplexity) == 1=T =\u003e T"
+        }
+      ]
+    },
+    {
+      "id": "github.com/TykTechnologies/tyk/internal/policy:rpc.go:*RPCDataLoaderMock.GetApiDefinitions",
+      "package": "github.com/TykTechnologies/tyk/internal/policy",
+      "file": "rpc.go",
+      "function": "*RPCDataLoaderMock.GetApiDefinitions",
+      "layers": {
+        "statement_percent": 0,
+        "decision_count": 2,
+        "covered_decisions": 0,
+        "decision_percent": 0,
+        "condition_count": 2,
+        "covered_conditions": 0,
+        "condition_percent": 0,
+        "incomplete_decisions": 2,
+        "missing_condition_count": 2
+      },
+      "decision_count": 2,
+      "fully_covered": 0,
+      "partially_covered": 2,
+      "hotspots": [
+        {
+          "package": "github.com/TykTechnologies/tyk/internal/policy",
+          "file": "rpc.go",
+          "function": "*RPCDataLoaderMock.GetApiDefinitions",
+          "line": 25,
+          "kind": "if",
+          "expression": "len(tags) \u003e 1",
+          "samples": 0,
+          "missing_conditions": [
+            "len(tags) \u003e 1"
+          ]
+        },
+        {
+          "package": "github.com/TykTechnologies/tyk/internal/policy",
+          "file": "rpc.go",
+          "function": "*RPCDataLoaderMock.GetApiDefinitions",
+          "line": 30,
+          "kind": "if",
+          "expression": "err != nil",
+          "samples": 0,
+          "missing_conditions": [
+            "err != nil"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "github.com/TykTechnologies/tyk/internal/policy:rpc.go:*RPCDataLoaderMock.GetPolicies",
+      "package": "github.com/TykTechnologies/tyk/internal/policy",
+      "file": "rpc.go",
+      "function": "*RPCDataLoaderMock.GetPolicies",
+      "layers": {
+        "statement_percent": 0,
+        "decision_count": 1,
+        "covered_decisions": 0,
+        "decision_percent": 0,
+        "condition_count": 1,
+        "covered_conditions": 0,
+        "condition_percent": 0,
+        "incomplete_decisions": 1,
+        "missing_condition_count": 1
+      },
+      "decision_count": 1,
+      "fully_covered": 0,
+      "partially_covered": 1,
+      "hotspots": [
+        {
+          "package": "github.com/TykTechnologies/tyk/internal/policy",
+          "file": "rpc.go",
+          "function": "*RPCDataLoaderMock.GetPolicies",
+          "line": 39,
+          "kind": "if",
+          "expression": "err != nil",
+          "samples": 0,
+          "missing_conditions": [
+            "err != nil"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "github.com/TykTechnologies/tyk/internal/policy:store.go:*Store.PolicyByID",
+      "package": "github.com/TykTechnologies/tyk/internal/policy",
+      "file": "store.go",
+      "function": "*Store.PolicyByID",
+      "layers": {
+        "statement_percent": 0,
+        "decision_count": 1,
+        "covered_decisions": 1,
+        "decision_percent": 100,
+        "condition_count": 1,
+        "covered_conditions": 1,
+        "condition_percent": 100,
+        "incomplete_decisions": 0,
+        "missing_condition_count": 0
+      },
+      "decision_count": 1,
+      "fully_covered": 1,
+      "partially_covered": 0
+    },
+    {
+      "id": "github.com/TykTechnologies/tyk/internal/policy:store.go:*Store.PolicyIDs",
+      "package": "github.com/TykTechnologies/tyk/internal/policy",
+      "file": "store.go",
+      "function": "*Store.PolicyIDs",
+      "layers": {
+        "statement_percent": 0,
+        "decision_count": 1,
+        "covered_decisions": 0,
+        "decision_percent": 0,
+        "condition_count": 1,
+        "covered_conditions": 0,
+        "condition_percent": 0,
+        "incomplete_decisions": 1,
+        "missing_condition_count": 1
+      },
+      "decision_count": 1,
+      "fully_covered": 0,
+      "partially_covered": 1,
+      "hotspots": [
+        {
+          "package": "github.com/TykTechnologies/tyk/internal/policy",
+          "file": "store.go",
+          "function": "*Store.PolicyIDs",
+          "line": 27,
+          "kind": "if",
+          "expression": "len(s.policies) == 0",
+          "samples": 1,
+          "missing_conditions": [
+            "len(s.policies) == 0"
+          ],
+          "example_row": "len(s.policies) == 0=F =\u003e F"
+        }
+      ]
+    },
+    {
+      "id": "github.com/TykTechnologies/tyk/internal/policy:store_map.go:*StoreMap.PolicyIDs",
+      "package": "github.com/TykTechnologies/tyk/internal/policy",
+      "file": "store_map.go",
+      "function": "*StoreMap.PolicyIDs",
+      "layers": {
+        "statement_percent": 0,
+        "decision_count": 1,
+        "covered_decisions": 0,
+        "decision_percent": 0,
+        "condition_count": 1,
+        "covered_conditions": 0,
+        "condition_percent": 0,
+        "incomplete_decisions": 1,
+        "missing_condition_count": 1
+      },
+      "decision_count": 1,
+      "fully_covered": 0,
+      "partially_covered": 1,
+      "hotspots": [
+        {
+          "package": "github.com/TykTechnologies/tyk/internal/policy",
+          "file": "store_map.go",
+          "function": "*StoreMap.PolicyIDs",
+          "line": 29,
+          "kind": "if",
+          "expression": "len(s.policies) == 0",
+          "samples": 0,
+          "missing_conditions": [
+            "len(s.policies) == 0"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "github.com/TykTechnologies/tyk/internal/policy:store_map.go:NewStoreMap",
+      "package": "github.com/TykTechnologies/tyk/internal/policy",
+      "file": "store_map.go",
+      "function": "NewStoreMap",
+      "layers": {
+        "statement_percent": 0,
+        "decision_count": 1,
+        "covered_decisions": 0,
+        "decision_percent": 0,
+        "condition_count": 1,
+        "covered_conditions": 0,
+        "condition_percent": 0,
+        "incomplete_decisions": 1,
+        "missing_condition_count": 1
+      },
+      "decision_count": 1,
+      "fully_covered": 0,
+      "partially_covered": 1,
+      "hotspots": [
+        {
+          "package": "github.com/TykTechnologies/tyk/internal/policy",
+          "file": "store_map.go",
+          "function": "NewStoreMap",
+          "line": 16,
+          "kind": "if",
+          "expression": "len(policies) == 0",
+          "samples": 1,
+          "missing_conditions": [
+            "len(policies) == 0"
+          ],
+          "example_row": "len(policies) == 0=F =\u003e F"
+        }
+      ]
+    },
+    {
+      "id": "github.com/TykTechnologies/tyk/internal/policy:util.go:MergeAllowedURLs",
+      "package": "github.com/TykTechnologies/tyk/internal/policy",
+      "file": "util.go",
+      "function": "MergeAllowedURLs",
+      "layers": {
+        "statement_percent": 0,
+        "decision_count": 2,
+        "covered_decisions": 2,
+        "decision_percent": 100,
+        "condition_count": 2,
+        "covered_conditions": 2,
+        "condition_percent": 100,
+        "incomplete_decisions": 0,
+        "missing_condition_count": 0
+      },
+      "decision_count": 2,
+      "fully_covered": 2,
+      "partially_covered": 0
+    },
+    {
+      "id": "github.com/TykTechnologies/tyk/internal/policy:util.go:appendIfMissing",
+      "package": "github.com/TykTechnologies/tyk/internal/policy",
+      "file": "util.go",
+      "function": "appendIfMissing",
+      "layers": {
+        "statement_percent": 0,
+        "decision_count": 1,
+        "covered_decisions": 1,
+        "decision_percent": 100,
+        "condition_count": 1,
+        "covered_conditions": 1,
+        "condition_percent": 100,
+        "incomplete_decisions": 0,
+        "missing_condition_count": 0
+      },
+      "decision_count": 1,
+      "fully_covered": 1,
+      "partially_covered": 0
+    },
+    {
+      "id": "github.com/TykTechnologies/tyk/internal/policy:util.go:greaterThanInt",
+      "package": "github.com/TykTechnologies/tyk/internal/policy",
+      "file": "util.go",
+      "function": "greaterThanInt",
+      "layers": {
+        "statement_percent": 0,
+        "decision_count": 2,
+        "covered_decisions": 2,
+        "decision_percent": 100,
+        "condition_count": 2,
+        "covered_conditions": 2,
+        "condition_percent": 100,
+        "incomplete_decisions": 0,
+        "missing_condition_count": 0
+      },
+      "decision_count": 2,
+      "fully_covered": 2,
+      "partially_covered": 0
+    },
+    {
+      "id": "github.com/TykTechnologies/tyk/internal/policy:util.go:greaterThanInt64",
+      "package": "github.com/TykTechnologies/tyk/internal/policy",
+      "file": "util.go",
+      "function": "greaterThanInt64",
+      "layers": {
+        "statement_percent": 0,
+        "decision_count": 2,
+        "covered_decisions": 2,
+        "decision_percent": 100,
+        "condition_count": 2,
+        "covered_conditions": 2,
+        "condition_percent": 100,
+        "incomplete_decisions": 0,
+        "missing_condition_count": 0
+      },
+      "decision_count": 2,
+      "fully_covered": 2,
+      "partially_covered": 0
+    },
+    {
+      "id": "github.com/TykTechnologies/tyk/internal/policy:util.go:intersection",
+      "package": "github.com/TykTechnologies/tyk/internal/policy",
+      "file": "util.go",
+      "function": "intersection",
+      "layers": {
+        "statement_percent": 0,
+        "decision_count": 1,
+        "covered_decisions": 0,
+        "decision_percent": 0,
+        "condition_count": 1,
+        "covered_conditions": 0,
+        "condition_percent": 0,
+        "incomplete_decisions": 1,
+        "missing_condition_count": 1
+      },
+      "decision_count": 1,
+      "fully_covered": 0,
+      "partially_covered": 1,
+      "hotspots": [
+        {
+          "package": "github.com/TykTechnologies/tyk/internal/policy",
+          "file": "util.go",
+          "function": "intersection",
+          "line": 74,
+          "kind": "if",
+          "expression": "ok",
+          "samples": 0,
+          "missing_conditions": [
+            "ok"
+          ]
+        }
+      ]
+    }
+  ]
+}

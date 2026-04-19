@@ -1,0 +1,45 @@
+id: SYS-REQ-052
+version: 1
+status: review
+priority: shall
+category: functional
+req_type: constraint
+fretish: the policy shall always satisfy !apply_requested | !policy_found | !org_matches | quota_applied
+description: 'When a policy specifies QuotaMax = -1 (unlimited), the merged quota must always be -1 regardless of other policies quota values. The -1 sentinel always wins via greaterThanInt64. SECURITY: Failing to propagate unlimited quota could cause premature quota exhaustion for users who should have unlimited access.'
+formalization_strategy: fretish
+informal_verification:
+    method: ""
+    evidence: ""
+    verified: false
+parent: ""
+component: policy
+rationale: ""
+tags: []
+variables: []
+traces:
+    satisfies:
+        - STK-REQ-001
+        - STK-REQ-005
+    documented_by_extra:
+        - README.md
+verification:
+    assurance_level: B
+    formalization_status: valid
+    review:
+        status: pending
+        reviewer: ""
+        reviewed_at: ""
+        ai_generated: false
+history:
+    created_by: human:cli
+    created_at: "2026-04-19T15:29:29Z"
+    last_modified_by: human:cli
+    last_modified_at: "2026-04-19T15:35:44Z"
+obligation_class: rate_limit_boundary
+lifecycle:
+    change_history:
+        - date: "2026-04-19T15:35:44Z"
+          from: draft
+          to: review
+          reason: Migration to assurance model complete
+          changed_by: human:cli

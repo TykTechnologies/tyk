@@ -1,0 +1,82 @@
+id: STK-REQ-005
+version: 1
+status: review
+priority: shall
+category: functional
+req_type: guarantee
+fretish: ""
+description: The policy engine shall enforce strict error reporting for all failure conditions. When an error occurs (policy not found, organization mismatch, invalid configuration), no policy fields shall be merged into the session. Error and success states are mutually exclusive.
+formalization_strategy: ""
+informal_verification:
+    method: ""
+    evidence: ""
+    verified: false
+parent: ""
+component: policy
+rationale: Partial policy application is a security risk. If an error occurs mid-apply but some fields have already been merged, the session state becomes corrupted -- potentially granting access that should have been denied. Atomic error handling ensures either full success or full failure.
+tags:
+    - error-handling
+    - security-critical
+    - atomicity
+variables: []
+traces:
+    implemented_by_extra:
+        - internal/policy/apply.go
+    documented_by_extra:
+        - README.md
+verification:
+    assurance_level: A
+    formalization_status: ""
+    review:
+        status: pending
+        reviewer: ""
+        reviewed_at: ""
+        ai_generated: true
+history:
+    created_by: ai:claude
+    created_at: "2026-04-14T10:00:00Z"
+    last_modified_by: human:cli
+    last_modified_at: "2026-04-19T15:13:33Z"
+stakeholder:
+    obligation_checklist:
+        - nominal
+        - error_handling
+        - access_denied
+        - malformed_input
+    persona: Security engineer
+    story: As a security engineer, I need the policy engine to enforce strict error atomicity so that a failed policy application never partially modifies the session, which could grant unauthorized access.
+    acceptance_criteria:
+        - id: STK-REQ-005-AC-01
+          text: Given a successful policy application, then no error is reported and all fields are merged
+          testable: true
+          derived_reqs:
+            - SYS-REQ-008
+            - SYS-REQ-033
+        - id: STK-REQ-005-AC-02
+          text: Given a policy not found error, then an error is reported and no fields are merged
+          testable: true
+          derived_reqs:
+            - SYS-REQ-010
+            - SYS-REQ-040
+        - id: STK-REQ-005-AC-03
+          text: Given an organization mismatch error, then an error is reported and no fields are merged
+          testable: true
+          derived_reqs:
+            - SYS-REQ-011
+        - id: STK-REQ-005-AC-04
+          text: Given a malformed policy (PerAPI+partition conflict), then an error is reported and no fields are merged
+          testable: true
+          derived_reqs:
+            - SYS-REQ-012
+        - id: STK-REQ-005-AC-05
+          text: At no point can both error_reported and access_rights_merged be true simultaneously
+          testable: true
+          derived_reqs:
+            - SYS-REQ-028
+lifecycle:
+    change_history:
+        - date: "2026-04-19T15:13:33Z"
+          from: draft
+          to: review
+          reason: Migration to assurance model complete
+          changed_by: human:cli

@@ -1,6 +1,6 @@
 id: SYS-REQ-027
 version: 1
-status: draft
+status: review
 priority: shall
 category: functional
 req_type: guarantee
@@ -13,11 +13,13 @@ informal_verification:
     verified: false
 parent: ""
 component: policy
-rationale: ""
+rationale: 'Idle state: When no operation is active (no apply, clear, rate limit, or endpoint operation requested), all outputs must be false. This prevents the component from producing spurious outputs when idle'
 tags: []
 variables: []
 traces:
-    verified_by:
+    satisfies:
+        - STK-REQ-006
+    verified_by_extra:
         - FLIP:policy/tc-045
         - FLIP:policy/tc-046
         - FLIP:policy/tc-047
@@ -32,12 +34,11 @@ traces:
         - FLIP:policy/tc-056
         - FLIP:policy/tc-057
         - FLIP:policy/tc-058
+    documented_by_extra:
+        - README.md
 verification:
-    assurance_level: C
+    assurance_level: B
     formalization_status: valid
-    realizability: realizable
-    consistency_checked: true
-    vacuity_checked: true
     review:
         status: pending
         reviewer: ""
@@ -46,16 +47,13 @@ verification:
 history:
     created_by: human:cli
     created_at: "2026-03-28T13:29:03Z"
-    last_modified_by: auto:flip-fixtures
-    last_modified_at: "2026-03-28T17:22:42Z"
-_computed:
-    formalization:
-        CoCoSpecCode: (H(not not apply_requested or not not clear_requested or not not rate_limit_apply_requested or not not endpoint_limit_apply_requested or (not session_cleared and not access_rights_merged and not rate_limit_applied and not quota_applied and not tags_merged and not metadata_merged and not error_reported and not session_inactive_set and not endpoints_merged and not complexity_applied and not result_returned)))
-        description: 'SCOPE: in the interval defined by the entire execution.<br>TRIGGER: first point in the interval.<br>REQUIRED BEHAVIOR: for every trigger, not not apply_requested or not not clear_requested or not not rate_limit_apply_requested or not not endpoint_limit_apply_requested or (not session_cleared and not access_rights_merged and not rate_limit_applied and not quota_applied and not tags_merged and not metadata_merged and not error_reported and not session_inactive_set and not endpoints_merged and not complexity_applied and not result_returned) must hold at all time points between (and including) the trigger and the end of the interval.'
-        ft: (LAST V not not apply_requested or not not clear_requested or not not rate_limit_apply_requested or not not endpoint_limit_apply_requested or (not session_cleared and not access_rights_merged and not rate_limit_applied and not quota_applied and not tags_merged and not metadata_merged and not error_reported and not session_inactive_set and not endpoints_merged and not complexity_applied and not result_returned))
-        ftExpanded: (LAST V not not apply_requested or not not clear_requested or not not rate_limit_apply_requested or not not endpoint_limit_apply_requested or (not session_cleared and not access_rights_merged and not rate_limit_applied and not quota_applied and not tags_merged and not metadata_merged and not error_reported and not session_inactive_set and not endpoints_merged and not complexity_applied and not result_returned))
-        pt: (H not not apply_requested or not not clear_requested or not not rate_limit_apply_requested or not not endpoint_limit_apply_requested or (not session_cleared and not access_rights_merged and not rate_limit_applied and not quota_applied and not tags_merged and not metadata_merged and not error_reported and not session_inactive_set and not endpoints_merged and not complexity_applied and not result_returned))
-        ptExpanded: (H not not apply_requested or not not clear_requested or not not rate_limit_apply_requested or not not endpoint_limit_apply_requested or (not session_cleared and not access_rights_merged and not rate_limit_applied and not quota_applied and not tags_merged and not metadata_merged and not error_reported and not session_inactive_set and not endpoints_merged and not complexity_applied and not result_returned))
-    parse_status: valid
-    last_compiled: "2026-03-28T18:03:09Z"
-    file_hash: sha256:7b1531666f08b095ce147dd081b554a9d04694c65ce09a59658c3326d4514eb0
+    last_modified_by: human:cli
+    last_modified_at: "2026-04-19T15:13:34Z"
+obligation_class: nominal
+lifecycle:
+    change_history:
+        - date: "2026-04-19T15:13:34Z"
+          from: draft
+          to: review
+          reason: Migration to assurance model complete
+          changed_by: human:cli
