@@ -369,3 +369,28 @@ func TestValidateDriver(t *testing.T) {
 	supportedDrivers = originalSupportedDrivers
 	loadedDrivers = originalLoadedDrivers
 }
+
+func TestBuildObject_NilRequest(t *testing.T) {
+	c := &CoProcessor{Middleware: &CoProcessMiddleware{BaseMiddleware: &BaseMiddleware{Spec: &APISpec{APIDefinition: &apidef.APIDefinition{}}, Gw: &Gateway{}}},  }
+	obj, err := c.BuildObject(nil, nil, nil)
+	assert.Nil(t, obj)
+	assert.EqualError(t, err, "request is nil")
+}
+
+func TestBuildObject_EmptyHeaders(t *testing.T) {
+	c := &CoProcessor{Middleware: &CoProcessMiddleware{BaseMiddleware: &BaseMiddleware{Spec: &APISpec{APIDefinition: &apidef.APIDefinition{}}, Gw: &Gateway{}}},  }
+	req, _ := http.NewRequest("GET", "http://example.com", nil)
+	req.Header = nil
+	obj, err := c.BuildObject(req, nil, &APISpec{APIDefinition: &apidef.APIDefinition{}})
+	assert.NotNil(t, obj)
+	assert.NoError(t, err)
+}
+
+func TestBuildObject_NilResponseBody(t *testing.T) {
+	c := &CoProcessor{Middleware: &CoProcessMiddleware{BaseMiddleware: &BaseMiddleware{Spec: &APISpec{APIDefinition: &apidef.APIDefinition{}}}}}
+	req, _ := http.NewRequest("GET", "http://example.com", nil)
+	res := &http.Response{StatusCode: 200, Header: make(http.Header)}
+	obj, err := c.BuildObject(req, res, &APISpec{APIDefinition: &apidef.APIDefinition{}})
+	assert.NotNil(t, obj)
+	assert.NoError(t, err)
+}

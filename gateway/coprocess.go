@@ -73,6 +73,9 @@ type CoProcessor struct {
 
 // BuildObject constructs a CoProcessObject from a given http.Request.
 func (c *CoProcessor) BuildObject(req *http.Request, res *http.Response, spec *APISpec) (*coprocess.Object, error) {
+	if req == nil {
+		return nil, errors.New("request is nil")
+	}
 	headers := ProtoMap(req.Header)
 
 	host := req.Host
@@ -80,21 +83,25 @@ func (c *CoProcessor) BuildObject(req *http.Request, res *http.Response, spec *A
 		host = req.URL.Host
 	}
 	if host != "" {
+		if headers == nil {
+			headers = make(map[string]string)
+		}
 		headers["Host"] = host
 	}
 	scheme := "http"
 	if req.TLS != nil {
 		scheme = "https"
 	}
+	var urlStr string
+	var params map[string]string
+	if req.URL != nil {
+		urlStr = req.URL.String()
+		params = ProtoMap(req.URL.Query())
+	}
 	miniRequestObject := &coprocess.MiniRequestObject{
-		Headers:        headers,
-		SetHeaders:     map[string]string{},
-		DeleteHeaders:  []string{},
-		Url:            req.URL.String(),
-		Params:         ProtoMap(req.URL.Query()),
-		AddParams:      map[string]string{},
-		ExtendedParams: ProtoMap(nil),
-		DeleteParams:   []string{},
+		Headers: headers,
+		Url:     urlStr,
+		Params:  params,
 		ReturnOverrides: &coprocess.ReturnOverrides{
 			ResponseCode: -1,
 		},
@@ -120,8 +127,6 @@ func (c *CoProcessor) BuildObject(req *http.Request, res *http.Response, spec *A
 		HookName: c.Middleware.HookName,
 		HookType: c.Middleware.HookType,
 	}
-
-	object.Spec = make(map[string]string)
 
 	// Append spec data:
 	if c.Middleware != nil {
@@ -158,11 +163,11 @@ func (c *CoProcessor) BuildObject(req *http.Request, res *http.Response, spec *A
 			object.Metadata = object.Session.Metadata
 		}
 	}
-
 	// Append response data if it's available:
 	if res != nil {
 		resObj := &coprocess.ResponseObject{
-			Headers: make(map[string]string, len(res.Header)),
+			Headers:           make(map[string]string, len(res.Header)),
+			MultivalueHeaders: make([]*coprocess.Header, 0, len(res.Header)),
 		}
 		for k, v := range res.Header {
 			// set univalue header
@@ -176,9 +181,13 @@ func (c *CoProcessor) BuildObject(req *http.Request, res *http.Response, spec *A
 			resObj.MultivalueHeaders = append(resObj.MultivalueHeaders, &currentHeader)
 		}
 		resObj.StatusCode = int32(res.StatusCode)
-		rawBody, err := ioutil.ReadAll(res.Body)
-		if err != nil {
-			return nil, err
+		var rawBody []byte
+		if res.Body != nil {
+			var err error
+			rawBody, err = ioutil.ReadAll(res.Body)
+			if err != nil {
+				return nil, err
+			}
 		}
 		resObj.RawBody = rawBody
 		res.Body = ioutil.NopCloser(bytes.NewReader(rawBody))
