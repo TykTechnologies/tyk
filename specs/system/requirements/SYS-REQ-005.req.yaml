@@ -1,6 +1,6 @@
 id: SYS-REQ-005
 version: 1
-status: draft
+status: review
 priority: shall
 category: functional
 req_type: assumption
@@ -13,7 +13,7 @@ informal_verification:
     verified: false
 parent: ""
 component: policy
-rationale: ""
+rationale: Apply and ApplyRateLimits are not called simultaneously. ApplyRateLimits is called internally during Apply.
 tags: []
 variables: []
 references:
@@ -24,13 +24,14 @@ references:
     - type: meeting
       id: ARCH-REVIEW-2026-03-15
       description: Architecture review decision on Apply/ApplyRateLimits sequencing
-traces: {}
+traces:
+    satisfies:
+        - STK-REQ-006
+    documented_by_extra:
+        - README.md
 verification:
-    assurance_level: C
+    assurance_level: B
     formalization_status: valid
-    realizability: realizable
-    consistency_checked: true
-    vacuity_checked: true
     review:
         status: pending
         reviewer: ""
@@ -40,15 +41,12 @@ history:
     created_by: human:cli
     created_at: "2026-03-28T13:28:05Z"
     last_modified_by: human:cli
-    last_modified_at: "2026-03-28T13:28:05Z"
-_computed:
-    formalization:
-        CoCoSpecCode: (H(not (apply_requested and rate_limit_apply_requested)))
-        description: 'SCOPE: in the interval defined by the entire execution.<br>TRIGGER: first point in the interval.<br>REQUIRED BEHAVIOR: for every trigger, not (apply_requested and rate_limit_apply_requested) must hold at all time points between (and including) the trigger and the end of the interval.'
-        ft: (LAST V not (apply_requested and rate_limit_apply_requested))
-        ftExpanded: (LAST V not (apply_requested and rate_limit_apply_requested))
-        pt: (H not (apply_requested and rate_limit_apply_requested))
-        ptExpanded: (H not (apply_requested and rate_limit_apply_requested))
-    parse_status: valid
-    last_compiled: "2026-03-28T18:03:09Z"
-    file_hash: sha256:20d213477a9f1bfbbac5e3feb0988adfe500baea6da22cf68ce003bece1bb187
+    last_modified_at: "2026-04-19T15:13:33Z"
+obligation_class: nominal
+lifecycle:
+    change_history:
+        - date: "2026-04-19T15:13:33Z"
+          from: draft
+          to: review
+          reason: Migration to assurance model complete
+          changed_by: human:cli

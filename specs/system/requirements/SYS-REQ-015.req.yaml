@@ -1,6 +1,6 @@
 id: SYS-REQ-015
 version: 1
-status: draft
+status: review
 priority: shall
 category: functional
 req_type: guarantee
@@ -13,21 +13,23 @@ informal_verification:
     verified: false
 parent: ""
 component: policy
-rationale: ""
+rationale: 'When Apply processes a valid per-API policy (found, org matches, per-API mode), rate limits must be applied. Reads as: if apply requested AND policy found AND org matches AND is per-API, then rate lim'
 tags: []
 variables: []
 traces:
-    verified_by:
+    satisfies:
+        - STK-REQ-001
+        - STK-REQ-003
+    verified_by_extra:
         - FLIP:policy/tc-020
         - FLIP:policy/tc-021
         - FLIP:policy/tc-022
         - FLIP:policy/tc-023
+    documented_by_extra:
+        - README.md
 verification:
-    assurance_level: C
+    assurance_level: A
     formalization_status: valid
-    realizability: realizable
-    consistency_checked: true
-    vacuity_checked: true
     review:
         status: pending
         reviewer: ""
@@ -37,15 +39,12 @@ history:
     created_by: human:cli
     created_at: "2026-03-28T13:28:42Z"
     last_modified_by: human:cli
-    last_modified_at: "2026-03-28T17:44:19Z"
-_computed:
-    formalization:
-        CoCoSpecCode: (H(not apply_requested or not policy_found or not org_matches or not is_per_api or rate_limit_applied))
-        description: 'SCOPE: in the interval defined by the entire execution.<br>TRIGGER: first point in the interval.<br>REQUIRED BEHAVIOR: for every trigger, not apply_requested or not policy_found or not org_matches or not is_per_api or rate_limit_applied must hold at all time points between (and including) the trigger and the end of the interval.'
-        ft: (LAST V not apply_requested or not policy_found or not org_matches or not is_per_api or rate_limit_applied)
-        ftExpanded: (LAST V not apply_requested or not policy_found or not org_matches or not is_per_api or rate_limit_applied)
-        pt: (H not apply_requested or not policy_found or not org_matches or not is_per_api or rate_limit_applied)
-        ptExpanded: (H not apply_requested or not policy_found or not org_matches or not is_per_api or rate_limit_applied)
-    parse_status: valid
-    last_compiled: "2026-03-28T18:03:09Z"
-    file_hash: sha256:47c4a36281c55e4828886be48353a64476562ecc9004d100d0086d378b5d19fa
+    last_modified_at: "2026-04-19T15:13:34Z"
+obligation_class: nominal
+lifecycle:
+    change_history:
+        - date: "2026-04-19T15:13:34Z"
+          from: draft
+          to: review
+          reason: Migration to assurance model complete
+          changed_by: human:cli

@@ -1,6 +1,6 @@
 id: SYS-REQ-004
 version: 1
-status: draft
+status: review
 priority: shall
 category: functional
 req_type: assumption
@@ -13,16 +13,17 @@ informal_verification:
     verified: false
 parent: ""
 component: policy
-rationale: ""
+rationale: Apply and ClearSession are never called simultaneously. They are sequential operations on the same session.
 tags: []
 variables: []
-traces: {}
+traces:
+    satisfies:
+        - STK-REQ-006
+    documented_by_extra:
+        - README.md
 verification:
-    assurance_level: C
+    assurance_level: B
     formalization_status: valid
-    realizability: realizable
-    consistency_checked: true
-    vacuity_checked: true
     review:
         status: pending
         reviewer: ""
@@ -32,15 +33,12 @@ history:
     created_by: human:cli
     created_at: "2026-03-28T13:28:05Z"
     last_modified_by: human:cli
-    last_modified_at: "2026-03-28T13:28:05Z"
-_computed:
-    formalization:
-        CoCoSpecCode: (H(not (apply_requested and clear_requested)))
-        description: 'SCOPE: in the interval defined by the entire execution.<br>TRIGGER: first point in the interval.<br>REQUIRED BEHAVIOR: for every trigger, not (apply_requested and clear_requested) must hold at all time points between (and including) the trigger and the end of the interval.'
-        ft: (LAST V not (apply_requested and clear_requested))
-        ftExpanded: (LAST V not (apply_requested and clear_requested))
-        pt: (H not (apply_requested and clear_requested))
-        ptExpanded: (H not (apply_requested and clear_requested))
-    parse_status: valid
-    last_compiled: "2026-03-28T18:03:09Z"
-    file_hash: sha256:fb7f8ad1db5bdab5564a374e6759c70f8174d7d03310e424c9134b54031a464c
+    last_modified_at: "2026-04-19T15:13:33Z"
+obligation_class: nominal
+lifecycle:
+    change_history:
+        - date: "2026-04-19T15:13:33Z"
+          from: draft
+          to: review
+          reason: Migration to assurance model complete
+          changed_by: human:cli

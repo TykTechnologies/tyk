@@ -1,6 +1,6 @@
 id: SYS-REQ-048
 version: 1
-status: draft
+status: review
 priority: shall
 category: functional
 req_type: assumption
@@ -13,16 +13,17 @@ informal_verification:
     verified: false
 parent: ""
 component: policy
-rationale: ""
+rationale: 'Assumption: if all policies are missing, then no individual policy is found.'
 tags: []
 variables: []
-traces: {}
+traces:
+    satisfies:
+        - STK-REQ-001
+    documented_by_extra:
+        - README.md
 verification:
-    assurance_level: E
+    assurance_level: B
     formalization_status: valid
-    realizability: realizable
-    consistency_checked: true
-    vacuity_checked: true
     review:
         status: pending
         reviewer: ""
@@ -32,15 +33,12 @@ history:
     created_by: human:cli
     created_at: "2026-03-28T17:49:42Z"
     last_modified_by: human:cli
-    last_modified_at: "2026-03-28T17:49:42Z"
-_computed:
-    formalization:
-        CoCoSpecCode: (H(not policies_all_missing or not policy_found))
-        description: 'SCOPE: in the interval defined by the entire execution.<br>TRIGGER: first point in the interval.<br>REQUIRED BEHAVIOR: for every trigger, not policies_all_missing or not policy_found must hold at all time points between (and including) the trigger and the end of the interval.'
-        ft: (LAST V not policies_all_missing or not policy_found)
-        ftExpanded: (LAST V not policies_all_missing or not policy_found)
-        pt: (H not policies_all_missing or not policy_found)
-        ptExpanded: (H not policies_all_missing or not policy_found)
-    parse_status: valid
-    last_compiled: "2026-03-28T18:03:09Z"
-    file_hash: sha256:31017f30e583f1595e29b6b8470593882bd66bf818fefab6472fae885d65b704
+    last_modified_at: "2026-04-19T15:13:35Z"
+obligation_class: boundary
+lifecycle:
+    change_history:
+        - date: "2026-04-19T15:13:35Z"
+          from: draft
+          to: review
+          reason: Migration to assurance model complete
+          changed_by: human:cli

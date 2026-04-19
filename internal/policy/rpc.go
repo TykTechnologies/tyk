@@ -1,3 +1,4 @@
+// SYS-REQ-008: RPC data loader mock for policy integration tests
 package policy
 
 import (

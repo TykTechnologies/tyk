@@ -10,6 +10,7 @@ import (
 	"github.com/TykTechnologies/tyk/user"
 )
 
+// Verifies: SYS-REQ-013 [example]
 func TestMergeAllowedURLs(t *testing.T) {
 	svc := policy.New(nil, nil, logrus.New())
 

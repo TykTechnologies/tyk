@@ -22,6 +22,7 @@ type Z3Fixture struct {
 	Expected map[string]interface{}   `json:"expected"`
 }
 
+// Verifies: SYS-REQ-021, SYS-REQ-022
 func loadZ3Fixtures(t *testing.T, property string) []Z3Fixture {
 	t.Helper()
 	root := filepath.Join("..", "..", "tests", "policy", "z3-fixtures")
@@ -52,6 +53,7 @@ func loadZ3Fixtures(t *testing.T, property string) []Z3Fixture {
 	return fixtures
 }
 
+// Verifies: SYS-REQ-021, SYS-REQ-022
 func loadAllZ3Fixtures(t *testing.T) []Z3Fixture {
 	t.Helper()
 	root := filepath.Join("..", "..", "tests", "policy", "z3-fixtures")
@@ -74,6 +76,7 @@ func loadAllZ3Fixtures(t *testing.T) []Z3Fixture {
 	return fixtures
 }
 
+// Verifies: SYS-REQ-021
 // z3NumericValue extracts a numeric value from a Z3 fixture input map.
 // The key is the property name (e.g. "quota_applied", "complexity_applied").
 func z3NumericValue(m map[string]interface{}, property string) float64 {
@@ -84,6 +87,7 @@ func z3NumericValue(m map[string]interface{}, property string) float64 {
 	return v.(float64)
 }
 
+// Verifies: SYS-REQ-016
 // z3StringSlice extracts a string slice from a Z3 fixture input map.
 func z3StringSlice(m map[string]interface{}, property string) []string {
 	v, ok := m[property]
@@ -101,6 +105,7 @@ func z3StringSlice(m map[string]interface{}, property string) []string {
 	return result
 }
 
+// Verifies: SYS-REQ-017
 // z3StringMap extracts a string->string map from a Z3 fixture input map.
 func z3StringMap(m map[string]interface{}, property string) map[string]interface{} {
 	v, ok := m[property]
@@ -232,7 +237,7 @@ var z3PropertyMappings = map[string]z3PropertyMapping{
 	},
 }
 
-// Verifies: SYS-REQ-021, SYS-REQ-022, SYS-REQ-033, SYS-REQ-016, SYS-REQ-017
+// Verifies: STK-REQ-001, SYS-REQ-021, SYS-REQ-022, SYS-REQ-033, SYS-REQ-016, SYS-REQ-017 [boundary]
 func TestZ3_AllProperties(t *testing.T) {
 	allFixtures := loadAllZ3Fixtures(t)
 
@@ -295,7 +300,7 @@ func TestZ3_AllProperties(t *testing.T) {
 	}
 }
 
-// Verifies: SYS-REQ-022
+// Verifies: SYS-REQ-022 [boundary]
 func TestZ3_QuotaBoundary_ZeroVsNegative(t *testing.T) {
 	orgID := "org1"
 	pol1 := user.Policy{
@@ -335,7 +340,7 @@ func TestZ3_QuotaBoundary_ZeroVsNegative(t *testing.T) {
 		"Tyk treats -1 as unlimited (always wins), not as literal -1 < 0")
 }
 
-// Verifies: SYS-REQ-033
+// Verifies: SYS-REQ-033 [boundary]
 func TestZ3_ComplexityBoundary_ZeroVsNegative(t *testing.T) {
 	orgID := "org1"
 	pol1 := user.Policy{
@@ -373,7 +378,7 @@ func TestZ3_ComplexityBoundary_ZeroVsNegative(t *testing.T) {
 		"Tyk treats -1 as unlimited (always wins) for MaxQueryDepth")
 }
 
-// Verifies: SYS-REQ-022
+// Verifies: SYS-REQ-022 [boundary]
 func TestZ3_QuotaBoundary_NegativeVsNegative(t *testing.T) {
 	orgID := "org1"
 	pol1 := user.Policy{

@@ -1,0 +1,61 @@
+id: STK-REQ-007
+version: 1
+status: review
+priority: shall
+category: non-functional
+req_type: guarantee
+fretish: ""
+description: The policy engine shall complete Apply() within 100ms for sessions referencing up to 50 policies. Policy application is in the hot path of every API request; excessive latency degrades gateway throughput.
+formalization_strategy: ""
+informal_verification:
+    method: ""
+    evidence: ""
+    verified: false
+parent: ""
+component: policy
+rationale: The policy engine runs on every API request. Gateway SLAs require sub-100ms policy resolution. Performance regression in policy application directly impacts API response times and customer-facing SLAs.
+tags:
+    - performance
+    - sla
+variables: []
+traces:
+    implemented_by_extra:
+        - internal/policy/apply.go
+    documented_by_extra:
+        - README.md
+verification:
+    assurance_level: A
+    formalization_status: ""
+    review:
+        status: pending
+        reviewer: ""
+        reviewed_at: ""
+        ai_generated: true
+history:
+    created_by: ai:claude
+    created_at: "2026-04-14T10:00:00Z"
+    last_modified_by: human:cli
+    last_modified_at: "2026-04-19T15:13:33Z"
+stakeholder:
+    obligation_checklist:
+        - nominal
+    persona: Platform reliability engineer
+    story: As a platform reliability engineer, I need the policy engine to complete Apply() within 100ms for up to 50 policies so that API gateway latency SLAs are maintained.
+    acceptance_criteria:
+        - id: STK-REQ-007-AC-01
+          text: Given a session with 1-10 policies, when Apply is called, then it completes within 100ms
+          testable: true
+          derived_reqs:
+            - SYS-REQ-044
+        - id: STK-REQ-007-AC-02
+          text: Given a session with 50 policies, when Apply is called, then it completes within 100ms
+          testable: true
+          derived_reqs:
+            - SYS-REQ-044
+lifecycle:
+    change_history:
+        - date: "2026-04-19T15:13:33Z"
+          from: draft
+          to: review
+          reason: Migration to assurance model complete
+          changed_by: human:cli

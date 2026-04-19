@@ -1,0 +1,48 @@
+name: ReqProof Audit
+on:
+  push:
+    branches: [main, experiment/formal-requirements-policy]
+  pull_request:
+    paths:
+      - 'internal/policy/**'
+      - 'specs/**'
+      - 'proof.yaml'
+
+jobs:
+  audit:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.21'
+
+      - name: Install Z3 solver
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq z3
+
+      - name: Cache ReqProof solvers
+        uses: actions/cache@v4
+        with:
+          path: ~/.proof/solvers
+          key: proof-solvers-${{ runner.os }}
+
+      - name: Cache ReqProof index
+        uses: actions/cache@v4
+        with:
+          path: |
+            .proof/index.db
+            .proof/index.db-shm
+            .proof/index.db-wal
+          key: proof-index-${{ runner.os }}-${{ hashFiles('specs/**/*.req.yaml') }}
+          restore-keys: |
+            proof-index-${{ runner.os }}-
+
+      - uses: probelabs/proof-action@v1
+        with:
+          fail-level: warn
+          scope: full
+          format: markdown
