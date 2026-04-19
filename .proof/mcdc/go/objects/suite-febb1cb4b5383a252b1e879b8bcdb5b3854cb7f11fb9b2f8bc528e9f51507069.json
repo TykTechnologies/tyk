@@ -1,24 +1,24 @@
 {
-  "generated_at": "2026-04-19T19:27:47.788697Z",
+  "generated_at": "2026-04-19T19:58:44.901683Z",
   "suite": {
     "engine": "go",
     "pattern": "./internal/policy/...",
     "coverage": {
-      "percent": 88.15261044176707,
-      "function_text": "total:\t(statements)\t88.2%\n"
+      "percent": 99.79654120040692,
+      "function_text": "total:\t(statements)\t99.8%\n"
     },
     "timings": [
       {
         "stage": "resolve",
-        "duration_millis": 221
+        "duration_millis": 192
       },
       {
         "stage": "workspace_prepare",
-        "duration_millis": 27
+        "duration_millis": 17
       },
       {
         "stage": "workspace_materialize",
-        "duration_millis": 4641
+        "duration_millis": 4077
       },
       {
         "stage": "workspace_map",
@@ -30,11 +30,11 @@
       },
       {
         "stage": "test",
-        "duration_millis": 1458
+        "duration_millis": 1451
       },
       {
         "stage": "coverage",
-        "duration_millis": 267
+        "duration_millis": 212
       },
       {
         "stage": "trace",
@@ -46,49 +46,21 @@
       }
     ],
     "layers": {
-      "statement_percent": 88.15261044176707,
-      "decision_count": 103,
-      "covered_decisions": 74,
-      "decision_percent": 71.84466019417475,
-      "condition_count": 127,
-      "covered_conditions": 96,
-      "condition_percent": 75.59055118110236,
-      "incomplete_decisions": 29,
-      "missing_condition_count": 31
+      "statement_percent": 99.79654120040692,
+      "decision_count": 102,
+      "covered_decisions": 91,
+      "decision_percent": 89.2156862745098,
+      "condition_count": 126,
+      "covered_conditions": 115,
+      "condition_percent": 91.26984126984127,
+      "incomplete_decisions": 11,
+      "missing_condition_count": 11
     },
     "package_count": 1,
-    "decision_count": 103,
-    "fully_covered": 74,
-    "partially_covered": 29,
+    "decision_count": 102,
+    "fully_covered": 91,
+    "partially_covered": 11,
     "hotspots": [
-      {
-        "package": "github.com/TykTechnologies/tyk/internal/policy",
-        "file": "apply.go",
-        "function": "*Service.applyPerAPI",
-        "line": 337,
-        "kind": "if",
-        "expression": "ok \u0026\u0026 !r.Limit.IsEmpty()",
-        "samples": 1,
-        "missing_conditions": [
-          "ok",
-          "!r.Limit.IsEmpty()"
-        ],
-        "example_row": "ok=F, [!r.Limit.IsEmpty()=- skipped] =\u003e F"
-      },
-      {
-        "package": "github.com/TykTechnologies/tyk/internal/policy",
-        "file": "apply.go",
-        "function": "*Service.applyPartitions",
-        "line": 545,
-        "kind": "if",
-        "expression": "ok \u0026\u0026 !r.Limit.IsEmpty()",
-        "samples": 1,
-        "missing_conditions": [
-          "ok",
-          "!r.Limit.IsEmpty()"
-        ],
-        "example_row": "ok=F, [!r.Limit.IsEmpty()=- skipped] =\u003e F"
-      },
       {
         "package": "github.com/TykTechnologies/tyk/internal/policy",
         "file": "apply.go",
@@ -105,28 +77,54 @@
       {
         "package": "github.com/TykTechnologies/tyk/internal/policy",
         "file": "apply.go",
-        "function": "*Service.Apply",
-        "line": 199,
+        "function": "*Service.updateSessionRootVars",
+        "line": 589,
         "kind": "if",
-        "expression": "!accessRight.Limit.IsEmpty()",
+        "expression": "len(applyState.didRateLimit) == 1",
         "samples": 1,
         "missing_conditions": [
-          "accessRight.Limit.IsEmpty()"
+          "len(applyState.didRateLimit) == 1"
         ],
-        "example_row": "accessRight.Limit.IsEmpty()=F =\u003e T"
+        "example_row": "len(applyState.didRateLimit) == 1=T =\u003e T"
+      },
+      {
+        "package": "github.com/TykTechnologies/tyk/internal/policy",
+        "file": "apply.go",
+        "function": "*Service.updateSessionRootVars",
+        "line": 595,
+        "kind": "if",
+        "expression": "len(applyState.didQuota) == 1",
+        "samples": 1,
+        "missing_conditions": [
+          "len(applyState.didQuota) == 1"
+        ],
+        "example_row": "len(applyState.didQuota) == 1=T =\u003e T"
+      },
+      {
+        "package": "github.com/TykTechnologies/tyk/internal/policy",
+        "file": "apply.go",
+        "function": "*Service.updateSessionRootVars",
+        "line": 601,
+        "kind": "if",
+        "expression": "len(applyState.didComplexity) == 1",
+        "samples": 1,
+        "missing_conditions": [
+          "len(applyState.didComplexity) == 1"
+        ],
+        "example_row": "len(applyState.didComplexity) == 1=T =\u003e T"
       },
       {
         "package": "github.com/TykTechnologies/tyk/internal/policy",
         "file": "apply.go",
         "function": "*Service.applyPartitions",
-        "line": 428,
+        "line": 397,
         "kind": "if",
-        "expression": "!typeFound",
+        "expression": "ok",
         "samples": 1,
         "missing_conditions": [
-          "typeFound"
+          "ok"
         ],
-        "example_row": "typeFound=T =\u003e F"
+        "example_row": "ok=T =\u003e T"
       }
     ],
     "packages": [
@@ -134,20 +132,20 @@
         "engine": "go",
         "package": "github.com/TykTechnologies/tyk/internal/policy",
         "coverage": {
-          "percent": 88.15261044176707
+          "percent": 99.79654120040692
         },
         "timings": [
           {
             "stage": "resolve",
-            "duration_millis": 221
+            "duration_millis": 192
           },
           {
             "stage": "workspace_prepare",
-            "duration_millis": 27
+            "duration_millis": 17
           },
           {
             "stage": "workspace_materialize",
-            "duration_millis": 4641
+            "duration_millis": 4077
           },
           {
             "stage": "workspace_map",
@@ -159,11 +157,11 @@
           },
           {
             "stage": "test",
-            "duration_millis": 1458
+            "duration_millis": 1451
           },
           {
             "stage": "coverage",
-            "duration_millis": 267
+            "duration_millis": 212
           },
           {
             "stage": "trace",
@@ -175,48 +173,20 @@
           }
         ],
         "layers": {
-          "statement_percent": 88.15261044176707,
-          "decision_count": 103,
-          "covered_decisions": 74,
-          "decision_percent": 71.84466019417475,
-          "condition_count": 127,
-          "covered_conditions": 96,
-          "condition_percent": 75.59055118110236,
-          "incomplete_decisions": 29,
-          "missing_condition_count": 31
+          "statement_percent": 99.79654120040692,
+          "decision_count": 102,
+          "covered_decisions": 91,
+          "decision_percent": 89.2156862745098,
+          "condition_count": 126,
+          "covered_conditions": 115,
+          "condition_percent": 91.26984126984127,
+          "incomplete_decisions": 11,
+          "missing_condition_count": 11
         },
-        "decision_count": 103,
-        "fully_covered": 74,
-        "partially_covered": 29,
+        "decision_count": 102,
+        "fully_covered": 91,
+        "partially_covered": 11,
         "hotspots": [
-          {
-            "package": "github.com/TykTechnologies/tyk/internal/policy",
-            "file": "apply.go",
-            "function": "*Service.applyPerAPI",
-            "line": 337,
-            "kind": "if",
-            "expression": "ok \u0026\u0026 !r.Limit.IsEmpty()",
-            "samples": 1,
-            "missing_conditions": [
-              "ok",
-              "!r.Limit.IsEmpty()"
-            ],
-            "example_row": "ok=F, [!r.Limit.IsEmpty()=- skipped] =\u003e F"
-          },
-          {
-            "package": "github.com/TykTechnologies/tyk/internal/policy",
-            "file": "apply.go",
-            "function": "*Service.applyPartitions",
-            "line": 545,
-            "kind": "if",
-            "expression": "ok \u0026\u0026 !r.Limit.IsEmpty()",
-            "samples": 1,
-            "missing_conditions": [
-              "ok",
-              "!r.Limit.IsEmpty()"
-            ],
-            "example_row": "ok=F, [!r.Limit.IsEmpty()=- skipped] =\u003e F"
-          },
           {
             "package": "github.com/TykTechnologies/tyk/internal/policy",
             "file": "apply.go",
@@ -233,28 +203,54 @@
           {
             "package": "github.com/TykTechnologies/tyk/internal/policy",
             "file": "apply.go",
-            "function": "*Service.Apply",
-            "line": 199,
+            "function": "*Service.updateSessionRootVars",
+            "line": 589,
             "kind": "if",
-            "expression": "!accessRight.Limit.IsEmpty()",
+            "expression": "len(applyState.didRateLimit) == 1",
             "samples": 1,
             "missing_conditions": [
-              "accessRight.Limit.IsEmpty()"
+              "len(applyState.didRateLimit) == 1"
             ],
-            "example_row": "accessRight.Limit.IsEmpty()=F =\u003e T"
+            "example_row": "len(applyState.didRateLimit) == 1=T =\u003e T"
+          },
+          {
+            "package": "github.com/TykTechnologies/tyk/internal/policy",
+            "file": "apply.go",
+            "function": "*Service.updateSessionRootVars",
+            "line": 595,
+            "kind": "if",
+            "expression": "len(applyState.didQuota) == 1",
+            "samples": 1,
+            "missing_conditions": [
+              "len(applyState.didQuota) == 1"
+            ],
+            "example_row": "len(applyState.didQuota) == 1=T =\u003e T"
+          },
+          {
+            "package": "github.com/TykTechnologies/tyk/internal/policy",
+            "file": "apply.go",
+            "function": "*Service.updateSessionRootVars",
+            "line": 601,
+            "kind": "if",
+            "expression": "len(applyState.didComplexity) == 1",
+            "samples": 1,
+            "missing_conditions": [
+              "len(applyState.didComplexity) == 1"
+            ],
+            "example_row": "len(applyState.didComplexity) == 1=T =\u003e T"
           },
           {
             "package": "github.com/TykTechnologies/tyk/internal/policy",
             "file": "apply.go",
             "function": "*Service.applyPartitions",
-            "line": 428,
+            "line": 397,
             "kind": "if",
-            "expression": "!typeFound",
+            "expression": "ok",
             "samples": 1,
             "missing_conditions": [
-              "typeFound"
+              "ok"
             ],
-            "example_row": "typeFound=T =\u003e F"
+            "example_row": "ok=T =\u003e T"
           }
         ],
         "decisions": [
@@ -1430,26 +1426,37 @@
             "line": 199,
             "kind": "if",
             "expression": "!accessRight.Limit.IsEmpty()",
-            "samples": 1,
-            "fully_covered": false,
-            "gap_example": "accessRight.Limit.IsEmpty()=F =\u003e T",
+            "samples": 2,
+            "fully_covered": true,
             "conditions": [
               {
                 "id": 0,
                 "expression": "accessRight.Limit.IsEmpty()",
-                "covered": false,
-                "evaluated_count": 1,
+                "covered": true,
+                "evaluated_count": 2,
                 "skipped_count": 0,
                 "pair": {
                   "left_sample": 0,
-                  "right_sample": 0
+                  "right_sample": 1
                 },
-                "has_pair": false
+                "has_pair": true
               }
             ],
             "sample_executions": [
               {
                 "index": 0,
+                "occurrences": 1,
+                "result": false,
+                "conditions": [
+                  {
+                    "cond_id": 0,
+                    "value": true,
+                    "evaluated": true
+                  }
+                ]
+              },
+              {
+                "index": 1,
                 "occurrences": 1,
                 "result": true,
                 "conditions": [
@@ -2324,33 +2331,32 @@
             "line": 337,
             "kind": "if",
             "expression": "ok \u0026\u0026 !r.Limit.IsEmpty()",
-            "samples": 1,
-            "fully_covered": false,
-            "gap_example": "ok=F, [!r.Limit.IsEmpty()=- skipped] =\u003e F",
+            "samples": 3,
+            "fully_covered": true,
             "conditions": [
               {
                 "id": 0,
                 "expression": "ok",
-                "covered": false,
-                "evaluated_count": 1,
+                "covered": true,
+                "evaluated_count": 3,
                 "skipped_count": 0,
                 "pair": {
                   "left_sample": 0,
-                  "right_sample": 0
+                  "right_sample": 1
                 },
-                "has_pair": false
+                "has_pair": true
               },
               {
                 "id": 1,
                 "expression": "!r.Limit.IsEmpty()",
-                "covered": false,
-                "evaluated_count": 0,
+                "covered": true,
+                "evaluated_count": 2,
                 "skipped_count": 1,
                 "pair": {
-                  "left_sample": 0,
-                  "right_sample": 0
+                  "left_sample": 1,
+                  "right_sample": 2
                 },
-                "has_pair": false
+                "has_pair": true
               }
             ],
             "sample_executions": [
@@ -2370,6 +2376,40 @@
                     "evaluated": false
                   }
                 ]
+              },
+              {
+                "index": 1,
+                "occurrences": 1,
+                "result": true,
+                "conditions": [
+                  {
+                    "cond_id": 0,
+                    "value": true,
+                    "evaluated": true
+                  },
+                  {
+                    "cond_id": 1,
+                    "value": false,
+                    "evaluated": true
+                  }
+                ]
+              },
+              {
+                "index": 2,
+                "occurrences": 1,
+                "result": false,
+                "conditions": [
+                  {
+                    "cond_id": 0,
+                    "value": true,
+                    "evaluated": true
+                  },
+                  {
+                    "cond_id": 1,
+                    "value": true,
+                    "evaluated": true
+                  }
+                ]
               }
             ]
           },
@@ -2381,21 +2421,20 @@
             "line": 341,
             "kind": "if",
             "expression": "ok",
-            "samples": 1,
-            "fully_covered": false,
-            "gap_example": "ok=F =\u003e F",
+            "samples": 2,
+            "fully_covered": true,
             "conditions": [
               {
                 "id": 0,
                 "expression": "ok",
-                "covered": false,
-                "evaluated_count": 1,
+                "covered": true,
+                "evaluated_count": 2,
                 "skipped_count": 0,
                 "pair": {
                   "left_sample": 0,
-                  "right_sample": 0
+                  "right_sample": 1
                 },
-                "has_pair": false
+                "has_pair": true
               }
             ],
             "sample_executions": [
@@ -2410,6 +2449,18 @@
                     "evaluated": true
                   }
                 ]
+              },
+              {
+                "index": 1,
+                "occurrences": 1,
+                "result": true,
+                "conditions": [
+                  {
+                    "cond_id": 0,
+                    "value": true,
+                    "evaluated": true
+                  }
+                ]
               }
             ]
           },
@@ -2421,20 +2472,46 @@
             "line": 343,
             "kind": "if",
             "expression": "r.DisableIntrospection",
-            "samples": 0,
-            "fully_covered": false,
+            "samples": 2,
+            "fully_covered": true,
             "conditions": [
               {
                 "id": 0,
                 "expression": "r.DisableIntrospection",
-                "covered": false,
-                "evaluated_count": 0,
+                "covered": true,
+                "evaluated_count": 2,
                 "skipped_count": 0,
                 "pair": {
                   "left_sample": 0,
-                  "right_sample": 0
+                  "right_sample": 1
                 },
-                "has_pair": false
+                "has_pair": true
+              }
+            ],
+            "sample_executions": [
+              {
+                "index": 0,
+                "occurrences": 1,
+                "result": false,
+                "conditions": [
+                  {
+                    "cond_id": 0,
+                    "value": false,
+                    "evaluated": true
+                  }
+                ]
+              },
+              {
+                "index": 1,
+                "occurrences": 1,
+                "result": true,
+                "conditions": [
+                  {
+                    "cond_id": 0,
+                    "value": true,
+                    "evaluated": true
+                  }
+                ]
               }
             ]
           },
@@ -2497,21 +2574,20 @@
             "line": 362,
             "kind": "if",
             "expression": "len(policy.AccessRights) \u003e 0",
-            "samples": 1,
-            "fully_covered": false,
-            "gap_example": "len(policy.AccessRights) \u003e 0=T =\u003e T",
+            "samples": 2,
+            "fully_covered": true,
             "conditions": [
               {
                 "id": 0,
                 "expression": "len(policy.AccessRights) \u003e 0",
-                "covered": false,
-                "evaluated_count": 1,
+                "covered": true,
+                "evaluated_count": 2,
                 "skipped_count": 0,
                 "pair": {
                   "left_sample": 0,
-                  "right_sample": 0
+                  "right_sample": 1
                 },
-                "has_pair": false
+                "has_pair": true
               }
             ],
             "sample_executions": [
@@ -2523,6 +2599,18 @@
                   {
                     "cond_id": 0,
                     "value": true,
+                    "evaluated": true
+                  }
+                ]
+              },
+              {
+                "index": 1,
+                "occurrences": 1,
+                "result": false,
+                "conditions": [
+                  {
+                    "cond_id": 0,
+                    "value": false,
                     "evaluated": true
                   }
                 ]
@@ -2961,21 +3049,20 @@
             "line": 428,
             "kind": "if",
             "expression": "!typeFound",
-            "samples": 1,
-            "fully_covered": false,
-            "gap_example": "typeFound=T =\u003e F",
+            "samples": 2,
+            "fully_covered": true,
             "conditions": [
               {
                 "id": 0,
                 "expression": "typeFound",
-                "covered": false,
-                "evaluated_count": 1,
+                "covered": true,
+                "evaluated_count": 2,
                 "skipped_count": 0,
                 "pair": {
                   "left_sample": 0,
-                  "right_sample": 0
+                  "right_sample": 1
                 },
-                "has_pair": false
+                "has_pair": true
               }
             ],
             "sample_executions": [
@@ -2987,6 +3074,18 @@
                   {
                     "cond_id": 0,
                     "value": true,
+                    "evaluated": true
+                  }
+                ]
+              },
+              {
+                "index": 1,
+                "occurrences": 1,
+                "result": true,
+                "conditions": [
+                  {
+                    "cond_id": 0,
+                    "value": false,
                     "evaluated": true
                   }
                 ]
@@ -3103,21 +3202,20 @@
             "line": 455,
             "kind": "if",
             "expression": "!typeFound",
-            "samples": 1,
-            "fully_covered": false,
-            "gap_example": "typeFound=T =\u003e F",
+            "samples": 2,
+            "fully_covered": true,
             "conditions": [
               {
                 "id": 0,
                 "expression": "typeFound",
-                "covered": false,
-                "evaluated_count": 1,
+                "covered": true,
+                "evaluated_count": 2,
                 "skipped_count": 0,
                 "pair": {
                   "left_sample": 0,
-                  "right_sample": 0
+                  "right_sample": 1
                 },
-                "has_pair": false
+                "has_pair": true
               }
             ],
             "sample_executions": [
@@ -3129,6 +3227,18 @@
                   {
                     "cond_id": 0,
                     "value": true,
+                    "evaluated": true
+                  }
+                ]
+              },
+              {
+                "index": 1,
+                "occurrences": 1,
+                "result": true,
+                "conditions": [
+                  {
+                    "cond_id": 0,
+                    "value": false,
                     "evaluated": true
                   }
                 ]
@@ -3476,13 +3586,115 @@
             "line": 496,
             "kind": "if",
             "expression": "greaterThanInt64(policy.QuotaMax, session.QuotaMax)",
-            "samples": 1,
-            "fully_covered": false,
-            "gap_example": "greaterThanInt64(policy.QuotaMax, session.QuotaMax)=T =\u003e T",
+            "samples": 2,
+            "fully_covered": true,
             "conditions": [
               {
                 "id": 0,
                 "expression": "greaterThanInt64(policy.QuotaMax, session.QuotaMax)",
+                "covered": true,
+                "evaluated_count": 2,
+                "skipped_count": 0,
+                "pair": {
+                  "left_sample": 0,
+                  "right_sample": 1
+                },
+                "has_pair": true
+              }
+            ],
+            "sample_executions": [
+              {
+                "index": 0,
+                "occurrences": 1,
+                "result": true,
+                "conditions": [
+                  {
+                    "cond_id": 0,
+                    "value": true,
+                    "evaluated": true
+                  }
+                ]
+              },
+              {
+                "index": 1,
+                "occurrences": 1,
+                "result": false,
+                "conditions": [
+                  {
+                    "cond_id": 0,
+                    "value": false,
+                    "evaluated": true
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": 56,
+            "package": "github.com/TykTechnologies/tyk/internal/policy",
+            "file": "apply.go",
+            "function": "*Service.applyPartitions",
+            "line": 501,
+            "kind": "if",
+            "expression": "policy.QuotaRenewalRate \u003e ar.Limit.QuotaRenewalRate",
+            "samples": 2,
+            "fully_covered": true,
+            "conditions": [
+              {
+                "id": 0,
+                "expression": "policy.QuotaRenewalRate \u003e ar.Limit.QuotaRenewalRate",
+                "covered": true,
+                "evaluated_count": 2,
+                "skipped_count": 0,
+                "pair": {
+                  "left_sample": 0,
+                  "right_sample": 1
+                },
+                "has_pair": true
+              }
+            ],
+            "sample_executions": [
+              {
+                "index": 0,
+                "occurrences": 1,
+                "result": false,
+                "conditions": [
+                  {
+                    "cond_id": 0,
+                    "value": false,
+                    "evaluated": true
+                  }
+                ]
+              },
+              {
+                "index": 1,
+                "occurrences": 1,
+                "result": true,
+                "conditions": [
+                  {
+                    "cond_id": 0,
+                    "value": true,
+                    "evaluated": true
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": 55,
+            "package": "github.com/TykTechnologies/tyk/internal/policy",
+            "file": "apply.go",
+            "function": "*Service.applyPartitions",
+            "line": 503,
+            "kind": "if",
+            "expression": "policy.QuotaRenewalRate \u003e session.QuotaRenewalRate",
+            "samples": 1,
+            "fully_covered": false,
+            "gap_example": "policy.QuotaRenewalRate \u003e session.QuotaRenewalRate=T =\u003e T",
+            "conditions": [
+              {
+                "id": 0,
+                "expression": "policy.QuotaRenewalRate \u003e session.QuotaRenewalRate",
                 "covered": false,
                 "evaluated_count": 1,
                 "skipped_count": 0,
@@ -3505,71 +3717,6 @@
                     "evaluated": true
                   }
                 ]
-              }
-            ]
-          },
-          {
-            "id": 56,
-            "package": "github.com/TykTechnologies/tyk/internal/policy",
-            "file": "apply.go",
-            "function": "*Service.applyPartitions",
-            "line": 501,
-            "kind": "if",
-            "expression": "policy.QuotaRenewalRate \u003e ar.Limit.QuotaRenewalRate",
-            "samples": 1,
-            "fully_covered": false,
-            "gap_example": "policy.QuotaRenewalRate \u003e ar.Limit.QuotaRenewalRate=F =\u003e F",
-            "conditions": [
-              {
-                "id": 0,
-                "expression": "policy.QuotaRenewalRate \u003e ar.Limit.QuotaRenewalRate",
-                "covered": false,
-                "evaluated_count": 1,
-                "skipped_count": 0,
-                "pair": {
-                  "left_sample": 0,
-                  "right_sample": 0
-                },
-                "has_pair": false
-              }
-            ],
-            "sample_executions": [
-              {
-                "index": 0,
-                "occurrences": 1,
-                "result": false,
-                "conditions": [
-                  {
-                    "cond_id": 0,
-                    "value": false,
-                    "evaluated": true
-                  }
-                ]
-              }
-            ]
-          },
-          {
-            "id": 55,
-            "package": "github.com/TykTechnologies/tyk/internal/policy",
-            "file": "apply.go",
-            "function": "*Service.applyPartitions",
-            "line": 503,
-            "kind": "if",
-            "expression": "policy.QuotaRenewalRate \u003e session.QuotaRenewalRate",
-            "samples": 0,
-            "fully_covered": false,
-            "conditions": [
-              {
-                "id": 0,
-                "expression": "policy.QuotaRenewalRate \u003e session.QuotaRenewalRate",
-                "covered": false,
-                "evaluated_count": 0,
-                "skipped_count": 0,
-                "pair": {
-                  "left_sample": 0,
-                  "right_sample": 0
-                },
-                "has_pair": false
               }
             ]
           },
@@ -4034,21 +4181,20 @@
             "line": 538,
             "kind": "if",
             "expression": "greaterThanInt(policy.MaxQueryDepth, session.MaxQueryDepth)",
-            "samples": 1,
-            "fully_covered": false,
-            "gap_example": "greaterThanInt(policy.MaxQueryDepth, session.MaxQueryDepth)=T =\u003e T",
+            "samples": 2,
+            "fully_covered": true,
             "conditions": [
               {
                 "id": 0,
                 "expression": "greaterThanInt(policy.MaxQueryDepth, session.MaxQueryDepth)",
-                "covered": false,
-                "evaluated_count": 1,
+                "covered": true,
+                "evaluated_count": 2,
                 "skipped_count": 0,
                 "pair": {
                   "left_sample": 0,
-                  "right_sample": 0
+                  "right_sample": 1
                 },
-                "has_pair": false
+                "has_pair": true
               }
             ],
             "sample_executions": [
@@ -4063,6 +4209,18 @@
                     "evaluated": true
                   }
                 ]
+              },
+              {
+                "index": 1,
+                "occurrences": 1,
+                "result": false,
+                "conditions": [
+                  {
+                    "cond_id": 0,
+                    "value": false,
+                    "evaluated": true
+                  }
+                ]
               }
             ]
           },
@@ -4074,33 +4232,32 @@
             "line": 545,
             "kind": "if",
             "expression": "ok \u0026\u0026 !r.Limit.IsEmpty()",
-            "samples": 1,
-            "fully_covered": false,
-            "gap_example": "ok=F, [!r.Limit.IsEmpty()=- skipped] =\u003e F",
+            "samples": 3,
+            "fully_covered": true,
             "conditions": [
               {
                 "id": 0,
                 "expression": "ok",
-                "covered": false,
-                "evaluated_count": 1,
+                "covered": true,
+                "evaluated_count": 3,
                 "skipped_count": 0,
                 "pair": {
                   "left_sample": 0,
-                  "right_sample": 0
+                  "right_sample": 1
                 },
-                "has_pair": false
+                "has_pair": true
               },
               {
                 "id": 1,
                 "expression": "!r.Limit.IsEmpty()",
-                "covered": false,
-                "evaluated_count": 0,
+                "covered": true,
+                "evaluated_count": 2,
                 "skipped_count": 1,
                 "pair": {
-                  "left_sample": 0,
-                  "right_sample": 0
+                  "left_sample": 1,
+                  "right_sample": 2
                 },
-                "has_pair": false
+                "has_pair": true
               }
             ],
             "sample_executions": [
@@ -4118,6 +4275,40 @@
                     "cond_id": 1,
                     "value": false,
                     "evaluated": false
+                  }
+                ]
+              },
+              {
+                "index": 1,
+                "occurrences": 1,
+                "result": true,
+                "conditions": [
+                  {
+                    "cond_id": 0,
+                    "value": true,
+                    "evaluated": true
+                  },
+                  {
+                    "cond_id": 1,
+                    "value": false,
+                    "evaluated": true
+                  }
+                ]
+              },
+              {
+                "index": 2,
+                "occurrences": 1,
+                "result": false,
+                "conditions": [
+                  {
+                    "cond_id": 0,
+                    "value": true,
+                    "evaluated": true
+                  },
+                  {
+                    "cond_id": 1,
+                    "value": true,
+                    "evaluated": true
                   }
                 ]
               }
@@ -4272,33 +4463,32 @@
             "line": 562,
             "kind": "if",
             "expression": "!usePartitions || policy.Partitions.Complexity",
-            "samples": 2,
-            "fully_covered": false,
-            "gap_example": "!usePartitions=F, [policy.Partitions.Complexity=- skipped] =\u003e T",
+            "samples": 3,
+            "fully_covered": true,
             "conditions": [
               {
                 "id": 0,
                 "expression": "!usePartitions",
                 "covered": true,
-                "evaluated_count": 2,
+                "evaluated_count": 3,
                 "skipped_count": 0,
                 "pair": {
                   "left_sample": 0,
-                  "right_sample": 1
+                  "right_sample": 2
                 },
                 "has_pair": true
               },
               {
                 "id": 1,
                 "expression": "policy.Partitions.Complexity",
-                "covered": false,
-                "evaluated_count": 1,
+                "covered": true,
+                "evaluated_count": 2,
                 "skipped_count": 1,
                 "pair": {
                   "left_sample": 0,
-                  "right_sample": 0
+                  "right_sample": 1
                 },
-                "has_pair": false
+                "has_pair": true
               }
             ],
             "sample_executions": [
@@ -4321,6 +4511,23 @@
               },
               {
                 "index": 1,
+                "occurrences": 1,
+                "result": true,
+                "conditions": [
+                  {
+                    "cond_id": 0,
+                    "value": true,
+                    "evaluated": true
+                  },
+                  {
+                    "cond_id": 1,
+                    "value": true,
+                    "evaluated": true
+                  }
+                ]
+              },
+              {
+                "index": 2,
                 "occurrences": 1,
                 "result": true,
                 "conditions": [
@@ -4487,21 +4694,20 @@
             "line": 576,
             "kind": "if",
             "expression": "!session.EnableHTTPSignatureValidation",
-            "samples": 1,
-            "fully_covered": false,
-            "gap_example": "session.EnableHTTPSignatureValidation=F =\u003e T",
+            "samples": 2,
+            "fully_covered": true,
             "conditions": [
               {
                 "id": 0,
                 "expression": "session.EnableHTTPSignatureValidation",
-                "covered": false,
-                "evaluated_count": 1,
+                "covered": true,
+                "evaluated_count": 2,
                 "skipped_count": 0,
                 "pair": {
                   "left_sample": 0,
-                  "right_sample": 0
+                  "right_sample": 1
                 },
-                "has_pair": false
+                "has_pair": true
               }
             ],
             "sample_executions": [
@@ -4513,6 +4719,18 @@
                   {
                     "cond_id": 0,
                     "value": false,
+                    "evaluated": true
+                  }
+                ]
+              },
+              {
+                "index": 1,
+                "occurrences": 1,
+                "result": false,
+                "conditions": [
+                  {
+                    "cond_id": 0,
+                    "value": true,
                     "evaluated": true
                   }
                 ]
@@ -5374,20 +5592,46 @@
             "line": 25,
             "kind": "if",
             "expression": "len(tags) \u003e 1",
-            "samples": 0,
-            "fully_covered": false,
+            "samples": 2,
+            "fully_covered": true,
             "conditions": [
               {
                 "id": 0,
                 "expression": "len(tags) \u003e 1",
-                "covered": false,
-                "evaluated_count": 0,
+                "covered": true,
+                "evaluated_count": 2,
                 "skipped_count": 0,
                 "pair": {
                   "left_sample": 0,
-                  "right_sample": 0
+                  "right_sample": 1
                 },
-                "has_pair": false
+                "has_pair": true
+              }
+            ],
+            "sample_executions": [
+              {
+                "index": 0,
+                "occurrences": 1,
+                "result": false,
+                "conditions": [
+                  {
+                    "cond_id": 0,
+                    "value": false,
+                    "evaluated": true
+                  }
+                ]
+              },
+              {
+                "index": 1,
+                "occurrences": 1,
+                "result": true,
+                "conditions": [
+                  {
+                    "cond_id": 0,
+                    "value": true,
+                    "evaluated": true
+                  }
+                ]
               }
             ]
           },
@@ -5399,63 +5643,13 @@
             "line": 30,
             "kind": "if",
             "expression": "err != nil",
-            "samples": 0,
-            "fully_covered": false,
-            "conditions": [
-              {
-                "id": 0,
-                "expression": "err != nil",
-                "covered": false,
-                "evaluated_count": 0,
-                "skipped_count": 0,
-                "pair": {
-                  "left_sample": 0,
-                  "right_sample": 0
-                },
-                "has_pair": false
-              }
-            ]
-          },
-          {
-            "id": 90,
-            "package": "github.com/TykTechnologies/tyk/internal/policy",
-            "file": "rpc.go",
-            "function": "*RPCDataLoaderMock.GetPolicies",
-            "line": 39,
-            "kind": "if",
-            "expression": "err != nil",
-            "samples": 0,
-            "fully_covered": false,
-            "conditions": [
-              {
-                "id": 0,
-                "expression": "err != nil",
-                "covered": false,
-                "evaluated_count": 0,
-                "skipped_count": 0,
-                "pair": {
-                  "left_sample": 0,
-                  "right_sample": 0
-                },
-                "has_pair": false
-              }
-            ]
-          },
-          {
-            "id": 91,
-            "package": "github.com/TykTechnologies/tyk/internal/policy",
-            "file": "store.go",
-            "function": "*Store.PolicyIDs",
-            "line": 27,
-            "kind": "if",
-            "expression": "len(s.policies) == 0",
             "samples": 1,
             "fully_covered": false,
-            "gap_example": "len(s.policies) == 0=F =\u003e F",
+            "gap_example": "err != nil=F =\u003e F",
             "conditions": [
               {
                 "id": 0,
-                "expression": "len(s.policies) == 0",
+                "expression": "err != nil",
                 "covered": false,
                 "evaluated_count": 1,
                 "skipped_count": 0,
@@ -5475,6 +5669,97 @@
                   {
                     "cond_id": 0,
                     "value": false,
+                    "evaluated": true
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": 90,
+            "package": "github.com/TykTechnologies/tyk/internal/policy",
+            "file": "rpc.go",
+            "function": "*RPCDataLoaderMock.GetPolicies",
+            "line": 39,
+            "kind": "if",
+            "expression": "err != nil",
+            "samples": 1,
+            "fully_covered": false,
+            "gap_example": "err != nil=F =\u003e F",
+            "conditions": [
+              {
+                "id": 0,
+                "expression": "err != nil",
+                "covered": false,
+                "evaluated_count": 1,
+                "skipped_count": 0,
+                "pair": {
+                  "left_sample": 0,
+                  "right_sample": 0
+                },
+                "has_pair": false
+              }
+            ],
+            "sample_executions": [
+              {
+                "index": 0,
+                "occurrences": 1,
+                "result": false,
+                "conditions": [
+                  {
+                    "cond_id": 0,
+                    "value": false,
+                    "evaluated": true
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": 91,
+            "package": "github.com/TykTechnologies/tyk/internal/policy",
+            "file": "store.go",
+            "function": "*Store.PolicyIDs",
+            "line": 27,
+            "kind": "if",
+            "expression": "len(s.policies) == 0",
+            "samples": 2,
+            "fully_covered": true,
+            "conditions": [
+              {
+                "id": 0,
+                "expression": "len(s.policies) == 0",
+                "covered": true,
+                "evaluated_count": 2,
+                "skipped_count": 0,
+                "pair": {
+                  "left_sample": 0,
+                  "right_sample": 1
+                },
+                "has_pair": true
+              }
+            ],
+            "sample_executions": [
+              {
+                "index": 0,
+                "occurrences": 1,
+                "result": false,
+                "conditions": [
+                  {
+                    "cond_id": 0,
+                    "value": false,
+                    "evaluated": true
+                  }
+                ]
+              },
+              {
+                "index": 1,
+                "occurrences": 1,
+                "result": true,
+                "conditions": [
+                  {
+                    "cond_id": 0,
+                    "value": true,
                     "evaluated": true
                   }
                 ]
@@ -5540,21 +5825,20 @@
             "line": 16,
             "kind": "if",
             "expression": "len(policies) == 0",
-            "samples": 1,
-            "fully_covered": false,
-            "gap_example": "len(policies) == 0=F =\u003e F",
+            "samples": 2,
+            "fully_covered": true,
             "conditions": [
               {
                 "id": 0,
                 "expression": "len(policies) == 0",
-                "covered": false,
-                "evaluated_count": 1,
+                "covered": true,
+                "evaluated_count": 2,
                 "skipped_count": 0,
                 "pair": {
                   "left_sample": 0,
-                  "right_sample": 0
+                  "right_sample": 1
                 },
-                "has_pair": false
+                "has_pair": true
               }
             ],
             "sample_executions": [
@@ -5569,6 +5853,18 @@
                     "evaluated": true
                   }
                 ]
+              },
+              {
+                "index": 1,
+                "occurrences": 1,
+                "result": true,
+                "conditions": [
+                  {
+                    "cond_id": 0,
+                    "value": true,
+                    "evaluated": true
+                  }
+                ]
               }
             ]
           },
@@ -5580,20 +5876,46 @@
             "line": 29,
             "kind": "if",
             "expression": "len(s.policies) == 0",
-            "samples": 0,
-            "fully_covered": false,
+            "samples": 2,
+            "fully_covered": true,
             "conditions": [
               {
                 "id": 0,
                 "expression": "len(s.policies) == 0",
-                "covered": false,
-                "evaluated_count": 0,
+                "covered": true,
+                "evaluated_count": 2,
                 "skipped_count": 0,
                 "pair": {
                   "left_sample": 0,
-                  "right_sample": 0
+                  "right_sample": 1
                 },
-                "has_pair": false
+                "has_pair": true
+              }
+            ],
+            "sample_executions": [
+              {
+                "index": 0,
+                "occurrences": 1,
+                "result": true,
+                "conditions": [
+                  {
+                    "cond_id": 0,
+                    "value": true,
+                    "evaluated": true
+                  }
+                ]
+              },
+              {
+                "index": 1,
+                "occurrences": 1,
+                "result": false,
+                "conditions": [
+                  {
+                    "cond_id": 0,
+                    "value": false,
+                    "evaluated": true
+                  }
+                ]
               }
             ]
           },
@@ -5754,33 +6076,8 @@
             "id": 98,
             "package": "github.com/TykTechnologies/tyk/internal/policy",
             "file": "util.go",
-            "function": "intersection",
-            "line": 74,
-            "kind": "if",
-            "expression": "ok",
-            "samples": 0,
-            "fully_covered": false,
-            "conditions": [
-              {
-                "id": 0,
-                "expression": "ok",
-                "covered": false,
-                "evaluated_count": 0,
-                "skipped_count": 0,
-                "pair": {
-                  "left_sample": 0,
-                  "right_sample": 0
-                },
-                "has_pair": false
-              }
-            ]
-          },
-          {
-            "id": 99,
-            "package": "github.com/TykTechnologies/tyk/internal/policy",
-            "file": "util.go",
             "function": "greaterThanInt64",
-            "line": 86,
+            "line": 68,
             "kind": "if",
             "expression": "first == -1",
             "samples": 2,
@@ -5827,11 +6124,11 @@
             ]
           },
           {
-            "id": 100,
+            "id": 99,
             "package": "github.com/TykTechnologies/tyk/internal/policy",
             "file": "util.go",
             "function": "greaterThanInt64",
-            "line": 90,
+            "line": 72,
             "kind": "if",
             "expression": "second == -1",
             "samples": 2,
@@ -5878,11 +6175,11 @@
             ]
           },
           {
-            "id": 101,
+            "id": 100,
             "package": "github.com/TykTechnologies/tyk/internal/policy",
             "file": "util.go",
             "function": "greaterThanInt",
-            "line": 101,
+            "line": 83,
             "kind": "if",
             "expression": "first == -1",
             "samples": 2,
@@ -5929,11 +6226,11 @@
             ]
           },
           {
-            "id": 102,
+            "id": 101,
             "package": "github.com/TykTechnologies/tyk/internal/policy",
             "file": "util.go",
             "function": "greaterThanInt",
-            "line": 105,
+            "line": 87,
             "kind": "if",
             "expression": "second == -1",
             "samples": 2,

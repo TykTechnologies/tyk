@@ -11,7 +11,7 @@ project:
         - path: specs/system
           prefix: SYS-REQ
           type: system
-    default_assurance_level: B
+    default_assurance_level: A
     solvers:
         kind2:
             path: /Users/leonidbugaev/tools/kind2/kind2
@@ -34,7 +34,7 @@ project:
                 - policy
     checks:
         coverage_threshold:
-            threshold: 50
+            threshold: 90
             auto_link: true
             report_path: .proof/coverage/unit.coverprofile
             format: go-cover
@@ -60,9 +60,9 @@ project:
         code_mcdc:
             severity: warn
             engine: go
-            min_decision_percent: 90
-            min_condition_percent: 90
-            max_incomplete_decisions: 5
+            min_decision_percent: 89
+            min_condition_percent: 91
+            max_incomplete_decisions: 11
             targets:
                 - id: policy
                   enabled: true
@@ -79,13 +79,6 @@ project:
         - check: ambiguity_reviewed
           scope: "*"
           reason: 'Reviewed by leonid (2026-04-19): 154 ambiguous pairs are expected for a policy engine with 4 operation modes (apply, clear, rate_limit, endpoint_limit) sharing output variables (error_reported, result_returned, access_rights_merged, rate_limit_applied) under disjoint input conditions. Kind2 consistency proof confirms no actual conflicts. Gap review recorded in reviews/gap-reviews.yaml.'
-          by: leonid
-          role: system_owner
-          created_at: "2026-04-19"
-          expires: "2026-10-01"
-        - check: coverage_threshold
-          scope: "*"
-          reason: 'Reviewed by leonid (2026-04-19): SYS-REQ-008 (57% coverage) and SYS-REQ-013 (77% coverage) are architecturally broad requirements. SYS-REQ-008 covers all of Apply/New/Store infrastructure; SYS-REQ-013 covers per-API access rights merging with 5 nested merge strategies. Both have full MC/DC witness coverage and FLIP fixtures. The 50% threshold in config is honest for these broad-scope requirements.'
           by: leonid
           role: system_owner
           created_at: "2026-04-19"

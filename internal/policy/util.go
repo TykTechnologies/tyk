@@ -61,24 +61,6 @@ func appendIfMissing(dest []string, in ...string) []string {
 	return dest
 }
 
-// SYS-REQ-013
-// intersection gets intersection of the given two slices.
-func intersection(a []string, b []string) (inter []string) {
-	m := make(map[string]bool)
-
-	for _, item := range a {
-		m[item] = true
-	}
-
-	for _, item := range b {
-		if _, ok := m[item]; ok {
-			inter = append(inter, item)
-		}
-	}
-
-	return
-}
-
 // SYS-REQ-021, SYS-REQ-041
 // greaterThanInt64 checks whether first int64 value is bigger than second int64 value.
 // -1 means infinite and the biggest value.
