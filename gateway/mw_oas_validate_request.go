@@ -3,11 +3,13 @@ package gateway
 import (
 	"context"
 	"fmt"
+	"io"
 	"net/http"
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/clbanning/mxj"
 	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/getkin/kin-openapi/openapi3filter"
 	"github.com/getkin/kin-openapi/routers"
@@ -41,6 +43,33 @@ func init() {
 		_, err := time.Parse(time.DateOnly, value)
 		return err
 	})
+
+	// Register XML body decoders so kin-openapi can validate application/xml
+	// and text/xml request bodies against OAS schemas.
+	// mxj parses <root><name>val</name></root> as {"root":{"name":"val"}}.
+	// OAS schemas describe the content inside the root element, so we unwrap
+	// the single root key to match the schema structure.
+	xmlDecoder := func(body io.Reader, header http.Header, schema *openapi3.SchemaRef, encFn openapi3filter.EncodingFn) (any, error) {
+		data, err := io.ReadAll(body)
+		if err != nil {
+			return nil, err
+		}
+		mv, err := mxj.NewMapXml(data)
+		if err != nil {
+			return nil, err
+		}
+		// Unwrap single root element to align with OAS schema expectations.
+		if len(mv) == 1 {
+			for _, v := range mv {
+				if inner, ok := v.(map[string]any); ok {
+					return inner, nil
+				}
+			}
+		}
+		return map[string]any(mv), nil
+	}
+	openapi3filter.RegisterBodyDecoder("application/xml", xmlDecoder)
+	openapi3filter.RegisterBodyDecoder("text/xml", xmlDecoder)
 }
 
 type ValidateRequest struct {
