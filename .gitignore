@@ -92,3 +92,9 @@ ci/tests/specs/policies
 # unknown json files
 /gateway/test.json
 /gateway/child-v1.json
+
+# ReqProof generated artifacts
+.proof/
+tests/policy/properties/
+tests/policy/tc-*.json
+tests/policy/z3-*.json

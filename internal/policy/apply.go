@@ -421,8 +421,11 @@ func (t *Service) applyPartitions(policy user.Policy, session *user.SessionState
 		if !usePartitions || policy.Partitions.Acl {
 			applyState.didAcl[k] = true
 
-			// Merge ACLs for the same API
-			if r, ok := rights[k]; ok {
+			// Merge ACLs for the same API.
+			// rights[k] is guaranteed to exist: the pre-fill loop above (lines 382-387)
+			// ensures every key in policy.AccessRights is present in rights.
+			{
+				r := rights[k]
 				// If GQL introspection is disabled, keep that configuration.
 				if v.DisableIntrospection {
 					r.DisableIntrospection = v.DisableIntrospection
@@ -544,11 +547,11 @@ func (t *Service) applyPartitions(policy user.Policy, session *user.SessionState
 
 			t.ApplyRateLimits(session, policy, &ar.Limit)
 
-			if rightsAR, ok := rights[k]; ok {
-				ar.Endpoints = t.ApplyEndpointLevelLimits(v.Endpoints, rightsAR.Endpoints)
-				ar.JSONRPCMethods = t.ApplyJSONRPCMethodLimits(v.JSONRPCMethods, rightsAR.JSONRPCMethods)
-				ar.MCPPrimitives = t.ApplyMCPPrimitiveLimits(v.MCPPrimitives, rightsAR.MCPPrimitives)
-			}
+			// rights[k] is guaranteed to exist (pre-filled above).
+			rightsAR := rights[k]
+			ar.Endpoints = t.ApplyEndpointLevelLimits(v.Endpoints, rightsAR.Endpoints)
+			ar.JSONRPCMethods = t.ApplyJSONRPCMethodLimits(v.JSONRPCMethods, rightsAR.JSONRPCMethods)
+			ar.MCPPrimitives = t.ApplyMCPPrimitiveLimits(v.MCPPrimitives, rightsAR.MCPPrimitives)
 
 			if policy.ThrottleRetryLimit > ar.Limit.ThrottleRetryLimit {
 				ar.Limit.ThrottleRetryLimit = policy.ThrottleRetryLimit
@@ -621,21 +624,15 @@ func (t *Service) applyPartitions(policy user.Policy, session *user.SessionState
 func (t *Service) updateSessionRootVars(session *user.SessionState, rights map[string]user.AccessDefinition, applyState applyStatus) {
 	if len(applyState.didQuota) == 1 && len(applyState.didRateLimit) == 1 && len(applyState.didComplexity) == 1 {
 		for _, v := range rights {
-			if len(applyState.didRateLimit) == 1 {
-				session.Rate = v.Limit.Rate
-				session.Per = v.Limit.Per
-				session.Smoothing = v.Limit.Smoothing
-			}
+			session.Rate = v.Limit.Rate
+			session.Per = v.Limit.Per
+			session.Smoothing = v.Limit.Smoothing
 
-			if len(applyState.didQuota) == 1 {
-				session.QuotaMax = v.Limit.QuotaMax
-				session.QuotaRenews = v.Limit.QuotaRenews
-				session.QuotaRenewalRate = v.Limit.QuotaRenewalRate
-			}
+			session.QuotaMax = v.Limit.QuotaMax
+			session.QuotaRenews = v.Limit.QuotaRenews
+			session.QuotaRenewalRate = v.Limit.QuotaRenewalRate
 
-			if len(applyState.didComplexity) == 1 {
-				session.MaxQueryDepth = v.Limit.MaxQueryDepth
-			}
+			session.MaxQueryDepth = v.Limit.MaxQueryDepth
 		}
 	}
 }

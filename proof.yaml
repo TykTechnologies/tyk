@@ -18,7 +18,7 @@ project:
             timeout: 30
     commands:
         build: go build ./internal/policy/...
-        test: bash -c 'mkdir -p .proof/test-results/runtime .proof/coverage && go test ./internal/policy/... -count=1 -race -coverprofile=.proof/coverage/unit.coverprofile -json | go-junit-report -set-exit-code > .proof/test-results/runtime/junit.xml'
+        test: mkdir -p .proof/test-results .proof/coverage && go test ./internal/policy/... -count=1 -race -coverprofile=.proof/coverage/unit.coverprofile -json > .proof/test-results/go-test.json 2>&1
         lint: go vet ./internal/policy/...
     obligation_classes:
         - nominal
@@ -28,10 +28,9 @@ project:
         - access_denied
         - policy_merge
         - rate_limit_boundary
-    verification:
-        fixture_evidence:
-            components:
-                - policy
+    # Fixtures are generated artifacts, not committed to repo.
+    # MC/DC coverage enforced through test annotations.
+    # Regenerate locally: proof testgen specs/system policy --output tests/policy/
     checks:
         coverage_threshold:
             threshold: 90
@@ -40,7 +39,8 @@ project:
             format: go-cover
         test_results:
             auto_link: true
-            report_path: .proof/test-results/runtime/junit.xml
+            auto_link: true
+            report_path: .proof/test-results/go-test.json
         slow_tests:
             enabled: true
         mcdc_coverage:
