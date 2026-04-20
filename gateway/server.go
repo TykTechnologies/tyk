@@ -58,6 +58,7 @@ import (
 	"github.com/TykTechnologies/tyk/internal/model"
 	"github.com/TykTechnologies/tyk/internal/netutil"
 	"github.com/TykTechnologies/tyk/internal/otel"
+	"github.com/TykTechnologies/tyk/internal/rate"
 	"github.com/TykTechnologies/tyk/internal/scheduler"
 	"github.com/TykTechnologies/tyk/internal/service/newrelic"
 	"github.com/TykTechnologies/tyk/internal/uuid"
@@ -231,6 +232,8 @@ type Gateway struct {
 	// apiJWKCaches cache per api entity
 	apiJWKCaches sync.Map
 
+	limitHeaderFactory rate.HeaderSenderFactory
+
 	BundleChecksumVerifier bundleChecksumVerifyFunction
 
 	validator validator.Validator
@@ -282,6 +285,7 @@ func NewGateway(config config.Config, ctx context.Context) *Gateway {
 
 	gw.SetNodeID("solo-" + uuid.New())
 	gw.SessionID = uuid.New()
+	gw.limitHeaderFactory = rate.NewSenderFactory(config.RateLimitResponseHeaders)
 
 	// Only create registry in RPC mode
 	if config.SlaveOptions.UseRPC {
@@ -1663,6 +1667,9 @@ func (gw *Gateway) initSystem() error {
 	// instances periodically and deletes idle items, closes net.Listener instances to
 	// free resources.
 	go cleanIdleMemConnProviders(gw.ctx)
+
+	gw.limitHeaderFactory = rate.NewSenderFactory(gwConfig.RateLimitResponseHeaders)
+	gw.jwkCache = buildJWKSCache(gwConfig)
 
 	gw.initMembers(gwConfig)
 
