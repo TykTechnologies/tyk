@@ -230,6 +230,7 @@ jobs:
           labels: ${{ steps.ci_metadata_fips.outputs.labels }}
           build-args: |
             BUILD_PACKAGE_NAME=tyk-gateway-fips
+            NONROOT_CHOWN=true
       - name: Docker metadata for fips tag push
         id: tag_metadata_fips
         uses: docker/metadata-action@v5
@@ -263,6 +264,7 @@ jobs:
           labels: ${{ steps.tag_metadata_fips.outputs.labels }}
           build-args: |
             BUILD_PACKAGE_NAME=tyk-gateway-fips
+            NONROOT_CHOWN=true
       - name: Docker metadata for std CI
         id: ci_metadata_std
         if: ${{ matrix.golang_cross == '1.25-bullseye' }}
