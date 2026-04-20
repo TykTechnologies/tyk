@@ -7,7 +7,9 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
+	"github.com/TykTechnologies/tyk/internal/errors"
 	"github.com/TykTechnologies/tyk/internal/service/gojsonschema"
 )
 
@@ -716,6 +718,258 @@ func TestAPIDefinition_IsBaseAPI(t *testing.T) {
 			assert.Equal(t, tt.expected, result)
 		})
 	}
+}
+
+func TestAPIDefinition_ErrorOverrides_UnmarshalJSON(t *testing.T) {
+	t.Run("basic error override", func(t *testing.T) {
+		jsonData := []byte(`{
+		  "name": "Test API Override Upstream",
+		  "api_id": "test-api-override-upstream",
+		  "org_id": "default",
+		  "use_keyless": true,
+		  "error_overrides_disabled": false,
+		  "error_overrides": {
+			"404": [
+			  {
+				"response": {
+				  "status_code": 420,
+				  "body": "{\"error\": \"api_level_upstream\", \"status\": 404}",
+				  "headers": {
+					"X-Error-Flag": "UPSTREAM-API",
+					"X-Override-Applied": "true"
+				  }
+				}
+			  }
+			]
+		  }
+	    }`)
+
+		var api APIDefinition
+		err := json.Unmarshal(jsonData, &api)
+		require.NoError(t, err)
+
+		require.NotNil(t, api.ErrorOverrides)
+		require.Len(t, api.ErrorOverrides["404"], 1)
+		assert.Equal(t, 420, api.ErrorOverrides["404"][0].Response.StatusCode)
+		assert.False(t, api.ErrorOverridesDisabled)
+	})
+
+	t.Run("complete error override with all fields", func(t *testing.T) {
+		jsonData := []byte(`{
+		  "name": "Test API Complete Override",
+		  "api_id": "test-api-complete-override",
+		  "org_id": "default",
+		  "use_keyless": true,
+		  "error_overrides_disabled": false,
+		  "error_overrides": {
+			"500": [
+			  {
+				"match": {
+				  "flag": "TLE",
+				  "message_pattern": "timeout.*error",
+				  "body_field": "error.type",
+				  "body_value": "timeout"
+				},
+				"response": {
+				  "status_code": 503,
+				  "body": "{\"error\": \"Certificate expired\", \"retry_after\": 30}",
+				  "message": "Custom timeout error message",
+				  "template": "error_template.html",
+				  "headers": {
+					"X-Custom-Error": "TIMEOUT",
+					"Retry-After": "30",
+					"Content-Type": "application/json"
+				  }
+				}
+			  }
+			],
+			"401": [
+			  {
+				"match": {
+				  "flag": "TLI",
+				  "body_field": "error.code",
+				  "body_value": "INVALID_TOKEN"
+				},
+				"response": {
+				  "status_code": 401,
+				  "body": "{\"error\": \"Certificate invalid\"}",
+				  "message": "Token validation failed",
+				  "headers": {
+					"WWW-Authenticate": "Bearer",
+					"X-Auth-Error": "true"
+				  }
+				}
+			  }
+			]
+		  }
+	    }`)
+
+		var api APIDefinition
+		err := json.Unmarshal(jsonData, &api)
+		require.NoError(t, err)
+
+		require.NotNil(t, api.ErrorOverrides)
+		require.False(t, api.ErrorOverridesDisabled)
+		require.Len(t, api.ErrorOverrides, 2)
+
+		require.Len(t, api.ErrorOverrides["500"], 1)
+		override500 := api.ErrorOverrides["500"][0]
+
+		require.NotNil(t, override500.Match)
+		assert.Equal(t, errors.TLE, override500.Match.Flag)
+		assert.Equal(t, "timeout.*error", override500.Match.MessagePattern)
+		assert.Equal(t, "error.type", override500.Match.BodyField)
+		assert.Equal(t, "timeout", override500.Match.BodyValue)
+
+		assert.Equal(t, 503, override500.Response.StatusCode)
+		assert.Equal(t, "{\"error\": \"Certificate expired\", \"retry_after\": 30}", override500.Response.Body)
+		assert.Equal(t, "Custom timeout error message", override500.Response.Message)
+		assert.Equal(t, "error_template.html", override500.Response.Template)
+		require.Len(t, override500.Response.Headers, 3)
+		assert.Equal(t, "TIMEOUT", override500.Response.Headers["X-Custom-Error"])
+		assert.Equal(t, "30", override500.Response.Headers["Retry-After"])
+		assert.Equal(t, "application/json", override500.Response.Headers["Content-Type"])
+
+		require.Len(t, api.ErrorOverrides["401"], 1)
+		override401 := api.ErrorOverrides["401"][0]
+
+		require.NotNil(t, override401.Match)
+		assert.Equal(t, errors.TLI, override401.Match.Flag)
+		assert.Equal(t, "", override401.Match.MessagePattern)
+		assert.Equal(t, "error.code", override401.Match.BodyField)
+		assert.Equal(t, "INVALID_TOKEN", override401.Match.BodyValue)
+
+		assert.Equal(t, 401, override401.Response.StatusCode)
+		assert.Equal(t, "{\"error\": \"Certificate invalid\"}", override401.Response.Body)
+		assert.Equal(t, "Token validation failed", override401.Response.Message)
+		assert.Equal(t, "", override401.Response.Template)
+		require.Len(t, override401.Response.Headers, 2)
+		assert.Equal(t, "Bearer", override401.Response.Headers["WWW-Authenticate"])
+		assert.Equal(t, "true", override401.Response.Headers["X-Auth-Error"])
+	})
+
+	t.Run("multiple overrides for same status code", func(t *testing.T) {
+		jsonData := []byte(`{
+		  "name": "Test API Multiple Overrides",
+		  "api_id": "test-api-multiple-overrides",
+		  "org_id": "default",
+		  "use_keyless": true,
+		  "error_overrides_disabled": true,
+		  "error_overrides": {
+			"400": [
+			  {
+				"match": {
+				  "body_field": "error.type",
+				  "body_value": "validation"
+				},
+				"response": {
+				  "status_code": 422,
+				  "body": "{\"error\": \"Validation failed\"}"
+				}
+			  },
+			  {
+				"match": {
+				  "body_field": "error.type",
+				  "body_value": "malformed"
+				},
+				"response": {
+				  "status_code": 400,
+				  "body": "{\"error\": \"Malformed request\"}"
+				}
+			  }
+			]
+		  }
+	    }`)
+
+		var api APIDefinition
+		err := json.Unmarshal(jsonData, &api)
+		require.NoError(t, err)
+
+		require.NotNil(t, api.ErrorOverrides)
+		require.True(t, api.ErrorOverridesDisabled)
+		require.Len(t, api.ErrorOverrides["400"], 2)
+
+		assert.Equal(t, "validation", api.ErrorOverrides["400"][0].Match.BodyValue)
+		assert.Equal(t, 422, api.ErrorOverrides["400"][0].Response.StatusCode)
+
+		assert.Equal(t, "malformed", api.ErrorOverrides["400"][1].Match.BodyValue)
+		assert.Equal(t, 400, api.ErrorOverrides["400"][1].Response.StatusCode)
+	})
+
+	t.Run("override without match criteria", func(t *testing.T) {
+		jsonData := []byte(`{
+		  "name": "Test API No Match Override",
+		  "api_id": "test-api-no-match-override",
+		  "org_id": "default",
+		  "use_keyless": true,
+		  "error_overrides_disabled": false,
+		  "error_overrides": {
+			"502": [
+			  {
+				"response": {
+				  "status_code": 503,
+				  "body": "{\"error\": \"Service unavailable\"}",
+				  "message": "Upstream service is down",
+				  "template": "maintenance.html",
+				  "headers": {
+					"X-Maintenance": "true"
+				  }
+				}
+			  }
+			]
+		  }
+	    }`)
+
+		var api APIDefinition
+		err := json.Unmarshal(jsonData, &api)
+		require.NoError(t, err)
+
+		require.NotNil(t, api.ErrorOverrides)
+		require.False(t, api.ErrorOverridesDisabled)
+		require.Len(t, api.ErrorOverrides["502"], 1)
+
+		override := api.ErrorOverrides["502"][0]
+		assert.Nil(t, override.Match)
+		assert.Equal(t, 503, override.Response.StatusCode)
+		assert.Equal(t, "{\"error\": \"Service unavailable\"}", override.Response.Body)
+		assert.Equal(t, "Upstream service is down", override.Response.Message)
+		assert.Equal(t, "maintenance.html", override.Response.Template)
+		assert.Equal(t, "true", override.Response.Headers["X-Maintenance"])
+	})
+
+	t.Run("empty error overrides", func(t *testing.T) {
+		jsonData := []byte(`{
+		  "name": "Test API Empty Overrides",
+		  "api_id": "test-api-empty-overrides",
+		  "org_id": "default",
+		  "use_keyless": true,
+		  "error_overrides": {}
+	    }`)
+
+		var api APIDefinition
+		err := json.Unmarshal(jsonData, &api)
+		require.NoError(t, err)
+
+		require.NotNil(t, api.ErrorOverrides)
+		require.False(t, api.ErrorOverridesDisabled)
+		assert.Len(t, api.ErrorOverrides, 0)
+	})
+
+	t.Run("nil error overrides", func(t *testing.T) {
+		jsonData := []byte(`{
+		  "name": "Test API Nil Overrides",
+		  "api_id": "test-api-nil-overrides",
+		  "org_id": "default",
+		  "use_keyless": true
+	    }`)
+
+		var api APIDefinition
+		err := json.Unmarshal(jsonData, &api)
+		require.NoError(t, err)
+
+		assert.Nil(t, api.ErrorOverrides)
+		require.False(t, api.ErrorOverridesDisabled)
+	})
 }
 
 func TestAPIDefinition_IsBaseAPIWithVersioning(t *testing.T) {
