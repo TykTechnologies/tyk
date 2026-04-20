@@ -98,3 +98,4 @@ ci/tests/specs/policies
 tests/policy/properties/
 tests/policy/tc-*.json
 tests/policy/z3-*.json
+tests/policy/z3-fixtures/
