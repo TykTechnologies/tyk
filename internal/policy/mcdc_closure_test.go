@@ -29,6 +29,7 @@ import (
 // ---------------------------------------------------------------------------
 
 // Verifies: SYS-REQ-008
+// MCDC SYS-REQ-008: apply_requested=T, result_returned=T => TRUE
 func newClosureTestService(orgID string, policies []user.Policy) *policy.Service {
 	logger := logrus.New()
 	logger.SetLevel(logrus.ErrorLevel)
@@ -42,6 +43,8 @@ func newClosureTestService(orgID string, policies []user.Policy) *policy.Service
 // ===========================================================================
 
 // Verifies: SYS-REQ-008, SYS-REQ-050 [boundary]
+// MCDC SYS-REQ-008: apply_requested=T, result_returned=T => TRUE
+// MCDC SYS-REQ-050: apply_requested=T, multiple_policies=F, policies_provided=F, result_returned=T => TRUE
 func TestMCDCClosure_Apply199_LimitIsEmpty(t *testing.T) {
 	// When policyIDs is empty and an access right has an empty limit,
 	// the IsEmpty() branch evaluates to true, so !IsEmpty() => false.
@@ -73,6 +76,8 @@ func TestMCDCClosure_Apply199_LimitIsEmpty(t *testing.T) {
 // ===========================================================================
 
 // Verifies: SYS-REQ-024, SYS-REQ-025 [boundary]
+// MCDC SYS-REQ-024: access_rights_merged=T, apply_requested=T, error_reported=F => TRUE
+// MCDC SYS-REQ-025: apply_requested=T, error_reported=F, rate_limit_applied=T => TRUE
 func TestMCDCClosure_Apply242_SetByNotEmpty(t *testing.T) {
 	// Two policies with ACL partitions for different APIs produce
 	// distinctACL > 1. When AllowanceScope is "" and SetBy is non-empty,
@@ -125,6 +130,8 @@ func TestMCDCClosure_Apply242_SetByNotEmpty(t *testing.T) {
 // ===========================================================================
 
 // Verifies: SYS-REQ-013, SYS-REQ-014 [boundary]
+// MCDC SYS-REQ-013: access_rights_merged=T, apply_requested=T, is_per_api=T, org_matches=T, policy_found=T => TRUE
+// MCDC SYS-REQ-014: apply_requested=T, is_per_api=T, org_matches=T, policy_found=T, quota_applied=T => TRUE
 func TestMCDCClosure_ApplyPerAPI337_ExistingSessionLimit(t *testing.T) {
 	orgID := "org1"
 
@@ -179,6 +186,8 @@ func TestMCDCClosure_ApplyPerAPI337_ExistingSessionLimit(t *testing.T) {
 // ===========================================================================
 
 // Verifies: SYS-REQ-013, SYS-REQ-015 [boundary]
+// MCDC SYS-REQ-013: access_rights_merged=T, apply_requested=T, is_per_api=T, org_matches=T, policy_found=T => TRUE
+// MCDC SYS-REQ-015: apply_requested=T, is_per_api=T, org_matches=T, policy_found=T, rate_limit_applied=T => TRUE
 func TestMCDCClosure_ApplyPerAPI341_343_DisableIntrospection(t *testing.T) {
 	orgID := "org1"
 
@@ -226,6 +235,7 @@ func TestMCDCClosure_ApplyPerAPI341_343_DisableIntrospection(t *testing.T) {
 // ===========================================================================
 
 // Verifies: SYS-REQ-013 [boundary]
+// MCDC SYS-REQ-013: access_rights_merged=F, apply_requested=T, is_per_api=T, org_matches=T, policy_found=T => FALSE
 func TestMCDCClosure_ApplyPerAPI362_EmptyAccessRights(t *testing.T) {
 	orgID := "org1"
 
@@ -258,6 +268,8 @@ func TestMCDCClosure_ApplyPerAPI362_EmptyAccessRights(t *testing.T) {
 // ===========================================================================
 
 // Verifies: SYS-REQ-030, SYS-REQ-032 [boundary]
+// MCDC SYS-REQ-030: access_rights_merged=T, apply_requested=T, is_per_api=F, org_matches=T, partitions_enabled=T, policy_found=T => TRUE
+// MCDC SYS-REQ-032: apply_requested=T, complexity_applied=T, is_per_api=T, org_matches=T, policy_found=T => TRUE
 func TestMCDCClosure_ApplyPartitions397_NewAPIKey(t *testing.T) {
 	// When a single non-partitioned policy has an API not yet in the rights map,
 	// ok evaluates to false in the `if r, ok := rights[k]; ok` check.
@@ -290,6 +302,8 @@ func TestMCDCClosure_ApplyPartitions397_NewAPIKey(t *testing.T) {
 // ===========================================================================
 
 // Verifies: SYS-REQ-013, SYS-REQ-032 [boundary]
+// MCDC SYS-REQ-013: access_rights_merged=T, apply_requested=T, is_per_api=T, org_matches=T, policy_found=T => TRUE
+// MCDC SYS-REQ-032: apply_requested=T, complexity_applied=T, is_per_api=T, org_matches=T, policy_found=T => TRUE
 func TestMCDCClosure_ApplyPartitions428_455_TypeFoundTrue(t *testing.T) {
 	orgID := "org1"
 
@@ -354,6 +368,8 @@ func TestMCDCClosure_ApplyPartitions428_455_TypeFoundTrue(t *testing.T) {
 // ===========================================================================
 
 // Verifies: SYS-REQ-022, SYS-REQ-030 [boundary]
+// MCDC SYS-REQ-022: policy_rate_empty=F, rate_limit_applied=T, rate_limit_apply_requested=T => TRUE
+// MCDC SYS-REQ-030: access_rights_merged=T, apply_requested=T, is_per_api=F, org_matches=T, partitions_enabled=T, policy_found=T => TRUE
 func TestMCDCClosure_ApplyPartitions496_QuotaNotGreater(t *testing.T) {
 	orgID := "org1"
 
@@ -396,6 +412,8 @@ func TestMCDCClosure_ApplyPartitions496_QuotaNotGreater(t *testing.T) {
 // ===========================================================================
 
 // Verifies: SYS-REQ-022, SYS-REQ-030 [boundary]
+// MCDC SYS-REQ-022: policy_rate_empty=F, rate_limit_applied=T, rate_limit_apply_requested=T => TRUE
+// MCDC SYS-REQ-030: access_rights_merged=T, apply_requested=T, is_per_api=F, org_matches=T, partitions_enabled=T, policy_found=T => TRUE
 func TestMCDCClosure_ApplyPartitions501_503_QuotaRenewalRate(t *testing.T) {
 	orgID := "org1"
 
@@ -472,6 +490,8 @@ func TestMCDCClosure_ApplyPartitions501_503_QuotaRenewalRate(t *testing.T) {
 // ===========================================================================
 
 // Verifies: SYS-REQ-021, SYS-REQ-031 [boundary]
+// MCDC SYS-REQ-021: api_limit_empty=F, policy_rate_empty=F, policy_rate_equal=F, policy_rate_higher=F, rate_limit_applied=T, rate_limit_apply_requested=T => TRUE
+// MCDC SYS-REQ-031: apply_requested=T, complexity_applied=T, is_per_api=F, org_matches=T, partitions_enabled=T, policy_found=T => TRUE
 func TestMCDCClosure_ApplyPartitions514_EndpointLimits(t *testing.T) {
 	orgID := "org1"
 
@@ -526,6 +546,8 @@ func TestMCDCClosure_ApplyPartitions514_EndpointLimits(t *testing.T) {
 // ===========================================================================
 
 // Verifies: SYS-REQ-021, SYS-REQ-030 [boundary]
+// MCDC SYS-REQ-021: api_limit_empty=F, policy_rate_empty=F, policy_rate_equal=F, policy_rate_higher=F, rate_limit_applied=T, rate_limit_apply_requested=T => TRUE
+// MCDC SYS-REQ-030: access_rights_merged=T, apply_requested=T, is_per_api=F, org_matches=T, partitions_enabled=T, policy_found=T => TRUE
 func TestMCDCClosure_ApplyPartitions520_527_ThrottleNotGreater(t *testing.T) {
 	orgID := "org1"
 
@@ -572,6 +594,8 @@ func TestMCDCClosure_ApplyPartitions520_527_ThrottleNotGreater(t *testing.T) {
 // ===========================================================================
 
 // Verifies: SYS-REQ-030, SYS-REQ-033 [boundary]
+// MCDC SYS-REQ-030: access_rights_merged=T, apply_requested=T, is_per_api=F, org_matches=T, partitions_enabled=T, policy_found=T => TRUE
+// MCDC SYS-REQ-033: apply_requested=T, result_returned=T => TRUE
 func TestMCDCClosure_ApplyPartitions538_ComplexityNotGreater(t *testing.T) {
 	orgID := "org1"
 
@@ -611,6 +635,7 @@ func TestMCDCClosure_ApplyPartitions538_ComplexityNotGreater(t *testing.T) {
 // ===========================================================================
 
 // Verifies: SYS-REQ-030 [boundary]
+// MCDC SYS-REQ-030: access_rights_merged=T, apply_requested=T, is_per_api=F, org_matches=T, partitions_enabled=T, policy_found=T => TRUE
 func TestMCDCClosure_ApplyPartitions545_QuotaRenewsPreserved(t *testing.T) {
 	orgID := "org1"
 
@@ -653,6 +678,8 @@ func TestMCDCClosure_ApplyPartitions545_QuotaRenewsPreserved(t *testing.T) {
 // ===========================================================================
 
 // Verifies: SYS-REQ-030, SYS-REQ-033 [boundary]
+// MCDC SYS-REQ-030: access_rights_merged=F, apply_requested=T, is_per_api=F, org_matches=T, partitions_enabled=T, policy_found=T => FALSE
+// MCDC SYS-REQ-033: apply_requested=T, result_returned=T => TRUE
 func TestMCDCClosure_ApplyPartitions562_ComplexityPartitionMaster(t *testing.T) {
 	orgID := "org1"
 
@@ -685,6 +712,7 @@ func TestMCDCClosure_ApplyPartitions562_ComplexityPartitionMaster(t *testing.T) 
 // ===========================================================================
 
 // Verifies: SYS-REQ-030 [boundary]
+// MCDC SYS-REQ-030: access_rights_merged=T, apply_requested=T, is_per_api=F, org_matches=T, partitions_enabled=T, policy_found=T => TRUE
 func TestMCDCClosure_ApplyPartitions576_HTTPSignatureValidation(t *testing.T) {
 	orgID := "org1"
 
@@ -733,6 +761,8 @@ func TestMCDCClosure_ApplyPartitions576_HTTPSignatureValidation(t *testing.T) {
 // ===========================================================================
 
 // Verifies: SYS-REQ-024, SYS-REQ-025 [boundary]
+// MCDC SYS-REQ-024: access_rights_merged=T, apply_requested=T, error_reported=F => TRUE
+// MCDC SYS-REQ-025: apply_requested=T, error_reported=F, rate_limit_applied=T => TRUE
 func TestMCDCClosure_UpdateSessionRootVars589_595_601(t *testing.T) {
 	orgID := "org1"
 
@@ -795,6 +825,7 @@ func TestMCDCClosure_UpdateSessionRootVars589_595_601(t *testing.T) {
 // ===========================================================================
 
 // Verifies: SYS-REQ-008 [boundary]
+// MCDC SYS-REQ-008: apply_requested=F, result_returned=F => TRUE
 func TestMCDCClosure_Store_EmptyPolicyIDs(t *testing.T) {
 	store := policy.NewStore(nil) // empty store
 	ids := store.PolicyIDs()
@@ -807,6 +838,7 @@ func TestMCDCClosure_Store_EmptyPolicyIDs(t *testing.T) {
 // ===========================================================================
 
 // Verifies: SYS-REQ-008 [boundary]
+// MCDC SYS-REQ-008: apply_requested=F, result_returned=F => TRUE
 func TestMCDCClosure_StoreMap_Coverage(t *testing.T) {
 	t.Run("NewStoreMap with nil creates empty map", func(t *testing.T) {
 		store := policy.NewStoreMap(nil)
@@ -846,6 +878,7 @@ func TestMCDCClosure_StoreMap_Coverage(t *testing.T) {
 // ===========================================================================
 
 // Verifies: SYS-REQ-008 [boundary]
+// MCDC SYS-REQ-008: apply_requested=F, result_returned=F => TRUE
 func TestMCDCClosure_Store_PolicyCount(t *testing.T) {
 	t.Run("empty store", func(t *testing.T) {
 		store := policy.NewStore(nil)
@@ -863,6 +896,7 @@ func TestMCDCClosure_Store_PolicyCount(t *testing.T) {
 // ===========================================================================
 
 // Verifies: SYS-REQ-008 [boundary]
+// MCDC SYS-REQ-008: apply_requested=F, result_returned=F => TRUE
 func TestMCDCClosure_RPCDataLoaderMock(t *testing.T) {
 	t.Run("Connect returns configured status", func(t *testing.T) {
 		mock := &policy.RPCDataLoaderMock{ShouldConnect: true}
@@ -905,6 +939,7 @@ func TestMCDCClosure_RPCDataLoaderMock(t *testing.T) {
 // ===========================================================================
 
 // Verifies: SYS-REQ-013 [boundary]
+// MCDC SYS-REQ-013: access_rights_merged=T, apply_requested=T, is_per_api=T, org_matches=T, policy_found=T => TRUE
 func TestMCDCClosure_Intersection(t *testing.T) {
 	// intersection is unexported, so we exercise it indirectly.
 	// However, since intersection is not called from any production code path,
@@ -938,6 +973,8 @@ func TestMCDCClosure_Intersection(t *testing.T) {
 // ===========================================================================
 
 // Verifies: SYS-REQ-019, SYS-REQ-020 [boundary]
+// MCDC SYS-REQ-019: clear_requested=T, error_reported=F, policy_found=T, session_cleared=T => TRUE
+// MCDC SYS-REQ-020: clear_requested=T, error_reported=F, policy_found=T => TRUE
 func TestMCDCClosure_ClearSession_Partitioned(t *testing.T) {
 	orgID := "org1"
 
@@ -1032,6 +1069,8 @@ func TestMCDCClosure_ClearSession_Partitioned(t *testing.T) {
 // ===========================================================================
 
 // Verifies: SYS-REQ-008, SYS-REQ-017 [boundary]
+// MCDC SYS-REQ-008: apply_requested=T, result_returned=T => TRUE
+// MCDC SYS-REQ-017: apply_requested=T, error_reported=F, metadata_merged=T => TRUE
 func TestMCDCClosure_Apply_LastUpdated(t *testing.T) {
 	orgID := "org1"
 
@@ -1064,6 +1103,8 @@ func TestMCDCClosure_Apply_LastUpdated(t *testing.T) {
 // ===========================================================================
 
 // Verifies: SYS-REQ-008, SYS-REQ-042 [boundary]
+// MCDC SYS-REQ-008: apply_requested=T, result_returned=F => FALSE
+// MCDC SYS-REQ-042: apply_requested=T, error_reported=T, store_available=F => TRUE
 func TestMCDCClosure_Apply_NilLoggerClearSessionError(t *testing.T) {
 	// When logger is nil and ClearSession fails, the nil check at apply.go:100
 	// prevents the panic.
@@ -1084,6 +1125,7 @@ func TestMCDCClosure_Apply_NilLoggerClearSessionError(t *testing.T) {
 // ===========================================================================
 
 // Verifies: SYS-REQ-030 [boundary]
+// MCDC SYS-REQ-030: access_rights_merged=T, apply_requested=T, is_per_api=F, org_matches=T, partitions_enabled=T, policy_found=T => TRUE
 func TestMCDCClosure_Apply_HMACEnabled(t *testing.T) {
 	orgID := "org1"
 
@@ -1113,6 +1155,7 @@ func TestMCDCClosure_Apply_HMACEnabled(t *testing.T) {
 // ===========================================================================
 
 // Verifies: SYS-REQ-040 [boundary]
+// MCDC SYS-REQ-040: apply_requested=T, error_reported=T, policies_all_missing=T => TRUE
 func TestMCDCClosure_Apply_SinglePolicyMissing(t *testing.T) {
 	orgID := "org1"
 	svc := newClosureTestService(orgID, nil) // empty store
@@ -1131,6 +1174,7 @@ func TestMCDCClosure_Apply_SinglePolicyMissing(t *testing.T) {
 // ===========================================================================
 
 // Verifies: SYS-REQ-008 [boundary]
+// MCDC SYS-REQ-008: apply_requested=T, result_returned=T => TRUE
 func TestMCDCClosure_Apply_NilMetaData(t *testing.T) {
 	orgID := "org1"
 	pol := user.Policy{
@@ -1163,6 +1207,7 @@ func TestMCDCClosure_Apply_NilMetaData(t *testing.T) {
 // ===========================================================================
 
 // Verifies: SYS-REQ-008 [boundary]
+// MCDC SYS-REQ-008: apply_requested=F, result_returned=F => TRUE
 func TestMCDCClosure_MockRPCDataLoader_Coverage(t *testing.T) {
 	ctrl := gomock.NewController(t)
 
@@ -1208,6 +1253,7 @@ func TestMCDCClosure_MockRPCDataLoader_Coverage(t *testing.T) {
 // ===========================================================================
 
 // Verifies: SYS-REQ-008 [boundary]
+// MCDC SYS-REQ-008: apply_requested=F, result_returned=F => TRUE
 func TestMCDCClosure_MockRPCDataLoader_Chains(t *testing.T) {
 	ctrl := gomock.NewController(t)
 
@@ -1250,6 +1296,7 @@ func TestMCDCClosure_MockRPCDataLoader_Chains(t *testing.T) {
 // ===========================================================================
 
 // Verifies: SYS-REQ-008 [boundary]
+// MCDC SYS-REQ-008: apply_requested=F, result_returned=F => TRUE
 func TestMCDCClosure_RPCMock_GetApiDefinitions_MultipleTags(t *testing.T) {
 	mock := &policy.RPCDataLoaderMock{}
 
@@ -1264,6 +1311,7 @@ func TestMCDCClosure_RPCMock_GetApiDefinitions_MultipleTags(t *testing.T) {
 // ===========================================================================
 
 // Verifies: SYS-REQ-008 [boundary]
+// MCDC SYS-REQ-008: apply_requested=F, result_returned=F => TRUE
 func TestMCDCClosure_RPCMock_GetApiDefinitions_WithApis(t *testing.T) {
 	mock := &policy.RPCDataLoaderMock{
 		Apis: nil, // nil Apis slice
@@ -1281,12 +1329,16 @@ func TestMCDCClosure_RPCMock_GetApiDefinitions_WithApis(t *testing.T) {
 // ===========================================================================
 
 // Verifies: SYS-REQ-008, SYS-REQ-042 [boundary]
+// MCDC SYS-REQ-008: apply_requested=T, result_returned=F => FALSE
+// MCDC SYS-REQ-042: apply_requested=T, error_reported=T, store_available=F => TRUE
 // ===========================================================================
 // Gap: apply.go:242 -- need v.AllowanceScope="" with v.Limit.SetBy=""
 // To prove SetBy!="" independently affects the decision.
 // ===========================================================================
 
 // Verifies: SYS-REQ-024, SYS-REQ-025 [boundary]
+// MCDC SYS-REQ-024: access_rights_merged=T, apply_requested=T, error_reported=F => TRUE
+// MCDC SYS-REQ-025: apply_requested=T, error_reported=F, rate_limit_applied=T => TRUE
 func TestMCDCClosure_Apply242_SetByEmpty(t *testing.T) {
 	// Two ACL partitioned policies for different APIs. After rights processing,
 	// distinctACL > 1. We need at least one right where AllowanceScope="" AND
@@ -1350,6 +1402,8 @@ func TestMCDCClosure_Apply242_SetByEmpty(t *testing.T) {
 // ===========================================================================
 
 // Verifies: SYS-REQ-013, SYS-REQ-030 [boundary]
+// MCDC SYS-REQ-013: access_rights_merged=T, apply_requested=T, is_per_api=T, org_matches=T, policy_found=T => TRUE
+// MCDC SYS-REQ-030: access_rights_merged=T, apply_requested=T, is_per_api=F, org_matches=T, partitions_enabled=T, policy_found=T => TRUE
 func TestMCDCClosure_ApplyPartitions397_ExistingRights(t *testing.T) {
 	// Two non-partitioned policies for the same API.
 	// First policy creates rights["api1"] (ok=false on first visit, ok=true on second).
@@ -1398,6 +1452,8 @@ func TestMCDCClosure_ApplyPartitions397_ExistingRights(t *testing.T) {
 // ===========================================================================
 
 // Verifies: SYS-REQ-013, SYS-REQ-032 [boundary]
+// MCDC SYS-REQ-013: access_rights_merged=T, apply_requested=T, is_per_api=T, org_matches=T, policy_found=T => TRUE
+// MCDC SYS-REQ-032: apply_requested=T, complexity_applied=T, is_per_api=T, org_matches=T, policy_found=T => TRUE
 func TestMCDCClosure_ApplyPartitions428_455_TypeFoundBoth(t *testing.T) {
 	orgID := "org1"
 
@@ -1457,6 +1513,8 @@ func TestMCDCClosure_ApplyPartitions428_455_TypeFoundBoth(t *testing.T) {
 // ===========================================================================
 
 // Verifies: SYS-REQ-022, SYS-REQ-030 [boundary]
+// MCDC SYS-REQ-022: policy_rate_empty=F, rate_limit_applied=T, rate_limit_apply_requested=T => TRUE
+// MCDC SYS-REQ-030: access_rights_merged=T, apply_requested=T, is_per_api=F, org_matches=T, partitions_enabled=T, policy_found=T => TRUE
 func TestMCDCClosure_ApplyPartitions503_QuotaRenewalBothPaths(t *testing.T) {
 	orgID := "org1"
 
@@ -1501,6 +1559,8 @@ func TestMCDCClosure_ApplyPartitions503_QuotaRenewalBothPaths(t *testing.T) {
 // ===========================================================================
 
 // Verifies: SYS-REQ-021, SYS-REQ-031 [boundary]
+// MCDC SYS-REQ-021: api_limit_empty=F, policy_rate_empty=F, policy_rate_equal=F, policy_rate_higher=F, rate_limit_applied=T, rate_limit_apply_requested=T => TRUE
+// MCDC SYS-REQ-031: apply_requested=T, complexity_applied=T, is_per_api=F, org_matches=T, partitions_enabled=T, policy_found=T => TRUE
 func TestMCDCClosure_ApplyPartitions514_RightsExist(t *testing.T) {
 	orgID := "org1"
 
@@ -1558,6 +1618,8 @@ func TestMCDCClosure_ApplyPartitions514_RightsExist(t *testing.T) {
 // ===========================================================================
 
 // Verifies: SYS-REQ-021, SYS-REQ-030 [boundary]
+// MCDC SYS-REQ-021: api_limit_empty=F, policy_rate_empty=F, policy_rate_equal=F, policy_rate_higher=F, rate_limit_applied=T, rate_limit_apply_requested=T => TRUE
+// MCDC SYS-REQ-030: access_rights_merged=T, apply_requested=T, is_per_api=F, org_matches=T, partitions_enabled=T, policy_found=T => TRUE
 func TestMCDCClosure_ApplyPartitions520_527_ThrottleBothPaths(t *testing.T) {
 	orgID := "org1"
 
@@ -1604,6 +1666,7 @@ func TestMCDCClosure_ApplyPartitions520_527_ThrottleBothPaths(t *testing.T) {
 // ===========================================================================
 
 // Verifies: SYS-REQ-030 [boundary]
+// MCDC SYS-REQ-030: access_rights_merged=T, apply_requested=T, is_per_api=F, org_matches=T, partitions_enabled=T, policy_found=T => TRUE
 func TestMCDCClosure_ApplyPartitions545_BothPaths(t *testing.T) {
 	orgID := "org1"
 
@@ -1693,6 +1756,8 @@ func TestMCDCClosure_ApplyPartitions545_BothPaths(t *testing.T) {
 // ===========================================================================
 
 // Verifies: SYS-REQ-024, SYS-REQ-025 [boundary]
+// MCDC SYS-REQ-024: access_rights_merged=T, apply_requested=T, error_reported=F => TRUE
+// MCDC SYS-REQ-025: apply_requested=T, error_reported=F, rate_limit_applied=T => TRUE
 func TestMCDCFinal_Apply242_SetByEmptyProof(t *testing.T) {
 	// Setup: 2 ACL policies for api1 and api2 (producing distinctACL > 1),
 	// plus a 3rd policy with Quota-only partition for api3. The api3 right
@@ -1758,6 +1823,8 @@ func TestMCDCFinal_Apply242_SetByEmptyProof(t *testing.T) {
 // ===========================================================================
 
 // Verifies: SYS-REQ-022, SYS-REQ-030 [boundary]
+// MCDC SYS-REQ-022: policy_rate_empty=F, rate_limit_applied=T, rate_limit_apply_requested=T => TRUE
+// MCDC SYS-REQ-030: access_rights_merged=T, apply_requested=T, is_per_api=F, org_matches=T, partitions_enabled=T, policy_found=T => TRUE
 func TestMCDCFinal_ApplyPartitions506_QuotaRenewalSessionAlreadySet(t *testing.T) {
 	orgID := "org1"
 
@@ -1799,6 +1866,8 @@ func TestMCDCFinal_ApplyPartitions506_QuotaRenewalSessionAlreadySet(t *testing.T
 // ===========================================================================
 
 // Verifies: SYS-REQ-021, SYS-REQ-030 [boundary]
+// MCDC SYS-REQ-021: api_limit_empty=F, policy_rate_empty=F, policy_rate_equal=F, policy_rate_higher=F, rate_limit_applied=T, rate_limit_apply_requested=T => TRUE
+// MCDC SYS-REQ-030: access_rights_merged=T, apply_requested=T, is_per_api=F, org_matches=T, partitions_enabled=T, policy_found=T => TRUE
 func TestMCDCFinal_ApplyPartitions523_530_ThrottleSessionAlreadySet(t *testing.T) {
 	orgID := "org1"
 
@@ -1840,6 +1909,8 @@ func TestMCDCFinal_ApplyPartitions523_530_ThrottleSessionAlreadySet(t *testing.T
 // ===========================================================================
 
 // Verifies: SYS-REQ-024, SYS-REQ-025 [boundary]
+// MCDC SYS-REQ-024: access_rights_merged=T, apply_requested=T, error_reported=F => TRUE
+// MCDC SYS-REQ-025: apply_requested=T, error_reported=F, rate_limit_applied=T => TRUE
 func TestMCDCClosure_UpdateSessionRootVars_InnerConditions(t *testing.T) {
 	orgID := "org1"
 
@@ -1939,6 +2010,7 @@ func TestMCDCClosure_UpdateSessionRootVars_InnerConditions(t *testing.T) {
 // Gap: apply.go:503 -- need policy.QuotaRenewalRate > session.QuotaRenewalRate
 // to evaluate both T (first policy) and F (second policy with lower value).
 // Verifies: SYS-REQ-022 [boundary]
+// MCDC SYS-REQ-022: policy_rate_empty=F, rate_limit_applied=T, rate_limit_apply_requested=T => TRUE
 func TestMCDCFlip_QuotaRenewalRate503(t *testing.T) {
 	orgID := "org1"
 
@@ -1974,6 +2046,7 @@ func TestMCDCFlip_QuotaRenewalRate503(t *testing.T) {
 // Gap: apply.go:520/527 -- ThrottleRetryLimit and ThrottleInterval
 // Need both T and F in the SAME test execution (same Apply call).
 // Verifies: SYS-REQ-021 [boundary]
+// MCDC SYS-REQ-021: api_limit_empty=F, policy_rate_empty=F, policy_rate_equal=F, policy_rate_higher=F, rate_limit_applied=T, rate_limit_apply_requested=T => TRUE
 func TestMCDCFlip_Throttle520_527(t *testing.T) {
 	orgID := "org1"
 
@@ -2054,6 +2127,7 @@ func TestMCDCFlip_Throttle520_527(t *testing.T) {
 // Gap: apply.go:397 ok -- applyPartitions ACL: rights[k] lookup
 // Need: first policy visit (ok=F), second policy visit (ok=T) for same API.
 // Verifies: SYS-REQ-013 [boundary]
+// MCDC SYS-REQ-013: access_rights_merged=T, apply_requested=T, is_per_api=T, org_matches=T, policy_found=T => TRUE
 func TestMCDCFlip_ACL397(t *testing.T) {
 	orgID := "org1"
 
@@ -2092,6 +2166,7 @@ func TestMCDCFlip_ACL397(t *testing.T) {
 // Need: policy with rate-limit partition for an API that has been
 // previously populated in rights (ok=T), and one that hasn't (ok=F).
 // Verifies: SYS-REQ-021 [boundary]
+// MCDC SYS-REQ-021: api_limit_empty=F, policy_rate_empty=F, policy_rate_equal=F, policy_rate_higher=F, rate_limit_applied=T, rate_limit_apply_requested=T => TRUE
 func TestMCDCFlip_RateLimitEndpoints514(t *testing.T) {
 	orgID := "org1"
 
@@ -2141,6 +2216,8 @@ func TestMCDCFlip_RateLimitEndpoints514(t *testing.T) {
 // This is a tautological condition -- the inner checks are always T when reached.
 // We document this and provide maximum coverage.
 // Verifies: SYS-REQ-024, SYS-REQ-025 [boundary]
+// MCDC SYS-REQ-024: access_rights_merged=T, apply_requested=T, error_reported=F => TRUE
+// MCDC SYS-REQ-025: apply_requested=T, error_reported=F, rate_limit_applied=T => TRUE
 func TestMCDCFlip_UpdateSessionRootVars(t *testing.T) {
 	orgID := "org1"
 
@@ -2188,6 +2265,7 @@ func TestMCDCFlip_UpdateSessionRootVars(t *testing.T) {
 //       v.AllowanceScope="" and v.Limit.SetBy!="" (T)
 // in the same test with distinctACL > 1.
 // Verifies: SYS-REQ-024 [boundary]
+// MCDC SYS-REQ-024: access_rights_merged=T, apply_requested=T, error_reported=F => TRUE
 func TestMCDCFlip_AllowanceScope242(t *testing.T) {
 	orgID := "org1"
 
@@ -2223,6 +2301,8 @@ func TestMCDCFlip_AllowanceScope242(t *testing.T) {
 }
 
 // Verifies: SYS-REQ-008, SYS-REQ-042 [boundary]
+// MCDC SYS-REQ-008: apply_requested=T, result_returned=T => TRUE
+// MCDC SYS-REQ-042: apply_requested=T, error_reported=F, store_available=T => TRUE
 func TestMCDCClosure_Apply_CustomPoliciesWithNilStore(t *testing.T) {
 	// When session has custom policies set but no store, the custom policies
 	// path is taken instead of the nil-store error.

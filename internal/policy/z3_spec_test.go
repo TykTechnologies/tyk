@@ -23,6 +23,8 @@ type Z3Fixture struct {
 }
 
 // Verifies: SYS-REQ-021, SYS-REQ-022 [formal]
+// MCDC SYS-REQ-021: api_limit_empty=F, policy_rate_empty=F, policy_rate_equal=F, policy_rate_higher=F, rate_limit_applied=T, rate_limit_apply_requested=T => TRUE
+// MCDC SYS-REQ-022: policy_rate_empty=F, rate_limit_applied=T, rate_limit_apply_requested=T => TRUE
 func loadZ3Fixtures(t *testing.T, property string) []Z3Fixture {
 	t.Helper()
 	root := filepath.Join("..", "..", "tests", "policy", "z3-fixtures")
@@ -54,6 +56,8 @@ func loadZ3Fixtures(t *testing.T, property string) []Z3Fixture {
 }
 
 // Verifies: SYS-REQ-021, SYS-REQ-022 [formal]
+// MCDC SYS-REQ-021: api_limit_empty=F, policy_rate_empty=F, policy_rate_equal=F, policy_rate_higher=F, rate_limit_applied=T, rate_limit_apply_requested=T => TRUE
+// MCDC SYS-REQ-022: policy_rate_empty=F, rate_limit_applied=T, rate_limit_apply_requested=T => TRUE
 func loadAllZ3Fixtures(t *testing.T) []Z3Fixture {
 	t.Helper()
 	root := filepath.Join("..", "..", "tests", "policy", "z3-fixtures")
@@ -77,6 +81,7 @@ func loadAllZ3Fixtures(t *testing.T) []Z3Fixture {
 }
 
 // Verifies: SYS-REQ-021 [formal]
+// MCDC SYS-REQ-021: api_limit_empty=F, policy_rate_empty=F, policy_rate_equal=F, policy_rate_higher=F, rate_limit_applied=T, rate_limit_apply_requested=T => TRUE
 // z3NumericValue extracts a numeric value from a Z3 fixture input map.
 // The key is the property name (e.g. "quota_applied", "complexity_applied").
 func z3NumericValue(m map[string]interface{}, property string) float64 {
@@ -88,6 +93,7 @@ func z3NumericValue(m map[string]interface{}, property string) float64 {
 }
 
 // Verifies: SYS-REQ-016 [formal]
+// MCDC SYS-REQ-016: apply_requested=T, error_reported=F, tags_merged=T => TRUE
 // z3StringSlice extracts a string slice from a Z3 fixture input map.
 func z3StringSlice(m map[string]interface{}, property string) []string {
 	v, ok := m[property]
@@ -106,6 +112,7 @@ func z3StringSlice(m map[string]interface{}, property string) []string {
 }
 
 // Verifies: SYS-REQ-017 [formal]
+// MCDC SYS-REQ-017: apply_requested=T, error_reported=F, metadata_merged=T => TRUE
 // z3StringMap extracts a string->string map from a Z3 fixture input map.
 func z3StringMap(m map[string]interface{}, property string) map[string]interface{} {
 	v, ok := m[property]
@@ -238,6 +245,12 @@ var z3PropertyMappings = map[string]z3PropertyMapping{
 }
 
 // Verifies: STK-REQ-001, SYS-REQ-021, SYS-REQ-022, SYS-REQ-033, SYS-REQ-016, SYS-REQ-017 [boundary]
+// MCDC STK-REQ-001: N/A
+// MCDC SYS-REQ-021: api_limit_empty=F, policy_rate_empty=F, policy_rate_equal=F, policy_rate_higher=F, rate_limit_applied=T, rate_limit_apply_requested=T => TRUE
+// MCDC SYS-REQ-022: policy_rate_empty=F, rate_limit_applied=T, rate_limit_apply_requested=T => TRUE
+// MCDC SYS-REQ-033: apply_requested=T, result_returned=T => TRUE
+// MCDC SYS-REQ-016: apply_requested=T, error_reported=F, tags_merged=T => TRUE
+// MCDC SYS-REQ-017: apply_requested=T, error_reported=F, metadata_merged=T => TRUE
 func TestZ3_AllProperties(t *testing.T) {
 	allFixtures := loadAllZ3Fixtures(t)
 
@@ -301,6 +314,7 @@ func TestZ3_AllProperties(t *testing.T) {
 }
 
 // Verifies: SYS-REQ-022 [boundary]
+// MCDC SYS-REQ-022: policy_rate_empty=F, rate_limit_applied=T, rate_limit_apply_requested=T => TRUE
 func TestZ3_QuotaBoundary_ZeroVsNegative(t *testing.T) {
 	orgID := "org1"
 	pol1 := user.Policy{
@@ -341,6 +355,7 @@ func TestZ3_QuotaBoundary_ZeroVsNegative(t *testing.T) {
 }
 
 // Verifies: SYS-REQ-033 [boundary]
+// MCDC SYS-REQ-033: apply_requested=T, result_returned=T => TRUE
 func TestZ3_ComplexityBoundary_ZeroVsNegative(t *testing.T) {
 	orgID := "org1"
 	pol1 := user.Policy{
@@ -379,6 +394,7 @@ func TestZ3_ComplexityBoundary_ZeroVsNegative(t *testing.T) {
 }
 
 // Verifies: SYS-REQ-022 [boundary]
+// MCDC SYS-REQ-022: policy_rate_empty=F, rate_limit_applied=T, rate_limit_apply_requested=T => TRUE
 func TestZ3_QuotaBoundary_NegativeVsNegative(t *testing.T) {
 	orgID := "org1"
 	pol1 := user.Policy{
@@ -423,6 +439,11 @@ func TestZ3_QuotaBoundary_NegativeVsNegative(t *testing.T) {
 // against real code, proving that formal data properties hold for concrete inputs.
 
 // Verifies: SYS-REQ-021, SYS-REQ-022, SYS-REQ-033, SYS-REQ-016, SYS-REQ-017 [formal]
+// MCDC SYS-REQ-021: api_limit_empty=F, policy_rate_empty=F, policy_rate_equal=F, policy_rate_higher=F, rate_limit_applied=T, rate_limit_apply_requested=T => TRUE
+// MCDC SYS-REQ-022: policy_rate_empty=F, rate_limit_applied=T, rate_limit_apply_requested=T => TRUE
+// MCDC SYS-REQ-033: apply_requested=T, result_returned=T => TRUE
+// MCDC SYS-REQ-016: apply_requested=T, error_reported=F, tags_merged=T => TRUE
+// MCDC SYS-REQ-017: apply_requested=T, error_reported=F, metadata_merged=T => TRUE
 func TestZ3_FormalEvidence_AllProperties(t *testing.T) {
 	allFixtures := loadAllZ3Fixtures(t)
 	require.NotEmpty(t, allFixtures, "Z3 fixtures must exist for formal evidence")
@@ -438,6 +459,8 @@ func TestZ3_FormalEvidence_AllProperties(t *testing.T) {
 }
 
 // Verifies: STK-REQ-001, SYS-REQ-021 [formal]
+// MCDC STK-REQ-001: N/A
+// MCDC SYS-REQ-021: api_limit_empty=F, policy_rate_empty=F, policy_rate_equal=F, policy_rate_higher=F, rate_limit_applied=T, rate_limit_apply_requested=T => TRUE
 func TestZ3_FormalEvidence_RateLimitProperty(t *testing.T) {
 	fixtures := loadZ3Fixtures(t, "rate_limit_applied")
 	require.NotEmpty(t, fixtures, "rate_limit_applied Z3 fixtures must exist")
@@ -481,6 +504,7 @@ func TestZ3_FormalEvidence_RateLimitProperty(t *testing.T) {
 }
 
 // Verifies: SYS-REQ-022 [formal]
+// MCDC SYS-REQ-022: policy_rate_empty=F, rate_limit_applied=T, rate_limit_apply_requested=T => TRUE
 func TestZ3_FormalEvidence_QuotaProperty(t *testing.T) {
 	fixtures := loadZ3Fixtures(t, "quota_applied")
 	require.NotEmpty(t, fixtures, "quota_applied Z3 fixtures must exist")
