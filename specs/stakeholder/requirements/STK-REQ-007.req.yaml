@@ -37,8 +37,6 @@ history:
     last_modified_by: human:cli
     last_modified_at: "2026-04-19T15:13:33Z"
 stakeholder:
-    obligation_checklist:
-        - nominal
     persona: Platform reliability engineer
     story: As a platform reliability engineer, I need the policy engine to complete Apply() within 100ms for up to 50 policies so that API gateway latency SLAs are maintained.
     acceptance_criteria:
@@ -52,6 +50,8 @@ stakeholder:
           testable: true
           derived_reqs:
             - SYS-REQ-044
+    obligation_checklist:
+        - nominal
 lifecycle:
     change_history:
         - date: "2026-04-19T15:13:33Z"

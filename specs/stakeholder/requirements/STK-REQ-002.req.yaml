@@ -37,9 +37,6 @@ history:
     last_modified_by: human:cli
     last_modified_at: "2026-04-19T15:13:33Z"
 stakeholder:
-    obligation_checklist:
-        - nominal
-        - error_handling
     persona: API platform administrator
     story: As an API platform administrator, I need the policy engine to correctly clear session state so that policy changes take effect immediately without stale data.
     acceptance_criteria:
@@ -53,6 +50,9 @@ stakeholder:
           testable: true
           derived_reqs:
             - SYS-REQ-020
+    obligation_checklist:
+        - nominal
+        - error_handling
 lifecycle:
     change_history:
         - date: "2026-04-19T15:13:33Z"
