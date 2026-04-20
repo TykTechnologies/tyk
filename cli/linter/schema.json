@@ -1644,6 +1644,12 @@
         }
       }
     },
+    "rate_limit_response_headers": {
+      "description": "Determines the type of data that will be returned in the rate limit headers",
+      "type": ["string"],
+      "enum": ["", "quotas", "rate_limits"],
+      "default": "quotas"
+    },
     "allow_unsafe_policy_ids": {
       "type": ["boolean", "null"],
       "additionalProperties": false

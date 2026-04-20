@@ -16,13 +16,14 @@ import (
 	"time"
 
 	"github.com/robertkrimen/otto"
-	_ "github.com/robertkrimen/otto/underscore"
+	"github.com/sirupsen/logrus"
 
 	"github.com/TykTechnologies/tyk-pump/analytics"
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/internal/middleware"
 	"github.com/TykTechnologies/tyk/user"
-	"github.com/sirupsen/logrus"
+
+	_ "github.com/robertkrimen/otto/underscore"
 )
 
 // RequestObject is marshalled to JSON string and passed into JSON middleware
@@ -331,7 +332,7 @@ func (gw *Gateway) handleForcedResponse(rw http.ResponseWriter, res *http.Respon
 		res.Header.Set("Connection", "close")
 	}
 
-	spec.sendRateLimitHeaders(ses, res)
+	gw.limitHeaderFactory(res.Header).SendQuotas(ses, spec.APIID)
 
 	copyHeader(rw.Header(), res.Header, gw.GetConfig().IgnoreCanonicalMIMEHeaderKey)
 
