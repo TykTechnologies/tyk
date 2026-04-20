@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/base64"
 	"errors"
-	"html"
 	htmltemplate "html/template"
 	"io"
 	"io/ioutil"
@@ -13,10 +12,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/TykTechnologies/tyk/apidef"
-
 	"github.com/TykTechnologies/tyk-pump/analytics"
+	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
+	tykctx "github.com/TykTechnologies/tyk/ctx"
 	"github.com/TykTechnologies/tyk/header"
 	"github.com/TykTechnologies/tyk/internal/httpctx"
 	jsonrpcerrors "github.com/TykTechnologies/tyk/internal/jsonrpc/errors"
@@ -79,9 +78,8 @@ type APIError struct {
 }
 
 // APIErrorWithContext provides context for error override templates.
-// Uses plain string Message to allow html/template's context-aware escaping for JSON.
 type APIErrorWithContext struct {
-	Message    string
+	Message    htmltemplate.HTML
 	StatusCode int
 }
 
@@ -401,11 +399,9 @@ func (e *ErrorHandler) writeJSONRPCErrorResponse(w http.ResponseWriter, r *http.
 // Returns nil if no override applies, allowing fallback to the default template.
 func (e *ErrorHandler) tryWriteOverride(w http.ResponseWriter, r *http.Request, errMsg string, errCode int) *http.Response {
 	// Fast path: check config map length before atomic load
-	if len(e.Spec.GlobalConfig.ErrorOverrides) == 0 {
-		return nil
-	}
+	if len(e.Spec.GlobalConfig.ErrorOverrides) == 0 &&
+		(e.Spec.ErrorOverridesDisabled || len(e.Spec.ErrorOverrides) == 0) {
 
-	if e.Gw.GetCompiledErrorOverrides() == nil {
 		return nil
 	}
 
@@ -436,17 +432,21 @@ func (e *ErrorHandler) writeOverrideResponse(w http.ResponseWriter, r *http.Requ
 	// Body with template variables, or file template
 	tmpl := result.GetTemplateExecutor(e.Gw, ctx)
 	if tmpl != nil {
-		msg := result.GetMessageForTemplate()
-		if ctx.IsXML {
-			// text/template doesn't auto-escape, so we need explicit HTML escaping for XML
-			msg = html.EscapeString(msg)
+		data := map[string]any{
+			"Message":    escapeTemplateString(result.GetMessageForTemplate(), ctx.IsXML),
+			"StatusCode": result.StatusCode,
 		}
-		// For JSON, html/template does context-aware escaping automatically
 
-		data := &APIErrorWithContext{
-			Message:    msg,
-			StatusCode: result.StatusCode,
+		if ec := tykctx.GetErrorClassification(r); ec != nil && ec.TemplateData != nil {
+			for k, v := range ec.TemplateData {
+				if s, ok := v.(string); ok {
+					v = escapeTemplateString(s, ctx.IsXML)
+				}
+
+				data[k] = v
+			}
 		}
+
 		response := e.ExecuteErrorTemplate(w, tmpl, data, result.StatusCode)
 		response.Header = respHeader
 

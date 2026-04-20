@@ -75,7 +75,7 @@ func BenchmarkTryWriteOverride(b *testing.B) {
 func BenchmarkApplyOverride(b *testing.B) {
 	b.Run("no overrides configured", func(b *testing.B) {
 		gw := &Gateway{}
-		eo := NewErrorOverrides(nil, gw)
+		eo := NewErrorOverrides(&APISpec{}, gw)
 		req := httptest.NewRequest("GET", "/test", nil)
 		body := []byte("Internal server error")
 
@@ -100,7 +100,7 @@ func BenchmarkApplyOverride(b *testing.B) {
 		gw := &Gateway{}
 		compiled := CompileErrorOverrides(overrides)
 		gw.SetCompiledErrorOverrides(compiled)
-		eo := NewErrorOverrides(nil, gw)
+		eo := NewErrorOverrides(&APISpec{}, gw)
 		req := httptest.NewRequest("GET", "/test", nil)
 		body := []byte("Internal server error")
 
@@ -124,7 +124,7 @@ func BenchmarkApplyOverride(b *testing.B) {
 		gw := &Gateway{}
 		compiled := CompileErrorOverrides(overrides)
 		gw.SetCompiledErrorOverrides(compiled)
-		eo := NewErrorOverrides(nil, gw)
+		eo := NewErrorOverrides(&APISpec{}, gw)
 		req := httptest.NewRequest("GET", "/test", nil)
 		body := []byte("Not found")
 
@@ -152,7 +152,7 @@ func BenchmarkApplyOverride(b *testing.B) {
 		gw := &Gateway{}
 		compiled := CompileErrorOverrides(overrides)
 		gw.SetCompiledErrorOverrides(compiled)
-		eo := NewErrorOverrides(nil, gw)
+		eo := NewErrorOverrides(&APISpec{}, gw)
 		req := httptest.NewRequest("GET", "/test", nil)
 		body := []byte("database connection timeout occurred")
 
@@ -180,7 +180,7 @@ func BenchmarkApplyOverride(b *testing.B) {
 		gw := &Gateway{}
 		compiled := CompileErrorOverrides(overrides)
 		gw.SetCompiledErrorOverrides(compiled)
-		eo := NewErrorOverrides(nil, gw)
+		eo := NewErrorOverrides(&APISpec{}, gw)
 		req := httptest.NewRequest("GET", "/test", nil)
 		body := []byte("network error occurred")
 
@@ -209,7 +209,7 @@ func BenchmarkApplyOverride(b *testing.B) {
 		gw := &Gateway{}
 		compiled := CompileErrorOverrides(overrides)
 		gw.SetCompiledErrorOverrides(compiled)
-		eo := NewErrorOverrides(nil, gw)
+		eo := NewErrorOverrides(&APISpec{}, gw)
 		req := httptest.NewRequest("GET", "/test", nil)
 		body := []byte(`{"error": {"code": "INVALID_INPUT", "message": "Field x is required"}}`)
 
@@ -249,7 +249,7 @@ func BenchmarkApplyOverride(b *testing.B) {
 		gw := &Gateway{}
 		compiled := CompileErrorOverrides(overrides)
 		gw.SetCompiledErrorOverrides(compiled)
-		eo := NewErrorOverrides(nil, gw)
+		eo := NewErrorOverrides(&APISpec{}, gw)
 		req := httptest.NewRequest("GET", "/test", nil)
 		body := []byte("database connection failed")
 
@@ -276,7 +276,7 @@ func BenchmarkApplyOverride(b *testing.B) {
 		gw := &Gateway{}
 		compiled := CompileErrorOverrides(overrides)
 		gw.SetCompiledErrorOverrides(compiled)
-		eo := NewErrorOverrides(nil, gw)
+		eo := NewErrorOverrides(&APISpec{}, gw)
 		req := httptest.NewRequest("GET", "/test", nil)
 		largeBody := make([]byte, maxBodySizeForMatching+1000)
 		copy(largeBody, []byte("error at start"))
@@ -305,7 +305,7 @@ func BenchmarkApplyOverride(b *testing.B) {
 		gw := &Gateway{}
 		compiled := CompileErrorOverrides(overrides)
 		gw.SetCompiledErrorOverrides(compiled)
-		eo := NewErrorOverrides(nil, gw)
+		eo := NewErrorOverrides(&APISpec{}, gw)
 		req := httptest.NewRequest("GET", "/test", nil)
 		ctx.SetErrorClassification(req, errors.NewErrorClassification(errors.RLT, "rate_limited"))
 
@@ -333,7 +333,7 @@ func BenchmarkApplyOverride(b *testing.B) {
 		gw := &Gateway{}
 		compiled := CompileErrorOverrides(overrides)
 		gw.SetCompiledErrorOverrides(compiled)
-		eo := NewErrorOverrides(nil, gw)
+		eo := NewErrorOverrides(&APISpec{}, gw)
 		req := httptest.NewRequest("GET", "/test", nil)
 		// No classification set
 
@@ -362,7 +362,7 @@ func BenchmarkApplyOverride(b *testing.B) {
 		gw := &Gateway{}
 		compiled := CompileErrorOverrides(overrides)
 		gw.SetCompiledErrorOverrides(compiled)
-		eo := NewErrorOverrides(nil, gw)
+		eo := NewErrorOverrides(&APISpec{}, gw)
 		req := httptest.NewRequest("GET", "/test", nil)
 		// Set different flag so it falls back to regex
 		ctx.SetErrorClassification(req, errors.NewErrorClassification(errors.UCF, "connection_failure"))
@@ -412,7 +412,7 @@ func BenchmarkApplyOverride(b *testing.B) {
 		gw := &Gateway{}
 		compiled := CompileErrorOverrides(overrides)
 		gw.SetCompiledErrorOverrides(compiled)
-		eo := NewErrorOverrides(nil, gw)
+		eo := NewErrorOverrides(&APISpec{}, gw)
 		req := httptest.NewRequest("GET", "/test", nil)
 		ctx.SetErrorClassification(req, errors.NewErrorClassification(errors.TKE, "token_expired"))
 
@@ -452,7 +452,7 @@ func BenchmarkApplyOverride(b *testing.B) {
 		gw := &Gateway{}
 		compiled := CompileErrorOverrides(overrides)
 		gw.SetCompiledErrorOverrides(compiled)
-		eo := NewErrorOverrides(nil, gw)
+		eo := NewErrorOverrides(&APISpec{}, gw)
 		req := httptest.NewRequest("GET", "/test", nil)
 		// Set a flag that doesn't match any specific rule
 		ctx.SetErrorClassification(req, errors.NewErrorClassification(errors.AKI, "api_key_invalid"))
@@ -480,7 +480,7 @@ func BenchmarkApplyOverride(b *testing.B) {
 		gw := &Gateway{}
 		compiled := CompileErrorOverrides(overrides)
 		gw.SetCompiledErrorOverrides(compiled)
-		eo := NewErrorOverrides(nil, gw)
+		eo := NewErrorOverrides(&APISpec{}, gw)
 		req := httptest.NewRequest("GET", "/test", nil)
 		ctx.SetErrorClassification(req, errors.NewErrorClassification(errors.RLT, "rate_limited"))
 
@@ -507,7 +507,7 @@ func BenchmarkApplyOverride(b *testing.B) {
 		gw := &Gateway{}
 		compiled := CompileErrorOverrides(overrides)
 		gw.SetCompiledErrorOverrides(compiled)
-		eo := NewErrorOverrides(nil, gw)
+		eo := NewErrorOverrides(&APISpec{}, gw)
 		req := httptest.NewRequest("GET", "/test", nil)
 		body := []byte("Rate limit exceeded")
 

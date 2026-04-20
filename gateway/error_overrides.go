@@ -102,7 +102,7 @@ func compileRulesForStatusCode(rules []apidef.ErrorOverride, statusCode string) 
 
 	for i := range rules {
 		if err := compileSingleRule(&rules[i]); err != nil {
-			log.WithError(err).WithFields(map[string]interface{}{
+			log.WithError(err).WithFields(map[string]any{
 				"status_code": statusCode,
 				"rule_index":  i,
 			}).Warn("Failed to compile error override rule, skipping")
@@ -195,45 +195,40 @@ func compileBodyTemplates(rule *apidef.ErrorOverride) error {
 // Uses O(1) lookup by status code, then checks additional matching criteria.
 // Returns nil if no override matches.
 func (o *ErrorOverrides) ApplyOverride(r *http.Request, statusCode int, body []byte) *OverrideResult {
-	// Future: Check API-level first (o.Spec.CompiledErrorOverrides)
+	apiCompiled := o.Spec.GetCompiledErrorOverrides()
+	gwCompiled := o.Gw.GetCompiledErrorOverrides()
 
-	// Check gateway-level compiled overrides
-	compiled := o.Gw.GetCompiledErrorOverrides()
-	if compiled == nil {
+	if apiCompiled == nil && gwCompiled == nil {
 		return nil
 	}
 
-	// Find matching rule (uses request context for flag matching, body for pattern matching)
-	rule := o.findMatchingRule(r, compiled, statusCode, body)
-	if rule == nil {
-		return nil
+	if apiCompiled != nil {
+		if rule := o.findMatchingRule(r, apiCompiled, statusCode, body); rule != nil {
+			return o.createOverrideResult(rule, statusCode)
+		}
 	}
 
-	// Build result with context for response writing
-	// Original body is NOT stored - users must provide explicit override messages
-	result := &OverrideResult{
-		StatusCode:   rule.Response.StatusCode,
-		Headers:      rule.Response.Headers,
-		OriginalCode: statusCode,
-		rule:         rule,
+	if gwCompiled != nil {
+		if rule := o.findMatchingRule(r, gwCompiled, statusCode, body); rule != nil {
+			return o.createOverrideResult(rule, statusCode)
+		}
 	}
 
-	// If StatusCode is not set, keep the original status code
-	if result.StatusCode == 0 {
-		result.StatusCode = statusCode
-	}
-
-	return result
+	return nil
 }
 
-// findMatchingRule searches for a matching override rule.
+// findMatchingRuleGeneric searches for a matching override rule using a custom match function.
 // Checks exact status code first, then pattern matches (4xx, 5xx).
 // Rules are evaluated in order within each status code (first match wins).
-func (o *ErrorOverrides) findMatchingRule(r *http.Request, compiled *CompiledErrorOverrides, statusCode int, body []byte) *apidef.ErrorOverride {
+func (o *ErrorOverrides) findMatchingRuleGeneric(
+	compiled *CompiledErrorOverrides,
+	statusCode int,
+	matchFunc func(*apidef.ErrorOverride) bool,
+) *apidef.ErrorOverride {
 	// First, check exact status code matches (O(1) lookup)
 	if rules, ok := compiled.ByExactCode[statusCode]; ok {
 		for _, rule := range rules {
-			if o.matchesAdditionalCriteria(r, rule, body) {
+			if matchFunc(rule) {
 				return rule
 			}
 		}
@@ -243,7 +238,7 @@ func (o *ErrorOverrides) findMatchingRule(r *http.Request, compiled *CompiledErr
 	prefix := statusCode / 100
 	if rules, ok := compiled.ByPrefix[prefix]; ok {
 		for _, rule := range rules {
-			if o.matchesAdditionalCriteria(r, rule, body) {
+			if matchFunc(rule) {
 				return rule
 			}
 		}
@@ -252,12 +247,20 @@ func (o *ErrorOverrides) findMatchingRule(r *http.Request, compiled *CompiledErr
 	return nil
 }
 
-// matchesAdditionalCriteria checks if request/body matches flag, message_pattern, and body_field criteria.
+// findMatchingRule searches for a matching override rule.
+// Checks exact status code first, then pattern matches (4xx, 5xx).
+// Rules are evaluated in order within each status code (first match wins).
+func (o *ErrorOverrides) findMatchingRule(r *http.Request, compiled *CompiledErrorOverrides, statusCode int, body []byte) *apidef.ErrorOverride {
+	return o.findMatchingRuleGeneric(compiled, statusCode, func(rule *apidef.ErrorOverride) bool {
+		return o.matchesAdditionalCriteria(r, rule, body)
+	})
+}
+
+// matchesAdditionalCriteria checks if request/body matches flag and message_pattern criteria.
+// Used for gateway-generated errors where body is plain text (not JSON).
+// For upstream JSON responses, use matchesUpstreamCriteria instead.
 // Status code is already matched via map lookup.
-// Match priority: flag > body_field > message_pattern.
-// Large bodies are truncated before matching to prevent performance issues.
 func (o *ErrorOverrides) matchesAdditionalCriteria(r *http.Request, rule *apidef.ErrorOverride, body []byte) bool {
-	// If no match criteria, always matches
 	if rule.Match == nil {
 		return true
 	}
@@ -265,40 +268,18 @@ func (o *ErrorOverrides) matchesAdditionalCriteria(r *http.Request, rule *apidef
 	// Flag matching (highest priority - semantic match from error classification)
 	if rule.Match.Flag != "" {
 		if o.matchFlag(r, rule.Match.Flag) {
-			return true // Flag matched, no need to check other criteria
-		}
-		// Flag specified but didn't match - fall through to other criteria
-	}
-
-	// Truncate large bodies to prevent regex/JSON parsing performance issues
-	// This is mainly for upstream error responses (HTML pages, stack traces)
-	matchBody := body
-	if len(body) > maxBodySizeForMatching {
-		matchBody = body[:maxBodySizeForMatching]
-		log.WithField("body_size", len(body)).Debug("Truncated large error body for pattern matching")
-	}
-
-	// If body_field + body_value are set, extracted value must equal body_value
-	if rule.Match.BodyField != "" && rule.Match.BodyValue != "" {
-		if o.matchBodyField(rule.Match.BodyField, rule.Match.BodyValue, matchBody) {
 			return true
 		}
-		// Body field specified but didn't match - fall through to message pattern
 	}
 
-	// If message_pattern is set, body must match the regex
+	// Message pattern matching (regex on error message)
 	if rule.Match.MessagePattern != "" {
-		if o.matchMessagePattern(rule.Match, matchBody) {
-			return true
-		}
+		return o.matchMessagePattern(rule.Match, body)
 	}
 
-	// If any criteria were specified but none matched, return false
-	// This happens when flag, body_field, or message_pattern was set but didn't match
-	hasAnyCriteria := rule.Match.Flag != "" || rule.Match.MessagePattern != "" ||
-		(rule.Match.BodyField != "" && rule.Match.BodyValue != "")
-
-	return !hasAnyCriteria
+	// No criteria specified = match all
+	hasMatchCriteria := rule.Match.Flag != "" || rule.Match.MessagePattern != ""
+	return !hasMatchCriteria
 }
 
 // matchFlag checks if the error classification flag matches the expected flag.
@@ -403,4 +384,95 @@ func (r *OverrideResult) getInlineTemplate(errCtx *ErrorResponseContext) Templat
 	}
 
 	return nil
+}
+
+// ApplyUpstreamOverride applies overrides for upstream 4xx/5xx responses.
+// Uses lazy body reading via closure.
+func (o *ErrorOverrides) ApplyUpstreamOverride(statusCode int, readBody func() []byte) *OverrideResult {
+	apiCompiled := o.Spec.GetCompiledErrorOverrides()
+	gwCompiled := o.Gw.GetCompiledErrorOverrides()
+
+	if apiCompiled == nil && gwCompiled == nil {
+		return nil
+	}
+
+	matchFunc := func(rule *apidef.ErrorOverride) bool {
+		var matchBody []byte
+		if o.needsBodyForMatch(rule) {
+			matchBody = readBody()
+		}
+
+		return o.matchesUpstreamCriteria(rule, matchBody, statusCode)
+	}
+
+	if apiCompiled != nil {
+		if rule := o.findMatchingRuleGeneric(apiCompiled, statusCode, matchFunc); rule != nil {
+			return o.createOverrideResult(rule, statusCode)
+		}
+	}
+
+	if gwCompiled != nil {
+		if rule := o.findMatchingRuleGeneric(gwCompiled, statusCode, matchFunc); rule != nil {
+			return o.createOverrideResult(rule, statusCode)
+		}
+	}
+
+	return nil
+}
+
+func (o *ErrorOverrides) createOverrideResult(rule *apidef.ErrorOverride, statusCode int) *OverrideResult {
+	result := &OverrideResult{
+		StatusCode:   rule.Response.StatusCode,
+		Headers:      rule.Response.Headers,
+		OriginalCode: statusCode,
+		rule:         rule,
+	}
+	if result.StatusCode == 0 {
+		result.StatusCode = statusCode
+	}
+	return result
+}
+
+// matchesUpstreamCriteria checks if an upstream response matches the rule.
+// Handles URS flag specially for 5xx responses, supports body_field and message_pattern.
+// Skips gateway-only flags (AKI, RLT, etc.) since they require request context.
+func (o *ErrorOverrides) matchesUpstreamCriteria(rule *apidef.ErrorOverride, body []byte, statusCode int) bool {
+	if rule.Match == nil {
+		return true
+	}
+
+	// URS flag matches any 5xx upstream response
+	if rule.Match.Flag == errors.URS {
+		return statusCode >= 500 && statusCode <= 599
+	}
+
+	// Skip rules with other flags - they're gateway-only (AKI, RLT, etc.)
+	if rule.Match.Flag != "" {
+		return false
+	}
+
+	// Body field matching (JSON path) - useful for upstream JSON responses
+	if rule.Match.BodyField != "" && rule.Match.BodyValue != "" {
+		if o.matchBodyField(rule.Match.BodyField, rule.Match.BodyValue, body) {
+			return true
+		}
+	}
+
+	// Message pattern matching (regex)
+	if rule.Match.MessagePattern != "" {
+		return o.matchMessagePattern(rule.Match, body)
+	}
+
+	// No match criteria = match all
+	hasMatchCriteria := rule.Match.MessagePattern != "" ||
+		(rule.Match.BodyField != "" && rule.Match.BodyValue != "")
+	return !hasMatchCriteria
+}
+
+// needsBodyForMatch returns true if the rule requires body inspection.
+func (o *ErrorOverrides) needsBodyForMatch(rule *apidef.ErrorOverride) bool {
+	if rule.Match == nil {
+		return false
+	}
+	return rule.Match.BodyField != "" || rule.Match.MessagePattern != ""
 }

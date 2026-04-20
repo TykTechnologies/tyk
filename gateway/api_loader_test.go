@@ -19,6 +19,7 @@ import (
 	"github.com/gorilla/mux"
 	nr "github.com/newrelic/go-agent/v3/newrelic"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	persistentmodel "github.com/TykTechnologies/storage/persistent/model"
 
@@ -9926,5 +9927,40 @@ func TestMCPRequestSizeLimit_Security(t *testing.T) {
 
 		// Verify it's not MCP
 		assert.False(t, api.IsMCP(), "API should not be MCP")
+	})
+}
+
+func TestProcessSpec_ErrorOverrideDisabled(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	t.Run("compiles when disabled is false", func(t *testing.T) {
+		specs := ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+			spec.Name = "enabled-overrides"
+			spec.ErrorOverridesDisabled = false
+			spec.ErrorOverrides = apidef.ErrorOverridesMap{
+				"500": []apidef.ErrorOverride{
+					{Response: apidef.ErrorResponse{Message: "test"}},
+				},
+			}
+		})
+
+		require.Len(t, specs, 1)
+		assert.NotNil(t, specs[0].GetCompiledErrorOverrides())
+	})
+
+	t.Run("skips compildation when disabled is true", func(t *testing.T) {
+		specs := ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+			spec.Name = "disabled-overrides"
+			spec.ErrorOverridesDisabled = true
+			spec.ErrorOverrides = apidef.ErrorOverridesMap{
+				"500": []apidef.ErrorOverride{
+					{Response: apidef.ErrorResponse{Message: "test"}},
+				},
+			}
+		})
+
+		require.Len(t, specs, 1)
+		assert.Nil(t, specs[0].GetCompiledErrorOverrides())
 	})
 }

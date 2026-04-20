@@ -568,7 +568,7 @@ func TestErrorOverrideEdgeCases(t *testing.T) {
 		compiled := CompileErrorOverrides(overrides)
 		gw.SetCompiledErrorOverrides(compiled)
 
-		eo := NewErrorOverrides(nil, gw)
+		eo := NewErrorOverrides(&APISpec{}, gw)
 		req := httptest.NewRequest("GET", "/test", nil)
 
 		result := eo.ApplyOverride(req, 500, []byte("error"))

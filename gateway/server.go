@@ -1187,6 +1187,10 @@ func (gw *Gateway) createResponseMiddlewareChain(
 		responseMWChain = append(responseMWChain, processor)
 	}
 
+	// Add error override handler (before cache) - intercepts upstream 4xx/5xx
+	gw.responseMWAppendEnabled(&responseMWChain,
+		decorate(&ResponseErrorOverrideMiddleware{BaseTykResponseHandler: baseHandler}))
+
 	keyPrefix := "cache-" + spec.APIID
 	cacheStore := &storage.RedisCluster{KeyPrefix: keyPrefix, IsCache: true, ConnectionHandler: gw.StorageConnectionHandler}
 	cacheStore.Connect()
