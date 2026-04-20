@@ -247,9 +247,11 @@ func (t *Service) Apply(session *user.SessionState) error {
 			v.Limit.QuotaRenews = session.QuotaRenews
 		}
 
-		// If multime ACL
+		// If multiple ACLs from different policies, set AllowanceScope from SetBy.
+		// SetBy is always non-empty here: every API that passes the didAcl
+		// check above had SetBy assigned during partition/perAPI processing.
 		if len(distinctACL) > 1 {
-			if v.AllowanceScope == "" && v.Limit.SetBy != "" {
+			if v.AllowanceScope == "" {
 				v.AllowanceScope = v.Limit.SetBy
 			}
 		}
