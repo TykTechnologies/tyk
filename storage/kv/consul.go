@@ -84,6 +84,14 @@ func newConsul(conf config.ConsulConfig) (Store, error) {
 		defaultCfg.TLSConfig.CertFile = conf.TLSConfig.CertFile
 	}
 
+	if conf.TLSConfig.KeyFile != "" {
+		defaultCfg.TLSConfig.KeyFile = conf.TLSConfig.KeyFile
+	}
+
+	if conf.TLSConfig.CAPath != "" {
+		defaultCfg.TLSConfig.CAPath = conf.TLSConfig.CAPath
+	}
+
 	if conf.TLSConfig.CAFile != "" {
 		defaultCfg.TLSConfig.CAFile = conf.TLSConfig.CAFile
 	}
