@@ -37,10 +37,6 @@ history:
     last_modified_by: human:cli
     last_modified_at: "2026-04-19T15:13:33Z"
 stakeholder:
-    obligation_checklist:
-        - nominal
-        - rate_limit_boundary
-        - policy_merge
     persona: API platform administrator
     story: As an API platform administrator, I need endpoint-level rate limits to be merged per path+method so that fine-grained traffic control works correctly across multiple policies.
     acceptance_criteria:
@@ -54,6 +50,10 @@ stakeholder:
           testable: true
           derived_reqs:
             - SYS-REQ-023
+    obligation_checklist:
+        - nominal
+        - rate_limit_boundary
+        - policy_merge
 lifecycle:
     change_history:
         - date: "2026-04-19T15:13:33Z"

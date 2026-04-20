@@ -38,13 +38,6 @@ history:
     last_modified_by: human:cli
     last_modified_at: "2026-04-19T15:13:33Z"
 stakeholder:
-    obligation_checklist:
-        - nominal
-        - error_handling
-        - malformed_input
-        - boundary
-        - access_denied
-        - policy_merge
     persona: API platform administrator
     story: As an API platform administrator, I need the policy engine to correctly apply access control policies to sessions so that API consumers get the right permissions, rate limits, and quotas.
     acceptance_criteria:
@@ -88,6 +81,13 @@ stakeholder:
             - SYS-REQ-024
             - SYS-REQ-025
             - SYS-REQ-026
+    obligation_checklist:
+        - nominal
+        - error_handling
+        - malformed_input
+        - boundary
+        - access_denied
+        - policy_merge
 lifecycle:
     change_history:
         - date: "2026-04-19T15:13:33Z"

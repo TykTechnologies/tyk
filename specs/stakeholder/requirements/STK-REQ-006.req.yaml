@@ -38,9 +38,6 @@ history:
     last_modified_by: human:cli
     last_modified_at: "2026-04-19T15:13:33Z"
 stakeholder:
-    obligation_checklist:
-        - nominal
-        - error_handling
     persona: Platform reliability engineer
     story: As a platform reliability engineer, I need the policy engine to be idle-safe and store-aware so that it never produces spurious state changes when idle and never panics when the policy store is unavailable.
     acceptance_criteria:
@@ -60,6 +57,9 @@ stakeholder:
           derived_reqs:
             - SYS-REQ-027
             - SYS-REQ-029
+    obligation_checklist:
+        - nominal
+        - error_handling
 lifecycle:
     change_history:
         - date: "2026-04-19T15:13:33Z"

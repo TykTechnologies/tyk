@@ -38,11 +38,6 @@ history:
     last_modified_by: human:cli
     last_modified_at: "2026-04-19T15:13:33Z"
 stakeholder:
-    obligation_checklist:
-        - nominal
-        - error_handling
-        - access_denied
-        - malformed_input
     persona: Security engineer
     story: As a security engineer, I need the policy engine to enforce strict error atomicity so that a failed policy application never partially modifies the session, which could grant unauthorized access.
     acceptance_criteria:
@@ -73,6 +68,11 @@ stakeholder:
           testable: true
           derived_reqs:
             - SYS-REQ-028
+    obligation_checklist:
+        - nominal
+        - error_handling
+        - access_denied
+        - malformed_input
 lifecycle:
     change_history:
         - date: "2026-04-19T15:13:33Z"
