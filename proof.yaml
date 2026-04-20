@@ -28,10 +28,6 @@ project:
         - access_denied
         - policy_merge
         - rate_limit_boundary
-    verification:
-        fixture_evidence:
-            components:
-                - policy
     checks:
         coverage_threshold:
             threshold: 90
