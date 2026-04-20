@@ -2,6 +2,7 @@ package gateway
 
 import (
 	htmltemplate "html/template"
+	"net/http"
 	"net/http/httptest"
 	"testing"
 	texttemplate "text/template"
@@ -11,6 +12,15 @@ import (
 	"github.com/TykTechnologies/tyk/ctx"
 	"github.com/TykTechnologies/tyk/header"
 	"github.com/TykTechnologies/tyk/internal/errors"
+)
+
+const (
+	benchInternalServerError = "Internal server error"
+	benchServiceUnavailable  = "Service unavailable"
+	benchDBTimeoutPattern    = "database.*timeout"
+	benchDatabaseTimeout     = "Database timeout"
+	benchRateLimitExceeded   = "Rate limit exceeded"
+	benchErrorMessage        = "error message"
 )
 
 func BenchmarkTryWriteOverride(b *testing.B) {
@@ -30,7 +40,7 @@ func BenchmarkTryWriteOverride(b *testing.B) {
 		req := httptest.NewRequest("GET", "/test", nil)
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
-			handler.tryWriteOverride(nil, req, "error message", 500)
+			handler.tryWriteOverride(nil, req, benchErrorMessage, 500)
 		}
 	})
 
@@ -67,455 +77,202 @@ func BenchmarkTryWriteOverride(b *testing.B) {
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
 			w := httptest.NewRecorder()
-			handler.tryWriteOverride(w, req, "error message", 500)
+			handler.tryWriteOverride(w, req, benchErrorMessage, 500)
 		}
 	})
 }
 
 func BenchmarkApplyOverride(b *testing.B) {
-	b.Run("no overrides configured", func(b *testing.B) {
-		gw := &Gateway{}
-		eo := NewErrorOverrides(&APISpec{}, gw)
-		req := httptest.NewRequest("GET", "/test", nil)
-		body := []byte("Internal server error")
+	largeBody := make([]byte, maxBodySizeForMatching+1000)
+	copy(largeBody, []byte("error at start"))
 
-		b.ResetTimer()
-		for i := 0; i < b.N; i++ {
-			eo.ApplyOverride(req, 500, body)
-		}
-	})
-
-	b.Run("exact code match - no additional criteria", func(b *testing.B) {
-		overrides := apidef.ErrorOverridesMap{
-			"500": []apidef.ErrorOverride{
-				{
-					Response: apidef.ErrorResponse{
-						StatusCode: 503,
-						Message:    "Service unavailable",
-					},
+	cases := []struct {
+		name       string
+		overrides  apidef.ErrorOverridesMap
+		setupReq   func(*http.Request)
+		statusCode int
+		body       []byte
+	}{
+		{
+			name:       "no overrides configured",
+			statusCode: 500,
+			body:       []byte(benchInternalServerError),
+		},
+		{
+			name: "exact code match - no additional criteria",
+			overrides: apidef.ErrorOverridesMap{
+				"500": []apidef.ErrorOverride{{
+					Response: apidef.ErrorResponse{StatusCode: 503, Message: benchServiceUnavailable},
+				}},
+			},
+			statusCode: 500,
+			body:       []byte(benchInternalServerError),
+		},
+		{
+			name: "pattern match 4xx",
+			overrides: apidef.ErrorOverridesMap{
+				"4xx": []apidef.ErrorOverride{{
+					Response: apidef.ErrorResponse{Message: "Client error"},
+				}},
+			},
+			statusCode: 404,
+			body:       []byte("Not found"),
+		},
+		{
+			name: "regex pattern match",
+			overrides: apidef.ErrorOverridesMap{
+				"500": []apidef.ErrorOverride{{
+					Match:    &apidef.ErrorMatcher{MessagePattern: benchDBTimeoutPattern},
+					Response: apidef.ErrorResponse{StatusCode: 504, Message: benchDatabaseTimeout},
+				}},
+			},
+			statusCode: 500,
+			body:       []byte("database connection timeout occurred"),
+		},
+		{
+			name: "regex pattern non-match",
+			overrides: apidef.ErrorOverridesMap{
+				"500": []apidef.ErrorOverride{{
+					Match:    &apidef.ErrorMatcher{MessagePattern: benchDBTimeoutPattern},
+					Response: apidef.ErrorResponse{StatusCode: 504, Message: benchDatabaseTimeout},
+				}},
+			},
+			statusCode: 500,
+			body:       []byte("network error occurred"),
+		},
+		{
+			name: "JSON body field match",
+			overrides: apidef.ErrorOverridesMap{
+				"400": []apidef.ErrorOverride{{
+					Match:    &apidef.ErrorMatcher{BodyField: "error.code", BodyValue: "INVALID_INPUT"},
+					Response: apidef.ErrorResponse{StatusCode: 422, Message: "Validation failed"},
+				}},
+			},
+			statusCode: 400,
+			body:       []byte(`{"error": {"code": "INVALID_INPUT", "message": "Field x is required"}}`),
+		},
+		{
+			name: "multiple rules - first match",
+			overrides: apidef.ErrorOverridesMap{
+				"500": []apidef.ErrorOverride{
+					{Match: &apidef.ErrorMatcher{MessagePattern: "database"}, Response: apidef.ErrorResponse{Message: "Database error"}},
+					{Match: &apidef.ErrorMatcher{MessagePattern: "network"}, Response: apidef.ErrorResponse{Message: "Network error"}},
+					{Response: apidef.ErrorResponse{Message: "Generic error"}},
 				},
 			},
-		}
-
-		gw := &Gateway{}
-		compiled := CompileErrorOverrides(overrides)
-		gw.SetCompiledErrorOverrides(compiled)
-		eo := NewErrorOverrides(&APISpec{}, gw)
-		req := httptest.NewRequest("GET", "/test", nil)
-		body := []byte("Internal server error")
-
-		b.ResetTimer()
-		for i := 0; i < b.N; i++ {
-			eo.ApplyOverride(req, 500, body)
-		}
-	})
-
-	b.Run("pattern match 4xx", func(b *testing.B) {
-		overrides := apidef.ErrorOverridesMap{
-			"4xx": []apidef.ErrorOverride{
-				{
-					Response: apidef.ErrorResponse{
-						Message: "Client error",
-					},
+			statusCode: 500,
+			body:       []byte("database connection failed"),
+		},
+		{
+			name: "large body truncation",
+			overrides: apidef.ErrorOverridesMap{
+				"500": []apidef.ErrorOverride{{
+					Match:    &apidef.ErrorMatcher{MessagePattern: "error at start"},
+					Response: apidef.ErrorResponse{Message: "Matched"},
+				}},
+			},
+			statusCode: 500,
+			body:       largeBody,
+		},
+		{
+			name: "flag match - exact match",
+			overrides: apidef.ErrorOverridesMap{
+				"429": []apidef.ErrorOverride{{
+					Match:    &apidef.ErrorMatcher{Flag: errors.RLT},
+					Response: apidef.ErrorResponse{StatusCode: 429, Message: benchRateLimitExceeded},
+				}},
+			},
+			setupReq:   func(req *http.Request) { ctx.SetErrorClassification(req, errors.NewErrorClassification(errors.RLT, "rate_limited")) },
+			statusCode: 429,
+		},
+		{
+			name: "flag match - no classification in context",
+			overrides: apidef.ErrorOverridesMap{
+				"429": []apidef.ErrorOverride{{
+					Match:    &apidef.ErrorMatcher{Flag: errors.RLT},
+					Response: apidef.ErrorResponse{StatusCode: 429, Message: benchRateLimitExceeded},
+				}},
+			},
+			statusCode: 429,
+		},
+		{
+			name: "flag match - fallback to regex",
+			overrides: apidef.ErrorOverridesMap{
+				"500": []apidef.ErrorOverride{{
+					Match:    &apidef.ErrorMatcher{Flag: errors.CBO, MessagePattern: "circuit.*breaker"},
+					Response: apidef.ErrorResponse{StatusCode: 503, Message: benchServiceUnavailable},
+				}},
+			},
+			setupReq:   func(req *http.Request) { ctx.SetErrorClassification(req, errors.NewErrorClassification(errors.UCF, "connection_failure")) },
+			statusCode: 500,
+			body:       []byte("circuit breaker is open"),
+		},
+		{
+			name: "multiple flag rules - first match",
+			overrides: apidef.ErrorOverridesMap{
+				"401": []apidef.ErrorOverride{
+					{Match: &apidef.ErrorMatcher{Flag: errors.TKE}, Response: apidef.ErrorResponse{Message: "Token expired"}},
+					{Match: &apidef.ErrorMatcher{Flag: errors.AMF}, Response: apidef.ErrorResponse{Message: "Auth field missing"}},
+					{Match: &apidef.ErrorMatcher{Flag: errors.TKI}, Response: apidef.ErrorResponse{Message: "Token invalid"}},
+					{Response: apidef.ErrorResponse{Message: "Unauthorized"}},
 				},
 			},
-		}
-
-		gw := &Gateway{}
-		compiled := CompileErrorOverrides(overrides)
-		gw.SetCompiledErrorOverrides(compiled)
-		eo := NewErrorOverrides(&APISpec{}, gw)
-		req := httptest.NewRequest("GET", "/test", nil)
-		body := []byte("Not found")
-
-		b.ResetTimer()
-		for i := 0; i < b.N; i++ {
-			eo.ApplyOverride(req, 404, body)
-		}
-	})
-
-	b.Run("regex pattern match", func(b *testing.B) {
-		overrides := apidef.ErrorOverridesMap{
-			"500": []apidef.ErrorOverride{
-				{
-					Match: &apidef.ErrorMatcher{
-						MessagePattern: "database.*timeout",
-					},
-					Response: apidef.ErrorResponse{
-						StatusCode: 504,
-						Message:    "Database timeout",
-					},
+			setupReq:   func(req *http.Request) { ctx.SetErrorClassification(req, errors.NewErrorClassification(errors.TKE, "token_expired")) },
+			statusCode: 401,
+		},
+		{
+			name: "multiple flag rules - last match (catch-all)",
+			overrides: apidef.ErrorOverridesMap{
+				"401": []apidef.ErrorOverride{
+					{Match: &apidef.ErrorMatcher{Flag: errors.TKE}, Response: apidef.ErrorResponse{Message: "Token expired"}},
+					{Match: &apidef.ErrorMatcher{Flag: errors.AMF}, Response: apidef.ErrorResponse{Message: "Auth field missing"}},
+					{Response: apidef.ErrorResponse{Message: "Unauthorized"}},
 				},
 			},
-		}
-
-		gw := &Gateway{}
-		compiled := CompileErrorOverrides(overrides)
-		gw.SetCompiledErrorOverrides(compiled)
-		eo := NewErrorOverrides(&APISpec{}, gw)
-		req := httptest.NewRequest("GET", "/test", nil)
-		body := []byte("database connection timeout occurred")
-
-		b.ResetTimer()
-		for i := 0; i < b.N; i++ {
-			eo.ApplyOverride(req, 500, body)
-		}
-	})
-
-	b.Run("regex pattern non-match", func(b *testing.B) {
-		overrides := apidef.ErrorOverridesMap{
-			"500": []apidef.ErrorOverride{
-				{
-					Match: &apidef.ErrorMatcher{
-						MessagePattern: "database.*timeout",
-					},
-					Response: apidef.ErrorResponse{
-						StatusCode: 504,
-						Message:    "Database timeout",
-					},
-				},
+			setupReq:   func(req *http.Request) { ctx.SetErrorClassification(req, errors.NewErrorClassification(errors.AKI, "api_key_invalid")) },
+			statusCode: 401,
+		},
+		{
+			name: "flag vs regex performance comparison - flag",
+			overrides: apidef.ErrorOverridesMap{
+				"429": []apidef.ErrorOverride{{
+					Match:    &apidef.ErrorMatcher{Flag: errors.RLT},
+					Response: apidef.ErrorResponse{Message: "Rate limited"},
+				}},
 			},
-		}
-
-		gw := &Gateway{}
-		compiled := CompileErrorOverrides(overrides)
-		gw.SetCompiledErrorOverrides(compiled)
-		eo := NewErrorOverrides(&APISpec{}, gw)
-		req := httptest.NewRequest("GET", "/test", nil)
-		body := []byte("network error occurred")
-
-		b.ResetTimer()
-		for i := 0; i < b.N; i++ {
-			eo.ApplyOverride(req, 500, body)
-		}
-	})
-
-	b.Run("JSON body field match", func(b *testing.B) {
-		overrides := apidef.ErrorOverridesMap{
-			"400": []apidef.ErrorOverride{
-				{
-					Match: &apidef.ErrorMatcher{
-						BodyField: "error.code",
-						BodyValue: "INVALID_INPUT",
-					},
-					Response: apidef.ErrorResponse{
-						StatusCode: 422,
-						Message:    "Validation failed",
-					},
-				},
+			setupReq:   func(req *http.Request) { ctx.SetErrorClassification(req, errors.NewErrorClassification(errors.RLT, "rate_limited")) },
+			statusCode: 429,
+		},
+		{
+			name: "flag vs regex performance comparison - regex",
+			overrides: apidef.ErrorOverridesMap{
+				"429": []apidef.ErrorOverride{{
+					Match:    &apidef.ErrorMatcher{MessagePattern: "rate.*limit.*exceeded"},
+					Response: apidef.ErrorResponse{Message: "Rate limited"},
+				}},
 			},
-		}
+			statusCode: 429,
+			body:       []byte(benchRateLimitExceeded),
+		},
+	}
 
-		gw := &Gateway{}
-		compiled := CompileErrorOverrides(overrides)
-		gw.SetCompiledErrorOverrides(compiled)
-		eo := NewErrorOverrides(&APISpec{}, gw)
-		req := httptest.NewRequest("GET", "/test", nil)
-		body := []byte(`{"error": {"code": "INVALID_INPUT", "message": "Field x is required"}}`)
-
-		b.ResetTimer()
-		for i := 0; i < b.N; i++ {
-			eo.ApplyOverride(req, 400, body)
-		}
-	})
-
-	b.Run("multiple rules - first match", func(b *testing.B) {
-		overrides := apidef.ErrorOverridesMap{
-			"500": []apidef.ErrorOverride{
-				{
-					Match: &apidef.ErrorMatcher{
-						MessagePattern: "database",
-					},
-					Response: apidef.ErrorResponse{
-						Message: "Database error",
-					},
-				},
-				{
-					Match: &apidef.ErrorMatcher{
-						MessagePattern: "network",
-					},
-					Response: apidef.ErrorResponse{
-						Message: "Network error",
-					},
-				},
-				{
-					Response: apidef.ErrorResponse{
-						Message: "Generic error",
-					},
-				},
-			},
-		}
-
-		gw := &Gateway{}
-		compiled := CompileErrorOverrides(overrides)
-		gw.SetCompiledErrorOverrides(compiled)
-		eo := NewErrorOverrides(&APISpec{}, gw)
-		req := httptest.NewRequest("GET", "/test", nil)
-		body := []byte("database connection failed")
-
-		b.ResetTimer()
-		for i := 0; i < b.N; i++ {
-			eo.ApplyOverride(req, 500, body)
-		}
-	})
-
-	b.Run("large body truncation", func(b *testing.B) {
-		overrides := apidef.ErrorOverridesMap{
-			"500": []apidef.ErrorOverride{
-				{
-					Match: &apidef.ErrorMatcher{
-						MessagePattern: "error at start",
-					},
-					Response: apidef.ErrorResponse{
-						Message: "Matched",
-					},
-				},
-			},
-		}
-
-		gw := &Gateway{}
-		compiled := CompileErrorOverrides(overrides)
-		gw.SetCompiledErrorOverrides(compiled)
-		eo := NewErrorOverrides(&APISpec{}, gw)
-		req := httptest.NewRequest("GET", "/test", nil)
-		largeBody := make([]byte, maxBodySizeForMatching+1000)
-		copy(largeBody, []byte("error at start"))
-
-		b.ResetTimer()
-		for i := 0; i < b.N; i++ {
-			eo.ApplyOverride(req, 500, largeBody)
-		}
-	})
-
-	b.Run("flag match - exact match", func(b *testing.B) {
-		overrides := apidef.ErrorOverridesMap{
-			"429": []apidef.ErrorOverride{
-				{
-					Match: &apidef.ErrorMatcher{
-						Flag: errors.RLT,
-					},
-					Response: apidef.ErrorResponse{
-						StatusCode: 429,
-						Message:    "Rate limit exceeded",
-					},
-				},
-			},
-		}
-
-		gw := &Gateway{}
-		compiled := CompileErrorOverrides(overrides)
-		gw.SetCompiledErrorOverrides(compiled)
-		eo := NewErrorOverrides(&APISpec{}, gw)
-		req := httptest.NewRequest("GET", "/test", nil)
-		ctx.SetErrorClassification(req, errors.NewErrorClassification(errors.RLT, "rate_limited"))
-
-		b.ResetTimer()
-		for i := 0; i < b.N; i++ {
-			eo.ApplyOverride(req, 429, nil)
-		}
-	})
-
-	b.Run("flag match - no classification in context", func(b *testing.B) {
-		overrides := apidef.ErrorOverridesMap{
-			"429": []apidef.ErrorOverride{
-				{
-					Match: &apidef.ErrorMatcher{
-						Flag: errors.RLT,
-					},
-					Response: apidef.ErrorResponse{
-						StatusCode: 429,
-						Message:    "Rate limit exceeded",
-					},
-				},
-			},
-		}
-
-		gw := &Gateway{}
-		compiled := CompileErrorOverrides(overrides)
-		gw.SetCompiledErrorOverrides(compiled)
-		eo := NewErrorOverrides(&APISpec{}, gw)
-		req := httptest.NewRequest("GET", "/test", nil)
-		// No classification set
-
-		b.ResetTimer()
-		for i := 0; i < b.N; i++ {
-			eo.ApplyOverride(req, 429, nil)
-		}
-	})
-
-	b.Run("flag match - fallback to regex", func(b *testing.B) {
-		overrides := apidef.ErrorOverridesMap{
-			"500": []apidef.ErrorOverride{
-				{
-					Match: &apidef.ErrorMatcher{
-						Flag:           errors.CBO,
-						MessagePattern: "circuit.*breaker",
-					},
-					Response: apidef.ErrorResponse{
-						StatusCode: 503,
-						Message:    "Service unavailable",
-					},
-				},
-			},
-		}
-
-		gw := &Gateway{}
-		compiled := CompileErrorOverrides(overrides)
-		gw.SetCompiledErrorOverrides(compiled)
-		eo := NewErrorOverrides(&APISpec{}, gw)
-		req := httptest.NewRequest("GET", "/test", nil)
-		// Set different flag so it falls back to regex
-		ctx.SetErrorClassification(req, errors.NewErrorClassification(errors.UCF, "connection_failure"))
-		body := []byte("circuit breaker is open")
-
-		b.ResetTimer()
-		for i := 0; i < b.N; i++ {
-			eo.ApplyOverride(req, 500, body)
-		}
-	})
-
-	b.Run("multiple flag rules - first match", func(b *testing.B) {
-		overrides := apidef.ErrorOverridesMap{
-			"401": []apidef.ErrorOverride{
-				{
-					Match: &apidef.ErrorMatcher{
-						Flag: errors.TKE,
-					},
-					Response: apidef.ErrorResponse{
-						Message: "Token expired",
-					},
-				},
-				{
-					Match: &apidef.ErrorMatcher{
-						Flag: errors.AMF,
-					},
-					Response: apidef.ErrorResponse{
-						Message: "Auth field missing",
-					},
-				},
-				{
-					Match: &apidef.ErrorMatcher{
-						Flag: errors.TKI,
-					},
-					Response: apidef.ErrorResponse{
-						Message: "Token invalid",
-					},
-				},
-				{
-					Response: apidef.ErrorResponse{
-						Message: "Unauthorized",
-					},
-				},
-			},
-		}
-
-		gw := &Gateway{}
-		compiled := CompileErrorOverrides(overrides)
-		gw.SetCompiledErrorOverrides(compiled)
-		eo := NewErrorOverrides(&APISpec{}, gw)
-		req := httptest.NewRequest("GET", "/test", nil)
-		ctx.SetErrorClassification(req, errors.NewErrorClassification(errors.TKE, "token_expired"))
-
-		b.ResetTimer()
-		for i := 0; i < b.N; i++ {
-			eo.ApplyOverride(req, 401, nil)
-		}
-	})
-
-	b.Run("multiple flag rules - last match (catch-all)", func(b *testing.B) {
-		overrides := apidef.ErrorOverridesMap{
-			"401": []apidef.ErrorOverride{
-				{
-					Match: &apidef.ErrorMatcher{
-						Flag: errors.TKE,
-					},
-					Response: apidef.ErrorResponse{
-						Message: "Token expired",
-					},
-				},
-				{
-					Match: &apidef.ErrorMatcher{
-						Flag: errors.AMF,
-					},
-					Response: apidef.ErrorResponse{
-						Message: "Auth field missing",
-					},
-				},
-				{
-					Response: apidef.ErrorResponse{
-						Message: "Unauthorized",
-					},
-				},
-			},
-		}
-
-		gw := &Gateway{}
-		compiled := CompileErrorOverrides(overrides)
-		gw.SetCompiledErrorOverrides(compiled)
-		eo := NewErrorOverrides(&APISpec{}, gw)
-		req := httptest.NewRequest("GET", "/test", nil)
-		// Set a flag that doesn't match any specific rule
-		ctx.SetErrorClassification(req, errors.NewErrorClassification(errors.AKI, "api_key_invalid"))
-
-		b.ResetTimer()
-		for i := 0; i < b.N; i++ {
-			eo.ApplyOverride(req, 401, nil)
-		}
-	})
-
-	b.Run("flag vs regex performance comparison - flag", func(b *testing.B) {
-		overrides := apidef.ErrorOverridesMap{
-			"429": []apidef.ErrorOverride{
-				{
-					Match: &apidef.ErrorMatcher{
-						Flag: errors.RLT,
-					},
-					Response: apidef.ErrorResponse{
-						Message: "Rate limited",
-					},
-				},
-			},
-		}
-
-		gw := &Gateway{}
-		compiled := CompileErrorOverrides(overrides)
-		gw.SetCompiledErrorOverrides(compiled)
-		eo := NewErrorOverrides(&APISpec{}, gw)
-		req := httptest.NewRequest("GET", "/test", nil)
-		ctx.SetErrorClassification(req, errors.NewErrorClassification(errors.RLT, "rate_limited"))
-
-		b.ResetTimer()
-		for i := 0; i < b.N; i++ {
-			eo.ApplyOverride(req, 429, nil)
-		}
-	})
-
-	b.Run("flag vs regex performance comparison - regex", func(b *testing.B) {
-		overrides := apidef.ErrorOverridesMap{
-			"429": []apidef.ErrorOverride{
-				{
-					Match: &apidef.ErrorMatcher{
-						MessagePattern: "rate.*limit.*exceeded",
-					},
-					Response: apidef.ErrorResponse{
-						Message: "Rate limited",
-					},
-				},
-			},
-		}
-
-		gw := &Gateway{}
-		compiled := CompileErrorOverrides(overrides)
-		gw.SetCompiledErrorOverrides(compiled)
-		eo := NewErrorOverrides(&APISpec{}, gw)
-		req := httptest.NewRequest("GET", "/test", nil)
-		body := []byte("Rate limit exceeded")
-
-		b.ResetTimer()
-		for i := 0; i < b.N; i++ {
-			eo.ApplyOverride(req, 429, body)
-		}
-	})
+	for _, tc := range cases {
+		b.Run(tc.name, func(b *testing.B) {
+			gw := &Gateway{}
+			if tc.overrides != nil {
+				gw.SetCompiledErrorOverrides(CompileErrorOverrides(tc.overrides))
+			}
+			eo := NewErrorOverrides(&APISpec{}, gw)
+			req := httptest.NewRequest("GET", "/test", nil)
+			if tc.setupReq != nil {
+				tc.setupReq(req)
+			}
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				eo.ApplyOverride(req, tc.statusCode, tc.body)
+			}
+		})
+	}
 }
 
 func BenchmarkWriteOverrideResponse(b *testing.B) {
@@ -747,7 +504,7 @@ func BenchmarkWriteTemplateErrorResponse(b *testing.B) {
 			w := httptest.NewRecorder()
 			req := httptest.NewRequest("GET", "/test", nil)
 			req.Header.Set(header.ContentType, header.ApplicationJSON)
-			handler.writeTemplateErrorResponse(w, req, "Internal server error", 500)
+			handler.writeTemplateErrorResponse(w, req, benchInternalServerError, 500)
 		}
 	})
 }
@@ -759,7 +516,7 @@ func BenchmarkCompileErrorOverrides(b *testing.B) {
 				{
 					Response: apidef.ErrorResponse{
 						StatusCode: 503,
-						Message:    "Service unavailable",
+						Message:    benchServiceUnavailable,
 					},
 				},
 			},
@@ -801,11 +558,11 @@ func BenchmarkCompileErrorOverrides(b *testing.B) {
 			"500": []apidef.ErrorOverride{
 				{
 					Match: &apidef.ErrorMatcher{
-						MessagePattern: "database.*timeout",
+						MessagePattern: benchDBTimeoutPattern,
 					},
 					Response: apidef.ErrorResponse{
 						StatusCode: 504,
-						Message:    "Database timeout",
+						Message:    benchDatabaseTimeout,
 					},
 				},
 				{
@@ -832,7 +589,7 @@ func BenchmarkCompileErrorOverrides(b *testing.B) {
 				{
 					Response: apidef.ErrorResponse{
 						Body:    `{"error": "Error {{.StatusCode}}", "message": "{{.Message}}"}`,
-						Message: "error message",
+						Message: benchErrorMessage,
 					},
 				},
 			},

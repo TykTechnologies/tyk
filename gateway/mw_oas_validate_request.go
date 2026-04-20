@@ -23,6 +23,8 @@ import (
 	tykregexp "github.com/TykTechnologies/tyk/regexp"
 )
 
+const requestValidationErrFmt = "request validation error: %w"
+
 var (
 	skipHeaderNormalization = map[string]bool{
 		header.SetCookie:        true,
@@ -158,7 +160,7 @@ func (k *ValidateRequest) ProcessRequest(w http.ResponseWriter, r *http.Request,
 		err = schema.RestoreUnicodeEscapesInError(err)
 		ctx.SetErrorClassification(r, tykerrors.ClassifyJSONValidationError(tykerrors.ErrTypeSchemaValidationFailed, k.Name()).
 			WithTemplateData(map[string]any{"InvalidParams": err.Error()}))
-		return fmt.Errorf("request validation error: %w", err), errResponseCode
+		return fmt.Errorf(requestValidationErrFmt, err), errResponseCode
 	}
 
 	// Handle Success
@@ -234,7 +236,7 @@ func (k *ValidateRequest) validateRoute(r *http.Request, route *routers.Route, p
 	}
 
 	if err := openapi3filter.ValidateRequest(r.Context(), input); err != nil {
-		return errResponseCode, fmt.Errorf("request validation error: %w", schema.RestoreUnicodeEscapesInError(err))
+		return errResponseCode, fmt.Errorf(requestValidationErrFmt, schema.RestoreUnicodeEscapesInError(err))
 	}
 	return http.StatusOK, nil
 }
@@ -393,7 +395,7 @@ func (k *ValidateRequest) processRequestWithFindOperation(r *http.Request) (erro
 	if err != nil {
 		ctx.SetErrorClassification(r, tykerrors.ClassifyJSONValidationError(tykerrors.ErrTypeSchemaValidationFailed, k.Name()).
 			WithTemplateData(map[string]any{"InvalidParams": err.Error()}))
-		return fmt.Errorf("request validation error: %w", err), errResponseCode
+		return fmt.Errorf(requestValidationErrFmt, err), errResponseCode
 	}
 
 	// Handle Success
