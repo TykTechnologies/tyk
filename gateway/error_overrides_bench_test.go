@@ -182,7 +182,9 @@ func BenchmarkApplyOverride(b *testing.B) {
 					Response: apidef.ErrorResponse{StatusCode: 429, Message: benchRateLimitExceeded},
 				}},
 			},
-			setupReq:   func(req *http.Request) { ctx.SetErrorClassification(req, errors.NewErrorClassification(errors.RLT, "rate_limited")) },
+			setupReq: func(req *http.Request) {
+				ctx.SetErrorClassification(req, errors.NewErrorClassification(errors.RLT, "rate_limited"))
+			},
 			statusCode: 429,
 		},
 		{
@@ -203,7 +205,9 @@ func BenchmarkApplyOverride(b *testing.B) {
 					Response: apidef.ErrorResponse{StatusCode: 503, Message: benchServiceUnavailable},
 				}},
 			},
-			setupReq:   func(req *http.Request) { ctx.SetErrorClassification(req, errors.NewErrorClassification(errors.UCF, "connection_failure")) },
+			setupReq: func(req *http.Request) {
+				ctx.SetErrorClassification(req, errors.NewErrorClassification(errors.UCF, "connection_failure"))
+			},
 			statusCode: 500,
 			body:       []byte("circuit breaker is open"),
 		},
@@ -217,7 +221,9 @@ func BenchmarkApplyOverride(b *testing.B) {
 					{Response: apidef.ErrorResponse{Message: "Unauthorized"}},
 				},
 			},
-			setupReq:   func(req *http.Request) { ctx.SetErrorClassification(req, errors.NewErrorClassification(errors.TKE, "token_expired")) },
+			setupReq: func(req *http.Request) {
+				ctx.SetErrorClassification(req, errors.NewErrorClassification(errors.TKE, "token_expired"))
+			},
 			statusCode: 401,
 		},
 		{
@@ -229,7 +235,9 @@ func BenchmarkApplyOverride(b *testing.B) {
 					{Response: apidef.ErrorResponse{Message: "Unauthorized"}},
 				},
 			},
-			setupReq:   func(req *http.Request) { ctx.SetErrorClassification(req, errors.NewErrorClassification(errors.AKI, "api_key_invalid")) },
+			setupReq: func(req *http.Request) {
+				ctx.SetErrorClassification(req, errors.NewErrorClassification(errors.AKI, "api_key_invalid"))
+			},
 			statusCode: 401,
 		},
 		{
@@ -240,7 +248,9 @@ func BenchmarkApplyOverride(b *testing.B) {
 					Response: apidef.ErrorResponse{Message: "Rate limited"},
 				}},
 			},
-			setupReq:   func(req *http.Request) { ctx.SetErrorClassification(req, errors.NewErrorClassification(errors.RLT, "rate_limited")) },
+			setupReq: func(req *http.Request) {
+				ctx.SetErrorClassification(req, errors.NewErrorClassification(errors.RLT, "rate_limited"))
+			},
 			statusCode: 429,
 		},
 		{
