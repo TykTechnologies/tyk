@@ -18,6 +18,7 @@ import (
 )
 
 // Verifies: SYS-REQ-008
+// MCDC SYS-REQ-008: apply_requested=T, result_returned=T => TRUE
 // newTestService creates a policy.Service for testing.
 func newTestService(orgID string, policies []user.Policy) *policy.Service {
 	logger := logrus.New()
@@ -27,6 +28,8 @@ func newTestService(orgID string, policies []user.Policy) *policy.Service {
 }
 
 // Verifies: STK-REQ-001, SYS-REQ-017 [example]
+// MCDC STK-REQ-001: N/A
+// MCDC SYS-REQ-017: apply_requested=T, error_reported=F, metadata_merged=T => TRUE
 func TestSpec_MetadataMerged(t *testing.T) {
 	orgID := "org1"
 	pol := user.Policy{
@@ -57,6 +60,9 @@ func TestSpec_MetadataMerged(t *testing.T) {
 }
 
 // Verifies: STK-REQ-002, SYS-REQ-019, SYS-REQ-020 [example]
+// MCDC STK-REQ-002: N/A
+// MCDC SYS-REQ-019: clear_requested=T, error_reported=F, policy_found=T, session_cleared=T => TRUE
+// MCDC SYS-REQ-020: clear_requested=T, error_reported=F, policy_found=T => TRUE
 func TestSpec_ClearSession(t *testing.T) {
 	orgID := "org1"
 
@@ -97,6 +103,9 @@ func TestSpec_ClearSession(t *testing.T) {
 }
 
 // Verifies: STK-REQ-005, SYS-REQ-024, SYS-REQ-028 [boundary]
+// MCDC STK-REQ-005: N/A
+// MCDC SYS-REQ-024: access_rights_merged=T, apply_requested=T, error_reported=F => TRUE
+// MCDC SYS-REQ-028: access_rights_merged=T, error_reported=F => TRUE
 func TestSpec_MutualExclusivity_ErrorAndAccess(t *testing.T) {
 	orgID := "org1"
 
@@ -167,6 +176,7 @@ type PropertyFixture struct {
 }
 
 // Verifies: SYS-REQ-021
+// MCDC SYS-REQ-021: api_limit_empty=F, policy_rate_empty=F, policy_rate_equal=F, policy_rate_higher=F, rate_limit_applied=T, rate_limit_apply_requested=T => TRUE
 func loadPropertyFixtures(t *testing.T) []PropertyFixture {
 	t.Helper()
 	root := filepath.Join("..", "..", "tests", "policy", "properties")
@@ -198,6 +208,7 @@ type propertyFixtureMapping struct {
 }
 
 // Verifies: SYS-REQ-021
+// MCDC SYS-REQ-021: api_limit_empty=F, policy_rate_empty=F, policy_rate_equal=F, policy_rate_higher=F, rate_limit_applied=T, rate_limit_apply_requested=T => TRUE
 // propertyNumericValue extracts a numeric value from a property fixture input.
 func propertyNumericValue(m map[string]interface{}, key string) (float64, bool) {
 	v, ok := m[key]
@@ -385,6 +396,10 @@ var propertyFixtureMappings = map[string]propertyFixtureMapping{
 }
 
 // Verifies: SYS-REQ-021, SYS-REQ-022, SYS-REQ-033, SYS-REQ-016 [property]
+// MCDC SYS-REQ-021: api_limit_empty=F, policy_rate_empty=F, policy_rate_equal=F, policy_rate_higher=F, rate_limit_applied=T, rate_limit_apply_requested=T => TRUE
+// MCDC SYS-REQ-022: policy_rate_empty=F, rate_limit_applied=T, rate_limit_apply_requested=T => TRUE
+// MCDC SYS-REQ-033: apply_requested=T, result_returned=T => TRUE
+// MCDC SYS-REQ-016: apply_requested=T, error_reported=F, tags_merged=T => TRUE
 func TestProperty_FromFixtures(t *testing.T) {
 	allFixtures := loadPropertyFixtures(t)
 
@@ -450,6 +465,7 @@ func TestProperty_FromFixtures(t *testing.T) {
 // --- Tags: set union, dedup, commutativity ---
 
 // Verifies: SYS-REQ-016 [property]
+// MCDC SYS-REQ-016: apply_requested=T, error_reported=F, tags_merged=T => TRUE
 func TestProperty_Tags_Dedup(t *testing.T) {
 	orgID := "org1"
 	pol := user.Policy{
@@ -481,6 +497,7 @@ func TestProperty_Tags_Dedup(t *testing.T) {
 }
 
 // Verifies: SYS-REQ-016 [property]
+// MCDC SYS-REQ-016: apply_requested=T, error_reported=F, tags_merged=T => TRUE
 func TestProperty_Tags_Commutativity(t *testing.T) {
 	orgID := "org1"
 	pol1 := user.Policy{
@@ -528,6 +545,8 @@ func TestProperty_Tags_Commutativity(t *testing.T) {
 // --- Rate Limits: highest wins via duration comparison ---
 
 // Verifies: STK-REQ-003, SYS-REQ-021 [property]
+// MCDC STK-REQ-003: N/A
+// MCDC SYS-REQ-021: api_limit_empty=F, policy_rate_empty=F, policy_rate_equal=F, policy_rate_higher=F, rate_limit_applied=T, rate_limit_apply_requested=T => TRUE
 func TestProperty_RateLimit_HighestWins_ByDuration(t *testing.T) {
 	svc := &policy.Service{}
 
@@ -585,6 +604,7 @@ func TestProperty_RateLimit_HighestWins_ByDuration(t *testing.T) {
 // --- Quota: highest wins, -1 means unlimited ---
 
 // Verifies: SYS-REQ-022 [property]
+// MCDC SYS-REQ-022: policy_rate_empty=F, rate_limit_applied=T, rate_limit_apply_requested=T => TRUE
 func TestProperty_Quota_HighestWins(t *testing.T) {
 	orgID := "org1"
 
@@ -686,6 +706,7 @@ func TestProperty_Quota_HighestWins(t *testing.T) {
 // --- Access Rights: combine by API ID with nested URL union ---
 
 // Verifies: SYS-REQ-013 [property]
+// MCDC SYS-REQ-013: access_rights_merged=T, apply_requested=T, is_per_api=T, org_matches=T, policy_found=T => TRUE
 func TestProperty_AccessRights_NestedURLUnion(t *testing.T) {
 	orgID := "org1"
 	pol1 := user.Policy{
@@ -740,6 +761,7 @@ func TestProperty_AccessRights_NestedURLUnion(t *testing.T) {
 }
 
 // Verifies: SYS-REQ-013 [property]
+// MCDC SYS-REQ-013: access_rights_merged=T, apply_requested=T, is_per_api=T, org_matches=T, policy_found=T => TRUE
 func TestProperty_AccessRights_VersionUnion(t *testing.T) {
 	orgID := "org1"
 	pol1 := user.Policy{
@@ -770,6 +792,7 @@ func TestProperty_AccessRights_VersionUnion(t *testing.T) {
 // --- Metadata: combine by key (last-write-wins per key) ---
 
 // Verifies: SYS-REQ-017 [property]
+// MCDC SYS-REQ-017: apply_requested=T, error_reported=F, metadata_merged=T => TRUE
 func TestProperty_Metadata_CombineByKey(t *testing.T) {
 	orgID := "org1"
 
@@ -849,6 +872,8 @@ func TestProperty_Metadata_CombineByKey(t *testing.T) {
 // --- Endpoints: combine by path+method, highest rate per endpoint ---
 
 // Verifies: STK-REQ-004, SYS-REQ-023 [property]
+// MCDC STK-REQ-004: N/A
+// MCDC SYS-REQ-023: endpoint_limit_apply_requested=T, endpoints_merged=T => TRUE
 func TestProperty_Endpoints_CombineHighest(t *testing.T) {
 	svc := &policy.Service{}
 
@@ -944,6 +969,7 @@ func TestProperty_Endpoints_CombineHighest(t *testing.T) {
 // --- MergeAllowedURLs: direct unit test of the utility function ---
 
 // Verifies: SYS-REQ-013 [property]
+// MCDC SYS-REQ-013: access_rights_merged=T, apply_requested=T, is_per_api=T, org_matches=T, policy_found=T => TRUE
 func TestProperty_MergeAllowedURLs_Union(t *testing.T) {
 	t.Run("methods are unioned per URL", func(t *testing.T) {
 		s1 := []user.AccessSpec{
@@ -1011,6 +1037,8 @@ func TestProperty_MergeAllowedURLs_Union(t *testing.T) {
 // --- ClearSession: partition-aware clearing ---
 
 // Verifies: STK-REQ-002, SYS-REQ-019 [property]
+// MCDC STK-REQ-002: N/A
+// MCDC SYS-REQ-019: clear_requested=T, error_reported=F, policy_found=T, session_cleared=T => TRUE
 func TestProperty_ClearSession_PartitionBehavior(t *testing.T) {
 	orgID := "org1"
 
@@ -1102,6 +1130,7 @@ func TestProperty_ClearSession_PartitionBehavior(t *testing.T) {
 // --- Master Policy: no access rights -> session-level values set directly ---
 
 // Verifies: SYS-REQ-029 [property]
+// MCDC SYS-REQ-029: apply_requested=T, clear_requested=F, endpoint_limit_apply_requested=F, error_reported=T, rate_limit_apply_requested=F, result_returned=F => TRUE
 func TestProperty_MasterPolicy_SessionLevelValues(t *testing.T) {
 	orgID := "org1"
 	pol := user.Policy{
@@ -1129,6 +1158,7 @@ func TestProperty_MasterPolicy_SessionLevelValues(t *testing.T) {
 // --- HMAC/HTTP Signature: sticky-true semantics ---
 
 // Verifies: SYS-REQ-033 [property]
+// MCDC SYS-REQ-033: apply_requested=T, result_returned=T => TRUE
 func TestProperty_HMACEnabled_StickyTrue(t *testing.T) {
 	orgID := "org1"
 	pol1 := user.Policy{
@@ -1159,6 +1189,7 @@ func TestProperty_HMACEnabled_StickyTrue(t *testing.T) {
 // --- LastUpdated: highest timestamp wins ---
 
 // Verifies: SYS-REQ-038 [property]
+// MCDC SYS-REQ-038: apply_requested=T, org_matches=F, policy_found=T => TRUE
 func TestProperty_LastUpdated_HighestWins(t *testing.T) {
 	orgID := "org1"
 	pol1 := user.Policy{
@@ -1191,6 +1222,7 @@ func TestProperty_LastUpdated_HighestWins(t *testing.T) {
 // ============================================================================
 
 // Verifies: SYS-REQ-016 [malformed]
+// MCDC SYS-REQ-016: apply_requested=T, error_reported=F, tags_merged=T => TRUE
 func TestSpec_Issue1_TagsNotMergedOnError(t *testing.T) {
 	orgID := "org1"
 
@@ -1231,6 +1263,7 @@ func TestSpec_Issue1_TagsNotMergedOnError(t *testing.T) {
 }
 
 // Verifies: SYS-REQ-017 [malformed]
+// MCDC SYS-REQ-017: apply_requested=T, error_reported=F, metadata_merged=T => TRUE
 func TestSpec_Issue1_MetadataNotMergedOnError(t *testing.T) {
 	orgID := "org1"
 
@@ -1270,6 +1303,7 @@ func TestSpec_Issue1_MetadataNotMergedOnError(t *testing.T) {
 }
 
 // Verifies: SYS-REQ-018 [malformed]
+// MCDC SYS-REQ-018: apply_requested=T, error_reported=F, session_inactive_set=T => TRUE
 func TestSpec_Issue1_SessionInactiveNotSetOnError(t *testing.T) {
 	orgID := "org1"
 
@@ -1309,6 +1343,7 @@ func TestSpec_Issue2_AllPoliciesMissing(t *testing.T) {
 }
 
 // Verifies: SYS-REQ-041 [boundary]
+// MCDC SYS-REQ-041: api_limit_empty=F, policy_rate_empty=F, policy_rate_equal=T, rate_limit_applied=T, rate_limit_apply_requested=T => TRUE
 func TestSpec_Issue3_EqualRateLimits(t *testing.T) {
 	t.Run("equal duration does NOT overwrite", func(t *testing.T) {
 		svc := &policy.Service{}
@@ -1389,6 +1424,7 @@ func TestSpec_Issue4_NilStore(t *testing.T) {
 }
 
 // Verifies: SYS-REQ-043 [boundary]
+// MCDC SYS-REQ-043: apply_requested=T, metadata_order_independent=T => TRUE
 func TestSpec_Issue6_MetadataIterationOrder(t *testing.T) {
 	orgID := "org1"
 
@@ -1450,6 +1486,8 @@ func TestSpec_Issue6_MetadataIterationOrder(t *testing.T) {
 }
 
 // Verifies: STK-REQ-007, SYS-REQ-044 [boundary]
+// MCDC STK-REQ-007: N/A
+// MCDC SYS-REQ-044: apply_requested=T, apply_time_bounded=T => TRUE
 func TestSpec_Issue7_PerformanceBound(t *testing.T) {
 	orgID := "org1"
 
@@ -1520,6 +1558,7 @@ func TestSpec_Issue2_AllPoliciesMissing_MultiplePolicies(t *testing.T) {
 }
 
 // Verifies: SYS-REQ-016 [boundary]
+// MCDC SYS-REQ-016: apply_requested=T, error_reported=F, tags_merged=T => TRUE
 func TestSpec_Issue1_TagsMergedOnPartialError(t *testing.T) {
 	orgID := "org1"
 	pol := user.Policy{
@@ -1670,6 +1709,8 @@ func TestSpec_MixedModeAcrossPolicies(t *testing.T) {
 }
 
 // Verifies: SYS-REQ-051, SYS-REQ-052 [boundary]
+// MCDC SYS-REQ-051: policy_rate_higher=T, rate_limit_applied=T, rate_limit_apply_requested=T => TRUE
+// MCDC SYS-REQ-052: apply_requested=T, org_matches=T, policy_found=T, quota_applied=T => TRUE
 func TestSpec_SentinelValues_UnlimitedAlwaysWins(t *testing.T) {
 	orgID := "org1"
 
@@ -1937,6 +1978,10 @@ func TestSpec_SinglePolicy_NoMixedModeCheck(t *testing.T) {
 // correctly under the stated preconditions.
 
 // Verifies: SYS-REQ-001, SYS-REQ-004, SYS-REQ-005, SYS-REQ-006 [example]
+// MCDC SYS-REQ-001: apply_requested=T, policies_provided=T => TRUE
+// MCDC SYS-REQ-004: apply_requested=T, clear_requested=F => TRUE
+// MCDC SYS-REQ-005: apply_requested=T, rate_limit_apply_requested=F => TRUE
+// MCDC SYS-REQ-006: apply_requested=T, endpoint_limit_apply_requested=F => TRUE
 // Assumption: Apply() is only called when at least one policy ID exists, and
 // Apply/ClearSession/ApplyRateLimits/ApplyEndpointLevelLimits are sequential.
 func TestAssumption_ApplyWithPolicies(t *testing.T) {
@@ -1964,6 +2009,8 @@ func TestAssumption_ApplyWithPolicies(t *testing.T) {
 }
 
 // Verifies: SYS-REQ-002, SYS-REQ-003 [example]
+// MCDC SYS-REQ-002: per_api_and_partition_set=F, policy_found=T => TRUE
+// MCDC SYS-REQ-003: is_per_api=F, partitions_enabled=T => TRUE
 // Assumption: A well-formed policy never has both PerAPI and partition flags simultaneously.
 // PerAPI mode and partition mode are mutually exclusive.
 func TestAssumption_MutuallyExclusiveModes(t *testing.T) {
@@ -1993,6 +2040,7 @@ func TestAssumption_MutuallyExclusiveModes(t *testing.T) {
 }
 
 // Verifies: SYS-REQ-007 [example]
+// MCDC SYS-REQ-007: clear_requested=T, rate_limit_apply_requested=F => TRUE
 // Assumption: ClearSession and ApplyRateLimits are never called simultaneously.
 func TestAssumption_ClearThenApply_Sequential(t *testing.T) {
 	orgID := "org1"
@@ -2018,6 +2066,8 @@ func TestAssumption_ClearThenApply_Sequential(t *testing.T) {
 }
 
 // Verifies: SYS-REQ-034, SYS-REQ-037 [example]
+// MCDC SYS-REQ-034: policy_found=T, policy_inactive=T => TRUE
+// MCDC SYS-REQ-037: has_access_rights=T, is_per_api=T, policy_found=T => TRUE
 // Assumption: A policy can only be marked inactive if it exists in the store.
 // Assumption: A per-API policy that is found must have access rights.
 func TestAssumption_PolicyExistsAndHasRights(t *testing.T) {
@@ -2042,6 +2092,8 @@ func TestAssumption_PolicyExistsAndHasRights(t *testing.T) {
 }
 
 // Verifies: SYS-REQ-035, SYS-REQ-046 [example]
+// MCDC SYS-REQ-035: policy_rate_empty=F, policy_rate_higher=T => TRUE
+// MCDC SYS-REQ-046: policy_rate_equal=F, policy_rate_higher=T => TRUE
 // Assumption: A policy cannot have a higher rate if its rate is empty (zero).
 // Assumption: Policy rate cannot be both equal and higher simultaneously.
 func TestAssumption_ZeroRateNeverHigher(t *testing.T) {
@@ -2060,6 +2112,7 @@ func TestAssumption_ZeroRateNeverHigher(t *testing.T) {
 }
 
 // Verifies: SYS-REQ-036 [example]
+// MCDC SYS-REQ-036: multiple_policies=T, policies_provided=T => TRUE
 // Assumption: Having multiple policies implies at least one policy is provided.
 func TestAssumption_MultiplePoliciesImpliesProvided(t *testing.T) {
 	orgID := "org1"
@@ -2087,6 +2140,7 @@ func TestAssumption_MultiplePoliciesImpliesProvided(t *testing.T) {
 }
 
 // Verifies: SYS-REQ-039 [example]
+// MCDC SYS-REQ-039: api_limit_empty=F, apply_requested=F, rate_limit_apply_requested=F => TRUE
 // Assumption: API limit emptiness is only meaningful during rate limit application or full apply.
 func TestAssumption_APILimitEmptiness_DuringApply(t *testing.T) {
 	svc := &policy.Service{}
@@ -2102,6 +2156,8 @@ func TestAssumption_APILimitEmptiness_DuringApply(t *testing.T) {
 }
 
 // Verifies: SYS-REQ-045, SYS-REQ-048 [example]
+// MCDC SYS-REQ-045: multiple_policies=T, policies_all_missing=T => TRUE
+// MCDC SYS-REQ-048: policies_all_missing=T, policy_found=F => TRUE
 // Assumption: policies_all_missing can only be true when multiple_policies is true.
 // Assumption: if all policies are missing, then no individual policy is found.
 func TestAssumption_AllMissingRequiresMultiple(t *testing.T) {
@@ -2118,6 +2174,7 @@ func TestAssumption_AllMissingRequiresMultiple(t *testing.T) {
 }
 
 // Verifies: SYS-REQ-047 [example]
+// MCDC SYS-REQ-047: policy_found=T, store_available=T => TRUE
 // Assumption: if the store is unavailable, no policy can be found.
 func TestAssumption_NilStoreNoPolicyFound(t *testing.T) {
 	orgID := "org1"
