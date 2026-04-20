@@ -23,7 +23,11 @@ import (
 func newTestService(orgID string, policies []user.Policy) *policy.Service {
 	logger := logrus.New()
 	logger.SetLevel(logrus.ErrorLevel)
-	store := policy.NewStore(policies)
+	polMap := make(map[string]user.Policy)
+	for _, p := range policies {
+		polMap[p.ID] = p
+	}
+	store := policy.NewStoreMap(polMap)
 	return policy.New(&orgID, store, logger)
 }
 
