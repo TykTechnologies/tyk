@@ -378,6 +378,7 @@ func (t *Service) applyPerAPI(policy user.Policy, session *user.SessionState, ri
 	return nil
 }
 
+// SYS-REQ-008, SYS-REQ-033
 func (t *Service) policyIds(session *user.SessionState) []model.PolicyID {
 	ids := session.PolicyIDs()
 
@@ -713,6 +714,7 @@ func (t *Service) ApplyEndpointLevelLimits(policyEndpoints user.Endpoints, currE
 	return result.Endpoints()
 }
 
+// SYS-REQ-023
 // mergeACLRules merges two AccessControlRules using union semantics, consistent
 // with how AllowedURLs are merged across policies: both Allowed and Blocked lists
 // are unioned. If src is empty (not configured), dst is returned unchanged.
@@ -729,6 +731,7 @@ func mergeACLRules(dst, src user.AccessControlRules) user.AccessControlRules {
 	}
 }
 
+// SYS-REQ-023
 // ApplyJSONRPCMethodLimits merges per-method rate limits: higher rate (lower duration) wins,
 // matching the semantics of ApplyEndpointLevelLimits.
 func (t *Service) ApplyJSONRPCMethodLimits(policy, current []user.JSONRPCMethodLimit) []user.JSONRPCMethodLimit {
@@ -761,6 +764,7 @@ func (t *Service) ApplyJSONRPCMethodLimits(policy, current []user.JSONRPCMethodL
 	return out
 }
 
+// SYS-REQ-023
 // ApplyMCPPrimitiveLimits merges per-primitive rate limits keyed on type+name:
 // higher rate (lower duration) wins, matching ApplyEndpointLevelLimits semantics.
 func (t *Service) ApplyMCPPrimitiveLimits(policy, current []user.MCPPrimitiveLimit) []user.MCPPrimitiveLimit {

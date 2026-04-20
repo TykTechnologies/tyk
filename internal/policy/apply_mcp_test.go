@@ -14,6 +14,7 @@ import (
 
 const testAPIID = "test-api"
 
+// SYS-REQ-008, SYS-REQ-023, SYS-REQ-033
 // applyPolicies is a helper that applies a set of custom policies to a fresh session
 // and returns the resulting AccessDefinition for testAPIID.
 func applyPolicies(t *testing.T, policies []user.Policy) user.AccessDefinition {
@@ -27,6 +28,8 @@ func applyPolicies(t *testing.T, policies []user.Policy) user.AccessDefinition {
 
 // --- mergeACLRules via JSONRPCMethodsAccessRights ---
 
+// Verifies: SYS-REQ-023 [example]
+// MCDC SYS-REQ-023: endpoint_limit_apply_requested=T, endpoints_merged=T => TRUE
 func TestApply_MergeACLRules_SinglePolicy(t *testing.T) {
 	// A single policy's rules must be preserved in the session.
 	pol := user.Policy{
@@ -47,6 +50,8 @@ func TestApply_MergeACLRules_SinglePolicy(t *testing.T) {
 	assert.Equal(t, []string{"admin/.*"}, ad.JSONRPCMethodsAccessRights.Blocked)
 }
 
+// Verifies: SYS-REQ-023 [example]
+// MCDC SYS-REQ-023: endpoint_limit_apply_requested=T, endpoints_merged=T => TRUE
 func TestApply_MergeACLRules_UnionAllowed(t *testing.T) {
 	// Allowed lists from two policies are unioned.
 	policies := []user.Policy{
@@ -67,6 +72,8 @@ func TestApply_MergeACLRules_UnionAllowed(t *testing.T) {
 	assert.Equal(t, []string{"ping", "resources/read", "tools/call"}, ad.JSONRPCMethodsAccessRights.Allowed)
 }
 
+// Verifies: SYS-REQ-023 [example]
+// MCDC SYS-REQ-023: endpoint_limit_apply_requested=T, endpoints_merged=T => TRUE
 func TestApply_MergeACLRules_UnionBlocked(t *testing.T) {
 	// Blocked lists from two policies are unioned.
 	policies := []user.Policy{
@@ -87,6 +94,8 @@ func TestApply_MergeACLRules_UnionBlocked(t *testing.T) {
 	assert.Equal(t, []string{"admin/.*", "debug"}, ad.JSONRPCMethodsAccessRights.Blocked)
 }
 
+// Verifies: SYS-REQ-023 [boundary]
+// MCDC SYS-REQ-023: endpoint_limit_apply_requested=T, endpoints_merged=T => TRUE
 func TestApply_MergeACLRules_EmptyPolicyDoesNotClear(t *testing.T) {
 	// A policy that has no rules configured must not clear rules set by another policy.
 	policies := []user.Policy{
@@ -106,6 +115,8 @@ func TestApply_MergeACLRules_EmptyPolicyDoesNotClear(t *testing.T) {
 
 // --- MCPAccessRights via Tools/Resources/Prompts ---
 
+// Verifies: SYS-REQ-023 [example]
+// MCDC SYS-REQ-023: endpoint_limit_apply_requested=T, endpoints_merged=T => TRUE
 func TestApply_MergeMCPAccessRights_Tools(t *testing.T) {
 	policies := []user.Policy{
 		{ID: "pol1", AccessRights: map[string]user.AccessDefinition{
@@ -125,6 +136,8 @@ func TestApply_MergeMCPAccessRights_Tools(t *testing.T) {
 	assert.Equal(t, []string{"search", "translate", "weather"}, ad.MCPAccessRights.Tools.Allowed)
 }
 
+// Verifies: SYS-REQ-023 [example]
+// MCDC SYS-REQ-023: endpoint_limit_apply_requested=T, endpoints_merged=T => TRUE
 func TestApply_MergeMCPAccessRights_ResourcesAndPrompts(t *testing.T) {
 	policies := []user.Policy{
 		{ID: "pol1", AccessRights: map[string]user.AccessDefinition{
@@ -142,6 +155,8 @@ func TestApply_MergeMCPAccessRights_ResourcesAndPrompts(t *testing.T) {
 
 // --- JSONRPCMethods rate limits ---
 
+// Verifies: SYS-REQ-023 [example]
+// MCDC SYS-REQ-023: endpoint_limit_apply_requested=T, endpoints_merged=T => TRUE
 func TestApply_JSONRPCMethodLimits_SinglePolicy(t *testing.T) {
 	pol := user.Policy{
 		ID: "pol1", Rate: 100, Per: 60,
@@ -158,8 +173,10 @@ func TestApply_JSONRPCMethodLimits_SinglePolicy(t *testing.T) {
 	assert.Equal(t, float64(10), ad.JSONRPCMethods[0].Limit.Rate)
 }
 
+// Verifies: SYS-REQ-023 [example]
+// MCDC SYS-REQ-023: endpoint_limit_apply_requested=T, endpoints_merged=T => TRUE
 func TestApply_JSONRPCMethodLimits_HigherRateWins(t *testing.T) {
-	// pol2 has a higher rate for the same method — it should win.
+	// pol2 has a higher rate for the same method -- it should win.
 	policies := []user.Policy{
 		{ID: "pol1", Rate: 100, Per: 60, AccessRights: map[string]user.AccessDefinition{
 			testAPIID: {APIID: testAPIID, JSONRPCMethods: []user.JSONRPCMethodLimit{
@@ -178,6 +195,8 @@ func TestApply_JSONRPCMethodLimits_HigherRateWins(t *testing.T) {
 	assert.Equal(t, float64(20), ad.JSONRPCMethods[0].Limit.Rate)
 }
 
+// Verifies: SYS-REQ-023 [example]
+// MCDC SYS-REQ-023: endpoint_limit_apply_requested=T, endpoints_merged=T => TRUE
 func TestApply_JSONRPCMethodLimits_NonOverlappingMerged(t *testing.T) {
 	policies := []user.Policy{
 		{ID: "pol1", Rate: 100, Per: 60, AccessRights: map[string]user.AccessDefinition{
@@ -198,6 +217,8 @@ func TestApply_JSONRPCMethodLimits_NonOverlappingMerged(t *testing.T) {
 
 // --- MCPPrimitives rate limits ---
 
+// Verifies: SYS-REQ-023 [example]
+// MCDC SYS-REQ-023: endpoint_limit_apply_requested=T, endpoints_merged=T => TRUE
 func TestApply_MCPPrimitiveLimits_SinglePolicy(t *testing.T) {
 	pol := user.Policy{
 		ID: "pol1", Rate: 100, Per: 60,
@@ -214,6 +235,8 @@ func TestApply_MCPPrimitiveLimits_SinglePolicy(t *testing.T) {
 	assert.Equal(t, float64(5), ad.MCPPrimitives[0].Limit.Rate)
 }
 
+// Verifies: SYS-REQ-023 [example]
+// MCDC SYS-REQ-023: endpoint_limit_apply_requested=T, endpoints_merged=T => TRUE
 func TestApply_MCPPrimitiveLimits_HigherRateWins(t *testing.T) {
 	policies := []user.Policy{
 		{ID: "pol1", Rate: 100, Per: 60, AccessRights: map[string]user.AccessDefinition{
@@ -233,6 +256,54 @@ func TestApply_MCPPrimitiveLimits_HigherRateWins(t *testing.T) {
 	assert.Equal(t, float64(15), ad.MCPPrimitives[0].Limit.Rate)
 }
 
+// Verifies: SYS-REQ-023 [boundary]
+// MCDC SYS-REQ-023: endpoint_limit_apply_requested=T, endpoints_merged=T => TRUE
+func TestApply_MCPPrimitiveLimits_ZeroDurationCurrentOverwritten(t *testing.T) {
+	// When the existing entry has Per=0 (zero duration, treated as unconfigured),
+	// the policy's rate should replace it regardless of rate value.
+	policies := []user.Policy{
+		{ID: "pol1", Rate: 100, Per: 60, AccessRights: map[string]user.AccessDefinition{
+			testAPIID: {APIID: testAPIID, MCPPrimitives: []user.MCPPrimitiveLimit{
+				{Type: "tool", Name: "weather", Limit: user.RateLimit{Rate: 5, Per: 0}},
+			}},
+		}},
+		{ID: "pol2", Rate: 100, Per: 60, AccessRights: map[string]user.AccessDefinition{
+			testAPIID: {APIID: testAPIID, MCPPrimitives: []user.MCPPrimitiveLimit{
+				{Type: "tool", Name: "weather", Limit: user.RateLimit{Rate: 3, Per: 60}},
+			}},
+		}},
+	}
+
+	ad := applyPolicies(t, policies)
+	require.Len(t, ad.MCPPrimitives, 1)
+	assert.Equal(t, float64(3), ad.MCPPrimitives[0].Limit.Rate)
+	assert.Equal(t, float64(60), ad.MCPPrimitives[0].Limit.Per)
+}
+
+// Verifies: SYS-REQ-023 [boundary]
+// MCDC SYS-REQ-023: endpoint_limit_apply_requested=T, endpoints_merged=T => TRUE
+func TestApply_MCPPrimitiveLimits_EmptyPolicyPreservesCurrent(t *testing.T) {
+	// When one policy configures primitives and the next has none,
+	// the existing primitives must be preserved (empty policy is a no-op).
+	policies := []user.Policy{
+		{ID: "pol1", Rate: 100, Per: 60, AccessRights: map[string]user.AccessDefinition{
+			testAPIID: {APIID: testAPIID, MCPPrimitives: []user.MCPPrimitiveLimit{
+				{Type: "tool", Name: "weather", Limit: user.RateLimit{Rate: 10, Per: 60}},
+			}},
+		}},
+		{ID: "pol2", Rate: 100, Per: 60, AccessRights: map[string]user.AccessDefinition{
+			testAPIID: {APIID: testAPIID},
+		}},
+	}
+
+	ad := applyPolicies(t, policies)
+	require.Len(t, ad.MCPPrimitives, 1)
+	assert.Equal(t, "weather", ad.MCPPrimitives[0].Name)
+	assert.Equal(t, float64(10), ad.MCPPrimitives[0].Limit.Rate)
+}
+
+// Verifies: SYS-REQ-023 [boundary]
+// MCDC SYS-REQ-023: endpoint_limit_apply_requested=T, endpoints_merged=T => TRUE
 func TestApply_MCPPrimitiveLimits_SameNameDifferentTypeIsDistinct(t *testing.T) {
 	// "weather" as a tool and "weather" as a resource are separate entries.
 	pol := user.Policy{
@@ -253,6 +324,7 @@ func TestApply_MCPPrimitiveLimits_SameNameDifferentTypeIsDistinct(t *testing.T) 
 
 const testAPIID2 = "test-api-2"
 
+// SYS-REQ-008, SYS-REQ-023, SYS-REQ-033
 func applySession(t *testing.T, policies []user.Policy) *user.SessionState {
 	t.Helper()
 	svc := policy.New(nil, nil, logrus.New())
@@ -262,6 +334,7 @@ func applySession(t *testing.T, policies []user.Policy) *user.SessionState {
 	return session
 }
 
+// SYS-REQ-023
 func perAPIPolicy(id, apiID string, methods []user.JSONRPCMethodLimit, primitives []user.MCPPrimitiveLimit) user.Policy {
 	return user.Policy{
 		ID: id, Rate: 100, Per: 60,
@@ -277,6 +350,7 @@ func perAPIPolicy(id, apiID string, methods []user.JSONRPCMethodLimit, primitive
 	}
 }
 
+// SYS-REQ-023
 func methodsByName(methods []user.JSONRPCMethodLimit) map[string]user.JSONRPCMethodLimit {
 	m := make(map[string]user.JSONRPCMethodLimit, len(methods))
 	for _, v := range methods {
@@ -285,6 +359,7 @@ func methodsByName(methods []user.JSONRPCMethodLimit) map[string]user.JSONRPCMet
 	return m
 }
 
+// SYS-REQ-023
 func primitivesByKey(primitives []user.MCPPrimitiveLimit) map[string]user.MCPPrimitiveLimit {
 	m := make(map[string]user.MCPPrimitiveLimit, len(primitives))
 	for _, v := range primitives {
@@ -293,6 +368,8 @@ func primitivesByKey(primitives []user.MCPPrimitiveLimit) map[string]user.MCPPri
 	return m
 }
 
+// Verifies: SYS-REQ-023, SYS-REQ-015 [example]
+// MCDC SYS-REQ-023: endpoint_limit_apply_requested=T, endpoints_merged=T => TRUE
 func TestApply_PerAPI_JSONRPCMethods_SinglePolicy(t *testing.T) {
 	pol := perAPIPolicy("pol1", testAPIID, []user.JSONRPCMethodLimit{
 		{Name: "tools/call", Limit: user.RateLimit{Rate: 10, Per: 60}},
@@ -306,6 +383,8 @@ func TestApply_PerAPI_JSONRPCMethods_SinglePolicy(t *testing.T) {
 	assert.Equal(t, float64(5), byName["resources/read"].Limit.Rate)
 }
 
+// Verifies: SYS-REQ-023, SYS-REQ-015 [example]
+// MCDC SYS-REQ-023: endpoint_limit_apply_requested=T, endpoints_merged=T => TRUE
 func TestApply_PerAPI_JSONRPCMethods_NonOverlappingMerged(t *testing.T) {
 	policies := []user.Policy{
 		perAPIPolicy("pol1", testAPIID, []user.JSONRPCMethodLimit{
@@ -323,6 +402,8 @@ func TestApply_PerAPI_JSONRPCMethods_NonOverlappingMerged(t *testing.T) {
 	assert.Equal(t, float64(5), byName["resources/read"].Limit.Rate)
 }
 
+// Verifies: SYS-REQ-023, SYS-REQ-015 [example]
+// MCDC SYS-REQ-023: endpoint_limit_apply_requested=T, endpoints_merged=T => TRUE
 func TestApply_PerAPI_JSONRPCMethods_HigherRateWins(t *testing.T) {
 	// pol1: tools/call@20/60s (more permissive), pol2: tools/call@5/60s (more restrictive).
 	policies := []user.Policy{
@@ -339,6 +420,8 @@ func TestApply_PerAPI_JSONRPCMethods_HigherRateWins(t *testing.T) {
 	assert.Equal(t, float64(20), ad.JSONRPCMethods[0].Limit.Rate)
 }
 
+// Verifies: SYS-REQ-023, SYS-REQ-015 [example]
+// MCDC SYS-REQ-023: endpoint_limit_apply_requested=T, endpoints_merged=T => TRUE
 func TestApply_PerAPI_JSONRPCMethods_ThreePolicies_HighestRateWins(t *testing.T) {
 	// pol1: 10, pol2: 30 (wins), pol3: 20.
 	policies := []user.Policy{
@@ -358,6 +441,8 @@ func TestApply_PerAPI_JSONRPCMethods_ThreePolicies_HighestRateWins(t *testing.T)
 	assert.Equal(t, float64(30), ad.JSONRPCMethods[0].Limit.Rate)
 }
 
+// Verifies: SYS-REQ-023, SYS-REQ-015 [example]
+// MCDC SYS-REQ-023: endpoint_limit_apply_requested=T, endpoints_merged=T => TRUE
 func TestApply_PerAPI_JSONRPCMethods_ComplexOverlap(t *testing.T) {
 	// pol1: tools/call@10, tools/list@5
 	// pol2: tools/call@20 (wins), resources/read@15
@@ -381,6 +466,8 @@ func TestApply_PerAPI_JSONRPCMethods_ComplexOverlap(t *testing.T) {
 	assert.Equal(t, float64(15), byName["resources/read"].Limit.Rate)
 }
 
+// Verifies: SYS-REQ-023, SYS-REQ-015 [example]
+// MCDC SYS-REQ-023: endpoint_limit_apply_requested=T, endpoints_merged=T => TRUE
 func TestApply_PerAPI_MCPPrimitives_NonOverlappingMerged(t *testing.T) {
 	policies := []user.Policy{
 		perAPIPolicy("pol1", testAPIID, nil, []user.MCPPrimitiveLimit{
@@ -398,6 +485,8 @@ func TestApply_PerAPI_MCPPrimitives_NonOverlappingMerged(t *testing.T) {
 	assert.Equal(t, float64(5), byKey["resource:file"].Limit.Rate)
 }
 
+// Verifies: SYS-REQ-023, SYS-REQ-015 [example]
+// MCDC SYS-REQ-023: endpoint_limit_apply_requested=T, endpoints_merged=T => TRUE
 func TestApply_PerAPI_MCPPrimitives_HigherRateWins(t *testing.T) {
 	policies := []user.Policy{
 		perAPIPolicy("pol1", testAPIID, nil, []user.MCPPrimitiveLimit{
@@ -413,6 +502,8 @@ func TestApply_PerAPI_MCPPrimitives_HigherRateWins(t *testing.T) {
 	assert.Equal(t, float64(15), ad.MCPPrimitives[0].Limit.Rate)
 }
 
+// Verifies: SYS-REQ-023, SYS-REQ-015 [boundary]
+// MCDC SYS-REQ-023: endpoint_limit_apply_requested=T, endpoints_merged=T => TRUE
 func TestApply_PerAPI_MCPPrimitives_SameNameDifferentType_BothSurvive(t *testing.T) {
 	// (tool, weather) and (resource, weather) are distinct composite keys.
 	policies := []user.Policy{
@@ -431,6 +522,8 @@ func TestApply_PerAPI_MCPPrimitives_SameNameDifferentType_BothSurvive(t *testing
 	assert.Equal(t, float64(20), byKey["resource:weather"].Limit.Rate)
 }
 
+// Verifies: SYS-REQ-023, SYS-REQ-015 [example]
+// MCDC SYS-REQ-023: endpoint_limit_apply_requested=T, endpoints_merged=T => TRUE
 func TestApply_PerAPI_BothFields_IndependentMerge(t *testing.T) {
 	// pol1: tools/call@20, (tool,weather)@10
 	// pol2: tools/call@5 (loses), resources/read@15, (tool,weather)@25 (wins)
@@ -466,6 +559,8 @@ func TestApply_PerAPI_BothFields_IndependentMerge(t *testing.T) {
 	assert.Equal(t, float64(25), ad.MCPPrimitives[0].Limit.Rate)
 }
 
+// Verifies: SYS-REQ-023, SYS-REQ-015 [boundary]
+// MCDC SYS-REQ-023: endpoint_limit_apply_requested=T, endpoints_merged=T => TRUE
 func TestApply_PerAPI_OneFieldPerPolicy_BothSurvive(t *testing.T) {
 	policies := []user.Policy{
 		perAPIPolicy("pol1", testAPIID, []user.JSONRPCMethodLimit{
@@ -481,6 +576,8 @@ func TestApply_PerAPI_OneFieldPerPolicy_BothSurvive(t *testing.T) {
 	require.Len(t, ad.MCPPrimitives, 1, "primitive from pol2 must survive")
 }
 
+// Verifies: SYS-REQ-023, SYS-REQ-015, SYS-REQ-013 [example]
+// MCDC SYS-REQ-023: endpoint_limit_apply_requested=T, endpoints_merged=T => TRUE
 func TestApply_PerAPI_MultipleAPIs_IndependentMerge(t *testing.T) {
 	// Each policy covers two APIs; non-overlapping methods merge per API in isolation.
 	pol1 := user.Policy{
@@ -539,6 +636,8 @@ func TestApply_PerAPI_MultipleAPIs_IndependentMerge(t *testing.T) {
 	assert.Equal(t, float64(3), api2Methods["resources/write"].Limit.Rate)
 }
 
+// Verifies: SYS-REQ-023, SYS-REQ-015 [example]
+// MCDC SYS-REQ-023: endpoint_limit_apply_requested=T, endpoints_merged=T => TRUE
 func TestApply_PerAPI_MultipleAPIs_HigherRateWinsPerAPI(t *testing.T) {
 	// api1: pol1 wins (20 > 5); api2: pol2 wins (30 > 10).
 	pol1 := user.Policy{
@@ -593,6 +692,8 @@ func TestApply_PerAPI_MultipleAPIs_HigherRateWinsPerAPI(t *testing.T) {
 	assert.Equal(t, float64(30), api2.JSONRPCMethods[0].Limit.Rate)
 }
 
+// Verifies: SYS-REQ-023, SYS-REQ-015, SYS-REQ-013 [boundary]
+// MCDC SYS-REQ-023: endpoint_limit_apply_requested=T, endpoints_merged=T => TRUE
 func TestApply_PerAPI_MultipleAPIs_PartialCoverage(t *testing.T) {
 	// pol1 covers testAPIID (methods) + testAPIID2 (primitives).
 	// pol2 covers only testAPIID — testAPIID2 from pol1 must be preserved intact.

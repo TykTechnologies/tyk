@@ -1371,6 +1371,8 @@ func BenchmarkService_Apply(b *testing.B) {
 	}
 }
 
+// Verifies: SYS-REQ-008, SYS-REQ-033 [example]
+// MCDC SYS-REQ-033: apply_requested=T, result_returned=T => TRUE
 func TestApply_PostExpiryPropagation(t *testing.T) {
 	polID := "post-expiry-pol"
 	pol := user.Policy{
@@ -1398,6 +1400,8 @@ func TestApply_PostExpiryPropagation(t *testing.T) {
 	assert.Equal(t, int64(3600), sess.PostExpiryGracePeriod)
 }
 
+// Verifies: SYS-REQ-008, SYS-REQ-033 [boundary]
+// MCDC SYS-REQ-033: apply_requested=T, result_returned=T => TRUE
 func TestApply_PostExpiryPropagation_Scenarios(t *testing.T) {
 	orgID := ""
 
@@ -1509,4 +1513,147 @@ func TestApply_PostExpiryPropagation_Scenarios(t *testing.T) {
 		assert.NoError(t, svc.Apply(sess))
 		assert.Equal(t, user.PostExpiryActionDelete, sess.PostExpiryAction)
 	})
+}
+
+// Verifies: SYS-REQ-008, SYS-REQ-033 [boundary]
+// MCDC SYS-REQ-008: apply_requested=T, result_returned=T => TRUE
+// MCDC SYS-REQ-033: apply_requested=T, result_returned=T => TRUE
+func TestApply_PolicyIds_SessionOrgIDUsed(t *testing.T) {
+	// When the session has a non-empty OrgID, policyIds uses it directly
+	// (the service orgID is NOT substituted). This tests orgID != "" branch.
+	polID := "org-test-pol"
+	pol := user.Policy{
+		ID:    polID,
+		OrgID: "org123",
+		AccessRights: map[string]user.AccessDefinition{
+			"api1": {APIID: "api1", Versions: []string{"Default"}},
+		},
+	}
+
+	store := policy.NewStoreMap(map[string]user.Policy{polID: pol})
+	svcOrgID := "org123"
+	svc := policy.New(&svcOrgID, store, logrus.StandardLogger())
+
+	sess := &user.SessionState{OrgID: "org123"}
+	sess.SetPolicies(polID)
+	err := svc.Apply(sess)
+	assert.NoError(t, err)
+	assert.Contains(t, sess.AccessRights, "api1")
+}
+
+// Verifies: SYS-REQ-008, SYS-REQ-033 [boundary]
+// MCDC SYS-REQ-008: apply_requested=T, result_returned=T => TRUE
+// MCDC SYS-REQ-033: apply_requested=T, result_returned=T => TRUE
+func TestApply_PolicyIds_NilServiceOrgID(t *testing.T) {
+	// When the service's orgID pointer is nil, policyIds uses session's
+	// orgID directly without substitution (t.orgID == nil branch).
+	polID := "nil-org-pol"
+	pol := user.Policy{
+		ID: polID,
+		AccessRights: map[string]user.AccessDefinition{
+			"api1": {APIID: "api1", Versions: []string{"Default"}},
+		},
+	}
+
+	store := policy.NewStoreMap(map[string]user.Policy{polID: pol})
+	svc := policy.New(nil, store, logrus.StandardLogger()) // nil orgID
+
+	sess := &user.SessionState{}
+	sess.SetPolicies(polID)
+	err := svc.Apply(sess)
+	assert.NoError(t, err)
+	assert.Contains(t, sess.AccessRights, "api1")
+}
+
+// Verifies: SYS-REQ-023 [boundary]
+// MCDC SYS-REQ-023: endpoint_limit_apply_requested=T, endpoints_merged=T => TRUE
+func TestApply_MCPPrimitiveLimits_HigherRateWins_StorePolicy(t *testing.T) {
+	// Two store-based policies with same primitive; higher rate (lower duration) wins.
+	// pol1: weather tool Rate=5/Per=60 (duration=12s)
+	// pol2: weather tool Rate=15/Per=60 (duration=4s) — wins
+	pol1 := user.Policy{
+		ID: "mcp-prim-1", Rate: 100, Per: 60,
+		AccessRights: map[string]user.AccessDefinition{
+			"api1": {
+				APIID: "api1", Versions: []string{"Default"},
+				MCPPrimitives: []user.MCPPrimitiveLimit{
+					{Type: "tool", Name: "weather", Limit: user.RateLimit{Rate: 5, Per: 60}},
+				},
+			},
+		},
+	}
+	pol2 := user.Policy{
+		ID: "mcp-prim-2", Rate: 100, Per: 60,
+		AccessRights: map[string]user.AccessDefinition{
+			"api1": {
+				APIID: "api1", Versions: []string{"Default"},
+				MCPPrimitives: []user.MCPPrimitiveLimit{
+					{Type: "tool", Name: "weather", Limit: user.RateLimit{Rate: 15, Per: 60}},
+				},
+			},
+		},
+	}
+
+	store := policy.NewStoreMap(map[string]user.Policy{"mcp-prim-1": pol1, "mcp-prim-2": pol2})
+	orgID := ""
+	svc := policy.New(&orgID, store, logrus.StandardLogger())
+
+	sess := &user.SessionState{}
+	sess.SetPolicies("mcp-prim-1", "mcp-prim-2")
+	err := svc.Apply(sess)
+	assert.NoError(t, err)
+	ad := sess.AccessRights["api1"]
+	assert.Len(t, ad.MCPPrimitives, 1)
+	assert.Equal(t, float64(15), ad.MCPPrimitives[0].Limit.Rate)
+}
+
+// Verifies: SYS-REQ-023 [boundary]
+// MCDC SYS-REQ-023: endpoint_limit_apply_requested=T, endpoints_merged=T => TRUE
+func TestApply_JSONRPCMethodLimits_ZeroDurationCurrentOverwritten(t *testing.T) {
+	// When the existing method limit has Per=0 (zero duration, unconfigured),
+	// the policy's limit replaces it regardless of rate value.
+	polID := "jsonrpc-zero"
+	pol := user.Policy{
+		ID: polID, Rate: 100, Per: 60,
+		AccessRights: map[string]user.AccessDefinition{
+			"api1": {
+				APIID:    "api1",
+				Versions: []string{"Default"},
+				JSONRPCMethods: []user.JSONRPCMethodLimit{
+					{Name: "tools/call", Limit: user.RateLimit{Rate: 3, Per: 60}},
+				},
+			},
+		},
+	}
+	// First policy sets Per=0 (unconfigured duration), second policy has real rate.
+	polPre := user.Policy{
+		ID: "jsonrpc-pre", Rate: 100, Per: 60,
+		AccessRights: map[string]user.AccessDefinition{
+			"api1": {
+				APIID:    "api1",
+				Versions: []string{"Default"},
+				JSONRPCMethods: []user.JSONRPCMethodLimit{
+					{Name: "tools/call", Limit: user.RateLimit{Rate: 999, Per: 0}},
+				},
+			},
+		},
+	}
+
+	store := policy.NewStoreMap(map[string]user.Policy{polID: pol, "jsonrpc-pre": polPre})
+	orgID := ""
+	svc := policy.New(&orgID, store, logrus.StandardLogger())
+
+	sess := &user.SessionState{}
+	sess.SetPolicies("jsonrpc-pre", polID)
+	err := svc.Apply(sess)
+	assert.NoError(t, err)
+	ad := sess.AccessRights["api1"]
+	assert.NotEmpty(t, ad.JSONRPCMethods)
+	// The policy with real Per=60 should win over Per=0
+	for _, m := range ad.JSONRPCMethods {
+		if m.Name == "tools/call" {
+			assert.Equal(t, float64(60), m.Limit.Per)
+			break
+		}
+	}
 }
