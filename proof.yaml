@@ -43,6 +43,8 @@ project:
             report_path: .proof/test-results/go-test.json
         slow_tests:
             enabled: true
+        test_mcdc_annotations:
+            enabled: true
         mcdc_coverage:
             advisory: false
             max_no_verifying_tests: 0
