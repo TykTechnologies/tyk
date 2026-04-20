@@ -67,6 +67,14 @@ const (
 	JSONRPCRoutingState
 	// MCPRouting indicates the request came via MCP JSON-RPC routing
 	MCPRouting
+	// MCPMethod stores the JSON-RPC method name for MCP metrics dimensions.
+	MCPMethod
+	// MCPPrimitiveType stores the MCP primitive type (tool/resource/prompt) for metrics dimensions.
+	MCPPrimitiveType
+	// MCPPrimitiveName stores the MCP primitive name for metrics dimensions.
+	MCPPrimitiveName
+	// JSONRPCErrorCode stores the JSON-RPC error code for metrics dimensions.
+	JSONRPCErrorCode
 )
 
 func ctxSetSession(r *http.Request, s *user.SessionState, scheduleUpdate bool, hashKey bool) {
@@ -182,4 +190,36 @@ func GetErrorClassification(r *http.Request) *errors.ErrorClassification {
 		}
 	}
 	return nil
+}
+
+// GetMCPMethod returns the JSON-RPC method name stored in the request context.
+func GetMCPMethod(r *http.Request) string {
+	if v, ok := r.Context().Value(MCPMethod).(string); ok {
+		return v
+	}
+	return ""
+}
+
+// GetMCPPrimitiveType returns the MCP primitive type (tool/resource/prompt) from the request context.
+func GetMCPPrimitiveType(r *http.Request) string {
+	if v, ok := r.Context().Value(MCPPrimitiveType).(string); ok {
+		return v
+	}
+	return ""
+}
+
+// GetMCPPrimitiveName returns the MCP primitive name from the request context.
+func GetMCPPrimitiveName(r *http.Request) string {
+	if v, ok := r.Context().Value(MCPPrimitiveName).(string); ok {
+		return v
+	}
+	return ""
+}
+
+// GetJSONRPCErrorCode returns the JSON-RPC error code from the request context.
+func GetJSONRPCErrorCode(r *http.Request) int {
+	if v, ok := r.Context().Value(JSONRPCErrorCode).(int); ok {
+		return v
+	}
+	return 0
 }

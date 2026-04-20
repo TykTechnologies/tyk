@@ -100,7 +100,9 @@ func (r *RedisAnalyticsHandler) Stop() {
 
 	// close channel to stop workers
 	r.mu.Lock()
-	close(r.recordsChan)
+	if r.recordsChan != nil {
+		close(r.recordsChan)
+	}
 	r.mu.Unlock()
 
 	// wait for all workers to be done

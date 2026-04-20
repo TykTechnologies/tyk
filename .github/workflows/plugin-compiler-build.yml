@@ -3,6 +3,7 @@ name: Plugin-compiler build
 
 on:
   pull_request:
+    types: [opened, synchronize, reopened, labeled]
   push:
     branches:
       - master
@@ -18,9 +19,18 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
+  dep-guard:
+    uses: TykTechnologies/github-actions/.github/workflows/dependency-guard.yml@d3fa20888fa2878e877e22bb7702141217290e7c  # main
+    permissions:
+      contents: read
+
   docker-build:
+    needs: [dep-guard]
+    if: |
+      !cancelled() &&
+      (needs.dep-guard.result == 'success' || needs.dep-guard.result == 'skipped') &&
+      !github.event.pull_request.draft
     runs-on: ubuntu-latest
-    if: ${{ !github.event.pull_request.draft }}
     permissions:
       id-token: write
     steps:
@@ -28,13 +38,13 @@ jobs:
         run: sudo rm -rf /usr/local/bin/* /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
 
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4
         with:
-          fetch-depth: 1
+          fetch-depth: 0
 
       - name: Configure AWS Credentials
         id: configure-aws
-        uses: aws-actions/configure-aws-credentials@v2
+        uses: aws-actions/configure-aws-credentials@5fd3084fc36e372ff1fff382a39b10d03659f355  # v2
         with:
           role-to-assume: arn:aws:iam::754489498669:role/ecr_rw_tyk
           role-session-name: ci-plugin-compiler-push
@@ -42,11 +52,11 @@ jobs:
 
       - name: Login to AWS ECR
         id: login-ecr
-        uses: aws-actions/amazon-ecr-login@v1
+        uses: aws-actions/amazon-ecr-login@5a88a04c91d5c6f97aae0d9be790e64d9b1d47b7  # v1
 
       - name: Set docker metadata
         id: set-metadata
-        uses: docker/metadata-action@v4
+        uses: docker/metadata-action@818d4b7b91585d195f67373fd9cb0332e31a7175  # v4
         with:
           images: |
             tykio/tyk-plugin-compiler,enable=${{ startsWith(github.ref, 'refs/tags') }}
@@ -62,13 +72,13 @@ jobs:
             type=sha,format=long
 
       - name: Login to Dockerhub
-        uses: docker/login-action@v2
+        uses: docker/login-action@465a07811f14bebb1938fbed4728c6a1ff8901fc  # v2
         with:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
 
       - name: Build and push to dockerhub/ECR
-        uses: docker/build-push-action@v4
+        uses: docker/build-push-action@0a97817b6ade9f46837855d676c4cca3a2471fc9  # v4
         with:
           context: .
           file: ci/images/plugin-compiler/Dockerfile
@@ -83,7 +93,7 @@ jobs:
 
       - name: Set docker metadata EE
         id: set-metadata-ee
-        uses: docker/metadata-action@v4
+        uses: docker/metadata-action@818d4b7b91585d195f67373fd9cb0332e31a7175  # v4
         with:
           images: |
             tykio/tyk-plugin-compiler-ee,enable=${{ startsWith(github.ref, 'refs/tags') }}
@@ -99,7 +109,7 @@ jobs:
             type=sha,format=long
 
       - name: Build and push to dockerhub/ECR EE
-        uses: docker/build-push-action@v4
+        uses: docker/build-push-action@0a97817b6ade9f46837855d676c4cca3a2471fc9  # v4
         with:
           context: .
           file: ci/images/plugin-compiler/Dockerfile
@@ -112,3 +122,36 @@ jobs:
             GITHUB_SHA=${{ github.sha }}
             GITHUB_TAG=${{ github.ref_name }}
             BUILD_TAG=ee
+
+      - name: Set docker metadata FIPS
+        id: set-metadata-fips
+        uses: docker/metadata-action@818d4b7b91585d195f67373fd9cb0332e31a7175  # v4
+        with:
+          images: |
+            tykio/tyk-plugin-compiler-fips,enable=${{ startsWith(github.ref, 'refs/tags') }}
+            ${{ steps.login-ecr.outputs.registry }}/tyk-plugin-compiler-fips
+          labels: |
+            org.opencontainers.image.title=tyk-plugin-compiler-fips
+            org.opencontainers.image.description=Plugin compiler for the Tyk API Gateway FIPS Edition
+          tags: |
+            type=ref,event=pr
+            type=semver,pattern=v{{version}}
+            type=semver,pattern=v{{major}}.{{minor}}
+            type=semver,pattern={{raw}}
+            type=sha,format=long
+
+      - name: Build and push to dockerhub/ECR FIPS
+        uses: docker/build-push-action@0a97817b6ade9f46837855d676c4cca3a2471fc9  # v4
+        with:
+          context: .
+          file: ci/images/plugin-compiler/Dockerfile
+          platforms: linux/amd64
+          push: true
+          labels: ${{ steps.set-metadata-fips.outputs.labels }}
+          tags: ${{ steps.set-metadata-fips.outputs.tags }}
+          build-args: |
+            BASE_IMAGE=tykio/golang-cross:${{ env.GOLANG_CROSS }}
+            GITHUB_SHA=${{ github.sha }}
+            GITHUB_TAG=${{ github.ref_name }}
+            BUILD_TAG=ee,fips
+            GOFIPS140=v1.0.0

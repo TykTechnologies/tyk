@@ -170,7 +170,7 @@ func recordGraphDetails(rec *analytics.AnalyticsRecord, r *http.Request, resp *h
 const traceTagPrefix = "trace-id-"
 
 func (s *SuccessHandler) addTraceIDTag(reqCtx context.Context, tags []string) []string {
-	if !s.Gw.GetConfig().OpenTelemetry.Enabled {
+	if !s.Gw.GetConfig().OpenTelemetry.TracesEnabled() {
 		return tags
 	}
 	if id := otel.ExtractTraceID(reqCtx); id != "" {

@@ -5189,3 +5189,179 @@ func TestDeleteJWKCacheByAPIID(t *testing.T) {
 	// Verify cache contents are flushed (Close calls Flush)
 	assert.Equal(t, 0, jwkCache.Count(), "cache items should be flushed after Close()")
 }
+
+func TestJWTPostExpiry(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	const testAPIID = "test-api-id"
+
+	specs := ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		spec.APIID = testAPIID
+		spec.UseKeylessAccess = false
+		spec.EnableJWT = true
+		spec.JWTSigningMethod = RSASign
+		spec.JWTSource = base64.StdEncoding.EncodeToString([]byte(jwtRSAPubKey))
+		spec.JWTPolicyFieldName = "policy_id"
+		spec.Proxy.ListenPath = "/"
+	})
+	spec := specs[0]
+
+	getSession := func(userID string) (user.SessionState, bool) {
+		keyID := fmt.Sprintf("%x", md5.Sum([]byte(userID)))
+		sessionID := ts.Gw.generateToken(spec.OrgID, keyID)
+		return ts.Gw.GlobalSessionManager.SessionDetail(spec.OrgID, sessionID, false)
+	}
+
+	t.Run("retain with grace period propagated", func(t *testing.T) {
+		pID := ts.CreatePolicy(func(p *user.Policy) {
+			p.KeyExpiresIn = 10
+			p.PostExpiryAction = user.PostExpiryActionRetain
+			p.PostExpiryGracePeriod = 300
+			p.AccessRights = map[string]user.AccessDefinition{
+				testAPIID: {APIName: "test-api-name"},
+			}
+		})
+
+		userID := uuid.New()
+		jwtExp := time.Now().Add(300 * time.Second).Unix()
+
+		jwtToken := CreateJWKToken(func(t *jwt.Token) {
+			t.Claims.(jwt.MapClaims)["sub"] = userID
+			t.Claims.(jwt.MapClaims)["policy_id"] = pID
+			t.Claims.(jwt.MapClaims)["exp"] = jwtExp
+		})
+
+		_, _ = ts.Run(t, test.TestCase{
+			Headers: map[string]string{"authorization": jwtToken},
+			Code:    http.StatusOK,
+		})
+
+		session, found := getSession(userID)
+		require.True(t, found, "session should exist in Redis")
+		assert.Equal(t, user.PostExpiryActionRetain, session.PostExpiryAction)
+		assert.Equal(t, int64(300), session.PostExpiryGracePeriod)
+		assert.Equal(t, jwtExp, session.Expires)
+	})
+
+	t.Run("delete action propagated", func(t *testing.T) {
+		pID := ts.CreatePolicy(func(p *user.Policy) {
+			p.KeyExpiresIn = 10
+			p.PostExpiryAction = user.PostExpiryActionDelete
+			p.PostExpiryGracePeriod = 0
+			p.AccessRights = map[string]user.AccessDefinition{
+				testAPIID: {APIName: "test-api-name"},
+			}
+		})
+
+		userID := uuid.New()
+
+		jwtToken := CreateJWKToken(func(t *jwt.Token) {
+			t.Claims.(jwt.MapClaims)["sub"] = userID
+			t.Claims.(jwt.MapClaims)["policy_id"] = pID
+			t.Claims.(jwt.MapClaims)["exp"] = time.Now().Add(300 * time.Second).Unix()
+		})
+
+		_, _ = ts.Run(t, test.TestCase{
+			Headers: map[string]string{"authorization": jwtToken},
+			Code:    http.StatusOK,
+		})
+
+		session, found := getSession(userID)
+		require.True(t, found, "session should exist in Redis")
+		assert.Equal(t, user.PostExpiryActionDelete, session.PostExpiryAction)
+		assert.Equal(t, int64(0), session.PostExpiryGracePeriod)
+	})
+
+	t.Run("session survives past JWT exp with grace period", func(t *testing.T) {
+		pID := ts.CreatePolicy(func(p *user.Policy) {
+			p.KeyExpiresIn = 1
+			p.PostExpiryAction = user.PostExpiryActionRetain
+			p.PostExpiryGracePeriod = 10
+			p.AccessRights = map[string]user.AccessDefinition{
+				testAPIID: {APIName: "test-api-name"},
+			}
+		})
+
+		userID := uuid.New()
+
+		jwtExp := time.Now().Add(2 * time.Second).Unix()
+
+		jwtToken := CreateJWKToken(func(t *jwt.Token) {
+			t.Claims.(jwt.MapClaims)["sub"] = userID
+			t.Claims.(jwt.MapClaims)["policy_id"] = pID
+			t.Claims.(jwt.MapClaims)["exp"] = jwtExp
+		})
+
+		_, _ = ts.Run(t, test.TestCase{
+			Headers: map[string]string{"authorization": jwtToken},
+			Code:    http.StatusOK,
+		})
+
+		// JWT exp is 2s, but the grace period is 10s — session must still exist after JWT expires.
+		assert.Eventually(t, func() bool {
+			if time.Now().Unix() < jwtExp {
+				return false
+			}
+			_, found := getSession(userID)
+			return found
+		}, 10*time.Second, 500*time.Millisecond, "session should survive past JWT exp because grace period extends TTL")
+	})
+
+	t.Run("session deleted after grace period elapses", func(t *testing.T) {
+		pID := ts.CreatePolicy(func(p *user.Policy) {
+			p.KeyExpiresIn = 1
+			p.PostExpiryAction = user.PostExpiryActionRetain
+			p.PostExpiryGracePeriod = 1
+			p.AccessRights = map[string]user.AccessDefinition{
+				testAPIID: {APIName: "test-api-name"},
+			}
+		})
+
+		userID := uuid.New()
+
+		jwtToken := CreateJWKToken(func(t *jwt.Token) {
+			t.Claims.(jwt.MapClaims)["sub"] = userID
+			t.Claims.(jwt.MapClaims)["policy_id"] = pID
+			t.Claims.(jwt.MapClaims)["exp"] = time.Now().Add(1 * time.Second).Unix()
+		})
+
+		_, _ = ts.Run(t, test.TestCase{
+			Headers: map[string]string{"authorization": jwtToken},
+			Code:    http.StatusOK,
+		})
+
+		// JWT exp is 1s, the grace period is 1s → TTL ~ 2s. Session should disappear.
+		assert.Eventually(t, func() bool {
+			_, found := getSession(userID)
+			return !found
+		}, 10*time.Second, 500*time.Millisecond, "session should be gone after JWT exp + grace period elapsed")
+	})
+
+	t.Run("legacy behavior without PostExpiry fields", func(t *testing.T) {
+		pID := ts.CreatePolicy(func(p *user.Policy) {
+			p.KeyExpiresIn = 60
+			p.AccessRights = map[string]user.AccessDefinition{
+				testAPIID: {APIName: "test-api-name"},
+			}
+		})
+
+		userID := uuid.New()
+
+		jwtToken := CreateJWKToken(func(t *jwt.Token) {
+			t.Claims.(jwt.MapClaims)["sub"] = userID
+			t.Claims.(jwt.MapClaims)["policy_id"] = pID
+			t.Claims.(jwt.MapClaims)["exp"] = time.Now().Add(3600 * time.Second).Unix()
+		})
+
+		_, _ = ts.Run(t, test.TestCase{
+			Headers: map[string]string{"authorization": jwtToken},
+			Code:    http.StatusOK,
+		})
+
+		session, found := getSession(userID)
+		require.True(t, found, "session should exist in Redis")
+		assert.Equal(t, user.PostExpiryAction(""), session.PostExpiryAction)
+		assert.Equal(t, int64(0), session.PostExpiryGracePeriod)
+	})
+}

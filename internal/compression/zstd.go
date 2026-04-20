@@ -9,7 +9,11 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-const maxDecompressedSize = 100 * 1024 * 1024
+// maxDecompressedSize is the maximum allowed size for decompressed data.
+// It can be set from gateway config; defaults to 100MB.
+var maxDecompressedSize uint64 = 100 * 1024 * 1024
+
+const minDecompressedSize = 1 * 1024 * 1024 // 1MB
 
 var (
 	log = logrus.WithField("prefix", "compression")
@@ -90,6 +94,32 @@ func DecompressZstd(data []byte) ([]byte, error) {
 
 	log.WithField("decompressed_size", len(decompressed)).Debug("Data decompressed with Zstd")
 	return decompressed, nil
+}
+
+// GetMaxDecompressedSize returns the current maximum allowed decompressed size.
+func GetMaxDecompressedSize() uint64 {
+	return maxDecompressedSize
+}
+
+// SetMaxDecompressedSize updates the maximum allowed decompressed size
+// and reinitializes the decoder pool with the new limit.
+// Values below 1MB are clamped to 1MB with a warning.
+func SetMaxDecompressedSize(size uint64) {
+	if size < minDecompressedSize {
+		log.Warnf("MaxDecompressedSize %d is below minimum %d, using minimum", size, minDecompressedSize)
+		size = minDecompressedSize
+	}
+	maxDecompressedSize = size
+	decoderPool = sync.Pool{
+		New: func() interface{} {
+			decoder, err := zstd.NewReader(nil, zstd.WithDecoderMaxMemory(size))
+			if err != nil {
+				log.WithError(err).Error("Failed to create Zstd decoder")
+				return nil
+			}
+			return decoder
+		},
+	}
 }
 
 // IsZstdCompressed checks if the data starts with Zstd magic bytes

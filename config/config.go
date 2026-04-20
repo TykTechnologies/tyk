@@ -203,10 +203,15 @@ type StorageOptionsConf struct {
 	// You can safely enable this setting on existing deployments.
 	// The Gateway continues to load previously stored uncompressed backups and stores all new backups in compressed form.
 	//
-	// Note: This feature works with API definitions up to 100MB uncompressed
+	// Note: The maximum decompressed size is controlled by `max_decompressed_size`.
 	//
 	// Defaults to `false`.
 	CompressAPIDefinitions bool `json:"compress_api_definitions"`
+
+	// Maximum decompressed size (in bytes) for API definitions when using compression.
+	// This limit prevents memory exhaustion during decompression.
+	// Defaults to 104857600 (100MB).
+	MaxDecompressedSize int64 `json:"max_decompressed_size"`
 }
 
 type NormalisedURLConfig struct {
@@ -329,6 +334,11 @@ type AccessLogsConfig struct {
 	// - `upstream_latency` will include the upstream latency of the request.
 	// - `upstream_status` will include the upstream response status code for 5XX responses.
 	// - `user_agent` will include the user agent of the request.
+	// - `api_type` will include the API protocol type (classic, oas, graphql, mcp).
+	// - `mcp_method` will include the JSON-RPC method name (MCP APIs only).
+	// - `mcp_primitive_type` will include the MCP primitive type (MCP APIs only).
+	// - `mcp_primitive_name` will include the MCP primitive name (MCP APIs only).
+	// - `mcp_error_code` will include the JSON-RPC error code (MCP APIs only).
 	Template []string `json:"template"`
 }
 

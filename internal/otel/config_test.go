@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	otelconfig "github.com/TykTechnologies/opentelemetry/config"
 )
@@ -353,6 +354,315 @@ func TestOpenTelemetry_SetDefaults(t *testing.T) {
 				assert.Equal(t, -1, got.Metrics.CardinalityLimit)
 			},
 		},
+
+		// ---- New format (Traces sub-object) tests ----
+		{
+			name: "new format: both traces and metrics enabled independently",
+			input: OpenTelemetry{
+				Traces: &TracesConfig{
+					BaseOpenTelemetry: BaseOpenTelemetry{
+						Enabled: true,
+						ExporterConfig: ExporterConfig{
+							Exporter: "grpc",
+							Endpoint: "trace-collector:4317",
+						},
+					},
+				},
+				Metrics: MetricsConfig{
+					BaseMetricsConfig: BaseMetricsConfig{
+						Enabled: boolPtr(true),
+						ExporterConfig: ExporterConfig{
+							Endpoint: "metrics-collector:4318",
+						},
+					},
+				},
+			},
+			assert: func(t *testing.T, got *OpenTelemetry) {
+				t.Helper()
+				assert.True(t, got.TracesEnabled())
+				assert.True(t, got.Traces.Enabled)
+				require.NotNil(t, got.Metrics.Enabled)
+				assert.True(t, *got.Metrics.Enabled)
+
+				// Traces config got defaults applied
+				assert.Equal(t, "grpc", got.Traces.Exporter)
+				assert.Equal(t, "trace-collector:4317", got.Traces.Endpoint)
+
+				// Metrics kept its own endpoint, inherited exporter from traces
+				assert.Equal(t, "grpc", got.Metrics.Exporter)
+				assert.Equal(t, "metrics-collector:4318", got.Metrics.Endpoint)
+
+				// Root-level fields remain at zero (not used in new format)
+				assert.False(t, got.Enabled)
+			},
+		},
+		{
+			name: "new format: traces only, metrics disabled",
+			input: OpenTelemetry{
+				Traces: &TracesConfig{
+					BaseOpenTelemetry: BaseOpenTelemetry{
+						Enabled: true,
+						ExporterConfig: ExporterConfig{
+							Exporter: "http",
+							Endpoint: "collector:4318",
+						},
+					},
+				},
+			},
+			assert: func(t *testing.T, got *OpenTelemetry) {
+				t.Helper()
+				assert.True(t, got.TracesEnabled())
+				assert.Nil(t, got.Metrics.Enabled)
+			},
+		},
+		{
+			name: "new format: metrics only, traces disabled",
+			input: OpenTelemetry{
+				Traces: &TracesConfig{
+					BaseOpenTelemetry: BaseOpenTelemetry{
+						Enabled: false,
+					},
+				},
+				Metrics: MetricsConfig{
+					BaseMetricsConfig: BaseMetricsConfig{
+						Enabled: boolPtr(true),
+						ExporterConfig: ExporterConfig{
+							Exporter: "grpc",
+							Endpoint: "metrics-collector:4317",
+						},
+					},
+				},
+			},
+			assert: func(t *testing.T, got *OpenTelemetry) {
+				t.Helper()
+				assert.False(t, got.TracesEnabled())
+				require.NotNil(t, got.Metrics.Enabled)
+				assert.True(t, *got.Metrics.Enabled)
+				assert.Equal(t, "metrics-collector:4317", got.Metrics.Endpoint)
+			},
+		},
+		{
+			name: "legacy format: root-level trace fields, no Traces key",
+			input: OpenTelemetry{
+				BaseOpenTelemetry: BaseOpenTelemetry{
+					Enabled: true,
+					ExporterConfig: ExporterConfig{
+						Exporter: "grpc",
+						Endpoint: "collector:4317",
+					},
+				},
+			},
+			assert: func(t *testing.T, got *OpenTelemetry) {
+				t.Helper()
+				assert.True(t, got.TracesEnabled())
+				assert.Nil(t, got.Traces)
+				assert.Equal(t, "grpc", got.Exporter)
+				assert.Equal(t, "collector:4317", got.Endpoint)
+				// Metrics inherits from root-level trace
+				assert.Equal(t, "grpc", got.Metrics.Exporter)
+				assert.Equal(t, "collector:4317", got.Metrics.Endpoint)
+			},
+		},
+		{
+			name: "legacy + metrics: root-level trace + metrics",
+			input: OpenTelemetry{
+				BaseOpenTelemetry: BaseOpenTelemetry{
+					Enabled: true,
+					ExporterConfig: ExporterConfig{
+						Exporter: "grpc",
+						Endpoint: "collector:4317",
+					},
+				},
+				Metrics: MetricsConfig{
+					BaseMetricsConfig: BaseMetricsConfig{
+						Enabled: boolPtr(true),
+					},
+				},
+			},
+			assert: func(t *testing.T, got *OpenTelemetry) {
+				t.Helper()
+				assert.True(t, got.TracesEnabled())
+				assert.Nil(t, got.Traces)
+				require.NotNil(t, got.Metrics.Enabled)
+				assert.True(t, *got.Metrics.Enabled)
+				assert.Equal(t, "grpc", got.Metrics.Exporter)
+				assert.Equal(t, "collector:4317", got.Metrics.Endpoint)
+			},
+		},
+		{
+			name: "conflict: root + Traces present, Traces wins",
+			input: OpenTelemetry{
+				BaseOpenTelemetry: BaseOpenTelemetry{
+					Enabled: false,
+					ExporterConfig: ExporterConfig{
+						Exporter: "http",
+						Endpoint: "root-collector:4318",
+					},
+				},
+				Traces: &TracesConfig{
+					BaseOpenTelemetry: BaseOpenTelemetry{
+						Enabled: true,
+						ExporterConfig: ExporterConfig{
+							Exporter: "grpc",
+							Endpoint: "traces-collector:4317",
+						},
+					},
+				},
+			},
+			assert: func(t *testing.T, got *OpenTelemetry) {
+				t.Helper()
+				// Traces sub-object wins
+				assert.True(t, got.TracesEnabled())
+				assert.Equal(t, "grpc", got.EffectiveTraceConfig().Exporter)
+				assert.Equal(t, "traces-collector:4317", got.EffectiveTraceConfig().Endpoint)
+				// Root-level fields remain unchanged
+				assert.False(t, got.Enabled)
+				assert.Equal(t, "http", got.Exporter)
+			},
+		},
+		{
+			name: "metrics inherits from Traces (new format)",
+			input: OpenTelemetry{
+				Traces: &TracesConfig{
+					BaseOpenTelemetry: BaseOpenTelemetry{
+						Enabled: true,
+						ExporterConfig: ExporterConfig{
+							Exporter:          "grpc",
+							Endpoint:          "custom-collector:4317",
+							ConnectionTimeout: 10,
+							ResourceName:      "custom-gw",
+						},
+					},
+				},
+				// Metrics left at zero — should inherit from Traces.
+			},
+			assert: func(t *testing.T, got *OpenTelemetry) {
+				t.Helper()
+				assert.Equal(t, "grpc", got.Metrics.Exporter)
+				assert.Equal(t, "custom-collector:4317", got.Metrics.Endpoint)
+				assert.Equal(t, 10, got.Metrics.ConnectionTimeout)
+				assert.Equal(t, "custom-gw", got.Metrics.ResourceName)
+			},
+		},
+		{
+			name: "metrics inherits from root (legacy)",
+			input: OpenTelemetry{
+				BaseOpenTelemetry: BaseOpenTelemetry{
+					Enabled: true,
+					ExporterConfig: ExporterConfig{
+						Exporter:          "http",
+						Endpoint:          "legacy-collector:4318",
+						ConnectionTimeout: 7,
+						ResourceName:      "legacy-gw",
+					},
+				},
+			},
+			assert: func(t *testing.T, got *OpenTelemetry) {
+				t.Helper()
+				assert.Equal(t, "http", got.Metrics.Exporter)
+				assert.Equal(t, "legacy-collector:4318", got.Metrics.Endpoint)
+				assert.Equal(t, 7, got.Metrics.ConnectionTimeout)
+				assert.Equal(t, "legacy-gw", got.Metrics.ResourceName)
+			},
+		},
+		{
+			name: "SetDefaults completeness: minimal Traces enabled",
+			input: OpenTelemetry{
+				Traces: &TracesConfig{
+					BaseOpenTelemetry: BaseOpenTelemetry{
+						Enabled: true,
+					},
+				},
+			},
+			assert: func(t *testing.T, got *OpenTelemetry) {
+				t.Helper()
+				// Trace defaults applied to Traces sub-object
+				assert.Equal(t, "grpc", got.Traces.Exporter)
+				assert.Equal(t, "localhost:4317", got.Traces.Endpoint)
+				assert.Equal(t, 1, got.Traces.ConnectionTimeout)
+				assert.Equal(t, "tyk", got.Traces.ResourceName)
+
+				// Metrics inherits trace defaults
+				assert.Equal(t, "grpc", got.Metrics.Exporter)
+				assert.Equal(t, "localhost:4317", got.Metrics.Endpoint)
+				assert.Equal(t, 1, got.Metrics.ConnectionTimeout)
+
+				// Metrics-specific defaults also applied
+				assert.Equal(t, 60, got.Metrics.ExportInterval)
+				assert.Equal(t, "cumulative", got.Metrics.Temporality)
+			},
+		},
+		{
+			name: "metrics standalone: no traces config at all",
+			input: OpenTelemetry{
+				Metrics: MetricsConfig{
+					BaseMetricsConfig: BaseMetricsConfig{
+						Enabled: boolPtr(true),
+						ExporterConfig: ExporterConfig{
+							Exporter: "grpc",
+							Endpoint: "metrics-only:4317",
+						},
+					},
+				},
+			},
+			assert: func(t *testing.T, got *OpenTelemetry) {
+				t.Helper()
+				assert.False(t, got.TracesEnabled())
+				require.NotNil(t, got.Metrics.Enabled)
+				assert.True(t, *got.Metrics.Enabled)
+				assert.Equal(t, "metrics-only:4317", got.Metrics.Endpoint)
+				assert.Equal(t, 60, got.Metrics.ExportInterval)
+				assert.Equal(t, "cumulative", got.Metrics.Temporality)
+			},
+		},
+		{
+			name: "metrics standalone: traces disabled explicitly",
+			input: OpenTelemetry{
+				Traces: &TracesConfig{
+					BaseOpenTelemetry: BaseOpenTelemetry{
+						Enabled: false,
+					},
+				},
+				Metrics: MetricsConfig{
+					BaseMetricsConfig: BaseMetricsConfig{
+						Enabled: boolPtr(true),
+						ExporterConfig: ExporterConfig{
+							Exporter: "grpc",
+							Endpoint: "metrics-only:4317",
+						},
+					},
+				},
+			},
+			assert: func(t *testing.T, got *OpenTelemetry) {
+				t.Helper()
+				assert.False(t, got.TracesEnabled())
+				require.NotNil(t, got.Metrics.Enabled)
+				assert.True(t, *got.Metrics.Enabled)
+				assert.Equal(t, "metrics-only:4317", got.Metrics.Endpoint)
+				// Metrics-specific defaults applied
+				assert.Equal(t, 60, got.Metrics.ExportInterval)
+				assert.Equal(t, 2000, got.Metrics.CardinalityLimit)
+			},
+		},
+		{
+			name: "metrics own exporter, no traces",
+			input: OpenTelemetry{
+				Metrics: MetricsConfig{
+					BaseMetricsConfig: BaseMetricsConfig{
+						Enabled: boolPtr(true),
+						ExporterConfig: ExporterConfig{
+							Exporter: "http",
+							Endpoint: "metrics-own:4318",
+						},
+					},
+				},
+			},
+			assert: func(t *testing.T, got *OpenTelemetry) {
+				t.Helper()
+				assert.Equal(t, "http", got.Metrics.Exporter)
+				assert.Equal(t, "metrics-own:4318", got.Metrics.Endpoint)
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -362,4 +672,110 @@ func TestOpenTelemetry_SetDefaults(t *testing.T) {
 			tt.assert(t, &cfg)
 		})
 	}
+}
+
+func TestOpenTelemetry_TracesEnabled(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    OpenTelemetry
+		expected bool
+	}{
+		{
+			name:     "legacy: root enabled=true",
+			input:    OpenTelemetry{BaseOpenTelemetry: BaseOpenTelemetry{Enabled: true}},
+			expected: true,
+		},
+		{
+			name:     "legacy: root enabled=false",
+			input:    OpenTelemetry{BaseOpenTelemetry: BaseOpenTelemetry{Enabled: false}},
+			expected: false,
+		},
+		{
+			name: "new format: Traces enabled=true, root enabled=false",
+			input: OpenTelemetry{
+				BaseOpenTelemetry: BaseOpenTelemetry{Enabled: false},
+				Traces:            &TracesConfig{BaseOpenTelemetry: BaseOpenTelemetry{Enabled: true}},
+			},
+			expected: true,
+		},
+		{
+			name: "Traces disabled, root enabled: root wins (handles envconfig allocation)",
+			input: OpenTelemetry{
+				BaseOpenTelemetry: BaseOpenTelemetry{Enabled: true},
+				Traces:            &TracesConfig{BaseOpenTelemetry: BaseOpenTelemetry{Enabled: false}},
+			},
+			expected: true,
+		},
+		{
+			name:     "zero value: everything default",
+			input:    OpenTelemetry{},
+			expected: false,
+		},
+		{
+			name: "new format: Traces present but enabled=false",
+			input: OpenTelemetry{
+				Traces: &TracesConfig{BaseOpenTelemetry: BaseOpenTelemetry{Enabled: false}},
+			},
+			expected: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.expected, tt.input.TracesEnabled())
+		})
+	}
+}
+
+func TestOpenTelemetry_EffectiveTraceConfig(t *testing.T) {
+	t.Run("returns Traces config when present and enabled", func(t *testing.T) {
+		cfg := OpenTelemetry{
+			BaseOpenTelemetry: BaseOpenTelemetry{
+				ExporterConfig: ExporterConfig{Endpoint: "root-endpoint"},
+			},
+			Traces: &TracesConfig{
+				BaseOpenTelemetry: BaseOpenTelemetry{
+					Enabled:        true,
+					ExporterConfig: ExporterConfig{Endpoint: "traces-endpoint"},
+				},
+			},
+		}
+		assert.Equal(t, "traces-endpoint", cfg.EffectiveTraceConfig().Endpoint)
+	})
+
+	t.Run("returns root config when Traces present but disabled", func(t *testing.T) {
+		cfg := OpenTelemetry{
+			BaseOpenTelemetry: BaseOpenTelemetry{
+				ExporterConfig: ExporterConfig{Endpoint: "root-endpoint"},
+			},
+			Traces: &TracesConfig{
+				BaseOpenTelemetry: BaseOpenTelemetry{
+					Enabled:        false,
+					ExporterConfig: ExporterConfig{Endpoint: "traces-endpoint"},
+				},
+			},
+		}
+		assert.Equal(t, "root-endpoint", cfg.EffectiveTraceConfig().Endpoint)
+	})
+
+	t.Run("returns root config when Traces is nil", func(t *testing.T) {
+		cfg := OpenTelemetry{
+			BaseOpenTelemetry: BaseOpenTelemetry{
+				ExporterConfig: ExporterConfig{Endpoint: "root-endpoint"},
+			},
+		}
+		assert.Equal(t, "root-endpoint", cfg.EffectiveTraceConfig().Endpoint)
+	})
+
+	t.Run("LibraryConfig returns same as EffectiveTraceConfig", func(t *testing.T) {
+		cfg := OpenTelemetry{
+			Traces: &TracesConfig{
+				BaseOpenTelemetry: BaseOpenTelemetry{
+					Enabled:        true,
+					ExporterConfig: ExporterConfig{Endpoint: "traces-endpoint"},
+				},
+			},
+		}
+		assert.Equal(t, cfg.EffectiveTraceConfig(), cfg.LibraryConfig())
+	})
 }

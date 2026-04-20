@@ -4136,6 +4136,218 @@ func TestApplyLifetime(t *testing.T) {
 	}
 }
 
+func TestApplyLifetime_PostExpiry(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	ts.Gw.BuildAndLoadAPI(
+		func(spec *APISpec) {
+			spec.APIID = "api1"
+			spec.SessionLifetime = 60
+		},
+	)
+
+	now := time.Now().Unix()
+
+	testCases := []struct {
+		name   string
+		sess   user.SessionState
+		wantFn func(t *testing.T, got int64)
+	}{
+		{
+			name: "delete returns TTL from Expires",
+			sess: user.SessionState{
+				PostExpiryAction: user.PostExpiryActionDelete,
+				Expires:          now + 300,
+				AccessRights: map[string]user.AccessDefinition{
+					"api1": {APIID: "api1", Versions: []string{"v1"}},
+				},
+			},
+			wantFn: func(t *testing.T, got int64) {
+				assert.InDelta(t, 300, got, 10)
+			},
+		},
+		{
+			name: "retain grace=-1 returns -1",
+			sess: user.SessionState{
+				PostExpiryAction:      user.PostExpiryActionRetain,
+				PostExpiryGracePeriod: -1,
+				Expires:               now + 300,
+				AccessRights: map[string]user.AccessDefinition{
+					"api1": {APIID: "api1", Versions: []string{"v1"}},
+				},
+			},
+			wantFn: func(t *testing.T, got int64) {
+				assert.Equal(t, int64(-1), got)
+			},
+		},
+		{
+			name: "retain grace=600",
+			sess: user.SessionState{
+				PostExpiryAction:      user.PostExpiryActionRetain,
+				PostExpiryGracePeriod: 600,
+				Expires:               now + 300,
+				AccessRights: map[string]user.AccessDefinition{
+					"api1": {APIID: "api1", Versions: []string{"v1"}},
+				},
+			},
+			wantFn: func(t *testing.T, got int64) {
+				assert.InDelta(t, 900, got, 10)
+			},
+		},
+		{
+			name: "unset fields use legacy",
+			sess: user.SessionState{
+				AccessRights: map[string]user.AccessDefinition{
+					"api1": {APIID: "api1", Versions: []string{"v1"}},
+				},
+			},
+			wantFn: func(t *testing.T, got int64) {
+				assert.Equal(t, int64(60), got)
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			sess := tc.sess
+			got := ts.Gw.ApplyLifetime(&sess)
+			tc.wantFn(t, got)
+		})
+	}
+}
+
+func TestApplyLifetime_PostExpiry_FromPolicy(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		spec.APIID = "api1"
+		spec.UseKeylessAccess = false
+		spec.OrgID = "default"
+	})
+
+	pID := ts.CreatePolicy(func(p *user.Policy) {
+		p.PostExpiryAction = user.PostExpiryActionDelete
+		p.PostExpiryGracePeriod = 600
+		p.AccessRights = map[string]user.AccessDefinition{
+			"api1": {APIID: "api1", Versions: []string{"v1"}},
+		}
+	})
+
+	session, _ := ts.CreateSession(func(s *user.SessionState) {
+		s.ApplyPolicies = []string{pID}
+	})
+
+	assert.Equal(t, user.PostExpiryActionDelete, session.PostExpiryAction)
+	assert.Equal(t, int64(600), session.PostExpiryGracePeriod)
+
+	// Set Expires and verify ApplyLifetime returns correct TTL
+	now := time.Now().Unix()
+	session.Expires = now + 300
+
+	got := ts.Gw.ApplyLifetime(session)
+	// TTL = Expires - now, should be around 300
+	assert.InDelta(t, 300, got, 10)
+}
+
+func TestPostExpiryFields_APIRoundTrip(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		spec.APIID = "api1"
+		spec.UseKeylessAccess = false
+		spec.OrgID = "default"
+	})
+
+	t.Run("direct key creation", func(t *testing.T) {
+		session := CreateStandardSession()
+		session.PostExpiryAction = user.PostExpiryActionRetain
+		session.PostExpiryGracePeriod = 600
+		session.AccessRights = map[string]user.AccessDefinition{
+			"api1": {APIID: "api1", Versions: []string{"v1"}},
+		}
+
+		resp, err := ts.Do(test.TestCase{
+			Method:    http.MethodPost,
+			Path:      "/tyk/keys/create",
+			Data:      session,
+			AdminAuth: true,
+		})
+		assert.NoError(t, err)
+
+		var keyResp apiModifyKeySuccess
+		err = json.NewDecoder(resp.Body).Decode(&keyResp)
+		assert.NoError(t, err)
+		assert.Equal(t, "ok", keyResp.Status)
+
+		// GET the key and verify post_expiry fields are returned
+		stored, ok := ts.Gw.GlobalSessionManager.SessionDetail("default", keyResp.Key, false)
+		assert.True(t, ok)
+		assert.Equal(t, user.PostExpiryActionRetain, stored.PostExpiryAction)
+		assert.Equal(t, int64(600), stored.PostExpiryGracePeriod)
+
+		// Also verify via HTTP GET that the fields appear in the JSON response
+		resp, err = ts.Do(test.TestCase{
+			Method:    http.MethodGet,
+			Path:      "/tyk/keys/" + keyResp.Key,
+			AdminAuth: true,
+		})
+		assert.NoError(t, err)
+
+		body, _ := ioutil.ReadAll(resp.Body)
+		var fetched user.SessionState
+		err = json.Unmarshal(body, &fetched)
+		assert.NoError(t, err)
+		assert.Equal(t, user.PostExpiryActionRetain, fetched.PostExpiryAction)
+		assert.Equal(t, int64(600), fetched.PostExpiryGracePeriod)
+	})
+
+	t.Run("from policy", func(t *testing.T) {
+		pID := ts.CreatePolicy(func(p *user.Policy) {
+			p.PostExpiryAction = user.PostExpiryActionDelete
+			p.PostExpiryGracePeriod = 3600
+			p.AccessRights = map[string]user.AccessDefinition{
+				"api1": {APIID: "api1", Versions: []string{"v1"}},
+			}
+		})
+
+		session := CreateStandardSession()
+		session.ApplyPolicies = []string{pID}
+		session.AccessRights = map[string]user.AccessDefinition{
+			"api1": {APIID: "api1", Versions: []string{"v1"}},
+		}
+
+		resp, err := ts.Do(test.TestCase{
+			Method:    http.MethodPost,
+			Path:      "/tyk/keys/create",
+			Data:      session,
+			AdminAuth: true,
+		})
+		assert.NoError(t, err)
+
+		var keyResp apiModifyKeySuccess
+		err = json.NewDecoder(resp.Body).Decode(&keyResp)
+		assert.NoError(t, err)
+
+		// GET the key via HTTP and verify policy values are applied
+		resp, err = ts.Do(test.TestCase{
+			Method:    http.MethodGet,
+			Path:      "/tyk/keys/" + keyResp.Key,
+			AdminAuth: true,
+		})
+		assert.NoError(t, err)
+
+		body, _ := ioutil.ReadAll(resp.Body)
+		var fetched user.SessionState
+		err = json.Unmarshal(body, &fetched)
+		assert.NoError(t, err)
+		assert.Equal(t, user.PostExpiryActionDelete, fetched.PostExpiryAction)
+		assert.Equal(t, int64(3600), fetched.PostExpiryGracePeriod)
+	})
+}
+
 func TestOrgKeyHandler_LastUpdated(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()

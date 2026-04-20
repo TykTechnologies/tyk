@@ -183,4 +183,13 @@ message SessionState {
 
   // KeyId corresponds to the token used for API access.
   string key_id = 32;
+
+  // PostExpiryAction defines the action to take on a key in Redis after it expires.
+  // Valid values are "retain" and "delete".
+  string post_expiry_action = 33;
+
+  // PostExpiryGracePeriod defines the duration in seconds to retain a key in Redis
+  // after it expires. Only used when post_expiry_action is "retain".
+  // A value of -1 means never delete.
+  int64 post_expiry_grace_period = 34;
 }

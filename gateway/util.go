@@ -1,6 +1,8 @@
 package gateway
 
 import (
+	"crypto/tls"
+	"fmt"
 	"net"
 	"net/url"
 	"strconv"
@@ -215,4 +217,45 @@ func containsEscapedChars(str string) bool {
 	}
 
 	return str != unescaped
+}
+
+func resolveTLSVersions(userMin, userMax uint16) (uint16, uint16, error) {
+	const defaultMin = tls.VersionTLS12
+	const defaultMax = tls.VersionTLS13
+
+	resMin := userMin
+	resMax := userMax
+
+	if resMin == 0 {
+		resMin = defaultMin
+	}
+
+	if resMax == 0 {
+		resMax = defaultMax
+	}
+
+	switch {
+	case userMin != 0 && userMax == 0 && resMin > defaultMax:
+		return 0, 0, fmt.Errorf(
+			"provided minTLS (%s) exceeds the default maximum TLS version (%s); provide both versions explicitly",
+			tls.VersionName(userMin),
+			tls.VersionName(defaultMax),
+		)
+
+	case userMax != 0 && userMin == 0 && resMax < defaultMin:
+		return 0, 0, fmt.Errorf(
+			"provided maxTLS (%s) is lower than the default minimum TLS version (%s); provide both versions explicitly",
+			tls.VersionName(userMax),
+			tls.VersionName(defaultMin),
+		)
+
+	case userMin != 0 && userMax != 0 && userMin > userMax:
+		return 0, 0, fmt.Errorf(
+			"TLS validation error: minTLS (0x%X / %s) cannot be greater than maxTLS (0x%X / %s)",
+			userMin, tls.VersionName(userMin),
+			userMax, tls.VersionName(userMax),
+		)
+	}
+
+	return resMin, resMax, nil
 }

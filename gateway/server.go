@@ -52,6 +52,7 @@ import (
 	"github.com/TykTechnologies/tyk/dnscache"
 	"github.com/TykTechnologies/tyk/header"
 	"github.com/TykTechnologies/tyk/internal/cache"
+	"github.com/TykTechnologies/tyk/internal/compression"
 	"github.com/TykTechnologies/tyk/internal/crypto"
 	"github.com/TykTechnologies/tyk/internal/httputil"
 	"github.com/TykTechnologies/tyk/internal/model"
@@ -112,6 +113,8 @@ type Gateway struct {
 	config            atomic.Value
 	configMu          sync.Mutex
 	configViewerCache *configViewerCache
+
+	kvResolvers []func() error
 
 	ctx context.Context
 
@@ -464,6 +467,10 @@ func (gw *Gateway) setupGlobals() {
 
 	// Initialize the Global function in the request package to access the gateway config
 	request.Global = gw.GetConfig
+
+	if gwConfig.Storage.MaxDecompressedSize > 0 {
+		compression.SetMaxDecompressedSize(uint64(gwConfig.Storage.MaxDecompressedSize))
+	}
 
 	gw.dnsCacheManager = dnscache.NewDnsCacheManager(gwConfig.DnsCache.MultipleIPsHandleStrategy)
 
@@ -1122,6 +1129,7 @@ func (gw *Gateway) createResponseMiddlewareChain(
 	)
 	decorate := makeDefaultDecorator(log)
 
+	gw.responseMWAppendEnabled(&responseMWChain, decorate(&MCPListFilterResponseHandler{BaseTykResponseHandler: baseHandler}))
 	gw.responseMWAppendEnabled(&responseMWChain, decorate(&ResponseTransformMiddleware{BaseTykResponseHandler: baseHandler}))
 	headerInjector := decorate(&HeaderInjector{BaseTykResponseHandler: baseHandler})
 	headerInjectorAdded := gw.responseMWAppendEnabled(&responseMWChain, headerInjector)
@@ -1211,6 +1219,19 @@ func (gw *Gateway) DoReload() {
 
 	start := time.Now()
 
+	// Always record the current config state (loaded API and policy counts)
+	// even if the reload fails partway through. This ensures gauges report 0
+	// rather than emitting no data when e.g. MDCB is unreachable.
+	defer func() {
+		gw.MetricInstruments.RecordConfigState(gw.ctx, gw.apisByIDLen(), gw.policies.PolicyCount())
+	}()
+
+	for _, resolve := range gw.kvResolvers {
+		if err := resolve(); err != nil {
+			mainLog.WithError(err).Error("Failed to re-resolve KV value on reload")
+		}
+	}
+
 	// Initialize/reset the JSVM
 	if gw.GetConfig().EnableJSVM {
 		gw.GlobalEventsJSVM.DeInit()
@@ -1243,7 +1264,6 @@ func (gw *Gateway) DoReload() {
 	gw.loadGlobalApps()
 
 	gw.MetricInstruments.RecordReload(gw.ctx, time.Since(start))
-	gw.MetricInstruments.RecordConfigState(gw.ctx, gw.apisByIDLen(), gw.policies.PolicyCount())
 
 	gw.performedSuccessfulReload = true
 	mainLog.Info("API reload complete")
@@ -1550,7 +1570,9 @@ func (gw *Gateway) initSystem() error {
 		}
 
 		gw.SetConfig(gwConfig)
-		gw.afterConfSetup()
+		if err := gw.afterConfSetup(); err != nil {
+			log.WithError(err).Fatal("Could not complete configuration setup.")
+		}
 	}
 
 	overrideTykErrors(gw)
@@ -1607,20 +1629,28 @@ func (gw *Gateway) initSystem() error {
 		}
 	}
 
-	if gwConfig.ProxySSLMaxVersion == 0 {
-		gwConfig.ProxySSLMaxVersion = tls.VersionTLS12
+	if tMin, tMax, err := resolveTLSVersions(gwConfig.ProxySSLMinVersion, gwConfig.ProxySSLMaxVersion); err != nil {
+		return fmt.Errorf("failed to resolve `proxy_ssl_min_version` and `proxy_ssl_max_version`: %w", err)
+	} else {
+		log.
+			WithField("proxy_ssl_min_version", tls.VersionName(tMin)).
+			WithField("proxy_ssl_max_version", tls.VersionName(tMax)).
+			Info("Proxy TLS protocol range resolved and applied")
+
+		gwConfig.ProxySSLMinVersion = tMin
+		gwConfig.ProxySSLMaxVersion = tMax
 	}
 
-	if gwConfig.ProxySSLMinVersion > gwConfig.ProxySSLMaxVersion {
-		gwConfig.ProxySSLMaxVersion = gwConfig.ProxySSLMinVersion
-	}
+	if tMin, tMax, err := resolveTLSVersions(gwConfig.HttpServerOptions.MinVersion, gwConfig.HttpServerOptions.MaxVersion); err != nil {
+		return fmt.Errorf("failed to resolve `http_server_options.min_version` and `http_server_options.max_version`: %w", err)
+	} else {
+		log.
+			WithField("http_server_options.min_version", tls.VersionName(tMin)).
+			WithField("http_server_options.max_version", tls.VersionName(tMax)).
+			Info("HttpServerOptions TLS protocol range resolved and applied")
 
-	if gwConfig.HttpServerOptions.MaxVersion == 0 {
-		gwConfig.HttpServerOptions.MaxVersion = tls.VersionTLS12
-	}
-
-	if gwConfig.HttpServerOptions.MinVersion > gwConfig.HttpServerOptions.MaxVersion {
-		gwConfig.HttpServerOptions.MaxVersion = gwConfig.HttpServerOptions.MinVersion
+		gwConfig.HttpServerOptions.MinVersion = tMin
+		gwConfig.HttpServerOptions.MaxVersion = tMax
 	}
 
 	if gwConfig.UseDBAppConfigs && gwConfig.Policies.PolicySource != config.DefaultDashPolicySource {
@@ -1695,7 +1725,7 @@ func writePIDFile(file string) error {
 
 // afterConfSetup takes care of non-sensical config values (such as zero
 // timeouts) and sets up a few globals that depend on the config.
-func (gw *Gateway) afterConfSetup() {
+func (gw *Gateway) afterConfSetup() error {
 	conf := gw.GetConfig()
 
 	if conf.SlaveOptions.UseRPC {
@@ -1774,40 +1804,40 @@ func (gw *Gateway) afterConfSetup() {
 
 	conf.Secret, err = gw.kvStore(conf.Secret)
 	if err != nil {
-		log.WithError(err).Fatal("Could not retrieve the secret key...")
+		return fmt.Errorf("could not retrieve the secret key: %w", err)
 	}
 
 	conf.NodeSecret, err = gw.kvStore(conf.NodeSecret)
 	if err != nil {
-		log.WithError(err).Fatal("Could not retrieve the NodeSecret key...")
+		return fmt.Errorf("could not retrieve the node secret key: %w", err)
 	}
 
 	conf.Storage.Password, err = gw.kvStore(conf.Storage.Password)
 	if err != nil {
-		log.WithError(err).Fatal("Could not retrieve redis password...")
+		return fmt.Errorf("could not retrieve redis password: %w", err)
 	}
 
 	conf.CacheStorage.Password, err = gw.kvStore(conf.CacheStorage.Password)
 	if err != nil {
-		log.WithError(err).Fatal("Could not retrieve cache storage password...")
+		return fmt.Errorf("could not retrieve cache storage password: %w", err)
 	}
 
 	conf.Security.PrivateCertificateEncodingSecret, err = gw.kvStore(conf.Security.PrivateCertificateEncodingSecret)
 	if err != nil {
-		log.WithError(err).Fatal("Could not retrieve the private certificate encoding secret...")
+		return fmt.Errorf("could not retrieve the private certificate encoding secret: %w", err)
 	}
 
 	if conf.UseDBAppConfigs {
 		conf.DBAppConfOptions.ConnectionString, err = gw.kvStore(conf.DBAppConfOptions.ConnectionString)
 		if err != nil {
-			log.WithError(err).Fatal("Could not fetch dashboard connection string.")
+			return fmt.Errorf("could not fetch dashboard connection string: %w", err)
 		}
 	}
 
 	if conf.Policies.PolicySource == "service" {
 		conf.Policies.PolicyConnectionString, err = gw.kvStore(conf.Policies.PolicyConnectionString)
 		if err != nil {
-			log.WithError(err).Fatal("Could not fetch policy connection string.")
+			return fmt.Errorf("could not fetch policy connection string: %w", err)
 		}
 	}
 
@@ -1815,19 +1845,61 @@ func (gw *Gateway) afterConfSetup() {
 		conf.Private.EdgeOriginalAPIKeyPath = conf.SlaveOptions.APIKey
 		conf.SlaveOptions.APIKey, err = gw.kvStore(conf.SlaveOptions.APIKey)
 		if err != nil {
-			log.WithError(err).Fatalf("Could not retrieve API key from KV store.")
+			return fmt.Errorf("could not retrieve API key from KV store: %w", err)
 		}
 	}
 
-	if conf.OpenTelemetry.Enabled {
-		if conf.OpenTelemetry.ResourceName == "" {
-			conf.OpenTelemetry.ResourceName = config.DefaultOTelResourceName
+	// Retrieve OAuth mTLS certificate paths from KV store
+	if conf.ExternalServices.OAuth.MTLS.Enabled {
+		conf.ExternalServices.OAuth.MTLS.CertFile, err = gw.resolveKV(conf.ExternalServices.OAuth.MTLS.CertFile, func(c *config.Config, v string) {
+			c.ExternalServices.OAuth.MTLS.CertFile = v
+		}, true)
+		if err != nil {
+			return fmt.Errorf("could not retrieve OAuth mTLS cert file path from KV store: %w", err)
 		}
+		conf.ExternalServices.OAuth.MTLS.KeyFile, err = gw.resolveKV(conf.ExternalServices.OAuth.MTLS.KeyFile, func(c *config.Config, v string) {
+			c.ExternalServices.OAuth.MTLS.KeyFile = v
+		}, true)
+		if err != nil {
+			return fmt.Errorf("could not retrieve OAuth mTLS key file path from KV store: %w", err)
+		}
+		conf.ExternalServices.OAuth.MTLS.CAFile, err = gw.resolveKV(conf.ExternalServices.OAuth.MTLS.CAFile, func(c *config.Config, v string) {
+			c.ExternalServices.OAuth.MTLS.CAFile = v
+		}, true)
+		if err != nil {
+			return fmt.Errorf("could not retrieve OAuth mTLS CA file path from KV store: %w", err)
+		}
+	}
 
+	if conf.OpenTelemetry.TracesEnabled() || (conf.OpenTelemetry.Metrics.Enabled != nil && *conf.OpenTelemetry.Metrics.Enabled) {
+		if traceConfig := conf.OpenTelemetry.EffectiveTraceConfig(); traceConfig.ResourceName == "" {
+			traceConfig.ResourceName = config.DefaultOTelResourceName
+		}
 		conf.OpenTelemetry.SetDefaults()
 	}
 
 	gw.SetConfig(conf)
+	return nil
+}
+
+func (gw *Gateway) resolveKV(original string, set func(*config.Config, string), hotReload bool) (string, error) {
+	resolved, err := gw.kvStore(original)
+	if err != nil {
+		return original, err
+	}
+	if hotReload && resolved != original {
+		gw.kvResolvers = append(gw.kvResolvers, func() error {
+			val, err := gw.kvStore(original)
+			if err != nil {
+				return err
+			}
+			conf := gw.GetConfig()
+			set(&conf, val)
+			gw.SetConfig(conf)
+			return nil
+		})
+	}
+	return resolved, nil
 }
 
 func (gw *Gateway) kvStore(value string) (string, error) {

@@ -27,6 +27,36 @@
         "rate": 0.5,
         "parent_based": true
     },
+    "traces": {
+        "enabled": false,
+        "exporter": "",
+        "endpoint": "",
+        "headers": null,
+        "connection_timeout": 0,
+        "resource_name": "",
+        "tls": {
+            "enable": false,
+            "insecure_skip_verify": false,
+            "ca_file": "",
+            "cert_file": "",
+            "key_file": "",
+            "max_version": "",
+            "min_version": ""
+        },
+        "span_processor_type": "",
+        "span_batch_config": {
+            "max_queue_size": 0,
+            "max_export_batch_size": 0,
+            "batch_timeout": 0
+        },
+        "context_propagation": "",
+        "custom_trace_header": "",
+        "sampling": {
+            "type": "",
+            "rate": 0,
+            "parent_based": false
+        }
+    },
     "metrics": {
         "enabled": true,
         "exporter": "",

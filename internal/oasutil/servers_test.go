@@ -1,10 +1,11 @@
 package oasutil_test
 
 import (
+	"testing"
+
 	"github.com/TykTechnologies/tyk/internal/oasutil"
 	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/stretchr/testify/assert"
-	"testing"
 )
 
 func TestParseServerUrl(t *testing.T) {
@@ -101,7 +102,7 @@ func TestParseServerUrl(t *testing.T) {
 			t.Run(tCase.name, func(t *testing.T) {
 				_, err := oasutil.ParseServerUrl(tCase.input)
 				assert.NotNil(t, err)
-				assert.ErrorContains(t, err, tCase.expectedErr.Error())
+				assert.ErrorIs(t, err, tCase.expectedErr)
 			})
 		}
 	})
