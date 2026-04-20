@@ -28,9 +28,10 @@ project:
         - access_denied
         - policy_merge
         - rate_limit_boundary
-    # Fixtures are generated artifacts, not committed to repo.
-    # MC/DC coverage enforced through test annotations.
-    # Regenerate locally: proof testgen specs/system policy --output tests/policy/
+    verification:
+        fixture_evidence:
+            components:
+                - policy
     checks:
         coverage_threshold:
             threshold: 90
@@ -39,17 +40,16 @@ project:
             format: go-cover
         test_results:
             auto_link: true
-            auto_link: true
             report_path: .proof/test-results/go-test.json
         slow_tests:
             enabled: true
         mcdc_coverage:
-            advisory: true
-            max_no_verifying_tests: 10
-            max_missing_row_witnesses: 10
-            max_partial_row_coverage: 10
-            max_stale_witness_lines: 5
-            max_budget_skips: 3
+            advisory: false
+            max_no_verifying_tests: 0
+            max_missing_row_witnesses: 0
+            max_partial_row_coverage: 0
+            max_stale_witness_lines: 0
+            max_budget_skips: 0
         under_modeled_requirements:
             code_rich_decision_multiplier: 6
             code_rich_decision_floor: 10
@@ -60,9 +60,9 @@ project:
         code_mcdc:
             severity: warn
             engine: go
-            min_decision_percent: 89
-            min_condition_percent: 91
-            max_incomplete_decisions: 11
+            min_decision_percent: 100
+            min_condition_percent: 100
+            max_incomplete_decisions: 0
             targets:
                 - id: policy
                   enabled: true

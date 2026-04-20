@@ -1687,6 +1687,152 @@ func TestMCDCClosure_ApplyPartitions545_BothPaths(t *testing.T) {
 }
 
 // ===========================================================================
+// Final MC/DC closure: apply.go:242 SetBy="" (AllowanceScope="" && SetBy="")
+// After dead code removal, need to prove SetBy!="" independently affects the
+// decision. A right with AllowanceScope="" AND SetBy="" evaluates the && to false.
+// ===========================================================================
+
+// Verifies: SYS-REQ-024, SYS-REQ-025 [boundary]
+func TestMCDCFinal_Apply242_SetByEmptyProof(t *testing.T) {
+	// Setup: 2 ACL policies for api1 and api2 (producing distinctACL > 1),
+	// plus a 3rd policy with Quota-only partition for api3. The api3 right
+	// will have SetBy="" because only the ACL partition sets SetBy.
+	orgID := "org1"
+
+	pol1 := user.Policy{
+		ID:    "pol-acl-1",
+		OrgID: orgID,
+		Partitions: user.PolicyPartitions{
+			Acl: true,
+		},
+		AccessRights: map[string]user.AccessDefinition{
+			"api1": {Versions: []string{"v1"}},
+		},
+	}
+	pol2 := user.Policy{
+		ID:    "pol-acl-2",
+		OrgID: orgID,
+		Partitions: user.PolicyPartitions{
+			Acl: true,
+		},
+		AccessRights: map[string]user.AccessDefinition{
+			"api2": {Versions: []string{"v1"}},
+		},
+	}
+	pol3 := user.Policy{
+		ID:    "pol-quota",
+		OrgID: orgID,
+		Partitions: user.PolicyPartitions{
+			Quota: true,
+		},
+		QuotaMax: 5000,
+		AccessRights: map[string]user.AccessDefinition{
+			// api3 only gets Quota partition -- SetBy stays ""
+			"api3": {Versions: []string{"v1"}},
+		},
+	}
+
+	svc := newClosureTestService(orgID, []user.Policy{pol1, pol2, pol3})
+	session := &user.SessionState{}
+	session.SetPolicies("pol-acl-1", "pol-acl-2", "pol-quota")
+	session.MetaData = map[string]interface{}{}
+
+	err := svc.Apply(session)
+	require.NoError(t, err)
+
+	// api1 and api2 have SetBy set from ACL policies, so distinctACL > 1.
+	// api3 has SetBy="" so for api3: AllowanceScope=="" && SetBy!="" is
+	// AllowanceScope=="" && false => false. This proves SetBy!="" independently.
+	// api3 should NOT get AllowanceScope set (it stays "").
+	ar3, ok := session.AccessRights["api3"]
+	if ok {
+		assert.Empty(t, ar3.AllowanceScope,
+			"api3 should not get AllowanceScope since SetBy is empty")
+	}
+}
+
+// ===========================================================================
+// Final MC/DC closure: apply.go:506 QuotaRenewalRate inner check false path
+// One policy with 2 APIs. First API updates session, second API has fresh
+// ar.Limit (0) but session already equals policy value, so inner check is false.
+// ===========================================================================
+
+// Verifies: SYS-REQ-022, SYS-REQ-030 [boundary]
+func TestMCDCFinal_ApplyPartitions506_QuotaRenewalSessionAlreadySet(t *testing.T) {
+	orgID := "org1"
+
+	// Single policy with 2 APIs and QuotaRenewalRate > 0.
+	// Map iteration order is non-deterministic, but regardless of order:
+	// - First API processed: ar.Limit.QuotaRenewalRate=0 < 5000 -> outer T,
+	//   session.QuotaRenewalRate=0 < 5000 -> inner T, session updated to 5000
+	// - Second API processed: ar.Limit.QuotaRenewalRate=0 < 5000 -> outer T,
+	//   session.QuotaRenewalRate=5000, 5000 > 5000 = false -> inner F
+	pol := user.Policy{
+		ID:               "pol1",
+		OrgID:            orgID,
+		Rate:             10,
+		Per:              60,
+		QuotaMax:         1000,
+		QuotaRenewalRate: 5000,
+		AccessRights: map[string]user.AccessDefinition{
+			"api-a": {Versions: []string{"v1"}},
+			"api-b": {Versions: []string{"v1"}},
+		},
+	}
+
+	svc := newClosureTestService(orgID, []user.Policy{pol})
+	session := &user.SessionState{}
+	session.SetPolicies("pol1")
+	session.MetaData = map[string]interface{}{}
+
+	err := svc.Apply(session)
+	require.NoError(t, err)
+
+	// Session should have 5000 from the first API processed
+	assert.Equal(t, int64(5000), session.QuotaRenewalRate,
+		"session QuotaRenewalRate should be set from policy")
+}
+
+// ===========================================================================
+// Final MC/DC closure: apply.go:523/530 ThrottleRetryLimit and ThrottleInterval
+// inner check false path. Same multi-API pattern as above.
+// ===========================================================================
+
+// Verifies: SYS-REQ-021, SYS-REQ-030 [boundary]
+func TestMCDCFinal_ApplyPartitions523_530_ThrottleSessionAlreadySet(t *testing.T) {
+	orgID := "org1"
+
+	// Single policy with 2 APIs and throttle values > 0.
+	// First API: outer T, inner T (session updated)
+	// Second API: outer T (ar starts fresh), inner F (session already == policy)
+	pol := user.Policy{
+		ID:                 "pol1",
+		OrgID:              orgID,
+		Rate:               100,
+		Per:                60,
+		ThrottleRetryLimit: 42,
+		ThrottleInterval:   15,
+		AccessRights: map[string]user.AccessDefinition{
+			"api-x": {Versions: []string{"v1"}},
+			"api-y": {Versions: []string{"v1"}},
+		},
+	}
+
+	svc := newClosureTestService(orgID, []user.Policy{pol})
+	session := &user.SessionState{}
+	session.SetPolicies("pol1")
+	session.MetaData = map[string]interface{}{}
+
+	err := svc.Apply(session)
+	require.NoError(t, err)
+
+	assert.Equal(t, 42, session.ThrottleRetryLimit,
+		"session ThrottleRetryLimit should be set from policy")
+	assert.Equal(t, float64(15), session.ThrottleInterval,
+		"session ThrottleInterval should be set from policy")
+}
+
+// ===========================================================================
 // Gap: apply.go:589/595/601 -- updateSessionRootVars
 // Need: len(didXxx)==1 to be false (more than 1 API in the maps).
 // Already covered by the multi-API test, but need to ensure the INNER
