@@ -176,6 +176,7 @@ jobs:
           build-args: |
             BUILD_PACKAGE_NAME=tyk-gateway-ee
             BASE_IMAGE=tykio/dhi-busybox:1.37-fips
+            NONROOT_CHOWN=true
       - name: Docker metadata for ee tag push
         id: tag_metadata_ee
         uses: docker/metadata-action@c299e40c65443455700f0fdfc63efafe5b349051 # v5
@@ -211,6 +212,7 @@ jobs:
           build-args: |
             BUILD_PACKAGE_NAME=tyk-gateway-ee
             BASE_IMAGE=tykio/dhi-busybox:1.37-fips
+            NONROOT_CHOWN=true
       - name: Attach base image VEX to ee
         if: ${{ matrix.golang_cross == '1.25-bullseye' && startsWith(github.ref, 'refs/tags') }}
         run: |
@@ -259,6 +261,7 @@ jobs:
           build-args: |
             BUILD_PACKAGE_NAME=tyk-gateway-fips
             BASE_IMAGE=tykio/dhi-busybox:1.37-fips
+            NONROOT_CHOWN=true
       - name: Docker metadata for fips tag push
         id: tag_metadata_fips
         uses: docker/metadata-action@c299e40c65443455700f0fdfc63efafe5b349051 # v5
@@ -293,6 +296,7 @@ jobs:
           build-args: |
             BUILD_PACKAGE_NAME=tyk-gateway-fips
             BASE_IMAGE=tykio/dhi-busybox:1.37-fips
+            NONROOT_CHOWN=true
       - name: Attach base image VEX to fips
         if: ${{ matrix.golang_cross == '1.25-bullseye' && startsWith(github.ref, 'refs/tags') }}
         run: |
@@ -730,7 +734,7 @@ jobs:
             -e GOMODCACHE=/go/pkg/mod \
             -v /tmp/build-dashboard.sh:/tmp/build-dashboard.sh \
             -w /go/src/github.com/TykTechnologies/tyk-analytics \
-            tykio/golang-cross:1.24-bookworm /tmp/build-dashboard.sh
+            tykio/golang-cross:1.25-bullseye /tmp/build-dashboard.sh
 
           echo "✅ Packages built successfully for $GOARCH"
       - name: Detect platform for Docker build

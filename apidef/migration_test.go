@@ -687,7 +687,8 @@ func TestSetDisabledFlags(t *testing.T) {
 				},
 			},
 		},
-		DoNotTrack: true,
+		DoNotTrack:             true,
+		ErrorOverridesDisabled: true,
 	}
 	apiDef.SetDisabledFlags()
 	assert.Equal(t, expectedAPIDef, apiDef)

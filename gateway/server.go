@@ -59,6 +59,7 @@ import (
 	"github.com/TykTechnologies/tyk/internal/model"
 	"github.com/TykTechnologies/tyk/internal/netutil"
 	"github.com/TykTechnologies/tyk/internal/otel"
+	"github.com/TykTechnologies/tyk/internal/rate"
 	"github.com/TykTechnologies/tyk/internal/scheduler"
 	"github.com/TykTechnologies/tyk/internal/service/newrelic"
 	"github.com/TykTechnologies/tyk/internal/uuid"
@@ -237,9 +238,15 @@ type Gateway struct {
 	// apiJWKCaches cache per api entity
 	apiJWKCaches sync.Map
 
+	limitHeaderFactory rate.HeaderSenderFactory
+
 	BundleChecksumVerifier bundleChecksumVerifyFunction
 
 	validator validator.Validator
+
+	// compiledErrorOverrides holds the indexed error override rules for O(1) lookup.
+	// Built from apidef.ErrorOverrides during gateway startup.
+	compiledErrorOverrides atomic.Pointer[CompiledErrorOverrides]
 }
 
 func NewGateway(config config.Config, ctx context.Context) *Gateway {
@@ -288,6 +295,7 @@ func NewGateway(config config.Config, ctx context.Context) *Gateway {
 
 	gw.SetNodeID("solo-" + uuid.New())
 	gw.SessionID = uuid.New()
+	gw.limitHeaderFactory = rate.NewSenderFactory(config.RateLimitResponseHeaders)
 
 	// Only create registry in RPC mode
 	if config.SlaveOptions.UseRPC {
@@ -1189,6 +1197,10 @@ func (gw *Gateway) createResponseMiddlewareChain(
 		responseMWChain = append(responseMWChain, processor)
 	}
 
+	// Add error override handler (before cache) - intercepts upstream 4xx/5xx
+	gw.responseMWAppendEnabled(&responseMWChain,
+		decorate(&ResponseErrorOverrideMiddleware{BaseTykResponseHandler: baseHandler}))
+
 	keyPrefix := "cache-" + spec.APIID
 	cacheStore := &storage.RedisCluster{KeyPrefix: keyPrefix, IsCache: true, ConnectionHandler: gw.StorageConnectionHandler}
 	cacheStore.Connect()
@@ -1621,6 +1633,13 @@ func (gw *Gateway) initSystem() error {
 			return err
 		}
 
+		// Compile error override regex patterns and build indexed lookup
+		// Compilation failures are logged as warnings and those rules are skipped
+		compiled := CompileErrorOverrides(gwConfig.ErrorOverrides)
+		if compiled != nil {
+			gw.SetCompiledErrorOverrides(compiled)
+		}
+
 		gw.SetConfig(gwConfig)
 		if err := gw.afterConfSetup(); err != nil {
 			log.WithError(err).Fatal("Could not complete configuration setup.")
@@ -1726,6 +1745,9 @@ func (gw *Gateway) initSystem() error {
 	// instances periodically and deletes idle items, closes net.Listener instances to
 	// free resources.
 	go cleanIdleMemConnProviders(gw.ctx)
+
+	gw.limitHeaderFactory = rate.NewSenderFactory(gwConfig.RateLimitResponseHeaders)
+	gw.jwkCache = buildJWKSCache(gwConfig)
 
 	gw.initMembers(gwConfig)
 
@@ -2446,6 +2468,16 @@ func (gw *Gateway) GetConfig() config.Config {
 
 func (gw *Gateway) GetCertificateManager() certs.CertificateManager {
 	return gw.CertificateManager
+}
+
+// GetCompiledErrorOverrides returns the compiled error overrides for O(1) lookup.
+func (gw *Gateway) GetCompiledErrorOverrides() *CompiledErrorOverrides {
+	return gw.compiledErrorOverrides.Load()
+}
+
+// SetCompiledErrorOverrides stores the compiled error overrides.
+func (gw *Gateway) SetCompiledErrorOverrides(compiled *CompiledErrorOverrides) {
+	gw.compiledErrorOverrides.Store(compiled)
 }
 
 func (gw *Gateway) SetConfig(conf config.Config, skipReload ...bool) {

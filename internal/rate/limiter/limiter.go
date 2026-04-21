@@ -2,6 +2,7 @@ package limiter
 
 import (
 	"context"
+	"time"
 
 	"github.com/TykTechnologies/exp/pkg/limiters"
 
@@ -18,7 +19,7 @@ type Limiter struct {
 	clock  limiters.Clock
 }
 
-type LimiterFunc func(ctx context.Context, key string, rate float64, per float64) error
+type Func func(ctx context.Context, key string, rate float64, per float64) (ttl time.Duration, err error)
 
 // NewLimiter creates a new limiter object. It holds the redis client and the
 // default non-distributed locks, logger, and a clock for supporting tests.

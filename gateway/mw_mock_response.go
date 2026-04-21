@@ -170,7 +170,7 @@ func (m *mockResponseMiddleware) mockResponse(r *http.Request) (
 		res.Header.Set(header.Connection, "close")
 	}
 
-	m.Spec.sendRateLimitHeaders(ctxGetSession(r), res)
+	m.Gw.limitHeaderFactory(res.Header).SendQuotas(ctxGetSession(r), m.Spec.APIID)
 
 	return res, internal, nil
 }

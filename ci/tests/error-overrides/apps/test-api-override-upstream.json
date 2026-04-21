@@ -1,0 +1,35 @@
+{
+  "name": "Test API Override Upstream",
+  "api_id": "test-api-override-upstream",
+  "org_id": "default",
+  "use_keyless": true,
+  "active": true,
+  "proxy": {
+    "listen_path": "/test-api-override-upstream/",
+    "target_url": "http://backend-multi-error:5003/",
+    "strip_listen_path": true
+  },
+  "version_data": {
+    "not_versioned": true,
+    "default_version": "",
+    "versions": {
+      "Default": {
+        "name": "Default"
+      }
+    }
+  },
+  "error_overrides": {
+    "404": [
+      {
+        "response": {
+          "status_code": 420,
+          "body": "{\"error\": \"api_level_upstream\", \"status\": 404}",
+          "headers": {
+            "X-Error-Flag": "UPSTREAM-API",
+            "X-Override-Applied": "true"
+          }
+        }
+      }
+    ]
+  }
+}
