@@ -10,6 +10,7 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -455,18 +456,32 @@ func TestCoProcess_MemoryFragmentation(t *testing.T) {
 	if initialRSS == 0 {
 		t.Skip("Skipping test because VmRSS could not be read (not on Linux?)")
 	}
+	// 3. Simulate Allocation Churn Concurrently
+	iterations := 5000
+	concurrency := 10
+	var wg sync.WaitGroup
 
-	// 3. Simulate Allocation Churn
-	iterations := 10000
-	for i := 0; i < iterations; i++ {
-		_, err := c.BuildObject(req, nil, spec)
-		require.NoError(t, err)
+	for w := 0; w < concurrency; w++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for i := 0; i < iterations; i++ {
+				obj, err := c.BuildObject(req, nil, spec)
+				require.NoError(t, err)
+				
+				// Release object if pool is implemented
+				if obj != nil {
+					ReleaseCoprocessObject(obj)
+				}
 
-		// 4. Force Garbage Collection periodically
-		if i%100 == 0 {
-			runtime.GC()
-		}
+				// 4. Force Garbage Collection periodically
+				if i%1000 == 0 {
+					runtime.GC()
+				}
+			}
+		}()
 	}
+	wg.Wait()
 
 	// Final GC
 	runtime.GC()
@@ -484,12 +499,7 @@ func TestCoProcess_MemoryFragmentation(t *testing.T) {
 
 	t.Logf("Heap Diff: %d bytes", heapDiff)
 	t.Logf("RSS Diff: %d bytes", rssDiff)
-
-	// 6. Assert Fragmentation
-	// The Go heap should remain relatively small (e.g., < 50MB difference)
-	// The OS RSS should have grown significantly (e.g., > 100MB difference)
-
-	// We expect RSS to grow much more than Heap due to fragmentation
-	assert.True(t, rssDiff > heapDiff*2, "Expected RSS to grow significantly more than Heap due to fragmentation")
-	assert.True(t, rssDiff > 20*1024*1024, "Expected RSS to grow by at least 20MB")
+	// 6. Assert Fragmentation Fixed
+	// The OS RSS should NOT have grown significantly because we are using sync.Pool
+	assert.True(t, rssDiff < 100*1024*1024, "Expected RSS to grow by less than 100MB due to sync.Pool")
 }
