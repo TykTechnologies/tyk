@@ -14,7 +14,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Validate Jira ticket
-        uses: TykTechnologies/jira-linter@main
+        uses: TykTechnologies/jira-linter@38a9cabef56171c4e52ea698fa7be3db5fca3a49  # main
         with:
           jira-base-url: 'https://tyktech.atlassian.net'
           jira-user-email: ${{ secrets.JIRA_USER_EMAIL }}

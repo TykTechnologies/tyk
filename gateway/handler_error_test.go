@@ -95,6 +95,40 @@ func TestHandleDefaultErrorXml(t *testing.T) {
 	})
 }
 
+func TestHandleDefaultErrorSoapXml(t *testing.T) {
+
+	expect := `<?xml version = "1.0" encoding = "UTF-8"?>
+<error>There was a problem proxying the request</error>`
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		spec.Proxy.ListenPath = "/"
+		spec.Proxy.TargetURL = "http://localhost:66666"
+	})
+	ts.Run(t, test.TestCase{
+		Path: "/",
+		Code: http.StatusInternalServerError,
+		Headers: map[string]string{
+			header.ContentType: header.ApplicationSoapXML,
+		},
+		BodyMatchFunc: func(b []byte) bool {
+			return strings.TrimSpace(expect) == string(bytes.TrimSpace(b))
+		},
+	})
+
+	ts.Run(t, test.TestCase{
+		Path: "/",
+		Code: http.StatusInternalServerError,
+		Headers: map[string]string{
+			header.ContentType: header.ApplicationSoapXML + "; charset=UTF-8",
+		},
+		BodyMatchFunc: func(b []byte) bool {
+			return strings.TrimSpace(expect) == string(bytes.TrimSpace(b))
+		},
+	})
+}
+
 func TestHandleDefaultErrorJSON(t *testing.T) {
 
 	expect := `

@@ -1500,20 +1500,28 @@ func (gw *Gateway) initSystem() error {
 		}
 	}
 
-	if gwConfig.ProxySSLMaxVersion == 0 {
-		gwConfig.ProxySSLMaxVersion = tls.VersionTLS12
+	if tMin, tMax, err := resolveTLSVersions(gwConfig.ProxySSLMinVersion, gwConfig.ProxySSLMaxVersion); err != nil {
+		return fmt.Errorf("failed to resolve `proxy_ssl_min_version` and `proxy_ssl_max_version`: %w", err)
+	} else {
+		log.
+			WithField("proxy_ssl_min_version", tls.VersionName(tMin)).
+			WithField("proxy_ssl_max_version", tls.VersionName(tMax)).
+			Info("Proxy TLS protocol range resolved and applied")
+
+		gwConfig.ProxySSLMinVersion = tMin
+		gwConfig.ProxySSLMaxVersion = tMax
 	}
 
-	if gwConfig.ProxySSLMinVersion > gwConfig.ProxySSLMaxVersion {
-		gwConfig.ProxySSLMaxVersion = gwConfig.ProxySSLMinVersion
-	}
+	if tMin, tMax, err := resolveTLSVersions(gwConfig.HttpServerOptions.MinVersion, gwConfig.HttpServerOptions.MaxVersion); err != nil {
+		return fmt.Errorf("failed to resolve `http_server_options.min_version` and `http_server_options.max_version`: %w", err)
+	} else {
+		log.
+			WithField("http_server_options.min_version", tls.VersionName(tMin)).
+			WithField("http_server_options.max_version", tls.VersionName(tMax)).
+			Info("HttpServerOptions TLS protocol range resolved and applied")
 
-	if gwConfig.HttpServerOptions.MaxVersion == 0 {
-		gwConfig.HttpServerOptions.MaxVersion = tls.VersionTLS12
-	}
-
-	if gwConfig.HttpServerOptions.MinVersion > gwConfig.HttpServerOptions.MaxVersion {
-		gwConfig.HttpServerOptions.MaxVersion = gwConfig.HttpServerOptions.MinVersion
+		gwConfig.HttpServerOptions.MinVersion = tMin
+		gwConfig.HttpServerOptions.MaxVersion = tMax
 	}
 
 	if gwConfig.UseDBAppConfigs && gwConfig.Policies.PolicySource != config.DefaultDashPolicySource {

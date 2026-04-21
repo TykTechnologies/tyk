@@ -1167,10 +1167,9 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 	breakerEnforced, breakerConf := p.CheckCircuitBreakerEnforced(p.TykAPISpec, req)
 
 	// set up TLS certificates for upstream if needed
-	var tlsCertificates []tls.Certificate
-	if cert := p.Gw.getUpstreamCertificate(outreq.URL.Host, p.TykAPISpec); cert != nil {
+	cert := p.Gw.getUpstreamCertificate(outreq.URL.Host, p.TykAPISpec)
+	if cert != nil {
 		p.logger.Debug("Found upstream mutual TLS certificate")
-		tlsCertificates = []tls.Certificate{*cert}
 	}
 
 	p.TykAPISpec.Lock()
@@ -1220,8 +1219,11 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 
 	roundTripper = p.TykAPISpec.HTTPTransport
 
-	if roundTripper.transport != nil {
-		roundTripper.transport.TLSClientConfig.Certificates = tlsCertificates
+	if roundTripper.transport != nil && cert != nil {
+		roundTripper.transport.TLSClientConfig.Certificates = []tls.Certificate{*cert}
+		roundTripper.transport.TLSClientConfig.GetClientCertificate = func(_ *tls.CertificateRequestInfo) (*tls.Certificate, error) {
+			return cert, nil
+		}
 	}
 	p.TykAPISpec.Unlock()
 

@@ -12,6 +12,7 @@ on:
       - reopened
       - synchronize
       - ready_for_review
+      - labeled
   push:
     branches:
       - master
@@ -27,12 +28,19 @@ env:
   BRANCH_NAME: ${{ github.base_ref || github.ref_name }} # base_ref for PRs is 'master', but merges read in ref_name
 
 jobs:
+  dep-guard:
+    if: ${{ github.event_name == 'pull_request' }}
+    uses: TykTechnologies/github-actions/.github/workflows/dependency-guard.yml@2b35ab5dd4cfff21ced9d12446e9e27d10bf5785  # main
+    permissions:
+      contents: read
+
   lint:
+    needs: [dep-guard]
+    if: ${{ always() && !github.event.pull_request.draft && (needs.dep-guard.result == 'success' || needs.dep-guard.result == 'skipped') }}
     runs-on: ubuntu-latest
-    if: ${{ !github.event.pull_request.draft }}
     steps:
       - name: "Checkout PR"
-        uses: TykTechnologies/github-actions/.github/actions/checkout-pr@main
+        uses: TykTechnologies/github-actions/.github/actions/checkout-pr@2b35ab5dd4cfff21ced9d12446e9e27d10bf5785  # main
         with:
           token: ${{ secrets.ORG_GH_TOKEN }}
 
@@ -42,15 +50,15 @@ jobs:
           git rev-parse origin/${{ env.BRANCH_NAME }}
 
       - name: Setup Golang
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff  # v5
         with:
           go-version-file: go.mod
           cache-dependency-path: go.sum
 
       - name: Setup CI Tooling
-        uses: shrink/actions-docker-extract@v3
+        uses: shrink/actions-docker-extract@04c17c51a5b9fd93b7aed2e05e86c8fe2d90ee52  # v3
         with:
-          image: tykio/ci-tools:latest
+          image: tykio/ci-tools@sha256:1796c0938247f42c580c501f7cd04e1144a59a62c6d8ba743572ff40371e1306  # latest
           path: /usr/local/bin/.
           destination: /usr/local/bin
 
@@ -64,7 +72,7 @@ jobs:
           task --exit-code lint:check-git-state MESSAGE="task tidy made git state dirty, please run task lint locally and update PR"
 
       - name: golangci-lint
-        uses: golangci/golangci-lint-action@v8
+        uses: golangci/golangci-lint-action@4afd733a84b1f43292c63897423277bb7f4313a9  # v8
         timeout-minutes: 20
         with:
           version: v2.5.0
@@ -75,7 +83,7 @@ jobs:
           skip-cache: false
           skip-save-cache: false
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4
         if: ${{ always() }}
         with:
           name: golangcilint
@@ -102,7 +110,7 @@ jobs:
 
     steps:
       - name: Checkout Tyk
-        uses: actions/checkout@v4
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4
         with:
           ref: ${{ github.ref }}
 
@@ -114,7 +122,7 @@ jobs:
       # Regardless that the base image provides a python release, we need
       # setup-python so it properly configures the python3-venv.
       - name: Setup Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065  # v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
@@ -125,14 +133,14 @@ jobs:
         run: pip -V && pip3 -V
 
       - name: Setup CI Tooling
-        uses: shrink/actions-docker-extract@v3
+        uses: shrink/actions-docker-extract@04c17c51a5b9fd93b7aed2e05e86c8fe2d90ee52  # v3
         with:
-          image: tykio/ci-tools:latest
+          image: tykio/ci-tools@sha256:1796c0938247f42c580c501f7cd04e1144a59a62c6d8ba743572ff40371e1306  # latest
           path: /usr/local/bin/.
           destination: /usr/local/bin
 
       - name: Setup Golang
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff  # v5
         with:
           go-version-file: go.mod
           cache-dependency-path: go.sum
@@ -143,9 +151,9 @@ jobs:
           sudo apt-get install libluajit-5.1-dev
 
           python -m pip install --upgrade pip
-          pip install setuptools
-          pip install google
-          pip install 'protobuf==4.24.4'
+          pip install --no-deps setuptools
+          pip install --no-deps google
+          pip install --no-deps 'protobuf==4.24.4'
 
       - name: Bring up test services
         run: task services:up
@@ -160,14 +168,14 @@ jobs:
           task test:e2e-combined args="-race -timeout=15m"
           task test:coverage
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4
         if: ${{ always() }}
         with:
           name: coverage
           retention-days: 1
           path: coverage/gateway-all.cov
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4
         if: ${{ always() }}
         with:
           name: testjson
@@ -180,23 +188,23 @@ jobs:
     needs: [test, lint]
     steps:
       - name: "Checkout repository"
-        uses: TykTechnologies/github-actions/.github/actions/checkout-pr@main
+        uses: TykTechnologies/github-actions/.github/actions/checkout-pr@2b35ab5dd4cfff21ced9d12446e9e27d10bf5785  # main
         with:
           token: ${{ secrets.ORG_GH_TOKEN }}
 
       - name: Download coverage artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093  # v4
         with:
           name: coverage
 
       - name: Download golangcilint artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093  # v4
         with:
           name: golangcilint
 
       - name: Check reports existence
         id: check_files
-        uses: andstor/file-existence-action@v3
+        uses: andstor/file-existence-action@076e0072799f4942c8bc574a82233e1e4d13e9d6  # v3
         with:
           files: 'gateway-all.cov, golangci-lint-report.json'
           fail: true
@@ -230,7 +238,7 @@ jobs:
 
       - name: Scan
         if: always()
-        uses: sonarsource/sonarqube-scan-action@master
+        uses: sonarsource/sonarqube-scan-action@3988e54db2467c7e9583a4af619c3f5647d6b8ad  # master
         with:
           args: ${{ steps.sonar_params.outputs.sonar_args }}
         env:

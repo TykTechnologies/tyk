@@ -16,7 +16,7 @@ on:
   schedule:
     - cron: "0 0 * * 1"
   pull_request:
-    types: [opened, synchronize, reopened, labeled]
+    types: [opened, reopened, synchronize, labeled]
   push:
     branches:
       - master
@@ -31,8 +31,15 @@ env:
   # startsWith covers pull_request_target too
   BASE_REF: ${{startsWith(github.event_name, 'pull_request') && github.base_ref || github.ref_name}}
 jobs:
+  dep-guard:
+    if: ${{ github.event_name == 'pull_request' }}
+    uses: TykTechnologies/github-actions/.github/workflows/dependency-guard.yml@2b35ab5dd4cfff21ced9d12446e9e27d10bf5785  # main
+    permissions:
+      contents: read
+
   goreleaser:
-    if: github.event.pull_request.draft == false
+    needs: [dep-guard]
+    if: ${{ always() && github.event.pull_request.draft == false && (needs.dep-guard.result == 'success' || needs.dep-guard.result == 'skipped') }}
     name: '${{ matrix.golang_cross }}'
     runs-on: ubuntu-latest-m
     permissions:
@@ -56,7 +63,7 @@ jobs:
       commit_author: ${{ steps.set_outputs.outputs.commit_author}}
     steps:
       - name: Checkout of tyk
-        uses: actions/checkout@v4
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4
         with:
           fetch-depth: 1
       - name: Set some outputs for later
@@ -67,22 +74,22 @@ jobs:
         run: |
           echo "commit_author=$(git show -s --format='%ae' HEAD)" >> $GITHUB_OUTPUT
           echo "branch=${HEAD_REF##*/}" >> $GITHUB_OUTPUT
-      - uses: docker/setup-qemu-action@v3
-      - uses: docker/setup-buildx-action@v3
+      - uses: docker/setup-qemu-action@c7c53464625b32c7a7e944ae62b3e17d2b600130  # v3
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f  # v3
       - name: Login to DockerHub
         if: startsWith(github.ref, 'refs/tags')
-        uses: docker/login-action@v3
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9  # v3
         with:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
       - name: Login to Cloudsmith
         if: startsWith(github.ref, 'refs/tags')
-        uses: docker/login-action@v3
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9  # v3
         with:
           registry: docker.tyk.io
           username: ${{ secrets.CLOUDSMITH_USERNAME }}
           password: ${{ secrets.CLOUDSMITH_API_KEY }}
-      - uses: actions/cache@v4
+      - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830  # v4
         with:
           path: |
             ~/.cache/go-build
@@ -121,14 +128,14 @@ jobs:
           -v /tmp/build.sh:/tmp/build.sh                                         \
           -w /go/src/github.com/TykTechnologies/tyk                      \
           tykio/golang-cross:${{ matrix.golang_cross }} /tmp/build.sh
-      - uses: aws-actions/configure-aws-credentials@v4
+      - uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a  # v4
         with:
           role-to-assume: arn:aws:iam::754489498669:role/ecr_rw_tyk
           role-session-name: cipush
           aws-region: eu-central-1
           # Don't mask to pass it across job boundaries
           mask-aws-account-id: false
-      - uses: aws-actions/amazon-ecr-login@v2
+      - uses: aws-actions/amazon-ecr-login@183a1442edf41672e66566b7fc560e297a290896  # v2
         id: ecr
         if: ${{ matrix.golang_cross == '1.25-bullseye' }}
         with:
@@ -136,7 +143,7 @@ jobs:
       - name: Docker metadata for ee CI
         id: ci_metadata_ee
         if: ${{ matrix.golang_cross == '1.25-bullseye' }}
-        uses: docker/metadata-action@v5
+        uses: docker/metadata-action@c299e40c65443455700f0fdfc63efafe5b349051  # v5
         with:
           images: |
             ${{ steps.ecr.outputs.registry }}/tyk-ee
@@ -151,7 +158,7 @@ jobs:
             type=semver,pattern={{version}},prefix=v
       - name: push ee image to CI
         if: ${{ matrix.golang_cross == '1.25-bullseye' }}
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8  # v6
         with:
           context: "dist"
           platforms: linux/amd64,linux/arm64,linux/s390x
@@ -167,7 +174,7 @@ jobs:
             BUILD_PACKAGE_NAME=tyk-gateway-ee
       - name: Docker metadata for ee tag push
         id: tag_metadata_ee
-        uses: docker/metadata-action@v5
+        uses: docker/metadata-action@c299e40c65443455700f0fdfc63efafe5b349051  # v5
         with:
           images: |
             docker.tyk.io/tyk-gateway/tyk-gateway-ee
@@ -185,7 +192,7 @@ jobs:
             org.opencontainers.image.version=${{ github.ref_name }}
       - name: push ee image to prod
         if: ${{ matrix.golang_cross == '1.25-bullseye' }}
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8  # v6
         with:
           context: "dist"
           platforms: linux/amd64,linux/arm64,linux/s390x
@@ -202,7 +209,7 @@ jobs:
       - name: Docker metadata for fips CI
         id: ci_metadata_fips
         if: ${{ matrix.golang_cross == '1.25-bullseye' }}
-        uses: docker/metadata-action@v5
+        uses: docker/metadata-action@c299e40c65443455700f0fdfc63efafe5b349051  # v5
         with:
           images: |
             ${{ steps.ecr.outputs.registry }}/tyk
@@ -217,7 +224,7 @@ jobs:
             type=semver,pattern={{version}},prefix=v
       - name: push fips image to CI
         if: ${{ matrix.golang_cross == '1.25-bullseye' }}
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8  # v6
         with:
           context: "dist"
           platforms: linux/amd64,linux/arm64
@@ -233,7 +240,7 @@ jobs:
             BUILD_PACKAGE_NAME=tyk-gateway-fips
       - name: Docker metadata for fips tag push
         id: tag_metadata_fips
-        uses: docker/metadata-action@v5
+        uses: docker/metadata-action@c299e40c65443455700f0fdfc63efafe5b349051  # v5
         with:
           images: |
             tykio/tyk-gateway-fips
@@ -250,7 +257,7 @@ jobs:
             org.opencontainers.image.version=${{ github.ref_name }}
       - name: push fips image to prod
         if: ${{ matrix.golang_cross == '1.25-bullseye' }}
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8  # v6
         with:
           context: "dist"
           platforms: linux/amd64,linux/arm64
@@ -267,7 +274,7 @@ jobs:
       - name: Docker metadata for std CI
         id: ci_metadata_std
         if: ${{ matrix.golang_cross == '1.25-bullseye' }}
-        uses: docker/metadata-action@v5
+        uses: docker/metadata-action@c299e40c65443455700f0fdfc63efafe5b349051  # v5
         with:
           images: |
             ${{ steps.ecr.outputs.registry }}/tyk
@@ -282,7 +289,7 @@ jobs:
             type=semver,pattern={{version}},prefix=v
       - name: push std image to CI
         if: ${{ matrix.golang_cross == '1.25-bullseye' }}
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8  # v6
         with:
           context: "dist"
           platforms: linux/amd64,linux/arm64,linux/s390x
@@ -298,7 +305,7 @@ jobs:
             BUILD_PACKAGE_NAME=tyk-gateway
       - name: Docker metadata for std tag push
         id: tag_metadata_std
-        uses: docker/metadata-action@v5
+        uses: docker/metadata-action@c299e40c65443455700f0fdfc63efafe5b349051  # v5
         with:
           images: |
             docker.tyk.io/tyk-gateway/tyk-gateway
@@ -316,7 +323,7 @@ jobs:
             org.opencontainers.image.version=${{ github.ref_name }}
       - name: push std image to prod
         if: ${{ matrix.golang_cross == '1.25-bullseye' }}
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8  # v6
         with:
           context: "dist"
           platforms: linux/amd64,linux/arm64,linux/s390x
@@ -331,7 +338,7 @@ jobs:
           build-args: |
             BUILD_PACKAGE_NAME=tyk-gateway
       - name: save deb
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4
         if: ${{ matrix.golang_cross == '1.25-bullseye' }}
         with:
           name: deb
@@ -341,7 +348,7 @@ jobs:
             !dist/*PAYG*.deb
             !dist/*fips*.deb
       - name: save rpm
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4
         if: ${{ matrix.golang_cross == '1.25-bullseye' }}
         with:
           name: rpm
@@ -361,7 +368,7 @@ jobs:
       sink: ${{ steps.params.outputs.sink }}
     steps:
       - name: Set test parameters
-        uses: TykTechnologies/github-actions/.github/actions/tests/test-controller@main
+        uses: TykTechnologies/github-actions/.github/actions/tests/test-controller@2b35ab5dd4cfff21ced9d12446e9e27d10bf5785  # main
         id: params
         with:
           variation: ${{ env.VARIATION }}
@@ -389,17 +396,17 @@ jobs:
           - pump: $ECR/tyk-pump:master
             sink: tykio/tyk-mdcb-docker:v2.4
     steps:
-      - uses: aws-actions/configure-aws-credentials@v4
+      - uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a  # v4
         with:
           role-to-assume: arn:aws:iam::754489498669:role/ecr_rw_tyk
           role-session-name: cipush
           aws-region: eu-central-1
       - id: ecr
-        uses: aws-actions/amazon-ecr-login@v2
+        uses: aws-actions/amazon-ecr-login@183a1442edf41672e66566b7fc560e297a290896  # v2
         with:
           mask-password: 'true'
       - name: Setup tmate session only in debug mode
-        uses: mxschmitt/action-tmate@v3
+        uses: mxschmitt/action-tmate@c0afd6f790e3a5564914980036ebf83216678101  # v3
         if: runner.debug == '1'
         with:
           detached: true
@@ -407,11 +414,11 @@ jobs:
           # Only ${{ github.actor }} has access
           # See https://github.com/mxschmitt/action-tmate#use-registered-public-ssh-keys
       - name: Fetch environment from tyk-pro
-        uses: TykTechnologies/github-actions/.github/actions/tests/checkout-tyk-pro@main
+        uses: TykTechnologies/github-actions/.github/actions/tests/checkout-tyk-pro@2b35ab5dd4cfff21ced9d12446e9e27d10bf5785  # main
         with:
           org_gh_token: ${{ github.token }}
       - name: Set up test environment
-        uses: TykTechnologies/github-actions/.github/actions/tests/env-up@main
+        uses: TykTechnologies/github-actions/.github/actions/tests/env-up@2b35ab5dd4cfff21ced9d12446e9e27d10bf5785  # main
         timeout-minutes: 5
         id: env_up
         with:
@@ -421,18 +428,18 @@ jobs:
           TYK_DB_LICENSEKEY: ${{ secrets.DASH_LICENSE }}
           TYK_MDCB_LICENSE: ${{ secrets.MDCB_LICENSE }}
       - name: Choose test code branch
-        uses: TykTechnologies/github-actions/.github/actions/tests/choose-test-branch@main
+        uses: TykTechnologies/github-actions/.github/actions/tests/choose-test-branch@2b35ab5dd4cfff21ced9d12446e9e27d10bf5785  # main
         with:
           test_folder: api
           org_gh_token: ${{ secrets.ORG_GH_TOKEN }}
       - name: Run API tests
-        uses: TykTechnologies/github-actions/.github/actions/tests/api-tests@main
+        uses: TykTechnologies/github-actions/.github/actions/tests/api-tests@2b35ab5dd4cfff21ced9d12446e9e27d10bf5785  # main
         timeout-minutes: 30
         id: test_execution
         with:
           user_api_secret: ${{ steps.env_up.outputs.USER_API_SECRET }}
       - name: Generate test reports and collect logs
-        uses: TykTechnologies/github-actions/.github/actions/tests/reporting@main
+        uses: TykTechnologies/github-actions/.github/actions/tests/reporting@2b35ab5dd4cfff21ced9d12446e9e27d10bf5785  # main
         if: always() && (steps.test_execution.conclusion != 'skipped')
         with:
           report_xml: 'true'
@@ -503,21 +510,22 @@ jobs:
           - arm64
         distro: ${{ fromJson(needs.test-controller-distros.outputs.deb) }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4
         with:
           fetch-depth: 1
           sparse-checkout: ci
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093  # v4
         with:
           name: deb
-      - uses: docker/setup-qemu-action@v3
-      - uses: docker/setup-buildx-action@v3
+      - uses: docker/setup-qemu-action@c7c53464625b32c7a7e944ae62b3e17d2b600130  # v3
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f  # v3
       - name: generate dockerfile
         run: |
           echo 'FROM ${{ matrix.distro }}
           ARG TARGETARCH
           COPY tyk-gateway*_${TARGETARCH}.deb /tyk-gateway.deb
           RUN apt-get update && apt-get install -y curl
+          # TODO: curl|bash is unsafe — consider pinning or verifying checksum
           RUN curl -fsSL https://packagecloud.io/install/repositories/tyk/tyk-gateway/script.deb.sh | bash || echo "Repository setup failed, but continuing"
           RUN apt-get install -y tyk-gateway=3.0.8 || echo "Previous version not found, testing fresh install"
           RUN dpkg -i /tyk-gateway.deb
@@ -527,7 +535,7 @@ jobs:
           CMD ["/opt/tyk-gateway/tyk", "--conf", "/opt/tyk-gateway/tyk.conf"]
           ' | tee Dockerfile
       - name: install on ${{ matrix.distro }}
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8  # v6
         with:
           context: "."
           platforms: linux/${{ matrix.arch }}
@@ -561,15 +569,15 @@ jobs:
           - arm64
         distro: ${{ fromJson(needs.test-controller-distros.outputs.rpm) }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4
         with:
           fetch-depth: 1
           sparse-checkout: ci
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093  # v4
         with:
           name: rpm
-      - uses: docker/setup-qemu-action@v3
-      - uses: docker/setup-buildx-action@v3
+      - uses: docker/setup-qemu-action@c7c53464625b32c7a7e944ae62b3e17d2b600130  # v3
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f  # v3
       - name: generate dockerfile
         run: |
           echo 'FROM ${{ matrix.distro }}
@@ -577,6 +585,7 @@ jobs:
           COPY tyk-gateway*.${RHELARCH}.rpm /tyk-gateway.rpm
           RUN command -v curl || yum install -y curl
           RUN command -v useradd || yum install -y shadow-utils
+          # TODO: curl|bash is unsafe — consider pinning or verifying checksum
           RUN curl -fsSL https://packagecloud.io/install/repositories/tyk/tyk-gateway/script.rpm.sh | bash || echo "Repository setup failed, but continuing"
           RUN yum install -y tyk-gateway-3.0.8-1 || echo "Previous version not found, testing fresh install"
           RUN curl https://keyserver.tyk.io/tyk.io.rpm.signing.key.2020 -o tyk-gateway.key && rpm --import tyk-gateway.key
@@ -588,7 +597,7 @@ jobs:
           CMD ["/opt/tyk-gateway/tyk", "--conf", "/opt/tyk-gateway/tyk.conf"]
           ' | tee Dockerfile
       - name: install on ${{ matrix.distro }}
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8  # v6
         with:
           context: "."
           platforms: linux/${{ matrix.arch }}
@@ -613,7 +622,7 @@ jobs:
     secrets: inherit
   sbom:
     needs: goreleaser
-    uses: TykTechnologies/github-actions/.github/workflows/sbom.yaml@main
+    uses: TykTechnologies/github-actions/.github/workflows/sbom.yaml@2b35ab5dd4cfff21ced9d12446e9e27d10bf5785  # main
     secrets:
       DEPDASH_URL: ${{ secrets.DEPDASH_URL }}
       DEPDASH_KEY: ${{ secrets.DEPDASH_KEY }}

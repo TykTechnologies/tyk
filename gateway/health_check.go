@@ -187,9 +187,26 @@ func (gw *Gateway) liveCheckHandler(w http.ResponseWriter, r *http.Request) {
 		Details:     checks,
 	}
 
-	failCount, criticalFailure := gw.evaluateHealthChecks(checks)
+	var failCount int
 
-	status, httpStatus := gw.determineHealthStatus(failCount, criticalFailure, len(checks))
+	for _, v := range checks {
+		if v.Status == Fail {
+			failCount++
+		}
+	}
+
+	var status HealthCheckStatus
+
+	switch failCount {
+	case 0:
+		status = Pass
+
+	case len(checks):
+		status = Fail
+
+	default:
+		status = Warn
+	}
 
 	res.Status = status
 
@@ -200,7 +217,7 @@ func (gw *Gateway) liveCheckHandler(w http.ResponseWriter, r *http.Request) {
 		addMascotHeaders(w)
 	}
 
-	w.WriteHeader(httpStatus)
+	w.WriteHeader(http.StatusOK)
 	err := json.NewEncoder(w).Encode(res)
 	if err != nil {
 		mainLog.Warning(fmt.Sprintf("[Liveness] Could not encode response, error: %s", err.Error()))
@@ -259,7 +276,10 @@ func (gw *Gateway) readinessHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(res)
+	err := json.NewEncoder(w).Encode(res)
+	if err != nil {
+		mainLog.Warning(fmt.Sprintf("[Readiness] Could not encode response, error: %s", err.Error()))
+	}
 }
 
 func (gw *Gateway) determineHealthStatus(failCount int, criticalFailure bool, totalChecks int) (HealthCheckStatus, int) {
