@@ -288,7 +288,7 @@ func TestDetermineHosts(t *testing.T) {
 			expected: []string{"localhost:8080", ""},
 		},
 		{
-			name: "edge endpoints but no matching tags → relative paths",
+			name: "edge endpoints but no matching tags → DefaultHost + relative path",
 			apiData: &apidef.APIDefinition{
 				Tags: []string{"dev"},
 			},
@@ -298,7 +298,7 @@ func TestDetermineHosts(t *testing.T) {
 					{Endpoint: "http://edge1.example.com", Tags: []string{"prod"}},
 				},
 			},
-			expected: []string{""},
+			expected: []string{"localhost:8080", ""},
 		},
 		{
 			name: "gateway tags disabled with tags and edge endpoints → default host + relative path",
@@ -2646,8 +2646,8 @@ func TestDetermineHosts_MDCB(t *testing.T) {
 				HybridEnabled: true,
 				EdgeEndpoints: []EdgeEndpoint{},
 			},
-			expected: []string{""},
-			comment:  "Scenario 1: No edge endpoints, should return relative path",
+			expected: []string{"localhost:8080", ""},
+			comment:  "Scenario 1: No edge endpoints, should return DefaultHost + relative path",
 		},
 		{
 			name: "MDCB: API has no tags → relative path",
@@ -2758,8 +2758,8 @@ func TestDetermineHosts_MDCB(t *testing.T) {
 					{Endpoint: "http://edge1.example.com", Tags: []string{"prod"}},
 				},
 			},
-			expected: []string{""},
-			comment:  "Standard mode with no tag matches should return relative paths",
+			expected: []string{"localhost:8080", ""},
+			comment:  "Standard mode with no tag matches should return DefaultHost + relative path",
 		},
 		{
 			name: "Standard mode: some tags match, some don't → endpoints + relative paths",
@@ -2775,6 +2775,48 @@ func TestDetermineHosts_MDCB(t *testing.T) {
 			},
 			expected: []string{"http://ddd", ""},
 			comment:  "Standard mode with mixed tag matches should return matching endpoints + relative paths",
+		},
+		{
+			name: "Standard mode: has tags, no edge endpoints → DefaultHost",
+			apiData: &apidef.APIDefinition{
+				Tags: []string{"prod"},
+			},
+			config: ServerRegenerationConfig{
+				DefaultHost:   "localhost:8080",
+				HybridEnabled: false,
+				EdgeEndpoints: []EdgeEndpoint{},
+			},
+			expected: []string{"localhost:8080", ""},
+			comment:  "Non-hybrid with tags but no edge endpoints should return DefaultHost + relative path",
+		},
+		{
+			name: "MDCB: no tags, edge endpoints configured → relative path",
+			apiData: &apidef.APIDefinition{
+				Tags: []string{},
+			},
+			config: ServerRegenerationConfig{
+				DefaultHost:   "localhost:8080",
+				HybridEnabled: true,
+				EdgeEndpoints: []EdgeEndpoint{
+					{Endpoint: "http://edge1.example.com", Tags: []string{"prod"}},
+				},
+			},
+			expected: []string{""},
+			comment:  "Hybrid with no tags but edge endpoints configured should return relative path",
+		},
+		{
+			name: "MDCB: tags disabled, no edge endpoints → DefaultHost",
+			apiData: &apidef.APIDefinition{
+				TagsDisabled: true,
+				Tags:         []string{"prod"},
+			},
+			config: ServerRegenerationConfig{
+				DefaultHost:   "localhost:8080",
+				HybridEnabled: true,
+				EdgeEndpoints: []EdgeEndpoint{},
+			},
+			expected: []string{"localhost:8080", ""},
+			comment:  "Hybrid with tags disabled and no edge endpoints should return DefaultHost + relative path",
 		},
 	}
 
