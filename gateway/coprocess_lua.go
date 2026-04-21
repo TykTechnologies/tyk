@@ -145,6 +145,9 @@ func (d *LuaDispatcher) DispatchWithContext(ctx context.Context, object *coproce
 
 	// Call the dispatcher (objectPtr is freed during this call):
 	if err = d.NativeDispatch(unsafe.Pointer(objectPtr), unsafe.Pointer(newObjectPtr)); err != nil {
+		C.free(unsafe.Pointer(CObjectStr))
+		C.free(unsafe.Pointer(objectPtr))
+		C.free(unsafe.Pointer(newObjectPtr))
 		return nil, err
 	}
 	newObjectBytes := C.GoBytes(newObjectPtr.p_data, newObjectPtr.length)
@@ -152,10 +155,16 @@ func (d *LuaDispatcher) DispatchWithContext(ctx context.Context, object *coproce
 	newObject := &coprocess.Object{}
 
 	if err := json.Unmarshal(newObjectBytes, newObject); err != nil {
+		C.free(unsafe.Pointer(CObjectStr))
+		C.free(unsafe.Pointer(objectPtr))
+		C.free(unsafe.Pointer(newObjectPtr.p_data))
+		C.free(unsafe.Pointer(newObjectPtr))
 		return nil, err
 	}
 
 	// Free the returned object memory:
+	C.free(unsafe.Pointer(CObjectStr))
+	C.free(unsafe.Pointer(objectPtr))
 	C.free(unsafe.Pointer(newObjectPtr.p_data))
 	C.free(unsafe.Pointer(newObjectPtr))
 
