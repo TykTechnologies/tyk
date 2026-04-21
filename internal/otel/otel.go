@@ -18,7 +18,11 @@ type (
 
 	OpenTelemetry = otelconfig.OpenTelemetry
 
+	ExporterConfig = otelconfig.ExporterConfig
+
 	Sampling = otelconfig.Sampling
+
+	SpanBatchConfig = otelconfig.SpanBatchConfig
 
 	SpanAttribute = tyktrace.Attribute
 

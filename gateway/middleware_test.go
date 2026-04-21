@@ -661,9 +661,11 @@ func TestRecordAccessLog_TraceID(t *testing.T) {
 			if tc.hasTraceCtx && tc.otelEnabled {
 				// Create a real OTel provider and span
 				otelCfg := &otel.OpenTelemetry{
-					Enabled:  true,
-					Exporter: "http",
-					Endpoint: "http://localhost:4318", // Won't actually connect
+					Enabled: true,
+					ExporterConfig: otel.ExporterConfig{
+						Exporter: "http",
+						Endpoint: "http://localhost:4318", // Won't actually connect
+					},
 				}
 				provider := otel.InitOpenTelemetry(context.Background(), logger, otelCfg, "test-gw", "v1.0.0", false, "", false, nil)
 				_, span := provider.Tracer().Start(context.Background(), "test-span")
