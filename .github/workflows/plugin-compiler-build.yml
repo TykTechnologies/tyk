@@ -128,36 +128,3 @@ jobs:
             GITHUB_SHA=${{ github.sha }}
             GITHUB_TAG=${{ github.ref_name }}
             BUILD_TAG=ee
-
-      - name: Set docker metadata FIPS
-        id: set-metadata-fips
-        uses: docker/metadata-action@v4
-        with:
-          images: |
-            tykio/tyk-plugin-compiler-fips,enable=${{ startsWith(github.ref, 'refs/tags') }}
-            ${{ steps.login-ecr.outputs.registry }}/tyk-plugin-compiler-fips
-          labels: |
-            org.opencontainers.image.title=tyk-plugin-compiler-fips
-            org.opencontainers.image.description=Plugin compiler for the Tyk API Gateway FIPS Edition
-          tags: |
-            type=ref,event=pr
-            type=semver,pattern=v{{version}}
-            type=semver,pattern=v{{major}}.{{minor}}
-            type=semver,pattern={{raw}}
-            type=sha,format=long
-
-      - name: Build and push to dockerhub/ECR FIPS
-        uses: docker/build-push-action@v4
-        with:
-          context: .
-          file: ci/images/plugin-compiler/Dockerfile
-          platforms: linux/amd64
-          push: true
-          labels: ${{ steps.set-metadata-fips.outputs.labels }}
-          tags: ${{ steps.set-metadata-fips.outputs.tags }}
-          build-args: |
-            BASE_IMAGE=tykio/golang-cross:${{ env.GOLANG_CROSS }}
-            GITHUB_SHA=${{ github.sha }}
-            GITHUB_TAG=${{ github.ref_name }}
-            BUILD_TAG=ee,fips
-            GOFIPS140=v1.0.0
