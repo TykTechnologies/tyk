@@ -2,7 +2,10 @@ import ctypes
 parent = ctypes.cdll.LoadLibrary(None)
 
 parent.TykGetData.argtypes = [ctypes.c_char_p]
-parent.TykGetData.restype = ctypes.c_char_p
+parent.TykGetData.restype = ctypes.c_void_p
+
+parent.TykFreeMemory.argtypes = [ctypes.c_void_p]
+parent.TykFreeMemory.restype = None
 
 parent.TykStoreData.argtypes = [ctypes.c_char_p, ctypes.c_char_p, ctypes.c_int]
 
@@ -19,7 +22,12 @@ class TykGateway():
 
     def get_data(key):
         key_p = ctypes.c_char_p(bytes(key, "utf-8"))
-        return parent.TykGetData(key_p)
+        ptr = parent.TykGetData(key_p)
+        if not ptr:
+            return None
+        val = ctypes.cast(ptr, ctypes.c_char_p).value
+        parent.TykFreeMemory(ptr)
+        return val
 
     def store_data(key, value, ttl):
         key_p = ctypes.c_char_p(bytes(key, "utf-8"))

@@ -127,6 +127,7 @@ func PyObjectGetAttr(o unsafe.Pointer, attr interface{}) (unsafe.Pointer, error)
 		if pystr == nil {
 			return nil, errors.New("PyUnicode_FromString failed")
 		}
+		defer PyDecRef(unsafe.Pointer(pystr))
 		ret := PyObject_GetAttr(ToPyObject(o), pystr)
 		if ret == nil {
 			return nil, errors.New("PyObjectGetAttr failed")
