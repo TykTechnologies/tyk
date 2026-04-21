@@ -58,6 +58,7 @@ import (
 	"github.com/TykTechnologies/tyk/internal/model"
 	"github.com/TykTechnologies/tyk/internal/netutil"
 	"github.com/TykTechnologies/tyk/internal/otel"
+	"github.com/TykTechnologies/tyk/internal/rate"
 	"github.com/TykTechnologies/tyk/internal/scheduler"
 	"github.com/TykTechnologies/tyk/internal/service/newrelic"
 	"github.com/TykTechnologies/tyk/internal/uuid"
@@ -113,6 +114,8 @@ type Gateway struct {
 	config            atomic.Value
 	configMu          sync.Mutex
 	configViewerCache *configViewerCache
+
+	kvResolvers []func() error
 
 	ctx context.Context
 
@@ -229,9 +232,15 @@ type Gateway struct {
 	// apiJWKCaches cache per api entity
 	apiJWKCaches sync.Map
 
+	limitHeaderFactory rate.HeaderSenderFactory
+
 	BundleChecksumVerifier bundleChecksumVerifyFunction
 
 	validator validator.Validator
+
+	// compiledErrorOverrides holds the indexed error override rules for O(1) lookup.
+	// Built from apidef.ErrorOverrides during gateway startup.
+	compiledErrorOverrides atomic.Pointer[CompiledErrorOverrides]
 }
 
 func NewGateway(config config.Config, ctx context.Context) *Gateway {
@@ -280,6 +289,7 @@ func NewGateway(config config.Config, ctx context.Context) *Gateway {
 
 	gw.SetNodeID("solo-" + uuid.New())
 	gw.SessionID = uuid.New()
+	gw.limitHeaderFactory = rate.NewSenderFactory(config.RateLimitResponseHeaders)
 
 	// Only create registry in RPC mode
 	if config.SlaveOptions.UseRPC {
@@ -1123,6 +1133,7 @@ func (gw *Gateway) createResponseMiddlewareChain(
 	)
 	decorate := makeDefaultDecorator(log)
 
+	gw.responseMWAppendEnabled(&responseMWChain, decorate(&MCPListFilterResponseHandler{BaseTykResponseHandler: baseHandler}))
 	gw.responseMWAppendEnabled(&responseMWChain, decorate(&ResponseTransformMiddleware{BaseTykResponseHandler: baseHandler}))
 	headerInjector := decorate(&HeaderInjector{BaseTykResponseHandler: baseHandler})
 	headerInjectorAdded := gw.responseMWAppendEnabled(&responseMWChain, headerInjector)
@@ -1180,6 +1191,10 @@ func (gw *Gateway) createResponseMiddlewareChain(
 		responseMWChain = append(responseMWChain, processor)
 	}
 
+	// Add error override handler (before cache) - intercepts upstream 4xx/5xx
+	gw.responseMWAppendEnabled(&responseMWChain,
+		decorate(&ResponseErrorOverrideMiddleware{BaseTykResponseHandler: baseHandler}))
+
 	keyPrefix := "cache-" + spec.APIID
 	cacheStore := &storage.RedisCluster{KeyPrefix: keyPrefix, IsCache: true, ConnectionHandler: gw.StorageConnectionHandler}
 	cacheStore.Connect()
@@ -1218,6 +1233,12 @@ func (gw *Gateway) DoReload() {
 	defer func() {
 		gw.MetricInstruments.RecordConfigState(gw.ctx, gw.apisByIDLen(), gw.policies.PolicyCount())
 	}()
+
+	for _, resolve := range gw.kvResolvers {
+		if err := resolve(); err != nil {
+			mainLog.WithError(err).Error("Failed to re-resolve KV value on reload")
+		}
+	}
 
 	// Initialize/reset the JSVM
 	if gw.GetConfig().EnableJSVM {
@@ -1549,8 +1570,17 @@ func (gw *Gateway) initSystem() error {
 			return err
 		}
 
+		// Compile error override regex patterns and build indexed lookup
+		// Compilation failures are logged as warnings and those rules are skipped
+		compiled := CompileErrorOverrides(gwConfig.ErrorOverrides)
+		if compiled != nil {
+			gw.SetCompiledErrorOverrides(compiled)
+		}
+
 		gw.SetConfig(gwConfig)
-		gw.afterConfSetup()
+		if err := gw.afterConfSetup(); err != nil {
+			log.WithError(err).Fatal("Could not complete configuration setup.")
+		}
 	}
 
 	overrideTykErrors(gw)
@@ -1653,6 +1683,9 @@ func (gw *Gateway) initSystem() error {
 	// free resources.
 	go cleanIdleMemConnProviders(gw.ctx)
 
+	gw.limitHeaderFactory = rate.NewSenderFactory(gwConfig.RateLimitResponseHeaders)
+	gw.jwkCache = buildJWKSCache(gwConfig)
+
 	gw.initMembers(gwConfig)
 
 	return nil
@@ -1703,7 +1736,7 @@ func writePIDFile(file string) error {
 
 // afterConfSetup takes care of non-sensical config values (such as zero
 // timeouts) and sets up a few globals that depend on the config.
-func (gw *Gateway) afterConfSetup() {
+func (gw *Gateway) afterConfSetup() error {
 	conf := gw.GetConfig()
 
 	if conf.SlaveOptions.UseRPC {
@@ -1782,40 +1815,40 @@ func (gw *Gateway) afterConfSetup() {
 
 	conf.Secret, err = gw.kvStore(conf.Secret)
 	if err != nil {
-		log.WithError(err).Fatal("Could not retrieve the secret key...")
+		return fmt.Errorf("could not retrieve the secret key: %w", err)
 	}
 
 	conf.NodeSecret, err = gw.kvStore(conf.NodeSecret)
 	if err != nil {
-		log.WithError(err).Fatal("Could not retrieve the NodeSecret key...")
+		return fmt.Errorf("could not retrieve the node secret key: %w", err)
 	}
 
 	conf.Storage.Password, err = gw.kvStore(conf.Storage.Password)
 	if err != nil {
-		log.WithError(err).Fatal("Could not retrieve redis password...")
+		return fmt.Errorf("could not retrieve redis password: %w", err)
 	}
 
 	conf.CacheStorage.Password, err = gw.kvStore(conf.CacheStorage.Password)
 	if err != nil {
-		log.WithError(err).Fatal("Could not retrieve cache storage password...")
+		return fmt.Errorf("could not retrieve cache storage password: %w", err)
 	}
 
 	conf.Security.PrivateCertificateEncodingSecret, err = gw.kvStore(conf.Security.PrivateCertificateEncodingSecret)
 	if err != nil {
-		log.WithError(err).Fatal("Could not retrieve the private certificate encoding secret...")
+		return fmt.Errorf("could not retrieve the private certificate encoding secret: %w", err)
 	}
 
 	if conf.UseDBAppConfigs {
 		conf.DBAppConfOptions.ConnectionString, err = gw.kvStore(conf.DBAppConfOptions.ConnectionString)
 		if err != nil {
-			log.WithError(err).Fatal("Could not fetch dashboard connection string.")
+			return fmt.Errorf("could not fetch dashboard connection string: %w", err)
 		}
 	}
 
 	if conf.Policies.PolicySource == "service" {
 		conf.Policies.PolicyConnectionString, err = gw.kvStore(conf.Policies.PolicyConnectionString)
 		if err != nil {
-			log.WithError(err).Fatal("Could not fetch policy connection string.")
+			return fmt.Errorf("could not fetch policy connection string: %w", err)
 		}
 	}
 
@@ -1823,7 +1856,29 @@ func (gw *Gateway) afterConfSetup() {
 		conf.Private.EdgeOriginalAPIKeyPath = conf.SlaveOptions.APIKey
 		conf.SlaveOptions.APIKey, err = gw.kvStore(conf.SlaveOptions.APIKey)
 		if err != nil {
-			log.WithError(err).Fatalf("Could not retrieve API key from KV store.")
+			return fmt.Errorf("could not retrieve API key from KV store: %w", err)
+		}
+	}
+
+	// Retrieve OAuth mTLS certificate paths from KV store
+	if conf.ExternalServices.OAuth.MTLS.Enabled {
+		conf.ExternalServices.OAuth.MTLS.CertFile, err = gw.resolveKV(conf.ExternalServices.OAuth.MTLS.CertFile, func(c *config.Config, v string) {
+			c.ExternalServices.OAuth.MTLS.CertFile = v
+		}, true)
+		if err != nil {
+			return fmt.Errorf("could not retrieve OAuth mTLS cert file path from KV store: %w", err)
+		}
+		conf.ExternalServices.OAuth.MTLS.KeyFile, err = gw.resolveKV(conf.ExternalServices.OAuth.MTLS.KeyFile, func(c *config.Config, v string) {
+			c.ExternalServices.OAuth.MTLS.KeyFile = v
+		}, true)
+		if err != nil {
+			return fmt.Errorf("could not retrieve OAuth mTLS key file path from KV store: %w", err)
+		}
+		conf.ExternalServices.OAuth.MTLS.CAFile, err = gw.resolveKV(conf.ExternalServices.OAuth.MTLS.CAFile, func(c *config.Config, v string) {
+			c.ExternalServices.OAuth.MTLS.CAFile = v
+		}, true)
+		if err != nil {
+			return fmt.Errorf("could not retrieve OAuth mTLS CA file path from KV store: %w", err)
 		}
 	}
 
@@ -1835,6 +1890,27 @@ func (gw *Gateway) afterConfSetup() {
 	}
 
 	gw.SetConfig(conf)
+	return nil
+}
+
+func (gw *Gateway) resolveKV(original string, set func(*config.Config, string), hotReload bool) (string, error) {
+	resolved, err := gw.kvStore(original)
+	if err != nil {
+		return original, err
+	}
+	if hotReload && resolved != original {
+		gw.kvResolvers = append(gw.kvResolvers, func() error {
+			val, err := gw.kvStore(original)
+			if err != nil {
+				return err
+			}
+			conf := gw.GetConfig()
+			set(&conf, val)
+			gw.SetConfig(conf)
+			return nil
+		})
+	}
+	return resolved, nil
 }
 
 func (gw *Gateway) kvStore(value string) (string, error) {
@@ -2325,6 +2401,16 @@ func (gw *Gateway) GetConfig() config.Config {
 
 func (gw *Gateway) GetCertificateManager() certs.CertificateManager {
 	return gw.CertificateManager
+}
+
+// GetCompiledErrorOverrides returns the compiled error overrides for O(1) lookup.
+func (gw *Gateway) GetCompiledErrorOverrides() *CompiledErrorOverrides {
+	return gw.compiledErrorOverrides.Load()
+}
+
+// SetCompiledErrorOverrides stores the compiled error overrides.
+func (gw *Gateway) SetCompiledErrorOverrides(compiled *CompiledErrorOverrides) {
+	gw.compiledErrorOverrides.Store(compiled)
 }
 
 func (gw *Gateway) SetConfig(conf config.Config, skipReload ...bool) {

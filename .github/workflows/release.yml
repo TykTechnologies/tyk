@@ -16,6 +16,7 @@ on:
   schedule:
     - cron: "0 0 * * 1"
   pull_request:
+    types: [opened, synchronize, reopened, labeled]
   push:
     branches:
       - master
@@ -38,7 +39,10 @@ jobs:
   goreleaser:
     needs:
       - dep-guard
-    if: github.event.pull_request.draft == false
+    if: |
+      !cancelled() &&
+      (needs.dep-guard.result == 'success' || needs.dep-guard.result == 'skipped') &&
+      github.event.pull_request.draft == false
     name: '${{ matrix.golang_cross }}'
     runs-on: ${{ vars.DEFAULT_RUNNER }}
     permissions:
@@ -172,6 +176,7 @@ jobs:
           build-args: |
             BUILD_PACKAGE_NAME=tyk-gateway-ee
             BASE_IMAGE=tykio/dhi-busybox:1.37-fips
+            NONROOT_CHOWN=true
       - name: Docker metadata for ee tag push
         id: tag_metadata_ee
         uses: docker/metadata-action@c299e40c65443455700f0fdfc63efafe5b349051 # v5
@@ -207,6 +212,7 @@ jobs:
           build-args: |
             BUILD_PACKAGE_NAME=tyk-gateway-ee
             BASE_IMAGE=tykio/dhi-busybox:1.37-fips
+            NONROOT_CHOWN=true
       - name: Attach base image VEX to ee
         if: ${{ matrix.golang_cross == '1.25-bullseye' && startsWith(github.ref, 'refs/tags') }}
         run: |
@@ -228,7 +234,7 @@ jobs:
         uses: docker/metadata-action@c299e40c65443455700f0fdfc63efafe5b349051 # v5
         with:
           images: |
-            ${{ steps.ecr.outputs.registry }}/tyk
+            ${{ steps.ecr.outputs.registry }}/tyk-fips
           flavor: |
             latest=false
           tags: |
@@ -255,6 +261,7 @@ jobs:
           build-args: |
             BUILD_PACKAGE_NAME=tyk-gateway-fips
             BASE_IMAGE=tykio/dhi-busybox:1.37-fips
+            NONROOT_CHOWN=true
       - name: Docker metadata for fips tag push
         id: tag_metadata_fips
         uses: docker/metadata-action@c299e40c65443455700f0fdfc63efafe5b349051 # v5
@@ -289,6 +296,7 @@ jobs:
           build-args: |
             BUILD_PACKAGE_NAME=tyk-gateway-fips
             BASE_IMAGE=tykio/dhi-busybox:1.37-fips
+            NONROOT_CHOWN=true
       - name: Attach base image VEX to fips
         if: ${{ matrix.golang_cross == '1.25-bullseye' && startsWith(github.ref, 'refs/tags') }}
         run: |
@@ -388,8 +396,11 @@ jobs:
             !dist/*PAYG*.rpm
             !dist/*fips*.rpm
   resolve-dashboard-image:
-    if: github.event.pull_request.draft == false
     needs: goreleaser
+    if: |
+      !cancelled() &&
+      needs.goreleaser.result == 'success' &&
+      github.event.pull_request.draft == false
     runs-on: ${{ vars.DEFAULT_RUNNER }}
     permissions:
       id-token: write
@@ -404,6 +415,7 @@ jobs:
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
           fetch-depth: 0
+          persist-credentials: false
           ref: ${{ github.event.pull_request.head.sha }}
       - name: Check for relevant package changes in PR
         id: check_changes
@@ -513,6 +525,7 @@ jobs:
           COMMIT_SHA: ${{ github.sha }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
           HAS_RELEVANT_CHANGES: ${{ steps.check_changes.outputs.has_relevant_changes }}
+          ORG_GH_TOKEN: ${{ secrets.ORG_GH_TOKEN }}
         run: |
           echo "=================================="
           echo "📊 Dashboard Image Resolution"
@@ -527,14 +540,23 @@ jobs:
           echo "Has relevant changes in PR: $HAS_RELEVANT_CHANGES"
           echo "=================================="
 
-          # Only use custom build strategies for PRs targeting master
+          # For non-master base branches, check if the same branch exists in tyk-analytics
           if [ "$BASE_REF" != "master" ]; then
-            echo "ℹ️ Strategy: Use gromit default (base branch is not master)"
-            echo "    → Custom builds only for master branch PRs"
-            echo "dashboard_image=" >> $GITHUB_OUTPUT
-            echo "needs_build=false" >> $GITHUB_OUTPUT
-            echo "dashboard_branch=" >> $GITHUB_OUTPUT
-            echo "strategy=gromit-default" >> $GITHUB_OUTPUT
+            if git ls-remote --exit-code --heads "https://x-access-token:${ORG_GH_TOKEN}@github.com/TykTechnologies/tyk-analytics.git" "refs/heads/$BASE_REF" > /dev/null 2>&1; then
+              echo "📋 Strategy: Use release branch '$BASE_REF' from tyk-analytics"
+              echo "    → Base branch exists in tyk-analytics, using it directly"
+              echo "dashboard_image=${REGISTRY}/tyk-analytics:${BASE_REF}" >> $GITHUB_OUTPUT
+              echo "needs_build=false" >> $GITHUB_OUTPUT
+              echo "dashboard_branch=$BASE_REF" >> $GITHUB_OUTPUT
+              echo "strategy=release-branch-match" >> $GITHUB_OUTPUT
+            else
+              echo "ℹ️ Strategy: Use gromit default (base branch '$BASE_REF' not found in tyk-analytics)"
+              echo "    → Falling back to gromit default"
+              echo "dashboard_image=" >> $GITHUB_OUTPUT
+              echo "needs_build=false" >> $GITHUB_OUTPUT
+              echo "dashboard_branch=" >> $GITHUB_OUTPUT
+              echo "strategy=gromit-default" >> $GITHUB_OUTPUT
+            fi
 
           # Strategy 1: Matching branch exists in tyk-analytics → use gromit
           elif [ "$BRANCH_EXISTS" = "true" ]; then
@@ -579,8 +601,11 @@ jobs:
           echo "✅ Resolution complete"
           echo "=================================="
   build-dashboard-image:
-    if: needs.resolve-dashboard-image.outputs.needs_build == 'true'
     needs: resolve-dashboard-image
+    if: |
+      !cancelled() &&
+      needs.resolve-dashboard-image.result == 'success' &&
+      needs.resolve-dashboard-image.outputs.needs_build == 'true'
     runs-on: ${{ vars.DEFAULT_RUNNER }}
     permissions:
       id-token: write
@@ -709,7 +734,7 @@ jobs:
             -e GOMODCACHE=/go/pkg/mod \
             -v /tmp/build-dashboard.sh:/tmp/build-dashboard.sh \
             -w /go/src/github.com/TykTechnologies/tyk-analytics \
-            tykio/golang-cross:1.24-bookworm /tmp/build-dashboard.sh
+            tykio/golang-cross:1.25-bullseye /tmp/build-dashboard.sh
 
           echo "✅ Packages built successfully for $GOARCH"
       - name: Detect platform for Docker build
@@ -759,9 +784,12 @@ jobs:
           echo "image=$IMAGE" >> $GITHUB_OUTPUT
           echo "✅ Dashboard image built and pushed: $IMAGE"
   test-controller-api:
-    if: github.event.pull_request.draft == false
     needs:
       - goreleaser
+    if: |
+      !cancelled() &&
+      needs.goreleaser.result == 'success' &&
+      github.event.pull_request.draft == false
     runs-on: ${{ vars.DEFAULT_RUNNER }}
     outputs:
       envfiles: ${{ steps.params.outputs.envfiles }}
@@ -781,9 +809,9 @@ jobs:
       - goreleaser
       - resolve-dashboard-image
       - build-dashboard-image
-    # build-dashboard-image may be skipped, so use if: always() to run regardless
+    # build-dashboard-image may be skipped, so use !cancelled() to run regardless
     if: |
-      always() &&
+      !cancelled() &&
       needs.test-controller-api.result == 'success' &&
       needs.goreleaser.result == 'success' &&
       needs.resolve-dashboard-image.result == 'success' &&
@@ -859,7 +887,7 @@ jobs:
     name: Aggregated CI Status
     runs-on: ${{ vars.DEFAULT_RUNNER }}
     # Dynamically determine which jobs to depend on based on repository configuration
-    needs: [goreleaser, api-tests]
+    needs: [goreleaser, api-tests, dep-guard]
     if: ${{ always() && github.event_name == 'pull_request' }}
     steps:
       - name: Aggregate results
@@ -886,9 +914,12 @@ jobs:
 
           echo "✅ All required jobs succeeded"
   test-controller-distros:
-    if: github.event.pull_request.draft == false
     needs:
       - goreleaser
+    if: |
+      !cancelled() &&
+      needs.goreleaser.result == 'success' &&
+      github.event.pull_request.draft == false
     runs-on: ${{ vars.DEFAULT_RUNNER }}
     outputs:
       deb: ${{ steps.params.outputs.deb }}
@@ -913,6 +944,9 @@ jobs:
     runs-on: ${{ vars.DEFAULT_RUNNER }}
     needs:
       - test-controller-distros
+    if: |
+      !cancelled() &&
+      needs.test-controller-distros.result == 'success'
     strategy:
       fail-fast: true
       matrix:
@@ -972,6 +1006,9 @@ jobs:
     runs-on: ${{ vars.DEFAULT_RUNNER }}
     needs:
       - test-controller-distros
+    if: |
+      !cancelled() &&
+      needs.test-controller-distros.result == 'success'
     strategy:
       fail-fast: true
       matrix:
@@ -1025,6 +1062,9 @@ jobs:
   release-tests:
     needs:
       - goreleaser
+    if: |
+      !cancelled() &&
+      needs.goreleaser.result == 'success'
     permissions:
       id-token: write # This is required for requesting the JWT
       contents: read # This is required for actions/checkout
@@ -1033,6 +1073,9 @@ jobs:
     secrets: inherit
   sbom:
     needs: goreleaser
+    if: |
+      !cancelled() &&
+      needs.goreleaser.result == 'success'
     uses: TykTechnologies/github-actions/.github/workflows/sbom.yaml@42304edda365365e0a887cf018d8edc34b960b82 # main
     secrets:
       DEPDASH_URL: ${{ secrets.DEPDASH_URL }}

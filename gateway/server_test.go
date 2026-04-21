@@ -40,9 +40,11 @@ import (
 func TestGateway_afterConfSetup(t *testing.T) {
 
 	tests := []struct {
-		name           string
-		initialConfig  config.Config
-		expectedConfig config.Config
+		name            string
+		initialConfig   config.Config
+		expectedConfig  config.Config
+		setup           func(t *testing.T, gw *Gateway)
+		wantErrContains string
 	}{
 		{
 			name: "slave options test",
@@ -129,16 +131,429 @@ func TestGateway_afterConfSetup(t *testing.T) {
 				ReadinessCheckEndpointName: "ready",
 			},
 		},
+		{
+			name: "oauth mtls kv store - secrets backend",
+			initialConfig: config.Config{
+				ExternalServices: config.ExternalServiceConfig{
+					OAuth: config.ServiceConfig{
+						MTLS: config.MTLSConfig{
+							Enabled:  true,
+							CertFile: "secrets://oauth_cert",
+							KeyFile:  "secrets://oauth_key",
+							CAFile:   "secrets://oauth_ca",
+						},
+					},
+				},
+				Secrets: map[string]string{
+					"oauth_cert": "/path/to/cert.pem",
+					"oauth_key":  "/path/to/key.pem",
+					"oauth_ca":   "/path/to/ca.pem",
+				},
+			},
+			expectedConfig: config.Config{
+				ExternalServices: config.ExternalServiceConfig{
+					OAuth: config.ServiceConfig{
+						MTLS: config.MTLSConfig{
+							Enabled:  true,
+							CertFile: "/path/to/cert.pem",
+							KeyFile:  "/path/to/key.pem",
+							CAFile:   "/path/to/ca.pem",
+						},
+					},
+				},
+				Secrets: map[string]string{
+					"oauth_cert": "/path/to/cert.pem",
+					"oauth_key":  "/path/to/key.pem",
+					"oauth_ca":   "/path/to/ca.pem",
+				},
+				AnalyticsConfig: config.AnalyticsConfigConfig{
+					PurgeInterval: 10,
+				},
+				HealthCheckEndpointName:    "hello",
+				ReadinessCheckEndpointName: "ready",
+			},
+		},
+		{
+			name: "oauth mtls kv store - env backend",
+			initialConfig: config.Config{
+				ExternalServices: config.ExternalServiceConfig{
+					OAuth: config.ServiceConfig{
+						MTLS: config.MTLSConfig{
+							Enabled:  true,
+							CertFile: "env://oauth_cert_file",
+							KeyFile:  "env://oauth_key_file",
+							CAFile:   "env://oauth_ca_file",
+						},
+					},
+				},
+			},
+			setup: func(t *testing.T, _ *Gateway) {
+				t.Helper()
+				t.Setenv("TYK_SECRET_OAUTH_CERT_FILE", "/env/path/to/cert.pem")
+				t.Setenv("TYK_SECRET_OAUTH_KEY_FILE", "/env/path/to/key.pem")
+				t.Setenv("TYK_SECRET_OAUTH_CA_FILE", "/env/path/to/ca.pem")
+			},
+			expectedConfig: config.Config{
+				ExternalServices: config.ExternalServiceConfig{
+					OAuth: config.ServiceConfig{
+						MTLS: config.MTLSConfig{
+							Enabled:  true,
+							CertFile: "/env/path/to/cert.pem",
+							KeyFile:  "/env/path/to/key.pem",
+							CAFile:   "/env/path/to/ca.pem",
+						},
+					},
+				},
+				AnalyticsConfig: config.AnalyticsConfigConfig{
+					PurgeInterval: 10,
+				},
+				HealthCheckEndpointName:    "hello",
+				ReadinessCheckEndpointName: "ready",
+			},
+		},
+		{
+			name: "oauth mtls kv store - vault backend",
+			initialConfig: config.Config{
+				ExternalServices: config.ExternalServiceConfig{
+					OAuth: config.ServiceConfig{
+						MTLS: config.MTLSConfig{
+							Enabled:  true,
+							CertFile: "vault://secret/oauth/cert_file",
+							KeyFile:  "vault://secret/oauth/key_file",
+							CAFile:   "vault://secret/oauth/ca_file",
+						},
+					},
+				},
+			},
+			setup: func(_ *testing.T, gw *Gateway) {
+				gw.vaultKVStore = &mockKVStore{
+					store: map[string]string{
+						"secret/oauth/cert_file": "/vault/path/to/cert.pem",
+						"secret/oauth/key_file":  "/vault/path/to/key.pem",
+						"secret/oauth/ca_file":   "/vault/path/to/ca.pem",
+					},
+				}
+			},
+			expectedConfig: config.Config{
+				ExternalServices: config.ExternalServiceConfig{
+					OAuth: config.ServiceConfig{
+						MTLS: config.MTLSConfig{
+							Enabled:  true,
+							CertFile: "/vault/path/to/cert.pem",
+							KeyFile:  "/vault/path/to/key.pem",
+							CAFile:   "/vault/path/to/ca.pem",
+						},
+					},
+				},
+				AnalyticsConfig: config.AnalyticsConfigConfig{
+					PurgeInterval: 10,
+				},
+				HealthCheckEndpointName:    "hello",
+				ReadinessCheckEndpointName: "ready",
+			},
+		},
+		{
+			name: "oauth mtls kv store - consul backend",
+			initialConfig: config.Config{
+				ExternalServices: config.ExternalServiceConfig{
+					OAuth: config.ServiceConfig{
+						MTLS: config.MTLSConfig{
+							Enabled:  true,
+							CertFile: "consul://oauth/cert_file",
+							KeyFile:  "consul://oauth/key_file",
+							CAFile:   "consul://oauth/ca_file",
+						},
+					},
+				},
+			},
+			setup: func(_ *testing.T, gw *Gateway) {
+				gw.consulKVStore = &mockKVStore{
+					store: map[string]string{
+						"oauth/cert_file": "/consul/path/to/cert.pem",
+						"oauth/key_file":  "/consul/path/to/key.pem",
+						"oauth/ca_file":   "/consul/path/to/ca.pem",
+					},
+				}
+			},
+			expectedConfig: config.Config{
+				ExternalServices: config.ExternalServiceConfig{
+					OAuth: config.ServiceConfig{
+						MTLS: config.MTLSConfig{
+							Enabled:  true,
+							CertFile: "/consul/path/to/cert.pem",
+							KeyFile:  "/consul/path/to/key.pem",
+							CAFile:   "/consul/path/to/ca.pem",
+						},
+					},
+				},
+				AnalyticsConfig: config.AnalyticsConfigConfig{
+					PurgeInterval: 10,
+				},
+				HealthCheckEndpointName:    "hello",
+				ReadinessCheckEndpointName: "ready",
+			},
+		},
+		{
+			name: "error - secret key missing from kv store",
+			initialConfig: config.Config{
+				Secret: "secrets://missing_secret",
+			},
+			wantErrContains: "could not retrieve the secret key",
+		},
+		{
+			name: "error - node secret key missing from kv store",
+			initialConfig: config.Config{
+				NodeSecret: "secrets://missing_node_secret",
+			},
+			wantErrContains: "could not retrieve the node secret key",
+		},
+		{
+			name: "error - redis password missing from kv store",
+			initialConfig: config.Config{
+				Storage: config.StorageOptionsConf{
+					Password: "secrets://missing_redis_password",
+				},
+			},
+			wantErrContains: "could not retrieve redis password",
+		},
+		{
+			name: "error - cache storage password missing from kv store",
+			initialConfig: config.Config{
+				CacheStorage: config.StorageOptionsConf{
+					Password: "secrets://missing_cache_password",
+				},
+			},
+			wantErrContains: "could not retrieve cache storage password",
+		},
+		{
+			name: "error - private certificate encoding secret missing from kv store",
+			initialConfig: config.Config{
+				Security: config.SecurityConfig{
+					PrivateCertificateEncodingSecret: "secrets://missing_cert_secret",
+				},
+			},
+			wantErrContains: "could not retrieve the private certificate encoding secret",
+		},
+		{
+			name: "error - dashboard connection string missing from kv store",
+			initialConfig: config.Config{
+				UseDBAppConfigs: true,
+				DBAppConfOptions: config.DBAppConfOptionsConfig{
+					ConnectionString: "secrets://missing_dashboard_conn",
+				},
+			},
+			wantErrContains: "could not fetch dashboard connection string",
+		},
+		{
+			name: "error - policy connection string missing from kv store",
+			initialConfig: config.Config{
+				Policies: config.PoliciesConfig{
+					PolicySource:           "service",
+					PolicyConnectionString: "secrets://missing_policy_conn",
+				},
+			},
+			wantErrContains: "could not fetch policy connection string",
+		},
+		{
+			name: "error - slave options api key missing from kv store",
+			initialConfig: config.Config{
+				SlaveOptions: config.SlaveOptionsConfig{
+					APIKey: "secrets://missing_api_key",
+				},
+			},
+			wantErrContains: "could not retrieve API key from KV store",
+		},
+		{
+			name: "oauth mtls kv store - error on cert file",
+			initialConfig: config.Config{
+				ExternalServices: config.ExternalServiceConfig{
+					OAuth: config.ServiceConfig{
+						MTLS: config.MTLSConfig{
+							Enabled:  true,
+							CertFile: "secrets://missing_cert",
+							KeyFile:  "secrets://oauth_key",
+							CAFile:   "secrets://oauth_ca",
+						},
+					},
+				},
+				// Secrets map is empty — no references can be resolved
+			},
+			wantErrContains: "could not retrieve OAuth mTLS cert file path from KV store",
+		},
+		{
+			name: "oauth mtls kv store - error on key file",
+			initialConfig: config.Config{
+				ExternalServices: config.ExternalServiceConfig{
+					OAuth: config.ServiceConfig{
+						MTLS: config.MTLSConfig{
+							Enabled:  true,
+							CertFile: "secrets://oauth_cert",
+							KeyFile:  "secrets://missing_key",
+							CAFile:   "secrets://oauth_ca",
+						},
+					},
+				},
+				Secrets: map[string]string{
+					"oauth_cert": "/path/to/cert.pem",
+					// key file deliberately absent
+				},
+			},
+			wantErrContains: "could not retrieve OAuth mTLS key file path from KV store",
+		},
+		{
+			name: "oauth mtls kv store - error on ca file",
+			initialConfig: config.Config{
+				ExternalServices: config.ExternalServiceConfig{
+					OAuth: config.ServiceConfig{
+						MTLS: config.MTLSConfig{
+							Enabled:  true,
+							CertFile: "secrets://oauth_cert",
+							KeyFile:  "secrets://oauth_key",
+							CAFile:   "secrets://missing_ca",
+						},
+					},
+				},
+				Secrets: map[string]string{
+					"oauth_cert": "/path/to/cert.pem",
+					"oauth_key":  "/path/to/key.pem",
+					// ca file deliberately absent
+				},
+			},
+			wantErrContains: "could not retrieve OAuth mTLS CA file path from KV store",
+		},
+		{
+			name: "oauth mtls kv store - disabled mtls skips kv resolution",
+			initialConfig: config.Config{
+				ExternalServices: config.ExternalServiceConfig{
+					OAuth: config.ServiceConfig{
+						MTLS: config.MTLSConfig{
+							Enabled:  false,
+							CertFile: "secrets://oauth_cert",
+							KeyFile:  "secrets://oauth_key",
+							CAFile:   "secrets://oauth_ca",
+						},
+					},
+				},
+			},
+			expectedConfig: config.Config{
+				ExternalServices: config.ExternalServiceConfig{
+					OAuth: config.ServiceConfig{
+						MTLS: config.MTLSConfig{
+							Enabled:  false,
+							CertFile: "secrets://oauth_cert",
+							KeyFile:  "secrets://oauth_key",
+							CAFile:   "secrets://oauth_ca",
+						},
+					},
+				},
+				AnalyticsConfig: config.AnalyticsConfigConfig{
+					PurgeInterval: 10,
+				},
+				HealthCheckEndpointName:    "hello",
+				ReadinessCheckEndpointName: "ready",
+			},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			gw := NewGateway(tt.initialConfig, context.Background())
-			gw.afterConfSetup()
+			if tt.setup != nil {
+				tt.setup(t, gw)
+			}
+			err := gw.afterConfSetup()
 
+			if tt.wantErrContains != "" {
+				require.ErrorContains(t, err, tt.wantErrContains)
+				return
+			}
+			require.NoError(t, err)
 			assert.Equal(t, tt.expectedConfig, gw.GetConfig())
-
 		})
 	}
+}
+
+func TestGateway_kvResolvers_hotReload(t *testing.T) {
+	initialCert := "secrets://oauth_cert"
+	initialKey := "secrets://oauth_key"
+	initialCA := "secrets://oauth_ca"
+
+	gw := NewGateway(config.Config{
+		Secrets: map[string]string{
+			"oauth_cert": "/initial/cert.pem",
+			"oauth_key":  "/initial/key.pem",
+			"oauth_ca":   "/initial/ca.pem",
+		},
+		ExternalServices: config.ExternalServiceConfig{
+			OAuth: config.ServiceConfig{
+				MTLS: config.MTLSConfig{
+					Enabled:  true,
+					CertFile: initialCert,
+					KeyFile:  initialKey,
+					CAFile:   initialCA,
+				},
+			},
+		},
+	}, context.Background())
+
+	require.NoError(t, gw.afterConfSetup())
+
+	conf := gw.GetConfig()
+	assert.Equal(t, "/initial/cert.pem", conf.ExternalServices.OAuth.MTLS.CertFile)
+	assert.Equal(t, "/initial/key.pem", conf.ExternalServices.OAuth.MTLS.KeyFile)
+	assert.Equal(t, "/initial/ca.pem", conf.ExternalServices.OAuth.MTLS.CAFile)
+	assert.Len(t, gw.kvResolvers, 3)
+
+	// simulate updated secrets
+	updatedConf := gw.GetConfig()
+	updatedConf.Secrets = map[string]string{
+		"oauth_cert": "/updated/cert.pem",
+		"oauth_key":  "/updated/key.pem",
+		"oauth_ca":   "/updated/ca.pem",
+	}
+	gw.SetConfig(updatedConf)
+
+	for _, resolve := range gw.kvResolvers {
+		require.NoError(t, resolve())
+	}
+
+	conf = gw.GetConfig()
+	assert.Equal(t, "/updated/cert.pem", conf.ExternalServices.OAuth.MTLS.CertFile)
+	assert.Equal(t, "/updated/key.pem", conf.ExternalServices.OAuth.MTLS.KeyFile)
+	assert.Equal(t, "/updated/ca.pem", conf.ExternalServices.OAuth.MTLS.CAFile)
+}
+
+func TestGateway_kvResolvers_notRegisteredWhenMTLSDisabled(t *testing.T) {
+	gw := NewGateway(config.Config{
+		ExternalServices: config.ExternalServiceConfig{
+			OAuth: config.ServiceConfig{
+				MTLS: config.MTLSConfig{
+					Enabled:  false,
+					CertFile: "secrets://oauth_cert",
+				},
+			},
+		},
+	}, context.Background())
+
+	require.NoError(t, gw.afterConfSetup())
+	assert.Empty(t, gw.kvResolvers)
+}
+
+func TestGateway_kvResolvers_notRegisteredForPlainValues(t *testing.T) {
+	gw := NewGateway(config.Config{
+		ExternalServices: config.ExternalServiceConfig{
+			OAuth: config.ServiceConfig{
+				MTLS: config.MTLSConfig{
+					Enabled:  true,
+					CertFile: "/plain/cert.pem",
+					KeyFile:  "/plain/key.pem",
+					CAFile:   "/plain/ca.pem",
+				},
+			},
+		},
+	}, context.Background())
+
+	require.NoError(t, gw.afterConfSetup())
+	assert.Empty(t, gw.kvResolvers)
 }
 
 func TestGateway_apisByIDLen(t *testing.T) {
