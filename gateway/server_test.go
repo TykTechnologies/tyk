@@ -78,12 +78,19 @@ func TestGateway_afterConfSetup(t *testing.T) {
 			},
 			expectedConfig: config.Config{
 				OpenTelemetry: otel.OpenTelemetry{
-					Enabled:            true,
-					Exporter:           "grpc",
-					Endpoint:           "localhost:4317",
-					ResourceName:       "tyk-gateway",
-					SpanProcessorType:  "batch",
-					ConnectionTimeout:  1,
+					Enabled: true,
+					ExporterConfig: otel.ExporterConfig{
+						Exporter:          "grpc",
+						Endpoint:          "localhost:4317",
+						ResourceName:      "tyk-gateway",
+						ConnectionTimeout: 1,
+					},
+					SpanProcessorType: "batch",
+					SpanBatchConfig: otel.SpanBatchConfig{
+						MaxQueueSize:       2048,
+						MaxExportBatchSize: 512,
+						BatchTimeout:       5,
+					},
 					ContextPropagation: "tracecontext",
 					Sampling: otel.Sampling{
 						Type: "AlwaysOn",
