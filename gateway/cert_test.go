@@ -2366,7 +2366,11 @@ func TestUpstreamMutualTLS_GwCommunication(t *testing.T) {
 	})
 	defer gwA.Close()
 
-	clientCertIDA, err := gwA.Gw.CertificateManager.Add(combinedClientPEM, "")
+	clientCertIDA, err := gwA.Gw.CertificateManager.GetId(combinedClientPEM)
+	require.NoError(t, err)
+
+	gwA.Gw.CertificateManager.Delete(clientCertIDA, "")
+	_, err = gwA.Gw.CertificateManager.Add(combinedClientPEM, "")
 	require.NoError(t, err)
 	defer gwA.Gw.CertificateManager.Delete(clientCertIDA, "")
 
@@ -2416,7 +2420,10 @@ func TestUpstreamMutualTLS_GwCommunication(t *testing.T) {
 	})
 	defer gwB.Close()
 
-	clientCertIDB, err := gwB.Gw.CertificateManager.Add(combinedClientPEM, "")
+	clientCertIDB, err := gwB.Gw.CertificateManager.GetId(combinedClientPEM)
+	require.NoError(t, err)
+	gwB.Gw.CertificateManager.Delete(clientCertIDB, "")
+	_, err = gwB.Gw.CertificateManager.Add(combinedClientPEM, "")
 	require.NoError(t, err)
 	defer gwB.Gw.CertificateManager.Delete(clientCertIDB, "")
 
