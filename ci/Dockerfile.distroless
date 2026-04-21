@@ -13,6 +13,8 @@ COPY ${BUILD_PACKAGE_NAME}_*${TARGETARCH}.deb /
 ARG NONROOT_CHOWN=false
 RUN dpkg -i /${BUILD_PACKAGE_NAME}_*${TARGETARCH}.deb && rm /*.deb \
     && chmod -R a+rX /opt/tyk-gateway/ \
+    && mkdir -p /opt/tyk-gateway/middleware/bundles \
+    && chmod a+rwX /opt/tyk-gateway/middleware /opt/tyk-gateway/middleware/bundles \
     && if [ "$NONROOT_CHOWN" = "true" ]; then chown -R 65532:65532 /opt/tyk-gateway/; fi
 
 FROM ${BASE_IMAGE}
