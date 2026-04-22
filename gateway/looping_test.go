@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	"github.com/getkin/kin-openapi/openapi3"
+	"github.com/stretchr/testify/assert"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/apidef/oas"
@@ -81,8 +82,8 @@ func TestLooping(t *testing.T) {
 		ts.Run(t, []test.TestCase{
 			{Method: "POST", Path: "/xml", Data: postAction, BodyMatch: `"Url":"/post_action`},
 
-			// Should retain original query params
-			{Method: "POST", Path: "/xml?a=b", Data: getAction, BodyMatch: `"Url":"/get_action`},
+			// Should use rewritten path query params, not original request query params
+			{Method: "POST", Path: "/xml?a=b", Data: getAction, BodyMatch: `"Url":"/get_action"`, BodyNotMatch: `a=b`},
 
 			// Should rewrite http method, if loop rewrite param passed
 			{Method: "POST", Path: "/xml", Data: getAction, BodyMatch: `"Method":"GET"`},
@@ -211,8 +212,8 @@ func TestLooping(t *testing.T) {
 		ts.Run(t, []test.TestCase{
 			{Method: "POST", Path: "/virt", Data: postAction, BodyMatch: `"Url":"/post_action`},
 
-			// Should retain original query params
-			{Method: "POST", Path: "/virt?a=b", Data: getAction, BodyMatch: `"Url":"/get_action`},
+			// Should use rewritten path query params, not original request query params
+			{Method: "POST", Path: "/virt?a=b", Data: getAction, BodyMatch: `"Url":"/get_action"`, BodyNotMatch: `a=b`},
 
 			// Should rewrite http method, if loop rewrite param passed
 			{Method: "POST", Path: "/virt", Data: getAction, BodyMatch: `"Method":"GET"`},
@@ -272,6 +273,89 @@ func TestLooping(t *testing.T) {
 		ts.Run(t, []test.TestCase{
 			{Method: "GET", Path: "/recursion", Headers: authHeaders, BodyNotMatch: "Quota exceeded"},
 		}...)
+	})
+
+	t.Run("Rewritten query params preserved, original dropped", func(t *testing.T) {
+		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+			version := spec.VersionData.Versions["v1"]
+			err := json.Unmarshal([]byte(`{
+                "use_extended_paths": true,
+                "extended_paths": {
+                    "internal": [
+                        {"path": "/target", "method": "GET"},
+                        {"path": "/target", "method": "POST"}
+                    ],
+                    "url_rewrites": [
+                        {
+                            "path": "/rewrite_with_param",
+                            "match_pattern": "/rewrite_with_param",
+                            "method": "GET",
+                            "rewrite_to": "tyk://self/target?foo=bar"
+                        },
+                        {
+                            "path": "/rewrite_method_only",
+                            "match_pattern": "/rewrite_method_only",
+                            "method": "GET",
+                            "rewrite_to": "tyk://self/target?method=POST"
+                        },
+                        {
+                            "path": "/rewrite_param_and_method",
+                            "match_pattern": "/rewrite_param_and_method",
+                            "method": "GET",
+                            "rewrite_to": "tyk://self/target?foo=bar&method=POST"
+                        },
+                        {
+                            "path": "/rewrite_no_params",
+                            "match_pattern": "/rewrite_no_params",
+                            "method": "GET",
+                            "rewrite_to": "tyk://self/target"
+                        }
+                    ]
+                }
+            }`), &version)
+			assert.NoError(t, err)
+
+			spec.VersionData.Versions["v1"] = version
+			spec.Proxy.ListenPath = "/"
+		})
+
+		// tyk://api/path?foo=bar, foo=bar passed to target
+		t.Run("rewrite with user query param", func(t *testing.T) {
+			ts.Run(t, []test.TestCase{
+				{Method: "GET", Path: "/rewrite_with_param", BodyMatch: `foo=bar`},
+			}...)
+		})
+
+		// tyk://api/path?method=POST, method consumed and dropped
+		t.Run("rewrite with method control param only", func(t *testing.T) {
+			ts.Run(t, []test.TestCase{
+				{Method: "GET", Path: "/rewrite_method_only",
+					BodyMatch:    `"Method":"POST"`,
+					BodyNotMatch: `method=POST`},
+			}...)
+		})
+
+		// tyk://api/path?foo=bar&method=POST, foo=bar preserved, method consumed + dropped
+		t.Run("rewrite with user and control params", func(t *testing.T) {
+			ts.Run(t, []test.TestCase{
+				{Method: "GET", Path: "/rewrite_param_and_method",
+					BodyMatch:    `foo=bar`,
+					BodyNotMatch: `method=POST`},
+				{Method: "GET", Path: "/rewrite_param_and_method",
+					BodyMatch: `"Method":"POST"`},
+			}...)
+		})
+
+		// tyk://api/path?a=b, a=b dropped (must be explicit in rewrite)
+		t.Run("original query params dropped", func(t *testing.T) {
+			ts.Run(t, []test.TestCase{
+				{Method: "GET", Path: "/rewrite_no_params?a=b",
+					BodyNotMatch: `a=b`},
+				{Method: "GET", Path: "/rewrite_with_param?a=b",
+					BodyMatch:    `foo=bar`,
+					BodyNotMatch: `a=b`},
+			}...)
+		})
 	})
 
 	t.Run("loop external native def to internal OAS", func(t *testing.T) {
@@ -420,6 +504,351 @@ func TestLooping_AnotherAPIWithAuthTokens(t *testing.T) {
 			BodyMatch: "Authorization field missing",
 		},
 	}...)
+}
+
+func TestLoopingControlParams(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	t.Run("method overrides HTTP method", func(t *testing.T) {
+		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+			version := spec.VersionData.Versions["v1"]
+			assert.NoError(t, json.Unmarshal([]byte(`{
+				"use_extended_paths": true,
+				"extended_paths": {
+					"internal": [
+						{"path": "/target", "method": "GET"},
+						{"path": "/target", "method": "POST"},
+						{"path": "/target", "method": "PUT"},
+						{"path": "/target", "method": "DELETE"}
+					],
+					"url_rewrites": [
+						{
+							"path": "/to_post",
+							"match_pattern": "/to_post",
+							"method": "GET",
+							"rewrite_to": "tyk://self/target?method=POST"
+						},
+						{
+							"path": "/to_put",
+							"match_pattern": "/to_put",
+							"method": "GET",
+							"rewrite_to": "tyk://self/target?method=PUT"
+						},
+						{
+							"path": "/to_delete",
+							"match_pattern": "/to_delete",
+							"method": "GET",
+							"rewrite_to": "tyk://self/target?method=DELETE"
+						},
+						{
+							"path": "/no_method",
+							"match_pattern": "/no_method",
+							"method": "GET",
+							"rewrite_to": "tyk://self/target"
+						}
+					]
+				}
+			}`), &version))
+			spec.VersionData.Versions["v1"] = version
+			spec.Proxy.ListenPath = "/"
+		})
+
+		// GET overridden to POST
+		t.Run("GET to POST", func(t *testing.T) {
+			ts.Run(t, test.TestCase{
+				Method: "GET", Path: "/to_post",
+				BodyMatch: `"Method":"POST"`,
+			})
+		})
+
+		// GET overridden to PUT
+		t.Run("GET to PUT", func(t *testing.T) {
+			ts.Run(t, test.TestCase{
+				Method: "GET", Path: "/to_put",
+				BodyMatch: `"Method":"PUT"`,
+			})
+		})
+
+		// GET overridden to DELETE
+		t.Run("GET to DELETE", func(t *testing.T) {
+			ts.Run(t, test.TestCase{
+				Method: "GET", Path: "/to_delete",
+				BodyMatch: `"Method":"DELETE"`,
+			})
+		})
+
+		// No method param: original method preserved
+		t.Run("no override keeps original method", func(t *testing.T) {
+			ts.Run(t, test.TestCase{
+				Method: "GET", Path: "/no_method",
+				BodyMatch: `"Method":"GET"`,
+			})
+		})
+
+		// method param is stripped from query string reaching target
+		t.Run("method param stripped from target query", func(t *testing.T) {
+			ts.Run(t, test.TestCase{
+				Method: "GET", Path: "/to_post",
+				BodyNotMatch: `method=POST`,
+			})
+		})
+	})
+
+	t.Run("loop_limit controls max recursion depth", func(t *testing.T) {
+		// loop_limit=2: recursion should fail after 2 loops
+		t.Run("exceeds limit", func(t *testing.T) {
+			ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+				version := spec.VersionData.Versions["v1"]
+				assert.NoError(t, json.Unmarshal([]byte(`{
+					"use_extended_paths": true,
+					"extended_paths": {
+						"url_rewrites": [{
+							"path": "/recurse",
+							"match_pattern": "/recurse(.*)",
+							"method": "GET",
+							"rewrite_to": "tyk://self/recurse?loop_limit=2"
+						}]
+					}
+				}`), &version))
+				spec.VersionData.Versions["v1"] = version
+				spec.Proxy.ListenPath = "/"
+			})
+
+			ts.Run(t, test.TestCase{
+				Method: "GET", Path: "/recurse",
+				Code:      500,
+				BodyMatch: "Loop level too deep. Found more than 2 loops in single request",
+			})
+		})
+
+		// loop_limit=3: same recursion fails after 3 loops
+		t.Run("exceeds higher limit", func(t *testing.T) {
+			ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+				version := spec.VersionData.Versions["v1"]
+				assert.NoError(t, json.Unmarshal([]byte(`{
+					"use_extended_paths": true,
+					"extended_paths": {
+						"url_rewrites": [{
+							"path": "/recurse",
+							"match_pattern": "/recurse(.*)",
+							"method": "GET",
+							"rewrite_to": "tyk://self/recurse?loop_limit=3"
+						}]
+					}
+				}`), &version))
+				spec.VersionData.Versions["v1"] = version
+				spec.Proxy.ListenPath = "/"
+			})
+
+			ts.Run(t, test.TestCase{
+				Method: "GET", Path: "/recurse",
+				Code:      500,
+				BodyMatch: "Found more than 3 loops",
+			})
+		})
+
+		// No loop_limit: defaults to 5 (defaultLoopLevelLimit)
+		t.Run("default limit is 5", func(t *testing.T) {
+			ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+				version := spec.VersionData.Versions["v1"]
+				assert.NoError(t, json.Unmarshal([]byte(`{
+					"use_extended_paths": true,
+					"extended_paths": {
+						"url_rewrites": [{
+							"path": "/recurse",
+							"match_pattern": "/recurse(.*)",
+							"method": "GET",
+							"rewrite_to": "tyk://self/recurse"
+						}]
+					}
+				}`), &version))
+				spec.VersionData.Versions["v1"] = version
+				spec.Proxy.ListenPath = "/"
+			})
+
+			ts.Run(t, test.TestCase{
+				Method: "GET", Path: "/recurse",
+				Code:      500,
+				BodyMatch: "Found more than 5 loops",
+			})
+		})
+
+		// Non-recursive loop within limit succeeds
+		t.Run("single loop within limit succeeds", func(t *testing.T) {
+			ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+				version := spec.VersionData.Versions["v1"]
+				assert.NoError(t, json.Unmarshal([]byte(`{
+					"use_extended_paths": true,
+					"extended_paths": {
+						"url_rewrites": [{
+							"path": "/entry",
+							"match_pattern": "/entry",
+							"method": "GET",
+							"rewrite_to": "tyk://self/final?loop_limit=2"
+						}]
+					}
+				}`), &version))
+				spec.VersionData.Versions["v1"] = version
+				spec.Proxy.ListenPath = "/"
+			})
+
+			ts.Run(t, test.TestCase{
+				Method: "GET", Path: "/entry",
+				Code:      200,
+				BodyMatch: `"Url":"/final"`,
+			})
+		})
+
+		// loop_limit param is stripped from query string reaching target
+		t.Run("loop_limit stripped from target query", func(t *testing.T) {
+			ts.Run(t, test.TestCase{
+				Method: "GET", Path: "/entry",
+				BodyNotMatch: `loop_limit`,
+			})
+		})
+	})
+
+	t.Run("check_limits controls rate limiting in loops", func(t *testing.T) {
+		// Self-loop without check_limits: quota is NOT enforced (default for self-loops)
+		t.Run("self loop skips quota by default", func(t *testing.T) {
+			ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+				version := spec.VersionData.Versions["v1"]
+				assert.NoError(t, json.Unmarshal([]byte(`{
+					"use_extended_paths": true,
+					"extended_paths": {
+						"url_rewrites": [{
+							"path": "/entry",
+							"match_pattern": "/entry",
+							"method": "GET",
+							"rewrite_to": "tyk://self/dest"
+						}]
+					}
+				}`), &version))
+				spec.VersionData.Versions["v1"] = version
+				spec.Proxy.ListenPath = "/"
+				spec.UseKeylessAccess = false
+			})
+
+			// QuotaMax=1: only 1 request allowed, but the looped leg should not consume quota
+			keyID := CreateSession(ts.Gw, func(s *user.SessionState) {
+				s.QuotaMax = 1
+				s.QuotaRemaining = 1
+			})
+			authHeaders := map[string]string{"authorization": keyID}
+
+			ts.Run(t, test.TestCase{
+				Method: "GET", Path: "/entry", Headers: authHeaders,
+				Code:         200,
+				BodyNotMatch: "Quota exceeded",
+			})
+		})
+
+		// Self-loop with check_limits=true: quota IS enforced on looped request
+		t.Run("self loop enforces quota with check_limits=true", func(t *testing.T) {
+			ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+				version := spec.VersionData.Versions["v1"]
+				assert.NoError(t, json.Unmarshal([]byte(`{
+					"use_extended_paths": true,
+					"extended_paths": {
+						"url_rewrites": [{
+							"path": "/entry",
+							"match_pattern": "/entry",
+							"method": "GET",
+							"rewrite_to": "tyk://self/dest?check_limits=true"
+						}]
+					}
+				}`), &version))
+				spec.VersionData.Versions["v1"] = version
+				spec.Proxy.ListenPath = "/"
+				spec.UseKeylessAccess = false
+			})
+
+			// QuotaMax=1: first leg consumes quota, looped leg hits "Quota exceeded"
+			keyID := CreateSession(ts.Gw, func(s *user.SessionState) {
+				s.QuotaMax = 1
+				s.QuotaRemaining = 1
+			})
+			authHeaders := map[string]string{"authorization": keyID}
+
+			ts.Run(t, test.TestCase{
+				Method: "GET", Path: "/entry", Headers: authHeaders,
+				Code:      http.StatusForbidden,
+				BodyMatch: "Quota exceeded",
+			})
+		})
+
+		// check_limits param is stripped from query string reaching target
+		t.Run("check_limits stripped from target query", func(t *testing.T) {
+			ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+				version := spec.VersionData.Versions["v1"]
+				assert.NoError(t, json.Unmarshal([]byte(`{
+					"use_extended_paths": true,
+					"extended_paths": {
+						"url_rewrites": [{
+							"path": "/entry",
+							"match_pattern": "/entry",
+							"method": "GET",
+							"rewrite_to": "tyk://self/dest?check_limits=true"
+						}]
+					}
+				}`), &version))
+				spec.VersionData.Versions["v1"] = version
+				spec.Proxy.ListenPath = "/"
+			})
+
+			ts.Run(t, test.TestCase{
+				Method: "GET", Path: "/entry",
+				BodyNotMatch: `check_limits`,
+			})
+		})
+	})
+
+	t.Run("all control params combined", func(t *testing.T) {
+		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+			version := spec.VersionData.Versions["v1"]
+			assert.NoError(t, json.Unmarshal([]byte(`{
+				"use_extended_paths": true,
+				"extended_paths": {
+					"internal": [
+						{"path": "/target", "method": "POST"}
+					],
+					"url_rewrites": [{
+						"path": "/all_params",
+						"match_pattern": "/all_params",
+						"method": "GET",
+						"rewrite_to": "tyk://self/target?method=POST&loop_limit=3&check_limits=true&user_param=hello"
+					}]
+				}
+			}`), &version))
+			spec.VersionData.Versions["v1"] = version
+			spec.Proxy.ListenPath = "/"
+			spec.UseKeylessAccess = false
+		})
+
+		keyID := CreateSession(ts.Gw, func(s *user.SessionState) {
+			s.QuotaMax = 10
+			s.QuotaRemaining = 10
+		})
+		authHeaders := map[string]string{"authorization": keyID}
+
+		// method overridden to POST
+		t.Run("method is POST", func(t *testing.T) {
+			ts.Run(t, test.TestCase{
+				Method: "GET", Path: "/all_params", Headers: authHeaders,
+				BodyMatch: `"Method":"POST"`,
+			})
+		})
+
+		// user_param preserved, all control params stripped
+		t.Run("user param preserved, control params stripped", func(t *testing.T) {
+			ts.Run(t, test.TestCase{
+				Method: "GET", Path: "/all_params", Headers: authHeaders,
+				BodyMatch:    `user_param=hello`,
+				BodyNotMatch: `loop_limit`,
+			})
+		})
+	})
 }
 
 func TestConcurrencyReloads(t *testing.T) {
