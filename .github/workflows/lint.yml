@@ -24,6 +24,7 @@ jobs:
     if: ${{ !github.event.pull_request.draft }}
     uses: TykTechnologies/github-actions/.github/workflows/godoc.yml@d3fa20888fa2878e877e22bb7702141217290e7c  # main
     secrets:
-      ORG_GH_TOKEN: ${{ secrets.ORG_GH_TOKEN }}
+      PROBE_APP_ID: ${{ secrets.PROBE_APP_ID }}
+      PROBE_APP_PRIVATE_KEY: ${{ secrets.PROBE_APP_PRIVATE_KEY }}
     with:
       go-version: stable
