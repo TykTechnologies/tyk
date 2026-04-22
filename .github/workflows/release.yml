@@ -65,6 +65,13 @@ jobs:
       std_tags: ${{ steps.ci_metadata_std.outputs.tags }}
       commit_author: ${{ steps.set_outputs.outputs.commit_author}}
     steps:
+      - name: Generate GitHub App token
+        id: app-token
+        uses: actions/create-github-app-token@d72941d797fd3113feb6b93fd0dec494b13a2547 # v1
+        with:
+          app-id: ${{ secrets.PROBE_APP_ID }}
+          private-key: ${{ secrets.PROBE_APP_PRIVATE_KEY }}
+          owner: TykTechnologies
       - name: Checkout of tyk
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
@@ -120,7 +127,7 @@ jobs:
         run: |
           echo '#!/bin/sh
           ci/bin/unlock-agent.sh
-          git config --global url."https://${{ secrets.ORG_GH_TOKEN }}@github.com".insteadOf "https://github.com"
+          git config --global url."https://${{ steps.app-token.outputs.token }}@github.com".insteadOf "https://github.com"
           git config --global --add safe.directory /go/src/github.com/TykTechnologies/tyk
           goreleaser release --clean -f ${{ matrix.goreleaser }} ${{ !startsWith(github.ref, 'refs/tags/') && ' --snapshot --skip=sign,docker' || '--skip=docker' }}' | tee /tmp/build.sh
           chmod +x /tmp/build.sh
@@ -411,6 +418,13 @@ jobs:
       dashboard_branch: ${{ steps.resolve.outputs.dashboard_branch }}
       strategy: ${{ steps.resolve.outputs.strategy }}
     steps:
+      - name: Generate GitHub App token
+        id: app-token
+        uses: actions/create-github-app-token@d72941d797fd3113feb6b93fd0dec494b13a2547 # v1
+        with:
+          app-id: ${{ secrets.PROBE_APP_ID }}
+          private-key: ${{ secrets.PROBE_APP_PRIVATE_KEY }}
+          owner: TykTechnologies
       - name: Checkout tyk repository
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
@@ -465,7 +479,7 @@ jobs:
         id: check_branch
         shell: bash
         env:
-          GITHUB_TOKEN: ${{ secrets.ORG_GH_TOKEN }}
+          GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
           HEAD_REF: ${{ github.head_ref }}
         run: |
           if [ -z "$HEAD_REF" ]; then
@@ -525,7 +539,7 @@ jobs:
           COMMIT_SHA: ${{ github.sha }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
           HAS_RELEVANT_CHANGES: ${{ steps.check_changes.outputs.has_relevant_changes }}
-          ORG_GH_TOKEN: ${{ secrets.ORG_GH_TOKEN }}
+          ORG_GH_TOKEN: ${{ steps.app-token.outputs.token }}
         run: |
           echo "=================================="
           echo "📊 Dashboard Image Resolution"
@@ -613,19 +627,26 @@ jobs:
     outputs:
       dashboard_image: ${{ steps.output.outputs.image }}
     steps:
+      - name: Generate GitHub App token
+        id: app-token
+        uses: actions/create-github-app-token@d72941d797fd3113feb6b93fd0dec494b13a2547 # v1
+        with:
+          app-id: ${{ secrets.PROBE_APP_ID }}
+          private-key: ${{ secrets.PROBE_APP_PRIVATE_KEY }}
+          owner: TykTechnologies
       - name: Checkout tyk-analytics
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
           repository: TykTechnologies/tyk-analytics
           ref: ${{ needs.resolve-dashboard-image.outputs.dashboard_branch }}
-          token: ${{ secrets.ORG_GH_TOKEN }}
+          token: ${{ steps.app-token.outputs.token }}
           fetch-depth: 1
           submodules: true
       - name: Update gateway reference to PR branch
         shell: bash
         env:
           GATEWAY_BRANCH: ${{ github.head_ref }}
-          ORG_GH_TOKEN: ${{ secrets.ORG_GH_TOKEN }}
+          ORG_GH_TOKEN: ${{ steps.app-token.outputs.token }}
         run: |
           echo "📦 Updating tyk-gateway dependency to branch: $GATEWAY_BRANCH"
 
@@ -688,7 +709,7 @@ jobs:
           ECR_REGISTRY: ${{ steps.ecr.outputs.registry }}
           IMAGE_TAG: tyk-${{ github.event.pull_request.number }}
           GOPRIVATE: github.com/TykTechnologies
-          ORG_GH_TOKEN: ${{ secrets.ORG_GH_TOKEN }}
+          ORG_GH_TOKEN: ${{ steps.app-token.outputs.token }}
         run: |
           # Detect current architecture
           ARCH=$(uname -m)
@@ -834,6 +855,13 @@ jobs:
           - pump: $ECR/tyk-pump:master
             sink: tykio/tyk-mdcb-docker:v2.4
     steps:
+      - name: Generate GitHub App token
+        id: app-token
+        uses: actions/create-github-app-token@d72941d797fd3113feb6b93fd0dec494b13a2547 # v1
+        with:
+          app-id: ${{ secrets.PROBE_APP_ID }}
+          private-key: ${{ secrets.PROBE_APP_PRIVATE_KEY }}
+          owner: TykTechnologies
       - uses: aws-actions/configure-aws-credentials@ff717079ee2060e4bcee96c4779b553acc87447c # v4
         with:
           role-to-assume: arn:aws:iam::754489498669:role/ecr_rw_tyk
@@ -863,14 +891,14 @@ jobs:
           base_ref: ${{ env.BASE_REF }}
           tags: ${{ needs.goreleaser.outputs.ee_tags || needs.goreleaser.outputs.std_tags || format('{0}/tyk-ee:master', steps.ecr.outputs.registry) }}
           dashboard_image: ${{ needs.resolve-dashboard-image.outputs.dashboard_image }}
-          github_token: ${{ secrets.ORG_GH_TOKEN }}
+          github_token: ${{ steps.app-token.outputs.token }}
           TYK_DB_LICENSEKEY: ${{ secrets.DASH_LICENSE }}
           TYK_MDCB_LICENSE: ${{ secrets.MDCB_LICENSE }}
       - name: Choose test code branch
         uses: TykTechnologies/github-actions/.github/actions/tests/choose-test-branch@42304edda365365e0a887cf018d8edc34b960b82 # main
         with:
           test_folder: api
-          org_gh_token: ${{ secrets.ORG_GH_TOKEN }}
+          org_gh_token: ${{ steps.app-token.outputs.token }}
       - name: Run API tests
         uses: TykTechnologies/github-actions/.github/actions/tests/api-tests@42304edda365365e0a887cf018d8edc34b960b82 # main
         timeout-minutes: 30
