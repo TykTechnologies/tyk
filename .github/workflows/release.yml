@@ -87,6 +87,14 @@ jobs:
           key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
           restore-keys: |
             ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+      - name: Generate GitHub App token
+        id: app-token
+        uses: actions/create-github-app-token@d72941d797fd3113feb6b93fd0dec494b13a2547 # v1
+        with:
+          app-id: ${{ secrets.PROBE_APP_ID }}
+          private-key: ${{ secrets.PROBE_APP_PRIVATE_KEY }}
+          owner: TykTechnologies
+
       - name: Build
         env:
           NFPM_PASSPHRASE: ${{ secrets.SIGNING_KEY_PASSPHRASE }}
@@ -109,7 +117,7 @@ jobs:
           cp -r ./* /go/src/github.com/TykTechnologies/tyk
           find /go/src -name vendor | xargs --no-run-if-empty -d'\n' rm -rf
           rm -rf vendor
-          git config --global url."https://${{ secrets.ORG_GH_TOKEN }}@github.com".insteadOf "https://github.com"
+          git config --global url."https://${{ steps.app-token.outputs.token }}@github.com".insteadOf "https://github.com"
           git config --global --add safe.directory /go/src/github.com/TykTechnologies/tyk
           goreleaser release --clean -f ${{ matrix.goreleaser }} ${{ !startsWith(github.ref, 'refs/tags/') && ' --snapshot --skip=sign' || '' }}' | tee /tmp/build.sh
           chmod +x /tmp/build.sh
@@ -264,6 +272,14 @@ jobs:
           - pump: $ECR/tyk-pump:master
             sink: tykio/tyk-mdcb-docker:v2.4
     steps:
+      - name: Generate GitHub App token
+        id: app-token
+        uses: actions/create-github-app-token@d72941d797fd3113feb6b93fd0dec494b13a2547 # v1
+        with:
+          app-id: ${{ secrets.PROBE_APP_ID }}
+          private-key: ${{ secrets.PROBE_APP_PRIVATE_KEY }}
+          owner: TykTechnologies
+
       - uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: arn:aws:iam::754489498669:role/ecr_rw_tyk
@@ -293,7 +309,7 @@ jobs:
         id: env_up
         env:
           pull_policy: 'if_not_present'
-          GH_TOKEN: ${{ secrets.ORG_GH_TOKEN }}
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
           TYK_DB_LICENSEKEY: ${{ secrets.DASH_LICENSE }}
           TYK_MDCB_LICENSE: ${{ secrets.MDCB_LICENSE }}
         run: |
@@ -324,7 +340,7 @@ jobs:
         with:
           repository: TykTechnologies/tyk-analytics
           path: tyk-analytics
-          token: ${{ secrets.ORG_GH_TOKEN }}
+          token: ${{ steps.app-token.outputs.token }}
           fetch-depth: 0
           sparse-checkout: tests/api
       - name: Choosing test code branch
@@ -413,7 +429,7 @@ jobs:
         working-directory: auto
         env:
           pull_policy: 'if_not_present'
-          GH_TOKEN: ${{ secrets.ORG_GH_TOKEN }}
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
           TYK_DB_LICENSEKEY: ${{ secrets.DASH_LICENSE }}
           TYK_MDCB_LICENSE: ${{ secrets.MDCB_LICENSE }}
           ECR: ${{ steps.ecr.outputs.registry }}
@@ -561,10 +577,23 @@ jobs:
           load: true
       - name: Test the built container image with api functionality test.
         run: "docker run -d -p8080:8080 --network ${{ job.container.network }} --rm test-${{ matrix.distro }}-${{ matrix.arch }}\nsleep 2\n./ci/tests/api-functionality/api_test.sh  \n"
+  generate-token:
+    runs-on: ubuntu-latest
+    outputs:
+      token: ${{ steps.app-token.outputs.token }}
+    steps:
+      - name: Generate GitHub App token
+        id: app-token
+        uses: actions/create-github-app-token@d72941d797fd3113feb6b93fd0dec494b13a2547 # v1
+        with:
+          app-id: ${{ secrets.PROBE_APP_ID }}
+          private-key: ${{ secrets.PROBE_APP_PRIVATE_KEY }}
+          owner: TykTechnologies
+
   sbom:
-    needs: goreleaser
+    needs: [goreleaser, generate-token]
     uses: TykTechnologies/github-actions/.github/workflows/sbom.yaml@main
     secrets:
       DEPDASH_URL: ${{ secrets.DEPDASH_URL }}
       DEPDASH_KEY: ${{ secrets.DEPDASH_KEY }}
-      ORG_GH_TOKEN: ${{ secrets.ORG_GH_TOKEN }}
+      ORG_GH_TOKEN: ${{ needs.generate-token.outputs.token }}
