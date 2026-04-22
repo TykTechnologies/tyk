@@ -171,10 +171,17 @@ func (gw *Gateway) createMiddleware(actualMW TykMiddleware) func(http.Handler) h
 
 			err, errCode := mw.ProcessRequest(w, r, mwConf)
 
+			// Workaround
+			// ProcessRequest signature is too narrow it has to be extended to handle cases like this
+			// Abstraction should not know anything about implementation
+			if errors.Is(err, ErrResponseSucceed) {
+				err = nil
+			}
+
 			if err != nil {
-				writeResponse := true
 				// Prevent double error write
-				if goPlugin, isGoPlugin := actualMW.(*GoPluginMiddleware); isGoPlugin && goPlugin.handler != nil {
+				writeResponse := true
+				if goPlugin, isGoPlugin := actualMW.(*GoPluginMiddleware); isGoPlugin && goPlugin.handler != nil || errors.Is(err, ErrResponseErrorSent) {
 					writeResponse = false
 				}
 
