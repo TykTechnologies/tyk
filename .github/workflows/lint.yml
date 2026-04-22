@@ -19,11 +19,24 @@ jobs:
     permissions:
       contents: read
 
+  generate-token:
+    runs-on: ubuntu-latest
+    outputs:
+      token: ${{ steps.app-token.outputs.token }}
+    steps:
+      - name: Generate GitHub App token
+        id: app-token
+        uses: actions/create-github-app-token@d72941d797fd3113feb6b93fd0dec494b13a2547 # v1
+        with:
+          app-id: ${{ secrets.PROBE_APP_ID }}
+          private-key: ${{ secrets.PROBE_APP_PRIVATE_KEY }}
+          owner: TykTechnologies
+
   godoc:
-    needs: [dep-guard]
+    needs: [dep-guard, generate-token]
     if: ${{ !github.event.pull_request.draft }}
     uses: TykTechnologies/github-actions/.github/workflows/godoc.yml@2b35ab5dd4cfff21ced9d12446e9e27d10bf5785  # main
     secrets:
-      ORG_GH_TOKEN: ${{ secrets.ORG_GH_TOKEN }}
+      ORG_GH_TOKEN: ${{ needs.generate-token.outputs.token }}
     with:
       go-version: stable
