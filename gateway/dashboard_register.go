@@ -206,10 +206,7 @@ func (h *HTTPDashboardHandler) Register(ctx context.Context) error {
 		case <-time.After(5 * time.Second):
 		}
 		return h.Register(ctx)
-	} else if resp.StatusCode == http.StatusConflict {
-		dashLog.Debug("Node is already registered")
-		return nil
-	} else if resp != nil && resp.StatusCode != 200 {
+	} else if resp != nil && resp.StatusCode != 200 && resp.StatusCode != http.StatusConflict {
 		dashLog.Errorf("Response failed with code %d; retrying in 5s", resp.StatusCode)
 		select {
 		case <-ctx.Done():
