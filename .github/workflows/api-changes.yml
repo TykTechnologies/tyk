@@ -7,7 +7,21 @@ on:
       - release-**
 
 jobs:
+  generate-token:
+    runs-on: ubuntu-latest
+    outputs:
+      token: ${{ steps.app-token.outputs.token }}
+    steps:
+      - name: Generate GitHub App token
+        id: app-token
+        uses: actions/create-github-app-token@d72941d797fd3113feb6b93fd0dec494b13a2547 # v1
+        with:
+          app-id: ${{ secrets.PROBE_APP_ID }}
+          private-key: ${{ secrets.PROBE_APP_PRIVATE_KEY }}
+          owner: TykTechnologies
+
   godoc:
+    needs: [generate-token]
     uses: TykTechnologies/github-actions/.github/workflows/godoc.yml@main
     secrets:
-      ORG_GH_TOKEN: ${{ secrets.ORG_GH_TOKEN }}
+      ORG_GH_TOKEN: ${{ needs.generate-token.outputs.token }}
