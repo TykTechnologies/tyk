@@ -635,9 +635,16 @@ func (d *DummyProxyHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		loopLevelLimit, _ := strconv.Atoi(r.URL.Query().Get("loop_limit"))
 		ctxSetCheckLoopLimits(r, r.URL.Query().Get("check_limits") == "true")
 
+		// Strip control query parameters from the rewritten URL,
+		// keeping any non-control query parameters from the rewrite target.
+		rewrittenQuery := r.URL.Query()
+		rewrittenQuery.Del("method")
+		rewrittenQuery.Del("loop_limit")
+		rewrittenQuery.Del("check_limits")
+		r.URL.RawQuery = rewrittenQuery.Encode()
+
 		if origURL := ctxGetOrigRequestURL(r); origURL != nil {
 			r.URL.Host = origURL.Host
-			r.URL.RawQuery = origURL.RawQuery
 			ctxSetOrigRequestURL(r, nil)
 		}
 
