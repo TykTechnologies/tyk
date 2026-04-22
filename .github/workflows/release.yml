@@ -1080,4 +1080,5 @@ jobs:
     secrets:
       DEPDASH_URL: ${{ secrets.DEPDASH_URL }}
       DEPDASH_KEY: ${{ secrets.DEPDASH_KEY }}
-      ORG_GH_TOKEN: ${{ secrets.ORG_GH_TOKEN }}
+      PROBE_APP_ID: ${{ secrets.PROBE_APP_ID }}
+      PROBE_APP_PRIVATE_KEY: ${{ secrets.PROBE_APP_PRIVATE_KEY }}
