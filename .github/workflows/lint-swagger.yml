@@ -44,16 +44,24 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      - name: Generate GitHub App token
+        id: app-token
+        uses: actions/create-github-app-token@d72941d797fd3113feb6b93fd0dec494b13a2547 # v1
+        with:
+          app-id: ${{ secrets.PROBE_APP_ID }}
+          private-key: ${{ secrets.PROBE_APP_PRIVATE_KEY }}
+          owner: TykTechnologies
+
       - name: Use GitHub Token
         env:
-          TOKEN: ${{ secrets.ORG_GH_TOKEN }}
+          TOKEN: ${{ steps.app-token.outputs.token }}
         run: >
           git config --global url."https://${TOKEN}@github.com".insteadOf "https://github.com"
 
       - name: Checkout repo
         uses: TykTechnologies/github-actions/.github/actions/checkout-pr@2b35ab5dd4cfff21ced9d12446e9e27d10bf5785  # main
         with:
-          token: ${{ secrets.ORG_GH_TOKEN }}
+          token: ${{ steps.app-token.outputs.token }}
 
       - name: Setup Golang
         uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff  # v5

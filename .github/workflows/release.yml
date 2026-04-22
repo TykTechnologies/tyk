@@ -111,6 +111,14 @@ jobs:
           key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
           restore-keys: |
             ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+      - name: Generate GitHub App token
+        id: app-token
+        uses: actions/create-github-app-token@d72941d797fd3113feb6b93fd0dec494b13a2547 # v1
+        with:
+          app-id: ${{ secrets.PROBE_APP_ID }}
+          private-key: ${{ secrets.PROBE_APP_PRIVATE_KEY }}
+          owner: TykTechnologies
+
       - name: Build
         env:
           NFPM_PASSPHRASE: ${{ secrets.SIGNING_KEY_PASSPHRASE }}
@@ -119,7 +127,7 @@ jobs:
         run: |
           echo '#!/bin/sh
           ci/bin/unlock-agent.sh
-          git config --global url."https://${{ secrets.ORG_GH_TOKEN }}@github.com".insteadOf "https://github.com"
+          git config --global url."https://${{ steps.app-token.outputs.token }}@github.com".insteadOf "https://github.com"
           git config --global --add safe.directory /go/src/github.com/TykTechnologies/tyk
           goreleaser release --clean -f ${{ matrix.goreleaser }} ${{ !startsWith(github.ref, 'refs/tags/') && ' --snapshot --skip=sign,docker' || '--skip=docker' }}' | tee /tmp/build.sh
           chmod +x /tmp/build.sh
@@ -360,11 +368,19 @@ jobs:
         uses: aws-actions/amazon-ecr-login@f2e9fc6c2b355c1890b65e6f6f0e2ac3e6e22f78 # v2
         with:
           mask-password: 'true'
+      - name: Generate GitHub App token
+        id: app-token
+        uses: actions/create-github-app-token@d72941d797fd3113feb6b93fd0dec494b13a2547 # v1
+        with:
+          app-id: ${{ secrets.PROBE_APP_ID }}
+          private-key: ${{ secrets.PROBE_APP_PRIVATE_KEY }}
+          owner: TykTechnologies
+
       - name: Check if tyk-analytics branch exists
         id: check_branch
         shell: bash
         env:
-          GITHUB_TOKEN: ${{ secrets.ORG_GH_TOKEN }}
+          GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
           HEAD_REF: ${{ github.head_ref }}
         run: |
           if [ -z "$HEAD_REF" ]; then
@@ -424,7 +440,7 @@ jobs:
           COMMIT_SHA: ${{ github.sha }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
           HAS_RELEVANT_CHANGES: ${{ steps.check_changes.outputs.has_relevant_changes }}
-          ORG_GH_TOKEN: ${{ secrets.ORG_GH_TOKEN }}
+          ORG_GH_TOKEN: ${{ steps.app-token.outputs.token }}
         run: |
           echo "=================================="
           echo "📊 Dashboard Image Resolution"
@@ -509,19 +525,27 @@ jobs:
     outputs:
       dashboard_image: ${{ steps.output.outputs.image }}
     steps:
+      - name: Generate GitHub App token
+        id: app-token
+        uses: actions/create-github-app-token@d72941d797fd3113feb6b93fd0dec494b13a2547 # v1
+        with:
+          app-id: ${{ secrets.PROBE_APP_ID }}
+          private-key: ${{ secrets.PROBE_APP_PRIVATE_KEY }}
+          owner: TykTechnologies
+
       - name: Checkout tyk-analytics
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
           repository: TykTechnologies/tyk-analytics
           ref: ${{ needs.resolve-dashboard-image.outputs.dashboard_branch }}
-          token: ${{ secrets.ORG_GH_TOKEN }}
+          token: ${{ steps.app-token.outputs.token }}
           fetch-depth: 1
           submodules: true
       - name: Update gateway reference to PR branch
         shell: bash
         env:
           GATEWAY_BRANCH: ${{ github.head_ref }}
-          ORG_GH_TOKEN: ${{ secrets.ORG_GH_TOKEN }}
+          ORG_GH_TOKEN: ${{ steps.app-token.outputs.token }}
         run: |
           echo "📦 Updating tyk-gateway dependency to branch: $GATEWAY_BRANCH"
 
@@ -584,7 +608,7 @@ jobs:
           ECR_REGISTRY: ${{ steps.ecr.outputs.registry }}
           IMAGE_TAG: tyk-${{ github.event.pull_request.number }}
           GOPRIVATE: github.com/TykTechnologies
-          ORG_GH_TOKEN: ${{ secrets.ORG_GH_TOKEN }}
+          ORG_GH_TOKEN: ${{ steps.app-token.outputs.token }}
         run: |
           # Detect current architecture
           ARCH=$(uname -m)
@@ -739,6 +763,14 @@ jobs:
         uses: aws-actions/amazon-ecr-login@f2e9fc6c2b355c1890b65e6f6f0e2ac3e6e22f78 # v2
         with:
           mask-password: 'true'
+      - name: Generate GitHub App token
+        id: app-token
+        uses: actions/create-github-app-token@d72941d797fd3113feb6b93fd0dec494b13a2547 # v1
+        with:
+          app-id: ${{ secrets.PROBE_APP_ID }}
+          private-key: ${{ secrets.PROBE_APP_PRIVATE_KEY }}
+          owner: TykTechnologies
+
       - name: Setup tmate session only in debug mode
         uses: mxschmitt/action-tmate@c0afd6f790e3a5564914980036ebf83216678101 # v3
         if: runner.debug == '1'
@@ -759,14 +791,14 @@ jobs:
           base_ref: ${{ env.BASE_REF }}
           tags: ${{ needs.goreleaser.outputs.ee_tags || needs.goreleaser.outputs.std_tags || format('{0}/tyk-ee:master', steps.ecr.outputs.registry) }}
           dashboard_image: ${{ needs.resolve-dashboard-image.outputs.dashboard_image }}
-          github_token: ${{ secrets.ORG_GH_TOKEN }}
+          github_token: ${{ steps.app-token.outputs.token }}
           TYK_DB_LICENSEKEY: ${{ secrets.DASH_LICENSE }}
           TYK_MDCB_LICENSE: ${{ secrets.MDCB_LICENSE }}
       - name: Choose test code branch
         uses: TykTechnologies/github-actions/.github/actions/tests/choose-test-branch@42304edda365365e0a887cf018d8edc34b960b82 # main
         with:
           test_folder: api
-          org_gh_token: ${{ secrets.ORG_GH_TOKEN }}
+          org_gh_token: ${{ steps.app-token.outputs.token }}
       - name: Run API tests
         uses: TykTechnologies/github-actions/.github/actions/tests/api-tests@42304edda365365e0a887cf018d8edc34b960b82 # main
         timeout-minutes: 30
@@ -961,8 +993,21 @@ jobs:
       actions: read # This is required for the report_logs job in the called workflow
     uses: ./.github/workflows/release-tests.yml
     secrets: inherit
+  generate-token:
+    runs-on: ubuntu-latest
+    outputs:
+      token: ${{ steps.app-token.outputs.token }}
+    steps:
+      - name: Generate GitHub App token
+        id: app-token
+        uses: actions/create-github-app-token@d72941d797fd3113feb6b93fd0dec494b13a2547 # v1
+        with:
+          app-id: ${{ secrets.PROBE_APP_ID }}
+          private-key: ${{ secrets.PROBE_APP_PRIVATE_KEY }}
+          owner: TykTechnologies
+
   sbom:
-    needs: goreleaser
+    needs: [goreleaser, generate-token]
     if: |
       !cancelled() &&
       needs.goreleaser.result == 'success'
@@ -970,4 +1015,4 @@ jobs:
     secrets:
       DEPDASH_URL: ${{ secrets.DEPDASH_URL }}
       DEPDASH_KEY: ${{ secrets.DEPDASH_KEY }}
-      ORG_GH_TOKEN: ${{ secrets.ORG_GH_TOKEN }}
+      ORG_GH_TOKEN: ${{ needs.generate-token.outputs.token }}
