@@ -577,6 +577,39 @@ func (p *ReverseProxy) CheckHardTimeoutEnforced(spec *APISpec, req *http.Request
 	return false, 0
 }
 
+// GetHardTimeoutEnforcedSettings checks APISpec versions for a fine-grained timeout value.
+// The value is defined in string, so this function converts it to time.Duration
+func (p *ReverseProxy) GetHardTimeoutEnforcedSettings(spec *APISpec, req *http.Request) (time.Duration, bool) {
+	if !spec.EnforcedTimeoutEnabled {
+		return 0, false
+	}
+
+	vInfo, _ := spec.Version(req)
+	versionPaths := spec.RxPaths[vInfo.Name]
+	urlSpec, found := spec.FindSpecMatchesStatus(req, versionPaths, HardTimeout)
+	if found {
+		// Enforced timeout:
+		// 1. Can be int for backward compatibility
+		// 2. Can be string in form of "500ms" or "1.5s". Allowed time units: ms, s, m. Minimum timeout is 1ms, maximum 300s.
+		timeout := urlSpec.HardTimeout.TimeOut
+
+		switch tm := timeout.(type) {
+		case int:
+			return time.Duration(tm) * time.Second, true
+		case string:
+			dur, err := time.ParseDuration(tm)
+			if err != nil {
+				p.logger.Errorf("unable to parse %s to time.Duration: ", tm)
+				return 0, false
+			}
+
+			return dur, true
+		}
+	}
+
+	return 0, false
+}
+
 func (p *ReverseProxy) CheckHeaderInRemoveList(hdr string, spec *APISpec, req *http.Request) bool {
 	vInfo, _ := spec.Version(req)
 	versionPaths := spec.RxPaths[vInfo.Name]
@@ -1182,11 +1215,11 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 
 	p.TykAPISpec.Lock()
 
-	isTimeoutEnforced, enforcedTimeout := p.CheckHardTimeoutEnforced(p.TykAPISpec, outreq)
+	enforcedTimeout, isTimeoutEnforced := p.GetHardTimeoutEnforcedSettings(p.TykAPISpec, outreq)
 
 	// limit request time with context timeout
 	if isTimeoutEnforced {
-		timeoutContext, cancel := context.WithTimeout(outreq.Context(), time.Duration(enforcedTimeout)*time.Second)
+		timeoutContext, cancel := context.WithTimeout(outreq.Context(), enforcedTimeout)
 		defer cancel()
 
 		outreq = outreq.WithContext(timeoutContext)

@@ -229,7 +229,7 @@ type HardTimeoutMeta struct {
 	Disabled bool   `bson:"disabled" json:"disabled"`
 	Path     string `bson:"path" json:"path"`
 	Method   string `bson:"method" json:"method"`
-	TimeOut  int    `bson:"timeout" json:"timeout"`
+	TimeOut  any    `bson:"timeout" json:"timeout"`
 }
 
 type TrackEndpointMeta struct {
