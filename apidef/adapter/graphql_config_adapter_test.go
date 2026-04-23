@@ -14,7 +14,7 @@ import (
 	kafkaDataSource "github.com/TykTechnologies/graphql-go-tools/pkg/engine/datasource/kafka_datasource"
 	restDataSource "github.com/TykTechnologies/graphql-go-tools/pkg/engine/datasource/rest_datasource"
 	"github.com/TykTechnologies/graphql-go-tools/pkg/engine/plan"
-	"github.com/TykTechnologies/graphql-go-tools/pkg/graphql"
+
 	"github.com/TykTechnologies/tyk/apidef"
 )
 
@@ -494,7 +494,10 @@ func TestGraphQLConfigAdapter_engineConfigV2FieldConfigs(t *testing.T) {
 	}
 
 	adapter := NewGraphQLConfigAdapter(apiDef)
-	require.NoError(t, adapter.parseSchema())
+
+	var err error
+	adapter.schema, err = parseSchema(gqlConfig.Schema)
+	require.NoError(t, err)
 
 	actualFieldCfgs := adapter.engineConfigV2FieldConfigs()
 	assert.ElementsMatch(t, expectedFieldCfgs, actualFieldCfgs)
@@ -804,64 +807,15 @@ func TestGraphQLConfigAdapter_engineConfigV2DataSources(t *testing.T) {
 		WithStreamingClient(streamingClient),
 		withGraphQLSubscriptionClientFactory(&MockSubscriptionClientFactory{}),
 	)
-	require.NoError(t, adapter.parseSchema())
+
+	var err error
+	adapter.schema, err = parseSchema(gqlConfig.Schema)
+	require.NoError(t, err)
 
 	actualDataSources, err := adapter.engineConfigV2DataSources()
 	assert.NoError(t, err)
 	assert.Equal(t, expectedDataSources, actualDataSources)
 	//assert.ElementsMatch(t, expectedDataSources, actualDataSources)
-}
-
-func TestGraphQLConfigAdapter_GraphqlDataSourceWebSocketProtocol(t *testing.T) {
-	run := func(subscriptionType apidef.SubscriptionType, expectedWebSocketProtocol string) func(t *testing.T) {
-		return func(t *testing.T) {
-			adapter := NewGraphQLConfigAdapter(nil)
-			actualProtocol := adapter.graphqlDataSourceWebSocketProtocol(subscriptionType)
-			assert.Equal(t, expectedWebSocketProtocol, actualProtocol)
-		}
-	}
-
-	t.Run("should return 'graphql-ws' for undefined subscription type",
-		run(apidef.GQLSubscriptionUndefined, graphqlDataSource.ProtocolGraphQLWS),
-	)
-
-	t.Run("should return 'graphql-ws' for graphql-ws subscription type",
-		run(apidef.GQLSubscriptionWS, graphqlDataSource.ProtocolGraphQLWS),
-	)
-
-	t.Run("should return 'graphql-ws' for sse subscription type as websocket protocol is irrelevant in that case",
-		run(apidef.GQLSubscriptionSSE, graphqlDataSource.ProtocolGraphQLWS),
-	)
-
-	t.Run("should return 'graphql-transport-ws' for graphql-transport-ws subscription type",
-		run(apidef.GQLSubscriptionTransportWS, graphqlDataSource.ProtocolGraphQLTWS),
-	)
-}
-
-func TestGraphQLConfigAdapter_GraphqlSubscriptionType(t *testing.T) {
-	run := func(subscriptionType apidef.SubscriptionType, expectedGraphQLSubscriptionType graphql.SubscriptionType) func(t *testing.T) {
-		return func(t *testing.T) {
-			adapter := NewGraphQLConfigAdapter(nil)
-			actualSubscriptionType := adapter.graphqlSubscriptionType(subscriptionType)
-			assert.Equal(t, expectedGraphQLSubscriptionType, actualSubscriptionType)
-		}
-	}
-
-	t.Run("should return 'Unknown' for undefined subscription type",
-		run(apidef.GQLSubscriptionUndefined, graphql.SubscriptionTypeUnknown),
-	)
-
-	t.Run("should return 'SSE' for sse subscription type as websocket protocol is irrelevant in that case",
-		run(apidef.GQLSubscriptionSSE, graphql.SubscriptionTypeSSE),
-	)
-
-	t.Run("should return 'GraphQLWS' for graphql-ws subscription type",
-		run(apidef.GQLSubscriptionWS, graphql.SubscriptionTypeGraphQLWS),
-	)
-
-	t.Run("should return 'GraphQLTransportWS' for graphql-transport-ws subscription type",
-		run(apidef.GQLSubscriptionTransportWS, graphql.SubscriptionTypeGraphQLTransportWS),
-	)
 }
 
 var mockSubscriptionClient = &graphqlDataSource.SubscriptionClient{}

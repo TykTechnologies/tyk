@@ -4,8 +4,6 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
-	neturl "net/url"
-	"sort"
 	"strings"
 
 	graphqlDataSource "github.com/TykTechnologies/graphql-go-tools/pkg/engine/datasource/graphql_datasource"
@@ -72,11 +70,11 @@ func (g *GraphQLConfigAdapter) EngineConfigV2() (*graphql.EngineV2Configuration,
 		return nil, ErrUnsupportedGraphQLConfigVersion
 	}
 
-	if g.isProxyOnlyAPIDefinition() {
+	if isProxyOnlyAPIDefinition(g.apiDefinition) {
 		return g.createV2ConfigForProxyOnlyExecutionMode()
 	}
 
-	if g.isSupergraphAPIDefinition() {
+	if isSupergraphAPIDefinition(g.apiDefinition) {
 		return g.createV2ConfigForSupergraphExecutionMode()
 	}
 
@@ -98,7 +96,7 @@ func (g *GraphQLConfigAdapter) createV2ConfigForProxyOnlyExecutionMode() (*graph
 	upstreamConfig := graphql.ProxyUpstreamConfig{
 		URL:              url,
 		StaticHeaders:    staticHeaders,
-		SubscriptionType: g.graphqlSubscriptionType(g.apiDefinition.GraphQL.Proxy.SubscriptionType),
+		SubscriptionType: graphqlSubscriptionType(g.apiDefinition.GraphQL.Proxy.SubscriptionType),
 	}
 
 	if g.schema == nil {
@@ -162,7 +160,9 @@ func (g *GraphQLConfigAdapter) createV2ConfigForSupergraphExecutionMode() (*grap
 }
 
 func (g *GraphQLConfigAdapter) createV2ConfigForEngineExecutionMode() (*graphql.EngineV2Configuration, error) {
-	if err := g.parseSchema(); err != nil {
+	var err error
+	g.schema, err = parseSchema(g.apiDefinition.GraphQL.Schema)
+	if err != nil {
 		return nil, err
 	}
 
@@ -179,28 +179,6 @@ func (g *GraphQLConfigAdapter) createV2ConfigForEngineExecutionMode() (*graphql.
 	conf.SetDataSources(datsSources)
 
 	return &conf, nil
-}
-
-func (g *GraphQLConfigAdapter) parseSchema() (err error) {
-	if g.schema != nil {
-		return nil
-	}
-
-	g.schema, err = graphql.NewSchemaFromString(g.apiDefinition.GraphQL.Schema)
-	if err != nil {
-		return err
-	}
-
-	normalizationResult, err := g.schema.Normalize()
-	if err != nil {
-		return err
-	}
-
-	if !normalizationResult.Successful && normalizationResult.Errors != nil {
-		return normalizationResult.Errors
-	}
-
-	return nil
 }
 
 func (g *GraphQLConfigAdapter) engineConfigV2FieldConfigs() (planFieldConfigs plan.FieldConfigurations) {
@@ -249,7 +227,7 @@ func (g *GraphQLConfigAdapter) engineConfigV2DataSources() (planDataSources []pl
 				Client: g.getHttpClient(),
 			}
 
-			urlWithoutQueryParams, queryConfigs, err := g.extractURLQueryParamsForEngineV2(restConfig.URL, restConfig.Query)
+			urlWithoutQueryParams, queryConfigs, err := extractURLQueryParamsForEngineV2(restConfig.URL, restConfig.Query)
 			if err != nil {
 				return nil, err
 			}
@@ -260,7 +238,7 @@ func (g *GraphQLConfigAdapter) engineConfigV2DataSources() (planDataSources []pl
 					Method: restConfig.Method,
 					Body:   restConfig.Body,
 					Query:  queryConfigs,
-					Header: g.convertHeadersToHttpHeaders(restConfig.Headers),
+					Header: convertApiDefinitionHeadersToHttpHeaders(restConfig.Headers),
 				},
 			})
 
@@ -271,12 +249,17 @@ func (g *GraphQLConfigAdapter) engineConfigV2DataSources() (planDataSources []pl
 				return nil, err
 			}
 
-			planDataSource.Factory, err = g.createGraphQLDataSourceFactory(graphqlConfig)
+			planDataSource.Factory, err = createGraphQLDataSourceFactory(createGraphQLDataSourceFactoryParams{
+				graphqlConfig:             graphqlConfig,
+				subscriptionClientFactory: g.subscriptionClientFactory,
+				httpClient:                g.getHttpClient(),
+				streamingClient:           g.getStreamingClient(),
+			})
 			if err != nil {
 				return nil, err
 			}
 
-			planDataSource.Custom = graphqlDataSource.ConfigJson(g.graphqlDataSourceConfiguration(
+			planDataSource.Custom = graphqlDataSource.ConfigJson(graphqlDataSourceConfiguration(
 				graphqlConfig.URL,
 				graphqlConfig.Method,
 				graphqlConfig.Headers,
@@ -323,8 +306,8 @@ func (g *GraphQLConfigAdapter) subgraphDataSourceConfigs() []graphqlDataSource.C
 		if len(apiDefSubgraphConf.SDL) == 0 {
 			continue
 		}
-		hdr := g.removeDuplicateHeaders(apiDefSubgraphConf.Headers, g.apiDefinition.GraphQL.Supergraph.GlobalHeaders)
-		conf := g.graphqlDataSourceConfiguration(
+		hdr := removeDuplicateApiDefinitionHeaders(apiDefSubgraphConf.Headers, g.apiDefinition.GraphQL.Supergraph.GlobalHeaders)
+		conf := graphqlDataSourceConfiguration(
 			apiDefSubgraphConf.URL,
 			http.MethodPost,
 			hdr,
@@ -340,32 +323,6 @@ func (g *GraphQLConfigAdapter) subgraphDataSourceConfigs() []graphqlDataSource.C
 	return confs
 }
 
-func (g *GraphQLConfigAdapter) graphqlDataSourceConfiguration(url string, method string, headers map[string]string, subscriptionType apidef.SubscriptionType) graphqlDataSource.Configuration {
-	dataSourceHeaders := make(map[string]string)
-	for name, value := range headers {
-		dataSourceHeaders[name] = value
-	}
-
-	if strings.HasPrefix(url, "tyk://") {
-		url = strings.ReplaceAll(url, "tyk://", "http://")
-		dataSourceHeaders[apidef.TykInternalApiHeader] = "true"
-	}
-
-	cfg := graphqlDataSource.Configuration{
-		Fetch: graphqlDataSource.FetchConfiguration{
-			URL:    url,
-			Method: method,
-			Header: g.convertHeadersToHttpHeaders(dataSourceHeaders),
-		},
-		Subscription: graphqlDataSource.SubscriptionConfiguration{
-			URL:    url,
-			UseSSE: subscriptionType == apidef.GQLSubscriptionSSE,
-		},
-	}
-
-	return cfg
-}
-
 func (g *GraphQLConfigAdapter) engineConfigV2Arguments(fieldConfs *plan.FieldConfigurations, generatedArgs map[graphql.TypeFieldLookupKey]graphql.TypeFieldArguments) {
 	for i := range *fieldConfs {
 		if len(generatedArgs) == 0 {
@@ -378,7 +335,7 @@ func (g *GraphQLConfigAdapter) engineConfigV2Arguments(fieldConfs *plan.FieldCon
 			continue
 		}
 
-		(*fieldConfs)[i].Arguments = g.createArgumentConfigurationsForArgumentNames(currentArgs.ArgumentNames)
+		(*fieldConfs)[i].Arguments = createArgumentConfigurationsForArgumentNames(currentArgs.ArgumentNames...)
 		delete(generatedArgs, lookupKey)
 	}
 
@@ -386,105 +343,9 @@ func (g *GraphQLConfigAdapter) engineConfigV2Arguments(fieldConfs *plan.FieldCon
 		*fieldConfs = append(*fieldConfs, plan.FieldConfiguration{
 			TypeName:  genArgs.TypeName,
 			FieldName: genArgs.FieldName,
-			Arguments: g.createArgumentConfigurationsForArgumentNames(genArgs.ArgumentNames),
+			Arguments: createArgumentConfigurationsForArgumentNames(genArgs.ArgumentNames...),
 		})
 	}
-}
-
-func (g *GraphQLConfigAdapter) createArgumentConfigurationsForArgumentNames(argumentNames []string) plan.ArgumentsConfigurations {
-	argConfs := plan.ArgumentsConfigurations{}
-	for _, argName := range argumentNames {
-		argConf := plan.ArgumentConfiguration{
-			Name:       argName,
-			SourceType: plan.FieldArgumentSource,
-		}
-
-		argConfs = append(argConfs, argConf)
-	}
-
-	return argConfs
-}
-
-func (g *GraphQLConfigAdapter) extractURLQueryParamsForEngineV2(url string, providedApiDefQueries []apidef.QueryVariable) (urlWithoutParams string, engineV2Queries []restDataSource.QueryConfiguration, err error) {
-	urlParts := strings.Split(url, "?")
-	urlWithoutParams = urlParts[0]
-
-	queryPart := ""
-	if len(urlParts) == 2 {
-		queryPart = urlParts[1]
-	}
-	// Parse only query part as URL could contain templating {{.argument.id}} which should not be escaped
-	values, err := neturl.ParseQuery(queryPart)
-	if err != nil {
-		return "", nil, err
-	}
-
-	engineV2Queries = make([]restDataSource.QueryConfiguration, 0)
-	g.convertURLQueryParamsIntoEngineV2Queries(&engineV2Queries, values)
-	g.convertApiDefQueriesConfigIntoEngineV2Queries(&engineV2Queries, providedApiDefQueries)
-
-	if len(engineV2Queries) == 0 {
-		return urlWithoutParams, nil, nil
-	}
-
-	return urlWithoutParams, engineV2Queries, nil
-}
-
-func (g *GraphQLConfigAdapter) convertURLQueryParamsIntoEngineV2Queries(engineV2Queries *[]restDataSource.QueryConfiguration, queryValues neturl.Values) {
-	for queryKey, queryValue := range queryValues {
-		*engineV2Queries = append(*engineV2Queries, restDataSource.QueryConfiguration{
-			Name:  queryKey,
-			Value: strings.Join(queryValue, ","),
-		})
-	}
-
-	sort.Slice(*engineV2Queries, func(i, j int) bool {
-		return (*engineV2Queries)[i].Name < (*engineV2Queries)[j].Name
-	})
-}
-
-func (g *GraphQLConfigAdapter) convertApiDefQueriesConfigIntoEngineV2Queries(engineV2Queries *[]restDataSource.QueryConfiguration, apiDefQueries []apidef.QueryVariable) {
-	if len(apiDefQueries) == 0 {
-		return
-	}
-
-	for _, apiDefQueryVar := range apiDefQueries {
-		engineV2Query := restDataSource.QueryConfiguration{
-			Name:  apiDefQueryVar.Name,
-			Value: apiDefQueryVar.Value,
-		}
-
-		*engineV2Queries = append(*engineV2Queries, engineV2Query)
-	}
-}
-
-func (g *GraphQLConfigAdapter) convertHeadersToHttpHeaders(apiDefHeaders map[string]string) http.Header {
-	if len(apiDefHeaders) == 0 {
-		return nil
-	}
-
-	engineV2Headers := make(http.Header)
-	for apiDefHeaderKey, apiDefHeaderValue := range apiDefHeaders {
-		engineV2Headers.Add(apiDefHeaderKey, apiDefHeaderValue)
-	}
-
-	return engineV2Headers
-}
-
-func (g *GraphQLConfigAdapter) removeDuplicateHeaders(headers ...map[string]string) map[string]string {
-	hdr := make(map[string]string)
-	// headers priority depends on the order of arguments
-	for _, header := range headers {
-		for k, v := range header {
-			keyCanonical := http.CanonicalHeaderKey(k)
-			if _, ok := hdr[keyCanonical]; ok {
-				// skip because header is present
-				continue
-			}
-			hdr[keyCanonical] = v
-		}
-	}
-	return hdr
 }
 
 func (g *GraphQLConfigAdapter) determineChildNodes(planDataSources []plan.DataSourceConfiguration) error {
@@ -513,15 +374,6 @@ func (g *GraphQLConfigAdapter) determineChildNodes(planDataSources []plan.DataSo
 	return nil
 }
 
-func (g *GraphQLConfigAdapter) isSupergraphAPIDefinition() bool {
-	return g.apiDefinition.GraphQL.Enabled && g.apiDefinition.GraphQL.ExecutionMode == apidef.GraphQLExecutionModeSupergraph
-}
-
-func (g *GraphQLConfigAdapter) isProxyOnlyAPIDefinition() bool {
-	return g.apiDefinition.GraphQL.Enabled &&
-		(g.apiDefinition.GraphQL.ExecutionMode == apidef.GraphQLExecutionModeProxyOnly || g.apiDefinition.GraphQL.ExecutionMode == apidef.GraphQLExecutionModeSubgraph)
-}
-
 func (g *GraphQLConfigAdapter) getHttpClient() *http.Client {
 	if g.httpClient == nil {
 		g.httpClient = httpclient.DefaultNetHttpClient
@@ -537,47 +389,4 @@ func (g *GraphQLConfigAdapter) getStreamingClient() *http.Client {
 	}
 
 	return g.streamingClient
-}
-
-func (g *GraphQLConfigAdapter) createGraphQLDataSourceFactory(graphqlConfig apidef.GraphQLEngineDataSourceConfigGraphQL) (*graphqlDataSource.Factory, error) {
-	factory := &graphqlDataSource.Factory{
-		HTTPClient:      g.getHttpClient(),
-		StreamingClient: g.getStreamingClient(),
-	}
-
-	wsProtocol := g.graphqlDataSourceWebSocketProtocol(graphqlConfig.SubscriptionType)
-	graphqlSubscriptionClient := g.subscriptionClientFactory.NewSubscriptionClient(
-		g.getHttpClient(),
-		g.getStreamingClient(),
-		nil,
-		graphqlDataSource.WithWSSubProtocol(wsProtocol),
-	)
-
-	subscriptionClient, ok := graphqlSubscriptionClient.(*graphqlDataSource.SubscriptionClient)
-	if !ok {
-		return nil, errors.New("incorrect SubscriptionClient has been created")
-	}
-	factory.SubscriptionClient = subscriptionClient
-	return factory, nil
-}
-
-func (g *GraphQLConfigAdapter) graphqlDataSourceWebSocketProtocol(subscriptionType apidef.SubscriptionType) string {
-	wsProtocol := graphqlDataSource.ProtocolGraphQLWS
-	if subscriptionType == apidef.GQLSubscriptionTransportWS {
-		wsProtocol = graphqlDataSource.ProtocolGraphQLTWS
-	}
-	return wsProtocol
-}
-
-func (g *GraphQLConfigAdapter) graphqlSubscriptionType(subscriptionType apidef.SubscriptionType) graphql.SubscriptionType {
-	switch subscriptionType {
-	case apidef.GQLSubscriptionWS:
-		return graphql.SubscriptionTypeGraphQLWS
-	case apidef.GQLSubscriptionTransportWS:
-		return graphql.SubscriptionTypeGraphQLTransportWS
-	case apidef.GQLSubscriptionSSE:
-		return graphql.SubscriptionTypeSSE
-	default:
-		return graphql.SubscriptionTypeUnknown
-	}
 }
