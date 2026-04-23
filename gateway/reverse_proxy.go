@@ -46,6 +46,7 @@ import (
 	"github.com/TykTechnologies/tyk/internal/httputil"
 	"github.com/TykTechnologies/tyk/internal/otel"
 	"github.com/TykTechnologies/tyk/internal/service/core"
+	tyktime "github.com/TykTechnologies/tyk/internal/time"
 	"github.com/TykTechnologies/tyk/regexp"
 	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/trace"
@@ -578,7 +579,6 @@ func (p *ReverseProxy) CheckHardTimeoutEnforced(spec *APISpec, req *http.Request
 }
 
 // GetHardTimeoutEnforcedSettings checks APISpec versions for a fine-grained timeout value.
-// The value is defined in string, so this function converts it to time.Duration
 func (p *ReverseProxy) GetHardTimeoutEnforcedSettings(spec *APISpec, req *http.Request) (time.Duration, bool) {
 	if !spec.EnforcedTimeoutEnabled {
 		return 0, false
@@ -588,23 +588,15 @@ func (p *ReverseProxy) GetHardTimeoutEnforcedSettings(spec *APISpec, req *http.R
 	versionPaths := spec.RxPaths[vInfo.Name]
 	urlSpec, found := spec.FindSpecMatchesStatus(req, versionPaths, HardTimeout)
 	if found {
-		// Enforced timeout:
-		// 1. Can be int for backward compatibility
-		// 2. Can be string in form of "500ms" or "1.5s". Allowed time units: ms, s, m. Minimum timeout is 1ms, maximum 300s.
-		timeout := urlSpec.HardTimeout.TimeOut
+		var timeout tyktime.ReadableDuration
 
-		switch tm := timeout.(type) {
-		case int:
-			return time.Duration(tm) * time.Second, true
-		case string:
-			dur, err := time.ParseDuration(tm)
-			if err != nil {
-				p.logger.Errorf("unable to parse %s to time.Duration: ", tm)
-				return 0, false
-			}
-
-			return dur, true
+		if urlSpec.HardTimeout.TimeoutDuration > 0 {
+			timeout = urlSpec.HardTimeout.TimeoutDuration
+		} else {
+			timeout = tyktime.ReadableDuration(time.Duration(urlSpec.HardTimeout.TimeOut) * time.Second)
 		}
+
+		return time.Duration(timeout), true
 	}
 
 	return 0, false

@@ -198,7 +198,7 @@ func (r *RuleValidateEnforceTimeout) Validate(apiDef *APIDefinition, validationR
 				// Only ms, s, m units
 				// invalid configuration like <0, 0ms or empty strings should be rejected
 				// Minimum 1ms, max 300s
-				if hardTimeOutMeta.TimeOut.(int) < 0 {
+				if hardTimeOutMeta.TimeOut < 0 {
 					validationResult.IsValid = false
 					validationResult.AppendError(ErrInvalidTimeoutValue)
 					return

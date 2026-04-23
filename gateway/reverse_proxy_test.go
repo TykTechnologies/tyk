@@ -34,6 +34,7 @@ import (
 	"github.com/TykTechnologies/tyk/ctx"
 	"github.com/TykTechnologies/tyk/dnscache"
 	"github.com/TykTechnologies/tyk/header"
+	tyktime "github.com/TykTechnologies/tyk/internal/time"
 	"github.com/TykTechnologies/tyk/request"
 	"github.com/TykTechnologies/tyk/test"
 	"github.com/TykTechnologies/tyk/user"
@@ -2260,34 +2261,34 @@ func TestTimeoutPrioritization(t *testing.T) {
 				version.UseExtendedPaths = true
 				version.ExtendedPaths.HardTimeouts = []apidef.HardTimeoutMeta{
 					{
-						Disabled: false,
-						Path:     "/timeout/seconds",
-						Method:   http.MethodGet,
-						TimeOut:  "1.5s",
+						Disabled:        false,
+						Path:            "/timeout/seconds",
+						Method:          http.MethodGet,
+						TimeoutDuration: tyktime.ReadableDuration(1500 * time.Millisecond),
 					},
 					{
-						Disabled: false,
-						Path:     "/success/seconds",
-						Method:   http.MethodGet,
-						TimeOut:  "1.5s",
+						Disabled:        false,
+						Path:            "/success/seconds",
+						Method:          http.MethodGet,
+						TimeoutDuration: tyktime.ReadableDuration(1500 * time.Millisecond),
 					},
 					{
-						Disabled: false,
-						Path:     "/timeout/milliseconds/1",
-						Method:   http.MethodGet,
-						TimeOut:  "400ms",
+						Disabled:        false,
+						Path:            "/timeout/milliseconds/1",
+						Method:          http.MethodGet,
+						TimeoutDuration: tyktime.ReadableDuration(400 * time.Millisecond),
 					},
 					{
-						Disabled: false,
-						Path:     "/timeout/milliseconds/2",
-						Method:   http.MethodGet,
-						TimeOut:  "2500ms",
+						Disabled:        false,
+						Path:            "/timeout/milliseconds/2",
+						Method:          http.MethodGet,
+						TimeoutDuration: tyktime.ReadableDuration(2500 * time.Millisecond),
 					},
 					{
-						Disabled: false,
-						Path:     "/success/milliseconds",
-						Method:   http.MethodGet,
-						TimeOut:  "700ms",
+						Disabled:        false,
+						Path:            "/success/milliseconds",
+						Method:          http.MethodGet,
+						TimeoutDuration: tyktime.ReadableDuration(700 * time.Millisecond),
 					},
 				}
 			})

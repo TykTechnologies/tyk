@@ -2,12 +2,14 @@ package oas
 
 import (
 	"encoding/json"
+	"math"
 	"net/http"
 	"sort"
 	"strings"
 	"time"
 
 	"github.com/TykTechnologies/tyk/apidef"
+	tyktime "github.com/TykTechnologies/tyk/internal/time"
 )
 
 // Middleware holds configuration for Tyk's native middleware.
@@ -1317,19 +1319,36 @@ type EnforceTimeout struct {
 	// Value is the configured timeout in seconds or string.
 	//
 	// Tyk classic API definition: `version_data.versions.extended_paths.hard_timeouts[].timeout`.
-	Value any `bson:"value" json:"value"`
+	// Deprecated: Use Timeout instead.
+	Value int `bson:"value" json:"value"`
+
+	// Timeout is the configured timeout.
+	//
+	// Tyk classic API definition: `version_data.versions.extended_paths.hard_timeouts[].timeout_duration`.
+	Timeout tyktime.ReadableDuration `bson:"timeout" json:"timeout"`
 }
 
 // Fill fills *EnforceTimeout from apidef.HardTimeoutMeta.
 func (et *EnforceTimeout) Fill(meta apidef.HardTimeoutMeta) {
 	et.Enabled = !meta.Disabled
-	et.Value = meta.TimeOut
+
+	if meta.TimeoutDuration > 0 {
+		et.Timeout = meta.TimeoutDuration
+		et.Value = int(math.Ceil(meta.TimeoutDuration.Seconds()))
+	} else {
+		et.Value = meta.TimeOut
+	}
 }
 
 // ExtractTo extracts *EnforceTimeout to *apidef.HardTimeoutMeta.
 func (et *EnforceTimeout) ExtractTo(meta *apidef.HardTimeoutMeta) {
 	meta.Disabled = !et.Enabled
-	meta.TimeOut = et.Value
+
+	if et.Timeout > 0 {
+		meta.TimeoutDuration = et.Timeout
+	} else {
+		meta.TimeOut = et.Value
+	}
 }
 
 // CustomPlugin configures custom plugin.
