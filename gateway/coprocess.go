@@ -87,14 +87,9 @@ func (c *CoProcessor) BuildObject(req *http.Request, res *http.Response, spec *A
 		scheme = "https"
 	}
 	miniRequestObject := &coprocess.MiniRequestObject{
-		Headers:        headers,
-		SetHeaders:     map[string]string{},
-		DeleteHeaders:  []string{},
-		Url:            req.URL.String(),
-		Params:         ProtoMap(req.URL.Query()),
-		AddParams:      map[string]string{},
-		ExtendedParams: ProtoMap(nil),
-		DeleteParams:   []string{},
+		Headers: headers,
+		Url:     req.URL.String(),
+		Params:  ProtoMap(req.URL.Query()),
 		ReturnOverrides: &coprocess.ReturnOverrides{
 			ResponseCode: -1,
 		},
@@ -120,8 +115,6 @@ func (c *CoProcessor) BuildObject(req *http.Request, res *http.Response, spec *A
 		HookName: c.Middleware.HookName,
 		HookType: c.Middleware.HookType,
 	}
-
-	object.Spec = make(map[string]string)
 
 	// Append spec data:
 	if c.Middleware != nil {
@@ -158,11 +151,11 @@ func (c *CoProcessor) BuildObject(req *http.Request, res *http.Response, spec *A
 			object.Metadata = object.Session.Metadata
 		}
 	}
-
 	// Append response data if it's available:
 	if res != nil {
 		resObj := &coprocess.ResponseObject{
-			Headers: make(map[string]string, len(res.Header)),
+			Headers:           make(map[string]string, len(res.Header)),
+			MultivalueHeaders: make([]*coprocess.Header, 0, len(res.Header)),
 		}
 		for k, v := range res.Header {
 			// set univalue header

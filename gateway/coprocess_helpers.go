@@ -93,39 +93,53 @@ func TykSessionState(session *coprocess.SessionState) *user.SessionState {
 // ProtoSessionState takes a standard SessionState and outputs a SessionState object compatible with Protocol Buffers.
 func ProtoSessionState(session *user.SessionState) *coprocess.SessionState {
 
-	accessDefinitions := make(map[string]*coprocess.AccessDefinition, len(session.AccessRights))
-
-	for key, accessDefinition := range session.AccessRights {
-		var allowedUrls []*coprocess.AccessSpec
-		for _, allowedURL := range accessDefinition.AllowedURLs {
-			accessSpec := &coprocess.AccessSpec{
-				Url:     allowedURL.URL,
-				Methods: allowedURL.Methods,
+	var accessDefinitions map[string]*coprocess.AccessDefinition
+	if len(session.AccessRights) > 0 {
+		accessDefinitions = make(map[string]*coprocess.AccessDefinition, len(session.AccessRights))
+		for key, accessDefinition := range session.AccessRights {
+			allowedUrls := make([]*coprocess.AccessSpec, 0, len(accessDefinition.AllowedURLs))
+			for _, allowedURL := range accessDefinition.AllowedURLs {
+				accessSpec := &coprocess.AccessSpec{
+					Url:     allowedURL.URL,
+					Methods: allowedURL.Methods,
+				}
+				allowedUrls = append(allowedUrls, accessSpec)
 			}
-			allowedUrls = append(allowedUrls, accessSpec)
+
+			accessDefinitions[key] = &coprocess.AccessDefinition{
+				ApiName:     accessDefinition.APIName,
+				ApiId:       accessDefinition.APIID,
+				Versions:    accessDefinition.Versions,
+				AllowedUrls: allowedUrls,
+			}
 		}
+	}
 
-		accessDefinitions[key] = &coprocess.AccessDefinition{
-			ApiName:     accessDefinition.APIName,
-			ApiId:       accessDefinition.APIID,
-			Versions:    accessDefinition.Versions,
-			AllowedUrls: allowedUrls,
+	var basicAuthData *coprocess.BasicAuthData
+	if session.BasicAuthData.Password != "" || len(session.BasicAuthData.Hash) > 0 {
+		basicAuthData = &coprocess.BasicAuthData{
+			Password: session.BasicAuthData.Password,
+			Hash:     string(session.BasicAuthData.Hash),
 		}
 	}
 
-	basicAuthData := &coprocess.BasicAuthData{
-		Password: session.BasicAuthData.Password,
-		Hash:     string(session.BasicAuthData.Hash),
-	}
-	jwtData := &coprocess.JWTData{
-		Secret: session.JWTData.Secret,
-	}
-	monitor := &coprocess.Monitor{
-		TriggerLimits: session.Monitor.TriggerLimits,
+	var jwtData *coprocess.JWTData
+	if session.JWTData.Secret != "" {
+		jwtData = &coprocess.JWTData{
+			Secret: session.JWTData.Secret,
+		}
 	}
 
-	metadata := make(map[string]string)
+	var monitor *coprocess.Monitor
+	if len(session.Monitor.TriggerLimits) > 0 {
+		monitor = &coprocess.Monitor{
+			TriggerLimits: session.Monitor.TriggerLimits,
+		}
+	}
+
+	var metadata map[string]string
 	if len(session.MetaData) > 0 {
+		metadata = make(map[string]string, len(session.MetaData))
 		for k, v := range session.MetaData {
 			switch v.(type) {
 			case string:
@@ -181,13 +195,14 @@ func ProtoSessionState(session *user.SessionState) *coprocess.SessionState {
 
 // ProtoMap is a helper function for maps with string slice values.
 func ProtoMap(inputMap map[string][]string) map[string]string {
-	newMap := make(map[string]string)
-
-	if inputMap != nil {
-		for k, v := range inputMap {
+	if len(inputMap) == 0 {
+		return nil
+	}
+	newMap := make(map[string]string, len(inputMap))
+	for k, v := range inputMap {
+		if len(v) > 0 {
 			newMap[k] = v[0]
 		}
 	}
-
 	return newMap
 }
