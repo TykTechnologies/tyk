@@ -19,7 +19,13 @@ func RealIP(r *http.Request) string {
 	}
 
 	if realIPVal := r.Header.Get(header.XRealIP); realIPVal != "" {
-		if realIP := net.ParseIP(realIPVal); realIP != nil {
+		// Handle case where ALB or proxy adds port to IP (e.g., "192.168.1.1:8080")
+		ip := realIPVal
+		if host, _, err := net.SplitHostPort(realIPVal); err == nil {
+			ip = host
+		}
+
+		if realIP := net.ParseIP(ip); realIP != nil {
 			return realIP.String()
 		}
 	}
@@ -49,6 +55,11 @@ func RealIP(r *http.Request) string {
 			ip = strings.TrimSpace(xffs[0])
 		} else {
 			ip = strings.TrimSpace(xffs[len(xffs)-depth])
+		}
+
+		// Handle case where ALB or proxy adds port to IP (e.g., "192.168.1.1:8080")
+		if host, _, err := net.SplitHostPort(ip); err == nil {
+			ip = host
 		}
 
 		// Validate that the IP is properly formatted before returning it
