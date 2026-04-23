@@ -11,6 +11,8 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"testing"
@@ -2637,5 +2639,112 @@ func TestURLAllowedAndIgnored_CORSPreflight(t *testing.T) {
 		spec.CORS.OptionsPassthrough = false
 		status, _ := spec.URLAllowedAndIgnored(req, paths, true)
 		assert.Equal(t, EndPointNotAllowed, status)
+	})
+}
+
+func TestLoadDefFromFilePath(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	loader := APIDefinitionLoader{Gw: ts.Gw}
+
+	t.Run("load classic definition", func(t *testing.T) {
+		apiName := "Test API"
+		apiID := "test-api-1"
+		def := apidef.APIDefinition{
+			Name:  apiName,
+			APIID: apiID,
+			Proxy: apidef.ProxyConfig{
+				ListenPath: "/test-api-1",
+			},
+		}
+		data, err := json.Marshal(def)
+		assert.NoError(t, err)
+
+		tmpFile, err := os.CreateTemp("", "api_def_*.json")
+		assert.NoError(t, err)
+		defer os.Remove(tmpFile.Name())
+
+		_, err = tmpFile.Write(data)
+		assert.NoError(t, err)
+		tmpFile.Close()
+
+		spec, err := loader.loadDefFromFilePath(tmpFile.Name())
+		assert.NoError(t, err)
+		assert.NotNil(t, spec)
+		assert.Equal(t, apiName, spec.Name)
+		assert.Equal(t, apiID, spec.APIID)
+	})
+
+	t.Run("load OAS definition", func(t *testing.T) {
+		tmpDir, err := os.MkdirTemp("", "oas_test")
+		assert.NoError(t, err)
+		defer os.RemoveAll(tmpDir)
+
+		apiFilePath := filepath.Join(tmpDir, "test-api.json")
+		oasFilePath := filepath.Join(tmpDir, "test-api-oas.json")
+
+		// Test whether schema validator successfully applies schema manipulation to oas doc.
+		expectedPatternAfterLoad := "{\"^[\\\\x{0000}-\\\\x{017f}]*$\"}"
+		schema := openapi3.NewSchema()
+		schema.Pattern = "{\"^[\\\\u0000-\\\\u017f]*$\"}"
+		oasDoc := &oas.OAS{
+			T: openapi3.T{
+				Components: &openapi3.Components{
+					Schemas: openapi3.Schemas{
+						"Schema1": openapi3.NewSchemaRef("", schema),
+					},
+				},
+			},
+		}
+		oasData, err := json.Marshal(oasDoc)
+		assert.NoError(t, err)
+
+		err = os.WriteFile(oasFilePath, oasData, 0644)
+		assert.NoError(t, err)
+
+		apiName := "Test OAS API"
+		apiID := "test-oas-api-1"
+		def := apidef.APIDefinition{
+			Name:  apiName,
+			APIID: apiID,
+			IsOAS: true,
+			Proxy: apidef.ProxyConfig{
+				ListenPath: "/test-oas-api-1",
+			},
+		}
+		data, err := json.Marshal(def)
+		assert.NoError(t, err)
+
+		err = os.WriteFile(apiFilePath, data, 0644)
+		assert.NoError(t, err)
+
+		spec, err := loader.loadDefFromFilePath(apiFilePath)
+		assert.NoError(t, err)
+		assert.NotNil(t, spec)
+		assert.Equal(t, apiName, spec.Name)
+		assert.Equal(t, apiID, spec.APIID)
+		assert.NotNil(t, spec.OAS)
+		assert.Equal(t, expectedPatternAfterLoad, spec.OAS.Components.Schemas["Schema1"].Value.Pattern)
+	})
+
+	t.Run("file not found", func(t *testing.T) {
+		spec, err := loader.loadDefFromFilePath("non_existent_file.json")
+		assert.Error(t, err)
+		assert.Nil(t, spec)
+	})
+
+	t.Run("invalid json", func(t *testing.T) {
+		tmpFile, err := os.CreateTemp("", "api_def_*.json")
+		assert.NoError(t, err)
+		defer os.Remove(tmpFile.Name())
+
+		_, err = tmpFile.Write([]byte("{invalid json}"))
+		assert.NoError(t, err)
+		tmpFile.Close()
+
+		spec, err := loader.loadDefFromFilePath(tmpFile.Name())
+		assert.Error(t, err)
+		assert.Nil(t, spec)
 	})
 }
