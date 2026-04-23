@@ -1099,14 +1099,3 @@ jobs:
       actions: read # This is required for the report_logs job in the called workflow
     uses: ./.github/workflows/release-tests.yml
     secrets: inherit
-  sbom:
-    needs: goreleaser
-    if: |
-      !cancelled() &&
-      needs.goreleaser.result == 'success'
-    uses: TykTechnologies/github-actions/.github/workflows/sbom.yaml@42304edda365365e0a887cf018d8edc34b960b82 # main
-    secrets:
-      DEPDASH_URL: ${{ secrets.DEPDASH_URL }}
-      DEPDASH_KEY: ${{ secrets.DEPDASH_KEY }}
-      PROBE_APP_ID: ${{ secrets.PROBE_APP_ID }}
-      PROBE_APP_PRIVATE_KEY: ${{ secrets.PROBE_APP_PRIVATE_KEY }}
