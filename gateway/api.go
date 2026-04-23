@@ -3351,18 +3351,19 @@ func ctxSetCheckLoopLimits(r *http.Request, b bool) {
 
 // Should we check Rate limits and Quotas?
 func ctxCheckLimits(r *http.Request) bool {
-	// If this is a self loop, do not need to check the limits and quotas.
-	if httpctx.IsSelfLooping(r) {
-		return false
-	}
-
 	// If looping disabled, allow all
 	if !ctxLoopingEnabled(r) {
 		return true
 	}
 
+	// Explicit check_limits=true overrides the default self-loop skip behavior
 	if v := r.Context().Value(ctx.CheckLoopLimits); v != nil {
 		return v.(bool)
+	}
+
+	// Self-loops skip rate limit and quota checks by default
+	if httpctx.IsSelfLooping(r) {
+		return false
 	}
 
 	return false
