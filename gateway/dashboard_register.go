@@ -217,16 +217,27 @@ func (h *HTTPDashboardHandler) Register(ctx context.Context) error {
 	}
 
 	defer resp.Body.Close()
+
 	val := NodeResponseOK{}
 	if err := json.NewDecoder(resp.Body).Decode(&val); err != nil {
 		return err
 	}
 
-	// Set the NodeID
-	var found bool
+	// Any 409 whose Status is not "OK" means the gateway has not been assigned a node yet
+	// (lock contention, Redis failure, etc). Retry after backoff.
+	if resp.StatusCode == http.StatusConflict && val.Status != "OK" {
+		dashLog.Warning("Registration deferred (409 with status: ", val.Status, "); retrying in 5s")
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-time.After(5 * time.Second):
+		}
+		return h.Register(ctx)
+	}
+
+	// Both 200 and duplicate-session 409 (Status=="OK") carry a NodeID.
 	nodeID, found := val.Message["NodeID"]
-	h.Gw.SetNodeID(nodeID)
-	if !found {
+	if !found || nodeID == "" {
 		dashLog.Error("Failed to register node, retrying in 5s")
 		select {
 		case <-ctx.Done():
@@ -236,6 +247,7 @@ func (h *HTTPDashboardHandler) Register(ctx context.Context) error {
 		return h.Register(ctx)
 	}
 
+	h.Gw.SetNodeID(nodeID)
 	dashLog.WithField("id", h.Gw.GetNodeID()).Info("Node Registered")
 
 	// Set the nonce
