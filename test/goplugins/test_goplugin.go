@@ -227,3 +227,20 @@ func MyPluginApplyingPolicy(rw http.ResponseWriter, r *http.Request) {
 
 	ctx.SetSession(r, session, true)
 }
+
+func RejectWithBody(
+	rw http.ResponseWriter,
+	_ *http.Request,
+) {
+
+	rw.WriteHeader(403)
+	_, _ = rw.Write([]byte(`hello`)) // nolint:errcheck
+}
+
+func RejectWithoutBody(
+	rw http.ResponseWriter,
+	_ *http.Request,
+) {
+
+	rw.WriteHeader(403)
+}
