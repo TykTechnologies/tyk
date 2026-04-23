@@ -7,13 +7,16 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"net/http/httptest"
 	"strings"
 	"sync"
 	"testing"
 	"time"
 
+	"github.com/cenkalti/backoff/v4"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 
 	"github.com/TykTechnologies/again"
@@ -1128,4 +1131,335 @@ func TestLoadPoliciesFromRPC(t *testing.T) {
 		_, err = ts.Gw.LoadPoliciesFromRPC(store, orgId)
 		assert.ErrorContains(t, err, "invalid ObjectId in JSON")
 	})
+}
+
+// TestDoReloadWithRetry_RetriesUntilSuccess verifies that DoReloadWithRetry keeps
+// retrying when DoReloadWithError returns an error, and stops as soon as it succeeds.
+// It also confirms that performedSuccessfulReload is true after recovery.
+func TestDoReloadWithRetry_RetriesUntilSuccess(t *testing.T) {
+	// Start without UseDBAppConfigs to avoid blocking in handleDashboardRegistration
+	// during startup. We enable it and point at the mock after the gateway is up.
+	ts := StartTest(func(conf *config.Config) {
+		conf.ResourceSync.RetryAttempts = 0
+	})
+	defer ts.Close()
+
+	// Use a fast retry interval so the test does not wait seconds between retries.
+	ts.Gw.reloadRetryBackoff = func() backoff.BackOff {
+		return backoff.NewConstantBackOff(50 * time.Millisecond)
+	}
+
+	const succeedOnCall = 3
+	var callCount int
+
+	// Mock dashboard: returns 500 for the first (succeedOnCall-1) calls, then 200.
+	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.Contains(r.URL.Path, "/system/policies") || strings.Contains(r.URL.Path, "/system/apis") {
+			callCount++
+			if callCount < succeedOnCall {
+				w.WriteHeader(http.StatusInternalServerError)
+				_, err := w.Write([]byte(`{"Status":"Error","Message":"db unavailable","Meta":null}`))
+				require.NoError(t, err)
+				return
+			}
+			w.Header().Set("Content-Type", "application/json")
+			if strings.Contains(r.URL.Path, "/system/policies") {
+				_, err := w.Write([]byte(`{"Message":[],"Nonce":"ok"}`))
+				require.NoError(t, err)
+			} else {
+				_, err := w.Write([]byte(`{"Status":"OK","Nonce":"ok","Message":[]}`))
+				require.NoError(t, err)
+			}
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer mockServer.Close()
+
+	// Now enable dashboard mode and point at the mock.
+	conf := ts.Gw.GetConfig()
+	conf.UseDBAppConfigs = true
+	conf.DBAppConfOptions.ConnectionString = mockServer.URL
+	conf.Policies.PolicySource = "service"
+	conf.Policies.PolicyConnectionString = mockServer.URL
+	ts.Gw.SetConfig(conf)
+
+	ts.Gw.performedSuccessfulReload = false
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	ts.Gw.DoReloadWithRetry(ctx)
+
+	assert.True(t, ts.Gw.performedSuccessfulReload,
+		"performedSuccessfulReload should be true after DoReloadWithRetry succeeds")
+	assert.GreaterOrEqual(t, callCount, succeedOnCall,
+		"mock should have been called at least %d times before succeeding", succeedOnCall)
+}
+
+// TestDoReloadWithRetry_StopsOnContextCancel verifies that DoReloadWithRetry exits
+// cleanly when the context is cancelled, without blocking indefinitely.
+func TestDoReloadWithRetry_StopsOnContextCancel(t *testing.T) {
+	ts := StartTest(func(conf *config.Config) {
+		conf.ResourceSync.RetryAttempts = 0
+	})
+	defer ts.Close()
+
+	// Use a fast retry interval so context cancellation is observed quickly.
+	ts.Gw.reloadRetryBackoff = func() backoff.BackOff {
+		return backoff.NewConstantBackOff(50 * time.Millisecond)
+	}
+
+	// Mock dashboard that always returns 500 so the reload never succeeds.
+	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+		_, err := w.Write([]byte(`{"Status":"Error","Message":"db unavailable","Meta":null}`))
+		require.NoError(t, err)
+	}))
+	defer mockServer.Close()
+
+	// Enable dashboard mode after startup so handleDashboardRegistration does not block.
+	conf := ts.Gw.GetConfig()
+	conf.UseDBAppConfigs = true
+	conf.DBAppConfOptions.ConnectionString = mockServer.URL
+	conf.Policies.PolicySource = "service"
+	conf.Policies.PolicyConnectionString = mockServer.URL
+	ts.Gw.SetConfig(conf)
+
+	ts.Gw.performedSuccessfulReload = false
+
+	// Cancel the context after a short window — the loop must exit within that window.
+	ctx, cancel := context.WithTimeout(context.Background(), 300*time.Millisecond)
+	defer cancel()
+
+	done := make(chan struct{})
+	go func() {
+		ts.Gw.DoReloadWithRetry(ctx)
+		close(done)
+	}()
+
+	select {
+	case <-done:
+		// Good — the loop exited after context cancellation.
+	case <-time.After(5 * time.Second):
+		t.Fatal("DoReloadWithRetry did not exit after context cancellation — goroutine leak suspected")
+	}
+
+	assert.False(t, ts.Gw.performedSuccessfulReload,
+		"performedSuccessfulReload should remain false when reload never succeeded")
+}
+
+// TestDoReloadWithRetry_RetriesWithConstantInterval verifies that successive
+// retry attempts are spaced by the configured interval. Uses a constant
+// backoff so the test completes quickly with predictable timing.
+func TestDoReloadWithRetry_RetriesWithConstantInterval(t *testing.T) {
+	ts := StartTest(func(conf *config.Config) {
+		conf.ResourceSync.RetryAttempts = 0
+	})
+	defer ts.Close()
+
+	// Use a fast constant retry interval.
+	ts.Gw.reloadRetryBackoff = func() backoff.BackOff {
+		return backoff.NewConstantBackOff(100 * time.Millisecond)
+	}
+
+	const succeedOnCall = 4 // fail 3 times, succeed on the 4th
+	var (
+		mu        sync.Mutex
+		callTimes []time.Time
+		callCount int
+	)
+
+	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.Contains(r.URL.Path, "/system/policies") {
+			mu.Lock()
+			callCount++
+			callTimes = append(callTimes, time.Now())
+			n := callCount
+			mu.Unlock()
+
+			if n < succeedOnCall {
+				w.WriteHeader(http.StatusInternalServerError)
+				_, err := w.Write([]byte(`{"Status":"Error","Message":"db unavailable","Meta":null}`))
+				require.NoError(t, err)
+				return
+			}
+			w.Header().Set("Content-Type", "application/json")
+			_, err := w.Write([]byte(`{"Message":[],"Nonce":"ok"}`))
+			require.NoError(t, err)
+			return
+		}
+		if strings.Contains(r.URL.Path, "/system/apis") {
+			w.Header().Set("Content-Type", "application/json")
+			_, err := w.Write([]byte(`{"Status":"OK","Nonce":"ok","Message":[]}`))
+			require.NoError(t, err)
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer mockServer.Close()
+
+	// Enable dashboard mode after startup to avoid blocking in handleDashboardRegistration.
+	conf := ts.Gw.GetConfig()
+	conf.UseDBAppConfigs = true
+	conf.DBAppConfOptions.ConnectionString = mockServer.URL
+	conf.Policies.PolicySource = "service"
+	conf.Policies.PolicyConnectionString = mockServer.URL
+	ts.Gw.SetConfig(conf)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	ts.Gw.DoReloadWithRetry(ctx)
+
+	mu.Lock()
+	times := make([]time.Time, len(callTimes))
+	copy(times, callTimes)
+	mu.Unlock()
+
+	require.GreaterOrEqual(t, len(times), succeedOnCall,
+		"expected at least %d policy endpoint calls", succeedOnCall)
+
+	// All intervals should be ~100ms (constant). Allow ±80ms tolerance for scheduler jitter.
+	for i := 0; i < len(times)-1; i++ {
+		actual := times[i+1].Sub(times[i])
+		assert.InDelta(t, (100 * time.Millisecond).Milliseconds(), actual.Milliseconds(), 80,
+			"interval between call %d and %d: got %v, want ~100ms", i+1, i+2, actual)
+	}
+}
+
+// TestDoReload_RuntimeReloadLoopUnaffected verifies that the existing DoReload
+// (used by reloadLoop at runtime) still returns without retrying on failure,
+// keeping the hot-reload goroutine unblocked.
+func TestDoReload_RuntimeReloadLoopUnaffected(t *testing.T) {
+	ts := StartTest(func(conf *config.Config) {
+		conf.ResourceSync.RetryAttempts = 0
+	})
+	defer ts.Close()
+
+	// Note: no reloadRetryInterval override needed — DoReload does not use it.
+
+	var callCount int
+	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		callCount++
+		w.WriteHeader(http.StatusInternalServerError)
+		_, err := w.Write([]byte(`{"Status":"Error","Message":"db unavailable","Meta":null}`))
+		require.NoError(t, err)
+	}))
+	defer mockServer.Close()
+
+	// Enable dashboard mode after startup to avoid blocking in handleDashboardRegistration.
+	conf := ts.Gw.GetConfig()
+	conf.UseDBAppConfigs = true
+	conf.DBAppConfOptions.ConnectionString = mockServer.URL
+	conf.Policies.PolicySource = "service"
+	conf.Policies.PolicyConnectionString = mockServer.URL
+	ts.Gw.SetConfig(conf)
+
+	// DoReload must return promptly even on failure — it must NOT retry.
+	done := make(chan struct{})
+	go func() {
+		ts.Gw.DoReload()
+		close(done)
+	}()
+
+	select {
+	case <-done:
+		// Good — returned without blocking.
+	case <-time.After(5 * time.Second):
+		t.Fatal("DoReload blocked unexpectedly — it must not retry")
+	}
+
+	// With RetryAttempts=0 it makes exactly 1 attempt (policies endpoint only,
+	// since policies fail first and APIs are never reached).
+	assert.Equal(t, 1, callCount,
+		"DoReload should make exactly 1 request with RetryAttempts=0, got %d", callCount)
+}
+
+// TestRegister_DoReloadWithRetry_OnStartup verifies that when Register() is called
+// and the initial DoReloadWithRetry fails (dashboard returns 500 for APIs/policies),
+// the gateway keeps retrying until the upstream recovers, then marks the reload
+// as successful — without re-registering the node.
+func TestRegister_DoReloadWithRetry_OnStartup(t *testing.T) {
+	const succeedOnCall = 3
+	var (
+		registerCount int
+		policyCount   int
+	)
+
+	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case strings.Contains(r.URL.Path, "/register/node"):
+			registerCount++
+			w.Header().Set("Content-Type", "application/json")
+			err := json.NewEncoder(w).Encode(NodeResponseOK{
+				Status:  "ok",
+				Message: map[string]string{"NodeID": "test-node-id"},
+				Nonce:   fmt.Sprintf("nonce-%d", registerCount),
+			})
+			require.NoError(t, err)
+
+		case strings.Contains(r.URL.Path, "/system/policies"):
+			policyCount++
+			if policyCount < succeedOnCall {
+				w.WriteHeader(http.StatusInternalServerError)
+				_, err := w.Write([]byte(`{"Status":"Error","Message":"db unavailable","Meta":null}`))
+				require.NoError(t, err)
+				return
+			}
+			w.Header().Set("Content-Type", "application/json")
+			_, err := w.Write([]byte(`{"Message":[],"Nonce":"ok"}`))
+			require.NoError(t, err)
+
+		case strings.Contains(r.URL.Path, "/system/apis"):
+			w.Header().Set("Content-Type", "application/json")
+			_, err := w.Write([]byte(`{"Status":"OK","Nonce":"ok","Message":[]}`))
+			require.NoError(t, err)
+
+		default:
+			w.WriteHeader(http.StatusOK)
+		}
+	}))
+	defer mockServer.Close()
+
+	// Start without UseDBAppConfigs to avoid blocking in handleDashboardRegistration.
+	// We configure dashboard mode and point at the mock after the gateway is up.
+	ts := StartTest(func(conf *config.Config) {
+		conf.ResourceSync.RetryAttempts = 0
+		conf.NodeSecret = "test-secret"
+	})
+	defer ts.Close()
+
+	// Use a fast retry interval so retries happen in milliseconds during the test.
+	ts.Gw.reloadRetryBackoff = func() backoff.BackOff {
+		return backoff.NewConstantBackOff(50 * time.Millisecond)
+	}
+
+	// Enable dashboard mode and wire up the mock dashboard.
+	conf := ts.Gw.GetConfig()
+	conf.UseDBAppConfigs = true
+	conf.DBAppConfOptions.ConnectionString = mockServer.URL
+	conf.Policies.PolicySource = "service"
+	conf.Policies.PolicyConnectionString = mockServer.URL
+	ts.Gw.SetConfig(conf)
+
+	ts.Gw.DashService = &HTTPDashboardHandler{
+		Gw:                   ts.Gw,
+		Secret:               "test-secret",
+		RegistrationEndpoint: mockServer.URL + "/register/node",
+	}
+	ts.Gw.performedSuccessfulReload = false
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	err := ts.Gw.DashService.Register(ctx)
+
+	assert.NoError(t, err, "Register should not return an error")
+	assert.True(t, ts.Gw.performedSuccessfulReload,
+		"performedSuccessfulReload should be true after recovery")
+	assert.Equal(t, 1, registerCount,
+		"/register/node must be called exactly once — DoReloadWithRetry must not re-register")
+	assert.GreaterOrEqual(t, policyCount, succeedOnCall,
+		"policy endpoint should have been retried at least %d times", succeedOnCall)
 }
