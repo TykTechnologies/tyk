@@ -11,7 +11,6 @@ informal_verification:
     method: ""
     evidence: ""
     verified: false
-parent: ""
 component: policy
 rationale: Policy application is the core function of the policy engine. Every API request is governed by the session state produced by policy application. Incorrect merge behavior leads to either over-permissive access (security breach) or over-restrictive access (service denial).
 tags:
@@ -28,9 +27,9 @@ verification:
     assurance_level: A
     formalization_status: ""
     review:
-        status: pending
-        reviewer: ""
-        reviewed_at: ""
+        status: approved
+        reviewer: human:leonidbugaev
+        reviewed_at: "2026-04-21T00:00:00Z"
         ai_generated: true
 history:
     created_by: ai:claude
@@ -52,6 +51,7 @@ stakeholder:
             - SYS-REQ-016
             - SYS-REQ-017
             - SYS-REQ-018
+            - SYS-REQ-033
         - id: STK-REQ-001-AC-02
           text: Given a per-API policy, when Apply is called, then per-API limits are applied independently
           testable: true
@@ -78,9 +78,6 @@ stakeholder:
           testable: true
           derived_reqs:
             - SYS-REQ-011
-            - SYS-REQ-024
-            - SYS-REQ-025
-            - SYS-REQ-026
     obligation_checklist:
         - nominal
         - error_handling

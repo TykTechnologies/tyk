@@ -11,7 +11,6 @@ informal_verification:
     method: ""
     evidence: ""
     verified: false
-parent: ""
 component: policy
 rationale: 'When Apply encounters a policy from a different organization, it must report an error immediately. This is a security boundary: cross-org policy injection must never silently succeed.'
 tags: []
@@ -29,9 +28,9 @@ verification:
     assurance_level: A
     formalization_status: valid
     review:
-        status: pending
-        reviewer: ""
-        reviewed_at: ""
+        status: approved
+        reviewer: human:leonidbugaev
+        reviewed_at: "2026-04-21T00:00:00Z"
         ai_generated: false
 history:
     created_by: human:cli

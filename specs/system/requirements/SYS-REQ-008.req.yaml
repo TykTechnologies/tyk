@@ -11,7 +11,6 @@ informal_verification:
     method: ""
     evidence: ""
     verified: false
-parent: ""
 component: policy
 rationale: Every call to Apply() must return a result (nil error or error). Silent failures would leave the session in an indeterminate state, causing either over-permissive or over-restrictive API access.
 tags: []
@@ -27,9 +26,9 @@ verification:
     assurance_level: A
     formalization_status: valid
     review:
-        status: pending
-        reviewer: ""
-        reviewed_at: ""
+        status: approved
+        reviewer: human:leonidbugaev
+        reviewed_at: "2026-04-21T00:00:00Z"
         ai_generated: false
 history:
     created_by: human:cli

@@ -11,7 +11,6 @@ informal_verification:
     method: ""
     evidence: ""
     verified: false
-parent: ""
 component: policy
 rationale: Partial policy application is a security risk. If an error occurs mid-apply but some fields have already been merged, the session state becomes corrupted -- potentially granting access that should have been denied. Atomic error handling ensures either full success or full failure.
 tags:
@@ -28,9 +27,9 @@ verification:
     assurance_level: A
     formalization_status: ""
     review:
-        status: pending
-        reviewer: ""
-        reviewed_at: ""
+        status: approved
+        reviewer: human:leonidbugaev
+        reviewed_at: "2026-04-21T00:00:00Z"
         ai_generated: true
 history:
     created_by: ai:claude
@@ -45,8 +44,7 @@ stakeholder:
           text: Given a successful policy application, then no error is reported and all fields are merged
           testable: true
           derived_reqs:
-            - SYS-REQ-008
-            - SYS-REQ-033
+            - SYS-REQ-028
         - id: STK-REQ-005-AC-02
           text: Given a policy not found error, then an error is reported and no fields are merged
           testable: true
@@ -58,6 +56,9 @@ stakeholder:
           testable: true
           derived_reqs:
             - SYS-REQ-011
+            - SYS-REQ-024
+            - SYS-REQ-025
+            - SYS-REQ-026
         - id: STK-REQ-005-AC-04
           text: Given a malformed policy (PerAPI+partition conflict), then an error is reported and no fields are merged
           testable: true

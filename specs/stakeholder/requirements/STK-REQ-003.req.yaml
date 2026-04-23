@@ -11,7 +11,6 @@ informal_verification:
     method: ""
     evidence: ""
     verified: false
-parent: ""
 component: policy
 rationale: Rate limiting protects backend APIs from overload. The highest-rate-wins rule ensures that the most permissive policy governs when multiple policies apply, which is the correct business semantic for Tyk's multi-policy model. Applying empty (zero) rate limits would effectively disable API access.
 tags:
@@ -27,9 +26,9 @@ verification:
     assurance_level: A
     formalization_status: ""
     review:
-        status: pending
-        reviewer: ""
-        reviewed_at: ""
+        status: approved
+        reviewer: human:leonidbugaev
+        reviewed_at: "2026-04-21T00:00:00Z"
         ai_generated: true
 history:
     created_by: ai:claude

@@ -11,7 +11,6 @@ informal_verification:
     method: ""
     evidence: ""
     verified: false
-parent: ""
 component: policy
 rationale: When Apply encounters a policy not found and it is the only policy, it must report an error. With multiple policies, missing ones are skipped (logged and continued) to avoid one bad reference from bre
 tags: []
@@ -30,9 +29,9 @@ verification:
     assurance_level: A
     formalization_status: valid
     review:
-        status: pending
-        reviewer: ""
-        reviewed_at: ""
+        status: approved
+        reviewer: human:leonidbugaev
+        reviewed_at: "2026-04-21T00:00:00Z"
         ai_generated: false
 history:
     created_by: human:cli

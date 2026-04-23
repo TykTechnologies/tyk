@@ -11,7 +11,6 @@ informal_verification:
     method: ""
     evidence: ""
     verified: false
-parent: ""
 component: policy
 rationale: When Apply is called and ALL referenced policies are missing from the store, an error must be reported. The system must not silently succeed with zero applied policies.
 tags: []
@@ -27,9 +26,9 @@ verification:
     assurance_level: A
     formalization_status: valid
     review:
-        status: pending
-        reviewer: ""
-        reviewed_at: ""
+        status: approved
+        reviewer: human:leonidbugaev
+        reviewed_at: "2026-04-21T00:00:00Z"
         ai_generated: false
 history:
     created_by: human:cli

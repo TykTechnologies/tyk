@@ -11,7 +11,6 @@ informal_verification:
     method: ""
     evidence: ""
     verified: false
-parent: ""
 component: policy
 rationale: Apply() must complete within 100ms for up to 50 policies. The policy merge engine must have bounded execution time to prevent gateway request latency spikes.
 tags: []
@@ -25,9 +24,9 @@ verification:
     assurance_level: B
     formalization_status: valid
     review:
-        status: pending
-        reviewer: ""
-        reviewed_at: ""
+        status: approved
+        reviewer: human:leonidbugaev
+        reviewed_at: "2026-04-21T00:00:00Z"
         ai_generated: false
 history:
     created_by: human:cli

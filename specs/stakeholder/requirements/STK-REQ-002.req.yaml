@@ -11,7 +11,6 @@ informal_verification:
     method: ""
     evidence: ""
     verified: false
-parent: ""
 component: policy
 rationale: Session clearing is required before re-applying policies to prevent stale values from accumulating. Without proper clearing, policy updates would merge with leftover state, producing incorrect access decisions. This is especially critical after policy changes by administrators.
 tags:
@@ -27,9 +26,9 @@ verification:
     assurance_level: A
     formalization_status: ""
     review:
-        status: pending
-        reviewer: ""
-        reviewed_at: ""
+        status: approved
+        reviewer: human:leonidbugaev
+        reviewed_at: "2026-04-21T00:00:00Z"
         ai_generated: true
 history:
     created_by: ai:claude

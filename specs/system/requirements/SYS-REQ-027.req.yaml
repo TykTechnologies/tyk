@@ -11,7 +11,6 @@ informal_verification:
     method: ""
     evidence: ""
     verified: false
-parent: ""
 component: policy
 rationale: 'Idle state: When no operation is active (no apply, clear, rate limit, or endpoint operation requested), all outputs must be false. This prevents the component from producing spurious outputs when idle'
 tags: []
@@ -40,9 +39,9 @@ verification:
     assurance_level: B
     formalization_status: valid
     review:
-        status: pending
-        reviewer: ""
-        reviewed_at: ""
+        status: approved
+        reviewer: human:leonidbugaev
+        reviewed_at: "2026-04-21T00:00:00Z"
         ai_generated: false
 history:
     created_by: human:cli

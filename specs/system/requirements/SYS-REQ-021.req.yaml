@@ -11,7 +11,6 @@ informal_verification:
     method: ""
     evidence: ""
     verified: false
-parent: ""
 component: policy
 rationale: 'ApplyRateLimits must apply policy rate limits when: policy rate is non-empty AND not equal to current AND (current API limit is empty OR policy allows higher rate). The highest-rate-wins rule ensures '
 tags: []
@@ -30,9 +29,9 @@ verification:
     assurance_level: A
     formalization_status: valid
     review:
-        status: pending
-        reviewer: ""
-        reviewed_at: ""
+        status: approved
+        reviewer: human:leonidbugaev
+        reviewed_at: "2026-04-21T00:00:00Z"
         ai_generated: false
 history:
     created_by: human:cli
