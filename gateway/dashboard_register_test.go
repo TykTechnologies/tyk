@@ -60,10 +60,10 @@ func writeJSON(t *testing.T, w http.ResponseWriter, v interface{}) {
 	}
 }
 
-func okResponse(nodeID, nonce string) NodeResponseOK {
-	return NodeResponseOK{
+func okResponse(nodeID, nonce string) NodeResponse {
+	return NodeResponse{
 		Status:  "OK",
-		Message: map[string]string{"NodeID": nodeID},
+		Message: map[string]any{"NodeID": nodeID},
 		Nonce:   nonce,
 	}
 }
