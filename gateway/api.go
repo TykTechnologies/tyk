@@ -1590,6 +1590,11 @@ func (gw *Gateway) apiOASGetHandler(w http.ResponseWriter, r *http.Request) {
 		if api != nil && api.VersionDefinition.BaseID != "" {
 			w.Header().Set(apidef.HeaderBaseAPIID, api.VersionDefinition.BaseID)
 		}
+
+		visitor := schema.NewVisitor()
+		visitor.AddSchemaManipulation(schema.RestoreUnicodeEscapesFromRE2Manipulation)
+		visitor.ProcessOAS(oasAPI)
+		obj = oasAPI
 	}
 
 	jsonBytes, err := json.Marshal(obj)
