@@ -27,6 +27,7 @@ import (
 	"time"
 
 	logstashhook "github.com/bshuster-repo/logrus-logstash-hook"
+	"github.com/cenkalti/backoff/v4"
 	logrussentry "github.com/evalphobia/logrus_sentry"
 	grayloghook "github.com/gemnasium/logrus-graylog-hook"
 	"github.com/gorilla/mux"
@@ -52,11 +53,13 @@ import (
 	"github.com/TykTechnologies/tyk/dnscache"
 	"github.com/TykTechnologies/tyk/header"
 	"github.com/TykTechnologies/tyk/internal/cache"
+	"github.com/TykTechnologies/tyk/internal/compression"
 	"github.com/TykTechnologies/tyk/internal/crypto"
 	"github.com/TykTechnologies/tyk/internal/httputil"
 	"github.com/TykTechnologies/tyk/internal/model"
 	"github.com/TykTechnologies/tyk/internal/netutil"
 	"github.com/TykTechnologies/tyk/internal/otel"
+	"github.com/TykTechnologies/tyk/internal/rate"
 	"github.com/TykTechnologies/tyk/internal/scheduler"
 	"github.com/TykTechnologies/tyk/internal/service/newrelic"
 	"github.com/TykTechnologies/tyk/internal/uuid"
@@ -112,6 +115,8 @@ type Gateway struct {
 	config            atomic.Value
 	configMu          sync.Mutex
 	configViewerCache *configViewerCache
+
+	kvResolvers []func() error
 
 	ctx context.Context
 
@@ -198,6 +203,11 @@ type Gateway struct {
 	// performedSuccessfulReload is used to know whether a successful reload happened
 	performedSuccessfulReload bool
 
+	// reloadRetryBackoff optionally returns a custom backoff strategy for
+	// DoReloadWithRetry. Production code leaves this nil (default exponential
+	// backoff is used). Tests set it to return a fast constant backoff.
+	reloadRetryBackoff func() backoff.BackOff
+
 	requeueLock sync.Mutex
 
 	// This is a list of callbacks to execute on the next reload. It is protected by
@@ -228,9 +238,15 @@ type Gateway struct {
 	// apiJWKCaches cache per api entity
 	apiJWKCaches sync.Map
 
+	limitHeaderFactory rate.HeaderSenderFactory
+
 	BundleChecksumVerifier bundleChecksumVerifyFunction
 
 	validator validator.Validator
+
+	// compiledErrorOverrides holds the indexed error override rules for O(1) lookup.
+	// Built from apidef.ErrorOverrides during gateway startup.
+	compiledErrorOverrides atomic.Pointer[CompiledErrorOverrides]
 }
 
 func NewGateway(config config.Config, ctx context.Context) *Gateway {
@@ -279,6 +295,7 @@ func NewGateway(config config.Config, ctx context.Context) *Gateway {
 
 	gw.SetNodeID("solo-" + uuid.New())
 	gw.SessionID = uuid.New()
+	gw.limitHeaderFactory = rate.NewSenderFactory(config.RateLimitResponseHeaders)
 
 	// Only create registry in RPC mode
 	if config.SlaveOptions.UseRPC {
@@ -460,6 +477,10 @@ func (gw *Gateway) setupGlobals() {
 
 	// Initialize the Global function in the request package to access the gateway config
 	request.Global = gw.GetConfig
+
+	if gwConfig.Storage.MaxDecompressedSize > 0 {
+		compression.SetMaxDecompressedSize(uint64(gwConfig.Storage.MaxDecompressedSize))
+	}
 
 	gw.dnsCacheManager = dnscache.NewDnsCacheManager(gwConfig.DnsCache.MultipleIPsHandleStrategy)
 
@@ -1118,6 +1139,7 @@ func (gw *Gateway) createResponseMiddlewareChain(
 	)
 	decorate := makeDefaultDecorator(log)
 
+	gw.responseMWAppendEnabled(&responseMWChain, decorate(&MCPListFilterResponseHandler{BaseTykResponseHandler: baseHandler}))
 	gw.responseMWAppendEnabled(&responseMWChain, decorate(&ResponseTransformMiddleware{BaseTykResponseHandler: baseHandler}))
 	headerInjector := decorate(&HeaderInjector{BaseTykResponseHandler: baseHandler})
 	headerInjectorAdded := gw.responseMWAppendEnabled(&responseMWChain, headerInjector)
@@ -1175,6 +1197,10 @@ func (gw *Gateway) createResponseMiddlewareChain(
 		responseMWChain = append(responseMWChain, processor)
 	}
 
+	// Add error override handler (before cache) - intercepts upstream 4xx/5xx
+	gw.responseMWAppendEnabled(&responseMWChain,
+		decorate(&ResponseErrorOverrideMiddleware{BaseTykResponseHandler: baseHandler}))
+
 	keyPrefix := "cache-" + spec.APIID
 	cacheStore := &storage.RedisCluster{KeyPrefix: keyPrefix, IsCache: true, ConnectionHandler: gw.StorageConnectionHandler}
 	cacheStore.Connect()
@@ -1201,11 +1227,27 @@ func (gw *Gateway) rpcReloadLoop(rpcKey string) {
 	}
 }
 
-func (gw *Gateway) DoReload() {
+// DoReloadWithError performs a full reload of APIs and policies, returning any
+// sync error that prevented a successful reload. The reloadMu mutex is acquired
+// for the duration of the reload, so each call is safe to make concurrently.
+func (gw *Gateway) DoReloadWithError() error {
 	gw.reloadMu.Lock()
 	defer gw.reloadMu.Unlock()
 
 	start := time.Now()
+
+	// Always record the current config state (loaded API and policy counts)
+	// even if the reload fails partway through. This ensures gauges report 0
+	// rather than emitting no data when e.g. MDCB is unreachable.
+	defer func() {
+		gw.MetricInstruments.RecordConfigState(gw.ctx, gw.apisByIDLen(), gw.policies.PolicyCount())
+	}()
+
+	for _, resolve := range gw.kvResolvers {
+		if err := resolve(); err != nil {
+			mainLog.WithError(err).Error("Failed to re-resolve KV value on reload")
+		}
+	}
 
 	// Initialize/reset the JSVM
 	if gw.GetConfig().EnableJSVM {
@@ -1219,30 +1261,83 @@ func (gw *Gateway) DoReload() {
 	// Load the API Policies
 	if _, err := syncResourcesWithReload("policies", gw.GetConfig(), gw.syncPolicies); err != nil {
 		mainLog.Error("Error during syncing policies")
-		return
+		return err
 	}
 
 	// load the specs
 	if count, err := syncResourcesWithReload("apis", gw.GetConfig(), gw.syncAPISpecs); err != nil {
 		mainLog.Error("Error during syncing apis")
-		return
+		return err
 	} else {
 		// skip re-loading only if dashboard service reported 0 APIs
 		// and current registry had 0 APIs
 		if count == 0 && gw.apisByIDLen() == 0 {
 			mainLog.Warning("No API Definitions found, not reloading")
 			gw.performedSuccessfulReload = true
-			return
+			return nil
 		}
 	}
 
 	gw.loadGlobalApps()
 
 	gw.MetricInstruments.RecordReload(gw.ctx, time.Since(start))
-	gw.MetricInstruments.RecordConfigState(gw.ctx, gw.apisByIDLen(), gw.policies.PolicyCount())
 
 	gw.performedSuccessfulReload = true
 	mainLog.Info("API reload complete")
+	return nil
+}
+
+// DoReload preserves the func() signature required by RPCStorageHandler,
+// rpc.Connect, reloadLoop, gracefulShutdown, and all test callers.
+// Changing DoReload to return an error would break the stored func() field
+// in RPCStorageHandler and the emergencyModeLoadedFunc func() parameter in
+// rpc.Connect without a much wider refactor.
+func (gw *Gateway) DoReload() {
+	if err := gw.DoReloadWithError(); err != nil {
+		mainLog.Errorf("Reload failed: %v", err)
+	}
+}
+
+// Backoff parameters for DoReloadWithRetry.
+const (
+	reloadRetryInitialInterval = 5 * time.Second
+	reloadRetryMaxInterval     = 60 * time.Second
+	reloadRetryMultiplier      = 2.0
+)
+
+// DoReloadWithRetry calls DoReloadWithError in an exponential-backoff retry
+// loop (5s → 10s → 20s → 40s → 60s cap). It is used at the two startup call
+// sites (Register and startServer) where a failed reload means the gateway has
+// zero APIs and policies and must keep retrying until the upstream recovers.
+//
+// The loop is intentionally NOT used in reloadLoop (the runtime hot-reload
+// path) because that goroutine must remain unblocked so that subsequent
+// pub/sub-triggered reloads can be processed without delay.
+func (gw *Gateway) DoReloadWithRetry(ctx context.Context) {
+	var b backoff.BackOff
+	if gw.reloadRetryBackoff != nil {
+		b = gw.reloadRetryBackoff()
+	} else {
+		eb := backoff.NewExponentialBackOff()
+		eb.InitialInterval = reloadRetryInitialInterval
+		eb.MaxInterval = reloadRetryMaxInterval
+		eb.MaxElapsedTime = 0 // never stop on elapsed time; only ctx or success stops it
+		eb.Multiplier = reloadRetryMultiplier
+		eb.Reset()
+		b = eb
+	}
+
+	err := backoff.Retry(func() error {
+		if err := gw.DoReloadWithError(); err != nil {
+			mainLog.Errorf("Reload failed, will retry: %v", err)
+			return err
+		}
+		return nil
+	}, backoff.WithContext(b, ctx))
+
+	if err != nil && ctx.Err() != nil {
+		mainLog.Warning("Reload retry abandoned: gateway shutting down")
+	}
 }
 
 func createCORSWrapper(spec *APISpec) func(handler http.HandlerFunc) http.HandlerFunc {
@@ -1538,8 +1633,17 @@ func (gw *Gateway) initSystem() error {
 			return err
 		}
 
+		// Compile error override regex patterns and build indexed lookup
+		// Compilation failures are logged as warnings and those rules are skipped
+		compiled := CompileErrorOverrides(gwConfig.ErrorOverrides)
+		if compiled != nil {
+			gw.SetCompiledErrorOverrides(compiled)
+		}
+
 		gw.SetConfig(gwConfig)
-		gw.afterConfSetup()
+		if err := gw.afterConfSetup(); err != nil {
+			log.WithError(err).Fatal("Could not complete configuration setup.")
+		}
 	}
 
 	overrideTykErrors(gw)
@@ -1596,20 +1700,28 @@ func (gw *Gateway) initSystem() error {
 		}
 	}
 
-	if gwConfig.ProxySSLMaxVersion == 0 {
-		gwConfig.ProxySSLMaxVersion = tls.VersionTLS12
+	if tMin, tMax, err := resolveTLSVersions(gwConfig.ProxySSLMinVersion, gwConfig.ProxySSLMaxVersion); err != nil {
+		return fmt.Errorf("failed to resolve `proxy_ssl_min_version` and `proxy_ssl_max_version`: %w", err)
+	} else {
+		log.
+			WithField("proxy_ssl_min_version", tls.VersionName(tMin)).
+			WithField("proxy_ssl_max_version", tls.VersionName(tMax)).
+			Info("Proxy TLS protocol range resolved and applied")
+
+		gwConfig.ProxySSLMinVersion = tMin
+		gwConfig.ProxySSLMaxVersion = tMax
 	}
 
-	if gwConfig.ProxySSLMinVersion > gwConfig.ProxySSLMaxVersion {
-		gwConfig.ProxySSLMaxVersion = gwConfig.ProxySSLMinVersion
-	}
+	if tMin, tMax, err := resolveTLSVersions(gwConfig.HttpServerOptions.MinVersion, gwConfig.HttpServerOptions.MaxVersion); err != nil {
+		return fmt.Errorf("failed to resolve `http_server_options.min_version` and `http_server_options.max_version`: %w", err)
+	} else {
+		log.
+			WithField("http_server_options.min_version", tls.VersionName(tMin)).
+			WithField("http_server_options.max_version", tls.VersionName(tMax)).
+			Info("HttpServerOptions TLS protocol range resolved and applied")
 
-	if gwConfig.HttpServerOptions.MaxVersion == 0 {
-		gwConfig.HttpServerOptions.MaxVersion = tls.VersionTLS12
-	}
-
-	if gwConfig.HttpServerOptions.MinVersion > gwConfig.HttpServerOptions.MaxVersion {
-		gwConfig.HttpServerOptions.MaxVersion = gwConfig.HttpServerOptions.MinVersion
+		gwConfig.HttpServerOptions.MinVersion = tMin
+		gwConfig.HttpServerOptions.MaxVersion = tMax
 	}
 
 	if gwConfig.UseDBAppConfigs && gwConfig.Policies.PolicySource != config.DefaultDashPolicySource {
@@ -1633,6 +1745,9 @@ func (gw *Gateway) initSystem() error {
 	// instances periodically and deletes idle items, closes net.Listener instances to
 	// free resources.
 	go cleanIdleMemConnProviders(gw.ctx)
+
+	gw.limitHeaderFactory = rate.NewSenderFactory(gwConfig.RateLimitResponseHeaders)
+	gw.jwkCache = buildJWKSCache(gwConfig)
 
 	gw.initMembers(gwConfig)
 
@@ -1684,7 +1799,7 @@ func writePIDFile(file string) error {
 
 // afterConfSetup takes care of non-sensical config values (such as zero
 // timeouts) and sets up a few globals that depend on the config.
-func (gw *Gateway) afterConfSetup() {
+func (gw *Gateway) afterConfSetup() error {
 	conf := gw.GetConfig()
 
 	if conf.SlaveOptions.UseRPC {
@@ -1763,40 +1878,40 @@ func (gw *Gateway) afterConfSetup() {
 
 	conf.Secret, err = gw.kvStore(conf.Secret)
 	if err != nil {
-		log.WithError(err).Fatal("Could not retrieve the secret key...")
+		return fmt.Errorf("could not retrieve the secret key: %w", err)
 	}
 
 	conf.NodeSecret, err = gw.kvStore(conf.NodeSecret)
 	if err != nil {
-		log.WithError(err).Fatal("Could not retrieve the NodeSecret key...")
+		return fmt.Errorf("could not retrieve the node secret key: %w", err)
 	}
 
 	conf.Storage.Password, err = gw.kvStore(conf.Storage.Password)
 	if err != nil {
-		log.WithError(err).Fatal("Could not retrieve redis password...")
+		return fmt.Errorf("could not retrieve redis password: %w", err)
 	}
 
 	conf.CacheStorage.Password, err = gw.kvStore(conf.CacheStorage.Password)
 	if err != nil {
-		log.WithError(err).Fatal("Could not retrieve cache storage password...")
+		return fmt.Errorf("could not retrieve cache storage password: %w", err)
 	}
 
 	conf.Security.PrivateCertificateEncodingSecret, err = gw.kvStore(conf.Security.PrivateCertificateEncodingSecret)
 	if err != nil {
-		log.WithError(err).Fatal("Could not retrieve the private certificate encoding secret...")
+		return fmt.Errorf("could not retrieve the private certificate encoding secret: %w", err)
 	}
 
 	if conf.UseDBAppConfigs {
 		conf.DBAppConfOptions.ConnectionString, err = gw.kvStore(conf.DBAppConfOptions.ConnectionString)
 		if err != nil {
-			log.WithError(err).Fatal("Could not fetch dashboard connection string.")
+			return fmt.Errorf("could not fetch dashboard connection string: %w", err)
 		}
 	}
 
 	if conf.Policies.PolicySource == "service" {
 		conf.Policies.PolicyConnectionString, err = gw.kvStore(conf.Policies.PolicyConnectionString)
 		if err != nil {
-			log.WithError(err).Fatal("Could not fetch policy connection string.")
+			return fmt.Errorf("could not fetch policy connection string: %w", err)
 		}
 	}
 
@@ -1804,19 +1919,61 @@ func (gw *Gateway) afterConfSetup() {
 		conf.Private.EdgeOriginalAPIKeyPath = conf.SlaveOptions.APIKey
 		conf.SlaveOptions.APIKey, err = gw.kvStore(conf.SlaveOptions.APIKey)
 		if err != nil {
-			log.WithError(err).Fatalf("Could not retrieve API key from KV store.")
+			return fmt.Errorf("could not retrieve API key from KV store: %w", err)
 		}
 	}
 
-	if conf.OpenTelemetry.Enabled {
-		if conf.OpenTelemetry.ResourceName == "" {
-			conf.OpenTelemetry.ResourceName = config.DefaultOTelResourceName
+	// Retrieve OAuth mTLS certificate paths from KV store
+	if conf.ExternalServices.OAuth.MTLS.Enabled {
+		conf.ExternalServices.OAuth.MTLS.CertFile, err = gw.resolveKV(conf.ExternalServices.OAuth.MTLS.CertFile, func(c *config.Config, v string) {
+			c.ExternalServices.OAuth.MTLS.CertFile = v
+		}, true)
+		if err != nil {
+			return fmt.Errorf("could not retrieve OAuth mTLS cert file path from KV store: %w", err)
 		}
+		conf.ExternalServices.OAuth.MTLS.KeyFile, err = gw.resolveKV(conf.ExternalServices.OAuth.MTLS.KeyFile, func(c *config.Config, v string) {
+			c.ExternalServices.OAuth.MTLS.KeyFile = v
+		}, true)
+		if err != nil {
+			return fmt.Errorf("could not retrieve OAuth mTLS key file path from KV store: %w", err)
+		}
+		conf.ExternalServices.OAuth.MTLS.CAFile, err = gw.resolveKV(conf.ExternalServices.OAuth.MTLS.CAFile, func(c *config.Config, v string) {
+			c.ExternalServices.OAuth.MTLS.CAFile = v
+		}, true)
+		if err != nil {
+			return fmt.Errorf("could not retrieve OAuth mTLS CA file path from KV store: %w", err)
+		}
+	}
 
+	if conf.OpenTelemetry.TracesEnabled() || (conf.OpenTelemetry.Metrics.Enabled != nil && *conf.OpenTelemetry.Metrics.Enabled) {
+		if traceConfig := conf.OpenTelemetry.EffectiveTraceConfig(); traceConfig.ResourceName == "" {
+			traceConfig.ResourceName = config.DefaultOTelResourceName
+		}
 		conf.OpenTelemetry.SetDefaults()
 	}
 
 	gw.SetConfig(conf)
+	return nil
+}
+
+func (gw *Gateway) resolveKV(original string, set func(*config.Config, string), hotReload bool) (string, error) {
+	resolved, err := gw.kvStore(original)
+	if err != nil {
+		return original, err
+	}
+	if hotReload && resolved != original {
+		gw.kvResolvers = append(gw.kvResolvers, func() error {
+			val, err := gw.kvStore(original)
+			if err != nil {
+				return err
+			}
+			conf := gw.GetConfig()
+			set(&conf, val)
+			gw.SetConfig(conf)
+			return nil
+		})
+	}
+	return resolved, nil
 }
 
 func (gw *Gateway) kvStore(value string) (string, error) {
@@ -2298,7 +2455,11 @@ func (gw *Gateway) startServer() {
 	mainLog.Info("--> Listening on port: ", gw.GetConfig().ListenPort)
 	mainLog.Info("--> PID: ", gw.hostDetails.PID)
 
-	gw.DoReload()
+	if gw.GetConfig().UseDBAppConfigs {
+		gw.DoReloadWithRetry(gw.ctx)
+	} else {
+		gw.DoReload()
+	}
 }
 
 func (gw *Gateway) GetConfig() config.Config {
@@ -2307,6 +2468,16 @@ func (gw *Gateway) GetConfig() config.Config {
 
 func (gw *Gateway) GetCertificateManager() certs.CertificateManager {
 	return gw.CertificateManager
+}
+
+// GetCompiledErrorOverrides returns the compiled error overrides for O(1) lookup.
+func (gw *Gateway) GetCompiledErrorOverrides() *CompiledErrorOverrides {
+	return gw.compiledErrorOverrides.Load()
+}
+
+// SetCompiledErrorOverrides stores the compiled error overrides.
+func (gw *Gateway) SetCompiledErrorOverrides(compiled *CompiledErrorOverrides) {
+	gw.compiledErrorOverrides.Store(compiled)
 }
 
 func (gw *Gateway) SetConfig(conf config.Config, skipReload ...bool) {

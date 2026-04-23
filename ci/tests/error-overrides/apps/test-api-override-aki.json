@@ -1,0 +1,39 @@
+{
+  "name": "Test API Override Precedence",
+  "api_id": "test-api-override-aki",
+  "org_id": "default",
+  "use_keyless": false,
+  "auth": {
+    "auth_header_name": "Authorization"
+  },
+  "proxy": {
+    "listen_path": "/test-api-override-aki/",
+    "target_url": "http://backend-ok:80",
+    "strip_listen_path": true
+  },
+  "error_overrides": {
+    "403": [
+      {
+        "match": {
+          "flag": "AKI"
+        },
+        "response": {
+          "status_code": 418,
+          "body": "{\"error\": \"api_level_override\", \"flag\": \"AKI\"}",
+          "headers": {
+            "X-Error-Flag": "AKI-API",
+            "X-Override-Applied": "true"
+          }
+        }
+      }
+    ]
+  },
+  "version_data": {
+    "not_versioned": true,
+    "versions": {
+      "Default": {
+        "name": "Default"
+      }
+    }
+  }
+}

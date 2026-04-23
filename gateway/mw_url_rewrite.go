@@ -33,8 +33,8 @@ const (
 
 var dollarMatch = regexp.MustCompile(`\$\d+`)
 var contextMatch = regexp.MustCompile(`\$tyk_context.([A-Za-z0-9_\-\.]+)`)
-var consulMatch = regexp.MustCompile(`\$secret_consul.([A-Za-z0-9\/\-\.]+)`)
-var vaultMatch = regexp.MustCompile(`\$secret_vault.([A-Za-z0-9\/\-\.]+)`)
+var consulMatch = regexp.MustCompile(`\$secret_consul.([A-Za-z0-9_\/\-\.]+)`)
+var vaultMatch = regexp.MustCompile(`\$secret_vault.([A-Za-z0-9_\/\-\.]+)`)
 var envValueMatch = regexp.MustCompile(`\$secret_env.([A-Za-z0-9_\-\.]+)`)
 var metaMatch = regexp.MustCompile(`\$tyk_meta.([A-Za-z0-9_\-\.]+)`)
 var secretsConfMatch = regexp.MustCompile(`\$secret_conf.([A-Za-z0-9[.\-\_]+)`)
@@ -357,6 +357,8 @@ func valToStr(v interface{}) string {
 		s = x
 	case float64:
 		s = strconv.FormatFloat(x, 'f', -1, 64)
+	case int:
+		s = strconv.Itoa(x)
 	case int64:
 		s = strconv.FormatInt(x, 10)
 	case []string:

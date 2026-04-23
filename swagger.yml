@@ -5404,7 +5404,16 @@ components:
         use_standard_auth:
           type: boolean
         version_data:
-          $ref: '#/components/schemas/VersionData'
+          $ref: "#/components/schemas/VersionData"
+        error_overrides:
+          additionalProperties:
+            items:
+              $ref: "#/components/schemas/ErrorOverride"
+            type: array
+          nullable: true
+          type: object
+        error_overrides_disabled:
+          type: boolean
       type: object
     APILimit:
       properties:
@@ -6024,6 +6033,40 @@ components:
         certificate:
           type: string
         domain:
+          type: string
+      type: object
+    ErrorMatcher:
+      properties:
+        body_field:
+          type: string
+        body_value:
+          type: string
+        flag:
+          type: string
+        message_pattern:
+          type: string
+      type: object
+    ErrorOverride:
+      properties:
+        match:
+          $ref: '#/components/schemas/ErrorMatcher'
+        response:
+          $ref: '#/components/schemas/ErrorResponse'
+      type: object
+    ErrorResponse:
+      properties:
+        body:
+          type: string
+        headers:
+          additionalProperties:
+            type: string
+          nullable: true
+          type: object
+        message:
+          type: string
+        status_code:
+          type: integer
+        template:
           type: string
       type: object
     EndPointMeta:
@@ -7173,6 +7216,18 @@ components:
           example: 60
           format: double
           type: number
+        post_expiry_action:
+          description: Defines the action to take on a key in Redis after it expires. Valid values are "retain" and "delete".
+          example: delete
+          type: string
+          enum:
+            - retain
+            - delete
+        post_expiry_grace_period:
+          description: Duration in seconds to retain a key in Redis after it expires. Used with post_expiry_action "retain". Set to -1 to retain indefinitely.
+          example: 0
+          format: int64
+          type: integer
         quota_max:
           example: -1
           format: int64
@@ -7680,6 +7735,18 @@ components:
           example: 5
           format: double
           type: number
+        post_expiry_action:
+          description: Defines the action to take on a key in Redis after it expires. Valid values are "retain" and "delete".
+          example: delete
+          type: string
+          enum:
+            - retain
+            - delete
+        post_expiry_grace_period:
+          description: Duration in seconds to retain a key in Redis after it expires. Used with post_expiry_action "retain". Set to -1 to retain indefinitely.
+          example: 0
+          format: int64
+          type: integer
         quota_max:
           example: 20000
           format: int64

@@ -1,0 +1,72 @@
+{
+    "openapi": "3.0.3",
+    "info": {
+        "title": "TestMCPAPI",
+        "version": "1.0.0"
+    },
+    "servers": [
+        {
+            "url": "http://localhost:8080/mcp"
+        }
+    ],
+    "paths": {
+        "/tools/call": {
+            "post": {
+                "operationId": "toolsCall",
+                "responses": {
+                    "200": {
+                        "description": "Success"
+                    }
+                }
+            }
+        }
+    },
+    "x-tyk-api-gateway": {
+        "info": {
+            "id": "mcp-1",
+            "orgId": "default",
+            "name": "TestMCPAPI",
+            "state": {
+                "active": true
+            }
+        },
+        "upstream": {
+            "url": "http://mcp-server:3001/mcp"
+        },
+        "server": {
+            "listenPath": {
+                "value": "/mcp/",
+                "strip": true
+            },
+            "authentication": {
+                "enabled": false
+            }
+        },
+        "middleware": {
+            "mcpTools": {
+                "echo": {
+                    "allow": {
+                        "enabled": true
+                    }
+                },
+                "add": {
+                    "allow": {
+                        "enabled": true
+                    }
+                },
+                "longRunningOperation": {
+                    "allow": {
+                        "enabled": true
+                    }
+                }
+            },
+            "operations": {
+                "toolsCall": {
+                    "allow": {
+                        "enabled": false
+                    }
+                }
+            }
+        }
+    }
+}

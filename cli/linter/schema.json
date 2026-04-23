@@ -180,6 +180,94 @@
             "type": "string"
           }
         },
+        "traces": {
+          "type": ["object", "null"],
+          "additionalProperties": false,
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "exporter": {
+              "type": "string"
+            },
+            "endpoint": {
+              "type": "string"
+            },
+            "connection_timeout": {
+              "type": "integer"
+            },
+            "resource_name": {
+              "type": "string"
+            },
+            "span_processor_type": {
+              "type": "string"
+            },
+            "span_batch_config": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "max_queue_size": {
+                  "type": "integer"
+                },
+                "max_export_batch_size": {
+                  "type": "integer"
+                },
+                "batch_timeout": {
+                  "type": "integer"
+                }
+              }
+            },
+            "context_propagation": {
+              "type": "string"
+            },
+            "custom_trace_header": {
+              "type": "string"
+            },
+            "headers": {
+              "type": ["array", "null"]
+            },
+            "sampling": {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "type": "string"
+                },
+                "rate": {
+                  "type": "number"
+                },
+                "parent_based": {
+                  "type": "boolean"
+                }
+              }
+            },
+            "tls": {
+              "type": "object",
+              "properties": {
+                "enable": {
+                  "type": "boolean"
+                },
+                "insecure_skip_verify": {
+                  "type": "boolean"
+                },
+                "ca_file": {
+                  "type": "string"
+                },
+                "cert_file": {
+                  "type": "string"
+                },
+                "key_file": {
+                  "type": "string"
+                },
+                "max_version": {
+                  "type": "string"
+                },
+                "min_version": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
         "metrics": {
           "type": "object",
           "additionalProperties": false,
@@ -336,6 +424,40 @@
               "type": "string"
             }
           }
+        }
+      }
+    },
+    "ErrorOverrides": {
+      "type": ["object", "null"],
+      "additionalProperties": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "match": {
+              "type": "object",
+              "properties": {
+                "flag": { "type": "string" },
+                "message_pattern": { "type": "string" },
+                "body_field": { "type": "string" },
+                "body_value": { "type": "string" }
+              }
+            },
+            "response": {
+              "type": "object",
+              "properties": {
+                "status_code": { "type": "integer" },
+                "body": { "type": "string" },
+                "message": { "type": "string" },
+                "template": { "type": "string" },
+                "headers": {
+                  "type": "object",
+                  "additionalProperties": { "type": "string" }
+                }
+              }
+            }
+          },
+          "required": ["response"]
         }
       }
     }
@@ -1522,9 +1644,18 @@
         }
       }
     },
+    "rate_limit_response_headers": {
+      "description": "Determines the type of data that will be returned in the rate limit headers",
+      "type": ["string"],
+      "enum": ["", "quotas", "rate_limits"],
+      "default": "quotas"
+    },
     "allow_unsafe_policy_ids": {
       "type": ["boolean", "null"],
       "additionalProperties": false
+    },
+    "error_overrides": {
+      "$ref": "#/definitions/ErrorOverrides"
     }
   }
 }

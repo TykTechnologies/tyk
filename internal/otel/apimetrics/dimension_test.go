@@ -48,12 +48,24 @@ func TestCompileExtractor_MetadataResponseCode(t *testing.T) {
 	assert.Equal(t, "404", ext.Extract(rc))
 }
 
-func TestCompileExtractor_MetadataRoute(t *testing.T) {
-	ext, err := CompileExtractor(DimensionDefinition{Source: "metadata", Key: "route"})
+func TestCompileExtractor_MetadataListenPath(t *testing.T) {
+	ext, err := CompileExtractor(DimensionDefinition{Source: "metadata", Key: "listen_path"})
 	require.NoError(t, err)
 
 	rc := makeRequestContext()
 	assert.Equal(t, "/test", ext.Extract(rc))
+}
+
+func TestCompileExtractor_MetadataEndpoint(t *testing.T) {
+	ext, err := CompileExtractor(DimensionDefinition{Source: "metadata", Key: "endpoint"})
+	require.NoError(t, err)
+
+	rc := makeRequestContext()
+	rc.Endpoint = "/users/123"
+	assert.Equal(t, "/users/123", ext.Extract(rc))
+
+	rc.Endpoint = ""
+	assert.Equal(t, "", ext.Extract(rc))
 }
 
 func TestCompileExtractor_MetadataAPIID(t *testing.T) {
@@ -372,6 +384,95 @@ func TestCompileExtractor_MetadataSchemeNilRequest(t *testing.T) {
 
 	rc := &RequestContext{}
 	assert.Equal(t, "http", ext.Extract(rc), "nil request should return http")
+}
+
+func TestCompileExtractor_MetadataMCPMethod(t *testing.T) {
+	ext, err := CompileExtractor(DimensionDefinition{Source: "metadata", Key: "mcp_method"})
+	require.NoError(t, err)
+
+	rc := makeRequestContext()
+	rc.MCPMethod = "tools/call"
+	assert.Equal(t, "tools/call", ext.Extract(rc))
+}
+
+func TestCompileExtractor_MetadataMCPPrimitiveType(t *testing.T) {
+	ext, err := CompileExtractor(DimensionDefinition{Source: "metadata", Key: "mcp_primitive_type"})
+	require.NoError(t, err)
+
+	rc := makeRequestContext()
+	rc.MCPPrimitiveType = "tool"
+	assert.Equal(t, "tool", ext.Extract(rc))
+}
+
+func TestCompileExtractor_MetadataMCPPrimitiveName(t *testing.T) {
+	ext, err := CompileExtractor(DimensionDefinition{Source: "metadata", Key: "mcp_primitive_name"})
+	require.NoError(t, err)
+
+	rc := makeRequestContext()
+	rc.MCPPrimitiveName = "get_weather"
+	assert.Equal(t, "get_weather", ext.Extract(rc))
+}
+
+func TestCompileExtractor_MetadataMCPErrorCode(t *testing.T) {
+	ext, err := CompileExtractor(DimensionDefinition{Source: "metadata", Key: "mcp_error_code"})
+	require.NoError(t, err)
+
+	t.Run("returns string representation for non-zero code", func(t *testing.T) {
+		rc := makeRequestContext()
+		rc.MCPErrorCode = -32601
+		assert.Equal(t, "-32601", ext.Extract(rc))
+	})
+
+	t.Run("returns empty string for zero code", func(t *testing.T) {
+		rc := makeRequestContext()
+		rc.MCPErrorCode = 0
+		assert.Equal(t, "", ext.Extract(rc))
+	})
+}
+
+func TestCompileExtractor_MCPExtractorsEmptyWhenNotSet(t *testing.T) {
+	mcpKeys := []string{"mcp_method", "mcp_primitive_type", "mcp_primitive_name", "mcp_error_code"}
+
+	for _, key := range mcpKeys {
+		t.Run(key, func(t *testing.T) {
+			ext, err := CompileExtractor(DimensionDefinition{Source: "metadata", Key: key})
+			require.NoError(t, err)
+
+			// Zero-valued RequestContext (non-MCP API case).
+			rc := makeRequestContext()
+			assert.Equal(t, "", ext.Extract(rc), "MCP extractor %q should return empty for non-MCP request", key)
+		})
+	}
+}
+
+func TestCompileExtractor_ConfigData(t *testing.T) {
+	ext, err := CompileExtractor(DimensionDefinition{Source: "config_data", Key: "environment", Label: "config_data.environment"})
+	require.NoError(t, err)
+	assert.Equal(t, "config_data.environment", ext.Label)
+
+	t.Run("reads from config data map", func(t *testing.T) {
+		rc := makeRequestContext()
+		rc.ConfigData = map[string]interface{}{"environment": "production"}
+		assert.Equal(t, "production", ext.Extract(rc))
+	})
+
+	t.Run("returns empty when key missing", func(t *testing.T) {
+		rc := makeRequestContext()
+		rc.ConfigData = map[string]interface{}{"other": "value"}
+		assert.Equal(t, "", ext.Extract(rc))
+	})
+
+	t.Run("returns empty when config data nil", func(t *testing.T) {
+		rc := makeRequestContext()
+		rc.ConfigData = nil
+		assert.Equal(t, "", ext.Extract(rc))
+	})
+
+	t.Run("converts non-string values via Sprint", func(t *testing.T) {
+		rc := makeRequestContext()
+		rc.ConfigData = map[string]interface{}{"environment": 42}
+		assert.Equal(t, "42", ext.Extract(rc))
+	})
 }
 
 func BenchmarkCompileExtractor_Metadata(b *testing.B) {

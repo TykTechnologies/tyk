@@ -1,6 +1,7 @@
 package gateway
 
 import (
+	"crypto/tls"
 	"strings"
 	"testing"
 
@@ -547,6 +548,88 @@ func TestContainsEscapedCharacters(t *testing.T) {
 			if result != test.expected {
 				t.Errorf("containsEscapedChars() = %v, want %v", result, test.expected)
 			}
+		})
+	}
+}
+
+func Test_resolveTLSVersions(t *testing.T) {
+	tests := []struct {
+		name    string
+		uMin    uint16
+		uMax    uint16
+		wantMin uint16
+		wantMax uint16
+		wantErr bool
+	}{
+		{
+			name:    "Both empty - returns defaults",
+			uMin:    0,
+			uMax:    0,
+			wantMin: tls.VersionTLS12,
+			wantMax: tls.VersionTLS13,
+			wantErr: false,
+		},
+		{
+			name:    "Only Min defined (small) - Max stays default",
+			uMin:    tls.VersionTLS11,
+			uMax:    0,
+			wantMin: tls.VersionTLS11,
+			wantMax: tls.VersionTLS13,
+			wantErr: false,
+		},
+		{
+			name:    "Only Min defined (high) - returns error",
+			uMin:    tls.VersionTLS13 + 1,
+			uMax:    0,
+			wantMin: 0,
+			wantMax: 0,
+			wantErr: true,
+		},
+		{
+			name:    "Only Max defined (high) - Min stays default",
+			uMin:    0,
+			uMax:    tls.VersionTLS13,
+			wantMin: tls.VersionTLS12,
+			wantMax: tls.VersionTLS13,
+			wantErr: false,
+		},
+		{
+			name:    "Only Max defined (low) - returns error",
+			uMin:    0,
+			uMax:    tls.VersionTLS11,
+			wantMin: 0,
+			wantMax: 0,
+			wantErr: true,
+		},
+		{
+			name:    "Both defined valid - returns user values",
+			uMin:    tls.VersionTLS12,
+			uMax:    tls.VersionTLS12,
+			wantMin: tls.VersionTLS12,
+			wantMax: tls.VersionTLS12,
+			wantErr: false,
+		},
+		{
+			name:    "Both defined invalid - returns error",
+			uMin:    tls.VersionTLS13,
+			uMax:    tls.VersionTLS12,
+			wantMin: 0,
+			wantMax: 0,
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gotMin, gotMax, err := resolveTLSVersions(tt.uMin, tt.uMax)
+
+			if tt.wantErr {
+				assert.Error(t, err)
+				return
+			}
+
+			assert.Equal(t, tt.wantMin, gotMin)
+			assert.Equal(t, tt.wantMax, gotMax)
 		})
 	}
 }

@@ -1,8 +1,10 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
 	"os"
@@ -484,6 +486,106 @@ func TestCustomProfile_Instruments(t *testing.T) {
 			},
 		},
 		{
+			name: "tracked endpoint counter with listen_path dimension",
+			traffic: func(t *testing.T) {
+				t.Helper()
+				sendTraffic(t, "GET", gatewayURL+"/tracked/ip", 5)
+			},
+			assert: func(t *testing.T) {
+				t.Helper()
+				// The TrackedAPI (api_id=9) has listen_path=/tracked/.
+				// The endpoint dimension should be /ip (from track_endpoints config).
+				assertMetricExists(t, `custom_tracked_requests_total{tyk_api_id="9",tyk_listen_path="/tracked/"}`)
+				assertMetricExists(t, `custom_tracked_requests_total{tyk_api_id="9",tyk_endpoint="/ip"}`)
+			},
+		},
+		{
+			name: "tracked endpoint counter has all expected labels",
+			traffic: func(t *testing.T) {
+				t.Helper()
+				sendTraffic(t, "GET", gatewayURL+"/tracked/ip", 5)
+			},
+			assert: func(t *testing.T) {
+				t.Helper()
+				// Query the tracked API (api_id=9) specifically because the
+				// non-tracked API has an empty tyk_endpoint which Prometheus drops.
+				assertMetricHasLabels(t, `custom_tracked_requests_total{tyk_api_id="9"}`, []string{
+					"http_request_method",
+					"tyk_api_id",
+					"tyk_listen_path",
+					"tyk_endpoint",
+				})
+			},
+		},
+		{
+			name: "tracked endpoint dimension distinguishes different endpoints",
+			traffic: func(t *testing.T) {
+				t.Helper()
+				sendTraffic(t, "GET", gatewayURL+"/tracked/ip", 5)
+				sendTraffic(t, "GET", gatewayURL+"/tracked/get", 5)
+			},
+			assert: func(t *testing.T) {
+				t.Helper()
+				// Both tracked paths should appear as separate series.
+				assertMetricExists(t, `custom_tracked_requests_total{tyk_api_id="9",tyk_endpoint="/ip"}`)
+				assertMetricExists(t, `custom_tracked_requests_total{tyk_api_id="9",tyk_endpoint="/get"}`)
+			},
+		},
+		{
+			name: "non-tracked endpoint has empty endpoint dimension",
+			traffic: func(t *testing.T) {
+				t.Helper()
+				// /test/ API (api_id=3) has no track_endpoints, so endpoint should be empty.
+				sendTraffic(t, "GET", gatewayURL+"/test/ip", 5)
+			},
+			assert: func(t *testing.T) {
+				t.Helper()
+				// For a non-tracked API, the endpoint dimension should be empty.
+				assertMetricExists(t, `custom_tracked_requests_total{tyk_api_id="3",tyk_endpoint=""}`)
+			},
+		},
+		{
+			name: "configdata dimension populates from API config_data",
+			traffic: func(t *testing.T) {
+				t.Helper()
+				// TrackedAPI (api_id=9) has config_data: {"environment":"staging","team":"platform"}
+				sendTraffic(t, "GET", gatewayURL+"/tracked/ip", 5)
+			},
+			assert: func(t *testing.T) {
+				t.Helper()
+				assertMetricExists(t, `custom_configdata_requests_total{tyk_api_id="9",configdata_environment="staging"}`)
+				assertMetricExists(t, `custom_configdata_requests_total{tyk_api_id="9",configdata_team="platform"}`)
+			},
+		},
+		{
+			name: "configdata dimension has all expected labels",
+			traffic: func(t *testing.T) {
+				t.Helper()
+				sendTraffic(t, "GET", gatewayURL+"/tracked/ip", 5)
+			},
+			assert: func(t *testing.T) {
+				t.Helper()
+				assertMetricHasLabels(t, `custom_configdata_requests_total{tyk_api_id="9"}`, []string{
+					"http_request_method",
+					"tyk_api_id",
+					"configdata_environment",
+					"configdata_team",
+				})
+			},
+		},
+		{
+			name: "configdata dimension uses default for API without config_data",
+			traffic: func(t *testing.T) {
+				t.Helper()
+				// TestAPI (api_id=3) has no config_data, so dimensions should use default "".
+				sendTraffic(t, "GET", gatewayURL+"/test/ip", 5)
+			},
+			assert: func(t *testing.T) {
+				t.Helper()
+				assertMetricExists(t, `custom_configdata_requests_total{tyk_api_id="3",configdata_environment=""}`)
+			},
+		},
+		{
 			name: "default RED instruments are NOT present in custom profile",
 			traffic: func(t *testing.T) {
 				t.Helper()
@@ -535,10 +637,14 @@ func TestRuntimeMetrics(t *testing.T) {
 		name   string
 		metric string
 	}{
-		{"goroutine count exists", `process_runtime_go_goroutines`},
-		{"heap memory allocated exists", `process_runtime_go_mem_heap_alloc_bytes`},
-		{"heap memory in use exists", `process_runtime_go_mem_heap_inuse_bytes`},
-		{"GC count exists", `process_runtime_go_gc_count_total`},
+		// New Go runtime metric names (semconv) from runtime instrumentation v0.61+.
+		{"go.goroutine.count exists", `go_goroutine_count`},
+		{"go.memory.used exists", `go_memory_used_bytes`},
+		{"go.memory.allocated exists", `go_memory_allocated_bytes_total`},
+		{"go.memory.allocations exists", `go_memory_allocations_total`},
+		{"go.memory.gc.goal exists", `go_memory_gc_goal_bytes`},
+		{"go.processor.limit exists", `go_processor_limit`},
+		{"go.config.gogc exists", `go_config_gogc_percent`},
 	}
 
 	for _, tc := range tests {
@@ -557,10 +663,10 @@ func TestRuntimeMetrics_Disabled(t *testing.T) {
 
 	time.Sleep(15 * time.Second)
 
-	// Runtime metrics should not exist.
-	assertMetricAbsent(t, `process_runtime_go_goroutines`)
-	assertMetricAbsent(t, `process_runtime_go_mem_heap_alloc_bytes`)
-	assertMetricAbsent(t, `process_runtime_go_gc_count_total`)
+	// Runtime metrics should not exist (new names).
+	assertMetricAbsent(t, `go_goroutine_count`)
+	assertMetricAbsent(t, `go_memory_used_bytes`)
+	assertMetricAbsent(t, `go_memory_allocated_bytes_total`)
 }
 
 // ---------- Disabled profile tests ----------
@@ -808,6 +914,144 @@ func TestResponseHeaderDimension_ErrorPath(t *testing.T) {
 	// The error requests should be counted with the default "unknown" for
 	// backend_version (no upstream response to extract headers from).
 	assertMetricExists(t, `tyk_requests_by_backend_version_total{tyk_api_id="8",backend_version="unknown"}`)
+}
+
+// ---------- MCP profile tests ----------
+
+func TestMCPProfile_MetricEmission(t *testing.T) {
+	if gwProfile() != "mcp" {
+		t.Skip("only runs under mcp profile")
+	}
+	waitForGateway(t)
+
+	// Send a tools/call JSON-RPC request through the MCP API.
+	// The MCP everything server at mcp-server:3001 should handle this.
+	sendJSONRPC(t, gatewayURL+"/mcp/", "tools/call", map[string]interface{}{
+		"name":      "echo",
+		"arguments": map[string]string{"message": "hello"},
+	})
+
+	// Assert MCP counter exists with expected dimensions.
+	assertMetricExists(t, `tyk_mcp_requests_total{mcp_method_name="tools/call",mcp_primitive_type="tool"}`)
+}
+
+func TestMCPProfile_PrimitiveName(t *testing.T) {
+	if gwProfile() != "mcp" {
+		t.Skip("only runs under mcp profile")
+	}
+	waitForGateway(t)
+
+	sendJSONRPC(t, gatewayURL+"/mcp/", "tools/call", map[string]interface{}{
+		"name":      "echo",
+		"arguments": map[string]string{"message": "test"},
+	})
+
+	// Assert primitive name dimension is populated.
+	assertMetricExists(t, `tyk_mcp_requests_total{mcp_primitive_name="echo",mcp_primitive_type="tool"}`)
+}
+
+func TestMCPProfile_NonMCPIsolation(t *testing.T) {
+	if gwProfile() != "mcp" {
+		t.Skip("only runs under mcp profile")
+	}
+	waitForGateway(t)
+
+	// Send regular REST traffic to the non-MCP API.
+	sendTraffic(t, "GET", gatewayURL+"/test/ip", 10)
+
+	// Send MCP traffic.
+	sendJSONRPC(t, gatewayURL+"/mcp/", "tools/call", map[string]interface{}{
+		"name":      "echo",
+		"arguments": map[string]string{"message": "test"},
+	})
+
+	// REST API metrics should have empty MCP labels.
+	// MCP counter should exist with MCP labels populated.
+	assertMetricExists(t, `tyk_mcp_requests_total{mcp_method_name="tools/call"}`)
+}
+
+func TestMCPProfile_HistogramDuration(t *testing.T) {
+	if gwProfile() != "mcp" {
+		t.Skip("only runs under mcp profile")
+	}
+	waitForGateway(t)
+
+	for i := 0; i < 5; i++ {
+		sendJSONRPC(t, gatewayURL+"/mcp/", "tools/call", map[string]interface{}{
+			"name":      "echo",
+			"arguments": map[string]string{"message": "test"},
+		})
+	}
+
+	// Assert histogram exists.
+	assertMetricExists(t, `tyk_mcp_primitive_duration_seconds_count{mcp_primitive_type="tool",mcp_primitive_name="echo"}`)
+}
+
+func TestMCPProfile_HTTPServerDurationWithMCPMethod(t *testing.T) {
+	if gwProfile() != "mcp" {
+		t.Skip("only runs under mcp profile")
+	}
+	waitForGateway(t)
+
+	sendJSONRPC(t, gatewayURL+"/mcp/", "tools/call", map[string]interface{}{
+		"name":      "echo",
+		"arguments": map[string]string{"message": "test"},
+	})
+
+	// http.server.request.duration should also have the mcp.method.name label.
+	assertMetricExists(t, `http_server_request_duration_seconds_count{mcp_method_name="tools/call"}`)
+}
+
+func TestMCPProfile_SessionIdFromHeader(t *testing.T) {
+	if gwProfile() != "mcp" {
+		t.Skip("only runs under mcp profile")
+	}
+	waitForGateway(t)
+
+	sendJSONRPCWithHeaders(t, gatewayURL+"/mcp/", "tools/call", map[string]interface{}{
+		"name":      "echo",
+		"arguments": map[string]string{"message": "test"},
+	}, map[string]string{
+		"Mcp-Session-Id": "test-session-123",
+	})
+
+	// http.server.request.duration should have mcp.session.id from header.
+	assertMetricExists(t, `http_server_request_duration_seconds_count{mcp_session_id="test-session-123"}`)
+}
+
+func TestMCPProfile_InitializeMethod(t *testing.T) {
+	if gwProfile() != "mcp" {
+		t.Skip("only runs under mcp profile")
+	}
+	waitForGateway(t)
+
+	// Initialize is a non-primitive method (no tool/resource/prompt).
+	sendJSONRPC(t, gatewayURL+"/mcp/", "initialize", map[string]interface{}{
+		"protocolVersion": "2025-06-18",
+		"capabilities":    map[string]interface{}{},
+		"clientInfo":      map[string]interface{}{"name": "test-client", "version": "1.0"},
+	})
+
+	// Should have mcp_method_name="initialize" but empty primitive type/name.
+	assertMetricExists(t, `tyk_mcp_requests_total{mcp_method_name="initialize"}`)
+}
+
+func TestMCPProfile_CounterHasAllExpectedLabels(t *testing.T) {
+	if gwProfile() != "mcp" {
+		t.Skip("only runs under mcp profile")
+	}
+	waitForGateway(t)
+
+	// Use proper MCP session so the upstream returns 200.
+	sendMCPToolCall(t, gatewayURL+"/mcp/", "echo", map[string]string{"message": "test"})
+
+	query := `tyk_mcp_requests_total{api_id="mcp-1",mcp_method_name="tools/call",mcp_primitive_name="echo",response_code="200"}`
+	assertLabelEquals(t, query, "mcp_method_name", "tools/call")
+	assertLabelEquals(t, query, "mcp_primitive_type", "tool")
+	assertLabelEquals(t, query, "mcp_primitive_name", "echo")
+	assertLabelEquals(t, query, "response_code", "200")
+	assertLabelEquals(t, query, "api_id", "mcp-1")
+	// mcp_error_code is omitted by Prometheus when empty (no error).
 }
 
 // ---------- helpers ----------
@@ -1092,4 +1336,107 @@ func assertLabelContains(t *testing.T, query, labelKey, expected string) {
 		actualVal = lastLabels[labelKey]
 	}
 	t.Fatalf("%s label %s=%q does not contain %q", query, labelKey, actualVal, expected)
+}
+
+// sendJSONRPC sends a JSON-RPC 2.0 request to the given URL.
+func sendJSONRPC(t *testing.T, url, method string, params interface{}) {
+	t.Helper()
+	sendJSONRPCWithHeaders(t, url, method, params, nil)
+}
+
+// sendJSONRPCWithHeaders sends a JSON-RPC 2.0 request with custom headers.
+func sendJSONRPCWithHeaders(t *testing.T, url, method string, params interface{}, headers map[string]string) {
+	t.Helper()
+	doJSONRPC(t, url, method, params, headers)
+}
+
+// doJSONRPC sends a JSON-RPC 2.0 request and returns the HTTP response.
+func doJSONRPC(t *testing.T, url, method string, params interface{}, headers map[string]string) *http.Response {
+	t.Helper()
+	body := map[string]interface{}{
+		"jsonrpc": "2.0",
+		"method":  method,
+		"params":  params,
+		"id":      1,
+	}
+	jsonBody, err := json.Marshal(body)
+	if err != nil {
+		t.Fatalf("failed to marshal JSON-RPC body: %v", err)
+	}
+
+	req, err := http.NewRequest("POST", url, bytes.NewReader(jsonBody))
+	if err != nil {
+		t.Fatalf("failed to create request: %v", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Accept", "application/json, text/event-stream")
+	for k, v := range headers {
+		req.Header.Set(k, v)
+	}
+
+	client := &http.Client{Timeout: 10 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		t.Fatalf("JSON-RPC request failed: %v", err)
+	}
+	io.Copy(io.Discard, resp.Body)
+	resp.Body.Close()
+	return resp
+}
+
+// initMCPSession performs the MCP initialize handshake and returns the session ID.
+// The Streamable HTTP transport requires: initialize → (get Mcp-Session-Id) → initialized notification.
+func initMCPSession(t *testing.T, mcpURL string) string {
+	t.Helper()
+
+	// Step 1: Send initialize request.
+	resp := doJSONRPC(t, mcpURL, "initialize", map[string]interface{}{
+		"protocolVersion": "2025-06-18",
+		"capabilities":    map[string]interface{}{},
+		"clientInfo":      map[string]interface{}{"name": "test-client", "version": "1.0"},
+	}, nil)
+
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("initialize returned HTTP %d (expected 200); check that operation-level allow is disabled", resp.StatusCode)
+	}
+
+	sessionID := resp.Header.Get("Mcp-Session-Id")
+	if sessionID == "" {
+		t.Logf("initialize response headers: %v", resp.Header)
+		t.Fatal("MCP server did not return Mcp-Session-Id header on initialize")
+	}
+
+	// Step 2: Send initialized notification (no id field = notification).
+	notifBody, _ := json.Marshal(map[string]interface{}{
+		"jsonrpc": "2.0",
+		"method":  "notifications/initialized",
+	})
+	req, err := http.NewRequest("POST", mcpURL, bytes.NewReader(notifBody))
+	if err != nil {
+		t.Fatalf("failed to create initialized notification request: %v", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Accept", "application/json, text/event-stream")
+	req.Header.Set("Mcp-Session-Id", sessionID)
+
+	client := &http.Client{Timeout: 10 * time.Second}
+	notifResp, err := client.Do(req)
+	if err != nil {
+		t.Fatalf("initialized notification failed: %v", err)
+	}
+	notifResp.Body.Close()
+
+	return sessionID
+}
+
+// sendMCPToolCall initializes an MCP session and sends a tools/call request.
+func sendMCPToolCall(t *testing.T, mcpURL, toolName string, args map[string]string) {
+	t.Helper()
+	sessionID := initMCPSession(t, mcpURL)
+	sendJSONRPCWithHeaders(t, mcpURL, "tools/call", map[string]interface{}{
+		"name":      toolName,
+		"arguments": args,
+	}, map[string]string{
+		"Mcp-Session-Id": sessionID,
+	})
 }

@@ -841,7 +841,7 @@ func (rt *TykRoundTripper) RoundTrip(r *http.Request) (*http.Response, error) {
 		return handleInMemoryLoop(handler, r)
 	}
 
-	if rt.Gw.GetConfig().OpenTelemetry.Enabled {
+	if rt.Gw.GetConfig().OpenTelemetry.TracesEnabled() {
 		var baseRoundTripper http.RoundTripper = rt.transport
 		if rt.h2ctransport != nil {
 			baseRoundTripper = rt.h2ctransport
@@ -1173,11 +1173,9 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 	breakerEnforced, breakerConf := p.CheckCircuitBreakerEnforced(p.TykAPISpec, req)
 
 	// set up TLS certificates for upstream if needed
-	var tlsCertificates []tls.Certificate
-	if cert := p.Gw.getUpstreamCertificate(outreq.URL.Host, p.TykAPISpec); cert != nil {
+	cert := p.Gw.getUpstreamCertificate(outreq.URL.Host, p.TykAPISpec)
+	if cert != nil {
 		p.logger.Debug("Found upstream mutual TLS certificate")
-		tlsCertificates = []tls.Certificate{*cert}
-
 		// Check upstream certificate expiry
 		p.checkUpstreamCertificateExpiry(cert)
 	}
@@ -1236,8 +1234,11 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 
 	roundTripper = p.TykAPISpec.HTTPTransport
 
-	if roundTripper.transport != nil {
-		roundTripper.transport.TLSClientConfig.Certificates = tlsCertificates
+	if roundTripper.transport != nil && cert != nil {
+		roundTripper.transport.TLSClientConfig.Certificates = []tls.Certificate{*cert}
+		roundTripper.transport.TLSClientConfig.GetClientCertificate = func(_ *tls.CertificateRequestInfo) (*tls.Certificate, error) {
+			return cert, nil
+		}
 	}
 	p.TykAPISpec.Unlock()
 
@@ -1391,7 +1392,16 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 		if p.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
 			hooks = append(hooks, NewLoggingSSEHook(p.logger))
 		}
+		if filterHook := NewMCPListFilterSSEHook(p.TykAPISpec.APIID, ses); filterHook != nil {
+			hooks = append(hooks, filterHook)
+		}
 		res.Body = NewSSETap(res.Body, hooks...)
+		// Hooks may modify event data, changing the body length. Remove
+		// Content-Length so the client doesn't expect the original size.
+		if len(hooks) > 0 {
+			res.Header.Del("Content-Length")
+			res.ContentLength = -1
+		}
 	}
 
 	if withCache {
@@ -1441,7 +1451,7 @@ func (p *ReverseProxy) HandleResponse(rw http.ResponseWriter, res *http.Response
 		res.Header.Set(header.Connection, "close")
 	}
 
-	p.TykAPISpec.sendRateLimitHeaders(ses, res)
+	p.Gw.limitHeaderFactory(res.Header).SendQuotas(ses, p.TykAPISpec.APIID)
 
 	copyHeader(rw.Header(), res.Header, p.Gw.GetConfig().IgnoreCanonicalMIMEHeaderKey)
 
