@@ -44,6 +44,7 @@ import (
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/header"
 	"github.com/TykTechnologies/tyk/internal/model"
+	"github.com/TykTechnologies/tyk/pkg/schema"
 	"github.com/TykTechnologies/tyk/regexp"
 	"github.com/TykTechnologies/tyk/rpc"
 	"github.com/TykTechnologies/tyk/storage"
@@ -744,7 +745,13 @@ func (a APIDefinitionLoader) loadDefFromFilePath(filePath string) (*APISpec, err
 		loader.ReadFromURIFunc = openapi3.ReadFromFile
 		oasDoc, err := loader.LoadFromFile(a.GetOASFilepath(filePath))
 		if err == nil {
-			nestDef.OAS = &oas.OAS{T: *oasDoc}
+			oasObj := &oas.OAS{T: *oasDoc}
+
+			visitor := schema.NewVisitor()
+			visitor.AddSchemaManipulation(schema.TransformUnicodeEscapesToRE2Manipulation)
+			visitor.ProcessOAS(oasObj)
+
+			nestDef.OAS = oasObj
 		}
 	}
 

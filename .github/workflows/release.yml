@@ -661,26 +661,3 @@ jobs:
       actions: read # This is required for the report_logs job in the called workflow
     uses: ./.github/workflows/release-tests.yml
     secrets: inherit
-  generate-token:
-    runs-on: ubuntu-latest
-    outputs:
-      token: ${{ steps.app-token.outputs.token }}
-    steps:
-      - name: Generate GitHub App token
-        id: app-token
-        uses: actions/create-github-app-token@d72941d797fd3113feb6b93fd0dec494b13a2547 # v1
-        with:
-          app-id: ${{ secrets.PROBE_APP_ID }}
-          private-key: ${{ secrets.PROBE_APP_PRIVATE_KEY }}
-          owner: TykTechnologies
-
-  sbom:
-    needs: [goreleaser, generate-token]
-    if: |
-      !cancelled() &&
-      needs.goreleaser.result == 'success'
-    uses: TykTechnologies/github-actions/.github/workflows/sbom.yaml@2b35ab5dd4cfff21ced9d12446e9e27d10bf5785  # main
-    secrets:
-      DEPDASH_URL: ${{ secrets.DEPDASH_URL }}
-      DEPDASH_KEY: ${{ secrets.DEPDASH_KEY }}
-      ORG_GH_TOKEN: ${{ needs.generate-token.outputs.token }}
