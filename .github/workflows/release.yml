@@ -127,7 +127,7 @@ jobs:
         run: |
           echo '#!/bin/sh
           ci/bin/unlock-agent.sh
-          git config --global url."https://${{ steps.app-token.outputs.token }}@github.com".insteadOf "https://github.com"
+          git config --global url."https://x-access-token:${{ steps.app-token.outputs.token }}@github.com/".insteadOf "https://github.com/"
           git config --global --add safe.directory /go/src/github.com/TykTechnologies/tyk
           goreleaser release --clean -f ${{ matrix.goreleaser }} ${{ !startsWith(github.ref, 'refs/tags/') && ' --snapshot --skip=sign,docker' || '--skip=docker' }}' | tee /tmp/build.sh
           chmod +x /tmp/build.sh
@@ -550,7 +550,7 @@ jobs:
           echo "📦 Updating tyk-gateway dependency to branch: $GATEWAY_BRANCH"
 
           # Configure git for go get
-          git config --global url."https://${ORG_GH_TOKEN}@github.com".insteadOf "https://github.com"
+          git config --global url."https://x-access-token:${ORG_GH_TOKEN}@github.com/".insteadOf "https://github.com/"
 
           # Update dependency using branch name
           go get github.com/TykTechnologies/tyk@$GATEWAY_BRANCH
@@ -632,7 +632,7 @@ jobs:
           cat > /tmp/build-dashboard.sh <<'EOF'
           #!/bin/sh
           set -eax
-          git config --global url."https://${ORG_GH_TOKEN}@github.com".insteadOf "https://github.com"
+          git config --global url."https://x-access-token:${ORG_GH_TOKEN}@github.com/".insteadOf "https://github.com/"
           git config --global --add safe.directory /go/src/github.com/TykTechnologies/tyk-analytics
 
           # Build packages for current platform (GOOS and GOARCH are set via docker -e)
