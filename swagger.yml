@@ -316,6 +316,9 @@ paths:
     get:
       description: List APIs from Tyk Gateway
       operationId: listApis
+      parameters:
+      - $ref: '#/components/parameters/Page'
+      - $ref: '#/components/parameters/PerPage'
       responses:
         "200":
           content:
@@ -678,6 +681,8 @@ paths:
           type: string
       - $ref: '#/components/parameters/SearchText'
       - $ref: '#/components/parameters/AccessType'
+      - $ref: '#/components/parameters/Page'
+      - $ref: '#/components/parameters/PerPage'
       responses:
         "200":
           content:
@@ -737,6 +742,8 @@ paths:
           enum:
           - public
           type: string
+      - $ref: '#/components/parameters/Page'
+      - $ref: '#/components/parameters/PerPage'
       responses:
         "200":
           content:
@@ -1347,6 +1354,8 @@ paths:
           type: string
       - $ref: '#/components/parameters/SearchText'
       - $ref: '#/components/parameters/AccessType'
+      - $ref: '#/components/parameters/Page'
+      - $ref: '#/components/parameters/PerPage'
       responses:
         "200":
           content:
@@ -1684,6 +1693,8 @@ paths:
           enum:
           - detailed
           type: string
+      - $ref: '#/components/parameters/Page'
+      - $ref: '#/components/parameters/PerPage'
       responses:
         "200":
           content:
@@ -1973,6 +1984,9 @@ paths:
     get:
       description: List all the API keys.
       operationId: listKeys
+      parameters:
+      - $ref: '#/components/parameters/Page'
+      - $ref: '#/components/parameters/PerPage'
       responses:
         "200":
           content:
@@ -2817,6 +2831,8 @@ paths:
         required: true
         schema:
           type: string
+      - $ref: '#/components/parameters/Page'
+      - $ref: '#/components/parameters/PerPage'
       responses:
         "200":
           content:
@@ -3134,14 +3150,8 @@ paths:
         required: true
         schema:
           type: string
-      - description: Use page query parameter to say which page number you want returned.
-        example: 1
-        in: query
-        name: page
-        required: false
-        schema:
-          default: 1
-          type: integer
+      - $ref: '#/components/parameters/Page'
+      - $ref: '#/components/parameters/PerPage'
       responses:
         "200":
           content:
@@ -3211,6 +3221,8 @@ paths:
         required: false
         schema:
           type: string
+      - $ref: '#/components/parameters/Page'
+      - $ref: '#/components/parameters/PerPage'
       responses:
         "200":
           content:
@@ -3586,6 +3598,8 @@ paths:
         required: false
         schema:
           type: string
+      - $ref: '#/components/parameters/Page'
+      - $ref: '#/components/parameters/PerPage'
       responses:
         "200":
           content:
@@ -4097,6 +4111,9 @@ paths:
       description: Retrieve all the policies in your Tyk instance. Returns an array
         policies.
       operationId: listPolicies
+      parameters:
+      - $ref: '#/components/parameters/Page'
+      - $ref: '#/components/parameters/PerPage'
       responses:
         "200":
           content:
@@ -5117,6 +5134,24 @@ components:
       required: false
       schema:
         $ref: '#/components/schemas/BooleanQueryParam'
+    Page:
+      description: Page number to return. Pages start from 1. Use a value less than 0 to return all items without pagination.
+      example: 1
+      in: query
+      name: page
+      required: false
+      schema:
+        default: 1
+        type: integer
+    PerPage:
+      description: Number of items to return per page.
+      example: 10
+      in: query
+      name: per_page
+      required: false
+      schema:
+        default: 10
+        type: integer
   schemas:
     APIAllCertificateBasics:
       properties:
