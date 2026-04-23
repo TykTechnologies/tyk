@@ -16,9 +16,9 @@ import (
 
 var dashLog = log.WithField("prefix", "dashboard")
 
-type NodeResponseOK struct {
+type NodeResponse struct {
 	Status  string
-	Message map[string]string
+	Message any
 	Nonce   string
 }
 
@@ -177,7 +177,7 @@ func (h *HTTPDashboardHandler) NotifyDashboardOfEvent(event interface{}) error {
 		return err
 	}
 
-	val := NodeResponseOK{}
+	val := NodeResponse{}
 	if err := json.NewDecoder(resp.Body).Decode(&val); err != nil {
 		return err
 	}
@@ -210,7 +210,7 @@ func (h *HTTPDashboardHandler) Register(ctx context.Context) error {
 
 	defer resp.Body.Close()
 
-	val := NodeResponseOK{}
+	val := NodeResponse{}
 	if err := json.NewDecoder(resp.Body).Decode(&val); err != nil {
 		return err
 	}
@@ -228,8 +228,18 @@ func (h *HTTPDashboardHandler) Register(ctx context.Context) error {
 	}
 
 	// Both 200 and duplicate-session 409 (Status=="OK") carry a NodeID.
-	nodeID, found := val.Message["NodeID"]
-	if !found || nodeID == "" {
+	msgMap, ok := val.Message.(map[string]interface{})
+	if !ok {
+		dashLog.Error("Failed to register node, retrying in 5s")
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-time.After(5 * time.Second):
+		}
+		return h.Register(ctx)
+	}
+	nodeID, _ := msgMap["NodeID"].(string)
+	if nodeID == "" {
 		dashLog.Error("Failed to register node, retrying in 5s")
 		time.Sleep(time.Second * 5)
 		return h.Register(ctx)
@@ -312,7 +322,7 @@ func (h *HTTPDashboardHandler) sendHeartBeat(req *http.Request, client *http.Cli
 	if resp.StatusCode != http.StatusOK {
 		return errors.New("dashboard is down? Heartbeat non-200 response")
 	}
-	val := NodeResponseOK{}
+	val := NodeResponse{}
 	if err := json.NewDecoder(resp.Body).Decode(&val); err != nil {
 		return err
 	}
@@ -345,7 +355,7 @@ func (h *HTTPDashboardHandler) DeRegister() error {
 		return fmt.Errorf("deregister request failed with status %v", resp.StatusCode)
 	}
 
-	val := NodeResponseOK{}
+	val := NodeResponse{}
 	if err := json.NewDecoder(resp.Body).Decode(&val); err != nil {
 		return err
 	}
