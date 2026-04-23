@@ -1,0 +1,18 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Webhook Example",
+    "version": "1.0.0"
+  },
+  "webhooks": {
+    "newPet": {
+      "post": {
+        "responses": {
+          "200": {
+            "description": "Return a 200 status to indicate that the data was received successfully"
+          }
+        }
+      }
+    }
+  }
+}
