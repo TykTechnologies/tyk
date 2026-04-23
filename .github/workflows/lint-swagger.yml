@@ -56,7 +56,7 @@ jobs:
         env:
           TOKEN: ${{ steps.app-token.outputs.token }}
         run: >
-          git config --global url."https://${TOKEN}@github.com".insteadOf "https://github.com"
+          git config --global url."https://x-access-token:${TOKEN}@github.com/".insteadOf "https://github.com/"
 
       - name: Checkout repo
         uses: TykTechnologies/github-actions/.github/actions/checkout-pr@2b35ab5dd4cfff21ced9d12446e9e27d10bf5785  # main
