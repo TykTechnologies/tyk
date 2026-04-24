@@ -86,22 +86,22 @@ func (c *CoProcessor) BuildObject(req *http.Request, res *http.Response, spec *A
 	if req.TLS != nil {
 		scheme = "https"
 	}
-	miniRequestObject := &coprocess.MiniRequestObject{
-		Headers:        headers,
-		SetHeaders:     map[string]string{},
-		DeleteHeaders:  []string{},
-		Url:            req.URL.String(),
-		Params:         ProtoMap(req.URL.Query()),
-		AddParams:      map[string]string{},
-		ExtendedParams: ProtoMap(nil),
-		DeleteParams:   []string{},
-		ReturnOverrides: &coprocess.ReturnOverrides{
-			ResponseCode: -1,
-		},
-		Method:     req.Method,
-		RequestUri: req.RequestURI,
-		Scheme:     scheme,
+	miniRequestObject := coprocessMiniRequestObjectPool.Get().(*coprocess.MiniRequestObject)
+	miniRequestObject.Headers = headers
+	miniRequestObject.SetHeaders = map[string]string{}
+	miniRequestObject.DeleteHeaders = []string{}
+	miniRequestObject.Url = req.URL.String()
+	miniRequestObject.Params = ProtoMap(req.URL.Query())
+	miniRequestObject.AddParams = map[string]string{}
+	miniRequestObject.ExtendedParams = ProtoMap(nil)
+	miniRequestObject.DeleteParams = []string{}
+	if miniRequestObject.ReturnOverrides == nil {
+		miniRequestObject.ReturnOverrides = &coprocess.ReturnOverrides{}
 	}
+	miniRequestObject.ReturnOverrides.ResponseCode = -1
+	miniRequestObject.Method = req.Method
+	miniRequestObject.RequestUri = req.RequestURI
+	miniRequestObject.Scheme = scheme
 
 	if req.Body != nil {
 		defer req.Body.Close()
@@ -115,11 +115,10 @@ func (c *CoProcessor) BuildObject(req *http.Request, res *http.Response, spec *A
 		}
 	}
 
-	object := &coprocess.Object{
-		Request:  miniRequestObject,
-		HookName: c.Middleware.HookName,
-		HookType: c.Middleware.HookType,
-	}
+	object := coprocessObjectPool.Get().(*coprocess.Object)
+	object.Request = miniRequestObject
+	object.HookName = c.Middleware.HookName
+	object.HookType = c.Middleware.HookType
 
 	object.Spec = make(map[string]string)
 
@@ -161,9 +160,8 @@ func (c *CoProcessor) BuildObject(req *http.Request, res *http.Response, spec *A
 
 	// Append response data if it's available:
 	if res != nil {
-		resObj := &coprocess.ResponseObject{
-			Headers: make(map[string]string, len(res.Header)),
-		}
+		resObj := coprocessResponseObjectPool.Get().(*coprocess.ResponseObject)
+		resObj.Headers = make(map[string]string, len(res.Header))
 		for k, v := range res.Header {
 			// set univalue header
 			resObj.Headers[k] = v[0]
@@ -344,6 +342,7 @@ func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 		logger.WithError(err).Error("Failed to build request object")
 		return errors.New("Middleware error"), 500
 	}
+	defer ReleaseCoprocessObject(object)
 
 	var origURL string
 	if rewriteUrl := ctxGetURLRewriteTarget(r); rewriteUrl != nil {
@@ -370,6 +369,7 @@ func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 			return errors.New("Middleware error"), 500
 		}
 	}
+	defer ReleaseCoprocessObject(returnObject)
 
 	m.logger.WithField("ms", ms).Debug("gRPC request processing took")
 
@@ -592,6 +592,17 @@ func (h *CustomMiddlewareResponseHook) HandleResponse(rw http.ResponseWriter, re
 		h.logger().WithError(err).Debug("Couldn't build request object")
 		return errors.New("Middleware error")
 	}
+	defer ReleaseCoprocessObject(object)
+	if object.Session != nil {
+		// Release the session created by BuildObject to avoid a leak
+		sess := object.Session
+		object.Session = nil
+		// We can't easily release just the session with ReleaseCoprocessObject, 
+		// but we can create a dummy object to release it.
+		dummy := coprocessObjectPool.Get().(*coprocess.Object)
+		dummy.Session = sess
+		ReleaseCoprocessObject(dummy)
+	}
 	object.Session = ProtoSessionState(ses)
 
 	retObject, err := coProcessor.Dispatch(req.Context(), object)
@@ -599,6 +610,7 @@ func (h *CustomMiddlewareResponseHook) HandleResponse(rw http.ResponseWriter, re
 		h.logger().WithError(err).Debug("Couldn't dispatch request object")
 		return errors.New("Middleware error")
 	}
+	defer ReleaseCoprocessObject(retObject)
 
 	if retObject.Response == nil {
 		h.logger().WithError(err).Debug("No response object returned by response hook")
