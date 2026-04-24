@@ -26,16 +26,18 @@ func (s *RPCDataLoaderMock) GetApiDefinitions(_ string, tags []string) string {
 		panic("not implemented")
 	}
 
-	// json.Marshal cannot fail for []model.MergedAPI (no channels, funcs, or
-	// complex numbers). Silently ignore the impossible error.
-	apiList, _ := json.Marshal(s.Apis)
+	apiList, err := json.Marshal(s.Apis)
+	if err != nil { //mcdc:ignore json.Marshal cannot fail for []model.MergedAPI (no channels, funcs, or complex numbers)
+		return ""
+	}
 	return string(apiList)
 }
 
 // GetPolicies returns the internal Policies as a json string.
 func (s *RPCDataLoaderMock) GetPolicies(_ string) string {
-	// json.Marshal cannot fail for []user.Policy (no channels, funcs, or
-	// complex numbers). Silently ignore the impossible error.
-	policyList, _ := json.Marshal(s.Policies)
+	policyList, err := json.Marshal(s.Policies)
+	if err != nil { //mcdc:ignore json.Marshal cannot fail for []user.Policy (no channels, funcs, or complex numbers)
+		return ""
+	}
 	return string(policyList)
 }
