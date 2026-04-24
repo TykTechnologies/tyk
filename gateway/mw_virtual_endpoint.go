@@ -231,7 +231,11 @@ func (d *VirtualEndpoint) ServeHTTPForCache(w http.ResponseWriter, r *http.Reque
 	ms := DurationToMillisecond(time.Since(t1))
 	d.Logger().Debug("JSVM Virtual Endpoint execution took: (ms) ", ms)
 
-	if copiedResponse != nil {
+	// Skip recording intermediate VEM hits for MCP requests — the final
+	// SuccessHandler/ErrorHandler records the hit with proper MCPStats.
+	// Without this guard, each VEM continuation step produces a non-MCP
+	// analytics record that leaks internal routing paths into the endpoints table.
+	if copiedResponse != nil && !d.Spec.IsMCP() {
 		d.sh.RecordHit(r, analytics.Latency{Total: int64(ms), Upstream: 0, Gateway: int64(ms)}, copiedResponse.StatusCode, copiedResponse, false)
 	}
 
