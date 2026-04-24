@@ -1,6 +1,7 @@
 package gateway
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"encoding/json"
@@ -20,6 +21,7 @@ import (
 	"github.com/gorilla/websocket"
 	proxyproto "github.com/pires/go-proxyproto"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	msgpack "gopkg.in/vmihailenco/msgpack.v2"
 
 	"github.com/TykTechnologies/tyk-pump/analytics"
@@ -1500,6 +1502,50 @@ func TestWebsocketsSeveralOpenClose(t *testing.T) {
 	// clean up connections
 	conn2.Close()
 	conn3.Close()
+}
+
+func TestWebsocketsWithConnectionKeepAlive(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	globalConf := ts.Gw.GetConfig()
+	globalConf.HttpServerOptions.EnableWebSockets = true
+	ts.Gw.SetConfig(globalConf)
+
+	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		spec.Proxy.ListenPath = "/"
+	})
+
+	baseURL := strings.Replace(ts.URL, "http://", "ws://", -1)
+	url, err := url.Parse(baseURL)
+	require.NoError(t, err)
+
+	conn, err := net.Dial("tcp", url.Host)
+	require.NoError(t, err)
+	defer conn.Close()
+
+	req := fmt.Sprintf(`GET %s/ws HTTP/1.1
+Host: %s
+Accept-Encoding: gzip, deflate, br, zstd
+Sec-WebSocket-Version: 13
+Sec-WebSocket-Extensions: permessage-deflate
+Sec-WebSocket-Key: X62lCXELOHFcBBG72P2S2Q==
+Connection: Upgrade, keep-alive
+Upgrade: websocket
+
+`, baseURL, url.Host)
+	req = strings.Replace(req, "\n", "\r\n", -1)
+	_, err = conn.Write([]byte(req))
+	require.NoError(t, err)
+	buf, err := bufio.NewReader(conn).ReadString('\n')
+	require.NoError(t, err)
+	assert.Contains(t, buf, "HTTP/1.1 101 Switching Protocols")
+
+	_, _ = ts.Run(t, test.TestCase{
+		Method: "GET",
+		Path:   "/abc",
+		Code:   http.StatusOK,
+	})
 }
 
 func TestWebsocketsAndHTTPEndpointMatch(t *testing.T) {
