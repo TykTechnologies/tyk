@@ -57,6 +57,12 @@ tags:
 
   name: Tyk OAS APIs
 - description: |
+    Manage MCP (Model Context Protocol) Proxies on Tyk Gateway. MCP Proxies are
+    defined as Tyk OAS documents that include MCP-specific configuration in the
+    `x-tyk-api-gateway` extension. All create/update requests are validated against
+    the MCP JSON schema; a Gateway reload is required for changes to take effect.
+  name: MCP Proxies
+- description: |
     All keys that are used to access services via Tyk correspond to a session object that informs Tyk about the context of this particular token, like access rules and rate/quota allowance.
   name: Keys
 - description: |
@@ -1560,6 +1566,172 @@ paths:
       summary: Import an API in Tyk OAS format.
       tags:
       - Tyk OAS APIs
+  /tyk/mcps:
+    get:
+      description: List all MCP Proxy definitions on this Tyk Gateway. Each entry
+        is a Tyk OAS document whose `x-tyk-api-gateway` extension marks it as an
+        MCP Proxy definition.
+      operationId: listMCPs
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                items:
+                  allOf:
+                  - $ref: https://raw.githubusercontent.com/TykTechnologies/tyk/refs/heads/master/apidef/oas/schema/3.0.json
+                  - $ref: '#/components/schemas/TykVendorExtension'
+                type: array
+          description: List of MCP Proxy definitions.
+        "403":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Forbidden
+      summary: List MCP Proxy definitions.
+      tags:
+      - MCP Proxies
+    post:
+      description: |
+        Create an MCP Proxy definition from a Tyk OAS document. The payload must
+        contain the `x-tyk-api-gateway` extension with MCP configuration and is
+        validated against the MCP JSON schema (`/tyk/schema?type=mcp`) before being
+        stored. The Gateway must be reloaded (`POST /tyk/reload`) for the new MCP
+        Proxy definition to take effect.
+      operationId: createMCP
+      requestBody:
+        content:
+          application/json:
+            schema:
+              allOf:
+              - $ref: https://raw.githubusercontent.com/TykTechnologies/tyk/refs/heads/master/apidef/oas/schema/3.0.json
+              - $ref: '#/components/schemas/TykVendorExtension'
+      responses:
+        "200":
+          content:
+            application/json:
+              example:
+                action: added
+                key: e30bee13ad4248c3b529a4c58bb7be4e
+                status: ok
+              schema:
+                $ref: '#/components/schemas/ApiModifyKeySuccess'
+          description: MCP Proxy definition created.
+        "400":
+          content:
+            application/json:
+              example:
+                message: the payload should contain x-tyk-api-gateway
+                status: error
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Validation failed (invalid OAS, missing `x-tyk-api-gateway`, or schema violation).
+        "403":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Forbidden
+      summary: Create an MCP Proxy definition.
+      tags:
+      - MCP Proxies
+  /tyk/mcps/{apiID}:
+    parameters:
+    - description: The MCP Proxy definition ID.
+      in: path
+      name: apiID
+      required: true
+      schema:
+        type: string
+    get:
+      description: Retrieve a single MCP Proxy definition by its ID.
+      operationId: getMCP
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: https://raw.githubusercontent.com/TykTechnologies/tyk/refs/heads/master/apidef/oas/schema/3.0.json
+                - $ref: '#/components/schemas/TykVendorExtension'
+          description: The MCP Proxy definition.
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: MCP Proxy definition not found.
+      summary: Get an MCP Proxy definition.
+      tags:
+      - MCP Proxies
+    put:
+      description: Update an existing MCP Proxy definition. Body is validated against
+        the MCP JSON schema. A Gateway reload is required for changes to take effect.
+      operationId: updateMCP
+      requestBody:
+        content:
+          application/json:
+            schema:
+              allOf:
+              - $ref: https://raw.githubusercontent.com/TykTechnologies/tyk/refs/heads/master/apidef/oas/schema/3.0.json
+              - $ref: '#/components/schemas/TykVendorExtension'
+      responses:
+        "200":
+          content:
+            application/json:
+              example:
+                action: modified
+                key: e30bee13ad4248c3b529a4c58bb7be4e
+                status: ok
+              schema:
+                $ref: '#/components/schemas/ApiModifyKeySuccess'
+          description: MCP Proxy definition updated.
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Validation failed.
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: MCP Proxy definition not found.
+      summary: Update an MCP Proxy definition.
+      tags:
+      - MCP Proxies
+    delete:
+      description: Delete an MCP Proxy definition. A Gateway reload is required to
+        unload the proxy from the running Gateway.
+      operationId: deleteMCP
+      responses:
+        "200":
+          content:
+            application/json:
+              example:
+                action: deleted
+                key: e30bee13ad4248c3b529a4c58bb7be4e
+                status: ok
+              schema:
+                $ref: '#/components/schemas/ApiModifyKeySuccess'
+          description: MCP Proxy definition deleted.
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: MCP Proxy definition not found.
+        "500":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Delete failed.
+      summary: Delete an MCP Proxy definition.
+      tags:
+      - MCP Proxies
   /tyk/cache/{apiID}:
     delete:
       description: Invalidate cache for the given API.
