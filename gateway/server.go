@@ -252,7 +252,8 @@ type Gateway struct {
 func NewGateway(config config.Config, ctx context.Context) *Gateway {
 	gw := &Gateway{
 		DefaultProxyMux: &proxyMux{
-			again: again.New(),
+			again:        again.New(),
+			track404Logs: config.Track404Logs,
 		},
 		ctx: ctx,
 	}
@@ -2428,7 +2429,9 @@ func (gw *Gateway) setupPortsWhitelist() {
 
 func (gw *Gateway) startServer() {
 	// Ensure that Control listener and default http listener running on first start
-	muxer := &proxyMux{}
+	muxer := &proxyMux{
+		track404Logs: gw.GetConfig().Track404Logs,
+	}
 
 	router := mux.NewRouter()
 	gw.loadControlAPIEndpoints(router)

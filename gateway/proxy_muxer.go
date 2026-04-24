@@ -187,6 +187,7 @@ func (m *proxyMux) setRouter(port int, protocol string, router *mux.Router, conf
 	}
 
 	router.SkipClean(conf.HttpServerOptions.SkipURLCleaning)
+	router.NotFoundHandler = http.HandlerFunc(m.handle404)
 	p := m.getProxy(port, conf)
 	if p == nil {
 		p = &proxy{
