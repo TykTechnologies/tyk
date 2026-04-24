@@ -21,7 +21,7 @@ traces:
     documented_by_extra:
         - README.md
 verification:
-    assurance_level: ""
+    assurance_level: A
     formalization_status: ""
     review:
         status: approved

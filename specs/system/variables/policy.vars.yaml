@@ -529,3 +529,136 @@ variables:
       type: bool
       direction: output
       description: Apply() completed within the performance bound (100ms for up to 50 policies)
+
+    # ==========================================
+    # OBLIGATION CLASS VARIABLES
+    # Variables supporting determinism, idempotency, commutativity,
+    # monotonicity, nil_safety, and encoding_safety obligation classes.
+    # ==========================================
+
+    # --- Determinism (SYS-REQ-055) ---
+    - name: single_api_has_policies
+      type: bool
+      direction: input
+      description: Among multiple AccessRights entries, exactly one API has policies applied to it
+
+    - name: session_fields_from_specific_api
+      type: bool
+      direction: output
+      description: Session-level fields (rate, quota, ACL) were set from the specific API that has policies, not from arbitrary map iteration
+
+    # --- Idempotency (SYS-REQ-056) ---
+    - name: apply_result_first
+      type: bool
+      direction: output
+      description: The session state snapshot after the first Apply() call
+
+    - name: apply_result_second
+      type: bool
+      direction: output
+      description: The session state snapshot after the second Apply() call on the same session
+
+    # --- Commutativity (SYS-REQ-057) ---
+    - name: merge_order_independent
+      type: bool
+      direction: output
+      description: The merged session state is identical regardless of the order in which policies were applied
+
+    # --- Rate limit determinism (SYS-REQ-058) ---
+    - name: rate_result_deterministic
+      type: bool
+      direction: output
+      description: Rate limit merge result is the same regardless of policy iteration order
+
+    # --- Rate limit commutativity (SYS-REQ-059) ---
+    - name: rate_merge_AB
+      type: bool
+      direction: output
+      description: Rate limit merge result when applying policies in order [A, B]
+
+    - name: rate_merge_BA
+      type: bool
+      direction: output
+      description: Rate limit merge result when applying policies in order [B, A]
+
+    # --- Rate limit monotonicity (SYS-REQ-060) ---
+    - name: policy_added
+      type: bool
+      direction: input
+      description: An additional policy has been added to the session's applied policies set
+
+    - name: new_rate
+      type: bool
+      direction: output
+      description: The effective rate limit after adding the new policy
+
+    - name: old_rate
+      type: bool
+      direction: output
+      description: The effective rate limit before adding the new policy
+
+    # --- Endpoint limit determinism (SYS-REQ-061) ---
+    - name: endpoint_result_deterministic
+      type: bool
+      direction: output
+      description: Endpoint-level rate limit merge result is the same regardless of policy iteration order
+
+    # --- Endpoint limit commutativity (SYS-REQ-062) ---
+    - name: endpoint_merge_AB
+      type: bool
+      direction: output
+      description: Endpoint limit merge result when applying policies in order [A, B]
+
+    - name: endpoint_merge_BA
+      type: bool
+      direction: output
+      description: Endpoint limit merge result when applying policies in order [B, A]
+
+    # --- Endpoint limit monotonicity (SYS-REQ-063) ---
+    - name: new_endpoint_rate
+      type: bool
+      direction: output
+      description: The effective per-endpoint rate limit after adding a new policy
+
+    - name: old_endpoint_rate
+      type: bool
+      direction: output
+      description: The effective per-endpoint rate limit before adding a new policy
+
+    # --- Nil safety - ClearSession (SYS-REQ-064) ---
+    - name: clear_session_requested
+      type: bool
+      direction: input
+      description: ClearSession has been called on a session
+
+    - name: nil_session_fields
+      type: bool
+      direction: input
+      description: The session has nil or zero-valued quota, rate limit, or complexity fields
+
+    - name: safe_clear_completion
+      type: bool
+      direction: output
+      description: ClearSession completed without panic or error when handling nil/zero fields
+
+    # --- Nil safety - store (SYS-REQ-065) ---
+    - name: any_operation_requested
+      type: bool
+      direction: input
+      description: Any policy engine operation (Apply, ClearSession, ApplyRateLimits, ApplyEndpointLevelLimits) has been called
+
+    - name: nil_store
+      type: bool
+      direction: input
+      description: The policy store pointer is nil
+
+    # --- Encoding safety (SYS-REQ-066) ---
+    - name: rpc_data_load_requested
+      type: bool
+      direction: input
+      description: Policy data is being loaded via RPC using json.Marshal/json.Unmarshal
+
+    - name: encoding_roundtrip_safe
+      type: bool
+      direction: output
+      description: All policy fields survive JSON encoding round-trip without data loss or corruption

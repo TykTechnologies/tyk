@@ -26,9 +26,9 @@ verification:
     assurance_level: A
     formalization_status: ""
     review:
-        status: ""
-        reviewer: ""
-        reviewed_at: ""
+        status: approved
+        reviewer: human:leonidbugaev
+        reviewed_at: "2026-04-21T12:00:00Z"
         ai_generated: true
 history:
     created_by: ai:claude

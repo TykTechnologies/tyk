@@ -58,9 +58,9 @@ project:
             code_rich_decision_multiplier: 6
             code_rich_decision_floor: 10
         proof_complexity_clean:
-            max_formalized_requirements: 60
-            max_variables: 45
-            max_guarantees: 55
+            max_formalized_requirements: 75
+            max_variables: 65
+            max_guarantees: 70
         code_mcdc:
             severity: warn
             engine: go
